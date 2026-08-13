@@ -1,0 +1,455 @@
+# Pack de espacio de trabajo — CoreWork
+# Derivado de PRISMA_DOCUMENTO_MAESTRO.md v1.5
+#
+# Todo lo que está acá es configuración. Las reglas invariantes viven en
+# nucleo/constitucion.md y nucleo/mecanica-pm.md y este archivo no puede
+# contradecirlas.
+#
+# Los valores marcados PENDIENTE no están definidos. Prisma no los inventa:
+# el espacio no se activa hasta resolverlos.
+
+version: 1
+espacio:
+  slug: corework
+  nombre: CoreWork
+  descripcion: >
+    Equipo interdisciplinario que integra automatización industrial,
+    infraestructura IT, sistemas eléctricos, software productivo, agentes de IA
+    y la plataforma CoreLabs. Steigen es su laboratorio operativo y primer caso
+    real de integración.
+  zona_horaria: America/Argentina/Buenos_Aires
+
+# ---------------------------------------------------------------------------
+# Vocabulario
+# ---------------------------------------------------------------------------
+
+niveles:
+  objetivo_estrategico: objetivo estratégico
+  hito: hito
+  objetivo_operativo: objetivo operativo
+  tarea: tarea
+  subtarea: subtarea
+
+glosario:
+  - termino: CoreWork
+    definicion: >
+      El equipo completo e interdisciplinario. Prisma dice "equipo CoreWork"
+      cuando se refiere al conjunto de integrantes.
+    variantes_incorrectas: [Core Work, Corework]
+
+  - termino: CoreLabs
+    definicion: >
+      La plataforma de monitoreo e interfaz HMI. Es un producto y un frente de
+      trabajo de CoreWork, no el nombre del equipo. Sólo corresponde decir
+      "equipo de CoreLabs" si existe un subequipo dedicado exclusivamente al
+      producto.
+    variantes_incorrectas: [CoreLab, Core Labs, CoreAnalytics]
+
+  - termino: Steigen
+    definicion: Laboratorio operativo, entorno de entrenamiento y primer caso de integración.
+
+  - termino: EPPI
+    definicion: Sistema que produce y recolecta datos productivos — lotes, máquinas activas, estados de producción.
+
+  - termino: CoreAnalytics
+    definicion: >
+      Proyecto paralelo, fuera del alcance de Prisma. No se incorpora al alcance
+      sin instrucción humana explícita.
+    fuera_de_alcance: true
+
+# ---------------------------------------------------------------------------
+# Áreas
+# ---------------------------------------------------------------------------
+
+areas:
+  - slug: direccion
+    nombre: Dirección
+  - slug: ot
+    nombre: OT y automatización        # Marcos (referente) y Nahuel
+  - slug: it
+    nombre: Infraestructura IT         # Martín (referente) y Lucas
+  - slug: electricidad
+    nombre: Sistemas eléctricos y tableros
+  - slug: corelabs
+    nombre: Software e interfaz HMI
+  - slug: gestion
+    nombre: Gestión
+
+# ---------------------------------------------------------------------------
+# Roles
+# ---------------------------------------------------------------------------
+
+roles:
+  - slug: direccion
+    nombre: Dirección
+    autoridad_final: true          # exigido por el núcleo: debe haber exactamente uno
+  - slug: referente
+    nombre: Referente técnico de área
+  - slug: integrante
+    nombre: Integrante
+
+# ---------------------------------------------------------------------------
+# Personas
+#
+# Nota: el rol de plataforma NO se declara acá. Que Ariel administre Prisma no
+# le da ningún permiso dentro de este espacio y no se menciona en este archivo.
+# ---------------------------------------------------------------------------
+
+# La cadena de aprobación sube un nivel: cada referente aprueba las tareas de
+# su área, y a los referentes los aprueba Dirección.
+#
+# Se declara por persona y no por área porque una regla por área no puede
+# distinguir al referente de sus integrantes: diría "las tareas de OT las
+# aprueba el referente de OT", y Marcos terminaría aprobándose a sí mismo.
+#
+# Mariano y Ariel son referentes de áreas donde están solos: no tienen a nadie
+# a quien aprobarle, y sus propias tareas las aprueba Ismael.
+personas:
+  - id: ismael
+    nombre: Ismael Soschinski
+    rol: direccion
+    area: direccion
+    aprobado_por: null            # raíz de la cadena
+    telegram_user_id: 1848711856
+    resumen: >
+      Coordinación general, propietario y referente operativo de Steigen.
+      Valida prioridades y la selección de la próxima máquina. Decisión final
+      ante desacuerdos.
+    recibe_seguimiento_diario: false
+
+  - id: ariel
+    nombre: Ariel De Simone
+    rol: referente
+    area: corelabs
+    aprobado_por: ismael
+    telegram_user_id: 995701520
+    resumen: >
+      Desarrollo y robustecimiento de CoreLabs. Frontend, dashboards, UI, UX,
+      HMI, SCADA y visualización. Define criterios de software e integración
+      desde CoreLabs.
+
+  - id: martin
+    nombre: Martín Forte
+    rol: referente
+    area: it
+    aprobado_por: ismael
+    telegram_user_id: PENDIENTE
+    resumen: >
+      Arquitectura e infraestructura IT, backend, bases de datos, cloud y
+      seguridad. Dirección técnica de los trabajos de IT.
+    nota_de_contacto: >
+      Puede tener trabajos en paralelo. Recibe mensajes dentro del horario del
+      equipo igual que el resto.
+
+  - id: lucas
+    nombre: Lucas Natuche
+    rol: integrante
+    area: it
+    aprobado_por: martin
+    telegram_user_id: PENDIENTE
+    resumen: >
+      Servidores, data centers, infraestructura local, access points y
+      conectividad. Mejora y soporte de EPPI. Incorporación progresiva de IA.
+
+  - id: marcos
+    nombre: Marcos Tarquini
+    rol: referente
+    area: ot
+    aprobado_por: ismael
+    telegram_user_id: 5210680257
+    resumen: >
+      Automatización industrial, programación de PLC, comunicaciones
+      industriales, captura y entrega de datos de planta. Contacto continuo con
+      las condiciones reales de las máquinas de Steigen.
+
+  - id: nahuel
+    nombre: Nahuel Gimenez
+    rol: integrante
+    area: ot
+    aprobado_por: marcos
+    telegram_user_id: PENDIENTE
+    resumen: >
+      Planos, esquemas y diagramas eléctricos en DWG y ePlan. Digitalización
+      estructurada, incluyendo representación JSON. Asiste a Marcos en conexión
+      física y automatización OT.
+
+  - id: mariano
+    nombre: Mariano Naim
+    rol: referente
+    area: electricidad
+    aprobado_por: ismael
+    telegram_user_id: PENDIENTE
+    resumen: >
+      Análisis, diseño y ejecución de sistemas eléctricos. Diseño y construcción
+      de tableros para máquinas, con PLC, drivers y componentes de control.
+
+# ---------------------------------------------------------------------------
+# Política de aprobación
+#
+# Reemplaza la matriz en prosa del documento original.
+# ---------------------------------------------------------------------------
+
+aprobacion:
+  # Las tareas NO se aprueban por área: las aprueba quien revisa el trabajo de
+  # su responsable, según `aprobado_por` en la lista de personas. Acá quedan
+  # sólo los sujetos que sí son colectivos.
+  reglas:
+    - sujeto: objetivo_operativo
+      requiere: [aprobacion_de_cada_area_participante, rol:direccion]
+
+    - sujeto: hito
+      requiere: [rol:direccion]
+
+    - sujeto: plan_semanal
+      requiere: [rol:direccion]
+
+  umbral_reaprobacion:
+    cambio_de_responsable: true
+    corrimiento_de_fecha_dias: 3
+    cambio_de_alcance: true
+    tarea_nueva_fuera_del_plan: true
+
+  # Resuelve la contradicción del documento original: la ampliación de autonomía
+  # la autoriza la dirección del espacio y la aplica el administrador de
+  # plataforma. Ninguno de los dos puede hacerlo solo.
+  ampliacion_de_autonomia:
+    autoriza: rol:direccion
+    aplica: administrador_de_plataforma
+    estado_actual: >
+      Etapa inicial. Prisma no distribuye tareas hasta que el plan esté
+      aprobado por Dirección.
+
+# ---------------------------------------------------------------------------
+# Evidencia
+# ---------------------------------------------------------------------------
+
+evidencia:
+  por_area:
+    it:           [explicacion, resultado_de_prueba]
+    ot:           [explicacion, resultado_de_prueba, captura, archivo]
+    electricidad: [explicacion, foto]
+    corelabs:     [explicacion, captura]
+    direccion:    [explicacion]
+    gestion:      [explicacion]
+  almacenamiento: google_drive
+  estructura_drive: PENDIENTE
+
+# ---------------------------------------------------------------------------
+# Calendario y cadencia
+# ---------------------------------------------------------------------------
+
+calendario:
+  dias: [lunes, martes, miercoles, jueves, viernes]
+  horario: "09:00-17:00"
+  feriados: feriados_ar          # calendario nacional argentino
+
+cadencia:
+  - nombre: objetivos_semanales
+    cuando: "lunes 09:15"
+    audiencia: privado_cada_integrante
+    contenido: [objetivos_semana, prioridades, tareas_activas, fechas]
+
+  - nombre: estado_medio_semana
+    cuando: "miercoles 11:30"
+    audiencia: privado_cada_integrante
+    contenido: [pedido_de_estado, bloqueos, necesidad_de_colaboracion]
+
+  - nombre: resumen_grupal
+    cuando: "miercoles 15:30"
+    audiencia: grupo
+    contenido: [avances, bloqueos, decisiones_pendientes]
+
+  - nombre: cierre_semanal
+    cuando: "viernes 11:00"
+    audiencia: privado_cada_integrante
+    contenido: [cierre, evidencias_pendientes, tareas_en_riesgo]
+
+  - nombre: informe_semanal
+    cuando: "viernes 16:15"
+    audiencia: grupo
+    contenido: [completadas, pendientes, bloqueadas, reprogramadas, foco_proxima_semana]
+
+reunion_periodica:
+  cuando: "ultimo viernes del mes, por la mañana"
+  anuncio_y_pedido_de_temas: "jueves de la semana anterior"
+  agenda_e_informe_previo: "miercoles de la semana de la reunion"
+  contenido:
+    - agenda
+    - objetivos_del_periodo
+    - resultados
+    - tareas_vencidas_o_reprogramadas
+    - bloqueos
+    - decisiones_pendientes
+    - carga_por_persona
+    - proximos_objetivos
+    - puntos_que_requieren_definicion_de_direccion
+
+limites_de_contacto:
+  max_mensajes_automaticos_por_persona_por_dia: 3
+  consolidar_en_un_envio: true
+
+# ---------------------------------------------------------------------------
+# Urgencia, atrasos y escalamiento
+# ---------------------------------------------------------------------------
+
+tiempos_de_respuesta:
+  informativo: ninguna
+  normal: "1 dia habil"
+  seguimiento: "antes del cierre de la jornada"
+  prioritario: "4 horas laborales"
+  urgente: "2 horas laborales"
+
+urgencia:
+  puede_declararla: [rol:direccion]
+  # Sin condiciones automáticas: algo es urgente cuando Ismael lo declara, caso
+  # por caso. Prisma nunca lo infiere por su cuenta — ni por una fecha próxima,
+  # ni por un bloqueo, ni porque alguien escriba "urgente".
+  condiciones: [declaracion_explicita_de_direccion]
+
+escalamiento:
+  # Los problemas del equipo van a Dirección. Los problemas de Prisma van al
+  # administrador de plataforma por su propio canal, y no aparecen acá.
+  - disparador: problema_tecnico
+    area: it
+    destino: persona:martin
+  - disparador: problema_tecnico
+    area: ot
+    destino: persona:marcos
+  - disparador: problema_tecnico
+    area: corelabs
+    destino: persona:ariel
+  - disparador: bloqueo_transversal
+    destino: rol:direccion
+  - disparador: falta_persistente_de_respuesta
+    destino: rol:direccion
+  - disparador: desacuerdo_no_resuelto
+    destino: rol:direccion
+
+bloqueos:
+  escala_solo_a_los_dias: 5
+  ausencia_sin_fecha_de_fin_alerta_a_los_dias: 3
+
+# ---------------------------------------------------------------------------
+# Tono
+# ---------------------------------------------------------------------------
+
+persona:
+  nombre_visible: Prisma
+  registro: vos
+  formalidad: profesional_cordial
+  longitud: breve
+  emojis: false
+  presentacion: >
+    Hola, soy Prisma, el coordinador digital del equipo. Mi función es ayudarlos
+    a mantener claros los objetivos, organizar tareas, registrar avances y
+    detectar bloqueos con anticipación. Voy a comunicarme con cada integrante
+    durante la semana y mantendré al equipo informado, procurando que el
+    seguimiento sea útil, breve y agradable.
+
+# ---------------------------------------------------------------------------
+# Canal
+# ---------------------------------------------------------------------------
+
+telegram:
+  # El token NO va acá: este archivo se versiona en git. Vive en .env, como
+  # PRISMA_BOT_TOKEN_COREWORK.
+  #
+  # El identificador del grupo es un número negativo. Si no lo sabés:
+  #   python -m prisma grupo corework
+  grupo_gestion_id: -1004442696731        # CoreWork IA
+  entrega_de_enlaces: uno_a_uno    # nunca publicados en el grupo
+  uso_del_grupo:
+    - resumenes_semanales
+    - objetivos_aprobados
+    - avances_relevantes
+    - dependencias_entre_areas
+    - bloqueos_persistentes
+    - decisiones_y_cambios_de_prioridad
+    - preparacion_de_la_reunion
+  en_privado:
+    - consultas_personales
+    - recordatorios
+    - atrasos_no_persistentes
+
+# ---------------------------------------------------------------------------
+# Objetivo raíz
+# ---------------------------------------------------------------------------
+
+objetivo_inicial:
+  tipo: objetivo_estrategico
+  titulo: Vincular los equipos y máquinas de Steigen con CoreLabs
+  descripcion: >
+    Integrar la información proveniente de la automatización industrial, los
+    servidores y EPPI para disponer de monitoreo y estadísticas completas y
+    confiables.
+  horizonte_meses: 12
+  frentes:
+    - {area: ot,           titulo: "Conectar y automatizar equipos para que produzcan y entreguen datos"}
+    - {area: ot,           titulo: "Planos eléctricos correctos y documentación útil"}
+    - {area: it,           titulo: "Fortalecer servidores y mejorar EPPI"}
+    - {area: electricidad, titulo: "Construir o adaptar tableros preparados para la integración"}
+    - {area: corelabs,     titulo: "Robustecer la plataforma e integrar los datos"}
+
+# Secuencia estándar para integrar una máquina. Corrige el orden del documento
+# original, donde el tablero se construía en el paso 1 y otra vez en el paso 3.
+secuencia_tipo:
+  nombre: Integrar una máquina en CoreLabs
+  pasos:
+    - {orden: 1, area: ot,           titulo: "Determinar la situación del tablero"}
+    - {orden: 2, area: electricidad, titulo: "Diseñar el tablero", condicion: "si hace falta uno nuevo"}
+    - {orden: 3, area: ot,           titulo: "Relevar o documentar el plano eléctrico"}
+    - {orden: 4, area: ot,           titulo: "Aprobar planos y definir la conexión o automatización"}
+    - {orden: 5, area: electricidad, titulo: "Construir o adaptar el tablero"}
+    - {orden: 6, area: ot,           titulo: "Ejecutar la conexión y automatización"}
+    - {orden: 7, area: it,           titulo: "Asegurar infraestructura, servidores y datos de EPPI"}
+    - {orden: 8, area: corelabs,     titulo: "Integrar y validar la información en CoreLabs"}
+  cierre: aprobacion_de_cada_area_participante + rol:direccion
+
+seleccion_de_proxima_maquina:
+  propone: persona:marcos
+  criterios_de_la_propuesta: [factibilidad_ot, complejidad, dependencias, velocidad_estimada]
+  evalua: persona:ismael
+  criterios_de_la_evaluacion: [necesidad_operativa, urgencia]
+  decide: persona:ismael
+  rol_de_prisma: >
+    Prepara información comparativa, detecta dependencias y sugiere una
+    secuencia. Facilita el intercambio y registra la recomendación técnica y la
+    decisión final. No decide qué máquina tiene prioridad.
+
+# ---------------------------------------------------------------------------
+# Pendientes que impiden activar el espacio
+# ---------------------------------------------------------------------------
+
+pendientes:
+  bloqueantes:
+    - telegram.grupo_gestion_id
+    - "PRISMA_BOT_TOKEN_COREWORK en .env"
+  # Rutas que pueden quedar en PENDIENTE sin impedir que el espacio arranque.
+  no_bloqueantes:
+    - evidencia.estructura_drive
+    - "inventario inicial de máquinas y equipos de Steigen"
+    - "prioridades iniciales de Dirección"
+    - "primer plan mensual aprobado"
+
+advertencias_del_alta:
+  - id: aprobador_electricidad
+    estado: aceptada
+    texto: "El área de electricidad no tenía aprobador."
+    respuesta: "Lo aprueba Ismael. Sube a Dirección porque el área no tiene referente técnico propio."
+  - id: aprobador_corelabs
+    estado: aceptada
+    texto: "El trabajo de CoreLabs no lo revisaba nadie más."
+    respuesta: "Lo aprueba Ismael, igual que electricidad."
+  - id: direccion_aprueba_tareas
+    estado: abierta
+    texto: >
+      Ismael aprueba las tareas de dos áreas — electricidad y CoreLabs — además
+      de los hitos y objetivos. Contradice en parte la regla de reservarle las
+      aprobaciones a lo relevante. Revisar en un mes: si le genera volumen, la
+      salida es sumar referentes en esas áreas.
+  - id: aprobador_sin_suplente
+    estado: abierta
+    texto: "Dirección no tiene suplente. Si Ismael no está, no se aprueba ningún objetivo ni plan."
+  - id: volumen_de_cadencia
+    estado: abierta
+    texto: "Cinco toques semanales, tres de ellos privados. Revisar contra el máximo de 3 mensajes automáticos por persona y por día."

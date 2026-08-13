@@ -1,0 +1,61 @@
+"""Configuración por entorno.
+
+Regla: acá viven credenciales y rutas, nada de política. Qué modelo usar, con
+qué cadencia trabajar y quién aprueba qué son datos de la base, no variables
+de entorno.
+"""
+
+from __future__ import annotations
+
+import os
+from dataclasses import dataclass, field
+from pathlib import Path
+
+
+def _cargar_dotenv(ruta: Path) -> None:
+    if not ruta.exists():
+        return
+    for linea in ruta.read_text(encoding="utf-8").splitlines():
+        linea = linea.strip()
+        if not linea or linea.startswith("#") or "=" not in linea:
+            continue
+        clave, _, valor = linea.partition("=")
+        os.environ.setdefault(clave.strip(), valor.strip())
+
+
+RAIZ = Path(__file__).resolve().parents[2]
+if os.environ.get("PRISMA_LOAD_DOTENV", "1") != "0":
+    _cargar_dotenv(RAIZ / ".env")
+
+
+@dataclass(frozen=True)
+class Config:
+    db_url: str = os.environ.get("PRISMA_DB_URL", "")
+    authority_db_url: str = os.environ.get("PRISMA_AUTHORITY_DB_URL", "")
+    llm_api_key: str = os.environ.get("PRISMA_LLM_API_KEY", "")
+    webhook_secret: str = os.environ.get("PRISMA_WEBHOOK_SECRET", "")
+    base_url: str = os.environ.get("PRISMA_BASE_URL", "")
+    raiz: Path = RAIZ
+    nucleo: Path = RAIZ / "nucleo"
+    espacios: Path = RAIZ / "espacios"
+    plantillas: Path = RAIZ / "plantillas"
+
+    def token_bot(self, slug_espacio: str) -> str:
+        """Token del bot de un espacio. Un bot por equipo: si dos espacios
+        compartieran token, un integrante podría recibir mensajes del otro."""
+        clave = f"PRISMA_BOT_TOKEN_{slug_espacio.upper()}"
+        token = os.environ.get(clave, "")
+        if not token:
+            raise LookupError(f"Falta {clave} en el entorno")
+        return token
+
+    def espacios_con_token(self) -> dict[str, str]:
+        prefijo = "PRISMA_BOT_TOKEN_"
+        return {
+            k[len(prefijo):].lower(): v
+            for k, v in os.environ.items()
+            if k.startswith(prefijo) and v
+        }
+
+
+config = Config()

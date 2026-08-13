@@ -1,0 +1,147 @@
+# Plantilla — Equipo de mantenimiento
+#
+# Prueba de que la misma mecánica sirve para otro equipo. Cambia el vocabulario,
+# la taxonomía de áreas, la política de aprobación, la cadencia y el tono.
+# No cambia ni una línea del núcleo.
+#
+# Se usa como punto de partida en el alta: Prisma entrevista sólo sobre lo que
+# difiere de esta base.
+
+version: 1
+es_plantilla: true
+
+espacio:
+  slug: PENDIENTE
+  nombre: PENDIENTE
+  descripcion: >
+    Equipo de mantenimiento de planta. Trabaja sobre pedidos correctivos y un
+    plan preventivo, con turnos y disponibilidad de equipos como restricción
+    principal.
+  zona_horaria: America/Argentina/Buenos_Aires
+
+# El mismo árbol de cinco niveles, con otras etiquetas.
+niveles:
+  objetivo_estrategico: plan anual de mantenimiento
+  hito: campaña
+  objetivo_operativo: equipo o línea
+  tarea: orden de trabajo
+  subtarea: paso
+
+areas:
+  - {slug: preventivo, nombre: Mantenimiento preventivo}
+  - {slug: correctivo, nombre: Mantenimiento correctivo}
+  - {slug: mecanica,   nombre: Mecánica}
+  - {slug: electrica,  nombre: Eléctrica}
+  - {slug: repuestos,  nombre: Repuestos y almacén}
+  - {slug: supervision, nombre: Supervisión}
+
+roles:
+  - {slug: jefatura,   nombre: Jefatura de mantenimiento, autoridad_final: true}
+  - {slug: supervisor, nombre: Supervisor de turno}
+  - {slug: tecnico,    nombre: Técnico}
+
+personas: []   # se completan en la entrevista
+
+aprobacion:
+  reglas:
+    - {sujeto: orden_de_trabajo, area: preventivo, requiere: [rol:supervisor]}
+    - {sujeto: orden_de_trabajo, area: correctivo, requiere: [rol:supervisor]}
+    - {sujeto: orden_de_trabajo, area: mecanica,   requiere: [rol:supervisor]}
+    - {sujeto: orden_de_trabajo, area: electrica,  requiere: [rol:supervisor]}
+    - {sujeto: orden_de_trabajo, area: repuestos,  requiere: [rol:supervisor]}
+    - {sujeto: campania,         requiere: [rol:jefatura]}
+    - {sujeto: plan_anual,       requiere: [rol:jefatura]}
+
+  umbral_reaprobacion:
+    cambio_de_responsable: true
+    corrimiento_de_fecha_dias: 1     # más ajustado: en mantenimiento un día importa
+    cambio_de_alcance: true
+    tarea_nueva_fuera_del_plan: false  # el correctivo entra sin plan por definición
+
+# Este equipo no usa revisión previa al cierre: el supervisor firma en el momento.
+estados_ocultos: [en_revision, propuesta]
+
+evidencia:
+  por_area:
+    preventivo: [checklist, foto]
+    correctivo: [explicacion, foto]
+    mecanica:   [foto]
+    electrica:  [foto, medicion]
+    repuestos:  [remito]
+    supervision: [explicacion]
+  almacenamiento: google_drive
+  estructura_drive: PENDIENTE
+
+calendario:
+  dias: [lunes, martes, miercoles, jueves, viernes, sabado]
+  horario: "06:00-14:00"           # turno mañana; los demás turnos se agregan en el alta
+  feriados: feriados_ar
+
+cadencia:
+  - nombre: apertura_de_turno
+    cuando: "lunes a sabado 06:15"
+    audiencia: privado_cada_integrante
+    contenido: [ordenes_del_dia, prioridades, equipos_detenidos]
+
+  - nombre: cierre_de_turno
+    cuando: "lunes a sabado 13:30"
+    audiencia: privado_cada_integrante
+    contenido: [cierre, evidencias_pendientes, pendientes_para_el_turno_siguiente]
+
+  - nombre: parte_diario
+    cuando: "lunes a sabado 13:45"
+    audiencia: grupo
+    contenido: [cerradas, abiertas, equipos_fuera_de_servicio]
+
+reunion_periodica:
+  cuando: "lunes 08:00"
+  anuncio_y_pedido_de_temas: "viernes anterior"
+  agenda_e_informe_previo: "viernes anterior"
+  contenido: [preventivo_cumplido, correctivos_recurrentes, repuestos_criticos, equipos_en_riesgo]
+
+limites_de_contacto:
+  max_mensajes_automaticos_por_persona_por_dia: 2
+  consolidar_en_un_envio: true
+
+tiempos_de_respuesta:
+  informativo: ninguna
+  normal: "1 dia habil"
+  seguimiento: "antes del cierre del turno"
+  prioritario: "2 horas laborales"
+  urgente: "30 minutos"
+
+# A diferencia de CoreWork, acá la urgencia sí tiene condiciones objetivas.
+urgencia:
+  puede_declararla: [rol:jefatura, rol:supervisor]
+  condiciones:
+    - equipo_de_produccion_detenido
+    - riesgo_para_personas
+    - incumplimiento_normativo
+
+escalamiento:
+  - {disparador: problema_tecnico, area: mecanica,  destino: rol:supervisor}
+  - {disparador: problema_tecnico, area: electrica, destino: rol:supervisor}
+  - {disparador: falta_de_repuesto, destino: rol:jefatura}
+  - {disparador: bloqueo_transversal, destino: rol:jefatura}
+  - {disparador: falta_persistente_de_respuesta, destino: rol:supervisor}
+  - {disparador: desacuerdo_no_resuelto, destino: rol:jefatura}
+
+bloqueos:
+  escala_solo_a_los_dias: 1        # un equipo parado no espera cinco días
+  ausencia_sin_fecha_de_fin_alerta_a_los_dias: 1
+
+persona:
+  nombre_visible: Prisma
+  registro: vos
+  formalidad: directo
+  longitud: muy_breve              # se lee de pie, con guantes puestos
+  emojis: false
+  presentacion: >
+    Hola, soy Prisma. Llevo el registro de las órdenes de trabajo del equipo.
+    Cada mañana te paso lo que tenés asignado y al final del turno te pido el
+    cierre. Si algo te traba, avisame y lo escalo.
+
+telegram:
+  bot_token: PENDIENTE
+  grupo_gestion_id: PENDIENTE
+  entrega_de_enlaces: uno_a_uno

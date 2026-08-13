@@ -1,0 +1,32 @@
+[project]
+name = "prisma"
+version = "0.1.0"
+description = "Project manager digital multi-equipo"
+requires-python = ">=3.11"
+dependencies = [
+    "psycopg[binary]>=3.1",
+    "pyyaml>=6.0",
+    "apscheduler>=3.10",
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.27",
+    "httpx>=0.27",
+    "alembic>=1.13",
+    "openai>=1.40",
+    "anthropic>=0.40",
+]
+
+[project.optional-dependencies]
+# pgserver no publica ruedas para Windows. Ahí las pruebas usan un servidor
+# propio vía PRISMA_TEST_DB_URL; ver tests/conftest.py.
+dev = ["pytest>=8.0", "pgserver>=0.1; sys_platform != 'win32'"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

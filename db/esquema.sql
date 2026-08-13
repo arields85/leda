@@ -1,0 +1,1228 @@
+-- =========================================================================
+-- Prisma — esquema de base de datos
+-- PostgreSQL 16
+--
+-- Principios que el esquema hace cumplir, no sólo documenta:
+--
+--   1. Todo cuelga de un espacio de trabajo y está aislado por RLS.
+--   2. El estado de una tarea es una proyección de sus eventos. No se puede
+--      escribir directamente: se inserta un evento y un disparador lo aplica.
+--   3. Las condiciones de cierre son funciones deterministas. El modelo de
+--      lenguaje propone; la base decide.
+--   4. La autoridad son filas, no prosa.
+--   5. Nada sale a Telegram sin pasar por la cola, con clave de deduplicación.
+-- =========================================================================
+
+-- gen_random_uuid() es nativo desde PostgreSQL 13; no hace falta pgcrypto.
+
+create schema if not exists prisma;
+set search_path = prisma, public;
+
+-- =========================================================================
+-- Tipos
+-- =========================================================================
+
+create type rol_plataforma as enum ('administrador', 'operador');
+
+create type tipo_objetivo as enum ('estrategico', 'hito', 'operativo');
+
+create type estado_objetivo as enum (
+  'propuesto', 'activo', 'completo_pendiente_aprobacion',
+  'terminado', 'suspendido', 'cancelado');
+
+create type estado_tarea as enum (
+  'propuesta', 'pendiente_aprobacion', 'asignada', 'en_curso',
+  'bloqueada', 'en_revision', 'terminada', 'cancelada');
+
+create type tipo_dependencia as enum ('bloqueante', 'informativa');
+
+create type tipo_actor as enum ('persona', 'prisma', 'sistema');
+
+create type tipo_mensaje as enum (
+  'informativo', 'normal', 'seguimiento', 'prioritario', 'urgente');
+
+create type estado_salida as enum (
+  'pendiente', 'esperando_confirmacion', 'listo',
+  'enviado', 'fallido', 'descartado');
+
+create type estado_pendiente as enum (
+  'esperando', 'resuelta', 'cancelada', 'vencida');
+
+create type decision_aprobacion as enum ('aprobado', 'rechazado');
+
+-- =========================================================================
+-- Plataforma
+--
+-- Eje de rol global. Independiente de los espacios: ser administrador no
+-- otorga ningún permiso dentro de un equipo.
+-- =========================================================================
+
+create table app_user (
+  id                uuid primary key default gen_random_uuid(),
+  telegram_user_id  bigint unique,
+  nombre            text not null,
+  creado_en         timestamptz not null default now()
+);
+
+create table platform_role (
+  app_user_id   uuid not null references app_user(id) on delete cascade,
+  rol           rol_plataforma not null,
+  otorgado_por  uuid references app_user(id),
+  otorgado_en   timestamptz not null default now(),
+  primary key (app_user_id, rol)
+);
+
+comment on table platform_role is
+  'Eje de plataforma. Debe haber al menos dos administradores: uno solo es un punto único de falla.';
+
+-- =========================================================================
+-- Espacios de trabajo
+-- =========================================================================
+
+create table workspace (
+  id             uuid primary key default gen_random_uuid(),
+  slug           text not null unique,
+  nombre         text not null,
+  zona_horaria   text not null default 'America/Argentina/Buenos_Aires',
+  bot_token_ref  text,               -- referencia al secreto, nunca el token
+  grupo_chat_id  bigint,
+  activo         boolean not null default false,
+  creado_en      timestamptz not null default now()
+);
+
+-- Cada importación de un pack deja una versión. El hash permite saber con qué
+-- configuración exacta se tomó cada decisión registrada.
+create table workspace_version (
+  id            uuid primary key default gen_random_uuid(),
+  workspace_id  uuid not null references workspace(id) on delete cascade,
+  version       integer not null,
+  pack_hash     text not null,
+  importado_en  timestamptz not null default now(),
+  importado_por uuid references app_user(id),
+  aprobado_por  uuid references app_user(id),
+  unique (workspace_id, version)
+);
+
+create table area (
+  id            uuid primary key default gen_random_uuid(),
+  workspace_id  uuid not null references workspace(id) on delete cascade,
+  slug          text not null,
+  nombre        text not null,
+  unique (workspace_id, slug)
+);
+
+create table rol (
+  id               uuid primary key default gen_random_uuid(),
+  workspace_id     uuid not null references workspace(id) on delete cascade,
+  slug             text not null,
+  nombre           text not null,
+  autoridad_final  boolean not null default false,
+  unique (workspace_id, slug)
+);
+
+-- El núcleo exige exactamente una autoridad final por espacio.
+create unique index rol_una_autoridad_final
+  on rol (workspace_id) where autoridad_final;
+
+create table membership (
+  id            uuid primary key default gen_random_uuid(),
+  workspace_id  uuid not null references workspace(id) on delete cascade,
+  app_user_id   uuid not null references app_user(id) on delete cascade,
+  area_id       uuid not null references area(id),
+  rol_id        uuid not null references rol(id),
+  -- Quién revisa el trabajo de esta persona. La aprobación sube un nivel:
+  -- a un integrante lo aprueba su referente, a un referente lo aprueba
+  -- Dirección. Null sólo en la raíz de la cadena.
+  aprobador_membership_id uuid references membership(id),
+  horario       jsonb,
+  activo        boolean not null default true,
+  unique (workspace_id, app_user_id),
+  check (aprobador_membership_id is null or aprobador_membership_id <> id)
+);
+
+comment on table membership is
+  'Eje de espacio. Una persona puede pertenecer a varios espacios con roles distintos.';
+
+comment on column membership.aprobador_membership_id is
+  'La cadena de aprobación es por persona, no por área: Marcos aprueba a Nahuel aunque estén en áreas distintas.';
+
+create table absence (
+  id             uuid primary key default gen_random_uuid(),
+  membership_id  uuid not null references membership(id) on delete cascade,
+  desde          date not null,
+  hasta          date,                -- null = indefinida, dispara alerta
+  motivo         text
+);
+
+-- Telegram no permite que un bot inicie una conversación privada con alguien
+-- que nunca le escribió. Cada persona tiene que abrir su enlace una vez.
+--
+-- Los enlaces se entregan uno a uno, nunca publicados en el grupo: un token
+-- a la vista permite que cualquiera reclame la identidad de otro.
+create table activation_token (
+  id             uuid primary key default gen_random_uuid(),
+  workspace_id   uuid not null references workspace(id) on delete cascade,
+  membership_id  uuid not null references membership(id) on delete cascade,
+  token          text not null unique,
+  creado_en      timestamptz not null default now(),
+  creado_por     uuid references app_user(id),
+  expira_en      timestamptz not null,
+  usado_en       timestamptz,
+  usado_por      bigint                          -- telegram_user_id que lo canjeó
+);
+
+-- Un solo enlace vigente por persona: si se regenera, el anterior deja de servir.
+create unique index activation_token_vigente
+  on activation_token (membership_id) where usado_en is null;
+
+create table work_calendar (
+  workspace_id  uuid primary key references workspace(id) on delete cascade,
+  dias          text[] not null,
+  hora_inicio   time not null,
+  hora_fin      time not null
+);
+
+create table holiday (
+  workspace_id  uuid not null references workspace(id) on delete cascade,
+  fecha         date not null,
+  nombre        text,
+  primary key (workspace_id, fecha)
+);
+
+-- =========================================================================
+-- Política — la autoridad como datos
+--
+-- Reemplaza la matriz de aprobación en prosa del documento original.
+-- =========================================================================
+
+create table permission (
+  workspace_id  uuid not null references workspace(id) on delete cascade,
+  rol_id        uuid not null references rol(id) on delete cascade,
+  accion        text not null,
+  alcance       text not null default 'area',   -- area | espacio
+  primary key (workspace_id, rol_id, accion)
+);
+
+create table approval_policy (
+  id                        uuid primary key default gen_random_uuid(),
+  workspace_id              uuid not null references workspace(id) on delete cascade,
+  sujeto                    text not null,        -- tarea | objetivo_operativo | hito | plan
+  area_id                   uuid references area(id),
+  autoaprobacion_declarada  boolean not null default false,
+  motivo                    text,
+  unique (workspace_id, sujeto, area_id)
+);
+
+comment on column approval_policy.autoaprobacion_declarada is
+  'Un área sin requisitos debe declarar la autoaprobación a conciencia. La omisión no puede pasar por decisión.';
+
+create table approval_requirement (
+  id                  uuid primary key default gen_random_uuid(),
+  approval_policy_id  uuid not null references approval_policy(id) on delete cascade,
+  tipo                text not null,   -- rol | area | cada_area_participante
+  rol_id              uuid references rol(id),
+  area_id             uuid references area(id),
+  check (
+    (tipo = 'rol'  and rol_id is not null) or
+    (tipo = 'area' and area_id is not null) or
+    (tipo = 'cada_area_participante')
+  )
+);
+
+create table escalation_route (
+  id                uuid primary key default gen_random_uuid(),
+  workspace_id      uuid not null references workspace(id) on delete cascade,
+  disparador        text not null,
+  area_id           uuid references area(id),
+  destino_rol_id    uuid references rol(id),
+  destino_membership_id uuid references membership(id),
+  orden             integer not null default 1,
+  check (destino_rol_id is not null or destino_membership_id is not null)
+);
+
+create table glossary_term (
+  id                    uuid primary key default gen_random_uuid(),
+  workspace_id          uuid not null references workspace(id) on delete cascade,
+  termino               text not null,
+  definicion            text,
+  variantes_incorrectas text[] not null default '{}',
+  fuera_de_alcance      boolean not null default false,
+  unique (workspace_id, termino)
+);
+
+create table message_template (
+  workspace_id  uuid not null references workspace(id) on delete cascade,
+  clave         text not null,
+  cuerpo        text not null,
+  variables     text[] not null default '{}',
+  primary key (workspace_id, clave)
+);
+
+create table persona_config (
+  workspace_id    uuid primary key references workspace(id) on delete cascade,
+  nombre_visible  text not null default 'Prisma',
+  registro        text not null default 'vos',
+  formalidad      text not null default 'profesional_cordial',
+  longitud        text not null default 'breve',
+  emojis          boolean not null default false,
+  presentacion    text
+);
+
+-- Umbrales y límites del pack: re-aprobación, tope de mensajes, días de
+-- escalamiento. Clave-valor para no migrar el esquema cada vez que aparece
+-- un parámetro nuevo.
+create table workspace_setting (
+  workspace_id  uuid not null references workspace(id) on delete cascade,
+  clave         text not null,
+  valor         jsonb not null,
+  primary key (workspace_id, clave)
+);
+
+-- Policy imported from evidencia.por_area. An empty array is an explicit
+-- no-evidence policy; absence of a row means that policy is unresolved.
+create table task_evidence_policy (
+  workspace_id        uuid not null references workspace(id) on delete cascade,
+  area_id             uuid not null references area(id) on delete cascade,
+  evidencia_requerida text[] not null,
+  version             integer not null default 1 check (version > 0),
+  actualizado_en      timestamptz not null default now(),
+  primary key (workspace_id, area_id)
+);
+
+create table cadence_job (
+  id              uuid primary key default gen_random_uuid(),
+  workspace_id    uuid not null references workspace(id) on delete cascade,
+  nombre          text not null,
+  cron            text not null,
+  audiencia       text not null,      -- grupo | privado_cada_integrante
+  plantilla_clave text,
+  activo          boolean not null default true,
+  ultima_corrida  timestamptz,
+  unique (workspace_id, nombre)
+);
+
+comment on table cadence_job is
+  'El reloj de cadencia. Cambiar un horario es actualizar una fila, no desplegar código.';
+
+-- =========================================================================
+-- Trabajo
+-- =========================================================================
+
+create table objective (
+  id                      uuid primary key default gen_random_uuid(),
+  workspace_id            uuid not null references workspace(id) on delete cascade,
+  parent_id               uuid references objective(id) on delete cascade,
+  tipo                    tipo_objetivo not null,
+  titulo                  text not null,
+  descripcion             text,
+  referente_membership_id uuid references membership(id),
+  estado                  estado_objetivo not null default 'propuesto',
+  fecha_objetivo          date,
+  creado_en               timestamptz not null default now(),
+  actualizado_en          timestamptz not null default now()
+);
+
+create index objective_ws on objective (workspace_id, estado);
+create index objective_parent on objective (parent_id);
+
+-- A draft may be incomplete and therefore has no operational effects. The
+-- snapshots are the values shown in the preview and revalidated on commit.
+create table task_draft (
+  id                        uuid primary key default gen_random_uuid(),
+  workspace_id              uuid not null references workspace(id) on delete cascade,
+  creado_por_membership_id  uuid not null references membership(id),
+  objective_id              uuid references objective(id),
+  objective_snapshot        jsonb,
+  titulo                    text,
+  descripcion               text,
+  area_id                   uuid references area(id),
+  responsable_membership_id uuid references membership(id),
+  fecha_objetivo            timestamptz,
+  criterio_aceptacion       text,
+  evidencia_requerida       text[],
+  evidencia_policy_version  integer,
+  version                   integer not null default 1 check (version > 0),
+  converted_task_id         uuid,
+  creado_en                 timestamptz not null default now(),
+  actualizado_en            timestamptz not null default now(),
+  check ((evidencia_requerida is null) =
+         (evidencia_policy_version is null))
+);
+
+create index task_draft_ws on task_draft (workspace_id, creado_en desc);
+
+create table task (
+  id                        uuid primary key default gen_random_uuid(),
+  workspace_id              uuid not null references workspace(id) on delete cascade,
+  objective_id              uuid not null references objective(id) on delete cascade,
+  parent_task_id            uuid references task(id) on delete cascade,
+  titulo                    text not null,
+  descripcion               text,
+  area_id                   uuid not null references area(id),
+  responsable_membership_id uuid references membership(id),
+  prioridad                 integer,
+  estado                    estado_tarea not null default 'propuesta',
+  fecha_objetivo            timestamptz,
+  criterio_aceptacion       text,
+  evidencia_requerida       text[] not null default '{}',
+  evidencia_policy_version  integer,
+  source_draft_id           uuid unique references task_draft(id),
+  creado_en                 timestamptz not null default now(),
+  actualizado_en            timestamptz not null default now()
+);
+
+alter table task_draft
+  add constraint task_draft_converted_task
+  foreign key (converted_task_id) references task(id);
+
+create index task_ws on task (workspace_id, estado);
+create index task_responsable on task (responsable_membership_id, estado);
+create index task_vencimiento on task (fecha_objetivo)
+  where estado in ('asignada', 'en_curso', 'bloqueada');
+
+-- Registro append-only. Es la verdad; task.estado es su proyección.
+create table task_state_event (
+  id               uuid primary key default gen_random_uuid(),
+  task_id          uuid not null references task(id) on delete cascade,
+  estado_anterior  estado_tarea,
+  estado_nuevo     estado_tarea not null,
+  actor_kind       tipo_actor not null,
+  actor_app_user_id uuid references app_user(id),
+  motivo           text,
+  at               timestamptz not null default now()
+);
+
+create index task_state_event_task on task_state_event (task_id, at desc);
+
+create table objective_state_event (
+  id                uuid primary key default gen_random_uuid(),
+  objective_id      uuid not null references objective(id) on delete cascade,
+  estado_anterior   estado_objetivo,
+  estado_nuevo      estado_objetivo not null,
+  actor_kind        tipo_actor not null,
+  actor_app_user_id uuid references app_user(id),
+  motivo            text,
+  at                timestamptz not null default now()
+);
+
+create table dependency (
+  id               uuid primary key default gen_random_uuid(),
+  workspace_id     uuid not null references workspace(id) on delete cascade,
+  origen_task_id   uuid not null references task(id) on delete cascade,
+  destino_task_id  uuid not null references task(id) on delete cascade,
+  tipo             tipo_dependencia not null default 'bloqueante',
+  unique (origen_task_id, destino_task_id),
+  check (origen_task_id <> destino_task_id)
+);
+
+create table blocker (
+  id            uuid primary key default gen_random_uuid(),
+  workspace_id  uuid not null references workspace(id) on delete cascade,
+  task_id       uuid not null references task(id) on delete cascade,
+  causa         text not null,
+  impacto       text,
+  abierto_en    timestamptz not null default now(),
+  abierto_por   uuid references membership(id),
+  resuelto_en   timestamptz,
+  resolucion    text,
+  escalado_a    uuid references membership(id),
+  escalado_en   timestamptz
+);
+
+create index blocker_abiertos on blocker (workspace_id, abierto_en)
+  where resuelto_en is null;
+
+create table evidence (
+  id             uuid primary key default gen_random_uuid(),
+  workspace_id   uuid not null references workspace(id) on delete cascade,
+  task_id        uuid not null references task(id) on delete cascade,
+  tipo           text not null,
+  uri            text,
+  drive_file_id  text,
+  sha256         text,
+  entregado_por  uuid references membership(id),
+  at             timestamptz not null default now()
+);
+
+create table approval (
+  id                     uuid primary key default gen_random_uuid(),
+  workspace_id           uuid not null references workspace(id) on delete cascade,
+  sujeto_tipo            text not null,      -- tarea | objetivo | plan
+  sujeto_id              uuid not null,
+  aprobador_membership_id uuid not null references membership(id),
+  decision               decision_aprobacion not null,
+  comentario             text,
+  pack_hash              text,
+  nucleo_hash            text,
+  at                     timestamptz not null default now()
+);
+
+create index approval_sujeto on approval (sujeto_tipo, sujeto_id);
+
+-- Quién le debe una respuesta a Prisma. Sin esta tabla la escalera de
+-- recordatorios sería una adivinanza del modelo.
+create table pending_reply (
+  id             uuid primary key default gen_random_uuid(),
+  workspace_id   uuid not null references workspace(id) on delete cascade,
+  membership_id  uuid not null references membership(id) on delete cascade,
+  task_id        uuid references task(id) on delete cascade,
+  tipo           text not null,
+  preguntado_en  timestamptz not null default now(),
+  vence_en       timestamptz not null,
+  recordatorios  integer not null default 0,
+  satisfecho_en  timestamptz,
+  escalado_en    timestamptz
+);
+
+create index pending_reply_pendientes on pending_reply (workspace_id, vence_en)
+  where satisfecho_en is null;
+
+-- =========================================================================
+-- Mensajería
+-- =========================================================================
+
+create table inbound_message (
+  id                  uuid primary key default gen_random_uuid(),
+  workspace_id        uuid not null references workspace(id) on delete cascade,
+  telegram_message_id bigint,
+  chat_id             bigint not null,
+  app_user_id         uuid references app_user(id),
+  texto               text,
+  intencion           text,
+  task_id             uuid references task(id),
+  at                  timestamptz not null default now()
+);
+
+-- Prisma nunca llama a Telegram directamente: escribe acá y un worker despacha.
+-- dedupe_key es lo que hace que un reinicio no duplique mensajes.
+create table message_outbox (
+  id                      uuid primary key default gen_random_uuid(),
+  workspace_id            uuid not null references workspace(id) on delete cascade,
+  chat_id                 bigint not null,
+  destinatario_membership_id uuid references membership(id),
+  tipo                    tipo_mensaje not null default 'normal',
+  cuerpo                  text not null,
+  -- Una respuesta a alguien que acaba de escribir sale siempre. La regla de
+  -- no escribir fuera de horario es para lo que Prisma inicia; dejar a una
+  -- persona esperando hasta mañana porque son las 17:05 es peor.
+  es_respuesta            boolean not null default false,
+  requiere_confirmacion   boolean not null default false,
+  confirmado_por          uuid references app_user(id),
+  confirmado_en           timestamptz,
+  estado                  estado_salida not null default 'pendiente',
+  programado_para         timestamptz not null default now(),
+  vence_en                timestamptz,
+  enviado_en              timestamptz,
+  telegram_message_id     bigint,
+  dedupe_key              text not null unique,
+  intentos                integer not null default 0,
+  ultimo_error            text,
+  -- Si el mensaje pregunta algo con opciones, acá está la acción congelada.
+  -- La referencia se agrega más abajo: pending_action se declara después.
+  pending_action_id       uuid
+);
+
+create index outbox_despacho on message_outbox (estado, programado_para)
+  where estado in ('listo', 'pendiente');
+
+-- =========================================================================
+-- Acciones pendientes
+-- =========================================================================
+
+-- Trabajo que Prisma entendió y todavía no ejecutó, porque falta un acto de
+-- una persona: confirmarlo, o elegir entre opciones.
+--
+-- Sin esta tabla la confirmación humana sólo sabía frenar. El pedido salía a
+-- la cola como texto y la herramienta con sus argumentos se descartaba, así
+-- que confirmar no tenía nada que ejecutar.
+create table pending_action (
+  id                  uuid primary key default gen_random_uuid(),
+  workspace_id        uuid not null references workspace(id) on delete cascade,
+  -- Quién puede resolverla. En un grupo el botón lo ve todo el mundo; sólo
+  -- esta persona lo puede apretar.
+  membership_id       uuid not null references membership(id) on delete cascade,
+  herramienta         text not null,
+  args                jsonb not null default '{}'::jsonb,
+  -- Qué argumento completa la opción elegida. Nulo cuando lo que se pregunta
+  -- es confirmar o cancelar.
+  campo               text,
+  resumen             text not null,
+  estado              estado_pendiente not null default 'esperando',
+  creado_en           timestamptz not null default now(),
+  -- Obligatorio a propósito: no hay acción pendiente eterna. Un botón se
+  -- puede apretar tres días después; el contexto que lo justificaba, no.
+  vence_en            timestamptz not null,
+  resuelta_en         timestamptz,
+  resuelta_por        uuid references app_user(id),
+  chat_id             bigint,
+  telegram_message_id bigint
+  ,draft_id            uuid references task_draft(id)
+  ,draft_version       integer
+  ,preview             jsonb
+  ,check ((draft_id is null and draft_version is null and preview is null)
+       or (draft_id is not null and draft_version is not null and preview is not null))
+);
+
+create index pending_action_abiertas on pending_action (workspace_id, vence_en)
+  where estado = 'esperando';
+
+-- Una opción por botón. El token es lo que viaja en callback_data, que
+-- Telegram corta en 64 bytes: por eso es un identificador corto que apunta
+-- acá y no la acción serializada.
+create table pending_action_option (
+  id                uuid primary key default gen_random_uuid(),
+  workspace_id      uuid not null references workspace(id) on delete cascade,
+  pending_action_id uuid not null references pending_action(id) on delete cascade,
+  token             text not null unique,
+  etiqueta          text not null,
+  valor             jsonb,
+  orden             integer not null default 0,
+  constraint token_cabe_en_callback_data check (octet_length(token) between 8 and 40)
+);
+
+create index pending_action_option_de
+  on pending_action_option (pending_action_id, orden);
+
+-- Se declara acá y no en la tabla porque message_outbox viene antes. Si la
+-- acción se borra, el mensaje queda: es parte del historial de lo que se dijo.
+alter table message_outbox
+  add constraint message_outbox_pending_action
+  foreign key (pending_action_id) references pending_action(id) on delete set null;
+
+-- Resolver es una sola llamada a propósito: dos toques al mismo botón compiten
+-- por la misma fila y sólo uno la mueve de 'esperando'. Si esto se hiciera con
+-- un select seguido de un update, la carrera ejecutaría la acción dos veces.
+--
+-- No lanza excepciones para el control de flujo: devuelve qué pasó, y quien
+-- llama decide cómo contarlo. 'ajena' no es un error técnico, es una persona
+-- apretando un botón que no le corresponde.
+create function resolver_pendiente(p_token text, p_app_user_id uuid,
+                                   p_ahora timestamptz)
+returns table (resultado text, herramienta text, args jsonb, cancelada boolean)
+language plpgsql security definer as $$
+declare
+  o record;
+  a record;
+  ws uuid := nullif(current_setting('prisma.workspace_id', true), '')::uuid;
+begin
+  select * into o from pending_action_option
+   where token = p_token and (ws is null or workspace_id = ws);
+  if not found then
+    return query select 'inexistente'::text, null::text, null::jsonb, null::boolean;
+    return;
+  end if;
+
+  select * into a from pending_action where id = o.pending_action_id;
+
+  if a.estado <> 'esperando' then
+    return query select 'usada'::text, null::text, null::jsonb, null::boolean;
+    return;
+  end if;
+
+  if a.vence_en <= p_ahora then
+    update pending_action set estado = 'vencida' where id = a.id;
+    return query select 'vencida'::text, null::text, null::jsonb, null::boolean;
+    return;
+  end if;
+
+  -- El dueño de la acción es el único que la resuelve. Se resuelve por
+  -- membresía, no por identidad de plataforma: el sombrero lo da el espacio.
+  if not exists (select 1 from membership m
+                  where m.id = a.membership_id and m.app_user_id = p_app_user_id) then
+    return query select 'ajena'::text, null::text, null::jsonb, null::boolean;
+    return;
+  end if;
+
+  if a.campo is null and o.valor = 'false'::jsonb then
+    update pending_action
+       set estado = 'cancelada', resuelta_en = p_ahora, resuelta_por = p_app_user_id
+     where id = a.id and estado = 'esperando';
+    if not found then
+      return query select 'usada'::text, null::text, null::jsonb, null::boolean;
+      return;
+    end if;
+    return query select 'cancelada'::text, null::text, null::jsonb, true;
+    return;
+  end if;
+
+  update pending_action
+     set estado = 'resuelta', resuelta_en = p_ahora, resuelta_por = p_app_user_id
+   where id = a.id and estado = 'esperando';
+  if not found then
+    return query select 'usada'::text, null::text, null::jsonb, null::boolean;
+    return;
+  end if;
+
+  return query select 'ok'::text, a.herramienta,
+    case when a.campo is null then a.args
+         else a.args || jsonb_build_object(a.campo, o.valor) end,
+    false;
+end $$;
+
+comment on function resolver_pendiente is
+  'Resuelve una acción pendiente por el token de una de sus opciones. Atómica: el doble toque de un botón ejecuta una sola vez.';
+
+-- Draft commitment is deliberately separate from generic pending actions. It
+-- locks every linked row, revalidates the preview, creates the task and audit,
+-- and only then consumes the pending action in the same transaction.
+create function confirmar_borrador_tarea(p_workspace_id uuid, p_token text,
+                                         p_telegram_user_id bigint)
+returns table (resultado text, task_id uuid)
+language plpgsql security definer
+set search_path = prisma, public, pg_temp as $$
+declare
+  o pending_action_option%rowtype;
+  a pending_action%rowtype;
+  d task_draft%rowtype;
+  obj objective%rowtype;
+  responsable membership%rowtype;
+  politica task_evidence_policy%rowtype;
+  actor_membership uuid;
+  actor_app_user_id uuid;
+  aprobador_actual uuid;
+  nueva_task uuid;
+  ahora timestamptz := clock_timestamp();
+  preview_actual jsonb;
+begin
+  perform set_config('prisma.workspace_id', p_workspace_id::text, true);
+  select * into o from pending_action_option
+   where token = p_token and workspace_id = p_workspace_id;
+  if not found then
+    return query select 'inexistente'::text, null::uuid;
+    return;
+  end if;
+
+  select * into a from pending_action where id = o.pending_action_id for update;
+  if a.draft_id is null then
+    return query select 'no_es_borrador'::text, null::uuid;
+    return;
+  end if;
+  if a.estado <> 'esperando' then
+    return query select 'usada'::text, null::uuid;
+    return;
+  end if;
+  if a.workspace_id <> p_workspace_id then
+    return query select 'inexistente'::text, null::uuid;
+    return;
+  end if;
+  if a.vence_en <= ahora then
+    update pending_action set estado = 'vencida' where id = a.id;
+    return query select 'vencida'::text, null::uuid;
+    return;
+  end if;
+
+  select m.id, m.app_user_id into actor_membership, actor_app_user_id
+    from membership m join app_user u on u.id = m.app_user_id
+   where m.workspace_id = p_workspace_id and m.id = a.membership_id
+     and u.telegram_user_id = p_telegram_user_id and m.activo;
+  if actor_membership is null then
+    return query select 'ajena'::text, null::uuid;
+    return;
+  end if;
+
+  if o.valor = 'false'::jsonb then
+    update pending_action
+       set estado = 'cancelada', resuelta_en = ahora,
+           resuelta_por = actor_app_user_id
+     where id = a.id;
+    return query select 'cancelada'::text, null::uuid;
+    return;
+  end if;
+
+  select * into d from task_draft where id = a.draft_id for update;
+  if not found or d.converted_task_id is not null or d.version <> a.draft_version
+     or d.workspace_id <> a.workspace_id then
+    update pending_action set estado = 'vencida' where id = a.id;
+    return query select 'obsoleta'::text, null::uuid;
+    return;
+  end if;
+
+  select * into obj from objective where id = d.objective_id for share;
+  select * into responsable from membership
+   where id = d.responsable_membership_id for share;
+  select * into politica from task_evidence_policy
+   where workspace_id = d.workspace_id and area_id = d.area_id for share;
+
+  preview_actual := jsonb_build_object(
+    'draft_id', d.id::text, 'version', d.version,
+    'titulo', d.titulo, 'objetivo', d.objective_snapshot,
+    'area_id', d.area_id::text,
+    'responsable_membership_id', d.responsable_membership_id::text,
+    'fecha_objetivo', d.fecha_objetivo::text,
+    'criterio_aceptacion', d.criterio_aceptacion,
+    'evidencia_requerida', to_jsonb(d.evidencia_requerida),
+    'evidencia_policy_version', d.evidencia_policy_version);
+
+  if a.preview is distinct from preview_actual
+     or d.objective_id is null or d.responsable_membership_id is null
+     or d.area_id is null or d.fecha_objetivo is null
+     or nullif(btrim(d.titulo), '') is null
+     or nullif(btrim(d.criterio_aceptacion), '') is null
+     or d.evidencia_requerida is null
+     or obj.id is null or obj.workspace_id <> d.workspace_id
+     or obj.estado not in ('activo', 'propuesto')
+     or d.objective_snapshot is distinct from
+        jsonb_build_object('id', obj.id, 'titulo', obj.titulo, 'estado', obj.estado)
+     or responsable.id is null or not responsable.activo
+     or responsable.workspace_id <> d.workspace_id
+     or responsable.area_id <> d.area_id
+     or politica.area_id is null
+     or politica.version <> d.evidencia_policy_version
+     or politica.evidencia_requerida is distinct from d.evidencia_requerida then
+    update pending_action set estado = 'vencida' where id = a.id;
+    return query select 'obsoleta'::text, null::uuid;
+    return;
+  end if;
+
+  aprobador_actual := responsable.aprobador_membership_id;
+  if aprobador_actual is null then
+    select m.id into aprobador_actual
+      from membership m join rol r on r.id = m.rol_id
+     where m.workspace_id = d.workspace_id and m.activo and r.autoridad_final;
+  end if;
+  if aprobador_actual is distinct from a.membership_id
+     or aprobador_actual is distinct from actor_membership then
+    update pending_action set estado = 'vencida' where id = a.id;
+    return query select 'obsoleta'::text, null::uuid;
+    return;
+  end if;
+
+  insert into task
+       (workspace_id, objective_id, titulo, descripcion, area_id,
+        responsable_membership_id, fecha_objetivo, criterio_aceptacion,
+        evidencia_requerida, evidencia_policy_version, source_draft_id)
+  values
+       (d.workspace_id, d.objective_id, d.titulo, d.descripcion, d.area_id,
+        d.responsable_membership_id, d.fecha_objetivo, d.criterio_aceptacion,
+        d.evidencia_requerida, d.evidencia_policy_version, d.id)
+  returning id into nueva_task;
+
+  insert into task_state_event
+       (task_id, estado_nuevo, actor_kind, actor_app_user_id, motivo)
+  values (nueva_task, 'asignada', 'persona', actor_app_user_id,
+          'borrador confirmado por autoridad vigente');
+
+  insert into audit_log
+       (workspace_id, actor_app_user_id, actor_kind, accion, sujeto_tipo,
+        sujeto_id, detalle)
+  values
+       (d.workspace_id, actor_app_user_id, 'persona',
+        'confirmar_borrador_tarea', 'task', nueva_task,
+        jsonb_build_object(
+          'draft_id', d.id, 'draft_version', d.version,
+          'pending_action_id', a.id,
+          'responsable_membership_id', d.responsable_membership_id,
+          'confirmador_membership_id', actor_membership,
+          'evidencia_policy_version', d.evidencia_policy_version));
+
+  update task_draft set converted_task_id = nueva_task,
+                        actualizado_en = ahora
+   where id = d.id;
+  update pending_action
+     set estado = 'resuelta', resuelta_en = ahora,
+         resuelta_por = actor_app_user_id
+   where id = a.id;
+
+  return query select 'ok'::text, nueva_task;
+end $$;
+
+revoke all on function confirmar_borrador_tarea(uuid, text, bigint) from public;
+
+-- =========================================================================
+-- Sistema
+-- =========================================================================
+
+-- El modelo NO se configura en el pack ni en el núcleo. Vive acá, editable
+-- desde la consola. La clave de API vive en el archivo de secretos.
+create table model_config (
+  id            uuid primary key default gen_random_uuid(),
+  ambito        text not null default 'global',   -- global | espacio
+  workspace_id  uuid references workspace(id) on delete cascade,
+  proveedor     text not null,
+  modelo        text not null,
+  parametros    jsonb not null default '{}',
+  activo        boolean not null default true,
+  check (ambito = 'global' or workspace_id is not null)
+);
+
+create unique index model_config_un_global on model_config (ambito)
+  where ambito = 'global' and activo;
+
+create table learning (
+  id            uuid primary key default gen_random_uuid(),
+  workspace_id  uuid references workspace(id) on delete cascade,
+  contenido     text not null,
+  fuente        text,
+  confianza     numeric(3,2),
+  alcance       text,
+  aprobado_por  uuid references app_user(id),
+  creado_en     timestamptz not null default now(),
+  expira_en     timestamptz,
+  activo        boolean not null default true
+);
+
+comment on table learning is
+  'El aprendizaje ajusta cómo Prisma comunica y estima. Nunca modifica autoridad ni reglas.';
+
+create table incident (
+  id                   uuid primary key default gen_random_uuid(),
+  workspace_id         uuid references workspace(id) on delete set null,
+  severidad            text not null,
+  resumen_sanitizado   text not null,
+  referencia_cruda     text,
+  at                   timestamptz not null default now(),
+  notificado_en        timestamptz
+);
+
+create table audit_log (
+  id                uuid primary key default gen_random_uuid(),
+  at                timestamptz not null default now(),
+  workspace_id      uuid references workspace(id) on delete set null,
+  actor_app_user_id uuid references app_user(id),
+  actor_kind        tipo_actor not null,
+  accion            text not null,
+  sujeto_tipo       text,
+  sujeto_id         uuid,
+  detalle           jsonb,
+  pack_hash         text,
+  nucleo_hash       text
+);
+
+create index audit_ws on audit_log (workspace_id, at desc);
+
+-- El acceso del administrador a conversaciones también se registra.
+create table conversation_access_log (
+  id                  uuid primary key default gen_random_uuid(),
+  at                  timestamptz not null default now(),
+  admin_app_user_id   uuid not null references app_user(id),
+  workspace_id        uuid not null references workspace(id),
+  sujeto_app_user_id  uuid references app_user(id),
+  motivo              text
+);
+
+-- =========================================================================
+-- Reglas
+-- =========================================================================
+
+-- --- El estado es una proyección, no un campo editable -------------------
+
+create or replace function aplicar_evento_tarea() returns trigger
+security definer set search_path = prisma, public as $$
+begin
+  perform set_config('prisma.aplicando_evento', '1', true);
+  update task
+     set estado = new.estado_nuevo,
+         actualizado_en = new.at
+   where id = new.task_id;
+  perform set_config('prisma.aplicando_evento', '0', true);
+  return new;
+end $$ language plpgsql;
+
+create trigger trg_aplicar_evento_tarea
+  after insert on task_state_event
+  for each row execute function aplicar_evento_tarea();
+
+create or replace function bloquear_estado_directo() returns trigger as $$
+begin
+  if new.objective_id is distinct from old.objective_id
+     or new.titulo is distinct from old.titulo
+     or new.descripcion is distinct from old.descripcion
+     or new.area_id is distinct from old.area_id
+     or new.responsable_membership_id is distinct from old.responsable_membership_id
+     or new.fecha_objetivo is distinct from old.fecha_objetivo
+     or new.criterio_aceptacion is distinct from old.criterio_aceptacion
+     or new.evidencia_requerida is distinct from old.evidencia_requerida
+     or new.evidencia_policy_version is distinct from old.evidencia_policy_version
+     or new.source_draft_id is distinct from old.source_draft_id then
+    raise exception 'Los campos de compromiso de una tarea son inmutables.';
+  end if;
+  if new.estado is distinct from old.estado
+     and coalesce(current_setting('prisma.aplicando_evento', true), '0') <> '1' then
+    raise exception
+      'El estado de una tarea no se escribe directamente. Insertá una fila en task_state_event.';
+  end if;
+  return new;
+end $$ language plpgsql;
+
+create trigger trg_bloquear_estado_directo
+  before update on task
+  for each row execute function bloquear_estado_directo();
+
+create or replace function aplicar_evento_objetivo() returns trigger as $$
+begin
+  perform set_config('prisma.aplicando_evento', '1', true);
+  update objective
+     set estado = new.estado_nuevo, actualizado_en = new.at
+   where id = new.objective_id;
+  perform set_config('prisma.aplicando_evento', '0', true);
+  return new;
+end $$ language plpgsql;
+
+create trigger trg_aplicar_evento_objetivo
+  after insert on objective_state_event
+  for each row execute function aplicar_evento_objetivo();
+
+-- --- Sin ciclos en las dependencias --------------------------------------
+
+create or replace function evitar_ciclo_dependencia() returns trigger as $$
+declare hay_ciclo boolean;
+begin
+  with recursive alcanzables as (
+    select new.origen_task_id as t
+    union
+    select d.origen_task_id
+      from dependency d join alcanzables a on d.destino_task_id = a.t
+  )
+  select exists (select 1 from alcanzables where t = new.destino_task_id)
+    into hay_ciclo;
+
+  if hay_ciclo then
+    raise exception 'La dependencia crea un ciclo.';
+  end if;
+  return new;
+end $$ language plpgsql;
+
+create trigger trg_evitar_ciclo_dependencia
+  before insert or update on dependency
+  for each row execute function evitar_ciclo_dependencia();
+
+-- --- Un bloqueo no existe sin causa --------------------------------------
+
+create or replace function exigir_bloqueo_abierto() returns trigger as $$
+begin
+  if new.estado_nuevo = 'bloqueada'
+     and not exists (select 1 from blocker
+                      where task_id = new.task_id and resuelto_en is null) then
+    raise exception 'No se puede bloquear una tarea sin un bloqueo abierto que la explique.';
+  end if;
+  return new;
+end $$ language plpgsql;
+
+create trigger trg_exigir_bloqueo_abierto
+  before insert on task_state_event
+  for each row execute function exigir_bloqueo_abierto();
+
+-- --- Condiciones de cierre -----------------------------------------------
+-- Devuelven null si se puede cerrar, o el motivo por el que no.
+-- Esto es lo que impide que el modelo de lenguaje dé por terminada una tarea.
+
+create or replace function motivo_no_cierra_tarea(p_task uuid)
+returns text as $$
+declare
+  t            task%rowtype;
+  aprobador    uuid;
+  dep_abiertas integer;
+begin
+  select * into t from task where id = p_task;
+  if not found then return 'La tarea no existe.'; end if;
+
+  -- Que el criterio sea obligatorio lo decide el pack del espacio.
+  if coalesce((select valor::text::boolean from workspace_setting
+                where workspace_id = t.workspace_id
+                  and clave = 'exigir_criterio_aceptacion'), true)
+     and (t.criterio_aceptacion is null or btrim(t.criterio_aceptacion) = '') then
+    return 'Falta el criterio de aceptación.';
+  end if;
+
+  if array_length(t.evidencia_requerida, 1) is not null
+     and not exists (select 1 from evidence where task_id = p_task) then
+    return 'Falta la evidencia requerida.';
+  end if;
+
+  if exists (select 1 from blocker where task_id = p_task and resuelto_en is null) then
+    return 'La tarea tiene un bloqueo abierto.';
+  end if;
+
+  select count(*) into dep_abiertas
+    from dependency d join task o on o.id = d.origen_task_id
+   where d.destino_task_id = p_task
+     and d.tipo = 'bloqueante'
+     and o.estado not in ('terminada', 'cancelada');
+  if dep_abiertas > 0 then
+    return format('Quedan %s dependencias bloqueantes sin resolver.', dep_abiertas);
+  end if;
+
+  -- La aprobación de una tarea la da quien revisa el trabajo de su
+  -- responsable. Es por persona, no por área: Marcos aprueba a Nahuel aunque
+  -- estén en áreas distintas, y a Marcos lo aprueba Dirección.
+  select m.aprobador_membership_id into aprobador
+    from membership m where m.id = t.responsable_membership_id;
+
+  if aprobador is not null
+     and not exists (
+       select 1 from approval a
+        where a.sujeto_tipo = 'tarea' and a.sujeto_id = p_task
+          and a.decision = 'aprobado'
+          and a.aprobador_membership_id = aprobador) then
+    return 'Falta la aprobación de quien revisa ese trabajo.';
+  end if;
+
+  return null;
+end $$ language plpgsql;
+
+create or replace function motivo_no_cierra_objetivo(p_obj uuid)
+returns text as $$
+declare
+  o            objective%rowtype;
+  hijas        integer;
+  sub          integer;
+  areas_faltan integer;
+begin
+  select * into o from objective where id = p_obj;
+  if not found then return 'El objetivo no existe.'; end if;
+
+  select count(*) into hijas from task
+   where objective_id = p_obj and estado not in ('terminada', 'cancelada');
+  if hijas > 0 then
+    return format('Quedan %s tareas sin terminar.', hijas);
+  end if;
+
+  select count(*) into sub from objective
+   where parent_id = p_obj and estado not in ('terminado', 'cancelado');
+  if sub > 0 then
+    return format('Quedan %s objetivos hijos sin terminar.', sub);
+  end if;
+
+  -- Cada área que participó tiene que haber aprobado su componente.
+  select count(*) into areas_faltan
+    from (select distinct area_id from task
+           where objective_id = p_obj and estado = 'terminada') part
+   where not exists (
+     select 1 from approval a
+       join membership m on m.id = a.aprobador_membership_id
+      where a.sujeto_tipo = 'objetivo' and a.sujeto_id = p_obj
+        and a.decision = 'aprobado' and m.area_id = part.area_id);
+  if areas_faltan > 0 then
+    return format('Faltan %s áreas por aprobar su componente.', areas_faltan);
+  end if;
+
+  -- Y la autoridad final del espacio.
+  if not exists (
+    select 1 from approval a
+      join membership m on m.id = a.aprobador_membership_id
+      join rol r on r.id = m.rol_id
+     where a.sujeto_tipo = 'objetivo' and a.sujeto_id = p_obj
+       and a.decision = 'aprobado' and r.autoridad_final) then
+    return 'Falta la aprobación final.';
+  end if;
+
+  return null;
+end $$ language plpgsql;
+
+-- El disparador que hace que la regla no se pueda saltear.
+create or replace function exigir_condiciones_de_cierre() returns trigger as $$
+declare motivo text;
+begin
+  if new.estado_nuevo = 'terminada' then
+    motivo := motivo_no_cierra_tarea(new.task_id);
+    if motivo is not null then
+      raise exception 'No se puede cerrar la tarea: %', motivo;
+    end if;
+  end if;
+  return new;
+end $$ language plpgsql;
+
+create trigger trg_exigir_condiciones_de_cierre
+  before insert on task_state_event
+  for each row execute function exigir_condiciones_de_cierre();
+
+create or replace function exigir_condiciones_de_cierre_obj() returns trigger as $$
+declare motivo text;
+begin
+  if new.estado_nuevo = 'terminado' then
+    motivo := motivo_no_cierra_objetivo(new.objective_id);
+    if motivo is not null then
+      raise exception 'No se puede cerrar el objetivo: %', motivo;
+    end if;
+  end if;
+  return new;
+end $$ language plpgsql;
+
+create trigger trg_exigir_condiciones_de_cierre_obj
+  before insert on objective_state_event
+  for each row execute function exigir_condiciones_de_cierre_obj();
+
+-- =========================================================================
+-- Aislamiento entre espacios
+--
+-- El agente se conecta con prisma_app y sólo ve el espacio que declara en
+-- prisma.workspace_id. El aislamiento no depende de que el modelo se acuerde.
+-- =========================================================================
+
+do $$ begin
+  if not exists (select 1 from pg_roles where rolname = 'prisma_app') then
+    create role prisma_app nologin;
+  end if;
+  if not exists (select 1 from pg_roles where rolname = 'prisma_admin') then
+    create role prisma_admin nologin bypassrls;
+  end if;
+  if not exists (select 1 from pg_roles where rolname = 'prisma_gateway') then
+    create role prisma_gateway nologin noinherit;
+  end if;
+end $$;
+alter role prisma_gateway noinherit nobypassrls;
+
+do $$
+declare t text;
+begin
+  foreach t in array array[
+    'area','rol','membership','objective','task','task_draft',
+    'task_evidence_policy','dependency','blocker',
+    'evidence','approval','pending_reply','inbound_message','message_outbox',
+    'pending_action','pending_action_option',
+    'cadence_job','escalation_route','glossary_term','approval_policy',
+    'workspace_setting','message_template','permission']
+  loop
+    execute format('alter table %I enable row level security', t);
+    execute format('alter table %I force row level security', t);
+    execute format($f$
+      create policy aislamiento_espacio on %I
+        using (workspace_id = nullif(current_setting('prisma.workspace_id', true), '')::uuid)
+    $f$, t);
+    execute format('grant select, insert, update, delete on %I to prisma_app', t);
+  end loop;
+end $$;
+
+-- Committed tasks are created only by confirmar_borrador_tarea(). The admin
+-- role keeps direct access for controlled maintenance and legacy test data.
+revoke insert on task from prisma_app;
+revoke update, delete on task from prisma_app;
+grant select on task to prisma_app;
+revoke update, delete on task_draft from prisma_app;
+revoke insert, update, delete on task_evidence_policy from prisma_app;
+grant execute on function confirmar_borrador_tarea(uuid, text, bigint)
+  to prisma_gateway;
+revoke execute on function confirmar_borrador_tarea(uuid, text, bigint)
+  from prisma_app;
+
+-- El agente no consulta app_user directamente: lo haría por encima del
+-- aislamiento, porque esa tabla es global. Usa esta vista, que pasa por
+-- membership y por lo tanto queda acotada al espacio activo.
+create view integrante with (security_barrier = true) as
+  select m.id            as membership_id,
+         m.workspace_id,
+         m.area_id,
+         m.rol_id,
+         m.aprobador_membership_id,
+         m.activo,
+         u.id            as app_user_id,
+         u.telegram_user_id,
+         u.nombre
+    from membership m
+    join app_user u on u.id = m.app_user_id
+   where m.workspace_id = nullif(current_setting('prisma.workspace_id', true), '')::uuid;
+
+comment on view integrante is
+  'Personas del espacio activo. La vista corre con permisos de su dueño, así que app_user nunca se expone a prisma_app; el filtro explícito es lo que acota al espacio. Sin prisma.workspace_id definido no devuelve nada.';
+
+grant usage on schema prisma to prisma_app, prisma_admin;
+grant usage on schema prisma to prisma_gateway;
+-- approval_requirement no lleva workspace_id: sólo se llega a ella por
+-- approval_policy, que sí tiene RLS.
+grant select on workspace, work_calendar, holiday, persona_config,
+                integrante, absence, model_config, workspace_version,
+                approval_requirement to prisma_app;
+grant insert on task_state_event, objective_state_event, audit_log,
+                incident, absence to prisma_app;
+grant all on all tables in schema prisma to prisma_admin;
+grant all on integrante to prisma_admin;

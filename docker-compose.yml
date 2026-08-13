@@ -1,0 +1,70 @@
+# Los cuatro procesos de la VPS. La base corre acá mismo: los datos no salen
+# de tu infraestructura y la migración futura a servidor propio es mover un
+# volumen y un pg_dump.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: prisma
+      POSTGRES_USER: prisma
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?falta en .env}
+    volumes:
+      - datos:/var/lib/postgresql/data
+      - ./db/respaldos:/respaldos
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U prisma"]
+      interval: 10s
+      retries: 5
+    restart: unless-stopped
+
+  app:
+    build: .
+    command: python -m prisma servir --puerto 8080
+    env_file: .env
+    environment:
+      PRISMA_DB_URL: postgresql://prisma:${POSTGRES_PASSWORD}@postgres:5432/prisma
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8080:8080"
+    restart: unless-stopped
+
+  # Separado de app a propósito: si el webhook se cae, la cola no se pierde,
+  # y si el despachador se traba, Telegram sigue recibiendo.
+  despachador:
+    build: .
+    command: >
+      sh -c "while true; do
+               python -m prisma despachar corework || true;
+               sleep 30;
+             done"
+    env_file: .env
+    environment:
+      PRISMA_DB_URL: postgresql://prisma:${POSTGRES_PASSWORD}@postgres:5432/prisma
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  respaldo:
+    image: postgres:16-alpine
+    entrypoint: >
+      sh -c "while true; do
+               pg_dump -h postgres -U prisma prisma
+                 | gzip > /respaldos/prisma-$$(date +%%Y%%m%%d).sql.gz;
+               find /respaldos -name '*.sql.gz' -mtime +30 -delete;
+               sleep 86400;
+             done"
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ./db/respaldos:/respaldos
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  datos:
