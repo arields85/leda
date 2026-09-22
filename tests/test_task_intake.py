@@ -1472,6 +1472,59 @@ def test_two_workspaces_do_not_share_requests_or_candidates(intake_world, conn):
     assert request_ids[0] != request_ids[1]
 
 
+def test_un_espacio_no_puede_mover_el_estado_de_una_tarea_de_otro(
+        intake_world, conn):
+    """El aislamiento entre clientes es la garantía número uno del producto.
+
+    `task_state_event` es la única vía autorizada para cambiar el estado de una
+    tarea: `task.estado` es su proyección. Si esa vía no está acotada por
+    espacio, un cliente le mueve el trabajo a otro.
+    """
+    north = intake_world["north-lab"]
+    west = intake_world["west-studio"]
+
+    with admin(conn) as cur:
+        cur.execute(
+            """insert into task (workspace_id, objective_id, titulo, area_id,
+                                 responsable_membership_id, estado)
+               values (%s, %s, 'Trabajo de West', %s, %s, 'asignada')
+               returning id""",
+            (west["id"], west["objectives"][0], west["areas"]["field"],
+             west["people"]["Taylor Quinn"]["membership_id"]))
+        tarea_ajena = cur.fetchone()["id"]
+    conn.commit()
+
+    inexistente = uuid.uuid4()
+    errores = {}
+    for etiqueta, objetivo in (("ajena", tarea_ajena),
+                               ("inexistente", inexistente)):
+        with espacio(conn, north["id"]) as cur:
+            with pytest.raises(psycopg.Error) as excinfo, conn.transaction():
+                cur.execute(
+                    """insert into task_state_event
+                         (task_id, estado_anterior, estado_nuevo, actor_kind,
+                          actor_app_user_id, motivo)
+                       values (%s, 'asignada', 'en_curso', 'persona', %s,
+                               'cruce de espacios')""",
+                    (objetivo,
+                     north["people"]["Taylor Quinn"]["app_user_id"]))
+            errores[etiqueta] = excinfo.value
+
+    # Sin oráculo de enumeración: una tarea de otro espacio y una que no existe
+    # tienen que ser indistinguibles. Si difieren, el error revela cuáles de los
+    # identificadores probados son reales.
+    assert type(errores["ajena"]) is type(errores["inexistente"])
+    assert str(errores["ajena"]) == str(errores["inexistente"])
+
+    with admin(conn) as cur:
+        cur.execute("select estado from task where id = %s", (tarea_ajena,))
+        assert cur.fetchone()["estado"] == "asignada"
+        cur.execute(
+            "select count(*) n from task_state_event where task_id = %s",
+            (tarea_ajena,))
+        assert cur.fetchone()["n"] == 0
+
+
 def test_workspace_correlation_constraints_and_rls_reject_cross_tenant_children(
         intake_world, conn):
     north = intake_world["north-lab"]
@@ -1527,6 +1580,106 @@ def test_workspace_correlation_constraints_and_rls_reject_cross_tenant_children(
                    values (%s, %s, 1, 'cross-rls')""",
                 (west["id"], requests["west-studio"]),
             )
+
+
+def _retrato_de_aislamiento(url, tablas):
+    """Cómo quedó el aislamiento de unas tablas, leído del catálogo real."""
+    import psycopg
+    from psycopg.rows import dict_row
+
+    retrato = {}
+    with psycopg.connect(url, autocommit=True, row_factory=dict_row) as db:
+        for tabla in tablas:
+            columnas = db.execute(
+                """select column_name, data_type, is_nullable
+                     from information_schema.columns
+                    where table_schema = 'prisma' and table_name = %s
+                    order by column_name""", (tabla,)).fetchall()
+            seguridad = db.execute(
+                """select relrowsecurity, relforcerowsecurity
+                     from pg_class where oid = %s::regclass""",
+                (f"prisma.{tabla}",)).fetchone()
+            politicas = db.execute(
+                """select polname, pg_get_expr(polqual, polrelid) as expresion
+                     from pg_policy where polrelid = %s::regclass
+                    order by polname""", (f"prisma.{tabla}",)).fetchall()
+            disparadores = db.execute(
+                """select tgname from pg_trigger
+                    where tgrelid = %s::regclass and not tgisinternal
+                    order by tgname""", (f"prisma.{tabla}",)).fetchall()
+            permisos = db.execute(
+                """select privilege_type from information_schema.role_table_grants
+                    where grantee = 'prisma_app' and table_schema = 'prisma'
+                      and table_name = %s
+                    order by privilege_type""", (tabla,)).fetchall()
+            retrato[tabla] = {
+                "columnas": columnas, "seguridad": seguridad,
+                "politicas": politicas, "disparadores": disparadores,
+                "permisos": permisos,
+            }
+    return retrato
+
+
+def test_instalacion_limpia_y_base_migrada_convergen_en_el_aislamiento():
+    """Paridad comprobada contra dos bases reales, no comparando texto.
+
+    La prueba textual de más abajo sólo busca cadenas en los archivos. Acá se
+    instala el esquema limpio en una base, se migra otra desde el esquema
+    anterior a 0002, y se comparan los catálogos efectivos: columnas, RLS,
+    políticas, disparadores y privilegios. Si divergen, una instalación nueva y
+    una migrada no quedan igual de aisladas.
+    """
+    maintenance = os.environ.get("PRISMA_TEST_DB_URL")
+    if not maintenance:
+        pytest.skip("Migration rehearsal requires the pytest-authorized test server.")
+
+    import psycopg
+    from psycopg.conninfo import conninfo_to_dict, make_conninfo
+    from psycopg.sql import SQL, Identifier
+
+    tablas = ("task_state_event", "objective_state_event")
+    sufijo = uuid.uuid4().hex[:10]
+    nombres = {"limpia": f"prisma_limpia_{sufijo}",
+               "migrada": f"prisma_migrada_{sufijo}"}
+    urls = {}
+    try:
+        for clave, nombre in nombres.items():
+            with psycopg.connect(maintenance, autocommit=True) as control:
+                control.execute(SQL("create database {}").format(Identifier(nombre)))
+            urls[clave] = make_conninfo(
+                **{**conninfo_to_dict(maintenance), "dbname": nombre})
+
+        with psycopg.connect(urls["limpia"], autocommit=True) as db:
+            db.execute((ROOT / "db" / "esquema.sql").read_text("utf-8"))
+
+        base = subprocess.run(
+            ["git", "show", f"{BASELINE_REF}:db/esquema.sql"], cwd=ROOT,
+            check=True, capture_output=True).stdout.decode("utf-8")
+        with psycopg.connect(urls["migrada"], autocommit=True) as db:
+            db.execute(base)
+            for archivo in ("0002_general_task_intake.sql",
+                            "0003_state_event_isolation.sql"):
+                db.execute(_sql_script(ROOT / "db" / "migrations" / archivo))
+
+        limpia = _retrato_de_aislamiento(urls["limpia"], tablas)
+        migrada = _retrato_de_aislamiento(urls["migrada"], tablas)
+
+        for tabla in tablas:
+            assert limpia[tabla] == migrada[tabla], (
+                f"{tabla}: la instalación limpia y la base migrada no "
+                f"convergen.\nlimpia:  {limpia[tabla]}\nmigrada: {migrada[tabla]}")
+            assert limpia[tabla]["seguridad"]["relrowsecurity"]
+            assert limpia[tabla]["seguridad"]["relforcerowsecurity"]
+            assert [p["polname"] for p in limpia[tabla]["politicas"]] == [
+                "aislamiento_espacio"]
+            assert any(c["column_name"] == "workspace_id"
+                       and c["is_nullable"] == "NO"
+                       for c in limpia[tabla]["columnas"])
+    finally:
+        for nombre in nombres.values():
+            with psycopg.connect(maintenance, autocommit=True) as control:
+                control.execute(SQL("drop database if exists {} with (force)")
+                                .format(Identifier(nombre)))
 
 
 def test_migration_clean_schema_parity_and_guarded_rollback():

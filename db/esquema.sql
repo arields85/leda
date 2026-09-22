@@ -410,8 +410,11 @@ create index task_vencimiento on task (fecha_objetivo)
   where estado in ('asignada', 'en_curso', 'bloqueada');
 
 -- Registro append-only. Es la verdad; task.estado es su proyección.
+-- workspace_id no lo aporta quien inserta: lo deriva de la fila padre el
+-- disparador derivar_espacio_evento_tarea(), más abajo.
 create table task_state_event (
   id               uuid primary key default gen_random_uuid(),
+  workspace_id     uuid not null references workspace(id) on delete cascade,
   task_id          uuid not null references task(id) on delete cascade,
   estado_anterior  estado_tarea,
   estado_nuevo     estado_tarea not null,
@@ -422,9 +425,11 @@ create table task_state_event (
 );
 
 create index task_state_event_task on task_state_event (task_id, at desc);
+create index task_state_event_ws on task_state_event (workspace_id, at desc);
 
 create table objective_state_event (
   id                uuid primary key default gen_random_uuid(),
+  workspace_id      uuid not null references workspace(id) on delete cascade,
   objective_id      uuid not null references objective(id) on delete cascade,
   estado_anterior   estado_objetivo,
   estado_nuevo      estado_objetivo not null,
@@ -433,6 +438,9 @@ create table objective_state_event (
   motivo            text,
   at                timestamptz not null default now()
 );
+
+create index objective_state_event_ws
+  on objective_state_event (workspace_id, at desc);
 
 create table dependency (
   id               uuid primary key default gen_random_uuid(),
@@ -1210,6 +1218,44 @@ create table conversation_access_log (
 -- Reglas
 -- =========================================================================
 
+-- --- El espacio de un evento se deriva, no se declara ---------------------
+
+-- Estas dos funciones NO son security definer, y eso es deliberado. Corren con
+-- los privilegios de quien llama, así que la RLS de la tabla padre esconde una
+-- fila de otro espacio: el select no la encuentra y el insert falla.
+--
+-- De ahí que el mensaje sea neutro y no nombre el identificador. Uno que dijera
+-- "permiso insuficiente", o que distinguiera entre ajena e inexistente, sería
+-- en sí mismo un oráculo: confirmaría que esa fila existe pero pertenece a otro
+-- cliente. Un identificador ajeno tiene que fallar idéntico a uno inventado.
+create or replace function derivar_espacio_evento_tarea() returns trigger as $$
+begin
+  select t.workspace_id into new.workspace_id
+    from task t where t.id = new.task_id;
+  if new.workspace_id is null then
+    raise exception 'task_state_event: la tarea referida no existe';
+  end if;
+  return new;
+end $$ language plpgsql;
+
+create trigger trg_derivar_espacio_evento_tarea
+  before insert on task_state_event
+  for each row execute function derivar_espacio_evento_tarea();
+
+create or replace function derivar_espacio_evento_objetivo() returns trigger as $$
+begin
+  select o.workspace_id into new.workspace_id
+    from objective o where o.id = new.objective_id;
+  if new.workspace_id is null then
+    raise exception 'objective_state_event: el objetivo referido no existe';
+  end if;
+  return new;
+end $$ language plpgsql;
+
+create trigger trg_derivar_espacio_evento_objetivo
+  before insert on objective_state_event
+  for each row execute function derivar_espacio_evento_objetivo();
+
 -- --- El estado es una proyección, no un campo editable -------------------
 
 create or replace function aplicar_evento_tarea() returns trigger
@@ -1474,6 +1520,7 @@ begin
   foreach t in array array[
     'area','rol','membership','objective','task','task_draft',
     'task_evidence_policy','dependency','blocker',
+    'task_state_event','objective_state_event',
     'evidence','approval','pending_reply','inbound_message','message_outbox',
     'pending_action','pending_action_option','task_intake_request',
     'task_intake_field','task_intake_choice_set','task_intake_choice',
@@ -1503,6 +1550,12 @@ grant update (objective_id, objective_snapshot, titulo, descripcion, area_id,
               evidencia_policy_version, version, estado, actualizado_en)
   on task_draft to prisma_app;
 revoke insert, update, delete on task_evidence_policy from prisma_app;
+-- Los eventos de estado son append-only y prisma_app no los lee: sólo escribe
+-- hechos. Están en el arreglo de arriba por su política de aislamiento, que es
+-- lo que impide escribir contra una tarea de otro espacio; el bucle concede el
+-- juego completo, así que acá se recorta al insert que es lo único legítimo.
+revoke select, update, delete on task_state_event from prisma_app;
+revoke select, update, delete on objective_state_event from prisma_app;
 grant execute on function confirmar_borrador_tarea(uuid, text, bigint, bigint)
   to prisma_gateway;
 grant execute on function resolver_ingreso_borrador(uuid, text, bigint, bigint)
@@ -1539,7 +1592,8 @@ grant usage on schema prisma to prisma_gateway;
 grant select on workspace, work_calendar, holiday, persona_config,
                 integrante, absence, model_config, workspace_version,
                 approval_requirement to prisma_app;
-grant insert on task_state_event, objective_state_event, audit_log,
-                incident, absence to prisma_app;
+-- task_state_event y objective_state_event ya reciben su insert por el bucle de
+-- aislamiento, que además les instala la política.
+grant insert on audit_log, incident, absence to prisma_app;
 grant all on all tables in schema prisma to prisma_admin;
 grant all on integrante to prisma_admin;
