@@ -19,6 +19,7 @@ Reglas que este módulo hace cumplir:
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
@@ -46,6 +47,16 @@ class Accion:
     cuerpo: str
     dedupe_key: str
     escalamiento: bool = False
+
+
+@dataclass
+class AccionBloqueo:
+    bloqueo_id: str
+    task_id: str
+    destinatario_membership_id: str
+    chat_id: int | None
+    cuerpo: str
+    dedupe_key: str
 
 
 def _paso_correspondiente(cal: Calendario, vence: datetime, ahora: datetime) -> tuple[str, str] | None:
@@ -169,6 +180,114 @@ def _ruta_escalamiento(cur, workspace_id: str, area_id: str):
         """,
         (workspace_id, area_id))
     return cur.fetchone()
+
+
+def _ruta_bloqueo_transversal(cur, workspace_id: str):
+    """Ruta del bloqueo transversal del espacio (mecánica §8).
+
+    No reutiliza `_ruta_escalamiento`: esa función no filtra por
+    `disparador`, así que para una tarea de OT devolvería la ruta de
+    `problema_tecnico` de esa área (destino Marcos), que es la escalada
+    técnica de un vencimiento, no la de un bloqueo. Un bloqueo escala
+    siempre por la ruta transversal, sea cual sea el área de la tarea.
+    """
+    cur.execute(
+        """
+        select i.membership_id as id, i.telegram_user_id
+          from escalation_route r
+          join integrante i
+            on (r.destino_membership_id = i.membership_id
+                or (r.destino_rol_id is not null and i.rol_id = r.destino_rol_id
+                    and i.workspace_id = r.workspace_id))
+         where r.workspace_id = %s and r.disparador = 'bloqueo_transversal'
+         order by r.orden
+         limit 1
+        """,
+        (workspace_id,))
+    return cur.fetchone()
+
+
+def _dias_escalada_bloqueo(cur, workspace_id: str) -> int | None:
+    """Días hábiles de antigüedad a partir de los cuales un bloqueo escala
+    solo. Sale de `workspace_setting['bloqueos']`, que el importador guarda
+    desde el pack (`bloqueos.escala_solo_a_los_dias`) y hasta ahora nadie
+    leía. Sin configuración, no hay escalamiento automático."""
+    cur.execute(
+        "select valor from workspace_setting "
+        "where workspace_id = %s and clave = 'bloqueos'",
+        (workspace_id,))
+    fila = cur.fetchone()
+    if not fila:
+        return None
+    valor = fila["valor"]
+    if isinstance(valor, str):
+        valor = json.loads(valor)
+    dias = valor.get("escala_solo_a_los_dias")
+    return int(dias) if dias is not None else None
+
+
+def evaluar_bloqueos(cur: psycopg.Cursor, workspace_id: str, cal: Calendario,
+                     ahora: datetime | None = None) -> list[AccionBloqueo]:
+    """Bloqueos abiertos que ya superaron la antigüedad del pack y todavía no
+    escalaron. No envía nada."""
+    ahora = ahora or datetime.now(timezone.utc)
+    dias = _dias_escalada_bloqueo(cur, workspace_id)
+    if dias is None:
+        return []
+
+    cur.execute(
+        """select b.id, b.task_id, b.causa, b.abierto_en, t.titulo, i.nombre
+             from blocker b
+             join task t on t.id = b.task_id
+             join integrante i on i.membership_id = t.responsable_membership_id
+            where b.workspace_id = %s and b.resuelto_en is null
+              and b.escalado_en is null""",
+        (workspace_id,))
+    bloqueos = cur.fetchall()
+
+    acciones: list[AccionBloqueo] = []
+    for b in bloqueos:
+        # "hace más de [pack] días": al cumplirse justo el umbral todavía no.
+        if cal.habiles_entre(b["abierto_en"], ahora) <= dias:
+            continue
+        destino = _ruta_bloqueo_transversal(cur, workspace_id)
+        if destino is None:
+            continue
+        acciones.append(AccionBloqueo(
+            bloqueo_id=str(b["id"]), task_id=str(b["task_id"]),
+            destinatario_membership_id=str(destino["id"]),
+            chat_id=destino["telegram_user_id"],
+            cuerpo=(f"«{b['titulo']}», de {b['nombre']}, tiene un bloqueo sin "
+                    f"resolver hace más de {dias} días hábiles: {b['causa']}. "
+                    f"Lo escalo."),
+            dedupe_key=f"{workspace_id}:bloqueo-escalado:{b['id']}"))
+    return acciones
+
+
+def encolar_bloqueos(cur: psycopg.Cursor, workspace_id: str,
+                     acciones: list[AccionBloqueo],
+                     ahora: datetime | None = None) -> int:
+    """Deja los bloqueos escalados en la cola y deja constancia en la fila.
+
+    Igual que `encolar`: la marca de escalado se pone aunque el mensaje se
+    deduplique, porque lo que importa acá es que no se vuelva a evaluar este
+    bloqueo, no si esta corrida en particular pudo mandar el aviso.
+    """
+    ahora = ahora or datetime.now(timezone.utc)
+    encoladas = 0
+    for a in acciones:
+        if a.chat_id is None:
+            continue  # todavía no activó su enlace de Telegram
+        encoladas += enqueue_outbox(
+            cur, workspace_id=workspace_id, chat_id=a.chat_id, text=a.cuerpo,
+            recipient_membership_id=a.destinatario_membership_id,
+            message_type="prioritario", scheduled_for=ahora,
+            dedupe_key=a.dedupe_key,
+        )
+        cur.execute(
+            "update blocker set escalado_a = %s, escalado_en = %s where id = %s",
+            (a.destinatario_membership_id, ahora, a.bloqueo_id))
+    return encoladas
 
 
 def encolar(cur: psycopg.Cursor, workspace_id: str, acciones: list[Accion],

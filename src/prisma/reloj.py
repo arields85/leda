@@ -137,7 +137,14 @@ def _resumen_grupal(cur, workspace_id: str) -> str:
 def ejecutar_escalera(cur: psycopg.Cursor, workspace_id: str,
                       cal: Calendario, ahora: datetime | None = None) -> int:
     acciones = escalera.evaluar(cur, workspace_id, cal, ahora)
-    return escalera.encolar(cur, workspace_id, acciones, cal, ahora)
+    encoladas = escalera.encolar(cur, workspace_id, acciones, cal, ahora)
+
+    # Los bloqueos abiertos escalan por su propia antigüedad, no por el
+    # vencimiento de la tarea: la mecánica §8 los trata aparte de la
+    # escalera de recordatorios, pero corren en la misma pasada.
+    bloqueos = escalera.evaluar_bloqueos(cur, workspace_id, cal, ahora)
+    encoladas += escalera.encolar_bloqueos(cur, workspace_id, bloqueos, ahora)
+    return encoladas
 
 
 # ---------------------------------------------------------------------------

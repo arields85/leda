@@ -28,6 +28,7 @@ No se rehace.
 | Router de intención tipado | `llm.py`: un validador cerrado para cuatro proveedores |
 | Contrato único de salida | `salida.py`: normalización, medición UTF-16, división |
 | Escalera de recordatorios | `escalera.py`: cinco pasos en días hábiles, respeta ausencias |
+| Ciclo de vida de un bloqueo | `resolver_bloqueo` cierra y devuelve la tarea al estado previo a `bloqueada`; un bloqueo abierto hace más de `bloqueos.escala_solo_a_los_dias` días hábiles escala solo por la ruta transversal del pack |
 | Despacho idempotente | `dedupe_key`, reintento con incidente, respeta jornada |
 | Puerto de lectura | `lectura.py`: seis consultas agregadas, el espacio sale de la sesión |
 | Tablero de cliente | Credencial por enlace con vencimiento + pantalla |
@@ -46,7 +47,7 @@ Cada uno tiene diseño escrito y cero código.
 | **Almacenamiento documental** | Especificación §11 | `evidence.drive_file_id` sin uso |
 | **Reuniones e informes** | Especificación §17.2 y §23 | Anunciar, pedir temas, consolidar, agenda, minutas. `corework.yaml` declara `reunion_periodica` y el importador no la consume |
 | **Dependencias entre tareas** | Mecánica §4 | Crearlas, y avisar en cadena a los afectados antes del vencimiento |
-| **Cerrar bloqueos** | Mecánica §8 | Se abren y quedan abiertos. Tampoco escalan por antigüedad |
+| **Conversación de bloqueos** | Mecánica §8, pasos 2 a 7 | Abrir y cerrar un bloqueo ya funciona. Pedir la información mínima, proponer soluciones, preguntar por ayuda y proponer reasignaciones siguen sin construir; dependen de dependencias, la unidad anterior de esta tabla |
 | **Umbral de re-aprobación** | Mecánica §7 | El importador lo guarda en la base y ningún código lo lee |
 | **Privacidad configurable** | Especificación §19 | Sin código **ni** esquema. No existe matriz de visibilidad |
 | **Aprendizaje** | Mecánica §14 | Tabla `learning` vacía de uso |
@@ -71,9 +72,6 @@ operar Prisma de verdad.
 **El puerto de lectura no lista tareas.** Sus seis consultas son agregadas, y
 las únicas que nombran tareas son vencidas, bloqueadas y esperando aprobación.
 Una tarea asignada sin fecha no aparece en ninguna parte del tablero.
-
-**Un bloqueo no se puede cerrar.** `blocker.resolucion` y `blocker.escalado_a`
-existen en el esquema y nadie los escribe.
 
 ## Capacidades construidas que ningún documento describe
 

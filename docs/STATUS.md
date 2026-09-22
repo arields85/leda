@@ -132,12 +132,15 @@ se verifica sobre una base nueva dentro de un clúster existente.
 
 ## Próximo paso
 
-1. **Línea base versionada.** Registrar el trabajo acumulado en un commit con historia
-   recuperable. Es precondición de cualquier refactor.
-2. **Cierre del aislamiento entre clientes.** Agregar `workspace_id` y política de RLS
-   a las tablas de eventos de estado, fijar propietario explícito para cada función
-   `security definer`, y verificar el propietario efectivo en una instalación limpia.
-   El criterio de cierre está en [`ROADMAP.md`](ROADMAP.md#orden-de-entrega).
+**Dependencias entre tareas** (mecánica §4). El ciclo de vida de un bloqueo ya cierra
+—`resolver_bloqueo` devuelve la tarea al estado previo y un bloqueo abierto hace más
+de `bloqueos.escala_solo_a_los_dias` días hábiles escala solo—, pero `dependency` sigue
+siendo una tabla que nadie llena: `escalera.py` ya cuenta filas de esa tabla para el
+texto de un recordatorio y siempre da cero. Falta:
 
-El resto del orden de trabajo está en [`ROADMAP.md`](ROADMAP.md). No reanudar Telegram
-real ni operación hasta cerrar el riesgo 1.
+1. crear una dependencia entre dos tareas, con rechazo de ciclos al crearla;
+2. cuando la tarea origen de una dependencia bloqueante se atrasa, calcular el impacto
+   en cadena y avisar a los responsables afectados antes de que venzan sus propias
+   fechas.
+
+El resto del orden de trabajo está en [`ROADMAP.md`](ROADMAP.md).
