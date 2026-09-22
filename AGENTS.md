@@ -17,11 +17,22 @@ decisión explícita y documentada.
    configuración de cada cliente.
 2. Leer `docs/architecture/frontera.md` para conocer dónde termina el núcleo y qué
    reglas lo gobiernan.
-3. Leer `docs/STATUS.md` para conocer estado, riesgos y próximo paso.
-4. Leer `docs/ROADMAP.md` para conocer el orden de trabajo vigente.
-5. Leer `docs/INDEX.md` para elegir sólo el detalle necesario.
-6. Leer los ADR aplicables antes de cambiar dominio o arquitectura.
-7. Contrastar cualquier afirmación con código, esquema y pruebas actuales.
+3. Leer `nucleo/`: `constitucion.md`, `mecanica-pm.md` y `alta-de-equipo.md`.
+   Son el comportamiento **obligatorio** de Prisma, no material de consulta.
+   Una auditoría que no los lea no es una auditoría del proyecto.
+4. Leer `docs/capacidades.md` para saber qué está construido, qué está
+   diseñado sin construir y qué es esquema sin implementación.
+5. Leer `docs/STATUS.md` para conocer estado, riesgos y próximo paso.
+6. Leer `docs/ROADMAP.md` para conocer el orden de trabajo vigente.
+7. Leer `docs/INDEX.md` para elegir sólo el detalle necesario.
+8. Leer los ADR aplicables antes de cambiar dominio o arquitectura.
+9. Contrastar cualquier afirmación con código, esquema y pruebas actuales.
+
+**Al auditar, auditar contra este repositorio.** El corpus propio del proyecto
+—`nucleo/`, la especificación funcional, el esquema, los paquetes de espacio—
+es la fuente. Un documento externo sirve como insumo, nunca como el patrón
+contra el cual medir: medir contra él deja fuera todo lo que el proyecto ya
+decidió y nadie volvió a leer.
 
 No leer archivos `.env*`, salvo `.env.ejemplo` cuando sea necesario revisar la
 plantilla pública. Nunca mostrar secretos, tokens, credenciales, URLs privadas ni
@@ -41,8 +52,13 @@ Orden de autoridad para describir lo que existe hoy:
 5. `docs/decisions/`: decisiones aceptadas que gobiernan cambios futuros, salvo las
    marcadas como superadas.
 6. `docs/STATUS.md` y `docs/ROADMAP.md`: estado y orden de trabajo vigentes.
-7. `README.md`, `PRUEBA-LOCAL.md` y `nucleo/`: guía operativa y reglas existentes;
-   deben contrastarse con la implementación si hay discrepancias.
+7. `README.md` y `PRUEBA-LOCAL.md`: guía operativa; contrastar con la
+   implementación si hay discrepancias.
+
+`nucleo/` no es material de consulta: es el comportamiento obligatorio. Su
+autoridad está por encima de cualquier documento de `docs/`, y una auditoría
+de este proyecto que no lo haya leído entero no está terminada. Buena parte de
+lo que manda todavía no tiene código; `docs/capacidades.md` lleva la cuenta.
 
 `docs/product/functional-specification.md` quedó superada por el cambio de alcance a
 producto multi-tenant. Se conserva como insumo histórico y no describe el alcance
