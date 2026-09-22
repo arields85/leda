@@ -1539,6 +1539,33 @@ begin
   return null;
 end $$ language plpgsql;
 
+-- El estado de una tarea es la proyección del último evento, y `prisma_app`
+-- no puede leer `task_state_event` directamente: es un registro append-only,
+-- con el `select` revocado más abajo. Sin esta puerta angosta, salir de
+-- `bloqueada` no tendría forma de saber a qué estado volver sin adivinar
+-- `asignada`, que la mecánica §3 prohíbe explícitamente.
+--
+-- Filtra por `estado_nuevo = 'bloqueada'` a propósito: no alcanza con "el
+-- último evento de la tarea". `actualizar_estado` no exige bloqueos cerrados
+-- para salir de `bloqueada` (deuda conocida, no hay todavía un disparador que
+-- valide transiciones), así que el último evento puede ser una salida hacia
+-- otro estado con el bloqueo todavía abierto. Lo que hace falta acá es el
+-- `estado_anterior` de la última vez que la tarea ENTRÓ a `bloqueada`, no el
+-- de cualquier evento posterior. Quien llama sigue teniendo que comprobar
+-- que la tarea esté bloqueada *ahora* antes de usar este valor.
+create or replace function estado_previo_a_bloqueo(p_task uuid)
+returns estado_tarea
+language plpgsql security definer set search_path = prisma, public, pg_temp as $$
+declare previo estado_tarea;
+begin
+  select estado_anterior into previo
+    from task_state_event
+   where task_id = p_task and estado_nuevo = 'bloqueada'
+   order by at desc
+   limit 1;
+  return previo;
+end $$;
+
 create or replace function motivo_no_cierra_objetivo(p_obj uuid)
 returns text as $$
 declare
@@ -1739,6 +1766,11 @@ alter function resolver_ingreso_borrador(uuid, text, bigint, bigint)
   owner to prisma_owner;
 alter function aplicar_evento_tarea()
   owner to prisma_owner;
+alter function estado_previo_a_bloqueo(uuid)
+  owner to prisma_owner;
+
+revoke execute on function estado_previo_a_bloqueo(uuid) from public;
+grant execute on function estado_previo_a_bloqueo(uuid) to prisma_app;
 
 -- La concesión general de arriba alcanzó a `acceso_tablero` por haberse
 -- definido antes. Se la acota a lo que sus dos funciones necesitan, que es lo

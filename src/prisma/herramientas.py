@@ -513,19 +513,109 @@ def _actualizar_estado(cur, quien: Solicitante, tarea_id, estado, motivo=None):
      "causa": {"type": "string", "requerido": True},
      "impacto": {"type": "string"}})
 def _registrar_bloqueo(cur, quien: Solicitante, tarea_id, causa, impacto=None):
+    cur.execute("select estado from task where id = %s", (tarea_id,))
+    fila = cur.fetchone()
+    if not fila:
+        return {"error": "esa tarea no existe en este equipo"}
+    if fila["estado"] in ("terminada", "cancelada"):
+        return {"error": "esa tarea ya está cerrada, no se le puede agregar un bloqueo"}
+
     cur.execute(
         """insert into blocker (workspace_id, task_id, causa, impacto, abierto_por)
            values (%s, %s, %s, %s, %s) returning id""",
         (quien.workspace_id, tarea_id, causa, impacto, quien.membership_id))
     bid = cur.fetchone()["id"]
-    cur.execute("select estado from task where id = %s", (tarea_id,))
-    cur.execute(
-        """insert into task_state_event (task_id, estado_anterior, estado_nuevo,
-                                         actor_kind, actor_app_user_id, motivo)
-           values (%s, (select estado from task where id = %s), 'bloqueada',
-                   'persona', %s, %s)""",
-        (tarea_id, tarea_id, quien.app_user_id, causa))
+
+    # Si ya estaba bloqueada, el bloqueo se suma a los que tiene: no hay una
+    # segunda transición `bloqueada -> bloqueada` que registrar.
+    if fila["estado"] != "bloqueada":
+        cur.execute(
+            """insert into task_state_event (task_id, estado_anterior, estado_nuevo,
+                                             actor_kind, actor_app_user_id, motivo)
+               values (%s, %s, 'bloqueada', 'persona', %s, %s)""",
+            (tarea_id, fila["estado"], quien.app_user_id, causa))
     return {"bloqueo_id": str(bid)}
+
+
+@herramienta(
+    "resolver_bloqueo", "resolver_bloqueo",
+    "Cierra un bloqueo con su resolución. Cuando era el último abierto de la "
+    "tarea, la tarea vuelve al estado que tenía antes de bloquearse.",
+    {"bloqueo_id": {"type": "string", "requerido": True},
+     "resolucion": {"type": "string", "requerido": True}},
+    valida_en_handler=True)
+def _resolver_bloqueo(cur, quien: Solicitante, bloqueo_id, resolucion):
+    resolucion = (resolucion or "").strip()
+    if not resolucion:
+        raise Denegado("Hace falta contar cómo se resolvió para poder cerrarlo.")
+
+    cur.execute(
+        """select b.task_id, b.resuelto_en, b.abierto_por, b.escalado_a,
+                  t.responsable_membership_id
+             from blocker b join task t on t.id = b.task_id
+            where b.id = %s""",
+        (bloqueo_id,))
+    fila = cur.fetchone()
+    if not fila:
+        # RLS ya deja pasar sólo lo del espacio activo: un id de otro espacio
+        # llega hasta acá igual de vacío que uno que nunca existió.
+        return {"error": "ese bloqueo no existe en este equipo"}
+    if fila["resuelto_en"] is not None:
+        return {"error": "ese bloqueo ya estaba resuelto"}
+
+    autorizados = {str(m) for m in (fila["responsable_membership_id"],
+                                    fila["abierto_por"], fila["escalado_a"])
+                  if m is not None}
+    if str(quien.membership_id) not in autorizados:
+        raise Denegado(
+            "No podés resolver ese bloqueo: no es tuyo, no lo abriste vos ni "
+            "se te escaló.")
+
+    cur.execute(
+        "update blocker set resuelto_en = now(), resolucion = %s where id = %s",
+        (resolucion, bloqueo_id))
+
+    cur.execute(
+        "select count(*) n from blocker where task_id = %s and resuelto_en is null",
+        (fila["task_id"],))
+    quedan_abiertos = cur.fetchone()["n"] > 0
+
+    tarea_desbloqueada = False
+    if not quedan_abiertos:
+        # `actualizar_estado` no exige bloqueos cerrados para salir de
+        # `bloqueada` (deuda conocida, docs/STATUS.md "Pendiente": no hay
+        # disparador que valide transiciones todavía), así que la tarea puede
+        # haber salido por otro camino mientras este bloqueo seguía abierto.
+        # Si ya no está bloqueada, no hay a qué "volver": resolver el último
+        # bloqueo no la mueve.
+        cur.execute("select estado from task where id = %s", (fila["task_id"],))
+        estado_actual = cur.fetchone()["estado"]
+        if estado_actual == "bloqueada":
+            # `bloqueada` es una proyección: el estado al que se vuelve es el
+            # que tenía el último evento que entró a `bloqueada`, nunca un
+            # valor fijo. `task_state_event` es append-only y prisma_app no
+            # lo lee directo; esta función security definer es la única
+            # puerta.
+            cur.execute("select estado_previo_a_bloqueo(%s) as previo",
+                       (fila["task_id"],))
+            previo = cur.fetchone()["previo"]
+            if previo is None:
+                # No hay a qué volver y no se inventa un valor: ni null ni
+                # `asignada` por defecto. Levanta después del `update` de
+                # arriba a propósito -- la excepción deshace toda la
+                # herramienta, incluida la resolución del bloqueo, dentro del
+                # mismo punto de retorno por herramienta que usa `agente.py`.
+                raise Denegado(
+                    "No pude determinar a qué estado vuelve la tarea: no "
+                    "tiene un estado anterior a bloqueada registrado.")
+            cur.execute(
+                """insert into task_state_event
+                     (task_id, estado_anterior, estado_nuevo, actor_kind,
+                      actor_app_user_id, motivo)
+                   values (%s, 'bloqueada', %s, 'persona', %s, %s)""",
+                (fila["task_id"], previo, quien.app_user_id, resolucion))
+            tarea_desbloqueada = True
+    return {"resuelto": True, "tarea_desbloqueada": tarea_desbloqueada}
 
 
 @herramienta(

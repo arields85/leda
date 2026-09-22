@@ -41,10 +41,6 @@ PROMESAS_SIN_CUMPLIR = {
     "destino_task_id":
         "Dependencias entre tareas. `escalera.py` cuenta filas que nadie crea, "
         "así que 'dependencias invisibles' —misión §2— no se puede reducir.",
-    "resolucion":
-        "Cerrar un bloqueo. Hoy un bloqueo se abre y queda abierto para siempre.",
-    "escalado_a":
-        "A quién se escaló un bloqueo.",
     "drive_file_id":
         "Evidencia almacenada en Drive (§11 de la especificación funcional).",
     "preguntado_en":

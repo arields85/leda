@@ -1774,6 +1774,62 @@ def test_migration_clean_schema_parity_and_guarded_rollback():
     assert "confirmar_borrador_tarea(uuid, text, bigint, bigint)" in migration
 
 
+def test_0007_estado_previo_a_bloqueo_llega_por_migracion_con_dueno_correcto():
+    """Corrección tras revisión: la función vivía sólo en `esquema.sql`.
+
+    `db/migrations/README.md` dice que `esquema.sql` es la fuente para bases
+    limpias de prueba nada más: una base existente (CoreWork) avanza con los
+    scripts de `db/migrations/`. Sin uno para `estado_previo_a_bloqueo`,
+    `resolver_bloqueo` fallaría contra ella con "function does not exist".
+    """
+    maintenance = os.environ.get("PRISMA_TEST_DB_URL")
+    if not maintenance:
+        pytest.skip("Migration rehearsal requires the pytest-authorized test server.")
+
+    from psycopg.conninfo import conninfo_to_dict, make_conninfo
+    from psycopg.rows import dict_row
+    from psycopg.sql import SQL, Identifier
+
+    database = f"prisma_0007_migration_{uuid.uuid4().hex[:12]}"
+    with psycopg.connect(maintenance, autocommit=True) as control:
+        control.execute(SQL("create database {}").format(Identifier(database)))
+    url = make_conninfo(**{**conninfo_to_dict(maintenance), "dbname": database})
+    try:
+        baseline = subprocess.run(
+            ["git", "show", f"{BASELINE_REF}:db/esquema.sql"], cwd=ROOT,
+            check=True, capture_output=True).stdout.decode("utf-8")
+        with psycopg.connect(url, autocommit=True, row_factory=dict_row) as db:
+            db.execute(baseline)
+            # Cadena completa desde el directorio, no a mano: nombrarlas dejó
+            # una migración nueva fuera de esta comparación cuatro veces.
+            for migracion in _migraciones_posteriores_a("0001"):
+                db.execute(_sql_script(migracion))
+
+            existe = db.execute(
+                "select to_regprocedure("
+                "'prisma.estado_previo_a_bloqueo(uuid)') as f"
+            ).fetchone()["f"]
+            assert existe is not None, (
+                "estado_previo_a_bloqueo no llegó por la cadena de migraciones")
+
+            fila = db.execute(
+                """select r.rolname dueno,
+                          has_function_privilege('public',
+                            'prisma.estado_previo_a_bloqueo(uuid)', 'execute') publico,
+                          has_function_privilege('prisma_app',
+                            'prisma.estado_previo_a_bloqueo(uuid)', 'execute') app
+                     from pg_proc p join pg_roles r on r.oid = p.proowner
+                    where p.oid = 'prisma.estado_previo_a_bloqueo(uuid)'::regprocedure"""
+            ).fetchone()
+            assert fila["dueno"] == "prisma_owner"
+            assert fila["publico"] is False
+            assert fila["app"] is True
+    finally:
+        with psycopg.connect(maintenance, autocommit=True) as control:
+            control.execute(SQL("drop database if exists {} with (force)").format(
+                Identifier(database)))
+
+
 def test_migration_rejects_mojibake_then_accepts_zero_unit1a_rows():
     maintenance = os.environ.get("PRISMA_TEST_DB_URL")
     if not maintenance:
