@@ -28,6 +28,8 @@ from datetime import datetime, timedelta, timezone
 
 import psycopg
 
+from .salida import enqueue_outbox
+
 VIGENCIA = timedelta(days=14)
 
 
@@ -180,14 +182,11 @@ def encolar_presentacion(cur: psycopg.Cursor, workspace_id: str,
     fila = cur.fetchone()
     if not fila or not fila["grupo_chat_id"]:
         return False
-    cur.execute(
-        """insert into message_outbox
-             (workspace_id, chat_id, tipo, cuerpo, estado, programado_para, dedupe_key)
-           values (%s, %s, 'informativo', %s, 'listo', %s, %s)
-           on conflict (dedupe_key) do nothing""",
-        (workspace_id, fila["grupo_chat_id"], texto, ahora,
-         f"{workspace_id}:presentacion"))
-    return cur.rowcount > 0
+    return enqueue_outbox(
+        cur, workspace_id=workspace_id, chat_id=fila["grupo_chat_id"], text=texto,
+        message_type="informativo", scheduled_for=ahora,
+        dedupe_key=f"{workspace_id}:presentacion", allow_split=True,
+    ) > 0
 
 
 def pendientes_de_activar(cur: psycopg.Cursor, workspace_id: str) -> list[str]:

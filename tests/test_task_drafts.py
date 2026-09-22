@@ -18,6 +18,7 @@ from prisma.calendario import Calendario
 from prisma.db import admin, autoridad, conectar, espacio
 from prisma.despachador import TransporteDePrueba, despachar
 from prisma.llm import Llamada, ProveedorGuionado, Respuesta
+from prisma.salida import NO_EFFECT_STATUS
 
 
 AHORA = datetime(2026, 8, 12, 15, 0, tzinfo=timezone.utc)
@@ -53,7 +54,7 @@ def _args(objetivo, **cambios):
 def _crear_preview(cur, ws, **cambios):
     quien = _quien(cur, "Nahuel Gimenez", ws)
     objetivo = cambios.pop("objetivo_id", None) or _objetivo(cur, ws)
-    return H.ejecutar(cur, quien, "crear_tarea", _args(objetivo, **cambios))
+    return H.crear_borrador_tarea(cur, quien, **_args(objetivo, **cambios))
 
 
 def _token(cur, pending_id):
@@ -73,7 +74,8 @@ def _telegram(cur, nombre):
 
 def _confirmar(authority_conn, ws, token, telegram_user_id):
     with autoridad(authority_conn) as cur:
-        resultado = P.resolver_borrador(cur, ws, token, telegram_user_id)
+        resultado = P.resolver_borrador(
+            cur, ws, token, telegram_user_id, telegram_user_id)
     return resultado
 
 
@@ -87,7 +89,7 @@ def test_cada_dato_faltante_deja_solo_un_borrador(corework, conn, faltante):
         args = _args(_objetivo(cur, ws))
         args.pop(faltante)
 
-        resultado = H.ejecutar(cur, quien, "crear_tarea", args)
+        resultado = H.crear_borrador_tarea(cur, quien, **args)
 
         assert resultado["completa"] is False
         assert faltante in resultado["faltantes"]
@@ -176,7 +178,7 @@ def test_responsable_raiz_solo_puede_ser_confirmado_por_autoridad_final(
     ws = corework.workspace_id
     with espacio(conn, ws) as cur:
         quien = _quien(cur, "Ismael Soschinski", ws)
-        resultado = H.ejecutar(cur, quien, "crear_tarea", _args(
+        resultado = H.crear_borrador_tarea(cur, quien, **_args(
             _objetivo(cur, ws), responsable="Ismael Soschinski",
             area_slug="direccion"))
 
@@ -193,7 +195,7 @@ def test_integrante_no_puede_proponer_trabajo_ajeno(corework, conn):
     with espacio(conn, ws) as cur:
         quien = _quien(cur, "Nahuel Gimenez", ws)
         with pytest.raises(Denegado):
-            H.ejecutar(cur, quien, "crear_tarea", _args(
+            H.crear_borrador_tarea(cur, quien, **_args(
                 _objetivo(cur, ws), responsable="Lucas Natuche",
                 area_slug="it"))
         cur.execute("select count(*) n from task_draft")
@@ -314,8 +316,10 @@ def test_doble_confirmacion_secuencial_crea_una_sola_tarea(
         token = _token(cur, resultado["pending_action_id"])
         telegram = _telegram(cur, "Marcos Tarquini")
 
-    assert _confirmar(authority_conn, ws, token, telegram) is not None
-    assert _confirmar(authority_conn, ws, token, telegram) is None
+    first = _confirmar(authority_conn, ws, token, telegram)
+    replay = _confirmar(authority_conn, ws, token, telegram)
+    assert first is not None
+    assert replay is not None and replay.replay and replay.task_id == first.task_id
     with espacio(conn, ws) as cur:
         cur.execute("select count(*) n from task where source_draft_id = %s",
                     (resultado["draft_id"],))
@@ -341,7 +345,8 @@ def test_doble_confirmacion_concurrente_crea_una_sola_tarea(
         try:
             with autoridad(otra) as cur:
                 barrera.wait()
-                resultados.append(P.resolver_borrador(cur, ws, token, telegram))
+                resultados.append(P.resolver_borrador(
+                    cur, ws, token, telegram, telegram))
         finally:
             otra.close()
 
@@ -351,7 +356,9 @@ def test_doble_confirmacion_concurrente_crea_una_sola_tarea(
     for hilo in hilos:
         hilo.join()
 
-    assert sum(r is not None for r in resultados) == 1
+    assert len(resultados) == 2
+    assert sum(not r.replay for r in resultados) == 1
+    assert sum(r.replay for r in resultados) == 1
     with admin(conn) as cur:
         cur.execute("select count(*) n from task where source_draft_id = %s",
                     (resultado["draft_id"],))
@@ -388,7 +395,7 @@ def test_fallo_posterior_al_insert_revierte_toda_la_conversion(
     try:
         with pytest.raises(psycopg.errors.RaiseException):
             with autoridad(authority_conn) as cur:
-                P.resolver_borrador(cur, ws, token, telegram)
+                P.resolver_borrador(cur, ws, token, telegram, telegram)
     finally:
         with conn.transaction():
             with conn.cursor() as cur:
@@ -427,7 +434,7 @@ def test_ruta_directa_de_aplicacion_no_puede_insertar_tareas(corework, conn):
                 (ws, objetivo))
 
 
-def test_agente_no_publica_hecho_antes_de_confirmar(corework, conn):
+def test_agente_legacy_no_crea_preview_ni_tarea(corework, conn):
     ws = corework.workspace_id
     with espacio(conn, ws) as cur:
         quien = _quien(cur, "Nahuel Gimenez", ws)
@@ -442,14 +449,14 @@ def test_agente_no_publica_hecho_antes_de_confirmar(corework, conn):
                                ProveedorGuionado(guion), cal, chat_id=-1001,
                                ahora=AHORA)
 
-        assert resultado.texto == ""
+        assert resultado.texto.endswith(NO_EFFECT_STATUS)
+        assert resultado.texto.count(NO_EFFECT_STATUS) == 1
         cur.execute("select count(*) n from task")
         assert cur.fetchone()["n"] == 0
-        cur.execute("select cuerpo, chat_id from message_outbox")
-        mensajes = cur.fetchall()
-        assert mensajes
-        assert all("Hecho" not in m["cuerpo"] for m in mensajes)
-        assert all(m["chat_id"] != -1001 for m in mensajes)
+        cur.execute("select count(*) n from task_draft")
+        assert cur.fetchone()["n"] == 0
+        cur.execute("select pending_action_id from message_outbox")
+        assert cur.fetchone()["pending_action_id"] is None
 
 
 @pytest.fixture
@@ -573,14 +580,14 @@ def test_prisma_app_no_puede_ejecutar_compromiso_ni_usar_overload_anterior(
         cur.execute(
             """select has_function_privilege(
                  current_user,
-                 'prisma.confirmar_borrador_tarea(uuid,text,bigint)',
+                 'prisma.confirmar_borrador_tarea(uuid,text,bigint,bigint)',
                  'EXECUTE') as puede""")
         assert cur.fetchone()["puede"] is False
 
     with pytest.raises(psycopg.errors.InsufficientPrivilege):
         with espacio(conn, ws) as cur:
-            cur.execute("select * from confirmar_borrador_tarea(%s, %s, %s)",
-                        (ws, token, telegram))
+            cur.execute("select * from confirmar_borrador_tarea(%s, %s, %s, %s)",
+                        (ws, token, telegram, telegram))
 
     with espacio(conn, ws) as cur:
         cur.execute(
@@ -612,7 +619,7 @@ def test_login_autoridad_es_exclusivo_y_no_administra_tablas(
         cur.execute(
             """select has_function_privilege(
                  current_user,
-                 'prisma.confirmar_borrador_tarea(uuid,text,bigint)',
+                 'prisma.confirmar_borrador_tarea(uuid,text,bigint,bigint)',
                  'EXECUTE') as puede,
                has_table_privilege(current_user, 'prisma.task', 'SELECT')
                  as lee_task""")

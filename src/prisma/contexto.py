@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import hashlib
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from functools import lru_cache
 from pathlib import Path
 
@@ -56,6 +56,9 @@ Tres cosas que importan más que el resto:
   devuelve que falta algo, decilo tal cual.
 - No muestres detalles técnicos: nada de errores, rutas, nombres de
   herramientas, modelos ni razonamiento interno.
+- La creación de una tarea se resuelve antes de este turno. No simules un
+  borrador ni pidas confirmarlo sólo con texto: el servidor produce el resumen
+  para revisar y sus botones.
 
 Escribí como se escribe en un chat de trabajo: breve, sin encabezados, sin
 listas largas salvo que te pidan un listado.
@@ -91,8 +94,10 @@ def _ambiguos(texto: str, nombres: list[str]) -> dict[str, list[str]]:
 
 
 def construir(cur: psycopg.Cursor, quien: Solicitante,
-              texto_entrante: str = "") -> Contexto:
+              texto_entrante: str = "",
+              ahora: datetime | None = None) -> Contexto:
     nucleo_txt, nucleo_hash = _nucleo()
+    ahora = ahora or datetime.now(timezone.utc)
 
     cur.execute(
         """select nombre_visible, registro, formalidad, longitud, emojis
@@ -148,8 +153,13 @@ def construir(cur: psycopg.Cursor, quien: Solicitante,
     fila = cur.fetchone()
     pack_hash = fila["pack_hash"] if fila else None
 
-    cur.execute("select nombre from workspace where id = %s", (quien.workspace_id,))
-    nombre_espacio = cur.fetchone()["nombre"]
+    cur.execute("select nombre, zona_horaria from workspace where id = %s",
+                (quien.workspace_id,))
+    workspace = cur.fetchone()
+    nombre_espacio = workspace["nombre"]
+    from zoneinfo import ZoneInfo
+    zona = ZoneInfo(workspace["zona_horaria"])
+    momento_local = ahora.astimezone(zona)
 
     bloques = [
         PREAMBULO,
@@ -185,6 +195,10 @@ def construir(cur: psycopg.Cursor, quien: Solicitante,
     quien_txt = [
         "# Con quién estás hablando",
         "",
+        f"Su nombre verificado por la membresía es {quien.nombre}. No le "
+        "preguntes su nombre ni lo vuelvas a resolver.",
+        f"Fecha y hora local actual: {momento_local:%Y-%m-%d %H:%M:%S %z} "
+        f"({workspace['zona_horaria']}).",
         f"Rol en este equipo: {quien.rol_slug}."
         + (" Tiene la decisión final." if quien.autoridad_final else ""),
     ]

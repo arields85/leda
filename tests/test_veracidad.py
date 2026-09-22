@@ -23,6 +23,7 @@ from prisma.autoridad import Canal, identificar
 from prisma.calendario import Calendario
 from prisma.db import admin, espacio
 from prisma.llm import Llamada, ProveedorGuionado, Respuesta
+from prisma.salida import NO_EFFECT_STATUS
 
 BA = ZoneInfo("America/Argentina/Buenos_Aires")
 AHORA = datetime(2026, 7, 27, 10, 0, tzinfo=BA)
@@ -91,7 +92,7 @@ def test_no_anuncia_como_hecho_lo_que_quedo_esperando_confirmacion(corework, con
         autoridad.REQUIEREN_CONFIRMACION.discard("actualizar_estado")
 
 
-def test_no_anuncia_como_hecho_lo_que_quedo_esperando_una_eleccion(corework, conn):
+def test_legacy_crear_tarea_no_produce_eleccion_ni_efecto(corework, conn):
     ws = corework.workspace_id
     with espacio(conn, ws) as cur:
         quien = _quien(cur, "Ismael Soschinski", ws)
@@ -112,8 +113,11 @@ def test_no_anuncia_como_hecho_lo_que_quedo_esperando_una_eleccion(corework, con
                   ProveedorGuionado(guion), cal, chat_id=9000, ahora=AHORA)
 
         cuerpos = _cuerpos(cur)
-        assert not any("asigné" in c for c in cuerpos), cuerpos
-        assert any("¿A quién le asigno" in c for c in cuerpos)
+        assert any(NO_EFFECT_STATUS in c for c in cuerpos), cuerpos
+        cur.execute("select count(*) n from pending_action")
+        assert cur.fetchone()["n"] == 0
+        cur.execute("select count(*) n from task_draft")
+        assert cur.fetchone()["n"] == 0
 
 
 def test_no_arrastra_el_texto_de_una_vuelta_anterior(corework, conn):
@@ -174,7 +178,7 @@ def test_una_respuesta_normal_sale_tal_cual(corework, conn):
                       chat_id=9004, ahora=AHORA)
 
         assert r.texto == "Tenés dos tareas abiertas esta semana."
-        assert _cuerpos(cur) == ["Tenés dos tareas abiertas esta semana."]
+        assert _cuerpos(cur) == [r.texto]
 
 
 def test_lo_que_si_ejecuto_lo_puede_contar(corework, conn):

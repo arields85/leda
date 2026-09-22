@@ -20,6 +20,7 @@ from apscheduler.triggers.cron import CronTrigger
 
 from . import escalera
 from .calendario import Calendario
+from .salida import enqueue_outbox
 
 
 def _plantilla(cur, workspace_id: str, clave: str) -> str | None:
@@ -85,15 +86,12 @@ def _ausente(cur, membership_id, ahora) -> bool:
 
 def _encolar(cur, workspace_id, chat_id, membership_id, cuerpo, dedupe,
              cal: Calendario, ahora) -> int:
-    cur.execute(
-        """insert into message_outbox
-             (workspace_id, chat_id, destinatario_membership_id, tipo, cuerpo,
-              estado, programado_para, dedupe_key)
-           values (%s, %s, %s, 'seguimiento', %s, 'listo', %s, %s)
-           on conflict (dedupe_key) do nothing""",
-        (workspace_id, chat_id, membership_id, cuerpo,
-         cal.dentro_de_jornada(ahora), dedupe))
-    return cur.rowcount
+    return enqueue_outbox(
+        cur, workspace_id=workspace_id, chat_id=chat_id, text=cuerpo,
+        recipient_membership_id=membership_id, message_type="seguimiento",
+        scheduled_for=cal.dentro_de_jornada(ahora), dedupe_key=dedupe,
+        allow_split=True,
+    )
 
 
 def _resumen_personal(cur, workspace_id: str, membership_id: str,

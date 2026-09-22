@@ -25,6 +25,7 @@ from datetime import datetime, timezone
 import psycopg
 
 from .calendario import Calendario
+from .salida import enqueue_outbox
 
 PASOS = [
     (-1, "aviso",     "informativo"),
@@ -179,17 +180,12 @@ def encolar(cur: psycopg.Cursor, workspace_id: str, acciones: list[Accion],
     for a in acciones:
         if a.chat_id is None:
             continue  # todavía no activó su enlace de Telegram
-        cur.execute(
-            """
-            insert into message_outbox
-              (workspace_id, chat_id, destinatario_membership_id, tipo, cuerpo,
-               estado, programado_para, dedupe_key)
-            values (%s, %s, %s, %s, %s, 'listo', %s, %s)
-            on conflict (dedupe_key) do nothing
-            """,
-            (workspace_id, a.chat_id, a.destinatario_membership_id, a.tipo,
-             a.cuerpo, cal.dentro_de_jornada(ahora), a.dedupe_key))
-        encoladas += cur.rowcount
+        encoladas += enqueue_outbox(
+            cur, workspace_id=workspace_id, chat_id=a.chat_id, text=a.cuerpo,
+            recipient_membership_id=a.destinatario_membership_id,
+            message_type=a.tipo, scheduled_for=cal.dentro_de_jornada(ahora),
+            dedupe_key=a.dedupe_key, allow_split=True,
+        )
 
         if a.paso.startswith("recordar") or a.paso == "escalar":
             cur.execute(

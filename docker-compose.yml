@@ -1,16 +1,16 @@
 # Los cuatro procesos de la VPS. La base corre acá mismo: los datos no salen
-# de tu infraestructura y la migración futura a servidor propio es mover un
-# volumen y un pg_dump.
+# de tu infraestructura. Toda migración futura de servidor o versión mayor
+# requiere un procedimiento planificado; no basta con mover o reutilizar el volumen.
 
 services:
   postgres:
-    image: postgres:16-alpine
+    image: postgres:18-alpine
     environment:
       POSTGRES_DB: prisma
       POSTGRES_USER: prisma
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?falta en .env}
     volumes:
-      - datos:/var/lib/postgresql/data
+      - datos:/var/lib/postgresql
       - ./db/respaldos:/respaldos
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U prisma"]
@@ -49,7 +49,7 @@ services:
     restart: unless-stopped
 
   respaldo:
-    image: postgres:16-alpine
+    image: postgres:18-alpine
     entrypoint: >
       sh -c "while true; do
                pg_dump -h postgres -U prisma prisma

@@ -32,6 +32,8 @@ from .calendario import Calendario
 from .contexto import construir, historial, revisar_salida
 from .db import registrar_auditoria
 from .llm import Llamada, Proveedor, Respuesta
+from .salida import (enqueue_outbox, normalize_visible_text,
+                     with_no_effect_status)
 
 MAX_VUELTAS = 5
 
@@ -62,7 +64,7 @@ def responder(cur: psycopg.Cursor, quien: Solicitante, texto_entrante: str,
               ahora: datetime | None = None,
               entrante_id: str | None = None) -> Resultado:
     ahora = ahora or datetime.now(timezone.utc)
-    ctx = construir(cur, quien, texto_entrante)
+    ctx = construir(cur, quien, texto_entrante, ahora=ahora)
     esquemas = H.esquemas()
 
     # Lo que se dijeron hace un rato. `entrante_id` es la fila que el gateway
@@ -72,6 +74,7 @@ def responder(cur: psycopg.Cursor, quien: Solicitante, texto_entrante: str,
     acciones: list[str] = []
     confirmaciones: list[str] = []
     elecciones: list[str] = []
+    intentos_mutacion: list[str] = []
     salida = ""
     cerro = False
 
@@ -89,9 +92,12 @@ def responder(cur: psycopg.Cursor, quien: Solicitante, texto_entrante: str,
             mensajes.append({"role": "assistant", "content": _bloques(r)})
             resultados = []
             for c in r.llamadas:
+                if not c.nombre.startswith("consultar_"):
+                    intentos_mutacion.append(c.nombre)
                 resultados.append(
                     _ejecutar_una(cur, quien, c, ctx, acciones, confirmaciones,
-                                  elecciones, chat_id, cal, ahora))
+                                  elecciones, chat_id, cal, ahora,
+                                  entrante_id, texto_entrante))
             mensajes.append({"role": "user", "content": resultados})
     except Exception as e:  # noqa: BLE001
         _incidente(cur, quien, e)
@@ -128,7 +134,11 @@ def responder(cur: psycopg.Cursor, quien: Solicitante, texto_entrante: str,
     if not salida.strip():
         salida = "Anotado."
 
-    salida = revisar_salida(salida, ctx.variantes_prohibidas)
+    salida = normalize_visible_text(
+        revisar_salida(salida, ctx.variantes_prohibidas))
+    if intentos_mutacion and not any(
+            not accion.startswith("consultar_") for accion in acciones):
+        salida = with_no_effect_status(salida)
     _encolar_respuesta(cur, quien, chat_id, salida, cal, ahora)
     auditar(salida)
 
@@ -145,7 +155,8 @@ def _bloques(r: Respuesta) -> list[dict]:
 
 
 def _ejecutar_una(cur, quien: Solicitante, c: Llamada, ctx, acciones,
-                  confirmaciones, elecciones, chat_id, cal, ahora) -> dict:
+                  confirmaciones, elecciones, chat_id, cal, ahora,
+                  entrante_id, texto_entrante) -> dict:
     """Ejecuta una herramienta y devuelve el bloque de resultado para el modelo.
 
     Los rechazos no son excepciones que cortan el turno: son información que
@@ -213,14 +224,12 @@ def _ejecutar_una(cur, quien: Solicitante, c: Llamada, ctx, acciones,
 
 def _encolar_respuesta(cur, quien: Solicitante, chat_id: int, texto: str,
                        cal: Calendario, ahora: datetime) -> None:
-    cur.execute(
-        """insert into message_outbox
-             (workspace_id, chat_id, destinatario_membership_id, tipo, cuerpo,
-              estado, programado_para, dedupe_key, es_respuesta)
-           values (%s, %s, %s, 'normal', %s, 'listo', %s, %s, true)
-           on conflict (dedupe_key) do nothing""",
-        (quien.workspace_id, chat_id, quien.membership_id, texto, ahora,
-         f"{quien.workspace_id}:respuesta:{quien.app_user_id}:{ahora.timestamp()}"))
+    enqueue_outbox(
+        cur, workspace_id=quien.workspace_id, chat_id=chat_id, text=texto,
+        recipient_membership_id=quien.membership_id, scheduled_for=ahora,
+        dedupe_key=(f"{quien.workspace_id}:respuesta:{quien.app_user_id}:"
+                    f"{ahora.timestamp()}"), is_response=True, allow_split=True,
+    )
 
 
 def _encolar_confirmacion(cur, quien: Solicitante, chat_id: int,
@@ -237,18 +246,14 @@ def _encolar_confirmacion(cur, quien: Solicitante, chat_id: int,
     p = registrar(cur, quien, herramienta=e.herramienta, args=e.argumentos,
                   resumen=e.resumen, vence_en=ahora + VIGENCIA_PENDIENTE,
                   chat_id=chat_id)
-    cur.execute(
-        """insert into message_outbox
-             (workspace_id, chat_id, destinatario_membership_id, tipo, cuerpo,
-              estado, programado_para, dedupe_key, es_respuesta,
-              pending_action_id)
-           values (%s, %s, %s, 'normal', %s, 'listo', %s, %s, true, %s)
-           on conflict (dedupe_key) do nothing""",
-        (quien.workspace_id, chat_id, quien.membership_id,
-         f"Antes de hacerlo, confirmame: {e.resumen}",
-         ahora,
-         f"{quien.workspace_id}:confirmar:{e.herramienta}:{ahora.timestamp()}",
-         p.id))
+    enqueue_outbox(
+        cur, workspace_id=quien.workspace_id, chat_id=chat_id,
+        recipient_membership_id=quien.membership_id,
+        text=f"Antes de hacerlo, confirmame: {e.resumen}", scheduled_for=ahora,
+        dedupe_key=(f"{quien.workspace_id}:confirmar:{e.herramienta}:"
+                    f"{ahora.timestamp()}"), is_response=True,
+        pending_action_id=p.id,
+    )
 
 
 def _encolar_eleccion(cur, quien: Solicitante, chat_id: int,
@@ -264,16 +269,14 @@ def _encolar_eleccion(cur, quien: Solicitante, chat_id: int,
     p = registrar(cur, quien, herramienta=e.herramienta, args=e.argumentos,
                   resumen=e.resumen, vence_en=ahora + VIGENCIA_PENDIENTE,
                   campo=e.campo, opciones=e.opciones, chat_id=chat_id)
-    cur.execute(
-        """insert into message_outbox
-             (workspace_id, chat_id, destinatario_membership_id, tipo, cuerpo,
-              estado, programado_para, dedupe_key, es_respuesta,
-              pending_action_id)
-           values (%s, %s, %s, 'normal', %s, 'listo', %s, %s, true, %s)
-           on conflict (dedupe_key) do nothing""",
-        (quien.workspace_id, chat_id, quien.membership_id, e.resumen, ahora,
-         f"{quien.workspace_id}:elegir:{e.herramienta}:{ahora.timestamp()}",
-         p.id))
+    enqueue_outbox(
+        cur, workspace_id=quien.workspace_id, chat_id=chat_id,
+        recipient_membership_id=quien.membership_id, text=e.resumen,
+        scheduled_for=ahora,
+        dedupe_key=(f"{quien.workspace_id}:elegir:{e.herramienta}:"
+                    f"{ahora.timestamp()}"), is_response=True,
+        pending_action_id=p.id,
+    )
 
 
 def _incidente(cur, quien: Solicitante, error: Exception) -> None:

@@ -28,6 +28,7 @@ from prisma.autoridad import Canal, identificar
 from prisma.calendario import Calendario
 from prisma.db import admin, espacio
 from prisma.llm import Llamada, ProveedorGuionado, Respuesta
+from prisma.salida import NO_EFFECT_STATUS
 
 BA = ZoneInfo("America/Argentina/Buenos_Aires")
 AHORA = datetime(2026, 7, 27, 10, 0, tzinfo=BA)
@@ -56,7 +57,7 @@ def test_un_nombre_que_identifica_a_una_sola_persona_se_guarda_en_borrador(
     ws = corework.workspace_id
     with espacio(conn, ws) as cur:
         quien = _quien(cur, "Ismael Soschinski", ws)
-        r = H.ejecutar(cur, quien, "crear_tarea", {
+        r = H.crear_borrador_tarea(cur, quien, **{
             "titulo": "Relevar tablero", "objetivo_id": _objetivo(cur, ws),
             "area_slug": "ot", "responsable": "Marcos"})
 
@@ -75,7 +76,7 @@ def test_un_nombre_ambiguo_no_crea_nada_y_pregunta(corework, conn):
         quien = _quien(cur, "Ismael Soschinski", ws)
 
         with pytest.raises(H.NecesitaElegir) as e:
-            H.ejecutar(cur, quien, "crear_tarea", {
+            H.crear_borrador_tarea(cur, quien, **{
                 "titulo": "Relevar tablero", "objetivo_id": _objetivo(cur, ws),
                 "area_slug": "ot", "responsable": "Mar"})
 
@@ -93,7 +94,7 @@ def test_un_nombre_que_no_existe_no_crea_la_tarea_sin_responsable(corework, conn
     with espacio(conn, ws) as cur:
         quien = _quien(cur, "Ismael Soschinski", ws)
 
-        r = H.ejecutar(cur, quien, "crear_tarea", {
+        r = H.crear_borrador_tarea(cur, quien, **{
             "titulo": "Relevar tablero", "objetivo_id": _objetivo(cur, ws),
             "area_slug": "ot", "responsable": "Ronaldinho"})
 
@@ -107,7 +108,7 @@ def test_sin_responsable_el_pedido_queda_como_borrador(corework, conn):
     ws = corework.workspace_id
     with espacio(conn, ws) as cur:
         quien = _quien(cur, "Ismael Soschinski", ws)
-        r = H.ejecutar(cur, quien, "crear_tarea", {
+        r = H.crear_borrador_tarea(cur, quien, **{
             "titulo": "Relevar tablero", "objetivo_id": _objetivo(cur, ws),
             "area_slug": "ot"})
 
@@ -198,11 +199,28 @@ def test_un_mensaje_sin_nombres_no_agrega_nada(corework, conn):
         assert "ambiguo" not in ctx.sistema.lower()
 
 
+def test_contexto_expone_identidad_y_reloj_confiables(corework, conn):
+    from prisma.contexto import construir
+
+    ws = corework.workspace_id
+    with espacio(conn, ws) as cur:
+        quien = _quien(cur, "Ismael Soschinski", ws)
+        ctx = construir(cur, quien, "hola", ahora=AHORA)
+
+        assert quien.nombre == "Ismael Soschinski"
+        assert (
+            "Su nombre verificado por la membresía es Ismael Soschinski"
+            in ctx.sistema)
+        assert "No le preguntes su nombre" in ctx.sistema
+        assert "2026-07-27 10:00:00 -0300" in ctx.sistema
+        assert "America/Argentina/Buenos_Aires" in ctx.sistema
+
+
 # ---------------------------------------------------------------------------
 # El circuito completo: el agente pregunta, la persona elige
 # ---------------------------------------------------------------------------
 
-def test_el_agente_deja_la_eleccion_esperando_con_sus_opciones(corework, conn):
+def test_el_agente_legacy_no_puede_abrir_una_eleccion(corework, conn):
     ws = corework.workspace_id
     with espacio(conn, ws) as cur:
         quien = _quien(cur, "Ismael Soschinski", ws)
@@ -213,17 +231,17 @@ def test_el_agente_deja_la_eleccion_esperando_con_sus_opciones(corework, conn):
             Respuesta(llamadas=[Llamada("c1", "crear_tarea", {
                 "titulo": "Relevar tablero", "objetivo_id": obj,
                 "area_slug": "ot", "responsable": "Mar"})]),
-            Respuesta(texto="¿Cuál de los tres?"),
+            Respuesta(texto="No se registró la tarea."),
         ]
         r = responder(cur, quien, "creá una tarea para Mar",
                       ProveedorGuionado(guion), cal, chat_id=9000, ahora=AHORA)
 
         assert r.acciones == []
-        cur.execute("select count(*) n from pending_action where estado = 'esperando'")
-        assert cur.fetchone()["n"] == 1
-        cur.execute("""select count(*) n from message_outbox
-                        where pending_action_id is not null""")
-        assert cur.fetchone()["n"] == 1
+        assert r.texto == NO_EFFECT_STATUS
+        cur.execute("select count(*) n from pending_action")
+        assert cur.fetchone()["n"] == 0
+        cur.execute("select count(*) n from task_draft")
+        assert cur.fetchone()["n"] == 0
 
 
 @pytest.fixture
@@ -236,7 +254,7 @@ def cliente(corework, conn, monkeypatch):
     return TestClient(gateway.app)
 
 
-def test_elegir_el_boton_completa_el_borrador_con_la_persona_exacta(
+def test_callback_legacy_crear_tarea_falla_cerrado(
         cliente, conn, corework):
     ws = corework.workspace_id
     with espacio(conn, ws) as cur:
@@ -266,12 +284,9 @@ def test_elegir_el_boton_completa_el_borrador_con_la_persona_exacta(
                  headers={"X-Telegram-Bot-Api-Secret-Token": "s3cr3t"})
 
     with admin(conn) as cur:
-        cur.execute(
-            """select u.nombre from task_draft d
-                 join membership m on m.id = d.responsable_membership_id
-                 join app_user u on u.id = m.app_user_id""")
-        assert cur.fetchone()["nombre"] == "Marcos Tarquini"
+        cur.execute("select count(*) n from task_draft")
+        assert cur.fetchone()["n"] == 0
         cur.execute("select count(*) n from task")
         assert cur.fetchone()["n"] == 0
-        cur.execute("select cuerpo from message_outbox order by programado_para desc")
-        assert all(f["cuerpo"] != "Hecho." for f in cur.fetchall())
+        cur.execute("select estado from pending_action where id = %s", (p.id,))
+        assert cur.fetchone()["estado"] == "resuelta"

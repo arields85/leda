@@ -18,7 +18,8 @@ from .autoridad import (Canal, Denegado, identificar, identificar_en_espacio)
 from .config import config
 from .db import (admin, autoridad, conectar, conectar_autoridad, espacio,
                  registrar_auditoria)
-from .despachador import acusar_toque
+from .despachador import acusar_toque, mantener_chat_activo
+from .salida import enqueue_outbox, with_no_effect_status
 
 app = FastAPI(title="Prisma", docs_url=None, redoc_url=None)
 router = APIRouter()
@@ -68,6 +69,7 @@ def procesar_update(conn, slug: str, update: dict,
 
     texto = mensaje.get("text", "") if mensaje else ""
     chat_id = mensaje["chat"]["id"] if mensaje else None
+    chat_type = mensaje.get("chat", {}).get("type") if mensaje else None
     tg_user = (mensaje or toque).get("from", {}).get("id")
 
     canal = Canal.ADMINISTRACION if slug == "admin" else Canal.ESPACIO
@@ -95,8 +97,14 @@ def procesar_update(conn, slug: str, update: dict,
     workspace_id = str(ws["id"])
 
     if toque:
-        return _toque(conn, workspace_id, slug, toque, tg_user,
-                      authority_conn=authority_conn)
+        try:
+            resultado = _toque(conn, workspace_id, slug, toque, tg_user,
+                               authority_conn=authority_conn)
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        return resultado
 
     # /start va antes de identificar: quien lo manda todavía no está vinculado.
     if texto.startswith("/start"):
@@ -128,8 +136,19 @@ def procesar_update(conn, slug: str, update: dict,
             actor_app_user_id=quien.app_user_id, actor_kind="persona",
             detalle={"chat_id": chat_id})
 
-        if texto.strip():
-            _turno(cur, quien, texto, workspace_id, chat_id, entrante_id)
+        handled_intake_text = False
+        if texto.strip() and chat_type == "private":
+            from datetime import datetime, timezone
+            from .ingreso_tareas import handle_active_text
+
+            handled_intake_text = handle_active_text(
+                cur, quien, chat_id=chat_id, source_inbound_id=entrante_id,
+                source_raw_text=texto, now=datetime.now(timezone.utc),
+            ) is not None
+
+        if texto.strip() and not handled_intake_text:
+            with mantener_chat_activo(config.token_bot(slug), chat_id):
+                _turno(cur, quien, texto, workspace_id, chat_id, entrante_id)
 
     conn.commit()
     # La respuesta sale por la cola, no por acá: Telegram espera un ACK rápido
@@ -165,14 +184,12 @@ def _activacion(conn, workspace_id: str, texto: str, tg_user: int,
             fila = cur.fetchone()
             if not fila:
                 return {"ok": True}      # desconocido: no se le responde
-            cur.execute(
-                """insert into message_outbox
-                     (workspace_id, chat_id, tipo, cuerpo, estado,
-                      programado_para, dedupe_key, es_respuesta)
-                   values (%s, %s, 'informativo', %s, 'listo', now(), %s, true)
-                   on conflict (dedupe_key) do nothing""",
-                (workspace_id, chat_id, bienvenida(cur, workspace_id, fila["nombre"]),
-                 f"{workspace_id}:alta:{tg_user}"))
+            enqueue_outbox(
+                cur, workspace_id=workspace_id, chat_id=chat_id,
+                text=bienvenida(cur, workspace_id, fila["nombre"]),
+                message_type="informativo", dedupe_key=f"{workspace_id}:alta:{tg_user}",
+                is_response=True, allow_split=True,
+            )
         conn.commit()
         return {"ok": True}
 
@@ -187,13 +204,11 @@ def _activacion(conn, workspace_id: str, texto: str, tg_user: int,
                 cur, accion="activacion", workspace_id=workspace_id,
                 actor_kind="persona", detalle={"nombre": nombre})
 
-        cur.execute(
-            """insert into message_outbox
-                 (workspace_id, chat_id, tipo, cuerpo, estado, programado_para,
-                  dedupe_key, es_respuesta)
-               values (%s, %s, 'informativo', %s, 'listo', now(), %s, true)
-               on conflict (dedupe_key) do nothing""",
-            (workspace_id, chat_id, cuerpo, f"{workspace_id}:alta:{tg_user}"))
+        enqueue_outbox(
+            cur, workspace_id=workspace_id, chat_id=chat_id, text=cuerpo,
+            message_type="informativo", dedupe_key=f"{workspace_id}:alta:{tg_user}",
+            is_response=True, allow_split=True,
+        )
     return {"ok": True}
 
 
@@ -214,9 +229,13 @@ def _toque(conn, workspace_id: str, slug: str, toque: dict,
     from . import pendientes as P
     from .autoridad import Denegado as NoPuede
 
-    token = P.token_de(toque.get("data") or "")
+    from . import ingreso_tareas as I
+
+    callback = toque.get("data") or ""
+    intake_token = I.token_de(callback)
+    token = P.token_de(callback)
     chat_id = (toque.get("message") or {}).get("chat", {}).get("id")
-    if not token or tg_user is None or chat_id is None:
+    if (not token and not intake_token) or tg_user is None or chat_id is None:
         return {"ok": True}
 
     # Antes de trabajar: Telegram quiere el acuse en un par de segundos y lo
@@ -236,6 +255,11 @@ def _toque(conn, workspace_id: str, slug: str, toque: dict,
         except Denegado:
             return {"ok": True}      # desconocido: no se le responde
 
+        if intake_token:
+            I.resolve_choice(cur, quien, token=intake_token,
+                             chat_id=chat_id, now=ahora)
+            return {"ok": True}
+
         try:
             draft_token = P.es_borrador(cur, token)
             if not draft_token:
@@ -243,7 +267,7 @@ def _toque(conn, workspace_id: str, slug: str, toque: dict,
                                       app_user_id=quien.app_user_id, ahora=ahora)
         except NoPuede as e:
             # Se le contesta, pero la acción sigue esperando a quien sí puede.
-            # Salir del `with` confirma el mensaje encolado y nada más.
+            # La frontera exterior confirma el mensaje encolado y nada más.
             _responder(cur, workspace_id, chat_id, quien, str(e), ahora)
             return {"ok": True}
 
@@ -289,7 +313,6 @@ def _toque(conn, workspace_id: str, slug: str, toque: dict,
             conn, authority_conn or _authority_conn(), workspace_id, token,
             tg_user, chat_id, quien, ahora)
 
-    conn.commit()
     return {"ok": True}
 
 
@@ -301,12 +324,17 @@ def _resolver_toque_borrador(conn, authority_conn, workspace_id, token,
     try:
         with autoridad(authority_conn) as authority_cur:
             resuelta = P.resolver_borrador(
-                authority_cur, workspace_id, token, tg_user)
+                authority_cur, workspace_id, token, tg_user, chat_id)
     except Denegado as e:
         resuelta = None
         texto = str(e)
     else:
         texto = None
+
+    if resuelta is not None:
+        # The Unit 1A authority function persisted the terminal visible outbox
+        # row in the same transaction as cancel/convert. Replays reuse it.
+        return {"ok": True}
 
     with espacio(conn, workspace_id) as cur:
         if texto is not None:
@@ -319,33 +347,88 @@ def _resolver_toque_borrador(conn, authority_conn, workspace_id, token,
         else:
             texto = "Hecho. La tarea quedó comprometida."
         _responder(cur, workspace_id, chat_id, quien, texto, ahora)
-    conn.commit()
     return {"ok": True}
 
 
 def _responder(cur, workspace_id: str, chat_id: int, quien, texto: str,
                ahora) -> None:
     """La respuesta al toque sale por la cola, como cualquier otra."""
-    cur.execute(
-        """insert into message_outbox
-             (workspace_id, chat_id, destinatario_membership_id, tipo, cuerpo,
-              estado, programado_para, dedupe_key, es_respuesta)
-           values (%s, %s, %s, 'normal', %s, 'listo', %s, %s, true)
-           on conflict (dedupe_key) do nothing""",
-        (workspace_id, chat_id, quien.membership_id, texto, ahora,
-         f"{workspace_id}:toque:{quien.app_user_id}:{ahora.timestamp()}"))
+    enqueue_outbox(
+        cur, workspace_id=workspace_id, chat_id=chat_id, text=texto,
+        recipient_membership_id=quien.membership_id, scheduled_for=ahora,
+        dedupe_key=f"{workspace_id}:toque:{quien.app_user_id}:{ahora.timestamp()}",
+        is_response=True, allow_split=True,
+    )
 
 
 def _turno(cur, quien, texto: str, workspace_id: str, chat_id: int,
            entrante_id: str | None = None) -> None:
+    from datetime import datetime, timezone
+
     from .agente import responder
     from .calendario import Calendario
-    from .llm import desde_base
+    from .llm import IntentAction, IntentRoute, desde_base
 
+    now = datetime.now(timezone.utc)
     cal = Calendario.desde_base(cur, workspace_id)
     proveedor = desde_base(cur, workspace_id, config.llm_api_key)
-    responder(cur, quien, texto, proveedor, cal, chat_id,
-              entrante_id=entrante_id)
+    route = None
+    last_error = None
+    for _ in range(2):
+        try:
+            candidate = proveedor.route_intent(texto)
+            if not isinstance(candidate, IntentRoute):
+                raise TypeError("The provider returned an untyped route.")
+            route = candidate
+            break
+        except Exception as exc:  # noqa: BLE001
+            last_error = exc
+
+    if route is None:
+        _routing_incident(cur, quien, last_error)
+        _responder(
+            cur, workspace_id, chat_id, quien,
+            with_no_effect_status(
+                "No pude entender si querías crear una tarea. "
+                "Decime de otra forma qué necesitás."), now,
+        )
+        return
+
+    if route.action is IntentAction.NORMAL_CONVERSATION:
+        responder(cur, quien, texto, proveedor, cal, chat_id, ahora=now,
+                  entrante_id=entrante_id)
+        return
+
+    try:
+        if entrante_id is None:
+            raise ValueError("Task routing requires a persisted inbound message.")
+        from .ingreso_tareas import start
+
+        with cur.connection.transaction(force_rollback=False):
+            outcome = start(
+                cur, quien, chat_id=chat_id, source_inbound_id=entrante_id,
+                source_raw_text=texto, proposals=route.task, now=now,
+                buttons_first=True,
+            )
+            if not outcome.changed:
+                raise RuntimeError("Task capture did not open a server-owned prompt.")
+    except Exception as exc:  # noqa: BLE001
+        _routing_incident(cur, quien, exc)
+        _responder(
+            cur, workspace_id, chat_id, quien,
+            with_no_effect_status(
+                "No pude iniciar el borrador de la tarea. "
+                "Probá de nuevo en un chat privado."), now,
+        )
+
+
+def _routing_incident(cur, quien, error) -> None:
+    cur.execute(
+        """insert into incident (workspace_id, severidad, resumen_sanitizado)
+           values (%s, 'media', %s)""",
+        (quien.workspace_id,
+         f"Falló el enrutamiento tipado ({type(error).__name__})."),
+    )
 
 
 @router.get("/salud")

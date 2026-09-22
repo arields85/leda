@@ -1,8 +1,8 @@
 # Estado arquitectónico actual
 
 Prisma es hoy un monolito modular en Python, con PostgreSQL como fuente operativa y
-Telegram como interfaz principal. Esta descripción surge de inspección estática; la
-baseline de ejecución permanece pendiente.
+Telegram como interfaz principal. Esta descripción contrasta inspección estática con
+la evidencia operativa y la baseline registradas en `docs/STATUS.md`.
 
 ## Resumen implementado
 
@@ -14,7 +14,9 @@ Telegram webhook o polling local
               |
        identidad + autoridad
               |
-   contexto + proveedor de LLM
+   estado exacto o router tipado
+              |
+   agente ordinario si corresponde
               |
     herramientas autorizadas
               |
@@ -29,21 +31,33 @@ Telegram webhook o polling local
 |---|---|
 | Entrada | FastAPI recibe webhooks; el modo local usa `getUpdates`. Ambos llaman al mismo procesamiento. |
 | Identidad y autoridad | El canal fija el espacio; la autoridad se valida en servidor y nuevamente al ejecutar acciones pendientes. |
+| Routing | Sin un paso conversacional exacto ya activo, todos los adaptadores atraviesan el mismo validador cerrado: una llamada a `route_intent`, cero contenido lateral, argumentos objeto y acción enumerada. La creación abre el ledger directamente; sólo `normal_conversation` entra al agente ordinario. |
 | Agente | Construye contexto de núcleo, espacio y momento; usa un proveedor de LLM detrás de una interfaz. |
 | Efectos | El modelo solicita herramientas registradas; no escribe directamente en PostgreSQL. |
 | Persistencia | SQL explícito con Psycopg, sin ORM. El esquema contiene reglas, funciones y triggers. |
-| Estado | Tareas y objetivos proyectan eventos append-only. La escritura directa está bloqueada sólo para tareas. |
+| Estado | Tareas y objetivos proyectan eventos append-only. La escritura directa está bloqueada sólo para tareas; el límite de dominio acordado para 1B.1 todavía no está implementado. |
 | Confirmación | Las acciones pendientes congelan herramienta y argumentos; las opciones de botón se resuelven atómicamente. |
-| Salida | Los mensajes visibles se encolan con clave de deduplicación, reintentos, horario y límite de contacto. |
+| Intake de tareas | Un ledger server-owned limita un request activo por espacio, membresía y chat privado; campos, candidatos paginados, slots libres, preview acotada y resultados terminales son persistidos. Una búsqueda sin coincidencias sigue mostrando candidatos vigentes y `Otra opción`; un conjunto vacío sólo permite cancelar. La conversión final sigue en Unidad 1A y valida actor, espacio, token y chat. |
+| Salida | Un renderer/validador común normaliza y mide UTF-16 sin reemplazar vocabulario legítimo antes de encolar y al transportar. Mensajes con botones usan un margen indivisible de 3900; informativos sin botones pueden dividirse determinísticamente hasta 4096 con dedupe por parte. El estado server-owned de no-efecto se agrega sólo cuando corresponde y se deduplica semánticamente. PostgreSQL impide cualquier fila fuera del contrato. |
 | Memoria | El turno carga una ventana reciente del chat; sólo considera salidas efectivamente enviadas. |
 | Automatización | APScheduler monta cadencias y escalera en modo servidor; el polling local ejecuta escalera y despacho. |
 | Configuración | Packs YAML importan equipo, autoridad, cadencias, rutas, glosario y ajustes; se registra versión y hash. |
 | Aislamiento | `prisma_app` usa RLS por `workspace_id`; `prisma_admin` se reserva para importación y consola. |
 
+La separación objetivo en cinco credenciales técnicas todavía no existe. En
+particular, no existe el rol dedicado `prisma_dispatcher`; el gateway actual no debe
+interpretarse como autoridad general más allá del límite ya implementado de Unidad 1A.
+
 ## Reglas comprobadas por lectura
 
 - Las tareas requieren un objetivo y un área en el esquema.
-- El responsable, la fecha y el criterio de aceptación todavía pueden ser nulos.
+- En la tabla `task`, responsable, fecha y criterio de aceptación conservan
+  anulabilidad física. Eso no define el contrato operativo: Unidad 1A obliga a que una
+  tarea comprometida tenga objetivo, responsable, fecha, criterio de aceptación y
+  política de evidencia, y la conversión desde `task_draft` revalida esos datos.
+- Unidad 1A materializa la política de evidencia como snapshot y `prisma_app` no tiene
+  `INSERT` directo sobre `task`; el acceso administrativo residual no equivale a una
+  ruta operativa autorizada.
 - El cierre consulta criterio, evidencia configurada, bloqueos, dependencias y
   aprobación aplicable.
 - Las acciones pendientes vencen y sólo su destinatario puede resolverlas.
@@ -58,11 +72,10 @@ Estos huecos se observan directamente en el código o esquema actual:
 | Riesgo | Evidencia estática |
 |---|---|
 | Inbound duplicable | `inbound_message.telegram_message_id` no tiene restricción única y la inserción no maneja conflicto. |
-| Tareas huérfanas | `responsable_membership_id` es opcional y la herramienta permite crear sin responsable. |
-| Compromiso incompleto | Fecha, criterio y política de evidencia no son obligatorios al crear una tarea. |
-| Estados sin grafo | Se registran eventos, pero no existe validación general de transiciones permitidas. |
+| Validación pendiente del ingreso de tareas | El segundo smoke probó que el agente podía omitir la herramienta sugerida. El contrato común del router, el bypass de estado activo, los botones y la copia visible pasan su foco local, pero requieren revisión final antes de cualquier replay o Telegram real. |
+| Ciclo de tarea sin límite de dominio | `actualizar_estado` todavía admite selección manual de estado y no aplica el grafo ni la autoridad acordados para 1B.1. |
+| Estado de objetivo sin límite simétrico | `objective_state_event` conserva el mecanismo previo; su grafo pertenece a otra porción de 1B. |
 | Estado de objetivo mutable | El trigger que bloquea escritura directa existe para `task`, no para `objective`. |
-| Evidencia no materializada | La tarea tiene `evidencia_requerida`, pero la creación no la carga desde una política del pack. |
 | Respuestas pendientes incompletas | Existe `pending_reply` y la escalera la actualiza, pero el inbound no crea ni satisface el ciclo operativo. |
 | Afirmación de silencio no sustentada | La escalera dice “sin respuesta” sin comprobar una solicitud pendiente vigente y su respuesta posterior. |
 | Cadencias locales manuales | El loop local corre escalera y despacho; las cadencias sólo se disparan mediante comando explícito. |
@@ -70,6 +83,14 @@ Estos huecos se observan directamente en el código o esquema actual:
 | RLS incompleto | La lista de tablas protegidas no incluye todas las tablas con alcance de espacio, eventos o auditoría. |
 | Webhook opcionalmente inseguro | El secreto sólo se valida cuando está configurado; vacío deja la ruta sin esa verificación. |
 | Conexión no preparada para carga | El gateway conserva una única conexión, sin pool ni worker de entrada separado. |
+| Superficie DML legacy amplia | El análisis estático identifica 26 tablas directamente mutables por `prisma_app`; además, insertar eventos puede mutar indirectamente la proyección de tarea. El número no incluye funciones, secuencias, owners ni herencia. |
+| ACL implícita de funciones | La disponibilidad potencial de `EXECUTE` mediante `PUBLIC` impide tratar los revokes nominales de tablas como cierre exhaustivo. |
+| Riesgo de superusuario compartido | La topología Docker declarada puede compartir una credencial con capacidad de superusuario entre caminos; los roles lógicos no aíslan una sesión que pueda asumirlos o eludirlos. |
+| Registros con autoridad mezclable | La aplicación actual puede escribir conversación, auditoría e incidentes sin la separación objetivo que reserva auditoría autoritativa a T2b, gateway o administración identificada. |
+
+Estos cuatro hallazgos son conclusiones de inspección estática del repositorio. No
+demuestran los grants, membresías, owners, atributos ni credenciales efectivamente
+activos en producción; ese catálogo requiere el Corte 0 verificable de ADR 0003.
 
 ## Riesgos inferidos o por verificar
 
@@ -79,10 +100,14 @@ Estos huecos se observan directamente en el código o esquema actual:
   ejecutando pruebas específicas contra PostgreSQL.
 - El registro automático de webhooks al desplegar no se observa conectado al comando
   de servidor; debe verificarse el procedimiento operativo antes de VPS.
-- La suite y los comandos de puesta en marcha pueden haber derivado respecto de la
-  documentación. La baseline está marcada como pendiente en `STATUS.md`.
+- La baseline registrada después de Unidad 1A pasó, pero el contrato posterior de
+  Unidad 1B.1 no está implementado y requiere sus propias pruebas de grafo, autoridad,
+  bypass y concurrencia.
+- El inbound histórico carece de la raíz autenticada futura. Su conservación como
+  conversación legacy no permite promoverlo, reintentarlo ni derivar efectos.
 
 ## Límites de esta descripción
 
-No se inspeccionaron secretos ni archivos `.env*`. No se ejecutó la aplicación, la
-base, Telegram ni la suite durante esta tarea documental.
+No se inspeccionaron secretos ni archivos `.env*` manualmente. Las pruebas registradas
+en `docs/STATUS.md` usaron el fixture efímero existente; no se accedió a la base
+operativa, Telegram ni Docker.

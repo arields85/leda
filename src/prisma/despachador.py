@@ -15,6 +15,8 @@ sin tocar Telegram.
 from __future__ import annotations
 
 import json
+import threading
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import NamedTuple, Protocol
@@ -22,6 +24,7 @@ from typing import NamedTuple, Protocol
 import psycopg
 
 from .calendario import Calendario
+from .salida import prepare_buttons, prepare_payload
 
 
 class Boton(NamedTuple):
@@ -49,9 +52,14 @@ class TransporteDePrueba:
 
     def enviar(self, chat_id: int, texto: str,
                botones: list[Boton] | None = None) -> int:
+        prepared_buttons = prepare_buttons(botones or [])
+        payload = prepare_payload(
+            texto, dedupe_key="transport", has_buttons=bool(prepared_buttons),
+        )[0]
         if chat_id in self.falla_en:
             raise ConnectionError(f"no se pudo entregar a {chat_id}")
-        self.enviados.append(Entregado(chat_id, texto, list(botones or [])))
+        self.enviados.append(Entregado(
+            chat_id, payload.text, [Boton(*button) for button in prepared_buttons]))
         return len(self.enviados)
 
 
@@ -63,17 +71,88 @@ class TransporteTelegram:
 
     def enviar(self, chat_id: int, texto: str,
                botones: list[Boton] | None = None) -> int:
-        cuerpo: dict = {"chat_id": chat_id, "text": texto,
-                        "disable_notification": False}
-        if botones:
+        prepared_buttons = prepare_buttons(botones or [])
+        payload = prepare_payload(
+            texto, dedupe_key="transport", has_buttons=bool(prepared_buttons),
+        )[0]
+        cuerpo: dict = {"chat_id": chat_id, "text": payload.text,
+                         "disable_notification": False}
+        if prepared_buttons:
             # Uno por fila: las etiquetas son nombres de personas o frases
             # cortas, y en el teléfono dos por fila se cortan.
             cuerpo["reply_markup"] = {"inline_keyboard": [
-                [{"text": b.etiqueta, "callback_data": b.callback_data}]
-                for b in botones]}
+                [{"text": label, "callback_data": callback}]
+                for label, callback in prepared_buttons]}
         r = self._cliente.post(self._url, json=cuerpo)
         r.raise_for_status()
         return r.json()["result"]["message_id"]
+
+
+def _close_client_bounded(client, timeout: float) -> None:
+    def close() -> None:
+        try:
+            client.close()
+        except Exception:  # noqa: BLE001 - cleanup must not affect the turn
+            pass
+
+    try:
+        thread = threading.Thread(
+            target=close, name="prisma-typing-client-close", daemon=True)
+        thread.start()
+        thread.join(timeout=timeout)
+    except Exception:  # noqa: BLE001 - cosmetic cleanup remains best effort
+        pass
+
+
+@contextmanager
+def mantener_chat_activo(token: str, chat_id: int, *, cliente=None,
+                         intervalo: float = 4.0,
+                         nombre_hilo: str = "prisma-typing",
+                         espera_cierre: float = 0.25):
+    """Refresca la acción técnica `typing` mientras se procesa un turno."""
+    import httpx
+
+    try:
+        http = cliente or httpx.Client(timeout=5)
+    except Exception:  # noqa: BLE001 - typing is cosmetic
+        yield
+        return
+    owned_client = cliente is None
+    detener = threading.Event()
+
+    def refrescar() -> None:
+        try:
+            while not detener.is_set():
+                try:
+                    http.post(
+                        f"https://api.telegram.org/bot{token}/sendChatAction",
+                        json={"chat_id": chat_id, "action": "typing"})
+                except Exception:  # noqa: BLE001 - es una señal cosmética
+                    pass
+                detener.wait(intervalo)
+        finally:
+            if owned_client:
+                try:
+                    http.close()
+                except Exception:  # noqa: BLE001 - cosmetic cleanup is isolated
+                    pass
+
+    try:
+        hilo = threading.Thread(target=refrescar, name=nombre_hilo, daemon=True)
+        hilo.start()
+    except Exception:  # noqa: BLE001 - typing is cosmetic
+        if owned_client:
+            _close_client_bounded(http, espera_cierre)
+        yield
+        return
+    try:
+        yield
+    finally:
+        detener.set()
+        try:
+            hilo.join(timeout=espera_cierre)
+        except Exception:  # noqa: BLE001 - typing is cosmetic
+            pass
 
 
 def acusar_toque(token: str, callback_id: str, cliente=None) -> None:
@@ -116,6 +195,16 @@ def _botones(cur, m) -> list[Boton]:
     Se leen al despachar, no al encolar: entre que Prisma pregunta y el
     mensaje sale puede pasar tiempo, y lo que vale es lo vigente al entregar.
     """
+    if m.get("intake_choice_set_id"):
+        from .ingreso_tareas import callback_data
+
+        cur.execute(
+            """select etiqueta, token from task_intake_choice
+                where choice_set_id = %s and activa order by orden""",
+            (m["intake_choice_set_id"],),
+        )
+        return [Boton(row["etiqueta"], callback_data(row["token"]))
+                for row in cur.fetchall()]
     if not m["pending_action_id"]:
         return []
 
@@ -200,9 +289,9 @@ def despachar(cur: psycopg.Cursor, workspace_id: str, transporte: Transporte,
 
     cur.execute(
         """
-        select id, workspace_id, chat_id, cuerpo, tipo,
-               destinatario_membership_id, intentos,
-               vence_en, es_respuesta, pending_action_id
+         select id, workspace_id, chat_id, cuerpo, tipo,
+                destinatario_membership_id, intentos,
+                vence_en, es_respuesta, pending_action_id, intake_choice_set_id
           from message_outbox
          where workspace_id = %s
            and estado = 'listo'

@@ -33,6 +33,7 @@ class Solicitante:
     canal: Canal
     workspace_id: str | None = None
     membership_id: str | None = None
+    nombre: str | None = None
     rol_slug: str | None = None
     area_id: str | None = None
     autoridad_final: bool = False
@@ -68,7 +69,7 @@ def identificar_en_espacio(cur: psycopg.Cursor, telegram_user_id: int,
     no aparece.
     """
     cur.execute(
-        """select i.app_user_id, i.membership_id, i.area_id,
+        """select i.app_user_id, i.membership_id, i.nombre, i.area_id,
                   r.slug, r.autoridad_final
              from integrante i join rol r on r.id = i.rol_id
             where i.telegram_user_id = %s and i.activo""",
@@ -80,6 +81,7 @@ def identificar_en_espacio(cur: psycopg.Cursor, telegram_user_id: int,
     return Solicitante(
         app_user_id=str(m["app_user_id"]), canal=Canal.ESPACIO,
         workspace_id=workspace_id, membership_id=str(m["membership_id"]),
+        nombre=m["nombre"],
         rol_slug=m["slug"], area_id=str(m["area_id"]),
         autoridad_final=m["autoridad_final"])
 
@@ -116,7 +118,7 @@ def identificar(cur: psycopg.Cursor, telegram_user_id: int, canal: Canal,
     # no hay privilegio para hacerlo, la persona sencillamente no es de acá.
     try:
         cur.execute(
-            """select u.id as app_user_id, m.id as membership_id, m.area_id,
+            """select u.id as app_user_id, u.nombre, m.id as membership_id, m.area_id,
                       r.slug, r.autoridad_final
                  from membership m
                  join app_user u on u.id = m.app_user_id
@@ -132,6 +134,7 @@ def identificar(cur: psycopg.Cursor, telegram_user_id: int, canal: Canal,
     return Solicitante(
         app_user_id=str(m["app_user_id"]), canal=canal,
         workspace_id=workspace_id, membership_id=str(m["membership_id"]),
+        nombre=m["nombre"],
         rol_slug=m["slug"], area_id=str(m["area_id"]),
         autoridad_final=m["autoridad_final"])
 

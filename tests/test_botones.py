@@ -12,6 +12,7 @@ botón lo ve todo el equipo.
 from __future__ import annotations
 
 import dataclasses
+from contextlib import nullcontext
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
@@ -126,6 +127,8 @@ def cliente(corework, conn, monkeypatch):
     # segundos y depende de que haya red. Los tests que miran el acuse lo
     # vuelven a reemplazar por el suyo.
     monkeypatch.setattr(gateway, "acusar_toque", lambda *a, **k: None)
+    monkeypatch.setattr(gateway, "mantener_chat_activo",
+                        lambda *args, **kwargs: nullcontext())
     monkeypatch.setattr(gateway, "_conn", lambda: conn)
     monkeypatch.setattr(
         gateway, "config",

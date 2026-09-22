@@ -6,6 +6,8 @@ sombrero y que un desconocido no obtenga información.
 
 from __future__ import annotations
 
+from contextlib import contextmanager, nullcontext
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -19,6 +21,8 @@ def cliente(corework, conn, monkeypatch):
     import dataclasses
 
     monkeypatch.setattr(gateway, "_conn", lambda: conn)
+    monkeypatch.setattr(gateway, "mantener_chat_activo",
+                        lambda *args, **kwargs: nullcontext())
     monkeypatch.setattr(
         gateway, "config",
         dataclasses.replace(gateway.config, webhook_secret="s3cr3t"))
@@ -71,7 +75,36 @@ def test_integrante_conocido_deja_respuesta_en_la_cola(cliente, conn):
         assert cur.fetchone()["texto"] == "¿qué tengo?"
         cur.execute("select cuerpo, estado from message_outbox")
         fila = cur.fetchone()
-        assert fila["cuerpo"] == "Anotado." and fila["estado"] == "listo"
+        assert fila["cuerpo"] == "Anotado."
+        assert fila["estado"] == "listo"
+
+
+def test_webhook_mantiene_typing_solo_durante_el_turno(
+        cliente, conn, monkeypatch):
+    eventos = []
+
+    @contextmanager
+    def activo(token, chat_id):
+        eventos.append(("inicio", chat_id))
+        try:
+            yield
+        finally:
+            eventos.append(("fin", chat_id))
+
+    monkeypatch.setattr(gateway, "mantener_chat_activo", activo)
+    with admin(conn) as cur:
+        cur.execute("select telegram_user_id t from app_user "
+                    "where nombre = 'Marcos Tarquini'")
+        tg = cur.fetchone()["t"]
+
+    r = cliente.post("/telegram/corework", json=_update(tg, "hola", chat=812),
+                     headers={"X-Telegram-Bot-Api-Secret-Token": "s3cr3t"})
+
+    assert r.status_code == 200
+    assert eventos == [("inicio", 812), ("fin", 812)]
+    with admin(conn) as cur:
+        cur.execute("select count(*) n from message_outbox")
+        assert cur.fetchone()["n"] == 1
 
 
 def test_bot_de_administracion_no_atiende_al_equipo(cliente, conn):

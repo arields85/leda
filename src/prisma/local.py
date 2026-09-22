@@ -15,6 +15,7 @@ servicios, y para dos o tres personas alcanza de sobra.
 from __future__ import annotations
 
 import signal
+import sys
 import time
 from datetime import datetime, timezone
 
@@ -30,10 +31,22 @@ from .reloj import ejecutar_cadencia, ejecutar_escalera
 _seguir = True
 
 
+def _imprimir(texto: str = "") -> None:
+    """No deja caer el listener si la consola no representa Unicode."""
+    salida = sys.stdout
+    try:
+        salida.write(texto + "\n")
+    except UnicodeEncodeError:
+        encoding = getattr(salida, "encoding", None) or "ascii"
+        seguro = texto.encode(encoding, errors="backslashreplace").decode(encoding)
+        salida.write(seguro + "\n")
+    salida.flush()
+
+
 def _parar(*_):
     global _seguir
     _seguir = False
-    print("\nCortando…")
+    _imprimir("\nCortando…")
 
 
 class Escucha:
@@ -68,7 +81,7 @@ class Escucha:
             r.raise_for_status()
             updates = r.json().get("result", [])
         except Exception as e:  # noqa: BLE001
-            print(f"  (sin conexión con Telegram: {e})")
+            _imprimir(f"  (sin conexión con Telegram: {e})")
             time.sleep(5)
             return 0
 
@@ -77,16 +90,16 @@ class Escucha:
             origen = u.get("message") or u.get("callback_query") or {}
             quien = origen.get("from", {}).get("first_name", "?")
             if "callback_query" in u:
-                print(f"  ← {quien}: [tocó un botón]")
+                _imprimir(f"  ← {quien}: [tocó un botón]")
             else:
-                print(f"  ← {quien}: {origen.get('text', '')[:70]}")
+                _imprimir(f"  ← {quien}: {origen.get('text', '')[:70]}")
             try:
                 procesar_update(self.conn, self.slug, u,
                                 authority_conn=self.authority_conn)
             except Exception as e:  # noqa: BLE001
                 # Un mensaje que rompe no puede frenar la escucha.
                 self.conn.rollback()
-                print(f"  ! no se pudo procesar: {type(e).__name__}")
+                _imprimir(f"  ! no se pudo procesar: {type(e).__name__}")
         return len(updates)
 
     def tareas_de_fondo(self, ahora: datetime | None = None) -> dict[str, int]:
@@ -97,7 +110,7 @@ class Escucha:
             resumen = despachar(cur, self.ws, self.transporte, cal, ahora)
         self.conn.commit()
         for _ in range(resumen["enviados"]):
-            print("  → enviado")
+            _imprimir("  → enviado")
         return resumen
 
     def correr_cadencia(self, nombre: str, ahora: datetime | None = None) -> int:
@@ -130,8 +143,8 @@ def escuchar(conn, slug: str, workspace_id: str) -> None:
     # se saca.
     httpx.post(f"https://api.telegram.org/bot{token}/deleteWebhook", timeout=15)
 
-    print(f"Escuchando como @{usuario} — espacio '{slug}'.")
-    print("Ctrl+C para cortar.\n")
+    _imprimir(f"Escuchando como @{usuario} — espacio '{slug}'.")
+    _imprimir("Ctrl+C para cortar.\n")
 
     while _seguir:
         e.una_vuelta()

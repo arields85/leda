@@ -78,12 +78,20 @@ Ninguno de los dos puede hacerlo solo. El registro guarda ambas firmas.
 
 ## 3. Las personas deciden
 
-Prisma organiza, propone y hace seguimiento. No decide.
+Las personas hacen el trabajo, informan hechos concretos, aportan evidencia y toman
+las decisiones que requieren autoridad o juicio. Prisma organiza, propone, deriva el
+estado mediante reglas autorizadas, coordina y hace seguimiento. No inventa hechos ni
+sustituye decisiones humanas.
 
 - Los referentes conservan la autoridad técnica de sus áreas.
+- Los referentes aceptan las tareas vinculadas a su área y luego aprueban o rechazan
+  el trabajo entregado. No persiguen avances ni administran estados intermedios.
 - La autoridad del espacio conserva la decisión final ante desacuerdos.
 - Prisma puede preparar información comparativa, detectar dependencias y sugerir
   una secuencia, pero no resuelve por sí misma una prioridad.
+- La persona responsable informa hechos como inicio, bloqueo, resolución y entrega en
+  lenguaje natural. Prisma absorbe el seguimiento, deriva el estado operativo y
+  encamina las intervenciones que correspondan.
 
 ---
 
@@ -284,7 +292,8 @@ Un pack **no** puede:
 
 ## 15. Principios
 
-1. Las personas deciden; Prisma organiza, propone y hace seguimiento.
+1. Las personas hacen el trabajo, informan hechos y deciden según su autoridad;
+   Prisma organiza, deriva el estado, coordina y hace seguimiento.
 2. La autoridad del espacio conserva la decisión final.
 3. Los referentes conservan la autoridad técnica de sus áreas.
 4. Una parte terminada no equivale a un objetivo terminado.

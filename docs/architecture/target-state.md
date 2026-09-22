@@ -6,28 +6,54 @@ límites operativos antes de aumentar infraestructura, no distribuir el sistema.
 ## Horizonte 1: validación local simulada y piloto controlado
 
 ```text
-Telegram polling
-      |
- inbound idempotente
-      |
- intención + contrato operativo
-      |
- lectura vigente autorizada
-      |
- borrador -> confirmación -> tarea comprometida
-      |
- herramientas + reglas de dominio
-      |
- PostgreSQL + auditoría + outbox
-      |
- escalera/cadencias verificables
+Telegram webhook/polling autenticado por bot
+                    |
+          prisma_ingress + T1 durable
+                    |
+ recibo inmutable (bot_scope, update_id) + capacidad opaca
+                    |
+       prisma_app + T2 recuperable + LLM/herramientas
+                    |
+   capacidad -> actor/espacio derivados -> autoridad vigente
+                    |
+ prisma_gateway Unidad 1A + demás límites de dominio
+                    |
+ PostgreSQL + auditoría autoritativa + outbox
+                    |
+ prisma_dispatcher mínimo -> Telegram/incidentes técnicos
 ```
+
+Este flujo es el objetivo de
+[`ADR 0003`](../decisions/0003-authenticated-inbound-boundary.md), no una descripción
+del estado implementado. Antes del piloto puede ejecutarse dentro del mismo monolito,
+pero con conexiones y membresías PostgreSQL disjuntas para `prisma_ingress`,
+`prisma_app`, `prisma_gateway`, `prisma_dispatcher` y `prisma_admin`. Ningún login
+puede asumir varias de esas fronteras. El proceso de serving o polling no carga la
+credencial administrativa.
+
+T1 confirma el recibo antes del LLM y T2 puede recuperarse sin repetir efectos. Las
+funciones resuelven actor y espacio desde la capacidad y revalidan autoridad; no
+confían en identidad aportada por la aplicación. Un `edited_message` puede conservarse
+como historia, pero no produce efectos operativos.
+
+El dispatcher sólo reclama mensajes de outbox ya listos y puede marcar envío,
+reintento o fallo y abrir incidentes técnicos de transporte. No redacta contenido,
+cambia destinatarios ni escribe dominio. Conversación, auditoría autoritativa e
+incidentes técnicos permanecen separados: `prisma_app` no puede atribuir acciones
+humanas; esa auditoría nace sólo en T2b cercada, gateway de Unidad 1A o una acción
+administrativa identificada.
+
+El ingreso histórico anterior a T1 se conserva como conversación legacy de sólo
+lectura y no autoritativa. No se elimina ni se convierte en recibo, y no puede
+reintentarse o producir efectos.
 
 Antes del piloto real, la validación simulada debe alcanzar:
 
 - un alcance pequeño y explícito, con autoridad, privacidad y escalamiento
   acordados;
 - borradores sin efectos y conversión explícita a tareas completas;
+- recibos Telegram autenticados, inmutables y aislados de `prisma_app`, con secreto
+  webhook obligatorio y específico del bot;
 - idempotencia de updates entrantes y efectos salientes;
 - máquina de estados y cierre coherentes para tareas y objetivos;
 - contratos estructurados para respuestas operativas, con lectura fresca obligatoria;
@@ -73,7 +99,10 @@ Antes de exponerlo en una VPS se requiere:
 |---|---|
 | Arquitectura | Monolito modular con procesos operativos separados cuando haga falta. |
 | Datos | PostgreSQL continúa como fuente de verdad y límite transaccional. |
-| Mensajería | Idempotencia en entrada y outbox en salida. |
+| Mensajería | Recibo autenticado e idempotente en T1, procesamiento recuperable en T2 y outbox en salida. |
+| Confianza | Capacidades opacas, identidad derivada y cinco logins disjuntos; no protege frente al compromiso total del proceso Python. |
+| Autoridad de salida | `prisma_dispatcher` transporta outbox listo y registra resultado/incidente técnico; no decide contenido, destinatario ni hechos de dominio. |
+| Registros | Conversación, auditoría autoritativa e incidentes técnicos tienen escritores y significado separados. |
 | LLM | Interpreta y redacta; contratos y políticas controlan hechos y completitud. |
 | Configuración | Packs gobernados, versionados, reconciliables y auditables. |
 | Multi-tenant | RLS completo y pruebas negativas entre espacios. |

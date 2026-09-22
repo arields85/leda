@@ -27,6 +27,7 @@ from typing import Any
 import psycopg
 
 from .autoridad import Denegado, Solicitante
+from .salida import normalize_visible_text, prepare_buttons, prepare_payload
 
 # Lo que Telegram manda de vuelta al apretar un botón. El tope son 64 bytes,
 # así que viaja un token corto y la acción queda en la base.
@@ -58,6 +59,8 @@ class Resuelta:
     args: dict[str, Any]
     cancelada: bool
     task_id: str | None = None
+    replay: bool = False
+    pending_action_id: str | None = None
 
 
 def callback_data(opcion: Opcion) -> str:
@@ -83,6 +86,11 @@ def registrar(cur: psycopg.Cursor, quien: Solicitante, *, herramienta: str,
     Sin `opciones` la pregunta es confirmar o cancelar. Con `campo` y
     `opciones`, cada elección completa ese argumento con su valor.
     """
+    resumen = normalize_visible_text(resumen)
+    a_crear = opciones if opciones is not None else [("Confirmar", True),
+                                                      ("Cancelar", False)]
+    prepare_payload(resumen, dedupe_key="pending", has_buttons=True)
+    prepare_buttons([(etiqueta, "p:placeholder") for etiqueta, _ in a_crear])
     cur.execute(
         """insert into pending_action
              (workspace_id, membership_id, herramienta, args, campo, resumen,
@@ -96,8 +104,6 @@ def registrar(cur: psycopg.Cursor, quien: Solicitante, *, herramienta: str,
     fila = cur.fetchone()
     pid = str(fila["id"])
 
-    a_crear = opciones if opciones is not None else [("Confirmar", True),
-                                                     ("Cancelar", False)]
     creadas = [
         _crear_opcion(cur, quien.workspace_id, pid, etiqueta, valor, orden)
         for orden, (etiqueta, valor) in enumerate(a_crear)]
@@ -110,6 +116,8 @@ def registrar(cur: psycopg.Cursor, quien: Solicitante, *, herramienta: str,
 def _crear_opcion(cur, workspace_id: str, pending_action_id: str,
                   etiqueta: str, valor: Any, orden: int) -> Opcion:
     token = secrets.token_urlsafe(12)
+    etiqueta = normalize_visible_text(etiqueta)
+    prepare_buttons([(etiqueta, callback_data(Opcion(token, etiqueta)))])
     cur.execute(
         """insert into pending_action_option
              (workspace_id, pending_action_id, token, etiqueta, valor, orden)
@@ -135,7 +143,7 @@ def buscar(cur: psycopg.Cursor, pendiente_id: str) -> Pendiente | None:
 def opciones(cur: psycopg.Cursor, pendiente_id: str) -> list[Opcion]:
     cur.execute(
         """select token, etiqueta, valor from pending_action_option
-            where pending_action_id = %s order by orden""",
+            where pending_action_id = %s and activa order by orden""",
         (pendiente_id,))
     return [Opcion(token=f["token"], etiqueta=f["etiqueta"], valor=f["valor"])
             for f in cur.fetchall()]
@@ -192,16 +200,21 @@ def es_borrador(cur: psycopg.Cursor, token: str) -> bool:
 
 
 def resolver_borrador(cur: psycopg.Cursor, workspace_id: str, token: str,
-                      telegram_user_id: int) -> Resuelta | None:
+                       telegram_user_id: int, chat_id: int) -> Resuelta | None:
     """Commit through prisma_gateway using DB identity and DB time."""
-    cur.execute("select * from confirmar_borrador_tarea(%s, %s, %s)",
-                (workspace_id, token, telegram_user_id))
+    cur.execute("select * from resolver_ingreso_borrador(%s, %s, %s, %s)",
+                (workspace_id, token, telegram_user_id, chat_id))
     f = cur.fetchone()
     if f["resultado"] == "ajena":
         raise Denegado("Eso se lo pregunté a otra persona del equipo.")
     if f["resultado"] in ("inexistente", "usada", "vencida", "obsoleta"):
         return None
     if f["resultado"] == "cancelada":
-        return Resuelta(herramienta=None, args={}, cancelada=True)
+        return Resuelta(herramienta=None, args={}, cancelada=True,
+                        replay=f.get("replay", False),
+                        pending_action_id=str(f["pending_action_id"])
+                        if f.get("pending_action_id") else None)
     return Resuelta(herramienta=None, args={}, cancelada=False,
-                    task_id=str(f["task_id"]))
+                    task_id=str(f["task_id"]), replay=f.get("replay", False),
+                    pending_action_id=str(f["pending_action_id"])
+                    if f.get("pending_action_id") else None)

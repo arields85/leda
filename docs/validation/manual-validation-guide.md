@@ -1,20 +1,38 @@
 # Guía de validación manual por Telegram
 
-Esta guía permite al usuario validar Prisma mediante Telegram real sin recibir
-frases guionadas. La sesión ocurre sólo después de completar las capas A-D del
-[`protocolo canónico`](README.md) y usa exclusivamente situaciones simuladas,
+Esta guía permite al usuario validar Prisma mediante Telegram real sin recibir frases
+guionadas. Toda sesión usa exclusivamente situaciones ficticias, simuladas,
 inequívocamente identificadas y aisladas del trabajo real.
+
+## Tipos de sesión
+
+| Tipo | Momento y propósito | Autoridad del resultado |
+|---|---|---|
+| Progresiva por circuito | Tan pronto como una unidad está implementada, técnicamente verificada y su circuito cumple el gate acotado. Detecta temprano defectos de UX, comprensión y coordinación, y alimenta replay, regresión y corpus de desarrollo. | Aporta evidencia de desarrollo; no ejecuta holdout, no completa la capa E y no puede aprobar el piloto. |
+| Integral de capa E | Después de completar A-D y cumplir el gate final del [`protocolo canónico`](README.md#gates-manuales). Evalúa el sistema completo. | Sólo la aprobación explícita del usuario puede habilitar el piloto real. |
+
+La capa E no es la primera interacción manual. Tampoco se fuerza una sesión progresiva
+si el circuito aún no cumple el gate mínimo proporcional.
 
 ## Antes de la sesión
 
-- Confirmar que no existen defectos críticos o altos abiertos en el alcance.
+- Identificar si la sesión es progresiva por circuito o integral de capa E.
+- Para una sesión progresiva, confirmar workspace local o de prueba controlado, sólo
+  datos ficticios y sin trabajo real, secreto de Telegram protegido, efectos
+  inspeccionables y reversibles, backup, pausa o rollback proporcionado al circuito,
+  ausencia de operaciones destructivas e inexistencia de defectos `CRITICAL` o `HIGH`
+  abiertos en ese alcance. Si falta una condición, usar un harness determinista o
+  `TestClient` en lugar de Telegram.
+- Para capa E, confirmar todas las condiciones del gate final, incluidas A-D completas
+  y ausencia de defectos críticos o altos abiertos en el alcance integral.
 - Confirmar que el entorno contiene identidades, roles, áreas y autoridad vigentes de
   CoreWork, pero ningún objetivo, tarea, bloqueo, evidencia o situación de trabajo
   real para esta sesión.
 - Marcar los datos de prueba como simulados y verificar su aislamiento.
-- Preparar una hoja de registro vacía con IDs opacos. Si la sesión ejecuta holdout,
-  el usuario revela cada caso sólo en el momento de ejecutarlo; no expone su
-  contenido ni los resultados esperados a agentes escritores o correctores.
+- Preparar una hoja de registro vacía con IDs opacos. El holdout permanece reservado y
+  nunca se revela en una sesión progresiva. En la capa correspondiente, el usuario
+  revela cada caso holdout sólo al ejecutarlo y no expone su contenido ni los
+  resultados esperados a agentes escritores o correctores.
 - Acordar quién puede detener la sesión y cómo aislar efectos pendientes.
 
 ## Cómo recibir una consigna
@@ -42,6 +60,9 @@ formulación si Prisma toma un camino inesperado.
 7. Al terminar, capturar respuesta visible, estado PostgreSQL, herramientas/efectos y
    auditoría mediante el mecanismo autorizado.
 8. Calificar cada dimensión de la rúbrica y registrar el resultado.
+9. Si hubo un fallo, corregir su causa raíz y agregar replay/regresión antes de
+   reanudar; si el comportamiento fue aceptable, preparar el siguiente circuito
+   pequeño y endurecer sólo en proporción a la evidencia.
 
 ## Qué observar
 
@@ -105,6 +126,7 @@ por cancelación explícita del usuario.
 
 ```text
 Sesión:
+Tipo: PROGRESIVA POR CIRCUITO / CAPA E INTEGRAL
 Fecha y actor:
 Entorno simulado confirmado:
 Objetivos ejecutados (IDs opacos):
@@ -112,9 +134,12 @@ Resultados por dimensión:
 Fallos y severidad:
 Efectos pendientes o aislados:
 Evidencia disponible:
-Decisión del usuario: APROBADA / NO APROBADA
+Resultado de la sesión: APROBADO / FALLIDO / BLOQUEADO / NO CONCLUYENTE
+Decisión de capa E, sólo si corresponde: APROBADA / NO APROBADA / NO APLICA
 Condiciones o trabajo pendiente:
 ```
 
-`APROBADA` sólo es válida como decisión explícita del usuario después de revisar la
-evidencia y confirmar que no quedan defectos críticos o altos abiertos en alcance.
+La decisión de capa E `APROBADA` sólo es válida en una sesión integral, como decisión
+explícita del usuario después de revisar la evidencia y confirmar que no quedan
+defectos críticos o altos abiertos en alcance. Una sesión progresiva siempre registra
+`NO APLICA` en ese campo, aun cuando el circuito ejercitado haya aprobado.

@@ -1,6 +1,6 @@
 -- =========================================================================
 -- Prisma — esquema de base de datos
--- PostgreSQL 16
+-- PostgreSQL 18 o posterior
 --
 -- Principios que el esquema hace cumplir, no sólo documenta:
 --
@@ -137,6 +137,7 @@ create table membership (
   horario       jsonb,
   activo        boolean not null default true,
   unique (workspace_id, app_user_id),
+  constraint membership_workspace_id_unique unique (workspace_id, id),
   check (aprobador_membership_id is null or aprobador_membership_id <> id)
 );
 
@@ -325,6 +326,18 @@ create table objective (
 create index objective_ws on objective (workspace_id, estado);
 create index objective_parent on objective (parent_id);
 
+create function telegram_utf16_units(p_text text) returns integer
+language plpgsql immutable strict parallel safe as $$
+declare
+  units integer := 0;
+  i integer;
+begin
+  for i in 1..char_length(p_text) loop
+    units := units + case when ascii(substr(p_text, i, 1)) > 65535 then 2 else 1 end;
+  end loop;
+  return units;
+end $$;
+
 -- A draft may be incomplete and therefore has no operational effects. The
 -- snapshots are the values shown in the preview and revalidated on commit.
 create table task_draft (
@@ -342,9 +355,25 @@ create table task_draft (
   evidencia_requerida       text[],
   evidencia_policy_version  integer,
   version                   integer not null default 1 check (version > 0),
+  estado                    text not null default 'open'
+                            check (estado in ('open', 'cancelled', 'converted')),
   converted_task_id         uuid,
   creado_en                 timestamptz not null default now(),
   actualizado_en            timestamptz not null default now(),
+  constraint task_draft_workspace_id_unique unique (workspace_id, id),
+  constraint task_draft_creator_workspace
+    foreign key (workspace_id, creado_por_membership_id)
+    references membership(workspace_id, id),
+  constraint task_draft_responsible_workspace
+    foreign key (workspace_id, responsable_membership_id)
+    references membership(workspace_id, id),
+  constraint task_draft_title_payload
+    check (titulo is null or telegram_utf16_units(titulo) <= 200),
+  constraint task_draft_description_payload
+    check (descripcion is null or telegram_utf16_units(descripcion) <= 800),
+  constraint task_draft_acceptance_payload
+    check (criterio_aceptacion is null
+           or telegram_utf16_units(criterio_aceptacion) <= 500),
   check ((evidencia_requerida is null) =
          (evidencia_policy_version is null))
 );
@@ -490,7 +519,10 @@ create table inbound_message (
   texto               text,
   intencion           text,
   task_id             uuid references task(id),
-  at                  timestamptz not null default now()
+  at                  timestamptz not null default now(),
+  constraint inbound_message_workspace_id_unique unique (workspace_id, id),
+  constraint inbound_message_workspace_chat_unique
+    unique (workspace_id, id, chat_id)
 );
 
 -- Prisma nunca llama a Telegram directamente: escribe acá y un worker despacha.
@@ -556,9 +588,17 @@ create table pending_action (
   resuelta_por        uuid references app_user(id),
   chat_id             bigint,
   telegram_message_id bigint
+  ,resultado           jsonb
   ,draft_id            uuid references task_draft(id)
   ,draft_version       integer
   ,preview             jsonb
+  ,constraint pending_action_workspace_id_unique unique (workspace_id, id)
+  ,constraint pending_action_membership_workspace
+     foreign key (workspace_id, membership_id)
+     references membership(workspace_id, id)
+  ,constraint pending_action_draft_workspace
+     foreign key (workspace_id, draft_id)
+     references task_draft(workspace_id, id)
   ,check ((draft_id is null and draft_version is null and preview is null)
        or (draft_id is not null and draft_version is not null and preview is not null))
 );
@@ -577,17 +617,182 @@ create table pending_action_option (
   etiqueta          text not null,
   valor             jsonb,
   orden             integer not null default 0,
-  constraint token_cabe_en_callback_data check (octet_length(token) between 8 and 40)
+  activa            boolean not null default true,
+  resultado         jsonb,
+  constraint pending_action_option_workspace_id_unique unique (workspace_id, id),
+  constraint pending_action_option_parent_workspace
+    foreign key (workspace_id, pending_action_id)
+    references pending_action(workspace_id, id) on delete cascade,
+  constraint token_cabe_en_callback_data check (octet_length(token) between 8 and 40),
+  constraint pending_action_option_telegram_label
+    check (telegram_utf16_units(etiqueta) between 1 and 80)
 );
 
 create index pending_action_option_de
   on pending_action_option (pending_action_id, orden);
+
+-- Conversational task intake is server-owned. Model output may propose values,
+-- but only an exact free-text reply or a single-use server choice confirms one.
+create table task_intake_request (
+  id                    uuid primary key default gen_random_uuid(),
+  workspace_id          uuid not null references workspace(id) on delete cascade,
+  membership_id         uuid not null,
+  chat_id               bigint not null check (chat_id > 0),
+  task_draft_id         uuid not null unique,
+  estado                text not null default 'active'
+                        check (estado in ('active', 'cancelled', 'converted')),
+  version               integer not null default 1 check (version > 0),
+  source_inbound_id     uuid not null,
+  source_raw_text       text not null,
+  terminal_result       jsonb,
+  creado_en             timestamptz not null default now(),
+  actualizado_en        timestamptz not null default now(),
+  constraint task_intake_request_workspace_id_unique unique (workspace_id, id),
+  constraint task_intake_request_membership_workspace
+    foreign key (workspace_id, membership_id)
+    references membership(workspace_id, id) on delete cascade,
+  constraint task_intake_request_draft_workspace
+    foreign key (workspace_id, task_draft_id)
+    references task_draft(workspace_id, id),
+  constraint task_intake_request_source_workspace_chat
+    foreign key (workspace_id, source_inbound_id, chat_id)
+    references inbound_message(workspace_id, id, chat_id)
+);
+
+create unique index task_intake_one_active
+  on task_intake_request (workspace_id, membership_id, chat_id)
+  where estado = 'active';
+
+create table task_intake_field (
+  request_id          uuid not null,
+  workspace_id        uuid not null references workspace(id) on delete cascade,
+  campo               text not null check (campo in (
+                        'title', 'description', 'objective', 'responsible', 'area',
+                        'evidence', 'due_date', 'acceptance_criterion')),
+  estado              text not null default 'missing'
+                      check (estado in ('missing', 'proposed', 'confirmed')),
+  valor               jsonb,
+  proposed_by         text check (proposed_by in ('model', 'server', 'user')),
+  source_inbound_id   uuid references inbound_message(id),
+  source_raw_text     text,
+  source_choice_id    uuid,
+  version             integer not null default 1 check (version > 0),
+  actualizado_en      timestamptz not null default now(),
+  primary key (request_id, campo),
+  constraint task_intake_field_workspace_id_unique unique (workspace_id, request_id, campo),
+  constraint task_intake_field_request_workspace
+    foreign key (workspace_id, request_id)
+    references task_intake_request(workspace_id, id) on delete cascade,
+  constraint task_intake_field_source_workspace
+    foreign key (workspace_id, source_inbound_id)
+    references inbound_message(workspace_id, id),
+  check ((source_inbound_id is null) = (source_raw_text is null)),
+  check ((estado = 'missing' and valor is null) or
+         (estado <> 'missing' and valor is not null))
+);
+
+create table task_intake_choice_set (
+  id                uuid primary key default gen_random_uuid(),
+  workspace_id      uuid not null references workspace(id) on delete cascade,
+  request_id        uuid not null,
+  campo             text,
+  request_version   integer not null,
+  tipo              text not null,
+  estado            text not null default 'active'
+                    check (estado in ('active', 'consumed', 'invalidated')),
+  resultado         jsonb,
+  creado_en         timestamptz not null default now(),
+  constraint task_intake_choice_set_workspace_id_unique unique (workspace_id, id),
+  constraint task_intake_choice_set_request_workspace
+    foreign key (workspace_id, request_id)
+    references task_intake_request(workspace_id, id) on delete cascade
+);
+
+create unique index task_intake_one_active_choice_set
+  on task_intake_choice_set (request_id) where estado = 'active';
+
+create table task_intake_choice (
+  id                uuid primary key default gen_random_uuid(),
+  workspace_id      uuid not null references workspace(id) on delete cascade,
+  choice_set_id     uuid not null,
+  token             text not null unique,
+  etiqueta          text not null,
+  accion            text not null,
+  valor             jsonb,
+  orden             integer not null default 0,
+  activa            boolean not null default true,
+  elegida           boolean not null default false,
+  resultado         jsonb,
+  constraint task_intake_choice_workspace_id_unique unique (workspace_id, id),
+  constraint task_intake_choice_set_workspace
+    foreign key (workspace_id, choice_set_id)
+    references task_intake_choice_set(workspace_id, id) on delete cascade,
+  constraint intake_token_cabe_en_callback check (octet_length(token) between 8 and 40),
+  constraint task_intake_choice_telegram_label
+    check (telegram_utf16_units(etiqueta) between 1 and 80)
+);
+
+create index task_intake_choice_de
+  on task_intake_choice (choice_set_id, orden);
+
+create table task_intake_free_text_slot (
+  id                  uuid primary key default gen_random_uuid(),
+  workspace_id        uuid not null references workspace(id) on delete cascade,
+  request_id          uuid not null,
+  campo               text not null,
+  request_version     integer not null,
+  estado              text not null default 'active'
+                      check (estado in ('active', 'consumed', 'invalidated')),
+  source_inbound_id   uuid,
+  source_raw_text     text,
+  resultado           jsonb,
+  creado_en           timestamptz not null default now(),
+  consumido_en        timestamptz,
+  constraint task_intake_free_text_workspace_id_unique unique (workspace_id, id),
+  constraint task_intake_free_text_request_workspace
+    foreign key (workspace_id, request_id)
+    references task_intake_request(workspace_id, id) on delete cascade,
+  constraint task_intake_free_text_source_workspace
+    foreign key (workspace_id, source_inbound_id)
+    references inbound_message(workspace_id, id),
+  check ((source_inbound_id is null) = (source_raw_text is null))
+);
+
+create unique index task_intake_one_active_text_slot
+  on task_intake_free_text_slot (request_id) where estado = 'active';
+
+alter table task_intake_field
+  add constraint task_intake_field_source_choice
+  foreign key (workspace_id, source_choice_id)
+  references task_intake_choice(workspace_id, id);
+
+alter table message_outbox
+  add column intake_choice_set_id uuid references task_intake_choice_set(id)
+  on delete set null;
+
+alter table message_outbox
+  add constraint message_outbox_telegram_payload
+  check (telegram_utf16_units(cuerpo) between 1 and
+         case when pending_action_id is not null or intake_choice_set_id is not null
+              then 3900 else 4096 end);
 
 -- Se declara acá y no en la tabla porque message_outbox viene antes. Si la
 -- acción se borra, el mensaje queda: es parte del historial de lo que se dijo.
 alter table message_outbox
   add constraint message_outbox_pending_action
   foreign key (pending_action_id) references pending_action(id) on delete set null;
+
+alter table message_outbox
+  add constraint message_outbox_recipient_workspace
+    foreign key (workspace_id, destinatario_membership_id)
+    references membership(workspace_id, id),
+  add constraint message_outbox_pending_workspace
+    foreign key (workspace_id, pending_action_id)
+    references pending_action(workspace_id, id) on delete set null (pending_action_id),
+  add constraint message_outbox_choice_workspace
+    foreign key (workspace_id, intake_choice_set_id)
+    references task_intake_choice_set(workspace_id, id)
+    on delete set null (intake_choice_set_id);
 
 -- Resolver es una sola llamada a propósito: dos toques al mismo botón compiten
 -- por la misma fila y sólo uno la mueve de 'esperando'. Si esto se hiciera con
@@ -666,8 +871,9 @@ comment on function resolver_pendiente is
 -- locks every linked row, revalidates the preview, creates the task and audit,
 -- and only then consumes the pending action in the same transaction.
 create function confirmar_borrador_tarea(p_workspace_id uuid, p_token text,
-                                         p_telegram_user_id bigint)
-returns table (resultado text, task_id uuid)
+                                         p_telegram_user_id bigint,
+                                         p_chat_id bigint)
+returns table (resultado text, task_id uuid, pending_action_id uuid, replay boolean)
 language plpgsql security definer
 set search_path = prisma, public, pg_temp as $$
 declare
@@ -688,26 +894,21 @@ begin
   select * into o from pending_action_option
    where token = p_token and workspace_id = p_workspace_id;
   if not found then
-    return query select 'inexistente'::text, null::uuid;
+    return query select 'inexistente'::text, null::uuid, null::uuid, false;
     return;
   end if;
 
   select * into a from pending_action where id = o.pending_action_id for update;
   if a.draft_id is null then
-    return query select 'no_es_borrador'::text, null::uuid;
-    return;
-  end if;
-  if a.estado <> 'esperando' then
-    return query select 'usada'::text, null::uuid;
+    return query select 'no_es_borrador'::text, null::uuid, a.id, false;
     return;
   end if;
   if a.workspace_id <> p_workspace_id then
-    return query select 'inexistente'::text, null::uuid;
+    return query select 'inexistente'::text, null::uuid, null::uuid, false;
     return;
   end if;
-  if a.vence_en <= ahora then
-    update pending_action set estado = 'vencida' where id = a.id;
-    return query select 'vencida'::text, null::uuid;
+  if a.chat_id is distinct from p_chat_id then
+    return query select 'ajena'::text, null::uuid, a.id, false;
     return;
   end if;
 
@@ -716,16 +917,67 @@ begin
    where m.workspace_id = p_workspace_id and m.id = a.membership_id
      and u.telegram_user_id = p_telegram_user_id and m.activo;
   if actor_membership is null then
-    return query select 'ajena'::text, null::uuid;
+    return query select 'ajena'::text, null::uuid, a.id, false;
+    return;
+  end if;
+  if a.estado <> 'esperando' then
+    if a.resultado->>'resultado' in ('ok', 'cancelada') then
+      return query select a.resultado->>'resultado',
+        nullif(a.resultado->>'task_id', '')::uuid, a.id, true;
+    end if;
+    return query select 'usada'::text, null::uuid, a.id, false;
+    return;
+  end if;
+  if a.vence_en <= ahora then
+    update pending_action set estado = 'vencida' where id = a.id;
+    update pending_action_option set activa = false
+     where pending_action_option.pending_action_id = a.id;
+    return query select 'vencida'::text, null::uuid, a.id, false;
     return;
   end if;
 
   if o.valor = 'false'::jsonb then
     update pending_action
        set estado = 'cancelada', resuelta_en = ahora,
-           resuelta_por = actor_app_user_id
+            resuelta_por = actor_app_user_id,
+             resultado = coalesce(pending_action.resultado, '{}'::jsonb)
+                         || jsonb_build_object('resultado', 'cancelada')
      where id = a.id;
-    return query select 'cancelada'::text, null::uuid;
+    update pending_action_option set activa = false
+     where pending_action_option.pending_action_id = a.id;
+    update task_draft set estado = 'cancelled', actualizado_en = ahora where id = a.draft_id;
+    update task_intake_request
+       set estado = 'cancelled', actualizado_en = ahora,
+           terminal_result = jsonb_build_object('resultado', 'cancelada',
+                                                 'pending_action_id', a.id)
+     where task_draft_id = a.draft_id and estado = 'active';
+    update task_intake_choice set activa = false where choice_set_id in
+      (select s.id from task_intake_choice_set s join task_intake_request r
+         on r.id = s.request_id where r.task_draft_id = a.draft_id);
+    update task_intake_choice_set set estado = 'invalidated'
+     where request_id in (select id from task_intake_request
+                           where task_draft_id = a.draft_id)
+       and estado = 'active';
+    update task_intake_free_text_slot set estado = 'invalidated'
+     where request_id in (select id from task_intake_request
+                           where task_draft_id = a.draft_id)
+       and estado = 'active';
+    insert into audit_log
+         (workspace_id, actor_app_user_id, actor_kind, accion, sujeto_tipo,
+          sujeto_id, detalle)
+    select a.workspace_id, actor_app_user_id, 'persona',
+           'cancelar_ingreso_tarea', 'task_draft', a.draft_id,
+           jsonb_build_object('pending_action_id', a.id)
+     where exists (select 1 from task_intake_request
+                    where task_draft_id = a.draft_id);
+    insert into message_outbox
+         (workspace_id, chat_id, destinatario_membership_id, tipo, cuerpo,
+          estado, programado_para, dedupe_key, es_respuesta)
+    values (a.workspace_id, a.chat_id, a.membership_id, 'normal',
+            'Listo, cancelé el borrador de la tarea.', 'listo', ahora,
+            a.workspace_id || ':intake-terminal:' || a.id || ':cancelled', true)
+    on conflict (dedupe_key) do nothing;
+    return query select 'cancelada'::text, null::uuid, a.id, false;
     return;
   end if;
 
@@ -733,7 +985,9 @@ begin
   if not found or d.converted_task_id is not null or d.version <> a.draft_version
      or d.workspace_id <> a.workspace_id then
     update pending_action set estado = 'vencida' where id = a.id;
-    return query select 'obsoleta'::text, null::uuid;
+    update pending_action_option set activa = false
+     where pending_action_option.pending_action_id = a.id;
+    return query select 'obsoleta'::text, null::uuid, a.id, false;
     return;
   end if;
 
@@ -745,7 +999,8 @@ begin
 
   preview_actual := jsonb_build_object(
     'draft_id', d.id::text, 'version', d.version,
-    'titulo', d.titulo, 'objetivo', d.objective_snapshot,
+    'titulo', d.titulo, 'descripcion', d.descripcion,
+    'objetivo', d.objective_snapshot,
     'area_id', d.area_id::text,
     'responsable_membership_id', d.responsable_membership_id::text,
     'fecha_objetivo', d.fecha_objetivo::text,
@@ -770,7 +1025,9 @@ begin
      or politica.version <> d.evidencia_policy_version
      or politica.evidencia_requerida is distinct from d.evidencia_requerida then
     update pending_action set estado = 'vencida' where id = a.id;
-    return query select 'obsoleta'::text, null::uuid;
+    update pending_action_option set activa = false
+     where pending_action_option.pending_action_id = a.id;
+    return query select 'obsoleta'::text, null::uuid, a.id, false;
     return;
   end if;
 
@@ -783,7 +1040,9 @@ begin
   if aprobador_actual is distinct from a.membership_id
      or aprobador_actual is distinct from actor_membership then
     update pending_action set estado = 'vencida' where id = a.id;
-    return query select 'obsoleta'::text, null::uuid;
+    update pending_action_option set activa = false
+     where pending_action_option.pending_action_id = a.id;
+    return query select 'obsoleta'::text, null::uuid, a.id, false;
     return;
   end if;
 
@@ -815,18 +1074,65 @@ begin
           'confirmador_membership_id', actor_membership,
           'evidencia_policy_version', d.evidencia_policy_version));
 
-  update task_draft set converted_task_id = nueva_task,
+  update task_draft set converted_task_id = nueva_task, estado = 'converted',
                         actualizado_en = ahora
    where id = d.id;
   update pending_action
      set estado = 'resuelta', resuelta_en = ahora,
-         resuelta_por = actor_app_user_id
+         resuelta_por = actor_app_user_id,
+          resultado = coalesce(pending_action.resultado, '{}'::jsonb)
+                      || jsonb_build_object('resultado', 'ok', 'task_id', nueva_task)
    where id = a.id;
+  update pending_action_option set activa = false
+   where pending_action_option.pending_action_id = a.id;
+  update task_intake_request
+     set estado = 'converted', actualizado_en = ahora,
+         terminal_result = jsonb_build_object('resultado', 'ok',
+                                               'task_id', nueva_task,
+                                               'pending_action_id', a.id)
+   where task_draft_id = a.draft_id and estado = 'active';
+  update task_intake_choice set activa = false where choice_set_id in
+    (select s.id from task_intake_choice_set s join task_intake_request r
+       on r.id = s.request_id where r.task_draft_id = a.draft_id);
+  update task_intake_choice_set set estado = 'invalidated'
+   where request_id in (select id from task_intake_request
+                         where task_draft_id = a.draft_id)
+     and estado = 'active';
+  update task_intake_free_text_slot set estado = 'invalidated'
+   where request_id in (select id from task_intake_request
+                         where task_draft_id = a.draft_id)
+     and estado = 'active';
+  insert into message_outbox
+       (workspace_id, chat_id, destinatario_membership_id, tipo, cuerpo,
+        estado, programado_para, dedupe_key, es_respuesta)
+  values (a.workspace_id, a.chat_id, a.membership_id, 'normal',
+          'Hecho. La tarea quedó comprometida.', 'listo', ahora,
+          a.workspace_id || ':intake-terminal:' || a.id || ':converted', true)
+  on conflict (dedupe_key) do nothing;
 
-  return query select 'ok'::text, nueva_task;
+  return query select 'ok'::text, nueva_task, a.id, false;
 end $$;
 
-revoke all on function confirmar_borrador_tarea(uuid, text, bigint) from public;
+revoke all on function confirmar_borrador_tarea(uuid, text, bigint, bigint)
+  from public;
+
+-- Intake terminal wrapper. Unit 1A still performs the conversion; this layer
+-- adds deterministic replay and closes every intake surface atomically.
+create function resolver_ingreso_borrador(p_workspace_id uuid, p_token text,
+                                          p_telegram_user_id bigint,
+                                          p_chat_id bigint)
+returns table (resultado text, task_id uuid, pending_action_id uuid, replay boolean)
+language plpgsql security definer
+set search_path = prisma, public, pg_temp as $$
+begin
+  return query
+    select c.resultado, c.task_id, c.pending_action_id, c.replay
+      from confirmar_borrador_tarea(
+        p_workspace_id, p_token, p_telegram_user_id, p_chat_id) c;
+end $$;
+
+revoke all on function resolver_ingreso_borrador(uuid, text, bigint, bigint)
+  from public;
 
 -- =========================================================================
 -- Sistema
@@ -1169,7 +1475,9 @@ begin
     'area','rol','membership','objective','task','task_draft',
     'task_evidence_policy','dependency','blocker',
     'evidence','approval','pending_reply','inbound_message','message_outbox',
-    'pending_action','pending_action_option',
+    'pending_action','pending_action_option','task_intake_request',
+    'task_intake_field','task_intake_choice_set','task_intake_choice',
+    'task_intake_free_text_slot',
     'cadence_job','escalation_route','glossary_term','approval_policy',
     'workspace_setting','message_template','permission']
   loop
@@ -1189,10 +1497,19 @@ revoke insert on task from prisma_app;
 revoke update, delete on task from prisma_app;
 grant select on task to prisma_app;
 revoke update, delete on task_draft from prisma_app;
+grant update (objective_id, objective_snapshot, titulo, descripcion, area_id,
+              responsable_membership_id, fecha_objetivo,
+              criterio_aceptacion, evidencia_requerida,
+              evidencia_policy_version, version, estado, actualizado_en)
+  on task_draft to prisma_app;
 revoke insert, update, delete on task_evidence_policy from prisma_app;
-grant execute on function confirmar_borrador_tarea(uuid, text, bigint)
+grant execute on function confirmar_borrador_tarea(uuid, text, bigint, bigint)
   to prisma_gateway;
-revoke execute on function confirmar_borrador_tarea(uuid, text, bigint)
+grant execute on function resolver_ingreso_borrador(uuid, text, bigint, bigint)
+  to prisma_gateway;
+revoke execute on function confirmar_borrador_tarea(uuid, text, bigint, bigint)
+  from prisma_app;
+revoke execute on function resolver_ingreso_borrador(uuid, text, bigint, bigint)
   from prisma_app;
 
 -- El agente no consulta app_user directamente: lo haría por encima del

@@ -23,7 +23,8 @@ import psycopg
 from psycopg.types.json import Jsonb
 
 from .autoridad import (Denegado, Solicitante, puede_aprobar_tarea,
-                        requiere_confirmacion, verificar)
+                         requiere_confirmacion, verificar)
+from .salida import enqueue_outbox, normalize_visible_text, telegram_utf16_units
 
 
 @dataclass(frozen=True)
@@ -111,6 +112,9 @@ def ejecutar(cur: psycopg.Cursor, quien: Solicitante, nombre: str,
     ya dijo que sí, y volver a frenarla sería un bucle. La autoridad se
     verifica igual — confirmar no es lo mismo que tener permiso.
     """
+    if nombre == "crear_tarea":
+        raise Denegado(
+            "Para crear una tarea hay que completar primero su borrador guiado.")
     h = REGISTRO.get(nombre)
     if h is None:
         raise Denegado(f"No existe la herramienta '{nombre}'.")
@@ -264,21 +268,30 @@ def _crear_objetivo(cur, quien: Solicitante, titulo, tipo, padre_id=None,
     return {"id": str(oid), "titulo": titulo}
 
 
-@herramienta(
-    "crear_tarea", "crear_tarea",
-    "Crea una tarea dentro de un objetivo existente. Si no sabés a cuál "
-    "pertenece, consultá los objetivos antes de inventar uno.",
-    {"titulo": {"type": "string", "requerido": True},
-     "objetivo_id": {"type": "string"},
-     "area_slug": {"type": "string", "requerido": True},
-     "responsable": {"type": "string", "description": "nombre de la persona"},
-     "fecha_objetivo": {"type": "string", "description": "AAAA-MM-DD"},
-     "criterio_aceptacion": {"type": "string"},
-     "descripcion": {"type": "string"}})
-def _crear_tarea(cur, quien: Solicitante, titulo, objetivo_id=None, area_slug=None,
-                 responsable=None, fecha_objetivo=None,
-                 criterio_aceptacion=None, descripcion=None,
-                  responsable_membership_id=None):
+def crear_borrador_tarea(cur, quien: Solicitante, titulo, objetivo_id=None,
+                         area_slug=None, responsable=None, fecha_objetivo=None,
+                         criterio_aceptacion=None, descripcion=None,
+                         responsable_membership_id=None):
+    """Internal Unit 1A draft boundary; never exposed as a model tool."""
+    verificar(cur, quien, "crear_tarea")
+    from .ingreso_tareas import (EVIDENCE_COUNT_LIMIT, EVIDENCE_ITEM_LIMIT,
+                                 EVIDENCE_TOTAL_LIMIT, USER_FIELD_LIMITS)
+
+    titulo = normalize_visible_text(titulo)
+    descripcion = normalize_visible_text(descripcion) if descripcion else None
+    criterio_aceptacion = (normalize_visible_text(criterio_aceptacion)
+                           if criterio_aceptacion else None)
+    responsible_query = normalize_visible_text(responsable) if responsable else None
+    controlled = {
+        "title": titulo, "description": descripcion or "",
+        "responsible": responsible_query or "",
+        "acceptance_criterion": criterio_aceptacion or "",
+    }
+    for field, value in controlled.items():
+        if telegram_utf16_units(value) > USER_FIELD_LIMITS[field]:
+            raise Denegado(
+                f"El campo {field} debe tener hasta {USER_FIELD_LIMITS[field]} unidades.")
+    responsable = responsible_query
     # `responsable_membership_id` no está en el esquema que ve el modelo: lo
     # inyecta la opción que eligió la persona. Un identificador exacto no se
     # vuelve a resolver.
@@ -325,6 +338,22 @@ def _crear_tarea(cur, quien: Solicitante, titulo, objetivo_id=None, area_slug=No
     area_id = politica["area_id"] if politica else None
     evidencia = politica["evidencia_requerida"] if politica else None
     policy_version = politica["version"] if politica else None
+    if evidencia is not None:
+        evidence_units = [telegram_utf16_units(normalize_visible_text(item))
+                          for item in evidencia]
+        if (len(evidencia) > EVIDENCE_COUNT_LIMIT
+                or any(units > EVIDENCE_ITEM_LIMIT for units in evidence_units)
+                or sum(evidence_units) > EVIDENCE_TOTAL_LIMIT):
+            cur.execute(
+                """insert into incident
+                     (workspace_id, severidad, resumen_sanitizado)
+                   values (%s, 'media', %s)""",
+                (quien.workspace_id,
+                 "La política de evidencia excede el contrato visible."),
+            )
+            raise Denegado(
+                "No puedo mostrar una opción configurada de este espacio. "
+                "Pedile a quien lo administra que la revise.")
     if responsable_membership_id and str(responsable_actual["area_id"]) != str(area_id):
         raise Denegado("La persona responsable no pertenece al área de la tarea.")
 
@@ -393,7 +422,8 @@ def _crear_tarea(cur, quien: Solicitante, titulo, objetivo_id=None, area_slug=No
     cur.execute(
         """select jsonb_build_object(
                  'draft_id', id::text, 'version', version,
-                 'titulo', titulo, 'objetivo', objective_snapshot,
+                  'titulo', titulo, 'descripcion', descripcion,
+                  'objetivo', objective_snapshot,
                  'area_id', area_id::text,
                  'responsable_membership_id', responsable_membership_id::text,
                  'fecha_objetivo', fecha_objetivo::text,
@@ -419,15 +449,13 @@ def _crear_tarea(cur, quien: Solicitante, titulo, objetivo_id=None, area_slug=No
         resumen=resumen, vence_en=ahora + timedelta(hours=8),
         chat_id=autoridad["telegram_user_id"], draft_id=str(borrador["id"]),
         draft_version=borrador["version"], preview=preview)
-    cur.execute(
-        """insert into message_outbox
-             (workspace_id, chat_id, destinatario_membership_id, tipo, cuerpo,
-              estado, programado_para, dedupe_key, es_respuesta,
-              pending_action_id)
-           values (%s, %s, %s, 'normal', %s, 'listo', %s, %s, false, %s)""",
-        (quien.workspace_id, autoridad["telegram_user_id"], aprobador_id,
-         resumen, ahora, f"{quien.workspace_id}:draft-preview:{borrador['id']}:"
-         f"{borrador['version']}", pendiente.id))
+    enqueue_outbox(
+        cur, workspace_id=quien.workspace_id,
+        chat_id=autoridad["telegram_user_id"], text=resumen,
+        recipient_membership_id=str(aprobador_id), scheduled_for=ahora,
+        dedupe_key=(f"{quien.workspace_id}:draft-preview:{borrador['id']}:"
+                    f"{borrador['version']}"), pending_action_id=pendiente.id,
+    )
     return {"draft_id": str(borrador["id"]), "completa": True,
             "pendiente_revision": True, "notificada": True,
             "pending_action_id": pendiente.id}

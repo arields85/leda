@@ -9,7 +9,7 @@ pueden aprobar el pase al piloto real.
 
 | Etapa | Datos y uso | Condición de avance |
 |---|---|---|
-| Validación local simulada | Identidades, roles, áreas y autoridad vigentes de CoreWork; objetivos, tareas, bloqueos, evidencias y situaciones totalmente ficticios, identificados como simulados y aislados del trabajo real. | Capas A-D completas y luego validación manual E aprobada explícitamente por el usuario. |
+| Validación local simulada | Identidades, roles, áreas y autoridad vigentes de CoreWork; objetivos, tareas, bloqueos, evidencias y situaciones totalmente ficticios, identificados como simulados y aislados del trabajo real. Incluye sesiones manuales progresivas por Telegram para cada circuito elegible durante el desarrollo. | Capas A-D completas y luego validación manual integral E aprobada explícitamente por el usuario. Las sesiones progresivas aportan evidencia, pero no aprueban este avance. |
 | Piloto controlado real | Trabajo real de alcance acordado, con aceptación e información previas. | Criterios del piloto cumplidos y decisión humana de avanzar. |
 | VPS y producción/canary | Endurecimiento de infraestructura y exposición controlada. | Controles pre-VPS y canary verificados. |
 
@@ -20,10 +20,58 @@ Este proceso evalúa y mejora el sistema completo. No es fine-tuning. Entrenar o
 ajustar un modelo queda fuera de alcance salvo que evidencia futura motive una
 decisión separada.
 
-## Protocolo progresivo
+## Política de desarrollo MVP
 
-Las capas se ejecutan en orden. Una capa posterior no compensa defectos de una capa
-anterior.
+El objetivo inmediato es probar que Prisma comprende, responde, coordina y reduce
+carga humana. No se construye seguridad de grado productivo antes de observar el
+comportamiento, salvo cuando el riesgo alcance al circuito que se quiere ejercitar.
+
+El ciclo canónico es:
+
+1. elegir el menor circuito útil de extremo a extremo;
+2. realizar una verificación técnica, determinista y focalizada;
+3. comprobar el gate progresivo y, si cumple, ejecutar una sesión por Telegram real
+   con datos ficticios y aislados;
+4. inspeccionar respuesta visible, PostgreSQL, herramientas/efectos y
+   auditoría/historia;
+5. corregir la causa raíz de cualquier fallo y agregar replay y regresión;
+6. si el comportamiento es aceptable, avanzar al siguiente circuito pequeño y
+   endurecer proporcionalmente según la evidencia.
+
+ADR 0003, el catálogo exhaustivo/Cortes 0 a 5, la separación completa de credenciales
+y los controles avanzados de privacidad y producción siguen aceptados como horizonte.
+No bloquean por sí solos toda sesión simulada progresiva; deben retomarse antes del
+piloto real o la VPS, según corresponda, y antes si la evidencia muestra que son
+necesarios para el circuito actual.
+
+## Secuencia del protocolo
+
+Las capas A-D construyen evidencia acumulativa y la capa E es el gate humano integral
+final. No se debe completar primero todo el alcance de las Fases 1-4 para recién
+entonces realizar la primera interacción manual: cada circuito seguro se ejercita por
+Telegram real tan pronto como su unidad esté implementada y técnicamente verificada.
+Una capa o sesión posterior no compensa defectos anteriores.
+
+### Sesiones manuales progresivas por circuito
+
+Una sesión progresiva usa escenarios ficticios, simulados y aislados; nunca trabajo
+real. Sólo puede comenzar para un circuito cuando se cumplen todas estas condiciones:
+
+- se usa un workspace local o de prueba controlado, sin datos ni trabajo real;
+- el secreto de Telegram está configurado, protegido y no se registra;
+- los efectos del circuito son inspeccionables y reversibles;
+- existe backup, pausa o rollback efectivo y proporcionado al circuito;
+- no se realizará ninguna operación destructiva;
+- pueden inspeccionarse respuesta visible, PostgreSQL, herramientas/efectos y
+  auditoría/historia;
+- no hay defectos `CRITICAL` o `HIGH` abiertos para ese circuito.
+
+Si falta una condición, el circuito se ejercita mediante harness determinista o
+`TestClient`; no se fuerza Telegram ni se posterga la verificación técnica. La sesión
+progresiva busca revelar temprano defectos de UX, comprensión y coordinación. Su
+evidencia alimenta replay, regresión y corpus de desarrollo, pero nunca el holdout y
+nunca constituye aprobación del piloto real. El gate no exige hardening avanzado que
+no reduzca un riesgo del circuito acotado.
 
 ### A. Invariantes deterministas
 
@@ -51,9 +99,10 @@ El objetivo es corregir la clase causal, no memorizar una frase.
 
 ### E. Validación manual del usuario
 
-El usuario prueba Prisma por Telegram real siguiendo objetivos de evaluación, sin
-frases preparadas. Sólo el usuario puede aprobar este gate y habilitar el piloto
-controlado real. La guía operativa está en
+El usuario realiza una validación integral por Telegram real siguiendo objetivos de
+evaluación, sin frases preparadas. Esta capa consolida el sistema completo después de
+A-D; no es la primera interacción manual. Sólo el usuario puede aprobar este gate y
+habilitar el piloto controlado real. La guía operativa está en
 [`manual-validation-guide.md`](manual-validation-guide.md).
 
 ## Reglas de naturalidad
@@ -173,7 +222,7 @@ preservan conversación, PostgreSQL, logs y auditoría. No se corrige manualment
 base de datos, salvo la intervención mínima necesaria para aislar el entorno o un
 efecto y preservar la evidencia.
 
-La ejecución sólo se reanuda después de corregir el mecanismo general y superar el
+La ejecución sólo se reanuda después de corregir la causa raíz y superar el
 replay literal, sus variantes humanas y la regresión aplicable. El defecto permanece
 abierto hasta que todas las superficies requeridas coincidan con el resultado
 esperado.
@@ -186,7 +235,14 @@ Los fallos críticos o altos abiertos dentro del alcance bloquean el avance. La
 severidad debe priorizar autoridad, aislamiento, efectos irreversibles, pérdida de
 trazabilidad y afirmaciones operativas falsas, no sólo calidad de redacción.
 
-## Gate de salida
+## Gates manuales
+
+Una sesión progresiva de circuito sólo puede comenzar al cumplir el gate acotado
+definido en
+[`Sesiones manuales progresivas por circuito`](#sesiones-manuales-progresivas-por-circuito).
+Su resultado puede habilitar correcciones y nuevas regresiones, pero no la capa E ni
+el piloto real. El holdout permanece reservado y no se revela ni se usa en estas
+sesiones.
 
 La validación manual E sólo puede comenzar cuando:
 
@@ -197,8 +253,8 @@ La validación manual E sólo puede comenzar cuando:
 - cada fallo reproducible tiene replay y regresión;
 - no hay defectos críticos o altos abiertos dentro del alcance.
 
-Las pruebas y evaluaciones automatizadas sólo **habilitan** la validación manual. El
-pase al piloto controlado real requiere además:
+Las pruebas, evaluaciones automatizadas y sesiones progresivas sólo **habilitan** la
+validación manual integral E. El pase al piloto controlado real requiere además:
 
 - sesión manual por Telegram real realizada por el usuario;
 - cero defectos críticos o altos abiertos dentro del alcance;
@@ -215,4 +271,7 @@ autoaprobar este gate.
 - Entrenar, ajustar o diseñar contra el holdout.
 - Arreglar frases concretas sin probar el mecanismo general y sus variantes.
 - Tratar pruebas o evaluaciones del asistente como validación definitiva.
+- Construir todas las Fases 1-4 y reservar la primera interacción manual para la capa
+  E.
+- Usar trabajo real o revelar el holdout en una sesión progresiva.
 - Autoaprobar el pase al piloto real mediante un agente o LLM.
