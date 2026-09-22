@@ -37,6 +37,17 @@ NOW = datetime(2028, 2, 28, 15, 0, tzinfo=timezone.utc)
 BASELINE_REF = "efa8ee2"
 
 
+def _migraciones_posteriores_a(prefijo: str) -> list[Path]:
+    """Las migraciones que siguen a la indicada, descubiertas del directorio.
+
+    Nombrarlas a mano deja cada migración nueva fuera de las comparaciones de
+    paridad hasta que alguien se acuerda de agregarla, y el fallo aparece lejos
+    de la causa.
+    """
+    return [p for p in sorted((ROOT / "db" / "migrations").glob("0*.sql"))
+            if p.name[:4] > prefijo]
+
+
 def _sql_script(path: Path) -> str:
     lines = path.read_text("utf-8").splitlines()
     while lines and lines[0].startswith("\\"):
@@ -1525,6 +1536,37 @@ def test_un_espacio_no_puede_mover_el_estado_de_una_tarea_de_otro(
         assert cur.fetchone()["n"] == 0
 
 
+def test_ninguna_funcion_elevada_pertenece_a_un_rol_que_ignora_la_rls(conn):
+    """Una función `security definer` corre con los privilegios de su dueño.
+
+    Si ese dueño es superusuario o tiene `bypassrls`, la función ignora la
+    política de aislamiento por completo: adentro de ella, la RLS que protege
+    al resto del esquema no existe. Y el esquema no fija ningún propietario,
+    así que hoy queda a nombre de quien haya corrido el script.
+
+    Se lee el catálogo efectivo, no el texto del archivo: lo que importa es
+    quién resultó dueño en la instalación, no qué dice el SQL.
+    """
+    with admin(conn) as cur:
+        cur.execute(
+            """select p.proname, r.rolname, r.rolsuper, r.rolbypassrls
+                 from pg_proc p
+                 join pg_roles r on r.oid = p.proowner
+                 join pg_namespace n on n.oid = p.pronamespace
+                where n.nspname = 'prisma' and p.prosecdef
+                order by p.proname""")
+        elevadas = cur.fetchall()
+
+    assert elevadas, "no se encontró ninguna función security definer"
+    ciegas = [f for f in elevadas if f["rolsuper"] or f["rolbypassrls"]]
+    assert not ciegas, (
+        "funciones elevadas cuyo dueño ignora la RLS: "
+        + ", ".join(f"{f['proname']} (dueño {f['rolname']}"
+                    f"{', superusuario' if f['rolsuper'] else ''}"
+                    f"{', bypassrls' if f['rolbypassrls'] else ''})"
+                    for f in ciegas))
+
+
 def test_workspace_correlation_constraints_and_rls_reject_cross_tenant_children(
         intake_world, conn):
     north = intake_world["north-lab"]
@@ -1657,9 +1699,8 @@ def test_instalacion_limpia_y_base_migrada_convergen_en_el_aislamiento():
             check=True, capture_output=True).stdout.decode("utf-8")
         with psycopg.connect(urls["migrada"], autocommit=True) as db:
             db.execute(base)
-            for archivo in ("0002_general_task_intake.sql",
-                            "0003_state_event_isolation.sql"):
-                db.execute(_sql_script(ROOT / "db" / "migrations" / archivo))
+            for migracion in _migraciones_posteriores_a("0001"):
+                db.execute(_sql_script(migracion))
 
         limpia = _retrato_de_aislamiento(urls["limpia"], tablas)
         migrada = _retrato_de_aislamiento(urls["migrada"], tablas)
@@ -2047,6 +2088,13 @@ def test_migration_reconciles_legacy_and_guarded_rollback_restores_it(conn):
                 "select count(*) n from message_outbox where dedupe_key = %s",
                 (f"{ws}:intake-terminal:{terminal_pending}:cancelled",),
             ).fetchone()["n"] == 1
+
+            # Hasta acá la base migrada sólo tiene 0002, que es lo que este
+            # caso ejercita. La comparación de abajo exige la cadena completa:
+            # sin ella diverge por cada migración posterior, y el fallo culpa
+            # a la instalación limpia en vez de a la cadena incompleta.
+            for posterior in _migraciones_posteriores_a("0002"):
+                db.execute(_sql_script(posterior))
 
             clean_functions = {}
             with admin(conn) as clean:

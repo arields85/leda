@@ -111,29 +111,42 @@ no es el adaptador, es que el núcleo lo conoce.
 
 ## Cumplimiento actual
 
-Esta tabla es el estado real, no el deseado. Tres de las seis reglas están
-incumplidas hoy.
+Esta tabla es el estado real, no el deseado. Dos de las seis reglas siguen
+incumplidas hoy, y una es parcial.
 
 | Regla | Estado | Evidencia |
 |---|---|---|
-| 1. Aislamiento entre clientes | **Incumplida** | `task_state_event` y `objective_state_event` no tienen `workspace_id` (`db/esquema.sql:413-422,426-435`), no figuran en el arreglo de tablas con RLS (`db/esquema.sql:1474-1482`) y sin embargo reciben `grant insert` para `prisma_app` (`db/esquema.sql:1542`). El disparador `aplicar_evento_tarea()` es `security definer` y actualiza la proyección sin validar el espacio (`db/esquema.sql:1215-1225`). Además, el esquema versionado no contiene ninguna sentencia `alter ... owner to`, por lo que el propietario de esas funciones queda determinado por quien ejecute el esquema. |
+| 1. Aislamiento entre clientes | **Cumplida** | Migración `0003`: ambas tablas de eventos llevan `workspace_id`, con RLS forzado y política de aislamiento. El valor lo deriva un disparador `before insert` desde la fila padre, con privilegios del llamador, de modo que una tarea de otro espacio y una inexistente fallan idéntico. Migración `0004`: las cuatro funciones `security definer` pertenecen a `prisma_owner`, que no inicia sesión, no tiene miembros y no saltea la RLS. |
 | 2. El núcleo no conoce el transporte | **Incumplida** | `message_outbox` tiene `chat_id` y `telegram_message_id` y no tiene columna de canal (`db/esquema.sql:533,548`). |
 | 3. Límites de transporte fuera del negocio | **Incumplida** | `telegram_utf16_units` (`src/prisma/salida.py:39`) se usa para decidir la validez de datos de negocio en `src/prisma/ingreso_tareas.py:532,547,554,1118`. |
 | 4. Estado por eventos | **Cumplida** | `bloquear_estado_directo()` impide el `update` directo sobre la tarea (`db/esquema.sql:1231`); el estado es proyección. |
 | 5. Configuración como dato versionado | **Cumplida** | `area` y `rol` son tablas con alcance de espacio (`db/esquema.sql:106,114`); el importador de paquetes es genérico (`src/prisma/importador.py:211`). |
 | 6. Autoridad revalidada en la frontera | **Parcial** | Existe la resolución de identidad y autoridad (`src/prisma/autoridad.py`) y el límite dedicado de conversión. Falta el grafo de transiciones: `actualizar_estado` acepta cualquier destino del tipo enumerado sin validar que la transición sea legítima (`src/prisma/herramientas.py:464-491`). |
 
-### Consecuencia de la regla 1 incumplida
+### Cómo se cerró la regla 1
 
-Una conexión asociada a un espacio puede insertar un evento de estado que referencia
-una tarea de otro espacio. La restricción de clave foránea confirma la existencia de
-esa tarea, de modo que el incumplimiento habilita además la enumeración de
-identificadores ajenos.
+El propietario efectivo de las funciones elevadas **se midió**, no se supuso: eran
+propiedad de `postgres`, superusuario y `bypassrls`. Adentro de sus cuerpos la RLS
+no aplicaba. Eso cierra el `PENDIENTE` que este documento registraba antes.
 
-El alcance exacto de la mutación depende del propietario efectivo de las funciones
-`security definer` en cada instalación, que el esquema versionado no fija. Esa
-verificación es parte del trabajo de cierre del aislamiento descrito en
-[`ROADMAP.md`](../ROADMAP.md).
+Al quitarles ese privilegio apareció una dependencia oculta: el disparador que
+proyecta `task.estado` se apoyaba en saltear la RLS. La conexión administrativa no
+define espacio alguno, así que su `update` pasó a no encontrar ninguna fila y a
+fallar **en silencio**. Ahora se acota al espacio del propio evento, ya derivado, y
+restaura el valor previo para no angostar el resto de la transacción.
+
+Dos verificaciones sostienen la regla, ambas contra bases reales: el rechazo del
+cruce con indistinguibilidad frente a un identificador inexistente, y la
+convergencia entre instalación limpia y base migrada leyendo el catálogo efectivo.
+
+Límite que se conserva: la propiedad se verifica sobre una base nueva dentro de un
+clúster existente. Un ensayo sobre un clúster enteramente limpio sigue siendo una
+comprobación más fuerte y está `PENDIENTE`.
+
+`confirmar_borrador_tarea` todavía fija el espacio con el valor que recibe de quien
+la llama. Está acotada a `prisma_gateway` y fuera del alcance de `prisma_app`, pero
+es el patrón que la regla 6 rechaza; pertenece al ingreso autenticado, no a esta
+regla.
 
 ## Cómo se usa esta frontera
 

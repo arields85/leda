@@ -80,34 +80,37 @@ para que la próxima corrección tenga un lugar declarado al que pertenecer.
 
 ## Riesgos prioritarios
 
-1. **Aislamiento entre clientes incompleto.** `task_state_event` y
-   `objective_state_event` no tienen `workspace_id`
-   (`db/esquema.sql:413-422,426-435`), no figuran en el arreglo de tablas con RLS
-   (`db/esquema.sql:1474-1482`) y reciben `grant insert` para `prisma_app`
-   (`db/esquema.sql:1542`). El disparador `aplicar_evento_tarea()` es
-   `security definer` y actualiza la proyección sin validar el espacio
-   (`db/esquema.sql:1215-1225`). Una conexión asociada a un espacio puede insertar un
-   evento que referencie una tarea de otro espacio, y la clave foránea confirma la
-   existencia de ese identificador.
-   El propietario efectivo de las funciones `security definer` está `PENDIENTE` de
-   verificación contra un clúster limpio: el esquema versionado no contiene ninguna
-   sentencia `alter ... owner to`, por lo que el alcance exacto de la mutación depende
-   de quién ejecute el esquema en cada instalación.
-2. **El outbox está atado a un transporte.** `message_outbox` tiene `chat_id` y
+1. **El outbox está atado a un transporte.** `message_outbox` tiene `chat_id` y
    `telegram_message_id` y no tiene columna de canal (`db/esquema.sql:533,548`).
    Bloquea toda superficie que no sea la conversacional.
-3. **Un límite de transporte decide validez de negocio.** `telegram_utf16_units`
+2. **Un límite de transporte decide validez de negocio.** `telegram_utf16_units`
    (`src/prisma/salida.py:39`) se usa para aceptar o rechazar datos de negocio en
    `src/prisma/ingreso_tareas.py:532,547,554,1118`.
-4. **No existe grafo de transiciones de estado.** `actualizar_estado` acepta cualquier
+3. **No existe grafo de transiciones de estado.** `actualizar_estado` acepta cualquier
    destino del tipo enumerado sin validar que la transición sea legítima
    (`src/prisma/herramientas.py:464-491`).
-5. **`pending_reply` no es operativo.** La tabla y la escalera existen, pero el ingreso
+4. **`pending_reply` no es operativo.** La tabla y la escalera existen, pero el ingreso
    no crea ni satisface el ciclo de respuesta, de modo que el seguimiento no puede
    afirmar silencio sobre evidencia real.
-6. Cobertura RLS incompleta en registros auxiliares: `absence`, `incident` y
+5. Cobertura RLS incompleta en registros auxiliares: `absence`, `incident` y
    `audit_log` reciben `insert` sin política de aislamiento
-   (`db/esquema.sql:1542-1543`).
+   (`db/esquema.sql:1542-1543`). Misma clase que el riesgo ya cerrado, menor
+   impacto.
+6. **`confirmar_borrador_tarea` fija el espacio con el valor que recibe.** Está
+   acotada a `prisma_gateway` y fuera del alcance de `prisma_app`, pero confiar el
+   espacio a quien llama es el patrón que la frontera rechaza. Pertenece al ingreso
+   autenticado.
+
+### Cerrado: aislamiento entre clientes
+
+Era el riesgo número uno. Las tablas de eventos de estado no tenían `workspace_id`
+ni política, y las cuatro funciones `security definer` pertenecían a `postgres`
+—superusuario y `bypassrls`—, así que adentro de sus cuerpos la RLS no aplicaba.
+Cerrado por las migraciones `0003` y `0004`; el detalle está en
+[`architecture/frontera.md`](architecture/frontera.md#cómo-se-cerró-la-regla-1).
+
+Queda `PENDIENTE` un ensayo de propiedad sobre un clúster enteramente limpio: hoy
+se verifica sobre una base nueva dentro de un clúster existente.
 
 ## Deudas registradas
 

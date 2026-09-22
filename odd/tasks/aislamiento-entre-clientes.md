@@ -78,9 +78,13 @@ problema y menor impacto. No se incluye sin autorización explícita.
       en `db/esquema.sql`. *Ruta: delegada; el writer murió por límite de
       sesión durante su verificación, el trabajo estaba completo y lo verifiqué
       yo.*
-- [ ] **T3** — Rol propietario sin `bypassrls` y propiedad explícita de las
-      cuatro funciones `security definer`, con sus privilegios mínimos.
-      **Pendiente. Es la trampa del `bypassrls` y todavía está abierta.**
+- [x] **T3** — `prisma_owner` (`nologin noinherit nobypassrls nosuperuser`) es
+      dueño de las cuatro funciones elevadas. Migración `0004` y su rollback.
+      **Desvío deliberado de la especificación:** no se le dieron privilegios
+      mínimos sino acceso amplio a las tablas del esquema. Lo que contiene a
+      este rol es la RLS, no la lista de privilegios; una lista exacta habría
+      que derivarla leyendo los cuerpos de las funciones y se rompería, en
+      producción y en silencio, en el próximo cambio. *Ruta: inline.*
 - [x] **T4 (VERDE)** — T1 pasa. La prueba exige además que una tarea ajena y un
       identificador inexistente produzcan el **mismo** error: sin esa
       indistinguibilidad el rechazo sería en sí mismo un oráculo.
@@ -160,9 +164,41 @@ Revisión del SQL hecha por el orquestador, no por el writer:
 | Expresión de la política | Idéntica a la del resto del esquema |
 | `esquema.sql`: tablas en el bucle de RLS y `update`/`delete` revocados | Correcto (`:1523`, `:1557-1558`); `prisma_app` conserva sólo `insert` |
 
+## Lo que T3 destapó
+
+Las cuatro funciones pertenecían a `postgres`: superusuario y `bypassrls`.
+Medido, no supuesto. Eso cierra el `PENDIENTE` que arrastraba
+`docs/architecture/frontera.md`.
+
+Al quitarles el privilegio cayeron **diez** pruebas. Causa raíz: el disparador
+que proyecta `task.estado` se apoyaba en saltear la RLS. `src/prisma/db.py:56`
+muestra por qué — la conexión administrativa fija `role prisma_admin` pero
+**nunca define `prisma.workspace_id`**: ve todos los espacios por `bypassrls`,
+no por el GUC. Sin ese privilegio, el `update` de la proyección se filtraba
+contra un espacio vacío, no encontraba ninguna fila y **fallaba en silencio**:
+el evento quedaba registrado y el estado nunca se proyectaba.
+
+Corregido acotando el disparador al espacio del propio evento, que `0003` ya
+deriva de la tarea padre, y restaurando el valor previo para no angostar el
+resto de la transacción. Sin esa restauración, una operación administrativa que
+recorra varios espacios quedaría encerrada en el último que tocó: se habría
+cambiado un fallo ruidoso por uno sutil.
+
+## Patrón recurrente: migraciones nombradas a mano
+
+Tercera aparición en la misma sesión. `git show HEAD:db/esquema.sql` como
+esquema "anterior"; la prueba textual de paridad, cableada a `0002`; y
+`test_migration_reconciles_legacy_and_guarded_rollback_restores_it`, que
+comparaba dueños de funciones con una cadena que terminaba en `0002`. Cada
+migración nueva rompía una prueba lejos de su causa.
+
+Resuelto con `_migraciones_posteriores_a()`, que las descubre del directorio.
+Se aplicó también a la prueba de paridad nueva, que había nacido con el mismo
+defecto.
+
 ## Próximo paso
 
-T3: rol propietario sin `bypassrls` y propiedad explícita de las cuatro
-funciones `security definer`. Hasta cerrarla, la regla 1 de
-`docs/architecture/frontera.md` **sigue incumplida**: el cruce de escritura
-está tapado, pero las funciones elevadas siguen sin propietario declarado.
+T5 completa: ninguna prueba ejercita todavía los rollbacks de `0003` y `0004`.
+Después, decidir con el usuario el riesgo 5 de `STATUS.md` (`absence`,
+`incident` y `audit_log` sin política), que es la misma clase de problema con
+menor impacto.

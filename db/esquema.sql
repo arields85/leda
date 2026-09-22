@@ -1260,13 +1260,23 @@ create trigger trg_derivar_espacio_evento_objetivo
 
 create or replace function aplicar_evento_tarea() returns trigger
 security definer set search_path = prisma, public as $$
+declare espacio_anterior text := current_setting('prisma.workspace_id', true);
 begin
+  -- El dueño de esta función no saltea la RLS, así que este `update` queda
+  -- sujeto a la política de aislamiento. Se acota al espacio del propio
+  -- evento, que el disparador de derivación ya resolvió desde la tarea: no se
+  -- confía en nada aportado por quien llama. Hace falta fijarlo porque la
+  -- conexión administrativa no define espacio alguno, y sin esto la proyección
+  -- no encontraría la fila y fallaría en silencio. El valor previo se
+  -- restaura para no angostar el resto de la transacción.
+  perform set_config('prisma.workspace_id', new.workspace_id::text, true);
   perform set_config('prisma.aplicando_evento', '1', true);
   update task
      set estado = new.estado_nuevo,
          actualizado_en = new.at
    where id = new.task_id;
   perform set_config('prisma.aplicando_evento', '0', true);
+  perform set_config('prisma.workspace_id', coalesce(espacio_anterior, ''), true);
   return new;
 end $$ language plpgsql;
 
@@ -1511,8 +1521,15 @@ do $$ begin
   if not exists (select 1 from pg_roles where rolname = 'prisma_gateway') then
     create role prisma_gateway nologin noinherit;
   end if;
+  -- Dueño de las funciones `security definer`. Sin él, esas funciones quedan a
+  -- nombre de quien corra este script -- en la práctica un superusuario, que
+  -- ignora la RLS: adentro de sus cuerpos el aislamiento no existiría.
+  if not exists (select 1 from pg_roles where rolname = 'prisma_owner') then
+    create role prisma_owner nologin noinherit;
+  end if;
 end $$;
 alter role prisma_gateway noinherit nobypassrls;
+alter role prisma_owner nologin noinherit nobypassrls nosuperuser;
 
 do $$
 declare t text;
@@ -1564,6 +1581,25 @@ revoke execute on function confirmar_borrador_tarea(uuid, text, bigint, bigint)
   from prisma_app;
 revoke execute on function resolver_ingreso_borrador(uuid, text, bigint, bigint)
   from prisma_app;
+
+-- Una función `security definer` corre con los privilegios de su dueño. Si ese
+-- dueño fuera superusuario, la RLS no aplicaría dentro de ella y el
+-- aislamiento entre clientes se caería por adentro. Lo que contiene a
+-- `prisma_owner` es la RLS, no la lista de privilegios: por eso no inicia
+-- sesión, nadie es miembro suyo y no puede saltear la política. Una lista
+-- exacta de lo que toca cada cuerpo se desactualizaría en el próximo cambio.
+grant usage on schema prisma to prisma_owner;
+grant all privileges on all tables in schema prisma to prisma_owner;
+grant all privileges on all sequences in schema prisma to prisma_owner;
+
+alter function resolver_pendiente(text, uuid, timestamptz)
+  owner to prisma_owner;
+alter function confirmar_borrador_tarea(uuid, text, bigint, bigint)
+  owner to prisma_owner;
+alter function resolver_ingreso_borrador(uuid, text, bigint, bigint)
+  owner to prisma_owner;
+alter function aplicar_evento_tarea()
+  owner to prisma_owner;
 
 -- El agente no consulta app_user directamente: lo haría por encima del
 -- aislamiento, porque esa tabla es global. Usa esta vista, que pasa por
