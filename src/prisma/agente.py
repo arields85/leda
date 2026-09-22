@@ -173,7 +173,8 @@ def _ejecutar_una(cur, quien: Solicitante, c: Llamada, ctx, acciones,
     punto = cur.connection.transaction(force_rollback=False)
     try:
         with punto:
-            resultado = H.ejecutar(cur, quien, c.nombre, c.args)
+            resultado = H.ejecutar(cur, quien, c.nombre, c.args,
+                                   chat_id=chat_id)
     except Denegado as e:
         return bloque({"permitido": False, "explicacion": str(e)}, error=True)
     except H.NecesitaConfirmacion as e:

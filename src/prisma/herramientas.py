@@ -38,16 +38,22 @@ class Herramienta:
     # argumentos: hay que leerla de la base primero. Esas herramientas hacen
     # la verificación adentro, con el área ya resuelta.
     valida_en_handler: bool = False
+    # El chat desde el que escribieron. No está en el esquema que ve el
+    # modelo y lo inyecta el servidor: si el modelo pudiera declararlo,
+    # bastaría con que dijera "privado" para sortear una regla que depende
+    # de dónde se pidió algo.
+    necesita_chat: bool = False
 
 
 REGISTRO: dict[str, Herramienta] = {}
 
 
 def herramienta(nombre: str, accion: str, descripcion: str, parametros: dict,
-                *, valida_en_handler: bool = False):
+                *, valida_en_handler: bool = False,
+                necesita_chat: bool = False):
     def envoltura(fn):
         REGISTRO[nombre] = Herramienta(nombre, accion, descripcion, parametros,
-                                       fn, valida_en_handler)
+                                       fn, valida_en_handler, necesita_chat)
         return fn
     return envoltura
 
@@ -105,12 +111,17 @@ def candidatos(cur: psycopg.Cursor, texto: str) -> list[tuple[str, str]]:
 
 
 def ejecutar(cur: psycopg.Cursor, quien: Solicitante, nombre: str,
-             args: dict[str, Any], *, ya_confirmada: bool = False) -> Any:
+             args: dict[str, Any], *, ya_confirmada: bool = False,
+             chat_id: int | None = None) -> Any:
     """Punto único de entrada. Nada llega a la base por otro camino.
 
     `ya_confirmada` es para lo que vuelve de una acción pendiente: la persona
     ya dijo que sí, y volver a frenarla sería un bucle. La autoridad se
     verifica igual — confirmar no es lo mismo que tener permiso.
+
+    `chat_id` lo pone el servidor desde el update de Telegram, y sólo lo
+    reciben las herramientas que lo declaran. No viaja en el esquema que ve
+    el modelo: de dónde se pidió algo es un hecho, no un argumento.
     """
     if nombre == "crear_tarea":
         raise Denegado(
@@ -125,8 +136,12 @@ def ejecutar(cur: psycopg.Cursor, quien: Solicitante, nombre: str,
     if requiere_confirmacion(h.accion) and not ya_confirmada:
         raise NecesitaConfirmacion(_resumen(h, args), nombre, dict(args))
 
+    llamada = dict(args)
+    if h.necesita_chat:
+        llamada["chat_id"] = chat_id
+
     try:
-        return h.handler(cur, quien, **args)
+        return h.handler(cur, quien, **llamada)
     except NecesitaElegir as e:
         # La herramienta sabe qué falta; acá se completa con qué hacía falta
         # para ella. El texto ambiguo no vuelve a viajar.
@@ -556,6 +571,43 @@ def _aprobar_tarea(cur, quien: Solicitante, tarea_id, comentario=None):
            values (%s, 'tarea', %s, %s, 'aprobado', %s)""",
         (quien.workspace_id, tarea_id, quien.membership_id, comentario))
     return {"aprobada": True}
+
+
+@herramienta(
+    "pedir_tablero", "consultar",
+    "Devuelve un enlace personal al tablero, con el estado del equipo: avance "
+    "de objetivos, carga por persona, vencidas y bloqueos. Usalo cuando "
+    "pidan ver el tablero, el panel o un resumen visual.",
+    {}, necesita_chat=True)
+def _pedir_tablero(cur, quien: Solicitante, chat_id: int | None = None):
+    """Emite un enlace al tablero, sólo por chat privado.
+
+    Un enlace en un grupo es acceso para cualquiera que lo lea, ahora y
+    dentro de seis meses cuando alguien revise el historial. Por eso el
+    chat lo pone el servidor y no el modelo: si el modelo pudiera declararlo,
+    bastaría con que dijera "privado".
+    """
+    from datetime import datetime, timezone
+
+    from . import tablero
+    from .config import config
+
+    if chat_id is None or chat_id <= 0:
+        return {"emitido": False,
+                "explicacion": "El enlace al tablero se pide por chat privado, "
+                               "no por el grupo. Escribime por privado y te lo mando."}
+
+    if not config.base_url:
+        return {"emitido": False,
+                "explicacion": "Todavía no está configurada la dirección "
+                               "pública, así que no puedo armar el enlace."}
+
+    token = tablero.emitir(cur, quien.membership_id,
+                           datetime.now(timezone.utc))
+    minutos = tablero.minutos_de_vigencia(cur)
+    return {"emitido": True,
+            "enlace": f"{config.base_url.rstrip('/')}/tablero/{token}",
+            "vence_en_minutos": minutos}
 
 
 @herramienta(

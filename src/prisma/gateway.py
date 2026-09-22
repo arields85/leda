@@ -13,6 +13,7 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import APIRouter, FastAPI, Header, HTTPException, Request
+from fastapi.responses import HTMLResponse
 
 from .autoridad import (Canal, Denegado, identificar, identificar_en_espacio)
 from .config import config
@@ -288,7 +289,7 @@ def _toque(conn, workspace_id: str, slug: str, toque: dict,
                 try:
                     resultado = H.ejecutar(
                         cur, quien, resuelta.herramienta, resuelta.args,
-                        ya_confirmada=True)
+                        ya_confirmada=True, chat_id=chat_id)
                 except Denegado as e:
                     _responder(cur, workspace_id, chat_id, quien, str(e), ahora)
                 else:
@@ -429,6 +430,56 @@ def _routing_incident(cur, quien, error) -> None:
         (quien.workspace_id,
          f"Falló el enrutamiento tipado ({type(error).__name__})."),
     )
+
+
+@router.get("/tablero/{token}", response_class=HTMLResponse)
+def tablero_web(token: str):
+    """La pantalla del tablero.
+
+    El espacio sale del token y de ningún otro lado. No hay parámetro de
+    consulta, cabecera ni segmento de URL que lo indique: si lo hubiera,
+    cambiarlo sería todo lo que hace falta para mirar el espacio de otro.
+
+    Un token inválido, vencido, o de alguien que dejó el equipo, devuelven lo
+    mismo. Distinguirlos le diría a quien prueba enlaces cuáles existieron.
+    """
+    return _servir_tablero(_conn(), token)
+
+
+def _servir_tablero(conn, token: str) -> HTMLResponse:
+    from . import lectura
+    from . import tablero
+    from .db import sin_espacio
+    from .tablero_vista import enlace_vencido, pagina
+
+    with sin_espacio(conn) as cur:
+        acceso = tablero.resolver(cur, token)
+
+    if acceso is None:
+        return HTMLResponse(enlace_vencido(), status_code=401)
+
+    from datetime import datetime, timezone
+    ahora = datetime.now(timezone.utc)
+
+    with espacio(conn, acceso["workspace_id"]) as cur:
+        cur.execute("select nombre from workspace")
+        fila = cur.fetchone()
+        nombre_espacio = fila["nombre"] if fila else "Tu equipo"
+        cur.execute("select nombre from integrante where membership_id = %s",
+                    (acceso["membership_id"],))
+        fila = cur.fetchone()
+        persona = fila["nombre"] if fila else ""
+        datos = {
+            "objetivos": lectura.avance_de_objetivos(cur),
+            "estados": lectura.tareas_por_estado(cur),
+            "carga": lectura.carga_por_persona(cur),
+            "vencidas": lectura.tareas_vencidas(cur, ahora),
+            "bloqueos": lectura.bloqueos_abiertos(cur, ahora),
+            "aprobacion": lectura.trabajo_esperando_aprobacion(cur),
+        }
+
+    return HTMLResponse(
+        pagina(datos, espacio=nombre_espacio, persona=persona))
 
 
 @router.get("/salud")

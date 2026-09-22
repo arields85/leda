@@ -78,6 +78,25 @@ def autoridad(conn: psycopg.Connection) -> Iterator[psycopg.Cursor]:
             yield cur
 
 
+@contextlib.contextmanager
+def sin_espacio(conn: psycopg.Connection) -> Iterator[psycopg.Cursor]:
+    """Antes de saber a qué espacio pertenece el pedido.
+
+    Existe para un solo caso: resolver una credencial que todavía no dijo de
+    qué espacio es. Llega un token del tablero y averiguar su espacio es
+    justamente lo que falta hacer, así que no se puede abrir `espacio()`.
+
+    Dentro de este bloque **no hay espacio fijado**, de modo que la política
+    de aislamiento no deja ver ninguna fila con alcance de espacio. Lo único
+    que se puede hacer acá es llamar a la función acotada que resuelve el
+    token. Cualquier otra consulta va a devolver vacío, y eso es deliberado.
+    """
+    with conn.transaction():
+        with conn.cursor() as cur:
+            cur.execute("set local role prisma_app")
+            yield cur
+
+
 def registrar_auditoria(
     cur: psycopg.Cursor,
     *,
