@@ -29,6 +29,7 @@ cliente, no su definición.
 | Arquitectura objetivo previa | [`architecture/target-state.md`](architecture/target-state.md) |
 | Decisión sobre borradores | [`decisions/0001-drafts-and-committed-tasks.md`](decisions/0001-drafts-and-committed-tasks.md) |
 | Decisión sobre contexto LLM y retención | [`decisions/0002-pilot-llm-context-and-retention.md`](decisions/0002-pilot-llm-context-and-retention.md) |
+| Decisión sobre las dos superficies web separadas | [`decisions/0004-dos-superficies-separadas.md`](decisions/0004-dos-superficies-separadas.md) |
 | Reglas para futuras sesiones | [`../AGENTS.md`](../AGENTS.md) |
 | Configuración del primer cliente | [`../espacios/corework.yaml`](../espacios/corework.yaml) |
 

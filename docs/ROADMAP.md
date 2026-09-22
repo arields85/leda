@@ -7,6 +7,13 @@ El orden no son fases del proyecto: son unidades de trabajo con precondición y
 criterio de cierre. Una unidad se cierra por su criterio, no por cantidad de tareas
 completadas.
 
+**La entrevista de alta se antepuso al tablero de cliente.** Dos razones. Sin ella,
+cada cliente nuevo exige que alguien que conozca al equipo escriba un paquete a mano,
+y eso no es un producto: es una instalación a medida. **Prisma no se puede vender dos
+veces sin la entrevista.** Y además es la que define qué configuración existe —sus
+ocho bloques son exactamente lo que el tablero debería dejar editar—, así que
+construir el tablero antes sería adivinar esa lista.
+
 ## Qué se aprovecha tal cual
 
 Buena parte de lo construido sirve sin cambios para un producto multi-tenant. Esto no
@@ -96,15 +103,54 @@ negocio dejan de medir en unidades de un canal.
 prueba demuestra que un dato de negocio válido deja de rechazarse por un límite de
 transporte. Es la precondición de toda superficie que no sea conversacional.
 
-### API de lectura
+### Puerto de lectura — entregado
 
-**Entrega:** consultas agregadas de objetivos, avance, tareas por estado y por
-responsable, cumplimiento, bloqueos y carga, expuestas por el puerto de lectura.
+**Entregado** en `70685f3`: seis consultas agregadas en `src/prisma/lectura.py`
+—avance de objetivos, tareas por estado, carga por persona, vencidas, bloqueos
+abiertos y trabajo esperando aprobación—. Ninguna recibe el espacio: lo toman de la
+sesión, y el aislamiento queda a cargo de la política.
 
-**Depende de:** cierre del aislamiento y desacople del transporte.
+**Su adaptador HTTP no existe**, así que todavía ninguna superficie ajena al canal
+conversacional lee nada. Eso pertenece al tablero de cliente.
 
-**Cierre:** una superficie ajena al canal conversacional puede leer el estado
-completo de un espacio, y sólo de ese espacio.
+Nota sobre la dependencia que este roadmap declaraba: decía depender del desacople
+del transporte, y no era cierto. `message_outbox` es la cola de notificaciones
+empujadas a personas; un tablero no recibe notificaciones, lee estado. El desacople
+habilita un segundo canal de notificación, no una superficie de lectura.
+
+### Entrevista de alta de espacios
+
+**Entrega:** la implementación de [`nucleo/alta-de-equipo.md`](../nucleo/alta-de-equipo.md),
+hoy diseñado en detalle y sin una sola línea de código. Sus ocho bloques producen un
+paquete de espacio que un administrador de plataforma lee y aprueba antes de activar.
+
+**Depende de:** el panel de plataforma, que es donde vive.
+
+**Cierre:** se da de alta un espacio nuevo sin que nadie escriba un paquete a mano, y
+las validaciones del documento distinguen lo que impide activar de lo que sólo
+advierte.
+
+### Panel de plataforma
+
+**Entrega:** la superficie que aloja la entrevista de alta y el alta de clientes, y
+su autenticación.
+
+**Depende de:** nada en el código; sí de una decisión abierta sobre cómo se autentica
+quien opera Prisma. El enlace por Telegram no sirve acá: autentica contra una
+membresía, y en el alta el espacio todavía no existe.
+
+**Cierre:** quien opera Prisma entra, da de alta un espacio y lo activa.
+
+### Tablero de cliente
+
+**Entrega:** la superficie que consume el puerto de lectura y permite al cliente
+ajustar su propia configuración, con cada cambio atribuido en la auditoría.
+
+**Depende de:** puerto de lectura (hecho) y su credencial de acceso, cuya
+implementación quedó en pausa sin comitear.
+
+**Cierre:** un integrante abre su enlace, ve el estado de su espacio y sólo el suyo,
+y un cambio de configuración queda registrado con su autor.
 
 ### Grafo de transiciones de estado
 
@@ -131,8 +177,12 @@ ausencia y escalamiento sobre solicitudes reales.
 No se abordan hasta que las unidades anteriores estén cerradas, y cada uno requiere
 su propia decisión:
 
-- dashboard sobre la API de lectura;
 - aplicación móvil;
-- incorporación de un segundo cliente, con el proceso de alta que eso exija;
+- exportación de la configuración de un espacio al formato de paquete, que es la
+  portabilidad que pide el §17 del documento del primer cliente;
 - capacidades de producción para operar en internet: cola de entrada, pool de
   conexiones, secreto obligatorio de webhook, observabilidad, respaldo y restauración.
+
+La incorporación de un segundo cliente dejó de ser horizonte posterior: es
+exactamente lo que habilitan la entrevista de alta y el panel de plataforma, ya
+ordenados arriba.

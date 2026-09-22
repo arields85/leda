@@ -14,23 +14,36 @@ En el modelo de datos, un cliente se representa como un *espacio* (`workspace`).
 objetivo, tarea, integrante, política y mensaje pertenece a un espacio y no existe
 fuera de él.
 
-La configuración de cada cliente se carga como un paquete versionado, no como código.
-Esa es la diferencia entre un producto y una instalación a medida.
+La configuración de cada cliente es dato, no código. Esa es la diferencia entre un
+producto y una instalación a medida.
 
-## Las tres superficies
+El paquete versionado es el **formato de transporte** de esa configuración, no su
+fuente de verdad: lo produce la entrevista de alta, una exportación o el desarrollo,
+y el importador lo consume una sola vez para sembrar el espacio. Desde ese momento la
+base es la verdad operativa y el tablero del cliente la edita.
 
-Prisma está pensado para atenderse desde tres superficies distintas sobre el mismo
-núcleo.
+## Las cuatro superficies
+
+Prisma se atiende desde cuatro superficies distintas sobre el mismo núcleo.
 
 | Superficie | Propósito | Estado |
 |---|---|---|
 | Conversacional | Interacción cotidiana: informar avances, pedir estado, resolver confirmaciones. Hoy sobre Telegram. | Existe |
-| Lectura y dashboard | Visión consolidada de objetivos, avance, cumplimiento, bloqueos y carga por persona. | No existe |
+| Tablero de cliente | Visión consolidada de objetivos, avance, cumplimiento, bloqueos y carga por persona, **y ajuste de la configuración propia**. | No existe; su credencial está en curso |
+| Panel de plataforma | Alta de clientes y entrevista de alta de un espacio nuevo. | No existe |
 | Aplicación móvil | Acceso rápido a lo propio y a las confirmaciones pendientes. | No existe |
 
 Hoy sólo existe la primera. La superficie HTTP del sistema se limita a dos rutas:
-`POST /telegram/{slug}` y `GET /salud` (`src/prisma/gateway.py:47,434`). No hay API de
-lectura para ningún cliente que no sea el canal conversacional.
+`POST /telegram/{slug}` y `GET /salud` (`src/prisma/gateway.py:47,434`).
+
+El puerto de lectura sí existe (`src/prisma/lectura.py`): las consultas agregadas
+están, lo que falta es la superficie que las muestre.
+
+**Las dos superficies web son aplicaciones separadas, no una con niveles de
+permiso.** El tablero de cliente alcanza un solo espacio; el panel de plataforma los
+alcanza todos, y por eso no puede convivir con el otro a un error de autorización de
+distancia. El razonamiento completo está en
+[`ADR 0004`](../decisions/0004-dos-superficies-separadas.md).
 
 ## Qué hace Prisma
 
@@ -82,6 +95,11 @@ funcional.
 La consecuencia práctica: incorporar un segundo cliente no exige modificar el
 esquema.
 
+Dónde se edita cada columna: lo de la izquierda entra por la entrevista de alta y
+después se ajusta desde el tablero del cliente, con cada cambio atribuido en la
+auditoría. Lo de la derecha no se edita desde ninguna superficie: cambia con el
+producto.
+
 ## Principios invariantes
 
 1. Las personas deciden; Prisma organiza, propone y hace seguimiento.
@@ -98,9 +116,15 @@ esquema.
 
 ## CoreWork como primer cliente
 
-CoreWork es el primer cliente de Prisma, no su definición. Su configuración vive en
-[`espacios/corework.yaml`](../../espacios/corework.yaml) y se carga por el mismo
-mecanismo de paquetes que usará cualquier otro cliente.
+CoreWork es el primer cliente de Prisma, no su definición. Su paquete vive en
+[`espacios/corework.yaml`](../../espacios/corework.yaml) y entra por el mismo
+importador que usará cualquier otro cliente.
+
+Con una diferencia que conviene no olvidar: ese paquete se escribió a mano, porque
+quien lo escribió conocía al equipo. Un cliente nuevo no tiene a nadie que pueda
+hacer eso, y por eso la entrevista de alta —hoy diseñada en
+[`nucleo/alta-de-equipo.md`](../../nucleo/alta-de-equipo.md) y sin implementar— es lo
+que separa a Prisma de ser una instalación a medida.
 
 El documento maestro de CoreWork pasa a ser **insumo de configuración de ese
 cliente**: describe sus integrantes, su autoridad, sus cadencias y su objetivo anual.

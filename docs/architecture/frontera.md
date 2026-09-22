@@ -75,7 +75,7 @@ Un puerto es un contrato que el núcleo define y un adaptador implementa.
 | Intención | Recibe la intención de una persona ya identificada y autorizada, sin formato de canal. |
 | Notificación | Entrega un mensaje dirigido a una persona, sin conocer su transporte. |
 | Lectura | Expone consultas agregadas del estado para cualquier superficie de lectura. Implementado en `src/prisma/lectura.py`; ninguna de sus funciones recibe el espacio, lo toman de la sesión. |
-| Configuración | Carga el paquete versionado de un cliente y lo materializa en el modelo. |
+| Configuración | Materializa y modifica la configuración de un cliente. Tiene dos productores: el paquete versionado, que la siembra una vez, y la edición desde el tablero del cliente. El paquete es formato de transporte, no fuente de verdad: después de sembrar, manda la base. Toda edición queda atribuida en la auditoría. |
 | Razonamiento | Interpreta lenguaje natural y devuelve salida tipada y validada. |
 
 ## Adaptadores
@@ -85,8 +85,14 @@ Un puerto es un contrato que el núcleo define y un adaptador implementa.
 | Telegram | Existe | `src/prisma/despachador.py:66` |
 | Proveedores LLM | Existen | `src/prisma/llm.py` |
 | Importador de paquetes | Existe | `src/prisma/importador.py:211` |
-| HTTP de lectura | No existe | Sólo hay webhook y salud en `src/prisma/gateway.py:47,434` |
+| Tablero de cliente | No existe | Sólo hay webhook y salud en `src/prisma/gateway.py:47,434`. Alcanza un solo espacio. **No es de sólo lectura:** consume el puerto de Lectura y también el de Configuración. |
+| Panel de plataforma | No existe | Alcanza todos los espacios: da de alta clientes y conduce la entrevista de alta. Su autenticación es una decisión abierta. |
 | Aplicación móvil | No existe | — |
+
+Las dos superficies web son adaptadores distintos y aplicaciones separadas, por
+[`ADR 0004`](../decisions/0004-dos-superficies-separadas.md). No es una preferencia
+de organización: el dato de todos los clientes no debe existir en el proceso que
+atiende a uno solo.
 
 El adaptador de Telegram está bien construido: `TransporteTelegram` queda aislado
 detrás de una interfaz de envío y tiene un doble de prueba equivalente. El problema
