@@ -1,5 +1,15 @@
 # Fase 0: alcance de validación local simulada
 
+> **Superada por cambio de alcance — 2026-09-22.**
+>
+> Este documento define el alcance de un piloto local para un único equipo. Prisma
+> pasó a ser un producto de gestión de proyectos multi-tenant, y el trabajo ya no se
+> organiza por fases de piloto. Se conserva como registro histórico y **no debe usarse
+> para decidir**. Para el alcance vigente:
+> [`../product/que-es-prisma.md`](../product/que-es-prisma.md),
+> [`../architecture/frontera.md`](../architecture/frontera.md) y
+> [`../ROADMAP.md`](../ROADMAP.md).
+
 **Estado:** cerrada el 2026-08-12. Se cerraron alcance, métricas, pausa y
 reanudación, gobierno del corpus y gate humano. Los pendientes reservados para el
 piloto real o la VPS no bloquean este cierre.

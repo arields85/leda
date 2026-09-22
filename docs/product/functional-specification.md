@@ -1,5 +1,20 @@
 # Prisma — Especificación funcional genérica
 
+> **Superada por cambio de alcance — 2026-09-22.**
+>
+> Este documento ya se proponía describir a Prisma con independencia de una empresa
+> concreta, y esa intención sigue siendo correcta. Lo que quedó superado es su modelo:
+> precede a la definición de Prisma como producto multi-tenant y no distingue qué es
+> configuración de cada cliente y qué es núcleo del producto, ni trata el aislamiento
+> entre clientes como garantía. Se conserva como registro histórico y **no debe usarse
+> para decidir**. Para el alcance vigente:
+> [`que-es-prisma.md`](que-es-prisma.md),
+> [`../architecture/frontera.md`](../architecture/frontera.md) y
+> [`../ROADMAP.md`](../ROADMAP.md).
+>
+> Buena parte de su descripción de comportamiento conserva valor como insumo; debe
+> contrastarse contra la frontera antes de usarse.
+
 **Tipo de documento:** definición funcional y de comportamiento
 **Ámbito:** Prisma como Project Manager digital configurable para cualquier equipo
 **Propósito:** servir como contexto canónico para diseñar, programar, configurar y validar Prisma sin depender de una empresa, un equipo, una plataforma o una integración concreta.
@@ -16,7 +31,18 @@ Prisma no reemplaza a las personas ni asume autoridad por iniciativa propia. Las
 
 Su principio rector es:
 
-> **Las personas deciden; Prisma organiza, propone, guía, registra y hace seguimiento.**
+> **Las personas hacen el trabajo e informan hechos; Prisma absorbe el seguimiento y
+> la coordinación; las decisiones de autoridad o juicio siguen siendo humanas.**
+
+Las personas deben concentrarse en el trabajo concreto, las actualizaciones factuales,
+la evidencia y las decisiones que les correspondan. No deben administrar estados
+intermedios para que el sistema comprenda la situación. Prisma interpreta esos hechos,
+deriva el estado mediante reglas autorizadas, solicita lo que falta y encamina cada
+revisión o decisión al actor vigente.
+
+Los referentes aceptan las tareas vinculadas a su área y luego aprueban o rechazan el
+trabajo entregado. Prisma, no el referente, persigue las actualizaciones, coordina los
+pasos intermedios y mantiene el estado operativo.
 
 El seguimiento debe ayudar al equipo a trabajar mejor. No debe sentirse como vigilancia, presión innecesaria ni exposición pública.
 
@@ -331,9 +357,11 @@ Una tarea debe poder registrar:
 - bloqueo vigente;
 - historial de cambios y decisiones.
 
-### 7.2 Estados
+### 7.2 Estados derivados de hechos
 
-Prisma debe trabajar con estados semánticos consistentes. Una configuración inicial recomendada es:
+Prisma debe trabajar con estados semánticos consistentes, derivados de hechos y
+decisiones autorizados, no elegidos manualmente por las personas. El catálogo inicial
+es:
 
 - propuesta;
 - pendiente de aprobación;
@@ -344,7 +372,15 @@ Prisma debe trabajar con estados semánticos consistentes. Una configuración in
 - terminada;
 - cancelada.
 
-La interfaz puede permitir nombres o flujos personalizados, pero debe mapearlos a significados inequívocos para evitar que “realizado”, “aprobado” y “cerrado” se conviertan en sinónimos incorrectos.
+La interfaz puede permitir nombres o flujos personalizados, pero debe mapearlos a
+significados inequívocos para evitar que “realizado”, “aprobado” y “cerrado” se
+conviertan en sinónimos incorrectos.
+
+En el flujo operativo inicial, la propuesta y su aceptación ocurren en el borrador:
+`propuesta` y `pendiente de aprobación` no son estados de una tarea comprometida. La
+tarea comprometida comienza en `asignada`; después Prisma deriva sus transiciones desde
+hechos como inicio, bloqueo, resolución y entrega, o desde decisiones autorizadas como
+rechazo, aprobación, cierre y cancelación.
 
 ---
 
@@ -454,28 +490,28 @@ La propuesta debe conservarse o vencer de forma explícita y segura. Nunca debe 
 
 Una actualización debe registrar el significado real de lo informado sin exagerarlo.
 
-El circuito recomendado es:
+El circuito es:
 
 ```text
 Actualización concreta
   ↓
-Evidencia suficiente
-  ↓
-Ausencia o resolución de bloqueos
+Hecho de entrega y evidencia disponible
   ↓
 Presentación para revisión
   ↓
-Decisión del aprobador
-  ↓
-Cierre autorizado
-  ↓
-Tarea terminada
+Aprobador vigente: aprobar / rechazar
+  ├─ rechazar → vuelve al trabajo
+  └─ aprobar  → evaluación separada de cierre
+                   ↓
+              Tarea terminada
 ```
 
 Principios:
 
 - una actualización no es una aprobación;
 - una evidencia no aprueba por sí sola;
+- una entrega coloca el trabajo en revisión, no lo declara terminado;
+- un rechazo devuelve el trabajo al responsable y Prisma coordina el siguiente paso;
 - una aprobación no debe cerrar automáticamente si el flujo exige una acción separada;
 - una parte terminada no cierra un objetivo compuesto;
 - un objetivo multidisciplinario requiere todos los componentes y aprobaciones configurados;
@@ -1258,8 +1294,9 @@ La simulación no debe producir efectos reales.
 | Frescura | Vuelve a consultar antes de responder sobre estado actual | Umbrales adicionales de actualización |
 | Fallos | Una caída nunca se presenta como un resultado vacío | Mensaje humano y ruta de notificación |
 | Correcciones | Se corrige el mecanismo general, nunca una frase concreta | Casos de prueba y datos utilizados |
-| Tareas | No confunde actualización, aprobación y cierre | Tipos, estados, campos y flujos |
-| Seguimiento | Debe ser útil y proporcional | Días, horarios, destinatarios y cadencias |
+| Tareas | Deriva estados desde hechos; no confunde entrega, evidencia, aprobación y cierre | Tipos, estados, campos y flujos |
+| Responsabilidades | Las personas hacen el trabajo, informan hechos/evidencia y deciden según su autoridad; Prisma coordina y mantiene el seguimiento | Actores, aprobadores y rutas autorizadas |
+| Seguimiento | Prisma lo absorbe y debe ser útil y proporcional | Días, horarios, destinatarios y cadencias |
 | Recordatorios | Verifica vencimiento y evita duplicados | Cantidad, intervalos, contenido y canales |
 | Escalamiento | Es factual, gradual y trazable | Rutas, destinatarios y umbrales |
 | Privacidad | Aplica mínimo acceso y privacidad primero | Matriz de visibilidad |
@@ -1341,14 +1378,14 @@ Los fallos encontrados con una pregunta humana deben corregirse en el mecanismo 
 
 ## 29. Principios fundamentales
 
-1. **Las personas deciden; Prisma organiza, propone y hace seguimiento.**
+1. **Las personas hacen el trabajo, informan hechos y toman las decisiones que requieren autoridad o juicio; Prisma organiza, deriva el estado, coordina y hace seguimiento.**
 2. **Prisma debe poder adaptarse a cualquier equipo mediante configuración, no mediante código específico.**
 3. **La identidad, autoridad y estructura de cada organización se cargan desde una interfaz gobernada.**
 4. **PostgreSQL determina los hechos operativos actuales.**
 5. **Los contratos determinan la completitud y las políticas determinan las reglas; el modelo sólo las expresa humanamente.**
 6. **La conversación, el historial y la memoria no reemplazan la fuente oficial.**
 7. **No poder consultar no significa que no existan datos.**
-8. **Una actualización, una evidencia, una aprobación y un cierre son conceptos diferentes.**
+8. **Una actualización, una entrega, una evidencia, una aprobación y un cierre son conceptos diferentes.**
 9. **Toda acción relevante debe ser verificable y auditable.**
 10. **Los atrasos y la falta de respuesta se tratan primero en privado.**
 11. **El escalamiento es gradual, proporcional y respetuoso.**
@@ -1358,7 +1395,7 @@ Los fallos encontrados con una pregunta humana deben corregirse en el mecanismo 
 15. **El aprendizaje no puede ampliar permisos ni modificar reglas protegidas silenciosamente.**
 16. **La configuración debe ser versionada, validable y reversible.**
 17. **Los fallos se corrigen en el mecanismo general, nunca con parches para una frase.**
-18. **El seguimiento existe para facilitar el trabajo, no para vigilar personas.**
+18. **Prisma absorbe el seguimiento para facilitar el trabajo, no para vigilar personas ni convertir a los referentes en perseguidores de avances.**
 
 ---
 

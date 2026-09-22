@@ -1,126 +1,138 @@
-# Roadmap de evolución
+# Roadmap
 
-El roadmap ordena resultados verificables. Cada fase se cierra por criterios de
-salida, no por cantidad de tareas completadas.
+Prisma es un producto multi-tenant (ver [`product/que-es-prisma.md`](product/que-es-prisma.md))
+y este roadmap ordena el trabajo que falta para que el código lo sostenga.
 
-## Fase 0: alcance de validación local simulada
+El orden no son fases del proyecto: son unidades de trabajo con precondición y
+criterio de cierre. Una unidad se cierra por su criterio, no por cantidad de tareas
+completadas.
 
-**Objetivo:** acordar qué se validará con datos ficticios, bajo qué autoridad y con
-qué métricas, pausas y protección del corpus.
+## Qué se aprovecha tal cual
 
-**Entregables:** alcance simulado, protocolo de validación, definición del dataset y
-criterios de éxito, pausa y gate manual.
+Buena parte de lo construido sirve sin cambios para un producto multi-tenant. Esto no
+se rehace.
 
-**Salida:** checklist de [`phases/00-pilot-scope.md`](phases/00-pilot-scope.md)
-resuelto; ningún supuesto crítico queda delegado al modelo.
+| Activo | Por qué sirve |
+|---|---|
+| Aislamiento por `row level security` | 28 tablas con RLS forzado y política contra el espacio actual (`db/esquema.sql:1474-1492`). El aislamiento lo garantiza la base, no el cuidado de quien escribe la consulta. |
+| Modelo de roles y membresías | Separa persona, membresía y autoridad; funciona igual para cualquier cliente. |
+| Tablas de configuración por cliente | `area` y `rol` son datos con alcance de espacio (`db/esquema.sql:106,114`), no tipos enumerados. |
+| Estado como proyección de eventos | `bloquear_estado_directo()` impide la escritura directa (`db/esquema.sql:1231`). Es exactamente lo que necesita una superficie de lectura. |
+| Paquetes de configuración versionados | El importador es genérico por diseño (`src/prisma/importador.py:211`) y registra versión y hash. |
+| `TransporteTelegram` como adaptador | Aislado detrás de una interfaz de envío (`src/prisma/despachador.py:66`), con doble de prueba equivalente. |
+| Router tipado multiproveedor | Un validador cerrado compartido por todos los proveedores (`src/prisma/llm.py`). |
+| Renderer único de salida | Normalización y medición centralizadas (`src/prisma/salida.py`). Se conserva; cambia dónde se aplica. |
+| Escalera y cadencias como datos | Configurables por cliente, no codificadas. |
 
-## Fase 1: integridad para la validación
+## Qué se corrige
 
-**Objetivo:** impedir estados y compromisos inválidos antes de optimizar respuestas.
+| Defecto | Regla de la frontera que incumple |
+|---|---|
+| Las tablas de eventos de estado no tienen `workspace_id` ni RLS, y el disparador que proyecta el estado no valida el espacio | Regla 1 |
+| `message_outbox` está atado a un transporte: tiene `chat_id` y no tiene columna de canal | Regla 2 |
+| Un límite de tamaño de Telegram decide si un dato de negocio es válido | Regla 3 |
+| No existe grafo de transiciones de estado: cualquier destino del tipo enumerado es aceptado | Regla 6 |
 
-**Entregables:** borradores, conversión auditable, tareas completas, transiciones
-válidas, inbound idempotente, evidencia/aprobación coherentes, pending replies
-operativos, RLS y reconciliación.
+El detalle y la evidencia de cada uno están en
+[`architecture/frontera.md`](architecture/frontera.md).
 
-**Salida:** invariantes demostradas con pruebas contra PostgreSQL y escenarios de
-concurrencia; ver [`phases/01-local-pilot-foundations.md`](phases/01-local-pilot-foundations.md).
+## Qué queda superado
 
-## Fase 2: lecturas deterministas para la validación
+Estos documentos se conservan como registro histórico. No describen el alcance
+vigente y no deben usarse para decidir.
 
-**Objetivo:** obtener la misma conclusión operativa ante los mismos datos y permisos.
+| Documento | Motivo |
+|---|---|
+| [`decisions/0003-authenticated-inbound-boundary.md`](decisions/0003-authenticated-inbound-boundary.md) | El modelo de amenaza cambió. Fue escrito para un asistente interno de un solo equipo, donde la amenaza principal era el compromiso de la credencial de aplicación. En un producto multi-tenant la amenaza principal es el cruce entre clientes. Su análisis de capacidades y credenciales conserva valor; su secuencia y su prioridad no. |
+| [`phases/00-pilot-scope.md`](phases/00-pilot-scope.md) | Alcance de piloto local para un único equipo. |
+| [`phases/01-local-pilot-foundations.md`](phases/01-local-pilot-foundations.md) | Fundaciones organizadas por unidades de piloto local, superadas por este orden de entrega. |
+| [`product/functional-specification.md`](product/functional-specification.md) | Ya se proponía describir a Prisma con independencia de una empresa concreta, y esa intención sigue siendo correcta. Lo superado es su modelo: precede a la definición como producto multi-tenant, no distingue configuración de cliente frente a núcleo del producto y no trata el aislamiento entre clientes como garantía. Su descripción de comportamiento conserva valor como insumo, contrastada contra la frontera. |
 
-**Entregables:** contratos tipados por intención, lecturas frescas, completitud,
-distinción entre vacío/error/sin permiso y presentación controlada.
+Nada de esto se borra. La parte del inventario de autoridad de la decisión 0003 se
+reutiliza al cerrar el aislamiento entre clientes.
 
-**Salida:** pruebas comparan la respuesta estructurada con PostgreSQL y detectan
-omisiones, no sólo texto esperado.
+## Orden de entrega
 
-## Fase 3: efectos completos e idempotentes para la validación
+### Línea base versionada
 
-**Objetivo:** asegurar que cada efecto confirmado ocurra una sola vez y pueda
-explicarse.
+**Entrega:** el trabajo acumulado queda registrado en un commit con historia
+recuperable.
 
-**Entregables:** ciclo propuesta-modificación-cancelación-confirmación, revalidación,
-auditoría y verificación de resultados para todas las acciones en alcance.
+**Depende de:** nada.
 
-**Salida:** reintentos, doble toque, vencimiento y concurrencia no duplican efectos ni
-usan propuestas obsoletas.
+**Cierre:** el árbol de trabajo está limpio y existe un punto al que volver antes de
+refactorizar.
 
-## Fase 4: automatización local veraz para la validación
+### Cierre del aislamiento entre clientes
 
-**Objetivo:** ejecutar localmente las cadencias y escalamientos que debe evaluar la
-validación simulada.
+**Entrega:** `workspace_id` y política de RLS en las tablas de eventos de estado;
+propietario explícito para cada función `security definer`; verificación del
+propietario efectivo en una instalación limpia.
 
-**Entregables:** planificador local, solicitudes de respuesta reales, reloj
-controlable y observabilidad operativa básica.
+**Depende de:** línea base versionada.
 
-**Salida:** escenarios con tiempo simulado prueban envío, silencio, respuesta,
-bloqueo, ausencia, deduplicación y escalamiento.
+**Cierre:** una prueba demuestra que una conexión asociada a un espacio no puede
+insertar un evento que referencie una tarea de otro espacio, ni observar por efecto
+lateral que ese identificador existe.
 
-## Fase 5: validación local simulada
+### Base documental
 
-**Objetivo:** demostrar corrección y resiliencia sin usar objetivos, tareas ni
-situaciones de trabajo real.
+**Entrega:** definición de producto, frontera y este roadmap.
 
-**Entregables:** capas A-D del
-[`protocolo`](validation/README.md), corpus de desarrollo y holdout separados,
-replays/regresiones y luego validación manual E por Telegram real.
+**Depende de:** nada.
 
-**Salida:** cero defectos críticos o altos abiertos en alcance y aprobación explícita
-del usuario. Las pruebas y evaluaciones del asistente sólo habilitan la capa E; no
-aprueban el pase al piloto real.
+**Cierre:** un lector nuevo entiende qué es Prisma y dónde termina el núcleo sin
+recurrir a documentación superada. *Unidad en curso.*
 
-### Revisión inicial: contexto LLM
+### Desacople del transporte
 
-Tras la validación simulada, revisar inicialmente el contexto amplio con su evidencia
-de calidad, completitud, costo, latencia y exposición. Si la evidencia no alcanza,
-la revisión puede continuar durante el piloto controlado real. La decisión que
-adopte, ajuste o reemplace la política temporal de
-[`ADR 0002`](decisions/0002-pilot-llm-context-and-retention.md) debe quedar cerrada
-en una ADR posterior antes de iniciar Fase 7. El contexto adaptativo por intención
-sigue siendo una alternativa a evaluar, no una política aprobada.
+**Entrega:** `canal` y `destino` genéricos en `message_outbox` en lugar de `chat_id`;
+los límites de tamaño y división se trasladan al adaptador de salida; las reglas de
+negocio dejan de medir en unidades de un canal.
 
-## Fase 6: piloto controlado real
+**Depende de:** línea base versionada y base documental.
 
-**Objetivo:** validar utilidad, tono, carga de contacto y confianza con trabajo real
-de alcance acordado y radio de impacto limitado.
+**Cierre:** el núcleo puede encolar una notificación sin conocer el canal, y una
+prueba demuestra que un dato de negocio válido deja de rechazarse por un límite de
+transporte. Es la precondición de toda superficie que no sea conversacional.
 
-**Entrada obligatoria:** aprobación humana de Fase 5; ningún agente o LLM puede
-concederla.
+### API de lectura
 
-**Entregables:** ejecución controlada, aceptación e información de participantes,
-registro de incidentes y feedback, revisión de métricas y evidencia adicional para
-la política de contexto LLM si fuera necesaria.
+**Entrega:** consultas agregadas de objetivos, avance, tareas por estado y por
+responsable, cumplimiento, bloqueos y carga, expuestas por el puerto de lectura.
 
-**Salida:** criterios del piloto cumplidos, sin defectos críticos o altos abiertos, y
-decisión humana explícita de preparar VPS.
+**Depende de:** cierre del aislamiento y desacople del transporte.
 
-## Fase 7: endurecimiento y preparación VPS
+**Cierre:** una superficie ajena al canal conversacional puede leer el estado
+completo de un espacio, y sólo de ese espacio.
 
-**Objetivo:** preparar operación segura y recuperable en internet.
+### Grafo de transiciones de estado
 
-**Entregables:** ACK y cola de entrada, workers, pool, secreto obligatorio,
-migraciones, TLS, observabilidad, backups/restore y rollback.
+**Entrega:** transiciones válidas declaradas y aplicadas, con la autoridad requerida
+para cada una.
 
-**Salida:** ensayo reproducible de despliegue, migración, restore y rollback; controles
-de seguridad y capacidad aprobados.
+**Depende de:** cierre del aislamiento.
 
-## Fase 8: canary y producción VPS
+**Cierre:** una transición inválida o sin autoridad falla, y la prueba lo demuestra
+por cada par de estados.
 
-**Objetivo:** exponer la operación en VPS con el menor radio de impacto y ampliar
-sólo con evidencia estable.
+### Ciclo de seguimiento operativo
 
-**Entregables:** despliegue canary, monitoreo, runbooks e incident review.
+**Entrega:** el ingreso crea y satisface solicitudes de respuesta pendientes, de modo
+que la escalera afirme silencio sobre evidencia real.
 
-**Salida:** ventana canary estable y decisión explícita de ampliar a producción,
-corregir o volver atrás.
+**Depende de:** grafo de transiciones y desacople del transporte.
 
-## Horizonte futuro: capacidades posteriores
+**Cierre:** un escenario con tiempo simulado demuestra envío, silencio, respuesta,
+ausencia y escalamiento sobre solicitudes reales.
 
-**Objetivo:** ampliar producto sólo con evidencia de necesidad.
+## Horizonte posterior
 
-**Entregables posibles:** administración asistida, informes más ricos, agenda e
-integraciones, aprendizaje gobernado u otras capacidades priorizadas.
+No se abordan hasta que las unidades anteriores estén cerradas, y cada uno requiere
+su propia decisión:
 
-Cada capacidad requiere un problema probado, decisión propia y criterios de éxito.
-No se adopta microservicios por defecto.
+- dashboard sobre la API de lectura;
+- aplicación móvil;
+- incorporación de un segundo cliente, con el proceso de alta que eso exija;
+- capacidades de producción para operar en internet: cola de entrada, pool de
+  conexiones, secreto obligatorio de webhook, observabilidad, respaldo y restauración.
