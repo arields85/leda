@@ -1673,8 +1673,13 @@ def test_instalacion_limpia_y_base_migrada_convergen_en_el_aislamiento():
     from psycopg.conninfo import conninfo_to_dict, make_conninfo
     from psycopg.sql import SQL, Identifier
 
+    # Todas se comparan entre limpia y migrada. `acceso_tablero` no lleva
+    # política a propósito —el token se busca antes de saber el espacio— pero
+    # sus privilegios sí tienen que converger: divergían, y nada lo veía
+    # porque las bases de prueba se construyen desde el esquema limpio.
     tablas = ("task_state_event", "objective_state_event",
-              "absence", "audit_log", "incident")
+              "absence", "audit_log", "incident", "acceso_tablero")
+    con_politica = set(tablas) - {"acceso_tablero"}
     sufijo = uuid.uuid4().hex[:10]
     nombres = {"limpia": f"prisma_limpia_{sufijo}",
                "migrada": f"prisma_migrada_{sufijo}"}
@@ -1704,6 +1709,8 @@ def test_instalacion_limpia_y_base_migrada_convergen_en_el_aislamiento():
             assert limpia[tabla] == migrada[tabla], (
                 f"{tabla}: la instalación limpia y la base migrada no "
                 f"convergen.\nlimpia:  {limpia[tabla]}\nmigrada: {migrada[tabla]}")
+
+        for tabla in con_politica:
             assert limpia[tabla]["seguridad"]["relrowsecurity"]
             assert limpia[tabla]["seguridad"]["relforcerowsecurity"]
             assert [p["polname"] for p in limpia[tabla]["politicas"]] == [
@@ -1711,7 +1718,7 @@ def test_instalacion_limpia_y_base_migrada_convergen_en_el_aislamiento():
 
         # `audit_log` e `incident` admiten espacio nulo para los hechos de
         # alcance global; el resto no tiene esa excepción.
-        for tabla in set(tablas) - {"audit_log", "incident"}:
+        for tabla in con_politica - {"audit_log", "incident"}:
             assert any(c["column_name"] == "workspace_id"
                        and c["is_nullable"] == "NO"
                        for c in limpia[tabla]["columnas"]), (

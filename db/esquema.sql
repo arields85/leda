@@ -1191,6 +1191,81 @@ create table incident (
   notificado_en        timestamptz
 );
 
+-- Credencial para abrir el tablero desde un navegador, donde no existe nada de
+-- la identidad que aporta Telegram. El enlace es una credencial: sólo se
+-- guarda su hash, vence, y el espacio viaja adentro y no en la URL.
+--
+-- Sin política de aislamiento, a propósito y a diferencia del resto del
+-- esquema: la búsqueda del token ocurre ANTES de saber a qué espacio
+-- pertenece, así que una política por espacio no tendría contra qué comparar.
+-- Lo que protege esta tabla es que nadie la consulta: `prisma_app` no recibe
+-- ningún privilegio sobre ella, sólo `execute` sobre las dos funciones que son
+-- su única puerta.
+create table acceso_tablero (
+  id             uuid primary key default gen_random_uuid(),
+  workspace_id   uuid not null references workspace(id) on delete cascade,
+  membership_id  uuid not null references membership(id) on delete cascade,
+  token_hash     text not null unique,
+  emitido_en     timestamptz not null default now(),
+  vence_en       timestamptz not null
+);
+
+create index acceso_tablero_vencimiento on acceso_tablero (vence_en);
+
+revoke all on acceso_tablero from public;
+
+-- El espacio no se recibe: sale de la membresía. Como `prisma_owner` no
+-- saltea la RLS, esa búsqueda queda filtrada al espacio de la sesión, así que
+-- una membresía de otro cliente no se encuentra y falla idéntico a una
+-- inexistente. Decir "no tenés permiso" confirmaría que existe.
+create or replace function emitir_acceso_tablero(
+    p_membership_id uuid, p_token_hash text, p_vence_en timestamptz)
+returns uuid
+language plpgsql security definer set search_path = prisma, public, pg_temp as $$
+declare espacio uuid;
+        nuevo uuid;
+begin
+  select m.workspace_id into espacio
+    from membership m where m.id = p_membership_id and m.activo;
+  if espacio is null then
+    raise exception 'acceso_tablero: no existe la membresía %', p_membership_id;
+  end if;
+
+  insert into acceso_tablero (workspace_id, membership_id, token_hash, vence_en)
+       values (espacio, p_membership_id, p_token_hash, p_vence_en)
+    returning id into nuevo;
+  return nuevo;
+end $$;
+
+-- Devuelve filas sólo si el token existe, no venció, y la membresía sigue
+-- activa. Tener un token vigente no alcanza: la autoridad se revalida en cada
+-- pedido, no sólo al emitir.
+--
+-- El `set_config` es seguro porque el espacio sale del token, resuelto del
+-- lado del servidor, y no de nada que haya aportado quien llama. Recién
+-- después de fijarlo se comprueba la membresía, de modo que esa comprobación
+-- ya corre acotada al espacio correcto.
+create or replace function resolver_acceso_tablero(p_token_hash text)
+returns table (workspace_id uuid, membership_id uuid)
+language plpgsql security definer set search_path = prisma, public, pg_temp as $$
+declare acceso acceso_tablero%rowtype;
+begin
+  select * into acceso from acceso_tablero a
+   where a.token_hash = p_token_hash and a.vence_en > now();
+  if not found then
+    return;
+  end if;
+
+  perform set_config('prisma.workspace_id', acceso.workspace_id::text, true);
+
+  if not exists (select 1 from membership m
+                  where m.id = acceso.membership_id and m.activo) then
+    return;
+  end if;
+
+  return query select acceso.workspace_id, acceso.membership_id;
+end $$;
+
 create table audit_log (
   id                uuid primary key default gen_random_uuid(),
   at                timestamptz not null default now(),
@@ -1664,6 +1739,25 @@ alter function resolver_ingreso_borrador(uuid, text, bigint, bigint)
   owner to prisma_owner;
 alter function aplicar_evento_tarea()
   owner to prisma_owner;
+
+-- La concesión general de arriba alcanzó a `acceso_tablero` por haberse
+-- definido antes. Se la acota a lo que sus dos funciones necesitan, que es lo
+-- mismo que concede la migración `0006`: sin esto, instalación limpia y base
+-- migrada divergirían en los privilegios de esta tabla.
+revoke all on acceso_tablero from prisma_owner;
+grant select, insert on acceso_tablero to prisma_owner;
+
+alter function emitir_acceso_tablero(uuid, text, timestamptz)
+  owner to prisma_owner;
+alter function resolver_acceso_tablero(text)
+  owner to prisma_owner;
+
+revoke execute on function emitir_acceso_tablero(uuid, text, timestamptz)
+  from public;
+revoke execute on function resolver_acceso_tablero(text) from public;
+grant execute on function emitir_acceso_tablero(uuid, text, timestamptz)
+  to prisma_app;
+grant execute on function resolver_acceso_tablero(text) to prisma_app;
 
 -- El agente no consulta app_user directamente: lo haría por encima del
 -- aislamiento, porque esa tabla es global. Usa esta vista, que pasa por
