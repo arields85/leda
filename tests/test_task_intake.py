@@ -1536,6 +1536,31 @@ def test_un_espacio_no_puede_mover_el_estado_de_una_tarea_de_otro(
         assert cur.fetchone()["n"] == 0
 
 
+def test_un_espacio_no_puede_fabricar_auditoria_en_otro(intake_world, conn):
+    """La auditoría autoritativa es la prueba que se le muestra a un cliente.
+
+    Si otro cliente puede escribir en ella, deja de ser evidencia. `audit_log`
+    tiene `workspace_id` pero ninguna política, y `prisma_app` tiene `insert`:
+    nada impide declarar el espacio ajeno.
+    """
+    north = intake_world["north-lab"]
+    west = intake_world["west-studio"]
+
+    with espacio(conn, north["id"]) as cur:
+        cur.execute(
+            """insert into audit_log (workspace_id, actor_kind, accion)
+               values (%s, 'sistema', 'auditoria-forjada')""",
+            (west["id"],))
+
+    with admin(conn) as cur:
+        cur.execute(
+            """select count(*) n from audit_log
+                where workspace_id = %s and accion = 'auditoria-forjada'""",
+            (west["id"],))
+        assert cur.fetchone()["n"] == 0, (
+            "un espacio escribió auditoría atribuida a otro")
+
+
 def test_ninguna_funcion_elevada_pertenece_a_un_rol_que_ignora_la_rls(conn):
     """Una función `security definer` corre con los privilegios de su dueño.
 
@@ -1698,7 +1723,8 @@ def test_los_rollbacks_devuelven_la_base_al_estado_anterior():
     from psycopg.conninfo import conninfo_to_dict, make_conninfo
     from psycopg.sql import SQL, Identifier
 
-    tablas = ("task_state_event", "objective_state_event")
+    tablas = ("task_state_event", "objective_state_event",
+              "absence", "audit_log", "incident")
     nombre = f"prisma_rollback_{uuid.uuid4().hex[:10]}"
     with psycopg.connect(maintenance, autocommit=True) as control:
         control.execute(SQL("create database {}").format(Identifier(nombre)))
@@ -1716,23 +1742,26 @@ def test_los_rollbacks_devuelven_la_base_al_estado_anterior():
             db.execute(base)
         correr("migrations", "0002_general_task_intake.sql")
 
-        antes_de_0003 = _retrato_migratorio(url, tablas)
-        correr("migrations", "0003_state_event_isolation.sql")
-        con_0003 = _retrato_migratorio(url, tablas)
-        assert con_0003 != antes_de_0003, "0003 no cambió nada observable"
+        # Recorre la cadena descubriéndola del directorio. Nombrar las
+        # migraciones a mano dejaba cada una nueva sin rollback ejercitado.
+        for migracion in _migraciones_posteriores_a("0002"):
+            rollback = ROOT / "db" / "rollbacks" / migracion.name
+            assert rollback.is_file(), f"{migracion.name} no tiene rollback"
 
-        correr("rollbacks", "0003_state_event_isolation.sql")
-        assert _retrato_migratorio(url, tablas) == antes_de_0003, (
-            "el rollback de 0003 no devolvió la base a su estado anterior")
+            antes = _retrato_migratorio(url, tablas)
+            correr("migrations", migracion.name)
+            despues = _retrato_migratorio(url, tablas)
+            assert despues != antes, (
+                f"{migracion.name} no cambió nada observable: la comparación "
+                f"de abajo pasaría igual con un rollback vacío")
 
-        correr("migrations", "0003_state_event_isolation.sql")
-        correr("migrations", "0004_function_ownership.sql")
-        con_0004 = _retrato_migratorio(url, tablas)
-        assert con_0004 != con_0003, "0004 no cambió nada observable"
+            correr("rollbacks", migracion.name)
+            assert _retrato_migratorio(url, tablas) == antes, (
+                f"el rollback de {migracion.name} no devolvió la base a su "
+                f"estado anterior")
 
-        correr("rollbacks", "0004_function_ownership.sql")
-        assert _retrato_migratorio(url, tablas) == con_0003, (
-            "el rollback de 0004 no devolvió la base a su estado anterior")
+            # Se vuelve a aplicar para que la siguiente encuentre su premisa.
+            correr("migrations", migracion.name)
     finally:
         with psycopg.connect(maintenance, autocommit=True) as control:
             control.execute(SQL("drop database if exists {} with (force)")
@@ -1756,7 +1785,8 @@ def test_instalacion_limpia_y_base_migrada_convergen_en_el_aislamiento():
     from psycopg.conninfo import conninfo_to_dict, make_conninfo
     from psycopg.sql import SQL, Identifier
 
-    tablas = ("task_state_event", "objective_state_event")
+    tablas = ("task_state_event", "objective_state_event",
+              "absence", "audit_log", "incident")
     sufijo = uuid.uuid4().hex[:10]
     nombres = {"limpia": f"prisma_limpia_{sufijo}",
                "migrada": f"prisma_migrada_{sufijo}"}
@@ -1790,9 +1820,14 @@ def test_instalacion_limpia_y_base_migrada_convergen_en_el_aislamiento():
             assert limpia[tabla]["seguridad"]["relforcerowsecurity"]
             assert [p["polname"] for p in limpia[tabla]["politicas"]] == [
                 "aislamiento_espacio"]
+
+        # `audit_log` e `incident` admiten espacio nulo para los hechos de
+        # alcance global; el resto no tiene esa excepción.
+        for tabla in set(tablas) - {"audit_log", "incident"}:
             assert any(c["column_name"] == "workspace_id"
                        and c["is_nullable"] == "NO"
-                       for c in limpia[tabla]["columnas"])
+                       for c in limpia[tabla]["columnas"]), (
+                f"{tabla}: workspace_id debería ser obligatorio")
     finally:
         for nombre in nombres.values():
             with psycopg.connect(maintenance, autocommit=True) as control:

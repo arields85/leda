@@ -92,11 +92,7 @@ para que la próxima corrección tenga un lugar declarado al que pertenecer.
 4. **`pending_reply` no es operativo.** La tabla y la escalera existen, pero el ingreso
    no crea ni satisface el ciclo de respuesta, de modo que el seguimiento no puede
    afirmar silencio sobre evidencia real.
-5. Cobertura RLS incompleta en registros auxiliares: `absence`, `incident` y
-   `audit_log` reciben `insert` sin política de aislamiento
-   (`db/esquema.sql:1542-1543`). Misma clase que el riesgo ya cerrado, menor
-   impacto.
-6. **`confirmar_borrador_tarea` fija el espacio con el valor que recibe.** Está
+5. **`confirmar_borrador_tarea` fija el espacio con el valor que recibe.** Está
    acotada a `prisma_gateway` y fuera del alcance de `prisma_app`, pero confiar el
    espacio a quien llama es el patrón que la frontera rechaza. Pertenece al ingreso
    autenticado.
@@ -108,6 +104,17 @@ ni política, y las cuatro funciones `security definer` pertenecían a `postgres
 —superusuario y `bypassrls`—, así que adentro de sus cuerpos la RLS no aplicaba.
 Cerrado por las migraciones `0003` y `0004`; el detalle está en
 [`architecture/frontera.md`](architecture/frontera.md#cómo-se-cerró-la-regla-1).
+
+La migración `0005` cerró el resto: `audit_log`, `incident` y `absence` recibían
+`insert` sin política. Figuraba como riesgo menor, pero lo comprobado fue que un
+espacio podía **fabricar auditoría atribuida a otro**. La auditoría autoritativa es
+la evidencia que se le muestra a un cliente; si otro puede escribir en ella, deja
+de serlo. Su posición en la lista venía de cuando Prisma era un bot de un solo
+equipo y nadie más podía escribir.
+
+`audit_log` e `incident` conservan a propósito la posibilidad de espacio nulo, para
+los hechos de alcance global que sólo origina la conexión administrativa: una fila
+sin espacio no queda atribuida a ningún cliente y por eso no falsifica su registro.
 
 Queda `PENDIENTE` un ensayo de propiedad sobre un clúster enteramente limpio: hoy
 se verifica sobre una base nueva dentro de un clúster existente.

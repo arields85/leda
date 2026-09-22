@@ -200,6 +200,34 @@ Resuelto con `_migraciones_posteriores_a()`, que las descubre del directorio.
 Se aplicó también a la prueba de paridad nueva, que había nacido con el mismo
 defecto.
 
+## Ampliación autorizada: registros auxiliares (migración 0005)
+
+Estaba fuera de alcance y se incorporó al continuar. Lo comprobado justificó el
+cambio de prioridad: el rojo fue `assert 1 == 0` — un espacio escribió una
+entrada de `audit_log` **atribuida a otro**. La auditoría autoritativa es la
+evidencia que se le muestra a un cliente; si otro puede escribir en ella, deja
+de serlo. Figuraba quinto porque esa lista se escribió cuando Prisma era un bot
+de un solo equipo y nadie más podía escribir.
+
+Dos problemas distintos en tres tablas. `audit_log` e `incident` ya tenían
+`workspace_id`, pero nullable y sin política: bastaba declarar el ajeno. Ahora
+lo fija la sesión mediante `derivar_espacio_registro()`. `absence` no tenía
+espacio propio en absoluto; se agregó derivándolo de la membresía, con el mismo
+patrón de privilegios del llamador que `0003`.
+
+Excepción conservada a propósito: `audit_log` e `incident` admiten espacio nulo
+para los hechos de alcance global, que sólo origina la conexión administrativa.
+Una fila sin espacio no queda atribuida a ningún cliente, así que no puede
+falsificar su registro.
+
+A diferencia de `0004`, no rompió ninguna prueba.
+
+**Cuarta aparición del patrón de migraciones nombradas a mano**, y esta vez el
+defecto era mío: la prueba de rollbacks que escribí una hora antes tenía `0003`
+y `0004` cableadas, así que el rollback de `0005` nacía sin ejercitar. Ahora
+recorre la cadena descubriéndola del directorio y exige que cada migración
+tenga su rollback.
+
 ## Estado de la unidad
 
 Cerradas T1 a T5 y T7. Suite en **310 passed, 0 failed**. La regla 1 de

@@ -116,7 +116,7 @@ incumplidas hoy, y una es parcial.
 
 | Regla | Estado | Evidencia |
 |---|---|---|
-| 1. Aislamiento entre clientes | **Cumplida** | Migración `0003`: ambas tablas de eventos llevan `workspace_id`, con RLS forzado y política de aislamiento. El valor lo deriva un disparador `before insert` desde la fila padre, con privilegios del llamador, de modo que una tarea de otro espacio y una inexistente fallan idéntico. Migración `0004`: las cuatro funciones `security definer` pertenecen a `prisma_owner`, que no inicia sesión, no tiene miembros y no saltea la RLS. |
+| 1. Aislamiento entre clientes | **Cumplida** | Migración `0003`: ambas tablas de eventos llevan `workspace_id`, con RLS forzado y política de aislamiento. El valor lo deriva un disparador `before insert` desde la fila padre, con privilegios del llamador, de modo que una tarea de otro espacio y una inexistente fallan idéntico. Migración `0004`: las cuatro funciones `security definer` pertenecen a `prisma_owner`, que no inicia sesión, no tiene miembros y no saltea la RLS. Migración `0005`: `audit_log`, `incident` y `absence` quedan bajo política; el espacio de la auditoría lo fija la sesión, nunca quien escribe. |
 | 2. El núcleo no conoce el transporte | **Incumplida** | `message_outbox` tiene `chat_id` y `telegram_message_id` y no tiene columna de canal (`db/esquema.sql:533,548`). |
 | 3. Límites de transporte fuera del negocio | **Incumplida** | `telegram_utf16_units` (`src/prisma/salida.py:39`) se usa para decidir la validez de datos de negocio en `src/prisma/ingreso_tareas.py:532,547,554,1118`. |
 | 4. Estado por eventos | **Cumplida** | `bloquear_estado_directo()` impide el `update` directo sobre la tarea (`db/esquema.sql:1231`); el estado es proyección. |

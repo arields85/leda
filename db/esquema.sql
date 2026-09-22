@@ -149,11 +149,14 @@ comment on column membership.aprobador_membership_id is
 
 create table absence (
   id             uuid primary key default gen_random_uuid(),
+  workspace_id   uuid not null references workspace(id) on delete cascade,
   membership_id  uuid not null references membership(id) on delete cascade,
   desde          date not null,
   hasta          date,                -- null = indefinida, dispara alerta
   motivo         text
 );
+
+create index absence_ws on absence (workspace_id, membership_id);
 
 -- Telegram no permite que un bot inicie una conversación privada con alguien
 -- que nunca le escribió. Cada persona tiene que abrir su enlace una vez.
@@ -1256,6 +1259,45 @@ create trigger trg_derivar_espacio_evento_objetivo
   before insert on objective_state_event
   for each row execute function derivar_espacio_evento_objetivo();
 
+-- Misma regla para las ausencias: el espacio sale de la membresía, no de quien
+-- escribe. Privilegios del llamador, así una membresía ajena falla idéntico a
+-- una inexistente.
+create or replace function derivar_espacio_ausencia() returns trigger as $$
+begin
+  select m.workspace_id into new.workspace_id
+    from membership m where m.id = new.membership_id;
+  if new.workspace_id is null then
+    raise exception 'absence: no existe la membresía %', new.membership_id;
+  end if;
+  return new;
+end $$ language plpgsql;
+
+create trigger trg_derivar_espacio_ausencia
+  before insert on absence
+  for each row execute function derivar_espacio_ausencia();
+
+-- La auditoría autoritativa es la evidencia que se le muestra a un cliente. Su
+-- espacio lo fija la sesión, nunca quien escribe: si otro cliente pudiera
+-- atribuirse una entrada, el registro dejaría de ser evidencia. Sin espacio en
+-- la sesión --la conexión administrativa-- se conserva lo suministrado, que es
+-- como se registran los hechos de alcance global.
+create or replace function derivar_espacio_registro() returns trigger as $$
+declare actual text := nullif(current_setting('prisma.workspace_id', true), '');
+begin
+  if actual is not null then
+    new.workspace_id := actual::uuid;
+  end if;
+  return new;
+end $$ language plpgsql;
+
+create trigger trg_derivar_espacio_auditoria
+  before insert on audit_log
+  for each row execute function derivar_espacio_registro();
+
+create trigger trg_derivar_espacio_incidente
+  before insert on incident
+  for each row execute function derivar_espacio_registro();
+
 -- --- El estado es una proyección, no un campo editable -------------------
 
 create or replace function aplicar_evento_tarea() returns trigger
@@ -1573,6 +1615,28 @@ revoke insert, update, delete on task_evidence_policy from prisma_app;
 -- juego completo, así que acá se recorta al insert que es lo único legítimo.
 revoke select, update, delete on task_state_event from prisma_app;
 revoke select, update, delete on objective_state_event from prisma_app;
+
+-- Registros auxiliares. Quedan fuera del bucle de arriba porque `audit_log` e
+-- `incident` admiten espacio nulo para los hechos de alcance global, que sólo
+-- origina la conexión administrativa: una fila sin espacio no queda atribuida
+-- a ningún cliente y por eso no puede falsificar su registro.
+alter table absence enable row level security;
+alter table absence force row level security;
+create policy aislamiento_espacio on absence
+  using (workspace_id = nullif(current_setting('prisma.workspace_id', true), '')::uuid);
+
+alter table audit_log enable row level security;
+alter table audit_log force row level security;
+create policy aislamiento_espacio on audit_log
+  using (workspace_id is null
+         or workspace_id = nullif(current_setting('prisma.workspace_id', true), '')::uuid);
+
+alter table incident enable row level security;
+alter table incident force row level security;
+create policy aislamiento_espacio on incident
+  using (workspace_id is null
+         or workspace_id = nullif(current_setting('prisma.workspace_id', true), '')::uuid);
+
 grant execute on function confirmar_borrador_tarea(uuid, text, bigint, bigint)
   to prisma_gateway;
 grant execute on function resolver_ingreso_borrador(uuid, text, bigint, bigint)
