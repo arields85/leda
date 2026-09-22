@@ -74,7 +74,7 @@ Un puerto es un contrato que el núcleo define y un adaptador implementa.
 |---|---|
 | Intención | Recibe la intención de una persona ya identificada y autorizada, sin formato de canal. |
 | Notificación | Entrega un mensaje dirigido a una persona, sin conocer su transporte. |
-| Lectura | Expone consultas agregadas del estado para cualquier superficie de lectura. |
+| Lectura | Expone consultas agregadas del estado para cualquier superficie de lectura. Implementado en `src/prisma/lectura.py`; ninguna de sus funciones recibe el espacio, lo toman de la sesión. |
 | Configuración | Carga el paquete versionado de un cliente y lo materializa en el modelo. |
 | Razonamiento | Interpreta lenguaje natural y devuelve salida tipada y validada. |
 
