@@ -31,6 +31,11 @@ from prisma.llm import (IntentAction, IntentRoute, ProveedorAnthropic,
 ROOT = Path(__file__).resolve().parents[1]
 NOW = datetime(2028, 2, 28, 15, 0, tzinfo=timezone.utc)
 
+# Las pruebas de migración necesitan el esquema anterior a 0002. No puede ser
+# HEAD: desde que 0002 y el esquema que produce se versionaron en el mismo
+# commit, HEAD ya la incluye y la migración se rechaza a sí misma.
+BASELINE_REF = "efa8ee2"
+
 
 def _sql_script(path: Path) -> str:
     lines = path.read_text("utf-8").splitlines()
@@ -1583,7 +1588,7 @@ def test_migration_rejects_mojibake_then_accepts_zero_unit1a_rows():
     url = make_conninfo(**{**conninfo_to_dict(maintenance), "dbname": database})
     try:
         baseline = subprocess.run(
-            ["git", "show", "HEAD:db/esquema.sql"], cwd=ROOT,
+            ["git", "show", f"{BASELINE_REF}:db/esquema.sql"], cwd=ROOT,
             check=True, capture_output=True,
         ).stdout.decode("utf-8")
         migration = _sql_script(
@@ -1628,7 +1633,7 @@ def test_migration_reconciles_legacy_and_guarded_rollback_restores_it(conn):
     url = make_conninfo(**{**conninfo_to_dict(maintenance), "dbname": database})
     try:
         baseline = subprocess.run(
-            ["git", "show", "HEAD:db/esquema.sql"], cwd=ROOT,
+            ["git", "show", f"{BASELINE_REF}:db/esquema.sql"], cwd=ROOT,
             check=True, capture_output=True,
         ).stdout.decode("utf-8")
         migration = _sql_script(
@@ -2027,7 +2032,7 @@ def test_migration_preflight_fails_before_ddl_for_incompatible_unit1a_rows(
     url = make_conninfo(**{**conninfo_to_dict(maintenance), "dbname": database})
     try:
         baseline = subprocess.run(
-            ["git", "show", "HEAD:db/esquema.sql"], cwd=ROOT,
+            ["git", "show", f"{BASELINE_REF}:db/esquema.sql"], cwd=ROOT,
             check=True, capture_output=True,
         ).stdout.decode("utf-8")
         migration = _sql_script(
