@@ -1662,6 +1662,83 @@ def _retrato_de_aislamiento(url, tablas):
     return retrato
 
 
+def _retrato_de_funciones(url):
+    """Definición, dueño y ACL de las funciones elevadas del esquema."""
+    import psycopg
+    from psycopg.rows import dict_row
+
+    with psycopg.connect(url, autocommit=True, row_factory=dict_row) as db:
+        return db.execute(
+            """select p.proname, pg_get_functiondef(p.oid) definicion,
+                      r.rolname dueno, p.proacl::text acl
+                 from pg_proc p
+                 join pg_roles r on r.oid = p.proowner
+                 join pg_namespace n on n.oid = p.pronamespace
+                where n.nspname = 'prisma' and p.prosecdef
+                order by p.proname""").fetchall()
+
+
+def _retrato_migratorio(url, tablas):
+    return {"tablas": _retrato_de_aislamiento(url, tablas),
+            "funciones": _retrato_de_funciones(url)}
+
+
+def test_los_rollbacks_devuelven_la_base_al_estado_anterior():
+    """Un rollback sin ejercitar es una promesa, no un control.
+
+    Se compara el catálogo efectivo antes y después de cada par
+    migración/rollback. Se exige además que la migración haya cambiado algo:
+    sin eso, la comparación pasaría igual con dos rollbacks vacíos.
+    """
+    maintenance = os.environ.get("PRISMA_TEST_DB_URL")
+    if not maintenance:
+        pytest.skip("Migration rehearsal requires the pytest-authorized test server.")
+
+    import psycopg
+    from psycopg.conninfo import conninfo_to_dict, make_conninfo
+    from psycopg.sql import SQL, Identifier
+
+    tablas = ("task_state_event", "objective_state_event")
+    nombre = f"prisma_rollback_{uuid.uuid4().hex[:10]}"
+    with psycopg.connect(maintenance, autocommit=True) as control:
+        control.execute(SQL("create database {}").format(Identifier(nombre)))
+    url = make_conninfo(**{**conninfo_to_dict(maintenance), "dbname": nombre})
+
+    def correr(carpeta, archivo):
+        with psycopg.connect(url, autocommit=True) as db:
+            db.execute(_sql_script(ROOT / "db" / carpeta / archivo))
+
+    try:
+        base = subprocess.run(
+            ["git", "show", f"{BASELINE_REF}:db/esquema.sql"], cwd=ROOT,
+            check=True, capture_output=True).stdout.decode("utf-8")
+        with psycopg.connect(url, autocommit=True) as db:
+            db.execute(base)
+        correr("migrations", "0002_general_task_intake.sql")
+
+        antes_de_0003 = _retrato_migratorio(url, tablas)
+        correr("migrations", "0003_state_event_isolation.sql")
+        con_0003 = _retrato_migratorio(url, tablas)
+        assert con_0003 != antes_de_0003, "0003 no cambió nada observable"
+
+        correr("rollbacks", "0003_state_event_isolation.sql")
+        assert _retrato_migratorio(url, tablas) == antes_de_0003, (
+            "el rollback de 0003 no devolvió la base a su estado anterior")
+
+        correr("migrations", "0003_state_event_isolation.sql")
+        correr("migrations", "0004_function_ownership.sql")
+        con_0004 = _retrato_migratorio(url, tablas)
+        assert con_0004 != con_0003, "0004 no cambió nada observable"
+
+        correr("rollbacks", "0004_function_ownership.sql")
+        assert _retrato_migratorio(url, tablas) == con_0003, (
+            "el rollback de 0004 no devolvió la base a su estado anterior")
+    finally:
+        with psycopg.connect(maintenance, autocommit=True) as control:
+            control.execute(SQL("drop database if exists {} with (force)")
+                            .format(Identifier(nombre)))
+
+
 def test_instalacion_limpia_y_base_migrada_convergen_en_el_aislamiento():
     """Paridad comprobada contra dos bases reales, no comparando texto.
 

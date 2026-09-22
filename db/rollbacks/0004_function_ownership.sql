@@ -11,6 +11,21 @@
 begin;
 set search_path = prisma, public;
 
+-- Restore the projection trigger exactly as 0004 found it. Without this the
+-- rollback would be partial: ownership would revert while the body kept the
+-- workspace scoping that only exists because the owner stopped bypassing RLS.
+create or replace function aplicar_evento_tarea() returns trigger
+security definer set search_path = prisma, public as $$
+begin
+  perform set_config('prisma.aplicando_evento', '1', true);
+  update task
+     set estado = new.estado_nuevo,
+         actualizado_en = new.at
+   where id = new.task_id;
+  perform set_config('prisma.aplicando_evento', '0', true);
+  return new;
+end $$ language plpgsql;
+
 do $$
 declare invocante text := quote_ident(current_user);
 begin

@@ -88,9 +88,13 @@ problema y menor impacto. No se incluye sin autorización explícita.
 - [x] **T4 (VERDE)** — T1 pasa. La prueba exige además que una tarea ajena y un
       identificador inexistente produzcan el **mismo** error: sin esa
       indistinguibilidad el rechazo sería en sí mismo un oráculo.
-- [~] **T5** — Rollback escrito (`db/rollbacks/0003_state_event_isolation.sql`).
-      **Ninguna prueba lo ejercita todavía.** La paridad sí quedó comprobada,
-      pero por una prueba nueva: ver abajo.
+- [x] **T5** — Rollbacks de `0003` y `0004` escritos **y ejercitados** por
+      `test_los_rollbacks_devuelven_la_base_al_estado_anterior`: aplica cada
+      migración, exige que haya cambiado algo observable, la revierte y compara
+      el catálogo contra el estado previo. Escribir la prueba destapó que el
+      rollback de `0004` era parcial: revertía propiedad y privilegios pero
+      dejaba el cuerpo nuevo de `aplicar_evento_tarea`, que existe únicamente
+      porque el dueño dejó de saltear la RLS. Corregido. *Ruta: inline.*
 - [ ] **T6** — Verificar el propietario efectivo contra un clúster limpio, no
       contra el entorno de desarrollo. Cierra el `PENDIENTE` registrado en
       `docs/architecture/frontera.md:133-136`.
@@ -196,9 +200,25 @@ Resuelto con `_migraciones_posteriores_a()`, que las descubre del directorio.
 Se aplicó también a la prueba de paridad nueva, que había nacido con el mismo
 defecto.
 
+## Estado de la unidad
+
+Cerradas T1 a T5 y T7. Suite en **310 passed, 0 failed**. La regla 1 de
+`docs/architecture/frontera.md` pasó a cumplida.
+
+Queda abierto, todo registrado en `docs/STATUS.md`:
+
+- **T6 parcial.** La propiedad de las funciones se verifica sobre una base
+  nueva dentro de un clúster existente. Un ensayo sobre un clúster enteramente
+  limpio sigue siendo más fuerte y está `PENDIENTE`.
+- `confirmar_borrador_tarea` fija el espacio con el valor que recibe de quien
+  la llama. Contenida a `prisma_gateway` y fuera del alcance de `prisma_app`,
+  pero es el patrón que la regla 6 rechaza. Pertenece al ingreso autenticado.
+- Riesgo 5 de `STATUS.md`: `absence`, `incident` y `audit_log` reciben `insert`
+  sin política. Misma clase que lo ya cerrado, menor impacto. No se incluyó sin
+  autorización explícita.
+
 ## Próximo paso
 
-T5 completa: ninguna prueba ejercita todavía los rollbacks de `0003` y `0004`.
-Después, decidir con el usuario el riesgo 5 de `STATUS.md` (`absence`,
-`incident` y `audit_log` sin política), que es la misma clase de problema con
-menor impacto.
+Decidir con el usuario si sigue el riesgo 5, o la siguiente unidad del
+roadmap: el desacople del transporte, que es la precondición del dashboard y
+de cualquier canal que no sea el conversacional.
