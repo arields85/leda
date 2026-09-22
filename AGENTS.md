@@ -4,6 +4,13 @@ Este archivo es el punto de entrada para futuras sesiones. Prisma se endurece y
 extiende sobre la arquitectura actual; no se reestructura ni reescribe sin una
 decisión explícita y documentada.
 
+> **Este archivo es la fuente única de estas instrucciones.** `CLAUDE.md`
+> contiene sólo `@AGENTS.md`, que las importa. Claude Code lee `AGENTS.md` de
+> forma nativa, pero esa lectura depende de un indicador remoto y no se activa
+> en Bedrock o Vertex, con telemetría deshabilitada, ni en la primera sesión
+> posterior a una instalación o actualización; la importación funciona siempre.
+> Editar siempre este archivo, nunca `CLAUDE.md`.
+
 ## Orden de lectura
 
 1. Leer `docs/product/que-es-prisma.md` para conocer qué es el producto y qué es
