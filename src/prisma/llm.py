@@ -352,6 +352,7 @@ BASE_URLS = {
     "mistral":    "https://api.mistral.ai/v1",
     "xai":        "https://api.x.ai/v1",
     "openrouter": "https://openrouter.ai/api/v1",
+    "nan":        "https://api.nan.builders/v1",
     "local":      "http://localhost:11434/v1",
 }
 
