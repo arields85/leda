@@ -132,15 +132,28 @@ se verifica sobre una base nueva dentro de un clúster existente.
 
 ## Próximo paso
 
-**Dependencias entre tareas** (mecánica §4). El ciclo de vida de un bloqueo ya cierra
-—`resolver_bloqueo` devuelve la tarea al estado previo y un bloqueo abierto hace más
-de `bloqueos.escala_solo_a_los_dias` días hábiles escala solo—, pero `dependency` sigue
-siendo una tabla que nadie llena: `escalera.py` ya cuenta filas de esa tabla para el
-texto de un recordatorio y siempre da cero. Falta:
-
-1. crear una dependencia entre dos tareas, con rechazo de ciclos al crearla;
-2. cuando la tarea origen de una dependencia bloqueante se atrasa, calcular el impacto
-   en cadena y avisar a los responsables afectados antes de que venzan sus propias
-   fechas.
+**Banco de pruebas conversacional con el modelo real**, según
+[`docs/validation/README.md`](validation/README.md): escenarios ficticios fijos,
+comprobaciones de propiedad —se llamó la herramienta correcta, toda persona/tarea/fecha
+mencionada existe en PostgreSQL, nunca se afirma una acción que no ocurrió— con N
+corridas por escenario y una tasa de aprobación; cada falla se convierte en una
+regresión de repetición determinista con `ProveedorGuionado`. Después, la conversación
+de bloqueos (mecánica §8, pasos 2 a 7).
 
 El resto del orden de trabajo está en [`ROADMAP.md`](ROADMAP.md).
+
+## Cerrado: dependencias entre tareas
+
+Era el próximo paso anterior. `crear_dependencia`/`quitar_dependencia`
+(`src/prisma/herramientas.py`) crean y quitan con la autoridad decidida —responsable de
+cualquiera de las dos tareas, o su referente— y avisan a la otra parte y, entre áreas
+distintas, a los dos referentes; un ciclo lo rechaza `trg_evitar_ciclo_dependencia` con
+un mensaje legible. El freno de `en_curso` vive en la base
+(`motivo_no_arranca_tarea`/`trg_exigir_dependencias_resueltas`, migración `0008` con su
+rollback). El aviso en cadena por atraso o por fecha corrida corre en la misma pasada
+que la escalera (`escalera.evaluar_dependencias_en_riesgo`), deduplicado por
+(origen, su fecha objetivo vigente) por destinatario. La dependencia informativa avisa a
+las dos partes cuando la origen cambia de estado; el aviso por cambio de fecha queda sin
+disparador porque `bloquear_estado_directo` vuelve `fecha_objetivo` inmutable una vez
+comprometida la tarea y ninguna ruta de código la cambia — deuda registrada, no
+implementada.

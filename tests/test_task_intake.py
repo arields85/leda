@@ -1830,6 +1830,55 @@ def test_0007_estado_previo_a_bloqueo_llega_por_migracion_con_dueno_correcto():
                 Identifier(database)))
 
 
+def test_0008_motivo_no_arranca_tarea_llega_por_migracion():
+    """El freno de `en_curso` (mecánica §4) vive en un disparador que llama a
+    `motivo_no_arranca_tarea`. Sin una migración para esa función y ese
+    disparador, una base existente (CoreWork) los tendría en `esquema.sql`
+    nada más -- que `db/migrations/README.md` reserva para bases limpias de
+    prueba -- y `actualizar_estado` podría mover una tarea a `en_curso` con
+    su bloqueante sin terminar.
+    """
+    maintenance = os.environ.get("PRISMA_TEST_DB_URL")
+    if not maintenance:
+        pytest.skip("Migration rehearsal requires the pytest-authorized test server.")
+
+    from psycopg.conninfo import conninfo_to_dict, make_conninfo
+    from psycopg.rows import dict_row
+    from psycopg.sql import SQL, Identifier
+
+    database = f"prisma_0008_migration_{uuid.uuid4().hex[:12]}"
+    with psycopg.connect(maintenance, autocommit=True) as control:
+        control.execute(SQL("create database {}").format(Identifier(database)))
+    url = make_conninfo(**{**conninfo_to_dict(maintenance), "dbname": database})
+    try:
+        baseline = subprocess.run(
+            ["git", "show", f"{BASELINE_REF}:db/esquema.sql"], cwd=ROOT,
+            check=True, capture_output=True).stdout.decode("utf-8")
+        with psycopg.connect(url, autocommit=True, row_factory=dict_row) as db:
+            db.execute(baseline)
+            for migracion in _migraciones_posteriores_a("0001"):
+                db.execute(_sql_script(migracion))
+
+            existe = db.execute(
+                "select to_regprocedure("
+                "'prisma.motivo_no_arranca_tarea(uuid)') as f"
+            ).fetchone()["f"]
+            assert existe is not None, (
+                "motivo_no_arranca_tarea no llegó por la cadena de migraciones")
+
+            disparador = db.execute(
+                """select tgenabled from pg_trigger
+                    where tgname = 'trg_exigir_dependencias_resueltas'
+                      and tgrelid = 'prisma.task_state_event'::regclass"""
+            ).fetchone()
+            assert disparador is not None, (
+                "trg_exigir_dependencias_resueltas no llegó por la cadena de migraciones")
+    finally:
+        with psycopg.connect(maintenance, autocommit=True) as control:
+            control.execute(SQL("drop database if exists {} with (force)").format(
+                Identifier(database)))
+
+
 def test_migration_rejects_mojibake_then_accepts_zero_unit1a_rows():
     maintenance = os.environ.get("PRISMA_TEST_DB_URL")
     if not maintenance:

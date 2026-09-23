@@ -38,9 +38,6 @@ PROMESAS_SIN_CUMPLIR = {
     "prioridad":
         "Prioridad de una tarea, campo obligatorio según §8. Hoy toda tarea la "
         "tiene nula.",
-    "destino_task_id":
-        "Dependencias entre tareas. `escalera.py` cuenta filas que nadie crea, "
-        "así que 'dependencias invisibles' —misión §2— no se puede reducir.",
     "drive_file_id":
         "Evidencia almacenada en Drive (§11 de la especificación funcional).",
     "preguntado_en":

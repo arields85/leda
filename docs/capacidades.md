@@ -7,11 +7,12 @@ auditarlo. El detalle vive en los documentos que se citan; acá está el mapa.
 
 El esquema y los documentos describen un producto cerca del doble del código,
 y la brecha no es al azar: está sistemáticamente de un lado. Lo construido es
-**el registro** —capturar trabajo, aislarlo, entregar mensajes—. Lo ausente es
-**la coordinación** —dependencias, subtareas, prioridad, reuniones, informes,
-calendario, correo, umbral de re-aprobación—, que es justamente la misión del
-§2: reducir "dependencias invisibles" y "reuniones dedicadas únicamente a
-recopilar estado".
+**el registro** —capturar trabajo, aislarlo, entregar mensajes— y ahora
+también las dependencias entre tareas. Lo ausente sigue siendo el resto de
+**la coordinación** —subtareas, prioridad, reuniones, informes, calendario,
+correo, umbral de re-aprobación—, que es justamente la misión del §2: reducir
+"dependencias invisibles" y "reuniones dedicadas únicamente a recopilar
+estado".
 
 Prisma hoy es un registro de tareas bien construido con interfaz de Telegram.
 
@@ -33,6 +34,7 @@ No se rehace.
 | Puerto de lectura | `lectura.py`: seis consultas agregadas, el espacio sale de la sesión |
 | Tablero de cliente | Credencial por enlace con vencimiento + pantalla |
 | Importador de paquetes | Genérico, con validaciones cruzadas y hash versionado |
+| Dependencias entre tareas | `crear_dependencia`/`quitar_dependencia` (`herramientas.py`), autoridad del responsable de cualquiera de las dos o su referente; freno de `en_curso` en la base (`motivo_no_arranca_tarea`, migración `0008`); aviso en cadena por atraso o por fecha corrida (`escalera.evaluar_dependencias_en_riesgo`) y aviso de la informativa al cambiar de estado |
 
 ## Diseñado y sin construir
 
@@ -46,8 +48,7 @@ Cada uno tiene diseño escrito y cero código.
 | **Correo** | Especificación §18 | Sólo existe el nombre del permiso |
 | **Almacenamiento documental** | Especificación §11 | `evidence.drive_file_id` sin uso |
 | **Reuniones e informes** | Especificación §17.2 y §23 | Anunciar, pedir temas, consolidar, agenda, minutas. `corework.yaml` declara `reunion_periodica` y el importador no la consume |
-| **Dependencias entre tareas** | Mecánica §4 | Crearlas, y avisar en cadena a los afectados antes del vencimiento |
-| **Conversación de bloqueos** | Mecánica §8, pasos 2 a 7 | Abrir y cerrar un bloqueo ya funciona. Pedir la información mínima, proponer soluciones, preguntar por ayuda y proponer reasignaciones siguen sin construir; dependen de dependencias, la unidad anterior de esta tabla |
+| **Conversación de bloqueos** | Mecánica §8, pasos 2 a 7 | Abrir y cerrar un bloqueo ya funciona. Pedir la información mínima, proponer soluciones, preguntar por ayuda y proponer reasignaciones siguen sin construir. Su precondición —dependencias entre tareas— ya está resuelta; es la unidad siguiente en `docs/ROADMAP.md` |
 | **Umbral de re-aprobación** | Mecánica §7 | El importador lo guarda en la base y ningún código lo lee |
 | **Privacidad configurable** | Especificación §19 | Sin código **ni** esquema. No existe matriz de visibilidad |
 | **Aprendizaje** | Mecánica §14 | Tabla `learning` vacía de uso |

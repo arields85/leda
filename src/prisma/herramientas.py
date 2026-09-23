@@ -15,6 +15,7 @@ Cada herramienta declara:
 
 from __future__ import annotations
 
+import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable
@@ -498,11 +499,45 @@ def _actualizar_estado(cur, quien: Solicitante, tarea_id, estado, motivo=None):
             # No es un error: es información que Prisma tiene que transmitir.
             return {"cerrada": False, "falta": impedimento}
 
+    if estado == "en_curso":
+        # Chequeo proactivo, igual que el de arriba: sin esto, el disparador
+        # `trg_exigir_dependencias_resueltas` igual frena el insert, pero como
+        # un error de base -- acá se convierte en información antes de
+        # intentarlo (mecánica §4).
+        #
+        # Corrección tras revisión: si la tarea está `bloqueada`, este mismo
+        # `actualizar_estado` puede recibir la transición de vuelta -- la
+        # herramienta no exige bloqueos cerrados para salir de `bloqueada`
+        # (deuda conocida) --, y volver de un bloqueo es una restauración,
+        # no un arranque (mecánica §3).
+        #
+        # Segunda corrección tras revisión: no alcanza con mirar el estado
+        # actual. `asignada` -> `registrar_bloqueo` -> `bloqueada` ->
+        # `actualizar_estado(en_curso)` también tiene `fila["estado"] ==
+        # "bloqueada"`, y esa tarea nunca arrancó -- eximirla ahí habría
+        # dejado pasar justo lo que mecánica §4 prohíbe. La restauración
+        # legítima exige además que el estado previo a la ÚLTIMA entrada a
+        # `bloqueada` haya sido `en_curso`, igual que el disparador.
+        restaura_en_curso = False
+        if fila["estado"] == "bloqueada":
+            cur.execute("select estado_previo_a_bloqueo(%s) as previo", (tarea_id,))
+            restaura_en_curso = cur.fetchone()["previo"] == "en_curso"
+        if not restaura_en_curso:
+            cur.execute("select motivo_no_arranca_tarea(%s) as m", (tarea_id,))
+            impedimento = cur.fetchone()["m"]
+            if impedimento:
+                return {"iniciada": False, "falta": impedimento}
+
+    # Sin `returning`: `prisma_app` sólo tiene `insert` sobre
+    # `task_state_event` (es append-only, ver el `revoke` en
+    # `db/esquema.sql`), y `returning` exige además `select`. El token de
+    # deduplicación se genera acá, no se lee de la fila insertada.
     cur.execute(
         """insert into task_state_event (task_id, estado_anterior, estado_nuevo,
                                          actor_kind, actor_app_user_id, motivo)
            values (%s, %s, %s, 'persona', %s, %s)""",
         (tarea_id, fila["estado"], estado, quien.app_user_id, motivo))
+    _avisar_dependencia_informativa(cur, quien, tarea_id, estado, uuid.uuid4())
     return {"estado": estado}
 
 
@@ -534,6 +569,7 @@ def _registrar_bloqueo(cur, quien: Solicitante, tarea_id, causa, impacto=None):
                                              actor_kind, actor_app_user_id, motivo)
                values (%s, %s, 'bloqueada', 'persona', %s, %s)""",
             (tarea_id, fila["estado"], quien.app_user_id, causa))
+        _avisar_dependencia_informativa(cur, quien, tarea_id, "bloqueada", uuid.uuid4())
     return {"bloqueo_id": str(bid)}
 
 
@@ -614,6 +650,8 @@ def _resolver_bloqueo(cur, quien: Solicitante, bloqueo_id, resolucion):
                       actor_app_user_id, motivo)
                    values (%s, 'bloqueada', %s, 'persona', %s, %s)""",
                 (fila["task_id"], previo, quien.app_user_id, resolucion))
+            _avisar_dependencia_informativa(
+                cur, quien, fila["task_id"], previo, uuid.uuid4())
             tarea_desbloqueada = True
     return {"resuelto": True, "tarea_desbloqueada": tarea_desbloqueada}
 
@@ -661,6 +699,238 @@ def _aprobar_tarea(cur, quien: Solicitante, tarea_id, comentario=None):
            values (%s, 'tarea', %s, %s, 'aprobado', %s)""",
         (quien.workspace_id, tarea_id, quien.membership_id, comentario))
     return {"aprobada": True}
+
+
+# ---------------------------------------------------------------------------
+# Dependencias
+# ---------------------------------------------------------------------------
+
+def _persona(cur, membership_id):
+    if membership_id is None:
+        return None
+    cur.execute(
+        "select telegram_user_id, nombre from integrante where membership_id = %s",
+        (membership_id,))
+    return cur.fetchone()
+
+
+def _avisar(cur, quien: Solicitante, destinatario_membership_id, texto, *,
+           dedupe_key, tipo="normal") -> None:
+    """Un aviso automático más: si la persona todavía no activó el chat, se
+    omite en silencio, igual que la escalera y la cadencia."""
+    persona = _persona(cur, destinatario_membership_id)
+    if not persona or persona["telegram_user_id"] is None:
+        return
+    enqueue_outbox(
+        cur, workspace_id=quien.workspace_id, chat_id=persona["telegram_user_id"],
+        text=texto, recipient_membership_id=destinatario_membership_id,
+        message_type=tipo, dedupe_key=dedupe_key)
+
+
+def _avisar_dependencia_informativa(cur, quien: Solicitante, tarea_id, estado_nuevo,
+                                    event_id) -> None:
+    """Mecánica §4: una dependencia informativa avisa a las dos partes cuando
+    la origen cambia de fecha o de estado. Se llama después de insertar la
+    fila de `task_state_event` de cada herramienta que la escribe.
+
+    `fecha_objetivo` es inmutable una vez comprometida la tarea
+    (`bloquear_estado_directo` en `db/esquema.sql` la rechaza), y ninguna
+    ruta de código la cambia: el aviso por cambio de fecha queda sin
+    disparador propio. Cubre sólo el cambio de estado -- gap para
+    `docs/STATUS.md`.
+    """
+    cur.execute(
+        """select d.id, o.titulo as origen_titulo,
+                  o.responsable_membership_id as origen_resp,
+                  t.titulo as destino_titulo,
+                  t.responsable_membership_id as destino_resp
+             from dependency d
+             join task o on o.id = d.origen_task_id
+             join task t on t.id = d.destino_task_id
+            where d.origen_task_id = %s and d.tipo = 'informativa'""",
+        (tarea_id,))
+    for dep in cur.fetchall():
+        texto = (f"«{dep['origen_titulo']}» pasó a {estado_nuevo}. Es una "
+                 f"dependencia informativa con «{dep['destino_titulo']}».")
+        for destinatario in {dep["origen_resp"], dep["destino_resp"]}:
+            if destinatario is None:
+                continue
+            _avisar(cur, quien, destinatario, texto, tipo="informativo",
+                   dedupe_key=(f"{quien.workspace_id}:dependencia-informativa:"
+                               f"{dep['id']}:{event_id}:{destinatario}"))
+
+
+def _tarea_para_dependencia(cur, tarea_id):
+    cur.execute(
+        """select id, estado, area_id, responsable_membership_id, titulo
+             from task where id = %s""", (tarea_id,))
+    return cur.fetchone()
+
+
+def _autorizado_para_dependencia(cur, quien: Solicitante, origen, destino) -> bool:
+    """El responsable de cualquiera de las dos tareas, o su referente
+    (decisión de producto, 2026-09-22): una dependencia bloqueante frena la
+    tarea de otra persona, así que no la declara cualquiera; pero exigir
+    confirmación de la otra parte agrega fricción sin necesidad, porque el
+    aviso ya la hace visible. "Referente" es `puede_aprobar_tarea`, la misma
+    noción que usa `aprobar_tarea`."""
+    quien_id = str(quien.membership_id)
+    if quien_id == str(origen["responsable_membership_id"]):
+        return True
+    if quien_id == str(destino["responsable_membership_id"]):
+        return True
+    if puede_aprobar_tarea(cur, quien, origen["responsable_membership_id"]):
+        return True
+    if puede_aprobar_tarea(cur, quien, destino["responsable_membership_id"]):
+        return True
+    return False
+
+
+def _destinatarios_dependencia_creada(cur, quien: Solicitante, origen, destino):
+    """La otra parte, y entre áreas distintas los dos referentes (mecánica
+    §4). "Referente" acá es quien aprueba el trabajo de cada responsable
+    (`aprobador_membership_id`) -- la misma noción funcional que
+    `puede_aprobar_tarea`, no un rol con un nombre fijo que cada pack puede
+    llamar distinto."""
+    quien_id = str(quien.membership_id)
+    resp_origen = origen["responsable_membership_id"]
+    resp_destino = destino["responsable_membership_id"]
+    es_resp_origen = resp_origen is not None and quien_id == str(resp_origen)
+    es_resp_destino = resp_destino is not None and quien_id == str(resp_destino)
+
+    destinatarios: set[str] = set()
+    if es_resp_origen and not es_resp_destino:
+        if resp_destino is not None:
+            destinatarios.add(str(resp_destino))
+    elif es_resp_destino and not es_resp_origen:
+        if resp_origen is not None:
+            destinatarios.add(str(resp_origen))
+    elif not es_resp_origen and not es_resp_destino:
+        # Quien crea es referente de una de las dos, no responsable de
+        # ninguna: avisa a los dos responsables.
+        if resp_origen is not None:
+            destinatarios.add(str(resp_origen))
+        if resp_destino is not None:
+            destinatarios.add(str(resp_destino))
+    # Si es responsable de las dos a la vez, no hay "otra parte" a quien avisar.
+
+    if str(origen["area_id"]) != str(destino["area_id"]):
+        for resp in (resp_origen, resp_destino):
+            if resp is None:
+                continue
+            cur.execute(
+                "select aprobador_membership_id from membership where id = %s",
+                (resp,))
+            fila = cur.fetchone()
+            if fila and fila["aprobador_membership_id"]:
+                destinatarios.add(str(fila["aprobador_membership_id"]))
+
+    destinatarios.discard(quien_id)
+    return destinatarios
+
+
+def _texto_dependencia_creada(tipo, origen, destino, creador_nombre) -> str:
+    if tipo == "bloqueante":
+        texto = (f"{creador_nombre} registró que «{destino['titulo']}» depende de "
+                 f"«{origen['titulo']}»: no puede pasar a en curso hasta que esa "
+                 f"tarea esté terminada.")
+        if destino["estado"] == "en_curso":
+            # No la mueve retroactivamente (mecánica §4 sólo frena el pase a
+            # en curso, no revierte uno ya hecho); esto lo deja visible.
+            texto += (f" «{destino['titulo']}» ya está en curso, así que esta "
+                      f"dependencia no la frena ahora.")
+        return texto
+    return (f"{creador_nombre} registró una dependencia informativa entre "
+           f"«{origen['titulo']}» y «{destino['titulo']}»: aviso cuando "
+           f"alguna de las dos cambie de estado.")
+
+
+@herramienta(
+    "crear_dependencia", "crear_dependencia",
+    "Declara que una tarea depende de otra. 'bloqueante' frena que la "
+    "destino pase a en curso hasta que la origen esté terminada; "
+    "'informativa' sólo avisa cuando la origen cambia de estado.",
+    {"origen_tarea_id": {"type": "string", "requerido": True},
+     "destino_tarea_id": {"type": "string", "requerido": True},
+     "tipo": {"type": "string", "enum": ["bloqueante", "informativa"]}},
+    valida_en_handler=True)
+def _crear_dependencia(cur, quien: Solicitante, origen_tarea_id, destino_tarea_id,
+                       tipo="bloqueante"):
+    if str(origen_tarea_id) == str(destino_tarea_id):
+        return {"error": "una tarea no puede depender de sí misma"}
+
+    origen = _tarea_para_dependencia(cur, origen_tarea_id)
+    if not origen:
+        return {"error": "la tarea de origen no existe en este equipo"}
+    destino = _tarea_para_dependencia(cur, destino_tarea_id)
+    if not destino:
+        return {"error": "la tarea de destino no existe en este equipo"}
+
+    if destino["estado"] in ("terminada", "cancelada"):
+        return {"error": "esa tarea ya está cerrada, no se le puede agregar una dependencia"}
+
+    cur.execute(
+        "select 1 from dependency where origen_task_id = %s and destino_task_id = %s",
+        (origen_tarea_id, destino_tarea_id))
+    if cur.fetchone():
+        return {"error": "ya existe una dependencia registrada entre esas tareas"}
+
+    if not _autorizado_para_dependencia(cur, quien, origen, destino):
+        raise Denegado(
+            "No podés declarar una dependencia entre esas tareas: no sos "
+            "responsable de ninguna de las dos, ni referente de quien lo es.")
+
+    # Un ciclo lo rechaza `trg_evitar_ciclo_dependencia`: la excepción de la
+    # base sube tal cual, y `agente.py` ya la traduce a un mensaje legible
+    # para quien llama (no es un incidente).
+    cur.execute(
+        """insert into dependency (workspace_id, origen_task_id, destino_task_id, tipo)
+           values (%s, %s, %s, %s) returning id""",
+        (quien.workspace_id, origen_tarea_id, destino_tarea_id, tipo))
+    dep_id = cur.fetchone()["id"]
+
+    destinatarios = _destinatarios_dependencia_creada(cur, quien, origen, destino)
+    texto = _texto_dependencia_creada(tipo, origen, destino, quien.nombre)
+    for destinatario in destinatarios:
+        _avisar(cur, quien, destinatario, texto,
+               dedupe_key=f"{quien.workspace_id}:dependencia-creada:{dep_id}:{destinatario}")
+
+    return {"dependencia_id": str(dep_id)}
+
+
+@herramienta(
+    "quitar_dependencia", "quitar_dependencia",
+    "Elimina una dependencia entre dos tareas.",
+    {"dependencia_id": {"type": "string", "requerido": True}},
+    valida_en_handler=True)
+def _quitar_dependencia(cur, quien: Solicitante, dependencia_id):
+    cur.execute(
+        """select d.id, o.responsable_membership_id as origen_resp,
+                  t.responsable_membership_id as destino_resp
+             from dependency d
+             join task o on o.id = d.origen_task_id
+             join task t on t.id = d.destino_task_id
+            where d.id = %s""", (dependencia_id,))
+    fila = cur.fetchone()
+    if not fila:
+        # RLS ya deja pasar sólo lo del espacio activo: una dependencia de
+        # otro espacio llega hasta acá igual de vacía que una inventada.
+        return {"error": "esa dependencia no existe en este equipo"}
+
+    origen = {"responsable_membership_id": fila["origen_resp"]}
+    destino = {"responsable_membership_id": fila["destino_resp"]}
+    if not _autorizado_para_dependencia(cur, quien, origen, destino):
+        raise Denegado(
+            "No podés quitar esa dependencia: no sos responsable de ninguna "
+            "de las dos tareas, ni referente de quien lo es.")
+
+    # Baja física, no un estado "quitada": `dependency` no tiene columnas de
+    # baja blanda como `blocker.resuelto_en`, y `agente.py` ya audita todo
+    # llamado a herramienta (`registrar_auditoria`, accion
+    # "herramienta:quitar_dependencia", con los argumentos) con quién, cuándo
+    # y qué dependencia, así que el rastro no depende de esta fila.
+    cur.execute("delete from dependency where id = %s", (dependencia_id,))
+    return {"eliminada": True}
 
 
 @herramienta(

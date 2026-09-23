@@ -144,6 +144,11 @@ def ejecutar_escalera(cur: psycopg.Cursor, workspace_id: str,
     # escalera de recordatorios, pero corren en la misma pasada.
     bloqueos = escalera.evaluar_bloqueos(cur, workspace_id, cal, ahora)
     encoladas += escalera.encolar_bloqueos(cur, workspace_id, bloqueos, ahora)
+
+    # Dependencias bloqueantes en riesgo (mecánica §4): mismo criterio, misma
+    # pasada.
+    dependencias = escalera.evaluar_dependencias_en_riesgo(cur, workspace_id, cal, ahora)
+    encoladas += escalera.encolar_dependencias(cur, workspace_id, dependencias, ahora)
     return encoladas
 
 

@@ -59,6 +59,19 @@ class AccionBloqueo:
     dedupe_key: str
 
 
+@dataclass
+class AccionDependencia:
+    origen_task_id: str
+    # Una persona recibe un solo aviso por (origen, tipo de riesgo): si tiene
+    # más de una tarea afectada en la cadena, todas quedan acá, no una por
+    # `AccionDependencia`.
+    destino_task_ids: list[str]
+    destinatario_membership_id: str
+    chat_id: int | None
+    cuerpo: str
+    dedupe_key: str
+
+
 def _paso_correspondiente(cal: Calendario, vence: datetime, ahora: datetime) -> tuple[str, str] | None:
     """Devuelve el paso que toca hoy, o None si todavía no toca ninguno."""
     transcurridos = cal.habiles_entre(vence, ahora)
@@ -313,4 +326,145 @@ def encolar(cur: psycopg.Cursor, workspace_id: str, acciones: list[Accion],
                           escalado_en = case when %s then now() else escalado_en end
                     where task_id = %s and satisfecho_en is null""",
                 (a.escalamiento, a.task_id))
+    return encoladas
+
+
+# ---------------------------------------------------------------------------
+# Dependencias bloqueantes en riesgo (mecánica §4)
+# ---------------------------------------------------------------------------
+
+def _en_riesgo_por_fecha_posterior(cur, origen_id: str, origen_fecha,
+                                   ahora: datetime) -> bool:
+    """La origen no está vencida todavía, pero su fecha queda después de la
+    de algún dependiente directo que todavía la necesita (no terminado ni
+    cancelado): ese dependiente se va a atrasar antes de que la origen
+    siquiera venza."""
+    cur.execute(
+        """select exists (
+             select 1 from dependency d join task t on t.id = d.destino_task_id
+              where d.origen_task_id = %s and d.tipo = 'bloqueante'
+                and t.estado not in ('terminada', 'cancelada')
+                and t.fecha_objetivo is not null
+                and t.fecha_objetivo < %s
+           ) as riesgo""",
+        (origen_id, origen_fecha))
+    return cur.fetchone()["riesgo"]
+
+
+def _cadena_de_dependientes(cur, origen_id: str):
+    """Todos los que dependen de `origen_id` en cadena por dependencias
+    `bloqueante` (no sólo los directos), todavía no terminados ni cancelados,
+    con si la dependencia es directa o llega por un tramo intermedio (para
+    poder decirlo en el aviso). Es el "impacto en cadena" de mecánica §4.
+
+    Un mismo `t` puede aparecer por más de un camino (directo y, a la vez,
+    indirecto por otra rama); `distinct on` se queda con la fila directa
+    cuando existe, porque es la más precisa de las dos."""
+    cur.execute(
+        """with recursive cadena as (
+             select d.destino_task_id as t, true as directo from dependency d
+              where d.origen_task_id = %s and d.tipo = 'bloqueante'
+             union
+             select d.destino_task_id, false from dependency d
+               join cadena c on d.origen_task_id = c.t
+              where d.tipo = 'bloqueante'
+           )
+           select distinct on (t.id) t.id, t.titulo, t.responsable_membership_id,
+                  c.directo
+             from cadena c join task t on t.id = c.t
+            where t.estado not in ('terminada', 'cancelada')
+            order by t.id, c.directo desc""",
+        (origen_id,))
+    return cur.fetchall()
+
+
+def _texto_dependencia_en_riesgo(origen_titulo: str, vencida: bool, tareas) -> str:
+    """Nombra la o las tareas del destinatario afectadas -- sin eso, el aviso
+    no da nada para actuar -- y, para un dependiente indirecto, aclara que es
+    por la cadena y no por una dependencia declarada directamente con esa
+    tarea."""
+    motivo = (f"«{origen_titulo}» está vencida." if vencida else
+             f"«{origen_titulo}» tiene una fecha que queda después de la tuya.")
+    lineas = [
+        f"· {t['titulo']}" + ("" if t["directo"] else " (a través de la cadena)")
+        for t in tareas
+    ]
+    return f"{motivo} Depende de ella:\n" + "\n".join(lineas)
+
+
+def evaluar_dependencias_en_riesgo(cur: psycopg.Cursor, workspace_id: str,
+                                   cal: Calendario,
+                                   ahora: datetime | None = None) -> list[AccionDependencia]:
+    """Bloqueantes en riesgo (mecánica §4): no terminadas y, o vencidas, o con
+    fecha posterior a la de un dependiente. Avisa a cada responsable de la
+    cadena completa de dependientes, una vez por (origen, tipo de riesgo, su
+    fecha objetivo actual): "vencida" y "posterior" son motivos distintos y
+    no comparten clave, porque el segundo puede convertirse en el primero
+    más adelante y esa escalada tiene que volver a avisar, no quedar
+    deduplicada contra el aviso anterior. No envía nada."""
+    ahora = ahora or datetime.now(timezone.utc)
+
+    cur.execute(
+        """select distinct o.id, o.titulo, o.fecha_objetivo
+             from task o
+             join dependency d on d.origen_task_id = o.id and d.tipo = 'bloqueante'
+            where o.workspace_id = %s
+              and o.estado not in ('terminada', 'cancelada')
+              and o.fecha_objetivo is not null""",
+        (workspace_id,))
+    origenes = cur.fetchall()
+
+    acciones: list[AccionDependencia] = []
+    for o in origenes:
+        vencida = o["fecha_objetivo"] < ahora
+        if vencida:
+            tipo_riesgo = "vencida"
+        elif _en_riesgo_por_fecha_posterior(cur, o["id"], o["fecha_objetivo"], ahora):
+            tipo_riesgo = "posterior"
+        else:
+            continue
+
+        # Se agrupa por destinatario: si tiene más de una tarea afectada en
+        # la cadena, todas van en un solo aviso -- la letra pide un aviso por
+        # (origen, tipo de riesgo) por persona, no uno por tarea.
+        por_destinatario: dict[str, list] = {}
+        for dependiente in _cadena_de_dependientes(cur, o["id"]):
+            destinatario = dependiente["responsable_membership_id"]
+            if destinatario is None:
+                continue
+            por_destinatario.setdefault(str(destinatario), []).append(dependiente)
+
+        dedupe_base = (f"{workspace_id}:dependencia-riesgo:{o['id']}:{tipo_riesgo}:"
+                       f"{o['fecha_objetivo'].isoformat()}")
+        for destinatario, tareas in por_destinatario.items():
+            cur.execute(
+                "select telegram_user_id from integrante where membership_id = %s",
+                (destinatario,))
+            persona = cur.fetchone()
+            acciones.append(AccionDependencia(
+                origen_task_id=str(o["id"]),
+                destino_task_ids=[str(t["id"]) for t in tareas],
+                destinatario_membership_id=destinatario,
+                chat_id=persona["telegram_user_id"] if persona else None,
+                cuerpo=_texto_dependencia_en_riesgo(o["titulo"], vencida, tareas),
+                dedupe_key=f"{dedupe_base}:{destinatario}"))
+    return acciones
+
+
+def encolar_dependencias(cur: psycopg.Cursor, workspace_id: str,
+                         acciones: list[AccionDependencia],
+                         ahora: datetime | None = None) -> int:
+    """Deja los avisos de dependencias en riesgo en la cola. La clave de
+    deduplicación incluye la fecha objetivo vigente de la origen: si cambiara,
+    volvería a avisar; una corrida repetida sobre el mismo momento, no."""
+    ahora = ahora or datetime.now(timezone.utc)
+    encoladas = 0
+    for a in acciones:
+        if a.chat_id is None:
+            continue
+        encoladas += enqueue_outbox(
+            cur, workspace_id=workspace_id, chat_id=a.chat_id, text=a.cuerpo,
+            recipient_membership_id=a.destinatario_membership_id,
+            message_type="normal", scheduled_for=ahora, dedupe_key=a.dedupe_key,
+        )
     return encoladas
