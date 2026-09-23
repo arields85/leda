@@ -133,7 +133,18 @@ advierte.
 ### Panel de plataforma
 
 **Entrega:** la superficie que aloja la entrevista de alta y el alta de clientes, y
-su autenticación.
+su autenticación. También la elección de proveedor y modelo de lenguaje: hoy se
+fija por consola (`python -m prisma modelo <id> --proveedor <p>`, que escribe
+`model_config`), y tiene que poder cambiarse desde el panel, con el cambio atribuido
+en la auditoría. Va en el panel y no en el tablero de cliente porque el modelo
+global alcanza a todos los espacios.
+
+`PENDIENTE` para ese punto:
+
+- dónde vive la clave de cada proveedor, hoy una única `PRISMA_LLM_API_KEY` en
+  `.env` que se lee al arrancar el proceso;
+- si el ajuste por espacio que `model_config` ya admite se expone, y en qué
+  superficie.
 
 **Depende de:** nada en el código; sí de una decisión abierta sobre cómo se autentica
 quien opera Prisma. El enlace por Telegram no sirve acá: autentica contra una
