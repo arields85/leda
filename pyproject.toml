@@ -30,3 +30,7 @@ where = ["src"]
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]
+markers = [
+    "modelo_real: corre contra un modelo real, con red y credencial (excluido por defecto; ver tests/banco).",
+]
+addopts = "-m \"not modelo_real\""

@@ -1,0 +1,35 @@
+id: b-0003
+objetivo: >
+  Observar si Prisma cierra el bloqueo correcto con su resolución cuando
+  quien escribe es responsable de la tarea, sin volver a preguntar cuál
+  bloqueo es.
+actor: Marcos Tarquini
+mensajes:
+  - "che, ya llegó el switch que faltaba para el tablero, dalo por resuelto"
+precondiciones:
+  tareas:
+    - id: t1
+      titulo: Programar PLC de la comprimidora (simulado)
+      area: ot
+      responsable: Marcos Tarquini
+  bloqueos:
+    - tarea: t1
+      causa: falta el switch industrial en sala (simulado)
+      abierto_por: Marcos Tarquini
+herramientas_esperadas:
+  - resolver_bloqueo
+herramientas_prohibidas:
+  - registrar_bloqueo
+  - crear_dependencia
+  - quitar_dependencia
+  - aprobar_tarea
+# La tarea se sembró en 'asignada' (default de sembrar_precondiciones);
+# resolver_bloqueo la devuelve al estado previo a la última entrada a
+# 'bloqueada' (db/esquema.sql, estado_previo_a_bloqueo), que es 'asignada'.
+efectos:
+  tareas:
+    t1:
+      estado: asignada
+  bloqueos_abiertos:
+    t1: 0
+severidad: media

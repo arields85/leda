@@ -34,6 +34,7 @@ No se rehace.
 | Puerto de lectura | `lectura.py`: seis consultas agregadas, el espacio sale de la sesión |
 | Tablero de cliente | Credencial por enlace con vencimiento + pantalla |
 | Importador de paquetes | Genérico, con validaciones cruzadas y hash versionado |
+| Banco conversacional con modelo real | `tests/banco/`: escenarios ficticios en YAML corridos N veces por `gateway.procesar_update` con el proveedor real; comprueba herramientas, acciones afirmadas sin herramienta, personas fuera del equipo, efectos en PostgreSQL y contenido de la respuesta. Fuera de la suite por defecto (`-m modelo_real`); las fallas se guardan para replay |
 | Dependencias entre tareas | `crear_dependencia`/`quitar_dependencia` (`herramientas.py`), autoridad del responsable de cualquiera de las dos o su referente; freno de `en_curso` en la base (`motivo_no_arranca_tarea`, migración `0008`); aviso en cadena por atraso o por fecha corrida (`escalera.evaluar_dependencias_en_riesgo`) y aviso de la informativa al cambiar de estado |
 
 ## Diseñado y sin construir
@@ -65,6 +66,15 @@ contacto es por persona y no por espacio. El SQL hace el join correcto por
 espacio actual: **el join no puede cruzar**. Quien esté en tres equipos recibe
 el triple, y el comentario garantiza que nadie lo revise. Lo exige la mecánica
 §10.
+
+**El router de intención no ve las tareas que ya existen.** `route_intent`
+recibe sólo el texto del mensaje (`llm.ROUTER_SYSTEM`), no las tareas del
+espacio. "El cableado del tablero no puede arrancar hasta que yo termine de
+programar el PLC, dejalo anotado" —dos tareas ya cargadas— se clasificó como
+pedido de tarea nueva en 10 de 10 corridas del banco (escenario `b-0005`,
+2026-09-23, NaN `deepseek-v4-flash`): abre el alta guiada y la dependencia nunca
+se crea. Un replay guionado no sirve de regresión, porque repite la
+clasificación grabada; la regresión es el escenario contra el modelo real.
 
 **`cli.py` no tiene ninguna prueba.** 403 líneas y trece comandos operativos
 —`esquema`, `importar`, `despachar`, `escuchar`, `servir`—: lo que se usa para

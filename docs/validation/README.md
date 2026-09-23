@@ -263,6 +263,35 @@ validación manual integral E. El pase al piloto controlado real requiere ademá
 Ningún agente, LLM, suite, puntuación agregada ni evaluador automático puede
 autoaprobar este gate.
 
+## Banco conversacional (capas B y D)
+
+`tests/banco/` corre escenarios del corpus de desarrollo contra un modelo real, por
+el mismo camino que un mensaje de Telegram (`gateway.procesar_update`), sobre la base
+descartable de las pruebas. No corre en la suite por defecto:
+
+```bash
+.venv/Scripts/python.exe -m pytest -m modelo_real tests/banco \
+    --banco-n 10 --banco-proveedor nan --banco-modelo deepseek-v4-flash
+```
+
+`--banco-escenario <id>` corre uno solo. Cada escenario es un YAML en
+`tests/banco/escenarios/` con los campos de "Estructura mínima de un escenario" más
+lo verificable: herramientas esperadas y prohibidas, efectos en PostgreSQL por ID de
+semilla (estado, bloqueos abiertos, dependencias con su sentido, deltas de conteo) y
+fragmentos que la respuesta debe mencionar o patrones que no debe contener.
+
+Cada corrida se califica `aprobado`, `falla`, `no_concluyente` o `bloqueado`. Una
+`falla` hace fallar la prueba. `no_concluyente` —hoy, un nombre propio fuera del
+equipo— queda como advertencia y en el reporte: no se aprueba lo no verificable, pero
+tampoco se inventa un fallo sobre texto libre.
+
+El reporte (tasa por escenario, fallas por comprobación, latencias) y los candidatos
+de replay se escriben en `tests/banco/reportes/`, que no se versiona. Un candidato
+que muestra un defecto del código alrededor del modelo pasa a `tests/banco/replays/`
+y corre en la suite por defecto con `ProveedorGuionado`. Un defecto del propio modelo
+o de su prompt no tiene replay útil —el replay repite la salida grabada—: su regresión
+es el escenario y sus variantes contra el modelo real.
+
 ## Qué no hacer
 
 - Dar a Prisma el prompt exacto que conduce a la respuesta esperada.

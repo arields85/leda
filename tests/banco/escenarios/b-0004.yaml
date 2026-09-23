@@ -1,0 +1,27 @@
+id: b-0004
+objetivo: >
+  Observar si Prisma mueve la tarea al estado que corresponde a lo que la
+  persona cuenta, sin adelantarla a un cierre que todavía no pidió.
+actor: Marcos Tarquini
+mensajes:
+  - "terminé de programar el PLC, pasala a revisión"
+precondiciones:
+  tareas:
+    - id: t1
+      titulo: Programar PLC de la comprimidora (simulado)
+      area: ot
+      responsable: Marcos Tarquini
+herramientas_esperadas:
+  - actualizar_estado
+herramientas_prohibidas:
+  - registrar_bloqueo
+  - resolver_bloqueo
+  - crear_dependencia
+  - aprobar_tarea
+# 'en_revision' es el estado del esquema para "en revisión" (db/esquema.sql,
+# tipo estado_tarea). No 'terminada': todavía no hay evidencia ni aprobación.
+efectos:
+  tareas:
+    t1:
+      estado: en_revision
+severidad: media

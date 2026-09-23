@@ -132,15 +132,41 @@ se verifica sobre una base nueva dentro de un clúster existente.
 
 ## Próximo paso
 
-**Banco de pruebas conversacional con el modelo real**, según
-[`docs/validation/README.md`](validation/README.md): escenarios ficticios fijos,
-comprobaciones de propiedad —se llamó la herramienta correcta, toda persona/tarea/fecha
-mencionada existe en PostgreSQL, nunca se afirma una acción que no ocurrió— con N
-corridas por escenario y una tasa de aprobación; cada falla se convierte en una
-regresión de repetición determinista con `ProveedorGuionado`. Después, la conversación
-de bloqueos (mecánica §8, pasos 2 a 7).
+**Corregir el router de intención**, el defecto que encontró el banco: clasifica como
+pedido de tarea nueva un mensaje que habla de tareas que ya existen (escenario `b-0005`,
+0 de 10). Su causa está en `docs/capacidades.md`, "Trampas conocidas": `route_intent` no
+ve las tareas del espacio. La corrección se prueba con `b-0005` y variantes contra el
+modelo real, porque un replay guionado repite la clasificación grabada.
+
+Después, una sesión progresiva por Telegram real con datos ficticios para los circuitos
+ya verificados (consulta, bloqueos, estados) y, luego, la conversación de bloqueos
+(mecánica §8, pasos 2 a 7). Las dependencias no entran en esa sesión hasta cerrar el
+defecto del router.
 
 El resto del orden de trabajo está en [`ROADMAP.md`](ROADMAP.md).
+
+## Cerrado: banco conversacional con el modelo real
+
+`tests/banco/` (feature `odd/tasks/banco-conversacional.md`). Cómo se corre, en
+[`docs/validation/README.md`](validation/README.md). Primera corrida real, 2026-09-23,
+NaN `deepseek-v4-flash`, 7 escenarios × 10 corridas, base descartable de pruebas:
+
+| Escenario | Aprobadas | Nota |
+|---|---|---|
+| b-0001 consulta de tareas propias | 10/10 | |
+| b-0002 registrar un bloqueo relatado vagamente | 10/10 | |
+| b-0003 resolver un bloqueo | 9/10 | la falla era del comprobador, corregido |
+| b-0004 pasar una tarea a revisión | 10/10 | |
+| b-0005 declarar una dependencia | 0/10 | defecto real del router, abierto |
+| b-0006 pedir una tarea nueva | 10/10 | |
+| b-0007 persona que no está en el equipo | 9/10 + 1 no concluyente | el no concluyente era del comprobador, corregido |
+
+Latencia por corrida, línea base sin umbral: mediana 8,1 s, mínima 1,2 s, máxima
+100,7 s (un pico aislado en `b-0002`). Suite por defecto: 473 passed, el banco no
+corre en ella.
+
+Entorno local: PostgreSQL 18.6 instalado con scoop, sin servicio de Windows; se levanta
+con `levantar-postgres.bat`. Modelo activo `nan / deepseek-v4-flash`.
 
 ## Cerrado: dependencias entre tareas
 
