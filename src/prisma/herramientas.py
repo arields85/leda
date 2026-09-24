@@ -180,6 +180,35 @@ def candidatos(cur: psycopg.Cursor, texto: str) -> list[tuple[str, str]]:
     return [(f["nombre"], str(f["membership_id"])) for f in cur.fetchall()]
 
 
+def _validar_argumentos(h: Herramienta, args: dict[str, Any]) -> None:
+    """Un argumento que el modelo inventó, o uno requerido que le faltó, no
+    puede tirar abajo el turno entero (T7, punto J; evidencia b-0002: el
+    modelo llamó `consultar_tareas(tarea_id=...)` -- ese parámetro no existe
+    -- y el `TypeError` sin atrapar abortó todo lo que quedaba de la vuelta).
+
+    Se valida acá, antes de `preparar`/`handler`, contra los parámetros
+    declarados de la herramienta (`h.parametros`, la misma fuente que arma
+    `esquemas()` para el modelo) -- un solo punto para las dos rutas de
+    llamada, sin depender de atrapar `TypeError` genérico (que también
+    taparía un bug real adentro del handler). `Denegado` reusa el mismo
+    camino, sin incidente, que ya tenía "No existe la herramienta": un
+    argumento inválido es un error del modelo, no una falla del sistema."""
+    desconocidos = sorted(set(args) - set(h.parametros))
+    faltantes = sorted(clave for clave, esquema in h.parametros.items()
+                       if esquema.get("requerido") and clave not in args)
+    if not desconocidos and not faltantes:
+        return
+    partes = []
+    if desconocidos:
+        partes.append(f"no reconocidos: {', '.join(desconocidos)}")
+    if faltantes:
+        partes.append(f"faltan: {', '.join(faltantes)}")
+    aceptados = ", ".join(sorted(h.parametros)) or "ninguno"
+    raise Denegado(
+        f"argumentos no válidos para '{h.nombre}' ({'; '.join(partes)}). "
+        f"Parámetros aceptados: {aceptados}.")
+
+
 def ejecutar(cur: psycopg.Cursor, quien: Solicitante, nombre: str,
              args: dict[str, Any], *, ya_confirmada: bool = False,
              chat_id: int | None = None, huella_previa: str | None = None,
@@ -209,6 +238,8 @@ def ejecutar(cur: psycopg.Cursor, quien: Solicitante, nombre: str,
     h = REGISTRO.get(nombre)
     if h is None:
         raise Denegado(f"No existe la herramienta '{nombre}'.")
+
+    _validar_argumentos(h, args)
 
     if not h.valida_en_handler:
         verificar(cur, quien, h.accion, area_id=args.get("area_id"))
@@ -716,7 +747,10 @@ def _preparar_registrar_bloqueo(cur, quien: Solicitante, tarea_id, causa,
 
 @herramienta(
     "registrar_bloqueo", "registrar_bloqueo",
-    "Registra que una tarea está trabada, con su causa e impacto.",
+    "Registra que una tarea está trabada por una causa externa al equipo -- "
+    "algo que falta, una persona fuera del equipo, un permiso -- con su "
+    "causa e impacto. Si lo que la frena es otra tarea del equipo, no es un "
+    "bloqueo: usá crear_dependencia.",
     {"tarea_id": {"type": "string", "requerido": True},
      "causa": {"type": "string", "requerido": True},
      "impacto": {"type": "string"}},
@@ -1141,9 +1175,11 @@ def _preparar_crear_dependencia(cur, quien: Solicitante, origen_tarea_id,
 
 @herramienta(
     "crear_dependencia", "crear_dependencia",
-    "Declara que una tarea depende de otra. 'bloqueante' frena que la "
-    "destino pase a en curso hasta que la origen esté terminada; "
-    "'informativa' sólo avisa cuando la origen cambia de estado.",
+    "Declara que una tarea depende de otra tarea del equipo -- es lo que "
+    "corresponde cuando lo que frena una tarea es otra tarea, no una causa "
+    "externa (eso es registrar_bloqueo). 'bloqueante' frena que la destino "
+    "pase a en curso hasta que la origen esté terminada; 'informativa' sólo "
+    "avisa cuando la origen cambia de estado.",
     {"origen_tarea_id": {"type": "string", "requerido": True},
      "destino_tarea_id": {"type": "string", "requerido": True},
      "tipo": {"type": "string", "enum": ["bloqueante", "informativa"]}},

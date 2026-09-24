@@ -65,6 +65,12 @@ def test_contexto_lleva_nucleo_glosario_y_equipo(corework, conn):
     assert "CoreLabs" in ctx.sistema                    # glosario
     assert "Ismael Soschinski" in ctx.sistema           # equipo
     assert "decisión final" in ctx.sistema
+    # T7, punto D: para cambiar algo, llamar a la herramienta -- nunca pedir
+    # confirmación en texto ni decir que algo quedó registrado sin haberla
+    # llamado. Generaliza lo que antes sólo cubría la creación de una tarea.
+    assert "llamá a la herramienta" in ctx.sistema
+    assert "Confirmar, Modificar y Cancelar" in ctx.sistema
+    assert "Nunca pidas confirmación en texto" in ctx.sistema
     assert ctx.nucleo_hash and ctx.pack_hash
     assert ctx.variantes_prohibidas["corelab"] == "CoreLabs"
 
@@ -363,3 +369,89 @@ def test_herramienta_inexistente_se_rechaza(corework, conn):
         r = responder(cur, quien, "borrá todo", ProveedorGuionado(guion), cal,
                       chat_id=9002, ahora=AHORA)
         assert r.acciones == []
+
+
+# ---------------------------------------------------------------------------
+# Argumentos inválidos (T7, punto J): un error de argumento no aborta el
+# turno -- mismo tratamiento que una herramienta inexistente (arriba): se
+# rechaza con `Denegado`, sin incidente, y el modelo puede reintentar.
+# ---------------------------------------------------------------------------
+
+def test_argumento_desconocido_se_rechaza_con_h_ejecutar(corework, conn):
+    """`consultar_tareas` no tiene `tarea_id` -- b-0002: el modelo lo llamó
+    así y un `TypeError` sin atrapar tiraba abajo el turno entero."""
+    ws = corework.workspace_id
+    with espacio(conn, ws) as cur:
+        quien = _quien(cur, "Marcos Tarquini", ws)
+        with pytest.raises(H.Denegado) as exc:
+            H.ejecutar(cur, quien, "consultar_tareas", {"tarea_id": "algo"})
+    mensaje = str(exc.value)
+    assert "argumentos no válidos" in mensaje
+    assert "tarea_id" in mensaje
+    assert "responsable" in mensaje and "estado" in mensaje and "vencidas" in mensaje
+
+
+def test_argumento_requerido_faltante_se_rechaza_con_h_ejecutar(corework, conn):
+    ws = corework.workspace_id
+    with espacio(conn, ws) as cur:
+        quien = _quien(cur, "Marcos Tarquini", ws)
+        with pytest.raises(H.Denegado) as exc:
+            H.ejecutar(cur, quien, "registrar_bloqueo", {"tarea_id": "algo"})
+    mensaje = str(exc.value)
+    assert "argumentos no válidos" in mensaje
+    assert "causa" in mensaje
+
+
+def test_argumentos_correctos_no_se_ven_afectados(corework, conn):
+    ws = corework.workspace_id
+    with espacio(conn, ws) as cur:
+        quien = _quien(cur, "Marcos Tarquini", ws)
+        resultado = H.ejecutar(cur, quien, "consultar_tareas", {})
+    assert resultado == []                       # sin tareas propias sembradas
+
+
+def test_argumentos_invalidos_no_abortan_el_turno(corework, conn):
+    """Punto medio de la evidencia b-0002: `consultar_bloqueos` (válida) y
+    `consultar_tareas(tarea_id=...)` (inválida) en la misma vuelta -- la
+    primera corre, la segunda se rechaza, y el turno sigue hasta cerrar con
+    texto, sin incidente."""
+    ws = corework.workspace_id
+    guion = [
+        Respuesta(llamadas=[
+            Llamada("c1", "consultar_bloqueos", {}),
+            Llamada("c2", "consultar_tareas", {"tarea_id": "no-existe"}),
+        ]),
+        Respuesta(texto="No hay bloqueos activos ni tareas con ese id."),
+    ]
+    with espacio(conn, ws) as cur:
+        quien = _quien(cur, "Marcos Tarquini", ws)
+        cal = Calendario.desde_base(cur, ws)
+        r = responder(cur, quien, "¿qué tengo pendiente y bloqueado?",
+                      ProveedorGuionado(guion), cal, chat_id=9004, ahora=AHORA)
+
+    assert r.acciones == ["consultar_bloqueos"]
+    assert not r.incidente
+    assert r.texto == "No hay bloqueos activos ni tareas con ese id."
+    with admin(conn) as cur:
+        cur.execute("select count(*) n from incident")
+        assert cur.fetchone()["n"] == 0, "un error de argumento no es un incidente"
+
+
+# ---------------------------------------------------------------------------
+# Bloqueo vs. dependencia (T7, punto K): lo que frena una tarea puede ser
+# otra tarea del equipo (dependencia, `crear_dependencia`) o una causa
+# externa (bloqueo, `registrar_bloqueo`) -- nunca lo mismo. Evidencia
+# b-0015: con las dos tareas resueltas claras, el modelo registró un
+# bloqueo en vez de una dependencia.
+# ---------------------------------------------------------------------------
+
+def test_descripcion_de_bloqueo_distingue_causa_externa_de_otra_tarea():
+    descripcion = H.REGISTRO["registrar_bloqueo"].descripcion
+    assert "causa externa" in descripcion or "externa al equipo" in descripcion
+    assert "crear_dependencia" in descripcion
+
+
+def test_descripcion_de_dependencia_distingue_otra_tarea_de_causa_externa():
+    descripcion = H.REGISTRO["crear_dependencia"].descripcion
+    assert "otra tarea" in descripcion
+    assert "registrar_bloqueo" in descripcion
