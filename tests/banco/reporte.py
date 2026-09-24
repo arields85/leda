@@ -32,13 +32,39 @@ def _resumen_latencias(valores: list[float]) -> dict:
     return {"min": valores[0], "mediana": statistics.median(valores), "max": valores[-1]}
 
 
+def _raiz_de_grupo(escenario_id: str, variantes: dict[str, str | None]) -> str:
+    """El escenario base de un grupo: el propio `escenario_id` si no es una
+    variante (`variante_de` ausente o `None`), o el `variante_de` que
+    declaró (odd/tasks/banco-mensajes-humanos.md, T1: agrupar una redacción
+    desprolija con su escenario base para comparar la tasa de aprobación)."""
+    return variantes.get(escenario_id) or escenario_id
+
+
 def armar_reporte(entradas: list[EntradaReporte], *, proveedor: str, modelo: str,
-                  marca_de_tiempo: str) -> dict:
-    """Arma el reporte de una sesión de banco: agregado por escenario y
-    global. No decide aprobación ni umbrales -- sólo cuenta lo observado."""
+                  marca_de_tiempo: str, variantes: dict[str, str | None] | None = None) -> dict:
+    """Arma el reporte de una sesión de banco: agregado por escenario, por
+    grupo (un escenario base y sus variantes, `variantes`: id -> id del
+    escenario base o `None`) y global. No decide aprobación ni umbrales --
+    sólo cuenta lo observado."""
+    variantes = variantes or {}
     por_escenario: dict[str, list[EntradaReporte]] = {}
     for e in entradas:
         por_escenario.setdefault(e.escenario_id, []).append(e)
+
+    por_grupo: dict[str, list[EntradaReporte]] = {}
+    for e in entradas:
+        por_grupo.setdefault(_raiz_de_grupo(e.escenario_id, variantes), []).append(e)
+
+    grupos_reporte: dict[str, dict] = {}
+    for raiz, corridas in por_grupo.items():
+        n = len(corridas)
+        aprobadas = sum(1 for c in corridas if c.resultado == "aprobado")
+        grupos_reporte[raiz] = {
+            "escenarios": sorted({c.escenario_id for c in corridas}),
+            "corridas": n,
+            "aprobado": aprobadas,
+            "tasa_aprobacion": (aprobadas / n) if n else 0.0,
+        }
 
     escenarios_reporte: dict[str, dict] = {}
     for eid, corridas in por_escenario.items():
@@ -65,6 +91,7 @@ def armar_reporte(entradas: list[EntradaReporte], *, proveedor: str, modelo: str
         "modelo": modelo,
         "total_corridas": len(entradas),
         "escenarios": escenarios_reporte,
+        "grupos": grupos_reporte,
         "latencia_global_s": _resumen_latencias(
             sorted(e.latencia_total_s for e in entradas)),
     }
@@ -84,6 +111,16 @@ def resumen_texto(reporte: dict) -> str:
         if datos["fallas_por_comprobacion"]:
             lineas.append(
                 f"    fallas por comprobación: {datos['fallas_por_comprobacion']}")
+
+    grupos_con_variantes = {raiz: g for raiz, g in reporte["grupos"].items()
+                            if len(g["escenarios"]) > 1}
+    if grupos_con_variantes:
+        lineas.append("  grupos (base + variantes):")
+        for raiz, g in sorted(grupos_con_variantes.items()):
+            lineas.append(
+                f"    grupo {raiz}: {g['aprobado']}/{g['corridas']} aprobado "
+                f"({g['tasa_aprobacion']:.0%}) -- {', '.join(g['escenarios'])}")
+
     lat = reporte["latencia_global_s"]
     lineas.append(
         f"  latencia total (s): min={lat['min']} mediana={lat['mediana']} max={lat['max']}")

@@ -1,0 +1,30 @@
+id: b-0002-a
+variante_de: b-0002
+objetivo: >
+  Variante desprolija de b-0002: sin tildes, con abreviatura. Mismo objetivo,
+  mismas precondiciones y mismas expectativas verificables que el escenario
+  base -- sólo cambia la redacción.
+actor: Nahuel Gimenez
+mensajes:
+  - "quede trabado con el cableado, todavia no me pasaron el plano q prometieron"
+precondiciones:
+  tareas:
+    - id: t1
+      titulo: Cablear tablero de la máquina 3 (simulado)
+      area: ot
+      responsable: Nahuel Gimenez
+herramientas_esperadas:
+  - registrar_bloqueo
+herramientas_prohibidas:
+  - resolver_bloqueo
+  - crear_dependencia
+  - quitar_dependencia
+  - aprobar_tarea
+  - actualizar_estado
+efectos:
+  tareas:
+    t1:
+      estado: bloqueada
+  bloqueos_abiertos:
+    t1: 1
+severidad: alta

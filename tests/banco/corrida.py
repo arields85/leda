@@ -200,6 +200,32 @@ def recolectar_efectos(cur, ids_semilla: dict[str, str]) -> dict:
             "dependencias": dependencias}
 
 
+def filas_respuesta(cur, workspace_id: str, chat_id: int,
+                    ids_previos: set) -> list[dict]:
+    """Filas nuevas de `message_outbox` que son la respuesta visible de este
+    turno, con lo que hace falta para saber si ofrecieron una elección:
+    `pending_action_id` (confirmación o elección, `agente.py`,
+    `_encolar_confirmacion`/`_encolar_eleccion`) e `intake_choice_set_id`
+    (alta guiada de tarea, `ingreso_tareas.py::_open_choices`) -- las mismas
+    dos columnas que arma los botones al despachar
+    (`despachador.py::_botones`)."""
+    cur.execute(
+        """select id, cuerpo, pending_action_id, intake_choice_set_id
+            from message_outbox
+            where workspace_id = %s and chat_id = %s and es_respuesta
+            order by programado_para""",
+        (workspace_id, chat_id))
+    return [f for f in cur.fetchall() if f["id"] not in ids_previos]
+
+
+def respuesta_ofrecio_opciones(filas: list[dict]) -> bool:
+    """True si alguna fila de la respuesta ofreció una elección con botones
+    (`filas_respuesta`: `pending_action_id` o `intake_choice_set_id` no
+    nulo)."""
+    return any(f.get("pending_action_id") is not None
+              or f.get("intake_choice_set_id") is not None for f in filas)
+
+
 def conteos_delta(antes: dict[str, int], despues: dict[str, int]) -> dict[str, int]:
     """Diferencia despues-antes por tabla, para comparar contra
     `Escenario.efectos["conteos_delta"]`."""
@@ -242,6 +268,7 @@ class ResultadoCorrida:
     grabacion: dict
     bloqueado: bool = False
     motivo_bloqueo: str = ""
+    ofrecio_opciones: bool = False
 
 
 def _conteos(cur, ws: str) -> dict[str, int]:
@@ -317,13 +344,9 @@ def ejecutar_escenario(
 
     with admin(conn) as cur:
         despues = _conteos(cur, workspace_id)
-        cur.execute(
-            """select id, cuerpo from message_outbox
-                where workspace_id = %s and chat_id = %s and es_respuesta
-                order by programado_para""",
-            (workspace_id, chat))
-        respuesta_texto = "\n".join(
-            f["cuerpo"] for f in cur.fetchall() if f["id"] not in ids_previos)
+        filas = filas_respuesta(cur, workspace_id, chat, ids_previos)
+        respuesta_texto = "\n".join(f["cuerpo"] for f in filas)
+        ofrecio_opciones = respuesta_ofrecio_opciones(filas)
 
         cur.execute(
             """select accion from audit_log
@@ -335,4 +358,5 @@ def ejecutar_escenario(
         escenario_id=escenario_id, indice=indice, respuesta_texto=respuesta_texto,
         herramientas_ejecutadas=herramientas_ejecutadas, conteos_antes=antes,
         conteos_despues=despues, latencia_total_s=latencia_total,
-        grabacion=grabador.a_json(), bloqueado=bloqueado, motivo_bloqueo=motivo_bloqueo)
+        grabacion=grabador.a_json(), bloqueado=bloqueado, motivo_bloqueo=motivo_bloqueo,
+        ofrecio_opciones=ofrecio_opciones)

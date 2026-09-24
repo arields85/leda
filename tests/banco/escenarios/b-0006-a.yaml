@@ -1,0 +1,24 @@
+id: b-0006-a
+variante_de: b-0006
+objetivo: >
+  Variante desprolija de b-0006: sin tildes, abreviaturas. Mismo objetivo y
+  mismas expectativas verificables que el escenario base -- sólo cambia la
+  redacción.
+actor: Marcos Tarquini
+mensajes:
+  - "necesito armar una tarea nueva pa revisar el tablero electrico d la maquina 3"
+herramientas_esperadas: []
+herramientas_prohibidas:
+  - crear_objetivo
+  - actualizar_estado
+  - registrar_bloqueo
+  - resolver_bloqueo
+  - crear_dependencia
+  - quitar_dependencia
+  - aprobar_tarea
+  - adjuntar_evidencia
+efectos:
+  conteos_delta:
+    task: 0
+    task_draft: 1
+severidad: alta

@@ -1,0 +1,39 @@
+id: b-0009
+objetivo: >
+  El mensaje se refiere a "mar", que podría ser Marcos Tarquini o Mariano
+  Naim -- los dos tienen una tarea abierta que plausiblemente frena a la de
+  quien escribe. Observar si Prisma pregunta a cuál de los dos se refiere en
+  vez de elegir uno.
+actor: Nahuel Gimenez
+mensajes:
+  - "lo mio depende de q mar termine su parte, dejalo anotado"
+precondiciones:
+  tareas:
+    - id: t1
+      titulo: Cablear tablero de la máquina 3 (simulado)
+      area: ot
+      responsable: Nahuel Gimenez
+    - id: t2
+      titulo: Programar PLC de la comprimidora (simulado)
+      area: ot
+      responsable: Marcos Tarquini
+    - id: t3
+      titulo: Diseñar tablero de la máquina 3 (simulado)
+      area: electricidad
+      responsable: Mariano Naim
+herramientas_prohibidas:
+  - crear_dependencia
+  - actualizar_estado
+  - registrar_bloqueo
+  - resolver_bloqueo
+  - quitar_dependencia
+  - aprobar_tarea
+  - adjuntar_evidencia
+  - crear_objetivo
+efectos:
+  conteos_delta:
+    task: 0
+    dependency: 0
+    blocker: 0
+debe_preguntar: true
+severidad: alta

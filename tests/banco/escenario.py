@@ -40,6 +40,17 @@ class Escenario:
     efectos: dict = field(default_factory=dict)
     respuesta_menciona: tuple[str, ...] = ()
     respuesta_no_contiene_patron: tuple[str, ...] = ()
+    # Mensajes humanos reales (odd/tasks/banco-mensajes-humanos.md, T1):
+    # `variante_de` agrupa una redacción desprolija con su escenario base en
+    # el reporte (`reporte.py`); `debe_preguntar` activa la comprobación
+    # nueva "ante la duda, preguntó en vez de actuar"
+    # (`comprobadores.comprobar_pregunta`). `permite_borrador_de_tarea`
+    # excepciona el único caso en que abrir un `task_draft` SÍ es la
+    # respuesta correcta a una ambigüedad: un escenario que es justamente
+    # sobre dar de alta una tarea.
+    variante_de: str | None = None
+    debe_preguntar: bool = False
+    permite_borrador_de_tarea: bool = False
 
 
 def _validar_estructura(datos: dict, origen: pathlib.Path) -> None:
@@ -87,6 +98,15 @@ def _validar_estructura(datos: dict, origen: pathlib.Path) -> None:
         raise EscenarioInvalido(
             f"{origen}: 'severidad' tiene que ser una de {SEVERIDADES}, no {severidad!r}.")
 
+    variante_de = datos.get("variante_de")
+    if variante_de is not None and (not isinstance(variante_de, str) or not variante_de.strip()):
+        raise EscenarioInvalido(f"{origen}: 'variante_de' tiene que ser texto no vacío.")
+
+    for campo in ("debe_preguntar", "permite_borrador_de_tarea"):
+        valor = datos.get(campo, False)
+        if not isinstance(valor, bool):
+            raise EscenarioInvalido(f"{origen}: '{campo}' tiene que ser un booleano.")
+
 
 def cargar_escenario(ruta: pathlib.Path | str) -> Escenario:
     """Carga y valida un único escenario desde un archivo YAML."""
@@ -107,6 +127,9 @@ def cargar_escenario(ruta: pathlib.Path | str) -> Escenario:
         efectos=datos.get("efectos", {}) or {},
         respuesta_menciona=tuple(datos.get("respuesta_menciona", [])),
         respuesta_no_contiene_patron=tuple(datos.get("respuesta_no_contiene_patron", [])),
+        variante_de=(datos.get("variante_de") or "").strip() or None,
+        debe_preguntar=bool(datos.get("debe_preguntar", False)),
+        permite_borrador_de_tarea=bool(datos.get("permite_borrador_de_tarea", False)),
     )
 
 
@@ -122,4 +145,11 @@ def cargar_escenarios(directorio: pathlib.Path | str) -> list[Escenario]:
             raise EscenarioInvalido(
                 f"ID de escenario repetido: {e.id!r} en {vistos[e.id]} y {p}.")
         vistos[e.id] = p
+
+    ids = set(vistos)
+    for e, p in zip(escenarios, sorted(directorio.glob("*.yaml"))):
+        if e.variante_de is not None and e.variante_de not in ids:
+            raise EscenarioInvalido(
+                f"{p}: 'variante_de' referencia {e.variante_de!r}, que no existe "
+                f"entre los escenarios cargados.")
     return escenarios

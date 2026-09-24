@@ -16,8 +16,10 @@ from tests.banco.corrida import (
     ProveedorGrabador,
     conteos_delta,
     ejecutar_escenario,
+    filas_respuesta,
     guionado_desde_grabacion,
     recolectar_efectos,
+    respuesta_ofrecio_opciones,
     sembrar_precondiciones,
 )
 
@@ -233,3 +235,86 @@ def test_conteos_delta_resta_antes_de_despues():
     antes = {"task": 1, "blocker": 0}
     despues = {"task": 1, "blocker": 1}
     assert conteos_delta(antes, despues) == {"task": 0, "blocker": 1}
+
+
+# ---------------------------------------------------------------------------
+# respuesta_ofrecio_opciones (odd/tasks/banco-mensajes-humanos.md, T1): si
+# una respuesta ofreció botones, `message_outbox` tiene `pending_action_id`
+# (confirmación o elección, `agente.py::_encolar_confirmacion`/
+# `_encolar_eleccion`) o `intake_choice_set_id` (alta guiada de tarea,
+# `ingreso_tareas.py::_open_choices`) no nulo -- lo que lee
+# `despachador.py::_botones` para armar los botones al despachar.
+# ---------------------------------------------------------------------------
+
+
+def test_ofrecio_opciones_con_pending_action_id_es_true():
+    filas = [{"id": "1", "cuerpo": "¿Confirmás?", "pending_action_id": "p1",
+             "intake_choice_set_id": None}]
+    assert respuesta_ofrecio_opciones(filas) is True
+
+
+def test_ofrecio_opciones_con_intake_choice_set_id_es_true():
+    filas = [{"id": "1", "cuerpo": "¿Cuál es el objetivo?", "pending_action_id": None,
+             "intake_choice_set_id": "c1"}]
+    assert respuesta_ofrecio_opciones(filas) is True
+
+
+def test_ofrecio_opciones_sin_ninguno_de_los_dos_es_false():
+    filas = [{"id": "1", "cuerpo": "Tenés dos tareas pendientes.",
+             "pending_action_id": None, "intake_choice_set_id": None}]
+    assert respuesta_ofrecio_opciones(filas) is False
+
+
+def test_ofrecio_opciones_lista_vacia_es_false():
+    assert respuesta_ofrecio_opciones([]) is False
+
+
+def test_ejecutar_escenario_recolecta_ofrecio_opciones_false_por_defecto(corework, conn):
+    ws = corework.workspace_id
+    interno = ProveedorGuionado(
+        guion=[Respuesta(texto="Anotado.")],
+        rutas=[IntentRoute(IntentAction.NORMAL_CONVERSATION)],
+    )
+    r = ejecutar_escenario(
+        conn, ws, "corework", "Marcos Tarquini", ["hola"], interno,
+        escenario_id="b-test", indice=0)
+    assert r.ofrecio_opciones is False
+
+
+def test_filas_respuesta_trae_pending_action_id_e_intake_choice_set_id(corework, conn):
+    """Prueba directa contra el esquema real: `message_outbox` tiene las dos
+    columnas que `despachador.py::_botones` usa para armar los botones al
+    despachar (`pending_action_id`: confirmación/elección de
+    `agente.py`; `intake_choice_set_id`: alta guiada de tarea,
+    `ingreso_tareas.py::_open_choices`). No pasa por `gateway.procesar_update`
+    -- es una prueba de la consulta de `corrida.py`, no del circuito."""
+    from datetime import datetime, timedelta, timezone
+
+    from prisma.autoridad import Canal, identificar
+    from prisma.pendientes import registrar
+    from prisma.salida import enqueue_outbox
+
+    from tests.banco.corrida import _telegram_id
+
+    ws = corework.workspace_id
+    chat = _telegram_id(conn, ws, "Marcos Tarquini")
+    with admin(conn) as cur:
+        cur.execute("select id from message_outbox where workspace_id = %s", (ws,))
+        previos = {f["id"] for f in cur.fetchall()}
+
+        quien = identificar(cur, chat, Canal.ESPACIO, ws)
+        pendiente = registrar(
+            cur, quien, herramienta="actualizar_estado", args={},
+            resumen="¿Confirmás que la paso a revisión?",
+            vence_en=datetime.now(timezone.utc) + timedelta(hours=1), chat_id=chat)
+        enqueue_outbox(
+            cur, workspace_id=ws, chat_id=chat, text="¿Confirmás que la paso a revisión?",
+            dedupe_key="test:oferta-en-corrida", is_response=True,
+            pending_action_id=pendiente.id)
+
+        filas = filas_respuesta(cur, ws, chat, previos)
+
+    assert len(filas) == 1
+    assert str(filas[0]["pending_action_id"]) == pendiente.id
+    assert filas[0]["intake_choice_set_id"] is None
+    assert respuesta_ofrecio_opciones(filas) is True

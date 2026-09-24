@@ -164,3 +164,87 @@ def test_respuesta_no_contiene_patron_no_es_una_lista_es_invalido(tmp_path):
     ruta = _escribir(tmp_path, datos)
     with pytest.raises(EscenarioInvalido):
         cargar_escenario(ruta)
+
+
+# ---------------------------------------------------------------------------
+# variante_de / debe_preguntar / permite_borrador_de_tarea
+# (odd/tasks/banco-mensajes-humanos.md, T1): agrupar variantes desprolijas en
+# el reporte y la comprobación nueva "ante la duda, preguntó".
+# ---------------------------------------------------------------------------
+
+
+def test_carga_sin_variante_de_ni_debe_preguntar_usa_los_valores_por_defecto(tmp_path):
+    ruta = _escribir(tmp_path, _MINIMO)
+    e = cargar_escenario(ruta)
+    assert e.variante_de is None
+    assert e.debe_preguntar is False
+    assert e.permite_borrador_de_tarea is False
+
+
+def test_carga_variante_de_debe_preguntar_y_permite_borrador_de_tarea(tmp_path):
+    datos = dict(_MINIMO)
+    datos["variante_de"] = "b-0001"
+    datos["debe_preguntar"] = True
+    datos["permite_borrador_de_tarea"] = True
+    ruta = _escribir(tmp_path, datos)
+    e = cargar_escenario(ruta)
+    assert e.variante_de == "b-0001"
+    assert e.debe_preguntar is True
+    assert e.permite_borrador_de_tarea is True
+
+
+def test_variante_de_vacio_es_invalido(tmp_path):
+    datos = dict(_MINIMO)
+    datos["variante_de"] = ""
+    ruta = _escribir(tmp_path, datos)
+    with pytest.raises(EscenarioInvalido):
+        cargar_escenario(ruta)
+
+
+def test_variante_de_no_es_texto_es_invalido(tmp_path):
+    datos = dict(_MINIMO)
+    datos["variante_de"] = 123
+    ruta = _escribir(tmp_path, datos)
+    with pytest.raises(EscenarioInvalido):
+        cargar_escenario(ruta)
+
+
+def test_debe_preguntar_no_es_booleano_es_invalido(tmp_path):
+    datos = dict(_MINIMO)
+    datos["debe_preguntar"] = "si"
+    ruta = _escribir(tmp_path, datos)
+    with pytest.raises(EscenarioInvalido):
+        cargar_escenario(ruta)
+
+
+def test_permite_borrador_de_tarea_no_es_booleano_es_invalido(tmp_path):
+    datos = dict(_MINIMO)
+    datos["permite_borrador_de_tarea"] = "si"
+    ruta = _escribir(tmp_path, datos)
+    with pytest.raises(EscenarioInvalido):
+        cargar_escenario(ruta)
+
+
+def test_cargar_escenarios_variante_de_referencia_un_id_existente(tmp_path):
+    base = dict(_MINIMO)
+    _escribir(tmp_path, base, "a.yaml")
+    variante = dict(_MINIMO)
+    variante["id"] = "b-0098"
+    variante["variante_de"] = "b-0099"
+    _escribir(tmp_path, variante, "b.yaml")
+
+    escenarios = cargar_escenarios(tmp_path)
+    por_id = {e.id: e for e in escenarios}
+    assert por_id["b-0098"].variante_de == "b-0099"
+
+
+def test_cargar_escenarios_variante_de_id_inexistente_es_invalido(tmp_path):
+    base = dict(_MINIMO)
+    _escribir(tmp_path, base, "a.yaml")
+    variante = dict(_MINIMO)
+    variante["id"] = "b-0098"
+    variante["variante_de"] = "b-no-existe"
+    _escribir(tmp_path, variante, "b.yaml")
+
+    with pytest.raises(EscenarioInvalido):
+        cargar_escenarios(tmp_path)

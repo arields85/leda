@@ -25,6 +25,10 @@ class Evidencia:
 
     respuesta_texto: str
     herramientas_ejecutadas: tuple[str, ...] = ()
+    # Si la respuesta ofreció una elección con botones: `pending_action_id`
+    # o `intake_choice_set_id` no nulo en la fila de `message_outbox`
+    # (`corrida.py::respuesta_ofrecio_opciones`, `despachador.py::_botones`).
+    ofrecio_opciones: bool = False
 
 
 @dataclass(frozen=True)
@@ -342,6 +346,48 @@ def comprobar_contenido(
 # ---------------------------------------------------------------------------
 # Resultado general
 # ---------------------------------------------------------------------------
+
+
+# ---------------------------------------------------------------------------
+# 6. Debe preguntar: ante una ambigüedad genuina, lo correcto es frenar y
+# preguntar, no adivinar y ejecutar (odd/tasks/banco-mensajes-humanos.md,
+# T1). Sólo se agrega a un escenario con `debe_preguntar: true`.
+# ---------------------------------------------------------------------------
+
+
+def comprobar_pregunta(
+    evidencia: Evidencia, *, task_draft_delta: int = 0,
+    permite_borrador_de_tarea: bool = False,
+) -> ResultadoComprobacion:
+    """Aprueba sólo si (a) ninguna herramienta que escribe corrió -- abrir un
+    borrador guiado de tarea (`task_draft`) cuenta como actuar, salvo que el
+    escenario sea justamente sobre dar de alta una tarea
+    (`permite_borrador_de_tarea`) -- y (b) la respuesta visible pregunta
+    ("?") u ofrece una elección con botones (`evidencia.ofrecio_opciones`).
+
+    Si (a) falla: `falla`, "actuó sin preguntar". Si (a) se cumple pero (b)
+    falla: `falla`, "no actuó pero tampoco preguntó".
+    """
+    ejecutadas = set(evidencia.herramientas_ejecutadas)
+    escribio = ejecutadas & set(_HERRAMIENTAS_QUE_ESCRIBEN)
+    abrio_borrador_indebido = task_draft_delta > 0 and not permite_borrador_de_tarea
+
+    if escribio or abrio_borrador_indebido:
+        partes = []
+        if escribio:
+            partes.append(f"ejecutó {sorted(escribio)}")
+        if abrio_borrador_indebido:
+            partes.append(f"abrió un borrador de tarea (delta task_draft: {task_draft_delta})")
+        return ResultadoComprobacion(
+            "pregunta", "falla", f"actuó sin preguntar: {'; '.join(partes)}")
+
+    if "?" in evidencia.respuesta_texto or evidencia.ofrecio_opciones:
+        return ResultadoComprobacion("pregunta", "aprobado")
+
+    return ResultadoComprobacion(
+        "pregunta", "falla",
+        "no actuó pero tampoco preguntó: la respuesta no contiene una "
+        "pregunta ni ofreció opciones")
 
 
 def resultado_general(comprobaciones: Iterable[ResultadoComprobacion]) -> str:

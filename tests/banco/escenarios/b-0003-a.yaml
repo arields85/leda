@@ -1,0 +1,33 @@
+id: b-0003-a
+variante_de: b-0003
+objetivo: >
+  Variante desprolija de b-0003: sin tildes, con abreviaturas. Mismo
+  objetivo, mismas precondiciones y mismas expectativas verificables que el
+  escenario base -- sólo cambia la redacción.
+actor: Marcos Tarquini
+mensajes:
+  - "che ya llego el switch q faltaba pa el tablero, dalo x resuelto"
+precondiciones:
+  tareas:
+    - id: t1
+      titulo: Programar PLC de la comprimidora (simulado)
+      area: ot
+      responsable: Marcos Tarquini
+  bloqueos:
+    - tarea: t1
+      causa: falta el switch industrial en sala (simulado)
+      abierto_por: Marcos Tarquini
+herramientas_esperadas:
+  - resolver_bloqueo
+herramientas_prohibidas:
+  - registrar_bloqueo
+  - crear_dependencia
+  - quitar_dependencia
+  - aprobar_tarea
+efectos:
+  tareas:
+    t1:
+      estado: asignada
+  bloqueos_abiertos:
+    t1: 0
+severidad: media

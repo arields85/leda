@@ -81,3 +81,57 @@ def test_resumen_texto_incluye_escenario_y_tasa():
     texto = resumen_texto(r)
     assert "b-0001" in texto
     assert "nan/deepseek-v4-flash" in texto
+
+
+# ---------------------------------------------------------------------------
+# Agrupación de variantes (odd/tasks/banco-mensajes-humanos.md, T1): el
+# reporte agrupa un escenario base y sus variantes -- tasa de aprobación por
+# grupo además de las filas por escenario -- para comparar la redacción
+# limpia contra la desprolija del mismo objetivo.
+# ---------------------------------------------------------------------------
+
+
+def test_grupo_agrega_base_y_variantes():
+    entradas = [
+        _entrada("b-0001", 0, "aprobado"),
+        _entrada("b-0001", 1, "aprobado"),
+        _entrada("b-0001-a", 0, "aprobado"),
+        _entrada("b-0001-a", 1, "falla"),
+        _entrada("b-0001-b", 0, "falla"),
+    ]
+    variantes = {"b-0001": None, "b-0001-a": "b-0001", "b-0001-b": "b-0001"}
+    r = armar_reporte(entradas, proveedor="nan", modelo="m", marca_de_tiempo="t",
+                      variantes=variantes)
+    grupo = r["grupos"]["b-0001"]
+    assert grupo["corridas"] == 5
+    assert grupo["aprobado"] == 3
+    assert grupo["tasa_aprobacion"] == 3 / 5
+    assert grupo["escenarios"] == ["b-0001", "b-0001-a", "b-0001-b"]
+
+
+def test_grupo_de_un_escenario_sin_variantes_es_el_mismo():
+    entradas = [_entrada("b-0002", 0, "aprobado"), _entrada("b-0002", 1, "aprobado")]
+    r = armar_reporte(entradas, proveedor="nan", modelo="m", marca_de_tiempo="t",
+                      variantes={"b-0002": None})
+    assert r["grupos"]["b-0002"]["corridas"] == 2
+    assert r["grupos"]["b-0002"]["tasa_aprobacion"] == 1.0
+
+
+def test_sin_variantes_declaradas_cada_escenario_es_su_propio_grupo():
+    entradas = [_entrada("b-0001", 0, "aprobado"), _entrada("b-0002", 0, "falla")]
+    r = armar_reporte(entradas, proveedor="nan", modelo="m", marca_de_tiempo="t")
+    assert set(r["grupos"]) == {"b-0001", "b-0002"}
+    assert r["grupos"]["b-0001"]["corridas"] == 1
+    assert r["grupos"]["b-0002"]["corridas"] == 1
+
+
+def test_resumen_texto_incluye_tasa_por_grupo_cuando_hay_variantes():
+    entradas = [
+        _entrada("b-0001", 0, "aprobado"),
+        _entrada("b-0001-a", 0, "falla"),
+    ]
+    variantes = {"b-0001": None, "b-0001-a": "b-0001"}
+    r = armar_reporte(entradas, proveedor="nan", modelo="m", marca_de_tiempo="t",
+                      variantes=variantes)
+    texto = resumen_texto(r)
+    assert "grupo b-0001" in texto

@@ -1,0 +1,27 @@
+id: b-0004-b
+variante_de: b-0004
+objetivo: >
+  Variante desprolija de b-0004: referencia parcial a la tarea, muletilla.
+  Mismo objetivo, mismas precondiciones y mismas expectativas verificables
+  que el escenario base -- sólo cambia la redacción.
+actor: Marcos Tarquini
+mensajes:
+  - "ya termine lo del plc, pasala a revision porfa"
+precondiciones:
+  tareas:
+    - id: t1
+      titulo: Programar PLC de la comprimidora (simulado)
+      area: ot
+      responsable: Marcos Tarquini
+herramientas_esperadas:
+  - actualizar_estado
+herramientas_prohibidas:
+  - registrar_bloqueo
+  - resolver_bloqueo
+  - crear_dependencia
+  - aprobar_tarea
+efectos:
+  tareas:
+    t1:
+      estado: en_revision
+severidad: media

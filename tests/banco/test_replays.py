@@ -18,6 +18,7 @@ from tests.banco.comprobadores import (
     comprobar_efectos,
     comprobar_herramientas,
     comprobar_personas_mencionadas,
+    comprobar_pregunta,
     resultado_general,
 )
 from tests.banco.conftest import DIR_ESCENARIOS
@@ -62,7 +63,8 @@ def test_replay_reproduce_el_resultado_esperado(archivo_replay, corework, conn):
     integrantes, titulos = _roster_y_titulos(conn, ws)
     evidencia = Evidencia(
         respuesta_texto=resultado.respuesta_texto,
-        herramientas_ejecutadas=tuple(resultado.herramientas_ejecutadas))
+        herramientas_ejecutadas=tuple(resultado.herramientas_ejecutadas),
+        ofrecio_opciones=resultado.ofrecio_opciones)
 
     with admin(conn) as cur:
         efectos_observados = recolectar_efectos(cur, ids_semilla)
@@ -81,6 +83,10 @@ def test_replay_reproduce_el_resultado_esperado(archivo_replay, corework, conn):
             evidencia, menciona=escenario.respuesta_menciona,
             no_contiene_patron=escenario.respuesta_no_contiene_patron),
     ]
+    if escenario.debe_preguntar:
+        comprobaciones.append(comprobar_pregunta(
+            evidencia, task_draft_delta=efectos_observados["conteos_delta"].get("task_draft", 0),
+            permite_borrador_de_tarea=escenario.permite_borrador_de_tarea))
     veredicto = resultado_general(comprobaciones)
 
     assert veredicto == datos["resultado_esperado"], (

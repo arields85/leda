@@ -112,11 +112,16 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
         return
     DIR_REPORTES.mkdir(exist_ok=True)
     ahora = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    # `variante_de` agrupa una redacción desprolija con su escenario base en
+    # el reporte (odd/tasks/banco-mensajes-humanos.md, T1). Se recarga acá
+    # -- no en cada corrida -- porque el reporte de sesión junta corridas de
+    # todos los escenarios recién al final.
+    variantes = {e.id: e.variante_de for e in cargar_escenarios(DIR_ESCENARIOS)}
     reporte = armar_reporte(
         _ENTRADAS_SESION,
         proveedor=session.config.getoption("--banco-proveedor"),
         modelo=session.config.getoption("--banco-modelo"),
-        marca_de_tiempo=ahora)
+        marca_de_tiempo=ahora, variantes=variantes)
     nombre = ahora.replace(":", "").replace("-", "")
     ruta = DIR_REPORTES / f"banco-{nombre}.json"
     ruta.write_text(json.dumps(reporte, ensure_ascii=False, indent=2), "utf-8")
