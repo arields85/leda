@@ -21,6 +21,8 @@ Tres cosas que este módulo garantiza pase lo que pase:
 from __future__ import annotations
 
 import json
+import re
+import unicodedata
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 
@@ -65,7 +67,8 @@ def responder(cur: psycopg.Cursor, quien: Solicitante, texto_entrante: str,
               ahora: datetime | None = None,
               entrante_id: str | None = None,
               modificacion: P.ModificacionAbierta | None = None,
-              contexto_referencias: str | None = None) -> Resultado:
+              contexto_referencias: str | None = None,
+              tareas_resueltas_claras: dict[str, str] | None = None) -> Resultado:
     """`modificacion`, si viene, es la propuesta anterior que la persona pidió
     corregir (T3, ADR 0005 decisión 1): se agrega al sistema como contexto de
     confianza del servidor, nunca como texto de la persona, para que el
@@ -77,7 +80,24 @@ def responder(cur: psycopg.Cursor, quien: Solicitante, texto_entrante: str,
     tareas del espacio las referencias que separó `route_intent`
     (`gateway._turno`, T3 de `aclaracion-con-botones`, ADR 0005 decisión 6 /
     ADR 0006): igual que `modificacion`, es contexto de confianza del
-    servidor, nunca texto de la persona."""
+    servidor, nunca texto de la persona.
+
+    `tareas_resueltas_claras`, si viene, mapea id de tarea a título por cada
+    tarea que este turno resolvió CLARA vía Jev (T3) o por botón (T4). Es la
+    protección determinística de las lecturas (T5, ADR 0006, "toda respuesta
+    nombra la tarea por su título"): un prompt no es garantía, así que además
+    de la instrucción en el sistema, al cerrar el turno con una respuesta
+    visible se comprueba que esa respuesta nombre por su título exacto cada
+    una de estas tareas -- si no la nombra, se antepone una línea neutra con
+    el título, para que la persona note si Prisma entendió otra tarea.
+
+    Revisión del orquestador sobre la primera versión de esta unidad: la
+    condición original exigía además que `consultar_tareas` hubiera devuelto
+    la tarea en el mismo turno, así que una respuesta armada con otro
+    contexto (p. ej. el bloque de "tareas abiertas" que ya trae
+    `contexto.construir`, o cualquier otra herramienta) quedaba sin proteger.
+    La comprobación ya no depende de qué herramienta corrió, ni de que haya
+    corrido alguna."""
     ahora = ahora or datetime.now(timezone.utc)
     ctx = construir(cur, quien, texto_entrante, ahora=ahora)
     sistema = ctx.sistema
@@ -156,6 +176,7 @@ def responder(cur: psycopg.Cursor, quien: Solicitante, texto_entrante: str,
 
     salida = normalize_visible_text(
         revisar_salida(salida, ctx.variantes_prohibidas))
+    salida = _nombrar_tareas_sin_mencionar(salida, tareas_resueltas_claras)
     if intentos_mutacion and not any(
             not accion.startswith("consultar_") for accion in acciones):
         salida = with_no_effect_status(salida)
@@ -163,6 +184,38 @@ def responder(cur: psycopg.Cursor, quien: Solicitante, texto_entrante: str,
     auditar(salida)
 
     return Resultado(salida, acciones, confirmaciones, elecciones=elecciones)
+
+
+def _normalizar_comparacion(texto: str) -> str:
+    """Minúsculas, sin acentos, espacios colapsados -- para comparar si un
+    título aparece en la respuesta sin importar cómo lo escribió el modelo
+    (T5)."""
+    sin_acentos = unicodedata.normalize("NFKD", texto)
+    sin_acentos = "".join(c for c in sin_acentos if not unicodedata.combining(c))
+    return re.sub(r"\s+", " ", sin_acentos).strip().casefold()
+
+
+def _nombrar_tareas_sin_mencionar(
+        texto: str, tareas_resueltas_claras: dict[str, str] | None) -> str:
+    """Protección determinística de las lecturas (T5, ADR 0006): el prompt
+    del sistema ya le pide al modelo nombrar la tarea por su título, pero un
+    prompt no es garantía. Acá se comprueba de verdad: por cada tarea que
+    este turno resolvió CLARA (`tareas_resueltas_claras`, id → título, T3/T4),
+    si su título exacto no aparece en la respuesta visible, se antepone una
+    línea neutra que lo nombra -- así la persona nota si Prisma entendió otra
+    tarea. No importa qué herramienta corrió, ni si corrió alguna: una
+    respuesta armada con otro contexto (p. ej. "tareas abiertas" de
+    `contexto.construir`) protege igual. No toca el resto del texto del
+    modelo, y sólo se antepone lo que de verdad falta."""
+    if not tareas_resueltas_claras:
+        return texto
+    comparable = _normalizar_comparacion(texto)
+    faltantes = [titulo for titulo in tareas_resueltas_claras.values()
+                if _normalizar_comparacion(titulo) not in comparable]
+    if not faltantes:
+        return texto
+    encabezado = "\n".join(f"Sobre «{titulo}»:" for titulo in faltantes)
+    return f"{encabezado}\n\n{texto}"
 
 
 def _bloque_modificacion(m: P.ModificacionAbierta) -> str:

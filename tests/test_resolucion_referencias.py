@@ -20,7 +20,7 @@ from prisma import jev as jev_modulo
 from prisma.autoridad import Canal, identificar
 from prisma.db import admin, espacio
 from prisma.jev import ClienteJevGuionado
-from prisma.llm import (IntentAction, IntentRoute, ProveedorGuionado,
+from prisma.llm import (IntentAction, IntentRoute, Llamada, ProveedorGuionado,
                         Respuesta)
 
 
@@ -170,6 +170,41 @@ def test_referencia_clara_llega_como_contexto_al_modelo(
     sistema, _ = proveedor.recibidos[-1]
     assert f"«lo del tablero» es la tarea «Cablear tablero máq. 3» ({tarea_id})" in sistema
     assert "Usá esa tarea" in sistema
+    assert "nombrala por su título exacto" in sistema
+
+
+def test_referencia_clara_protege_la_respuesta_que_no_nombra_la_tarea(
+        corework, conn, monkeypatch, con_credencial):
+    """T5: la protección determinística llega hasta el turno completo, no
+    sólo hasta el sistema que ve el modelo -- `gateway._turno` tiene que
+    pasarle a `agente.responder` los ids que resolvió CLARA para que, si el
+    modelo consulta la tarea y no la nombra en su respuesta, la respuesta
+    visible la nombre igual."""
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        tarea_id = _tarea(cur, ws, titulo="Cablear tablero máq. 3",
+                          persona="Marcos Tarquini")
+    conn.commit()
+
+    doble = ClienteJevGuionado(guion=[
+        {"alcance": _alcance(una_tarea=0.95), "tarea": _tarea_resp({"T1": 0.9})},
+        {"misma": {"noul": 0.8}},
+    ])
+    _con_jev(monkeypatch, doble)
+    proveedor = _con_proveedor(
+        monkeypatch, rutas=[IntentRoute(IntentAction.NORMAL_CONVERSATION,
+                                        trabajos=("lo del tablero",))],
+        guion=[Respuesta(llamadas=[Llamada("c1", "consultar_tareas", {})]),
+              Respuesta(texto="Va bien, sin bloqueos.")])
+
+    with espacio(conn, ws) as cur:
+        quien = _quien(cur, "Marcos Tarquini", ws)
+        gateway._turno(cur, quien, "¿cómo va lo del tablero?", ws, chat_id=9)
+
+    with admin(conn) as cur:
+        cur.execute("select cuerpo from message_outbox where chat_id = 9")
+        cuerpo = cur.fetchone()["cuerpo"]
+    assert cuerpo == "Sobre «Cablear tablero máq. 3»:\n\nVa bien, sin bloqueos."
 
 
 # ---------------------------------------------------------------------------

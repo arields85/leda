@@ -67,7 +67,7 @@ sólo como etiqueta de los botones); decir "no encuentro esa tarea" (§5.9 punto
   tarea resuelta y termina en la vista previa; "Ninguna" pide el texto.
   Además (revisión de T3): la corrección que llega después de Modificar también
   pasa por la resolución de referencias; hoy el modelo la resuelve solo.
-- [ ] **T5 — Respuestas que nombran la tarea.** Toda respuesta a una consulta
+- [x] **T5 — Respuestas que nombran la tarea.** Toda respuesta a una consulta
   nombra la tarea por su título (protección de las lecturas, ADR 0006).
 - [ ] **T6 — Banco y continuidad.** Grabador de Jev para el banco, escenarios
   ambiguos con botones, `b-0005`; `docs/capacidades.md`, `docs/STATUS.md`, diseño
@@ -632,3 +632,164 @@ Previsión: bastante más de 400 líneas en total, repartidas en seis tareas.
     bloque de sistema dice "Usá esa tarea"). La prueba de Modificar real
     (`test_correccion_de_modificar_pasa_por_route_intent_y_jev`) sigue sin
     tocar y sigue pasando: ese camino no cambió.
+  - **Commit de T4:** `9ee5d54` ("feat: ask with buttons when a task
+    reference is ambiguous") -- faltaba registrarlo acá.
+- 2026-09-24: **T5 cerrada.** Ruta: delegada, un escritor (T5 tiene su fila
+  propia en "Ruta"; `agente.py`, `contexto.py`, `gateway.py`, pruebas). TDD
+  estricto: RED observado guardando (`git stash`) los tres archivos de
+  `src/prisma` tocados por esta unidad y corriendo
+  `.venv/Scripts/python.exe -m pytest -q tests/test_respuestas_nombran_tarea.py
+  tests/test_resolucion_referencias.py` sobre el código de T4 sin tocar --
+  **6 failed, 9 passed** (los 4 casos nuevos de `test_respuestas_nombran_
+  tarea.py` que sí dependen del guardia, más las dos aserciones nuevas de
+  `test_resolucion_referencias.py` sobre la instrucción y el turno completo;
+  los otros 2 casos nuevos -- "sin referencia resuelta" y la aserción vieja
+  de "Usá esa tarea" -- ya pasaban sin código nuevo, como corresponde). GREEN
+  restaurando la implementación (`git stash pop`) con el mismo comando --
+  **15 passed**. Verificación pedida:
+  - `.venv/Scripts/python.exe -m pytest -q tests/test_respuestas_nombran_tarea.py
+    tests/banco` → **131 passed, 90 deselected**.
+  - `.venv/Scripts/python.exe -m pytest -q` → **641 passed, 90 deselected**
+    (635 + 6 nuevas, 0 regresiones, 134,45 s).
+  - **Dos capas, como pedía la tarea:**
+    1. *Instrucción* (contexto de confianza, nunca garantía): `contexto.py`
+       `PREAMBULO` gana una viñeta ("Cuando contestes algo sobre una tarea
+       puntual, nombrala por su título exacto..."); la línea CLARA de
+       `gateway._bloque_contexto_referencias` (T3) suma "Si contestás algo
+       sobre ella, nombrala por su título exacto." a la instrucción que ya
+       tenía ("Usá esa tarea; no la vuelvas a resolver.").
+    2. *Guardia determinística* (la protección real): `agente.responder` gana
+       `tareas_resueltas_claras: tuple[str, ...] = ()` -- los ids que el
+       turno resolvió CLARA vía Jev (T3/T4; en la práctica, el mismo
+       `estado["resueltas"]` que ya arma `gateway._avanzar_aclaracion` a
+       partir de `_ReferenciasResueltas.resueltas_claras`, que también
+       incluye una candidata elegida por botón en T4 -- una elección
+       explícita de la persona es, si acaso, más confiable que una CLARA de
+       Jev, así que compartir el mismo dato es la extensión natural, no un
+       agregado aparte). `gateway.py` pasa
+       `tareas_resueltas_claras=tuple(estado["resueltas"].values())` en los
+       dos lugares donde ya llamaba a `agente.responder` (con Modificar y
+       sin Modificar).
+  - **Punto más angosto elegido para el guardia:** dentro de `responder()`,
+    justo después de `normalize_visible_text(revisar_salida(...))` y antes de
+    `with_no_effect_status`/`_encolar_respuesta` -- es el único lugar donde
+    ya existe el texto final de la vuelta que cerró el turno (`cerro`) y
+    antes de que ese texto se escriba en el outbox o se audite. Las dos
+    salidas tempranas (confirmaciones/elecciones con vista previa, y el
+    turno que se queda sin vueltas) devuelven antes de llegar ahí, así que
+    quedan protegidas por construcción, sin condición extra: nunca hay una
+    vista previa ni una pregunta que lleve la línea de T5.
+  - **Qué cuenta como "la tarea la devolvió `consultar_*`":** sólo
+    `consultar_tareas`, no las otras tres herramientas `consultar_*`. Es la
+    única cuyo campo `"id"` del resultado es de verdad un id de tarea;
+    `consultar_bloqueos` también devuelve `"id"`+`"titulo"` en cada fila,
+    pero ese `"id"` es el id del bloqueo, no el de la tarea que nombra
+    `"titulo"` -- tratarlas igual hubiera podido, en teoría, cruzar un id de
+    bloqueo con un id de tarea que casualmente resolvió Jev. `_ejecutar_una`
+    ahora recibe un `tareas_consultadas: dict[str, str]` que sólo se llena
+    cuando `c.nombre == "consultar_tareas"` y cada fila trae `id` y `titulo`.
+  - **Comparación:** `_normalizar_comparacion` (nuevo, `agente.py`) usa
+    `unicodedata.normalize("NFKD", ...)` para sacar los acentos, colapsa
+    espacios y aplica `casefold()` -- sin acentos, sin mayúsculas, sin
+    depender del espaciado exacto que haya usado el modelo.
+    `_nombrar_tareas_sin_mencionar` compara el título así normalizado contra
+    la respuesta completa así normalizada (substring, no exacto: "CABLEAR
+    TABLERO maq. 3" dentro de una frase más larga sigue contando como
+    nombrada). Si falta más de un título, antepone una línea por cada uno,
+    en el orden de `tareas_resueltas_claras`, antes de un salto de línea
+    doble y el texto del modelo tal cual -- nunca reescribe lo demás.
+  - **`salida.py` sin cambios:** revisado, no hizo falta tocarlo. El prefijo
+    que antepone el guardia es corto (una línea por título faltante) y
+    `_encolar_respuesta` ya llama a `enqueue_outbox` con `allow_split=True`,
+    así que aunque el prefijo empujara un texto ya cerca del límite de 4096
+    unidades UTF-16, `prepare_payload`/`_split` lo parte igual que a
+    cualquier respuesta larga -- no hay un límite nuevo que cuidar.
+  - `tests/test_respuestas_nombran_tarea.py` (nuevo, 5 pruebas, contra
+    `agente.responder` directo -- mismo patrón que `tests/test_agente.py`,
+    sin Jev ni red, `tareas_resueltas_claras` pasado a mano): título ausente
+    → se antepone "Sobre «título»:"; título presente con mayúsculas y sin el
+    acento de «máq.» → no se toca; sin `tareas_resueltas_claras` (default) →
+    no se toca aunque `consultar_tareas` haya traído la tarea; herramienta de
+    escritura con vista previa (`actualizar_estado`) → `r.texto == ""` y el
+    cuerpo de la vista previa sale tal cual, sin la línea de T5; dos tareas
+    resueltas, una sin nombrar → sólo se antepone esa.
+  - `tests/test_resolucion_referencias.py` (+2, sobre `gateway._turno`
+    completo): la prueba de T3 de la instrucción CLARA suma la aserción de
+    la frase nueva; prueba nueva
+    `test_referencia_clara_protege_la_respuesta_que_no_nombra_la_tarea`
+    (clara vía Jev + `consultar_tareas` + respuesta del modelo sin el título
+    → el outbox lleva "Sobre «Cablear tablero máq. 3»:" antepuesto) --
+    confirma que el cableado de `gateway.py` (pasar `tareas_resueltas_
+    claras` en los dos lugares que llaman a `agente.responder`) funciona de
+    punta a punta, no sólo la función aislada.
+  - No hubo commit (no pedido explícito todavía). **T6 sigue sin tocar**
+    (banco real, grabador de Jev).
+- 2026-09-24 (orquestador): revisión de T5 y corrección. Motivo: la primera
+  versión sólo protegía una respuesta cuando, además de resolver CLARA la
+  referencia, `consultar_tareas` la había devuelto en ese mismo turno -- una
+  respuesta armada con otro contexto del sistema (p. ej. el bloque de "tareas
+  abiertas" que ya trae `contexto.construir`, o cualquier otra herramienta
+  `consultar_*`) quedaba sin proteger, justo el caso que T5 existe para
+  cubrir. Nueva condición: por cada tarea que el turno resolvió CLARA (T3) o
+  por botón (T4), si el turno cierra con una respuesta visible y esa
+  respuesta no nombra la tarea por su título exacto, se antepone la línea --
+  sin depender de qué herramienta corrió, ni de que haya corrido alguna. TDD
+  estricto, sin `git stash` (pedido del orquestador): RED se observó
+  agregando primero la prueba nueva contra el código sin tocar --
+  `.venv/Scripts/python.exe -m pytest -q tests/test_respuestas_nombran_tarea.py::test_titulo_ausente_sin_llamar_a_ninguna_herramienta_se_antepone`
+  → **1 failed** (la respuesta salía sin la línea "Sobre «…»:", porque sin
+  llamar a `consultar_tareas` la condición vieja nunca se cumplía). GREEN
+  implementando la corrección con el mismo comando.
+  - `src/prisma/agente.py`: `responder` cambia `tareas_resueltas_claras` de
+    `tuple[str, ...]` (sólo ids) a `dict[str, str]` (id de tarea → título);
+    se eliminó por completo `tareas_consultadas` -- el parámetro nuevo de
+    `_ejecutar_una`, el bloque que lo llenaba sólo para `consultar_tareas`, y
+    su paso por el bucle de vueltas -- porque ya no hace falta: el título
+    viaja en `tareas_resueltas_claras` mismo, no hay que reconstruirlo de lo
+    que devolvió una herramienta. `_nombrar_tareas_sin_mencionar` queda con
+    una sola entrada, sin el chequeo `or not tareas_consultadas` que antes
+    apagaba la protección sin tool call.
+  - `src/prisma/gateway.py`: `_ReferenciasResueltas` gana
+    `titulos_resueltas: dict[str, str]` (id de tarea → título, sólo las
+    claras), calculado en `_resolver_referencias_del_turno` desde `por_id`
+    (las tareas activas del espacio, ya cargadas para armar el bloque de
+    sistema -- no hace falta una consulta nueva). `_estado_inicial_
+    aclaracion` lo guarda en `estado["titulos_resueltas"]`; `_resolver_
+    toque_aclaracion` lo actualiza también cuando la persona elige una
+    candidata por botón (mismo patrón que ya usaba `estado["resueltas"]`,
+    con el título que esa función ya tenía calculado para el texto del
+    botón). Los dos lugares donde `_avanzar_aclaracion` llama a
+    `agente.responder` pasan `tareas_resueltas_claras=estado["titulos_
+    resueltas"]` en vez de `tuple(estado["resueltas"].values())`.
+  - Capa de instrucción: la línea CLARA de `_bloque_contexto_referencias` y
+    el bloque que arma `_resolver_toque_aclaracion` para una candidata
+    elegida por botón suman ambas "Si contestás algo sobre ella, nombrala
+    por su título exacto." -- antes sólo la primera lo tenía.
+  - `tests/test_respuestas_nombran_tarea.py`: reescrito sobre el contrato
+    nuevo (`tareas_resueltas_claras` como `dict[str, str]`). Prueba nueva
+    `test_titulo_ausente_sin_llamar_a_ninguna_herramienta_se_antepone` (el
+    modelo cierra con texto propio, sin ninguna llamada a herramienta,
+    tarea resuelta sin nombrar → se antepone igual) y
+    `test_titulo_ausente_con_una_herramienta_distinta_igual_se_antepone`
+    (llama a `consultar_personas`, no a `consultar_tareas` → se antepone
+    igual, prueba explícita de "no depende de qué herramienta corrió"). Las
+    demás pruebas se adaptaron al contrato nuevo, conservando el mismo
+    comportamiento cubierto: título presente con otra forma → sin tocar;
+    sin `tareas_resueltas_claras` → sin tocar; herramienta de escritura con
+    vista previa → sin tocar; dos tareas resueltas, una ausente → nombra
+    sólo esa.
+  - `tests/test_resolucion_referencias.py`: sin cambios sobre la revisión
+    anterior -- la prueba de gateway completo
+    (`test_referencia_clara_protege_la_respuesta_que_no_nombra_la_tarea`)
+    sigue pasando tal cual, porque `estado["titulos_resueltas"]` reemplaza a
+    `tuple(estado["resueltas"].values())` sin cambiar lo que esa prueba
+    observa (el cuerpo del outbox).
+  - Verificación pedida:
+    `.venv/Scripts/python.exe -m pytest -q tests/test_respuestas_nombran_tarea.py
+    tests/test_resolucion_referencias.py tests/test_aclaracion_botones.py
+    tests/banco` → **157 passed, 90 deselected**.
+    `.venv/Scripts/python.exe -m pytest -q` → **642 passed, 90 deselected**
+    (641 + 1 neta -- el archivo de T5 pasó de 5 a 6 pruebas: se sacó una y
+    entraron dos nuevas -- 0 regresiones, 147,54 s).
+  - Sin commit (no pedido explícito todavía). Sin `.env*` tocado, sin modelo
+    real, sin `git stash` en esta revisión.

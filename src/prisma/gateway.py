@@ -629,6 +629,8 @@ def _estado_inicial_aclaracion(texto: str, entrante_id: str | None, route,
         "route_action": route.action.value,
         "route_task": dict(route.task),
         "resueltas": dict(referencias.resueltas_claras) if referencias else {},
+        "titulos_resueltas": (
+            dict(referencias.titulos_resueltas) if referencias else {}),
         "bloque_base": referencias.bloque if referencias else "",
         "hay_clara": referencias.hay_clara if referencias else False,
         "pendientes": [referencia for referencia, _candidatas in pendientes_boton],
@@ -665,7 +667,8 @@ def _avanzar_aclaracion(cur, quien, workspace_id: str, chat_id: int, ahora,
             args=mod["args"], resumen=mod["resumen"])
         responder(cur, quien, estado["mensaje"], proveedor, cal, chat_id,
                  ahora=ahora, entrante_id=estado["entrante_id"],
-                 modificacion=modificacion, contexto_referencias=contexto)
+                 modificacion=modificacion, contexto_referencias=contexto,
+                 tareas_resueltas_claras=estado["titulos_resueltas"])
         return
 
     # b-0005: una referencia resuelta -- clara desde el arranque, o elegida
@@ -681,7 +684,8 @@ def _avanzar_aclaracion(cur, quien, workspace_id: str, chat_id: int, ahora,
     from .agente import responder
     responder(cur, quien, estado["mensaje"], proveedor, cal, chat_id,
              ahora=ahora, entrante_id=estado["entrante_id"],
-             contexto_referencias=contexto)
+             contexto_referencias=contexto,
+             tareas_resueltas_claras=estado["titulos_resueltas"])
 
 
 def _preguntar_por_botones(cur, quien, workspace_id: str, chat_id: int, ahora,
@@ -770,10 +774,13 @@ def _resolver_toque_aclaracion(cur, quien, workspace_id: str, chat_id: int,
         titulo = next((c["titulo"] for c in candidatos if c["id"] == eleccion),
                       eleccion)
         estado["resueltas"] = {**args.get("resueltas", {}), referencia: eleccion}
+        estado["titulos_resueltas"] = {
+            **args.get("titulos_resueltas", {}), eleccion: titulo}
         estado["hay_clara"] = True
         estado["bloque_base"] = args.get("bloque_base", "") + (
             f"\n- «{referencia}» es la tarea «{titulo}» ({eleccion}). Usá "
-            "esa tarea; no la vuelvas a resolver.")
+            "esa tarea; no la vuelvas a resolver. Si contestás algo sobre "
+            "ella, nombrala por su título exacto.")
 
     cal = Calendario.desde_base(cur, workspace_id)
     proveedor = desde_base(cur, workspace_id, config.llm_api_key)
@@ -796,6 +803,10 @@ class _ReferenciasResueltas:
     bloque: str
     hay_clara: bool
     resueltas_claras: dict[str, str] = field(default_factory=dict)
+    # id de tarea -> título, por cada tarea de `resueltas_claras` (T5, ADR
+    # 0006): lo que necesita `agente.responder` para nombrarla si la
+    # respuesta visible no lo hace, sin depender de qué herramienta corrió.
+    titulos_resueltas: dict[str, str] = field(default_factory=dict)
     pendientes_boton: tuple[tuple[str, list[dict]], ...] = ()
 
 
@@ -859,6 +870,9 @@ def _resolver_referencias_del_turno(cur, quien, texto: str, route,
         referencia: resolucion.tarea_id
         for referencia, (resolucion, error) in resultados.items()
         if error is None and resolucion.tipo is jev_modulo.TipoResolucion.CLARA}
+    titulos_resueltas = {tarea_id: por_id[tarea_id].titulo
+                        for tarea_id in resueltas_claras.values()
+                        if tarea_id in por_id}
     pendientes_boton = tuple(
         (referencia, _candidatas_para_botones(
             por_id, resultados[referencia][0], quien.membership_id))
@@ -867,7 +881,7 @@ def _resolver_referencias_del_turno(cur, quien, texto: str, route,
     return _ReferenciasResueltas(
         bloque=_bloque_contexto_referencias(sin_boton, por_id),
         hay_clara=hay_clara, resueltas_claras=resueltas_claras,
-        pendientes_boton=pendientes_boton)
+        titulos_resueltas=titulos_resueltas, pendientes_boton=pendientes_boton)
 
 
 def _etiqueta_boton(titulo: str, responsable: str, *, ajena: bool) -> str:
@@ -977,7 +991,8 @@ def _bloque_contexto_referencias(resultados: dict, tareas_por_id: dict) -> str:
             tarea = tareas_por_id[resolucion.tarea_id]
             lineas.append(
                 f"- «{referencia}» es la tarea «{tarea.titulo}» "
-                f"({tarea.id}). Usá esa tarea; no la vuelvas a resolver.")
+                f"({tarea.id}). Usá esa tarea; no la vuelvas a resolver. Si "
+                "contestás algo sobre ella, nombrala por su título exacto.")
         elif resolucion.tipo is jev_modulo.TipoResolucion.AMBIGUA and resolucion.candidatas:
             candidatas = "; ".join(
                 f"«{tareas_por_id[cid].titulo}» ({cid})"
