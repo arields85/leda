@@ -5,7 +5,7 @@
 - **Alcance:** el paso de interpretación que decide a qué tarea o persona se
   refiere un mensaje y si su intención es dudosa, antes de proponer un cambio
 - **Complementa:** [`ADR 0005`](0005-interpretacion-y-confirmacion.md)
-- **Evidencia:** [`architecture/interpretacion-y-confirmacion.md`](../architecture/interpretacion-y-confirmacion.md), pruebas 5.1 a 5.8
+- **Evidencia:** [`architecture/interpretacion-y-confirmacion.md`](../architecture/interpretacion-y-confirmacion.md), pruebas 5.1 a 5.9
 
 ## Decisión
 
@@ -45,8 +45,10 @@
 - Repetida cinco veces sobre 45 mensajes, la receta sin verificación eligió mal un
   mismo mensaje en cuatro repeticiones: algo que no existe ("el horno") asignado a
   una tarea parecida ("la estufa"). Con la verificación, cero en las cinco, sin
-  frenar ninguna elección correcta. El margen es fino y falta confirmarlo con un
-  lote nuevo.
+  frenar ninguna elección correcta. Confirmado con un lote nuevo, no visto: sin
+  verificación eligió mal dos mensajes en cada una de cinco repeticiones ("el switch
+  de la oficina", "el backup de las notebooks"); con verificación, cero, sin frenar
+  elecciones correctas.
 - El modelo de conversación no señala su duda: clasificando cinco veces el mismo
   mensaje, `deepseek-v4-flash` no detectó ninguno de 8 casos ambiguos. Jev, con
   elección y sí o no combinados, detectó 7 de 8, y en el lote no visto los dos
@@ -78,7 +80,8 @@
   como tendencia y se revisan con el banco.
 - **Límites conocidos:** ante algo que no existe tiende a ofrecer tareas parecidas
   en lugar de decir que no hay, y sin la verificación puede elegir una; da falsas
-  alarmas de intención en una de cada tres frases claras. Con la verificación,
+  alarmas de intención en una de cada tres frases claras, y una duda de intención
+  marcada por el usuario se detectó en 3 de 5 repeticiones. Con la verificación,
   ambos terminan en una pregunta, no en un efecto.
 - **Las consultas no pasan por vista previa:** toda respuesta nombra la tarea por
   su título, para que la persona note si Prisma entendió otra cosa.

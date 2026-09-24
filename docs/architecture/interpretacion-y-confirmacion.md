@@ -860,6 +860,48 @@ Lectura:
    persona note si Prisma entendió otra cosa; es la protección de las lecturas, que
    no pasan por vista previa.
 
+### 5.9 Lote 4, no visto: confirmación de la verificación
+
+15 mensajes nuevos, escritos por el usuario sobre una plantilla: cinco cosas que no
+existen pero se parecen a una tarea ("el tablero de la maq 5", "el switc de la ofi de
+administrasion", "el bacap de las notebooks"), cinco claras dichas con otras palabras
+("el wifi de la planta", "el respaldo de los servers", "la red de la comprimidora"),
+dos ambiguas y tres directas. Receta y corte de verificación congelados, cinco
+repeticiones (2026-09-24).
+
+| 5 repeticiones | 12 tareas | 200 tareas |
+|---|---|---|
+| Eligió mal sin preguntar, sin verificación | 2 en cada una | 2 en cada una |
+| **Eligió mal sin preguntar, con verificación** | **0** | **0** |
+| Correctos | 8 a 10 de 15 | 7 de 15 |
+| Elecciones correctas frenadas por la verificación | 0 | 0 |
+| Probabilidad de "misma" en elecciones correctas | mínimo 0,61; mediana 0,82 | mínimo 0,61; mediana 0,87 |
+| Probabilidad de "misma" en elecciones equivocadas | 0,18 a 0,24 | 0,17 a 0,23 |
+
+Las dos elecciones equivocadas sin verificación son "el switc de la ofi de
+administrasion" (asignado al switch de la sala de servidores) y "el bacap de las
+notebooks" (asignado al backup de servidores): el mismo patrón que "el horno".
+
+| Intención, 5 repeticiones | Resultado |
+|---|---|
+| Ambiguo marcado por el usuario ("se hizo el bacap de las notebooks", sin signo de pregunta) | detectado en 3 de 5 |
+| Claros con duda falsa | 5 o 6 de 14 |
+
+Lectura:
+
+1. **La verificación queda confirmada con mensajes no vistos:** frena los dos casos
+   en todas las repeticiones y no frena ninguna elección correcta. El margen es más
+   amplio que en 5.8: 0,24 la equivocada más alta, 0,61 la correcta más baja.
+2. **"No existe" termina en pregunta, no en "no hay":** las cinco cosas inexistentes
+   terminan ofreciendo la tarea parecida con "Ninguna, lo escribo". Seguro, pero
+   molesto; decir "no encuentro esa tarea" sigue pendiente.
+3. **Con 200 tareas pregunta más:** "lo del tablero" pregunta entre tableros sin
+   incluir los dos correctos, porque el universo grande tiene muchos tableros.
+4. **La intención dudosa no es confiable:** el caso marcado se detectó en 3 de 5 y
+   las falsas alarmas rondan 1 de cada 3. No aplica nada: un cambio mal leído termina
+   en la vista previa, y una consulta mal leída se ve en el título que nombra la
+   respuesta. La hipótesis de agrupar por herramienta (5.6) sigue sin probar.
+
 ## 6. Cómo se mide el diseño terminado
 
 Con el banco (`docs/validation/README.md`, "Banco conversacional") y, después, por
@@ -922,3 +964,4 @@ comparar, no antes.
 | 2026-09-24 | Prueba 5.3 con Jev: 9 de 9 claras en el lote no visto y duda correcta en "los planos"; falla vocabulario del equipo y áreas; para intención, 4 de 8 al corte 0,8 frente a 0 de 8 de DeepSeek |
 | 2026-09-24 | Pruebas 5.4 a 5.7: combinaciones de modalidades de Jev, validación con el lote 3 (11 de 15, 0 inseguros) y escala a 200 tareas |
 | 2026-09-24 | Prueba 5.8: cinco repeticiones muestran un caso inseguro repetido ("el horno" asignado a "la estufa"); se agrega una pregunta de verificación que lo frena sin frenar elecciones correctas; falta confirmarla con un lote nuevo |
+| 2026-09-24 | Prueba 5.9, lote 4 no visto: la verificación frena los dos casos inseguros en todas las repeticiones, sin frenar elecciones correctas; la duda de intención se detecta en 3 de 5 |

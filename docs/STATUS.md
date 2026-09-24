@@ -142,8 +142,8 @@ completas y "Ninguna, lo escribo"; las preguntas de Prisma con botones; apodos y
 vocabulario del equipo aprendidos preguntando. Incluye la corrección del router de
 intención, el defecto que encontró el banco (`b-0005`, 0 de 10: `route_intent` no ve
 las tareas del espacio; ver `docs/capacidades.md`, "Trampas conocidas").
-`PENDIENTE`: confirmar la pregunta de verificación con un lote de mensajes no visto
-(diseño §5.8).
+La pregunta de verificación quedó confirmada con un lote no visto (diseño §5.9); la
+detección de intención dudosa sigue sin ser confiable (3 de 5 en el caso marcado).
 
 Después, una sesión progresiva por Telegram real con datos ficticios para los circuitos
 ya verificados (consulta, bloqueos, estados, vista previa y confirmación) y, luego, la
