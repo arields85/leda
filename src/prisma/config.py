@@ -33,6 +33,7 @@ class Config:
     db_url: str = os.environ.get("PRISMA_DB_URL", "")
     authority_db_url: str = os.environ.get("PRISMA_AUTHORITY_DB_URL", "")
     llm_api_key: str = os.environ.get("PRISMA_LLM_API_KEY", "")
+    openrouter_api_key: str = os.environ.get("PRISMA_OPENROUTER_API_KEY", "")
     webhook_secret: str = os.environ.get("PRISMA_WEBHOOK_SECRET", "")
     base_url: str = os.environ.get("PRISMA_BASE_URL", "")
     raiz: Path = RAIZ
