@@ -902,6 +902,33 @@ Lectura:
    en la vista previa, y una consulta mal leída se ve en el título que nombra la
    respuesta. La hipótesis de agrupar por herramienta (5.6) sigue sin probar.
 
+### 5.10 ¿Saber quién escribe ayuda a Jev?
+
+**Pregunta (planteada por el usuario):** Prisma sabe quién escribe por su cuenta de
+Telegram, pero Jev no lo recibía. Se asignó un autor verosímil a los 60 mensajes de
+los lotes 1 a 4 (quien cuenta avances de su trabajo, un referente que pregunta por
+tareas de otros, y casos adversariales: alguien que nombra algo inexistente parecido
+a una tarea propia). Receta con verificación, 12 tareas, 5 repeticiones
+(2026-09-24).
+
+| 5 repeticiones | Correctos | Eligió mal sin preguntar |
+|---|---|---|
+| Sin autor | 41 a 44 de 60 | 0 |
+| Autor + pista en la instrucción ("cuando cuenta que terminó suele hablar de sus tareas") | 41 a 43 | **1 o 2 en cada repetición** |
+| Sólo el autor como dato, sin pista | 43 a 45 | 0 |
+
+El error con pista: "como va lo del tablero", escrito por un referente, terminó
+asignado al dashboard de lotes (tablero es también sinónimo de dashboard).
+
+Lectura:
+
+1. **La pista empeora:** empuja a Jev a decidir y rompe el cero de inseguros.
+2. **El autor como dato es seguro y aporta poco:** uno o dos correctos más, dentro
+   de lo que varía entre corridas.
+3. **Donde más aporta quién escribe es en la pantalla:** ordenar primero las tareas
+   propias entre los botones y mostrar el responsable sólo cuando la tarea es de otra
+   persona.
+
 ## 6. Cómo se mide el diseño terminado
 
 Con el banco (`docs/validation/README.md`, "Banco conversacional") y, después, por
