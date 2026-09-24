@@ -407,6 +407,50 @@ visto, con mensajes reales.
    más los apodos aprendidos; sin coincidencia, se pregunta quién es;
 4. `rerank` no interviene en la decisión.
 
+**Resultado (quinta corrida, 2026-09-24): lote nuevo, no visto — la receta no
+generaliza.** 15 mensajes nuevos escritos por el usuario, con la receta de la
+cuarta corrida sin ningún cambio.
+
+| Resultado | Mensajes |
+|---|---|
+| Correcto | 7 de 15 |
+| **Inseguro** (elige sin preguntar) | **3**: "lo de los planos" → T6 (eran T5 o T6); "lo de dashboar" → T9 (eran T9 o T10); "las cosas de IT" → sin referente (eran cuatro tareas de IT) |
+| Incompleto (no encuentra la tarea; Prisma preguntaría) | 3: "lo del wifi", "la migración", "la red que había quedado pendiente" |
+| Pregunta de más | 2: "el tablero de la 3"; una referencia del mensaje largo |
+
+Personas: "mariano" bien; "marquitos" y "Luquitas" sin coincidencia, que es lo
+correcto con apodos todavía no aprendidos; "nahual" (falta de tipeo de Nahuel)
+tampoco coincide —el corte de parecido de nombres no lo alcanza—.
+
+Corrección de etiqueta hecha por el usuario: el diseñador había marcado "lo de
+dashboar" como clara hacia T9 porque la palabra aparece en ese título. Es un error
+de concepto: **"dashboard", "interfaz HMI" y "CoreLabs" son nombres que la gente
+usa para lo mismo**, como un apodo. La etiqueta correcta es T9 o T10.
+
+Lectura:
+
+1. **Las reglas por palabras sobreajustaron.** La regla de "sin referente" por
+   falta de palabras en común se equivoca con sinónimos ("wifi" o "red" por
+   access points) y con variantes ("migración" frente a "Migrar"). La del ancla
+   se equivoca con el vocabulario del equipo: una palabra que aparece en un solo
+   título no garantiza que la persona hable de esa tarea.
+2. **Hacen falta dos fuentes que no son palabras sueltas:**
+   - **vocabulario del equipo aprendido**, igual que los apodos: "dashboard",
+     "interfaz HMI" y "CoreLabs" nombran lo mismo; "wifi" y "red" son los access
+     points. Se aprende preguntando la primera vez;
+   - **referencias a un área o a una persona** ("las cosas de IT", "lo de
+     Mariano") que abarcan todas sus tareas y se resuelven preguntando cuál.
+3. **La protección sigue siendo la vista previa.** Los tres casos inseguros
+   habrían terminado en una vista previa con la tarea equivocada, que la persona
+   cancela o modifica. Ninguno aplica nada solo.
+4. **Lo que sí se sostuvo:** la separación de referencias por el modelo, los
+   embeddings para encontrar candidatas y la coincidencia de nombres.
+
+Próximo paso de la prueba: rediseñar la decisión —el ancla no decide sola; "sin
+referente" no se declara sólo por falta de palabras en común; vocabulario y
+referencias por área o persona— y validar con un tercer lote no visto, no con
+estos.
+
 ### 5.2 ¿Clasificar varias veces detecta la intención dudosa?
 
 **Pregunta:** si se clasifica el mismo mensaje varias veces, ¿los mensajes
@@ -464,6 +508,268 @@ Consecuencias de diseño:
 - **La detección de intención queda como mejora, no como garantía.** Se puede
   volver a probar con otro modelo o con otro planteo; no bloquea el resto del
   diseño.
+
+### 5.3 ¿Jev detecta la duda de intención que DeepSeek no detecta?
+
+**Pregunta:** Jev (TypeSafe AI) elige una opción de una lista y devuelve una
+probabilidad por opción. ¿Esa probabilidad separa los mensajes ambiguos de los
+claros, donde `deepseek-v4-flash` falló (prueba 5.2)?
+
+**Verificado (2026-09-24):** está en OpenRouter como `typesafe/jev-1.13` (alias
+`~typesafe/jev-latest`), por una API propia de OpenRouter
+(`POST https://openrouter.ai/api/v1/systemone`), no por la de chat; el tipo
+**Choice** devuelve la opción elegida, una probabilidad por opción y una
+confianza. La documentación no dice cuántas opciones admite ni qué idiomas.
+
+**Según la investigación, sin verificar una por una:** el propio proveedor aclara
+que la calibración vale en conjunto y no por respuesta; una evaluación de terceros
+encontró sobreconfianza justo en preguntas ambiguas (44,7 % de acierto con 0,74 de
+confianza media); no hay evidencia en español; la velocidad y el costo sí
+coinciden con lo anunciado en una prueba independiente.
+
+**Método:** los mismos 18 mensajes de 5.2 como una elección entre las 12
+intenciones; medir ambiguos detectados por probabilidad máxima o diferencia entre
+las dos primeras, falsas alarmas en claros, acierto en claros, latencia y costo.
+Los cortes salen de los datos.
+
+**Criterio:** se adopta para la detección de intención sólo si detecta la mayoría
+de los ambiguos con pocas falsas alarmas, acierta en los claros al menos como
+DeepSeek y maneja el español desprolijo. Si no, sigue DeepSeek con la vista previa
+como protección.
+
+**Requiere:** una clave de OpenRouter. Primer paso sólo con datos ficticios.
+
+**Resultado (2026-09-24):** Jev sirve para **elegir la tarea** —mucho mejor que las
+reglas por palabras en el lote no visto— y da una señal de duda de intención
+mejor que DeepSeek, pero insuficiente como garantía. Datos ficticios; 0,35–0,51 s
+por llamada; alrededor de USD 0,000014 por llamada.
+
+Parte A — intención, los 18 mensajes de 5.2 (Choice entre 12 intenciones):
+
+| Corte (duda si la probabilidad más alta es menor) | Ambiguos detectados | Claros con duda falsa |
+|---|---|---|
+| 0,6 | 3 de 8 | 0 de 10 |
+| 0,8 | 4 de 8 | 2 de 10 |
+| 0,9 | 5 de 8 | 2 de 10 |
+
+Acierto en claros: 8 de 10 (los dos desvíos son etiquetas discutibles: "xq martin
+no me paso la informacion" como dependencia; "dalo x resuelto" como cambio de
+estado). El ejemplo sin comas del usuario sigue sin detectarse (0,98 "no
+terminado"). DeepSeek, en la misma prueba: 0 de 8 clasificando cinco veces.
+
+Parte B — tareas, Choice entre las 12 tareas más "ninguna", sobre las referencias
+ya separadas por DeepSeek:
+
+| Lote 2 (no visto por nadie) | Reglas por palabras (corrida 5) | Jev |
+|---|---|---|
+| Claras (9) | 4 bien, 3 sin encontrar, 2 preguntan de más | **9 bien** ("wifi", "la red", "la migración", "copia de seguridad", "el tablero de la 3") |
+| "lo de los planos" (T5 o T6) | elige T6: inseguro | reparte 0,37 / 0,32 / 0,31: **duda correcta** |
+| "lo de dashboar" (T9 o T10) | elige T9: inseguro | elige T9 con 0,95: **inseguro** |
+| "las cosas de IT" (cuatro tareas) | sin referente | "ninguna" con 1,0: no encuentra |
+| "lo de mariano" (sus dos tareas) | resuelve la persona | "ninguna" con 1,0 |
+| "la cámara de frío" (no existe) | sin referente | "ninguna" con 0,95: bien |
+
+En el lote 1 acertó todas las claras, pero ante las referencias vagas ("lo del
+tablero", "lo de la comprimidora", "lo de los servidores") respondió "ninguna"
+(0,65–0,73) en lugar de repartir entre las candidatas.
+
+Lectura:
+
+1. **Jev entiende sinónimos y variantes que las reglas no alcanzaban** ("wifi" y
+   "red" por access points, "la interfaz" por CoreLabs, "migración" por
+   "Migrar"). Pasa a ser el candidato para decidir la tarea, en lugar de las
+   reglas por palabras.
+2. **Sigue sin saber lo que sólo sabe el equipo.** "dashboard" por CoreLabs, las
+   áreas ("las cosas de IT") y "lo de Mariano" necesitan que las opciones lleven
+   más datos —área, responsable, vocabulario aprendido— o una pregunta aparte.
+3. **La opción "ninguna" absorbe lo vago.** Conviene separar dos preguntas: si la
+   referencia apunta a una tarea concreta (sí o no) y, si apunta, cuál; y mostrar
+   las candidatas cuando se reparte.
+4. **Para la intención, la vista previa sigue siendo la protección.** Jev da una
+   señal graduada que DeepSeek no daba y se puede usar para decidir cuándo
+   ofrecer botones, pero falla el caso clave de puntuación.
+5. **Español desprolijo, bien** en esta muestra: faltas, sin tildes, abreviaturas.
+
+Límites: muestras chicas; ningún corte fijado; Jev está en beta. Antes de usar
+datos reales hay que decidir si se aceptan los términos de privacidad de TypeSafe
+para mandar títulos de tareas y nombres del equipo.
+
+**Segunda versión (2026-09-24): opciones enriquecidas y dos preguntas.** Cada
+tarea lleva área y responsable; el vocabulario del equipo va como contexto ("a
+CoreLabs también le dicen dashboard o interfaz HMI", simulando lo aprendido o
+cargado en el alta); en la misma llamada, dos preguntas: si la referencia apunta a
+una tarea, a varias (un área, una persona) o a ninguna, y a cuál.
+
+Regla de decisión: "ninguna" ≥ 0,6 → sin referente; "varias" ≥ 0,5 → preguntar
+entre las tareas con probabilidad ≥ 0,1; la tarea más probable ≥ 0,85 con 0,4 de
+diferencia → clara; si no, preguntar. El corte de 0,85 se eligió mirando los lotes
+1 y 2 (con 0,75 quedaban dos inseguros) y **queda congelado** para el lote 3.
+
+| Con el corte congelado | Lotes 1 y 2 (30 mensajes) |
+|---|---|
+| Correctos | 24 |
+| Inseguros | **0** |
+| Preguntas de más | 4 |
+| Preguntas innecesarias ("lo del horno", "la cámara de frío") | 2 |
+
+Lo que resolvió respecto de la primera versión: "lo de Mariano" y "las cosas de
+IT" ahora preguntan entre sus tareas; "lo de dashboar" pregunta, con el
+vocabulario en contexto. Lo que empeoró: con opciones más cargadas, Jev dejó de
+reconocer lo que no existe ("horno", "cámara de frío" ya no salen como
+"ninguna"); con el corte de 0,85 terminan en una pregunta, no en un efecto.
+
+**Próximo paso:** tercer lote no visto con esta configuración congelada.
+
+### 5.4 ¿Combinar las tres modalidades de Jev da una señal más certera?
+
+**Pregunta (propuesta del usuario):** preguntar lo mismo de varias formas a la vez
+—Choice entre las opciones, un Noul (sí o no) por opción y un Score de claridad—
+y decidir por el acuerdo entre ellas.
+
+**Fundamento:** la documentación de TypeSafe recomienda "partir una pregunta
+difícil en preguntas angostas, cada una sobre una sola propiedad" y combinarlas en
+el código; van todas en una misma llamada y corren en paralelo.
+
+**Regla, sin pesos y con cortes redondos fijados antes de correr:** clara sólo si
+Choice ≥ 0,8, los Noul ≥ 0,5 son exactamente la opción del Choice y el Score pone
+≥ 0,6 en "clara"; ninguna (sólo tareas) si ningún Noul llega a 0,5 y el Score pone
+≥ 0,6 en "no corresponde"; si no, duda, con candidatas = los Noul ≥ 0,5 más las dos
+primeras del Choice.
+
+**Resultado (2026-09-24):**
+
+| Intención (18 mensajes) | DeepSeek (5.2) | Choice solo (5.3) | Combinado (5.4) |
+|---|---|---|---|
+| Ambiguos detectados | 0 de 8 | 4 de 8 | **8 de 8** |
+| Claros con duda falsa | 0 de 10 | 2 de 10 | **5 de 10** |
+
+| Tareas, lotes 1 y 2 (30 mensajes) | Choice enriquecido (5.3 v2) | Combinado (5.4) |
+|---|---|---|
+| Correctos | **24** | 14 |
+| Inseguros | 0 | 0 |
+| Preguntas de más o innecesarias | 6 | 16 |
+
+Lectura:
+
+1. **Para la intención, combinar funciona**: detecta todos los ambiguos, incluido
+   el ejemplo sin comas del usuario. El costo son falsas alarmas, y su causa es del
+   diseño de la prueba, no de Jev: las 12 intenciones se superponen ("voy por la
+   mitad" es a la vez "avance parcial" y "no terminado", y ambas son ciertas). Esa
+   duda no es material: las dos lecturas llevan a la misma acción. Corrección, que
+   sale del principio de ambigüedad material y no de ajustar números: agrupar las
+   intenciones por la acción que disparan y marcar duda sólo cuando las lecturas
+   altas apuntan a acciones distintas.
+2. **Para las tareas, combinar es demasiado cauteloso.** Los Noul por tarea salen
+   bajos incluso ante referencias claras (0,45–0,75) y el Score rara vez llega a
+   "clara". Choice con opciones enriquecidas sigue siendo mejor.
+3. **Ambigüedad real del idioma:** "tablero" también se usa por "dashboard", así
+   que "el tablero de la 3" levantó el Noul de CoreLabs. Es vocabulario del equipo.
+
+**Próximo paso:** intención combinada con agrupación por acción; tareas con Choice
+enriquecido; congelar ambas y validar con el lote 3.
+
+### 5.5 Las siete combinaciones de modalidades
+
+**Pregunta (propuesta del usuario):** probar cada modalidad sola y todas sus
+combinaciones. Una sola ronda de llamadas (cada una trae las tres respuestas) y
+las siete combinaciones evaluadas sobre las mismas respuestas. Reglas fijadas antes
+de correr: Choice decide si la primera tiene ≥ 0,8 y 0,4 de diferencia; Noul, si
+exactamente una opción tiene ≥ 0,5; Score, si pone ≥ 0,6 en "clara" (sólo detecta,
+no elige). Una combinación decide sólo si todas sus modalidades dicen "clara" y
+eligen lo mismo. En intención, "avance parcial" y "no terminado" cuentan como la
+misma acción; "no sé" queda aparte.
+
+| Intención (18) | Ambiguos detectados | Falsas alarmas |
+|---|---|---|
+| Choice | 5 de 8 | 2 de 10 |
+| Noul | 5 de 8 | 3 de 10 |
+| Score | 5 de 8 | 3 de 10 |
+| **Choice + Noul** | **7 de 8** | **3 de 10** |
+| Choice + Score | 6 de 8 | 5 de 10 |
+| Noul + Score | 8 de 8 | 6 de 10 |
+| Las tres | 8 de 8 | 6 de 10 |
+
+| Tareas, lotes 1 y 2 (30) | Correctos | Inseguros |
+|---|---|---|
+| Choice | 26 | 3 |
+| Noul | 15 | 4 |
+| Choice + Noul | 14 | 2 |
+| Choice + Score | 17 | 0 |
+| Noul + Score | 10 | 1 |
+| Las tres | 14 | 0 |
+| Choice enriquecido con pregunta de alcance (5.3 v2) | **24** | **0** |
+
+Lectura:
+
+1. **Intención: combinar mejora la detección.** Choice + Noul es el mejor
+   equilibrio. Sumar Score detecta todo, pero pregunta en 6 de cada 10 mensajes
+   claros.
+2. **Tareas: combinar no supera a Choice enriquecido con la pregunta de alcance**
+   ("¿una tarea, varias o ninguna?"). Choice solo acierta más pero con tres
+   inseguros; las combinaciones con Noul o Score se vuelven demasiado cautelosas.
+3. **Variación entre corridas:** la combinación de las tres dio 5 falsas alarmas en
+   5.4 y 6 acá, con las mismas preguntas. Jev no responde idéntico en cada llamada;
+   los resultados se leen como tendencia, no como cifra exacta.
+
+**Configuración congelada para el lote 3:** intención con Choice + Noul y
+agrupación por acción; tareas con Choice enriquecido y pregunta de alcance (5.3
+v2, corte 0,85).
+
+### 5.6 Validación con el lote 3, no visto
+
+15 mensajes nuevos del usuario, con dos casos de intención marcados por él: sin
+signo de pregunta, "que onda con lo eléctrico falta mucho" y "esta listo lo de las
+comunicaciones" se pueden leer como pregunta o como afirmación. Configuración
+congelada, sin ningún cambio (2026-09-24).
+
+| Tareas | Mensajes |
+|---|---|
+| Correctos | **11 de 15** |
+| **Inseguros** | **0** |
+| Pregunta de más, con la correcta entre las opciones | 2 ("esta listo lo de las comunicaciones"; "el dash de lotes") |
+| Pregunta innecesaria | 2 ("el techo del galpón", "los compresores de aire": ofrece tareas que no son; nada se aplica y está "Ninguna, lo escribo") |
+
+| Intención | Resultado |
+|---|---|
+| Ambiguos marcados por el usuario | **2 de 2 detectados** |
+| Claros con duda falsa | 4 de 13 |
+| Claros bien resueltos | 9 de 13 |
+
+Personas: "Lucas" y "Nahuel" bien; "tincho" sin coincidencia, que con la decisión de
+aprender apodos lleva a preguntar quién es.
+
+Lectura:
+
+1. **La configuración generaliza en lo que importa:** cero inseguros en tareas con
+   mensajes que ninguna versión vio, frente a tres de las reglas por palabras en
+   el lote 2. Lo que queda son preguntas de más, del lado seguro.
+2. **"No existe" sigue siendo el punto débil:** ante algo que no está en la lista,
+   Jev ofrece tareas parecidas en lugar de decir que no hay. Seguro, pero molesto.
+3. **La intención detecta la duda que el usuario señaló** —preguntas sin signo—
+   con un costo de una falsa alarma cada tres o cuatro mensajes claros.
+4. **Hipótesis para bajar falsas alarmas, sin probar:** agrupar las intenciones
+   por la herramienta que disparan, no por intención. "Terminé con el plc" dudó
+   entre "informar terminado" y "pedir cambio de estado", que llevan a la misma
+   propuesta (pasar a revisión). Este lote ya fue visto: la hipótesis se valida
+   con otro.
+
+**Receta resultante para el paso 2**, sujeta a esa mejora:
+
+1. DeepSeek separa las referencias del mensaje, sin ver tareas ni equipo.
+2. Por cada referencia a tarea, Jev en una llamada: Choice de alcance (una tarea,
+   varias, ninguna) y Choice entre las tareas con título, área y responsable, con
+   el vocabulario del equipo como contexto. "Ninguna" ≥ 0,6 → no existe; "varias"
+   ≥ 0,5 → preguntar entre las tareas con ≥ 0,1; la primera ≥ 0,85 con 0,4 de
+   diferencia → clara; si no, preguntar.
+3. Por mensaje, Jev en una llamada: Choice entre intenciones y un Noul por
+   intención; decide sólo si ambos coinciden en una acción; si no, preguntar con
+   las lecturas como botones.
+4. Personas por coincidencia de nombres y apodos aprendidos; sin coincidencia,
+   preguntar quién es.
+5. Toda propuesta termina en vista previa con Confirmar, Modificar y Cancelar.
+
+`PENDIENTE` antes de usar datos reales: decidir si se aceptan los términos de
+privacidad de TypeSafe para enviar títulos de tareas y nombres del equipo.
 
 ## 6. Cómo se mide el diseño terminado
 
@@ -523,3 +829,5 @@ comparar, no antes.
 | 2026-09-24 | Cuarta corrida con palabras distintivas: 15 de 15 en mensajes del usuario y 21 de 23 en la corrida 1, 0 inseguros; extracción estable; falta un conjunto nuevo no visto |
 | 2026-09-24 | Prueba 5.2: ni clasificar 5 veces (0 de 8) ni pedir lecturas (4 de 8, hasta 73 s) detectan la duda de intención con fiabilidad; la vista previa con confirmación queda como la protección y se evita el texto libre en las preguntas de Prisma |
 | 2026-09-24 | El usuario confirma: la vista previa con confirmación es la protección principal y las preguntas de Prisma van con botones |
+| 2026-09-24 | Quinta corrida con un lote no visto: 7 de 15, 3 inseguros; las reglas por palabras sobreajustaron; hacen falta vocabulario del equipo aprendido y referencias por área o persona |
+| 2026-09-24 | Prueba 5.3 con Jev: 9 de 9 claras en el lote no visto y duda correcta en "los planos"; falla vocabulario del equipo y áreas; para intención, 4 de 8 al corte 0,8 frente a 0 de 8 de DeepSeek |
