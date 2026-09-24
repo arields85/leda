@@ -50,6 +50,7 @@ class Pendiente:
     estado: str
     campo: str | None = None
     opciones: list[Opcion] = field(default_factory=list)
+    huella: str | None = None
 
 
 @dataclass(frozen=True)
@@ -61,6 +62,9 @@ class Resuelta:
     task_id: str | None = None
     replay: bool = False
     pending_action_id: str | None = None
+    # La huella que se guardó al mostrar la vista previa (ADR 0005, decisión
+    # 1). `ejecutar` la vuelve a comparar antes de aplicar nada.
+    huella: str | None = None
 
 
 def callback_data(opcion: Opcion) -> str:
@@ -80,11 +84,16 @@ def registrar(cur: psycopg.Cursor, quien: Solicitante, *, herramienta: str,
               opciones: list[tuple[str, Any]] | None = None,
               chat_id: int | None = None, draft_id: str | None = None,
               draft_version: int | None = None,
-              preview: dict[str, Any] | None = None) -> Pendiente:
+              preview: dict[str, Any] | None = None,
+              huella: str | None = None) -> Pendiente:
     """Congela una acción y deja preparadas sus opciones.
 
     Sin `opciones` la pregunta es confirmar o cancelar. Con `campo` y
     `opciones`, cada elección completa ese argumento con su valor.
+
+    `huella` es la del estado que se leyó para armar la vista previa (ADR
+    0005, decisión 1). La ponen las herramientas que escriben; el resto de
+    los llamados a `registrar` (elegir, borrador) no la usan.
     """
     resumen = normalize_visible_text(resumen)
     a_crear = opciones if opciones is not None else [("Confirmar", True),
@@ -94,13 +103,14 @@ def registrar(cur: psycopg.Cursor, quien: Solicitante, *, herramienta: str,
     cur.execute(
         """insert into pending_action
              (workspace_id, membership_id, herramienta, args, campo, resumen,
-               vence_en, chat_id, draft_id, draft_version, preview)
-           values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+               vence_en, chat_id, draft_id, draft_version, preview, huella)
+           values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
            returning id, estado""",
         (quien.workspace_id, quien.membership_id, herramienta,
          json.dumps(args, ensure_ascii=False), campo, resumen, vence_en,
           chat_id, draft_id, draft_version,
-          json.dumps(preview, ensure_ascii=False) if preview is not None else None))
+          json.dumps(preview, ensure_ascii=False) if preview is not None else None,
+          huella))
     fila = cur.fetchone()
     pid = str(fila["id"])
 
@@ -110,7 +120,7 @@ def registrar(cur: psycopg.Cursor, quien: Solicitante, *, herramienta: str,
 
     return Pendiente(id=pid, herramienta=herramienta, args=args,
                      resumen=resumen, estado=fila["estado"], campo=campo,
-                     opciones=creadas)
+                     opciones=creadas, huella=huella)
 
 
 def _crear_opcion(cur, workspace_id: str, pending_action_id: str,
@@ -129,7 +139,7 @@ def _crear_opcion(cur, workspace_id: str, pending_action_id: str,
 
 def buscar(cur: psycopg.Cursor, pendiente_id: str) -> Pendiente | None:
     cur.execute(
-        """select id, herramienta, args, campo, resumen, estado
+        """select id, herramienta, args, campo, resumen, estado, huella
              from pending_action where id = %s""",
         (pendiente_id,))
     f = cur.fetchone()
@@ -137,7 +147,8 @@ def buscar(cur: psycopg.Cursor, pendiente_id: str) -> Pendiente | None:
         return None
     return Pendiente(id=str(f["id"]), herramienta=f["herramienta"],
                      args=f["args"], resumen=f["resumen"], estado=f["estado"],
-                     campo=f["campo"], opciones=opciones(cur, pendiente_id))
+                     campo=f["campo"], opciones=opciones(cur, pendiente_id),
+                     huella=f["huella"])
 
 
 def opciones(cur: psycopg.Cursor, pendiente_id: str) -> list[Opcion]:
@@ -186,7 +197,7 @@ def resolver(cur: psycopg.Cursor, token: str, *, app_user_id: str,
         return None
 
     return Resuelta(herramienta=f["herramienta"], args=f["args"] or {},
-                    cancelada=f["cancelada"])
+                    cancelada=f["cancelada"], huella=f.get("huella"))
 
 
 def es_borrador(cur: psycopg.Cursor, token: str) -> bool:

@@ -549,7 +549,7 @@ def test_prisma_app_no_puede_borrar_task_y_evento_autorizado_sigue_operando(
         marcos = _quien(cur, "Marcos Tarquini", ws)
         assert H.ejecutar(cur, marcos, "actualizar_estado", {
             "tarea_id": resuelta.task_id, "estado": "en_curso",
-        })["estado"] == "en_curso"
+        }, ya_confirmada=True)["estado"] == "en_curso"
         cur.execute("select estado from task where id = %s", (resuelta.task_id,))
         assert cur.fetchone()["estado"] == "en_curso"
 

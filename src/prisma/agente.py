@@ -246,11 +246,14 @@ def _encolar_confirmacion(cur, quien: Solicitante, chat_id: int,
 
     p = registrar(cur, quien, herramienta=e.herramienta, args=e.argumentos,
                   resumen=e.resumen, vence_en=ahora + VIGENCIA_PENDIENTE,
-                  chat_id=chat_id)
+                  chat_id=chat_id, huella=e.huella)
+    # El resumen ya es la vista previa completa -- recurso, estado actual,
+    # cambio propuesto y el aviso de que todavía no se aplicó nada (ADR 0005,
+    # decisión 1) -- así que sale tal cual, sin envoltorio.
     enqueue_outbox(
         cur, workspace_id=quien.workspace_id, chat_id=chat_id,
         recipient_membership_id=quien.membership_id,
-        text=f"Antes de hacerlo, confirmame: {e.resumen}", scheduled_for=ahora,
+        text=e.resumen, scheduled_for=ahora,
         dedupe_key=(f"{quien.workspace_id}:confirmar:{e.herramienta}:"
                     f"{ahora.timestamp()}"), is_response=True,
         pending_action_id=p.id,

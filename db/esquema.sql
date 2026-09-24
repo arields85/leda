@@ -603,6 +603,10 @@ create table pending_action (
   ,draft_id            uuid references task_draft(id)
   ,draft_version       integer
   ,preview             jsonb
+  -- Huella del estado que se leyó para armar la vista previa (opaca para la
+  -- base; la arma y la interpreta `herramientas.py`). Al confirmar se vuelve
+  -- a calcular y, si difiere, no se aplica nada (ADR 0005, decisión 1).
+  ,huella              text
   ,constraint pending_action_workspace_id_unique unique (workspace_id, id)
   ,constraint pending_action_membership_workspace
      foreign key (workspace_id, membership_id)
@@ -814,7 +818,8 @@ alter table message_outbox
 -- apretando un botón que no le corresponde.
 create function resolver_pendiente(p_token text, p_app_user_id uuid,
                                    p_ahora timestamptz)
-returns table (resultado text, herramienta text, args jsonb, cancelada boolean)
+returns table (resultado text, herramienta text, args jsonb,
+               cancelada boolean, huella text)
 language plpgsql security definer as $$
 declare
   o record;
@@ -824,20 +829,23 @@ begin
   select * into o from pending_action_option
    where token = p_token and (ws is null or workspace_id = ws);
   if not found then
-    return query select 'inexistente'::text, null::text, null::jsonb, null::boolean;
+    return query select 'inexistente'::text, null::text, null::jsonb,
+      null::boolean, null::text;
     return;
   end if;
 
   select * into a from pending_action where id = o.pending_action_id;
 
   if a.estado <> 'esperando' then
-    return query select 'usada'::text, null::text, null::jsonb, null::boolean;
+    return query select 'usada'::text, null::text, null::jsonb,
+      null::boolean, null::text;
     return;
   end if;
 
   if a.vence_en <= p_ahora then
     update pending_action set estado = 'vencida' where id = a.id;
-    return query select 'vencida'::text, null::text, null::jsonb, null::boolean;
+    return query select 'vencida'::text, null::text, null::jsonb,
+      null::boolean, null::text;
     return;
   end if;
 
@@ -845,7 +853,8 @@ begin
   -- membresía, no por identidad de plataforma: el sombrero lo da el espacio.
   if not exists (select 1 from membership m
                   where m.id = a.membership_id and m.app_user_id = p_app_user_id) then
-    return query select 'ajena'::text, null::text, null::jsonb, null::boolean;
+    return query select 'ajena'::text, null::text, null::jsonb,
+      null::boolean, null::text;
     return;
   end if;
 
@@ -854,10 +863,12 @@ begin
        set estado = 'cancelada', resuelta_en = p_ahora, resuelta_por = p_app_user_id
      where id = a.id and estado = 'esperando';
     if not found then
-      return query select 'usada'::text, null::text, null::jsonb, null::boolean;
+      return query select 'usada'::text, null::text, null::jsonb,
+        null::boolean, null::text;
       return;
     end if;
-    return query select 'cancelada'::text, null::text, null::jsonb, true;
+    return query select 'cancelada'::text, null::text, null::jsonb, true,
+      null::text;
     return;
   end if;
 
@@ -865,18 +876,19 @@ begin
      set estado = 'resuelta', resuelta_en = p_ahora, resuelta_por = p_app_user_id
    where id = a.id and estado = 'esperando';
   if not found then
-    return query select 'usada'::text, null::text, null::jsonb, null::boolean;
+    return query select 'usada'::text, null::text, null::jsonb,
+      null::boolean, null::text;
     return;
   end if;
 
   return query select 'ok'::text, a.herramienta,
     case when a.campo is null then a.args
          else a.args || jsonb_build_object(a.campo, o.valor) end,
-    false;
+    false, a.huella;
 end $$;
 
 comment on function resolver_pendiente is
-  'Resuelve una acción pendiente por el token de una de sus opciones. Atómica: el doble toque de un botón ejecuta una sola vez.';
+  'Resuelve una acción pendiente por el token de una de sus opciones. Atómica: el doble toque de un botón ejecuta una sola vez. Devuelve la huella guardada para que quien llama detecte si el estado cambió desde la vista previa.';
 
 -- Draft commitment is deliberately separate from generic pending actions. It
 -- locks every linked row, revalidates the preview, creates the task and audit,

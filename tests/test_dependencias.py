@@ -95,7 +95,7 @@ def test_crear_dependencia_la_puede_el_responsable_de_origen(corework, conn):
         quien = _quien(cur, "Nahuel Gimenez", ws)
         r = H.ejecutar(cur, quien, "crear_dependencia",
                        {"origen_tarea_id": origen, "destino_tarea_id": destino,
-                        "tipo": "bloqueante"})
+                        "tipo": "bloqueante"}, ya_confirmada=True)
         assert "dependencia_id" in r
 
         cur.execute("select tipo from dependency where origen_task_id = %s", (origen,))
@@ -123,7 +123,7 @@ def test_crear_dependencia_la_puede_el_referente_de_cualquiera_de_las_dos(corewo
     with espacio(conn, ws) as cur:
         quien = _quien(cur, "Ismael Soschinski", ws)
         r = H.ejecutar(cur, quien, "crear_dependencia",
-                       {"origen_tarea_id": origen, "destino_tarea_id": destino})
+                       {"origen_tarea_id": origen, "destino_tarea_id": destino}, ya_confirmada=True)
         assert "dependencia_id" in r
 
         avisos = _outbox(cur)
@@ -145,7 +145,7 @@ def test_crear_dependencia_entre_areas_avisa_a_los_dos_referentes(corework, conn
     with espacio(conn, ws) as cur:
         quien = _quien(cur, "Nahuel Gimenez", ws)
         H.ejecutar(cur, quien, "crear_dependencia",
-                  {"origen_tarea_id": origen, "destino_tarea_id": destino})
+                  {"origen_tarea_id": origen, "destino_tarea_id": destino}, ya_confirmada=True)
 
         avisos = _outbox(cur)
         destinatarios = {str(a["destinatario_membership_id"]) for a in avisos}
@@ -168,7 +168,7 @@ def test_crear_dependencia_nunca_avisa_a_quien_la_crea(corework, conn):
     with espacio(conn, ws) as cur:
         quien = _quien(cur, "Marcos Tarquini", ws)
         H.ejecutar(cur, quien, "crear_dependencia",
-                  {"origen_tarea_id": origen, "destino_tarea_id": destino})
+                  {"origen_tarea_id": origen, "destino_tarea_id": destino}, ya_confirmada=True)
         assert _outbox(cur) == []
 
 
@@ -187,7 +187,7 @@ def test_crear_dependencia_avisa_a_la_otra_parte_aunque_sea_su_referente(corewor
     with espacio(conn, ws) as cur:
         quien = _quien(cur, "Marcos Tarquini", ws)
         H.ejecutar(cur, quien, "crear_dependencia",
-                  {"origen_tarea_id": origen, "destino_tarea_id": destino})
+                  {"origen_tarea_id": origen, "destino_tarea_id": destino}, ya_confirmada=True)
         avisos = _outbox(cur)
         assert [str(a["destinatario_membership_id"]) for a in avisos] == [
             _mid(cur, "Nahuel Gimenez")]
@@ -205,7 +205,7 @@ def test_crear_dependencia_sin_autoridad_se_rechaza(corework, conn):
         quien = _quien(cur, "Ariel De Simone", ws)   # ajeno a las dos tareas
         with pytest.raises(Denegado):
             H.ejecutar(cur, quien, "crear_dependencia",
-                       {"origen_tarea_id": origen, "destino_tarea_id": destino})
+                       {"origen_tarea_id": origen, "destino_tarea_id": destino}, ya_confirmada=True)
 
 
 def test_crear_dependencia_tarea_inexistente_dice_que_no_existe(corework, conn):
@@ -218,7 +218,7 @@ def test_crear_dependencia_tarea_inexistente_dice_que_no_existe(corework, conn):
         quien = _quien(cur, "Marcos Tarquini", ws)
         r = H.ejecutar(cur, quien, "crear_dependencia",
                        {"origen_tarea_id": "00000000-0000-0000-0000-000000000000",
-                        "destino_tarea_id": destino})
+                        "destino_tarea_id": destino}, ya_confirmada=True)
         assert "no existe" in r["error"]
 
 
@@ -231,7 +231,7 @@ def test_crear_dependencia_misma_tarea_en_las_dos_puntas_se_rechaza(corework, co
     with espacio(conn, ws) as cur:
         quien = _quien(cur, "Marcos Tarquini", ws)
         r = H.ejecutar(cur, quien, "crear_dependencia",
-                       {"origen_tarea_id": tid, "destino_tarea_id": tid})
+                       {"origen_tarea_id": tid, "destino_tarea_id": tid}, ya_confirmada=True)
         assert "error" in r
 
 
@@ -247,7 +247,7 @@ def test_crear_dependencia_duplicada_se_rechaza(corework, conn):
     with espacio(conn, ws) as cur:
         quien = _quien(cur, "Marcos Tarquini", ws)
         r = H.ejecutar(cur, quien, "crear_dependencia",
-                       {"origen_tarea_id": origen, "destino_tarea_id": destino})
+                       {"origen_tarea_id": origen, "destino_tarea_id": destino}, ya_confirmada=True)
         assert "error" in r
         cur.execute(
             "select count(*) n from dependency where origen_task_id = %s", (origen,))
@@ -270,7 +270,7 @@ def test_crear_dependencia_con_destino_ya_cerrada_se_rechaza(corework, conn):
     with espacio(conn, ws) as cur:
         quien = _quien(cur, "Marcos Tarquini", ws)
         r = H.ejecutar(cur, quien, "crear_dependencia",
-                       {"origen_tarea_id": origen, "destino_tarea_id": destino})
+                       {"origen_tarea_id": origen, "destino_tarea_id": destino}, ya_confirmada=True)
         assert "error" in r
 
 
@@ -285,7 +285,7 @@ def test_crear_dependencia_que_forma_un_ciclo_da_un_mensaje_claro(corework, conn
         quien = _quien(cur, "Marcos Tarquini", ws)
         with pytest.raises(psycopg.errors.RaiseException, match="ciclo"):
             H.ejecutar(cur, quien, "crear_dependencia",
-                       {"origen_tarea_id": b, "destino_tarea_id": a})
+                       {"origen_tarea_id": b, "destino_tarea_id": a}, ya_confirmada=True)
 
 
 def test_crear_dependencia_bloqueante_sobre_destino_ya_en_curso_lo_menciona(corework, conn):
@@ -299,7 +299,7 @@ def test_crear_dependencia_bloqueante_sobre_destino_ya_en_curso_lo_menciona(core
     with espacio(conn, ws) as cur:
         quien = _quien(cur, "Nahuel Gimenez", ws)
         H.ejecutar(cur, quien, "crear_dependencia",
-                  {"origen_tarea_id": origen, "destino_tarea_id": destino})
+                  {"origen_tarea_id": origen, "destino_tarea_id": destino}, ya_confirmada=True)
 
         cur.execute("select estado from task where id = %s", (destino,))
         assert cur.fetchone()["estado"] == "en_curso"   # no la mueve retroactivamente
@@ -323,7 +323,7 @@ def test_quitar_dependencia_la_puede_el_responsable_de_cualquiera(corework, conn
 
     with espacio(conn, ws) as cur:
         quien = _quien(cur, "Marcos Tarquini", ws)
-        r = H.ejecutar(cur, quien, "quitar_dependencia", {"dependencia_id": dep_id})
+        r = H.ejecutar(cur, quien, "quitar_dependencia", {"dependencia_id": dep_id}, ya_confirmada=True)
         assert r["eliminada"] is True
         cur.execute("select count(*) n from dependency where id = %s", (dep_id,))
         assert cur.fetchone()["n"] == 0
@@ -341,7 +341,7 @@ def test_quitar_dependencia_sin_autoridad_se_rechaza(corework, conn):
     with espacio(conn, ws) as cur:
         quien = _quien(cur, "Ariel De Simone", ws)
         with pytest.raises(Denegado):
-            H.ejecutar(cur, quien, "quitar_dependencia", {"dependencia_id": dep_id})
+            H.ejecutar(cur, quien, "quitar_dependencia", {"dependencia_id": dep_id}, ya_confirmada=True)
         cur.execute("select count(*) n from dependency where id = %s", (dep_id,))
         assert cur.fetchone()["n"] == 1
 
@@ -351,17 +351,23 @@ def test_quitar_dependencia_inexistente_dice_que_no_existe(corework, conn):
     with espacio(conn, ws) as cur:
         quien = _quien(cur, "Marcos Tarquini", ws)
         r = H.ejecutar(cur, quien, "quitar_dependencia",
-                       {"dependencia_id": "00000000-0000-0000-0000-000000000000"})
+                       {"dependencia_id": "00000000-0000-0000-0000-000000000000"}, ya_confirmada=True)
         assert "no existe" in r["error"]
 
 
 def test_quitar_dependencia_queda_auditada(corework, conn):
     """No hay baja blanda en `dependency` (a diferencia de `blocker.resuelto_en`):
     el rastro de quién quitó qué y cuándo lo da el mismo mecanismo genérico
-    que audita cualquier herramienta (`agente._ejecutar_una`,
-    `registrar_auditoria` con accion `herramienta:<nombre>` y los argumentos),
-    así que se prueba a través del turno completo, no de `H.ejecutar` directo."""
+    que audita cualquier herramienta.
+
+    Desde ADR 0005 (decisión 1), `quitar_dependencia` pide confirmación: el
+    turno completo sólo deja la propuesta pendiente, y la auditoría con
+    accion `herramienta:<nombre>` se escribe recién al confirmar por botón
+    (`gateway._toque`), no dentro del turno del agente.
+    """
+    from prisma import pendientes as P
     from prisma.agente import responder
+    from prisma.db import registrar_auditoria
     from prisma.llm import Llamada, ProveedorGuionado, Respuesta
 
     ws = corework.workspace_id
@@ -377,13 +383,28 @@ def test_quitar_dependencia_queda_auditada(corework, conn):
                                     {"dependencia_id": dep_id})]),
         Respuesta(texto="Listo, la quité."),
     ]
+    ahora = datetime(2026, 7, 27, 10, 0, tzinfo=BA)
     with espacio(conn, ws) as cur:
         quien = _quien(cur, "Marcos Tarquini", ws)
         cal = Calendario.desde_base(cur, ws)
         r = responder(cur, quien, "sacá esa dependencia",
-                     ProveedorGuionado(guion), cal, chat_id=9002,
-                     ahora=datetime(2026, 7, 27, 10, 0, tzinfo=BA))
-        assert r.acciones == ["quitar_dependencia"]
+                     ProveedorGuionado(guion), cal, chat_id=9002, ahora=ahora)
+        assert r.confirmaciones == ["quitar_dependencia"]
+        assert r.acciones == []
+
+        cur.execute(
+            """select id from pending_action
+                where herramienta = 'quitar_dependencia' and estado = 'esperando'""")
+        pid = str(cur.fetchone()["id"])
+        confirmar = P.opcion_por_etiqueta(cur, pid, "Confirmar")
+        resuelta = P.resolver(cur, confirmar.token,
+                              app_user_id=quien.app_user_id, ahora=ahora)
+        H.ejecutar(cur, quien, resuelta.herramienta, resuelta.args,
+                  ya_confirmada=True, chat_id=9002, huella_previa=resuelta.huella)
+        registrar_auditoria(
+            cur, accion=f"herramienta:{resuelta.herramienta}", workspace_id=ws,
+            actor_app_user_id=quien.app_user_id, actor_kind="persona",
+            detalle={"args": resuelta.args, "via": "boton"})
 
     with admin(conn) as cur:
         cur.execute(
@@ -410,7 +431,7 @@ def test_en_curso_se_frena_con_bloqueante_sin_terminar(corework, conn):
     with espacio(conn, ws) as cur:
         quien = _quien(cur, "Marcos Tarquini", ws)
         r = H.ejecutar(cur, quien, "actualizar_estado",
-                       {"tarea_id": destino, "estado": "en_curso"})
+                       {"tarea_id": destino, "estado": "en_curso"}, ya_confirmada=True)
         assert r["iniciada"] is False
         assert "Programar PLC" not in r["falta"] or "bloqueante" in r["falta"].lower() \
             or "dependencia" in r["falta"].lower()
@@ -444,13 +465,13 @@ def test_en_curso_se_libera_cuando_la_origen_termina(corework, conn):
     with espacio(conn, ws) as cur:
         quien = _quien(cur, "Nahuel Gimenez", ws)
         r = H.ejecutar(cur, quien, "actualizar_estado",
-                       {"tarea_id": origen, "estado": "terminada"})
+                       {"tarea_id": origen, "estado": "terminada"}, ya_confirmada=True)
         assert r == {"estado": "terminada"}
 
     with espacio(conn, ws) as cur:
         quien = _quien(cur, "Marcos Tarquini", ws)
         r = H.ejecutar(cur, quien, "actualizar_estado",
-                       {"tarea_id": destino, "estado": "en_curso"})
+                       {"tarea_id": destino, "estado": "en_curso"}, ya_confirmada=True)
         assert r == {"estado": "en_curso"}
 
 
@@ -466,7 +487,7 @@ def test_en_curso_no_se_frena_por_dependencia_informativa(corework, conn):
     with espacio(conn, ws) as cur:
         quien = _quien(cur, "Marcos Tarquini", ws)
         r = H.ejecutar(cur, quien, "actualizar_estado",
-                       {"tarea_id": destino, "estado": "en_curso"})
+                       {"tarea_id": destino, "estado": "en_curso"}, ya_confirmada=True)
         assert r == {"estado": "en_curso"}
 
 
@@ -487,7 +508,7 @@ def test_en_curso_no_se_frena_si_el_origen_ya_estaba_cancelada(corework, conn):
     with espacio(conn, ws) as cur:
         quien = _quien(cur, "Marcos Tarquini", ws)
         r = H.ejecutar(cur, quien, "actualizar_estado",
-                       {"tarea_id": destino, "estado": "en_curso"})
+                       {"tarea_id": destino, "estado": "en_curso"}, ya_confirmada=True)
         assert r == {"estado": "en_curso"}
 
 
@@ -613,7 +634,7 @@ def test_dependencia_informativa_avisa_a_ambos_al_cambiar_de_estado(corework, co
     with espacio(conn, ws) as cur:
         quien = _quien(cur, "Nahuel Gimenez", ws)
         H.ejecutar(cur, quien, "actualizar_estado",
-                  {"tarea_id": origen, "estado": "en_curso"})
+                  {"tarea_id": origen, "estado": "en_curso"}, ya_confirmada=True)
 
         avisos = _outbox(cur)
         destinatarios = {str(a["destinatario_membership_id"]) for a in avisos}
@@ -635,11 +656,11 @@ def test_dependencia_informativa_no_avisa_dos_veces_por_el_mismo_evento(corework
     with espacio(conn, ws) as cur:
         quien = _quien(cur, "Nahuel Gimenez", ws)
         H.ejecutar(cur, quien, "actualizar_estado",
-                  {"tarea_id": origen, "estado": "en_curso"})
+                  {"tarea_id": origen, "estado": "en_curso"}, ya_confirmada=True)
         primero = len(_outbox(cur))
 
         H.ejecutar(cur, quien, "actualizar_estado",
-                  {"tarea_id": origen, "estado": "en_revision"})
+                  {"tarea_id": origen, "estado": "en_revision"}, ya_confirmada=True)
         segundo = len(_outbox(cur))
         assert segundo > primero   # es un cambio de estado distinto, avisa de nuevo
 
@@ -668,11 +689,11 @@ def test_resolver_bloqueo_no_se_frena_por_dependencia_bloqueante_abierta(corewor
     with espacio(conn, ws) as cur:
         quien = _quien(cur, "Marcos Tarquini", ws)
         r = H.ejecutar(cur, quien, "registrar_bloqueo",
-                       {"tarea_id": destino, "causa": "algo urgente"})
+                       {"tarea_id": destino, "causa": "algo urgente"}, ya_confirmada=True)
         bloqueo_id = r["bloqueo_id"]
 
         r = H.ejecutar(cur, quien, "resolver_bloqueo",
-                       {"bloqueo_id": bloqueo_id, "resolucion": "listo"})
+                       {"bloqueo_id": bloqueo_id, "resolucion": "listo"}, ya_confirmada=True)
         assert r == {"resuelto": True, "tarea_desbloqueada": True}
 
         cur.execute("select estado from task where id = %s", (destino,))
@@ -697,9 +718,9 @@ def test_actualizar_estado_de_bloqueada_a_en_curso_no_se_frena_por_dependencia(c
     with espacio(conn, ws) as cur:
         quien = _quien(cur, "Marcos Tarquini", ws)
         H.ejecutar(cur, quien, "registrar_bloqueo",
-                  {"tarea_id": destino, "causa": "algo"})
+                  {"tarea_id": destino, "causa": "algo"}, ya_confirmada=True)
         r = H.ejecutar(cur, quien, "actualizar_estado",
-                       {"tarea_id": destino, "estado": "en_curso"})
+                       {"tarea_id": destino, "estado": "en_curso"}, ya_confirmada=True)
         assert r == {"estado": "en_curso"}
 
 
@@ -802,9 +823,9 @@ def test_en_curso_desde_bloqueada_sigue_frenado_si_nunca_arranco(corework, conn)
     with espacio(conn, ws) as cur:
         quien = _quien(cur, "Marcos Tarquini", ws)
         H.ejecutar(cur, quien, "registrar_bloqueo",
-                  {"tarea_id": destino, "causa": "algo"})
+                  {"tarea_id": destino, "causa": "algo"}, ya_confirmada=True)
         r = H.ejecutar(cur, quien, "actualizar_estado",
-                       {"tarea_id": destino, "estado": "en_curso"})
+                       {"tarea_id": destino, "estado": "en_curso"}, ya_confirmada=True)
         assert r["iniciada"] is False
         assert "dependencia" in r["falta"].lower() or "bloqueante" in r["falta"].lower()
 

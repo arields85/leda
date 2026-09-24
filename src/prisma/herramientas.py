@@ -15,6 +15,7 @@ Cada herramienta declara:
 
 from __future__ import annotations
 
+import hashlib
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -44,6 +45,16 @@ class Herramienta:
     # bastaría con que dijera "privado" para sortear una regla que depende
     # de dónde se pidió algo.
     necesita_chat: bool = False
+    # Las herramientas que escriben declaran esto (ADR 0005, decisión 1): lee
+    # el estado vigente, valida autoridad y reglas de negocio -- las mismas
+    # que el handler -- y arma la vista previa humana con su huella. Devuelve
+    # una `Preparacion`, o directamente el mismo dict de rechazo que el
+    # handler devolvería (para que una vista previa nunca proponga algo que
+    # el confirmar va a negar). `ejecutar` es quien decide, con esto, si la
+    # herramienta necesita confirmación: no una lista aparte por nombre de
+    # acción, que `crear_objetivo` ya demostró que se puede desalinear
+    # (`accion="crear_tarea"`, corregido en esta misma unidad).
+    preparar: Callable[..., Any] | None = None
 
 
 REGISTRO: dict[str, Herramienta] = {}
@@ -51,12 +62,50 @@ REGISTRO: dict[str, Herramienta] = {}
 
 def herramienta(nombre: str, accion: str, descripcion: str, parametros: dict,
                 *, valida_en_handler: bool = False,
-                necesita_chat: bool = False):
+                necesita_chat: bool = False,
+                preparar: Callable[..., Any] | None = None):
     def envoltura(fn):
         REGISTRO[nombre] = Herramienta(nombre, accion, descripcion, parametros,
-                                       fn, valida_en_handler, necesita_chat)
+                                       fn, valida_en_handler, necesita_chat,
+                                       preparar)
         return fn
     return envoltura
+
+
+@dataclass(frozen=True)
+class Preparacion:
+    """Lo que arma la preparación de una herramienta que escribe: el cambio
+    en términos humanos, y una huella del estado que se leyó para armarlo.
+
+    `cambio` no incluye el aviso de que todavía no se aplicó nada -- eso lo
+    agrega `resumen`, que es lo que se muestra en la vista previa. `cambio`
+    solo se reusa como base del recibo cuando se confirma.
+    """
+    cambio: str
+    huella: str
+
+    @property
+    def resumen(self) -> str:
+        return f"{self.cambio}\n\nTodavía no se aplicó ningún cambio."
+
+
+def _huella(*partes: Any) -> str:
+    """Hash estable del estado que se leyó. Opaco para quien lo compara:
+    sólo importa si es igual o distinto al que se guardó en la vista previa.
+    """
+    crudo = "|".join("" if p is None else str(p) for p in partes)
+    return hashlib.sha256(crudo.encode("utf-8")).hexdigest()
+
+
+_ESTADOS_LEGIBLES = {
+    "asignada": "Asignada", "en_curso": "En curso", "bloqueada": "Bloqueada",
+    "en_revision": "En revisión", "terminada": "Terminada",
+    "cancelada": "Cancelada",
+}
+
+
+def _estado_legible(estado: str | None) -> str:
+    return _ESTADOS_LEGIBLES.get(estado, estado or "sin estado")
 
 
 class NecesitaConfirmacion(Exception):
@@ -68,10 +117,30 @@ class NecesitaConfirmacion(Exception):
     tenían que ir los argumentos de la herramienta.
     """
 
-    def __init__(self, resumen: str, herramienta: str, argumentos: dict) -> None:
+    def __init__(self, resumen: str, herramienta: str, argumentos: dict,
+                 huella: str | None = None) -> None:
         self.resumen = resumen
         self.herramienta = herramienta
         self.argumentos = argumentos
+        self.huella = huella
+        super().__init__(resumen)
+
+
+class EstadoCambio(Exception):
+    """El estado que se había mostrado en la vista previa ya no es el mismo.
+
+    Se lanza al confirmar, nunca antes: la preparación se volvió a correr con
+    autoridad vigente y el resultado sigue siendo una propuesta válida, pero
+    su huella no coincide con la que se guardó. No se aplica nada; quien
+    llama arma una vista previa nueva con `resumen` y `huella`.
+    """
+
+    def __init__(self, resumen: str, herramienta: str, argumentos: dict,
+                 huella: str) -> None:
+        self.resumen = resumen
+        self.herramienta = herramienta
+        self.argumentos = argumentos
+        self.huella = huella
         super().__init__(resumen)
 
 
@@ -113,7 +182,8 @@ def candidatos(cur: psycopg.Cursor, texto: str) -> list[tuple[str, str]]:
 
 def ejecutar(cur: psycopg.Cursor, quien: Solicitante, nombre: str,
              args: dict[str, Any], *, ya_confirmada: bool = False,
-             chat_id: int | None = None) -> Any:
+             chat_id: int | None = None, huella_previa: str | None = None,
+             preparacion: dict[str, Any] | None = None) -> Any:
     """Punto único de entrada. Nada llega a la base por otro camino.
 
     `ya_confirmada` es para lo que vuelve de una acción pendiente: la persona
@@ -123,6 +193,15 @@ def ejecutar(cur: psycopg.Cursor, quien: Solicitante, nombre: str,
     `chat_id` lo pone el servidor desde el update de Telegram, y sólo lo
     reciben las herramientas que lo declaran. No viaja en el esquema que ve
     el modelo: de dónde se pidió algo es un hecho, no un argumento.
+
+    `huella_previa` es la que se guardó al mostrar la vista previa; sólo la
+    manda quien confirma por botón. Si la preparación, corrida de nuevo,
+    devuelve una huella distinta, no se aplica nada (`EstadoCambio`).
+
+    `preparacion`, si se pasa un dict, se completa con `cambio` y `huella` de
+    la última preparación corrida acá -- así quien llama arma un recibo que
+    cuenta qué cambió, sin que `ejecutar` deje de devolver sólo el resultado
+    del handler.
     """
     if nombre == "crear_tarea":
         raise Denegado(
@@ -134,7 +213,23 @@ def ejecutar(cur: psycopg.Cursor, quien: Solicitante, nombre: str,
     if not h.valida_en_handler:
         verificar(cur, quien, h.accion, area_id=args.get("area_id"))
 
-    if requiere_confirmacion(h.accion) and not ya_confirmada:
+    if h.preparar is not None:
+        prep = h.preparar(cur, quien, **args)
+        if isinstance(prep, dict):
+            # La preparación encontró lo mismo que encontraría el handler:
+            # un rechazo de negocio, no de autoridad. Se devuelve tal cual,
+            # sin pasar por confirmación -- confirmar algo imposible no
+            # tiene sentido.
+            return prep
+        if preparacion is not None:
+            preparacion["cambio"] = prep.cambio
+            preparacion["huella"] = prep.huella
+        if not ya_confirmada:
+            raise NecesitaConfirmacion(prep.resumen, nombre, dict(args),
+                                       huella=prep.huella)
+        if huella_previa is not None and prep.huella != huella_previa:
+            raise EstadoCambio(prep.resumen, nombre, dict(args), prep.huella)
+    elif requiere_confirmacion(h.accion) and not ya_confirmada:
         raise NecesitaConfirmacion(_resumen(h, args), nombre, dict(args))
 
     llamada = dict(args)
@@ -258,8 +353,32 @@ def _consultar_bloqueos(cur, quien: Solicitante):
 # Trabajo
 # ---------------------------------------------------------------------------
 
+def _preparar_crear_objetivo(cur, quien: Solicitante, titulo, tipo,
+                             padre_id=None, descripcion=None,
+                             fecha_objetivo=None):
+    padre_titulo = None
+    padre_estado = None
+    if padre_id:
+        cur.execute("select titulo, estado from objective where id = %s",
+                   (padre_id,))
+        padre = cur.fetchone()
+        if not padre:
+            return {"error": "el objetivo del que iba a colgar no existe en "
+                             "este equipo"}
+        padre_titulo, padre_estado = padre["titulo"], padre["estado"]
+
+    cambio = f"Nuevo objetivo ({tipo}): {titulo}"
+    if padre_titulo:
+        cambio += f" · cuelga de «{padre_titulo}»"
+    if fecha_objetivo:
+        cambio += f" · fecha objetivo: {fecha_objetivo}"
+    huella = _huella("crear_objetivo", titulo, tipo, padre_id, padre_estado,
+                     descripcion, fecha_objetivo)
+    return Preparacion(cambio=cambio, huella=huella)
+
+
 @herramienta(
-    "crear_objetivo", "crear_tarea",
+    "crear_objetivo", "crear_objetivo",
     "Crea un objetivo. Usalo cuando el trabajo que piden no encaja en ninguno "
     "de los que ya existen. Consultá primero los objetivos actuales.",
     {"titulo": {"type": "string", "requerido": True},
@@ -267,7 +386,8 @@ def _consultar_bloqueos(cur, quien: Solicitante):
               "enum": ["estrategico", "hito", "operativo"]},
      "padre_id": {"type": "string", "description": "objetivo del que cuelga"},
      "descripcion": {"type": "string"},
-     "fecha_objetivo": {"type": "string", "description": "AAAA-MM-DD"}})
+     "fecha_objetivo": {"type": "string", "description": "AAAA-MM-DD"}},
+    preparar=_preparar_crear_objetivo)
 def _crear_objetivo(cur, quien: Solicitante, titulo, tipo, padre_id=None,
                     descripcion=None, fecha_objetivo=None):
     cur.execute(
@@ -477,6 +597,37 @@ def crear_borrador_tarea(cur, quien: Solicitante, titulo, objetivo_id=None,
             "pending_action_id": pendiente.id}
 
 
+def _preparar_actualizar_estado(cur, quien: Solicitante, tarea_id, estado,
+                                motivo=None):
+    cur.execute("select titulo, estado from task where id = %s", (tarea_id,))
+    fila = cur.fetchone()
+    if not fila:
+        return {"error": "esa tarea no existe en este equipo"}
+
+    if estado == "terminada":
+        cur.execute("select motivo_no_cierra_tarea(%s) as m", (tarea_id,))
+        impedimento = cur.fetchone()["m"]
+        if impedimento:
+            return {"cerrada": False, "falta": impedimento}
+
+    if estado == "en_curso":
+        restaura_en_curso = False
+        if fila["estado"] == "bloqueada":
+            cur.execute("select estado_previo_a_bloqueo(%s) as previo", (tarea_id,))
+            restaura_en_curso = cur.fetchone()["previo"] == "en_curso"
+        if not restaura_en_curso:
+            cur.execute("select motivo_no_arranca_tarea(%s) as m", (tarea_id,))
+            impedimento = cur.fetchone()["m"]
+            if impedimento:
+                return {"iniciada": False, "falta": impedimento}
+
+    cambio = (f"Tarea: {fila['titulo']} · Estado actual: "
+             f"{_estado_legible(fila['estado'])} · Nuevo estado: "
+             f"{_estado_legible(estado)}")
+    huella = _huella("actualizar_estado", tarea_id, fila["estado"])
+    return Preparacion(cambio=cambio, huella=huella)
+
+
 @herramienta(
     "actualizar_estado", "actualizar_estado",
     "Mueve una tarea de estado. No cierra: para terminar hace falta que se "
@@ -485,7 +636,8 @@ def crear_borrador_tarea(cur, quien: Solicitante, titulo, objetivo_id=None,
      "estado": {"type": "string", "requerido": True,
                 "enum": ["asignada", "en_curso", "en_revision", "terminada",
                          "cancelada"]},
-     "motivo": {"type": "string"}})
+     "motivo": {"type": "string"}},
+    preparar=_preparar_actualizar_estado)
 def _actualizar_estado(cur, quien: Solicitante, tarea_id, estado, motivo=None):
     cur.execute("select estado from task where id = %s", (tarea_id,))
     fila = cur.fetchone()
@@ -541,12 +693,34 @@ def _actualizar_estado(cur, quien: Solicitante, tarea_id, estado, motivo=None):
     return {"estado": estado}
 
 
+def _preparar_registrar_bloqueo(cur, quien: Solicitante, tarea_id, causa,
+                                impacto=None):
+    cur.execute("select titulo, estado from task where id = %s", (tarea_id,))
+    fila = cur.fetchone()
+    if not fila:
+        return {"error": "esa tarea no existe en este equipo"}
+    if fila["estado"] in ("terminada", "cancelada"):
+        return {"error": "esa tarea ya está cerrada, no se le puede agregar un bloqueo"}
+
+    cambio = f"Tarea: {fila['titulo']} · Causa del bloqueo: {causa}"
+    if impacto:
+        cambio += f" · Impacto: {impacto}"
+    if fila["estado"] == "bloqueada":
+        cambio += " · se suma a los bloqueos abiertos; la tarea sigue Bloqueada"
+    else:
+        cambio += (f" · Estado actual: {_estado_legible(fila['estado'])} · "
+                  f"la tarea pasa a Bloqueada")
+    huella = _huella("registrar_bloqueo", tarea_id, fila["estado"])
+    return Preparacion(cambio=cambio, huella=huella)
+
+
 @herramienta(
     "registrar_bloqueo", "registrar_bloqueo",
     "Registra que una tarea está trabada, con su causa e impacto.",
     {"tarea_id": {"type": "string", "requerido": True},
      "causa": {"type": "string", "requerido": True},
-     "impacto": {"type": "string"}})
+     "impacto": {"type": "string"}},
+    preparar=_preparar_registrar_bloqueo)
 def _registrar_bloqueo(cur, quien: Solicitante, tarea_id, causa, impacto=None):
     cur.execute("select estado from task where id = %s", (tarea_id,))
     fila = cur.fetchone()
@@ -573,13 +747,61 @@ def _registrar_bloqueo(cur, quien: Solicitante, tarea_id, causa, impacto=None):
     return {"bloqueo_id": str(bid)}
 
 
+def _preparar_resolver_bloqueo(cur, quien: Solicitante, bloqueo_id, resolucion):
+    resolucion = (resolucion or "").strip()
+    if not resolucion:
+        raise Denegado("Hace falta contar cómo se resolvió para poder cerrarlo.")
+
+    cur.execute(
+        """select b.causa, b.task_id, b.resuelto_en, b.abierto_por, b.escalado_a,
+                  t.titulo, t.estado, t.responsable_membership_id
+             from blocker b join task t on t.id = b.task_id
+            where b.id = %s""",
+        (bloqueo_id,))
+    fila = cur.fetchone()
+    if not fila:
+        return {"error": "ese bloqueo no existe en este equipo"}
+    if fila["resuelto_en"] is not None:
+        return {"error": "ese bloqueo ya estaba resuelto"}
+
+    autorizados = {str(m) for m in (fila["responsable_membership_id"],
+                                    fila["abierto_por"], fila["escalado_a"])
+                  if m is not None}
+    if str(quien.membership_id) not in autorizados:
+        raise Denegado(
+            "No podés resolver ese bloqueo: no es tuyo, no lo abriste vos ni "
+            "se te escaló.")
+
+    vuelve_a = None
+    quedan_abiertos = None
+    if fila["estado"] == "bloqueada":
+        cur.execute(
+            """select count(*) n from blocker
+                where task_id = %s and resuelto_en is null and id <> %s""",
+            (fila["task_id"], bloqueo_id))
+        quedan_abiertos = cur.fetchone()["n"] > 0
+        if not quedan_abiertos:
+            cur.execute("select estado_previo_a_bloqueo(%s) as previo",
+                       (fila["task_id"],))
+            vuelve_a = cur.fetchone()["previo"]
+
+    cambio = f"Tarea: {fila['titulo']} · Bloqueo: {fila['causa']} · Resolución: {resolucion}"
+    if vuelve_a:
+        cambio += f" · la tarea vuelve a {_estado_legible(vuelve_a)}"
+    elif fila["estado"] == "bloqueada":
+        cambio += " · la tarea sigue Bloqueada (hay otros bloqueos abiertos)"
+    huella = _huella("resolver_bloqueo", bloqueo_id, fila["resuelto_en"],
+                     fila["estado"], quedan_abiertos)
+    return Preparacion(cambio=cambio, huella=huella)
+
+
 @herramienta(
     "resolver_bloqueo", "resolver_bloqueo",
     "Cierra un bloqueo con su resolución. Cuando era el último abierto de la "
     "tarea, la tarea vuelve al estado que tenía antes de bloquearse.",
     {"bloqueo_id": {"type": "string", "requerido": True},
      "resolucion": {"type": "string", "requerido": True}},
-    valida_en_handler=True)
+    valida_en_handler=True, preparar=_preparar_resolver_bloqueo)
 def _resolver_bloqueo(cur, quien: Solicitante, bloqueo_id, resolucion):
     resolucion = (resolucion or "").strip()
     if not resolucion:
@@ -656,13 +878,27 @@ def _resolver_bloqueo(cur, quien: Solicitante, bloqueo_id, resolucion):
     return {"resuelto": True, "tarea_desbloqueada": tarea_desbloqueada}
 
 
+def _preparar_adjuntar_evidencia(cur, quien: Solicitante, tarea_id, tipo,
+                                 uri=None, descripcion=None):
+    cur.execute("select titulo from task where id = %s", (tarea_id,))
+    fila = cur.fetchone()
+    if not fila:
+        return {"error": "esa tarea no existe en este equipo"}
+
+    detalle = uri or descripcion or "(sin detalle)"
+    cambio = f"Tarea: {fila['titulo']} · Nueva evidencia ({tipo}): {detalle}"
+    huella = _huella("adjuntar_evidencia", tarea_id, tipo, uri, descripcion)
+    return Preparacion(cambio=cambio, huella=huella)
+
+
 @herramienta(
     "adjuntar_evidencia", "adjuntar_evidencia",
     "Registra la prueba de que un trabajo se hizo.",
     {"tarea_id": {"type": "string", "requerido": True},
      "tipo": {"type": "string", "requerido": True},
      "uri": {"type": "string"},
-     "descripcion": {"type": "string"}})
+     "descripcion": {"type": "string"}},
+    preparar=_preparar_adjuntar_evidencia)
 def _adjuntar_evidencia(cur, quien: Solicitante, tarea_id, tipo, uri=None,
                         descripcion=None):
     cur.execute(
@@ -673,13 +909,37 @@ def _adjuntar_evidencia(cur, quien: Solicitante, tarea_id, tipo, uri=None,
     return {"evidencia_id": str(cur.fetchone()["id"])}
 
 
+def _preparar_aprobar_tarea(cur, quien: Solicitante, tarea_id, comentario=None):
+    cur.execute(
+        "select titulo, estado, responsable_membership_id from task where id = %s",
+        (tarea_id,))
+    fila = cur.fetchone()
+    if not fila:
+        return {"error": "esa tarea no existe en este equipo"}
+    if fila["responsable_membership_id"] is None:
+        return {"error": "esa tarea no tiene responsable asignado"}
+
+    if str(fila["responsable_membership_id"]) == str(quien.membership_id):
+        raise Denegado("No podés aprobar tu propio trabajo.")
+    if not puede_aprobar_tarea(cur, quien, fila["responsable_membership_id"]):
+        raise Denegado("No sos quien revisa el trabajo de esa persona.")
+
+    cambio = (f"Tarea: {fila['titulo']} · Estado actual: "
+             f"{_estado_legible(fila['estado'])} · se aprueba el trabajo")
+    if comentario:
+        cambio += f" · Comentario: {comentario}"
+    huella = _huella("aprobar_tarea", tarea_id, fila["estado"],
+                     fila["responsable_membership_id"])
+    return Preparacion(cambio=cambio, huella=huella)
+
+
 @herramienta(
     "aprobar_tarea", "aprobar_tarea",
     "Aprueba el trabajo de una tarea. Sólo puede quien la política del equipo "
     "designa para esa área.",
     {"tarea_id": {"type": "string", "requerido": True},
      "comentario": {"type": "string"}},
-    valida_en_handler=True)
+    valida_en_handler=True, preparar=_preparar_aprobar_tarea)
 def _aprobar_tarea(cur, quien: Solicitante, tarea_id, comentario=None):
     cur.execute(
         "select responsable_membership_id from task where id = %s", (tarea_id,))
@@ -845,6 +1105,40 @@ def _texto_dependencia_creada(tipo, origen, destino, creador_nombre) -> str:
            f"alguna de las dos cambie de estado.")
 
 
+def _preparar_crear_dependencia(cur, quien: Solicitante, origen_tarea_id,
+                                destino_tarea_id, tipo="bloqueante"):
+    if str(origen_tarea_id) == str(destino_tarea_id):
+        return {"error": "una tarea no puede depender de sí misma"}
+
+    origen = _tarea_para_dependencia(cur, origen_tarea_id)
+    if not origen:
+        return {"error": "la tarea de origen no existe en este equipo"}
+    destino = _tarea_para_dependencia(cur, destino_tarea_id)
+    if not destino:
+        return {"error": "la tarea de destino no existe en este equipo"}
+
+    if destino["estado"] in ("terminada", "cancelada"):
+        return {"error": "esa tarea ya está cerrada, no se le puede agregar una dependencia"}
+
+    cur.execute(
+        "select 1 from dependency where origen_task_id = %s and destino_task_id = %s",
+        (origen_tarea_id, destino_tarea_id))
+    if cur.fetchone():
+        return {"error": "ya existe una dependencia registrada entre esas tareas"}
+
+    if not _autorizado_para_dependencia(cur, quien, origen, destino):
+        raise Denegado(
+            "No podés declarar una dependencia entre esas tareas: no sos "
+            "responsable de ninguna de las dos, ni referente de quien lo es.")
+
+    tipo_legible = "bloqueante" if tipo == "bloqueante" else "informativa"
+    cambio = (f"Tarea «{destino['titulo']}» pasa a depender de "
+             f"«{origen['titulo']}» ({tipo_legible})")
+    huella = _huella("crear_dependencia", origen_tarea_id, destino_tarea_id,
+                     tipo, origen["estado"], destino["estado"])
+    return Preparacion(cambio=cambio, huella=huella)
+
+
 @herramienta(
     "crear_dependencia", "crear_dependencia",
     "Declara que una tarea depende de otra. 'bloqueante' frena que la "
@@ -853,7 +1147,7 @@ def _texto_dependencia_creada(tipo, origen, destino, creador_nombre) -> str:
     {"origen_tarea_id": {"type": "string", "requerido": True},
      "destino_tarea_id": {"type": "string", "requerido": True},
      "tipo": {"type": "string", "enum": ["bloqueante", "informativa"]}},
-    valida_en_handler=True)
+    valida_en_handler=True, preparar=_preparar_crear_dependencia)
 def _crear_dependencia(cur, quien: Solicitante, origen_tarea_id, destino_tarea_id,
                        tipo="bloqueante"):
     if str(origen_tarea_id) == str(destino_tarea_id):
@@ -898,11 +1192,37 @@ def _crear_dependencia(cur, quien: Solicitante, origen_tarea_id, destino_tarea_i
     return {"dependencia_id": str(dep_id)}
 
 
+def _preparar_quitar_dependencia(cur, quien: Solicitante, dependencia_id):
+    cur.execute(
+        """select d.id, o.titulo as origen_titulo, t.titulo as destino_titulo,
+                  o.responsable_membership_id as origen_resp,
+                  t.responsable_membership_id as destino_resp
+             from dependency d
+             join task o on o.id = d.origen_task_id
+             join task t on t.id = d.destino_task_id
+            where d.id = %s""", (dependencia_id,))
+    fila = cur.fetchone()
+    if not fila:
+        return {"error": "esa dependencia no existe en este equipo"}
+
+    origen = {"responsable_membership_id": fila["origen_resp"]}
+    destino = {"responsable_membership_id": fila["destino_resp"]}
+    if not _autorizado_para_dependencia(cur, quien, origen, destino):
+        raise Denegado(
+            "No podés quitar esa dependencia: no sos responsable de ninguna "
+            "de las dos tareas, ni referente de quien lo es.")
+
+    cambio = (f"Se elimina la dependencia entre «{fila['destino_titulo']}» y "
+             f"«{fila['origen_titulo']}»")
+    huella = _huella("quitar_dependencia", dependencia_id)
+    return Preparacion(cambio=cambio, huella=huella)
+
+
 @herramienta(
     "quitar_dependencia", "quitar_dependencia",
     "Elimina una dependencia entre dos tareas.",
     {"dependencia_id": {"type": "string", "requerido": True}},
-    valida_en_handler=True)
+    valida_en_handler=True, preparar=_preparar_quitar_dependencia)
 def _quitar_dependencia(cur, quien: Solicitante, dependencia_id):
     cur.execute(
         """select d.id, o.responsable_membership_id as origen_resp,

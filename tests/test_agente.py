@@ -169,6 +169,8 @@ def test_no_cierra_sin_condiciones_y_lo_dice(corework, conn):
 
 
 def test_confirmacion_congela_la_accion_y_no_ejecuta(corework, conn):
+    """Desde ADR 0005 (decisión 1), `actualizar_estado` siempre pide
+    confirmación: no hace falta forzar `REQUIEREN_CONFIRMACION` a mano."""
     ws = corework.workspace_id
     with admin(conn) as cur:
         tid = _tarea(cur, ws)
@@ -178,36 +180,31 @@ def test_confirmacion_congela_la_accion_y_no_ejecuta(corework, conn):
                                     {"tarea_id": tid, "estado": "en_curso"})]),
         Respuesta(texto="Listo."),
     ]
-    # Marcamos la acción como de las que exigen confirmación humana.
-    from prisma import autoridad
-    autoridad.REQUIEREN_CONFIRMACION.add("actualizar_estado")
-    try:
-        with espacio(conn, ws) as cur:
-            quien = _quien(cur, "Marcos Tarquini", ws)
-            cal = Calendario.desde_base(cur, ws)
-            r = responder(cur, quien, "arranco con esto",
-                          ProveedorGuionado(guion), cal, chat_id=9002, ahora=AHORA)
+    with espacio(conn, ws) as cur:
+        quien = _quien(cur, "Marcos Tarquini", ws)
+        cal = Calendario.desde_base(cur, ws)
+        r = responder(cur, quien, "arranco con esto",
+                      ProveedorGuionado(guion), cal, chat_id=9002, ahora=AHORA)
 
-            assert r.confirmaciones == ["actualizar_estado"]
-            assert r.acciones == []
-            cur.execute("select estado from task where id = %s", (tid,))
-            assert cur.fetchone()["estado"] == "asignada"     # no se ejecutó
+        assert r.confirmaciones == ["actualizar_estado"]
+        assert r.acciones == []
+        cur.execute("select estado from task where id = %s", (tid,))
+        assert cur.fetchone()["estado"] == "asignada"     # no se ejecutó
 
-            # Lo que espera es la acción, no la pregunta. Antes el pedido de
-            # confirmación entraba a la cola en 'esperando_confirmacion' y el
-            # despachador sólo levanta 'listo': la pregunta no salía nunca, y
-            # la acción no quedaba guardada en ningún lado. Ahora la pregunta
-            # sale con sus botones y la herramienta queda congelada entera.
-            cur.execute("""select estado, pending_action_id from message_outbox""")
-            m = cur.fetchone()
-            assert m["estado"] == "listo" and m["pending_action_id"]
-            cur.execute("""select herramienta, args, estado from pending_action""")
-            p = cur.fetchone()
-            assert p["estado"] == "esperando"
-            assert p["herramienta"] == "actualizar_estado"
-            assert p["args"]["estado"] == "en_curso"
-    finally:
-        autoridad.REQUIEREN_CONFIRMACION.discard("actualizar_estado")
+        # Lo que espera es la acción, no la pregunta. Antes el pedido de
+        # confirmación entraba a la cola en 'esperando_confirmacion' y el
+        # despachador sólo levanta 'listo': la pregunta no salía nunca, y
+        # la acción no quedaba guardada en ningún lado. Ahora la pregunta
+        # sale con sus botones y la herramienta queda congelada entera.
+        cur.execute("""select estado, pending_action_id from message_outbox""")
+        m = cur.fetchone()
+        assert m["estado"] == "listo" and m["pending_action_id"]
+        cur.execute("""select herramienta, args, estado, huella from pending_action""")
+        p = cur.fetchone()
+        assert p["estado"] == "esperando"
+        assert p["herramienta"] == "actualizar_estado"
+        assert p["args"]["estado"] == "en_curso"
+        assert p["huella"]      # T1: la vista previa guarda una huella del estado leído
 
 
 def test_falla_del_modelo_no_filtra_detalles_tecnicos(corework, conn):
@@ -237,7 +234,13 @@ def test_falla_del_modelo_no_filtra_detalles_tecnicos(corework, conn):
 
 
 def test_bloqueo_registrado_saca_la_tarea_de_la_escalera(corework, conn):
+    """Desde ADR 0005, `registrar_bloqueo` queda pendiente de confirmación en
+    el turno; se confirma por botón (simulado acá con `pendientes.resolver` +
+    `H.ejecutar(ya_confirmada=True)`, el mismo camino que usa el gateway) y
+    recién ahí saca a la tarea de la escalera."""
     from prisma import escalera
+    from prisma import herramientas as H
+    from prisma import pendientes as P
 
     ws = corework.workspace_id
     with admin(conn) as cur:
@@ -255,7 +258,21 @@ def test_bloqueo_registrado_saca_la_tarea_de_la_escalera(corework, conn):
         r = responder(cur, quien, "estoy trabado, falta el switch",
                       ProveedorGuionado(guion), cal, chat_id=9002, ahora=AHORA)
 
-        assert r.acciones == ["registrar_bloqueo"]
+        assert r.confirmaciones == ["registrar_bloqueo"]
+        assert r.acciones == []
+        cur.execute("select estado from task where id = %s", (tid,))
+        assert cur.fetchone()["estado"] == "asignada"     # todavía no se aplicó
+
+        cur.execute(
+            """select id from pending_action
+                where herramienta = 'registrar_bloqueo' and estado = 'esperando'""")
+        pid = str(cur.fetchone()["id"])
+        confirmar = P.opcion_por_etiqueta(cur, pid, "Confirmar")
+        resuelta = P.resolver(cur, confirmar.token,
+                              app_user_id=quien.app_user_id, ahora=AHORA)
+        H.ejecutar(cur, quien, resuelta.herramienta, resuelta.args,
+                  ya_confirmada=True, chat_id=9002, huella_previa=resuelta.huella)
+
         cur.execute("select estado from task where id = %s", (tid,))
         assert cur.fetchone()["estado"] == "bloqueada"
 
@@ -280,6 +297,10 @@ def test_auditoria_guarda_las_versiones_de_las_reglas(corework, conn):
 
 
 def _intento_aprobar(conn, ws, quien_nombre, tid, chat):
+    """Desde ADR 0005, `aprobar_tarea` nunca ejecuta en el mismo turno: la
+    cadena de autoridad se sigue decidiendo en la preparación (antes de
+    mostrar la vista previa), así que "puede aprobar" ahora se traduce en
+    "queda pendiente de confirmación" en vez de "acción ejecutada"."""
     guion = [
         Respuesta(llamadas=[Llamada("c1", "aprobar_tarea", {"tarea_id": tid})]),
         Respuesta(texto="…"),
@@ -289,7 +310,8 @@ def _intento_aprobar(conn, ws, quien_nombre, tid, chat):
         cal = Calendario.desde_base(cur, ws)
         r = responder(cur, quien, "apruebo esa tarea", ProveedorGuionado(guion),
                       cal, chat_id=chat, ahora=AHORA)
-    return r.acciones == ["aprobar_tarea"]
+    assert r.acciones == []      # nunca ejecuta directo, autorizado o no
+    return r.confirmaciones == ["aprobar_tarea"]
 
 
 def test_cadena_de_aprobacion(corework, conn):

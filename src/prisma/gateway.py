@@ -286,12 +286,36 @@ def _toque(conn, workspace_id: str, slug: str, toque: dict,
                 _responder(cur, workspace_id, chat_id, quien,
                            "Hecho. La tarea quedó comprometida.", ahora)
             else:
+                from .agente import VIGENCIA_PENDIENTE
+
+                prep_capturada: dict = {}
                 try:
                     resultado = H.ejecutar(
                         cur, quien, resuelta.herramienta, resuelta.args,
-                        ya_confirmada=True, chat_id=chat_id)
+                        ya_confirmada=True, chat_id=chat_id,
+                        huella_previa=resuelta.huella,
+                        preparacion=prep_capturada)
                 except Denegado as e:
                     _responder(cur, workspace_id, chat_id, quien, str(e), ahora)
+                except H.EstadoCambio as e:
+                    # La situación cambió entre la vista previa y el toque
+                    # (ADR 0005, decisión 1): no se aplica nada, se arma una
+                    # vista previa nueva y una acción pendiente nueva.
+                    nueva = P.registrar(
+                        cur, quien, herramienta=e.herramienta,
+                        args=e.argumentos, resumen=e.resumen,
+                        vence_en=ahora + VIGENCIA_PENDIENTE, chat_id=chat_id,
+                        huella=e.huella)
+                    enqueue_outbox(
+                        cur, workspace_id=workspace_id, chat_id=chat_id,
+                        recipient_membership_id=quien.membership_id,
+                        text=("La situación cambió desde que te mostré esto. "
+                              f"Vista previa nueva:\n\n{e.resumen}"),
+                        scheduled_for=ahora,
+                        dedupe_key=(f"{workspace_id}:cambio:{e.herramienta}:"
+                                   f"{ahora.timestamp()}"),
+                        is_response=True, pending_action_id=nueva.id,
+                    )
                 else:
                     registrar_auditoria(
                         cur, accion=f"herramienta:{resuelta.herramienta}",
@@ -306,6 +330,22 @@ def _toque(conn, workspace_id: str, slug: str, toque: dict,
                             texto = ("Guardé el pedido como borrador; todavía "
                                      "está incompleto.")
                         _responder(cur, workspace_id, chat_id, quien, texto, ahora)
+                    elif isinstance(resultado, dict) and (
+                            resultado.get("error")
+                            or resultado.get("cerrada") is False
+                            or resultado.get("iniciada") is False):
+                        # La preparación había pasado, pero el handler encontró
+                        # un impedimento de negocio al aplicar (p. ej. una
+                        # condición de cierre que cambió en el mismo instante).
+                        _responder(cur, workspace_id, chat_id, quien,
+                                  "No se aplicó el cambio.", ahora)
+                    elif prep_capturada.get("cambio"):
+                        # El recibo cuenta qué cambió, no un "Hecho." solo
+                        # (T2, punto 3): reusa la descripción que ya se había
+                        # mostrado en la vista previa, porque la huella
+                        # coincidió -- el estado sigue siendo ese.
+                        _responder(cur, workspace_id, chat_id, quien,
+                                  f"Hecho. {prep_capturada['cambio']}", ahora)
                     else:
                         _responder(cur, workspace_id, chat_id, quien, "Hecho.", ahora)
 

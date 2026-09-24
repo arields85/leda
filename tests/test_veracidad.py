@@ -17,7 +17,6 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from prisma import autoridad
 from prisma.agente import responder
 from prisma.autoridad import Canal, identificar
 from prisma.calendario import Calendario
@@ -67,7 +66,11 @@ def _cuerpos(cur) -> list[str]:
 # ---------------------------------------------------------------------------
 
 def test_no_anuncia_como_hecho_lo_que_quedo_esperando_confirmacion(corework, conn):
-    """El caso que da vergüenza: "listo" cuando no hizo nada."""
+    """El caso que da vergüenza: "listo" cuando no hizo nada.
+
+    Desde ADR 0005 (decisión 1), `actualizar_estado` siempre pide
+    confirmación: no hace falta forzar `REQUIEREN_CONFIRMACION` a mano.
+    """
     ws = corework.workspace_id
     with admin(conn) as cur:
         tid = _tarea(cur, ws)
@@ -77,19 +80,15 @@ def test_no_anuncia_como_hecho_lo_que_quedo_esperando_confirmacion(corework, con
                                     {"tarea_id": tid, "estado": "en_curso"})]),
         Respuesta(texto="Listo, ya la puse en curso."),
     ]
-    autoridad.REQUIEREN_CONFIRMACION.add("actualizar_estado")
-    try:
-        with espacio(conn, ws) as cur:
-            quien = _quien(cur, "Marcos Tarquini", ws)
-            cal = Calendario.desde_base(cur, ws)
-            responder(cur, quien, "arranco con esto", ProveedorGuionado(guion),
-                      cal, chat_id=9004, ahora=AHORA)
+    with espacio(conn, ws) as cur:
+        quien = _quien(cur, "Marcos Tarquini", ws)
+        cal = Calendario.desde_base(cur, ws)
+        responder(cur, quien, "arranco con esto", ProveedorGuionado(guion),
+                  cal, chat_id=9004, ahora=AHORA)
 
-            cuerpos = _cuerpos(cur)
-            assert not any("Listo" in c for c in cuerpos), cuerpos
-            assert any("confirmame" in c.lower() for c in cuerpos)
-    finally:
-        autoridad.REQUIEREN_CONFIRMACION.discard("actualizar_estado")
+        cuerpos = _cuerpos(cur)
+        assert not any("Listo" in c for c in cuerpos), cuerpos
+        assert any("Todavía no se aplicó ningún cambio." in c for c in cuerpos)
 
 
 def test_legacy_crear_tarea_no_produce_eleccion_ni_efecto(corework, conn):
@@ -182,20 +181,23 @@ def test_una_respuesta_normal_sale_tal_cual(corework, conn):
 
 
 def test_lo_que_si_ejecuto_lo_puede_contar(corework, conn):
-    """Si la acción corrió, el texto del modelo sale sin recortes."""
+    """Si la acción corrió, el texto del modelo sale sin recortes.
+
+    Las 8 herramientas que escriben ya no ejecutan directo (ADR 0005): la
+    que se ejecuta sola en un turno es una de consulta.
+    """
     ws = corework.workspace_id
     with espacio(conn, ws) as cur:
         quien = _quien(cur, "Marcos Tarquini", ws)
         cal = Calendario.desde_base(cur, ws)
-        tid = _tarea(cur, ws)
+        _tarea(cur, ws)
 
         guion = [
-            Respuesta(llamadas=[Llamada("c1", "actualizar_estado",
-                                        {"tarea_id": tid, "estado": "en_curso"})]),
-            Respuesta(texto="Listo, quedó en curso."),
+            Respuesta(llamadas=[Llamada("c1", "consultar_tareas", {})]),
+            Respuesta(texto="Tenés una tarea abierta."),
         ]
-        r = responder(cur, quien, "arranco", ProveedorGuionado(guion), cal,
+        r = responder(cur, quien, "qué tengo", ProveedorGuionado(guion), cal,
                       chat_id=9004, ahora=AHORA)
 
-        assert r.texto == "Listo, quedó en curso."
-        assert r.acciones == ["actualizar_estado"]
+        assert r.texto == "Tenés una tarea abierta."
+        assert r.acciones == ["consultar_tareas"]

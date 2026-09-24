@@ -208,7 +208,8 @@ def test_recolectar_efectos_bloqueos_abiertos_baja_al_resolver(corework, conn):
         tg = cur.fetchone()["t"]
         quien = identificar(cur, tg, Canal.ESPACIO, ws)
         H.ejecutar(cur, quien, "resolver_bloqueo",
-                  {"bloqueo_id": bloqueo_id, "resolucion": "listo (simulado)"})
+                  {"bloqueo_id": bloqueo_id, "resolucion": "listo (simulado)"},
+                  ya_confirmada=True)
     with admin(conn) as cur:
         efectos = recolectar_efectos(cur, ids)
     assert efectos["bloqueos_abiertos"]["t1"] == 0

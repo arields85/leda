@@ -88,7 +88,7 @@ def test_resolver_bloqueo_devuelve_la_tarea_al_estado_previo(corework, conn):
     with espacio(conn, ws) as cur:
         quien = _quien(cur, "Marcos Tarquini", ws)
         r = H.ejecutar(cur, quien, "resolver_bloqueo",
-                       {"bloqueo_id": bid, "resolucion": "llegó el switch"})
+                       {"bloqueo_id": bid, "resolucion": "llegó el switch"}, ya_confirmada=True)
         assert r == {"resuelto": True, "tarea_desbloqueada": True}
 
         cur.execute("select estado from task where id = %s", (tid,))
@@ -112,7 +112,7 @@ def test_resolver_bloqueo_con_otro_abierto_no_saca_a_la_tarea_de_bloqueada(corew
     with espacio(conn, ws) as cur:
         quien = _quien(cur, "Marcos Tarquini", ws)
         r = H.ejecutar(cur, quien, "resolver_bloqueo",
-                       {"bloqueo_id": b1, "resolucion": "llegó el switch"})
+                       {"bloqueo_id": b1, "resolucion": "llegó el switch"}, ya_confirmada=True)
         assert r["tarea_desbloqueada"] is False
 
         cur.execute("select estado from task where id = %s", (tid,))
@@ -129,7 +129,7 @@ def test_resolver_bloqueo_requiere_ser_responsable_quien_lo_abrio_o_escalado(cor
         quien = _quien(cur, "Ariel De Simone", ws)   # ajeno a la tarea
         with pytest.raises(Denegado):
             H.ejecutar(cur, quien, "resolver_bloqueo",
-                       {"bloqueo_id": bid, "resolucion": "listo"})
+                       {"bloqueo_id": bid, "resolucion": "listo"}, ya_confirmada=True)
 
 
 def test_resolver_bloqueo_lo_puede_quien_lo_abrio_aunque_no_sea_el_responsable(corework, conn):
@@ -142,7 +142,7 @@ def test_resolver_bloqueo_lo_puede_quien_lo_abrio_aunque_no_sea_el_responsable(c
     with espacio(conn, ws) as cur:
         quien = _quien(cur, "Ariel De Simone", ws)
         r = H.ejecutar(cur, quien, "resolver_bloqueo",
-                       {"bloqueo_id": bid, "resolucion": "listo"})
+                       {"bloqueo_id": bid, "resolucion": "listo"}, ya_confirmada=True)
         assert r["resuelto"] is True
 
 
@@ -159,7 +159,7 @@ def test_resolver_bloqueo_lo_puede_a_quien_se_escalo(corework, conn):
     with espacio(conn, ws) as cur:
         quien = _quien(cur, "Ismael Soschinski", ws)
         r = H.ejecutar(cur, quien, "resolver_bloqueo",
-                       {"bloqueo_id": bid, "resolucion": "lo resolvió dirección"})
+                       {"bloqueo_id": bid, "resolucion": "lo resolvió dirección"}, ya_confirmada=True)
         assert r["resuelto"] is True
 
 
@@ -173,7 +173,7 @@ def test_resolver_bloqueo_exige_contar_la_resolucion(corework, conn):
         quien = _quien(cur, "Marcos Tarquini", ws)
         with pytest.raises(Denegado):
             H.ejecutar(cur, quien, "resolver_bloqueo",
-                       {"bloqueo_id": bid, "resolucion": "   "})
+                       {"bloqueo_id": bid, "resolucion": "   "}, ya_confirmada=True)
 
 
 def test_resolver_bloqueo_inexistente_dice_que_no_existe(corework, conn):
@@ -182,7 +182,7 @@ def test_resolver_bloqueo_inexistente_dice_que_no_existe(corework, conn):
         quien = _quien(cur, "Marcos Tarquini", ws)
         r = H.ejecutar(cur, quien, "resolver_bloqueo",
                        {"bloqueo_id": "00000000-0000-0000-0000-000000000000",
-                        "resolucion": "listo"})
+                        "resolucion": "listo"}, ya_confirmada=True)
         assert "no existe" in r["error"]
 
 
@@ -198,7 +198,7 @@ def test_resolver_bloqueo_ya_resuelto_no_se_vuelve_a_resolver(corework, conn):
     with espacio(conn, ws) as cur:
         quien = _quien(cur, "Marcos Tarquini", ws)
         r = H.ejecutar(cur, quien, "resolver_bloqueo",
-                       {"bloqueo_id": bid, "resolucion": "otra vez"})
+                       {"bloqueo_id": bid, "resolucion": "otra vez"}, ya_confirmada=True)
         assert "ya estaba resuelto" in r["error"]
 
 
@@ -230,7 +230,7 @@ def test_resolver_bloqueo_de_otro_espacio_dice_que_no_existe(conn, intake_world)
         quien = identificar(cur, west["people"]["Morgan Hale"]["telegram"],
                             Canal.ESPACIO, west["id"])
         r = H.ejecutar(cur, quien, "resolver_bloqueo",
-                       {"bloqueo_id": str(bid), "resolucion": "x"})
+                       {"bloqueo_id": str(bid), "resolucion": "x"}, ya_confirmada=True)
         assert "no existe" in r["error"]
 
 
@@ -254,12 +254,12 @@ def test_resolver_bloqueo_no_reingresa_a_bloqueada_si_ya_salio_por_otro_camino(
     with espacio(conn, ws) as cur:
         quien = _quien(cur, "Marcos Tarquini", ws)
         H.ejecutar(cur, quien, "actualizar_estado",
-                   {"tarea_id": tid, "estado": "en_curso"})
+                   {"tarea_id": tid, "estado": "en_curso"}, ya_confirmada=True)
         cur.execute("select estado from task where id = %s", (tid,))
         assert cur.fetchone()["estado"] == "en_curso"
 
         r = H.ejecutar(cur, quien, "resolver_bloqueo",
-                       {"bloqueo_id": bid, "resolucion": "listo"})
+                       {"bloqueo_id": bid, "resolucion": "listo"}, ya_confirmada=True)
         assert r == {"resuelto": True, "tarea_desbloqueada": False}
 
         cur.execute("select estado from task where id = %s", (tid,))
@@ -317,7 +317,7 @@ def test_registrar_bloqueo_en_tarea_inexistente_no_inserta(corework, conn):
         quien = _quien(cur, "Marcos Tarquini", ws)
         r = H.ejecutar(cur, quien, "registrar_bloqueo",
                        {"tarea_id": "00000000-0000-0000-0000-000000000000",
-                        "causa": "algo"})
+                        "causa": "algo"}, ya_confirmada=True)
         assert "no existe" in r["error"]
         cur.execute("select count(*) n from blocker")
         assert cur.fetchone()["n"] == 0
@@ -332,7 +332,7 @@ def test_registrar_bloqueo_sobre_tarea_ya_bloqueada_no_duplica_el_evento(corewor
     with espacio(conn, ws) as cur:
         quien = _quien(cur, "Marcos Tarquini", ws)
         H.ejecutar(cur, quien, "registrar_bloqueo",
-                   {"tarea_id": tid, "causa": "segundo"})
+                   {"tarea_id": tid, "causa": "segundo"}, ya_confirmada=True)
 
         cur.execute("select count(*) n from blocker where task_id = %s", (tid,))
         assert cur.fetchone()["n"] == 2
@@ -359,7 +359,7 @@ def test_registrar_bloqueo_en_tarea_cancelada_se_rechaza(corework, conn):
     with espacio(conn, ws) as cur:
         quien = _quien(cur, "Marcos Tarquini", ws)
         r = H.ejecutar(cur, quien, "registrar_bloqueo",
-                       {"tarea_id": tid, "causa": "algo"})
+                       {"tarea_id": tid, "causa": "algo"}, ya_confirmada=True)
         assert "error" in r
         cur.execute("select count(*) n from blocker where task_id = %s", (tid,))
         assert cur.fetchone()["n"] == 0
