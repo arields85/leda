@@ -38,11 +38,17 @@ TABLAS_ESTADO = ("task", "task_draft", "blocker", "dependency",
 
 
 def _ruta_a_dict(ruta: IntentRoute) -> dict:
-    return {"action": ruta.action.value, "task": dict(ruta.task)}
+    return {"action": ruta.action.value, "task": dict(ruta.task),
+            "trabajos": list(ruta.trabajos), "personas": list(ruta.personas)}
 
 
 def _dict_a_ruta(d: dict) -> IntentRoute:
-    return IntentRoute(IntentAction(d["action"]), dict(d.get("task", {})))
+    # `.get(..., ())` con default: una grabación de antes de T2 no tiene
+    # estas dos claves y tiene que seguir cargando (`aclaracion-con-botones`,
+    # T2).
+    return IntentRoute(
+        IntentAction(d["action"]), dict(d.get("task", {})),
+        tuple(d.get("trabajos", ())), tuple(d.get("personas", ())))
 
 
 def _respuesta_a_dict(r: Respuesta) -> dict:

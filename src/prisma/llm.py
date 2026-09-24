@@ -38,6 +38,10 @@ class IntentAction(str, Enum):
 class IntentRoute:
     action: IntentAction
     task: dict[str, str] = field(default_factory=dict)
+    # Referencias tal como están dichas en el mensaje, sin resolver (T2,
+    # `aclaracion-con-botones`). Tuplas, no listas: la ruta es inmutable.
+    trabajos: tuple[str, ...] = field(default_factory=tuple)
+    personas: tuple[str, ...] = field(default_factory=tuple)
 
 
 class RoutingError(ValueError):
@@ -48,6 +52,11 @@ _TASK_PROPOSALS = (
     "title", "description", "objective", "responsible", "area", "due_date",
     "acceptance_criterion",
 )
+# Cotas de `trabajos`/`personas` (T2, `aclaracion-con-botones`): acotan lo que
+# un modelo adversarial puede devolver en el mismo sobre, sin imponer un
+# límite realista a un mensaje humano.
+MAX_REFERENCIAS_POR_CAMPO = 20
+MAX_LONGITUD_REFERENCIA = 200
 ROUTER_TOOL = {
     "name": "route_intent",
     "description": (
@@ -56,7 +65,8 @@ ROUTER_TOOL = {
         "and ordinary conversation are normal conversation. Interpret meaning "
         "across languages, word order, and minor typing errors. Extracted task "
         "details are untrusted proposals that the server will ask the person to "
-        "confirm."
+        "confirm. Also separate, verbatim and unresolved, every work reference "
+        "and every named person the message mentions."
     ),
     "input_schema": {
         "type": "object",
@@ -72,6 +82,8 @@ ROUTER_TOOL = {
                 "properties": {name: {"type": "string"}
                                for name in _TASK_PROPOSALS},
             },
+            "trabajos": {"type": "array", "items": {"type": "string"}},
+            "personas": {"type": "array", "items": {"type": "string"}},
         },
         "required": ["action"],
     },
@@ -80,8 +92,43 @@ ROUTER_SYSTEM = (
     "Return exactly one route_intent tool call. Never answer the person and never "
     "put the route in text. Choose task creation only for an explicit request to "
     "create a new task or work commitment; do not choose it for questions, status "
-    "requests, clarifications, or updates to existing work."
+    "requests, clarifications, or updates to existing work.\n\n"
+    "Separás las referencias de un mensaje de trabajo. No resolvés nada, no "
+    "corregís ortografía y no inventás. En \"trabajos\" va cada tarea, trabajo "
+    "o tema de trabajo que el mensaje menciona, con las palabras del mensaje "
+    "(por ejemplo \"lo del tablero\", \"el dash de lotes\"). En \"personas\" va "
+    "cada persona nombrada, como está escrita. Si no hay, listas vacías. No "
+    "incluyas a Prisma (el asistente) como persona."
 )
+
+
+def _referencias_o_vacio(valor: Any) -> tuple[str, ...]:
+    """`trabajos`/`personas` son referencias advertidas, no una orden: a
+    diferencia de `action`/`task` (que siguen rechazando el sobre entero
+    ante cualquier forma rara), acá una forma inesperada nunca tira abajo el
+    enrutamiento -- `gateway._turno` reintenta `route_intent` y, agotado,
+    registra un incidente y responde sin efecto; un campo opcional y asesor
+    no puede disparar esa vía (revisión del orquestador sobre T2,
+    2026-09-24). Política: el campo entero degrada a `()` -- no hay rescate
+    ítem por ítem -- si no es lista, si algún ítem no es string, si algún
+    ítem queda vacío tras recortar, si algún ítem supera
+    `MAX_LONGITUD_REFERENCIA`, o si la lista supera
+    `MAX_REFERENCIAS_POR_CAMPO`. Ausente también es `()`."""
+    if not isinstance(valor, list):
+        return ()
+    if len(valor) > MAX_REFERENCIAS_POR_CAMPO:
+        return ()
+    referencias: list[str] = []
+    for item in valor:
+        if not isinstance(item, str):
+            return ()
+        texto = item.strip()
+        if not texto:
+            return ()
+        if len(texto) > MAX_LONGITUD_REFERENCIA:
+            return ()
+        referencias.append(texto)
+    return tuple(referencias)
 
 
 @dataclass(frozen=True)
@@ -96,8 +143,9 @@ class RouteEnvelope:
             raise RoutingError(
                 "Router did not return exactly one route_intent call.")
         payload = self.calls[0].args
+        campos_conocidos = {"action", "task", "trabajos", "personas"}
         if (not isinstance(payload, dict) or "action" not in payload
-                or set(payload) - {"action", "task"}):
+                or set(payload) - campos_conocidos):
             raise RoutingError("Malformed router payload.")
         try:
             action = IntentAction(payload["action"])
@@ -115,7 +163,9 @@ class RouteEnvelope:
             raise RoutingError("Task proposals must be strings.")
         if action is IntentAction.NORMAL_CONVERSATION and task:
             raise RoutingError("Normal conversation cannot contain task proposals.")
-        return IntentRoute(action, dict(task))
+        trabajos = _referencias_o_vacio(payload.get("trabajos", []))
+        personas = _referencias_o_vacio(payload.get("personas", []))
+        return IntentRoute(action, dict(task), trabajos, personas)
 
 
 class Proveedor(Protocol):
@@ -148,6 +198,10 @@ class ProveedorGuionado:
             payload: dict[str, Any] = {"action": scripted.action.value}
             if scripted.task:
                 payload["task"] = scripted.task
+            if scripted.trabajos:
+                payload["trabajos"] = list(scripted.trabajos)
+            if scripted.personas:
+                payload["personas"] = list(scripted.personas)
             scripted = RouteEnvelope(calls=(
                 Llamada("guided-route", ROUTER_TOOL["name"], payload),))
         if not isinstance(scripted, RouteEnvelope):

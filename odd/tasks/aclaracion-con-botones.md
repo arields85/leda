@@ -55,7 +55,7 @@ sólo como etiqueta de los botones); decir "no encuentro esa tarea" (§5.9 punto
   doble guionado para pruebas; función que aplica la receta (alcance, tarea,
   cortes 0,6 / 0,5 / 0,85 con 0,4 de margen / candidatas ≥ 0,1, verificación < 0,5
   → preguntar) y devuelve clara, ambigua o ninguna.
-- [ ] **T2 — Referencias en el enrutador.** `route_intent` devuelve además las
+- [x] **T2 — Referencias en el enrutador.** `route_intent` devuelve además las
   referencias a trabajos tal como están dichas, en los tres proveedores y con su
   validación.
 - [ ] **T3 — Resolver antes de actuar.** En `_turno`, las referencias se resuelven
@@ -172,4 +172,124 @@ Previsión: bastante más de 400 líneas en total, repartidas en seis tareas.
   - Suite completa: `.venv/Scripts/python.exe -m pytest -q` → **566 passed, 90
     deselected** (554 + 12 netos, 0 regresiones, 168,39 s).
   - Sigue bloqueado `.env.ejemplo` (mismo motivo que antes); sin cambios a
-    `gateway`/`agente`; sin commit.
+    `gateway`/`agente`.
+  - **Commit:** `158a410` ("feat: add a Jev client that resolves which task a
+    reference means"), pedido explícito del usuario -- cierra T1 (incluye
+    `.env.ejemplo` con `PRISMA_OPENROUTER_API_KEY=`, `src/prisma/jev.py`,
+    `tests/test_jev.py` y este documento).
+- 2026-09-24: **T2 cerrada.** Ruta: delegada, un escritor (T2 tiene su fila
+  propia en "Ruta"; `llm.py` en los tres proveedores, pruebas). TDD estricto:
+  RED observado con `.venv/Scripts/python.exe -m pytest -q
+  tests/test_llm_protocol.py` (`AttributeError: module 'prisma.llm' has no
+  attribute 'MAX_LONGITUD_REFERENCIA'`, error de colección) y con
+  `.venv/Scripts/python.exe -m pytest -q tests/banco/test_corrida.py -k
+  "trabajos_y_personas or grabacion_vieja"` (2 failed:
+  `TypeError: IntentRoute.__init__() got an unexpected keyword argument
+  'trabajos'` y `AttributeError: 'IntentRoute' object has no attribute
+  'trabajos'`). GREEN con `tests/banco tests/test_llm_protocol.py` → **225
+  passed, 90 deselected**. Suite completa: `.venv/Scripts/python.exe -m
+  pytest -q` → **605 passed, 90 deselected** (566 + 39 nuevas, 0 regresiones,
+  179,10 s).
+  - `src/prisma/llm.py`: `IntentRoute` gana `trabajos` y `personas` (tuplas
+    inmutables, default `()`); `ROUTER_TOOL["input_schema"]` gana las
+    propiedades `trabajos`/`personas` (`array` de `string`, no requeridas) --
+    las tres implementaciones de `route_intent` (`ProveedorAnthropic`,
+    `ProveedorGemini`, `ProveedorCompatible`) ya arman `Llamada.args` a partir
+    de lo que el modelo devuelve para `ROUTER_TOOL`, así que no necesitaron
+    tocarse: el esquema y `RouteEnvelope.validate()` compartidos alcanzan.
+    `ROUTER_SYSTEM` suma, como párrafo aparte, la instrucción medida del
+    enunciado de la tarea ("Separás las referencias de un mensaje de
+    trabajo...", en español, verbatim -- es la que las pruebas de concepto
+    validaron para el paso de separación de DeepSeek en §5.6, ahora dentro
+    del mismo llamado a `route_intent`, sin llamado aparte al modelo).
+  - **Política de validación (decisión inicial de esta tarea, superada el
+    mismo día -- ver "Revisión del orquestador sobre T2" más abajo):** mismo
+    criterio que ya aplica `validate()` al resto del sobre -- cualquier forma
+    inesperada **rechaza el sobre entero** con `RoutingError`, nunca se
+    descarta en silencio una entrada rara. `trabajos`/`personas` son
+    opcionales (ausentes = tupla vacía); si están, tienen que ser una lista
+    de strings no vacíos (recortados con `.strip()`), acotada en cantidad
+    (`MAX_REFERENCIAS_POR_CAMPO = 20`) y en longitud por entrada
+    (`MAX_LONGITUD_REFERENCIA = 200`) -- constantes nuevas en `llm.py`, sin
+    equivalente medido en las pruebas de concepto; elegidas para acotar lo que
+    un modelo adversarial puede mandar en el mismo sobre, sin límite realista
+    para un mensaje humano. `campos_conocidos` en `validate()` ahora incluye
+    las dos claves nuevas (antes sólo `action`/`task`), y una entrada fuera de
+    ese conjunto sigue rechazando el sobre -- esta parte no cambió con la
+    revisión.
+  - `ProveedorGuionado.route_intent`: cuando el guion es un `IntentRoute` con
+    `trabajos`/`personas`, los arma en el payload igual que ya hacía con
+    `task`, para que el guion pase por `validate()` sin cambiar el
+    comportamiento de los guiones existentes (sin esos campos, el payload no
+    los incluye y `validate()` los devuelve vacíos).
+  - `tests/banco/corrida.py`: `_ruta_a_dict`/`_dict_a_ruta` serializan y
+    recargan `trabajos`/`personas`; `_dict_a_ruta` usa `.get(..., ())` para
+    que una grabación de antes de T2 (sin esas claves) siga cargando con
+    referencias vacías -- probado con una grabación armada a mano sin las
+    claves nuevas (`test_grabacion_vieja_sin_trabajos_ni_personas_sigue_cargando`).
+  - `tests/test_llm_protocol.py` (nuevas): un caso por adaptador
+    (`anthropic`/`gemini`/`openai`/`guided`) que confirma que las cuatro
+    implementaciones devuelven las mismas referencias recortadas para el
+    mismo sobre; un caso por adaptador con los campos ausentes (default
+    vacío); redondeo por `ProveedorGuionado`; siete formas inválidas nuevas
+    agregadas a la matriz `INVALID_ENVELOPES` (no-lista, entrada no-string,
+    entrada vacía tras `.strip()`, entrada más larga que la cota, más
+    entradas que la cota, para `trabajos` y `personas`), cada una corrida
+    contra los cuatro adaptadores -- **estos siete casos se movieron fuera de
+    `INVALID_ENVELOPES` en la revisión del mismo día** (ver más abajo); ya no
+    describen el comportamiento vigente.
+  - `tests/banco/test_corrida.py` (nuevas): round-trip de `trabajos`/
+    `personas` por `ProveedorGrabador` → JSON → `guionado_desde_grabacion`;
+    carga de una grabación vieja sin esas claves.
+  - No se usaron los campos nuevos en `gateway`/`agente` (es T3); no cambió
+    el comportamiento de enrutamiento. Sin llamada real a ningún modelo ni a
+    Jev en ninguna prueba. Sin commit (no pedido explícito todavía).
+- 2026-09-24: **Revisión del orquestador sobre T2 y corrección.** Motivo:
+  `gateway._turno` reintenta `route_intent` dos veces y, agotado, registra un
+  incidente de enrutamiento y responde sin efecto -- con la política inicial
+  (rechazar el sobre entero), una forma rara en `trabajos`/`personas` (un
+  string vacío, 21 elementos) disparaba esa vía para un campo que sólo es
+  asesor; el comportamiento de hoy sin referencias tiene que seguir siendo el
+  resultado por omisión. TDD estricto, mismas reglas (sin commit, sin
+  `.env*`, sin modelo real). RED con `.venv/Scripts/python.exe -m pytest -q
+  tests/test_llm_protocol.py -k "degrade_to_empty"` → **32 failed** (una
+  `RoutingError` por caso, p. ej. `'personas' entries must not be empty.`, la
+  política vieja seguía rechazando el sobre). GREEN con
+  `.venv/Scripts/python.exe -m pytest -q tests/test_llm_protocol.py` → **103
+  passed**. Verificación pedida:
+  - `.venv/Scripts/python.exe -m pytest -q tests/banco tests/test_llm_protocol.py`
+    → **229 passed, 90 deselected**.
+  - `.venv/Scripts/python.exe -m pytest -q` → **609 passed, 90 deselected**
+    (605 + 4 netos -- se sacaron 7 casos × 4 adaptadores de
+    `INVALID_ENVELOPES` y entraron 8 casos × 4 adaptadores de degradación, 0
+    regresiones, 184,02 s).
+  - **Política nueva:** `action`/`task` siguen estrictos, sin cambios. Para
+    `trabajos`/`personas`, `_referencias_o_vacio` (antes `_validar_referencias`,
+    renombrada porque ya no valida en el sentido de rechazar) nunca lanza
+    `RoutingError`: cualquier forma inesperada en ese campo -- no es lista,
+    algún ítem no es string, algún ítem queda vacío tras `.strip()`, algún
+    ítem supera `MAX_LONGITUD_REFERENCIA`, o la lista supera
+    `MAX_REFERENCIAS_POR_CAMPO` -- degrada **el campo entero** a `()`; no hay
+    rescate ítem por ítem (todo o nada, simple y predecible, como pidió la
+    revisión). Ausente sigue siendo `()`. La política queda documentada en
+    el docstring de `_referencias_o_vacio` en `src/prisma/llm.py`.
+  - `tests/test_llm_protocol.py`: los siete casos de `trabajos`/`personas`
+    salieron de `INVALID_ENVELOPES`; entraron a `DEGRADED_REFERENCE_PAYLOADS`
+    (ocho casos -- se sumó `personas-blank-entry` para dejar a `personas` con
+    la misma cobertura que `trabajos` en el caso vacío) y a
+    `test_malformed_references_degrade_to_empty_instead_of_rejecting_the_route`,
+    que corre cada caso contra los cuatro adaptadores y comprueba que la ruta
+    se devuelve igual (`action` correcta) con `trabajos == ()` y
+    `personas == ()`.
+  - **Medición del orquestador con el enrutador real** (NaN,
+    `deepseek-v4-flash`) sobre los 60 mensajes de los lotes 1 a 4
+    (`docs/architecture/interpretacion-y-confirmacion.md` §5.6-§5.9): las
+    referencias separadas por `route_intent` coincidieron con la extracción
+    separada medida en 57 de 60 mensajes (3 diferencias sin consecuencia),
+    **0 errores de validación**, y aplicando la receta de Jev con
+    verificación sobre esas referencias, **0 elecciones inseguras sin
+    preguntar** (45 de 60 correctas, el resto preguntas de más) -- evidencia
+    de que unir la separación de referencias al mismo llamado de
+    `route_intent` no perdió lo que medían §5.6-§5.9 por separado. Medición
+    del orquestador, no de este escritor; no hay un comando de esta sesión
+    que la reproduzca.

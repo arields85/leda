@@ -7,6 +7,7 @@ import anthropic
 import httpx
 import pytest
 
+import prisma.llm as llm
 from prisma.llm import (IntentAction, IntentRoute, Llamada, ProveedorAnthropic,
                          ProveedorCompatible, ProveedorGemini, ProveedorGuionado,
                          RouteEnvelope, RoutingError)
@@ -146,6 +147,43 @@ def test_every_router_adapter_accepts_the_same_strict_valid_envelope(adapter):
         IntentAction.START_TASK_INTAKE, {"title": "Check pump"})
 
 
+@pytest.mark.parametrize("adapter", ["anthropic", "gemini", "openai", "guided"])
+def test_every_router_adapter_returns_trabajos_and_personas_references(adapter):
+    provider = _protocol_provider(adapter, [(
+        "route_intent",
+        {"action": "normal_conversation",
+         "trabajos": ["lo del tablero", "  el dash de lotes  "],
+         "personas": ["Lucas"]},
+    )])
+
+    route = provider.route_intent("¿cómo va lo del tablero, lucas dijo algo?")
+
+    assert route == IntentRoute(
+        IntentAction.NORMAL_CONVERSATION, {},
+        trabajos=("lo del tablero", "el dash de lotes"), personas=("Lucas",))
+
+
+@pytest.mark.parametrize("adapter", ["anthropic", "gemini", "openai", "guided"])
+def test_router_adapters_default_references_to_empty_when_absent(adapter):
+    provider = _protocol_provider(adapter, [(
+        "route_intent", {"action": "normal_conversation"},
+    )])
+
+    route = provider.route_intent("¿qué tengo pendiente?")
+
+    assert route.trabajos == ()
+    assert route.personas == ()
+
+
+def test_guided_provider_round_trips_references_through_validate():
+    scripted = IntentRoute(
+        IntentAction.NORMAL_CONVERSATION,
+        trabajos=("lo del tablero",), personas=("Lucas", "Nahuel"))
+    provider = ProveedorGuionado([], rutas=[scripted])
+
+    assert provider.route_intent("¿lucas y nahuel vieron lo del tablero?") == scripted
+
+
 INVALID_ENVELOPES = [
     pytest.param([("route_intent", {"action": "normal_conversation"})],
                  "I chose a route", id="mixed-text"),
@@ -179,6 +217,42 @@ INVALID_ENVELOPES = [
         "action": "start_task_intake", "task": {"unknown": "value"},
     })], None, id="extra-task-field"),
 ]
+
+
+# `trabajos`/`personas` son referencias advertidas, no una orden: una forma
+# rara en cualquiera de los dos no puede tirar abajo el enrutamiento entero
+# (`gateway._turno` reintenta y, agotado, registra un incidente y responde
+# sin efecto -- un campo opcional y asesor no puede disparar esa vía).
+# `action`/`task` siguen estrictos arriba, sin cambios (revisión del
+# orquestador sobre T2, 2026-09-24).
+DEGRADED_REFERENCE_PAYLOADS = [
+    pytest.param({"trabajos": "lo del tablero"}, id="trabajos-not-a-list"),
+    pytest.param({"trabajos": [3]}, id="trabajos-non-string-entry"),
+    pytest.param({"trabajos": ["  "]}, id="trabajos-blank-entry"),
+    pytest.param({"trabajos": ["x" * (llm.MAX_LONGITUD_REFERENCIA + 1)]},
+                 id="trabajos-entry-too-long"),
+    pytest.param(
+        {"trabajos": [f"tarea {i}"
+                      for i in range(llm.MAX_REFERENCIAS_POR_CAMPO + 1)]},
+        id="trabajos-too-many-entries"),
+    pytest.param({"personas": {"nombre": "Lucas"}}, id="personas-not-a-list"),
+    pytest.param({"personas": [None]}, id="personas-non-string-entry"),
+    pytest.param({"personas": ["  "]}, id="personas-blank-entry"),
+]
+
+
+@pytest.mark.parametrize("adapter", ["anthropic", "gemini", "openai", "guided"])
+@pytest.mark.parametrize("extra", DEGRADED_REFERENCE_PAYLOADS)
+def test_malformed_references_degrade_to_empty_instead_of_rejecting_the_route(
+        adapter, extra):
+    payload = {"action": "normal_conversation", **extra}
+    provider = _protocol_provider(adapter, [("route_intent", payload)])
+
+    route = provider.route_intent("adversarial input")
+
+    assert route.action is IntentAction.NORMAL_CONVERSATION
+    assert route.trabajos == ()
+    assert route.personas == ()
 
 
 @pytest.mark.parametrize("adapter", ["anthropic", "gemini", "openai", "guided"])

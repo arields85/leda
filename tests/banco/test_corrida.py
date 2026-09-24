@@ -71,6 +71,42 @@ def test_grabacion_json_es_serializable_y_recargable():
     assert r2.texto == "Tenés dos tareas."
 
 
+def test_grabacion_json_redondea_trabajos_y_personas():
+    interno = ProveedorGuionado(
+        guion=[],
+        rutas=[IntentRoute(
+            IntentAction.NORMAL_CONVERSATION,
+            trabajos=("lo del tablero",), personas=("Lucas", "Nahuel"))],
+    )
+    g = ProveedorGrabador(interno)
+    g.route_intent("¿lucas y nahuel vieron lo del tablero?")
+
+    import json
+    grabacion = json.loads(json.dumps(g.a_json()))
+    assert grabacion["rutas"][0]["salida"]["trabajos"] == ["lo del tablero"]
+    assert grabacion["rutas"][0]["salida"]["personas"] == ["Lucas", "Nahuel"]
+
+    guionado = guionado_desde_grabacion(grabacion)
+    ruta = guionado.route_intent("cualquier cosa")
+    assert ruta.trabajos == ("lo del tablero",)
+    assert ruta.personas == ("Lucas", "Nahuel")
+
+
+def test_grabacion_vieja_sin_trabajos_ni_personas_sigue_cargando():
+    """Una grabación guardada antes de T2 no tiene las claves nuevas -- tiene
+    que seguir cargando, con referencias vacías por defecto."""
+    grabacion_vieja = {
+        "rutas": [{"entrada": "listo", "salida": {
+            "action": "normal_conversation", "task": {}}, "latencia_s": 0.1}],
+        "respuestas": [],
+    }
+
+    guionado = guionado_desde_grabacion(grabacion_vieja)
+    ruta = guionado.route_intent("cualquier cosa")
+    assert ruta.trabajos == ()
+    assert ruta.personas == ()
+
+
 # ---------------------------------------------------------------------------
 # sembrar_precondiciones
 # ---------------------------------------------------------------------------
