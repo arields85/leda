@@ -6,14 +6,18 @@ pruebas. TDD estricto.
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
+
 import pytest
 
+from prisma import pendientes as P
 from prisma.autoridad import Canal, identificar
-from prisma.db import admin
+from prisma.db import admin, espacio
 from prisma.llm import IntentAction, IntentRoute, Llamada, ProveedorGuionado, Respuesta
 
 from tests.banco.corrida import (
     ProveedorGrabador,
+    _pendiente_para_confirmar,
     conteos_delta,
     ejecutar_escenario,
     filas_respuesta,
@@ -319,3 +323,126 @@ def test_filas_respuesta_trae_pending_action_id_e_intake_choice_set_id(corework,
     assert str(filas[0]["pending_action_id"]) == pendiente.id
     assert filas[0]["intake_choice_set_id"] is None
     assert respuesta_ofrecio_opciones(filas) is True
+
+
+# ---------------------------------------------------------------------------
+# _pendiente_para_confirmar (T4): la última acción pendiente 'esperando' de
+# un chat que ofrece un botón Confirmar -- la vista previa de una herramienta
+# que escribe (T1). Una `NecesitaElegir` (candidatos ambiguos) no lo tiene y
+# no se toca acá.
+# ---------------------------------------------------------------------------
+
+
+def _quien(cur, ws, nombre="Marcos Tarquini"):
+    cur.execute("select telegram_user_id t from integrante where nombre = %s",
+                (nombre,))
+    tg = cur.fetchone()["t"]
+    return identificar(cur, tg, Canal.ESPACIO, ws), tg
+
+
+def test_pendiente_para_confirmar_encuentra_la_que_ofrece_confirmar(corework, conn):
+    ws = corework.workspace_id
+    with espacio(conn, ws) as cur:
+        quien, tg = _quien(cur, ws)
+        p = P.registrar(
+            cur, quien, herramienta="actualizar_estado", args={"a": 1},
+            resumen="¿Confirmás?",
+            vence_en=datetime.now(timezone.utc) + timedelta(hours=1), chat_id=tg)
+
+        encontrada = _pendiente_para_confirmar(cur, ws, tg)
+
+    assert encontrada is not None
+    pid, token = encontrada
+    assert pid == p.id
+    assert token
+
+
+def test_pendiente_para_confirmar_ignora_una_eleccion_entre_candidatos(corework, conn):
+    ws = corework.workspace_id
+    with espacio(conn, ws) as cur:
+        quien, tg = _quien(cur, ws)
+        P.registrar(
+            cur, quien, herramienta="crear_tarea", args={"titulo": "Relevar tablero"},
+            resumen="¿a quién?",
+            vence_en=datetime.now(timezone.utc) + timedelta(hours=1),
+            campo="responsable_membership_id", chat_id=tg,
+            opciones=[("Marcos Tarquini", "m1"), ("Martín Forte", "m2")])
+
+        encontrada = _pendiente_para_confirmar(cur, ws, tg)
+
+    assert encontrada is None
+
+
+def test_pendiente_para_confirmar_sin_ninguna_pendiente_es_none(corework, conn):
+    ws = corework.workspace_id
+    with espacio(conn, ws) as cur:
+        _, tg = _quien(cur, ws)
+        encontrada = _pendiente_para_confirmar(cur, ws, tg)
+    assert encontrada is None
+
+
+# ---------------------------------------------------------------------------
+# ejecutar_escenario confirma automáticamente (T4): una propuesta de una
+# herramienta que escribe se toca sola por el mismo camino que un toque real
+# de Telegram (`gateway.procesar_update` con un `callback_query`), y antes de
+# ese toque no hay ningún efecto en la base.
+# ---------------------------------------------------------------------------
+
+
+def test_ejecutar_escenario_confirma_una_propuesta_de_herramienta_que_escribe(
+        corework, conn):
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        ids = sembrar_precondiciones(cur, ws, {
+            "tareas": [{"id": "t1", "titulo": "Programar PLC (simulado)",
+                       "area": "ot", "responsable": "Marcos Tarquini"}],
+        })
+    tid = ids["t1"]
+
+    interno = ProveedorGuionado(
+        guion=[Respuesta(llamadas=[Llamada(
+                   "c1", "actualizar_estado", {"tarea_id": tid, "estado": "en_curso"})]),
+              Respuesta(texto="listo")],
+        rutas=[IntentRoute(IntentAction.NORMAL_CONVERSATION)],
+    )
+
+    r = ejecutar_escenario(
+        conn, ws, "corework", "Marcos Tarquini", ["pasala a en curso"], interno,
+        escenario_id="b-test-confirmar", indice=0)
+
+    assert r.bloqueado is False, r.motivo_bloqueo
+    assert r.herramientas_ejecutadas == ["actualizar_estado"]
+    assert r.conteos_antes_del_toque is not None
+    # Nada de lo que las 8 herramientas escriben cambió antes del toque; el
+    # único delta esperado es la vista previa, que sale por la cola.
+    for tabla in ("task", "blocker", "dependency", "task_state_event",
+                 "objective", "evidence", "approval"):
+        assert r.conteos_antes_del_toque[tabla] == r.conteos_antes[tabla], (
+            f"'{tabla}' cambió antes de tocar Confirmar")
+    assert r.conteos_antes_del_toque["message_outbox"] > r.conteos_antes["message_outbox"], (
+        "la vista previa tiene que haber salido por la cola antes del toque")
+    # `actualizar_estado` sólo dejó su entrada en audit_log al confirmar
+    # (después del toque, no antes) -- señal primaria de la propiedad
+    # central (T4, revisión del orquestador).
+    assert r.herramientas_antes_del_toque == ()
+
+    with admin(conn) as cur:
+        cur.execute("select estado from task where id = %s", (tid,))
+        assert cur.fetchone()["estado"] == "en_curso"
+        cur.execute("select estado from pending_action where herramienta = 'actualizar_estado'")
+        assert cur.fetchone()["estado"] == "resuelta"
+
+
+def test_ejecutar_escenario_sin_propuesta_deja_conteos_antes_del_toque_en_none(
+        corework, conn):
+    interno = ProveedorGuionado(
+        guion=[Respuesta(texto="Anotado.")],
+        rutas=[IntentRoute(IntentAction.NORMAL_CONVERSATION)],
+    )
+    r = ejecutar_escenario(
+        conn, corework.workspace_id, "corework", "Marcos Tarquini", ["hola"], interno,
+        escenario_id="b-test-sin-propuesta", indice=0)
+
+    assert r.bloqueado is False, r.motivo_bloqueo
+    assert r.conteos_antes_del_toque is None
+    assert r.herramientas_antes_del_toque == ()

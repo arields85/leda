@@ -132,21 +132,39 @@ se verifica sobre una base nueva dentro de un clúster existente.
 
 ## Próximo paso
 
-**Interpretación, aclaración y confirmación**, según el diseño vivo
-[`architecture/interpretacion-y-confirmacion.md`](architecture/interpretacion-y-confirmacion.md):
-ante una ambigüedad material, botones con propuestas completas; todo cambio relevante
-con vista previa y confirmación. Primero su prueba de concepto 5.1 (¿los embeddings
-separan lo claro de lo ambiguo?), fuera del código de Prisma. El diseño incluye la
-corrección del router de intención, el defecto que encontró el banco (`b-0005`, 0 de 10:
-`route_intent` no ve las tareas del espacio; ver `docs/capacidades.md`, "Trampas
-conocidas").
+**Aclaración con botones**, según el diseño vivo
+[`architecture/interpretacion-y-confirmacion.md`](architecture/interpretacion-y-confirmacion.md)
+y las decisiones [`ADR 0005`](decisions/0005-interpretacion-y-confirmacion.md) (puntos
+3 a 5) y [`ADR 0006`](decisions/0006-jev-para-resolver-referencias-e-intencion.md):
+Jev resuelve a qué tarea se refiere cada mensaje, con la pregunta de verificación, y
+detecta la intención dudosa; ante una ambigüedad material, botones con propuestas
+completas y "Ninguna, lo escribo"; las preguntas de Prisma con botones; apodos y
+vocabulario del equipo aprendidos preguntando. Incluye la corrección del router de
+intención, el defecto que encontró el banco (`b-0005`, 0 de 10: `route_intent` no ve
+las tareas del espacio; ver `docs/capacidades.md`, "Trampas conocidas").
+`PENDIENTE`: confirmar la pregunta de verificación con un lote de mensajes no visto
+(diseño §5.8).
 
 Después, una sesión progresiva por Telegram real con datos ficticios para los circuitos
-ya verificados (consulta, bloqueos, estados) y, luego, la conversación de bloqueos
-(mecánica §8, pasos 2 a 7). Las dependencias no entran en esa sesión hasta cerrar el
-defecto del router.
+ya verificados (consulta, bloqueos, estados, vista previa y confirmación) y, luego, la
+conversación de bloqueos (mecánica §8, pasos 2 a 7). Las dependencias no entran en esa
+sesión hasta cerrar el defecto del router.
 
 El resto del orden de trabajo está en [`ROADMAP.md`](ROADMAP.md).
+
+## Cerrado: vista previa y confirmación de todo cambio
+
+Feature `odd/tasks/vista-previa-y-confirmacion.md` (commits `2bd2200`, `763b427` y el
+de cierre). Las 8 herramientas que escriben muestran estado vigente y cambio propuesto
+y esperan Confirmar, Modificar o Cancelar; al confirmar se recalcula una huella del
+estado y, si cambió, no se aplica. Modificar acepta la corrección durante 30 minutos.
+El banco toca Confirmar por el mismo camino que Telegram y falla si alguna de las 8
+herramientas se ejecutó o cambió la base antes del toque.
+
+Verificación, 2026-09-24: `.venv/Scripts/python.exe -m pytest -q` → 536 passed, 90
+deselected; `tests/banco` → 124 passed. El banco con el modelo real no se volvió a
+correr con este cambio. Pendiente conocido: un ciclo de dependencias se detecta recién
+al confirmar (lo frena la base), no en la vista previa.
 
 ## Cerrado: banco conversacional con el modelo real
 

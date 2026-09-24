@@ -17,12 +17,18 @@ from typing import Any
 
 import prisma.llm as llm_modulo
 from prisma import gateway
+from prisma import pendientes as P
 from prisma.db import admin
 from prisma.llm import (IntentAction, IntentRoute, Llamada, Proveedor,
                         ProveedorGuionado, Respuesta)
 
+# 'objective', 'evidence' y 'approval' se agregaron en T4 (banco-conversacional
+# -> vista-previa-y-confirmacion): son las tablas que escriben crear_objetivo,
+# adjuntar_evidencia y aprobar_tarea -- sin ellas, `conteos_delta` nunca podía
+# ver esos efectos.
 TABLAS_ESTADO = ("task", "task_draft", "blocker", "dependency",
-                 "task_state_event", "message_outbox")
+                 "task_state_event", "message_outbox", "objective",
+                 "evidence", "approval")
 
 
 # ---------------------------------------------------------------------------
@@ -269,6 +275,20 @@ class ResultadoCorrida:
     bloqueado: bool = False
     motivo_bloqueo: str = ""
     ofrecio_opciones: bool = False
+    # Conteos por tabla justo antes de simular el toque en Confirmar (T4,
+    # ADR 0005 decisión 1) -- `None` si el turno no dejó ninguna propuesta
+    # con botón Confirmar, y entonces no hay nada que tocar ni que comprobar
+    # (`comprobadores.comprobar_sin_efectos_antes_de_confirmar`).
+    conteos_antes_del_toque: dict[str, int] | None = None
+    # Herramientas de las 8 que ya habían dejado su entrada en `audit_log`
+    # (`herramienta:<nombre>`) en ese mismo momento -- antes de cualquier
+    # toque posible, haya o no propuesta. Señal primaria de la propiedad
+    # central: a diferencia de un conteo por tabla, ve una herramienta que
+    # sólo actualiza una fila que ya existía (`resolver_bloqueo`,
+    # `actualizar_estado`) y, sobre todo, ve una que se ejecutó directo, sin
+    # que ninguna propuesta haya llegado a esperar un Confirmar (revisión
+    # del orquestador, T4, 2026-09-24).
+    herramientas_antes_del_toque: tuple[str, ...] = ()
 
 
 def _conteos(cur, ws: str) -> dict[str, int]:
@@ -277,6 +297,46 @@ def _conteos(cur, ws: str) -> dict[str, int]:
         cur.execute(f"select count(*) n from {tabla} where workspace_id = %s", (ws,))
         conteos[tabla] = cur.fetchone()["n"]
     return conteos
+
+
+def _herramientas_registradas(cur, workspace_id: str) -> list[str]:
+    """Las herramientas que ya dejaron su entrada `herramienta:<nombre>` en
+    `audit_log` hasta este momento -- sólo se escribe cuando la herramienta
+    se ejecutó de verdad (`agente.py::responder`, `gateway._toque`), nunca
+    al levantar `NecesitaConfirmacion`. Señal primaria de la propiedad
+    central (T4): a diferencia de un conteo por tabla, ve una herramienta
+    que sólo actualiza una fila que ya existía."""
+    cur.execute(
+        """select accion from audit_log
+            where workspace_id = %s and accion like %s order by at""",
+        (workspace_id, "herramienta:%"))
+    return [f["accion"].split(":", 1)[1] for f in cur.fetchall()]
+
+
+def _pendiente_para_confirmar(cur, workspace_id: str, chat_id: int) -> tuple[str, str] | None:
+    """La última acción pendiente 'esperando' de este chat que ofrece un
+    botón Confirmar -- la vista previa de una herramienta que escribe (T1,
+    `pending_action` con huella). Una `NecesitaElegir` (candidatos ambiguos,
+    p. ej. a quién asignar) tiene sus propios botones, sin Confirmar, y no se
+    toca acá: el banco no adivina una elección por la persona.
+
+    Devuelve `(pending_action_id, token_de_confirmar)`, o `None` si no hay
+    ninguna o la que hay no ofrece Confirmar.
+    """
+    cur.execute(
+        """select id from pending_action
+            where workspace_id = %s and chat_id = %s and estado = 'esperando'
+            order by creado_en desc limit 1""",
+        (workspace_id, chat_id))
+    fila = cur.fetchone()
+    if not fila:
+        return None
+    pid = str(fila["id"])
+    try:
+        opcion = P.opcion_por_etiqueta(cur, pid, "Confirmar")
+    except LookupError:
+        return None
+    return pid, opcion.token
 
 
 def _telegram_id(conn, ws: str, nombre: str) -> int:
@@ -313,11 +373,14 @@ def ejecutar_escenario(
     grabador = ProveedorGrabador(proveedor_real)
     desde_base_original = llm_modulo.desde_base
     mantener_chat_activo_original = gateway.mantener_chat_activo
+    acusar_toque_original = gateway.acusar_toque
     llm_modulo.desde_base = lambda cur, ws, key: grabador
     # El banco no habla con Telegram de verdad: el token del espacio de
     # pruebas es ficticio (`corework`, fixture) y no hay nada real a lo que
-    # avisar que se está escribiendo.
+    # avisar que se está escribiendo, ni un acuse real que mandarle al tocar
+    # Confirmar (`_toque`, `despachador.acusar_toque`).
     gateway.mantener_chat_activo = lambda *a, **k: contextlib.nullcontext()
+    gateway.acusar_toque = lambda *a, **k: None
 
     with admin(conn) as cur:
         antes = _conteos(cur, workspace_id)
@@ -327,12 +390,40 @@ def ejecutar_escenario(
 
     bloqueado = False
     motivo_bloqueo = ""
+    conteos_antes_del_toque: dict[str, int] | None = None
+    herramientas_antes_del_toque: list[str] = []
     inicio = time.perf_counter()
     try:
         for texto in mensajes:
             update = {"message": {"message_id": 1, "text": texto,
                                   "chat": {"id": chat}, "from": {"id": tg_id}}}
             gateway.procesar_update(conn, slug, update)
+
+        # El turno pudo haber dejado una propuesta de una herramienta que
+        # escribe esperando un Confirmar (T1/T2, ADR 0005 decisión 1): el
+        # banco la confirma sola, por el mismo camino que un toque real de
+        # Telegram (`gateway.procesar_update` con un `callback_query`,
+        # `gateway._toque`) -- no un atajo que ejecute la herramienta
+        # directo. Antes de tocar (haya o no propuesta), se guarda el
+        # estado: es la evidencia de que hasta acá no se aplicó nada
+        # (propiedad central, T4) -- `herramientas_antes_del_toque` se
+        # captura siempre, no sólo cuando hay propuesta, porque el hueco que
+        # tiene que atrapar es justo el de una herramienta que se ejecutó
+        # directo, sin que ninguna propuesta haya llegado a esperar un
+        # Confirmar.
+        with admin(conn) as cur:
+            herramientas_antes_del_toque = _herramientas_registradas(cur, workspace_id)
+            pendiente = _pendiente_para_confirmar(cur, workspace_id, chat)
+            if pendiente is not None:
+                conteos_antes_del_toque = _conteos(cur, workspace_id)
+
+        if pendiente is not None:
+            _, token = pendiente
+            toque = {"callback_query": {
+                "id": "banco-confirmar", "from": {"id": tg_id},
+                "data": f"{P.CALLBACK_PREFIJO}{token}",
+                "message": {"message_id": 2, "chat": {"id": chat}}}}
+            gateway.procesar_update(conn, slug, toque)
     except Exception as exc:  # noqa: BLE001 -- una corrida rota queda bloqueada, no cae la suite
         conn.rollback()
         bloqueado = True
@@ -340,6 +431,7 @@ def ejecutar_escenario(
     finally:
         llm_modulo.desde_base = desde_base_original
         gateway.mantener_chat_activo = mantener_chat_activo_original
+        gateway.acusar_toque = acusar_toque_original
     latencia_total = time.perf_counter() - inicio
 
     with admin(conn) as cur:
@@ -347,16 +439,13 @@ def ejecutar_escenario(
         filas = filas_respuesta(cur, workspace_id, chat, ids_previos)
         respuesta_texto = "\n".join(f["cuerpo"] for f in filas)
         ofrecio_opciones = respuesta_ofrecio_opciones(filas)
-
-        cur.execute(
-            """select accion from audit_log
-                where workspace_id = %s and accion like %s order by at""",
-            (workspace_id, "herramienta:%"))
-        herramientas_ejecutadas = [f["accion"].split(":", 1)[1] for f in cur.fetchall()]
+        herramientas_ejecutadas = _herramientas_registradas(cur, workspace_id)
 
     return ResultadoCorrida(
         escenario_id=escenario_id, indice=indice, respuesta_texto=respuesta_texto,
         herramientas_ejecutadas=herramientas_ejecutadas, conteos_antes=antes,
         conteos_despues=despues, latencia_total_s=latencia_total,
         grabacion=grabador.a_json(), bloqueado=bloqueado, motivo_bloqueo=motivo_bloqueo,
-        ofrecio_opciones=ofrecio_opciones)
+        ofrecio_opciones=ofrecio_opciones,
+        conteos_antes_del_toque=conteos_antes_del_toque,
+        herramientas_antes_del_toque=tuple(herramientas_antes_del_toque))

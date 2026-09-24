@@ -1,6 +1,6 @@
 # Vista previa y confirmación para todo cambio
 
-**Estado:** en curso
+**Estado:** cerrada
 **Creado:** 2026-09-24
 **Origen:** [`ADR 0005`](../../docs/decisions/0005-interpretacion-y-confirmacion.md),
 decisiones 1 y 2; diseño en `docs/architecture/interpretacion-y-confirmacion.md`.
@@ -58,9 +58,9 @@ resolución de referencias (receta 5.1).
 - [x] **T3 — Modificar.** Cierra la propuesta sin efecto, pregunta qué cambiar y
   el siguiente mensaje de esa persona en ese chat se interpreta con la propuesta
   anterior como contexto, produciendo una vista previa nueva.
-- [ ] **T4 — Banco.** El banco confirma las propuestas tocando el botón y
+- [x] **T4 — Banco.** El banco confirma las propuestas tocando el botón y
   verifica que antes del toque no hubo ningún efecto.
-- [ ] **T5 — Continuidad.** `docs/capacidades.md`, `docs/STATUS.md`, diseño §4.5.
+- [x] **T5 — Continuidad.** `docs/capacidades.md`, `docs/STATUS.md`, diseño §4.5.
 
 ## Ruta
 
@@ -335,3 +335,173 @@ Commits sobre `master` por unidad, con pedido explícito del usuario
   `test_la_modificacion_se_cierra_pasada_la_ventana` (a los 31 minutos todavía
   se reclamaba); verde: `tests/test_modificar.py` 15 passed; suite completa 522
   passed, 90 deselected.
+- 2026-09-24: **T4 implementado.** Ruta: delegada, un escritor
+  (`tests/banco/corrida.py`, `tests/banco/comprobadores.py`,
+  `tests/banco/test_corrida.py`, `tests/banco/test_comprobadores.py`,
+  `tests/banco/test_replays.py`, `tests/banco/test_banco.py`; disparador:
+  2+ archivos no triviales en `tests/banco/`).
+
+  **Camino del toque, sin inventar uno paralelo.** `gateway.procesar_update`
+  ya es el único punto de entrada tanto para un mensaje como para un
+  `callback_query` (`gateway.py:58`, "La usan el webhook y el modo local por
+  polling"); `corrida.py::ejecutar_escenario` ya lo llama directo para los
+  mensajes, sin pasar por `TestClient`/FastAPI (a diferencia de
+  `tests/test_botones.py`/`tests/test_modificar.py`, que sí usan
+  `TestClient` porque además prueban el secreto del webhook). Se mantuvo esa
+  misma forma para el toque: un `update` con `callback_query` armado igual
+  que en esos tests (`data: f"p:{token}"`, `from.id`, `message.chat.id`) y
+  pasado al mismo `gateway.procesar_update` — cae en `gateway._toque`, la
+  función real que atiende un toque, no un atajo que llame a
+  `herramientas.ejecutar` directo. Se agregó un parche de
+  `gateway.acusar_toque` (con guardado/restauración manual, igual que ya
+  hacía `mantener_chat_activo`) para no salir a la red real por cada
+  confirmación del banco; su falla ya es cosmética y no afecta el resultado
+  (`_toque` la ignora con un `except Exception: pass`), así que el parche
+  sólo evita la demora del timeout, no cambia comportamiento.
+
+  **Decisión de diseño: el banco confirma siempre, sin flag de YAML.** La
+  tarea preguntaba si hacía falta un `confirmar: true` por escenario. Se
+  decidió que no: `ejecutar_escenario` detecta sola, después del/de los
+  turno(s) de mensajes, si quedó una `pending_action` en `'esperando'` que
+  ofrece un botón "Confirmar" (`_pendiente_para_confirmar`, nueva función:
+  la última `pending_action` de ese chat con esa opción) y la toca. Una
+  `NecesitaElegir` (candidatos ambiguos, p. ej. a quién asignar) no tiene esa
+  opción y no se toca — el banco no adivina una elección por la persona.
+
+  Motivo (verificado contra `agente.py:250`, `agente.py:118-132`): el
+  registro `herramienta:<nombre>` en `audit_log` que arma
+  `herramientas_ejecutadas` sólo se escribe cuando una herramienta se
+  ejecuta de verdad (o al confirmar en `gateway._toque:336`) — nunca cuando
+  sólo levanta `NecesitaConfirmacion`. Antes de T4, una propuesta que
+  quedaba sin confirmar era invisible tanto para `herramientas_esperadas`
+  (b-0002/b-0004/b-0005, que esperan `registrar_bloqueo`/`actualizar_estado`/
+  `crear_dependencia` — hoy quedarían pendientes en vez de ejecutadas, y el
+  escenario fallaría por "no ejecutó las esperadas") como para
+  `herramientas_prohibidas` (b-0001/b-0006 a b-0012, que prohíben
+  `crear_objetivo` entre otras — si el modelo la llamaba por error, con T1/T2
+  solas se quedaba pendiente sin confirmar y la prohibición dejaba de
+  detectar el error, un hueco de cobertura peor que el que había antes de
+  esta unidad). Confirmar siempre que aparece un botón Confirmar cierra las
+  dos puntas con el cambio más chico: no hace falta declarar por escenario
+  cuál de las 8 herramientas corresponde ni tocar ningún YAML existente.
+
+  **Propiedad central: sin efectos antes de confirmar.** Nueva
+  `comprobadores.comprobar_sin_efectos_antes_de_confirmar(conteos_antes,
+  conteos_antes_del_toque)`: compara, tabla por tabla, los conteos de antes
+  de la corrida contra los de justo antes del toque (nuevo campo
+  `ResultadoCorrida.conteos_antes_del_toque`, `None` si no hubo propuesta) y
+  falla si alguna de las tablas que las 8 herramientas escriben cambió
+  (`task`, `blocker`, `dependency`, `task_state_event`, `objective`,
+  `evidence`, `approval` — deliberadamente sin `message_outbox`, porque la
+  vista previa misma sale por la cola antes del toque, ni `task_draft`,
+  porque el alta guiada de tarea no es ninguna de las 8). Se agregaron
+  `objective`, `evidence` y `approval` a `corrida.TABLAS_ESTADO`: sin esto,
+  `_conteos`/`conteos_delta` nunca habían visto los efectos de
+  `crear_objetivo`, `adjuntar_evidencia` ni `aprobar_tarea`, en ningún
+  escenario, ni antes ni después del toque. El comprobador se agregó,
+  incondicional (no depende de `debe_preguntar` ni de ninguna otra
+  bandera), a las listas de `comprobaciones` de `test_replays.py` y
+  `test_banco.py`.
+
+  **Pruebas.** RED observado por corrida real de pytest antes de
+  implementar: `tests/banco/test_comprobadores.py` — `ImportError: cannot
+  import name 'comprobar_sin_efectos_antes_de_confirmar'` (colección
+  fallida, 1 error). Verde tras implementarlo:
+  `.venv/Scripts/python.exe -m pytest -q tests/banco/test_comprobadores.py`
+  → 64 passed. Luego `tests/banco/test_corrida.py` —
+  `ImportError: cannot import name '_pendiente_para_confirmar'` (colección
+  fallida, 1 error); verde tras implementar `_pendiente_para_confirmar` y el
+  toque automático en `ejecutar_escenario`:
+  `.venv/Scripts/python.exe -m pytest -q tests/banco/test_corrida.py` →
+  22 passed (dos ajustes sobre la marcha: los tests nuevos que llaman
+  `identificar`/`P.registrar` necesitaban cursor de `espacio(conn, ws)`, no
+  de `admin(conn)` — mismo motivo que ya usan `test_botones.py`/
+  `test_modificar.py`; y la comparación "sin efectos antes del toque" no
+  podía exigir el dict completo igual, porque `message_outbox` sí cambia
+  legítimamente por la vista previa encolada).
+
+  GREEN de todo el paquete del banco:
+  `.venv/Scripts/python.exe -m pytest -q tests/banco` → 121 passed, 90
+  deselected (incluye el replay existente `b-0003`, que sigue sin tocar un
+  toque porque en esa grabación el modelo no llama ninguna herramienta).
+  GREEN de la suite completa:
+  `.venv/Scripts/python.exe -m pytest -q` → 533 passed, 90 deselected,
+  1 warning (173.04s) — exactamente 522 + 11 (las 6 pruebas nuevas de
+  `test_comprobadores.py` más las 5 de `test_corrida.py`), sin
+  regresiones. `pg_isready`: PostgreSQL local ya estaba arriba (verificado
+  al principio de la unidad).
+
+  **`test_replays.py` sin cambios de comportamiento.** El único replay
+  (`afirma-resolvio-sin-ejecutar-la-herramienta`, escenario b-0003) sigue
+  pasando sin tocar ningún botón: la grabación no incluye ninguna llamada a
+  herramienta, así que `_pendiente_para_confirmar` no encuentra nada que
+  confirmar — exactamente lo que ya anotaba T1-T2 sobre este replay.
+
+- 2026-09-24 (orquestador): revisión de T4, dos huecos encontrados en
+  `comprobar_sin_efectos_antes_de_confirmar` y corregidos con TDD estricto.
+
+  1. **Sin propuesta, aprobaba sin más.** Cuando el turno no dejaba ninguna
+     `pending_action` con Confirmar, `conteos_antes_del_toque` quedaba en
+     `None` y la función aprobaba directo — exactamente el caso que la
+     propiedad central tiene que atrapar: una de las 8 herramientas
+     ejecutándose sin que nadie haya confirmado nada. Corregido: sin toque,
+     la comparación pasa a ser `conteos_antes` contra `conteos_despues` (la
+     corrida entera, no sólo hasta un toque que nunca pasó). Nuevo parámetro
+     obligatorio `conteos_despues`.
+  2. **Un conteo por tabla no ve un `UPDATE`.** `resolver_bloqueo` marca
+     `resuelto_en` sobre una fila que ya existía; `actualizar_estado` puede
+     cambiar `estado` sin insertar ninguna fila — ninguno de los dos mueve
+     un conteo por tabla. Señal primaria agregada: `ResultadoCorrida` suma
+     `herramientas_antes_del_toque` (`corrida.py`, nueva
+     `_herramientas_registradas`, reusada también para el
+     `herramientas_ejecutadas` final), las herramientas que ya tenían su
+     entrada `herramienta:<nombre>` en `audit_log` en el momento justo antes
+     de cualquier toque posible — se captura siempre, haya o no propuesta,
+     porque el hueco 1 es justo la ejecución que nunca llega a proponer
+     nada. Verificado contra el código (`agente.py:250`,
+     `gateway.py:336`): esa entrada sólo se escribe al ejecutar de verdad,
+     nunca al levantar `NecesitaConfirmacion`. El comprobador falla si
+     cualquiera de esas herramientas está en `_HERRAMIENTAS_QUE_ESCRIBEN`
+     (reusada tal cual de `comprobadores.py`, mismo conjunto de 8 que ya
+     usaba `comprobar_accion_sin_herramienta` — no hizo falta una lista
+     nueva). El conteo por tabla queda como señal secundaria.
+
+  **Pruebas.** RED observado por corrida real de pytest antes de
+  implementar: `tests/banco/test_comprobadores.py`, 9 fallos —
+  `TypeError: comprobar_sin_efectos_antes_de_confirmar() takes 2 positional
+  arguments but 3 were given` / `got an unexpected keyword argument
+  'herramientas_antes_del_toque'` (firma vieja no aceptaba los parámetros
+  nuevos que los tests ya pedían, incluidos los dos que ejercitan los
+  huecos: uno sin propuesta con cambio en `conteos_despues`, otro con
+  `resolver_bloqueo` en `herramientas_antes_del_toque` y conteos sin ningún
+  cambio). Verde:
+  `.venv/Scripts/python.exe -m pytest -q tests/banco/test_comprobadores.py`
+  → 67 passed. Luego `tests/banco/test_corrida.py`:
+  `AttributeError: 'ResultadoCorrida' object has no attribute
+  'herramientas_antes_del_toque'` (2 fallos) antes de agregar el campo y su
+  captura en `ejecutar_escenario`; verde:
+  `.venv/Scripts/python.exe -m pytest -q tests/banco/test_corrida.py` →
+  22 passed. `test_replays.py` y `test_banco.py` actualizados para pasar
+  `conteos_despues` y `herramientas_antes_del_toque` en su llamada (sin
+  cambio de comportamiento: ningún escenario ni replay actual pisa ninguno
+  de los dos huecos).
+
+  GREEN de todo el paquete del banco:
+  `.venv/Scripts/python.exe -m pytest -q tests/banco` → 124 passed, 90
+  deselected. GREEN de la suite completa:
+  `.venv/Scripts/python.exe -m pytest -q` → 536 passed, 90 deselected,
+  1 warning (178.12s) — 533 → 536: +3 pruebas nuevas en
+  `test_comprobadores.py` (de 6 a 9 sobre este comprobador); en
+  `test_corrida.py` no se agregó ninguna prueba nueva, sólo una aserción
+  sobre `herramientas_antes_del_toque` en cada una de las dos pruebas ya
+  existentes. Sin regresiones. `pg_isready`: PostgreSQL local seguía
+  arriba.
+
+  **Pendiente anotado, no de esta unidad:** el gap de T1-T2 sobre ciclos de
+  dependencia (se detectan al confirmar, no en la vista previa) sigue sin
+  tocar. Sigue T5 (continuidad: `docs/capacidades.md`, `docs/STATUS.md`,
+  diseño §4.5).
+- 2026-09-24 (orquestador): **T5.** `docs/capacidades.md` (fila nueva), `docs/STATUS.md`
+  (próximo paso: aclaración con botones; sección de cierre) y diseño §4.5. Control del
+  orquestador: `.venv/Scripts/python.exe -m pytest -q tests/banco` → 124 passed, 90
+  deselected. Unidad cerrada.

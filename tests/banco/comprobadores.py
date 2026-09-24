@@ -313,6 +313,78 @@ def comprobar_efectos(observados: dict, esperados: dict) -> ResultadoComprobacio
 
 
 # ---------------------------------------------------------------------------
+# 4bis. Sin efectos antes de confirmar (T4, ADR 0005 decisión 1): la
+# propiedad central de la vista previa y confirmación -- ninguna de las 8
+# herramientas que escriben cambia la base antes de que alguien toque
+# Confirmar. `corrida.py::ejecutar_escenario` arma lo que hace falta:
+# `conteos_antes` (antes de mandar cualquier mensaje), `conteos_antes_del_
+# toque` (justo después del turno que dejó la propuesta, antes de simular el
+# toque -- `None` si no hubo ninguna) y `conteos_despues` (al final de toda
+# la corrida), más `herramientas_antes_del_toque` -- las herramientas que ya
+# habían dejado su entrada en `audit_log` en ese mismo momento, antes de
+# cualquier toque posible.
+#
+# Dos huecos de la primera versión (revisión del orquestador, T4,
+# 2026-09-24), corregidos acá:
+# 1. Sin propuesta, la versión anterior aprobaba sin más -- exactamente el
+#    caso que hay que atrapar: una de las 8 ejecutándose directo, sin ningún
+#    Confirmar de por medio. Sin toque, la comparación es `conteos_antes`
+#    contra `conteos_despues`: nada de lo que las 8 escriben puede haber
+#    cambiado sin un Confirmar.
+# 2. Un conteo por tabla no ve un UPDATE (`resolver_bloqueo` marca
+#    `resuelto_en` sobre una fila que ya existía; `actualizar_estado` puede
+#    cambiar `estado` sin insertar ninguna fila). La señal primaria es
+#    `audit_log`: sólo lleva una entrada `herramienta:<nombre>` cuando la
+#    herramienta se ejecutó de verdad (`agente.py`, `gateway._toque` --
+#    nunca al levantar `NecesitaConfirmacion`), así que alcanza con mirar si
+#    alguna de las 8 ya está ahí antes del toque. El conteo por tabla queda
+#    como señal secundaria (cubre, por ejemplo, un `insert` directo que por
+#    algún motivo no pasara por `registrar_auditoria`).
+# ---------------------------------------------------------------------------
+
+# Tablas que alguna de las 8 herramientas escribe de verdad. No incluye
+# 'message_outbox' (la vista previa misma sale por la cola: un mensaje nuevo
+# antes del toque es esperado) ni 'task_draft' (el alta guiada de tarea no es
+# ninguna de las 8 herramientas).
+_TABLAS_QUE_ESCRIBEN_LAS_8 = ("task", "blocker", "dependency", "task_state_event",
+                              "objective", "evidence", "approval")
+
+
+def comprobar_sin_efectos_antes_de_confirmar(
+    conteos_antes: dict, conteos_antes_del_toque: dict | None, conteos_despues: dict,
+    *, herramientas_antes_del_toque: Iterable[str] = (),
+) -> ResultadoComprobacion:
+    """Dos señales, no una. `herramientas_antes_del_toque` (primaria):
+    cualquiera de las 8 que ya haya corrido -- según `audit_log`, que sólo se
+    escribe al ejecutar de verdad -- antes del toque es una falla, la vea o
+    no un conteo por tabla (una `UPDATE` como la de `resolver_bloqueo` no
+    cambia ningún conteo). Conteos por tabla (secundaria): si no hubo
+    propuesta (`conteos_antes_del_toque` `None`), la referencia es
+    `conteos_despues` -- toda la corrida, no sólo hasta un toque que nunca
+    pasó --; si la hubo, es `conteos_antes_del_toque`."""
+    escritas_antes = sorted(set(herramientas_antes_del_toque) & set(_HERRAMIENTAS_QUE_ESCRIBEN))
+
+    conteos_referencia = conteos_despues if conteos_antes_del_toque is None \
+        else conteos_antes_del_toque
+    cambios = {
+        tabla: conteos_referencia.get(tabla, 0) - conteos_antes.get(tabla, 0)
+        for tabla in _TABLAS_QUE_ESCRIBEN_LAS_8
+        if conteos_referencia.get(tabla, 0) != conteos_antes.get(tabla, 0)
+    }
+
+    if not escritas_antes and not cambios:
+        return ResultadoComprobacion("sin_efectos_antes_de_confirmar", "aprobado")
+
+    partes = []
+    if escritas_antes:
+        partes.append(f"ejecutó sin que nadie confirmara: {escritas_antes}")
+    if cambios:
+        partes.append(f"hubo efectos en la base antes de tocar Confirmar: {cambios}")
+    return ResultadoComprobacion(
+        "sin_efectos_antes_de_confirmar", "falla", "; ".join(partes))
+
+
+# ---------------------------------------------------------------------------
 # 5. Contenido de la respuesta visible
 # ---------------------------------------------------------------------------
 

@@ -192,9 +192,16 @@ Un mensaje claro empieza directamente en la vista previa.
 - Paso 2: resolución de referencias con puntaje (requiere la prueba de 5.1).
 - Paso 3: estabilidad de la intención (requiere la prueba de 5.2).
 - Paso 4: la regla de materialidad.
-- Paso 5 para mensajes claros: hoy las herramientas que escriben ejecutan directo.
-- Detección de estado cambiado entre vista previa y confirmación: `PENDIENTE`
-  verificar si `task` tiene una versión utilizable o hace falta agregarla.
+- ~~Paso 5 para mensajes claros~~: construido (2026-09-24). Las 8 herramientas
+  que escriben pasan por vista previa con Confirmar, Modificar y Cancelar
+  (`Herramienta.preparar`, `pending_action`); ver `docs/capacidades.md`.
+- ~~Detección de estado cambiado entre vista previa y confirmación~~: construido
+  con una huella del estado leído por cada preparación, sin versión en `task`.
+- Pendiente de la vista previa: un ciclo de dependencias se detecta recién al
+  confirmar (lo frena la base), no en la vista previa.
+- Botón "Ninguna, lo escribo": llega con la aclaración con botones. La propuesta
+  vence a las 8 h heredadas de `pending_action`; el plazo por defecto sigue
+  abierto (§7).
 
 ## 5. Pruebas de concepto
 

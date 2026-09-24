@@ -39,6 +39,7 @@ from tests.banco.comprobadores import (
     comprobar_herramientas,
     comprobar_personas_mencionadas,
     comprobar_pregunta,
+    comprobar_sin_efectos_antes_de_confirmar,
     resultado_general,
 )
 from tests.banco.conftest import guardar_candidato_replay, registrar_entrada_sesion
@@ -107,6 +108,10 @@ def test_escenario_contra_modelo_real(escenario_y_corrida, corework, conn, prove
         comprobar_contenido(
             evidencia, menciona=escenario.respuesta_menciona,
             no_contiene_patron=escenario.respuesta_no_contiene_patron),
+        comprobar_sin_efectos_antes_de_confirmar(
+            resultado.conteos_antes, resultado.conteos_antes_del_toque,
+            resultado.conteos_despues,
+            herramientas_antes_del_toque=resultado.herramientas_antes_del_toque),
     ]
     if escenario.debe_preguntar:
         comprobaciones.append(comprobar_pregunta(

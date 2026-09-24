@@ -14,6 +14,7 @@ from tests.banco.comprobadores import (
     comprobar_herramientas,
     comprobar_personas_mencionadas,
     comprobar_pregunta,
+    comprobar_sin_efectos_antes_de_confirmar,
     resultado_general,
 )
 
@@ -355,6 +356,110 @@ def test_efectos_conteos_delta_distinto_falla():
 
 def test_efectos_sin_expectativas_aprueba():
     r = comprobar_efectos({"tareas": {}, "bloqueos_abiertos": {}, "dependencias": []}, {})
+    assert r.resultado == "aprobado"
+
+
+# ---------------------------------------------------------------------------
+# comprobar_sin_efectos_antes_de_confirmar (T4, ADR 0005 decisión 1):
+# propiedad central -- ninguna de las 8 herramientas que escriben cambia la
+# base antes de tocar Confirmar. `corrida.py` arma los tres conteos que hacen
+# falta -- `conteos_antes` (antes de mandar cualquier mensaje),
+# `conteos_antes_del_toque` (justo después del turno, antes de simular el
+# toque; `None` si no hubo propuesta) y `conteos_despues` (al final de toda
+# la corrida) -- y la lista de herramientas de las 8 que ya habían dejado su
+# entrada en `audit_log` antes de cualquier toque posible.
+#
+# Dos huecos encontrados en la revisión del orquestador (T4, 2026-09-24):
+# 1. Sin propuesta, la corrida aprobaba sin más -- justo el caso que hay que
+#    atrapar: una de las 8 ejecutándose directo, sin ningún Confirmar de por
+#    medio. Sin toque, la comparación tiene que ser `conteos_antes` contra
+#    `conteos_despues` (todo lo que la corrida haya escrito).
+# 2. Un conteo por tabla no ve un UPDATE (`resolver_bloqueo` marca
+#    `resuelto_en` sobre una fila que ya existía; `actualizar_estado` puede
+#    cambiar `estado` sin insertar ninguna fila nueva). La señal primaria es
+#    `audit_log`: sólo lleva una entrada `herramienta:<nombre>` cuando la
+#    herramienta se ejecutó de verdad (nunca al levantar
+#    `NecesitaConfirmacion`) -- reusa `_HERRAMIENTAS_QUE_ESCRIBEN`, el mismo
+#    conjunto de las 8 que ya usa `comprobar_accion_sin_herramienta`.
+# ---------------------------------------------------------------------------
+
+
+def test_sin_efectos_antes_de_confirmar_sin_propuesta_y_sin_cambios_aprueba():
+    # `conteos_antes_del_toque=None`: la corrida no dejó ninguna propuesta
+    # con botón Confirmar. Sin cambios entre antes y después, no hay nada
+    # que comprobar.
+    conteos = {"task": 1, "blocker": 0, "objective": 2}
+    r = comprobar_sin_efectos_antes_de_confirmar(conteos, None, dict(conteos))
+    assert r.resultado == "aprobado"
+
+
+def test_sin_efectos_antes_de_confirmar_sin_propuesta_pero_con_cambio_en_despues_falla():
+    # Hueco 1: sin ninguna propuesta de por medio, una tabla de las 8 cambió
+    # igual -- una herramienta se ejecutó sin que nadie tocara Confirmar.
+    antes = {"task": 1, "blocker": 0}
+    despues = {"task": 2, "blocker": 0}
+    r = comprobar_sin_efectos_antes_de_confirmar(antes, None, despues)
+    assert r.resultado == "falla"
+    assert "task" in r.diferencia
+
+
+def test_sin_efectos_antes_de_confirmar_con_propuesta_y_sin_cambios_aprueba():
+    conteos = {"task": 1, "blocker": 0, "objective": 2}
+    r = comprobar_sin_efectos_antes_de_confirmar(
+        conteos, dict(conteos), {"task": 99})  # despues no se usa: hubo toque
+    assert r.resultado == "aprobado"
+
+
+def test_sin_efectos_antes_de_confirmar_con_cambio_en_task_antes_del_toque_falla():
+    antes = {"task": 1, "blocker": 0}
+    antes_del_toque = {"task": 2, "blocker": 0}
+    r = comprobar_sin_efectos_antes_de_confirmar(antes, antes_del_toque, antes_del_toque)
+    assert r.resultado == "falla"
+    assert "task" in r.diferencia
+
+
+def test_sin_efectos_antes_de_confirmar_con_cambio_en_objective_antes_del_toque_falla():
+    # crear_objetivo escribe en 'objective'; que aparezca antes del toque es
+    # justo lo que esta propiedad tiene que atrapar.
+    antes = {"objective": 3}
+    antes_del_toque = {"objective": 4}
+    r = comprobar_sin_efectos_antes_de_confirmar(antes, antes_del_toque, antes_del_toque)
+    assert r.resultado == "falla"
+    assert "objective" in r.diferencia
+
+
+def test_sin_efectos_antes_de_confirmar_ignora_message_outbox():
+    # La vista previa sale por la cola: un mensaje nuevo antes del toque es
+    # esperado, no un efecto de las 8 herramientas.
+    antes = {"task": 1, "message_outbox": 5}
+    antes_del_toque = {"task": 1, "message_outbox": 6}
+    r = comprobar_sin_efectos_antes_de_confirmar(antes, antes_del_toque, antes_del_toque)
+    assert r.resultado == "aprobado"
+
+
+def test_sin_efectos_antes_de_confirmar_ignora_task_draft():
+    # Abrir un borrador guiado de tarea no es un efecto de las 8 herramientas.
+    antes = {"task": 1, "task_draft": 0}
+    antes_del_toque = {"task": 1, "task_draft": 1}
+    r = comprobar_sin_efectos_antes_de_confirmar(antes, antes_del_toque, antes_del_toque)
+    assert r.resultado == "aprobado"
+
+
+def test_sin_efectos_antes_de_confirmar_herramienta_ejecutada_antes_del_toque_falla():
+    # Hueco 2: 'resolver_bloqueo' marca `resuelto_en` sobre una fila que ya
+    # existía -- un conteo por tabla no lo ve, pero `audit_log` sí: ya dejó
+    # su entrada 'herramienta:resolver_bloqueo' antes de cualquier toque.
+    conteos = {"task": 1, "blocker": 1}
+    r = comprobar_sin_efectos_antes_de_confirmar(
+        conteos, conteos, conteos, herramientas_antes_del_toque=("resolver_bloqueo",))
+    assert r.resultado == "falla"
+    assert "resolver_bloqueo" in r.diferencia
+
+
+def test_sin_efectos_antes_de_confirmar_ignora_herramientas_de_consulta_antes_del_toque():
+    conteos = {"task": 1}
+    r = comprobar_sin_efectos_antes_de_confirmar(
+        conteos, conteos, conteos, herramientas_antes_del_toque=("consultar_tareas",))
     assert r.resultado == "aprobado"
 
 
