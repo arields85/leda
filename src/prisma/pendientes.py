@@ -263,6 +263,50 @@ def reclamar_modificacion_abierta(cur: psycopg.Cursor, quien: Solicitante,
                                args=f["args"] or {}, resumen=f["resumen"])
 
 
+def pending_action_id_de(cur: psycopg.Cursor, token: str) -> str | None:
+    """El id de la acción pendiente dueña de un token de opción.
+
+    Lo necesita "Ninguna, lo escribo" (T4, `aclaracion-con-botones`,
+    decisión 4): esa fila ya se resolvió por el camino de siempre (con
+    `campo="eleccion"`, para que la elección vuelva en `args`), así que hace
+    falta el id aparte para poder marcarla como el contexto que retoma el
+    próximo turno (`marcar_para_corregir`)."""
+    cur.execute(
+        "select pending_action_id from pending_action_option where token = %s",
+        (token,))
+    fila = cur.fetchone()
+    return str(fila["pending_action_id"]) if fila else None
+
+
+def marcar_para_corregir(cur: psycopg.Cursor, quien: Solicitante,
+                         pending_action_id: str, chat_id: int,
+                         ahora: datetime) -> None:
+    """Deja `pending_action_id` como el contexto que va a leer el próximo
+    turno de esta persona en este chat -- el mismo mecanismo que Modificar
+    (T3): `modificar_pedido_en`/`modificacion_consumida_en`/
+    `VENTANA_MODIFICACION` y `reclamar_modificacion_abierta`, que no
+    distinguen de qué acción pendiente salió la marca.
+
+    No se puede reusar la rama de `resolver_pendiente` que hace esto mismo
+    para Modificar tal cual: esa rama exige `campo is null` para reconocer
+    el valor especial `"modificar"`, y esta fila ya usa `campo="eleccion"`
+    para que la elección del botón vuelva en `args`. Se marca acá, después
+    de resolver, con el mismo efecto en las dos columnas que usa
+    `reclamar_modificacion_abierta` -- esa consulta no mira `estado`, así
+    que no importa que esta fila haya quedado `resuelta` y no `cancelada`."""
+    cur.execute(
+        "update pending_action set modificar_pedido_en = %s where id = %s",
+        (ahora, pending_action_id))
+    cur.execute(
+        """update pending_action
+              set modificacion_consumida_en = %s
+            where workspace_id = %s and membership_id = %s and chat_id = %s
+              and modificar_pedido_en is not null
+              and modificacion_consumida_en is null and id <> %s""",
+        (ahora, quien.workspace_id, quien.membership_id, chat_id,
+         pending_action_id))
+
+
 def es_borrador(cur: psycopg.Cursor, token: str) -> bool:
     cur.execute(
         """select p.draft_id is not null as es_borrador

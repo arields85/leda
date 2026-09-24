@@ -155,6 +155,10 @@ class TareaCandidata:
     titulo: str
     area: str
     responsable: str
+    # Para decidir, del lado de quien arma los botones (T4), si la tarea es
+    # de quien escribe o de otra persona -- nunca entra en `criterio()`, que
+    # es lo único que viaja a Jev.
+    responsable_membership_id: str | None = None
 
     def criterio(self) -> str:
         return f"{self.titulo} — área: {self.area} — responsable: {self.responsable}"
@@ -213,7 +217,8 @@ def _extraer_noul(respuesta: Any, pregunta: str) -> float:
 
 def resolver_referencia_tarea(
         cliente: Jev, *, mensaje: str, referencia: str,
-        tareas: Sequence[TareaCandidata], vocabulario: str) -> ResolucionReferencia:
+        tareas: Sequence[TareaCandidata], vocabulario: str,
+        quien_escribe: str | None = None) -> ResolucionReferencia:
     """Resuelve UNA referencia a tarea con la receta congelada.
 
     Sin candidatas no hay a qué llamar (principio 5 del diseño: sin
@@ -225,6 +230,14 @@ def resolver_referencia_tarea(
     con claves así ("T1".."T12"); el id real de una tarea es un UUID y nunca
     se probó como clave de una opción. La respuesta se traduce de vuelta al
     id real antes de devolverla.
+
+    `quien_escribe` (T4, `aclaracion-con-botones`; §5.10), si se pasa, viaja
+    como un campo más del `state` en las dos llamadas -- nunca como texto
+    agregado a las instrucciones: §5.10 midió que el dato solo es seguro (0
+    elecciones inseguras en 5 repeticiones) y que una pista en la instrucción
+    lo empeora (1 o 2 inseguras por repetición). Dónde más aporta -- ordenar
+    los botones y mostrar el responsable sólo cuando la tarea es de otra
+    persona -- lo decide quien arma los botones, no esta función.
     """
     if not tareas:
         return ResolucionReferencia(TipoResolucion.NINGUNA)
@@ -234,6 +247,8 @@ def resolver_referencia_tarea(
     criterios = {clave: tarea.criterio() for clave, tarea in por_clave.items()}
     state = {"mensaje": mensaje, "referencia": referencia,
               "vocabulario_del_equipo": vocabulario}
+    if quien_escribe:
+        state["quien_escribe"] = quien_escribe
     respuesta = cliente.decidir(state, {
         "alcance": {"type": "choice", "instructions": INSTRUCCION_ALCANCE,
                     "criteria": CRITERIOS_ALCANCE},
@@ -267,9 +282,13 @@ def resolver_referencia_tarea(
                                      candidatas=candidatas_por_umbral)
 
     top_tarea = por_clave[top_clave]
+    state_verificacion = {"mensaje": mensaje, "referencia": referencia,
+                          "tarea": top_tarea.criterio(),
+                          "vocabulario_del_equipo": vocabulario}
+    if quien_escribe:
+        state_verificacion["quien_escribe"] = quien_escribe
     verificacion = cliente.decidir(
-        {"mensaje": mensaje, "referencia": referencia,
-         "tarea": top_tarea.criterio(), "vocabulario_del_equipo": vocabulario},
+        state_verificacion,
         {"misma": {"type": "noul", "instructions": INSTRUCCION_VERIFICACION}})
     p_misma = _extraer_noul(verificacion, "misma")
     if p_misma < CORTE_VERIFICACION:

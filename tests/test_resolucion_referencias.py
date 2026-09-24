@@ -176,8 +176,10 @@ def test_referencia_clara_llega_como_contexto_al_modelo(
 # Ambigua
 # ---------------------------------------------------------------------------
 
-def test_referencia_ambigua_pregunta_sin_actuar(
+def test_referencia_ambigua_sin_candidatas_pregunta_en_texto(
         corework, conn, monkeypatch, con_credencial):
+    """Ambigua SIN candidatas por encima del corte sigue el texto de T3 (T4,
+    requisito 7): sin candidatos reales no hay botones que ofrecer."""
     ws = corework.workspace_id
     with admin(conn) as cur:
         _tarea(cur, ws, titulo="Cablear tablero máq. 3")
@@ -186,7 +188,7 @@ def test_referencia_ambigua_pregunta_sin_actuar(
 
     doble = ClienteJevGuionado(guion=[
         {"alcance": _alcance(varias_tareas=0.7),
-         "tarea": _tarea_resp({"T1": 0.5, "T2": 0.3})},
+         "tarea": _tarea_resp({"T1": 0.05, "T2": 0.03})},
     ])
     _con_jev(monkeypatch, doble)
     proveedor = _con_proveedor(
@@ -198,12 +200,14 @@ def test_referencia_ambigua_pregunta_sin_actuar(
         resultado = gateway._turno(cur, quien, "avisame de lo del tablero", ws, chat_id=3)
 
     sistema, _ = proveedor.recibidos[-1]
-    assert "puede ser más de una tarea" in sistema
-    assert "Cablear tablero máq. 3" in sistema
-    assert "Revisar tablero máq. 4" in sistema
-    assert "sin elegir" in sistema or "sin actuar" in sistema
+    assert "ambigua y no quedó ninguna candidata" in sistema
+    assert "sin adivinar" in sistema or "sin actuar" in sistema
     assert "Usá esa tarea" not in sistema
     assert resultado is None            # `_turno` no devuelve nada; nada se ejecutó
+
+    with admin(conn) as cur:
+        cur.execute("select count(*) n from pending_action")
+        assert cur.fetchone()["n"] == 0, "sin candidatas no hay botones que ofrecer"
 
 
 # ---------------------------------------------------------------------------

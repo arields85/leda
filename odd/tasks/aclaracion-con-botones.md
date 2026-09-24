@@ -62,7 +62,7 @@ sólo como etiqueta de los botones); decir "no encuentro esa tarea" (§5.9 punto
   contra las tareas activas del espacio. Clara: el agente recibe la tarea resuelta
   como contexto. Una referencia a una tarea existente no arranca el alta de tarea
   nueva (corrige `b-0005`). Jev caído: se pide la referencia.
-- [ ] **T4 — Botones de aclaración.** Ambigua: una `pending_action` con una opción
+- [x] **T4 — Botones de aclaración.** Ambigua: una `pending_action` con una opción
   por candidata y "Ninguna, lo escribo". Elegir retoma el mensaje original con la
   tarea resuelta y termina en la vista previa; "Ninguna" pide el texto.
   Además (revisión de T3): la corrección que llega después de Modificar también
@@ -411,3 +411,224 @@ Previsión: bastante más de 400 líneas en total, repartidas en seis tareas.
   del mismo mensaje de quien escribe y las herramientas revalidan autoridad, así que
   el riesgo queda acotado a su propio turno. (4) Sin tope de tareas: el límite de
   ~700 de la ventana de Jev sigue pendiente (ADR 0006 punto 5).
+  **Commit de T3:** `cb51f06` ("feat: resolve task references with Jev before
+  acting"), pedido explícito del usuario -- faltaba registrarlo acá.
+- 2026-09-24: **Decisiones del usuario para T4** (quedan incorporadas al
+  encabezado de la tarea T4 y a "Decisiones de esta unidad" más arriba, y acá
+  como referencia rápida de lo que pidió el usuario, palabra por palabra en
+  sustancia):
+  1. `jev.resolver_referencia_tarea` gana `quien_escribe` opcional (nombre de
+     quien escribe); si se pasa, viaja como campo `quien_escribe` del
+     `state` en las DOS llamadas (alcance/tarea y verificación) -- sin texto
+     ni pista agregada a las instrucciones (medido en §5.10: la pista
+     empeoró la receta, el dato solo es seguro). `_turno` manda el nombre de
+     quien escribe.
+  2. Ambigua con candidatas: en vez de la pregunta en texto, una
+     `pending_action` (reusando `pendientes.registrar`/`_crear_opcion`/
+     outbox/`gateway._toque`; dueño, vencimiento, tokens de un solo uso,
+     sólo la misma persona) con un botón por candidata -- el título de la
+     tarea, y " — <primer nombre del responsable>" sólo cuando la tarea es
+     de otra persona, nunca de quien escribe -- en orden: las tareas propias
+     primero, después el resto en el orden de Jev; títulos largos truncados
+     con "…" a una constante con nombre (~48 caracteres), sin recortar nunca
+     el sufijo del responsable. Último botón siempre "Ninguna, lo escribo".
+     Caso mixto de b-0005: si la acción del enrutador era alta de tarea y
+     hay una referencia ambigua, se agrega "Es una tarea nueva", que sigue
+     al alta guiada tal como la hubiera arrancado la ruta original.
+  3. Elegir una candidata retoma el mensaje ORIGINAL: `agente.responder`
+     corre con la referencia ya resuelta como contexto, así que el camino de
+     siempre (herramienta → vista previa → Confirmar/Modificar/Cancelar)
+     sigue igual. El toque en sí no aplica nada. Si quedan más referencias
+     ambiguas, se pregunta la siguiente con botones antes de retomar -- una
+     pregunta a la vez. Lo necesario para retomar (texto original, datos de
+     la ruta, lo ya resuelto) se guarda en los `args` de la `pending_action`
+     -- nunca en logs ni auditoría.
+  4. "Ninguna, lo escribo": cierra la acción pendiente sin efecto, pide el
+     texto, y el próximo mensaje de esa persona en ese chat dentro de la
+     misma ventana de 30 minutos de Modificar (`pendientes.
+     VENTANA_MODIFICACION`) se interpreta con el mensaje original como
+     contexto -- reusando el mecanismo de Modificar en vez de inventar uno
+     paralelo.
+  5. La corrección que llega después de Modificar (hallazgo de la revisión
+     de T3) también pasa por resolución: se rutea (`route_intent`) para
+     sacar sus referencias, y se resuelven con Jev como en cualquier turno,
+     antes de que `agente.responder` reciba el contexto de Modificar.
+  6. Auditoría: qué tipo de opción se eligió y, si aplica, el id de tarea --
+     nunca el mensaje ni el texto de la referencia.
+  7. Ambigua sin candidatas, ninguna, y Jev caído mantienen el comportamiento
+     de T3 (pregunta en texto, sin adivinar).
+- 2026-09-24: **T4 cerrada.** Ruta: delegada, un escritor (T4 tiene su fila
+  propia en "Ruta"; `gateway.py`, `pendientes.py`, pruebas -- también
+  `jev.py`, extensión natural del cliente). TDD estricto: RED observado con
+  `.venv/Scripts/python.exe -m pytest -q tests/test_jev.py -k quien_escribe`
+  (`TypeError: resolver_referencia_tarea() got an unexpected keyword
+  argument 'quien_escribe'`, 1 failed / 1 passed -- la prueba que pasaba de
+  entrada confirmaba el comportamiento sin el campo, sin código nuevo) y con
+  `tests/test_aclaracion_botones.py` recién creado contra el `gateway.py` de
+  T3 (10 de 14 pruebas fallaban: `AttributeError` por `herramienta` sin
+  reconocer, `pending_action` inexistente, o el texto de siempre en vez de
+  botones). GREEN con
+  `.venv/Scripts/python.exe -m pytest -q tests/test_aclaracion_botones.py
+  tests/test_jev.py tests/test_resolucion_referencias.py tests/test_modificar.py
+  tests/test_gateway.py tests/test_agente.py tests/banco` → **215 passed, 90
+  deselected**. Suite completa: `.venv/Scripts/python.exe -m pytest -q` →
+  **634 passed, 90 deselected** (618 + 16 nuevas, 0 regresiones, 138,51 s).
+  - `src/prisma/jev.py`: `resolver_referencia_tarea` gana `quien_escribe:
+    str | None = None`; si se pasa, entra como `state["quien_escribe"]` en
+    las dos llamadas (alcance/tarea y verificación) -- nunca como texto
+    agregado a `INSTRUCCION_ALCANCE`/`INSTRUCCION_TAREA`/
+    `INSTRUCCION_VERIFICACION` (§5.10: la pista empeoró la receta). Nuevo
+    campo `TareaCandidata.responsable_membership_id` (opcional, default
+    `None`) -- no entra en `criterio()` (lo único que viaja a Jev), sólo
+    sirve del lado de `gateway.py` para ordenar los botones.
+  - `src/prisma/gateway.py` (la mayor parte de esta unidad):
+    - Constantes nuevas: `_SENTINEL_ACLARACION` (el `herramienta` de una
+      `pending_action` de aclaración -- nunca un nombre real de
+      `herramientas.REGISTRO`, así que `_toque` la intercepta antes de
+      `H.ejecutar`, que si no la rechazaría), `_OPCION_NINGUNA`/
+      `_OPCION_NUEVA` (valores reservados de botón, nunca un id de tarea
+      real -- los ids son UUID), `TRUNCAR_TITULO_BOTON = 48`.
+    - `_tareas_activas` suma `responsable_membership_id` a la consulta.
+      `_resolver_en_paralelo` y `_resolver_referencias_del_turno` mandan
+      `quien_escribe=quien.nombre` a Jev.
+    - `_ReferenciasResueltas` gana `resueltas_claras` (referencia → id de
+      tarea, sólo las claras) y `pendientes_boton` (referencia → candidatas
+      ya armadas para botón, en el orden del enrutador) -- una referencia
+      ambigua CON candidatas ya no entra en el bloque de texto de siempre
+      (`_bloque_contexto_referencias` corre sólo sobre lo que sigue siendo
+      terminal en este turno: clara, ninguna, ambigua sin candidatas, Jev
+      caído).
+    - `_candidatas_para_botones`/`_etiqueta_boton` arman la lista y el texto
+      de cada botón: las tareas de quien escribe primero (comparando
+      `responsable_membership_id` contra `quien.membership_id`), el resto
+      después, cada grupo en el orden de Jev (`resolucion.candidatas` ya
+      viene ordenada por probabilidad); el título se trunca a
+      `TRUNCAR_TITULO_BOTON` con "…" antes de agregar " — <primer nombre>",
+      que nunca se recorta, y sólo se agrega cuando la tarea es ajena.
+    - `_turno` queda reorganizado alrededor de un estado que sigue el
+      mensaje mientras se preguntan botones: `_estado_inicial_aclaracion`
+      arma ese estado (mensaje, `entrante_id`, acción y propuesta de tarea
+      del enrutador, lo ya resuelto, el bloque de texto de lo terminal, si
+      hay clara, y lo pendiente de preguntar); `_avanzar_aclaracion` decide,
+      con ese estado, si falta preguntar (`_preguntar_por_botones`, una
+      referencia a la vez) o si ya se puede retomar -- a Modificar si hay
+      corrección de por medio, al alta guiada (b-0005, sólo sin ninguna
+      referencia resuelta) o al agente, con el contexto acumulado.
+      `_iniciar_alta_guiada` es el mismo camino que ya tenía `_turno`,
+      extraído para que también lo use "Es una tarea nueva".
+    - `_preguntar_por_botones` arma las opciones (una por candidata, "Es una
+      tarea nueva" sólo sin Modificar de por medio y con el enrutador
+      pidiendo alta de tarea, y "Ninguna, lo escribo" siempre al final) y
+      registra la `pending_action` con `campo="eleccion"` -- así
+      `resolver_pendiente` devuelve, en `args["eleccion"]`, qué botón se
+      tocó, reusando el mecanismo genérico de elección sin tocar SQL.
+    - `_toque` intercepta `resuelta.herramienta == _SENTINEL_ACLARACION`
+      antes de `H.ejecutar` y llama a `_resolver_toque_aclaracion`, que
+      audita la elección (`accion="aclaracion_referencia"`, `detalle` con
+      el tipo y, si aplica, el id de tarea -- nunca mensaje ni referencia,
+      decisión 6) y bifurca en tres: "Ninguna, lo escribo" marca para
+      corregir (`pendientes.marcar_para_corregir`) y responde pidiendo el
+      texto; "Es una tarea nueva" va directo a `_iniciar_alta_guiada`; una
+      candidata arma el estado con esa referencia resuelta (título sacado
+      de los propios `args["candidatas"]`, sin volver a tocar la base) y
+      sigue por `_avanzar_aclaracion` -- a la siguiente pregunta si queda
+      otra ambigua, o a retomar si no queda ninguna.
+    - `_resumir_aclaracion_ninguna`: cuando `_turno` reclama una
+      Modificación abierta cuyo `herramienta` es el centinela de
+      aclaración, no vuelve a rutear ni a llamar a Jev -- arma un bloque de
+      contexto con el mensaje original (mismo patrón que
+      `_bloque_modificacion`) y llama a `agente.responder` con el mensaje
+      nuevo como texto de la persona.
+    - **Revisión de T3 (corrección de esta unidad):** `_turno` ya no
+      devuelve apenas detecta una Modificación real -- ahora corre
+      `route_intent` y `_resolver_referencias_del_turno` igual que
+      cualquier turno, y sólo entonces, si había una corrección real (no la
+      de "Ninguna"), llama a `agente.responder(modificacion=...,
+      contexto_referencias=...)`. Las semánticas de Modificar no cambiaron:
+      sigue sin arrancar el alta guiada nunca, sigue yendo siempre a
+      `agente.responder`; lo nuevo es que ese mensaje ya no le llega al
+      modelo a resolver solo.
+    - `src/prisma/pendientes.py`: `pending_action_id_de` (el id de la
+      acción pendiente dueña de un token) y `marcar_para_corregir` (deja
+      `modificar_pedido_en`/invalida cualquier otra Modificación sin leer de
+      la misma persona y chat) -- **decisión de reuso, no de SQL nueva:** no
+      se pudo reusar la rama de `resolver_pendiente` que hace esto mismo
+      para Modificar tal cual, porque esa rama exige `campo is null` para
+      reconocer el valor especial `"modificar"`, y la fila de aclaración ya
+      usa `campo="eleccion"` para que la elección del botón vuelva en
+      `args`. Se marca en Python, después de resolver, con el mismo efecto
+      en las mismas dos columnas -- `reclamar_modificacion_abierta` no mira
+      `estado`, así que funciona igual aunque la fila haya quedado
+      `resuelta` en vez de `cancelada`. Sin cambios a SQL ni migración: no
+      hizo falta.
+  - `tests/test_jev.py` (+2): `quien_escribe` viaja en el `state` de las dos
+    llamadas cuando se pasa; sin pasarlo, ni el campo ni ninguna pista nueva
+    en las instrucciones.
+  - `tests/test_resolucion_referencias.py`: la prueba de T3
+    `test_referencia_ambigua_pregunta_sin_actuar` probaba exactamente el
+    escenario que esta unidad reemplaza (ambigua con dos candidatas por
+    encima del corte) -- pasó a
+    `test_referencia_ambigua_sin_candidatas_pregunta_en_texto`, con
+    probabilidades por debajo de `CORTE_CANDIDATA` para seguir cubriendo el
+    requisito 7 (sin candidatas, sigue el texto de T3, cero
+    `pending_action`).
+  - `tests/test_aclaracion_botones.py` (nuevo, 14 pruebas, contra
+    `gateway._turno`/`gateway._toque` vía `procesar_update` con
+    `callback_query`, proveedor y Jev guionados, sin red): `quien_escribe`
+    llega a Jev desde el turno; orden y etiqueta de los botones (propia sin
+    nombre, ajena con el primer nombre, título largo truncado sin recortar
+    el sufijo -- con Jev devolviendo las candidatas en un orden que no es
+    "propia primero", para probar que el reordenamiento es del lado de
+    `gateway.py`); elegir candidata retoma y llega a la vista previa de
+    `actualizar_estado` sin aplicar nada (estado de la tarea sin tocar
+    hasta Confirmar); dos referencias ambiguas preguntan una por vez (la
+    segunda pregunta reemplaza a la primera, no coexisten); "Ninguna, lo
+    escribo" cierra sin efecto y marca `modificar_pedido_en`, el siguiente
+    mensaje dentro de la ventana usa el original como contexto sin volver a
+    llamar a Jev, y pasada la ventana (simulada por SQL, no por `sleep`) el
+    siguiente mensaje es un turno común; "Es una tarea nueva" sigue al alta
+    guiada (y no aparece cuando la ruta es conversación normal); la
+    corrección después de Modificar se rutea y se resuelve con Jev antes de
+    llegar a `agente.responder` con el contexto de Modificar (revisión de
+    T3); toque de otro integrante, vencido, y repetido -- las garantías
+    existentes de `pending_action`/`resolver_pendiente`, reusadas sin
+    cambios para las filas de aclaración; auditoría de la elección sin
+    mensaje ni texto de la referencia.
+  - **T5 sigue igual que estaba** (sin la instrucción de nombrar la tarea en
+    las consultas). **T6 sin tocar** (banco real, grabador de Jev). No hubo
+    commit (no pedido explícito todavía).
+- 2026-09-24 (orquestador): revisión de T4 y corrección. Hallazgo: al retomar
+  después de "Ninguna, lo escribo", `_resumir_aclaracion_ninguna` no volvía a
+  rutear ni a llamar a Jev sobre el mensaje de aclaración -- lo trataba sólo
+  como texto libre con un bloque de contexto fijo, así que si la persona
+  nombraba la tarea con sus propias palabras ("es la de máq. 3") esa
+  referencia nunca se resolvía. TDD estricto, mismas reglas (sin commit, sin
+  `.env*`, sin modelo real, sin tocar el documento de diseño). RED con
+  `.venv/Scripts/python.exe -m pytest -q tests/test_aclaracion_botones.py -k
+  ninguna` → **2 failed, 2 passed** (el mensaje de aclaración nunca llegaba a
+  `route_intent`, y una referencia nueva en ese mensaje no se resolvía).
+  GREEN con el mismo comando → **4 passed**. Arreglo en
+  `src/prisma/gateway.py`: `_resumir_aclaracion_ninguna` ahora rutea
+  (`route_intent`) y resuelve (`_resolver_referencias_del_turno`) el mensaje
+  de aclaración como cualquier turno -- mismo camino que ya usa la
+  corrección real de Modificar -- y arma su propio bloque de contexto (no
+  `_bloque_modificacion`, que hubiera hablado de una vista previa y una
+  herramienta que no existen) que nombra la referencia sin resolver y el
+  mensaje original, conserva lo ya resuelto de otras referencias en ese
+  turno (`bloque_base` guardado en `args`), y fuerza `route_action` a
+  conversación normal para que este retomo nunca dispare el alta guiada.
+  Verificación pedida:
+  - `.venv/Scripts/python.exe -m pytest -q tests/test_aclaracion_botones.py
+    tests/test_modificar.py tests/test_resolucion_referencias.py tests/banco`
+    → **165 passed, 90 deselected**.
+  - `.venv/Scripts/python.exe -m pytest -q` → **635 passed, 90 deselected**
+    (634 + 1 neta, 0 regresiones, 142,18 s).
+  - `tests/test_aclaracion_botones.py`: la prueba de la ventana ahora
+    comprueba el bloque nuevo (sin "Modificar" ni el nombre del centinela,
+    con la referencia y el mensaje original, y `proveedor.ruteados[-1]`
+    igual al mensaje de aclaración); prueba nueva
+    `test_ninguna_el_siguiente_mensaje_puede_traer_su_propia_referencia`
+    (la aclaración nombra la tarea con otras palabras, Jev la resuelve, y el
+    bloque de sistema dice "Usá esa tarea"). La prueba de Modificar real
+    (`test_correccion_de_modificar_pasa_por_route_intent_y_jev`) sigue sin
+    tocar y sigue pasando: ese camino no cambió.

@@ -13,6 +13,7 @@ import json
 import httpx
 import pytest
 
+from prisma import jev
 from prisma.jev import (URL, ClienteJev, ClienteJevGuionado, JevError,
                          ResolucionReferencia, TareaCandidata, TipoResolucion,
                          resolver_referencia_tarea)
@@ -376,3 +377,49 @@ def test_resolver_referencia_verificacion_malformada_lanza_jeverror(verificacion
         resolver_referencia_tarea(
             doble, mensaje="m", referencia="r",
             tareas=(TAREA_TABLERO_3, TAREA_TABLERO_4), vocabulario="")
+
+
+# ------------------------------------------------- quién escribe (T4, §5.10)
+#
+# §5.10 midió que el dato solo -- sin pista en la instrucción -- es seguro
+# (0 inseguros en 5 repeticiones) y que una pista lo empeora (1 o 2 inseguros
+# por repetición). Por eso `quien_escribe` viaja como un campo más del
+# `state`, nunca como texto agregado a las instrucciones.
+
+def test_quien_escribe_viaja_en_el_state_de_las_dos_llamadas_cuando_se_pasa():
+    doble = ClienteJevGuionado(guion=[
+        {"alcance": _alcance(una_tarea=0.95),
+         "tarea": _tarea({"T1": 0.9, "T2": 0.05})},
+        {"misma": {"noul": 0.8}},
+    ])
+
+    resolver_referencia_tarea(
+        doble, mensaje="pasala a revision", referencia="lo del tablero",
+        tareas=(TAREA_TABLERO_3, TAREA_TABLERO_4), vocabulario="",
+        quien_escribe="Marcos Tarquini")
+
+    assert len(doble.pedidos) == 2
+    assert doble.pedidos[0][0]["quien_escribe"] == "Marcos Tarquini"
+    assert doble.pedidos[1][0]["quien_escribe"] == "Marcos Tarquini"
+
+
+def test_sin_quien_escribe_no_agrega_el_campo_ni_cambia_las_instrucciones():
+    """Sin `quien_escribe` (por defecto, `None`), el `state` sigue exactamente
+    como antes de esta unidad: sin el campo, y sin ninguna pista agregada a
+    `INSTRUCCION_ALCANCE`/`INSTRUCCION_TAREA`/`INSTRUCCION_VERIFICACION` (la
+    pista medida en §5.10 empeoró la receta)."""
+    doble = ClienteJevGuionado(guion=[
+        {"alcance": _alcance(una_tarea=0.95),
+         "tarea": _tarea({"T1": 0.9, "T2": 0.05})},
+        {"misma": {"noul": 0.8}},
+    ])
+
+    resolver_referencia_tarea(
+        doble, mensaje="pasala a revision", referencia="lo del tablero",
+        tareas=(TAREA_TABLERO_3, TAREA_TABLERO_4), vocabulario="")
+
+    assert "quien_escribe" not in doble.pedidos[0][0]
+    assert "quien_escribe" not in doble.pedidos[1][0]
+    for instruccion in (jev.INSTRUCCION_ALCANCE, jev.INSTRUCCION_TAREA,
+                        jev.INSTRUCCION_VERIFICACION):
+        assert "quien" not in instruccion.lower()

@@ -10,7 +10,7 @@ conozca la URL podría hacerse pasar por el gateway.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from fastapi import APIRouter, FastAPI, Header, HTTPException, Request
@@ -25,6 +25,27 @@ from .salida import enqueue_outbox, with_no_effect_status
 
 app = FastAPI(title="Prisma", docs_url=None, redoc_url=None)
 router = APIRouter()
+
+# Aclaración con botones (T4, `aclaracion-con-botones`; ADR 0005 decisión 3).
+#
+# `herramienta` de una acción pendiente de aclaración: nunca es un nombre
+# real del `REGISTRO` de `herramientas.py`, así que `_toque` la intercepta
+# antes de llegar a `H.ejecutar` (que si no, la rechazaría con "no existe la
+# herramienta"). `campo="eleccion"` es lo que hace que `resolver_pendiente`
+# devuelva, en `args["eleccion"]`, qué botón se tocó -- el id real de una
+# tarea, o uno de estos dos valores reservados que nunca puede ser un id
+# (los ids de tarea son UUID).
+_SENTINEL_ACLARACION = "_aclarar_referencia"
+_OPCION_NINGUNA = "__ninguna__"
+_OPCION_NUEVA = "__nueva__"
+_ETIQUETA_NINGUNA = "Ninguna, lo escribo"
+_ETIQUETA_NUEVA = "Es una tarea nueva"
+_TIPO_ELECCION = {_OPCION_NINGUNA: "ninguna", _OPCION_NUEVA: "nueva"}
+
+# Cuántos caracteres del título entran en un botón antes de truncar con
+# "…" (medido a ojo para que entre cómodo en una pantalla de teléfono; el
+# sufijo " — <nombre>" nunca se recorta, se agrega después de truncar).
+TRUNCAR_TITULO_BOTON = 48
 
 
 def _conn():
@@ -298,6 +319,11 @@ def _toque(conn, workspace_id: str, slug: str, toque: dict,
             if resuelta.task_id:
                 _responder(cur, workspace_id, chat_id, quien,
                            "Hecho. La tarea quedó comprometida.", ahora)
+            elif resuelta.herramienta == _SENTINEL_ACLARACION:
+                # T4: no es una herramienta real -- `H.ejecutar` la
+                # rechazaría -- es la elección de un botón de aclaración.
+                _resolver_toque_aclaracion(
+                    cur, quien, workspace_id, chat_id, token, resuelta.args, ahora)
             else:
                 from .agente import VIGENCIA_PENDIENTE
 
@@ -424,29 +450,31 @@ def _turno(cur, quien, texto: str, workspace_id: str, chat_id: int,
     from datetime import datetime, timezone
 
     from . import pendientes as P
-    from .agente import responder
     from .calendario import Calendario
-    from .llm import IntentAction, IntentRoute, desde_base
+    from .llm import IntentRoute, desde_base
 
     now = datetime.now(timezone.utc)
     cal = Calendario.desde_base(cur, workspace_id)
     proveedor = desde_base(cur, workspace_id, config.llm_api_key)
 
-    # Modificar (T3, ADR 0005 decisión 1): si esta persona, en este chat,
-    # tiene una corrección abierta y todavía sin leer, este mensaje es esa
-    # corrección -- no un pedido nuevo a rutear. `reclamar_modificacion_
-    # abierta` la consume de un solo uso, se haya usado o no: si el mensaje
-    # resulta ser sobre otra cosa, la propuesta vieja sigue cerrada.
+    # Modificar (T3, ADR 0005 decisión 1) y "Ninguna, lo escribo" (T4,
+    # decisión 4) comparten el mismo mecanismo: si esta persona, en este
+    # chat, tiene una corrección abierta y todavía sin leer, este mensaje es
+    # esa corrección -- no un pedido nuevo a rutear. `reclamar_modificacion_
+    # abierta` la consume de un solo uso, se haya usado o no.
     #
-    # No pasa por resolución de referencias (T3, `aclaracion-con-botones`):
-    # habría que rutear este mensaje aparte sólo para separarlas, y esa
-    # corrección ya tiene su propio contexto de confianza (`modificacion`,
-    # la propuesta que se está corrigiendo). Queda así documentado como
-    # decisión de esta unidad, no como un caso pendiente.
+    # Se distinguen por `herramienta`: `_SENTINEL_ACLARACION` es "Ninguna, lo
+    # escribo" -- la persona declinó los botones ofrecidos, así que este
+    # mensaje sigue en texto libre con el original como contexto, sin volver
+    # a rutear ni a llamar a Jev (ya protegido igual por la vista previa de
+    # siempre). Cualquier otro valor es un Modificar real: T4 (revisión de
+    # T3) hace que esa corrección también pase por enrutador y Jev, como
+    # cualquier turno, antes de llegar a `agente.responder` con el contexto
+    # de la propuesta que se está corrigiendo.
     modificacion = P.reclamar_modificacion_abierta(cur, quien, chat_id, now)
-    if modificacion is not None:
-        responder(cur, quien, texto, proveedor, cal, chat_id, ahora=now,
-                 entrante_id=entrante_id, modificacion=modificacion)
+    if modificacion is not None and modificacion.herramienta == _SENTINEL_ACLARACION:
+        _resumir_aclaracion_ninguna(cur, quien, texto, modificacion, proveedor,
+                                    cal, chat_id, workspace_id, now, entrante_id)
         return
 
     route = None
@@ -481,21 +509,18 @@ def _turno(cur, quien, texto: str, workspace_id: str, chat_id: int,
     referencias = _resolver_referencias_del_turno(cur, quien, texto, route,
                                                    workspace_id)
 
-    # b-0005: una referencia que resolvió clara a una tarea existente no es
-    # un pedido de tarea nueva, aunque el enrutador haya elegido esa acción
-    # -- sigue al agente con la tarea ya resuelta como contexto, en vez de
-    # abrir el alta guiada. Una referencia ambigua, sin coincidencia, o que
-    # Jev no pudo resolver, mantiene el ruteo de siempre: T4 va a agregar
-    # una opción explícita "Crear una tarea nueva" para el caso mixto.
-    if route.action is IntentAction.NORMAL_CONVERSATION or (
-            route.action is IntentAction.START_TASK_INTAKE
-            and referencias is not None and referencias.hay_clara):
-        responder(cur, quien, texto, proveedor, cal, chat_id, ahora=now,
-                  entrante_id=entrante_id,
-                  contexto_referencias=(referencias.bloque
-                                        if referencias else None))
-        return
+    estado = _estado_inicial_aclaracion(texto, entrante_id, route, referencias,
+                                        modificacion)
+    _avanzar_aclaracion(cur, quien, workspace_id, chat_id, now, proveedor, cal,
+                       estado)
 
+
+def _iniciar_alta_guiada(cur, quien, chat_id: int, entrante_id: str | None,
+                         texto: str, route_task: dict, workspace_id: str,
+                         now) -> None:
+    """El alta guiada de tarea nueva, tal como la arrancaba `_turno` antes de
+    T4 -- extraída para que también la use la opción "Es una tarea nueva"
+    del caso mixto (decisión 2, ADR 0005) sin duplicar el camino."""
     try:
         if entrante_id is None:
             raise ValueError("Task routing requires a persisted inbound message.")
@@ -504,7 +529,7 @@ def _turno(cur, quien, texto: str, workspace_id: str, chat_id: int,
         with cur.connection.transaction(force_rollback=False):
             outcome = start(
                 cur, quien, chat_id=chat_id, source_inbound_id=entrante_id,
-                source_raw_text=texto, proposals=route.task, now=now,
+                source_raw_text=texto, proposals=route_task, now=now,
                 buttons_first=True,
             )
             if not outcome.changed:
@@ -519,12 +544,259 @@ def _turno(cur, quien, texto: str, workspace_id: str, chat_id: int,
         )
 
 
+def _resumir_aclaracion_ninguna(cur, quien, texto: str, modificacion, proveedor,
+                                cal, chat_id: int, workspace_id: str, ahora,
+                                entrante_id) -> None:
+    """Retoma después de "Ninguna, lo escribo" (T4, decisión 4). La persona
+    declinó las tareas ofrecidas para una referencia; este mensaje NO es un
+    Modificar (nadie tocó Modificar, no hay vista previa de una herramienta
+    que corregir) así que nunca pasa por `_bloque_modificacion` -- eso le
+    diría al modelo que vuelva a llamar a una herramienta que ni siquiera es
+    real (el centinela interno).
+
+    Revisión del orquestador sobre T4: este mensaje se rutea y resuelve como
+    cualquier turno -- el mismo camino que ya usa una corrección real de
+    Modificar -- porque puede traer su propia referencia dicha con otras
+    palabras ("es la de máq. 3"). El bloque de contexto es propio: nombra la
+    referencia que quedó sin resolver y el mensaje original, y conserva lo
+    que ya se había resuelto de otras referencias en ese mismo turno
+    (`bloque_base` guardado en `args` al armar la pregunta)."""
+    from .llm import IntentAction, IntentRoute
+
+    args = modificacion.args
+    referencia = args.get("referencia_actual", "")
+    mensaje_original = args.get("mensaje", "")
+    declive = (
+        "# Aclaración de una referencia a tarea\n\n"
+        f"La persona no encontró entre las opciones la tarea a la que se "
+        f"refería con «{referencia}» en su mensaje anterior: «{mensaje_original}». "
+        "Su próximo mensaje dice cuál es. Seguí con el pedido original usando "
+        "esa tarea; si no queda claro, preguntá. No apliques nada sin la "
+        "vista previa."
+    )
+    bloque_previo = args.get("bloque_base", "")
+    bloque_previo = f"{bloque_previo}\n\n{declive}" if bloque_previo else declive
+
+    route = None
+    last_error = None
+    for _ in range(2):
+        try:
+            candidate = proveedor.route_intent(texto)
+            if not isinstance(candidate, IntentRoute):
+                raise TypeError("The provider returned an untyped route.")
+            route = candidate
+            break
+        except Exception as exc:  # noqa: BLE001
+            last_error = exc
+
+    if route is None:
+        _routing_incident(cur, quien, last_error)
+        _responder(
+            cur, workspace_id, chat_id, quien,
+            with_no_effect_status(
+                "No pude entender si querías crear una tarea. "
+                "Decime de otra forma qué necesitás."), ahora,
+        )
+        return
+
+    referencias = _resolver_referencias_del_turno(cur, quien, texto, route,
+                                                   workspace_id)
+
+    estado = _estado_inicial_aclaracion(texto, entrante_id, route, referencias, None)
+    estado["bloque_base"] = (
+        f"{bloque_previo}\n\n{estado['bloque_base']}"
+        if estado["bloque_base"] else bloque_previo)
+    # Nunca arranca alta guiada acá: la persona estaba aclarando una
+    # referencia, no pidiendo una tarea nueva, así que este retomo siempre
+    # termina en el agente (nunca en `_iniciar_alta_guiada`), aunque el
+    # enrutador haya leído este mensaje suelto como intención de alta.
+    estado["route_action"] = IntentAction.NORMAL_CONVERSATION.value
+    _avanzar_aclaracion(cur, quien, workspace_id, chat_id, ahora, proveedor,
+                       cal, estado)
+
+
+def _estado_inicial_aclaracion(texto: str, entrante_id: str | None, route,
+                               referencias, modificacion) -> dict:
+    """El estado que sigue `_avanzar_aclaracion` para retomar el mensaje
+    original una vez resueltas -- desde el arranque o botón por botón -- las
+    referencias que separó el enrutador (T4). Es lo que se guarda en
+    `pending_action.args` de una fila de aclaración: nunca en logs ni
+    auditoría, y siempre sin secretos (sólo lo que ya viajaba en el turno)."""
+    pendientes_boton = referencias.pendientes_boton if referencias else ()
+    return {
+        "mensaje": texto,
+        "entrante_id": entrante_id,
+        "route_action": route.action.value,
+        "route_task": dict(route.task),
+        "resueltas": dict(referencias.resueltas_claras) if referencias else {},
+        "bloque_base": referencias.bloque if referencias else "",
+        "hay_clara": referencias.hay_clara if referencias else False,
+        "pendientes": [referencia for referencia, _candidatas in pendientes_boton],
+        "candidatas": dict(pendientes_boton),
+        "modificacion": (
+            {"herramienta": modificacion.herramienta, "args": modificacion.args,
+             "resumen": modificacion.resumen}
+            if modificacion is not None else None),
+    }
+
+
+def _avanzar_aclaracion(cur, quien, workspace_id: str, chat_id: int, ahora,
+                       proveedor, cal, estado: dict) -> None:
+    """Sigue el estado de la aclaración con botones (T4, decisión 2 y 3): si
+    queda una referencia ambigua con candidatas por preguntar, la siguiente
+    pregunta con botones y el turno termina ahí -- una pregunta a la vez. Si
+    no queda ninguna, retoma el mensaje original: a la corrección de
+    Modificar si la hay, al alta guiada (b-0005, sólo sin ninguna referencia
+    resuelta) o al agente, con el contexto acumulado."""
+    if estado["pendientes"]:
+        _preguntar_por_botones(cur, quien, workspace_id, chat_id, ahora, estado)
+        return
+
+    from .llm import IntentAction
+
+    contexto = estado["bloque_base"] or None
+    mod = estado["modificacion"]
+    if mod is not None:
+        from . import pendientes as P
+        from .agente import responder
+
+        modificacion = P.ModificacionAbierta(
+            pending_action_id="", herramienta=mod["herramienta"],
+            args=mod["args"], resumen=mod["resumen"])
+        responder(cur, quien, estado["mensaje"], proveedor, cal, chat_id,
+                 ahora=ahora, entrante_id=estado["entrante_id"],
+                 modificacion=modificacion, contexto_referencias=contexto)
+        return
+
+    # b-0005: una referencia resuelta -- clara desde el arranque, o elegida
+    # por botón, que cuenta más todavía -- a una tarea existente no es un
+    # pedido de tarea nueva, aunque el enrutador haya elegido esa acción.
+    if (estado["route_action"] == IntentAction.START_TASK_INTAKE.value
+            and not estado["hay_clara"]):
+        _iniciar_alta_guiada(cur, quien, chat_id, estado["entrante_id"],
+                            estado["mensaje"], estado["route_task"],
+                            workspace_id, ahora)
+        return
+
+    from .agente import responder
+    responder(cur, quien, estado["mensaje"], proveedor, cal, chat_id,
+             ahora=ahora, entrante_id=estado["entrante_id"],
+             contexto_referencias=contexto)
+
+
+def _preguntar_por_botones(cur, quien, workspace_id: str, chat_id: int, ahora,
+                           estado: dict) -> None:
+    """Encola la pregunta con botones de la próxima referencia ambigua con
+    candidatas pendiente (T4, decisión 2): una tarea por botón, más "Es una
+    tarea nueva" en el caso mixto de b-0005 (sólo sin Modificar de por medio
+    y con el enrutador pidiendo alta de tarea) y "Ninguna, lo escribo" al
+    final, siempre."""
+    from . import pendientes as P
+    from .agente import VIGENCIA_PENDIENTE
+    from .llm import IntentAction
+
+    referencia = estado["pendientes"][0]
+    candidatas = estado["candidatas"].get(referencia, [])
+    opciones = [(c["etiqueta"], c["id"]) for c in candidatas]
+    mostrar_nueva = (estado["modificacion"] is None
+                     and estado["route_action"] == IntentAction.START_TASK_INTAKE.value)
+    if mostrar_nueva:
+        opciones.append((_ETIQUETA_NUEVA, _OPCION_NUEVA))
+    opciones.append((_ETIQUETA_NINGUNA, _OPCION_NINGUNA))
+
+    siguiente = dict(estado)
+    siguiente["pendientes"] = estado["pendientes"][1:]
+    siguiente["referencia_actual"] = referencia
+
+    pregunta = f"¿A cuál te referís con «{referencia}»?"
+    p = P.registrar(cur, quien, herramienta=_SENTINEL_ACLARACION, args=siguiente,
+                    resumen=pregunta, vence_en=ahora + VIGENCIA_PENDIENTE,
+                    campo="eleccion", opciones=opciones, chat_id=chat_id)
+    enqueue_outbox(
+        cur, workspace_id=workspace_id, chat_id=chat_id,
+        recipient_membership_id=quien.membership_id, text=p.resumen,
+        scheduled_for=ahora,
+        dedupe_key=f"{workspace_id}:aclarar:{quien.app_user_id}:{ahora.timestamp()}",
+        is_response=True, pending_action_id=p.id,
+    )
+
+
+def _resolver_toque_aclaracion(cur, quien, workspace_id: str, chat_id: int,
+                               token: str, args: dict, ahora) -> None:
+    """Alguien apretó un botón de aclaración (T4). Tres casos:
+
+    - "Ninguna, lo escribo": no se aplica nada; se marca para que el próximo
+      mensaje de esta persona en este chat, dentro de la ventana de
+      Modificar, se lea como la aclaración (decisión 4).
+    - "Es una tarea nueva": el caso mixto de b-0005 -- sigue al alta guiada
+      con la misma propuesta que hubiera usado el enrutador.
+    - Una candidata: retoma el mensaje original con esa referencia resuelta;
+      si queda otra referencia ambigua, la siguiente pregunta; si no, sigue
+      al agente (o a Modificar, o al alta guiada) con todo lo resuelto.
+    """
+    eleccion = args.get("eleccion")
+    referencia = args.get("referencia_actual")
+
+    # Auditoría (decisión 6): qué tipo de elección y, si aplica, qué tarea --
+    # nunca el mensaje ni el texto de la referencia.
+    registrar_auditoria(
+        cur, accion="aclaracion_referencia", workspace_id=workspace_id,
+        actor_app_user_id=quien.app_user_id, actor_kind="persona",
+        detalle={"tipo": _TIPO_ELECCION.get(eleccion, "candidata"),
+                 "tarea_id": eleccion if eleccion not in _TIPO_ELECCION else None})
+
+    if eleccion == _OPCION_NINGUNA:
+        from . import pendientes as P
+
+        pid = P.pending_action_id_de(cur, token)
+        if pid is not None:
+            P.marcar_para_corregir(cur, quien, pid, chat_id, ahora)
+        _responder(cur, workspace_id, chat_id, quien,
+                  "¿A qué tarea te referís? Decime cuál es.", ahora)
+        return
+
+    if eleccion == _OPCION_NUEVA:
+        _iniciar_alta_guiada(cur, quien, chat_id, args.get("entrante_id"),
+                            args.get("mensaje", ""), args.get("route_task", {}),
+                            workspace_id, ahora)
+        return
+
+    from .calendario import Calendario
+    from .llm import desde_base
+
+    estado = dict(args)
+    if referencia is not None and eleccion is not None:
+        candidatos = args.get("candidatas", {}).get(referencia, [])
+        titulo = next((c["titulo"] for c in candidatos if c["id"] == eleccion),
+                      eleccion)
+        estado["resueltas"] = {**args.get("resueltas", {}), referencia: eleccion}
+        estado["hay_clara"] = True
+        estado["bloque_base"] = args.get("bloque_base", "") + (
+            f"\n- «{referencia}» es la tarea «{titulo}» ({eleccion}). Usá "
+            "esa tarea; no la vuelvas a resolver.")
+
+    cal = Calendario.desde_base(cur, workspace_id)
+    proveedor = desde_base(cur, workspace_id, config.llm_api_key)
+    _avanzar_aclaracion(cur, quien, workspace_id, chat_id, ahora, proveedor, cal,
+                       estado)
+
+
 @dataclass(frozen=True)
 class _ReferenciasResueltas:
     """Lo que le queda al turno después de resolver, listo para pasarle a
-    `agente.responder` como contexto de confianza del servidor."""
+    `agente.responder` como contexto de confianza del servidor -- o, si algo
+    quedó ambiguo con candidatas reales, para preguntar con botones (T4)
+    antes de llegar al agente.
+
+    `bloque` sólo cubre lo que ya es terminal en este turno (clara, ninguna,
+    ambigua sin candidatas, Jev caído): una referencia ambigua CON
+    candidatas no entra ahí, entra en `pendientes_boton` -- eso es lo que
+    reemplaza el texto de siempre por botones.
+    """
     bloque: str
     hay_clara: bool
+    resueltas_claras: dict[str, str] = field(default_factory=dict)
+    pendientes_boton: tuple[tuple[str, list[dict]], ...] = ()
 
 
 def _resolver_referencias_del_turno(cur, quien, texto: str, route,
@@ -566,28 +838,86 @@ def _resolver_referencias_del_turno(cur, quien, texto: str, route,
 
     resultados = _resolver_en_paralelo(
         cliente_jev, texto=texto, referencias=route.trabajos, tareas=tareas,
-        vocabulario=vocab)
+        vocabulario=vocab, quien_escribe=quien.nombre)
 
     _auditar_resolucion(cur, quien, workspace_id, resultados)
+
+    # Ambigua CON candidatas (T4, decisión 2): botones, no el texto de
+    # siempre. El resto -- clara, ninguna, ambigua sin candidatas, Jev caído
+    # -- sigue exactamente como en T3.
+    con_botones = {
+        referencia for referencia, (resolucion, error) in resultados.items()
+        if error is None and resolucion.tipo is jev_modulo.TipoResolucion.AMBIGUA
+        and resolucion.candidatas}
+    sin_boton = {referencia: par for referencia, par in resultados.items()
+                if referencia not in con_botones}
 
     hay_clara = any(
         resolucion is not None and resolucion.tipo is jev_modulo.TipoResolucion.CLARA
         for resolucion, _error in resultados.values())
+    resueltas_claras = {
+        referencia: resolucion.tarea_id
+        for referencia, (resolucion, error) in resultados.items()
+        if error is None and resolucion.tipo is jev_modulo.TipoResolucion.CLARA}
+    pendientes_boton = tuple(
+        (referencia, _candidatas_para_botones(
+            por_id, resultados[referencia][0], quien.membership_id))
+        for referencia in route.trabajos if referencia in con_botones)
+
     return _ReferenciasResueltas(
-        bloque=_bloque_contexto_referencias(resultados, por_id),
-        hay_clara=hay_clara)
+        bloque=_bloque_contexto_referencias(sin_boton, por_id),
+        hay_clara=hay_clara, resueltas_claras=resueltas_claras,
+        pendientes_boton=pendientes_boton)
+
+
+def _etiqueta_boton(titulo: str, responsable: str, *, ajena: bool) -> str:
+    """El texto de un botón de aclaración (T4, decisión 2): el título, y el
+    primer nombre del responsable agregado con " — " sólo cuando la tarea es
+    de otra persona (§5.10: "quién escribe" aporta ahí, no como pista para
+    Jev). El título se trunca antes de agregar el sufijo -- el sufijo nunca
+    se recorta."""
+    corto = (titulo if len(titulo) <= TRUNCAR_TITULO_BOTON
+             else titulo[:TRUNCAR_TITULO_BOTON - 1].rstrip() + "…")
+    if not ajena or not responsable:
+        return corto
+    primer_nombre = responsable.split()[0]
+    return f"{corto} — {primer_nombre}"
+
+
+def _candidatas_para_botones(tareas_por_id: dict, resolucion, membership_id: str | None
+                             ) -> list[dict]:
+    """Las candidatas de una referencia ambigua, en el orden de los botones
+    (T4, decisión 2): las tareas propias de quien escribe primero, después
+    el resto -- dentro de cada grupo, en el orden que mandó Jev
+    (`resolucion.candidatas` ya viene ordenada por probabilidad). Una
+    candidata que Jev haya devuelto fuera de las tareas leídas no rompe,
+    igual que en `jev.resolver_referencia_tarea`: se descarta."""
+    propias, ajenas = [], []
+    for cid in resolucion.candidatas:
+        tarea = tareas_por_id.get(cid)
+        if tarea is None:
+            continue
+        es_propia = (membership_id is not None
+                    and tarea.responsable_membership_id == membership_id)
+        etiqueta = _etiqueta_boton(tarea.titulo, tarea.responsable, ajena=not es_propia)
+        item = {"id": tarea.id, "etiqueta": etiqueta, "titulo": tarea.titulo}
+        (propias if es_propia else ajenas).append(item)
+    return propias + ajenas
 
 
 def _tareas_activas(cur, workspace_id: str) -> list:
     """Tareas activas del espacio (no `terminada` ni `cancelada`), con lo
     que necesita la receta de Jev -- título, área y responsable -- leídas
     con el mismo cursor con RLS que ya tiene el turno: nunca otra conexión,
-    nunca otro espacio."""
+    nunca otro espacio. `responsable_membership_id` no viaja a Jev (no entra
+    en `criterio()`): sólo sirve, del lado de acá, para ordenar los botones
+    (T4, decisión 2)."""
     from . import jev as jev_modulo
 
     cur.execute(
         """select t.id, t.titulo, a.nombre as area,
-                  coalesce(i.nombre, '') as responsable
+                  coalesce(i.nombre, '') as responsable,
+                  t.responsable_membership_id
              from task t
              join area a on a.id = t.area_id
              left join integrante i on i.membership_id = t.responsable_membership_id
@@ -596,12 +926,14 @@ def _tareas_activas(cur, workspace_id: str) -> list:
         (workspace_id,))
     return [jev_modulo.TareaCandidata(
                 id=str(f["id"]), titulo=f["titulo"], area=f["area"],
-                responsable=f["responsable"])
+                responsable=f["responsable"],
+                responsable_membership_id=(str(f["responsable_membership_id"])
+                                          if f["responsable_membership_id"] else None))
             for f in cur.fetchall()]
 
 
 def _resolver_en_paralelo(cliente_jev, *, texto: str, referencias, tareas,
-                          vocabulario: str) -> dict:
+                          vocabulario: str, quien_escribe: str | None = None) -> dict:
     """Resuelve cada referencia con Jev. Ninguna llamada toca la base, así
     que corren en un pool chico de hilos en vez de una detrás de otra (T3).
 
@@ -616,7 +948,8 @@ def _resolver_en_paralelo(cliente_jev, *, texto: str, referencias, tareas,
         try:
             return referencia, jev_modulo.resolver_referencia_tarea(
                 cliente_jev, mensaje=texto, referencia=referencia,
-                tareas=tareas, vocabulario=vocabulario), None
+                tareas=tareas, vocabulario=vocabulario,
+                quien_escribe=quien_escribe), None
         except jev_modulo.JevError as exc:
             return referencia, None, exc
 
