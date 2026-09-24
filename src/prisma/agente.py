@@ -64,16 +64,25 @@ def responder(cur: psycopg.Cursor, quien: Solicitante, texto_entrante: str,
               proveedor: Proveedor, cal: Calendario, chat_id: int,
               ahora: datetime | None = None,
               entrante_id: str | None = None,
-              modificacion: P.ModificacionAbierta | None = None) -> Resultado:
+              modificacion: P.ModificacionAbierta | None = None,
+              contexto_referencias: str | None = None) -> Resultado:
     """`modificacion`, si viene, es la propuesta anterior que la persona pidió
     corregir (T3, ADR 0005 decisión 1): se agrega al sistema como contexto de
     confianza del servidor, nunca como texto de la persona, para que el
     modelo pueda volver a llamar a la herramienta con los argumentos
     corregidos. Si el mensaje resulta ser sobre otra cosa, no se hace nada
-    especial: la propuesta anterior sigue cerrada."""
+    especial: la propuesta anterior sigue cerrada.
+
+    `contexto_referencias`, si viene, es el resultado de resolver contra las
+    tareas del espacio las referencias que separó `route_intent`
+    (`gateway._turno`, T3 de `aclaracion-con-botones`, ADR 0005 decisión 6 /
+    ADR 0006): igual que `modificacion`, es contexto de confianza del
+    servidor, nunca texto de la persona."""
     ahora = ahora or datetime.now(timezone.utc)
     ctx = construir(cur, quien, texto_entrante, ahora=ahora)
     sistema = ctx.sistema
+    if contexto_referencias:
+        sistema = sistema + "\n\n---\n\n" + contexto_referencias
     if modificacion is not None:
         sistema = sistema + "\n\n---\n\n" + _bloque_modificacion(modificacion)
     esquemas = H.esquemas()

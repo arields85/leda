@@ -58,13 +58,15 @@ sólo como etiqueta de los botones); decir "no encuentro esa tarea" (§5.9 punto
 - [x] **T2 — Referencias en el enrutador.** `route_intent` devuelve además las
   referencias a trabajos tal como están dichas, en los tres proveedores y con su
   validación.
-- [ ] **T3 — Resolver antes de actuar.** En `_turno`, las referencias se resuelven
+- [x] **T3 — Resolver antes de actuar.** En `_turno`, las referencias se resuelven
   contra las tareas activas del espacio. Clara: el agente recibe la tarea resuelta
   como contexto. Una referencia a una tarea existente no arranca el alta de tarea
   nueva (corrige `b-0005`). Jev caído: se pide la referencia.
 - [ ] **T4 — Botones de aclaración.** Ambigua: una `pending_action` con una opción
   por candidata y "Ninguna, lo escribo". Elegir retoma el mensaje original con la
   tarea resuelta y termina en la vista previa; "Ninguna" pide el texto.
+  Además (revisión de T3): la corrección que llega después de Modificar también
+  pasa por la resolución de referencias; hoy el modelo la resuelve solo.
 - [ ] **T5 — Respuestas que nombran la tarea.** Toda respuesta a una consulta
   nombra la tarea por su título (protección de las lecturas, ADR 0006).
 - [ ] **T6 — Banco y continuidad.** Grabador de Jev para el banco, escenarios
@@ -293,3 +295,119 @@ Previsión: bastante más de 400 líneas en total, repartidas en seis tareas.
     `route_intent` no perdió lo que medían §5.6-§5.9 por separado. Medición
     del orquestador, no de este escritor; no hay un comando de esta sesión
     que la reproduzca.
+  - **Commit:** `0dcef8b` ("feat: make the intent router return the
+    references it mentions"), pedido explícito del usuario -- cierra T2
+    (incluye `src/prisma/llm.py`, `tests/test_llm_protocol.py`,
+    `tests/banco/corrida.py`, `tests/banco/test_corrida.py` y este
+    documento).
+- 2026-09-24: **T3 cerrada.** Ruta: delegada, un escritor (T3 tiene su fila
+  propia en "Ruta"; `gateway.py`, `agente.py`, `contexto.py`, pruebas --
+  también `jev.py` y `tests/banco/corrida.py`, extensión natural de la
+  fábrica de Jev y del banco). TDD estricto: RED observado con
+  `.venv/Scripts/python.exe -m pytest -q tests/test_resolucion_referencias.py`
+  (`AttributeError: <module 'prisma.jev' ...> has no attribute 'desde_base'`,
+  7 failed / 1 passed -- la prueba que pasaba de entrada fue la de "sin
+  credencial", antes de la corrección del usuario, porque no hacía falta
+  código nuevo para no cambiar nada). GREEN con el mismo comando -- **9
+  passed**. Verificación pedida:
+  - `.venv/Scripts/python.exe -m pytest -q tests/test_resolucion_referencias.py
+    tests/test_gateway.py tests/test_agente.py tests/test_jev.py tests/banco`
+    → **184 passed, 90 deselected**.
+  - `.venv/Scripts/python.exe -m pytest -q` → **618 passed, 90 deselected**
+    (609 + 9 nuevas, 0 regresiones, 249,41 s).
+  - **Decisión del usuario, 2026-09-24 (cambio de requisito a mitad de
+    tarea):** sin `PRISMA_OPENROUTER_API_KEY`, Prisma **no** sigue como si
+    Jev no existiera. Con referencias en el mensaje, la falta de credencial
+    se trata igual que un `JevError` en cada una -- se le pide al modelo que
+    pregunte, nunca que elija solo -- y además deja un incidente (sin
+    secretos ni texto del mensaje) para que la falta de configuración no
+    pase inadvertida. Un mensaje sin referencias no se toca. Reemplaza el
+    criterio original de T3 ("si la clave está vacía, saltear la resolución
+    por completo... para que las pruebas y los despliegues sin la clave no
+    cambien"): ese criterio hubiera dejado a Prisma adivinando en cualquier
+    despliegue sin la clave configurada, que es justo lo que esta unidad
+    existe para evitar.
+  - `src/prisma/jev.py`: `desde_base(api_key) -> Jev | None` -- `None` si
+    `api_key` está vacía, si no un `ClienteJev`. Mismo patrón de reemplazo
+    que `llm.desde_base`: un import local en `_turno` lee este nombre del
+    módulo en cada turno, así que alcanza con reemplazar
+    `prisma.jev.desde_base` para las pruebas y para que el banco no llame a
+    Jev de verdad por defecto.
+  - `src/prisma/contexto.py`: extraídas `_glosario_filas` y `_lineas_glosario`
+    de adentro de `construir()`, y agregada `vocabulario(cur, workspace_id)
+    -> str` (mismo glosario en texto plano, vacío si no hay) -- para no
+    repetir la consulta y para que `gateway.py` pueda pasarle el mismo
+    vocabulario del equipo a Jev (ADR 0006, "sólo viajan datos del espacio
+    actual"). `construir()` se comporta igual que antes (probado por
+    `test_contexto_lleva_nucleo_glosario_y_equipo`, sin tocar).
+  - `src/prisma/agente.py`: `responder()` gana `contexto_referencias: str |
+    None = None`, agregado al sistema igual que `modificacion` -- contexto
+    de confianza del servidor, nunca texto de la persona.
+  - `src/prisma/gateway.py`, en `_turno` (después de `route_intent`, antes
+    de decidir alta guiada vs. `agente.responder`):
+    `_resolver_referencias_del_turno` arma las tareas activas del espacio
+    (`_tareas_activas`: `estado not in ('terminada', 'cancelada')`, con
+    título/área/responsable, bajo el mismo cursor con RLS que ya tiene
+    `_turno`) y el vocabulario, resuelve cada referencia con
+    `jev.resolver_referencia_tarea` en un `ThreadPoolExecutor` chico
+    (`_resolver_en_paralelo`, sin tocar la base), arma el bloque de
+    contexto (`_bloque_contexto_referencias`: clara dice qué tarea usar,
+    ambigua lista candidatas y pide preguntar sin elegir, ninguna dice que
+    no invente, y una referencia con `JevError` -- Jev caído, respuesta
+    malformada, o sin credencial -- pide aclaración) y dejar una única
+    entrada de auditoría por turno (`_auditar_resolucion`: `accion =
+    "resolucion_referencias"`, por referencia sólo el tipo y los ids de
+    tarea/candidatas, nunca el mensaje ni el texto de la referencia). Sin
+    referencias, `_resolver_referencias_del_turno` devuelve `None` sin
+    tocar la base ni la red.
+  - **b-0005 corregida:** si la acción del enrutador es
+    `START_TASK_INTAKE` pero al menos una referencia resolvió **clara** a
+    una tarea existente, no arranca el alta guiada: va a
+    `agente.responder` con la tarea resuelta como contexto (puede llamar
+    `crear_dependencia`, etc.). Ambigua, ninguna, o sin resolver mantiene el
+    ruteo de siempre (T4 va a agregar la opción explícita "Crear una tarea
+    nueva" para el caso mixto).
+  - **Decisión de esta unidad -- Modificar sin resolución.** El camino de
+    `reclamar_modificacion_abierta` sigue directo a `agente.responder`, sin
+    pasar por resolución de referencias: hacerlo exigiría rutear ese
+    mensaje aparte sólo para separarlas (`route_intent` no corre en esa
+    rama), lo que no es el caso simple que este bullet pedía preferir. Ese
+    mensaje además ya lleva su propio contexto de confianza
+    (`modificacion`, la propuesta que se está corrigiendo). Documentado acá
+    como decisión, no como pendiente.
+  - `tests/banco/corrida.py`: `ejecutar_escenario` gana `cliente_jev`
+    opcional y reemplaza `jev.desde_base` con el mismo patrón que ya usa
+    para `llm.desde_base` (guardar el original, reemplazar, restaurar en el
+    `finally`). Por defecto es un `ClienteJevGuionado(guion=[])` --
+    explícito, nunca `None` (que desde esta unidad hace que Prisma pida en
+    vez de adivinar) -- pero sin ninguna respuesta preparada, así que el
+    banco no llama a la red por defecto; ningún escenario actual trae
+    `trabajos` que lo ejerciten (T6 va a agregar un grabador real de Jev).
+    Replays existentes sin tocar, siguen pasando.
+  - `tests/test_resolucion_referencias.py` (nuevo, 9 pruebas, contra
+    `gateway._turno` con `corework`/`intake_world`, proveedor y Jev
+    guionados, sin red): sin credencial + con referencias → pregunta y dos
+    aserciones de auditoría/incidente sin secretos ni texto (decisión del
+    usuario); sin credencial y sin referencias → nada cambia; clara → el
+    bloque de contexto llega al modelo con título e id; ambigua → pregunta
+    sin elegir, sin `"Usá esa tarea"`; ninguna → no inventa y no llama a
+    Jev (lista de tareas vacía, principio "sin candidatos no hay red");
+    Jev caído (guion agotado) → pide la referencia, el turno sigue y
+    responde igual; b-0005 → ninguna fila en `task_intake_request`, pasa a
+    `agente.responder` con la tarea resuelta; RLS con `intake_world` (dos
+    espacios reales) → sólo el título del espacio activo llega a
+    `criteria`, nunca el del otro; auditoría → una sola entrada, `detalle`
+    sin el texto del mensaje ni el de la referencia.
+  - T4/T5 quedan igual que estaban: sin botones (T4) y sin la instrucción
+    de nombrar la tarea en las consultas (T5). No hubo commit (no pedido
+    explícito todavía).
+- 2026-09-24 (orquestador): revisión de T3. Control: `pytest -q
+  tests/test_resolucion_referencias.py tests/banco` → 135 passed, 90 deselected.
+  Hallazgos anotados: (1) la corrección después de Modificar no pasa por Jev: el
+  modelo resuelve solo la tarea; se agrega a T4. (2) El banco con modelo real usa por
+  defecto un Jev guionado vacío: un escenario con referencias termina preguntando
+  hasta que T6 agregue el grabador de Jev; el banco real no se corre antes de T6.
+  (3) El texto de la referencia entra en el bloque de sistema entre comillas; viene
+  del mismo mensaje de quien escribe y las herramientas revalidan autoridad, así que
+  el riesgo queda acotado a su propio turno. (4) Sin tope de tareas: el límite de
+  ~700 de la ventana de Jev sigue pendiente (ADR 0006 punto 5).

@@ -15,10 +15,12 @@ import time
 from dataclasses import dataclass, field
 from typing import Any
 
+import prisma.jev as jev_modulo
 import prisma.llm as llm_modulo
 from prisma import gateway
 from prisma import pendientes as P
 from prisma.db import admin
+from prisma.jev import ClienteJevGuionado
 from prisma.llm import (IntentAction, IntentRoute, Llamada, Proveedor,
                         ProveedorGuionado, Respuesta)
 
@@ -361,12 +363,21 @@ def _telegram_id(conn, ws: str, nombre: str) -> int:
 def ejecutar_escenario(
     conn, workspace_id: str, slug: str, actor_nombre: str, mensajes: list[str],
     proveedor_real: Proveedor, *, escenario_id: str, indice: int,
-    chat_id: int | None = None,
+    chat_id: int | None = None, cliente_jev: Any | None = None,
 ) -> ResultadoCorrida:
     """Corre un escenario por `gateway.procesar_update`, con
     `proveedor_real` envuelto en `ProveedorGrabador` e inyectado en lugar de
     `llm.desde_base`, y recolecta la evidencia de la corrida: respuesta
     visible, herramientas ejecutadas, estado antes/después y latencia.
+
+    `cliente_jev`, si viene, se inyecta en lugar de `jev.desde_base` (mismo
+    patrón de reemplazo que `llm.desde_base`). Por defecto es un
+    `ClienteJevGuionado` con guion vacío: explícito -- nunca `None`, que
+    desde esta unidad hace que Prisma pida en vez de adivinar (T3,
+    `aclaracion-con-botones`, decisión del usuario 2026-09-24) -- pero sin
+    ninguna respuesta preparada, así que el banco no llama a la red por
+    defecto (T6 va a agregar un grabador real de Jev; hasta entonces,
+    ningún escenario del banco trae referencias a tarea que lo ejerciten).
 
     Un fallo durante el procesamiento (por ejemplo, infraestructura del
     escenario mal declarada) deja la corrida `bloqueado`, con el motivo, en
@@ -377,10 +388,13 @@ def ejecutar_escenario(
     chat = chat_id if chat_id is not None else tg_id
 
     grabador = ProveedorGrabador(proveedor_real)
+    jev_doble = cliente_jev if cliente_jev is not None else ClienteJevGuionado(guion=[])
     desde_base_original = llm_modulo.desde_base
+    jev_desde_base_original = jev_modulo.desde_base
     mantener_chat_activo_original = gateway.mantener_chat_activo
     acusar_toque_original = gateway.acusar_toque
     llm_modulo.desde_base = lambda cur, ws, key: grabador
+    jev_modulo.desde_base = lambda api_key: jev_doble
     # El banco no habla con Telegram de verdad: el token del espacio de
     # pruebas es ficticio (`corework`, fixture) y no hay nada real a lo que
     # avisar que se está escribiendo, ni un acuse real que mandarle al tocar
@@ -436,6 +450,7 @@ def ejecutar_escenario(
         motivo_bloqueo = f"{type(exc).__name__}: {exc}"
     finally:
         llm_modulo.desde_base = desde_base_original
+        jev_modulo.desde_base = jev_desde_base_original
         gateway.mantener_chat_activo = mantener_chat_activo_original
         gateway.acusar_toque = acusar_toque_original
     latencia_total = time.perf_counter() - inicio

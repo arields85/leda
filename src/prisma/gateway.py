@@ -10,6 +10,7 @@ conozca la URL podría hacerse pasar por el gateway.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any
 
 from fastapi import APIRouter, FastAPI, Header, HTTPException, Request
@@ -436,6 +437,12 @@ def _turno(cur, quien, texto: str, workspace_id: str, chat_id: int,
     # corrección -- no un pedido nuevo a rutear. `reclamar_modificacion_
     # abierta` la consume de un solo uso, se haya usado o no: si el mensaje
     # resulta ser sobre otra cosa, la propuesta vieja sigue cerrada.
+    #
+    # No pasa por resolución de referencias (T3, `aclaracion-con-botones`):
+    # habría que rutear este mensaje aparte sólo para separarlas, y esa
+    # corrección ya tiene su propio contexto de confianza (`modificacion`,
+    # la propuesta que se está corrigiendo). Queda así documentado como
+    # decisión de esta unidad, no como un caso pendiente.
     modificacion = P.reclamar_modificacion_abierta(cur, quien, chat_id, now)
     if modificacion is not None:
         responder(cur, quien, texto, proveedor, cal, chat_id, ahora=now,
@@ -464,9 +471,29 @@ def _turno(cur, quien, texto: str, workspace_id: str, chat_id: int,
         )
         return
 
-    if route.action is IntentAction.NORMAL_CONVERSATION:
+    # Resolver antes de actuar (T3, ADR 0005 decisión 6 / ADR 0006): las
+    # referencias a tarea que separó el enrutador se resuelven contra las
+    # tareas activas del espacio, bajo el mismo cursor con RLS que ya tiene
+    # `cur`. Sin referencias no hay nada que resolver. Sin credencial de Jev
+    # (`PRISMA_OPENROUTER_API_KEY` vacía) Prisma no adivina igual: se pide
+    # aclaración como si Jev hubiera fallado (decisión del usuario,
+    # 2026-09-24; ver `_resolver_referencias_del_turno`).
+    referencias = _resolver_referencias_del_turno(cur, quien, texto, route,
+                                                   workspace_id)
+
+    # b-0005: una referencia que resolvió clara a una tarea existente no es
+    # un pedido de tarea nueva, aunque el enrutador haya elegido esa acción
+    # -- sigue al agente con la tarea ya resuelta como contexto, en vez de
+    # abrir el alta guiada. Una referencia ambigua, sin coincidencia, o que
+    # Jev no pudo resolver, mantiene el ruteo de siempre: T4 va a agregar
+    # una opción explícita "Crear una tarea nueva" para el caso mixto.
+    if route.action is IntentAction.NORMAL_CONVERSATION or (
+            route.action is IntentAction.START_TASK_INTAKE
+            and referencias is not None and referencias.hay_clara):
         responder(cur, quien, texto, proveedor, cal, chat_id, ahora=now,
-                  entrante_id=entrante_id)
+                  entrante_id=entrante_id,
+                  contexto_referencias=(referencias.bloque
+                                        if referencias else None))
         return
 
     try:
@@ -490,6 +517,182 @@ def _turno(cur, quien, texto: str, workspace_id: str, chat_id: int,
                 "No pude iniciar el borrador de la tarea. "
                 "Probá de nuevo en un chat privado."), now,
         )
+
+
+@dataclass(frozen=True)
+class _ReferenciasResueltas:
+    """Lo que le queda al turno después de resolver, listo para pasarle a
+    `agente.responder` como contexto de confianza del servidor."""
+    bloque: str
+    hay_clara: bool
+
+
+def _resolver_referencias_del_turno(cur, quien, texto: str, route,
+                                    workspace_id: str) -> _ReferenciasResueltas | None:
+    """Resuelve, con Jev, cada referencia a tarea que separó `route_intent`
+    contra las tareas activas del espacio (T3, `aclaracion-con-botones`).
+
+    `None` sólo cuando no hay ninguna referencia: ahí no hay nada que
+    resolver y el turno sigue exactamente como antes de esta unidad, sin
+    tocar la base ni la red.
+
+    Sin credencial de Jev (`Config.openrouter_api_key` vacía) Prisma **no
+    adivina** (decisión del usuario, 2026-09-24): con referencias en el
+    mensaje, se trata igual que si Jev hubiera respondido `JevError` en cada
+    una -- se le pide al modelo que pregunte, nunca que elija por su cuenta
+    -- y se registra un incidente (sin secretos ni texto del mensaje) para
+    que la falta de configuración quede visible.
+    """
+    if not route.trabajos:
+        return None
+
+    from . import jev as jev_modulo
+
+    cliente_jev = jev_modulo.desde_base(config.openrouter_api_key)
+    if cliente_jev is None:
+        _incidente_jev_no_configurado(cur, workspace_id)
+        resultados = {referencia: (None, jev_modulo.JevError(
+            "No hay credencial de Jev configurada."))
+            for referencia in route.trabajos}
+        _auditar_resolucion(cur, quien, workspace_id, resultados)
+        return _ReferenciasResueltas(
+            bloque=_bloque_contexto_referencias(resultados, {}), hay_clara=False)
+
+    from .contexto import vocabulario as vocabulario_del_equipo
+
+    tareas = _tareas_activas(cur, workspace_id)
+    por_id = {t.id: t for t in tareas}
+    vocab = vocabulario_del_equipo(cur, workspace_id)
+
+    resultados = _resolver_en_paralelo(
+        cliente_jev, texto=texto, referencias=route.trabajos, tareas=tareas,
+        vocabulario=vocab)
+
+    _auditar_resolucion(cur, quien, workspace_id, resultados)
+
+    hay_clara = any(
+        resolucion is not None and resolucion.tipo is jev_modulo.TipoResolucion.CLARA
+        for resolucion, _error in resultados.values())
+    return _ReferenciasResueltas(
+        bloque=_bloque_contexto_referencias(resultados, por_id),
+        hay_clara=hay_clara)
+
+
+def _tareas_activas(cur, workspace_id: str) -> list:
+    """Tareas activas del espacio (no `terminada` ni `cancelada`), con lo
+    que necesita la receta de Jev -- título, área y responsable -- leídas
+    con el mismo cursor con RLS que ya tiene el turno: nunca otra conexión,
+    nunca otro espacio."""
+    from . import jev as jev_modulo
+
+    cur.execute(
+        """select t.id, t.titulo, a.nombre as area,
+                  coalesce(i.nombre, '') as responsable
+             from task t
+             join area a on a.id = t.area_id
+             left join integrante i on i.membership_id = t.responsable_membership_id
+            where t.workspace_id = %s and t.estado not in ('terminada', 'cancelada')
+            order by t.creado_en""",
+        (workspace_id,))
+    return [jev_modulo.TareaCandidata(
+                id=str(f["id"]), titulo=f["titulo"], area=f["area"],
+                responsable=f["responsable"])
+            for f in cur.fetchall()]
+
+
+def _resolver_en_paralelo(cliente_jev, *, texto: str, referencias, tareas,
+                          vocabulario: str) -> dict:
+    """Resuelve cada referencia con Jev. Ninguna llamada toca la base, así
+    que corren en un pool chico de hilos en vez de una detrás de otra (T3).
+
+    Una referencia cuyo Jev se cae, o responde con una forma que
+    `resolver_referencia_tarea` no puede leer, no corta a las demás: queda
+    con su propio `JevError`, capturado acá."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    from . import jev as jev_modulo
+
+    def _una(referencia: str):
+        try:
+            return referencia, jev_modulo.resolver_referencia_tarea(
+                cliente_jev, mensaje=texto, referencia=referencia,
+                tareas=tareas, vocabulario=vocabulario), None
+        except jev_modulo.JevError as exc:
+            return referencia, None, exc
+
+    resultados: dict = {}
+    with ThreadPoolExecutor(max_workers=min(len(referencias), 4)) as pool:
+        for referencia, resolucion, error in pool.map(_una, referencias):
+            resultados[referencia] = (resolucion, error)
+    return resultados
+
+
+def _bloque_contexto_referencias(resultados: dict, tareas_por_id: dict) -> str:
+    """Sistema de confianza del servidor (nunca texto de la persona) con lo
+    que Jev resolvió de cada referencia, para que el modelo use la tarea
+    correcta, pregunte, o no invente (T3; ADR 0005 decisión 6, ADR 0006)."""
+    from . import jev as jev_modulo
+
+    lineas = ["# Referencias a tareas en este mensaje", ""]
+    for referencia, (resolucion, error) in resultados.items():
+        if error is not None:
+            lineas.append(
+                f"- No se pudo resolver «{referencia}» en este momento. No "
+                "adivines a qué tarea se refiere: preguntale a la persona "
+                "cuál es, sin elegir por tu cuenta.")
+        elif resolucion.tipo is jev_modulo.TipoResolucion.CLARA:
+            tarea = tareas_por_id[resolucion.tarea_id]
+            lineas.append(
+                f"- «{referencia}» es la tarea «{tarea.titulo}» "
+                f"({tarea.id}). Usá esa tarea; no la vuelvas a resolver.")
+        elif resolucion.tipo is jev_modulo.TipoResolucion.AMBIGUA and resolucion.candidatas:
+            candidatas = "; ".join(
+                f"«{tareas_por_id[cid].titulo}» ({cid})"
+                for cid in resolucion.candidatas if cid in tareas_por_id)
+            lineas.append(
+                f"- «{referencia}» puede ser más de una tarea: {candidatas}. "
+                "Preguntale cuál es, sin elegir ni actuar por tu cuenta.")
+        elif resolucion.tipo is jev_modulo.TipoResolucion.AMBIGUA:
+            lineas.append(
+                f"- «{referencia}» es ambigua y no quedó ninguna candidata "
+                "para ofrecer. Preguntale a qué tarea se refiere, sin "
+                "adivinar ni actuar.")
+        else:  # NINGUNA
+            lineas.append(
+                f"- «{referencia}» no coincide con ninguna tarea activa del "
+                "espacio. No inventes una tarea para eso: preguntá.")
+    return "\n".join(lineas)
+
+
+def _auditar_resolucion(cur, quien, workspace_id: str, resultados: dict) -> None:
+    """Una entrada de auditoría por turno resuelto. Nunca el mensaje ni el
+    texto de la referencia (`AGENTS.md`: nada de cuerpos de conversación en
+    los registros) -- sólo el tipo de resultado y los ids de tarea o
+    candidatas, por referencia."""
+    detalle = {"referencias": [
+        {"tipo": ("jev_error" if error is not None else resolucion.tipo.value),
+         "tarea_id": resolucion.tarea_id if resolucion is not None else None,
+         "candidatas": list(resolucion.candidatas) if resolucion is not None else []}
+        for resolucion, error in resultados.values()
+    ]}
+    registrar_auditoria(
+        cur, accion="resolucion_referencias", workspace_id=workspace_id,
+        actor_app_user_id=quien.app_user_id, actor_kind="prisma",
+        detalle=detalle)
+
+
+def _incidente_jev_no_configurado(cur, workspace_id: str) -> None:
+    """El mensaje traía referencias a tarea pero no hay credencial de Jev
+    (`PRISMA_OPENROUTER_API_KEY`): Prisma le pide al modelo que pregunte en
+    vez de adivinar (decisión del usuario, 2026-09-24), y esto queda
+    registrado para que la falta de configuración no pase inadvertida. Sin
+    secretos ni texto del mensaje, igual que `_routing_incident`."""
+    cur.execute(
+        """insert into incident (workspace_id, severidad, resumen_sanitizado)
+           values (%s, 'media', %s)""",
+        (workspace_id,
+         "El mensaje tenía referencias a tarea, pero no hay credencial de "
+         "Jev configurada (PRISMA_OPENROUTER_API_KEY)."))
 
 
 def _routing_incident(cur, quien, error) -> None:

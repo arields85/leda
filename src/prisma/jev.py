@@ -107,6 +107,22 @@ class ClienteJev:
             f"Jev no respondió tras {self.intentos} intentos.") from ultimo
 
 
+def desde_base(api_key: str) -> Jev | None:
+    """Arma el cliente de Jev desde la credencial, o `None` si no hay
+    (`PRISMA_OPENROUTER_API_KEY` vacía).
+
+    Sin cliente, `gateway._turno` no resuelve ninguna referencia y el turno
+    sigue exactamente como antes de esta unidad (T3, `aclaracion-con-
+    botones`). Mismo patrón de reemplazo que `llm.desde_base`: `_turno` hace
+    un import local de este nombre en cada turno, así que alcanza con
+    reemplazar `jev.desde_base` para las pruebas y para que el banco no
+    llame a Jev de verdad por defecto (`tests/banco/corrida.py`).
+    """
+    if not api_key:
+        return None
+    return ClienteJev(api_key=api_key)
+
+
 @dataclass
 class ClienteJevGuionado:
     """Devuelve respuestas preparadas. Permite probar la resolución de

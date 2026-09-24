@@ -93,6 +93,35 @@ def _ambiguos(texto: str, nombres: list[str]) -> dict[str, list[str]]:
     return salida
 
 
+def _glosario_filas(cur: psycopg.Cursor, workspace_id: str) -> list[dict]:
+    cur.execute(
+        "select termino, definicion, variantes_incorrectas, fuera_de_alcance "
+        "from glossary_term where workspace_id = %s", (workspace_id,))
+    return cur.fetchall()
+
+
+def _lineas_glosario(glosario: list[dict]) -> list[str]:
+    lineas = []
+    for g in glosario:
+        marca = " (fuera de alcance)" if g["fuera_de_alcance"] else ""
+        lineas.append(f"- {g['termino']}{marca}: {g['definicion'] or ''}")
+        if g["variantes_incorrectas"]:
+            lineas.append(
+                f"  nunca escribas: {', '.join(g['variantes_incorrectas'])}")
+    return lineas
+
+
+def vocabulario(cur: psycopg.Cursor, workspace_id: str) -> str:
+    """Vocabulario del equipo en texto plano.
+
+    Mismo glosario que `construir()` pone en el sistema del modelo de
+    conversación, para pasarlo también como contexto de Jev al resolver
+    referencias (ADR 0006, "sólo viajan datos del espacio actual"; T3,
+    `aclaracion-con-botones`). Vacío si el espacio no tiene glosario.
+    """
+    return "\n".join(_lineas_glosario(_glosario_filas(cur, workspace_id)))
+
+
 def construir(cur: psycopg.Cursor, quien: Solicitante,
               texto_entrante: str = "",
               ahora: datetime | None = None) -> Contexto:
@@ -105,21 +134,13 @@ def construir(cur: psycopg.Cursor, quien: Solicitante,
         (quien.workspace_id,))
     p = cur.fetchone() or {}
 
-    cur.execute(
-        "select termino, definicion, variantes_incorrectas, fuera_de_alcance "
-        "from glossary_term where workspace_id = %s", (quien.workspace_id,))
-    glosario = cur.fetchall()
+    glosario = _glosario_filas(cur, quien.workspace_id)
 
     variantes: dict[str, str] = {}
-    lineas_glosario = []
     for g in glosario:
         for v in g["variantes_incorrectas"] or []:
             variantes[v.lower()] = g["termino"]
-        marca = " (fuera de alcance)" if g["fuera_de_alcance"] else ""
-        lineas_glosario.append(f"- {g['termino']}{marca}: {g['definicion'] or ''}")
-        if g["variantes_incorrectas"]:
-            lineas_glosario.append(
-                f"  nunca escribas: {', '.join(g['variantes_incorrectas'])}")
+    lineas_glosario = _lineas_glosario(glosario)
 
     cur.execute(
         """select i.nombre, r.nombre as rol, a.nombre as area, r.autoridad_final
