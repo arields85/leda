@@ -79,6 +79,18 @@ def test_anthropic_router_rejects_raw_text_wrong_tool_and_wrong_action(content):
         provider.route_intent("adversarial input")
 
 
+def test_router_system_keeps_the_measured_reference_wording():
+    """T7, punto A(1), descartado por medición: excluir estados y causas en la
+    instrucción hizo que el enrutador perdiera tareas reales ("el switch" en
+    "El switch ya se cambio ahora queda el tablero de la 4"; 55 de 60 iguales
+    frente a 57 de 60 con la instrucción medida en T2). Las referencias que
+    sobran las descarta el código (`gateway`, T7 punto A(2)), no el modelo."""
+    assert ("(por ejemplo \"lo del tablero\", \"el dash de lotes\"). En "
+            "\"personas\" va") in llm.ROUTER_SYSTEM
+    assert "Separás las referencias de un mensaje de trabajo." in llm.ROUTER_SYSTEM
+    assert "No incluyas a Prisma (el asistente) como persona." in llm.ROUTER_SYSTEM
+
+
 def test_guided_provider_exposes_typed_routes_separately_from_main_turns():
     expected = IntentRoute(IntentAction.NORMAL_CONVERSATION)
     provider = ProveedorGuionado([], rutas=[expected])

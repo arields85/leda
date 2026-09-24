@@ -8,6 +8,7 @@ o un transporte falso de `httpx`.
 
 from __future__ import annotations
 
+import dataclasses
 import json
 
 import httpx
@@ -188,6 +189,68 @@ def _alcance(una_tarea=0.0, varias_tareas=0.0, ninguna=0.0):
             "confidence": top[1]}
 
 
+# --------------------------------------------- bloqueos abiertos en el criterio
+
+def test_criterio_sin_bloqueos_no_cambia():
+    assert TAREA_TABLERO_3.criterio() == (
+        "Cablear tablero máq. 3 — área: Sistemas eléctricos — responsable: "
+        "Mariano Naim")
+
+
+def test_criterio_con_un_bloqueo_abierto_suma_la_causa():
+    """T7, punto H (decisión del usuario, 2026-09-24: las causas de bloqueo
+    pueden viajar a TypeSafe vía OpenRouter). b-0003: "ya llegó el switch que
+    faltaba para el tablero, dalo por resuelto" nombra la tarea por su
+    bloqueo, no por su título -- la verificación rechazaba porque el
+    criterio sólo tenía el título."""
+    tarea = dataclasses.replace(TAREA_TABLERO_3,
+                                causas_bloqueo="falta el switch industrial en sala")
+    assert tarea.criterio() == (
+        "Cablear tablero máq. 3 — área: Sistemas eléctricos — responsable: "
+        "Mariano Naim — bloqueada: falta el switch industrial en sala")
+
+
+def test_criterio_con_varios_bloqueos_los_une():
+    tarea = dataclasses.replace(
+        TAREA_TABLERO_3,
+        causas_bloqueo="falta el switch industrial en sala; falta aprobación del plano")
+    assert "bloqueada: falta el switch industrial en sala; falta aprobación del plano" in (
+        tarea.criterio())
+
+
+def test_criterio_acota_una_causa_de_bloqueo_muy_larga():
+    causa_larga = "x" * (jev.MAX_LONGITUD_CAUSAS_BLOQUEO + 50)
+    tarea = dataclasses.replace(TAREA_TABLERO_3, causas_bloqueo=causa_larga)
+    criterio = tarea.criterio()
+    # La parte de la causa nunca supera la cota (más el "…" de corte); el
+    # resto del criterio (título, área, responsable) no se toca.
+    parte_bloqueo = criterio.split("bloqueada: ", 1)[1]
+    assert len(parte_bloqueo) <= jev.MAX_LONGITUD_CAUSAS_BLOQUEO
+    assert parte_bloqueo.endswith("…")
+    assert criterio.startswith(TAREA_TABLERO_3.criterio())
+
+
+def test_criterio_de_verificacion_tambien_lleva_el_bloqueo():
+    """"Apply it to the verification call's task description too" -- como
+    `resolver_referencia_tarea` arma la verificación con `top_tarea.
+    criterio()`, un solo cambio en `criterio()` alcanza para las dos
+    llamadas; esta prueba lo confirma de punta a punta."""
+    tarea = dataclasses.replace(TAREA_TABLERO_3,
+                                causas_bloqueo="falta el switch industrial en sala")
+    doble = ClienteJevGuionado(guion=[
+        {"alcance": _alcance(una_tarea=0.95), "tarea": _tarea({"T1": 0.9})},
+        {"misma": {"noul": 0.8}},
+    ])
+
+    resolver_referencia_tarea(
+        doble, mensaje="dalo por resuelto", referencia="el switch que faltaba",
+        tareas=(tarea,), vocabulario="")
+
+    state_verificacion = doble.pedidos[1][0]
+    assert state_verificacion["tarea"] == tarea.criterio()
+    assert "bloqueada: falta el switch industrial en sala" in state_verificacion["tarea"]
+
+
 def _tarea(probabilidades: dict[str, float]):
     top = max(probabilidades.items(), key=lambda kv: kv[1])
     return {"choice": top[0], "probabilities": probabilidades, "confidence": top[1]}
@@ -197,7 +260,11 @@ def test_resolver_referencia_clara_llama_verificacion_y_confirma():
     doble = ClienteJevGuionado(guion=[
         {"alcance": _alcance(una_tarea=0.95),
          "tarea": _tarea({"T1": 0.9, "T2": 0.05, "T3": 0.05})},
-        {"misma": {"noul": 0.8}},
+        # T2 es la subcampeona (T7, punto L, revisión del orquestador): la
+        # pregunta "rival" se hace sin importar cuán baja sea su
+        # probabilidad -- una respuesta baja de "rival" no cambia el
+        # resultado de esta prueba (sigue clara).
+        {"misma": {"noul": 0.8}, "rival": {"noul": 0.1}},
     ])
 
     resultado = resolver_referencia_tarea(
@@ -219,7 +286,7 @@ def test_resolver_referencia_usa_claves_cortas_para_las_opciones_de_jev():
     doble = ClienteJevGuionado(guion=[
         {"alcance": _alcance(una_tarea=0.95),
          "tarea": _tarea({"T1": 0.9, "T2": 0.05, "T3": 0.05})},
-        {"misma": {"noul": 0.8}},
+        {"misma": {"noul": 0.8}, "rival": {"noul": 0.1}},
     ])
 
     resultado = resolver_referencia_tarea(
@@ -248,7 +315,11 @@ def test_resolver_referencia_ninguna_por_alcance_no_llama_verificacion():
     assert len(doble.pedidos) == 1
 
 
-def test_resolver_referencia_varias_da_ambigua_con_candidatas_ordenadas():
+def test_resolver_referencia_varias_da_varias_con_candidatas_ordenadas():
+    """T7, punto C: el alcance "varias_tareas" (un área, lo de una persona o
+    algo genérico) es un tipo aparte de una ambigüedad real entre pocas
+    candidatas -- `gateway.py` no le abre botones (T4 los reserva para
+    ambigüedad de una sola tarea); se lo pasa al modelo como contexto."""
     doble = ClienteJevGuionado(guion=[
         {"alcance": _alcance(varias_tareas=0.7),
          "tarea": _tarea({"T1": 0.5, "T2": 0.3, "T3": 0.05})},
@@ -259,7 +330,7 @@ def test_resolver_referencia_varias_da_ambigua_con_candidatas_ordenadas():
         tareas=(TAREA_TABLERO_3, TAREA_TABLERO_4, TAREA_HMI), vocabulario="")
 
     assert resultado == ResolucionReferencia(
-        TipoResolucion.AMBIGUA, candidatas=(TAREA_TABLERO_3.id, TAREA_TABLERO_4.id))
+        TipoResolucion.VARIAS, candidatas=(TAREA_TABLERO_3.id, TAREA_TABLERO_4.id))
     assert len(doble.pedidos) == 1
 
 
@@ -292,6 +363,172 @@ def test_resolver_referencia_verificacion_baja_pasa_a_ambigua_con_esa_tarea():
     assert resultado == ResolucionReferencia(
         TipoResolucion.AMBIGUA, candidatas=(TAREA_TABLERO_3.id,))
     assert len(doble.pedidos) == 2
+
+
+# ------------------------------------------------- candidata subcampeona (rival)
+#
+# T7, punto L; decisión del usuario, 2026-09-24: "ante la duda se pregunta"
+# (medido en el diseño §5.11). Cuando la receta decide clara, la MISMA
+# llamada de verificación suma un segundo Noul ("rival") sobre la
+# subcampeona -- la segunda más probable que Jev haya devuelto, sin importar
+# su probabilidad (revisión del orquestador, 2026-09-24: b-0013 medía
+# justamente 0,91 / 0,09 -- un corte por `CORTE_CANDIDATA` en la primera
+# versión de esta unidad dejaba a la subcampeona afuera y "rival" nunca se
+# preguntaba). Sólo cuando Jev no devolvió una segunda tarea en absoluto
+# (una sola entrada en la respuesta de "tarea") no hay de quién preguntar --
+# eso sigue exactamente como antes de esta unidad.
+
+def test_instruccion_rival_pregunta_por_la_referencia_no_por_el_mensaje():
+    """T7, punto M; revisión del orquestador, 2026-09-24: la redacción
+    original de "rival" ("¿El mensaje también podría...") preguntaba por el
+    MENSAJE completo, así que un pedido de dependencia que nombra las dos
+    tareas ("el cableado del tablero no puede arrancar hasta que yo termine
+    de programar el PLC") hacía que "rival" contestara que sí para las dos
+    referencias -- b-0005 (9/9) y b-0015 (3/3) terminaban preguntando en vez
+    de crear la dependencia. La v2 medida en el diseño §5.12 pregunta por la
+    REFERENCIA, tal como está dicha, no por el mensaje entero."""
+    assert jev.INSTRUCCION_RIVAL == (
+        "¿La referencia, tal como está dicha, también podría estar hablando "
+        "de esta otra tarea en lugar de la elegida? Respondé que sí sólo si "
+        "una persona del equipo podría entender esa referencia como "
+        "cualquiera de las dos.")
+    assert "El mensaje también podría" not in jev.INSTRUCCION_RIVAL
+
+
+def test_resolver_referencia_clara_con_subcampeona_pide_rival_en_la_misma_llamada():
+    doble = ClienteJevGuionado(guion=[
+        {"alcance": _alcance(una_tarea=0.95),
+         "tarea": _tarea({"T1": 0.9, "T2": 0.4})},
+        {"misma": {"noul": 0.8}, "rival": {"noul": 0.2}},
+    ])
+
+    resultado = resolver_referencia_tarea(
+        doble, mensaje="pasala a revision", referencia="lo del tablero",
+        tareas=(TAREA_TABLERO_3, TAREA_TABLERO_4, TAREA_HMI), vocabulario="")
+
+    assert resultado == ResolucionReferencia(
+        TipoResolucion.CLARA, tarea_id=TAREA_TABLERO_3.id)
+    assert len(doble.pedidos) == 2
+    preguntas_verificacion = doble.pedidos[1][1]
+    assert "rival" in preguntas_verificacion
+    assert preguntas_verificacion["rival"]["instructions"] == jev.INSTRUCCION_RIVAL
+    state_verificacion = doble.pedidos[1][0]
+    assert state_verificacion["tarea_elegida"] == TAREA_TABLERO_3.criterio()
+    assert state_verificacion["otra_tarea"] == TAREA_TABLERO_4.criterio()
+
+
+def test_resolver_referencia_rival_alto_baja_a_ambigua_con_las_dos():
+    doble = ClienteJevGuionado(guion=[
+        {"alcance": _alcance(una_tarea=0.95),
+         "tarea": _tarea({"T1": 0.9, "T2": 0.4})},
+        {"misma": {"noul": 0.8}, "rival": {"noul": 0.6}},
+    ])
+
+    resultado = resolver_referencia_tarea(
+        doble, mensaje="pasala a revision", referencia="lo del tablero",
+        tareas=(TAREA_TABLERO_3, TAREA_TABLERO_4, TAREA_HMI), vocabulario="")
+
+    assert resultado == ResolucionReferencia(
+        TipoResolucion.AMBIGUA, candidatas=(TAREA_TABLERO_3.id, TAREA_TABLERO_4.id))
+
+
+def test_resolver_referencia_rival_justo_en_el_corte_baja_a_ambigua():
+    doble = ClienteJevGuionado(guion=[
+        {"alcance": _alcance(una_tarea=0.95),
+         "tarea": _tarea({"T1": 0.9, "T2": 0.4})},
+        {"misma": {"noul": 0.8}, "rival": {"noul": jev.CORTE_RIVAL}},
+    ])
+
+    resultado = resolver_referencia_tarea(
+        doble, mensaje="pasala a revision", referencia="lo del tablero",
+        tareas=(TAREA_TABLERO_3, TAREA_TABLERO_4, TAREA_HMI), vocabulario="")
+
+    assert resultado.tipo is TipoResolucion.AMBIGUA
+
+
+def test_resolver_referencia_rival_baja_probabilidad_igual_pide_y_puede_ambiguar_b0013():
+    """Revisión del orquestador, 2026-09-24: b-0013 midió Jev devolviendo
+    0,91 / 0,09 para las dos tareas del dashboard -- muy por debajo de
+    `CORTE_CANDIDATA` (0,1) -- y con el corte de la primera versión de esta
+    unidad, "rival" nunca se preguntaba y la referencia se resolvía sola.
+    "Rival" se pide igual, sin importar cuán baja sea la probabilidad de la
+    subcampeona, y si la respuesta es alta baja a ambigua con las dos."""
+    doble = ClienteJevGuionado(guion=[
+        {"alcance": _alcance(una_tarea=0.95),
+         "tarea": _tarea({"T1": 0.91, "T2": 0.09})},
+        {"misma": {"noul": 0.8}, "rival": {"noul": 0.6}},
+    ])
+
+    resultado = resolver_referencia_tarea(
+        doble, mensaje="cuál es el estado del dashboard", referencia="el dashboard",
+        tareas=(TAREA_TABLERO_3, TAREA_TABLERO_4), vocabulario="")
+
+    assert resultado == ResolucionReferencia(
+        TipoResolucion.AMBIGUA, candidatas=(TAREA_TABLERO_3.id, TAREA_TABLERO_4.id))
+    preguntas_verificacion = doble.pedidos[1][1]
+    assert "rival" in preguntas_verificacion
+
+
+def test_resolver_referencia_rival_baja_probabilidad_se_pide_y_puede_seguir_clara():
+    """Misma forma que la prueba anterior (0,09 de subcampeona), pero con
+    una respuesta de "rival" baja: se preguntó igual, y como la respuesta
+    fue baja, sigue clara -- adapta lo que antes probaba el corte (T2 en
+    0,05/0,09 ya no evita la pregunta; ahora hace falta scriptear la
+    respuesta de "rival" para que la referencia siga clara)."""
+    doble = ClienteJevGuionado(guion=[
+        {"alcance": _alcance(una_tarea=0.95),
+         "tarea": _tarea({"T1": 0.9, "T2": 0.05})},
+        {"misma": {"noul": 0.8}, "rival": {"noul": 0.1}},
+    ])
+
+    resultado = resolver_referencia_tarea(
+        doble, mensaje="pasala a revision", referencia="lo del tablero",
+        tareas=(TAREA_TABLERO_3, TAREA_TABLERO_4), vocabulario="")
+
+    assert resultado == ResolucionReferencia(
+        TipoResolucion.CLARA, tarea_id=TAREA_TABLERO_3.id)
+    preguntas_verificacion = doble.pedidos[1][1]
+    assert "rival" in preguntas_verificacion
+    assert preguntas_verificacion["rival"]["instructions"] == jev.INSTRUCCION_RIVAL
+    state_verificacion = doble.pedidos[1][0]
+    assert state_verificacion["tarea_elegida"] == TAREA_TABLERO_3.criterio()
+    assert state_verificacion["otra_tarea"] == TAREA_TABLERO_4.criterio()
+
+
+def test_resolver_referencia_una_sola_tarea_sigue_sin_pedir_rival():
+    doble = ClienteJevGuionado(guion=[
+        {"alcance": _alcance(una_tarea=0.95), "tarea": _tarea({"T1": 0.9})},
+        {"misma": {"noul": 0.75}},
+    ])
+
+    resultado = resolver_referencia_tarea(
+        doble, mensaje="pasala a revision", referencia="lo del tablero",
+        tareas=(TAREA_TABLERO_3,), vocabulario="")
+
+    assert resultado == ResolucionReferencia(
+        TipoResolucion.CLARA, tarea_id=TAREA_TABLERO_3.id)
+    assert "rival" not in doble.pedidos[1][1]
+
+
+@pytest.mark.parametrize("verificacion_mala", [
+    pytest.param({"misma": {"noul": 0.8}}, id="falta-rival"),
+    pytest.param({"misma": {"noul": 0.8}, "rival": {}}, id="rival-sin-noul"),
+    pytest.param({"misma": {"noul": 0.8}, "rival": {"noul": "alta"}},
+                 id="rival-no-numerico"),
+    pytest.param({"misma": {"noul": 0.8}, "rival": "no-es-un-objeto"},
+                 id="rival-no-es-dict"),
+])
+def test_resolver_referencia_rival_malformado_lanza_jeverror(verificacion_mala):
+    doble = ClienteJevGuionado(guion=[
+        {"alcance": _alcance(una_tarea=0.95),
+         "tarea": _tarea({"T1": 0.9, "T2": 0.4})},
+        verificacion_mala,
+    ])
+
+    with pytest.raises(JevError):
+        resolver_referencia_tarea(
+            doble, mensaje="m", referencia="r",
+            tareas=(TAREA_TABLERO_3, TAREA_TABLERO_4), vocabulario="")
 
 
 def test_resolver_referencia_lista_vacia_no_llama_a_jev():
@@ -390,7 +627,7 @@ def test_quien_escribe_viaja_en_el_state_de_las_dos_llamadas_cuando_se_pasa():
     doble = ClienteJevGuionado(guion=[
         {"alcance": _alcance(una_tarea=0.95),
          "tarea": _tarea({"T1": 0.9, "T2": 0.05})},
-        {"misma": {"noul": 0.8}},
+        {"misma": {"noul": 0.8}, "rival": {"noul": 0.1}},
     ])
 
     resolver_referencia_tarea(
@@ -411,7 +648,7 @@ def test_sin_quien_escribe_no_agrega_el_campo_ni_cambia_las_instrucciones():
     doble = ClienteJevGuionado(guion=[
         {"alcance": _alcance(una_tarea=0.95),
          "tarea": _tarea({"T1": 0.9, "T2": 0.05})},
-        {"misma": {"noul": 0.8}},
+        {"misma": {"noul": 0.8}, "rival": {"noul": 0.1}},
     ])
 
     resolver_referencia_tarea(

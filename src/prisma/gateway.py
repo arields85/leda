@@ -10,6 +10,7 @@ conozca la URL podría hacerse pasar por el gateway.
 
 from __future__ import annotations
 
+import unicodedata
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -826,7 +827,12 @@ def _resolver_referencias_del_turno(cur, quien, texto: str, route,
     -- y se registra un incidente (sin secretos ni texto del mensaje) para
     que la falta de configuración quede visible.
     """
-    if not route.trabajos:
+    # T7, punto E: una referencia cuyo texto entero es sólo un estado de
+    # tarea ("revisión", "en curso"...) nunca es un trabajo -- se descarta
+    # antes de tocar Jev o la base, con el mismo criterio que "sin
+    # referencias" si no queda ninguna otra.
+    trabajos = tuple(t for t in route.trabajos if not _es_referencia_de_estado(t))
+    if not trabajos:
         return None
 
     from . import jev as jev_modulo
@@ -836,7 +842,7 @@ def _resolver_referencias_del_turno(cur, quien, texto: str, route,
         _incidente_jev_no_configurado(cur, workspace_id)
         resultados = {referencia: (None, jev_modulo.JevError(
             "No hay credencial de Jev configurada."))
-            for referencia in route.trabajos}
+            for referencia in trabajos}
         _auditar_resolucion(cur, quien, workspace_id, resultados)
         return _ReferenciasResueltas(
             bloque=_bloque_contexto_referencias(resultados, {}), hay_clara=False)
@@ -848,20 +854,10 @@ def _resolver_referencias_del_turno(cur, quien, texto: str, route,
     vocab = vocabulario_del_equipo(cur, workspace_id)
 
     resultados = _resolver_en_paralelo(
-        cliente_jev, texto=texto, referencias=route.trabajos, tareas=tareas,
+        cliente_jev, texto=texto, referencias=trabajos, tareas=tareas,
         vocabulario=vocab, quien_escribe=quien.nombre)
 
     _auditar_resolucion(cur, quien, workspace_id, resultados)
-
-    # Ambigua CON candidatas (T4, decisión 2): botones, no el texto de
-    # siempre. El resto -- clara, ninguna, ambigua sin candidatas, Jev caído
-    # -- sigue exactamente como en T3.
-    con_botones = {
-        referencia for referencia, (resolucion, error) in resultados.items()
-        if error is None and resolucion.tipo is jev_modulo.TipoResolucion.AMBIGUA
-        and resolucion.candidatas}
-    sin_boton = {referencia: par for referencia, par in resultados.items()
-                if referencia not in con_botones}
 
     hay_clara = any(
         resolucion is not None and resolucion.tipo is jev_modulo.TipoResolucion.CLARA
@@ -873,10 +869,53 @@ def _resolver_referencias_del_turno(cur, quien, texto: str, route,
     titulos_resueltas = {tarea_id: por_id[tarea_id].titulo
                         for tarea_id in resueltas_claras.values()
                         if tarea_id in por_id}
+
+    # Dedupe determinístico (T7, punto A2): una referencia ambigua cuyas
+    # candidatas son, todas, la tarea CLARA de otra referencia de este mismo
+    # mensaje no suma nada para preguntar -- p. ej. un estado que se coló
+    # como "trabajo" pese al ajuste del enrutador, y que Jev termina
+    # resolviendo ambiguo hacia la misma tarea que otra referencia ya dejó
+    # clara. Se descarta entera (ni botón ni línea de texto). Seguro: si le
+    # queda aunque sea una candidata sin resolver, se queda -- nunca se
+    # descarta "por las dudas".
+    claras_ids = set(resueltas_claras.values())
+    redundantes = {
+        referencia for referencia, (resolucion, error) in resultados.items()
+        if error is None and resolucion.tipo is jev_modulo.TipoResolucion.AMBIGUA
+        and resolucion.candidatas and set(resolucion.candidatas) <= claras_ids}
+    visibles = {referencia: par for referencia, par in resultados.items()
+               if referencia not in redundantes}
+
+    # Ambigua CON candidatas (T4, decisión 2): botones, no el texto de
+    # siempre. "Varias tareas" (T7, punto C) nunca abre botones para una
+    # consulta -- son reservados para la ambigüedad de una sola tarea
+    # concreta. El resto -- clara, ninguna, varias tareas, ambigua sin
+    # candidatas, Jev caído -- sigue por el bloque de texto.
+    #
+    # T7, punto G (regresión de C): si el enrutador pide alta de tarea y
+    # nada quedó CLARA, una VARIAS sin botón dejaba pasar el alta guiada en
+    # silencio (b-0009, "lo mio depende de q mar termine su parte, dejalo
+    # anotado") -- acá, y sólo acá, sus candidatas (ya recortadas por Jev a
+    # >= 0,1) también entran a botón, para que el caso mixto de b-0005
+    # (`_avanzar_aclaracion`, "Es una tarea nueva") las ofrezca en vez de
+    # arrancar sola.
+    from .llm import IntentAction
+
+    varias_bloquea_alta = (route.action is IntentAction.START_TASK_INTAKE
+                           and not hay_clara)
+    con_botones = {
+        referencia for referencia, (resolucion, error) in visibles.items()
+        if error is None and resolucion.candidatas and (
+            resolucion.tipo is jev_modulo.TipoResolucion.AMBIGUA
+            or (varias_bloquea_alta
+                and resolucion.tipo is jev_modulo.TipoResolucion.VARIAS))}
+    sin_boton = {referencia: par for referencia, par in visibles.items()
+                if referencia not in con_botones}
+
     pendientes_boton = tuple(
         (referencia, _candidatas_para_botones(
             por_id, resultados[referencia][0], quien.membership_id))
-        for referencia in route.trabajos if referencia in con_botones)
+        for referencia in trabajos if referencia in con_botones)
 
     return _ReferenciasResueltas(
         bloque=_bloque_contexto_referencias(sin_boton, por_id),
@@ -919,19 +958,65 @@ def _candidatas_para_botones(tareas_por_id: dict, resolucion, membership_id: str
     return propias + ajenas
 
 
+# Referencias de sólo estado (T7, punto E): vocabulario cerrado a partir de
+# `estado_tarea` (`db/esquema.sql`) y sus formas humanas habituales -- nunca
+# frases de los escenarios del banco. El banco real mostraba a Jev
+# resolviendo "revisión" (separada como "trabajo" por el enrutador) contra
+# una tarea cuyo título comparte raíz ("Revisar tablero..."), un falso
+# positivo que nunca debería haber llegado a la red: una referencia que sólo
+# nombra un estado no es un trabajo.
+ESTADOS_REFERENCIA_SOLA = frozenset({
+    # `estado_tarea` tal cual (improbable en lenguaje natural, pero es la
+    # fuente formal del vocabulario).
+    "propuesta", "pendiente_aprobacion", "asignada", "en_curso", "bloqueada",
+    "en_revision", "terminada", "cancelada",
+    # Formas humanas habituales de esos estados. "en revisión"/"en curso" se
+    # reducen a "revision"/"curso" porque el "en" líder se recorta antes de
+    # comparar, igual que "a"/"la"/"el" (ver `_normalizar_referencia_estado`).
+    "revision", "curso", "terminado", "terminada", "listo", "lista",
+    "hecho", "hecha", "bloqueado", "bloqueada", "pendiente",
+    "resuelto", "resuelta", "cancelado", "cancelada",
+})
+# Artículos y preposiciones líderes que no cambian que una referencia sea "de
+# estado" -- "la revisión", "a resuelto".
+_ARTICULOS_LIDER_ESTADO = ("a", "la", "el", "en")
+
+
+def _normalizar_referencia_estado(texto: str) -> str:
+    """Minúsculas, sin acentos, sin artículo/preposición líder -- para
+    comparar contra `ESTADOS_REFERENCIA_SOLA` sin depender de cómo separó el
+    enrutador la referencia."""
+    sin_acentos = unicodedata.normalize("NFKD", texto.strip().casefold())
+    sin_acentos = "".join(c for c in sin_acentos if not unicodedata.combining(c))
+    palabras = sin_acentos.split()
+    while palabras and palabras[0] in _ARTICULOS_LIDER_ESTADO:
+        palabras = palabras[1:]
+    return " ".join(palabras)
+
+
+def _es_referencia_de_estado(texto: str) -> bool:
+    """Verdadero si toda la referencia -- ya sin artículo/preposición líder --
+    es sólo un estado de tarea, nunca un trabajo real (T7, punto E)."""
+    return _normalizar_referencia_estado(texto) in ESTADOS_REFERENCIA_SOLA
+
+
 def _tareas_activas(cur, workspace_id: str) -> list:
     """Tareas activas del espacio (no `terminada` ni `cancelada`), con lo
-    que necesita la receta de Jev -- título, área y responsable -- leídas
-    con el mismo cursor con RLS que ya tiene el turno: nunca otra conexión,
-    nunca otro espacio. `responsable_membership_id` no viaja a Jev (no entra
-    en `criterio()`): sólo sirve, del lado de acá, para ordenar los botones
+    que necesita la receta de Jev -- título, área, responsable y, si tiene,
+    la causa de sus bloqueos abiertos (T7, punto H) -- leídas con el mismo
+    cursor con RLS que ya tiene el turno: nunca otra conexión, nunca otro
+    espacio. `responsable_membership_id` no viaja a Jev (no entra en
+    `criterio()`): sólo sirve, del lado de acá, para ordenar los botones
     (T4, decisión 2)."""
     from . import jev as jev_modulo
 
     cur.execute(
         """select t.id, t.titulo, a.nombre as area,
                   coalesce(i.nombre, '') as responsable,
-                  t.responsable_membership_id
+                  t.responsable_membership_id,
+                  (select string_agg(b.causa, '; ' order by b.abierto_en)
+                     from blocker b
+                    where b.task_id = t.id and b.resuelto_en is null) as causas_bloqueo
              from task t
              join area a on a.id = t.area_id
              left join integrante i on i.membership_id = t.responsable_membership_id
@@ -942,7 +1027,8 @@ def _tareas_activas(cur, workspace_id: str) -> list:
                 id=str(f["id"]), titulo=f["titulo"], area=f["area"],
                 responsable=f["responsable"],
                 responsable_membership_id=(str(f["responsable_membership_id"])
-                                          if f["responsable_membership_id"] else None))
+                                          if f["responsable_membership_id"] else None),
+                causas_bloqueo=f["causas_bloqueo"])
             for f in cur.fetchall()]
 
 
@@ -1005,10 +1091,32 @@ def _bloque_contexto_referencias(resultados: dict, tareas_por_id: dict) -> str:
                 f"- «{referencia}» es ambigua y no quedó ninguna candidata "
                 "para ofrecer. Preguntale a qué tarea se refiere, sin "
                 "adivinar ni actuar.")
+        elif resolucion.tipo is jev_modulo.TipoResolucion.VARIAS:
+            # T7, punto C: abarca varias tareas de verdad (un área, lo de una
+            # persona, algo genérico) -- nunca botones, nunca elegir por su
+            # cuenta. Si consultan, contesta sobre todas; si piden cambiar
+            # algo, pregunta cuál es (en texto).
+            candidatas = "; ".join(
+                f"«{tareas_por_id[cid].titulo}» ({cid})"
+                for cid in resolucion.candidatas if cid in tareas_por_id)
+            if candidatas:
+                lineas.append(
+                    f"- «{referencia}» abarca varias tareas: {candidatas}. Si "
+                    "te preguntan o consultan por ellas, contestá sobre "
+                    "todas. Si piden cambiar algo, preguntá primero a cuál "
+                    "se refieren, en texto -- nunca elijas ni actúes por tu "
+                    "cuenta.")
+            else:
+                lineas.append(
+                    f"- «{referencia}» abarca varias tareas, pero ninguna "
+                    "coincide con las activas del espacio. No inventes: "
+                    "preguntá si hace falta para responder o actuar.")
         else:  # NINGUNA
             lineas.append(
                 f"- «{referencia}» no coincide con ninguna tarea activa del "
-                "espacio. No inventes una tarea para eso: preguntá.")
+                "espacio. No es una tarea: no la inventes ni la trates como "
+                "una. Si hace falta para responder o actuar y no tenés otra "
+                "cosa clara para usar, preguntá.")
     return "\n".join(lineas)
 
 

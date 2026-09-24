@@ -40,6 +40,14 @@ INSTRUCCION_VERIFICACION = (
     "¿La referencia del mensaje habla exactamente de esta tarea (la misma "
     "cosa, aunque esté dicha con otras palabras, con errores o con el "
     "vocabulario del equipo), y no de otra cosa parecida o del mismo tipo?")
+# Pregunta de la candidata subcampeona (T7, punto L; decisión del usuario,
+# 2026-09-24: "ante la duda se pregunta", medida en el diseño §5.11) -- viaja
+# en la MISMA llamada de verificación que "misma", nunca aparte.
+INSTRUCCION_RIVAL = (
+    "¿La referencia, tal como está dicha, también podría estar hablando de "
+    "esta otra tarea en lugar de la elegida? Respondé que sí sólo si una "
+    "persona del equipo podría entender esa referencia como cualquiera de "
+    "las dos.")
 
 # Cortes de la receta congelada (ADR 0006; §5.6, §5.8, §5.9). Se ajustan acá,
 # no en el llamador.
@@ -49,6 +57,20 @@ CORTE_CLARA = 0.85
 MARGEN_CLARA = 0.4
 CORTE_CANDIDATA = 0.1
 CORTE_VERIFICACION = 0.5
+# T7, punto L: si la subcampeona podría ser confundida con la elegida, ya no
+# es clara -- pasa a ambigua con las dos como candidatas.
+CORTE_RIVAL = 0.5
+
+# Cota del texto de bloqueo que entra en `TareaCandidata.criterio()` (T7,
+# punto H): acota lo que un bloqueo con causa larga manda a Jev, sin límite
+# realista para una causa escrita a mano.
+MAX_LONGITUD_CAUSAS_BLOQUEO = 200
+
+
+def _acotar(texto: str, limite: int) -> str:
+    if len(texto) <= limite:
+        return texto
+    return texto[:limite - 1].rstrip() + "…"
 
 
 class JevError(RuntimeError):
@@ -159,14 +181,30 @@ class TareaCandidata:
     # de quien escribe o de otra persona -- nunca entra en `criterio()`, que
     # es lo único que viaja a Jev.
     responsable_membership_id: str | None = None
+    # Causa(s) de los bloqueos abiertos de la tarea, ya unidas en un solo
+    # texto (T7, punto H; decisión del usuario, 2026-09-24: las causas de
+    # bloqueo pueden viajar a TypeSafe vía OpenRouter). `None`/vacío si no
+    # tiene bloqueos abiertos -- entonces `criterio()` no cambia.
+    causas_bloqueo: str | None = None
 
     def criterio(self) -> str:
-        return f"{self.titulo} — área: {self.area} — responsable: {self.responsable}"
+        base = f"{self.titulo} — área: {self.area} — responsable: {self.responsable}"
+        if not self.causas_bloqueo:
+            return base
+        return f"{base} — bloqueada: {_acotar(self.causas_bloqueo, MAX_LONGITUD_CAUSAS_BLOQUEO)}"
 
 
 class TipoResolucion(str, Enum):
     CLARA = "clara"
     AMBIGUA = "ambigua"
+    # Alcance "varias_tareas" (T7, `aclaracion-con-botones`, punto C): la
+    # referencia abarca de verdad varias tareas (un área, lo de una persona
+    # o algo genérico) -- no es la misma ambigüedad que "una tarea concreta,
+    # pero no sé cuál": esa sigue siendo AMBIGUA y sigue abriendo botones
+    # (T4); VARIAS nunca abre botones, se lo pasa al modelo como contexto
+    # (el banco real medía botones de más para pedidos genéricos, p. ej.
+    # "algo pendiente esta semana").
+    VARIAS = "varias"
     NINGUNA = "ninguna"
 
 
@@ -272,7 +310,7 @@ def resolver_referencia_tarea(
         return ResolucionReferencia(TipoResolucion.NINGUNA)
 
     if prob_alcance.get("varias_tareas", 0) >= CORTE_VARIAS:
-        return ResolucionReferencia(TipoResolucion.AMBIGUA,
+        return ResolucionReferencia(TipoResolucion.VARIAS,
                                      candidatas=candidatas_por_umbral)
 
     top_clave, top_p = ordenadas[0]
@@ -287,11 +325,34 @@ def resolver_referencia_tarea(
                           "vocabulario_del_equipo": vocabulario}
     if quien_escribe:
         state_verificacion["quien_escribe"] = quien_escribe
-    verificacion = cliente.decidir(
-        state_verificacion,
-        {"misma": {"type": "noul", "instructions": INSTRUCCION_VERIFICACION}})
+
+    preguntas_verificacion = {
+        "misma": {"type": "noul", "instructions": INSTRUCCION_VERIFICACION}}
+
+    # T7, punto L: la subcampeona -- la segunda tarea más probable que Jev
+    # haya devuelto, sin importar cuán baja sea su probabilidad -- suma la
+    # pregunta "rival" en la MISMA llamada, nunca aparte (revisión del
+    # orquestador, 2026-09-24: un corte por `CORTE_CANDIDATA` acá dejaba
+    # afuera justo el caso que §5.11 midió, b-0013, con 0,91 / 0,09). Sólo
+    # cuando Jev no devolvió una segunda tarea en absoluto no hay de quién
+    # preguntar -- eso sigue exactamente como antes de esta unidad.
+    subcampeona = None
+    if len(ordenadas) > 1:
+        subcampeona = por_clave[ordenadas[1][0]]
+        state_verificacion["tarea_elegida"] = top_tarea.criterio()
+        state_verificacion["otra_tarea"] = subcampeona.criterio()
+        preguntas_verificacion["rival"] = {
+            "type": "noul", "instructions": INSTRUCCION_RIVAL}
+
+    verificacion = cliente.decidir(state_verificacion, preguntas_verificacion)
     p_misma = _extraer_noul(verificacion, "misma")
     if p_misma < CORTE_VERIFICACION:
         return ResolucionReferencia(TipoResolucion.AMBIGUA, candidatas=(top_tarea.id,))
+
+    if subcampeona is not None:
+        p_rival = _extraer_noul(verificacion, "rival")
+        if p_rival >= CORTE_RIVAL:
+            return ResolucionReferencia(
+                TipoResolucion.AMBIGUA, candidatas=(top_tarea.id, subcampeona.id))
 
     return ResolucionReferencia(TipoResolucion.CLARA, tarea_id=top_tarea.id)

@@ -187,7 +187,7 @@ def test_botones_propia_primero_ajena_con_nombre_y_titulo_truncado(
     # Jev las devuelve en un orden que NO es "propia primero": el resolutor
     # tiene que reordenar, no confiar en el orden de Jev para eso.
     doble = ClienteJevGuionado(guion=[
-        {"alcance": _alcance(varias_tareas=0.7),
+        {"alcance": _alcance(una_tarea=0.8),
          "tarea": _tarea_resp({"T2": 0.5, "T1": 0.3, "T3": 0.15})},
     ])
     _con_jev(monkeypatch, doble)
@@ -224,7 +224,7 @@ def test_elegir_candidata_retoma_y_llega_a_la_vista_previa_sin_aplicar_nada(
     conn.commit()
 
     doble = ClienteJevGuionado(guion=[
-        {"alcance": _alcance(varias_tareas=0.7),
+        {"alcance": _alcance(una_tarea=0.8),
          "tarea": _tarea_resp({"T1": 0.5, "T2": 0.3})},
     ])
     _con_jev(monkeypatch, doble)
@@ -282,7 +282,7 @@ def test_dos_referencias_ambiguas_preguntan_una_por_vez(
 
     # Las dos referencias dan la misma forma de respuesta ambigua: el orden
     # de qué hilo consume qué entrada del guion no importa para esta prueba.
-    resp = {"alcance": _alcance(varias_tareas=0.6),
+    resp = {"alcance": _alcance(una_tarea=0.8),
            "tarea": _tarea_resp({"T1": 0.5, "T2": 0.3})}
     doble = ClienteJevGuionado(guion=[dict(resp), dict(resp)])
     _con_jev(monkeypatch, doble)
@@ -341,7 +341,7 @@ def test_ninguna_cierra_sin_efecto_y_marca_para_corregir(
     conn.commit()
 
     doble = ClienteJevGuionado(guion=[
-        {"alcance": _alcance(varias_tareas=0.7),
+        {"alcance": _alcance(una_tarea=0.8),
          "tarea": _tarea_resp({"T1": 0.5, "T2": 0.3})},
     ])
     _con_jev(monkeypatch, doble)
@@ -386,7 +386,7 @@ def test_ninguna_dentro_de_la_ventana_el_siguiente_mensaje_usa_el_original(
     conn.commit()
 
     doble = ClienteJevGuionado(guion=[
-        {"alcance": _alcance(varias_tareas=0.7),
+        {"alcance": _alcance(una_tarea=0.8),
          "tarea": _tarea_resp({"T1": 0.5, "T2": 0.3})},
     ])
     _con_jev(monkeypatch, doble)
@@ -417,7 +417,12 @@ def test_ninguna_dentro_de_la_ventana_el_siguiente_mensaje_usa_el_original(
     assert "no encontró entre las opciones" in sistema
     assert "lo del tablero" in sistema
     assert "avisame de lo del tablero" in sistema
-    assert "Modificar" not in sistema
+    # No es el bloque real de Modificar (T7 agregó "Confirmar, Modificar y
+    # Cancelar" al preámbulo general, así que la palabra sola ya no alcanza
+    # para distinguirlo): el marcador propio de `_bloque_modificacion` tiene
+    # que estar ausente.
+    assert "# Corrección a una propuesta anterior" not in sistema
+    assert "apretó Modificar" not in sistema
     assert gateway._SENTINEL_ACLARACION not in sistema
     assert "vista previa" in sistema.lower()
 
@@ -435,7 +440,7 @@ def test_ninguna_el_siguiente_mensaje_puede_traer_su_propia_referencia(
     conn.commit()
 
     doble = ClienteJevGuionado(guion=[
-        {"alcance": _alcance(varias_tareas=0.7),
+        {"alcance": _alcance(una_tarea=0.8),
          "tarea": _tarea_resp({"T1": 0.5, "T2": 0.3})},
         {"alcance": _alcance(una_tarea=0.95), "tarea": _tarea_resp({"T1": 0.9})},
         {"misma": {"noul": 0.8}},
@@ -473,7 +478,7 @@ def test_ninguna_pasada_la_ventana_el_siguiente_mensaje_es_un_turno_normal(
     conn.commit()
 
     doble = ClienteJevGuionado(guion=[
-        {"alcance": _alcance(varias_tareas=0.7),
+        {"alcance": _alcance(una_tarea=0.8),
          "tarea": _tarea_resp({"T1": 0.5, "T2": 0.3})},
     ])
     _con_jev(monkeypatch, doble)
@@ -516,7 +521,7 @@ def test_es_una_tarea_nueva_sigue_al_alta_guiada(
     conn.commit()
 
     doble = ClienteJevGuionado(guion=[
-        {"alcance": _alcance(varias_tareas=0.7),
+        {"alcance": _alcance(una_tarea=0.8),
          "tarea": _tarea_resp({"T1": 0.5, "T2": 0.3})},
     ])
     _con_jev(monkeypatch, doble)
@@ -557,7 +562,7 @@ def test_normal_conversation_no_ofrece_es_una_tarea_nueva(
     conn.commit()
 
     doble = ClienteJevGuionado(guion=[
-        {"alcance": _alcance(varias_tareas=0.7),
+        {"alcance": _alcance(una_tarea=0.8),
          "tarea": _tarea_resp({"T1": 0.5, "T2": 0.3})},
     ])
     _con_jev(monkeypatch, doble)
@@ -571,6 +576,54 @@ def test_normal_conversation_no_ofrece_es_una_tarea_nueva(
         etiquetas = [o["etiqueta"] for o in _opciones(cur, pid)]
         assert etiquetas[-1] == "Ninguna, lo escribo"
         assert "Es una tarea nueva" not in etiquetas
+
+
+def test_alta_de_tarea_con_referencia_varias_pregunta_en_vez_de_arrancar_sola(
+        corework, conn, monkeypatch, con_credencial):
+    """T7, punto G -- regresión de C: b-0009 ("lo mio depende de q mar
+    termine su parte, dejalo anotado") terminaba abriendo un borrador de
+    tarea en silencio, porque una referencia VARIAS nunca entraba en
+    `estado["pendientes"]` (T7, punto C la sacó de los botones a propósito
+    para el caso de sólo consulta) y el enrutador leyó el mensaje como alta.
+    Con el enrutador pidiendo alta y nada CLARA, una VARIAS también tiene que
+    frenar el alta silenciosa y preguntar con los botones de T4 -- las
+    candidatas que Jev listó (>= 0,1, propias primero) más "Es una tarea
+    nueva" y "Ninguna, lo escribo"."""
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        propia = _tarea(cur, ws, titulo="Cablear tablero máq. 3", persona="Marcos Tarquini")
+        ajena = _tarea(cur, ws, titulo="Revisar accesos VPN", persona="Mariano Naim")
+    conn.commit()
+
+    doble = ClienteJevGuionado(guion=[
+        {"alcance": _alcance(varias_tareas=0.7),
+         "tarea": _tarea_resp({"T2": 0.5, "T1": 0.3})},
+    ])
+    _con_jev(monkeypatch, doble)
+    _con_proveedor(monkeypatch, rutas=[IntentRoute(
+        IntentAction.START_TASK_INTAKE, task={"title": "Anotar dependencia"},
+        trabajos=("lo mio",))])
+
+    with espacio(conn, ws) as cur:
+        quien = _quien(cur, "Marcos Tarquini", ws)
+        gateway._turno(
+            cur, quien, "lo mio depende de q mar termine su parte, dejalo anotado",
+            ws, chat_id=13)
+        pid = _aclaracion_esperando(cur, ws)
+        filas = _opciones(cur, pid)
+
+    etiquetas = [f["etiqueta"] for f in filas]
+    valores = [f["valor"] for f in filas]
+    assert etiquetas[-2:] == ["Es una tarea nueva", "Ninguna, lo escribo"]
+    assert etiquetas[0] == "Cablear tablero máq. 3"          # propia primero, sin nombre
+    assert valores[0] == propia
+    assert "Revisar accesos VPN — Mariano" in etiquetas
+    assert valores[1] == ajena
+
+    with admin(conn) as cur:
+        cur.execute(
+            "select count(*) n from task_intake_request where workspace_id = %s", (ws,))
+        assert cur.fetchone()["n"] == 0, "no arranca el alta en silencio"
 
 
 # ---------------------------------------------------------------------------
@@ -643,7 +696,7 @@ def test_toque_de_otro_integrante_no_resuelve_la_aclaracion(
     conn.commit()
 
     doble = ClienteJevGuionado(guion=[
-        {"alcance": _alcance(varias_tareas=0.7),
+        {"alcance": _alcance(una_tarea=0.8),
          "tarea": _tarea_resp({"T1": 0.5, "T2": 0.3})},
     ])
     _con_jev(monkeypatch, doble)
@@ -672,7 +725,7 @@ def test_toque_vencido_no_aplica(cliente, conn, corework, monkeypatch, con_crede
     conn.commit()
 
     doble = ClienteJevGuionado(guion=[
-        {"alcance": _alcance(varias_tareas=0.7),
+        {"alcance": _alcance(una_tarea=0.8),
          "tarea": _tarea_resp({"T1": 0.5, "T2": 0.3})},
     ])
     _con_jev(monkeypatch, doble)
@@ -706,7 +759,7 @@ def test_toque_repetido_no_aplica_dos_veces(
     conn.commit()
 
     doble = ClienteJevGuionado(guion=[
-        {"alcance": _alcance(varias_tareas=0.7),
+        {"alcance": _alcance(una_tarea=0.8),
          "tarea": _tarea_resp({"T1": 0.5, "T2": 0.3})},
     ])
     _con_jev(monkeypatch, doble)
@@ -742,7 +795,7 @@ def test_auditoria_de_la_eleccion_sin_mensaje_ni_referencia(
     conn.commit()
 
     doble = ClienteJevGuionado(guion=[
-        {"alcance": _alcance(varias_tareas=0.7),
+        {"alcance": _alcance(una_tarea=0.8),
          "tarea": _tarea_resp({"T1": 0.5, "T2": 0.3})},
     ])
     _con_jev(monkeypatch, doble)
