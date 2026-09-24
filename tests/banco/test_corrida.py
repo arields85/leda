@@ -13,15 +13,18 @@ import pytest
 from prisma import pendientes as P
 from prisma.autoridad import Canal, identificar
 from prisma.db import admin, espacio
+from prisma.jev import ClienteJevGuionado
 from prisma.llm import IntentAction, IntentRoute, Llamada, ProveedorGuionado, Respuesta
 
 from tests.banco.corrida import (
+    JevGrabador,
     ProveedorGrabador,
     _pendiente_para_confirmar,
     conteos_delta,
     ejecutar_escenario,
     filas_respuesta,
     guionado_desde_grabacion,
+    jev_guionado_desde_grabacion,
     recolectar_efectos,
     respuesta_ofrecio_opciones,
     sembrar_precondiciones,
@@ -105,6 +108,57 @@ def test_grabacion_vieja_sin_trabajos_ni_personas_sigue_cargando():
     ruta = guionado.route_intent("cualquier cosa")
     assert ruta.trabajos == ()
     assert ruta.personas == ()
+
+
+# ---------------------------------------------------------------------------
+# JevGrabador: grabación y round-trip a JSON / ClienteJevGuionado (T6,
+# `aclaracion-con-botones`) -- mismo patrón que ProveedorGrabador, para que
+# una corrida contra un Jev real se pueda repetir después sin red.
+# ---------------------------------------------------------------------------
+
+
+def test_jev_grabador_registra_pedido_y_respuesta():
+    interno = ClienteJevGuionado(guion=[{"alcance": {"probabilities": {"ninguna": 0.9}}}])
+    g = JevGrabador(interno)
+
+    respuesta = g.decidir({"mensaje": "hola"}, {"alcance": {"type": "choice"}})
+
+    assert respuesta == {"alcance": {"probabilities": {"ninguna": 0.9}}}
+    assert len(g.pedidos) == 1
+    assert g.pedidos[0]["state"] == {"mensaje": "hola"}
+    assert g.pedidos[0]["preguntas"] == {"alcance": {"type": "choice"}}
+    assert g.pedidos[0]["respuesta"] == respuesta
+
+
+def test_jev_grabacion_json_es_serializable_y_recargable():
+    interno = ClienteJevGuionado(guion=[
+        {"alcance": {"probabilities": {"una_tarea": 0.9}},
+         "tarea": {"probabilities": {"T1": 0.9}}},
+        {"misma": {"noul": 0.8}},
+    ])
+    g = JevGrabador(interno)
+    g.decidir({"mensaje": "a"}, {"alcance": {}, "tarea": {}})
+    g.decidir({"mensaje": "a", "tarea": "x"}, {"misma": {}})
+
+    import json
+    grabacion = json.loads(json.dumps(g.a_json()))
+
+    jev_guionado = jev_guionado_desde_grabacion({"jev": grabacion})
+    assert isinstance(jev_guionado, ClienteJevGuionado)
+    r1 = jev_guionado.decidir({}, {})
+    assert r1["alcance"]["probabilities"]["una_tarea"] == 0.9
+    r2 = jev_guionado.decidir({}, {})
+    assert r2["misma"]["noul"] == 0.8
+
+
+def test_jev_grabacion_vieja_sin_clave_jev_sigue_cargando():
+    """Una grabación de antes de T6 no tiene la clave 'jev' -- tiene que
+    seguir cargando, con un guión vacío (nunca llama a Jev de verdad si el
+    escenario no traía ninguna referencia que lo hubiera ejercitado)."""
+    grabacion_vieja = {"rutas": [], "respuestas": []}
+    jev_guionado = jev_guionado_desde_grabacion(grabacion_vieja)
+    assert isinstance(jev_guionado, ClienteJevGuionado)
+    assert jev_guionado.guion == []
 
 
 # ---------------------------------------------------------------------------
@@ -482,3 +536,92 @@ def test_ejecutar_escenario_sin_propuesta_deja_conteos_antes_del_toque_en_none(
     assert r.bloqueado is False, r.motivo_bloqueo
     assert r.conteos_antes_del_toque is None
     assert r.herramientas_antes_del_toque == ()
+
+
+# ---------------------------------------------------------------------------
+# aclaracion_esperada en ejecutar_escenario (T6, `aclaracion-con-botones`):
+# el corredor tapea la candidata elegida para poder retomar el pedido
+# original hasta la vista previa, y graba lo que le pidió a Jev en el
+# camino.
+# ---------------------------------------------------------------------------
+
+
+def test_ejecutar_escenario_sin_referencias_graba_jev_vacio(corework, conn):
+    ws = corework.workspace_id
+    interno = ProveedorGuionado(
+        guion=[Respuesta(texto="Anotado.")],
+        rutas=[IntentRoute(IntentAction.NORMAL_CONVERSATION)],
+    )
+    r = ejecutar_escenario(
+        conn, ws, "corework", "Marcos Tarquini", ["hola"], interno,
+        escenario_id="b-test-jev-vacio", indice=0)
+    assert r.grabacion["jev"] == {"pedidos": []}
+    assert r.etiquetas_aclaracion_ofrecidas == ()
+
+
+def test_ejecutar_escenario_aclaracion_tapea_la_candidata_elegida_sin_aplicar_nada(
+        corework, conn):
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        ids = sembrar_precondiciones(cur, ws, {
+            "tareas": [
+                {"id": "t1", "titulo": "Cablear tablero máq. 3 (simulado)",
+                 "area": "ot", "responsable": "Marcos Tarquini"},
+                {"id": "t2", "titulo": "Revisar tablero máq. 4 (simulado)",
+                 "area": "ot", "responsable": "Marcos Tarquini"},
+            ],
+        })
+    tid_a = ids["t1"]
+
+    doble_jev = ClienteJevGuionado(guion=[
+        {"alcance": {"probabilities": {"una_tarea": 0.8}},
+         "tarea": {"probabilities": {"T1": 0.5, "T2": 0.3}}},
+    ])
+    interno = ProveedorGuionado(
+        guion=[Respuesta(llamadas=[Llamada(
+                   "c1", "actualizar_estado",
+                   {"tarea_id": tid_a, "estado": "en_revision"})]),
+              Respuesta(texto="listo")],
+        rutas=[IntentRoute(IntentAction.NORMAL_CONVERSATION,
+                           trabajos=("lo del tablero",))],
+    )
+
+    r = ejecutar_escenario(
+        conn, ws, "corework", "Marcos Tarquini",
+        ["ya termine lo del tablero, pasala a revision"], interno,
+        escenario_id="b-test-aclaracion", indice=0, cliente_jev=doble_jev,
+        aclaracion_esperada={
+            "candidatas": ["Cablear tablero máq. 3 (simulado)",
+                          "Revisar tablero máq. 4 (simulado)"],
+            "elegir": "Cablear tablero máq. 3 (simulado)"})
+
+    assert r.bloqueado is False, r.motivo_bloqueo
+    assert set(r.etiquetas_aclaracion_ofrecidas) >= {
+        "Cablear tablero máq. 3 (simulado)", "Revisar tablero máq. 4 (simulado)"}
+    assert r.herramientas_ejecutadas == ["actualizar_estado"]
+    # Nada de lo que las 8 herramientas escriben cambió mientras se
+    # preguntaba con botones ni antes del toque en Confirmar -- la
+    # propiedad central de T4 tiene que seguir valiendo con el paso nuevo
+    # de la mitad.
+    for tabla in ("task", "blocker", "dependency", "task_state_event",
+                 "objective", "evidence", "approval"):
+        assert r.conteos_antes_del_toque[tabla] == r.conteos_antes[tabla], (
+            f"'{tabla}' cambió antes de tocar Confirmar")
+    assert r.herramientas_antes_del_toque == ()
+    assert r.grabacion["jev"]["pedidos"], "tiene que haber grabado el pedido a Jev"
+
+    with admin(conn) as cur:
+        cur.execute("select estado from task where id = %s", (tid_a,))
+        assert cur.fetchone()["estado"] == "en_revision"
+
+
+def test_ejecutar_escenario_sin_aclaracion_esperada_no_junta_etiquetas(corework, conn):
+    ws = corework.workspace_id
+    interno = ProveedorGuionado(
+        guion=[Respuesta(texto="Anotado.")],
+        rutas=[IntentRoute(IntentAction.NORMAL_CONVERSATION)],
+    )
+    r = ejecutar_escenario(
+        conn, ws, "corework", "Marcos Tarquini", ["hola"], interno,
+        escenario_id="b-test-sin-aclaracion", indice=0)
+    assert r.etiquetas_aclaracion_ofrecidas == ()

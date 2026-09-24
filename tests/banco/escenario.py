@@ -51,6 +51,13 @@ class Escenario:
     variante_de: str | None = None
     debe_preguntar: bool = False
     permite_borrador_de_tarea: bool = False
+    # Aclaración con botones (T6, `aclaracion-con-botones`): qué títulos
+    # tienen que aparecer como candidatas cuando una referencia a tarea es
+    # ambigua, y cuál tocar para retomar el pedido original
+    # (`corrida.ejecutar_escenario`). Vacío: el corredor no espera ninguna
+    # aclaración con botones para este escenario (referencia clara, sin
+    # referencia, o el caso "debe preguntar" de siempre, en texto).
+    aclaracion_esperada: dict = field(default_factory=dict)
 
 
 def _validar_estructura(datos: dict, origen: pathlib.Path) -> None:
@@ -107,6 +114,25 @@ def _validar_estructura(datos: dict, origen: pathlib.Path) -> None:
         if not isinstance(valor, bool):
             raise EscenarioInvalido(f"{origen}: '{campo}' tiene que ser un booleano.")
 
+    aclaracion_esperada = datos.get("aclaracion_esperada", {})
+    if not isinstance(aclaracion_esperada, dict):
+        raise EscenarioInvalido(f"{origen}: 'aclaracion_esperada' tiene que ser un mapeo.")
+    if aclaracion_esperada:
+        candidatas = aclaracion_esperada.get("candidatas")
+        if (not isinstance(candidatas, list) or not candidatas
+                or not all(isinstance(c, str) and c.strip() for c in candidatas)):
+            raise EscenarioInvalido(
+                f"{origen}: 'aclaracion_esperada.candidatas' tiene que ser una "
+                "lista no vacía de texto.")
+        elegir = aclaracion_esperada.get("elegir")
+        if not isinstance(elegir, str) or not elegir.strip():
+            raise EscenarioInvalido(
+                f"{origen}: 'aclaracion_esperada.elegir' tiene que ser texto no vacío.")
+        if elegir not in candidatas:
+            raise EscenarioInvalido(
+                f"{origen}: 'aclaracion_esperada.elegir' tiene que ser una de "
+                "'aclaracion_esperada.candidatas'.")
+
 
 def cargar_escenario(ruta: pathlib.Path | str) -> Escenario:
     """Carga y valida un único escenario desde un archivo YAML."""
@@ -130,6 +156,7 @@ def cargar_escenario(ruta: pathlib.Path | str) -> Escenario:
         variante_de=(datos.get("variante_de") or "").strip() or None,
         debe_preguntar=bool(datos.get("debe_preguntar", False)),
         permite_borrador_de_tarea=bool(datos.get("permite_borrador_de_tarea", False)),
+        aclaracion_esperada=datos.get("aclaracion_esperada", {}) or {},
     )
 
 

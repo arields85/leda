@@ -32,4 +32,6 @@ efectos:
     - origen: t1
       destino: t2
       tipo: bloqueante
+  conteos_delta:
+    task_draft: 0
 severidad: media

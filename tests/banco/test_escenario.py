@@ -248,3 +248,62 @@ def test_cargar_escenarios_variante_de_id_inexistente_es_invalido(tmp_path):
 
     with pytest.raises(EscenarioInvalido):
         cargar_escenarios(tmp_path)
+
+
+# ---------------------------------------------------------------------------
+# aclaracion_esperada (T6, `aclaracion-con-botones`): qué candidatas tiene
+# que ofrecer una referencia ambigua y cuál tocar, para que el corredor
+# pueda seguir la aclaración con botones en vez de quedarse en la pregunta.
+# ---------------------------------------------------------------------------
+
+
+def test_carga_sin_aclaracion_esperada_usa_diccionario_vacio(tmp_path):
+    ruta = _escribir(tmp_path, _MINIMO)
+    e = cargar_escenario(ruta)
+    assert e.aclaracion_esperada == {}
+
+
+def test_carga_aclaracion_esperada_completa(tmp_path):
+    datos = dict(_MINIMO)
+    datos["aclaracion_esperada"] = {
+        "candidatas": ["Cablear tablero máq. 3", "Revisar tablero máq. 4"],
+        "elegir": "Cablear tablero máq. 3",
+    }
+    ruta = _escribir(tmp_path, datos)
+    e = cargar_escenario(ruta)
+    assert e.aclaracion_esperada["candidatas"] == [
+        "Cablear tablero máq. 3", "Revisar tablero máq. 4"]
+    assert e.aclaracion_esperada["elegir"] == "Cablear tablero máq. 3"
+
+
+def test_aclaracion_esperada_no_es_mapeo_es_invalido(tmp_path):
+    datos = dict(_MINIMO)
+    datos["aclaracion_esperada"] = ["no es un mapeo"]
+    ruta = _escribir(tmp_path, datos)
+    with pytest.raises(EscenarioInvalido):
+        cargar_escenario(ruta)
+
+
+def test_aclaracion_esperada_candidatas_vacia_es_invalido(tmp_path):
+    datos = dict(_MINIMO)
+    datos["aclaracion_esperada"] = {"candidatas": [], "elegir": "Lo que sea"}
+    ruta = _escribir(tmp_path, datos)
+    with pytest.raises(EscenarioInvalido):
+        cargar_escenario(ruta)
+
+
+def test_aclaracion_esperada_sin_elegir_es_invalido(tmp_path):
+    datos = dict(_MINIMO)
+    datos["aclaracion_esperada"] = {"candidatas": ["Tarea A", "Tarea B"]}
+    ruta = _escribir(tmp_path, datos)
+    with pytest.raises(EscenarioInvalido):
+        cargar_escenario(ruta)
+
+
+def test_aclaracion_esperada_elegir_fuera_de_candidatas_es_invalido(tmp_path):
+    datos = dict(_MINIMO)
+    datos["aclaracion_esperada"] = {
+        "candidatas": ["Tarea A", "Tarea B"], "elegir": "Tarea C"}
+    ruta = _escribir(tmp_path, datos)
+    with pytest.raises(EscenarioInvalido):
+        cargar_escenario(ruta)

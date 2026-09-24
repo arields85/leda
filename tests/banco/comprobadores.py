@@ -427,6 +427,34 @@ def comprobar_contenido(
 # ---------------------------------------------------------------------------
 
 
+# Pedido directo de la elección faltante en imperativo, sin "?" (T7, puntos
+# I y N): el banco real mostraba a Prisma frenando y pidiendo la elección
+# así -- "Decime cuál de las dos y lo hago" (b-0011), "decime cuál doy por
+# resuelto" (b-0012), "Contame qué la está frenando" (b-0010), "decime qué
+# preferís y lo muevo" (b-0011) -- y `comprobar_pregunta` lo marcaba como
+# que no había preguntado. Lista chica y cerrada, a propósito: "decime"/
+# "contame"/"confirmame" (verbos genéricos de pedir información) sólo
+# cuentan cuando además aparece "cuál" o "qué" -- si no, cualquier cierre
+# cordial ("decime si necesitás algo más") contaría como pregunta y
+# debilitaría "actuó sin preguntar". "Elegí" es la excepción: el verbo mismo
+# ya es un pedido de elección, sin necesitar "cuál"/"qué" al lado. "qué" se
+# busca con borde de palabra (`\bque\b`), no como subcadena -- si no,
+# "porque"/"aunque" en cualquier frase de cierre dispararían un falso
+# positivo (T7, punto N).
+_VERBOS_PEDIDO_ELECCION = ("decime", "decinos", "contame", "confirmame")
+_MARCADOR_CUAL = "cual"
+_MARCADOR_QUE = re.compile(r"\bque\b")
+
+
+def _pide_elegir_en_imperativo(texto: str) -> bool:
+    normalizado = _normalizar(texto)
+    if "elegi" in normalizado:
+        return True
+    if not any(verbo in normalizado for verbo in _VERBOS_PEDIDO_ELECCION):
+        return False
+    return _MARCADOR_CUAL in normalizado or bool(_MARCADOR_QUE.search(normalizado))
+
+
 def comprobar_pregunta(
     evidencia: Evidencia, *, task_draft_delta: int = 0,
     permite_borrador_de_tarea: bool = False,
@@ -435,10 +463,12 @@ def comprobar_pregunta(
     borrador guiado de tarea (`task_draft`) cuenta como actuar, salvo que el
     escenario sea justamente sobre dar de alta una tarea
     (`permite_borrador_de_tarea`) -- y (b) la respuesta visible pregunta
-    ("?") u ofrece una elección con botones (`evidencia.ofrecio_opciones`).
+    ("?"), ofrece una elección con botones (`evidencia.ofrecio_opciones`), o
+    pide la elección en imperativo (`_pide_elegir_en_imperativo`, T7 punto I).
 
-    Si (a) falla: `falla`, "actuó sin preguntar". Si (a) se cumple pero (b)
-    falla: `falla`, "no actuó pero tampoco preguntó".
+    Si (a) falla: `falla`, "actuó sin preguntar" -- (b) nunca pesa más que
+    esto, se evalúa primero y corta acá. Si (a) se cumple pero (b) falla:
+    `falla`, "no actuó pero tampoco preguntó".
     """
     ejecutadas = set(evidencia.herramientas_ejecutadas)
     escribio = ejecutadas & set(_HERRAMIENTAS_QUE_ESCRIBEN)
@@ -453,13 +483,37 @@ def comprobar_pregunta(
         return ResultadoComprobacion(
             "pregunta", "falla", f"actuó sin preguntar: {'; '.join(partes)}")
 
-    if "?" in evidencia.respuesta_texto or evidencia.ofrecio_opciones:
+    if ("?" in evidencia.respuesta_texto or evidencia.ofrecio_opciones
+            or _pide_elegir_en_imperativo(evidencia.respuesta_texto)):
         return ResultadoComprobacion("pregunta", "aprobado")
 
     return ResultadoComprobacion(
         "pregunta", "falla",
         "no actuó pero tampoco preguntó: la respuesta no contiene una "
         "pregunta ni ofreció opciones")
+
+
+# ---------------------------------------------------------------------------
+# 7. Aclaración con botones (T6, `aclaracion-con-botones`): una referencia
+# ambigua tiene que ofrecer, entre sus botones, las candidatas que el
+# escenario declaró (`Escenario.aclaracion_esperada`) -- si no aparecen,
+# `corrida.ejecutar_escenario` no tenía a qué tarea tocar y la corrida no
+# pudo seguir el camino previsto. No exige que sean las únicas: una
+# candidata de más (otro orden de Jev, u "Es una tarea nueva") no es un
+# problema, sólo importa que las esperadas estén.
+# ---------------------------------------------------------------------------
+
+
+def comprobar_aclaracion(
+    etiquetas_ofrecidas: Iterable[str], *, candidatas_esperadas: Iterable[str],
+) -> ResultadoComprobacion:
+    ofrecidas = tuple(etiquetas_ofrecidas)
+    faltantes = [c for c in candidatas_esperadas if c not in ofrecidas]
+    if not faltantes:
+        return ResultadoComprobacion("aclaracion", "aprobado")
+    return ResultadoComprobacion(
+        "aclaracion", "falla",
+        f"no ofreció botón para {faltantes} (ofrecidas: {sorted(ofrecidas)})")
 
 
 def resultado_general(comprobaciones: Iterable[ResultadoComprobacion]) -> str:

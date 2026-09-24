@@ -14,6 +14,7 @@ from prisma.db import admin
 from tests.banco.comprobadores import (
     Evidencia,
     comprobar_accion_sin_herramienta,
+    comprobar_aclaracion,
     comprobar_contenido,
     comprobar_efectos,
     comprobar_herramientas,
@@ -27,6 +28,7 @@ from tests.banco.corrida import (
     conteos_delta,
     ejecutar_escenario,
     guionado_desde_grabacion,
+    jev_guionado_desde_grabacion,
     recolectar_efectos,
     sembrar_precondiciones,
 )
@@ -55,9 +57,11 @@ def test_replay_reproduce_el_resultado_esperado(archivo_replay, corework, conn):
             ids_semilla = sembrar_precondiciones(cur, ws, escenario.precondiciones)
 
     guionado = guionado_desde_grabacion(datos["grabacion"])
+    jev_guionado = jev_guionado_desde_grabacion(datos["grabacion"])
     resultado = ejecutar_escenario(
         conn, ws, "corework", escenario.actor, escenario.mensajes, guionado,
-        escenario_id=escenario.id, indice=0)
+        escenario_id=escenario.id, indice=0, cliente_jev=jev_guionado,
+        aclaracion_esperada=escenario.aclaracion_esperada or None)
 
     assert not resultado.bloqueado, resultado.motivo_bloqueo
 
@@ -92,6 +96,10 @@ def test_replay_reproduce_el_resultado_esperado(archivo_replay, corework, conn):
         comprobaciones.append(comprobar_pregunta(
             evidencia, task_draft_delta=efectos_observados["conteos_delta"].get("task_draft", 0),
             permite_borrador_de_tarea=escenario.permite_borrador_de_tarea))
+    if escenario.aclaracion_esperada:
+        comprobaciones.append(comprobar_aclaracion(
+            resultado.etiquetas_aclaracion_ofrecidas,
+            candidatas_esperadas=escenario.aclaracion_esperada["candidatas"]))
     veredicto = resultado_general(comprobaciones)
 
     assert veredicto == datos["resultado_esperado"], (

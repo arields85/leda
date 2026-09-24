@@ -1,0 +1,37 @@
+id: b-0015
+objetivo: >
+  Observar si un pedido de dependencia entre dos tareas existentes de otra
+  área también va directo a crear la dependencia, sin arrancar el alta
+  guiada de una tarea nueva -- mismo defecto que b-0005 (router, corregido
+  en T3), verificado acá con un dominio y una redacción distintos, y con el
+  chequeo explícito de que no se abrió ningún `task_draft`.
+actor: Martín Forte
+mensajes:
+  - "che, los accesos vpn no los puedo actualizar hasta que Lucas no termine de migrar el servidor, anotalo"
+precondiciones:
+  tareas:
+    - id: t1
+      titulo: Migrar el servidor de archivos (simulado)
+      area: it
+      responsable: Lucas Natuche
+    - id: t2
+      titulo: Actualizar los accesos VPN del equipo (simulado)
+      area: it
+      responsable: Martín Forte
+herramientas_esperadas:
+  - crear_dependencia
+herramientas_prohibidas:
+  - actualizar_estado
+  - registrar_bloqueo
+  - resolver_bloqueo
+  - aprobar_tarea
+# El sentido correcto es t1 (migrar el servidor) bloqueando a t2 (actualizar
+# los accesos VPN) -- los accesos esperan a la migración, no al revés.
+efectos:
+  dependencias:
+    - origen: t1
+      destino: t2
+      tipo: bloqueante
+  conteos_delta:
+    task_draft: 0
+severidad: media

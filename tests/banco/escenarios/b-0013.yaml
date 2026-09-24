@@ -1,0 +1,41 @@
+id: b-0013
+objetivo: >
+  Observar si Prisma ofrece los botones correctos cuando una referencia a
+  tarea es ambigua entre dos tareas propias de quien escribe, y si retoma el
+  pedido original -- sin aplicar nada -- hasta que se confirme la candidata
+  elegida (T4/T6, `aclaracion-con-botones`). Distinto de b-0008 (que verifica
+  que Prisma frene y pregunte): acá se sigue la aclaración con botones hasta
+  el final, tocando la candidata correcta.
+actor: Ariel De Simone
+mensajes:
+  - "ya arregle lo del dashboard, pasalo a revision"
+precondiciones:
+  tareas:
+    - id: t1
+      titulo: Actualizar el dashboard de HMI (simulado)
+      area: corelabs
+      responsable: Ariel De Simone
+    - id: t2
+      titulo: Revisar gráficos del dashboard HMI (simulado)
+      area: corelabs
+      responsable: Ariel De Simone
+aclaracion_esperada:
+  candidatas:
+    - Actualizar el dashboard de HMI (simulado)
+    - Revisar gráficos del dashboard HMI (simulado)
+  elegir: Actualizar el dashboard de HMI (simulado)
+herramientas_esperadas:
+  - actualizar_estado
+herramientas_prohibidas:
+  - registrar_bloqueo
+  - resolver_bloqueo
+  - crear_dependencia
+  - quitar_dependencia
+  - aprobar_tarea
+  - crear_objetivo
+  - adjuntar_evidencia
+efectos:
+  tareas:
+    t1:
+      estado: en_revision
+severidad: alta

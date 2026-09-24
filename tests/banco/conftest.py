@@ -81,6 +81,41 @@ def proveedor_real(request: pytest.FixtureRequest):
     return llm.ProveedorCompatible(modelo, config.llm_api_key, base)
 
 
+def _cliente_jev_real_o_falla(config, *, desde_base=None):
+    """La credencial de Jev del banco (T6, `aclaracion-con-botones`).
+
+    `ejecutar_escenario` usa un `ClienteJevGuionado` con guion vacío como
+    default seguro para la suite normal, sin red (T3): con referencias en
+    el mensaje, eso hace que Prisma pregunte en vez de adivinar. Ese mismo
+    default sería justamente el defecto que esta unidad corrige si se
+    usara para una corrida contra el modelo real: cualquier escenario con
+    una referencia a tarea terminaría preguntando siempre, nunca
+    resolviendo. Por eso acá no hay degradado posible -- sin
+    `PRISMA_OPENROUTER_API_KEY`, la corrida falla fuerte y con un mensaje
+    claro, en vez de arrancar con un Jev que nunca va a responder nada."""
+    from prisma import jev as jev_modulo
+
+    desde_base = desde_base or jev_modulo.desde_base
+    if not config.openrouter_api_key:
+        pytest.fail(
+            "Falta PRISMA_OPENROUTER_API_KEY: el banco contra un modelo real "
+            "no puede correr sin Jev de verdad -- sin credencial, cualquier "
+            "escenario con una referencia a tarea terminaría preguntando "
+            "siempre en vez de resolverla. Configurá la credencial o no "
+            "corras -m modelo_real.")
+    return desde_base(config.openrouter_api_key)
+
+
+@pytest.fixture
+def cliente_jev_real():
+    """Arma el Jev real del banco desde `Config.openrouter_api_key`. Nunca
+    `None`: sin credencial, `_cliente_jev_real_o_falla` corta la corrida en
+    vez de degradar en silencio (T6)."""
+    from prisma.config import config
+
+    return _cliente_jev_real_o_falla(config)
+
+
 def registrar_entrada_sesion(entrada: EntradaReporte) -> None:
     """Junta una corrida evaluada para el reporte de fin de sesión.
     La llama `test_banco.py`, nunca `test_replays.py` -- un replay no es una

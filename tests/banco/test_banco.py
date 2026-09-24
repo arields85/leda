@@ -34,6 +34,7 @@ from prisma.db import admin
 from tests.banco.comprobadores import (
     Evidencia,
     comprobar_accion_sin_herramienta,
+    comprobar_aclaracion,
     comprobar_contenido,
     comprobar_efectos,
     comprobar_herramientas,
@@ -65,7 +66,8 @@ def _roster_y_titulos(conn, ws: str) -> tuple[list[str], list[str]]:
     return integrantes, titulos
 
 
-def test_escenario_contra_modelo_real(escenario_y_corrida, corework, conn, proveedor_real):
+def test_escenario_contra_modelo_real(
+        escenario_y_corrida, corework, conn, proveedor_real, cliente_jev_real):
     escenario, indice = escenario_y_corrida
     ws = corework.workspace_id
 
@@ -76,7 +78,8 @@ def test_escenario_contra_modelo_real(escenario_y_corrida, corework, conn, prove
 
     resultado = ejecutar_escenario(
         conn, ws, "corework", escenario.actor, escenario.mensajes, proveedor_real,
-        escenario_id=escenario.id, indice=indice)
+        escenario_id=escenario.id, indice=indice, cliente_jev=cliente_jev_real,
+        aclaracion_esperada=escenario.aclaracion_esperada or None)
 
     if resultado.bloqueado:
         entrada = EntradaReporte(
@@ -117,6 +120,10 @@ def test_escenario_contra_modelo_real(escenario_y_corrida, corework, conn, prove
         comprobaciones.append(comprobar_pregunta(
             evidencia, task_draft_delta=efectos_observados["conteos_delta"].get("task_draft", 0),
             permite_borrador_de_tarea=escenario.permite_borrador_de_tarea))
+    if escenario.aclaracion_esperada:
+        comprobaciones.append(comprobar_aclaracion(
+            resultado.etiquetas_aclaracion_ofrecidas,
+            candidatas_esperadas=escenario.aclaracion_esperada["candidatas"]))
     veredicto = resultado_general(comprobaciones)
 
     entrada = EntradaReporte(

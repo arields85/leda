@@ -9,6 +9,7 @@ from tests.banco.comprobadores import (
     Evidencia,
     ResultadoComprobacion,
     comprobar_accion_sin_herramienta,
+    comprobar_aclaracion,
     comprobar_contenido,
     comprobar_efectos,
     comprobar_herramientas,
@@ -600,4 +601,165 @@ def test_pregunta_abrir_borrador_de_tarea_permitido_aprueba():
 def test_pregunta_sin_delta_de_borrador_no_se_ve_afectada():
     ev = Evidencia(respuesta_texto="¿A cuál te referís?", herramientas_ejecutadas=())
     r = comprobar_pregunta(ev, task_draft_delta=0)
+    assert r.resultado == "aprobado"
+
+
+# ---------------------------------------------------------------------------
+# comprobar_pregunta -- pedido de elección en imperativo, sin "?" (T7, punto
+# I): b-0011 ("Decime cuál de las dos y lo hago") y b-0012 ("decime cuál doy
+# por resuelto") frenaban y pedían la elección sin signo de pregunta ni
+# botones, y el comprobador los marcaba como que no preguntaron.
+# ---------------------------------------------------------------------------
+
+
+def test_pregunta_imperativo_decime_cual_sin_signo_de_pregunta_aprueba():
+    ev = Evidencia(respuesta_texto="Decime cuál de las dos y lo hago",
+                   herramientas_ejecutadas=())
+    r = comprobar_pregunta(ev)
+    assert r.resultado == "aprobado"
+
+
+def test_pregunta_imperativo_decime_cual_minuscula_y_sin_acento_aprueba():
+    ev = Evidencia(respuesta_texto="decime cual doy por resuelto",
+                   herramientas_ejecutadas=())
+    r = comprobar_pregunta(ev)
+    assert r.resultado == "aprobado"
+
+
+def test_pregunta_imperativo_confirmame_cual_aprueba():
+    ev = Evidencia(respuesta_texto="Confirmame cuál es antes de tocarla.",
+                   herramientas_ejecutadas=())
+    r = comprobar_pregunta(ev)
+    assert r.resultado == "aprobado"
+
+
+def test_pregunta_imperativo_elegi_sin_cual_aprueba():
+    ev = Evidencia(respuesta_texto="Elegí una de las dos, por favor.",
+                   herramientas_ejecutadas=())
+    r = comprobar_pregunta(ev)
+    assert r.resultado == "aprobado"
+
+
+def test_pregunta_imperativo_contame_cual_aprueba():
+    ev = Evidencia(respuesta_texto="Contame cuál te sirve más.",
+                   herramientas_ejecutadas=())
+    r = comprobar_pregunta(ev)
+    assert r.resultado == "aprobado"
+
+
+def test_pregunta_imperativo_decime_sin_cual_no_es_pedido_de_eleccion():
+    """Negativo (pedido explícito de I): un imperativo con "decime" que no
+    pide elegir entre candidatas -- una frase de cierre común al final de
+    una acción ya hecha -- no puede convertir una acción en pregunta ni
+    debilitar "actuó sin preguntar"."""
+    ev = Evidencia(respuesta_texto="Listo, ya quedó anotado. Decime si necesitás algo más.",
+                   herramientas_ejecutadas=("actualizar_estado",))
+    r = comprobar_pregunta(ev)
+    assert r.resultado == "falla"
+    assert "actuó sin preguntar" in r.diferencia
+
+
+def test_pregunta_imperativo_decime_sin_cual_y_sin_actuar_sigue_fallando():
+    """Mismo texto que la negativa anterior pero sin ninguna herramienta
+    ejecutada: tampoco alcanza, porque "decime si necesitás algo más" no
+    pide elegir una candidata -- es una frase de cierre genérica."""
+    ev = Evidencia(respuesta_texto="Decime si necesitás algo más.",
+                   herramientas_ejecutadas=())
+    r = comprobar_pregunta(ev)
+    assert r.resultado == "falla"
+    assert "no actuó pero tampoco preguntó" in r.diferencia
+
+
+def test_pregunta_imperativo_con_herramienta_que_escribe_sigue_fallando():
+    """El imperativo nunca puede pesar más que "actuó sin preguntar": aunque
+    la respuesta sí pida elegir, si además corrió una herramienta que
+    escribe, sigue siendo una falla -- mismo criterio que ya vale para "?"."""
+    ev = Evidencia(respuesta_texto="Decime cuál de las dos y lo hago",
+                   herramientas_ejecutadas=("actualizar_estado",))
+    r = comprobar_pregunta(ev)
+    assert r.resultado == "falla"
+    assert "actuó sin preguntar" in r.diferencia
+
+
+# ---------------------------------------------------------------------------
+# comprobar_pregunta -- "decime qué"/"contame qué" (T7, punto N): b-0010
+# ("Contame qué la está frenando") y b-0011 ("decime qué preferís y lo
+# muevo") pedían la elección con "qué" en vez de "cuál", sin signo de
+# pregunta, y el comprobador tampoco los reconocía.
+# ---------------------------------------------------------------------------
+
+
+def test_pregunta_imperativo_contame_que_la_esta_frenando_aprueba():
+    ev = Evidencia(respuesta_texto="Contame qué la está frenando.",
+                   herramientas_ejecutadas=())
+    r = comprobar_pregunta(ev)
+    assert r.resultado == "aprobado"
+
+
+def test_pregunta_imperativo_decime_que_preferis_aprueba():
+    ev = Evidencia(respuesta_texto="decime qué preferís y lo muevo",
+                   herramientas_ejecutadas=())
+    r = comprobar_pregunta(ev)
+    assert r.resultado == "aprobado"
+
+
+def test_pregunta_imperativo_decime_sin_cual_ni_que_no_es_pedido_de_eleccion():
+    """Negativo que pide el encargo (kept): sigue sin alcanzar."""
+    ev = Evidencia(respuesta_texto="Decime si necesitás algo más.",
+                   herramientas_ejecutadas=())
+    r = comprobar_pregunta(ev)
+    assert r.resultado == "falla"
+    assert "no actuó pero tampoco preguntó" in r.diferencia
+
+
+def test_pregunta_imperativo_porque_no_es_un_falso_positivo_de_que():
+    """Negativo propio: "porque"/"aunque" contienen "que" como subcadena --
+    el marcador de N busca la palabra "que" con borde de palabra, no
+    cualquier subcadena, para no confundir un "porque" de cierre con un
+    pedido real de elegir."""
+    ev = Evidencia(
+        respuesta_texto="Decime si hace falta algo, porque ya avisé a todos.",
+        herramientas_ejecutadas=())
+    r = comprobar_pregunta(ev)
+    assert r.resultado == "falla"
+    assert "no actuó pero tampoco preguntó" in r.diferencia
+
+
+# ---------------------------------------------------------------------------
+# comprobar_aclaracion (T6, `aclaracion-con-botones`): la aclaración con
+# botones ofreció las candidatas que el escenario espera -- lo que
+# `corrida.ejecutar_escenario` necesitaba para poder tocar la elegida.
+# ---------------------------------------------------------------------------
+
+
+def test_aclaracion_ofrece_todas_las_candidatas_esperadas_aprueba():
+    r = comprobar_aclaracion(
+        ("Cablear tablero máq. 3", "Revisar tablero máq. 4", "Ninguna, lo escribo"),
+        candidatas_esperadas=("Cablear tablero máq. 3", "Revisar tablero máq. 4"))
+    assert r.resultado == "aprobado"
+
+
+def test_aclaracion_sin_ofrecer_ninguna_candidata_falla():
+    r = comprobar_aclaracion((), candidatas_esperadas=("Cablear tablero máq. 3",))
+    assert r.resultado == "falla"
+    assert "Cablear tablero máq. 3" in r.diferencia
+
+
+def test_aclaracion_falta_una_candidata_esperada_falla():
+    r = comprobar_aclaracion(
+        ("Cablear tablero máq. 3", "Ninguna, lo escribo"),
+        candidatas_esperadas=("Cablear tablero máq. 3", "Revisar tablero máq. 4"))
+    assert r.resultado == "falla"
+    assert "Revisar tablero máq. 4" in r.diferencia
+    assert "Cablear tablero máq. 3" not in r.diferencia.split("ofrecidas")[0]
+
+
+def test_aclaracion_con_candidatas_de_mas_no_le_importa():
+    """Botones de más (otra candidata que Jev sumó, o el propio 'Es una
+    tarea nueva') no son un problema: lo único que se exige es que las
+    esperadas estén, no que sean las únicas."""
+    r = comprobar_aclaracion(
+        ("Cablear tablero máq. 3", "Revisar tablero máq. 4",
+         "Es una tarea nueva", "Ninguna, lo escribo"),
+        candidatas_esperadas=("Cablear tablero máq. 3",))
     assert r.resultado == "aprobado"
