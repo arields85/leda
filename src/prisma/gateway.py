@@ -281,6 +281,18 @@ def _toque(conn, workspace_id: str, slug: str, toque: dict,
         elif not draft_token and resuelta.cancelada:
             _responder(cur, workspace_id, chat_id, quien,
                        "Listo, no lo hago.", ahora)
+        elif not draft_token and resuelta.modificada:
+            # No se aplica nada (T3, ADR 0005 decisión 1): la fila ya quedó
+            # cerrada por `resolver_pendiente`, con `herramienta`, `args` y
+            # `resumen` guardados como el contexto que va a leer el próximo
+            # turno de esta persona en este chat -- `_turno` lo reclama con
+            # `pendientes.reclamar_modificacion_abierta` antes de rutear.
+            registrar_auditoria(
+                cur, accion=f"modificar:{resuelta.herramienta}",
+                workspace_id=workspace_id, actor_app_user_id=quien.app_user_id,
+                actor_kind="persona", detalle={"args": resuelta.args, "via": "boton"})
+            _responder(cur, workspace_id, chat_id, quien,
+                       "¿Qué querés cambiar?", ahora)
         elif not draft_token:
             if resuelta.task_id:
                 _responder(cur, workspace_id, chat_id, quien,
@@ -300,12 +312,16 @@ def _toque(conn, workspace_id: str, slug: str, toque: dict,
                 except H.EstadoCambio as e:
                     # La situación cambió entre la vista previa y el toque
                     # (ADR 0005, decisión 1): no se aplica nada, se arma una
-                    # vista previa nueva y una acción pendiente nueva.
+                    # vista previa nueva y una acción pendiente nueva. Sigue
+                    # siendo la vista previa de una herramienta que escribe,
+                    # así que conserva sus tres botones (T3).
                     nueva = P.registrar(
                         cur, quien, herramienta=e.herramienta,
                         args=e.argumentos, resumen=e.resumen,
                         vence_en=ahora + VIGENCIA_PENDIENTE, chat_id=chat_id,
-                        huella=e.huella)
+                        huella=e.huella,
+                        opciones=[("Confirmar", True), ("Modificar", "modificar"),
+                                 ("Cancelar", False)])
                     enqueue_outbox(
                         cur, workspace_id=workspace_id, chat_id=chat_id,
                         recipient_membership_id=quien.membership_id,
@@ -406,6 +422,7 @@ def _turno(cur, quien, texto: str, workspace_id: str, chat_id: int,
            entrante_id: str | None = None) -> None:
     from datetime import datetime, timezone
 
+    from . import pendientes as P
     from .agente import responder
     from .calendario import Calendario
     from .llm import IntentAction, IntentRoute, desde_base
@@ -413,6 +430,18 @@ def _turno(cur, quien, texto: str, workspace_id: str, chat_id: int,
     now = datetime.now(timezone.utc)
     cal = Calendario.desde_base(cur, workspace_id)
     proveedor = desde_base(cur, workspace_id, config.llm_api_key)
+
+    # Modificar (T3, ADR 0005 decisión 1): si esta persona, en este chat,
+    # tiene una corrección abierta y todavía sin leer, este mensaje es esa
+    # corrección -- no un pedido nuevo a rutear. `reclamar_modificacion_
+    # abierta` la consume de un solo uso, se haya usado o no: si el mensaje
+    # resulta ser sobre otra cosa, la propuesta vieja sigue cerrada.
+    modificacion = P.reclamar_modificacion_abierta(cur, quien, chat_id, now)
+    if modificacion is not None:
+        responder(cur, quien, texto, proveedor, cal, chat_id, ahora=now,
+                 entrante_id=entrante_id, modificacion=modificacion)
+        return
+
     route = None
     last_error = None
     for _ in range(2):

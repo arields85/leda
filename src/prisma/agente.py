@@ -27,6 +27,7 @@ from datetime import datetime, timedelta, timezone
 import psycopg
 
 from . import herramientas as H
+from . import pendientes as P
 from .autoridad import Denegado, Solicitante
 from .calendario import Calendario
 from .contexto import construir, historial, revisar_salida
@@ -62,9 +63,19 @@ INCOMPLETO = ("Me quedé a mitad de camino con esto. Lo dejo anotado para "
 def responder(cur: psycopg.Cursor, quien: Solicitante, texto_entrante: str,
               proveedor: Proveedor, cal: Calendario, chat_id: int,
               ahora: datetime | None = None,
-              entrante_id: str | None = None) -> Resultado:
+              entrante_id: str | None = None,
+              modificacion: P.ModificacionAbierta | None = None) -> Resultado:
+    """`modificacion`, si viene, es la propuesta anterior que la persona pidió
+    corregir (T3, ADR 0005 decisión 1): se agrega al sistema como contexto de
+    confianza del servidor, nunca como texto de la persona, para que el
+    modelo pueda volver a llamar a la herramienta con los argumentos
+    corregidos. Si el mensaje resulta ser sobre otra cosa, no se hace nada
+    especial: la propuesta anterior sigue cerrada."""
     ahora = ahora or datetime.now(timezone.utc)
     ctx = construir(cur, quien, texto_entrante, ahora=ahora)
+    sistema = ctx.sistema
+    if modificacion is not None:
+        sistema = sistema + "\n\n---\n\n" + _bloque_modificacion(modificacion)
     esquemas = H.esquemas()
 
     # Lo que se dijeron hace un rato. `entrante_id` es la fila que el gateway
@@ -80,7 +91,7 @@ def responder(cur: psycopg.Cursor, quien: Solicitante, texto_entrante: str,
 
     try:
         for _ in range(MAX_VUELTAS):
-            r: Respuesta = proveedor.responder(ctx.sistema, mensajes, esquemas)
+            r: Respuesta = proveedor.responder(sistema, mensajes, esquemas)
             # Vale el texto de esta vuelta y nada más. Arrastrar el de una
             # anterior manda "voy a crear la tarea" como respuesta final.
             salida = r.texto
@@ -143,6 +154,27 @@ def responder(cur: psycopg.Cursor, quien: Solicitante, texto_entrante: str,
     auditar(salida)
 
     return Resultado(salida, acciones, confirmaciones, elecciones=elecciones)
+
+
+def _bloque_modificacion(m: P.ModificacionAbierta) -> str:
+    """Contexto de confianza del servidor para un turno que corrige una
+    propuesta anterior (T3). No es texto de la persona: si lo fuera, cualquier
+    mensaje libre podría fingir ser una corrección."""
+    return (
+        "# Corrección a una propuesta anterior\n\n"
+        "La persona apretó Modificar en la vista previa de abajo, así que esa "
+        "propuesta quedó cerrada y no se aplicó nada.\n\n"
+        f"Herramienta: {m.herramienta}\n"
+        f"Argumentos con los que se había llamado: "
+        f"{json.dumps(m.args, ensure_ascii=False)}\n\n"
+        f"Vista previa que se le había mostrado:\n{m.resumen}\n\n"
+        "Su próximo mensaje, el que sigue en esta conversación, puede ser la "
+        "corrección. Si de verdad se refiere a esto, volvé a llamar a la "
+        "misma herramienta con los argumentos corregidos -- conservando los "
+        "que no cambiaron -- para armar una vista previa nueva; eso tampoco "
+        "aplica nada todavía. Si su mensaje es sobre otra cosa, no toques "
+        "esta propuesta: ya quedó cerrada y no hay nada que retomar."
+    )
 
 
 def _bloques(r: Respuesta) -> list[dict]:
@@ -242,11 +274,17 @@ def _encolar_confirmacion(cur, quien: Solicitante, chat_id: int,
     promesa del modelo. La herramienta y sus argumentos se guardan enteros:
     sin eso, confirmar no tendría nada que ejecutar.
     """
-    from .pendientes import registrar
-
-    p = registrar(cur, quien, herramienta=e.herramienta, args=e.argumentos,
-                  resumen=e.resumen, vence_en=ahora + VIGENCIA_PENDIENTE,
-                  chat_id=chat_id, huella=e.huella)
+    # Las 8 herramientas que escriben (las que declaran `preparar`, únicas
+    # que llegan acá con huella) ganan el tercer botón, Modificar (T3, ADR
+    # 0005 decisión 1). El resto de lo que pasa por `NecesitaConfirmacion`
+    # -- hoy, `REQUIEREN_CONFIRMACION` sin `preparar`, que ninguna de las 8
+    # usa -- mantiene sus dos botones de siempre: no tiene una preparación
+    # que una corrección pueda volver a correr.
+    opciones = ([("Confirmar", True), ("Modificar", "modificar"), ("Cancelar", False)]
+               if e.huella is not None else None)
+    p = P.registrar(cur, quien, herramienta=e.herramienta, args=e.argumentos,
+                    resumen=e.resumen, vence_en=ahora + VIGENCIA_PENDIENTE,
+                    chat_id=chat_id, huella=e.huella, opciones=opciones)
     # El resumen ya es la vista previa completa -- recurso, estado actual,
     # cambio propuesto y el aviso de que todavía no se aplicó nada (ADR 0005,
     # decisión 1) -- así que sale tal cual, sin envoltorio.

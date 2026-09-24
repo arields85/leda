@@ -607,6 +607,19 @@ create table pending_action (
   -- base; la arma y la interpreta `herramientas.py`). Al confirmar se vuelve
   -- a calcular y, si difiere, no se aplica nada (ADR 0005, decisión 1).
   ,huella              text
+  -- Modificar (ADR 0005, decisión 1; T3): cuándo se cerró esta fila porque
+  -- la persona apretó Modificar en vez de Confirmar o Cancelar. No es un
+  -- estado nuevo de `estado_pendiente` -- queda en 'cancelada', que ya
+  -- significa "no se aplicó nada" -- sino la marca de que además hay que
+  -- interpretar el próximo mensaje de texto de esa persona en ese chat como
+  -- una corrección de esta propuesta: `herramienta`, `args` y `resumen` ya
+  -- quedan guardados desde que se armó la vista previa, así que no hace
+  -- falta una tabla aparte.
+  ,modificar_pedido_en timestamptz
+  -- Cuándo se leyó esa corrección para el turno siguiente. Sin esto la misma
+  -- fila serviría de contexto para cualquier mensaje posterior dentro de su
+  -- vigencia, no sólo el próximo (T3, punto 5).
+  ,modificacion_consumida_en timestamptz
   ,constraint pending_action_workspace_id_unique unique (workspace_id, id)
   ,constraint pending_action_membership_workspace
      foreign key (workspace_id, membership_id)
@@ -858,6 +871,33 @@ begin
     return;
   end if;
 
+  -- Modificar (T3, ADR 0005 decisión 1): cierra sin aplicar nada, igual que
+  -- Cancelar -- por eso queda en 'cancelada' y no en un estado nuevo -- pero
+  -- deja marcado `modificar_pedido_en`: la fila misma es el contexto que va
+  -- a leer el próximo turno de esta persona en este chat, porque ya tiene
+  -- `herramienta`, `args` y `resumen` de cuando se armó la vista previa.
+  if a.campo is null and o.valor = '"modificar"'::jsonb then
+    update pending_action
+       set estado = 'cancelada', resuelta_en = p_ahora, resuelta_por = p_app_user_id,
+           modificar_pedido_en = p_ahora
+     where id = a.id and estado = 'esperando';
+    if not found then
+      return query select 'usada'::text, null::text, null::jsonb,
+        null::boolean, null::text;
+      return;
+    end if;
+    -- Sólo puede haber una Modificación abierta por persona y chat: una
+    -- nueva deja sin efecto cualquier otra que todavía no se hubiera leído,
+    -- para que una corrección nunca se aplique a una propuesta vieja.
+    update pending_action
+       set modificacion_consumida_en = p_ahora
+     where workspace_id = a.workspace_id and membership_id = a.membership_id
+       and chat_id = a.chat_id and modificar_pedido_en is not null
+       and modificacion_consumida_en is null and id <> a.id;
+    return query select 'modificada'::text, a.herramienta, a.args, false, a.huella;
+    return;
+  end if;
+
   if a.campo is null and o.valor = 'false'::jsonb then
     update pending_action
        set estado = 'cancelada', resuelta_en = p_ahora, resuelta_por = p_app_user_id
@@ -888,7 +928,7 @@ begin
 end $$;
 
 comment on function resolver_pendiente is
-  'Resuelve una acción pendiente por el token de una de sus opciones. Atómica: el doble toque de un botón ejecuta una sola vez. Devuelve la huella guardada para que quien llama detecte si el estado cambió desde la vista previa.';
+  'Resuelve una acción pendiente por el token de una de sus opciones. Atómica: el doble toque de un botón ejecuta una sola vez. Devuelve la huella guardada para que quien llama detecte si el estado cambió desde la vista previa. "modificada" cierra sin aplicar nada y marca `modificar_pedido_en`, que deja la fila como contexto para el próximo turno de esa persona en ese chat (ADR 0005, decisión 1).';
 
 -- Draft commitment is deliberately separate from generic pending actions. It
 -- locks every linked row, revalidates the preview, creates the task and audit,

@@ -21,7 +21,7 @@ from __future__ import annotations
 import json
 import secrets
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 import psycopg
@@ -32,6 +32,9 @@ from .salida import normalize_visible_text, prepare_buttons, prepare_payload
 # Lo que Telegram manda de vuelta al apretar un botón. El tope son 64 bytes,
 # así que viaja un token corto y la acción queda en la base.
 CALLBACK_PREFIJO = "p:"
+
+# Cuánto espera Prisma la corrección después de un toque en Modificar.
+VENTANA_MODIFICACION = timedelta(minutes=30)
 
 
 @dataclass(frozen=True)
@@ -65,6 +68,23 @@ class Resuelta:
     # La huella que se guardó al mostrar la vista previa (ADR 0005, decisión
     # 1). `ejecutar` la vuelve a comparar antes de aplicar nada.
     huella: str | None = None
+    # Modificar (T3): cierra sin aplicar nada, igual que `cancelada`, pero
+    # además queda registrado que el próximo mensaje de esta persona en este
+    # chat es una corrección -- ver `reclamar_modificacion_abierta`.
+    modificada: bool = False
+
+
+@dataclass(frozen=True)
+class ModificacionAbierta:
+    """El contexto de una Modificación todavía no leída por ningún turno.
+
+    Reusa lo que ya quedó en la fila de `pending_action` desde que se armó la
+    vista previa original: no hace falta guardarlo aparte.
+    """
+    pending_action_id: str
+    herramienta: str
+    args: dict[str, Any]
+    resumen: str
 
 
 def callback_data(opcion: Opcion) -> str:
@@ -195,9 +215,52 @@ def resolver(cur: psycopg.Cursor, token: str, *, app_user_id: str,
         raise Denegado("Eso se lo pregunté a otra persona del equipo.")
     if f["resultado"] in ("inexistente", "usada", "vencida"):
         return None
+    if f["resultado"] == "modificada":
+        return Resuelta(herramienta=f["herramienta"], args=f["args"] or {},
+                        cancelada=False, modificada=True, huella=f.get("huella"))
 
     return Resuelta(herramienta=f["herramienta"], args=f["args"] or {},
                     cancelada=f["cancelada"], huella=f.get("huella"))
+
+
+def reclamar_modificacion_abierta(cur: psycopg.Cursor, quien: Solicitante,
+                                  chat_id: int,
+                                  ahora: datetime) -> ModificacionAbierta | None:
+    """Reclama, de forma atómica y de un solo uso, la última Modificación
+    abierta de esta persona en este chat (T3, ADR 0005 decisión 1).
+
+    Sólo puede haber una vigente a la vez -- `resolver_pendiente` invalida
+    cualquier otra al abrir una nueva --, así que "la más reciente sin leer y
+    sin vencer" identifica una sola fila sin ambigüedad. `for update skip
+    locked` la reclama sin bloquear: dos turnos concurrentes para la misma
+    persona no pueden leer -- ni consumir -- la misma Modificación dos veces.
+
+    La corrección tiene que llegar dentro de `VENTANA_MODIFICACION` desde que
+    se tocó Modificar, aunque la propuesta en sí venza mucho después: un
+    mensaje de horas más tarde ya es otra conversación, y tratarlo como
+    corrección le haría saltear el enrutador de intención.
+    """
+    cur.execute(
+        """update pending_action
+              set modificacion_consumida_en = %(ahora)s
+            where id = (
+                    select id from pending_action
+                     where workspace_id = %(ws)s and membership_id = %(mid)s
+                       and chat_id = %(chat)s and modificar_pedido_en is not null
+                       and vence_en > %(ahora)s and modificacion_consumida_en is null
+                       and modificar_pedido_en > %(ahora)s - %(ventana)s
+                     order by modificar_pedido_en desc
+                     limit 1
+                     for update skip locked)
+            returning id, herramienta, args, resumen""",
+        {"ahora": ahora, "ws": quien.workspace_id, "mid": quien.membership_id,
+         "chat": chat_id, "ventana": VENTANA_MODIFICACION})
+    f = cur.fetchone()
+    if not f:
+        return None
+    return ModificacionAbierta(pending_action_id=str(f["id"]),
+                               herramienta=f["herramienta"],
+                               args=f["args"] or {}, resumen=f["resumen"])
 
 
 def es_borrador(cur: psycopg.Cursor, token: str) -> bool:

@@ -55,7 +55,7 @@ resolución de referencias (receta 5.1).
   `crear_objetivo` declara su acción correcta. Al confirmar se recalcula la huella:
   si el estado cambió, no se aplica y se explica. Botones Confirmar / Modificar /
   Cancelar.
-- [ ] **T3 — Modificar.** Cierra la propuesta sin efecto, pregunta qué cambiar y
+- [x] **T3 — Modificar.** Cierra la propuesta sin efecto, pregunta qué cambiar y
   el siguiente mensaje de esa persona en ese chat se interpreta con la propuesta
   anterior como contexto, produciendo una vista previa nueva.
 - [ ] **T4 — Banco.** El banco confirma las propuestas tocando el botón y
@@ -213,3 +213,125 @@ Commits sobre `master` por unidad, con pedido explícito del usuario
   4. `Herramienta.preparar` es un campo del `@dataclass(frozen=True)`
      existente, no un registro paralelo: mantiene una sola fuente de verdad
      por herramienta y no le agrega una segunda estructura al módulo.
+- 2026-09-24 (orquestador): revisión de T1-T2. La preparación de las cuatro
+  herramientas con `valida_en_handler` valida permisos antes de la vista previa
+  (`_preparar_resolver_bloqueo`, `_preparar_aprobar_tarea`,
+  `_preparar_crear_dependencia`, `_preparar_quitar_dependencia`). Control:
+  `tests/test_vista_previa_confirmacion.py` 8 passed; suite completa 507 passed,
+  90 deselected. Pendiente anotado: un ciclo de dependencia se detecta recién al
+  confirmar (lo controla el disparador de la base), no en la vista previa.
+  Commit `2bd2200` "feat: require a preview and confirmation before every change".
+  Siguen T3 (Modificar), T4 (banco) y T5 (continuidad).
+- 2026-09-24: **T3 implementado.** Ruta: delegada, un escritor (`db/esquema.sql`,
+  `db/migrations/0010_modificar_propuesta.sql`,
+  `db/rollbacks/0010_modificar_propuesta.sql`, `src/prisma/pendientes.py`,
+  `src/prisma/agente.py`, `src/prisma/gateway.py`, `tests/test_modificar.py`).
+
+  **Mecanismo elegido para el contexto de Modificar.** Se evaluaron las dos
+  alternativas que sugería la tarea y se descartó inventar una tercera:
+  - `pending_reply`: no encaja. Su forma es la de la escalera de
+    recordatorios (`tipo`, `recordatorios`, `escalado_en`, ligada a
+    `task_id`), no tiene `chat_id` ni referencia a `pending_action`, y
+    reusarla habría mezclado dos dominios distintos —una fila de esa tabla
+    hoy significa "Prisma le debe una pregunta sobre una tarea a esta
+    persona", no "esta persona pidió corregir una propuesta"— además de
+    arriesgar que `escalera.py` la contara para la escalada.
+  - `pending_action` (elegida): la fila que ya representa la propuesta
+    original tiene exactamente lo que hace falta —`herramienta`, `args`,
+    `resumen`, `workspace_id`, `membership_id`, `chat_id`, `vence_en`— desde
+    que T1 arma la vista previa. No hace falta una tabla nueva: alcanza con
+    dejar esa misma fila marcada.
+
+  **Alternativa al valor de enum sugerido por la tarea, justificada.** La
+  tarea sugería "un nuevo valor de `estado_pendiente` como `modificada`".
+  Se optó por NO agregar un valor al enum y en cambio reusar `'cancelada'`
+  (que ya significa "no se aplicó nada") más dos columnas nuevas,
+  nullable, en `pending_action`:
+  - `modificar_pedido_en timestamptz`: marca que este cierre en particular
+    fue un pedido de corrección, no un Cancelar liso.
+  - `modificacion_consumida_en timestamptz`: marca que esa corrección ya se
+    leyó para un turno (de un solo uso).
+
+  Motivo: `estado_pendiente` sólo se usa en esta columna
+  (`grep` confirmó que ninguna otra tabla ni firma de función lo usa), así
+  que técnicamente agregar un valor era viable, pero requería (a) dos
+  transacciones separadas en la migración —Postgres no permite usar un
+  valor de enum recién agregado con `ALTER TYPE ... ADD VALUE` en la misma
+  transacción que lo agrega— y (b) para el rollback, recrear el tipo entero
+  (`rename` + `create` + `alter column ... using` + `drop`), porque
+  Postgres no tiene `DROP VALUE`. Las dos columnas nullable logran lo mismo
+  —diferenciar "Cancelar" de "Modificar" y "todavía no se leyó" de "ya se
+  leyó"— con el mismo patrón que ya usa el esquema para otras marcas
+  temporales opcionales (`resuelta_en`, `escalado_en`, `satisfecho_en`), sin
+  tocar el tipo de la columna `estado` ni su índice parcial
+  (`pending_action_abiertas`), y con una migración y un rollback de una sola
+  transacción cada uno.
+
+  **Botón Modificar.** `Herramienta` no cambió: el discriminador de quién
+  gana el tercer botón es `e.huella is not None` dentro de
+  `agente._encolar_confirmacion` —las 8 herramientas con `preparar` siempre
+  llegan con huella (T1), y es exactamente el mismo criterio que ya
+  distinguía la vista previa "de verdad" del resto—. La rama de
+  `H.EstadoCambio` en `gateway._toque` (vista previa nueva tras un cambio de
+  estado detectado al confirmar) también pasa las tres opciones, porque por
+  construcción sólo la levanta una herramienta con `preparar`. Los demás
+  caminos (confirmación vieja sin `preparar` —hoy sin ninguna herramienta
+  real, `REQUIEREN_CONFIRMACION` sigue vacía de handlers—, `NecesitaElegir`,
+  y el borrador guiado de tarea) no se tocaron: siguen con sus botones de
+  siempre porque no pasan por `_encolar_confirmacion` con huella, o no pasan
+  por ahí en absoluto.
+
+  `resolver_pendiente` (0010, `create or replace`: la forma de salida no
+  cambió, no hizo falta `drop`) suma la rama de `o.valor = '"modificar"'`,
+  antes de la de Cancelar: pone `estado = 'cancelada'` +
+  `modificar_pedido_en`, y en la misma sentencia invalida
+  (`modificacion_consumida_en`) cualquier otra Modificación de la misma
+  persona y chat que siguiera sin leerse, para que sólo pueda haber una
+  abierta a la vez.
+
+  **`pendientes.reclamar_modificacion_abierta`.** Reclama de forma atómica
+  ("`for update skip locked`" sobre una subconsulta con `limit 1`) la
+  Modificación más reciente, sin leer y sin vencer, de una persona en un
+  chat, y la marca consumida en la misma sentencia (un solo uso, se use o
+  no lo que trae). `Resuelta` ganó el campo `modificada: bool`.
+
+  **El turno con contexto.** `gateway._turno` reclama la Modificación
+  abierta antes de rutear (`route_intent` no se llama para ese turno: es
+  una corrección, no un pedido nuevo a clasificar) y, si hay una, llama
+  directo a `agente.responder(..., modificacion=...)`. `responder` arma un
+  bloque de sistema con la herramienta, los argumentos originales y la
+  vista previa que se había mostrado, y lo agrega a `ctx.sistema` —nunca al
+  mensaje del usuario— antes de llamar al proveedor. Si el modelo vuelve a
+  llamar a la herramienta, el camino normal de `preparar`/confirmar arma la
+  vista previa nueva; si el mensaje era sobre otra cosa, no pasa nada y la
+  propuesta vieja queda cerrada como estaba.
+
+  **Pruebas.** RED observado por corrida real de pytest antes de implementar
+  (11 de 13 pruebas nuevas fallaban por `LookupError: ... no ofrece
+  'Modificar'` o por el toque contra el webhook real; ver historial de la
+  sesión). GREEN: `tests/test_modificar.py` 13 passed; suite completa 520
+  passed, 90 deselected (antes: 507 passed) —
+  `.venv/Scripts/python.exe -m pytest -q`. `pg_isready`: "localhost:5432 -
+  aceptando conexiones". La corrida de migración/rollback contra la base de
+  prueba real (`test_los_rollbacks_devuelven_la_base_al_estado_anterior`,
+  que descubre `0010_modificar_propuesta.sql` del directorio) pasó.
+
+  Textos verificados con datos ficticios (corework, "Marcos Tarquini",
+  `registrar_bloqueo`): vista previa con sus tres botones en orden
+  `["Confirmar", "Modificar", "Cancelar"]`; tras Modificar, "¿Qué querés
+  cambiar?"; el siguiente turno con corrección arma una vista previa nueva
+  con el cambio corregido ("... Causa del bloqueo: falta el cable, no el
+  switch ... Todavía no se aplicó ningún cambio.") sin aplicar nada.
+
+  **Pendiente anotado:** el gap conocido de T1-T2 sobre ciclos de
+  dependencia (se detectan al confirmar, no en la vista previa) sigue sin
+  tocar; T3 no lo alcanza. Sigue T4 (banco) y T5 (continuidad).
+- 2026-09-24 (orquestador): revisión de T3. Riesgo encontrado: la corrección
+  después de Modificar se aceptaba mientras la propuesta estuviera vigente
+  (hasta 8 h), y ese mensaje saltea el enrutador de intención, así que un pedido
+  no relacionado horas después se habría tomado como corrección. Decisión del
+  usuario: ventana de 30 minutos (`pendientes.VENTANA_MODIFICACION`, filtro en
+  `reclamar_modificacion_abierta`). Rojo observado:
+  `test_la_modificacion_se_cierra_pasada_la_ventana` (a los 31 minutos todavía
+  se reclamaba); verde: `tests/test_modificar.py` 15 passed; suite completa 522
+  passed, 90 deselected.
