@@ -139,8 +139,27 @@ fija por consola (`python -m prisma modelo <id> --proveedor <p>`, que escribe
 en la auditoría. Va en el panel y no en el tablero de cliente porque el modelo
 global alcanza a todos los espacios.
 
+También la vista de incidentes (pedido del usuario, 2026-09-24): hoy cada falla
+queda en la tabla `incident` (espacio, severidad, resumen sin datos sensibles, fecha)
+y sólo se consulta por consola (`python -m prisma incidentes <espacio>`). El
+administrador tiene que poder ver desde el panel dónde está fallando el sistema y qué
+lo hizo fallar: enrutamiento, Jev caído o sin clave, errores del modelo, despacho.
+Cada incidente apunta al mensaje que lo causó en lugar de copiar su texto: quien
+tenga permiso llega desde el incidente a la conversación, y si esa conversación se
+borró, el incidente conserva qué falló pero ya no muestra el texto. Así el texto vive
+en un solo lugar, con un solo control de acceso y de borrado.
+
+La retención y la visibilidad de las conversaciones pasan a ser configuración de
+cada cliente (pedido del usuario, 2026-09-24): cuánto tiempo se guardan y quién puede
+verlas lo decide quien contrata Prisma o administra el equipo. Hoy lo fija para el
+piloto [`ADR 0002`](decisions/0002-pilot-llm-context-and-retention.md) (retención
+indefinida hasta que un administrador autorizado borre; acceso y borrado restringidos
+y auditados); el cambio requiere un ADR nuevo que la reemplace en ese punto.
+
 `PENDIENTE` para ese punto:
 
+- si el tablero de cada cliente muestra también sus propios incidentes, o sólo el
+  panel de plataforma;
 - dónde vive la clave de cada proveedor, hoy una única `PRISMA_LLM_API_KEY` en
   `.env` que se lee al arrancar el proceso;
 - si el ajuste por espacio que `model_config` ya admite se expone, y en qué
