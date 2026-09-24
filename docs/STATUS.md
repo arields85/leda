@@ -132,11 +132,14 @@ se verifica sobre una base nueva dentro de un clúster existente.
 
 ## Próximo paso
 
-**Corregir el router de intención**, el defecto que encontró el banco: clasifica como
-pedido de tarea nueva un mensaje que habla de tareas que ya existen (escenario `b-0005`,
-0 de 10). Su causa está en `docs/capacidades.md`, "Trampas conocidas": `route_intent` no
-ve las tareas del espacio. La corrección se prueba con `b-0005` y variantes contra el
-modelo real, porque un replay guionado repite la clasificación grabada.
+**Interpretación, aclaración y confirmación**, según el diseño vivo
+[`architecture/interpretacion-y-confirmacion.md`](architecture/interpretacion-y-confirmacion.md):
+ante una ambigüedad material, botones con propuestas completas; todo cambio relevante
+con vista previa y confirmación. Primero su prueba de concepto 5.1 (¿los embeddings
+separan lo claro de lo ambiguo?), fuera del código de Prisma. El diseño incluye la
+corrección del router de intención, el defecto que encontró el banco (`b-0005`, 0 de 10:
+`route_intent` no ve las tareas del espacio; ver `docs/capacidades.md`, "Trampas
+conocidas").
 
 Después, una sesión progresiva por Telegram real con datos ficticios para los circuitos
 ya verificados (consulta, bloqueos, estados) y, luego, la conversación de bloqueos
