@@ -742,7 +742,9 @@ Lectura:
 
 1. **La configuración generaliza en lo que importa:** cero inseguros en tareas con
    mensajes que ninguna versión vio, frente a tres de las reglas por palabras en
-   el lote 2. Lo que queda son preguntas de más, del lado seguro.
+   el lote 2. Lo que queda son preguntas de más, del lado seguro. El doble control
+   de 5.8 mostró que este cero no era estable en los lotes 1 y 2; se corrigió con
+   una pregunta de verificación.
 2. **"No existe" sigue siendo el punto débil:** ante algo que no está en la lista,
    Jev ofrece tareas parecidas en lugar de decir que no hay. Seguro, pero molesto.
 3. **La intención detecta la duda que el usuario señaló** —preguntas sin signo—
@@ -761,6 +763,10 @@ Lectura:
    el vocabulario del equipo como contexto. "Ninguna" ≥ 0,6 → no existe; "varias"
    ≥ 0,5 → preguntar entre las tareas con ≥ 0,1; la primera ≥ 0,85 con 0,4 de
    diferencia → clara; si no, preguntar.
+   **Verificación (agregada en 5.8):** si decidió clara, una segunda llamada con
+   un Noul sobre la tarea elegida: ¿la referencia habla exactamente de esta tarea
+   y no de otra parecida? Con menos de 0,5, en lugar de elegirla se pregunta con
+   esa tarea como opción.
 3. Por mensaje, Jev en una llamada: Choice entre intenciones y un Noul por
    intención; decide sólo si ambos coinciden en una acción; si no, preguntar con
    las lecturas como botones.
@@ -768,8 +774,84 @@ Lectura:
    preguntar quién es.
 5. Toda propuesta termina en vista previa con Confirmar, Modificar y Cancelar.
 
-`PENDIENTE` antes de usar datos reales: decidir si se aceptan los términos de
-privacidad de TypeSafe para enviar títulos de tareas y nombres del equipo.
+Términos de privacidad de TypeSafe aceptados por el usuario el 2026-09-24
+([`ADR 0006`](../decisions/0006-jev-para-resolver-referencias-e-intencion.md)).
+
+### 5.7 Escala: 12 tareas frente a 200
+
+**Pregunta (planteada por el usuario):** el diseñador había afirmado, sin medirlo,
+que con muchas tareas Jev sería caro y elegiría peor. Se midió con las referencias
+del lote 3, la configuración congelada y dos universos: las 12 tareas de siempre, y
+200 (las 12 más 188 ficticias realistas, con muchas parecidas a propósito).
+
+| | 12 tareas | 200 tareas |
+|---|---|---|
+| Latencia por llamada (mediana) | 0,39 s | 0,46 s |
+| Tokens de entrada por llamada | ~964 | ~8.819 |
+| Costo por llamada | US$ 0,00004 | US$ 0,00037 |
+| Eligió una tarea equivocada sin preguntar | 0 | **0** |
+| Correctos | 9 de 15 | 6 de 15 |
+| Preguntas de más o innecesarias | 5 | 7 |
+
+Lectura:
+
+1. **Latencia y costo escalan bien:** la afirmación previa del diseñador era
+   incorrecta.
+2. **Con más tareas pregunta más,** en parte con razón: con varias tareas de PLC,
+   "terminé con el plc" es ambiguo de verdad.
+3. **Sigue sin elegir mal** con 200 tareas; con 12, el doble control de 5.8
+   encontró un caso repetido.
+4. **Límite real:** la ventana de 32.000 tokens de Jev, unas 700 tareas.
+5. **Variación entre corridas:** con 12 tareas y la misma configuración dio 9
+   correctos; en 5.6 había dado 11. Los resultados se leen como tendencia.
+
+### 5.8 Doble control y pregunta de verificación
+
+**Pregunta (planteada por el usuario):** antes de fijar la base, ¿los resultados se
+sostienen si se repiten? Se repitió cinco veces la configuración congelada sobre los
+45 mensajes de los lotes 1 a 3, con 12 y con 200 tareas, y la intención sobre 33
+mensajes (2026-09-24).
+
+| Configuración congelada, 5 repeticiones | Resultado |
+|---|---|
+| Tareas, 12: correctos | 35 a 37 de 45 |
+| Tareas, 12: **eligió mal sin preguntar** | **1 en 4 de las 5 repeticiones** |
+| Tareas, 200: correctos | 24 a 26 de 45 |
+| Tareas, 200: eligió mal sin preguntar | 0 |
+| Intención: ambiguos detectados | 9 de 10 en todas |
+| Intención: claros con duda falsa | 8 o 9 de 23 |
+
+El error es siempre el mismo mensaje del lote 1: "ya esta listo lo del horno de la
+línea 2? falta mucho?". No existe una tarea del horno; Jev eligió "Relevar planos
+del tablero de la estufa" con confianza. El cero de corridas anteriores fue suerte.
+Además del riesgo en un cambio, que la vista previa frena, el riesgo mayor está en
+una consulta: sin vista previa, Prisma respondería sobre la estufa como si fuera el
+horno.
+
+**Arreglo probado:** cuando la receta decide clara, una segunda llamada con un Noul
+sobre la tarea elegida ("¿la referencia habla exactamente de esta tarea, y no de otra
+cosa parecida o del mismo tipo?"). Con menos de 0,5 se pregunta en lugar de elegir.
+Mismas 5 repeticiones:
+
+| | Sin verificación | Con verificación |
+|---|---|---|
+| Eligió mal sin preguntar, 12 tareas | 1 en 4 de 5 | **0 en las 5** |
+| Eligió mal sin preguntar, 200 tareas | 0 | 0 |
+| Correctos, 12 / 200 | 34–37 / 24–28 | iguales |
+| Probabilidad de "misma" en elecciones correctas | — | mínimo 0,51; mediana 0,87 (255 casos) |
+| Probabilidad de "misma" en la elección equivocada | — | 0,26 a 0,32 |
+
+Lectura:
+
+1. **La verificación frena el caso y no frena ninguna elección correcta.**
+2. **El margen es fino:** la correcta más baja dio 0,51, al lado del corte.
+3. **Se midió sobre mensajes ya vistos y con un solo caso fallido.** Se confirma con
+   un lote nuevo, no con esta prueba.
+4. **Cuesta una llamada más, de unos 0,4 s,** sólo cuando Prisma está por decidir
+   solo: la tarea a verificar no se conoce hasta que Jev la elige.
+5. **Toda respuesta a una consulta nombra la tarea por su título,** para que la
+   persona note si Prisma entendió otra cosa; es la protección de las lecturas, que
+   no pasan por vista previa.
 
 ## 6. Cómo se mide el diseño terminado
 
@@ -831,3 +913,5 @@ comparar, no antes.
 | 2026-09-24 | El usuario confirma: la vista previa con confirmación es la protección principal y las preguntas de Prisma van con botones |
 | 2026-09-24 | Quinta corrida con un lote no visto: 7 de 15, 3 inseguros; las reglas por palabras sobreajustaron; hacen falta vocabulario del equipo aprendido y referencias por área o persona |
 | 2026-09-24 | Prueba 5.3 con Jev: 9 de 9 claras en el lote no visto y duda correcta en "los planos"; falla vocabulario del equipo y áreas; para intención, 4 de 8 al corte 0,8 frente a 0 de 8 de DeepSeek |
+| 2026-09-24 | Pruebas 5.4 a 5.7: combinaciones de modalidades de Jev, validación con el lote 3 (11 de 15, 0 inseguros) y escala a 200 tareas |
+| 2026-09-24 | Prueba 5.8: cinco repeticiones muestran un caso inseguro repetido ("el horno" asignado a "la estufa"); se agrega una pregunta de verificación que lo frena sin frenar elecciones correctas; falta confirmarla con un lote nuevo |
