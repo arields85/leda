@@ -990,6 +990,46 @@ margen. v3 pregunta menos, pero queda al borde del corte en el único caso de du
 real medido; con "ante la duda se pregunta", el margen pesa más que dos o tres
 preguntas de más cada 60 mensajes.
 
+### 5.13 Primera sesión por Telegram real
+
+2026-09-25, con datos ficticios: 12 tareas "(simulado)" en la base local, el bot del
+espacio y tres cuentas de Telegram, todas del usuario (Ariel, Marcos, Ismael). 12
+mensajes recibidos; 5 turnos resolvieron referencias con Jev; 3 aclaraciones con
+botones, las 3 innecesarias según el usuario; una vista previa llevada a Modificar;
+ningún cambio aplicado sin confirmar; ningún incidente. Antes de empezar, la base
+local no tenía las migraciones 0009 y 0010: las pruebas crean una base nueva desde
+`db/esquema.sql` y no lo detectaban (se aplicaron con copia de seguridad previa).
+
+Hallazgos:
+
+1. **Prisma pregunta con texto abierto.** "¿Querés que vea si alguna depende de
+   otra?", "¿Cuál querés ver?", "decime y la paso a revisión", "¿Qué querés
+   cambiar?": cada pregunta abierta invitó una respuesta vaga ("si, revisa", "la
+   tarea") que después hubo que interpretar. ADR 0005 punto 4 (las preguntas de
+   Prisma van con botones) sólo está construido para la duda de referencia.
+2. **Suposición presentada como hecho:** ante "si, revisa", el modelo afirmó que una
+   tarea "claramente va detrás" de otra, sin ningún dato que lo diga.
+3. **Botones con tareas que la persona no puede reportar:** para "ya terminé la
+   comprimidora", escrito por Ariel, se ofreció el PLC de Marcos, que después se
+   rechazó al prepararse el cambio.
+4. **Jev no sigue el hilo:** Prisma acababa de listar las tareas de Ariel y "ya
+   terminé la comprimidora" igual abrió botones; el modelo de conversación ve el
+   historial, Jev no.
+5. **Una referencia genérica llega a Jev:** "la tarea", respuesta a "¿Qué querés
+   cambiar?", se resolvió como referencia y ofreció tres tareas al azar.
+6. **Lo que funcionó:** retomar el hilo después de horas, la vista previa con
+   Confirmar, Modificar y Cancelar, y una respuesta que entendió una dependencia
+   implícita ("cuando él termine yo puedo hacer mi trabajo") y propuso declararla.
+
+**Principio propuesto por el usuario: Prisma orienta, no charla.** Cada respuesta
+cierra con opciones concretas para tocar, no con una pregunta abierta; si Prisma
+nombra opciones, esas opciones van como botones, más una salida del tipo "Quiero
+consultar otra cosa". Una lista de tareas se ofrece como botones; tocar una abre lo
+que se puede hacer con ella. Responde a la vez a los hallazgos 1, 2, 4 y 5. Se fija en
+un ADR antes de construirlo. Propuestas asociadas, a medir antes: cuando el mensaje
+cuenta algo propio, ofrecer sólo las tareas de quien escribe (3); pasarle a Jev el
+hilo reciente (4); resolver las referencias genéricas con el hilo y no con Jev (5).
+
 ## 6. Cómo se mide el diseño terminado
 
 Con el banco (`docs/validation/README.md`, "Banco conversacional") y, después, por

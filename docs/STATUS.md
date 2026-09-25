@@ -132,12 +132,15 @@ se verifica sobre una base nueva dentro de un clúster existente.
 
 ## Próximo paso
 
-**Sesión progresiva por Telegram real con datos ficticios** para los circuitos ya
-verificados (consulta, bloqueos, estados, vista previa y confirmación, aclaración con
-botones). Objetivo principal: medir con mensajes reales cuántas veces Prisma pregunta
-sin necesidad, y ajustar los cortes de Jev con esa evidencia. Después, la unidad de
-aprendizaje de apodos y aclaraciones ([`ROADMAP.md`](ROADMAP.md)) y la conversación de
-bloqueos (mecánica §8, pasos 2 a 7).
+**Prisma orienta, no charla** (primera sesión por Telegram real, diseño §5.13): cada
+respuesta cierra con opciones concretas como botones, en lugar de preguntas abiertas.
+Primero un ADR que fije el principio; después, construirlo junto con las propuestas
+asociadas, medidas antes: ofrecer sólo las tareas propias cuando el mensaje cuenta algo
+de quien escribe, pasarle a Jev el hilo reciente y no mandarle referencias genéricas
+("la tarea"). Luego, una segunda sesión por Telegram para comparar.
+
+Después, la unidad de aprendizaje de apodos y aclaraciones ([`ROADMAP.md`](ROADMAP.md))
+y la conversación de bloqueos (mecánica §8, pasos 2 a 7).
 
 El resto del orden de trabajo está en [`ROADMAP.md`](ROADMAP.md).
 
