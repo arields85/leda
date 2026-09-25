@@ -1522,4 +1522,22 @@ Previsión: bastante más de 400 líneas en total, repartidas en seis tareas.
   §5.11 y §5.12. Continuidad: `docs/capacidades.md`, `docs/STATUS.md`, diseño §4.5,
   `docs/ROADMAP.md` (incidentes, retención por cliente, aprendizaje de apodos y
   aclaraciones con Engram y Obsidian como insumos). Suite: 721 passed, 99 deselected.
+- 2026-09-24 (orquestador): **commits y revisión RDD.** El commit único de T6+T7
+  excedía el presupuesto de contexto del revisor (`lens_context_budget_exceeded`, 31
+  archivos, 2865 líneas); con autorización del usuario se rehízo el historial local, no
+  publicado, en trozos: `97f8f7b` (banco), `e31f702` (herramientas), `8ea8d86`
+  (resolución) y `79222c1` (documentación). Revisión de fiabilidad sobre `97f8f7b`:
+  aprobada y reconocida (`review-6539bc79b03fec85`). Revisión sobre `e31f702`+`8ea8d86`
+  (1126 líneas): aprobada y reconocida (`review-bcea0cbe2601ab6b`). La documentación se
+  evaluó pasiva, sin revisión. Los trozos intermedios no se probaron uno por uno; la
+  suite pasa sobre el estado final.
+
+  Observaciones no bloqueantes, pendientes para una unidad posterior:
+  `tests/banco/corrida.py:519-528` (sugerencia: aclaración esperada sin objetivo);
+  `tests/banco/comprobadores.py:445-455` (advertencia: el imperativo compara por
+  subcadena); `tests/banco/corrida.py:124-128` (sugerencia: grabador de Jev y la
+  referencia); `tests/test_resolucion_referencias.py:329-351` (advertencia: la prueba de
+  descarte de redundantes usa "revisión", que ahora descarta el filtro de estados, así
+  que no prueba el descarte); `src/prisma/gateway.py:968-982` (advertencia: el
+  vocabulario de estados puede descartar una referencia real como "la lista").
 
