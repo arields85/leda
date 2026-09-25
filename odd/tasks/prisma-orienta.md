@@ -44,7 +44,7 @@ gestión.
   elegido: el turno siguiente la recibe con la tarea resuelta, sin pasar por Jev.
   Reglas en el contexto: no preguntar con texto abierto; no presentar suposiciones
   como hechos.
-- [ ] **T2 — Menú de tarea.** Tocar una tarea ofrece las acciones del diseño §4.6
+- [x] **T2 — Menú de tarea.** Tocar una tarea ofrece las acciones del diseño §4.6
   según estado y relación (responsable, aprobador, otra persona), calculadas por
   código. Cada acción sigue su camino: ver detalle (lectura), acciones que cambian
   (herramienta con vista previa), acciones que necesitan un dato (por ejemplo la causa
@@ -185,3 +185,158 @@ cada commit con código pasa por la evaluación de RDD.
   como botones) queda "a decidir tras T1"; con `ofrecer_opciones` ya construida como
   herramienta del `REGISTRO`, la vía más directa es que el modelo la llame también
   para listar tareas, sin una segunda herramienta -- a confirmar al empezar T3.
+- 2026-09-25 (orquestador): T1 commiteada (`1db9e1f` documentación, `c253d27` código). Revisión
+  RDD de fiabilidad aprobada y reconocida (`review-995bc30d2d0df7e8`). Observaciones no
+  bloqueantes: `herramientas.py:281` (un id de tarea en mayúsculas no coincide al validar;
+  se corrige en T2), `gateway.py:854-856` (verificar que la respuesta al retomar tras tocar
+  una opción siempre se entregue; se revisa en T2), `agente.py:420-421` (sugerencia: la
+  clave de deduplicación usa la marca de tiempo).
+- 2026-09-25: **T2 cerrada.** Ruta: delegada, un escritor (disparador de mapeo: 6+ archivos
+  de código + pruebas, igual que T1).
+
+  Archivos:
+  - `src/prisma/menu_tarea.py` (nuevo): `calcular_menu` (el menú determinístico de §4.6
+    según estado y relación -- responsable/aprobador/otra persona --, calculada por
+    código, nunca por el modelo), `detalle_tarea` (la lectura de "Ver detalle"/"Ver
+    detalle y evidencia"), `bloqueos_abiertos`, `tareas_activas_de` (candidatas para
+    una dependencia, tope `MAX_CANDIDATAS_DEPENDENCIA = 4`, mismo tope que T1).
+  - `src/prisma/gateway.py`: sección nueva "Menú de acciones de una tarea" --
+    `_encolar_menu_tarea`/`_abrir_menu_tarea` (arma o rearma el menú con sus botones),
+    `_encolar_vista_previa_menu` (la vista previa de una acción del menú, mismos tres
+    botones que `agente._encolar_confirmacion`), `_ejecutar_accion_menu` (corre una
+    herramienta que ya existe sin `ya_confirmada`), `_pedir_dato_menu_tarea` (pide un
+    dato en texto libre), `_pedir_eleccion_dependencia` (pide con botones cuál otra
+    tarea), `_resolver_toque_menu_tarea`, `_resolver_toque_dato_menu_tarea`,
+    `_resumir_dato_menu_tarea` -- más las dos correcciones de revisión de T1 (abajo) y
+    el cableado nuevo en `_toque` (dos `elif` más, por `P.SENTINEL_MENU_TAREA` y
+    `P.SENTINEL_DATO_MENU_TAREA`) y en `_turno` (reclama `SENTINEL_DATO_MENU_TAREA`
+    antes de rutear, igual que "Ninguna, lo escribo").
+  - `src/prisma/pendientes.py`: `SENTINEL_MENU_TAREA`, `SENTINEL_DATO_MENU_TAREA`,
+    `ETIQUETA_SALIR_OPCIONES` (la etiqueta de salida de T1, movida acá para que el
+    menú de T2 la reuse sin duplicarla).
+  - `src/prisma/agente.py`: `_encolar_opciones_modelo` usa `P.ETIQUETA_SALIR_OPCIONES`
+    en vez de su propia constante privada (refactor de compatibilidad, mismo valor).
+  - `src/prisma/herramientas.py`: `ofrecer_opciones` gana un campo opcional `accion`
+    por opción de tarea (`"responder"`, el de siempre, o `"menu"`, que abre el menú en
+    vez de retomar la conversación); `_uuid_normalizado` (nuevo) + corrección de
+    revisión de T1 sobre `_tareas_activas_por_id`/`_ofrecer_opciones` (abajo).
+  - `tests/test_menu_tarea.py` (nuevo, 21 pruebas).
+
+  Decisiones de diseño:
+  - **Cómo se llega al menú.** El enunciado pedía "un nuevo tipo de opción en
+    `ofrecer_opciones` o una entrada dedicada" -- se eligió lo primero: una opción de
+    tarea de `ofrecer_opciones` (T1) gana un campo opcional `accion` (`"responder"` por
+    defecto, o `"menu"`). El modelo sigue siendo quien ofrece la tarea como botón (T1
+    ya la valida contra PostgreSQL); tocarla con `accion: "menu"` no retoma la
+    conversación -- abre el menú que calcula `menu_tarea.calcular_menu`, sin llamar al
+    modelo. Es el mismo mecanismo que reusará T3 para listar tareas como botones: no
+    hizo falta una segunda herramienta ni un segundo camino de validación de tareas.
+  - **Un sentinel para el menú, otro para el dato que le falta a una acción.**
+    `SENTINEL_MENU_TAREA` es el menú en sí -- tocar una opción nunca resume al modelo,
+    a diferencia de `SENTINEL_OPCIONES_MODELO` (T1). `SENTINEL_DATO_MENU_TAREA` es
+    el dato que le falta a una acción para armar su vista previa, y tiene dos formas
+    -- un texto libre (la causa de un bloqueo, su resolución, la evidencia) o una
+    elección entre tareas conocidas (para una dependencia) -- porque se resuelven por
+    dos caminos distintos del gateway (turno vs. toque, ver el punto siguiente). Los
+    dos sentinelas viven en `pendientes.py`, igual que el de T1, porque las dos puntas
+    (armar/interceptar) están en `gateway.py` pero en funciones distintas.
+  - **Cómo se captura un dato en texto libre.** Se pidió explícitamente "el mismo
+    patrón que 'Ninguna, lo escribo'" (T4, `aclaracion-con-botones`): en vez de un
+    tercer mecanismo, `_pedir_dato_menu_tarea` registra una `pending_action` sin
+    botones (`opciones=[]`) y la marca de inmediato con `marcar_para_corregir` -- la
+    misma función que usa "Ninguna, lo escribo" para dejar el próximo mensaje de esa
+    persona, en ese chat, como la respuesta. `_turno` la reclama con
+    `reclamar_modificacion_abierta` antes de rutear (antes de `route_intent`, antes de
+    Jev): el texto pasa directo como argumento de la herramienta -- causa, resolución,
+    evidencia son datos que se pidieron, no una referencia que interpretar, así que no
+    hace falta consultar al modelo para retomar.
+  - **Cómo se captura una elección entre tareas (dependencias).** Distinto del texto
+    libre: "de cuál otra tarea depende" tiene candidatas conocidas (las otras tareas
+    activas de la persona, `menu_tarea.tareas_activas_de`, tope 4), así que se ofrecen
+    con botones -- una `pending_action` con `campo="eleccion"`, igual que
+    `NecesitaElegir`. Sin candidatas, no se inventa ninguna: se le dice a la persona
+    que escriba y ese mensaje se rutea como un turno común.
+  - **"Ya se destrabó" con más de un bloqueo abierto.** `registrar_bloqueo` permite
+    sumar bloqueos a una tarea ya bloqueada, así que puede haber más de uno abierto a
+    la vez -- el caso raro. En vez de inventar una forma de elegir cuál, se le pide a
+    la persona que lo cuente completo en texto libre (el modelo ya tiene
+    `consultar_bloqueos` y `resolver_bloqueo`); con exactamente uno abierto, va directo
+    a pedir la resolución.
+  - **Reuso de `motivo_no_arranca_tarea`.** "Empezar" no se ofrece con una dependencia
+    bloqueante sin terminar (§4): en vez de reimplementar el chequeo, `_puede_empezar`
+    llama a la misma función SQL que ya usa `herramientas._actualizar_estado` antes de
+    intentar el pase a `en_curso` -- una sola fuente de verdad.
+  - **Vista previa del menú, no `agente._encolar_confirmacion`.** Las acciones que
+    cambian algo (Empezar, Ya la terminé, Aprobar, una dependencia) llaman a
+    `herramientas.ejecutar` sin `ya_confirmada`, que frena en `NecesitaConfirmacion`
+    porque las cuatro declaran `preparar` (ADR 0005, decisión 1): nada se aplica hasta
+    la vista previa. `_encolar_vista_previa_menu` arma esa vista previa con los mismos
+    tres botones que `agente._encolar_confirmacion`, pero es una función propia -- el
+    menú nunca pasa por `agente.responder`, así que no hay una vuelta del modelo a la
+    que devolverle el resultado.
+  - **Ofrecer no autoriza.** El menú sólo determina qué botones aparecen; cada acción
+    que escribe pasa igual por `herramientas.ejecutar`, que vuelve a verificar
+    autoridad (`aprobar_tarea` rechaza la auto-aprobación, `crear_dependencia` exige
+    ser responsable o referente de alguna de las dos tareas) sin importar qué mostró
+    el menú.
+  - **Dedupe key por id de acción pendiente, no por marca de tiempo.** Durante el
+    desarrollo, varias pruebas fallaban de forma intermitente: dos toques seguidos
+    dentro de la misma prueba podían compartir el mismo microsegundo de
+    `ahora.timestamp()`, y `enqueue_outbox` descarta un mensaje con clave de
+    deduplicación repetida (`on conflict do nothing`) -- el mensaje del toque siguiente
+    se perdía en silencio. Las claves nuevas de T2 (`_encolar_menu_tarea`,
+    `_encolar_vista_previa_menu`, `_pedir_dato_menu_tarea`, `_pedir_eleccion_dependencia`)
+    usan el id de la `pending_action` recién creada (siempre distinto) en vez de la
+    marca de tiempo. Es la misma clase de fragilidad que ya había señalado la revisión
+    de T1 sobre `agente.py:420-421` (sugerencia, no bloqueante); acá se corrigió donde
+    tocaba escribir de todos modos. Las claves existentes de T1 no se tocaron -- no era
+    parte del pedido de esta unidad y su patrón (una sola respuesta por turno) no
+    mostró el problema en la práctica.
+
+  Revisión del orquestador sobre T1, resuelta en esta unidad:
+  - **(a) Id de tarea en mayúsculas.** `_tareas_activas_por_id` guardaba el id tal como
+    lo mandaba el modelo; Postgres compara `uuid` por valor (encuentra la fila
+    igual), pero el diccionario que arma esa función lo indexaba por `str(fila["id"])`,
+    que psycopg siempre devuelve en minúsculas -- así que `_ofrecer_opciones` buscaba
+    después con el id tal cual llegó y no coincidía nunca si venía en mayúsculas.
+    `_uuid_normalizado` (nuevo) normaliza a la forma canónica en el único lugar que
+    valida un id entrante, y `_ofrecer_opciones` guarda y busca con esa misma forma.
+    Prueba: `test_tarea_id_en_mayusculas_coincide_al_validar`.
+  - **(b) Respuesta que no se entregaba ante una falla del proveedor.**
+    `_resolver_toque_opcion_modelo` construía el calendario y el proveedor (`desde_base`)
+    ANTES de llamar a `agente.responder` -- que sí atrapa que falle el proveedor
+    DENTRO de la conversación (constante `DISCULPA`) --, así que una falla en esa
+    construcción se escapaba hasta `procesar_update`, que revierte toda la transacción
+    (incluido el toque ya resuelto) sin dejar ninguna respuesta en la cola: la persona
+    se quedaba sin nada, y el toque podía volver a dispararse en un reintento del
+    webhook. Ahora ese tramo está en un `try`/`except` que registra un incidente y
+    encola una disculpa. Prueba:
+    `test_retomar_una_opcion_entrega_respuesta_aunque_falle_el_proveedor`.
+
+  Abierto (no en el alcance de esta unidad, observado al reusar herramientas
+  existentes): `actualizar_estado` no verifica que quien la llama sea el responsable
+  de la tarea -- cualquier integrante autenticado puede mover el estado de cualquier
+  tarea del espacio, tanto desde el menú como si el modelo la llamara directo. El menú
+  sólo ofrece el botón a quien corresponde, pero la herramienta en sí no lo exige; es
+  una brecha preexistente (de antes de T1), no introducida acá, y tocarla es un cambio
+  de autoridad que excede el pedido de esta unidad.
+
+  RED (antes de implementar, `tests/test_menu_tarea.py` contra el código sin el menú):
+  `.venv/Scripts/python.exe -m pytest -q tests/test_menu_tarea.py` ->
+  `21 failed` (todas por el motivo esperado: atributos que todavía no existían en
+  `pendientes`/`menu_tarea`, o `psycopg.errors` por columnas/opciones que el código
+  viejo no reconocía).
+
+  GREEN:
+  - `.venv/Scripts/python.exe -m pytest -q tests/test_menu_tarea.py` -> `21 passed`.
+  - `.venv/Scripts/python.exe -m pytest -q tests/test_menu_tarea.py tests/test_opciones_modelo.py tests/banco`
+    -> `190 passed, 99 deselected`.
+  - `.venv/Scripts/python.exe -m pytest -q` (suite completa) -> `755 passed, 99 deselected`
+    (línea base 734 + 21 pruebas nuevas de T2), reproducido dos veces en soledad
+    (170.74s y 220.11s). Una corrida intermedia, lanzada por error en paralelo con otra
+    sobre la misma base de pruebas, mostró una sola falla ajena
+    (`test_task_intake.py::test_migration_reconciles_legacy_and_guarded_rollback_restores_it`,
+    `psycopg.errors.InternalError_: tuple concurrently updated`) -- contención de dos
+    sesiones de pytest corriendo a la vez, no una regresión; no se repitió en ninguna de
+    las corridas en soledad.
+

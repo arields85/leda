@@ -202,6 +202,25 @@ class NecesitaOpciones(Exception):
         super().__init__(pregunta)
 
 
+def _uuid_normalizado(valor: Any) -> str | None:
+    """Forma canónica (minúsculas) de un id de tarea, o `None` si no es un
+    UUID válido.
+
+    Revisión del orquestador sobre T1: `_tareas_activas_por_id` guardaba el
+    string tal como lo mandó el modelo, y Postgres compara `uuid` por valor
+    -- así que un id en mayúsculas encontraba igual la fila en la base --,
+    pero el diccionario que arma esa función lo indexa por `str(f["id"])`,
+    que psycopg siempre devuelve en minúsculas. `_ofrecer_opciones` buscaba
+    después con el id tal cual llegó, sin normalizar: un id en mayúsculas
+    nunca coincidía en el diccionario y se rechazaba como si no existiera.
+    Normalizar acá, en el único lugar que valida un id entrante, es lo que
+    hace que las dos puntas (guardar y buscar) comparen lo mismo."""
+    try:
+        return str(uuid.UUID(str(valor)))
+    except (ValueError, AttributeError, TypeError):
+        return None
+
+
 def _tareas_activas_por_id(cur: psycopg.Cursor, workspace_id: str,
                           tarea_ids: list[Any]) -> dict[str, str]:
     """Título de cada id de tarea activa del espacio, bajo el mismo cursor con
@@ -209,13 +228,8 @@ def _tareas_activas_por_id(cur: psycopg.Cursor, workspace_id: str,
     no es un UUID válido, que no existe, que está cerrada o que es de otro
     espacio queda simplemente afuera del resultado -- `_ofrecer_opciones` lo
     rechaza igual que uno inexistente, sin distinguir el motivo."""
-    validos = []
-    for tid in tarea_ids:
-        try:
-            uuid.UUID(str(tid))
-        except (ValueError, AttributeError, TypeError):
-            continue
-        validos.append(str(tid))
+    validos = [norm for norm in (_uuid_normalizado(tid) for tid in tarea_ids)
+              if norm is not None]
     if not validos:
         return {}
     cur.execute(
@@ -234,8 +248,11 @@ def _tareas_activas_por_id(cur: psycopg.Cursor, workspace_id: str,
     "'tarea_id', con 'etiqueta' opcional para el botón). El servidor valida "
     "cada tarea contra el equipo, arma los botones, agrega la salida "
     f"'Quiero consultar otra cosa' y termina el turno. Hasta "
-    f"{MAX_OPCIONES_MODELO} opciones. No escribas nada más ni llames a otra "
-    "herramienta después de usar ésta: el turno termina acá.",
+    f"{MAX_OPCIONES_MODELO} opciones. Una opción de tarea puede, en vez de "
+    "retomar la conversación al tocarla, abrir el menú de acciones de esa "
+    "tarea (campo 'accion': 'menu') -- lo calcula el servidor, no vuelve a "
+    "preguntarte nada. No escribas nada más ni llames a otra herramienta "
+    "después de usar ésta: el turno termina acá.",
     {"pregunta": {"type": "string", "requerido": True,
                  "description": "lo que Prisma pregunta, en una frase corta"},
      "opciones": {
@@ -252,6 +269,12 @@ def _tareas_activas_por_id(cur: psycopg.Cursor, workspace_id: str,
                              "description": "etiqueta corta para el botón de "
                                             "la tarea (si falta, se usa su "
                                             "título)"},
+                 "accion": {"type": "string", "enum": ["responder", "menu"],
+                           "description": "sólo para una opción de tarea: "
+                                          "'responder' (por defecto) retoma "
+                                          "la conversación con esa tarea "
+                                          "resuelta; 'menu' abre el menú de "
+                                          "acciones de la tarea."},
              }}}})
 def _ofrecer_opciones(cur, quien: Solicitante, pregunta, opciones):
     pregunta = normalize_visible_text(pregunta)
@@ -281,20 +304,26 @@ def _ofrecer_opciones(cur, quien: Solicitante, pregunta, opciones):
                 "Cada opción es una tarea (tarea_id) o un texto (texto), no "
                 "las dos a la vez.")
         if tarea_id:
-            titulo = titulos.get(str(tarea_id))
+            tarea_id_normalizado = _uuid_normalizado(tarea_id)
+            titulo = titulos.get(tarea_id_normalizado) if tarea_id_normalizado else None
             if titulo is None:
                 raise Denegado(
                     f"La tarea {tarea_id} no existe entre las activas de "
                     "este equipo. No inventes candidatos: consultá las "
                     "tareas primero.")
+            accion = o.get("accion") or "responder"
+            if accion not in ("responder", "menu"):
+                raise Denegado(
+                    "El campo 'accion' de una opción de tarea sólo puede "
+                    f"ser 'responder' o 'menu' (llegó: {accion!r}).")
             etiqueta = truncar_etiqueta_boton(
                 normalize_visible_text(o.get("etiqueta") or titulo))
             if not etiqueta:
                 raise Denegado("La etiqueta de una opción no puede quedar vacía.")
             armadas.append(OpcionOfrecida(
                 etiqueta=etiqueta,
-                valor={"tipo": "tarea", "tarea_id": str(tarea_id),
-                      "titulo": titulo, "etiqueta": etiqueta}))
+                valor={"tipo": "tarea", "tarea_id": tarea_id_normalizado,
+                      "titulo": titulo, "etiqueta": etiqueta, "accion": accion}))
         elif texto:
             texto = truncar_etiqueta_boton(normalize_visible_text(texto))
             if not texto:

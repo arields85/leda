@@ -392,11 +392,6 @@ def _encolar_eleccion(cur, quien: Solicitante, chat_id: int,
     )
 
 
-# La salida que se suma siempre a las opciones del modelo (T1, ADR 0007,
-# punto 1: "siempre hay una salida").
-_ETIQUETA_OTRA_COSA = "Quiero consultar otra cosa"
-
-
 def _encolar_opciones_modelo(cur, quien: Solicitante, chat_id: int,
                              e: H.NecesitaOpciones, ahora: datetime) -> None:
     """El modelo pidió una elección con `ofrecer_opciones` (T1, ADR 0007):
@@ -407,7 +402,7 @@ def _encolar_opciones_modelo(cur, quien: Solicitante, chat_id: int,
     `pendientes.SENTINEL_OPCIONES_MODELO`.
     """
     opciones = [(o.etiqueta, o.valor) for o in e.opciones]
-    opciones.append((_ETIQUETA_OTRA_COSA, {"tipo": "salida"}))
+    opciones.append((P.ETIQUETA_SALIR_OPCIONES, {"tipo": "salida"}))
     p = P.registrar(cur, quien, herramienta=P.SENTINEL_OPCIONES_MODELO,
                     args={"pregunta": e.pregunta}, resumen=e.pregunta,
                     vence_en=ahora + VIGENCIA_PENDIENTE, campo="eleccion",

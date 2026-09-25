@@ -23,7 +23,8 @@ from .db import (admin, autoridad, conectar, conectar_autoridad, espacio,
                  registrar_auditoria)
 from .despachador import acusar_toque, mantener_chat_activo
 from .salida import TRUNCAR_ETIQUETA_BOTON as TRUNCAR_TITULO_BOTON
-from .salida import enqueue_outbox, truncar_etiqueta_boton, with_no_effect_status
+from .salida import (enqueue_outbox, normalize_visible_text,
+                     truncar_etiqueta_boton, with_no_effect_status)
 
 app = FastAPI(title="Prisma", docs_url=None, redoc_url=None)
 router = APIRouter()
@@ -333,6 +334,19 @@ def _toque(conn, workspace_id: str, slug: str, toque: dict,
                 # conversación con el modelo.
                 _resolver_toque_opcion_modelo(
                     cur, quien, workspace_id, chat_id, resuelta.args, ahora)
+            elif resuelta.herramienta == P.SENTINEL_MENU_TAREA:
+                # T2, ADR 0007 §4.6: el menú de acciones de una tarea. Cada
+                # opción es una acción calculada por código, no una
+                # herramienta -- `_resolver_toque_menu_tarea` la despacha.
+                _resolver_toque_menu_tarea(
+                    cur, quien, workspace_id, chat_id, resuelta.args, ahora)
+            elif resuelta.herramienta == P.SENTINEL_DATO_MENU_TAREA:
+                # T2: la elección, con botones, de con cuál otra tarea se
+                # declara una dependencia -- la única forma de este
+                # sentinel que se resuelve por toque (la otra, un dato en
+                # texto libre, la retoma `_turno` cuando llega el mensaje).
+                _resolver_toque_dato_menu_tarea(
+                    cur, quien, workspace_id, chat_id, resuelta.args, ahora)
             else:
                 from .agente import VIGENCIA_PENDIENTE
 
@@ -484,6 +498,14 @@ def _turno(cur, quien, texto: str, workspace_id: str, chat_id: int,
     if modificacion is not None and modificacion.herramienta == _SENTINEL_ACLARACION:
         _resumir_aclaracion_ninguna(cur, quien, texto, modificacion, proveedor,
                                     cal, chat_id, workspace_id, now, entrante_id)
+        return
+    if modificacion is not None and modificacion.herramienta == P.SENTINEL_DATO_MENU_TAREA:
+        # T2: la persona escribió el dato que le faltaba a una acción del
+        # menú (la causa de un bloqueo, su resolución, la evidencia). Pasa
+        # directo a la herramienta -- no hay referencia que resolver, ni
+        # modelo ni Jev de por medio.
+        _resumir_dato_menu_tarea(cur, quien, texto, modificacion, chat_id,
+                                 workspace_id, now)
         return
 
     route = None
@@ -828,6 +850,13 @@ def _resolver_toque_opcion_modelo(cur, quien, workspace_id: str, chat_id: int,
     if tipo == "tarea":
         titulo = eleccion.get("titulo", "")
         tarea_id = eleccion.get("tarea_id")
+        if eleccion.get("accion") == "menu":
+            # T2, ADR 0007 §4.6: esta tarea se ofreció para abrir su menú de
+            # acciones, no para resolver la pregunta del modelo -- el menú
+            # lo calcula el código (`menu_tarea.calcular_menu`), así que acá
+            # nunca se retoma la conversación.
+            _abrir_menu_tarea(cur, quien, workspace_id, chat_id, tarea_id, ahora)
+            return
         texto_entrante = eleccion.get("etiqueta") or titulo
         contexto = (
             "# Elección de una opción\n\n"
@@ -845,15 +874,413 @@ def _resolver_toque_opcion_modelo(cur, quien, workspace_id: str, chat_id: int,
             "pregunta, tratala como tal.")
         tareas_resueltas = None
 
-    from .agente import responder
-    from .calendario import Calendario
-    from .llm import desde_base
+    try:
+        from .agente import responder
+        from .calendario import Calendario
+        from .llm import desde_base
 
-    cal = Calendario.desde_base(cur, workspace_id)
-    proveedor = desde_base(cur, workspace_id, config.llm_api_key)
-    responder(cur, quien, texto_entrante, proveedor, cal, chat_id, ahora=ahora,
-             contexto_referencias=contexto,
-             tareas_resueltas_claras=tareas_resueltas)
+        cal = Calendario.desde_base(cur, workspace_id)
+        proveedor = desde_base(cur, workspace_id, config.llm_api_key)
+        responder(cur, quien, texto_entrante, proveedor, cal, chat_id, ahora=ahora,
+                 contexto_referencias=contexto,
+                 tareas_resueltas_claras=tareas_resueltas)
+    except Exception as e:  # noqa: BLE001
+        # Revisión del orquestador sobre T1: `agente.responder` ya atrapa
+        # que falle el proveedor DENTRO de la conversación (constante
+        # `DISCULPA`, ahí adentro), pero construir el calendario o el
+        # proveedor pasa ACÁ, antes de llamarla. Sin este resguardo, esa
+        # falla se escapaba hasta `procesar_update`, que revierte toda la
+        # transacción -- incluido el toque ya resuelto -- y no queda
+        # ninguna respuesta en la cola: la persona se quedaba sin nada, y
+        # el toque podía volver a dispararse en un reintento del webhook.
+        _routing_incident(cur, quien, e)
+        _responder(cur, workspace_id, chat_id, quien,
+                  "Perdón, no pude retomar la conversación. Ya quedó "
+                  "registrado para que lo revisen. Escribime de nuevo si "
+                  "hace falta.", ahora)
+
+
+# ---------------------------------------------------------------------------
+# Menú de acciones de una tarea (T2, `prisma-orienta`; ADR 0007 §4.6)
+# ---------------------------------------------------------------------------
+#
+# Se llega al menú tocando una tarea que se ofreció con `accion: "menu"`
+# (`_resolver_toque_opcion_modelo`, arriba) -- el mismo mecanismo que
+# reusará T3 para listar tareas como botones. El menú lo calcula
+# `menu_tarea.calcular_menu`, nunca el modelo; tocar una de sus opciones
+# jamás resume la conversación: cada acción sigue su propio camino --una
+# lectura determinística, la vista previa de una herramienta que ya existe,
+# o un dato que hace falta pedir.
+
+
+def _encolar_menu_tarea(cur, quien, workspace_id: str, chat_id: int,
+                        tarea_id: str, ahora, *, encabezado: str | None) -> None:
+    """Arma (o rearma) el menú de una tarea y lo encola con sus botones.
+    `encabezado`, si viene, se antepone al mensaje -- es cómo "Ver detalle"
+    cierra con el menú de nuevo en el mismo mensaje (T2, punto 3)."""
+    from . import menu_tarea as M
+    from . import pendientes as P
+    from .agente import VIGENCIA_PENDIENTE
+
+    menu = M.calcular_menu(cur, quien, tarea_id)
+    if menu is None:
+        _responder(cur, workspace_id, chat_id, quien,
+                  "Esa tarea ya no está disponible.", ahora)
+        return
+
+    opciones = [(a.etiqueta, {"accion": a.codigo}) for a in menu.acciones]
+    opciones.append((P.ETIQUETA_SALIR_OPCIONES, {"accion": "salir"}))
+    pregunta = f"¿Qué querés hacer con «{menu.titulo}»?"
+    resumen = f"{encabezado}\n\n{pregunta}" if encabezado else pregunta
+
+    p = P.registrar(cur, quien, herramienta=P.SENTINEL_MENU_TAREA,
+                    args={"tarea_id": menu.tarea_id, "titulo": menu.titulo},
+                    resumen=resumen, vence_en=ahora + VIGENCIA_PENDIENTE,
+                    campo="eleccion", opciones=opciones, chat_id=chat_id)
+    enqueue_outbox(
+        cur, workspace_id=workspace_id, chat_id=chat_id,
+        recipient_membership_id=quien.membership_id, text=p.resumen,
+        scheduled_for=ahora,
+        # El id de `p` (fresco por cada `registrar`) identifica el mensaje,
+        # no la marca de tiempo: dos toques seguidos del mismo menú pueden
+        # caer en el mismo microsegundo y perderse por `on conflict do
+        # nothing` si la clave sólo dependiera de `ahora`.
+        dedupe_key=f"{workspace_id}:menu-tarea:{p.id}",
+        is_response=True, pending_action_id=p.id,
+    )
+
+
+def _abrir_menu_tarea(cur, quien, workspace_id: str, chat_id: int,
+                      tarea_id: str, ahora) -> None:
+    _encolar_menu_tarea(cur, quien, workspace_id, chat_id, tarea_id, ahora,
+                        encabezado=None)
+
+
+def _encolar_vista_previa_menu(cur, quien, workspace_id: str, chat_id: int,
+                               e, ahora) -> None:
+    """La vista previa de una acción del menú (T2): los mismos tres botones
+    y la misma huella que cualquier confirmación (ADR 0005, decisión 1;
+    `agente._encolar_confirmacion`). Se arma acá y no ahí porque el menú
+    nunca pasa por `agente.responder`: no hay una vuelta del modelo a la
+    que devolverle el resultado."""
+    from . import pendientes as P
+    from .agente import VIGENCIA_PENDIENTE
+
+    opciones = ([("Confirmar", True), ("Modificar", "modificar"), ("Cancelar", False)]
+               if e.huella is not None else None)
+    p = P.registrar(cur, quien, herramienta=e.herramienta, args=e.argumentos,
+                    resumen=e.resumen, vence_en=ahora + VIGENCIA_PENDIENTE,
+                    chat_id=chat_id, huella=e.huella, opciones=opciones)
+    enqueue_outbox(
+        cur, workspace_id=workspace_id, chat_id=chat_id,
+        recipient_membership_id=quien.membership_id, text=e.resumen,
+        scheduled_for=ahora,
+        dedupe_key=f"{workspace_id}:confirmar-menu:{p.id}",
+        is_response=True, pending_action_id=p.id,
+    )
+
+
+def _ejecutar_accion_menu(cur, quien, workspace_id: str, chat_id: int,
+                          herramienta: str, call_args: dict, ahora) -> None:
+    """Corre una herramienta que ya existe con lo que ya se sabe -- sin
+    `ya_confirmada`, así que si declara `preparar` siempre frena primero en
+    una vista previa (ADR 0005, decisión 1): nada se aplica todavía. Un
+    `Denegado` no se atrapa acá: lo maneja quien llama, junto con el resto
+    del toque o del mensaje que retoma."""
+    import psycopg
+
+    from . import herramientas as H
+
+    try:
+        resultado = H.ejecutar(cur, quien, herramienta, call_args, chat_id=chat_id)
+    except H.NecesitaConfirmacion as e:
+        _encolar_vista_previa_menu(cur, quien, workspace_id, chat_id, e, ahora)
+        return
+    except psycopg.errors.RaiseException as e:
+        # Una regla de la base rechazó la operación (p. ej. un ciclo de
+        # dependencias) -- mismo tratamiento que `agente._ejecutar_una`: el
+        # texto de esas excepciones está escrito para una persona, no es
+        # una falla del sistema que amerite un incidente.
+        _responder(cur, workspace_id, chat_id, quien,
+                  str(e).split("\n")[0], ahora)
+        return
+    _responder(cur, workspace_id, chat_id, quien,
+              _mensaje_resultado_menu(resultado), ahora)
+
+
+def _mensaje_resultado_menu(resultado) -> str:
+    if isinstance(resultado, dict):
+        return resultado.get("falta") or resultado.get("error") or \
+            "No se aplicó ningún cambio."
+    return "No se aplicó ningún cambio."
+
+
+def _pedir_dato_menu_tarea(cur, quien, workspace_id: str, chat_id: int, *,
+                           accion: str, tarea_id: str, titulo: str,
+                           pregunta: str, ahora, extra: dict | None = None) -> None:
+    """Pide un dato que ninguna herramienta puede adivinar -- la causa de un
+    bloqueo, su resolución, la evidencia -- con el mismo mecanismo que
+    "Ninguna, lo escribo" (T4, `aclaracion-con-botones`, decisión 4):
+    `marcar_para_corregir`, dentro de la ventana de
+    `pendientes.VENTANA_MODIFICACION`. Sin botones -- la respuesta es texto
+    libre -- y `_turno` la recibe antes de rutearla, por el sentinel
+    `SENTINEL_DATO_MENU_TAREA`, sin pasar por el modelo ni por Jev."""
+    from . import pendientes as P
+    from .agente import VIGENCIA_PENDIENTE
+
+    args = {"accion": accion, "tarea_id": tarea_id, "titulo": titulo}
+    if extra:
+        args.update(extra)
+    p = P.registrar(cur, quien, herramienta=P.SENTINEL_DATO_MENU_TAREA,
+                    args=args, resumen=pregunta, vence_en=ahora + VIGENCIA_PENDIENTE,
+                    chat_id=chat_id, opciones=[])
+    P.marcar_para_corregir(cur, quien, p.id, chat_id, ahora)
+    # Sin `pending_action_id`: esta fila no tiene botones (se responde
+    # escribiendo), pero el id de `p` sigue siendo lo que identifica el
+    # mensaje -- no la marca de tiempo, igual que arriba.
+    enqueue_outbox(
+        cur, workspace_id=workspace_id, chat_id=chat_id,
+        recipient_membership_id=quien.membership_id, text=pregunta,
+        scheduled_for=ahora, dedupe_key=f"{workspace_id}:dato-menu:{p.id}",
+        is_response=True,
+    )
+
+
+def _pedir_eleccion_dependencia(cur, quien, workspace_id: str, chat_id: int, *,
+                                accion: str, tarea_id: str, titulo: str,
+                                pregunta: str, candidatas: list[tuple[str, str]],
+                                ahora) -> None:
+    """La elección, con botones, de con cuál otra tarea se declara la
+    dependencia (T2, punto 3: "cuando la respuesta es un dato de tarea, con
+    botones"). Se resuelve como cualquier toque -- `campo="eleccion"` trae
+    el id de la tarea elegida en `args["eleccion"]`, igual que
+    `NecesitaElegir` -- no como un texto libre."""
+    from . import pendientes as P
+    from .agente import VIGENCIA_PENDIENTE
+
+    opciones = [(truncar_etiqueta_boton(t), tid) for tid, t in candidatas]
+    p = P.registrar(cur, quien, herramienta=P.SENTINEL_DATO_MENU_TAREA,
+                    args={"accion": accion, "tarea_id": tarea_id, "titulo": titulo},
+                    resumen=pregunta, vence_en=ahora + VIGENCIA_PENDIENTE,
+                    campo="eleccion", opciones=opciones, chat_id=chat_id)
+    enqueue_outbox(
+        cur, workspace_id=workspace_id, chat_id=chat_id,
+        recipient_membership_id=quien.membership_id, text=p.resumen,
+        scheduled_for=ahora,
+        dedupe_key=f"{workspace_id}:dependencia-menu:{p.id}",
+        is_response=True, pending_action_id=p.id,
+    )
+
+
+def _resolver_toque_menu_tarea(cur, quien, workspace_id: str, chat_id: int,
+                               args: dict, ahora) -> None:
+    """Alguien tocó una acción del menú de una tarea (T2). El menú ya
+    calculó qué se puede hacer; acá cada acción sigue su camino."""
+    from . import menu_tarea as M
+
+    eleccion = args.get("eleccion") or {}
+    accion = eleccion.get("accion")
+    tarea_id = args.get("tarea_id")
+    titulo = args.get("titulo", "")
+
+    # Auditoría (T2, punto 5): tipo de acción e id de tarea, nunca texto.
+    registrar_auditoria(
+        cur, accion="accion_menu_tarea", workspace_id=workspace_id,
+        actor_app_user_id=quien.app_user_id, actor_kind="persona",
+        detalle={"accion": accion, "tarea_id": tarea_id})
+
+    if accion == "salir":
+        _responder(cur, workspace_id, chat_id, quien,
+                  "Dale, escribime qué necesitás.", ahora)
+        return
+
+    try:
+        if accion in ("ver_detalle", "ver_detalle_evidencia"):
+            detalle = M.detalle_tarea(
+                cur, tarea_id, incluir_evidencia=accion == "ver_detalle_evidencia")
+            _encolar_menu_tarea(cur, quien, workspace_id, chat_id, tarea_id, ahora,
+                                encabezado=detalle)
+            return
+
+        if accion == "empezar":
+            _ejecutar_accion_menu(cur, quien, workspace_id, chat_id,
+                                  "actualizar_estado",
+                                  {"tarea_id": tarea_id, "estado": "en_curso"}, ahora)
+            return
+        if accion == "terminar":
+            _ejecutar_accion_menu(cur, quien, workspace_id, chat_id,
+                                  "actualizar_estado",
+                                  {"tarea_id": tarea_id, "estado": "en_revision"}, ahora)
+            return
+        if accion == "aprobar":
+            _ejecutar_accion_menu(cur, quien, workspace_id, chat_id,
+                                  "aprobar_tarea", {"tarea_id": tarea_id}, ahora)
+            return
+
+        if accion == "informar_bloqueo":
+            _pedir_dato_menu_tarea(
+                cur, quien, workspace_id, chat_id, accion="informar_bloqueo",
+                tarea_id=tarea_id, titulo=titulo,
+                pregunta=f"¿Cuál es la causa del bloqueo de «{titulo}»?",
+                ahora=ahora)
+            return
+
+        if accion == "destrabar":
+            abiertos = M.bloqueos_abiertos(cur, tarea_id)
+            if not abiertos:
+                _encolar_menu_tarea(
+                    cur, quien, workspace_id, chat_id, tarea_id, ahora,
+                    encabezado="No hay ningún bloqueo abierto para destrabar.")
+                return
+            if len(abiertos) > 1:
+                # Más de un bloqueo abierto a la vez es el caso raro
+                # (`registrar_bloqueo` los suma en vez de reemplazarlos): no
+                # se inventa cuál -- se lo pide completo, en texto libre, y
+                # ese mensaje se rutea como un turno común (el modelo tiene
+                # `consultar_bloqueos` y `resolver_bloqueo`).
+                _responder(
+                    cur, workspace_id, chat_id, quien,
+                    f"Hay más de un bloqueo abierto en «{titulo}». Contame "
+                    "cuál se destrabó y cómo, y lo registro.", ahora)
+                return
+            _pedir_dato_menu_tarea(
+                cur, quien, workspace_id, chat_id, accion="destrabar",
+                tarea_id=tarea_id, titulo=titulo,
+                pregunta=f"¿Cómo se destrabó «{titulo}»?", ahora=ahora,
+                extra={"bloqueo_id": str(abiertos[0]["id"])})
+            return
+
+        if accion == "adjuntar_evidencia":
+            _pedir_dato_menu_tarea(
+                cur, quien, workspace_id, chat_id, accion="adjuntar_evidencia",
+                tarea_id=tarea_id, titulo=titulo,
+                pregunta=f"Contame la evidencia de «{titulo}» (o pegá el enlace).",
+                ahora=ahora)
+            return
+
+        if accion in ("depende_de_otra", "mi_trabajo_depende"):
+            if accion == "depende_de_otra":
+                fila = M._tarea_para_menu(cur, tarea_id)
+                membership_id = fila["responsable_membership_id"] if fila else None
+                clave_eleccion = "crear_dependencia_origen"
+                pregunta = f"¿De cuál de tus tareas depende «{titulo}»?"
+            else:
+                membership_id = quien.membership_id
+                clave_eleccion = "crear_dependencia_destino"
+                pregunta = f"¿Cuál de tus tareas depende de «{titulo}»?"
+
+            candidatas = (
+                M.tareas_activas_de(cur, workspace_id, membership_id,
+                                    excluir_tarea_id=tarea_id)
+                if membership_id else [])
+            if not candidatas:
+                _encolar_menu_tarea(
+                    cur, quien, workspace_id, chat_id, tarea_id, ahora,
+                    encabezado="No encontré otras tareas activas para elegir. "
+                              "Escribime cuál es y lo vemos.")
+                return
+            _pedir_eleccion_dependencia(
+                cur, quien, workspace_id, chat_id, accion=clave_eleccion,
+                tarea_id=tarea_id, titulo=titulo, pregunta=pregunta,
+                candidatas=candidatas, ahora=ahora)
+            return
+
+        # No debería pasar: `calcular_menu` sólo ofrece los códigos que este
+        # bloque conoce. No se inventa nada -- se vuelve a mostrar el menú.
+        _encolar_menu_tarea(cur, quien, workspace_id, chat_id, tarea_id, ahora,
+                            encabezado=None)
+    except Denegado as e:
+        _responder(cur, workspace_id, chat_id, quien, str(e), ahora)
+    except Exception as e:  # noqa: BLE001
+        _routing_incident(cur, quien, e)
+        _responder(cur, workspace_id, chat_id, quien,
+                  "Perdón, no pude completar eso. Ya quedó registrado para "
+                  "que lo revisen.", ahora)
+
+
+def _resolver_toque_dato_menu_tarea(cur, quien, workspace_id: str, chat_id: int,
+                                    args: dict, ahora) -> None:
+    """Alguien tocó una tarea candidata para una dependencia, dentro del
+    menú (T2). A diferencia de `_resolver_toque_menu_tarea`, lo que vuelve
+    por `campo="eleccion"` no es el código de una acción: es el id de la
+    otra tarea elegida -- el mismo patrón que `NecesitaElegir`."""
+    accion = args.get("accion")
+    otra_tarea_id = args.get("eleccion")
+    tarea_id = args.get("tarea_id")
+
+    registrar_auditoria(
+        cur, accion="accion_menu_tarea", workspace_id=workspace_id,
+        actor_app_user_id=quien.app_user_id, actor_kind="persona",
+        detalle={"accion": accion, "tarea_id": tarea_id,
+                 "otra_tarea_id": otra_tarea_id})
+
+    if accion == "crear_dependencia_origen":
+        call_args = {"origen_tarea_id": otra_tarea_id, "destino_tarea_id": tarea_id,
+                    "tipo": "bloqueante"}
+    else:
+        call_args = {"origen_tarea_id": tarea_id, "destino_tarea_id": otra_tarea_id,
+                    "tipo": "bloqueante"}
+
+    try:
+        _ejecutar_accion_menu(cur, quien, workspace_id, chat_id,
+                              "crear_dependencia", call_args, ahora)
+    except Denegado as e:
+        _responder(cur, workspace_id, chat_id, quien, str(e), ahora)
+    except Exception as e:  # noqa: BLE001
+        _routing_incident(cur, quien, e)
+        _responder(cur, workspace_id, chat_id, quien,
+                  "Perdón, no pude completar eso. Ya quedó registrado para "
+                  "que lo revisen.", ahora)
+
+
+def _resumir_dato_menu_tarea(cur, quien, texto: str, modificacion, chat_id: int,
+                             workspace_id: str, ahora) -> None:
+    """Retoma después de pedir un dato del menú de una tarea (T2): la causa
+    de un bloqueo, su resolución o la evidencia. El texto de la persona pasa
+    directo como argumento de la herramienta correspondiente -- no hay
+    modelo ni Jev de por medio: es un dato que se pidió, no una referencia
+    que interpretar."""
+    args = modificacion.args
+    accion = args.get("accion")
+    tarea_id = args.get("tarea_id")
+    dato = normalize_visible_text(texto)
+
+    registrar_auditoria(
+        cur, accion="accion_menu_tarea", workspace_id=workspace_id,
+        actor_app_user_id=quien.app_user_id, actor_kind="persona",
+        detalle={"accion": accion, "tarea_id": tarea_id})
+
+    if not dato:
+        _responder(cur, workspace_id, chat_id, quien,
+                  "Contame un poco más, así lo registro.", ahora)
+        return
+
+    if accion == "informar_bloqueo":
+        herramienta, call_args = "registrar_bloqueo", {
+            "tarea_id": tarea_id, "causa": dato}
+    elif accion == "destrabar":
+        herramienta, call_args = "resolver_bloqueo", {
+            "bloqueo_id": args.get("bloqueo_id"), "resolucion": dato}
+    elif accion == "adjuntar_evidencia":
+        herramienta, call_args = "adjuntar_evidencia", {
+            "tarea_id": tarea_id, "tipo": "texto", "descripcion": dato}
+    else:
+        # No debería pasar: sólo estas tres acciones abren esta pregunta.
+        _responder(cur, workspace_id, chat_id, quien,
+                  "Perdón, no encontré a qué acción corresponde esto. Volvé "
+                  "a intentarlo desde el menú de la tarea.", ahora)
+        return
+
+    try:
+        _ejecutar_accion_menu(cur, quien, workspace_id, chat_id, herramienta,
+                              call_args, ahora)
+    except Denegado as e:
+        _responder(cur, workspace_id, chat_id, quien, str(e), ahora)
+    except Exception as e:  # noqa: BLE001
+        _routing_incident(cur, quien, e)
+        _responder(cur, workspace_id, chat_id, quien,
+                  "Perdón, no pude completar eso. Ya quedó registrado para "
+                  "que lo revisen.", ahora)
 
 
 @dataclass(frozen=True)

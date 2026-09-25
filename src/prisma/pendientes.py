@@ -46,6 +46,34 @@ VENTANA_MODIFICACION = timedelta(minutes=30)
 # resuelve está del lado del gateway.
 SENTINEL_OPCIONES_MODELO = "_opciones_modelo"
 
+# T2 (`prisma-orienta`, ADR 0007 §4.6): el menú de acciones de una tarea.
+# Dos sentinelas más, viven acá por el mismo motivo que el de arriba -- lo
+# arma y lo intercepta `gateway.py`, en dos puntas distintas (armar la
+# pregunta / resolver el toque o el próximo mensaje).
+#
+# `SENTINEL_MENU_TAREA` es el menú en sí -- cada opción es una acción del
+# diseño §4.6, calculada por código (`menu_tarea.calcular_menu`), nunca por
+# el modelo. Tocar una opción no retoma la conversación: cada acción sigue
+# su propio camino (una lectura, la vista previa de una herramienta que ya
+# existe, o un dato que hace falta pedir).
+#
+# `SENTINEL_DATO_MENU_TAREA` es el dato que le falta a una acción del menú
+# para armar su vista previa. Tiene dos formas: una elección entre
+# candidatos conocidos (qué otra tarea, para una dependencia -- se resuelve
+# como cualquier toque, con `campo="eleccion"` y botones) o un texto libre
+# que la persona escribe (la causa de un bloqueo, su resolución, la
+# evidencia -- capturado con el mismo mecanismo que "Ninguna, lo escribo",
+# T4 `aclaracion-con-botones`: `marcar_para_corregir` +
+# `reclamar_modificacion_abierta`, sin botones).
+SENTINEL_MENU_TAREA = "_menu_tarea"
+SENTINEL_DATO_MENU_TAREA = "_dato_menu_tarea"
+
+# La salida que ofrece siempre una elección con botones (T1, ADR 0007 punto
+# 1: "siempre hay una salida"). Vive acá, no repetida en cada lugar que la
+# usa, para que el menú de tarea (T2) y `ofrecer_opciones` (T1) muestren
+# exactamente la misma etiqueta.
+ETIQUETA_SALIR_OPCIONES = "Quiero consultar otra cosa"
+
 
 @dataclass(frozen=True)
 class Opcion:
