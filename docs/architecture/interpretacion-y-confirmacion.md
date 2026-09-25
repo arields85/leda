@@ -208,6 +208,44 @@ Un mensaje claro empieza directamente en la vista previa.
   como Modificar. La propuesta vence a las 8 h heredadas de `pending_action`; el
   plazo por defecto sigue abierto (§7).
 
+### 4.6 Acciones por tarea (ADR 0007, decidido con el usuario el 2026-09-25)
+
+Al tocar una tarea, Prisma ofrece sólo lo que quien toca puede hacer, según el estado
+de la tarea y su relación con ella (`nucleo/mecanica-pm.md` §3, §4, §7 y §8). Siempre
+se suma "Quiero consultar otra cosa". Todo lo que cambia algo termina en la vista
+previa, y al confirmar se vuelve a verificar la autoridad: ofrecer no autoriza.
+
+Responsable:
+
+| Estado | Opciones |
+|---|---|
+| Asignada | Ver detalle · Empezar · Ya la terminé (pasa a revisión) · Informar un bloqueo · Depende de otra tarea |
+| En curso | Ver detalle · Ya la terminé (pasa a revisión) · Avisar un avance* · Informar un bloqueo · Depende de otra tarea |
+| Bloqueada | Ver detalle · Ya se destrabó (resuelve el bloqueo) · Sumar información al bloqueo* |
+| En revisión | Ver detalle · Adjuntar evidencia |
+| Terminada o cancelada | Ver detalle |
+
+Aprobador de la tarea (cadena de aprobación del espacio):
+
+| Estado | Opciones |
+|---|---|
+| En revisión | Ver detalle y evidencia · Aprobar · Devolver con observaciones* |
+| Otro | Ver detalle · Pedirle el estado al responsable* |
+
+Otra persona del equipo: Ver detalle · Pedirle el estado al responsable* · Mi trabajo
+depende de esta tarea.
+
+Reglas: "Ya la terminé" nunca termina una tarea, la pasa a revisión (§3); "Empezar" no
+se ofrece si la tarea espera una dependencia bloqueante sin terminar (§4); cancelar
+exige razón y autoridad y no se ofrece como opción común.
+
+\* **Aportes sobre tareas**, unidad posterior: texto, foto, video o archivo que una
+persona suma a una tarea con un motivo (avance, información de un bloqueo,
+observaciones al devolver una revisión, respuesta a un pedido de estado). Un aporte no
+es evidencia (actualización, evidencia, aprobación y cierre son hechos distintos); los
+archivos se guardan por referencia con verificación de integridad y Prisma no los
+interpreta. Hasta que exista, esas opciones no se muestran.
+
 ## 5. Pruebas de concepto
 
 Cada una se corre antes de construir el paso que la necesita, fuera del código de

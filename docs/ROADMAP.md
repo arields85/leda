@@ -202,6 +202,27 @@ que la escalera afirme silencio sobre evidencia real.
 **Cierre:** un escenario con tiempo simulado demuestra envío, silencio, respuesta,
 ausencia y escalamiento sobre solicitudes reales.
 
+### Prisma orienta
+
+**Entrega:** [`ADR 0007`](decisions/0007-prisma-orienta-no-charla.md): cada respuesta que
+espera algo cierra con botones concretos y una salida; las listas de tareas son botones
+y tocar una ofrece las acciones del diseño §4.6 que ya tienen herramienta.
+
+**Cierre:** una segunda sesión por Telegram real muestra menos preguntas innecesarias
+y ninguna respuesta vaga que haya que interpretar.
+
+### Aportes sobre tareas
+
+**Entrega:** texto, foto, video o archivo que una persona suma a una tarea con un motivo:
+avisar un avance, sumar información a un bloqueo, devolver una revisión con
+observaciones, responder un pedido de estado (diseño §4.6). Recibir archivos de
+Telegram y guardarlos por referencia con verificación de integridad, sin interpretarlos;
+un aporte no es evidencia. Incluye la transición de revisión a en curso al devolver y el
+pedido de estado de Prisma al responsable, respetando el volumen de contacto (mecánica
+§10).
+
+**Depende de:** Prisma orienta.
+
 ### Aprendizaje de apodos y de aclaraciones
 
 **Entrega:** Prisma aprende de lo que ya preguntó, para preguntar menos (pedido del

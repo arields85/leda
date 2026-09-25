@@ -65,6 +65,7 @@ existe: el toque ya dice cuál es.
 
 ## Pendiente
 
-- Qué acciones ofrece cada estado de tarea y para qué roles.
+- ~~Qué acciones ofrece cada estado de tarea y para qué roles~~: resuelto con el
+  usuario el 2026-09-25, en el diseño §4.6.
 - Si una respuesta puede cerrar sin opciones (un aviso que no espera nada).
 - Cómo se ven las opciones en el grupo de gestión, fuera del chat privado.
