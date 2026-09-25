@@ -14,6 +14,12 @@ BUTTON_TEXT_LIMIT = 3900
 BUTTON_LABEL_LIMIT = 80
 CALLBACK_DATA_BYTES = 64
 _SPLIT_BODY_LIMIT = 4000
+# Cuántos caracteres de una etiqueta de botón entran cómodos en una pantalla
+# de teléfono antes de truncar con "…" (medido a ojo; más chico que
+# `BUTTON_LABEL_LIMIT`, que es el tope técnico de Telegram). Un sufijo
+# agregado después de truncar (p. ej. " — <nombre>" en
+# `gateway._etiqueta_boton`) nunca se recorta.
+TRUNCAR_ETIQUETA_BOTON = 48
 NO_EFFECT_STATUS = "Estado: sin cambios."
 _NO_EFFECT_PATTERNS = tuple(re.compile(pattern, re.IGNORECASE) for pattern in (
     r"\bno se (?:registr[oó]|modific[oó]|cambi[oó]) (?:nada|ning[uú]n cambio)\b",
@@ -68,6 +74,18 @@ def with_no_effect_status(raw: Any, *, required: bool = True) -> str:
         text = pattern.sub("", text)
     text = normalize_visible_text(text).strip(" .,;:-")
     return f"{text}\n\n{NO_EFFECT_STATUS}" if text else NO_EFFECT_STATUS
+
+
+def truncar_etiqueta_boton(texto: str) -> str:
+    """Recorta una etiqueta a `TRUNCAR_ETIQUETA_BOTON` caracteres, con "…" al
+    final si hizo falta. Reusado por la aclaración con botones
+    (`gateway._etiqueta_boton`) y por `ofrecer_opciones` (T1, ADR 0007): la
+    misma regla de truncado para toda etiqueta de botón, en vez de una por
+    cada lugar que arma botones."""
+    texto = texto.strip()
+    if len(texto) <= TRUNCAR_ETIQUETA_BOTON:
+        return texto
+    return texto[:TRUNCAR_ETIQUETA_BOTON - 1].rstrip() + "…"
 
 
 def prepare_buttons(buttons: Iterable[Any]) -> list[tuple[str, str]]:

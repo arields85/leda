@@ -287,6 +287,15 @@ def _ejecutar_una(cur, quien: Solicitante, c: Llamada, ctx, acciones,
             "opciones": [et for et, _ in e.opciones],
             "aclaracion": "Ya le mostré los botones. No elijas vos ni "
                           "supongas cuál era."})
+    except H.NecesitaOpciones as e:
+        _encolar_opciones_modelo(cur, quien, chat_id, e, ahora)
+        elecciones.append(c.nombre)
+        return bloque({
+            "ejecutado": False,
+            "estado": "esperando que la persona elija entre las opciones",
+            "aclaracion": "Ya le mostré los botones con la pregunta y la "
+                          "salida. No preguntes de nuevo ni agregues más "
+                          "texto: el turno termina acá."})
     except psycopg.errors.RaiseException as e:
         # Una regla de la base rechazó la operación. El texto de esas
         # excepciones está escrito para ser leído por una persona.
@@ -379,6 +388,36 @@ def _encolar_eleccion(cur, quien: Solicitante, chat_id: int,
         scheduled_for=ahora,
         dedupe_key=(f"{quien.workspace_id}:elegir:{e.herramienta}:"
                     f"{ahora.timestamp()}"), is_response=True,
+        pending_action_id=p.id,
+    )
+
+
+# La salida que se suma siempre a las opciones del modelo (T1, ADR 0007,
+# punto 1: "siempre hay una salida").
+_ETIQUETA_OTRA_COSA = "Quiero consultar otra cosa"
+
+
+def _encolar_opciones_modelo(cur, quien: Solicitante, chat_id: int,
+                             e: H.NecesitaOpciones, ahora: datetime) -> None:
+    """El modelo pidió una elección con `ofrecer_opciones` (T1, ADR 0007):
+    arma los botones con la salida de siempre y termina el turno -- a
+    diferencia de `_encolar_eleccion`, tocar una opción no vuelve a llamar a
+    la herramienta: retoma la conversación en
+    `gateway._resolver_toque_opcion_modelo`, con el sentinel compartido en
+    `pendientes.SENTINEL_OPCIONES_MODELO`.
+    """
+    opciones = [(o.etiqueta, o.valor) for o in e.opciones]
+    opciones.append((_ETIQUETA_OTRA_COSA, {"tipo": "salida"}))
+    p = P.registrar(cur, quien, herramienta=P.SENTINEL_OPCIONES_MODELO,
+                    args={"pregunta": e.pregunta}, resumen=e.pregunta,
+                    vence_en=ahora + VIGENCIA_PENDIENTE, campo="eleccion",
+                    opciones=opciones, chat_id=chat_id)
+    enqueue_outbox(
+        cur, workspace_id=quien.workspace_id, chat_id=chat_id,
+        recipient_membership_id=quien.membership_id, text=p.resumen,
+        scheduled_for=ahora,
+        dedupe_key=(f"{quien.workspace_id}:opciones:{quien.app_user_id}:"
+                   f"{ahora.timestamp()}"), is_response=True,
         pending_action_id=p.id,
     )
 

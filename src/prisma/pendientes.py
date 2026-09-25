@@ -36,6 +36,16 @@ CALLBACK_PREFIJO = "p:"
 # Cuánto espera Prisma la corrección después de un toque en Modificar.
 VENTANA_MODIFICACION = timedelta(minutes=30)
 
+# `herramienta` reservada para una acción pendiente armada por
+# `ofrecer_opciones` (T1, ADR 0007 "Prisma orienta, no charla"): nunca es un
+# nombre real del `REGISTRO` de `herramientas.py` -- lo arma `agente.py`
+# (`_encolar_opciones_modelo`) y lo intercepta `gateway._toque` antes de
+# llegar a `H.ejecutar`, igual que `_SENTINEL_ACLARACION` en `gateway.py`.
+# Vive acá, no en `gateway.py`, porque las dos puntas lo necesitan: la
+# herramienta que arma la pregunta está del lado del agente, el toque que la
+# resuelve está del lado del gateway.
+SENTINEL_OPCIONES_MODELO = "_opciones_modelo"
+
 
 @dataclass(frozen=True)
 class Opcion:

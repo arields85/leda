@@ -22,7 +22,8 @@ from .config import config
 from .db import (admin, autoridad, conectar, conectar_autoridad, espacio,
                  registrar_auditoria)
 from .despachador import acusar_toque, mantener_chat_activo
-from .salida import enqueue_outbox, with_no_effect_status
+from .salida import TRUNCAR_ETIQUETA_BOTON as TRUNCAR_TITULO_BOTON
+from .salida import enqueue_outbox, truncar_etiqueta_boton, with_no_effect_status
 
 app = FastAPI(title="Prisma", docs_url=None, redoc_url=None)
 router = APIRouter()
@@ -43,10 +44,10 @@ _ETIQUETA_NINGUNA = "Ninguna, lo escribo"
 _ETIQUETA_NUEVA = "Es una tarea nueva"
 _TIPO_ELECCION = {_OPCION_NINGUNA: "ninguna", _OPCION_NUEVA: "nueva"}
 
-# Cuántos caracteres del título entran en un botón antes de truncar con
-# "…" (medido a ojo para que entre cómodo en una pantalla de teléfono; el
-# sufijo " — <nombre>" nunca se recorta, se agrega después de truncar).
-TRUNCAR_TITULO_BOTON = 48
+# `TRUNCAR_TITULO_BOTON` es un alias de `salida.TRUNCAR_ETIQUETA_BOTON`
+# (importado arriba): la regla de truncado vive ahí, reusada por
+# `ofrecer_opciones` (T1, ADR 0007); este nombre se conserva porque las
+# pruebas de la aclaración con botones ya lo referencian.
 
 
 def _conn():
@@ -325,6 +326,13 @@ def _toque(conn, workspace_id: str, slug: str, toque: dict,
                 # rechazaría -- es la elección de un botón de aclaración.
                 _resolver_toque_aclaracion(
                     cur, quien, workspace_id, chat_id, token, resuelta.args, ahora)
+            elif resuelta.herramienta == P.SENTINEL_OPCIONES_MODELO:
+                # T1, ADR 0007: tampoco es una herramienta real -- es la
+                # elección de una opción que ofreció el modelo con
+                # `ofrecer_opciones`. No vuelve a llamarla: retoma la
+                # conversación con el modelo.
+                _resolver_toque_opcion_modelo(
+                    cur, quien, workspace_id, chat_id, resuelta.args, ahora)
             else:
                 from .agente import VIGENCIA_PENDIENTE
 
@@ -789,6 +797,65 @@ def _resolver_toque_aclaracion(cur, quien, workspace_id: str, chat_id: int,
                        estado)
 
 
+def _resolver_toque_opcion_modelo(cur, quien, workspace_id: str, chat_id: int,
+                                  args: dict, ahora) -> None:
+    """Alguien tocó una opción de `ofrecer_opciones` (T1, ADR 0007).
+
+    A diferencia de `_resolver_toque_aclaracion`, ninguna elección acá vuelve
+    a llamar a una herramienta: "Quiero consultar otra cosa" cierra sin
+    efecto e invita a escribir (el próximo mensaje se rutea como un turno
+    común); cualquier otra opción retoma la conversación con el modelo,
+    pasándole la elección como si fuera lo que escribió la persona -- para
+    una tarea, ya resuelta, sin pasar por Jev ni por el enrutador.
+    """
+    eleccion = args.get("eleccion") or {}
+    pregunta = args.get("pregunta", "")
+    tipo = eleccion.get("tipo")
+
+    # Auditoría (T1, punto 4): el tipo de elección y, si es una tarea, su id
+    # -- nunca la pregunta ni el texto de una opción de texto libre.
+    registrar_auditoria(
+        cur, accion="eleccion_opciones_modelo", workspace_id=workspace_id,
+        actor_app_user_id=quien.app_user_id, actor_kind="persona",
+        detalle={"tipo": tipo,
+                 "tarea_id": eleccion.get("tarea_id") if tipo == "tarea" else None})
+
+    if tipo == "salida":
+        _responder(cur, workspace_id, chat_id, quien,
+                  "Dale, escribime qué necesitás.", ahora)
+        return
+
+    if tipo == "tarea":
+        titulo = eleccion.get("titulo", "")
+        tarea_id = eleccion.get("tarea_id")
+        texto_entrante = eleccion.get("etiqueta") or titulo
+        contexto = (
+            "# Elección de una opción\n\n"
+            f"Prisma había preguntado: «{pregunta}»\n\n"
+            f"La persona tocó la tarea «{titulo}» ({tarea_id}): es su "
+            "respuesta a esa pregunta. Usá esa tarea directamente; no la "
+            "vuelvas a resolver ni preguntes de nuevo cuál es.")
+        tareas_resueltas = {tarea_id: titulo} if titulo and tarea_id else None
+    else:
+        texto_entrante = eleccion.get("texto", "")
+        contexto = (
+            "# Elección de una opción\n\n"
+            f"Prisma había preguntado: «{pregunta}»\n\n"
+            f"La persona tocó «{texto_entrante}»: es su respuesta a esa "
+            "pregunta, tratala como tal.")
+        tareas_resueltas = None
+
+    from .agente import responder
+    from .calendario import Calendario
+    from .llm import desde_base
+
+    cal = Calendario.desde_base(cur, workspace_id)
+    proveedor = desde_base(cur, workspace_id, config.llm_api_key)
+    responder(cur, quien, texto_entrante, proveedor, cal, chat_id, ahora=ahora,
+             contexto_referencias=contexto,
+             tareas_resueltas_claras=tareas_resueltas)
+
+
 @dataclass(frozen=True)
 class _ReferenciasResueltas:
     """Lo que le queda al turno después de resolver, listo para pasarle a
@@ -929,8 +996,7 @@ def _etiqueta_boton(titulo: str, responsable: str, *, ajena: bool) -> str:
     de otra persona (§5.10: "quién escribe" aporta ahí, no como pista para
     Jev). El título se trunca antes de agregar el sufijo -- el sufijo nunca
     se recorta."""
-    corto = (titulo if len(titulo) <= TRUNCAR_TITULO_BOTON
-             else titulo[:TRUNCAR_TITULO_BOTON - 1].rstrip() + "…")
+    corto = truncar_etiqueta_boton(titulo)
     if not ajena or not responsable:
         return corto
     primer_nombre = responsable.split()[0]

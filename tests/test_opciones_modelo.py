@@ -1,0 +1,524 @@
+"""El modelo ofrece opciones en vez de preguntar en texto abierto (T1,
+`prisma-orienta`; ADR 0007 "Prisma orienta, no charla").
+
+`ofrecer_opciones` es una herramienta más: el modelo la llama con una
+pregunta y sus opciones (texto corto o tarea existente por id), el servidor
+valida cada tarea contra PostgreSQL, arma los botones con "Quiero consultar
+otra cosa" y termina el turno -- el modelo no puede seguir escribiendo
+después. Tocar una opción NO vuelve a llamar a la herramienta (a diferencia
+de `NecesitaElegir`): retoma la conversación con el modelo, con la elección
+como si fuera lo que escribió la persona -- para una tarea, ya resuelta, sin
+pasar por Jev.
+
+Los toques se simulan con `gateway.procesar_update` y un `callback_query`,
+igual que `tests/test_aclaracion_botones.py`.
+"""
+
+from __future__ import annotations
+
+from contextlib import nullcontext
+from datetime import datetime, timezone
+
+import pytest
+from fastapi.testclient import TestClient
+
+from prisma import gateway
+from prisma import herramientas as H
+from prisma import jev as jev_modulo
+from prisma import pendientes as P
+from prisma.agente import responder
+from prisma.autoridad import Canal, identificar
+from prisma.calendario import Calendario
+from prisma.contexto import PREAMBULO, construir
+from prisma.db import admin, espacio
+from prisma.llm import Llamada, ProveedorGuionado, Respuesta
+
+
+def _quien(cur, nombre, ws):
+    cur.execute("select telegram_user_id t from integrante where nombre = %s", (nombre,))
+    return identificar(cur, cur.fetchone()["t"], Canal.ESPACIO, ws)
+
+
+def _telegram_id(cur, nombre) -> int:
+    cur.execute("select telegram_user_id t from integrante where nombre = %s", (nombre,))
+    return cur.fetchone()["t"]
+
+
+def _tarea(cur, ws, *, titulo="Cablear tablero máq. 3", area="electricidad",
+          persona="Mariano Naim", estado="asignada"):
+    cur.execute(
+        """insert into objective (workspace_id, tipo, titulo)
+           values (%s, 'operativo', 'Objetivo de prueba') returning id""", (ws,))
+    obj = cur.fetchone()["id"]
+    cur.execute(
+        """insert into task (workspace_id, objective_id, titulo, area_id,
+                             responsable_membership_id, criterio_aceptacion,
+                             evidencia_requerida)
+           values (%s, %s, %s,
+                   (select id from area where workspace_id = %s and slug = %s),
+                   (select m.id from membership m join app_user u on u.id = m.app_user_id
+                     where m.workspace_id = %s and u.nombre = %s),
+                    'Criterio de prueba', array['explicacion'])
+           returning id""",
+        (ws, obj, titulo, ws, area, ws, persona))
+    t = cur.fetchone()["id"]
+    cur.execute("insert into task_state_event (task_id, estado_nuevo, actor_kind) "
+                "values (%s, %s, 'prisma')", (t, estado))
+    return str(t)
+
+
+def _con_proveedor(monkeypatch, guion):
+    proveedor = ProveedorGuionado(guion=list(guion))
+    monkeypatch.setattr("prisma.llm.desde_base", lambda cur, ws, key: proveedor)
+    return proveedor
+
+
+def _jev_no_debe_llamarse(monkeypatch):
+    """Falla la prueba si algo intenta resolver con Jev: el toque de una
+    opción de tarea ya trae la tarea resuelta, no tiene que consultarlo."""
+    def _explota(api_key):
+        raise AssertionError("No debería consultarse a Jev al retomar una opción.")
+    monkeypatch.setattr(jev_modulo, "desde_base", _explota)
+
+
+@pytest.fixture
+def cliente(conn, monkeypatch):
+    """Como en `test_botones.py`/`test_aclaracion_botones.py`: sin esto, cada
+    toque de verdad intenta hablar con `api.telegram.org`."""
+    monkeypatch.setattr(gateway, "acusar_toque", lambda *a, **k: None)
+    monkeypatch.setattr(gateway, "mantener_chat_activo",
+                        lambda *args, **kwargs: nullcontext())
+    monkeypatch.setattr(gateway, "_conn", lambda: conn)
+    import dataclasses
+    monkeypatch.setattr(
+        gateway, "config",
+        dataclasses.replace(gateway.config, webhook_secret="s3cr3t"))
+    return TestClient(gateway.app)
+
+
+def _tocar(cliente, token, user_id):
+    return cliente.post(
+        "/telegram/corework",
+        json={"callback_query": {
+            "id": "cb1", "from": {"id": user_id}, "data": f"p:{token}",
+            "message": {"message_id": 7, "chat": {"id": user_id}}}},
+        headers={"X-Telegram-Bot-Api-Secret-Token": "s3cr3t"})
+
+
+def _opciones(cur, pid):
+    cur.execute(
+        """select token, etiqueta, valor from pending_action_option
+            where pending_action_id = %s order by orden""", (pid,))
+    return cur.fetchall()
+
+
+def _pendiente_opciones(cur, ws) -> str:
+    cur.execute(
+        """select id from pending_action
+            where workspace_id = %s and herramienta = %s and estado = 'esperando'
+            order by creado_en desc limit 1""",
+        (ws, P.SENTINEL_OPCIONES_MODELO))
+    return str(cur.fetchone()["id"])
+
+
+# ---------------------------------------------------------------------------
+# La herramienta arma botones con la salida, hasta el tope
+# ---------------------------------------------------------------------------
+
+def test_opciones_de_texto_arman_botones_con_la_salida(corework, conn, monkeypatch):
+    ws = corework.workspace_id
+    guion = [Respuesta(llamadas=[Llamada("c1", "ofrecer_opciones", {
+        "pregunta": "¿Cuál preferís?",
+        "opciones": [{"texto": "El Dashboard de lotes"},
+                    {"texto": "La Integración de datos"}]})])]
+    proveedor = _con_proveedor(monkeypatch, guion)
+
+    with espacio(conn, ws) as cur:
+        quien = _quien(cur, "Marcos Tarquini", ws)
+        cal = Calendario.desde_base(cur, ws)
+        r = responder(cur, quien, "no sé qué mirar", proveedor, cal, chat_id=1,
+                     ahora=datetime.now(timezone.utc))
+        assert r.elecciones == ["ofrecer_opciones"]
+        assert r.texto == ""            # nada de texto extra después de ofrecer
+
+        pid = _pendiente_opciones(cur, ws)
+        filas = _opciones(cur, pid)
+
+    etiquetas = [f["etiqueta"] for f in filas]
+    assert etiquetas == ["El Dashboard de lotes", "La Integración de datos",
+                        "Quiero consultar otra cosa"]
+
+
+def test_mas_de_cuatro_opciones_se_rechaza_al_modelo(corework, conn, monkeypatch):
+    ws = corework.workspace_id
+    opciones = [{"texto": f"Opción {n}"} for n in range(H.MAX_OPCIONES_MODELO + 1)]
+    guion = [
+        Respuesta(llamadas=[Llamada("c1", "ofrecer_opciones", {
+            "pregunta": "¿Cuál?", "opciones": opciones})]),
+        Respuesta(texto="listo"),
+    ]
+    proveedor = _con_proveedor(monkeypatch, guion)
+
+    with espacio(conn, ws) as cur:
+        quien = _quien(cur, "Marcos Tarquini", ws)
+        cal = Calendario.desde_base(cur, ws)
+        r = responder(cur, quien, "elegí algo", proveedor, cal, chat_id=1,
+                     ahora=datetime.now(timezone.utc))
+        # El rechazo vuelve al modelo como error de la herramienta, no se
+        # arma ninguna acción pendiente.
+        cur.execute("select count(*) n from pending_action where herramienta = %s",
+                    (P.SENTINEL_OPCIONES_MODELO,))
+        assert cur.fetchone()["n"] == 0
+    assert r.elecciones == []
+    assert "ofrecer_opciones" not in r.acciones
+
+
+# ---------------------------------------------------------------------------
+# Una tarea inexistente o de otro espacio se rechaza al modelo, no se inventa
+# ---------------------------------------------------------------------------
+
+def test_tarea_id_inexistente_se_rechaza_al_modelo(corework, conn, monkeypatch):
+    ws = corework.workspace_id
+    guion = [
+        Respuesta(llamadas=[Llamada("c1", "ofrecer_opciones", {
+            "pregunta": "¿Cuál tarea?",
+            "opciones": [{"tarea_id": "00000000-0000-0000-0000-000000000000"}]})]),
+        Respuesta(texto="listo"),
+    ]
+    proveedor = _con_proveedor(monkeypatch, guion)
+
+    with espacio(conn, ws) as cur:
+        quien = _quien(cur, "Marcos Tarquini", ws)
+        cal = Calendario.desde_base(cur, ws)
+        responder(cur, quien, "elegí una tarea", proveedor, cal, chat_id=1,
+                 ahora=datetime.now(timezone.utc))
+        cur.execute("select count(*) n from pending_action where herramienta = %s",
+                    (P.SENTINEL_OPCIONES_MODELO,))
+        assert cur.fetchone()["n"] == 0
+
+    sistema, mensajes = proveedor.recibidos[-1]
+    ultimo = mensajes[-1]
+    assert ultimo["role"] == "user"
+    contenido = str(ultimo["content"])
+    assert "no existe" in contenido or "permitido" in contenido.lower()
+
+
+def test_tarea_de_otro_espacio_se_rechaza_al_modelo(intake_world, conn, monkeypatch):
+    """`intake_world` arma dos espacios independientes: la tarea de uno no
+    puede ofrecerse en el otro (T1: "valida... bajo RLS")."""
+    norte = intake_world["north-lab"]
+    oeste = intake_world["west-studio"]
+    with admin(conn) as cur:
+        cur.execute(
+            """insert into task (workspace_id, objective_id, titulo, area_id,
+                                 responsable_membership_id, criterio_aceptacion,
+                                 evidencia_requerida)
+               values (%s, %s, 'Tarea de otro equipo', %s, %s, 'Criterio',
+                       array['explicacion']) returning id""",
+            (oeste["id"], oeste["objectives"][0], oeste["areas"]["field"],
+             oeste["people"]["Taylor Quinn"]["membership_id"]))
+        tarea_ajena = str(cur.fetchone()["id"])
+        cur.execute("insert into task_state_event (task_id, estado_nuevo, actor_kind) "
+                    "values (%s, 'asignada', 'prisma')", (tarea_ajena,))
+    conn.commit()
+
+    guion = [
+        Respuesta(llamadas=[Llamada("c1", "ofrecer_opciones", {
+            "pregunta": "¿Cuál tarea?", "opciones": [{"tarea_id": tarea_ajena}]})]),
+        Respuesta(texto="listo"),
+    ]
+    proveedor = _con_proveedor(monkeypatch, guion)
+
+    with espacio(conn, norte["id"]) as cur:
+        quien = identificar(cur, norte["people"]["Taylor Quinn"]["telegram"],
+                            Canal.ESPACIO, norte["id"])
+        cal = Calendario.desde_base(cur, norte["id"])
+        responder(cur, quien, "elegí una tarea", proveedor, cal, chat_id=1,
+                 ahora=datetime.now(timezone.utc))
+        cur.execute("select count(*) n from pending_action where herramienta = %s",
+                    (P.SENTINEL_OPCIONES_MODELO,))
+        assert cur.fetchone()["n"] == 0
+
+
+# ---------------------------------------------------------------------------
+# Tocar una tarea retoma con la tarea resuelta, sin pasar por Jev
+# ---------------------------------------------------------------------------
+
+def test_tocar_una_tarea_retoma_resuelta_sin_jev(
+        cliente, conn, corework, monkeypatch):
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        tid = _tarea(cur, ws, titulo="Cablear tablero máq. 3", persona="Marcos Tarquini")
+    conn.commit()
+
+    _jev_no_debe_llamarse(monkeypatch)
+    guion = [
+        Respuesta(llamadas=[Llamada("c1", "ofrecer_opciones", {
+            "pregunta": "¿De cuál tarea hablamos?",
+            "opciones": [{"tarea_id": tid}]})]),
+        Respuesta(texto="Va bien, sin novedades."),
+    ]
+    proveedor = _con_proveedor(monkeypatch, guion)
+
+    with espacio(conn, ws) as cur:
+        quien = _quien(cur, "Marcos Tarquini", ws)
+        cal = Calendario.desde_base(cur, ws)
+        responder(cur, quien, "¿cómo va?", proveedor, cal, chat_id=1,
+                 ahora=datetime.now(timezone.utc))
+        pid = _pendiente_opciones(cur, ws)
+        token = _opciones(cur, pid)[0]["token"]
+        tg = _telegram_id(cur, "Marcos Tarquini")
+
+    assert _tocar(cliente, token, tg).status_code == 200
+
+    with admin(conn) as cur:
+        cur.execute("select estado from pending_action where id = %s", (pid,))
+        assert cur.fetchone()["estado"] == "resuelta"
+
+    sistema, mensajes = proveedor.recibidos[-1]
+    assert f"«Cablear tablero máq. 3» ({tid})" in sistema
+    assert "no la vuelvas a resolver" in sistema
+    assert mensajes[-1]["role"] == "user"
+
+
+# ---------------------------------------------------------------------------
+# Tocar una opción de texto retoma con ese texto
+# ---------------------------------------------------------------------------
+
+def test_tocar_texto_retoma_con_ese_texto(cliente, conn, corework, monkeypatch):
+    ws = corework.workspace_id
+    guion = [
+        Respuesta(llamadas=[Llamada("c1", "ofrecer_opciones", {
+            "pregunta": "¿Terminaste la tarea?",
+            "opciones": [{"texto": "Sí"}, {"texto": "Todavía no"}]})]),
+        Respuesta(texto="Perfecto, la paso a revisión."),
+    ]
+    proveedor = _con_proveedor(monkeypatch, guion)
+
+    with espacio(conn, ws) as cur:
+        quien = _quien(cur, "Marcos Tarquini", ws)
+        cal = Calendario.desde_base(cur, ws)
+        responder(cur, quien, "avisame", proveedor, cal, chat_id=1,
+                 ahora=datetime.now(timezone.utc))
+        pid = _pendiente_opciones(cur, ws)
+        si = next(o for o in _opciones(cur, pid) if o["etiqueta"] == "Sí")
+        tg = _telegram_id(cur, "Marcos Tarquini")
+
+    assert _tocar(cliente, si["token"], tg).status_code == 200
+
+    sistema, mensajes = proveedor.recibidos[-1]
+    assert mensajes[-1] == {"role": "user", "content": "Sí"}
+    assert "¿Terminaste la tarea?" in sistema
+    assert "tocó «Sí»" in sistema
+
+
+# ---------------------------------------------------------------------------
+# "Quiero consultar otra cosa": cierra sin efecto, invita a escribir
+# ---------------------------------------------------------------------------
+
+def test_salida_cierra_sin_efecto_y_no_llama_al_modelo(
+        cliente, conn, corework, monkeypatch):
+    ws = corework.workspace_id
+    guion = [Respuesta(llamadas=[Llamada("c1", "ofrecer_opciones", {
+        "pregunta": "¿Cuál?", "opciones": [{"texto": "A"}, {"texto": "B"}]})])]
+    proveedor = _con_proveedor(monkeypatch, guion)
+
+    with espacio(conn, ws) as cur:
+        quien = _quien(cur, "Marcos Tarquini", ws)
+        cal = Calendario.desde_base(cur, ws)
+        responder(cur, quien, "algo", proveedor, cal, chat_id=1,
+                 ahora=datetime.now(timezone.utc))
+        pid = _pendiente_opciones(cur, ws)
+        salir = next(o for o in _opciones(cur, pid)
+                    if o["etiqueta"] == "Quiero consultar otra cosa")
+        tg = _telegram_id(cur, "Marcos Tarquini")
+
+    llamadas_antes = len(proveedor.recibidos)
+    assert _tocar(cliente, salir["token"], tg).status_code == 200
+
+    # No retoma la conversación con el modelo: cierra e invita a escribir.
+    assert len(proveedor.recibidos) == llamadas_antes
+
+    with admin(conn) as cur:
+        cur.execute("select estado from pending_action where id = %s", (pid,))
+        assert cur.fetchone()["estado"] == "resuelta"
+        cur.execute(
+            "select cuerpo from message_outbox where chat_id = %s order by id desc limit 1",
+            (tg,))
+        assert "escrib" in cur.fetchone()["cuerpo"].lower()
+
+
+# ---------------------------------------------------------------------------
+# Nada se aplica sin la vista previa de siempre
+# ---------------------------------------------------------------------------
+
+def test_retomar_con_un_cambio_sigue_pidiendo_confirmar(
+        cliente, conn, corework, monkeypatch):
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        tid = _tarea(cur, ws, titulo="Cablear tablero máq. 3", persona="Marcos Tarquini")
+    conn.commit()
+
+    _jev_no_debe_llamarse(monkeypatch)
+    guion = [
+        Respuesta(llamadas=[Llamada("c1", "ofrecer_opciones", {
+            "pregunta": "¿Cuál pasamos a revisión?",
+            "opciones": [{"tarea_id": tid}]})]),
+        Respuesta(llamadas=[Llamada(
+            "c2", "actualizar_estado", {"tarea_id": tid, "estado": "en_revision"})]),
+    ]
+    proveedor = _con_proveedor(monkeypatch, guion)
+
+    with espacio(conn, ws) as cur:
+        quien = _quien(cur, "Marcos Tarquini", ws)
+        cal = Calendario.desde_base(cur, ws)
+        responder(cur, quien, "ya terminé", proveedor, cal, chat_id=1,
+                 ahora=datetime.now(timezone.utc))
+        pid = _pendiente_opciones(cur, ws)
+        token = _opciones(cur, pid)[0]["token"]
+        tg = _telegram_id(cur, "Marcos Tarquini")
+
+    assert _tocar(cliente, token, tg).status_code == 200
+
+    with admin(conn) as cur:
+        cur.execute("select estado from task where id = %s", (tid,))
+        assert cur.fetchone()["estado"] == "asignada"      # sin tocar: sólo hay preview
+        cur.execute(
+            """select count(*) n from pending_action
+                where herramienta = 'actualizar_estado' and estado = 'esperando'""")
+        assert cur.fetchone()["n"] == 1
+
+
+# ---------------------------------------------------------------------------
+# Garantías existentes reusadas: otro integrante, vencida, doble toque
+# ---------------------------------------------------------------------------
+
+def test_toque_de_otro_integrante_no_resuelve(cliente, conn, corework, monkeypatch):
+    ws = corework.workspace_id
+    guion = [Respuesta(llamadas=[Llamada("c1", "ofrecer_opciones", {
+        "pregunta": "¿Cuál?", "opciones": [{"texto": "A"}, {"texto": "B"}]})])]
+    proveedor = _con_proveedor(monkeypatch, guion)
+
+    with espacio(conn, ws) as cur:
+        quien = _quien(cur, "Marcos Tarquini", ws)
+        cal = Calendario.desde_base(cur, ws)
+        responder(cur, quien, "algo", proveedor, cal, chat_id=1,
+                 ahora=datetime.now(timezone.utc))
+        pid = _pendiente_opciones(cur, ws)
+        token = _opciones(cur, pid)[0]["token"]
+        ajeno = _telegram_id(cur, "Ariel De Simone")
+
+    assert _tocar(cliente, token, ajeno).status_code == 200
+
+    with admin(conn) as cur:
+        cur.execute("select estado from pending_action where id = %s", (pid,))
+        assert cur.fetchone()["estado"] == "esperando"
+
+
+def test_toque_vencido_no_aplica(cliente, conn, corework, monkeypatch):
+    ws = corework.workspace_id
+    guion = [Respuesta(llamadas=[Llamada("c1", "ofrecer_opciones", {
+        "pregunta": "¿Cuál?", "opciones": [{"texto": "A"}, {"texto": "B"}]})])]
+    proveedor = _con_proveedor(monkeypatch, guion)
+
+    with espacio(conn, ws) as cur:
+        quien = _quien(cur, "Marcos Tarquini", ws)
+        cal = Calendario.desde_base(cur, ws)
+        responder(cur, quien, "algo", proveedor, cal, chat_id=1,
+                 ahora=datetime.now(timezone.utc))
+        pid = _pendiente_opciones(cur, ws)
+        token = _opciones(cur, pid)[0]["token"]
+        tg = _telegram_id(cur, "Marcos Tarquini")
+        cur.execute(
+            "update pending_action set vence_en = now() - interval '1 hour' where id = %s",
+            (pid,))
+    conn.commit()
+
+    assert _tocar(cliente, token, tg).status_code == 200
+
+    with admin(conn) as cur:
+        cur.execute("select estado from pending_action where id = %s", (pid,))
+        assert cur.fetchone()["estado"] == "vencida"
+
+
+def test_toque_repetido_no_aplica_dos_veces(cliente, conn, corework, monkeypatch):
+    ws = corework.workspace_id
+    guion = [
+        Respuesta(llamadas=[Llamada("c1", "ofrecer_opciones", {
+            "pregunta": "¿Cuál?", "opciones": [{"texto": "A"}, {"texto": "B"}]})]),
+        Respuesta(texto="listo"),
+    ]
+    proveedor = _con_proveedor(monkeypatch, guion)
+
+    with espacio(conn, ws) as cur:
+        quien = _quien(cur, "Marcos Tarquini", ws)
+        cal = Calendario.desde_base(cur, ws)
+        responder(cur, quien, "algo", proveedor, cal, chat_id=1,
+                 ahora=datetime.now(timezone.utc))
+        pid = _pendiente_opciones(cur, ws)
+        token = _opciones(cur, pid)[0]["token"]
+        tg = _telegram_id(cur, "Marcos Tarquini")
+
+    assert _tocar(cliente, token, tg).status_code == 200
+    assert _tocar(cliente, token, tg).status_code == 200   # de nuevo, no rompe
+
+    with admin(conn) as cur:
+        cur.execute(
+            "select count(*) n from audit_log where accion = 'eleccion_opciones_modelo'")
+        assert cur.fetchone()["n"] == 1, "el segundo toque no vuelve a auditar nada"
+
+
+# ---------------------------------------------------------------------------
+# Auditoría de la elección, nunca el texto
+# ---------------------------------------------------------------------------
+
+def test_auditoria_sin_texto(cliente, conn, corework, monkeypatch):
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        tid = _tarea(cur, ws, titulo="Cablear tablero máq. 3 (secreto)",
+                    persona="Marcos Tarquini")
+    conn.commit()
+
+    _jev_no_debe_llamarse(monkeypatch)
+    guion = [
+        Respuesta(llamadas=[Llamada("c1", "ofrecer_opciones", {
+            "pregunta": "¿Cuál tarea, secreto de más?",
+            "opciones": [{"tarea_id": tid}]})]),
+        Respuesta(texto="listo"),
+    ]
+    proveedor = _con_proveedor(monkeypatch, guion)
+
+    with espacio(conn, ws) as cur:
+        quien = _quien(cur, "Marcos Tarquini", ws)
+        cal = Calendario.desde_base(cur, ws)
+        responder(cur, quien, "algo", proveedor, cal, chat_id=1,
+                 ahora=datetime.now(timezone.utc))
+        pid = _pendiente_opciones(cur, ws)
+        token = _opciones(cur, pid)[0]["token"]
+        tg = _telegram_id(cur, "Marcos Tarquini")
+
+    assert _tocar(cliente, token, tg).status_code == 200
+
+    with admin(conn) as cur:
+        cur.execute(
+            "select detalle from audit_log where accion = 'eleccion_opciones_modelo'")
+        fila = cur.fetchone()
+        assert fila["detalle"] == {"tipo": "tarea", "tarea_id": tid}
+        crudo = str(fila["detalle"])
+        assert "secreto" not in crudo.lower()
+
+
+# ---------------------------------------------------------------------------
+# Reglas del contexto (ADR 0007)
+# ---------------------------------------------------------------------------
+
+def test_reglas_del_contexto_piden_ofrecer_opciones(corework, conn):
+    ws = corework.workspace_id
+    with espacio(conn, ws) as cur:
+        quien = _quien(cur, "Marcos Tarquini", ws)
+        ctx = construir(cur, quien)
+
+    assert "ofrecer_opciones" in PREAMBULO
+    assert "ofrecer_opciones" in ctx.sistema
+    assert "no la presentes como un hecho" in PREAMBULO.lower() or \
+           "no presentes" in PREAMBULO.lower()

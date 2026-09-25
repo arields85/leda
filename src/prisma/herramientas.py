@@ -26,7 +26,8 @@ from psycopg.types.json import Jsonb
 
 from .autoridad import (Denegado, Solicitante, puede_aprobar_tarea,
                          requiere_confirmacion, verificar)
-from .salida import enqueue_outbox, normalize_visible_text, telegram_utf16_units
+from .salida import (enqueue_outbox, normalize_visible_text,
+                     telegram_utf16_units, truncar_etiqueta_boton)
 
 
 @dataclass(frozen=True)
@@ -165,6 +166,145 @@ class NecesitaElegir(Exception):
         self.herramienta = ""      # los completa `ejecutar`
         self.argumentos: dict = {}   # `args` es de BaseException, no se toca
         super().__init__(resumen)
+
+
+# Cuántas opciones puede ofrecer el modelo con `ofrecer_opciones` (T1, ADR
+# 0007: "hasta cuatro opciones más la salida"). La salida "Quiero consultar
+# otra cosa" no cuenta para este tope: la agrega siempre `agente.py`.
+MAX_OPCIONES_MODELO = 4
+
+
+@dataclass(frozen=True)
+class OpcionOfrecida:
+    """Una opción ya validada de `ofrecer_opciones`: la etiqueta que ve la
+    persona y el valor que vuelve al tocarla -- un dict, no un id suelto,
+    porque `gateway._resolver_toque_opcion_modelo` necesita saber si lo que
+    se tocó fue una tarea o un texto para retomar distinto."""
+    etiqueta: str
+    valor: dict[str, Any]
+
+
+class NecesitaOpciones(Exception):
+    """El modelo le ofrece una elección concreta a la persona en vez de
+    preguntar en texto abierto (T1, ADR 0007 "Prisma orienta, no charla").
+
+    No es un argumento que falta para volver a llamar a esta misma
+    herramienta -- a diferencia de `NecesitaElegir` --: es una pregunta del
+    modelo que espera la respuesta de la persona como su próximo turno.
+    Tocar una opción retoma la conversación con el modelo
+    (`gateway._resolver_toque_opcion_modelo`); nunca vuelve a llamar a
+    `ofrecer_opciones`.
+    """
+
+    def __init__(self, pregunta: str, opciones: list[OpcionOfrecida]) -> None:
+        self.pregunta = pregunta
+        self.opciones = opciones
+        super().__init__(pregunta)
+
+
+def _tareas_activas_por_id(cur: psycopg.Cursor, workspace_id: str,
+                          tarea_ids: list[Any]) -> dict[str, str]:
+    """Título de cada id de tarea activa del espacio, bajo el mismo cursor con
+    RLS del turno (T1, ADR 0007: "el modelo no inventa candidatos"). Un id que
+    no es un UUID válido, que no existe, que está cerrada o que es de otro
+    espacio queda simplemente afuera del resultado -- `_ofrecer_opciones` lo
+    rechaza igual que uno inexistente, sin distinguir el motivo."""
+    validos = []
+    for tid in tarea_ids:
+        try:
+            uuid.UUID(str(tid))
+        except (ValueError, AttributeError, TypeError):
+            continue
+        validos.append(str(tid))
+    if not validos:
+        return {}
+    cur.execute(
+        """select id, titulo from task
+            where workspace_id = %s and estado not in ('terminada', 'cancelada')
+              and id = any(%s::uuid[])""",
+        (workspace_id, validos))
+    return {str(f["id"]): f["titulo"] for f in cur.fetchall()}
+
+
+@herramienta(
+    "ofrecer_opciones", "consultar",
+    "Ofrece a la persona una elección concreta, con botones, en vez de "
+    "preguntar en texto abierto (Prisma orienta, no charla). Cada opción es "
+    "un texto corto (campo 'texto') o una tarea existente por su id (campo "
+    "'tarea_id', con 'etiqueta' opcional para el botón). El servidor valida "
+    "cada tarea contra el equipo, arma los botones, agrega la salida "
+    f"'Quiero consultar otra cosa' y termina el turno. Hasta "
+    f"{MAX_OPCIONES_MODELO} opciones. No escribas nada más ni llames a otra "
+    "herramienta después de usar ésta: el turno termina acá.",
+    {"pregunta": {"type": "string", "requerido": True,
+                 "description": "lo que Prisma pregunta, en una frase corta"},
+     "opciones": {
+         "type": "array", "requerido": True,
+         "description": f"hasta {MAX_OPCIONES_MODELO} opciones",
+         "items": {
+             "type": "object",
+             "properties": {
+                 "texto": {"type": "string",
+                          "description": "una opción de texto corto"},
+                 "tarea_id": {"type": "string",
+                             "description": "id de una tarea existente"},
+                 "etiqueta": {"type": "string",
+                             "description": "etiqueta corta para el botón de "
+                                            "la tarea (si falta, se usa su "
+                                            "título)"},
+             }}}})
+def _ofrecer_opciones(cur, quien: Solicitante, pregunta, opciones):
+    pregunta = normalize_visible_text(pregunta)
+    if not pregunta:
+        raise Denegado("ofrecer_opciones necesita una pregunta.")
+    if not isinstance(opciones, list) or not opciones:
+        raise Denegado("ofrecer_opciones necesita al menos una opción.")
+    if len(opciones) > MAX_OPCIONES_MODELO:
+        raise Denegado(
+            f"ofrecer_opciones acepta hasta {MAX_OPCIONES_MODELO} opciones "
+            f"(la salida se agrega aparte); llegaron {len(opciones)}.")
+
+    tarea_ids = [o.get("tarea_id") for o in opciones
+                if isinstance(o, dict) and o.get("tarea_id")]
+    titulos = (_tareas_activas_por_id(cur, quien.workspace_id, tarea_ids)
+              if tarea_ids else {})
+
+    armadas: list[OpcionOfrecida] = []
+    for o in opciones:
+        if not isinstance(o, dict):
+            raise Denegado(
+                "Cada opción tiene que ser un objeto con 'texto' o 'tarea_id'.")
+        tarea_id = o.get("tarea_id")
+        texto = o.get("texto")
+        if tarea_id and texto:
+            raise Denegado(
+                "Cada opción es una tarea (tarea_id) o un texto (texto), no "
+                "las dos a la vez.")
+        if tarea_id:
+            titulo = titulos.get(str(tarea_id))
+            if titulo is None:
+                raise Denegado(
+                    f"La tarea {tarea_id} no existe entre las activas de "
+                    "este equipo. No inventes candidatos: consultá las "
+                    "tareas primero.")
+            etiqueta = truncar_etiqueta_boton(
+                normalize_visible_text(o.get("etiqueta") or titulo))
+            if not etiqueta:
+                raise Denegado("La etiqueta de una opción no puede quedar vacía.")
+            armadas.append(OpcionOfrecida(
+                etiqueta=etiqueta,
+                valor={"tipo": "tarea", "tarea_id": str(tarea_id),
+                      "titulo": titulo, "etiqueta": etiqueta}))
+        elif texto:
+            texto = truncar_etiqueta_boton(normalize_visible_text(texto))
+            if not texto:
+                raise Denegado("Una opción de texto no puede quedar vacía.")
+            armadas.append(OpcionOfrecida(
+                etiqueta=texto, valor={"tipo": "texto", "texto": texto}))
+        else:
+            raise Denegado("Cada opción necesita 'texto' o 'tarea_id'.")
+
+    raise NecesitaOpciones(pregunta, armadas)
 
 
 def candidatos(cur: psycopg.Cursor, texto: str) -> list[tuple[str, str]]:
