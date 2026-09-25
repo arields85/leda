@@ -36,6 +36,7 @@ No se rehace.
 | Importador de paquetes | Genérico, con validaciones cruzadas y hash versionado |
 | Banco conversacional con modelo real | `tests/banco/`: escenarios ficticios en YAML corridos N veces por `gateway.procesar_update` con el proveedor real; comprueba herramientas, acciones afirmadas sin herramienta, personas fuera del equipo, efectos en PostgreSQL y contenido de la respuesta. Fuera de la suite por defecto (`-m modelo_real`); las fallas se guardan para replay |
 | Vista previa y confirmación de todo cambio | Las 8 herramientas que escriben (`herramientas.py`, `Herramienta.preparar`) validan autoridad y reglas, muestran estado vigente y cambio propuesto, y esperan Confirmar, Modificar o Cancelar (`pending_action`, migraciones `0009` y `0010`); al confirmar se recalcula una huella del estado y, si cambió, no se aplica. Modificar acepta la corrección durante 30 minutos. El banco toca Confirmar y comprueba que antes no hubo efectos ([`ADR 0005`](decisions/0005-interpretacion-y-confirmacion.md)) |
+| Resolución de referencias y aclaración con botones | `route_intent` separa las referencias; Jev (`jev.py`, TypeSafe vía OpenRouter) decide a qué tarea activa del espacio se refiere cada una, con pregunta de verificación, bajo el cursor con RLS (`gateway._turno`). Clara: el modelo recibe la tarea. Dudosa: botones con cada candidata (las propias primero), "Es una tarea nueva" cuando corresponde y "Ninguna, lo escribo"; elegir retoma el mensaje y termina en la vista previa. Sin clave o con Jev caído, pregunta y registra un incidente. Toda respuesta sobre una tarea resuelta nombra su título ([`ADR 0006`](decisions/0006-jev-para-resolver-referencias-e-intencion.md)) |
 | Dependencias entre tareas | `crear_dependencia`/`quitar_dependencia` (`herramientas.py`), autoridad del responsable de cualquiera de las dos o su referente; freno de `en_curso` en la base (`motivo_no_arranca_tarea`, migración `0008`); aviso en cadena por atraso o por fecha corrida (`escalera.evaluar_dependencias_en_riesgo`) y aviso de la informativa al cambiar de estado |
 
 ## Diseñado y sin construir
@@ -76,6 +77,11 @@ pedido de tarea nueva en 10 de 10 corridas del banco (escenario `b-0005`,
 2026-09-23, NaN `deepseek-v4-flash`): abre el alta guiada y la dependencia nunca
 se crea. Un replay guionado no sirve de regresión, porque repite la
 clasificación grabada; la regresión es el escenario contra el modelo real.
+**Corregido el 2026-09-24** (unidad de aclaración con botones): una referencia que Jev
+resuelve con claridad a una tarea existente ya no abre el alta de tarea nueva, y en el
+caso mixto Prisma pregunta con "Es una tarea nueva" entre las opciones. En la última
+corrida del banco real, `b-0005` y `b-0005-a` pasan 6 de 6; `b-0005-b` pregunta de más
+en 3 de 3.
 
 **`cli.py` no tiene ninguna prueba.** 403 líneas y trece comandos operativos
 —`esquema`, `importar`, `despachar`, `escuchar`, `servir`—: lo que se usa para

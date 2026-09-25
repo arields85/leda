@@ -202,6 +202,81 @@ que la escalera afirme silencio sobre evidencia real.
 **Cierre:** un escenario con tiempo simulado demuestra envío, silencio, respuesta,
 ausencia y escalamiento sobre solicitudes reales.
 
+### Aprendizaje de apodos y de aclaraciones
+
+**Entrega:** Prisma aprende de lo que ya preguntó, para preguntar menos (pedido del
+usuario, 2026-09-24). Dos partes: los apodos y el vocabulario del equipo ("tincho" es
+Martín; "dashboard", "interfaz HMI" y "CoreLabs" son lo mismo), que ADR 0005 ya
+decide aprender preguntando; y las aclaraciones de tareas: si una persona eligió
+"Actualizar el dashboard de HMI" para "lo del dashboard" y lo confirmó, la próxima
+vez esa referencia llega a Jev con ese dato.
+
+Reglas propuestas, a fijar en un ADR que amplíe la excepción de ADR 0005 al
+aprendizaje persistente:
+
+- sólo se aprende de una elección confirmada en la vista previa, nunca de un toque
+  suelto ni de una propuesta cancelada;
+- lo aprendido es una pista para Jev, no una decisión: siguen la verificación, la
+  pregunta por la segunda candidata y la vista previa;
+- una aclaración aprendida vence cuando su tarea termina o se cancela, para no
+  elegir con confianza una tarea vieja cuando aparece otra parecida;
+- alcance por persona o por equipo según el caso;
+- lo aprendido queda a la vista y se puede borrar, desde el panel cuando exista.
+
+**Insumo a profundizar: Engram** (memoria persistente de gentle-ai,
+[github.com/Gentleman-Programming/engram](https://github.com/Gentleman-Programming/engram),
+MIT). Relevamiento inicial, 2026-09-24: binario Go con SQLite y búsqueda de texto
+(FTS5), sin búsqueda por significado; la unidad es una observación tipada con
+`topic_key` que actualiza en lugar de duplicar; resúmenes de sesión y veredictos
+sobre conflictos entre observaciones. Es local y de un solo usuario por defecto,
+separa por proyecto y no por cliente, y su modo multiusuario es una capa en la nube
+aparte. Lectura inicial: usarlo como componente sumaría un segundo almacén y otro
+modelo de aislamiento, frente a PostgreSQL como única fuente de verdad y RLS por
+espacio; sus ideas (clave de tema con actualización, observaciones con tipo y
+vencimiento, búsqueda de texto) se pueden llevar a PostgreSQL. `PENDIENTE`, a
+profundizar antes del ADR de esta unidad: el modo en la nube y su control de acceso
+por proyecto, cómo decide `mem_judge` los conflictos, y si conviene como
+componente, como servicio aparte o sólo como referencia de diseño.
+
+**Idea a investigar, no decidida: memoria por integrante** (propuesta del usuario,
+2026-09-24, inspirada en los proyectos de Engram). Tratar la conversación de cada
+integrante como un espacio de memoria propio, para que Prisma recuerde lo que habló
+con esa persona. Es una hipótesis a evaluar, no una decisión de usar Engram ni de
+construirla. Condiciones que la investigación tiene que respetar:
+
+- memoria por persona dentro de su espacio, con RLS; lo que una persona le dijo a
+  Prisma nunca aparece en la respuesta a otra;
+- guarda lo que la base no tiene (lo conversado, preferencias, compromisos dichos al
+  pasar, apodos y aclaraciones), nunca el estado de las tareas, que se lee en el
+  momento: la memoria no reemplaza una lectura vigente;
+- se guarda todo lo permitido, pero al modelo le llega sólo lo relacionado con cada
+  mensaje (resúmenes por conversación y búsqueda), no el historial completo;
+- retención y visibilidad según lo que decida cada cliente.
+
+`PENDIENTE`: medir si mejora las respuestas frente al historial actual de 6 horas
+(`contexto.historial`), y definirlo en el mismo ADR que amplíe la excepción de
+ADR 0005.
+
+**Insumo a profundizar: Obsidian** ([obsidian.md](https://obsidian.md)). Relevamiento
+inicial, 2026-09-24: aplicación de escritorio sobre una carpeta de archivos Markdown
+con enlaces, propiedades y extensiones; gratis también para uso comercial
+([licencia](https://obsidian.md/license)). No tiene modo servidor ni permisos por
+usuario: `obsidian-headless` (beta, 2026) sólo sincroniza con Obsidian Sync, y darle
+memoria a un agente se hace con la extensión comunitaria Local REST API, que corre
+dentro de la aplicación abierta, una carpeta por instancia. Lectura inicial: como
+memoria del núcleo choca igual que Engram (segundo almacén, aislamiento por carpeta
+y no por RLS, aplicación de escritorio en un servidor). Único uso con sentido: como
+formato en el que un cliente redacte documentación de su proyecto y Prisma la lea
+como archivos Markdown, sin la aplicación en el servidor. `PENDIENTE`: si existen
+bóvedas compartidas con permisos, los términos de Sync y Publish para un servicio
+con varios clientes, y si la extensión funciona sin entorno gráfico.
+
+**Depende de:** aclaración con botones (entregada) y la sesión por Telegram real con
+datos ficticios, que muestra qué dudas se repiten.
+
+**Cierre:** medido con mensajes reales, las preguntas repetidas bajan sin ninguna
+elección equivocada sin preguntar.
+
 ## Horizonte posterior
 
 No se abordan hasta que las unidades anteriores estén cerradas, y cada uno requiere

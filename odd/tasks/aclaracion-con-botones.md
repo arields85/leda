@@ -1,6 +1,6 @@
 # Aclaración con botones
 
-**Estado:** en curso
+**Estado:** cerrada
 **Creado:** 2026-09-24
 **Origen:** [`ADR 0005`](../../docs/decisions/0005-interpretacion-y-confirmacion.md)
 puntos 3 y 4, [`ADR 0006`](../../docs/decisions/0006-jev-para-resolver-referencias-e-intencion.md);
@@ -69,7 +69,41 @@ sólo como etiqueta de los botones); decir "no encuentro esa tarea" (§5.9 punto
   pasa por la resolución de referencias; hoy el modelo la resuelve solo.
 - [x] **T5 — Respuestas que nombran la tarea.** Toda respuesta a una consulta
   nombra la tarea por su título (protección de las lecturas, ADR 0006).
-- [ ] **T6 — Banco y continuidad.** Grabador de Jev para el banco, escenarios
+- [x] **T7 — Ajustes tras el banco real.** (A) El enrutador separa sólo trabajos,
+  no estados ni causas, y una referencia dudosa cuyas candidatas ya quedaron
+  resueltas por otra del mismo mensaje se descarta. (B) "Ninguna" no fuerza a
+  preguntar si el resto del mensaje es claro. (C) Una referencia que abarca varias
+  tareas no abre botones: si es consulta, se responde sobre todas; si es un cambio,
+  se pregunta. (D) Para cambiar algo, el modelo llama a la herramienta, que arma la
+  vista previa; no pide confirmación con texto. Se vuelve a medir la separación
+  sobre los 60 mensajes y se corre el banco real completo (medición y banco real:
+  pendientes del orquestador, no de este escritor).
+  **Segunda ronda (tras la segunda corrida real, 77/99):** A1 revertida por el
+  orquestador (medición propia, ver Progreso) -- `ROUTER_SYSTEM` volvió a la
+  redacción de T2. (E) Una referencia de sólo estado nunca llega a Jev. (G)
+  Regresión de C: alta de tarea + referencia VARIAS/AMBIGUA sin nada claro
+  pregunta con botones, no arranca sola. (H) Las causas de bloqueos abiertos
+  viajan en el criterio de Jev (decisión del usuario). (I) El comprobador del
+  banco también acepta un pedido de elección en imperativo, sin "?".
+  **Tercera ronda (tras la tercera corrida real, 84/99):** (J) Un argumento de
+  herramienta inválido no aborta el turno: se valida antes de llamar y vuelve
+  como error para que el modelo reintente, sin incidente. (K) Las
+  descripciones de `registrar_bloqueo`/`crear_dependencia` distinguen causa
+  externa de otra tarea del equipo (alineado con `nucleo/mecanica-pm.md`,
+  citado en Progreso). (L) La verificación de una CLARA suma, en la misma
+  llamada, una pregunta sobre la subcampeona ("rival"); si es alta, pasa a
+  ambigua con las dos (decisión del usuario, "ante la duda se pregunta",
+  diseño §5.11). Revisión del orquestador sobre L (mismo día): se sacó el
+  corte por `CORTE_CANDIDATA` en la subcampeona -- dejaba afuera justo el
+  caso 0,91/0,09 que midió §5.11 (b-0013).
+  **Cuarta ronda (tras la cuarta corrida real, 81/99):** (M) "Rival" pasa a
+  preguntar por la REFERENCIA, no por el mensaje completo -- la redacción
+  vieja hacía que un pedido de dependencia que nombra las dos tareas
+  contestara "sí" para las dos referencias (b-0005 9/9, b-0015 3/3 frenaban
+  en vez de crear la dependencia); redacción v2 del diseño §5.12
+  (orquestador, sin tocar `docs/`). (N) El comprobador del banco también
+  acepta "decime qué…"/"contame qué…", no sólo "cuál".
+- [x] **T6 — Banco y continuidad.** Grabador de Jev para el banco, escenarios
   ambiguos con botones, `b-0005`; `docs/capacidades.md`, `docs/STATUS.md`, diseño
   §4.5.
 
@@ -793,3 +827,699 @@ Previsión: bastante más de 400 líneas en total, repartidas en seis tareas.
     entraron dos nuevas -- 0 regresiones, 147,54 s).
   - Sin commit (no pedido explícito todavía). Sin `.env*` tocado, sin modelo
     real, sin `git stash` en esta revisión.
+  - **Commit de T5:** `3ed3956` ("feat: name the resolved task in every
+    answer about it") -- faltaba registrarlo acá.
+- 2026-09-24: **T6 (banco) en curso -- parte del banco cerrada, falta la
+  documental.** Ruta: delegada, un escritor (T6 tiene su fila propia en
+  "Ruta"; `tests/banco/`; la documentación -- `docs/capacidades.md`,
+  `docs/STATUS.md`, diseño §4.5 -- la hace el orquestador aparte, sin
+  tocarse en esta unidad). TDD estricto, cinco rondas (una por
+  comportamiento), cada una con RED real antes de implementar:
+  1. `Escenario.aclaracion_esperada` -- RED con
+     `.venv/Scripts/python.exe -m pytest -q tests/banco/test_escenario.py -k aclaracion_esperada`
+     → **6 failed** (el campo no existía: `AttributeError`/`DID NOT RAISE`).
+     GREEN con el mismo comando → **6 passed**.
+  2. `comprobadores.comprobar_aclaracion` -- RED con
+     `.venv/Scripts/python.exe -m pytest -q tests/banco/test_comprobadores.py -k aclaracion`
+     → **error de colección** (`ImportError: cannot import name
+     'comprobar_aclaracion'`). GREEN con
+     `.venv/Scripts/python.exe -m pytest -q tests/banco/test_comprobadores.py`
+     → **71 passed**.
+  3. `corrida.JevGrabador` / `jev_guionado_desde_grabacion` -- RED con
+     `.venv/Scripts/python.exe -m pytest -q tests/banco/test_corrida.py -k jev_grab`
+     → **error de colección** (`ImportError: cannot import name
+     'JevGrabador'`). GREEN con el mismo comando → **3 passed**.
+  4. `ejecutar_escenario` con `aclaracion_esperada` y grabación de Jev --
+     RED con
+     `.venv/Scripts/python.exe -m pytest -q tests/banco/test_corrida.py -k "aclaracion or jev_vacio"`
+     → **3 failed** (`TypeError` por el kwarg nuevo, y
+     `AttributeError: 'ResultadoCorrida' object has no attribute
+     'etiquetas_aclaracion_ofrecidas'`). GREEN con
+     `.venv/Scripts/python.exe -m pytest -q tests/banco/test_corrida.py`
+     → **30 passed**.
+  5. `conftest._cliente_jev_real_o_falla` / fixture `cliente_jev_real` --
+     RED con
+     `.venv/Scripts/python.exe -m pytest -q tests/banco/test_conftest.py`
+     (archivo nuevo) → **error de colección** (`ImportError: cannot import
+     name '_cliente_jev_real_o_falla'`). GREEN con el mismo comando →
+     **2 passed**.
+  - **Grabador de Jev (punto 1 del encargo).** `tests/banco/corrida.py`:
+    `JevGrabador` (mismo patrón que `ProveedorGrabador`) envuelve cualquier
+    `Jev` -- real o guionado -- y graba cada `(state, preguntas, respuesta)`
+    en `pedidos`; nunca lleva la credencial, sólo lo que
+    `jev.resolver_referencia_tarea` manda de verdad (mensaje, referencia,
+    vocabulario del equipo, quién escribe) y lo que Jev responde.
+    `ejecutar_escenario` ahora envuelve SIEMPRE lo que reciba en
+    `cliente_jev` (real o el guionado vacío por defecto) en un
+    `JevGrabador` -- mismo criterio que ya usa con `proveedor_real` -- y
+    `ResultadoCorrida.grabacion` suma la clave `"jev"` con
+    `JevGrabador.a_json()`. `jev_guionado_desde_grabacion(grabacion)`
+    reconstruye un `ClienteJevGuionado` desde esa clave para el replay; una
+    grabación de antes de T6 no la tiene y sigue cargando con guión vacío
+    (nunca llama a Jev de verdad, lo mismo que si el escenario no hubiera
+    traído ninguna referencia). `tests/banco/test_replays.py` arma ese
+    guionado y lo pasa como `cliente_jev` -- el replay existente
+    (`afirma-resolvio-sin-ejecutar-la-herramienta.json`, b-0003, sin
+    `trabajos` en su ruta grabada) sigue pasando sin cambios, porque nunca
+    llegó a llamar a Jev ni antes ni ahora.
+  - **Jev real en el modelo real (punto 2).** `tests/banco/conftest.py`:
+    `_cliente_jev_real_o_falla(config, *, desde_base=None)` (función pura,
+    testeada con un `Config` fabricado, sin red) -- sin
+    `PRISMA_OPENROUTER_API_KEY` llama a `pytest.fail` con un mensaje que
+    explica por qué (nunca degrada al guionado vacío, que haría que
+    cualquier escenario con referencia termine preguntando siempre -- el
+    defecto que esta unidad corrige, visible en vez de silencioso, como
+    pide `AGENTS.md` para una guarda que falta). Con credencial, llama a
+    `jev.desde_base(api_key)`. Fixture `cliente_jev_real` la usa con la
+    `config` real. `tests/banco/test_banco.py::test_escenario_contra_modelo_real`
+    ahora pide esa fixture y pasa `cliente_jev=cliente_jev_real` a
+    `ejecutar_escenario` -- la suite por defecto sigue sin red (esa prueba
+    lleva el marcador `modelo_real`, excluido por `addopts`).
+  - **Botones de aclaración en el corredor (punto 3).** `Escenario` gana
+    `aclaracion_esperada: dict` (vacío por defecto; si viene, valida
+    `candidatas` -- lista no vacía de texto -- y `elegir` -- texto,
+    tiene que ser una de `candidatas`). `ejecutar_escenario` gana el mismo
+    parámetro: si viene, busca la `pending_action` de aclaración
+    (`herramienta == gateway._SENTINEL_ACLARACION`, `estado='esperando'`) que
+    el turno haya dejado, junta las etiquetas de sus opciones en
+    `ResultadoCorrida.etiquetas_aclaracion_ofrecidas`, y si alguna etiqueta
+    coincide con `elegir` la tapea -- por `gateway.procesar_update` con un
+    `callback_query`, exactamente como ya hace con Confirmar (mismo
+    `CALLBACK_PREFIJO`, mismo armado de `toque`). Si no aparece ninguna
+    coincidencia, no tapea nada -- no adivina cuál tocar -- y la falta queda
+    visible en las etiquetas grabadas para que
+    `comprobadores.comprobar_aclaracion` (nueva; séptima comprobación,
+    aprobado sólo si todas las `candidatas_esperadas` están entre las
+    ofrecidas; una de más -- otro orden de Jev, o "Es una tarea nueva" --
+    no es problema) la marque como falla en vez de bloquear la corrida.
+    **Decisión de dónde tapear:** el paso de aclaración corre ANTES de
+    capturar `herramientas_antes_del_toque`/`conteos_antes_del_toque` (el
+    chequeo de "nada se aplica antes de Confirmar" de T4) -- así esa
+    propiedad sigue valiendo con el paso nuevo en el medio, no sólo hasta
+    la aclaración; lo prueba
+    `test_ejecutar_escenario_aclaracion_tapea_la_candidata_elegida_sin_aplicar_nada`
+    contra el circuito real (dos tareas propias ambiguas, Jev guionado,
+    tapea la elegida, llega a la vista previa de `actualizar_estado` sin
+    que ninguna de las 8 tablas cambie hasta el Confirmar real).
+    `tests/banco/test_banco.py` y `tests/banco/test_replays.py` pasan
+    `aclaracion_esperada=escenario.aclaracion_esperada or None` a
+    `ejecutar_escenario` y agregan `comprobar_aclaracion` a la lista de
+    comprobaciones cuando el escenario lo declara.
+  - **Escenarios nuevos (punto 4), ids b-0013 a b-0015 (siguientes libres
+    después de b-0012):**
+    - `b-0013`: referencia ambigua entre dos tareas propias de Ariel De
+      Simone ("Actualizar el dashboard de HMI" / "Revisar gráficos del
+      dashboard HMI", área `corelabs`, para no repetir el dominio
+      tablero/PLC de los escenarios existentes) -- `aclaracion_esperada`
+      con las dos candidatas y `elegir` la primera; espera
+      `actualizar_estado` sobre esa tarea. Deliberadamente NO reusa el
+      mensaje de b-0008 (que es idéntico en texto y en tareas de
+      precondición, pero verifica lo contrario: que Prisma frene y
+      pregunte en texto, sin tocar nada) -- son la misma ambigüedad
+      probada de dos maneras: b-0008 se queda en la pregunta, b-0013 sigue
+      la aclaración con botones hasta el final.
+    - `b-0014`: "el tablero de la maq 5" -- una referencia parecida a dos
+      tareas existentes (máquina 3 y 4) pero de una máquina que no está en
+      el equipo; `debe_preguntar: true`, prohíbe las 8 herramientas que
+      escriben y exige `conteos_delta` en cero (incluido `task_draft`):
+      Jev tiene que resolver esto como "ninguna", no inventar una
+      candidata de las que sí existen.
+    - `b-0015`: dependencia entre dos tareas existentes de otra área (`it`,
+      Martín Forte/Lucas Natuche, "migrar el servidor" bloqueando
+      "actualizar los accesos VPN") -- mismo defecto que documenta
+      `b-0005` en "Problema" de este mismo archivo (el enrutador tomaba un
+      pedido de dependencia como alta de tarea nueva), verificado con un
+      dominio y una redacción distintos, con `conteos_delta.task_draft: 0`
+      explícito.
+  - **Cambio de expectativa en escenarios existentes (revisión pedida por
+    el encargo, "list every such change and why; never weaken a check"):**
+    `b-0005.yaml`, `b-0005-a.yaml`, `b-0005-b.yaml` suman
+    `efectos.conteos_delta.task_draft: 0` -- no reemplaza nada, sólo agrega
+    una comprobación más estricta. Motivo: son justo los escenarios que
+    "Problema" de este documento cita como el síntoma original del defecto
+    de enrutamiento ("b-0005, 0 de 10"); hasta ahora sólo probaban la
+    ausencia indirecta de las 8 herramientas que escriben, nunca que
+    tampoco se hubiera abierto el alta guiada de tarea nueva -- el efecto
+    concreto del defecto. El resto del corpus (b-0001 a b-0012) se revisó
+    mensaje por mensaje: los que mencionan una tarea existente por
+    descripción (b-0002 a b-0005, b-0008 a b-0012) siempre tuvieron sólo
+    una tarea de la persona que encaja con lo que describen (o, en b-0008/
+    b-0009, la ambigüedad ya es justo lo que se está probando con
+    `debe_preguntar`), así que pasar de verdad por Jev no debería cambiar
+    su resultado esperado -- no se tocó ninguna otra expectativa: no hay
+    evidencia (no se corrió el banco real en esta unidad) de que alguna
+    necesite ajustarse, y `AGENTS.md` pide no inventar hipótesis como
+    hecho.
+  - **Unidades nuevas (punto 5):** `tests/banco/test_escenario.py` (+6),
+    `tests/banco/test_comprobadores.py` (+4), `tests/banco/test_corrida.py`
+    (+6: 3 de `JevGrabador`/replay, 3 de `ejecutar_escenario` con
+    aclaración), `tests/banco/test_conftest.py` (nuevo, 2) -- 18 pruebas
+    nuevas, todas con dobles/fakes, sin red ni credencial real.
+  - Verificación pedida:
+    - `.venv/Scripts/python.exe -m pytest -q tests/banco` → **144 passed,
+      99 deselected** (99 = 90 + 9: tres escenarios nuevos × `--banco-n 3`
+      por defecto).
+    - `.venv/Scripts/python.exe -m pytest -q` → **660 passed, 99
+      deselected** (642 + 18 nuevas, 0 regresiones, 169,91 s).
+    - `.venv/Scripts/python.exe -m pytest -m modelo_real --collect-only -q
+      tests/banco` → **33/177 tests collected (144 deselected)**, con
+      `b-0013-0`, `b-0014-0` y `b-0015-0` entre los recolectados (sólo
+      colección, sin llamar al modelo).
+  - **No se corrió el banco contra el modelo real** (pedido explícito del
+    encargo). Comando sugerido para que el orquestador corra los
+    escenarios nuevos y los que cambiaron de expectativa:
+    `.venv/Scripts/python.exe -m pytest -m modelo_real tests/banco --banco-n 10 --banco-proveedor nan --banco-modelo deepseek-v4-flash --banco-escenario b-0013`
+    (repetir con `b-0014`, `b-0015`, `b-0005`, `b-0005-a`, `b-0005-b`; sin
+    `--banco-escenario` corre todo el corpus). Requiere
+    `PRISMA_OPENROUTER_API_KEY` configurada -- sin ella, `cliente_jev_real`
+    hace fallar la corrida con un mensaje claro en vez de dejarla preguntar
+    siempre.
+  - No se tocó `docs/` (documentación de T6 es tarea aparte del
+    orquestador). No hubo commit (no pedido explícito todavía). No se leyó
+    ni se tocó ningún `.env*`.
+- 2026-09-24 (orquestador): **primera corrida del banco real con Jev** (NaN
+  `deepseek-v4-flash` + Jev real, 33 escenarios x 3, base descartable de pruebas):
+  `.venv/Scripts/python.exe -m pytest -m modelo_real tests/banco --banco-proveedor nan
+  --banco-modelo deepseek-v4-flash -q` → 41 failed, 58 passed. Causas observadas en
+  las grabaciones (`tests/banco/reportes/replay-candidato-*.json`, sin versionar):
+  (A) el enrutador separa como trabajos cosas que no lo son: estados ("revisión"),
+  causas ("el plano que prometieron", "el switch que faltaba") o partes de la misma
+  referencia ("el tablero"); cada una termina en botones o en una pregunta aunque la
+  tarea principal quedó clara (b-0002, b-0003, b-0004, b-0005-b). (B) El bloque de
+  "ninguna" le ordena al modelo preguntar aunque el resto del mensaje sea claro. (C)
+  Una referencia genérica ("algo pendiente esta semana") abre botones en vez de
+  responder sobre todas (b-0001-b). (D) El modelo pide confirmación con texto en vez
+  de llamar a la herramienta que arma la vista previa, y en un caso afirmó "quedó
+  registrado" sin haber registrado nada (b-0008, b-0013); no se había corrido el banco
+  real después de la unidad de vista previa. (E) Jev eligió claro "lo del tablero" y
+  "lo del dashboard" donde el escenario espera duda (b-0008, b-0013); la vista previa
+  lo frena. (F) b-0015: el modelo registró un bloqueo en vez de una dependencia. T6
+  queda abierta hasta corregir y volver a correr.
+- 2026-09-24: **T7 cerrada (A-D).** Ruta: delegada, un escritor (T7 no tiene fila
+  propia en "Ruta" -- se agrega acá: `src/prisma/llm.py`, `src/prisma/jev.py`,
+  `src/prisma/gateway.py`, `src/prisma/contexto.py`, pruebas en
+  `tests/test_llm_protocol.py`, `tests/test_jev.py`,
+  `tests/test_resolucion_referencias.py`, `tests/test_aclaracion_botones.py`,
+  `tests/test_agente.py`, `tests/banco/test_corrida.py`). No se tocó `docs/`
+  (pedido explícito del encargo) ni ningún `.env*`. Postgres local verificado con
+  `pg_isready` antes de empezar. TDD estricto, RED real antes de cada
+  comportamiento (A1, A2+C juntos por la dependencia del enum, B, D):
+  1. **A1 (enrutador).** RED con
+     `.venv/Scripts/python.exe -m pytest -q tests/test_llm_protocol.py -k router_system_excludes`
+     → **1 failed**. GREEN con
+     `.venv/Scripts/python.exe -m pytest -q tests/test_llm_protocol.py` → **104
+     passed**.
+  2. **A2 + C (dedupe y "varias tareas").** RED en dos pasos: `test_jev.py -k varias`
+     → **1 failed** (`AttributeError: type object 'TipoResolucion' has no
+     attribute 'VARIAS'`); después de agregar el enum, `test_resolucion_referencias.py`
+     completo → **4 failed** (varias-tareas sin botones, dedupe con clara, dedupe
+     seguro -- este último ya pasaba sin código nuevo, correctamente, porque sin
+     dedupe nunca se descarta nada -- y la reescritura de "ninguna" del punto B).
+     GREEN con
+     `.venv/Scripts/python.exe -m pytest -q tests/test_resolucion_referencias.py tests/test_aclaracion_botones.py tests/test_jev.py`
+     → **61 passed**.
+  3. **B (ninguna).** Cubierto por el mismo ciclo RED/GREEN del punto anterior
+     (dos aserciones nuevas en la prueba existente del horno más una prueba
+     nueva de mensaje mixto).
+  4. **D (preámbulo).** RED con
+     `.venv/Scripts/python.exe -m pytest -q tests/test_agente.py -k test_contexto_lleva_nucleo_glosario_y_equipo`
+     → **1 failed**. GREEN con
+     `.venv/Scripts/python.exe -m pytest -q tests/test_agente.py tests/test_personas.py`
+     → **26 passed**.
+  - Verificación pedida:
+    `.venv/Scripts/python.exe -m pytest -q tests/test_resolucion_referencias.py tests/test_aclaracion_botones.py tests/test_llm_protocol.py tests/test_respuestas_nombran_tarea.py tests/banco`
+    → **283 passed, 99 deselected**.
+    `.venv/Scripts/python.exe -m pytest -q` → **665 passed, 99 deselected** (660 +
+    5 netas -- test_llm_protocol.py +1, test_resolucion_referencias.py +4; el resto
+    de los archivos tocados sólo reescribió pruebas existentes o ajustó fixtures --
+    0 regresiones, 200,52 s).
+  - **A1 -- `llm.ROUTER_SYSTEM` (`src/prisma/llm.py`):** una sola oración nueva,
+    en el mismo párrafo medido en T2, sin tocar el resto: "no separes un estado
+    (\"revisión\", \"terminado\"), una causa o algo que falta (\"el plano que
+    prometieron\", \"el switch que faltaba\"), ni una segunda mención de la
+    misma referencia." -- toma las palabras textuales de las causas A que
+    anotó el orquestador sobre el banco real.
+  - **A2 -- dedupe determinístico (`gateway._resolver_referencias_del_turno`):**
+    después de calcular `resueltas_claras`, una referencia cuyo `resolucion.tipo
+    is AMBIGUA` con `candidatas` no vacías, y cuyas candidatas son subconjunto de
+    `set(resueltas_claras.values())`, se saca de `resultados` antes de calcular
+    `con_botones`/`sin_boton`/`pendientes_boton` -- no entra ni como botón ni
+    como línea del bloque de texto. Nunca toca `AMBIGUA` sin candidatas, `VARIAS`,
+    `NINGUNA` ni los `JevError` (Jev caído nunca expone candidatas, así que no hay
+    nada que comparar). La auditoría (`_auditar_resolucion`) sigue corriendo
+    sobre `resultados` completo, sin dedupe -- registra lo que Jev respondió de
+    verdad, no lo que se terminó preguntando.
+  - **C -- `TipoResolucion.VARIAS` (`src/prisma/jev.py`):** el alcance
+    "varias_tareas" (un área, lo de una persona, algo genérico) ahora devuelve
+    `ResolucionReferencia(TipoResolucion.VARIAS, candidatas=...)` en vez de
+    `AMBIGUA` -- son conceptualmente distintos (abarca varias tareas de verdad,
+    contra "es una sola tarea pero no sé cuál") y sólo el segundo abre botones
+    (T4). `gateway._bloque_contexto_referencias` gana la rama `VARIAS`: con
+    candidatas, lista las tareas y pide responder sobre todas si consultan o
+    preguntar cuál (en texto) si piden un cambio; sin candidatas, pide no
+    inventar. `con_botones` en `_resolver_referencias_del_turno` sigue
+    comprobando sólo `AMBIGUA`, así que `VARIAS` queda afuera sin tocar esa
+    línea.
+  - **Blast radius de C, mayor al previsto: 15 sitios de prueba usaban
+    `varias_tareas` sólo como gatillo de "ambigua con candidatas" (nunca para
+    probar el alcance "varias" en sí).** Antes de esta unidad, todo T4
+    (`tests/test_aclaracion_botones.py`, 13 sitios) y una prueba de T3/T4
+    (`tests/test_resolucion_referencias.py::test_referencia_ambigua_sin_candidatas_pregunta_en_texto`)
+    simulaban la ambigüedad de una sola tarea con el alcance equivocado
+    ("varias_tareas" en vez de "una_tarea"); con la corrección de C esos
+    escenarios dejarían de abrir botones, que es justo lo que esas pruebas
+    verifican. Se cambió el disparador (`_alcance(varias_tareas=0.7)` →
+    `_alcance(una_tarea=0.8)`, mecánico, mismas probabilidades de "tarea") en
+    los 13 sitios de `test_aclaracion_botones.py`, en el sitio de
+    `test_resolucion_referencias.py`, y en el dict crudo equivalente de
+    `tests/banco/test_corrida.py::test_ejecutar_escenario_aclaracion_tapea_la_candidata_elegida_sin_aplicar_nada`.
+    Se agregó una prueba nueva y propia para el alcance "varias" real
+    (`test_referencia_varias_tareas_no_abre_botones_y_llega_como_contexto`,
+    con el pedido genérico "algo pendiente esta semana" del hallazgo C del
+    banco real) y se renombró/ajustó la prueba unitaria de `jev.py`
+    (`test_resolver_referencia_varias_da_ambigua_con_candidatas_ordenadas` →
+    `..._da_varias_con_candidatas_ordenadas`, tipo esperado `VARIAS`). Ninguna
+    prueba perdió cobertura: siguen verificando exactamente lo mismo (botones
+    para ambigüedad real de una tarea), sólo con el alcance correcto.
+  - **Doble de Jev nuevo para pruebas con más de una referencia
+    (`tests/test_resolucion_referencias.py::_JevPorReferencia`):**
+    `_resolver_en_paralelo` corre las referencias de un mismo turno en un
+    `ThreadPoolExecutor`, así que el orden real de las llamadas a la red no es
+    determinístico; el guión FIFO único de `ClienteJevGuionado` alcanza cuando
+    todas las referencias necesitan la misma forma de respuesta (como ya hacía
+    T4), pero no sirve para un escenario con dos referencias que necesitan
+    cantidades de llamadas distintas (p. ej. una CLARA con verificación, dos
+    llamadas, y otra ambigua, una sola) -- las pruebas nuevas de A2 y B lo
+    necesitaban. `_JevPorReferencia` responde según `state["referencia"]`
+    (presente en las dos llamadas de `resolver_referencia_tarea`), no según el
+    orden global de llamadas, así que cada referencia consume su propia cola
+    sin importar qué hilo la ejecuta primero.
+  - **B -- "ninguna" (`gateway._bloque_contexto_referencias`):** la rama
+    `NINGUNA` cambia "No inventes una tarea para eso: preguntá." (orden
+    incondicional) por "No es una tarea: no la inventes ni la trates como una.
+    Si hace falta para responder o actuar y no tenés otra cosa clara para usar,
+    preguntá." -- condicional, en vez de mandato. Se conservó la frase
+    "no coincide con ninguna tarea activa del espacio" tal cual (la prueba del
+    horno la usaba como ancla) y se sumaron dos aserciones a esa misma prueba
+    más una prueba nueva de mensaje mixto (una referencia CLARA y otra
+    NINGUNA en el mismo turno) que comprueba la ausencia de la frase vieja.
+    Es un cambio puramente de redacción del bloque de sistema -- no hay lógica
+    nueva que decida "preguntar o no" según lo demás resuelto en el turno; es
+    el modelo el que ahora lee una instrucción condicional en vez de una
+    orden.
+  - **D -- preámbulo (`src/prisma/contexto.py`, `PREAMBULO`):** la viñeta que
+    sólo cubría la creación de una tarea ("La creación de una tarea se resuelve
+    antes de este turno...") se reemplaza por una general: "Para cambiar algo
+    -- crear, actualizar, asignar, cerrar, lo que sea -- llamá a la herramienta
+    correspondiente: el servidor arma la vista previa con Confirmar, Modificar
+    y Cancelar. Nunca pidas confirmación en texto ni digas que algo quedó
+    registrado, creado o cambiado si no llamaste a esa herramienta." Cubre
+    directamente las causas D del banco real (pedir confirmación en texto, y
+    afirmar "quedó registrado" sin tool call en b-0008/b-0013). El vocabulario
+    "vista previa con Confirmar, Modificar y Cancelar" no es nuevo: coincide
+    con `docs/architecture/interpretacion-y-confirmacion.md` (§"Al elegir una
+    propuesta"), sólo se lo mueve al preámbulo para que valga siempre, no sólo
+    para la creación de tareas.
+  - **Efecto secundario de D, corregido en la prueba correspondiente:**
+    `tests/test_aclaracion_botones.py::test_ninguna_dentro_de_la_ventana_el_siguiente_mensaje_usa_el_original`
+    comprobaba `"Modificar" not in sistema` para probar que el bloque propio de
+    `_resumir_aclaracion_ninguna` no se confunde con una corrección real de
+    Modificar (`agente._bloque_modificacion`); como el preámbulo ahora nombra
+    los tres botones por su nombre en todo turno, esa palabra sola dejó de
+    alcanzar. Se angostó la aserción al marcador real que
+    `_bloque_modificacion` usa y que este camino evita a propósito ("#
+    Corrección a una propuesta anterior", "apretó Modificar") -- mismo
+    chequeo, ya no falso positivo por el preámbulo.
+  - **nucleo/ revisado, sin conflicto y sin tocar** (pedido del encargo):
+    `nucleo/constitucion.md` §7 ("Prisma prepara un borrador, pide confirmación
+    y sólo entonces ejecuta...") y `nucleo/mecanica-pm.md` §12 ("Un mensaje que
+    requiere confirmación humana espera en la cola...") describen la
+    obligación de confirmar a nivel de negocio, sin fijar el medio (texto vs.
+    botones) -- compatibles con el mecanismo de vista previa con botones que ya
+    implementa `PREAMBULO`/`herramientas.NecesitaConfirmacion` desde antes de
+    esta unidad. No instruyen al modelo a pedir confirmación en texto en
+    ningún punto; no hubo que reportar conflicto.
+  - **Pendiente, del orquestador, no de este escritor:** volver a medir la
+    separación de referencias sobre los 60 mensajes y correr el banco real
+    completo (T7 lo pide explícitamente); T6 sigue abierta hasta esa corrida.
+  - No hubo commit (no pedido explícito todavía).
+- 2026-09-24 (orquestador): **A1 revertida.** Motivo: medición propia del
+  orquestador con el enrutador real sobre los 60 mensajes -- la instrucción de
+  A1 (excluir estados/causas/segunda mención del párrafo de T2) mejoraba la
+  separación en algunos casos pero perdía tareas reales: 55 de 60 iguales a la
+  extracción separada, contra 57 de 60 con la redacción medida en T2 sin tocar;
+  el caso concreto perdido fue "el switch" en "El switch ya se cambio ahora
+  queda el tablero de la 4". `src/prisma/llm.py`: `ROUTER_SYSTEM` vuelve a la
+  redacción exacta de T2 (revierte la oración agregada por A1). `tests/
+  test_llm_protocol.py`: `test_router_system_excludes_states_causes_and_
+  repeated_mentions` (A1) se reemplaza por `test_router_system_keeps_the_
+  measured_reference_wording`, que fija la redacción de T2 como guarda para
+  que no se vuelva a tocar por accidente. Las referencias que sobran (estados,
+  causas, segundas menciones) las descarta el código, no el modelo -- A2 (T7)
+  ya cubre el caso de "revisión"/estados repetidos por dedupe; E (segunda
+  ronda, más abajo) cubre el caso de una referencia que es sólo un estado.
+- 2026-09-24: **T7, segunda ronda (E, G, H, I) cerrada.** Motivo: segunda
+  corrida del banco real (77 passed, 22 failed) tras la primera tanda de
+  arreglos. Ruta: delegada, un escritor (misma fila de T7 en "Ruta", se
+  extiende a `src/prisma/gateway.py`, `src/prisma/jev.py`,
+  `tests/banco/comprobadores.py`, pruebas en `tests/test_resolucion_
+  referencias.py`, `tests/test_aclaracion_botones.py`, `tests/test_jev.py`,
+  `tests/banco/test_comprobadores.py`). No se tocó `docs/` ni `nucleo/`
+  (pedido explícito), ni ningún `.env*`. `pg_isready` verificado antes de
+  empezar. TDD estricto, RED real antes de cada punto, dobles/fakes
+  solamente, sin modelo ni Jev real, sin commit/stage/stash:
+  1. **E (referencias de sólo estado).** RED con
+     `.venv/Scripts/python.exe -m pytest -q tests/test_resolucion_referencias.py -k "solo_estado or referencia_de_estado"`
+     → **16 failed, 1 passed** (la única que pasaba de entrada,
+     `test_referencia_de_estado_no_confunde_una_referencia_real`, confirmaba
+     que "el switch" -- causa, no estado -- seguía yendo a Jev sin tocar
+     nada). GREEN con
+     `.venv/Scripts/python.exe -m pytest -q tests/test_resolucion_referencias.py`
+     → **31 passed**.
+  2. **G (regresión de C).** RED con
+     `.venv/Scripts/python.exe -m pytest -q tests/test_aclaracion_botones.py -k varias_pregunta`
+     → **1 failed** (`TypeError: 'NoneType' object is not subscriptable` --
+     nunca se abrió la `pending_action` de aclaración: el alta guiada
+     arrancaba sola). GREEN con el mismo comando → **1 passed**.
+  3. **H (bloqueos en el criterio).** RED en dos pasos: unitario primero --
+     `.venv/Scripts/python.exe -m pytest -q tests/test_jev.py -k criterio` →
+     **4 failed, 1 passed** (`TypeError: TareaCandidata.__init__() got an
+     unexpected keyword argument 'causas_bloqueo'`; la única que pasaba,
+     `test_criterio_sin_bloqueos_no_cambia`, no necesitaba código nuevo) --
+     GREEN con el mismo comando → **5 passed**. Después, extremo a extremo --
+     `.venv/Scripts/python.exe -m pytest -q tests/test_resolucion_referencias.py -k bloqueo`
+     → **2 failed, 2 passed** (las dos negativas, sin bloqueo y bloqueo ya
+     resuelto, ya pasaban sin tocar `_tareas_activas`) -- GREEN con el mismo
+     comando → **4 passed**.
+  4. **I (comprobador del banco).** RED con
+     `.venv/Scripts/python.exe -m pytest -q tests/banco/test_comprobadores.py -k imperativo`
+     → **5 failed, 3 passed** (las tres negativas/de orden -- "decime si
+     necesitás algo más" con y sin herramienta, y el imperativo con
+     herramienta que escribe -- ya pasaban con el código de antes, como tenía
+     que ser). GREEN con
+     `.venv/Scripts/python.exe -m pytest -q tests/banco/test_comprobadores.py`
+     → **79 passed**.
+  - Verificación pedida:
+    `.venv/Scripts/python.exe -m pytest -q tests/test_resolucion_referencias.py tests/test_aclaracion_botones.py tests/test_jev.py tests/test_llm_protocol.py tests/banco`
+    → **344 passed, 99 deselected**.
+    `.venv/Scripts/python.exe -m pytest -q` → **700 passed, 99 deselected**
+    (665 + 35 nuevas -- E 17 (16 con estados parametrizados + 2 sueltas, una
+    ya contada en el RED como pasando de entrada), G 1, H 9 (5 unitarias de
+    `criterio()` + 4 de `_tareas_activas`), I 8 -- 0 regresiones, 159,94 s).
+  - **E -- `gateway.ESTADOS_REFERENCIA_SOLA`/`_es_referencia_de_estado`:**
+    vocabulario cerrado a partir de `estado_tarea` (`db/esquema.sql`:
+    'propuesta', 'pendiente_aprobacion', 'asignada', 'en_curso', 'bloqueada',
+    'en_revision', 'terminada', 'cancelada') más sus formas humanas dadas por
+    el encargo (revisión/revision, en revisión, terminado/terminada, listo,
+    hecho, en curso, bloqueado/bloqueada, pendiente, resuelto, cancelado) con
+    sus pares de género obvios (lista, hecha, resuelta) -- nunca frases de un
+    escenario del banco, como pedía el encargo. `_normalizar_referencia_
+    estado` (minúsculas, sin acentos, recorta un artículo/preposición líder
+    de `("a","la","el","en")`) reduce "en revisión"/"en curso" a
+    "revision"/"curso" -- por eso el vocabulario lleva "curso" y "revision"
+    sueltos, no las frases con "en". `_resolver_referencias_del_turno`
+    descarta esas referencias de `route.trabajos` ANTES de pedir la
+    credencial o tocar la base -- si no queda ninguna, se comporta exactamente
+    como "sin referencias" (`None`, sin bloque, sin auditoría). El resto de la
+    función (crédito ausente, dedupe A2, botones) sigue usando la lista ya
+    filtrada (`trabajos`), no `route.trabajos`.
+  - **G -- `_resolver_referencias_del_turno`, `con_botones`:** cuando
+    `route.action is IntentAction.START_TASK_INTAKE` y nada quedó CLARA
+    (`hay_clara` falso), una referencia VARIAS con candidatas también entra a
+    `con_botones` -- fuera de ese caso (consulta normal), sigue sin abrir
+    botón nunca, como fija C. Con eso ya alcanza: `_avanzar_aclaracion`
+    pregunta antes que nada si `estado["pendientes"]` no está vacío (T4),
+    así que el b-0005 mixto (alta silenciosa) queda cubierto sin tocar esa
+    función; `_preguntar_por_botones` ya agregaba "Es una tarea nueva" y
+    "Ninguna, lo escribo" para cualquier pendiente con el enrutador pidiendo
+    alta, así que tampoco hizo falta tocarla -- las candidatas de VARIAS
+    llegan ya recortadas a >= 0,1 por `jev.resolver_referencia_tarea`
+    (`candidatas_por_umbral`), y `_candidatas_para_botones` las ordena
+    propias primero sin cambios. **Alcance deliberado, no evidenciado más
+    allá:** no se tocó el caso VARIAS/AMBIGUA sin ninguna candidata mezclado
+    con alta de tarea (sigue arrancando el alta sola, como ya hacía AMBIGUA
+    sin candidatas antes de esta unidad) -- el encargo y la evidencia
+    (b-0009) hablan de candidatas reales, no inventé un caso sin evidencia.
+  - **H -- `jev.TareaCandidata.causas_bloqueo` + `criterio()`:** campo nuevo
+    (`str | None`, default `None`); `criterio()` agrega
+    " — bloqueada: <causas>" sólo si hay valor, acotado a
+    `MAX_LONGITUD_CAUSAS_BLOQUEO = 200` con "…" (`_acotar`, nuevo, module-
+    level). Como la verificación ya arma su `state` con
+    `top_tarea.criterio()`, un solo punto de cambio alcanza para las dos
+    llamadas (probado de punta a punta en `test_criterio_de_verificacion_
+    tambien_lleva_el_bloqueo`). `gateway._tareas_activas`: la consulta suma
+    una subconsulta (`string_agg(b.causa, '; ' order by b.abierto_en)` desde
+    `blocker` donde `resuelto_en is null`, agrupada por tarea vía subquery
+    correlacionada) bajo el mismo cursor con RLS que ya tenía -- sin conexión
+    ni consulta aparte. Varios bloqueos abiertos se unen con "; "; uno
+    resuelto no cuenta.
+  - **I -- `comprobadores._pide_elegir_en_imperativo`:** lista chica y
+    cerrada (`_VERBOS_PEDIDO_ELECCION = ("decime", "decinos", "contame",
+    "confirmame")`) que sólo cuenta como pedido de elección junto con la
+    palabra "cual" (normalizada, sin tilde) en el mismo texto -- "elegí" es la
+    única excepción, alcanza sola porque el verbo ya es la acción de elegir.
+    Ese diseño es justamente lo que separa "decime cuál doy por resuelto"
+    (aprueba) de "decime si necesitás algo más" (no aprueba): las dos
+    empiezan con "decime", sólo la primera tiene "cuál". `comprobar_pregunta`
+    suma esta condición al `or` que ya tenía ("?" / `ofrecio_opciones`) --
+    **nunca antes** del corte por `escribio`, que sigue evaluándose primero y
+    solo, así que "actuó sin preguntar" no se debilita (probado en
+    `test_pregunta_imperativo_con_herramienta_que_escribe_sigue_fallando`,
+    mismo texto que aprueba solo, pero con una herramienta que escribe
+    ejecutada -- sigue siendo `falla`).
+  - No hubo commit (no pedido explícito todavía); no se leyó ni se tocó
+    ningún `.env*`; `docs/` y `nucleo/` sin tocar en esta unidad.
+- 2026-09-24: **T7, tercera ronda (J, K, L) cerrada.** Motivo: tercera corrida
+  del banco real (84 passed, 15 failed) tras la segunda tanda de arreglos.
+  Ruta: delegada, un escritor (misma fila de T7 en "Ruta", se extiende a
+  `src/prisma/herramientas.py`, `src/prisma/jev.py`, pruebas en
+  `tests/test_agente.py`, `tests/test_jev.py`). No se tocó `docs/` (el
+  orquestador ya había sumado el diseño §5.11) ni `nucleo/` -- se lo leyó
+  para K, ver más abajo -- ni ningún `.env*`. `pg_isready` verificado antes de
+  empezar. TDD estricto, RED real antes de cada punto, dobles/fakes
+  solamente, sin modelo ni Jev real, sin commit/stage/stash:
+  1. **J (argumentos inválidos).** RED con
+     `.venv/Scripts/python.exe -m pytest -q tests/test_agente.py -k argumento`
+     → **3 failed, 1 passed** (la que pasaba de entrada,
+     `test_argumentos_correctos_no_se_ven_afectados`, confirmaba que una
+     llamada válida no cambiaba; las otras tres mostraban el `TypeError` sin
+     atrapar -- `_preparar_registrar_bloqueo() missing 1 required positional
+     argument: 'causa'` -- y el turno completo cayendo a incidente/disculpa).
+     GREEN con `.venv/Scripts/python.exe -m pytest -q tests/test_agente.py`
+     → **17 passed**.
+  2. **K (bloqueo vs. dependencia).** RED con
+     `.venv/Scripts/python.exe -m pytest -q tests/test_agente.py -k descripcion_de`
+     → **2 failed**. GREEN con el mismo comando → **2 passed**.
+  3. **L (subcampeona/rival).** RED con
+     `.venv/Scripts/python.exe -m pytest -q tests/test_jev.py -k "rival or subcampeona"`
+     → **7 failed, 2 passed** (las dos que pasaban de entrada -- candidata
+     débil y una sola tarea -- confirmaban que el comportamiento de siempre
+     seguía igual sin subcampeona real, antes de tocar nada). GREEN con
+     `.venv/Scripts/python.exe -m pytest -q tests/test_jev.py` → **46 passed**.
+  - Verificación pedida:
+    `.venv/Scripts/python.exe -m pytest -q tests/test_jev.py tests/test_agente.py tests/test_resolucion_referencias.py tests/test_aclaracion_botones.py tests/banco`
+    → **268 passed, 99 deselected**.
+    `.venv/Scripts/python.exe -m pytest -q` → **715 passed, 99 deselected**
+    (700 + 15 nuevas -- J 4, K 2, L 9 -- 0 regresiones, 162,79 s).
+  - **J -- `herramientas._validar_argumentos` + `ejecutar`:** un punto único
+    de validación, antes de `preparar`/`handler`, contra `h.parametros` (la
+    misma fuente que ya arma `esquemas()` para el modelo) -- cubre las dos
+    rutas de llamada de una sola vez. Chequea sólo nombres: argumentos que el
+    modelo mandó y la herramienta no declara ("no reconocidos"), y
+    argumentos `requerido: True` que faltan ("faltan") -- no valida tipos,
+    la evidencia (b-0002) es de un parámetro inexistente, no de un tipo mal
+    puesto. **Decisión: validar antes de llamar, no atrapar `TypeError`
+    genérico** (la alternativa que ofrecía el encargo) -- atrapar `TypeError`
+    en `agente._ejecutar_una` también taparía un bug real dentro de un
+    handler que por su cuenta levante un `TypeError` no relacionado con
+    argumentos, mientras que la validación previa sólo dispara para el fallo
+    exacto que pide J. **Decisión: reusar `Denegado`, no una excepción
+    nueva, y sin incidente.** `agente._ejecutar_una` ya atrapa `Denegado` y
+    lo devuelve como `tool_result` de error sin incidente (`except Denegado
+    as e: return bloque({"permitido": False, "explicacion": str(e)},
+    error=True)`) -- el mismo camino que ya usaba "No existe la
+    herramienta", un error de modelo estructuralmente igual (llamó algo que
+    no existe/no encaja) al de un argumento inválido; no hizo falta tocar
+    `agente.py` en absoluto. El mensaje empieza con "argumentos no válidos
+    para '<herramienta>' (...)" y termina listando los parámetros aceptados,
+    sin ningún detalle técnico (nombre de excepción, traceback). **No se
+    agregó `tarea_id` a `consultar_tareas`**: el pedido explícito era no
+    hacerlo salvo que fuera la opción más limpia, y no lo es -- el problema
+    es genérico (cualquier herramienta, cualquier argumento inventado), no
+    algo que un parámetro nuevo en una sola herramienta resuelva.
+  - **K -- descripciones de `registrar_bloqueo`/`crear_dependencia`:**
+    `nucleo/mecanica-pm.md` §4 ("Dependencias") define la dependencia
+    explícitamente entre dos tareas: "Una dependencia relaciona dos tareas y
+    tiene un tipo: **bloqueante** — la tarea destino no puede pasar a
+    `en_curso` hasta que la origen esté `terminada`." El bloqueo (§8) nunca
+    se describe así -- es "causa, impacto y fecha", con pasos de gestión
+    (proponer soluciones, preguntar si otro integrante puede ayudar,
+    escalar) que sólo tienen sentido para algo fuera del control directo del
+    equipo; `constitucion.md` §6 ya decía que ante un bloqueo Prisma "no
+    intenta resolver técnicamente... actuando sobre los sistemas", coherente
+    con una causa externa. Ninguna sección usa la frase "causa externa"
+    textualmente -- la redacción de las dos herramientas es una síntesis de
+    lo que §4 y §8 ya distinguen, no una cita literal. `nucleo/` se leyó,
+    no se tocó. Descripciones nuevas: `registrar_bloqueo` -- "Registra que
+    una tarea está trabada por una causa externa al equipo -- algo que
+    falta, una persona fuera del equipo, un permiso -- con su causa e
+    impacto. Si lo que la frena es otra tarea del equipo, no es un bloqueo:
+    usá crear_dependencia."; `crear_dependencia` -- "Declara que una tarea
+    depende de otra tarea del equipo -- es lo que corresponde cuando lo que
+    frena una tarea es otra tarea, no una causa externa (eso es
+    registrar_bloqueo). 'bloqueante' frena..." (resto sin cambios). Cada una
+    nombra a la otra, para que el modelo la encuentre esté evaluando
+    cualquiera de las dos. **No hizo falta una línea en el contexto de
+    confianza** (la alternativa que ofrecía el encargo): la elección de
+    herramienta es responsabilidad de la descripción de la herramienta, no
+    del preámbulo general -- mismo criterio que ya separa "qué hace cada
+    herramienta" (`herramientas.py`) de "reglas de comportamiento general"
+    (`contexto.PREAMBULO`).
+  - **L -- subcampeona/rival (`jev.resolver_referencia_tarea`):**
+    `INSTRUCCION_RIVAL` y `CORTE_RIVAL = 0.5` (constantes nuevas). Cuando la
+    receta iba a decidir clara, si `ordenadas` tiene una segunda entrada con
+    probabilidad `>= CORTE_CANDIDATA` (el mismo corte que ya separa una
+    candidata real de ruido en el resto de la receta -- **decisión de esta
+    unidad**, no dicha explícitamente por el encargo: una segunda
+    probabilidad ínfima, como las de 0.05 que ya usaban las pruebas de T1,
+    no es una subcampeona de verdad y no debía sumar la pregunta), se agrega
+    "rival" a las `preguntas` de la MISMA llamada de verificación (nunca una
+    llamada aparte) y `tarea_elegida`/`otra_tarea` (`criterio()`, con el
+    sufijo de bloqueo de H si corresponde) al `state` -- **sólo cuando hay
+    subcampeona**; el campo `tarea` que ya usaba "misma" no se tocó, para no
+    romper lo que ya dependía de él (T7 H, `test_criterio_de_
+    verificacion_tambien_lleva_el_bloqueo`). Si "misma" no alcanza el corte
+    de siempre, sigue exactamente igual que antes (ambigua con sólo la
+    elegida, sin mirar "rival" -- semántica de la verificación sin tocar,
+    como pedía el encargo). Si "misma" pasa y hay subcampeona, "rival" >=
+    `CORTE_RIVAL` baja a ambigua con `[elegida, subcampeona]`; si no hay
+    subcampeona, o "rival" queda debajo del corte, sigue clara -- el
+    comportamiento de siempre. "Rival" malformado (falta, sin `noul`, no
+    numérico, no es un objeto) lanza `JevError` con `_extraer_noul`, la
+    misma función que ya validaba "misma" -- sin código nuevo de validación.
+  - No hubo commit (no pedido explícito todavía); no se leyó ni se tocó
+    ningún `.env*`; `docs/` y `nucleo/` sin tocar (nucleo/ leído para K,
+    citado arriba, nunca editado).
+- 2026-09-24 (orquestador): **revisión de L y corrección -- se saca el corte
+  por `CORTE_CANDIDATA` en la subcampeona.** Motivo: ese corte (decisión de
+  esta unidad, no pedida por el encargo original) dejaba afuera justo el caso
+  que §5.11 midió -- b-0013, Jev devolvió 0,91 / 0,09 para las dos tareas del
+  dashboard, y 0,09 queda por debajo de `CORTE_CANDIDATA` (0,1) -- así que
+  "rival" nunca se preguntaba y la referencia se resolvía sola. El diseño
+  medido (PoC de scratchpad y §5.11) pregunta por la segunda más probable
+  siempre que Jev haya devuelto al menos dos, sin condicionarlo a su
+  probabilidad. TDD estricto, mismas reglas (sin commit, sin `.env*`, sin
+  llamadas reales): RED con
+  `.venv/Scripts/python.exe -m pytest -q tests/test_jev.py -k "b0013 or rival_baja_probabilidad"`
+  → **2 failed** (una prueba nueva con 0,91/0,09 esperando ambigua seguía
+  dando clara; otra esperando que "rival" viajara igual con una subcampeona
+  débil no lo encontraba en la llamada). GREEN sacando el corte en
+  `src/prisma/jev.py` (`if len(ordenadas) > 1:` en vez de `if len(ordenadas) >
+  1 and ordenadas[1][1] >= CORTE_CANDIDATA:`) con el mismo comando → **2
+  passed**.
+  - `tests/test_jev.py`: prueba nueva
+    `test_resolver_referencia_rival_baja_probabilidad_igual_pide_y_puede_ambiguar_b0013`
+    (0,91/0,09 tal como lo midió §5.11, respuesta de "rival" alta → ambigua
+    con las dos). La prueba que fijaba el corte viejo
+    (`test_resolver_referencia_candidata_debil_no_cuenta_como_rival`, que
+    afirmaba que una subcampeona débil NO sumaba "rival") se reemplaza por
+    `test_resolver_referencia_rival_baja_probabilidad_se_pide_y_puede_seguir_
+    clara`, que prueba lo contrario correcto: se pregunta igual, y una
+    respuesta baja de "rival" (0,1) es lo que mantiene la referencia clara --
+    tal como pedía la revisión ("adapta las pruebas de clara que usaban un
+    0,05 de relleno scripteando una respuesta baja de rival"). Se adaptaron
+    las otras cuatro pruebas de clara que tenían una segunda probabilidad
+    (0,05) sin "rival" en el guión de verificación --
+    `test_resolver_referencia_clara_llama_verificacion_y_confirma`,
+    `test_resolver_referencia_usa_claves_cortas_para_las_opciones_de_jev`,
+    `test_quien_escribe_viaja_en_el_state_de_las_dos_llamadas_cuando_se_pasa`,
+    `test_sin_quien_escribe_no_agrega_el_campo_ni_cambia_las_instrucciones` --
+    sumando `"rival": {"noul": 0.1}` a su respuesta de verificación; el
+    resultado esperado (clara) no cambió en ninguna. Se auditaron a mano
+    todas las demás respuestas de verificación de una sola "misma" en
+    `tests/test_jev.py`, `tests/test_resolucion_referencias.py`,
+    `tests/test_aclaracion_botones.py` y `tests/banco/test_corrida.py`: el
+    resto usa `tarea` con una sola clave (sin segunda probabilidad, nunca
+    hay subcampeona) o falla antes de llegar a "rival" porque "misma" ya es
+    baja o está malformada (`test_resolver_referencia_verificacion_baja_pasa_
+    a_ambigua_con_esa_tarea`, `test_resolver_referencia_verificacion_
+    malformada_lanza_jeverror`) -- ninguna de esas necesitó cambios.
+  - Verificación pedida:
+    `.venv/Scripts/python.exe -m pytest -q tests/test_jev.py tests/test_resolucion_referencias.py tests/test_aclaracion_botones.py tests/banco`
+    → **250 passed, 99 deselected**.
+    `.venv/Scripts/python.exe -m pytest -q` → **716 passed, 99 deselected**
+    (715 + 1 neta -- dos pruebas nuevas de b-0013/rival-débil menos una
+    prueba vieja del corte que se reemplazó -- 0 regresiones, 163,89 s).
+  - No hubo commit (no pedido explícito todavía); no se leyó ni se tocó
+    ningún `.env*`; `docs/` y `nucleo/` sin tocar.
+- 2026-09-24: **T7, cuarta ronda (M, N) cerrada.** Motivo: cuarta corrida del
+  banco real (81 passed, 18 failed). Hallazgo nuevo sobre las grabaciones: la
+  pregunta "rival" (T7, punto L) se disparaba mal en pedidos de dependencia
+  que nombran las dos tareas ("el cableado del tablero no puede arrancar
+  hasta que yo termine de programar el PLC") -- cada referencia tiene a la
+  otra tarea como subcampeona, y "rival" (que preguntaba por el MENSAJE
+  completo) contestaba que sí para las dos (0,54-0,56), así que las dos
+  referencias quedaban ambiguas y b-0005 (9/9) y b-0015 (3/3) preguntaban en
+  vez de crear la dependencia. El orquestador midió tres redacciones (diseño
+  §5.12, sin commitear -- no se tocó `docs/`) y adoptó la v2, que pregunta
+  por la REFERENCIA en vez del mensaje. Ruta: delegada, un escritor (misma
+  fila de T7 en "Ruta", se extiende a `src/prisma/jev.py`,
+  `tests/banco/comprobadores.py`, pruebas en `tests/test_jev.py`,
+  `tests/banco/test_comprobadores.py`). No se tocó `docs/` ni `nucleo/` ni
+  ningún `.env*`. `pg_isready` verificado antes de empezar. TDD estricto,
+  RED real antes de cada punto, dobles/fakes solamente, sin modelo ni Jev
+  real, sin commit/stage/stash:
+  1. **M (redacción v2 de "rival").** RED con
+     `.venv/Scripts/python.exe -m pytest -q tests/test_jev.py -k instruccion_rival_pregunta`
+     → **1 failed** (`INSTRUCCION_RIVAL` seguía con la redacción vieja, "¿El
+     mensaje también podría..."). GREEN con
+     `.venv/Scripts/python.exe -m pytest -q tests/test_jev.py` → **48
+     passed**.
+  2. **N (comprobador del banco, "qué").** RED con
+     `.venv/Scripts/python.exe -m pytest -q tests/banco/test_comprobadores.py -k que`
+     → **2 failed, 18 passed** (las dos nuevas positivas de "qué" fallaban;
+     las negativas -- incluida una nueva contra "porque" como falso
+     positivo de subcadena -- ya pasaban de entrada, como tenía que ser).
+     GREEN con
+     `.venv/Scripts/python.exe -m pytest -q tests/banco/test_comprobadores.py`
+     → **83 passed**.
+  - Verificación pedida:
+    `.venv/Scripts/python.exe -m pytest -q tests/test_jev.py tests/banco`
+    → **204 passed, 99 deselected**.
+    `.venv/Scripts/python.exe -m pytest -q` → **721 passed, 99 deselected**
+    (716 + 5 nuevas -- M 1, N 4 -- 0 regresiones, 157,35 s).
+  - **M -- `jev.INSTRUCCION_RIVAL`:** redacción reemplazada exactamente por
+    la que pidió el encargo -- "¿La referencia, tal como está dicha, también
+    podría estar hablando de esta otra tarea en lugar de la elegida?
+    Respondé que sí sólo si una persona del equipo podría entender esa
+    referencia como cualquiera de las dos." `CORTE_RIVAL`, los campos del
+    `state` (`tarea_elegida`/`otra_tarea`) y el resto de la lógica de L no
+    se tocaron -- cambio de una sola constante. Prueba nueva
+    `test_instruccion_rival_pregunta_por_la_referencia_no_por_el_mensaje`
+    fija la redacción exacta y confirma que la frase vieja ("El mensaje
+    también podría") ya no está.
+  - **N -- `comprobadores._pide_elegir_en_imperativo`:** se agrega "qué"
+    como segundo marcador junto a "cuál" (además del verbo). **Decisión de
+    esta unidad, no dicha por el encargo:** "qué" se busca con borde de
+    palabra (`re.compile(r"\bque\b")`), no como subcadena como ya hacía
+    "cuál" -- "porque" y "aunque" contienen "que" como subcadena, y
+    cualquier cierre cordial con esas palabras habría contado como pedido
+    de elección; con borde de palabra, "porque" no matchea pero "decime qué
+    preferís" sí. Prueba nueva
+    `test_pregunta_imperativo_porque_no_es_un_falso_positivo_de_que` cubre
+    justo ese caso. Las dos evidencias del encargo
+    (`test_pregunta_imperativo_contame_que_la_esta_frenando_aprueba`,
+    `test_pregunta_imperativo_decime_que_preferis_aprueba`) y el negativo
+    pedido (`decime si necesitás algo más`, ya existente y sin tocar) pasan
+    igual.
+  - No hubo commit (no pedido explícito todavía); no se leyó ni se tocó
+    ningún `.env*`; `docs/` y `nucleo/` sin tocar.
+- 2026-09-24 (orquestador): **cierre.** Banco real con Jev, cinco corridas: 58, 77, 84,
+  81 y 96 de 99 aprobadas (`.venv/Scripts/python.exe -m pytest -m modelo_real
+  tests/banco --banco-proveedor nan --banco-modelo deepseek-v4-flash -q`). Las 3 que
+  fallan son `b-0005-b` ("el plc" entre 0,79 y 0,84, corte 0,85): pregunta de más,
+  segura, queda como límite conocido. Mediciones de la segunda candidata en diseño
+  §5.11 y §5.12. Continuidad: `docs/capacidades.md`, `docs/STATUS.md`, diseño §4.5,
+  `docs/ROADMAP.md` (incidentes, retención por cliente, aprendizaje de apodos y
+  aclaraciones con Engram y Obsidian como insumos). Suite: 721 passed, 99 deselected.
+

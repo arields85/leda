@@ -75,7 +75,9 @@
   pregunta con botones o pide la referencia; la vista previa sigue protegiendo.
 - **Datos que salen:** títulos de tareas, áreas, responsables, vocabulario del
   equipo y el texto del mensaje viajan a TypeSafe vía OpenRouter. El usuario
-  aceptó esos términos el 2026-09-24.
+  aceptó esos términos el 2026-09-24. Ese mismo día aceptó sumar el nombre de
+  quien escribe y la causa de los bloqueos abiertos de cada tarea: la gente
+  nombra una tarea por lo que la frena ("ya llegó el switch que faltaba").
 - **Jev está en beta y no responde idéntico en cada llamada.** Los cortes se leen
   como tendencia y se revisan con el banco.
 - **Límites conocidos:** ante algo que no existe tiende a ofrecer tareas parecidas

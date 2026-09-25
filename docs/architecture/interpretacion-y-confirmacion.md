@@ -188,8 +188,13 @@ Un mensaje claro empieza directamente en la vista previa.
 
 ### 4.5 Qué falta construir
 
-- Paso 1: que el modelo devuelva lecturas y referencias, no una decisión.
-- Paso 2: resolución de referencias con puntaje (requiere la prueba de 5.1).
+- ~~Paso 1: referencias separadas por el modelo~~: construido (2026-09-24), en la
+  misma llamada de `route_intent` (`trabajos`, `personas`).
+- ~~Paso 2: resolución de referencias~~: construido con Jev y la verificación
+  (§5.6, §5.8 a §5.10); dudas con botones, "Ninguna, lo escribo" y "Es una tarea
+  nueva"; respuestas que nombran la tarea. Pendiente: resolver personas y apodos
+  (ADR 0005 punto 5), y decir "no encuentro esa tarea" en vez de ofrecer una
+  parecida.
 - Paso 3: estabilidad de la intención (requiere la prueba de 5.2).
 - Paso 4: la regla de materialidad.
 - ~~Paso 5 para mensajes claros~~: construido (2026-09-24). Las 8 herramientas
@@ -199,9 +204,9 @@ Un mensaje claro empieza directamente en la vista previa.
   con una huella del estado leído por cada preparación, sin versión en `task`.
 - Pendiente de la vista previa: un ciclo de dependencias se detecta recién al
   confirmar (lo frena la base), no en la vista previa.
-- Botón "Ninguna, lo escribo": llega con la aclaración con botones. La propuesta
-  vence a las 8 h heredadas de `pending_action`; el plazo por defecto sigue
-  abierto (§7).
+- ~~Botón "Ninguna, lo escribo"~~: construido; espera la aclaración 30 minutos,
+  como Modificar. La propuesta vence a las 8 h heredadas de `pending_action`; el
+  plazo por defecto sigue abierto (§7).
 
 ## 5. Pruebas de concepto
 
@@ -928,6 +933,62 @@ Lectura:
 3. **Donde más aporta quién escribe es en la pantalla:** ordenar primero las tareas
    propias entre los botones y mostrar el responsable sólo cuando la tarea es de otra
    persona.
+
+### 5.11 La segunda candidata: duda que la verificación no ve
+
+**Pregunta:** en el banco real, "ya arregle lo del dashboard, pasalo a revision",
+con "Actualizar el dashboard de HMI" y "Revisar gráficos del dashboard HMI", Jev
+eligió la primera con 0,91 y la verificación la confirmó con 0,89. El usuario
+decidió que ese mensaje tiene que preguntar: "ante la duda se pregunta"
+(2026-09-24). La verificación pregunta si la tarea elegida es la misma cosa; no
+pregunta si también podría ser otra.
+
+**Prueba:** cuando la receta decide clara, un Noul más sobre la segunda tarea más
+probable: "¿el mensaje también podría estar hablando de esta otra tarea?"; con 0,5
+o más, se pregunta entre las dos. 60 mensajes de los lotes 1 a 4 más cuatro casos
+del banco, 3 repeticiones.
+
+| 3 repeticiones | Sin segunda candidata | Con segunda candidata (corte 0,5) |
+|---|---|---|
+| Correctos, lotes 1 a 4 | 42 de 60 | 38 o 39 |
+| Eligió mal sin preguntar | 0 | 0 |
+| "lo del dashboard" (b-0013) | elige | **pregunta en las 3** (0,70) |
+| "los accesos vpn" (b-0015, claro) | elige | pregunta (0,52 a 0,53) |
+
+Lectura:
+
+1. **Detecta el caso que la verificación no veía,** de forma estable.
+2. **Cuesta entre 5 y 6 preguntas de más cada 60 mensajes,** con dos botones. La
+   separación es débil: las elecciones correctas llegan hasta 0,63.
+3. **El corte queda en 0,5, el neutro, sin ajustarlo a estos datos:** subirlo para
+   dejar pasar "los accesos vpn" sería ajustar al caso visto. El usuario prefiere
+   preguntar de más.
+4. **Va en la misma llamada que la verificación:** la segunda candidata ya se
+   conoce, así que no suma demora.
+
+### 5.12 La segunda candidata, corregida: mirar la referencia
+
+**Hallazgo del banco real:** con la pregunta de 5.11, los pedidos de dependencia
+("el cableado del tablero no puede arrancar hasta que yo termine de programar el
+PLC") empezaron a preguntar en las 9 corridas. El mensaje nombra las dos tareas, y
+para cada referencia la segunda candidata es justamente la otra: la pregunta miraba
+el mensaje ("¿el mensaje también podría estar hablando de esta otra tarea?"), y el
+mensaje sí habla de las dos. En 5.11 ya se veía en los mensajes con varias
+referencias de los lotes, sin que se leyera así.
+
+**Prueba (2026-09-24):** tres redacciones, 60 mensajes de los lotes 1 a 4 más siete
+casos del banco, 3 repeticiones.
+
+| Redacción | Correctos, lotes | Eligió mal sin preguntar | "lo del dashboard" | Dependencias (4 casos) |
+|---|---|---|---|---|
+| v1: mira el mensaje (5.11) | 37 a 39 | 0 | pregunta (0,71 a 0,73) | 3 de 4 mal |
+| **v2: mira la referencia** | 39 a 40 | 0 | pregunta (0,69 a 0,72) | 4 de 4 bien |
+| v3: la referencia, y "que el mensaje nombre la otra tarea en otra parte no cuenta" | 42 | 0 | pregunta (0,58 a 0,61) | 4 de 4 bien |
+
+Se adopta **v2**: corrige las dependencias y detecta la duda del dashboard con
+margen. v3 pregunta menos, pero queda al borde del corte en el único caso de duda
+real medido; con "ante la duda se pregunta", el margen pesa más que dos o tres
+preguntas de más cada 60 mensajes.
 
 ## 6. Cómo se mide el diseño terminado
 

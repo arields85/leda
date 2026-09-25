@@ -132,25 +132,38 @@ se verifica sobre una base nueva dentro de un clúster existente.
 
 ## Próximo paso
 
-**Aclaración con botones**, según el diseño vivo
-[`architecture/interpretacion-y-confirmacion.md`](architecture/interpretacion-y-confirmacion.md)
-y las decisiones [`ADR 0005`](decisions/0005-interpretacion-y-confirmacion.md) (puntos
-3 a 5) y [`ADR 0006`](decisions/0006-jev-para-resolver-referencias-e-intencion.md):
-Jev resuelve a qué tarea se refiere cada mensaje, con la pregunta de verificación, y
-detecta la intención dudosa; ante una ambigüedad material, botones con propuestas
-completas y "Ninguna, lo escribo"; las preguntas de Prisma con botones; apodos y
-vocabulario del equipo aprendidos preguntando. Incluye la corrección del router de
-intención, el defecto que encontró el banco (`b-0005`, 0 de 10: `route_intent` no ve
-las tareas del espacio; ver `docs/capacidades.md`, "Trampas conocidas").
-La pregunta de verificación quedó confirmada con un lote no visto (diseño §5.9); la
-detección de intención dudosa sigue sin ser confiable (3 de 5 en el caso marcado).
-
-Después, una sesión progresiva por Telegram real con datos ficticios para los circuitos
-ya verificados (consulta, bloqueos, estados, vista previa y confirmación) y, luego, la
-conversación de bloqueos (mecánica §8, pasos 2 a 7). Las dependencias no entran en esa
-sesión hasta cerrar el defecto del router.
+**Sesión progresiva por Telegram real con datos ficticios** para los circuitos ya
+verificados (consulta, bloqueos, estados, vista previa y confirmación, aclaración con
+botones). Objetivo principal: medir con mensajes reales cuántas veces Prisma pregunta
+sin necesidad, y ajustar los cortes de Jev con esa evidencia. Después, la unidad de
+aprendizaje de apodos y aclaraciones ([`ROADMAP.md`](ROADMAP.md)) y la conversación de
+bloqueos (mecánica §8, pasos 2 a 7).
 
 El resto del orden de trabajo está en [`ROADMAP.md`](ROADMAP.md).
+
+## Cerrado: aclaración con botones
+
+Feature `odd/tasks/aclaracion-con-botones.md`. El enrutador separa las referencias;
+Jev (TypeSafe vía OpenRouter) decide a qué tarea activa del espacio se refiere cada
+una, con la pregunta de verificación, la de la segunda candidata y las causas de los
+bloqueos abiertos a la vista; ante la duda, botones con cada candidata, "Es una tarea
+nueva" y "Ninguna, lo escribo"; sin clave o con Jev caído, pregunta y registra un
+incidente; toda respuesta sobre una tarea resuelta nombra su título
+([`ADR 0006`](decisions/0006-jev-para-resolver-referencias-e-intencion.md), diseño §5.6
+a §5.12).
+
+Banco con modelo real y Jev real (NaN `deepseek-v4-flash`, 33 escenarios x 3, base
+descartable de pruebas), 2026-09-24, cinco corridas mientras se corregía lo que
+mostraba cada una: 58, 77, 84, 81 y **96 de 99** aprobadas. Las 3 que fallan son
+`b-0005-b`: Jev da 0,79 a 0,84 a "el plc" (corte 0,85) y Prisma pregunta; es una
+pregunta de más, segura. Límites conocidos: "lo del tablero" (`b-0008`) puede elegirse
+solo, lo frena la vista previa; ante algo que no existe, Prisma ofrece la tarea
+parecida en lugar de decir que no la encuentra. Con los 60 mensajes de los lotes,
+Prisma pregunta en uno de cada tres; los lotes son difíciles a propósito y la
+proporción real se mide en la sesión por Telegram.
+
+Suite por defecto, 2026-09-24: `.venv/Scripts/python.exe -m pytest -q` → 721 passed,
+99 deselected.
 
 ## Cerrado: vista previa y confirmación de todo cambio
 
