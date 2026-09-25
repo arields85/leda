@@ -799,10 +799,24 @@ def crear_borrador_tarea(cur, quien: Solicitante, titulo, objetivo_id=None,
 
 def _preparar_actualizar_estado(cur, quien: Solicitante, tarea_id, estado,
                                 motivo=None):
-    cur.execute("select titulo, estado from task where id = %s", (tarea_id,))
+    cur.execute(
+        "select titulo, estado, responsable_membership_id from task where id = %s",
+        (tarea_id,))
     fila = cur.fetchone()
     if not fila:
         return {"error": "esa tarea no existe en este equipo"}
+    if str(fila["responsable_membership_id"]) != str(quien.membership_id):
+        # T2b (revisión de `0814fa3`): sin este chequeo, cualquier
+        # integrante autenticado del espacio podía mover el estado de
+        # CUALQUIER tarea, no sólo la propia. `nucleo/constitucion.md` §3:
+        # "la persona responsable informa hechos como inicio, bloqueo,
+        # resolución y entrega"; los referentes "aprueban o rechazan el
+        # trabajo entregado. No persiguen avances ni administran estados
+        # intermedios" -- el menú (T2) ya sólo ofrece estas transiciones a
+        # la relación "responsable" (`menu_tarea.calcular_menu`); esto lo
+        # exige también del lado de la herramienta, para quien escriba
+        # texto libre en vez de tocar un botón.
+        raise Denegado("No podés cambiar el estado de una tarea que no es tuya.")
 
     if estado == "terminada":
         cur.execute("select motivo_no_cierra_tarea(%s) as m", (tarea_id,))
@@ -839,10 +853,19 @@ def _preparar_actualizar_estado(cur, quien: Solicitante, tarea_id, estado,
      "motivo": {"type": "string"}},
     preparar=_preparar_actualizar_estado)
 def _actualizar_estado(cur, quien: Solicitante, tarea_id, estado, motivo=None):
-    cur.execute("select estado from task where id = %s", (tarea_id,))
+    cur.execute(
+        "select estado, responsable_membership_id from task where id = %s",
+        (tarea_id,))
     fila = cur.fetchone()
     if not fila:
         return {"error": "esa tarea no existe en este equipo"}
+    if str(fila["responsable_membership_id"]) != str(quien.membership_id):
+        # Misma regla que `_preparar_actualizar_estado`, repetida acá porque
+        # el handler también se llama solo (herramientas sin `preparar` no
+        # existen para esta acción, pero el handler es la puerta real a la
+        # base: la autoridad se verifica en las dos, igual que
+        # `_resolver_bloqueo`/`_aprobar_tarea`).
+        raise Denegado("No podés cambiar el estado de una tarea que no es tuya.")
 
     if estado == "terminada":
         cur.execute("select motivo_no_cierra_tarea(%s) as m", (tarea_id,))
@@ -895,10 +918,18 @@ def _actualizar_estado(cur, quien: Solicitante, tarea_id, estado, motivo=None):
 
 def _preparar_registrar_bloqueo(cur, quien: Solicitante, tarea_id, causa,
                                 impacto=None):
-    cur.execute("select titulo, estado from task where id = %s", (tarea_id,))
+    cur.execute(
+        "select titulo, estado, responsable_membership_id from task where id = %s",
+        (tarea_id,))
     fila = cur.fetchone()
     if not fila:
         return {"error": "esa tarea no existe en este equipo"}
+    if str(fila["responsable_membership_id"]) != str(quien.membership_id):
+        # T2b: mecánica §8 describe la gestión de un bloqueo que "alguien
+        # declara" sobre su propio trabajo, y constitución §3 lo atribuye a
+        # "la persona responsable" como un hecho que informa. El menú (T2)
+        # ya sólo ofrece "Informar un bloqueo" a la relación "responsable".
+        raise Denegado("No podés declarar un bloqueo en una tarea que no es tuya.")
     if fila["estado"] in ("terminada", "cancelada"):
         return {"error": "esa tarea ya está cerrada, no se le puede agregar un bloqueo"}
 
@@ -925,10 +956,14 @@ def _preparar_registrar_bloqueo(cur, quien: Solicitante, tarea_id, causa,
      "impacto": {"type": "string"}},
     preparar=_preparar_registrar_bloqueo)
 def _registrar_bloqueo(cur, quien: Solicitante, tarea_id, causa, impacto=None):
-    cur.execute("select estado from task where id = %s", (tarea_id,))
+    cur.execute(
+        "select estado, responsable_membership_id from task where id = %s",
+        (tarea_id,))
     fila = cur.fetchone()
     if not fila:
         return {"error": "esa tarea no existe en este equipo"}
+    if str(fila["responsable_membership_id"]) != str(quien.membership_id):
+        raise Denegado("No podés declarar un bloqueo en una tarea que no es tuya.")
     if fila["estado"] in ("terminada", "cancelada"):
         return {"error": "esa tarea ya está cerrada, no se le puede agregar un bloqueo"}
 
@@ -1083,10 +1118,20 @@ def _resolver_bloqueo(cur, quien: Solicitante, bloqueo_id, resolucion):
 
 def _preparar_adjuntar_evidencia(cur, quien: Solicitante, tarea_id, tipo,
                                  uri=None, descripcion=None):
-    cur.execute("select titulo from task where id = %s", (tarea_id,))
+    cur.execute(
+        "select titulo, responsable_membership_id from task where id = %s",
+        (tarea_id,))
     fila = cur.fetchone()
     if not fila:
         return {"error": "esa tarea no existe en este equipo"}
+    if (str(fila["responsable_membership_id"]) != str(quien.membership_id)
+            and not puede_aprobar_tarea(cur, quien, fila["responsable_membership_id"])):
+        # T2b: a diferencia de actualizar_estado/registrar_bloqueo, mecánica
+        # §6 lista "confirmación del referente" entre la evidencia que
+        # Prisma solicita -- el aprobador de la tarea (`puede_aprobar_tarea`,
+        # un solo nivel) también puede adjuntarla, no sólo el responsable.
+        raise Denegado(
+            "No podés adjuntar evidencia a una tarea que no es tuya ni que revisás.")
 
     detalle = uri or descripcion or "(sin detalle)"
     cambio = f"Tarea: {fila['titulo']} · Nueva evidencia ({tipo}): {detalle}"
@@ -1104,6 +1149,16 @@ def _preparar_adjuntar_evidencia(cur, quien: Solicitante, tarea_id, tipo,
     preparar=_preparar_adjuntar_evidencia)
 def _adjuntar_evidencia(cur, quien: Solicitante, tarea_id, tipo, uri=None,
                         descripcion=None):
+    cur.execute(
+        "select responsable_membership_id from task where id = %s", (tarea_id,))
+    fila = cur.fetchone()
+    if not fila:
+        return {"error": "esa tarea no existe en este equipo"}
+    if (str(fila["responsable_membership_id"]) != str(quien.membership_id)
+            and not puede_aprobar_tarea(cur, quien, fila["responsable_membership_id"])):
+        raise Denegado(
+            "No podés adjuntar evidencia a una tarea que no es tuya ni que revisás.")
+
     cur.execute(
         """insert into evidence (workspace_id, task_id, tipo, uri, entregado_por)
            values (%s, %s, %s, %s, %s) returning id""",

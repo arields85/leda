@@ -127,56 +127,109 @@ def procesar_update(conn, slug: str, update: dict,
             resultado = _toque(conn, workspace_id, slug, toque, tg_user,
                                authority_conn=authority_conn)
             conn.commit()
-        except Exception:
+        except Exception as e:  # noqa: BLE001
+            # Decisión del usuario, 2026-09-25: un error nunca pasa en
+            # silencio. Antes se revertía y se volvía a levantar -- sin
+            # incidente ni aviso, el toque simplemente se perdía. Revertir y
+            # confirmar viven acá, no en `_toque`: `conn.commit()`/
+            # `conn.rollback()` no se pueden llamar dentro del contexto de
+            # `conn.transaction()` que abre `espacio()`, y un `return`
+            # temprano de `_toque` nunca llegaría a un commit puesto
+            # después. `_toque` deja la referencia a la `pending_action`
+            # (si la conocía) puesta en la excepción, para que el incidente
+            # quede trazable hasta ahí (T2b, trazabilidad).
             conn.rollback()
-            raise
+            chat_id_toque = (toque.get("message") or {}).get("chat", {}).get("id")
+            pending_action_id = getattr(e, "pending_action_id", None)
+            reportar_incidente_no_manejado(
+                conn, workspace_id=workspace_id, chat_id=chat_id_toque,
+                tg_user=tg_user, error=e, etapa=ETAPA_TOQUE_BOTON,
+                referencia_tipo=(REFERENCIA_PENDING_ACTION
+                                if pending_action_id else None),
+                referencia_id=pending_action_id)
+            return {"ok": True}
         return resultado
 
     # /start va antes de identificar: quien lo manda todavía no está vinculado.
     if texto.startswith("/start"):
-        return _activacion(conn, workspace_id, texto, tg_user, chat_id)
-
-    with espacio(conn, workspace_id) as cur:
         try:
-            # Por la vista, que ya está acotada al espacio: si la persona no
-            # es de este equipo, sencillamente no aparece.
-            quien = identificar_en_espacio(cur, tg_user, workspace_id)
-        except Denegado:
-            # A un desconocido no se le explica por qué no se le responde.
-            desconocido = True
-        else:
-            desconocido = False
-
-        if desconocido:
+            return _activacion(conn, workspace_id, texto, tg_user, chat_id)
+        except Exception as e:  # noqa: BLE001
+            conn.rollback()
+            reportar_incidente_no_manejado(
+                conn, workspace_id=workspace_id, chat_id=chat_id,
+                tg_user=tg_user, error=e, etapa=ETAPA_ACTIVACION)
             return {"ok": True}
 
-        cur.execute(
-            """insert into inbound_message
-                 (workspace_id, telegram_message_id, chat_id, app_user_id, texto)
-               values (%s, %s, %s, %s, %s) returning id""",
-            (workspace_id, mensaje.get("message_id"), chat_id,
-             quien.app_user_id, texto))
-        entrante_id = str(cur.fetchone()["id"])
-        registrar_auditoria(
-            cur, accion="mensaje_recibido", workspace_id=workspace_id,
-            actor_app_user_id=quien.app_user_id, actor_kind="persona",
-            detalle={"chat_id": chat_id})
+    # Fase 1: identificar y dejar constancia del mensaje recibido. Se
+    # confirma acá, aparte de lo que sigue (T2b, punto 2, corrección sobre
+    # trazabilidad): `inbound_message` es el recibo de lo que llegó, no un
+    # efecto de negocio -- si la fase 2 (interpretarlo) falla, el incidente
+    # todavía tiene a qué apuntar para que el administrador abra el texto
+    # exacto, en vez de perderlo junto con la reversión.
+    quien = None
+    entrante_id = None
+    try:
+        with espacio(conn, workspace_id) as cur:
+            try:
+                # Por la vista, que ya está acotada al espacio: si la persona
+                # no es de este equipo, sencillamente no aparece.
+                quien = identificar_en_espacio(cur, tg_user, workspace_id)
+            except Denegado:
+                # A un desconocido no se le explica por qué no se le responde.
+                return {"ok": True}
 
-        handled_intake_text = False
-        if texto.strip() and chat_type == "private":
-            from datetime import datetime, timezone
-            from .ingreso_tareas import handle_active_text
+            cur.execute(
+                """insert into inbound_message
+                     (workspace_id, telegram_message_id, chat_id, app_user_id, texto)
+                   values (%s, %s, %s, %s, %s) returning id""",
+                (workspace_id, mensaje.get("message_id"), chat_id,
+                 quien.app_user_id, texto))
+            entrante_id = str(cur.fetchone()["id"])
+            registrar_auditoria(
+                cur, accion="mensaje_recibido", workspace_id=workspace_id,
+                actor_app_user_id=quien.app_user_id, actor_kind="persona",
+                detalle={"chat_id": chat_id})
+        conn.commit()
+    except Exception as e:  # noqa: BLE001
+        conn.rollback()
+        reportar_incidente_no_manejado(
+            conn, workspace_id=workspace_id, chat_id=chat_id, tg_user=tg_user,
+            error=e, etapa=ETAPA_TURNO_TEXTO)
+        return {"ok": True}
 
-            handled_intake_text = handle_active_text(
-                cur, quien, chat_id=chat_id, source_inbound_id=entrante_id,
-                source_raw_text=texto, now=datetime.now(timezone.utc),
-            ) is not None
+    # Fase 2: interpretarlo. Esto sí puede fallar y revertirse entero sin
+    # perder el recibo de la fase 1.
+    try:
+        with espacio(conn, workspace_id) as cur:
+            handled_intake_text = False
+            if texto.strip() and chat_type == "private":
+                from datetime import datetime, timezone
+                from .ingreso_tareas import handle_active_text
 
-        if texto.strip() and not handled_intake_text:
-            with mantener_chat_activo(config.token_bot(slug), chat_id):
-                _turno(cur, quien, texto, workspace_id, chat_id, entrante_id)
+                handled_intake_text = handle_active_text(
+                    cur, quien, chat_id=chat_id, source_inbound_id=entrante_id,
+                    source_raw_text=texto, now=datetime.now(timezone.utc),
+                ) is not None
 
-    conn.commit()
+            if texto.strip() and not handled_intake_text:
+                with mantener_chat_activo(config.token_bot(slug), chat_id):
+                    _turno(cur, quien, texto, workspace_id, chat_id, entrante_id)
+
+        conn.commit()
+    except Exception as e:  # noqa: BLE001
+        # Red de contención final (decisión del usuario, 2026-09-25):
+        # evidencia de la sesión real, un `UndefinedColumn` hacía que Prisma
+        # saltara el mensaje entero sin ninguna respuesta ni incidente. Lo
+        # que ya atajan `_turno`/`agente.responder` por su cuenta (con su
+        # propio incidente y disculpa) nunca llega hasta acá; esto es sólo
+        # para lo que ningún camino específico previó.
+        conn.rollback()
+        reportar_incidente_no_manejado(
+            conn, workspace_id=workspace_id, chat_id=chat_id, tg_user=tg_user,
+            error=e, etapa=ETAPA_TURNO_TEXTO,
+            referencia_tipo=REFERENCIA_INBOUND_MESSAGE, referencia_id=entrante_id)
+        return {"ok": True}
     # La respuesta sale por la cola, no por acá: Telegram espera un ACK rápido
     # y así el envío conserva idempotencia y auditoría.
     return {"ok": True}
@@ -274,146 +327,179 @@ def _toque(conn, workspace_id: str, slug: str, toque: dict,
 
     ahora = datetime.now(timezone.utc)
     draft_token = False
+    quien = None
+    resuelta = None
+    pending_action_id = None
 
-    with espacio(conn, workspace_id) as cur:
-        try:
-            quien = identificar_en_espacio(cur, tg_user, workspace_id)
-        except Denegado:
-            return {"ok": True}      # desconocido: no se le responde
+    try:
+        with espacio(conn, workspace_id) as cur:
+            try:
+                quien = identificar_en_espacio(cur, tg_user, workspace_id)
+            except Denegado:
+                return {"ok": True}      # desconocido: no se le responde
 
-        if intake_token:
-            I.resolve_choice(cur, quien, token=intake_token,
-                             chat_id=chat_id, now=ahora)
-            return {"ok": True}
+            if intake_token:
+                I.resolve_choice(cur, quien, token=intake_token,
+                                 chat_id=chat_id, now=ahora)
+                return {"ok": True}
 
-        try:
-            draft_token = P.es_borrador(cur, token)
-            if not draft_token:
-                resuelta = P.resolver(cur, token,
-                                      app_user_id=quien.app_user_id, ahora=ahora)
-        except NoPuede as e:
-            # Se le contesta, pero la acción sigue esperando a quien sí puede.
-            # La frontera exterior confirma el mensaje encolado y nada más.
-            _responder(cur, workspace_id, chat_id, quien, str(e), ahora)
-            return {"ok": True}
+            try:
+                draft_token = P.es_borrador(cur, token)
+                if not draft_token:
+                    resuelta = P.resolver(cur, token,
+                                          app_user_id=quien.app_user_id, ahora=ahora)
+                    # `Resuelta` no trae el id de la `pending_action` (T2b,
+                    # trazabilidad): se busca aparte, por el mismo token --
+                    # la fila de `pending_action_option` sigue ahí después de
+                    # resolver, sólo cambia el estado de la acción, no se
+                    # borra la opción.
+                    if resuelta is not None:
+                        pending_action_id = P.pending_action_id_de(cur, token)
+            except NoPuede as e:
+                # Se le contesta, pero la acción sigue esperando a quien sí
+                # puede. La frontera exterior confirma el mensaje encolado y
+                # nada más.
+                _responder(cur, workspace_id, chat_id, quien, str(e), ahora)
+                return {"ok": True}
 
-        if not draft_token and resuelta is None:
-            # Vencida, ya usada, o de otro espacio. Para la persona es lo
-            # mismo: ese pedido ya no está en pie.
-            _responder(cur, workspace_id, chat_id, quien,
-                       "Ese pedido ya no está vigente. Si sigue haciendo "
-                       "falta, escribime y lo vemos de nuevo.", ahora)
-        elif not draft_token and resuelta.cancelada:
-            _responder(cur, workspace_id, chat_id, quien,
-                       "Listo, no lo hago.", ahora)
-        elif not draft_token and resuelta.modificada:
-            # No se aplica nada (T3, ADR 0005 decisión 1): la fila ya quedó
-            # cerrada por `resolver_pendiente`, con `herramienta`, `args` y
-            # `resumen` guardados como el contexto que va a leer el próximo
-            # turno de esta persona en este chat -- `_turno` lo reclama con
-            # `pendientes.reclamar_modificacion_abierta` antes de rutear.
-            registrar_auditoria(
-                cur, accion=f"modificar:{resuelta.herramienta}",
-                workspace_id=workspace_id, actor_app_user_id=quien.app_user_id,
-                actor_kind="persona", detalle={"args": resuelta.args, "via": "boton"})
-            _responder(cur, workspace_id, chat_id, quien,
-                       "¿Qué querés cambiar?", ahora)
-        elif not draft_token:
-            if resuelta.task_id:
+            if not draft_token and resuelta is None:
+                # Vencida, ya usada, o de otro espacio. Para la persona es lo
+                # mismo: ese pedido ya no está en pie.
                 _responder(cur, workspace_id, chat_id, quien,
-                           "Hecho. La tarea quedó comprometida.", ahora)
-            elif resuelta.herramienta == _SENTINEL_ACLARACION:
-                # T4: no es una herramienta real -- `H.ejecutar` la
-                # rechazaría -- es la elección de un botón de aclaración.
-                _resolver_toque_aclaracion(
-                    cur, quien, workspace_id, chat_id, token, resuelta.args, ahora)
-            elif resuelta.herramienta == P.SENTINEL_OPCIONES_MODELO:
-                # T1, ADR 0007: tampoco es una herramienta real -- es la
-                # elección de una opción que ofreció el modelo con
-                # `ofrecer_opciones`. No vuelve a llamarla: retoma la
-                # conversación con el modelo.
-                _resolver_toque_opcion_modelo(
-                    cur, quien, workspace_id, chat_id, resuelta.args, ahora)
-            elif resuelta.herramienta == P.SENTINEL_MENU_TAREA:
-                # T2, ADR 0007 §4.6: el menú de acciones de una tarea. Cada
-                # opción es una acción calculada por código, no una
-                # herramienta -- `_resolver_toque_menu_tarea` la despacha.
-                _resolver_toque_menu_tarea(
-                    cur, quien, workspace_id, chat_id, resuelta.args, ahora)
-            elif resuelta.herramienta == P.SENTINEL_DATO_MENU_TAREA:
-                # T2: la elección, con botones, de con cuál otra tarea se
-                # declara una dependencia -- la única forma de este
-                # sentinel que se resuelve por toque (la otra, un dato en
-                # texto libre, la retoma `_turno` cuando llega el mensaje).
-                _resolver_toque_dato_menu_tarea(
-                    cur, quien, workspace_id, chat_id, resuelta.args, ahora)
-            else:
-                from .agente import VIGENCIA_PENDIENTE
-
-                prep_capturada: dict = {}
-                try:
-                    resultado = H.ejecutar(
-                        cur, quien, resuelta.herramienta, resuelta.args,
-                        ya_confirmada=True, chat_id=chat_id,
-                        huella_previa=resuelta.huella,
-                        preparacion=prep_capturada)
-                except Denegado as e:
-                    _responder(cur, workspace_id, chat_id, quien, str(e), ahora)
-                except H.EstadoCambio as e:
-                    # La situación cambió entre la vista previa y el toque
-                    # (ADR 0005, decisión 1): no se aplica nada, se arma una
-                    # vista previa nueva y una acción pendiente nueva. Sigue
-                    # siendo la vista previa de una herramienta que escribe,
-                    # así que conserva sus tres botones (T3).
-                    nueva = P.registrar(
-                        cur, quien, herramienta=e.herramienta,
-                        args=e.argumentos, resumen=e.resumen,
-                        vence_en=ahora + VIGENCIA_PENDIENTE, chat_id=chat_id,
-                        huella=e.huella,
-                        opciones=[("Confirmar", True), ("Modificar", "modificar"),
-                                 ("Cancelar", False)])
-                    enqueue_outbox(
-                        cur, workspace_id=workspace_id, chat_id=chat_id,
-                        recipient_membership_id=quien.membership_id,
-                        text=("La situación cambió desde que te mostré esto. "
-                              f"Vista previa nueva:\n\n{e.resumen}"),
-                        scheduled_for=ahora,
-                        dedupe_key=(f"{workspace_id}:cambio:{e.herramienta}:"
-                                   f"{ahora.timestamp()}"),
-                        is_response=True, pending_action_id=nueva.id,
-                    )
+                           "Ese pedido ya no está vigente. Si sigue haciendo "
+                           "falta, escribime y lo vemos de nuevo.", ahora)
+            elif not draft_token and resuelta.cancelada:
+                _responder(cur, workspace_id, chat_id, quien,
+                           "Listo, no lo hago.", ahora)
+            elif not draft_token and resuelta.modificada:
+                # No se aplica nada (T3, ADR 0005 decisión 1): la fila ya
+                # quedó cerrada por `resolver_pendiente`, con `herramienta`,
+                # `args` y `resumen` guardados como el contexto que va a leer
+                # el próximo turno de esta persona en este chat -- `_turno`
+                # lo reclama con `pendientes.reclamar_modificacion_abierta`
+                # antes de rutear.
+                registrar_auditoria(
+                    cur, accion=f"modificar:{resuelta.herramienta}",
+                    workspace_id=workspace_id, actor_app_user_id=quien.app_user_id,
+                    actor_kind="persona", detalle={"args": resuelta.args, "via": "boton"})
+                _responder(cur, workspace_id, chat_id, quien,
+                           "¿Qué querés cambiar?", ahora)
+            elif not draft_token:
+                if resuelta.task_id:
+                    _responder(cur, workspace_id, chat_id, quien,
+                               "Hecho. La tarea quedó comprometida.", ahora)
+                elif resuelta.herramienta == _SENTINEL_ACLARACION:
+                    # T4: no es una herramienta real -- `H.ejecutar` la
+                    # rechazaría -- es la elección de un botón de aclaración.
+                    _resolver_toque_aclaracion(
+                        cur, quien, workspace_id, chat_id, token, resuelta.args, ahora)
+                elif resuelta.herramienta == P.SENTINEL_OPCIONES_MODELO:
+                    # T1, ADR 0007: tampoco es una herramienta real -- es la
+                    # elección de una opción que ofreció el modelo con
+                    # `ofrecer_opciones`. No vuelve a llamarla: retoma la
+                    # conversación con el modelo.
+                    _resolver_toque_opcion_modelo(
+                        cur, quien, workspace_id, chat_id, resuelta.args, ahora)
+                elif resuelta.herramienta == P.SENTINEL_MENU_TAREA:
+                    # T2, ADR 0007 §4.6: el menú de acciones de una tarea.
+                    # Cada opción es una acción calculada por código, no una
+                    # herramienta -- `_resolver_toque_menu_tarea` la
+                    # despacha. Se le pasa el id de la `pending_action` ya
+                    # resuelta (T2b, trazabilidad): si algo revienta más
+                    # adelante, el incidente apunta a esta fila.
+                    _resolver_toque_menu_tarea(
+                        cur, quien, workspace_id, chat_id, resuelta.args, ahora,
+                        pending_action_id=pending_action_id)
+                elif resuelta.herramienta == P.SENTINEL_DATO_MENU_TAREA:
+                    # T2: la elección, con botones, de con cuál otra tarea se
+                    # declara una dependencia -- la única forma de este
+                    # sentinel que se resuelve por toque (la otra, un dato en
+                    # texto libre, la retoma `_turno` cuando llega el mensaje).
+                    _resolver_toque_dato_menu_tarea(
+                        cur, quien, workspace_id, chat_id, resuelta.args, ahora,
+                        pending_action_id=pending_action_id)
                 else:
-                    registrar_auditoria(
-                        cur, accion=f"herramienta:{resuelta.herramienta}",
-                        workspace_id=workspace_id,
-                        actor_app_user_id=quien.app_user_id, actor_kind="persona",
-                        detalle={"args": resuelta.args, "via": "boton"})
-                    if isinstance(resultado, dict) and resultado.get("draft_id"):
-                        if resultado.get("pendiente_revision"):
-                            texto = ("Guardé el borrador y envié la vista previa a "
-                                     "quien puede confirmarlo.")
-                        else:
-                            texto = ("Guardé el pedido como borrador; todavía "
-                                     "está incompleto.")
-                        _responder(cur, workspace_id, chat_id, quien, texto, ahora)
-                    elif isinstance(resultado, dict) and (
-                            resultado.get("error")
-                            or resultado.get("cerrada") is False
-                            or resultado.get("iniciada") is False):
-                        # La preparación había pasado, pero el handler encontró
-                        # un impedimento de negocio al aplicar (p. ej. una
-                        # condición de cierre que cambió en el mismo instante).
-                        _responder(cur, workspace_id, chat_id, quien,
-                                  "No se aplicó el cambio.", ahora)
-                    elif prep_capturada.get("cambio"):
-                        # El recibo cuenta qué cambió, no un "Hecho." solo
-                        # (T2, punto 3): reusa la descripción que ya se había
-                        # mostrado en la vista previa, porque la huella
-                        # coincidió -- el estado sigue siendo ese.
-                        _responder(cur, workspace_id, chat_id, quien,
-                                  f"Hecho. {prep_capturada['cambio']}", ahora)
+                    from .agente import VIGENCIA_PENDIENTE
+
+                    prep_capturada: dict = {}
+                    try:
+                        resultado = H.ejecutar(
+                            cur, quien, resuelta.herramienta, resuelta.args,
+                            ya_confirmada=True, chat_id=chat_id,
+                            huella_previa=resuelta.huella,
+                            preparacion=prep_capturada)
+                    except Denegado as e:
+                        _responder(cur, workspace_id, chat_id, quien, str(e), ahora)
+                    except H.EstadoCambio as e:
+                        # La situación cambió entre la vista previa y el
+                        # toque (ADR 0005, decisión 1): no se aplica nada, se
+                        # arma una vista previa nueva y una acción pendiente
+                        # nueva. Sigue siendo la vista previa de una
+                        # herramienta que escribe, así que conserva sus tres
+                        # botones (T3).
+                        nueva = P.registrar(
+                            cur, quien, herramienta=e.herramienta,
+                            args=e.argumentos, resumen=e.resumen,
+                            vence_en=ahora + VIGENCIA_PENDIENTE, chat_id=chat_id,
+                            huella=e.huella,
+                            opciones=[("Confirmar", True), ("Modificar", "modificar"),
+                                     ("Cancelar", False)])
+                        enqueue_outbox(
+                            cur, workspace_id=workspace_id, chat_id=chat_id,
+                            recipient_membership_id=quien.membership_id,
+                            text=("La situación cambió desde que te mostré esto. "
+                                  f"Vista previa nueva:\n\n{e.resumen}"),
+                            scheduled_for=ahora,
+                            dedupe_key=(f"{workspace_id}:cambio:{e.herramienta}:"
+                                       f"{ahora.timestamp()}"),
+                            is_response=True, pending_action_id=nueva.id,
+                        )
                     else:
-                        _responder(cur, workspace_id, chat_id, quien, "Hecho.", ahora)
+                        registrar_auditoria(
+                            cur, accion=f"herramienta:{resuelta.herramienta}",
+                            workspace_id=workspace_id,
+                            actor_app_user_id=quien.app_user_id, actor_kind="persona",
+                            detalle={"args": resuelta.args, "via": "boton"})
+                        if isinstance(resultado, dict) and resultado.get("draft_id"):
+                            if resultado.get("pendiente_revision"):
+                                texto = ("Guardé el borrador y envié la vista previa a "
+                                         "quien puede confirmarlo.")
+                            else:
+                                texto = ("Guardé el pedido como borrador; todavía "
+                                         "está incompleto.")
+                            _responder(cur, workspace_id, chat_id, quien, texto, ahora)
+                        elif isinstance(resultado, dict) and (
+                                resultado.get("error")
+                                or resultado.get("cerrada") is False
+                                or resultado.get("iniciada") is False):
+                            # La preparación había pasado, pero el handler
+                            # encontró un impedimento de negocio al aplicar
+                            # (p. ej. una condición de cierre que cambió en
+                            # el mismo instante).
+                            _responder(cur, workspace_id, chat_id, quien,
+                                      "No se aplicó el cambio.", ahora)
+                        elif prep_capturada.get("cambio"):
+                            # El recibo cuenta qué cambió, no un "Hecho."
+                            # solo (T2, punto 3): reusa la descripción que ya
+                            # se había mostrado en la vista previa, porque la
+                            # huella coincidió -- el estado sigue siendo ese.
+                            _responder(cur, workspace_id, chat_id, quien,
+                                      f"Hecho. {prep_capturada['cambio']}", ahora)
+                        else:
+                            _responder(cur, workspace_id, chat_id, quien, "Hecho.", ahora)
+    except Exception as e:  # noqa: BLE001
+        # `conn.commit()`/`conn.rollback()` no se pueden llamar todavía acá
+        # adentro -- psycopg3 los rechaza mientras el contexto de
+        # `conn.transaction()` de `espacio()` sigue abierto (y un `return`
+        # temprano de arriba nunca llegaría a un commit puesto después del
+        # `with` igual). Por eso el resguardo real -- revertir, registrar el
+        # incidente y no volver a levantar -- vive en `procesar_update`,
+        # como antes de T2b; lo único que se hace acá, mientras `resuelta`
+        # todavía está en alcance, es dejar la referencia a la
+        # `pending_action` puesta en la excepción para que ese resguardo la
+        # use al registrar el incidente (T2b, trazabilidad).
+        e.pending_action_id = pending_action_id
+        raise
 
     if draft_token:
         return _resolver_toque_borrador(
@@ -981,18 +1067,37 @@ def _encolar_vista_previa_menu(cur, quien, workspace_id: str, chat_id: int,
 
 
 def _ejecutar_accion_menu(cur, quien, workspace_id: str, chat_id: int,
-                          herramienta: str, call_args: dict, ahora) -> None:
+                          herramienta: str, call_args: dict, ahora, *,
+                          pending_action_id: str | None = None) -> None:
     """Corre una herramienta que ya existe con lo que ya se sabe -- sin
     `ya_confirmada`, así que si declara `preparar` siempre frena primero en
-    una vista previa (ADR 0005, decisión 1): nada se aplica todavía. Un
-    `Denegado` no se atrapa acá: lo maneja quien llama, junto con el resto
-    del toque o del mensaje que retoma."""
+    una vista previa (ADR 0005, decisión 1): nada se aplica todavía.
+
+    Revisión del orquestador sobre `0814fa3` (T2b): las tres funciones que
+    llaman a ésta (`_resolver_toque_menu_tarea`, `_resolver_toque_dato_menu_
+    tarea`, `_resumir_dato_menu_tarea`) ya atajan `Denegado` en su propio
+    `try`/`except` -- pero esta función tiene que ser correcta por sí sola,
+    no depender de que quien la llama la envuelva bien. Un `Denegado` de
+    `preparar` (p. ej. el chequeo de autoridad nuevo de T2b sobre una tarea
+    que no es de quien tocó) se atrapa acá y se responde con el mismo texto
+    humano que ya usa `agente._ejecutar_una`.
+
+    El `try` corre dentro de un punto de retorno (`cur.connection.
+    transaction`, mismo patrón que `agente._ejecutar_una`): si la base
+    rechaza la operación (`psycopg.errors.RaiseException`, p. ej. un ciclo
+    de dependencias), la transacción queda abortada y el `_responder` que
+    sigue -- un insert -- fallaría sin este resguardo."""
     import psycopg
 
     from . import herramientas as H
 
+    punto = cur.connection.transaction(force_rollback=False)
     try:
-        resultado = H.ejecutar(cur, quien, herramienta, call_args, chat_id=chat_id)
+        with punto:
+            resultado = H.ejecutar(cur, quien, herramienta, call_args, chat_id=chat_id)
+    except Denegado as e:
+        _responder(cur, workspace_id, chat_id, quien, str(e), ahora)
+        return
     except H.NecesitaConfirmacion as e:
         _encolar_vista_previa_menu(cur, quien, workspace_id, chat_id, e, ahora)
         return
@@ -1005,14 +1110,42 @@ def _ejecutar_accion_menu(cur, quien, workspace_id: str, chat_id: int,
                   str(e).split("\n")[0], ahora)
         return
     _responder(cur, workspace_id, chat_id, quien,
-              _mensaje_resultado_menu(resultado), ahora)
+              _mensaje_resultado_menu(cur, quien, herramienta, resultado,
+                                      pending_action_id=pending_action_id), ahora)
 
 
-def _mensaje_resultado_menu(resultado) -> str:
-    if isinstance(resultado, dict):
-        return resultado.get("falta") or resultado.get("error") or \
-            "No se aplicó ningún cambio."
-    return "No se aplicó ningún cambio."
+def _mensaje_resultado_menu(cur, quien, herramienta: str, resultado, *,
+                            pending_action_id: str | None = None) -> str:
+    """El mensaje tras correr una acción del menú sin `ya_confirmada`
+    (revisión del orquestador sobre `0814fa3`, T2b, punto 3).
+
+    Como TODAS las herramientas que ofrece el menú declaran `preparar`, y
+    `_ejecutar_accion_menu` nunca pasa `ya_confirmada`, `herramientas.
+    ejecutar` corta siempre en `NecesitaConfirmacion` antes de tocar el
+    handler (ver ese código: con `preparar` devolviendo una `Preparacion` y
+    `ya_confirmada=False`, siempre levanta esa excepción) -- lo que llega
+    hasta acá sin excepción es siempre el rechazo de negocio que devolvió
+    `preparar` (`{"falta": ...}` o `{"error": ...}`), nunca el resultado de
+    un handler que sí aplicó algo.
+
+    Decisión del usuario, 2026-09-25: un error nunca pasa en silencio -- ni
+    siquiera como una `AssertionError` que se atrapa lejos de acá. Un
+    resultado que no se reconoce (por ejemplo, si una herramienta nueva del
+    menú alguna vez deja de declarar `preparar`) registra su propio
+    incidente, sanitizado, y le contesta a la persona con un aviso neutro --
+    nunca "No se aplicó ningún cambio.", que sería afirmar algo que acá no
+    se sabe si es cierto."""
+    if isinstance(resultado, dict) and ("falta" in resultado or "error" in resultado):
+        return resultado.get("falta") or resultado.get("error")
+    _registrar_incidente(
+        cur, quien.workspace_id,
+        f"_ejecutar_accion_menu: resultado inesperado sin excepción de "
+        f"'{herramienta}' (ninguna herramienta del menú debería llegar "
+        f"hasta acá sin haber frenado antes en preparar).",
+        referencia_cruda=repr(resultado)[:2000], etapa=ETAPA_ACCION_MENU,
+        referencia_tipo=(REFERENCIA_PENDING_ACTION if pending_action_id else None),
+        referencia_id=pending_action_id, app_user_id=quien.app_user_id)
+    return NOTICIA_NEUTRA_INCIDENTE
 
 
 def _pedir_dato_menu_tarea(cur, quien, workspace_id: str, chat_id: int, *,
@@ -1073,9 +1206,14 @@ def _pedir_eleccion_dependencia(cur, quien, workspace_id: str, chat_id: int, *,
 
 
 def _resolver_toque_menu_tarea(cur, quien, workspace_id: str, chat_id: int,
-                               args: dict, ahora) -> None:
+                               args: dict, ahora, *,
+                               pending_action_id: str | None = None) -> None:
     """Alguien tocó una acción del menú de una tarea (T2). El menú ya
-    calculó qué se puede hacer; acá cada acción sigue su camino."""
+    calculó qué se puede hacer; acá cada acción sigue su camino.
+
+    `pending_action_id` (T2b, trazabilidad): la `pending_action` del propio
+    menú que se está resolviendo, para que un incidente en
+    `_ejecutar_accion_menu` quede trazable hasta acá."""
     from . import menu_tarea as M
 
     eleccion = args.get("eleccion") or {}
@@ -1105,16 +1243,19 @@ def _resolver_toque_menu_tarea(cur, quien, workspace_id: str, chat_id: int,
         if accion == "empezar":
             _ejecutar_accion_menu(cur, quien, workspace_id, chat_id,
                                   "actualizar_estado",
-                                  {"tarea_id": tarea_id, "estado": "en_curso"}, ahora)
+                                  {"tarea_id": tarea_id, "estado": "en_curso"}, ahora,
+                                  pending_action_id=pending_action_id)
             return
         if accion == "terminar":
             _ejecutar_accion_menu(cur, quien, workspace_id, chat_id,
                                   "actualizar_estado",
-                                  {"tarea_id": tarea_id, "estado": "en_revision"}, ahora)
+                                  {"tarea_id": tarea_id, "estado": "en_revision"}, ahora,
+                                  pending_action_id=pending_action_id)
             return
         if accion == "aprobar":
             _ejecutar_accion_menu(cur, quien, workspace_id, chat_id,
-                                  "aprobar_tarea", {"tarea_id": tarea_id}, ahora)
+                                  "aprobar_tarea", {"tarea_id": tarea_id}, ahora,
+                                  pending_action_id=pending_action_id)
             return
 
         if accion == "informar_bloqueo":
@@ -1199,11 +1340,15 @@ def _resolver_toque_menu_tarea(cur, quien, workspace_id: str, chat_id: int,
 
 
 def _resolver_toque_dato_menu_tarea(cur, quien, workspace_id: str, chat_id: int,
-                                    args: dict, ahora) -> None:
+                                    args: dict, ahora, *,
+                                    pending_action_id: str | None = None) -> None:
     """Alguien tocó una tarea candidata para una dependencia, dentro del
     menú (T2). A diferencia de `_resolver_toque_menu_tarea`, lo que vuelve
     por `campo="eleccion"` no es el código de una acción: es el id de la
-    otra tarea elegida -- el mismo patrón que `NecesitaElegir`."""
+    otra tarea elegida -- el mismo patrón que `NecesitaElegir`.
+
+    `pending_action_id` (T2b, trazabilidad): igual que en
+    `_resolver_toque_menu_tarea`."""
     accion = args.get("accion")
     otra_tarea_id = args.get("eleccion")
     tarea_id = args.get("tarea_id")
@@ -1223,7 +1368,8 @@ def _resolver_toque_dato_menu_tarea(cur, quien, workspace_id: str, chat_id: int,
 
     try:
         _ejecutar_accion_menu(cur, quien, workspace_id, chat_id,
-                              "crear_dependencia", call_args, ahora)
+                              "crear_dependencia", call_args, ahora,
+                              pending_action_id=pending_action_id)
     except Denegado as e:
         _responder(cur, workspace_id, chat_id, quien, str(e), ahora)
     except Exception as e:  # noqa: BLE001
@@ -1273,7 +1419,8 @@ def _resumir_dato_menu_tarea(cur, quien, texto: str, modificacion, chat_id: int,
 
     try:
         _ejecutar_accion_menu(cur, quien, workspace_id, chat_id, herramienta,
-                              call_args, ahora)
+                              call_args, ahora,
+                              pending_action_id=modificacion.pending_action_id)
     except Denegado as e:
         _responder(cur, workspace_id, chat_id, quien, str(e), ahora)
     except Exception as e:  # noqa: BLE001
@@ -1651,6 +1798,159 @@ def _routing_incident(cur, quien, error) -> None:
         (quien.workspace_id,
          f"Falló el enrutamiento tipado ({type(error).__name__})."),
     )
+
+
+NOTICIA_NEUTRA_INCIDENTE = "No pude completar eso. Ya quedó registrado para revisarlo."
+
+# Etapas nombradas (T2b, corrección de trazabilidad, 2026-09-25): en qué
+# punto de entrada se atrapó la excepción no manejada. No pretenden cubrir
+# cada paso interno posible (enrutar, resolver referencias, armar la vista
+# previa, el turno del modelo, correr una herramienta, mandar la respuesta)
+# -- eso ya tiene su propio incidente puntual donde corresponde
+# (`_routing_incident`, `agente._incidente`, etc.), sin tocar. Éstas son las
+# de la red de contención general que agrega esta unidad: el punto de
+# entrada, no el paso interno.
+ETAPA_TURNO_TEXTO = "turno_texto"
+ETAPA_TOQUE_BOTON = "toque_boton"
+ETAPA_ACTIVACION = "activacion"
+ETAPA_ACCION_MENU = "accion_menu"
+
+# Qué tipo de fila referencia `incident.referencia_id` -- mismo patrón
+# polimórfico que `audit_log.sujeto_tipo`/`sujeto_id`, sin clave foránea:
+# apunta a texto o a un toque, nunca lo copia (docs/ROADMAP.md: la
+# retención de `inbound_message` es por cliente).
+REFERENCIA_INBOUND_MESSAGE = "inbound_message"
+REFERENCIA_PENDING_ACTION = "pending_action"
+
+
+def _routing_incident(cur, quien, error) -> None:
+    cur.execute(
+        """insert into incident (workspace_id, severidad, resumen_sanitizado)
+           values (%s, 'media', %s)""",
+        (quien.workspace_id,
+         f"Falló el enrutamiento tipado ({type(error).__name__})."),
+    )
+
+
+def _registrar_incidente(cur, workspace_id: str, resumen: str, *,
+                         severidad: str = "media",
+                         referencia_cruda: str | None = None,
+                         etapa: str | None = None,
+                         referencia_tipo: str | None = None,
+                         referencia_id: str | None = None,
+                         chat_id: int | None = None,
+                         app_user_id: str | None = None,
+                         notificado_en=None) -> None:
+    """Inserta un incidente sanitizado -- decisión del usuario, 2026-09-25:
+    un error nunca pasa en silencio, y el incidente tiene que hacer
+    encontrable la causa (corrección posterior del usuario, misma fecha).
+
+    `resumen` es legible para una persona y no lleva texto de mensajes;
+    `referencia_cruda` es la traza técnica completa (tipo y mensaje de la
+    excepción), sólo para quien administra. `referencia_tipo` +
+    `referencia_id` apuntan a la fila que originó esto -- el
+    `inbound_message` o la `pending_action` -- sin copiar su contenido: el
+    texto se abre desde ahí, bajo la retención por cliente que define
+    `docs/ROADMAP.md`. Helper compartido para que quien necesite registrar
+    un incidente no arme el `insert` a mano en cada lugar nuevo."""
+    cur.execute(
+        """insert into incident (workspace_id, severidad, resumen_sanitizado,
+                                 referencia_cruda, etapa, referencia_tipo,
+                                 referencia_id, chat_id, app_user_id,
+                                 notificado_en)
+           values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+        (workspace_id, severidad, resumen, referencia_cruda, etapa,
+         referencia_tipo, referencia_id, chat_id, app_user_id, notificado_en))
+
+
+def reportar_incidente_no_manejado(conn, *, workspace_id: str | None,
+                                   chat_id: int | None, tg_user: int | None,
+                                   error: Exception, etapa: str,
+                                   referencia_tipo: str | None = None,
+                                   referencia_id: str | None = None) -> None:
+    """Red de contención final para un update de Telegram (mensaje o toque)
+    que levantó algo que ningún camino específico atajó -- decisión del
+    usuario, 2026-09-25: un error nunca pasa en silencio. Evidencia de la
+    sesión real: un `UndefinedColumn` hacía que Prisma saltara el mensaje
+    sin ninguna respuesta ni incidente, invisible hasta que alguien lo
+    notaba por otro lado.
+
+    Quien llama ya revirtió la transacción que falló (`conn.rollback()`);
+    ésta abre una nueva -- la vieja ya no sirve. Nunca deja escapar una
+    excepción propia: si hasta este resguardo falla (por ejemplo, la base
+    sigue caída), el aviso se pierde pero no se reintenta ni se cuelga el
+    ciclo que sigue escuchando updates (`local.Escucha.recibir` reusa esta
+    misma función).
+
+    Corrección del usuario sobre trazabilidad (2026-09-25): el incidente
+    tiene que poder encontrarse. Se intenta avisar a la persona PRIMERO --
+    sin tocar `incident` todavía -- porque `prisma_app` sólo tiene `insert`
+    sobre esa tabla (`db/esquema.sql`, "grant insert on ... incident ... to
+    prisma_app"): no hay una segunda pasada que la actualice con si el
+    aviso funcionó. El incidente se registra una sola vez, al final, ya con
+    el resultado del aviso resuelto (`notificado_en`, y una nota en el
+    resumen si no se pudo avisar) -- nunca dos filas para un mismo fallo."""
+    if workspace_id is None:
+        return
+
+    from datetime import datetime, timezone
+
+    ahora = datetime.now(timezone.utc)
+    app_user_id = None
+    notificado_en = None
+    nota_aviso = None
+
+    if chat_id is None or tg_user is None:
+        nota_aviso = "No se avisó: no se identificó chat o usuario."
+    else:
+        try:
+            with espacio(conn, workspace_id) as cur:
+                try:
+                    quien = identificar_en_espacio(cur, tg_user, workspace_id)
+                except Denegado:
+                    quien = None
+                if quien is None:
+                    nota_aviso = ("No se avisó: la persona no se identificó "
+                                  "en el espacio.")
+                else:
+                    app_user_id = quien.app_user_id
+                    enqueue_outbox(
+                        cur, workspace_id=workspace_id, chat_id=chat_id,
+                        recipient_membership_id=quien.membership_id,
+                        text=NOTICIA_NEUTRA_INCIDENTE, scheduled_for=ahora,
+                        dedupe_key=(f"{workspace_id}:incidente-no-manejado:"
+                                   f"{chat_id}:{ahora.timestamp()}"),
+                        is_response=True)
+            conn.commit()
+            notificado_en = ahora
+        except Exception:  # noqa: BLE001
+            try:
+                conn.rollback()
+            except Exception:  # noqa: BLE001
+                pass
+            nota_aviso = "No se avisó: falló el envío del aviso."
+
+    resumen = f"Excepción no manejada en '{etapa}' ({type(error).__name__})."
+    if nota_aviso:
+        resumen += f" {nota_aviso}"
+
+    try:
+        with espacio(conn, workspace_id) as cur:
+            _registrar_incidente(
+                cur, workspace_id, resumen, severidad="alta",
+                referencia_cruda=str(error)[:2000], etapa=etapa,
+                referencia_tipo=referencia_tipo, referencia_id=referencia_id,
+                chat_id=chat_id, app_user_id=app_user_id,
+                notificado_en=notificado_en)
+        conn.commit()
+    except Exception:  # noqa: BLE001
+        # Ni siquiera el incidente se pudo registrar (decisión del usuario,
+        # T2b): no se reintenta ni se propaga -- se pierde el registro, no
+        # el ciclo que sigue escuchando.
+        try:
+            conn.rollback()
+        except Exception:  # noqa: BLE001
+            pass
 
 
 @router.get("/tablero/{token}", response_class=HTMLResponse)

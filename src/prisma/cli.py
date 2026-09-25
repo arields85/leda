@@ -344,7 +344,9 @@ def main(argv: list[str] | None = None) -> int:
     if a.cmd == "incidentes":
         with admin(conn) as cur:
             cur.execute(
-                """select at, severidad, resumen_sanitizado, referencia_cruda
+                """select at, severidad, resumen_sanitizado, referencia_cruda,
+                          etapa, referencia_tipo, referencia_id, chat_id,
+                          notificado_en
                      from incident where workspace_id = %s
                     order by at desc limit 20""", (ws,))
             filas = cur.fetchall()
@@ -352,6 +354,19 @@ def main(argv: list[str] | None = None) -> int:
             print("Sin incidentes.")
         for f in filas:
             print(f"\n{f['at']:%d/%m %H:%M}  [{f['severidad']}] {f['resumen_sanitizado']}")
+            # Trazabilidad (T2b): etapa + referencia a la fila que originó
+            # esto (nunca su texto -- eso se abre aparte, desde esa fila) +
+            # si se avisó a la persona. Nunca se imprime un secreto acá.
+            detalle = []
+            if f["etapa"]:
+                detalle.append(f"etapa={f['etapa']}")
+            if f["referencia_tipo"] and f["referencia_id"]:
+                detalle.append(f"{f['referencia_tipo']}={f['referencia_id']}")
+            if f["chat_id"]:
+                detalle.append(f"chat={f['chat_id']}")
+            detalle.append("avisado" if f["notificado_en"] else "sin avisar")
+            if detalle:
+                print(f"    {' · '.join(detalle)}")
             if f["referencia_cruda"]:
                 print(f"    {f['referencia_cruda'][:300]}")
         return 0

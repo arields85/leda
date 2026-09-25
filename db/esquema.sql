@@ -1240,7 +1240,21 @@ create table incident (
   resumen_sanitizado   text not null,
   referencia_cruda     text,
   at                   timestamptz not null default now(),
-  notificado_en        timestamptz
+  notificado_en        timestamptz,
+  -- Trazabilidad (T2b, corrección del usuario sobre incidentes, 2026-09-25):
+  -- el incidente tiene que hacer encontrable la causa, sin copiar texto de
+  -- conversación. `etapa` es el punto de entrada donde se atrapó la
+  -- excepción (`gateway.ETAPA_*`); `referencia_tipo`/`referencia_id` apuntan
+  -- -- mismo patrón polimórfico que `audit_log.sujeto_tipo`/`sujeto_id`,
+  -- sin clave foránea -- a la fila que originó esto (`inbound_message` o
+  -- `pending_action`): el texto se abre desde ahí, bajo la retención por
+  -- cliente de docs/ROADMAP.md, nunca copiado acá. `chat_id`/`app_user_id`
+  -- ubican a quién y dónde, igual que en `inbound_message`.
+  etapa                text,
+  referencia_tipo      text,
+  referencia_id        uuid,
+  chat_id              bigint,
+  app_user_id          uuid references app_user(id) on delete set null
 );
 
 -- Credencial para abrir el tablero desde un navegador, donde no existe nada de

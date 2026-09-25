@@ -546,8 +546,15 @@ def test_prisma_app_no_puede_borrar_task_y_evento_autorizado_sigue_operando(
             cur.execute("delete from task where id = %s", (resuelta.task_id,))
 
     with espacio(conn, ws) as cur:
-        marcos = _quien(cur, "Marcos Tarquini", ws)
-        assert H.ejecutar(cur, marcos, "actualizar_estado", {
+        # El responsable de la tarea es Nahuel Gimenez (`_args`, default de
+        # `_crear_preview`); Marcos sólo confirmó el borrador. Con el
+        # chequeo de autoridad de T2b (`herramientas._preparar_actualizar_
+        # estado`), sólo el responsable puede mover el estado -- se usa acá
+        # para seguir probando lo que este test verifica de verdad: que la
+        # operación autorizada sigue funcionando después del intento
+        # rechazado de arriba, no que Marcos tenga algo que ver con la tarea.
+        nahuel = _quien(cur, "Nahuel Gimenez", ws)
+        assert H.ejecutar(cur, nahuel, "actualizar_estado", {
             "tarea_id": resuelta.task_id, "estado": "en_curso",
         }, ya_confirmada=True)["estado"] == "en_curso"
         cur.execute("select estado from task where id = %s", (resuelta.task_id,))

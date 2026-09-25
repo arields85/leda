@@ -293,6 +293,13 @@ def test_objective_callback_rejects_wrong_actor_chat_request_or_version(
 
 def test_objective_callback_failure_rolls_back_before_outer_commit(
         intake_world, conn, monkeypatch):
+    """Revisión del orquestador sobre `0814fa3` (T2b, punto 2): antes,
+    `gateway.procesar_update` revertía la transacción y volvía a levantar la
+    excepción -- 500, sin incidente ni aviso a la persona. Decisión del
+    usuario, 2026-09-25: un error nunca pasa en silencio. La reversión de la
+    mutación de intake (lo que este test prueba de fondo) sigue exactamente
+    igual; lo que cambia es que ahora la respuesta es 200 (la persona no se
+    queda sin nada) y queda un incidente más un aviso neutro encolado."""
     ws, user, request_id, choice = _objective_callback_setup(conn, intake_world)
     resolve_choice = I.resolve_choice
 
@@ -303,9 +310,13 @@ def test_objective_callback_failure_rolls_back_before_outer_commit(
     monkeypatch.setattr(I, "resolve_choice", fail_after_resolution)
     client = _callback_client(conn, monkeypatch, raise_server_exceptions=False)
 
+    with admin(conn) as cur:
+        cur.execute("select count(*) n from incident where workspace_id = %s", (ws["id"],))
+        incidentes_antes = cur.fetchone()["n"]
+
     response = _post_intake_callback(client, choice["token"], user)
 
-    assert response.status_code == 500
+    assert response.status_code == 200
     assert conn.info.transaction_status == psycopg.pq.TransactionStatus.IDLE
     with admin(conn) as cur:
         cur.execute(
@@ -330,11 +341,23 @@ def test_objective_callback_failure_rolls_back_before_outer_commit(
             (choice["choice_set_id"],),
         )
         assert cur.fetchone()["n"] == choice["choice_count"]
+        # Sigue sin haber ningún cambio de negocio aplicado -- lo único
+        # nuevo en la cola es el aviso neutro del incidente, no un efecto de
+        # la elección que falló.
         cur.execute(
             "select count(*) n from message_outbox where workspace_id = %s",
             (ws["id"],),
         )
-        assert cur.fetchone()["n"] == choice["outbox_count"]
+        assert cur.fetchone()["n"] == choice["outbox_count"] + 1
+        cur.execute(
+            """select count(*) n from message_outbox
+                where workspace_id = %s and cuerpo = %s""",
+            (ws["id"], gateway.NOTICIA_NEUTRA_INCIDENTE),
+        )
+        assert cur.fetchone()["n"] == 1
+        cur.execute(
+            "select count(*) n from incident where workspace_id = %s", (ws["id"],))
+        assert cur.fetchone()["n"] == incidentes_antes + 1
 
 
 def _complete(cur, world, request_id, actor, *, criterion_label="Confirm"):

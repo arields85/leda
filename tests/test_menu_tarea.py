@@ -14,6 +14,7 @@ un `message`, igual que `tests/test_modificar.py`.
 
 from __future__ import annotations
 
+import uuid
 from contextlib import nullcontext
 from datetime import datetime, timezone
 
@@ -21,6 +22,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from prisma import gateway
+from prisma import herramientas as H
 from prisma import jev as jev_modulo
 from prisma import pendientes as P
 from prisma.agente import responder
@@ -662,3 +664,299 @@ def test_retomar_una_opcion_entrega_respuesta_aunque_falle_el_proveedor(
         cur.execute(
             "select count(*) n from incident where workspace_id = %s", (ws,))
         assert cur.fetchone()["n"] >= 1
+
+
+# ---------------------------------------------------------------------------
+# Revisión del orquestador sobre T2 (`0814fa3`), T2b: `_ejecutar_accion_menu`
+# tiene que ser correcta por sí sola -- no depender de que quien la llama la
+# envuelva bien -- y no puede dejar la transacción abortada cuando la base
+# rechaza la operación.
+# ---------------------------------------------------------------------------
+
+def test_ejecutar_accion_menu_deniega_sin_romper_la_respuesta(conn, corework):
+    """(1) `_ejecutar_accion_menu` no atrapaba `Denegado`: con el chequeo de
+    autoridad nuevo de T2b (`herramientas._preparar_actualizar_estado`), si
+    alguien sin autoridad llegara hasta acá (una carrera entre abrir el menú
+    y tocarlo, o una futura acción del menú sin ese filtro), la excepción se
+    escapaba de la función en vez de avisarle a la persona -- las tres
+    funciones que la llaman ya la atajan, pero la función tiene que ser
+    correcta también sola."""
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        tid = _tarea(cur, ws, estado="asignada", persona="Nahuel Gimenez")
+    conn.commit()
+
+    with espacio(conn, ws) as cur:
+        ajeno = _quien(cur, "Ariel De Simone", ws)   # ni responsable ni aprobador
+        gateway._ejecutar_accion_menu(
+            cur, ajeno, ws, 9999, "actualizar_estado",
+            {"tarea_id": tid, "estado": "en_curso"}, datetime.now(timezone.utc))
+
+        cur.execute("select estado from task where id = %s", (tid,))
+        assert cur.fetchone()["estado"] == "asignada"      # nada cambió
+
+        cur.execute(
+            """select cuerpo from message_outbox where chat_id = %s
+                order by programado_para desc limit 1""", (9999,))
+        fila = cur.fetchone()
+        assert fila is not None, "la persona se quedó sin ninguna respuesta"
+        assert "no es tuya" in fila["cuerpo"].lower()
+
+
+def test_ejecutar_accion_menu_recupera_de_un_rechazo_de_la_base(
+        conn, corework, monkeypatch):
+    """(2) El `except psycopg.errors.RaiseException` corría sin el punto de
+    retorno (`cur.connection.transaction`) que sí usa `agente._ejecutar_una`:
+    una regla de la base (acá, el disparador que rechaza un ciclo de
+    dependencias) deja la transacción abortada, y el `_responder` que sigue
+    -- un insert -- fallaba en vez de avisarle a la persona por qué se
+    rechazó. Se fuerza `ya_confirmada=True` para llegar hasta el handler real
+    (`_ejecutar_accion_menu` nunca lo hace por sí sola sin confirmar) y
+    ejercitar el rechazo genuino del disparador, no uno simulado."""
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        a = _tarea(cur, ws, titulo="Instalar tablero", persona="Marcos Tarquini")
+        b = _tarea(cur, ws, titulo="Programar HMI línea 2", persona="Marcos Tarquini")
+        # B ya depende de A (A bloqueante para B).
+        cur.execute(
+            """insert into dependency (workspace_id, origen_task_id, destino_task_id, tipo)
+               values (%s, %s, %s, 'bloqueante')""", (ws, a, b))
+    conn.commit()
+
+    ejecutar_real = H.ejecutar
+
+    def _forzar_confirmada(cur, quien, nombre, args, **kwargs):
+        kwargs["ya_confirmada"] = True
+        return ejecutar_real(cur, quien, nombre, args, **kwargs)
+
+    monkeypatch.setattr(H, "ejecutar", _forzar_confirmada)
+
+    with espacio(conn, ws) as cur:
+        marcos = _quien(cur, "Marcos Tarquini", ws)
+        # Ahora A depende de B -- junto con B ya depende de A, cierra el ciclo.
+        gateway._ejecutar_accion_menu(
+            cur, marcos, ws, 9998, "crear_dependencia",
+            {"origen_tarea_id": b, "destino_tarea_id": a, "tipo": "bloqueante"},
+            datetime.now(timezone.utc))
+
+        cur.execute(
+            """select cuerpo from message_outbox where chat_id = %s
+                order by programado_para desc limit 1""", (9998,))
+        fila = cur.fetchone()
+        assert fila is not None, (
+            "la respuesta no se pudo encolar tras el rechazo de la base -- "
+            "la transacción quedó abortada")
+        assert "ciclo" in fila["cuerpo"].lower()
+
+        cur.execute("select count(*) n from dependency where workspace_id = %s", (ws,))
+        assert cur.fetchone()["n"] == 1    # sólo la que ya existía
+
+
+def test_mensaje_resultado_menu_no_dice_no_se_aplico_para_algo_no_reconocido(
+        conn, corework):
+    """(3) `_mensaje_resultado_menu` colapsaba cualquier resultado que no
+    reconociera en "No se aplicó ningún cambio.". Hoy eso nunca pasa en la
+    práctica -- las cinco herramientas que ofrece el menú declaran
+    `preparar`, y `_ejecutar_accion_menu` nunca pasa `ya_confirmada`, así que
+    lo único que puede volver sin excepción es el rechazo de negocio de
+    `preparar` (`falta`/`error`) -- pero la función no debe asumirlo para
+    cualquier entrada: un resultado que no trae ninguna de esas dos claves
+    (por ejemplo, el resultado real de un handler que sí aplicó algo) no
+    puede reportarse como "nada cambió" sin poder probarlo.
+
+    Decisión del usuario, 2026-09-25: un error nunca pasa en silencio, ni
+    siquiera como una `AssertionError` atrapada lejos de acá -- registra su
+    propio incidente y contesta con un aviso neutro, nunca "No se aplicó
+    ningún cambio."."""
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        # `prisma_app` sólo tiene `insert` sobre `incident` (`db/esquema.sql`,
+        # "grant insert on ... incident ... to prisma_app"), igual que
+        # `task_state_event`: se lee por la conexión administrativa.
+        cur.execute("select count(*) n from incident where workspace_id = %s", (ws,))
+        antes = cur.fetchone()["n"]
+
+    with espacio(conn, ws) as cur:
+        quien = _quien(cur, "Nahuel Gimenez", ws)
+
+        assert gateway._mensaje_resultado_menu(
+            cur, quien, "actualizar_estado", {"error": "x"}) == "x"
+        assert gateway._mensaje_resultado_menu(
+            cur, quien, "actualizar_estado", {"falta": "y"}) == "y"
+
+        for resultado in ({"estado": "en_curso"}, {"bloqueo_id": "1"}, None):
+            texto = gateway._mensaje_resultado_menu(
+                cur, quien, "actualizar_estado", resultado)
+            assert texto == gateway.NOTICIA_NEUTRA_INCIDENTE
+            assert "no se aplicó" not in texto.lower()
+    conn.commit()
+
+    with admin(conn) as cur:
+        cur.execute("select count(*) n from incident where workspace_id = %s", (ws,))
+        assert cur.fetchone()["n"] == antes + 3
+        cur.execute(
+            """select etapa from incident where workspace_id = %s
+                order by at desc""", (ws,))
+        assert [f["etapa"] for f in cur.fetchall()[:3]] == [gateway.ETAPA_ACCION_MENU] * 3
+
+
+# ---------------------------------------------------------------------------
+# Decisión del usuario, 2026-09-25: un error nunca pasa en silencio. Evidencia
+# de la sesión real por Telegram: un `UndefinedColumn` hacía que Prisma
+# saltara un mensaje sin ninguna respuesta ni incidente -- invisible hasta que
+# alguien lo notaba por otro lado.
+# ---------------------------------------------------------------------------
+
+def test_excepcion_no_manejada_en_un_turno_registra_incidente_y_avisa(
+        cliente, conn, corework, monkeypatch):
+    """Una excepción inesperada dentro de un turno de texto tiene que (a)
+    revertir la transacción que falló, (b) registrar un incidente que apunte
+    a la causa y (c) avisarle a la persona con un texto neutro, sin ningún
+    detalle técnico.
+
+    Corrección del usuario sobre trazabilidad (2026-09-25): el
+    `inbound_message` (el recibo de lo que llegó) sobrevive la reversión a
+    propósito -- se confirma en su propia fase, antes de interpretar el
+    texto -- así el incidente tiene a qué apuntar; lo que se revierte es la
+    interpretación (`_turno`), no la constancia de haber recibido algo."""
+    ws = corework.workspace_id
+
+    def _explota(cur, quien, texto, workspace_id, chat_id, entrante_id=None):
+        raise RuntimeError("falla inesperada de prueba")
+
+    monkeypatch.setattr(gateway, "_turno", _explota)
+
+    with espacio(conn, ws) as cur:
+        tg = _telegram_id(cur, "Nahuel Gimenez")
+    conn.commit()
+
+    r = _mensaje(cliente, tg, "arranco con esto")
+    assert r.status_code == 200
+
+    with admin(conn) as cur:
+        cur.execute(
+            "select id from inbound_message where workspace_id = %s", (ws,))
+        filas_entrantes = cur.fetchall()
+        assert len(filas_entrantes) == 1, (
+            "el recibo del mensaje (inbound_message) tiene que sobrevivir: "
+            "es la referencia que el incidente necesita para ser trazable")
+        entrante_id = str(filas_entrantes[0]["id"])
+
+        cur.execute(
+            """select severidad, resumen_sanitizado, referencia_cruda, etapa,
+                      referencia_tipo, referencia_id, chat_id, app_user_id,
+                      notificado_en, at
+                 from incident where workspace_id = %s
+                order by at desc limit 1""", (ws,))
+        incidente = cur.fetchone()
+        assert incidente is not None
+        assert incidente["etapa"] == gateway.ETAPA_TURNO_TEXTO
+        assert incidente["referencia_tipo"] == gateway.REFERENCIA_INBOUND_MESSAGE
+        assert incidente["referencia_id"] == filas_entrantes[0]["id"]
+        assert "RuntimeError" in incidente["resumen_sanitizado"]
+        assert "falla inesperada de prueba" in incidente["referencia_cruda"]
+        assert incidente["chat_id"] == tg
+        assert incidente["notificado_en"] is not None    # se avisó
+        assert incidente["at"] is not None                # fecha y hora
+
+        cur.execute(
+            """select cuerpo from message_outbox where chat_id = %s
+                order by programado_para desc limit 1""", (tg,))
+        fila = cur.fetchone()
+        assert fila is not None, "la persona se quedó sin ningún aviso"
+        assert fila["cuerpo"] == gateway.NOTICIA_NEUTRA_INCIDENTE
+        assert entrante_id    # referenciable: el admin puede abrir el texto desde ahí
+
+
+def test_excepcion_no_manejada_en_un_toque_registra_incidente_y_avisa(
+        cliente, conn, corework, monkeypatch):
+    """Lo mismo que el turno de texto, pero para un toque de botón: una
+    excepción inesperada dentro de `_toque` (acá, dentro del despacho de una
+    acción del menú) no puede perderse -- ni la acción pendiente ni la tarea
+    quedan a medio aplicar, y la persona recibe un aviso neutro. El
+    incidente tiene que apuntar a la `pending_action` que se estaba
+    resolviendo (corrección del usuario sobre trazabilidad)."""
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        tid = _tarea(cur, ws, estado="asignada", persona="Nahuel Gimenez")
+    conn.commit()
+
+    pid_menu, filas, tg = _abrir_menu(cliente, conn, ws, monkeypatch, tid,
+                                      "Nahuel Gimenez")
+
+    def _explota(*args, **kwargs):
+        raise RuntimeError("falla inesperada de prueba")
+
+    monkeypatch.setattr(gateway, "_resolver_toque_menu_tarea", _explota)
+
+    token = next(f for f in filas if f["etiqueta"] == "Empezar")["token"]
+    r = _tocar(cliente, token, tg)
+    assert r.status_code == 200
+
+    with admin(conn) as cur:
+        cur.execute("select estado from pending_action where id = %s", (pid_menu,))
+        assert cur.fetchone()["estado"] == "esperando"     # nada quedó a medio aplicar
+
+        cur.execute("select estado from task where id = %s", (tid,))
+        assert cur.fetchone()["estado"] == "asignada"
+
+        cur.execute(
+            """select severidad, resumen_sanitizado, referencia_cruda, etapa,
+                      referencia_tipo, referencia_id, chat_id, notificado_en
+                 from incident where workspace_id = %s
+                order by at desc limit 1""", (ws,))
+        incidente = cur.fetchone()
+        assert incidente is not None
+        assert incidente["etapa"] == gateway.ETAPA_TOQUE_BOTON
+        assert incidente["referencia_tipo"] == gateway.REFERENCIA_PENDING_ACTION
+        assert incidente["referencia_id"] == uuid.UUID(pid_menu)
+        assert "RuntimeError" in incidente["resumen_sanitizado"]
+        assert "falla inesperada de prueba" in incidente["referencia_cruda"]
+        assert incidente["notificado_en"] is not None
+
+        cur.execute(
+            """select cuerpo from message_outbox where chat_id = %s
+                order by programado_para desc limit 1""", (tg,))
+        fila = cur.fetchone()
+        assert fila is not None, "la persona se quedó sin ningún aviso"
+        assert fila["cuerpo"] == gateway.NOTICIA_NEUTRA_INCIDENTE
+
+
+def test_reportar_incidente_no_manejado_no_levanta_si_tambien_falla_el_aviso(
+        conn, corework, monkeypatch):
+    """Si hasta el intento de avisar falla (p. ej. `enqueue_outbox` levanta),
+    el resguardo no puede levantar ni reintentar -- se registra un único
+    incidente, con una nota de que el aviso también falló y sin
+    `notificado_en`, y no hay ningún loop."""
+    ws = corework.workspace_id
+    with espacio(conn, ws) as cur:
+        tg = _telegram_id(cur, "Nahuel Gimenez")
+    conn.commit()
+
+    def _explota(*args, **kwargs):
+        raise RuntimeError("el envío también falla")
+
+    monkeypatch.setattr(gateway, "enqueue_outbox", _explota)
+
+    with admin(conn) as cur:
+        cur.execute("select count(*) n from incident where workspace_id = %s", (ws,))
+        antes = cur.fetchone()["n"]
+
+    # No debe levantar ninguna excepción.
+    gateway.reportar_incidente_no_manejado(
+        conn, workspace_id=ws, chat_id=tg, tg_user=tg,
+        error=RuntimeError("falla original de prueba"), etapa=gateway.ETAPA_TURNO_TEXTO)
+
+    with admin(conn) as cur:
+        cur.execute(
+            """select resumen_sanitizado, notificado_en, etapa
+                 from incident where workspace_id = %s
+                order by at""", (ws,))
+        filas = cur.fetchall()
+        assert len(filas) == antes + 1    # una sola fila, no dos
+        nueva = filas[-1]
+        assert "Excepción no manejada" in nueva["resumen_sanitizado"]
+        assert "también falló el aviso" in nueva["resumen_sanitizado"].lower() \
+            or "falló el envío del aviso" in nueva["resumen_sanitizado"].lower()
+        assert nueva["notificado_en"] is None
+        assert nueva["etapa"] == gateway.ETAPA_TURNO_TEXTO

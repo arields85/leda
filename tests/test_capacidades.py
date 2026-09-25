@@ -45,8 +45,6 @@ PROMESAS_SIN_CUMPLIR = {
         "silencio sobre evidencia real.",
     "intencion":
         "Clasificación de intención persistida del mensaje entrante.",
-    "notificado_en":
-        "Aviso privado ante un incidente técnico (documento maestro §15).",
     "bot_token_ref":
         "Referencia al secreto del bot de un espacio.",
     "source_draft_id":

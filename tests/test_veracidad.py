@@ -41,16 +41,25 @@ def _tarea(cur, ws):
         (ws,))
     obj = cur.fetchone()["id"]
     cur.execute("set local role prisma_admin")
+    # Por `membership`/`app_user` directo y no por la vista `integrante`: esa
+    # vista filtra por `prisma.workspace_id` (`db/esquema.sql`), que sólo
+    # pone `db.espacio` -- bajo `admin` queda sin definir, la vista no
+    # devuelve nada y la subconsulta original resolvía en null. Con el
+    # chequeo de autoridad de T2b (`herramientas._preparar_actualizar_estado`)
+    # eso dejó de ser invisible: `responsable_membership_id` null nunca
+    # coincide con quien llama, así que la corrección es necesaria, no sólo
+    # prolija (revisión del orquestador sobre `0814fa3`).
     cur.execute(
         """insert into task (workspace_id, objective_id, titulo, area_id,
                              responsable_membership_id, fecha_objetivo,
                              criterio_aceptacion, evidencia_requerida)
            values (%s, %s, 'Programar PLC',
                    (select id from area where workspace_id = %s and slug = 'ot'),
-                   (select membership_id from integrante where nombre = 'Marcos Tarquini'),
+                   (select m.id from membership m join app_user u on u.id = m.app_user_id
+                     where m.workspace_id = %s and u.nombre = 'Marcos Tarquini'),
                     '2026-08-14', 'Resultado verificado',
                     array['resultado_de_prueba'])
-           returning id""", (ws, obj, ws))
+           returning id""", (ws, obj, ws, ws))
     t = cur.fetchone()["id"]
     cur.execute("insert into task_state_event (task_id, estado_nuevo, actor_kind) "
                 "values (%s, 'asignada', 'prisma')", (t,))

@@ -25,7 +25,8 @@ from .calendario import Calendario
 from .config import config
 from .db import conectar_autoridad, espacio
 from .despachador import TransporteTelegram, despachar
-from .gateway import procesar_update
+from .gateway import (ETAPA_TOQUE_BOTON, ETAPA_TURNO_TEXTO, procesar_update,
+                      reportar_incidente_no_manejado)
 from .reloj import ejecutar_cadencia, ejecutar_escalera
 
 _seguir = True
@@ -97,8 +98,23 @@ class Escucha:
                 procesar_update(self.conn, self.slug, u,
                                 authority_conn=self.authority_conn)
             except Exception as e:  # noqa: BLE001
-                # Un mensaje que rompe no puede frenar la escucha.
+                # Un mensaje que rompe no puede frenar la escucha. Decisión
+                # del usuario, 2026-09-25: un error nunca pasa en silencio
+                # -- `procesar_update` ya atrapa casi todo por su cuenta
+                # (incidente + aviso neutro), así que llegar hasta acá es lo
+                # que queda para una falla estructural previa a eso (p. ej.
+                # un update malformado). `self.ws` es el único espacio que
+                # escucha este proceso, así que se sabe igual sin haberlo
+                # resuelto adentro de `procesar_update`.
                 self.conn.rollback()
+                mensaje_o_toque = origen if "callback_query" not in u else (
+                    u["callback_query"].get("message") or {})
+                chat_id = mensaje_o_toque.get("chat", {}).get("id")
+                tg_user = origen.get("from", {}).get("id")
+                etapa = ETAPA_TOQUE_BOTON if "callback_query" in u else ETAPA_TURNO_TEXTO
+                reportar_incidente_no_manejado(
+                    self.conn, workspace_id=self.ws, chat_id=chat_id,
+                    tg_user=tg_user, error=e, etapa=etapa)
                 _imprimir(f"  ! no se pudo procesar: {type(e).__name__}")
         return len(updates)
 
