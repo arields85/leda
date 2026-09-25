@@ -132,15 +132,20 @@ se verifica sobre una base nueva dentro de un clúster existente.
 
 ## Próximo paso
 
-**Prisma orienta, no charla** (primera sesión por Telegram real, diseño §5.13): cada
-respuesta cierra con opciones concretas como botones, en lugar de preguntas abiertas.
-Principio fijado en [`ADR 0007`](decisions/0007-prisma-orienta-no-charla.md) (aceptada el 2026-09-25); falta construirlo junto con las propuestas
-asociadas, medidas antes: ofrecer sólo las tareas propias cuando el mensaje cuenta algo
-de quien escribe, pasarle a Jev el hilo reciente y no mandarle referencias genéricas
-("la tarea"). Luego, una segunda sesión por Telegram para comparar.
+**Seguir con "Prisma orienta"** (`odd/tasks/prisma-orienta.md`, [`ADR 0007`](decisions/0007-prisma-orienta-no-charla.md)).
+Hechas T1 (opciones del modelo, `c253d27`), T2 (menú de tarea, `0814fa3`) y T2b
+(autoridad sobre la propia tarea y fallas con aviso, `fd4e2a6`), las tres con revisión
+aprobada. Lo primero al retomar: corregir que un incidente quede marcado como avisado
+cuando la persona no se pudo identificar (observación de dos lentes de la revisión de
+T2b, `gateway.py` ~1905-1925). Después T3 (listas de tareas como botones), T4 (banco con
+botones y control de preguntas abiertas) y T5 (continuidad y segunda sesión por
+Telegram). Antes de una sesión real, comparar la base local con `db/esquema.sql`: hoy
+está al día hasta la migración `0011`.
 
-Después, la unidad de aprendizaje de apodos y aclaraciones ([`ROADMAP.md`](ROADMAP.md))
-y la conversación de bloqueos (mecánica §8, pasos 2 a 7).
+Después, las propuestas medidas aparte (tareas propias en autoinformes, hilo para Jev,
+referencias genéricas), la unidad de aportes sobre tareas, la de aprendizaje de apodos y
+aclaraciones ([`ROADMAP.md`](ROADMAP.md)) y la conversación de bloqueos (mecánica §8,
+pasos 2 a 7).
 
 El resto del orden de trabajo está en [`ROADMAP.md`](ROADMAP.md).
 

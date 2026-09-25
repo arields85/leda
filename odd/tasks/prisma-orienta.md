@@ -700,4 +700,17 @@ cada commit con código pasa por la evaluación de RDD.
   del alcance autorizado para esta unidad, "no tocar docs/"): sigue mencionando
   `notificado_en` como promesa sin cumplir aunque `tests/test_capacidades.py` ya no
   lo liste así -- desalineación conocida, no silenciada.
+- 2026-09-25 (orquestador): **T2b commiteada** (`fd4e2a6`; migración `0011` aplicada también en
+  la base local, con copia previa). Revisión RDD de riesgo alto con cuatro lentes, aprobada y
+  reconocida (`review-9ac0b4b8afec17ee`), con consentimiento previo del usuario para este
+  cambio. Observaciones no bloqueantes: **`gateway.py` ~1905-1925 (resiliencia y
+  fiabilidad): `notificado_en` se marca aunque la persona no se haya identificado y no se le
+  haya avisado; contradice "nunca mentir", va primero en la próxima sesión**;
+  `local.py:110-117` (el `except` del bucle de escucha puede volver a levantar si falla el
+  registro del incidente); `gateway.py:1826-1832` (incidente de enrutamiento duplicado);
+  `gateway.py:1117-1148` (efecto lateral en `_mensaje_resultado_menu`); `gateway.py:156-161`
+  (cobertura de las redes nuevas); migración `0011` no ejercitada contra una base de ensayo
+  (`PRISMA_TEST_DB_URL` sin configurar); `cli.py:367-369` y `tests/test_menu_tarea.py:959-960`
+  (código muerto). Pendiente de T2b: autoridad para `cancelada`.
+- **Próximo paso al retomar:** corregir `notificado_en` falso (TDD), después T3.
 
