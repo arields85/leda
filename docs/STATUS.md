@@ -134,7 +134,7 @@ se verifica sobre una base nueva dentro de un clúster existente.
 
 **Prisma orienta, no charla** (primera sesión por Telegram real, diseño §5.13): cada
 respuesta cierra con opciones concretas como botones, en lugar de preguntas abiertas.
-Primero un ADR que fije el principio; después, construirlo junto con las propuestas
+Principio fijado en [`ADR 0007`](decisions/0007-prisma-orienta-no-charla.md) (aceptada el 2026-09-25); falta construirlo junto con las propuestas
 asociadas, medidas antes: ofrecer sólo las tareas propias cuando el mensaje cuenta algo
 de quien escribe, pasarle a Jev el hilo reciente y no mandarle referencias genéricas
 ("la tarea"). Luego, una segunda sesión por Telegram para comparar.

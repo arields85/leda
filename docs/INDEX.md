@@ -33,6 +33,7 @@ cliente, no su definición.
 | Decisión sobre las dos superficies web separadas | [`decisions/0004-dos-superficies-separadas.md`](decisions/0004-dos-superficies-separadas.md) |
 | Decisión sobre interpretación, confirmación y aclaración con botones | [`decisions/0005-interpretacion-y-confirmacion.md`](decisions/0005-interpretacion-y-confirmacion.md) |
 | Decisión sobre Jev para resolver referencias y detectar la duda de intención | [`decisions/0006-jev-para-resolver-referencias-e-intencion.md`](decisions/0006-jev-para-resolver-referencias-e-intencion.md) |
+| Decisión sobre Prisma que orienta con opciones concretas, no charla | [`decisions/0007-prisma-orienta-no-charla.md`](decisions/0007-prisma-orienta-no-charla.md) |
 | Reglas para futuras sesiones | [`../AGENTS.md`](../AGENTS.md) |
 | Configuración del primer cliente | [`../espacios/corework.yaml`](../espacios/corework.yaml) |
 
