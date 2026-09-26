@@ -1740,5 +1740,254 @@ cada commit con código pasa por la evaluación de RDD.
     unidad -- queda para el próximo paso, junto con `b-0007` de vuelta.
   - Mismas brechas fuera de alcance de unidades anteriores sin cambios: autoridad
     para `cancelada` (T2b), "Adjuntar evidencia" del aprobador en el menú (T2).
-- **Próximo paso al retomar:** banco real para verificar b-0007, después T5.
+- 2026-09-26: **Un rechazo de `preparar` se auditaba y contaba como ejecutado
+  (defecto de producto preexistente desde ADR 0005, hallazgo del orquestador
+  sobre el banco real `b-0005-a`).** Ruta: delegada, un escritor (disparador
+  de mapeo: `agente.py`, `herramientas.py`, más pruebas).
+
+  Evidencia (orquestador, banco real 2026-09-26 `b-0005-a`, reproducida
+  determinísticamente): `herramientas.ejecutar` devuelve tal cual el dict de
+  rechazo de negocio que arma `preparar` (`herramientas.py:445-452`, p. ej.
+  `{"error": ...}` cuando un id de tarea no resuelve). `agente._ejecutar_una`
+  trataba cualquier valor sin excepción como una ejecución real: lo sumaba a
+  `acciones` y auditaba `herramienta:<nombre>` -- `crear_dependencia` quedaba
+  auditado como ejecutado sin ninguna fila en `dependency`, y como
+  `acciones` ya no estaba vacía, `with_no_effect_status` ("Estado: sin
+  cambios") no se aplicaba: el modelo podía decir "Anoté…" sin la advertencia.
+
+  Archivos: `src/prisma/agente.py` (`_ejecutar_una`, un bloque nuevo antes
+  del chequeo de `consultar_tareas`); `tests/test_agente.py` (dos pruebas
+  nuevas).
+
+  Decisión: **señal precisa, sin marcador nuevo.** `_ejecutar_una` nunca pasa
+  `ya_confirmada` a `H.ejecutar` (queda en su default `False`). Con eso fijo,
+  `herramientas.ejecutar` (línea 445-452) sólo puede devolver un dict SIN
+  excepción, para una herramienta que declara `preparar`, cuando `preparar`
+  encontró el mismo rechazo de negocio que encontraría el handler -- con una
+  preparación que sí puede seguir, siempre levanta `NecesitaConfirmacion`
+  antes de tocar el handler. Es una señal exacta (`H.REGISTRO[c.nombre].
+  preparar is not None` + resultado es dict), no un heurístico sobre la
+  forma del dict (`error`/`falta`): no hizo falta agregar ningún marcador a
+  `herramientas.ejecutar`, y `gateway._ejecutar_accion_menu`/
+  `_mensaje_resultado_menu` (que también consumen estos dicts, sin
+  `ya_confirmada`, y nunca auditaban en ese camino) siguen sin tocar. El
+  rechazo se audita con una acción distinta y verdadera,
+  `herramienta_rechazada:<nombre>` -- el banco (`_herramientas_registradas`)
+  sólo lee `herramienta:%`, así que un rechazo ya no cuenta como ejecutado
+  ahí tampoco -- y vuelve al modelo con `is_error: true`. Al no sumarse a
+  `acciones`, `with_no_effect_status` (ya existente, sin tocar) se aplica
+  solo con la condición que ya tenía: hubo un intento de mutación y ninguna
+  acción no-consultar se ejecutó.
+
+  RED (`git stash push -- src/prisma/agente.py`, con las pruebas ya
+  escritas): `tests/test_agente.py -k rechazo_de_preparacion_no_se_audita`
+  -> `1 failed` (`r.acciones == ['crear_dependencia']`, no `[]`). `git stash
+  pop` restauró la implementación.
+
+  GREEN:
+  - `tests/test_agente.py -k rechazo_de_preparacion` -> `2 passed`.
+  - `tests/test_agente.py tests/test_dependencias.py tests/test_menu_tarea.py
+    tests/test_vista_previa_confirmacion.py` -> `89 passed`.
+
+  Abierto:
+  - `gateway.py:426-462` (la confirmación por botón, `ya_confirmada=True`)
+    audita `herramienta:<nombre>` INCONDICIONALMENTE apenas vuelve de
+    `H.ejecutar` sin excepción, antes de mirar si `resultado` es en realidad
+    un rechazo de negocio (`preparar`, corrido de nuevo al confirmar,
+    encontró un impedimento nuevo). Mismo defecto de fondo que el corregido
+    acá, en otro camino -- fuera del pedido de esta unidad (que acotaba el
+    alcance a `_ejecutar_una`); no se tocó. Queda para que el usuario decida
+    si se corrige en una unidad aparte.
+- 2026-09-26: **Se descartaba el texto informativo del modelo cuando además
+  ofrecía opciones (defecto de producto, hallazgo del orquestador sobre el
+  banco real `b-0001-a`; ADR 0007 punto 2).** Ruta: delegada, un escritor
+  (mismo disparador de mapeo que la unidad anterior: `agente.py`, más
+  pruebas).
+
+  Evidencia: banco real `b-0001-a`
+  (`tests/banco/reportes/replay-candidato-b-0001-a-*.json`): el modelo
+  contestó "Tenés dos tareas abiertas: «Programar PLC…» y «Revisar
+  comunicaciones…», sin fecha…" Y llamó a `ofrecer_opciones` en la misma
+  respuesta. Desde T1, `NecesitaOpciones` se sumaba a `elecciones`, y
+  `responder` cerraba el turno con `if confirmaciones or elecciones: return
+  Resultado("", ...)` -- el texto que había escrito el modelo no se mandaba
+  nunca: la persona sólo recibía la pregunta con botones y perdía la
+  información (ADR 0007 punto 2: "el texto da el contexto; la elección se
+  hace tocando").
+
+  Archivos: `src/prisma/agente.py` (`responder`: nuevas variables de
+  seguimiento del turno, `elegir_pendiente`/`opciones_pendientes`/
+  `texto_al_ofrecer`, y el bloque que decide `confirmaciones or elecciones`
+  reescrito; `_ejecutar_una`: dos parámetros nuevos, las ramas `except
+  H.NecesitaElegir`/`except H.NecesitaOpciones` ajustadas; `_encolar_
+  opciones_modelo`: gana un parámetro `texto` y pasa a reusar `_encolar_
+  texto_con_opciones` en vez de armar el `enqueue_outbox` a mano);
+  `tests/test_opciones_modelo.py` (tres pruebas nuevas, import de
+  `BUTTON_TEXT_LIMIT`/`telegram_utf16_units`).
+
+  Decisiones:
+  - **La pregunta con botones se sigue encolando siempre; sólo se decide si
+    el texto la acompaña.** `_ejecutar_una` ya no encola nada al atrapar
+    `NecesitaOpciones` (antes lo hacía ahí mismo, sin saber todavía si el
+    resto del turno iba a dejar además una confirmación u otra elección
+    pendiente): guarda la excepción en `opciones_pendientes` y `responder`
+    decide recién al cerrar el turno completo. Esto es necesario porque
+    `test_retomar_con_un_cambio_sigue_pidiendo_confirmar` (T1, ya existente)
+    prueba que la pregunta de `ofrecer_opciones` de una vuelta se puede
+    tocar aunque una vuelta POSTERIOR del mismo turno deje además una
+    confirmación esperando -- si se difiriera también CUÁNDO se encola (no
+    sólo el texto), esa acción pendiente dejaría de crearse.
+  - **`elecciones` no cambia de forma (contrato externo de
+    `Resultado.elecciones`, ya probado).** Mezcla `NecesitaElegir` y
+    `NecesitaOpciones` desde T1; se agregó `elegir_pendiente` aparte (sólo
+    `NecesitaElegir`) para poder distinguir "la única interacción pendiente
+    del turno es `ofrecer_opciones`" sin tocar qué hay en `elecciones`.
+  - **El texto es el de la vuelta que llamó a `ofrecer_opciones`, no el de
+    una vuelta posterior.** El modelo suele repetir "Listo, ahí tenés las
+    opciones" en la vuelta siguiente (la que cierra el turno sin llamadas) --
+    ese texto no describe nada; se descarta a propósito. Se captura con un
+    antes/después de `len(opciones_pendientes)` por vuelta, quedándose con
+    la primera vez que crece.
+  - **`ofrecer_opciones` no cuenta como "mutación intentada" para
+    `with_no_effect_status`.** Es la pregunta, no un intento de cambio que
+    haya fallado -- `intentos_mutacion` la incluye igual (cualquier
+    herramienta que no empiece con `consultar_`), así que se filtra antes de
+    decidir si corresponde agregar "Estado: sin cambios." Sin este filtro,
+    `test_opciones_de_texto_arman_botones_con_la_salida` (T1, ya existente:
+    `ofrecer_opciones` solo, sin texto) hubiera roto -- pasaba de `r.texto
+    == ""` a `r.texto == "Estado: sin cambios."`, un aviso falso (nada se
+    intentó cambiar).
+  - **Mismo armado de T3a/T4b, reusado, no una tercera heurística.**
+    `_encolar_opciones_modelo` arma `texto_combinado = f"{texto}\n\n
+    {e.pregunta}"` y se lo pasa a `_encolar_texto_con_opciones` (el mismo
+    helper de T3a/lista-de-tareas y T4b/cierre-genérico): si entra en
+    `BUTTON_TEXT_LIMIT` va todo junto; si no, el texto sale partido aparte,
+    primero, y los botones -- con la pregunta sola como resumen corto --
+    después de la última parte. `pending_action.args` sigue guardando sólo
+    `{"pregunta": e.pregunta}`: es lo único que lee `gateway._resolver_
+    toque_opcion_modelo` al retomar, sin cambios ahí.
+
+  RED (`git stash push -- src/prisma/agente.py`, con las pruebas ya
+  escritas): `tests/test_opciones_modelo.py -k
+  "texto_del_modelo_acompana or texto_largo_con_opciones"` -> `2 failed`
+  (`r.texto == ''` en vez del texto del modelo; 0 partes de texto en vez de
+  >=2) -- la tercera prueba nueva (texto se descarta si además queda una
+  confirmación pendiente) ya pasaba sin el fix, como corresponde a una
+  prueba de regresión. `git stash pop` restauró la implementación.
+
+  GREEN:
+  - `tests/test_opciones_modelo.py` -> `16 passed`.
+  - `tests/test_agente.py tests/test_opciones_modelo.py
+    tests/test_lista_botones.py tests/test_pregunta_sin_opciones.py
+    tests/test_menu_tarea.py tests/test_veracidad.py
+    tests/test_vista_previa_confirmacion.py tests/test_dependencias.py
+    tests/banco` -> `334 passed, 108 deselected`.
+
+  Abierto:
+  - El orden de entrega entre la pregunta de `ofrecer_opciones` (ahora
+    encolada al cerrar el turno) y una confirmación de una vuelta posterior
+    del MISMO turno puede quedar invertido frente al de antes cuando
+    comparten el mismo `scheduled_for` (los dos usan el mismo `ahora` de
+    `responder`, como ya pasaba con `_encolar_confirmacion`/`_encolar_
+    eleccion`/la vieja `_encolar_opciones_modelo` desde antes de esta
+    unidad): el desempate entre mensajes con igual `programado_para` no está
+    definido (`despachador.despachar` sólo ordena por esa columna). No es
+    una regresión de esta unidad -- el empate ya existía --, pero esta
+    unidad lo hace más frecuente al diferir el encolado. Ningún escenario ni
+    prueba depende del orden entre esos dos mensajes; se deja constancia
+    para que el usuario decida si amerita una unidad aparte.
+  - Punto pendiente de ADR 0007 ("si una respuesta puede cerrar sin
+    opciones") sigue sin resolver -- no era parte de esta unidad.
+- 2026-09-26: **El banco adivinaba entre varias acciones pendientes en
+  espera (hallazgo de revisión).** Ruta: delegada, un escritor (disparador
+  de mapeo: `tests/banco/corrida.py`, `tests/banco/test_corrida.py`). Sólo
+  `tests/banco/`; ningún cambio de esquema ni de `src/`.
+
+  Hallazgo (revisión del orquestador, `tests/banco/corrida.py:467-471`):
+  `_pendiente_actual` desataba el empate entre acciones pendientes
+  'esperando' del mismo chat con `order by creado_en desc, ctid desc` --
+  `creado_en` es igual para dos filas creadas en la MISMA transacción
+  (`now()` de Postgres es constante dentro de una transacción; puede pasar
+  si un turno del modelo llama a dos herramientas y cada una deja su propia
+  acción pendiente), y `ctid` no es una garantía general de Postgres bajo
+  escritura concurrente (sólo "funcionaba" porque el banco corre en serie) --
+  además de no ser ningún criterio de negocio, sólo posición física.
+  `_aclaracion_para_elegir` (los dos sentinels de aclaración) no tenía
+  NINGÚN desempate (`order by creado_en desc limit 1` a secas). Y
+  `o["valor"]["titulo"]` podía levantar `KeyError` ante una opción de tarea
+  sin título.
+
+  Archivos: `tests/banco/corrida.py` (`_pendiente_actual` eliminada,
+  reemplazada por `_resolver_toque_generico`; `_aclaracion_para_elegir`
+  eliminada, reemplazada por `_aclaraciones_para_elegir` -- devuelve TODAS,
+  no una sola --; `_candidatas_tarea_por_titulo`, nueva, extraída para poder
+  probarla sola; `_resolver_opcion_toque` sin cambios de comportamiento;
+  `ejecutar_escenario` reescribe los dos bloques que resuelven "aclaración
+  esperada" y "toques genéricos"); `tests/banco/test_corrida.py` (import
+  actualizado; las tres pruebas de `_pendiente_actual` reemplazadas por
+  cinco de `_resolver_toque_generico`; una prueba nueva de
+  `_candidatas_tarea_por_titulo`).
+
+  Decisiones:
+  - **Resolver contra la UNIÓN de todas las acciones 'esperando' del chat,
+    nunca contra una elegida por orden.** `_resolver_toque_generico` reúne
+    los ids de TODAS las acciones pendientes 'esperando' de ese chat (sin
+    `order by` ni límite), les aplica `_resolver_opcion_toque` (sin cambios)
+    una por una, y junta las coincidencias. Exactamente una coincidencia ->
+    se tapea. Ninguna coincidencia, o ninguna acción pendiente -> `LookupError`
+    (como ya pasaba: la corrida queda `bloqueado`, nunca `aprobado` por una
+    adivinanza). Más de una coincidencia EN ACCIONES PENDIENTES DISTINTAS ->
+    `LookupError` nuevo ("ambiguo, no se adivina cuál"): antes esto eligía
+    en silencio cualquiera de las dos por `ctid`.
+  - **Se quitó `ctid` del `order by` por completo, no se lo reemplazó por
+    otra columna.** El enunciado lo pedía explícitamente; con la resolución
+    por unión + conteo de coincidencias, ya no hace falta ningún desempate
+    por orden -- el criterio pasó a ser "cuántas acciones pendientes
+    distintas ofrecen lo que pide el escenario", no "cuál se insertó
+    después".
+  - **Misma lógica para la aclaración esperada (`aclaracion_esperada`).**
+    `_aclaraciones_para_elegir` devuelve TODAS las acciones pendientes de
+    aclaración (con su `herramienta`, para saber qué semántica de comparación
+    usar -- título de tarea para `SENTINEL_OPCIONES_MODELO`, etiqueta para
+    la aclaración de botones de siempre); `ejecutar_escenario` arma las
+    coincidencias de la misma manera (una por acción pendiente, unidas) y
+    aplica el mismo criterio: una -> tapea, más de una en acciones distintas
+    -> `LookupError`.
+  - **`_candidatas_tarea_por_titulo` extraída para poder probar el `.get`
+    sin `ejecutar_escenario` completo.** Antes vivía inline; con
+    `.get("titulo")` en vez de `["titulo"]` (pedido del enunciado), una
+    opción de tarea sin título queda afuera de las candidatas en vez de
+    romper la corrida con un `KeyError` -- probado directo, con una lista de
+    opciones armada a mano, sin necesitar un escenario ni Postgres.
+
+  RED (`git stash push -- tests/banco/corrida.py`, con las pruebas ya
+  escritas): `tests/banco/test_corrida.py -k "resolver_toque_generico or
+  candidatas_tarea_por_titulo"` -> error de colección (`ImportError:
+  cannot import name '_candidatas_tarea_por_titulo'`) -- las funciones
+  nuevas todavía no existían. `git stash pop` restauró la implementación.
+
+  GREEN:
+  - `tests/banco/test_corrida.py -k "resolver_toque_generico or
+    candidatas_tarea_por_titulo"` -> `6 passed`.
+  - `tests/banco` -> `197 passed, 108 deselected`.
+
+  Abierto:
+  - Ninguna de las tres correcciones tocó `src/` ni el esquema -- las tres
+    eran del arnés del banco.
+  - `_pendiente_para_confirmar` (el paso de Confirmar, distinto del toque
+    genérico y de la aclaración) sigue con `order by creado_en desc limit 1`
+    sin desempate -- fuera del pedido de esta unidad (el enunciado nombraba
+    sólo `_pendiente_actual` y `_aclaracion_para_elegir`); no se tocó. Mismo
+    tipo de hallazgo, potencialmente, si alguna vez dos herramientas que
+    piden confirmación quedan esperando a la vez en el mismo chat.
+
+**Verificación final de las tres unidades (suite completa):**
+`.venv/Scripts/python.exe -m pytest -q` -> `856 passed, 108 deselected`
+(línea base 848 + 8 pruebas nuevas: 2 del rechazo de preparación, 3 del
+texto con opciones, +3 netas del banco -- 6 nuevas de `_resolver_toque_
+generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
+`_pendiente_actual`), 200s.
+
+- **Próximo paso al retomar:** banco real para verificar b-0001-a y
+  b-0005-a, después T5.
 

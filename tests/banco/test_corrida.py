@@ -23,9 +23,10 @@ from tests.banco.corrida import (
     JevGrabador,
     ProveedorGrabador,
     _MARCA_TURNO_CAIDO,
-    _pendiente_actual,
+    _candidatas_tarea_por_titulo,
     _pendiente_para_confirmar,
     _resolver_opcion_toque,
+    _resolver_toque_generico,
     conteos_delta,
     ejecutar_escenario,
     filas_respuesta,
@@ -906,14 +907,18 @@ def test_resolver_opcion_toque_indice_fuera_de_rango_es_none():
 
 
 # ---------------------------------------------------------------------------
-# _pendiente_actual (T4): la última acción pendiente 'esperando' de un chat,
-# sin importar qué la armó -- a diferencia de `_pendiente_para_confirmar`
-# (T1), que sólo encuentra una que ofrezca el botón Confirmar.
+# _resolver_toque_generico (T4, revisión del orquestador): un toque genérico
+# de escenario se resuelve contra la UNIÓN de las opciones de TODAS las
+# acciones pendientes 'esperando' de un chat -- nunca contra "la última"
+# elegida por `creado_en`/`ctid` (ninguno de los dos desata un empate real
+# entre filas creadas en la misma transacción; `ctid` tampoco es una
+# garantía general de Postgres bajo escritura concurrente). A diferencia de
+# `_pendiente_para_confirmar` (T1), que sólo encuentra una que ofrezca el
+# botón Confirmar.
 # ---------------------------------------------------------------------------
 
 
-def test_pendiente_actual_encuentra_la_ultima_esperando_sin_importar_herramienta(
-        corework, conn):
+def test_resolver_toque_generico_encuentra_la_unica_esperando(corework, conn):
     ws = corework.workspace_id
     with espacio(conn, ws) as cur:
         quien, tg = _quien(cur, ws)
@@ -924,25 +929,42 @@ def test_pendiente_actual_encuentra_la_ultima_esperando_sin_importar_herramienta
             campo="eleccion", chat_id=tg,
             opciones=[("Ver detalle", {"accion": "ver_detalle"})])
 
-        encontrada = _pendiente_actual(cur, ws, tg)
+        pid, opcion = _resolver_toque_generico(cur, ws, tg, {"etiqueta": "Ver detalle"})
 
-    assert encontrada == p.id
+    assert pid == p.id
+    assert opcion["etiqueta"] == "Ver detalle"
 
 
-def test_pendiente_actual_sin_ninguna_pendiente_es_none(corework, conn):
+def test_resolver_toque_generico_sin_ninguna_pendiente_bloquea(corework, conn):
     ws = corework.workspace_id
     with espacio(conn, ws) as cur:
         _, tg = _quien(cur, ws)
-        assert _pendiente_actual(cur, ws, tg) is None
+        with pytest.raises(LookupError, match="no hay ninguna acción pendiente"):
+            _resolver_toque_generico(cur, ws, tg, {"etiqueta": "Confirmar"})
 
 
-def test_pendiente_actual_desempata_por_orden_de_insercion_con_creado_en_igual(
+def test_resolver_toque_generico_sin_coincidencia_bloquea(corework, conn):
+    ws = corework.workspace_id
+    with espacio(conn, ws) as cur:
+        quien, tg = _quien(cur, ws)
+        P.registrar(
+            cur, quien, herramienta=P.SENTINEL_MENU_TAREA, args={},
+            resumen="¿Qué querés hacer?",
+            vence_en=datetime.now(timezone.utc) + timedelta(hours=1),
+            campo="eleccion", chat_id=tg,
+            opciones=[("Ver detalle", {"accion": "ver_detalle"})])
+
+        with pytest.raises(LookupError, match="no lo ofrece"):
+            _resolver_toque_generico(cur, ws, tg, {"etiqueta": "No existe"})
+
+
+def test_resolver_toque_generico_tapea_la_correcta_sin_importar_el_orden_fisico(
         corework, conn):
     """Revisión del orquestador (T4, 2026-09-26, `corrida.py:467-471`): dos
     `pending_action` 'esperando' creadas en la MISMA transacción comparten
-    `creado_en` (`now()` es constante dentro de una transacción) -- el
-    desempate tiene que elegir la segunda (la última insertada), no
-    cualquiera de las dos al azar."""
+    `creado_en` (`now()` es constante dentro de una transacción), con
+    etiquetas DISTINTAS -- se tapea la que corresponde por etiqueta, sin
+    adivinar por orden físico de inserción."""
     ws = corework.workspace_id
     with espacio(conn, ws) as cur:
         quien, tg = _quien(cur, ws)
@@ -965,9 +987,54 @@ def test_pendiente_actual_desempata_por_orden_de_insercion_con_creado_en_igual(
             "where id in (%s, %s)", (primera.id, segunda.id))
         assert cur.fetchone()["n"] == 1
 
-        encontrada = _pendiente_actual(cur, ws, tg)
+        pid1, opcion1 = _resolver_toque_generico(cur, ws, tg, {"etiqueta": "Primera"})
+        pid2, opcion2 = _resolver_toque_generico(cur, ws, tg, {"etiqueta": "Segunda"})
 
-    assert encontrada == segunda.id
+    assert pid1 == primera.id and opcion1["etiqueta"] == "Primera"
+    assert pid2 == segunda.id and opcion2["etiqueta"] == "Segunda"
+
+
+def test_resolver_toque_generico_misma_etiqueta_en_dos_pendientes_bloquea(
+        corework, conn):
+    """Dos acciones pendientes DISTINTAS ofrecen la MISMA etiqueta: ambiguo,
+    no se adivina cuál -- tiene que levantar, no elegir cualquiera de las
+    dos al azar (la corrida queda `bloqueada`, con un motivo legible)."""
+    ws = corework.workspace_id
+    with espacio(conn, ws) as cur:
+        quien, tg = _quien(cur, ws)
+        P.registrar(
+            cur, quien, herramienta=P.SENTINEL_MENU_TAREA, args={},
+            resumen="¿Cuál de las dos, primera?",
+            vence_en=datetime.now(timezone.utc) + timedelta(hours=1),
+            campo="eleccion", chat_id=tg,
+            opciones=[("Confirmar", {"accion": "a"})])
+        P.registrar(
+            cur, quien, herramienta=P.SENTINEL_MENU_TAREA, args={},
+            resumen="¿Cuál de las dos, segunda?",
+            vence_en=datetime.now(timezone.utc) + timedelta(hours=1),
+            campo="eleccion", chat_id=tg,
+            opciones=[("Confirmar", {"accion": "b"})])
+
+        with pytest.raises(LookupError, match="ambiguo"):
+            _resolver_toque_generico(cur, ws, tg, {"etiqueta": "Confirmar"})
+
+
+# ---------------------------------------------------------------------------
+# _candidatas_tarea_por_titulo (T1/T4, revisión del orquestador): las
+# opciones de tarea de una aclaración por `ofrecer_opciones`, por título --
+# una opción sin título no cuenta, no rompe la corrida.
+# ---------------------------------------------------------------------------
+
+
+def test_candidatas_tarea_por_titulo_ignora_una_opcion_sin_titulo():
+    opciones = [
+        {"token": "t1", "etiqueta": "Programar PLC",
+         "valor": {"tipo": "tarea", "tarea_id": "id-1", "titulo": "Programar PLC"}},
+        {"token": "t2", "etiqueta": "Revisar comunicaciones",
+         "valor": {"tipo": "tarea", "tarea_id": "id-2"}},   # sin "titulo"
+        {"token": "t3", "etiqueta": "Otra cosa", "valor": {"tipo": "texto", "texto": "Otra cosa"}},
+    ]
+    assert _candidatas_tarea_por_titulo(opciones) == [("Programar PLC", "t1")]
 
 
 # ---------------------------------------------------------------------------

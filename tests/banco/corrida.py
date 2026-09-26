@@ -435,12 +435,13 @@ def _pendiente_para_confirmar(cur, workspace_id: str, chat_id: int) -> tuple[str
     return pid, opcion.token
 
 
-def _aclaracion_para_elegir(cur, workspace_id: str, chat_id: int) -> tuple[str, str] | None:
-    """La referencia ambigua que este turno dejó esperando una elección con
-    botones, por cualquiera de las dos formas en que Prisma la ofrece (T4,
-    revisión del orquestador 2026-09-26): la aclaración con botones de
-    siempre (T6, `aclaracion-con-botones`, `gateway._SENTINEL_ACLARACION`) o
-    una elección del modelo por `ofrecer_opciones` (T1, ADR 0007,
+def _aclaraciones_para_elegir(cur, workspace_id: str, chat_id: int) -> list[tuple[str, str]]:
+    """TODAS las acciones pendientes 'esperando' de este chat que dejaron una
+    referencia ambigua lista para elegir con botones, por cualquiera de las
+    dos formas en que Prisma la ofrece (T4, revisión del orquestador
+    2026-09-26): la aclaración con botones de siempre (T6,
+    `aclaracion-con-botones`, `gateway._SENTINEL_ACLARACION`) o una elección
+    del modelo por `ofrecer_opciones` (T1, ADR 0007,
     `pendientes.SENTINEL_OPCIONES_MODELO`) que ofreció las mismas tareas
     como botones. Antes de esta corrección el corredor sólo reconocía la
     primera -- una corrida real (b-0013, 2026-09-26) donde el modelo
@@ -449,17 +450,19 @@ def _aclaracion_para_elegir(cur, workspace_id: str, chat_id: int) -> tuple[str, 
     (ofrecidas: []) y sin tocar nada, porque el corredor nunca tapeaba esa
     forma.
 
-    Devuelve `(pending_action_id, herramienta)`, o `None` si la referencia
-    no resultó ambigua con candidatas (clara, ninguna, o Jev caído: T3 sigue
-    tratando esos casos en texto, sin botones que tocar acá)."""
+    Revisión del orquestador (T4, hallazgo de revisión): antes se quedaba
+    con una sola fila (`order by creado_en desc limit 1`), sin ningún
+    desempate real -- dos acciones pendientes creadas en la MISMA
+    transacción comparten `creado_en` (`now()` de Postgres es constante
+    dentro de una transacción). Devuelve TODAS las que haya (vacío si
+    ninguna): quien llama resuelve contra la UNIÓN de sus opciones, nunca
+    contra una elegida por orden."""
     cur.execute(
         """select id, herramienta from pending_action
             where workspace_id = %s and chat_id = %s and herramienta in (%s, %s)
-              and estado = 'esperando'
-            order by creado_en desc limit 1""",
+              and estado = 'esperando'""",
         (workspace_id, chat_id, gateway._SENTINEL_ACLARACION, P.SENTINEL_OPCIONES_MODELO))
-    fila = cur.fetchone()
-    return (str(fila["id"]), fila["herramienta"]) if fila else None
+    return [(str(f["id"]), f["herramienta"]) for f in cur.fetchall()]
 
 
 def _opciones_pendiente(cur, pending_action_id: str) -> list[dict]:
@@ -470,39 +473,31 @@ def _opciones_pendiente(cur, pending_action_id: str) -> list[dict]:
     return cur.fetchall()
 
 
-def _pendiente_actual(cur, workspace_id: str, chat_id: int) -> str | None:
-    """El último `pending_action` 'esperando' de este chat, sin importar qué
-    la armó -- lo que un toque genérico de escenario (T4, `Escenario.toques`)
-    resuelve contra la propuesta REAL que dejó el turno anterior (una lista
-    de tareas de T3, un menú de T2, una vista previa de siempre), nunca
-    contra un token inventado.
+def _candidatas_tarea_por_titulo(opciones: list[dict]) -> list[tuple[str, str]]:
+    """Las opciones de tarea (T1, `ofrecer_opciones`, ADR 0007) de una
+    aclaración por `pendientes.SENTINEL_OPCIONES_MODELO`, como
+    `(titulo, token)`. Sólo una opción de tarea -- la que `ofrecer_opciones`
+    validó contra PostgreSQL -- cuenta como la tarea ofrecida. Una opción de
+    texto que sólo NOMBRA la tarea (b-0013, corrida real 2026-09-26: el
+    modelo ofreció una tarea por `tarea_id` y la otra por `texto`) no
+    cuenta: el servidor sólo puede resolver una opción de tarea, nunca
+    adivinar que un texto libre significa la misma tarea. Se compara por
+    título (`valor.titulo`, siempre el de la base), no por la etiqueta del
+    botón: el modelo puede poner una etiqueta propia, más corta o distinta,
+    para una opción de tarea (visto en la misma corrida real).
 
-    Desempate por `ctid` (revisión del orquestador, T4, 2026-09-26): dos
-    `pending_action` 'esperando' creadas en la MISMA transacción comparten
-    `creado_en` -- `now()` de Postgres es constante dentro de una
-    transacción -- así que `order by creado_en desc` solo no alcanza para
-    elegir "la última" entre las dos (puede pasar si un turno del modelo
-    llama a dos herramientas y cada una deja su propia acción pendiente).
-    Sin cambiar el esquema (fuera de alcance de esta corrección), ninguna
-    otra columna existente desata el empate: `id` es un UUID aleatorio, sin
-    orden, y el `xmin` de la transacción también es igual para las dos
-    filas. `ctid` (la posición física de la fila) sí crece con el orden real
-    de inserción dentro de una misma transacción -- alcanza acá porque el
-    banco corre en serie, sin otra transacción escribiendo esta tabla al
-    mismo tiempo; no es una garantía general de Postgres bajo escritura
-    concurrente, pero el banco nunca la tiene."""
-    cur.execute(
-        """select id from pending_action
-            where workspace_id = %s and chat_id = %s and estado = 'esperando'
-            order by creado_en desc, ctid desc limit 1""",
-        (workspace_id, chat_id))
-    fila = cur.fetchone()
-    return str(fila["id"]) if fila else None
+    `.get("titulo")`, no `["titulo"]` (revisión del orquestador, hallazgo de
+    revisión): una opción de tarea sin título no cuenta -- se descarta, no
+    rompe la corrida con un `KeyError`."""
+    return [
+        (o["valor"].get("titulo"), o["token"]) for o in opciones
+        if isinstance(o.get("valor"), dict) and o["valor"].get("tipo") == "tarea"
+        and o["valor"].get("titulo")]
 
 
 def _resolver_opcion_toque(opciones: list[dict], toque: dict) -> dict | None:
     """Resuelve un toque genérico de escenario (T4) contra las opciones
-    REALES de la acción pendiente vigente (`_opciones_pendiente`). `etiqueta`:
+    REALES de una acción pendiente (`_opciones_pendiente`). `etiqueta`:
     coincidencia exacta de texto. `indice`: posición 0-based en el orden en
     que se ofrecieron (`pending_action_option.orden`, ya el orden de
     `_opciones_pendiente`). `None` si ninguna opción matchea -- nunca se
@@ -512,6 +507,56 @@ def _resolver_opcion_toque(opciones: list[dict], toque: dict) -> dict | None:
         return next((o for o in opciones if o["etiqueta"] == toque["etiqueta"]), None)
     indice = toque["indice"]
     return opciones[indice] if 0 <= indice < len(opciones) else None
+
+
+def _resolver_toque_generico(cur, workspace_id: str, chat_id: int,
+                             toque: dict) -> tuple[str, dict]:
+    """Resuelve un toque genérico de escenario (T4, `Escenario.toques`)
+    contra la UNIÓN de las opciones de TODAS las acciones pendientes
+    'esperando' de este chat -- nunca contra "la última" elegida por orden
+    (revisión del orquestador, hallazgo de revisión: `_pendiente_actual`
+    desataba el empate con `order by creado_en desc, ctid desc`, pero
+    `creado_en` es igual para dos filas creadas en la misma transacción y
+    `ctid` no es una garantía general de Postgres bajo escritura
+    concurrente -- sólo "funcionaba" porque el banco corre en serie, y aun
+    así elegía cualquiera de las dos sin ningún criterio de negocio).
+
+    Devuelve `(pending_action_id, opcion)` de la única acción pendiente que
+    ofrece lo que pide `toque`. Levanta `LookupError` -- que
+    `ejecutar_escenario` atrapa y deja la corrida `bloqueada` con un motivo
+    legible, nunca `aprobada` por una adivinanza -- en cualquiera de estos
+    tres casos: no hay ninguna acción pendiente esperando en este chat;
+    ninguna la ofrece; o más de una acción pendiente DISTINTA la ofrece
+    (ambiguo, no se adivina cuál)."""
+    cur.execute(
+        """select id from pending_action
+            where workspace_id = %s and chat_id = %s and estado = 'esperando'""",
+        (workspace_id, chat_id))
+    ids_esperando = [str(f["id"]) for f in cur.fetchall()]
+    if not ids_esperando:
+        raise LookupError(
+            f"El escenario pide tocar {toque!r}, pero no hay ninguna acción "
+            "pendiente esperando en este chat.")
+
+    coincidencias: list[tuple[str, dict]] = []
+    etiquetas_todas: list[str] = []
+    for pid in ids_esperando:
+        opciones = _opciones_pendiente(cur, pid)
+        etiquetas_todas.extend(o["etiqueta"] for o in opciones)
+        objetivo = _resolver_opcion_toque(opciones, toque)
+        if objetivo is not None:
+            coincidencias.append((pid, objetivo))
+
+    if len(coincidencias) > 1:
+        raise LookupError(
+            f"El escenario pide tocar {toque!r}, pero coincide con "
+            f"{len(coincidencias)} acciones pendientes distintas de este "
+            "chat -- ambiguo, no se adivina cuál.")
+    if not coincidencias:
+        raise LookupError(
+            f"El escenario pide tocar {toque!r}, pero la acción pendiente "
+            f"no lo ofrece (opciones: {etiquetas_todas}).")
+    return coincidencias[0]
 
 
 def _tocar_opcion(conn, slug: str, chat: int, tg_id: int, token: str) -> None:
@@ -647,38 +692,44 @@ def ejecutar_escenario(
         # de más en el medio, no sólo hasta acá.
         if aclaracion_esperada:
             with admin(conn) as cur:
-                pendiente_aclaracion = _aclaracion_para_elegir(cur, workspace_id, chat)
-                opciones_aclaracion = (
-                    _opciones_pendiente(cur, pendiente_aclaracion[0])
-                    if pendiente_aclaracion is not None else [])
-            es_opciones_modelo = (
-                pendiente_aclaracion is not None
-                and pendiente_aclaracion[1] == P.SENTINEL_OPCIONES_MODELO)
-            if es_opciones_modelo:
-                # T1 (ADR 0007): sólo una opción de tarea -- la que
-                # `ofrecer_opciones` validó contra PostgreSQL -- cuenta como
-                # la tarea ofrecida. Una opción de texto que sólo NOMBRA la
-                # tarea (b-0013, corrida real 2026-09-26: el modelo ofreció
-                # una tarea por `tarea_id` y la otra por `texto`) no cuenta:
-                # el servidor sólo puede resolver una opción de tarea, nunca
-                # adivinar que un texto libre significa la misma tarea. Se
-                # compara por título (`valor.titulo`, siempre el de la base),
-                # no por la etiqueta del botón: el modelo puede poner una
-                # etiqueta propia, más corta o distinta, para una opción de
-                # tarea (visto en la misma corrida real).
-                candidatas_ofrecidas = [
-                    (o["valor"]["titulo"], o["token"]) for o in opciones_aclaracion
-                    if isinstance(o.get("valor"), dict) and o["valor"].get("tipo") == "tarea"]
-                etiquetas_aclaracion_ofrecidas = [t for t, _ in candidatas_ofrecidas]
-                objetivo_token = next(
-                    (token for titulo, token in candidatas_ofrecidas
-                     if titulo == aclaracion_esperada.get("elegir")), None)
-            else:
-                etiquetas_aclaracion_ofrecidas = [o["etiqueta"] for o in opciones_aclaracion]
-                objetivo_token = next(
-                    (o["token"] for o in opciones_aclaracion
-                     if o["etiqueta"] == aclaracion_esperada.get("elegir")), None)
-            if objetivo_token is not None:
+                pendientes_aclaracion = _aclaraciones_para_elegir(cur, workspace_id, chat)
+                opciones_por_pendiente = {
+                    pid: _opciones_pendiente(cur, pid) for pid, _ in pendientes_aclaracion}
+
+            # Se resuelve contra la UNIÓN de TODAS las acciones pendientes de
+            # aclaración de este chat (revisión del orquestador, hallazgo de
+            # revisión: antes se elegía "la última" sin ningún desempate real
+            # -- dos acciones pendientes creadas en la misma transacción
+            # comparten `creado_en`). Cada una se compara con su propia
+            # semántica: una aclaración de `ofrecer_opciones` por título de
+            # tarea, la de botones de siempre por etiqueta.
+            etiquetas_aclaracion_ofrecidas = []
+            coincidencias_aclaracion: list[tuple[str, str]] = []
+            for pid, herramienta in pendientes_aclaracion:
+                opciones_aclaracion = opciones_por_pendiente[pid]
+                if herramienta == P.SENTINEL_OPCIONES_MODELO:
+                    candidatas_ofrecidas = _candidatas_tarea_por_titulo(opciones_aclaracion)
+                    etiquetas_aclaracion_ofrecidas.extend(t for t, _ in candidatas_ofrecidas)
+                    token = next(
+                        (tok for titulo, tok in candidatas_ofrecidas
+                         if titulo == aclaracion_esperada.get("elegir")), None)
+                else:
+                    etiquetas_aclaracion_ofrecidas.extend(
+                        o["etiqueta"] for o in opciones_aclaracion)
+                    token = next(
+                        (o["token"] for o in opciones_aclaracion
+                         if o["etiqueta"] == aclaracion_esperada.get("elegir")), None)
+                if token is not None:
+                    coincidencias_aclaracion.append((pid, token))
+
+            if len(coincidencias_aclaracion) > 1:
+                raise LookupError(
+                    f"La aclaración a elegir ({aclaracion_esperada.get('elegir')!r}) "
+                    f"coincide con {len(coincidencias_aclaracion)} acciones "
+                    "pendientes distintas de este chat -- ambiguo, no se "
+                    "adivina cuál.")
+            if coincidencias_aclaracion:
+                _, objetivo_token = coincidencias_aclaracion[0]
                 toque_aclaracion = {"callback_query": {
                     "id": "banco-aclaracion", "from": {"id": tg_id},
                     "data": f"{P.CALLBACK_PREFIJO}{objetivo_token}",
@@ -693,18 +744,7 @@ def ejecutar_escenario(
         # ya vale con la aclaración.
         for toque in (toques or []):
             with admin(conn) as cur:
-                pid_actual = _pendiente_actual(cur, workspace_id, chat)
-                if pid_actual is None:
-                    raise LookupError(
-                        f"El escenario pide tocar {toque!r}, pero no hay "
-                        "ninguna acción pendiente esperando en este chat.")
-                opciones_actuales = _opciones_pendiente(cur, pid_actual)
-            objetivo = _resolver_opcion_toque(opciones_actuales, toque)
-            if objetivo is None:
-                raise LookupError(
-                    f"El escenario pide tocar {toque!r}, pero la acción "
-                    "pendiente no lo ofrece (opciones: "
-                    f"{[o['etiqueta'] for o in opciones_actuales]}).")
+                _, objetivo = _resolver_toque_generico(cur, workspace_id, chat, toque)
             _tocar_opcion(conn, slug, chat, tg_id, objetivo["token"])
 
         # El turno pudo haber dejado una propuesta de una herramienta que
