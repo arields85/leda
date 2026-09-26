@@ -508,14 +508,27 @@ def test_lista_con_respuesta_larga_se_parte_y_los_botones_van_aparte(
 
     # El texto sale partido, nunca junto con los botones.
     assert len(partes_texto) >= 2
+    # Orden explícito por `programado_para`, no un supuesto sobre el `order
+    # by` de `_outbox`: antes de la corrección del orquestador del
+    # 2026-09-26, `enqueue_outbox` mandaba todas las partes con la MISMA
+    # marca (`scheduled_for`) y `despachador.despachar` sólo ordena `by
+    # programado_para` (`despachador.py:299`) -- el `id` de `message_outbox`
+    # es un uuid al azar que no desempata, así que el orden entre filas
+    # empatadas quedaba librado al orden físico con el que Postgres las
+    # devolviera. Esta prueba era la intermitente que lo mostraba. Ahora
+    # cada parte tiene una marca estrictamente creciente
+    # (`salida.enqueue_outbox`): se comprueba acá mismo, sin depender de que
+    # `filas` haya llegado en ese orden por casualidad.
+    partes_texto = sorted(partes_texto, key=lambda f: f["programado_para"])
+    marcas = [f["programado_para"] for f in partes_texto]
+    assert marcas == sorted(marcas)
+    assert len(set(marcas)) == len(marcas)  # sin empates
     for indice, fila in enumerate(partes_texto, start=1):
         assert fila["cuerpo"].startswith(f"({indice}/{len(partes_texto)})\n")
         assert telegram_utf16_units(fila["cuerpo"]) <= 4096  # TELEGRAM_TEXT_LIMIT
 
-    # Un solo mensaje de botones, corto, después de todas las partes del
-    # texto -- orden determinístico por `programado_para`, lo único que usa
-    # `despachador.despachar` (el `id` de `message_outbox` es un uuid al azar,
-    # no sirve de desempate).
+    # Un solo mensaje de botones, corto, después de TODAS las partes del
+    # texto (después de la última, no sólo de la primera).
     assert len(mensajes_botones) == 1
     assert mensajes_botones[0]["cuerpo"] == "Elegí una tarea:"
     assert (max(f["programado_para"] for f in partes_texto)

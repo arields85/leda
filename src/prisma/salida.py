@@ -181,18 +181,34 @@ def enqueue_outbox(cur, *, workspace_id: str, chat_id: int,
         text, dedupe_key=dedupe_key, has_buttons=has_buttons,
         allow_split=allow_split,
     )
+    # Defecto pre-existente encontrado en la revisión del orquestador sobre
+    # T3a (`tests/test_lista_botones.py:511-512`): un mensaje partido manda
+    # todas sus partes con el mismo `scheduled_for`, y `despachador.despachar`
+    # sólo ordena `by programado_para` (`despachador.py:299`) -- el `id` de
+    # `message_outbox` es un `uuid` al azar que no sirve de desempate, así que
+    # el orden entre partes con la misma marca queda librado al azar del
+    # orden físico con el que Postgres devuelva las filas. Cada parte avanza
+    # un microsegundo sobre la anterior a partir de la misma base; sin
+    # `scheduled_for`, esa base sigue siendo `now()` de la base de datos (la
+    # hora de inicio de la transacción, igual para todas las filas del bucle:
+    # justamente por eso el desplazamiento por parte alcanza para desempatar),
+    # nunca el reloj de la aplicación. Postgres guarda `timestamptz` con
+    # precisión de microsegundos, y el caso de siempre (un solo mensaje,
+    # desplazamiento 0) no cambia.
     inserted = 0
-    for payload in payloads:
+    for index, payload in enumerate(payloads):
         cur.execute(
             """insert into message_outbox
                  (workspace_id, chat_id, destinatario_membership_id, tipo, cuerpo,
                   estado, programado_para, vence_en, dedupe_key, es_respuesta,
                   pending_action_id, intake_choice_set_id)
-               values (%s, %s, %s, %s, %s, %s, coalesce(%s, now()), %s, %s,
-                       %s, %s, %s)
+               values (%s, %s, %s, %s, %s, %s,
+                       coalesce(%s, now()) + %s * interval '1 microsecond',
+                       %s, %s, %s, %s, %s)
                on conflict (dedupe_key) do nothing""",
             (workspace_id, chat_id, recipient_membership_id, message_type,
-             payload.text, state, scheduled_for, expires_at, payload.dedupe_key,
+             payload.text, state, scheduled_for, index,
+             expires_at, payload.dedupe_key,
              is_response, pending_action_id, intake_choice_set_id),
         )
         inserted += cur.rowcount

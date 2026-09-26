@@ -36,8 +36,8 @@ from .contexto import construir, historial, revisar_salida
 from .db import registrar_auditoria
 from .llm import Llamada, Proveedor, Respuesta
 from .salida import (BUTTON_TEXT_LIMIT, enqueue_outbox, normalize_visible_text,
-                     telegram_utf16_units, truncar_etiqueta_boton,
-                     with_no_effect_status)
+                     prepare_payload, telegram_utf16_units,
+                     truncar_etiqueta_boton, with_no_effect_status)
 
 MAX_VUELTAS = 5
 
@@ -498,10 +498,13 @@ def _encolar_respuesta_con_tareas(cur, quien: Solicitante, chat_id: int,
     siempre (botones en el mismo mensaje). Si no entra, `resumen` pasa a ser
     `_TEXTO_BOTONES_LISTA_TAREAS`, un texto corto fijo que sí entra siempre; el
     texto completo del modelo sale aparte, ANTES, partido exactamente como lo
-    partiría `_encolar_respuesta`. El mensaje de botones se programa un
-    instante después del de texto (`programado_para`, lo único que ordena
+    partiría `_encolar_respuesta`. El mensaje de botones se programa después
+    de la ÚLTIMA parte del texto (`programado_para`, lo único que ordena
     `despachador.despachar`) para que la entrega quede determinística: el
-    texto primero, los botones después, nunca al revés.
+    texto primero -- todas sus partes, en orden -- y los botones después,
+    nunca al revés (corrección sobre el defecto de partes con la misma marca,
+    revisión del orquestador del 2026-09-26: ver comentario en la llamada de
+    abajo y en `salida.enqueue_outbox`).
 
     `args={"pregunta": texto}` guarda el texto completo del modelo pase lo
     que pase con `resumen` -- por consistencia con la forma que ya tiene
@@ -533,21 +536,33 @@ def _encolar_respuesta_con_tareas(cur, quien: Solicitante, chat_id: int,
         )
         return
 
+    dedupe_key_texto = f"{quien.workspace_id}:lista-tareas:{p.id}:texto"
     enqueue_outbox(
         cur, workspace_id=quien.workspace_id, chat_id=chat_id, text=texto,
         recipient_membership_id=quien.membership_id, scheduled_for=ahora,
-        dedupe_key=f"{quien.workspace_id}:lista-tareas:{p.id}:texto",
+        dedupe_key=dedupe_key_texto,
         is_response=True, allow_split=True,
     )
+    # `enqueue_outbox` programa cada parte del texto en `ahora +
+    # microsegundos(índice)` (0, 1, 2...) para que queden en orden estricto
+    # entre sí (defecto de la revisión del orquestador del 2026-09-26: antes
+    # todas las partes compartían la misma marca y el orden entre ellas
+    # quedaba librado al azar del `id`, un uuid). Los botones tienen que ir
+    # después de la ÚLTIMA parte, no de la primera -- `len(partes)`
+    # microsegundos alcanza porque las partes ocupan los índices
+    # `0..len(partes)-1`. `partes` se recalcula acá con el mismo texto y la
+    # misma `dedupe_key` que la llamada de arriba (`prepare_payload` es
+    # determinística, ya probado en `test_ordinary_payload_split_is_
+    # deterministic_and_dedupe_safe`) sólo para contar cuántas partes salen:
+    # `enqueue_outbox` devuelve filas efectivamente insertadas, no partes,
+    # porque otras llamadas (`escalera.encolar`, etc.) suman ese número para
+    # saber cuánto entregaron de verdad pese al `on conflict (dedupe_key) do
+    # nothing`, y ese conteo tiene que seguir reflejando inserciones reales.
+    partes = prepare_payload(texto, dedupe_key=dedupe_key_texto, allow_split=True)
     enqueue_outbox(
         cur, workspace_id=quien.workspace_id, chat_id=chat_id,
         recipient_membership_id=quien.membership_id, text=p.resumen,
-        # Un instante después del texto: `despachador.despachar` sólo ordena
-        # por `programado_para` (el `id` de `message_outbox` es un uuid al
-        # azar, no sirve de desempate), así que la entrega en orden depende
-        # de que esta columna, no la casualidad del orden físico, diga que
-        # el texto va primero.
-        scheduled_for=ahora + timedelta(microseconds=1),
+        scheduled_for=ahora + timedelta(microseconds=len(partes)),
         dedupe_key=f"{quien.workspace_id}:lista-tareas:{p.id}:botones",
         is_response=True, pending_action_id=p.id,
     )

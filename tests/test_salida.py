@@ -15,8 +15,9 @@ from prisma.despachador import Boton, TransporteTelegram
 from prisma.llm import ProveedorGuionado, Respuesta
 from prisma.salida import (BUTTON_TEXT_LIMIT, TELEGRAM_TEXT_LIMIT,
                              NO_EFFECT_STATUS, PayloadValidationError,
-                             normalize_visible_text, prepare_payload,
-                             telegram_utf16_units, with_no_effect_status)
+                             enqueue_outbox, normalize_visible_text,
+                             prepare_payload, telegram_utf16_units,
+                             with_no_effect_status)
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -117,6 +118,43 @@ def test_sql_terminal_producers_are_guarded_by_the_same_database_contract():
     for sql in (schema, migration):
         assert "message_outbox_telegram_payload" in sql
         assert "telegram_utf16_units" in sql
+
+
+def test_split_outbox_parts_get_strictly_increasing_schedule(corework, conn):
+    """Defecto pre-existente, encontrado en la revisión del orquestador del
+    2026-09-26 sobre T3a (observación no bloqueante en
+    `tests/test_lista_botones.py:511-512`): antes de esta corrección,
+    `enqueue_outbox` mandaba todas las partes de un mensaje partido con el
+    mismo `programado_para` -- el único valor que ordena
+    `despachador.despachar` (`despachador.py:299`) --, y `message_outbox.id`
+    es un `uuid` al azar que no desempata, así que el orden de entrega entre
+    partes quedaba librado al azar del orden físico con el que Postgres
+    devolviera las filas. Cada parte tiene que quedar estrictamente después
+    de la anterior, en el mismo orden en que `_split` las generó -- acá se
+    verifica ese orden con `dedupe_key` (que sí codifica el índice de cada
+    parte de forma estable), no con `programado_para`, para no validar la
+    corrección usando la misma columna que se está corrigiendo."""
+    ws = corework.workspace_id
+    texto = "sección larga de la respuesta para forzar el partido. " * 900
+    with espacio(conn, ws) as cur:
+        enqueue_outbox(
+            cur, workspace_id=ws, chat_id=1, text=texto,
+            dedupe_key="split-order-test", scheduled_for=NOW,
+            allow_split=True,
+        )
+        cur.execute(
+            """select cuerpo, programado_para from message_outbox
+                where dedupe_key like 'split-order-test:part:%'
+                order by dedupe_key""")
+        filas = cur.fetchall()
+
+    assert len(filas) > 1
+    for indice, fila in enumerate(filas, start=1):
+        assert fila["cuerpo"].startswith(f"({indice}/{len(filas)})\n")
+
+    marcas = [f["programado_para"] for f in filas]
+    assert marcas == sorted(marcas)
+    assert len(set(marcas)) == len(marcas)  # sin empates
 
 
 def test_agent_arbitrary_long_model_output_is_split_before_enqueue(corework, conn):
