@@ -127,6 +127,37 @@ def bloqueos_abiertos(cur: psycopg.Cursor, tarea_id: str) -> list[dict]:
     return [dict(f) for f in cur.fetchall()]
 
 
+def tareas_activas_de_persona(
+        cur: psycopg.Cursor, workspace_id: str, membership_id: str, *,
+        excluir_tarea_id: str | None = None,
+        limite: int | None = None) -> list[dict]:
+    """La regla compartida de "tarea activa de una persona"
+    (`estado not in ('terminada', 'cancelada')`), en un único lugar --
+    `tareas_activas_de` (la elección de con cuál otra tarea depende, T2) y
+    `gateway._mostrar_tareas_propias` (T4b, "Es sobre una tarea existente")
+    la necesitan igual, y antes cada una tenía su propia copia de la
+    consulta (hallazgo del orquestador).
+
+    Orden determinístico: `fecha_objetivo nulls last` no alcanza sola para
+    desempatar entre tareas sin fecha o con la misma fecha -- se agrega
+    `id` como segundo criterio, siempre el mismo para el mismo conjunto de
+    filas, en vez de depender del orden físico con el que Postgres las
+    devuelva."""
+    condiciones = ["workspace_id = %s", "responsable_membership_id = %s",
+                  "estado not in ('terminada', 'cancelada')"]
+    parametros: list = [workspace_id, membership_id]
+    if excluir_tarea_id is not None:
+        condiciones.append("id <> %s")
+        parametros.append(excluir_tarea_id)
+    sql = ("select id, titulo from task where " + " and ".join(condiciones)
+          + " order by fecha_objetivo nulls last, id")
+    if limite is not None:
+        sql += " limit %s"
+        parametros.append(limite)
+    cur.execute(sql, parametros)
+    return [dict(f) for f in cur.fetchall()]
+
+
 def tareas_activas_de(cur: psycopg.Cursor, workspace_id: str, membership_id: str,
                       *, excluir_tarea_id: str,
                       limite: int = MAX_CANDIDATAS_DEPENDENCIA) -> list[tuple[str, str]]:
@@ -134,13 +165,10 @@ def tareas_activas_de(cur: psycopg.Cursor, workspace_id: str, membership_id: str
     botones cuál es la que depende / de la que depende (T2, punto 3: "cuando
     la respuesta es un dato... con botones"). Nunca más de
     `MAX_CANDIDATAS_DEPENDENCIA` (ADR 0007, mismo tope que el modelo)."""
-    cur.execute(
-        """select id, titulo from task
-            where workspace_id = %s and responsable_membership_id = %s
-              and estado not in ('terminada', 'cancelada') and id <> %s
-            order by fecha_objetivo nulls last limit %s""",
-        (workspace_id, membership_id, excluir_tarea_id, limite))
-    return [(str(f["id"]), f["titulo"]) for f in cur.fetchall()]
+    filas = tareas_activas_de_persona(
+        cur, workspace_id, membership_id, excluir_tarea_id=excluir_tarea_id,
+        limite=limite)
+    return [(str(f["id"]), f["titulo"]) for f in filas]
 
 
 def detalle_tarea(cur: psycopg.Cursor, tarea_id: str, *,

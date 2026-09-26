@@ -16,6 +16,7 @@ igual que `tests/test_aclaracion_botones.py`.
 
 from __future__ import annotations
 
+import json
 from contextlib import nullcontext
 from datetime import datetime, timezone
 
@@ -183,6 +184,44 @@ def test_texto_del_modelo_acompana_la_pregunta_de_opciones(corework, conn, monke
     assert cuerpo.index(texto_modelo) < cuerpo.index("¿De cuál te referís?")
 
 
+def test_texto_de_una_vuelta_posterior_a_ofrecer_opciones_se_descarta(
+        corework, conn, monkeypatch):
+    """El texto que acompaña la pregunta es el de la vuelta que LLAMÓ a
+    `ofrecer_opciones` -- no el de una vuelta posterior del mismo turno. El
+    modelo suele repetir un cierre ("Listo, ahí tenés las opciones") después
+    de ver el resultado de la herramienta; ese texto no describe nada nuevo
+    y se descarta, aunque sea el último `salida` del turno."""
+    ws = corework.workspace_id
+    texto_primera_vuelta = ("Tenés dos tareas abiertas: «Programar PLC» y "
+                            "«Revisar comunicaciones», sin fecha.")
+    guion = [
+        Respuesta(texto=texto_primera_vuelta, llamadas=[Llamada("c1", "ofrecer_opciones", {
+            "pregunta": "¿De cuál te referís?",
+            "opciones": [{"texto": "Programar PLC"}, {"texto": "Revisar comunicaciones"}]})]),
+        # Vuelta posterior, sin llamadas: cierra el turno, pero su texto no
+        # tiene que viajar -- el modelo ya no puede agregar nada después de
+        # `ofrecer_opciones` (T1, "el turno termina acá").
+        Respuesta(texto="Listo, ahí tenés las opciones."),
+    ]
+    proveedor = _con_proveedor(monkeypatch, guion)
+
+    with espacio(conn, ws) as cur:
+        quien = _quien(cur, "Marcos Tarquini", ws)
+        cal = Calendario.desde_base(cur, ws)
+        r = responder(cur, quien, "lo del dashboard", proveedor, cal, chat_id=1,
+                     ahora=datetime.now(timezone.utc))
+        assert r.elecciones == ["ofrecer_opciones"]
+        assert r.texto == texto_primera_vuelta
+
+        pid = _pendiente_opciones(cur, ws)
+        cur.execute(
+            "select cuerpo from message_outbox where pending_action_id = %s", (pid,))
+        cuerpo = cur.fetchone()["cuerpo"]
+
+    assert texto_primera_vuelta in cuerpo
+    assert "Listo, ahí tenés las opciones" not in cuerpo
+
+
 def test_texto_se_descarta_si_ademas_queda_una_confirmacion_pendiente(
         corework, conn, monkeypatch):
     """Evitar anunciar como hecho algo que no se hizo (ADR 0005) sigue
@@ -275,6 +314,55 @@ def test_mas_de_cuatro_opciones_se_rechaza_al_modelo(corework, conn, monkeypatch
         assert cur.fetchone()["n"] == 0
     assert r.elecciones == []
     assert "ofrecer_opciones" not in r.acciones
+
+
+# ---------------------------------------------------------------------------
+# Un solo juego de botones por turno (ADR 0007): una segunda llamada a
+# `ofrecer_opciones` en el mismo turno no se muestra, y se le dice la verdad
+# al modelo en vez de contarle que sí (hallazgo del orquestador).
+# ---------------------------------------------------------------------------
+
+def test_segunda_llamada_a_ofrecer_opciones_en_el_mismo_turno_no_se_muestra(
+        corework, conn, monkeypatch):
+    ws = corework.workspace_id
+    guion = [
+        Respuesta(llamadas=[
+            Llamada("c1", "ofrecer_opciones", {
+                "pregunta": "¿A o B?",
+                "opciones": [{"texto": "A"}, {"texto": "B"}]}),
+            Llamada("c2", "ofrecer_opciones", {
+                "pregunta": "¿C o D?",
+                "opciones": [{"texto": "C"}, {"texto": "D"}]}),
+        ]),
+        Respuesta(texto="listo"),
+    ]
+    proveedor = _con_proveedor(monkeypatch, guion)
+
+    with espacio(conn, ws) as cur:
+        quien = _quien(cur, "Marcos Tarquini", ws)
+        cal = Calendario.desde_base(cur, ws)
+        r = responder(cur, quien, "dos preguntas de una", proveedor, cal,
+                     chat_id=1, ahora=datetime.now(timezone.utc))
+        # Sólo la primera cuenta como mostrada -- ni duplicada en
+        # `elecciones` ni una segunda `pending_action`.
+        assert r.elecciones == ["ofrecer_opciones"]
+        cur.execute("select count(*) n from pending_action where herramienta = %s",
+                    (P.SENTINEL_OPCIONES_MODELO,))
+        assert cur.fetchone()["n"] == 1
+
+        pid = _pendiente_opciones(cur, ws)
+        etiquetas = [f["etiqueta"] for f in _opciones(cur, pid)]
+    assert etiquetas[:2] == ["A", "B"]           # la primera llamada ganó
+
+    # El modelo tiene que recibir la verdad sobre la segunda llamada, no el
+    # mismo texto de éxito que la primera.
+    ultimos_resultados = proveedor.recibidos[-1][1][-1]["content"]
+    r1 = next(b for b in ultimos_resultados if b["tool_use_id"] == "c1")
+    r2 = next(b for b in ultimos_resultados if b["tool_use_id"] == "c2")
+    assert r1["is_error"] is False
+    assert r2["is_error"] is True
+    contenido_2 = json.loads(r2["content"])
+    assert "ya ofreciste opciones" in contenido_2["explicacion"]
 
 
 # ---------------------------------------------------------------------------

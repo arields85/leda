@@ -455,38 +455,62 @@ def _toque(conn, workspace_id: str, slug: str, toque: dict,
                             is_response=True, pending_action_id=nueva.id,
                         )
                     else:
-                        registrar_auditoria(
-                            cur, accion=f"herramienta:{resuelta.herramienta}",
-                            workspace_id=workspace_id,
-                            actor_app_user_id=quien.app_user_id, actor_kind="persona",
-                            detalle={"args": resuelta.args, "via": "boton"})
-                        if isinstance(resultado, dict) and resultado.get("draft_id"):
-                            if resultado.get("pendiente_revision"):
-                                texto = ("Guardé el borrador y envié la vista previa a "
-                                         "quien puede confirmarlo.")
-                            else:
-                                texto = ("Guardé el pedido como borrador; todavía "
-                                         "está incompleto.")
-                            _responder(cur, workspace_id, chat_id, quien, texto, ahora)
-                        elif isinstance(resultado, dict) and (
+                        if isinstance(resultado, dict) and (
                                 resultado.get("error")
                                 or resultado.get("cerrada") is False
                                 or resultado.get("iniciada") is False):
-                            # La preparación había pasado, pero el handler
-                            # encontró un impedimento de negocio al aplicar
-                            # (p. ej. una condición de cierre que cambió en
-                            # el mismo instante).
-                            _responder(cur, workspace_id, chat_id, quien,
-                                      "No se aplicó el cambio.", ahora)
-                        elif prep_capturada.get("cambio"):
-                            # El recibo cuenta qué cambió, no un "Hecho."
-                            # solo (T2, punto 3): reusa la descripción que ya
-                            # se había mostrado en la vista previa, porque la
-                            # huella coincidió -- el estado sigue siendo ese.
-                            _responder(cur, workspace_id, chat_id, quien,
-                                      f"Hecho. {prep_capturada['cambio']}", ahora)
+                            # La preparación se corrió de nuevo al confirmar
+                            # (`ya_confirmada=True`) y encontró un
+                            # impedimento de negocio -- la situación cambió
+                            # entre la vista previa y el toque (sin llegar a
+                            # `EstadoCambio`, porque la huella puede seguir
+                            # coincidiendo aunque el estado ya no admita la
+                            # transición), o el propio handler encontró la
+                            # misma condición al aplicar. Mismo defecto de
+                            # fondo que el corregido en `agente._ejecutar_una`
+                            # (banco b-0005-a): nunca auditar como ejecutado
+                            # (`herramienta:<nombre>`) lo que no escribió
+                            # nada, y nunca decirle "Hecho" a la persona por
+                            # algo que no pasó. Mismo mensaje específico que
+                            # ya usa `_mensaje_resultado_menu` para el mismo
+                            # tipo de rechazo, en vez de un genérico "No se
+                            # aplicó el cambio.".
+                            registrar_auditoria(
+                                cur, accion=f"herramienta_rechazada:{resuelta.herramienta}",
+                                workspace_id=workspace_id,
+                                actor_app_user_id=quien.app_user_id,
+                                actor_kind="persona",
+                                detalle={"args": resuelta.args, "via": "boton",
+                                        "rechazo": resultado})
+                            _responder(
+                                cur, workspace_id, chat_id, quien,
+                                resultado.get("falta") or resultado.get("error")
+                                or "No se aplicó el cambio.", ahora)
                         else:
-                            _responder(cur, workspace_id, chat_id, quien, "Hecho.", ahora)
+                            registrar_auditoria(
+                                cur, accion=f"herramienta:{resuelta.herramienta}",
+                                workspace_id=workspace_id,
+                                actor_app_user_id=quien.app_user_id,
+                                actor_kind="persona",
+                                detalle={"args": resuelta.args, "via": "boton"})
+                            if isinstance(resultado, dict) and resultado.get("draft_id"):
+                                if resultado.get("pendiente_revision"):
+                                    texto = ("Guardé el borrador y envié la vista previa "
+                                             "a quien puede confirmarlo.")
+                                else:
+                                    texto = ("Guardé el pedido como borrador; todavía "
+                                             "está incompleto.")
+                                _responder(cur, workspace_id, chat_id, quien, texto, ahora)
+                            elif prep_capturada.get("cambio"):
+                                # El recibo cuenta qué cambió, no un "Hecho."
+                                # solo (T2, punto 3): reusa la descripción
+                                # que ya se había mostrado en la vista
+                                # previa, porque la huella coincidió -- el
+                                # estado sigue siendo ese.
+                                _responder(cur, workspace_id, chat_id, quien,
+                                          f"Hecho. {prep_capturada['cambio']}", ahora)
+                            else:
+                                _responder(cur, workspace_id, chat_id, quien, "Hecho.", ahora)
     except Exception as e:  # noqa: BLE001
         # `conn.commit()`/`conn.rollback()` no se pueden llamar todavía acá
         # adentro -- psycopg3 los rechaza mientras el contexto de
@@ -1080,24 +1104,27 @@ def _mostrar_tareas_propias(cur, quien, workspace_id: str, chat_id: int,
                             ahora) -> None:
     """"Es sobre una tarea existente" (T4b, ADR 0007, cierre genérico de una
     pregunta sin opciones): lista las tareas ACTIVAS de la propia persona
-    como botones -- mismo criterio de "activa" que `menu_tarea.
-    tareas_activas_de` (`estado not in ('terminada', 'cancelada')`), bajo el
-    cursor con RLS de este toque, así que nunca puede traer una tarea de otro
-    espacio ni de otra persona.
+    como botones -- misma regla compartida de "activa" que la elección de
+    dependencia de T2 (`menu_tarea.tareas_activas_de_persona`, hallazgo del
+    orquestador: antes cada una tenía su propia copia de la consulta), bajo
+    el cursor con RLS de este toque, así que nunca puede traer una tarea de
+    otro espacio ni de otra persona. Orden determinístico (`fecha_objetivo
+    nulls last, id`): mismo motivo que el resto del desempate de esta unidad.
 
-    Reusa el armado de página + "Ver más" de T3 (`agente._opciones_lista_
-    tareas`) en vez de duplicarlo: la consulta ya trae como mucho
-    `id`/`titulo`, la misma forma que espera ese armador."""
+    Sin tope: se piden TODAS las activas -- `agente._opciones_lista_tareas`
+    ya arma "Ver más" con el resto cuando son más de `H.MAX_OPCIONES_MODELO`
+    (T3), y esos ids viajan en `pending_action_option.valor` (columna
+    jsonb del servidor), nunca en el `callback_data` de Telegram (ese sigue
+    siendo sólo el token corto `p:<uuid>`) -- así que no hay límite de
+    tamaño de payload que un "Ver más" de más páginas pueda superar. Antes
+    se cortaba en silencio a las primeras 25 sin decirlo (hallazgo del
+    orquestador); ahora se pagina todo, igual que la lista que arma T3 para
+    una respuesta de `consultar_tareas`."""
+    from . import menu_tarea as M
     from . import pendientes as P
     from .agente import VIGENCIA_PENDIENTE, _opciones_lista_tareas
 
-    cur.execute(
-        """select id, titulo from task
-            where workspace_id = %s and responsable_membership_id = %s
-              and estado not in ('terminada', 'cancelada')
-            order by fecha_objetivo nulls last limit 25""",
-        (workspace_id, quien.membership_id))
-    tareas = cur.fetchall()
+    tareas = M.tareas_activas_de_persona(cur, workspace_id, quien.membership_id)
 
     if not tareas:
         resumen = "No tenés tareas activas por ahora."

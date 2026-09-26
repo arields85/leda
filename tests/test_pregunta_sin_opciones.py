@@ -180,8 +180,9 @@ def test_pedido_de_eleccion_en_imperativo_tambien_agrega_el_cierre(
     with espacio(conn, ws) as cur:
         quien = _quien(cur, "Marcos Tarquini", ws)
         cal = Calendario.desde_base(cur, ws)
+        entrante_id = _entrante(cur, ws, quien, 1, "algo")
         responder(cur, quien, "algo", proveedor, cal, chat_id=1,
-                 ahora=datetime.now(timezone.utc))
+                 ahora=datetime.now(timezone.utc), entrante_id=entrante_id)
         pid = _pendiente_opciones(cur, ws)
         etiquetas = [f["etiqueta"] for f in _opciones(cur, pid)]
 
@@ -267,8 +268,9 @@ def test_pregunta_larga_se_parte_y_los_botones_van_aparte(corework, conn, monkey
     with espacio(conn, ws) as cur:
         quien = _quien(cur, "Marcos Tarquini", ws)
         cal = Calendario.desde_base(cur, ws)
+        entrante_id = _entrante(cur, ws, quien, 1, "lo del proveedor")
         r = responder(cur, quien, "lo del proveedor", proveedor, cal, chat_id=1,
-                     ahora=datetime.now(timezone.utc))
+                     ahora=datetime.now(timezone.utc), entrante_id=entrante_id)
         assert not r.incidente
 
         cur.execute(
@@ -340,48 +342,29 @@ def test_tocar_es_una_tarea_nueva_arranca_el_alta_guiada(
         assert cur.fetchone()["n"] == 1
 
 
-def test_tocar_es_una_tarea_nueva_sin_entrante_id_no_falla_en_silencio(
-        cliente, conn, corework, monkeypatch):
-    """Si el turno que armó el cierre genérico no tenía un `inbound_message`
-    propio (p. ej. retomó otra opción), el alta guiada no se puede arrancar
-    -- `gateway._iniciar_alta_guiada` ya registra incidente + aviso neutro
-    (patrón existente); nunca se inventa un mensaje de origen ni se cae en
-    silencio."""
+def test_sin_entrante_id_no_ofrece_es_una_tarea_nueva(corework, conn, monkeypatch):
+    """Hallazgo del orquestador: sin un `inbound_message` propio (p. ej. al
+    retomar otra opción -- `gateway._resolver_toque_opcion_modelo` llama a
+    `responder` sin `entrante_id`) el alta guiada tiene garantizado fallar
+    (`gateway._iniciar_alta_guiada` exige ese mensaje persistido y, sin uno,
+    siempre levanta antes de intentar nada). Antes se ofrecía el botón
+    igual y sólo se notaba el fallo al tocarlo -- ahora el cierre genérico
+    no lo ofrece en absoluto en ese caso, sólo las otras dos opciones."""
     ws = corework.workspace_id
     guion = [Respuesta(texto="¿De qué tarea hablamos?")]
     proveedor = _con_proveedor(monkeypatch, guion)
 
     with espacio(conn, ws) as cur:
         quien = _quien(cur, "Marcos Tarquini", ws)
-        tg = _telegram_id(cur, "Marcos Tarquini")
         cal = Calendario.desde_base(cur, ws)
         # Sin `entrante_id`: simula un turno que no vino de un mensaje
         # persistido (por ejemplo, al retomar otra opción).
-        responder(cur, quien, "lo del proveedor", proveedor, cal, chat_id=tg,
+        responder(cur, quien, "lo del proveedor", proveedor, cal, chat_id=1,
                  ahora=datetime.now(timezone.utc))
         pid = _pendiente_opciones(cur, ws)
-        nueva = next(o for o in _opciones(cur, pid)
-                    if o["etiqueta"] == "Es una tarea nueva")
+        etiquetas = [f["etiqueta"] for f in _opciones(cur, pid)]
 
-    with admin(conn) as cur:
-        cur.execute("select count(*) n from incident")
-        incidentes_antes = cur.fetchone()["n"]
-
-    assert _tocar(cliente, nueva["token"], tg).status_code == 200
-
-    with admin(conn) as cur:
-        cur.execute("select count(*) n from task_intake_request where workspace_id = %s",
-                    (ws,))
-        assert cur.fetchone()["n"] == 0
-
-        cur.execute("select count(*) n from incident")
-        assert cur.fetchone()["n"] == incidentes_antes + 1
-
-        cur.execute(
-            """select cuerpo from message_outbox where chat_id = %s
-                order by programado_para desc limit 1""", (tg,))
-        aviso = cur.fetchone()["cuerpo"]
-    assert "no pude" in aviso.lower()
+    assert etiquetas == ["Es sobre una tarea existente", "Quiero consultar otra cosa"]
 
 
 # ---------------------------------------------------------------------------
@@ -465,6 +448,84 @@ def test_tocar_es_sobre_una_tarea_existente_pagina_con_mas_de_cuatro(
         etiquetas = [f["etiqueta"] for f in _opciones(cur, pid2)]
     assert etiquetas == ["Tarea propia 1", "Tarea propia 2", "Tarea propia 3",
                         "Tarea propia 4", "Ver más", "Quiero consultar otra cosa"]
+
+
+def test_tocar_es_sobre_una_tarea_existente_pagina_mas_alla_del_limite_viejo(
+        cliente, conn, corework, monkeypatch):
+    """Hallazgo del orquestador: el `limit 25` anterior cortaba en silencio.
+    Con 26 tareas activas (una más que ese tope viejo), las 26 tienen que
+    poder verse tocando "Ver más" las veces que hagan falta -- nunca se
+    pierde ninguna, y nunca hace falta decir que se cortó porque no se
+    corta."""
+    ws = corework.workspace_id
+    total = 26
+    with admin(conn) as cur:
+        for n in range(1, total + 1):
+            _tarea(cur, ws, titulo=f"Tarea propia {n}", dias_para_vencer=n)
+    conn.commit()
+
+    guion = [Respuesta(texto="¿De qué tarea hablamos?")]
+    proveedor = _con_proveedor(monkeypatch, guion)
+
+    with espacio(conn, ws) as cur:
+        quien = _quien(cur, "Marcos Tarquini", ws)
+        tg = _telegram_id(cur, "Marcos Tarquini")
+        cal = Calendario.desde_base(cur, ws)
+        responder(cur, quien, "lo del proveedor", proveedor, cal, chat_id=tg,
+                 ahora=datetime.now(timezone.utc))
+        pid = _pendiente_opciones(cur, ws)
+        existente = next(o for o in _opciones(cur, pid)
+                         if o["etiqueta"] == "Es sobre una tarea existente")
+
+    assert _tocar(cliente, existente["token"], tg).status_code == 200
+
+    vistas: list[str] = []
+    with admin(conn) as cur:
+        pid_actual = _pendiente_opciones(cur, ws)
+        filas = _opciones(cur, pid_actual)
+    while True:
+        vistas += [f["etiqueta"] for f in filas if f["etiqueta"] not in
+                  ("Ver más", "Quiero consultar otra cosa")]
+        ver_mas = next((f for f in filas if f["etiqueta"] == "Ver más"), None)
+        if ver_mas is None:
+            break
+        assert _tocar(cliente, ver_mas["token"], tg).status_code == 200
+        with admin(conn) as cur:
+            pid_actual = _pendiente_opciones(cur, ws)
+            filas = _opciones(cur, pid_actual)
+
+    assert sorted(vistas) == sorted(f"Tarea propia {n}" for n in range(1, total + 1))
+
+
+def test_tocar_es_sobre_una_tarea_existente_orden_deterministico_sin_fecha(
+        cliente, conn, corework, monkeypatch):
+    """`fecha_objetivo nulls last` sola no desempata entre tareas sin fecha
+    -- el orden tiene que ser el mismo en dos corridas independientes, no
+    depender del orden físico con el que Postgres devuelva las filas
+    (hallazgo del orquestador)."""
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        for n in range(1, 6):
+            _tarea(cur, ws, titulo=f"Sin fecha {n}")     # dias_para_vencer=None
+    conn.commit()
+
+    def _pedir_orden():
+        guion = [Respuesta(texto="¿De qué tarea hablamos?")]
+        proveedor = _con_proveedor(monkeypatch, guion)
+        with espacio(conn, ws) as cur:
+            quien = _quien(cur, "Marcos Tarquini", ws)
+            tg = _telegram_id(cur, "Marcos Tarquini")
+            cal = Calendario.desde_base(cur, ws)
+            responder(cur, quien, "lo del proveedor", proveedor, cal, chat_id=tg,
+                     ahora=datetime.now(timezone.utc))
+            pid = _pendiente_opciones(cur, ws)
+            filas = _opciones(cur, pid)
+        return [f["etiqueta"] for f in filas
+               if f["etiqueta"] not in ("Ver más", "Quiero consultar otra cosa")]
+
+    primera = _pedir_orden()
+    segunda = _pedir_orden()
+    assert primera == segunda
 
 
 def test_tocar_es_sobre_una_tarea_existente_sin_tareas_activas_dice_que_no_hay(

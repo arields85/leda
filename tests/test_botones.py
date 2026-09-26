@@ -198,6 +198,60 @@ def test_el_toque_de_otro_integrante_no_ejecuta(cliente, conn, corework):
         assert cur.fetchone()["estado"] == "esperando"     # sigue esperando
 
 
+def test_confirmar_una_preparacion_que_rechaza_no_se_audita_como_ejecutada(
+        cliente, conn, corework):
+    """Mismo defecto que el corregido en `agente._ejecutar_una` (banco
+    b-0005-a), acá en el camino de Confirmar por botón: `preparar` se corre
+    de nuevo al confirmar (`ya_confirmada=True`) y puede rechazar aunque la
+    huella no cambió -- acá, simulado con una dependencia bloqueante que se
+    agrega DESPUÉS de armar la vista previa, sin tocar el estado de la tarea
+    (mismo `tarea_id`/`estado` que arma la huella). Confirmar no puede
+    auditarse como `herramienta:actualizar_estado` (no escribió nada) ni
+    decirle "Hecho" a la persona."""
+    ws = corework.workspace_id
+    with espacio(conn, ws) as cur:
+        quien = _quien(cur, "Marcos Tarquini", ws)
+        destino = _tarea(cur, ws, persona="Marcos Tarquini")
+        origen = _tarea(cur, ws, persona="Nahuel Gimenez")
+        p = P.registrar(
+            cur, quien, herramienta="actualizar_estado",
+            args={"tarea_id": destino, "estado": "en_curso"},
+            resumen="poner Programar PLC en curso",
+            vence_en=datetime.now(timezone.utc) + timedelta(days=1),
+            chat_id=500)
+        token = P.opcion_por_etiqueta(cur, p.id, "Confirmar").token
+        tg = _telegram_id(cur, "Marcos Tarquini")
+        cur.execute("set local role prisma_admin")
+        cur.execute(
+            """insert into dependency (workspace_id, origen_task_id,
+                                       destino_task_id, tipo)
+               values (%s, %s, %s, 'bloqueante')""", (ws, origen, destino))
+        cur.execute("set local role prisma_app")
+    conn.commit()
+
+    assert _tocar(cliente, token, tg).status_code == 200
+
+    with admin(conn) as cur:
+        cur.execute("select estado from task where id = %s", (destino,))
+        assert cur.fetchone()["estado"] == "asignada"          # no se aplicó
+        cur.execute(
+            "select count(*) n from audit_log where accion = 'herramienta:actualizar_estado'")
+        assert cur.fetchone()["n"] == 0
+        cur.execute(
+            """select detalle from audit_log
+                where accion = 'herramienta_rechazada:actualizar_estado'""")
+        f = cur.fetchone()
+        assert f is not None
+        assert f["detalle"]["rechazo"]["iniciada"] is False
+        cur.execute(
+            """select cuerpo from message_outbox
+                where workspace_id = %s and chat_id = %s
+               order by programado_para desc limit 1""", (ws, tg))
+        cuerpo = cur.fetchone()["cuerpo"]
+    assert cuerpo != "Hecho."
+    assert "bloqueante" in cuerpo.lower() or "dependencia" in cuerpo.lower()
+
+
 def test_cancelar_no_ejecuta_pero_cierra_la_accion(cliente, conn, corework):
     ws = corework.workspace_id
     with espacio(conn, ws) as cur:

@@ -1095,8 +1095,12 @@ def test_no_mutating_tool_output_is_truth_marked_and_has_no_buttons(
                             where pending_action_id = %s order by orden""",
                         (ids[0],))
             etiquetas = [f["etiqueta"] for f in cur.fetchall()]
-            assert etiquetas == ["Es una tarea nueva",
-                                 "Es sobre una tarea existente",
+            # Sin `entrante_id` (este turno no viene de un `inbound_message`
+            # persistido) el cierre genérico no ofrece "Es una tarea nueva"
+            # -- ese botón tiene garantizado fallar sin un mensaje de origen
+            # (hallazgo del orquestador, unidad sobre `gateway.py`
+            # `_mostrar_tareas_propias`/`agente._encolar_opciones_genericas`).
+            assert etiquetas == ["Es sobre una tarea existente",
                                  P.ETIQUETA_SALIR_OPCIONES]
 
 

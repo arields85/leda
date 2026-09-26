@@ -363,6 +363,23 @@ def _ejecutar_una(cur, quien: Solicitante, c: Llamada, ctx, acciones,
             "aclaracion": "Ya le mostré los botones. No elijas vos ni "
                           "supongas cuál era."})
     except H.NecesitaOpciones as e:
+        if opciones_pendientes:
+            # ADR 0007: un solo juego de botones por turno (`responder`
+            # sólo encola `opciones_pendientes[0]`). Sin esta guarda, una
+            # segunda llamada a `ofrecer_opciones` en el mismo turno
+            # quedaba en `opciones_pendientes` sin encolarse nunca, pero el
+            # modelo recibía el mismo texto de éxito que la primera --le
+            # mentía diciéndole que ya se mostraron unos botones que en
+            # realidad no se armaron. Ahora una llamada de más se rechaza
+            # con la verdad, sin sumarse a `elecciones` ni a
+            # `opciones_pendientes`: no cuenta como mostrada.
+            return bloque({
+                "ejecutado": False,
+                "explicacion": "ya ofreciste opciones en este turno; no se "
+                              "mostraron estas",
+                "aclaracion": "Sólo se puede mostrar un juego de botones por "
+                              "turno. No lo anuncies como hecho ni supongas "
+                              "que la persona las vio."}, error=True)
         # No se encola acá (fix del orquestador, evidencia de banco
         # b-0001-a): recién `responder`, al cerrar el turno completo, sabe
         # si además queda una confirmación o un `NecesitaElegir` pendiente
@@ -728,12 +745,21 @@ def _encolar_opciones_genericas(cur, quien: Solicitante, chat_id: int,
 
     "Es sobre una tarea existente" lista las tareas activas de la propia
     persona (`gateway._mostrar_tareas_propias`), con el mismo armado de
-    página + "Ver más" que T3. La salida de siempre cierra sin efecto."""
-    opciones = [
-        (_ETIQUETA_TAREA_NUEVA_GENERICA, {"tipo": "tarea_nueva"}),
-        (_ETIQUETA_TAREA_EXISTENTE_GENERICA, {"tipo": "tarea_existente"}),
-        (P.ETIQUETA_SALIR_OPCIONES, {"tipo": "salida"}),
-    ]
+    página + "Ver más" que T3. La salida de siempre cierra sin efecto.
+
+    Sin `entrante_id` (hallazgo del orquestador) "Es una tarea nueva" no se
+    ofrece: `_iniciar_alta_guiada` exige un `inbound_message` persistido y,
+    sin uno, siempre levanta `ValueError` antes de intentar nada -- no es un
+    caso raro que a veces falla, es un botón que garantizado no hace lo que
+    promete. Pasa, por ejemplo, al retomar una opción con un toque
+    (`gateway._resolver_toque_opcion_modelo` llama a `responder` sin
+    `entrante_id`): si esa segunda vuelta también cierra preguntando en
+    texto abierto, sólo quedan las otras dos opciones."""
+    opciones = []
+    if entrante_id is not None:
+        opciones.append((_ETIQUETA_TAREA_NUEVA_GENERICA, {"tipo": "tarea_nueva"}))
+    opciones.append((_ETIQUETA_TAREA_EXISTENTE_GENERICA, {"tipo": "tarea_existente"}))
+    opciones.append((P.ETIQUETA_SALIR_OPCIONES, {"tipo": "salida"}))
     _encolar_texto_con_opciones(
         cur, quien, chat_id, texto, opciones, ahora,
         dedupe_prefijo="opciones-genericas", texto_corto=_TEXTO_BOTONES_GENERICO,

@@ -496,33 +496,111 @@ def test_rechazo_de_preparacion_no_se_audita_como_ejecutado(corework, conn):
             "un rechazo de preparar no es una ejecución"
 
 
-def test_rechazo_de_preparacion_no_bloquea_una_ejecucion_real_despues(corework, conn):
-    """Regresión: el turno agotó su intento con un rechazo, pero una
-    ejecución real -- confirmada por botón, el mismo camino que usa
-    `gateway.py` -- sigue auditándose como `herramienta:<nombre>`."""
-    from prisma.db import registrar_auditoria
+def test_rechazo_de_preparacion_no_bloquea_una_ejecucion_real_despues(
+        corework, conn, monkeypatch):
+    """Reemplaza la versión anterior (tautológica: escribía ella misma la
+    fila de auditoría de la "ejecución real" en vez de producirla por el
+    camino real -- no probaba nada que `_ejecutar_una`/`gateway._toque`
+    pudieran romper).
+
+    Acá se ejercitan los dos caminos reales, de punta a punta, con la MISMA
+    herramienta: (1) el modelo llama `crear_dependencia` con un destino que
+    no existe -- `agente._ejecutar_una` audita el rechazo como
+    `herramienta_rechazada:crear_dependencia` y lo devuelve al modelo como
+    error (banco b-0005-a); (2) el modelo la llama de nuevo con argumentos
+    válidos -- queda esperando Confirmar -- y la persona confirma por botón,
+    el mismo camino HTTP que corre `gateway._toque` (unidad de esta sesión
+    sobre `gateway.py` ~426-462): sólo esa segunda escribe la fila y se
+    audita como `herramienta:crear_dependencia`."""
+    import dataclasses
+    from contextlib import nullcontext
+
+    from fastapi.testclient import TestClient
+
+    from prisma import gateway
+    from prisma import pendientes as P
 
     ws = corework.workspace_id
     with admin(conn) as cur:
         origen = _tarea(cur, ws, titulo="Programar PLC")
         destino = _tarea(cur, ws, titulo="Cablear tablero",
                          persona="Nahuel Gimenez")
+    id_inexistente = "00000000-0000-0000-0000-000000000000"
 
+    # (1) Rechazo real de `preparar`: destino inexistente.
+    guion_rechazo = [
+        Respuesta(llamadas=[Llamada("c1", "crear_dependencia",
+                                    {"origen_tarea_id": origen,
+                                     "destino_tarea_id": id_inexistente})]),
+        Respuesta(texto="Anoté la dependencia."),
+    ]
     with espacio(conn, ws) as cur:
         quien = _quien(cur, "Marcos Tarquini", ws)
-        r = H.ejecutar(cur, quien, "crear_dependencia",
-                       {"origen_tarea_id": origen, "destino_tarea_id": destino},
-                       ya_confirmada=True)
-        assert "dependencia_id" in r
-        registrar_auditoria(
-            cur, accion="herramienta:crear_dependencia", workspace_id=ws,
-            actor_app_user_id=quien.app_user_id, actor_kind="persona",
-            detalle={"args": {"origen_tarea_id": origen,
-                              "destino_tarea_id": destino}})
+        cal = Calendario.desde_base(cur, ws)
+        proveedor_rechazo = ProveedorGuionado(guion_rechazo)
+        r = responder(cur, quien, "agregá esa dependencia", proveedor_rechazo,
+                      cal, chat_id=9006, ahora=AHORA)
+        assert r.acciones == []
+        cur.execute("select count(*) n from dependency")
+        assert cur.fetchone()["n"] == 0
+
+        # El modelo recibe la verdad: un error, no un "listo".
+        _, mensajes_recibidos = proveedor_rechazo.recibidos[-1]
+        bloque_rechazo = mensajes_recibidos[-1]["content"][0]
+        assert bloque_rechazo["is_error"] is True
+
+        # (2) Vista previa real, con argumentos válidos: nada se aplica
+        # todavía, sólo queda esperando Confirmar.
+        # Con la hora real (no `AHORA`, fija en el pasado): la vista previa
+        # tiene que seguir vigente cuando el toque HTTP de abajo la resuelva
+        # con `datetime.now(timezone.utc)` de verdad.
+        from datetime import timezone
+
+        guion_preview = [Respuesta(llamadas=[Llamada(
+            "c2", "crear_dependencia",
+            {"origen_tarea_id": origen, "destino_tarea_id": destino})])]
+        r2 = responder(cur, quien, "ahora con la tarea correcta",
+                      ProveedorGuionado(guion_preview), cal, chat_id=9006,
+                      ahora=datetime.now(timezone.utc))
+        assert r2.confirmaciones == ["crear_dependencia"]
+        cur.execute("select count(*) n from dependency")
+        assert cur.fetchone()["n"] == 0
+
+        cur.execute(
+            """select id from pending_action
+                where herramienta = 'crear_dependencia' and estado = 'esperando'""")
+        pid = str(cur.fetchone()["id"])
+        token = P.opcion_por_etiqueta(cur, pid, "Confirmar").token
+        cur.execute("select telegram_user_id t from integrante where nombre = %s",
+                    ("Marcos Tarquini",))
+        tg = cur.fetchone()["t"]
+
+    # Confirmar por botón: el camino real de `gateway._toque`.
+    monkeypatch.setattr(gateway, "acusar_toque", lambda *a, **k: None)
+    monkeypatch.setattr(gateway, "mantener_chat_activo",
+                        lambda *args, **kwargs: nullcontext())
+    monkeypatch.setattr(gateway, "_conn", lambda: conn)
+    monkeypatch.setattr(
+        gateway, "config",
+        dataclasses.replace(gateway.config, webhook_secret="s3cr3t"))
+    cliente = TestClient(gateway.app)
+    respuesta = cliente.post(
+        "/telegram/corework",
+        json={"callback_query": {
+            "id": "cb1", "from": {"id": tg}, "data": f"p:{token}",
+            "message": {"message_id": 7, "chat": {"id": tg}}}},
+        headers={"X-Telegram-Bot-Api-Secret-Token": "s3cr3t"})
+    assert respuesta.status_code == 200
 
     with admin(conn) as cur:
+        cur.execute("select count(*) n from dependency")
+        assert cur.fetchone()["n"] == 1, "la confirmación sí aplicó el cambio"
+
         cur.execute(
             "select count(*) n from audit_log where accion = 'herramienta:crear_dependencia'")
-        assert cur.fetchone()["n"] == 1
-        cur.execute("select count(*) n from dependency")
-        assert cur.fetchone()["n"] == 1
+        assert cur.fetchone()["n"] == 1, "una sola ejecución real, auditada como tal"
+
+        cur.execute(
+            """select count(*) n from audit_log
+                where accion = 'herramienta_rechazada:crear_dependencia'""")
+        assert cur.fetchone()["n"] == 1, "el rechazo previo no cuenta como ejecución"
