@@ -82,3 +82,21 @@ def test_cual_como_subcadena_de_cualquier_no_cuenta():
     assert not pide_elegir_en_imperativo("Decime cualquier novedad.")
     assert not pide_elegir_en_imperativo("Contame cualquiera de las dos.")
     assert not hace_pregunta("Decime cualquier novedad.")
+
+
+def test_pregunta_que_termina_con_una_url_sigue_contando():
+    # El "?" pegado al final de una URL es el de la pregunta, no parte de la
+    # URL: descartar la URL no puede llevarse el signo que cierra la frase.
+    assert hace_pregunta("¿Te paso el link del tablero https://ejemplo.com/tablero?")
+    assert hace_pregunta("Te paso el link https://ejemplo.com/tablero?")
+
+
+def test_signo_de_apertura_solo_tambien_cuenta():
+    assert hace_pregunta("¿Te lo anoto para mañana")
+
+
+def test_palabras_dentro_de_una_url_no_cuentan_como_pedido_de_eleccion():
+    # Las URLs se descartan para las dos señales, no sólo para el "?": un
+    # camino como ".../elegi/..." o ".../cual" no es un pedido de elección.
+    assert not hace_pregunta("Decime si sirve: https://ejemplo.com/elegi/cual")
+    assert not pide_elegir_en_imperativo("Mirá https://ejemplo.com/elegi")
