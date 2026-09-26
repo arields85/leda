@@ -8,6 +8,7 @@ from __future__ import annotations
 from tests.banco.comprobadores import (
     Evidencia,
     ResultadoComprobacion,
+    comprobaciones_pregunta_con_opciones,
     comprobar_accion_sin_herramienta,
     comprobar_aclaracion,
     comprobar_contenido,
@@ -801,6 +802,32 @@ def test_pregunta_con_opciones_no_le_importa_si_actuo():
                    herramientas_ejecutadas=("actualizar_estado",))
     r = comprobar_pregunta_con_opciones(ev)
     assert r.resultado == "falla"
+
+
+# ---------------------------------------------------------------------------
+# comprobaciones_pregunta_con_opciones (T4, `prisma-orienta`, ADR 0007): la
+# puerta de opt-out en un sólo lugar, revisión del orquestador 2026-09-26 --
+# `test_banco.py` y `test_replays.py` la llaman igual; acá se prueba la
+# puerta sola, de punta a punta contra los dos valores del campo se prueba
+# en `test_replays.py` (con una corrida real de `ejecutar_escenario`).
+# ---------------------------------------------------------------------------
+
+
+def test_comprobaciones_pregunta_con_opciones_activa_por_defecto_devuelve_la_comprobacion():
+    ev = Evidencia(respuesta_texto="¿Cuál de las dos tareas es?",
+                   herramientas_ejecutadas=())
+    comprobaciones = comprobaciones_pregunta_con_opciones(
+        ev, permite_pregunta_sin_opciones=False)
+    assert [c.nombre for c in comprobaciones] == ["pregunta_con_opciones"]
+    assert comprobaciones[0].resultado == "falla"
+
+
+def test_comprobaciones_pregunta_con_opciones_desactivada_no_agrega_nada():
+    ev = Evidencia(respuesta_texto="¿Cuál de las dos tareas es?",
+                   herramientas_ejecutadas=())
+    comprobaciones = comprobaciones_pregunta_con_opciones(
+        ev, permite_pregunta_sin_opciones=True)
+    assert comprobaciones == []
 
 
 # ---------------------------------------------------------------------------

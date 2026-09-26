@@ -10,9 +10,11 @@ from __future__ import annotations
 import json
 
 from prisma.db import admin
+from prisma.llm import IntentAction, IntentRoute, ProveedorGuionado, Respuesta
 
 from tests.banco.comprobadores import (
     Evidencia,
+    comprobaciones_pregunta_con_opciones,
     comprobar_accion_sin_herramienta,
     comprobar_aclaracion,
     comprobar_contenido,
@@ -20,7 +22,6 @@ from tests.banco.comprobadores import (
     comprobar_herramientas,
     comprobar_personas_mencionadas,
     comprobar_pregunta,
-    comprobar_pregunta_con_opciones,
     comprobar_sin_efectos_antes_de_confirmar,
     resultado_general,
 )
@@ -95,9 +96,11 @@ def test_replay_reproduce_el_resultado_esperado(archivo_replay, corework, conn):
             herramientas_antes_del_toque=resultado.herramientas_antes_del_toque),
     ]
     # ADR 0007 ("Prisma orienta, no charla"), T4: mismo criterio que
-    # `test_banco.py` -- activa por defecto, opt-out explícito por escenario.
-    if not escenario.permite_pregunta_sin_opciones:
-        comprobaciones.append(comprobar_pregunta_con_opciones(evidencia))
+    # `test_banco.py` -- activa por defecto, opt-out explícito por escenario
+    # (`comprobaciones_pregunta_con_opciones`, una sola implementación de la
+    # puerta para los dos llamadores reales).
+    comprobaciones.extend(comprobaciones_pregunta_con_opciones(
+        evidencia, permite_pregunta_sin_opciones=escenario.permite_pregunta_sin_opciones))
     if escenario.debe_preguntar:
         comprobaciones.append(comprobar_pregunta(
             evidencia, task_draft_delta=efectos_observados["conteos_delta"].get("task_draft", 0),
@@ -111,3 +114,58 @@ def test_replay_reproduce_el_resultado_esperado(archivo_replay, corework, conn):
     assert veredicto == datos["resultado_esperado"], (
         f"esperado {datos['resultado_esperado']!r}, obtuve {veredicto!r} -- "
         f"comprobaciones: {[(c.nombre, c.resultado, c.diferencia) for c in comprobaciones]}")
+
+
+# ---------------------------------------------------------------------------
+# Puerta de opt-out de `comprobar_pregunta_con_opciones` (T4, ADR 0007),
+# de punta a punta (revisión del orquestador, 2026-09-26): antes de esto,
+# `permite_pregunta_sin_opciones` sólo tenía prueba de que se parsea bien
+# (`test_escenario.py`) y de que `comprobar_pregunta_con_opciones` funciona
+# sola (`test_comprobadores.py`) -- nada ejercitaba la puerta en sí, sobre
+# una corrida real de `ejecutar_escenario`, con los dos valores del campo.
+# No se fabrica un replay "real" para esto (mismo criterio que T4 con
+# `b-0016`-`b-0018`: un replay representa una corrida ya evaluada de verdad);
+# en cambio, corre un `ProveedorGuionado` directo -- sin red, en la suite por
+# defecto -- contra `comprobaciones_pregunta_con_opciones`, la función que
+# este archivo y `test_banco.py` llaman de verdad.
+# ---------------------------------------------------------------------------
+
+
+def _corrida_pregunta_en_texto_abierto(conn, ws: str, escenario_id: str):
+    """Una respuesta que pregunta en texto abierto, sin ofrecer opciones con
+    botones ni ejecutar ninguna herramienta -- el caso que
+    `comprobar_pregunta_con_opciones` marca `falla` cuando la puerta está
+    activa."""
+    interno = ProveedorGuionado(
+        guion=[Respuesta(texto="Tenés dos pendientes. ¿Cuál mirás primero?")],
+        rutas=[IntentRoute(IntentAction.NORMAL_CONVERSATION)],
+    )
+    resultado = ejecutar_escenario(
+        conn, ws, "corework", "Marcos Tarquini",
+        ["tengo dos cosas pendientes, no se por cual arrancar"], interno,
+        escenario_id=escenario_id, indice=0)
+    assert resultado.bloqueado is False, resultado.motivo_bloqueo
+    return Evidencia(
+        respuesta_texto=resultado.respuesta_texto,
+        herramientas_ejecutadas=tuple(resultado.herramientas_ejecutadas),
+        ofrecio_opciones=resultado.ofrecio_opciones)
+
+
+def test_permite_pregunta_sin_opciones_deja_pasar_una_pregunta_en_texto_abierto(
+        corework, conn):
+    evidencia = _corrida_pregunta_en_texto_abierto(
+        conn, corework.workspace_id, "b-test-gate-permitida")
+    comprobaciones = comprobaciones_pregunta_con_opciones(
+        evidencia, permite_pregunta_sin_opciones=True)
+    assert comprobaciones == []
+    assert resultado_general(comprobaciones) == "aprobado"
+
+
+def test_pregunta_con_opciones_activa_por_defecto_falla_la_misma_corrida(
+        corework, conn):
+    evidencia = _corrida_pregunta_en_texto_abierto(
+        conn, corework.workspace_id, "b-test-gate-activada")
+    comprobaciones = comprobaciones_pregunta_con_opciones(
+        evidencia, permite_pregunta_sin_opciones=False)
+    assert [c.nombre for c in comprobaciones] == ["pregunta_con_opciones"]
+    assert resultado_general(comprobaciones) == "falla"

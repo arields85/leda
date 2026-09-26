@@ -33,6 +33,7 @@ from prisma.db import admin
 
 from tests.banco.comprobadores import (
     Evidencia,
+    comprobaciones_pregunta_con_opciones,
     comprobar_accion_sin_herramienta,
     comprobar_aclaracion,
     comprobar_contenido,
@@ -40,7 +41,6 @@ from tests.banco.comprobadores import (
     comprobar_herramientas,
     comprobar_personas_mencionadas,
     comprobar_pregunta,
-    comprobar_pregunta_con_opciones,
     comprobar_sin_efectos_antes_de_confirmar,
     resultado_general,
 )
@@ -121,9 +121,11 @@ def test_escenario_contra_modelo_real(
     # ADR 0007 ("Prisma orienta, no charla"), T4: activa por defecto para
     # todo escenario -- `permite_pregunta_sin_opciones` es el opt-out
     # explícito de un escenario legado que necesite seguir pasando con una
-    # pregunta en texto abierto sin botones.
-    if not escenario.permite_pregunta_sin_opciones:
-        comprobaciones.append(comprobar_pregunta_con_opciones(evidencia))
+    # pregunta en texto abierto sin botones
+    # (`comprobaciones_pregunta_con_opciones`, una sola implementación de la
+    # puerta para los dos llamadores reales).
+    comprobaciones.extend(comprobaciones_pregunta_con_opciones(
+        evidencia, permite_pregunta_sin_opciones=escenario.permite_pregunta_sin_opciones))
     if escenario.debe_preguntar:
         comprobaciones.append(comprobar_pregunta(
             evidencia, task_draft_delta=efectos_observados["conteos_delta"].get("task_draft", 0),

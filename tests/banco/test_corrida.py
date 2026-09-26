@@ -18,6 +18,7 @@ from prisma.db import admin, espacio
 from prisma.jev import ClienteJevGuionado
 from prisma.llm import IntentAction, IntentRoute, Llamada, ProveedorGuionado, Respuesta
 
+from tests.banco.comprobadores import comprobar_aclaracion
 from tests.banco.corrida import (
     JevGrabador,
     ProveedorGrabador,
@@ -754,6 +755,125 @@ def test_ejecutar_escenario_sin_aclaracion_esperada_no_junta_etiquetas(corework,
 
 
 # ---------------------------------------------------------------------------
+# aclaracion_esperada reconoce `ofrecer_opciones` del modelo (T1, ADR 0007),
+# no sólo la aclaración con botones de siempre (revisión del orquestador,
+# T4, 2026-09-26): una corrida real (b-0013) donde el modelo resolvió una
+# referencia ambigua ofreciendo las dos tareas con `ofrecer_opciones` -- el
+# comportamiento correcto -- quedaba marcada `falla` en `aclaracion` porque
+# el corredor nunca la tapeaba.
+# ---------------------------------------------------------------------------
+
+
+def test_ejecutar_escenario_opciones_modelo_ofrece_tareas_y_tapea_para_actualizar_estado(
+        corework, conn):
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        ids = sembrar_precondiciones(cur, ws, {
+            "tareas": [
+                {"id": "t1", "titulo": "Actualizar el dashboard de HMI (simulado)",
+                 "area": "ot", "responsable": "Marcos Tarquini"},
+                {"id": "t2", "titulo": "Revisar gráficos del dashboard HMI (simulado)",
+                 "area": "ot", "responsable": "Marcos Tarquini"},
+            ],
+        })
+    tid_a, tid_b = ids["t1"], ids["t2"]
+
+    interno = ProveedorGuionado(
+        guion=[
+            Respuesta(llamadas=[Llamada("c1", "ofrecer_opciones", {
+                "pregunta": "¿Cuál de las dos tareas del dashboard paso a revisión?",
+                "opciones": [{"tarea_id": tid_a}, {"tarea_id": tid_b}]})]),
+            Respuesta(texto="Ya te mostré las opciones."),
+            Respuesta(llamadas=[Llamada(
+                       "c2", "actualizar_estado",
+                       {"tarea_id": tid_a, "estado": "en_revision"})]),
+            Respuesta(texto="listo"),
+        ],
+        rutas=[IntentRoute(IntentAction.NORMAL_CONVERSATION)],
+    )
+
+    r = ejecutar_escenario(
+        conn, ws, "corework", "Marcos Tarquini",
+        ["ya arregle lo del dashboard, pasalo a revision"], interno,
+        escenario_id="b-test-opciones-modelo-aclaracion", indice=0,
+        aclaracion_esperada={
+            "candidatas": ["Actualizar el dashboard de HMI (simulado)",
+                          "Revisar gráficos del dashboard HMI (simulado)"],
+            "elegir": "Actualizar el dashboard de HMI (simulado)"})
+
+    assert r.bloqueado is False, r.motivo_bloqueo
+    assert set(r.etiquetas_aclaracion_ofrecidas) == {
+        "Actualizar el dashboard de HMI (simulado)",
+        "Revisar gráficos del dashboard HMI (simulado)"}
+    assert comprobar_aclaracion(
+        r.etiquetas_aclaracion_ofrecidas,
+        candidatas_esperadas=["Actualizar el dashboard de HMI (simulado)",
+                              "Revisar gráficos del dashboard HMI (simulado)"],
+    ).resultado == "aprobado"
+    # El tap sobre la opción de tarea retomó la conversación con el modelo
+    # (`gateway._resolver_toque_opcion_modelo`) y llegó a ejecutar la
+    # herramienta esperada, con la vista previa de siempre confirmada sola.
+    assert r.herramientas_ejecutadas == ["actualizar_estado"]
+    assert r.herramientas_antes_del_toque == ()
+
+    with admin(conn) as cur:
+        cur.execute("select estado from task where id = %s", (tid_a,))
+        assert cur.fetchone()["estado"] == "en_revision"
+
+
+def test_ejecutar_escenario_opcion_de_texto_no_cuenta_como_tarea_ofrecida(
+        corework, conn):
+    """La otra mitad de la corrida real b-0013: el modelo ofreció una tarea
+    por `tarea_id` (cuenta) y la otra por `texto` (no cuenta, aunque nombre
+    la tarea) -- `comprobar_aclaracion` sigue marcando `falla` para la que
+    sólo se nombró en texto, porque el servidor no puede resolverla como esa
+    tarea."""
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        ids = sembrar_precondiciones(cur, ws, {
+            "tareas": [
+                {"id": "t1", "titulo": "Actualizar el dashboard de HMI (simulado)",
+                 "area": "ot", "responsable": "Marcos Tarquini"},
+                {"id": "t2", "titulo": "Revisar gráficos del dashboard HMI (simulado)",
+                 "area": "ot", "responsable": "Marcos Tarquini"},
+            ],
+        })
+    tid_a = ids["t1"]
+
+    interno = ProveedorGuionado(
+        guion=[
+            Respuesta(llamadas=[Llamada("c1", "ofrecer_opciones", {
+                "pregunta": "¿Cuál de las dos tareas del dashboard paso a revisión?",
+                "opciones": [
+                    {"tarea_id": tid_a,
+                     "etiqueta": "Actualizar el dashboard de HMI (simulado)"},
+                    {"texto": "Revisar gráficos del dashboard HMI (simulado)"}]})]),
+            Respuesta(texto="Ya te mostré las opciones."),
+        ],
+        rutas=[IntentRoute(IntentAction.NORMAL_CONVERSATION)],
+    )
+
+    r = ejecutar_escenario(
+        conn, ws, "corework", "Marcos Tarquini",
+        ["ya arregle lo del dashboard, pasalo a revision"], interno,
+        escenario_id="b-test-opciones-modelo-texto-no-cuenta", indice=0,
+        aclaracion_esperada={
+            "candidatas": ["Actualizar el dashboard de HMI (simulado)",
+                          "Revisar gráficos del dashboard HMI (simulado)"],
+            "elegir": "Actualizar el dashboard de HMI (simulado)"})
+
+    assert r.bloqueado is False, r.motivo_bloqueo
+    assert r.etiquetas_aclaracion_ofrecidas == (
+        "Actualizar el dashboard de HMI (simulado)",)
+    resultado = comprobar_aclaracion(
+        r.etiquetas_aclaracion_ofrecidas,
+        candidatas_esperadas=["Actualizar el dashboard de HMI (simulado)",
+                              "Revisar gráficos del dashboard HMI (simulado)"])
+    assert resultado.resultado == "falla"
+    assert "Revisar gráficos del dashboard HMI (simulado)" in resultado.diferencia
+
+
+# ---------------------------------------------------------------------------
 # _resolver_opcion_toque (T4, `prisma-orienta`): resuelve un toque genérico
 # de escenario contra las opciones REALES de la propuesta vigente -- nunca
 # inventa un token.
@@ -814,6 +934,40 @@ def test_pendiente_actual_sin_ninguna_pendiente_es_none(corework, conn):
     with espacio(conn, ws) as cur:
         _, tg = _quien(cur, ws)
         assert _pendiente_actual(cur, ws, tg) is None
+
+
+def test_pendiente_actual_desempata_por_orden_de_insercion_con_creado_en_igual(
+        corework, conn):
+    """Revisión del orquestador (T4, 2026-09-26, `corrida.py:467-471`): dos
+    `pending_action` 'esperando' creadas en la MISMA transacción comparten
+    `creado_en` (`now()` es constante dentro de una transacción) -- el
+    desempate tiene que elegir la segunda (la última insertada), no
+    cualquiera de las dos al azar."""
+    ws = corework.workspace_id
+    with espacio(conn, ws) as cur:
+        quien, tg = _quien(cur, ws)
+        primera = P.registrar(
+            cur, quien, herramienta=P.SENTINEL_MENU_TAREA, args={},
+            resumen="¿Cuál de las dos, primera?",
+            vence_en=datetime.now(timezone.utc) + timedelta(hours=1),
+            campo="eleccion", chat_id=tg,
+            opciones=[("Primera", {"accion": "a"})])
+        segunda = P.registrar(
+            cur, quien, herramienta=P.SENTINEL_MENU_TAREA, args={},
+            resumen="¿Cuál de las dos, segunda?",
+            vence_en=datetime.now(timezone.utc) + timedelta(hours=1),
+            campo="eleccion", chat_id=tg,
+            opciones=[("Segunda", {"accion": "b"})])
+
+        # Las dos comparten `creado_en`: son la misma transacción.
+        cur.execute(
+            "select count(distinct creado_en) n from pending_action "
+            "where id in (%s, %s)", (primera.id, segunda.id))
+        assert cur.fetchone()["n"] == 1
+
+        encontrada = _pendiente_actual(cur, ws, tg)
+
+    assert encontrada == segunda.id
 
 
 # ---------------------------------------------------------------------------

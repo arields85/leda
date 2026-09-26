@@ -537,6 +537,26 @@ def comprobar_pregunta_con_opciones(evidencia: Evidencia) -> ResultadoComprobaci
         f"0007, prisma-orienta): {evidencia.respuesta_texto!r}")
 
 
+def comprobaciones_pregunta_con_opciones(
+        evidencia: Evidencia, *, permite_pregunta_sin_opciones: bool,
+) -> list[ResultadoComprobacion]:
+    """La puerta de opt-out (T4, ADR 0007) en un sólo lugar: activa por
+    defecto (`permite_pregunta_sin_opciones=False` -> corre
+    `comprobar_pregunta_con_opciones`), desactivada para un escenario legado
+    que lo declare explícitamente (`permite_pregunta_sin_opciones=True` ->
+    lista vacía, no se agrega ninguna comprobación). Antes de esta función,
+    `test_banco.py` y `test_replays.py` repetían el mismo `if
+    not escenario.permite_pregunta_sin_opciones: comprobaciones.append(...)`
+    -- revisión del orquestador (T4, 2026-09-26): la puerta en sí no tenía
+    ninguna prueba de punta a punta que la ejercitara con los dos valores del
+    campo, sólo el comprobador solo (`test_comprobadores.py`) y el parseo
+    del campo solo (`test_escenario.py`). Extraída para que la puerta tenga
+    una sola implementación, comprobable directamente."""
+    if permite_pregunta_sin_opciones:
+        return []
+    return [comprobar_pregunta_con_opciones(evidencia)]
+
+
 # ---------------------------------------------------------------------------
 # 7. Aclaración con botones (T6, `aclaracion-con-botones`): una referencia
 # ambigua tiene que ofrecer, entre sus botones, las candidatas que el

@@ -1429,6 +1429,174 @@ cada commit con código pasa por la evaluación de RDD.
     (`gateway.py:270,289,553`, `reloj.py:93`, `escalera.py:319`, `onboarding.py:188`,
     `agente.py:356,544`) encolan un único mensaje, sin seguimiento.
   `nan` volvió a responder (06:24Z; chat 200 con la clave real); banco real en curso.
+- 2026-09-26: **Tres correcciones del banco (falsos rechazos de `ofrecer_opciones`,
+  desempate de `_pendiente_actual`, puerta de `permite_pregunta_sin_opciones` sin
+  prueba de punta a punta).** Ruta: delegada, un escritor (disparador de mapeo:
+  código y pruebas del banco en `tests/banco/` -- `corrida.py`, `comprobadores.py`,
+  `test_corrida.py`, `test_replays.py`, `test_banco.py`, `test_comprobadores.py`).
+  Sólo `tests/banco/`; ningún cambio de esquema ni de `src/`.
+
+  **1. El comprobador y el corredor ignoraban las opciones que ofrece el modelo
+  (falsos rechazos).** Corrida real `tests/banco/reportes/banco-20260926T112553Z.json`,
+  escenario `b-0013` (2/3 falló). "lo del dashboard" es ambiguo entre dos tareas
+  sembradas; en las corridas que fallaron el MODELO llamó `ofrecer_opciones`
+  ofreciendo las dos tareas como botones (comportamiento correcto, ADR 0007), pero
+  `comprobar_aclaracion` marcaba "no ofreció botón para [...] (ofrecidas: [])" porque
+  sólo reconocía la aclaración con botones del servidor (`_SENTINEL_ACLARACION`), y el
+  corredor nunca tapeaba la elección del modelo (`pendientes.SENTINEL_OPCIONES_MODELO`),
+  así que `actualizar_estado` nunca corría. Evidencia de la forma real del problema:
+  `tests/banco/reportes/replay-candidato-b-0013-0.json` grabó al modelo ofreciendo una
+  tarea por `tarea_id` (etiqueta propia, sin el sufijo "(simulado)" del título real) y
+  la otra por `texto` (nombra la tarea pero no la resuelve); `replay-candidato-b-0013-2.json`
+  grabó al modelo ofreciendo las DOS por `tarea_id` -- el caso que tiene que aprobar.
+
+  Archivos: `tests/banco/corrida.py` (`_aclaracion_para_elegir` reconoce ahora
+  cualquiera de las dos formas -- devuelve `(pending_action_id, herramienta)` en vez de
+  sólo el id --, `_opciones_pendiente` trae también `valor`, y el bloque de
+  `ejecutar_escenario` que arma `etiquetas_aclaracion_ofrecidas` y decide qué tapear
+  distingue el mecanismo); `tests/banco/test_corrida.py` (dos pruebas nuevas).
+
+  Decisiones:
+  - **Match por título (`valor.titulo`), no por la etiqueta del botón.** La corrida
+    real mostró por qué: el modelo puso una etiqueta propia ("Actualizar el dashboard
+    de HMI", sin "(simulado)") para una opción de tarea -- si el corredor comparara por
+    etiqueta, no reconocería esa tarea contra `aclaracion_esperada.candidatas` (siempre
+    títulos completos). `valor.titulo` es el título real que `ofrecer_opciones` ya
+    validó contra PostgreSQL (`herramientas._tareas_activas_por_id`), sin depender de
+    qué etiqueta haya elegido el modelo.
+  - **Una opción de `texto` que sólo nombra la tarea no cuenta como ofrecida.** Tal
+    cual lo pidió el enunciado: el servidor sólo puede resolver una opción de tarea
+    real (`tipo: "tarea"`, con `tarea_id` validado); una opción de `texto` sigue siendo
+    un botón tocable (retoma la conversación con ese texto), pero no es prueba de que
+    el servidor haya reconocido esa tarea, así que no cuenta para
+    `etiquetas_aclaracion_ofrecidas` ni es candidata a tapear como "elegir".
+  - **`comprobar_aclaracion` no cambió.** Toda la corrección vive en cómo
+    `corrida.py` arma `etiquetas_aclaracion_ofrecidas` -- el comprobador sigue
+    comparando una lista de strings contra `candidatas_esperadas`, sin saber de
+    mecanismos ni de tipos de opción.
+  - **No se agregó el replay real de b-0013 a `tests/banco/replays/`.** Se
+    consideró, tal como sugiere el enunciado. Se descartó: el guión grabado de
+    `replay-candidato-b-0013-2.json` (el caso que ofrece las dos tareas por `tarea_id`)
+    tiene sólo dos respuestas del proveedor -- las que se usaron para llegar a
+    `ofrecer_opciones` -- porque en la corrida real nunca se tapeó nada. Para un replay
+    de punta a punta que además pruebe que el tap llega a `actualizar_estado` hacen
+    falta más respuestas grabadas (las del turno que retoma tras el toque), que esa
+    corrida real jamás produjo. Un archivo de replay tiene que representar una corrida
+    ya evaluada de verdad (T4, mismo criterio ya usado con `b-0016`-`b-0018`); en vez
+    de fabricar las respuestas faltantes, las dos pruebas nuevas usan un
+    `ProveedorGuionado` propio con guión completo.
+
+  RED (`git stash push -- tests/banco/corrida.py`, con las pruebas ya escritas):
+  `tests/banco/test_corrida.py -k "opciones_modelo_ofrece or texto_no_cuenta"` ->
+  `2 failed` -- las dos por el motivo esperado (`etiquetas_aclaracion_ofrecidas`
+  vacío: el corredor no reconocía la elección del modelo). `git stash pop` restauró
+  la implementación.
+
+  GREEN:
+  - `tests/banco/test_corrida.py -k "opciones_modelo_ofrece or texto_no_cuenta"` ->
+    `2 passed`.
+  - `tests/banco/test_corrida.py` completo -> `47 passed`.
+  - `tests/banco` -> `189 passed, 108 deselected`.
+
+  **2. `_pendiente_actual` sin desempate (hallazgo del orquestador,
+  `tests/banco/corrida.py:467-471`).** `order by creado_en desc limit 1` no desata un
+  empate: dos `pending_action` 'esperando' creadas en la MISMA transacción comparten
+  `creado_en` (`now()` de Postgres es constante dentro de una transacción) -- puede
+  pasar si un turno del modelo llama a dos herramientas y cada una deja su propia
+  acción pendiente. Verificado que el hallazgo es real, no sólo teórico: una prueba que
+  fuerza el empate y corre contra el código sin corregir devuelve la PRIMERA acción en
+  vez de la segunda (ver RED abajo).
+
+  Archivos: `tests/banco/corrida.py` (`_pendiente_actual` agrega `ctid desc` como
+  segundo criterio de orden); `tests/banco/test_corrida.py` (una prueba nueva).
+
+  Decisión: **desempatar por `ctid`, no por una columna nueva.** Sin cambio de
+  esquema (fuera de alcance), ninguna columna existente de `pending_action` sirve:
+  `id` es un UUID aleatorio (`gen_random_uuid()`, sin orden), y el `xmin` de la
+  transacción es igual para las dos filas (es la misma transacción). `ctid` -- la
+  posición física de la fila -- sí crece con el orden real de inserción dentro de una
+  misma transacción; alcanza para el banco porque corre en serie, sin otra transacción
+  escribiendo la tabla al mismo tiempo -- no es una garantía general de Postgres bajo
+  escritura concurrente, pero el banco nunca la tiene. Se consideró "la acción
+  referenciada por el mensaje más reciente en `message_outbox`" (sugerido en el
+  enunciado): se descartó porque `message_outbox.programado_para` tiene el mismo
+  problema (también `now()` de la misma transacción) y `message_outbox.id` es otro
+  UUID aleatorio -- no resuelve el empate, sólo lo traslada a otra tabla.
+
+  RED (`git stash push -- tests/banco/corrida.py`, con la prueba ya escrita, que
+  registra dos `pending_action` 'esperando' en la misma transacción y confirma que
+  comparten `creado_en` antes de comprobar cuál devuelve `_pendiente_actual`):
+  `tests/banco/test_corrida.py -k desempata_por_orden` -> `1 failed` -- devolvía la
+  primera acción registrada, no la segunda (reproducción real del empate, no
+  simulada). `git stash pop` restauró la implementación. Repetida 5 veces en soledad
+  tras la corrección: estable, sin parpadeo.
+
+  GREEN:
+  - `tests/banco/test_corrida.py -k desempata_por_orden` -> `1 passed` (x5, sin
+    parpadeo).
+  - `tests/banco` -> `190 passed, 108 deselected`.
+
+  **3. Puerta de `permite_pregunta_sin_opciones` sin prueba de punta a punta
+  (hallazgo del orquestador, `tests/banco/test_replays.py:97-100`).** El campo tenía
+  prueba de que se parsea bien (`test_escenario.py`) y `comprobar_pregunta_con_opciones`
+  tenía prueba sola (`test_comprobadores.py`), pero nada ejercitaba la puerta
+  (`if not escenario.permite_pregunta_sin_opciones: comprobaciones.append(...)`,
+  repetida igual en `test_banco.py` y `test_replays.py`) sobre una corrida real de
+  `ejecutar_escenario`, con los dos valores del campo.
+
+  Archivos: `tests/banco/comprobadores.py` (`comprobaciones_pregunta_con_opciones`,
+  nueva -- la puerta en una sola función, para que tenga una sola implementación
+  comprobable); `tests/banco/test_replays.py` y `tests/banco/test_banco.py` (los dos
+  llamadores reales pasan a usarla, mismo comportamiento); `tests/banco/test_replays.py`
+  (dos pruebas de punta a punta nuevas, con `ProveedorGuionado`); `tests/banco/test_comprobadores.py`
+  (dos pruebas unitarias nuevas de la función).
+
+  Decisiones:
+  - **Extraer la puerta en vez de duplicar la prueba.** `test_banco.py` (marcador
+    `modelo_real`, fuera de la suite por defecto) y `test_replays.py` repetían el
+    mismo `if`/`append` -- probarlo sólo en un test propio, sin tocar ese código, no
+    hubiera probado que los llamadores reales lo usan bien. Extraída a
+    `comprobaciones_pregunta_con_opciones(evidencia, *, permite_pregunta_sin_opciones)`,
+    los dos llamadores la usan igual y la prueba de punta a punta corre contra la
+    función real.
+  - **Sin replay fabricado.** Mismo criterio que el punto 1 y que T4 con
+    `b-0016`-`b-0018`: un replay representa una corrida ya evaluada de verdad. Las
+    pruebas de punta a punta corren un `ProveedorGuionado` directo (sin red, en la
+    suite por defecto) contra una respuesta que pregunta en texto abierto sin botones,
+    y comparan `comprobaciones_pregunta_con_opciones` con los dos valores del campo.
+  - **Comprobación por mutación, no sólo RED/GREEN.** La puerta ya funcionaba bien
+    (hallazgo de cobertura, no de comportamiento) -- las pruebas nuevas pasaron ya en
+    su primera corrida. Para probar que de verdad hubieran atrapado una puerta rota,
+    se invirtió la condición de `comprobaciones_pregunta_con_opciones` a propósito, se
+    confirmó que las dos pruebas nuevas fallan, y se restauró la función.
+
+  RED: no aplica -- la puerta ya era correcta (hallazgo de cobertura). Mutación
+  temporal (`if permite_pregunta_sin_opciones` invertido en
+  `comprobaciones_pregunta_con_opciones`): `tests/banco/test_replays.py -k
+  "permite_pregunta or pregunta_con_opciones_activa"` -> `2 failed` (las dos nuevas,
+  por el motivo esperado). Función restaurada.
+
+  GREEN:
+  - `tests/banco/test_replays.py` -> `3 passed`.
+  - `tests/banco/test_comprobadores.py` -> `92 passed`.
+  - `tests/banco/test_banco.py --collect-only` -> recolecta sin error de import (108
+    deselected, `modelo_real`; no se pudo correr contra el modelo real, fuera de
+    alcance de esta unidad).
+  - `tests/banco` -> `194 passed, 108 deselected`.
+
+  **Verificación final (suite completa):**
+  `.venv/Scripts/python.exe -m pytest -q` -> `829 passed, 108 deselected` (línea base
+  822 + 7 pruebas nuevas: 2 del punto 1, 1 del punto 2, 2+2 del punto 3), 221s.
+
+  Abierto:
+  - Ninguna de las tres correcciones tocó `src/` ni el esquema -- las tres eran
+    defectos/huecos del arnés de pruebas del banco, no del producto.
+  - El desempate por `ctid` (punto 2) es válido para el banco (corre en serie); si
+    algún día el banco corre corridas en paralelo sobre el mismo chat, hay que
+    revisarlo -- no es el caso hoy (`--banco-n` corre corridas secuenciales por
+    escenario).
+  - `test_banco.py` (punto 3) no se pudo ejecutar contra el modelo real en esta
+    unidad (fuera del pedido: sólo se verificó que sigue recolectando).
 - **Próximo paso al retomar:** resultado del banco real; corregir las dos observaciones
   pendientes del banco; después T5.
 

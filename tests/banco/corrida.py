@@ -435,24 +435,36 @@ def _pendiente_para_confirmar(cur, workspace_id: str, chat_id: int) -> tuple[str
     return pid, opcion.token
 
 
-def _aclaracion_para_elegir(cur, workspace_id: str, chat_id: int) -> str | None:
-    """La aclaración con botones (T4/T6, `aclaracion-con-botones`) que este
-    turno dejó esperando una elección -- `None` si la referencia no resultó
-    ambigua con candidatas (clara, ninguna, o Jev caído: T3 sigue tratando
-    esos casos en texto, sin botones que tocar acá)."""
+def _aclaracion_para_elegir(cur, workspace_id: str, chat_id: int) -> tuple[str, str] | None:
+    """La referencia ambigua que este turno dejó esperando una elección con
+    botones, por cualquiera de las dos formas en que Prisma la ofrece (T4,
+    revisión del orquestador 2026-09-26): la aclaración con botones de
+    siempre (T6, `aclaracion-con-botones`, `gateway._SENTINEL_ACLARACION`) o
+    una elección del modelo por `ofrecer_opciones` (T1, ADR 0007,
+    `pendientes.SENTINEL_OPCIONES_MODELO`) que ofreció las mismas tareas
+    como botones. Antes de esta corrección el corredor sólo reconocía la
+    primera -- una corrida real (b-0013, 2026-09-26) donde el modelo
+    resolvió la ambigüedad con `ofrecer_opciones` (comportamiento correcto,
+    ADR 0007) quedaba con `comprobar_aclaracion` marcando "no ofreció botón"
+    (ofrecidas: []) y sin tocar nada, porque el corredor nunca tapeaba esa
+    forma.
+
+    Devuelve `(pending_action_id, herramienta)`, o `None` si la referencia
+    no resultó ambigua con candidatas (clara, ninguna, o Jev caído: T3 sigue
+    tratando esos casos en texto, sin botones que tocar acá)."""
     cur.execute(
-        """select id from pending_action
-            where workspace_id = %s and chat_id = %s and herramienta = %s
+        """select id, herramienta from pending_action
+            where workspace_id = %s and chat_id = %s and herramienta in (%s, %s)
               and estado = 'esperando'
             order by creado_en desc limit 1""",
-        (workspace_id, chat_id, gateway._SENTINEL_ACLARACION))
+        (workspace_id, chat_id, gateway._SENTINEL_ACLARACION, P.SENTINEL_OPCIONES_MODELO))
     fila = cur.fetchone()
-    return str(fila["id"]) if fila else None
+    return (str(fila["id"]), fila["herramienta"]) if fila else None
 
 
 def _opciones_pendiente(cur, pending_action_id: str) -> list[dict]:
     cur.execute(
-        """select token, etiqueta from pending_action_option
+        """select token, etiqueta, valor from pending_action_option
             where pending_action_id = %s order by orden""",
         (pending_action_id,))
     return cur.fetchall()
@@ -463,11 +475,26 @@ def _pendiente_actual(cur, workspace_id: str, chat_id: int) -> str | None:
     la armó -- lo que un toque genérico de escenario (T4, `Escenario.toques`)
     resuelve contra la propuesta REAL que dejó el turno anterior (una lista
     de tareas de T3, un menú de T2, una vista previa de siempre), nunca
-    contra un token inventado."""
+    contra un token inventado.
+
+    Desempate por `ctid` (revisión del orquestador, T4, 2026-09-26): dos
+    `pending_action` 'esperando' creadas en la MISMA transacción comparten
+    `creado_en` -- `now()` de Postgres es constante dentro de una
+    transacción -- así que `order by creado_en desc` solo no alcanza para
+    elegir "la última" entre las dos (puede pasar si un turno del modelo
+    llama a dos herramientas y cada una deja su propia acción pendiente).
+    Sin cambiar el esquema (fuera de alcance de esta corrección), ninguna
+    otra columna existente desata el empate: `id` es un UUID aleatorio, sin
+    orden, y el `xmin` de la transacción también es igual para las dos
+    filas. `ctid` (la posición física de la fila) sí crece con el orden real
+    de inserción dentro de una misma transacción -- alcanza acá porque el
+    banco corre en serie, sin otra transacción escribiendo esta tabla al
+    mismo tiempo; no es una garantía general de Postgres bajo escritura
+    concurrente, pero el banco nunca la tiene."""
     cur.execute(
         """select id from pending_action
             where workspace_id = %s and chat_id = %s and estado = 'esperando'
-            order by creado_en desc limit 1""",
+            order by creado_en desc, ctid desc limit 1""",
         (workspace_id, chat_id))
     fila = cur.fetchone()
     return str(fila["id"]) if fila else None
@@ -534,16 +561,23 @@ def ejecutar_escenario(
 
     `aclaracion_esperada` (T6), si viene, trae `{"candidatas": [...],
     "elegir": ...}` (`Escenario.aclaracion_esperada`): si el turno dejó una
-    aclaración con botones esperando (referencia ambigua con candidatas,
-    T4), el corredor la tapea -- por el mismo camino que un toque real de
-    Telegram, igual que ya hace con Confirmar -- para retomar el pedido
-    original hasta la vista previa de siempre, en vez de quedarse
-    preguntando. Las etiquetas que ofreció quedan en
+    referencia ambigua esperando que se elija una candidata, el corredor la
+    tapea -- por el mismo camino que un toque real de Telegram, igual que ya
+    hace con Confirmar -- para retomar el pedido original hasta la vista
+    previa de siempre, en vez de quedarse preguntando. Reconoce las DOS
+    formas en que Prisma puede dejarla esperando (revisión del orquestador,
+    T4, 2026-09-26): la aclaración con botones de siempre (T6) o una
+    elección del modelo por `ofrecer_opciones` (T1, ADR 0007) que ofreció
+    las mismas tareas como botones -- `_aclaracion_para_elegir`. Para la
+    segunda forma, sólo cuenta una opción de tarea (`tarea_id`, validada
+    contra PostgreSQL); una opción de texto que sólo nombra la tarea no
+    cuenta como ofrecida, porque el servidor no puede resolverla como esa
+    tarea. Las etiquetas (títulos) que sí contaron como ofrecidas quedan en
     `ResultadoCorrida.etiquetas_aclaracion_ofrecidas`, las compare o no el
     llamador (`comprobadores.comprobar_aclaracion`). Si la candidata a
-    elegir no aparece entre las opciones, no se tapea nada -- la corrida
-    sigue igual, sin adivinar cuál tocar, y la falta queda visible en las
-    etiquetas ofrecidas.
+    elegir no aparece entre las opciones que cuentan, no se tapea nada -- la
+    corrida sigue igual, sin adivinar cuál tocar, y la falta queda visible
+    en las etiquetas ofrecidas.
 
     `toques` (T4, `prisma-orienta`): una secuencia de botones genéricos a
     tocar, EN ORDEN, después de la aclaración con botones (si la hubo) y
@@ -613,18 +647,41 @@ def ejecutar_escenario(
         # de más en el medio, no sólo hasta acá.
         if aclaracion_esperada:
             with admin(conn) as cur:
-                pid_aclaracion = _aclaracion_para_elegir(cur, workspace_id, chat)
+                pendiente_aclaracion = _aclaracion_para_elegir(cur, workspace_id, chat)
                 opciones_aclaracion = (
-                    _opciones_pendiente(cur, pid_aclaracion)
-                    if pid_aclaracion is not None else [])
-            etiquetas_aclaracion_ofrecidas = [o["etiqueta"] for o in opciones_aclaracion]
-            objetivo = next(
-                (o for o in opciones_aclaracion
-                 if o["etiqueta"] == aclaracion_esperada.get("elegir")), None)
-            if objetivo is not None:
+                    _opciones_pendiente(cur, pendiente_aclaracion[0])
+                    if pendiente_aclaracion is not None else [])
+            es_opciones_modelo = (
+                pendiente_aclaracion is not None
+                and pendiente_aclaracion[1] == P.SENTINEL_OPCIONES_MODELO)
+            if es_opciones_modelo:
+                # T1 (ADR 0007): sólo una opción de tarea -- la que
+                # `ofrecer_opciones` validó contra PostgreSQL -- cuenta como
+                # la tarea ofrecida. Una opción de texto que sólo NOMBRA la
+                # tarea (b-0013, corrida real 2026-09-26: el modelo ofreció
+                # una tarea por `tarea_id` y la otra por `texto`) no cuenta:
+                # el servidor sólo puede resolver una opción de tarea, nunca
+                # adivinar que un texto libre significa la misma tarea. Se
+                # compara por título (`valor.titulo`, siempre el de la base),
+                # no por la etiqueta del botón: el modelo puede poner una
+                # etiqueta propia, más corta o distinta, para una opción de
+                # tarea (visto en la misma corrida real).
+                candidatas_ofrecidas = [
+                    (o["valor"]["titulo"], o["token"]) for o in opciones_aclaracion
+                    if isinstance(o.get("valor"), dict) and o["valor"].get("tipo") == "tarea"]
+                etiquetas_aclaracion_ofrecidas = [t for t, _ in candidatas_ofrecidas]
+                objetivo_token = next(
+                    (token for titulo, token in candidatas_ofrecidas
+                     if titulo == aclaracion_esperada.get("elegir")), None)
+            else:
+                etiquetas_aclaracion_ofrecidas = [o["etiqueta"] for o in opciones_aclaracion]
+                objetivo_token = next(
+                    (o["token"] for o in opciones_aclaracion
+                     if o["etiqueta"] == aclaracion_esperada.get("elegir")), None)
+            if objetivo_token is not None:
                 toque_aclaracion = {"callback_query": {
                     "id": "banco-aclaracion", "from": {"id": tg_id},
-                    "data": f"{P.CALLBACK_PREFIJO}{objetivo['token']}",
+                    "data": f"{P.CALLBACK_PREFIJO}{objetivo_token}",
                     "message": {"message_id": 2, "chat": {"id": chat}}}}
                 gateway.procesar_update(conn, slug, toque_aclaracion)
 
