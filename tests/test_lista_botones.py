@@ -17,6 +17,7 @@ Reusa el mismo mecanismo que T1/T2
 
 from __future__ import annotations
 
+import uuid
 from contextlib import nullcontext
 from datetime import datetime, timedelta, timezone
 
@@ -30,6 +31,7 @@ from prisma.autoridad import Canal, identificar
 from prisma.calendario import Calendario
 from prisma.db import admin, espacio
 from prisma.llm import Llamada, ProveedorGuionado, Respuesta
+from prisma.salida import BUTTON_TEXT_LIMIT, telegram_utf16_units
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -127,6 +129,16 @@ def _pendiente(cur, ws, herramienta) -> str:
             order by creado_en desc limit 1""",
         (ws, herramienta))
     return str(cur.fetchone()["id"])
+
+
+def _outbox(cur, ws, chat_id):
+    cur.execute(
+        """select cuerpo, pending_action_id, programado_para
+             from message_outbox
+            where workspace_id = %s and chat_id = %s
+            order by programado_para""",
+        (ws, chat_id))
+    return cur.fetchall()
 
 
 # ---------------------------------------------------------------------------
@@ -449,3 +461,155 @@ def test_ver_mas_nunca_muestra_una_tarea_de_otro_espacio(intake_world, conn):
         etiquetas = [f["etiqueta"] for f in _opciones(cur, pid)]
 
     assert etiquetas == ["Tarea del norte", P.ETIQUETA_SALIR_OPCIONES]
+
+
+# ---------------------------------------------------------------------------
+# T3a -- una respuesta larga no puede perder sus botones (revisión del
+# orquestador sobre T3: `salida.prepare_payload` nunca parte un mensaje con
+# botones y lo rechaza por encima de BUTTON_TEXT_LIMIT).
+# ---------------------------------------------------------------------------
+
+def test_lista_con_respuesta_larga_se_parte_y_los_botones_van_aparte(
+        conn, corework, monkeypatch):
+    """Antes de esta corrección, `_encolar_respuesta_con_tareas` mandaba el
+    texto del modelo JUNTO con los botones sin mirar su longitud: una
+    respuesta más larga que `BUTTON_TEXT_LIMIT` levantaba
+    `PayloadValidationError` (un mensaje con botones nunca se parte) y la
+    persona se quedaba con el aviso neutro de incidente en vez de su lista.
+    Antes de T3, esa misma respuesta iba por `_encolar_respuesta`, que sí
+    parte -- este es el comportamiento al que hay que volver cuando el texto
+    no entra con los botones."""
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        ids = _tareas_en_orden(cur, ws, 6)  # > 4: la página también trae "Ver más"
+    conn.commit()
+
+    oracion = "Resumen largo de las tareas pendientes para revisar con calma. "
+    texto_largo = oracion * 70
+    assert telegram_utf16_units(texto_largo) > BUTTON_TEXT_LIMIT
+
+    guion = [Respuesta(llamadas=[Llamada("c1", "consultar_tareas", {})]),
+            Respuesta(texto=texto_largo)]
+    proveedor = _con_proveedor(monkeypatch, guion)
+
+    with espacio(conn, ws) as cur:
+        quien = _quien(cur, "Marcos Tarquini", ws)
+        cal = Calendario.desde_base(cur, ws)
+        r = responder(cur, quien, "qué tengo pendiente", proveedor, cal, chat_id=1,
+                     ahora=datetime.now(timezone.utc))
+        assert not r.incidente
+
+        filas = _outbox(cur, ws, 1)
+        pid = _pendiente(cur, ws, P.SENTINEL_OPCIONES_MODELO)
+        etiquetas = [f["etiqueta"] for f in _opciones(cur, pid)]
+
+    partes_texto = [f for f in filas if f["pending_action_id"] is None]
+    mensajes_botones = [f for f in filas if f["pending_action_id"] is not None]
+
+    # El texto sale partido, nunca junto con los botones.
+    assert len(partes_texto) >= 2
+    for indice, fila in enumerate(partes_texto, start=1):
+        assert fila["cuerpo"].startswith(f"({indice}/{len(partes_texto)})\n")
+        assert telegram_utf16_units(fila["cuerpo"]) <= 4096  # TELEGRAM_TEXT_LIMIT
+
+    # Un solo mensaje de botones, corto, después de todas las partes del
+    # texto -- orden determinístico por `programado_para`, lo único que usa
+    # `despachador.despachar` (el `id` de `message_outbox` es un uuid al azar,
+    # no sirve de desempate).
+    assert len(mensajes_botones) == 1
+    assert mensajes_botones[0]["cuerpo"] == "Elegí una tarea:"
+    assert (max(f["programado_para"] for f in partes_texto)
+           < mensajes_botones[0]["programado_para"])
+
+    assert etiquetas == ["Tarea 1", "Tarea 2", "Tarea 3", "Tarea 4",
+                        P.ETIQUETA_VER_MAS, P.ETIQUETA_SALIR_OPCIONES]
+
+
+def test_lista_con_respuesta_corta_sigue_yendo_junto_con_los_botones(
+        conn, corework, monkeypatch):
+    """Que el texto largo se mande aparte no puede romper el caso de siempre:
+    una respuesta que entra en `BUTTON_TEXT_LIMIT` sigue en el mismo mensaje
+    que los botones, un solo renglón en `message_outbox`."""
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        _tareas_en_orden(cur, ws, 2)
+    conn.commit()
+
+    guion = [Respuesta(llamadas=[Llamada("c1", "consultar_tareas", {})]),
+            Respuesta(texto="Tenés 2 tareas abiertas.")]
+    proveedor = _con_proveedor(monkeypatch, guion)
+
+    with espacio(conn, ws) as cur:
+        quien = _quien(cur, "Marcos Tarquini", ws)
+        cal = Calendario.desde_base(cur, ws)
+        responder(cur, quien, "qué tengo pendiente", proveedor, cal, chat_id=1,
+                 ahora=datetime.now(timezone.utc))
+        filas = _outbox(cur, ws, 1)
+
+    assert len(filas) == 1
+    assert filas[0]["pending_action_id"] is not None
+    assert filas[0]["cuerpo"] == "Tenés 2 tareas abiertas."
+
+
+# ---------------------------------------------------------------------------
+# T3a -- cobertura de las dos ramas sin prueba de `_mostrar_mas_tareas`
+# (observación del orquestador sobre T3, no un defecto nuevo)
+# ---------------------------------------------------------------------------
+
+def test_mostrar_mas_tareas_sin_sobrevivientes_dice_que_ya_no_estan_disponibles(
+        conn, corework):
+    ws = corework.workspace_id
+    with espacio(conn, ws) as cur:
+        quien = _quien(cur, "Marcos Tarquini", ws)
+        # Ninguno de estos ids existe: ni son de otro espacio, directamente no
+        # están en `task`.
+        gateway._mostrar_mas_tareas(cur, quien, ws, 1,
+                                    [str(uuid.uuid4()), str(uuid.uuid4())],
+                                    datetime.now(timezone.utc))
+        pid = _pendiente(cur, ws, P.SENTINEL_OPCIONES_MODELO)
+        filas = _opciones(cur, pid)
+
+    assert [f["etiqueta"] for f in filas] == [P.ETIQUETA_SALIR_OPCIONES]
+    assert filas[0]["valor"] == {"tipo": "salida"}
+
+
+def test_ver_mas_de_mas_de_ocho_tareas_arma_una_tercera_pagina(
+        cliente, conn, corework, monkeypatch):
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        ids = _tareas_en_orden(cur, ws, 10)
+    conn.commit()
+
+    guion = [Respuesta(llamadas=[Llamada("c1", "consultar_tareas", {})]),
+            Respuesta(texto="Tenés varias tareas abiertas.")]
+    proveedor = _con_proveedor(monkeypatch, guion)
+
+    with espacio(conn, ws) as cur:
+        quien = _quien(cur, "Marcos Tarquini", ws)
+        cal = Calendario.desde_base(cur, ws)
+        responder(cur, quien, "qué tengo pendiente", proveedor, cal, chat_id=1,
+                 ahora=datetime.now(timezone.utc))
+        pid = _pendiente(cur, ws, P.SENTINEL_OPCIONES_MODELO)
+        ver_mas1 = next(f for f in _opciones(cur, pid)
+                       if f["etiqueta"] == P.ETIQUETA_VER_MAS)
+        tg = _telegram_id(cur, "Marcos Tarquini")
+
+    assert ver_mas1["valor"] == {"tipo": "ver_mas", "tarea_ids": ids[4:]}
+    assert _tocar(cliente, ver_mas1["token"], tg).status_code == 200
+
+    with admin(conn) as cur:
+        pid2 = _pendiente(cur, ws, P.SENTINEL_OPCIONES_MODELO)
+        filas2 = _opciones(cur, pid2)
+    etiquetas2 = [f["etiqueta"] for f in filas2]
+    assert etiquetas2 == ["Tarea 5", "Tarea 6", "Tarea 7", "Tarea 8",
+                          P.ETIQUETA_VER_MAS, P.ETIQUETA_SALIR_OPCIONES]
+    ver_mas2 = next(f for f in filas2 if f["etiqueta"] == P.ETIQUETA_VER_MAS)
+    assert ver_mas2["valor"] == {"tipo": "ver_mas", "tarea_ids": ids[8:]}
+
+    assert _tocar(cliente, ver_mas2["token"], tg).status_code == 200
+
+    with admin(conn) as cur:
+        pid3 = _pendiente(cur, ws, P.SENTINEL_OPCIONES_MODELO)
+        filas3 = _opciones(cur, pid3)
+    etiquetas3 = [f["etiqueta"] for f in filas3]
+    assert etiquetas3 == ["Tarea 9", "Tarea 10", P.ETIQUETA_SALIR_OPCIONES]

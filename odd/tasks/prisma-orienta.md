@@ -922,8 +922,99 @@ cada commit con código pasa por la evaluación de RDD.
   Abierto: ninguno nuevo. La brecha de `cancelada` (autoridad, T2b) y la falta
   de "Adjuntar evidencia" para el aprobador en el menú (T2) siguen igual,
   fuera del alcance de esta unidad.
-- **Próximo paso al retomar:** T4 (banco): escenarios de lista de tareas con
-  botones, tocar una tarea y llegar a la vista previa, pregunta de Prisma
-  siempre con opciones; comprobador que falla ante una pregunta abierta sin
-  opciones.
+- 2026-09-25 (orquestador): **T3 commiteada** (`5e47038`, en `main`). Evaluación RDD
+  `--base-ref ea931ee --committed-only`: riesgo `medium`, `review_due: true`
+  (`slice_budget_reached`, 916 líneas, incluye `b4e5973`). Revisión con consentimiento del
+  usuario, una lente (fiabilidad), aprobada y reconocida (`review-112e1420d47dd637`,
+  autoridad consumida). La frontera de revisión avanza a `5e47038`.
+  Observaciones no bloqueantes:
+  - **T3a (advertencia, confirmada por lectura de `salida.prepare_payload`):** un mensaje
+    con botones no puede superar `BUTTON_TEXT_LIMIT` (3900 unidades UTF-16) y nunca se
+    parte; `_encolar_respuesta_con_tareas` manda el texto del modelo con los botones, así
+    que una respuesta de lista más larga que eso levanta `PayloadValidationError` y la
+    persona recibe el aviso neutro en vez de la lista. Antes de T3 se partía. Corrección
+    propuesta: si el texto excede el límite, mandarlo partido como antes y los botones en
+    un mensaje corto aparte. Sin prueba todavía.
+  - `gateway._mostrar_mas_tareas`: sin prueba la rama "Esas tareas ya no están
+    disponibles" ni la segunda página con su propio "Ver más" (más de 8 tareas).
+- 2026-09-25: **T3a cerrada.** Ruta: delegada, mismo escritor (defecto confirmado por el
+  orquestador contra `salida.prepare_payload`, más las dos pruebas de cobertura
+  sugeridas en la misma revisión).
+
+  Archivos: `src/prisma/agente.py` (`_encolar_respuesta_con_tareas` reescrita;
+  constante nueva `_TEXTO_BOTONES_LISTA_TAREAS`; import de `BUTTON_TEXT_LIMIT` y
+  `telegram_utf16_units` desde `.salida`), `tests/test_lista_botones.py` (cuatro
+  pruebas nuevas: `test_lista_con_respuesta_larga_se_parte_y_los_botones_van_aparte`,
+  `test_lista_con_respuesta_corta_sigue_yendo_junto_con_los_botones`,
+  `test_mostrar_mas_tareas_sin_sobrevivientes_dice_que_ya_no_estan_disponibles`,
+  `test_ver_mas_de_mas_de_ocho_tareas_arma_una_tercera_pagina`; helper nuevo `_outbox`).
+
+  Decisión (defecto 1, respuesta de lista larga):
+
+  - **La primera corrección que se probó estaba incompleta -- lo encontró la propia
+    prueba RED.** La primera versión sólo movía la decisión de "¿entra con botones?" a
+    `enqueue_outbox`, pero seguía pasando el `texto` completo del modelo como `resumen`
+    a `P.registrar`. `pendientes.registrar` valida ese `resumen` contra
+    `BUTTON_TEXT_LIMIT` SIN excepción (línea `prepare_payload(resumen, dedupe_key="pending",
+    has_buttons=True)`, incondicional) porque `resumen` es el texto que se manda junto
+    con los botones de esa `pending_action` -- así que la excepción seguía saltando, sólo
+    que un `P.registrar` antes de lo que se había movido. La prueba
+    `test_lista_con_respuesta_larga_se_parte_y_los_botones_van_aparte`, corrida contra
+    esa primera corrección, falló con el mismo `PayloadValidationError`
+    (`pendientes.py:166`), lo que mostró el problema antes de darlo por cerrado.
+  - **Corrección final: la decisión se toma ANTES de llamar a `registrar`, sobre `texto`
+    crudo.** Si `texto` (normalizado, medido con `telegram_utf16_units` -- la misma regla
+    UTF-16 de `prepare_payload`) entra en `BUTTON_TEXT_LIMIT`, `resumen` es el texto del
+    modelo tal cual (comportamiento de siempre, botones en el mismo mensaje). Si no entra,
+    `resumen` pasa a ser `_TEXTO_BOTONES_LISTA_TAREAS` ("Elegí una tarea:") -- un texto
+    corto fijo que siempre entra --, y el texto completo del modelo sale ANTES, en un
+    mensaje aparte sin botones y con `allow_split=True` (exactamente como lo mandaría
+    `_encolar_respuesta`). `args={"pregunta": texto}` sigue guardando el texto completo
+    pase lo que pase con `resumen`: nada de este sentinel lo lee para una lista de tareas
+    (T3), pero mantiene el registro de auditoría fiel a lo que dijo el modelo.
+  - **Orden determinístico por `programado_para`, no por casualidad.** `message_outbox.id`
+    es un `uuid` al azar (`gen_random_uuid()`), no sirve de desempate, y
+    `despachador.despachar` ordena sólo `by programado_para` (`despachador.py:299`), sin
+    una columna de desempate. Las partes del texto comparten el mismo `programado_para
+    = ahora` que ya usaba `_encolar_respuesta`; el mensaje de botones se programa un
+    instante después (`ahora + timedelta(microseconds=1)`), así que la comparación de
+    esa columna sola ya garantiza texto-antes-que-botones, sin depender del orden físico
+    en que Postgres devuelva filas con el mismo valor.
+  - **Dedupe keys por id de la `pending_action`, no por marca de tiempo**, en las dos
+    partes nuevas (`...:{p.id}:texto`, `...:{p.id}:botones`) -- misma lección que T1/T2/T3.
+
+  Decisión (defecto 2, cobertura sugerida): las dos pruebas nuevas sobre
+  `gateway._mostrar_mas_tareas` (sin sobrevivientes; tercera página con más de ocho
+  tareas) pasaron contra el código YA corregido de T3 sin tocar nada -- confirman que esas
+  dos ramas, señaladas sin prueba en la revisión, ya funcionan como corresponde; no eran
+  un defecto, sólo huecos de cobertura.
+
+  RED (defecto 1 -- reversión quirúrgica de `src/prisma/agente.py` a `5e47038`, con las
+  cuatro pruebas nuevas ya escritas):
+  `.venv/Scripts/python.exe -m pytest -q
+  tests/test_lista_botones.py::test_lista_con_respuesta_larga_se_parte_y_los_botones_van_aparte
+  tests/test_lista_botones.py::test_lista_con_respuesta_corta_sigue_yendo_junto_con_los_botones
+  tests/test_lista_botones.py::test_mostrar_mas_tareas_sin_sobrevivientes_dice_que_ya_no_estan_disponibles
+  tests/test_lista_botones.py::test_ver_mas_de_mas_de_ocho_tareas_arma_una_tercera_pagina`
+  -> `1 failed, 3 passed`: la de respuesta larga falló con
+  `prisma.salida.PayloadValidationError: Un mensaje con botones no puede exceder 3900
+  unidades UTF-16` (`pendientes.py:166`, dentro de `P.registrar`) -- exactamente el
+  defecto reportado; las otras tres ya pasaban contra el código sin tocar, confirmando que
+  sólo eran cobertura.
+
+  GREEN:
+  - `.venv/Scripts/python.exe -m pytest -q tests/test_lista_botones.py` -> `12 passed`
+    (8 de T3 + 4 nuevas de T3a).
+  - Barrido de regresión (`tests/test_menu_tarea.py tests/test_opciones_modelo.py
+    tests/test_agente.py tests/test_botones.py tests/test_aclaracion_botones.py
+    tests/test_autoridad_tarea.py tests/test_lista_botones.py tests/test_salida.py
+    tests/banco`, con `test_salida.py` sumado por tocar `salida.py`/`BUTTON_TEXT_LIMIT`
+    en el razonamiento aunque no en el código) -> `285 passed, 99 deselected`.
+  - Suite completa -> `788 passed, 99 deselected` (784 previos + 4 pruebas nuevas), 183 s.
+
+  Abierto: ninguno nuevo. Mismas brechas fuera de alcance que T3 (`cancelada` en T2b,
+  "Adjuntar evidencia" del aprobador en T2).
+- **Próximo paso al retomar:** T4 (banco): escenarios de lista de tareas con botones,
+  tocar una tarea y llegar a la vista previa, pregunta de Prisma siempre con opciones;
+  comprobador que falla ante una pregunta abierta sin opciones.
 

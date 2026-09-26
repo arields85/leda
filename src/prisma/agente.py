@@ -35,8 +35,9 @@ from .calendario import Calendario
 from .contexto import construir, historial, revisar_salida
 from .db import registrar_auditoria
 from .llm import Llamada, Proveedor, Respuesta
-from .salida import (enqueue_outbox, normalize_visible_text,
-                     truncar_etiqueta_boton, with_no_effect_status)
+from .salida import (BUTTON_TEXT_LIMIT, enqueue_outbox, normalize_visible_text,
+                     telegram_utf16_units, truncar_etiqueta_boton,
+                     with_no_effect_status)
 
 MAX_VUELTAS = 5
 
@@ -462,37 +463,92 @@ def _opciones_lista_tareas(tareas: list[dict]) -> list[tuple[str, dict]]:
     return opciones
 
 
+_TEXTO_BOTONES_LISTA_TAREAS = "Elegí una tarea:"
+
+
 def _encolar_respuesta_con_tareas(cur, quien: Solicitante, chat_id: int,
                                   texto: str, tareas: list[dict],
                                   ahora: datetime) -> None:
     """T3 (ADR 0007 punto 3): el servidor, no el modelo, garantiza que una
-    lista de tareas salga como botones -- se agregan a la MISMA respuesta del
-    modelo (`texto`), reusando el mecanismo de T1
+    lista de tareas salga como botones -- reusando el mecanismo de T1
     (`pendientes.SENTINEL_OPCIONES_MODELO`): tocar una tarea abre su menú
     (T2), tocar "Ver más" pagina en `gateway._mostrar_mas_tareas` sin volver a
     llamar al modelo, y siempre queda la salida de siempre. Costo aceptado
     (decisión del usuario): una respuesta que sólo dio un conteo también
     lleva estos botones.
 
-    `args={"pregunta": texto}` sólo se guarda por consistencia con la forma
-    que ya tiene `pending_action.args` para este sentinel (T1); ninguna de
-    las opciones de una lista de tareas la lee -- una tarea con `accion:
-    "menu"` nunca retoma la conversación, y "Ver más"/la salida tampoco.
+    Corrección tras revisión del orquestador sobre T3: un mensaje con
+    botones nunca se parte y no puede superar `BUTTON_TEXT_LIMIT`
+    (`salida.prepare_payload`) -- mandar el texto del modelo CON los botones,
+    como hacía la primera versión, levantaba `PayloadValidationError` en
+    cuanto la respuesta pasaba ese límite, y la persona se quedaba con el
+    aviso neutro de incidente en vez de su lista. Antes de T3, esa misma
+    respuesta iba por `_encolar_respuesta`, que sí parte.
+
+    `pendientes.registrar` valida el `resumen` que se le pasa contra
+    `BUTTON_TEXT_LIMIT` sin excepción -- es el texto que se manda junto con
+    estos botones, así que no alcanza con decidir el mensaje DESPUÉS de
+    registrar la `pending_action`: el texto largo tiene que quedar afuera de
+    `resumen` desde antes de llamar a `registrar`, o la excepción salta ahí
+    mismo (así fallaba la primera versión de esta corrección, que sólo movía
+    la decisión a `enqueue_outbox` y seguía pasando el texto completo como
+    `resumen`). Por eso la decisión se toma primero, sobre `texto`: si entra
+    en `BUTTON_TEXT_LIMIT` (normalizado, medido con la misma regla UTF-16 de
+    `prepare_payload`), `resumen` es el texto del modelo y todo sigue como
+    siempre (botones en el mismo mensaje). Si no entra, `resumen` pasa a ser
+    `_TEXTO_BOTONES_LISTA_TAREAS`, un texto corto fijo que sí entra siempre; el
+    texto completo del modelo sale aparte, ANTES, partido exactamente como lo
+    partiría `_encolar_respuesta`. El mensaje de botones se programa un
+    instante después del de texto (`programado_para`, lo único que ordena
+    `despachador.despachar`) para que la entrega quede determinística: el
+    texto primero, los botones después, nunca al revés.
+
+    `args={"pregunta": texto}` guarda el texto completo del modelo pase lo
+    que pase con `resumen` -- por consistencia con la forma que ya tiene
+    `pending_action.args` para este sentinel (T1), aunque ninguna de las
+    opciones de una lista de tareas lo lee: una tarea con `accion: "menu"`
+    nunca retoma la conversación, y "Ver más"/la salida tampoco.
     """
     opciones = _opciones_lista_tareas(tareas)
     opciones.append((P.ETIQUETA_SALIR_OPCIONES, {"tipo": "salida"}))
+
+    cabe_con_botones = (
+        telegram_utf16_units(normalize_visible_text(texto)) <= BUTTON_TEXT_LIMIT)
+    resumen_botones = texto if cabe_con_botones else _TEXTO_BOTONES_LISTA_TAREAS
+
     p = P.registrar(cur, quien, herramienta=P.SENTINEL_OPCIONES_MODELO,
-                    args={"pregunta": texto}, resumen=texto,
+                    args={"pregunta": texto}, resumen=resumen_botones,
                     vence_en=ahora + VIGENCIA_PENDIENTE, campo="eleccion",
                     opciones=opciones, chat_id=chat_id)
+    # El id de `p` (fresco por cada `registrar`) identifica el mensaje, no la
+    # marca de tiempo -- misma lección que T2 (`agente.py:420-421`, revisión
+    # del orquestador sobre T1).
+    if cabe_con_botones:
+        enqueue_outbox(
+            cur, workspace_id=quien.workspace_id, chat_id=chat_id,
+            recipient_membership_id=quien.membership_id, text=p.resumen,
+            scheduled_for=ahora,
+            dedupe_key=f"{quien.workspace_id}:lista-tareas:{p.id}",
+            is_response=True, pending_action_id=p.id,
+        )
+        return
+
+    enqueue_outbox(
+        cur, workspace_id=quien.workspace_id, chat_id=chat_id, text=texto,
+        recipient_membership_id=quien.membership_id, scheduled_for=ahora,
+        dedupe_key=f"{quien.workspace_id}:lista-tareas:{p.id}:texto",
+        is_response=True, allow_split=True,
+    )
     enqueue_outbox(
         cur, workspace_id=quien.workspace_id, chat_id=chat_id,
         recipient_membership_id=quien.membership_id, text=p.resumen,
-        scheduled_for=ahora,
-        # El id de `p` (fresco por cada `registrar`) identifica el mensaje,
-        # no la marca de tiempo -- misma lección que T2 (`agente.py:420-421`,
-        # revisión del orquestador sobre T1).
-        dedupe_key=f"{quien.workspace_id}:lista-tareas:{p.id}",
+        # Un instante después del texto: `despachador.despachar` sólo ordena
+        # por `programado_para` (el `id` de `message_outbox` es un uuid al
+        # azar, no sirve de desempate), así que la entrega en orden depende
+        # de que esta columna, no la casualidad del orden físico, diga que
+        # el texto va primero.
+        scheduled_for=ahora + timedelta(microseconds=1),
+        dedupe_key=f"{quien.workspace_id}:lista-tareas:{p.id}:botones",
         is_response=True, pending_action_id=p.id,
     )
 
