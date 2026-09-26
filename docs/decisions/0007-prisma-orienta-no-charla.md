@@ -67,5 +67,15 @@ existe: el toque ya dice cuál es.
 
 - ~~Qué acciones ofrece cada estado de tarea y para qué roles~~: resuelto con el
   usuario el 2026-09-25, en el diseño §4.6.
-- Si una respuesta puede cerrar sin opciones (un aviso que no espera nada).
+- ~~Si Prisma pregunta sin tener opciones concretas que ofrecer~~: decisión del usuario,
+  2026-09-26 (evidencia real `b-0007`, T4b): una respuesta que pregunta lleva opciones
+  siempre. Sin ninguna concreta, el servidor agrega un juego genérico fijo — "Es una
+  tarea nueva", "Es sobre una tarea existente", "Quiero consultar otra cosa" — cuando el
+  turno cierra preguntando en texto abierto sin ningún juego de botones propio
+  (`deteccion_pregunta.hace_pregunta`, `agente._encolar_opciones_genericas`).
+- Si una respuesta puede cerrar **sin preguntar nada** (un aviso que no espera nada de
+  la persona) sigue sin botones, tal como está implementado hoy: ningún mecanismo de
+  esta unidad se dispara si el turno no pregunta. Esto es el comportamiento actual, no
+  una decisión del usuario confirmada explícitamente — sigue **PENDIENTE** esa
+  confirmación explícita.
 - Cómo se ven las opciones en el grupo de gestión, fuera del chat privado.

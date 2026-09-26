@@ -72,6 +72,8 @@ gestión.
   `ofrecer_opciones` igual sin opciones concretas.
 - [ ] **T5 — Continuidad.** `docs/capacidades.md`, `docs/STATUS.md`, diseño §4.5 y
   segunda sesión por Telegram.
+  - [x] Documentación (2026-09-26, ver Progreso).
+  - [ ] Segunda sesión real por Telegram, datos ficticios (necesita al usuario).
 
 ## Ruta
 
@@ -2259,5 +2261,121 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
     el menú (T2).
   - No se corrió el banco real (`-m modelo_real`) en esta sesión.
 
-- **Próximo paso al retomar:** T5 (continuidad y segunda sesión por Telegram).
+- 2026-09-26: **T5, parte documental cerrada.** Ruta: inline (documentación pura, sin
+  cambio de lógica, esquema, dependencias ni arquitectura, `AGENTS.md`). Verificado
+  contra el código, git y el banco antes de escribir; nada se afirmó sin evidencia.
+
+  Archivos:
+  - `docs/STATUS.md`: fecha de actualización, hecho de commits/rama corregido (67
+    commits en `main`, renombrada desde `master` el 2026-09-25, sin push — no "un
+    único commit `efa8ee2`"), tabla de línea base de pruebas actualizada (876 passed,
+    108 deselected, 2026-09-26), sección nueva "Cerrado: Prisma orienta (T1-T4b)" con
+    la evidencia de suite y banco real, y "Próximo paso" reescrito.
+  - `docs/capacidades.md`: la fila "Prisma orienta con opciones (parcial)" pasa a
+    fila completa con lo construido en T2/T3/T4b (menú, listas con "Ver más", cierre
+    genérico); autoridad sobre la propia tarea anota el hueco de `cancelada`; fallas
+    con aviso y trazabilidad describe `notificado_en` correcto y
+    `herramienta_rechazada:<nombre>`.
+  - `docs/decisions/0007-prisma-orienta-no-charla.md`: "Pendiente" registra la
+    decisión del usuario del 2026-09-26 (cierre genérico con tres opciones) como
+    resuelta, y dejó explícito que "cerrar sin preguntar nada, sin botones" es el
+    comportamiento implementado hoy, no una confirmación explícita del usuario —
+    sigue esa confirmación como pendiente real.
+  - `docs/architecture/interpretacion-y-confirmacion.md` §4.5: bullet nuevo marcando
+    T1-T4b construidos con el rango de commits, remitiendo a §4.6 y dejando
+    `cancelada`, "Adjuntar evidencia" del aprobador y la segunda sesión como
+    pendientes.
+  - `docs/validation/README.md`: sección "Banco conversacional" gana `toques`,
+    `permite_pregunta_sin_opciones`, el comprobador `comprobar_pregunta_con_opciones`,
+    `bloqueado` por fallo del proveedor, y que la aclaración acepta una opción de
+    tarea ofrecida por el modelo.
+  - `odd/tasks/prisma-orienta.md` (este archivo): T5 dividida en su parte documental
+    (hecha) y la sesión por Telegram (pendiente); esta entrada de Progreso; "Próximo
+    paso al retomar" reescrito.
+
+  Verificación:
+  - `.venv/Scripts/python.exe -m pytest -q tests/test_capacidades.py` (`pg_isready`
+    antes) -> `3 passed` (cruza `docs/capacidades.md`/`PROMESAS_SIN_CUMPLIR` contra el
+    esquema; no falla con la reescritura de la fila de Prisma orienta).
+  - `.venv/Scripts/python.exe -m pytest -q` (suite completa, reejecutada para esta
+    unidad) -> `876 passed, 108 deselected` (206 s) — confirma el número que ya
+    figuraba como hecho de la sesión.
+  - `tests/banco/reportes/banco-20260926T155611Z.json` releído y agregado en Python:
+    84 aprobado, 3 falla, 21 no_concluyente, 0 bloqueado de 108; la única falla es
+    `b-0005-b` (3/3) — confirma el hecho de la sesión antes de llevarlo a `STATUS.md`.
+  - `git log`/`git branch -a`/`git rev-list --count HEAD`/`git ls-remote --heads
+    origin`: rama `main`, 67 commits, HEAD `9681973`, remoto sin ninguna rama —
+    confirma el hecho de la sesión antes de reemplazar la línea vieja de
+    `docs/STATUS.md`.
+  - `db/migrations/`: sin ninguna migración posterior a `0011` — confirma "sin cambio
+    de esquema esta sesión".
+
+  No verificable / no verificado en esta unidad (queda `PENDIENTE`, no se inventó):
+  - Los 7 ids de revisión RDD que el orquestador entregó como hecho de la sesión
+    (`review-4a429367dd7cfdc8`, `review-231a98f5d94099c9`, `review-d81552b4b65f4be5`,
+    `review-42b7c7c32af6e755`) no aparecen en `odd/tasks/prisma-orienta.md` ni en
+    ningún mensaje de commit de este repositorio (`git log --all`, buscado); sólo hay
+    evidencia escrita de cinco (`review-995bc30d2d0df7e8`, `review-9ac0b4b8afec17ee`,
+    `review-112e1420d47dd637`, `review-0ea0c4be83f8e6d9`, `review-356a9a31c3d84353`,
+    todos ya registrados arriba en este documento). No se escribió ningún id sin
+    evidencia en `docs/STATUS.md`.
+  - El commit `9681973` ("fix: keep a question that ends with a link and ignore words
+    inside links") no tiene una entrada de unidad propia en este documento — su
+    trabajo (URLs terminando en "?", palabras dentro de una URL) extiende la
+    corrección (c) de la sesión anterior, y sus 3 pruebas nuevas explican la
+    diferencia entre el `873 passed` de esa sección y el `876 passed` verificado
+    arriba, pero no se reconstruyó su RED/GREEN ni sus decisiones de diseño porque no
+    se registraron en su momento. Al usuario le puede convenir completar esa entrada
+    o confirmar que el registro de esta corrección quedó incompleto a propósito.
+
+- 2026-09-26 (orquestador): **registro que faltaba de revisiones y del commit `9681973`**
+  (lo señaló el escritor de T5; la evidencia son las salidas de `gentle-ai review` de esta
+  sesión, que no habían quedado escritas acá).
+  - `review-4a429367dd7cfdc8` sobre `d193b61` (aclaración con `ofrecer_opciones`,
+    desempate, exclusión): una lente (fiabilidad), aprobada y reconocida. Observaciones:
+    `ctid` no es orden de inserción; `_aclaracion_para_elegir` sin desempate; `KeyError`
+    sin `titulo` -> corregidas en `e0de2d4` y `633ec39`.
+  - `review-231a98f5d94099c9` sobre `6ef68cb`/`76341fe` (T4b), riesgo alto, cuatro lentes,
+    aprobada y reconocida. Observaciones: falsos positivos del detector en producción,
+    "Es una tarea nueva" sin `entrante_id`, límite 25 silencioso y regla de tarea activa
+    duplicada en `_mostrar_tareas_propias` -> corregidas en `ad8a48b` y `fd1287c`.
+  - `review-d81552b4b65f4be5` sobre `86a40c6`/`e0de2d4`: una lente (fiabilidad), aprobada y
+    reconocida. Observaciones: `ofrecer_opciones` repetido en un turno, prueba
+    tautológica, unión de toques con acciones viejas, ronda de texto sin prueba ->
+    corregidas en `fd1287c` y `633ec39`.
+  - `review-42b7c7c32af6e755` sobre `ad8a48b`/`fd1287c`/`633ec39` (unidad de cierre),
+    riesgo alto, cuatro lentes, aprobada y reconocida; frontera de revisión en `633ec39`.
+    Observaciones: el "?" pegado al final de una URL se perdía (falso negativo) y la señal
+    imperativa seguía mirando dentro de las URLs -> corregidas en `9681973`; quedan como
+    sugerencias menores sin corregir: comentarios con referencias a la sesión ("esta
+    unidad", "hallazgo del orquestador") en `menu_tarea.py`, `gateway.py` y
+    `tests/banco/corrida.py`; import local y referencia a líneas en
+    `tests/test_agente.py:554-559`; la prueba de orden determinístico de
+    `tests/test_pregunta_sin_opciones.py:500-528` no prueba el desempate.
+  - `9681973` (orquestador, inline): `_URL` ya no se lleva la puntuación final de la
+    frase; `hace_pregunta` cuenta también "¿"; `pide_elegir_en_imperativo` descarta las
+    URLs antes de buscar. RED: `tests/test_deteccion_pregunta.py` -> `3 failed, 9 passed`.
+    GREEN: `tests/test_deteccion_pregunta.py tests/banco/test_comprobadores.py
+    tests/test_pregunta_sin_opciones.py` -> `120 passed`; suite completa -> `876 passed,
+    108 deselected` (208 s). Evaluación RDD `--base-ref 633ec39`: `medium`, 52 líneas,
+    `under_budget` (pendiente en el tramo).
+
+- **Próximo paso al retomar:** T5, sólo la segunda sesión real por Telegram (necesita
+  al usuario; datos ficticios). Antes de empezar: comparar la base local con
+  `db/esquema.sql` (hoy al día hasta la migración `0011`) y aplicar lo que falte;
+  confirmar que el secreto de Telegram sigue protegido (no leer `.env*`); confirmar
+  ausencia de datos y trabajo real en el espacio de prueba; tener un plan de pausa o
+  rollback a mano. Ejercitar al menos:
+  - una lista de tareas con más de 4 (para ver los botones y "Ver más");
+  - tocar una tarea y recorrer menú de tarea → vista previa → Confirmar;
+  - una pregunta de Prisma con opciones concretas (`ofrecer_opciones`);
+  - un mensaje sin ninguna tarea que coincida, para ver el cierre genérico ("Es una
+    tarea nueva" / "Es sobre una tarea existente" / "Quiero consultar otra cosa");
+  - si surge naturalmente, una referencia ambigua de una sola palabra clave (tipo
+    "el plc", ver `b-0005-b`).
+
+  Registrar en esta unidad: preguntas que la persona considere innecesarias,
+  respuestas vagas que haya que interpretar, y cualquier incidente
+  (`python -m prisma incidentes`). Tras la sesión, actualizar `docs/STATUS.md` con el
+  resultado y cerrar T5.
 

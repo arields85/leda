@@ -3,7 +3,7 @@
 **Alcance:** Prisma es un producto de gestión de proyectos multi-tenant. CoreWork es
 su primer cliente, no su definición.
 
-**Última actualización documental:** 2026-09-22.
+**Última actualización documental:** 2026-09-26.
 
 ## Resumen
 
@@ -42,21 +42,27 @@ tales. Ver [`INDEX.md`](INDEX.md#documentos-superados).
 - Las migraciones `0001` y `0002` se ensayaron contra bases descartables, incluida
   paridad entre instalación limpia y migración, y rollback guardado. **No fueron
   aplicadas a ninguna base operativa.**
-- El repositorio tiene un único commit, `efa8ee2`. El árbol de trabajo acumula cambios
-  sin comitear. El remoto `origin` quedó conectado a GitHub el 2026-09-22 y está
-  vacío; no se hizo push.
+- El repositorio tiene 67 commits en `main` (renombrada desde `master` el
+  2026-09-25, a pedido explícito del usuario); el árbol de trabajo está limpio
+  (verificado por inspección, 2026-09-26). El remoto `origin` sigue conectado a
+  GitHub sin ninguna rama (`git ls-remote --heads origin` no devuelve nada); no se
+  hizo push.
 
 ## Baseline de pruebas
 
 | Campo | Valor |
 |---|---|
-| Comando | `.venv\Scripts\python.exe -m pytest` |
-| Fecha | 2026-08-15 |
-| Resultado exacto | 306 passed, 0 failed. |
+| Comando | `.venv\Scripts\python.exe -m pytest -q` |
+| Fecha | 2026-09-26 |
+| Resultado exacto | 876 passed, 108 deselected. |
 
-**Esta ejecución no fue repetida desde el 2026-08-15 y el árbol de trabajo cambió
-después.** El resultado vale como registro histórico, no como estado verificado de la
-suite hoy. Debe reejecutarse antes de afirmar cualquier cosa sobre ella.
+Reejecutada como parte de este cierre documental (T5, `odd/tasks/prisma-orienta.md`):
+mismo resultado, `876 passed, 108 deselected` (206 s). La corrida de 2026-08-15
+(`306 passed, 0 failed`) y la de 2026-09-24 (`721 passed, 99 deselected`, "Cerrado:
+aclaración con botones" más abajo) quedan como registro histórico de una suite mucho
+más chica; no reflejan el estado actual del código. Los `108 deselected` son los
+escenarios del banco marcados `modelo_real` (`tests/banco/`), que no corren en la
+suite por defecto.
 
 ## Correcciones anteriores
 
@@ -132,22 +138,102 @@ se verifica sobre una base nueva dentro de un clúster existente.
 
 ## Próximo paso
 
-**Seguir con "Prisma orienta"** (`odd/tasks/prisma-orienta.md`, [`ADR 0007`](decisions/0007-prisma-orienta-no-charla.md)).
-Hechas T1 (opciones del modelo, `c253d27`), T2 (menú de tarea, `0814fa3`) y T2b
-(autoridad sobre la propia tarea y fallas con aviso, `fd4e2a6`), las tres con revisión
-aprobada. Lo primero al retomar: corregir que un incidente quede marcado como avisado
-cuando la persona no se pudo identificar (observación de dos lentes de la revisión de
-T2b, `gateway.py` ~1905-1925). Después T3 (listas de tareas como botones), T4 (banco con
-botones y control de preguntas abiertas) y T5 (continuidad y segunda sesión por
-Telegram). Antes de una sesión real, comparar la base local con `db/esquema.sql`: hoy
-está al día hasta la migración `0011`.
+**Terminar T5 de "Prisma orienta"** (`odd/tasks/prisma-orienta.md`,
+[`ADR 0007`](decisions/0007-prisma-orienta-no-charla.md)): T1 a T4b ya están cerradas y
+commiteadas en `main` (ver "Cerrado: Prisma orienta (T1-T4b)" más abajo). La parte
+documental de T5 queda hecha con esta actualización; falta la **segunda sesión real por
+Telegram con datos ficticios**, que necesita al usuario.
 
-Después, las propuestas medidas aparte (tareas propias en autoinformes, hilo para Jev,
-referencias genéricas), la unidad de aportes sobre tareas, la de aprendizaje de apodos y
-aclaraciones ([`ROADMAP.md`](ROADMAP.md)) y la conversación de bloqueos (mecánica §8,
-pasos 2 a 7).
+Antes de esa sesión: comparar la base local con `db/esquema.sql` (hoy al día hasta la
+migración `0011`) y aplicar lo que falte; confirmar que el secreto de Telegram sigue
+protegido. Durante la sesión, ejercitar al menos: una lista de tareas ofrecida como
+botones (más de 4, para ver "Ver más"); tocar una tarea y recorrer menú → vista previa →
+Confirmar; una pregunta del modelo con opciones concretas; un mensaje sin ninguna tarea
+que coincida, para ver el cierre genérico ("Es una tarea nueva" / "Es sobre una tarea
+existente" / "Quiero consultar otra cosa"); y, si surge, una referencia ambigua tipo
+"el plc" (ver `b-0005-b` más abajo).
+
+Abierto de esta unidad, sin bloquear el cierre de T5:
+
+- **Autoridad sobre `cancelada`** (T2b): no se resolvió si una autoridad superior al
+  responsable puede cancelar una tarea ajena. `PENDIENTE` de decisión explícita.
+- El menú de tarea (T2) todavía no ofrece "Adjuntar evidencia" al aprobador, aunque
+  `herramientas.py` ya se lo permite desde T2b — ajuste de UX pendiente.
+- `b-0005-b` (banco real, 2026-09-26): Jev resuelve "el plc" a 0,76/0,53 de
+  probabilidad/confianza, debajo de `jev.CORTE_CLARA = 0,85`, y Prisma abre una
+  aclaración que el escenario no contesta — comportamiento del modelo contra un umbral
+  ya codificado, no un defecto de Prisma. `PENDIENTE` de decisión de producto: ajustar
+  el umbral o enriquecer el contexto que recibe Jev para referencias informales de una
+  sola palabra clave.
+- El reintento del despachador puede reordenar las partes de una respuesta partida:
+  el orden estrictamente creciente que garantiza `salida.enqueue_outbox` vale para la
+  primera pasada, no para una parte reprogramada tras un fallo — límite documentado en
+  `odd/tasks/prisma-orienta.md`, no corregido.
+- ADR 0007 sigue con dos puntos abiertos en "Pendiente": si una respuesta puede cerrar
+  sin ninguna opción, y cómo se ven las opciones en el grupo de gestión.
+
+Después de T5, según [`ROADMAP.md`](ROADMAP.md): **Aportes sobre tareas** (depende de
+Prisma orienta), después aprendizaje de apodos y aclaraciones, y la conversación de
+bloqueos (mecánica §8, pasos 2 a 7).
 
 El resto del orden de trabajo está en [`ROADMAP.md`](ROADMAP.md).
+
+## Cerrado: Prisma orienta (T1-T4b)
+
+Feature `odd/tasks/prisma-orienta.md`, origen [`ADR 0007`](decisions/0007-prisma-orienta-no-charla.md);
+acciones por tarea en
+[`architecture/interpretacion-y-confirmacion.md`](architecture/interpretacion-y-confirmacion.md)
+§4.6. Construido sobre `main` (commits `c253d27` a `9681973`), cada unidad con su
+revisión RDD; detalle completo, decisiones y evidencia de cada corrección en
+`odd/tasks/prisma-orienta.md`.
+
+- **T1 — Opciones del modelo.** `ofrecer_opciones` (`herramientas.py`): el modelo pide
+  una elección con hasta `MAX_OPCIONES_MODELO = 4` opciones (texto o tarea), el
+  servidor valida cada tarea contra PostgreSQL bajo RLS y arma botones más "Quiero
+  consultar otra cosa"; tocar una tarea la retoma resuelta, sin pasar por Jev.
+- **T2 — Menú de tarea.** `menu_tarea.calcular_menu` decide las acciones según estado y
+  relación (responsable, aprobador, otra persona) del diseño §4.6; cada acción que
+  cambia algo pasa por la vista previa de siempre (ADR 0005).
+- **T2b — Autoridad sobre tareas ajenas.** `actualizar_estado`, `registrar_bloqueo`
+  (sólo el responsable) y `adjuntar_evidencia` (responsable o aprobador) verifican
+  autoridad por tarea, no sólo por rol — cerraba un hueco real observado en la sesión
+  del 2026-09-25. `cancelada` queda sin resolver (arriba, "Próximo paso").
+- **T3 — Listas como botones.** El servidor agrega un botón por tarea a cualquier
+  respuesta que liste tareas (`consultar_tareas`), con páginas de 4 y "Ver más"; no
+  depende de que el modelo llame a ninguna herramienta.
+- **T4 — Banco.** `tests/banco/` gana `toques` genéricos (tocar por etiqueta o índice),
+  el comprobador `comprobar_pregunta_con_opciones` (activo por defecto: si Prisma
+  pregunta, tiene que ofrecer botones) y tres escenarios nuevos (`b-0016` a `b-0018`).
+  Corridas guionadas ejercitan el circuito lista → menú → acción → vista previa de
+  punta a punta sin modelo real.
+- **T4b — Cierre genérico sin opciones concretas.** Si el turno cierra preguntando en
+  texto abierto sin ningún juego de botones propio, el servidor agrega "Es una tarea
+  nueva" / "Es sobre una tarea existente" / "Quiero consultar otra cosa"
+  (`deteccion_pregunta.py`, `agente.py`).
+- **Trazabilidad de incidentes** (migración `0011`): toda falla no manejada al
+  procesar un mensaje o un toque revierte, registra un incidente con etapa, referencia
+  a `inbound_message`/`pending_action`, persona y chat, y avisa con un texto neutro;
+  `notificado_en` sólo se completa si el aviso se encoló y confirmó de verdad.
+- Además, ocho correcciones de seguimiento sobre revisiones ya aprobadas (auditoría
+  fiel de un rechazo de `preparar` como `herramienta_rechazada:<nombre>`, nunca como
+  ejecutado; un solo juego de botones por turno; falsos positivos de la detección de
+  pregunta con URLs y subcadenas; el banco resolviendo contra la unión de acciones
+  pendientes en vez de adivinar por orden) y la corrección de credenciales fuera del
+  `repr` de `ClienteJev`/`Config`.
+
+**Pruebas:** suite por defecto, 2026-09-26, `.venv/Scripts/python.exe -m pytest -q` →
+**876 passed, 108 deselected** (línea base de T1 era 721 passed, 99 deselected,
+2026-09-24 — ver "Baseline de pruebas" arriba).
+
+**Banco real** (NaN `deepseek-v4-flash`, `--banco-n 3`), corrida final 2026-09-26
+(`tests/banco/reportes/banco-20260926T155611Z.json`): **84 aprobado, 3 falla,
+21 no_concluyente, 0 bloqueado, de 108** (36 escenarios × 3). La única falla es
+`b-0005-b` (arriba, "Próximo paso"). Referencia de inicio de sesión, 2026-09-24
+(`banco-20260924T225944Z.json`): 75 aprobado / 96 no-falla de 99. El proveedor `nan`
+tuvo una caída real entre 2026-09-26 ~03:00Z y ~06:24Z (todo `chat completion`
+devolvía 404, incluso con una clave inválida — falla del proveedor, no de la cuenta);
+el banco ahora califica `bloqueado` una corrida así en vez de darla por aprobada sin
+que ningún modelo haya decidido nada.
 
 ## Cerrado: aclaración con botones
 

@@ -207,6 +207,14 @@ Un mensaje claro empieza directamente en la vista previa.
 - ~~Botón "Ninguna, lo escribo"~~: construido; espera la aclaración 30 minutos,
   como Modificar. La propuesta vence a las 8 h heredadas de `pending_action`; el
   plazo por defecto sigue abierto (§7).
+- ~~Prisma orienta (ADR 0007): opciones del modelo, menú de tarea, listas de tareas
+  como botones y cierre genérico sin opciones concretas~~: construido, T1 a T4b
+  (`main`, commits `c253d27`..`9681973`; detalle y evidencia en
+  `odd/tasks/prisma-orienta.md`). El menú de tarea por estado y relación es §4.6, más
+  abajo. Pendiente: autoridad de una autoridad superior sobre `cancelada` (T2b);
+  "Adjuntar evidencia" del aprobador todavía no aparece como botón en el menú aunque
+  la herramienta ya lo permite; y la segunda sesión real por Telegram que mide ADR
+  0007 (§5.13 fue la primera).
 
 ### 4.6 Acciones por tarea (ADR 0007, decidido con el usuario el 2026-09-25)
 

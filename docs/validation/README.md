@@ -283,7 +283,33 @@ fragmentos que la respuesta debe mencionar o patrones que no debe contener.
 Cada corrida se califica `aprobado`, `falla`, `no_concluyente` o `bloqueado`. Una
 `falla` hace fallar la prueba. `no_concluyente` —hoy, un nombre propio fuera del
 equipo— queda como advertencia y en el reporte: no se aprueba lo no verificable, pero
-tampoco se inventa un fallo sobre texto libre.
+tampoco se inventa un fallo sobre texto libre. `bloqueado` también se usa cuando el
+corredor encuentra, entre los incidentes que dejó la corrida, la marca de un fallo del
+proveedor al enrutar o al responder dentro del turno (`tests/banco/corrida.py`,
+`_incidentes_de_proveedor_caido`): "no se pudo consultar" no se cuenta como si ningún
+modelo hubiera decidido nada, ni se aprueba en silencio.
+
+Un escenario (`Escenario`, `tests/banco/escenario.py`) admite además:
+
+- `toques`: una lista de `{"etiqueta": ...}` o `{"indice": ...}` que el corredor
+  resuelve en orden, contra la última acción pendiente 'esperando' del chat que
+  ofrezca esa opción — el mismo `callback_query` sintético que ya usa Confirmar.
+  Sirve para ejercitar de punta a punta un circuito con botones (lista de tareas →
+  menú → acción → vista previa) sin necesitar que el modelo real elija cada paso.
+  Si un toque no resuelve, o resuelve contra más de una acción pendiente distinta de
+  esta corrida, la corrida queda `bloqueado` con el motivo exacto — nunca adivina.
+- `permite_pregunta_sin_opciones` (por defecto `false`): habilita, sólo para ese
+  escenario, que Prisma cierre preguntando en texto abierto sin ofrecer botones. Por
+  defecto, todo escenario pasa por el comprobador nuevo `comprobar_pregunta_con_
+  opciones` (`tests/banco/comprobadores.py`), que aprueba una pregunta con botones o
+  una respuesta que no pregunta nada, y falla una pregunta en texto abierto sin
+  opciones (ADR 0007, puntos 1 y 5) — sin mirar qué herramientas se ejecutaron, a
+  diferencia de `comprobar_pregunta` (`debe_preguntar`).
+- La aclaración con botones acepta también una elección que el propio modelo ofreció
+  con `ofrecer_opciones` (no sólo la aclaración de referencia que arma el servidor):
+  el corredor reconoce una opción de tarea por su `tarea_id` resuelto, no por la
+  etiqueta que haya elegido el modelo, así que una etiqueta propia del modelo sigue
+  contando como la tarea ofrecida.
 
 El reporte (tasa por escenario, fallas por comprobación, latencias) y los candidatos
 de replay se escriben en `tests/banco/reportes/`, que no se versiona. Un candidato
