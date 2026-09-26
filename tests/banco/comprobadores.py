@@ -15,6 +15,9 @@ import unicodedata
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 
+from prisma.deteccion_pregunta import hace_pregunta as _hace_pregunta
+from prisma.deteccion_pregunta import pide_elegir_en_imperativo as _pide_elegir_en_imperativo
+
 RESULTADOS = ("aprobado", "falla", "no_concluyente", "bloqueado")
 
 
@@ -427,43 +430,16 @@ def comprobar_contenido(
 # ---------------------------------------------------------------------------
 
 
-# Pedido directo de la elección faltante en imperativo, sin "?" (T7, puntos
-# I y N): el banco real mostraba a Prisma frenando y pidiendo la elección
-# así -- "Decime cuál de las dos y lo hago" (b-0011), "decime cuál doy por
-# resuelto" (b-0012), "Contame qué la está frenando" (b-0010), "decime qué
-# preferís y lo muevo" (b-0011) -- y `comprobar_pregunta` lo marcaba como
-# que no había preguntado. Lista chica y cerrada, a propósito: "decime"/
-# "contame"/"confirmame" (verbos genéricos de pedir información) sólo
-# cuentan cuando además aparece "cuál" o "qué" -- si no, cualquier cierre
-# cordial ("decime si necesitás algo más") contaría como pregunta y
-# debilitaría "actuó sin preguntar". "Elegí" es la excepción: el verbo mismo
-# ya es un pedido de elección, sin necesitar "cuál"/"qué" al lado. "qué" se
-# busca con borde de palabra (`\bque\b`), no como subcadena -- si no,
-# "porque"/"aunque" en cualquier frase de cierre dispararían un falso
-# positivo (T7, punto N).
-_VERBOS_PEDIDO_ELECCION = ("decime", "decinos", "contame", "confirmame")
-_MARCADOR_CUAL = "cual"
-_MARCADOR_QUE = re.compile(r"\bque\b")
-
-
-def _pide_elegir_en_imperativo(texto: str) -> bool:
-    normalizado = _normalizar(texto)
-    if "elegi" in normalizado:
-        return True
-    if not any(verbo in normalizado for verbo in _VERBOS_PEDIDO_ELECCION):
-        return False
-    return _MARCADOR_CUAL in normalizado or bool(_MARCADOR_QUE.search(normalizado))
-
-
-def _hace_pregunta(texto: str) -> bool:
-    """Detecta si el texto le pregunta algo a la persona: signo de
-    interrogación, o un pedido de elección en imperativo
-    (`_pide_elegir_en_imperativo`, T7 punto I). Compartida entre
-    `comprobar_pregunta` (T7, "ante la duda, preguntó en vez de actuar") y
-    `comprobar_pregunta_con_opciones` (T4, ADR 0007 "Prisma orienta, no
-    charla") -- una sola detección de "esto es una pregunta", dos
-    comprobaciones distintas sobre ella."""
-    return "?" in texto or _pide_elegir_en_imperativo(texto)
+# La detección de "esto es una pregunta" (signo de interrogación, o un
+# pedido de elección en imperativo como "Decime cuál de las dos y lo hago")
+# vive en `prisma.deteccion_pregunta` (T4b, `prisma-orienta`): antes T7 la
+# tenía sólo acá, pero el servidor (`agente.responder`) la necesita también
+# para el cierre genérico de una pregunta sin opciones -- una sola
+# implementación en `src/prisma/`, importada acá como `_hace_pregunta`/
+# `_pide_elegir_en_imperativo` para no tocar el resto de este archivo.
+# Compartida entre `comprobar_pregunta` (T7, "ante la duda, preguntó en vez
+# de actuar") y `comprobar_pregunta_con_opciones` (T4, ADR 0007 "Prisma
+# orienta, no charla") -- una sola detección, dos comprobaciones distintas.
 
 
 def comprobar_pregunta(
