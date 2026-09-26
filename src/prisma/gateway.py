@@ -1904,6 +1904,7 @@ def reportar_incidente_no_manejado(conn, *, workspace_id: str | None,
         nota_aviso = "No se avisó: no se identificó chat o usuario."
     else:
         try:
+            avisado = False
             with espacio(conn, workspace_id) as cur:
                 try:
                     quien = identificar_en_espacio(cur, tg_user, workspace_id)
@@ -1921,8 +1922,12 @@ def reportar_incidente_no_manejado(conn, *, workspace_id: str | None,
                         dedupe_key=(f"{workspace_id}:incidente-no-manejado:"
                                    f"{chat_id}:{ahora.timestamp()}"),
                         is_response=True)
+                    avisado = True
             conn.commit()
-            notificado_en = ahora
+            # Sólo cuenta como avisado si de verdad se encoló el aviso: marcar
+            # `notificado_en` sin haber avisado a nadie sería mentir.
+            if avisado:
+                notificado_en = ahora
         except Exception:  # noqa: BLE001
             try:
                 conn.rollback()

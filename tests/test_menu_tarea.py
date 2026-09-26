@@ -960,3 +960,35 @@ def test_reportar_incidente_no_manejado_no_levanta_si_tambien_falla_el_aviso(
             or "falló el envío del aviso" in nueva["resumen_sanitizado"].lower()
         assert nueva["notificado_en"] is None
         assert nueva["etapa"] == gateway.ETAPA_TURNO_TEXTO
+
+
+def test_reportar_incidente_no_manejado_no_marca_avisado_si_no_identifica(
+        conn, corework):
+    """Si la persona no se identifica en el espacio, nadie recibió el aviso:
+    el incidente no puede quedar con `notificado_en` (observación de la
+    revisión de T2b -- marcarlo sería mentir) y no se encola nada."""
+    ws = corework.workspace_id
+    desconocido = 987654321012
+
+    with admin(conn) as cur:
+        cur.execute("select count(*) n from message_outbox where chat_id = %s",
+                    (desconocido,))
+        outbox_antes = cur.fetchone()["n"]
+
+    gateway.reportar_incidente_no_manejado(
+        conn, workspace_id=ws, chat_id=desconocido, tg_user=desconocido,
+        error=RuntimeError("falla original de prueba"), etapa=gateway.ETAPA_TURNO_TEXTO)
+
+    with admin(conn) as cur:
+        cur.execute(
+            """select resumen_sanitizado, notificado_en, app_user_id
+                 from incident where workspace_id = %s
+                order by at desc limit 1""", (ws,))
+        nueva = cur.fetchone()
+        assert nueva["notificado_en"] is None
+        assert nueva["app_user_id"] is None
+        assert "no se identificó en el espacio" in nueva["resumen_sanitizado"]
+
+        cur.execute("select count(*) n from message_outbox where chat_id = %s",
+                    (desconocido,))
+        assert cur.fetchone()["n"] == outbox_antes
