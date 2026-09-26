@@ -1132,9 +1132,138 @@ cada commit con código pasa por la evaluación de RDD.
     corrida.
   Banco real: el proveedor `nan` sigue devolviendo 404 en toda llamada de chat
   (re-probado 2026-09-26); la corrida se repite cuando vuelva.
-- **Próximo paso al retomar:** corregir las dos observaciones de la revisión (orden de las
-  partes de una respuesta partida, prueba del caso sin `DISCULPA`); después T4 (banco):
-  escenarios de lista de tareas con botones, tocar una tarea y llegar a la vista previa,
-  pregunta de Prisma siempre con opciones; comprobador que falla ante una pregunta abierta
-  sin opciones.
+- 2026-09-26: **Orden de las partes de una respuesta partida.** Ruta: delegada, un
+  escritor (defecto de producción pre-existente, señalado en la revisión del orquestador
+  del 2026-09-26 sobre T3a/T3, primera de las dos observaciones no bloqueantes).
+
+  Problema: `salida.enqueue_outbox` mandaba todas las partes de un mensaje partido
+  (`allow_split=True`) con el mismo `programado_para`, y `despachador.despachar` sólo
+  ordena `by programado_para` (`despachador.py:299`) -- el `id` de `message_outbox` es un
+  `uuid` al azar que no desempata. El orden de entrega entre partes quedaba librado al
+  azar del orden físico con el que Postgres devolviera las filas empatadas; lo mismo hacía
+  intermitente `tests/test_lista_botones.py:511-512` (helper `_outbox`, que sólo ordena por
+  esa columna). Con varias partes compartiendo `ahora`, el mensaje de botones de T3a
+  (`agente._encolar_respuesta_con_tareas`, programado `ahora + 1 microsegundo`) podía
+  incluso empatar con partes siguientes o llegar antes que ellas.
+
+  Archivos:
+  - `src/prisma/salida.py` (`enqueue_outbox`): cada parte se programa ahora en
+    `base + microsegundos(índice)`, con `base` fijada una sola vez en Python
+    (`scheduled_for` o, si no vino, `datetime.now(timezone.utc)`) -- no con
+    `coalesce(%s, now())` en SQL, porque `now()` devuelve la hora de inicio de la
+    transacción, la misma para todas las filas del bucle, y no serviría para desempatar.
+  - `src/prisma/agente.py` (`_encolar_respuesta_con_tareas`): el mensaje de botones ahora
+    se programa `len(partes)` microsegundos después de `ahora` -- después de la ÚLTIMA
+    parte del texto (índices `0..len(partes)-1`), no de la primera. `partes` se recalcula
+    con `salida.prepare_payload` (la misma función determinística que usa `enqueue_outbox`
+    por dentro) sólo para contar cuántas partes van a salir: el valor de retorno de
+    `enqueue_outbox` no sirve para esto, porque son filas efectivamente insertadas
+    (`escalera.encolar` y otras llamadas lo suman para saber cuánto entregaron de verdad
+    pese al `on conflict (dedupe_key) do nothing`, y ese conteo tiene que seguir
+    reflejando inserciones reales, no partes intentadas).
+  - `tests/test_salida.py`: `test_split_outbox_parts_get_strictly_increasing_schedule`
+    (nueva) -- llama a `enqueue_outbox` directo con un texto largo y comprueba, ordenando
+    por `dedupe_key` (que codifica el índice de cada parte de forma estable, no por la
+    columna que se está corrigiendo), que `programado_para` queda estrictamente creciente
+    y sin empates.
+  - `tests/test_lista_botones.py`: `test_lista_con_respuesta_larga_se_parte_y_los_botones_van_aparte`
+    ya no asume que el `order by programado_para` de `_outbox` alcanza por casualidad --
+    ordena explícitamente las partes por esa columna dentro de la prueba y comprueba
+    primero que la marca sea estrictamente creciente y sin empates, antes de comparar las
+    etiquetas `(i/n)`.
+
+  Decisión: no se construyó ningún mecanismo de reintento con orden garantizado.
+  `despachador._fallo` (despachador.py:371-388) reprograma `programado_para` de la fila
+  que falló, sola, a `cal.dentro_de_jornada(ahora)` -- independiente del resto de las
+  partes de ese mismo mensaje. Si una parte falla y las demás no, la reprogramada puede
+  volver a quedar antes o después de sus hermanas: el orden estrictamente creciente que
+  esta corrección garantiza es el de la primera pasada del despachador sobre un lote
+  recién encolado, no el de una entrega que ya pasó por un reintento. Queda documentado
+  como límite conocido, no corregido -- el alcance pedido fue documentarlo, no construir
+  un mecanismo de orden para reintentos.
+
+  RED: `.venv/Scripts/python.exe -m pytest -q
+  tests/test_salida.py::test_split_outbox_parts_get_strictly_increasing_schedule` (contra
+  `enqueue_outbox` revertido a antes de esta corrección, con la prueba ya escrita) ->
+  `1 failed`: `AssertionError` en `len(set(marcas)) == len(marcas)` -- las 13 partes
+  generadas por el texto de prueba compartían un único valor de `programado_para` (el
+  defecto reportado, reproducido).
+
+  GREEN:
+  - `.venv/Scripts/python.exe -m pytest -q
+    tests/test_salida.py::test_split_outbox_parts_get_strictly_increasing_schedule` ->
+    `1 passed`.
+  - `.venv/Scripts/python.exe -m pytest -q tests/test_salida.py tests/test_lista_botones.py
+    tests/test_agente.py tests/test_botones.py` -> `59 passed`.
+  - `tests/test_lista_botones.py` corrida 5 veces seguidas (chequeo de intermitencia
+    pedido por el usuario) -> `12 passed` las 5 veces.
+  - Barrido de regresión: `.venv/Scripts/python.exe -m pytest -q tests/test_salida.py
+    tests/test_lista_botones.py tests/banco tests/test_agente.py tests/test_botones.py`
+    -> `219 passed, 99 deselected`.
+  - Suite completa -> `795 passed, 99 deselected` (793 previos + 2 pruebas nuevas, entre
+    esta unidad y la siguiente), 192 s.
+
+  Abierto: ninguno nuevo. El límite de orden tras un reintento (arriba) queda
+  documentado, no resuelto -- no es un defecto de esta corrección, es el alcance que se
+  pidió.
+- 2026-09-26: **Banco: cobertura del carve-out de proveedor caído.** Ruta: delegada, un
+  escritor (cobertura sugerida en la misma revisión del orquestador, segunda observación
+  no bloqueante). Fuera de la secuencia T1-T4.
+
+  Problema: `tests/banco/corrida.py::_incidentes_de_proveedor_caido` sólo cuenta un
+  incidente con la marca de `agente._incidente` (`_MARCA_TURNO_CAIDO`, "Falló un turno de
+  conversación (") como proveedor caído si además `agente.DISCULPA` está en la respuesta
+  visible -- esa misma marca también se genera dentro de `_ejecutar_una` para un
+  `psycopg.Error` de una sola herramienta, que el turno sigue procesando con normalidad y
+  nunca deja `DISCULPA` como respuesta. No había ninguna prueba que ejercitara ese segundo
+  camino ni que probara que el bloqueo del primero viene realmente de esa marca.
+
+  Archivos: `tests/banco/test_corrida.py` --
+  `test_ejecutar_escenario_incidente_de_herramienta_sin_disculpa_no_bloquea` (nueva:
+  `herramientas.ejecutar` reemplazado por `monkeypatch` para levantar
+  `psycopg.OperationalError` dentro de una llamada a `consultar_tareas`, con un
+  `ProveedorGuionado` de dos vueltas -- la herramienta que falla y un cierre de texto
+  normal sin `DISCULPA` -- comprueba que la corrida NO queda bloqueada aunque el incidente
+  con la marca de turno caído sí se registre); `test_ejecutar_escenario_proveedor_caido_al_responder_queda_bloqueado`
+  (reforzada: ahora comprueba además que `motivo_bloqueo` empieza con `_MARCA_TURNO_CAIDO`,
+  no sólo que sea una cadena no vacía).
+
+  Decisión: se comprobó con una mutación deliberada que la prueba nueva depende de la
+  guarda -- sacando temporalmente `and DISCULPA in respuesta_texto` de
+  `_incidentes_de_proveedor_caido`, la prueba pasó a fallar (`assert r.bloqueado is False`
+  con `bloqueado=True`), confirmando que sin esa guarda la corrida se bloquearía por un
+  fallo de herramienta que no es un proveedor caído; se restauró la guarda de inmediato.
+  Ningún archivo de producción cambió en esta unidad: es cobertura, no corrección.
+
+  RED/mutación: `.venv/Scripts/python.exe -m pytest -q
+  tests/banco/test_corrida.py::test_ejecutar_escenario_incidente_de_herramienta_sin_disculpa_no_bloquea`
+  con la guarda quitada -> `1 failed`: `AssertionError: assert True is False`
+  (`r.bloqueado`). Con la guarda restaurada, mismo comando -> `1 passed`.
+
+  GREEN:
+  - `.venv/Scripts/python.exe -m pytest -q tests/banco/test_corrida.py -k
+    "proveedor_caido or corrida_sana or incidente_de_herramienta"` -> `4 passed`.
+  - `.venv/Scripts/python.exe -m pytest -q tests/banco/test_corrida.py` -> `34 passed`.
+  - Barrido de regresión (junto con la unidad anterior): `.venv/Scripts/python.exe -m
+    pytest -q tests/test_salida.py tests/test_lista_botones.py tests/banco
+    tests/test_agente.py tests/test_botones.py` -> `219 passed, 99 deselected`.
+  - Suite completa -> `795 passed, 99 deselected` (ver entrada anterior; ambas unidades se
+    verificaron juntas contra la suite completa).
+
+  Abierto: ninguno. Banco real: el proveedor `nan` sigue devolviendo 404 en toda llamada
+  de chat (no se volvió a probar en esta unidad).
+- 2026-09-26 (orquestador): **corrección sobre el orden de las partes.** La versión del
+  escritor fijaba la base con `datetime.now()` de la aplicación cuando no llegaba
+  `scheduled_for`; antes la ponía `now()` de PostgreSQL, que es la fuente oficial del
+  estado. Se restituyó la hora de la base: `coalesce(%s, now()) + %s * interval
+  '1 microsecond'`, con el índice de la parte como desplazamiento (que `now()` sea igual
+  para todas las filas de la transacción no impide desempatar: el desplazamiento lo hace).
+  Verificación: `tests/test_salida.py tests/test_lista_botones.py tests/banco/test_corrida.py`
+  -> `64 passed`; suite completa -> `795 passed, 99 deselected` (192 s).
+  Banco real: `nan` sigue en 404; una clave inválida también da 404, así que el servicio
+  rechaza el pedido antes de autenticar (falla del proveedor, no de la cuenta del usuario,
+  que está activa). La URL usada coincide con la documentación de `nan.builders/docs`.
+- **Próximo paso al retomar:** T4 (banco): escenarios de lista de tareas con botones,
+  tocar una tarea y llegar a la vista previa, pregunta de Prisma siempre con opciones;
+  comprobador que falla ante una pregunta abierta sin opciones.
 

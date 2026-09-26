@@ -8,8 +8,10 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
+import psycopg
 import pytest
 
+from prisma import agente, herramientas
 from prisma import pendientes as P
 from prisma.autoridad import Canal, identificar
 from prisma.db import admin, espacio
@@ -19,6 +21,7 @@ from prisma.llm import IntentAction, IntentRoute, Llamada, ProveedorGuionado, Re
 from tests.banco.corrida import (
     JevGrabador,
     ProveedorGrabador,
+    _MARCA_TURNO_CAIDO,
     _pendiente_para_confirmar,
     conteos_delta,
     ejecutar_escenario,
@@ -316,6 +319,12 @@ def test_ejecutar_escenario_proveedor_caido_al_responder_queda_bloqueado(corewor
 
     assert r.bloqueado is True
     assert r.motivo_bloqueo
+    # El bloqueo tiene que venir de la marca de `agente._incidente` (turno
+    # caído), no de cualquier incidente que haya quedado en el espacio --
+    # `agente._incidente` también se usa para un `psycopg.Error` de una sola
+    # herramienta que no bloquea (ver
+    # `test_ejecutar_escenario_incidente_de_herramienta_sin_disculpa_no_bloquea`).
+    assert r.motivo_bloqueo.startswith(_MARCA_TURNO_CAIDO)
 
 
 def test_ejecutar_escenario_corrida_sana_no_queda_bloqueada_por_el_chequeo_nuevo(corework, conn):
@@ -332,6 +341,50 @@ def test_ejecutar_escenario_corrida_sana_no_queda_bloqueada_por_el_chequeo_nuevo
 
     assert r.bloqueado is False
     assert r.motivo_bloqueo == ""
+
+
+def test_ejecutar_escenario_incidente_de_herramienta_sin_disculpa_no_bloquea(
+        corework, conn, monkeypatch):
+    """Cobertura sugerida por la revisión del orquestador del 2026-09-26
+    (`tests/banco/test_corrida.py`, ~309-316 de esa revisión): la marca de
+    `agente._incidente` (`_MARCA_TURNO_CAIDO`) también aparece cuando falla
+    una sola herramienta dentro de un turno que sigue con normalidad
+    (`agente._ejecutar_una`, `except psycopg.Error`) -- eso NO es "el
+    proveedor no contestó", así que no puede bloquear la corrida. La marca
+    sólo cuenta como proveedor caído si además la respuesta visible es
+    `agente.DISCULPA` (el `except` que envuelve a `proveedor.responder`
+    entero, nunca el de una herramienta individual).
+
+    El turno rutea bien (`ProveedorGuionado.route_intent` por defecto, sin
+    `rutas`, ya devuelve conversación normal): la única vuelta guionada llama
+    a `consultar_tareas`, que acá se hace fallar con un `psycopg.Error`
+    (`herramientas.ejecutar` reemplazado por `monkeypatch`); la segunda
+    vuelta, con el resultado de error ya en `mensajes`, cierra con un texto
+    común, sin `DISCULPA`."""
+    ws = corework.workspace_id
+
+    def falla(*args, **kwargs):
+        raise psycopg.OperationalError("boom")
+
+    monkeypatch.setattr(herramientas, "ejecutar", falla)
+
+    interno = ProveedorGuionado(guion=[
+        Respuesta(llamadas=[Llamada("c1", "consultar_tareas", {})]),
+        Respuesta(texto="Ya reviso y te aviso."),
+    ])
+    r = ejecutar_escenario(
+        conn, ws, "corework", "Marcos Tarquini", ["hola"], interno,
+        escenario_id="b-test", indice=0)
+
+    assert agente.DISCULPA not in r.respuesta_texto
+    assert r.bloqueado is False
+    assert r.motivo_bloqueo == ""
+
+    with admin(conn) as cur:
+        cur.execute(
+            "select resumen_sanitizado from incident where workspace_id = %s", (ws,))
+        resumenes = [f["resumen_sanitizado"] for f in cur.fetchall()]
+    assert any(resumen.startswith(_MARCA_TURNO_CAIDO) for resumen in resumenes)
 
 
 # ---------------------------------------------------------------------------
