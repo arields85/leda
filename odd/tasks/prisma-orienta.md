@@ -1116,7 +1116,25 @@ cada commit con código pasa por la evaluación de RDD.
     unidades se verificaron juntas contra la suite completa).
 
   Abierto: ninguno.
-- **Próximo paso al retomar:** T4 (banco): escenarios de lista de tareas con botones,
-  tocar una tarea y llegar a la vista previa, pregunta de Prisma siempre con opciones;
-  comprobador que falla ante una pregunta abierta sin opciones.
+- 2026-09-26 (orquestador): commits `45552d0` (T3a), `4967b90` (claves fuera del repr) y
+  `23fc6f6` (banco con proveedor caído). Evaluación RDD `--base-ref 5e47038`: riesgo
+  `medium`, 636 líneas, `slice_budget_reached`. Revisión con consentimiento del usuario, una
+  lente (fiabilidad), aprobada y reconocida (`review-0ea0c4be83f8e6d9`). La frontera de
+  revisión avanza a `23fc6f6`. Observaciones no bloqueantes:
+  - `tests/test_lista_botones.py:511-512` (advertencia): la prueba de respuesta larga
+    compara las partes `(i/n)` en el orden de `_outbox`, que sólo ordena por
+    `programado_para`; todas las partes comparten ese valor y el id es un uuid, así que el
+    orden entre partes no está garantizado (prueba intermitente). El mismo empate existe
+    en producción para cualquier respuesta partida (preexistente, `_encolar_respuesta`):
+    el despachador podría mandar las partes desordenadas.
+  - `tests/banco/test_corrida.py:309-316` (sugerencia): falta la prueba de que un
+    incidente de herramienta con la marca de turno caído pero sin `DISCULPA` no bloquea la
+    corrida.
+  Banco real: el proveedor `nan` sigue devolviendo 404 en toda llamada de chat
+  (re-probado 2026-09-26); la corrida se repite cuando vuelva.
+- **Próximo paso al retomar:** corregir las dos observaciones de la revisión (orden de las
+  partes de una respuesta partida, prueba del caso sin `DISCULPA`); después T4 (banco):
+  escenarios de lista de tareas con botones, tocar una tarea y llegar a la vista previa,
+  pregunta de Prisma siempre con opciones; comprobador que falla ante una pregunta abierta
+  sin opciones.
 
