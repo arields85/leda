@@ -11,6 +11,7 @@ from datetime import datetime, timedelta, timezone
 import psycopg
 import pytest
 
+import prisma.jev as jev
 from prisma import agente, herramientas
 from prisma import pendientes as P
 from prisma.autoridad import Canal, identificar
@@ -20,6 +21,7 @@ from prisma.llm import IntentAction, IntentRoute, Llamada, ProveedorGuionado, Re
 
 from tests.banco.comprobadores import comprobar_aclaracion
 from tests.banco.corrida import (
+    ClienteJevGuionadoPorReferencia,
     JevGrabador,
     ProveedorGrabador,
     _MARCA_TURNO_CAIDO,
@@ -36,6 +38,12 @@ from tests.banco.corrida import (
     respuesta_ofrecio_opciones,
     sembrar_precondiciones,
 )
+
+# Cuando la prueba no le importa el filtro `desde` de esta unidad (restringir
+# la unión a lo creado durante la corrida actual), una fecha bien anterior
+# incluye cualquier fila que la prueba haya sembrado.
+_MUY_ANTES = datetime(2000, 1, 1, tzinfo=timezone.utc)
+
 
 # ---------------------------------------------------------------------------
 # ProveedorGrabador: grabación y round-trip a JSON / ProveedorGuionado
@@ -138,6 +146,10 @@ def test_jev_grabador_registra_pedido_y_respuesta():
 
 
 def test_jev_grabacion_json_es_serializable_y_recargable():
+    """Las dos llamadas grabadas comparten la misma referencia (ninguna trae
+    `"referencia"` en su `state`, así que las dos caen bajo la misma clave
+    `None`) -- se devuelven en el mismo orden en que se grabaron, dentro de
+    esa referencia."""
     interno = ClienteJevGuionado(guion=[
         {"alcance": {"probabilities": {"una_tarea": 0.9}},
          "tarea": {"probabilities": {"T1": 0.9}}},
@@ -151,7 +163,7 @@ def test_jev_grabacion_json_es_serializable_y_recargable():
     grabacion = json.loads(json.dumps(g.a_json()))
 
     jev_guionado = jev_guionado_desde_grabacion({"jev": grabacion})
-    assert isinstance(jev_guionado, ClienteJevGuionado)
+    assert isinstance(jev_guionado, ClienteJevGuionadoPorReferencia)
     r1 = jev_guionado.decidir({}, {})
     assert r1["alcance"]["probabilities"]["una_tarea"] == 0.9
     r2 = jev_guionado.decidir({}, {})
@@ -160,12 +172,106 @@ def test_jev_grabacion_json_es_serializable_y_recargable():
 
 def test_jev_grabacion_vieja_sin_clave_jev_sigue_cargando():
     """Una grabación de antes de T6 no tiene la clave 'jev' -- tiene que
-    seguir cargando, con un guión vacío (nunca llama a Jev de verdad si el
-    escenario no traía ninguna referencia que lo hubiera ejercitado)."""
+    seguir cargando, sin ningún pedido grabado (nunca llama a Jev de verdad
+    si el escenario no traía ninguna referencia que lo hubiera ejercitado)."""
     grabacion_vieja = {"rutas": [], "respuestas": []}
     jev_guionado = jev_guionado_desde_grabacion(grabacion_vieja)
-    assert isinstance(jev_guionado, ClienteJevGuionado)
-    assert jev_guionado.guion == []
+    assert isinstance(jev_guionado, ClienteJevGuionadoPorReferencia)
+    assert jev_guionado.pedidos_grabados == []
+    with pytest.raises(jev.JevError):
+        jev_guionado.decidir({"referencia": "lo que sea"}, {})
+
+
+# ---------------------------------------------------------------------------
+# ClienteJevGuionadoPorReferencia (esta unidad, hallazgo del orquestador,
+# investigación de b-0005-b): agrupa por `state["referencia"]`, no una cola
+# FIFO única -- `gateway._resolver_en_paralelo` resuelve cada referencia en
+# su propio hilo, así que el orden real de llegada a `decidir()` no tiene
+# por qué coincidir con el orden de grabación cuando un mensaje trae más de
+# un `trabajo`.
+# ---------------------------------------------------------------------------
+
+def test_cliente_jev_guionado_por_referencia_devuelve_lo_de_cada_una_sin_importar_el_orden():
+    pedidos_grabados = [
+        {"state": {"referencia": "el plc"}, "respuesta": {"tarea": "respuesta-A-1"}},
+        {"state": {"referencia": "lo del cableado"}, "respuesta": {"tarea": "respuesta-B-1"}},
+        {"state": {"referencia": "lo del cableado", "tarea": "x"},
+         "respuesta": {"misma": "respuesta-B-2-verificacion"}},
+    ]
+    cliente = ClienteJevGuionadoPorReferencia(pedidos_grabados=pedidos_grabados)
+
+    # Orden de llamada DELIBERADAMENTE distinto al de grabación -- "lo del
+    # cableado" pide primero, dos veces (su ronda inicial y su verificación),
+    # y "el plc" pide después: con una cola FIFO única esto habría devuelto
+    # las respuestas de "el plc"/"lo del cableado" cruzadas.
+    r_cableado_1 = cliente.decidir({"referencia": "lo del cableado"}, {})
+    r_cableado_2 = cliente.decidir({"referencia": "lo del cableado", "tarea": "x"}, {})
+    r_plc = cliente.decidir({"referencia": "el plc"}, {})
+
+    assert r_cableado_1 == {"tarea": "respuesta-B-1"}
+    assert r_cableado_2 == {"misma": "respuesta-B-2-verificacion"}
+    assert r_plc == {"tarea": "respuesta-A-1"}
+
+
+def test_cliente_jev_guionado_por_referencia_agotada_para_una_referencia_no_afecta_otra():
+    pedidos_grabados = [
+        {"state": {"referencia": "A"}, "respuesta": {"tarea": "respuesta-A"}},
+    ]
+    cliente = ClienteJevGuionadoPorReferencia(pedidos_grabados=pedidos_grabados)
+
+    assert cliente.decidir({"referencia": "A"}, {}) == {"tarea": "respuesta-A"}
+    with pytest.raises(jev.JevError, match="'B'"):
+        cliente.decidir({"referencia": "B"}, {})
+
+
+def test_cliente_jev_guionado_por_referencia_registra_todos_los_pedidos():
+    pedidos_grabados = [{"state": {"referencia": "A"}, "respuesta": {"tarea": "r"}}]
+    cliente = ClienteJevGuionadoPorReferencia(pedidos_grabados=pedidos_grabados)
+    cliente.decidir({"referencia": "A"}, {"p": 1})
+    assert cliente.pedidos == [({"referencia": "A"}, {"p": 1})]
+
+
+def test_resolver_en_paralelo_con_guionado_por_referencia_no_cruza_las_dos_referencias():
+    """Prueba de punta a punta del hallazgo real (b-0005-b): dos referencias
+    del mismo mensaje, resueltas por `gateway._resolver_en_paralelo` (el
+    mismo `ThreadPoolExecutor` de producción), cada una tiene que recibir su
+    propia probabilidad grabada -- nunca la de la otra."""
+    from prisma.gateway import _resolver_en_paralelo
+    from prisma.jev import TareaCandidata
+
+    pedidos_grabados = [
+        {"state": {"referencia": "el plc"},
+         "respuesta": {"alcance": {"probabilities": {"una_tarea": 0.58, "ninguna": 0.13,
+                                                     "varias_tareas": 0.29}},
+                       "tarea": {"probabilities": {"T1": 0.76, "T2": 0.24}}}},
+        {"state": {"referencia": "lo del cableado del tablero"},
+         "respuesta": {"alcance": {"probabilities": {"una_tarea": 0.9, "ninguna": 0,
+                                                     "varias_tareas": 0.1}},
+                       "tarea": {"probabilities": {"T1": 0.01, "T2": 0.99}}}},
+        {"state": {"referencia": "lo del cableado del tablero", "tarea": "x"},
+         "respuesta": {"misma": {"noul": 0.93}, "rival": {"noul": 0.11}}},
+    ]
+    tareas = [
+        TareaCandidata(id="t1", titulo="Programar PLC de la comprimidora (simulado)",
+                       area="ot", responsable="Nahuel Gimenez"),
+        TareaCandidata(id="t2", titulo="Cablear tablero de la máquina 3 (simulado)",
+                       area="ot", responsable="Marcos Tarquini"),
+    ]
+
+    for _ in range(20):     # repetido: el cruce por scheduling era intermitente
+        # Un cliente fresco por vuelta: cada uno sólo tiene una respuesta
+        # grabada por referencia (más su verificación).
+        cliente = ClienteJevGuionadoPorReferencia(pedidos_grabados=list(pedidos_grabados))
+        resultados = _resolver_en_paralelo(
+            cliente, texto="che, anota que depende...",
+            referencias=("lo del cableado del tablero", "el plc"),
+            tareas=tareas, vocabulario="")
+        resolucion_plc, error_plc = resultados["el plc"]
+        resolucion_cab, error_cab = resultados["lo del cableado del tablero"]
+        assert error_plc is None and error_cab is None
+        assert resolucion_plc.tipo is jev.TipoResolucion.AMBIGUA
+        assert resolucion_cab.tipo is jev.TipoResolucion.CLARA
+        assert resolucion_cab.tarea_id == "t2"
 
 
 # ---------------------------------------------------------------------------
@@ -567,7 +673,7 @@ def test_pendiente_para_confirmar_encuentra_la_que_ofrece_confirmar(corework, co
             resumen="¿Confirmás?",
             vence_en=datetime.now(timezone.utc) + timedelta(hours=1), chat_id=tg)
 
-        encontrada = _pendiente_para_confirmar(cur, ws, tg)
+        encontrada = _pendiente_para_confirmar(cur, ws, tg, _MUY_ANTES)
 
     assert encontrada is not None
     pid, token = encontrada
@@ -586,7 +692,7 @@ def test_pendiente_para_confirmar_ignora_una_eleccion_entre_candidatos(corework,
             campo="responsable_membership_id", chat_id=tg,
             opciones=[("Marcos Tarquini", "m1"), ("Martín Forte", "m2")])
 
-        encontrada = _pendiente_para_confirmar(cur, ws, tg)
+        encontrada = _pendiente_para_confirmar(cur, ws, tg, _MUY_ANTES)
 
     assert encontrada is None
 
@@ -595,8 +701,54 @@ def test_pendiente_para_confirmar_sin_ninguna_pendiente_es_none(corework, conn):
     ws = corework.workspace_id
     with espacio(conn, ws) as cur:
         _, tg = _quien(cur, ws)
-        encontrada = _pendiente_para_confirmar(cur, ws, tg)
+        encontrada = _pendiente_para_confirmar(cur, ws, tg, _MUY_ANTES)
     assert encontrada is None
+
+
+# ---------------------------------------------------------------------------
+# `desde` en `_pendiente_para_confirmar` (esta unidad, hallazgo del
+# orquestador): restringe la unión a lo creado durante ESTA corrida, para que
+# una acción que quedó esperando de un turno ANTERIOR del mismo chat no
+# vuelva ambigua (o gane por casualidad) una confirmación de ahora.
+# ---------------------------------------------------------------------------
+
+def test_pendiente_para_confirmar_ignora_una_pendiente_anterior_a_desde(corework, conn):
+    ws = corework.workspace_id
+    with espacio(conn, ws) as cur:
+        quien, tg = _quien(cur, ws)
+        # "Anterior" (de un turno de otra corrida, o de antes en el mismo
+        # chat): queda esperando, pero es de ANTES de `desde`.
+        P.registrar(
+            cur, quien, herramienta="actualizar_estado", args={"a": 1},
+            resumen="¿Confirmás la vieja?",
+            vence_en=datetime.now(timezone.utc) + timedelta(hours=1), chat_id=tg)
+
+        # El reloj de la base, no el de Python (mismo motivo que la
+        # producción usa `clock_timestamp()`, no `now()`): `now()` queda
+        # fijo al inicio de la transacción y no serviría para desempatar acá.
+        cur.execute("select clock_timestamp() as ahora")
+        desde = cur.fetchone()["ahora"]
+
+        encontrada = _pendiente_para_confirmar(cur, ws, tg, desde)
+
+    assert encontrada is None, "una pendiente de antes de `desde` no cuenta"
+
+
+def test_pendiente_para_confirmar_dos_pendientes_de_esta_corrida_es_ambiguo(corework, conn):
+    ws = corework.workspace_id
+    with espacio(conn, ws) as cur:
+        quien, tg = _quien(cur, ws)
+        P.registrar(
+            cur, quien, herramienta="actualizar_estado", args={"a": 1},
+            resumen="¿Confirmás la primera?",
+            vence_en=datetime.now(timezone.utc) + timedelta(hours=1), chat_id=tg)
+        P.registrar(
+            cur, quien, herramienta="registrar_bloqueo", args={"a": 2},
+            resumen="¿Confirmás la segunda?",
+            vence_en=datetime.now(timezone.utc) + timedelta(hours=1), chat_id=tg)
+
+        with pytest.raises(LookupError, match="ambiguo"):
+            _pendiente_para_confirmar(cur, ws, tg, _MUY_ANTES)
 
 
 # ---------------------------------------------------------------------------
@@ -929,7 +1081,7 @@ def test_resolver_toque_generico_encuentra_la_unica_esperando(corework, conn):
             campo="eleccion", chat_id=tg,
             opciones=[("Ver detalle", {"accion": "ver_detalle"})])
 
-        pid, opcion = _resolver_toque_generico(cur, ws, tg, {"etiqueta": "Ver detalle"})
+        pid, opcion = _resolver_toque_generico(cur, ws, tg, {"etiqueta": "Ver detalle"}, _MUY_ANTES)
 
     assert pid == p.id
     assert opcion["etiqueta"] == "Ver detalle"
@@ -940,7 +1092,7 @@ def test_resolver_toque_generico_sin_ninguna_pendiente_bloquea(corework, conn):
     with espacio(conn, ws) as cur:
         _, tg = _quien(cur, ws)
         with pytest.raises(LookupError, match="no hay ninguna acción pendiente"):
-            _resolver_toque_generico(cur, ws, tg, {"etiqueta": "Confirmar"})
+            _resolver_toque_generico(cur, ws, tg, {"etiqueta": "Confirmar"}, _MUY_ANTES)
 
 
 def test_resolver_toque_generico_sin_coincidencia_bloquea(corework, conn):
@@ -955,7 +1107,50 @@ def test_resolver_toque_generico_sin_coincidencia_bloquea(corework, conn):
             opciones=[("Ver detalle", {"accion": "ver_detalle"})])
 
         with pytest.raises(LookupError, match="no lo ofrece"):
-            _resolver_toque_generico(cur, ws, tg, {"etiqueta": "No existe"})
+            _resolver_toque_generico(cur, ws, tg, {"etiqueta": "No existe"}, _MUY_ANTES)
+
+
+def test_resolver_toque_generico_ignora_una_pendiente_anterior_a_desde(corework, conn):
+    """`desde` (esta unidad, hallazgo del orquestador): una acción pendiente
+    que quedó esperando de un turno ANTERIOR (otra corrida del mismo
+    escenario, u otro escenario que comparta chat) no cuenta -- ni para
+    resolver el toque ni para armar ambigüedad."""
+    ws = corework.workspace_id
+    with espacio(conn, ws) as cur:
+        quien, tg = _quien(cur, ws)
+        P.registrar(
+            cur, quien, herramienta=P.SENTINEL_MENU_TAREA, args={},
+            resumen="¿Qué querés hacer (de otra corrida)?",
+            vence_en=datetime.now(timezone.utc) + timedelta(hours=1),
+            campo="eleccion", chat_id=tg,
+            opciones=[("Ver detalle", {"accion": "ver_detalle"})])
+
+        cur.execute("select clock_timestamp() as ahora")
+        desde = cur.fetchone()["ahora"]
+
+        with pytest.raises(LookupError, match="no hay ninguna acción pendiente"):
+            _resolver_toque_generico(cur, ws, tg, {"etiqueta": "Ver detalle"}, desde)
+
+
+def test_resolver_toque_generico_dos_pendientes_de_esta_corrida_es_ambiguo(corework, conn):
+    ws = corework.workspace_id
+    with espacio(conn, ws) as cur:
+        quien, tg = _quien(cur, ws)
+        P.registrar(
+            cur, quien, herramienta=P.SENTINEL_MENU_TAREA, args={},
+            resumen="¿Cuál, primera?",
+            vence_en=datetime.now(timezone.utc) + timedelta(hours=1),
+            campo="eleccion", chat_id=tg,
+            opciones=[("Confirmar", {"accion": "a"})])
+        P.registrar(
+            cur, quien, herramienta=P.SENTINEL_MENU_TAREA, args={},
+            resumen="¿Cuál, segunda?",
+            vence_en=datetime.now(timezone.utc) + timedelta(hours=1),
+            campo="eleccion", chat_id=tg,
+            opciones=[("Confirmar", {"accion": "b"})])
+
+        with pytest.raises(LookupError, match="ambiguo"):
+            _resolver_toque_generico(cur, ws, tg, {"etiqueta": "Confirmar"}, _MUY_ANTES)
 
 
 def test_resolver_toque_generico_tapea_la_correcta_sin_importar_el_orden_fisico(
@@ -987,8 +1182,8 @@ def test_resolver_toque_generico_tapea_la_correcta_sin_importar_el_orden_fisico(
             "where id in (%s, %s)", (primera.id, segunda.id))
         assert cur.fetchone()["n"] == 1
 
-        pid1, opcion1 = _resolver_toque_generico(cur, ws, tg, {"etiqueta": "Primera"})
-        pid2, opcion2 = _resolver_toque_generico(cur, ws, tg, {"etiqueta": "Segunda"})
+        pid1, opcion1 = _resolver_toque_generico(cur, ws, tg, {"etiqueta": "Primera"}, _MUY_ANTES)
+        pid2, opcion2 = _resolver_toque_generico(cur, ws, tg, {"etiqueta": "Segunda"}, _MUY_ANTES)
 
     assert pid1 == primera.id and opcion1["etiqueta"] == "Primera"
     assert pid2 == segunda.id and opcion2["etiqueta"] == "Segunda"
@@ -1016,7 +1211,7 @@ def test_resolver_toque_generico_misma_etiqueta_en_dos_pendientes_bloquea(
             opciones=[("Confirmar", {"accion": "b"})])
 
         with pytest.raises(LookupError, match="ambiguo"):
-            _resolver_toque_generico(cur, ws, tg, {"etiqueta": "Confirmar"})
+            _resolver_toque_generico(cur, ws, tg, {"etiqueta": "Confirmar"}, _MUY_ANTES)
 
 
 # ---------------------------------------------------------------------------

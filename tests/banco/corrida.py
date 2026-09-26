@@ -11,6 +11,7 @@ acordado"). No se usa `agente.responder` directo porque se saltearía
 from __future__ import annotations
 
 import contextlib
+import threading
 import time
 from dataclasses import dataclass, field
 from typing import Any
@@ -176,16 +177,71 @@ class JevGrabador:
         return {"pedidos": list(self.pedidos)}
 
 
-def jev_guionado_desde_grabacion(grabacion: dict) -> ClienteJevGuionado:
-    """Reconstruye un `ClienteJevGuionado` desde el JSON de una grabación
-    completa de `ejecutar_escenario` (que trae la clave `'jev'` con
-    `JevGrabador.a_json()`). Una grabación de antes de T6 no tiene esa
-    clave y tiene que seguir cargando -- guión vacío, nunca llama a Jev de
-    verdad, lo mismo que si el escenario no hubiera traído ninguna
-    referencia a tarea que lo ejercitara."""
+@dataclass
+class ClienteJevGuionadoPorReferencia:
+    """Como `ClienteJevGuionado` (una cola FIFO única), pero agrupa las
+    respuestas grabadas por la referencia de cada pedido
+    (`state["referencia"]`) en vez de una sola cola compartida.
+
+    Hallazgo del orquestador (investigación de `b-0005-b`, 2026-09-26):
+    `gateway._resolver_en_paralelo` resuelve cada referencia a tarea de un
+    mensaje en su propio hilo (`ThreadPoolExecutor`, T3) -- con MÁS de un
+    `trabajo` en el mismo mensaje (el caso real de `b-0005`/`b-0005-b`, dos
+    referencias), el orden real en el que cada hilo llega a llamar
+    `decidir()` no tiene por qué coincidir con el orden en que
+    `JevGrabador` grabó los pedidos originales. Con una cola FIFO única
+    (`ClienteJevGuionado`, `jev_guionado_desde_grabacion` de antes de esta
+    corrección), un pedido de una referencia podía consumir por error la
+    respuesta grabada para OTRA -- reproducido de forma determinística: la
+    reconstrucción de `b-0005-b` pedía siempre la aclaración sobre "lo del
+    cableado del tablero" (la referencia CLARA de la grabación real) en vez
+    de "el plc" (la AMBIGUA real), porque el hilo de la primera llegaba
+    primero a la cola compartida y se llevaba la respuesta grabada para la
+    segunda. El verdicto final de esa corrida (`falla`, ninguna herramienta
+    ejecutada) no cambia con esta corrección -- Jev nunca alcanzó el 0,85 de
+    confianza que exige `CORTE_CLARA` para "el plc" en la corrida real--
+    pero un replay tiene que reproducir la MISMA resolución, no una
+    intercambiada por casualidad de scheduling de hilos.
+
+    Sin credencial ni red, como `ClienteJevGuionado`; con lock porque
+    corre bajo el mismo `ThreadPoolExecutor` que la producción."""
+
+    pedidos_grabados: list[dict]
+    pedidos: list[tuple[dict, dict]] = field(default_factory=list)
+
+    def __post_init__(self) -> None:
+        self._colas: dict[str | None, list[dict]] = {}
+        for p in self.pedidos_grabados:
+            referencia = p.get("state", {}).get("referencia")
+            self._colas.setdefault(referencia, []).append(p["respuesta"])
+        self._lock = threading.Lock()
+
+    def decidir(self, state: dict, preguntas: dict) -> dict:
+        referencia = state.get("referencia")
+        with self._lock:
+            self.pedidos.append((state, preguntas))
+            cola = self._colas.get(referencia)
+            if not cola:
+                raise jev_modulo.JevError(
+                    f"Guión de Jev agotado para la referencia {referencia!r}: "
+                    "falta encolar una respuesta.")
+            return cola.pop(0)
+
+
+def jev_guionado_desde_grabacion(grabacion: dict) -> ClienteJevGuionadoPorReferencia:
+    """Reconstruye un cliente de Jev guionado desde el JSON de una
+    grabación completa de `ejecutar_escenario` (que trae la clave `'jev'`
+    con `JevGrabador.a_json()`). Una grabación de antes de T6 no tiene esa
+    clave y tiene que seguir cargando -- sin pedidos grabados, nunca llama a
+    Jev de verdad, lo mismo que si el escenario no hubiera traído ninguna
+    referencia a tarea que lo ejercitara.
+
+    Agrupado por referencia (`ClienteJevGuionadoPorReferencia`), no una cola
+    FIFO única -- ver su docstring: con más de un `trabajo` en el mismo
+    mensaje, `_resolver_en_paralelo` los resuelve en hilos separados y el
+    orden de llegada a una cola compartida no está garantizado."""
     pedidos = grabacion.get("jev", {}).get("pedidos", [])
-    guion = [p["respuesta"] for p in pedidos]
-    return ClienteJevGuionado(guion=guion)
+    return ClienteJevGuionadoPorReferencia(pedidos_grabados=pedidos)
 
 
 # ---------------------------------------------------------------------------
@@ -409,46 +465,64 @@ def _herramientas_registradas(cur, workspace_id: str) -> list[str]:
     return [f["accion"].split(":", 1)[1] for f in cur.fetchall()]
 
 
-def _pendiente_para_confirmar(cur, workspace_id: str, chat_id: int) -> tuple[str, str] | None:
-    """La última acción pendiente 'esperando' de este chat que ofrece un
-    botón Confirmar -- la vista previa de una herramienta que escribe (T1,
-    `pending_action` con huella). Una `NecesitaElegir` (candidatos ambiguos,
-    p. ej. a quién asignar) tiene sus propios botones, sin Confirmar, y no se
-    toca acá: el banco no adivina una elección por la persona.
+def _pendiente_para_confirmar(cur, workspace_id: str, chat_id: int,
+                              desde) -> tuple[str, str] | None:
+    """La acción pendiente 'esperando' de este chat, creada durante ESTA
+    corrida (`creado_en >= desde`), que ofrece un botón Confirmar -- la
+    vista previa de una herramienta que escribe (T1, `pending_action` con
+    huella). Una `NecesitaElegir` (candidatos ambiguos, p. ej. a quién
+    asignar) tiene sus propios botones, sin Confirmar, y no se toca acá: el
+    banco no adivina una elección por la persona.
+
+    `desde` (revisión del orquestador, mismo motivo que `_resolver_toque_
+    generico`/`_aclaraciones_para_elegir`): sin este filtro, una acción
+    pendiente que quedó esperando de un turno ANTERIOR del mismo chat
+    (fuera del alcance de esta corrida) podía mezclarse con la de ahora --
+    antes además se elegía "la última" con `order by creado_en desc limit
+    1`, sin ningún desempate real (`creado_en` es igual para dos filas de la
+    misma transacción). Con más de una coincidencia DISTINTA, ambiguo: se
+    levanta `LookupError`, nunca se adivina cuál -- mismo criterio que
+    `_resolver_toque_generico`.
 
     Devuelve `(pending_action_id, token_de_confirmar)`, o `None` si no hay
-    ninguna o la que hay no ofrece Confirmar.
+    ninguna de esta corrida o ninguna ofrece Confirmar.
     """
     cur.execute(
         """select id from pending_action
             where workspace_id = %s and chat_id = %s and estado = 'esperando'
-            order by creado_en desc limit 1""",
-        (workspace_id, chat_id))
-    fila = cur.fetchone()
-    if not fila:
-        return None
-    pid = str(fila["id"])
-    try:
-        opcion = P.opcion_por_etiqueta(cur, pid, "Confirmar")
-    except LookupError:
-        return None
-    return pid, opcion.token
+              and creado_en >= %s""",
+        (workspace_id, chat_id, desde))
+    candidatas = []
+    for fila in cur.fetchall():
+        pid = str(fila["id"])
+        try:
+            opcion = P.opcion_por_etiqueta(cur, pid, "Confirmar")
+        except LookupError:
+            continue
+        candidatas.append((pid, opcion.token))
+
+    if len(candidatas) > 1:
+        raise LookupError(
+            f"{len(candidatas)} acciones pendientes distintas de este chat "
+            "ofrecen Confirmar en esta corrida -- ambiguo, no se adivina cuál.")
+    return candidatas[0] if candidatas else None
 
 
-def _aclaraciones_para_elegir(cur, workspace_id: str, chat_id: int) -> list[tuple[str, str]]:
-    """TODAS las acciones pendientes 'esperando' de este chat que dejaron una
-    referencia ambigua lista para elegir con botones, por cualquiera de las
-    dos formas en que Prisma la ofrece (T4, revisión del orquestador
-    2026-09-26): la aclaración con botones de siempre (T6,
-    `aclaracion-con-botones`, `gateway._SENTINEL_ACLARACION`) o una elección
-    del modelo por `ofrecer_opciones` (T1, ADR 0007,
-    `pendientes.SENTINEL_OPCIONES_MODELO`) que ofreció las mismas tareas
-    como botones. Antes de esta corrección el corredor sólo reconocía la
-    primera -- una corrida real (b-0013, 2026-09-26) donde el modelo
-    resolvió la ambigüedad con `ofrecer_opciones` (comportamiento correcto,
-    ADR 0007) quedaba con `comprobar_aclaracion` marcando "no ofreció botón"
-    (ofrecidas: []) y sin tocar nada, porque el corredor nunca tapeaba esa
-    forma.
+def _aclaraciones_para_elegir(cur, workspace_id: str, chat_id: int,
+                              desde) -> list[tuple[str, str]]:
+    """TODAS las acciones pendientes 'esperando' de este chat, creadas
+    durante ESTA corrida (`creado_en >= desde`), que dejaron una referencia
+    ambigua lista para elegir con botones, por cualquiera de las dos formas
+    en que Prisma la ofrece (T4, revisión del orquestador 2026-09-26): la
+    aclaración con botones de siempre (T6, `aclaracion-con-botones`,
+    `gateway._SENTINEL_ACLARACION`) o una elección del modelo por
+    `ofrecer_opciones` (T1, ADR 0007, `pendientes.SENTINEL_OPCIONES_MODELO`)
+    que ofreció las mismas tareas como botones. Antes de esta corrección el
+    corredor sólo reconocía la primera -- una corrida real (b-0013,
+    2026-09-26) donde el modelo resolvió la ambigüedad con `ofrecer_opciones`
+    (comportamiento correcto, ADR 0007) quedaba con `comprobar_aclaracion`
+    marcando "no ofreció botón" (ofrecidas: []) y sin tocar nada, porque el
+    corredor nunca tapeaba esa forma.
 
     Revisión del orquestador (T4, hallazgo de revisión): antes se quedaba
     con una sola fila (`order by creado_en desc limit 1`), sin ningún
@@ -456,12 +530,18 @@ def _aclaraciones_para_elegir(cur, workspace_id: str, chat_id: int) -> list[tupl
     transacción comparten `creado_en` (`now()` de Postgres es constante
     dentro de una transacción). Devuelve TODAS las que haya (vacío si
     ninguna): quien llama resuelve contra la UNIÓN de sus opciones, nunca
-    contra una elegida por orden."""
+    contra una elegida por orden.
+
+    `desde` (esta unidad, hallazgo del orquestador): sin este filtro, una
+    acción pendiente de aclaración que quedó esperando de un turno ANTERIOR
+    del mismo chat (fuera del alcance de esta corrida) podía sumarse a la
+    unión y volver ambiguo un toque que en esta corrida no lo es."""
     cur.execute(
         """select id, herramienta from pending_action
             where workspace_id = %s and chat_id = %s and herramienta in (%s, %s)
-              and estado = 'esperando'""",
-        (workspace_id, chat_id, gateway._SENTINEL_ACLARACION, P.SENTINEL_OPCIONES_MODELO))
+              and estado = 'esperando' and creado_en >= %s""",
+        (workspace_id, chat_id, gateway._SENTINEL_ACLARACION,
+         P.SENTINEL_OPCIONES_MODELO, desde))
     return [(str(f["id"]), f["herramienta"]) for f in cur.fetchall()]
 
 
@@ -510,33 +590,42 @@ def _resolver_opcion_toque(opciones: list[dict], toque: dict) -> dict | None:
 
 
 def _resolver_toque_generico(cur, workspace_id: str, chat_id: int,
-                             toque: dict) -> tuple[str, dict]:
+                             toque: dict, desde) -> tuple[str, dict]:
     """Resuelve un toque genérico de escenario (T4, `Escenario.toques`)
     contra la UNIÓN de las opciones de TODAS las acciones pendientes
-    'esperando' de este chat -- nunca contra "la última" elegida por orden
-    (revisión del orquestador, hallazgo de revisión: `_pendiente_actual`
-    desataba el empate con `order by creado_en desc, ctid desc`, pero
-    `creado_en` es igual para dos filas creadas en la misma transacción y
-    `ctid` no es una garantía general de Postgres bajo escritura
-    concurrente -- sólo "funcionaba" porque el banco corre en serie, y aun
-    así elegía cualquiera de las dos sin ningún criterio de negocio).
+    'esperando' de este chat, CREADAS DURANTE ESTA CORRIDA (`creado_en >=
+    desde`) -- nunca contra "la última" elegida por orden (revisión del
+    orquestador, hallazgo de revisión: `_pendiente_actual` desataba el
+    empate con `order by creado_en desc, ctid desc`, pero `creado_en` es
+    igual para dos filas creadas en la misma transacción y `ctid` no es una
+    garantía general de Postgres bajo escritura concurrente -- sólo
+    "funcionaba" porque el banco corre en serie, y aun así elegía cualquiera
+    de las dos sin ningún criterio de negocio).
+
+    `desde` (esta unidad, hallazgo del orquestador): sin este filtro, una
+    acción pendiente que quedó esperando de un turno ANTERIOR del mismo chat
+    -- de una corrida previa del mismo escenario contra `--banco-n`, o de
+    otro escenario que compartiera chat -- se sumaba a la unión y podía
+    volver ambiguo (o resolver contra la fila equivocada) un toque que en
+    esta corrida no lo es.
 
     Devuelve `(pending_action_id, opcion)` de la única acción pendiente que
     ofrece lo que pide `toque`. Levanta `LookupError` -- que
     `ejecutar_escenario` atrapa y deja la corrida `bloqueada` con un motivo
     legible, nunca `aprobada` por una adivinanza -- en cualquiera de estos
-    tres casos: no hay ninguna acción pendiente esperando en este chat;
-    ninguna la ofrece; o más de una acción pendiente DISTINTA la ofrece
-    (ambiguo, no se adivina cuál)."""
+    tres casos: no hay ninguna acción pendiente esperando en este chat de
+    esta corrida; ninguna la ofrece; o más de una acción pendiente DISTINTA
+    la ofrece (ambiguo, no se adivina cuál)."""
     cur.execute(
         """select id from pending_action
-            where workspace_id = %s and chat_id = %s and estado = 'esperando'""",
-        (workspace_id, chat_id))
+            where workspace_id = %s and chat_id = %s and estado = 'esperando'
+              and creado_en >= %s""",
+        (workspace_id, chat_id, desde))
     ids_esperando = [str(f["id"]) for f in cur.fetchall()]
     if not ids_esperando:
         raise LookupError(
             f"El escenario pide tocar {toque!r}, pero no hay ninguna acción "
-            "pendiente esperando en este chat.")
+            "pendiente esperando en este chat, en esta corrida.")
 
     coincidencias: list[tuple[str, dict]] = []
     etiquetas_todas: list[str] = []
@@ -669,6 +758,16 @@ def ejecutar_escenario(
         cur.execute("select id from incident where workspace_id = %s",
                     (workspace_id,))
         ids_incidentes_previos = {f["id"] for f in cur.fetchall()}
+        # Reloj de la base, no de la aplicación (revisión del orquestador,
+        # hallazgo de revisión): marca el arranque de ESTA corrida para que
+        # `_resolver_toque_generico`/`_aclaraciones_para_elegir`/
+        # `_pendiente_para_confirmar` sólo vean acciones pendientes
+        # 'esperando' creadas a partir de acá -- una acción que quedó
+        # esperando de un turno anterior del mismo chat (otra corrida del
+        # mismo escenario, u otro escenario que comparta chat) no puede
+        # volver ambiguo un toque de esta corrida.
+        cur.execute("select clock_timestamp() as ahora")
+        desde_corrida = cur.fetchone()["ahora"]
 
     bloqueado = False
     motivo_bloqueo = ""
@@ -692,7 +791,8 @@ def ejecutar_escenario(
         # de más en el medio, no sólo hasta acá.
         if aclaracion_esperada:
             with admin(conn) as cur:
-                pendientes_aclaracion = _aclaraciones_para_elegir(cur, workspace_id, chat)
+                pendientes_aclaracion = _aclaraciones_para_elegir(
+                    cur, workspace_id, chat, desde_corrida)
                 opciones_por_pendiente = {
                     pid: _opciones_pendiente(cur, pid) for pid, _ in pendientes_aclaracion}
 
@@ -744,7 +844,8 @@ def ejecutar_escenario(
         # ya vale con la aclaración.
         for toque in (toques or []):
             with admin(conn) as cur:
-                _, objetivo = _resolver_toque_generico(cur, workspace_id, chat, toque)
+                _, objetivo = _resolver_toque_generico(
+                    cur, workspace_id, chat, toque, desde_corrida)
             _tocar_opcion(conn, slug, chat, tg_id, objetivo["token"])
 
         # El turno pudo haber dejado una propuesta de una herramienta que
@@ -761,7 +862,7 @@ def ejecutar_escenario(
         # Confirmar.
         with admin(conn) as cur:
             herramientas_antes_del_toque = _herramientas_registradas(cur, workspace_id)
-            pendiente = _pendiente_para_confirmar(cur, workspace_id, chat)
+            pendiente = _pendiente_para_confirmar(cur, workspace_id, chat, desde_corrida)
             if pendiente is not None:
                 conteos_antes_del_toque = _conteos(cur, workspace_id)
 

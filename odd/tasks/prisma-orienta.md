@@ -1988,6 +1988,276 @@ texto con opciones, +3 netas del banco -- 6 nuevas de `_resolver_toque_
 generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
 `_pendiente_actual`), 200s.
 
-- **Próximo paso al retomar:** banco real para verificar b-0001-a y
-  b-0005-a, después T5.
+- 2026-09-26: **Ocho correcciones de seguimiento sobre revisiones ya
+  aprobadas.** Ruta: delegada, un escritor, unidades separadas para que el
+  orquestador commitee cada una aparte. Línea base 856 passed, 108
+  deselected.
+
+  **(a) Un solo juego de botones por turno (`agente._ejecutar_una`).**
+  Si el modelo llamaba a `ofrecer_opciones` más de una vez en el mismo
+  turno, `responder` sólo encolaba `opciones_pendientes[0]`, pero
+  `_ejecutar_una` le devolvía a CADA llamada el mismo texto de éxito ("Le
+  voy a mostrar los botones...") -- una mentira al modelo para la segunda
+  llamada, que nunca se mostró. Corrección: si `opciones_pendientes` ya
+  tiene una entrada, una llamada de más se rechaza con
+  `is_error: true` ("ya ofreciste opciones en este turno; no se mostraron
+  estas") y no se suma ni a `elecciones` ni a `opciones_pendientes` (ADR
+  0007, ninguna herramienta nueva, ningún marcador nuevo). Archivo:
+  `src/prisma/agente.py`. Prueba:
+  `tests/test_opciones_modelo.py::test_segunda_llamada_a_ofrecer_opciones_en_el_mismo_turno_no_se_muestra`
+  (dos llamadas en la misma vuelta; verifica `r.elecciones == ["ofrecer_opciones"]`,
+  una sola `pending_action`, y que el segundo `tool_result` sea
+  `is_error: true` con la explicación).
+  RED (código revertido con `git stash`): `1 failed` (elecciones duplicada).
+  GREEN: `tests/test_opciones_modelo.py` -> `17 passed`; barrido
+  (`test_agente.py test_opciones_modelo.py test_menu_tarea.py
+  test_lista_botones.py test_pregunta_sin_opciones.py tests/banco`) ->
+  `289 passed, 108 deselected`.
+
+  **(b) El Confirmar por botón auditaba un rechazo como ejecutado
+  (`gateway.py` ~426-462, mismo defecto de fondo que el ya corregido en
+  `agente._ejecutar_una`).** Al confirmar (`ya_confirmada=True`),
+  `H.ejecutar` puede devolver sin excepción el rechazo de negocio de
+  `preparar` corrido de nuevo (la situación cambió entre la vista previa y
+  el toque, sin llegar a `EstadoCambio` porque la huella puede seguir
+  coincidiendo) -- el código auditaba `herramienta:<nombre>`
+  INCONDICIONALMENTE antes de mirar si el resultado era en realidad ese
+  rechazo. Corrección: se decide primero si `resultado` es un rechazo
+  (`error`/`cerrada is False`/`iniciada is False`, la misma detección que ya
+  usaba el mensaje de abajo); si lo es, se audita
+  `herramienta_rechazada:<nombre>` y el mensaje a la persona es el motivo
+  específico (`falta`/`error`, mismo criterio que
+  `_mensaje_resultado_menu`) en vez del genérico "No se aplicó el cambio.";
+  si no, sigue el camino de siempre (`herramienta:<nombre>`, "Hecho."/borrador).
+  Archivo: `src/prisma/gateway.py`. Prueba nueva en `tests/test_botones.py`
+  (`test_confirmar_una_preparacion_que_rechaza_no_se_audita_como_ejecutada`):
+  crea una dependencia bloqueante DESPUÉS de armar la vista previa de
+  `actualizar_estado` (mismo `tarea_id`/`estado`, huella sin cambiar) y
+  confirma por HTTP -- verifica cero filas `herramienta:actualizar_estado`,
+  una `herramienta_rechazada:actualizar_estado` con el rechazo en el
+  detalle, la tarea intacta y el mensaje sin "Hecho.".
+  RED: `1 failed` (`n == 1` en vez de `0` para `herramienta:actualizar_estado`).
+  GREEN: `tests/test_botones.py` -> `11 passed`; barrido (`test_botones.py
+  test_menu_tarea.py test_vista_previa_confirmacion.py test_dependencias.py
+  test_bloqueos.py test_autoridad_tarea.py test_agente.py test_task_intake.py
+  test_task_drafts.py`) -> `253 passed`.
+
+  **(c) Falsos positivos de `deteccion_pregunta.py`.** Tres correcciones,
+  sin tocar los casos reales que ya protegía el banco
+  (`tests/banco/test_comprobadores.py`, sin cambios, `101 passed` junto con
+  las pruebas nuevas): un "?" dentro de una URL (`?id=5&modo=ver`) ya no
+  cuenta como pregunta (se descarta la URL, `https?://\S+|www\.\S+`, antes
+  de buscar "?"); "elegi"/"cual" pasan a buscarse con borde de palabra
+  (`\belegi\b`, `\bcual\b`) en vez de subcadena, así que "elegido"/"elegida"/
+  "elegimos"/"elegible" y "cualquier"/"cualquiera" dejan de disparar un
+  pedido de elección falso. Archivo: `src/prisma/deteccion_pregunta.py`.
+  Pruebas nuevas en `tests/test_deteccion_pregunta.py` (URL con "?", pregunta
+  real junto a una URL sigue contando, las cuatro formas de "elegi" como
+  subcadena, dos formas de "cualquier"). RED: `3 failed` (las tres exactas).
+  GREEN: `tests/test_deteccion_pregunta.py tests/banco/test_comprobadores.py`
+  -> `101 passed`; barrido (+ `test_pregunta_sin_opciones.py test_agente.py
+  tests/banco test_task_intake.py`) -> `324 passed, 108 deselected`.
+
+  **(d) `gateway._mostrar_tareas_propias` (T4b): tres correcciones.**
+  1. Se agregó `menu_tarea.tareas_activas_de_persona` -- la regla
+  compartida de "tarea activa" (`estado not in ('terminada','cancelada')`),
+  con `excluir_tarea_id`/`limite` opcionales -- y tanto `tareas_activas_de`
+  (T2, elección de dependencia) como `_mostrar_tareas_propias` la llaman en
+  vez de cada una tener su propia consulta duplicada. 2. Orden
+  determinístico: se agrega `id` como segundo criterio después de
+  `fecha_objetivo nulls last` (antes, sin desempate, el orden entre tareas
+  sin fecha o con la misma fecha dependía del orden físico de Postgres).
+  3. El `limit 25` que cortaba en silencio se saca: se piden TODAS las
+  tareas activas y se pagina con el armador ya existente de T3
+  (`agente._opciones_lista_tareas`, "Ver más" con el resto) -- los ids
+  viajan en `pending_action_option.valor` (columna del servidor), nunca en
+  el `callback_data` de Telegram, así que no hay límite de payload que una
+  página más pueda superar. Además: "Es una tarea nueva" ya no se ofrece en
+  el cierre genérico cuando `entrante_id is None` (un turno resumido desde
+  un toque, p. ej. `_resolver_toque_opcion_modelo` llama a `responder` sin
+  `entrante_id`) -- ese botón tiene garantizado fallar
+  (`_iniciar_alta_guiada` exige un `inbound_message` persistido y levanta
+  antes de intentar nada sin uno); sólo quedan las otras dos opciones.
+  Archivos: `src/prisma/menu_tarea.py`, `src/prisma/gateway.py`,
+  `src/prisma/agente.py`. Pruebas nuevas/adaptadas en
+  `tests/test_pregunta_sin_opciones.py`: `test_sin_entrante_id_no_ofrece_es_una_tarea_nueva`
+  (reemplaza la prueba anterior, que esperaba el botón ofrecido y fallando
+  recién al tocarlo);
+  `test_tocar_es_sobre_una_tarea_existente_pagina_mas_alla_del_limite_viejo`
+  (26 tareas, todas visibles tocando "Ver más" las veces que hagan falta);
+  `test_tocar_es_sobre_una_tarea_existente_orden_deterministico_sin_fecha`
+  (5 tareas sin fecha, dos corridas independientes, mismo orden). Dos
+  pruebas existentes (`test_pedido_de_eleccion_en_imperativo_tambien_agrega_el_cierre`,
+  `test_pregunta_larga_se_parte_y_los_botones_van_aparte`) se adaptaron para
+  pasar `entrante_id` (su propósito no era este botón, así que se preserva
+  el caso de 3 opciones que ya probaban). RED: `2 failed` (paginación
+  cortada en 25; botón ofrecido sin `entrante_id`). GREEN:
+  `tests/test_pregunta_sin_opciones.py` -> `16 passed`; barrido (+
+  `test_menu_tarea.py test_lista_botones.py test_dependencias.py
+  test_autoridad_tarea.py test_agente.py test_opciones_modelo.py
+  test_botones.py tests/banco`) -> `348 passed, 108 deselected`.
+  **Regresión de barrido completo encontrada aparte** (no en el barrido de
+  la unidad, en la suite completa):
+  `tests/test_task_intake.py::test_no_mutating_tool_output_is_truth_marked_and_has_no_buttons`
+  esperaba las 3 opciones del cierre genérico sin pasar `entrante_id` --
+  adaptada a esperar sólo las 2 que corresponden ahora (su propósito, que
+  "Confirm?" del modelo nunca termine en una confirmación real, no cambió).
+
+  **(e) `test_rechazo_de_preparacion_no_bloquea_una_ejecucion_real_despues`
+  (tautológica) reemplazada.** La versión anterior escribía ELLA MISMA la
+  fila `herramienta:crear_dependencia` con `registrar_auditoria` en vez de
+  producirla por un camino real -- no probaba nada que `_ejecutar_una`/
+  `gateway._toque` pudieran romper. Reemplazada por dos pasos reales con la
+  MISMA herramienta: (1) el modelo llama `crear_dependencia` con un destino
+  inexistente, vía `agente.responder` -- se audita
+  `herramienta_rechazada:crear_dependencia` y el modelo recibe
+  `is_error: true`; (2) el modelo la llama de nuevo con argumentos válidos
+  -- queda esperando Confirmar -- y la persona confirma por botón, el mismo
+  camino HTTP de `gateway._toque` (unidad (b) de esta sesión). Sólo la
+  segunda escribe la fila `dependency` y se audita
+  `herramienta:crear_dependencia`. Archivo: `tests/test_agente.py`.
+  Decisión de implementación: la vista previa (paso 2) se arma con
+  `ahora=datetime.now(timezone.utc)` real, no la `AHORA` fija en el pasado
+  que usa el resto del archivo -- si no, la `pending_action` ya está
+  `vencida` para cuando el toque HTTP (que sí usa la hora real) intenta
+  resolverla. Verificado que la prueba pasa igual contra el código previo a
+  las unidades (a)/(b) de esta sesión (no depende de ninguna de las dos:
+  reemplaza el antipatrón, no fija un defecto nuevo de esas dos). GREEN:
+  `tests/test_agente.py` -> `2 passed` (la nueva + su vecina de rechazo);
+  barrido (`test_agente.py test_dependencias.py test_botones.py
+  test_vista_previa_confirmacion.py`) -> `72 passed`.
+
+  **(f) Prueba multi-vuelta para `agente.py`: qué texto queda con las
+  opciones.** Cobertura, no corrección -- el código ya elegía bien
+  (`texto_al_ofrecer`, fijado la primera vez que crece
+  `opciones_pendientes`, nunca sobrescrito por una vuelta posterior). Prueba
+  nueva: dos vueltas, la primera llama a `ofrecer_opciones` con un texto que
+  describe contexto, la segunda (sin llamadas, cierra el turno) repite un
+  relleno ("Listo, ahí tenés las opciones.") -- se verifica que el texto
+  que viaja con los botones es el de la PRIMERA vuelta. Archivo:
+  `tests/test_opciones_modelo.py`
+  (`test_texto_de_una_vuelta_posterior_a_ofrecer_opciones_se_descarta`).
+  Comprobado por mutación (no por RED, la implementación ya era correcta):
+  se cambió `texto_al_ofrecer` por `salida` (el último texto del turno) en
+  `agente.responder`, la prueba nueva pasó a fallar con el texto de relleno
+  en vez del real, se restauró la línea. GREEN:
+  `tests/test_opciones_modelo.py` -> `18 passed`.
+
+  **(g) Banco: `_pendiente_para_confirmar` sin el mismo filtro de corrida
+  que ya tenían `_resolver_toque_generico`/`_aclaraciones_para_elegir`
+  (hallazgo del orquestador).** Las tres funciones resuelven contra
+  acciones pendientes 'esperando' de un chat; sólo las últimas dos ya
+  restringían la unión a lo creado durante la corrida actual (unidad previa
+  del 2026-09-26). Se agrega `desde` (capturado con `clock_timestamp()` de
+  Postgres, no `now()` -- `now()` queda fijo al inicio de la transacción y
+  no serviría para el corte -- justo antes de correr los mensajes del
+  escenario) a las tres funciones: `creado_en >= desde` en la consulta, y
+  `_pendiente_para_confirmar` pasa de "la última por `order by` " a la
+  UNIÓN + ambigüedad (más de una `pending_action` distinta que ofrezca
+  Confirmar en esta corrida levanta `LookupError`, igual criterio que
+  `_resolver_toque_generico`) en vez de adivinar con
+  `order by creado_en desc limit 1`. Archivo: `tests/banco/corrida.py`
+  (sólo `tests/banco/`, sin tocar `src/` ni el esquema). Pruebas nuevas en
+  `tests/banco/test_corrida.py`: exclusión de una pendiente anterior a
+  `desde` (dos, una por función) y ambigüedad con dos pendientes de esta
+  corrida (dos, una por función); las pruebas existentes de las tres
+  funciones se actualizaron para pasar el parámetro nuevo (`_MUY_ANTES`,
+  una fecha del año 2000, cuando el filtro no es lo que se está probando).
+  RED (`git stash` de `corrida.py`): `12 failed`
+  (`TypeError: takes N positional arguments but N+1 were given`, las nueve
+  llamadas ya adaptadas más las tres pruebas nuevas). GREEN:
+  `tests/banco/test_corrida.py` -> `53 passed`; `tests/banco` ->
+  `201 passed, 108 deselected`.
+
+  **(h) Investigación: `b-0005-b` falla 3/3 en todo banco real (evidencia:
+  `tests/banco/reportes/replay-candidato-b-0005-b-{0,1,2}.json`).**
+
+  Causa real, verificada replayando las tres grabaciones
+  (`tests/banco/replays/`, temporal, borrado después) contra
+  `tests/banco/test_replays.py`: el router clasificó correctamente el
+  mensaje ("che, anota q lo del cableado del tablero depende de q termine
+  primero el plc") como `normal_conversation`, con dos `trabajos` a
+  resolver ("lo del cableado del tablero", "el plc"). Jev resolvió "lo del
+  cableado del tablero" CLARA (T2, 0,99 de probabilidad) pero "el plc" sólo
+  llegó a 0,76 de probabilidad / 0,53 de confianza para T1 -- por debajo de
+  `jev.CORTE_CLARA = 0,85` -- así que quedó AMBIGUA. Con una referencia
+  ambigua y candidatas reales, el servidor abre la aclaración con botones
+  (ADR 0006) ANTES de llegar a `agente.responder`: el modelo nunca se llega
+  a consultar (`"respuestas": []` en la grabación) y `crear_dependencia`
+  nunca se llama. El escenario `b-0005-b.yaml` no declara
+  `aclaracion_esperada` ni un toque que conteste esa pregunta, así que la
+  corrida termina ahí, con `herramientas: []` y sin la dependencia --
+  exactamente el `falla` que reporta cada corrida real.
+
+  **Esto es comportamiento de Jev (el modelo), evaluado contra un umbral ya
+  codificado a propósito (`CORTE_CLARA`), no un defecto de Prisma ni del
+  router** -- "el plc" es una referencia genuinamente informal para
+  "Programar PLC de la comprimidora (simulado)" y Jev no llegó al 85% que
+  exige el diseño para no preguntar. **No se cambiaron las expectativas del
+  escenario** (sigue esperando `crear_dependencia`/la dependencia, con
+  severidad "media"): documentar que Jev necesita más contexto o ajustar el
+  umbral es una decisión de producto/tuning que excede esta investigación,
+  no un código a corregir. `b-0005-b` sigue confirmando lo mismo que
+  documentó su creación: la variante de redacción no cambia el resultado, y
+  el motivo real (acá) resultó distinto del defecto histórico documentado
+  para `b-0005` (`odd/tasks/banco-conversacional.md`: aquel era el router
+  clasificando como `start_task_intake`; éste es la confianza de Jev para
+  una referencia terca, con el router ya clasificando bien).
+
+  **Defecto real encontrado y corregido durante la investigación, ajeno al
+  veredicto de `b-0005-b`: `ClienteJevGuionado` (una sola cola FIFO) puede
+  cruzar las respuestas grabadas entre dos referencias del mismo mensaje.**
+  `gateway._resolver_en_paralelo` resuelve cada referencia en su propio
+  hilo (`ThreadPoolExecutor`, T3); con una cola compartida, el hilo que
+  llega primero a `decidir()` se lleva la respuesta grabada para la
+  referencia que sea -- reproducido de forma determinística (5/5): el
+  replay de `b-0005-b` pedía siempre la aclaración sobre "lo del cableado
+  del tablero" (la CLARA real) en vez de "el plc" (la AMBIGUA real). El
+  verdicto final no cambiaba (seguía `falla`), pero un replay tiene que
+  reproducir la MISMA resolución, no una intercambiada por el orden de
+  scheduling de los hilos -- afecta a cualquier escenario guionado con 2+
+  `trabajos` en el mismo mensaje, no sólo a `b-0005-b`. Corrección: nueva
+  `ClienteJevGuionadoPorReferencia` (`tests/banco/corrida.py`, sólo el
+  arnés de pruebas -- `ClienteJevGuionado` en `src/prisma/jev.py` sigue
+  igual, la usan decenas de pruebas unitarias de una sola referencia que no
+  tienen este problema) que agrupa las respuestas grabadas por
+  `state["referencia"]` en colas propias, con lock; `jev_guionado_desde_grabacion`
+  la usa en vez de una `ClienteJevGuionado` plana. Pruebas nuevas en
+  `tests/banco/test_corrida.py`: mapeo correcto sin importar el orden de
+  llamada; una referencia agotada no afecta a otra; registro de pedidos
+  intacto; y una de punta a punta contra `gateway._resolver_en_paralelo`
+  real (20 repeticiones) con las probabilidades reales de la grabación de
+  `b-0005-b`, verificando que "el plc" siempre sale AMBIGUA y "lo del
+  cableado del tablero" siempre CLARA→T2. Dos pruebas existentes
+  (`test_jev_grabacion_json_es_serializable_y_recargable`,
+  `test_jev_grabacion_vieja_sin_clave_jev_sigue_cargando`) se actualizaron
+  para el tipo nuevo. Comprobado por mutación: con la clase vieja
+  (`ClienteJevGuionado` plana) en la prueba de punta a punta, "el plc" sale
+  CLARA→T2 (cruzada) -- falla exactamente como se esperaba; restaurada la
+  clase nueva. RED (función revertida a la cola plana): `2 failed`
+  (las dos pruebas adaptadas, por `isinstance`). GREEN:
+  `tests/banco/test_corrida.py -k jev` -> `7 passed`; `tests/banco` ->
+  `205 passed, 108 deselected`.
+
+  **Verificación final de las ocho unidades:**
+  `.venv/Scripts/python.exe -m pytest -q` -> primera corrida `1 failed,
+  872 passed, 108 deselected` (regresión real de la unidad (d) sobre
+  `test_task_intake.py`, corregida arriba); segunda corrida ->
+  `873 passed, 108 deselected` (línea base 856 + 17 pruebas nuevas: 1(a) +
+  1(b) + 5(c, 5 nuevas) + 3(d, netas: 1 reemplazada + 2 nuevas) + 0(e,
+  reemplazo sin cambiar la cuenta) + 1(f) + 4(g) + 6(h, netas: 4 nuevas +
+  2 adaptadas sin cambio de cuenta), 208s en total.
+
+  Abierto (ninguno bloquea T5):
+  - `b-0005`/`b-0005-b`: siguen documentados como fallas reales del banco,
+    de origen distinto (router vs. confianza de Jev) -- **PENDIENTE** de
+    una decisión de producto sobre `jev.CORTE_CLARA` o sobre enriquecer el
+    contexto que recibe Jev para referencias informales de una sola
+    palabra clave ("el plc"), fuera del alcance de esta sesión.
+  - Mismas brechas fuera de alcance de unidades anteriores sin cambios:
+    autoridad para `cancelada` (T2b), "Adjuntar evidencia" del aprobador en
+    el menú (T2).
+  - No se corrió el banco real (`-m modelo_real`) en esta sesión.
+
+- **Próximo paso al retomar:** T5 (continuidad y segunda sesión por Telegram).
 
