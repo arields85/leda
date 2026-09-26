@@ -34,6 +34,7 @@ from .autoridad import Denegado, Solicitante
 from .calendario import Calendario
 from .contexto import construir, historial, revisar_salida
 from .db import registrar_auditoria
+from .deteccion_pregunta import hace_pregunta
 from .llm import Llamada, Proveedor, Respuesta
 from .salida import (BUTTON_TEXT_LIMIT, enqueue_outbox, normalize_visible_text,
                      prepare_payload, telegram_utf16_units,
@@ -194,6 +195,16 @@ def responder(cur: psycopg.Cursor, quien: Solicitante, texto_entrante: str,
     if ultima_lista_tareas:
         _encolar_respuesta_con_tareas(cur, quien, chat_id, salida,
                                       ultima_lista_tareas, ahora)
+    elif hace_pregunta(salida):
+        # T4b (ADR 0007, corrida real b-0007): el modelo cerró preguntando en
+        # texto abierto sin ofrecer ningún botón propio -- el servidor agrega
+        # el cierre genérico de tres botones (decisión del usuario,
+        # 2026-09-26) en vez de dejar pasar la pregunta abierta. Nunca compite
+        # con la lista de T3 (rama `elif`, no una condición aparte) ni con
+        # confirmaciones/elecciones de una herramienta (ya cerraron el turno
+        # antes, línea ~161).
+        _encolar_opciones_genericas(cur, quien, chat_id, salida, ahora,
+                                    entrante_id, texto_entrante)
     else:
         _encolar_respuesta(cur, quien, chat_id, salida, cal, ahora)
     auditar(salida)
@@ -466,61 +477,44 @@ def _opciones_lista_tareas(tareas: list[dict]) -> list[tuple[str, dict]]:
 _TEXTO_BOTONES_LISTA_TAREAS = "Elegí una tarea:"
 
 
-def _encolar_respuesta_con_tareas(cur, quien: Solicitante, chat_id: int,
-                                  texto: str, tareas: list[dict],
-                                  ahora: datetime) -> None:
-    """T3 (ADR 0007 punto 3): el servidor, no el modelo, garantiza que una
-    lista de tareas salga como botones -- reusando el mecanismo de T1
-    (`pendientes.SENTINEL_OPCIONES_MODELO`): tocar una tarea abre su menú
-    (T2), tocar "Ver más" pagina en `gateway._mostrar_mas_tareas` sin volver a
-    llamar al modelo, y siempre queda la salida de siempre. Costo aceptado
-    (decisión del usuario): una respuesta que sólo dio un conteo también
-    lleva estos botones.
-
-    Corrección tras revisión del orquestador sobre T3: un mensaje con
-    botones nunca se parte y no puede superar `BUTTON_TEXT_LIMIT`
-    (`salida.prepare_payload`) -- mandar el texto del modelo CON los botones,
-    como hacía la primera versión, levantaba `PayloadValidationError` en
-    cuanto la respuesta pasaba ese límite, y la persona se quedaba con el
-    aviso neutro de incidente en vez de su lista. Antes de T3, esa misma
-    respuesta iba por `_encolar_respuesta`, que sí parte.
+def _encolar_texto_con_opciones(cur, quien: Solicitante, chat_id: int,
+                                texto: str, opciones: list[tuple[str, dict]],
+                                ahora: datetime, *, dedupe_prefijo: str,
+                                texto_corto: str, args: dict) -> None:
+    """Botones de T1 (`pendientes.SENTINEL_OPCIONES_MODELO`) junto con un
+    texto que puede superar `BUTTON_TEXT_LIMIT` -- extraído de T3
+    (revisión del orquestador sobre `_encolar_respuesta_con_tareas`, T3a)
+    para que T4b (el cierre genérico de una pregunta sin opciones) reuse la
+    misma decisión en vez de duplicarla.
 
     `pendientes.registrar` valida el `resumen` que se le pasa contra
     `BUTTON_TEXT_LIMIT` sin excepción -- es el texto que se manda junto con
     estos botones, así que no alcanza con decidir el mensaje DESPUÉS de
     registrar la `pending_action`: el texto largo tiene que quedar afuera de
     `resumen` desde antes de llamar a `registrar`, o la excepción salta ahí
-    mismo (así fallaba la primera versión de esta corrección, que sólo movía
-    la decisión a `enqueue_outbox` y seguía pasando el texto completo como
-    `resumen`). Por eso la decisión se toma primero, sobre `texto`: si entra
-    en `BUTTON_TEXT_LIMIT` (normalizado, medido con la misma regla UTF-16 de
-    `prepare_payload`), `resumen` es el texto del modelo y todo sigue como
+    mismo. Por eso la decisión se toma primero, sobre `texto`: si entra en
+    `BUTTON_TEXT_LIMIT` (normalizado, medido con la misma regla UTF-16 de
+    `prepare_payload`), `resumen` es el texto tal cual y todo sigue como
     siempre (botones en el mismo mensaje). Si no entra, `resumen` pasa a ser
-    `_TEXTO_BOTONES_LISTA_TAREAS`, un texto corto fijo que sí entra siempre; el
-    texto completo del modelo sale aparte, ANTES, partido exactamente como lo
-    partiría `_encolar_respuesta`. El mensaje de botones se programa después
-    de la ÚLTIMA parte del texto (`programado_para`, lo único que ordena
+    `texto_corto` -- un texto corto fijo que sí entra siempre --; el texto
+    completo sale aparte, ANTES, partido exactamente como lo partiría
+    `_encolar_respuesta`. El mensaje de botones se programa después de la
+    ÚLTIMA parte del texto (`programado_para`, lo único que ordena
     `despachador.despachar`) para que la entrega quede determinística: el
     texto primero -- todas sus partes, en orden -- y los botones después,
-    nunca al revés (corrección sobre el defecto de partes con la misma marca,
-    revisión del orquestador del 2026-09-26: ver comentario en la llamada de
-    abajo y en `salida.enqueue_outbox`).
+    nunca al revés.
 
-    `args={"pregunta": texto}` guarda el texto completo del modelo pase lo
-    que pase con `resumen` -- por consistencia con la forma que ya tiene
-    `pending_action.args` para este sentinel (T1), aunque ninguna de las
-    opciones de una lista de tareas lo lee: una tarea con `accion: "menu"`
-    nunca retoma la conversación, y "Ver más"/la salida tampoco.
-    """
-    opciones = _opciones_lista_tareas(tareas)
-    opciones.append((P.ETIQUETA_SALIR_OPCIONES, {"tipo": "salida"}))
-
+    `dedupe_prefijo` distingue el mecanismo que llama (`lista-tareas`,
+    `opciones-genericas`) para que las claves de una llamada nunca choquen
+    con las de otra; `args` es lo que guarda `pending_action.args` (igual
+    para las tres opciones de un mismo cierre, nunca algo por opción)."""
+    opciones = list(opciones)
     cabe_con_botones = (
         telegram_utf16_units(normalize_visible_text(texto)) <= BUTTON_TEXT_LIMIT)
-    resumen_botones = texto if cabe_con_botones else _TEXTO_BOTONES_LISTA_TAREAS
+    resumen_botones = texto if cabe_con_botones else texto_corto
 
     p = P.registrar(cur, quien, herramienta=P.SENTINEL_OPCIONES_MODELO,
-                    args={"pregunta": texto}, resumen=resumen_botones,
+                    args=args, resumen=resumen_botones,
                     vence_en=ahora + VIGENCIA_PENDIENTE, campo="eleccion",
                     opciones=opciones, chat_id=chat_id)
     # El id de `p` (fresco por cada `registrar`) identifica el mensaje, no la
@@ -531,12 +525,12 @@ def _encolar_respuesta_con_tareas(cur, quien: Solicitante, chat_id: int,
             cur, workspace_id=quien.workspace_id, chat_id=chat_id,
             recipient_membership_id=quien.membership_id, text=p.resumen,
             scheduled_for=ahora,
-            dedupe_key=f"{quien.workspace_id}:lista-tareas:{p.id}",
+            dedupe_key=f"{quien.workspace_id}:{dedupe_prefijo}:{p.id}",
             is_response=True, pending_action_id=p.id,
         )
         return
 
-    dedupe_key_texto = f"{quien.workspace_id}:lista-tareas:{p.id}:texto"
+    dedupe_key_texto = f"{quien.workspace_id}:{dedupe_prefijo}:{p.id}:texto"
     enqueue_outbox(
         cur, workspace_id=quien.workspace_id, chat_id=chat_id, text=texto,
         recipient_membership_id=quien.membership_id, scheduled_for=ahora,
@@ -563,9 +557,98 @@ def _encolar_respuesta_con_tareas(cur, quien: Solicitante, chat_id: int,
         cur, workspace_id=quien.workspace_id, chat_id=chat_id,
         recipient_membership_id=quien.membership_id, text=p.resumen,
         scheduled_for=ahora + timedelta(microseconds=len(partes)),
-        dedupe_key=f"{quien.workspace_id}:lista-tareas:{p.id}:botones",
+        dedupe_key=f"{quien.workspace_id}:{dedupe_prefijo}:{p.id}:botones",
         is_response=True, pending_action_id=p.id,
     )
+
+
+def _encolar_respuesta_con_tareas(cur, quien: Solicitante, chat_id: int,
+                                  texto: str, tareas: list[dict],
+                                  ahora: datetime) -> None:
+    """T3 (ADR 0007 punto 3): el servidor, no el modelo, garantiza que una
+    lista de tareas salga como botones -- reusando el mecanismo de T1
+    (`pendientes.SENTINEL_OPCIONES_MODELO`): tocar una tarea abre su menú
+    (T2), tocar "Ver más" pagina en `gateway._mostrar_mas_tareas` sin volver a
+    llamar al modelo, y siempre queda la salida de siempre. Costo aceptado
+    (decisión del usuario): una respuesta que sólo dio un conteo también
+    lleva estos botones.
+
+    `args={"pregunta": texto}` guarda el texto completo del modelo pase lo
+    que pase con el `resumen` que arma `_encolar_texto_con_opciones` --por
+    consistencia con la forma que ya tiene `pending_action.args` para este
+    sentinel (T1), aunque ninguna de las opciones de una lista de tareas lo
+    lee: una tarea con `accion: "menu"` nunca retoma la conversación, y "Ver
+    más"/la salida tampoco.
+
+    Corrección tras revisión del orquestador sobre T3: un mensaje con
+    botones nunca se parte y no puede superar `BUTTON_TEXT_LIMIT`
+    (`salida.prepare_payload`) -- mandar el texto del modelo CON los botones,
+    como hacía la primera versión, levantaba `PayloadValidationError` en
+    cuanto la respuesta pasaba ese límite. El armado (partir el texto largo
+    aparte, botones después de la última parte) vive en
+    `_encolar_texto_con_opciones` desde T4b, reusado acá tal cual.
+    """
+    opciones = _opciones_lista_tareas(tareas)
+    opciones.append((P.ETIQUETA_SALIR_OPCIONES, {"tipo": "salida"}))
+    _encolar_texto_con_opciones(
+        cur, quien, chat_id, texto, opciones, ahora,
+        dedupe_prefijo="lista-tareas", texto_corto=_TEXTO_BOTONES_LISTA_TAREAS,
+        args={"pregunta": texto})
+
+
+# T4b (ADR 0007, corrida real b-0007 del 2026-09-26): el cierre genérico
+# cuando Prisma necesita algo de la persona pero termina el turno
+# preguntando en texto abierto, sin ningún botón propio. Mismas etiquetas que
+# ya usa "Es una tarea nueva" de la aclaración con botones (T4,
+# `aclaracion-con-botones`) para la primera -- coincide a propósito, aunque
+# viven en módulos distintos (`gateway._ETIQUETA_NUEVA` no se puede importar
+# acá sin ciclo: `gateway.py` ya importa de `agente.py`).
+_ETIQUETA_TAREA_NUEVA_GENERICA = "Es una tarea nueva"
+_ETIQUETA_TAREA_EXISTENTE_GENERICA = "Es sobre una tarea existente"
+_TEXTO_BOTONES_GENERICO = "Elegí una opción:"
+
+
+def _encolar_opciones_genericas(cur, quien: Solicitante, chat_id: int,
+                                texto: str, ahora: datetime,
+                                entrante_id: str | None,
+                                texto_entrante: str) -> None:
+    """Decisión del usuario (2026-09-26, evidencia
+    `tests/banco/reportes/replay-candidato-b-0007-*.json`): cuando Prisma
+    necesita algo de la persona pero no tiene opciones concretas para
+    ofrecer, el modelo debería llamar a `ofrecer_opciones` igual (regla
+    reforzada en `contexto.PREAMBULO`) -- esto es la red de seguridad del
+    servidor para cuando, aun así, el turno cierra preguntando en texto
+    abierto: agrega un juego FIJO de tres botones en vez de dejar pasar la
+    pregunta sin opciones (ADR 0007, "Prisma orienta, no charla", sin
+    excepción). Reusa el mecanismo de T1
+    (`pendientes.SENTINEL_OPCIONES_MODELO`): las tres opciones se resuelven
+    en `gateway._resolver_toque_opcion_modelo` por su `tipo`
+    (`tarea_nueva`/`tarea_existente`/`salida`), igual que "ver_mas"/"tarea"
+    ya lo hacen.
+
+    "Es una tarea nueva" arranca la misma alta guiada que ya usa la
+    aclaración con botones (`gateway._iniciar_alta_guiada`) -- necesita el
+    `inbound_message` y el texto que originaron esta pregunta, porque un
+    toque no es un mensaje nuevo: viajan en `args` (`entrante_id`,
+    `mensaje_original`), iguales para las tres opciones, nunca en una opción
+    puntual. Sin `entrante_id` (el turno no vino de un mensaje persistido,
+    p. ej. al retomar otra opción) el alta guiada lo nota y cierra con
+    incidente + aviso neutro (`gateway._iniciar_alta_guiada`, patrón ya
+    existente) -- nunca se inventa un mensaje de origen.
+
+    "Es sobre una tarea existente" lista las tareas activas de la propia
+    persona (`gateway._mostrar_tareas_propias`), con el mismo armado de
+    página + "Ver más" que T3. La salida de siempre cierra sin efecto."""
+    opciones = [
+        (_ETIQUETA_TAREA_NUEVA_GENERICA, {"tipo": "tarea_nueva"}),
+        (_ETIQUETA_TAREA_EXISTENTE_GENERICA, {"tipo": "tarea_existente"}),
+        (P.ETIQUETA_SALIR_OPCIONES, {"tipo": "salida"}),
+    ]
+    _encolar_texto_con_opciones(
+        cur, quien, chat_id, texto, opciones, ahora,
+        dedupe_prefijo="opciones-genericas", texto_corto=_TEXTO_BOTONES_GENERICO,
+        args={"pregunta": texto, "entrante_id": entrante_id,
+             "mensaje_original": texto_entrante})
 
 
 def _incidente(cur, quien: Solicitante, error: Exception) -> None:

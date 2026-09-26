@@ -132,10 +132,17 @@ def test_replay_reproduce_el_resultado_esperado(archivo_replay, corework, conn):
 
 
 def _corrida_pregunta_en_texto_abierto(conn, ws: str, escenario_id: str):
-    """Una respuesta que pregunta en texto abierto, sin ofrecer opciones con
-    botones ni ejecutar ninguna herramienta -- el caso que
-    `comprobar_pregunta_con_opciones` marca `falla` cuando la puerta está
-    activa."""
+    """Un guión que hace que el modelo cierre el turno preguntando en texto
+    abierto, sin llamar a `ofrecer_opciones` ni a ninguna otra herramienta.
+
+    Hasta T4b (`prisma-orienta`), este era el caso que
+    `comprobar_pregunta_con_opciones` marcaba `falla` cuando la puerta está
+    activa -- nada del lado del servidor evitaba que esa pregunta abierta
+    llegara tal cual. Desde T4b, `agente.responder` agrega un cierre
+    genérico de botones cada vez que el turno termina así (ADR 0007, "Prisma
+    orienta, no charla", sin excepción), así que esta misma corrida ya
+    ofrece opciones -- ver `test_pregunta_con_opciones_activa_ahora_aprueba_
+    porque_el_servidor_ya_cierra_con_botones`, más abajo."""
     interno = ProveedorGuionado(
         guion=[Respuesta(texto="Tenés dos pendientes. ¿Cuál mirás primero?")],
         rutas=[IntentRoute(IntentAction.NORMAL_CONVERSATION)],
@@ -161,11 +168,23 @@ def test_permite_pregunta_sin_opciones_deja_pasar_una_pregunta_en_texto_abierto(
     assert resultado_general(comprobaciones) == "aprobado"
 
 
-def test_pregunta_con_opciones_activa_por_defecto_falla_la_misma_corrida(
+def test_pregunta_con_opciones_activa_ahora_aprueba_porque_el_servidor_ya_cierra_con_botones(
         corework, conn):
+    """Regresión detectada al implementar T4b (`prisma-orienta`): antes de
+    esa unidad, esta misma corrida (una pregunta en texto abierto, sin
+    `ofrecer_opciones`) daba `falla` con la puerta activa -- era el caso que
+    `comprobar_pregunta_con_opciones` existía para atrapar. Desde T4b,
+    `agente.responder` agrega el cierre genérico de tres botones al mismo
+    turno (nunca deja pasar una pregunta sin opciones), así que la corrida
+    real ya trae `ofrecio_opciones=True` y la comprobación aprueba -- no
+    porque la comprobación se haya debilitado, sino porque el defecto que
+    medía ya no existe en el servidor. El comprobador sigue fallando ante
+    una `Evidencia` sin opciones armada a mano
+    (`test_comprobadores.py::test_pregunta_con_opciones_signo_de_pregunta_
+    sin_botones_falla`), que no depende de este camino."""
     evidencia = _corrida_pregunta_en_texto_abierto(
         conn, corework.workspace_id, "b-test-gate-activada")
     comprobaciones = comprobaciones_pregunta_con_opciones(
         evidencia, permite_pregunta_sin_opciones=False)
     assert [c.nombre for c in comprobaciones] == ["pregunta_con_opciones"]
-    assert resultado_general(comprobaciones) == "falla"
+    assert resultado_general(comprobaciones) == "aprobado"

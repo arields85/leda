@@ -907,18 +907,22 @@ def _resolver_toque_aclaracion(cur, quien, workspace_id: str, chat_id: int,
 
 def _resolver_toque_opcion_modelo(cur, quien, workspace_id: str, chat_id: int,
                                   args: dict, ahora) -> None:
-    """Alguien tocó una opción de `ofrecer_opciones` (T1, ADR 0007) o de una
-    lista de tareas que armó el servidor (T3, ADR 0007 punto 3) -- las dos
-    comparten el mismo sentinel, `pendientes.SENTINEL_OPCIONES_MODELO`.
+    """Alguien tocó una opción de `ofrecer_opciones` (T1, ADR 0007), de una
+    lista de tareas que armó el servidor (T3, ADR 0007 punto 3), o del cierre
+    genérico de una pregunta sin opciones (T4b) -- las tres comparten el
+    mismo sentinel, `pendientes.SENTINEL_OPCIONES_MODELO`.
 
     A diferencia de `_resolver_toque_aclaracion`, ninguna elección acá vuelve
     a llamar a una herramienta: "Quiero consultar otra cosa" cierra sin
     efecto e invita a escribir (el próximo mensaje se rutea como un turno
     común); una tarea con `accion: "menu"` abre el menú de T2 sin retomar
     nada; "Ver más" (T3) pagina en `_mostrar_mas_tareas`, también sin
-    retomar; cualquier otra opción sí retoma la conversación con el modelo,
-    pasándole la elección como si fuera lo que escribió la persona -- para
-    una tarea, ya resuelta, sin pasar por Jev ni por el enrutador.
+    retomar; "Es una tarea nueva" (T4b) arranca el alta guiada en
+    `_iniciar_alta_guiada`; "Es sobre una tarea existente" (T4b) lista en
+    `_mostrar_tareas_propias`; cualquier otra opción sí retoma la
+    conversación con el modelo, pasándole la elección como si fuera lo que
+    escribió la persona -- para una tarea, ya resuelta, sin pasar por Jev ni
+    por el enrutador.
     """
     eleccion = args.get("eleccion") or {}
     pregunta = args.get("pregunta", "")
@@ -941,6 +945,25 @@ def _resolver_toque_opcion_modelo(cur, quien, workspace_id: str, chat_id: int,
         # T3: pagina sin volver a llamar al modelo, a Jev ni a `route_intent`.
         _mostrar_mas_tareas(cur, quien, workspace_id, chat_id,
                            eleccion.get("tarea_ids") or [], ahora)
+        return
+
+    if tipo == "tarea_nueva":
+        # T4b (ADR 0007, cierre genérico de una pregunta sin opciones):
+        # arranca la misma alta guiada que ya usa "Es una tarea nueva" de la
+        # aclaración con botones (T4, `aclaracion-con-botones`) --
+        # `_iniciar_alta_guiada` ya se encarga de registrar incidente + aviso
+        # neutro si `entrante_id` falta o algo falla, sin inventar un mensaje
+        # de origen. Sin propuestas del enrutador (nunca se llegó a rutear
+        # este turno): el alta guiada las pide todas.
+        _iniciar_alta_guiada(cur, quien, chat_id, args.get("entrante_id"),
+                            args.get("mensaje_original", pregunta), {},
+                            workspace_id, ahora)
+        return
+
+    if tipo == "tarea_existente":
+        # T4b: lista las tareas activas de la propia persona, con el mismo
+        # armado de página + "Ver más" que T3.
+        _mostrar_tareas_propias(cur, quien, workspace_id, chat_id, ahora)
         return
 
     if tipo == "tarea":
@@ -1049,6 +1072,50 @@ def _mostrar_mas_tareas(cur, quien, workspace_id: str, chat_id: int,
         recipient_membership_id=quien.membership_id, text=p.resumen,
         scheduled_for=ahora,
         dedupe_key=f"{workspace_id}:ver-mas:{p.id}",
+        is_response=True, pending_action_id=p.id,
+    )
+
+
+def _mostrar_tareas_propias(cur, quien, workspace_id: str, chat_id: int,
+                            ahora) -> None:
+    """"Es sobre una tarea existente" (T4b, ADR 0007, cierre genérico de una
+    pregunta sin opciones): lista las tareas ACTIVAS de la propia persona
+    como botones -- mismo criterio de "activa" que `menu_tarea.
+    tareas_activas_de` (`estado not in ('terminada', 'cancelada')`), bajo el
+    cursor con RLS de este toque, así que nunca puede traer una tarea de otro
+    espacio ni de otra persona.
+
+    Reusa el armado de página + "Ver más" de T3 (`agente._opciones_lista_
+    tareas`) en vez de duplicarlo: la consulta ya trae como mucho
+    `id`/`titulo`, la misma forma que espera ese armador."""
+    from . import pendientes as P
+    from .agente import VIGENCIA_PENDIENTE, _opciones_lista_tareas
+
+    cur.execute(
+        """select id, titulo from task
+            where workspace_id = %s and responsable_membership_id = %s
+              and estado not in ('terminada', 'cancelada')
+            order by fecha_objetivo nulls last limit 25""",
+        (workspace_id, quien.membership_id))
+    tareas = cur.fetchall()
+
+    if not tareas:
+        resumen = "No tenés tareas activas por ahora."
+        opciones = [(P.ETIQUETA_SALIR_OPCIONES, {"tipo": "salida"})]
+    else:
+        resumen = "Elegí una tarea:"
+        opciones = _opciones_lista_tareas(tareas)
+        opciones.append((P.ETIQUETA_SALIR_OPCIONES, {"tipo": "salida"}))
+
+    p = P.registrar(cur, quien, herramienta=P.SENTINEL_OPCIONES_MODELO,
+                    args={"pregunta": resumen}, resumen=resumen,
+                    vence_en=ahora + VIGENCIA_PENDIENTE, campo="eleccion",
+                    opciones=opciones, chat_id=chat_id)
+    enqueue_outbox(
+        cur, workspace_id=workspace_id, chat_id=chat_id,
+        recipient_membership_id=quien.membership_id, text=p.resumen,
+        scheduled_for=ahora,
+        dedupe_key=f"{workspace_id}:tarea-existente:{p.id}",
         is_response=True, pending_action_id=p.id,
     )
 

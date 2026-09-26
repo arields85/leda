@@ -64,6 +64,12 @@ gestión.
 - [x] **T4 — Banco.** Escenarios: lista de tareas con botones, tocar una tarea y
   llegar a la vista previa, pregunta de Prisma siempre con opciones; comprobador que
   falla ante una pregunta abierta sin opciones.
+- [x] **T4b — Cierre genérico de una pregunta sin opciones.** Decisión del usuario
+  (2026-09-26, evidencia real b-0007): si el turno cierra preguntando en texto
+  abierto y sin ningún juego de botones propio, el servidor agrega un juego fijo de
+  tres botones ("Es una tarea nueva", "Es sobre una tarea existente", "Quiero
+  consultar otra cosa"); regla reforzada en el contexto para que el modelo llame a
+  `ofrecer_opciones` igual sin opciones concretas.
 - [ ] **T5 — Continuidad.** `docs/capacidades.md`, `docs/STATUS.md`, diseño §4.5 y
   segunda sesión por Telegram.
 
@@ -1597,6 +1603,142 @@ cada commit con código pasa por la evaluación de RDD.
     escenario).
   - `test_banco.py` (punto 3) no se pudo ejecutar contra el modelo real en esta
     unidad (fuera del pedido: sólo se verificó que sigue recolectando).
-- **Próximo paso al retomar:** resultado del banco real; corregir las dos observaciones
-  pendientes del banco; después T5.
+- 2026-09-26: **T4b cerrada.** Ruta: delegada, un escritor (disparador de mapeo: 4
+  archivos de código -- `agente.py`, `gateway.py`, `contexto.py`,
+  `deteccion_pregunta.py` -- más pruebas nuevas y adaptadas).
+
+  Decisión del usuario: evidencia real de banco
+  (`tests/banco/reportes/replay-candidato-b-0007-*.json`) mostró al modelo
+  preguntando en texto abierto ("¿De qué se trata? Contame…") ante una persona sin
+  tarea que coincidiera ("lo del proveedor"). Se agrega un cierre GENÉRICO de tres
+  botones -- "Es una tarea nueva", "Es sobre una tarea existente", "Quiero
+  consultar otra cosa" (`pendientes.ETIQUETA_SALIR_OPCIONES`) -- cuando el turno
+  cierra preguntando sin ningún juego de botones propio; texto libre sigue
+  disponible. Ambas partes de la decisión: refuerzo del contexto (el modelo debería
+  llamar a `ofrecer_opciones` igual, aun sin opciones concretas) Y el servidor
+  agrega el cierre si aun así pregunta en texto abierto.
+
+  Archivos:
+  - `src/prisma/deteccion_pregunta.py` (nuevo): `hace_pregunta`/
+    `pide_elegir_en_imperativo`, movidas de `tests/banco/comprobadores.py` (T7) --
+    una sola implementación en `src/prisma/`, porque el servidor la necesita en
+    tiempo de ejecución y `tests/banco` puede importar de `src/prisma/`, nunca al
+    revés (`AGENTS.md`).
+  - `src/prisma/agente.py`: `responder` gana una rama `elif hace_pregunta(salida)`
+    después de la de T3 (lista de tareas) y antes de `_encolar_respuesta` -- nunca
+    compite con confirmaciones/elecciones (ya cerraron el turno antes) ni con la
+    lista de T3 (mismo `if`/`elif`). `_encolar_texto_con_opciones` (nuevo): el
+    armado de "¿entra con los botones? si no, texto partido aparte + botones
+    cortos después" que tenía `_encolar_respuesta_con_tareas` (T3a), extraído para
+    que T4b lo reuse sin duplicarlo; `_encolar_respuesta_con_tareas` queda como una
+    envoltura fina sobre el helper. `_encolar_opciones_genericas` (nuevo): arma las
+    tres opciones (`tipo`: `tarea_nueva`/`tarea_existente`/`salida`) y guarda
+    `entrante_id`/`mensaje_original` en `args` (iguales para las tres, no por
+    opción) para que "Es una tarea nueva" pueda arrancar el alta guiada.
+  - `src/prisma/gateway.py`: `_resolver_toque_opcion_modelo` gana dos `tipo` más --
+    `tarea_nueva` llama a `_iniciar_alta_guiada` (la misma que ya usa "Es una tarea
+    nueva" de la aclaración con botones, T4) con `route_task={}` (sin propuestas:
+    el alta guiada las pide todas); `tarea_existente` llama a
+    `_mostrar_tareas_propias` (nueva), que lista las tareas ACTIVAS de la propia
+    persona bajo RLS y reusa `agente._opciones_lista_tareas` (el armador de página
+    + "Ver más" de T3) en vez de duplicarlo. Sin tareas activas, sólo la salida.
+  - `src/prisma/contexto.py`: nueva regla en `PREAMBULO` -- sin opciones concretas,
+    llamar a `ofrecer_opciones` igual con las más razonables; nunca cerrar en texto
+    abierto.
+  - `tests/banco/comprobadores.py`: `_hace_pregunta`/`_pide_elegir_en_imperativo`
+    pasan a importarse de `prisma.deteccion_pregunta` (con esos mismos nombres,
+    para no tocar el resto del archivo) en vez de definirse acá.
+  - `tests/test_deteccion_pregunta.py` (nuevo, 5 pruebas): la detección movida,
+    contra los mismos casos que ya la validaban en el banco.
+  - `tests/test_pregunta_sin_opciones.py` (nuevo, 14 pruebas): cierre genérico
+    agregado/no agregado (aviso sin pregunta, lista de T3 con pregunta,
+    `ofrecer_opciones` con pregunta -- nunca dos juegos de botones), texto
+    largo/corto, los tres toques (alta guiada, sin `entrante_id` no falla en
+    silencio, lista propia con paginación y sin tareas, salida), auditoría sin
+    texto.
+
+  Pruebas adaptadas (regresión real, no debilitada):
+  - `tests/test_task_intake.py::test_no_mutating_tool_output_is_truth_marked_and_
+    has_no_buttons`: el texto guionado terminaba en "Confirm?" -- incidental al
+    propósito de la prueba (que un texto plano sin herramienta no quede marcado
+    con un `pending_action_id` ajeno), pero desde T4b esa "?" agrega el cierre
+    genérico. Se sacó el "?" del texto; la aserción original no cambió.
+  - `tests/banco/test_replays.py::test_pregunta_con_opciones_activa_por_defecto_
+    falla_la_misma_corrida` -> renombrada
+    `test_pregunta_con_opciones_activa_ahora_aprueba_porque_el_servidor_ya_cierra_
+    con_botones`: esta prueba corría una corrida real con una pregunta en texto
+    abierto para probar que `comprobar_pregunta_con_opciones` la marca `falla` --
+    exactamente el hueco que T4b cierra en el servidor. Con T4b, la misma corrida
+    ya ofrece opciones (el servidor las agrega), así que el veredicto pasa a
+    `aprobado` -- no porque el comprobador se haya debilitado (sigue fallando ante
+    una `Evidencia` armada a mano sin botones, `test_comprobadores.py`), sino
+    porque el defecto que medía ya no existe. Docstrings actualizados para dejar
+    constancia del cambio de sentido.
+
+  Decisiones de diseño:
+  - **Detección de pregunta: una sola implementación, movida a `src/prisma/`.**
+    `_hace_pregunta`/`_pide_elegir_en_imperativo` vivían sólo en
+    `tests/banco/comprobadores.py` (T7); el servidor las necesita ahora en tiempo
+    de ejecución. Se mueven a `deteccion_pregunta.py` (nunca al revés: `src/`
+    nunca importa de `tests/`) y el banco las importa con los mismos nombres
+    privados para no reescribir el resto del archivo.
+  - **Reuso del armado de texto+botones de T3a, no una segunda heurística.** T3a ya
+    había resuelto "texto que puede superar `BUTTON_TEXT_LIMIT`, junto con
+    botones" para la lista de tareas; T4b necesita exactamente lo mismo para el
+    cierre genérico. Se extrajo `_encolar_texto_con_opciones` en vez de copiar el
+    bloque.
+  - **`args` del cierre genérico lleva `entrante_id`/`mensaje_original`, no una
+    opción puntual.** Las tres opciones de un mismo cierre comparten el mismo
+    `pending_action.args` (T1); sólo "Es una tarea nueva" los lee, pero viajan ahí
+    -- igual que "Es una tarea nueva" de la aclaración con botones ya guarda
+    `entrante_id`/`mensaje` en el estado de esa pregunta.
+  - **Sin `route_task` (propuestas) para el alta guiada del cierre genérico.** A
+    diferencia de la aclaración con botones (que sí rutea antes), este cierre
+    nunca pasó por el enrutador -- no hay ninguna propuesta que ofrecerle al alta
+    guiada. Verificado contra `ingreso_tareas.start`/`_store_proposals`: un
+    `proposals={}` no rompe nada, sólo no pre-llena ningún campo.
+  - **Nunca se inventa un mensaje de origen sin `entrante_id`.** Si el turno que
+    armó el cierre genérico no tenía un `inbound_message` propio (p. ej. al
+    retomar otra opción), `_iniciar_alta_guiada` ya registra incidente + aviso
+    neutro (patrón existente, sin cambios) -- nunca se lo inventa.
+  - **Nunca dos juegos de botones.** La rama nueva es un `elif` después de la de
+    T3 (lista de tareas); confirmaciones/elecciones de una herramienta ya cierran
+    el turno antes (`if confirmaciones or elecciones: return ...`), así que nunca
+    llegan a `hace_pregunta`.
+
+  RED (antes de implementar, `git stash push -- src/prisma/agente.py
+  src/prisma/gateway.py src/prisma/contexto.py`, con las pruebas nuevas ya
+  escritas y `deteccion_pregunta.py` ya creado):
+  `.venv/Scripts/python.exe -m pytest -q tests/test_pregunta_sin_opciones.py
+  tests/test_deteccion_pregunta.py` -> `11 failed, 8 passed` -- las 11 fallas son
+  exactamente las que dependen del cierre genérico (sin él, ninguna `pending_action`
+  de `SENTINEL_OPCIONES_MODELO` se arma); las 8 que ya pasaban son las 5 de
+  detección (movida, no depende del cambio) más las 3 que verifican que NO se
+  agregan botones de más (ciertas igual sin la funcionalidad). `git stash pop`
+  restauró la implementación antes de seguir.
+
+  GREEN:
+  - `.venv/Scripts/python.exe -m pytest -q tests/test_pregunta_sin_opciones.py
+    tests/test_deteccion_pregunta.py` -> `19 passed`.
+  - `.venv/Scripts/python.exe -m pytest -q tests/test_lista_botones.py
+    tests/test_opciones_modelo.py tests/test_menu_tarea.py tests/test_agente.py
+    tests/test_aclaracion_botones.py tests/test_task_intake.py tests/banco
+    tests/test_pregunta_sin_opciones.py tests/test_deteccion_pregunta.py` ->
+    primera corrida `2 failed` (las dos regresiones reales de arriba, encontradas
+    por el barrido, no simuladas), corregidas las pruebas afectadas -> segunda
+    corrida `384 passed, 108 deselected`.
+  - `.venv/Scripts/python.exe -m pytest -q` (suite completa) -> `848 passed,
+    108 deselected` (línea base 829 + 19 pruebas nuevas de T4b), 200s.
+
+  Abierto:
+  - Punto pendiente de ADR 0007 ("si una respuesta puede cerrar sin opciones")
+    sigue sin resolver -- T4b no lo decide, sólo actúa cuando SÍ pregunta.
+  - `docs/validation/README.md` podría sumar una mención corta del cierre
+    genérico y de `deteccion_pregunta.py` -- se deja a criterio del orquestador
+    (no se tocó `docs/`, fuera de alcance de esta unidad).
+  - No se corrió el banco real contra el modelo (`-m modelo_real`) para esta
+    unidad -- queda para el próximo paso, junto con `b-0007` de vuelta.
+  - Mismas brechas fuera de alcance de unidades anteriores sin cambios: autoridad
+    para `cancelada` (T2b), "Adjuntar evidencia" del aprobador en el menú (T2).
+- **Próximo paso al retomar:** banco real para verificar b-0007, después T5.
 

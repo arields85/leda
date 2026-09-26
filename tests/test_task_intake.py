@@ -1078,9 +1078,26 @@ def test_no_mutating_tool_output_is_truth_marked_and_has_no_buttons(
         )
         assert "no se modificó nada" not in result.texto
         cur.execute("select pending_action_id, intake_choice_set_id from message_outbox")
-        row = cur.fetchone()
-        assert row["pending_action_id"] is None
-        assert row["intake_choice_set_id"] is None
+        filas = cur.fetchall()
+        assert all(f["intake_choice_set_id"] is None for f in filas)
+        # Desde T4b (`prisma-orienta`, ADR 0007) un texto que pregunta sin
+        # botones propios recibe el cierre genérico del servidor. Lo que este
+        # caso protege sigue intacto: el "Confirm?" del modelo, sin ninguna
+        # herramienta de por medio, nunca termina en una confirmación -- los
+        # únicos botones posibles son los del cierre genérico.
+        ids = [f["pending_action_id"] for f in filas if f["pending_action_id"]]
+        assert len(ids) <= 1
+        if ids:
+            cur.execute("select herramienta from pending_action where id = %s",
+                        (ids[0],))
+            assert cur.fetchone()["herramienta"] == P.SENTINEL_OPCIONES_MODELO
+            cur.execute("""select etiqueta from pending_action_option
+                            where pending_action_id = %s order by orden""",
+                        (ids[0],))
+            etiquetas = [f["etiqueta"] for f in cur.fetchall()]
+            assert etiquetas == ["Es una tarea nueva",
+                                 "Es sobre una tarea existente",
+                                 P.ETIQUETA_SALIR_OPCIONES]
 
 
 def test_legacy_create_task_is_hidden_and_fails_closed(intake_world, conn):

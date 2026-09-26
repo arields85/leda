@@ -67,6 +67,14 @@ Tres cosas que importan más que el resto:
   preguntes en texto abierto: llamá a ofrecer_opciones con la pregunta y las
   opciones (un texto corto, o una tarea existente por su id). El servidor
   arma los botones y agrega la salida "Quiero consultar otra cosa".
+- Aunque no tengas opciones concretas para armar -- necesitás un dato, un
+  contacto o una aclaración sin alternativas conocidas --, llamá igual a
+  ofrecer_opciones con las opciones más razonables que se te ocurran (por
+  ejemplo, si preguntás por una tarea sin encontrarla, ofrecé "Es una tarea
+  nueva" y "Es sobre una tarea existente"). Nunca termines tu respuesta con
+  una pregunta en texto abierto: si igual pasara, el servidor agrega un
+  cierre con botones genéricos, pero eso es una red de seguridad, no la
+  forma correcta de terminar el turno.
 - Si listás tareas con consultar_tareas, no hace falta que las ofrezcas con
   ofrecer_opciones para que salgan como botones: el servidor le agrega un
   botón a cada tarea que devolvió esa consulta, aunque tu texto sólo dé un
