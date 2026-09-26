@@ -2390,6 +2390,20 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
     base registrada arriba. Sin cambio de comportamiento en `src/`: sólo comentarios y
     docstrings.
 
+- 2026-09-26 (orquestador): commits `ec41640` (comentarios) y `fc4b5db` (prueba del
+  desempate). Evaluación RDD `--base-ref 633ec39`: `medium`, 623 líneas,
+  `slice_budget_reached` (incluye `9681973` y `dd031a9`). Revisión con consentimiento del
+  usuario, una lente (fiabilidad), aprobada y reconocida (`review-6333bc5a1ab13726`); la
+  frontera de revisión avanza a `fc4b5db`. Observaciones:
+  - `tests/test_pregunta_sin_opciones.py:535-538` (advertencia): ids literales con
+    `commit` podían chocar si la prueba se repetía sobre la misma base -> corregido en
+    `9896ba7` con cuatro `uuid4` al azar, ordenados (el orden de texto en minúsculas
+    coincide con el orden de `uuid` en PostgreSQL); la prueba pasó tres veces seguidas.
+  - `src/prisma/deteccion_pregunta.py:49` (sugerencia, aceptada sin cambio): una URL cuyo
+    último carácter sea su propio "?" (query vacía) seguida de más texto deja ese "?"
+    afuera y cuenta como pregunta. Caso raro; el costo es un cierre genérico de más, no
+    una respuesta perdida.
+
 - **Próximo paso al retomar:** T5, sólo la segunda sesión real por Telegram (necesita
   al usuario; datos ficticios). Antes de empezar: comparar la base local con
   `db/esquema.sql` (hoy al día hasta la migración `0011`) y aplicar lo que falte;
