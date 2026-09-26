@@ -19,6 +19,7 @@ from __future__ import annotations
 
 from contextlib import nullcontext
 from datetime import datetime, timedelta, timezone
+import uuid
 
 import pytest
 from fastapi.testclient import TestClient
@@ -535,10 +536,12 @@ def test_tocar_es_sobre_una_tarea_existente_orden_deterministico_por_id(
     que lo determine."""
     ws = corework.workspace_id
     fecha_comun = datetime(2026, 10, 1, tzinfo=timezone.utc)
-    id_con_fecha_bajo = "00000000-0000-0000-0000-000000000001"
-    id_sin_fecha_bajo = "00000000-0000-0000-0000-000000000002"
-    id_con_fecha_alto = "00000000-0000-0000-0000-000000000003"
-    id_sin_fecha_alto = "00000000-0000-0000-0000-000000000004"
+    # Ids al azar, ordenados después: el orden relativo queda conocido sin
+    # fijar claves literales que choquen si la prueba se repite sobre la
+    # misma base.
+    (id_con_fecha_bajo, id_sin_fecha_bajo,
+     id_con_fecha_alto, id_sin_fecha_alto) = sorted(
+        str(uuid.uuid4()) for _ in range(4))
 
     with admin(conn) as cur:
         # Orden de inserción deliberadamente distinto del esperado
