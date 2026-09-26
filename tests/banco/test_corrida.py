@@ -264,6 +264,77 @@ def test_ejecutar_escenario_actor_desconocido_levanta_lookup_error(corework, con
 
 
 # ---------------------------------------------------------------------------
+# ejecutar_escenario: el proveedor caído (evidencia real, 2026-09-26: un
+# corrida real contra un proveedor que devolvía 404 quedó `aprobado` porque
+# `gateway.procesar_update` atajó el fallo adentro y nunca propagó nada que
+# `ejecutar_escenario` capturara como `bloqueado`). "No poder consultar no
+# equivale a que no haya nada que hacer" (AGENTS.md): la corrida tiene que
+# quedar `bloqueado`, no aprobada por default, cuando el proveedor no
+# contestó -- ni al enrutar (`gateway._routing_incident`) ni en la
+# conversación (`agente._incidente` + `agente.DISCULPA`).
+# ---------------------------------------------------------------------------
+
+
+class _ProveedorCaidoAlRutear:
+    """El proveedor no contesta ni una vez a `route_intent` -- el mismo
+    síntoma que un 404 sostenido del proveedor real."""
+
+    def route_intent(self, text):
+        raise RuntimeError("Proveedor caído: sin ruta.")
+
+    def responder(self, sistema, mensajes, herramientas):  # pragma: no cover
+        raise AssertionError("no debería llegar a responder sin haber ruteado")
+
+
+class _ProveedorCaidoAlResponder:
+    """El ruteo contesta bien, pero la llamada principal del agente
+    (`agente.responder` -> `proveedor.responder`) es la que cae."""
+
+    def route_intent(self, text):
+        return IntentRoute(IntentAction.NORMAL_CONVERSATION)
+
+    def responder(self, sistema, mensajes, herramientas):
+        raise RuntimeError("Proveedor caído: sin respuesta.")
+
+
+def test_ejecutar_escenario_proveedor_caido_al_rutear_queda_bloqueado(corework, conn):
+    ws = corework.workspace_id
+    r = ejecutar_escenario(
+        conn, ws, "corework", "Marcos Tarquini", ["hola"],
+        _ProveedorCaidoAlRutear(), escenario_id="b-test", indice=0)
+
+    assert r.bloqueado is True
+    assert r.motivo_bloqueo
+    assert "secreto" not in r.motivo_bloqueo.lower()
+
+
+def test_ejecutar_escenario_proveedor_caido_al_responder_queda_bloqueado(corework, conn):
+    ws = corework.workspace_id
+    r = ejecutar_escenario(
+        conn, ws, "corework", "Marcos Tarquini", ["hola"],
+        _ProveedorCaidoAlResponder(), escenario_id="b-test", indice=0)
+
+    assert r.bloqueado is True
+    assert r.motivo_bloqueo
+
+
+def test_ejecutar_escenario_corrida_sana_no_queda_bloqueada_por_el_chequeo_nuevo(corework, conn):
+    """El chequeo de incidentes de proveedor caído no debe marcar `bloqueado`
+    una corrida sana -- una corrida guionada normal sigue pasando igual."""
+    ws = corework.workspace_id
+    interno = ProveedorGuionado(
+        guion=[Respuesta(texto="Anotado.")],
+        rutas=[IntentRoute(IntentAction.NORMAL_CONVERSATION)],
+    )
+    r = ejecutar_escenario(
+        conn, ws, "corework", "Marcos Tarquini", ["hola"], interno,
+        escenario_id="b-test", indice=0)
+
+    assert r.bloqueado is False
+    assert r.motivo_bloqueo == ""
+
+
+# ---------------------------------------------------------------------------
 # recolectar_efectos / conteos_delta (defecto de revisión: el objetivo del
 # escenario -- estado, bloqueo o dependencia correctos -- nunca se
 # verificaba contra la base)

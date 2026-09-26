@@ -19,6 +19,7 @@ import prisma.jev as jev_modulo
 import prisma.llm as llm_modulo
 from prisma import gateway
 from prisma import pendientes as P
+from prisma.agente import DISCULPA
 from prisma.db import admin
 from prisma.jev import ClienteJevGuionado
 from prisma.llm import (IntentAction, IntentRoute, Llamada, Proveedor,
@@ -31,6 +32,50 @@ from prisma.llm import (IntentAction, IntentRoute, Llamada, Proveedor,
 TABLAS_ESTADO = ("task", "task_draft", "blocker", "dependency",
                  "task_state_event", "message_outbox", "objective",
                  "evidence", "approval")
+
+
+# ---------------------------------------------------------------------------
+# Detección de "proveedor caído" (evidencia real, 2026-09-26): una corrida
+# real contra un proveedor que devolvía 404 en cada `chat completion` quedó
+# `aprobado` -- `gateway.procesar_update` atajó el fallo adentro (nunca
+# propaga la excepción) y respondió con un mensaje de disculpa sin efectos,
+# así que los escenarios que sólo esperaban "sin herramientas / sin efectos"
+# pasaban igual, sin que ningún modelo hubiera decidido nada. "No poder
+# consultar no equivale a que no haya nada que hacer" (invariante,
+# `AGENTS.md`): esa corrida tiene que quedar `bloqueado`, no `aprobado`.
+#
+# Los dos resúmenes son estables y no llevan secretos ni texto de mensajes
+# (`gateway._routing_incident`, `agente._incidente`): el prefijo alcanza,
+# sin importar qué tipo de excepción trajo el proveedor real (404, timeout,
+# error de autenticación, lo que sea).
+_MARCA_ENRUTAMIENTO_CAIDO = "Falló el enrutamiento tipado ("
+# `agente._incidente` también se usa dentro de `_ejecutar_una` para un
+# `psycopg.Error` de una sola herramienta -- un fallo de esa fila que el
+# turno sigue procesando con normalidad, no "no se pudo consultar al
+# proveedor". Para no confundir ese caso con uno real de proveedor caído,
+# esta marca sólo cuenta si además el turno terminó en `agente.DISCULPA`:
+# eso sólo pasa en el `except` que envuelve `proveedor.responder` (agente.py,
+# `responder`), nunca en el de una herramienta individual.
+_MARCA_TURNO_CAIDO = "Falló un turno de conversación ("
+
+
+def _incidentes_de_proveedor_caido(cur, workspace_id: str, ids_previos: set,
+                                   respuesta_texto: str) -> str:
+    """Los resúmenes (ya sanitizados) de los incidentes nuevos de esta
+    corrida que significan "el proveedor/enrutador no contestó", o cadena
+    vacía si no hay ninguno. Devuelve el primero: alcanza con uno para
+    bloquear la corrida entera."""
+    cur.execute(
+        """select id, resumen_sanitizado from incident
+            where workspace_id = %s order by at""", (workspace_id,))
+    nuevos = [f for f in cur.fetchall() if f["id"] not in ids_previos]
+    for fila in nuevos:
+        resumen = fila["resumen_sanitizado"]
+        if resumen.startswith(_MARCA_ENRUTAMIENTO_CAIDO):
+            return resumen
+        if resumen.startswith(_MARCA_TURNO_CAIDO) and DISCULPA in respuesta_texto:
+            return resumen
+    return ""
 
 
 # ---------------------------------------------------------------------------
@@ -489,6 +534,9 @@ def ejecutar_escenario(
         cur.execute("select id from message_outbox where workspace_id = %s",
                     (workspace_id,))
         ids_previos = {f["id"] for f in cur.fetchall()}
+        cur.execute("select id from incident where workspace_id = %s",
+                    (workspace_id,))
+        ids_incidentes_previos = {f["id"] for f in cur.fetchall()}
 
     bloqueado = False
     motivo_bloqueo = ""
@@ -569,6 +617,18 @@ def ejecutar_escenario(
         respuesta_texto = "\n".join(f["cuerpo"] for f in filas)
         ofrecio_opciones = respuesta_ofrecio_opciones(filas)
         herramientas_ejecutadas = _herramientas_registradas(cur, workspace_id)
+        # `gateway.procesar_update` no propaga que el proveedor haya caído --
+        # lo ataja adentro y responde con un mensaje sin efectos (evidencia
+        # real, 2026-09-26). Sin este chequeo esa corrida seguía `aprobado`,
+        # aunque ningún modelo hubiera decidido nada. No pisa un `bloqueado`
+        # que ya haya quedado por una excepción real de la corrida (arriba):
+        # ese motivo ya es más específico que el del incidente.
+        if not bloqueado:
+            motivo_proveedor = _incidentes_de_proveedor_caido(
+                cur, workspace_id, ids_incidentes_previos, respuesta_texto)
+            if motivo_proveedor:
+                bloqueado = True
+                motivo_bloqueo = motivo_proveedor
 
     return ResultadoCorrida(
         escenario_id=escenario_id, indice=indice, respuesta_texto=respuesta_texto,

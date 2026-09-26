@@ -1014,6 +1014,108 @@ cada commit con código pasa por la evaluación de RDD.
 
   Abierto: ninguno nuevo. Mismas brechas fuera de alcance que T3 (`cancelada` en T2b,
   "Adjuntar evidencia" del aprobador en T2).
+- 2026-09-26: **Banco: corridas con el proveedor caído quedan bloqueadas.** Ruta:
+  delegada, un escritor (disparador de mapeo: 5 archivos entre código y pruebas).
+  Fuera de la secuencia T1-T4: hallazgo del orquestador sobre una corrida real
+  (`.venv/Scripts/python.exe -m pytest -m modelo_real tests/banco --banco-n 3
+  --banco-proveedor nan --banco-modelo deepseek-v4-flash`) que coincidió con el
+  proveedor devolviendo 404 en cada `chat completion`.
+
+  Problema: `gateway.procesar_update` ataja el fallo del proveedor adentro (nunca
+  propaga la excepción) y responde con un mensaje sin efectos -- por
+  `gateway._routing_incident` cuando falla `route_intent`, o por `agente._incidente`
+  + `agente.DISCULPA` cuando falla `proveedor.responder` dentro del turno.
+  `tests/banco/corrida.py::ejecutar_escenario` sólo marcaba `bloqueado` si
+  `gateway.procesar_update` propagaba una excepción -- nunca pasaba con el
+  proveedor caído, así que escenarios que sólo esperaban "sin herramientas / sin
+  efectos" (b-0007..b-0014) quedaban `aprobado` sin que ningún modelo hubiera
+  decidido nada. Contradice el invariante "no poder consultar no equivale a que no
+  haya nada que hacer" y la regla del usuario de nunca fallar en silencio.
+
+  Archivos:
+  - `tests/banco/corrida.py`: `_MARCA_ENRUTAMIENTO_CAIDO` / `_MARCA_TURNO_CAIDO`
+    (los prefijos estables y sin secretos de `gateway._routing_incident` y
+    `agente._incidente`) y `_incidentes_de_proveedor_caido` (compara los `incident`
+    del espacio antes/después de la corrida). `ejecutar_escenario` guarda
+    `ids_incidentes_previos` junto con `ids_previos`, y después de armar
+    `respuesta_texto` -- sólo si no quedó `bloqueado` ya por una excepción propia --
+    busca un incidente nuevo que matchee alguna marca y, si lo encuentra, marca
+    `bloqueado=True` con ese resumen (ya sanitizado) como `motivo_bloqueo`. La marca
+    de `agente._incidente` sólo cuenta si además `agente.DISCULPA` está en
+    `respuesta_texto`: esa función también se usa dentro de `_ejecutar_una` para un
+    `psycopg.Error` de una sola herramienta -- un fallo de esa fila que el turno
+    sigue procesando con normalidad, no "no se pudo consultar al proveedor" -- y
+    ese camino nunca deja `DISCULPA` como respuesta visible.
+  - `tests/banco/test_corrida.py`: dos proveedores falsos nuevos
+    (`_ProveedorCaidoAlRutear`, `_ProveedorCaidoAlResponder`) y tres pruebas
+    (`test_ejecutar_escenario_proveedor_caido_al_rutear_queda_bloqueado`,
+    `test_ejecutar_escenario_proveedor_caido_al_responder_queda_bloqueado`,
+    `test_ejecutar_escenario_corrida_sana_no_queda_bloqueada_por_el_chequeo_nuevo`).
+
+  Decisión: no se usó el texto de exención "El turno agotó N vueltas sin cerrar"
+  (mismo `agente._incidente`, agotamiento de `MAX_VUELTAS`) como marca de proveedor
+  caído -- es un comportamiento del modelo, no evidencia de que no se lo pudo
+  consultar -- y `_incidente_jev_no_configurado` tiene su propio resumen, sin
+  relación con esto. `reporte.py`/`test_banco.py` ya excluían `bloqueado` del
+  numerador de `tasa_aprobacion` y ya cortaban la corrida con `pytest.fail`; no hizo
+  falta tocarlos.
+
+  RED:
+  `.venv/Scripts/python.exe -m pytest -q tests/banco/test_corrida.py -k
+  "proveedor_caido or corrida_sana"` -> `2 failed, 1 passed` (las dos corridas con
+  proveedor caído seguían `bloqueado=False`; la corrida sana ya pasaba, confirmando
+  que el chequeo nuevo no tenía por qué tocarla).
+
+  GREEN:
+  - `.venv/Scripts/python.exe -m pytest -q tests/banco/test_corrida.py -k
+    "proveedor_caido or corrida_sana"` -> `3 passed`.
+  - `.venv/Scripts/python.exe -m pytest -q tests/banco tests/test_jev.py
+    tests/test_config.py` -> `209 passed, 99 deselected`.
+  - Suite completa -> `793 passed, 99 deselected` (788 previos + 5 pruebas nuevas
+    de esta sesión, entre esta unidad y la siguiente), 189 s.
+
+  Abierto: ninguno nuevo. No se corrió el banco real (`-m modelo_real`): el
+  proveedor sigue caído, y la corrección se probó entera con proveedores falsos.
+
+- 2026-09-26: **Clave de Jev fuera del repr.** Ruta: delegada, un escritor
+  (disparador de mapeo: 3 archivos entre código y pruebas). Fuera de la secuencia
+  T1-T4: hallazgo del orquestador -- `ClienteJev` es un dataclass cuyo `repr` por
+  defecto incluye `api_key`, y una traza de pytest sin capturar la imprimió
+  entera.
+
+  Archivos:
+  - `src/prisma/jev.py`: `ClienteJev.api_key` pasa a `field(repr=False)`.
+  - `src/prisma/config.py`: mismo repaso sobre `Config` (dataclass, singleton de
+    módulo que circula por todo el proceso): `db_url`, `authority_db_url`,
+    `llm_api_key`, `openrouter_api_key` y `webhook_secret` pasan a
+    `field(repr=False, default=...)`. `base_url` queda igual (no es secreto).
+  - `tests/test_jev.py`: `test_cliente_jev_repr_no_incluye_la_clave`.
+  - `tests/test_config.py` (nuevo): `test_config_repr_no_incluye_credenciales`.
+
+  Decisión: se revisaron además `ProveedorAnthropic`, `ProveedorCompatible`,
+  `ProveedorGemini` (`llm.py`) y `Escucha` (`local.py`) -- ninguno es dataclass;
+  guardan la credencial sólo para pasarla al cliente HTTP de la librería (`httpx`,
+  `anthropic`, `openai`), y el repr por defecto de una clase común no expone
+  atributos, así que no hay fuga ahí. `Opcion.token` (`pendientes.py`) y
+  `Enlace.token` (`onboarding.py`) quedaron afuera a propósito: el primero es un
+  identificador de botón que Telegram ya devuelve tal cual al servidor (no es un
+  secreto adicional); el segundo es el enlace de activación que el comando
+  `python -m prisma enlaces` imprime a propósito para distribuirlo -- ocultarlo del
+  repr rompería el único uso que tiene.
+
+  RED: `.venv/Scripts/python.exe -m pytest -q tests/test_jev.py::test_cliente_jev_repr_no_incluye_la_clave`
+  -> `1 failed`: `AssertionError`, la clave aparecía en el repr
+  (`ClienteJev(api_key='secreto-de-prueba', ...)`).
+  `.venv/Scripts/python.exe -m pytest -q tests/test_config.py` -> `1 failed`: mismo
+  patrón, las cinco credenciales aparecían en `repr(Config(...))`.
+
+  GREEN:
+  - `.venv/Scripts/python.exe -m pytest -q tests/test_config.py tests/test_jev.py`
+    -> `50 passed`.
+  - Suite completa -> `793 passed, 99 deselected` (ver entrada anterior; ambas
+    unidades se verificaron juntas contra la suite completa).
+
+  Abierto: ninguno.
 - **Próximo paso al retomar:** T4 (banco): escenarios de lista de tareas con botones,
   tocar una tarea y llegar a la vista previa, pregunta de Prisma siempre con opciones;
   comprobador que falla ante una pregunta abierta sin opciones.
