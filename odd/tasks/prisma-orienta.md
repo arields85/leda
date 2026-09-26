@@ -1409,6 +1409,26 @@ cada commit con código pasa por la evaluación de RDD.
   - Mismas brechas fuera de alcance de unidades anteriores sin cambios:
     autoridad para `cancelada` (T2b) y "Adjuntar evidencia" del aprobador en el
     menú (T2).
-- **Próximo paso al retomar:** corrida del banco real cuando vuelva `nan`, después
-  T5.
+- 2026-09-26 (orquestador): commits `4b90984`, `07f1f8a`, `6517faa` (toques genéricos y
+  comprobador de pregunta sin opciones) y `4dc1997` (escenarios b-0016 a b-0018).
+  Evaluación RDD `--base-ref 23fc6f6`: riesgo `medium`, 1096 líneas,
+  `slice_budget_reached`. Revisión con consentimiento del usuario, una lente (fiabilidad),
+  aprobada y reconocida (`review-356a9a31c3d84353`); la frontera de revisión avanza a
+  `4dc1997`. Observaciones no bloqueantes:
+  - `tests/banco/corrida.py:467-471` (advertencia): `_pendiente_actual` elige con `order by
+    creado_en desc limit 1` sin desempate; dos `pending_action` esperando creadas en la
+    misma transacción comparten `creado_en` y el toque genérico se resolvería contra
+    cualquiera de las dos. Pendiente.
+  - `tests/banco/test_replays.py:97-100` (sugerencia): sin prueba de punta a punta de la
+    exclusión `permite_pregunta_sin_opciones` ni de que el comprobador activo cambie el
+    veredicto. Pendiente.
+  - `src/prisma/salida.py:199` (sugerencia, verificada sin cambio): el desplazamiento por
+    parte aplica a todos los llamadores; el único que encola un mensaje detrás de un texto
+    partido es `agente._encolar_respuesta_con_tareas` (`agente.py:565`), que ya se programa
+    después de la última parte. Los demás llamadores con `allow_split=True`
+    (`gateway.py:270,289,553`, `reloj.py:93`, `escalera.py:319`, `onboarding.py:188`,
+    `agente.py:356,544`) encolan un único mensaje, sin seguimiento.
+  `nan` volvió a responder (06:24Z; chat 200 con la clave real); banco real en curso.
+- **Próximo paso al retomar:** resultado del banco real; corregir las dos observaciones
+  pendientes del banco; después T5.
 
