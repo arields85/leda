@@ -42,9 +42,9 @@ tales. Ver [`INDEX.md`](INDEX.md#documentos-superados).
 - Las migraciones `0001` y `0002` se ensayaron contra bases descartables, incluida
   paridad entre instalación limpia y migración, y rollback guardado. **No fueron
   aplicadas a ninguna base operativa.**
-- El repositorio tiene 67 commits en `main` (renombrada desde `master` el
-  2026-09-25, a pedido explícito del usuario); el árbol de trabajo está limpio
-  (verificado por inspección, 2026-09-26). El remoto `origin` sigue conectado a
+- El trabajo vive en la rama `main` (renombrada desde `master` el 2026-09-25, a
+  pedido explícito del usuario); al cerrar la sesión del 2026-09-26 el árbol de
+  trabajo quedó limpio (verificado por inspección). El remoto `origin` sigue conectado a
   GitHub sin ninguna rama (`git ls-remote --heads origin` no devuelve nada); no se
   hizo push.
 
