@@ -32,8 +32,19 @@ import unicodedata
 # elección. "qué" se busca con borde de palabra (`\bque\b`), no como
 # subcadena, para no disparar con "porque"/"aunque".
 _VERBOS_PEDIDO_ELECCION = ("decime", "decinos", "contame", "confirmame")
-_MARCADOR_CUAL = "cual"
+# Palabra completa, no subcadena (hallazgo del orquestador): "elegi" suelto
+# coincidía dentro de "elegido"/"elegida"/"elegimos"/"elegible", y "cual"
+# suelto dentro de "cualquier" -- ninguno de esos pide elegir entre
+# candidatas. `\b` alcanza porque `_normalizar` ya sacó los acentos: "elegí"
+# y "cuál" quedan como "elegi"/"cual" antes de llegar acá.
+_MARCADOR_ELEGI = re.compile(r"\belegi\b")
+_MARCADOR_CUAL = re.compile(r"\bcual\b")
 _MARCADOR_QUE = re.compile(r"\bque\b")
+# Una URL puede traer su propio "?" (query string) sin que eso sea Prisma
+# preguntando algo -- se descarta antes de buscar el signo de interrogación
+# (hallazgo del orquestador). No hace falta reconocer cualquier URL válida:
+# alcanza con las dos formas que puede escribir el modelo o la persona.
+_URL = re.compile(r"(?:https?://|www\.)\S+", re.IGNORECASE)
 
 
 def _normalizar(texto: str) -> str:
@@ -44,15 +55,16 @@ def _normalizar(texto: str) -> str:
 
 def pide_elegir_en_imperativo(texto: str) -> bool:
     normalizado = _normalizar(texto)
-    if "elegi" in normalizado:
+    if _MARCADOR_ELEGI.search(normalizado):
         return True
     if not any(verbo in normalizado for verbo in _VERBOS_PEDIDO_ELECCION):
         return False
-    return _MARCADOR_CUAL in normalizado or bool(_MARCADOR_QUE.search(normalizado))
+    return bool(_MARCADOR_CUAL.search(normalizado) or _MARCADOR_QUE.search(normalizado))
 
 
 def hace_pregunta(texto: str) -> bool:
     """Detecta si el texto le pregunta algo a la persona: signo de
-    interrogación, o un pedido de elección en imperativo
+    interrogación fuera de una URL, o un pedido de elección en imperativo
     (`pide_elegir_en_imperativo`)."""
-    return "?" in texto or pide_elegir_en_imperativo(texto)
+    sin_urls = _URL.sub("", texto)
+    return "?" in sin_urls or pide_elegir_en_imperativo(texto)

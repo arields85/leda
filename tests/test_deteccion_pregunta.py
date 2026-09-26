@@ -43,3 +43,42 @@ def test_negacion_no_es_relevante_para_esta_deteccion():
     # A diferencia de `comprobar_accion_sin_herramienta`, esta detección no
     # mira negaciones: sólo importa si el texto pregunta o pide elegir.
     assert not hace_pregunta("Todo tranquilo, nada que decidir.")
+
+
+# ---------------------------------------------------------------------------
+# Falsos positivos (hallazgo del orquestador): la heurística ahora dispara
+# efectos de producción (los botones genéricos, T4b) -- reducir falsos
+# positivos sin perder los casos reales que el banco ya valida arriba.
+# ---------------------------------------------------------------------------
+
+def test_signo_de_pregunta_dentro_de_una_url_no_cuenta():
+    # Un "?" de query string no es Prisma preguntando algo.
+    assert not hace_pregunta(
+        "Mirá el detalle acá: https://ejemplo.com/tarea?id=5&modo=ver")
+    assert not hace_pregunta("Lo subí a www.ejemplo.com/reporte?mes=9")
+
+
+def test_pregunta_real_junto_a_una_url_sigue_contando():
+    assert hace_pregunta(
+        "¿Viste esto? Te dejo el link: https://ejemplo.com/tarea?id=5")
+
+
+def test_elegi_como_subcadena_de_otra_palabra_no_cuenta():
+    # "elegido"/"elegida"/"elegimos"/"elegible" no son el imperativo "elegí":
+    # antes coincidían porque el marcador buscaba la subcadena "elegi" sin
+    # borde de palabra.
+    assert not pide_elegir_en_imperativo("Ya fue elegido el responsable.")
+    assert not pide_elegir_en_imperativo("La tarea elegida quedó anotada.")
+    assert not pide_elegir_en_imperativo("Elegimos seguir con la otra.")
+    assert not pide_elegir_en_imperativo("No es elegible para esta ronda.")
+    assert not hace_pregunta("Ya fue elegido el responsable.")
+
+
+def test_cual_como_subcadena_de_cualquier_no_cuenta():
+    # "cualquier"/"cualquiera" no son el pedido "cuál" -- mismo motivo que
+    # "elegi": el marcador buscaba la subcadena "cual" sin borde de palabra.
+    # Sin "qué"/"cuál" como palabra propia al lado (ninguna de las dos frases
+    # la tiene), el verbo de pedido solo no alcanza.
+    assert not pide_elegir_en_imperativo("Decime cualquier novedad.")
+    assert not pide_elegir_en_imperativo("Contame cualquiera de las dos.")
+    assert not hace_pregunta("Decime cualquier novedad.")
