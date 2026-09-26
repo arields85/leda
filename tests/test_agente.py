@@ -455,3 +455,74 @@ def test_descripcion_de_dependencia_distingue_otra_tarea_de_causa_externa():
     descripcion = H.REGISTRO["crear_dependencia"].descripcion
     assert "otra tarea" in descripcion
     assert "registrar_bloqueo" in descripcion
+
+
+# ---------------------------------------------------------------------------
+# Un rechazo de `preparar` no es una ejecución (hallazgo del orquestador,
+# evidencia real de banco b-0005-a, ADR 0005 preexistente): `_ejecutar_una`
+# nunca pasa `ya_confirmada`, así que con una herramienta que declara
+# `preparar` el único dict que puede volver sin excepción es el rechazo de
+# negocio de `preparar` -- antes se sumaba a `acciones` y se auditaba como
+# `herramienta:<nombre>` aunque no se escribió ninguna fila.
+# ---------------------------------------------------------------------------
+
+def test_rechazo_de_preparacion_no_se_audita_como_ejecutado(corework, conn):
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        origen = _tarea(cur, ws, titulo="Programar PLC")
+    id_inexistente = "00000000-0000-0000-0000-000000000000"
+
+    guion = [
+        Respuesta(llamadas=[Llamada("c1", "crear_dependencia",
+                                    {"origen_tarea_id": origen,
+                                     "destino_tarea_id": id_inexistente})]),
+        Respuesta(texto="Anoté la dependencia."),
+    ]
+    with espacio(conn, ws) as cur:
+        quien = _quien(cur, "Marcos Tarquini", ws)
+        cal = Calendario.desde_base(cur, ws)
+        r = responder(cur, quien, "agregá esa dependencia",
+                      ProveedorGuionado(guion), cal, chat_id=9006, ahora=AHORA)
+
+        assert r.acciones == []                 # nada se ejecutó
+        assert "Estado: sin cambios." in r.texto  # no anuncia como hecho
+        cur.execute("select count(*) n from dependency")
+        assert cur.fetchone()["n"] == 0
+
+    with admin(conn) as cur:
+        cur.execute(
+            "select count(*) n from audit_log where accion = 'herramienta:crear_dependencia'")
+        assert cur.fetchone()["n"] == 0, \
+            "un rechazo de preparar no es una ejecución"
+
+
+def test_rechazo_de_preparacion_no_bloquea_una_ejecucion_real_despues(corework, conn):
+    """Regresión: el turno agotó su intento con un rechazo, pero una
+    ejecución real -- confirmada por botón, el mismo camino que usa
+    `gateway.py` -- sigue auditándose como `herramienta:<nombre>`."""
+    from prisma.db import registrar_auditoria
+
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        origen = _tarea(cur, ws, titulo="Programar PLC")
+        destino = _tarea(cur, ws, titulo="Cablear tablero",
+                         persona="Nahuel Gimenez")
+
+    with espacio(conn, ws) as cur:
+        quien = _quien(cur, "Marcos Tarquini", ws)
+        r = H.ejecutar(cur, quien, "crear_dependencia",
+                       {"origen_tarea_id": origen, "destino_tarea_id": destino},
+                       ya_confirmada=True)
+        assert "dependencia_id" in r
+        registrar_auditoria(
+            cur, accion="herramienta:crear_dependencia", workspace_id=ws,
+            actor_app_user_id=quien.app_user_id, actor_kind="persona",
+            detalle={"args": {"origen_tarea_id": origen,
+                              "destino_tarea_id": destino}})
+
+    with admin(conn) as cur:
+        cur.execute(
+            "select count(*) n from audit_log where accion = 'herramienta:crear_dependencia'")
+        assert cur.fetchone()["n"] == 1
+        cur.execute("select count(*) n from dependency")
+        assert cur.fetchone()["n"] == 1

@@ -32,6 +32,7 @@ from prisma.calendario import Calendario
 from prisma.contexto import PREAMBULO, construir
 from prisma.db import admin, espacio
 from prisma.llm import Llamada, ProveedorGuionado, Respuesta
+from prisma.salida import BUTTON_TEXT_LIMIT, telegram_utf16_units
 
 
 def _quien(cur, nombre, ws):
@@ -147,6 +148,109 @@ def test_opciones_de_texto_arman_botones_con_la_salida(corework, conn, monkeypat
     etiquetas = [f["etiqueta"] for f in filas]
     assert etiquetas == ["El Dashboard de lotes", "La Integración de datos",
                         "Quiero consultar otra cosa"]
+
+
+# ---------------------------------------------------------------------------
+# El texto del modelo acompaña la pregunta, no se descarta (hallazgo del
+# orquestador, evidencia real de banco b-0001-a, ADR 0007 punto 2: "el texto
+# da el contexto; la elección se hace tocando").
+# ---------------------------------------------------------------------------
+
+def test_texto_del_modelo_acompana_la_pregunta_de_opciones(corework, conn, monkeypatch):
+    ws = corework.workspace_id
+    texto_modelo = ("Tenés dos tareas abiertas: «Programar PLC» y «Revisar "
+                    "comunicaciones», sin fecha.")
+    guion = [Respuesta(texto=texto_modelo, llamadas=[Llamada("c1", "ofrecer_opciones", {
+        "pregunta": "¿De cuál te referís?",
+        "opciones": [{"texto": "Programar PLC"}, {"texto": "Revisar comunicaciones"}]})])]
+    proveedor = _con_proveedor(monkeypatch, guion)
+
+    with espacio(conn, ws) as cur:
+        quien = _quien(cur, "Marcos Tarquini", ws)
+        cal = Calendario.desde_base(cur, ws)
+        r = responder(cur, quien, "lo del dashboard", proveedor, cal, chat_id=1,
+                     ahora=datetime.now(timezone.utc))
+        assert r.elecciones == ["ofrecer_opciones"]
+        assert r.texto == texto_modelo           # antes se descartaba entero (r.texto == "")
+
+        pid = _pendiente_opciones(cur, ws)
+        cur.execute(
+            "select cuerpo from message_outbox where pending_action_id = %s", (pid,))
+        cuerpo = cur.fetchone()["cuerpo"]
+
+    assert texto_modelo in cuerpo
+    assert "¿De cuál te referís?" in cuerpo
+    assert cuerpo.index(texto_modelo) < cuerpo.index("¿De cuál te referís?")
+
+
+def test_texto_se_descarta_si_ademas_queda_una_confirmacion_pendiente(
+        corework, conn, monkeypatch):
+    """Evitar anunciar como hecho algo que no se hizo (ADR 0005) sigue
+    ganando: si en el mismo turno además queda una confirmación esperando,
+    el texto no viaja -- sólo la pregunta con sus botones."""
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        tid = _tarea(cur, ws, persona="Marcos Tarquini")
+
+    guion = [Respuesta(
+        texto="Ya casi termino, sólo falta elegir con cuál seguimos.",
+        llamadas=[
+            Llamada("c1", "actualizar_estado", {"tarea_id": tid, "estado": "en_curso"}),
+            Llamada("c2", "ofrecer_opciones", {
+                "pregunta": "¿Seguimos con ésta?",
+                "opciones": [{"texto": "Sí"}, {"texto": "No"}]}),
+        ])]
+    proveedor = _con_proveedor(monkeypatch, guion)
+
+    with espacio(conn, ws) as cur:
+        quien = _quien(cur, "Marcos Tarquini", ws)
+        cal = Calendario.desde_base(cur, ws)
+        r = responder(cur, quien, "arranco", proveedor, cal, chat_id=1,
+                     ahora=datetime.now(timezone.utc))
+        assert r.confirmaciones == ["actualizar_estado"]
+        assert r.texto == ""
+
+        pid = _pendiente_opciones(cur, ws)
+        cur.execute(
+            "select cuerpo from message_outbox where pending_action_id = %s", (pid,))
+        cuerpo = cur.fetchone()["cuerpo"]
+
+    assert cuerpo == "¿Seguimos con ésta?"
+    assert "Ya casi termino" not in cuerpo
+
+
+def test_texto_largo_con_opciones_se_parte_y_los_botones_van_aparte(
+        corework, conn, monkeypatch):
+    oracion = "Repasé las tareas abiertas y ninguna tiene fecha asignada. "
+    texto_largo = oracion * 70
+    assert telegram_utf16_units(texto_largo) > BUTTON_TEXT_LIMIT
+
+    ws = corework.workspace_id
+    guion = [Respuesta(texto=texto_largo, llamadas=[Llamada("c1", "ofrecer_opciones", {
+        "pregunta": "¿Cuál priorizamos?",
+        "opciones": [{"texto": "A"}, {"texto": "B"}]})])]
+    proveedor = _con_proveedor(monkeypatch, guion)
+
+    with espacio(conn, ws) as cur:
+        quien = _quien(cur, "Marcos Tarquini", ws)
+        cal = Calendario.desde_base(cur, ws)
+        responder(cur, quien, "estado general", proveedor, cal, chat_id=1,
+                 ahora=datetime.now(timezone.utc))
+
+        cur.execute(
+            """select cuerpo, pending_action_id, programado_para
+                 from message_outbox where workspace_id = %s and chat_id = %s
+                order by programado_para""", (ws, 1))
+        filas = cur.fetchall()
+
+    partes_texto = [f for f in filas if f["pending_action_id"] is None]
+    mensajes_botones = [f for f in filas if f["pending_action_id"] is not None]
+
+    assert len(partes_texto) >= 2
+    assert len(mensajes_botones) == 1
+    assert mensajes_botones[0]["cuerpo"] == "¿Cuál priorizamos?"
+    assert (max(f["programado_para"] for f in partes_texto)
+           < mensajes_botones[0]["programado_para"])
 
 
 def test_mas_de_cuatro_opciones_se_rechaza_al_modelo(corework, conn, monkeypatch):

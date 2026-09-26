@@ -116,6 +116,17 @@ def responder(cur: psycopg.Cursor, quien: Solicitante, texto_entrante: str,
     acciones: list[str] = []
     confirmaciones: list[str] = []
     elecciones: list[str] = []
+    # `elecciones` mezcla dos mecanismos distintos (T1 `NecesitaElegir` y
+    # `NecesitaOpciones`, `ofrecer_opciones`) para no romper el contrato
+    # externo de `Resultado.elecciones` -- `elegir_pendiente` distingue sólo
+    # el primero, y `opciones_pendientes` guarda las excepciones del segundo,
+    # para que este turno pueda decidir, recién al cerrar, si el texto del
+    # modelo acompaña la pregunta (fix del orquestador, evidencia de banco
+    # b-0001-a, ADR 0007 punto 2: "el texto da el contexto; la elección se
+    # hace tocando" -- antes ese texto se descartaba entero).
+    elegir_pendiente: list[str] = []
+    opciones_pendientes: list[H.NecesitaOpciones] = []
+    texto_al_ofrecer: str | None = None
     intentos_mutacion: list[str] = []
     # T3 (ADR 0007 punto 3): filas de la ÚLTIMA llamada a `consultar_tareas`
     # de este turno que devolvió alguna -- se sobrescribe sólo cuando hay
@@ -139,13 +150,22 @@ def responder(cur: psycopg.Cursor, quien: Solicitante, texto_entrante: str,
 
             mensajes.append({"role": "assistant", "content": _bloques(r)})
             resultados = []
+            antes_de_opciones = len(opciones_pendientes)
             for c in r.llamadas:
                 if not c.nombre.startswith("consultar_"):
                     intentos_mutacion.append(c.nombre)
                 resultados.append(
                     _ejecutar_una(cur, quien, c, ctx, acciones, confirmaciones,
-                                  elecciones, ultima_lista_tareas, chat_id, cal,
+                                  elecciones, elegir_pendiente, opciones_pendientes,
+                                  ultima_lista_tareas, chat_id, cal,
                                   ahora, entrante_id, texto_entrante))
+            if len(opciones_pendientes) > antes_de_opciones and texto_al_ofrecer is None:
+                # El texto de ESTA vuelta -- la que llamó a `ofrecer_opciones`
+                # --, no el de una vuelta posterior: el modelo suele repetir
+                # "Listo, ahí tenés las opciones" después, y ese texto no
+                # aporta nada (nunca describe qué pasó, el turno ya había
+                # terminado para él).
+                texto_al_ofrecer = salida
             mensajes.append({"role": "user", "content": resultados})
     except Exception as e:  # noqa: BLE001
         _incidente(cur, quien, e)
@@ -160,13 +180,40 @@ def responder(cur: psycopg.Cursor, quien: Solicitante, texto_entrante: str,
                      "elecciones": elecciones, "dijo": texto},
             pack_hash=ctx.pack_hash, nucleo_hash=ctx.nucleo_hash)
 
-    # Algo quedó esperando a la persona y ya salió el mensaje que se lo pide,
-    # con sus botones. Lo que el modelo haya escrito además no se manda: es
-    # justo el lugar donde anunciaría como hecho algo que no hizo. No alcanza
-    # con pedírselo en el preámbulo — un modelo se distrae, una condición no.
+    # Algo quedó esperando a la persona y ya salió (o sale acá abajo) el
+    # mensaje que se lo pide, con sus botones.
     if confirmaciones or elecciones:
-        auditar(salida)
-        return Resultado("", acciones, confirmaciones, elecciones=elecciones)
+        texto_opciones = ""
+        if opciones_pendientes and not confirmaciones and not elegir_pendiente:
+            # La única interacción pendiente de todo el turno es
+            # `ofrecer_opciones` (fix del orquestador, ADR 0007 punto 2): acá
+            # sí se manda el texto del modelo, junto con la pregunta -- es
+            # justo el lugar donde antes se anunciaba como hecho algo que no
+            # se hizo (confirmación/`NecesitaElegir` pendiente), pero una
+            # pregunta con opciones no anuncia nada: sólo da contexto. Mismas
+            # protecciones de veracidad que la salida normal.
+            texto_opciones = normalize_visible_text(
+                revisar_salida(texto_al_ofrecer or "", ctx.variantes_prohibidas))
+            texto_opciones = _nombrar_tareas_sin_mencionar(
+                texto_opciones, tareas_resueltas_claras)
+            # `ofrecer_opciones` en sí no es una mutación que haya fallado --
+            # es la pregunta -- así que no cuenta para "se intentó cambiar
+            # algo y no se aplicó nada".
+            intentos_reales = [n for n in intentos_mutacion if n != "ofrecer_opciones"]
+            if intentos_reales and not any(
+                    not accion.startswith("consultar_") for accion in acciones):
+                texto_opciones = with_no_effect_status(texto_opciones)
+        if opciones_pendientes:
+            # Se encola acá, recién ahora que se sabe si el resto del turno
+            # dejó además una confirmación o un `NecesitaElegir` pendiente --
+            # antes se encolaba apenas se atrapaba la excepción, sin poder
+            # saberlo todavía. Se manda de todos modos aunque haya otra cosa
+            # pendiente (T2, `test_retomar_con_un_cambio_sigue_pidiendo_
+            # confirmar`): lo único que cambia es si lleva texto.
+            _encolar_opciones_modelo(cur, quien, chat_id, opciones_pendientes[0],
+                                     ahora, texto=texto_opciones)
+        auditar(texto_opciones or salida)
+        return Resultado(texto_opciones, acciones, confirmaciones, elecciones=elecciones)
 
     # Se acabaron las vueltas con herramientas todavía en curso: el modelo
     # nunca vio cómo terminó lo que pidió, así que su texto no describe nada
@@ -275,7 +322,8 @@ def _bloques(r: Respuesta) -> list[dict]:
 
 
 def _ejecutar_una(cur, quien: Solicitante, c: Llamada, ctx, acciones,
-                  confirmaciones, elecciones, ultima_lista_tareas, chat_id,
+                  confirmaciones, elecciones, elegir_pendiente,
+                  opciones_pendientes, ultima_lista_tareas, chat_id,
                   cal, ahora, entrante_id, texto_entrante) -> dict:
     """Ejecuta una herramienta y devuelve el bloque de resultado para el modelo.
 
@@ -307,6 +355,7 @@ def _ejecutar_una(cur, quien: Solicitante, c: Llamada, ctx, acciones,
     except H.NecesitaElegir as e:
         _encolar_eleccion(cur, quien, chat_id, e, ahora)
         elecciones.append(e.herramienta)
+        elegir_pendiente.append(e.herramienta)
         return bloque({
             "ejecutado": False,
             "estado": "esperando que la persona elija entre las opciones",
@@ -314,13 +363,19 @@ def _ejecutar_una(cur, quien: Solicitante, c: Llamada, ctx, acciones,
             "aclaracion": "Ya le mostré los botones. No elijas vos ni "
                           "supongas cuál era."})
     except H.NecesitaOpciones as e:
-        _encolar_opciones_modelo(cur, quien, chat_id, e, ahora)
+        # No se encola acá (fix del orquestador, evidencia de banco
+        # b-0001-a): recién `responder`, al cerrar el turno completo, sabe
+        # si además queda una confirmación o un `NecesitaElegir` pendiente
+        # de otra herramienta -- de eso depende si el texto del modelo
+        # acompaña esta pregunta. `elecciones` conserva su forma de siempre
+        # (contrato externo de `Resultado.elecciones`, sin cambios).
         elecciones.append(c.nombre)
+        opciones_pendientes.append(e)
         return bloque({
             "ejecutado": False,
             "estado": "esperando que la persona elija entre las opciones",
-            "aclaracion": "Ya le mostré los botones con la pregunta y la "
-                          "salida. No preguntes de nuevo ni agregues más "
+            "aclaracion": "Le voy a mostrar los botones con la pregunta y "
+                          "la salida. No preguntes de nuevo ni agregues más "
                           "texto: el turno termina acá."})
     except psycopg.errors.RaiseException as e:
         # Una regla de la base rechazó la operación. El texto de esas
@@ -334,6 +389,34 @@ def _ejecutar_una(cur, quien: Solicitante, c: Llamada, ctx, acciones,
         return bloque({"ejecutado": False,
                        "explicacion": "no se pudo completar esa operación"},
                       error=True)
+
+    h = H.REGISTRO.get(c.nombre)
+    if h is not None and h.preparar is not None and isinstance(resultado, dict):
+        # `_ejecutar_una` nunca pasa `ya_confirmada` (queda en su default
+        # `False`): con una herramienta que declara `preparar`,
+        # `herramientas.ejecutar` sólo puede devolver acá sin excepción
+        # cuando `preparar` encontró el mismo rechazo de negocio que
+        # encontraría el handler (`if isinstance(prep, dict): return prep`)
+        # -- con una preparación que sí puede seguir, siempre levanta
+        # `NecesitaConfirmacion` antes de tocar el handler. No es un
+        # heurístico sobre la forma del dict (`error`/`falta`): es la única
+        # forma en la que un dict puede llegar hasta acá sin haber ejecutado
+        # nada, así que no cuenta como acción ni se audita como tal
+        # (evidencia de banco b-0005-a, ADR 0005 -- antes se auditaba
+        # `herramienta:<nombre>` y se sumaba a `acciones` aunque no se
+        # escribió ninguna fila).
+        registrar_auditoria(
+            cur, accion=f"herramienta_rechazada:{c.nombre}",
+            workspace_id=quien.workspace_id,
+            actor_app_user_id=quien.app_user_id, actor_kind="prisma",
+            detalle={"args": c.args, "rechazo": resultado},
+            pack_hash=ctx.pack_hash, nucleo_hash=ctx.nucleo_hash)
+        return bloque({
+            "ejecutado": False,
+            "explicacion": resultado.get("error") or resultado.get("falta")
+                          or "no se pudo completar esa operación",
+            "aclaracion": "No se aplicó ningún cambio. No lo anuncies como "
+                          "hecho."}, error=True)
 
     if c.nombre == "consultar_tareas" and isinstance(resultado, list) and resultado:
         # T3 (ADR 0007 punto 3): se guarda para que `responder` arme los
@@ -425,28 +508,34 @@ def _encolar_eleccion(cur, quien: Solicitante, chat_id: int,
 
 
 def _encolar_opciones_modelo(cur, quien: Solicitante, chat_id: int,
-                             e: H.NecesitaOpciones, ahora: datetime) -> None:
+                             e: H.NecesitaOpciones, ahora: datetime,
+                             texto: str = "") -> None:
     """El modelo pidió una elección con `ofrecer_opciones` (T1, ADR 0007):
-    arma los botones con la salida de siempre y termina el turno -- a
-    diferencia de `_encolar_eleccion`, tocar una opción no vuelve a llamar a
-    la herramienta: retoma la conversación en
+    arma los botones con la pregunta y termina el turno -- a diferencia de
+    `_encolar_eleccion`, tocar una opción no vuelve a llamar a la
+    herramienta: retoma la conversación en
     `gateway._resolver_toque_opcion_modelo`, con el sentinel compartido en
     `pendientes.SENTINEL_OPCIONES_MODELO`.
+
+    `texto`, si viene (fix del orquestador, ADR 0007 punto 2), es lo que el
+    modelo escribió en la misma vuelta que llamó a `ofrecer_opciones` --
+    `responder` ya decidió que es seguro mandarlo (nada más quedó pendiente
+    en el turno) y ya le aplicó las mismas protecciones de veracidad que a
+    cualquier salida. Va como contexto ANTES de la pregunta, en el mismo
+    mensaje cuando entra en `BUTTON_TEXT_LIMIT`; si no entra, se reusa el
+    mismo armado de T3a/T4b (`_encolar_texto_con_opciones`): el texto sale
+    partido aparte, primero, y los botones -- con la pregunta sola como
+    resumen corto -- después de la última parte. `args` sigue guardando sólo
+    `{"pregunta": e.pregunta}`, igual que siempre: es lo único que lee
+    `gateway._resolver_toque_opcion_modelo` al retomar.
     """
     opciones = [(o.etiqueta, o.valor) for o in e.opciones]
     opciones.append((P.ETIQUETA_SALIR_OPCIONES, {"tipo": "salida"}))
-    p = P.registrar(cur, quien, herramienta=P.SENTINEL_OPCIONES_MODELO,
-                    args={"pregunta": e.pregunta}, resumen=e.pregunta,
-                    vence_en=ahora + VIGENCIA_PENDIENTE, campo="eleccion",
-                    opciones=opciones, chat_id=chat_id)
-    enqueue_outbox(
-        cur, workspace_id=quien.workspace_id, chat_id=chat_id,
-        recipient_membership_id=quien.membership_id, text=p.resumen,
-        scheduled_for=ahora,
-        dedupe_key=(f"{quien.workspace_id}:opciones:{quien.app_user_id}:"
-                   f"{ahora.timestamp()}"), is_response=True,
-        pending_action_id=p.id,
-    )
+    texto_combinado = f"{texto}\n\n{e.pregunta}" if texto else e.pregunta
+    _encolar_texto_con_opciones(
+        cur, quien, chat_id, texto_combinado, opciones, ahora,
+        dedupe_prefijo="opciones-modelo", texto_corto=e.pregunta,
+        args={"pregunta": e.pregunta})
 
 
 def _opciones_lista_tareas(tareas: list[dict]) -> list[tuple[str, dict]]:
@@ -505,9 +594,10 @@ def _encolar_texto_con_opciones(cur, quien: Solicitante, chat_id: int,
     nunca al revés.
 
     `dedupe_prefijo` distingue el mecanismo que llama (`lista-tareas`,
-    `opciones-genericas`) para que las claves de una llamada nunca choquen
-    con las de otra; `args` es lo que guarda `pending_action.args` (igual
-    para las tres opciones de un mismo cierre, nunca algo por opción)."""
+    `opciones-genericas`, `opciones-modelo`) para que las claves de una
+    llamada nunca choquen con las de otra; `args` es lo que guarda
+    `pending_action.args` (igual para las tres opciones de un mismo cierre,
+    nunca algo por opción)."""
     opciones = list(opciones)
     cabe_con_botones = (
         telegram_utf16_units(normalize_visible_text(texto)) <= BUTTON_TEXT_LIMIT)
