@@ -183,7 +183,7 @@ class ClienteJevGuionadoPorReferencia:
     respuestas grabadas por la referencia de cada pedido
     (`state["referencia"]`) en vez de una sola cola compartida.
 
-    Hallazgo del orquestador (investigación de `b-0005-b`, 2026-09-26):
+    Investigación de `b-0005-b` (2026-09-26):
     `gateway._resolver_en_paralelo` resuelve cada referencia a tarea de un
     mensaje en su propio hilo (`ThreadPoolExecutor`, T3) -- con MÁS de un
     `trabajo` en el mismo mensaje (el caso real de `b-0005`/`b-0005-b`, dos
@@ -432,8 +432,8 @@ class ResultadoCorrida:
     # central: a diferencia de un conteo por tabla, ve una herramienta que
     # sólo actualiza una fila que ya existía (`resolver_bloqueo`,
     # `actualizar_estado`) y, sobre todo, ve una que se ejecutó directo, sin
-    # que ninguna propuesta haya llegado a esperar un Confirmar (revisión
-    # del orquestador, T4, 2026-09-24).
+    # que ninguna propuesta haya llegado a esperar un Confirmar (T4,
+    # 2026-09-24).
     herramientas_antes_del_toque: tuple[str, ...] = ()
     # Etiquetas de los botones que ofreció la aclaración con botones de este
     # turno (T6, `aclaracion-con-botones`) -- vacío si el escenario no
@@ -474,7 +474,7 @@ def _pendiente_para_confirmar(cur, workspace_id: str, chat_id: int,
     asignar) tiene sus propios botones, sin Confirmar, y no se toca acá: el
     banco no adivina una elección por la persona.
 
-    `desde` (revisión del orquestador, mismo motivo que `_resolver_toque_
+    `desde` (mismo motivo que `_resolver_toque_
     generico`/`_aclaraciones_para_elegir`): sin este filtro, una acción
     pendiente que quedó esperando de un turno ANTERIOR del mismo chat
     (fuera del alcance de esta corrida) podía mezclarse con la de ahora --
@@ -513,8 +513,8 @@ def _aclaraciones_para_elegir(cur, workspace_id: str, chat_id: int,
     """TODAS las acciones pendientes 'esperando' de este chat, creadas
     durante ESTA corrida (`creado_en >= desde`), que dejaron una referencia
     ambigua lista para elegir con botones, por cualquiera de las dos formas
-    en que Prisma la ofrece (T4, revisión del orquestador 2026-09-26): la
-    aclaración con botones de siempre (T6, `aclaracion-con-botones`,
+    en que Prisma la ofrece (T4, 2026-09-26): la aclaración con botones de
+    siempre (T6, `aclaracion-con-botones`,
     `gateway._SENTINEL_ACLARACION`) o una elección del modelo por
     `ofrecer_opciones` (T1, ADR 0007, `pendientes.SENTINEL_OPCIONES_MODELO`)
     que ofreció las mismas tareas como botones. Antes de esta corrección el
@@ -524,18 +524,17 @@ def _aclaraciones_para_elegir(cur, workspace_id: str, chat_id: int,
     marcando "no ofreció botón" (ofrecidas: []) y sin tocar nada, porque el
     corredor nunca tapeaba esa forma.
 
-    Revisión del orquestador (T4, hallazgo de revisión): antes se quedaba
-    con una sola fila (`order by creado_en desc limit 1`), sin ningún
-    desempate real -- dos acciones pendientes creadas en la MISMA
-    transacción comparten `creado_en` (`now()` de Postgres es constante
-    dentro de una transacción). Devuelve TODAS las que haya (vacío si
-    ninguna): quien llama resuelve contra la UNIÓN de sus opciones, nunca
-    contra una elegida por orden.
+    En T4, antes se quedaba con una sola fila (`order by creado_en desc
+    limit 1`), sin ningún desempate real -- dos acciones pendientes creadas
+    en la MISMA transacción comparten `creado_en` (`now()` de Postgres es
+    constante dentro de una transacción). Devuelve TODAS las que haya
+    (vacío si ninguna): quien llama resuelve contra la UNIÓN de sus
+    opciones, nunca contra una elegida por orden.
 
-    `desde` (esta unidad, hallazgo del orquestador): sin este filtro, una
-    acción pendiente de aclaración que quedó esperando de un turno ANTERIOR
-    del mismo chat (fuera del alcance de esta corrida) podía sumarse a la
-    unión y volver ambiguo un toque que en esta corrida no lo es."""
+    `desde`: sin este filtro, una acción pendiente de aclaración que quedó
+    esperando de un turno ANTERIOR del mismo chat (fuera del alcance de
+    esta corrida) podía sumarse a la unión y volver ambiguo un toque que en
+    esta corrida no lo es."""
     cur.execute(
         """select id, herramienta from pending_action
             where workspace_id = %s and chat_id = %s and herramienta in (%s, %s)
@@ -566,9 +565,8 @@ def _candidatas_tarea_por_titulo(opciones: list[dict]) -> list[tuple[str, str]]:
     botón: el modelo puede poner una etiqueta propia, más corta o distinta,
     para una opción de tarea (visto en la misma corrida real).
 
-    `.get("titulo")`, no `["titulo"]` (revisión del orquestador, hallazgo de
-    revisión): una opción de tarea sin título no cuenta -- se descarta, no
-    rompe la corrida con un `KeyError`."""
+    `.get("titulo")`, no `["titulo"]`: una opción de tarea sin título no
+    cuenta -- se descarta, no rompe la corrida con un `KeyError`."""
     return [
         (o["valor"].get("titulo"), o["token"]) for o in opciones
         if isinstance(o.get("valor"), dict) and o["valor"].get("tipo") == "tarea"
@@ -594,15 +592,14 @@ def _resolver_toque_generico(cur, workspace_id: str, chat_id: int,
     """Resuelve un toque genérico de escenario (T4, `Escenario.toques`)
     contra la UNIÓN de las opciones de TODAS las acciones pendientes
     'esperando' de este chat, CREADAS DURANTE ESTA CORRIDA (`creado_en >=
-    desde`) -- nunca contra "la última" elegida por orden (revisión del
-    orquestador, hallazgo de revisión: `_pendiente_actual` desataba el
-    empate con `order by creado_en desc, ctid desc`, pero `creado_en` es
+    desde`) -- nunca contra "la última" elegida por orden (`_pendiente_actual`
+    desataba el empate con `order by creado_en desc, ctid desc`, pero `creado_en` es
     igual para dos filas creadas en la misma transacción y `ctid` no es una
     garantía general de Postgres bajo escritura concurrente -- sólo
     "funcionaba" porque el banco corre en serie, y aun así elegía cualquiera
     de las dos sin ningún criterio de negocio).
 
-    `desde` (esta unidad, hallazgo del orquestador): sin este filtro, una
+    `desde`: sin este filtro, una
     acción pendiente que quedó esperando de un turno ANTERIOR del mismo chat
     -- de una corrida previa del mismo escenario contra `--banco-n`, o de
     otro escenario que compartiera chat -- se sumaba a la unión y podía
@@ -699,8 +696,8 @@ def ejecutar_escenario(
     tapea -- por el mismo camino que un toque real de Telegram, igual que ya
     hace con Confirmar -- para retomar el pedido original hasta la vista
     previa de siempre, en vez de quedarse preguntando. Reconoce las DOS
-    formas en que Prisma puede dejarla esperando (revisión del orquestador,
-    T4, 2026-09-26): la aclaración con botones de siempre (T6) o una
+    formas en que Prisma puede dejarla esperando (T4, 2026-09-26): la
+    aclaración con botones de siempre (T6) o una
     elección del modelo por `ofrecer_opciones` (T1, ADR 0007) que ofreció
     las mismas tareas como botones -- `_aclaracion_para_elegir`. Para la
     segunda forma, sólo cuenta una opción de tarea (`tarea_id`, validada
@@ -758,8 +755,7 @@ def ejecutar_escenario(
         cur.execute("select id from incident where workspace_id = %s",
                     (workspace_id,))
         ids_incidentes_previos = {f["id"] for f in cur.fetchall()}
-        # Reloj de la base, no de la aplicación (revisión del orquestador,
-        # hallazgo de revisión): marca el arranque de ESTA corrida para que
+        # Reloj de la base, no de la aplicación: marca el arranque de ESTA corrida para que
         # `_resolver_toque_generico`/`_aclaraciones_para_elegir`/
         # `_pendiente_para_confirmar` sólo vean acciones pendientes
         # 'esperando' creadas a partir de acá -- una acción que quedó
@@ -797,9 +793,8 @@ def ejecutar_escenario(
                     pid: _opciones_pendiente(cur, pid) for pid, _ in pendientes_aclaracion}
 
             # Se resuelve contra la UNIÓN de TODAS las acciones pendientes de
-            # aclaración de este chat (revisión del orquestador, hallazgo de
-            # revisión: antes se elegía "la última" sin ningún desempate real
-            # -- dos acciones pendientes creadas en la misma transacción
+            # aclaración de este chat (antes se elegía "la última" sin ningún
+            # desempate real -- dos acciones pendientes creadas en la misma transacción
             # comparten `creado_en`). Cada una se compara con su propia
             # semántica: una aclaración de `ofrecer_opciones` por título de
             # tarea, la de botones de siempre por etiqueta.

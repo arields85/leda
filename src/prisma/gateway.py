@@ -695,7 +695,7 @@ def _resumir_aclaracion_ninguna(cur, quien, texto: str, modificacion, proveedor,
     diría al modelo que vuelva a llamar a una herramienta que ni siquiera es
     real (el centinela interno).
 
-    Revisión del orquestador sobre T4: este mensaje se rutea y resuelve como
+    En T4, este mensaje se rutea y resuelve como
     cualquier turno -- el mismo camino que ya usa una corrección real de
     Modificar -- porque puede traer su propia referencia dicha con otras
     palabras ("es la de máq. 3"). El bloque de contexto es propio: nombra la
@@ -1028,7 +1028,7 @@ def _resolver_toque_opcion_modelo(cur, quien, workspace_id: str, chat_id: int,
                  contexto_referencias=contexto,
                  tareas_resueltas_claras=tareas_resueltas)
     except Exception as e:  # noqa: BLE001
-        # Revisión del orquestador sobre T1: `agente.responder` ya atrapa
+        # En T1, `agente.responder` ya atrapa
         # que falle el proveedor DENTRO de la conversación (constante
         # `DISCULPA`, ahí adentro), pero construir el calendario o el
         # proveedor pasa ACÁ, antes de llamarla. Sin este resguardo, esa
@@ -1105,11 +1105,14 @@ def _mostrar_tareas_propias(cur, quien, workspace_id: str, chat_id: int,
     """"Es sobre una tarea existente" (T4b, ADR 0007, cierre genérico de una
     pregunta sin opciones): lista las tareas ACTIVAS de la propia persona
     como botones -- misma regla compartida de "activa" que la elección de
-    dependencia de T2 (`menu_tarea.tareas_activas_de_persona`, hallazgo del
-    orquestador: antes cada una tenía su propia copia de la consulta), bajo
-    el cursor con RLS de este toque, así que nunca puede traer una tarea de
-    otro espacio ni de otra persona. Orden determinístico (`fecha_objetivo
-    nulls last, id`): mismo motivo que el resto del desempate de esta unidad.
+    dependencia de T2 (`menu_tarea.tareas_activas_de_persona`; antes cada
+    una tenía su propia copia de la consulta), bajo el cursor con RLS de
+    este toque, así que nunca puede traer una tarea de otro espacio ni de
+    otra persona. Orden determinístico (`fecha_objetivo nulls last, id`):
+    mismo motivo que `tareas_activas_de_persona` -- `id` desempata cuando
+    dos tareas comparten `fecha_objetivo` (o no tienen), para que el orden
+    sea siempre el mismo en vez de depender del orden físico con el que
+    Postgres las devuelva.
 
     Sin tope: se piden TODAS las activas -- `agente._opciones_lista_tareas`
     ya arma "Ver más" con el resto cuando son más de `H.MAX_OPCIONES_MODELO`
@@ -1117,9 +1120,9 @@ def _mostrar_tareas_propias(cur, quien, workspace_id: str, chat_id: int,
     jsonb del servidor), nunca en el `callback_data` de Telegram (ese sigue
     siendo sólo el token corto `p:<uuid>`) -- así que no hay límite de
     tamaño de payload que un "Ver más" de más páginas pueda superar. Antes
-    se cortaba en silencio a las primeras 25 sin decirlo (hallazgo del
-    orquestador); ahora se pagina todo, igual que la lista que arma T3 para
-    una respuesta de `consultar_tareas`."""
+    se cortaba en silencio a las primeras 25 sin decirlo; ahora se pagina
+    todo, igual que la lista que arma T3 para una respuesta de
+    `consultar_tareas`."""
     from . import menu_tarea as M
     from . import pendientes as P
     from .agente import VIGENCIA_PENDIENTE, _opciones_lista_tareas
@@ -1234,7 +1237,7 @@ def _ejecutar_accion_menu(cur, quien, workspace_id: str, chat_id: int,
     `ya_confirmada`, así que si declara `preparar` siempre frena primero en
     una vista previa (ADR 0005, decisión 1): nada se aplica todavía.
 
-    Revisión del orquestador sobre `0814fa3` (T2b): las tres funciones que
+    Desde `0814fa3` (T2b): las tres funciones que
     llaman a ésta (`_resolver_toque_menu_tarea`, `_resolver_toque_dato_menu_
     tarea`, `_resumir_dato_menu_tarea`) ya atajan `Denegado` en su propio
     `try`/`except` -- pero esta función tiene que ser correcta por sí sola,
@@ -1278,7 +1281,7 @@ def _ejecutar_accion_menu(cur, quien, workspace_id: str, chat_id: int,
 def _mensaje_resultado_menu(cur, quien, herramienta: str, resultado, *,
                             pending_action_id: str | None = None) -> str:
     """El mensaje tras correr una acción del menú sin `ya_confirmada`
-    (revisión del orquestador sobre `0814fa3`, T2b, punto 3).
+    (desde `0814fa3`, T2b, punto 3).
 
     Como TODAS las herramientas que ofrece el menú declaran `preparar`, y
     `_ejecutar_accion_menu` nunca pasa `ya_confirmada`, `herramientas.
@@ -1619,8 +1622,8 @@ def _resolver_referencias_del_turno(cur, quien, texto: str, route,
     contra las tareas activas del espacio (T3, `aclaracion-con-botones`).
 
     `None` sólo cuando no hay ninguna referencia: ahí no hay nada que
-    resolver y el turno sigue exactamente como antes de esta unidad, sin
-    tocar la base ni la red.
+    resolver y el turno sigue exactamente igual que sin resolución de
+    referencias (T3), sin tocar la base ni la red.
 
     Sin credencial de Jev (`Config.openrouter_api_key` vacía) Prisma **no
     adivina** (decisión del usuario, 2026-09-24): con referencias en el
@@ -1969,8 +1972,8 @@ NOTICIA_NEUTRA_INCIDENTE = "No pude completar eso. Ya quedó registrado para rev
 # previa, el turno del modelo, correr una herramienta, mandar la respuesta)
 # -- eso ya tiene su propio incidente puntual donde corresponde
 # (`_routing_incident`, `agente._incidente`, etc.), sin tocar. Éstas son las
-# de la red de contención general que agrega esta unidad: el punto de
-# entrada, no el paso interno.
+# etapas de la red de contención general en el punto de entrada, no en el
+# paso interno.
 ETAPA_TURNO_TEXTO = "turno_texto"
 ETAPA_TOQUE_BOTON = "toque_boton"
 ETAPA_ACTIVACION = "activacion"

@@ -136,7 +136,7 @@ def tareas_activas_de_persona(
     `tareas_activas_de` (la elección de con cuál otra tarea depende, T2) y
     `gateway._mostrar_tareas_propias` (T4b, "Es sobre una tarea existente")
     la necesitan igual, y antes cada una tenía su propia copia de la
-    consulta (hallazgo del orquestador).
+    consulta.
 
     Orden determinístico: `fecha_objetivo nulls last` no alcanza sola para
     desempatar entre tareas sin fecha o con la misma fecha -- se agrega
