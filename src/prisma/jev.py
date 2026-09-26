@@ -92,7 +92,10 @@ class ClienteJev:
     para que las pruebas no esperen de verdad.
     """
 
-    api_key: str
+    # `repr=False`: el repr por defecto del dataclass mostraba la clave en
+    # texto plano, y una excepción sin capturar la imprime entera en la
+    # traza (se vio en un fallo real de pytest).
+    api_key: str = field(repr=False)
     cliente: httpx.Client | None = None
     intentos: int = INTENTOS
     dormir: Callable[[float], None] = time.sleep

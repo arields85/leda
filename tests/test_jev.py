@@ -167,6 +167,14 @@ def test_cliente_jev_guionado_lanza_jeverror_si_se_agota_el_guion():
         doble.decidir({}, {})
 
 
+def test_cliente_jev_repr_no_incluye_la_clave():
+    cliente = ClienteJev(api_key="secreto-de-prueba", cliente=object())
+
+    representacion = repr(cliente)
+
+    assert "secreto-de-prueba" not in representacion
+
+
 # --------------------------------------------------------- resolución de tareas
 
 # Ids con forma de identificador real (no "T1".."T3": esas son las claves
