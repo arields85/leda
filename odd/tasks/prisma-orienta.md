@@ -61,7 +61,7 @@ gestión.
   sin punto de retorno).
 - [x] **T3 — Listas como botones.** Una respuesta que presenta tareas para elegir las
   ofrece como botones (por la herramienta de T1 o por la consulta misma).
-- [ ] **T4 — Banco.** Escenarios: lista de tareas con botones, tocar una tarea y
+- [x] **T4 — Banco.** Escenarios: lista de tareas con botones, tocar una tarea y
   llegar a la vista previa, pregunta de Prisma siempre con opciones; comprobador que
   falla ante una pregunta abierta sin opciones.
 - [ ] **T5 — Continuidad.** `docs/capacidades.md`, `docs/STATUS.md`, diseño §4.5 y
@@ -1263,7 +1263,152 @@ cada commit con código pasa por la evaluación de RDD.
   Banco real: `nan` sigue en 404; una clave inválida también da 404, así que el servicio
   rechaza el pedido antes de autenticar (falla del proveedor, no de la cuenta del usuario,
   que está activa). La URL usada coincide con la documentación de `nan.builders/docs`.
-- **Próximo paso al retomar:** T4 (banco): escenarios de lista de tareas con botones,
-  tocar una tarea y llegar a la vista previa, pregunta de Prisma siempre con opciones;
-  comprobador que falla ante una pregunta abierta sin opciones.
+- 2026-09-26: **T4 cerrada.** Ruta: delegada, un escritor (disparador de mapeo:
+  código y pruebas del banco en `tests/banco/` -- `escenario.py`, `corrida.py`,
+  `comprobadores.py`, `test_banco.py`, `test_replays.py`, más los archivos de
+  prueba correspondientes).
+
+  Unidades (para que el orquestador pueda commitear por separado):
+  1. **Extensión de esquema y corredor (`toques` genéricos).**
+     `tests/banco/escenario.py` (campo `toques`, validación), `tests/banco/corrida.py`
+     (`_pendiente_actual`, `_resolver_opcion_toque`, `_tocar_opcion`, y el bloque
+     nuevo en `ejecutar_escenario`), `tests/banco/test_escenario.py` y
+     `tests/banco/test_corrida.py` (pruebas nuevas de esta unidad).
+  2. **Comprobador `comprobar_pregunta_con_opciones`.** `tests/banco/comprobadores.py`
+     (`_hace_pregunta` extraída, `comprobar_pregunta_con_opciones`,
+     `escenario.py` campo `permite_pregunta_sin_opciones`), `tests/banco/test_banco.py`
+     y `tests/banco/test_replays.py` (wiring, activo por defecto), pruebas nuevas en
+     `tests/banco/test_comprobadores.py` y `tests/banco/test_escenario.py`.
+  3. **Escenarios nuevos.** `tests/banco/escenarios/b-0016.yaml` (lista de tareas
+     como botones, sin pregunta abierta), `b-0017.yaml` (tocar una tarea -> menú ->
+     acción -> vista previa, sin efecto antes de Confirmar, usando `toques`),
+     `b-0018.yaml` (referencia ambigua: la elección se ofrece con botones, no en
+     texto abierto).
+
+  Decisiones de diseño:
+  - **`toques` genéricos, no un mecanismo por caso.** El enunciado pedía "tocar el
+    botón cuya etiqueta es X / la N-ésima tarea / la acción del menú X" de forma
+    genérica. Se agregó un solo campo de escenario, `toques: [{"etiqueta": ...} |
+    {"indice": ...}]`, resuelto EN ORDEN por `corrida._pendiente_actual` (la última
+    `pending_action` "esperando" del chat, sin importar qué la armó) +
+    `corrida._resolver_opcion_toque` (busca la opción REAL por etiqueta exacta o por
+    posición 0-based en `pending_action_option.orden`) + `corrida._tocar_opcion`
+    (el mismo `callback_query` sintético que ya usan Confirmar y la aclaración con
+    botones). Nunca se arma ni se acepta un token inventado: si un toque no
+    resuelve (no hay ninguna acción pendiente, o la que hay no ofrece esa
+    etiqueta/índice), se levanta `LookupError` -- capturado como el resto de fallas
+    de infraestructura del escenario, la corrida queda `bloqueado` con el motivo
+    exacto, nunca inventa un toque ni cae en silencio.
+  - **Dónde se insertan los toques.** Después de la aclaración con botones (T6, si
+    la hay) y ANTES de capturar `herramientas_antes_del_toque`/`conteos_antes_del_
+    toque` -- la propiedad central de T4 original (nada se aplica antes de
+    Confirmar) tiene que seguir valiendo con estos pasos de más en el medio, igual
+    que ya valía con la aclaración. El toque automático en Confirmar de siempre
+    (T1, sin tocar en esta unidad) sigue corriendo DESPUÉS de los `toques` del
+    escenario: si el último toque declarado llega a una vista previa, ese Confirmar
+    la resuelve solo, y `conteos_antes_del_toque` queda capturado justo antes de
+    ese Confirmar -- exactamente el punto que pide el enunciado ("con NO efecto en
+    PostgreSQL antes de confirmar").
+  - **`comprobar_pregunta_con_opciones` reusa la detección existente, no una
+    heurística nueva.** Se extrajo `_hace_pregunta(texto)` (`"?" in texto or
+    _pide_elegir_en_imperativo(texto)`) de adentro de `comprobar_pregunta` (T7) --
+    la misma detección, ahora compartida. El comprobador nuevo es la mitad que
+    faltaba: `comprobar_pregunta` (activo sólo con `debe_preguntar: true`) aprueba
+    tanto una pregunta con botones como una en texto abierto, porque su pregunta es
+    "¿frenó en vez de actuar?"; `comprobar_pregunta_con_opciones` (activo por
+    defecto en TODO escenario) es estricto sobre la FORMA -- si pregunta, tiene que
+    ofrecer botones (ADR 0007 puntos 1 y 5) -- y no mira en absoluto qué
+    herramientas se ejecutaron. Una respuesta que no pregunta nada (ADR 0007, punto
+    pendiente "si una respuesta puede cerrar sin opciones") aprueba sin condición:
+    esta comprobación no toma partido sobre ese punto, sigue abierto.
+  - **Alcance de la comprobación nueva: por defecto en todo escenario, con
+    opt-out explícito.** Se agregó `Escenario.permite_pregunta_sin_opciones`
+    (default `False`) y se comprobó ANTES de activarla por defecto cuántos
+    escenarios existentes cambiarían de veredicto: el único escenario que hoy se
+    gradúa de verdad en la suite por defecto (sin proveedor real) es el replay
+    `tests/banco/replays/afirma-resolvio-sin-ejecutar-la-herramienta.json`
+    (`b-0003`) -- su respuesta grabada ("Listo, ya resolví el bloqueo.") no
+    pregunta nada (`_hace_pregunta` da `False`), así que la comprobación nueva
+    aprueba sin condición y el veredicto esperado ("falla", por las otras dos
+    comprobaciones) no cambió; se verificó corriendo `tests/banco/test_replays.py`
+    con la comprobación ya activada -- pasa igual. Los 33 escenarios YAML
+    preexistentes sólo corren contra el modelo real (`-m modelo_real`, fuera de la
+    suite por defecto) y el proveedor sigue caído (ver más abajo): no se puede
+    correr ninguno para confirmar si cambiarían de veredicto. Los seis con
+    `debe_preguntar: true` (`b-0008` a `b-0012`, `b-0014`) son los más expuestos --
+    si alguno pregunta en texto abierto sin ofrecer botones, la comprobación nueva
+    lo marcará `falla` por primera vez, que es exactamente el comportamiento que
+    pide ADR 0007; no se les agregó `permite_pregunta_sin_opciones` de antemano,
+    sin evidencia de que lo necesiten -- **PENDIENTE**: revisar sus resultados en
+    la primera corrida real después de esta unidad y decidir el opt-out sólo si
+    alguno lo necesita genuinamente (no como default preventivo).
+  - **Escenarios nuevos: estructura, no ejecución.** El proveedor real (`nan`)
+    sigue devolviendo 404 (re-confirmado en la sesión anterior), así que
+    `b-0016`/`b-0017`/`b-0018` sólo se validaron estructuralmente
+    (`cargar_escenarios`, sin `EscenarioInvalido`) y quedan en `tests/banco/
+    escenarios/` para correr contra el modelo real cuando el proveedor vuelva --
+    **PENDIENTE**. `b-0017` es la prueba de aceptación pensada para la propiedad
+    de punta a punta (lista -> menú -> acción -> vista previa): los dos `toques`
+    ("indice: 0" y la etiqueta del menú) los simula el corredor en nombre de la
+    persona, no el modelo -- el modelo sólo decide llamar o no `consultar_tareas`;
+    si no la llama (porque ya tiene las tareas en contexto y contesta sin volver a
+    consultarlas), T3 no arma ninguna lista de botones y el primer toque queda
+    `bloqueado` por "no hay ninguna acción pendiente" -- limitación inherente a un
+    escenario contra un modelo real, documentada, no corregida acá.
+  - **Prueba de punta a punta en la suite por defecto (reemplaza un replay
+    fabricado).** El enunciado pedía "al menos un replay o una corrida guionada"
+    probando el circuito completo. No se fabricó un archivo de replay (un replay
+    representa una corrida real ya evaluada; no hubo ninguna, con el proveedor
+    caído, y fabricar uno sería presentar como evidencia real algo que no lo es).
+    En cambio, `tests/banco/test_corrida.py::
+    test_ejecutar_escenario_toques_lista_tarea_menu_accion_llega_a_la_vista_previa`
+    corre con `ProveedorGuionado` (sin red) el circuito completo: el modelo llama
+    `consultar_tareas`, T3 arma la lista con un botón por tarea, un toque genérico
+    (`{"indice": 0}`) abre el menú de esa tarea (T2), otro (`{"etiqueta": "Ya la
+    terminé"}`) llega a la vista previa de `actualizar_estado` -- se verifica que
+    nada de lo que las 8 herramientas escriben cambió antes de ese punto
+    (`conteos_antes_del_toque == conteos_antes` en las tablas que escriben) y que
+    el Confirmar automático de siempre aplica el cambio real después (la tarea
+    queda en `en_revision`).
+
+  RED (`git stash push -- tests/banco/escenario.py tests/banco/comprobadores.py
+  tests/banco/corrida.py`, con los archivos de prueba ya escritos):
+  - `tests/banco/test_escenario.py` -> `11 failed, 30 passed` (los 11 nuevos de
+    `toques`/`permite_pregunta_sin_opciones`; el resto de la suite de ese archivo
+    ya pasaba, sin tocar).
+  - `tests/banco/test_comprobadores.py` y `tests/banco/test_corrida.py`:
+    `ImportError` al recolectar (`comprobar_pregunta_con_opciones`,
+    `_pendiente_actual` todavía no existían) -- exactamente el motivo esperado.
+  `git stash pop` restauró la implementación antes de seguir.
+
+  GREEN:
+  - `.venv/Scripts/python.exe -m pytest -q tests/banco/test_escenario.py
+    tests/banco/test_comprobadores.py tests/banco/test_corrida.py` -> `174 passed`.
+  - `.venv/Scripts/python.exe -m pytest -q tests/banco` -> `187 passed,
+    108 deselected` (99 previos + 9 nuevos: 3 escenarios × `--banco-n` 3 por
+    defecto).
+  - `.venv/Scripts/python.exe -m pytest -q` (suite completa) -> `822 passed,
+    108 deselected` (795 previos + 27 pruebas nuevas de T4: 7 en
+    `test_comprobadores.py`, 11 en `test_escenario.py`, 9 en `test_corrida.py`),
+    197 s.
+
+  Nota para el orquestador (fuera del alcance autorizado, "no tocar docs/"):
+  `docs/validation/README.md`, sección "Banco conversacional (capas B y D)",
+  podría sumar una mención corta de los campos de escenario nuevos (`toques`,
+  `permite_pregunta_sin_opciones`) y del comprobador `pregunta_con_opciones` --
+  se deja a criterio del orquestador, no se editó.
+
+  Abierto:
+  - **PENDIENTE**: corrida contra el modelo real cuando vuelva `nan`, para
+    `b-0016`/`b-0017`/`b-0018` y para confirmar si alguno de los seis escenarios
+    `debe_preguntar: true` necesita `permite_pregunta_sin_opciones` de verdad.
+  - Punto pendiente de ADR 0007 ("si una respuesta puede cerrar sin opciones")
+    sigue sin resolver -- no era parte del pedido de esta unidad; se verificó que
+    `comprobar_pregunta_con_opciones` no fuerza una respuesta al respecto (una
+    respuesta que no pregunta nada aprueba sin condición).
+  - Mismas brechas fuera de alcance de unidades anteriores sin cambios:
+    autoridad para `cancelada` (T2b) y "Adjuntar evidencia" del aprobador en el
+    menú (T2).
+- **Próximo paso al retomar:** corrida del banco real cuando vuelva `nan`, después
+  T5.
 
