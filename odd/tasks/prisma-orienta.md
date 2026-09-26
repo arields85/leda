@@ -59,7 +59,7 @@ gestión.
   para evidencia) y se corrigen dos defectos que la revisión RDD de T2 encontró en
   `gateway._ejecutar_accion_menu` (no atajaba `Denegado`; el rechazo de la base corría
   sin punto de retorno).
-- [ ] **T3 — Listas como botones.** Una respuesta que presenta tareas para elegir las
+- [x] **T3 — Listas como botones.** Una respuesta que presenta tareas para elegir las
   ofrece como botones (por la herramienta de T1 o por la consulta misma).
 - [ ] **T4 — Banco.** Escenarios: lista de tareas con botones, tocar una tarea y
   llegar a la vista previa, pregunta de Prisma siempre con opciones; comprobador que
@@ -89,7 +89,7 @@ gestión.
 
 ## Entrega
 
-Commits sobre `master` por tarea, con pedido explícito del usuario (`AGENTS.md`);
+Commits sobre `main` (renombrada desde `master` el 2026-09-25) por tarea, con pedido explícito del usuario (`AGENTS.md`);
 cada commit con código pasa por la evaluación de RDD.
 
 ## Progreso
@@ -712,5 +712,218 @@ cada commit con código pasa por la evaluación de RDD.
   (cobertura de las redes nuevas); migración `0011` no ejercitada contra una base de ensayo
   (`PRISMA_TEST_DB_URL` sin configurar); `cli.py:367-369` y `tests/test_menu_tarea.py:959-960`
   (código muerto). Pendiente de T2b: autoridad para `cancelada`.
-- **Próximo paso al retomar:** corregir `notificado_en` falso (TDD), después T3.
+- 2026-09-25 (orquestador): **`notificado_en` falso corregido** (`b4e5973`). Cambio encontrado
+  sin commitear tras el cierre de sesión, de origen desconocido; verificado antes de aceptarlo.
+  `reportar_incidente_no_manejado` sólo completa `notificado_en` si el aviso se encoló y la
+  transacción se confirmó. Prueba nueva:
+  `test_reportar_incidente_no_manejado_no_marca_avisado_si_no_identifica`.
+  - RED (con `gateway.py` de `ea931ee`): `1 failed` (`notificado_en` con fecha sin aviso).
+  - GREEN: `tests/test_menu_tarea.py` -> `28 passed`; suite completa -> `776 passed,
+    99 deselected` (180 s).
+  - RDD: `gentle-ai review assess --base-ref ea931ee --committed-only` -> riesgo `medium`,
+    `review_due: false` (`under_budget`, 39 líneas); queda pendiente en el tramo, frontera de
+    revisión sigue en `ea931ee`.
+- 2026-09-25: **Decisiones del usuario para T3.**
+  1. **El servidor garantiza la lista como botones**, no el modelo: cuando en un turno el
+     modelo usa `consultar_tareas` y responde, el servidor agrega un botón por tarea y
+     tocarlo abre el menú de T2 (ADR 0007 puntos 3 y 4). No depende de que el modelo
+     obedezca la regla del contexto. Costo aceptado: también lleva botones una respuesta
+     que sólo daba un conteo.
+  2. **Más de 4 tareas: páginas con "Ver más".** 4 tareas en el orden de la consulta,
+     más "Ver más" y la salida; "Ver más" trae las 4 siguientes sin pasar por el modelo.
+     Se descartó agrupar por estado (un toque más siempre, y un grupo grande vuelve a
+     necesitar páginas).
+  Ruta: delegada, un escritor (`agente.py`, `gateway.py`, `contexto.py`, pruebas).
+- 2026-09-25: **T3 cerrada.** Ruta: delegada, un escritor (disparador de mapeo: 4
+  archivos de código + pruebas).
+
+  Archivos:
+  - `src/prisma/agente.py`: `_ejecutar_una` gana un acumulador más,
+    `ultima_lista_tareas` (mismo patrón mutable que `acciones`/`confirmaciones`/
+    `elecciones`) -- se sobrescribe sólo cuando una llamada a `consultar_tareas`
+    devuelve filas, así que si hay varias en el turno gana la ÚLTIMA que trajo
+    algo, no la última llamada a secas. `responder`, al cerrar con una respuesta
+    visible normal (nunca si el turno ya terminó con `confirmaciones`/
+    `elecciones`: ese camino ya devuelve antes), llama a
+    `_encolar_respuesta_con_tareas` en vez de `_encolar_respuesta` cuando esa
+    lista no está vacía. `_opciones_lista_tareas` arma hasta
+    `H.MAX_OPCIONES_MODELO` botones de tarea (mismo tope y forma de valor que
+    una opción de `ofrecer_opciones` con `accion: "menu"`, T1/T2) y agrega
+    "Ver más" con los ids restantes cuando sobran; `_encolar_respuesta_con_tareas`
+    arma la `pending_action` (sentinel compartido `SENTINEL_OPCIONES_MODELO`) y
+    la encola con el MISMO texto que ya iba a mandar el modelo.
+  - `src/prisma/gateway.py`: `_resolver_toque_opcion_modelo` gana un tercer tipo
+    de elección, `"ver_mas"`, que despacha a la función nueva
+    `_mostrar_mas_tareas` sin retomar la conversación (ni con el modelo, ni con
+    Jev, ni con `route_intent`). `_mostrar_mas_tareas` revalida los ids
+    restantes contra PostgreSQL bajo el cursor con RLS del toque, reusando
+    `herramientas._tareas_activas_por_id` (T1) -- la misma función que ya valida
+    las tareas que ofrece el modelo --, arma la página siguiente (hasta 4 +
+    "Ver más" si sobra más + la salida) y la encola con el mismo sentinel.
+  - `src/prisma/pendientes.py`: `ETIQUETA_VER_MAS = "Ver más"`, al lado de
+    `ETIQUETA_SALIR_OPCIONES`, por el mismo motivo (que `agente.py`, que arma la
+    primera página, y `gateway.py`, que arma las siguientes, muestren la misma
+    etiqueta).
+  - `src/prisma/contexto.py`: la regla del `PREAMBULO` sobre listar tareas se
+    reescribe -- ya no le pide al modelo llamar a `ofrecer_opciones` para que
+    una lista de `consultar_tareas` salga como botones (eso ahora lo garantiza
+    el servidor); sigue pidiéndole usar `ofrecer_opciones` para el resto de las
+    elecciones concretas y seguir sin preguntar en texto abierto. La prueba
+    `test_opciones_modelo.py::test_reglas_del_contexto_piden_ofrecer_opciones`
+    no se tocó: sólo comprueba que "ofrecer_opciones" siga apareciendo en el
+    `PREAMBULO` y la regla de no presentar una suposición como un hecho, ninguna
+    de las dos afectada por este reemplazo.
+  - `tests/test_lista_botones.py` (nuevo, 7 pruebas).
+
+  Decisiones de diseño:
+  - **Reuso, no un mecanismo paralelo.** La lista se arma como una
+    `pending_action` más del sentinel de T1 (`SENTINEL_OPCIONES_MODELO`), con
+    opciones de tarea `accion: "menu"` -- el mismo mecanismo que T2 ya usa para
+    abrir el menú al tocar una opción de `ofrecer_opciones`. No hizo falta un
+    sentinel nuevo ni una segunda función de validación de tareas: "Ver más" (el
+    único elemento nuevo) es sólo un tercer tipo de elección (`"ver_mas"`) sobre
+    el mismo sentinel, resuelto en el mismo lugar
+    (`gateway._resolver_toque_opcion_modelo`) que ya resolvía `"salida"` y
+    `"tarea"`.
+  - **`calcular_menu` sí soporta tareas cerradas -- verificado, no supuesto.**
+    El enunciado pedía comprobar si el menú de T2 soporta `terminada`/
+    `cancelada` antes de decidir si hay que excluirlas de los botones.
+    `menu_tarea.calcular_menu` (relación "responsable") ofrece "Ver detalle" para
+    cualquier estado, incluidos `terminada`/`cancelada` -- el comentario del
+    código ya lo decía ("terminada/cancelada: sólo Ver detalle, ya agregado
+    arriba") y las otras dos relaciones (aprobador, otra persona) también caen
+    siempre a "Ver detalle" cuando no hay una acción más específica. Por eso la
+    PRIMERA página (las filas que acaba de devolver `consultar_tareas`, en la
+    misma transacción) no filtra por estado: si el modelo pidió expresamente
+    tareas terminadas, cada una igual sale como botón y tocarla abre un menú
+    válido (sólo "Ver detalle"). Costo aceptado explícito del enunciado: una
+    respuesta que sólo dio un conteo también lleva estos botones.
+  - **"Ver más" revalida existencia, no estado -- corregido tras revisión del
+    orquestador.** La primera implementación reusaba
+    `herramientas._tareas_activas_por_id` (T1) en `_mostrar_mas_tareas`, que
+    sólo devuelve tareas `not in ('terminada', 'cancelada')`, con la idea de
+    que la asimetría con la primera página era intencional (la primera se arma
+    con datos recién leídos en la misma transacción; "Ver más" puede tocarse
+    horas después, `VIGENCIA_PENDIENTE` 8 horas, así que ahí sí hacía falta
+    revalidar). La revisión encontró el defecto: la PRIMERA página también
+    puede traer tareas terminadas -- `consultar_tareas` acepta
+    `estado="terminada"` y no filtra nada --, así que alguien que pide sus
+    tareas terminadas, ve más de cuatro y toca "Ver más" se encontraba con
+    "Esas tareas ya no están disponibles", un mensaje falso: esas tareas nunca
+    dejaron de existir, sólo están cerradas, que es exactamente lo que la
+    persona pidió ver. La página siguiente tiene que ser consistente con la
+    primera, no más estricta.
+
+    Regla corregida: `_mostrar_mas_tareas` revalida con la función nueva
+    `herramientas._tareas_existentes_por_id` -- existencia y espacio (mismo id
+    normalizado, mismo `workspace_id = %s` bajo el cursor con RLS del toque),
+    sin filtrar por estado, devolviendo el título ACTUAL. Sólo desaparece un
+    id que no es un UUID válido, que no existe, o que es de otro espacio; una
+    tarea que se cierra entre que se listó y que se tocó "Ver más" se queda en
+    la lista -- tocarla abre el menú, que sí recalcula por el estado ACTUAL
+    (cerrada -> sólo "Ver detalle", `menu_tarea.calcular_menu`). El chequeo de
+    estado vive una sola vez, en el menú, no duplicado en la paginación.
+    `_tareas_activas_por_id` (T1) queda sin tocar -- su regla es distinta y
+    correcta para su caso: una opción que el modelo ACABA de ofrecer siempre
+    tiene que seguir abierta para que "elegirla" tenga sentido, algo que no
+    aplica a una lista que la persona pidió ver tal cual está.
+  - **Dónde van los botones: la MISMA respuesta del modelo, no un mensaje
+    aparte.** `enqueue_outbox` decide `has_buttons` por `pending_action_id`
+    presente, y un mensaje con botones tiene un tope más chico
+    (`BUTTON_TEXT_LIMIT`, 3900 unidades UTF-16) y NUNCA se parte en varias partes
+    aunque se pida `allow_split=True` (a diferencia de `_encolar_respuesta`, que
+    sí puede partir una respuesta larga). Es la misma limitación que ya aceptan
+    todas las demás respuestas con botones de este proyecto (confirmación, menú,
+    opciones de T1) -- ninguna usa `allow_split`--, así que adjuntar los botones
+    a la respuesta del modelo no es una regla nueva, es la regla de siempre
+    aplicada a un mensaje más. Se prefirió sobre un segundo mensaje separado
+    porque evita dos mensajes por turno (uno con el texto, otro con los
+    botones) y reusa `_encolar_respuesta_con_tareas`/`P.registrar` tal cual el
+    resto del sentinel.
+  - **`args={"pregunta": texto}` es inerte para esta lista.** Se guarda por
+    consistencia con la forma que ya tiene `pending_action.args` para
+    `SENTINEL_OPCIONES_MODELO` (T1), pero ninguna rama de una lista de tareas la
+    lee: una tarea con `accion: "menu"` nunca retoma la conversación, "Ver más"
+    pagina, y la salida cierra sin efecto. Sólo el camino de T1 (una opción de
+    texto libre, o una tarea sin `accion: "menu"`) usa `pregunta` para reconstruir
+    el contexto que ve el modelo al retomar.
+  - **Dedupe key por id de la `pending_action`, no por marca de tiempo.** Mismo
+    criterio que T2 (revisión del orquestador sobre T1,
+    `agente.py:420-421`): `_encolar_respuesta_con_tareas` y `_mostrar_mas_tareas`
+    usan `f"...:{p.id}"`, nunca `ahora.timestamp()`.
+  - **Regla del contexto reescrita, no eliminada.** El modelo sigue sin poder
+    preguntar en texto abierto; sólo deja de necesitar `ofrecer_opciones` para
+    el caso puntual de listar tareas que ya listó con `consultar_tareas`, porque
+    ese caso ahora lo garantiza el servidor sin depender de que el modelo
+    obedezca.
+
+  RED (antes de implementar -- `git stash push -- src/prisma/agente.py
+  src/prisma/gateway.py src/prisma/pendientes.py src/prisma/contexto.py`, con
+  `tests/test_lista_botones.py` ya escrito):
+  `.venv/Scripts/python.exe -m pytest -q tests/test_lista_botones.py` ->
+  `5 failed, 2 passed` -- los 2 que ya pasaban en rojo son "lista vacía no arma
+  botones" y "un turno con otras opciones no agrega botones de lista": con el
+  código viejo tampoco se arma ninguna `pending_action` de lista (todavía no
+  existe el mecanismo), así que la aserción "no hay una segunda" se cumple por
+  ausencia, no por la regla; quedaron confirmadas igual una vez implementada la
+  función, ya no por la ausencia. Las 5 fallas restantes son exactamente las
+  esperadas: sin la función, no se arma ninguna `pending_action` de lista
+  (`TypeError: 'NoneType' object is not subscriptable` al buscarla) y
+  `gateway._mostrar_mas_tareas` no existe (`AttributeError`). `git stash pop`
+  restauró la implementación antes de seguir.
+
+  GREEN:
+  - `.venv/Scripts/python.exe -m pytest -q tests/test_lista_botones.py` ->
+    `7 passed`.
+  - `.venv/Scripts/python.exe -m pytest -q tests/test_menu_tarea.py
+    tests/test_opciones_modelo.py tests/test_agente.py tests/test_botones.py
+    tests/test_aclaracion_botones.py tests/test_autoridad_tarea.py
+    tests/test_lista_botones.py tests/banco` -> `263 passed, 99 deselected`
+    (barrido de regresión sobre todo lo que llama a las tres piezas que se
+    tocaron: el sentinel de T1, el menú de T2 y el contexto).
+  - `.venv/Scripts/python.exe -m pytest -q` (suite completa) -> `783 passed,
+    99 deselected` (línea base 776 + 7 pruebas nuevas de T3), 181 s.
+
+  Corrección tras revisión del orquestador (mismo día, misma unidad -- ver
+  arriba, "«Ver más» revalida existencia, no estado"):
+
+  Archivos: `src/prisma/herramientas.py` (función nueva
+  `_tareas_existentes_por_id`, al lado de `_tareas_activas_por_id`),
+  `src/prisma/gateway.py` (`_mostrar_mas_tareas` llama a la función nueva),
+  `tests/test_lista_botones.py` (test nuevo
+  `test_ver_mas_de_tareas_terminadas_no_dice_que_ya_no_estan_disponibles`;
+  `test_ver_mas_descarta_una_tarea_que_se_cerro_mientras_tanto` reescrito como
+  `test_ver_mas_tarea_que_se_cierra_mientras_tanto_se_queda_en_la_pagina`, que
+  ahora comprueba que la tarea se QUEDA en la página y que su menú, al
+  abrirse, recalcula a sólo "Ver detalle").
+
+  RED (antes del arreglo -- reversión quirúrgica de las dos ediciones en
+  `herramientas.py`/`gateway.py`, dejando el resto de T3 intacto, con los dos
+  tests ya escritos/reescritos):
+  `.venv/Scripts/python.exe -m pytest -q
+  tests/test_lista_botones.py::test_ver_mas_de_tareas_terminadas_no_dice_que_ya_no_estan_disponibles
+  tests/test_lista_botones.py::test_ver_mas_tarea_que_se_cierra_mientras_tanto_se_queda_en_la_pagina
+  tests/test_lista_botones.py::test_ver_mas_nunca_muestra_una_tarea_de_otro_espacio`
+  -> `2 failed, 1 passed`: el de tenencia entre espacios seguía pasando (no
+  tocado por el defecto); el de tareas terminadas fallaba con
+  `['Quiero consultar otra cosa'] == ['Tarea terminada 5', 'Tarea terminada 6',
+  ...]` (la página volvía vacía, "ya no están disponibles"); el de "se cierra
+  mientras tanto" fallaba porque "Tarea 5" ya no aparecía (`['Tarea 6', ...]
+  == ['Tarea 5', 'Tarea 6', ...]`) -- exactamente el defecto reportado.
+
+  GREEN:
+  - `.venv/Scripts/python.exe -m pytest -q tests/test_lista_botones.py` ->
+    `8 passed`.
+  - Barrido de regresión (mismo comando de arriba) -> `264 passed,
+    99 deselected`.
+  - Suite completa -> `784 passed, 99 deselected` (783 previos + 1 prueba
+    nueva), 180 s.
+
+  Abierto: ninguno nuevo. La brecha de `cancelada` (autoridad, T2b) y la falta
+  de "Adjuntar evidencia" para el aprobador en el menú (T2) siguen igual,
+  fuera del alcance de esta unidad.
+- **Próximo paso al retomar:** T4 (banco): escenarios de lista de tareas con
+  botones, tocar una tarea y llegar a la vista previa, pregunta de Prisma
+  siempre con opciones; comprobador que falla ante una pregunta abierta sin
+  opciones.
 

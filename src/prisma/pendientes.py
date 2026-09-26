@@ -74,6 +74,13 @@ SENTINEL_DATO_MENU_TAREA = "_dato_menu_tarea"
 # exactamente la misma etiqueta.
 ETIQUETA_SALIR_OPCIONES = "Quiero consultar otra cosa"
 
+# T3 (`prisma-orienta`, ADR 0007 punto 3): la lista de tareas que arma el
+# servidor cuando el modelo usa `consultar_tareas` pagina con este botón, sin
+# volver a llamar al modelo -- mismo lugar que `ETIQUETA_SALIR_OPCIONES` para
+# que `agente.py` (arma la primera página) y `gateway.py` (arma las
+# siguientes al tocar "Ver más") muestren la misma etiqueta.
+ETIQUETA_VER_MAS = "Ver más"
+
 
 @dataclass(frozen=True)
 class Opcion:

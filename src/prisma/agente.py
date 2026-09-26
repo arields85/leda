@@ -36,7 +36,7 @@ from .contexto import construir, historial, revisar_salida
 from .db import registrar_auditoria
 from .llm import Llamada, Proveedor, Respuesta
 from .salida import (enqueue_outbox, normalize_visible_text,
-                     with_no_effect_status)
+                     truncar_etiqueta_boton, with_no_effect_status)
 
 MAX_VUELTAS = 5
 
@@ -115,6 +115,12 @@ def responder(cur: psycopg.Cursor, quien: Solicitante, texto_entrante: str,
     confirmaciones: list[str] = []
     elecciones: list[str] = []
     intentos_mutacion: list[str] = []
+    # T3 (ADR 0007 punto 3): filas de la ÚLTIMA llamada a `consultar_tareas`
+    # de este turno que devolvió alguna -- se sobrescribe sólo cuando hay
+    # filas, así que si varias llamadas ocurren en el mismo turno, gana la
+    # última que trajo algo, no la última llamada a secas. Vacía si ninguna
+    # trajo filas.
+    ultima_lista_tareas: list[dict] = []
     salida = ""
     cerro = False
 
@@ -136,8 +142,8 @@ def responder(cur: psycopg.Cursor, quien: Solicitante, texto_entrante: str,
                     intentos_mutacion.append(c.nombre)
                 resultados.append(
                     _ejecutar_una(cur, quien, c, ctx, acciones, confirmaciones,
-                                  elecciones, chat_id, cal, ahora,
-                                  entrante_id, texto_entrante))
+                                  elecciones, ultima_lista_tareas, chat_id, cal,
+                                  ahora, entrante_id, texto_entrante))
             mensajes.append({"role": "user", "content": resultados})
     except Exception as e:  # noqa: BLE001
         _incidente(cur, quien, e)
@@ -180,7 +186,15 @@ def responder(cur: psycopg.Cursor, quien: Solicitante, texto_entrante: str,
     if intentos_mutacion and not any(
             not accion.startswith("consultar_") for accion in acciones):
         salida = with_no_effect_status(salida)
-    _encolar_respuesta(cur, quien, chat_id, salida, cal, ahora)
+    # T3 (ADR 0007 punto 3): el servidor, no el modelo, garantiza que una
+    # lista de tareas salga como botones. Llegar acá ya descartó que el turno
+    # haya terminado con otro juego de botones (confirmaciones/elecciones
+    # cerraron antes, línea ~161) -- nunca compite con ellos.
+    if ultima_lista_tareas:
+        _encolar_respuesta_con_tareas(cur, quien, chat_id, salida,
+                                      ultima_lista_tareas, ahora)
+    else:
+        _encolar_respuesta(cur, quien, chat_id, salida, cal, ahora)
     auditar(salida)
 
     return Resultado(salida, acciones, confirmaciones, elecciones=elecciones)
@@ -249,8 +263,8 @@ def _bloques(r: Respuesta) -> list[dict]:
 
 
 def _ejecutar_una(cur, quien: Solicitante, c: Llamada, ctx, acciones,
-                  confirmaciones, elecciones, chat_id, cal, ahora,
-                  entrante_id, texto_entrante) -> dict:
+                  confirmaciones, elecciones, ultima_lista_tareas, chat_id,
+                  cal, ahora, entrante_id, texto_entrante) -> dict:
     """Ejecuta una herramienta y devuelve el bloque de resultado para el modelo.
 
     Los rechazos no son excepciones que cortan el turno: son información que
@@ -308,6 +322,12 @@ def _ejecutar_una(cur, quien: Solicitante, c: Llamada, ctx, acciones,
         return bloque({"ejecutado": False,
                        "explicacion": "no se pudo completar esa operación"},
                       error=True)
+
+    if c.nombre == "consultar_tareas" and isinstance(resultado, list) and resultado:
+        # T3 (ADR 0007 punto 3): se guarda para que `responder` arme los
+        # botones de la lista con la última llamada que trajo filas -- se
+        # sobrescribe adrede sólo cuando hay algo, nunca con una lista vacía.
+        ultima_lista_tareas[:] = resultado
 
     if isinstance(resultado, dict) and resultado.get("pendiente_revision"):
         confirmaciones.append(c.nombre)
@@ -414,6 +434,66 @@ def _encolar_opciones_modelo(cur, quien: Solicitante, chat_id: int,
         dedupe_key=(f"{quien.workspace_id}:opciones:{quien.app_user_id}:"
                    f"{ahora.timestamp()}"), is_response=True,
         pending_action_id=p.id,
+    )
+
+
+def _opciones_lista_tareas(tareas: list[dict]) -> list[tuple[str, dict]]:
+    """Botones de la primera página de una lista de tareas (T3, ADR 0007
+    punto 3): hasta `H.MAX_OPCIONES_MODELO` tareas, en el orden que ya trajo
+    `consultar_tareas` (`fecha_objetivo`). Cada tarea usa la misma forma de
+    valor que una opción de tarea de `ofrecer_opciones` (T1) con
+    `accion: "menu"` -- tocarla abre el menú de T2 sin retomar la
+    conversación --, así que `gateway._resolver_toque_opcion_modelo` no
+    necesita distinguir de dónde salió la opción. Si quedan más de
+    `H.MAX_OPCIONES_MODELO`, agrega "Ver más" con los ids restantes, en el
+    mismo orden, para que `gateway._mostrar_mas_tareas` arme la página
+    siguiente sin llamar al modelo."""
+    primera = tareas[:H.MAX_OPCIONES_MODELO]
+    resto = tareas[H.MAX_OPCIONES_MODELO:]
+    opciones = [
+        (truncar_etiqueta_boton(normalize_visible_text(t["titulo"])),
+         {"tipo": "tarea", "tarea_id": str(t["id"]), "titulo": t["titulo"],
+          "accion": "menu"})
+        for t in primera]
+    if resto:
+        opciones.append((P.ETIQUETA_VER_MAS,
+                         {"tipo": "ver_mas",
+                          "tarea_ids": [str(t["id"]) for t in resto]}))
+    return opciones
+
+
+def _encolar_respuesta_con_tareas(cur, quien: Solicitante, chat_id: int,
+                                  texto: str, tareas: list[dict],
+                                  ahora: datetime) -> None:
+    """T3 (ADR 0007 punto 3): el servidor, no el modelo, garantiza que una
+    lista de tareas salga como botones -- se agregan a la MISMA respuesta del
+    modelo (`texto`), reusando el mecanismo de T1
+    (`pendientes.SENTINEL_OPCIONES_MODELO`): tocar una tarea abre su menú
+    (T2), tocar "Ver más" pagina en `gateway._mostrar_mas_tareas` sin volver a
+    llamar al modelo, y siempre queda la salida de siempre. Costo aceptado
+    (decisión del usuario): una respuesta que sólo dio un conteo también
+    lleva estos botones.
+
+    `args={"pregunta": texto}` sólo se guarda por consistencia con la forma
+    que ya tiene `pending_action.args` para este sentinel (T1); ninguna de
+    las opciones de una lista de tareas la lee -- una tarea con `accion:
+    "menu"` nunca retoma la conversación, y "Ver más"/la salida tampoco.
+    """
+    opciones = _opciones_lista_tareas(tareas)
+    opciones.append((P.ETIQUETA_SALIR_OPCIONES, {"tipo": "salida"}))
+    p = P.registrar(cur, quien, herramienta=P.SENTINEL_OPCIONES_MODELO,
+                    args={"pregunta": texto}, resumen=texto,
+                    vence_en=ahora + VIGENCIA_PENDIENTE, campo="eleccion",
+                    opciones=opciones, chat_id=chat_id)
+    enqueue_outbox(
+        cur, workspace_id=quien.workspace_id, chat_id=chat_id,
+        recipient_membership_id=quien.membership_id, text=p.resumen,
+        scheduled_for=ahora,
+        # El id de `p` (fresco por cada `registrar`) identifica el mensaje,
+        # no la marca de tiempo -- misma lección que T2 (`agente.py:420-421`,
+        # revisión del orquestador sobre T1).
+        dedupe_key=f"{quien.workspace_id}:lista-tareas:{p.id}",
+        is_response=True, pending_action_id=p.id,
     )
 
 

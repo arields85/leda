@@ -240,6 +240,35 @@ def _tareas_activas_por_id(cur: psycopg.Cursor, workspace_id: str,
     return {str(f["id"]): f["titulo"] for f in cur.fetchall()}
 
 
+def _tareas_existentes_por_id(cur: psycopg.Cursor, workspace_id: str,
+                              tarea_ids: list[Any]) -> dict[str, str]:
+    """Título ACTUAL de cada id de tarea que EXISTE en este espacio, sin
+    filtrar por estado -- a diferencia de `_tareas_activas_por_id`, pensada
+    para T1 (una opción recién ofrecida por el modelo siempre tiene que
+    seguir abierta para que "elegirla" tenga sentido).
+
+    Revisión del orquestador sobre T3: "Ver más" (`gateway._mostrar_mas_tareas`)
+    pagina una lista cuya PRIMERA página ya salió tal cual la devolvió
+    `consultar_tareas` -- que acepta `estado="terminada"` y no filtra nada --,
+    así que la página siguiente tiene que ser consistente con la primera. Con
+    `_tareas_activas_por_id` ahí, alguien que pide sus tareas terminadas, ve
+    más de cuatro y toca "Ver más" se encontraba con "Esas tareas ya no están
+    disponibles" -- falso: nunca dejaron de existir, sólo están cerradas, que
+    es exactamente el estado que pidió ver. Acá sólo desaparece un id que no
+    es un UUID válido, que no existe, o que es de otro espacio; una tarea
+    cerrada en el medio se queda en la lista, y su menú, al abrirse, ya
+    recalcula por estado (cerrada -> sólo "Ver detalle")."""
+    validos = [norm for norm in (_uuid_normalizado(tid) for tid in tarea_ids)
+              if norm is not None]
+    if not validos:
+        return {}
+    cur.execute(
+        """select id, titulo from task
+            where workspace_id = %s and id = any(%s::uuid[])""",
+        (workspace_id, validos))
+    return {str(f["id"]): f["titulo"] for f in cur.fetchall()}
+
+
 @herramienta(
     "ofrecer_opciones", "consultar",
     "Ofrece a la persona una elección concreta, con botones, en vez de "

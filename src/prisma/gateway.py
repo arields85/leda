@@ -907,12 +907,16 @@ def _resolver_toque_aclaracion(cur, quien, workspace_id: str, chat_id: int,
 
 def _resolver_toque_opcion_modelo(cur, quien, workspace_id: str, chat_id: int,
                                   args: dict, ahora) -> None:
-    """Alguien tocó una opción de `ofrecer_opciones` (T1, ADR 0007).
+    """Alguien tocó una opción de `ofrecer_opciones` (T1, ADR 0007) o de una
+    lista de tareas que armó el servidor (T3, ADR 0007 punto 3) -- las dos
+    comparten el mismo sentinel, `pendientes.SENTINEL_OPCIONES_MODELO`.
 
     A diferencia de `_resolver_toque_aclaracion`, ninguna elección acá vuelve
     a llamar a una herramienta: "Quiero consultar otra cosa" cierra sin
     efecto e invita a escribir (el próximo mensaje se rutea como un turno
-    común); cualquier otra opción retoma la conversación con el modelo,
+    común); una tarea con `accion: "menu"` abre el menú de T2 sin retomar
+    nada; "Ver más" (T3) pagina en `_mostrar_mas_tareas`, también sin
+    retomar; cualquier otra opción sí retoma la conversación con el modelo,
     pasándole la elección como si fuera lo que escribió la persona -- para
     una tarea, ya resuelta, sin pasar por Jev ni por el enrutador.
     """
@@ -931,6 +935,12 @@ def _resolver_toque_opcion_modelo(cur, quien, workspace_id: str, chat_id: int,
     if tipo == "salida":
         _responder(cur, workspace_id, chat_id, quien,
                   "Dale, escribime qué necesitás.", ahora)
+        return
+
+    if tipo == "ver_mas":
+        # T3: pagina sin volver a llamar al modelo, a Jev ni a `route_intent`.
+        _mostrar_mas_tareas(cur, quien, workspace_id, chat_id,
+                           eleccion.get("tarea_ids") or [], ahora)
         return
 
     if tipo == "tarea":
@@ -984,6 +994,63 @@ def _resolver_toque_opcion_modelo(cur, quien, workspace_id: str, chat_id: int,
                   "Perdón, no pude retomar la conversación. Ya quedó "
                   "registrado para que lo revisen. Escribime de nuevo si "
                   "hace falta.", ahora)
+
+
+def _mostrar_mas_tareas(cur, quien, workspace_id: str, chat_id: int,
+                        tarea_ids: list, ahora) -> None:
+    """"Ver más" de una lista de tareas (T3, ADR 0007 punto 3).
+
+    Nunca confía en los ids que trae el botón: los revalida contra
+    PostgreSQL bajo el cursor con RLS de este toque, con
+    `herramientas._tareas_existentes_por_id` -- existencia y espacio, sin
+    filtrar por estado. No es `_tareas_activas_por_id` (la que usa T1 para
+    validar tareas ofrecidas por el modelo) a propósito: la primera página de
+    esta misma lista ya salió tal cual la devolvió `consultar_tareas`, que
+    acepta pedir tareas terminadas y no las filtra, así que la página
+    siguiente tiene que ser consistente con la primera -- una tarea que se
+    cierra entre que se listó y que se tocó "Ver más" se queda en la lista,
+    no desaparece. Sólo un id que no es un UUID válido, que no existe, o que
+    es de otro espacio queda afuera. No llama al modelo, a Jev ni a
+    `route_intent`: es la misma página que ya se había armado, sólo que la
+    persona todavía no la había pedido."""
+    from . import herramientas as H
+    from . import pendientes as P
+    from .agente import VIGENCIA_PENDIENTE
+
+    titulos = H._tareas_existentes_por_id(cur, workspace_id, tarea_ids)
+    normalizados = [H._uuid_normalizado(tid) for tid in tarea_ids]
+    vigentes = [(nid, titulos[nid]) for nid in normalizados
+               if nid is not None and nid in titulos]
+
+    if not vigentes:
+        resumen = "Esas tareas ya no están disponibles."
+        opciones = [(P.ETIQUETA_SALIR_OPCIONES, {"tipo": "salida"})]
+    else:
+        pagina, resto = (vigentes[:H.MAX_OPCIONES_MODELO],
+                        vigentes[H.MAX_OPCIONES_MODELO:])
+        resumen = "Más tareas:"
+        opciones = [
+            (truncar_etiqueta_boton(normalize_visible_text(titulo)),
+             {"tipo": "tarea", "tarea_id": tid, "titulo": titulo,
+              "accion": "menu"})
+            for tid, titulo in pagina]
+        if resto:
+            opciones.append((P.ETIQUETA_VER_MAS,
+                             {"tipo": "ver_mas",
+                              "tarea_ids": [tid for tid, _ in resto]}))
+        opciones.append((P.ETIQUETA_SALIR_OPCIONES, {"tipo": "salida"}))
+
+    p = P.registrar(cur, quien, herramienta=P.SENTINEL_OPCIONES_MODELO,
+                    args={"pregunta": resumen}, resumen=resumen,
+                    vence_en=ahora + VIGENCIA_PENDIENTE, campo="eleccion",
+                    opciones=opciones, chat_id=chat_id)
+    enqueue_outbox(
+        cur, workspace_id=workspace_id, chat_id=chat_id,
+        recipient_membership_id=quien.membership_id, text=p.resumen,
+        scheduled_for=ahora,
+        dedupe_key=f"{workspace_id}:ver-mas:{p.id}",
+        is_response=True, pending_action_id=p.id,
+    )
 
 
 # ---------------------------------------------------------------------------
