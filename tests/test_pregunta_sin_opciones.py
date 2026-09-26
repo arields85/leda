@@ -47,24 +47,47 @@ def _telegram_id(cur, nombre) -> int:
 
 
 def _tarea(cur, ws, *, titulo="Cablear tablero máq. 3", area="electricidad",
-          persona="Marcos Tarquini", estado="asignada", dias_para_vencer=None):
+          persona="Marcos Tarquini", estado="asignada", dias_para_vencer=None,
+          fecha_objetivo=None, tarea_id=None):
+    """`fecha_objetivo`, si viene, reemplaza a `dias_para_vencer` -- deja
+    elegir el mismo instante exacto para dos tareas (dos llamadas a
+    `datetime.now()` no coinciden al microsegundo). `tarea_id`, si viene,
+    fuerza el `id` de la fila en vez del `gen_random_uuid()` por defecto de
+    la tabla -- lo necesita una prueba de orden que quiera un `id` conocido
+    de antemano, distinto del orden en que las filas se insertan."""
     cur.execute(
         """insert into objective (workspace_id, tipo, titulo)
            values (%s, 'operativo', 'Objetivo de prueba') returning id""", (ws,))
     obj = cur.fetchone()["id"]
-    vence = (datetime.now(timezone.utc) + timedelta(days=dias_para_vencer)
-             if dias_para_vencer is not None else None)
-    cur.execute(
-        """insert into task (workspace_id, objective_id, titulo, area_id,
-                             responsable_membership_id, criterio_aceptacion,
-                             evidencia_requerida, fecha_objetivo)
-           values (%s, %s, %s,
-                   (select id from area where workspace_id = %s and slug = %s),
-                   (select m.id from membership m join app_user u on u.id = m.app_user_id
-                     where m.workspace_id = %s and u.nombre = %s),
-                    'Criterio de prueba', array['explicacion'], %s)
-           returning id""",
-        (ws, obj, titulo, ws, area, ws, persona, vence))
+    if fecha_objetivo is not None:
+        vence = fecha_objetivo
+    else:
+        vence = (datetime.now(timezone.utc) + timedelta(days=dias_para_vencer)
+                 if dias_para_vencer is not None else None)
+    if tarea_id is not None:
+        cur.execute(
+            """insert into task (id, workspace_id, objective_id, titulo, area_id,
+                                 responsable_membership_id, criterio_aceptacion,
+                                 evidencia_requerida, fecha_objetivo)
+               values (%s, %s, %s, %s,
+                       (select id from area where workspace_id = %s and slug = %s),
+                       (select m.id from membership m join app_user u on u.id = m.app_user_id
+                         where m.workspace_id = %s and u.nombre = %s),
+                        'Criterio de prueba', array['explicacion'], %s)
+               returning id""",
+            (tarea_id, ws, obj, titulo, ws, area, ws, persona, vence))
+    else:
+        cur.execute(
+            """insert into task (workspace_id, objective_id, titulo, area_id,
+                                 responsable_membership_id, criterio_aceptacion,
+                                 evidencia_requerida, fecha_objetivo)
+               values (%s, %s, %s,
+                       (select id from area where workspace_id = %s and slug = %s),
+                       (select m.id from membership m join app_user u on u.id = m.app_user_id
+                         where m.workspace_id = %s and u.nombre = %s),
+                        'Criterio de prueba', array['explicacion'], %s)
+               returning id""",
+            (ws, obj, titulo, ws, area, ws, persona, vence))
     t = cur.fetchone()["id"]
     cur.execute("insert into task_state_event (task_id, estado_nuevo, actor_kind) "
                 "values (%s, %s, 'prisma')", (t, estado))
@@ -497,35 +520,61 @@ def test_tocar_es_sobre_una_tarea_existente_pagina_mas_alla_del_limite_viejo(
     assert sorted(vistas) == sorted(f"Tarea propia {n}" for n in range(1, total + 1))
 
 
-def test_tocar_es_sobre_una_tarea_existente_orden_deterministico_sin_fecha(
+def test_tocar_es_sobre_una_tarea_existente_orden_deterministico_por_id(
         cliente, conn, corework, monkeypatch):
-    """`fecha_objetivo nulls last` sola no desempata entre tareas sin fecha
-    -- el orden tiene que ser el mismo en dos corridas independientes, no
-    depender del orden físico con el que Postgres devuelva las filas
-    (hallazgo del orquestador)."""
+    """`fecha_objetivo nulls last` sola no desempata entre dos tareas que
+    comparten fecha, ni entre dos sin fecha -- `id` es el segundo criterio
+    (`menu_tarea.tareas_activas_de_persona`). Comparar dos corridas sobre un
+    montón sin cambios no prueba esto: sin ningún empate real, Postgres
+    puede devolver las mismas cuatro filas en el mismo orden en las dos
+    corridas aunque el `order by` no tuviera `id`. Para que el desempate
+    quede realmente ejercitado, dos tareas comparten `fecha_objetivo` y dos
+    no tienen ninguna, y las cuatro se insertan con un `id` elegido a mano
+    en un orden que NO coincide ni con el orden esperado ni con el de
+    inserción -- si `id` no decidiera el orden, no hay ninguna otra columna
+    que lo determine."""
     ws = corework.workspace_id
+    fecha_comun = datetime(2026, 10, 1, tzinfo=timezone.utc)
+    id_con_fecha_bajo = "00000000-0000-0000-0000-000000000001"
+    id_sin_fecha_bajo = "00000000-0000-0000-0000-000000000002"
+    id_con_fecha_alto = "00000000-0000-0000-0000-000000000003"
+    id_sin_fecha_alto = "00000000-0000-0000-0000-000000000004"
+
     with admin(conn) as cur:
-        for n in range(1, 6):
-            _tarea(cur, ws, titulo=f"Sin fecha {n}")     # dias_para_vencer=None
+        # Orden de inserción deliberadamente distinto del esperado
+        # (fecha_objetivo nulls last, id).
+        _tarea(cur, ws, titulo="Con fecha, id alto", fecha_objetivo=fecha_comun,
+              tarea_id=id_con_fecha_alto)
+        _tarea(cur, ws, titulo="Sin fecha, id alto", tarea_id=id_sin_fecha_alto)
+        _tarea(cur, ws, titulo="Con fecha, id bajo", fecha_objetivo=fecha_comun,
+              tarea_id=id_con_fecha_bajo)
+        _tarea(cur, ws, titulo="Sin fecha, id bajo", tarea_id=id_sin_fecha_bajo)
     conn.commit()
 
-    def _pedir_orden():
-        guion = [Respuesta(texto="¿De qué tarea hablamos?")]
-        proveedor = _con_proveedor(monkeypatch, guion)
-        with espacio(conn, ws) as cur:
-            quien = _quien(cur, "Marcos Tarquini", ws)
-            tg = _telegram_id(cur, "Marcos Tarquini")
-            cal = Calendario.desde_base(cur, ws)
-            responder(cur, quien, "lo del proveedor", proveedor, cal, chat_id=tg,
-                     ahora=datetime.now(timezone.utc))
-            pid = _pendiente_opciones(cur, ws)
-            filas = _opciones(cur, pid)
-        return [f["etiqueta"] for f in filas
-               if f["etiqueta"] not in ("Ver más", "Quiero consultar otra cosa")]
+    # Orden esperado: primero las que tienen fecha_objetivo (desempatadas por
+    # id ascendente), después las que no tienen ninguna (mismo desempate).
+    esperado = ["Con fecha, id bajo", "Con fecha, id alto",
+               "Sin fecha, id bajo", "Sin fecha, id alto"]
 
-    primera = _pedir_orden()
-    segunda = _pedir_orden()
-    assert primera == segunda
+    guion = [Respuesta(texto="¿De qué tarea hablamos?")]
+    proveedor = _con_proveedor(monkeypatch, guion)
+    with espacio(conn, ws) as cur:
+        quien = _quien(cur, "Marcos Tarquini", ws)
+        tg = _telegram_id(cur, "Marcos Tarquini")
+        cal = Calendario.desde_base(cur, ws)
+        responder(cur, quien, "lo del proveedor", proveedor, cal, chat_id=tg,
+                 ahora=datetime.now(timezone.utc))
+        pid = _pendiente_opciones(cur, ws)
+        existente = next(o for o in _opciones(cur, pid)
+                         if o["etiqueta"] == "Es sobre una tarea existente")
+
+    assert _tocar(cliente, existente["token"], tg).status_code == 200
+
+    with admin(conn) as cur:
+        pid2 = _pendiente_opciones(cur, ws)
+        etiquetas = [f["etiqueta"] for f in _opciones(cur, pid2)
+                    if f["etiqueta"] not in ("Ver más", "Quiero consultar otra cosa")]
+    assert etiquetas == esperado
 
 
 def test_tocar_es_sobre_una_tarea_existente_sin_tareas_activas_dice_que_no_hay(

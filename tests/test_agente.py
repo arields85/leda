@@ -6,7 +6,7 @@ que Prisma haga cumplir sus reglas pase lo que pase con el modelo.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -509,9 +509,9 @@ def test_rechazo_de_preparacion_no_bloquea_una_ejecucion_real_despues(
     `herramienta_rechazada:crear_dependencia` y lo devuelve al modelo como
     error (banco b-0005-a); (2) el modelo la llama de nuevo con argumentos
     válidos -- queda esperando Confirmar -- y la persona confirma por botón,
-    el mismo camino HTTP que corre `gateway._toque` (unidad de esta sesión
-    sobre `gateway.py` ~426-462): sólo esa segunda escribe la fila y se
-    audita como `herramienta:crear_dependencia`."""
+    el mismo camino HTTP que corre `gateway._toque` (la rama que llama a
+    `H.ejecutar` con `ya_confirmada=True` al confirmar): sólo esa segunda
+    escribe la fila y se audita como `herramienta:crear_dependencia`."""
     import dataclasses
     from contextlib import nullcontext
 
@@ -554,8 +554,6 @@ def test_rechazo_de_preparacion_no_bloquea_una_ejecucion_real_despues(
         # Con la hora real (no `AHORA`, fija en el pasado): la vista previa
         # tiene que seguir vigente cuando el toque HTTP de abajo la resuelva
         # con `datetime.now(timezone.utc)` de verdad.
-        from datetime import timezone
-
         guion_preview = [Respuesta(llamadas=[Llamada(
             "c2", "crear_dependencia",
             {"origen_tarea_id": origen, "destino_tarea_id": destino})])]

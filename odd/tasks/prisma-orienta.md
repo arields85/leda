@@ -2360,6 +2360,36 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
     108 deselected` (208 s). Evaluación RDD `--base-ref 633ec39`: `medium`, 52 líneas,
     `under_budget` (pendiente en el tramo).
 
+- 2026-09-26 (orquestador, inline): **las tres sugerencias menores pendientes de
+  `review-42b7c7c32af6e755` quedaron corregidas.**
+  - Comentarios con referencias a la sesión ("esta unidad", "hallazgo del
+    orquestador", "revisión del orquestador") en `menu_tarea.py`, `gateway.py` y
+    `tests/banco/corrida.py`: reescritos para que cada uno diga la razón en términos
+    del código (por ejemplo, por qué `id` desempata en `tareas_activas_de_persona`),
+    sin tocar las referencias durables a ADR/T-labels/commits (ADR 0007, T1-T6,
+    `0814fa3`).
+  - `tests/test_agente.py`: el `from datetime import timezone` a mitad de función se
+    movió al import de módulo (`from datetime import datetime, timezone`); la
+    referencia a `gateway.py ~426-462` en el docstring pasó a nombrar la rama real
+    (`gateway._toque`, la que llama a `H.ejecutar` con `ya_confirmada=True`).
+  - `tests/test_pregunta_sin_opciones.py`: la prueba de orden determinístico no
+    ejercitaba el desempate -- ni siquiera tocaba "Es sobre una tarea existente", así
+    que comparaba dos veces el mismo menú fijo de cierre genérico. Se reemplazó por
+    `test_tocar_es_sobre_una_tarea_existente_orden_deterministico_por_id`: cuatro
+    tareas con `id` explícito (`_tarea` ahora acepta `tarea_id` y `fecha_objetivo`),
+    dos con la misma `fecha_objetivo` y dos sin ninguna, insertadas en un orden que no
+    coincide con el esperado; se toca el botón real y se compara la lista resultante
+    contra el orden `(fecha_objetivo nulls last, id)` calculado a mano.
+  - Prueba de mutación (registrada tal como se pidió): se quitó `, id` del `order by`
+    en `menu_tarea.tareas_activas_de_persona` y se corrió sólo la prueba nueva ->
+    `1 failed` (`'Con fecha, id alto' != 'Con fecha, id bajo'`, el orden pasó a
+    depender de la inserción). Se restauró el `order by fecha_objetivo nulls last,
+    id` y se volvió a correr -> `1 passed`.
+  - Verificación: `tests/test_pregunta_sin_opciones.py tests/test_agente.py` -> `37
+    passed`; suite completa -> `876 passed, 108 deselected` (205 s), igual que la
+    base registrada arriba. Sin cambio de comportamiento en `src/`: sólo comentarios y
+    docstrings.
+
 - **Próximo paso al retomar:** T5, sólo la segunda sesión real por Telegram (necesita
   al usuario; datos ficticios). Antes de empezar: comparar la base local con
   `db/esquema.sql` (hoy al día hasta la migración `0011`) y aplicar lo que falte;
