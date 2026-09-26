@@ -40,6 +40,7 @@ from tests.banco.comprobadores import (
     comprobar_herramientas,
     comprobar_personas_mencionadas,
     comprobar_pregunta,
+    comprobar_pregunta_con_opciones,
     comprobar_sin_efectos_antes_de_confirmar,
     resultado_general,
 )
@@ -79,7 +80,8 @@ def test_escenario_contra_modelo_real(
     resultado = ejecutar_escenario(
         conn, ws, "corework", escenario.actor, escenario.mensajes, proveedor_real,
         escenario_id=escenario.id, indice=indice, cliente_jev=cliente_jev_real,
-        aclaracion_esperada=escenario.aclaracion_esperada or None)
+        aclaracion_esperada=escenario.aclaracion_esperada or None,
+        toques=list(escenario.toques) or None)
 
     if resultado.bloqueado:
         entrada = EntradaReporte(
@@ -116,6 +118,12 @@ def test_escenario_contra_modelo_real(
             resultado.conteos_despues,
             herramientas_antes_del_toque=resultado.herramientas_antes_del_toque),
     ]
+    # ADR 0007 ("Prisma orienta, no charla"), T4: activa por defecto para
+    # todo escenario -- `permite_pregunta_sin_opciones` es el opt-out
+    # explícito de un escenario legado que necesite seguir pasando con una
+    # pregunta en texto abierto sin botones.
+    if not escenario.permite_pregunta_sin_opciones:
+        comprobaciones.append(comprobar_pregunta_con_opciones(evidencia))
     if escenario.debe_preguntar:
         comprobaciones.append(comprobar_pregunta(
             evidencia, task_draft_delta=efectos_observados["conteos_delta"].get("task_draft", 0),

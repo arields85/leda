@@ -58,6 +58,23 @@ class Escenario:
     # aclaración con botones para este escenario (referencia clara, sin
     # referencia, o el caso "debe preguntar" de siempre, en texto).
     aclaracion_esperada: dict = field(default_factory=dict)
+    # Toques genéricos de escenario (T4, `prisma-orienta`): una secuencia de
+    # botones a tocar, EN ORDEN, después de los mensajes (y de la aclaración
+    # con botones de arriba, si la hay) -- antes del toque automático en
+    # Confirmar de siempre (`corrida.ejecutar_escenario`). Cada elemento
+    # resuelve contra las opciones REALES que dejó el turno anterior, nunca
+    # un token inventado: `{"etiqueta": "..."}` (coincidencia exacta de
+    # texto) o `{"indice": N}` (posición 0-based en el orden en que se
+    # ofrecieron). Sirve para simular, por ejemplo, tocar una tarea de una
+    # lista (T3) y después una acción de su menú (T2) hasta llegar a la
+    # vista previa de siempre. Vacío: ningún toque de escenario más allá del
+    # de Confirmar, que ya corre siempre.
+    toques: tuple[dict, ...] = ()
+    # ADR 0007 ("Prisma orienta, no charla"), T4: opt-out explícito, por
+    # escenario, de `comprobadores.comprobar_pregunta_con_opciones` (activa
+    # por defecto para todo escenario) -- para un escenario legado que
+    # necesite seguir pasando con una pregunta en texto abierto sin botones.
+    permite_pregunta_sin_opciones: bool = False
 
 
 def _validar_estructura(datos: dict, origen: pathlib.Path) -> None:
@@ -109,10 +126,33 @@ def _validar_estructura(datos: dict, origen: pathlib.Path) -> None:
     if variante_de is not None and (not isinstance(variante_de, str) or not variante_de.strip()):
         raise EscenarioInvalido(f"{origen}: 'variante_de' tiene que ser texto no vacío.")
 
-    for campo in ("debe_preguntar", "permite_borrador_de_tarea"):
+    for campo in ("debe_preguntar", "permite_borrador_de_tarea",
+                 "permite_pregunta_sin_opciones"):
         valor = datos.get(campo, False)
         if not isinstance(valor, bool):
             raise EscenarioInvalido(f"{origen}: '{campo}' tiene que ser un booleano.")
+
+    toques = datos.get("toques", [])
+    if not isinstance(toques, list):
+        raise EscenarioInvalido(f"{origen}: 'toques' tiene que ser una lista.")
+    for i, t in enumerate(toques):
+        if not isinstance(t, dict):
+            raise EscenarioInvalido(f"{origen}: 'toques[{i}]' tiene que ser un mapeo.")
+        tiene_etiqueta = "etiqueta" in t
+        tiene_indice = "indice" in t
+        if tiene_etiqueta == tiene_indice:
+            raise EscenarioInvalido(
+                f"{origen}: 'toques[{i}]' tiene que traer 'etiqueta' o 'indice', "
+                "exactamente uno de los dos.")
+        if tiene_etiqueta:
+            if not isinstance(t["etiqueta"], str) or not t["etiqueta"].strip():
+                raise EscenarioInvalido(
+                    f"{origen}: 'toques[{i}].etiqueta' tiene que ser texto no vacío.")
+        else:
+            indice = t["indice"]
+            if not isinstance(indice, int) or isinstance(indice, bool) or indice < 0:
+                raise EscenarioInvalido(
+                    f"{origen}: 'toques[{i}].indice' tiene que ser un entero >= 0.")
 
     aclaracion_esperada = datos.get("aclaracion_esperada", {})
     if not isinstance(aclaracion_esperada, dict):
@@ -157,6 +197,8 @@ def cargar_escenario(ruta: pathlib.Path | str) -> Escenario:
         debe_preguntar=bool(datos.get("debe_preguntar", False)),
         permite_borrador_de_tarea=bool(datos.get("permite_borrador_de_tarea", False)),
         aclaracion_esperada=datos.get("aclaracion_esperada", {}) or {},
+        toques=tuple(datos.get("toques", []) or []),
+        permite_pregunta_sin_opciones=bool(datos.get("permite_pregunta_sin_opciones", False)),
     )
 
 

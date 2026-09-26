@@ -458,6 +458,46 @@ def _opciones_pendiente(cur, pending_action_id: str) -> list[dict]:
     return cur.fetchall()
 
 
+def _pendiente_actual(cur, workspace_id: str, chat_id: int) -> str | None:
+    """El último `pending_action` 'esperando' de este chat, sin importar qué
+    la armó -- lo que un toque genérico de escenario (T4, `Escenario.toques`)
+    resuelve contra la propuesta REAL que dejó el turno anterior (una lista
+    de tareas de T3, un menú de T2, una vista previa de siempre), nunca
+    contra un token inventado."""
+    cur.execute(
+        """select id from pending_action
+            where workspace_id = %s and chat_id = %s and estado = 'esperando'
+            order by creado_en desc limit 1""",
+        (workspace_id, chat_id))
+    fila = cur.fetchone()
+    return str(fila["id"]) if fila else None
+
+
+def _resolver_opcion_toque(opciones: list[dict], toque: dict) -> dict | None:
+    """Resuelve un toque genérico de escenario (T4) contra las opciones
+    REALES de la acción pendiente vigente (`_opciones_pendiente`). `etiqueta`:
+    coincidencia exacta de texto. `indice`: posición 0-based en el orden en
+    que se ofrecieron (`pending_action_option.orden`, ya el orden de
+    `_opciones_pendiente`). `None` si ninguna opción matchea -- nunca se
+    inventa un token; la falta queda visible como corrida `bloqueado` (el
+    escenario pidió un toque que la propuesta real no ofrece)."""
+    if "etiqueta" in toque:
+        return next((o for o in opciones if o["etiqueta"] == toque["etiqueta"]), None)
+    indice = toque["indice"]
+    return opciones[indice] if 0 <= indice < len(opciones) else None
+
+
+def _tocar_opcion(conn, slug: str, chat: int, tg_id: int, token: str) -> None:
+    """Simula el toque de un botón real de Telegram -- mismo camino que
+    Confirmar y la aclaración con botones (`gateway.procesar_update` con un
+    `callback_query`)."""
+    callback = {"callback_query": {
+        "id": "banco-toque", "from": {"id": tg_id},
+        "data": f"{P.CALLBACK_PREFIJO}{token}",
+        "message": {"message_id": 2, "chat": {"id": chat}}}}
+    gateway.procesar_update(conn, slug, callback)
+
+
 def _telegram_id(conn, ws: str, nombre: str) -> int:
     with admin(conn) as cur:
         cur.execute(
@@ -475,7 +515,7 @@ def ejecutar_escenario(
     conn, workspace_id: str, slug: str, actor_nombre: str, mensajes: list[str],
     proveedor_real: Proveedor, *, escenario_id: str, indice: int,
     chat_id: int | None = None, cliente_jev: Any | None = None,
-    aclaracion_esperada: dict | None = None,
+    aclaracion_esperada: dict | None = None, toques: list[dict] | None = None,
 ) -> ResultadoCorrida:
     """Corre un escenario por `gateway.procesar_update`, con
     `proveedor_real` envuelto en `ProveedorGrabador` e inyectado en lugar de
@@ -504,6 +544,19 @@ def ejecutar_escenario(
     elegir no aparece entre las opciones, no se tapea nada -- la corrida
     sigue igual, sin adivinar cuál tocar, y la falta queda visible en las
     etiquetas ofrecidas.
+
+    `toques` (T4, `prisma-orienta`): una secuencia de botones genéricos a
+    tocar, EN ORDEN, después de la aclaración con botones (si la hubo) y
+    antes del toque automático en Confirmar de siempre, más abajo. Cada uno
+    (`Escenario.toques`, `{"etiqueta": ...}` o `{"indice": ...}`) resuelve
+    contra las opciones REALES de la acción pendiente vigente en ese momento
+    -- nunca un token inventado -- así que sirve, por ejemplo, para simular
+    tocar una tarea de una lista (T3) y después una acción de su menú (T2)
+    hasta llegar a la vista previa de siempre. Si algún toque no resuelve
+    (no hay ninguna acción pendiente, o no ofrece esa etiqueta/índice), se
+    levanta `LookupError` -- capturado más abajo como el resto de las fallas
+    de infraestructura del escenario: la corrida queda `bloqueado`, nunca
+    inventa un toque.
 
     Un fallo durante el procesamiento (por ejemplo, infraestructura del
     escenario mal declarada) deja la corrida `bloqueado`, con el motivo, en
@@ -574,6 +627,28 @@ def ejecutar_escenario(
                     "data": f"{P.CALLBACK_PREFIJO}{objetivo['token']}",
                     "message": {"message_id": 2, "chat": {"id": chat}}}}
                 gateway.procesar_update(conn, slug, toque_aclaracion)
+
+        # Toques genéricos de escenario (T4, `prisma-orienta`): en orden,
+        # después de la aclaración con botones de arriba y antes de capturar
+        # `herramientas_antes_del_toque`/`conteos_antes_del_toque` -- la
+        # propiedad central de T4 (nada se aplica antes de Confirmar) tiene
+        # que seguir valiendo con estos pasos de más en el medio, igual que
+        # ya vale con la aclaración.
+        for toque in (toques or []):
+            with admin(conn) as cur:
+                pid_actual = _pendiente_actual(cur, workspace_id, chat)
+                if pid_actual is None:
+                    raise LookupError(
+                        f"El escenario pide tocar {toque!r}, pero no hay "
+                        "ninguna acción pendiente esperando en este chat.")
+                opciones_actuales = _opciones_pendiente(cur, pid_actual)
+            objetivo = _resolver_opcion_toque(opciones_actuales, toque)
+            if objetivo is None:
+                raise LookupError(
+                    f"El escenario pide tocar {toque!r}, pero la acción "
+                    "pendiente no lo ofrece (opciones: "
+                    f"{[o['etiqueta'] for o in opciones_actuales]}).")
+            _tocar_opcion(conn, slug, chat, tg_id, objetivo["token"])
 
         # El turno pudo haber dejado una propuesta de una herramienta que
         # escribe esperando un Confirmar (T1/T2, ADR 0005 decisión 1): el

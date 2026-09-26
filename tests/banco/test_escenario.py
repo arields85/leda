@@ -307,3 +307,99 @@ def test_aclaracion_esperada_elegir_fuera_de_candidatas_es_invalido(tmp_path):
     ruta = _escribir(tmp_path, datos)
     with pytest.raises(EscenarioInvalido):
         cargar_escenario(ruta)
+
+
+# ---------------------------------------------------------------------------
+# toques / permite_pregunta_sin_opciones (T4, `prisma-orienta`, ADR 0007): una
+# secuencia de botones genéricos a tocar en orden (lista de tareas -> menú ->
+# acción -> vista previa), y el opt-out explícito de
+# `comprobadores.comprobar_pregunta_con_opciones` para un escenario legado.
+# ---------------------------------------------------------------------------
+
+
+def test_carga_sin_toques_ni_permite_pregunta_sin_opciones_usa_los_valores_por_defecto(
+        tmp_path):
+    ruta = _escribir(tmp_path, _MINIMO)
+    e = cargar_escenario(ruta)
+    assert e.toques == ()
+    assert e.permite_pregunta_sin_opciones is False
+
+
+def test_carga_toques_por_indice_y_por_etiqueta(tmp_path):
+    datos = dict(_MINIMO)
+    datos["toques"] = [{"indice": 0}, {"etiqueta": "Ya la terminé"}]
+    ruta = _escribir(tmp_path, datos)
+    e = cargar_escenario(ruta)
+    assert e.toques == ({"indice": 0}, {"etiqueta": "Ya la terminé"})
+
+
+def test_carga_permite_pregunta_sin_opciones_true(tmp_path):
+    datos = dict(_MINIMO)
+    datos["permite_pregunta_sin_opciones"] = True
+    ruta = _escribir(tmp_path, datos)
+    e = cargar_escenario(ruta)
+    assert e.permite_pregunta_sin_opciones is True
+
+
+def test_permite_pregunta_sin_opciones_no_es_booleano_es_invalido(tmp_path):
+    datos = dict(_MINIMO)
+    datos["permite_pregunta_sin_opciones"] = "si"
+    ruta = _escribir(tmp_path, datos)
+    with pytest.raises(EscenarioInvalido):
+        cargar_escenario(ruta)
+
+
+def test_toques_no_es_una_lista_es_invalido(tmp_path):
+    datos = dict(_MINIMO)
+    datos["toques"] = {"indice": 0}
+    ruta = _escribir(tmp_path, datos)
+    with pytest.raises(EscenarioInvalido):
+        cargar_escenario(ruta)
+
+
+def test_toques_elemento_no_es_un_mapeo_es_invalido(tmp_path):
+    datos = dict(_MINIMO)
+    datos["toques"] = ["Ya la terminé"]
+    ruta = _escribir(tmp_path, datos)
+    with pytest.raises(EscenarioInvalido):
+        cargar_escenario(ruta)
+
+
+def test_toques_sin_etiqueta_ni_indice_es_invalido(tmp_path):
+    datos = dict(_MINIMO)
+    datos["toques"] = [{}]
+    ruta = _escribir(tmp_path, datos)
+    with pytest.raises(EscenarioInvalido):
+        cargar_escenario(ruta)
+
+
+def test_toques_con_etiqueta_e_indice_juntos_es_invalido(tmp_path):
+    datos = dict(_MINIMO)
+    datos["toques"] = [{"etiqueta": "Ya la terminé", "indice": 0}]
+    ruta = _escribir(tmp_path, datos)
+    with pytest.raises(EscenarioInvalido):
+        cargar_escenario(ruta)
+
+
+def test_toques_etiqueta_vacia_es_invalido(tmp_path):
+    datos = dict(_MINIMO)
+    datos["toques"] = [{"etiqueta": "   "}]
+    ruta = _escribir(tmp_path, datos)
+    with pytest.raises(EscenarioInvalido):
+        cargar_escenario(ruta)
+
+
+def test_toques_indice_negativo_es_invalido(tmp_path):
+    datos = dict(_MINIMO)
+    datos["toques"] = [{"indice": -1}]
+    ruta = _escribir(tmp_path, datos)
+    with pytest.raises(EscenarioInvalido):
+        cargar_escenario(ruta)
+
+
+def test_toques_indice_no_es_entero_es_invalido(tmp_path):
+    datos = dict(_MINIMO)
+    datos["toques"] = [{"indice": "0"}]
+    ruta = _escribir(tmp_path, datos)
+    with pytest.raises(EscenarioInvalido):
+        cargar_escenario(ruta)

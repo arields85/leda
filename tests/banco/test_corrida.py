@@ -22,7 +22,9 @@ from tests.banco.corrida import (
     JevGrabador,
     ProveedorGrabador,
     _MARCA_TURNO_CAIDO,
+    _pendiente_actual,
     _pendiente_para_confirmar,
+    _resolver_opcion_toque,
     conteos_delta,
     ejecutar_escenario,
     filas_respuesta,
@@ -749,3 +751,158 @@ def test_ejecutar_escenario_sin_aclaracion_esperada_no_junta_etiquetas(corework,
         conn, ws, "corework", "Marcos Tarquini", ["hola"], interno,
         escenario_id="b-test-sin-aclaracion", indice=0)
     assert r.etiquetas_aclaracion_ofrecidas == ()
+
+
+# ---------------------------------------------------------------------------
+# _resolver_opcion_toque (T4, `prisma-orienta`): resuelve un toque genérico
+# de escenario contra las opciones REALES de la propuesta vigente -- nunca
+# inventa un token.
+# ---------------------------------------------------------------------------
+
+
+def test_resolver_opcion_toque_por_etiqueta_exacta():
+    opciones = [{"token": "t1", "etiqueta": "Ver detalle"},
+               {"token": "t2", "etiqueta": "Empezar"}]
+    o = _resolver_opcion_toque(opciones, {"etiqueta": "Empezar"})
+    assert o["token"] == "t2"
+
+
+def test_resolver_opcion_toque_por_indice():
+    opciones = [{"token": "t1", "etiqueta": "Ver detalle"},
+               {"token": "t2", "etiqueta": "Empezar"}]
+    o = _resolver_opcion_toque(opciones, {"indice": 1})
+    assert o["token"] == "t2"
+
+
+def test_resolver_opcion_toque_etiqueta_inexistente_es_none():
+    opciones = [{"token": "t1", "etiqueta": "Ver detalle"}]
+    assert _resolver_opcion_toque(opciones, {"etiqueta": "No existe"}) is None
+
+
+def test_resolver_opcion_toque_indice_fuera_de_rango_es_none():
+    opciones = [{"token": "t1", "etiqueta": "Ver detalle"}]
+    assert _resolver_opcion_toque(opciones, {"indice": 5}) is None
+    assert _resolver_opcion_toque([], {"indice": 0}) is None
+
+
+# ---------------------------------------------------------------------------
+# _pendiente_actual (T4): la última acción pendiente 'esperando' de un chat,
+# sin importar qué la armó -- a diferencia de `_pendiente_para_confirmar`
+# (T1), que sólo encuentra una que ofrezca el botón Confirmar.
+# ---------------------------------------------------------------------------
+
+
+def test_pendiente_actual_encuentra_la_ultima_esperando_sin_importar_herramienta(
+        corework, conn):
+    ws = corework.workspace_id
+    with espacio(conn, ws) as cur:
+        quien, tg = _quien(cur, ws)
+        p = P.registrar(
+            cur, quien, herramienta=P.SENTINEL_MENU_TAREA, args={},
+            resumen="¿Qué querés hacer?",
+            vence_en=datetime.now(timezone.utc) + timedelta(hours=1),
+            campo="eleccion", chat_id=tg,
+            opciones=[("Ver detalle", {"accion": "ver_detalle"})])
+
+        encontrada = _pendiente_actual(cur, ws, tg)
+
+    assert encontrada == p.id
+
+
+def test_pendiente_actual_sin_ninguna_pendiente_es_none(corework, conn):
+    ws = corework.workspace_id
+    with espacio(conn, ws) as cur:
+        _, tg = _quien(cur, ws)
+        assert _pendiente_actual(cur, ws, tg) is None
+
+
+# ---------------------------------------------------------------------------
+# ejecutar_escenario con `toques` (T4, `prisma-orienta`): simula, en orden,
+# tocar una tarea de la lista (T3) y después una acción de su menú (T2) --
+# extremo a extremo, hasta la vista previa y su Confirmar automático de
+# siempre -- sin que nada de lo que las 8 herramientas escriben cambie antes
+# de ese Confirmar.
+# ---------------------------------------------------------------------------
+
+
+def test_ejecutar_escenario_toques_lista_tarea_menu_accion_llega_a_la_vista_previa(
+        corework, conn):
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        ids = sembrar_precondiciones(cur, ws, {
+            "tareas": [{"id": "t1", "titulo": "Programar PLC (simulado)",
+                       "area": "ot", "responsable": "Marcos Tarquini"}],
+        })
+    tid = ids["t1"]
+
+    interno = ProveedorGuionado(
+        guion=[
+            Respuesta(llamadas=[Llamada("c1", "consultar_tareas", {})]),
+            Respuesta(texto="Tenés una tarea pendiente."),
+        ],
+        rutas=[IntentRoute(IntentAction.NORMAL_CONVERSATION)],
+    )
+
+    r = ejecutar_escenario(
+        conn, ws, "corework", "Marcos Tarquini", ["pasame mis tareas"], interno,
+        escenario_id="b-test-toques", indice=0,
+        toques=[{"indice": 0}, {"etiqueta": "Ya la terminé"}])
+
+    assert r.bloqueado is False, r.motivo_bloqueo
+    # `consultar_tareas` (el turno del modelo) corrió antes de cualquier
+    # toque; `actualizar_estado` (la acción del menú) recién al Confirmar
+    # automático de siempre -- ninguna de las dos antes de ese toque salvo la
+    # de consulta, que no escribe nada (no está en `_HERRAMIENTAS_QUE_
+    # ESCRIBEN`, ver `comprobadores.py`).
+    assert r.herramientas_antes_del_toque == ("consultar_tareas",)
+    assert r.herramientas_ejecutadas == ["consultar_tareas", "actualizar_estado"]
+    assert r.conteos_antes_del_toque is not None
+    for tabla in ("task", "blocker", "dependency", "task_state_event",
+                 "objective", "evidence", "approval"):
+        assert r.conteos_antes_del_toque[tabla] == r.conteos_antes[tabla], (
+            f"'{tabla}' cambió antes de tocar Confirmar")
+
+    with admin(conn) as cur:
+        cur.execute("select estado from task where id = %s", (tid,))
+        assert cur.fetchone()["estado"] == "en_revision"
+
+
+def test_ejecutar_escenario_toque_con_etiqueta_no_ofrecida_queda_bloqueado(
+        corework, conn):
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        sembrar_precondiciones(cur, ws, {
+            "tareas": [{"id": "t1", "titulo": "Programar PLC (simulado)",
+                       "area": "ot", "responsable": "Marcos Tarquini"}],
+        })
+
+    interno = ProveedorGuionado(
+        guion=[
+            Respuesta(llamadas=[Llamada("c1", "consultar_tareas", {})]),
+            Respuesta(texto="Tenés una tarea pendiente."),
+        ],
+        rutas=[IntentRoute(IntentAction.NORMAL_CONVERSATION)],
+    )
+
+    r = ejecutar_escenario(
+        conn, ws, "corework", "Marcos Tarquini", ["pasame mis tareas"], interno,
+        escenario_id="b-test-toque-invalido", indice=0,
+        toques=[{"etiqueta": "Un botón que no existe"}])
+
+    assert r.bloqueado is True
+    assert "no lo ofrece" in r.motivo_bloqueo
+
+
+def test_ejecutar_escenario_toque_sin_ninguna_pendiente_queda_bloqueado(corework, conn):
+    interno = ProveedorGuionado(
+        guion=[Respuesta(texto="Anotado.")],
+        rutas=[IntentRoute(IntentAction.NORMAL_CONVERSATION)],
+    )
+
+    r = ejecutar_escenario(
+        conn, corework.workspace_id, "corework", "Marcos Tarquini", ["hola"], interno,
+        escenario_id="b-test-toque-sin-pendiente", indice=0,
+        toques=[{"indice": 0}])
+
+    assert r.bloqueado is True
+    assert "no hay ninguna acción pendiente" in r.motivo_bloqueo

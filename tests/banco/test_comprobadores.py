@@ -15,6 +15,7 @@ from tests.banco.comprobadores import (
     comprobar_herramientas,
     comprobar_personas_mencionadas,
     comprobar_pregunta,
+    comprobar_pregunta_con_opciones,
     comprobar_sin_efectos_antes_de_confirmar,
     resultado_general,
 )
@@ -723,6 +724,83 @@ def test_pregunta_imperativo_porque_no_es_un_falso_positivo_de_que():
     r = comprobar_pregunta(ev)
     assert r.resultado == "falla"
     assert "no actuó pero tampoco preguntó" in r.diferencia
+
+
+# ---------------------------------------------------------------------------
+# comprobar_pregunta_con_opciones (T4, `prisma-orienta`, ADR 0007 puntos 1 y
+# 5): a diferencia de `comprobar_pregunta` -- que sólo corre si el escenario
+# declaró `debe_preguntar: true`, y aprueba tanto una pregunta con botones
+# como una en texto abierto -- ésta corre por defecto en todo escenario y es
+# estricta sobre la FORMA: si Prisma pregunta, tiene que ofrecer botones.
+# Reusa `_hace_pregunta` (misma detección que `comprobar_pregunta`): "?" o el
+# pedido de elección en imperativo (T7).
+# ---------------------------------------------------------------------------
+
+
+def test_pregunta_con_opciones_signo_de_pregunta_sin_botones_falla():
+    ev = Evidencia(respuesta_texto="¿Cuál de las dos tareas es?",
+                   herramientas_ejecutadas=())
+    r = comprobar_pregunta_con_opciones(ev)
+    assert r.resultado == "falla"
+    assert "ADR 0007" in r.diferencia
+
+
+def test_pregunta_con_opciones_signo_de_pregunta_con_botones_aprueba():
+    ev = Evidencia(respuesta_texto="¿Cuál de las dos tareas es?",
+                   herramientas_ejecutadas=(), ofrecio_opciones=True)
+    r = comprobar_pregunta_con_opciones(ev)
+    assert r.resultado == "aprobado"
+
+
+def test_pregunta_con_opciones_imperativo_sin_botones_falla():
+    """El mismo pedido en imperativo que `comprobar_pregunta` ya reconoce
+    como pregunta (T7, "Decime cuál de las dos y lo hago") -- sin botones,
+    ADR 0007 lo prohíbe igual que un "?" abierto."""
+    ev = Evidencia(respuesta_texto="Decime cuál de las dos y lo hago",
+                   herramientas_ejecutadas=())
+    r = comprobar_pregunta_con_opciones(ev)
+    assert r.resultado == "falla"
+
+
+def test_pregunta_con_opciones_imperativo_con_botones_aprueba():
+    ev = Evidencia(respuesta_texto="Decime cuál de las dos y lo hago",
+                   herramientas_ejecutadas=(), ofrecio_opciones=True)
+    r = comprobar_pregunta_con_opciones(ev)
+    assert r.resultado == "aprobado"
+
+
+def test_pregunta_con_opciones_aviso_que_no_pregunta_nada_aprueba_sin_botones():
+    """ADR 0007, punto pendiente ('si una respuesta puede cerrar sin
+    opciones'): un aviso que no le pregunta nada a la persona no tiene por
+    qué llevar botones -- esta comprobación no se mete con eso, sólo exige
+    botones cuando SÍ pregunta."""
+    ev = Evidencia(respuesta_texto="Listo, quedó registrado.",
+                   herramientas_ejecutadas=())
+    r = comprobar_pregunta_con_opciones(ev)
+    assert r.resultado == "aprobado"
+
+
+def test_pregunta_con_opciones_lista_de_tareas_sin_pregunta_ni_botones_aprueba():
+    """Una respuesta que sólo presenta información (p. ej. un conteo de
+    tareas) sin preguntar nada tampoco depende de `ofrecio_opciones` acá --
+    aunque T3 igual le agregue botones por servidor, esta comprobación en sí
+    no lo exige salvo que el texto pregunte algo."""
+    ev = Evidencia(respuesta_texto="Tenés 2 tareas pendientes.",
+                   herramientas_ejecutadas=("consultar_tareas",))
+    r = comprobar_pregunta_con_opciones(ev)
+    assert r.resultado == "aprobado"
+
+
+def test_pregunta_con_opciones_no_le_importa_si_actuo():
+    """A diferencia de `comprobar_pregunta`, esta comprobación no mira
+    `herramientas_ejecutadas` en absoluto -- sólo la FORMA de la pregunta.
+    Una respuesta que actuó y además pregunta algo más en texto abierto,
+    sin botones, sigue fallando acá (otra comprobación, `comprobar_pregunta`
+    con `debe_preguntar`, es la que juzga si actuar estuvo bien)."""
+    ev = Evidencia(respuesta_texto="Ya la pasé a revisión. ¿Querés que avise a alguien más?",
+                   herramientas_ejecutadas=("actualizar_estado",))
+    r = comprobar_pregunta_con_opciones(ev)
+    assert r.resultado == "falla"
 
 
 # ---------------------------------------------------------------------------

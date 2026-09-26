@@ -455,6 +455,17 @@ def _pide_elegir_en_imperativo(texto: str) -> bool:
     return _MARCADOR_CUAL in normalizado or bool(_MARCADOR_QUE.search(normalizado))
 
 
+def _hace_pregunta(texto: str) -> bool:
+    """Detecta si el texto le pregunta algo a la persona: signo de
+    interrogación, o un pedido de elección en imperativo
+    (`_pide_elegir_en_imperativo`, T7 punto I). Compartida entre
+    `comprobar_pregunta` (T7, "ante la duda, preguntó en vez de actuar") y
+    `comprobar_pregunta_con_opciones` (T4, ADR 0007 "Prisma orienta, no
+    charla") -- una sola detección de "esto es una pregunta", dos
+    comprobaciones distintas sobre ella."""
+    return "?" in texto or _pide_elegir_en_imperativo(texto)
+
+
 def comprobar_pregunta(
     evidencia: Evidencia, *, task_draft_delta: int = 0,
     permite_borrador_de_tarea: bool = False,
@@ -483,14 +494,47 @@ def comprobar_pregunta(
         return ResultadoComprobacion(
             "pregunta", "falla", f"actuó sin preguntar: {'; '.join(partes)}")
 
-    if ("?" in evidencia.respuesta_texto or evidencia.ofrecio_opciones
-            or _pide_elegir_en_imperativo(evidencia.respuesta_texto)):
+    if _hace_pregunta(evidencia.respuesta_texto) or evidencia.ofrecio_opciones:
         return ResultadoComprobacion("pregunta", "aprobado")
 
     return ResultadoComprobacion(
         "pregunta", "falla",
         "no actuó pero tampoco preguntó: la respuesta no contiene una "
         "pregunta ni ofreció opciones")
+
+
+# ---------------------------------------------------------------------------
+# 6bis. Pregunta con opciones (T4, `prisma-orienta`, ADR 0007 puntos 1 y 5):
+# a diferencia de `comprobar_pregunta` (que sólo corre para un escenario que
+# declaró `debe_preguntar: true`, y aprueba una pregunta en texto abierto
+# tanto como una con botones), esta comprobación corre por defecto en TODO
+# escenario y es estricta sobre la forma: si Prisma le pregunta algo a la
+# persona, esa pregunta tiene que venir con opciones como botones
+# (`evidencia.ofrecio_opciones`), nunca en texto abierto solo. Reusa
+# `_hace_pregunta` -- la misma detección de "esto es una pregunta" que ya
+# usa `comprobar_pregunta` -- en vez de otra heurística.
+#
+# Una respuesta que no pregunta nada (un aviso que no espera nada de la
+# persona) no le compete a esta comprobación: aprueba sin mirar botones. El
+# punto pendiente de ADR 0007 ("si una respuesta puede cerrar sin opciones")
+# sigue abierto -- lo que esta comprobación fija es que, cuando SÍ pregunta,
+# no lo haga en texto abierto.
+# ---------------------------------------------------------------------------
+
+
+def comprobar_pregunta_con_opciones(evidencia: Evidencia) -> ResultadoComprobacion:
+    """Aprueba si la respuesta no pregunta nada, o si pregunta y además
+    ofreció la elección con botones. Falla sólo cuando pregunta EN TEXTO
+    ABIERTO sin haber ofrecido opciones -- exactamente lo que ADR 0007 (T4)
+    prohíbe."""
+    if not _hace_pregunta(evidencia.respuesta_texto):
+        return ResultadoComprobacion("pregunta_con_opciones", "aprobado")
+    if evidencia.ofrecio_opciones:
+        return ResultadoComprobacion("pregunta_con_opciones", "aprobado")
+    return ResultadoComprobacion(
+        "pregunta_con_opciones", "falla",
+        "preguntó en texto abierto sin ofrecer opciones con botones (ADR "
+        f"0007, prisma-orienta): {evidencia.respuesta_texto!r}")
 
 
 # ---------------------------------------------------------------------------
