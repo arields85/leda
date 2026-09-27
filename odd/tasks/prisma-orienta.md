@@ -102,15 +102,18 @@ gestión.
   - [x] **T6d — Dedupe estable del aviso de entrega.** `_notificar_entrega_al_aprobador`
     recibe `evidencia_id or uuid.uuid4()`: sin evidencia, la clave es aleatoria y no
     deduplica nada. Derivarla de la identidad del acto de entrega.
-  - [ ] **T6e — Prueba de punta a punta de "Pedir cambios".**
+  - [x] **T6e — Prueba de punta a punta de "Pedir cambios".**
   - [ ] **T6f — Serializar "Aprobar" y "Pedir cambios" concurrentes** (review-3cf89bef).
   - [ ] **T6g — Empate de evidencia y entrega repetida en `en_revision`** (review-e719d807,
     review-09452c69). Una entrega repetida sobre una tarea ya `en_revision` inserta
     un evento `en_revision -> en_revision`: además de sumar evidencia, hace que
     `estado_previo_a_revision` devuelva `en_revision` y que "Pedir cambios" mande a
     `asignada` una tarea que estaba en curso (y el empate de `at` en una misma
-    transacción queda sin desempate). Decidir si esa transición se rechaza (riesgo 3,
-    sin grafo de transiciones) o si la función ignora los eventos de mismo estado.
+    transacción queda sin desempate). Decisión del usuario (2026-09-27): sobre una
+    tarea que ya está `en_revision`, "ya la terminé" no registra ningún cambio de
+    estado; la evidencia que llegue se suma como un adjunto más (igual que "Adjuntar
+    evidencia") y Prisma avisa que ya está en revisión y que sumó la evidencia para
+    quien la revisa.
     Sumar pruebas: previo nulo -> `asignada`; rama `en_revision` de
     `_preparar_actualizar_estado` sin confirmar.
   - [ ] **T6h — Seguimientos de review-6b1efba1 sobre el aviso de entrega.** (1) Dos
@@ -3237,3 +3240,14 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   dos sugerencias de pruebas -> sumados a T6g. La cuarta sugerencia (la migración
   no se ejercita) no aplica: el ensayo de `tests/test_task_intake.py` aplica cada
   migración y su rollback y los comparó contra el esquema en esta misma suite.
+
+- 2026-09-27: **T6e cerrada — "Pedir cambios" de punta a punta por Telegram.** Ruta:
+  delegada, un escritor (sólo pruebas). `tests/test_pedir_cambios_extremo_a_extremo.py`
+  maneja `POST /telegram/corework` con `TestClient` (toques y texto libre; el modelo
+  sólo abre el menú, con `ProveedorGuionado`): entrega con evidencia -> aviso con
+  botones al aprobador -> "Pedir cambios" con comentario y destino en la vista previa
+  -> vuelve a `en_curso` y avisa al responsable -> reentrega que pide evidencia nueva
+  (T6b) con un segundo aviso de clave distinta (T6d) -> "Aprobar" cierra la tarea
+  (T6a, ADR 0008). Variante con dependencia bloqueante abierta (T6c). Sin defectos.
+  Resultados: el archivo -> `2 passed` (reejecutado por el orquestador); suite
+  completa (escritor): `946 passed, 108 deselected`.
