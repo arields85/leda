@@ -43,13 +43,17 @@ class MenuTarea:
     titulo: str
     estado: str
     relacion: str      # "responsable" | "aprobador" | "otra"
+    responsable_nombre: str | None
     acciones: list[AccionMenu]
 
 
 def _tarea_para_menu(cur: psycopg.Cursor, tarea_id: str) -> dict | None:
     cur.execute(
-        """select id, titulo, estado, responsable_membership_id
-             from task where id = %s""", (tarea_id,))
+        """select t.id, t.titulo, t.estado, t.responsable_membership_id,
+                  i.nombre as responsable_nombre
+             from task t
+             left join integrante i on i.membership_id = t.responsable_membership_id
+            where t.id = %s""", (tarea_id,))
     return cur.fetchone()
 
 
@@ -116,7 +120,23 @@ def calcular_menu(cur: psycopg.Cursor, quien: Solicitante,
         acciones.append(AccionMenu("mi_trabajo_depende", "Mi trabajo depende de esta tarea"))
 
     return MenuTarea(tarea_id=str(tarea_id), titulo=fila["titulo"], estado=estado,
-                     relacion=relacion, acciones=acciones)
+                     relacion=relacion, responsable_nombre=fila["responsable_nombre"],
+                     acciones=acciones)
+
+
+def encabezado_menu(menu: MenuTarea) -> str:
+    """Encabezado corto del menú de una tarea (T2, hallazgo 4 de sesión 2 por
+    Telegram, 2026-09-27): con la lista de tareas movida a botones (T3) y el
+    texto resumiendo en vez de enumerar, lo único que se perdía era saber DE
+    QUIÉN es la tarea y en qué estado está sin tocarla y abrir "Ver
+    detalle". Una sola línea, antes de la única pregunta del menú.
+
+    "tuya" cuando quien toca ES la responsable (`relacion == "responsable"`)
+    -- nunca su propio nombre; el nombre real sólo para un aprobador u otra
+    persona."""
+    quien = "tuya" if menu.relacion == "responsable" else (
+        menu.responsable_nombre or "sin asignar")
+    return f"«{menu.titulo}» · {quien} · {_estado_legible(menu.estado)}"
 
 
 def bloqueos_abiertos(cur: psycopg.Cursor, tarea_id: str) -> list[dict]:

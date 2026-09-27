@@ -866,18 +866,25 @@ def test_ejecutar_escenario_aclaracion_tapea_la_candidata_elegida_sin_aplicar_na
                            trabajos=("lo del tablero",))],
     )
 
+    # Adaptación deliberada (hallazgo 2, sesión 2 por Telegram): la
+    # aclaración con botones (`_SENTINEL_ACLARACION`) ahora arma la etiqueta
+    # con `salida.acortar_etiqueta_boton` (límite de palabra, objetivo ~30),
+    # no con el título completo -- acá los dos títulos superan el objetivo y
+    # su "(simulado)" queda afuera, igual que en una corrida real (el propio
+    # hallazgo del usuario: "los títulos de sesión terminan en
+    # '(simulado)', el corte por palabra normalmente lo deja afuera").
+    etiqueta_a = "Cablear tablero máq. 3…"
+    etiqueta_b = "Revisar tablero máq. 4…"
     r = ejecutar_escenario(
         conn, ws, "corework", "Marcos Tarquini",
         ["ya termine lo del tablero, pasala a revision"], interno,
         escenario_id="b-test-aclaracion", indice=0, cliente_jev=doble_jev,
         aclaracion_esperada={
-            "candidatas": ["Cablear tablero máq. 3 (simulado)",
-                          "Revisar tablero máq. 4 (simulado)"],
-            "elegir": "Cablear tablero máq. 3 (simulado)"})
+            "candidatas": [etiqueta_a, etiqueta_b],
+            "elegir": etiqueta_a})
 
     assert r.bloqueado is False, r.motivo_bloqueo
-    assert set(r.etiquetas_aclaracion_ofrecidas) >= {
-        "Cablear tablero máq. 3 (simulado)", "Revisar tablero máq. 4 (simulado)"}
+    assert set(r.etiquetas_aclaracion_ofrecidas) >= {etiqueta_a, etiqueta_b}
     assert r.herramientas_ejecutadas == ["actualizar_estado"]
     # Nada de lo que las 8 herramientas escriben cambió mientras se
     # preguntaba con botones ni antes del toque en Confirmar -- la

@@ -195,6 +195,56 @@ def test_menu_responsable_en_curso(cliente, conn, corework, monkeypatch):
                         "Depende de otra tarea", P.ETIQUETA_SALIR_OPCIONES]
 
 
+# ---------------------------------------------------------------------------
+# Encabezado del menú: responsable y estado (hallazgo 4, sesión 2 por
+# Telegram, 2026-09-27). Con la lista de tareas movida a botones, el texto
+# ya no enumera -- lo único que se perdía era saber DE QUIÉN es la tarea y en
+# qué estado está sin abrir "Ver detalle". El encabezado del menú lo agrega,
+# corto, en una sola pregunta.
+# ---------------------------------------------------------------------------
+
+def _resumen_menu(conn, ws) -> str:
+    with admin(conn) as cur:
+        cur.execute(
+            """select resumen from pending_action
+                where workspace_id = %s and herramienta = %s and estado = 'esperando'
+                order by creado_en desc limit 1""",
+            (ws, P.SENTINEL_MENU_TAREA))
+        return cur.fetchone()["resumen"]
+
+
+def test_encabezado_del_menu_muestra_responsable_y_estado(
+        cliente, conn, corework, monkeypatch):
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        tid = _tarea(cur, ws, titulo="Programar HMI línea 2", estado="en_revision",
+                    persona="Mariano Naim")
+    conn.commit()
+
+    _abrir_menu(cliente, conn, ws, monkeypatch, tid, "Nahuel Gimenez")
+    resumen = _resumen_menu(conn, ws)
+
+    assert "Mariano Naim" in resumen
+    assert "en revisión" in resumen.lower()
+    assert "Programar HMI línea 2" in resumen
+    assert resumen.count("?") == 1          # una sola pregunta
+
+
+def test_encabezado_del_menu_dice_tuya_para_la_propia_responsable(
+        cliente, conn, corework, monkeypatch):
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        tid = _tarea(cur, ws, estado="asignada", persona="Nahuel Gimenez")
+    conn.commit()
+
+    _abrir_menu(cliente, conn, ws, monkeypatch, tid, "Nahuel Gimenez")
+    resumen = _resumen_menu(conn, ws)
+
+    assert "tuya" in resumen.lower()
+    assert "Nahuel Gimenez" not in resumen   # nunca su propio nombre
+    assert resumen.count("?") == 1
+
+
 def _bloquear(cur, ws, tarea_id, *, causa="Falta un repuesto"):
     cur.execute(
         "insert into blocker (workspace_id, task_id, causa) values (%s, %s, %s)",

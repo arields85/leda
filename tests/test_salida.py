@@ -13,9 +13,12 @@ from prisma.calendario import Calendario
 from prisma.db import admin, espacio
 from prisma.despachador import Boton, TransporteTelegram
 from prisma.llm import ProveedorGuionado, Respuesta
-from prisma.salida import (BUTTON_TEXT_LIMIT, TELEGRAM_TEXT_LIMIT,
+from prisma.salida import (BUTTON_TEXT_LIMIT, OBJETIVO_ETIQUETA_BOTON,
+                             TELEGRAM_TEXT_LIMIT, TRUNCAR_ETIQUETA_BOTON,
                              NO_EFFECT_STATUS, PayloadValidationError,
-                             enqueue_outbox, normalize_visible_text,
+                             acortar_etiqueta_boton, enqueue_outbox,
+                             etiquetas_boton_distinguibles,
+                             normalize_visible_text, prepare_buttons,
                              prepare_payload, telegram_utf16_units,
                              with_no_effect_status)
 
@@ -226,6 +229,94 @@ def test_onboarding_scheduler_and_escalation_split_only_buttonless_messages(
         assert len(rows) >= 6
         assert all(telegram_utf16_units(row["cuerpo"]) <= TELEGRAM_TEXT_LIMIT
                    for row in rows)
+
+
+# ---------------------------------------------------------------------------
+# Etiquetas de botón cortas (hallazgo 2, sesión 2 por Telegram): las
+# etiquetas que arma el servidor a partir de un título de tarea se cortan en
+# un límite de PALABRA, no a mitad de una, y a un objetivo bastante más chico
+# que el tope técnico de Telegram (`TRUNCAR_ETIQUETA_BOTON`, 48) para que
+# entren cómodas en un botón inline de ancho completo en un teléfono chico
+# (`OBJETIVO_ETIQUETA_BOTON`, ver su comentario en `salida.py`).
+# ---------------------------------------------------------------------------
+
+
+def test_acortar_etiqueta_boton_no_corta_si_ya_entra_en_el_objetivo():
+    corto = "Cablear tablero máq. 3"
+    assert len(corto) <= OBJETIVO_ETIQUETA_BOTON
+    assert acortar_etiqueta_boton(corto) == corto        # sin "…": no se tocó
+
+
+def test_acortar_etiqueta_boton_corta_en_limite_de_palabra_con_elipsis():
+    largo = "Revisar comunicaciones industriales de la compresora principal"
+    assert len(largo) > OBJETIVO_ETIQUETA_BOTON
+
+    corta = acortar_etiqueta_boton(largo)
+
+    assert corta.endswith("…")
+    sin_elipsis = corta[:-1]
+    assert len(sin_elipsis) <= OBJETIVO_ETIQUETA_BOTON
+    assert largo.startswith(sin_elipsis.rstrip())
+    # Nunca corta a mitad de palabra: lo que quedó antes de "…" es un prefijo
+    # de palabras completas del título original.
+    assert sin_elipsis.rstrip() in [
+        " ".join(largo.split(" ")[:n]) for n in range(len(largo.split(" ")) + 1)]
+
+
+def test_acortar_etiqueta_boton_primera_palabra_larga_cae_al_corte_duro():
+    # Una sola "palabra" (sin espacios) más larga que el objetivo no tiene
+    # límite de palabra donde cortar: cae al corte duro de siempre
+    # (`TRUNCAR_ETIQUETA_BOTON`, 48), nunca deja una etiqueta vacía.
+    una_palabra = "Supercalifragilisticoexpialidocosisimo" * 2
+    assert len(una_palabra) > TRUNCAR_ETIQUETA_BOTON
+
+    corta = acortar_etiqueta_boton(una_palabra)
+
+    assert corta.endswith("…")
+    assert len(corta) == TRUNCAR_ETIQUETA_BOTON
+
+
+def test_acortar_etiqueta_boton_es_seguro_para_prepare_buttons_con_acentos():
+    largo = "Revisar el tablero eléctrico de la máquina número tres del área"
+    corta = acortar_etiqueta_boton(largo)
+    etiqueta, _ = prepare_buttons([(corta, "p:x")])[0]
+    assert etiqueta == corta
+    assert telegram_utf16_units(corta) <= 80
+
+
+# ---------------------------------------------------------------------------
+# Un conjunto de etiquetas nunca queda ambiguo: si dos títulos distintos
+# cortan igual, se extienden palabra por palabra hasta distinguirse.
+# ---------------------------------------------------------------------------
+
+
+def test_etiquetas_boton_distinguibles_extiende_las_que_colisionan():
+    titulos = ["Revisar tablero de la máquina 3", "Revisar tablero de la máquina 4"]
+    cortas_sin_distinguir = [acortar_etiqueta_boton(t) for t in titulos]
+    assert cortas_sin_distinguir[0] == cortas_sin_distinguir[1]     # colisionan
+
+    distinguidas = etiquetas_boton_distinguibles(titulos)
+
+    assert len(set(distinguidas)) == 2
+    assert distinguidas[0] != distinguidas[1]
+    assert "3" in distinguidas[0] and "4" in distinguidas[1]
+
+
+def test_etiquetas_boton_distinguibles_no_toca_las_que_no_colisionan():
+    titulos = ["Programar PLC", "Cablear tablero máq. 3"]
+    assert etiquetas_boton_distinguibles(titulos) == titulos
+
+
+def test_etiquetas_boton_distinguibles_respeta_etiquetas_fijas_como_obstaculo():
+    # Una etiqueta "fija" (por ejemplo, la que ya eligió el modelo en
+    # `ofrecer_opciones`) nunca se hace crecer -- sólo cuenta como obstáculo
+    # para que las demás no la pisen.
+    titulos = ["Programar PLC", "Programar PLC de la comprimidora principal"]
+    distinguidas = etiquetas_boton_distinguibles(
+        titulos, fijas=[True, False])
+    assert distinguidas[0] == "Programar PLC"
+    assert distinguidas[1] != "Programar PLC"
+    assert len(set(distinguidas)) == 2
 
 
 def test_invalid_button_metadata_is_rejected_before_enqueue():

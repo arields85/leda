@@ -20,6 +20,19 @@ _SPLIT_BODY_LIMIT = 4000
 # agregado después de truncar (p. ej. " — <nombre>" en
 # `gateway._etiqueta_boton`) nunca se recorta.
 TRUNCAR_ETIQUETA_BOTON = 48
+# Objetivo de largo para una etiqueta de botón "linda" (hallazgo de sesión 2
+# por Telegram, 2026-09-27: una etiqueta server-armada con el título completo
+# recortado a mitad de palabra -- "Revisar comunicaciones industriales de la
+# compr…" -- no entra cómoda en un botón inline de ancho completo en un
+# teléfono chico). Un botón inline de Telegram ocupa el ancho disponible del
+# chat; en una pantalla angosta de referencia (iPhone SE, ~320pt de ancho) el
+# texto del botón, con su padding, entra sin ajustar renglón hasta unos
+# 28-32 caracteres con la tipografía de sistema que usa Telegram -- 30 queda
+# en el medio de ese rango, con margen de sobra para acentos y mayúsculas
+# más anchas. Bastante más chico que `TRUNCAR_ETIQUETA_BOTON` (48, el corte
+# duro histórico, ahora sólo el último recurso cuando ni una palabra entera
+# entra en el objetivo).
+OBJETIVO_ETIQUETA_BOTON = 30
 NO_EFFECT_STATUS = "Estado: sin cambios."
 _NO_EFFECT_PATTERNS = tuple(re.compile(pattern, re.IGNORECASE) for pattern in (
     r"\bno se (?:registr[oó]|modific[oó]|cambi[oó]) (?:nada|ning[uú]n cambio)\b",
@@ -86,6 +99,109 @@ def truncar_etiqueta_boton(texto: str) -> str:
     if len(texto) <= TRUNCAR_ETIQUETA_BOTON:
         return texto
     return texto[:TRUNCAR_ETIQUETA_BOTON - 1].rstrip() + "…"
+
+
+def acortar_etiqueta_boton(texto: str, *, objetivo: int = OBJETIVO_ETIQUETA_BOTON,
+                           limite: int = TRUNCAR_ETIQUETA_BOTON) -> str:
+    """Acorta una etiqueta de botón armada por el servidor a partir de un
+    título (hallazgo de sesión 2 por Telegram): corta en un límite de
+    PALABRA, nunca a mitad de una, con "…" al final sólo cuando de verdad
+    hizo falta cortar algo. Si el título entero ya entra en `objetivo`, se
+    devuelve tal cual -- sin "…" -- porque no se cortó nada.
+
+    Si la primera palabra sola ya supera `objetivo` (no hay ningún límite de
+    palabra dentro del objetivo donde cortar), cae al corte duro de siempre
+    (`truncar_etiqueta_boton`, a `limite`) en vez de devolver una etiqueta
+    vacía.
+
+    Reusada por todo lugar que arma botones de tarea a partir de un título
+    (T3, "Ver más", tareas propias, candidatas de aclaración y de
+    dependencia) y por `herramientas._ofrecer_opciones` cuando el modelo no
+    dio una etiqueta corta propia."""
+    texto = texto.strip()
+    if len(texto) <= objetivo:
+        return texto
+
+    palabras = texto.split(" ")
+    acumulado = ""
+    for palabra in palabras:
+        candidato = f"{acumulado} {palabra}".strip()
+        if len(candidato) > objetivo:
+            break
+        acumulado = candidato
+
+    if not acumulado:
+        return truncar_etiqueta_boton(texto)
+    return acumulado + "…"
+
+
+def etiquetas_boton_distinguibles(
+        titulos: list[str], *, fijas: list[bool] | None = None,
+        objetivo: int = OBJETIVO_ETIQUETA_BOTON,
+        limite: int = TRUNCAR_ETIQUETA_BOTON) -> list[str]:
+    """La versión "de conjunto" de `acortar_etiqueta_boton` (hallazgo de
+    sesión 2 por Telegram): un juego de botones nunca puede quedar ambiguo,
+    así que si acortar dos títulos DISTINTOS los deja iguales (p. ej.
+    "Revisar tablero de la máquina 3" y "...máquina 4" cortando los dos en
+    "Revisar tablero de la máquina…"), las que colisionan se extienden
+    palabra por palabra -- pueden superar `objetivo` para esto, hasta
+    `limite` (el corte duro histórico) -- hasta volver a distinguirse.
+
+    `fijas[i]` marca una etiqueta que ya vino elegida (la que puso el modelo
+    en `ofrecer_opciones`, por ejemplo): nunca se hace crecer, sólo cuenta
+    como obstáculo para que las demás no la pisen -- respeta la elección del
+    modelo tal cual pidió T1.
+
+    Último recurso: si dos títulos son indistinguibles incluso enteros (o en
+    su corte duro a `limite`), se numeran -- nunca dos botones ambiguos en el
+    mismo mensaje."""
+    titulos = [t.strip() for t in titulos]
+    fijas = list(fijas) if fijas is not None else [False] * len(titulos)
+
+    resultado = [
+        t if fija else acortar_etiqueta_boton(t, objetivo=objetivo, limite=limite)
+        for t, fija in zip(titulos, fijas)]
+
+    crecibles = [i for i, fija in enumerate(fijas) if not fija]
+    palabras = {i: titulos[i].split(" ") for i in crecibles}
+    n_palabras = {i: len(resultado[i].rstrip("…").split(" ")) for i in crecibles}
+
+    avanzo = True
+    while avanzo:
+        avanzo = False
+        # Colisiones contra una foto del arranque de esta pasada -- no
+        # contra `resultado` mientras se lo va mutando en la misma pasada:
+        # si no, la primera etiqueta que crece dentro del `for` deja de
+        # "colisionar" contra sí misma y las demás de su mismo grupo se
+        # saltean de largo sin crecer (dos etiquetas iguales, una sola se
+        # distingue).
+        foto = list(resultado)
+        for i in crecibles:
+            otras = foto[:i] + foto[i + 1:]
+            if foto[i] not in otras:
+                continue
+            if n_palabras[i] >= len(palabras[i]):
+                continue
+            n_palabras[i] += 1
+            candidato = " ".join(palabras[i][:n_palabras[i]])
+            if len(candidato) > limite:
+                candidato = titulos[i][:limite - 1].rstrip() + "…"
+                n_palabras[i] = len(palabras[i])
+            elif n_palabras[i] < len(palabras[i]):
+                candidato = candidato + "…"
+            resultado[i] = candidato
+            avanzo = True
+
+    conteo: dict[str, int] = {}
+    for etiqueta in resultado:
+        conteo[etiqueta] = conteo.get(etiqueta, 0) + 1
+    vistos: dict[str, int] = {}
+    for i, etiqueta in enumerate(resultado):
+        if conteo[etiqueta] > 1:
+            vistos[etiqueta] = vistos.get(etiqueta, 0) + 1
+            if vistos[etiqueta] > 1:
+                resultado[i] = f"{etiqueta} ({vistos[etiqueta]})"
+    return resultado
 
 
 def prepare_buttons(buttons: Iterable[Any]) -> list[tuple[str, str]]:

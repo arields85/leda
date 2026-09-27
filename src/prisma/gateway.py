@@ -23,8 +23,8 @@ from .db import (admin, autoridad, conectar, conectar_autoridad, espacio,
                  registrar_auditoria)
 from .despachador import acusar_toque, mantener_chat_activo
 from .salida import TRUNCAR_ETIQUETA_BOTON as TRUNCAR_TITULO_BOTON
-from .salida import (enqueue_outbox, normalize_visible_text,
-                     truncar_etiqueta_boton, with_no_effect_status)
+from .salida import (enqueue_outbox, etiquetas_boton_distinguibles,
+                     normalize_visible_text, with_no_effect_status)
 
 app = FastAPI(title="Prisma", docs_url=None, redoc_url=None)
 router = APIRouter()
@@ -1076,11 +1076,16 @@ def _mostrar_mas_tareas(cur, quien, workspace_id: str, chat_id: int,
         pagina, resto = (vigentes[:H.MAX_OPCIONES_MODELO],
                         vigentes[H.MAX_OPCIONES_MODELO:])
         resumen = "Más tareas:"
+        # Mismas etiquetas cortas y distinguibles que la primera página
+        # (`agente._opciones_lista_tareas`) -- esta es la página siguiente
+        # de la misma lista, calculada aparte porque no vuelve a llamar al
+        # modelo.
+        etiquetas = etiquetas_boton_distinguibles(
+            [normalize_visible_text(titulo) for _, titulo in pagina])
         opciones = [
-            (truncar_etiqueta_boton(normalize_visible_text(titulo)),
-             {"tipo": "tarea", "tarea_id": tid, "titulo": titulo,
-              "accion": "menu"})
-            for tid, titulo in pagina]
+            (etiqueta, {"tipo": "tarea", "tarea_id": tid, "titulo": titulo,
+                       "accion": "menu"})
+            for (tid, titulo), etiqueta in zip(pagina, etiquetas)]
         if resto:
             opciones.append((P.ETIQUETA_VER_MAS,
                              {"tipo": "ver_mas",
@@ -1180,7 +1185,9 @@ def _encolar_menu_tarea(cur, quien, workspace_id: str, chat_id: int,
 
     opciones = [(a.etiqueta, {"accion": a.codigo}) for a in menu.acciones]
     opciones.append((P.ETIQUETA_SALIR_OPCIONES, {"accion": "salir"}))
-    pregunta = f"¿Qué querés hacer con «{menu.titulo}»?"
+    # Encabezado corto -- responsable y estado (T2, hallazgo 4 de sesión 2
+    # por Telegram) -- y una sola pregunta debajo, nunca dos.
+    pregunta = f"{M.encabezado_menu(menu)}\n¿Qué querés hacer?"
     resumen = f"{encabezado}\n\n{pregunta}" if encabezado else pregunta
 
     p = P.registrar(cur, quien, herramienta=P.SENTINEL_MENU_TAREA,
@@ -1355,7 +1362,11 @@ def _pedir_eleccion_dependencia(cur, quien, workspace_id: str, chat_id: int, *,
     from . import pendientes as P
     from .agente import VIGENCIA_PENDIENTE
 
-    opciones = [(truncar_etiqueta_boton(t), tid) for tid, t in candidatas]
+    # Etiquetas cortas y distinguibles entre sí (hallazgo de sesión 2 por
+    # Telegram): las candidatas de dependencia son títulos de tarea como
+    # cualquier otro botón server-armado.
+    etiquetas = etiquetas_boton_distinguibles([t for _, t in candidatas])
+    opciones = [(etiqueta, tid) for (tid, _), etiqueta in zip(candidatas, etiquetas)]
     p = P.registrar(cur, quien, herramienta=P.SENTINEL_DATO_MENU_TAREA,
                     args={"accion": accion, "tarea_id": tarea_id, "titulo": titulo},
                     resumen=pregunta, vence_en=ahora + VIGENCIA_PENDIENTE,
@@ -1728,17 +1739,17 @@ def _resolver_referencias_del_turno(cur, quien, texto: str, route,
         titulos_resueltas=titulos_resueltas, pendientes_boton=pendientes_boton)
 
 
-def _etiqueta_boton(titulo: str, responsable: str, *, ajena: bool) -> str:
-    """El texto de un botón de aclaración (T4, decisión 2): el título, y el
-    primer nombre del responsable agregado con " — " sólo cuando la tarea es
-    de otra persona (§5.10: "quién escribe" aporta ahí, no como pista para
-    Jev). El título se trunca antes de agregar el sufijo -- el sufijo nunca
-    se recorta."""
-    corto = truncar_etiqueta_boton(titulo)
+def _etiqueta_boton(titulo_corto: str, responsable: str, *, ajena: bool) -> str:
+    """El texto de un botón de aclaración (T4, decisión 2): el título YA
+    acortado -- las colisiones del conjunto entero ya se resolvieron en
+    `_candidatas_para_botones` con `salida.etiquetas_boton_distinguibles`,
+    antes de llegar acá -- y el primer nombre del responsable agregado con
+    " — " sólo cuando la tarea es de otra persona (§5.10: "quién escribe"
+    aporta ahí, no como pista para Jev). El sufijo nunca se recorta."""
     if not ajena or not responsable:
-        return corto
+        return titulo_corto
     primer_nombre = responsable.split()[0]
-    return f"{corto} — {primer_nombre}"
+    return f"{titulo_corto} — {primer_nombre}"
 
 
 def _candidatas_para_botones(tareas_por_id: dict, resolucion, membership_id: str | None
@@ -1748,15 +1759,27 @@ def _candidatas_para_botones(tareas_por_id: dict, resolucion, membership_id: str
     el resto -- dentro de cada grupo, en el orden que mandó Jev
     (`resolucion.candidatas` ya viene ordenada por probabilidad). Una
     candidata que Jev haya devuelto fuera de las tareas leídas no rompe,
-    igual que en `jev.resolver_referencia_tarea`: se descarta."""
-    propias, ajenas = [], []
+    igual que en `jev.resolver_referencia_tarea`: se descarta.
+
+    Los títulos se acortan y desambiguan como UN SOLO conjunto (hallazgo de
+    sesión 2 por Telegram: dos candidatas con títulos parecidos no pueden
+    cortar igual), antes de repartirlas entre propias y ajenas -- el sufijo
+    con el nombre del responsable se agrega recién después, en
+    `_etiqueta_boton`, sobre el título ya corto."""
+    entradas = []
     for cid in resolucion.candidatas:
         tarea = tareas_por_id.get(cid)
         if tarea is None:
             continue
         es_propia = (membership_id is not None
                     and tarea.responsable_membership_id == membership_id)
-        etiqueta = _etiqueta_boton(tarea.titulo, tarea.responsable, ajena=not es_propia)
+        entradas.append((es_propia, tarea))
+
+    cortos = etiquetas_boton_distinguibles([tarea.titulo for _, tarea in entradas])
+
+    propias, ajenas = [], []
+    for (es_propia, tarea), corto in zip(entradas, cortos):
+        etiqueta = _etiqueta_boton(corto, tarea.responsable, ajena=not es_propia)
         item = {"id": tarea.id, "etiqueta": etiqueta, "titulo": tarea.titulo}
         (propias if es_propia else ajenas).append(item)
     return propias + ajenas

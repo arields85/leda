@@ -31,6 +31,7 @@ from prisma.db import admin, espacio
 from prisma.jev import ClienteJevGuionado
 from prisma.llm import (IntentAction, IntentRoute, Llamada, ProveedorGuionado,
                         Respuesta)
+from prisma.salida import acortar_etiqueta_boton
 
 
 def _quien(cur, nombre, ws):
@@ -175,6 +176,14 @@ def test_turno_pasa_quien_escribe_a_jev(corework, conn, monkeypatch, con_credenc
 
 def test_botones_propia_primero_ajena_con_nombre_y_titulo_truncado(
         corework, conn, monkeypatch, con_credencial):
+    """Adaptación deliberada (hallazgo 2, sesión 2 por Telegram): el título
+    largo ya no se corta a mitad de palabra en `gateway.TRUNCAR_TITULO_BOTON`
+    (48, el corte duro histórico) -- se corta en un límite de PALABRA, a un
+    objetivo bastante más chico (`salida.acortar_etiqueta_boton`,
+    `OBJETIVO_ETIQUETA_BOTON`), para que entre cómodo en un botón de
+    teléfono. El corte duro de 48 sigue existiendo como último recurso
+    (cuando ni una palabra entera entra en el objetivo, o para desambiguar
+    dos títulos que colisionan)."""
     ws = corework.workspace_id
     titulo_largo = "Actualizar toda la documentación técnica del área completa"
     assert len(titulo_largo) > gateway.TRUNCAR_TITULO_BOTON
@@ -203,7 +212,8 @@ def test_botones_propia_primero_ajena_con_nombre_y_titulo_truncado(
     etiquetas = [f["etiqueta"] for f in filas]
     valores = [f["valor"] for f in filas]
 
-    corto = titulo_largo[:gateway.TRUNCAR_TITULO_BOTON - 1] + "…"
+    corto = acortar_etiqueta_boton(titulo_largo)
+    assert corto == "Actualizar toda la…"        # límite de palabra, no de carácter
     assert etiquetas == ["Programar PLC", "Cablear tablero máq. 3 — Mariano",
                         f"{corto} — Mariano", "Ninguna, lo escribo"]
     assert valores[0] == propia

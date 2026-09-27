@@ -26,7 +26,8 @@ from psycopg.types.json import Jsonb
 
 from .autoridad import (Denegado, Solicitante, puede_aprobar_tarea,
                          requiere_confirmacion, verificar)
-from .salida import (enqueue_outbox, normalize_visible_text,
+from .salida import (OBJETIVO_ETIQUETA_BOTON, enqueue_outbox,
+                     etiquetas_boton_distinguibles, normalize_visible_text,
                      telegram_utf16_units, truncar_etiqueta_boton)
 
 
@@ -321,7 +322,12 @@ def _ofrecer_opciones(cur, quien: Solicitante, pregunta, opciones):
     titulos = (_tareas_activas_por_id(cur, quien.workspace_id, tarea_ids)
               if tarea_ids else {})
 
-    armadas: list[OpcionOfrecida] = []
+    # Primera pasada: valida cada opción tal como antes (nada cambia acá) y
+    # junta lo necesario para armar la etiqueta -- eso se resuelve en la
+    # segunda pasada, como CONJUNTO, después de que todas las opciones de
+    # tarea pasaron su validación (hallazgo de sesión 2 por Telegram:
+    # etiquetas cortas y sin ambigüedad, `salida.etiquetas_boton_distinguibles`).
+    validadas: list[dict] = []
     for o in opciones:
         if not isinstance(o, dict):
             raise Denegado(
@@ -345,22 +351,59 @@ def _ofrecer_opciones(cur, quien: Solicitante, pregunta, opciones):
                 raise Denegado(
                     "El campo 'accion' de una opción de tarea sólo puede "
                     f"ser 'responder' o 'menu' (llegó: {accion!r}).")
-            etiqueta = truncar_etiqueta_boton(
-                normalize_visible_text(o.get("etiqueta") or titulo))
-            if not etiqueta:
-                raise Denegado("La etiqueta de una opción no puede quedar vacía.")
-            armadas.append(OpcionOfrecida(
-                etiqueta=etiqueta,
-                valor={"tipo": "tarea", "tarea_id": tarea_id_normalizado,
-                      "titulo": titulo, "etiqueta": etiqueta, "accion": accion}))
+            etiqueta_modelo = normalize_visible_text(o.get("etiqueta") or "")
+            validadas.append({
+                "tipo": "tarea", "tarea_id": tarea_id_normalizado,
+                "titulo": titulo, "accion": accion,
+                "etiqueta_modelo": etiqueta_modelo})
         elif texto:
-            texto = truncar_etiqueta_boton(normalize_visible_text(texto))
-            if not texto:
+            # Texto libre: la etiqueta la eligió el modelo -- se deja tal
+            # cual (T1: "cuando el modelo elige su propia etiqueta, está
+            # bien"), sólo con el corte duro de siempre como red de
+            # seguridad.
+            texto_final = truncar_etiqueta_boton(normalize_visible_text(texto))
+            if not texto_final:
                 raise Denegado("Una opción de texto no puede quedar vacía.")
-            armadas.append(OpcionOfrecida(
-                etiqueta=texto, valor={"tipo": "texto", "texto": texto}))
+            validadas.append({"tipo": "texto", "texto": texto_final})
         else:
             raise Denegado("Cada opción necesita 'texto' o 'tarea_id'.")
+
+    # Segunda pasada: etiqueta de cada opción de tarea. Si el modelo ya dio
+    # una etiqueta corta (<= `OBJETIVO_ETIQUETA_BOTON`), se respeta tal cual
+    # -- es su elección, y ya es corta -- y sólo cuenta como obstáculo fijo
+    # para las demás. Si no dio etiqueta, o la que dio es más larga que el
+    # objetivo, se acorta a partir de esa base (el título, o su propia
+    # etiqueta larga) y se desambigua contra el resto del conjunto.
+    indices_tarea = [i for i, v in enumerate(validadas) if v["tipo"] == "tarea"]
+    if indices_tarea:
+        bases = []
+        fijas = []
+        for i in indices_tarea:
+            v = validadas[i]
+            et = v["etiqueta_modelo"]
+            if et and len(et) <= OBJETIVO_ETIQUETA_BOTON:
+                bases.append(et)
+                fijas.append(True)
+            else:
+                bases.append(et or v["titulo"])
+                fijas.append(False)
+        etiquetas = etiquetas_boton_distinguibles(bases, fijas=fijas)
+        for i, etiqueta in zip(indices_tarea, etiquetas):
+            if not etiqueta:
+                raise Denegado("La etiqueta de una opción no puede quedar vacía.")
+            validadas[i]["etiqueta"] = etiqueta
+
+    armadas: list[OpcionOfrecida] = []
+    for v in validadas:
+        if v["tipo"] == "tarea":
+            armadas.append(OpcionOfrecida(
+                etiqueta=v["etiqueta"],
+                valor={"tipo": "tarea", "tarea_id": v["tarea_id"],
+                      "titulo": v["titulo"], "etiqueta": v["etiqueta"],
+                      "accion": v["accion"]}))
+        else:
+            armadas.append(OpcionOfrecida(
+                etiqueta=v["texto"], valor={"tipo": "texto", "texto": v["texto"]}))
 
     raise NecesitaOpciones(pregunta, armadas)
 

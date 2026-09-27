@@ -36,9 +36,10 @@ from .contexto import construir, historial, revisar_salida
 from .db import registrar_auditoria
 from .deteccion_pregunta import hace_pregunta
 from .llm import Llamada, Proveedor, Respuesta
-from .salida import (BUTTON_TEXT_LIMIT, enqueue_outbox, normalize_visible_text,
+from .salida import (BUTTON_TEXT_LIMIT, enqueue_outbox,
+                     etiquetas_boton_distinguibles, normalize_visible_text,
                      prepare_payload, telegram_utf16_units,
-                     truncar_etiqueta_boton, with_no_effect_status)
+                     with_no_effect_status)
 
 MAX_VUELTAS = 5
 
@@ -582,11 +583,18 @@ def _opciones_lista_tareas(tareas: list[dict]) -> list[tuple[str, dict]]:
     siguiente sin llamar al modelo."""
     primera = tareas[:H.MAX_OPCIONES_MODELO]
     resto = tareas[H.MAX_OPCIONES_MODELO:]
+    # Etiquetas cortas por límite de palabra, distinguibles entre sí dentro
+    # de esta página (hallazgo de sesión 2 por Telegram: un título completo
+    # recortado a mitad de palabra no entra cómodo en un botón de teléfono;
+    # `salida.etiquetas_boton_distinguibles` corre sobre TODA la página para
+    # que dos títulos parecidos nunca corten igual).
+    etiquetas = etiquetas_boton_distinguibles(
+        [normalize_visible_text(t["titulo"]) for t in primera])
     opciones = [
-        (truncar_etiqueta_boton(normalize_visible_text(t["titulo"])),
+        (etiqueta,
          {"tipo": "tarea", "tarea_id": str(t["id"]), "titulo": t["titulo"],
           "accion": "menu"})
-        for t in primera]
+        for t, etiqueta in zip(primera, etiquetas)]
     if resto:
         opciones.append((P.ETIQUETA_VER_MAS,
                          {"tipo": "ver_mas",

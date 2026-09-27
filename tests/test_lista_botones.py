@@ -186,6 +186,43 @@ def test_lista_de_hasta_cuatro_tareas_arma_botones_y_tocar_una_abre_el_menu(
 
 
 # ---------------------------------------------------------------------------
+# Etiquetas cortas y distinguibles (hallazgo 2, sesión 2 por Telegram): dos
+# títulos parecidos, largos, no pueden cortar igual en la misma página de
+# botones.
+# ---------------------------------------------------------------------------
+
+def test_titulos_parecidos_y_largos_producen_etiquetas_distintas(
+        cliente, conn, corework, monkeypatch):
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        id_3 = _tarea(cur, ws, titulo="Revisar tablero de la máquina 3")
+        id_4 = _tarea(cur, ws, titulo="Revisar tablero de la máquina 4")
+    conn.commit()
+
+    guion = [Respuesta(llamadas=[Llamada("c1", "consultar_tareas", {})]),
+            Respuesta(texto="Tenés 2 tareas abiertas.")]
+    proveedor = _con_proveedor(monkeypatch, guion)
+
+    with espacio(conn, ws) as cur:
+        quien = _quien(cur, "Marcos Tarquini", ws)
+        cal = Calendario.desde_base(cur, ws)
+        responder(cur, quien, "qué tengo pendiente", proveedor, cal, chat_id=1,
+                 ahora=datetime.now(timezone.utc))
+        pid = _pendiente(cur, ws, P.SENTINEL_OPCIONES_MODELO)
+        filas = _opciones(cur, pid)
+
+    etiquetas = [f["etiqueta"] for f in filas
+                if f["etiqueta"] != P.ETIQUETA_SALIR_OPCIONES]
+    assert len(etiquetas) == len(set(etiquetas)), \
+        f"etiquetas ambiguas en el mismo juego de botones: {etiquetas}"
+    # Cortas: por límite de palabra, no el título entero mid-word.
+    assert all(len(e) <= 48 for e in etiquetas)
+    tarea_3 = next(f for f in filas if f["valor"].get("tarea_id") == id_3)
+    tarea_4 = next(f for f in filas if f["valor"].get("tarea_id") == id_4)
+    assert tarea_3["etiqueta"] != tarea_4["etiqueta"]
+
+
+# ---------------------------------------------------------------------------
 # Más de cuatro tareas: 4 + "Ver más" + salida; "Ver más" pagina sin modelo
 # ---------------------------------------------------------------------------
 
