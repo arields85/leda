@@ -3091,3 +3091,15 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   tests/test_task_intake.py tests/test_menu_tarea.py` -> `141 passed` (incluye el
   ensayo migración/rollback, que descubre `0013` solo). Suite completa (escritor):
   `.venv/Scripts/python.exe -m pytest -q` -> `930 passed, 108 deselected`.
+  Commit `f6c282a`. RDD: `review assess --base-ref e8dbc24 --committed-only` ->
+  medio, `review_due` (`slice_budget_reached`); consentimiento del usuario: revisar.
+  Revisión review-3cf89bef5f7c1c09 (una lente, confiabilidad) aprobada y reconocida
+  (autoridad quemada); frontera de revisión en `f6c282a`. Hallazgo no bloqueante
+  (WARNING, inferencial): `approval.at` es `now()`, la hora de inicio de la
+  transacción; un "Pedir cambios" que empieza antes y confirma después de un
+  "Aprobar" concurrente del mismo aprobador quedaría con `at` anterior y la
+  aprobación seguiría contando. La mitad del hallazgo sobre `at` nulo no aplica:
+  la columna es `not null` (`db/esquema.sql`, `create table approval`). Seguimiento
+  **PENDIENTE**: serializar las decisiones sobre una misma tarea (bloqueo de la fila
+  de `task` en `aprobar_tarea`/`pedir_cambios_tarea`) o volver a leer el estado
+  dentro del mismo acto.
