@@ -3349,3 +3349,22 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   Chequeos que valen para un validador diario: evidencia faltante en revisión,
   gate de arranque por hora, `workspace_id` cruzado (hoy sin constraint en esas
   tablas), proyección del estado, personas sin respuesta.
+
+- 2026-09-27: **Experimento 3 — opinión sombra Jev contra el modelo en el banco real.**
+  Sin tocar el repositorio (plugin de medición en el scratchpad, cargado con `-p`).
+  Comando: `pytest -m modelo_real tests/banco -p exp3_instrumentacion --banco-n 1
+  --banco-proveedor nan --banco-modelo deepseek-v4-flash -k "<14 escenarios con
+  referencias>"` -> `12 passed, 2 failed` (163 s); veredictos: aprobado 10,
+  no_concluyente 2 (`b-0002`, `b-0003`), falla 2 (`b-0005-b`, `b-0013`).
+  Resultado: **cero desacuerdos**; el modelo nunca actuó sobre una tarea distinta de
+  la que Jev resolvió clara. No es una señal independiente: la resolución clara de
+  Jev entra al turno como instrucción ("Usá esa tarea; no la vuelvas a resolver",
+  `gateway.py`), así que un desacuerdo mediría desobediencia, no una segunda
+  opinión. La idea, en su forma original, no se adopta. Hallazgos laterales del
+  banco: (1) `b-0013` falla porque el comprobador compara la etiqueta del botón
+  entera y ahora las etiquetas se acortan con "…" (efecto de `e7071eb`/`2bee9a9`
+  sobre el comprobador, no sobre Prisma); (2) `b-0002`/`b-0003` quedan no
+  concluyentes porque el comprobador de nombres toma "Bloqueada Todavía" y
+  "Asignada Todavía" como nombres propios (falso positivo); (3) `b-0005-b`, ya
+  conocido. `audit_log` ya guarda la resolución de Jev y cada llamada del modelo,
+  pero sin una clave de turno que las una.
