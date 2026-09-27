@@ -123,6 +123,13 @@ gestión.
     quien la revisa.
     Sumar pruebas: previo nulo -> `asignada`; rama `en_revision` de
     `_preparar_actualizar_estado` sin confirmar.
+  - [ ] **T6j — La hora de escritura como regla del esquema** (review-5085907d).
+    Sólo los cuatro actos bloqueados fijan `at = clock_timestamp()`; el resto de
+    quienes escriben `task_state_event`, `evidence` y `approval` (transiciones del
+    sistema, cargas administrativas) sigue con `now()`. Cambiar el `default` de
+    esas columnas a `clock_timestamp()` en una migración para que el orden por `at`
+    valga para todos, y reforzar la prueba de T6h: la `pending_action` que queda
+    tiene que estar `esperando` y ser la del único mensaje.
   - [x] **T6i — Evidencia nueva en revisión reemplaza el aviso del aprobador.**
     Decisión del usuario (2026-09-27): cuando llega evidencia nueva a una tarea
     `en_revision` (entrega repetida o "Adjuntar evidencia") de alguien que no es el
@@ -3392,3 +3399,9 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   (reejecutada por el orquestador): `tests/test_entrega_con_evidencia.py
   tests/test_aprobacion_cierra_tarea.py tests/test_pedir_cambios_extremo_a_extremo.py`
   -> `58 passed`. Suite completa (escritor): `966 passed, 108 deselected`.
+  Commit `48b6c8a`. RDD sobre `d6c08ac..48b6c8a`: medio, `review_due`
+  (`slice_budget_reached`, 1091 líneas con la documentación de los experimentos);
+  consentimiento del usuario: revisar. review-5085907da1b3a798 (confiabilidad)
+  aprobada y reconocida; frontera en `48b6c8a`. Un WARNING (prueba de botones
+  huérfanos sin chequear el estado de la acción que queda) y una sugerencia (relojes
+  mezclados entre escritores) -> T6j.
