@@ -312,6 +312,23 @@ Un worktree nuevo no trae lo que no se versiona.
     como `acceso_tablero`), `aviso_administrativo`. Seguimiento para G1d:
     hoy `prisma_app` tiene `update` directo sobre `aviso_administrativo`;
     marcar leído/resuelto debe quedar sólo para el canal de administración.
+    Revisión RDD `review-d95ced9967467a93` (riesgo medio, consentida por el
+    usuario, lente de confiabilidad): un hallazgo CRITICAL
+    (`completar_verificacion_correo` escribía el contacto antes de validar el
+    estado) corregido en `7a21374` con prueba nueva (RED observado → GREEN;
+    suite completa `993 passed, 108 deselected`); validación dirigida
+    aprobada; reconocimiento emitido (autoridad consumida).
+  - [ ] **G1a2 — Endurecimiento tras la revisión** (hallazgos no bloqueantes
+    de la misma revisión): `emitir_verificacion_correo` bloquea la
+    proyección y exige `awaiting_email` o `pending_email_verification`
+    (límites 3/h y 5/ciclo sin carrera; la carrera sobre el índice único
+    devuelve un motivo tipado, no una excepción); `completar` fija el espacio
+    del token antes de tocar tablas con RLS; pruebas de los caminos de falla
+    de `completar` (`verification_state_changed`, `email_in_use` tras la
+    reserva, `verification_token_busy` sin reserva o vencida) verificando que
+    no queda contacto y que la reserva se libera; `habilitado()` filtra por
+    el espacio; `prisma_app` sin `update` directo sobre
+    `aviso_administrativo` si G1d no lo necesita.
   - [ ] **G1b — Recorrido del alta con correo.** `alta_correo.py` con puerto
     de envío (`Protocol`) y doble de prueba; sin emisor configurado con la
     clave encendida → incidente + aviso neutral, nunca "enviado".
