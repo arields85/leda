@@ -67,6 +67,10 @@ SENTINEL_OPCIONES_MODELO = "_opciones_modelo"
 # `reclamar_modificacion_abierta`, sin botones).
 SENTINEL_MENU_TAREA = "_menu_tarea"
 SENTINEL_DATO_MENU_TAREA = "_dato_menu_tarea"
+# Marca en `args` del aviso de entrega al aprobador (ADR 0009), que comparte
+# `SENTINEL_MENU_TAREA` con el menú general de la tarea: es lo que permite
+# retirarlo sin tocar ese menú (`retirar_avisos_de_entrega`).
+AVISO_ENTREGA = "entrega"
 
 # La salida que ofrece siempre una elección con botones (T1, ADR 0007 punto
 # 1: "siempre hay una salida"). Vive acá, no repetida en cada lugar que la
@@ -350,6 +354,51 @@ def marcar_para_corregir(cur: psycopg.Cursor, quien: Solicitante,
               and modificacion_consumida_en is null and id <> %s""",
         (ahora, quien.workspace_id, quien.membership_id, chat_id,
          pending_action_id))
+
+
+def retirar_avisos_de_entrega(cur: psycopg.Cursor, workspace_id: str, tarea_id: str,
+                              aprobador_membership_id: str,
+                              ahora: datetime) -> list[str]:
+    """T6i (`odd/tasks/prisma-orienta.md`; ADR 0009, enmienda 2026-09-27):
+    vence cualquier aviso de entrega que el aprobador todavía tenga
+    `esperando` sobre esta tarea -- lo llama `herramientas` cuando evidencia
+    nueva reemplaza uno vigente. Mismo criterio que
+    `despachador._preview_vigente` para una vista previa superada (queda
+    'vencida', no 'resuelta' ni 'cancelada': nadie decidió nada, la vista
+    previa dejó de ser la que corresponde mostrar) y mismo patrón de dos
+    pasos que `ingreso_tareas._cancel` (la fila y, después, sus opciones).
+
+    Nunca toca el menú general de la tarea (`_encolar_menu_tarea`), aunque
+    use el mismo `herramienta=SENTINEL_MENU_TAREA` con el mismo
+    `tarea_id` en `args`: sólo el aviso de entrega lleva
+    `args.aviso = AVISO_ENTREGA` (lo pone `herramientas._notificar_entrega_
+    al_aprobador`), y el filtro es por esa marca, no por las etiquetas de
+    los botones. Alcance estricto por `workspace_id` + `membership_id` (el
+    aprobador) + `tarea_id`: nunca una acción pendiente de otra persona ni
+    de otra tarea.
+
+    Devuelve los ids retirados (vacío si no había ninguno esperando, el caso
+    normal fuera de este escenario)."""
+    cur.execute(
+        """update pending_action p
+              set estado = 'vencida', resuelta_en = %(ahora)s
+            where p.workspace_id = %(ws)s
+              and p.membership_id = %(mid)s
+              and p.herramienta = %(herramienta)s
+              and p.estado = 'esperando'
+              and p.args ->> 'tarea_id' = %(tarea_id)s
+              and p.args ->> 'aviso' = %(aviso)s
+            returning p.id""",
+        {"ahora": ahora, "ws": workspace_id, "mid": aprobador_membership_id,
+         "herramienta": SENTINEL_MENU_TAREA, "tarea_id": str(tarea_id),
+         "aviso": AVISO_ENTREGA})
+    ids = [str(f["id"]) for f in cur.fetchall()]
+    if ids:
+        cur.execute(
+            "update pending_action_option set activa = false "
+            "where pending_action_id = any(%s::uuid[])",
+            (ids,))
+    return ids
 
 
 def es_borrador(cur: psycopg.Cursor, token: str) -> bool:

@@ -430,3 +430,64 @@ def test_pedir_cambios_con_dependencia_bloqueante_sigue_por_telegram(
         # el `psycopg.errors.RaiseException` que el disparador de `0008`
         # devolvía antes de la corrección.
         assert cur.fetchone()["estado"] == "en_curso"
+
+
+# ---------------------------------------------------------------------------
+# T6i (`odd/tasks/prisma-orienta.md`; ADR 0009, enmienda 2026-09-27):
+# evidencia nueva sobre una tarea en_revision, de alguien que no es el
+# aprobador, retira el aviso de entrega que tiene esperando y manda uno
+# nuevo con toda la evidencia -- acá por "Adjuntar evidencia", de punta a
+# punta por el webhook (la entrega repetida y el caso del propio aprobador
+# ya tienen cobertura a nivel de `herramientas.ejecutar`, en
+# `tests/test_entrega_con_evidencia.py`).
+# ---------------------------------------------------------------------------
+
+def test_adjuntar_evidencia_en_revision_retira_el_aviso_del_aprobador_por_telegram(
+        cliente, conn, corework, monkeypatch):
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        tid = _tarea(cur, ws)
+        tg_nahuel = _tg(cur, "Nahuel Gimenez")
+        tg_marcos = _tg(cur, "Marcos Tarquini")
+    conn.commit()
+
+    filas = _abrir_menu(cliente, conn, ws, monkeypatch, tid, "Nahuel Gimenez", tg_nahuel)
+    _tocar_etiqueta(cliente, filas, "Ya la terminé", tg_nahuel)
+    assert _mensaje(cliente, tg_nahuel, "Primera entrega.").status_code == 200
+    assert _confirmar(cliente, conn, ws, "actualizar_estado", tg_nahuel,
+                      tg_nahuel).status_code == 200
+
+    with admin(conn) as cur:
+        pid_aviso_1 = _pendiente(cur, ws, P.SENTINEL_MENU_TAREA, chat_id=tg_marcos)
+        token_aprobar_1 = next(f["token"] for f in _opciones(cur, pid_aviso_1)
+                               if f["etiqueta"] == "Aprobar")
+
+    # Antes de que Marcos toque nada, Nahuel manda evidencia nueva por
+    # "Adjuntar evidencia" -- no una entrega repetida.
+    filas = _abrir_menu(cliente, conn, ws, monkeypatch, tid, "Nahuel Gimenez", tg_nahuel)
+    _tocar_etiqueta(cliente, filas, "Adjuntar evidencia", tg_nahuel)
+    assert _mensaje(cliente, tg_nahuel,
+                    "Segunda evidencia, por si falta.").status_code == 200
+    assert _confirmar(cliente, conn, ws, "adjuntar_evidencia", tg_nahuel,
+                      tg_nahuel).status_code == 200
+
+    with admin(conn) as cur:
+        cur.execute("select estado from pending_action where id = %s", (pid_aviso_1,))
+        assert cur.fetchone()["estado"] != "esperando"      # retirado, no esperando más
+
+        pid_aviso_2 = _pendiente(cur, ws, P.SENTINEL_MENU_TAREA, chat_id=tg_marcos)
+        assert pid_aviso_2 != pid_aviso_1                   # T6i: otro aviso
+        cuerpo_aviso_2 = _outbox_ultimo(cur, ws, tg_marcos)
+    assert "Primera entrega." in cuerpo_aviso_2
+    assert "Segunda evidencia, por si falta." in cuerpo_aviso_2
+
+    # El "Aprobar" del aviso viejo ya no vale: mismo criterio que el
+    # "Aprobar" viejo tras "Pedir cambios" (arriba, seguimiento de
+    # review-8b7dde28) -- nunca aplica nada.
+    assert _tocar(cliente, token_aprobar_1, tg_marcos).status_code == 200
+    with admin(conn) as cur:
+        assert "ya no está vigente" in _outbox_ultimo(cur, ws, tg_marcos).lower()
+        cur.execute("select estado from task where id = %s", (tid,))
+        assert cur.fetchone()["estado"] == "en_revision"    # nunca se aprobó
+        cur.execute("select count(*) n from approval where sujeto_id = %s", (tid,))
+        assert cur.fetchone()["n"] == 0

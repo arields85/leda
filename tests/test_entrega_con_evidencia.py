@@ -1408,3 +1408,236 @@ def test_evidencia_pendiente_empate_de_at_en_la_misma_transaccion_falla_cerrado(
 
         cur.execute("select evidencia_pendiente(%s) as f", (tid,))
         assert cur.fetchone()["f"] is True
+
+
+# ---------------------------------------------------------------------------
+# 10. Evidencia nueva en revisión reemplaza el aviso del aprobador (T6i,
+#     `odd/tasks/prisma-orienta.md`; ADR 0009, enmienda 2026-09-27).
+#     Decisión del usuario: cuando llega evidencia nueva a una tarea que ya
+#     está `en_revision` -- entrega repetida (T6g) o "Adjuntar evidencia" --
+#     de alguien que no es el aprobador, el aviso que el aprobador tiene
+#     esperando queda retirado y sale uno nuevo con toda la evidencia
+#     vigente. Si la manda el propio aprobador, no hay a quién avisar de
+#     nuevo -- el aviso que esperaba sigue como estaba.
+# ---------------------------------------------------------------------------
+
+def _id_aviso_entrega_esperando(cur, ws, tg_aprobador) -> str:
+    cur.execute(
+        """select pa.id from pending_action pa
+            where pa.workspace_id = %s and pa.chat_id = %s and pa.estado = 'esperando'
+              and exists (
+                    select 1 from pending_action_option po
+                     where po.pending_action_id = pa.id and po.etiqueta = 'Aprobar')
+           order by pa.creado_en desc limit 1""",
+        (ws, tg_aprobador))
+    fila = cur.fetchone()
+    assert fila is not None, "no hay aviso de entrega esperando"
+    return str(fila["id"])
+
+
+def test_adjuntar_evidencia_en_revision_retira_el_aviso_viejo_y_manda_uno_nuevo(
+        corework, conn):
+    """Responsable manda evidencia con "Adjuntar evidencia" sobre una tarea
+    ya en_revision: el aviso que Marcos tiene esperando queda retirado --
+    tocar su "Aprobar" ya no está vigente y no aplica nada -- y sale uno
+    nuevo con las dos evidencias y una clave de dedupe distinta."""
+    from prisma import pendientes as P
+
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        tid = _tarea(cur, ws, estado="en_curso")
+    conn.commit()
+
+    with espacio(conn, ws) as cur:
+        nahuel = _quien(cur, "Nahuel Gimenez", ws)
+        H.ejecutar(
+            cur, nahuel, "actualizar_estado",
+            {"tarea_id": tid, "estado": "en_revision",
+             "evidencia_texto": "Primera evidencia."},
+            ya_confirmada=True)
+    conn.commit()
+
+    with admin(conn) as cur:
+        tg_marcos = _tg(cur, "Marcos Tarquini")
+        pid_viejo = _id_aviso_entrega_esperando(cur, ws, tg_marcos)
+        token_viejo = next(
+            f.token for f in P.opciones(cur, pid_viejo) if f.etiqueta == "Aprobar")
+        cur.execute(
+            "select dedupe_key from message_outbox where pending_action_id = %s",
+            (pid_viejo,))
+        dedupe_viejo = cur.fetchone()["dedupe_key"]
+
+    with espacio(conn, ws) as cur:
+        nahuel = _quien(cur, "Nahuel Gimenez", ws)
+        resultado = H.ejecutar(
+            cur, nahuel, "adjuntar_evidencia",
+            {"tarea_id": tid, "tipo": "texto",
+             "uri": "Segunda evidencia, por adjuntar."},
+            ya_confirmada=True)
+    assert "evidencia_id" in resultado
+
+    with admin(conn) as cur:
+        cur.execute("select estado from pending_action where id = %s", (pid_viejo,))
+        assert cur.fetchone()["estado"] != "esperando"
+
+        pid_nuevo = _id_aviso_entrega_esperando(cur, ws, tg_marcos)
+        assert pid_nuevo != pid_viejo
+
+        cuerpo_nuevo = _outbox_ultimo(cur, ws, tg_marcos)
+        assert "Primera evidencia." in cuerpo_nuevo
+        assert "Segunda evidencia, por adjuntar." in cuerpo_nuevo
+
+        cur.execute(
+            "select dedupe_key from message_outbox where pending_action_id = %s",
+            (pid_nuevo,))
+        dedupe_nuevo = cur.fetchone()["dedupe_key"]
+        assert dedupe_nuevo != dedupe_viejo
+
+    with espacio(conn, ws) as cur:
+        marcos = _quien(cur, "Marcos Tarquini", ws)
+        resuelta = P.resolver(cur, token_viejo, app_user_id=marcos.app_user_id,
+                              ahora=datetime.now(timezone.utc))
+    assert resuelta is None       # "ya no está vigente" (gateway._toque)
+
+    with admin(conn) as cur:
+        cur.execute("select estado from task where id = %s", (tid,))
+        assert cur.fetchone()["estado"] == "en_revision"     # nunca se aprobó
+        cur.execute("select count(*) n from approval where sujeto_id = %s", (tid,))
+        assert cur.fetchone()["n"] == 0
+
+
+def test_entrega_repetida_en_revision_retira_el_aviso_viejo_y_manda_uno_nuevo(
+        corework, conn):
+    """Mismo caso, por el camino de "ya la terminé" repetido sobre una tarea
+    que ya está en_revision (T6g): sigue sin registrar un segundo evento de
+    estado, pero ahora también retira el aviso viejo y notifica de nuevo."""
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        tid = _tarea(cur, ws, estado="en_curso")
+    conn.commit()
+
+    with espacio(conn, ws) as cur:
+        nahuel = _quien(cur, "Nahuel Gimenez", ws)
+        H.ejecutar(
+            cur, nahuel, "actualizar_estado",
+            {"tarea_id": tid, "estado": "en_revision",
+             "evidencia_texto": "Primera entrega."},
+            ya_confirmada=True)
+    conn.commit()
+
+    with admin(conn) as cur:
+        tg_marcos = _tg(cur, "Marcos Tarquini")
+        pid_viejo = _id_aviso_entrega_esperando(cur, ws, tg_marcos)
+        cur.execute("select count(*) n from task_state_event where task_id = %s", (tid,))
+        eventos_antes = cur.fetchone()["n"]
+
+    with espacio(conn, ws) as cur:
+        nahuel = _quien(cur, "Nahuel Gimenez", ws)
+        resultado = H.ejecutar(
+            cur, nahuel, "actualizar_estado",
+            {"tarea_id": tid, "estado": "en_revision",
+             "evidencia_texto": "Entrega repetida, con más detalle."},
+            ya_confirmada=True)
+    assert "evidencia_id" in resultado
+
+    with admin(conn) as cur:
+        cur.execute("select count(*) n from task_state_event where task_id = %s", (tid,))
+        assert cur.fetchone()["n"] == eventos_antes           # T6g: ningún evento nuevo
+
+        cur.execute("select estado from pending_action where id = %s", (pid_viejo,))
+        assert cur.fetchone()["estado"] != "esperando"
+
+        pid_nuevo = _id_aviso_entrega_esperando(cur, ws, tg_marcos)
+        assert pid_nuevo != pid_viejo
+
+        cuerpo_nuevo = _outbox_ultimo(cur, ws, tg_marcos)
+        assert "Primera entrega." in cuerpo_nuevo
+        assert "Entrega repetida, con más detalle." in cuerpo_nuevo
+
+
+def test_aprobador_adjunta_su_propia_evidencia_no_reemplaza_el_aviso(corework, conn):
+    """Si quien manda la evidencia nueva es el propio aprobador, no hay a
+    quién avisar de nuevo -- ya lo sabe -- y el aviso que esperaba sigue
+    como estaba, sin ningún aviso adicional."""
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        tid = _tarea(cur, ws, estado="en_curso")
+    conn.commit()
+
+    with espacio(conn, ws) as cur:
+        nahuel = _quien(cur, "Nahuel Gimenez", ws)
+        H.ejecutar(
+            cur, nahuel, "actualizar_estado",
+            {"tarea_id": tid, "estado": "en_revision",
+             "evidencia_texto": "Primera evidencia."},
+            ya_confirmada=True)
+    conn.commit()
+
+    with admin(conn) as cur:
+        tg_marcos = _tg(cur, "Marcos Tarquini")
+        pid_viejo = _id_aviso_entrega_esperando(cur, ws, tg_marcos)
+        cur.execute(
+            "select count(*) n from message_outbox where workspace_id = %s and chat_id = %s",
+            (ws, tg_marcos))
+        avisos_antes = cur.fetchone()["n"]
+
+    with espacio(conn, ws) as cur:
+        marcos = _quien(cur, "Marcos Tarquini", ws)
+        resultado = H.ejecutar(
+            cur, marcos, "adjuntar_evidencia",
+            {"tarea_id": tid, "tipo": "texto",
+             "uri": "Lo reviso y agrego mi propia nota."},
+            ya_confirmada=True)
+    assert "evidencia_id" in resultado
+
+    with admin(conn) as cur:
+        cur.execute("select estado from pending_action where id = %s", (pid_viejo,))
+        assert cur.fetchone()["estado"] == "esperando"        # sigue como estaba
+
+        cur.execute(
+            "select count(*) n from message_outbox where workspace_id = %s and chat_id = %s",
+            (ws, tg_marcos))
+        assert cur.fetchone()["n"] == avisos_antes            # ningún aviso nuevo
+
+
+def test_aviso_de_entrega_lista_toda_la_evidencia_del_ciclo_actual(corework, conn):
+    """El aviso de la primera entrega tras "Pedir cambios" muestra TODA la
+    evidencia del ciclo actual -- no sólo el texto de este llamado --,
+    incluida la que se sumó aparte por "Adjuntar evidencia" mientras la
+    tarea todavía estaba en curso; la de antes del rechazado queda afuera
+    (mismo corte que `evidencia_pendiente`, ADR 0009 enmienda T6b). Sin la
+    corrección de T6i, el aviso mostraba sólo `evidencia_texto` de este
+    llamado -- "Evidencia adjuntada aparte." quedaba afuera."""
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        tid = _tarea(cur, ws, estado="en_revision")
+        _evidencia(cur, ws, tid)       # anterior al rechazado, no debe aparecer
+    conn.commit()
+
+    with espacio(conn, ws) as cur:
+        marcos = _quien(cur, "Marcos Tarquini", ws)
+        H.ejecutar(cur, marcos, "pedir_cambios_tarea",
+                   {"tarea_id": tid, "comentario": "Falta un detalle."},
+                   ya_confirmada=True)
+
+    with espacio(conn, ws) as cur:
+        nahuel = _quien(cur, "Nahuel Gimenez", ws)
+        H.ejecutar(
+            cur, nahuel, "adjuntar_evidencia",
+            {"tarea_id": tid, "tipo": "texto", "uri": "Evidencia adjuntada aparte."},
+            ya_confirmada=True)
+
+    with espacio(conn, ws) as cur:
+        nahuel = _quien(cur, "Nahuel Gimenez", ws)
+        H.ejecutar(
+            cur, nahuel, "actualizar_estado",
+            {"tarea_id": tid, "estado": "en_revision",
+             "evidencia_texto": "Evidencia del ciclo nuevo."},
+            ya_confirmada=True)
+
+    with admin(conn) as cur:
+        tg_marcos = _tg(cur, "Marcos Tarquini")
+        cuerpo = _outbox_ultimo(cur, ws, tg_marcos)
+    assert "Evidencia del ciclo nuevo." in cuerpo
+    assert "Evidencia adjuntada aparte." in cuerpo
+    assert "lista" not in cuerpo       # la evidencia previa al rechazado no aparece

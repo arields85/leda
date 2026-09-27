@@ -116,6 +116,12 @@ gestión.
     quien la revisa.
     Sumar pruebas: previo nulo -> `asignada`; rama `en_revision` de
     `_preparar_actualizar_estado` sin confirmar.
+  - [x] **T6i — Evidencia nueva en revisión reemplaza el aviso del aprobador.**
+    Decisión del usuario (2026-09-27): cuando llega evidencia nueva a una tarea
+    `en_revision` (entrega repetida o "Adjuntar evidencia") de alguien que no es el
+    aprobador, se retiran los botones del aviso que el aprobador tiene esperando y
+    sale un aviso nuevo con toda la evidencia y "Aprobar"/"Pedir cambios". Así nunca
+    aprueba sin ver la evidencia vigente (ADR 0009).
   - [ ] **T6h — Seguimientos de review-6b1efba1 sobre el aviso de entrega.** (1) Dos
     entregas reales en una misma transacción colapsan en un solo aviso y la prueba
     lo da por correcto sin verificar que no queden `pending_action` de botones
@@ -3285,3 +3291,31 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   -> `38 passed`. Suite completa (escritor): `953 passed, 108 deselected`.
   Commit `c9f1d1c`. RDD: medio, `review_due` falso (`under_budget`, 368 líneas):
   queda pendiente en el tramo desde `5c4f72a`.
+
+- 2026-09-27: **T6i cerrada — evidencia nueva en revisión reemplaza el aviso del
+  aprobador.** Ruta: delegada, un escritor; ajuste del orquestador antes del commit.
+  `_avisar_evidencia_nueva_en_revision` (desde la entrega repetida de T6g y desde
+  `_adjuntar_evidencia` cuando la tarea está `en_revision`): si quien suma la
+  evidencia no es el aprobador, `pendientes.retirar_avisos_de_entrega` vence el aviso
+  esperando (`estado = 'vencida'`, opciones inactivas; tocarlo contesta "ya no está
+  vigente") y sale uno nuevo con la clave `evidencia_id`. El aviso lista ahora toda
+  la evidencia del ciclo vigente (`_evidencia_vigente`: posterior al último
+  'rechazado'), también en la primera entrega. El orquestador cambió cómo se
+  reconoce el aviso: el escritor lo distinguía del menú general por la ausencia del
+  botón "Quiero consultar otra cosa"; ahora el aviso lleva `args.aviso =
+  AVISO_ENTREGA` y el filtro es por esa marca (los avisos ya registrados sin marca
+  no se retiran; sólo existen en la base local de datos ficticios). Límite: el
+  mensaje viejo sigue visible en Telegram con sus botones inertes, porque el
+  transporte no sabe editar mensajes (`despachador.Transporte` sólo envía). Enmienda
+  de ADR 0009, punto 4.
+  RED (fuente revertida con `git show HEAD:<ruta>`): 4 de 5 pruebas nuevas fallaron
+  (la quinta, el aprobador suma su propia evidencia, pasa también con el código
+  viejo porque antes nunca se avisaba). GREEN tras el ajuste del orquestador:
+  `pytest -q tests/test_entrega_con_evidencia.py tests/test_pedir_cambios_extremo_a_extremo.py
+  tests/test_menu_tarea.py tests/test_aclaracion_botones.py` -> `95 passed`. Suite
+  completa (escritor, antes del ajuste): `957 passed, 1 failed, 108 deselected`; la
+  falla, `test_task_intake.py::test_migration_preflight_fails_before_ddl_for_incompatible_unit1a_rows[converted_waiting]`
+  (`tuple concurrently updated`), coincidió con el experimento 1 aplicando
+  migraciones en el mismo servidor (catálogo de roles compartido por el clúster);
+  reejecutado aparte, `tests/test_task_intake.py` completo junto con las pruebas de
+  T6i -> `126 passed`.

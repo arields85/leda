@@ -1031,8 +1031,7 @@ def _actualizar_estado(cur, quien: Solicitante, tarea_id, estado, motivo=None,
             # repetido acá por el mismo motivo que la autoridad de arriba
             # (el handler es la puerta real a la base). Sin evento de
             # estado: la evidencia que llegue se suma sola, igual que
-            # `_adjuntar_evidencia`, sin avisar de nuevo al aprobador (esa
-            # herramienta tampoco avisa).
+            # `_adjuntar_evidencia`.
             evidencia_texto = (evidencia_texto or "").strip()
             if not evidencia_texto:
                 return {"error": _AVISO_YA_EN_REVISION}
@@ -1041,6 +1040,14 @@ def _actualizar_estado(cur, quien: Solicitante, tarea_id, estado, motivo=None,
                    values (%s, %s, 'texto', %s, %s) returning id""",
                 (quien.workspace_id, tarea_id, evidencia_texto, quien.membership_id))
             evidencia_id = cur.fetchone()["id"]
+            # T6i (ADR 0009, enmienda 2026-09-27): esta entrega repetida es
+            # evidencia nueva sobre una tarea ya en_revision -- si viene de
+            # alguien que no es el aprobador, retira el aviso que tiene
+            # esperando y manda uno nuevo con toda la evidencia vigente.
+            _avisar_evidencia_nueva_en_revision(
+                cur, quien, tarea_id, fila["titulo"],
+                fila["responsable_membership_id"], evidencia_id,
+                datetime.now(timezone.utc))
             return {"evidencia_id": str(evidencia_id),
                    "aviso": _AVISO_EVIDENCIA_SUMADA_EN_REVISION}
 
@@ -1169,7 +1176,7 @@ def _actualizar_estado(cur, quien: Solicitante, tarea_id, estado, motivo=None,
             xact = cur.fetchone()["x"]
             dedupe_id = evidencia_id or f"{tarea_id}:{xact}"
             _notificar_entrega_al_aprobador(
-                cur, quien, tarea_id, fila["titulo"], evidencia_texto,
+                cur, quien, tarea_id, fila["titulo"],
                 aprobador_membership_id, dedupe_id,
                 datetime.now(timezone.utc))
 
@@ -1410,7 +1417,8 @@ def _preparar_adjuntar_evidencia(cur, quien: Solicitante, tarea_id, tipo,
 def _adjuntar_evidencia(cur, quien: Solicitante, tarea_id, tipo, uri=None,
                         descripcion=None):
     cur.execute(
-        "select responsable_membership_id from task where id = %s", (tarea_id,))
+        "select estado, titulo, responsable_membership_id from task where id = %s",
+        (tarea_id,))
     fila = cur.fetchone()
     if not fila:
         return {"error": "esa tarea no existe en este equipo"}
@@ -1424,7 +1432,18 @@ def _adjuntar_evidencia(cur, quien: Solicitante, tarea_id, tipo, uri=None,
            values (%s, %s, %s, %s, %s) returning id""",
         (quien.workspace_id, tarea_id, tipo, uri or descripcion,
          quien.membership_id))
-    return {"evidencia_id": str(cur.fetchone()["id"])}
+    evidencia_id = cur.fetchone()["id"]
+
+    if fila["estado"] == "en_revision":
+        # T6i (ADR 0009, enmienda 2026-09-27): mismo criterio que la entrega
+        # repetida (T6g) -- evidencia nueva sobre una tarea ya en_revision,
+        # de alguien que no es el aprobador, retira el aviso que tiene
+        # esperando y manda uno nuevo con toda la evidencia vigente.
+        _avisar_evidencia_nueva_en_revision(
+            cur, quien, tarea_id, fila["titulo"], fila["responsable_membership_id"],
+            evidencia_id, datetime.now(timezone.utc))
+
+    return {"evidencia_id": str(evidencia_id)}
 
 
 def _exigir_puede_aprobarse(cur, tarea_id, fila) -> None:
@@ -1712,9 +1731,31 @@ def _enlace_portal_tarea(tarea_id) -> str | None:
     return None
 
 
+def _evidencia_vigente(cur, tarea_id) -> list[dict]:
+    """T6i (`odd/tasks/prisma-orienta.md`): toda la evidencia del ciclo de
+    entrega actual, para el aviso al aprobador -- mismo corte que
+    `evidencia_pendiente` (`db/esquema.sql`): sólo cuenta la que tiene `at`
+    posterior al último `approval` 'rechazado' de la tarea; sin ningún
+    'rechazado', es toda la evidencia registrada. Sin esto, el aviso podía
+    mostrar evidencia de un ciclo ya superado por "Pedir cambios" -- la misma
+    razón por la que `evidencia_pendiente` deja de contarla (ADR 0009,
+    enmienda T6b)."""
+    cur.execute(
+        """select tipo, uri from evidence e
+            where e.task_id = %s
+              and e.at > coalesce(
+                (select max(r.at) from approval r
+                  where r.sujeto_tipo = 'tarea' and r.sujeto_id = e.task_id
+                    and r.decision = 'rechazado'),
+                '-infinity'::timestamptz)
+            order by e.at""",
+        (tarea_id,))
+    return cur.fetchall()
+
+
 def _notificar_entrega_al_aprobador(cur, quien: Solicitante, tarea_id, titulo,
-                                    evidencia_texto, aprobador_membership_id,
-                                    dedupe_id, ahora) -> None:
+                                    aprobador_membership_id, dedupe_id, ahora,
+                                    *, es_reemplazo: bool = False) -> None:
     """ADR 0009, decisión 3: cuando una tarea llega a `en_revision`, quien la
     aprueba se entera con botones -- no sólo el responsable con `_avisar` --
     para que "Aprobar" y "Pedir cambios" salgan del mismo mensaje, por el
@@ -1722,7 +1763,15 @@ def _notificar_entrega_al_aprobador(cur, quien: Solicitante, tarea_id, titulo,
     `pendientes.SENTINEL_MENU_TAREA`, resuelto por
     `gateway._resolver_toque_menu_tarea`. Se omite en silencio si el
     aprobador no tiene chat vinculado, igual que cualquier otro aviso
-    automático -- nunca falla en silencio por otra causa."""
+    automático -- nunca falla en silencio por otra causa.
+
+    Enmienda T6i (2026-09-27): el aviso muestra TODA la evidencia vigente del
+    ciclo actual (`_evidencia_vigente`), no sólo la de este llamado -- si el
+    aprobador recién abre el chat después de dos entregas, tiene que ver las
+    dos. `es_reemplazo` distingue el verbo de la primera entrega del que sale
+    cuando evidencia nueva reemplaza un aviso que el aprobador todavía tenía
+    esperando (`_avisar_evidencia_nueva_en_revision`, abajo) -- mismos
+    botones, mismo destino, sólo cambia cómo se cuenta."""
     from . import pendientes as P
     from .autoridad import Canal
 
@@ -1733,9 +1782,12 @@ def _notificar_entrega_al_aprobador(cur, quien: Solicitante, tarea_id, titulo,
     if not aprobador or aprobador["telegram_user_id"] is None:
         return
 
-    texto = f"{quien.nombre} entregó «{titulo}»"
-    if evidencia_texto:
-        texto += f": {evidencia_texto}"
+    verbo = "sumó evidencia nueva a" if es_reemplazo else "entregó"
+    texto = f"{quien.nombre} {verbo} «{titulo}»"
+    evidencias = _evidencia_vigente(cur, tarea_id)
+    if evidencias:
+        texto += "\nEvidencia:\n" + "\n".join(
+            f"- ({e['tipo']}) {e['uri'] or 'sin detalle'}" for e in evidencias)
     enlace = _enlace_portal_tarea(tarea_id)
     if enlace:
         texto += f"\n{enlace}"
@@ -1748,7 +1800,8 @@ def _notificar_entrega_al_aprobador(cur, quien: Solicitante, tarea_id, titulo,
     # puede tardar en mirar el chat, no una confirmación del mismo turno.
     p = P.registrar(
         cur, aprobador_solicitante, herramienta=P.SENTINEL_MENU_TAREA,
-        args={"tarea_id": str(tarea_id), "titulo": titulo}, resumen=texto,
+        args={"tarea_id": str(tarea_id), "titulo": titulo,
+              "aviso": P.AVISO_ENTREGA}, resumen=texto,
         vence_en=ahora + timedelta(hours=8), campo="eleccion",
         opciones=[("Aprobar", {"accion": "aprobar"}),
                  ("Pedir cambios", {"accion": "pedir_cambios"})],
@@ -1758,6 +1811,37 @@ def _notificar_entrega_al_aprobador(cur, quien: Solicitante, tarea_id, titulo,
         text=texto, recipient_membership_id=str(aprobador_membership_id),
         scheduled_for=ahora, dedupe_key=f"{quien.workspace_id}:entrega:{dedupe_id}",
         pending_action_id=p.id)
+
+
+def _avisar_evidencia_nueva_en_revision(cur, quien: Solicitante, tarea_id, titulo,
+                                        responsable_membership_id, evidencia_id,
+                                        ahora) -> None:
+    """T6i (`odd/tasks/prisma-orienta.md`; ADR 0009, enmienda 2026-09-27):
+    evidencia nueva sobre una tarea que YA está `en_revision` -- entrega
+    repetida (T6g) o "Adjuntar evidencia" -- de alguien que no es el
+    aprobador retira el aviso de entrega que el aprobador tiene esperando
+    (`pendientes.retirar_avisos_de_entrega`) y manda uno nuevo con toda la
+    evidencia vigente (`_notificar_entrega_al_aprobador`, `es_reemplazo`) --
+    así nunca aprueba con botones que responden sobre evidencia que ya no es
+    toda la que hay. Si quien la manda es el propio aprobador, no hay a quién
+    avisar de nuevo -- ya lo sabe -- y el aviso que esperaba sigue como
+    estaba."""
+    cur.execute(
+        "select aprobador_membership_id from membership where id = %s",
+        (responsable_membership_id,))
+    aprob = cur.fetchone()
+    aprobador_membership_id = aprob["aprobador_membership_id"] if aprob else None
+    if not aprobador_membership_id:
+        return
+    if str(quien.membership_id) == str(aprobador_membership_id):
+        return
+
+    from . import pendientes as P
+    P.retirar_avisos_de_entrega(cur, quien.workspace_id, tarea_id,
+                                aprobador_membership_id, ahora)
+    _notificar_entrega_al_aprobador(
+        cur, quien, tarea_id, titulo, aprobador_membership_id,
+        str(evidencia_id), ahora, es_reemplazo=True)
 
 
 def _avisar_dependencia_informativa(cur, quien: Solicitante, tarea_id, estado_nuevo,

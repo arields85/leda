@@ -206,3 +206,32 @@ dos llaman a la misma función SQL.
    `_actualizar_estado`/`_preparar_actualizar_estado` para `en_curso` gana
    la misma rama, por consistencia con el disparador. Migración
    `0015_pedir_cambios_exento_del_gate_de_arranque.sql`.
+
+4. **T6i -- evidencia nueva en revisión no deja aprobar sin verla.** El
+   aviso de entrega (decisión 3, arriba) queda esperando en el chat del
+   aprobador con "Aprobar"/"Pedir cambios" -- pero si entre que se manda y
+   que se toca llega evidencia nueva sobre la misma tarea, todavía
+   `en_revision` -- una entrega repetida (T6g) o "Adjuntar evidencia" --, el
+   aviso queda desactualizado: sus botones siguen respondiendo sobre la
+   evidencia vieja, y "Aprobar" podía cerrar sin que el aprobador hubiera
+   visto la nueva. Decisión del usuario (2026-09-27): si esa evidencia la
+   manda alguien que NO es el aprobador, el aviso que tiene esperando queda
+   retirado (`pendientes.retirar_avisos_de_entrega`, el mismo criterio
+   'vencida' que usa `despachador._preview_vigente` para una vista previa
+   superada -- tocar su "Aprobar" viejo responde "ya no está vigente", nunca
+   aplica nada) y sale un aviso nuevo con TODA la evidencia vigente del
+   ciclo actual (`_evidencia_vigente`, mismo corte que `evidencia_pendiente`,
+   enmienda T6b) y los mismos botones. El dedupe del aviso nuevo usa el id
+   de esta evidencia, nunca el del aviso que reemplaza. Si quien manda la
+   evidencia es el propio aprobador, no hay a quién avisar de nuevo -- ya lo
+   sabe -- y el aviso que esperaba sigue como estaba. El retiro nunca toca
+   el menú general de la tarea (`_encolar_menu_tarea`, mismo
+   `SENTINEL_MENU_TAREA`): se distingue porque ese menú siempre ofrece
+   "Quiero consultar otra cosa" y el aviso de entrega nunca. Sin migración
+   -- sólo `src/prisma/herramientas.py` (`_notificar_entrega_al_aprobador`,
+   `_evidencia_vigente`, `_avisar_evidencia_nueva_en_revision`) y
+   `src/prisma/pendientes.py` (`retirar_avisos_de_entrega`). Hoy no existe
+   edición del lado de Telegram para borrar los botones del mensaje viejo ya
+   entregado (el transporte sólo manda, `despachador.Transporte.enviar`) --
+   el mensaje viejo puede seguir visible en el chat, pero tocar sus botones
+   ya no aplica nada.
