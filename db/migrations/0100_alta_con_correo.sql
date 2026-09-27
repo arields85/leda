@@ -512,6 +512,17 @@ begin
     return;
   end if;
 
+  -- El estado se comprueba (y se bloquea) antes de escribir el contacto:
+  -- una salida por estado cambiado no deja un correo verificado a medias.
+  select * into proyeccion from alta_correo_estado
+   where membership_id = p_membership_id
+   for update;
+  if not found or proyeccion.estado <> 'pending_email_verification' then
+    update alta_correo_verificacion set reservado_hasta = null where id = v.id;
+    return query select false, 'verification_state_changed'::text;
+    return;
+  end if;
+
   begin
     insert into alta_correo_contacto
         (membership_id, workspace_id, email, verificado_en, actualizado_en)
@@ -524,14 +535,6 @@ begin
     return query select false, 'email_in_use'::text;
     return;
   end;
-
-  select * into proyeccion from alta_correo_estado
-   where membership_id = p_membership_id;
-  if proyeccion.estado <> 'pending_email_verification' then
-    update alta_correo_verificacion set reservado_hasta = null where id = v.id;
-    return query select false, 'verification_state_changed'::text;
-    return;
-  end if;
 
   perform set_config('prisma.workspace_id', v.workspace_id::text, true);
   insert into alta_correo_evento

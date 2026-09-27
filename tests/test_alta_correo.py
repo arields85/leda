@@ -282,6 +282,31 @@ def test_recorrido_completo_de_verificacion_de_correo(intake_world, conn):
     conn.commit()
 
 
+def test_si_el_estado_cambio_completar_no_deja_un_contacto_a_medias(
+        intake_world, conn):
+    """Un fallo por estado cambiado no deja el correo registrado como
+    verificado ni consume el token: el ciclo sigue donde estaba."""
+    norte = intake_world["north-lab"]
+    m = _membership(intake_world, "north-lab")
+
+    with espacio(conn, norte["id"]) as cur:
+        _hasta_awaiting_email(cur, m)
+        AC.transicionar(cur, m, "pending_email_verification", ahora=AHORA)
+        AC.emitir_verificacion(cur, m, "persona@example.com", "token-uno",
+                               ahora=AHORA)
+        assert AC.reservar_verificacion(cur, "token-uno", m, ahora=AHORA).ok
+        # La persona corrige el correo mientras el enlace viejo está abierto.
+        AC.transicionar(cur, m, "awaiting_email", ahora=AHORA)
+
+        completado = AC.completar_verificacion(cur, "token-uno", m, ahora=AHORA)
+
+        assert completado.ok is False
+        assert completado.motivo == "verification_state_changed"
+        assert AC.contacto_verificado(cur, m) is None
+        assert AC.estado(cur, m)["estado"] == "awaiting_email"
+    conn.commit()
+
+
 def test_el_correo_se_normaliza_en_un_solo_lugar(intake_world, conn):
     norte = intake_world["north-lab"]
     m = _membership(intake_world, "north-lab")
