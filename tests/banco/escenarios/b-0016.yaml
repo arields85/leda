@@ -17,6 +17,17 @@ precondiciones:
       titulo: Revisar comunicaciones industriales (simulado)
       area: ot
       responsable: Marcos Tarquini
+# Hallazgo 4 (sesión 2 por Telegram, 2026-09-27): una corrida real listó las
+# tareas en botones (T3) Y ADEMÁS las enumeró una por una en el texto ("-
+# Backup de servidores... (simulado)" x 12) -- el texto tiene que resumir,
+# nunca repetir lo que ya muestran los botones. Ninguna de las dos tareas de
+# este escenario tiene un estado notable (bloqueada/en revisión/vencida), así
+# que una respuesta que cumple la regla no tiene motivo para nombrar a
+# ninguna por su título -- si aparece cualquiera de los dos, es que las
+# enumeró.
+respuesta_no_contiene_patron:
+  - "Programar PLC de la comprimidora"
+  - "Revisar comunicaciones industriales"
 herramientas_prohibidas:
   - actualizar_estado
   - registrar_bloqueo

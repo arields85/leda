@@ -714,3 +714,11 @@ def test_reglas_del_contexto_piden_ofrecer_opciones(corework, conn):
     assert "ofrecer_opciones" in ctx.sistema
     assert "no la presentes como un hecho" in PREAMBULO.lower() or \
            "no presentes" in PREAMBULO.lower()
+    # Hallazgo 1 (sesión 2 por Telegram, 2026-09-27): una respuesta real
+    # hizo dos preguntas seguidas ("¿En qué te ayudo? ¿Por dónde
+    # arrancamos?"). Nunca más de una por turno.
+    assert "más de una pregunta" in PREAMBULO.lower()
+    # Hallazgo 4 (misma sesión): con la lista de tareas en botones (T3), el
+    # texto no puede volver a enumerar cada tarea -- eso es lo que hacía la
+    # respuesta real ("- Backup de servidores... (simulado)" x 12).
+    assert "no las enumeres" in PREAMBULO.lower()

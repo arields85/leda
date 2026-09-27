@@ -2456,6 +2456,180 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
     passed`; suite completa -> `876 passed, 108 deselected` (233 s), igual que la
     base registrada arriba.
 
+- 2026-09-27 (orquestador): **Sesión 2 por Telegram, hallazgos 2, 3 y 4.**
+  Confirmados por el usuario sobre la misma sesión real que dio el hallazgo 1.
+
+  **Hallazgo 2 -- el saludo hacía dos preguntas seguidas.** Evidencia: "¿En qué
+  te ayudo? ¿Por dónde arrancamos?" y, en otra vuelta, "¿Con qué te doy una
+  mano? ¿Qué necesitás?". Regla nueva en `contexto.PREAMBULO`: una respuesta
+  nunca hace más de una pregunta en el mismo turno -- si va a llamar a
+  `ofrecer_opciones`, esa pregunta (con sus botones) es la única, sin otra en
+  el texto que la acompaña. Archivo: `src/prisma/contexto.py`. Prueba:
+  `tests/test_opciones_modelo.py::test_reglas_del_contexto_piden_ofrecer_opciones`,
+  assertion nueva sobre `"más de una pregunta" in PREAMBULO.lower()`. RED
+  verificado a mano contra el `PREAMBULO` de `HEAD` (sin la frase, `False`);
+  GREEN: `1 passed` (42 s, incluye la construcción de contexto contra
+  PostgreSQL).
+
+  **Hallazgo 3 -- etiquetas de botón truncadas a mitad de palabra.** Evidencia:
+  "Revisar comunicaciones industriales de la compr…" (recorte de
+  `salida.TRUNCAR_ETIQUETA_BOTON`, 48 caracteres, a mitad de "compresora").
+  Los títulos de tarea de la sesión terminaban en " (simulado)"; no se trató
+  como caso especial -- el corte por límite de palabra simplemente lo deja
+  afuera la mayoría de las veces, igual que cualquier otro sufijo largo.
+
+  Decisiones:
+  - `salida.OBJETIVO_ETIQUETA_BOTON = 30`: un botón inline de Telegram ocupa
+    el ancho del chat; en una pantalla de referencia angosta (iPhone SE,
+    ~320pt) el texto de un botón con su padding entra sin ajustar renglón
+    hasta unos 28-32 caracteres con la tipografía de sistema -- 30 queda en
+    el medio, con margen para acentos y mayúsculas más anchas. Bastante más
+    chico que `TRUNCAR_ETIQUETA_BOTON` (48), que pasa a ser sólo el último
+    recurso: cuando ni una palabra entera entra en el objetivo, o para
+    desambiguar dos títulos que colisionan.
+  - `salida.acortar_etiqueta_boton(texto, *, objetivo=30, limite=48)`: corta
+    en el último límite de palabra que entra en `objetivo`; sin "…" si no
+    hizo falta cortar nada; si la primera palabra sola ya supera `objetivo`,
+    cae al corte duro de siempre (`truncar_etiqueta_boton`) en vez de dejar
+    una etiqueta vacía.
+  - `salida.etiquetas_boton_distinguibles(titulos, *, fijas=None)`: la
+    versión de CONJUNTO -- si acortar dos títulos distintos los deja
+    iguales (el propio ejemplo del usuario: "...máquina 3" y "...máquina 4"
+    cortando los dos en "...máquina…"), las que colisionan se extienden
+    palabra por palabra, contra todo el conjunto, hasta `limite` (48).
+    `fijas[i]` marca una etiqueta que ya vino elegida (la que puso el modelo
+    en `ofrecer_opciones`): nunca se hace crecer, sólo cuenta como obstáculo
+    para que las demás no la pisen. Último recurso si dos títulos son
+    indistinguibles incluso enteros: se numeran (` (2)`, ` (3)`...) -- nunca
+    dos botones ambiguos en el mismo mensaje.
+
+  Aplicado a los seis lugares que arman botones de tarea a partir de un
+  título: `agente._opciones_lista_tareas` (T3, primera página) y
+  `gateway._mostrar_mas_tareas` (T3, "Ver más") corren
+  `etiquetas_boton_distinguibles` sobre toda la página; `gateway.
+  _mostrar_tareas_propias` reusa `_opciones_lista_tareas`;
+  `gateway._candidatas_para_botones` (aclaración con botones, T4) ahora
+  acorta y desambigua los títulos como un solo conjunto ANTES de repartirlos
+  entre propias/ajenas -- `_etiqueta_boton` sólo agrega el sufijo `— nombre`
+  sobre el título ya corto, nunca lo vuelve a truncar;
+  `gateway._pedir_eleccion_dependencia` (candidatas de dependencia, T2) igual;
+  `herramientas._ofrecer_opciones` (T1) trata la `etiqueta` del modelo como
+  fija (obstáculo, nunca se hace crecer) cuando ya es corta (<=
+  `OBJETIVO_ETIQUETA_BOTON`), y si falta o es más larga que el objetivo,
+  deriva y desambigua a partir de esa base -- una opción de texto libre
+  sigue con el corte duro de siempre, sin cambios (T1: "cuando el modelo
+  elige su propia etiqueta, está bien").
+
+  Archivos: `src/prisma/salida.py` (funciones nuevas),
+  `src/prisma/agente.py`, `src/prisma/gateway.py`, `src/prisma/herramientas.py`
+  (los seis sitios de arriba).
+
+  Adaptaciones deliberadas de pruebas existentes (título afectado por el
+  cambio de límite, no un debilitamiento):
+  - `tests/test_aclaracion_botones.py::test_botones_propia_primero_ajena_con_nombre_y_titulo_truncado`:
+    la etiqueta esperada del título largo pasó del corte duro a 48
+    (`"Actualizar toda la documentaci…"`, cortado a mitad de palabra) al
+    corte por palabra a 30 (`"Actualizar toda la…"`), calculado con
+    `salida.acortar_etiqueta_boton` en vez de a mano; docstring nuevo que
+    explica el cambio.
+  - `tests/banco/test_corrida.py::test_ejecutar_escenario_aclaracion_tapea_la_candidata_elegida_sin_aplicar_nada`:
+    mismo motivo -- las candidatas de la aclaración con botones
+    (`_SENTINEL_ACLARACION`) ahora son `"Cablear tablero máq. 3…"` /
+    `"Revisar tablero máq. 4…"` (el corte por palabra deja afuera
+    "(simulado)"), no el título completo. No afecta a `b-0013.yaml` ni a las
+    pruebas de `ofrecer_opciones` (`test_ejecutar_escenario_opciones_modelo_
+    ofrece_tareas_y_tapea_para_actualizar_estado` y análogas): esas
+    resuelven la aclaración por TÍTULO (`valor.titulo`, `_candidatas_tarea_
+    por_titulo`), no por etiqueta de botón, así que no les importa cómo se
+    acorta la etiqueta visible.
+
+  Pruebas nuevas (RED verificado antes de implementar):
+  - `tests/test_salida.py`: `acortar_etiqueta_boton` (no corta si ya entra,
+    corta en límite de palabra con "…", primera palabra larga cae al corte
+    duro, seguro para `prepare_buttons` con acentos) y
+    `etiquetas_boton_distinguibles` (extiende las que colisionan, no toca
+    las que no colisionan, respeta `fijas` como obstáculo). RED:
+    `ImportError: cannot import name 'OBJETIVO_ETIQUETA_BOTON'`. GREEN:
+    `tests/test_salida.py` -> `25 passed`.
+  - `tests/test_lista_botones.py::test_titulos_parecidos_y_largos_producen_etiquetas_distintas`:
+    circuito de punta a punta de T3 -- dos tareas con títulos parecidos y
+    largos ("Revisar tablero de la máquina 3/4") producen etiquetas
+    distintas en la misma página de botones. GREEN: `tests/test_lista_botones.py`
+    -> `13 passed`.
+
+  Bug encontrado y corregido durante el TDD de `etiquetas_boton_distinguibles`
+  (no llegó a versión publicada): la primera implementación comparaba cada
+  etiqueta contra `resultado` mientras lo iba mutando en la misma pasada del
+  `while` -- la primera etiqueta del grupo que crecía dejaba de "colisionar
+  contra sí misma" y las siguientes del mismo grupo se salteaban sin crecer
+  (dos etiquetas iguales quedaban con una sola distinguida). Corregido
+  comparando contra una foto (`list(resultado)`) tomada al arranque de cada
+  pasada, no contra el arreglo mutándose en vivo.
+
+  **Hallazgo 4 -- con la lista en botones, el texto seguía enumerando cada
+  tarea, y el menú de una tarea no decía de quién era ni en qué estado
+  estaba.** Evidencia: con T3 ya armando un botón por tarea (hallazgo 1), el
+  modelo además enumeraba las 12 en el texto ("- Backup de servidores de
+  producción (simulado) — asignada" x 12) -- ADR 0007 punto 2 ("el texto da
+  el contexto; la elección se hace tocando") pide lo contrario: texto corto,
+  elección por botón. Al dejar de enumerar, lo único que el texto viejo
+  aportaba y los botones no -- de quién es cada tarea y en qué estado está --
+  se perdía.
+
+  Decisiones:
+  - `contexto.PREAMBULO`: al listar tareas con `consultar_tareas`, el texto
+    resume -- cuántas son y, si hace falta, sólo lo notable (bloqueada, en
+    revisión, vencida) -- nunca la lista completa de títulos. Si son de
+    varias personas, nombra a alguien sólo cuando importa (quién tiene la
+    bloqueada) o lo da como conteo ("dos por persona"), nunca enumerando
+    quién tiene cada una.
+  - `menu_tarea.encabezado_menu(menu)`: el menú de una tarea (T2) antepone
+    una línea corta -- `«título» · quién · estado` -- a su única pregunta
+    ("¿Qué querés hacer?"), en vez de "¿Qué querés hacer con «título»?" a
+    secas. "tuya" cuando quien toca ES la responsable (nunca su propio
+    nombre); el nombre real para un aprobador o para otra persona. Requirió
+    sumar `responsable_nombre` a `MenuTarea` y el `join` a `integrante` en
+    `menu_tarea._tarea_para_menu` (antes sólo traía el `membership_id`).
+    Sigue siendo una sola pregunta por mensaje (regla del hallazgo 2).
+
+  Archivos: `src/prisma/contexto.py` (regla nueva), `src/prisma/menu_tarea.py`
+  (`responsable_nombre`, `encabezado_menu`), `src/prisma/gateway.py`
+  (`_encolar_menu_tarea` arma la pregunta con el encabezado nuevo).
+
+  Bench (`tests/banco`, sólo corre contra un modelo real, fuera de la suite
+  por defecto): se agregó `respuesta_no_contiene_patron` a
+  `tests/banco/escenarios/b-0016.yaml` (lista de tareas propias, T3) contra
+  los dos títulos de tarea del escenario -- ninguna de las dos tiene un
+  estado notable, así que una respuesta que cumple la regla no tiene motivo
+  para nombrar a ninguna por su título; que aparezca cualquiera de las dos
+  es indicio de que las enumeró. No se tocaron `b-0009.yaml`/`b-0017.yaml`
+  (no declaran candidatas/etiquetas afectadas) ni `b-0013.yaml` (su
+  aclaración real se resuelve por `ofrecer_opciones`, que compara por
+  título, no por etiqueta de botón -- ver hallazgo 3 arriba).
+
+  Pruebas nuevas (RED verificado antes de implementar):
+  - `tests/test_opciones_modelo.py::test_reglas_del_contexto_piden_ofrecer_opciones`:
+    assertion nueva sobre `"no las enumeres" in PREAMBULO.lower()`. RED
+    verificado a mano contra el `PREAMBULO` de `HEAD` (`False`).
+  - `tests/test_menu_tarea.py::test_encabezado_del_menu_muestra_responsable_y_estado`
+    y `::test_encabezado_del_menu_dice_tuya_para_la_propia_responsable`: RED
+    -- `AssertionError: assert 'Mariano Naim' in '¿Qué querés hacer con
+    «Programar HMI línea 2»?'` (el encabezado viejo no traía responsable ni
+    estado) y el análogo con "tuya". GREEN: `tests/test_menu_tarea.py` ->
+    `30 passed`.
+
+  Verificación de la unidad completa (hallazgos 2, 3 y 4 juntos):
+  - `tests/test_salida.py tests/test_aclaracion_botones.py
+    tests/banco/test_corrida.py tests/test_menu_tarea.py
+    tests/test_autoridad_tarea.py tests/test_pregunta_sin_opciones.py
+    tests/test_opciones_modelo.py tests/test_lista_botones.py` -> `281
+    passed` (antes de sumar `tests/test_menu_tarea.py`, corrida aparte:
+    `30 passed`).
+  - Suite completa: `.venv/Scripts/python.exe -m pytest -q` -> `886 passed,
+    108 deselected` (207 s) -- `876` de base + 10 pruebas nuevas (7 de
+    `salida`, 2 de `menu_tarea`, 1 de `lista_botones`); mismo `108
+    deselected` (el banco contra modelo real, sin tocar).
+
 - **Próximo paso al retomar:** T5, sólo la segunda sesión real por Telegram (necesita
   al usuario; datos ficticios). Antes de empezar: comparar la base local con
   `db/esquema.sql` (hoy al día hasta la migración `0011`) y aplicar lo que falte;
