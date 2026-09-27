@@ -1,6 +1,6 @@
 # Alta con correo verificado y acceso a Google (rama auxiliar)
 
-**Estado:** G0 presentada (matriz abajo) — pendiente de aprobación del usuario y aceptación de ADR 0010
+**Estado:** G0 cerrada (matriz aprobada, ADR 0010 aceptada, 2026-09-27) — próximo: G1
 **Creado:** 2026-09-27
 **Origen:** decisión del usuario, 2026-09-27; [`ADR 0010`](../../docs/decisions/0010-correo-verificado-y-google-en-el-producto.md).
 **Rama/worktree:** `auxiliar/alta-y-google`, `D:\Proyectos\Prisma-PM-worktrees\alta-y-google`.
@@ -278,7 +278,7 @@ Un worktree nuevo no trae lo que no se versiona.
 
 ## Tareas
 
-- [ ] **G0 — Matriz de aceptación y OK del usuario.** Antes de escribir
+- [x] **G0 — Matriz de aceptación y OK del usuario.** Antes de escribir
   código: presentar la matriz que exige `00-LEER-PRIMERO.md` ("Instrucción
   breve para la IA receptora"): capacidades y estados, contratos, permisos y
   plan de validación, para G1 a G6, con el mapa de casos de `VALIDACION`.
@@ -324,7 +324,7 @@ proyecto de Google Cloud), G3-G4 (cuenta real con datos ficticios), G6
 (decisiones 2/3), y cada rebanada una sesión real por Telegram (Tanda 2 de
 `VALIDACION`) antes de darla por cerrada.
 
-## Matriz de aceptación G0 (propuesta, pendiente de aprobación del usuario)
+## Matriz de aceptación G0 (aprobada por el usuario, 2026-09-27)
 
 Responde a la "Instrucción breve para la IA receptora" de `00-LEER-PRIMERO.md`:
 capacidades y estados, contratos, permisos y plan de validación. El pack
@@ -417,12 +417,12 @@ ficticios, una interacción por vez; el primer defecto detiene el lote.
 | # | Conflicto | Propuesta | ¿Consulta? |
 |---|---|---|---|
 | C1 | `01` §4: estados como campo; `frontera.md` regla 4: eventos | Proyección por eventos, mismos estados y mensajes | No (cómo) |
-| C2 | `02` §5 `workspace_mutate` frente a una herramienta por acción | Herramientas discretas en `REGISTRO` | Sí, en G0 |
-| C3 | `01` §3 pasos 1-4 (solicitud pendiente + revisión administrativa) frente al enlace que la administración ya emite para una membresía concreta y entrega en privado | El enlace emitido es la vinculación decidida explícitamente por la administración que exige `01` §2; se conserva como pasos 1-4 y la revisión administrativa queda para la recuperación de §8 | Sí, en G0 |
+| C2 | `02` §5 `workspace_mutate` frente a una herramienta por acción | Herramientas discretas en `REGISTRO` | Aprobada por el usuario (2026-09-27) |
+| C3 | `01` §3 pasos 1-4 (solicitud pendiente + revisión administrativa) frente al enlace que la administración ya emite para una membresía concreta y entrega en privado | El enlace emitido es la vinculación decidida explícitamente por la administración que exige `01` §2; se conserva como pasos 1-4 y la revisión administrativa queda para la recuperación de §8 | Aprobada por el usuario (2026-09-27) |
 | C4 | El correo de verificación necesita un emisor; el pack usó Gmail de la cuenta autorizada, que es G2 | G1 construye el puerto de envío con doble de prueba; el adaptador real Gmail llega en G2 y la Tanda 2 de G1 espera a G2 | Aprobada por el usuario (2026-09-27). El usuario ya tiene la cuenta de correo de Prisma que servirá de remitente |
-| C5 | `01` §4: sin verificar no hay herramientas de negocio; ADR 0010 decisión 2: "sin correo verificado, la persona sigue operando por Telegram exactamente como hoy" | Clave apagada: exactamente como hoy. Clave encendida: el pack (V), el control actúa antes del despacho. `PENDIENTE` qué pasa con quien ya estaba activo al encender la clave | Sí, en G0 |
-| C6 | Bienvenida del pack (`01` §5) frente a `onboarding.bienvenida` (incluye tareas abiertas) | Clave encendida: textos del pack literales; clave apagada: la bienvenida actual | Sí, en G0 |
-| C7 | `constitucion.md` §7 pide confirmación para "correos" | El correo de verificación no es la herramienta `enviar_correo`: lo pide la persona, a su propia dirección, dentro del flujo de alta aprobado (último párrafo de §7) | Sí, en G0 |
+| C5 | `01` §4: sin verificar no hay herramientas de negocio; ADR 0010 decisión 2: "sin correo verificado, la persona sigue operando por Telegram exactamente como hoy" | Clave apagada: exactamente como hoy. Clave encendida: el pack (V), el control actúa antes del despacho. `PENDIENTE` qué pasa con quien ya estaba activo al encender la clave | Aprobada por el usuario (2026-09-27) |
+| C6 | Bienvenida del pack (`01` §5) frente a `onboarding.bienvenida` (incluye tareas abiertas) | Clave encendida: textos del pack literales; clave apagada: la bienvenida actual | Aprobada por el usuario (2026-09-27) |
+| C7 | `constitucion.md` §7 pide confirmación para "correos" | El correo de verificación no es la herramienta `enviar_correo`: lo pide la persona, a su propia dirección, dentro del flujo de alta aprobado (último párrafo de §7) | Aprobada por el usuario (2026-09-27) |
 | C8 | `02` §7 exige `executing` durable; `pending_action` no lo tiene | Diseño explícito en G4, presentado antes de construir | En G4 |
 | C9 | `reunion_periodica` de `corework.yaml` no la consume el importador, y `importador.py` no está entre los archivos compartidos de esta rama | Decidir al abrir G5 (tocar el importador o cargarla por otra vía) | En G5 |
 
@@ -476,6 +476,11 @@ por commit, igual que en `main`. Nunca push sin pedido explícito del usuario.
 - Dependencia registrada: el hecho "bienvenida entregada" de G1 queda como
   evento propio para que la unidad de saludo diario de `main` (pack 06)
   pueda contarlo como saludo del día.
+- 2026-09-27: **G0 cerrada.** El usuario aprobó la matriz con las
+  resoluciones C2-C7 (C4 antes, por separado) y aceptó ADR 0010, cuyo estado
+  pasa a `aceptada`. Queda `PENDIENTE` de C5 qué pasa con quien ya estaba
+  activo al encender la clave; se pregunta al abrir G1, junto con la decisión
+  abierta 5, reducida por C3 a la superficie de la recuperación de §8.
 
 ## Cómo arrancar la sesión auxiliar
 
