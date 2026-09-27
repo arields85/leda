@@ -103,7 +103,14 @@ gestión.
     recibe `evidencia_id or uuid.uuid4()`: sin evidencia, la clave es aleatoria y no
     deduplica nada. Derivarla de la identidad del acto de entrega.
   - [x] **T6e — Prueba de punta a punta de "Pedir cambios".**
-  - [ ] **T6f — Serializar "Aprobar" y "Pedir cambios" concurrentes** (review-3cf89bef).
+  - [ ] **T6f — Serializar las decisiones y avisos concurrentes sobre una misma tarea**
+    (review-3cf89bef, review-ae0ab510). "Aprobar" y "Pedir cambios" simultáneos, y dos
+    evidencias simultáneas sobre una tarea en revisión (cada transacción retira los
+    avisos que ve y crea el suyo: el aprobador puede quedar con dos avisos esperando,
+    uno sin toda la evidencia). Bloquear la fila de `task` al empezar esos actos.
+    Sumar pruebas: el menú general del aprobador sobre la misma tarea no se retira;
+    la evidencia previa a un 'rechazado' no aparece en el aviso (con un texto
+    distintivo, no uno por defecto).
   - [x] **T6g — Empate de evidencia y entrega repetida en `en_revision`** (review-e719d807,
     review-09452c69). Una entrega repetida sobre una tarea ya `en_revision` inserta
     un evento `en_revision -> en_revision`: además de sumar evidencia, hace que
@@ -3319,3 +3326,26 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   migraciones en el mismo servidor (catálogo de roles compartido por el clúster);
   reejecutado aparte, `tests/test_task_intake.py` completo junto con las pruebas de
   T6i -> `126 passed`.
+  Commit `d6c08ac`. RDD sobre el tramo `5c4f72a..d6c08ac` (T6g + T6i): medio,
+  `review_due` (`slice_budget_reached`, 880 líneas); consentimiento del usuario:
+  revisar. review-ae0ab5100f07401d (confiabilidad) aprobada y reconocida; frontera en
+  `d6c08ac`. Dos WARNING y una sugerencia, sumados a T6f (concurrencia de avisos y
+  pruebas faltantes).
+
+- 2026-09-27: **Experimento 1 — validador de invariantes sobre una copia de la base
+  local** (sólo lectura: `pg_dump` de la base local, restaurada en una base
+  descartable ya borrada; ningún texto de mensaje en el informe). Las migraciones
+  `0013`, `0014` y `0015` aplicaron limpio sobre la copia con datos de forma real.
+  De trece chequeos, uno encontró algo: dos tareas `en_revision` con una aprobación
+  y ninguna evidencia aunque su política la exige; son los hallazgos 8 y 9 de la
+  sesión 2 (aprobar a ciegas), anteriores a ADR 0009 -- el cierre las siguió frenando.
+  El resto en cero (cierre, proyección del estado, bloqueos, gate de arranque
+  reconstruido por hora, cadena de aprobación, pendientes, cola de salida, personas
+  sin respuesta, incidentes sin aviso, `workspace_id` cruzado). Dos datos laterales:
+  (1) la base local con los datos de las sesiones es la base de mantenimiento
+  `postgres` del servidor, la misma a la que apunta `PRISMA_TEST_DB_URL` (las
+  pruebas crean bases propias y no escriben ahí, pero conviven en el mismo lugar);
+  (2) quedan bases residuales `prisma_diag_*`/`prisma_test_*` de corridas viejas.
+  Chequeos que valen para un validador diario: evidencia faltante en revisión,
+  gate de arranque por hora, `workspace_id` cruzado (hoy sin constraint en esas
+  tablas), proyección del estado, personas sin respuesta.
