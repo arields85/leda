@@ -3135,3 +3135,14 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   tests/test_entrega_con_evidencia.py tests/test_aprobacion_cierra_tarea.py
   tests/test_task_intake.py tests/test_menu_tarea.py` -> `146 passed`. Suite
   completa (escritor): `935 passed, 108 deselected`.
+  Commit `12aecaa`. RDD: `review assess --base-ref f6c282a --committed-only` ->
+  medio, `review_due` (`slice_budget_reached`); consentimiento del usuario: revisar.
+  Revisión review-e719d807bbe9f356 (una lente, confiabilidad) aprobada y reconocida
+  (autoridad quemada); frontera de revisión en `12aecaa`. Dos sugerencias no
+  bloqueantes, seguimiento **PENDIENTE** (T6g): (1) falta una prueba del empate de
+  evidencia (`evidence.at = rechazado.at` en la misma transacción -> sigue pendiente),
+  para que un cambio de `>` a `>=` no pase inadvertido; (2) al registrar siempre el
+  `evidencia_texto`, un `actualizar_estado(en_revision)` repetido sobre una tarea que
+  ya está `en_revision` (por texto libre; la confirmación ya es de ejecución única)
+  agrega otra fila de evidencia junto con el evento de mismo estado -- ligado al
+  riesgo 3 de `docs/STATUS.md` (no hay grafo de transiciones), sin prueba hoy.
