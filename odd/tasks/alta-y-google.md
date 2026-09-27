@@ -294,6 +294,37 @@ Un worktree nuevo no trae lo que no se versiona.
   cierre: con la clave apagada, activar por Telegram funciona exactamente
   igual que hoy; encendida, el correo se pide, se verifica y queda registrado
   como hecho auditable aparte.
+  - [ ] **G1a — Esquema del alta con correo.** Migración `0100` + rollback:
+    eventos de alta append-only con proyección por disparador (estados de
+    §4, `review_required`, modo `alta`/`existente`); token de verificación
+    sin privilegios de `prisma_app` y funciones `security definer` de
+    `prisma_owner` (emitir, reservar 5 min, consumir, vencer 24 h, límites
+    3/h y 5/ciclo); contacto verificado por integrante con alta idempotente
+    por función; avisos administrativos persistentes (leído ≠ resuelto).
+    Todo con `workspace_id`, RLS forzada y `aislamiento_espacio`. Pruebas:
+    transiciones válidas e inválidas, aislamiento entre espacios,
+    `prisma_app` sin acceso directo, paridad migración/rollback,
+    `test_capacidades`.
+  - [ ] **G1b — Recorrido del alta con correo.** `alta_correo.py` con puerto
+    de envío (`Protocol`) y doble de prueba; sin emisor configurado con la
+    clave encendida → incidente + aviso neutral, nunca "enviado".
+    Bienvenida y pedido de correo del pack al activar (clave encendida);
+    recepción del correo, envío, `/start pv_{token}` en
+    `gateway._activacion`, reenviar/cambiar, mensajes literales de §5,
+    control antes del despacho conversacional para el modo `alta`.
+  - [ ] **G1c — Integrantes ya activos (modo `existente`).** Al encender la
+    clave (comando de `cli.py`), a quien ya estaba activo sin correo se le
+    pide una vez, sin bloquearlo; en ese modo sólo un mensaje que es
+    exactamente una dirección de correo entra al recorrido, el resto va al
+    agente como siempre.
+  - [ ] **G1d — Avisos "🛠️ Administración" por el bot de administración.**
+    Camino de salida propio (hoy el bot de administración no envía nada y
+    `message_outbox` exige `workspace_id`); botones Reenviar correo /
+    Cambiar correo con vista previa y confirmación; aviso informativo de
+    quiénes faltan dar su correo; texto libre → respuesta breve sin acción.
+  - [ ] **G1e — Tanda 1** (escenarios de banco `g-` o `TestClient`) con
+    A01-A05, X01, X02 y los casos de `01` §9. La Tanda 2 por Telegram real
+    espera a G2 (C4).
 - [ ] **G2 — Credencial de Google por espacio.** Tabla dedicada sin
   privilegios de `prisma_app` (patrón `acceso_tablero`), cifrado en reposo,
   flujo OAuth mínimo. Depende de las decisiones abiertas 1, 4 y 6.
@@ -449,6 +480,12 @@ ficticios, una interacción por vez; el primer defecto detiene el lote.
   - Las acciones y la configuración complejas quedan para el panel.
   - Registro de la decisión del usuario, que primero consideró recibirlos en
     el chat del equipo y eligió el bot separado para evitar confusión.
+- **C5 resuelto (2026-09-27): a quien ya estaba activo se le pide el correo
+  sin bloquearlo.** Sigue trabajando normal; Prisma le pide el correo una
+  vez, con el mismo recorrido de verificación; sin correo no se lo puede
+  invitar por Calendar; la administración puede recibir un aviso
+  informativo con quiénes faltan. El bloqueo hasta verificar rige sólo para
+  las altas nuevas con la clave encendida.
 
 ## Ruta
 
