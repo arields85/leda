@@ -21,6 +21,9 @@ Estas pruebas cubren:
 
 from __future__ import annotations
 
+import psycopg
+import pytest
+
 from prisma import herramientas as H
 from prisma.autoridad import Canal, Denegado, identificar
 from prisma.db import admin, espacio
@@ -419,3 +422,139 @@ def test_aprobar_tarea_no_repite_la_palabra_falta_en_el_mensaje(corework, conn):
         tg_nahuel = _tg(cur, "Nahuel Gimenez")
         cuerpo = _outbox_ultimo(cur, ws, tg_nahuel)
     assert cuerpo.lower().count("falta") == 1
+
+
+# ---------------------------------------------------------------------------
+# 5. Una aprobación anterior no sobrevive a "Pedir cambios" (T6a,
+#    review-c112506a)
+# ---------------------------------------------------------------------------
+
+def test_pedir_cambios_invalida_una_aprobacion_anterior_que_no_habia_cerrado(
+        corework, conn):
+    """Antes de esta corrección, `motivo_no_cierra_tarea` contaba cualquier
+    `approval` 'aprobado' del aprobador, de cualquier momento. Escenario
+    completo: Marcos aprueba una entrega que no cierra porque queda un
+    bloqueo abierto (registrado directo en `blocker`, no vía
+    `registrar_bloqueo` -- ese cambia el estado a `bloqueada`, y acá la
+    tarea tiene que seguir `en_revision` para poder aprobarse); pide
+    cambios (ADR 0009, decisión 4); Nahuel vuelve a entregar; se resuelve el
+    bloqueo -- la aprobación vieja ya no puede contar: falta una aprobación
+    NUEVA, y cerrar sigue bloqueado hasta que llegue."""
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        tid = _tarea(cur, ws, estado="en_revision")
+        _evidencia(cur, ws, tid)
+        cur.execute(
+            """insert into blocker (workspace_id, task_id, causa)
+               values (%s, %s, 'permiso pendiente de otro equipo') returning id""",
+            (ws, tid))
+        bloqueo_id = cur.fetchone()["id"]
+    conn.commit()
+
+    # Marcos aprueba: la aprobación se registra, pero el bloqueo todavía
+    # abierto impide cerrar.
+    with espacio(conn, ws) as cur:
+        marcos = _quien(cur, "Marcos Tarquini", ws)
+        resultado = H.ejecutar(cur, marcos, "aprobar_tarea", {"tarea_id": tid},
+                               ya_confirmada=True)
+    assert resultado["aprobada"] is True
+    assert resultado["cerrada"] is False
+    assert "bloqueo" in resultado["falta"].lower()
+
+    # Marcos pide cambios: la tarea vuelve a en_curso; esa aprobación queda
+    # invalidada por el `approval` 'rechazado' que acaba de insertarse.
+    with espacio(conn, ws) as cur:
+        marcos = _quien(cur, "Marcos Tarquini", ws)
+        H.ejecutar(cur, marcos, "pedir_cambios_tarea",
+                   {"tarea_id": tid, "comentario": "Falta ajustar el HMI."},
+                   ya_confirmada=True)
+
+    with admin(conn) as cur:
+        cur.execute("select estado from task where id = %s", (tid,))
+        assert cur.fetchone()["estado"] == "en_curso"
+
+    # Nahuel vuelve a entregar (la evidencia ya estaba, no hace falta de
+    # nuevo) y se resuelve el bloqueo.
+    with espacio(conn, ws) as cur:
+        nahuel = _quien(cur, "Nahuel Gimenez", ws)
+        resultado = H.ejecutar(cur, nahuel, "actualizar_estado",
+                               {"tarea_id": tid, "estado": "en_revision"},
+                               ya_confirmada=True)
+    assert resultado == {"estado": "en_revision"}
+
+    with admin(conn) as cur:
+        cur.execute(
+            "update blocker set resuelto_en = now(), resolucion = 'listo' "
+            "where id = %s", (bloqueo_id,))
+
+        # El bloqueo ya no cuenta, pero la aprobación vieja tampoco: todavía
+        # falta una aprobación.
+        cur.execute("select motivo_no_cierra_tarea(%s) as m", (tid,))
+        assert (cur.fetchone()["m"] ==
+               "Falta la aprobación de quien revisa ese trabajo.")
+
+    with admin(conn) as cur:
+        with pytest.raises(psycopg.errors.RaiseException, match="aprobación"):
+            cur.execute(
+                """insert into task_state_event (task_id, estado_anterior,
+                                                 estado_nuevo, actor_kind)
+                   values (%s, 'en_revision', 'terminada', 'sistema')""", (tid,))
+
+    # Una aprobación nueva -- posterior al "Pedir cambios" -- sí alcanza.
+    with espacio(conn, ws) as cur:
+        marcos = _quien(cur, "Marcos Tarquini", ws)
+        resultado = H.ejecutar(cur, marcos, "aprobar_tarea", {"tarea_id": tid},
+                               ya_confirmada=True)
+    assert resultado == {"aprobada": True, "cerrada": True, "falta": None,
+                         "titulo": "Programar HMI línea 2"}
+
+    with admin(conn) as cur:
+        cur.execute("select estado from task where id = %s", (tid,))
+        assert cur.fetchone()["estado"] == "terminada"
+
+
+def test_motivo_no_cierra_tarea_empate_de_at_no_cuenta_como_aprobada(
+        corework, conn):
+    """Regla explícita de la corrección: un 'aprobado' y un 'rechazado' del
+    mismo aprobador con el mismo `at` -- dos filas insertadas en la misma
+    transacción, donde `now()` es estable en PostgreSQL -- son un empate, y
+    el empate falla cerrado: nunca cuenta como aprobada."""
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        tid = _tarea(cur, ws, estado="en_revision")
+        _evidencia(cur, ws, tid)
+    conn.commit()
+
+    with espacio(conn, ws) as cur:
+        marcos = _quien(cur, "Marcos Tarquini", ws)
+        cur.execute(
+            """insert into approval (workspace_id, sujeto_tipo, sujeto_id,
+                                     aprobador_membership_id, decision)
+               values (%s, 'tarea', %s, %s, 'aprobado')""",
+            (ws, tid, marcos.membership_id))
+        cur.execute(
+            """insert into approval (workspace_id, sujeto_tipo, sujeto_id,
+                                     aprobador_membership_id, decision, comentario)
+               values (%s, 'tarea', %s, %s, 'rechazado', 'empate')""",
+            (ws, tid, marcos.membership_id))
+        cur.execute("select motivo_no_cierra_tarea(%s) as m", (tid,))
+        motivo = cur.fetchone()["m"]
+    assert motivo == "Falta la aprobación de quien revisa ese trabajo."
+
+
+def test_aprobar_tarea_plana_sigue_alcanzando_para_cerrar(corework, conn):
+    """Regresión: una aprobación sin ningún 'pedir cambios' de por medio
+    sigue contando -- el arreglo de T6a no exige nada nuevo cuando no hubo
+    'rechazado'."""
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        tid = _tarea(cur, ws, estado="en_revision")
+        _evidencia(cur, ws, tid)
+    conn.commit()
+
+    with espacio(conn, ws) as cur:
+        marcos = _quien(cur, "Marcos Tarquini", ws)
+        resultado = H.ejecutar(cur, marcos, "aprobar_tarea", {"tarea_id": tid},
+                               ya_confirmada=True)
+    assert resultado == {"aprobada": True, "cerrada": True, "falta": None,
+                         "titulo": "Programar HMI línea 2"}

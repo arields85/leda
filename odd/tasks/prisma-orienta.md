@@ -74,6 +74,14 @@ gestión.
   segunda sesión por Telegram.
   - [x] Documentación (2026-09-26, ver Progreso).
   - [ ] Segunda sesión real por Telegram, datos ficticios (necesita al usuario).
+- [ ] **T6 — Seguimientos de review-c112506a (entrega con evidencia).**
+  - [x] **T6a — Una aprobación anterior no sobrevive a "Pedir cambios".**
+    `motivo_no_cierra_tarea` acepta cualquier `approval` `aprobado` del
+    aprobador, de cualquier momento: si una aprobación no cerró la tarea
+    (dependencia o bloqueo abierto) y después el aprobador pidió cambios, al
+    volver a entregar la tarea puede cerrarse sin que nadie apruebe el trabajo
+    corregido. Cuenta sólo si la última decisión del aprobador sobre la tarea
+    es `aprobado` (empate de `at` = no aprobada). Migración `0013`.
 
 ## Ruta
 
@@ -85,6 +93,7 @@ gestión.
 | T3 | a decidir tras T1 | depende de dónde quede la herramienta |
 | T4 | delegada, un escritor | `tests/banco/` |
 | T5 | inline | documentación |
+| T6a | delegada, un escritor | `db/esquema.sql`, migración y rollback `0013`, pruebas (4 archivos) |
 
 ## Verificación
 
@@ -3059,3 +3068,26 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   personas y tareas, títulos sin sufijo, con `evidencia_requerida` coherente con la
   política del pack) que cargue una base de prueba nueva o restaurada, nunca editando
   campos inmutables; documentar su uso en `PRUEBA-LOCAL.md`.
+
+- 2026-09-27: **T6a cerrada — una aprobación anterior no sobrevive a "Pedir
+  cambios"** (seguimiento de review-c112506a). Ruta: delegada, un escritor
+  (`db/esquema.sql`, migración y rollback `0013`, pruebas). `motivo_no_cierra_tarea`
+  cuenta un `approval` 'aprobado' sólo si no hay un 'rechazado' del mismo aprobador
+  con `at` posterior o igual (el empate falla cerrado). Migración
+  `db/migrations/0013_aprobacion_no_sobrevive_a_pedir_cambios.sql` y su rollback
+  (restaura el cuerpo de `0012`); **no aplicada todavía a la base local**.
+  Pruebas nuevas en `tests/test_entrega_con_evidencia.py` (sección 5): escenario
+  completo con un bloqueo abierto, empate de `at`, y regresión de aprobación simple.
+  Hallazgo del escritor: el escenario con una dependencia bloqueante abierta no se
+  puede reproducir hoy, porque "Pedir cambios" devuelve la tarea a `en_curso` y el
+  disparador de `0008` rechaza esa transición con la dependencia abierta -- es
+  exactamente el seguimiento T6c. Fuera de alcance, anotado:
+  `motivo_no_cierra_objetivo` tiene el mismo patrón ("cualquier 'aprobado' cuenta
+  para siempre"), sin camino de rechazo para objetivos hoy.
+  RED: `pytest -q tests/test_entrega_con_evidencia.py -k "pedir_cambios_invalida or
+  empate_de_at or plana_sigue"` -> `2 failed, 1 passed`. GREEN: mismo comando ->
+  `3 passed`. Enfocada (reejecutada por el orquestador): `pytest -q
+  tests/test_entrega_con_evidencia.py tests/test_aprobacion_cierra_tarea.py
+  tests/test_task_intake.py tests/test_menu_tarea.py` -> `141 passed` (incluye el
+  ensayo migración/rollback, que descubre `0013` solo). Suite completa (escritor):
+  `.venv/Scripts/python.exe -m pytest -q` -> `930 passed, 108 deselected`.

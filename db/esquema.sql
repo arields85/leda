@@ -1682,12 +1682,27 @@ begin
   select m.aprobador_membership_id into aprobador
     from membership m where m.id = t.responsable_membership_id;
 
+  -- Sólo cuenta si la ÚLTIMA decisión del aprobador sobre esta tarea es
+  -- 'aprobado' (migración 0013, review-c112506a): ADR 0009 agregó "Pedir
+  -- cambios", que inserta un `approval` 'rechazado' y devuelve la tarea a
+  -- `en_curso` -- sin este chequeo, una aprobación vieja que no había
+  -- alcanzado para cerrar (por ejemplo por un bloqueo abierto) seguía
+  -- contando para siempre, y el trabajo corregido
+  -- podía cerrarse sin que nadie lo aprobara. Una fila 'aprobado' cuenta
+  -- sólo si no existe ningún 'rechazado' del mismo aprobador con `at`
+  -- posterior o igual: el empate falla cerrado, nunca aprobado.
   if aprobador is not null
      and not exists (
        select 1 from approval a
         where a.sujeto_tipo = 'tarea' and a.sujeto_id = p_task
           and a.decision = 'aprobado'
-          and a.aprobador_membership_id = aprobador) then
+          and a.aprobador_membership_id = aprobador
+          and not exists (
+            select 1 from approval r
+             where r.sujeto_tipo = 'tarea' and r.sujeto_id = p_task
+               and r.aprobador_membership_id = aprobador
+               and r.decision = 'rechazado'
+               and r.at >= a.at)) then
     return 'Falta la aprobación de quien revisa ese trabajo.';
   end if;
 
