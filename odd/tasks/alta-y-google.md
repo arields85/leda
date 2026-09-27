@@ -294,7 +294,7 @@ Un worktree nuevo no trae lo que no se versiona.
   cierre: con la clave apagada, activar por Telegram funciona exactamente
   igual que hoy; encendida, el correo se pide, se verifica y queda registrado
   como hecho auditable aparte.
-  - [ ] **G1a — Esquema del alta con correo.** Migración `0100` + rollback:
+  - [x] **G1a — Esquema del alta con correo.** Migración `0100` + rollback:
     eventos de alta append-only con proyección por disparador (estados de
     §4, `review_required`, modo `alta`/`existente`); token de verificación
     sin privilegios de `prisma_app` y funciones `security definer` de
@@ -305,6 +305,13 @@ Un worktree nuevo no trae lo que no se versiona.
     transiciones válidas e inválidas, aislamiento entre espacios,
     `prisma_app` sin acceso directo, paridad migración/rollback,
     `test_capacidades`.
+    Hecho (ruta: delegada, un escritor; disparador: esquema, migración,
+    rollback, capa Python y pruebas). Tablas `alta_correo_evento` (append-only)
+    + proyección `alta_correo_estado` con grafo validado en la base,
+    `alta_correo_contacto`, `alta_correo_verificacion` (sólo por funciones,
+    como `acceso_tablero`), `aviso_administrativo`. Seguimiento para G1d:
+    hoy `prisma_app` tiene `update` directo sobre `aviso_administrativo`;
+    marcar leído/resuelto debe quedar sólo para el canal de administración.
   - [ ] **G1b — Recorrido del alta con correo.** `alta_correo.py` con puerto
     de envío (`Protocol`) y doble de prueba; sin emisor configurado con la
     clave encendida → incidente + aviso neutral, nunca "enviado".
@@ -534,6 +541,12 @@ por commit, igual que en `main`. Nunca push sin pedido explícito del usuario.
 - 2026-09-27: pack y corpus leídos completos; matriz de G0 redactada arriba
   (conflictos C1-C9). Pendiente la aprobación del usuario y la aceptación de
   ADR 0010.
+- 2026-09-27: G1a. RED: `pytest -q tests/test_alta_correo.py` con el
+  esquema anterior → `36 failed, 2 passed` (tablas y funciones inexistentes).
+  GREEN: `pytest -q tests/test_alta_correo.py` → `39 passed`;
+  `pytest -q tests/test_task_intake.py tests/test_capacidades.py` →
+  `86 passed` (paridad migración/rollback incluida); suite completa del
+  escritor y repetida por la sesión → `992 passed, 108 deselected`.
 - Dependencia registrada: el hecho "bienvenida entregada" de G1 queda como
   evento propio para que la unidad de saludo diario de `main` (pack 06)
   pueda contarlo como saludo del día.

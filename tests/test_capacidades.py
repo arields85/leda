@@ -68,7 +68,11 @@ TABLAS_MUERTAS = ("conversation_access_log", "learning")
 # `acceso_tablero` se toca únicamente desde sus dos funciones `security
 # definer`, por diseño: `prisma_app` no tiene ningún privilegio sobre ella.
 # Que sus columnas no aparezcan en `src/` es la señal de que eso se respeta.
-TABLAS_POR_FUNCION = ("acceso_tablero",)
+# `alta_correo_verificacion` (rama auxiliar/alta-y-google, G1a) sigue el
+# mismo patrón: el token de verificación sólo se toca desde
+# emitir_verificacion_correo(), reservar_verificacion_correo() y
+# completar_verificacion_correo().
+TABLAS_POR_FUNCION = ("acceso_tablero", "alta_correo_verificacion")
 
 
 def _fuente() -> str:
