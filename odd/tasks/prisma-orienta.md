@@ -3182,3 +3182,6 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   tests/test_entrega_con_evidencia.py tests/test_menu_tarea.py
   tests/test_aprobacion_cierra_tarea.py` -> `66 passed`. Suite completa (escritor):
   `938 passed, 108 deselected`.
+  Commit `2ab76bf`. RDD: `review assess --base-ref 12aecaa --committed-only` -> medio,
+  `review_due` falso (`under_budget`, 236 líneas): queda pendiente en el tramo hasta
+  que un commit siguiente alcance el presupuesto; la frontera sigue en `12aecaa`.
