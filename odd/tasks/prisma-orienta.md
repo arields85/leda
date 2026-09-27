@@ -104,7 +104,15 @@ gestión.
     deduplica nada. Derivarla de la identidad del acto de entrega.
   - [ ] **T6e — Prueba de punta a punta de "Pedir cambios".**
   - [ ] **T6f — Serializar "Aprobar" y "Pedir cambios" concurrentes** (review-3cf89bef).
-  - [ ] **T6g — Empate de evidencia y entrega repetida en `en_revision`** (review-e719d807).
+  - [ ] **T6g — Empate de evidencia y entrega repetida en `en_revision`** (review-e719d807,
+    review-09452c69). Una entrega repetida sobre una tarea ya `en_revision` inserta
+    un evento `en_revision -> en_revision`: además de sumar evidencia, hace que
+    `estado_previo_a_revision` devuelva `en_revision` y que "Pedir cambios" mande a
+    `asignada` una tarea que estaba en curso (y el empate de `at` en una misma
+    transacción queda sin desempate). Decidir si esa transición se rechaza (riesgo 3,
+    sin grafo de transiciones) o si la función ignora los eventos de mismo estado.
+    Sumar pruebas: previo nulo -> `asignada`; rama `en_revision` de
+    `_preparar_actualizar_estado` sin confirmar.
   - [ ] **T6h — Seguimientos de review-6b1efba1 sobre el aviso de entrega.** (1) Dos
     entregas reales en una misma transacción colapsan en un solo aviso y la prueba
     lo da por correcto sin verificar que no queden `pending_action` de botones
@@ -3222,3 +3230,10 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   (reejecutada por el orquestador): `pytest -q tests/test_entrega_con_evidencia.py
   tests/test_dependencias.py tests/test_task_intake.py` -> `144 passed`. Suite
   completa (escritor): `944 passed, 108 deselected`.
+  Commit `9d400c8`. RDD: medio, `review_due` (`slice_budget_reached`, 538 líneas);
+  consentimiento del usuario: revisar. review-09452c696da77aaa (una lente,
+  confiabilidad) aprobada y reconocida; frontera en `9d400c8`. Un WARNING
+  (eventos `en_revision -> en_revision` confunden a `estado_previo_a_revision`) y
+  dos sugerencias de pruebas -> sumados a T6g. La cuarta sugerencia (la migración
+  no se ejercita) no aplica: el ensayo de `tests/test_task_intake.py` aplica cada
+  migración y su rollback y los comparó contra el esquema en esta misma suite.
