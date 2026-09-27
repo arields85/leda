@@ -105,6 +105,13 @@ gestión.
   - [ ] **T6e — Prueba de punta a punta de "Pedir cambios".**
   - [ ] **T6f — Serializar "Aprobar" y "Pedir cambios" concurrentes** (review-3cf89bef).
   - [ ] **T6g — Empate de evidencia y entrega repetida en `en_revision`** (review-e719d807).
+  - [ ] **T6h — Seguimientos de review-6b1efba1 sobre el aviso de entrega.** (1) Dos
+    entregas reales en una misma transacción colapsan en un solo aviso y la prueba
+    lo da por correcto sin verificar que no queden `pending_action` de botones
+    huérfanas; (2) `pg_current_xact_id()` se consulta aunque haya `evidencia_id` y
+    exige PostgreSQL 13+: consultarla sólo sin evidencia y fijar la versión mínima;
+    (3) ninguna prueba verifica la forma de la clave (`tarea_id` + transacción) ni
+    que dos tareas en la misma transacción no colisionen.
 
 ## Ruta
 
@@ -3185,3 +3192,15 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   Commit `2ab76bf`. RDD: `review assess --base-ref 12aecaa --committed-only` -> medio,
   `review_due` falso (`under_budget`, 236 líneas): queda pendiente en el tramo hasta
   que un commit siguiente alcance el presupuesto; la frontera sigue en `12aecaa`.
+
+- 2026-09-27: **Revisión del tramo `12aecaa..dec6ae9`** (T6d `2ab76bf` + ADR 0010 y
+  `odd/tasks/alta-y-google.md`). RDD: medio, `review_due` (`slice_budget_reached`,
+  837 líneas); consentimiento del usuario: revisar. review-6b1efba15aab793d (una
+  lente, confiabilidad) aprobada y reconocida (autoridad quemada); frontera en
+  `dec6ae9`. Un WARNING y dos sugerencias no bloqueantes -> T6h.
+- 2026-09-27: **Rama auxiliar creada.** `auxiliar/alta-y-google` en
+  `D:\Proyectos\Prisma-PM-worktrees\alta-y-google`, desde `main` en `dec6ae9`
+  (`aux` es un nombre reservado de Windows y git no pudo crear la carpeta de la
+  referencia; se renombró). Alcance, contrato y fuentes en
+  `odd/tasks/alta-y-google.md`; ADR 0010 en propuesta. `main` no cambia de
+  comportamiento hasta la integración.
