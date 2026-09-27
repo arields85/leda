@@ -2317,6 +2317,7 @@ language plpgsql security definer set search_path = prisma, public, pg_temp as $
 declare
   espacio uuid;
   ciclo_actual integer;
+  estado_actual text;
   envios_hora integer;
   envios_ciclo integer;
   nuevo uuid;
@@ -2332,10 +2333,21 @@ begin
     return;
   end if;
 
-  select e.ciclo into ciclo_actual from alta_correo_estado e
-   where e.membership_id = p_membership_id;
+  -- El `for update` bloquea la proyección de esta membresía hasta el final
+  -- de la transacción: dos emisiones concurrentes para la misma persona se
+  -- serializan acá, así los límites de 3/hora y 5/ciclo cuentan sobre un
+  -- estado que no puede cambiar debajo de la cuenta (G1a2, hallazgo de la
+  -- revisión).
+  select e.ciclo, e.estado into ciclo_actual, estado_actual
+    from alta_correo_estado e
+   where e.membership_id = p_membership_id
+   for update;
   if ciclo_actual is null then
     return query select false, 'verification_no_cycle'::text, null::uuid;
+    return;
+  end if;
+  if estado_actual not in ('awaiting_email', 'pending_email_verification') then
+    return query select false, 'verification_state_invalid'::text, null::uuid;
     return;
   end if;
 
@@ -2365,12 +2377,21 @@ begin
      set vigente = false
    where membership_id = p_membership_id and ciclo = ciclo_actual and vigente;
 
-  insert into alta_correo_verificacion
-      (workspace_id, membership_id, ciclo, email, token_hash,
-       proveedor_referencia, vigente, emitido_en, expira_en)
-    values (espacio, p_membership_id, ciclo_actual, p_email, p_token_hash,
-            p_proveedor_referencia, true, p_ahora, p_ahora + interval '24 hours')
-    returning alta_correo_verificacion.id into nuevo;
+  -- El lock de arriba ya vuelve esto inalcanzable en la práctica; queda como
+  -- defensa en profundidad: si de algún modo dos emisiones llegaran a
+  -- competir por el mismo (membership_id, ciclo) vigente, la base devuelve
+  -- un motivo tipado, nunca una excepción cruda.
+  begin
+    insert into alta_correo_verificacion
+        (workspace_id, membership_id, ciclo, email, token_hash,
+         proveedor_referencia, vigente, emitido_en, expira_en)
+      values (espacio, p_membership_id, ciclo_actual, p_email, p_token_hash,
+              p_proveedor_referencia, true, p_ahora, p_ahora + interval '24 hours')
+      returning alta_correo_verificacion.id into nuevo;
+  exception when unique_violation then
+    return query select false, 'verification_conflict'::text, null::uuid;
+    return;
+  end;
 
   return query select true, null::text, nuevo;
 end $$;
@@ -2379,7 +2400,10 @@ create or replace function reservar_verificacion_correo(
     p_token_hash text, p_membership_id uuid, p_ahora timestamptz)
 returns table (ok boolean, motivo text, workspace_id uuid, ciclo integer, email text)
 language plpgsql security definer set search_path = prisma, public, pg_temp as $$
-declare v alta_correo_verificacion%rowtype;
+declare
+  v alta_correo_verificacion%rowtype;
+  espacio_anterior text := current_setting('prisma.workspace_id', true);
+  membresia_activa boolean;
 begin
   select * into v from alta_correo_verificacion a
    where a.token_hash = p_token_hash
@@ -2410,12 +2434,26 @@ begin
                         null::uuid, null::integer, null::text;
     return;
   end if;
-  if not exists (select 1 from membership m
-                  where m.id = p_membership_id and m.activo) then
+
+  -- `membership` lleva política de aislamiento y esta función puede llegar
+  -- sin ningún espacio declarado en la sesión (el `/start pv_{token}` de
+  -- Telegram, antes de saber a qué equipo pertenece). Fija el espacio del
+  -- token sólo para esta lectura y lo restaura enseguida: nada más abajo
+  -- necesita RLS (G1a2, hallazgo de la revisión).
+  perform set_config('prisma.workspace_id', v.workspace_id::text, true);
+  membresia_activa := exists (select 1 from membership m
+                                where m.id = p_membership_id and m.activo);
+  perform set_config('prisma.workspace_id', coalesce(espacio_anterior, ''), true);
+
+  if not membresia_activa then
     return query select false, 'verification_token_invalid'::text,
                         null::uuid, null::integer, null::text;
     return;
   end if;
+  -- La reserva es de exclusión mutua, no de propiedad: mientras esté viva
+  -- (5 minutos), NADIE puede volver a reservar el mismo token -- ni
+  -- siquiera la propia membresía que la abrió -- para que dos procesos
+  -- concurrentes no se crucen a mitad de la verificación.
   if v.reservado_hasta is not null and v.reservado_hasta > p_ahora then
     return query select false, 'verification_token_busy'::text,
                         null::uuid, null::integer, null::text;
@@ -2468,8 +2506,19 @@ begin
     return query select false, 'verification_token_busy'::text;
     return;
   end if;
+
+  -- Desde acá se leen y escriben tablas con política de aislamiento
+  -- (`membership`, `alta_correo_estado`, `alta_correo_contacto`): el espacio
+  -- se fija ANTES de tocarlas, para que llamar sin espacio declarado en la
+  -- sesión (el `/start pv_{token}` de Telegram, antes de saber a qué equipo
+  -- pertenece) resuelva el camino feliz y no choque contra la RLS. Se
+  -- restaura en cada salida de acá en adelante, no sólo al final (G1a2,
+  -- hallazgo de la revisión).
+  perform set_config('prisma.workspace_id', v.workspace_id::text, true);
+
   if not exists (select 1 from membership m
                   where m.id = p_membership_id and m.activo) then
+    perform set_config('prisma.workspace_id', coalesce(espacio_anterior, ''), true);
     return query select false, 'verification_token_invalid'::text;
     return;
   end if;
@@ -2481,6 +2530,7 @@ begin
    for update;
   if not found or proyeccion.estado <> 'pending_email_verification' then
     update alta_correo_verificacion set reservado_hasta = null where id = v.id;
+    perform set_config('prisma.workspace_id', coalesce(espacio_anterior, ''), true);
     return query select false, 'verification_state_changed'::text;
     return;
   end if;
@@ -2494,11 +2544,11 @@ begin
           actualizado_en = excluded.actualizado_en;
   exception when unique_violation then
     update alta_correo_verificacion set reservado_hasta = null where id = v.id;
+    perform set_config('prisma.workspace_id', coalesce(espacio_anterior, ''), true);
     return query select false, 'email_in_use'::text;
     return;
   end;
 
-  perform set_config('prisma.workspace_id', v.workspace_id::text, true);
   insert into alta_correo_evento
       (membership_id, ciclo, tipo, modo, estado_anterior, estado_nuevo, actor_kind)
     values (p_membership_id, v.ciclo, 'transicion', proyeccion.modo,

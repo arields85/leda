@@ -318,7 +318,7 @@ Un worktree nuevo no trae lo que no se versiona.
     estado) corregido en `7a21374` con prueba nueva (RED observado → GREEN;
     suite completa `993 passed, 108 deselected`); validación dirigida
     aprobada; reconocimiento emitido (autoridad consumida).
-  - [ ] **G1a2 — Endurecimiento tras la revisión** (hallazgos no bloqueantes
+  - [x] **G1a2 — Endurecimiento tras la revisión** (hallazgos no bloqueantes
     de la misma revisión): `emitir_verificacion_correo` bloquea la
     proyección y exige `awaiting_email` o `pending_email_verification`
     (límites 3/h y 5/ciclo sin carrera; la carrera sobre el índice único
@@ -329,6 +329,15 @@ Un worktree nuevo no trae lo que no se versiona.
     no queda contacto y que la reserva se libera; `habilitado()` filtra por
     el espacio; `prisma_app` sin `update` directo sobre
     `aviso_administrativo` si G1d no lo necesita.
+    Hecho (ruta: delegada, un escritor). Motivos nuevos
+    `verification_state_invalid` y `verification_conflict`; prueba real de
+    concurrencia con dos conexiones (RED: `UniqueViolation` sin capturar →
+    GREEN); `reservar`/`completar` funcionan sin espacio declarado (RED:
+    `verification_token_invalid` → GREEN); `habilitado(cur, workspace_id)`
+    filtra por espacio. Los tres caminos de falla de `completar` resultaron
+    guardas de regresión (ya correctos). El `update` de `prisma_app` sobre
+    `aviso_administrativo` queda para G1d. Suite: `1000 passed, 108
+    deselected`; repetición parcial de la sesión: `133 passed`.
   - [ ] **G1b — Recorrido del alta con correo.** `alta_correo.py` con puerto
     de envío (`Protocol`) y doble de prueba; sin emisor configurado con la
     clave encendida → incidente + aviso neutral, nunca "enviado".

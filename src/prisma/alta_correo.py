@@ -50,14 +50,20 @@ def hash_token(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
-def habilitado(cur: psycopg.Cursor) -> bool:
+def habilitado(cur: psycopg.Cursor, workspace_id: str) -> bool:
     """Si la clave del espacio para pedir y verificar correo está encendida.
 
     Ausencia de fila = apagada: es la configuración por defecto del
     producto, y `main` no la enciende nunca.
+
+    El espacio se filtra explícitamente, no sólo por la RLS de la sesión: una
+    conexión de administración (`admin()`) ve todos los espacios, y sin este
+    filtro leería la clave de cualquiera, no la del que llama (G1a2, hallazgo
+    de la revisión).
     """
-    cur.execute("select valor from workspace_setting where clave = %s",
-                (CLAVE_HABILITADO,))
+    cur.execute(
+        "select valor from workspace_setting where workspace_id = %s and clave = %s",
+        (workspace_id, CLAVE_HABILITADO))
     fila = cur.fetchone()
     if not fila:
         return False
