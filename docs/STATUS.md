@@ -141,20 +141,28 @@ se verifica sobre una base nueva dentro de un clúster existente.
 
 ## Próximo paso
 
-**Terminar T5 de "Prisma orienta"** (`odd/tasks/prisma-orienta.md`,
-[`ADR 0007`](decisions/0007-prisma-orienta-no-charla.md)): T1 a T4b ya están cerradas y
-commiteadas en `main` (ver "Cerrado: Prisma orienta (T1-T4b)" más abajo). La parte
-documental de T5 queda hecha con esta actualización; falta la **segunda sesión real por
-Telegram con datos ficticios**, que necesita al usuario.
+**Segunda sesión real por Telegram hecha** (2026-09-27, datos ficticios, base local con
+copias `db/respaldos/prisma-antes-sesion2-20260927.dump` y
+`prisma-antes-0012-20260927.dump`; cero incidentes). Diez hallazgos, registrados en
+`odd/tasks/prisma-orienta.md`: los hallazgos 1 a 7 quedaron corregidos y probados en vivo
+(lista de botones por unión de consultas, una sola pregunta, etiquetas cortas por palabra
+sin palabra de enlace final, resumen en vez de enumerar, encabezado del menú con
+responsable y estado, aprobar cierra la tarea cuando se cumplen las condiciones —
+[`ADR 0008`](decisions/0008-la-aprobacion-cierra-la-tarea.md)); los hallazgos 8 y 9 se
+construyeron como entrega con evidencia y revisión
+([`ADR 0009`](decisions/0009-entrega-con-evidencia-y-revision.md), migración `0012`
+aplicada también en la base local) y **todavía no se probaron en vivo**.
 
-Antes de esa sesión: comparar la base local con `db/esquema.sql` (hoy al día hasta la
-migración `0012`) y aplicar lo que falte; confirmar que el secreto de Telegram sigue
-protegido. Durante la sesión, ejercitar al menos: una lista de tareas ofrecida como
-botones (más de 4, para ver "Ver más"); tocar una tarea y recorrer menú → vista previa →
-Confirmar; una pregunta del modelo con opciones concretas; un mensaje sin ninguna tarea
-que coincida, para ver el cierre genérico ("Es una tarea nueva" / "Es sobre una tarea
-existente" / "Quiero consultar otra cosa"); y, si surge, una referencia ambigua tipo
-"el plc" (ver `b-0005-b` más abajo).
+Próximo, en este orden: los seguimientos de la revisión de la entrega con evidencia
+(una aprobación anterior sigue valiendo después de "Pedir cambios"; la evidencia nueva se
+descarta al volver a entregar; chequeo de dependencias al pedir cambios; deduplicación
+estable del aviso de entrega; prueba de punta a punta de "Pedir cambios"); después el
+hallazgo 10 (Prisma retoma una pregunta que la persona descartó) y los seguimientos de las
+etiquetas; después la reformulación de referencias por el modelo para `b-0005-b`
+(decisión del usuario: ni bajar el umbral de Jev ni pasarle más contexto), medida con el
+banco real completo sin empeorar ningún escenario; y por último una tercera ronda corta
+por Telegram para probar la entrega con evidencia. Antes de cualquier sesión real:
+comparar la base local con `db/esquema.sql` (hoy al día hasta `0012`).
 
 Abierto de esta unidad, sin bloquear el cierre de T5:
 

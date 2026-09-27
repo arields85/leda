@@ -3017,22 +3017,36 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   aportes sobre tareas); extender `tests/banco/corrida.py` con un paso de texto
   libre intercalado entre dos toques.
 
-- **Próximo paso al retomar:** T5, sólo la segunda sesión real por Telegram (necesita
-  al usuario; datos ficticios). Antes de empezar: comparar la base local con
-  `db/esquema.sql` (hoy al día hasta la migración `0012`) y aplicar lo que falte;
-  confirmar que el secreto de Telegram sigue protegido (no leer `.env*`); confirmar
-  ausencia de datos y trabajo real en el espacio de prueba; tener un plan de pausa o
-  rollback a mano. Ejercitar al menos:
-  - una lista de tareas con más de 4 (para ver los botones y "Ver más");
-  - tocar una tarea y recorrer menú de tarea → vista previa → Confirmar;
-  - una pregunta de Prisma con opciones concretas (`ofrecer_opciones`);
-  - un mensaje sin ninguna tarea que coincida, para ver el cierre genérico ("Es una
-    tarea nueva" / "Es sobre una tarea existente" / "Quiero consultar otra cosa");
-  - si surge naturalmente, una referencia ambigua de una sola palabra clave (tipo
-    "el plc", ver `b-0005-b`).
+- 2026-09-27 (orquestador): **cierre de la segunda sesión real por Telegram.** Datos
+  ficticios en la base local (copias `db/respaldos/prisma-antes-sesion2-20260927.dump` y
+  `prisma-antes-0012-20260927.dump`); cero incidentes en toda la sesión. Diez hallazgos:
+  1 (botones de lista sólo con la última consulta, `efb4feb`), 2 y 6 (dos preguntas: regla
+  del contexto `dafe87e` y la causa real, el servidor pegaba texto y pregunta, `2bee9a9`),
+  3 y 7 (etiquetas cortas por palabra sin palabra de enlace final, `e7071eb`, `2bee9a9`),
+  4 (resumen en vez de enumerar y encabezado del menú con responsable y estado, `e7071eb`,
+  `dafe87e`), 5 (aprobar cierra la tarea si se cumplen las condiciones, `d6885d7`, ADR 0008),
+  8 y 9 (entrega con evidencia y revisión, `739f441`, `8835ad9`, ADR 0009, migración `0012`
+  aplicada en la base local con `psql` y verificada), 10 (retoma una pregunta descartada,
+  pendiente). Probados en vivo: 1 a 7. Sin probar en vivo: 8 y 9. Revisiones de la sesión
+  aprobadas y reconocidas: review-af418dd93b4b39ea, review-ec6f7d80b7e7e7b4,
+  review-149a33fa3aa53447, review-c112506ab1690225 (riesgo alto, cuatro lentes); frontera
+  de revisión en `e8dbc24`. Suite completa: `927 passed, 108 deselected` (escritor de la
+  entrega con evidencia, reproducida dos veces). Decisiones del usuario de la sesión:
+  unión de consultas para los botones; aprobar cierra (ADR 0008); entrega con evidencia y
+  aprobador que ve la evidencia antes de aprobar, "Pedir cambios" (ADR 0009); referencias
+  reformuladas por el modelo como el trabajo al que apuntan, sin bajar el umbral de Jev ni
+  pasarle más contexto, adoptable sólo si el banco real completo no empeora ningún
+  escenario; principio "Prisma ayuda y dirige, firme donde importa, sin burocracia".
+  Los títulos de las tareas ficticias conservan "(simulado)": el esquema protege los campos
+  de compromiso como inmutables y no se forzó; sembrarlas sin sufijo en la próxima base de
+  prueba.
 
-  Registrar en esta unidad: preguntas que la persona considere innecesarias,
-  respuestas vagas que haya que interpretar, y cualquier incidente
-  (`python -m prisma incidentes`). Tras la sesión, actualizar `docs/STATUS.md` con el
-  resultado y cerrar T5.
-
+- **Próximo paso al retomar:** (1) seguimientos de review-c112506a — prioridad: una
+  aprobación anterior sigue valiendo después de "Pedir cambios"; la evidencia nueva se
+  descarta al volver a entregar; `pedir_cambios_tarea` sin chequeo de dependencias; dedupe
+  del aviso de entrega con `uuid4`; prueba de punta a punta de "Pedir cambios"; (2) hallazgo
+  10 y seguimientos de review-149a33fa (etiquetas repetidas del modelo, pregunta suprimida,
+  asserts); (3) referencias reformuladas por el modelo (`b-0005-b`) con banco real antes y
+  después y casos de guarda; (4) tercera ronda corta por Telegram para la entrega con
+  evidencia y "Pedir cambios". Antes de una sesión real: base local contra
+  `db/esquema.sql` (al día hasta `0012`).
