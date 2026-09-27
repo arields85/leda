@@ -43,10 +43,10 @@ tales. Ver [`INDEX.md`](INDEX.md#documentos-superados).
   paridad entre instalación limpia y migración, y rollback guardado. **No fueron
   aplicadas a ninguna base operativa.**
 - El trabajo vive en la rama `main` (renombrada desde `master` el 2026-09-25, a
-  pedido explícito del usuario); al cerrar la sesión del 2026-09-26 el árbol de
-  trabajo quedó limpio (verificado por inspección). El remoto `origin` sigue conectado a
-  GitHub sin ninguna rama (`git ls-remote --heads origin` no devuelve nada); no se
-  hizo push.
+  pedido explícito del usuario). Primer push a `origin` (GitHub) el 2026-09-27, a pedido
+  explícito del usuario: `main` publicada y siguiendo a `origin/main` (verificado con
+  `git ls-remote --heads origin`). Antes del push se verificó que no se versiona ningún
+  `.env`, respaldo ni credencial.
 
 ## Baseline de pruebas
 
