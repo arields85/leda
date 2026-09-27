@@ -186,3 +186,23 @@ definer`; corren con los privilegios de quien llama, y `evidence`/
 (`menu_tarea.evidencia_pendiente`) y el gate de "Aprobar"
 (`_exigir_puede_aprobarse`) heredan la corrección sin cambiar, porque las
 dos llaman a la misma función SQL.
+
+3. **T6c -- "Pedir cambios" con una dependencia bloqueante abierta.**
+   `pedir_cambios_tarea` siempre devolvía la tarea a `en_curso` (decisión 4,
+   arriba); el disparador `exigir_dependencias_resueltas` (0008) rechaza
+   CUALQUIER llegada a `en_curso` con una dependencia bloqueante todavía
+   abierta, salvo la restauración desde `bloqueada` -- así que con esa
+   dependencia abierta, el insert chocaba con el disparador y el aprobador
+   no podía pedir cambios en absoluto (hallazgo anotado al cerrar T6a).
+   Enmienda a la decisión 4: la tarea vuelve al estado que tenía antes de
+   la ÚLTIMA entrada a `en_revision` -- `en_curso` si estaba en curso (una
+   restauración, exenta del gate igual que salir de `bloqueada`),
+   `asignada` en cualquier otro caso (se entregó sin haber arrancado nunca,
+   o no hay un evento anterior registrado -- "Ya la terminé" se ofrece
+   desde `asignada`). Función nueva `estado_previo_a_revision` (misma
+   puerta angosta que `estado_previo_a_bloqueo`, 0007: `security definer`,
+   dueño `prisma_owner`, sin `execute` para `public`), y la misma rama de
+   excepción en el disparador. El chequeo proactivo de
+   `_actualizar_estado`/`_preparar_actualizar_estado` para `en_curso` gana
+   la misma rama, por consistencia con el disparador. Migración
+   `0015_pedir_cambios_exento_del_gate_de_arranque.sql`.

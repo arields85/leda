@@ -1574,6 +1574,15 @@ create trigger trg_exigir_bloqueo_abierto
 -- evento inmediatamente anterior a este, sino el que tenía la tarea justo
 -- antes de bloquearse -- era `en_curso`. Por eso se consulta
 -- `estado_previo_a_bloqueo` (0007), no `new.estado_anterior` a secas.
+--
+-- T6c (`odd/tasks/prisma-orienta.md`): mismo criterio para la vuelta desde
+-- `en_revision`. Decisión del usuario (2026-09-27): "Pedir cambios"
+-- (`herramientas._pedir_cambios_tarea`) devuelve la tarea al estado que
+-- tenía antes de la ÚLTIMA entrada a `en_revision` -- `en_curso` si estaba
+-- en curso, exento por la misma razón que salir de `bloqueada`; `asignada`
+-- si se entregó sin haber arrancado nunca, sin ninguna excepción. Por eso
+-- se consulta `estado_previo_a_revision` (abajo), no `new.estado_anterior`
+-- a secas.
 
 create or replace function motivo_no_arranca_tarea(p_task uuid)
 returns text as $$
@@ -1597,11 +1606,13 @@ begin
 end $$ language plpgsql;
 
 -- No es security definer: corre con los privilegios de quien inserta. Sólo
--- necesita ejecutar `estado_previo_a_bloqueo` (también no security definer
--- para quien la llama desde acá, sólo para lo que lee adentro) cuando la
--- transición realmente sale de `bloqueada`; `prisma_app` -- el único rol
--- que hoy hace pasar una tarea a `en_curso`, vía `resolver_bloqueo` o
--- `actualizar_estado` -- ya tiene `execute` concedido sobre ella desde 0007.
+-- necesita ejecutar `estado_previo_a_bloqueo` y `estado_previo_a_revision`
+-- (tampoco security definer para quien las llama desde acá, sólo para lo
+-- que leen adentro) cuando la transición realmente sale de `bloqueada` o de
+-- `en_revision`; `prisma_app` -- el único rol que hoy hace pasar una tarea a
+-- `en_curso`, vía `resolver_bloqueo`, `pedir_cambios_tarea` o
+-- `actualizar_estado` -- ya tiene `execute` concedido sobre las dos (0007 y
+-- T6c más abajo).
 create or replace function exigir_dependencias_resueltas() returns trigger as $$
 declare
   motivo text;
@@ -1610,6 +1621,8 @@ begin
   if new.estado_nuevo = 'en_curso' then
     if new.estado_anterior = 'bloqueada' then
       restaura_en_curso := estado_previo_a_bloqueo(new.task_id) = 'en_curso';
+    elsif new.estado_anterior = 'en_revision' then
+      restaura_en_curso := estado_previo_a_revision(new.task_id) = 'en_curso';
     end if;
     if not restaura_en_curso then
       motivo := motivo_no_arranca_tarea(new.task_id);
@@ -1752,6 +1765,31 @@ begin
   select estado_anterior into previo
     from task_state_event
    where task_id = p_task and estado_nuevo = 'bloqueada'
+   order by at desc
+   limit 1;
+  return previo;
+end $$;
+
+-- T6c (`odd/tasks/prisma-orienta.md`): la misma puerta angosta que
+-- `estado_previo_a_bloqueo`, pero para la ÚLTIMA entrada a `en_revision` en
+-- vez de a `bloqueada` -- la necesita `herramientas._pedir_cambios_tarea`
+-- para saber a qué estado devolver la tarea al pedirle cambios, y
+-- `exigir_dependencias_resueltas` (arriba) para eximir esa restauración del
+-- mismo freno que exime salir de `bloqueada`.
+--
+-- Filtra por `estado_nuevo = 'en_revision'` a propósito, con el mismo
+-- criterio que `estado_previo_a_bloqueo`: hace falta el `estado_anterior`
+-- de la última vez que la tarea ENTRÓ a `en_revision`, no el de cualquier
+-- evento posterior. Quien llama sigue teniendo que comprobar que la tarea
+-- esté en revisión *ahora* antes de usar este valor.
+create or replace function estado_previo_a_revision(p_task uuid)
+returns estado_tarea
+language plpgsql security definer set search_path = prisma, public, pg_temp as $$
+declare previo estado_tarea;
+begin
+  select estado_anterior into previo
+    from task_state_event
+   where task_id = p_task and estado_nuevo = 'en_revision'
    order by at desc
    limit 1;
   return previo;
@@ -1959,9 +1997,13 @@ alter function aplicar_evento_tarea()
   owner to prisma_owner;
 alter function estado_previo_a_bloqueo(uuid)
   owner to prisma_owner;
+alter function estado_previo_a_revision(uuid)
+  owner to prisma_owner;
 
 revoke execute on function estado_previo_a_bloqueo(uuid) from public;
 grant execute on function estado_previo_a_bloqueo(uuid) to prisma_app;
+revoke execute on function estado_previo_a_revision(uuid) from public;
+grant execute on function estado_previo_a_revision(uuid) to prisma_app;
 
 -- La concesión general de arriba alcanzó a `acceso_tablero` por haberse
 -- definido antes. Se la acota a lo que sus dos funciones necesitan, que es lo

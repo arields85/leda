@@ -931,6 +931,15 @@ def _preparar_actualizar_estado(cur, quien: Solicitante, tarea_id, estado,
         if fila["estado"] == "bloqueada":
             cur.execute("select estado_previo_a_bloqueo(%s) as previo", (tarea_id,))
             restaura_en_curso = cur.fetchone()["previo"] == "en_curso"
+        elif fila["estado"] == "en_revision":
+            # T6c (`odd/tasks/prisma-orienta.md`): mismo criterio que la
+            # rama de `bloqueada`, ahora también para la restauración que
+            # hace `pedir_cambios_tarea` -- consistente con el disparador
+            # `exigir_dependencias_resueltas` (`db/esquema.sql`). Sin esta
+            # rama, este chequeo proactivo devolvería un `falta` que la base
+            # no rechazaría.
+            cur.execute("select estado_previo_a_revision(%s) as previo", (tarea_id,))
+            restaura_en_curso = cur.fetchone()["previo"] == "en_curso"
         if not restaura_en_curso:
             cur.execute("select motivo_no_arranca_tarea(%s) as m", (tarea_id,))
             impedimento = cur.fetchone()["m"]
@@ -1030,9 +1039,18 @@ def _actualizar_estado(cur, quien: Solicitante, tarea_id, estado, motivo=None,
         # dejado pasar justo lo que mecánica §4 prohíbe. La restauración
         # legítima exige además que el estado previo a la ÚLTIMA entrada a
         # `bloqueada` haya sido `en_curso`, igual que el disparador.
+        #
+        # T6c (`odd/tasks/prisma-orienta.md`): mismo criterio para la rama
+        # `en_revision` -- repetido acá por el mismo motivo que el resto de
+        # este chequeo proactivo (el handler es la puerta real a la base,
+        # no depende de que `_preparar_actualizar_estado` haya corrido
+        # antes con los mismos argumentos).
         restaura_en_curso = False
         if fila["estado"] == "bloqueada":
             cur.execute("select estado_previo_a_bloqueo(%s) as previo", (tarea_id,))
+            restaura_en_curso = cur.fetchone()["previo"] == "en_curso"
+        elif fila["estado"] == "en_revision":
+            cur.execute("select estado_previo_a_revision(%s) as previo", (tarea_id,))
             restaura_en_curso = cur.fetchone()["previo"] == "en_curso"
         if not restaura_en_curso:
             cur.execute("select motivo_no_arranca_tarea(%s) as m", (tarea_id,))
@@ -1500,6 +1518,23 @@ def _exigir_puede_pedirse_cambios(cur, fila) -> None:
             f"{_estado_legible(fila['estado']).lower()}.")
 
 
+def _destino_pedir_cambios(cur, tarea_id) -> str:
+    """T6c (`odd/tasks/prisma-orienta.md`), enmienda a la decisión 4 de ADR
+    0009: a qué estado vuelve la tarea al pedirle cambios -- el que tenía
+    antes de la ÚLTIMA entrada a `en_revision` (`estado_previo_a_revision`,
+    `db/esquema.sql`). `en_curso` si estaba en curso: es una restauración,
+    exenta del gate de arranque (`exigir_dependencias_resueltas`), igual que
+    salir de `bloqueada`. Cualquier otro valor -- `asignada` si se entregó
+    sin haber arrancado nunca, o nulo si no hay un evento anterior
+    registrado -- devuelve `asignada`: nunca hace falta eximirla del gate,
+    así que es el default seguro cuando no se puede afirmar que la tarea ya
+    había arrancado.
+    """
+    cur.execute("select estado_previo_a_revision(%s) as previo", (tarea_id,))
+    previo = cur.fetchone()["previo"]
+    return previo if previo == "en_curso" else "asignada"
+
+
 def _preparar_pedir_cambios_tarea(cur, quien: Solicitante, tarea_id, comentario=None):
     cur.execute(
         "select titulo, estado, responsable_membership_id from task where id = %s",
@@ -1520,9 +1555,11 @@ def _preparar_pedir_cambios_tarea(cur, quien: Solicitante, tarea_id, comentario=
     if not comentario:
         raise Denegado("Hace falta contar qué falta corregir.")
 
+    destino = _destino_pedir_cambios(cur, tarea_id)
+
     cambio = (f"Se piden cambios en «{fila['titulo']}»: {comentario} · "
-             "vuelve a en curso")
-    huella = _huella("pedir_cambios_tarea", tarea_id, fila["estado"], comentario)
+             f"vuelve a {_estado_legible(destino).lower()}")
+    huella = _huella("pedir_cambios_tarea", tarea_id, fila["estado"], comentario, destino)
     return Preparacion(cambio=cambio, huella=huella)
 
 
@@ -1553,6 +1590,16 @@ def _pedir_cambios_tarea(cur, quien: Solicitante, tarea_id, comentario=None):
     if not comentario:
         raise Denegado("Hace falta contar qué falta corregir.")
 
+    # T6c (`odd/tasks/prisma-orienta.md`), enmienda a la decisión 4 de ADR
+    # 0009: el destino ya no es siempre `en_curso` -- una tarea que se
+    # entregó sin haber arrancado nunca ("Ya la terminé" se ofrece desde
+    # `asignada`) vuelve a `asignada`, no a un `en_curso` que nunca tuvo. El
+    # disparador `exigir_dependencias_resueltas` (`db/esquema.sql`) exime la
+    # restauración a `en_curso` del gate de arranque; sin ella, esta misma
+    # herramienta era la que no podía pedir cambios con una dependencia
+    # bloqueante todavía abierta -- el insert de abajo lo rechazaba.
+    destino = _destino_pedir_cambios(cur, tarea_id)
+
     # `rechazado` es el único otro valor de `decision_aprobacion`
     # (db/esquema.sql) -- no se agrega un tercero para esto: "pedir
     # cambios" es, en los hechos, un rechazo del trabajo entregado, con la
@@ -1567,12 +1614,13 @@ def _pedir_cambios_tarea(cur, quien: Solicitante, tarea_id, comentario=None):
     cur.execute(
         """insert into task_state_event (task_id, estado_anterior, estado_nuevo,
                                          actor_kind, actor_app_user_id, motivo)
-           values (%s, %s, 'en_curso', 'persona', %s, %s)""",
-        (tarea_id, fila["estado"], quien.app_user_id, comentario))
+           values (%s, %s, %s, 'persona', %s, %s)""",
+        (tarea_id, fila["estado"], destino, quien.app_user_id, comentario))
 
     _avisar(
         cur, quien, fila["responsable_membership_id"],
-        f"{quien.nombre} pidió cambios en «{fila['titulo']}»: {comentario}",
+        (f"{quien.nombre} pidió cambios en «{fila['titulo']}»: {comentario} "
+         f"· vuelve a {_estado_legible(destino).lower()}"),
         dedupe_key=f"{quien.workspace_id}:pedir_cambios:{decision_id}")
 
     return {"pedido": True, "titulo": fila["titulo"]}

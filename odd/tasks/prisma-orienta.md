@@ -92,7 +92,7 @@ gestión.
     muestra esa parte pintada). `evidencia_pendiente` cuenta sólo evidencia con
     `at` posterior al último `rechazado`; la evidencia enviada en la entrega se
     registra siempre. Migración `0014`; enmienda en ADR 0009.
-  - [ ] **T6c — "Pedir cambios" con una dependencia bloqueante abierta.** Hoy la
+  - [x] **T6c — "Pedir cambios" con una dependencia bloqueante abierta.** Hoy la
     vuelta a `en_curso` la rechaza el disparador de `0008` y el aprobador no puede
     pedir cambios. Decisión del usuario (2026-09-27): vuelve al estado que tenía
     antes de la última entrada a `en_revision` -- `en_curso` si estaba en curso (es
@@ -3204,3 +3204,21 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   referencia; se renombró). Alcance, contrato y fuentes en
   `odd/tasks/alta-y-google.md`; ADR 0010 en propuesta. `main` no cambia de
   comportamiento hasta la integración.
+
+- 2026-09-27: **T6c cerrada — "Pedir cambios" vuelve al estado previo a la entrega.**
+  Ruta: delegada, un escritor. Función nueva `estado_previo_a_revision` (misma puerta
+  angosta que `estado_previo_a_bloqueo`: `security definer`, dueña `prisma_owner`,
+  `execute` sólo para `prisma_app`); `exigir_dependencias_resueltas` exime
+  `en_revision -> en_curso` cuando el estado previo a la revisión era `en_curso`;
+  `_pedir_cambios_tarea` devuelve a `en_curso` o a `asignada` (cualquier otro previo
+  -> `asignada`, que nunca saltea el gate), con vista previa, huella y aviso que
+  nombran el destino; el chequeo previo de `_actualizar_estado` quedó consistente
+  con el disparador. Migración `db/migrations/0015_pedir_cambios_exento_del_gate_de_arranque.sql`
+  y su rollback; **no aplicada todavía a la base local** (tampoco 0013 y 0014).
+  Enmienda de ADR 0009 ampliada. Seis pruebas nuevas (sección 8 de
+  `tests/test_entrega_con_evidencia.py`); el helper `_tarea` de ese archivo ahora
+  siembra un evento `en_curso` previo en las tareas `en_revision`.
+  RED (stash de esquema y herramientas): `6 failed`. GREEN: `6 passed`. Enfocada
+  (reejecutada por el orquestador): `pytest -q tests/test_entrega_con_evidencia.py
+  tests/test_dependencias.py tests/test_task_intake.py` -> `144 passed`. Suite
+  completa (escritor): `944 passed, 108 deselected`.

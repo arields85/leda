@@ -56,8 +56,24 @@ def _tarea(cur, ws, *, titulo="Programar HMI línea 2", persona="Nahuel Gimenez"
         (ws, obj, titulo, ws, ws, persona, criterio_aceptacion,
          list(evidencia_requerida) if evidencia_requerida else []))
     t = cur.fetchone()["id"]
-    cur.execute("insert into task_state_event (task_id, estado_nuevo, actor_kind) "
-                "values (%s, %s, 'prisma')", (t, estado))
+    if estado == "en_revision":
+        # T6c (`odd/tasks/prisma-orienta.md`): `_pedir_cambios_tarea` ahora
+        # consulta `estado_previo_a_revision` -- el `estado_anterior` de la
+        # ÚLTIMA entrada a `en_revision` -- para decidir a qué estado
+        # vuelve la tarea. Sin un `en_curso` real antes, ese valor sería
+        # nulo y "Pedir cambios" volvería a `asignada`, rompiendo todas las
+        # pruebas de este archivo que asumen la entrega típica (desde
+        # `en_curso`). Una entrega sin haber arrancado nunca tiene su propio
+        # helper (sección 8, más abajo).
+        cur.execute("insert into task_state_event (task_id, estado_nuevo, "
+                   "actor_kind) values (%s, 'en_curso', 'prisma')", (t,))
+        cur.execute(
+            "insert into task_state_event (task_id, estado_anterior, "
+            "estado_nuevo, actor_kind) values (%s, 'en_curso', 'en_revision', "
+            "'prisma')", (t,))
+    else:
+        cur.execute("insert into task_state_event (task_id, estado_nuevo, actor_kind) "
+                    "values (%s, %s, 'prisma')", (t, estado))
     return str(t)
 
 
@@ -939,3 +955,217 @@ def test_dos_entregas_distintas_con_evidencia_notifican_dos_veces_con_claves_dis
         claves = _dedupe_keys_entrega(cur, ws, tg_marcos)
     assert len(claves) == 2
     assert claves[0] != claves[1]
+
+
+# ---------------------------------------------------------------------------
+# 8. "Pedir cambios" con una dependencia bloqueante abierta (T6c,
+#    `odd/tasks/prisma-orienta.md`; enmienda a la decisión 4 de ADR 0009).
+#    Antes de esta corrección, el disparador `exigir_dependencias_resueltas`
+#    (`db/esquema.sql`) rechazaba CUALQUIER llegada a `en_curso` con una
+#    dependencia bloqueante todavía abierta, incluida la restauración que
+#    hace "Pedir cambios" -- el aprobador no podía pedir cambios en absoluto
+#    mientras esa dependencia siguiera abierta. Decisión del usuario
+#    (2026-09-27): la tarea vuelve al estado que tenía antes de la ÚLTIMA
+#    entrada a `en_revision` -- `en_curso` si estaba en curso (una
+#    restauración, exenta del gate igual que salir de `bloqueada`),
+#    `asignada` si se entregó sin haber arrancado nunca.
+# ---------------------------------------------------------------------------
+
+def _dependencia_bloqueante(cur, ws, destino):
+    """Una dependencia bloqueante abierta sobre `destino`: la origen se crea
+    `asignada` y esta prueba nunca la cierra, así que `motivo_no_arranca_
+    tarea` sigue frenando cualquier llegada a `en_curso` de `destino` que no
+    sea una restauración exenta."""
+    origen = _tarea(cur, ws, titulo="Programar PLC", estado="asignada",
+                    evidencia_requerida=None)
+    cur.execute(
+        """insert into dependency (workspace_id, origen_task_id, destino_task_id, tipo)
+           values (%s, %s, %s, 'bloqueante')""", (ws, origen, destino))
+    return origen
+
+
+def test_pedir_cambios_con_dependencia_bloqueante_abierta_vuelve_a_en_curso(
+        corework, conn):
+    """Antes de esta corrección, este mismo `pedir_cambios_tarea` levantaba
+    `psycopg.errors.RaiseException` ("No se puede pasar la tarea a en
+    curso...") porque el insert a `en_curso` chocaba con el disparador:
+    exactamente el hallazgo anotado al cerrar T6a (`odd/tasks/
+    prisma-orienta.md`)."""
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        tid = _tarea(cur, ws, estado="en_revision")
+        _evidencia(cur, ws, tid)
+        _dependencia_bloqueante(cur, ws, tid)
+    conn.commit()
+
+    with espacio(conn, ws) as cur:
+        marcos = _quien(cur, "Marcos Tarquini", ws)
+        resultado = H.ejecutar(
+            cur, marcos, "pedir_cambios_tarea",
+            {"tarea_id": tid, "comentario": "Falta ajustar el HMI."},
+            ya_confirmada=True)
+    assert resultado == {"pedido": True, "titulo": "Programar HMI línea 2"}
+
+    with admin(conn) as cur:
+        cur.execute("select estado from task where id = %s", (tid,))
+        assert cur.fetchone()["estado"] == "en_curso"
+
+        tg_nahuel = _tg(cur, "Nahuel Gimenez")
+        cuerpo = _outbox_ultimo(cur, ws, tg_nahuel)
+    assert "vuelve a en curso" in cuerpo.lower()
+
+
+def test_pedir_cambios_entregada_sin_arrancar_con_dependencia_abierta_vuelve_a_asignada(
+        corework, conn):
+    """"Ya la terminé" se ofrece desde `asignada` (`menu_tarea.py`): una
+    tarea puede llegar a `en_revision` sin haber pasado nunca por
+    `en_curso`. "Pedir cambios" no puede devolverla a un `en_curso` que
+    nunca tuvo -- vuelve a `asignada`, y el gate de arranque sigue
+    aplicando después: con la dependencia todavía abierta, `asignada` ->
+    `en_curso` se rechaza igual que siempre. T6c exime la RESTAURACIÓN,
+    nunca un arranque real."""
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        tid = _tarea(cur, ws, estado="asignada")
+        cur.execute(
+            """insert into task_state_event (task_id, estado_anterior,
+                                             estado_nuevo, actor_kind)
+               values (%s, 'asignada', 'en_revision', 'prisma')""", (tid,))
+        _evidencia(cur, ws, tid)
+        _dependencia_bloqueante(cur, ws, tid)
+    conn.commit()
+
+    with espacio(conn, ws) as cur:
+        marcos = _quien(cur, "Marcos Tarquini", ws)
+        resultado = H.ejecutar(
+            cur, marcos, "pedir_cambios_tarea",
+            {"tarea_id": tid, "comentario": "Todavía falta empezar bien."},
+            ya_confirmada=True)
+    assert resultado == {"pedido": True, "titulo": "Programar HMI línea 2"}
+
+    with admin(conn) as cur:
+        cur.execute("select estado from task where id = %s", (tid,))
+        assert cur.fetchone()["estado"] == "asignada"
+
+    with espacio(conn, ws) as cur:
+        nahuel = _quien(cur, "Nahuel Gimenez", ws)
+        resultado = H.ejecutar(cur, nahuel, "actualizar_estado",
+                               {"tarea_id": tid, "estado": "en_curso"},
+                               ya_confirmada=True)
+    assert resultado["iniciada"] is False
+    assert "dependencia" in resultado["falta"].lower()
+
+
+def test_pedir_cambios_sin_dependencia_sigue_volviendo_a_en_curso(corework, conn):
+    """Regresión: sin ninguna dependencia bloqueante de por medio, "Pedir
+    cambios" sigue devolviendo la tarea a `en_curso` -- T6c sólo agrega la
+    excepción que faltaba, no cambia el caso que ya cubría la sección 3."""
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        tid = _tarea(cur, ws, estado="en_revision")
+        _evidencia(cur, ws, tid)
+    conn.commit()
+
+    with espacio(conn, ws) as cur:
+        # `estado_previo_a_revision` sólo tiene `execute` concedido a
+        # `prisma_app` (`db/esquema.sql`) -- bajo `prisma_admin` (helper
+        # `admin(conn)`) el permiso está revocado, igual que
+        # `estado_previo_a_bloqueo`. Se comprueba bajo el mismo rol que usa
+        # `_pedir_cambios_tarea`.
+        cur.execute("select estado_previo_a_revision(%s) as previo", (tid,))
+        assert cur.fetchone()["previo"] == "en_curso"
+
+        marcos = _quien(cur, "Marcos Tarquini", ws)
+        resultado = H.ejecutar(cur, marcos, "pedir_cambios_tarea",
+                               {"tarea_id": tid, "comentario": "Ajustar algo."},
+                               ya_confirmada=True)
+    assert resultado == {"pedido": True, "titulo": "Programar HMI línea 2"}
+
+    with admin(conn) as cur:
+        cur.execute("select estado from task where id = %s", (tid,))
+        assert cur.fetchone()["estado"] == "en_curso"
+
+
+def test_pedir_cambios_vista_previa_nombra_el_destino_real(corework, conn):
+    """La vista previa (hoy siempre "vuelve a en curso") tiene que nombrar
+    el destino real: `en curso` para una restauración, `asignada` para una
+    entrega que nunca arrancó."""
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        tid_en_curso = _tarea(cur, ws, estado="en_revision")
+        _evidencia(cur, ws, tid_en_curso)
+
+        tid_asignada = _tarea(cur, ws, titulo="Cablear tablero", estado="asignada")
+        cur.execute(
+            """insert into task_state_event (task_id, estado_anterior,
+                                             estado_nuevo, actor_kind)
+               values (%s, 'asignada', 'en_revision', 'prisma')""", (tid_asignada,))
+        _evidencia(cur, ws, tid_asignada)
+    conn.commit()
+
+    with espacio(conn, ws) as cur:
+        marcos = _quien(cur, "Marcos Tarquini", ws)
+        try:
+            H.ejecutar(cur, marcos, "pedir_cambios_tarea",
+                      {"tarea_id": tid_en_curso, "comentario": "Ajustar algo."})
+            assert False, "tenía que pedir confirmación"
+        except H.NecesitaConfirmacion as e:
+            assert "vuelve a en curso" in e.resumen.lower()
+
+    with espacio(conn, ws) as cur:
+        marcos = _quien(cur, "Marcos Tarquini", ws)
+        try:
+            H.ejecutar(cur, marcos, "pedir_cambios_tarea",
+                      {"tarea_id": tid_asignada, "comentario": "Ajustar algo."})
+            assert False, "tenía que pedir confirmación"
+        except H.NecesitaConfirmacion as e:
+            assert "vuelve a asignada" in e.resumen.lower()
+
+
+def test_actualizar_estado_en_curso_desde_en_revision_con_previo_en_curso_no_rechaza(
+        corework, conn):
+    """Consistencia entre el chequeo proactivo de `_actualizar_estado`/
+    `_preparar_actualizar_estado` y el disparador: la misma restauración que
+    exime `pedir_cambios_tarea` del gate de arranque tiene que eximir
+    también una llamada directa a `actualizar_estado(estado="en_curso")` --
+    sin la rama de T6c en el chequeo de Python, esto devolvía un `falta` que
+    la base, con el disparador ya corregido, no habría rechazado."""
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        tid = _tarea(cur, ws, estado="en_revision")
+        _evidencia(cur, ws, tid)
+        _dependencia_bloqueante(cur, ws, tid)
+    conn.commit()
+
+    with espacio(conn, ws) as cur:
+        nahuel = _quien(cur, "Nahuel Gimenez", ws)
+        resultado = H.ejecutar(cur, nahuel, "actualizar_estado",
+                               {"tarea_id": tid, "estado": "en_curso"},
+                               ya_confirmada=True)
+    assert resultado == {"estado": "en_curso"}
+
+    with admin(conn) as cur:
+        cur.execute("select estado from task where id = %s", (tid,))
+        assert cur.fetchone()["estado"] == "en_curso"
+
+
+def test_estado_previo_a_revision_no_es_ejecutable_por_public(corework, conn):
+    """Catálogo efectivo, no el texto del SQL (mismo criterio que
+    `test_task_intake.py::test_0007_estado_previo_a_bloqueo_llega_por_
+    migracion_con_dueno_correcto`): `security definer`, dueño
+    `prisma_owner`, sin `execute` para `public`, con `execute` para
+    `prisma_app`."""
+    with admin(conn) as cur:
+        cur.execute(
+            """select r.rolname dueno, p.prosecdef definer,
+                      has_function_privilege('public',
+                        'prisma.estado_previo_a_revision(uuid)', 'execute') publico,
+                      has_function_privilege('prisma_app',
+                        'prisma.estado_previo_a_revision(uuid)', 'execute') app
+                 from pg_proc p join pg_roles r on r.oid = p.proowner
+                where p.oid = 'prisma.estado_previo_a_revision(uuid)'::regprocedure""")
+        fila = cur.fetchone()
+    assert fila["dueno"] == "prisma_owner"
+    assert fila["definer"] is True
+    assert fila["publico"] is False
+    assert fila["app"] is True
