@@ -713,13 +713,16 @@ def test_dos_emisiones_concurrentes_no_rompen_los_limites_ni_el_indice_unico(
         AC.transicionar(cur, m, "pending_email_verification", ahora=AHORA)
     conn.commit()
 
-    barrier = threading.Barrier(2)
+    # Con tiempos de espera acotados: si un hilo falla antes de la barrera, el
+    # otro no queda esperando para siempre y la prueba falla en vez de colgarse.
+    barrier = threading.Barrier(2, timeout=30)
     outcomes = []
     failures = []
 
     def emitir(index):
-        other = conectar(uri)
+        other = None
         try:
+            other = conectar(uri)
             with espacio(other, norte["id"]) as cur:
                 barrier.wait()
                 outcomes.append(AC.emitir_verificacion(
@@ -728,15 +731,19 @@ def test_dos_emisiones_concurrentes_no_rompen_los_limites_ni_el_indice_unico(
             other.commit()
         except Exception as exc:  # probamos que ninguna excepción cruda escapa
             failures.append(exc)
-            other.rollback()
+            barrier.abort()
+            if other is not None:
+                other.rollback()
         finally:
-            other.close()
+            if other is not None:
+                other.close()
 
     threads = [threading.Thread(target=emitir, args=(index,)) for index in range(2)]
     for thread in threads:
         thread.start()
     for thread in threads:
-        thread.join()
+        thread.join(timeout=60)
+    assert not any(thread.is_alive() for thread in threads), "un hilo quedó colgado"
 
     assert failures == []
     assert all(outcome.ok for outcome in outcomes), outcomes

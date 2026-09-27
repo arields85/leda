@@ -338,6 +338,12 @@ Un worktree nuevo no trae lo que no se versiona.
     guardas de regresión (ya correctos). El `update` de `prisma_app` sobre
     `aviso_administrativo` queda para G1d. Suite: `1000 passed, 108
     deselected`; repetición parcial de la sesión: `133 passed`.
+    Revisión RDD `review-36cb59bfd957a460` (riesgo medio, consentida):
+    aprobada sin correcciones; reconocimiento emitido. Advertencia aplicada:
+    la prueba de concurrencia ya no puede colgarse (barrera y `join` con
+    tiempo de espera). Sugerencia pendiente, menor: ninguna prueba alcanza
+    la rama defensiva `verification_conflict` (el bloqueo la vuelve
+    inalcanzable en la práctica).
   - [ ] **G1b — Recorrido del alta con correo.** `alta_correo.py` con puerto
     de envío (`Protocol`) y doble de prueba; sin emisor configurado con la
     clave encendida → incidente + aviso neutral, nunca "enviado".
