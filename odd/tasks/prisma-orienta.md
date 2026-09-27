@@ -3251,3 +3251,10 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   (T6a, ADR 0008). Variante con dependencia bloqueante abierta (T6c). Sin defectos.
   Resultados: el archivo -> `2 passed` (reejecutado por el orquestador); suite
   completa (escritor): `946 passed, 108 deselected`.
+  Commit `5c4f72a`. RDD: medio, `review_due` (`slice_budget_reached`, 426 líneas);
+  consentimiento del usuario: revisar. review-8b7dde285b819238 (confiabilidad)
+  aprobada y reconocida; frontera en `5c4f72a`. Un WARNING y una sugerencia sobre la
+  prueba, sumados a T6g: (1) "el último mensaje" se elige con `order by
+  programado_para desc limit 1` sin desempate, y dos filas pueden compartir hora;
+  (2) no se verifica qué pasa con los botones del primer aviso después de "Pedir
+  cambios" y de la reentrega.
