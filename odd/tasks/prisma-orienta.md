@@ -2730,6 +2730,130 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   hoy no hay una herramienta `aprobar_objetivo` equivalente para decidirlo en
   código; queda anotado en el ADR, no implementado.
 
+- 2026-09-27: **Sesión 2 por Telegram, hallazgos 6 y 7, y seguimientos de la
+  revisión de etiquetas.** Ruta: delegada, un escritor (disparador de mapeo:
+  `agente.py`, `salida.py`, lectura de `herramientas.py`/`gateway.py`, y
+  cinco archivos de prueba).
+
+  **Hallazgo 6 -- dos preguntas seguidas.** Evidencia real, confirmada por el
+  usuario: "Hola Ismael. ¿Con qué te ayudo?\n\n¿Qué querés hacer?". Desde
+  `86a40c6` el texto del modelo se manda junto con `ofrecer_opciones`
+  (`agente._encolar_opciones_modelo`), y esa función le agregaba encima la
+  `pregunta` de las opciones sin mirar si el texto ya preguntaba algo.
+  Corregido: si el texto ya pregunta (`deteccion_pregunta.hace_pregunta`, ya
+  usada en T4b), sale solo -- introduce los botones sin repetir la pregunta
+  aparte; si no pregunta, se sigue agregando `e.pregunta` como siempre.
+  `e.pregunta` sigue guardada en `args` para `gateway._resolver_toque_
+  opcion_modelo`, sin cambios ahí.
+
+  **Hallazgo 7 -- palabra de función antes de la elipsis.** Evidencia real:
+  "Backup de servidores de…", "Configurar access points de…", "Cambiar
+  switch industrial de…". `salida.acortar_etiqueta_boton` ya cortaba en
+  límite de palabra (sesión 1) pero podía dejar una preposición o un
+  artículo suelto justo antes de "…". Corregido con `_PALABRAS_FUNCION_
+  FINALES` (lista chica y cerrada: de, del, la, el, los, las, en, al, a, y,
+  e, o, u, para, con, por, sin, sobre, un, una) y `_sin_palabras_funcion_
+  finales`, que saca palabras del final una por una sin dejar nunca la
+  etiqueta vacía.
+
+  **Seguimientos de la revisión de etiquetas (review-af418dd9):**
+  - (a) `truncar_etiqueta_boton` ganó un parámetro `limite` -- antes
+    ignoraba el `limite` de quien la llamaba y el corte duro quedaba
+    siempre en 48; `acortar_etiqueta_boton` se lo pasa ahora en su propio
+    corte duro.
+  - (b) La numeración de último recurso de `etiquetas_boton_distinguibles`
+    (cuando dos títulos son indistinguibles incluso enteros) no tenía
+    ninguna prueba. Corregida para no colisionar con una etiqueta ya
+    presente en el conjunto (salta el número ocupado) y para no numerar
+    nunca una etiqueta `fija`; si una movible coincide con una fija, se
+    numera la movible (nunca queda igual a la fija, que no se puede tocar).
+  - (c) `etiquetas_boton_distinguibles` levanta `ValueError` si `fijas` no
+    tiene el mismo largo que `titulos`, en vez de descartar etiquetas en
+    silencio por el `zip` corto.
+  - (d) Pruebas nuevas a través de la herramienta (`ofrecer_opciones`, no
+    llamando directo a `herramientas._ofrecer_opciones`): etiqueta del
+    modelo ≤ 30 se respeta exacta; etiqueta del modelo > 30 se acorta en
+    límite de palabra; sin etiqueta propia, sale del título.
+  - (e) Pruebas nuevas sobre los otros dos lugares que arman botones de
+    tarea: la página de "Ver más" (`gateway._mostrar_mas_tareas`) y las
+    candidatas de una dependencia (`gateway._pedir_eleccion_dependencia`).
+
+  Archivos:
+  - `src/prisma/agente.py`: `_encolar_opciones_modelo` (hallazgo 6).
+  - `src/prisma/salida.py`: `truncar_etiqueta_boton` (seguimiento a);
+    `_PALABRAS_FUNCION_FINALES` + `_sin_palabras_funcion_finales` +
+    `acortar_etiqueta_boton` (hallazgo 7); `etiquetas_boton_distinguibles`
+    (seguimientos b y c).
+  - `tests/test_opciones_modelo.py`: `test_no_duplica_la_pregunta_si_el_
+    texto_del_modelo_ya_pregunta` (hallazgo 6);
+    `test_etiqueta_del_modelo_corta_se_respeta_tal_cual`,
+    `test_etiqueta_del_modelo_larga_se_acorta_en_limite_de_palabra`,
+    `test_etiqueta_de_tarea_sin_etiqueta_propia_sale_del_titulo`
+    (seguimiento d).
+  - `tests/test_salida.py`: `test_acortar_etiqueta_boton_no_termina_en_
+    palabra_de_funcion` (parametrizada, 3 casos) y `test_acortar_etiqueta_
+    boton_nunca_deja_vacio_si_todo_es_funcion` (hallazgo 7);
+    `test_acortar_etiqueta_boton_corte_duro_honra_un_limite_no_default` y
+    `test_truncar_etiqueta_boton_honra_un_limite_no_default` (seguimiento
+    a); `test_etiquetas_boton_distinguibles_fijas_de_otro_largo_levanta_
+    error` (seguimiento c); `test_etiquetas_boton_distinguibles_numera_
+    titulos_identicos`, `test_etiquetas_boton_distinguibles_numera_
+    saltando_una_colision_existente`, `test_etiquetas_boton_distinguibles_
+    nunca_numera_ni_modifica_una_fija` (seguimiento b).
+  - `tests/test_lista_botones.py`: `test_mostrar_mas_tareas_acorta_titulos_
+    largos_en_limite_de_palabra`, `test_mostrar_mas_tareas_distingue_
+    titulos_que_colisionan_al_acortar` (seguimiento e).
+  - `tests/test_menu_tarea.py`: `test_pedir_eleccion_dependencia_acorta_y_
+    distingue_titulos_largos` (seguimiento e).
+  - `tests/test_aclaracion_botones.py`: `test_botones_propia_primero_ajena_
+    con_nombre_y_titulo_truncado` adaptada -- su título de prueba
+    ("Actualizar toda la documentación técnica del área completa") cortaba
+    justo en "la" antes de esta corrección; la aserción pasa de "Actualizar
+    toda la…" a "Actualizar toda…" (era exactamente el hallazgo 7, no una
+    aserción débil que se relaje).
+
+  RED (`tests/test_opciones_modelo.py::test_no_duplica_la_pregunta_si_el_
+  texto_del_modelo_ya_pregunta` y `tests/test_salida.py::test_acortar_
+  etiqueta_boton_no_termina_en_palabra_de_funcion` contra el código sin
+  estas correcciones, con `agente.py`/`salida.py` apartados temporalmente
+  por `git stash push -- src/prisma/agente.py src/prisma/salida.py`, los
+  archivos de prueba ya escritos):
+  `.venv/Scripts/python.exe -m pytest -q tests/test_opciones_modelo.py::
+  test_no_duplica_la_pregunta_si_el_texto_del_modelo_ya_pregunta
+  "tests/test_salida.py::test_acortar_etiqueta_boton_no_termina_en_palabra_
+  de_funcion"` -> `4 failed` (la de hallazgo 6, y las 3 variantes
+  parametrizadas de hallazgo 7) -- exactamente por el motivo esperado: el
+  mensaje traía la pregunta duplicada (`'Hola Ismael. ¿Con qué te
+  ayudo?\n\n¿Qué querés hacer?'` en vez del texto solo), y la etiqueta corta
+  terminaba en "de la"/"de" antes de "…" (`'Backup de servidores de la…'`,
+  `'Configurar access points de la…'`, `'Cambiar switch industrial de…'`).
+  `git stash pop` restauró la implementación antes de seguir.
+
+  GREEN:
+  - `.venv/Scripts/python.exe -m pytest -q tests/test_opciones_modelo.py
+    tests/test_menu_tarea.py tests/test_lista_botones.py tests/test_salida.py`
+    -> `106 passed, 1 warning`.
+  - `.venv/Scripts/python.exe -m pytest -q tests/test_aclaracion_botones.py
+    tests/test_pregunta_sin_opciones.py tests/test_botones.py
+    tests/test_vista_previa_confirmacion.py tests/test_agente.py
+    tests/test_deteccion_pregunta.py tests/test_autoridad_tarea.py
+    tests/test_task_intake.py tests/test_modificar.py
+    tests/test_respuestas_nombran_tarea.py tests/test_veracidad.py
+    tests/test_resolucion_referencias.py tests/test_pendientes.py
+    tests/test_personas.py tests/test_memoria.py tests/test_capacidades.py
+    tests/test_opciones_modelo.py tests/test_menu_tarea.py
+    tests/test_lista_botones.py tests/test_salida.py tests/banco` ->
+    `586 passed, 108 deselected, 1 warning` (barrido de regresión).
+  - Suite completa: `.venv/Scripts/python.exe -m pytest -q` -> `912 passed,
+    108 deselected, 1 warning` (216 s) -- línea base 895 + 17 pruebas nuevas
+    de esta unidad (4 en `test_opciones_modelo.py`, 10 en `test_salida.py`,
+    2 en `test_lista_botones.py`, 1 en `test_menu_tarea.py`); mismo `108
+    deselected`.
+
+  Abierto: ninguno de los hallazgos/seguimientos restantes de la sesión 2
+  (más allá de 6 y 7) ni la segunda sesión real por Telegram -- siguen en
+  "Próximo paso al retomar", sin tocar acá.
+
 - **Próximo paso al retomar:** T5, sólo la segunda sesión real por Telegram (necesita
   al usuario; datos ficticios). Antes de empezar: comparar la base local con
   `db/esquema.sql` (hoy al día hasta la migración `0011`) y aplicar lo que falte;

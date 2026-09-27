@@ -33,7 +33,8 @@ from prisma.calendario import Calendario
 from prisma.contexto import PREAMBULO, construir
 from prisma.db import admin, espacio
 from prisma.llm import Llamada, ProveedorGuionado, Respuesta
-from prisma.salida import BUTTON_TEXT_LIMIT, telegram_utf16_units
+from prisma.salida import (BUTTON_TEXT_LIMIT, OBJETIVO_ETIQUETA_BOTON,
+                             telegram_utf16_units)
 
 
 def _quien(cur, nombre, ws):
@@ -182,6 +183,40 @@ def test_texto_del_modelo_acompana_la_pregunta_de_opciones(corework, conn, monke
     assert texto_modelo in cuerpo
     assert "¿De cuál te referís?" in cuerpo
     assert cuerpo.index(texto_modelo) < cuerpo.index("¿De cuál te referís?")
+
+
+def test_no_duplica_la_pregunta_si_el_texto_del_modelo_ya_pregunta(
+        corework, conn, monkeypatch):
+    """Hallazgo 6 (sesión 2 por Telegram, 2026-09-27, confirmado por el
+    usuario): "Hola Ismael. ¿Con qué te ayudo?\n\n¿Qué querés hacer?" -- el
+    texto del modelo ya preguntaba, y encima se le agregaba la `pregunta` de
+    `ofrecer_opciones` -- dos preguntas seguidas en el mismo mensaje. Si el
+    texto ya pregunta (`deteccion_pregunta.hace_pregunta`), sólo él sale: la
+    `pregunta` de las opciones no se repite aparte."""
+    ws = corework.workspace_id
+    texto_modelo = "Hola Ismael. ¿Con qué te ayudo?"
+    guion = [Respuesta(texto=texto_modelo, llamadas=[Llamada("c1", "ofrecer_opciones", {
+        "pregunta": "¿Qué querés hacer?",
+        "opciones": [{"texto": "Es una tarea nueva"},
+                    {"texto": "Es sobre una tarea existente"}]})])]
+    proveedor = _con_proveedor(monkeypatch, guion)
+
+    with espacio(conn, ws) as cur:
+        quien = _quien(cur, "Marcos Tarquini", ws)
+        cal = Calendario.desde_base(cur, ws)
+        r = responder(cur, quien, "hola", proveedor, cal, chat_id=1,
+                     ahora=datetime.now(timezone.utc))
+        assert r.elecciones == ["ofrecer_opciones"]
+        assert r.texto == texto_modelo
+
+        pid = _pendiente_opciones(cur, ws)
+        cur.execute(
+            "select cuerpo from message_outbox where pending_action_id = %s", (pid,))
+        cuerpo = cur.fetchone()["cuerpo"]
+
+    assert cuerpo == texto_modelo
+    assert cuerpo.count("?") == 1
+    assert "¿Qué querés hacer?" not in cuerpo
 
 
 def test_texto_de_una_vuelta_posterior_a_ofrecer_opciones_se_descarta(
@@ -430,6 +465,92 @@ def test_tarea_de_otro_espacio_se_rechaza_al_modelo(intake_world, conn, monkeypa
         cur.execute("select count(*) n from pending_action where herramienta = %s",
                     (P.SENTINEL_OPCIONES_MODELO,))
         assert cur.fetchone()["n"] == 0
+
+
+# ---------------------------------------------------------------------------
+# Etiqueta de una opción de tarea (seguimiento d a la revisión de la sesión
+# de etiquetas, review-af418dd9): a través de la herramienta, no llamando
+# directo a `herramientas._ofrecer_opciones`.
+# ---------------------------------------------------------------------------
+
+def test_etiqueta_del_modelo_corta_se_respeta_tal_cual(corework, conn, monkeypatch):
+    ws = corework.workspace_id
+    etiqueta_modelo = "Cablear máq. 3"
+    assert len(etiqueta_modelo) <= OBJETIVO_ETIQUETA_BOTON
+    with admin(conn) as cur:
+        tid = _tarea(cur, ws, titulo="Cablear tablero eléctrico de la máquina 3",
+                    persona="Marcos Tarquini")
+    conn.commit()
+
+    guion = [Respuesta(llamadas=[Llamada("c1", "ofrecer_opciones", {
+        "pregunta": "¿Cuál tarea?",
+        "opciones": [{"tarea_id": tid, "etiqueta": etiqueta_modelo}]})])]
+    proveedor = _con_proveedor(monkeypatch, guion)
+
+    with espacio(conn, ws) as cur:
+        quien = _quien(cur, "Marcos Tarquini", ws)
+        cal = Calendario.desde_base(cur, ws)
+        responder(cur, quien, "elegí una tarea", proveedor, cal, chat_id=1,
+                 ahora=datetime.now(timezone.utc))
+        pid = _pendiente_opciones(cur, ws)
+        etiqueta = _opciones(cur, pid)[0]["etiqueta"]
+
+    assert etiqueta == etiqueta_modelo    # exacta: ni cortada ni con "…"
+
+
+def test_etiqueta_del_modelo_larga_se_acorta_en_limite_de_palabra(
+        corework, conn, monkeypatch):
+    ws = corework.workspace_id
+    etiqueta_modelo = "Cablear el tablero eléctrico completo de la máquina número tres"
+    assert len(etiqueta_modelo) > OBJETIVO_ETIQUETA_BOTON
+    with admin(conn) as cur:
+        tid = _tarea(cur, ws, titulo="Cablear tablero", persona="Marcos Tarquini")
+    conn.commit()
+
+    guion = [Respuesta(llamadas=[Llamada("c1", "ofrecer_opciones", {
+        "pregunta": "¿Cuál tarea?",
+        "opciones": [{"tarea_id": tid, "etiqueta": etiqueta_modelo}]})])]
+    proveedor = _con_proveedor(monkeypatch, guion)
+
+    with espacio(conn, ws) as cur:
+        quien = _quien(cur, "Marcos Tarquini", ws)
+        cal = Calendario.desde_base(cur, ws)
+        responder(cur, quien, "elegí una tarea", proveedor, cal, chat_id=1,
+                 ahora=datetime.now(timezone.utc))
+        pid = _pendiente_opciones(cur, ws)
+        etiqueta = _opciones(cur, pid)[0]["etiqueta"]
+
+    assert etiqueta.endswith("…")
+    sin_elipsis = etiqueta[:-1].rstrip()
+    assert etiqueta_modelo.startswith(sin_elipsis)
+    assert sin_elipsis in [
+        " ".join(etiqueta_modelo.split(" ")[:n])
+        for n in range(len(etiqueta_modelo.split(" ")) + 1)]
+
+
+def test_etiqueta_de_tarea_sin_etiqueta_propia_sale_del_titulo(
+        corework, conn, monkeypatch):
+    ws = corework.workspace_id
+    titulo = "Revisar comunicaciones industriales de la compresora principal"
+    assert len(titulo) > OBJETIVO_ETIQUETA_BOTON
+    with admin(conn) as cur:
+        tid = _tarea(cur, ws, titulo=titulo, persona="Marcos Tarquini")
+    conn.commit()
+
+    guion = [Respuesta(llamadas=[Llamada("c1", "ofrecer_opciones", {
+        "pregunta": "¿Cuál tarea?", "opciones": [{"tarea_id": tid}]})])]
+    proveedor = _con_proveedor(monkeypatch, guion)
+
+    with espacio(conn, ws) as cur:
+        quien = _quien(cur, "Marcos Tarquini", ws)
+        cal = Calendario.desde_base(cur, ws)
+        responder(cur, quien, "elegí una tarea", proveedor, cal, chat_id=1,
+                 ahora=datetime.now(timezone.utc))
+        pid = _pendiente_opciones(cur, ws)
+        etiqueta = _opciones(cur, pid)[0]["etiqueta"]
+
+    assert etiqueta.endswith("…")
+    assert titulo.startswith(etiqueta[:-1].rstrip())
 
 
 # ---------------------------------------------------------------------------

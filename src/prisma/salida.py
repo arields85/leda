@@ -89,16 +89,42 @@ def with_no_effect_status(raw: Any, *, required: bool = True) -> str:
     return f"{text}\n\n{NO_EFFECT_STATUS}" if text else NO_EFFECT_STATUS
 
 
-def truncar_etiqueta_boton(texto: str) -> str:
-    """Recorta una etiqueta a `TRUNCAR_ETIQUETA_BOTON` caracteres, con "…" al
-    final si hizo falta. Reusado por la aclaración con botones
-    (`gateway._etiqueta_boton`) y por `ofrecer_opciones` (T1, ADR 0007): la
-    misma regla de truncado para toda etiqueta de botón, en vez de una por
-    cada lugar que arma botones."""
+def truncar_etiqueta_boton(texto: str, *, limite: int = TRUNCAR_ETIQUETA_BOTON) -> str:
+    """Recorta una etiqueta a `limite` caracteres (por omisión,
+    `TRUNCAR_ETIQUETA_BOTON`), con "…" al final si hizo falta. Reusado por la
+    aclaración con botones (`gateway._etiqueta_boton`) y por
+    `ofrecer_opciones` (T1, ADR 0007): la misma regla de truncado para toda
+    etiqueta de botón, en vez de una por cada lugar que arma botones.
+
+    Corrección de la revisión sobre las etiquetas de botón (seguimiento a):
+    antes el corte duro de `acortar_etiqueta_boton` llamaba acá sin pasar
+    `limite` -- quedaba siempre en 48 aunque quien llamara a
+    `acortar_etiqueta_boton` hubiera pedido otro."""
     texto = texto.strip()
-    if len(texto) <= TRUNCAR_ETIQUETA_BOTON:
+    if len(texto) <= limite:
         return texto
-    return texto[:TRUNCAR_ETIQUETA_BOTON - 1].rstrip() + "…"
+    return texto[:limite - 1].rstrip() + "…"
+
+
+# Palabras de función que no aportan nada como última palabra visible antes
+# de "…" (hallazgo 7, sesión 2 por Telegram, 2026-09-27: "Backup de
+# servidores de…", "Configurar access points de…", "Cambiar switch
+# industrial de…"). Lista chica y cerrada, en minúsculas -- se compara
+# siempre con `casefold()`.
+_PALABRAS_FUNCION_FINALES = frozenset({
+    "de", "del", "la", "el", "los", "las", "en", "al", "a", "y", "e", "o",
+    "u", "para", "con", "por", "sin", "sobre", "un", "una",
+})
+
+
+def _sin_palabras_funcion_finales(palabras: list[str]) -> list[str]:
+    """Saca palabras de función del final de una lista de palabras, una por
+    una, sin dejarla nunca vacía -- si sólo queda una palabra, se conserva
+    aunque sea de función (mejor que una etiqueta vacía)."""
+    palabras = list(palabras)
+    while len(palabras) > 1 and palabras[-1].casefold() in _PALABRAS_FUNCION_FINALES:
+        palabras.pop()
+    return palabras
 
 
 def acortar_etiqueta_boton(texto: str, *, objetivo: int = OBJETIVO_ETIQUETA_BOTON,
@@ -113,6 +139,10 @@ def acortar_etiqueta_boton(texto: str, *, objetivo: int = OBJETIVO_ETIQUETA_BOTO
     palabra dentro del objetivo donde cortar), cae al corte duro de siempre
     (`truncar_etiqueta_boton`, a `limite`) en vez de devolver una etiqueta
     vacía.
+
+    El corte de palabra nunca deja la etiqueta terminando en una palabra de
+    función (hallazgo 7: `_sin_palabras_funcion_finales`) -- "Backup de
+    servidores de…" pasa a "Backup de servidores…".
 
     Reusada por todo lugar que arma botones de tarea a partir de un título
     (T3, "Ver más", tareas propias, candidatas de aclaración y de
@@ -131,7 +161,8 @@ def acortar_etiqueta_boton(texto: str, *, objetivo: int = OBJETIVO_ETIQUETA_BOTO
         acumulado = candidato
 
     if not acumulado:
-        return truncar_etiqueta_boton(texto)
+        return truncar_etiqueta_boton(texto, limite=limite)
+    acumulado = " ".join(_sin_palabras_funcion_finales(acumulado.split(" ")))
     return acumulado + "…"
 
 
@@ -154,9 +185,17 @@ def etiquetas_boton_distinguibles(
 
     Último recurso: si dos títulos son indistinguibles incluso enteros (o en
     su corte duro a `limite`), se numeran -- nunca dos botones ambiguos en el
-    mismo mensaje."""
+    mismo mensaje. Una etiqueta fija nunca se numera (respeta la elección del
+    modelo igual que no se hace crecer); si la numeración nueva coincidiría
+    con una etiqueta ya presente en el conjunto (fija o no), se salta ese
+    número (seguimiento b a la revisión de la sesión de etiquetas)."""
     titulos = [t.strip() for t in titulos]
     fijas = list(fijas) if fijas is not None else [False] * len(titulos)
+    if len(fijas) != len(titulos):
+        raise ValueError(
+            f"fijas tiene que tener el mismo largo que titulos "
+            f"({len(fijas)} != {len(titulos)}); si no hay ninguna fija, no "
+            "pasar `fijas` en vez de una lista más corta.")
 
     resultado = [
         t if fija else acortar_etiqueta_boton(t, objetivo=objetivo, limite=limite)
@@ -195,12 +234,36 @@ def etiquetas_boton_distinguibles(
     conteo: dict[str, int] = {}
     for etiqueta in resultado:
         conteo[etiqueta] = conteo.get(etiqueta, 0) + 1
+    # Una etiqueta fija "ocupa" su texto sin poder cederlo -- si una o más
+    # movibles coinciden con ella, TODAS se numeran (nunca sólo la segunda):
+    # la primera libre de un grupo sin ninguna fija sigue quedando tal cual,
+    # igual que antes.
+    fija_ocupa = {etiqueta for i, etiqueta in enumerate(resultado) if fijas[i]}
+    # Todas las etiquetas ya en uso -- una fija nunca se numera (se conserva
+    # tal cual), y ninguna etiqueta nueva puede coincidir con una que ya está
+    # en el conjunto, sea fija o el resultado de una numeración anterior.
+    ocupadas = set(resultado)
     vistos: dict[str, int] = {}
     for i, etiqueta in enumerate(resultado):
-        if conteo[etiqueta] > 1:
-            vistos[etiqueta] = vistos.get(etiqueta, 0) + 1
-            if vistos[etiqueta] > 1:
-                resultado[i] = f"{etiqueta} ({vistos[etiqueta]})"
+        if fijas[i] or conteo[etiqueta] <= 1:
+            continue
+        vistos[etiqueta] = vistos.get(etiqueta, 0) + 1
+        # Si una fija ya ocupa este texto, cuenta como la ocurrencia 1 -- la
+        # numeración de las movibles arranca en 2 aunque sea la primera que
+        # se ve acá (nunca queda una movible igual a la fija).
+        indice_ocurrencia = vistos[etiqueta] + (1 if etiqueta in fija_ocupa else 0)
+        if indice_ocurrencia == 1:
+            # La primera aparición de un grupo repetido sin ninguna fija se
+            # deja tal cual -- sólo las siguientes se numeran, igual que
+            # antes.
+            continue
+        sufijo = indice_ocurrencia
+        candidata = f"{etiqueta} ({sufijo})"
+        while candidata in ocupadas:
+            sufijo += 1
+            candidata = f"{etiqueta} ({sufijo})"
+        resultado[i] = candidata
+        ocupadas.add(candidata)
     return resultado
 
 

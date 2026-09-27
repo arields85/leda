@@ -659,6 +659,53 @@ def test_mostrar_mas_tareas_sin_sobrevivientes_dice_que_ya_no_estan_disponibles(
     assert filas[0]["valor"] == {"tipo": "salida"}
 
 
+# ---------------------------------------------------------------------------
+# Seguimiento (e) a la revisión de la sesión de etiquetas (review-af418dd9):
+# la página de "Ver más" usa `salida.etiquetas_boton_distinguibles` igual que
+# cualquier otro botón server-armado -- títulos largos se cortan en límite de
+# palabra, no a mitad de una, y dos títulos que colisionan se distinguen.
+# ---------------------------------------------------------------------------
+
+def test_mostrar_mas_tareas_acorta_titulos_largos_en_limite_de_palabra(
+        conn, corework):
+    ws = corework.workspace_id
+    titulo_largo = "Revisar comunicaciones industriales de la compresora principal"
+    with admin(conn) as cur:
+        tid = _tarea(cur, ws, titulo=titulo_largo)
+    conn.commit()
+
+    with espacio(conn, ws) as cur:
+        quien = _quien(cur, "Marcos Tarquini", ws)
+        gateway._mostrar_mas_tareas(cur, quien, ws, 1, [tid],
+                                    datetime.now(timezone.utc))
+        pid = _pendiente(cur, ws, P.SENTINEL_OPCIONES_MODELO)
+        etiqueta = next(f["etiqueta"] for f in _opciones(cur, pid)
+                        if f["etiqueta"] != P.ETIQUETA_SALIR_OPCIONES)
+
+    assert etiqueta.endswith("…")
+    assert titulo_largo.startswith(etiqueta[:-1].rstrip())
+
+
+def test_mostrar_mas_tareas_distingue_titulos_que_colisionan_al_acortar(
+        conn, corework):
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        a = _tarea(cur, ws, titulo="Revisar tablero de la máquina 3")
+        b = _tarea(cur, ws, titulo="Revisar tablero de la máquina 4")
+    conn.commit()
+
+    with espacio(conn, ws) as cur:
+        quien = _quien(cur, "Marcos Tarquini", ws)
+        gateway._mostrar_mas_tareas(cur, quien, ws, 1, [a, b],
+                                    datetime.now(timezone.utc))
+        pid = _pendiente(cur, ws, P.SENTINEL_OPCIONES_MODELO)
+        etiquetas = [f["etiqueta"] for f in _opciones(cur, pid)
+                    if f["etiqueta"] != P.ETIQUETA_SALIR_OPCIONES]
+
+    assert len(set(etiquetas)) == 2
+    assert "3" in etiquetas[0] and "4" in etiquetas[1]
+
+
 def test_ver_mas_de_mas_de_ocho_tareas_arma_una_tercera_pagina(
         cliente, conn, corework, monkeypatch):
     ws = corework.workspace_id

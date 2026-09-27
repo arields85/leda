@@ -183,7 +183,11 @@ def test_botones_propia_primero_ajena_con_nombre_y_titulo_truncado(
     `OBJETIVO_ETIQUETA_BOTON`), para que entre cómodo en un botón de
     teléfono. El corte duro de 48 sigue existiendo como último recurso
     (cuando ni una palabra entera entra en el objetivo, o para desambiguar
-    dos títulos que colisionan)."""
+    dos títulos que colisionan).
+
+    Adaptación 2 (hallazgo 7, sesión 2 por Telegram, 2026-09-27): el corte de
+    palabra tampoco puede dejar una palabra de función ("la") justo antes de
+    la elipsis -- "Actualizar toda la…" pasa a "Actualizar toda…"."""
     ws = corework.workspace_id
     titulo_largo = "Actualizar toda la documentación técnica del área completa"
     assert len(titulo_largo) > gateway.TRUNCAR_TITULO_BOTON
@@ -213,7 +217,9 @@ def test_botones_propia_primero_ajena_con_nombre_y_titulo_truncado(
     valores = [f["valor"] for f in filas]
 
     corto = acortar_etiqueta_boton(titulo_largo)
-    assert corto == "Actualizar toda la…"        # límite de palabra, no de carácter
+    # Límite de palabra, no de carácter, y sin dejar "la" (palabra de función)
+    # justo antes de la elipsis (hallazgo 7).
+    assert corto == "Actualizar toda…"
     assert etiquetas == ["Programar PLC", "Cablear tablero máq. 3 — Mariano",
                         f"{corto} — Mariano", "Ninguna, lo escribo"]
     assert valores[0] == propia

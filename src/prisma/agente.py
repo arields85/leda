@@ -557,10 +557,20 @@ def _encolar_opciones_modelo(cur, quien: Solicitante, chat_id: int,
     resumen corto -- después de la última parte. `args` sigue guardando sólo
     `{"pregunta": e.pregunta}`, igual que siempre: es lo único que lee
     `gateway._resolver_toque_opcion_modelo` al retomar.
+
+    Si `texto` ya pregunta algo (`deteccion_pregunta.hace_pregunta`), no se le
+    agrega encima `e.pregunta` (hallazgo 6, sesión 2 por Telegram,
+    2026-09-27: "Hola Ismael. ¿Con qué te ayudo?\n\n¿Qué querés hacer?" --
+    dos preguntas seguidas en el mismo mensaje). El texto del modelo ya
+    introduce los botones; `e.pregunta` sigue guardada en `args` igual que
+    siempre, para quien retoma el toque.
     """
     opciones = [(o.etiqueta, o.valor) for o in e.opciones]
     opciones.append((P.ETIQUETA_SALIR_OPCIONES, {"tipo": "salida"}))
-    texto_combinado = f"{texto}\n\n{e.pregunta}" if texto else e.pregunta
+    if texto and hace_pregunta(texto):
+        texto_combinado = texto
+    else:
+        texto_combinado = f"{texto}\n\n{e.pregunta}" if texto else e.pregunta
     _encolar_texto_con_opciones(
         cur, quien, chat_id, texto_combinado, opciones, ahora,
         dedupe_prefijo="opciones-modelo", texto_corto=e.pregunta,

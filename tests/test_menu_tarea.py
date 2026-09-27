@@ -460,6 +460,40 @@ def test_empezar_no_se_ofrece_con_dependencia_bloqueante_sin_terminar(
 
 
 # ---------------------------------------------------------------------------
+# Seguimiento (e) a la revisión de la sesión de etiquetas (review-af418dd9):
+# las candidatas de una dependencia usan `salida.etiquetas_boton_distinguibles`
+# igual que cualquier otro botón server-armado -- títulos largos se cortan en
+# límite de palabra, y dos que colisionan se distinguen.
+# ---------------------------------------------------------------------------
+
+def test_pedir_eleccion_dependencia_acorta_y_distingue_titulos_largos(
+        conn, corework):
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        origen = _tarea(cur, ws, titulo="Instalar tablero", persona="Marcos Tarquini")
+        a = _tarea(cur, ws, titulo="Revisar tablero de la máquina 3",
+                  persona="Marcos Tarquini")
+        b = _tarea(cur, ws, titulo="Revisar tablero de la máquina 4",
+                  persona="Marcos Tarquini")
+    conn.commit()
+
+    with espacio(conn, ws) as cur:
+        quien = _quien(cur, "Marcos Tarquini", ws)
+        gateway._pedir_eleccion_dependencia(
+            cur, quien, ws, 1, accion="crear_dependencia_bloqueante",
+            tarea_id=origen, titulo="Instalar tablero",
+            pregunta="¿De cuál depende?",
+            candidatas=[(a, "Revisar tablero de la máquina 3"),
+                       (b, "Revisar tablero de la máquina 4")],
+            ahora=datetime.now(timezone.utc))
+        pid = _pendiente(cur, ws, P.SENTINEL_DATO_MENU_TAREA)
+        etiquetas = [f["etiqueta"] for f in _opciones(cur, pid)]
+
+    assert len(set(etiquetas)) == 2
+    assert "3" in etiquetas[0] and "4" in etiquetas[1]
+
+
+# ---------------------------------------------------------------------------
 # Tocar el menú nunca aplica nada; "Ya la terminé" termina en vista previa
 # ---------------------------------------------------------------------------
 

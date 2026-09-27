@@ -20,7 +20,7 @@ from prisma.salida import (BUTTON_TEXT_LIMIT, OBJETIVO_ETIQUETA_BOTON,
                              etiquetas_boton_distinguibles,
                              normalize_visible_text, prepare_buttons,
                              prepare_payload, telegram_utf16_units,
-                             with_no_effect_status)
+                             truncar_etiqueta_boton, with_no_effect_status)
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -316,6 +316,118 @@ def test_etiquetas_boton_distinguibles_respeta_etiquetas_fijas_como_obstaculo():
         titulos, fijas=[True, False])
     assert distinguidas[0] == "Programar PLC"
     assert distinguidas[1] != "Programar PLC"
+    assert len(set(distinguidas)) == 2
+
+
+# ---------------------------------------------------------------------------
+# Hallazgo 7 (sesión 2 por Telegram, 2026-09-27, confirmado por el usuario):
+# el corte de palabra no puede dejar una palabra de función (preposición,
+# artículo, conjunción) justo antes de la elipsis -- "Backup de servidores
+# de…", "Configurar access points de…", "Cambiar switch industrial de…".
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("largo, esperado", [
+    ("Backup de servidores de la sucursal norte", "Backup de servidores…"),
+    ("Configurar access points de la planta baja", "Configurar access points…"),
+    ("Cambiar switch industrial de la línea dos", "Cambiar switch industrial…"),
+])
+def test_acortar_etiqueta_boton_no_termina_en_palabra_de_funcion(largo, esperado):
+    assert len(largo) > OBJETIVO_ETIQUETA_BOTON
+
+    corta = acortar_etiqueta_boton(largo)
+
+    assert corta == esperado
+    ultima_palabra = corta[:-1].rstrip().rsplit(" ", 1)[-1].casefold()
+    assert ultima_palabra not in {
+        "de", "del", "la", "el", "los", "las", "en", "al", "a", "y", "e",
+        "o", "u", "para", "con", "por", "sin", "sobre", "un", "una"}
+
+
+def test_acortar_etiqueta_boton_nunca_deja_vacio_si_todo_es_funcion():
+    # Caso degenerado (no realista para un título): si sólo queda una
+    # palabra tras el corte de palabra, se conserva aunque sea de función --
+    # nunca una etiqueta vacía.
+    largo = "de " * 20 + "cosa"
+    corta = acortar_etiqueta_boton(largo, objetivo=4)
+    assert corta.strip("…") != ""
+
+
+# ---------------------------------------------------------------------------
+# Seguimiento (a) a la revisión de la sesión de etiquetas (review-af418dd9):
+# el corte duro de `acortar_etiqueta_boton` (cuando ni una palabra entra en
+# el objetivo) ignoraba `limite` y usaba siempre 48.
+# ---------------------------------------------------------------------------
+
+
+def test_acortar_etiqueta_boton_corte_duro_honra_un_limite_no_default():
+    una_palabra = "Supercalifragilisticoexpialidocosisimo" * 2
+    limite_custom = 20
+    assert len(una_palabra) > limite_custom
+
+    corta = acortar_etiqueta_boton(una_palabra, limite=limite_custom)
+
+    assert corta.endswith("…")
+    assert len(corta) == limite_custom
+
+
+def test_truncar_etiqueta_boton_honra_un_limite_no_default():
+    largo = "x" * 60
+    assert truncar_etiqueta_boton(largo, limite=10) == "x" * 9 + "…"
+    assert truncar_etiqueta_boton(largo) == "x" * 47 + "…"       # default: 48
+
+
+# ---------------------------------------------------------------------------
+# Seguimiento (c): `fijas` más corta que `titulos` no descarta etiquetas en
+# silencio.
+# ---------------------------------------------------------------------------
+
+
+def test_etiquetas_boton_distinguibles_fijas_de_otro_largo_levanta_error():
+    with pytest.raises(ValueError):
+        etiquetas_boton_distinguibles(["A", "B", "C"], fijas=[True])
+
+
+# ---------------------------------------------------------------------------
+# Seguimiento (b): la numeración de último recurso -- antes sin ninguna
+# prueba -- no colisiona con una etiqueta ya presente y nunca toca una fija.
+# ---------------------------------------------------------------------------
+
+
+def test_etiquetas_boton_distinguibles_numera_titulos_identicos():
+    # Dos títulos literalmente idénticos: crecer palabra por palabra no
+    # alcanza para distinguirlos (ya están completos) -- último recurso, la
+    # numeración.
+    titulos = ["Backup de servidores", "Backup de servidores"]
+
+    distinguidas = etiquetas_boton_distinguibles(titulos)
+
+    assert distinguidas == ["Backup de servidores", "Backup de servidores (2)"]
+
+
+def test_etiquetas_boton_distinguibles_numera_saltando_una_colision_existente():
+    # La segunda "Backup" repetida numeraría "(2)" por default -- pero ese
+    # texto ya lo usa la tercera opción tal cual, así que salta a "(3)".
+    titulos = ["Backup", "Backup", "Backup (2)"]
+
+    distinguidas = etiquetas_boton_distinguibles(titulos)
+
+    assert distinguidas[0] == "Backup"
+    assert distinguidas[2] == "Backup (2)"          # la literal, sin tocar
+    assert distinguidas[1] == "Backup (3)"          # saltea el 2, ya ocupado
+    assert len(set(distinguidas)) == 3
+
+
+def test_etiquetas_boton_distinguibles_nunca_numera_ni_modifica_una_fija():
+    # Una movible que coincide con una fija nunca puede quedar igual a ella
+    # -- la fija nunca se toca, y la movible se numera (arrancando en 2,
+    # como si la fija ocupara el primer lugar).
+    titulos = ["Backup de servidores", "Backup de servidores"]
+
+    distinguidas = etiquetas_boton_distinguibles(titulos, fijas=[True, False])
+
+    assert distinguidas[0] == "Backup de servidores"        # fija: intacta
+    assert distinguidas[1] == "Backup de servidores (2)"    # nunca igual a la fija
     assert len(set(distinguidas)) == 2
 
 
