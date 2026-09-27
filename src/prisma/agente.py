@@ -128,12 +128,16 @@ def responder(cur: psycopg.Cursor, quien: Solicitante, texto_entrante: str,
     opciones_pendientes: list[H.NecesitaOpciones] = []
     texto_al_ofrecer: str | None = None
     intentos_mutacion: list[str] = []
-    # T3 (ADR 0007 punto 3): filas de la ÚLTIMA llamada a `consultar_tareas`
-    # de este turno que devolvió alguna -- se sobrescribe sólo cuando hay
-    # filas, así que si varias llamadas ocurren en el mismo turno, gana la
-    # última que trajo algo, no la última llamada a secas. Vacía si ninguna
-    # trajo filas.
-    ultima_lista_tareas: list[dict] = []
+    # T3 (ADR 0007 punto 3; corregido por el hallazgo de sesión 2 del
+    # 2026-09-27, evidencia en `audit_log`): unión deduplicada por id de
+    # tarea de las filas de TODAS las llamadas a `consultar_tareas` de este
+    # turno que devolvieron algo, en orden de primera aparición -- no sólo
+    # las de la última llamada que trajo filas. Antes ("gana la última con
+    # filas") un turno que arma una lista con varias consultas (una por
+    # persona, por ejemplo) contestaba en el texto con todas las tareas pero
+    # ofrecía en los botones sólo las de la última consulta. Vacía si
+    # ninguna trajo filas.
+    tareas_listadas: list[dict] = []
     salida = ""
     cerro = False
 
@@ -157,7 +161,7 @@ def responder(cur: psycopg.Cursor, quien: Solicitante, texto_entrante: str,
                 resultados.append(
                     _ejecutar_una(cur, quien, c, ctx, acciones, confirmaciones,
                                   elecciones, elegir_pendiente, opciones_pendientes,
-                                  ultima_lista_tareas, chat_id, cal,
+                                  tareas_listadas, chat_id, cal,
                                   ahora, entrante_id, texto_entrante))
             if len(opciones_pendientes) > antes_de_opciones and texto_al_ofrecer is None:
                 # El texto de ESTA vuelta -- la que llamó a `ofrecer_opciones`
@@ -239,9 +243,9 @@ def responder(cur: psycopg.Cursor, quien: Solicitante, texto_entrante: str,
     # lista de tareas salga como botones. Llegar acá ya descartó que el turno
     # haya terminado con otro juego de botones (confirmaciones/elecciones
     # cerraron antes, línea ~161) -- nunca compite con ellos.
-    if ultima_lista_tareas:
+    if tareas_listadas:
         _encolar_respuesta_con_tareas(cur, quien, chat_id, salida,
-                                      ultima_lista_tareas, ahora)
+                                      tareas_listadas, ahora)
     elif hace_pregunta(salida):
         # T4b (ADR 0007, corrida real b-0007): el modelo cerró preguntando en
         # texto abierto sin ofrecer ningún botón propio -- el servidor agrega
@@ -323,7 +327,7 @@ def _bloques(r: Respuesta) -> list[dict]:
 
 def _ejecutar_una(cur, quien: Solicitante, c: Llamada, ctx, acciones,
                   confirmaciones, elecciones, elegir_pendiente,
-                  opciones_pendientes, ultima_lista_tareas, chat_id,
+                  opciones_pendientes, tareas_listadas, chat_id,
                   cal, ahora, entrante_id, texto_entrante) -> dict:
     """Ejecuta una herramienta y devuelve el bloque de resultado para el modelo.
 
@@ -436,10 +440,17 @@ def _ejecutar_una(cur, quien: Solicitante, c: Llamada, ctx, acciones,
                           "hecho."}, error=True)
 
     if c.nombre == "consultar_tareas" and isinstance(resultado, list) and resultado:
-        # T3 (ADR 0007 punto 3): se guarda para que `responder` arme los
-        # botones de la lista con la última llamada que trajo filas -- se
-        # sobrescribe adrede sólo cuando hay algo, nunca con una lista vacía.
-        ultima_lista_tareas[:] = resultado
+        # T3 (ADR 0007 punto 3; corregido por el hallazgo de sesión 2): se
+        # acumula acá, sin repetir ninguna tarea que ya haya traído otra
+        # llamada de este mismo turno, para que `responder` arme los botones
+        # con la UNIÓN de todas las llamadas a `consultar_tareas` que
+        # trajeron filas -- nunca sólo con la última. Nunca se agrega nada
+        # con una lista vacía.
+        ids_ya_listados = {str(t["id"]) for t in tareas_listadas}
+        for t in resultado:
+            if str(t["id"]) not in ids_ya_listados:
+                tareas_listadas.append(t)
+                ids_ya_listados.add(str(t["id"]))
 
     if isinstance(resultado, dict) and resultado.get("pendiente_revision"):
         confirmaciones.append(c.nombre)
@@ -557,8 +568,11 @@ def _encolar_opciones_modelo(cur, quien: Solicitante, chat_id: int,
 
 def _opciones_lista_tareas(tareas: list[dict]) -> list[tuple[str, dict]]:
     """Botones de la primera página de una lista de tareas (T3, ADR 0007
-    punto 3): hasta `H.MAX_OPCIONES_MODELO` tareas, en el orden que ya trajo
-    `consultar_tareas` (`fecha_objetivo`). Cada tarea usa la misma forma de
+    punto 3): hasta `H.MAX_OPCIONES_MODELO` tareas, en el orden de primera
+    aparición de `tareas_listadas` -- la unión deduplicada, por id de tarea,
+    de todas las llamadas a `consultar_tareas` del turno que trajeron filas
+    (corregido por el hallazgo de sesión 2: antes era sólo el orden de la
+    última llamada que trajo filas). Cada tarea usa la misma forma de
     valor que una opción de tarea de `ofrecer_opciones` (T1) con
     `accion: "menu"` -- tocarla abre el menú de T2 sin retomar la
     conversación --, así que `gateway._resolver_toque_opcion_modelo` no

@@ -2404,6 +2404,58 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
     afuera y cuenta como pregunta. Caso raro; el costo es un cierre genérico de más, no
     una respuesta perdida.
 
+- 2026-09-27 (orquestador): **Sesión 2 por Telegram, hallazgo 1 -- botones de una
+  lista armada con varias consultas mostraban sólo la última.** Evidencia en
+  `audit_log`: Ismael escribió "quiero ver todas las tareas que hay para el
+  equipo"; el modelo llamó a `consultar_tareas` 7 veces en el mismo turno -- una
+  sin filtro (sus propias tareas: ninguna) y una por cada una de las 6 personas
+  del equipo (`responsable=<nombre>`). El texto de la respuesta nombró las 12
+  tareas de todo el equipo, pero los botones sólo ofrecían las 2 de Ariel (+
+  salida), porque `agente.responder`/`_ejecutar_una` (T3, ADR 0007 punto 3)
+  guardaban sólo las filas de la ÚLTIMA llamada a `consultar_tareas` que trajo
+  algo ("gana la última con filas"), no las de todas.
+
+  **Cambio de regla (decisión del orquestador):** se acumulan las filas de TODAS
+  las llamadas a `consultar_tareas` del turno que devolvieron algo -- unión
+  deduplicada por id de tarea, en orden de primera aparición -- en vez de
+  quedarse con la última. El resto de T3/T3a no cambia: paginado con "Ver más" (4
+  por página), el texto largo se sigue partiendo aparte de los botones, y nunca
+  compiten dos juegos de botones en el mismo turno. Motivo: el modelo arma una
+  lista de "todo el equipo" con varias consultas encadenadas (una por persona),
+  no con una sola llamada amplia -- la regla vieja asumía lo segundo.
+
+  **Costo aceptado:** una consulta amplia seguida de una más angosta (p. ej. "mis
+  tareas" sin filtro, después "las de Ariel" por otra razón dentro del mismo
+  turno) ahora deja ambas en los botones -- de más, nunca de menos. Antes el
+  costo era el inverso y más grave: tareas que el texto nombraba desaparecían de
+  los botones sin aviso.
+
+  Se renombró el acumulador `ultima_lista_tareas` a `tareas_listadas` (ya no
+  describe "la última", sino la unión) y se actualizaron los comentarios que
+  explicaban la regla vieja en `src/prisma/agente.py` (declaración cerca de
+  `responder`, `_ejecutar_una`, y los docstrings de `_opciones_lista_tareas`;
+  `_encolar_respuesta_con_tareas` no mencionaba la regla vieja, no hizo falta
+  tocarlo).
+
+  Archivos:
+  - `src/prisma/agente.py`: acumulación por unión deduplicada (ver arriba) y
+    renombre `ultima_lista_tareas` -> `tareas_listadas`.
+  - `tests/test_lista_botones.py`: `test_ultima_llamada_con_filas_gana` (afirmaba
+    la regla vieja a propósito) se reemplazó por
+    `test_varias_llamadas_con_filas_se_unen_por_orden_de_aparicion`, que reproduce
+    la forma real del turno de Ismael (una consulta sin filtro vacía + varias por
+    persona, con una repetida) y prueba la unión en orden de primera aparición,
+    con paginado "Ver más" al pasar de 4. El docstring de la prueba nueva deja
+    explícito que es un cambio de regla, no un debilitamiento.
+
+  - RED (con `agente.py` sin el cambio, `tests/test_lista_botones.py` con la
+    prueba nueva): `1 failed` -- los botones traían sólo la última consulta
+    ("Tarea Lucas 5"), no la unión.
+  - GREEN: `tests/test_lista_botones.py tests/test_agente.py
+    tests/test_opciones_modelo.py tests/test_pregunta_sin_opciones.py` -> `67
+    passed`; suite completa -> `876 passed, 108 deselected` (233 s), igual que la
+    base registrada arriba.
+
 - **Próximo paso al retomar:** T5, sólo la segunda sesión real por Telegram (necesita
   al usuario; datos ficticios). Antes de empezar: comparar la base local con
   `db/esquema.sql` (hoy al día hasta la migración `0011`) y aplicar lo que falte;

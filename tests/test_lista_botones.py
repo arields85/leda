@@ -383,38 +383,74 @@ def test_turno_con_otras_opciones_no_agrega_botones_de_lista(
 
 
 # ---------------------------------------------------------------------------
-# Varias llamadas a consultar_tareas en el mismo turno: gana la última con filas
+# Varias llamadas a consultar_tareas en el mismo turno: unión deduplicada de
+# TODAS las que trajeron filas, en orden de primera aparición (hallazgo de
+# sesión 2 por Telegram, 2026-09-27)
 # ---------------------------------------------------------------------------
 
-def test_ultima_llamada_con_filas_gana(corework, conn, monkeypatch):
+def test_varias_llamadas_con_filas_se_unen_por_orden_de_aparicion(
+        corework, conn, monkeypatch):
+    """Corrección tras un hallazgo de sesión real (2026-09-27, evidencia en
+    `audit_log`): Ismael pidió "quiero ver todas las tareas que hay para el
+    equipo" y el modelo llamó a `consultar_tareas` una vez sin filtro (sus
+    propias tareas: ninguna) y una vez por persona del equipo. El texto de la
+    respuesta nombró las tareas de las seis personas, pero los botones sólo
+    ofrecían las de la ÚLTIMA consulta -- porque la regla vieja de esta misma
+    prueba (`ultima_lista_tareas`, "gana la última con filas") pisaba cada
+    lista con la siguiente.
+
+    Este es un CAMBIO DE REGLA a propósito, no una prueba debilitada: antes
+    esta prueba afirmaba que ganaba sólo la última llamada con filas; ahora
+    afirma la regla nueva -- unión deduplicada por id de tarea de todas las
+    llamadas del turno que trajeron filas, en orden de primera aparición --
+    reproduciendo la forma real del turno de Ismael: una consulta sin filtro
+    que vuelve vacía y no debe agregar nada, seguida de varias por persona,
+    con una tarea repetida entre dos llamadas (la del modelo repitiendo
+    `responsable="Ariel"`) que no debe duplicarse en los botones. Con más de
+    cuatro tareas en la unión, la primera página trae cuatro más "Ver más",
+    igual que con una sola consulta."""
     ws = corework.workspace_id
     with admin(conn) as cur:
-        _tarea(cur, ws, titulo="Tarea asignada A", estado="asignada",
-              dias_para_vencer=1)
-        _tarea(cur, ws, titulo="Tarea asignada B", estado="asignada",
-              dias_para_vencer=2)
-        _tarea(cur, ws, titulo="Tarea terminada C", estado="terminada",
-              dias_para_vencer=3)
+        ariel_ids = [_tarea(cur, ws, titulo=f"Tarea Ariel {n}",
+                            persona="Ariel De Simone", dias_para_vencer=dias)
+                    for n, dias in enumerate((1, 2), start=1)]
+        martin_ids = [_tarea(cur, ws, titulo=f"Tarea Martín {n}",
+                             persona="Martín Forte", dias_para_vencer=dias)
+                     for n, dias in enumerate((3, 4), start=1)]
+        lucas_ids = [_tarea(cur, ws, titulo=f"Tarea Lucas {n}",
+                            persona="Lucas Natuche", dias_para_vencer=dias)
+                    for n, dias in enumerate((5, 6), start=1)]
     conn.commit()
 
     guion = [Respuesta(llamadas=[
-        Llamada("c1", "consultar_tareas", {"estado": "asignada"}),
-        Llamada("c2", "consultar_tareas", {"estado": "terminada"}),
-        # Ninguna bloqueada: esta última llamada vuelve vacía y no debe pisar
-        # la de "terminada", que sí trajo filas.
-        Llamada("c3", "consultar_tareas", {"estado": "bloqueada"})]),
-        Respuesta(texto="Listo.")]
+        # Sus propias tareas (Ismael no tiene ninguna): vacía, no agrega nada.
+        Llamada("c1", "consultar_tareas", {}),
+        Llamada("c2", "consultar_tareas", {"responsable": "Ariel"}),
+        Llamada("c3", "consultar_tareas", {"responsable": "Martín"}),
+        # Repite "Ariel": las mismas dos tareas de `c2`, no deben duplicarse.
+        Llamada("c4", "consultar_tareas", {"responsable": "Ariel"}),
+        Llamada("c5", "consultar_tareas", {"responsable": "Lucas"})]),
+        Respuesta(texto="Tenés 6 tareas entre todo el equipo.")]
     proveedor = _con_proveedor(monkeypatch, guion)
 
     with espacio(conn, ws) as cur:
-        quien = _quien(cur, "Marcos Tarquini", ws)
+        quien = _quien(cur, "Ismael Soschinski", ws)
         cal = Calendario.desde_base(cur, ws)
-        responder(cur, quien, "resumime", proveedor, cal, chat_id=1,
-                 ahora=datetime.now(timezone.utc))
+        responder(cur, quien, "quiero ver todas las tareas que hay para el equipo",
+                 proveedor, cal, chat_id=1, ahora=datetime.now(timezone.utc))
         pid = _pendiente(cur, ws, P.SENTINEL_OPCIONES_MODELO)
-        etiquetas = [f["etiqueta"] for f in _opciones(cur, pid)]
+        filas = _opciones(cur, pid)
 
-    assert etiquetas == ["Tarea terminada C", P.ETIQUETA_SALIR_OPCIONES]
+    etiquetas = [f["etiqueta"] for f in filas]
+    assert etiquetas == ["Tarea Ariel 1", "Tarea Ariel 2", "Tarea Martín 1",
+                        "Tarea Martín 2", P.ETIQUETA_VER_MAS,
+                        P.ETIQUETA_SALIR_OPCIONES]
+    ver_mas = next(f for f in filas if f["etiqueta"] == P.ETIQUETA_VER_MAS)
+    assert ver_mas["valor"] == {"tipo": "ver_mas", "tarea_ids": lucas_ids}
+    for n, (f, tid) in enumerate(zip(filas[:2], ariel_ids), start=1):
+        assert f["valor"]["tarea_id"] == tid
+    for n, (f, tid) in enumerate(zip(filas[2:4], martin_ids), start=1):
+        assert f["valor"]["tarea_id"] == tid
 
 
 # ---------------------------------------------------------------------------
