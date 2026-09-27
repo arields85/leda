@@ -3050,3 +3050,12 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   después y casos de guarda; (4) tercera ronda corta por Telegram para la entrega con
   evidencia y "Pedir cambios". Antes de una sesión real: base local contra
   `db/esquema.sql` (al día hasta `0012`).
+  **Resolver antes de la próxima sesión real — títulos "(simulado)":** las 12 tareas
+  ficticias de la base local terminan en " (simulado)" y el usuario pidió que no. No se
+  pueden renombrar: el título es un campo de compromiso y `bloquear_estado_directo` lo
+  protege como inmutable (se intentó el 2026-09-27 y la base lo rechazó, correctamente;
+  no se fuerza). Tampoco hay un script de siembra en el repositorio: se cargaron a mano en
+  la sesión 1. Solución: un script de siembra reproducible de datos ficticios (mismas
+  personas y tareas, títulos sin sufijo, con `evidencia_requerida` coherente con la
+  política del pack) que cargue una base de prueba nueva o restaurada, nunca editando
+  campos inmutables; documentar su uso en `PRUEBA-LOCAL.md`.

@@ -166,6 +166,11 @@ comparar la base local con `db/esquema.sql` (hoy al día hasta `0012`).
 
 Abierto de esta unidad, sin bloquear el cierre de T5:
 
+- **Títulos "(simulado)" en los datos ficticios**, a resolver antes de la próxima sesión
+  real: el título es un campo de compromiso inmutable y no se renombra; no existe script
+  de siembra (las tareas se cargaron a mano). Se resuelve con un script de siembra
+  reproducible sin el sufijo sobre una base de prueba nueva o restaurada
+  (`odd/tasks/prisma-orienta.md`, próximo paso).
 - **Autoridad sobre `cancelada`** (T2b): no se resolvió si una autoridad superior al
   responsable puede cancelar una tarea ajena. `PENDIENTE` de decisión explícita.
 - El menú de tarea (T2) todavía no ofrece "Adjuntar evidencia" al aprobador, aunque
