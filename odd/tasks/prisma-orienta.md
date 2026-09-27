@@ -92,6 +92,19 @@ gestión.
     muestra esa parte pintada). `evidencia_pendiente` cuenta sólo evidencia con
     `at` posterior al último `rechazado`; la evidencia enviada en la entrega se
     registra siempre. Migración `0014`; enmienda en ADR 0009.
+  - [ ] **T6c — "Pedir cambios" con una dependencia bloqueante abierta.** Hoy la
+    vuelta a `en_curso` la rechaza el disparador de `0008` y el aprobador no puede
+    pedir cambios. Decisión del usuario (2026-09-27): vuelve al estado que tenía
+    antes de la última entrada a `en_revision` -- `en_curso` si estaba en curso (es
+    una restauración, exenta del gate de arranque, igual que salir de `bloqueada`),
+    `asignada` si se entregó sin haber arrancado ("Ya la terminé" se ofrece desde
+    `asignada`). Enmienda la decisión 4 de ADR 0009 ("vuelve a `en_curso`").
+  - [x] **T6d — Dedupe estable del aviso de entrega.** `_notificar_entrega_al_aprobador`
+    recibe `evidencia_id or uuid.uuid4()`: sin evidencia, la clave es aleatoria y no
+    deduplica nada. Derivarla de la identidad del acto de entrega.
+  - [ ] **T6e — Prueba de punta a punta de "Pedir cambios".**
+  - [ ] **T6f — Serializar "Aprobar" y "Pedir cambios" concurrentes** (review-3cf89bef).
+  - [ ] **T6g — Empate de evidencia y entrega repetida en `en_revision`** (review-e719d807).
 
 ## Ruta
 
@@ -105,6 +118,7 @@ gestión.
 | T5 | inline | documentación |
 | T6a | delegada, un escritor | `db/esquema.sql`, migración y rollback `0013`, pruebas (4 archivos) |
 | T6b | delegada, un escritor | `db/esquema.sql`, migración y rollback `0014`, `herramientas.py`, ADR 0009, pruebas |
+| T6d | delegada, un escritor | lectura de `herramientas.py`/`gateway.py`/`pendientes.py` para ubicar la identidad del acto + pruebas |
 
 ## Verificación
 
@@ -3146,3 +3160,25 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   ya está `en_revision` (por texto libre; la confirmación ya es de ejecución única)
   agrega otra fila de evidencia junto con el evento de mismo estado -- ligado al
   riesgo 3 de `docs/STATUS.md` (no hay grafo de transiciones), sin prueba hoy.
+
+- 2026-09-27: **T6d cerrada — dedupe estable del aviso de entrega** (seguimiento de
+  review-c112506a). Ruta: delegada, un escritor. Sin evidencia nueva, la clave del
+  aviso al aprobador pasa de `uuid.uuid4()` a `f"{tarea_id}:{pg_current_xact_id()}"`
+  (con evidencia sigue siendo `evidencia_id`): igual dentro del mismo acto, distinta
+  entre actos. El orquestador rechazó una primera versión que derivaba la clave de
+  la tarea, el estado de origen y el texto: entrega -> "Pedir cambios" -> reentrega
+  sin evidencia repetía la clave y, como `message_outbox.dedupe_key` es `unique`,
+  la segunda entrega quedaba sin avisar en silencio. La repetición del mismo acto
+  entre transacciones no la cubre esta clave sino la ejecución única de la
+  `pending_action` confirmada. `pg_current_xact_id()` exige PostgreSQL 13+
+  (desarrollo: 18). Pruebas en `tests/test_entrega_con_evidencia.py` sección 7:
+  repetición en la misma transacción -> un aviso; tarea sin política de evidencia,
+  entrega -> pedir cambios -> reentrega -> dos avisos (RED contra la primera versión:
+  `1 failed, 1 passed`); dos entregas con evidencia -> dos avisos. Seguimiento
+  anotado, sin cambiar: `_avisar_dependencia_informativa` sigue recibiendo
+  `uuid.uuid4()` desde `_actualizar_estado`, `_registrar_bloqueo` y
+  `_resolver_bloqueo`.
+  GREEN enfocada (reejecutada por el orquestador): `pytest -q
+  tests/test_entrega_con_evidencia.py tests/test_menu_tarea.py
+  tests/test_aprobacion_cierra_tarea.py` -> `66 passed`. Suite completa (escritor):
+  `938 passed, 108 deselected`.

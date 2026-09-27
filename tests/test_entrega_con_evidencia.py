@@ -791,3 +791,151 @@ def test_evidencia_texto_se_registra_aunque_ya_exista_evidencia_sin_pedir_cambio
             """select uri from evidence where task_id = %s order by at desc limit 1""",
             (tid,))
         assert cur.fetchone()["uri"] == "Mandé esto de nuevo, por si acaso."
+
+
+# ---------------------------------------------------------------------------
+# 7. Dedupe estable del aviso de entrega (T6d, `odd/tasks/prisma-orienta.md`)
+# ---------------------------------------------------------------------------
+
+def _dedupe_keys_entrega(cur, ws, tg) -> list[str]:
+    cur.execute(
+        """select dedupe_key from message_outbox
+            where workspace_id = %s and chat_id = %s
+              and dedupe_key like %s
+           order by programado_para""",
+        (ws, tg, f"{ws}:entrega:%"))
+    return [f["dedupe_key"] for f in cur.fetchall()]
+
+
+def test_notificar_entrega_repetido_en_la_misma_transaccion_no_duplica_el_aviso(
+        corework, conn):
+    """La clave de dedupe ancla en la transacción (`pg_current_xact_id()`),
+    no en los hechos de la vista previa: dos llamadas al handler DENTRO de
+    la misma transacción -- sin commit entre medio, ej. un código que se
+    invoca dos veces por error antes de terminar -- comparten la misma
+    transacción y tienen que colapsar en un solo aviso. Se llama al handler
+    directo -- no a `H.ejecutar` -- porque el chequeo de huella de
+    `ejecutar` ya impide un replay con el mismo `huella_previa` una vez que
+    el estado cambió; lo que hay que probar acá es la clave de dedupe en sí,
+    sin depender de esa otra protección."""
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        tid = _tarea(cur, ws, estado="en_curso", evidencia_requerida=None)
+    conn.commit()
+
+    handler = H.REGISTRO["actualizar_estado"].handler
+
+    with espacio(conn, ws) as cur:
+        nahuel = _quien(cur, "Nahuel Gimenez", ws)
+        resultado_1 = handler(cur, nahuel, tarea_id=tid, estado="en_revision")
+        assert resultado_1 == {"estado": "en_revision"}
+
+        # Fuerza la tarea de vuelta al mismo estado de origen, DENTRO de
+        # esta misma transacción -- sin pasar por "Pedir cambios" y sin
+        # commit --, para invocar el handler otra vez para lo que, a los
+        # ojos de esta clave, es el mismo acto: la misma transacción.
+        cur.execute(
+            """insert into task_state_event (task_id, estado_anterior,
+                                             estado_nuevo, actor_kind)
+               values (%s, 'en_revision', 'en_curso', 'sistema')""", (tid,))
+        resultado_2 = handler(cur, nahuel, tarea_id=tid, estado="en_revision")
+        assert resultado_2 == {"estado": "en_revision"}
+
+    with admin(conn) as cur:
+        cur.execute("select estado from task where id = %s", (tid,))
+        assert cur.fetchone()["estado"] == "en_revision"   # el acto sí se aplicó las dos veces
+
+        tg_marcos = _tg(cur, "Marcos Tarquini")
+        claves = _dedupe_keys_entrega(cur, ws, tg_marcos)
+    # Un solo aviso: la segunda inserción chocó con `on conflict (dedupe_key)
+    # do nothing` porque las dos llamadas comparten la misma transacción.
+    assert len(claves) == 1
+
+
+def test_entrega_sin_politica_de_evidencia_tras_pedir_cambios_notifica_dos_veces(
+        corework, conn):
+    """Corrección tras revisión del orquestador sobre la primera versión de
+    este arreglo: usaba `_huella(tarea_id, fila["estado"], evidencia_texto)`
+    -- los mismos hechos de la vista previa -- como ancla cuando no había
+    evidencia nueva. Eso identifica el ESTADO DE ORIGEN, no el acto: dos
+    entregas REALMENTE distintas (entrega -> "Pedir cambios" -> reentrega)
+    que arrancan las dos desde `en_curso` sin evidencia nueva en ninguna de
+    las dos -- el camino real de una tarea sin política de evidencia --
+    producían la MISMA clave. El resultado no era "no duplica": la segunda
+    entrega se quedaba sin avisar, en silencio (`AGENTS.md` lo prohíbe:
+    "nunca falla en silencio"), con el `pending_action` de los botones
+    "Aprobar"/"Pedir cambios" ya registrado para un mensaje que nunca salía
+    -- y `message_outbox.dedupe_key` es `unique` para siempre, así que esa
+    colisión no se arreglaba sola más adelante. Con la clave anclada en la
+    transacción, cada entrega -- en su propia transacción -- avisa la suya."""
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        tid = _tarea(cur, ws, estado="en_curso", evidencia_requerida=[])
+    conn.commit()
+
+    with espacio(conn, ws) as cur:
+        nahuel = _quien(cur, "Nahuel Gimenez", ws)
+        resultado = H.ejecutar(cur, nahuel, "actualizar_estado",
+                               {"tarea_id": tid, "estado": "en_revision"},
+                               ya_confirmada=True)
+    assert resultado == {"estado": "en_revision"}
+
+    with espacio(conn, ws) as cur:
+        marcos = _quien(cur, "Marcos Tarquini", ws)
+        H.ejecutar(cur, marcos, "pedir_cambios_tarea",
+                   {"tarea_id": tid, "comentario": "Falta un detalle."},
+                   ya_confirmada=True)
+
+    with espacio(conn, ws) as cur:
+        nahuel = _quien(cur, "Nahuel Gimenez", ws)
+        resultado = H.ejecutar(cur, nahuel, "actualizar_estado",
+                               {"tarea_id": tid, "estado": "en_revision"},
+                               ya_confirmada=True)
+    assert resultado == {"estado": "en_revision"}
+
+    with admin(conn) as cur:
+        tg_marcos = _tg(cur, "Marcos Tarquini")
+        claves = _dedupe_keys_entrega(cur, ws, tg_marcos)
+    assert len(claves) == 2
+    assert claves[0] != claves[1]
+
+
+def test_dos_entregas_distintas_con_evidencia_notifican_dos_veces_con_claves_distintas(
+        corework, conn):
+    """Dos actos de entrega REALMENTE distintos -- separados por "Pedir
+    cambios", cada uno con su propio texto de evidencia -- siguen avisando
+    dos veces, con dos claves de dedupe distintas: la corrección de T6d no
+    junta lo que es distinto, sólo deja de inventar una clave al azar donde
+    antes no había ninguna identidad estable."""
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        tid = _tarea(cur, ws, estado="en_curso")   # evidencia_requerida por defecto
+    conn.commit()
+
+    with espacio(conn, ws) as cur:
+        nahuel = _quien(cur, "Nahuel Gimenez", ws)
+        H.ejecutar(
+            cur, nahuel, "actualizar_estado",
+            {"tarea_id": tid, "estado": "en_revision",
+             "evidencia_texto": "Primera entrega."},
+            ya_confirmada=True)
+
+    with espacio(conn, ws) as cur:
+        marcos = _quien(cur, "Marcos Tarquini", ws)
+        H.ejecutar(cur, marcos, "pedir_cambios_tarea",
+                   {"tarea_id": tid, "comentario": "Falta un detalle."},
+                   ya_confirmada=True)
+
+    with espacio(conn, ws) as cur:
+        nahuel = _quien(cur, "Nahuel Gimenez", ws)
+        H.ejecutar(
+            cur, nahuel, "actualizar_estado",
+            {"tarea_id": tid, "estado": "en_revision",
+             "evidencia_texto": "Segunda entrega, corregida."},
+            ya_confirmada=True)
+
+    with admin(conn) as cur:
+        tg_marcos = _tg(cur, "Marcos Tarquini")
+        claves = _dedupe_keys_entrega(cur, ws, tg_marcos)
+    assert len(claves) == 2
+    assert claves[0] != claves[1]

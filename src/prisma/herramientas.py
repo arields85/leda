@@ -1061,9 +1061,48 @@ def _actualizar_estado(cur, quien: Solicitante, tarea_id, estado, motivo=None,
         aprob = cur.fetchone()
         aprobador_membership_id = aprob["aprobador_membership_id"] if aprob else None
         if aprobador_membership_id:
+            # T6d (`odd/tasks/prisma-orienta.md`): antes, sin evidencia nueva
+            # (política sin evidencia requerida, o entrega sin texto nuevo),
+            # esto era `uuid.uuid4()` -- una clave al azar en cada ejecución.
+            # Con evidencia nueva, `evidencia_id` ya es un id real de la fila
+            # que se acaba de insertar y sigue siendo la ancla (mismo patrón
+            # que `aprobacion_id` en `_aprobar_tarea`, revisión ec6f7d80). Sin
+            # ella no hay ninguna fila nueva para anclar -- `prisma_app`
+            # tampoco puede leer el id de `task_state_event` recién insertado
+            # (ver el comentario de arriba).
+            #
+            # La clave NO puede salir de los hechos de la vista previa (tarea,
+            # estado de origen, texto): entrega -> "Pedir cambios" ->
+            # reentrega sin evidencia repite esos hechos, y como
+            # `message_outbox.dedupe_key` es `unique` para siempre, la
+            # segunda entrega quedaría sin avisar, en silencio, con los
+            # botones "Aprobar"/"Pedir cambios" registrados para un mensaje
+            # que nunca sale.
+            #
+            # La identidad estable de un acto -- sin depender de una fila que
+            # esta vez no existe -- es la transacción que lo ejecuta:
+            # `pg_current_xact_id()` (PostgreSQL 13+; verificado como
+            # `prisma_app`, sin grants extra, contra el Postgres 18 de
+            # `docker-compose.yml`/desarrollo) es la misma para cualquier
+            # llamada dentro de esta misma transacción y distinta de la de
+            # cualquier otra transacción, sin repetirse nunca en el clúster.
+            # Junto con `tarea_id` alcanza para no colisionar entre tareas.
+            # Esto sólo cubre una repetición DENTRO de esta misma transacción
+            # (p. ej. este mismo código invocado dos veces sin haber hecho
+            # commit); una repetición del mismo acto entre transacciones
+            # distintas (un reintento, una entrega de Telegram duplicada) no
+            # es responsabilidad de esta clave -- ya la cubre una capa
+            # anterior: la `pending_action` confirmada se ejecuta una sola
+            # vez (`pendientes.resolver` la marca resuelta antes de que
+            # `ejecutar` corra el handler) y el recibo del update entrante de
+            # Telegram es igual de acotado. Esta clave nunca tiene que
+            # resolver esa otra garantía.
+            cur.execute("select pg_current_xact_id()::text as x")
+            xact = cur.fetchone()["x"]
+            dedupe_id = evidencia_id or f"{tarea_id}:{xact}"
             _notificar_entrega_al_aprobador(
                 cur, quien, tarea_id, fila["titulo"], evidencia_texto,
-                aprobador_membership_id, evidencia_id or uuid.uuid4(),
+                aprobador_membership_id, dedupe_id,
                 datetime.now(timezone.utc))
 
     return {"estado": estado}
