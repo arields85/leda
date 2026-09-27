@@ -471,7 +471,8 @@ def _toque(conn, workspace_id: str, slug: str, toque: dict,
                         if not aprobacion_registrada and isinstance(resultado, dict) and (
                                 resultado.get("error")
                                 or resultado.get("cerrada") is False
-                                or resultado.get("iniciada") is False):
+                                or resultado.get("iniciada") is False
+                                or resultado.get("en_revision") is False):
                             # La preparación se corrió de nuevo al confirmar
                             # (`ya_confirmada=True`) y encontró un
                             # impedimento de negocio -- la situación cambió
@@ -525,7 +526,7 @@ def _toque(conn, workspace_id: str, slug: str, toque: dict,
                                     texto = f"Listo: aprobaste «{titulo}». Quedó terminada."
                                 else:
                                     texto = (f"Listo: aprobaste «{titulo}»; para cerrarla "
-                                             f"falta: {resultado.get('falta')}")
+                                             f"todavía: {resultado.get('falta')}")
                                 _responder(cur, workspace_id, chat_id, quien, texto, ahora)
                             elif (resuelta.herramienta == "actualizar_estado"
                                   and isinstance(resultado, dict) and "estado" in resultado):
@@ -1468,6 +1469,19 @@ def _resolver_toque_menu_tarea(cur, quien, workspace_id: str, chat_id: int,
                                   pending_action_id=pending_action_id)
             return
         if accion == "terminar":
+            # ADR 0009 (hallazgo 8, sesión 2 por Telegram, 2026-09-27): si la
+            # política de la tarea exige evidencia y todavía no tiene
+            # ninguna, se pide antes -- mismo patrón que "Informar un
+            # bloqueo" -- y recién con ese dato se arma UNA sola vista
+            # previa que registra la evidencia y mueve el estado en el mismo
+            # Confirmar (`_resumir_dato_menu_tarea`, más abajo).
+            if M.evidencia_pendiente(cur, tarea_id):
+                _pedir_dato_menu_tarea(
+                    cur, quien, workspace_id, chat_id, accion="terminar",
+                    tarea_id=tarea_id, titulo=titulo,
+                    pregunta="Contame brevemente qué hiciste o pasame un link.",
+                    ahora=ahora)
+                return
             _ejecutar_accion_menu(cur, quien, workspace_id, chat_id,
                                   "actualizar_estado",
                                   {"tarea_id": tarea_id, "estado": "en_revision"}, ahora,
@@ -1477,6 +1491,12 @@ def _resolver_toque_menu_tarea(cur, quien, workspace_id: str, chat_id: int,
             _ejecutar_accion_menu(cur, quien, workspace_id, chat_id,
                                   "aprobar_tarea", {"tarea_id": tarea_id}, ahora,
                                   pending_action_id=pending_action_id)
+            return
+        if accion == "pedir_cambios":
+            _pedir_dato_menu_tarea(
+                cur, quien, workspace_id, chat_id, accion="pedir_cambios",
+                tarea_id=tarea_id, titulo=titulo,
+                pregunta=f"¿Qué falta corregir en «{titulo}»?", ahora=ahora)
             return
         if accion == "cerrar_tarea":
             # ADR 0008: mismo `actualizar_estado` que "Ya la terminé" usa
@@ -1641,8 +1661,18 @@ def _resumir_dato_menu_tarea(cur, quien, texto: str, modificacion, chat_id: int,
     elif accion == "adjuntar_evidencia":
         herramienta, call_args = "adjuntar_evidencia", {
             "tarea_id": tarea_id, "tipo": "texto", "descripcion": dato}
+    elif accion == "terminar":
+        # ADR 0009: la evidencia que se acaba de pedir viaja en el mismo
+        # pedido que el cambio de estado -- una sola vista previa, un solo
+        # Confirmar, que registra las dos cosas juntas
+        # (`herramientas._actualizar_estado`).
+        herramienta, call_args = "actualizar_estado", {
+            "tarea_id": tarea_id, "estado": "en_revision", "evidencia_texto": dato}
+    elif accion == "pedir_cambios":
+        herramienta, call_args = "pedir_cambios_tarea", {
+            "tarea_id": tarea_id, "comentario": dato}
     else:
-        # No debería pasar: sólo estas tres acciones abren esta pregunta.
+        # No debería pasar: sólo estas acciones abren esta pregunta.
         _responder(cur, workspace_id, chat_id, quien,
                   "Perdón, no encontré a qué acción corresponde esto. Volvé "
                   "a intentarlo desde el menú de la tarea.", ahora)

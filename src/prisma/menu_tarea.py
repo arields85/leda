@@ -81,6 +81,16 @@ def _puede_empezar(cur: psycopg.Cursor, tarea_id: str) -> bool:
     return cur.fetchone()["m"] is None
 
 
+def evidencia_pendiente(cur: psycopg.Cursor, tarea_id: str) -> bool:
+    """Reusa `evidencia_pendiente` (ADR 0009): a esta tarea le falta la
+    evidencia que exige su política y todavía no tiene ninguna. La usan
+    "Ya la terminé" (para pedirla antes de la vista previa) y el gate de
+    "Aprobar" del aprobador -- una sola fuente de verdad, la misma función
+    SQL que ya usa `herramientas._actualizar_estado`/`_aprobar_tarea`."""
+    cur.execute("select evidencia_pendiente(%s) as f", (tarea_id,))
+    return bool(cur.fetchone()["f"])
+
+
 def _puede_cerrar(cur: psycopg.Cursor, tarea_id: str) -> bool:
     """Reusa `motivo_no_cierra_tarea` (mecánica §5), la misma función que
     `aprobar_tarea` usa para decidir si cierra en el acto (ADR 0008): sólo
@@ -129,7 +139,13 @@ def calcular_menu(cur: psycopg.Cursor, quien: Solicitante,
     elif relacion == "aprobador":
         if estado == "en_revision":
             acciones.append(AccionMenu("ver_detalle_evidencia", "Ver detalle y evidencia"))
-            acciones.append(AccionMenu("aprobar", "Aprobar"))
+            # ADR 0009, decisión 2: "Aprobar" sólo se ofrece si ya tiene la
+            # evidencia que exige su política -- sesión 2 por Telegram,
+            # 2026-09-27, hallazgo 5: Ismael aprobó a ciegas una tarea sin
+            # evidencia porque el menú se la ofrecía igual.
+            if not evidencia_pendiente(cur, tarea_id):
+                acciones.append(AccionMenu("aprobar", "Aprobar"))
+            acciones.append(AccionMenu("pedir_cambios", "Pedir cambios"))
         else:
             acciones.append(AccionMenu("ver_detalle", "Ver detalle"))
     else:

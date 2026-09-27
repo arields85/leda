@@ -400,15 +400,39 @@ def test_cerrar_tarea_desde_el_menu_termina_en_vista_previa(
 
 
 def test_menu_aprobador_en_revision(cliente, conn, corework, monkeypatch):
+    """ADR 0009, decisión 2: "Aprobar" sólo se ofrece con la evidencia que
+    exige la política ya registrada -- esta tarea la tiene. "Pedir cambios"
+    (decisión 4) se ofrece siempre que la tarea esté en revisión."""
     ws = corework.workspace_id
     with admin(conn) as cur:
         tid = _tarea(cur, ws, estado="en_revision")
+        cur.execute(
+            """insert into evidence (workspace_id, task_id, tipo, uri)
+               values (%s, %s, 'explicacion', 'ya está')""", (ws, tid))
     conn.commit()
 
     # Marcos Tarquini es el aprobador de Nahuel Gimenez (aprobado_por: marcos).
     _, filas, _ = _abrir_menu(cliente, conn, ws, monkeypatch, tid, "Marcos Tarquini")
     etiquetas = [f["etiqueta"] for f in filas]
-    assert etiquetas == ["Ver detalle y evidencia", "Aprobar", P.ETIQUETA_SALIR_OPCIONES]
+    assert etiquetas == ["Ver detalle y evidencia", "Aprobar", "Pedir cambios",
+                        P.ETIQUETA_SALIR_OPCIONES]
+
+
+def test_menu_aprobador_en_revision_sin_evidencia_no_ofrece_aprobar(
+        cliente, conn, corework, monkeypatch):
+    """Hallazgo 5 (sesión 2 por Telegram, 2026-09-27): Ismael pudo tocar
+    "Aprobar" sobre la tarea de Ariel aunque no tenía evidencia -- el menú se
+    lo ofrecía igual. Ahora no aparece; "Pedir cambios" sigue disponible."""
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        tid = _tarea(cur, ws, estado="en_revision")   # sin evidencia
+    conn.commit()
+
+    _, filas, _ = _abrir_menu(cliente, conn, ws, monkeypatch, tid, "Marcos Tarquini")
+    etiquetas = [f["etiqueta"] for f in filas]
+    assert "Aprobar" not in etiquetas
+    assert etiquetas == ["Ver detalle y evidencia", "Pedir cambios",
+                        P.ETIQUETA_SALIR_OPCIONES]
 
 
 def test_menu_aprobador_otro_estado(cliente, conn, corework, monkeypatch):
@@ -497,11 +521,71 @@ def test_pedir_eleccion_dependencia_acorta_y_distingue_titulos_largos(
 # Tocar el menú nunca aplica nada; "Ya la terminé" termina en vista previa
 # ---------------------------------------------------------------------------
 
-def test_ya_la_termine_pasa_a_en_revision_por_vista_previa(
+def test_ya_la_termine_pide_evidencia_si_falta_y_termina_en_vista_previa(
         cliente, conn, corework, monkeypatch):
+    """ADR 0009 (hallazgo 8, sesión 2 por Telegram, 2026-09-27): antes,
+    "Ya la terminé" pasaba directo a la vista previa aunque la política
+    exigiera evidencia y no hubiera ninguna -- exactamente lo que le pasó a
+    Ariel. Ahora pide el dato primero (mismo patrón que "Informar un
+    bloqueo") y arma UNA sola vista previa que registra la evidencia y
+    mueve el estado juntos."""
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        tid = _tarea(cur, ws, estado="asignada")   # evidencia_requerida = ['explicacion']
+    conn.commit()
+
+    pid_menu, filas, tg = _abrir_menu(cliente, conn, ws, monkeypatch, tid,
+                                      "Nahuel Gimenez")
+    _tocar_accion(cliente, conn, ws, filas, "Ya la terminé", tg)
+
+    with admin(conn) as cur:
+        cur.execute("select estado from task where id = %s", (tid,))
+        assert cur.fetchone()["estado"] == "asignada"      # todavía no se pidió nada
+        cur.execute(
+            """select cuerpo from message_outbox where chat_id = %s
+                order by programado_para desc limit 1""", (tg,))
+        assert "qué hiciste" in cur.fetchone()["cuerpo"].lower()
+        cur.execute(
+            """select count(*) n from pending_action
+                where herramienta = %s and modificar_pedido_en is not null
+                  and modificacion_consumida_en is null""",
+            (P.SENTINEL_DATO_MENU_TAREA,))
+        assert cur.fetchone()["n"] == 1
+
+    assert _mensaje(cliente, tg, "Ya lo probé en producción.").status_code == 200
+
+    with admin(conn) as cur:
+        cur.execute("select estado from task where id = %s", (tid,))
+        assert cur.fetchone()["estado"] == "asignada"      # nada se aplicó todavía
+        cur.execute("select count(*) n from evidence where task_id = %s", (tid,))
+        assert cur.fetchone()["n"] == 0                    # tampoco la evidencia
+
+        cur.execute(
+            """select id, resumen from pending_action
+                where herramienta = 'actualizar_estado' and estado = 'esperando'""")
+        fila = cur.fetchone()
+        assert fila is not None
+        assert "en revisión" in fila["resumen"].lower()
+        assert "ya lo probé en producción" in fila["resumen"].lower()
+
+        cur.execute(
+            """select etiqueta from pending_action_option
+                where pending_action_id = %s order by orden""", (fila["id"],))
+        assert [f["etiqueta"] for f in cur.fetchall()] == [
+            "Confirmar", "Modificar", "Cancelar"]
+
+
+def test_ya_la_termine_pasa_directo_a_vista_previa_si_ya_tiene_evidencia(
+        cliente, conn, corework, monkeypatch):
+    """Con la evidencia ya registrada (por ejemplo, "Adjuntar evidencia" se
+    usó antes de tocar "Ya la terminé"), no hay nada que pedir: sigue el
+    camino de siempre, directo a la vista previa."""
     ws = corework.workspace_id
     with admin(conn) as cur:
         tid = _tarea(cur, ws, estado="asignada")
+        cur.execute(
+            """insert into evidence (workspace_id, task_id, tipo, uri)
+               values (%s, %s, 'explicacion', 'ya está')""", (ws, tid))
     conn.commit()
 
     pid_menu, filas, tg = _abrir_menu(cliente, conn, ws, monkeypatch, tid,
@@ -517,8 +601,7 @@ def test_ya_la_termine_pasa_a_en_revision_por_vista_previa(
                 where herramienta = 'actualizar_estado' and estado = 'esperando'""")
         fila = cur.fetchone()
         assert fila is not None
-        assert "en revisión" in fila["resumen"].lower() or \
-               "en_revision" in fila["resumen"].lower()
+        assert "en revisión" in fila["resumen"].lower()
 
         cur.execute(
             """select etiqueta from pending_action_option
@@ -550,6 +633,10 @@ def test_aprobar_termina_en_vista_previa(cliente, conn, corework, monkeypatch):
     ws = corework.workspace_id
     with admin(conn) as cur:
         tid = _tarea(cur, ws, estado="en_revision")
+        # ADR 0009: "Aprobar" sólo se ofrece con la evidencia ya registrada.
+        cur.execute(
+            """insert into evidence (workspace_id, task_id, tipo, uri)
+               values (%s, %s, 'explicacion', 'ya está')""", (ws, tid))
     conn.commit()
 
     pid_menu, filas, tg = _abrir_menu(cliente, conn, ws, monkeypatch, tid,

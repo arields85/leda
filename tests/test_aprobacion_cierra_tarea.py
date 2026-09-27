@@ -65,7 +65,7 @@ def _tarea(cur, ws, *, titulo="Programar HMI línea 2", persona="Nahuel Gimenez"
                    %s, %s)
            returning id""",
         (ws, obj, titulo, ws, ws, persona, criterio_aceptacion,
-         list(evidencia_requerida) if evidencia_requerida else None))
+         list(evidencia_requerida) if evidencia_requerida else []))
     t = cur.fetchone()["id"]
     cur.execute("insert into task_state_event (task_id, estado_nuevo, actor_kind) "
                 "values (%s, %s, 'prisma')", (t, estado))
@@ -118,7 +118,15 @@ def test_aprobar_tarea_cierra_cuando_las_condiciones_estan(corework, conn):
     assert aviso == "Marcos Tarquini aprobó «Programar HMI línea 2»; quedó terminada."
 
 
-def test_aprobar_tarea_registra_pero_no_cierra_si_falta_evidencia(corework, conn):
+def test_aprobar_tarea_rechaza_si_falta_la_evidencia_que_exige(corework, conn):
+    """Adaptado para ADR 0009 (decisión 2): antes, aprobar sin evidencia
+    igual registraba la aprobación y sólo avisaba que no alcanzaba para
+    cerrar -- exactamente lo que permitió que Ismael aprobara a ciegas la
+    tarea de Ariel (hallazgo 5). Ahora ni siquiera se registra: se rechaza
+    antes de escribir nada. Cobertura más completa (el gate, "Pedir
+    cambios", la notificación de entrega) en `test_entrega_con_evidencia.py`."""
+    from prisma.autoridad import Denegado
+
     ws = corework.workspace_id
     with admin(conn) as cur:
         tid = _tarea(cur, ws)   # sin evidencia
@@ -126,33 +134,18 @@ def test_aprobar_tarea_registra_pero_no_cierra_si_falta_evidencia(corework, conn
 
     with espacio(conn, ws) as cur:
         marcos = _quien(cur, "Marcos Tarquini", ws)
-        resultado = H.ejecutar(cur, marcos, "aprobar_tarea", {"tarea_id": tid},
-                               ya_confirmada=True)
-
-    assert resultado == {"aprobada": True, "cerrada": False,
-                         "falta": "Falta la evidencia requerida.",
-                         "titulo": "Programar HMI línea 2"}
+        try:
+            H.ejecutar(cur, marcos, "aprobar_tarea", {"tarea_id": tid},
+                      ya_confirmada=True)
+            assert False, "tenía que rechazar"
+        except Denegado as e:
+            assert "evidencia" in str(e).lower()
 
     with admin(conn) as cur:
         cur.execute("select estado from task where id = %s", (tid,))
-        assert cur.fetchone()["estado"] == "en_revision"    # nada se cerró
+        assert cur.fetchone()["estado"] == "en_revision"    # nada cambió
         cur.execute("select count(*) n from approval where sujeto_id = %s", (tid,))
-        assert cur.fetchone()["n"] == 1                     # pero sí se aprobó
-        cur.execute(
-            """select count(*) n from task_state_event
-                where task_id = %s and estado_nuevo = 'terminada'""", (tid,))
-        assert cur.fetchone()["n"] == 0
-
-        cur.execute("select telegram_user_id from app_user where nombre = %s",
-                   ("Nahuel Gimenez",))
-        tg_nahuel = cur.fetchone()["telegram_user_id"]
-        cur.execute(
-            """select cuerpo from message_outbox
-                where workspace_id = %s and chat_id = %s
-               order by programado_para desc limit 1""", (ws, tg_nahuel))
-        aviso = cur.fetchone()["cuerpo"]
-    assert aviso == ("Marcos Tarquini aprobó «Programar HMI línea 2»; "
-                     "para cerrarla falta: Falta la evidencia requerida.")
+        assert cur.fetchone()["n"] == 0                     # tampoco se aprobó
 
 
 def test_aprobar_tarea_no_cierra_con_dependencia_bloqueante_sin_resolver(
@@ -239,12 +232,17 @@ def test_mensaje_post_confirmacion_aprobar_tarea_que_cierra(
     assert cuerpo == "Listo: aprobaste «Programar HMI línea 2». Quedó terminada."
 
 
-def test_mensaje_post_confirmacion_aprobar_tarea_que_no_cierra(
+def test_mensaje_post_confirmacion_aprobar_tarea_rechaza_si_falta_evidencia(
         corework, conn, monkeypatch):
+    """Adaptado para ADR 0009 (decisión 2): aprobar sin evidencia ahora se
+    rechaza antes de registrar nada -- el mensaje post-confirmación es el
+    del rechazo, no "para cerrarla falta: ..." (eso sólo puede pasar hoy por
+    otra condición, ver `test_mensaje_post_confirmacion_aprobar_tarea_que_
+    no_cierra_por_dependencia`)."""
     cliente = _cliente(conn, monkeypatch)
     ws = corework.workspace_id
     with admin(conn) as cur:
-        tid = _tarea(cur, ws)   # sin evidencia: no va a cerrar
+        tid = _tarea(cur, ws)   # sin evidencia
     with espacio(conn, ws) as cur:
         marcos = _quien(cur, "Marcos Tarquini", ws)
         p = P.registrar(cur, marcos, herramienta="aprobar_tarea",
@@ -257,13 +255,55 @@ def test_mensaje_post_confirmacion_aprobar_tarea_que_no_cierra(
     assert _tocar(cliente, token, tg).status_code == 200
 
     with admin(conn) as cur:
+        cur.execute("select count(*) n from approval where sujeto_id = %s", (tid,))
+        assert cur.fetchone()["n"] == 0
+        cur.execute(
+            """select cuerpo from message_outbox
+                where workspace_id = %s and chat_id = %s
+               order by programado_para desc limit 1""", (ws, tg))
+        cuerpo = cur.fetchone()["cuerpo"]
+    assert "evidencia" in cuerpo.lower()
+
+
+def test_mensaje_post_confirmacion_aprobar_tarea_que_no_cierra_por_dependencia(
+        corework, conn, monkeypatch):
+    """Misma forma que la prueba de arriba, pero con la evidencia ya
+    registrada (así el gate de ADR 0009 no interfiere) y una dependencia
+    bloqueante -- para seguir cubriendo el mensaje "para cerrarla todavía:
+    ..." con la palabra "falta" sin repetirse (hallazgo 9)."""
+    cliente = _cliente(conn, monkeypatch)
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        origen = _tarea(cur, ws, titulo="Instalar tablero",
+                        persona="Marcos Tarquini", estado="asignada")
+        tid = _tarea(cur, ws)
+        _evidencia(cur, ws, tid)
+        cur.execute(
+            """insert into dependency (workspace_id, origen_task_id,
+                                       destino_task_id, tipo)
+               values (%s, %s, %s, 'bloqueante')""", (ws, origen, tid))
+    with espacio(conn, ws) as cur:
+        marcos = _quien(cur, "Marcos Tarquini", ws)
+        p = P.registrar(cur, marcos, herramienta="aprobar_tarea",
+                        args={"tarea_id": tid}, resumen="aprobar",
+                        vence_en=AHORA + timedelta(days=1), chat_id=500)
+        token = P.opcion_por_etiqueta(cur, p.id, "Confirmar").token
+        tg = _telegram_id(cur, "Marcos Tarquini")
+    conn.commit()
+
+    assert _tocar(cliente, token, tg).status_code == 200
+
+    with admin(conn) as cur:
+        cur.execute("select count(*) n from approval where sujeto_id = %s", (tid,))
+        assert cur.fetchone()["n"] == 1
         cur.execute(
             """select cuerpo from message_outbox
                 where workspace_id = %s and chat_id = %s
                order by programado_para desc limit 1""", (ws, tg))
         cuerpo = cur.fetchone()["cuerpo"]
     assert cuerpo == ("Listo: aprobaste «Programar HMI línea 2»; para cerrarla "
-                      "falta: Falta la evidencia requerida.")
+                      "todavía: Quedan 1 dependencias bloqueantes sin resolver.")
+    assert cuerpo.lower().count("falta") == 0
     # Nunca "Estado actual: En revisión" -- la vista previa, no el resultado.
     assert "Estado actual" not in cuerpo
 
@@ -272,7 +312,10 @@ def test_mensaje_post_confirmacion_actualizar_estado(corework, conn, monkeypatch
     cliente = _cliente(conn, monkeypatch)
     ws = corework.workspace_id
     with admin(conn) as cur:
-        tid = _tarea(cur, ws, persona="Marcos Tarquini", estado="asignada")
+        # Sin exigir evidencia (ADR 0009): esta prueba es sobre el fraseo
+        # del mensaje posterior a confirmar, no sobre el gate de entrega.
+        tid = _tarea(cur, ws, persona="Marcos Tarquini", estado="asignada",
+                    evidencia_requerida=None)
     with espacio(conn, ws) as cur:
         marcos = _quien(cur, "Marcos Tarquini", ws)
         p = P.registrar(cur, marcos, herramienta="actualizar_estado",

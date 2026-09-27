@@ -15,6 +15,9 @@ precondiciones:
       titulo: Actualizar el dashboard de HMI (simulado)
       area: corelabs
       responsable: Ariel De Simone
+      # ADR 0009: este escenario prueba la aclaración con botones, no la
+      # entrega con evidencia -- se la exime a propósito.
+      evidencia_requerida: []
     - id: t2
       titulo: Revisar gráficos del dashboard HMI (simulado)
       area: corelabs

@@ -860,7 +860,8 @@ def test_ejecutar_escenario_aclaracion_tapea_la_candidata_elegida_sin_aplicar_na
     interno = ProveedorGuionado(
         guion=[Respuesta(llamadas=[Llamada(
                    "c1", "actualizar_estado",
-                   {"tarea_id": tid_a, "estado": "en_revision"})]),
+                   {"tarea_id": tid_a, "estado": "en_revision",
+                    "evidencia_texto": "Ya quedó cableado."})]),
               Respuesta(texto="listo")],
         rutas=[IntentRoute(IntentAction.NORMAL_CONVERSATION,
                            trabajos=("lo del tablero",))],
@@ -946,7 +947,8 @@ def test_ejecutar_escenario_opciones_modelo_ofrece_tareas_y_tapea_para_actualiza
             Respuesta(texto="Ya te mostré las opciones."),
             Respuesta(llamadas=[Llamada(
                        "c2", "actualizar_estado",
-                       {"tarea_id": tid_a, "estado": "en_revision"})]),
+                       {"tarea_id": tid_a, "estado": "en_revision",
+                        "evidencia_texto": "Ya lo arreglé."})]),
             Respuesta(texto="listo"),
         ],
         rutas=[IntentRoute(IntentAction.NORMAL_CONVERSATION)],
@@ -1250,11 +1252,21 @@ def test_candidatas_tarea_por_titulo_ignora_una_opcion_sin_titulo():
 
 def test_ejecutar_escenario_toques_lista_tarea_menu_accion_llega_a_la_vista_previa(
         corework, conn):
+    """`evidencia_requerida: []` (ADR 0009): "Ya la terminé" ahora pide la
+    evidencia antes de la vista previa cuando la política la exige, y el
+    corredor no tiene un tipo de paso para responder ese pedido con texto
+    libre entre dos toques -- `toques` sólo resuelve botones
+    (`_resolver_toque_generico`). Esta tarea no la exige a propósito, para
+    seguir cubriendo lo que el escenario prueba de verdad: que un toque
+    genérico llega hasta el Confirmar automático de siempre. Extender el
+    corredor con un paso de texto libre intercalado queda **pendiente**,
+    fuera del alcance de esta unidad."""
     ws = corework.workspace_id
     with admin(conn) as cur:
         ids = sembrar_precondiciones(cur, ws, {
             "tareas": [{"id": "t1", "titulo": "Programar PLC (simulado)",
-                       "area": "ot", "responsable": "Marcos Tarquini"}],
+                       "area": "ot", "responsable": "Marcos Tarquini",
+                       "evidencia_requerida": []}],
         })
     tid = ids["t1"]
 

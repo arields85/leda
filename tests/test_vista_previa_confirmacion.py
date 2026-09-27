@@ -242,10 +242,19 @@ def test_propiedad_adjuntar_evidencia(corework, conn):
 
 
 def test_propiedad_aprobar_tarea(corework, conn):
-    """Marcos es el referente (aprobador) de Nahuel en OT."""
+    """Marcos es el referente (aprobador) de Nahuel en OT.
+
+    ADR 0009: "Aprobar" ahora exige `en_revision` con la evidencia ya
+    registrada (decisión 2) -- esta prueba es sobre la propiedad de
+    confirmación (nada se aplica antes de Confirmar), no sobre ese gate, así
+    que se lo deja satisfecho de antemano."""
     ws = corework.workspace_id
     with admin(conn) as cur:
-        tid = _tarea(cur, ws, titulo="Relevar plano", persona="Nahuel Gimenez")
+        tid = _tarea(cur, ws, titulo="Relevar plano", persona="Nahuel Gimenez",
+                    estado_inicial="en_revision")
+        cur.execute(
+            """insert into evidence (workspace_id, task_id, tipo, uri)
+               values (%s, %s, 'resultado_de_prueba', 'ok')""", (ws, tid))
     with espacio(conn, ws) as cur:
         quien = _quien(cur, "Marcos Tarquini", ws)
 

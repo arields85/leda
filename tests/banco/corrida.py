@@ -269,7 +269,15 @@ def _membership_id(cur, ws: str, nombre: str):
 
 def _crear_tarea_semilla(cur, ws: str, *, titulo: str, area: str, responsable: str,
                          estado: str = "asignada", fecha_objetivo=None,
-                         criterio_aceptacion: str = "Simulado: criterio de prueba del banco.") -> str:
+                         criterio_aceptacion: str = "Simulado: criterio de prueba del banco.",
+                         evidencia_requerida: list[str] | None = None) -> str:
+    """`evidencia_requerida` (ADR 0009): por omisión sigue exigiendo
+    `['explicacion']`, igual que siempre -- un escenario puede pasar `[]`
+    cuando lo que ejercita es otra cosa (p. ej. un toque genérico que llega
+    hasta el Confirmar automático de siempre) y el corredor no tiene forma
+    de mandar el dato de evidencia como un mensaje de texto aparte."""
+    if evidencia_requerida is None:
+        evidencia_requerida = ["explicacion"]
     cur.execute(
         """insert into objective (workspace_id, tipo, titulo, estado)
            values (%s, 'operativo', %s, 'activo') returning id""",
@@ -279,10 +287,10 @@ def _crear_tarea_semilla(cur, ws: str, *, titulo: str, area: str, responsable: s
         """insert into task (workspace_id, objective_id, titulo, area_id,
                              responsable_membership_id, fecha_objetivo,
                              criterio_aceptacion, evidencia_requerida)
-           values (%s, %s, %s, %s, %s, %s, %s, array['explicacion'])
+           values (%s, %s, %s, %s, %s, %s, %s, %s)
            returning id""",
         (ws, obj, titulo, _area_id(cur, ws, area), _membership_id(cur, ws, responsable),
-         fecha_objetivo, criterio_aceptacion))
+         fecha_objetivo, criterio_aceptacion, evidencia_requerida))
     tid = cur.fetchone()["id"]
     cur.execute(
         "insert into task_state_event (task_id, estado_nuevo, actor_kind, at) "
@@ -393,7 +401,8 @@ def sembrar_precondiciones(cur, ws: str, precondiciones: dict) -> dict[str, str]
     for t in precondiciones.get("tareas", []):
         ids[t["id"]] = _crear_tarea_semilla(
             cur, ws, titulo=t["titulo"], area=t["area"], responsable=t["responsable"],
-            estado=t.get("estado", "asignada"), fecha_objetivo=t.get("fecha_objetivo"))
+            estado=t.get("estado", "asignada"), fecha_objetivo=t.get("fecha_objetivo"),
+            evidencia_requerida=t.get("evidencia_requerida"))
     for b in precondiciones.get("bloqueos", []):
         _crear_bloqueo_semilla(cur, ws, ids[b["tarea"]], causa=b["causa"],
                                abierto_por=b.get("abierto_por"))

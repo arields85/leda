@@ -16,6 +16,13 @@ precondiciones:
       titulo: Programar PLC de la comprimidora (simulado)
       area: ot
       responsable: Marcos Tarquini
+      # ADR 0009: "Ya la terminé" ahora pide la evidencia que falta antes de
+      # la vista previa, cuando la política la exige -- el corredor no tiene
+      # un paso de texto libre intercalado entre dos toques (`toques` sólo
+      # resuelve botones), así que esta tarea no la exige a propósito. Lo
+      # que este escenario prueba (tocar hasta el Confirmar automático) no
+      # cambia; extender el corredor queda PENDIENTE, fuera de esta unidad.
+      evidencia_requerida: []
 toques:
   - indice: 0
   - etiqueta: "Ya la terminé"

@@ -13,6 +13,9 @@ precondiciones:
       titulo: Programar PLC de la comprimidora (simulado)
       area: ot
       responsable: Marcos Tarquini
+      # ADR 0009: este escenario prueba el fraseo del cambio de estado,
+      # no la entrega con evidencia -- se la exime a propósito.
+      evidencia_requerida: []
 herramientas_esperadas:
   - actualizar_estado
 herramientas_prohibidas:

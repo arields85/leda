@@ -882,8 +882,13 @@ def crear_borrador_tarea(cur, quien: Solicitante, titulo, objetivo_id=None,
             "pending_action_id": pendiente.id}
 
 
+_MOTIVO_FALTA_EVIDENCIA_ENTREGA = (
+    "Falta la evidencia requerida. Contame brevemente qué hiciste o pasame "
+    "un link.")
+
+
 def _preparar_actualizar_estado(cur, quien: Solicitante, tarea_id, estado,
-                                motivo=None):
+                                motivo=None, evidencia_texto=None):
     cur.execute(
         "select titulo, estado, responsable_membership_id from task where id = %s",
         (tarea_id,))
@@ -909,6 +914,18 @@ def _preparar_actualizar_estado(cur, quien: Solicitante, tarea_id, estado,
         if impedimento:
             return {"cerrada": False, "falta": impedimento}
 
+    if estado == "en_revision":
+        # ADR 0009 (hallazgo 8, sesión 2 por Telegram, 2026-09-27): Ariel
+        # tocó "Ya la terminé" y la tarea pasó a `en_revision` sin ninguna
+        # evidencia, aunque su política la exige -- Ismael después aprobó a
+        # ciegas. Sin evidencia y sin que la persona la haya mandado en este
+        # mismo pedido, se devuelve un `falta` verdadero y nunca se mueve la
+        # tarea (constitución §4: nunca se da por entregado lo que nadie
+        # entregó).
+        cur.execute("select evidencia_pendiente(%s) as f", (tarea_id,))
+        if cur.fetchone()["f"] and not (evidencia_texto or "").strip():
+            return {"en_revision": False, "falta": _MOTIVO_FALTA_EVIDENCIA_ENTREGA}
+
     if estado == "en_curso":
         restaura_en_curso = False
         if fila["estado"] == "bloqueada":
@@ -923,23 +940,30 @@ def _preparar_actualizar_estado(cur, quien: Solicitante, tarea_id, estado,
     cambio = (f"Tarea: {fila['titulo']} · Estado actual: "
              f"{_estado_legible(fila['estado'])} · Nuevo estado: "
              f"{_estado_legible(estado)}")
-    huella = _huella("actualizar_estado", tarea_id, fila["estado"])
+    if estado == "en_revision" and evidencia_texto:
+        cambio += f" · Evidencia: {evidencia_texto.strip()}"
+    huella = _huella("actualizar_estado", tarea_id, fila["estado"], estado,
+                     evidencia_texto)
     return Preparacion(cambio=cambio, huella=huella)
 
 
 @herramienta(
     "actualizar_estado", "actualizar_estado",
     "Mueve una tarea de estado. No cierra: para terminar hace falta que se "
-    "cumplan las condiciones de cierre y estén las aprobaciones.",
+    "cumplan las condiciones de cierre y estén las aprobaciones. Para pasar "
+    "a en_revision, si la tarea exige evidencia y todavía no tiene, hay que "
+    "mandar evidencia_texto en el mismo pedido.",
     {"tarea_id": {"type": "string", "requerido": True},
      "estado": {"type": "string", "requerido": True,
                 "enum": ["asignada", "en_curso", "en_revision", "terminada",
                          "cancelada"]},
-     "motivo": {"type": "string"}},
+     "motivo": {"type": "string"},
+     "evidencia_texto": {"type": "string"}},
     preparar=_preparar_actualizar_estado)
-def _actualizar_estado(cur, quien: Solicitante, tarea_id, estado, motivo=None):
+def _actualizar_estado(cur, quien: Solicitante, tarea_id, estado, motivo=None,
+                       evidencia_texto=None):
     cur.execute(
-        "select estado, responsable_membership_id from task where id = %s",
+        "select estado, titulo, responsable_membership_id from task where id = %s",
         (tarea_id,))
     fila = cur.fetchone()
     if not fila:
@@ -958,6 +982,26 @@ def _actualizar_estado(cur, quien: Solicitante, tarea_id, estado, motivo=None):
         if impedimento:
             # No es un error: es información que Prisma tiene que transmitir.
             return {"cerrada": False, "falta": impedimento}
+
+    evidencia_id = None
+    if estado == "en_revision":
+        # Repetido acá por el mismo motivo que la autoridad de arriba: el
+        # handler es la puerta real a la base, no depende de que `preparar`
+        # haya corrido antes con los mismos argumentos.
+        cur.execute("select evidencia_pendiente(%s) as f", (tarea_id,))
+        if cur.fetchone()["f"]:
+            evidencia_texto = (evidencia_texto or "").strip()
+            if not evidencia_texto:
+                return {"en_revision": False, "falta": _MOTIVO_FALTA_EVIDENCIA_ENTREGA}
+            # Dos hechos, dos filas, un solo acto -- mismo patrón que
+            # `_aprobar_tarea` (ADR 0008): la evidencia que la persona
+            # acaba de mandar se registra junto con el cambio de estado,
+            # nunca por separado ni en un paso previo.
+            cur.execute(
+                """insert into evidence (workspace_id, task_id, tipo, uri, entregado_por)
+                   values (%s, %s, 'texto', %s, %s) returning id""",
+                (quien.workspace_id, tarea_id, evidencia_texto, quien.membership_id))
+            evidencia_id = cur.fetchone()["id"]
 
     if estado == "en_curso":
         # Chequeo proactivo, igual que el de arriba: sin esto, el disparador
@@ -998,6 +1042,22 @@ def _actualizar_estado(cur, quien: Solicitante, tarea_id, estado, motivo=None):
            values (%s, %s, %s, 'persona', %s, %s)""",
         (tarea_id, fila["estado"], estado, quien.app_user_id, motivo))
     _avisar_dependencia_informativa(cur, quien, tarea_id, estado, uuid.uuid4())
+
+    if estado == "en_revision":
+        # ADR 0009, decisión 3: quien aprueba se entera de la entrega con
+        # botones -- no sólo el responsable con un aviso de texto -- para
+        # que "Aprobar" y "Pedir cambios" salgan de ese mismo mensaje.
+        cur.execute(
+            "select aprobador_membership_id from membership where id = %s",
+            (fila["responsable_membership_id"],))
+        aprob = cur.fetchone()
+        aprobador_membership_id = aprob["aprobador_membership_id"] if aprob else None
+        if aprobador_membership_id:
+            _notificar_entrega_al_aprobador(
+                cur, quien, tarea_id, fila["titulo"], evidencia_texto,
+                aprobador_membership_id, evidencia_id or uuid.uuid4(),
+                datetime.now(timezone.utc))
+
     return {"estado": estado}
 
 
@@ -1252,6 +1312,28 @@ def _adjuntar_evidencia(cur, quien: Solicitante, tarea_id, tipo, uri=None,
     return {"evidencia_id": str(cur.fetchone()["id"])}
 
 
+def _exigir_puede_aprobarse(cur, tarea_id, fila) -> None:
+    """ADR 0009, decisión 2: "Aprobar" sólo se permite sobre una tarea
+    `en_revision` y con la evidencia que exige su política ya registrada.
+
+    Sesión 2 por Telegram, 2026-09-27 (hallazgo 5): Ismael tocó "Aprobar" y
+    Prisma lo dejó aprobar a ciegas una tarea sin evidencia -- este chequeo
+    es el que faltaba, y cierra también el defecto de revisión encontrado
+    aparte: sin él, cualquiera con autoridad de aprobador podía aprobar (y
+    de paso cerrar) una tarea `asignada`, o volver a aprobar una ya
+    `terminada`, sólo con texto libre."""
+    if fila["estado"] != "en_revision":
+        raise Denegado(
+            f"Sólo se aprueba una tarea en revisión; hoy está "
+            f"{_estado_legible(fila['estado']).lower()}.")
+    cur.execute("select evidencia_pendiente(%s) as f", (tarea_id,))
+    if cur.fetchone()["f"]:
+        responsable = _persona(cur, fila["responsable_membership_id"])
+        nombre = responsable["nombre"] if responsable else "quien la tiene asignada"
+        raise Denegado(
+            f"Todavía no tiene la evidencia que exige; pedísela a {nombre}.")
+
+
 def _preparar_aprobar_tarea(cur, quien: Solicitante, tarea_id, comentario=None):
     cur.execute(
         "select titulo, estado, responsable_membership_id from task where id = %s",
@@ -1266,6 +1348,7 @@ def _preparar_aprobar_tarea(cur, quien: Solicitante, tarea_id, comentario=None):
         raise Denegado("No podés aprobar tu propio trabajo.")
     if not puede_aprobar_tarea(cur, quien, fila["responsable_membership_id"]):
         raise Denegado("No sos quien revisa el trabajo de esa persona.")
+    _exigir_puede_aprobarse(cur, tarea_id, fila)
 
     # Decisión del usuario, 2026-09-27 (ADR 0008): aprobar registra la
     # aprobación y, si con ella alcanzan las condiciones de cierre (mecánica
@@ -1278,7 +1361,10 @@ def _preparar_aprobar_tarea(cur, quien: Solicitante, tarea_id, comentario=None):
     falta = None if motivo in (None, _MOTIVO_FALTA_APROBACION) else motivo
 
     cambio = f"Se aprueba «{fila['titulo']}»"
-    cambio += " y queda terminada" if falta is None else f"; para cerrarla todavía falta: {falta}"
+    # Sin la palabra "falta" repetida (hallazgo 9, sesión 2 por Telegram,
+    # 2026-09-27): el motivo que devuelve `motivo_no_cierra_tarea` ya
+    # empieza diciendo qué falta ("Falta la evidencia requerida.", etc.).
+    cambio += " y queda terminada" if falta is None else f"; para cerrarla todavía: {falta}"
     if comentario:
         cambio += f" · Comentario: {comentario}"
     huella = _huella("aprobar_tarea", tarea_id, fila["estado"],
@@ -1308,6 +1394,7 @@ def _aprobar_tarea(cur, quien: Solicitante, tarea_id, comentario=None):
         raise Denegado("No podés aprobar tu propio trabajo.")
     if not puede_aprobar_tarea(cur, quien, fila["responsable_membership_id"]):
         raise Denegado("No sos quien revisa el trabajo de esa persona.")
+    _exigir_puede_aprobarse(cur, tarea_id, fila)
 
     cur.execute(
         """insert into approval (workspace_id, sujeto_tipo, sujeto_id,
@@ -1332,7 +1419,10 @@ def _aprobar_tarea(cur, quien: Solicitante, tarea_id, comentario=None):
                                              actor_kind, actor_app_user_id, motivo)
                values (%s, %s, 'terminada', 'persona', %s, %s)""",
             (tarea_id, fila["estado"], quien.app_user_id, comentario or "aprobación"))
-        _avisar_dependencia_informativa(cur, quien, tarea_id, "terminada", uuid.uuid4())
+        # Revisión (review-ec6f7d80): antes usaba `uuid.uuid4()` -- sin
+        # ningún vínculo con lo que se acaba de escribir -- cuando ya había
+        # un id real de negocio a mano, el de esta misma aprobación.
+        _avisar_dependencia_informativa(cur, quien, tarea_id, "terminada", aprobacion_id)
 
     # Constitución §3: "no persiguen avances ni administran estados
     # intermedios" es sobre el responsable, no sobre enterarse de un hecho
@@ -1345,11 +1435,100 @@ def _aprobar_tarea(cur, quien: Solicitante, tarea_id, comentario=None):
         cur, quien, fila["responsable_membership_id"],
         (f"{quien.nombre} aprobó «{fila['titulo']}»; quedó terminada."
          if cerrada else
-         f"{quien.nombre} aprobó «{fila['titulo']}»; para cerrarla falta: {falta}"),
+         f"{quien.nombre} aprobó «{fila['titulo']}»; para cerrarla todavía: {falta}"),
         dedupe_key=f"{quien.workspace_id}:aprobacion:{aprobacion_id}")
 
     return {"aprobada": True, "cerrada": cerrada, "falta": falta,
            "titulo": fila["titulo"]}
+
+
+def _exigir_puede_pedirse_cambios(cur, fila) -> None:
+    """ADR 0009, decisión 4: "Pedir cambios" es del mismo aprobador que
+    "Aprobar", sobre una tarea `en_revision` -- sin el gate de evidencia:
+    pedir que se corrija algo no depende de que ya haya evidencia
+    registrada."""
+    if fila["estado"] != "en_revision":
+        raise Denegado(
+            f"Sólo se piden cambios sobre una tarea en revisión; hoy está "
+            f"{_estado_legible(fila['estado']).lower()}.")
+
+
+def _preparar_pedir_cambios_tarea(cur, quien: Solicitante, tarea_id, comentario=None):
+    cur.execute(
+        "select titulo, estado, responsable_membership_id from task where id = %s",
+        (tarea_id,))
+    fila = cur.fetchone()
+    if not fila:
+        return {"error": "esa tarea no existe en este equipo"}
+    if fila["responsable_membership_id"] is None:
+        return {"error": "esa tarea no tiene responsable asignado"}
+
+    if str(fila["responsable_membership_id"]) == str(quien.membership_id):
+        raise Denegado("No podés pedir cambios en tu propio trabajo.")
+    if not puede_aprobar_tarea(cur, quien, fila["responsable_membership_id"]):
+        raise Denegado("No sos quien revisa el trabajo de esa persona.")
+    _exigir_puede_pedirse_cambios(cur, fila)
+
+    comentario = (comentario or "").strip()
+    if not comentario:
+        raise Denegado("Hace falta contar qué falta corregir.")
+
+    cambio = (f"Se piden cambios en «{fila['titulo']}»: {comentario} · "
+             "vuelve a en curso")
+    huella = _huella("pedir_cambios_tarea", tarea_id, fila["estado"], comentario)
+    return Preparacion(cambio=cambio, huella=huella)
+
+
+@herramienta(
+    "pedir_cambios_tarea", "pedir_cambios_tarea",
+    "Devuelve a trabajo una tarea en revisión, con el comentario de lo que "
+    "falta corregir. Sólo puede quien revisa el trabajo de esa persona.",
+    {"tarea_id": {"type": "string", "requerido": True},
+     "comentario": {"type": "string", "requerido": True}},
+    valida_en_handler=True, preparar=_preparar_pedir_cambios_tarea)
+def _pedir_cambios_tarea(cur, quien: Solicitante, tarea_id, comentario=None):
+    cur.execute(
+        "select titulo, estado, responsable_membership_id from task where id = %s",
+        (tarea_id,))
+    fila = cur.fetchone()
+    if not fila:
+        return {"error": "esa tarea no existe en este equipo"}
+    if fila["responsable_membership_id"] is None:
+        return {"error": "esa tarea no tiene responsable asignado"}
+
+    if str(fila["responsable_membership_id"]) == str(quien.membership_id):
+        raise Denegado("No podés pedir cambios en tu propio trabajo.")
+    if not puede_aprobar_tarea(cur, quien, fila["responsable_membership_id"]):
+        raise Denegado("No sos quien revisa el trabajo de esa persona.")
+    _exigir_puede_pedirse_cambios(cur, fila)
+
+    comentario = (comentario or "").strip()
+    if not comentario:
+        raise Denegado("Hace falta contar qué falta corregir.")
+
+    # `rechazado` es el único otro valor de `decision_aprobacion`
+    # (db/esquema.sql) -- no se agrega un tercero para esto: "pedir
+    # cambios" es, en los hechos, un rechazo del trabajo entregado, con la
+    # tarea volviendo a trabajo en vez de quedar cerrada.
+    cur.execute(
+        """insert into approval (workspace_id, sujeto_tipo, sujeto_id,
+                                 aprobador_membership_id, decision, comentario)
+           values (%s, 'tarea', %s, %s, 'rechazado', %s) returning id""",
+        (quien.workspace_id, tarea_id, quien.membership_id, comentario))
+    decision_id = cur.fetchone()["id"]
+
+    cur.execute(
+        """insert into task_state_event (task_id, estado_anterior, estado_nuevo,
+                                         actor_kind, actor_app_user_id, motivo)
+           values (%s, %s, 'en_curso', 'persona', %s, %s)""",
+        (tarea_id, fila["estado"], quien.app_user_id, comentario))
+
+    _avisar(
+        cur, quien, fila["responsable_membership_id"],
+        f"{quien.nombre} pidió cambios en «{fila['titulo']}»: {comentario}",
+        dedupe_key=f"{quien.workspace_id}:pedir_cambios:{decision_id}")
+
+    return {"pedido": True, "titulo": fila["titulo"]}
 
 
 # ---------------------------------------------------------------------------
@@ -1376,6 +1555,64 @@ def _avisar(cur, quien: Solicitante, destinatario_membership_id, texto, *,
         cur, workspace_id=quien.workspace_id, chat_id=persona["telegram_user_id"],
         text=texto, recipient_membership_id=destinatario_membership_id,
         message_type=tipo, dedupe_key=dedupe_key)
+
+
+def _enlace_portal_tarea(tarea_id) -> str | None:
+    """Enlace a una vista de esta tarea en particular, para sumar al aviso
+    de entrega (ADR 0009, 'pendiente'). Hoy no existe: sólo hay un tablero
+    de sólo lectura por espacio (`/tablero/{token}`, sin una tarea puntual).
+    Punto de enganche a propósito -- cuando exista esa vista,
+    `_notificar_entrega_al_aprobador` suma lo que devuelva acá sin que nada
+    más cambie; hasta entonces, ninguna URL se inventa (constitución §4)."""
+    return None
+
+
+def _notificar_entrega_al_aprobador(cur, quien: Solicitante, tarea_id, titulo,
+                                    evidencia_texto, aprobador_membership_id,
+                                    dedupe_id, ahora) -> None:
+    """ADR 0009, decisión 3: cuando una tarea llega a `en_revision`, quien la
+    aprueba se entera con botones -- no sólo el responsable con `_avisar` --
+    para que "Aprobar" y "Pedir cambios" salgan del mismo mensaje, por el
+    mismo camino que el menú de una tarea (T2):
+    `pendientes.SENTINEL_MENU_TAREA`, resuelto por
+    `gateway._resolver_toque_menu_tarea`. Se omite en silencio si el
+    aprobador no tiene chat vinculado, igual que cualquier otro aviso
+    automático -- nunca falla en silencio por otra causa."""
+    from . import pendientes as P
+    from .autoridad import Canal
+
+    cur.execute(
+        "select app_user_id, telegram_user_id from integrante where membership_id = %s",
+        (aprobador_membership_id,))
+    aprobador = cur.fetchone()
+    if not aprobador or aprobador["telegram_user_id"] is None:
+        return
+
+    texto = f"{quien.nombre} entregó «{titulo}»"
+    if evidencia_texto:
+        texto += f": {evidencia_texto}"
+    enlace = _enlace_portal_tarea(tarea_id)
+    if enlace:
+        texto += f"\n{enlace}"
+
+    aprobador_solicitante = Solicitante(
+        app_user_id=str(aprobador["app_user_id"]), canal=Canal.ESPACIO,
+        workspace_id=quien.workspace_id, membership_id=str(aprobador_membership_id))
+    # `vence_en` fijo (8 horas), no `agente.VIGENCIA_PENDIENTE`: mismo
+    # criterio que `crear_borrador_tarea` para un aviso a un tercero que
+    # puede tardar en mirar el chat, no una confirmación del mismo turno.
+    p = P.registrar(
+        cur, aprobador_solicitante, herramienta=P.SENTINEL_MENU_TAREA,
+        args={"tarea_id": str(tarea_id), "titulo": titulo}, resumen=texto,
+        vence_en=ahora + timedelta(hours=8), campo="eleccion",
+        opciones=[("Aprobar", {"accion": "aprobar"}),
+                 ("Pedir cambios", {"accion": "pedir_cambios"})],
+        chat_id=aprobador["telegram_user_id"])
+    enqueue_outbox(
+        cur, workspace_id=quien.workspace_id, chat_id=aprobador["telegram_user_id"],
+        text=texto, recipient_membership_id=str(aprobador_membership_id),
+        scheduled_for=ahora, dedupe_key=f"{quien.workspace_id}:entrega:{dedupe_id}",
+        pending_action_id=p.id)
 
 
 def _avisar_dependencia_informativa(cur, quien: Solicitante, tarea_id, estado_nuevo,

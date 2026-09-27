@@ -320,6 +320,18 @@ def _intento_aprobar(conn, ws, quien_nombre, tid, chat):
     return r.confirmaciones == ["aprobar_tarea"]
 
 
+def _en_revision_con_evidencia(cur, ws, tarea_id):
+    """ADR 0009: `aprobar_tarea` ahora exige `en_revision` con la evidencia
+    ya registrada antes de dejar aprobar (decisión 2) -- esta prueba es
+    sobre la CADENA de autoridad, no sobre ese gate, así que se lo deja
+    satisfecho de antemano en vez de mezclar las dos cosas."""
+    cur.execute("insert into task_state_event (task_id, estado_nuevo, actor_kind) "
+                "values (%s, 'en_revision', 'prisma')", (tarea_id,))
+    cur.execute(
+        """insert into evidence (workspace_id, task_id, tipo, uri)
+           values (%s, %s, 'resultado_de_prueba', 'ok')""", (ws, tarea_id))
+
+
 def test_cadena_de_aprobacion(corework, conn):
     """A un integrante lo aprueba su referente; a un referente, Dirección.
 
@@ -336,6 +348,8 @@ def test_cadena_de_aprobacion(corework, conn):
                           persona="Lucas Natuche")
         de_ariel = _tarea(cur, ws, titulo="Panel de lote", area="corelabs",
                           persona="Ariel De Simone")
+        for tid in (de_nahuel, de_marcos, de_lucas, de_ariel):
+            _en_revision_con_evidencia(cur, ws, tid)
 
     # La tarea de Nahuel la aprueba Marcos, su referente. Nadie más.
     assert not _intento_aprobar(conn, ws, "Nahuel Gimenez", de_nahuel, 1)   # ni él

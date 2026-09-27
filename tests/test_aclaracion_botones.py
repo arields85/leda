@@ -245,7 +245,9 @@ def test_elegir_candidata_retoma_y_llega_a_la_vista_previa_sin_aplicar_nada(
     ])
     _con_jev(monkeypatch, doble)
     guion_respuesta = [Respuesta(llamadas=[Llamada(
-        "c1", "actualizar_estado", {"tarea_id": "PLACEHOLDER", "estado": "en_revision"})])]
+        "c1", "actualizar_estado",
+        {"tarea_id": "PLACEHOLDER", "estado": "en_revision",
+         "evidencia_texto": "Ya está cableado."})])]
     proveedor = _con_proveedor(
         monkeypatch, rutas=[IntentRoute(IntentAction.NORMAL_CONVERSATION,
                                         trabajos=("lo del tablero",))],

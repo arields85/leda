@@ -660,7 +660,8 @@ def test_dependencia_informativa_no_avisa_dos_veces_por_el_mismo_evento(corework
         primero = len(_outbox(cur))
 
         H.ejecutar(cur, quien, "actualizar_estado",
-                  {"tarea_id": origen, "estado": "en_revision"}, ya_confirmada=True)
+                  {"tarea_id": origen, "estado": "en_revision",
+                   "evidencia_texto": "Listo."}, ya_confirmada=True)
         segundo = len(_outbox(cur))
         assert segundo > primero   # es un cambio de estado distinto, avisa de nuevo
 

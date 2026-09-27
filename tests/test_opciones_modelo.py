@@ -678,7 +678,9 @@ def test_retomar_con_un_cambio_sigue_pidiendo_confirmar(
             "pregunta": "¿Cuál pasamos a revisión?",
             "opciones": [{"tarea_id": tid}]})]),
         Respuesta(llamadas=[Llamada(
-            "c2", "actualizar_estado", {"tarea_id": tid, "estado": "en_revision"})]),
+            "c2", "actualizar_estado",
+            {"tarea_id": tid, "estado": "en_revision",
+             "evidencia_texto": "Ya está."})]),
     ]
     proveedor = _con_proveedor(monkeypatch, guion)
 
