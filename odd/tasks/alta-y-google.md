@@ -1,6 +1,6 @@
 # Alta con correo verificado y acceso a Google (rama auxiliar)
 
-**Estado:** propuesto (no iniciado — pendiente de G0: matriz aprobada y ADR 0010 aceptado)
+**Estado:** G0 presentada (matriz abajo) — pendiente de aprobación del usuario y aceptación de ADR 0010
 **Creado:** 2026-09-27
 **Origen:** decisión del usuario, 2026-09-27; [`ADR 0010`](../../docs/decisions/0010-correo-verificado-y-google-en-el-producto.md).
 **Rama/worktree:** `auxiliar/alta-y-google`, `D:\Proyectos\Prisma-PM-worktrees\alta-y-google`.
@@ -324,6 +324,108 @@ proyecto de Google Cloud), G3-G4 (cuenta real con datos ficticios), G6
 (decisiones 2/3), y cada rebanada una sesión real por Telegram (Tanda 2 de
 `VALIDACION`) antes de darla por cerrada.
 
+## Matriz de aceptación G0 (propuesta, pendiente de aprobación del usuario)
+
+Responde a la "Instrucción breve para la IA receptora" de `00-LEER-PRIMERO.md`:
+capacidades y estados, contratos, permisos y plan de validación. El pack
+define el qué; el repositorio, el cómo. Nada de esto habilita efectos
+externos: todo nace apagado por espacio (`correo_verificacion.habilitado`,
+`google.habilitado` en `workspace_setting`).
+
+### 1. Capacidades y estados
+
+| Rebanada | Capacidad (etiqueta del pack) | Estados | Cómo en este repositorio |
+|---|---|---|---|
+| G1 | Alta con correo verificado (V) | `pending_welcome` → `awaiting_email` → `pending_email_verification` → `active`; corregir vuelve a `awaiting_email`; `revoked` sólo por revocación explícita; marca aparte `review_required` (causa y fecha) | Tabla append-only de eventos de alta con `workspace_id` y RLS forzada; proyección por disparador (patrón `task_state_event`/`bloquear_estado_directo`); `prisma_app` sólo inserta eventos. Con la clave encendida, `onboarding.activar` emite `pending_welcome` en la misma transacción; con la clave apagada no emite nada |
+| G1 | Token de verificación (I) | emitido → reservado (5 min) → consumido / vencido (24 h) | Tabla sin privilegios de `prisma_app`, acceso sólo por funciones `security definer` de `prisma_owner` (patrón `acceso_tablero`); se guarda SHA-256, comparación con `hmac.compare_digest`; hash y reserva se borran al verificar; enlace `https://t.me/{bot}?start=pv_{token}` resuelto en `gateway._activacion` por el prefijo `pv_` |
+| G1 | Reenvío y corrección (I) | máx. 3 envíos por hora y 5 por ciclo (incluye el inicial); reenviar renueva hash, recibo y vencimiento | Límites contados sobre los eventos de envío, no sobre un contador mutable |
+| G1 | Contacto verificado (V) | un correo activo por integrante; normalizado (trim + minúsculas) | Alta idempotente por función estrecha: mismo integrante → no-op; activo de otro integrante del espacio → rechazo |
+| G1 | Recuperación administrativa (I/D) | `review_required` hasta resolución; leída ≠ resuelta | Superficie según decisión abierta 5 |
+| G2 | Credencial de Google por espacio (V para el uso; D para las cinco puertas) | sin autorizar → vigente → requiere reautorización / revocada | Tabla dedicada sin privilegios de `prisma_app`, cifrada en reposo, eventos de autorización/revocación; scopes habilitados como dato en `workspace_setting`, separados de la credencial; las cinco puertas de `02` §2 se comprueban antes de ofrecer una operación |
+| G3 | Consultar agenda (V/D) | lectura sin estado | Herramienta `consultar_agenda` con calendario, rango, zona y máximo explícitos; separa confirmado/tentativo/cancelado/sin respuesta; cero resultados → "No encontré eventos en ese calendario entre estas fechas"; caída → "No pude comprobarlo ahora" + incidente |
+| G4 | Crear/modificar/retirar evento, responder invitación (V) | `prepared` → `executing` (persistido antes de llamar) → `executed` / `failed` / `incierto` (P: timeout, sin reintento) ; `cancelled`, `expired` | Herramientas discretas sobre `Preparacion`/`pending_action`; la operación externa lleva registro propio por eventos con clave idempotente y recibo normalizado (`tipo` + id externo). Diseño presentado antes de construir |
+| G5 | Reunión mensual, agenda e informe previo, minuta (D/P) | reunión: programada → anunciada (−8 días, 15:00) → agenda publicada (−2 días, 16:00) → realizada; reprogramar invalida preparaciones | Cadencia como dato; acuerdos entran por el flujo de borrador → tarea existente; la minuta se enlaza (`evidence.drive_file_id` u homólogo) y nunca cierra una tarea |
+| G6 | Gmail, Drive, Docs (V en piloto) | mismos estados que G4 | Según decisiones 2 y 3; Gmail sólo a destinatarios internos verificados; Drive sin compartir público ni a dominio |
+
+Fuera: Sheets, Contacts, Meet, Slides, grabación/transcripción, correo externo,
+verificación por respuesta de correo (`01` §7), saludo diario e indicador.
+
+### 2. Contratos
+
+- **Mensajes visibles de G1:** los de `01` §5, textuales (bienvenida,
+  pedido de correo, "Gracias. Te envié…", "✅ Gracias, {nombre_preferido}…",
+  botones **Reenviar correo** / **Cambiar correo**, `Cambiar correo a {email}`
+  / `Mantener correo anterior`, correo no reconocido, dominio no habilitado,
+  dirección incompleta, correo ya asociado). Correo de verificación: asunto
+  `Confirmá tu correo laboral en Prisma`, botón **Verificar correo**, 24 h, un
+  uso, misma cuenta de Telegram. Bienvenida y pedido de correo son dos
+  entregas por outbox con claves de deduplicación propias: si falla la
+  segunda, se reintenta sólo esa.
+- **Vista previa de evento (`03` §2):** los siete campos (nombre y propósito;
+  fecha completa y día; inicio, fin y zona; participantes resueltos;
+  lugar/enlace si se definió; invitaciones previstas; cambio exacto frente al
+  original) viven en `Preparacion.cambio`; la huella incluye la versión leída
+  del evento en Google, así un cambio entre vista previa y confirmación
+  termina en `EstadoCambio` sin efecto. Confirmar/Modificar/Cancelar; una
+  propuesta modificada invalida la anterior.
+- **Propuesta (`02` §6):** actor, operación, recurso exacto, versión leída,
+  destinatarios resueltos, contenido aprobado, vencimiento y clave idempotente
+  quedan en `pending_action` + registro de la operación externa.
+- **Recibo:** nunca "agendado", "enviado" ni "verificado" sin recibo del
+  proveedor; el aviso a integrantes por Telegram sale por `message_outbox`.
+- **Falla:** toda falla de Google, del envío de correo o de PostgreSQL registra
+  incidente saneado y deja el aviso neutral; nunca una activación ficticia ni
+  "no pasó nada".
+- **Frontera:** puerto nuevo en `frontera.md` ("Agenda y documentos externos"),
+  con el contrato de Notificación y Lectura; el adaptador vive en
+  `src/prisma/google/`. Ningún límite de Google decide validez de negocio.
+- **Contenido externo** (títulos, correos, documentos) es dato, nunca
+  instrucción (X02).
+
+### 3. Permisos
+
+| Acción | Quién | Confirmación | Límite |
+|---|---|---|---|
+| Activar por enlace | la persona con el enlace emitido para su membresía | — (igual que hoy) | sin cambios |
+| Dar, reenviar o cambiar su correo; verificar | la propia persona, identificada por su cuenta de Telegram ya vinculada | no (es un hecho propio; dentro de los límites de reenvío) | el token sólo verifica a la membresía que lo originó (A04) |
+| Recuperación del alta (§8) | administración | sí, preparada y ligada al incidente vigente | superficie según decisión 5 |
+| Autorizar/revocar Google | administración del espacio | sí | modelo según decisión 1; flujo según decisión 4 |
+| `consultar_agenda` | integrante del espacio | no (lectura) | sólo calendarios autorizados del espacio |
+| `crear_evento`, `modificar_evento`, `retirar_evento`, `responder_invitacion` | integrante con autoridad sobre la reunión | sí (`REQUIEREN_CONFIRMACION`; `crear_evento` ya está, se agregan las otras) | invitados: integrantes activos del espacio con correo verificado |
+| `enviar_correo` (G6) | integrante | sí | sólo destinatarios internos verificados (`constitucion.md` §6) |
+| Drive/Docs (G6) | integrante | sí para toda mutación | nunca público ni a dominio completo |
+| Base de datos | `prisma_app` | — | sin lectura de tokens, credenciales ni hashes; sólo funciones estrechas |
+
+### 4. Plan de validación
+
+TDD estricto por rebanada (RED observado, GREEN, refactor), luego Tanda 1
+human-first (harness determinista o `TestClient` con dobles explícitos,
+escenarios de banco `g-`) y Tanda 2 por Telegram real con cuentas y datos
+ficticios, una interacción por vez; el primer defecto detiene el lote.
+
+| Rebanada | Pruebas automáticas mínimas | Casos de `VALIDACION` |
+|---|---|---|
+| G1 | clave apagada: activación idéntica a hoy (suite existente sin cambios); cada transición válida y cada inválida rechazada por la base; token vencido, consumido, ajeno, ocupado; límites 3/h y 5/ciclo; correo duplicado; dos correos en una frase; bienvenida parcialmente entregada; falla de envío y de PostgreSQL → incidente + aviso; revocación durante la verificación; dos procesos simultáneos; RLS entre espacios; `prisma_app` sin acceso a tokens; paridad de migración/rollback; `test_capacidades` | A01-A05, X01, X02 y los 17 casos de `01` §9 |
+| G2 | `prisma_app` no lee la credencial; aislamiento entre espacios; falta la clave de cifrado → no opera y deja incidente (nunca "sin clave seguimos"); permiso insuficiente; API deshabilitada; revocación | — (base de G3-G6) |
+| G3 | rango/calendario/zona explícitos; cero eventos sin ampliar la consulta; caída → "No pude comprobarlo ahora"; título con instrucciones tratado como dato | plantilla G01 aplicada a agenda; X02 |
+| G4 | dos confirmaciones concurrentes → una llamada; `executing` persistido antes de llamar; timeout → `incierto`, sin reintento; confirmación vencida; botón viejo tras cancelar; cambio del evento entre vista previa y confirmación; organizador vs. invitado | C01-C03, G02-G04 |
+| G5 | último viernes y −8/−2 días (incluido cruce de mes y año); reprogramación invalida preparaciones; minuta que dice "cerrar" no cierra | S01, X01, X02 |
+| G6 | destinatario externo rechazado; sin compartir público; borrador ≠ envío | G01-G04, X02 |
+
+### 5. Conflictos qué/cómo y resolución propuesta
+
+| # | Conflicto | Propuesta | ¿Consulta? |
+|---|---|---|---|
+| C1 | `01` §4: estados como campo; `frontera.md` regla 4: eventos | Proyección por eventos, mismos estados y mensajes | No (cómo) |
+| C2 | `02` §5 `workspace_mutate` frente a una herramienta por acción | Herramientas discretas en `REGISTRO` | Sí, en G0 |
+| C3 | `01` §3 pasos 1-4 (solicitud pendiente + revisión administrativa) frente al enlace que la administración ya emite para una membresía concreta y entrega en privado | El enlace emitido es la vinculación decidida explícitamente por la administración que exige `01` §2; se conserva como pasos 1-4 y la revisión administrativa queda para la recuperación de §8 | Sí, en G0 |
+| C4 | El correo de verificación necesita un emisor; el pack usó Gmail de la cuenta autorizada, que es G2 | G1 construye el puerto de envío con doble de prueba; el adaptador real Gmail llega en G2 y la Tanda 2 de G1 espera a G2 | Sí, en G0 |
+| C5 | `01` §4: sin verificar no hay herramientas de negocio; ADR 0010 decisión 2: "sin correo verificado, la persona sigue operando por Telegram exactamente como hoy" | Clave apagada: exactamente como hoy. Clave encendida: el pack (V), el control actúa antes del despacho. `PENDIENTE` qué pasa con quien ya estaba activo al encender la clave | Sí, en G0 |
+| C6 | Bienvenida del pack (`01` §5) frente a `onboarding.bienvenida` (incluye tareas abiertas) | Clave encendida: textos del pack literales; clave apagada: la bienvenida actual | Sí, en G0 |
+| C7 | `constitucion.md` §7 pide confirmación para "correos" | El correo de verificación no es la herramienta `enviar_correo`: lo pide la persona, a su propia dirección, dentro del flujo de alta aprobado (último párrafo de §7) | Sí, en G0 |
+| C8 | `02` §7 exige `executing` durable; `pending_action` no lo tiene | Diseño explícito en G4, presentado antes de construir | En G4 |
+| C9 | `reunion_periodica` de `corework.yaml` no la consume el importador, y `importador.py` no está entre los archivos compartidos de esta rama | Decidir al abrir G5 (tocar el importador o cargarla por otra vía) | En G5 |
+
 ## Ruta
 
 | Tarea | Ruta | Evidencia del disparador |
@@ -357,6 +459,23 @@ por commit, igual que en `main`. Nunca push sin pedido explícito del usuario.
 
 - 2026-09-27: documento creado en `main` junto con ADR 0010 (propuesta), antes
   de crear la rama. Pendiente G0.
+- 2026-09-27 (sesión auxiliar): rebase sobre `main` en avance rápido hasta
+  `ba30dab`; índice de CodeGraph propio creado; `.venv` creado con
+  `pip install -e ".[dev]"`; `.env.test` presente (copiado por el usuario,
+  no leído). `pg_isready`: acepta conexiones en `:5432`.
+  `.venv/Scripts/python.exe -m pytest -q` → `1 failed, 943 passed, 108
+  deselected`; la falla (`test_llm_protocol.py::test_anthropic_router_forces_one_typed_tool_over_http`)
+  es de entorno: `anthropic>=0.40` sin techo resolvió 1.8.0, que exige
+  `httpx2`; el repositorio principal corre 0.125.0. Con `anthropic==0.125.0`
+  en el `.venv`, `pytest -q tests/test_llm_protocol.py` → `104 passed`.
+  Hallazgo para `main` (no se toca desde esta rama): `pyproject.toml` deja
+  esa dependencia sin techo.
+- 2026-09-27: pack y corpus leídos completos; matriz de G0 redactada arriba
+  (conflictos C1-C9). Pendiente la aprobación del usuario y la aceptación de
+  ADR 0010.
+- Dependencia registrada: el hecho "bienvenida entregada" de G1 queda como
+  evento propio para que la unidad de saludo diario de `main` (pack 06)
+  pueda contarlo como saludo del día.
 
 ## Cómo arrancar la sesión auxiliar
 
