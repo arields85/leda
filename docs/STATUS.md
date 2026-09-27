@@ -53,11 +53,14 @@ tales. Ver [`INDEX.md`](INDEX.md#documentos-superados).
 | Campo | Valor |
 |---|---|
 | Comando | `.venv\Scripts\python.exe -m pytest -q` |
-| Fecha | 2026-09-26 |
-| Resultado exacto | 876 passed, 108 deselected. |
+| Fecha | 2026-09-27 |
+| Resultado exacto | 927 passed, 108 deselected. |
 
-Reejecutada como parte de este cierre documental (T5, `odd/tasks/prisma-orienta.md`):
-mismo resultado, `876 passed, 108 deselected` (206 s). La corrida de 2026-08-15
+Sesión 2 por Telegram, hallazgos 8 y 9 (entrega con evidencia y revisión, ADR
+0009, `odd/tasks/prisma-orienta.md`): `927 passed, 108 deselected` (216 s) --
+línea base 912 (hallazgos 1-7 de la misma sesión) + 15 pruebas nuevas. Antes,
+reejecutada como parte del cierre documental (T5): mismo resultado, `876
+passed, 108 deselected` (206 s). La corrida de 2026-08-15
 (`306 passed, 0 failed`) y la de 2026-09-24 (`721 passed, 99 deselected`, "Cerrado:
 aclaración con botones" más abajo) quedan como registro histórico de una suite mucho
 más chica; no reflejan el estado actual del código. Los `108 deselected` son los
@@ -145,7 +148,7 @@ documental de T5 queda hecha con esta actualización; falta la **segunda sesión
 Telegram con datos ficticios**, que necesita al usuario.
 
 Antes de esa sesión: comparar la base local con `db/esquema.sql` (hoy al día hasta la
-migración `0011`) y aplicar lo que falte; confirmar que el secreto de Telegram sigue
+migración `0012`) y aplicar lo que falte; confirmar que el secreto de Telegram sigue
 protegido. Durante la sesión, ejercitar al menos: una lista de tareas ofrecida como
 botones (más de 4, para ver "Ver más"); tocar una tarea y recorrer menú → vista previa →
 Confirmar; una pregunta del modelo con opciones concretas; un mensaje sin ninguna tarea

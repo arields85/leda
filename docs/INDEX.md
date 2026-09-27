@@ -35,6 +35,7 @@ cliente, no su definición.
 | Decisión sobre Jev para resolver referencias y detectar la duda de intención | [`decisions/0006-jev-para-resolver-referencias-e-intencion.md`](decisions/0006-jev-para-resolver-referencias-e-intencion.md) |
 | Decisión sobre Prisma que orienta con opciones concretas, no charla | [`decisions/0007-prisma-orienta-no-charla.md`](decisions/0007-prisma-orienta-no-charla.md) |
 | Decisión sobre que aprobar cierra la tarea, en el mismo acto, si se puede | [`decisions/0008-la-aprobacion-cierra-la-tarea.md`](decisions/0008-la-aprobacion-cierra-la-tarea.md) |
+| Decisión sobre entrega con evidencia y revisión | [`decisions/0009-entrega-con-evidencia-y-revision.md`](decisions/0009-entrega-con-evidencia-y-revision.md) |
 | Reglas para futuras sesiones | [`../AGENTS.md`](../AGENTS.md) |
 | Configuración del primer cliente | [`../espacios/corework.yaml`](../espacios/corework.yaml) |
 

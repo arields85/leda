@@ -2854,9 +2854,172 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   (más allá de 6 y 7) ni la segunda sesión real por Telegram -- siguen en
   "Próximo paso al retomar", sin tocar acá.
 
+- 2026-09-27: **Sesión 2 por Telegram, hallazgos 8 y 9: entrega con evidencia y
+  revisión (ADR 0009).** Ruta: delegada, un escritor (disparador de mapeo:
+  `herramientas.py`, `menu_tarea.py`, `gateway.py`, `db/esquema.sql` + migración,
+  ocho archivos de prueba existentes adaptados + un archivo nuevo).
+
+  **Evidencia real:** Ariel tocó "Ya la terminé" sobre una tarea que exige
+  evidencia (`evidencia_requerida = ['explicacion']`); Prisma la pasó a
+  `en_revision` sin pedir ni registrar ninguna. Ismael, el aprobador, tocó
+  "Aprobar" → vista previa → Confirmar y Prisma lo dejó aprobar a ciegas,
+  contestando "Se aprueba «…»; para cerrarla todavía falta: Falta la evidencia
+  requerida." -- con "falta" repetida. Una revisión de código aparte encontró el
+  defecto de fondo: `_aprobar_tarea`/`_preparar_aprobar_tarea` no exigían que la
+  tarea estuviera `en_revision` -- por texto libre se podía aprobar (y cerrar,
+  por ADR 0008) una tarea `asignada`, o volver a aprobar una `terminada`.
+
+  **Decisión del usuario (ADR 0009):** 1) "Ya la terminé" pide la evidencia que
+  falta en el mismo paso (mismo patrón que "Informar un bloqueo") y arma UNA
+  vista previa que registra la evidencia y mueve el estado juntos, en el mismo
+  Confirmar -- sin evidencia, la tarea no llega a `en_revision` por el menú; por
+  texto libre, `actualizar_estado(estado="en_revision")` sin evidencia devuelve
+  un `falta` verdadero, nunca mueve la tarea. 2) "Aprobar" sólo se permite sobre
+  una tarea `en_revision` y con la evidencia ya registrada -- el menú y la
+  herramienta (`preparar` y el handler) lo exigen los dos. 3) Quien aprueba se
+  entera de la entrega con botones ("Aprobar"/"Pedir cambios"), no sólo el
+  responsable con un aviso de texto. 4) "Pedir cambios" (acción nueva del
+  aprobador en `en_revision`) pide el comentario, arma vista previa y al
+  confirmar registra `approval.decision = 'rechazado'` y devuelve la tarea a
+  `en_curso` con el comentario como motivo. 5) La palabra "falta" no queda
+  repetida en ningún mensaje. Fotos/archivos como evidencia quedan fuera
+  (unidad de aportes sobre tareas del roadmap). Detalle completo, alternativas
+  consideradas y lo pendiente en `docs/decisions/0009-entrega-con-evidencia-y-revision.md`.
+
+  Archivos:
+  - `db/esquema.sql`, `db/migrations/0012_evidencia_pendiente.sql` / `db/rollbacks/
+    0012_evidencia_pendiente.sql` (nuevos): `evidencia_pendiente(p_task uuid)
+    returns boolean` -- única fuente de verdad de "a esta tarea le falta la
+    evidencia que exige su política" -- y `motivo_no_cierra_tarea` refactorizada
+    para llamarla en vez de repetir el chequeo inline (mismo criterio que
+    `motivo_no_arranca_tarea`/`estado_previo_a_bloqueo`: una función, no una
+    regla duplicada en Python).
+  - `src/prisma/herramientas.py`: `_MOTIVO_FALTA_EVIDENCIA_ENTREGA`;
+    `actualizar_estado` gana el parámetro opcional `evidencia_texto`;
+    `_preparar_actualizar_estado`/`_actualizar_estado` piden/registran la
+    evidencia junto con el cambio a `en_revision` (dos filas, un acto, mismo
+    patrón que ADR 0008) y notifican al aprobador; `_exigir_puede_aprobarse`
+    (nuevo, usado por `preparar` y el handler de `aprobar_tarea`) exige
+    `en_revision` + evidencia; `_enlace_portal_tarea` (hoy `None`, punto de
+    enganche nombrado para cuando exista una vista de tarea individual) y
+    `_notificar_entrega_al_aprobador` (arma la `pending_action` con
+    `SENTINEL_MENU_TAREA`, botones "Aprobar"/"Pedir cambios" -- mismo camino que
+    el menú de tarea T2); herramienta nueva `pedir_cambios_tarea` con su
+    `_preparar_pedir_cambios_tarea`/`_exigir_puede_pedirse_cambios`; wording de
+    "falta" corregido en `_preparar_aprobar_tarea` y el aviso de `_aprobar_tarea`;
+    `_avisar_dependencia_informativa` en `_aprobar_tarea` usa `aprobacion_id` en
+    vez de `uuid.uuid4()` (revisión review-ec6f7d80, decisión 6 del enunciado).
+  - `src/prisma/menu_tarea.py`: `evidencia_pendiente` (envoltorio de la función
+    SQL, mismo patrón que `_puede_cerrar`/`_puede_empezar`); el menú del
+    aprobador en `en_revision` sólo ofrece "Aprobar" sin evidencia pendiente, y
+    siempre ofrece "Pedir cambios".
+  - `src/prisma/gateway.py`: `_resolver_toque_menu_tarea` -- "terminar" pide la
+    evidencia primero si falta (`_pedir_dato_menu_tarea`) y agrega la acción
+    "pedir_cambios"; `_resumir_dato_menu_tarea` mapea esos dos datos a
+    `actualizar_estado(evidencia_texto=...)`/`pedir_cambios_tarea`; wording de
+    "falta" corregido en el mensaje posterior a confirmar `aprobar_tarea`;
+    `_toque` reconoce `en_revision: False` como rechazo (igual que
+    `cerrada`/`iniciada` en `False`) para no mostrar la vista previa vieja como si
+    hubiera aplicado algo.
+  - `tests/test_entrega_con_evidencia.py` (nuevo, 12 pruebas): la entrega pide/
+    registra evidencia, notifica al aprobador con botones, tocar "Aprobar" desde
+    esa notificación llega a la vista previa de ADR 0008; el gate de "Aprobar"
+    (por estado y por evidencia); `pedir_cambios_tarea` completo y sus rechazos;
+    la palabra "falta" no se repite.
+  - `tests/test_menu_tarea.py` (+4 pruebas: `test_menu_aprobador_en_revision_
+    sin_evidencia_no_ofrece_aprobar`,
+    `test_ya_la_termine_pasa_directo_a_vista_previa_si_ya_tiene_evidencia`, y dos
+    reemplazos sin cambiar la cuenta neta): `test_menu_aprobador_en_revision`
+    gana evidencia + "Pedir cambios" en la aserción;
+    `test_ya_la_termine_pasa_a_en_revision_por_vista_previa` reemplazada por
+    `test_ya_la_termine_pide_evidencia_si_falta_y_termina_en_vista_previa` (pide
+    el dato, UNA vista previa combinada); `test_aprobar_termina_en_vista_previa`
+    gana evidencia en la precondición (si no, "Aprobar" ya no aparece).
+  - `tests/test_aprobacion_cierra_tarea.py` (+1 prueba neta):
+    `test_aprobar_tarea_registra_pero_no_cierra_si_falta_evidencia` reemplazada
+    por `test_aprobar_tarea_rechaza_si_falta_la_evidencia_que_exige` (ahora
+    rechaza, no registra); `test_mensaje_post_confirmacion_aprobar_tarea_que_
+    no_cierra` reemplazada por la versión que rechaza, y se agregó
+    `test_mensaje_post_confirmacion_aprobar_tarea_que_no_cierra_por_dependencia`
+    (evidencia presente, bloqueada por una dependencia, para seguir cubriendo el
+    wording de "todavía: …" sin evidencia de por medio);
+    `test_mensaje_post_confirmacion_actualizar_estado` exime la evidencia
+    (`evidencia_requerida=None`) porque prueba el fraseo del mensaje, no el gate
+    nuevo; `_tarea` corrige un bug latente (`None` en vez de `[]` para "sin
+    evidencia", violaba el `not null` de la columna -- no se había ejercitado
+    hasta ahora).
+  - Pruebas adaptadas para seguir pasando el gate nuevo sin evidencia de por
+    medio (tareas ya `en_revision`/con evidencia agregada en la precondición, o
+    `evidencia_texto` agregado al llamado): `tests/test_agente.py`
+    (`test_cadena_de_aprobacion`, prueba la cadena de autoridad, no el gate --
+    nuevo helper `_en_revision_con_evidencia`), `tests/test_vista_previa_
+    confirmacion.py` (`test_propiedad_aprobar_tarea`), `tests/test_dependencias.py`
+    (`test_dependencia_informativa_no_avisa_dos_veces_por_el_mismo_evento`),
+    `tests/test_aclaracion_botones.py`
+    (`test_elegir_candidata_retoma_y_llega_a_la_vista_previa_sin_aplicar_nada`),
+    `tests/test_opciones_modelo.py` (`test_retomar_con_un_cambio_sigue_pidiendo_
+    confirmar`), `tests/banco/test_corrida.py` (dos escenarios con
+    `actualizar_estado` del modelo ganan `evidencia_texto`; el escenario de
+    toques genéricos y `tests/banco/escenarios/b-0004*.yaml`/`b-0013.yaml`/
+    `b-0017.yaml` ganan `evidencia_requerida: []` en la precondición -- **no**
+    se extendió el corredor con un paso de texto libre intercalado entre dos
+    toques porque no existe ese tipo de paso hoy (`tests/banco/corrida.py`,
+    `_resolver_toque_generico` sólo resuelve botones); extenderlo queda
+    **PENDIENTE**, reportado en el ADR, fuera de esta unidad.
+  - `tests/banco/corrida.py`: `_crear_tarea_semilla`/`sembrar_precondiciones`
+    ganan el parámetro opcional `evidencia_requerida` (por omisión sigue siendo
+    `['explicacion']`, sin cambio para ningún escenario que no lo declare).
+
+  **Hallazgo incidental, ajeno a ADR 0009, corregido en la misma unidad:**
+  ampliar `tests/test_task_intake.py::_retrato_de_funciones` (la comparación de
+  paridad migración/rollback) para que ya no filtre por `security definer` --
+  `evidencia_pendiente` y la nueva rama de `motivo_no_cierra_tarea` no lo son, y
+  con el filtro viejo la migración `0012` no cambiaba "nada observable" para esa
+  prueba, aunque sí cambiaba algo real -- expuso que el rollback de
+  `0008_task_start_gate.sql` nunca borraba `exigir_dependencias_resueltas()` (la
+  función del disparador, sólo se borraba el disparador y `motivo_no_arranca_
+  tarea`): un defecto de fidelidad preexistente, ajeno a esta sesión, que la
+  comprobación vieja (filtrada a funciones `security definer`) nunca podía ver.
+  Corregido agregando el `drop function` que faltaba en
+  `db/rollbacks/0008_task_start_gate.sql`, con la evidencia del diagnóstico
+  documentada en el propio archivo. Verificado con un guión aparte que aplica
+  cada migración + su rollback en cadena, contra una base descartable, y compara
+  el catálogo antes/después: limpio para las doce migraciones tras la
+  corrección (antes, sólo fallaba `0008` -- y, mientras se escribía la migración
+  `0012`, el mismo guión encontró dos comentarios que se habían perdido al
+  transcribir el rollback de `0012`, ya corregidos ahí mismo).
+
+  RED (`git stash push -- src/prisma/herramientas.py src/prisma/menu_tarea.py
+  src/prisma/gateway.py`, con `db/esquema.sql` ya con `evidencia_pendiente` y
+  los archivos de prueba ya escritos):
+  `.venv/Scripts/python.exe -m pytest -q tests/test_entrega_con_evidencia.py` ->
+  `7 failed, 5 passed` (los 5 que ya pasaban son los que no dependen del cambio
+  de comportamiento -- p. ej. el gate cuando la tarea ya está en el estado
+  correcto). `git stash pop` restauró la implementación antes de seguir.
+
+  GREEN:
+  - `.venv/Scripts/python.exe -m pytest -q tests/test_entrega_con_evidencia.py`
+    -> `12 passed`.
+  - `.venv/Scripts/python.exe -m pytest -q tests/banco/test_corrida.py
+    tests/test_aclaracion_botones.py tests/test_agente.py
+    tests/test_aprobacion_cierra_tarea.py tests/test_dependencias.py
+    tests/test_menu_tarea.py tests/test_opciones_modelo.py
+    tests/test_task_intake.py tests/test_vista_previa_confirmacion.py
+    tests/test_entrega_con_evidencia.py` -> `292 passed`.
+  - Suite completa: `.venv/Scripts/python.exe -m pytest -q` -> `927 passed,
+    108 deselected` (216 s) -- línea base 912 + 15 pruebas nuevas (12 de
+    `test_entrega_con_evidencia.py`, 2 de `test_menu_tarea.py`, 1 de
+    `test_aprobacion_cierra_tarea.py`); mismo `108 deselected`.
+
+  Abierto (documentado como PENDIENTE en el ADR, no bloquea el cierre de esta
+  unidad): enlace al detalle de la tarea en el aviso de entrega (no existe vista
+  de tarea individual todavía); fotos/archivos como evidencia (unidad de
+  aportes sobre tareas); extender `tests/banco/corrida.py` con un paso de texto
+  libre intercalado entre dos toques.
+
 - **Próximo paso al retomar:** T5, sólo la segunda sesión real por Telegram (necesita
   al usuario; datos ficticios). Antes de empezar: comparar la base local con
-  `db/esquema.sql` (hoy al día hasta la migración `0011`) y aplicar lo que falte;
+  `db/esquema.sql` (hoy al día hasta la migración `0012`) y aplicar lo que falte;
   confirmar que el secreto de Telegram sigue protegido (no leer `.env*`); confirmar
   ausencia de datos y trabajo real en el espacio de prueba; tener un plan de pausa o
   rollback a mano. Ejercitar al menos:
