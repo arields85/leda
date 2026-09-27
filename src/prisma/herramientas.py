@@ -886,6 +886,15 @@ _MOTIVO_FALTA_EVIDENCIA_ENTREGA = (
     "Falta la evidencia requerida. Contame brevemente qué hiciste o pasame "
     "un link.")
 
+# T6g (`odd/tasks/prisma-orienta.md`; review-e719d807, review-09452c69):
+# decisión del usuario (2026-09-27) -- "ya la terminé" sobre una tarea que YA
+# está en_revision no es una segunda entrega, así que no hay un segundo
+# `falta` que devolver: la tarea ya tiene lo que este pedido pretendía lograr.
+_AVISO_YA_EN_REVISION = "Esa tarea ya está en revisión."
+_AVISO_EVIDENCIA_SUMADA_EN_REVISION = (
+    "Esa tarea ya está en revisión; se sumó la evidencia para quien la "
+    "revisa.")
+
 
 def _preparar_actualizar_estado(cur, quien: Solicitante, tarea_id, estado,
                                 motivo=None, evidencia_texto=None):
@@ -915,6 +924,29 @@ def _preparar_actualizar_estado(cur, quien: Solicitante, tarea_id, estado,
             return {"cerrada": False, "falta": impedimento}
 
     if estado == "en_revision":
+        if fila["estado"] == "en_revision":
+            # T6g (`odd/tasks/prisma-orienta.md`; review-e719d807,
+            # review-09452c69): decisión del usuario (2026-09-27) -- una
+            # entrega repetida sobre una tarea que YA está en_revision no
+            # registra ningún evento de estado (nunca un
+            # `en_revision -> en_revision`): ese evento hacía que
+            # `estado_previo_a_revision` devolviera `en_revision` en vez del
+            # estado real anterior, y "Pedir cambios" mandaba a `asignada`
+            # una tarea que en realidad estaba `en_curso` (review-09452c69,
+            # WARNING). Mismo criterio que `_registrar_bloqueo` con
+            # `bloqueada -> bloqueada`: no hay una segunda transición al
+            # mismo estado que registrar -- lo que llega de nuevo es
+            # evidencia, no un cambio de estado, y se suma igual que
+            # "Adjuntar evidencia" (`_preparar_adjuntar_evidencia`).
+            evidencia_texto = (evidencia_texto or "").strip()
+            if not evidencia_texto:
+                return {"error": _AVISO_YA_EN_REVISION}
+            cambio = (f"Tarea: {fila['titulo']} · ya está en revisión · se "
+                     f"suma la evidencia para quien la revisa: {evidencia_texto}")
+            huella = _huella("actualizar_estado_evidencia_en_revision",
+                             tarea_id, evidencia_texto)
+            return Preparacion(cambio=cambio, huella=huella)
+
         # ADR 0009 (hallazgo 8, sesión 2 por Telegram, 2026-09-27): Ariel
         # tocó "Ya la terminé" y la tarea pasó a `en_revision` sin ninguna
         # evidencia, aunque su política la exige -- Ismael después aprobó a
@@ -994,6 +1026,24 @@ def _actualizar_estado(cur, quien: Solicitante, tarea_id, estado, motivo=None,
 
     evidencia_id = None
     if estado == "en_revision":
+        if fila["estado"] == "en_revision":
+            # T6g: mismo criterio que `_preparar_actualizar_estado`,
+            # repetido acá por el mismo motivo que la autoridad de arriba
+            # (el handler es la puerta real a la base). Sin evento de
+            # estado: la evidencia que llegue se suma sola, igual que
+            # `_adjuntar_evidencia`, sin avisar de nuevo al aprobador (esa
+            # herramienta tampoco avisa).
+            evidencia_texto = (evidencia_texto or "").strip()
+            if not evidencia_texto:
+                return {"error": _AVISO_YA_EN_REVISION}
+            cur.execute(
+                """insert into evidence (workspace_id, task_id, tipo, uri, entregado_por)
+                   values (%s, %s, 'texto', %s, %s) returning id""",
+                (quien.workspace_id, tarea_id, evidencia_texto, quien.membership_id))
+            evidencia_id = cur.fetchone()["id"]
+            return {"evidencia_id": str(evidencia_id),
+                   "aviso": _AVISO_EVIDENCIA_SUMADA_EN_REVISION}
+
         # Repetido acá por el mismo motivo que la autoridad de arriba: el
         # handler es la puerta real a la base, no depende de que `preparar`
         # haya corrido antes con los mismos argumentos.

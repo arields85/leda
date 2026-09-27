@@ -1169,3 +1169,242 @@ def test_estado_previo_a_revision_no_es_ejecutable_por_public(corework, conn):
     assert fila["definer"] is True
     assert fila["publico"] is False
     assert fila["app"] is True
+
+
+# ---------------------------------------------------------------------------
+# 9. Entrega repetida en_revision y empate de evidencia (T6g,
+#    `odd/tasks/prisma-orienta.md`; review-e719d807, review-09452c69).
+#    Decisión del usuario (2026-09-27): "ya la terminé" sobre una tarea que
+#    YA está en_revision no registra ningún evento de estado -- antes, ese
+#    evento `en_revision -> en_revision` hacía que `estado_previo_a_revision`
+#    devolviera `en_revision` y que "Pedir cambios" mandara a `asignada` una
+#    tarea que en realidad estaba `en_curso`.
+# ---------------------------------------------------------------------------
+
+def test_actualizar_estado_repetido_sobre_en_revision_sin_evidencia_solo_avisa(
+        corework, conn):
+    """Sin evidencia_texto en el pedido repetido, no hay nada que sumar: ni
+    fila de evidencia ni fila de task_state_event nuevas -- sólo el aviso de
+    que ya está en revisión."""
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        tid = _tarea(cur, ws, estado="en_revision")
+        _evidencia(cur, ws, tid)
+        cur.execute("select count(*) n from task_state_event where task_id = %s", (tid,))
+        eventos_antes = cur.fetchone()["n"]
+    conn.commit()
+
+    with espacio(conn, ws) as cur:
+        nahuel = _quien(cur, "Nahuel Gimenez", ws)
+        resultado = H.ejecutar(cur, nahuel, "actualizar_estado",
+                               {"tarea_id": tid, "estado": "en_revision"},
+                               ya_confirmada=True)
+
+    assert "error" in resultado
+    assert "en revisión" in resultado["error"].lower()
+
+    with admin(conn) as cur:
+        cur.execute("select estado from task where id = %s", (tid,))
+        assert cur.fetchone()["estado"] == "en_revision"
+        cur.execute("select count(*) n from evidence where task_id = %s", (tid,))
+        assert cur.fetchone()["n"] == 1                     # sigue sólo la que ya tenía
+        cur.execute("select count(*) n from task_state_event where task_id = %s", (tid,))
+        assert cur.fetchone()["n"] == eventos_antes         # ningún evento nuevo
+
+
+def test_actualizar_estado_repetido_sobre_en_revision_con_evidencia_suma_fila_sin_evento(
+        corework, conn):
+    """Con evidencia_texto, se suma como un adjunto más -- igual que
+    "Adjuntar evidencia" (`_preparar_adjuntar_evidencia`) -- pero nunca un
+    segundo evento de estado."""
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        tid = _tarea(cur, ws, estado="en_revision")
+        _evidencia(cur, ws, tid)
+        cur.execute("select count(*) n from task_state_event where task_id = %s", (tid,))
+        eventos_antes = cur.fetchone()["n"]
+    conn.commit()
+
+    with espacio(conn, ws) as cur:
+        nahuel = _quien(cur, "Nahuel Gimenez", ws)
+        resultado = H.ejecutar(
+            cur, nahuel, "actualizar_estado",
+            {"tarea_id": tid, "estado": "en_revision",
+             "evidencia_texto": "Una captura más, por si sirve."},
+            ya_confirmada=True)
+
+    assert "evidencia_id" in resultado
+    assert "en revisión" in resultado["aviso"].lower()
+    assert "evidencia" in resultado["aviso"].lower()
+
+    with admin(conn) as cur:
+        cur.execute("select count(*) n from evidence where task_id = %s", (tid,))
+        assert cur.fetchone()["n"] == 2                     # la que ya tenía + la nueva
+        cur.execute(
+            """select uri from evidence where task_id = %s order by at desc limit 1""",
+            (tid,))
+        assert cur.fetchone()["uri"] == "Una captura más, por si sirve."
+        cur.execute("select estado from task where id = %s", (tid,))
+        assert cur.fetchone()["estado"] == "en_revision"
+        cur.execute("select count(*) n from task_state_event where task_id = %s", (tid,))
+        assert cur.fetchone()["n"] == eventos_antes         # ningún evento nuevo
+
+
+def test_actualizar_estado_repetido_sobre_en_revision_con_evidencia_pide_confirmacion(
+        corework, conn):
+    """La vista previa describe lo que realmente va a pasar -- se suma
+    evidencia, nunca "vuelve a en revisión" (no hay ningún cambio de
+    estado que confirmar)."""
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        tid = _tarea(cur, ws, estado="en_revision")
+        _evidencia(cur, ws, tid)
+    conn.commit()
+
+    with espacio(conn, ws) as cur:
+        nahuel = _quien(cur, "Nahuel Gimenez", ws)
+        try:
+            H.ejecutar(cur, nahuel, "actualizar_estado",
+                      {"tarea_id": tid, "estado": "en_revision",
+                       "evidencia_texto": "Otra vez, con más detalle."})
+            assert False, "tenía que pedir confirmación"
+        except H.NecesitaConfirmacion as e:
+            assert "ya está en revisión" in e.resumen.lower()
+            assert "se suma la evidencia" in e.resumen.lower()
+            assert "Otra vez, con más detalle." in e.resumen
+
+
+def test_pedir_cambios_tras_entrega_repetida_en_en_revision_sigue_volviendo_a_en_curso(
+        corework, conn):
+    """Regresión del hallazgo de review-09452c69: antes de esta corrección,
+    la entrega repetida insertaba un evento `en_revision -> en_revision` que
+    hacía que `estado_previo_a_revision` devolviera `en_revision` -- "Pedir
+    cambios" mandaba a `asignada` una tarea que en realidad seguía en curso.
+    Con la corrección, la entrega repetida no deja ningún evento nuevo, así
+    que el previo real (`en_curso`) sigue intacto."""
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        tid = _tarea(cur, ws, estado="en_revision")   # previo real: en_curso
+        _evidencia(cur, ws, tid)
+    conn.commit()
+
+    with espacio(conn, ws) as cur:
+        nahuel = _quien(cur, "Nahuel Gimenez", ws)
+        resultado = H.ejecutar(
+            cur, nahuel, "actualizar_estado",
+            {"tarea_id": tid, "estado": "en_revision",
+             "evidencia_texto": "Ahí va de nuevo, por si no llegó."},
+            ya_confirmada=True)
+    assert "evidencia_id" in resultado
+
+    with espacio(conn, ws) as cur:
+        marcos = _quien(cur, "Marcos Tarquini", ws)
+        resultado = H.ejecutar(cur, marcos, "pedir_cambios_tarea",
+                               {"tarea_id": tid, "comentario": "Ajustar algo."},
+                               ya_confirmada=True)
+    assert resultado == {"pedido": True, "titulo": "Programar HMI línea 2"}
+
+    with admin(conn) as cur:
+        cur.execute("select estado from task where id = %s", (tid,))
+        assert cur.fetchone()["estado"] == "en_curso"       # nunca `asignada`
+
+
+def test_pedir_cambios_con_previo_en_revision_nulo_vuelve_a_asignada(corework, conn):
+    """`estado_previo_a_revision` puede devolver NULL cuando no hay ningún
+    evento anterior de entrada a en_revision registrado -- `_destino_pedir_
+    cambios` trata ese caso igual que cualquier otro que no sea `en_curso`:
+    vuelve a `asignada`, nunca supone un arranque que no se puede probar."""
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        tid = _tarea(cur, ws, titulo="Cablear tablero", estado="asignada",
+                    evidencia_requerida=None)
+        # Reemplaza el único evento por uno sin `estado_anterior` -- mismo
+        # patrón que usa `_tarea` para el estado inicial de cualquier tarea
+        # -- para que `estado_previo_a_revision` no encuentre ninguna fila.
+        cur.execute("delete from task_state_event where task_id = %s", (tid,))
+        cur.execute(
+            "insert into task_state_event (task_id, estado_nuevo, actor_kind) "
+            "values (%s, 'en_revision', 'prisma')", (tid,))
+        _evidencia(cur, ws, tid)
+    conn.commit()
+
+    with espacio(conn, ws) as cur:
+        # `estado_previo_a_revision` sólo tiene `execute` concedido a
+        # `prisma_app` -- bajo `prisma_admin` el permiso está revocado
+        # (mismo gotcha documentado en la sección 8), así que la premisa se
+        # comprueba bajo el mismo rol que usa `_pedir_cambios_tarea`.
+        cur.execute("select estado_previo_a_revision(%s) as previo", (tid,))
+        assert cur.fetchone()["previo"] is None
+
+        marcos = _quien(cur, "Marcos Tarquini", ws)
+        resultado = H.ejecutar(cur, marcos, "pedir_cambios_tarea",
+                               {"tarea_id": tid, "comentario": "Ajustar algo."},
+                               ya_confirmada=True)
+    assert resultado == {"pedido": True, "titulo": "Cablear tablero"}
+
+    with admin(conn) as cur:
+        cur.execute("select estado from task where id = %s", (tid,))
+        assert cur.fetchone()["estado"] == "asignada"
+
+
+def test_preparar_actualizar_estado_en_curso_desde_en_revision_pide_confirmacion_no_falta(
+        corework, conn):
+    """Sin `ya_confirmada`, la restauración a `en_curso` exenta del gate
+    (T6c) tiene que llegar a la vista previa -- nunca a un `falta` --
+    incluso con una dependencia bloqueante todavía abierta: eso es
+    justamente lo que exime el disparador para esta restauración."""
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        tid = _tarea(cur, ws, estado="en_revision")
+        _evidencia(cur, ws, tid)
+        _dependencia_bloqueante(cur, ws, tid)
+    conn.commit()
+
+    with espacio(conn, ws) as cur:
+        nahuel = _quien(cur, "Nahuel Gimenez", ws)
+        try:
+            H.ejecutar(cur, nahuel, "actualizar_estado",
+                      {"tarea_id": tid, "estado": "en_curso"})
+            assert False, "tenía que pedir confirmación"
+        except H.NecesitaConfirmacion as e:
+            assert "en curso" in e.resumen.lower()
+
+
+def test_evidencia_pendiente_empate_de_at_en_la_misma_transaccion_falla_cerrado(
+        corework, conn):
+    """Sugerencia pendiente de review-e719d807: `evidencia_pendiente`
+    compara con `>` estricto contra el último `rechazado` -- si el
+    `approval` y la `evidence` nueva quedan con el mismo `at` (los dos
+    insertados en la misma transacción, mismo `now()`), el empate tiene que
+    fallar cerrado: sigue pendiente, para que un cambio futuro de `>` a `>=`
+    no pase inadvertido."""
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        tid = _tarea(cur, ws, estado="en_revision")
+        cur.execute(
+            """select m.id from membership m join app_user u on u.id = m.app_user_id
+                where m.workspace_id = %s and u.nombre = %s""",
+            (ws, "Marcos Tarquini"))
+        marcos_id = cur.fetchone()["id"]
+        cur.execute(
+            """insert into approval (workspace_id, sujeto_tipo, sujeto_id,
+                                     aprobador_membership_id, decision, comentario)
+               values (%s, 'tarea', %s, %s, 'rechazado', 'Ajustar algo')""",
+            (ws, tid, marcos_id))
+        cur.execute(
+            """insert into evidence (workspace_id, task_id, tipo, uri)
+               values (%s, %s, 'texto', 'Ya corregido.')""", (ws, tid))
+
+        # Confirma la premisa del empate antes de comprobar el resultado:
+        # los dos inserts, en la misma transacción, comparten el mismo
+        # `now()`.
+        cur.execute(
+            """select (select at from approval where sujeto_id = %s
+                        order by at desc limit 1)
+                     = (select at from evidence where task_id = %s
+                        order by at desc limit 1) as mismo_at""",
+            (tid, tid))
+        assert cur.fetchone()["mismo_at"] is True
+
+        cur.execute("select evidencia_pendiente(%s) as f", (tid,))
+        assert cur.fetchone()["f"] is True

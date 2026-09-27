@@ -104,7 +104,7 @@ gestión.
     deduplica nada. Derivarla de la identidad del acto de entrega.
   - [x] **T6e — Prueba de punta a punta de "Pedir cambios".**
   - [ ] **T6f — Serializar "Aprobar" y "Pedir cambios" concurrentes** (review-3cf89bef).
-  - [ ] **T6g — Empate de evidencia y entrega repetida en `en_revision`** (review-e719d807,
+  - [x] **T6g — Empate de evidencia y entrega repetida en `en_revision`** (review-e719d807,
     review-09452c69). Una entrega repetida sobre una tarea ya `en_revision` inserta
     un evento `en_revision -> en_revision`: además de sumar evidencia, hace que
     `estado_previo_a_revision` devuelva `en_revision` y que "Pedir cambios" mande a
@@ -3258,3 +3258,28 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   programado_para desc limit 1` sin desempate, y dos filas pueden compartir hora;
   (2) no se verifica qué pasa con los botones del primer aviso después de "Pedir
   cambios" y de la reentrega.
+
+- 2026-09-27: **T6g cerrada — entrega repetida sobre una tarea ya en revisión.** Ruta:
+  delegada, un escritor. `_preparar_actualizar_estado`/`_actualizar_estado`: si la
+  tarea ya está `en_revision`, no se inserta ningún `task_state_event`; con texto de
+  evidencia, vista previa ("ya está en revisión · se suma la evidencia para quien la
+  revisa") y al confirmar una fila de `evidence` más (igual que `_adjuntar_evidencia`,
+  que no avisa a nadie); sin texto, "Esa tarea ya está en revisión.". Sin migración:
+  la guarda sigue la convención de `_registrar_bloqueo` (no insertar un segundo
+  evento del mismo estado) y ese insert es el único camino que produce
+  `estado_nuevo = 'en_revision'`; `estado_previo_a_revision` queda igual. Siete
+  pruebas nuevas (sección 9 de `tests/test_entrega_con_evidencia.py`): entrega
+  repetida con y sin texto, "Pedir cambios" después de una entrega repetida sigue
+  volviendo a `en_curso`, previo nulo -> `asignada`, vista previa sin confirmar de la
+  restauración `en_revision -> en_curso`, empate de evidencia. Prueba de punta a
+  punta: desempate por `dedupe_key` en "el último mensaje" y verificación de que los
+  botones del primer aviso mueren al tocar "Pedir cambios" (`resolver_pendiente`
+  resuelve la fila entera).
+  Observación del escritor: si llega evidencia por una entrega repetida mientras el
+  primer aviso sigue esperando, el aprobador puede aprobar desde ese aviso sin que
+  nadie le haya mostrado la evidencia nueva (la aprobación lee la evidencia vigente;
+  el aviso no se reenvía). Queda para decisión del usuario.
+  RED (stash de herramientas): `4 failed` (las otras 3 cubren comportamiento que ya
+  era correcto). GREEN enfocada (reejecutada por el orquestador):
+  `tests/test_entrega_con_evidencia.py tests/test_pedir_cambios_extremo_a_extremo.py`
+  -> `38 passed`. Suite completa (escritor): `953 passed, 108 deselected`.

@@ -91,10 +91,19 @@ def _dependencia_bloqueante(cur, ws, destino):
 
 
 def _outbox_ultimo(cur, ws, chat_id) -> str:
+    # T6g (`odd/tasks/prisma-orienta.md`; review-8b7dde28): `programado_para`
+    # no tiene desempate -- dos filas pueden compartir la misma hora dentro
+    # de la misma transacción --, y `message_outbox.id` (`db/esquema.sql`) es
+    # un `uuid` al azar (`gen_random_uuid()`, sin ningún orden temporal), así
+    # que tampoco sirve como desempate de "la más reciente". `dedupe_key`
+    # (`unique`, `db/esquema.sql`) sí garantiza un orden total determinístico
+    # -- nunca hay dos filas iguales para desempatar --, así que un empate en
+    # `programado_para` deja de depender del orden, no definido, en que
+    # Postgres devuelva las filas iguales.
     cur.execute(
         """select cuerpo from message_outbox
             where workspace_id = %s and chat_id = %s
-           order by programado_para desc limit 1""", (ws, chat_id))
+           order by programado_para desc, dedupe_key desc limit 1""", (ws, chat_id))
     return cur.fetchone()["cuerpo"]
 
 
@@ -260,10 +269,14 @@ def test_pedir_cambios_punta_a_punta_por_telegram(cliente, conn, corework, monke
         pid_aviso_1 = _pendiente(cur, ws, P.SENTINEL_MENU_TAREA, chat_id=tg_marcos)
         opciones_aviso_1 = _opciones(cur, pid_aviso_1)
         cuerpo_aviso_1 = _outbox_ultimo(cur, ws, tg_marcos)
+        # Mismo desempate que `_outbox_ultimo` (review-8b7dde28): `dedupe_key`
+        # es `unique`, así que ordenar también por ella deja el resultado
+        # determinístico frente a un empate en `programado_para`.
         cur.execute(
             """select dedupe_key from message_outbox
                 where workspace_id = %s and chat_id = %s
-               order by programado_para desc limit 1""", (ws, tg_marcos))
+               order by programado_para desc, dedupe_key desc limit 1""",
+            (ws, tg_marcos))
         dedupe_1 = cur.fetchone()["dedupe_key"]
     assert "Nahuel Gimenez entregó" in cuerpo_aviso_1
     assert "instalación" in cuerpo_aviso_1.lower()
@@ -303,6 +316,31 @@ def test_pedir_cambios_punta_a_punta_por_telegram(cliente, conn, corework, monke
     assert "Marcos Tarquini pidió cambios" in cuerpo_a_nahuel
     assert "certificado del proveedor" in cuerpo_a_nahuel.lower()
 
+    # -- Seguimiento de review-8b7dde28 (T6g): el aviso 1 ("Aprobar"/"Pedir
+    # cambios") es una sola `pending_action` con dos opciones -- tocar
+    # cualquiera de las dos la resuelve entera (`resolver_pendiente`,
+    # `db/esquema.sql`: `update ... where id = a.id`, no `where token = ...`).
+    # Después de tocar "Pedir cambios", el "Aprobar" viejo del MISMO aviso
+    # queda muerto sin hacer falta nada más: nunca abre una vista previa de
+    # `aprobar_tarea` ni cambia el estado de la tarea que "Pedir cambios" ya
+    # devolvió a `en_curso`.
+    with admin(conn) as cur:
+        cur.execute("select estado from pending_action where id = %s", (pid_aviso_1,))
+        assert cur.fetchone()["estado"] == "resuelta"
+
+    token_aprobar_viejo = next(f["token"] for f in opciones_aviso_1
+                               if f["etiqueta"] == "Aprobar")
+    assert _tocar(cliente, token_aprobar_viejo, tg_marcos).status_code == 200
+
+    with admin(conn) as cur:
+        assert "ya no está vigente" in _outbox_ultimo(cur, ws, tg_marcos).lower()
+        cur.execute(
+            """select count(*) n from pending_action
+                where herramienta = 'aprobar_tarea' and estado = 'esperando'""")
+        assert cur.fetchone()["n"] == 0
+        cur.execute("select estado from task where id = %s", (tid,))
+        assert cur.fetchone()["estado"] == "en_curso"
+
     # -- 3. Nahuel entrega otra vez: evidencia NUEVA (T6b), aviso NUEVO (T6d) -----
     filas = _abrir_menu(cliente, conn, ws, monkeypatch, tid, "Nahuel Gimenez",
                        tg_nahuel)
@@ -329,7 +367,8 @@ def test_pedir_cambios_punta_a_punta_por_telegram(cliente, conn, corework, monke
         cur.execute(
             """select dedupe_key from message_outbox
                 where workspace_id = %s and chat_id = %s
-               order by programado_para desc limit 1""", (ws, tg_marcos))
+               order by programado_para desc, dedupe_key desc limit 1""",
+            (ws, tg_marcos))
         dedupe_2 = cur.fetchone()["dedupe_key"]
     assert pid_aviso_2 != pid_aviso_1          # T6d: otra pending_action
     assert dedupe_2 != dedupe_1                # T6d: otra clave de dedupe
