@@ -16,7 +16,7 @@
   anterior del propio usuario. Este documento y el resto del corpus del
   repositorio (`docs/architecture/frontera.md`, `nucleo/`) deciden el *cómo*,
   dentro de la arquitectura multi-tenant vigente.
-- **Rama de trabajo:** `aux/alta-y-google`, worktree
+- **Rama de trabajo:** `auxiliar/alta-y-google`, worktree
   `D:\Proyectos\Prisma-PM-worktrees\alta-y-google`, sin efecto sobre `main`
   hasta integración. Ver `odd/tasks/alta-y-google.md`.
 
