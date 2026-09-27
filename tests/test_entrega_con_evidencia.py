@@ -21,6 +21,8 @@ Estas pruebas cubren:
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 import psycopg
 import pytest
 
@@ -473,13 +475,18 @@ def test_pedir_cambios_invalida_una_aprobacion_anterior_que_no_habia_cerrado(
         cur.execute("select estado from task where id = %s", (tid,))
         assert cur.fetchone()["estado"] == "en_curso"
 
-    # Nahuel vuelve a entregar (la evidencia ya estaba, no hace falta de
-    # nuevo) y se resuelve el bloqueo.
+    # Nahuel vuelve a entregar. Con "Pedir cambios" de por medio, la
+    # evidencia vieja ya no cuenta (T6b): sin `evidencia_texto` en este
+    # mismo pedido, la reentrega quedaría pidiendo evidencia de nuevo
+    # (cubierto aparte en la sección 6, más abajo) -- acá manda la
+    # evidencia nueva y se resuelve el bloqueo.
     with espacio(conn, ws) as cur:
         nahuel = _quien(cur, "Nahuel Gimenez", ws)
-        resultado = H.ejecutar(cur, nahuel, "actualizar_estado",
-                               {"tarea_id": tid, "estado": "en_revision"},
-                               ya_confirmada=True)
+        resultado = H.ejecutar(
+            cur, nahuel, "actualizar_estado",
+            {"tarea_id": tid, "estado": "en_revision",
+             "evidencia_texto": "Ya ajusté el HMI que pidió Marcos."},
+            ya_confirmada=True)
     assert resultado == {"estado": "en_revision"}
 
     with admin(conn) as cur:
@@ -518,7 +525,13 @@ def test_motivo_no_cierra_tarea_empate_de_at_no_cuenta_como_aprobada(
     """Regla explícita de la corrección: un 'aprobado' y un 'rechazado' del
     mismo aprobador con el mismo `at` -- dos filas insertadas en la misma
     transacción, donde `now()` es estable en PostgreSQL -- son un empate, y
-    el empate falla cerrado: nunca cuenta como aprobada."""
+    el empate falla cerrado: nunca cuenta como aprobada.
+
+    Con T6b de por medio, el 'rechazado' también invalida la evidencia
+    vieja (la de `_evidencia`, insertada antes) -- así que se manda una
+    evidencia nueva, en su propia transacción para que su `at` quede
+    después del empate, y así la comprobación llega hasta la de la
+    aprobación en vez de quedarse antes, en la de evidencia."""
     ws = corework.workspace_id
     with admin(conn) as cur:
         tid = _tarea(cur, ws, estado="en_revision")
@@ -537,6 +550,13 @@ def test_motivo_no_cierra_tarea_empate_de_at_no_cuenta_como_aprobada(
                                      aprobador_membership_id, decision, comentario)
                values (%s, 'tarea', %s, %s, 'rechazado', 'empate')""",
             (ws, tid, marcos.membership_id))
+    conn.commit()
+
+    with admin(conn) as cur:
+        _evidencia(cur, ws, tid)
+    conn.commit()
+
+    with espacio(conn, ws) as cur:
         cur.execute("select motivo_no_cierra_tarea(%s) as m", (tid,))
         motivo = cur.fetchone()["m"]
     assert motivo == "Falta la aprobación de quien revisa ese trabajo."
@@ -558,3 +578,216 @@ def test_aprobar_tarea_plana_sigue_alcanzando_para_cerrar(corework, conn):
                                ya_confirmada=True)
     assert resultado == {"aprobada": True, "cerrada": True, "falta": None,
                          "titulo": "Programar HMI línea 2"}
+
+
+# ---------------------------------------------------------------------------
+# 6. Después de "Pedir cambios", la entrega pide evidencia nueva (T6b,
+#    review-c112506a). Decisión del usuario (2026-09-27): la evidencia vieja
+#    deja de contar -- hay que volver a mandar evidencia (ejemplo: pintar
+#    una pared, al aprobador le faltó una parte, la evidencia nueva muestra
+#    esa parte pintada).
+# ---------------------------------------------------------------------------
+
+def test_evidencia_pendiente_vuelve_a_pedir_tras_pedir_cambios(corework, conn):
+    """Antes de esta corrección, `evidencia_pendiente` contaba cualquier
+    fila de `evidence` de la tarea, aunque fuera de antes del "Pedir
+    cambios" -- la evidencia de la primera entrega alcanzaba para que
+    `actualizar_estado(en_revision)` no pidiera nada. Ahora vuelve a ser
+    verdadero después de un `approval` 'rechazado', y sin evidencia nueva
+    en el mismo pedido la tarea nunca se mueve."""
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        tid = _tarea(cur, ws, estado="en_revision")
+        _evidencia(cur, ws, tid)
+    conn.commit()
+
+    with espacio(conn, ws) as cur:
+        marcos = _quien(cur, "Marcos Tarquini", ws)
+        H.ejecutar(cur, marcos, "pedir_cambios_tarea",
+                   {"tarea_id": tid, "comentario": "Falta un detalle."},
+                   ya_confirmada=True)
+
+    with admin(conn) as cur:
+        cur.execute("select evidencia_pendiente(%s) as f", (tid,))
+        assert cur.fetchone()["f"] is True
+
+    with espacio(conn, ws) as cur:
+        nahuel = _quien(cur, "Nahuel Gimenez", ws)
+        resultado = H.ejecutar(cur, nahuel, "actualizar_estado",
+                               {"tarea_id": tid, "estado": "en_revision"},
+                               ya_confirmada=True)
+    assert resultado["en_revision"] is False
+    assert "evidencia" in resultado["falta"].lower()
+
+    with admin(conn) as cur:
+        cur.execute("select estado from task where id = %s", (tid,))
+        assert cur.fetchone()["estado"] == "en_curso"      # nunca se movió
+        cur.execute("select count(*) n from evidence where task_id = %s", (tid,))
+        assert cur.fetchone()["n"] == 1                    # sigue sólo la vieja
+
+
+def test_redelivery_con_evidencia_texto_registra_fila_nueva_y_notifica(
+        corework, conn):
+    """La evidencia nueva de la reentrega se registra siempre (corrección
+    del descarte): antes, con alguna fila de `evidence` ya existente,
+    `_actualizar_estado` ni siquiera intentaba el insert, aunque la vista
+    previa y el aviso al aprobador ya mostraban el texto nuevo."""
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        tid = _tarea(cur, ws, estado="en_revision")
+        _evidencia(cur, ws, tid)
+    conn.commit()
+
+    with espacio(conn, ws) as cur:
+        marcos = _quien(cur, "Marcos Tarquini", ws)
+        H.ejecutar(cur, marcos, "pedir_cambios_tarea",
+                   {"tarea_id": tid, "comentario": "Falta un detalle."},
+                   ya_confirmada=True)
+
+    with espacio(conn, ws) as cur:
+        nahuel = _quien(cur, "Nahuel Gimenez", ws)
+        resultado = H.ejecutar(
+            cur, nahuel, "actualizar_estado",
+            {"tarea_id": tid, "estado": "en_revision",
+             "evidencia_texto": "Ahora sí, con el detalle corregido."},
+            ya_confirmada=True)
+    assert resultado == {"estado": "en_revision"}
+
+    with admin(conn) as cur:
+        cur.execute("select count(*) n from evidence where task_id = %s", (tid,))
+        assert cur.fetchone()["n"] == 2     # la vieja (que ya no cuenta) + la nueva
+
+        tg_marcos = _tg(cur, "Marcos Tarquini")
+        cuerpo = _outbox_ultimo(cur, ws, tg_marcos)
+    assert "Ahora sí, con el detalle corregido." in cuerpo
+
+
+def test_ya_la_termine_pide_evidencia_de_nuevo_tras_pedir_cambios(corework, conn):
+    """Mismo patrón que
+    `test_ya_la_termine_pide_evidencia_si_falta_y_termina_en_vista_previa`
+    (`tests/test_menu_tarea.py`), pero con "Pedir cambios" de por medio: la
+    entrega anterior dejó una fila de `evidence`, y como después el
+    aprobador pidió cambios esa evidencia ya no cuenta -- el menú vuelve a
+    pedirla. Llama a `gateway._resolver_toque_menu_tarea` directo, sin
+    pasar por HTTP ni por el token del menú (que T2 ya prueba de punta a
+    punta): lo que importa acá es que la acción "terminar" recalcule
+    `evidencia_pendiente` y no la vieja lectura descartada."""
+    from prisma import gateway
+    from prisma import pendientes as P
+
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        tid = _tarea(cur, ws, estado="en_revision")
+        _evidencia(cur, ws, tid)
+    conn.commit()
+
+    with espacio(conn, ws) as cur:
+        marcos = _quien(cur, "Marcos Tarquini", ws)
+        H.ejecutar(cur, marcos, "pedir_cambios_tarea",
+                   {"tarea_id": tid, "comentario": "Falta un detalle."},
+                   ya_confirmada=True)
+
+    with admin(conn) as cur:
+        tg_nahuel = _tg(cur, "Nahuel Gimenez")
+
+    with espacio(conn, ws) as cur:
+        nahuel = _quien(cur, "Nahuel Gimenez", ws)
+        gateway._resolver_toque_menu_tarea(
+            cur, nahuel, ws, tg_nahuel,
+            {"eleccion": {"accion": "terminar"}, "tarea_id": tid,
+             "titulo": "Programar HMI línea 2"},
+            datetime.now(timezone.utc))
+
+    with admin(conn) as cur:
+        cur.execute("select estado from task where id = %s", (tid,))
+        assert cur.fetchone()["estado"] == "en_curso"      # todavía no se pidió nada
+
+        cuerpo = _outbox_ultimo(cur, ws, tg_nahuel)
+        assert "qué hiciste" in cuerpo.lower()
+
+        cur.execute(
+            """select count(*) n from pending_action
+                where herramienta = %s and modificar_pedido_en is not null
+                  and modificacion_consumida_en is null""",
+            (P.SENTINEL_DATO_MENU_TAREA,))
+        assert cur.fetchone()["n"] == 1
+
+
+def test_aprobar_tarea_rechaza_tras_pedir_cambios_sin_evidencia_nueva(
+        corework, conn):
+    """El gate de "Aprobar" (`_exigir_puede_aprobarse`, ADR 0009 decisión 2)
+    reusa la misma `evidencia_pendiente`: si la tarea llega a `en_revision`
+    sin evidencia posterior al "Pedir cambios" -- acá insertada directo en
+    la base, nunca por `actualizar_estado`, que ya la exigiría (prueba de
+    arriba) --, "Aprobar" sigue rechazando; con evidencia nueva, se
+    permite."""
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        tid = _tarea(cur, ws, estado="en_revision")
+        _evidencia(cur, ws, tid)
+    conn.commit()
+
+    with espacio(conn, ws) as cur:
+        marcos = _quien(cur, "Marcos Tarquini", ws)
+        H.ejecutar(cur, marcos, "pedir_cambios_tarea",
+                   {"tarea_id": tid, "comentario": "Falta un detalle."},
+                   ya_confirmada=True)
+
+    with admin(conn) as cur:
+        cur.execute(
+            """insert into task_state_event (task_id, estado_anterior,
+                                             estado_nuevo, actor_kind)
+               values (%s, 'en_curso', 'en_revision', 'sistema')""", (tid,))
+
+    with espacio(conn, ws) as cur:
+        marcos = _quien(cur, "Marcos Tarquini", ws)
+        try:
+            H.ejecutar(cur, marcos, "aprobar_tarea", {"tarea_id": tid},
+                      ya_confirmada=True)
+            assert False, "tenía que rechazar"
+        except Denegado as e:
+            assert "evidencia" in str(e).lower()
+
+    with admin(conn) as cur:
+        cur.execute(
+            """insert into evidence (workspace_id, task_id, tipo, uri)
+               values (%s, %s, 'texto', 'Ahora sí, corregido.')""", (ws, tid))
+    conn.commit()
+
+    with espacio(conn, ws) as cur:
+        marcos = _quien(cur, "Marcos Tarquini", ws)
+        resultado = H.ejecutar(cur, marcos, "aprobar_tarea", {"tarea_id": tid},
+                               ya_confirmada=True)
+    assert resultado["aprobada"] is True
+
+
+def test_evidencia_texto_se_registra_aunque_ya_exista_evidencia_sin_pedir_cambios(
+        corework, conn):
+    """Regresión y corrección del descarte, sin ningún "Pedir cambios" de
+    por medio: si la tarea ya tiene evidencia y de todos modos llega
+    `evidencia_texto` en un `actualizar_estado(en_revision)` -- por
+    ejemplo, alguien que la manda de nuevo sin que se la hayan pedido --,
+    el texto se registra. Antes se descartaba en silencio porque
+    `evidencia_pendiente` ya era falso."""
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        tid = _tarea(cur, ws, estado="en_curso")
+        _evidencia(cur, ws, tid)
+    conn.commit()
+
+    with espacio(conn, ws) as cur:
+        nahuel = _quien(cur, "Nahuel Gimenez", ws)
+        resultado = H.ejecutar(
+            cur, nahuel, "actualizar_estado",
+            {"tarea_id": tid, "estado": "en_revision",
+             "evidencia_texto": "Mandé esto de nuevo, por si acaso."},
+            ya_confirmada=True)
+    assert resultado == {"estado": "en_revision"}
+
+    with admin(conn) as cur:
+        cur.execute("select count(*) n from evidence where task_id = %s", (tid,))
+        assert cur.fetchone()["n"] == 2
+        cur.execute(
+            """select uri from evidence where task_id = %s order by at desc limit 1""",
+            (tid,))
+        assert cur.fetchone()["uri"] == "Mandé esto de nuevo, por si acaso."

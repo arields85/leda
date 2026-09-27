@@ -82,6 +82,16 @@ gestión.
     volver a entregar la tarea puede cerrarse sin que nadie apruebe el trabajo
     corregido. Cuenta sólo si la última decisión del aprobador sobre la tarea
     es `aprobado` (empate de `at` = no aprobada). Migración `0013`.
+  - [x] **T6b — Después de "Pedir cambios", la entrega pide evidencia nueva.**
+    Defecto: al volver a entregar, `evidencia_pendiente` ya es falso (quedó la
+    evidencia de la primera entrega), así que `_actualizar_estado` descarta el
+    `evidencia_texto` nuevo aunque la vista previa y el aviso al aprobador lo
+    muestran. Decisión del usuario (2026-09-27): si se pidieron cambios, la
+    evidencia vieja deja de contar y hay que volver a enviar evidencia (ejemplo:
+    pintar una pared, el aprobador dice que faltó una parte, la evidencia nueva
+    muestra esa parte pintada). `evidencia_pendiente` cuenta sólo evidencia con
+    `at` posterior al último `rechazado`; la evidencia enviada en la entrega se
+    registra siempre. Migración `0014`; enmienda en ADR 0009.
 
 ## Ruta
 
@@ -94,6 +104,7 @@ gestión.
 | T4 | delegada, un escritor | `tests/banco/` |
 | T5 | inline | documentación |
 | T6a | delegada, un escritor | `db/esquema.sql`, migración y rollback `0013`, pruebas (4 archivos) |
+| T6b | delegada, un escritor | `db/esquema.sql`, migración y rollback `0014`, `herramientas.py`, ADR 0009, pruebas |
 
 ## Verificación
 
@@ -3103,3 +3114,24 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   **PENDIENTE**: serializar las decisiones sobre una misma tarea (bloqueo de la fila
   de `task` en `aprobar_tarea`/`pedir_cambios_tarea`) o volver a leer el estado
   dentro del mismo acto.
+
+- 2026-09-27: **T6b cerrada — después de "Pedir cambios", la entrega pide evidencia
+  nueva** (seguimiento de review-c112506a + decisión del usuario del mismo día).
+  Ruta: delegada, un escritor. `evidencia_pendiente` cuenta sólo evidencia con `at`
+  estrictamente posterior al último `approval` 'rechazado' de la tarea (de cualquier
+  aprobador; empate falla cerrado; sin 'rechazado', sin cambio). `_actualizar_estado`
+  registra siempre el `evidencia_texto` no vacío de la entrega (antes se descartaba
+  en silencio si ya había evidencia). El gate de "Aprobar", el cierre y el menú
+  ("Ya la terminé" vuelve a pedir evidencia) siguen solos porque llaman a la misma
+  función. Migración `db/migrations/0014_evidencia_no_sobrevive_a_pedir_cambios.sql`
+  y su rollback; **no aplicada todavía a la base local**. Enmienda fechada en ADR
+  0009 (T6a y T6b). Cinco pruebas nuevas en `tests/test_entrega_con_evidencia.py`
+  (sección 6); dos pruebas de T6a ajustadas para mandar evidencia nueva después del
+  'rechazado' (siguen probando el empate y la aprobación vieja). Límite anotado: una
+  evidencia que adjunta el aprobador después de pedir cambios también cuenta, igual
+  que antes de esta unidad.
+  RED (stash de `db/esquema.sql`/`herramientas.py`, pruebas nuevas presentes): `5
+  failed, 1 passed`. GREEN enfocada (reejecutada por el orquestador): `pytest -q
+  tests/test_entrega_con_evidencia.py tests/test_aprobacion_cierra_tarea.py
+  tests/test_task_intake.py tests/test_menu_tarea.py` -> `146 passed`. Suite
+  completa (escritor): `935 passed, 108 deselected`.

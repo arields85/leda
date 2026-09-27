@@ -989,14 +989,22 @@ def _actualizar_estado(cur, quien: Solicitante, tarea_id, estado, motivo=None,
         # handler es la puerta real a la base, no depende de que `preparar`
         # haya corrido antes con los mismos argumentos.
         cur.execute("select evidencia_pendiente(%s) as f", (tarea_id,))
-        if cur.fetchone()["f"]:
-            evidencia_texto = (evidencia_texto or "").strip()
-            if not evidencia_texto:
-                return {"en_revision": False, "falta": _MOTIVO_FALTA_EVIDENCIA_ENTREGA}
-            # Dos hechos, dos filas, un solo acto -- mismo patrón que
-            # `_aprobar_tarea` (ADR 0008): la evidencia que la persona
-            # acaba de mandar se registra junto con el cambio de estado,
-            # nunca por separado ni en un paso previo.
+        pendiente = cur.fetchone()["f"]
+        evidencia_texto = (evidencia_texto or "").strip()
+        if pendiente and not evidencia_texto:
+            return {"en_revision": False, "falta": _MOTIVO_FALTA_EVIDENCIA_ENTREGA}
+        if evidencia_texto:
+            # T6b (`odd/tasks/prisma-orienta.md`, decisión del usuario
+            # 2026-09-27): antes, este insert corría sólo cuando
+            # `evidencia_pendiente` era verdadero -- si la tarea ya tenía
+            # alguna fila de `evidence` (por ejemplo de una entrega
+            # anterior a "Pedir cambios"), el `evidencia_texto` nuevo se
+            # descartaba en silencio, aunque la vista previa
+            # (`_preparar_actualizar_estado`) y el aviso al aprobador
+            # (`_notificar_entrega_al_aprobador`, abajo) ya lo mostraban.
+            # Ahora se registra siempre que llegue texto: dos hechos, dos
+            # filas, un solo acto -- mismo patrón que `_aprobar_tarea`
+            # (ADR 0008).
             cur.execute(
                 """insert into evidence (workspace_id, task_id, tipo, uri, entregado_por)
                    values (%s, %s, 'texto', %s, %s) returning id""",

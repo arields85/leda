@@ -1634,10 +1634,31 @@ create trigger trg_exigir_dependencias_resueltas
 -- también `herramientas._actualizar_estado`/`menu_tarea.calcular_menu`
 -- (entrega a `en_revision` y el gate de "Aprobar"), que antes no tenían
 -- ninguna forma de hacer la misma pregunta sin reimplementar el criterio.
+--
+-- Migración 0014 (T6b, `odd/tasks/prisma-orienta.md`): decisión del usuario
+-- (2026-09-27) -- si el aprobador pidió cambios, la evidencia vieja deja de
+-- contar; hay que volver a mandar evidencia (ejemplo: pintar una pared, al
+-- aprobador le faltó una parte, la evidencia nueva muestra esa parte
+-- pintada). Antes, cualquier fila de `evidence` de la tarea -- aunque fuera
+-- de antes del "Pedir cambios" -- alcanzaba para que esta función devolviera
+-- `false`, y `herramientas._actualizar_estado` descartaba en silencio la
+-- evidencia nueva de la reentrega. Ahora sólo cuenta evidencia con `at`
+-- estrictamente posterior al último `approval` 'rechazado' de la tarea (de
+-- cualquier aprobador: no hace falta que sea el mismo de `motivo_no_cierra_
+-- tarea`, alcanza con que alguien haya pedido cambios); el empate (`evidence.
+-- at = rechazado.at`) falla cerrado, igual que el empate de 0013. Sin ningún
+-- 'rechazado', el comportamiento no cambia: cualquier evidencia cuenta.
 create or replace function evidencia_pendiente(p_task uuid)
 returns boolean as $$
   select array_length(t.evidencia_requerida, 1) is not null
-     and not exists (select 1 from evidence where task_id = t.id)
+     and not exists (
+       select 1 from evidence e
+        where e.task_id = t.id
+          and e.at > coalesce(
+            (select max(r.at) from approval r
+              where r.sujeto_tipo = 'tarea' and r.sujeto_id = t.id
+                and r.decision = 'rechazado'),
+            '-infinity'::timestamptz))
     from task t where t.id = p_task;
 $$ language sql stable;
 

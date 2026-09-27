@@ -146,3 +146,43 @@ sincronizados. Mismo criterio que ya usan `motivo_no_arranca_tarea` y
   (`tests/banco/escenarios/b-0017.yaml` y el escenario nuevo de toques
   genéricos se adaptaron eximiendo la evidencia a propósito, no extendiendo
   el corredor). Extenderlo queda fuera del alcance de esta unidad.
+
+## Enmienda (2026-09-27): "Pedir cambios" no deja sobrevivir lo anterior
+
+Seguimiento de review-c112506a (`odd/tasks/prisma-orienta.md` T6). "Pedir
+cambios" (decisión 4, arriba) devuelve la tarea a `en_curso` para que se
+corrija, pero dos cosas de la entrega original seguían contando para
+siempre, como si nunca se hubiera pedido cambios:
+
+1. **T6a -- una aprobación anterior no sobrevive a "Pedir cambios".**
+   `motivo_no_cierra_tarea` contaba cualquier `approval` 'aprobado' del
+   aprobador, de cualquier momento: si esa aprobación no había alcanzado
+   para cerrar (por ejemplo por un bloqueo abierto) y después el aprobador
+   pedía cambios, el trabajo corregido podía cerrarse sin que nadie lo
+   aprobara. Ahora una fila 'aprobado' cuenta sólo si es la ÚLTIMA decisión
+   del aprobador sobre la tarea -- el empate de `at` falla cerrado, nunca
+   aprobado. Migración `0013_aprobacion_no_sobrevive_a_pedir_cambios.sql`.
+2. **T6b -- la entrega pide evidencia nueva.** `evidencia_pendiente`
+   contaba cualquier fila de `evidence` de la tarea, aunque fuera de antes
+   del "Pedir cambios": la evidencia de la primera entrega alcanzaba para
+   que `_actualizar_estado` no pidiera nada, y descartaba en silencio el
+   `evidencia_texto` de la reentrega. Decisión del usuario (2026-09-27): si
+   se pidieron cambios, la evidencia vieja deja de contar -- ejemplo,
+   pintar una pared, al aprobador le faltó una parte, la evidencia nueva
+   tiene que mostrar esa parte pintada. Ahora `evidencia_pendiente` cuenta
+   sólo evidencia con `at` estrictamente posterior al último `approval`
+   'rechazado' de la tarea (de cualquier aprobador, el empate falla
+   cerrado igual que en T6a); sin ningún 'rechazado', el comportamiento no
+   cambia. `_actualizar_estado` pasa a registrar el `evidencia_texto` de la
+   reentrega siempre que llegue, no sólo cuando `evidencia_pendiente` es
+   verdadero -- así deja de descartarlo en silencio incluso fuera del caso
+   de "Pedir cambios" (por ejemplo, alguien que manda evidencia otra vez
+   sin que se la hayan pedido). Migración
+   `0014_evidencia_no_sobrevive_a_pedir_cambios.sql`.
+
+Las dos migraciones tocan sólo el cuerpo de su función (no son `security
+definer`; corren con los privilegios de quien llama, y `evidence`/
+`approval` ya tienen `select` concedido a `prisma_app`); el menú de tarea
+(`menu_tarea.evidencia_pendiente`) y el gate de "Aprobar"
+(`_exigir_puede_aprobarse`) heredan la corrección sin cambiar, porque las
+dos llaman a la misma función SQL.
