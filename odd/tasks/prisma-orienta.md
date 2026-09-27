@@ -3283,3 +3283,5 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   era correcto). GREEN enfocada (reejecutada por el orquestador):
   `tests/test_entrega_con_evidencia.py tests/test_pedir_cambios_extremo_a_extremo.py`
   -> `38 passed`. Suite completa (escritor): `953 passed, 108 deselected`.
+  Commit `c9f1d1c`. RDD: medio, `review_due` falso (`under_budget`, 368 líneas):
+  queda pendiente en el tramo desde `5c4f72a`.
