@@ -103,7 +103,7 @@ gestión.
     recibe `evidencia_id or uuid.uuid4()`: sin evidencia, la clave es aleatoria y no
     deduplica nada. Derivarla de la identidad del acto de entrega.
   - [x] **T6e — Prueba de punta a punta de "Pedir cambios".**
-  - [ ] **T6f — Serializar las decisiones y avisos concurrentes sobre una misma tarea**
+  - [x] **T6f — Serializar las decisiones y avisos concurrentes sobre una misma tarea**
     (review-3cf89bef, review-ae0ab510). "Aprobar" y "Pedir cambios" simultáneos, y dos
     evidencias simultáneas sobre una tarea en revisión (cada transacción retira los
     avisos que ve y crea el suyo: el aprobador puede quedar con dos avisos esperando,
@@ -129,7 +129,7 @@ gestión.
     aprobador, se retiran los botones del aviso que el aprobador tiene esperando y
     sale un aviso nuevo con toda la evidencia y "Aprobar"/"Pedir cambios". Así nunca
     aprueba sin ver la evidencia vigente (ADR 0009).
-  - [ ] **T6h — Seguimientos de review-6b1efba1 sobre el aviso de entrega.** (1) Dos
+  - [x] **T6h — Seguimientos de review-6b1efba1 sobre el aviso de entrega.** (1) Dos
     entregas reales en una misma transacción colapsan en un solo aviso y la prueba
     lo da por correcto sin verificar que no queden `pending_action` de botones
     huérfanas; (2) `pg_current_xact_id()` se consulta aunque haya `evidencia_id` y
@@ -3368,3 +3368,27 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   "Asignada Todavía" como nombres propios (falso positivo); (3) `b-0005-b`, ya
   conocido. `audit_log` ya guarda la resolución de Jev y cada llamada del modelo,
   pero sin una clave de turno que las una.
+
+- 2026-09-27: **T6f y T6h cerradas — actos serializados por tarea y seguimientos del
+  aviso de entrega.** Ruta: delegada, un escritor; una corrección pedida por el
+  orquestador antes del commit. `_bloquear_tarea` toma `pg_advisory_xact_lock` por
+  tarea al empezar `_actualizar_estado`, `_adjuntar_evidencia`, `_aprobar_tarea` y
+  `_pedir_cambios_tarea` (`prisma_app` no tiene `update` sobre `task`, así que `for
+  update` falla por permisos; el bloqueo consultivo es el mismo recurso que ya usa
+  `ingreso_tareas.start`). Corrección del orquestador: el bloqueo ordena los actos,
+  pero `approval.at`, `evidence.at` y `task_state_event.at` tomaban `now()`, la hora
+  de inicio de la transacción, que en el gateway empieza mucho antes de la
+  herramienta; un "Pedir cambios" que arrancó antes y esperó el bloqueo quedaba con
+  hora anterior a la aprobación que ganó. Ahora esas ocho escrituras fijan
+  `at = clock_timestamp()` después del bloqueo. T6h: `pg_current_xact_id()` sólo sin
+  `evidencia_id`; `_notificar_entrega_al_aprobador` no registra botones si el aviso
+  con esa clave ya existe (antes quedaba una `pending_action` esperando sin mensaje:
+  defecto real que marcó review-6b1efba1); pruebas de la forma de la clave, del menú
+  general del aprobador que no se retira y de la evidencia previa al 'rechazado' que
+  no aparece en el aviso. PostgreSQL mínimo: `db/esquema.sql` ya fija 18 o posterior.
+  RED: `3 failed, 3 passed` (sin el arreglo; las 3 que pasan fijan comportamiento que
+  ya era correcto) y, para la corrección, las dos pruebas nuevas fallan con el bloqueo
+  pero sin `clock_timestamp()` (`at_rechazado > at_aprobado` falso). GREEN enfocada
+  (reejecutada por el orquestador): `tests/test_entrega_con_evidencia.py
+  tests/test_aprobacion_cierra_tarea.py tests/test_pedir_cambios_extremo_a_extremo.py`
+  -> `58 passed`. Suite completa (escritor): `966 passed, 108 deselected`.

@@ -896,6 +896,61 @@ _AVISO_EVIDENCIA_SUMADA_EN_REVISION = (
     "revisa.")
 
 
+def _bloquear_tarea(cur, tarea_id) -> None:
+    """T6f (`odd/tasks/prisma-orienta.md`; review-3cf89bef, review-ae0ab510):
+    serializa los actos que deciden o avisan sobre una misma tarea --
+    "Aprobar" y "Pedir cambios" simultáneos, o dos evidencias simultáneas
+    sobre una tarea `en_revision` -- para que el segundo espere a que el
+    primero termine y recién ahí lea el estado, ya actualizado, en vez de
+    decidir con una lectura tomada bajo `READ COMMITTED` antes de que el otro
+    termine (dos avisos esperando al aprobador, uno con evidencia vieja; un
+    "aprobado" contado después de un "rechazado" posterior).
+
+    `select ... for update`/`for no key update` sobre `task` exige el
+    privilegio `update` (o `delete`/`truncate`) en PostgreSQL, y `prisma_app`
+    sólo tiene `select` ahí (`db/esquema.sql`: "Committed tasks are created
+    only by confirmar_borrador_tarea()", `revoke update, delete on task from
+    prisma_app`) -- verificado contra el esquema real:
+    `psycopg.errors.InsufficientPrivilege: permission denied for table task`
+    con las dos formas. Un advisory lock no depende de ningún privilegio
+    sobre la tabla -- mismo mecanismo y misma forma de clave
+    (`hashtextextended`, semilla 0) que ya usa `ingreso_tareas.start` para su
+    propio borrador/chat. Alcance de transacción (`_xact_`): se libera solo
+    al terminar -- commit o rollback --, nunca hace falta soltarlo a mano.
+
+    Se llama al principio de cada handler que decide o notifica sobre la
+    tarea (`_actualizar_estado`, `_adjuntar_evidencia`, `_aprobar_tarea`,
+    `_pedir_cambios_tarea`), antes de la primera lectura de `task` -- nunca en
+    `_preparar_*`: esas funciones sólo arman la vista previa (no escriben
+    nada) y el handler ya vuelve a leer todo por su cuenta como la puerta
+    real a la base, tomado el lock; una `preparar` sin confirmar nunca llega
+    al handler.
+
+    El lock por sí solo NO alcanza (corrección del orquestador tras revisar
+    T6f): serializa el ORDEN DE EJECUCIÓN, pero `approval.at`, `evidence.at`
+    y `task_state_event.at` (`db/esquema.sql`) tienen `default now()`, que en
+    PostgreSQL es la hora de INICIO de la transacción, no la del `insert`. En
+    el gateway la transacción arranca mucho antes de llegar acá -- ruteo,
+    llamada al modelo, fase 2 --, así que la transacción B puede haber
+    arrancado antes que A, quedar esperando el lock, y terminar insertando su
+    'rechazado' con un `at` ANTERIOR al 'aprobado' de A aunque A escribió
+    primero. `motivo_no_cierra_tarea` (un 'rechazado' sólo cancela un
+    'aprobado' con `r.at >= a.at`) y `evidencia_pendiente` (evidencia sólo
+    cuenta con `e.at > último rechazado.at`) -- y, por la misma razón,
+    `estado_previo_a_bloqueo`/`estado_previo_a_revision`, que ordenan
+    `task_state_event` por `at desc` -- juzgarían mal con esa hora de
+    arranque. Por eso cada `insert` en `approval`, `evidence` y
+    `task_state_event` dentro de estos cuatro handlers fija `at =
+    clock_timestamp()` de forma explícita (columna `not null default now()`,
+    sin trigger que la reescriba ni la prohíba -- verificado en
+    `db/esquema.sql`): `clock_timestamp()` es la hora real en el momento del
+    `insert`, ya con el lock tomado, así que el orden de los `at` coincide
+    con el orden serializado en el que las transacciones realmente
+    escribieron."""
+    cur.execute("select pg_advisory_xact_lock(hashtextextended(%s, 0))",
+               (f"task:{tarea_id}",))
+
+
 def _preparar_actualizar_estado(cur, quien: Solicitante, tarea_id, estado,
                                 motivo=None, evidencia_texto=None):
     cur.execute(
@@ -1003,6 +1058,10 @@ def _preparar_actualizar_estado(cur, quien: Solicitante, tarea_id, estado,
     preparar=_preparar_actualizar_estado)
 def _actualizar_estado(cur, quien: Solicitante, tarea_id, estado, motivo=None,
                        evidencia_texto=None):
+    # T6f: serializa contra cualquier otro acto sobre esta misma tarea
+    # (`_bloquear_tarea`) antes de la primera lectura, para decidir siempre
+    # con el estado más nuevo.
+    _bloquear_tarea(cur, tarea_id)
     cur.execute(
         "select estado, titulo, responsable_membership_id from task where id = %s",
         (tarea_id,))
@@ -1035,9 +1094,13 @@ def _actualizar_estado(cur, quien: Solicitante, tarea_id, estado, motivo=None,
             evidencia_texto = (evidencia_texto or "").strip()
             if not evidencia_texto:
                 return {"error": _AVISO_YA_EN_REVISION}
+            # T6f (seguimiento del orquestador): `at` explícito con
+            # `clock_timestamp()` -- ver el comentario de `_bloquear_tarea`.
             cur.execute(
-                """insert into evidence (workspace_id, task_id, tipo, uri, entregado_por)
-                   values (%s, %s, 'texto', %s, %s) returning id""",
+                """insert into evidence (workspace_id, task_id, tipo, uri,
+                                         entregado_por, at)
+                   values (%s, %s, 'texto', %s, %s, clock_timestamp())
+                   returning id""",
                 (quien.workspace_id, tarea_id, evidencia_texto, quien.membership_id))
             evidencia_id = cur.fetchone()["id"]
             # T6i (ADR 0009, enmienda 2026-09-27): esta entrega repetida es
@@ -1071,9 +1134,14 @@ def _actualizar_estado(cur, quien: Solicitante, tarea_id, estado, motivo=None,
             # Ahora se registra siempre que llegue texto: dos hechos, dos
             # filas, un solo acto -- mismo patrón que `_aprobar_tarea`
             # (ADR 0008).
+            #
+            # T6f (seguimiento del orquestador): `at` explícito con
+            # `clock_timestamp()` -- ver el comentario de `_bloquear_tarea`.
             cur.execute(
-                """insert into evidence (workspace_id, task_id, tipo, uri, entregado_por)
-                   values (%s, %s, 'texto', %s, %s) returning id""",
+                """insert into evidence (workspace_id, task_id, tipo, uri,
+                                         entregado_por, at)
+                   values (%s, %s, 'texto', %s, %s, clock_timestamp())
+                   returning id""",
                 (quien.workspace_id, tarea_id, evidencia_texto, quien.membership_id))
             evidencia_id = cur.fetchone()["id"]
 
@@ -1119,10 +1187,13 @@ def _actualizar_estado(cur, quien: Solicitante, tarea_id, estado, motivo=None,
     # `task_state_event` (es append-only, ver el `revoke` en
     # `db/esquema.sql`), y `returning` exige además `select`. El token de
     # deduplicación se genera acá, no se lee de la fila insertada.
+    #
+    # T6f (seguimiento del orquestador): `at` explícito con
+    # `clock_timestamp()` -- ver el comentario de `_bloquear_tarea`.
     cur.execute(
         """insert into task_state_event (task_id, estado_anterior, estado_nuevo,
-                                         actor_kind, actor_app_user_id, motivo)
-           values (%s, %s, %s, 'persona', %s, %s)""",
+                                         actor_kind, actor_app_user_id, motivo, at)
+           values (%s, %s, %s, 'persona', %s, %s, clock_timestamp())""",
         (tarea_id, fila["estado"], estado, quien.app_user_id, motivo))
     _avisar_dependencia_informativa(cur, quien, tarea_id, estado, uuid.uuid4())
 
@@ -1172,9 +1243,18 @@ def _actualizar_estado(cur, quien: Solicitante, tarea_id, estado, motivo=None,
             # `ejecutar` corra el handler) y el recibo del update entrante de
             # Telegram es igual de acotado. Esta clave nunca tiene que
             # resolver esa otra garantía.
-            cur.execute("select pg_current_xact_id()::text as x")
-            xact = cur.fetchone()["x"]
-            dedupe_id = evidencia_id or f"{tarea_id}:{xact}"
+            #
+            # T6h (seguimiento de review-6b1efba1): `pg_current_xact_id()`
+            # sólo hace falta acá, sin evidencia nueva -- con `evidencia_id`
+            # ya hay un ancla real y consultar la transacción sería una
+            # vuelta a la base de más en el camino más común (evidencia
+            # nueva en cada entrega).
+            if evidencia_id:
+                dedupe_id = evidencia_id
+            else:
+                cur.execute("select pg_current_xact_id()::text as x")
+                xact = cur.fetchone()["x"]
+                dedupe_id = f"{tarea_id}:{xact}"
             _notificar_entrega_al_aprobador(
                 cur, quien, tarea_id, fila["titulo"],
                 aprobador_membership_id, dedupe_id,
@@ -1416,6 +1496,10 @@ def _preparar_adjuntar_evidencia(cur, quien: Solicitante, tarea_id, tipo,
     preparar=_preparar_adjuntar_evidencia)
 def _adjuntar_evidencia(cur, quien: Solicitante, tarea_id, tipo, uri=None,
                         descripcion=None):
+    # T6f: mismo motivo que `_actualizar_estado` -- dos evidencias
+    # simultáneas sobre una tarea `en_revision` no pueden decidir cada una
+    # con su propia lectura de qué aviso hay que retirar.
+    _bloquear_tarea(cur, tarea_id)
     cur.execute(
         "select estado, titulo, responsable_membership_id from task where id = %s",
         (tarea_id,))
@@ -1427,9 +1511,11 @@ def _adjuntar_evidencia(cur, quien: Solicitante, tarea_id, tipo, uri=None,
         raise Denegado(
             "No podés adjuntar evidencia a una tarea que no es tuya ni que revisás.")
 
+    # T6f (seguimiento del orquestador): `at` explícito con
+    # `clock_timestamp()` -- ver el comentario de `_bloquear_tarea`.
     cur.execute(
-        """insert into evidence (workspace_id, task_id, tipo, uri, entregado_por)
-           values (%s, %s, %s, %s, %s) returning id""",
+        """insert into evidence (workspace_id, task_id, tipo, uri, entregado_por, at)
+           values (%s, %s, %s, %s, %s, clock_timestamp()) returning id""",
         (quien.workspace_id, tarea_id, tipo, uri or descripcion,
          quien.membership_id))
     evidencia_id = cur.fetchone()["id"]
@@ -1515,6 +1601,10 @@ def _preparar_aprobar_tarea(cur, quien: Solicitante, tarea_id, comentario=None):
      "comentario": {"type": "string"}},
     valida_en_handler=True, preparar=_preparar_aprobar_tarea)
 def _aprobar_tarea(cur, quien: Solicitante, tarea_id, comentario=None):
+    # T6f: "Aprobar" contra "Pedir cambios" simultáneos sobre la misma tarea
+    # -- el que llega segundo tiene que decidir sobre lo que dejó el primero,
+    # no sobre lo que leyó antes de que el primero terminara.
+    _bloquear_tarea(cur, tarea_id)
     cur.execute(
         "select titulo, estado, responsable_membership_id from task where id = %s",
         (tarea_id,))
@@ -1530,10 +1620,13 @@ def _aprobar_tarea(cur, quien: Solicitante, tarea_id, comentario=None):
         raise Denegado("No sos quien revisa el trabajo de esa persona.")
     _exigir_puede_aprobarse(cur, tarea_id, fila)
 
+    # T6f (seguimiento del orquestador): `at` explícito con
+    # `clock_timestamp()` -- ver el comentario de `_bloquear_tarea`.
     cur.execute(
         """insert into approval (workspace_id, sujeto_tipo, sujeto_id,
-                                 aprobador_membership_id, decision, comentario)
-           values (%s, 'tarea', %s, %s, 'aprobado', %s) returning id""",
+                                 aprobador_membership_id, decision, comentario, at)
+           values (%s, 'tarea', %s, %s, 'aprobado', %s, clock_timestamp())
+           returning id""",
         (quien.workspace_id, tarea_id, quien.membership_id, comentario))
     aprobacion_id = cur.fetchone()["id"]
 
@@ -1548,10 +1641,12 @@ def _aprobar_tarea(cur, quien: Solicitante, tarea_id, comentario=None):
     falta = cur.fetchone()["m"]
     cerrada = falta is None
     if cerrada:
+        # T6f (seguimiento del orquestador): `at` explícito con
+        # `clock_timestamp()` -- ver el comentario de `_bloquear_tarea`.
         cur.execute(
             """insert into task_state_event (task_id, estado_anterior, estado_nuevo,
-                                             actor_kind, actor_app_user_id, motivo)
-               values (%s, %s, 'terminada', 'persona', %s, %s)""",
+                                             actor_kind, actor_app_user_id, motivo, at)
+               values (%s, %s, 'terminada', 'persona', %s, %s, clock_timestamp())""",
             (tarea_id, fila["estado"], quien.app_user_id, comentario or "aprobación"))
         # Revisión (review-ec6f7d80): antes usaba `uuid.uuid4()` -- sin
         # ningún vínculo con lo que se acaba de escribir -- cuando ya había
@@ -1640,6 +1735,8 @@ def _preparar_pedir_cambios_tarea(cur, quien: Solicitante, tarea_id, comentario=
      "comentario": {"type": "string", "requerido": True}},
     valida_en_handler=True, preparar=_preparar_pedir_cambios_tarea)
 def _pedir_cambios_tarea(cur, quien: Solicitante, tarea_id, comentario=None):
+    # T6f: mismo motivo que `_aprobar_tarea`.
+    _bloquear_tarea(cur, tarea_id)
     cur.execute(
         "select titulo, estado, responsable_membership_id from task where id = %s",
         (tarea_id,))
@@ -1673,17 +1770,22 @@ def _pedir_cambios_tarea(cur, quien: Solicitante, tarea_id, comentario=None):
     # (db/esquema.sql) -- no se agrega un tercero para esto: "pedir
     # cambios" es, en los hechos, un rechazo del trabajo entregado, con la
     # tarea volviendo a trabajo en vez de quedar cerrada.
+    #
+    # T6f (seguimiento del orquestador): `at` explícito con
+    # `clock_timestamp()` en las dos inserciones de abajo -- ver el
+    # comentario de `_bloquear_tarea`.
     cur.execute(
         """insert into approval (workspace_id, sujeto_tipo, sujeto_id,
-                                 aprobador_membership_id, decision, comentario)
-           values (%s, 'tarea', %s, %s, 'rechazado', %s) returning id""",
+                                 aprobador_membership_id, decision, comentario, at)
+           values (%s, 'tarea', %s, %s, 'rechazado', %s, clock_timestamp())
+           returning id""",
         (quien.workspace_id, tarea_id, quien.membership_id, comentario))
     decision_id = cur.fetchone()["id"]
 
     cur.execute(
         """insert into task_state_event (task_id, estado_anterior, estado_nuevo,
-                                         actor_kind, actor_app_user_id, motivo)
-           values (%s, %s, %s, 'persona', %s, %s)""",
+                                         actor_kind, actor_app_user_id, motivo, at)
+           values (%s, %s, %s, 'persona', %s, %s, clock_timestamp())""",
         (tarea_id, fila["estado"], destino, quien.app_user_id, comentario))
 
     _avisar(
@@ -1782,6 +1884,19 @@ def _notificar_entrega_al_aprobador(cur, quien: Solicitante, tarea_id, titulo,
     if not aprobador or aprobador["telegram_user_id"] is None:
         return
 
+    dedupe_key = f"{quien.workspace_id}:entrega:{dedupe_id}"
+    # T6h (seguimiento de review-6b1efba1): dos entregas reales dentro de la
+    # misma transacción (T6d) comparten esta clave -- `message_outbox` la
+    # descarta en silencio con `on conflict (dedupe_key) do nothing`, pero
+    # `P.registrar` de abajo no sabe nada de eso: sin este corte, la segunda
+    # llamada igual arma una `pending_action` nueva con botones propios que
+    # ningún mensaje va a mostrar nunca, esperando una respuesta que no puede
+    # llegar. Comprobar antes de armar nada hace que la segunda registración
+    # sea imposible, no sólo que su aviso se pierda.
+    cur.execute("select 1 from message_outbox where dedupe_key = %s", (dedupe_key,))
+    if cur.fetchone():
+        return
+
     verbo = "sumó evidencia nueva a" if es_reemplazo else "entregó"
     texto = f"{quien.nombre} {verbo} «{titulo}»"
     evidencias = _evidencia_vigente(cur, tarea_id)
@@ -1809,8 +1924,7 @@ def _notificar_entrega_al_aprobador(cur, quien: Solicitante, tarea_id, titulo,
     enqueue_outbox(
         cur, workspace_id=quien.workspace_id, chat_id=aprobador["telegram_user_id"],
         text=texto, recipient_membership_id=str(aprobador_membership_id),
-        scheduled_for=ahora, dedupe_key=f"{quien.workspace_id}:entrega:{dedupe_id}",
-        pending_action_id=p.id)
+        scheduled_for=ahora, dedupe_key=dedupe_key, pending_action_id=p.id)
 
 
 def _avisar_evidencia_nueva_en_revision(cur, quien: Solicitante, tarea_id, titulo,
