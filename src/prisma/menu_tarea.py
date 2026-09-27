@@ -81,6 +81,16 @@ def _puede_empezar(cur: psycopg.Cursor, tarea_id: str) -> bool:
     return cur.fetchone()["m"] is None
 
 
+def _puede_cerrar(cur: psycopg.Cursor, tarea_id: str) -> bool:
+    """Reusa `motivo_no_cierra_tarea` (mecánica §5), la misma función que
+    `aprobar_tarea` usa para decidir si cierra en el acto (ADR 0008): sólo
+    se ofrece "Cerrar tarea" cuando ya no falta ninguna condición -- por
+    ejemplo, la aprobación llegó antes de que se completara la evidencia, y
+    ahora ya está."""
+    cur.execute("select motivo_no_cierra_tarea(%s) as m", (tarea_id,))
+    return cur.fetchone()["m"] is None
+
+
 def calcular_menu(cur: psycopg.Cursor, quien: Solicitante,
                   tarea_id: str) -> MenuTarea | None:
     """El menú de una tarea para quien la toca, ya filtrado por lo que
@@ -108,6 +118,13 @@ def calcular_menu(cur: psycopg.Cursor, quien: Solicitante,
             acciones.append(AccionMenu("destrabar", "Ya se destrabó"))
         elif estado == "en_revision":
             acciones.append(AccionMenu("adjuntar_evidencia", "Adjuntar evidencia"))
+            # ADR 0008, hallazgo 5 (sesión 2 por Telegram, 2026-09-27): si
+            # ya no falta ninguna condición de cierre -- por ejemplo, la
+            # aprobación llegó antes que la evidencia y ésta ya se sumó --
+            # el responsable tiene que poder cerrarla tocando, no sólo
+            # enterarse por texto libre.
+            if _puede_cerrar(cur, tarea_id):
+                acciones.append(AccionMenu("cerrar_tarea", "Cerrar tarea"))
         # terminada/cancelada: sólo Ver detalle, ya agregado arriba.
     elif relacion == "aprobador":
         if estado == "en_revision":

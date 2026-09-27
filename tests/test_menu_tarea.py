@@ -312,6 +312,93 @@ def test_menu_responsable_terminada(conn, corework):
     assert [a.etiqueta for a in menu.acciones] == ["Ver detalle"]
 
 
+def test_menu_responsable_en_revision_ofrece_cerrar_tarea_si_ya_alcanza(
+        conn, corework):
+    """ADR 0008, hallazgo 5 (sesión 2 por Telegram, 2026-09-27): si la
+    aprobación llegó antes de que se completara otra condición de cierre --
+    acá, la evidencia -- y esa condición se resuelve después, el responsable
+    tiene que poder cerrar tocando, no sólo escribiendo."""
+    from prisma import menu_tarea as M
+
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        tid = _tarea(cur, ws, estado="en_revision")
+        cur.execute(
+            """insert into evidence (workspace_id, task_id, tipo, uri)
+               values (%s, %s, 'explicacion', 'ya está')""", (ws, tid))
+        cur.execute(
+            """insert into approval (workspace_id, sujeto_tipo, sujeto_id,
+                                     aprobador_membership_id, decision)
+               values (%s, 'tarea', %s,
+                       (select m.id from membership m join app_user u
+                          on u.id = m.app_user_id
+                         where m.workspace_id = %s and u.nombre = 'Marcos Tarquini'),
+                       'aprobado')""",
+            (ws, tid, ws))
+    conn.commit()
+
+    with espacio(conn, ws) as cur:
+        quien = _quien(cur, "Nahuel Gimenez", ws)
+        menu = M.calcular_menu(cur, quien, tid)
+    assert [a.etiqueta for a in menu.acciones] == [
+        "Ver detalle", "Adjuntar evidencia", "Cerrar tarea"]
+
+
+def test_menu_responsable_en_revision_sin_aprobacion_no_ofrece_cerrar_tarea(
+        cliente, conn, corework, monkeypatch):
+    """Mismo escenario de `test_menu_responsable_en_revision`, pero explícito
+    sobre el motivo (ADR 0008): sin la aprobación todavía no alcanza, así que
+    "Cerrar tarea" no aparece."""
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        tid = _tarea(cur, ws, estado="en_revision")
+        cur.execute(
+            """insert into evidence (workspace_id, task_id, tipo, uri)
+               values (%s, %s, 'explicacion', 'ya está')""", (ws, tid))
+    conn.commit()
+
+    _, filas, _ = _abrir_menu(cliente, conn, ws, monkeypatch, tid, "Nahuel Gimenez")
+    etiquetas = [f["etiqueta"] for f in filas]
+    assert "Cerrar tarea" not in etiquetas
+    assert etiquetas == ["Ver detalle", "Adjuntar evidencia", P.ETIQUETA_SALIR_OPCIONES]
+
+
+def test_cerrar_tarea_desde_el_menu_termina_en_vista_previa(
+        cliente, conn, corework, monkeypatch):
+    """"Cerrar tarea" reusa `actualizar_estado` -- pasa por la misma vista
+    previa que cualquier acción del menú que escribe (T2); tocarla no aplica
+    nada todavía."""
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        tid = _tarea(cur, ws, estado="en_revision")
+        cur.execute(
+            """insert into evidence (workspace_id, task_id, tipo, uri)
+               values (%s, %s, 'explicacion', 'ya está')""", (ws, tid))
+        cur.execute(
+            """insert into approval (workspace_id, sujeto_tipo, sujeto_id,
+                                     aprobador_membership_id, decision)
+               values (%s, 'tarea', %s,
+                       (select m.id from membership m join app_user u
+                          on u.id = m.app_user_id
+                         where m.workspace_id = %s and u.nombre = 'Marcos Tarquini'),
+                       'aprobado')""",
+            (ws, tid, ws))
+    conn.commit()
+
+    pid_menu, filas, tg = _abrir_menu(cliente, conn, ws, monkeypatch, tid,
+                                      "Nahuel Gimenez")
+    assert "Cerrar tarea" in [f["etiqueta"] for f in filas]
+    _tocar_accion(cliente, conn, ws, filas, "Cerrar tarea", tg)
+
+    with admin(conn) as cur:
+        cur.execute("select estado from task where id = %s", (tid,))
+        assert cur.fetchone()["estado"] == "en_revision"    # todavía vista previa
+        cur.execute(
+            """select count(*) n from pending_action
+                where herramienta = 'actualizar_estado' and estado = 'esperando'""")
+        assert cur.fetchone()["n"] == 1
+
+
 def test_menu_aprobador_en_revision(cliente, conn, corework, monkeypatch):
     ws = corework.workspace_id
     with admin(conn) as cur:

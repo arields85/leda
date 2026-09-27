@@ -110,6 +110,19 @@ def _estado_legible(estado: str | None) -> str:
     return _ESTADOS_LEGIBLES.get(estado, estado or "sin estado")
 
 
+# El texto exacto que `db/esquema.sql: motivo_no_cierra_tarea` devuelve cuando
+# la única condición de cierre que falta es la aprobación de quien revisa el
+# trabajo. `_preparar_aprobar_tarea` lo usa para predecir, sin escribir nada
+# todavía, si ESTA aprobación (que la vista previa todavía no insertó) va a
+# alcanzar para cerrar la tarea: corre la misma función SQL y trata ese
+# motivo puntual como resuelto, porque es la única condición que este acto va
+# a satisfacer. Si el texto de la base cambia sin actualizar esta constante,
+# el peor caso es un falso "todavía falta algo" -- nunca un cierre indebido,
+# porque `_aprobar_tarea` vuelve a preguntarle a la base, ya con la
+# aprobación insertada, antes de cerrar de verdad (ADR 0008).
+_MOTIVO_FALTA_APROBACION = "Falta la aprobación de quien revisa ese trabajo."
+
+
 class NecesitaConfirmacion(Exception):
     """La acción no se ejecuta hasta que una persona diga que sí.
 
@@ -1254,25 +1267,37 @@ def _preparar_aprobar_tarea(cur, quien: Solicitante, tarea_id, comentario=None):
     if not puede_aprobar_tarea(cur, quien, fila["responsable_membership_id"]):
         raise Denegado("No sos quien revisa el trabajo de esa persona.")
 
-    cambio = (f"Tarea: {fila['titulo']} · Estado actual: "
-             f"{_estado_legible(fila['estado'])} · se aprueba el trabajo")
+    # Decisión del usuario, 2026-09-27 (ADR 0008): aprobar registra la
+    # aprobación y, si con ella alcanzan las condiciones de cierre (mecánica
+    # §5), cierra la tarea en el mismo acto -- dos hechos distintos
+    # (constitución §3: "aprobación y cierre son hechos distintos"), un solo
+    # toque. Acá sólo se PREDICE el resultado, sin escribir nada todavía: ver
+    # el comentario de `_MOTIVO_FALTA_APROBACION`.
+    cur.execute("select motivo_no_cierra_tarea(%s) as m", (tarea_id,))
+    motivo = cur.fetchone()["m"]
+    falta = None if motivo in (None, _MOTIVO_FALTA_APROBACION) else motivo
+
+    cambio = f"Se aprueba «{fila['titulo']}»"
+    cambio += " y queda terminada" if falta is None else f"; para cerrarla todavía falta: {falta}"
     if comentario:
         cambio += f" · Comentario: {comentario}"
     huella = _huella("aprobar_tarea", tarea_id, fila["estado"],
-                     fila["responsable_membership_id"])
+                     fila["responsable_membership_id"], falta)
     return Preparacion(cambio=cambio, huella=huella)
 
 
 @herramienta(
     "aprobar_tarea", "aprobar_tarea",
     "Aprueba el trabajo de una tarea. Sólo puede quien la política del equipo "
-    "designa para esa área.",
+    "designa para esa área. Si con esa aprobación se cumplen las condiciones "
+    "de cierre, la tarea queda terminada en el mismo acto.",
     {"tarea_id": {"type": "string", "requerido": True},
      "comentario": {"type": "string"}},
     valida_en_handler=True, preparar=_preparar_aprobar_tarea)
 def _aprobar_tarea(cur, quien: Solicitante, tarea_id, comentario=None):
     cur.execute(
-        "select responsable_membership_id from task where id = %s", (tarea_id,))
+        "select titulo, estado, responsable_membership_id from task where id = %s",
+        (tarea_id,))
     fila = cur.fetchone()
     if not fila:
         return {"error": "esa tarea no existe en este equipo"}
@@ -1283,12 +1308,48 @@ def _aprobar_tarea(cur, quien: Solicitante, tarea_id, comentario=None):
         raise Denegado("No podés aprobar tu propio trabajo.")
     if not puede_aprobar_tarea(cur, quien, fila["responsable_membership_id"]):
         raise Denegado("No sos quien revisa el trabajo de esa persona.")
+
     cur.execute(
         """insert into approval (workspace_id, sujeto_tipo, sujeto_id,
                                  aprobador_membership_id, decision, comentario)
-           values (%s, 'tarea', %s, %s, 'aprobado', %s)""",
+           values (%s, 'tarea', %s, %s, 'aprobado', %s) returning id""",
         (quien.workspace_id, tarea_id, quien.membership_id, comentario))
-    return {"aprobada": True}
+    aprobacion_id = cur.fetchone()["id"]
+
+    # La aprobación ya está insertada: a diferencia de `preparar`, acá no
+    # hace falta predecir nada -- se le vuelve a preguntar a la misma
+    # función SQL (`motivo_no_cierra_tarea`, ya con esta fila adentro), que
+    # es la única autoridad sobre si cierra (constitución §11: "esa
+    # verificación es determinista"). Dos hechos distintos, dos filas
+    # distintas: `approval` arriba, `task_state_event` acá abajo sólo si
+    # corresponde -- nunca un único paso oculto.
+    cur.execute("select motivo_no_cierra_tarea(%s) as m", (tarea_id,))
+    falta = cur.fetchone()["m"]
+    cerrada = falta is None
+    if cerrada:
+        cur.execute(
+            """insert into task_state_event (task_id, estado_anterior, estado_nuevo,
+                                             actor_kind, actor_app_user_id, motivo)
+               values (%s, %s, 'terminada', 'persona', %s, %s)""",
+            (tarea_id, fila["estado"], quien.app_user_id, comentario or "aprobación"))
+        _avisar_dependencia_informativa(cur, quien, tarea_id, "terminada", uuid.uuid4())
+
+    # Constitución §3: "no persiguen avances ni administran estados
+    # intermedios" es sobre el responsable, no sobre enterarse de un hecho
+    # que lo involucra -- sesión 2 por Telegram, 2026-09-27, hallazgo 5:
+    # Ismael aprobó y nadie le avisó a Ariel. `_avisar` ya omite en silencio
+    # si el responsable no tiene chat vinculado (mismo patrón que el resto
+    # de los avisos automáticos); el dedupe es por esta aprobación, nunca
+    # por la hora.
+    _avisar(
+        cur, quien, fila["responsable_membership_id"],
+        (f"{quien.nombre} aprobó «{fila['titulo']}»; quedó terminada."
+         if cerrada else
+         f"{quien.nombre} aprobó «{fila['titulo']}»; para cerrarla falta: {falta}"),
+        dedupe_key=f"{quien.workspace_id}:aprobacion:{aprobacion_id}")
+
+    return {"aprobada": True, "cerrada": cerrada, "falta": falta,
+           "titulo": fila["titulo"]}
 
 
 # ---------------------------------------------------------------------------

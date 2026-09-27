@@ -455,7 +455,20 @@ def _toque(conn, workspace_id: str, slug: str, toque: dict,
                             is_response=True, pending_action_id=nueva.id,
                         )
                     else:
-                        if isinstance(resultado, dict) and (
+                        # `aprobar_tarea` (ADR 0008, hallazgo 5 de sesión 2
+                        # por Telegram) siempre escribe la aprobación, aun
+                        # cuando `cerrada` sea `False` -- a diferencia de
+                        # `actualizar_estado`/`preparar` en general, donde
+                        # `cerrada`/`iniciada` en `False` significa que
+                        # `preparar` frenó ANTES de escribir nada. Sin este
+                        # distingo, el rechazo genérico de abajo auditaría la
+                        # aprobación como `herramienta_rechazada` y nunca le
+                        # confirmaría a quien aprobó que sí quedó registrada.
+                        aprobacion_registrada = (
+                            resuelta.herramienta == "aprobar_tarea"
+                            and isinstance(resultado, dict)
+                            and resultado.get("aprobada"))
+                        if not aprobacion_registrada and isinstance(resultado, dict) and (
                                 resultado.get("error")
                                 or resultado.get("cerrada") is False
                                 or resultado.get("iniciada") is False):
@@ -501,12 +514,45 @@ def _toque(conn, workspace_id: str, slug: str, toque: dict,
                                     texto = ("Guardé el pedido como borrador; todavía "
                                              "está incompleto.")
                                 _responder(cur, workspace_id, chat_id, quien, texto, ahora)
+                            elif aprobacion_registrada:
+                                # Hallazgo 5, sesión 2 por Telegram,
+                                # 2026-09-27: acá el bot decía "Hecho. Tarea:
+                                # X · Estado actual: En revisión · se aprueba
+                                # el trabajo" -- la vista previa, no lo que
+                                # pasó. El resultado, en pasado, corto.
+                                titulo = resultado.get("titulo") or "esa tarea"
+                                if resultado.get("cerrada"):
+                                    texto = f"Listo: aprobaste «{titulo}». Quedó terminada."
+                                else:
+                                    texto = (f"Listo: aprobaste «{titulo}»; para cerrarla "
+                                             f"falta: {resultado.get('falta')}")
+                                _responder(cur, workspace_id, chat_id, quien, texto, ahora)
+                            elif (resuelta.herramienta == "actualizar_estado"
+                                  and isinstance(resultado, dict) and "estado" in resultado):
+                                # Mismo hallazgo: acá decía "... Estado actual:
+                                # Asignada · Nuevo estado: En revisión" -- el
+                                # estado VIEJO, después de aplicar el cambio.
+                                # `_actualizar_estado` no devuelve el título
+                                # (otros tests comparan su resultado con
+                                # `{"estado": ...}` exacto), así que se lee acá.
+                                cur.execute(
+                                    "select titulo from task where id = %s",
+                                    (resuelta.args.get("tarea_id"),))
+                                fila_tarea = cur.fetchone()
+                                titulo = fila_tarea["titulo"] if fila_tarea else "esa tarea"
+                                _responder(
+                                    cur, workspace_id, chat_id, quien,
+                                    f"Listo: «{titulo}» pasó a "
+                                    f"{H._estado_legible(resultado['estado'])}.", ahora)
                             elif prep_capturada.get("cambio"):
                                 # El recibo cuenta qué cambió, no un "Hecho."
                                 # solo (T2, punto 3): reusa la descripción
                                 # que ya se había mostrado en la vista
                                 # previa, porque la huella coincidió -- el
-                                # estado sigue siendo ese.
+                                # estado sigue siendo ese. Sigue así para
+                                # cualquier otra herramienta del menú: sólo
+                                # `aprobar_tarea` y `actualizar_estado` (arriba)
+                                # tienen fraseo específico del resultado.
                                 _responder(cur, workspace_id, chat_id, quien,
                                           f"Hecho. {prep_capturada['cambio']}", ahora)
                             else:
@@ -1430,6 +1476,16 @@ def _resolver_toque_menu_tarea(cur, quien, workspace_id: str, chat_id: int,
         if accion == "aprobar":
             _ejecutar_accion_menu(cur, quien, workspace_id, chat_id,
                                   "aprobar_tarea", {"tarea_id": tarea_id}, ahora,
+                                  pending_action_id=pending_action_id)
+            return
+        if accion == "cerrar_tarea":
+            # ADR 0008: mismo `actualizar_estado` que "Ya la terminé" usa
+            # para `en_revision` -- `calcular_menu` (`_puede_cerrar`) sólo
+            # ofrece este botón cuando `motivo_no_cierra_tarea` ya está
+            # vacío, y el handler lo vuelve a comprobar antes de escribir.
+            _ejecutar_accion_menu(cur, quien, workspace_id, chat_id,
+                                  "actualizar_estado",
+                                  {"tarea_id": tarea_id, "estado": "terminada"}, ahora,
                                   pending_action_id=pending_action_id)
             return
 
