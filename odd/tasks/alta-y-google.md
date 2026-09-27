@@ -303,6 +303,16 @@ Un worktree nuevo no trae lo que no se versiona.
   Contrato de vista previa de `03-...` §2; estados `prepared/executing/
   executed/failed/cancelled/expired` con "en ejecución" persistido antes de
   llamar a Google; sin reintento automático ante timeout.
+  **Requisito agregado por el usuario (2026-09-27)**, tomado de un sistema
+  auditado de ingreso de documentos con efectos externos: (1) un estado
+  **indeterminado** para cuando no se sabe si Google aplicó el efecto (timeout,
+  respuesta perdida): nunca se da por hecho ni por fallido, nunca se reintenta
+  solo, queda un incidente y se reconcilia leyendo Google; (2) **relectura
+  después de cada mutación**: el recibo que ve la persona sale de lo que Google
+  devuelve al volver a leer el evento, no de lo que se pidió; (3) **clave de
+  idempotencia por operación**, estable y derivada del acto (no aleatoria), para
+  que un reintento no duplique el evento. Probar los tres con dobles del
+  adaptador que simulen timeout, respuesta perdida y éxito sin recibo.
 - [ ] **G5 — Reuniones y minutas sobre evidencia/aprobación.** Cadencia
   mensual, agenda e informe previo, minuta enlazada desde el registro
   oficial; una minuta nunca cierra una tarea por sí sola.
@@ -363,3 +373,6 @@ En el worktree `D:\Proyectos\Prisma-PM-worktrees\alta-y-google`, rama
 5. Preparar el entorno (sección de arriba); pedirle al usuario sólo lo que
    figura en "Cuándo consultar al usuario".
 6. Presentar G0. No escribir código hasta cerrarla.
+- 2026-09-27 (sesión principal, en `main`): G4 gana un requisito del usuario
+  (estado indeterminado, relectura después de cada mutación, clave de
+  idempotencia por operación). La rama auxiliar lo recibe con su próximo rebase.
