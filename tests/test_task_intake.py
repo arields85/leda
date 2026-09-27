@@ -1620,7 +1620,15 @@ def _retrato_de_aislamiento(url, tablas):
 
 
 def _retrato_de_funciones(url):
-    """Definición, dueño y ACL de las funciones elevadas del esquema."""
+    """Definición, dueño y ACL de las funciones del esquema.
+
+    No se filtra por `p.prosecdef` (ADR 0009, migración 0012): una migración
+    puede cambiar el cuerpo de una función ordinaria -- `evidencia_pendiente`
+    y la nueva rama de `motivo_no_cierra_tarea` no son `security definer`,
+    no necesitan privilegios elevados -- y esa migración es igual de
+    observable que una que toque una función elevada. Filtrar por
+    `prosecdef` dejaba pasar como "no cambió nada" una migración que sí
+    cambió una función real, sólo porque no era security definer."""
     import psycopg
     from psycopg.rows import dict_row
 
@@ -1631,7 +1639,7 @@ def _retrato_de_funciones(url):
                  from pg_proc p
                  join pg_roles r on r.oid = p.proowner
                  join pg_namespace n on n.oid = p.pronamespace
-                where n.nspname = 'prisma' and p.prosecdef
+                where n.nspname = 'prisma'
                 order by p.proname""").fetchall()
 
 

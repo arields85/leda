@@ -1629,6 +1629,18 @@ create trigger trg_exigir_dependencias_resueltas
 -- Devuelven null si se puede cerrar, o el motivo por el que no.
 -- Esto es lo que impide que el modelo de lenguaje dé por terminada una tarea.
 
+-- ADR 0009: única fuente de verdad de "a esta tarea le falta la evidencia
+-- que exige su política" -- la usa `motivo_no_cierra_tarea` (cierre) y
+-- también `herramientas._actualizar_estado`/`menu_tarea.calcular_menu`
+-- (entrega a `en_revision` y el gate de "Aprobar"), que antes no tenían
+-- ninguna forma de hacer la misma pregunta sin reimplementar el criterio.
+create or replace function evidencia_pendiente(p_task uuid)
+returns boolean as $$
+  select array_length(t.evidencia_requerida, 1) is not null
+     and not exists (select 1 from evidence where task_id = t.id)
+    from task t where t.id = p_task;
+$$ language sql stable;
+
 create or replace function motivo_no_cierra_tarea(p_task uuid)
 returns text as $$
 declare
@@ -1647,8 +1659,7 @@ begin
     return 'Falta el criterio de aceptación.';
   end if;
 
-  if array_length(t.evidencia_requerida, 1) is not null
-     and not exists (select 1 from evidence where task_id = p_task) then
+  if evidencia_pendiente(p_task) then
     return 'Falta la evidencia requerida.';
   end if;
 
