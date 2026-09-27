@@ -2630,6 +2630,106 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
     `salida`, 2 de `menu_tarea`, 1 de `lista_botones`); mismo `108
     deselected` (el banco contra modelo real, sin tocar).
 
+- 2026-09-27 (orquestador): **Sesión 2 por Telegram, hallazgo 5 -- aprobar no
+  cerraba la tarea, ni avisaba a nadie.** Evidencia en `audit_log`: Ismael (el
+  aprobador) tocó el menú de una tarea -> "Aprobar" -> vista previa -> Confirmar;
+  el bot contestó "Hecho. Tarea: Dashboard de lotes en CoreLabs (simulado) ·
+  Estado actual: En revisión · se aprueba el trabajo". `audit_log` registró
+  `herramienta:aprobar_tarea` y `approval` tiene la fila, pero la tarea siguió
+  `en_revision`: `herramientas._aprobar_tarea` sólo insertaba en `approval`,
+  nunca corría `motivo_no_cierra_tarea` ni escribía en `task_state_event`. El
+  menú del responsable en `en_revision` sólo ofrece "Adjuntar evidencia" --
+  nadie podía cerrarla tocando -- y nadie le avisó a Ariel (el responsable) que
+  su tarea había sido aprobada. Mismo hallazgo, defecto más chico: el mensaje
+  posterior a Confirmar repetía el texto de la vista previa ("Estado actual: En
+  revisión") en vez de describir el resultado, tanto para `aprobar_tarea` como
+  para `actualizar_estado`.
+
+  **Decisión del usuario, 2026-09-27 (ADR 0008):** aprobar registra la
+  aprobación Y, si con ella alcanzan las condiciones de cierre (mecánica §5 --
+  comprobado con `motivo_no_cierra_tarea(tarea_id)`, la misma función que ya
+  gobierna el cierre por `actualizar_estado`), registra la transición
+  `en_revision -> terminada` en el mismo acto: dos registros distintos
+  (`approval` y `task_state_event`), un solo toque. Si falta algo, la tarea
+  queda `en_revision` con la aprobación igual registrada, y Prisma dice
+  exactamente qué falta -- nunca una pregunta abierta. Se avisa al responsable
+  por outbox en cualquiera de los dos casos (dedupe por el id de la
+  aprobación, nunca por la hora; se omite en silencio sólo si no tiene chat
+  vinculado). Principio del usuario: Prisma ayuda y orienta, nunca agrega
+  burocracia -- pero "aprobación y cierre son hechos distintos"
+  (`AGENTS.md`/constitución §3) sigue valiendo como dos REGISTROS distintos,
+  no dos actos separados que exigirían un segundo toque para algo que la base
+  ya puede decidir sola. Detalle de la interpretación y las alternativas
+  consideradas en el ADR.
+
+  Archivos:
+  - `src/prisma/herramientas.py`: constante `_MOTIVO_FALTA_APROBACION` (el
+    texto exacto que devuelve `motivo_no_cierra_tarea` cuando lo único que
+    falta es esta aprobación); `_preparar_aprobar_tarea` predice el resultado
+    corriendo esa misma función SQL antes de escribir nada (preview: "Se
+    aprueba «X» y queda terminada." / "...; para cerrarla todavía falta:
+    ..."); `_aprobar_tarea` inserta la aprobación, vuelve a preguntarle a
+    `motivo_no_cierra_tarea` (ya con la aprobación adentro, sin necesidad de
+    predecir), inserta el `task_state_event` sólo si cierra, avisa la
+    dependencia informativa si corresponde, y notifica al responsable por
+    `_avisar`. Devuelve `{"aprobada": True, "cerrada": bool, "falta": motivo o
+    None, "titulo": ...}` en vez de `{"aprobada": True}`.
+  - `src/prisma/gateway.py`: el camino de confirmación por botón distingue
+    `aprobar_tarea` (donde `cerrada: False` significa "se escribió la
+    aprobación, pero no alcanzó para cerrar", no "no se escribió nada") del
+    resto de las herramientas con `preparar`, para no auditarla como
+    `herramienta_rechazada`; agrega el fraseo del resultado para
+    `aprobar_tarea` ("Listo: aprobaste «X». Quedó terminada." / "...; para
+    cerrarla falta: ...") y para `actualizar_estado` ("Listo: «X» pasó a
+    <estado>."), leyendo el título aparte porque `_actualizar_estado` no lo
+    devuelve (otros tests comparan su resultado con `{"estado": ...}` exacto).
+    También se agregó el mapeo de la acción de menú `cerrar_tarea` a
+    `actualizar_estado(estado="terminada")` en `_resolver_toque_menu_tarea`.
+  - `src/prisma/menu_tarea.py`: `_puede_cerrar` (reusa `motivo_no_cierra_tarea`,
+    igual que `_puede_empezar` reusa `motivo_no_arranca_tarea`) y el botón
+    "Cerrar tarea" en el menú del responsable cuando la tarea está
+    `en_revision` y ya no falta ninguna condición.
+  - `docs/decisions/0008-la-aprobacion-cierra-la-tarea.md` (nuevo) y
+    `docs/INDEX.md` (fila agregada a la tabla de decisiones).
+
+  Pruebas nuevas (RED verificado antes de implementar, revirtiendo sólo los
+  tres archivos de `src/prisma/` con `git stash` y corriendo las pruebas
+  nuevas contra el código viejo):
+  - `tests/test_aprobacion_cierra_tarea.py` (nuevo):
+    `test_aprobar_tarea_cierra_cuando_las_condiciones_estan`,
+    `test_aprobar_tarea_registra_pero_no_cierra_si_falta_evidencia`,
+    `test_aprobar_tarea_no_cierra_con_dependencia_bloqueante_sin_resolver`,
+    `test_mensaje_post_confirmacion_aprobar_tarea_que_cierra`,
+    `test_mensaje_post_confirmacion_aprobar_tarea_que_no_cierra`,
+    `test_mensaje_post_confirmacion_actualizar_estado`.
+  - `tests/test_menu_tarea.py`:
+    `test_menu_responsable_en_revision_ofrece_cerrar_tarea_si_ya_alcanza`,
+    `test_menu_responsable_en_revision_sin_aprobacion_no_ofrece_cerrar_tarea`,
+    `test_cerrar_tarea_desde_el_menu_termina_en_vista_previa`.
+  - RED (código de `src/prisma/` en el estado anterior a esta unidad): `8
+    failed, 1 passed` -- las 6 de `test_aprobacion_cierra_tarea.py` (tarea
+    seguía `en_revision`/mensaje seguía siendo la vista previa) y 2 de las 3
+    nuevas de `test_menu_tarea.py` (`Cerrar tarea` no aparecía en el menú ni
+    en la vista previa del toque); la de "no ofrece" ya pasaba porque el
+    botón nuevo directamente no existía.
+  - GREEN: `tests/test_aprobacion_cierra_tarea.py tests/test_menu_tarea.py`
+    -> `39 passed`; adyacentes
+    (`tests/test_vista_previa_confirmacion.py tests/test_botones.py
+    tests/test_autoridad_tarea.py tests/test_dependencias.py
+    tests/test_task_drafts.py tests/test_task_intake.py`) -> `185 passed`;
+    `tests/banco` -> `205 passed, 108 deselected`.
+  - Suite completa: `.venv/Scripts/python.exe -m pytest -q` -> `895 passed,
+    108 deselected` (241 s) -- `886` de base + 9 pruebas nuevas (6 de
+    `test_aprobacion_cierra_tarea.py`, 3 de `test_menu_tarea.py`); mismo `108
+    deselected`.
+
+  **Preguntas de producto abiertas (no bloquean esta unidad, quedan
+  `PENDIENTE`):** si el mismo tratamiento ("aprobar cierra si alcanza")
+  conviene para `motivo_no_cierra_objetivo` (cierre de objetivo, hito o plan) --
+  constitución §7 reserva esa aprobación final para decisiones de otro peso, y
+  hoy no hay una herramienta `aprobar_objetivo` equivalente para decidirlo en
+  código; queda anotado en el ADR, no implementado.
+
 - **Próximo paso al retomar:** T5, sólo la segunda sesión real por Telegram (necesita
   al usuario; datos ficticios). Antes de empezar: comparar la base local con
   `db/esquema.sql` (hoy al día hasta la migración `0011`) y aplicar lo que falte;
