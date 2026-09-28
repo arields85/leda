@@ -33,10 +33,29 @@ Los demás (b, d, e, g, h, i, k, m) quedan como candidatos; `d` hoy marca todas 
 tareas por `evidencia_policy_version` vacía (hueco de trazabilidad, no de la
 garantía) e `i3` dio un falso positivo por textos cortos genéricos.
 
-## Pendiente de decidir al diseñarlo
+## Decisiones del usuario (2026-09-28)
 
-Dónde corre (cadencia existente o comando propio), a quién avisa y con qué texto
-neutral, y si también debe correr como `postflight` antes de una sesión real.
+1. **Cuándo corre:** automáticamente todos los días y además a mano. A mano, hoy con
+   un comando (`python -m prisma validar <slug>`); cuando exista el panel de
+   plataforma, desde un botón del panel que llame a la misma función. Automático: en
+   modo servidor (`servir`), como un trabajo diario más del planificador que ya
+   programa las cadencias (`reloj.montar`); en modo local (`escuchar`), una vez por día
+   dentro del mismo ciclo que hoy corre la escalera y despacha la cola
+   (`local.tareas_de_fondo`).
+2. **A quién avisa:** al administrador de la plataforma, por el bot de administración
+   y por el panel de plataforma. Cada violación queda además como incidente. Nunca a
+   los integrantes del equipo.
+
+Hechos que condicionan el diseño (verificados en el código el 2026-09-28): hoy un
+incidente avisa a la **persona afectada** con un texto neutral
+(`gateway.reportar_incidente_no_manejado`), no al administrador; el administrador los
+ve con `python -m prisma incidentes <slug>`. El bot de administración es un cascarón
+(identifica, audita y responde `ok`, `docs/capacidades.md`) y no manda avisos; el
+panel de plataforma no existe. Por eso el aviso por el bot de administración es parte
+de esta unidad, y el del panel queda para cuando el panel exista.
+
+Pendiente de decidir al diseñarlo: el texto del aviso y si también corre como
+`postflight` antes de una sesión real.
 
 ## Consultas del experimento (referencia, no código de producción)
 
