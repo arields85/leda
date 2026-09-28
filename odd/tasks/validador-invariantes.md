@@ -54,6 +54,17 @@ ve con `python -m prisma incidentes <slug>`. El bot de administración es un cas
 panel de plataforma no existe. Por eso el aviso por el bot de administración es parte
 de esta unidad, y el del panel queda para cuando el panel exista.
 
+3. **Frecuencia (2026-09-28):** cada 30 minutos, junto con la escalera, los chequeos
+   urgentes y livianos (persona sin respuesta, mensajes trabados en la cola, botones
+   esperando sin su mensaje); una vez por día los estructurales (estado contra su
+   último evento, arranque con dependencia abierta reconstruido por hora,
+   `workspace_id` cruzado, evidencia faltante en revisión); y a mano cuando se pida.
+   Cada violación se avisa una sola vez, cuando aparece, no en cada corrida mientras
+   siga (clave estable por violación).
+4. **Aviso al administrador:** por el mismo camino que los incidentes (#28), con el
+   texto que disparó el problema cuando lo hay (constitución §2 y §12: el
+   administrador accede a las conversaciones y ese acceso queda auditado).
+
 Pendiente de decidir al diseñarlo: el texto del aviso y si también corre como
 `postflight` antes de una sesión real.
 
