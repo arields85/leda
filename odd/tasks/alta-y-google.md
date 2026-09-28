@@ -608,6 +608,14 @@ Un worktree nuevo no trae lo que no se versiona.
     2 y 3. Toque compartido: `gateway._toque_admin` (pasa el id del toque).
     Repetición de la sesión: `287 passed`. Suite completa del escritor:
     `4 failed, 1224 passed` (las 4 de fecha fija de `main`).
+    Revisión RDD `review-9ab28ed86c392725` (riesgo medio, consentida):
+    aprobada; reconocimiento emitido. Seguimientos que pasan a G1e: enlace
+    consumido con ciclo pendiente sin envío vigente debe usar el mismo
+    enrutador por estado; el cupo de 5 y el conteo desde el último
+    `intento_habilitado` viven en un solo lugar (la base), no duplicados en
+    `avisos_admin`; pruebas sin mezclar reloj fijo y reloj real; pruebas del
+    respaldo neutral de `_responder_estado_actual` y de `pending_welcome`;
+    registrar cuando un toque llega sin id.
   - [ ] **G1d — Avisos "🛠️ Administración" por el bot de administración.**
     Camino de salida propio (hoy el bot de administración no envía nada y
     `message_outbox` exige `workspace_id`); botones Reenviar correo /
