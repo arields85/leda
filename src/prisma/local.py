@@ -420,7 +420,11 @@ class Escucha:
         # El aviso a la administración (T28, Constitución §10) no está
         # acotado a este espacio -- puede venir de cualquiera, o de ninguno
         # -- así que se despacha aparte, bajo rol `prisma_admin`, y corre
-        # igual aunque la pasada de este espacio haya fallado arriba.
+        # igual aunque la pasada de este espacio haya fallado arriba. Desde
+        # la unificación de G1d con esta unidad (decisión del usuario,
+        # 2026-09-28), `ciclo.despachar_admin` también reconcilia y entrega
+        # los avisos "🛠️ Administración" (`aviso_administrativo`) -- un solo
+        # despacho hacia la administración, nunca dos.
         transporte_admin = self._obtener_transporte_admin()
         if transporte_admin is not None:
             try:
