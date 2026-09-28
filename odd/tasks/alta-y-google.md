@@ -560,11 +560,12 @@ Un worktree nuevo no trae lo que no se versiona.
     `intento_habilitado`), `prisma_admin` ejecuta
     `verificacion_vigente_correo`, y las dos funciones nuevas sólo para
     `prisma_app`. Suite de la sesión: `4 failed, 1210 passed, 108
-    deselected` (las 4 de fecha fija de `main`). Textos nuevos para revisar:
+    deselected` (las 4 de fecha fija de `main`). Textos nuevos del bot de administración:
     la vista previa del administrador ("¿Habilitar un nuevo intento de
     verificación de correo para {nombre}? Le vuelvo a preguntar por su
     correo y este aviso queda resuelto."), "Ese aviso ya estaba resuelto.",
-    "Listo, habilitado.", "No se habilitó nada.". El evento del
+    "Listo, habilitado.", "No se habilitó nada." — aprobados por el usuario
+    (2026-09-28). El evento del
     administrador se registra con `actor_kind = 'persona'` (el enum
     `tipo_actor` de `main` no tiene `administrador`).
 - Requisito de la Tanda 2 cumplido por el usuario (2026-09-28): el token del
