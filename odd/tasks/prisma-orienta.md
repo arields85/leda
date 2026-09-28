@@ -3653,3 +3653,31 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
 
 - 2026-09-28: **Cierre de sesión.** Punto exacto para retomar en `docs/STATUS.md`
   ("Punto exacto para retomar"). Tercera ronda por Telegram pendiente.
+
+- 2026-09-28: **#28b cerrada — los avisos al administrador ya no fallan en silencio.**
+  Ruta: delegada, un escritor (4 archivos de código y pruebas: disparador de escritura).
+  TDD estricto: ROJO observado (`ImportError` de `BACKOFF_MINUTOS_AVISO_ADMIN`), VERDE
+  tras la implementación. `despachar_avisos_admin` pospone cada reintento 1, 2, 4 y 8
+  minutos; un aviso que agota `MAX_INTENTOS` deja un incidente de severidad alta
+  (`referencia_tipo = 'admin_notice'`, texto libre sin restricción en el esquema) con
+  `registrar_incidente(..., avisar_admin=False)`: sin ese freno, el incidente encolaría
+  otro aviso por el mismo canal caído y se encadenaría sin fin. `notificado_admin_en`
+  queda nulo y el resumen lo dice. El listener imprime cada aviso agotado.
+  `_obtener_transporte_admin` ya no cachea la falta del token: relee `.env` (sin pisar
+  el entorno) como mucho una vez por minuto y avisa una sola vez por consola.
+  `tests/test_avisos_admin.py` -> `14 passed`; con `tests/test_capacidades.py` ->
+  `17 passed`. Suite completa (escritor): `1037 passed, 108 deselected, 4 failed`; las
+  4 son `test_aprobacion_cierra_tarea.py::test_mensaje_post_confirmacion_*`, que fijan
+  `AHORA = 2026-09-27 10:00` y vencen con el reloj real desde el 2026-09-28 10:00
+  (Buenos Aires), ajenas a este cambio -> tarea nueva. Confirmado sin tocar:
+  `despachador._fallo` (`message_outbox`) también reintenta sin espera en horario
+  laboral, porque `cal.dentro_de_jornada(ahora)` devuelve `ahora`.
+  Migración `0017` aplicada a la base `prisma` con respaldo previo
+  (`db/respaldos/prisma-antes-0017-20260928.dump`). Hallazgo al preparar la ronda: en
+  modo local el administrador no es alcanzable. La base `prisma` no tiene ningún
+  `platform_role` 'administrador' y ningún comando lo asigna, y `escuchar` no lee el bot
+  de administración (`mensaje_admin` sólo se registra por el webhook de `servir`) ->
+  tarea nueva, antes de la ronda.
+  Decisión del usuario: la tercera ronda por Telegram va al final, después de los
+  íconos por categoría (pack 06), el indicador de "pensando" (pack 05) y el resto de
+  lo pendiente, para probar todo junto.

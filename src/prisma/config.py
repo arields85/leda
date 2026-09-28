@@ -28,6 +28,17 @@ if os.environ.get("PRISMA_LOAD_DOTENV", "1") != "0":
     _cargar_dotenv(RAIZ / ".env")
 
 
+def recargar_dotenv() -> None:
+    """Vuelve a leer `.env` sin pisar lo que ya está en el entorno
+    (`_cargar_dotenv` usa `setdefault`). Hace falta porque la carga de
+    arriba sólo corre una vez, al importar este módulo: un proceso de larga
+    vida -- el listener local (`local.Escucha`) -- puede arrancar antes de
+    que `.env` tenga, por ejemplo, `PRISMA_BOT_TOKEN_ADMIN`, y sin releer el
+    archivo ese token nunca se vería hasta reiniciar el proceso."""
+    if os.environ.get("PRISMA_LOAD_DOTENV", "1") != "0":
+        _cargar_dotenv(RAIZ / ".env")
+
+
 # Campos con credencial: fuera del repr por defecto (`field(repr=False)`).
 # `config` es un singleton de módulo que circula por todo el proceso, así
 # que aparece fácil en una traza sin capturar -- mismo riesgo que se vio con

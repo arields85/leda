@@ -50,6 +50,12 @@ from .db import registrar_auditoria
 # con el mismo nombre (los importa de acá) para no romper a quien ya los usa.
 REFERENCIA_INBOUND_MESSAGE = "inbound_message"
 REFERENCIA_PENDING_ACTION = "pending_action"
+# Un aviso de `admin_notice` que agotó sus reintentos (T28, despachador.py
+# `despachar_avisos_admin`): apunta a esa fila, no a un mensaje ni una
+# acción -- `referencia_tipo` es texto libre, sin restricción en el esquema
+# (mismo patrón polimórfico, sin clave foránea), así que agregar este valor
+# no necesita una migración.
+REFERENCIA_ADMIN_NOTICE = "admin_notice"
 
 # Tope del texto disparador en el aviso -- decisión del usuario, 2026-09-28:
 # acotado, y el aviso dice cuándo lo recortó.
@@ -158,7 +164,8 @@ def registrar_incidente(cur, workspace_id: str | None, resumen: str, *,
                         referencia_id: str | None = None,
                         chat_id: int | None = None,
                         app_user_id: str | None = None,
-                        notificado_en=None) -> str:
+                        notificado_en=None,
+                        avisar_admin: bool = True) -> str:
     """Inserta un incidente sanitizado y avisa a la administración de
     plataforma (Constitución §10). Helper compartido para que quien necesite
     registrar un incidente no arme el insert a mano en cada lugar nuevo.
@@ -181,25 +188,39 @@ def registrar_incidente(cur, workspace_id: str | None, resumen: str, *,
     `notificado_admin_en`, sin mentir si nadie era alcanzable: se lo nota
     dentro del propio `resumen`, igual que ya se hacía para la persona.
 
+    `avisar_admin=False` corta el fan-out a la administración (freno contra
+    loop, T28: `despachador.despachar_avisos_admin` lo usa cuando el propio
+    aviso admin es lo que agotó sus reintentos -- sin este freno,
+    `avisar_incidente_admin` encolaría un `admin_notice` nuevo por el mismo
+    canal que acaba de fallar, ese fallaría también, y encadenaría
+    incidentes sin fin). Con `avisar_admin=False` nunca se llena
+    `notificado_admin_en` -- sería mentir que se avisó por un canal que se
+    sabe caído -- y el `resumen` deja una nota honesta, mismo criterio que
+    cuando nadie es alcanzable.
+
     Devuelve el id del incidente insertado."""
     incident_id = str(uuid.uuid4())
 
-    cuerpo_aviso = _texto_aviso_admin(
-        cur, incident_id, workspace_id, etapa=etapa, severidad=severidad,
-        resumen=resumen, referencia_tipo=referencia_tipo,
-        referencia_id=referencia_id, app_user_id=app_user_id)
-    avisados = avisar_incidente_admin(
-        cur, incident_id, workspace_id=workspace_id, cuerpo=cuerpo_aviso,
-        referencia_tipo=referencia_tipo, referencia_id=referencia_id)
-
     resumen_final = resumen
     notificado_admin_en = None
-    if avisados:
-        notificado_admin_en = datetime.now(timezone.utc)
+    if avisar_admin:
+        cuerpo_aviso = _texto_aviso_admin(
+            cur, incident_id, workspace_id, etapa=etapa, severidad=severidad,
+            resumen=resumen, referencia_tipo=referencia_tipo,
+            referencia_id=referencia_id, app_user_id=app_user_id)
+        avisados = avisar_incidente_admin(
+            cur, incident_id, workspace_id=workspace_id, cuerpo=cuerpo_aviso,
+            referencia_tipo=referencia_tipo, referencia_id=referencia_id)
+        if avisados:
+            notificado_admin_en = datetime.now(timezone.utc)
+        else:
+            resumen_final += (" No se avisó a la administración: ningún "
+                              "administrador de plataforma tiene el bot de "
+                              "administración vinculado.")
     else:
-        resumen_final += (" No se avisó a la administración: ningún "
-                          "administrador de plataforma tiene el bot de "
-                          "administración vinculado.")
+        resumen_final += (" No se avisó a la administración: el canal de "
+                          "administración es justamente el que falló -- "
+                          "revisar con `python -m prisma incidentes <espacio>`.")
 
     cur.execute(
         """insert into incident (id, workspace_id, severidad, resumen_sanitizado,

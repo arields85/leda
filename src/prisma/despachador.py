@@ -18,13 +18,13 @@ import json
 import threading
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import NamedTuple, Protocol
 
 import psycopg
 
 from .calendario import Calendario
-from .incidentes import registrar_incidente
+from .incidentes import REFERENCIA_ADMIN_NOTICE, registrar_incidente
 from .salida import prepare_buttons, prepare_payload
 
 
@@ -188,6 +188,21 @@ def acusar_toque(token: str, callback_id: str, cliente=None) -> None:
 
 
 MAX_INTENTOS = 5
+
+# Backoff entre reintentos de un aviso admin -- hallazgo de la revisión
+# review-1b0a5a47 (2026-09-28): sin esto, un intento fallido queda con `estado='listo'` y
+# `programado_para` sin mover, así que el listener (corre cada unos
+# segundos) lo reintenta de inmediato y agota MAX_INTENTOS en un par de
+# minutos frente a un blip de Telegram, en vez de dejar pasar el blip.
+# Geométrico simple (1, 2, 4, 8 minutos) para los intentos 1 a 4 -- el
+# intento 5 ya cae en `fallido`, así que no hace falta un quinto valor.
+BACKOFF_MINUTOS_AVISO_ADMIN = (1, 2, 4, 8)
+
+
+def _proximo_intento_admin(intentos: int, ahora: datetime) -> datetime:
+    """`intentos` ya incluye el que acaba de fallar (1-indexado)."""
+    indice = min(intentos, len(BACKOFF_MINUTOS_AVISO_ADMIN)) - 1
+    return ahora + timedelta(minutes=BACKOFF_MINUTOS_AVISO_ADMIN[indice])
 
 
 def _botones(cur, m) -> list[Boton]:
@@ -384,15 +399,25 @@ def despachar_avisos_admin(cur: psycopg.Cursor, transporte: Transporte,
     horario; esto es una alerta operativa para quien administra la
     plataforma, no un mensaje de cadencia.
 
+    Un intento fallido no se reintenta de inmediato: se pospone
+    `programado_para` con backoff creciente (`BACKOFF_MINUTOS_AVISO_ADMIN`),
+    igual motivo que `_fallo` para `message_outbox` pero sin su calendario
+    -- acá no hay jornada laboral que respetar, sólo un blip de Telegram que
+    dejar pasar. Un aviso que agota `MAX_INTENTOS` no desaparece en
+    silencio (regla del proyecto: nunca fallar en silencio): deja un
+    incidente de severidad alta apuntando a esa fila, con
+    `avisar_admin=False` -- avisar por el mismo canal que justo falló
+    encadenaría incidentes sin fin (ver `incidentes.registrar_incidente`).
+
     Reusable por el validador de invariantes diario que se agregue después
     (`odd/tasks/validador-invariantes.md`): el mismo camino que entrega un
     aviso de incidente entrega cualquier otro aviso que ese proceso encole
     en `admin_notice`."""
     ahora = ahora or datetime.now(timezone.utc)
-    resumen = {"enviados": 0, "fallidos": 0}
+    resumen = {"enviados": 0, "fallidos": 0, "agotados": 0}
 
     cur.execute(
-        """select id, chat_id, cuerpo, intentos
+        """select id, workspace_id, chat_id, cuerpo, intentos
              from admin_notice
             where estado = 'listo' and programado_para <= %s
             order by programado_para
@@ -406,13 +431,26 @@ def despachar_avisos_admin(cur: psycopg.Cursor, transporte: Transporte,
             tg_id = transporte.enviar(n["chat_id"], n["cuerpo"])
         except Exception as e:  # noqa: BLE001 — se registra, no se propaga
             intentos = n["intentos"] + 1
-            estado = "fallido" if intentos >= MAX_INTENTOS else "listo"
+            agotado = intentos >= MAX_INTENTOS
+            estado = "fallido" if agotado else "listo"
+            proximo = None if agotado else _proximo_intento_admin(intentos, ahora)
             cur.execute(
                 """update admin_notice
-                      set intentos = %s, ultimo_error = %s, estado = %s
+                      set intentos = %s, ultimo_error = %s, estado = %s,
+                          programado_para = coalesce(%s, programado_para)
                     where id = %s""",
-                (intentos, str(e)[:500], estado, n["id"]))
+                (intentos, str(e)[:500], estado, proximo, n["id"]))
             resumen["fallidos"] += 1
+            if agotado:
+                resumen["agotados"] += 1
+                registrar_incidente(
+                    cur, n["workspace_id"],
+                    f"Un aviso a la administración no se pudo entregar "
+                    f"tras {MAX_INTENTOS} intentos.",
+                    severidad="alta", referencia_cruda=str(e)[:500],
+                    referencia_tipo=REFERENCIA_ADMIN_NOTICE,
+                    referencia_id=n["id"], chat_id=n["chat_id"],
+                    avisar_admin=False)
             continue
 
         cur.execute(

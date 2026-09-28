@@ -17,12 +17,12 @@ from __future__ import annotations
 import signal
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import httpx
 
 from .calendario import Calendario
-from .config import config
+from .config import config, recargar_dotenv
 from .db import admin, conectar_autoridad, espacio
 from .despachador import (Transporte, TransporteTelegram, despachar,
                           despachar_avisos_admin)
@@ -31,6 +31,11 @@ from .gateway import (ETAPA_TOQUE_BOTON, ETAPA_TURNO_TEXTO, procesar_update,
 from .reloj import ejecutar_cadencia, ejecutar_escalera
 
 _seguir = True
+
+# Cada cuánto `_obtener_transporte_admin` puede releer `.env` mientras el
+# token todavía no aparece -- el listener corre cada unos segundos y sin
+# este tope le pegaría al disco en cada pasada.
+_RELECTURA_DOTENV_CADA = timedelta(minutes=1)
 
 
 def _imprimir(texto: str = "") -> None:
@@ -64,7 +69,8 @@ class Escucha:
         self.transporte = TransporteTelegram(token, cliente=httpx.Client(timeout=15))
         self.authority_conn = authority_conn
         self._transporte_admin: Transporte | None = None
-        self._transporte_admin_probado = False
+        self._ultimo_reintento_dotenv: datetime | None = None
+        self._avisado_falta_token_admin = False
 
     # -- ciclo -------------------------------------------------------------
 
@@ -126,14 +132,35 @@ class Escucha:
         `PRISMA_BOT_TOKEN_ADMIN` no está configurado, los avisos de
         incidente quedan encolados en `admin_notice` igual (los arma
         `incidentes.registrar_incidente`) y se entregan solos en cuanto se
-        configure el token, sin perder nada mientras tanto."""
-        if self._transporte_admin_probado:
+        configure el token, sin perder nada mientras tanto.
+
+        Nunca cachea la AUSENCIA del token -- sólo el transporte, una vez
+        que lo encuentra: `config._cargar_dotenv` sólo lee `.env` una vez,
+        al importar el módulo, así que cachear la ausencia dejaría a este
+        proceso sin ver un token agregado después hasta reiniciarlo. Por
+        eso, mientras falta, cada pasada relee `.env`
+        (`config.recargar_dotenv`, sin pisar lo que ya esté en el entorno) —
+        acotado a `_RELECTURA_DOTENV_CADA` para no pegarle al disco en cada
+        vuelta del listener, que corre cada unos segundos."""
+        if self._transporte_admin is not None:
             return self._transporte_admin
-        self._transporte_admin_probado = True
+
+        ahora = datetime.now(timezone.utc)
+        if (self._ultimo_reintento_dotenv is None
+                or ahora - self._ultimo_reintento_dotenv >= _RELECTURA_DOTENV_CADA):
+            self._ultimo_reintento_dotenv = ahora
+            recargar_dotenv()
+
         try:
             token = config.token_bot("admin")
         except LookupError:
+            if not self._avisado_falta_token_admin:
+                self._avisado_falta_token_admin = True
+                _imprimir("  (sin PRISMA_BOT_TOKEN_ADMIN: los avisos de "
+                          "administración quedan encolados hasta que se "
+                          "configure)")
             return None
+
         self._transporte_admin = TransporteTelegram(
             token, cliente=httpx.Client(timeout=15))
         return self._transporte_admin
@@ -157,8 +184,14 @@ class Escucha:
                 resumen_admin = despachar_avisos_admin(cur, transporte_admin, ahora)
             self.conn.commit()
             resumen["avisos_admin_enviados"] = resumen_admin["enviados"]
+            resumen["avisos_admin_agotados"] = resumen_admin["agotados"]
             for _ in range(resumen_admin["enviados"]):
                 _imprimir("  → aviso admin enviado")
+            for _ in range(resumen_admin["agotados"]):
+                # Nunca en silencio: agotó MAX_INTENTOS y quedó un incidente
+                # (despachador.despachar_avisos_admin) -- visible acá también.
+                _imprimir("  ! aviso admin agotado tras reintentos -- ver "
+                          f"`python -m prisma incidentes {self.slug}`")
         return resumen
 
     def correr_cadencia(self, nombre: str, ahora: datetime | None = None) -> int:

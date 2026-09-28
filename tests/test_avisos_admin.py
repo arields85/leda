@@ -16,14 +16,15 @@ from __future__ import annotations
 
 import uuid
 from contextlib import nullcontext
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from fastapi.testclient import TestClient
 
 from prisma import gateway, incidentes
 from prisma.db import admin, espacio, registrar_auditoria
-from prisma.despachador import TransporteDePrueba, despachar_avisos_admin
+from prisma.despachador import (BACKOFF_MINUTOS_AVISO_ADMIN, MAX_INTENTOS,
+                                TransporteDePrueba, despachar_avisos_admin)
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -358,7 +359,7 @@ def test_despachar_avisos_admin_entrega_por_el_transporte_del_bot_de_administrac
         fila = cur.fetchone()
     conn.commit()
 
-    assert resumen == {"enviados": 1, "fallidos": 0}
+    assert resumen == {"enviados": 1, "fallidos": 0, "agotados": 0}
     assert len(transporte.enviados) == 1
     assert transporte.enviados[0].chat_id == 644001
     assert fila["estado"] == "enviado"
@@ -380,10 +381,111 @@ def test_despachar_avisos_admin_reintenta_si_el_transporte_falla(conn, corework)
         fila = cur.fetchone()
     conn.commit()
 
-    assert resumen == {"enviados": 0, "fallidos": 1}
+    assert resumen == {"enviados": 0, "fallidos": 1, "agotados": 0}
     assert fila["estado"] == "listo"          # menos de MAX_INTENTOS: reintenta
     assert fila["intentos"] == 1
     assert fila["ultimo_error"]
+
+
+def test_despachar_avisos_admin_pospone_con_backoff_creciente(conn, corework):
+    """A: un aviso admin que falla no se reintenta de inmediato -- eso
+    agotaría MAX_INTENTOS en un par de minutos frente a un blip de Telegram
+    (el listener corre cada unos segundos). Cada intento fallido pospone
+    `programado_para` con un backoff creciente
+    (`despachador.BACKOFF_MINUTOS_AVISO_ADMIN`), así que con el mismo
+    "ahora" una pasada inmediatamente posterior no lo vuelve a tomar."""
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        _administrador(cur, "Admin Backoff", 656001, chat_id=656001)
+        incidentes.registrar_incidente(
+            cur, ws, "Falló algo en una prueba.", etapa="prueba_directa")
+    conn.commit()
+
+    transporte = TransporteDePrueba(falla_en={656001})
+    ahora = datetime.now(timezone.utc)
+
+    for minutos_esperados in BACKOFF_MINUTOS_AVISO_ADMIN:
+        with admin(conn) as cur:
+            resumen = despachar_avisos_admin(cur, transporte, ahora)
+            cur.execute(
+                "select programado_para, intentos, estado from admin_notice limit 1")
+            fila = cur.fetchone()
+        conn.commit()
+
+        assert resumen["fallidos"] == 1
+        assert fila["estado"] == "listo"
+        assert fila["programado_para"] == ahora + timedelta(minutes=minutos_esperados)
+
+        # Con el mismo "ahora", como en la pasada del listener unos segundos
+        # después, el backoff lo protege: no se vuelve a tomar.
+        with admin(conn) as cur:
+            resumen_inmediato = despachar_avisos_admin(cur, transporte, ahora)
+        conn.commit()
+        assert resumen_inmediato == {"enviados": 0, "fallidos": 0, "agotados": 0}
+
+        ahora = fila["programado_para"]  # simula que pasó el backoff
+
+
+def test_despachar_avisos_admin_agotado_registra_incidente_sin_avisar_de_nuevo(
+        conn, corework):
+    """B: un aviso admin que agota MAX_INTENTOS no desaparece en silencio
+    (regla del proyecto: "nunca fallar en silencio") -- deja un incidente de
+    severidad alta apuntando a la fila `admin_notice` que se agotó.
+
+    Guarda contra el loop: `registrar_incidente` siempre llama a
+    `avisar_incidente_admin`, que encolaría un `admin_notice` NUEVO a cada
+    administrador alcanzable por el mismo canal que justo falló -- ese aviso
+    fallaría también, y encadenaría incidentes sin fin. Por eso este
+    incidente se registra con `avisar_admin=False`: nunca deja
+    `notificado_admin_en` puesto, y no se encola ningún `admin_notice`
+    nuevo (`total_avisos` sigue en 1)."""
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        _administrador(cur, "Admin Agotado", 658001, chat_id=658001)
+        incidentes.registrar_incidente(
+            cur, ws, "Falló algo en una prueba.", etapa="prueba_directa")
+        cur.execute("select id from admin_notice limit 1")
+        notice_id = cur.fetchone()["id"]
+    conn.commit()
+
+    transporte = TransporteDePrueba(falla_en={658001})
+    ahora = datetime.now(timezone.utc)
+    resumen = None
+    fila = None
+    for _ in range(MAX_INTENTOS):
+        with admin(conn) as cur:
+            resumen = despachar_avisos_admin(cur, transporte, ahora)
+            cur.execute(
+                """select estado, intentos, programado_para from admin_notice
+                    where id = %s""", (notice_id,))
+            fila = cur.fetchone()
+        conn.commit()
+        if fila["estado"] == "fallido":
+            break
+        ahora = fila["programado_para"]
+
+    assert fila["estado"] == "fallido"
+    assert fila["intentos"] == MAX_INTENTOS
+    assert resumen["agotados"] == 1
+    assert resumen["fallidos"] == 1
+
+    with admin(conn) as cur:
+        cur.execute(
+            """select id, workspace_id, severidad, resumen_sanitizado,
+                      referencia_tipo, referencia_id, notificado_admin_en
+                 from incident where referencia_id = %s""", (notice_id,))
+        incidente = cur.fetchone()
+        cur.execute("select count(*) n from admin_notice")
+        total_avisos = cur.fetchone()["n"]
+    conn.commit()
+
+    assert incidente is not None
+    assert str(incidente["workspace_id"]) == ws
+    assert incidente["severidad"] == "alta"
+    assert incidente["referencia_tipo"] == incidentes.REFERENCIA_ADMIN_NOTICE
+    assert incidente["notificado_admin_en"] is None  # nunca se reenvía por el mismo canal
+    assert "no se avisó a la administración" in incidente["resumen_sanitizado"].lower()
+    assert total_avisos == 1  # el guard: NO se encoló un admin_notice nuevo
 
 
 def test_tareas_de_fondo_despacha_los_avisos_admin_en_el_modo_local(conn, corework):
@@ -402,8 +504,7 @@ def test_tareas_de_fondo_despacha_los_avisos_admin_en_el_modo_local(conn, corewo
 
     e = Escucha(conn, "corework", ws, "tok")
     transporte_admin = TransporteDePrueba()
-    e._transporte_admin = transporte_admin
-    e._transporte_admin_probado = True   # se salta la búsqueda de PRISMA_BOT_TOKEN_ADMIN
+    e._transporte_admin = transporte_admin  # ya hay transporte: se salta la búsqueda del token
     e.transporte = TransporteDePrueba()  # el de la cola del espacio, sin usar acá
 
     resumen = e.tareas_de_fondo()
@@ -438,3 +539,97 @@ def test_tareas_de_fondo_sin_token_de_administracion_no_rompe(conn, corework, mo
     resumen = e.tareas_de_fondo()   # no debe levantar ninguna excepción
 
     assert "avisos_admin_enviados" not in resumen
+
+
+def test_tareas_de_fondo_entrega_avisos_admin_apenas_el_token_aparece(
+        conn, corework, monkeypatch):
+    """C: `_obtener_transporte_admin` no cachea la AUSENCIA del token -- si
+    en la primera pasada `PRISMA_BOT_TOKEN_ADMIN` todavía no está
+    configurado, no rompe nada (mismo caso que la prueba anterior) y, apenas
+    el token aparece en una pasada posterior (sin reiniciar el proceso), el
+    aviso que había quedado encolado se entrega."""
+    from prisma import config as config_modulo
+    from prisma import local as local_modulo
+    from prisma.local import Escucha
+
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        # Sin un administrador alcanzable no se encola ningún `admin_notice`
+        # (`avisar_incidente_admin` no tiene a quién) -- hace falta uno para
+        # que haya algo que la segunda pasada entregue.
+        _administrador(cur, "Admin Token Tardio", 659001, chat_id=659001)
+        incidentes.registrar_incidente(
+            cur, ws, "Falló algo en una prueba.", etapa="prueba_directa")
+    conn.commit()
+
+    original = config_modulo.Config.token_bot
+    intentos_admin = {"n": 0}
+
+    def _token_admin_recien_en_la_segunda_pasada(self, slug):
+        if slug != "admin":
+            return original(self, slug)
+        intentos_admin["n"] += 1
+        if intentos_admin["n"] == 1:
+            raise LookupError("Falta PRISMA_BOT_TOKEN_ADMIN en el entorno")
+        return original(self, slug)
+
+    monkeypatch.setattr(config_modulo.Config, "token_bot",
+                        _token_admin_recien_en_la_segunda_pasada)
+    monkeypatch.setenv("PRISMA_BOT_TOKEN_ADMIN", "tok-admin-prueba")
+
+    # `_obtener_transporte_admin` arma un `TransporteTelegram` real con el
+    # token apenas aparece -- acá se reemplaza por un doble (mismo motivo
+    # que `TransporteDePrueba` en el resto del archivo: sin esto, la
+    # segunda pasada le pegaría de verdad a la API de Telegram con un token
+    # falso y fallaría por eso, no por el token). Lo que prueba este caso es
+    # que SE ARMA el transporte, no cómo entrega Telegram de verdad.
+    monkeypatch.setattr(
+        local_modulo, "TransporteTelegram",
+        lambda token, cliente=None: TransporteDePrueba())
+
+    e = Escucha(conn, "corework", ws, "tok")
+    e.transporte = TransporteDePrueba()
+    # No depende de releer .env en esta prueba -- el token ya está en el
+    # entorno vía monkeypatch; sólo hace falta que no se cachee la ausencia.
+    e._ultimo_reintento_dotenv = datetime.now(timezone.utc)
+
+    resumen1 = e.tareas_de_fondo()
+    assert "avisos_admin_enviados" not in resumen1  # primera pasada: sin token, no rompe
+    assert e._transporte_admin is None
+
+    e.transporte = TransporteDePrueba()
+    resumen2 = e.tareas_de_fondo()
+    assert resumen2["avisos_admin_enviados"] == 1    # segunda pasada: ya hay token, entrega
+    assert e._transporte_admin is not None
+    assert len(e._transporte_admin.enviados) == 1
+
+
+def test_obtener_transporte_admin_relee_env_cuando_el_token_llega_despues(
+        conn, corework, monkeypatch, tmp_path):
+    """C: `config._cargar_dotenv` sólo lee `.env` una vez, al importar el
+    módulo -- si el token se agrega al archivo después de que el listener ya
+    arrancó, sin releerlo nunca se vería hasta reiniciar el proceso.
+    `_obtener_transporte_admin` relee `.env` (sin pisar lo que ya está en el
+    entorno, throttleado para no pegarle al disco en cada pasada) para
+    cubrir ese caso."""
+    from prisma import config as config_modulo
+    from prisma.local import Escucha
+
+    monkeypatch.delenv("PRISMA_BOT_TOKEN_ADMIN", raising=False)
+    dotenv = tmp_path / ".env"
+    dotenv.write_text("", encoding="utf-8")
+    monkeypatch.setattr(config_modulo, "RAIZ", tmp_path)
+
+    ws = corework.workspace_id
+    e = Escucha(conn, "corework", ws, "tok")
+
+    assert e._obtener_transporte_admin() is None
+    assert e._transporte_admin is None
+
+    # El token se agrega al archivo mientras el proceso sigue corriendo.
+    dotenv.write_text("PRISMA_BOT_TOKEN_ADMIN=tok-admin-nuevo\n", encoding="utf-8")
+    e._ultimo_reintento_dotenv = None  # sin esperar el throttle real en la prueba
+
+    transporte = e._obtener_transporte_admin()
+    assert transporte is not None
+    assert e._transporte_admin is transporte

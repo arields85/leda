@@ -65,7 +65,7 @@ tales. Ver [`INDEX.md`](INDEX.md#documentos-superados).
 |---|---|
 | Comando | `.venv\Scripts\python.exe -m pytest -q` |
 | Fecha | 2026-09-28 |
-| Resultado exacto | 1037 passed, 108 deselected. |
+| Resultado exacto | 1037 passed, 108 deselected, 4 failed (corrida del escritor de #28b). Las 4 son `test_aprobacion_cierra_tarea.py::test_mensaje_post_confirmacion_*`: fecha fija vencida con el reloj real, ajenas al cambio. |
 
 Seguimientos de la entrega con evidencia (T6a-T6j), siembra reproducible (T7, T7b) y
 comprobadores del banco, `odd/tasks/prisma-orienta.md`: `1008 passed, 108
@@ -199,33 +199,45 @@ arriba: hallazgo 10 (una pregunta descartada no se reabre, `7e816b6`), `b-0005-b
 `844a471`) y cada incidente avisa también al administrador por el bot de
 administración (`dd6ab0a`, migración `0017`).
 
-Próximo, en este orden:
+Actualización (2026-09-28, más tarde): **#28b cerrada** (backoff 1-2-4-8 minutos, un
+aviso agotado deja incidente sin volver a avisar por el canal caído, el token del bot
+de administración se toma aunque se configure después; detalle en
+`odd/tasks/prisma-orienta.md`). Base `prisma` con la migración `0017` aplicada
+(respaldo `db/respaldos/prisma-antes-0017-20260928.dump`); `PRISMA_BOT_TOKEN_ADMIN`
+configurado por el usuario. PostgreSQL local (scoop) no es un servicio: tras reiniciar
+Windows hay que arrancarlo con `pg_ctl`.
 
-1. **#28b** (review-1b0a5a47, antes de usar los avisos en serio): `despachar_avisos_admin`
-   reintenta sin espera y un aviso que agota sus intentos queda `fallido` sin incidente
-   ni aviso -- viola "nunca fallar en silencio"; el transporte del bot de administración
-   se prueba una sola vez por proceso y no toma el token si se configura después;
-   probar el paso a `fallido`.
-2. **Preparar la base `prisma` para la ronda:** respaldo, aplicar
-   `db/migrations/0017_aviso_incidente_administracion.sql` (la base se creó con el
-   esquema hasta `0016`), configurar `PRISMA_BOT_TOKEN_ADMIN` en `.env` (el usuario), y
-   que el administrador le escriba una vez al bot de administración (Telegram no deja
-   que el bot inicie la conversación). Reiniciar el listener para que cargue el código
-   commiteado.
-3. **Tercera ronda corta por Telegram** (entrega con evidencia y "Pedir cambios"):
-   guion de dos circuitos en `odd/tasks/prisma-orienta.md` (entrada "la tercera ronda
-   por Telegram queda pendiente"), con Ismael, Ariel y Marcos ya vinculados.
-4. **#29** unificar en `escuchar` (y en `servir`) las rutinas programadas, el despacho
+Próximo, en este orden (decisión del usuario: la ronda por Telegram va **al final**,
+para probar todo junto):
+
+1. **Administrador alcanzable en modo local:** la base `prisma` no tiene ningún
+   `platform_role` 'administrador' y ningún comando lo asigna; `escuchar` no lee el bot
+   de administración (`mensaje_admin` sólo se registra por el webhook de `servir`). Sin
+   esto, ningún aviso de incidente llega en la ronda local.
+2. **Fecha fija en `tests/test_aprobacion_cierra_tarea.py`:** 4 pruebas
+   `test_mensaje_post_confirmacion_*` fallan desde el 2026-09-28 10:00 (Buenos Aires)
+   porque `AHORA` es fijo y la base compara `vence_en` contra el reloj real.
+3. **#29** unificar en `escuchar` (y en `servir`) las rutinas programadas, el despacho
    de la cola y de los avisos al administrador (en `servir` hoy nadie despacha
    `message_outbox` ni `admin_notice`: `reloj.py` sólo encola), con opción para apagar
    las cadencias en pruebas; después **#23** el validador de invariantes
    (`odd/tasks/validador-invariantes.md`: cada 30 minutos los urgentes, una vez por día
    los estructurales, a mano, aviso único por violación al administrador).
-5. Escenarios del banco que fallan desde antes de `b-0005-b`: `b-0001`, `b-0001-a`,
-   `b-0002-c`, `b-0013`.
-6. Recuperación del pack en `main`: indicador de "escribiendo" y borrador nativo sin
-   demorar respuestas (pack 05); saludo, tono e íconos por categoría en los botones
-   (pack 06). Menores: T7d (`sembrar`).
+4. Escenarios del banco que fallan desde antes de `b-0005-b`: `b-0001`, `b-0001-a`,
+   `b-0002-c`, `b-0013`. Menores: T7d (`sembrar`).
+5. Recuperación del pack en `main`: saludo, tono e íconos por categoría en los botones
+   (pack 06); indicador de "escribiendo" y borrador nativo animado sólo si la respuesta
+   tarda, sin demorarla nunca (pack 05).
+6. **Tercera ronda por Telegram**, al final: entrega con evidencia y "Pedir cambios"
+   (guion de dos circuitos en `odd/tasks/prisma-orienta.md`), más avisos al
+   administrador, íconos, indicador de "pensando" y despacho unificado. Antes: aplicar
+   las migraciones nuevas a la base `prisma` con respaldo, que el administrador le
+   escriba al bot de administración (Telegram descarta a las 24 h los updates no
+   leídos) y reiniciar el listener con el código commiteado.
+
+Abierto de esta unidad, sin bloquear: `despachador._fallo` (`message_outbox`) también
+reintenta sin espera en horario laboral (`cal.dentro_de_jornada(ahora)` devuelve
+`ahora`).
 
 La rama auxiliar `auxiliar/alta-y-google` avanza en su sesión (alta con correo y
 Google); `main` cambió mucho desde que se creó, así que le toca traer los cambios de
