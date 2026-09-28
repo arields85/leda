@@ -439,6 +439,14 @@ Un worktree nuevo no trae lo que no se versiona.
     `workspace_id` explícito + bloqueo consultivo por espacio), `gateway.py`
     (sólo comentario). Suite del escritor: `1087 passed, 108 deselected`;
     repetición de la sesión: `121 passed` en las pruebas del alta con correo.
+    Revisión RDD `review-33cd2defb2564552` (riesgo alto por `cli.py`,
+    consentida; cuatro lentes): aprobada; reconocimiento emitido.
+    Seguimientos no bloqueantes que entran en G1d: la prueba del bloqueo
+    consultivo tiene que comprobar que la corrida en segundo plano terminó
+    bien (código 0, ciclos abiertos); la prueba de filtro por espacio tiene
+    que probar filas de otro espacio con resultado no vacío; la parte local
+    estricta rechaza puntos al inicio, al final y consecutivos; docstring
+    confuso sobre URL; chequeo redundante de vacío.
   - [ ] **G1d — Avisos "🛠️ Administración" por el bot de administración.**
     Camino de salida propio (hoy el bot de administración no envía nada y
     `message_outbox` exige `workspace_id`); botones Reenviar correo /
