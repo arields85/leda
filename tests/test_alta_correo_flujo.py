@@ -253,6 +253,79 @@ def test_activacion_con_clave_encendida_manda_bienvenida_y_pedido(
     assert fila["bienvenida_entregada_en"] is not None
 
 
+def test_activacion_con_clave_encendida_reclama_un_solo_saludo_del_dia(
+        cliente_corework, conn, sin_activar):
+    """Integración con el saludo diario de `main` (pack 06, migraciones 0018/
+    0019): la bienvenida propia de esta rama se encola con `es_bienvenida=
+    True` -- el despachador (`despachador._intentar_envio` ->
+    `saludo.reclamar_y_anteponer`) reclama la reserva del día por ella sin
+    anteponerle nada (ya trae su propio "👋 ..." de `texto_bienvenida`), y el
+    pedido de correo que la sigue -- encolado un microsegundo después,
+    despachado en el mismo lote -- no vuelve a llevar saludo porque el día ya
+    quedó reclamado por la bienvenida. Ninguna respuesta posterior de esa
+    misma fecha local repite el saludo: una sola persona, un solo saludo."""
+    from prisma.calendario import Calendario
+    from prisma.despachador import TransporteDePrueba, despachar
+    from prisma.salida import enqueue_outbox
+
+    ws = sin_activar.workspace_id
+    _habilitar(conn, ws)
+    with admin(conn) as cur:
+        token = _token_vigente(cur, ws, "Nahuel")
+    conn.commit()
+
+    resp = _post(cliente_corework, f"/start {token}", 555009, slug="corework")
+    assert resp.status_code == 200
+
+    with admin(conn) as cur:
+        cur.execute(
+            "select m.id from membership m join app_user u on u.id = m.app_user_id "
+            "where m.workspace_id = %s and u.telegram_user_id = 555009", (ws,))
+        mid = str(cur.fetchone()["id"])
+
+    # `_activacion` programa la bienvenida con su propio reloj real, así que
+    # el despacho también usa "ahora" real -- ambos mensajes son
+    # `es_respuesta=True`, saltan el chequeo de horario (igual que el test
+    # análogo de `main`, `test_bienvenida_por_activacion_reclama_y_la_
+    # respuesta_del_dia_no_repite`).
+    ahora = datetime.now(timezone.utc)
+    with espacio(conn, ws) as cur:
+        cal = Calendario.desde_base(cur, ws)
+        transporte = TransporteDePrueba()
+        despachar(cur, ws, transporte, cal, ahora)
+    conn.commit()
+
+    assert len(transporte.enviados) == 2
+    bienvenida_enviada, pedido_enviado = transporte.enviados
+    # La bienvenida trae su propio saludo (texto_bienvenida) y nunca uno
+    # segundo antepuesto por el despachador.
+    assert bienvenida_enviada.texto.count("👋") == 1
+    assert "coordinadora digital del equipo" in bienvenida_enviada.texto
+    # El pedido de correo no lleva ningún saludo: el día ya quedó reclamado.
+    assert pedido_enviado.texto == ACF.TEXTO_PEDIDO_CORREO
+    assert "👋" not in pedido_enviado.texto
+
+    with admin(conn) as cur:
+        cur.execute(
+            "select ultima_fecha_local from greeting_state where membership_id = %s",
+            (mid,))
+        reserva = cur.fetchone()
+    assert reserva is not None  # la bienvenida sí reclamó la reserva del día
+
+    # Una respuesta posterior de la misma fecha local no repite el saludo.
+    with espacio(conn, ws) as cur:
+        cal = Calendario.desde_base(cur, ws)
+        enqueue_outbox(
+            cur, workspace_id=ws, chat_id=555009, text="Anotado.",
+            recipient_membership_id=mid, is_response=True,
+            scheduled_for=ahora, dedupe_key="test:alta-correo-saludo:respuesta")
+        despachar(cur, ws, transporte, cal, ahora + timedelta(hours=1))
+    conn.commit()
+
+    assert len(transporte.enviados) == 3
+    assert transporte.enviados[2].texto == "Anotado."
+
+
 # ===========================================================================
 # C. El control: nada de negocio corre para quien no verificó
 # ===========================================================================

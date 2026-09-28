@@ -510,19 +510,36 @@ def _completar_bienvenida(cur: psycopg.Cursor, membership_id: str, workspace_id:
     nombre_preferido = _nombre_preferido(nombre)
     zona = _zona_horaria(cur, workspace_id)
     saludo = saludo_para(ahora, zona)
+    # `recipient_membership_id` + `es_bienvenida=True` (saludo diario de
+    # `main`, pack 06, migraciones 0018/0019): esta fila ES la bienvenida de
+    # incorporación, así que `despachador._intentar_envio` ->
+    # `saludo.reclamar_y_anteponer` reclama la reserva del día por ella SIN
+    # anteponerle nada -- `texto_bienvenida` ya trae su propio saludo fijo
+    # (`saludo_para`, arriba), igual que hace `onboarding.bienvenida` en
+    # `gateway._activacion` para el alta sin correo.
     enqueue_outbox(
         cur, workspace_id=workspace_id, chat_id=chat_id,
         text=texto_bienvenida(saludo, nombre_preferido),
+        recipient_membership_id=membership_id,
         message_type="informativo", scheduled_for=ahora,
         dedupe_key=f"{workspace_id}:alta-correo:bienvenida:{membership_id}:{ciclo}",
-        is_response=True, allow_split=True)
+        is_response=True, allow_split=True, es_bienvenida=True)
     # Un microsegundo después, no al mismo instante: son dos llamadas
     # separadas a `enqueue_outbox` (no dos partes de un mismo mensaje
     # partido), así que sin este desplazamiento `programado_para` empataría
     # y el orden de entrega del despachador quedaría al azar -- el pedido de
     # correo podría llegar antes que la bienvenida.
+    #
+    # También lleva `recipient_membership_id` (sin `es_bienvenida`): al
+    # despachar, la bienvenida ya reclamó la reserva del día -- este mensaje
+    # intenta reclamarla de nuevo, pierde (`saludo.reclamar_saludo` sólo
+    # avanza `ultima_fecha_local` una vez por fecha) y sale sin saludo,
+    # nunca porque este código lo decida de antemano. Un solo saludo por
+    # persona y por día, resuelto por el orden de despacho, no por una
+    # excepción hardcodeada acá.
     enqueue_outbox(
         cur, workspace_id=workspace_id, chat_id=chat_id, text=TEXTO_PEDIDO_CORREO,
+        recipient_membership_id=membership_id,
         message_type="informativo", scheduled_for=ahora + timedelta(microseconds=1),
         dedupe_key=f"{workspace_id}:alta-correo:pedido:{membership_id}:{ciclo}",
         is_response=True, allow_split=True)
