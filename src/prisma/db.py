@@ -25,6 +25,18 @@ from .config import config
 def conectar(url: str | None = None) -> psycopg.Connection:
     conn = psycopg.connect(url or config.db_url, row_factory=dict_row)
     conn.execute("set search_path = prisma, public")
+    # Sin este commit, la conexión queda "en transacción" desde el primer
+    # `execute` (autocommit=False): el próximo `espacio()`/`admin()` no abre
+    # una transacción real, sino un savepoint anidado dentro de ésta, que
+    # nunca se confirma sola al salir limpio (Tanda 1, G1e, caso 16 --
+    # "reinicio": una conexión nueva que sólo procesa un `/start pv_{token}`
+    # -- `resolver_verificacion_correo`, que depende explícitamente de que
+    # `espacio()` confirme sola -- dejaba la verificación sin persistir
+    # hasta que algún commit posterior, ajeno, la arrastrara consigo; si el
+    # proceso caía antes, la persona ya había recibido "✅ ... quedó
+    # verificado" sin que quedara ningún recibo real en la base). Mismo
+    # patrón que ya usa `conectar_autoridad()` acá abajo.
+    conn.commit()
     return conn
 
 

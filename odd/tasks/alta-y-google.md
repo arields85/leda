@@ -713,12 +713,12 @@ Un worktree nuevo no trae lo que no se versiona.
     dominios sólo se leen de una lista de textos; una configuración corrupta
     deja un solo incidente mientras siga pendiente (un aviso por espacio y
     clave hace de candado, porque `prisma_app` no puede leer `incident`).
-  - [ ] **G1d — Avisos "🛠️ Administración" por el bot de administración.**
+  - [x] **G1d — Avisos "🛠️ Administración" por el bot de administración.**
     Camino de salida propio (hoy el bot de administración no envía nada y
     `message_outbox` exige `workspace_id`); botones Reenviar correo /
     Cambiar correo con vista previa y confirmación; aviso informativo de
     quiénes faltan dar su correo; texto libre → respuesta breve sin acción.
-  - [ ] **G1e — Tanda 1** (escenarios de banco `g-` o `TestClient`) con
+  - [x] **G1e — Tanda 1** (escenarios de banco `g-` o `TestClient`) con
     A01-A05, X01, X02 y los casos de `01` §9. La Tanda 2 por Telegram real
     espera a G2 (C4).
 - [ ] **G2 — Credencial de Google por espacio.** Tabla dedicada sin
@@ -1022,6 +1022,18 @@ por commit, igual que en `main`. Nunca push sin pedido explícito del usuario.
   aprobada por el usuario: se conservan los dos bloques, el de `main` sin
   cambios (el diff contra `main` en `cli.py` no borra ninguna línea).
   `pytest -q` → `1148 passed, 108 deselected`.
+- 2026-09-28: G1d cerrada (G1d-a a G1d-c2). G1e (Tanda 1) hecha:
+  `tests/test_alta_correo_tanda1.py` con la matriz de trazabilidad de
+  A01-A05, X01, X02 y los 17 casos de `01` §9 (X01 no aplica: es la entrega
+  con evidencia de `main`) y 8 escenarios nuevos de punta a punta. Defecto
+  real encontrado (caso 16, "reinicio", RED → GREEN): `db.conectar()` y
+  `gateway.procesar_update()` dejaban la conexión en una transacción
+  abierta, así que el `/start` (verificación y también la activación por
+  enlace de `main`) quedaba en un savepoint sin confirmar: la persona veía
+  "verificado"/"Listo" y el dato podía perderse si el proceso caía.
+  Corregido con un `commit` en cada punto. Hallazgo para `main`: afecta a su
+  activación por enlace. Suite del escritor: `1361 passed, 108 deselected`.
+  Pendiente de G1: la Tanda 2 por Telegram real, que espera a G2 (Gmail).
 - Dependencia registrada: el hecho "bienvenida entregada" de G1 queda como
   evento propio para que la unidad de saludo diario de `main` (pack 06)
   pueda contarlo como saludo del día.
