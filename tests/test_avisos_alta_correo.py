@@ -25,15 +25,16 @@ import threading
 import uuid
 from datetime import datetime, timedelta, timezone
 
+import psycopg
 import pytest
 from fastapi.testclient import TestClient
 
 from prisma import alta_correo as AC
 from prisma import alta_correo_flujo as ACF
 from prisma import avisos_admin as AA
-from prisma import despachador, gateway
+from prisma import ciclo, despachador, gateway, incidentes
 from prisma.db import admin, conectar, espacio, registrar_auditoria
-from prisma.despachador import TransporteDePrueba
+from prisma.despachador import MAX_INTENTOS, TransporteDePrueba
 
 AHORA = datetime(2028, 3, 15, 12, 0, tzinfo=timezone.utc)
 
@@ -1016,3 +1017,310 @@ def test_error_no_manejado_del_canal_admin_pasa_por_registrar_incidente(
         cur.execute("select cuerpo from admin_notice where chat_id = %s", (tg,))
         [aviso] = cur.fetchall()
         assert f"'{gateway.ETAPA_ADMIN}'" in aviso["cuerpo"]
+
+
+# ===========================================================================
+# G. G1d-c2 -- correcciones de las revisiones de la rama unificada
+# ===========================================================================
+
+
+def test_admin_notice_exige_exactamente_una_referencia(conn):
+    """G1d-c2, ítem 6: `admin_notice` es siempre sobre un incidente o un
+    aviso administrativo -- nunca ninguno de los dos (antes el check
+    permitía cero) ni los dos a la vez. Una respuesta puntual sin ninguna
+    referencia va en la tabla hermana `admin_reply`, nunca acá."""
+    with admin(conn) as cur:
+        cur.execute(
+            "insert into app_user (nombre) values ('Prueba Sin Referencia') "
+            "returning id")
+        app_user_id = cur.fetchone()["id"]
+    conn.commit()
+
+    with pytest.raises(psycopg.Error):
+        with admin(conn) as cur:
+            with conn.transaction():
+                cur.execute(
+                    """insert into admin_notice
+                         (destinatario_app_user_id, chat_id, cuerpo, dedupe_key)
+                       values (%s, %s, %s, %s)""",
+                    (app_user_id, 999001, "cuerpo de prueba",
+                     "prueba:admin-notice-sin-referencia"))
+    conn.rollback()
+
+
+def test_despachar_admin_aisla_la_reconciliacion_en_savepoint(
+        conn, intake_world, monkeypatch):
+    """G1d-c2, ítem 3: si `reconciliar_avisos_admin_notice` revienta, los
+    avisos de incidente de T28 se siguen entregando en la MISMA pasada --
+    antes, la excepción salía de `despachar_admin` sin que `despachar_
+    avisos_admin` llegara siquiera a correr."""
+    ws = intake_world["north-lab"]["id"]
+    _, tg = _hacer_administrador(conn, intake_world, "north-lab", "Morgan Hale")
+    with admin(conn) as cur:
+        incidentes.registrar_incidente(
+            cur, ws, "Falló algo en una prueba.", etapa="prueba_directa")
+    conn.commit()
+
+    def _revienta(cur, *, ahora=None):
+        raise RuntimeError("reconciliación rota, de prueba")
+
+    monkeypatch.setattr(AA, "reconciliar_avisos_admin_notice", _revienta)
+
+    transporte = TransporteDePrueba()
+    resumen = ciclo.despachar_admin(conn, transporte, datetime.now(timezone.utc))
+
+    assert resumen["enviados"] == 1
+    assert len(transporte.enviados) == 1
+    assert transporte.enviados[0].chat_id == tg
+    with admin(conn) as cur:
+        cur.execute(
+            "select count(*) n from incident "
+            "where etapa = 'despachar_admin_reconciliacion'")
+        assert cur.fetchone()["n"] == 1
+
+
+# ===========================================================================
+# H. G1d-c2, ítem 4 -- despacho real de `admin_reply`
+# ===========================================================================
+
+
+def _insertar_admin_reply(conn, chat_id: int, *, cuerpo: str = "Confirmación de prueba.",
+                          dedupe_key: str | None = None) -> str:
+    dedupe_key = dedupe_key or f"prueba:admin-reply:{uuid.uuid4()}"
+    with admin(conn) as cur:
+        cur.execute(
+            "insert into admin_reply (chat_id, cuerpo, dedupe_key) "
+            "values (%s, %s, %s) returning id",
+            (chat_id, cuerpo, dedupe_key))
+        reply_id = str(cur.fetchone()["id"])
+    conn.commit()
+    return reply_id
+
+
+def test_despachar_respuestas_admin_entrega_por_el_transporte(conn):
+    reply_id = _insertar_admin_reply(conn, 672001)
+
+    transporte = TransporteDePrueba()
+    with admin(conn) as cur:
+        resumen = despachador.despachar_respuestas_admin(
+            cur, transporte, datetime.now(timezone.utc))
+        cur.execute(
+            "select estado, enviado_en, telegram_message_id from admin_reply "
+            "where id = %s", (reply_id,))
+        fila = cur.fetchone()
+    conn.commit()
+
+    assert resumen == {"enviados": 1, "fallidos": 0, "agotados": 0,
+                       "incidentes_sin_registrar": 0}
+    assert len(transporte.enviados) == 1
+    assert transporte.enviados[0].chat_id == 672001
+    assert fila["estado"] == "enviado"
+    assert fila["enviado_en"] is not None
+    assert fila["telegram_message_id"] is not None
+
+
+def test_despachar_respuestas_admin_reintenta_si_el_transporte_falla(conn):
+    _insertar_admin_reply(conn, 672002)
+
+    transporte = TransporteDePrueba(falla_en={672002})
+    with admin(conn) as cur:
+        resumen = despachador.despachar_respuestas_admin(
+            cur, transporte, datetime.now(timezone.utc))
+        cur.execute("select estado, intentos, ultimo_error from admin_reply limit 1")
+        fila = cur.fetchone()
+    conn.commit()
+
+    assert resumen == {"enviados": 0, "fallidos": 1, "agotados": 0,
+                       "incidentes_sin_registrar": 0}
+    assert fila["estado"] == "listo"
+    assert fila["intentos"] == 1
+    assert fila["ultimo_error"]
+
+
+def test_despachar_respuestas_admin_agotado_registra_incidente(conn):
+    """B: agotar `MAX_INTENTOS` deja un incidente apuntando a la fila de
+    `admin_reply` que se agotó -- nunca desaparece en silencio."""
+    reply_id = _insertar_admin_reply(conn, 672003)
+
+    transporte = TransporteDePrueba(falla_en={672003})
+    ahora = datetime.now(timezone.utc)
+    resumen = None
+    fila = None
+    for _ in range(MAX_INTENTOS):
+        with admin(conn) as cur:
+            resumen = despachador.despachar_respuestas_admin(cur, transporte, ahora)
+            cur.execute(
+                "select estado, intentos, programado_para from admin_reply "
+                "where id = %s", (reply_id,))
+            fila = cur.fetchone()
+        conn.commit()
+        if fila["estado"] == "fallido":
+            break
+        ahora = fila["programado_para"]
+
+    assert fila["estado"] == "fallido"
+    assert fila["intentos"] == MAX_INTENTOS
+    assert resumen["agotados"] == 1
+    assert resumen["fallidos"] == 1
+    with admin(conn) as cur:
+        cur.execute(
+            "select severidad, referencia_tipo, referencia_id, notificado_admin_en "
+            "from incident where referencia_id = %s", (reply_id,))
+        [incidente] = cur.fetchall()
+    assert incidente["severidad"] == "alta"
+    assert incidente["referencia_tipo"] == incidentes.REFERENCIA_ADMIN_REPLY
+    assert incidente["notificado_admin_en"] is None    # avisar_admin=False: freno anti-loop
+
+
+def test_despachar_respuestas_admin_si_registrar_incidente_falla_no_pierde_el_lote(
+        conn, monkeypatch):
+    """El registro del incidente cuando una fila agota `MAX_INTENTOS` corre
+    en su propio SAVEPOINT -- si falla, sólo se deshace esa escritura; el
+    resto del lote (incluida la propia fila agotada, ya marcada 'fallido')
+    sigue en pie, y el fallo se cuenta en `incidentes_sin_registrar`."""
+    ok_id = _insertar_admin_reply(conn, 672004)
+    agotado_id = _insertar_admin_reply(conn, 672005)
+    with admin(conn) as cur:
+        cur.execute("update admin_reply set intentos = %s where id = %s",
+                    (MAX_INTENTOS - 1, agotado_id))
+    conn.commit()
+
+    transporte = TransporteDePrueba(falla_en={672005})
+
+    def _registrar_incidente_falla_en_la_base(cur, *args, **kwargs):
+        cur.execute("select 1/0")
+
+    monkeypatch.setattr(
+        despachador, "registrar_incidente", _registrar_incidente_falla_en_la_base)
+
+    ahora = datetime.now(timezone.utc)
+    with admin(conn) as cur:
+        resumen = despachador.despachar_respuestas_admin(cur, transporte, ahora)
+        cur.execute(
+            "select id, estado, intentos from admin_reply where id in (%s, %s)",
+            (ok_id, agotado_id))
+        filas = {str(f["id"]): f for f in cur.fetchall()}
+    conn.commit()   # si el savepoint no aislara la falla, este commit no llegaría a correr
+
+    assert resumen["enviados"] == 1
+    assert resumen["agotados"] == 1
+    assert resumen["incidentes_sin_registrar"] == 1
+    assert filas[ok_id]["estado"] == "enviado"
+    assert filas[agotado_id]["estado"] == "fallido"
+    assert filas[agotado_id]["intentos"] == MAX_INTENTOS
+
+
+def test_despachar_admin_llama_a_despachar_respuestas_admin(conn, monkeypatch):
+    """`ciclo.despachar_admin` tiene que llamar de verdad a `despachar_
+    respuestas_admin` -- no sólo a `despachar_avisos_admin` -- dentro de la
+    misma pasada y el mismo commit."""
+    llamado = {"veces": 0}
+    original = despachador.despachar_respuestas_admin
+
+    def _envuelto(cur, transporte, ahora=None, lote=50):
+        llamado["veces"] += 1
+        return original(cur, transporte, ahora, lote)
+
+    monkeypatch.setattr(despachador, "despachar_respuestas_admin", _envuelto)
+    _insertar_admin_reply(conn, 672006)
+
+    transporte = TransporteDePrueba()
+    resumen = ciclo.despachar_admin(conn, transporte, datetime.now(timezone.utc))
+
+    assert llamado["veces"] == 1
+    assert resumen["enviados"] == 1
+    assert any(e.chat_id == 672006 for e in transporte.enviados)
+
+
+# ===========================================================================
+# I. G1d-c2, ítem 8 -- retorno veraz de marcar_leido/marcar_resuelto;
+#    habilitado()/dominios_permitidos() toleran un valor inválido
+# ===========================================================================
+
+
+def test_marcar_leido_devuelve_si_realmente_cambio_algo(conn, intake_world):
+    """G1d-c2, ítem 8: `True` la primera vez (cambió algo); `False` la
+    segunda (ya estaba leído) -- antes no devolvía nada."""
+    ws = intake_world["north-lab"]["id"]
+    aviso_id = _crear_aviso(conn, ws, texto="aviso de prueba, marcar leído")
+    with admin(conn) as cur:
+        cur.execute(
+            "insert into app_user (nombre) values ('Admin Marca') returning id")
+        app_user_id = str(cur.fetchone()["id"])
+    conn.commit()
+
+    with admin(conn) as cur:
+        primera = AC.marcar_leido(cur, aviso_id, app_user_id, ahora=AHORA)
+    conn.commit()
+    with admin(conn) as cur:
+        segunda = AC.marcar_leido(cur, aviso_id, app_user_id, ahora=AHORA)
+    conn.commit()
+
+    assert primera is True
+    assert segunda is False
+
+
+def test_marcar_resuelto_devuelve_si_realmente_cambio_algo(conn, intake_world):
+    ws = intake_world["north-lab"]["id"]
+    aviso_id = _crear_aviso(conn, ws, texto="aviso de prueba, marcar resuelto")
+    with admin(conn) as cur:
+        cur.execute(
+            "insert into app_user (nombre) values ('Admin Resuelve') returning id")
+        app_user_id = str(cur.fetchone()["id"])
+    conn.commit()
+
+    with admin(conn) as cur:
+        primera = AC.marcar_resuelto(cur, aviso_id, app_user_id, ahora=AHORA)
+    conn.commit()
+    with admin(conn) as cur:
+        segunda = AC.marcar_resuelto(cur, aviso_id, app_user_id, ahora=AHORA)
+        inexistente = AC.marcar_resuelto(cur, str(uuid.uuid4()), app_user_id, ahora=AHORA)
+    conn.commit()
+
+    assert primera is True
+    assert segunda is False
+    assert inexistente is False
+
+
+def test_habilitado_con_valor_invalido_lo_trata_como_apagado_y_deja_incidente(
+        conn, intake_world):
+    ws = intake_world["north-lab"]["id"]
+    with admin(conn) as cur:
+        cur.execute(
+            "insert into workspace_setting (workspace_id, clave, valor) "
+            "values (%s, %s, to_jsonb('no es booleano'::text))",
+            (ws, AC.CLAVE_HABILITADO))
+    conn.commit()
+
+    with espacio(conn, ws) as cur:
+        resultado = AC.habilitado(cur, ws)
+    conn.commit()
+
+    assert resultado is False
+    with admin(conn) as cur:
+        cur.execute(
+            "select severidad from incident where workspace_id = %s "
+            "and etapa = 'alta_correo_config_invalida'", (ws,))
+        assert cur.fetchone() is not None
+
+
+def test_dominios_permitidos_con_valor_invalido_trata_como_sin_restriccion(
+        conn, intake_world):
+    ws = intake_world["north-lab"]["id"]
+    with admin(conn) as cur:
+        cur.execute(
+            "insert into workspace_setting (workspace_id, clave, valor) "
+            "values (%s, 'correo_verificacion.dominios', to_jsonb(42))",
+            (ws,))
+    conn.commit()
+
+    with espacio(conn, ws) as cur:
+        resultado = AC.dominios_permitidos(cur, ws)
+    conn.commit()
+
+    assert resultado is None
+    with admin(conn) as cur:
+        cur.execute(
+            "select severidad from incident where workspace_id = %s "
+            "and etapa = 'alta_correo_config_invalida'", (ws,))
+        assert cur.fetchone() is not None

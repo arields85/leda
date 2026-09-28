@@ -183,9 +183,9 @@ begin
         raise exception 'alta_correo_evento: el modo no cambia dentro de un mismo ciclo';
       end if;
       if not (
-           (actual.estado = 'pending_welcome' and new.estado_nuevo = 'awaiting_email')
-        or (actual.estado = 'awaiting_email' and new.estado_nuevo = 'pending_email_verification')
-        or (actual.estado = 'pending_email_verification' and new.estado_nuevo in ('active', 'awaiting_email'))
+           (actual.estado = 'pending_welcome' and new.estado_nuevo in ('awaiting_email', 'revoked'))
+        or (actual.estado = 'awaiting_email' and new.estado_nuevo in ('pending_email_verification', 'revoked'))
+        or (actual.estado = 'pending_email_verification' and new.estado_nuevo in ('active', 'awaiting_email', 'revoked'))
         or (actual.estado = 'active' and new.estado_nuevo = 'revoked')
       ) then
         raise exception 'alta_correo_evento: transición inválida de % a %',
@@ -807,17 +807,18 @@ alter table admin_notice
 alter table admin_notice
   add column botones jsonb;
 
--- Una fila de `admin_notice` es sobre UN incidente, sobre UN aviso
--- administrativo, o sobre ninguno de los dos (una respuesta puntual del bot
--- de administración -- confirmación de un botón, guía de texto libre --
--- que no necesariamente vuelve a citar el aviso que la originó): nunca los
--- dos a la vez.
+-- Una fila de `admin_notice` es SIEMPRE sobre un hecho de fan-out a TODOS
+-- los administradores alcanzables: un incidente, o un aviso administrativo
+-- -- exactamente uno de los dos, nunca los dos a la vez ni ninguno (G1d-c2,
+-- ítem 6: antes el check permitía cero, que nunca corresponde acá -- una
+-- respuesta puntual sin ninguna referencia va en la tabla hermana
+-- `admin_reply`, nunca en ésta).
 alter table admin_notice
   add constraint admin_notice_una_referencia
-    check (num_nonnulls(incident_id, aviso_administrativo_id) <= 1);
+    check (num_nonnulls(incident_id, aviso_administrativo_id) = 1);
 
 comment on table admin_notice is
-  'Cola de salida del bot de administración: un aviso por incidente (o por aviso administrativo, o una respuesta puntual sin ninguno de los dos) y por administrador de plataforma alcanzable. Sin política de aislamiento por espacio -- no tiene un único espacio dueño -- y sin concesión a prisma_app: la escriben avisar_incidente_admin()/avisar_aviso_administrativo_admin() (security definer) o una inserción directa bajo prisma_admin cuando ya se conoce el destinatario exacto (una respuesta puntual), y sólo la despacha prisma_admin (despachador.despachar_avisos_admin).';
+  'Cola de salida del bot de administración: fan-out de UN aviso -- de incidente o administrativo, exactamente una referencia entre incident_id y aviso_administrativo_id, nunca las dos ni ninguna -- a CADA administrador de plataforma alcanzable. Sin política de aislamiento por espacio -- no tiene un único espacio dueño -- y sin concesión a prisma_app: la escriben avisar_incidente_admin()/avisar_aviso_administrativo_admin() (security definer), y sólo la despacha prisma_admin (despachador.despachar_avisos_admin). Una respuesta puntual a UN administrador -- confirmación de un botón, guía de texto libre -- va en la tabla hermana admin_reply, nunca acá.';
 
 -- Fan-out de UN aviso administrativo a cada administrador de plataforma
 -- alcanzable -- mismo patrón que avisar_incidente_admin (0017): "alcanzable"
