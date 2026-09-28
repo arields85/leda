@@ -909,6 +909,13 @@ ficticios, una interacción por vez; el primer defecto detiene el lote.
   Suma la dependencia `cryptography` en `pyproject.toml` (archivo de `main`,
   se lista para la integración). Un KMS externo queda para producción.
 
+- **Decisiones abiertas 2 y 3 resueltas (2026-09-28): permisos de la
+  primera tanda = `gmail.send` (sólo para el correo de verificación, nunca
+  leer la bandeja) y `calendar.events` (leer agenda y crear/modificar
+  eventos, G3-G4).** Drive y Docs se piden en G6 (volver a autorizar una
+  vez). Leer Gmail no se pide (la verificación por respuesta quedó fuera por
+  ADR 0010).
+
 ### Textos del alta con correo aprobados por el usuario (2026-09-28)
 
 Regla general aprobada: ningún mensaje termina en "escribime y lo vemos" ni
