@@ -78,8 +78,24 @@ def habilitado(cur: psycopg.Cursor, workspace_id: str) -> bool:
 # ---------------------------------------------------------------------------
 
 
-def estado(cur: psycopg.Cursor, membership_id: str) -> dict | None:
-    """La proyección vigente de una membresía, o `None` si nunca se abrió un ciclo."""
+def estado(cur: psycopg.Cursor, membership_id: str, *,
+           bloquear: bool = False) -> dict | None:
+    """La proyección vigente de una membresía, o `None` si nunca se abrió un ciclo.
+
+    `bloquear=True` toma el candado de la fila con
+    `bloquear_alta_correo_estado()` (G1d, seguimiento de la revisión de
+    G1b2): quien necesita decidir con esta lectura si todavía hace falta
+    escribir algo -- `_completar_bienvenida`, por ejemplo -- tiene que
+    tomar el candado ANTES de decidir, no después. Sin esto, dos mensajes
+    simultáneos pueden leer los dos el mismo estado de arranque (ninguno
+    escribió nada todavía) y los dos deciden escribir: la fila ya está
+    protegida más abajo (`preparar_evento_alta_correo()` toma su propio
+    `for update` antes de aplicar cualquier evento), así que nunca corrompe
+    nada, pero el segundo revienta contra un índice único o una transición
+    inválida en vez de simplemente ver la proyección ya avanzada y no
+    hacer nada."""
+    if bloquear:
+        cur.execute("select bloquear_alta_correo_estado(%s)", (membership_id,))
     cur.execute(
         """select membership_id, workspace_id, ciclo, modo, estado,
                   review_required, review_required_causa, review_required_desde,
@@ -320,21 +336,43 @@ def crear_aviso(cur: psycopg.Cursor, tipo: str, texto_saneado: str,
                  referencia_tipo: str | None = None,
                  referencia_id: str | None = None,
                  ahora: datetime | None = None) -> str:
-    """Crea un aviso administrativo.
+    """Crea un aviso administrativo -- o, si ya había uno igual y sin
+    resolver, devuelve el id de ese (G1d, ítem 4: insertar o nada,
+    garantizado por `aviso_administrativo_pendiente_unico` incluso bajo dos
+    disparadores concurrentes del mismo aviso, no por el orden en que
+    Python los ejecute).
 
     Dentro de `espacio()` el disparador `derivar_espacio_registro` fija el
     espacio desde la sesión y descarta lo que se pase acá -- igual que
     `audit_log` e `incident`. `workspace_id` sólo hace falta bajo una
     conexión de administración, donde no hay ningún espacio en la sesión.
+
+    Sin referencia (`referencia_tipo`/`referencia_id` en `None`), el índice
+    nunca colisiona -- Postgres trata cada `null` como distinto -- así que
+    ese caso siempre inserta una fila nueva, como antes.
     """
     cur.execute(
         """insert into aviso_administrativo
              (workspace_id, tipo, texto_saneado, referencia_tipo, referencia_id,
               creado_en)
            values (%s, %s, %s, %s, %s, %s)
+           on conflict (tipo, referencia_tipo, referencia_id)
+             where resuelto_en is null
+           do nothing
            returning id""",
         (workspace_id, tipo, texto_saneado, referencia_tipo, referencia_id,
          _ahora(ahora)))
+    fila = cur.fetchone()
+    if fila is not None:
+        return str(fila["id"])
+
+    # Carrera perdida (o alguien se adelantó): ya hay uno pendiente igual.
+    cur.execute(
+        """select id from aviso_administrativo
+            where tipo = %s and referencia_tipo is not distinct from %s
+              and referencia_id is not distinct from %s and resuelto_en is null
+            order by creado_en desc limit 1""",
+        (tipo, referencia_tipo, referencia_id))
     return str(cur.fetchone()["id"])
 
 

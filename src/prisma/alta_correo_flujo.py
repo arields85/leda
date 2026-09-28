@@ -334,8 +334,15 @@ def _completar_bienvenida(cur: psycopg.Cursor, membership_id: str, workspace_id:
     de `alta_correo_evento` (G1b2, ítem 5, hallazgo de la revisión: antes
     del guardia de abajo, una segunda llamada sobre un ciclo ya avanzado
     reventaba con `UniqueViolation` o con la transición inválida sobre el
-    disparador de la base)."""
-    actual = AC.estado(cur, membership_id)
+    disparador de la base).
+
+    G1d, seguimiento de la revisión de G1b2: la lectura toma el candado de
+    fila (`bloquear=True`) antes de decidir -- si dos mensajes simultáneos
+    llegan hasta acá, el segundo espera a que el primero termine y confirme,
+    y entonces ve la proyección ya en `awaiting_email` (no `pending_welcome`)
+    y devuelve sin escribir nada, en vez de reventar contra el índice único
+    de `bienvenida_entregada` o la transición inválida."""
+    actual = AC.estado(cur, membership_id, bloquear=True)
     if actual is not None and actual["estado"] != "pending_welcome":
         return
     nombre_preferido = _nombre_preferido(nombre)
@@ -450,15 +457,25 @@ def gate(cur: psycopg.Cursor, quien: Any, texto: str, *, chat_id: int,
 # ES un correo, de punta a punta.
 # ---------------------------------------------------------------------------
 
-# Parte local estricta (G1c2, ítem 2): a diferencia de `extraer_correos`
-# (que sólo separa candidatos DENTRO de una frase libre, sin validar
-# formato), esto tiene que decidir por sí solo si el mensaje ENTERO es
-# "exactamente una dirección de correo" -- así que no puede aceptar nada
-# que sirva para otra cosa. Deliberadamente sin "/" ni ":": son justo lo
-# que distingue una URL con credenciales (`http://usuario@host`) o un
-# host con puerto/ruta (`usuario@host:8080`, `usuario@host/ruta`) de una
-# dirección real.
-_LOCAL_ESTRICTO = re.compile(r"^[A-Za-z0-9.!#$%&'*+=?^_`{|}~-]+$")
+# Parte local estricta (G1c2, ítem 2; punto interno endurecido en G1d): a
+# diferencia de `extraer_correos` (que sólo separa candidatos DENTRO de una
+# frase libre, sin validar formato), esto tiene que decidir por sí solo si
+# el mensaje ENTERO es "exactamente una dirección de correo" -- así que no
+# puede aceptar nada que sirva para otra cosa.
+#
+# Deliberadamente sin "/" ni ":" en ningún átomo: eso es lo que hace que
+# `http://usuario@host` (donde la parte local, antes del único `@`, queda
+# siendo `http://usuario`) se rechace acá. `usuario@host:8080` y
+# `usuario@host/ruta`, en cambio, tienen una parte local válida (`usuario`)
+# -- ahí el `:` y el `/` caen del lado del dominio, y es `_DOMINIO_VALIDO`
+# quien los rechaza, no esta regla.
+#
+# Un punto separa átomos, nunca puede ir al principio, al final, ni dos
+# seguidos (RFC 5321; un correo real nunca los tiene) -- de ahí la forma
+# "átomo(.átomo)*" en vez de aceptar cualquier `.` suelto en la clase de
+# caracteres.
+_ATOMO_LOCAL = r"[A-Za-z0-9!#$%&'*+=?^_`{|}~-]+"
+_LOCAL_ESTRICTO = re.compile(rf"^{_ATOMO_LOCAL}(\.{_ATOMO_LOCAL})*$")
 
 
 def _solo_un_correo(texto: str) -> str | None:
@@ -487,9 +504,11 @@ def _solo_un_correo(texto: str) -> str | None:
         return None
     if candidato.count("@") != 1:
         return None
+    # Sin chequeo de vacío aparte para `local`/`dominio`: los dos regex
+    # exigen como mínimo un carácter (`+`), así que una parte vacía ya cae
+    # por no matchear -- un chequeo previo sería redundante (seguimiento a
+    # la revisión de G1c2).
     local, _, dominio = candidato.partition("@")
-    if not local or not dominio:
-        return None
     if not _LOCAL_ESTRICTO.match(local) or not _DOMINIO_VALIDO.match(dominio):
         return None
     return candidato

@@ -13,6 +13,7 @@ from __future__ import annotations
 import contextlib
 import dataclasses
 import re
+import threading
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -21,7 +22,7 @@ from fastapi.testclient import TestClient
 from prisma import alta_correo as AC
 from prisma import alta_correo_flujo as ACF
 from prisma import gateway
-from prisma.db import admin, espacio
+from prisma.db import admin, conectar, espacio
 from prisma.llm import ProveedorGuionado, Respuesta
 
 from tests.alta_correo_ayudas import (
@@ -1063,6 +1064,62 @@ def test_recuperacion_desde_pending_welcome_es_idempotente(conn, intake_world):
         ACF._completar_bienvenida(cur, m, ws, 71001, "Taylor Quinn", AHORA)
         ACF._completar_bienvenida(cur, m, ws, 71001, "Taylor Quinn", AHORA)
     conn.commit()
+
+    textos = _outbox_textos(conn, 71001)
+    assert len(textos) == 2
+    with admin(conn) as cur:
+        cur.execute(
+            "select count(*) n from alta_correo_evento "
+            "where membership_id = %s and tipo = 'bienvenida_entregada'", (m,))
+        assert cur.fetchone()["n"] == 1
+    assert _estado(conn, ws, m)["estado"] == "awaiting_email"
+
+
+def test_dos_completar_bienvenida_concurrentes_no_revientan(conn, intake_world, uri):
+    """G1d, seguimiento de la revisión de G1b2: dos mensajes simultáneos
+    pueden llegar a leer `pending_welcome` los dos, antes de que ninguno
+    haya escrito nada -- sin bloquear la proyección, el segundo termina
+    reventando contra el índice único de `bienvenida_entregada`
+    (`alta_correo_evento_bienvenida_unica`) en vez de ver la proyección ya
+    avanzada y no hacer nada. No corrompe datos (`preparar_evento_alta_
+    correo()` ya toma su propio `for update` antes de aplicar), pero es un
+    incidente de más que bloquear la proyección al leer evita del todo."""
+    ws = intake_world["north-lab"]["id"]
+    m = _membership_id(intake_world, "north-lab", "Taylor Quinn")
+    with espacio(conn, ws) as cur:
+        AC.iniciar_ciclo(cur, m, "alta", ahora=AHORA)
+    conn.commit()
+
+    barrier = threading.Barrier(2, timeout=30)
+    outcomes: list[str] = []
+    failures: list[Exception] = []
+
+    def completar() -> None:
+        other = None
+        try:
+            other = conectar(uri)
+            with espacio(other, ws) as cur:
+                barrier.wait()
+                ACF._completar_bienvenida(cur, m, ws, 71001, "Taylor Quinn", AHORA)
+            other.commit()
+            outcomes.append("ok")
+        except Exception as exc:  # noqa: BLE001 -- justo lo que se prueba que no pase
+            failures.append(exc)
+            barrier.abort()
+            other.rollback()
+        finally:
+            if other is not None:
+                other.close()
+
+    threads = [threading.Thread(target=completar) for _ in range(2)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=60)
+    assert not any(thread.is_alive() for thread in threads), "un hilo quedó colgado"
+
+    assert failures == [], [type(e).__name__ for e in failures]
+    assert outcomes == ["ok", "ok"]
 
     textos = _outbox_textos(conn, 71001)
     assert len(textos) == 2

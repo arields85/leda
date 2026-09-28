@@ -2568,6 +2568,21 @@ end $$;
 -- tipeado mientras hay una verificación pendiente es igual al que ya se
 -- pidió verificar, o es una dirección distinta que hay que proponer antes de
 -- cambiarla. Nunca expone el hash del token: sólo el correo y su vencimiento.
+create or replace function bloquear_alta_correo_estado(p_membership_id uuid)
+returns void
+language plpgsql security definer set search_path = prisma, public, pg_temp as $$
+begin
+  -- Candado de fila para serializar lecturas que deciden si escribir
+  -- (`alta_correo.estado(..., bloquear=True)`). Vive en una función para no
+  -- conceder `update` a `prisma_app`: con ese privilegio podría fijar la
+  -- marca de sesión que desactiva el disparador y escribir la proyección.
+  -- `prisma_owner` no ignora la RLS, así que sólo alcanza filas del espacio
+  -- declarado en la sesión.
+  perform 1 from alta_correo_estado
+   where membership_id = p_membership_id
+   for update;
+end $$;
+
 create or replace function verificacion_vigente_correo(p_membership_id uuid)
 returns table (email text, expira_en timestamptz)
 language plpgsql security definer set search_path = prisma, public, pg_temp as $$
@@ -2597,6 +2612,19 @@ create table aviso_administrativo (
 create index aviso_administrativo_pendientes
   on aviso_administrativo (workspace_id, creado_en) where resuelto_en is null;
 
+-- Idempotencia bajo concurrencia (G1d, ítem 4): dos disparadores del mismo
+-- aviso (mismo tipo, misma referencia) casi al mismo tiempo -- p. ej. dos
+-- mensajes que agotan el límite de reenvío en la misma ventana -- no pueden
+-- crear dos filas mientras la primera siga sin resolver. Sólo se aplica
+-- cuando hay una referencia real: `referencia_tipo`/`referencia_id` en
+-- `null` (un aviso sin referencia puntual) nunca colisiona entre sí, porque
+-- Postgres trata cada `null` como distinto en un índice único -- mismo
+-- comportamiento que ya tenía `aviso_pendiente()` en Python, ahora también
+-- garantizado por la base bajo carrera.
+create unique index aviso_administrativo_pendiente_unico
+  on aviso_administrativo (tipo, referencia_tipo, referencia_id)
+  where resuelto_en is null;
+
 comment on table aviso_administrativo is
   'Avisos "🛠️ Administración". Leído no es resuelto: se conservan hasta marcarse explícitamente, así el futuro panel de plataforma también podrá listarlos.';
 
@@ -2604,10 +2632,77 @@ create trigger trg_derivar_espacio_aviso_administrativo
   before insert on aviso_administrativo
   for each row execute function derivar_espacio_registro();
 
+-- =========================================================================
+-- Entrega de avisos por el bot de administración (G1d)
+-- =========================================================================
+--
+-- `message_outbox` exige `workspace_id` y se despacha por el bot de CADA
+-- espacio (`despachador.despachar(cur, workspace_id, transporte, ...)`); el
+-- bot de administración es uno solo para toda la plataforma, así que
+-- necesita su propio camino de salida -- reusar `message_outbox` mandaría
+-- el aviso por el bot equivocado.
+--
+-- Una fila por (aviso, administrador): permite reintentos y backoff por
+-- destinatario, igual que `despachador._fallo`, sin que la falla de
+-- entregarle a uno bloquee a los demás.
+create table aviso_administrativo_entrega (
+  id                  uuid primary key default gen_random_uuid(),
+  workspace_id        uuid not null references workspace(id) on delete cascade,
+  aviso_id            uuid not null references aviso_administrativo(id) on delete cascade,
+  app_user_id         uuid not null references app_user(id) on delete cascade,
+  estado              text not null default 'listo'
+                        check (estado in ('listo', 'enviado', 'fallido')),
+  intentos            integer not null default 0,
+  ultimo_error        text,
+  telegram_message_id bigint,
+  delivered_at        timestamptz,
+  creado_en           timestamptz not null default now(),
+  check (estado <> 'enviado' or delivered_at is not null)
+);
+
+create unique index aviso_administrativo_entrega_unica
+  on aviso_administrativo_entrega (aviso_id, app_user_id);
+create index aviso_administrativo_entrega_pendientes
+  on aviso_administrativo_entrega (estado) where estado = 'listo';
+
+comment on table aviso_administrativo_entrega is
+  'Entrega por integrante administrador de un aviso "🛠️ Administración" -- ver el comentario de arriba sobre por qué no reusa message_outbox.';
+
+-- Cola de salida del bot de administración para respuestas puntuales (la
+-- confirmación de "Marcar leído", la guía a quien escribe texto libre):
+-- mismo motivo que la tabla de arriba -- no hay ningún espacio al que
+-- mandarle esto por message_outbox. No lleva alcance de espacio: es un
+-- mensaje suelto a un chat de administración, no una fila con dueño de
+-- espacio (mismo motivo por el que app_user y platform_role tampoco
+-- llevan workspace_id).
+create table aviso_administrativo_respuesta (
+  id                  uuid primary key default gen_random_uuid(),
+  chat_id             bigint not null,
+  texto               text not null,
+  estado              text not null default 'listo'
+                        check (estado in ('listo', 'enviado', 'fallido')),
+  intentos            integer not null default 0,
+  ultimo_error        text,
+  telegram_message_id bigint,
+  enviado_en          timestamptz,
+  dedupe_key          text not null,
+  creado_en           timestamptz not null default now()
+);
+
+create unique index aviso_administrativo_respuesta_dedupe
+  on aviso_administrativo_respuesta (dedupe_key);
+create index aviso_administrativo_respuesta_pendientes
+  on aviso_administrativo_respuesta (estado) where estado = 'listo';
+
+comment on table aviso_administrativo_respuesta is
+  'Respuestas puntuales del bot de administración (confirmación de botón, guía de texto libre). Sin alcance de espacio: ver el comentario de aviso_administrativo_entrega.';
+
 alter table alta_correo_estado enable row level security;
 alter table alta_correo_estado force row level security;
 create policy aislamiento_espacio on alta_correo_estado
   using (workspace_id = nullif(current_setting('prisma.workspace_id', true), '')::uuid);
+-- Sólo `select`: el candado de fila se toma con
+-- `bloquear_alta_correo_estado()`, nunca con `update` concedido acá.
 grant select on alta_correo_estado to prisma_app;
 
 alter table alta_correo_evento enable row level security;
@@ -2626,7 +2721,21 @@ alter table aviso_administrativo enable row level security;
 alter table aviso_administrativo force row level security;
 create policy aislamiento_espacio on aviso_administrativo
   using (workspace_id = nullif(current_setting('prisma.workspace_id', true), '')::uuid);
-grant select, insert, update on aviso_administrativo to prisma_app;
+-- Sin `update` (G1d, ítem 3): los flujos que crean avisos siguen
+-- insertando (`alta_correo.crear_aviso`), pero marcarlos leídos o
+-- resueltos es sólo del camino de administración, que corre bajo
+-- `prisma_admin` (ya tiene `all` más abajo) -- nunca `prisma_app`.
+grant select, insert on aviso_administrativo to prisma_app;
+
+alter table aviso_administrativo_entrega enable row level security;
+alter table aviso_administrativo_entrega force row level security;
+create policy aislamiento_espacio on aviso_administrativo_entrega
+  using (workspace_id = nullif(current_setting('prisma.workspace_id', true), '')::uuid);
+-- Nada para `prisma_app`: sólo lo toca el despacho del bot de
+-- administración, que corre bajo `prisma_admin`.
+
+-- `aviso_administrativo_respuesta` no lleva RLS: no tiene `workspace_id`
+-- (ver su comentario de tabla, arriba).
 
 -- alta_correo_verificacion no lleva política: igual que acceso_tablero, lo
 -- que la protege es que nadie la consulta.
@@ -2636,7 +2745,9 @@ grant insert on alta_correo_evento to prisma_owner;
 grant select, insert, update on alta_correo_contacto to prisma_owner;
 grant select, insert, update on alta_correo_verificacion to prisma_owner;
 grant all on alta_correo_estado, alta_correo_evento, alta_correo_contacto,
-             alta_correo_verificacion, aviso_administrativo to prisma_admin;
+             alta_correo_verificacion, aviso_administrativo,
+             aviso_administrativo_entrega, aviso_administrativo_respuesta
+             to prisma_admin;
 
 alter function preparar_evento_alta_correo() owner to prisma_owner;
 alter function aplicar_evento_alta_correo() owner to prisma_owner;
@@ -2647,6 +2758,7 @@ alter function reservar_verificacion_correo(text, uuid, timestamptz)
 alter function completar_verificacion_correo(text, uuid, timestamptz)
   owner to prisma_owner;
 alter function verificacion_vigente_correo(uuid) owner to prisma_owner;
+alter function bloquear_alta_correo_estado(uuid) owner to prisma_owner;
 
 revoke execute on function emitir_verificacion_correo(uuid, text, text, text, timestamptz)
   from public;
@@ -2655,6 +2767,7 @@ revoke execute on function reservar_verificacion_correo(text, uuid, timestamptz)
 revoke execute on function completar_verificacion_correo(text, uuid, timestamptz)
   from public;
 revoke execute on function verificacion_vigente_correo(uuid) from public;
+revoke execute on function bloquear_alta_correo_estado(uuid) from public;
 grant execute on function emitir_verificacion_correo(uuid, text, text, text, timestamptz)
   to prisma_app;
 grant execute on function reservar_verificacion_correo(text, uuid, timestamptz)
@@ -2662,3 +2775,5 @@ grant execute on function reservar_verificacion_correo(text, uuid, timestamptz)
 grant execute on function completar_verificacion_correo(text, uuid, timestamptz)
   to prisma_app;
 grant execute on function verificacion_vigente_correo(uuid) to prisma_app;
+grant execute on function bloquear_alta_correo_estado(uuid) to prisma_app;
+grant execute on function bloquear_alta_correo_estado(uuid) to prisma_admin;

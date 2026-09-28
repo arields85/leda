@@ -17,7 +17,8 @@ from typing import Any
 from fastapi import APIRouter, FastAPI, Header, HTTPException, Request
 from fastapi.responses import HTMLResponse
 
-from .autoridad import (Canal, Denegado, identificar, identificar_en_espacio)
+from .autoridad import (Canal, Denegado, identificar_administrador,
+                        identificar_en_espacio)
 from .config import config
 from .db import (admin, autoridad, conectar, conectar_autoridad, espacio,
                  registrar_auditoria)
@@ -138,19 +139,7 @@ def procesar_update(conn, slug: str, update: dict,
     canal = Canal.ADMINISTRACION if slug == "admin" else Canal.ESPACIO
 
     if canal is Canal.ADMINISTRACION:
-        if not mensaje:
-            return {"ok": True}
-        with conn.cursor() as cur:
-            cur.execute("set role prisma_admin")
-            try:
-                quien = identificar(cur, tg_user, canal, None)
-            except Denegado:
-                return {"ok": True}
-            registrar_auditoria(
-                cur, accion="mensaje_admin", actor_app_user_id=quien.app_user_id,
-                actor_kind="persona", detalle={"chat_id": chat_id})
-        conn.commit()
-        return {"ok": True}
+        return _procesar_admin(conn, mensaje, toque, tg_user, chat_id, texto)
 
     with conn.cursor() as cur:
         cur.execute("set role prisma_admin")
@@ -317,6 +306,119 @@ def procesar_update(conn, slug: str, update: dict,
     # La respuesta sale por la cola, no por acá: Telegram espera un ACK rápido
     # y así el envío conserva idempotencia y auditoría.
     return {"ok": True}
+
+
+def _procesar_admin(conn, mensaje: dict | None, toque: dict | None,
+                    tg_user: int | None, chat_id: int | None, texto: str) -> dict:
+    """Canal de administración (G1d, "Decisiones del usuario para G1"):
+    sólo avisos "🛠️ Administración" y sus botones -- nunca ninguna acción
+    de negocio ni herramienta del `REGISTRO`. Un desconocido (no
+    `platform_role administrador`) no recibe respuesta, igual que hoy.
+    """
+    if toque:
+        return _toque_admin(conn, toque, tg_user)
+    if not mensaje:
+        return {"ok": True}
+
+    from . import avisos_admin as AA
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute("set role prisma_admin")
+            try:
+                quien = identificar_administrador(cur, tg_user)
+            except Denegado:
+                return {"ok": True}      # desconocido: no se le responde
+            registrar_auditoria(
+                cur, accion="mensaje_admin", actor_app_user_id=quien.app_user_id,
+                actor_kind="persona", detalle={"chat_id": chat_id})
+            if texto.strip():
+                # Decisión del usuario: texto libre nunca concede ninguna
+                # acción administrativa -- sólo una guía breve a los
+                # botones del aviso o al panel.
+                AA.responder_texto_libre(
+                    cur, chat_id, mensaje.get("message_id"))
+        conn.commit()
+    except Exception as e:  # noqa: BLE001
+        conn.rollback()
+        _reportar_incidente_admin(
+            conn, chat_id=chat_id, tg_user=tg_user, error=e, etapa=ETAPA_ADMIN)
+    return {"ok": True}
+
+
+def _toque_admin(conn, toque: dict, tg_user: int | None) -> dict:
+    """Único botón hoy: "Marcar leído" de un aviso administrativo."""
+    from . import avisos_admin as AA
+
+    callback = toque.get("data") or ""
+    partes = AA.partes_de_callback(callback)
+    chat_id = (toque.get("message") or {}).get("chat", {}).get("id")
+    if partes is None or tg_user is None or chat_id is None:
+        return {"ok": True}
+
+    try:
+        acusar_toque(config.token_bot("admin"), toque.get("id", ""))
+    except Exception:  # noqa: BLE001 -- sólo el reloj del teléfono de alguien
+        pass
+
+    accion, aviso_id = partes
+    try:
+        with conn.cursor() as cur:
+            cur.execute("set role prisma_admin")
+            try:
+                quien = identificar_administrador(cur, tg_user)
+            except Denegado:
+                return {"ok": True}      # desconocido: no se le responde
+            registrar_auditoria(
+                cur, accion=f"toque_admin:{accion}",
+                actor_app_user_id=quien.app_user_id, actor_kind="persona",
+                detalle={"chat_id": chat_id, "aviso_id": aviso_id})
+            if accion == AA.ACCION_LEIDO:
+                AA.marcar_leido_por_toque(cur, aviso_id, quien.app_user_id, chat_id)
+            # Cualquier otra acción es un botón de un tipo que este canal
+            # todavía no reconoce (versión vieja, o de un aviso retirado):
+            # no hay nada para hacer, y no es un error propio.
+        conn.commit()
+    except Exception as e:  # noqa: BLE001
+        conn.rollback()
+        _reportar_incidente_admin(
+            conn, chat_id=chat_id, tg_user=tg_user, error=e, etapa=ETAPA_ADMIN)
+    return {"ok": True}
+
+
+def _reportar_incidente_admin(conn, *, chat_id: int | None, tg_user: int | None,
+                              error: Exception, etapa: str) -> None:
+    """Red de contención del canal de administración -- mismo espíritu que
+    `reportar_incidente_no_manejado`, pero sin `workspace_id`: el bot de
+    administración no tiene ningún espacio al que atarse, así que no puede
+    reusar `espacio()`/`enqueue_outbox`. El aviso neutral sale por
+    `avisos_admin.encolar_respuesta` -- el mismo camino que ya usan la
+    confirmación de "Marcar leído" y la guía de texto libre."""
+    from datetime import datetime, timezone
+
+    from . import avisos_admin as AA
+
+    ahora = datetime.now(timezone.utc)
+    resumen = f"Excepción no manejada en '{etapa}' ({type(error).__name__})."
+    try:
+        with conn.cursor() as cur:
+            cur.execute("set role prisma_admin")
+            cur.execute(
+                """insert into incident (workspace_id, severidad, resumen_sanitizado,
+                                         referencia_cruda, etapa, chat_id)
+                   values (null, 'alta', %s, %s, %s, %s)""",
+                (resumen, str(error)[:2000], etapa, chat_id))
+            if chat_id is not None:
+                AA.encolar_respuesta(
+                    cur, chat_id, NOTICIA_NEUTRA_INCIDENTE,
+                    dedupe_key=f"adm:incidente:{chat_id}:{ahora.timestamp()}",
+                    ahora=ahora)
+        conn.commit()
+    except Exception:  # noqa: BLE001 -- ni el incidente se pudo registrar
+        try:
+            conn.rollback()
+        except Exception:  # noqa: BLE001
+            pass
 
 
 def _activacion(conn, workspace_id: str, texto: str, tg_user: int,
@@ -2268,6 +2370,9 @@ ETAPA_ACCION_MENU = "accion_menu"
 # G1b (rama auxiliar/alta-y-google): recorrido del alta con correo --
 # pedido/emisión/reenvío de verificación y `/start pv_{token}`.
 ETAPA_ALTA_CORREO = "alta_correo"
+# G1d (rama auxiliar/alta-y-google): canal de administración -- toque de
+# "Marcar leído" o texto libre en el bot de administración.
+ETAPA_ADMIN = "admin"
 
 # Qué tipo de fila referencia `incident.referencia_id` -- mismo patrón
 # polimórfico que `audit_log.sujeto_tipo`/`sujeto_id`, sin clave foránea:

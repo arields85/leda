@@ -841,6 +841,48 @@ def test_prisma_app_solo_inserta_eventos_de_alta_correo(intake_world, conn):
                 (m,))
 
 
+def test_prisma_app_no_puede_saltear_la_verificacion_fijando_la_marca_de_sesion(
+        intake_world, conn):
+    """La marca `prisma.aplicando_evento_alta_correo` es una variable de
+    sesión que cualquier rol puede fijar: si `prisma_app` tuviera `update`
+    sobre la proyección, podría fijarla y pasar a `active` sin verificar el
+    correo. El candado para serializar se toma por una función, nunca con un
+    `update` concedido a `prisma_app`."""
+    norte = intake_world["north-lab"]
+    m = _membership(intake_world, "north-lab")
+
+    with espacio(conn, norte["id"]) as cur:
+        _hasta_awaiting_email(cur, m)
+
+    with espacio(conn, norte["id"]) as cur:
+        with pytest.raises(psycopg.errors.InsufficientPrivilege), conn.transaction():
+            cur.execute(
+                "select set_config('prisma.aplicando_evento_alta_correo', '1', true)")
+            cur.execute(
+                "update alta_correo_estado set estado = 'active' "
+                "where membership_id = %s", (m,))
+
+    with espacio(conn, norte["id"]) as cur:
+        assert AC.estado(cur, m)["estado"] == "awaiting_email"
+
+
+def test_prisma_app_no_puede_marcar_leido_ni_resuelto_directo(intake_world, conn):
+    """G1d, ítem 3: leer/resolver un aviso es sólo del camino de
+    administración (`prisma_admin`, ver `avisos_admin.py`) -- `prisma_app`
+    conserva `select`/`insert`, pero no `update`."""
+    norte = intake_world["north-lab"]
+
+    with espacio(conn, norte["id"]) as cur:
+        aviso_id = AC.crear_aviso(cur, "correo_pendiente", "texto", ahora=AHORA)
+    conn.commit()
+
+    with espacio(conn, norte["id"]) as cur:
+        with pytest.raises(psycopg.errors.InsufficientPrivilege), conn.transaction():
+            cur.execute(
+                "update aviso_administrativo set leido_en = now() where id = %s",
+                (aviso_id,))
+
+
 # ---------------------------------------------------------------------------
 # Aislamiento entre espacios
 # ---------------------------------------------------------------------------
@@ -972,6 +1014,13 @@ def test_un_aviso_leido_no_queda_resuelto(intake_world, conn):
             cur, "correo_pendiente",
             "3 integrantes todavía no dieron su correo laboral.",
             ahora=AHORA)
+    conn.commit()
+
+    # `marcar_leido`/`marcar_resuelto` sólo desde el camino de
+    # administración (G1d, ítem 3): `prisma_app` perdió el `update` directo
+    # sobre `aviso_administrativo` -- leer y resolver es cosa del bot de
+    # administración, que corre bajo `prisma_admin` (mismo rol que `admin()`).
+    with admin(conn) as cur:
         AC.marcar_leido(cur, aviso_id, admin_id, ahora=AHORA)
 
         [fila] = AC.avisos(cur)
@@ -1004,8 +1053,14 @@ def test_aviso_pendiente_ve_el_no_resuelto_e_ignora_el_resuelto(
         assert AC.aviso_pendiente(cur, "correo_limite_agotado", "membership", m) is True
         # Otro tipo, o otra referencia, no cuenta.
         assert AC.aviso_pendiente(cur, "correo_sin_emisor", "membership", m) is False
+    conn.commit()
 
+    # Sólo desde el camino de administración (G1d, ítem 3).
+    with admin(conn) as cur:
         AC.marcar_resuelto(cur, aviso_id, admin_id, ahora=AHORA)
+    conn.commit()
+
+    with espacio(conn, norte["id"]) as cur:
         assert AC.aviso_pendiente(cur, "correo_limite_agotado", "membership", m) is False
     conn.commit()
 
@@ -1038,3 +1093,86 @@ def test_ningun_aviso_administrativo_lleva_cuerpo_de_conversacion(
         assert fila["texto_saneado"] == texto
         assert "token" not in fila["texto_saneado"].lower()
     conn.commit()
+
+
+def test_crear_aviso_es_insertar_o_nada_para_el_mismo_pendiente(
+        intake_world, conn):
+    """G1d, ítem 4: mientras el primero siga sin resolver, un segundo golpe
+    con el mismo tipo y la misma referencia no crea una fila nueva -- se
+    devuelve el id del que ya estaba, y `crear_aviso` no revienta contra el
+    índice único (`aviso_administrativo_pendiente_unico`)."""
+    norte = intake_world["north-lab"]
+    m = norte["people"]["Morgan Hale"]["membership_id"]
+    admin_id = norte["people"]["Morgan Hale"]["app_user_id"]
+
+    with espacio(conn, norte["id"]) as cur:
+        primero = AC.crear_aviso(
+            cur, "correo_limite_agotado", "texto", referencia_tipo="membership",
+            referencia_id=m, ahora=AHORA)
+        segundo = AC.crear_aviso(
+            cur, "correo_limite_agotado", "otro texto", referencia_tipo="membership",
+            referencia_id=m, ahora=AHORA)
+        assert segundo == primero
+        assert len(AC.avisos(cur)) == 1
+    conn.commit()
+
+    with admin(conn) as cur:
+        AC.marcar_resuelto(cur, primero, admin_id, ahora=AHORA)
+    conn.commit()
+
+    # Resuelto el primero, un nuevo golpe del mismo tipo y referencia SÍ
+    # crea uno nuevo -- misma semántica que `aviso_pendiente` ya tenía.
+    with espacio(conn, norte["id"]) as cur:
+        tercero = AC.crear_aviso(
+            cur, "correo_limite_agotado", "texto de nuevo",
+            referencia_tipo="membership", referencia_id=m, ahora=AHORA)
+        assert tercero != primero
+        assert len(AC.avisos(cur)) == 2
+    conn.commit()
+
+
+def test_crear_aviso_concurrente_no_duplica_el_mismo_pendiente(
+        intake_world, conn, uri):
+    """Mismo escenario que arriba, pero con dos conexiones reales
+    disparando el mismo aviso casi al mismo tiempo -- el índice único bajo
+    carrera es lo único que puede garantizar esto, no el orden de
+    ejecución de Python."""
+    norte = intake_world["north-lab"]
+    m = norte["people"]["Morgan Hale"]["membership_id"]
+    ws = norte["id"]
+
+    barrier = threading.Barrier(2, timeout=30)
+    resultados: list[str] = []
+    failures: list[Exception] = []
+
+    def crear(index: int) -> None:
+        other = None
+        try:
+            other = conectar(uri)
+            with espacio(other, ws) as cur:
+                barrier.wait()
+                resultados.append(AC.crear_aviso(
+                    cur, "correo_limite_agotado", f"texto {index}",
+                    referencia_tipo="membership", referencia_id=m, ahora=AHORA))
+            other.commit()
+        except Exception as exc:  # noqa: BLE001 -- justo lo que se prueba que no pase
+            failures.append(exc)
+            barrier.abort()
+            other.rollback()
+        finally:
+            if other is not None:
+                other.close()
+
+    threads = [threading.Thread(target=crear, args=(i,)) for i in range(2)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=60)
+    assert not any(thread.is_alive() for thread in threads), "un hilo quedó colgado"
+
+    assert failures == [], [type(e).__name__ for e in failures]
+    assert len(resultados) == 2
+    assert resultados[0] == resultados[1]
+
+    with espacio(conn, ws) as cur:
+        assert len(AC.avisos(cur)) == 1

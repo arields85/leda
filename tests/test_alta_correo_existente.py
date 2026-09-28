@@ -134,6 +134,15 @@ def test_solo_un_correo_rechaza_puntuacion_final():
     assert ACF._solo_un_correo("taylor.quinn@empresa.com!") is None
 
 
+def test_solo_un_correo_rechaza_puntos_invalidos_en_parte_local():
+    """G1d, seguimiento de la revisión de G1c2: la parte local estricta
+    aceptaba un `.` al inicio, al final o dos seguidos -- formas que RFC
+    5321 no admite y que un correo real nunca tiene."""
+    assert ACF._solo_un_correo(".taylor@empresa.com") is None
+    assert ACF._solo_un_correo("taylor.@empresa.com") is None
+    assert ACF._solo_un_correo("taylor..quinn@empresa.com") is None
+
+
 # ===========================================================================
 # B. CLI `correo-verificacion --activar`
 # ===========================================================================
@@ -294,23 +303,29 @@ def test_activar_reabre_ciclo_revocado_sin_verificar_y_pide_de_nuevo(
 
 def test_elegibles_existente_nunca_devuelve_datos_de_otro_espacio_bajo_admin(
         conn, intake_world):
-    """Bajo `admin()` (bypassa RLS), si el filtro de esta consulta
-    dependiera sólo de la sesión ambiente, alcanzaría con que esa sesión
-    quedara apuntando al espacio equivocado para devolver integrantes de
-    otro. Con el filtro explícito por `workspace_id` (mismo motivo que ya
-    exige `habilitado()`, G1a2), pedir north-lab mientras la sesión quedó
-    en west-studio nunca devuelve a nadie de west-studio."""
+    """Bajo `admin()` (bypassa RLS), la vista `integrante` ya está acotada a
+    la sesión: si el filtro de esta consulta dependiera sólo de eso y no
+    del parámetro explícito `workspace_id` (mismo motivo que ya exige
+    `habilitado()`, G1a2), pedir north-lab mientras la sesión quedó en
+    west-studio devolvería el elenco de west-studio, mal etiquetado como
+    si fuera la respuesta de north-lab.
+
+    Seguimiento de la revisión de G1c2: para que probar que eso no pasa
+    tenga sentido, primero hay que confirmar que west-studio de verdad
+    tiene su propio elenco elegible no vacío -- si no lo tuviera, la lista
+    vacía de abajo no probaría el filtro, sólo que no había nada para
+    filtrar."""
     ws_a = intake_world["north-lab"]["id"]
     ws_b = intake_world["west-studio"]["id"]
 
     with admin(conn) as cur:
         cur.execute("select set_config('prisma.workspace_id', %s, true)", (ws_b,))
+        filas_b = AC.elegibles_existente(cur, ws_b)
+        assert filas_b, "west-studio tiene que tener su propio elenco elegible"
+
         filas = AC.elegibles_existente(cur, ws_a)
 
-    membership_ids_b = {p["membership_id"]
-                        for p in intake_world["west-studio"]["people"].values()}
     assert filas == []
-    assert not membership_ids_b & {str(f["membership_id"]) for f in filas}
 
 
 def test_elegibles_existente_devuelve_los_del_espacio_pedido(conn, intake_world):
@@ -350,8 +365,17 @@ def test_activar_toma_un_bloqueo_por_espacio_para_corridas_superpuestas(
     conexion_hilo = conectar(uri)
     monkeypatch.setattr(cli, "conectar", lambda: conexion_hilo)
 
-    hilo = threading.Thread(
-        target=cli.main, args=(["correo-verificacion", "north-lab", "--activar"],))
+    # G1d, seguimiento de la revisión de G1c2: sin capturar el código de
+    # salida de la corrida de fondo, esta prueba podía pasar aunque
+    # `cli.main` reventara adentro del hilo -- `threading.Thread` traga la
+    # excepción y sólo la imprime, `hilo.join()` no la propaga.
+    resultado_hilo: list[int] = []
+
+    def _correr_de_fondo() -> None:
+        resultado_hilo.append(
+            cli.main(["correo-verificacion", "north-lab", "--activar"]))
+
+    hilo = threading.Thread(target=_correr_de_fondo)
     hilo.start()
     try:
         assert tomado.wait(timeout=5), "la corrida de fondo nunca tomó el bloqueo"
@@ -371,6 +395,19 @@ def test_activar_toma_un_bloqueo_por_espacio_para_corridas_superpuestas(
         hilo.join(timeout=5)
         assert not hilo.is_alive(), "la corrida de fondo no terminó"
         conexion_hilo.close()
+
+    assert resultado_hilo == [0], "la corrida de fondo tiene que terminar en éxito"
+
+    # La corrida de fondo tiene que haber hecho el trabajo real, no sólo
+    # devuelto 0 sin tocar nada: los ciclos `existente` quedaron abiertos y
+    # el pedido de correo, encolado, para el elenco elegible de north-lab.
+    elegibles = {p["name"]: p for p in intake_world["north-lab"]["people"].values()}
+    for persona in elegibles.values():
+        estado = _estado(conn, ws, persona["membership_id"])
+        assert estado is not None, f"no se abrió ciclo para {persona['name']}"
+        assert estado["modo"] == "existente"
+        assert estado["estado"] == "awaiting_email"
+        assert _outbox_textos(conn, persona["telegram"]) == [ACF.TEXTO_PEDIDO_CORREO]
 
     # Liberado (la corrida terminó y confirmó): una tercera conexión puede
     # tomarlo sin esperar.

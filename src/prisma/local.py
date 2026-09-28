@@ -127,6 +127,20 @@ class Escucha:
         self.conn.commit()
         for _ in range(resumen["enviados"]):
             _imprimir("  → enviado")
+
+        # G1d: mismo loop que ya despacha `message_outbox` -- el bot de
+        # administración es uno solo para toda la plataforma (no de este
+        # espacio), así que se despacha aparte, bajo `admin()`. `for update
+        # skip locked` en `avisos_admin` hace que correr esto una vez por
+        # cada espacio que escucha (`escuchar <slug>`, un proceso por bot)
+        # nunca duplique un envío.
+        from . import avisos_admin as AA
+        from .db import admin
+
+        with admin(self.conn) as cur:
+            AA.despachar_todo(cur, ahora=ahora)
+        self.conn.commit()
+
         return resumen
 
     def correr_cadencia(self, nombre: str, ahora: datetime | None = None) -> int:

@@ -447,6 +447,27 @@ Un worktree nuevo no trae lo que no se versiona.
     que probar filas de otro espacio con resultado no vacío; la parte local
     estricta rechaza puntos al inicio, al final y consecutivos; docstring
     confuso sobre URL; chequeo redundante de vacío.
+  - [x] **G1d-a — Entrega de avisos por el bot de administración.** Hecho
+    (ruta: delegada, un escritor). `avisos_admin.py`: entrega por
+    administrador (`aviso_administrativo_entrega`), reintentos e incidente,
+    botón **Marcar leído** (rol revalidado), texto libre → guía sin acción;
+    enganchado al mismo ciclo que despacha el outbox (`local.py`, `cli.py
+    despachar`). Aviso único por referencia (índice parcial), bienvenida con
+    candado, parte local estricta sin puntos inválidos, pruebas de la
+    revisión de G1c2 mejoradas. El escritor declaró que la entrega y el
+    webhook no se hicieron con prueba primero. Toques compartidos:
+    `gateway.py` (rama de administración), `local.py`, `cli.py`,
+    `tests/conftest.py` (truncado de `aviso_administrativo_respuesta`),
+    esquema/migración/rollback 0100. La sesión corrigió antes del commit una
+    regresión de privilegios con RED observado: el escritor había dado
+    `update` sobre `alta_correo_estado` a `prisma_app` para tomar un
+    candado, y con eso `prisma_app` podía fijar la marca de sesión y
+    escribir `active` sin verificar; ahora el candado se toma con
+    `bloquear_alta_correo_estado()` (`security definer`, `prisma_owner`) y
+    `prisma_app` vuelve a sólo `select`. Suite de la sesión: `2 failed,
+    1172 passed, 108 deselected`; las dos fallas son pruebas de migración de
+    `test_task_intake.py` que pasan aisladas (`4 passed`), el mismo patrón
+    de contención ya registrado.
   - [ ] **G1d — Avisos "🛠️ Administración" por el bot de administración.**
     Camino de salida propio (hoy el bot de administración no envía nada y
     `message_outbox` exige `workspace_id`); botones Reenviar correo /

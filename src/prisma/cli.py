@@ -553,6 +553,16 @@ def main(argv: list[str] | None = None) -> int:
             transporte = TransporteTelegram(config.token_bot(a.slug))
             print(despachar(cur, ws, transporte, cal))
 
+    if a.cmd == "despachar":
+        # G1d: mismo comando que ya vacía `message_outbox` de este espacio
+        # también despacha los avisos "🛠️ Administración" pendientes -- el
+        # bot de administración es uno solo para toda la plataforma, así
+        # que se hace bajo `admin()`, no dentro del `espacio()` de arriba.
+        from . import avisos_admin as AA
+
+        with admin(conn) as cur:
+            print(AA.despachar_todo(cur))
+
     conn.commit()
     return 0
 
