@@ -3758,3 +3758,34 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   Decisión del usuario: las cadencias se configuran desde la plataforma (tablero de
   cliente) y un cambio toma efecto sin reiniciar; quedó explícito en
   `docs/ROADMAP.md` (`94a323d`) y es requisito de #29.
+  Evaluación de `a46d92c` contra la frontera `1117e5d`: medio, `under_budget`.
+
+- 2026-09-28: **#29 cerrada — una sola rutina de fondo para `escuchar` y `servir`.**
+  Ruta: mapeo delegado (sólo lectura) y un escritor; dos pasadas. Módulo nuevo
+  `src/prisma/ciclo.py` (`reloj.py` sigue sin enviar nada): por espacio, cadencias
+  vencidas + escalera + `despachar`; una vez por pasada, `despachar_avisos_admin`.
+  `Escucha.tareas_de_fondo` y `servir` (un único job de APScheduler cada 20 s, vía
+  `reloj.montar`) usan el mismo código. Las cadencias se releen de `cadence_job` en cada
+  pasada y disparan si su cron cayó entre la última corrida (o el arranque del proceso)
+  y ahora: un cambio en la base toma efecto sin reiniciar, y al arrancar no se reponen
+  disparos viejos. `--sin-cadencias` en `escuchar` y `servir` (parámetro, no variable de
+  entorno, por la política de `config.py`). La escalera corre para todo espacio activo,
+  no sólo para los que tienen cadencias. Bug encontrado: `CronTrigger.from_crontab` de
+  APScheduler 3.11.3 numera los días con lunes=0, así que `'15 9 * * 1'` (lunes en cron
+  estándar, lo que escribe `importador._a_cron`) disparaba el martes (verificado por el
+  orquestador: próximo disparo desde el 28/9 = martes 29/9); `_dia_semana_apscheduler`
+  convierte rangos, listas, pasos, domingo 0/7 y deja pasar nombres.
+  Segunda pasada, por revisión del orquestador: una cadencia mal escrita o que falla al
+  ejecutarse no frena la escalera ni el despacho de su equipo (savepoint por cadencia:
+  sin él, `InFailedSqlTransaction`, ROJO observado por el orquestador); una falla que
+  persiste se reporta una sola vez hasta que se recupera (`SupresorDeRepetidos`), no
+  cada 20 s; `escuchar` sobrevive a una pasada que falla; `servir` reutiliza un
+  transporte por espacio y cierra el anterior si cambia el token. Pruebas nuevas en
+  `tests/test_ciclo.py` y `tests/test_cli.py` (las primeras de `cli.py`), incluida una de
+  concurrencia (`for update skip locked`: `servir` y `escuchar` a la vez no duplican
+  envíos). Suite completa del escritor: `1099 passed, 108 deselected`; con la prueba
+  del savepoint por cadencia, orquestador: `1100 passed, 108 deselected`. Juicio del
+  escritor, aceptado: si las cadencias se reactivan tras un tiempo apagadas, la pasada
+  siguiente puede encolar la de la semana en curso (la deduplicación semanal evita el
+  doble envío).
+  Decisión del usuario: orden del resto de la sesión confirmado (ver `docs/STATUS.md`).

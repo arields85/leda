@@ -124,12 +124,14 @@ python -m prisma feriados corework
 python -m prisma enlaces corework --solo <nombres>
 python -m prisma administrador corework <nombre>
 python -m prisma escuchar corework
+python -m prisma escuchar corework --sin-cadencias
 python -m prisma estado corework
 python -m prisma correr corework <cadencia>
 python -m prisma escalera corework
 python -m prisma despachar corework
 python -m prisma incidentes corework
 python -m prisma servir --puerto 8080
+python -m prisma servir --puerto 8080 --sin-cadencias
 python -m pytest
 ```
 

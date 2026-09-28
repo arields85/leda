@@ -16,7 +16,6 @@ from datetime import datetime, timezone
 
 import psycopg
 from apscheduler.schedulers.background import BackgroundScheduler
-from apscheduler.triggers.cron import CronTrigger
 
 from . import escalera
 from .calendario import Calendario
@@ -156,48 +155,25 @@ def ejecutar_escalera(cur: psycopg.Cursor, workspace_id: str,
 # Planificador
 # ---------------------------------------------------------------------------
 
-def montar(conn_factory, scheduler: BackgroundScheduler | None = None) -> BackgroundScheduler:
-    """Carga las cadencias activas de todos los espacios y las programa.
+def montar(conn_factory, scheduler: BackgroundScheduler | None = None, *,
+          con_cadencias: bool = True,
+          intervalo_segundos: int | None = None) -> BackgroundScheduler:
+    """Arranca el ciclo compartido (cadencias vencidas + escalera + despacho,
+    por espacio, más el aviso a la administración) a intervalos regulares.
 
-    Se llama al arrancar y cada vez que se reimporta un pack: los horarios
-    viven en la base, así que no hace falta desplegar para cambiarlos.
+    Un solo job de intervalo, no uno por cadencia ni uno de escalera por
+    espacio: cada pasada relee `cadence_job` y la lista de espacios activos
+    de la base (`ciclo.Ciclo.tick`), así que un pack reimportado o un
+    espacio nuevo se aplican solos, sin reiniciar el proceso ni volver a
+    llamar a `montar`. `con_cadencias=False` corre escalera y despacho igual,
+    sin encolar ninguna cadencia -- el interruptor que expone `--sin-cadencias`.
     """
+    from .ciclo import Ciclo, INTERVALO_SEGUNDOS
+
     sched = scheduler or BackgroundScheduler(timezone="UTC")
-
-    conn = conn_factory()
-    with conn.cursor() as cur:
-        cur.execute(
-            """select c.id, c.workspace_id, c.nombre, c.cron, w.slug, w.zona_horaria
-                 from cadence_job c join workspace w on w.id = c.workspace_id
-                where c.activo and w.activo""")
-        jobs = cur.fetchall()
-
-    for j in jobs:
-        sched.add_job(
-            _correr_cadencia, CronTrigger.from_crontab(j["cron"], timezone=j["zona_horaria"]),
-            args=[conn_factory, str(j["workspace_id"]), j["nombre"]],
-            id=f"cadencia:{j['slug']}:{j['nombre']}", replace_existing=True)
-
-    espacios = {str(j["workspace_id"]) for j in jobs}
-    for ws in espacios:
-        sched.add_job(
-            _correr_escalera, "interval", minutes=30,
-            args=[conn_factory, ws], id=f"escalera:{ws}", replace_existing=True)
-
+    ciclo_obj = Ciclo(conn_factory)
+    sched.add_job(
+        ciclo_obj.tick, "interval",
+        seconds=intervalo_segundos or INTERVALO_SEGUNDOS,
+        kwargs={"con_cadencias": con_cadencias}, id="ciclo", replace_existing=True)
     return sched
-
-
-def _correr_cadencia(conn_factory, workspace_id: str, nombre: str) -> None:
-    from .db import espacio
-    conn = conn_factory()
-    with espacio(conn, workspace_id) as cur:
-        cal = Calendario.desde_base(cur, workspace_id)
-        ejecutar_cadencia(cur, workspace_id, nombre, cal)
-
-
-def _correr_escalera(conn_factory, workspace_id: str) -> None:
-    from .db import espacio
-    conn = conn_factory()
-    with espacio(conn, workspace_id) as cur:
-        cal = Calendario.desde_base(cur, workspace_id)
-        ejecutar_escalera(cur, workspace_id, cal)

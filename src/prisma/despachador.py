@@ -88,6 +88,14 @@ class TransporteTelegram:
         r.raise_for_status()
         return r.json()["result"]["message_id"]
 
+    def cerrar(self) -> None:
+        """Cierra el cliente HTTP propio. Lo usa `ciclo.Ciclo` al reemplazar
+        un transporte cacheado cuyo token cambió."""
+        try:
+            self._cliente.close()
+        except Exception:  # noqa: BLE001 -- cierre best-effort
+            pass
+
 
 def _close_client_bounded(client, timeout: float) -> None:
     def close() -> None:

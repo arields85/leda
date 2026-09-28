@@ -86,9 +86,11 @@ caso mixto Prisma pregunta con "Es una tarea nueva" entre las opciones. En la ú
 corrida del banco real, `b-0005` y `b-0005-a` pasan 6 de 6; `b-0005-b` pregunta de más
 en 3 de 3.
 
-**`cli.py` no tiene ninguna prueba.** 403 líneas y trece comandos operativos
-—`esquema`, `importar`, `despachar`, `escuchar`, `servir`—: lo que se usa para
-operar Prisma de verdad.
+**`cli.py` está casi sin probar.** `tests/test_cli.py` cubre sólo el cableado
+del interruptor `--sin-cadencias` sobre `escuchar` y `servir` (4 pruebas). El
+resto de sus trece comandos operativos —`esquema`, `importar`, `despachar`,
+`estado`, `incidentes`...— sigue sin ninguna: lo que se usa para operar
+Prisma de verdad.
 
 **El puerto de lectura no lista tareas.** Sus seis consultas son agregadas, y
 las únicas que nombran tareas son vencidas, bloqueadas y esperando aprobación.

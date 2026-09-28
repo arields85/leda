@@ -74,8 +74,15 @@ existen, tienen tareas y cuentan para cerrar objetivos, pero no reciben nada.
 python -m prisma escuchar corework
 ```
 
-Ese proceso hace todo: recibe mensajes, contesta, corre la escalera de
-recordatorios y despacha la cola. Ctrl+C para cortar.
+Ese proceso hace todo: recibe mensajes, contesta, dispara las cadencias que
+ya vencieron, corre la escalera de recordatorios y despacha la cola. Ctrl+C
+para cortar. Para probar sin que dispare cadencias automáticas (por ejemplo,
+para no mezclar los mensajes de una cadencia con lo que se está probando a
+mano), agregá `--sin-cadencias`; la escalera y el despacho siguen igual:
+
+```bash
+python -m prisma escuchar corework --sin-cadencias
+```
 
 En otra terminal, para ver cómo va:
 
@@ -153,6 +160,10 @@ Ese contraste es lo que muestra que la cadena es por persona y no por área.
   la escalera de recordatorios y deja de recibir avisos.
 
 ### Cadencias sin esperar al lunes
+
+Con `escuchar` (o `servir`) corriendo, cada cadencia se dispara sola apenas
+vence su horario -- no hace falta reiniciar el proceso ni volver a importar
+el pack para que un horario editado tome efecto. Para no esperar ni eso:
 
 ```bash
 python -m prisma correr corework objetivos_semanales

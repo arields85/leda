@@ -7,7 +7,9 @@
     python -m prisma sembrar corework --semilla espacios/corework.semilla-ficticia.yaml
     python -m prisma cadencia corework objetivos_semanales
     python -m prisma despachar corework       vacía la cola una vez
-    python -m prisma servir                   webhook + planificador
+    python -m prisma escuchar corework         long polling + cadencias + escalera + despacho
+    python -m prisma servir                   webhook + cadencias + escalera + despacho
+    python -m prisma servir --sin-cadencias    igual, sin disparar cadencias automáticas
 """
 
 from __future__ import annotations
@@ -175,7 +177,12 @@ def main(argv: list[str] | None = None) -> int:
     adm.add_argument("nombre", help="nombre del integrante, entre comillas si tiene espacios")
 
     sub.add_parser("presentar").add_argument("slug")
-    sub.add_parser("escuchar").add_argument("slug")
+
+    esc = sub.add_parser("escuchar")
+    esc.add_argument("slug")
+    esc.add_argument("--sin-cadencias", action="store_true",
+                     help="no dispara cadencias automáticas; escalera y despacho siguen")
+
     sub.add_parser("grupo").add_argument("slug")
 
     mod = sub.add_parser("modelo")
@@ -192,6 +199,8 @@ def main(argv: list[str] | None = None) -> int:
 
     srv = sub.add_parser("servir")
     srv.add_argument("--puerto", type=int, default=8080)
+    srv.add_argument("--sin-cadencias", action="store_true",
+                     help="no dispara cadencias automáticas; escalera y despacho siguen")
 
     a = p.parse_args(argv)
 
@@ -222,7 +231,7 @@ def main(argv: list[str] | None = None) -> int:
         import uvicorn
         from .reloj import montar
 
-        montar(lambda: conectar()).start()
+        montar(lambda: conectar(), con_cadencias=not a.sin_cadencias).start()
         uvicorn.run("prisma.gateway:app", host="0.0.0.0", port=a.puerto)
         return 0
 
@@ -425,7 +434,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if a.cmd == "escuchar":
         from .local import escuchar
-        escuchar(conn, a.slug, ws)
+        escuchar(conn, a.slug, ws, con_cadencias=not a.sin_cadencias)
         return 0
 
     if a.cmd == "estado":

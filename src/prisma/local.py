@@ -8,7 +8,8 @@ Para probar en tu computadora, polling. Al pasar a la VPS se cambia por
 webhook y no se toca nada más: los dos caminos llaman a la misma función.
 
 Este comando hace el circuito completo en un solo proceso: escucha, procesa,
-corre la escalera y despacha la cola. Es más simple de seguir que cuatro
+dispara las cadencias vencidas, corre la escalera y despacha la cola (mismo
+ciclo que usa `servir`, en `ciclo.py`). Es más simple de seguir que cuatro
 servicios, y para dos o tres personas alcanza de sobra.
 """
 
@@ -23,15 +24,15 @@ from urllib.parse import urlsplit
 
 import httpx
 
+from . import ciclo
 from .calendario import Calendario
 from .config import config, recargar_dotenv
 from .db import admin, conectar_autoridad, espacio
-from .despachador import (Transporte, TransporteTelegram, despachar,
-                          despachar_avisos_admin)
+from .despachador import Transporte, TransporteTelegram
 from .gateway import (ETAPA_TOQUE_BOTON, ETAPA_TURNO_TEXTO, procesar_update,
                       reportar_incidente_no_manejado)
 from .incidentes import registrar_incidente
-from .reloj import ejecutar_cadencia, ejecutar_escalera
+from .reloj import ejecutar_cadencia
 
 _seguir = True
 
@@ -124,7 +125,7 @@ def _reportar_incidente_admin_no_manejado(conn, *, chat_id: int | None,
 class Escucha:
     def __init__(self, conn, slug: str, workspace_id: str, token: str,
                  cliente: httpx.Client | None = None,
-                 authority_conn=None) -> None:
+                 authority_conn=None, *, con_cadencias: bool = True) -> None:
         self.conn = conn
         self.slug = slug
         self.ws = workspace_id
@@ -134,6 +135,13 @@ class Escucha:
         self.offset_admin = 0
         self.transporte = TransporteTelegram(token, cliente=httpx.Client(timeout=15))
         self.authority_conn = authority_conn
+        self.con_cadencias = con_cadencias
+        # Piso de búsqueda de `ciclo.cadencias_vencidas`: nunca repone un
+        # disparo anterior a que este proceso arrancara.
+        self.arranque = datetime.now(timezone.utc)
+        # Deduplica el reporte de una falla persistente (ciclo.reportar_fallo):
+        # una vez mientras sigue igual, de nuevo si se recupera y vuelve a fallar.
+        self._fallas = ciclo.SupresorDeRepetidos()
         self._admin_bot: _AdminBot | None = None
         self._ultimo_reintento_dotenv: datetime | None = None
         self._avisado_falta_token_admin = False
@@ -336,24 +344,67 @@ class Escucha:
             transporte=TransporteTelegram(token, cliente=httpx.Client(timeout=15)))
         return self._admin_bot.transporte
 
+    def _revertir(self) -> None:
+        try:
+            self.conn.rollback()
+        except Exception:  # noqa: BLE001
+            pass
+
     def tareas_de_fondo(self, ahora: datetime | None = None) -> dict[str, int]:
         ahora = ahora or datetime.now(timezone.utc)
-        with espacio(self.conn, self.ws) as cur:
-            cal = Calendario.desde_base(cur, self.ws)
-            ejecutar_escalera(cur, self.ws, cal, ahora)
-            resumen = despachar(cur, self.ws, self.transporte, cal, ahora)
-        self.conn.commit()
+        try:
+            with espacio(self.conn, self.ws) as cur:
+                resumen = ciclo.ejecutar_ciclo_espacio(
+                    cur, self.ws, self.transporte, ahora, self.arranque,
+                    con_cadencias=self.con_cadencias)
+            self.conn.commit()
+            self._fallas.recuperada((self.ws, "tick"))
+        except Exception as e:  # noqa: BLE001 -- una pasada rota no corta la escucha
+            self._revertir()
+            ciclo.reportar_fallo(
+                self.conn, self._fallas, self.ws, "tick",
+                f"Falló la pasada de fondo de '{self.slug}' "
+                f"({type(e).__name__}).", e)
+            _imprimir(f"  ! la pasada de fondo falló: {_error_sin_url(e)}")
+            resumen = {"enviados": 0, "pospuestos": 0, "fallidos": 0,
+                      "descartados": 0, "cadencias_encoladas": 0,
+                      "escalera_encoladas": 0, "cadencias_fallidas": [],
+                      "cadencias_ok": []}
+
+        # Una cadencia con cron roto no frena a las demás (se aisló en
+        # `ciclo.cadencias_vencidas`): se reporta acá, deduplicada.
+        for job in resumen.pop("cadencias_ok", []):
+            self._fallas.recuperada((self.ws, f"cadencia:{job['nombre']}"))
+        for job, error in resumen.pop("cadencias_fallidas", []):
+            nombre = job["nombre"]
+            ciclo.reportar_fallo(
+                self.conn, self._fallas, self.ws, f"cadencia:{nombre}",
+                f"Cron inválido en la cadencia '{nombre}' de '{self.slug}' "
+                f"({type(error).__name__}).", error)
+            _imprimir(f"  ! cadencia '{nombre}' con cron inválido: "
+                      f"{_error_sin_url(error)}")
+
         for _ in range(resumen["enviados"]):
             _imprimir("  → enviado")
 
         # El aviso a la administración (T28, Constitución §10) no está
         # acotado a este espacio -- puede venir de cualquiera, o de ninguno
-        # -- así que se despacha aparte, bajo rol `prisma_admin`.
+        # -- así que se despacha aparte, bajo rol `prisma_admin`, y corre
+        # igual aunque la pasada de este espacio haya fallado arriba.
         transporte_admin = self._obtener_transporte_admin()
         if transporte_admin is not None:
-            with admin(self.conn) as cur:
-                resumen_admin = despachar_avisos_admin(cur, transporte_admin, ahora)
-            self.conn.commit()
+            try:
+                resumen_admin = ciclo.despachar_admin(self.conn, transporte_admin, ahora)
+            except Exception as e:  # noqa: BLE001
+                self._revertir()
+                ciclo.reportar_fallo(
+                    self.conn, self._fallas, None, "admin",
+                    f"Falló el aviso a la administración "
+                    f"({type(e).__name__}).", e)
+                _imprimir(f"  ! el aviso a la administración falló: "
+                          f"{_error_sin_url(e)}")
+                return resumen
+            self._fallas.recuperada((None, "admin"))
             resumen["avisos_admin_enviados"] = resumen_admin["enviados"]
             resumen["avisos_admin_agotados"] = resumen_admin["agotados"]
             resumen["avisos_admin_incidentes_sin_registrar"] = (
@@ -385,7 +436,8 @@ class Escucha:
         return n
 
 
-def escuchar(conn, slug: str, workspace_id: str) -> None:
+def escuchar(conn, slug: str, workspace_id: str, *,
+            con_cadencias: bool = True) -> None:
     global _seguir
     _seguir = True
     signal.signal(signal.SIGINT, _parar)
@@ -395,7 +447,7 @@ def escuchar(conn, slug: str, workspace_id: str) -> None:
         raise RuntimeError("Falta PRISMA_AUTHORITY_DB_URL.")
     authority_conn = conectar_autoridad(config.authority_db_url)
     e = Escucha(conn, slug, workspace_id, token,
-                authority_conn=authority_conn)
+                authority_conn=authority_conn, con_cadencias=con_cadencias)
 
     r = httpx.get(f"https://api.telegram.org/bot{token}/getMe", timeout=15).json()
     if not r.get("ok"):
