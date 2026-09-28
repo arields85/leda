@@ -18,7 +18,7 @@ import sys
 
 from .calendario import Calendario, cargar_feriados_ar
 from .config import config
-from .db import admin, conectar, espacio
+from .db import admin, conectar, espacio, registrar_auditoria
 
 
 def _revertir_sin_traza(conn) -> None:
@@ -43,6 +43,26 @@ def _id_de(conn, slug: str) -> str:
     if not fila:
         sys.exit(f"No existe el espacio '{slug}'.")
     return str(fila["id"])
+
+
+def _resolver_integrante(cur, ws: str, nombre: str) -> list[dict]:
+    """Empareja por subcadena, sin importar mayúsculas -- mismo criterio que
+    `onboarding.generar_enlaces` con `--solo` (T7,
+    `odd/tasks/prisma-orienta.md`), pero sobre todo integrante activo del
+    espacio, esté o no vinculado a Telegram: designar administrador no
+    depende de que ya haya activado su cuenta (T11)."""
+    cur.execute(
+        """select m.app_user_id, u.nombre, u.telegram_user_id
+             from membership m join app_user u on u.id = m.app_user_id
+            where m.workspace_id = %s and m.activo
+            order by u.nombre""",
+        (ws,))
+    buscado = nombre.lower()
+    candidatos = [p for p in cur.fetchall() if buscado in p["nombre"].lower()]
+    # Designa un rol privilegiado: si alguien coincide exacto, es esa
+    # persona, aunque el fragmento también aparezca en otros nombres.
+    exactos = [p for p in candidatos if p["nombre"].lower() == buscado]
+    return exactos or candidatos
 
 
 def _estado(conn, ws: str, slug: str) -> int:
@@ -145,6 +165,10 @@ def main(argv: list[str] | None = None) -> int:
     enl = sub.add_parser("enlaces")
     enl.add_argument("slug")
     enl.add_argument("--solo", nargs="*", help="nombres, para el piloto")
+
+    adm = sub.add_parser("administrador")
+    adm.add_argument("slug")
+    adm.add_argument("nombre", help="nombre del integrante, entre comillas si tiene espacios")
 
     sub.add_parser("presentar").add_argument("slug")
     sub.add_parser("escuchar").add_argument("slug")
@@ -351,6 +375,48 @@ def main(argv: list[str] | None = None) -> int:
             print(f"  {e.nombre:24s} {e.url}")
         print(f"\nVencen el {enlaces[0].expira_en:%d/%m/%Y}.")
         print(f"Pendientes de activar: {len(faltan)}")
+        return 0
+
+    if a.cmd == "administrador":
+        with admin(conn) as cur:
+            candidatos = _resolver_integrante(cur, ws, a.nombre)
+            if not candidatos:
+                print(f"No encontré a nadie llamado «{a.nombre}» en '{a.slug}'.")
+                return 1
+            if len(candidatos) > 1:
+                print(f"«{a.nombre}» es ambiguo en '{a.slug}': hay "
+                      f"{len(candidatos)} personas que coinciden:")
+                for c in candidatos:
+                    print(f"  {c['nombre']}")
+                print("Usá un nombre más específico.")
+                return 1
+
+            persona = candidatos[0]
+            cur.execute(
+                """insert into platform_role (app_user_id, rol)
+                     values (%s, 'administrador')
+                   on conflict do nothing
+                   returning app_user_id""",
+                (persona["app_user_id"],))
+            nuevo = cur.fetchone() is not None
+            if nuevo:
+                registrar_auditoria(
+                    cur, accion="otorgar_administrador", actor_kind="sistema",
+                    sujeto_tipo="app_user", sujeto_id=persona["app_user_id"],
+                    detalle={"nombre": persona["nombre"]})
+        conn.commit()
+
+        print(f"{persona['nombre']}: administrador de plataforma "
+              + ("otorgado." if nuevo else "(ya lo era)."))
+        if not persona["telegram_user_id"]:
+            print("Todavía no vinculó su Telegram (falta 'enlaces'): los "
+                  "avisos de incidente no le van a llegar hasta que active "
+                  "su cuenta y le escriba una vez al bot de administración.")
+        else:
+            print("Próximo paso: que le escriba una vez al bot de "
+                  "administración (PRISMA_BOT_TOKEN_ADMIN) -- Telegram no "
+                  "deja que un bot le escriba primero a quien nunca le "
+                  "escribió, así que sin eso no hay a qué chat avisarle.")
         return 0
 
     if a.cmd == "escuchar":

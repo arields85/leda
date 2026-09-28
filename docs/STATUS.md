@@ -65,7 +65,7 @@ tales. Ver [`INDEX.md`](INDEX.md#documentos-superados).
 |---|---|
 | Comando | `.venv\Scripts\python.exe -m pytest -q` |
 | Fecha | 2026-09-28 |
-| Resultado exacto | 1042 passed, 108 deselected (corrida del escritor de #28c). |
+| Resultado exacto | 1053 passed, 108 deselected (orquestador, después del administrador alcanzable en modo local). |
 
 Seguimientos de la entrega con evidencia (T6a-T6j), siembra reproducible (T7, T7b) y
 comprobadores del banco, `odd/tasks/prisma-orienta.md`: `1008 passed, 108
@@ -210,10 +210,10 @@ Windows hay que arrancarlo con `pg_ctl`.
 Próximo, en este orden (decisión del usuario: la ronda por Telegram va **al final**,
 para probar todo junto):
 
-1. **Administrador alcanzable en modo local:** la base `prisma` no tiene ningún
-   `platform_role` 'administrador' y ningún comando lo asigna; `escuchar` no lee el bot
-   de administración (`mensaje_admin` sólo se registra por el webhook de `servir`). Sin
-   esto, ningún aviso de incidente llega en la ronda local.
+1. *(Administrador alcanzable en modo local, cerrada: `python -m prisma administrador
+   <espacio> <nombre>` otorga el rol de plataforma y lo audita, y `escuchar` también lee
+   el bot de administración sin demorar al del espacio. Falta usarlo sobre la base
+   `prisma` y que el administrador le escriba al bot con `escuchar` corriendo.)*
 2. *(#28c cerrada: la prueba ya no deja `PRISMA_BOT_TOKEN_ADMIN` en el entorno, y el
    incidente de un aviso agotado se escribe en un savepoint: si falla, el lote se
    confirma igual y el fallo se cuenta, se imprime y queda en `ultimo_error`.)*

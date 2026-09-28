@@ -300,3 +300,37 @@ con una dependencia bloqueante abierta hacia otra tarea sin terminar, para
 pedirle cambios a esa entrega y comprobar que vuelve a `en_curso` (no a
 `asignada`); el resto, `asignada`. Nada preaprobado, nada en revisión.
 Detalle completo en `espacios/corework.semilla-ficticia.yaml`.
+
+**8. Designar administrador de plataforma y vincular el bot de
+administración** (T11, Constitución §10): un aviso de incidente sólo le
+llega a quien tiene `platform_role.rol = 'administrador'` **y** ya le
+escribió al bot de administración -- Telegram no deja que un bot le escriba
+primero a quien nunca le escribió. Ninguna de las dos cosas pasa sola en un
+entorno local nuevo.
+
+Agregá a `.env` el token de un bot de administración **aparte** -- nunca el
+mismo que `PRISMA_BOT_TOKEN_COREWORK`: un integrante no puede terminar
+recibiendo avisos de administración por el bot de su propio equipo:
+
+```
+PRISMA_BOT_TOKEN_ADMIN=<el token de BotFather del bot de administración>
+```
+
+Elegí a alguien del equipo ya vinculado (punto 6) y otorgale el rol:
+
+```bash
+python -m prisma administrador corework Ismael
+```
+
+Es idempotente: correrlo de nuevo no duplica el rol, y avisa si la persona
+ya lo tenía. Si todavía no activó su cuenta de Telegram, igual se lo otorga
+-- pero avisa que los incidentes no le van a llegar hasta que la active y
+escriba una vez al bot de administración.
+
+Con `python -m prisma escuchar corework` corriendo (punto 7 -- ahora también
+sondea el bot de administración, sin bloquear, si `PRISMA_BOT_TOKEN_ADMIN`
+está puesto), esa persona le escribe **una vez** cualquier cosa al bot de
+administración. Sin ese mensaje no hay a qué `chat_id` mandarle nada.
+Hacelo mientras el listener está corriendo: Telegram descarta las
+actualizaciones no leídas después de 24 horas, así que un mensaje mandado
+con el listener apagado se puede perder.

@@ -80,6 +80,35 @@ def _administrador(cur, nombre: str, telegram_id: int, *,
     return app_user_id
 
 
+class _RespuestaGetUpdatesFalsa:
+    def __init__(self, updates: list[dict]) -> None:
+        self._updates = updates
+
+    def raise_for_status(self) -> None:
+        return None
+
+    def json(self) -> dict:
+        return {"result": self._updates}
+
+
+class _HttpAdminFalso:
+    """Doble de `self.http` para probar `Escucha.recibir_admin` (T11) sin
+    pegarle nunca a la API real de Telegram: registra cada llamada a `.get`
+    (URL y params) para poder comprobar el sondeo sin bloqueo (`timeout=0`)
+    y el offset propio del bot de administración."""
+
+    def __init__(self, updates: list[dict] | None = None, falla: bool = False) -> None:
+        self.updates = updates if updates is not None else []
+        self.falla = falla
+        self.llamadas: list[dict] = []
+
+    def get(self, url, params=None):
+        self.llamadas.append({"url": url, "params": params})
+        if self.falla:
+            raise ConnectionError("fallo simulado de red")
+        return _RespuestaGetUpdatesFalsa(self.updates)
+
+
 # ---------------------------------------------------------------------------
 # Fan-out a cada administrador alcanzable
 # ---------------------------------------------------------------------------
@@ -675,6 +704,10 @@ def test_tareas_de_fondo_entrega_avisos_admin_apenas_el_token_aparece(
     monkeypatch.setattr(
         local_modulo, "TransporteTelegram",
         lambda token, cliente=None: TransporteDePrueba())
+    # T11: apenas el token aparece, `_obtener_transporte_admin` intenta
+    # sacar un webhook que hubiera quedado puesto sobre el bot de
+    # administración -- nunca la API real de Telegram desde una prueba.
+    monkeypatch.setattr(local_modulo.httpx, "post", lambda *a, **k: None)
 
     e = Escucha(conn, "corework", ws, "tok")
     e.transporte = TransporteDePrueba()
@@ -715,6 +748,7 @@ def test_obtener_transporte_admin_relee_env_cuando_el_token_llega_despues(
     de cada operando: repetir la cadena real ahí la dejaría en la salida de
     la prueba)."""
     from prisma import config as config_modulo
+    from prisma import local as local_modulo
     from prisma.local import Escucha
 
     valor_real = os.environ.pop("PRISMA_BOT_TOKEN_ADMIN", None)
@@ -725,6 +759,10 @@ def test_obtener_transporte_admin_relee_env_cuando_el_token_llega_despues(
         # anota nada para deshacer.
         monkeypatch.setenv("PRISMA_BOT_TOKEN_ADMIN", "placeholder-antes-de-recargar")
         monkeypatch.delenv("PRISMA_BOT_TOKEN_ADMIN")
+        # T11: apenas el token aparece, `_obtener_transporte_admin` intenta
+        # sacar un webhook que hubiera quedado puesto sobre el bot de
+        # administración -- nunca la API real de Telegram desde una prueba.
+        monkeypatch.setattr(local_modulo.httpx, "post", lambda *a, **k: None)
         dotenv = tmp_path / ".env"
         dotenv.write_text("", encoding="utf-8")
         monkeypatch.setattr(config_modulo, "RAIZ", tmp_path)
@@ -766,3 +804,204 @@ def test_obtener_transporte_admin_relee_env_cuando_el_token_llega_despues(
             os.environ["PRISMA_BOT_TOKEN_ADMIN"] = valor_real
         else:
             os.environ.pop("PRISMA_BOT_TOKEN_ADMIN", None)
+
+
+# ---------------------------------------------------------------------------
+# T11: el modo local también sondea el bot de administración
+#
+# Hasta acá nadie podía volverse "alcanzable" (`db/esquema.sql`,
+# `avisar_incidente_admin`) en desarrollo local: nada leía los updates del
+# bot de administración fuera del webhook de `servir`. `Escucha.recibir_admin`
+# cierra ese circuito -- estas pruebas nunca pegan a la API real de Telegram
+# (`_HttpAdminFalso` para `self.http`, y `local_modulo.httpx.post` parchado
+# para el `deleteWebhook` que dispara `_obtener_transporte_admin` la primera
+# vez que el token aparece).
+# ---------------------------------------------------------------------------
+
+def _fijar_token_admin(monkeypatch, config_modulo, token: str = "tok-admin-prueba"):
+    """Mismo criterio que ya usan las pruebas de arriba (C): parchar
+    `Config.token_bot` en vez de tocar variables de entorno, para no
+    depender de si esta máquina tiene un `.env` real con
+    `PRISMA_BOT_TOKEN_ADMIN` puesto."""
+    original = config_modulo.Config.token_bot
+
+    def _con_token_admin(self, slug):
+        if slug == "admin":
+            return token
+        return original(self, slug)
+
+    monkeypatch.setattr(config_modulo.Config, "token_bot", _con_token_admin)
+
+
+def test_recibir_admin_sondea_con_timeout_0_y_offset_propio(
+        conn, corework, monkeypatch, capsys):
+    from prisma import config as config_modulo
+    from prisma import local as local_modulo
+    from prisma.local import Escucha
+
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        _administrador(cur, "Admin Sondeo", 681001)  # todavía no le escribió al bot
+    conn.commit()
+
+    _fijar_token_admin(monkeypatch, config_modulo)
+    monkeypatch.setattr(local_modulo.httpx, "post", lambda *a, **k: None)
+
+    update = {
+        "update_id": 900,
+        "message": {"message_id": 1, "text": "hola, soy administrador",
+                   "chat": {"id": 681001}, "from": {"id": 681001, "first_name": "Admin"}},
+    }
+    http_admin = _HttpAdminFalso(updates=[update])
+    e = Escucha(conn, "corework", ws, "tok", cliente=http_admin)
+
+    recibidos = e.recibir_admin()
+
+    assert recibidos == 1
+    assert len(http_admin.llamadas) == 1
+    llamada = http_admin.llamadas[0]
+    assert llamada["url"] == "https://api.telegram.org/bottok-admin-prueba/getUpdates"
+    assert llamada["params"] == {"offset": 0, "timeout": 0,
+                                 "allowed_updates": '["message"]'}
+    assert e.offset_admin == 901  # update_id + 1, offset propio del bot de administración
+
+    salida = capsys.readouterr().out
+    assert "[admin]" in salida
+    assert "Admin" in salida
+    assert "hola, soy administrador" in salida
+
+    # Reachability de punta a punta (T11): el sondeo dejó el `mensaje_admin`
+    # que `avisar_incidente_admin` exige -- un incidente posterior SÍ le
+    # encola un aviso a este administrador.
+    with admin(conn) as cur:
+        cur.execute(
+            """select actor_app_user_id, detalle from audit_log
+                where accion = 'mensaje_admin'""")
+        filas = cur.fetchall()
+        assert len(filas) == 1
+        assert filas[0]["detalle"]["chat_id"] == 681001
+
+        incidentes.registrar_incidente(
+            cur, ws, "Falló algo en una prueba.", etapa="prueba_directa")
+        cur.execute("select chat_id from admin_notice")
+        avisos = cur.fetchall()
+    conn.commit()
+
+    assert [a["chat_id"] for a in avisos] == [681001]
+
+
+def test_recibir_admin_sin_token_no_sondea_y_no_rompe(conn, corework, monkeypatch):
+    from prisma import config as config_modulo
+    from prisma.local import Escucha
+
+    def _sin_token(self, slug):
+        raise LookupError(f"Falta PRISMA_BOT_TOKEN_{slug.upper()} en el entorno")
+
+    monkeypatch.setattr(config_modulo.Config, "token_bot", _sin_token)
+
+    ws = corework.workspace_id
+    http_admin = _HttpAdminFalso()
+    e = Escucha(conn, "corework", ws, "tok", cliente=http_admin)
+
+    recibidos = e.recibir_admin()  # no debe levantar
+
+    assert recibidos == 0
+    assert http_admin.llamadas == []  # nunca sondeó: ni un solo GET
+    assert e.offset_admin == 0
+    assert e._transporte_admin is None
+
+
+def test_recibir_admin_borra_un_webhook_viejo_la_primera_vez_que_aparece_el_token(
+        conn, corework, monkeypatch):
+    """Mismo motivo que en `escuchar()` para el bot del espacio (comentario
+    cerca de la línea 340 de `local.py`): un webhook activo bloquea
+    `getUpdates`. Acá se saca sobre el bot de administración la primera vez
+    que `PRISMA_BOT_TOKEN_ADMIN` aparece -- nunca en las vueltas
+    siguientes, porque `_transporte_admin` ya queda cacheado."""
+    from prisma import config as config_modulo
+    from prisma import local as local_modulo
+    from prisma.local import Escucha
+
+    ws = corework.workspace_id
+    _fijar_token_admin(monkeypatch, config_modulo, token="tok-admin-webhook")
+    llamadas_delete: list[str] = []
+    monkeypatch.setattr(
+        local_modulo.httpx, "post",
+        lambda url, timeout=None: llamadas_delete.append(url))
+
+    e = Escucha(conn, "corework", ws, "tok", cliente=_HttpAdminFalso())
+
+    e.recibir_admin()
+    assert llamadas_delete == [
+        "https://api.telegram.org/bottok-admin-webhook/deleteWebhook"]
+
+    e.recibir_admin()  # segunda vuelta: no lo vuelve a borrar
+    assert llamadas_delete == [
+        "https://api.telegram.org/bottok-admin-webhook/deleteWebhook"]
+
+
+def test_recibir_admin_error_de_procesamiento_registra_incidente_global_y_sigue(
+        conn, corework, monkeypatch, capsys):
+    """B: nunca en silencio (regla del proyecto) -- pero acá no hay espacio
+    (`gateway.reportar_incidente_no_manejado` haría `if workspace_id is
+    None: return` y perdería el incidente), así que
+    `_reportar_incidente_admin_no_manejado` registra uno global."""
+    from prisma import config as config_modulo
+    from prisma import local as local_modulo
+    from prisma.local import Escucha
+
+    ws = corework.workspace_id
+    _fijar_token_admin(monkeypatch, config_modulo)
+    monkeypatch.setattr(local_modulo.httpx, "post", lambda *a, **k: None)
+    monkeypatch.setattr(
+        local_modulo, "procesar_update",
+        lambda *a, **k: (_ for _ in ()).throw(RuntimeError("fallo simulado admin")))
+
+    update = {
+        "update_id": 950,
+        "message": {"message_id": 2, "text": "esto rompe",
+                   "chat": {"id": 691001}, "from": {"id": 691001, "first_name": "Rota"}},
+    }
+    e = Escucha(conn, "corework", ws, "tok",
+               cliente=_HttpAdminFalso(updates=[update]))
+
+    recibidos = e.recibir_admin()  # no debe levantar la excepción
+
+    assert recibidos == 1
+    salida = capsys.readouterr().out
+    assert "no se pudo procesar [admin]: RuntimeError" in salida
+
+    with admin(conn) as cur:
+        cur.execute(
+            """select severidad, etapa, chat_id, referencia_cruda from incident
+                where workspace_id is null and etapa = 'mensaje_admin'""")
+        incidente = cur.fetchone()
+
+    assert incidente is not None
+    assert incidente["severidad"] == "alta"
+    assert incidente["chat_id"] == 691001
+    assert "fallo simulado admin" in incidente["referencia_cruda"]
+    # El offset ya avanzó aunque el procesamiento haya fallado: no reintenta
+    # el mismo update para siempre (mismo criterio que `recibir`).
+    assert e.offset_admin == 951
+
+
+def test_error_de_red_se_describe_sin_la_url_que_lleva_el_token():
+    """El mensaje de un error de httpx incluye la URL, y la URL de la API de
+    Telegram lleva el token del bot: la consola del listener no lo muestra."""
+    import httpx
+
+    from prisma.local import _error_sin_url
+
+    pedido = httpx.Request("GET", "https://api.telegram.org/bot123:SECRETO/getUpdates")
+    respuesta = httpx.Response(401, request=pedido)
+    error = httpx.HTTPStatusError("fallo", request=pedido, response=respuesta)
+    error_con_url = httpx.ConnectError(f"sin red para {pedido.url}", request=pedido)
+
+    descripcion = _error_sin_url(error)
+    descripcion_conexion = _error_sin_url(error_con_url)
+
+    filtra_token = "SECRETO" in descripcion or "SECRETO" in descripcion_conexion
+    assert not filtra_token, "la descripción del error incluye el token"
+    assert descripcion == "HTTPStatusError HTTP 401"
+    assert descripcion_conexion == "ConnectError"

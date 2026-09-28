@@ -28,6 +28,7 @@ from .despachador import (Transporte, TransporteTelegram, despachar,
                           despachar_avisos_admin)
 from .gateway import (ETAPA_TOQUE_BOTON, ETAPA_TURNO_TEXTO, procesar_update,
                       reportar_incidente_no_manejado)
+from .incidentes import registrar_incidente
 from .reloj import ejecutar_cadencia, ejecutar_escalera
 
 _seguir = True
@@ -36,6 +37,13 @@ _seguir = True
 # token todavía no aparece -- el listener corre cada unos segundos y sin
 # este tope le pegaría al disco en cada pasada.
 _RELECTURA_DOTENV_CADA = timedelta(minutes=1)
+
+# Etapa de la red de contención (T11) para un update del canal de
+# administración que se escapó de `gateway.procesar_update` sin que nada
+# específico lo atajara -- mismo criterio que `gateway.ETAPA_TURNO_TEXTO` /
+# `ETAPA_TOQUE_BOTON`, pero acá no hay espacio: ver
+# `_reportar_incidente_admin_no_manejado`.
+ETAPA_MENSAJE_ADMIN = "mensaje_admin"
 
 
 def _imprimir(texto: str = "") -> None:
@@ -50,10 +58,50 @@ def _imprimir(texto: str = "") -> None:
     salida.flush()
 
 
+def _error_sin_url(e: Exception) -> str:
+    """Describe un error de red sin su mensaje: el de httpx incluye la URL,
+    y la URL de la API de Telegram lleva el token del bot (`/bot<token>/`)."""
+    respuesta = getattr(e, "response", None)
+    if respuesta is not None:
+        return f"{type(e).__name__} HTTP {respuesta.status_code}"
+    return type(e).__name__
+
+
 def _parar(*_):
     global _seguir
     _seguir = False
     _imprimir("\nCortando…")
+
+
+def _reportar_incidente_admin_no_manejado(conn, *, chat_id: int | None,
+                                          error: Exception) -> None:
+    """Misma red de contención que `gateway.reportar_incidente_no_manejado`
+    (decisión del usuario, 2026-09-25: un error nunca pasa en silencio), pero
+    para el canal de administración -- esa función no sirve acá porque hace
+    `if workspace_id is None: return` (usa `identificar_en_espacio` y
+    `espacio()`, que necesitan un espacio activo) y un update del bot de
+    administración no es de ningún espacio en particular.
+
+    El incidente queda registrado global (`workspace_id=None`), mismo camino
+    que ya cubre `incidentes.registrar_incidente` para el validador de
+    invariantes -- y bajo rol `prisma_admin`, como el resto de lo que toca el
+    canal de administración. Nunca deja escapar una excepción propia: si ni
+    siquiera esto funciona, el aviso se pierde pero el ciclo que sigue
+    escuchando no se cuelga."""
+    resumen = (f"Excepción no manejada en '{ETAPA_MENSAJE_ADMIN}' "
+              f"({type(error).__name__}).")
+    try:
+        with admin(conn) as cur:
+            registrar_incidente(
+                cur, None, resumen, severidad="alta",
+                referencia_cruda=str(error)[:2000], etapa=ETAPA_MENSAJE_ADMIN,
+                chat_id=chat_id)
+        conn.commit()
+    except Exception:  # noqa: BLE001
+        try:
+            conn.rollback()
+        except Exception:  # noqa: BLE001
+            pass
 
 
 class Escucha:
@@ -66,9 +114,11 @@ class Escucha:
         self.token = token
         self.http = cliente or httpx.Client(timeout=40)
         self.offset = 0
+        self.offset_admin = 0
         self.transporte = TransporteTelegram(token, cliente=httpx.Client(timeout=15))
         self.authority_conn = authority_conn
         self._transporte_admin: Transporte | None = None
+        self._token_admin: str | None = None
         self._ultimo_reintento_dotenv: datetime | None = None
         self._avisado_falta_token_admin = False
 
@@ -76,6 +126,7 @@ class Escucha:
 
     def una_vuelta(self, espera: int = 25) -> int:
         recibidos = self.recibir(espera)
+        recibidos += self.recibir_admin()
         self.tareas_de_fondo()
         return recibidos
 
@@ -91,7 +142,7 @@ class Escucha:
             r.raise_for_status()
             updates = r.json().get("result", [])
         except Exception as e:  # noqa: BLE001
-            _imprimir(f"  (sin conexión con Telegram: {e})")
+            _imprimir(f"  (sin conexión con Telegram: {_error_sin_url(e)})")
             time.sleep(5)
             return 0
 
@@ -125,6 +176,53 @@ class Escucha:
                     self.conn, workspace_id=self.ws, chat_id=chat_id,
                     tg_user=tg_user, error=e, etapa=etapa)
                 _imprimir(f"  ! no se pudo procesar: {type(e).__name__}")
+        return len(updates)
+
+    def recibir_admin(self) -> int:
+        """Sondea el bot de administración, aparte del bot del espacio que
+        atiende `recibir` (T11: sin esto, nadie podía volverse "alcanzable"
+        -- `db/esquema.sql`, `avisar_incidente_admin` -- en desarrollo local,
+        porque nada leía sus updates fuera del webhook de `servir`).
+
+        `timeout=0`: no bloqueante a propósito, para no sumarle latencia al
+        long poll del bot del espacio (`recibir`, que ya espera hasta
+        `espera` segundos por vuelta) -- esto sondea "hay algo ahora", no
+        espera a que aparezca. Offset propio (`self.offset_admin`): son dos
+        bots distintos, cada uno con su propia numeración de updates."""
+        transporte_admin = self._obtener_transporte_admin()
+        if transporte_admin is None:
+            return 0
+
+        try:
+            r = self.http.get(
+                f"https://api.telegram.org/bot{self._token_admin}/getUpdates",
+                params={"offset": self.offset_admin, "timeout": 0,
+                        "allowed_updates": '["message"]'})
+            r.raise_for_status()
+            updates = r.json().get("result", [])
+        except Exception as e:  # noqa: BLE001
+            _imprimir("  (sin conexión con el bot de administración: "
+                      f"{_error_sin_url(e)})")
+            return 0
+
+        for u in updates:
+            self.offset_admin = u["update_id"] + 1
+            mensaje = u.get("message") or {}
+            quien = mensaje.get("from", {}).get("first_name", "?")
+            _imprimir(f"  ← [admin] {quien}: {mensaje.get('text', '')[:70]}")
+            try:
+                procesar_update(self.conn, "admin", u,
+                                authority_conn=self.authority_conn)
+            except Exception as e:  # noqa: BLE001
+                # Mismo criterio que en `recibir`: un update que rompe no
+                # puede frenar la escucha, y nunca en silencio -- pero acá no
+                # hay espacio (`_reportar_incidente_admin_no_manejado`,
+                # no `gateway.reportar_incidente_no_manejado`).
+                self.conn.rollback()
+                chat_id = mensaje.get("chat", {}).get("id")
+                _reportar_incidente_admin_no_manejado(
+                    self.conn, chat_id=chat_id, error=e)
+                _imprimir(f"  ! no se pudo procesar [admin]: {type(e).__name__}")
         return len(updates)
 
     def _obtener_transporte_admin(self) -> Transporte | None:
@@ -161,8 +259,25 @@ class Escucha:
                           "configure)")
             return None
 
+        self._token_admin = token
         self._transporte_admin = TransporteTelegram(
             token, cliente=httpx.Client(timeout=15))
+
+        # Un webhook activo bloquea getUpdates (mismo motivo que en
+        # `escuchar`, más abajo, para el bot del espacio): si quedó uno de
+        # una prueba anterior sobre el bot de administración, se saca la
+        # primera vez que el token aparece -- este bloque sólo corre una vez
+        # por proceso, porque `self._transporte_admin` ya queda cacheado de
+        # acá en más. Nunca en silencio si falla, pero tampoco frena el
+        # listener: `recibir_admin` va a mostrar el problema de nuevo en la
+        # próxima vuelta si el webhook seguía puesto.
+        try:
+            httpx.post(f"https://api.telegram.org/bot{token}/deleteWebhook",
+                      timeout=15)
+        except Exception as e:  # noqa: BLE001
+            _imprimir("  (no se pudo confirmar que el bot de administración "
+                      f"no tenga un webhook puesto: {_error_sin_url(e)})")
+
         return self._transporte_admin
 
     def tareas_de_fondo(self, ahora: datetime | None = None) -> dict[str, int]:

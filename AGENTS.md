@@ -122,6 +122,7 @@ python -m prisma importar corework
 python -m prisma importar corework --activar
 python -m prisma feriados corework
 python -m prisma enlaces corework --solo <nombres>
+python -m prisma administrador corework <nombre>
 python -m prisma escuchar corework
 python -m prisma estado corework
 python -m prisma correr corework <cadencia>

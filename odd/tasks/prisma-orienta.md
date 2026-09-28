@@ -3708,3 +3708,22 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   completo, con el token real del bot de administración, en la salida de una
   herramienta del escritor; se reescribió la aserción para que no pueda volver a
   imprimirlo y se recomendó al usuario rotar el token.
+
+- 2026-09-28: **Administrador alcanzable en modo local (T11 de la sesión).** Ruta:
+  delegada, un escritor (el primer intento se cortó por el límite de uso, sin dejar
+  cambios; se relanzó igual). `python -m prisma administrador <espacio> <nombre>`:
+  busca entre los integrantes activos por fragmento del nombre, prefiere la
+  coincidencia exacta (ajuste del orquestador: es un rol privilegiado), frena si hay
+  cero o varias, otorga `platform_role` de forma idempotente y audita
+  `otorgar_administrador` sólo cuando es nuevo. `Escucha.recibir_admin` sondea el bot de
+  administración con `timeout=0` y offset propio, y enruta cada update por
+  `procesar_update(conn, "admin", ...)`; un error queda como incidente global.
+  Ajuste del orquestador por seguridad: los errores de red se imprimen sin su mensaje
+  (`_error_sin_url`), porque el de httpx trae la URL y la URL lleva el token; también
+  en `recibir`, que ya lo hacía antes. ROJO/VERDE del escritor (comando inexistente,
+  método inexistente) y del orquestador para la coincidencia exacta (`«mar» es
+  ambiguo`, 3 personas); la prueba de `_error_sin_url` se escribió después del cambio.
+  Suite completa del escritor: `1051 passed, 108 deselected`; con los ajustes y sus
+  dos pruebas, orquestador: `1053 passed, 108 deselected`. Pendiente del
+  administrador: el bot no le responde nada cuando le escribe (sólo identifica y
+  audita), así que no hay confirmación visible de que quedó vinculado.
