@@ -617,6 +617,73 @@ ficticios, una interacción por vez; el primer defecto detiene el lote.
   informativo con quiénes faltan. El bloqueo hasta verificar rige sólo para
   las altas nuevas con la clave encendida.
 
+### Textos del alta con correo aprobados por el usuario (2026-09-28)
+
+Regla general aprobada: ningún mensaje termina en "escribime y lo vemos" ni
+deja a la persona sin salida; cada problema trae el paso siguiente listo (un
+botón, o Prisma hace sola lo obvio y seguro y lo dice). Cuando hablamos del
+correo, se muestra la dirección. Los textos del pack (`01` §5) se mantienen
+literales; estos son los que no tienen equivalente en el pack.
+
+- A. Cuerpo del correo: "Hola, {nombre}.
+
+Para terminar tu alta en Prisma
+  necesito que confirmes que este es tu correo laboral.
+
+Verificar correo:
+  {enlace}
+
+Este enlace vence en 24 horas, sirve una sola vez y tiene que
+  abrirse con la misma cuenta de Telegram que usás para hablar con Prisma."
+- B1. Dos correos: "Encontré más de un correo en ese mensaje. ¿Cuál de estos
+  es el que querés usar?" (un botón por dirección).
+- B2. Otra cosa sin verificar: "Te mandé el correo de verificación a
+  {correo}. ¿No te llegó?" **[Reenviarlo]** **[Usar otro correo]**.
+- B3. Otra dirección con verificación pendiente: "¿Uso {nuevo} en lugar de
+  {anterior}?" **[Sí, usar {nuevo}]** **[No, dejar {anterior}]**.
+- B4. Mantiene la anterior: "Perfecto, seguimos con el correo anterior."
+- B5. Enlace vencido: Prisma manda uno nuevo sola, respetando los límites:
+  "Ese enlace venció, así que te mandé uno nuevo a {correo}." (sin envíos
+  disponibles → B11 o B12).
+- B6. Enlace real abierto desde una cuenta de Telegram que no es la de su
+  dueño (integrante o no): "Este enlace tiene que abrirse con la cuenta de
+  Telegram que usás con Prisma." El enlace no se consume. Un enlace
+  inexistente de una cuenta desconocida no recibe respuesta (como hoy). Un
+  enlace roto de un integrante con verificación pendiente: Prisma manda uno
+  nuevo sola: "Ese enlace no funciona, así que te mandé uno nuevo a
+  {correo}."
+- B7. Enlace ya usado y correo ya verificado: "Tu correo ya está
+  verificado ✅". B7b. Enlace viejo reemplazado por uno más nuevo: "Ese
+  enlace ya no sirve porque te mandé uno más nuevo." **[Reenviar el último]**.
+- B8. Doble clic: "Ya estoy procesando esa verificación. Esperá un momento y
+  revisá si te llegó la confirmación."
+- B9. El estado cambió mientras verificaba: sin texto fijo; Prisma sigue
+  desde el estado actual (si falta el correo, lo pide; si ya está
+  verificado, lo confirma).
+- B10. Reenviar sin nada pendiente: "Todavía no tengo tu correo. Pasámelo y
+  te envío la verificación."
+- B11. Límite por hora: "Se enviaron varios correos de verificación en la
+  última hora. Por seguridad, sólo puedo reenviarte otro a partir de las
+  {hh:mm}." (hora local del espacio).
+- B12. Cinco envíos agotados: "Se agotaron los envíos de verificación. Ya le
+  avisé a administración y te escribo apenas lo destrabe." — sólo cuando el
+  aviso efectivamente se entrega (G1d-a) y exista la acción de la
+  administración para habilitar un nuevo intento (decisión pendiente de
+  G1d); hasta entonces se mantiene "Quedó registrado para que
+  administración te ayude."
+- C. Verificación en modo `existente`: "✅ Gracias, {nombre}. Tu correo quedó
+  verificado."
+- D. Sin variantes sin nombre: el nombre lo carga la administración al
+  definir el equipo (pack o entrevista, `nucleo/alta-de-equipo.md` Bloque 2)
+  y es obligatorio. Hallazgo para `main`: la base acepta `nombre = ''`
+  (sólo `not null`) y el importador no lo valida
+  (`src/prisma/importador.py`, `_importar_personas`); rechazarlo en origen
+  es trabajo de la sesión principal.
+- E. `{nombre}` = primera palabra del nombre guardado.
+
+Pendiente: aplicar estos textos (unidad G1t) cuando termine G1d-a, que toca
+los mismos archivos.
+
 ## Ruta
 
 | Tarea | Ruta | Evidencia del disparador |
