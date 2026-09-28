@@ -18,6 +18,7 @@ import signal
 import sys
 import time
 from datetime import datetime, timedelta, timezone
+from typing import NamedTuple
 from urllib.parse import urlsplit
 
 import httpx
@@ -52,6 +53,14 @@ _RECONSULTA_WEBHOOK_ADMIN_CADA = timedelta(minutes=1)
 # `ETAPA_TOQUE_BOTON`, pero acá no hay espacio: ver
 # `_reportar_incidente_admin_no_manejado`.
 ETAPA_MENSAJE_ADMIN = "mensaje_admin"
+
+
+class _AdminBot(NamedTuple):
+    """Token y transporte del bot de administración, cacheados juntos: un
+    transporte sin su token no es representable (R2-003, revisión
+    2026-09-28)."""
+    token: str
+    transporte: Transporte
 
 
 def _imprimir(texto: str = "") -> None:
@@ -125,8 +134,7 @@ class Escucha:
         self.offset_admin = 0
         self.transporte = TransporteTelegram(token, cliente=httpx.Client(timeout=15))
         self.authority_conn = authority_conn
-        self._transporte_admin: Transporte | None = None
-        self._token_admin: str | None = None
+        self._admin_bot: _AdminBot | None = None
         self._ultimo_reintento_dotenv: datetime | None = None
         self._avisado_falta_token_admin = False
         self._ultimo_chequeo_webhook_admin: datetime | None = None
@@ -199,18 +207,13 @@ class Escucha:
         `espera` segundos por vuelta) -- esto sondea "hay algo ahora", no
         espera a que aparezca. Offset propio (`self.offset_admin`): son dos
         bots distintos, cada uno con su propia numeración de updates."""
-        transporte_admin = self._obtener_transporte_admin()
-        if transporte_admin is None:
+        if self._obtener_transporte_admin() is None:
             return 0
-
-        token_admin = self._token_admin_resuelto()
-        if token_admin is None:
-            # No debería pasar -- `_obtener_transporte_admin` sólo cachea el
-            # transporte junto con el token -- pero nunca en silencio si
-            # pasara (R2-001, revisión 2026-09-28).
-            _imprimir("  ! transporte de administración sin token asociado "
-                      "-- se salta esta vuelta")
-            return 0
+        # `self._admin_bot` quedó cacheado por `_obtener_transporte_admin`
+        # -- token y transporte juntos (`_AdminBot`, R2-003, revisión
+        # 2026-09-28), así que si el transporte está resuelto el token
+        # también lo está, por construcción.
+        token_admin = self._admin_bot.token
 
         try:
             r = self.http.get(
@@ -244,16 +247,7 @@ class Escucha:
                 _imprimir(f"  ! no se pudo procesar [admin]: {type(e).__name__}")
         return len(updates)
 
-    def _token_admin_resuelto(self) -> str | None:
-        """El token de administración, sólo cuando ya hay un transporte
-        confirmado -- `_obtener_transporte_admin` cachea los dos juntos, en
-        el mismo momento. Explícito en vez de que `recibir_admin` arme la
-        URL de `getUpdates` leyendo `self._token_admin` como un efecto
-        lateral de esa función (R2-001, revisión 2026-09-28): así esa URL
-        nunca puede terminar armada con `None`."""
-        return self._token_admin if self._transporte_admin is not None else None
-
-    def _obtener_transporte_admin(self) -> Transporte | None:
+    def _obtener_transporte_admin(self, ahora: datetime | None = None) -> Transporte | None:
         """El bot de administración es opcional en desarrollo local: si
         `PRISMA_BOT_TOKEN_ADMIN` no está configurado, los avisos de
         incidente quedan encolados en `admin_notice` igual (los arma
@@ -275,11 +269,16 @@ class Escucha:
         bot servido por webhook en otro lado, como el de producción. Si hay
         uno puesto, no lo toca ni sondea, avisa una vez y vuelve a consultar
         cada `_RECONSULTA_WEBHOOK_ADMIN_CADA`; una consulta fallida se avisa
-        y se reintenta igual, nunca se da por buena."""
-        if self._transporte_admin is not None:
-            return self._transporte_admin
+        y se reintenta igual, nunca se da por buena.
 
-        ahora = datetime.now(timezone.utc)
+        `ahora` es inyectable (mismo patrón que `tareas_de_fondo` /
+        `correr_cadencia`) para que las pruebas del throttle de
+        `_RECONSULTA_WEBHOOK_ADMIN_CADA` controlen el tiempo sin depender
+        del reloj real ni pisar `_ultimo_chequeo_webhook_admin` a mano."""
+        if self._admin_bot is not None:
+            return self._admin_bot.transporte
+
+        ahora = ahora or datetime.now(timezone.utc)
         if (self._ultimo_reintento_dotenv is None
                 or ahora - self._ultimo_reintento_dotenv >= _RELECTURA_DOTENV_CADA):
             self._ultimo_reintento_dotenv = ahora
@@ -302,8 +301,11 @@ class Escucha:
         self._ultimo_chequeo_webhook_admin = ahora
 
         try:
+            # 5s, no 15s: corre en el único hilo del listener -- una demora
+            # larga acá le resta esa misma demora a `recibir` (R4-001,
+            # revisión 2026-09-28).
             r = httpx.get(f"https://api.telegram.org/bot{token}/getWebhookInfo",
-                         timeout=15)
+                         timeout=5)
             r.raise_for_status()
             cuerpo = r.json()
             if not cuerpo.get("ok"):
@@ -325,13 +327,14 @@ class Escucha:
                     "updates (probablemente `servir` en producción). Si es "
                     "un resto de una prueba local anterior sobre ESTE "
                     "bot, sacalo a mano (`deleteWebhook`, ver "
-                    "PRUEBA-LOCAL.md) y esta vuelta lo detecta sola.")
+                    "PRUEBA-LOCAL.md) -- se detecta solo, dentro de un "
+                    "minuto aproximadamente, sin reiniciar nada.")
             return None
 
-        self._token_admin = token
-        self._transporte_admin = TransporteTelegram(
-            token, cliente=httpx.Client(timeout=15))
-        return self._transporte_admin
+        self._admin_bot = _AdminBot(
+            token=token,
+            transporte=TransporteTelegram(token, cliente=httpx.Client(timeout=15)))
+        return self._admin_bot.transporte
 
     def tareas_de_fondo(self, ahora: datetime | None = None) -> dict[str, int]:
         ahora = ahora or datetime.now(timezone.utc)

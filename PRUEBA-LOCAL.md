@@ -348,4 +348,5 @@ sobre uno de producción), sacalo a mano una vez con:
 curl "https://api.telegram.org/bot<token>/deleteWebhook"
 ```
 
-y la vuelta siguiente del listener lo detecta sola, sin reiniciar nada.
+y el listener lo detecta solo, dentro de un minuto aproximadamente, sin
+reiniciar nada.

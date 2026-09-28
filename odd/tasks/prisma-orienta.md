@@ -3742,3 +3742,19 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   del bot de administración local. Suite completa (escritor): `1056 passed, 108
   deselected`. Sin cambios: el `deleteWebhook` del bot del espacio al arrancar
   `escuchar`, anterior a esta unidad.
+  Revisión de `1117e5d`: alto (`high_risk`); consentimiento del usuario: revisar.
+  review-c4440d6c45ac75c2 (4 lentes) aprobada y reconocida; frontera en `1117e5d`.
+  Hallazgos no bloqueantes -> #11c.
+
+- 2026-09-28: **#11c cerrada — seguimientos de review-c4440d6c.** Ruta: delegada, un
+  escritor. El aviso de consola y `PRUEBA-LOCAL.md` dicen que un webhook sacado a mano
+  se detecta dentro de un minuto (no "la vuelta siguiente"); `getWebhookInfo` baja a 5 s
+  de timeout; token y transporte del bot de administración viven juntos en `_AdminBot`,
+  sin la guarda muerta; `_obtener_transporte_admin(ahora=...)` permite probar la espera
+  de un minuto: ROJO observado anulando la condición (`2 == 1`), VERDE con ella. Suite
+  completa (orquestador): `1057 passed, 108 deselected`. La corrida del escritor tuvo 2
+  fallas `tuple concurrently updated` en `tests/test_task_intake.py` que pasan aisladas
+  (la intermitencia ya documentada).
+  Decisión del usuario: las cadencias se configuran desde la plataforma (tablero de
+  cliente) y un cambio toma efecto sin reiniciar; quedó explícito en
+  `docs/ROADMAP.md` (`94a323d`) y es requisito de #29.

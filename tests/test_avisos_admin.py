@@ -623,7 +623,7 @@ def test_tareas_de_fondo_despacha_los_avisos_admin_en_el_modo_local(conn, corewo
     espacio (`local.Escucha.tareas_de_fondo`) también despacha los avisos de
     administración -- no están acotados a ningún espacio en particular, así
     que se despachan aparte, bajo rol `prisma_admin`."""
-    from prisma.local import Escucha
+    from prisma.local import _AdminBot, Escucha
 
     ws = corework.workspace_id
     with admin(conn) as cur:
@@ -634,7 +634,8 @@ def test_tareas_de_fondo_despacha_los_avisos_admin_en_el_modo_local(conn, corewo
 
     e = Escucha(conn, "corework", ws, "tok")
     transporte_admin = TransporteDePrueba()
-    e._transporte_admin = transporte_admin  # ya hay transporte: se salta la búsqueda del token
+    # ya hay transporte (y token) cacheados juntos: se salta la búsqueda.
+    e._admin_bot = _AdminBot(token="tok-admin-ya-resuelto", transporte=transporte_admin)
     e.transporte = TransporteDePrueba()  # el de la cola del espacio, sin usar acá
 
     resumen = e.tareas_de_fondo()
@@ -729,13 +730,13 @@ def test_tareas_de_fondo_entrega_avisos_admin_apenas_el_token_aparece(
 
     resumen1 = e.tareas_de_fondo()
     assert "avisos_admin_enviados" not in resumen1  # primera pasada: sin token, no rompe
-    assert e._transporte_admin is None
+    assert e._admin_bot is None
 
     e.transporte = TransporteDePrueba()
     resumen2 = e.tareas_de_fondo()
     assert resumen2["avisos_admin_enviados"] == 1    # segunda pasada: ya hay token, entrega
-    assert e._transporte_admin is not None
-    assert len(e._transporte_admin.enviados) == 1
+    assert e._admin_bot is not None
+    assert len(e._admin_bot.transporte.enviados) == 1
 
 
 def test_obtener_transporte_admin_relee_env_cuando_el_token_llega_despues(
@@ -783,7 +784,7 @@ def test_obtener_transporte_admin_relee_env_cuando_el_token_llega_despues(
         e = Escucha(conn, "corework", ws, "tok")
 
         assert e._obtener_transporte_admin() is None
-        assert e._transporte_admin is None
+        assert e._admin_bot is None
 
         # El token se agrega al archivo mientras el proceso sigue corriendo.
         dotenv.write_text("PRISMA_BOT_TOKEN_ADMIN=tok-admin-nuevo\n", encoding="utf-8")
@@ -791,7 +792,7 @@ def test_obtener_transporte_admin_relee_env_cuando_el_token_llega_despues(
 
         transporte = e._obtener_transporte_admin()
         assert transporte is not None
-        assert e._transporte_admin is transporte
+        assert e._admin_bot.transporte is transporte
 
         # `recargar_dotenv` escribe el token en `os.environ` con
         # `setdefault`, por fuera de `monkeypatch` -- si el `setenv`/
@@ -957,7 +958,7 @@ def test_recibir_admin_sin_token_no_sondea_y_no_rompe(conn, corework, monkeypatc
     assert recibidos == 0
     assert http_admin.llamadas == []  # nunca sondeó: ni un solo GET
     assert e.offset_admin == 0
-    assert e._transporte_admin is None
+    assert e._admin_bot is None
 
 
 def test_obtener_transporte_admin_consulta_getwebhookinfo_una_sola_vez_cuando_esta_vacio(
@@ -965,9 +966,9 @@ def test_obtener_transporte_admin_consulta_getwebhookinfo_una_sola_vez_cuando_es
     """Mismo motivo que en `escuchar()` para el bot del espacio: un webhook
     activo bloquea `getUpdates`, así que antes de sondear por primera vez
     hay que confirmar que el bot de administración no tiene uno puesto. La
-    consulta corre una sola vez por proceso -- una vez que
-    `_transporte_admin` queda cacheado (webhook vacío), las vueltas
-    siguientes no vuelven a pegarle a la API de Telegram para esto."""
+    consulta corre una sola vez por proceso -- una vez que `_admin_bot`
+    queda cacheado (webhook vacío), las vueltas siguientes no vuelven a
+    pegarle a la API de Telegram para esto."""
     from prisma import config as config_modulo
     from prisma import local as local_modulo
     from prisma.local import Escucha
@@ -991,6 +992,55 @@ def test_obtener_transporte_admin_consulta_getwebhookinfo_una_sola_vez_cuando_es
     e.recibir_admin()  # segunda vuelta: no la vuelve a consultar
     assert llamadas_get == [
         "https://api.telegram.org/bottok-admin-sin-webhook/getWebhookInfo"]
+
+
+def test_obtener_transporte_admin_throttlea_la_reconsulta_de_getwebhookinfo(
+        conn, corework, monkeypatch):
+    """R3-001/R4-002 (revisión de confiabilidad y resiliencia, 2026-09-28):
+    las pruebas de reintento de arriba (falla de red, `ok=false`, webhook ya
+    puesto) resetean `_ultimo_chequeo_webhook_admin` a mano para forzar la
+    "vuelta posterior" -- eso salta por completo el throttle de
+    `_RECONSULTA_WEBHOOK_ADMIN_CADA`, así que ninguna prueba probaba el
+    throttle en sí. Acá se inyecta `ahora` explícito (parámetro de
+    `_obtener_transporte_admin`) en vez de tocar el reloj real o el
+    atributo privado: dentro de la ventana no vuelve a pegarle a
+    `getWebhookInfo`, y pasada la ventana sí.
+
+    La consulta se deja fallando siempre (nunca resuelve el transporte) para
+    que el throttle sea lo único que decida si hay una llamada nueva o no --
+    con éxito, `_admin_bot` quedaría cacheado y el primer `if self._admin_bot
+    is not None` de la función taparía lo que se está probando acá."""
+    from prisma import config as config_modulo
+    from prisma import local as local_modulo
+    from prisma.local import Escucha
+
+    ws = corework.workspace_id
+    _fijar_token_admin(monkeypatch, config_modulo, token="tok-admin-throttle")
+    llamadas_get: list[str] = []
+
+    def _get_que_siempre_falla(url, timeout=None):
+        llamadas_get.append(url)
+        raise ConnectionError("fallo simulado consultando getWebhookInfo")
+
+    monkeypatch.setattr(local_modulo.httpx, "get", _get_que_siempre_falla)
+
+    e = Escucha(conn, "corework", ws, "tok", cliente=_HttpAdminFalso())
+
+    t0 = datetime.now(timezone.utc)
+    assert e._obtener_transporte_admin(ahora=t0) is None
+    assert len(llamadas_get) == 1
+
+    # Dentro de la ventana de `_RECONSULTA_WEBHOOK_ADMIN_CADA`: no vuelve a
+    # consultar `getWebhookInfo`.
+    dentro_de_la_ventana = (
+        t0 + local_modulo._RECONSULTA_WEBHOOK_ADMIN_CADA - timedelta(seconds=1))
+    assert e._obtener_transporte_admin(ahora=dentro_de_la_ventana) is None
+    assert len(llamadas_get) == 1
+
+    # Pasada la ventana: vuelve a consultar.
+    pasada_la_ventana = t0 + local_modulo._RECONSULTA_WEBHOOK_ADMIN_CADA
+    assert e._obtener_transporte_admin(ahora=pasada_la_ventana) is None
+    assert len(llamadas_get) == 2
 
 
 def test_recibir_admin_no_sondea_si_el_bot_de_administracion_ya_tiene_webhook(
@@ -1023,7 +1073,7 @@ def test_recibir_admin_no_sondea_si_el_bot_de_administracion_ya_tiene_webhook(
     assert recibidos == 0
     assert http_admin.llamadas == []  # nunca sondeó al bot de administración
     assert llamadas_post == []        # y nunca le llamó a `deleteWebhook`
-    assert e._transporte_admin is None
+    assert e._admin_bot is None
 
     salida = capsys.readouterr().out
     assert salida.count("ya tiene un webhook puesto") == 1
