@@ -74,6 +74,15 @@ gestión.
   segunda sesión por Telegram.
   - [x] Documentación (2026-09-26, ver Progreso).
   - [ ] Segunda sesión real por Telegram, datos ficticios (necesita al usuario).
+- [x] **T7 — Base nueva y siembra reproducible para la tercera ronda por Telegram.**
+  Decisión del usuario (2026-09-27): base dedicada nueva (`prisma`) creada desde
+  `db/esquema.sql` completo (ya con 0013-0016), sembrada con un comando reproducible
+  (mismas personas del pack y mismas tareas ficticias, títulos sin "(simulado)",
+  `evidencia_requerida` coherente con la política del pack, estados iniciales que
+  permitan probar la entrega con evidencia y "Pedir cambios"). La base actual
+  (`postgres`, con los datos de las sesiones 1 y 2) queda intacta como respaldo. El
+  usuario cambia el nombre de la base en su `.env`; las cuentas de Telegram se
+  vuelven a vincular con `enlaces`.
 - [ ] **T6 — Seguimientos de review-c112506a (entrega con evidencia).**
   - [x] **T6a — Una aprobación anterior no sobrevive a "Pedir cambios".**
     `motivo_no_cierra_tarea` acepta cualquier `approval` `aprobado` del
@@ -3443,3 +3452,28 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   en palabra no llega a esa rama; (4) el `- 1` del corte duro sin explicar, la
   importación del privado `_ESTADOS_LEGIBLES` y el registro que acredita las pruebas
   del banco a `test_corrida.py` cuando están en `test_comprobadores.py`.
+
+- 2026-09-27: **T7 cerrada — base nueva y siembra reproducible.** Ruta: delegada, un
+  escritor; dos agregados pedidos por el orquestador. `espacios/corework.semilla-ficticia.yaml`
+  (12 tareas extraídas en sólo lectura de la base de las sesiones, títulos sin
+  "(simulado)", cada una colgada de un frente real del pack, fecha objetivo relativa
+  al día de siembra, `evidencia_requerida: [explicacion]`), `src/prisma/siembra.py` y
+  el comando `python -m prisma sembrar corework --semilla <archivo>`. Estados
+  iniciales: seis `en_curso` (una por responsable; una con dependencia bloqueante
+  abierta, creada después de arrancar, sin saltear el gate) y seis `asignada`; ninguna
+  aprobada ni en revisión. Todo por eventos (`bloquear_estado_directo` rechaza la
+  escritura directa incluso como administrador). Camino: inserts administrativos, no
+  `confirmar_borrador_tarea` (ese es el compromiso de un borrador por Telegram, con su
+  vista previa y la conexión de autoridad). Rechaza si el espacio ya tiene tareas o
+  no existe; una sola transacción. Agregados del orquestador: una fila de
+  `audit_log` por siembra (`siembra_ficticia`, `actor_kind='sistema'`, sólo
+  cantidades y el nombre del archivo) y `evidencia_policy_version` tomada de
+  `task_evidence_policy` del área, igual que el alta real (el vacío que encontró el
+  experimento 1 era de la carga a mano). Pasos para el usuario en `PRUEBA-LOCAL.md`
+  §5 (respaldo, `create database prisma`, cambiar sólo el nombre de la base en
+  `PRISMA_DB_URL` y, si apunta a la misma base, en `PRISMA_AUTHORITY_DB_URL`,
+  `esquema`, `importar`, `feriados`, `sembrar`, `enlaces`, `escuchar`).
+  RED: sin `siembra.py` no se recolectan las pruebas; para los agregados, `3 failed`.
+  GREEN (reejecutado por el orquestador): `tests/test_siembra.py tests/test_esqueleto.py
+  tests/test_onboarding.py` -> `51 passed`. Suite completa (escritor): `988 passed,
+  108 deselected`.

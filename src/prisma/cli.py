@@ -4,6 +4,7 @@
     python -m prisma importar corework        importa el pack (sin activar)
     python -m prisma importar corework --activar
     python -m prisma feriados corework        carga los feriados nacionales
+    python -m prisma sembrar corework --semilla espacios/corework.semilla-ficticia.yaml
     python -m prisma cadencia corework objetivos_semanales
     python -m prisma despachar corework       vacía la cola una vez
     python -m prisma servir                   webhook + planificador
@@ -115,6 +116,11 @@ def main(argv: list[str] | None = None) -> int:
     imp.add_argument("--activar", action="store_true")
 
     fer = sub.add_parser("feriados"); fer.add_argument("slug")
+
+    sem = sub.add_parser("sembrar")
+    sem.add_argument("slug")
+    sem.add_argument("--semilla", required=True,
+                     help="ruta al YAML de datos ficticios (T7, odd/tasks/prisma-orienta.md)")
 
     cad = sub.add_parser("cadencia")
     cad.add_argument("slug"); cad.add_argument("nombre")
@@ -392,6 +398,23 @@ def main(argv: list[str] | None = None) -> int:
             cargar_feriados_ar(cur, ws)
         conn.commit()
         print("feriados cargados")
+        return 0
+
+    if a.cmd == "sembrar":
+        from pathlib import Path
+
+        from .siembra import SiembraInvalida, sembrar
+
+        try:
+            with admin(conn) as cur:
+                r = sembrar(cur, ws, Path(a.semilla))
+        except SiembraInvalida as e:
+            print(str(e))
+            return 1
+        conn.commit()
+        print(f"{r.tareas} tareas y {r.dependencias} dependencias sembradas.")
+        for estado, n in sorted(r.estados.items()):
+            print(f"  {estado}: {n}")
         return 0
 
     with espacio(conn, ws) as cur:

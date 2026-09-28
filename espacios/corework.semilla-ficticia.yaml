@@ -1,0 +1,201 @@
+# Semilla de datos ficticios para la tercera ronda por Telegram
+# (T7, `odd/tasks/prisma-orienta.md`).
+#
+# Mismas 12 tareas y las mismas seis personas responsables del pack
+# `corework.yaml` que ya se habían cargado a mano en las sesiones 1 y 2 --
+# extraídas de sólo lectura de la base de mantenimiento local (`postgres`,
+# la misma a la que apunta `PRISMA_TEST_DB_URL`) el 2026-09-27 -- pero:
+#
+#   - sin el sufijo " (simulado)" en el título: el título es un campo de
+#     compromiso inmutable (`bloquear_estado_directo`, `db/esquema.sql`) y
+#     no se puede renombrar en la base ya cargada; de ahí esta semilla, para
+#     una base nueva.
+#   - con estados iniciales pensados para probar la tercera ronda -- entrega
+#     con evidencia y "Pedir cambios" (ADR 0009 y su enmienda T6c) --, no una
+#     copia de cómo habían quedado las tareas al final de las sesiones 1 y 2.
+#
+# Se carga con:
+#   python -m prisma sembrar corework --semilla espacios/corework.semilla-ficticia.yaml
+#
+# en un espacio recién importado con `importar corework --activar` y sin
+# ninguna tarea todavía: `sembrar` rechaza si el espacio ya tiene alguna, para
+# no mezclar datos ficticios con datos reales ni con una siembra anterior.
+#
+# Cada tarea cuelga de uno de los objetivos operativos ("frentes") que ya trae
+# el pack (`objetivo_inicial.frentes` en `corework.yaml`), no de un objetivo
+# nuevo por tarea -- eso último fue un atajo de la carga a mano de la sesión 1
+# (quedó como "Objetivo simulado de <título>", un objetivo por tarea, que no
+# es como el resto del producto modela objetivos).
+#
+# `fecha_objetivo.dias` es relativo al día en que se corre `sembrar` (mismo
+# desplazamiento para las 12, igual que la base original tenía la misma
+# fecha para todas), para que la semilla sea reproducible sin fechas fijas
+# que terminen vencidas solas.
+#
+# `evidencia_requerida: [explicacion]` es coherente con la política del pack
+# (`evidencia.por_area` en `corework.yaml`): "explicacion" está en la lista
+# de evidencia admitida de las seis áreas, así que vale para cualquiera de
+# estas tareas sin importar su área.
+#
+# Estados iniciales (ninguna aprobada, ninguna en revisión -- ADR 0009,
+# "nada preaprobado"):
+#   - una `en_curso` por cada responsable con aprobador (las seis personas
+#     de esta semilla lo tienen): lista para entregarse con "Ya la terminé"
+#     y evidencia.
+#   - una tarea `en_curso` (la segunda de Marcos) con una dependencia
+#     bloqueante abierta hacia una tarea todavía sin terminar (la primera de
+#     Marcos): para probar "Pedir cambios" con la dependencia abierta (T6c),
+#     que restaura `en_curso` sin pasar por el freno de arranque.
+#   - el resto, `asignada`: todavía no arrancaron.
+
+version: 1
+
+tareas:
+  - titulo: "Cablear tablero de la máquina 3"
+    area: electricidad
+    objetivo: "Construir o adaptar tableros preparados para la integración"
+    responsable: "Mariano Naim"
+    criterio_aceptacion: "Simulado: criterio de prueba del banco."
+    evidencia_requerida: [explicacion]
+    fecha_objetivo: {dias: 10}
+    estado_inicial: en_curso
+    motivo_estado_inicial: >
+      En curso, con evidencia pendiente: para probar "Ya la terminé" con
+      entrega de evidencia (ADR 0009).
+
+  - titulo: "Revisar tablero de la máquina 4"
+    area: electricidad
+    objetivo: "Construir o adaptar tableros preparados para la integración"
+    responsable: "Mariano Naim"
+    criterio_aceptacion: "Simulado: criterio de prueba del banco."
+    evidencia_requerida: [explicacion]
+    fecha_objetivo: {dias: 10}
+    estado_inicial: asignada
+    motivo_estado_inicial: "Asignada: todavía sin arrancar."
+
+  - titulo: "Programar PLC de la comprimidora"
+    area: ot
+    objetivo: "Conectar y automatizar equipos para que produzcan y entreguen datos"
+    responsable: "Marcos Tarquini"
+    criterio_aceptacion: "Simulado: criterio de prueba del banco."
+    evidencia_requerida: [explicacion]
+    fecha_objetivo: {dias: 10}
+    estado_inicial: asignada
+    motivo_estado_inicial: >
+      Asignada y sin terminar a propósito: es el origen de la dependencia
+      bloqueante abierta sobre la tarea siguiente (para probar "Pedir
+      cambios" con una dependencia abierta, T6c).
+
+  - titulo: "Revisar comunicaciones industriales de la comprimidora"
+    area: ot
+    objetivo: "Conectar y automatizar equipos para que produzcan y entreguen datos"
+    responsable: "Marcos Tarquini"
+    criterio_aceptacion: "Simulado: criterio de prueba del banco."
+    evidencia_requerida: [explicacion]
+    fecha_objetivo: {dias: 10}
+    estado_inicial: en_curso
+    motivo_estado_inicial: >
+      En curso desde antes de que exista la dependencia bloqueante -- la
+      siembra la agrega después, sobre una tarea que ya está en curso, sin
+      moverla retroactivamente (mismo criterio que
+      test_crear_dependencia_bloqueante_sobre_destino_ya_en_curso_lo_menciona
+      en tests/test_dependencias.py). Destino de la dependencia bloqueante
+      abierta de la tarea anterior.
+
+  - titulo: "Actualizar planos eléctricos de la paila 2"
+    area: ot
+    objetivo: "Planos eléctricos correctos y documentación útil"
+    responsable: "Nahuel Gimenez"
+    criterio_aceptacion: "Simulado: criterio de prueba del banco."
+    evidencia_requerida: [explicacion]
+    fecha_objetivo: {dias: 10}
+    estado_inicial: en_curso
+    motivo_estado_inicial: >
+      En curso, con evidencia pendiente: para probar "Ya la terminé" con
+      entrega de evidencia (ADR 0009).
+
+  - titulo: "Relevar planos del tablero de la estufa"
+    area: ot
+    objetivo: "Planos eléctricos correctos y documentación útil"
+    responsable: "Nahuel Gimenez"
+    criterio_aceptacion: "Simulado: criterio de prueba del banco."
+    evidencia_requerida: [explicacion]
+    fecha_objetivo: {dias: 10}
+    estado_inicial: asignada
+    motivo_estado_inicial: "Asignada: todavía sin arrancar."
+
+  - titulo: "Configurar access points de planta"
+    area: it
+    objetivo: "Fortalecer servidores y mejorar EPPI"
+    responsable: "Lucas Natuche"
+    criterio_aceptacion: "Simulado: criterio de prueba del banco."
+    evidencia_requerida: [explicacion]
+    fecha_objetivo: {dias: 10}
+    estado_inicial: en_curso
+    motivo_estado_inicial: >
+      En curso, con evidencia pendiente: para probar "Ya la terminé" con
+      entrega de evidencia (ADR 0009).
+
+  - titulo: "Cambiar switch industrial de la sala de servidores"
+    area: it
+    objetivo: "Fortalecer servidores y mejorar EPPI"
+    responsable: "Lucas Natuche"
+    criterio_aceptacion: "Simulado: criterio de prueba del banco."
+    evidencia_requerida: [explicacion]
+    fecha_objetivo: {dias: 10}
+    estado_inicial: asignada
+    motivo_estado_inicial: "Asignada: todavía sin arrancar."
+
+  - titulo: "Backup de servidores de producción"
+    area: it
+    objetivo: "Fortalecer servidores y mejorar EPPI"
+    responsable: "Martín Forte"
+    criterio_aceptacion: "Simulado: criterio de prueba del banco."
+    evidencia_requerida: [explicacion]
+    fecha_objetivo: {dias: 10}
+    estado_inicial: en_curso
+    motivo_estado_inicial: >
+      En curso, con evidencia pendiente: para probar "Ya la terminé" con
+      entrega de evidencia (ADR 0009).
+
+  - titulo: "Migrar base de datos de EPPI al servidor nuevo"
+    area: it
+    objetivo: "Fortalecer servidores y mejorar EPPI"
+    responsable: "Martín Forte"
+    criterio_aceptacion: "Simulado: criterio de prueba del banco."
+    evidencia_requerida: [explicacion]
+    fecha_objetivo: {dias: 10}
+    estado_inicial: asignada
+    motivo_estado_inicial: "Asignada: todavía sin arrancar."
+
+  - titulo: "Dashboard de lotes en CoreLabs"
+    area: corelabs
+    objetivo: "Robustecer la plataforma e integrar los datos"
+    responsable: "Ariel De Simone"
+    criterio_aceptacion: "Simulado: criterio de prueba del banco."
+    evidencia_requerida: [explicacion]
+    fecha_objetivo: {dias: 10}
+    estado_inicial: en_curso
+    motivo_estado_inicial: >
+      En curso, con evidencia pendiente: para probar "Ya la terminé" con
+      entrega de evidencia (ADR 0009).
+
+  - titulo: "Integrar datos de la comprimidora en CoreLabs"
+    area: corelabs
+    objetivo: "Robustecer la plataforma e integrar los datos"
+    responsable: "Ariel De Simone"
+    criterio_aceptacion: "Simulado: criterio de prueba del banco."
+    evidencia_requerida: [explicacion]
+    fecha_objetivo: {dias: 10}
+    estado_inicial: asignada
+    motivo_estado_inicial: "Asignada: todavía sin arrancar."
+
+# Única dependencia bloqueante de la semilla: ver el motivo de las dos
+# tareas de Marcos, arriba. `sembrar` la inserta después de dejar las 12
+# tareas en su estado inicial, así el freno de arranque
+# (`exigir_dependencias_resueltas`, sólo corre al INSERTAR el evento
+# `en_curso`) ya no se vuelve a evaluar sobre una tarea que ya está en curso.
+dependencias:
+  - origen: "Programar PLC de la comprimidora"
+    destino: "Revisar comunicaciones industriales de la comprimidora"
+    tipo: bloqueante

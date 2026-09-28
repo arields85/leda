@@ -196,3 +196,98 @@ si el equipo lo tolera:
 
 Todo eso se ajusta editando `espacios/corework.yaml` y reimportando. No hace
 falta tocar código.
+
+---
+
+## 5. Base nueva para la tercera ronda (sin "(simulado)" en los títulos)
+
+Las 12 tareas ficticias de las sesiones 1 y 2 quedaron con " (simulado)" al
+final del título. No se pueden renombrar: el título es un campo de
+compromiso y `bloquear_estado_directo` (`db/esquema.sql`) lo protege como
+inmutable. La salida es una base **nueva**, sembrada sin el sufijo -- la
+base actual (`postgres`, con los datos de las sesiones 1 y 2) queda intacta
+como respaldo, sin tocarla.
+
+**1. Respaldo de la base actual**, antes de cualquier otra cosa:
+
+```bash
+mkdir -p db/respaldos
+pg_dump "$PRISMA_DB_URL" -Fc -f db/respaldos/prisma-antes-base-nueva-<fecha>.dump
+```
+
+(`<fecha>` en `AAAAMMDD`, igual que los respaldos anteriores en esa carpeta.)
+
+**2. Crear la base vacía `prisma`**, en el mismo servidor:
+
+```sql
+create database prisma;
+```
+
+o, equivalente, `createdb prisma` con el mismo usuario y host que usa
+`PRISMA_DB_URL` hoy.
+
+**3. Cambiar el nombre de la base en `.env`.** La variable es `PRISMA_DB_URL`:
+es una URL completa (`postgresql://usuario:contraseña@host:puerto/basededatos`)
+y el nombre de la base es sólo el último segmento, después de la última `/` --
+cambiá únicamente ese segmento, a `prisma`; dejá usuario, contraseña, host y
+puerto como están. Si `PRISMA_AUTHORITY_DB_URL` también apunta a esta base
+(no hay fallback entre las dos: `db/README.md`), cambiale el mismo segmento --
+si sólo se cambia una de las dos, la sesión real terminaría escribiendo tareas
+en una base y confirmándolas en otra.
+
+**4. Aplicar el esquema completo** (ya con las migraciones `0013` a `0016`
+incluidas: `esquema.sql` es el estado actual, no hace falta aplicar
+migraciones sueltas sobre una base nueva):
+
+```bash
+python -m prisma esquema
+```
+
+Es una base recién creada: `esquema.sql` crea los roles del clúster
+(`prisma_app`, `prisma_admin`, `prisma_gateway`, `prisma_owner`) si todavía no
+existen -- como suelen ya existir en el mismo servidor por la base anterior,
+esa parte no hace nada la segunda vez -- así que sólo hace falta que el
+usuario de `PRISMA_DB_URL` pueda crear roles y el esquema `prisma` en esta
+base nueva, ni más ni menos que lo que ya hacía falta para la base actual.
+
+> **Nunca correr `python -m prisma esquema --recrear` contra la base
+> anterior.** Borra todos los datos. La base nueva se crea recién, así que
+> acá no hace falta -- y contra la anterior jamás, es el respaldo.
+
+**5. Importar el pack, feriados y sembrar:**
+
+```bash
+python -m prisma importar corework --activar
+python -m prisma feriados corework
+python -m prisma sembrar corework --semilla espacios/corework.semilla-ficticia.yaml
+```
+
+`sembrar` rechaza con un mensaje claro si el espacio ya tiene alguna tarea
+(no mezcla datos ficticios con datos reales) o si el espacio no existe
+todavía (correr `importar` primero). Sólo imprime cuántas tareas y
+dependencias quedaron, y cuántas por estado inicial -- nunca los títulos ni
+los nombres de las personas.
+
+**6. Volver a vincular las cuentas de Telegram** (son las mismas personas del
+pack, pero es una base nueva: sin activaciones previas). Con `--solo` y los
+nombres de quienes participan de esta ronda, igual que en el punto 3 más
+arriba; sin `--solo`, genera el enlace de las siete:
+
+```bash
+python -m prisma enlaces corework --solo <nombres>
+```
+
+**7. Arrancar el proceso** que escucha Telegram, igual que en las sesiones
+anteriores:
+
+```bash
+python -m prisma escuchar corework
+```
+
+La semilla deja, para probar entrega con evidencia y "Pedir cambios" (ADR
+0009 y su enmienda T6c): una tarea `en_curso` por cada responsable con
+aprobador, lista para "Ya la terminé" con evidencia; una tarea `en_curso`
+con una dependencia bloqueante abierta hacia otra tarea sin terminar, para
+pedirle cambios a esa entrega y comprobar que vuelve a `en_curso` (no a
+`asignada`); el resto, `asignada`. Nada preaprobado, nada en revisión.
+Detalle completo en `espacios/corework.semilla-ficticia.yaml`.
