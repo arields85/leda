@@ -574,8 +574,9 @@ def test_existente_pending_verification_correo_distinto_propone_cambio(
 
     _post(con_agente, "taylor.q@otradireccion.com", 71001)
 
-    assert _outbox_textos(conn, 71001)[-1] == ACF.TEXTO_PROPONE_CAMBIO
-    assert _token_boton(conn, ws, m, ACF.etiqueta_cambiar_a("taylor.q@otradireccion.com"))
+    assert _outbox_textos(conn, 71001)[-1] == ACF.texto_propone_cambio(
+        "taylor.q@otradireccion.com", "taylor.quinn@empresa.com")
+    assert _token_boton(conn, ws, m, ACF.etiqueta_usar_nuevo("taylor.q@otradireccion.com"))
     assert len(doble.enviados) == 1                         # ningún envío nuevo todavía
     assert _estado(conn, ws, m)["estado"] == "pending_email_verification"
 

@@ -17,6 +17,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from prisma import alta_correo as AC
+from prisma import alta_correo_flujo as ACF
 from prisma import avisos_admin as AA
 from prisma import gateway
 from prisma.db import admin, conectar, espacio
@@ -73,6 +74,286 @@ def _crear_aviso(conn, ws: str, tipo: str = "correo_existente_pendientes",
         aviso_id = AC.crear_aviso(cur, tipo, texto, ahora=AHORA)
     conn.commit()
     return aviso_id
+
+
+def _dejar_pending_verification_con_aviso_agotado(
+        conn, ws: str, m: str, nombre: str,
+        correo: str = "persona@empresa.com") -> str:
+    """Deja una membresía en `pending_email_verification` con un envío
+    vigente, y el aviso `correo_limite_agotado` ya creado -- el escenario de
+    partida de "Habilitar un nuevo intento" (G1d-b, acción F)."""
+    with espacio(conn, ws) as cur:
+        AC.iniciar_ciclo(cur, m, "alta", ahora=AHORA)
+        AC.transicionar(cur, m, "awaiting_email", ahora=AHORA)
+        AC.transicionar(cur, m, "pending_email_verification", ahora=AHORA)
+        AC.emitir_verificacion(cur, m, correo, "token-agotado", ahora=AHORA)
+        aviso_id = AC.crear_aviso(
+            cur, AC.TIPO_CORREO_LIMITE_AGOTADO,
+            f"{nombre} agotó los 5 envíos del correo de verificación.",
+            referencia_tipo="membership", referencia_id=m, ahora=AHORA)
+    conn.commit()
+    return aviso_id
+
+
+# ===========================================================================
+# G1d-b/F: "Habilitar un nuevo intento" sobre el aviso de envíos agotados
+# ===========================================================================
+
+
+def test_aviso_de_limite_agotado_trae_habilitar_y_marcar_leido(
+        conn, intake_world, monkeypatch):
+    """F (textos aprobados por el usuario, 2026-09-28): este tipo de aviso
+    suma "Habilitar un nuevo intento" -- los demás siguen sólo con "Marcar
+    leído" (`test_despachar_avisos_entrega_a_cada_administrador_con_
+    telegram`, arriba, ya cubre ese caso general)."""
+    monkeypatch.setenv("PRISMA_BOT_TOKEN_ADMIN", "prueba:token-admin")
+    ws = intake_world["north-lab"]["id"]
+    m = intake_world["north-lab"]["people"]["Taylor Quinn"]["membership_id"]
+    _hacer_administrador(conn, intake_world, "north-lab", "Morgan Hale")
+    _dejar_pending_verification_con_aviso_agotado(conn, ws, m, "Taylor Quinn")
+
+    doble = TransporteDePrueba()
+    with admin(conn) as cur:
+        AA.despachar_avisos(cur, doble, ahora=AHORA)
+    conn.commit()
+
+    [entrega] = doble.enviados
+    assert entrega.texto.startswith("🛠️ Administración · North Lab")
+    assert "Taylor Quinn agotó los 5 envíos del correo de verificación." in entrega.texto
+    assert [b.etiqueta for b in entrega.botones] == [
+        AA.ETIQUETA_HABILITAR, AA.ETIQUETA_MARCAR_LEIDO]
+
+
+def test_habilitar_muestra_vista_previa_sin_aplicar_nada(
+        cliente_admin, conn, intake_world):
+    ws = intake_world["north-lab"]["id"]
+    m = intake_world["north-lab"]["people"]["Taylor Quinn"]["membership_id"]
+    _, tg = _hacer_administrador(conn, intake_world, "north-lab", "Morgan Hale")
+    aviso_id = _dejar_pending_verification_con_aviso_agotado(conn, ws, m, "Taylor Quinn")
+
+    r = _post_admin_toque(cliente_admin, AA.callback_data(AA.ACCION_HABILITAR, aviso_id), tg)
+    assert r.status_code == 200
+
+    with admin(conn) as cur:
+        cur.execute("select texto, botones from aviso_administrativo_respuesta")
+        [fila] = cur.fetchall()
+        assert "Taylor Quinn" in fila["texto"]
+        assert "@" not in fila["texto"]       # nunca el correo -- administración no lo necesita
+        etiquetas = {b["etiqueta"] for b in fila["botones"]}
+        assert etiquetas == {AA.ETIQUETA_CONFIRMAR, AA.ETIQUETA_CANCELAR}
+        [aviso] = AC.avisos(cur)
+        assert aviso["resuelto_en"] is None
+        cur.execute(
+            "select count(*) n from alta_correo_evento where tipo = 'intento_habilitado'")
+        assert cur.fetchone()["n"] == 0
+
+
+def test_habilitar_sobre_aviso_ya_resuelto_no_ofrece_confirmar(
+        cliente_admin, conn, intake_world):
+    ws = intake_world["north-lab"]["id"]
+    m = intake_world["north-lab"]["people"]["Taylor Quinn"]["membership_id"]
+    admin_id, tg = _hacer_administrador(conn, intake_world, "north-lab", "Morgan Hale")
+    aviso_id = _dejar_pending_verification_con_aviso_agotado(conn, ws, m, "Taylor Quinn")
+    with admin(conn) as cur:
+        AC.marcar_resuelto(cur, aviso_id, admin_id, ahora=AHORA)
+    conn.commit()
+
+    r = _post_admin_toque(cliente_admin, AA.callback_data(AA.ACCION_HABILITAR, aviso_id), tg)
+    assert r.status_code == 200
+
+    with admin(conn) as cur:
+        cur.execute("select texto, botones from aviso_administrativo_respuesta")
+        [fila] = cur.fetchall()
+        assert fila["texto"] == AA.TEXTO_HABILITAR_YA_RESUELTO
+        assert not fila["botones"]
+
+
+def test_confirmar_habilitar_aplica_evento_resuelve_aviso_y_avisa_a_la_persona(
+        cliente_admin, conn, intake_world):
+    ws = intake_world["north-lab"]["id"]
+    tg_persona = intake_world["north-lab"]["people"]["Taylor Quinn"]["telegram"]
+    m = intake_world["north-lab"]["people"]["Taylor Quinn"]["membership_id"]
+    admin_id, tg_admin = _hacer_administrador(conn, intake_world, "north-lab", "Morgan Hale")
+    aviso_id = _dejar_pending_verification_con_aviso_agotado(
+        conn, ws, m, "Taylor Quinn", correo="taylor.quinn@empresa.com")
+
+    r = _post_admin_toque(
+        cliente_admin, AA.callback_data(AA.ACCION_CONFIRMAR_HABILITAR, aviso_id), tg_admin)
+    assert r.status_code == 200
+
+    with admin(conn) as cur:
+        [aviso] = AC.avisos(cur)
+        assert aviso["resuelto_en"] is not None
+        assert str(aviso["resuelto_por"]) == admin_id
+        cur.execute(
+            "select count(*) n from alta_correo_evento "
+            "where membership_id = %s and tipo = 'intento_habilitado'", (m,))
+        assert cur.fetchone()["n"] == 1
+        cur.execute("select texto from aviso_administrativo_respuesta where chat_id = %s",
+                   (tg_admin,))
+        assert [f["texto"] for f in cur.fetchall()] == [AA.TEXTO_HABILITAR_CONFIRMADO]
+
+    with espacio(conn, ws) as cur:
+        cur.execute(
+            "select cuerpo from message_outbox where chat_id = %s "
+            "order by programado_para", (tg_persona,))
+        textos = [f["cuerpo"] for f in cur.fetchall()]
+    assert textos[-1] == ACF.texto_reintento_habilitado("taylor.quinn@empresa.com")
+
+
+def test_confirmar_habilitar_dos_veces_no_duplica_nada(
+        cliente_admin, conn, intake_world):
+    """Idempotente bajo doble tap: el segundo Confirmar sobre un aviso ya
+    resuelto no aplica una segunda vez -- ni un segundo evento, ni un
+    segundo aviso a la persona."""
+    ws = intake_world["north-lab"]["id"]
+    tg_persona = intake_world["north-lab"]["people"]["Taylor Quinn"]["telegram"]
+    m = intake_world["north-lab"]["people"]["Taylor Quinn"]["membership_id"]
+    admin_id, tg_admin = _hacer_administrador(conn, intake_world, "north-lab", "Morgan Hale")
+    aviso_id = _dejar_pending_verification_con_aviso_agotado(
+        conn, ws, m, "Taylor Quinn", correo="taylor.quinn@empresa.com")
+
+    _post_admin_toque(
+        cliente_admin, AA.callback_data(AA.ACCION_CONFIRMAR_HABILITAR, aviso_id), tg_admin)
+    r2 = _post_admin_toque(
+        cliente_admin, AA.callback_data(AA.ACCION_CONFIRMAR_HABILITAR, aviso_id), tg_admin)
+    assert r2.status_code == 200
+
+    with admin(conn) as cur:
+        cur.execute(
+            "select count(*) n from alta_correo_evento "
+            "where membership_id = %s and tipo = 'intento_habilitado'", (m,))
+        assert cur.fetchone()["n"] == 1
+        cur.execute("select texto from aviso_administrativo_respuesta where chat_id = %s",
+                   (tg_admin,))
+        assert [f["texto"] for f in cur.fetchall()] == [AA.TEXTO_HABILITAR_CONFIRMADO]
+    with espacio(conn, ws) as cur:
+        cur.execute("select count(*) n from message_outbox where chat_id = %s", (tg_persona,))
+        assert cur.fetchone()["n"] == 1
+
+
+def test_confirmar_habilitar_sin_poder_avisar_a_la_persona_no_resuelve_ni_aplica(
+        cliente_admin, conn, intake_world):
+    """Nunca fallar en silencio: si la persona no se puede avisar (sin
+    Telegram vinculado), no se aplica el intento ni se resuelve el aviso, y
+    el administrador recibe el aviso neutral -- nunca "Listo, habilitado."
+    cuando a la persona no le va a llegar nada."""
+    ws = intake_world["north-lab"]["id"]
+    persona = intake_world["north-lab"]["people"]["Taylor Quinn"]
+    m = persona["membership_id"]
+    _, tg_admin = _hacer_administrador(conn, intake_world, "north-lab", "Morgan Hale")
+    aviso_id = _dejar_pending_verification_con_aviso_agotado(conn, ws, m, "Taylor Quinn")
+    with admin(conn) as cur:
+        cur.execute("update app_user set telegram_user_id = null where id = %s",
+                    (persona["app_user_id"],))
+    conn.commit()
+
+    r = _post_admin_toque(
+        cliente_admin, AA.callback_data(AA.ACCION_CONFIRMAR_HABILITAR, aviso_id), tg_admin)
+    assert r.status_code == 200
+
+    with admin(conn) as cur:
+        [aviso] = AC.avisos(cur)
+        assert aviso["resuelto_en"] is None
+        cur.execute(
+            "select count(*) n from alta_correo_evento "
+            "where membership_id = %s and tipo = 'intento_habilitado'", (m,))
+        assert cur.fetchone()["n"] == 0
+        cur.execute("select texto from aviso_administrativo_respuesta where chat_id = %s",
+                   (tg_admin,))
+        assert [f["texto"] for f in cur.fetchall()] == [gateway.NOTICIA_NEUTRA_INCIDENTE]
+        cur.execute("select count(*) n from incident where workspace_id is null")
+        assert cur.fetchone()["n"] == 1
+
+
+def test_confirmar_habilitar_serializa_dos_administradores_a_la_vez(
+        conn, intake_world, uri):
+    """Dos confirmaciones simultáneas sobre el mismo aviso: la segunda
+    espera a la primera (candado sobre la fila del aviso) en vez de leer
+    los dos "sin resolver" y aplicar dos veces."""
+    ws = intake_world["north-lab"]["id"]
+    m = intake_world["north-lab"]["people"]["Taylor Quinn"]["membership_id"]
+    admin_id, _ = _hacer_administrador(conn, intake_world, "north-lab", "Morgan Hale")
+    aviso_id = _dejar_pending_verification_con_aviso_agotado(conn, ws, m, "Taylor Quinn")
+
+    primera = conectar(uri)
+    resultado_segunda: list = []
+    errores: list = []
+
+    def segunda_confirmacion():
+        otra = None
+        try:
+            otra = conectar(uri)
+            with admin(otra) as cur2:
+                resultado_segunda.append(
+                    AA.confirmar_habilitar(cur2, aviso_id, admin_id, ahora=AHORA))
+            otra.commit()
+        except Exception as exc:  # la prueba revisa que no haya ninguna
+            errores.append(exc)
+            if otra is not None:
+                otra.rollback()
+        finally:
+            if otra is not None:
+                otra.close()
+
+    hilo = threading.Thread(target=segunda_confirmacion)
+    try:
+        with admin(primera) as cur:
+            assert AA.confirmar_habilitar(cur, aviso_id, admin_id, ahora=AHORA) is True
+            # La primera sigue abierta: la segunda arranca mientras tanto.
+            hilo.start()
+            hilo.join(timeout=1)
+        primera.commit()
+    finally:
+        primera.close()
+    hilo.join(timeout=30)
+    assert not hilo.is_alive(), "la segunda confirmación quedó colgada"
+
+    assert errores == []
+    assert resultado_segunda == [False]
+
+    with admin(conn) as cur:
+        cur.execute(
+            "select count(*) n from alta_correo_evento "
+            "where membership_id = %s and tipo = 'intento_habilitado'", (m,))
+        assert cur.fetchone()["n"] == 1
+
+
+def test_cancelar_habilitar_no_aplica_nada(cliente_admin, conn, intake_world):
+    ws = intake_world["north-lab"]["id"]
+    m = intake_world["north-lab"]["people"]["Taylor Quinn"]["membership_id"]
+    _, tg = _hacer_administrador(conn, intake_world, "north-lab", "Morgan Hale")
+    aviso_id = _dejar_pending_verification_con_aviso_agotado(conn, ws, m, "Taylor Quinn")
+
+    r = _post_admin_toque(
+        cliente_admin, AA.callback_data(AA.ACCION_CANCELAR_HABILITAR, aviso_id), tg)
+    assert r.status_code == 200
+
+    with admin(conn) as cur:
+        [aviso] = AC.avisos(cur)
+        assert aviso["resuelto_en"] is None
+        cur.execute("select texto from aviso_administrativo_respuesta")
+        assert [f["texto"] for f in cur.fetchall()] == [AA.TEXTO_HABILITAR_CANCELADO]
+        cur.execute(
+            "select count(*) n from alta_correo_evento where tipo = 'intento_habilitado'")
+        assert cur.fetchone()["n"] == 0
+
+
+def test_toque_habilitar_de_un_no_administrador_no_hace_nada(
+        cliente_admin, conn, intake_world):
+    ws = intake_world["north-lab"]["id"]
+    m = intake_world["north-lab"]["people"]["Taylor Quinn"]["membership_id"]
+    aviso_id = _dejar_pending_verification_con_aviso_agotado(conn, ws, m, "Taylor Quinn")
+    ajeno = intake_world["north-lab"]["people"]["Sam North"]["telegram"]
+
+    r = _post_admin_toque(cliente_admin, AA.callback_data(AA.ACCION_HABILITAR, aviso_id), ajeno)
+    assert r.status_code == 200
+
+    with admin(conn) as cur:
+        cur.execute("select count(*) n from aviso_administrativo_respuesta")
+        assert cur.fetchone()["n"] == 0
+        [aviso] = AC.avisos(cur)
+        assert aviso["resuelto_en"] is None
 
 
 def _hacer_administrador_sin_telegram(conn, nombre: str = "Sin Telegram") -> str:
@@ -796,12 +1077,13 @@ def test_tareas_de_fondo_contiene_una_falla_del_despacho_administrativo(
 
     # G1d-a3, ítem 2: el incidente ahora sale por el mismo camino
     # deduplicado que un incidente de plataforma persistente (`AA.
-    # reportar_fallo_despacho` / `_incidente_plataforma_persistente`) -- sin
-    # columna `etapa` propia (esa tabla de incidentes de plataforma no la
-    # usa), pero la etapa queda identificable dentro del resumen saneado; el
-    # mensaje crudo de la excepción ("boom") nunca entra ahí -- sólo en
-    # `referencia_cruda`, la clave exacta de deduplicación es `resumen_
-    # sanitizado`, no el detalle crudo.
+    # reportar_fallo_despacho` / `_incidente_plataforma_persistente`) -- la
+    # tabla `incident` sí tiene una columna `etapa` (la usan `_registrar_
+    # incidente` y `gateway._reportar_incidente_admin`), pero ESTE camino en
+    # particular no la completa: la etapa queda identificable de todos
+    # modos, dentro del resumen saneado. El mensaje crudo de la excepción
+    # ("boom") nunca entra ahí -- sólo en `referencia_cruda`; la clave
+    # exacta de deduplicación es `resumen_sanitizado`, no el detalle crudo.
     with admin(conn) as cur:
         cur.execute(
             "select resumen_sanitizado, referencia_cruda from incident "
@@ -926,3 +1208,66 @@ def test_despachar_cli_contiene_una_falla_del_despacho_administrativo(
     with admin(conn) as cur:
         cur.execute("select count(*) n from incident where workspace_id is null")
         assert cur.fetchone()["n"] == 1
+
+
+def test_reportar_fallo_despacho_deja_rastro_en_stderr_si_tambien_falla_el_registro(
+        conn, monkeypatch, capsys):
+    """Seguimiento de la revisión de G1d-a3: si ni el incidente se puede
+    registrar, `reportar_fallo_despacho` no puede perderse en silencio
+    total -- deja una línea saneada en stderr (nunca el mensaje crudo de la
+    excepción original) y avisa con su valor de retorno, para que `cli.py`
+    no diga "quedó registrado" sin que sea cierto. La conexión sigue
+    usable después (nunca queda en transacción abortada)."""
+    def _revienta(cur, resumen, ahora, referencia_cruda=None):
+        raise RuntimeError("ni esto se pudo")
+
+    monkeypatch.setattr(AA, "_incidente_plataforma_persistente", _revienta)
+    # La conexión de la fixture arranca con una transacción implícita
+    # abierta (el `set search_path` de `conectar()`, sin confirmar todavía)
+    # -- se confirma acá para dejar el punto de partida limpio, como en
+    # cualquier uso real (`local.py`/`cli.py` siempre llaman a esto ya sobre
+    # una conexión recién confirmada).
+    conn.commit()
+
+    aplicado = AA.reportar_fallo_despacho(
+        conn, RuntimeError("boom"), "admin_despacho", ahora=AHORA)
+
+    assert aplicado is False
+    salida = capsys.readouterr().err
+    assert "admin_despacho" in salida
+    assert "RuntimeError" in salida
+    assert "boom" not in salida        # nunca el mensaje crudo de la excepción original
+
+    with admin(conn) as cur:
+        cur.execute("select 1")
+        assert cur.fetchone() is not None
+
+
+def test_cli_despachar_no_dice_quedo_registrado_si_tampoco_se_pudo_registrar(
+        conn, intake_world, monkeypatch, uri, capsys):
+    """`cli.py despachar` sólo dice "quedó registrado" cuando
+    `reportar_fallo_despacho` de verdad lo logró -- con la doble falla,
+    dice la verdad."""
+    from prisma import cli, despachador
+
+    monkeypatch.setattr(cli, "conectar", lambda: conn)
+    monkeypatch.setenv("PRISMA_BOT_TOKEN_NORTH-LAB", "prueba:token-espacio")
+    ws = intake_world["north-lab"]["id"]
+
+    def _revienta_despacho(cur, ahora=None, lote=50):
+        raise RuntimeError("boom")
+
+    def _revienta_tambien_el_registro(conn_, error, etapa, *, ahora=None):
+        return False
+
+    monkeypatch.setattr(AA, "despachar_todo", _revienta_despacho)
+    monkeypatch.setattr(AA, "reportar_fallo_despacho", _revienta_tambien_el_registro)
+
+    codigo = cli.main(["despachar", "north-lab"])
+
+    assert codigo == 0
+    salida = capsys.readouterr().out
+    assert "quedó registrado" not in salida
+    assert "tampoco se pudo registrar" in salida
+
+

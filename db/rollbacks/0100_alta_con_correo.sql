@@ -28,6 +28,8 @@ drop index if exists aviso_administrativo_pendiente_unico;
 drop index if exists aviso_administrativo_pendientes;
 drop table if exists aviso_administrativo;
 
+drop function if exists proximo_reenvio_correo(uuid, timestamptz);
+drop function if exists existe_verificacion_correo(text);
 drop function if exists verificacion_vigente_correo(uuid);
 drop function if exists bloquear_alta_correo_estado(uuid);
 drop function if exists completar_verificacion_correo(text, uuid, timestamptz);

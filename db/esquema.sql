@@ -2115,7 +2115,8 @@ create table alta_correo_evento (
   ciclo             integer not null check (ciclo > 0),
   tipo              text not null default 'transicion'
                       check (tipo in ('transicion', 'marca_revision',
-                                       'resuelta_revision', 'bienvenida_entregada')),
+                                       'resuelta_revision', 'bienvenida_entregada',
+                                       'intento_habilitado')),
   modo              text check (modo in ('alta', 'existente')),
   estado_anterior   text,
   estado_nuevo      text,
@@ -2129,6 +2130,16 @@ create table alta_correo_evento (
 
 comment on table alta_correo_evento is
   'Registro append-only. Es la verdad; alta_correo_estado es su proyección. workspace_id no lo aporta quien inserta: lo deriva preparar_evento_alta_correo() de la membresía, igual que derivar_espacio_evento_tarea() para las tareas.';
+
+-- `intento_habilitado` (G1d-b, acción F de la administración sobre "envíos
+-- agotados"): un hecho más, nunca una transición de estado -- el ciclo sigue
+-- exactamente donde estaba, alta_correo_estado.estado no cambia (por eso
+-- aplicar_evento_alta_correo() no tiene ninguna rama para este tipo). Lo
+-- único que hace es marcar, dentro del ciclo vigente, desde cuándo volver a
+-- contar el cupo de 5 envíos: emitir_verificacion_correo() sólo cuenta los
+-- envíos posteriores al último evento de este tipo. El límite de 3 por hora
+-- no se toca -- sigue contando sobre todos los envíos, honesto incluso justo
+-- después de habilitar.
 
 create unique index alta_correo_evento_bienvenida_unica
   on alta_correo_evento (membership_id, ciclo) where tipo = 'bienvenida_entregada';
@@ -2320,6 +2331,7 @@ declare
   estado_actual text;
   envios_hora integer;
   envios_ciclo integer;
+  desde_habilitado timestamptz;
   nuevo uuid;
 begin
   if p_email <> lower(btrim(p_email)) then
@@ -2366,8 +2378,19 @@ begin
     return;
   end if;
 
+  -- G1d-b (acción F): un `intento_habilitado` reabre el cupo del ciclo
+  -- vigente -- sólo cuentan los envíos posteriores al último de esos
+  -- eventos (si nunca hubo uno, cuentan todos, como siempre). El límite de
+  -- 3 por hora de arriba no mira esto: sigue contando sobre todos los
+  -- envíos, sin excepción.
+  select max(ev.at) into desde_habilitado
+    from alta_correo_evento ev
+   where ev.membership_id = p_membership_id and ev.ciclo = ciclo_actual
+     and ev.tipo = 'intento_habilitado';
+
   select count(*) into envios_ciclo from alta_correo_verificacion
-   where membership_id = p_membership_id and ciclo = ciclo_actual;
+   where membership_id = p_membership_id and ciclo = ciclo_actual
+     and (desde_habilitado is null or emitido_en > desde_habilitado);
   if envios_ciclo >= 5 then
     return query select false, 'verification_send_limit'::text, null::uuid;
     return;
@@ -2396,6 +2419,15 @@ begin
   return query select true, null::text, nuevo;
 end $$;
 
+-- G1t/B6 (textos aprobados por el usuario, 2026-09-28): el dueño equivocado
+-- (integrante o no) se rechaza SEGUNDO, inmediatamente después de "no
+-- existe" -- antes de mirar si está consumido, vigente o vencido. Antes esos
+-- tres chequeos corrían primero, así que quien abre un token ajeno recibía
+-- un motivo distinto según el estado interno del token de otra persona
+-- (`verification_token_consumed`/`_invalid`/`_expired`) -- una filtración
+-- más fina de lo que A04 permite. Con el dueño equivocado cortando temprano,
+-- `verification_token_superseded` (más abajo) y `verification_token_expired`
+-- sólo los ve nunca nadie más que el dueño real.
 create or replace function reservar_verificacion_correo(
     p_token_hash text, p_membership_id uuid, p_ahora timestamptz)
 returns table (ok boolean, motivo text, workspace_id uuid, ciclo integer, email text)
@@ -2414,23 +2446,26 @@ begin
                         null::uuid, null::integer, null::text;
     return;
   end if;
+  if v.membership_id <> p_membership_id then
+    return query select false, 'verification_token_invalid'::text,
+                        null::uuid, null::integer, null::text;
+    return;
+  end if;
   if v.consumido_en is not null then
     return query select false, 'verification_token_consumed'::text,
                         null::uuid, null::integer, null::text;
     return;
   end if;
   if not v.vigente then
-    return query select false, 'verification_token_invalid'::text,
+    -- El token es real y es de quien lo abre, pero un envío posterior (un
+    -- reenvío, un cambio de dirección) ya lo reemplazó (B7b): distinto de
+    -- "inválido" -- la persona tiene un enlace más nuevo esperándola.
+    return query select false, 'verification_token_superseded'::text,
                         null::uuid, null::integer, null::text;
     return;
   end if;
   if v.expira_en < p_ahora then
     return query select false, 'verification_token_expired'::text,
-                        null::uuid, null::integer, null::text;
-    return;
-  end if;
-  if v.membership_id <> p_membership_id then
-    return query select false, 'verification_token_invalid'::text,
                         null::uuid, null::integer, null::text;
     return;
   end if;
@@ -2614,6 +2649,27 @@ begin
      order by a.emitido_en desc limit 1;
 end $$;
 
+-- G1t/B6 (textos aprobados por el usuario, 2026-09-28): distinguir un enlace
+-- roto (nunca existió, o un typo) de uno real abierto por la cuenta
+-- equivocada necesita saber si el token EXISTE, sin filtrar a quién
+-- pertenece, su correo ni su estado -- ninguna otra cosa.
+create or replace function existe_verificacion_correo(p_token_hash text)
+returns boolean
+language sql security definer set search_path = prisma, public, pg_temp as $$
+  select exists (select 1 from alta_correo_verificacion where token_hash = p_token_hash);
+$$;
+
+-- G1t/B11: el límite de 3 por hora es una ventana corrediza -- se puede
+-- volver a enviar recién cuando el envío MÁS VIEJO dentro de la última hora
+-- sale de esa ventana. `null` si no hay ningún envío en la última hora.
+create or replace function proximo_reenvio_correo(p_membership_id uuid, p_ahora timestamptz)
+returns timestamptz
+language sql security definer set search_path = prisma, public, pg_temp as $$
+  select min(emitido_en) + interval '1 hour'
+    from alta_correo_verificacion
+   where membership_id = p_membership_id and emitido_en > p_ahora - interval '1 hour';
+$$;
+
 create table aviso_administrativo (
   id               uuid primary key default gen_random_uuid(),
   workspace_id     uuid not null references workspace(id) on delete cascade,
@@ -2709,6 +2765,11 @@ create table aviso_administrativo_respuesta (
   id                  uuid primary key default gen_random_uuid(),
   chat_id             bigint not null,
   texto               text not null,
+  -- Botones opcionales de esta respuesta puntual (G1d-b: la vista previa de
+  -- "Habilitar un nuevo intento" trae Confirmar/Cancelar) -- lista de
+  -- `{"etiqueta": ..., "callback_data": ...}`. `null`/`[]` es una respuesta
+  -- sin botones, como todas las de antes de G1d-b.
+  botones             jsonb,
   estado              text not null default 'listo'
                         check (estado in ('listo', 'enviado', 'fallido')),
   intentos            integer not null default 0,
@@ -2772,7 +2833,11 @@ create policy aislamiento_espacio on aviso_administrativo_entrega
 -- que la protege es que nadie la consulta.
 
 grant select, insert, update on alta_correo_estado to prisma_owner;
-grant insert on alta_correo_evento to prisma_owner;
+-- `select` (G1d-b/G1t): `emitir_verificacion_correo()` ahora lee sus propios
+-- eventos para saber desde cuándo volver a contar el cupo del ciclo tras un
+-- `intento_habilitado` (acción F). Sigue sin ningún privilegio para
+-- `prisma_app` -- sólo `insert`, arriba.
+grant select, insert on alta_correo_evento to prisma_owner;
 grant select, insert, update on alta_correo_contacto to prisma_owner;
 grant select, insert, update on alta_correo_verificacion to prisma_owner;
 grant all on alta_correo_estado, alta_correo_evento, alta_correo_contacto,
@@ -2790,6 +2855,8 @@ alter function completar_verificacion_correo(text, uuid, timestamptz)
   owner to prisma_owner;
 alter function verificacion_vigente_correo(uuid) owner to prisma_owner;
 alter function bloquear_alta_correo_estado(uuid) owner to prisma_owner;
+alter function existe_verificacion_correo(text) owner to prisma_owner;
+alter function proximo_reenvio_correo(uuid, timestamptz) owner to prisma_owner;
 
 revoke execute on function emitir_verificacion_correo(uuid, text, text, text, timestamptz)
   from public;
@@ -2799,6 +2866,8 @@ revoke execute on function completar_verificacion_correo(text, uuid, timestamptz
   from public;
 revoke execute on function verificacion_vigente_correo(uuid) from public;
 revoke execute on function bloquear_alta_correo_estado(uuid) from public;
+revoke execute on function existe_verificacion_correo(text) from public;
+revoke execute on function proximo_reenvio_correo(uuid, timestamptz) from public;
 grant execute on function emitir_verificacion_correo(uuid, text, text, text, timestamptz)
   to prisma_app;
 grant execute on function reservar_verificacion_correo(text, uuid, timestamptz)
@@ -2806,5 +2875,11 @@ grant execute on function reservar_verificacion_correo(text, uuid, timestamptz)
 grant execute on function completar_verificacion_correo(text, uuid, timestamptz)
   to prisma_app;
 grant execute on function verificacion_vigente_correo(uuid) to prisma_app;
+-- G1d-b: `avisos_admin.confirmar_habilitar` lee el correo vigente para
+-- avisarle a la persona -- corre bajo `prisma_admin` (el canal de
+-- administración), no dentro de `espacio()`.
+grant execute on function verificacion_vigente_correo(uuid) to prisma_admin;
 grant execute on function bloquear_alta_correo_estado(uuid) to prisma_app;
 grant execute on function bloquear_alta_correo_estado(uuid) to prisma_admin;
+grant execute on function existe_verificacion_correo(text) to prisma_app;
+grant execute on function proximo_reenvio_correo(uuid, timestamptz) to prisma_app;

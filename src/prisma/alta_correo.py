@@ -26,6 +26,12 @@ import psycopg
 
 CLAVE_HABILITADO = "correo_verificacion.habilitado"
 
+# Tipo de aviso administrativo de la acción F (G1d-b): "se agotaron los 5
+# envíos del correo de verificación" -- constante compartida entre
+# `alta_correo_flujo.py` (quien lo crea) y `avisos_admin.py` (quien lo
+# reconoce para ofrecer "Habilitar un nuevo intento").
+TIPO_CORREO_LIMITE_AGOTADO = "correo_limite_agotado"
+
 ESTADOS_VALIDOS = (
     "pending_welcome", "awaiting_email", "pending_email_verification",
     "active", "revoked",
@@ -269,6 +275,51 @@ def verificacion_vigente(cur: psycopg.Cursor, membership_id: str) -> dict | None
     cur.execute("select email, expira_en from verificacion_vigente_correo(%s)",
                 (membership_id,))
     return cur.fetchone()
+
+
+def existe_verificacion(cur: psycopg.Cursor, token: str) -> bool:
+    """`True` si el token existe (en cualquier espacio, cualquier estado) --
+    nunca revela de quién es, su correo ni si está vigente/consumido/
+    vencido (G1t/B6: distinguir un enlace roto de uno real abierto por la
+    cuenta equivocada). No necesita ningún espacio declarado en la sesión,
+    igual que `verificacion_vigente`."""
+    cur.execute("select existe_verificacion_correo(%s) as existe", (hash_token(token),))
+    return bool(cur.fetchone()["existe"])
+
+
+def proximo_reenvio(cur: psycopg.Cursor, membership_id: str, *,
+                     ahora: datetime | None = None) -> datetime | None:
+    """Cuándo el envío más viejo dentro de la última hora deja de contar
+    para el límite de 3/hora -- `None` si no hay ningún envío en esa
+    ventana (nada que esperar). G1t/B11: el texto de límite por hora
+    muestra esta hora exacta, nunca un genérico "más tarde"."""
+    cur.execute("select proximo_reenvio_correo(%s, %s) as proximo",
+                (membership_id, _ahora(ahora)))
+    return cur.fetchone()["proximo"]
+
+
+def habilitar_intento(cur: psycopg.Cursor, membership_id: str, *,
+                       actor_app_user_id: str, ahora: datetime | None = None) -> None:
+    """Registra el evento `intento_habilitado` (G1d-b, acción F de la
+    administración sobre "envíos agotados"): reabre el cupo de 5 envíos del
+    ciclo vigente -- `emitir_verificacion_correo()` sólo cuenta los envíos
+    posteriores al último evento de este tipo dentro del ciclo. El límite de
+    3 por hora no se toca.
+
+    No es una transición de estado: `alta_correo_estado.estado` no cambia --
+    el ciclo sigue exactamente donde estaba, sólo se le da más cupo.
+    `actor_kind='persona'` con `actor_app_user_id` es quien administra, no
+    la propia persona (el `tipo_actor` compartido de todo el esquema no
+    distingue "administrador" de "integrante"; el `app_user_id` sí)."""
+    actual = estado(cur, membership_id)
+    if actual is None:
+        raise ValueError(
+            f"alta_correo: no hay ciclo abierto para la membresía {membership_id}")
+    cur.execute(
+        """insert into alta_correo_evento
+             (membership_id, ciclo, tipo, actor_kind, actor_app_user_id, at)
+           values (%s, %s, 'intento_habilitado', 'persona', %s, %s)""",
+        (membership_id, actual["ciclo"], actor_app_user_id, _ahora(ahora)))
 
 
 def dominios_permitidos(cur: psycopg.Cursor, workspace_id: str) -> list[str] | None:

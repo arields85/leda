@@ -67,30 +67,32 @@ TEXTO_CORREO_EN_USO = (
 
 ASUNTO_VERIFICACION = "Confirmá tu correo laboral en Prisma"
 
-ETIQUETA_REENVIAR = "Reenviar correo"
-ETIQUETA_CAMBIAR = "Cambiar correo"
-ETIQUETA_MANTENER = "Mantener correo anterior"
-
-
-def etiqueta_cambiar_a(email: str) -> str:
-    return f"Cambiar correo a {email}"
-
 
 def _nombre_preferido(nombre: str) -> str:
-    """Primera palabra de `nombre`, o cadena vacía si no hay ninguna (nombre
-    vacío o de sólo espacios) -- nunca `IndexError` (G1b2, ítem 5: antes,
-    `nombre.split()[0]` reventaba con ese `nombre`).
+    """Primera palabra de `nombre`.
 
-    Con cadena vacía, los textos que la reciben saludan sin nombre: el pack
-    (`06-SALUDOS-TONO-E-ICONOGRAFIA.md`, §"Uso del nombre") admite
-    explícitamente "si no está disponible, saludar sin nombre"."""
-    partes = nombre.split()
-    return partes[0] if partes else ""
+    Nunca cadena vacía: un nombre vacío o de sólo espacios es un ERROR DE
+    DATOS (D, "Textos del alta con correo aprobados por el usuario",
+    2026-09-28) -- el nombre lo carga la administración al definir el
+    equipo y es obligatorio (`nucleo/alta-de-equipo.md`, Bloque 2). Levanta
+    `ValueError` a propósito: los handlers que llaman a esto (`abrir_ciclo_
+    alta`, `_completar_bienvenida`, `resolver_verificacion_correo`, `gate`,
+    `resolver_toque`) corren dentro de la red de contención de
+    `gateway.procesar_update`/`_activacion`, que atrapa cualquier excepción
+    no prevista y deja un incidente + el aviso neutral -- nunca fallar en
+    silencio. Antes (G1b2) esto devolvía "" y tres textos ofrecían una
+    variante "sin nombre"; el usuario las quitó explícitamente: la base
+    acepta hoy `nombre = ''` (hallazgo para `main`, ver el documento de la
+    rama), pero mientras eso no se corrija en origen, acá se trata como la
+    falla que es, no como un caso normal a acomodar en el texto."""
+    nombre = (nombre or "").strip()
+    if not nombre:
+        raise ValueError("alta_correo: el nombre de la persona está vacío")
+    return nombre.split()[0]
 
 
 def texto_bienvenida(saludo: str, nombre_preferido: str) -> str:
-    quien_saluda = f", {nombre_preferido}" if nombre_preferido else ""
-    return (f"{saludo}{quien_saluda}. Soy Prisma, la coordinadora "
+    return (f"{saludo}, {nombre_preferido}. Soy Prisma, la coordinadora "
             "digital del equipo. Mi función es ayudarlos a mantener claros "
             "los objetivos, organizar tareas, registrar avances y detectar "
             "bloqueos con anticipación. Voy a procurar que el seguimiento "
@@ -98,91 +100,160 @@ def texto_bienvenida(saludo: str, nombre_preferido: str) -> str:
 
 
 def texto_verificado(nombre_preferido: str) -> str:
-    quien_agradece = f", {nombre_preferido}" if nombre_preferido else ""
-    return (f"✅ Gracias{quien_agradece}. Tu correo quedó verificado y "
+    return (f"✅ Gracias, {nombre_preferido}. Tu correo quedó verificado y "
             "el registro está completo. Ya podés conversar conmigo "
             "normalmente.")
 
 
 def texto_verificado_existente(nombre_preferido: str) -> str:
-    """Variante de `texto_verificado` para el modo `existente` (G1c).
-
-    El texto del pack ("ya podés conversar conmigo normalmente") está
-    pensado para quien recién se está dando de alta -- a quien ya estaba
-    trabajando normalmente le suena como si algo la hubiera estado
-    bloqueando, cuando C5 exige exactamente lo contrario (nunca bloqueada).
-    Texto NUEVO, sin equivalente literal en el pack -- reportado para
-    revisión del usuario, igual que el resto de los textos nuevos de este
-    módulo."""
-    quien_agradece = f", {nombre_preferido}" if nombre_preferido else ""
-    return f"✅ Gracias{quien_agradece}. Tu correo quedó verificado."
+    """C (textos aprobados por el usuario, 2026-09-28): verificación en modo
+    `existente` (G1c). El texto del pack ("ya podés conversar conmigo
+    normalmente") está pensado para quien recién se está dando de alta -- a
+    quien ya estaba trabajando normalmente le suena como si algo la hubiera
+    estado bloqueando, cuando C5 exige exactamente lo contrario (nunca
+    bloqueada)."""
+    return f"✅ Gracias, {nombre_preferido}. Tu correo quedó verificado."
 
 
 def cuerpo_verificacion(nombre_preferido: str, enlace: str) -> str:
-    """Cuerpo del correo de verificación.
+    """Cuerpo del correo de verificación (A, textos aprobados por el
+    usuario, 2026-09-28).
 
-    El pack (§5) da el asunto, el saludo, la etiqueta del botón y describe
-    el contenido (vence en 24 horas, un solo uso, misma cuenta de Telegram);
-    no da el párrafo literal. Este texto es NUEVO -- reportado para revisión
-    del usuario -- y deliberadamente NO ofrece "responder este correo" como
-    alternativa: ADR 0010 excluye la verificación por respuesta de correo
-    como mecanismo (C7/`01` §7).
+    El pack (§5) da el asunto, la etiqueta del botón y describe el
+    contenido (vence en 24 horas, un solo uso, misma cuenta de Telegram);
+    no da el párrafo literal. Deliberadamente NO ofrece "responder este
+    correo" como alternativa: ADR 0010 excluye la verificación por
+    respuesta de correo como mecanismo (C7/`01` §7).
     """
-    saludo = f"Hola, {nombre_preferido}." if nombre_preferido else "Hola."
     return (
-        f"{saludo}\n\n"
-        "Para terminar tu alta en Prisma necesito que confirmes que este es "
-        "tu correo laboral.\n\n"
-        f"Verificar correo: {enlace}\n\n"
-        "Este enlace vence en 24 horas, sirve una sola vez y tiene que "
+        f"Hola, {nombre_preferido}.\n\n"
+        "Para terminar tu alta en Prisma\n  necesito que confirmes que este "
+        "es tu correo laboral.\n\n"
+        f"Verificar correo:\n  {enlace}\n\n"
+        "Este enlace vence en 24 horas, sirve una sola vez y tiene que\n  "
         "abrirse con la misma cuenta de Telegram que usás para hablar con "
         "Prisma.")
 
 
-# Textos nuevos, sin equivalente literal en el pack -- reportados aparte
-# para revisión del usuario (no hay una frase original para estos casos).
+# ---------------------------------------------------------------------------
+# Textos del alta con correo aprobados por el usuario (2026-09-28) -- letras
+# B1-B12, C. Regla general: ningún mensaje termina en "escribime y lo vemos"
+# ni deja a la persona sin salida; cada problema trae el paso siguiente
+# listo. Cuando se habla del correo, se muestra la dirección.
+# ---------------------------------------------------------------------------
+
+ETIQUETA_REENVIAR = "Reenviarlo"
+ETIQUETA_CAMBIAR = "Usar otro correo"
+ETIQUETA_REENVIAR_ULTIMO = "Reenviar el último"
+
+
+def texto_recordatorio_pendiente(correo: str) -> str:
+    """B2. Otra cosa sin verificar, mientras hay un envío en pie."""
+    return f"Te mandé el correo de verificación a {correo}. ¿No te llegó?"
+
+
+def texto_propone_cambio(nuevo: str, anterior: str) -> str:
+    """B3. Otra dirección con verificación pendiente."""
+    return f"¿Uso {nuevo} en lugar de {anterior}?"
+
+
+def etiqueta_usar_nuevo(nuevo: str) -> str:
+    return f"Sí, usar {nuevo}"
+
+
+def etiqueta_dejar_anterior(anterior: str) -> str:
+    return f"No, dejar {anterior}"
+
+
+# B4. Mantiene la anterior.
+TEXTO_MANTENER_CONFIRMADO = "Perfecto, seguimos con el correo anterior."
+
+
+def texto_enlace_vencido_reenviado(correo: str) -> str:
+    """B5. Enlace vencido -- Prisma manda uno nuevo sola, respetando los
+    límites (sin envíos disponibles: B11 o B12, que se resuelven aparte)."""
+    return f"Ese enlace venció, así que te mandé uno nuevo a {correo}."
+
+
+# B6. Enlace real abierto desde una cuenta de Telegram que no es la de su
+# dueño (integrante o no): nunca se consume. Un enlace inexistente de una
+# cuenta desconocida no recibe respuesta (como hoy, ver
+# `resolver_verificacion_correo`).
+TEXTO_CUENTA_INCORRECTA = (
+    "Este enlace tiene que abrirse con la cuenta de Telegram que usás con "
+    "Prisma.")
+
+
+def texto_enlace_roto_reenviado(correo: str) -> str:
+    """B6. Enlace roto (no existe) de un integrante con verificación
+    pendiente: Prisma manda uno nuevo sola."""
+    return f"Ese enlace no funciona, así que te mandé uno nuevo a {correo}."
+
+
+# B7. Enlace ya usado y correo ya verificado.
+TEXTO_YA_VERIFICADO = "Tu correo ya está verificado ✅"
+# B7b. Enlace viejo reemplazado por uno más nuevo (no consumido, ya no
+# vigente): botón "Reenviar el último".
+TEXTO_ENLACE_REEMPLAZADO = "Ese enlace ya no sirve porque te mandé uno más nuevo."
+
+# B8. Doble clic sobre la misma verificación.
+TEXTO_VERIFICACION_OCUPADA = (
+    "Ya estoy procesando esa verificación. Esperá un momento y revisá si "
+    "te llegó la confirmación.")
+
+# B10. Reenviar sin nada pendiente.
+TEXTO_SIN_ENVIO_VIGENTE = "Todavía no tengo tu correo. Pasámelo y te envío la verificación."
+
+
+def texto_limite_hora(hhmm: str) -> str:
+    """B11. Límite por hora -- {hhmm} es cuándo el envío más viejo de la
+    última hora deja de contar (`alta_correo.proximo_reenvio`), en la hora
+    local del espacio."""
+    return (f"Se enviaron varios correos de verificación en la última "
+            f"hora. Por seguridad, sólo puedo reenviarte otro a partir de "
+            f"las {hhmm}.")
+
+
+# B12. Cinco envíos agotados -- ya cierto: el aviso se entrega (G1d-a) y
+# existe la acción de administración para habilitar un nuevo intento
+# (G1d-b, acción F).
+TEXTO_LIMITE_AGOTADO = (
+    "Se agotaron los envíos de verificación. Ya le avisé a administración "
+    "y te escribo apenas lo destrabe.")
+
+
+def texto_reintento_habilitado(correo: str) -> str:
+    """F. Tras "Habilitar un nuevo intento" (acción de la administración),
+    a la persona le llega esto sola."""
+    return f"¿Te mando la verificación a {correo} otra vez?"
+
+
+def etiqueta_si_a(correo: str) -> str:
+    return f"Sí, a {correo}"
+
+
+# Textos nuevos, sin equivalente literal en el pack ni en la lista aprobada
+# por el usuario -- casos residuales que esa lista no cubre explícitamente
+# (B9 sin texto fijo; el resto, la reserva de un token que nunca se abrió).
 TEXTO_MULTIPLES_CORREOS = (
     "Encontré más de un correo en ese mensaje. ¿Cuál de estos es el que "
     "querés usar?")
-TEXTO_RECORDATORIO_PENDIENTE = (
-    "Todavía estoy esperando que verifiques tu correo. Podés reenviarte el "
-    "mensaje de verificación o cambiar la dirección.")
-TEXTO_PROPONE_CAMBIO = (
-    "Encontré una dirección distinta a la que ya te pedí verificar. "
-    "¿Querés que te mande la verificación a esta nueva?")
-TEXTO_MANTENER_CONFIRMADO = "Dale, seguimos con el correo anterior."
-TEXTO_ENLACE_VENCIDO = "Ese enlace de verificación venció."
 TEXTO_ENLACE_INVALIDO = (
     "Ese enlace no es válido. Si necesitás verificar tu correo, pedime "
     "que te lo reenvíe.")
-TEXTO_ENLACE_USADO = (
-    "Ese enlace ya se usó. Si necesitás verificar tu correo, pedime que "
-    "te lo reenvíe.")
-TEXTO_VERIFICACION_OCUPADA = (
-    "Ya estoy procesando esa verificación. Esperá un momento y fijate si "
-    "te llegó la confirmación.")
+TEXTO_ENLACE_VENCIDO = "Ese enlace de verificación venció."
 TEXTO_ESTADO_CAMBIO = (
     "El estado de tu registro cambió mientras verificabas ese correo. "
     "Escribime y lo vemos de nuevo.")
-TEXTO_SIN_ENVIO_VIGENTE = (
-    "No encontré ningún envío pendiente para reenviar. Escribime tu "
-    "correo laboral y te mando uno nuevo.")
 
 _TEXTOS_MOTIVO_EMISION = {
     "email_in_use": TEXTO_CORREO_EN_USO,
-    "verification_rate_limited": (
-        "Probaste varias veces en la última hora. Esperá un poco antes de "
-        "volver a pedir el correo de verificación."),
-    "verification_send_limit": (
-        "Ya alcanzaste el máximo de reenvíos para este intento de "
-        "verificación. Quedó registrado para que administración te ayude."),
+    "verification_send_limit": TEXTO_LIMITE_AGOTADO,
 }
 
 _TEXTOS_VERIFICACION_FALLIDA = {
-    "verification_token_invalid": TEXTO_ENLACE_INVALIDO,
-    "verification_token_consumed": TEXTO_ENLACE_USADO,
+    "verification_token_consumed": TEXTO_YA_VERIFICADO,
     "verification_token_busy": TEXTO_VERIFICACION_OCUPADA,
-    "verification_state_changed": TEXTO_ESTADO_CAMBIO,
     "email_in_use": TEXTO_CORREO_EN_USO,
 }
 
@@ -713,6 +784,14 @@ def _emitir_y_enviar(cur, quien, email: str, workspace_id: str, chat_id: int,
                 cuerpo=cuerpo_verificacion(nombre_preferido, enlace),
                 nombre_preferido=nombre_preferido, enlace=enlace, vence_en=vence_en)
     except _RefusalTipada as exc:
+        if exc.motivo == "verification_rate_limited":
+            # B11: {hhmm} es cuándo el envío más viejo de la última hora
+            # deja de contar -- nunca un genérico "más tarde".
+            proximo = AC.proximo_reenvio(cur, quien.membership_id, ahora=ahora)
+            zona = _zona_horaria(cur, workspace_id)
+            hhmm = proximo.astimezone(zona).strftime("%H:%M") if proximo else "??:??"
+            _responder(cur, workspace_id, chat_id, quien, texto_limite_hora(hhmm), ahora)
+            return
         texto = _TEXTOS_MOTIVO_EMISION.get(exc.motivo)
         if texto is None:
             _registrar_incidente(
@@ -723,15 +802,18 @@ def _emitir_y_enviar(cur, quien, email: str, workspace_id: str, chat_id: int,
             _responder(cur, workspace_id, chat_id, quien, NOTICIA_NEUTRA_INCIDENTE, ahora)
             return
         if (exc.motivo == "verification_send_limit"
-                and not AC.aviso_pendiente(cur, "correo_limite_agotado",
+                and not AC.aviso_pendiente(cur, AC.TIPO_CORREO_LIMITE_AGOTADO,
                                           "membership", quien.membership_id)):
             # "Exactamente una vez" (G1b2, ítem 5): mientras el aviso siga
             # sin resolver, un nuevo golpe contra el mismo límite no crea
-            # otro -- leído ≠ resuelto, y resolverlo es tarea de
-            # administración (G1d).
+            # otro -- leído ≠ resuelto; resolverlo (F, G1d-b) es "Habilitar
+            # un nuevo intento" desde el bot de administración. El nombre
+            # (nunca el correo) identifica a la persona para quien
+            # administra -- ver `_texto_aviso` (`avisos_admin.py`) para el
+            # encabezado completo.
             AC.crear_aviso(
-                cur, "correo_limite_agotado",
-                "Se agotaron los reenvíos del ciclo de verificación de correo.",
+                cur, AC.TIPO_CORREO_LIMITE_AGOTADO,
+                f"{quien.nombre} agotó los 5 envíos del correo de verificación.",
                 workspace_id=workspace_id, referencia_tipo="membership",
                 referencia_id=quien.membership_id, ahora=ahora)
         _responder(cur, workspace_id, chat_id, quien, texto, ahora)
@@ -798,17 +880,23 @@ def _ofrecer_eleccion_correo(cur, quien, candidatos: list[str], workspace_id: st
 
 
 def _recordatorio(cur, quien, workspace_id: str, chat_id: int, ahora: datetime) -> None:
+    """B2. El correo mostrado es el que sigue vigente -- si por alguna
+    razón no hubiera ninguno (no debería pasar en `pending_email_
+    verification`), el texto queda sin dirección antes que reventar."""
     from . import pendientes as P
 
+    vigente = AC.verificacion_vigente(cur, quien.membership_id)
+    correo = vigente["email"] if vigente else "esa dirección"
+    texto = texto_recordatorio_pendiente(correo)
     pendiente = P.registrar(
         cur, quien, herramienta=SENTINEL_RECORDATORIO, args={}, campo="eleccion",
-        resumen=TEXTO_RECORDATORIO_PENDIENTE, vence_en=ahora + VIGENCIA_BOTONES,
+        resumen=texto, vence_en=ahora + VIGENCIA_BOTONES,
         chat_id=chat_id,
         opciones=[(ETIQUETA_REENVIAR, {"accion": "reenviar"}),
                  (ETIQUETA_CAMBIAR, {"accion": "cambiar"})])
     enqueue_outbox(
         cur, workspace_id=workspace_id, chat_id=chat_id,
-        text=TEXTO_RECORDATORIO_PENDIENTE, scheduled_for=ahora,
+        text=texto, scheduled_for=ahora,
         dedupe_key=(f"{workspace_id}:alta-correo:recordatorio:{quien.membership_id}:"
                    f"{ahora.timestamp()}"),
         is_response=True, allow_split=True, pending_action_id=pendiente.id)
@@ -816,20 +904,71 @@ def _recordatorio(cur, quien, workspace_id: str, chat_id: int, ahora: datetime) 
 
 def _proponer_cambio(cur, quien, correo_crudo: str, workspace_id: str, chat_id: int,
                      ahora: datetime) -> None:
+    """B3. `anterior` es el correo hoy vigente -- lo muestran tanto el
+    texto como el botón de "dejar la anterior" (aprobado por el usuario,
+    2026-09-28)."""
     from . import pendientes as P
 
     email = AC.normalizar_correo(correo_crudo)
+    vigente = AC.verificacion_vigente(cur, quien.membership_id)
+    anterior = vigente["email"] if vigente else "la anterior"
+    texto = texto_propone_cambio(correo_crudo, anterior)
     pendiente = P.registrar(
         cur, quien, herramienta=SENTINEL_CAMBIO, args={}, campo="eleccion",
-        resumen=TEXTO_PROPONE_CAMBIO, vence_en=ahora + VIGENCIA_BOTONES,
+        resumen=texto, vence_en=ahora + VIGENCIA_BOTONES,
         chat_id=chat_id,
-        opciones=[(etiqueta_cambiar_a(correo_crudo), {"accion": "cambiar", "email": email}),
-                 (ETIQUETA_MANTENER, {"accion": "mantener"})])
+        opciones=[(etiqueta_usar_nuevo(correo_crudo), {"accion": "cambiar", "email": email}),
+                 (etiqueta_dejar_anterior(anterior), {"accion": "mantener"})])
     enqueue_outbox(
-        cur, workspace_id=workspace_id, chat_id=chat_id, text=TEXTO_PROPONE_CAMBIO,
+        cur, workspace_id=workspace_id, chat_id=chat_id, text=texto,
         scheduled_for=ahora,
         dedupe_key=(f"{workspace_id}:alta-correo:proponer:{quien.membership_id}:"
                    f"{ahora.timestamp()}"),
+        is_response=True, allow_split=True, pending_action_id=pendiente.id)
+
+
+def _enlace_reemplazado(cur, quien, workspace_id: str, chat_id: int, ahora: datetime) -> None:
+    """B7b. Reusa el mismo sentinel que `_recordatorio`
+    (`SENTINEL_RECORDATORIO`): un solo botón, "Reenviar el último", cuya
+    acción (`"reenviar"`) `resolver_toque` ya sabe resolver -- reenvía al
+    correo hoy vigente. No hace falta un sentinel propio."""
+    from . import pendientes as P
+
+    pendiente = P.registrar(
+        cur, quien, herramienta=SENTINEL_RECORDATORIO, args={}, campo="eleccion",
+        resumen=TEXTO_ENLACE_REEMPLAZADO, vence_en=ahora + VIGENCIA_BOTONES,
+        chat_id=chat_id,
+        opciones=[(ETIQUETA_REENVIAR_ULTIMO, {"accion": "reenviar"})])
+    enqueue_outbox(
+        cur, workspace_id=workspace_id, chat_id=chat_id, text=TEXTO_ENLACE_REEMPLAZADO,
+        scheduled_for=ahora,
+        dedupe_key=(f"{workspace_id}:alta-correo:reemplazado:{quien.membership_id}:"
+                   f"{ahora.timestamp()}"),
+        is_response=True, allow_split=True, pending_action_id=pendiente.id)
+
+
+def ofrecer_reintento_habilitado(cur, quien, workspace_id: str, chat_id: int,
+                                 ahora: datetime, correo: str) -> None:
+    """F (G1d-b, acción de la administración sobre "envíos agotados"): tras
+    "Habilitar un nuevo intento", esto es lo que le llega a la persona
+    -- llamado desde `avisos_admin.confirmar_habilitar`, nunca desde el
+    gateway del espacio (por eso es público, sin guión bajo). Mismo
+    mecanismo de botones que `_recordatorio` (`SENTINEL_RECORDATORIO`): "Sí,
+    a {correo}" reenvía al vigente, "Usar otro correo" vuelve a
+    `awaiting_email` -- ambos ya resueltos por `resolver_toque`."""
+    from . import pendientes as P
+
+    texto = texto_reintento_habilitado(correo)
+    pendiente = P.registrar(
+        cur, quien, herramienta=SENTINEL_RECORDATORIO, args={}, campo="eleccion",
+        resumen=texto, vence_en=ahora + VIGENCIA_BOTONES, chat_id=chat_id,
+        opciones=[(etiqueta_si_a(correo), {"accion": "reenviar"}),
+                 (ETIQUETA_CAMBIAR, {"accion": "cambiar"})])
+    enqueue_outbox(
+        cur, workspace_id=workspace_id, chat_id=chat_id, text=texto,
+        scheduled_for=ahora,
+        dedupe_key=(f"{workspace_id}:alta-correo:reintento-habilitado:"
+                   f"{quien.membership_id}:{ahora.timestamp()}"),
         is_response=True, allow_split=True, pending_action_id=pendiente.id)
 
 
@@ -915,19 +1054,24 @@ def resolver_toque(cur, quien, workspace_id: str, chat_id: int, herramienta: str
 
 
 def resolver_verificacion_correo(conn, workspace_id: str, token: str, tg_user: int,
-                                 chat_id: int) -> dict:
+                                 chat_id: int, *,
+                                 bot_username_resolver: Callable[[], str] | None = None
+                                 ) -> dict:
     """La persona volvió del correo con `/start pv_{token}`.
 
-    Nunca revela de quién es un token ajeno (A04): un desconocido y un
-    token que no le pertenece a quien lo aprieta se tratan igual, con el
-    mismo motivo genérico devuelto por `reservar_verificacion_correo`. Las
-    fallas inesperadas (no las rechazadas por motivo tipado) las atrapa
+    B6 (textos aprobados por el usuario, 2026-09-28): un token REAL abierto
+    por la cuenta equivocada (integrante o no) recibe `TEXTO_CUENTA_
+    INCORRECTA`, sin consumirse; un token que no existe, de una cuenta
+    desconocida, no recibe respuesta (como siempre). `AC.existe_
+    verificacion` es la única fuente de "existe/no existe" -- nunca revela
+    nada más (ni dueño, ni correo, ni estado).
+
+    Las fallas inesperadas (no las rechazadas por motivo tipado) las atrapa
     `gateway.procesar_update`, igual que el resto de `_activacion`."""
     from datetime import datetime, timezone
 
     from .autoridad import Denegado, identificar_en_espacio
     from .db import espacio
-    from .gateway import _responder
 
     # `espacio()` abre con `conn.transaction()`, que ya confirma sola al
     # salir limpio del `with` -- ningún `conn.commit()` manual acá adentro
@@ -938,19 +1082,28 @@ def resolver_verificacion_correo(conn, workspace_id: str, token: str, tg_user: i
         try:
             quien = identificar_en_espacio(cur, tg_user, workspace_id)
         except Denegado:
+            quien = None
+
+        if quien is None:
+            if AC.existe_verificacion(cur, token):
+                _responder_cuenta_incorrecta(cur, workspace_id, chat_id, ahora)
             return {"ok": True}
 
         reserva = AC.reservar_verificacion(cur, token, quien.membership_id, ahora=ahora)
         if not reserva.ok:
-            _responder_falla_verificacion(cur, quien, workspace_id, chat_id, ahora,
-                                          reserva.motivo)
+            _responder_falla_verificacion(
+                cur, quien, workspace_id, chat_id, ahora, reserva.motivo,
+                bot_username_resolver=bot_username_resolver,
+                token_existe=lambda: AC.existe_verificacion(cur, token))
             return {"ok": True}
 
         completado = AC.completar_verificacion(cur, token, quien.membership_id,
                                                ahora=ahora)
         if not completado.ok:
-            _responder_falla_verificacion(cur, quien, workspace_id, chat_id, ahora,
-                                          completado.motivo)
+            _responder_falla_verificacion(
+                cur, quien, workspace_id, chat_id, ahora, completado.motivo,
+                bot_username_resolver=bot_username_resolver,
+                token_existe=lambda: True)
             return {"ok": True}
 
         # G1c: el texto final difiere por modo -- `texto_verificado` (el del
@@ -958,6 +1111,8 @@ def resolver_verificacion_correo(conn, workspace_id: str, token: str, tg_user: i
         # quien ya estaba activa (`existente`) necesita la variante propia
         # (ver su docstring). El modo no cambia dentro de un ciclo, así que
         # leer la proyección ya actualizada alcanza.
+        from .gateway import _responder
+
         nombre_preferido = _nombre_preferido(quien.nombre)
         proyeccion = AC.estado(cur, quien.membership_id)
         texto_exito = (texto_verificado_existente(nombre_preferido)
@@ -967,16 +1122,88 @@ def resolver_verificacion_correo(conn, workspace_id: str, token: str, tg_user: i
     return {"ok": True}
 
 
+def _responder_cuenta_incorrecta(cur, workspace_id: str, chat_id: int,
+                                 ahora: datetime) -> None:
+    """B6: sale igual para un desconocido que para un integrante -- no hace
+    falta identificar a quien escribe para decirle esto, así que no usa
+    `_responder` (que exige un `quien` ya identificado en el espacio)."""
+    enqueue_outbox(
+        cur, workspace_id=workspace_id, chat_id=chat_id, text=TEXTO_CUENTA_INCORRECTA,
+        scheduled_for=ahora,
+        dedupe_key=f"{workspace_id}:alta-correo:cuenta-incorrecta:{chat_id}:{ahora.timestamp()}",
+        is_response=True, allow_split=True)
+
+
+def _responder_estado_actual(cur, quien, workspace_id: str, chat_id: int,
+                             ahora: datetime) -> None:
+    """B9: sin texto fijo -- Prisma sigue desde el estado actual (si falta
+    el correo, lo pide; si ya está verificado, lo confirma). Cualquier otro
+    estado residual (el pack no lo contempla) usa el neutral genérico de
+    siempre en vez de fingir una continuación que no existe."""
+    from .gateway import _responder
+
+    actual = AC.estado(cur, quien.membership_id)
+    estado = actual["estado"] if actual else None
+    if estado == "awaiting_email":
+        _responder(cur, workspace_id, chat_id, quien, TEXTO_PEDIDO_CORREO, ahora)
+        return
+    if estado == "active":
+        nombre_preferido = _nombre_preferido(quien.nombre)
+        texto = (texto_verificado_existente(nombre_preferido)
+                 if actual["modo"] == "existente" else texto_verificado(nombre_preferido))
+        _responder(cur, workspace_id, chat_id, quien, texto, ahora)
+        return
+    _responder(cur, workspace_id, chat_id, quien, TEXTO_ESTADO_CAMBIO, ahora)
+
+
 def _responder_falla_verificacion(cur, quien, workspace_id: str, chat_id: int,
-                                  ahora: datetime, motivo: str) -> None:
+                                  ahora: datetime, motivo: str, *,
+                                  bot_username_resolver: Callable[[], str] | None = None,
+                                  token_existe: Callable[[], bool] | None = None) -> None:
     from .gateway import ETAPA_ALTA_CORREO, NOTICIA_NEUTRA_INCIDENTE, _registrar_incidente, _responder
 
     if motivo == "verification_token_expired":
+        # B5: Prisma manda uno nuevo sola, respetando los límites (sin
+        # envíos disponibles, `_emitir_y_enviar` cae sola en B11 o B12).
         actual = AC.estado(cur, quien.membership_id)
         if actual and actual["estado"] == "pending_email_verification":
-            _recordatorio(cur, quien, workspace_id, chat_id, ahora)
-        else:
-            _responder(cur, workspace_id, chat_id, quien, TEXTO_ENLACE_VENCIDO, ahora)
+            vigente = AC.verificacion_vigente(cur, quien.membership_id)
+            if vigente is not None:
+                nombre_preferido = _nombre_preferido(quien.nombre)
+                _emitir_y_enviar(
+                    cur, quien, vigente["email"], workspace_id, chat_id, ahora,
+                    bot_username_resolver, nombre_preferido,
+                    texto_enlace_vencido_reenviado(vigente["email"]))
+                return
+        _responder(cur, workspace_id, chat_id, quien, TEXTO_ENLACE_VENCIDO, ahora)
+        return
+
+    if motivo == "verification_token_superseded":
+        _enlace_reemplazado(cur, quien, workspace_id, chat_id, ahora)
+        return
+
+    if motivo == "verification_state_changed":
+        _responder_estado_actual(cur, quien, workspace_id, chat_id, ahora)
+        return
+
+    if motivo == "verification_token_invalid":
+        if token_existe is not None and token_existe():
+            # B6: real, pero no es el dueño.
+            _responder(cur, workspace_id, chat_id, quien, TEXTO_CUENTA_INCORRECTA, ahora)
+            return
+        # B6: roto/inexistente -- un integrante con verificación pendiente
+        # recibe uno nuevo sola.
+        actual = AC.estado(cur, quien.membership_id)
+        if actual and actual["estado"] == "pending_email_verification":
+            vigente = AC.verificacion_vigente(cur, quien.membership_id)
+            if vigente is not None:
+                nombre_preferido = _nombre_preferido(quien.nombre)
+                _emitir_y_enviar(
+                    cur, quien, vigente["email"], workspace_id, chat_id, ahora,
+                    bot_username_resolver, nombre_preferido,
+                    texto_enlace_roto_reenviado(vigente["email"]))
+                return
+        _responder(cur, workspace_id, chat_id, quien, TEXTO_ENLACE_INVALIDO, ahora)
         return
 
     texto = _TEXTOS_VERIFICACION_FALLIDA.get(motivo)

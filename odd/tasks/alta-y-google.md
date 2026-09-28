@@ -540,10 +540,37 @@ Un worktree nuevo no trae lo que no se versiona.
     `reportar_fallo_despacho` no deja rastro (debe escribir a stderr y
     `cli.py` no debe decir "quedó registrado"); docstrings inexactos
     (conexión, `hashtext`, columna `etapa`); prueba del camino de doble falla.
-  - [ ] **G1d-b + G1t — Acción "Habilitar un nuevo intento" y textos
+  - [x] **G1d-b + G1t — Acción "Habilitar un nuevo intento" y textos
     aprobados.** Aplicar la sección "Textos del alta con correo aprobados
     por el usuario" (regla sin callejones sin salida, B1-B12, C, sin
     variantes sin nombre) y la acción F del administrador.
+    Hecho (ruta: delegada, un escritor). Textos B1-B12, C y F aplicados
+    literalmente; sin variantes sin nombre (un nombre vacío es un error de
+    datos → incidente + aviso neutral); evento `intento_habilitado` que
+    reinicia el tope de 5 por ciclo; funciones `existe_verificacion_correo`
+    (sólo booleano) y `proximo_reenvio_correo` (hora de B11). El escritor
+    declaró pruebas después del código para la reescritura de B1-B12. La
+    sesión corrigió antes del commit, con RED observado: (a) si a la persona
+    no se la podía avisar, el aviso quedaba resuelto y el administrador
+    recibía "Listo, habilitado." — ahora no se aplica nada, queda un
+    incidente y el administrador recibe el aviso neutral; (b) dos
+    administradores confirmando a la vez aplicaban dos veces — ahora el
+    aviso se bloquea al confirmar. Cambios de permisos, justificados:
+    `prisma_owner` lee `alta_correo_evento` (para contar desde el último
+    `intento_habilitado`), `prisma_admin` ejecuta
+    `verificacion_vigente_correo`, y las dos funciones nuevas sólo para
+    `prisma_app`. Suite de la sesión: `4 failed, 1210 passed, 108
+    deselected` (las 4 de fecha fija de `main`). Textos nuevos para revisar:
+    la vista previa del administrador ("¿Habilitar un nuevo intento de
+    verificación de correo para {nombre}? Le vuelvo a preguntar por su
+    correo y este aviso queda resuelto."), "Ese aviso ya estaba resuelto.",
+    "Listo, habilitado.", "No se habilitó nada.". El evento del
+    administrador se registra con `actor_kind = 'persona'` (el enum
+    `tipo_actor` de `main` no tiene `administrador`).
+- Requisito de la Tanda 2 cumplido por el usuario (2026-09-28): el token del
+  bot de administración está en `.env` del worktree
+  (`PRISMA_BOT_TOKEN_ADMIN`; el archivo existe y git lo ignora; la sesión no
+  lo leyó).
   - [ ] **G1d — Avisos "🛠️ Administración" por el bot de administración.**
     Camino de salida propio (hoy el bot de administración no envía nada y
     `message_outbox` exige `workspace_id`); botones Reenviar correo /

@@ -590,9 +590,16 @@ def main(argv: list[str] | None = None) -> int:
             with admin(conn) as cur:
                 print(AA.despachar_todo(cur))
         except Exception as e:  # noqa: BLE001 -- nunca frena el despacho del espacio
-            AA.reportar_fallo_despacho(conn, e, ETAPA_ADMIN_DESPACHO)
-            print("No se pudieron despachar los avisos administrativos; "
-                  "quedó registrado.")
+            # G1d-a3, seguimiento de la revisión: `reportar_fallo_despacho`
+            # devuelve si el incidente quedó de verdad registrado -- nunca
+            # decir "quedó registrado" cuando ni eso se pudo (esa doble
+            # falla ya deja su propio rastro saneado en stderr).
+            if AA.reportar_fallo_despacho(conn, e, ETAPA_ADMIN_DESPACHO):
+                print("No se pudieron despachar los avisos administrativos; "
+                      "quedó registrado.")
+            else:
+                print("No se pudieron despachar los avisos administrativos "
+                      "y tampoco se pudo registrar el incidente.")
 
     conn.commit()
     return 0

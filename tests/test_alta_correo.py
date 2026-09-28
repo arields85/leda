@@ -958,6 +958,195 @@ def test_un_token_de_otro_espacio_no_verifica_con_una_membresia_ajena(
 
 
 # ---------------------------------------------------------------------------
+# G1t/B6: el dueño equivocado se corta ANTES que consumido/vigente/vencido
+# ---------------------------------------------------------------------------
+
+
+def test_dueno_equivocado_no_revela_que_el_token_del_propietario_esta_vencido(
+        intake_world, conn):
+    """El motivo tiene que ser siempre el mismo genérico para quien no es el
+    dueño, sin importar que el token del propietario esté, además, vencido
+    -- antes, "vencido" se comprobaba ANTES que la identidad, así que `otro`
+    se enteraba de un detalle interno del token ajeno que no le
+    corresponde."""
+    norte = intake_world["north-lab"]
+    propietario = _membership(intake_world, "north-lab", "Taylor Quinn")
+    otro = _membership(intake_world, "north-lab", "Sam North")
+    emitido = AHORA - timedelta(hours=25)
+
+    with espacio(conn, norte["id"]) as cur:
+        _hasta_awaiting_email(cur, propietario, ahora=emitido)
+        AC.transicionar(cur, propietario, "pending_email_verification", ahora=emitido)
+        AC.emitir_verificacion(
+            cur, propietario, "propietario@example.com", "token-vencido-ajeno",
+            ahora=emitido)
+
+        reserva = AC.reservar_verificacion(cur, "token-vencido-ajeno", otro, ahora=AHORA)
+        assert reserva.ok is False
+        assert reserva.motivo == "verification_token_invalid"
+    conn.commit()
+
+
+def test_un_token_reemplazado_por_uno_nuevo_es_superseded_para_su_dueno(
+        intake_world, conn):
+    """G1t/B7b: un token real, del dueño correcto, pero ya reemplazado por
+    un envío posterior -- motivo propio (`verification_token_superseded`),
+    distinto de "inválido": la persona tiene un enlace más nuevo
+    esperándola, no uno roto."""
+    norte = intake_world["north-lab"]
+    m = _membership(intake_world, "north-lab")
+
+    with espacio(conn, norte["id"]) as cur:
+        _hasta_awaiting_email(cur, m)
+        AC.transicionar(cur, m, "pending_email_verification", ahora=AHORA)
+        AC.emitir_verificacion(cur, m, "persona@example.com", "token-viejo", ahora=AHORA)
+        AC.emitir_verificacion(
+            cur, m, "persona@example.com", "token-nuevo",
+            ahora=AHORA + timedelta(minutes=1))
+
+        reserva = AC.reservar_verificacion(cur, "token-viejo", m, ahora=AHORA)
+        assert reserva.ok is False
+        assert reserva.motivo == "verification_token_superseded"
+
+        assert AC.reservar_verificacion(cur, "token-nuevo", m, ahora=AHORA).ok
+    conn.commit()
+
+
+# ---------------------------------------------------------------------------
+# G1t/B6: existencia de un token, sin revelar nada más
+# ---------------------------------------------------------------------------
+
+
+def test_existe_verificacion_distingue_real_de_inventado(intake_world, conn):
+    norte = intake_world["north-lab"]
+    m = _membership(intake_world, "north-lab")
+
+    with espacio(conn, norte["id"]) as cur:
+        _hasta_awaiting_email(cur, m)
+        AC.transicionar(cur, m, "pending_email_verification", ahora=AHORA)
+        AC.emitir_verificacion(cur, m, "persona@example.com", "token-real", ahora=AHORA)
+
+        assert AC.existe_verificacion(cur, "token-real") is True
+        assert AC.existe_verificacion(cur, "token-que-nunca-existio") is False
+    conn.commit()
+
+
+def test_existe_verificacion_no_requiere_espacio_declarado(intake_world, conn):
+    """Mismo motivo que `verificacion_vigente_correo`: hace falta poder
+    comprobarlo antes de saber a qué equipo pertenece quien abrió el
+    enlace."""
+    norte = intake_world["north-lab"]
+    m = _membership(intake_world, "north-lab")
+
+    with espacio(conn, norte["id"]) as cur:
+        _hasta_awaiting_email(cur, m)
+        AC.transicionar(cur, m, "pending_email_verification", ahora=AHORA)
+        AC.emitir_verificacion(
+            cur, m, "persona@example.com", "token-sin-espacio", ahora=AHORA)
+    conn.commit()
+
+    with sin_espacio(conn) as cur:
+        assert AC.existe_verificacion(cur, "token-sin-espacio") is True
+        assert AC.existe_verificacion(cur, "nunca-existio") is False
+
+
+# ---------------------------------------------------------------------------
+# G1t/B11: cuándo se puede volver a reenviar
+# ---------------------------------------------------------------------------
+
+
+def test_proximo_reenvio_es_el_mas_viejo_de_la_ventana_mas_una_hora(
+        intake_world, conn):
+    norte = intake_world["north-lab"]
+    m = _membership(intake_world, "north-lab")
+
+    with espacio(conn, norte["id"]) as cur:
+        assert AC.proximo_reenvio(cur, m, ahora=AHORA) is None  # nada enviado todavía
+
+        _hasta_awaiting_email(cur, m, ahora=AHORA)
+        AC.transicionar(cur, m, "pending_email_verification", ahora=AHORA)
+        AC.emitir_verificacion(cur, m, "persona@example.com", "token-1", ahora=AHORA)
+        AC.emitir_verificacion(
+            cur, m, "persona@example.com", "token-2", ahora=AHORA + timedelta(minutes=10))
+
+        proximo = AC.proximo_reenvio(cur, m, ahora=AHORA + timedelta(minutes=20))
+        assert proximo == AHORA + timedelta(hours=1)
+    conn.commit()
+
+
+def test_proximo_reenvio_ignora_envios_fuera_de_la_ventana(intake_world, conn):
+    norte = intake_world["north-lab"]
+    m = _membership(intake_world, "north-lab")
+
+    with espacio(conn, norte["id"]) as cur:
+        _hasta_awaiting_email(cur, m, ahora=AHORA)
+        AC.transicionar(cur, m, "pending_email_verification", ahora=AHORA)
+        AC.emitir_verificacion(cur, m, "persona@example.com", "token-1", ahora=AHORA)
+
+        proximo = AC.proximo_reenvio(cur, m, ahora=AHORA + timedelta(hours=2))
+        assert proximo is None
+    conn.commit()
+
+
+# ---------------------------------------------------------------------------
+# G1d-b/F: habilitar_intento reabre el cupo de 5 envíos del ciclo vigente
+# ---------------------------------------------------------------------------
+
+
+def test_habilitar_intento_reabre_el_cupo_de_cinco_del_ciclo(intake_world, conn):
+    norte = intake_world["north-lab"]
+    m = _membership(intake_world, "north-lab")
+    admin_id = norte["people"]["Morgan Hale"]["app_user_id"]
+
+    with espacio(conn, norte["id"]) as cur:
+        _hasta_awaiting_email(cur, m, ahora=AHORA)
+        AC.transicionar(cur, m, "pending_email_verification", ahora=AHORA)
+        for i in range(5):
+            instante = AHORA + timedelta(hours=2 * i)
+            resultado = AC.emitir_verificacion(
+                cur, m, "persona@example.com", f"token-{i}", ahora=instante)
+            assert resultado.ok is True
+
+        instante_6 = AHORA + timedelta(hours=10)
+        agotado = AC.emitir_verificacion(
+            cur, m, "persona@example.com", "token-6", ahora=instante_6)
+        assert agotado.ok is False
+        assert agotado.motivo == "verification_send_limit"
+
+        AC.habilitar_intento(cur, m, actor_app_user_id=admin_id, ahora=instante_6)
+
+        instante_7 = instante_6 + timedelta(hours=2)
+        habilitado_ok = AC.emitir_verificacion(
+            cur, m, "persona@example.com", "token-7", ahora=instante_7)
+        assert habilitado_ok.ok is True
+        # El estado del ciclo no cambió -- sólo se reabrió el cupo.
+        assert AC.estado(cur, m)["estado"] == "pending_email_verification"
+    conn.commit()
+
+
+def test_habilitar_intento_no_toca_el_limite_de_tres_por_hora(intake_world, conn):
+    """El límite de 3/hora sigue honesto justo después de habilitar: no es
+    lo que se reabre."""
+    norte = intake_world["north-lab"]
+    m = _membership(intake_world, "north-lab")
+    admin_id = norte["people"]["Morgan Hale"]["app_user_id"]
+
+    with espacio(conn, norte["id"]) as cur:
+        _hasta_awaiting_email(cur, m, ahora=AHORA)
+        AC.transicionar(cur, m, "pending_email_verification", ahora=AHORA)
+        for i in range(3):
+            AC.emitir_verificacion(cur, m, "persona@example.com", f"token-{i}", ahora=AHORA)
+
+        AC.habilitar_intento(cur, m, actor_app_user_id=admin_id, ahora=AHORA)
+
+        rechazado = AC.emitir_verificacion(
+            cur, m, "persona@example.com", "token-justo-despues", ahora=AHORA)
+        assert rechazado.ok is False
+        assert rechazado.motivo == "verification_rate_limited"
+    conn.commit()
+
+
+# ---------------------------------------------------------------------------
 # La clave del espacio
 # ---------------------------------------------------------------------------
 

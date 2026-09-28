@@ -14,6 +14,8 @@ sólo se asume ya identificado ("el canal manda", `autoridad.py`).
 
 from __future__ import annotations
 
+import json
+import sys
 from datetime import datetime, timedelta, timezone
 
 import psycopg
@@ -27,11 +29,27 @@ CALLBACK_PREFIJO = "adm"
 ACCION_LEIDO = "leido"
 ETIQUETA_MARCAR_LEIDO = "Marcar leído"
 
+# G1d-b, acción F: "Habilitar un nuevo intento" sobre el aviso de envíos
+# agotados -- vista previa, Confirmar, Cancelar. El estado del aviso mismo
+# (`resuelto_en`) es la única fuente de idempotencia: no hace falta ninguna
+# tabla de "pendiente de confirmar" propia del canal de administración (a
+# diferencia de `pendientes.py`, que exige `workspace_id`/`membership_id` --
+# un administrador de plataforma no necesariamente los tiene).
+ACCION_HABILITAR = "habilitar"
+ACCION_CONFIRMAR_HABILITAR = "confirmar_habilitar"
+ACCION_CANCELAR_HABILITAR = "cancelar_habilitar"
+ETIQUETA_HABILITAR = "Habilitar un nuevo intento"
+ETIQUETA_CONFIRMAR = "Confirmar"
+ETIQUETA_CANCELAR = "Cancelar"
+
 TEXTO_ACCION_LIBRE = (
     "Las acciones de administración se hacen desde los botones de cada "
     "aviso, o desde el panel de plataforma. Un mensaje de texto acá no "
     "hace nada.")
 TEXTO_MARCADO_LEIDO = "Marcado como leído."
+TEXTO_HABILITAR_YA_RESUELTO = "Ese aviso ya estaba resuelto."
+TEXTO_HABILITAR_CONFIRMADO = "Listo, habilitado."
+TEXTO_HABILITAR_CANCELADO = "No se habilitó nada."
 
 
 def _ahora(valor: datetime | None) -> datetime:
@@ -39,9 +57,8 @@ def _ahora(valor: datetime | None) -> datetime:
 
 
 # ---------------------------------------------------------------------------
-# Botones -- prefijo genérico, para que agregar otra acción después (p. ej.
-# Reenviar/Cambiar correo, fuera de alcance de G1d) sea sumar un valor a
-# `ACCION_*`, nunca un esquema de callback nuevo.
+# Botones -- prefijo genérico, para que agregar otra acción después sea
+# sumar un valor a `ACCION_*`, nunca un esquema de callback nuevo.
 # ---------------------------------------------------------------------------
 
 
@@ -61,6 +78,29 @@ def partes_de_callback(data: str) -> tuple[str, str] | None:
 
 def boton_marcar_leido(aviso_id: str) -> Boton:
     return Boton(ETIQUETA_MARCAR_LEIDO, callback_data(ACCION_LEIDO, aviso_id))
+
+
+def boton_habilitar(aviso_id: str) -> Boton:
+    return Boton(ETIQUETA_HABILITAR, callback_data(ACCION_HABILITAR, aviso_id))
+
+
+def boton_confirmar_habilitar(aviso_id: str) -> Boton:
+    return Boton(ETIQUETA_CONFIRMAR, callback_data(ACCION_CONFIRMAR_HABILITAR, aviso_id))
+
+
+def boton_cancelar_habilitar(aviso_id: str) -> Boton:
+    return Boton(ETIQUETA_CANCELAR, callback_data(ACCION_CANCELAR_HABILITAR, aviso_id))
+
+
+def _botones_para(tipo: str, aviso_id: str) -> list[Boton]:
+    """Qué botones lleva un aviso ya entregado, según su tipo (F, "Textos
+    del alta con correo aprobados por el usuario", 2026-09-28): "envíos
+    agotados" suma "Habilitar un nuevo intento"; el resto de los tipos --
+    "falta configurar el envío" y "quiénes no dieron su correo" -- quedan
+    informativos, sólo con "Marcar leído"."""
+    if tipo == AC.TIPO_CORREO_LIMITE_AGOTADO:
+        return [boton_habilitar(aviso_id), boton_marcar_leido(aviso_id)]
+    return [boton_marcar_leido(aviso_id)]
 
 
 # ---------------------------------------------------------------------------
@@ -83,6 +123,146 @@ def marcar_leido_por_toque(cur: psycopg.Cursor, aviso_id: str, app_user_id: str,
         dedupe_key=f"adm:leido:{aviso_id}:{app_user_id}", ahora=ahora)
 
 
+def _cargar_aviso(cur: psycopg.Cursor, aviso_id: str, *,
+                  bloquear: bool = False) -> dict | None:
+    """`bloquear=True` toma el candado de la fila: dos administradores que
+    confirman a la vez se serializan acá, y el segundo ve el aviso ya
+    resuelto en vez de aplicar la acción otra vez."""
+    cur.execute(
+        f"""select id, workspace_id, tipo, referencia_tipo, referencia_id, resuelto_en
+              from aviso_administrativo where id = %s
+              {"for update" if bloquear else ""}""",
+        (aviso_id,))
+    return cur.fetchone()
+
+
+class NoSePuedeAvisar(Exception):
+    """La persona del aviso no se puede avisar (sin Telegram vinculado o sin
+    un envío previo del que retomar la dirección): no se aplica nada."""
+
+
+def _texto_preview_habilitar(nombre: str) -> str:
+    return (f"¿Habilitar un nuevo intento de verificación de correo para "
+            f"{nombre}? Le vuelvo a preguntar por su correo y este aviso "
+            "queda resuelto.")
+
+
+def mostrar_preview_habilitar(cur: psycopg.Cursor, aviso_id: str, chat_id: int, *,
+                              ahora: datetime | None = None) -> None:
+    """Primer toque de "Habilitar un nuevo intento" (G1d-b, acción F): sólo
+    muestra la vista previa con Confirmar/Cancelar -- todavía no aplica
+    nada. Un aviso ya resuelto (doble tap, u otro administrador ya
+    resolvió) recibe una respuesta breve y ninguna acción nueva."""
+    ahora = _ahora(ahora)
+    aviso = _cargar_aviso(cur, aviso_id)
+    if (aviso is None or aviso["resuelto_en"] is not None
+            or aviso["tipo"] != AC.TIPO_CORREO_LIMITE_AGOTADO):
+        encolar_respuesta(
+            cur, chat_id, TEXTO_HABILITAR_YA_RESUELTO,
+            dedupe_key=f"adm:habilitar-preview:{aviso_id}:{ahora.timestamp()}", ahora=ahora)
+        return
+
+    cur.execute(
+        """select u.nombre from membership m join app_user u on u.id = m.app_user_id
+            where m.id = %s""", (aviso["referencia_id"],))
+    fila = cur.fetchone()
+    nombre = fila["nombre"] if fila else "esa persona"
+    texto = _texto_preview_habilitar(nombre)
+    encolar_respuesta(
+        cur, chat_id, texto,
+        dedupe_key=f"adm:habilitar-preview:{aviso_id}:{ahora.timestamp()}", ahora=ahora,
+        botones=[boton_confirmar_habilitar(aviso_id), boton_cancelar_habilitar(aviso_id)])
+
+
+def confirmar_habilitar(cur: psycopg.Cursor, aviso_id: str, admin_app_user_id: str, *,
+                        ahora: datetime | None = None) -> bool:
+    """Aplica "Habilitar un nuevo intento": todo bajo la misma transacción
+    que ya trae quien llama. `False` si el aviso ya estaba resuelto (doble
+    tap, u otro administrador que confirmó primero) -- entonces no aplica
+    una segunda vez ni manda un segundo aviso a la persona."""
+    from . import alta_correo_flujo as ACF
+    from .autoridad import Canal, Solicitante
+
+    ahora = _ahora(ahora)
+    aviso = _cargar_aviso(cur, aviso_id, bloquear=True)
+    if (aviso is None or aviso["resuelto_en"] is not None
+            or aviso["tipo"] != AC.TIPO_CORREO_LIMITE_AGOTADO
+            or aviso["referencia_tipo"] != "membership"):
+        return False
+
+    workspace_id = str(aviso["workspace_id"])
+    membership_id = str(aviso["referencia_id"])
+
+    cur.execute(
+        """select u.id as app_user_id, u.telegram_user_id, u.nombre
+             from membership m join app_user u on u.id = m.app_user_id
+            where m.id = %s""", (membership_id,))
+    persona = cur.fetchone()
+
+    # Primero se comprueba que a la persona le va a llegar el aviso; si no,
+    # no se aplica nada ni se resuelve el aviso (nunca fallar en silencio:
+    # el administrador no recibe "Listo, habilitado." si a la persona no le
+    # va a llegar nada).
+    if persona is None or not persona["telegram_user_id"]:
+        raise NoSePuedeAvisar("sin cuenta de Telegram vinculada")
+    vigente = AC.verificacion_vigente(cur, membership_id)
+    if vigente is None:
+        raise NoSePuedeAvisar("sin un envío previo del que retomar la dirección")
+
+    # Recién ahora se declara el espacio (después de comprobar que se puede
+    # avisar, así un incidente por no poder avisar queda como incidente de
+    # plataforma, sin espacio). `alta_correo_evento`/`alta_correo_estado`
+    # llevan RLS forzada y sus funciones de escritura corren
+    # `security definer` como `prisma_owner`
+    # (`nobypassrls`) -- sin este espacio declarado en la sesión, no
+    # encontrarían nada, aunque `prisma_admin` (bypassrls) sí vea la fila
+    # directamente. Mismo patrón que `gateway._activacion`.
+    cur.execute("select set_config('prisma.workspace_id', %s, true)", (workspace_id,))
+
+    AC.habilitar_intento(cur, membership_id, actor_app_user_id=admin_app_user_id, ahora=ahora)
+    AC.marcar_resuelto(cur, aviso_id, admin_app_user_id, ahora=ahora)
+
+    quien = Solicitante(
+        app_user_id=str(persona["app_user_id"]), canal=Canal.ESPACIO,
+        workspace_id=workspace_id, membership_id=membership_id, nombre=persona["nombre"])
+    ACF.ofrecer_reintento_habilitado(
+        cur, quien, workspace_id, persona["telegram_user_id"], ahora, vigente["email"])
+    return True
+
+
+def confirmar_habilitar_por_toque(cur: psycopg.Cursor, aviso_id: str, admin_app_user_id: str,
+                                  chat_id: int, *, ahora: datetime | None = None) -> None:
+    from .gateway import NOTICIA_NEUTRA_INCIDENTE
+
+    ahora = _ahora(ahora)
+    try:
+        aplicado = confirmar_habilitar(cur, aviso_id, admin_app_user_id, ahora=ahora)
+    except NoSePuedeAvisar as e:
+        _incidente_plataforma_persistente(
+            cur, "No se habilitó un nuevo intento de verificación de correo: "
+            f"no se puede avisar a la persona ({e}).", ahora)
+        encolar_respuesta(
+            cur, chat_id, NOTICIA_NEUTRA_INCIDENTE,
+            dedupe_key=f"adm:habilitar-sin-aviso:{aviso_id}:{admin_app_user_id}",
+            ahora=ahora)
+        return
+    texto = TEXTO_HABILITAR_CONFIRMADO if aplicado else TEXTO_HABILITAR_YA_RESUELTO
+    encolar_respuesta(
+        cur, chat_id, texto,
+        dedupe_key=f"adm:habilitar-confirmado:{aviso_id}:{admin_app_user_id}", ahora=ahora)
+
+
+def cancelar_habilitar_por_toque(cur: psycopg.Cursor, aviso_id: str, chat_id: int, *,
+                                 ahora: datetime | None = None) -> None:
+    """Cancelar no aplica nada -- ni siquiera revisa si el aviso sigue sin
+    resolver: declinar una vista previa nunca es una acción que necesite
+    idempotencia propia."""
+    ahora = _ahora(ahora)
+    encolar_respuesta(
+        cur, chat_id, TEXTO_HABILITAR_CANCELADO,
+        dedupe_key=f"adm:habilitar-cancelado:{aviso_id}", ahora=ahora)
+
+
 def responder_texto_libre(cur: psycopg.Cursor, chat_id: int, mensaje_id: int | None,
                           *, ahora: datetime | None = None) -> None:
     """Cualquier texto libre en el bot de administración nunca concede una
@@ -95,13 +275,21 @@ def responder_texto_libre(cur: psycopg.Cursor, chat_id: int, mensaje_id: int | N
 
 
 def encolar_respuesta(cur: psycopg.Cursor, chat_id: int, texto: str, *,
-                      dedupe_key: str, ahora: datetime | None = None) -> None:
+                      dedupe_key: str, ahora: datetime | None = None,
+                      botones: list[Boton] | None = None) -> None:
+    """`botones` (G1d-b): la vista previa de "Habilitar un nuevo intento"
+    trae Confirmar/Cancelar -- `None`/`[]` es una respuesta sin botones,
+    como todas las de antes de G1d-b."""
+    payload_botones = (
+        json.dumps([{"etiqueta": b.etiqueta, "callback_data": b.callback_data}
+                    for b in botones])
+        if botones else None)
     cur.execute(
         """insert into aviso_administrativo_respuesta
-             (chat_id, texto, dedupe_key, creado_en)
-           values (%s, %s, %s, %s)
+             (chat_id, texto, botones, dedupe_key, creado_en)
+           values (%s, %s, %s, %s, %s)
            on conflict (dedupe_key) do nothing""",
-        (chat_id, texto, dedupe_key, _ahora(ahora)))
+        (chat_id, texto, payload_botones, dedupe_key, _ahora(ahora)))
 
 
 # ---------------------------------------------------------------------------
@@ -234,12 +422,14 @@ def _incidente_plataforma_persistente(cur: psycopg.Cursor, resumen: str,
 
 
 def reportar_fallo_despacho(conn: psycopg.Connection, error: Exception, etapa: str,
-                            *, ahora: datetime | None = None) -> None:
+                            *, ahora: datetime | None = None) -> bool:
     """Incidente de la contención alrededor de `despachar_todo` (G1d-a3,
     ítem 2), llamado desde `local.Escucha.tareas_de_fondo` y `cli.py
     despachar` cuando esa llamada revienta -- ninguno de los dos puede
-    reusar la conexión de `espacio()`/`admin()` que ya se cerró sola al
-    salir por la excepción, así que abre la suya propia acá.
+    reusar el CURSOR de `espacio()`/`admin()` que abrió `despachar_todo`
+    (se cerró solo, con su `with`, al salir por la excepción); la conexión
+    (`conn`) en sí sigue viva y es la misma que se le pasa acá, para abrir
+    su propio `admin(conn)` nuevo.
 
     Deduplicado con la misma ventana que un incidente de plataforma
     persistente (`_incidente_plataforma_persistente`), por etapa + tipo de
@@ -249,22 +439,43 @@ def reportar_fallo_despacho(conn: psycopg.Connection, error: Exception, etapa: s
     igualdad exacta de `resumen_sanitizado`. Antes, la contención llamaba
     directamente a `gateway._reportar_incidente_admin`, que inserta sin
     deduplicar: mientras el error persistiera, cada vuelta del loop de
-    despacho dejaba un incidente nuevo."""
+    despacho dejaba un incidente nuevo.
+
+    Devuelve `True` si el incidente quedó registrado, `False` si ni eso se
+    pudo (G1d-a3, seguimiento de la revisión de G1d-a3: antes, esta doble
+    falla se perdía en absoluto silencio -- ni una fila en `incident`, ni
+    ningún rastro en otro lado). Quien llama (`cli.py`) usa este valor para
+    no decir "quedó registrado" cuando no fue así; acá, además, queda una
+    línea saneada en stderr -- la única forma de encontrar la causa cuando
+    ni la base pudo guardarla. Nunca el cuerpo de un mensaje ni un secreto:
+    sólo la etapa y el tipo de las dos excepciones (la que se quería
+    registrar y la que impidió registrarla)."""
     ahora = _ahora(ahora)
     resumen = f"Excepción no manejada en '{etapa}' ({type(error).__name__})."
     try:
         with admin(conn) as cur:
             _incidente_plataforma_persistente(
                 cur, resumen, ahora, referencia_cruda=str(error)[:2000])
-    except Exception:  # noqa: BLE001 -- ni el incidente se pudo registrar
+        return True
+    except Exception as fallo_registro:  # noqa: BLE001 -- ni el incidente se pudo registrar
         try:
             conn.rollback()
         except Exception:  # noqa: BLE001
             pass
+        print(
+            f"avisos_admin: no se pudo registrar el incidente de '{etapa}' "
+            f"({type(error).__name__}) -- falló también el registro "
+            f"({type(fallo_registro).__name__}).",
+            file=sys.stderr)
+        return False
 
 
 def _texto_aviso(workspace_nombre: str, texto_saneado: str) -> str:
-    return f"🛠️ Administración\n\n{workspace_nombre}\n{texto_saneado}"
+    """F ("Textos del alta con correo aprobados por el usuario",
+    2026-09-28): encabezado unificado "🛠️ Administración · {equipo}" seguido
+    del texto propio de cada aviso -- ej. "{nombre} agotó los 5 envíos del
+    correo de verificación."."""
+    return f"🛠️ Administración · {workspace_nombre}\n{texto_saneado}"
 
 
 def _retraso_reintento(intentos: int) -> timedelta:
@@ -349,7 +560,7 @@ def despachar_avisos(cur: psycopg.Cursor, transporte: Transporte | None, *,
 
     cur.execute(
         """select e.id, e.aviso_id, e.intentos, u.telegram_user_id,
-                  a.texto_saneado, w.nombre as workspace_nombre
+                  a.tipo, a.texto_saneado, w.nombre as workspace_nombre
              from aviso_administrativo_entrega e
              join app_user u on u.id = e.app_user_id
              join aviso_administrativo a on a.id = e.aviso_id
@@ -364,9 +575,9 @@ def despachar_avisos(cur: psycopg.Cursor, transporte: Transporte | None, *,
 
     for fila in pendientes:
         texto = _texto_aviso(fila["workspace_nombre"], fila["texto_saneado"])
-        boton = boton_marcar_leido(str(fila["aviso_id"]))
+        botones = _botones_para(fila["tipo"], str(fila["aviso_id"]))
         try:
-            tg_id = transporte.enviar(fila["telegram_user_id"], texto, [boton])
+            tg_id = transporte.enviar(fila["telegram_user_id"], texto, botones)
         except Exception as e:  # noqa: BLE001 -- el error se registra, no se propaga
             _fallo(cur, "aviso_administrativo_entrega", fila["id"], fila["intentos"],
                   e, ahora,
@@ -408,7 +619,8 @@ def despachar_respuestas(cur: psycopg.Cursor, transporte: Transporte | None, *,
         transporte = TransporteTelegram(token)
 
     cur.execute(
-        """select id, chat_id, texto, intentos from aviso_administrativo_respuesta
+        """select id, chat_id, texto, botones, intentos
+             from aviso_administrativo_respuesta
             where estado = 'listo'
               and (proximo_intento_en is null or proximo_intento_en <= %s)
             order by creado_en
@@ -418,8 +630,10 @@ def despachar_respuestas(cur: psycopg.Cursor, transporte: Transporte | None, *,
     pendientes = cur.fetchall()
 
     for fila in pendientes:
+        botones = ([Boton(b["etiqueta"], b["callback_data"]) for b in fila["botones"]]
+                  if fila["botones"] else None)
         try:
-            tg_id = transporte.enviar(fila["chat_id"], fila["texto"])
+            tg_id = transporte.enviar(fila["chat_id"], fila["texto"], botones)
         except Exception as e:  # noqa: BLE001 -- el error se registra, no se propaga
             _fallo(cur, "aviso_administrativo_respuesta", fila["id"], fila["intentos"],
                   e, ahora,

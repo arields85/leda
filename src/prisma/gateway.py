@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import unicodedata
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Callable
 
 from fastapi import APIRouter, FastAPI, Header, HTTPException, Request
 from fastapi.responses import HTMLResponse
@@ -179,7 +179,8 @@ def procesar_update(conn, slug: str, update: dict,
     # /start va antes de identificar: quien lo manda todavía no está vinculado.
     if texto.startswith("/start"):
         try:
-            return _activacion(conn, workspace_id, texto, tg_user, chat_id)
+            return _activacion(conn, workspace_id, texto, tg_user, chat_id,
+                               bot_username_resolver=lambda: _bot_username(slug))
         except Exception as e:  # noqa: BLE001
             conn.rollback()
             reportar_incidente_no_manejado(
@@ -347,7 +348,9 @@ def _procesar_admin(conn, mensaje: dict | None, toque: dict | None,
 
 
 def _toque_admin(conn, toque: dict, tg_user: int | None) -> dict:
-    """Único botón hoy: "Marcar leído" de un aviso administrativo."""
+    """"Marcar leído" de un aviso administrativo, y el recorrido de
+    "Habilitar un nuevo intento" (G1d-b, acción F): vista previa, Confirmar,
+    Cancelar."""
     from . import avisos_admin as AA
 
     callback = toque.get("data") or ""
@@ -375,6 +378,12 @@ def _toque_admin(conn, toque: dict, tg_user: int | None) -> dict:
                 detalle={"chat_id": chat_id, "aviso_id": aviso_id})
             if accion == AA.ACCION_LEIDO:
                 AA.marcar_leido_por_toque(cur, aviso_id, quien.app_user_id, chat_id)
+            elif accion == AA.ACCION_HABILITAR:
+                AA.mostrar_preview_habilitar(cur, aviso_id, chat_id)
+            elif accion == AA.ACCION_CONFIRMAR_HABILITAR:
+                AA.confirmar_habilitar_por_toque(cur, aviso_id, quien.app_user_id, chat_id)
+            elif accion == AA.ACCION_CANCELAR_HABILITAR:
+                AA.cancelar_habilitar_por_toque(cur, aviso_id, chat_id)
             # Cualquier otra acción es un botón de un tipo que este canal
             # todavía no reconoce (versión vieja, o de un aviso retirado):
             # no hay nada para hacer, y no es un error propio.
@@ -422,12 +431,19 @@ def _reportar_incidente_admin(conn, *, chat_id: int | None, tg_user: int | None,
 
 
 def _activacion(conn, workspace_id: str, texto: str, tg_user: int,
-                chat_id: int) -> dict:
+                chat_id: int, *,
+                bot_username_resolver: Callable[[], str] | None = None) -> dict:
     """Canjea el token de un enlace de activación.
 
     Requiere permisos de administración porque escribe en app_user, que es
     global. Es la única operación de un bot de espacio que los necesita, y
     está acotada a esto.
+
+    `bot_username_resolver` sólo lo necesita el camino `pv_` de abajo (G1t/
+    B5-B6: reenviar un enlace nuevo requiere reconstruir `t.me/{bot}?
+    start=pv_{token}`) -- se le pasa `None` por defecto para no romper a
+    quien llama a esta función sin pasar por el webhook real, como
+    `test_salida.py`, que nunca ejercita ese camino.
     """
     from .onboarding import ActivacionInvalida, activar, bienvenida
 
@@ -442,7 +458,8 @@ def _activacion(conn, workspace_id: str, texto: str, tg_user: int,
         from . import alta_correo_flujo as ACF
 
         return ACF.resolver_verificacion_correo(
-            conn, workspace_id, partes[1].strip()[len("pv_"):], tg_user, chat_id)
+            conn, workspace_id, partes[1].strip()[len("pv_"):], tg_user, chat_id,
+            bot_username_resolver=bot_username_resolver)
 
     if len(partes) < 2:
         # /start sin token. Si la persona ya está vinculada —porque su
