@@ -242,6 +242,7 @@ def procesar_update(conn, slug: str, update: dict,
             from datetime import datetime, timezone
 
             atendido_alta_correo = False
+            bloqueada_en_grupo = False
             if texto.strip():
                 from . import alta_correo_flujo as ACF
 
@@ -252,13 +253,25 @@ def procesar_update(conn, slug: str, update: dict,
                 # apagada (o ya `active`), `gate` no hace nada y devuelve
                 # `False` de inmediato: el resto de esta rama queda igual
                 # que hoy.
-                atendido_alta_correo = ACF.gate(
-                    cur, quien, texto, chat_id=chat_id, workspace_id=workspace_id,
-                    ahora=datetime.now(timezone.utc),
-                    bot_username_resolver=lambda: _bot_username(slug))
+                #
+                # G1b2, ítem 1: `gate` sólo tiene sentido en un chat privado
+                # -- no hay recorrido de correo por grupo. Antes corría para
+                # cualquier chat, y en un grupo llegaba a pedir/mostrar/
+                # procesar un correo por ahí. En cualquier otro tipo de chat,
+                # si la membresía sigue gateada, la respuesta es no hacer
+                # nada -- ni responder, ni dejarla llegar a intake o al
+                # agente: todavía no está verificada.
+                if chat_type == "private":
+                    atendido_alta_correo = ACF.gate(
+                        cur, quien, texto, chat_id=chat_id, workspace_id=workspace_id,
+                        ahora=datetime.now(timezone.utc),
+                        bot_username_resolver=lambda: _bot_username(slug))
+                else:
+                    bloqueada_en_grupo = ACF.bloqueada_para_negocio(
+                        cur, quien.membership_id)
 
             handled_intake_text = False
-            if (not atendido_alta_correo and texto.strip()
+            if (not atendido_alta_correo and not bloqueada_en_grupo and texto.strip()
                     and chat_type == "private"):
                 from .ingreso_tareas import handle_active_text
 
@@ -267,7 +280,8 @@ def procesar_update(conn, slug: str, update: dict,
                     source_raw_text=texto, now=datetime.now(timezone.utc),
                 ) is not None
 
-            if not atendido_alta_correo and texto.strip() and not handled_intake_text:
+            if (not atendido_alta_correo and not bloqueada_en_grupo and texto.strip()
+                    and not handled_intake_text):
                 with mantener_chat_activo(config.token_bot(slug), chat_id):
                     _turno(cur, quien, texto, workspace_id, chat_id, entrante_id)
 

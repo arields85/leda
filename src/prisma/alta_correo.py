@@ -306,6 +306,21 @@ def crear_aviso(cur: psycopg.Cursor, tipo: str, texto_saneado: str,
     return str(cur.fetchone()["id"])
 
 
+def aviso_pendiente(cur: psycopg.Cursor, tipo: str, referencia_tipo: str,
+                     referencia_id: str) -> bool:
+    """`True` si ya hay un aviso de este tipo, sobre esta misma referencia,
+    todavía sin resolver (G1b2, ítem 5: evita crear un segundo aviso
+    idéntico mientras administración no marcó el anterior resuelto --
+    "leído ≠ resuelto")."""
+    cur.execute(
+        """select 1 from aviso_administrativo
+            where tipo = %s and referencia_tipo = %s and referencia_id = %s
+              and resuelto_en is null
+            limit 1""",
+        (tipo, referencia_tipo, referencia_id))
+    return cur.fetchone() is not None
+
+
 def avisos(cur: psycopg.Cursor, *, solo_no_leidos: bool = False,
            solo_no_resueltos: bool = False) -> list[dict]:
     condiciones = []

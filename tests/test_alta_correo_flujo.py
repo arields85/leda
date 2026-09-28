@@ -113,10 +113,25 @@ def _sender(conn, ws: str, monkeypatch, doble: DobleEnvioCorreo | None) -> None:
 
 
 def _post(cliente, texto, user_id, slug="north-lab"):
+    # `type: "private"` porque todas estas pruebas simulan un chat directo
+    # con la persona -- Telegram siempre lo manda; `gate()` (G1b2, ítem 1)
+    # pasó a exigirlo explícitamente. Las pruebas de grupo usan `_post_grupo`.
     return cliente.post(
         f"/telegram/{slug}",
         json={"message": {"message_id": 1, "text": texto,
-                          "chat": {"id": user_id}, "from": {"id": user_id}}},
+                          "chat": {"id": user_id, "type": "private"},
+                          "from": {"id": user_id}}},
+        headers={"X-Telegram-Bot-Api-Secret-Token": "s3cr3t"})
+
+
+def _post_grupo(cliente, texto, user_id, chat_id, slug="north-lab"):
+    """Mismo mensaje, pero en un chat de grupo -- `chat_id` (el grupo) puede
+    ser distinto del `from.id` (quien escribió)."""
+    return cliente.post(
+        f"/telegram/{slug}",
+        json={"message": {"message_id": 1, "text": texto,
+                          "chat": {"id": chat_id, "type": "group"},
+                          "from": {"id": user_id}}},
         headers={"X-Telegram-Bot-Api-Secret-Token": "s3cr3t"})
 
 
@@ -872,3 +887,425 @@ def test_una_falla_al_resolver_el_bot_no_filtra_su_token(monkeypatch):
     assert secreto not in str(info.value)
     assert secreto not in repr(info.value)
     assert info.value.__cause__ is None
+
+
+# ===========================================================================
+# I. Endurecimiento G1b2 -- 1: la compuerta sólo actúa en chat privado
+# ===========================================================================
+
+
+def test_grupo_no_procesa_nada_de_un_integrante_gateado(cliente, conn, intake_world):
+    """Un integrante en modo `alta` por debajo de `active` escribe en un
+    grupo: no se le pide, muestra ni procesa ningún correo, y el mensaje
+    tampoco llega a ninguna herramienta de negocio (todavía no está
+    verificado). Nada en el grupo, nada en su privado, nunca un error."""
+    ws = intake_world["north-lab"]["id"]
+    m = _membership_id(intake_world, "north-lab", "Taylor Quinn")
+    _habilitar(conn, ws)
+    _abrir_awaiting_email(conn, ws, m)
+
+    resp = _post_grupo(cliente, "taylor.quinn@empresa.com", 71001, chat_id=-5001)
+
+    assert resp.status_code == 200
+    assert _outbox_textos(conn, -5001) == []
+    assert _outbox_textos(conn, 71001) == []
+    assert _estado(conn, ws, m)["estado"] == "awaiting_email"      # sin cambios
+    assert _verificaciones(conn, m) == []                          # nunca se emitió
+    assert _incidentes(conn, ws) == []
+
+
+def test_grupo_sigue_llegando_al_agente_para_quien_no_esta_gateado(
+        con_agente, conn, intake_world):
+    """Regresión: sin ningún ciclo de alta con correo abierto (el caso de
+    hoy, o alguien ya `active`), un mensaje de grupo sigue llegando al
+    agente exactamente como antes de este endurecimiento."""
+    resp = _post_grupo(con_agente, "hola equipo", 71001, chat_id=-5001)
+
+    assert resp.status_code == 200
+    assert _outbox_textos(conn, -5001)[-1] == "Anotado."
+
+
+# ===========================================================================
+# J. Endurecimiento G1b2 -- 2 y 4: atomicidad de "Cambiar correo a X" y el
+#    envío como último efecto
+# ===========================================================================
+
+
+def _hasta_propone_cambio(cliente, conn, ws, m, tg_user, doble):
+    _hasta_pending_verification(cliente, conn, ws, m, tg_user, doble)
+    _post(cliente, "en realidad usá taylor.q@otradireccion.com", tg_user)
+
+
+def test_cambiar_a_con_correo_en_uso_no_deja_el_ciclo_en_awaiting_email(
+        cliente, conn, intake_world, monkeypatch):
+    """Si "Cambiar correo a X" se rechaza (X ya está asociado a otra
+    persona), el ciclo tiene que quedar EXACTAMENTE como estaba --
+    `pending_email_verification`, con la verificación anterior todavía
+    vigente -- no varado en `awaiting_email`."""
+    ws = intake_world["north-lab"]["id"]
+    m1 = _membership_id(intake_world, "north-lab", "Taylor Quinn")
+    m2 = _membership_id(intake_world, "north-lab", "Sam North")
+    _habilitar(conn, ws)
+    doble = DobleEnvioCorreo()
+    _sender(conn, ws, monkeypatch, doble)
+    # Sam North ya verificó la dirección que Taylor va a intentar "cambiar a".
+    _abrir_awaiting_email(conn, ws, m2)
+    _post(cliente, "sam.north@empresa.com", 71002)
+    token_sam = _token_de_enlace(doble.enviados[-1].enlace)
+    with espacio(conn, ws) as cur:
+        AC.reservar_verificacion(cur, token_sam, m2, ahora=datetime.now(timezone.utc))
+        AC.completar_verificacion(cur, token_sam, m2, ahora=datetime.now(timezone.utc))
+    conn.commit()
+
+    _hasta_pending_verification(cliente, conn, ws, m1, 71001, doble)
+    envios_antes = len(doble.enviados)
+    with espacio(conn, ws) as cur:
+        vigente_antes_valor = AC.verificacion_vigente(cur, m1)
+
+    _post(cliente, "en realidad usá sam.north@empresa.com", 71001)
+    token_cambiar = _token_boton(conn, ws, m1, ACF.etiqueta_cambiar_a("sam.north@empresa.com"))
+    assert token_cambiar
+
+    _post_toque(cliente, token_cambiar, 71001)
+
+    assert _outbox_textos(conn, 71001)[-1] == ACF.TEXTO_CORREO_EN_USO
+    assert len(doble.enviados) == envios_antes            # ningún envío nuevo
+    fila = _estado(conn, ws, m1)
+    assert fila["estado"] == "pending_email_verification"  # nunca awaiting_email
+    with espacio(conn, ws) as cur:
+        assert AC.verificacion_vigente(cur, m1) == vigente_antes_valor  # sin tocar
+
+
+def test_cambiar_a_sin_emisor_configurado_no_deja_el_ciclo_en_awaiting_email(
+        cliente, conn, intake_world, monkeypatch):
+    """Mismo invariante, pero por falta de emisor en vez de un rechazo
+    tipado: tampoco puede quedar el ciclo en `awaiting_email`."""
+    ws = intake_world["north-lab"]["id"]
+    m = _membership_id(intake_world, "north-lab", "Taylor Quinn")
+    _habilitar(conn, ws)
+    doble = DobleEnvioCorreo()
+    _sender(conn, ws, monkeypatch, doble)
+    _hasta_propone_cambio(cliente, conn, ws, m, 71001, doble)
+    token = _token_boton(conn, ws, m, ACF.etiqueta_cambiar_a("taylor.q@otradireccion.com"))
+    assert token
+    # A partir de ahora, sin emisor configurado (como si G2 no estuviera).
+    monkeypatch.setattr(ACF, "obtener_emisor_configurado", lambda cur, workspace_id: None)
+
+    _post_toque(cliente, token, 71001)
+
+    assert _outbox_textos(conn, 71001)[-1] == gateway.NOTICIA_NEUTRA_INCIDENTE
+    assert len(doble.enviados) == 1                        # sin envíos nuevos
+    assert _estado(conn, ws, m)["estado"] == "pending_email_verification"
+
+
+def test_cambiar_a_con_falla_de_envio_no_deja_el_ciclo_en_awaiting_email(
+        cliente, conn, intake_world, monkeypatch):
+    ws = intake_world["north-lab"]["id"]
+    m = _membership_id(intake_world, "north-lab", "Taylor Quinn")
+    _habilitar(conn, ws)
+    doble = DobleEnvioCorreo()
+    _sender(conn, ws, monkeypatch, doble)
+    _hasta_propone_cambio(cliente, conn, ws, m, 71001, doble)
+    token = _token_boton(conn, ws, m, ACF.etiqueta_cambiar_a("taylor.q@otradireccion.com"))
+    assert token
+    doble.falla = True     # el envío de esta segunda dirección va a fallar
+
+    _post_toque(cliente, token, 71001)
+
+    assert _outbox_textos(conn, 71001)[-1] == gateway.NOTICIA_NEUTRA_INCIDENTE
+    assert len(doble.enviados) == 1                         # el envío que falló no se contó
+    assert _estado(conn, ws, m)["estado"] == "pending_email_verification"
+    assert _verificaciones(conn, m)[-1]["email"] == "taylor.quinn@empresa.com"  # la anterior, intacta
+
+
+def test_cambiar_a_respeta_el_limite_de_reenvios_sin_dejar_el_ciclo_varado(
+        cliente, conn, intake_world, monkeypatch):
+    """El rechazo por límite (3/hora) también es un motivo tipado -- el
+    mismo invariante de arriba, con `verification_rate_limited`."""
+    ws = intake_world["north-lab"]["id"]
+    m = _membership_id(intake_world, "north-lab", "Taylor Quinn")
+    _habilitar(conn, ws)
+    doble = DobleEnvioCorreo()
+    _sender(conn, ws, monkeypatch, doble)
+    _hasta_pending_verification(cliente, conn, ws, m, 71001, doble)   # envío 1
+    _reenviar(cliente, conn, ws, m, 71001)                             # envío 2
+    _reenviar(cliente, conn, ws, m, 71001)                             # envío 3
+    assert len(doble.enviados) == 3
+    _post(cliente, "en realidad usá taylor.q@otradireccion.com", 71001)
+    token = _token_boton(conn, ws, m, ACF.etiqueta_cambiar_a("taylor.q@otradireccion.com"))
+    assert token
+
+    _post_toque(cliente, token, 71001)                                 # 4to envío: rechazado
+
+    assert len(doble.enviados) == 3
+    assert "última hora" in _outbox_textos(conn, 71001)[-1]
+    assert _estado(conn, ws, m)["estado"] == "pending_email_verification"
+
+
+def test_transicion_falla_despues_del_envio_no_cuenta_el_envio_como_hecho(
+        cliente, conn, intake_world, monkeypatch):
+    """G1b2, ítem 4: si algo escrito en la base FALLA después de mandar el
+    correo, ese envío no puede haber pasado -- el envío tiene que ser el
+    último efecto dentro del savepoint. Se simula la falla de escritura
+    (no la de red) parchando la transición que sigue al registro del envío;
+    si el envío fuera anterior a esa escritura, el doble ya habría
+    registrado el mensaje pese a que todo se revierte."""
+    ws = intake_world["north-lab"]["id"]
+    m = _membership_id(intake_world, "north-lab", "Taylor Quinn")
+    _habilitar(conn, ws)
+    _abrir_awaiting_email(conn, ws, m)
+    doble = DobleEnvioCorreo()
+    _sender(conn, ws, monkeypatch, doble)
+
+    original_transicionar = AC.transicionar
+
+    def _transicionar_que_falla(cur, membership_id, estado_nuevo, **kwargs):
+        if estado_nuevo == "pending_email_verification":
+            raise RuntimeError("falla simulada de escritura")
+        return original_transicionar(cur, membership_id, estado_nuevo, **kwargs)
+
+    monkeypatch.setattr(AC, "transicionar", _transicionar_que_falla)
+
+    _post(cliente, "taylor.quinn@empresa.com", 71001)
+
+    assert doble.enviados == []                             # nunca se llegó a mandar
+    assert _outbox_textos(conn, 71001)[-1] == gateway.NOTICIA_NEUTRA_INCIDENTE
+    assert _estado(conn, ws, m)["estado"] == "awaiting_email"  # revertido entero
+    assert _verificaciones(conn, m) == []
+
+
+# ===========================================================================
+# K. Endurecimiento G1b2 -- 3: los botones relean el estado antes de actuar
+# ===========================================================================
+
+
+def test_boton_elegir_correo_viejo_tras_otro_envio_no_hace_nada(
+        cliente, conn, intake_world, monkeypatch):
+    """Se ofrecen dos candidatos por botón (`awaiting_email`); antes de
+    elegir, otro mensaje ya manda una dirección distinta y avanza el ciclo a
+    `pending_email_verification`. El botón viejo de "elegir" queda gateado
+    a `awaiting_email`: al apretarlo, no tiene que emitir nada ni cambiar
+    el correo en verificación."""
+    ws = intake_world["north-lab"]["id"]
+    m = _membership_id(intake_world, "north-lab", "Taylor Quinn")
+    _habilitar(conn, ws)
+    _abrir_awaiting_email(conn, ws, m)
+    doble = DobleEnvioCorreo()
+    _sender(conn, ws, monkeypatch, doble)
+
+    _post(cliente, "capaz taylor@empresa.com o taylor.quinn@empresa.com", 71001)
+    token_viejo = _token_boton(conn, ws, m, "taylor@empresa.com")
+    assert token_viejo
+
+    _post(cliente, "mejor taylor.quinn@empresa.com", 71001)   # avanza el ciclo
+    assert _estado(conn, ws, m)["estado"] == "pending_email_verification"
+    envios_antes = len(doble.enviados)
+
+    _post_toque(cliente, token_viejo, 71001)
+
+    assert _outbox_textos(conn, 71001)[-1] == ACF.TEXTO_ESTADO_CAMBIO
+    assert len(doble.enviados) == envios_antes                 # nada nuevo
+    assert _estado(conn, ws, m)["estado"] == "pending_email_verification"
+    assert _incidentes(conn, ws) == []                          # nunca un incidente
+
+
+def test_botones_de_recordatorio_viejos_tras_quedar_active_no_hacen_nada(
+        con_agente, conn, intake_world, monkeypatch):
+    """Reenviar/Cambiar del recordatorio, apretados después de que la
+    persona ya quedó `active` por otro camino: no tienen que reactivar
+    nada ni mandar un correo nuevo.
+
+    Cada botón sale de un recordatorio DISTINTO (dos mensajes de texto
+    libre separados, cada uno abre su propio `pending_action`): así, apretar
+    el primero no deja "vencida" -- a nivel de `pendientes.resolver`, por la
+    resolución del `pending_action` entero -- la pregunta por el segundo, y
+    la prueba llega a ejercitar la relectura de estado de `resolver_toque`
+    (G1b2, ítem 3) en vez de la vigencia genérica de un botón, que es un
+    mecanismo distinto y anterior."""
+    ws = intake_world["north-lab"]["id"]
+    m = _membership_id(intake_world, "north-lab", "Taylor Quinn")
+    _habilitar(conn, ws)
+    doble = DobleEnvioCorreo()
+    _sender(conn, ws, monkeypatch, doble)
+    _hasta_pending_verification(con_agente, conn, ws, m, 71001, doble)
+    _post(con_agente, "¿todavía falta algo?", 71001)
+    token_reenviar = _token_boton(conn, ws, m, ACF.ETIQUETA_REENVIAR)
+    assert token_reenviar
+    _post(con_agente, "¿sigue pendiente?", 71001)
+    token_cambiar = _token_boton(conn, ws, m, ACF.ETIQUETA_CAMBIAR)
+    assert token_cambiar
+    token_verificacion = _token_de_enlace(doble.enviados[-1].enlace)
+    _post(con_agente, f"/start pv_{token_verificacion}", 71001)
+    assert _estado(conn, ws, m)["estado"] == "active"
+    envios_antes = len(doble.enviados)
+
+    _post_toque(con_agente, token_reenviar, 71001)
+
+    assert _outbox_textos(conn, 71001)[-1] == ACF.TEXTO_ESTADO_CAMBIO
+    assert len(doble.enviados) == envios_antes
+    assert _estado(conn, ws, m)["estado"] == "active"
+    assert _incidentes(conn, ws) == []
+
+    _post_toque(con_agente, token_cambiar, 71001)
+
+    assert _outbox_textos(conn, 71001)[-1] == ACF.TEXTO_ESTADO_CAMBIO
+    assert len(doble.enviados) == envios_antes
+    assert _estado(conn, ws, m)["estado"] == "active"
+    assert _incidentes(conn, ws) == []
+
+    # Y ya `active`, el turno normal del agente sigue andando.
+    _post(con_agente, "qué tengo pendiente", 71001)
+    assert _outbox_textos(conn, 71001)[-1] == "Anotado."
+
+
+def test_boton_cambiar_a_viejo_tras_quedar_active_no_hace_nada(
+        cliente, conn, intake_world, monkeypatch):
+    """"Cambiar correo a X" ofrecido durante `pending_email_verification`,
+    apretado después de que la persona ya verificó (quedó `active`) por
+    otra vía: sin efecto, sin incidente -- nunca intenta la transición
+    imposible `active -> awaiting_email`, que antes de este endurecimiento
+    llegaba cruda hasta el disparador de la base."""
+    ws = intake_world["north-lab"]["id"]
+    m = _membership_id(intake_world, "north-lab", "Taylor Quinn")
+    _habilitar(conn, ws)
+    doble = DobleEnvioCorreo()
+    _sender(conn, ws, monkeypatch, doble)
+    _hasta_propone_cambio(cliente, conn, ws, m, 71001, doble)
+    token_cambiar = _token_boton(conn, ws, m, ACF.etiqueta_cambiar_a("taylor.q@otradireccion.com"))
+    assert token_cambiar
+    token_verificacion = _token_de_enlace(doble.enviados[-1].enlace)
+    _post(cliente, f"/start pv_{token_verificacion}", 71001)
+    assert _estado(conn, ws, m)["estado"] == "active"
+    envios_antes = len(doble.enviados)
+
+    _post_toque(cliente, token_cambiar, 71001)
+
+    assert _outbox_textos(conn, 71001)[-1] == ACF.TEXTO_ESTADO_CAMBIO
+    assert len(doble.enviados) == envios_antes
+    assert _estado(conn, ws, m)["estado"] == "active"
+    assert _incidentes(conn, ws) == []
+
+
+# ===========================================================================
+# L. Endurecimiento G1b2 -- 5: pruebas faltantes señaladas en la revisión
+# ===========================================================================
+
+
+def test_recuperacion_desde_pending_welcome_es_idempotente(conn, intake_world):
+    """Si algo dejó el ciclo a mitad en `pending_welcome` y la recuperación
+    se ejecuta dos veces (un reintento, dos llamadas concurrentes que
+    ambas llegaron a leer `pending_welcome`), la segunda no tiene que
+    duplicar ni el outbox ni el evento de bienvenida entregada -- y no
+    puede reventar."""
+    ws = intake_world["north-lab"]["id"]
+    m = _membership_id(intake_world, "north-lab", "Taylor Quinn")
+    with espacio(conn, ws) as cur:
+        AC.iniciar_ciclo(cur, m, "alta", ahora=AHORA)
+    conn.commit()
+
+    with espacio(conn, ws) as cur:
+        ACF._completar_bienvenida(cur, m, ws, 71001, "Taylor Quinn", AHORA)
+        ACF._completar_bienvenida(cur, m, ws, 71001, "Taylor Quinn", AHORA)
+    conn.commit()
+
+    textos = _outbox_textos(conn, 71001)
+    assert len(textos) == 2
+    with admin(conn) as cur:
+        cur.execute(
+            "select count(*) n from alta_correo_evento "
+            "where membership_id = %s and tipo = 'bienvenida_entregada'", (m,))
+        assert cur.fetchone()["n"] == 1
+    assert _estado(conn, ws, m)["estado"] == "awaiting_email"
+
+
+def test_limite_de_cinco_por_ciclo_agota_y_crea_aviso_una_vez(
+        conn, intake_world, monkeypatch):
+    """El sexto intento de envío dentro del mismo ciclo (el límite cuenta el
+    inicial) tiene que rechazarse con el texto de límite agotado y crear el
+    aviso administrativo `correo_limite_agotado` exactamente una vez, incluso
+    si se lo vuelve a golpear después."""
+    from prisma.autoridad import identificar_en_espacio
+
+    ws = intake_world["north-lab"]["id"]
+    m = _membership_id(intake_world, "north-lab", "Taylor Quinn")
+    doble = DobleEnvioCorreo()
+    monkeypatch.setattr(ACF, "obtener_emisor_configurado",
+                        lambda cur, workspace_id: doble)
+    with espacio(conn, ws) as cur:
+        AC.iniciar_ciclo(cur, m, "alta", ahora=AHORA)
+        AC.transicionar(cur, m, "awaiting_email", ahora=AHORA)
+    conn.commit()
+
+    # Espaciados más de una hora entre sí para no chocar con el límite de
+    # 3/hora -- este intento es específicamente sobre el de 5/ciclo.
+    for i in range(5):
+        instante = AHORA + timedelta(hours=2 * i)
+        with espacio(conn, ws) as cur:
+            quien = identificar_en_espacio(cur, 71001, ws)
+            ACF._emitir_y_enviar(
+                cur, quien, "taylor.quinn@empresa.com", ws, 71001, instante,
+                lambda: "prisma_bot", "Taylor", ACF.TEXTO_GRACIAS_ENVIADO)
+        conn.commit()
+    assert len(doble.enviados) == 5
+
+    instante_6 = AHORA + timedelta(hours=2 * 5)
+    with espacio(conn, ws) as cur:
+        quien = identificar_en_espacio(cur, 71001, ws)
+        ACF._emitir_y_enviar(
+            cur, quien, "taylor.quinn@empresa.com", ws, 71001, instante_6,
+            lambda: "prisma_bot", "Taylor", ACF.TEXTO_GRACIAS_ENVIADO)
+    conn.commit()
+
+    assert len(doble.enviados) == 5      # el sexto se rechazó, no se mandó
+    assert _outbox_textos(conn, 71001)[-1] == \
+        ACF._TEXTOS_MOTIVO_EMISION["verification_send_limit"]
+    avisos = [a for a in _avisos(conn, ws) if a["tipo"] == "correo_limite_agotado"]
+    assert len(avisos) == 1
+
+    # Un séptimo golpe (mismo motivo) no crea un segundo aviso.
+    instante_7 = AHORA + timedelta(hours=2 * 6)
+    with espacio(conn, ws) as cur:
+        quien = identificar_en_espacio(cur, 71001, ws)
+        ACF._emitir_y_enviar(
+            cur, quien, "taylor.quinn@empresa.com", ws, 71001, instante_7,
+            lambda: "prisma_bot", "Taylor", ACF.TEXTO_GRACIAS_ENVIADO)
+    conn.commit()
+    avisos = [a for a in _avisos(conn, ws) if a["tipo"] == "correo_limite_agotado"]
+    assert len(avisos) == 1
+
+
+def test_nombre_vacio_no_revienta_y_saluda_sin_nombre():
+    """Un `nombre` vacío o de sólo espacios no puede levantar `IndexError`
+    (`"".split()[0]`) -- el pack admite saludar sin nombre cuando no hay
+    ninguno disponible."""
+    assert ACF._nombre_preferido("") == ""
+    assert ACF._nombre_preferido("   ") == ""
+    assert ACF._nombre_preferido("Taylor Quinn") == "Taylor"
+
+    saludo = ACF.texto_bienvenida("👋 Buen día", ACF._nombre_preferido(""))
+    assert "👋 Buen día. Soy Prisma" in saludo
+    assert ", ." not in saludo
+    assert ",." not in saludo
+
+    verificado = ACF.texto_verificado(ACF._nombre_preferido("   "))
+    assert verificado.startswith("✅ Gracias. Tu correo")
+
+    cuerpo = ACF.cuerpo_verificacion(ACF._nombre_preferido(""), "https://t.me/bot?start=pv_x")
+    assert cuerpo.startswith("Hola.\n\n")
+
+
+def test_abrir_ciclo_con_nombre_vacio_no_revienta(conn, intake_world):
+    """Mismo caso, a través del recorrido real de apertura del ciclo (donde
+    antes del arreglo `nombre.split()[0]` reventaba con `IndexError`)."""
+    ws = intake_world["north-lab"]["id"]
+    m = _membership_id(intake_world, "north-lab", "Taylor Quinn")
+
+    with espacio(conn, ws) as cur:
+        ACF.abrir_ciclo_alta(cur, m, ws, 71001, "   ", AHORA)
+    conn.commit()
+
+    textos = _outbox_textos(conn, 71001)
+    assert len(textos) == 2
+    assert textos[0].startswith("👋")
+    assert ", ." not in textos[0] and ",." not in textos[0]
+    assert _estado(conn, ws, m)["estado"] == "awaiting_email"

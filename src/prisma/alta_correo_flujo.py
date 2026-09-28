@@ -76,8 +76,21 @@ def etiqueta_cambiar_a(email: str) -> str:
     return f"Cambiar correo a {email}"
 
 
+def _nombre_preferido(nombre: str) -> str:
+    """Primera palabra de `nombre`, o cadena vacía si no hay ninguna (nombre
+    vacío o de sólo espacios) -- nunca `IndexError` (G1b2, ítem 5: antes,
+    `nombre.split()[0]` reventaba con ese `nombre`).
+
+    Con cadena vacía, los textos que la reciben saludan sin nombre: el pack
+    (`06-SALUDOS-TONO-E-ICONOGRAFIA.md`, §"Uso del nombre") admite
+    explícitamente "si no está disponible, saludar sin nombre"."""
+    partes = nombre.split()
+    return partes[0] if partes else ""
+
+
 def texto_bienvenida(saludo: str, nombre_preferido: str) -> str:
-    return (f"{saludo}, {nombre_preferido}. Soy Prisma, la coordinadora "
+    quien_saluda = f", {nombre_preferido}" if nombre_preferido else ""
+    return (f"{saludo}{quien_saluda}. Soy Prisma, la coordinadora "
             "digital del equipo. Mi función es ayudarlos a mantener claros "
             "los objetivos, organizar tareas, registrar avances y detectar "
             "bloqueos con anticipación. Voy a procurar que el seguimiento "
@@ -85,7 +98,8 @@ def texto_bienvenida(saludo: str, nombre_preferido: str) -> str:
 
 
 def texto_verificado(nombre_preferido: str) -> str:
-    return (f"✅ Gracias, {nombre_preferido}. Tu correo quedó verificado y "
+    quien_agradece = f", {nombre_preferido}" if nombre_preferido else ""
+    return (f"✅ Gracias{quien_agradece}. Tu correo quedó verificado y "
             "el registro está completo. Ya podés conversar conmigo "
             "normalmente.")
 
@@ -100,8 +114,9 @@ def cuerpo_verificacion(nombre_preferido: str, enlace: str) -> str:
     alternativa: ADR 0010 excluye la verificación por respuesta de correo
     como mecanismo (C7/`01` §7).
     """
+    saludo = f"Hola, {nombre_preferido}." if nombre_preferido else "Hola."
     return (
-        f"Hola, {nombre_preferido}.\n\n"
+        f"{saludo}\n\n"
         "Para terminar tu alta en Prisma necesito que confirmes que este es "
         "tu correo laboral.\n\n"
         f"Verificar correo: {enlace}\n\n"
@@ -269,12 +284,17 @@ def _completar_bienvenida(cur: psycopg.Cursor, membership_id: str, workspace_id:
                           chat_id: int, nombre: str, ahora: datetime) -> None:
     """Bienvenida + pedido de correo (dos entregas, claves de dedupe propias)
     y paso a `awaiting_email`. Idempotente: si algo dejó el ciclo a mitad en
-    `pending_welcome` (un reinicio, por ejemplo), repetir esto no duplica
-    ningún mensaje -- el outbox ya deduplica por clave -- y el evento de
-    bienvenida entregada tampoco se repite dos veces con efecto (la unidad
-    de saludo diario de `main`, pack 06, cuenta la bienvenida como el saludo
-    del día a partir de este evento)."""
-    nombre_preferido = nombre.split()[0]
+    `pending_welcome` (un reinicio, una llamada concurrente que se
+    adelantó), repetir esto no hace nada -- ni el outbox ni el evento de
+    bienvenida entregada se duplican, y no revienta contra el índice único
+    de `alta_correo_evento` (G1b2, ítem 5, hallazgo de la revisión: antes
+    del guardia de abajo, una segunda llamada sobre un ciclo ya avanzado
+    reventaba con `UniqueViolation` o con la transición inválida sobre el
+    disparador de la base)."""
+    actual = AC.estado(cur, membership_id)
+    if actual is not None and actual["estado"] != "pending_welcome":
+        return
+    nombre_preferido = _nombre_preferido(nombre)
     zona = _zona_horaria(cur, workspace_id)
     saludo = saludo_para(ahora, zona)
     enqueue_outbox(
@@ -302,6 +322,29 @@ def _completar_bienvenida(cur: psycopg.Cursor, membership_id: str, workspace_id:
 # El control (gate) -- antepuesto al despacho conversacional
 # ---------------------------------------------------------------------------
 
+# Los tres estados por debajo de `active` en modo `alta` -- mientras la
+# proyección esté en uno de éstos, ninguna herramienta de negocio puede
+# correr para esta membresía, sea el chat que sea (G1b2, ítem 1).
+_ESTADOS_BLOQUEANTES = ("pending_welcome", "awaiting_email",
+                       "pending_email_verification")
+
+
+def _gateada(actual: dict | None) -> bool:
+    return (actual is not None and actual["modo"] == "alta"
+            and actual["estado"] in _ESTADOS_BLOQUEANTES)
+
+
+def bloqueada_para_negocio(cur: psycopg.Cursor, membership_id: str) -> bool:
+    """`True` si esta membresía sigue en modo `alta` por debajo de `active`.
+
+    La usan los chats que no son privados -- `gate()` sólo corre en privado
+    (G1b2, ítem 1: antes corría para cualquier chat, y en un grupo llegaba a
+    pedir/mostrar/procesar un correo, o dejaba pasar el mensaje a una
+    herramienta de negocio para quien todavía no verificó el suyo). En un
+    grupo no hay recorrido de correo que ofrecer: la respuesta correcta es
+    no hacer nada -- ni responder ni rutear a ningún lado."""
+    return _gateada(AC.estado(cur, membership_id))
+
 
 def gate(cur: psycopg.Cursor, quien: Any, texto: str, *, chat_id: int,
          workspace_id: str, ahora: datetime,
@@ -309,9 +352,11 @@ def gate(cur: psycopg.Cursor, quien: Any, texto: str, *, chat_id: int,
     """`True` si el mensaje quedó atendido por el recorrido de alta con
     correo -- no hay que rutearlo a intake ni al agente. `False` si esta
     membresía no está en modo `alta` con un ciclo abierto por debajo de
-    `active` (incluye la clave apagada, donde nunca hay ciclo)."""
+    `active` (incluye la clave apagada, donde nunca hay ciclo). Sólo tiene
+    sentido llamarla en un chat privado -- ver `bloqueada_para_negocio`
+    para lo que corresponde en cualquier otro tipo de chat."""
     actual = AC.estado(cur, quien.membership_id)
-    if actual is None or actual["modo"] != "alta":
+    if not _gateada(actual):
         return False
 
     estado = actual["estado"]
@@ -322,10 +367,8 @@ def gate(cur: psycopg.Cursor, quien: Any, texto: str, *, chat_id: int,
         _completar_bienvenida(cur, quien.membership_id, workspace_id, chat_id,
                               quien.nombre, ahora)
         estado = "awaiting_email"
-    elif estado not in ("awaiting_email", "pending_email_verification"):
-        return False
 
-    nombre_preferido = quien.nombre.split()[0]
+    nombre_preferido = _nombre_preferido(quien.nombre)
     if estado == "awaiting_email":
         _atender_awaiting_email(cur, quien, texto, workspace_id, chat_id, ahora,
                                 bot_username_resolver, nombre_preferido)
@@ -371,18 +414,31 @@ def _validar_y_emitir(cur, quien, correo_crudo: str, workspace_id: str, chat_id:
 
 def _emitir_y_enviar(cur, quien, email: str, workspace_id: str, chat_id: int,
                      ahora: datetime, bot_username_resolver, nombre_preferido: str,
-                     texto_exito: str) -> None:
+                     texto_exito: str, *, transicion_previa: str | None = None) -> None:
     """Núcleo compartido por un correo nuevo válido, Reenviar y Cambiar
     correo: intenta un envío y responde según lo que haya pasado.
 
     Sin emisor configurado, nunca se llega a gastar un intento de envío
-    (regla "no silent safety fallbacks"). Con emisor, el registro del envío
-    (`AC.emitir_verificacion`) y el envío en sí viven en un savepoint
-    (`cur.connection.transaction()`, mismo patrón que
-    `gateway._iniciar_alta_guiada`): si el envío falla, se revierte sólo esa
-    parte -- nunca queda un token válido ni un envío contado por algo que no
-    se mandó -- y la transacción de afuera sigue en pie para dejar el
-    incidente y el aviso neutral."""
+    (regla "no silent safety fallbacks"). Con emisor, todas las escrituras
+    (la transición previa si la hay, el registro del envío con
+    `AC.emitir_verificacion` y la transición hacia adelante) y el envío en
+    sí viven en un solo savepoint (`cur.connection.transaction()`, mismo
+    patrón que `gateway._iniciar_alta_guiada`): si cualquier parte falla, se
+    revierte todo junto -- nunca queda el ciclo movido a mitad de camino
+    (G1b2, ítem 2) -- y la transacción de afuera sigue en pie para dejar el
+    incidente y el aviso neutral.
+
+    `transicion_previa` es sólo para "Cambiar correo a X" desde
+    `pending_email_verification`: hace que el ciclo pase primero por
+    `awaiting_email` (mismo camino narrado que un correo nuevo), dentro del
+    mismo savepoint que el resto -- nunca suelto antes, que es lo que
+    dejaba el ciclo varado en `awaiting_email` si después algo rechazaba o
+    fallaba (G1b2, ítem 2).
+
+    Dentro del savepoint, el envío es lo ÚLTIMO que pasa (G1b2, ítem 4): si
+    una escritura posterior fallara, ya no hay nada posterior que pueda
+    fallar sin haber mandado el correo -- nunca un correo entregado con un
+    enlace que la base terminó sin registrar."""
     from .gateway import ETAPA_ALTA_CORREO, NOTICIA_NEUTRA_INCIDENTE, _registrar_incidente, _responder
 
     sender = obtener_emisor_configurado(cur, workspace_id)
@@ -405,17 +461,14 @@ def _emitir_y_enviar(cur, quien, email: str, workspace_id: str, chat_id: int,
     token = secrets.token_urlsafe(24)
     try:
         with cur.connection.transaction():
+            if transicion_previa is not None:
+                AC.transicionar(cur, quien.membership_id, transicion_previa,
+                                actor_kind="persona",
+                                actor_app_user_id=quien.app_user_id, ahora=ahora)
             resultado = AC.emitir_verificacion(cur, quien.membership_id, email, token,
                                                ahora=ahora)
             if not resultado.ok:
                 raise _RefusalTipada(resultado.motivo)
-            bot_username = bot_username_resolver()
-            enlace = f"https://t.me/{bot_username}?start=pv_{token}"
-            vence_en = ahora + timedelta(hours=24)
-            sender.enviar_verificacion(
-                destinatario=email, asunto=ASUNTO_VERIFICACION,
-                cuerpo=cuerpo_verificacion(nombre_preferido, enlace),
-                nombre_preferido=nombre_preferido, enlace=enlace, vence_en=vence_en)
             # Sólo el primer envío de un correo (desde `awaiting_email`)
             # avanza el ciclo; un reenvío desde `pending_email_verification`
             # se queda en el mismo estado -- no hay transición
@@ -425,6 +478,14 @@ def _emitir_y_enviar(cur, quien, email: str, workspace_id: str, chat_id: int,
             if actual and actual["estado"] == "awaiting_email":
                 AC.transicionar(cur, quien.membership_id, "pending_email_verification",
                                 actor_kind="sistema", ahora=ahora)
+            # El envío va al final a propósito -- ver el docstring (ítem 4).
+            bot_username = bot_username_resolver()
+            enlace = f"https://t.me/{bot_username}?start=pv_{token}"
+            vence_en = ahora + timedelta(hours=24)
+            sender.enviar_verificacion(
+                destinatario=email, asunto=ASUNTO_VERIFICACION,
+                cuerpo=cuerpo_verificacion(nombre_preferido, enlace),
+                nombre_preferido=nombre_preferido, enlace=enlace, vence_en=vence_en)
     except _RefusalTipada as exc:
         texto = _TEXTOS_MOTIVO_EMISION.get(exc.motivo)
         if texto is None:
@@ -435,7 +496,13 @@ def _emitir_y_enviar(cur, quien, email: str, workspace_id: str, chat_id: int,
                 etapa=ETAPA_ALTA_CORREO)
             _responder(cur, workspace_id, chat_id, quien, NOTICIA_NEUTRA_INCIDENTE, ahora)
             return
-        if exc.motivo == "verification_send_limit":
+        if (exc.motivo == "verification_send_limit"
+                and not AC.aviso_pendiente(cur, "correo_limite_agotado",
+                                          "membership", quien.membership_id)):
+            # "Exactamente una vez" (G1b2, ítem 5): mientras el aviso siga
+            # sin resolver, un nuevo golpe contra el mismo límite no crea
+            # otro -- leído ≠ resuelto, y resolverlo es tarea de
+            # administración (G1d).
             AC.crear_aviso(
                 cur, "correo_limite_agotado",
                 "Se agotaron los reenvíos del ciclo de verificación de correo.",
@@ -540,12 +607,32 @@ def _proponer_cambio(cur, quien, correo_crudo: str, workspace_id: str, chat_id: 
         is_response=True, allow_split=True, pending_action_id=pendiente.id)
 
 
+def _estado_esperado_por_boton(herramienta: str) -> str | None:
+    """El estado del ciclo bajo el que se ofreció cada botón -- ninguno de
+    éstos tiene sentido en otro estado. `None` para cualquier otro
+    `herramienta` (no es un sentinel de este módulo)."""
+    if herramienta == SENTINEL_ELEGIR_CORREO:
+        return "awaiting_email"
+    if herramienta in (SENTINEL_RECORDATORIO, SENTINEL_CAMBIO):
+        return "pending_email_verification"
+    return None
+
+
 def resolver_toque(cur, quien, workspace_id: str, chat_id: int, herramienta: str,
                    args: dict, ahora: datetime,
                    bot_username_resolver: Callable[[], str]) -> None:
     """Despacha el botón apretado -- `gateway._toque` ya validó que le
     corresponde a esta membresía (`pendientes.resolver`, motivo `ajena` si
     no) antes de llegar acá.
+
+    Antes de actuar, relee el estado del ciclo (G1b2, ítem 3): el botón
+    quedó congelado con el estado que tenía cuando se ofreció, pero el
+    ciclo puede haber avanzado por otro camino mientras tanto (otro correo
+    ya enviado, la verificación ya completada). Si el estado actual ya no
+    es el que ese botón esperaba, no hace nada dañino -- ni emite, ni
+    transiciona, ni intenta nada -- y devuelve un texto neutral ya
+    existente (`TEXTO_ESTADO_CAMBIO`), nunca un incidente por un toque
+    viejo normal.
 
     `args` llega como `{"eleccion": <valor de la opción tocada>}`: así
     registró la opción `_ofrecer_eleccion_correo`/`_recordatorio`/
@@ -554,8 +641,15 @@ def resolver_toque(cur, quien, workspace_id: str, chat_id: int, herramienta: str
     `campo`; sin él, se pierde -- ver `pendientes.registrar`)."""
     from .gateway import _responder
 
-    nombre_preferido = quien.nombre.split()[0]
+    nombre_preferido = _nombre_preferido(quien.nombre)
     eleccion = args.get("eleccion") or {}
+
+    esperado = _estado_esperado_por_boton(herramienta)
+    actual = AC.estado(cur, quien.membership_id)
+    estado_actual = actual["estado"] if actual else None
+    if esperado is not None and estado_actual != esperado:
+        _responder(cur, workspace_id, chat_id, quien, TEXTO_ESTADO_CAMBIO, ahora)
+        return
 
     if herramienta == SENTINEL_ELEGIR_CORREO:
         _validar_y_emitir(cur, quien, eleccion["email"], workspace_id, chat_id, ahora,
@@ -581,11 +675,11 @@ def resolver_toque(cur, quien, workspace_id: str, chat_id: int, herramienta: str
         if eleccion.get("accion") == "mantener":
             _responder(cur, workspace_id, chat_id, quien, TEXTO_MANTENER_CONFIRMADO, ahora)
             return
-        AC.transicionar(cur, quien.membership_id, "awaiting_email",
-                        actor_kind="persona", actor_app_user_id=quien.app_user_id,
-                        ahora=ahora)
+        # La transición a `awaiting_email` va DENTRO del savepoint de
+        # `_emitir_y_enviar` (`transicion_previa`), no antes -- G1b2, ítem 2.
         _emitir_y_enviar(cur, quien, eleccion["email"], workspace_id, chat_id, ahora,
-                         bot_username_resolver, nombre_preferido, TEXTO_GRACIAS_ENVIADO)
+                         bot_username_resolver, nombre_preferido, TEXTO_GRACIAS_ENVIADO,
+                         transicion_previa="awaiting_email")
         return
 
 
@@ -634,7 +728,7 @@ def resolver_verificacion_correo(conn, workspace_id: str, token: str, tg_user: i
             return {"ok": True}
 
         _responder(cur, workspace_id, chat_id, quien,
-                  texto_verificado(quien.nombre.split()[0]), ahora)
+                  texto_verificado(_nombre_preferido(quien.nombre)), ahora)
     return {"ok": True}
 
 

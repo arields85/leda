@@ -986,6 +986,30 @@ def test_un_aviso_leido_no_queda_resuelto(intake_world, conn):
     conn.commit()
 
 
+def test_aviso_pendiente_ve_el_no_resuelto_e_ignora_el_resuelto(
+        intake_world, conn):
+    """G1b2, ítem 5: la base para "crear el aviso una sola vez" -- mientras
+    quede sin resolver, `aviso_pendiente` lo encuentra; una vez resuelto,
+    deja de contar (un nuevo golpe del mismo límite sí puede crear otro)."""
+    norte = intake_world["north-lab"]
+    m = norte["people"]["Morgan Hale"]["membership_id"]
+    admin_id = norte["people"]["Morgan Hale"]["app_user_id"]
+
+    with espacio(conn, norte["id"]) as cur:
+        assert AC.aviso_pendiente(cur, "correo_limite_agotado", "membership", m) is False
+
+        aviso_id = AC.crear_aviso(
+            cur, "correo_limite_agotado", "texto", referencia_tipo="membership",
+            referencia_id=m, ahora=AHORA)
+        assert AC.aviso_pendiente(cur, "correo_limite_agotado", "membership", m) is True
+        # Otro tipo, o otra referencia, no cuenta.
+        assert AC.aviso_pendiente(cur, "correo_sin_emisor", "membership", m) is False
+
+        AC.marcar_resuelto(cur, aviso_id, admin_id, ahora=AHORA)
+        assert AC.aviso_pendiente(cur, "correo_limite_agotado", "membership", m) is False
+    conn.commit()
+
+
 def test_los_avisos_administrativos_estan_aislados_por_espacio(
         intake_world, conn):
     norte = intake_world["north-lab"]
