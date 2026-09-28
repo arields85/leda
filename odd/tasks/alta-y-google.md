@@ -656,6 +656,37 @@ Un worktree nuevo no trae lo que no se versiona.
     (implementación y pruebas juntas). Suite del escritor: `1288 passed,
     108 deselected`; repetición de la sesión: `304 passed` en las pruebas
     relacionadas.
+    Revisión: el candidato único (10.529 líneas) excedió el presupuesto del
+    revisor (`lens_context_budget_exceeded`, sin autoridad creada); se
+    partió en 6 commits encadenados (respaldo del commit único en
+    `auxiliar/alta-y-google-unificada-un-commit`) y se revisaron los 5 con
+    código, todos aprobados con consentimiento del usuario y reconocidos:
+    `review-58e2529951ee4e59` (esquema), `review-91d147d2494593a2` (capa
+    de datos), `review-e44c3c68c130e7f5` (unificación),
+    `review-220c54b04c7c78f3` (recorrido/gateway/cli, cuatro lentes),
+    `review-1083f9b7bcb58c4b` (pruebas). Suite sobre la rama rebasada:
+    `1306 passed, 108 deselected`.
+  - [ ] **G1d-c2 — Correcciones de las revisiones de la rama unificada.**
+    (1) Filtro de dominios salteable por "Cambiar correo a X": toda
+    dirección pasa por la misma validación. (2) Sin emisor configurado,
+    cada intento crea un incidente y un aviso nuevos: deduplicar (un aviso
+    `correo_sin_emisor` pendiente por espacio). (3) `ciclo.despachar_admin`:
+    la reconciliación de avisos del alta queda aislada (savepoint): un
+    error suyo nunca frena la entrega de los avisos de incidente de `main`.
+    (4) Pruebas del despacho real de `admin_reply` (envío, reintento,
+    agotado, incidente). (5) Reactivación con un ciclo ya `active`: la
+    persona recibe un mensaje (la bienvenida vigente), nunca silencio. (6)
+    `admin_notice`: exactamente una referencia (incidente o aviso), no
+    ninguna; comentario del esquema coherente con `admin_reply`. (7) Un
+    ciclo trabado a mitad del alta se puede revocar/reiniciar por evento
+    (hoy sólo desde `active`). (8) `marcar_leido`/`marcar_resuelto`
+    informan si cambiaron algo; `habilitado()`/`dominios_permitidos()`
+    toleran un valor inválido (tratar como apagado / sin restricción, con
+    incidente). (9) El enlace consumido usa el mismo enrutador por estado
+    (una sola copia). (10) La fixture `sin_activar` usa
+    `monkeypatch.setenv`. (11) El envío del correo con el enlace ocurre
+    dentro de la transacción: documentar el límite honestamente o mover el
+    envío después del commit con reconciliación (decidir en la unidad).
   - [ ] **G1d — Avisos "🛠️ Administración" por el bot de administración.**
     Camino de salida propio (hoy el bot de administración no envía nada y
     `message_outbox` exige `workspace_id`); botones Reenviar correo /
