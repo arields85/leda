@@ -1,6 +1,6 @@
 # Alta con correo verificado y acceso a Google (rama auxiliar)
 
-**Estado:** G0 cerrada (matriz aprobada, ADR 0010 aceptada, 2026-09-27) — próximo: G1
+**Estado:** G0 y G1 cerradas salvo la Tanda 2 por Telegram (espera a G2) — próximo: G2 (ver "Cómo retomar", al final)
 **Creado:** 2026-09-27
 **Origen:** decisión del usuario, 2026-09-27; [`ADR 0010`](../../docs/decisions/0010-correo-verificado-y-google-en-el-producto.md).
 **Rama/worktree:** `auxiliar/alta-y-google`, `D:\Proyectos\Prisma-PM-worktrees\alta-y-google`.
@@ -1074,6 +1074,15 @@ por commit, igual que en `main`. Nunca push sin pedido explícito del usuario.
   incidente); dos lecturas simultáneas de una configuración corrupta pueden
   dejar dos incidentes (el candado del aviso es "consultar y después
   crear").
+- 2026-09-28: rebase sobre `main` con el saludo diario (`e83a280`,
+  `eb16f87`, migraciones 0018/0019): un conflicto sólo de ubicación en
+  `gateway.py` (se conservaron las dos funciones). Integración aprobada por
+  el usuario (`dc6cd1b`): la bienvenida del alta con correo se encola con
+  `es_bienvenida` y `recipient_membership_id`, cuenta como el saludo del día
+  y el despachador no le antepone nada; el pedido de correo que sigue no
+  recibe saludo. RED → GREEN. Suite completa: `1403 passed, 108
+  deselected`. 92 líneas, por debajo del umbral: su revisión queda
+  acumulada para el próximo tramo.
 - Dependencia registrada: el hecho "bienvenida entregada" de G1 queda como
   evento propio para que la unidad de saludo diario de `main` (pack 06)
   pueda contarlo como saludo del día.
@@ -1101,3 +1110,61 @@ En el worktree `D:\Proyectos\Prisma-PM-worktrees\alta-y-google`, rama
 - 2026-09-27 (sesión principal, en `main`): G4 gana un requisito del usuario
   (estado indeterminado, relectura después de cada mutación, clave de
   idempotencia por operación). La rama auxiliar lo recibe con su próximo rebase.
+
+## Cómo retomar (punto exacto al cierre del 2026-09-28)
+
+**Estado de la rama.** `auxiliar/alta-y-google`, rebasada sobre `main`
+(saludo diario incluido); último commit de código `dc6cd1b`; árbol limpio.
+Suite completa: `1403 passed, 108 deselected`. Respaldos:
+`auxiliar/alta-y-google-pre-unificacion` y
+`auxiliar/alta-y-google-unificada-un-commit`.
+
+**Hecho.** G0; G1 completa (esquema 0100, recorrido, integrantes ya activos,
+avisos al administrador unificados con el canal de `main`, "Habilitar un
+nuevo intento", textos aprobados, Tanda 1). Todo revisado por RDD salvo el
+último tramo (`dc6cd1b`, 92 líneas, acumulado bajo el umbral).
+
+**Pendiente de G1.** Sólo la Tanda 2 por Telegram real: necesita el envío
+real de Gmail (G2).
+
+**Decisiones de G2 ya tomadas** (sección "Decisiones del usuario para G2"):
+una cuenta de Google por espacio (la de Prisma); autorización por comando
+`python -m prisma google autorizar <espacio>` con redirección local;
+credencial cifrada en la aplicación con `cryptography` (Fernet con rotación)
+y clave en `PRISMA_CLAVE_CREDENCIALES`; permisos `gmail.send` y
+`calendar.events` (más, para saber qué cuenta se autorizó, las identidades
+`openid`/`email`: confirmarlo con el usuario al empezar).
+
+**Lo que necesita el usuario antes o durante G2.**
+1. Proyecto de Google Cloud con las APIs de Gmail y Calendar habilitadas.
+2. Pantalla de consentimiento OAuth y un cliente OAuth de tipo "aplicación
+   de escritorio"; su id y secreto van al `.env` del worktree
+   (`PRISMA_GOOGLE_CLIENT_ID`, `PRISMA_GOOGLE_CLIENT_SECRET`, nombres a
+   confirmar al construir).
+3. Generar la clave `PRISMA_CLAVE_CREDENCIALES` (G2 incluye el comando que la
+   genera) y guardarla en el `.env`.
+4. Ya hecho: `PRISMA_BOT_TOKEN_ADMIN` en el `.env` del worktree.
+
+**Primer paso concreto de la próxima sesión.** Rebasar sobre `main`, correr
+la suite, y delegar la unidad G2: migración `0101` (credencial por espacio,
+sólo por funciones `security definer`, sin privilegios de `prisma_app`),
+módulo de cifrado con rotación, comando `google autorizar` (OAuth local con
+PKCE), renovación de token (`invalid_grant` → requiere reautorización +
+aviso + incidente), adaptador Gmail que implementa `EnvioCorreo` y
+reemplaza a `obtener_emisor_configurado` (hoy devuelve `None`), puerto
+nuevo en `docs/architecture/frontera.md`, `cryptography` en
+`pyproject.toml`. Todo con dobles (sin Google real) y apagado por defecto.
+
+**Seguimientos menores anotados.** `null` JSON en la configuración tratado
+como corrupto; posible doble incidente por configuración corrupta
+simultánea; varios mensajes del alta con correo no pasan
+`recipient_membership_id`, así que no participan del saludo diario de
+`main` (decidir si deben).
+
+**Hallazgos para la sesión principal de `main`.** `anthropic>=0.40` sin
+techo en `pyproject.toml`; `app_user.nombre` acepta `''` y el importador no
+lo valida; `db.conectar()`/`gateway.procesar_update()` dejaban la conexión en
+una transacción abierta (corregido en esta rama; afecta la activación por
+enlace de `main`); pruebas de migración que chocan cuando dos suites usan el
+mismo PostgreSQL (`tuple concurrently updated`).
+
