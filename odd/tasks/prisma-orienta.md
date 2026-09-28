@@ -3477,3 +3477,14 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   GREEN (reejecutado por el orquestador): `tests/test_siembra.py tests/test_esqueleto.py
   tests/test_onboarding.py` -> `51 passed`. Suite completa (escritor): `988 passed,
   108 deselected`.
+  Commit `e71cfa0`. RDD sobre `86a55d9..e71cfa0`: **alto** (`process_boundary` en
+  `src/prisma/cli.py`), `review_due`; consentimiento del usuario: revisar.
+  review-943484ef642de774, cuatro lentes, aprobada y reconocida; frontera en
+  `e71cfa0`. Seguimientos atendidos en T7b antes de que el usuario corra los pasos:
+  errores del comando sin traza cruda (podía mostrar títulos en el DETAIL de la
+  base), validación completa antes del primer insert (títulos repetidos,
+  dependencias a títulos inexistentes, estados permitidos sólo `asignada`/`en_curso`),
+  día de siembra en la zona horaria del espacio, pruebas que prometían más de lo que
+  chequeaban, y la redacción de `PRUEBA-LOCAL.md` sobre cuál es el respaldo real. No
+  aplica la observación sobre la versión de política "arbitraria":
+  `task_evidence_policy` tiene clave primaria `(workspace_id, area_id)`.
