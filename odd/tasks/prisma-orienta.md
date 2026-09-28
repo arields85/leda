@@ -3808,3 +3808,18 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   como reportado sólo después de escribir el incidente. Probado sin cambios de código:
   dos conexiones evaluando la misma cadencia a la vez no la encolan dos veces
   (`dedupe_key` único). Suite completa del escritor: `1113 passed, 108 deselected`.
+  Revisión de `a46d92c..c4e877e`: medio (`slice_budget_reached`, 714 líneas);
+  consentimiento del usuario: revisar. review-f51cb1e4b748702a (confiabilidad) aprobada y
+  reconocida; frontera en `c4e877e`. Hallazgos no bloqueantes -> #29c.
+
+- 2026-09-28: **#29c cerrada — seguimientos de review-f51cb1e4.** Ruta: delegada, un
+  escritor. `despachar` marca `enviado` antes de enviar, dentro del savepoint: si el
+  envío falla, se deshace la marca; si falla guardar el `telegram_message_id` (su propio
+  savepoint), la marca queda y el mensaje no se reenvía. `Ciclo` cierra la conexión que
+  descarta. La prueba de dos conexiones espera el bloqueo real en `pg_stat_activity` en
+  vez de dormir 200 ms; pruebas nuevas de reconexión. ROJO observado (3 pruebas) antes de
+  la corrección. Suite completa del escritor: `1118 passed, 108 deselected`.
+  Decisión del usuario: íconos de los botones aprobados (📋 tarea, ➕ Ver más, 💬 Quiero
+  consultar otra cosa, ✅ Confirmar, ✖️ Cancelar, ✏️ Otra opción) y el saludo diario va
+  con la unidad del pack 06 (ya registrado en STATUS, ADR 0010 y
+  `odd/tasks/alta-y-google.md`).

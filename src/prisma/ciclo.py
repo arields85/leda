@@ -247,6 +247,22 @@ def _revertir_best_effort(conn) -> None:
         pass
 
 
+def _cerrar_best_effort(conn) -> None:
+    """Cierra una conexión antes de descartarla -- best-effort, mismo
+    patrón que `_revertir_best_effort`. Sin esto, `Ciclo.tick` descartaba
+    `self._conn` (lo pone en `None` para que la próxima pasada reconecte)
+    sin cerrar la conexión vieja: una falla persistente al listar espacios
+    activos filtraba una conexión por pasada, para siempre (R3-002,
+    revisión 2026-09-28). Nunca deja escapar una excepción propia, y
+    tolera `conn=None`."""
+    if conn is None:
+        return
+    try:
+        conn.close()
+    except Exception:  # noqa: BLE001
+        pass
+
+
 def _resumen_vacio() -> dict:
     """Resumen sin ningún efecto -- lo usa quien necesita seguir el resto
     del ciclo (reportar cadencias rotas, avisar admin) después de una
@@ -387,9 +403,12 @@ class Ciclo:
         except Exception as e:  # noqa: BLE001
             # La conexión puede haber quedado inservible -- nunca se
             # reintenta con la misma rota cada pasada: se descarta para que
-            # la próxima reconecte sola.
+            # la próxima reconecte sola. Se cierra ANTES de descartarla
+            # (R3-002, revisión 2026-09-28): antes se ponía `self._conn` en
+            # `None` sin cerrarla, y una falla persistente filtraba una
+            # conexión por pasada. El reporte del incidente todavía la
+            # necesita viva, así que el cierre va DESPUÉS de intentarlo.
             _revertir_best_effort(conn)
-            self._conn = None
             if conn is None:
                 # Sin conexión, ni siquiera se puede INTENTAR escribir el
                 # incidente -- se deduplica en memoria y sólo se imprime:
@@ -404,6 +423,8 @@ class Ciclo:
                     f"({type(e).__name__}).", e):
                 print(f"  ! el ciclo de fondo no pudo listar espacios activos: "
                      f"{type(e).__name__}")
+            _cerrar_best_effort(conn)
+            self._conn = None
             resultados["_error"] = {"tipo": type(e).__name__}
             return resultados
 

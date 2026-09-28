@@ -5,6 +5,7 @@ vez por pasada -- lo que hoy usan `local.Escucha.tareas_de_fondo` y `servir`.
 
 from __future__ import annotations
 
+import contextlib
 import threading
 import time
 from datetime import datetime, timedelta, timezone
@@ -62,6 +63,30 @@ def _espacio_activo(cur, slug: str, *, con_calendario: bool = True) -> str:
                        '08:00', '18:00')""", (ws,))
     cur.execute("insert into persona_config (workspace_id) values (%s)", (ws,))
     return ws
+
+
+def _esperar_bloqueada_por_lock(uri: str, pid: int, *, timeout: float = 5.0) -> None:
+    """Espera hasta que el proceso `pid` quede bloqueado esperando un lock,
+    sondeando `pg_stat_activity` -- reemplaza un `sleep` fijo, que es lento
+    en el caso normal y flaco bajo carga (R3-003, revisión 2026-09-28)."""
+    from prisma.db import conectar
+
+    polling = conectar(uri)
+    try:
+        limite = time.monotonic() + timeout
+        with polling.cursor() as cur:
+            while time.monotonic() < limite:
+                cur.execute(
+                    "select wait_event_type = 'Lock' as bloqueada "
+                    "from pg_stat_activity where pid = %s", (pid,))
+                fila = cur.fetchone()
+                polling.rollback()
+                if fila and fila["bloqueada"]:
+                    return
+                time.sleep(0.01)
+    finally:
+        polling.close()
+    raise AssertionError(f"el proceso {pid} nunca quedó bloqueado esperando un lock")
 
 
 def _fake_transportes(monkeypatch):
@@ -594,11 +619,11 @@ def test_despachar_no_reenvia_el_primero_si_el_segundo_falla_al_marcarse(
     llamadas = {"n": 0}
     original = desp._marcar_enviado
 
-    def _falla_en_el_segundo(cur, ahora, tg_id, outbox_id):
+    def _falla_en_el_segundo(cur, ahora, outbox_id):
         llamadas["n"] += 1
         if llamadas["n"] == 2:
             raise RuntimeError("falla simulada al marcar 'enviado'")
-        return original(cur, ahora, tg_id, outbox_id)
+        return original(cur, ahora, outbox_id)
 
     monkeypatch.setattr(desp, "_marcar_enviado", _falla_en_el_segundo)
 
@@ -625,6 +650,115 @@ def test_despachar_no_reenvia_el_primero_si_el_segundo_falla_al_marcarse(
 
 
 # ---------------------------------------------------------------------------
+# R3-001 (revisión 2026-09-28): marcar 'enviado' va ANTES de enviar, no
+# después -- si el envío ya salió y la marca falla, se reenvía seguro.
+# ---------------------------------------------------------------------------
+
+def test_intentar_envio_no_envia_si_falla_la_marca_de_enviado(
+        corework, conn, monkeypatch):
+    """Si el UPDATE que marca 'enviado' falla, el mensaje NUNCA se manda:
+    la marca -- el cambio de estado durable -- va antes del envío, no
+    después."""
+    from prisma import despachador as desp
+
+    ws = corework.workspace_id
+    ahora = datetime(2026, 7, 27, 10, 0, tzinfo=BA)  # lunes, en horario
+
+    with espacio(conn, ws) as cur:
+        cur.execute(
+            """insert into message_outbox
+                 (workspace_id, chat_id, cuerpo, estado, programado_para,
+                  dedupe_key)
+               values (%s, 6000, 'mensaje de prueba', 'listo', %s, %s)""",
+            (ws, ahora, "prueba-r3-001-marca"))
+    conn.commit()
+
+    def _marca_rota(cur, ahora, outbox_id):
+        raise RuntimeError("falla simulada al marcar 'enviado'")
+
+    monkeypatch.setattr(desp, "_marcar_enviado", _marca_rota)
+
+    transporte = TransporteDePrueba()
+    with espacio(conn, ws) as cur:
+        cal = Calendario.desde_base(cur, ws)
+        r = desp.despachar(cur, ws, transporte, cal, ahora)
+    conn.commit()
+
+    assert transporte.enviados == []   # nunca se llegó a llamar a enviar
+    assert r["fallidos"] == 1
+
+    with admin(conn) as cur:
+        cur.execute("select estado from message_outbox where dedupe_key = %s",
+                    ("prueba-r3-001-marca",))
+        fila = cur.fetchone()
+    conn.commit()
+    assert fila["estado"] == "listo"   # sigue pendiente, nunca quedó 'enviado'
+
+
+def test_intentar_envio_conserva_la_marca_si_falla_guardar_el_id_de_telegram(
+        corework, conn, monkeypatch, capsys):
+    """El mensaje YA se entregó cuando se intenta guardar el id de
+    Telegram: si ese UPDATE falla, la marca 'enviado' tiene que quedar en
+    pie -- no se reenvía en la próxima pasada -- y el fallo se reporta sin
+    el texto crudo de la excepción."""
+    from prisma import despachador as desp
+
+    ws = corework.workspace_id
+    ahora = datetime(2026, 7, 27, 10, 0, tzinfo=BA)
+
+    with espacio(conn, ws) as cur:
+        cur.execute(
+            """insert into message_outbox
+                 (workspace_id, chat_id, cuerpo, estado, programado_para,
+                  dedupe_key)
+               values (%s, 6001, 'mensaje de prueba', 'listo', %s, %s)""",
+            (ws, ahora, "prueba-r3-001-id"))
+    conn.commit()
+
+    original_guardar = desp._guardar_id_telegram
+    texto_secreto = "falla simulada al guardar el id de Telegram"
+
+    def _id_roto(cur, tg_id, outbox_id):
+        raise RuntimeError(texto_secreto)
+
+    monkeypatch.setattr(desp, "_guardar_id_telegram", _id_roto)
+
+    transporte = TransporteDePrueba()
+    with espacio(conn, ws) as cur:
+        cal = Calendario.desde_base(cur, ws)
+        r = desp.despachar(cur, ws, transporte, cal, ahora)
+    conn.commit()
+
+    assert len(transporte.enviados) == 1   # sí se entregó
+    assert r["enviados"] == 1              # cuenta como éxito: ya se entregó
+
+    salida = capsys.readouterr().out
+    assert texto_secreto not in salida     # nunca el texto crudo de la excepción
+    assert "RuntimeError" in salida
+
+    with admin(conn) as cur:
+        cur.execute(
+            """select estado, telegram_message_id from message_outbox
+                where dedupe_key = %s""",
+            ("prueba-r3-001-id",))
+        fila = cur.fetchone()
+    conn.commit()
+    assert fila["estado"] == "enviado"          # la marca queda en pie
+    assert fila["telegram_message_id"] is None  # el id no se pudo guardar
+
+    # "próxima pasada": si la marca se hubiera deshecho, se reenviaría acá.
+    monkeypatch.setattr(desp, "_guardar_id_telegram", original_guardar)
+    transporte2 = TransporteDePrueba()
+    with espacio(conn, ws) as cur:
+        cal = Calendario.desde_base(cur, ws)
+        r2 = desp.despachar(cur, ws, transporte2, cal, ahora)
+    conn.commit()
+
+    assert transporte2.enviados == []   # no se reenvía: ya estaba 'enviado'
+    assert r2["enviados"] == 0
+
+
+# ---------------------------------------------------------------------------
 # R3-004: `servir` y `escuchar` evaluando la misma cadencia a la vez no la
 # encolan dos veces
 # ---------------------------------------------------------------------------
@@ -648,6 +782,7 @@ def test_ejecutar_cadencia_evaluada_a_la_vez_por_dos_conexiones_no_duplica(
         cal = Calendario.desde_base(cur, ws)
 
     otra = conectar(uri)
+    pid_otra = otra.info.backend_pid
     resultado_otra: dict = {}
     seguir = threading.Event()
 
@@ -666,8 +801,10 @@ def test_ejecutar_cadencia_evaluada_a_la_vez_por_dos_conexiones_no_duplica(
             # La otra conexión intenta el mismo `insert` AHORA, mientras esta
             # transacción sigue abierta -- Postgres la obliga a esperar en
             # vez de dejarla pasar sin ver este `insert` todavía sin commit.
+            # Se espera a que quede REALMENTE bloqueada (sondeo, no un
+            # `sleep` a ciegas) antes de confirmar.
             seguir.set()
-            time.sleep(0.2)
+            _esperar_bloqueada_por_lock(uri, pid_otra)
         conn.commit()
     finally:
         hilo.join(timeout=5)
@@ -1153,6 +1290,118 @@ def test_ciclo_tick_conexion_inalcanzable_se_reporta_una_vez_sin_traceback(capsy
     assert intentos["n"] == 3     # reintenta conectar en cada pasada
     salida = capsys.readouterr().out
     assert salida.count("no pudo conectar") == 1   # deduplicado, no un aluvión
+
+
+# ---------------------------------------------------------------------------
+# R3-002 (revisión 2026-09-28): cerrar la conexión ANTES de descartarla
+# ---------------------------------------------------------------------------
+
+def test_ciclo_tick_cierra_la_conexion_antes_de_descartarla_si_falla_al_listar_espacios(
+        monkeypatch):
+    """Antes, una falla persistente al listar espacios activos descartaba
+    `self._conn` (la ponía en `None` para que la próxima pasada reconecte)
+    sin cerrarla nunca: una conexión filtrada por pasada, para siempre."""
+
+    class _ConexionFalsa:
+        def __init__(self) -> None:
+            self.closed = False
+            self.cierres = 0
+
+        def rollback(self) -> None:
+            pass
+
+        def close(self) -> None:
+            self.cierres += 1
+            self.closed = True
+
+    def _admin_roto(conn):
+        raise RuntimeError("no se pudo listar espacios activos")
+
+    monkeypatch.setattr(ciclo, "admin", _admin_roto)
+
+    fake = _ConexionFalsa()
+    c = ciclo.Ciclo(lambda: fake, arranque=datetime(2026, 1, 1, tzinfo=timezone.utc))
+    ahora = datetime(2026, 1, 2, tzinfo=timezone.utc)
+
+    r = c.tick(ahora=ahora)
+
+    assert r == {"_error": {"tipo": "RuntimeError"}}
+    assert fake.cierres == 1        # se cerró, no se filtró
+    assert fake.closed
+    assert c._conn is None          # y se descartó de verdad
+
+
+# ---------------------------------------------------------------------------
+# R3-004 (revisión 2026-09-28): reconexión de `Ciclo._conectar`
+# ---------------------------------------------------------------------------
+
+def test_ciclo_conectar_reconecta_si_la_conexion_guardada_esta_cerrada():
+    """`_conectar` reusa la conexión guardada mientras esté viva, pero la
+    reemplaza si quedó cerrada -- no la sigue devolviendo."""
+    from types import SimpleNamespace
+
+    conexiones = [SimpleNamespace(closed=False), SimpleNamespace(closed=False)]
+    fabrica = iter(conexiones)
+
+    c = ciclo.Ciclo(lambda: next(fabrica))
+
+    primera = c._conectar()
+    assert primera is conexiones[0]
+    assert c._conectar() is conexiones[0]   # sigue viva: no reconecta
+
+    conexiones[0].closed = True
+    segunda = c._conectar()
+    assert segunda is conexiones[1]         # quedó cerrada: reconecta
+    assert c._conectar() is conexiones[1]   # y ahora reusa la nueva
+
+
+def test_ciclo_tick_reconecta_en_la_proxima_pasada_tras_una_conexion_muerta_a_mitad(
+        uri, corework, monkeypatch):
+    """Si la conexión se vuelve inservible a mitad de una pasada -- una
+    falla fatal, no un simple error de aplicación -- `_conectar` tiene que
+    reemplazarla en la próxima pasada en vez de reintentar para siempre con
+    una conexión muerta."""
+    from prisma.db import conectar
+
+    monkeypatch.setenv("PRISMA_BOT_TOKEN_COREWORK", "tok-reconexion")
+    monkeypatch.delenv("PRISMA_BOT_TOKEN_ADMIN", raising=False)
+    _fake_transportes(monkeypatch)
+
+    conexiones: list = []
+
+    def _fabrica():
+        c = conectar(uri)
+        conexiones.append(c)
+        return c
+
+    original = ciclo.ejecutar_ciclo_espacio
+    llamadas = {"n": 0}
+
+    def _muere_en_la_primera(cur, *a, **k):
+        llamadas["n"] += 1
+        if llamadas["n"] == 1:
+            cur.connection.close()   # simula una falla fatal de red
+            raise RuntimeError("conexión perdida a mitad de la pasada")
+        return original(cur, *a, **k)
+
+    monkeypatch.setattr(ciclo, "ejecutar_ciclo_espacio", _muere_en_la_primera)
+
+    c = ciclo.Ciclo(_fabrica, arranque=datetime(2026, 1, 1, tzinfo=timezone.utc))
+    ahora = datetime(2026, 1, 2, tzinfo=timezone.utc)
+
+    try:
+        r1 = c.tick(ahora=ahora)
+        assert "error" in r1["corework"]
+        assert conexiones[0].closed
+
+        r2 = c.tick(ahora=ahora)
+        assert "error" not in r2["corework"]
+        assert len(conexiones) == 2       # reconectó en la próxima pasada
+        assert c._conn is conexiones[1]
+    finally:
+        for cx in conexiones:
+            with contextlib.suppress(Exception):
+                cx.close()
 
 
 # ---------------------------------------------------------------------------

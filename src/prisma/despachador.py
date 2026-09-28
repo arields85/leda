@@ -373,36 +373,52 @@ def despachar(cur: psycopg.Cursor, workspace_id: str, transporte: Transporte,
     return resumen
 
 
-def _marcar_enviado(cur: psycopg.Cursor, ahora: datetime, tg_id: int, outbox_id) -> None:
+def _marcar_enviado(cur: psycopg.Cursor, ahora: datetime, outbox_id) -> None:
+    """El cambio de estado durable: se llama ANTES de intentar el envío
+    (ver `_intentar_envio`), no después."""
     cur.execute(
-        """update message_outbox
-              set estado = 'enviado', enviado_en = %s, telegram_message_id = %s
+        """update message_outbox set estado = 'enviado', enviado_en = %s
             where id = %s""",
-        (ahora, tg_id, outbox_id))
+        (ahora, outbox_id))
+
+
+def _guardar_id_telegram(cur: psycopg.Cursor, tg_id: int, outbox_id) -> None:
+    """Guarda el id que devolvió Telegram, en su propio punto de retorno
+    (ver `_intentar_envio`): si este UPDATE falla, no puede deshacer la
+    marca 'enviado' de arriba -- el mensaje ya se entregó de verdad."""
+    cur.execute(
+        "update message_outbox set telegram_message_id = %s where id = %s",
+        (tg_id, outbox_id))
 
 
 def _intentar_envio(cur: psycopg.Cursor, workspace_id: str, transporte: Transporte,
                     cal: Calendario, ahora: datetime, m) -> bool:
-    """Envía un mensaje y lo marca 'enviado' en un único punto de retorno
+    """Marca 'enviado' y envía, en ese orden, dentro de un punto de retorno
     propio. Devuelve si se entregó.
 
-    Antes, sólo el ENVÍO estaba protegido: si la marca posterior (el UPDATE
-    que pasa la fila a 'enviado') fallaba, la excepción escapaba de
-    `despachar` sin contenerse -- y como corre dentro de la misma
-    transacción que la escalera y el resto del lote, el `rollback` que
-    seguía devolvía a 'listo' TAMBIÉN los mensajes de este mismo lote que ya
-    se habían marcado 'enviado' antes, y se reenviaban en la próxima pasada
-    (R4-001, revisión 2026-09-28+1).
+    Antes se enviaba primero y se marcaba después: si el UPDATE de la marca
+    fallaba, Telegram ya había entregado el mensaje, el punto de retorno
+    deshacía la marca, `_fallo` lo contaba como fallido y la próxima pasada
+    lo reenviaba -- un duplicado seguro (R3-001, revisión 2026-09-28).
 
-    Ahora el envío y la marca van juntos dentro de un punto de retorno
-    propio (`SAVEPOINT`): si cualquiera de los dos falla, se aísla acá --
-    nunca deshace lo que ya quedó marcado en un mensaje anterior del mismo
-    lote -- y se cuenta como fallido, igual que un envío que falló
-    directamente."""
+    Ahora la marca -- el cambio de estado durable -- va PRIMERO: si falla,
+    nunca se llega a enviar. Si la marca sale bien y el envío falla, el
+    punto de retorno deshace la marca y `_fallo` lo cuenta como fallido,
+    igual que antes. `telegram_message_id` sólo se conoce después de
+    enviar: se guarda en un punto de retorno propio, anidado, cuyo fallo NO
+    puede deshacer la marca 'enviado' de la fila -- el mensaje ya se
+    entregó, y perder ese id no amerita reenviarlo. Ese fallo se reporta
+    (nunca en silencio) sin el texto crudo de la excepción."""
     try:
         with cur.connection.transaction():
+            _marcar_enviado(cur, ahora, m["id"])
             tg_id = transporte.enviar(m["chat_id"], m["cuerpo"], _botones(cur, m))
-            _marcar_enviado(cur, ahora, tg_id, m["id"])
+            try:
+                with cur.connection.transaction():
+                    _guardar_id_telegram(cur, tg_id, m["id"])
+            except Exception as exc_id:  # noqa: BLE001 -- se aísla, no deshace la marca
+                print(f"  ! no se pudo guardar el id de Telegram del mensaje "
+                     f"{m['id']} ({type(exc_id).__name__}).")
     except Exception as e:  # noqa: BLE001 — se registra, no se propaga
         _fallo(cur, workspace_id, m, e, cal, ahora)
         return False
