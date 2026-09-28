@@ -564,16 +564,29 @@ def _encolar_opciones_modelo(cur, quien: Solicitante, chat_id: int,
     dos preguntas seguidas en el mismo mensaje). El texto del modelo ya
     introduce los botones; `e.pregunta` sigue guardada en `args` igual que
     siempre, para quien retoma el toque.
+
+    Seguimiento de review-149a33fa ("pregunta suprimida"): esa supresión sólo
+    tapaba el mensaje único (`texto_combinado` entra en `BUTTON_TEXT_LIMIT`).
+    Si no entra, `_encolar_texto_con_opciones` parte `texto` aparte y manda
+    `texto_corto` como resumen de los botones DESPUÉS -- pasarle siempre
+    `e.pregunta` ahí reintroducía la segunda pregunta exactamente en el caso
+    largo, deshaciendo el hallazgo 6 para cualquier texto que la disparara Y
+    además superara el límite. `texto_corto` pasa a ser el genérico que ya usa
+    `_encolar_opciones_genericas` (T4b, `_TEXTO_BOTONES_GENERICO`) cuando la
+    pregunta ya se dijo -- reuso, no una redacción nueva.
     """
     opciones = [(o.etiqueta, o.valor) for o in e.opciones]
     opciones.append((P.ETIQUETA_SALIR_OPCIONES, {"tipo": "salida"}))
-    if texto and hace_pregunta(texto):
+    pregunta_ya_dicha = bool(texto) and hace_pregunta(texto)
+    if pregunta_ya_dicha:
         texto_combinado = texto
+        texto_corto = _TEXTO_BOTONES_GENERICO
     else:
         texto_combinado = f"{texto}\n\n{e.pregunta}" if texto else e.pregunta
+        texto_corto = e.pregunta
     _encolar_texto_con_opciones(
         cur, quien, chat_id, texto_combinado, opciones, ahora,
-        dedupe_prefijo="opciones-modelo", texto_corto=e.pregunta,
+        dedupe_prefijo="opciones-modelo", texto_corto=texto_corto,
         args={"pregunta": e.pregunta})
 
 

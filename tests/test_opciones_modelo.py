@@ -23,6 +23,7 @@ from datetime import datetime, timezone
 import pytest
 from fastapi.testclient import TestClient
 
+from prisma import agente
 from prisma import gateway
 from prisma import herramientas as H
 from prisma import jev as jev_modulo
@@ -34,7 +35,7 @@ from prisma.contexto import PREAMBULO, construir
 from prisma.db import admin, espacio
 from prisma.llm import Llamada, ProveedorGuionado, Respuesta
 from prisma.salida import (BUTTON_TEXT_LIMIT, OBJETIVO_ETIQUETA_BOTON,
-                             telegram_utf16_units)
+                             normalize_visible_text, telegram_utf16_units)
 
 
 def _quien(cur, nombre, ws):
@@ -219,6 +220,40 @@ def test_no_duplica_la_pregunta_si_el_texto_del_modelo_ya_pregunta(
     assert "¿Qué querés hacer?" not in cuerpo
 
 
+def test_no_repite_la_pregunta_en_los_botones_si_el_texto_largo_ya_pregunto(
+        corework, conn, monkeypatch):
+    """Seguimiento de review-149a33fa ("pregunta suprimida") al hallazgo 6:
+    la supresión de arriba sólo tapaba el mensaje único -- si el texto del
+    modelo ya pregunta pero es tan largo que no entra en `BUTTON_TEXT_LIMIT`,
+    `_encolar_texto_con_opciones` lo parte aparte y manda los botones con
+    `texto_corto` como resumen DESPUÉS; pasarle ahí `e.pregunta` de todos
+    modos reintroducía la segunda pregunta, exactamente en el caso que el
+    hallazgo 6 quería evitar. El resumen de los botones pasa a ser el mismo
+    genérico que ya usa el cierre de T4b (`agente._TEXTO_BOTONES_GENERICO`)
+    cuando la pregunta ya se dijo."""
+    ws = corework.workspace_id
+    texto_modelo = "Avance registrado. " * 250 + "¿Seguimos con la siguiente?"
+    assert telegram_utf16_units(normalize_visible_text(texto_modelo)) > BUTTON_TEXT_LIMIT
+    guion = [Respuesta(texto=texto_modelo, llamadas=[Llamada("c1", "ofrecer_opciones", {
+        "pregunta": "¿Qué querés hacer?",
+        "opciones": [{"texto": "Es una tarea nueva"},
+                    {"texto": "Es sobre una tarea existente"}]})])]
+    proveedor = _con_proveedor(monkeypatch, guion)
+
+    with espacio(conn, ws) as cur:
+        quien = _quien(cur, "Marcos Tarquini", ws)
+        cal = Calendario.desde_base(cur, ws)
+        responder(cur, quien, "hola", proveedor, cal, chat_id=1,
+                 ahora=datetime.now(timezone.utc))
+        pid = _pendiente_opciones(cur, ws)
+        cur.execute(
+            "select cuerpo from message_outbox where pending_action_id = %s", (pid,))
+        resumen_botones = cur.fetchone()["cuerpo"]
+
+    assert resumen_botones == agente._TEXTO_BOTONES_GENERICO
+    assert "¿Qué querés hacer?" not in resumen_botones
+
+
 def test_texto_de_una_vuelta_posterior_a_ofrecer_opciones_se_descarta(
         corework, conn, monkeypatch):
     """El texto que acompaña la pregunta es el de la vuelta que LLAMÓ a
@@ -398,6 +433,66 @@ def test_segunda_llamada_a_ofrecer_opciones_en_el_mismo_turno_no_se_muestra(
     assert r2["is_error"] is True
     contenido_2 = json.loads(r2["content"])
     assert "ya ofreciste opciones" in contenido_2["explicacion"]
+
+
+# ---------------------------------------------------------------------------
+# Dos opciones no pueden mostrar la misma etiqueta (seguimiento de
+# review-149a33fa, "etiquetas repetidas del modelo"): la persona no podría
+# distinguir a cuál de las dos tocó.
+# ---------------------------------------------------------------------------
+
+def test_dos_opciones_de_texto_con_la_misma_etiqueta_se_rechazan_al_modelo(
+        corework, conn, monkeypatch):
+    ws = corework.workspace_id
+    guion = [
+        Respuesta(llamadas=[Llamada("c1", "ofrecer_opciones", {
+            "pregunta": "¿Cuál?",
+            "opciones": [{"texto": "Sí"}, {"texto": "Sí"}]})]),
+        Respuesta(texto="listo"),
+    ]
+    proveedor = _con_proveedor(monkeypatch, guion)
+
+    with espacio(conn, ws) as cur:
+        quien = _quien(cur, "Marcos Tarquini", ws)
+        cal = Calendario.desde_base(cur, ws)
+        r = responder(cur, quien, "elegí algo", proveedor, cal, chat_id=1,
+                     ahora=datetime.now(timezone.utc))
+        cur.execute("select count(*) n from pending_action where herramienta = %s",
+                    (P.SENTINEL_OPCIONES_MODELO,))
+        assert cur.fetchone()["n"] == 0
+    assert r.elecciones == []
+
+
+def test_dos_tareas_con_la_misma_etiqueta_corta_del_modelo_se_rechazan(
+        corework, conn, monkeypatch):
+    """Las dos etiquetas son `fija` (el modelo dio una corta para cada una):
+    `salida.etiquetas_boton_distinguibles` nunca numera una fija (hallazgo 7,
+    seguimiento b), así que sin este rechazo quedarían dos botones
+    idénticos apuntando a tareas distintas."""
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        a = _tarea(cur, ws, titulo="Cablear tablero máq. 3", persona="Marcos Tarquini")
+        b = _tarea(cur, ws, titulo="Cablear tablero máq. 4", persona="Marcos Tarquini")
+    conn.commit()
+
+    guion = [
+        Respuesta(llamadas=[Llamada("c1", "ofrecer_opciones", {
+            "pregunta": "¿Cuál tarea?",
+            "opciones": [{"tarea_id": a, "etiqueta": "Cablear máquina"},
+                        {"tarea_id": b, "etiqueta": "Cablear máquina"}]})]),
+        Respuesta(texto="listo"),
+    ]
+    proveedor = _con_proveedor(monkeypatch, guion)
+
+    with espacio(conn, ws) as cur:
+        quien = _quien(cur, "Marcos Tarquini", ws)
+        cal = Calendario.desde_base(cur, ws)
+        r = responder(cur, quien, "elegí una tarea", proveedor, cal, chat_id=1,
+                     ahora=datetime.now(timezone.utc))
+        cur.execute("select count(*) n from pending_action where herramienta = %s",
+                    (P.SENTINEL_OPCIONES_MODELO,))
+        assert cur.fetchone()["n"] == 0
+    assert r.elecciones == []
 
 
 # ---------------------------------------------------------------------------
@@ -659,6 +754,95 @@ def test_salida_cierra_sin_efecto_y_no_llama_al_modelo(
             "select cuerpo from message_outbox where chat_id = %s order by id desc limit 1",
             (tg,))
         assert "escrib" in cur.fetchone()["cuerpo"].lower()
+
+
+# ---------------------------------------------------------------------------
+# Hallazgo 10 (sesión 2 por Telegram, 2026-09-27): Prisma no puede volver a
+# preguntar sola lo que la persona ya descartó con "Quiero consultar otra
+# cosa". Evidencia real: Marcos tocó la salida sobre "¿Sobre cuál de tus
+# tareas avanzaste?", escribió "hols" (un saludo) y Prisma repitió la misma
+# pregunta -- el cierre salía con un texto fijo ("Dale, escribime qué
+# necesitás.") que no nombraba qué se había cerrado; `contexto.historial`
+# guarda literalmente lo que salió por `message_outbox`, así que el turno
+# siguiente veía la pregunta y el cierre como dos mensajes de Prisma
+# seguidos, sin ninguna marca de que la persona la había descartado.
+# ---------------------------------------------------------------------------
+
+def test_salida_nombra_la_pregunta_cerrada_en_vez_de_un_texto_fijo(
+        cliente, conn, corework, monkeypatch):
+    ws = corework.workspace_id
+    pregunta = "¿Sobre cuál de tus tareas avanzaste?"
+    guion = [Respuesta(llamadas=[Llamada("c1", "ofrecer_opciones", {
+        "pregunta": pregunta,
+        "opciones": [{"texto": "Cablear tablero"}, {"texto": "Programar PLC"}]})])]
+    proveedor = _con_proveedor(monkeypatch, guion)
+
+    with espacio(conn, ws) as cur:
+        quien = _quien(cur, "Marcos Tarquini", ws)
+        cal = Calendario.desde_base(cur, ws)
+        responder(cur, quien, "avancé con algo", proveedor, cal, chat_id=1,
+                 ahora=datetime.now(timezone.utc))
+        pid = _pendiente_opciones(cur, ws)
+        salir = next(o for o in _opciones(cur, pid)
+                    if o["etiqueta"] == "Quiero consultar otra cosa")
+        tg = _telegram_id(cur, "Marcos Tarquini")
+
+    assert _tocar(cliente, salir["token"], tg).status_code == 200
+
+    with admin(conn) as cur:
+        cur.execute(
+            "select cuerpo from message_outbox where chat_id = %s order by id desc limit 1",
+            (tg,))
+        cierre = cur.fetchone()["cuerpo"]
+
+    # Nombra qué pregunta quedó cerrada -- no el texto fijo de siempre --
+    # para que quede como un hecho en el propio `message_outbox`, que es lo
+    # único que lee `contexto.historial` (`tests/test_memoria.py` prueba que
+    # ese hecho llega al historial).
+    assert pregunta in cierre
+    assert "escrib" in cierre.lower()
+
+
+def test_traer_el_tema_de_nuevo_reabre_la_pregunta_normalmente(
+        cliente, conn, corework, monkeypatch):
+    """La regla nueva es "no la retomes sola", no "no se puede volver a
+    preguntar nunca": si la persona trae el tema de nuevo, el modelo puede
+    volver a ofrecer la misma pregunta sin que nada del servidor lo bloquee."""
+    ws = corework.workspace_id
+    pregunta = "¿Sobre cuál de tus tareas avanzaste?"
+    opciones = [{"texto": "Cablear tablero"}, {"texto": "Programar PLC"}]
+    # Dos proveedores, uno por turno -- el bucle de `responder` consume el
+    # guion hasta que una vuelta llega sin llamadas (`ProveedorGuionado`
+    # devuelve texto vacío cuando se queda sin guion), así que un segundo
+    # `ofrecer_opciones` en el MISMO guion se consumiría dentro del primer
+    # turno (y se rechazaría por el tope de un juego de botones por turno,
+    # ADR 0007), no en el segundo.
+    proveedor1 = _con_proveedor(monkeypatch, [Respuesta(llamadas=[Llamada(
+        "c1", "ofrecer_opciones", {"pregunta": pregunta, "opciones": opciones})])])
+
+    with espacio(conn, ws) as cur:
+        quien = _quien(cur, "Marcos Tarquini", ws)
+        cal = Calendario.desde_base(cur, ws)
+        responder(cur, quien, "avancé con algo", proveedor1, cal, chat_id=1,
+                 ahora=datetime.now(timezone.utc))
+        pid = _pendiente_opciones(cur, ws)
+        salir = next(o for o in _opciones(cur, pid)
+                    if o["etiqueta"] == "Quiero consultar otra cosa")
+        tg = _telegram_id(cur, "Marcos Tarquini")
+
+    assert _tocar(cliente, salir["token"], tg).status_code == 200
+
+    proveedor2 = ProveedorGuionado(guion=[Respuesta(llamadas=[Llamada(
+        "c2", "ofrecer_opciones", {"pregunta": pregunta, "opciones": opciones})])])
+    with espacio(conn, ws) as cur:
+        quien = _quien(cur, "Marcos Tarquini", ws)
+        cal = Calendario.desde_base(cur, ws)
+        r = responder(cur, quien,
+                     "che, sobre lo de la tarea: avancé con el tablero",
+                     proveedor2, cal, chat_id=1, ahora=datetime.now(timezone.utc))
+        assert r.elecciones == ["ofrecer_opciones"]
+        pid2 = _pendiente_opciones(cur, ws)
+        assert pid2 != pid
 
 
 # ---------------------------------------------------------------------------

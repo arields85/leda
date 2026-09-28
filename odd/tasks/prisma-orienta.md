@@ -3556,3 +3556,30 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   31/12 en Buenos Aires); las pruebas del comando miran también `stderr`;
   `_TareaPreparada` en lugar de diccionarios. RED/GREEN observado. `tests/test_siembra.py`
   -> `44 passed` (escritor). Suite completa (escritor): `1021 passed, 108 deselected`.
+  Commits `3140a45` (T6k) y `cb9cd2d` (T7c). RDD sobre `4885703..cb9cd2d`: **alto**
+  (`cli.py`), `review_due`; consentimiento del usuario: revisar.
+  review-022fb782dc763215, cuatro lentes, aprobada y reconocida; frontera en
+  `cb9cd2d`. Sugerencias menores sobre `sembrar` (T7d, sin urgencia: `ahora` sin zona
+  aceptado en silencio, `tareas: {}` falsos aceptados como lista vacía, el `except`
+  amplio de `_revertir_sin_traza`, el nombre `_LARGO_MAXIMO_...` usado como mínimo) y
+  una advertencia sobre `docs/STATUS.md` con la línea base vieja (se corrige al cierre).
+
+- 2026-09-28: **Hallazgo 10 cerrado y seguimientos de review-149a33fa.** Ruta: delegada,
+  un escritor. Causa real: al tocar "Quiero consultar otra cosa" sobre una pregunta del
+  modelo, `gateway._resolver_toque_opcion_modelo` cerraba con un texto fijo ("Dale,
+  escribime qué necesitás."), y `contexto.historial` -- que se arma sólo con
+  `message_outbox`/`inbound_message` -- no mostraba que la pregunta se había
+  descartado; un saludo alcanzaba para que el modelo la reabriera. Arreglo: el cierre
+  nombra la pregunta descartada ("Dale, dejamos de lado «…». Escribime qué
+  necesitás.", `_texto_cierre_opciones`), en la misma fila de la cola que el historial
+  ya lee, y el preámbulo le dice al modelo que no la reabra salvo que la persona vuelva
+  al tema. Seguimientos: (1) *pregunta suprimida*: con texto largo que se parte, el
+  rótulo de los botones volvía a poner la pregunta; ahora usa "Elegí una opción:"
+  (`agente._encolar_opciones_modelo`); (2) *etiquetas repetidas del modelo*:
+  `_ofrecer_opciones` rechaza dos botones con la misma etiqueta final para que el
+  modelo reintente; (3) *asserts*: las dos pruebas de `2bee9a9` comparan ahora contra el
+  valor exacto de `etiquetas_boton_distinguibles`. RED/GREEN observado por separado en
+  cada arreglo. Enfocada (reejecutada por el orquestador): `tests/test_opciones_modelo.py
+  tests/test_memoria.py tests/test_lista_botones.py tests/test_menu_tarea.py
+  tests/test_pregunta_sin_opciones.py` -> `101 passed`. Suite completa (escritor):
+  `1027 passed, 108 deselected`.

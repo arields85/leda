@@ -24,7 +24,8 @@ from .db import (admin, autoridad, conectar, conectar_autoridad, espacio,
 from .despachador import acusar_toque, mantener_chat_activo
 from .salida import TRUNCAR_ETIQUETA_BOTON as TRUNCAR_TITULO_BOTON
 from .salida import (enqueue_outbox, etiquetas_boton_distinguibles,
-                     normalize_visible_text, with_no_effect_status)
+                     normalize_visible_text, truncar_etiqueta_boton,
+                     with_no_effect_status)
 
 app = FastAPI(title="Prisma", docs_url=None, redoc_url=None)
 router = APIRouter()
@@ -976,6 +977,39 @@ def _resolver_toque_aclaracion(cur, quien, workspace_id: str, chat_id: int,
                        estado)
 
 
+# Cuánto de la pregunta cerrada entra en el mensaje de "Quiero consultar
+# otra cosa" (hallazgo 10, sesión 2 por Telegram, 2026-09-27): nombrarla ahí,
+# en el propio `message_outbox`, es lo que deja el cierre como un hecho en
+# `contexto.historial` -- no hace falta una tabla nueva, es el mismo
+# mecanismo que ya arma el historial de cualquier otro turno. Corte por
+# caracteres (no por palabra): esto es un mensaje, no un botón -- lo normal
+# (T1: "una frase corta") entra entero de sobra; el corte es sólo una red de
+# seguridad para el texto largo que T3/T4b guardan en el mismo `pregunta`.
+LIMITE_PREGUNTA_CERRADA = 160
+
+
+def _texto_cierre_opciones(pregunta: str) -> str:
+    """Texto de "Quiero consultar otra cosa" (hallazgo 10, sesión 2 por
+    Telegram, 2026-09-27, evidencia real: Marcos tocó la salida sobre "¿Sobre
+    cuál de tus tareas avanzaste?", escribió "hols" y Prisma volvió a
+    preguntar lo mismo). Causa real: el cierre salía con un texto fijo que no
+    nombraba qué se cerró ("Dale, escribime qué necesitás.") -- el historial
+    que arma `contexto.historial` guarda literalmente lo que salió por
+    `message_outbox`, así que el turno siguiente veía dos mensajes de Prisma
+    seguidos (la pregunta y el cierre) sin ninguna marca de que la persona la
+    descartó, y un saludo alcanzaba para que el modelo la retomara.
+
+    Nombrar acá la pregunta cerrada deja ese hecho en el propio historial --
+    el mismo mecanismo que ya lee `contexto.historial`, sin una tabla ni un
+    campo nuevo -- y la regla nueva de `contexto.PREAMBULO` le dice al modelo
+    que no la retome sin que la persona la traiga de nuevo."""
+    pregunta = (pregunta or "").strip()
+    if not pregunta:
+        return "Dale, escribime qué necesitás."
+    corta = truncar_etiqueta_boton(pregunta, limite=LIMITE_PREGUNTA_CERRADA)
+    return f"Dale, dejamos de lado «{corta}». Escribime qué necesitás."
+
+
 def _resolver_toque_opcion_modelo(cur, quien, workspace_id: str, chat_id: int,
                                   args: dict, ahora) -> None:
     """Alguien tocó una opción de `ofrecer_opciones` (T1, ADR 0007), de una
@@ -985,10 +1019,12 @@ def _resolver_toque_opcion_modelo(cur, quien, workspace_id: str, chat_id: int,
 
     A diferencia de `_resolver_toque_aclaracion`, ninguna elección acá vuelve
     a llamar a una herramienta: "Quiero consultar otra cosa" cierra sin
-    efecto e invita a escribir (el próximo mensaje se rutea como un turno
-    común); una tarea con `accion: "menu"` abre el menú de T2 sin retomar
-    nada; "Ver más" (T3) pagina en `_mostrar_mas_tareas`, también sin
-    retomar; "Es una tarea nueva" (T4b) arranca el alta guiada en
+    efecto e invita a escribir, nombrando qué pregunta quedó cerrada
+    (`_texto_cierre_opciones`, hallazgo 10) para que el historial de
+    `contexto.py` lo vea (el próximo mensaje se rutea como un turno común);
+    una tarea con `accion: "menu"` abre el menú de T2 sin retomar nada; "Ver
+    más" (T3) pagina en `_mostrar_mas_tareas`, también sin retomar; "Es una
+    tarea nueva" (T4b) arranca el alta guiada en
     `_iniciar_alta_guiada`; "Es sobre una tarea existente" (T4b) lista en
     `_mostrar_tareas_propias`; cualquier otra opción sí retoma la
     conversación con el modelo, pasándole la elección como si fuera lo que
@@ -1009,7 +1045,7 @@ def _resolver_toque_opcion_modelo(cur, quien, workspace_id: str, chat_id: int,
 
     if tipo == "salida":
         _responder(cur, workspace_id, chat_id, quien,
-                  "Dale, escribime qué necesitás.", ahora)
+                  _texto_cierre_opciones(pregunta), ahora)
         return
 
     if tipo == "ver_mas":

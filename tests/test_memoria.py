@@ -16,6 +16,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
+from prisma import gateway
 from prisma.agente import responder
 from prisma.autoridad import Canal, identificar
 from prisma.calendario import Calendario
@@ -168,3 +169,38 @@ def test_el_historial_arranca_con_la_persona_y_alterna(corework, conn):
         roles = [m["role"] for m in h]
         assert all(a != b for a, b in zip(roles, roles[1:])), roles
         assert "ahí voy" in h[0]["content"] and "mañana la cierro" in h[0]["content"]
+
+
+def test_el_historial_deja_ver_que_una_pregunta_quedo_cerrada(corework, conn):
+    """Hallazgo 10 (sesión 2 por Telegram, 2026-09-27): Marcos tocó "Quiero
+    consultar otra cosa" sobre "¿Sobre cuál de tus tareas avanzaste?",
+    escribió "hols" (un saludo) y Prisma volvió a hacer la misma pregunta.
+    El cierre salía con un texto fijo ("Dale, escribime qué necesitás.") que
+    no nombraba qué se había cerrado -- el historial mostraba la pregunta y
+    el cierre como dos mensajes de Prisma seguidos, sin ninguna marca de que
+    la persona la había descartado.
+
+    `gateway._texto_cierre_opciones` (hallazgo 10) nombra la pregunta cerrada
+    en el propio texto que sale por `message_outbox`: acá se prueba que,
+    entregado ese texto, el hecho llega al historial que arma este módulo --
+    el mismo mecanismo que ya usa cualquier otro turno, sin una tabla ni un
+    campo nuevo."""
+    ws = corework.workspace_id
+    with espacio(conn, ws) as cur:
+        quien = _quien(cur, "Marcos Tarquini", ws)
+        cal = Calendario.desde_base(cur, ws)
+
+        pregunta = "¿Sobre cuál de tus tareas avanzaste?"
+        _entra(cur, ws, quien, "ya avancé con algo", AHORA - timedelta(minutes=3))
+        _salio(cur, ws, pregunta, AHORA - timedelta(minutes=2))
+        _salio(cur, ws, gateway._texto_cierre_opciones(pregunta),
+               AHORA - timedelta(minutes=1))
+
+        prov = ProveedorGuionado([Respuesta(texto="Hola de nuevo.")])
+        _turno(cur, ws, quien, "hols", cal, prov)
+
+        _, mensajes = prov.recibidos[0]
+        cierre = next((m["content"] for m in mensajes
+                      if m["role"] == "assistant" and pregunta in m["content"]
+                      and "dejamos de lado" in m["content"]), None)
+        assert cierre is not None, mensajes

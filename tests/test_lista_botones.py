@@ -31,7 +31,8 @@ from prisma.autoridad import Canal, identificar
 from prisma.calendario import Calendario
 from prisma.db import admin, espacio
 from prisma.llm import Llamada, ProveedorGuionado, Respuesta
-from prisma.salida import BUTTON_TEXT_LIMIT, telegram_utf16_units
+from prisma.salida import (BUTTON_TEXT_LIMIT, etiquetas_boton_distinguibles,
+                           telegram_utf16_units)
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -688,10 +689,18 @@ def test_mostrar_mas_tareas_acorta_titulos_largos_en_limite_de_palabra(
 
 def test_mostrar_mas_tareas_distingue_titulos_que_colisionan_al_acortar(
         conn, corework):
+    """Seguimiento de review-149a33fa ("asserts"): la aserción original sólo
+    comprobaba `len(set(etiquetas)) == 2` y que "3"/"4" aparecieran en algún
+    lado -- pasaría igual con un resultado distinto al que arma de verdad
+    `salida.etiquetas_boton_distinguibles` (por ejemplo, numerado como
+    "... (2)" en vez de extendido con el dígito). Se compara contra el valor
+    exacto que devuelve esa función para este mismo par de títulos."""
     ws = corework.workspace_id
+    titulo_a = "Revisar tablero de la máquina 3"
+    titulo_b = "Revisar tablero de la máquina 4"
     with admin(conn) as cur:
-        a = _tarea(cur, ws, titulo="Revisar tablero de la máquina 3")
-        b = _tarea(cur, ws, titulo="Revisar tablero de la máquina 4")
+        a = _tarea(cur, ws, titulo=titulo_a)
+        b = _tarea(cur, ws, titulo=titulo_b)
     conn.commit()
 
     with espacio(conn, ws) as cur:
@@ -702,8 +711,8 @@ def test_mostrar_mas_tareas_distingue_titulos_que_colisionan_al_acortar(
         etiquetas = [f["etiqueta"] for f in _opciones(cur, pid)
                     if f["etiqueta"] != P.ETIQUETA_SALIR_OPCIONES]
 
-    assert len(set(etiquetas)) == 2
-    assert "3" in etiquetas[0] and "4" in etiquetas[1]
+    assert etiquetas == etiquetas_boton_distinguibles([titulo_a, titulo_b])
+    assert etiquetas == [titulo_a, titulo_b]      # los dos títulos enteros entran en el corte duro
 
 
 def test_ver_mas_de_mas_de_ocho_tareas_arma_una_tercera_pagina(

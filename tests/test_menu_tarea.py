@@ -30,6 +30,7 @@ from prisma.autoridad import Canal, identificar
 from prisma.calendario import Calendario
 from prisma.db import admin, espacio
 from prisma.llm import Llamada, ProveedorGuionado, Respuesta
+from prisma.salida import etiquetas_boton_distinguibles
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -492,13 +493,19 @@ def test_empezar_no_se_ofrece_con_dependencia_bloqueante_sin_terminar(
 
 def test_pedir_eleccion_dependencia_acorta_y_distingue_titulos_largos(
         conn, corework):
+    """Seguimiento de review-149a33fa ("asserts"): la aserción original sólo
+    comprobaba `len(set(etiquetas)) == 2` y que "3"/"4" aparecieran en algún
+    lado -- pasaría igual con un resultado distinto al que arma de verdad
+    `salida.etiquetas_boton_distinguibles` (por ejemplo, numerado como
+    "... (2)" en vez de extendido con el dígito). Se compara contra el valor
+    exacto que devuelve esa función para este mismo par de títulos."""
     ws = corework.workspace_id
+    titulo_a = "Revisar tablero de la máquina 3"
+    titulo_b = "Revisar tablero de la máquina 4"
     with admin(conn) as cur:
         origen = _tarea(cur, ws, titulo="Instalar tablero", persona="Marcos Tarquini")
-        a = _tarea(cur, ws, titulo="Revisar tablero de la máquina 3",
-                  persona="Marcos Tarquini")
-        b = _tarea(cur, ws, titulo="Revisar tablero de la máquina 4",
-                  persona="Marcos Tarquini")
+        a = _tarea(cur, ws, titulo=titulo_a, persona="Marcos Tarquini")
+        b = _tarea(cur, ws, titulo=titulo_b, persona="Marcos Tarquini")
     conn.commit()
 
     with espacio(conn, ws) as cur:
@@ -507,14 +514,13 @@ def test_pedir_eleccion_dependencia_acorta_y_distingue_titulos_largos(
             cur, quien, ws, 1, accion="crear_dependencia_bloqueante",
             tarea_id=origen, titulo="Instalar tablero",
             pregunta="¿De cuál depende?",
-            candidatas=[(a, "Revisar tablero de la máquina 3"),
-                       (b, "Revisar tablero de la máquina 4")],
+            candidatas=[(a, titulo_a), (b, titulo_b)],
             ahora=datetime.now(timezone.utc))
         pid = _pendiente(cur, ws, P.SENTINEL_DATO_MENU_TAREA)
         etiquetas = [f["etiqueta"] for f in _opciones(cur, pid)]
 
-    assert len(set(etiquetas)) == 2
-    assert "3" in etiquetas[0] and "4" in etiquetas[1]
+    assert etiquetas == etiquetas_boton_distinguibles([titulo_a, titulo_b])
+    assert etiquetas == [titulo_a, titulo_b]      # los dos títulos enteros entran en el corte duro
 
 
 # ---------------------------------------------------------------------------

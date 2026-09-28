@@ -423,6 +423,27 @@ def _ofrecer_opciones(cur, quien: Solicitante, pregunta, opciones):
             armadas.append(OpcionOfrecida(
                 etiqueta=v["texto"], valor={"tipo": "texto", "texto": v["texto"]}))
 
+    # Seguimiento de review-149a33fa ("etiquetas repetidas del modelo"): la
+    # segunda pasada de arriba desambigua tareas ENTRE SÍ, pero sólo cuando
+    # ninguna de las dos es `fija` (`salida.etiquetas_boton_distinguibles`
+    # nunca numera una etiqueta que el modelo eligió, hallazgo 7, seguimiento
+    # b -- a propósito, para no tocarle la elección). Eso deja dos huecos sin
+    # cubrir: dos opciones de texto con el mismo texto (nunca pasan por esa
+    # función), y dos tareas con la MISMA etiqueta corta propia del modelo
+    # (las dos `fija`, ninguna se numera). En los dos casos la persona vería
+    # dos botones idénticos sin poder distinguir a cuál tocó. Se rechaza acá,
+    # sobre las etiquetas ya armadas (después de acortar/desambiguar tareas),
+    # con el mismo criterio que el resto de esta herramienta: el modelo no
+    # inventa candidatos, reintenta con un `Denegado` explícito.
+    vistas: set[str] = set()
+    for a in armadas:
+        clave = a.etiqueta.casefold()
+        if clave in vistas:
+            raise Denegado(
+                f"Dos opciones no pueden mostrar la misma etiqueta ({a.etiqueta!r}). "
+                "Dale a cada opción un texto o una etiqueta distinta.")
+        vistas.add(clave)
+
     raise NecesitaOpciones(pregunta, armadas)
 
 
