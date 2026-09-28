@@ -1280,3 +1280,133 @@ def test_abrir_ciclo_con_nombre_vacio_no_revienta(conn, intake_world):
     assert textos[0].startswith("👋")
     assert ", ." not in textos[0] and ",." not in textos[0]
     assert _estado(conn, ws, m)["estado"] == "awaiting_email"
+
+
+# ===========================================================================
+# M. Endurecimiento G1d-a3 -- 1: reactivación tras `revoked`
+# ===========================================================================
+
+
+def _llevar_a_revoked(conn, ws: str, m: str, ahora=AHORA) -> None:
+    """Recorre el único camino válido hasta `revoked` (la base sólo lo
+    permite desde `active`, `preparar_evento_alta_correo()`), para dejar una
+    membresía con una proyección de un ciclo YA cerrado -- el escenario de
+    "reactivación administrativa tras revocar" del ítem 1."""
+    with espacio(conn, ws) as cur:
+        AC.iniciar_ciclo(cur, m, "alta", ahora=ahora)
+        AC.transicionar(cur, m, "awaiting_email", ahora=ahora)
+        AC.transicionar(cur, m, "pending_email_verification", ahora=ahora)
+        AC.transicionar(cur, m, "active", ahora=ahora)
+        AC.transicionar(cur, m, "revoked", ahora=ahora)
+    conn.commit()
+
+
+def test_reactivacion_tras_revoked_abre_el_ciclo_siguiente_con_bienvenida_y_pedido(
+        conn, intake_world):
+    """G1d-a3, ítem 1 (regresión): antes, `abrir_ciclo_alta` sólo llamaba a
+    `AC.iniciar_ciclo` cuando no había ninguna proyección (`actual is None`)
+    -- una membresía con una proyección de un ciclo anterior ya `revoked`
+    (revocación administrativa, después reactivada) nunca abría el ciclo
+    siguiente, así que la bienvenida y el pedido de correo del ciclo nuevo
+    nunca salían. También cubre la clave de dedupe de la bienvenida/pedido
+    (tenía que incluir el ciclo): el ciclo 1 ya gastó esas mismas claves
+    sobre el mismo chat -- sin el ciclo en la clave, el pedido y la
+    bienvenida del ciclo 2 se habrían descartado en silencio contra
+    `on conflict (dedupe_key) do nothing`."""
+    ws = intake_world["north-lab"]["id"]
+    m = _membership_id(intake_world, "north-lab", "Taylor Quinn")
+
+    # Ciclo 1: activación real (gasta las claves de dedupe de bienvenida y
+    # pedido para este chat), después revocada.
+    with espacio(conn, ws) as cur:
+        ACF.abrir_ciclo_alta(cur, m, ws, 71001, "Taylor Quinn", AHORA)
+    conn.commit()
+    assert _estado(conn, ws, m)["ciclo"] == 1
+    assert len(_outbox_textos(conn, 71001)) == 2
+
+    with espacio(conn, ws) as cur:
+        AC.transicionar(cur, m, "pending_email_verification", ahora=AHORA)
+        AC.transicionar(cur, m, "active", ahora=AHORA)
+        AC.transicionar(cur, m, "revoked", ahora=AHORA)
+    conn.commit()
+    assert _estado(conn, ws, m)["estado"] == "revoked"
+
+    # Reactivación administrativa: mismo membership_id, mismo chat.
+    despues = AHORA + timedelta(days=1)
+    with espacio(conn, ws) as cur:
+        ACF.abrir_ciclo_alta(cur, m, ws, 71001, "Taylor Quinn", despues)
+    conn.commit()
+
+    estado = _estado(conn, ws, m)
+    assert estado["ciclo"] == 2
+    assert estado["estado"] == "awaiting_email"
+
+    textos = _outbox_textos(conn, 71001)
+    assert len(textos) == 4          # 2 del ciclo 1 + 2 del ciclo 2, nunca deduplicados entre sí
+    assert textos[2].startswith("👋")
+    assert textos[3] == ACF.TEXTO_PEDIDO_CORREO
+
+    with admin(conn) as cur:
+        cur.execute(
+            "select ciclo from alta_correo_evento "
+            "where membership_id = %s and tipo = 'bienvenida_entregada' order by ciclo",
+            (m,))
+        assert [f["ciclo"] for f in cur.fetchall()] == [1, 2]
+
+
+def test_dos_abrir_ciclo_alta_concurrentes_de_una_reactivacion_no_duplican_el_ciclo(
+        conn, intake_world, uri):
+    """G1d-a3, ítem 1: la protección contra la carrera de la primera
+    activación sigue valiendo para una reactivación tras `revoked` -- dos
+    llamadas simultáneas de `abrir_ciclo_alta` sobre la misma membresía YA
+    revocada no pueden abrir las dos el ciclo 2. El candado (`bloquear=True`)
+    sirve igual que en `test_dos_abrir_ciclo_alta_concurrentes_de_una_
+    primera_activacion_no_revientan`: quien se desbloquea segundo ya ve la
+    proyección que dejó el primero (ciclo 2, ya no `revoked`) y no abre otro."""
+    ws = intake_world["north-lab"]["id"]
+    m = _membership_id(intake_world, "north-lab", "Taylor Quinn")
+    _llevar_a_revoked(conn, ws, m, ahora=AHORA)
+
+    barrier = threading.Barrier(2, timeout=30)
+    outcomes: list[str] = []
+    failures: list[Exception] = []
+
+    def activar() -> None:
+        other = None
+        try:
+            other = conectar(uri)
+            with espacio(other, ws) as cur:
+                barrier.wait()
+                ACF.abrir_ciclo_alta(cur, m, ws, 71001, "Taylor Quinn", AHORA)
+            other.commit()
+            outcomes.append("ok")
+        except Exception as exc:  # noqa: BLE001 -- justo lo que se prueba que no pase
+            failures.append(exc)
+            barrier.abort()
+            if other is not None:
+                other.rollback()
+        finally:
+            if other is not None:
+                other.close()
+
+    threads = [threading.Thread(target=activar) for _ in range(2)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=60)
+    assert not any(thread.is_alive() for thread in threads), "un hilo quedó colgado"
+
+    assert failures == [], [type(e).__name__ for e in failures]
+    assert outcomes == ["ok", "ok"]
+
+    estado = _estado(conn, ws, m)
+    assert estado["ciclo"] == 2
+    assert estado["estado"] == "awaiting_email"
+    textos = _outbox_textos(conn, 71001)
+    assert len(textos) == 2
+    with admin(conn) as cur:
+        cur.execute(
+            "select count(*) n from alta_correo_evento "
+            "where membership_id = %s and ciclo = 2 and tipo = 'bienvenida_entregada'",
+            (m,))
+        assert cur.fetchone()["n"] == 1

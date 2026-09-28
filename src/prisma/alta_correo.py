@@ -331,6 +331,15 @@ def contacto_verificado(cur: psycopg.Cursor, membership_id: str) -> dict | None:
 # ---------------------------------------------------------------------------
 
 
+# Cuántas vueltas de "insertar o nada, si no está leer" tolera `crear_aviso`
+# antes de rendirse (G1d-a3, ítem 5): dos alcanza en la práctica para
+# cualquier carrera real (perder la carrera de inserción y no encontrar
+# tampoco la fila del otro sólo pasa si alguien la resolvió justo en esa
+# ventana angosta); una tercera vuelta es margen barato para una carrera
+# encima de otra carrera, sin convertir esto en un reintento indefinido.
+_MAX_INTENTOS_CREAR_AVISO = 3
+
+
 def crear_aviso(cur: psycopg.Cursor, tipo: str, texto_saneado: str,
                  *, workspace_id: str | None = None,
                  referencia_tipo: str | None = None,
@@ -361,9 +370,15 @@ def crear_aviso(cur: psycopg.Cursor, tipo: str, texto_saneado: str,
     ganó la carrera puede haber marcado su aviso resuelto -- ahí ya no
     queda ningún pendiente vivo contra el que haber chocado, así que el
     próximo intento de este mismo bucle vuelve a insertar sin tropezar en
-    vez de leer una fila que ya no está."""
+    vez de leer una fila que ya no está.
+
+    Puede levantar `RuntimeError` (G1d-a3, ítem 5: antes esto no estaba
+    dicho acá) si agota `_MAX_INTENTOS_CREAR_AVISO` intentos sin poder
+    insertar ni encontrar ningún aviso pendiente -- una carrera inusualmente
+    persistente, no un caso que quien llama deba esperar en el camino
+    normal; nunca devuelve `None` en su lugar ni finge éxito."""
     ahora = _ahora(ahora)
-    for _ in range(3):
+    for _ in range(_MAX_INTENTOS_CREAR_AVISO):
         cur.execute(
             """insert into aviso_administrativo
                  (workspace_id, tipo, texto_saneado, referencia_tipo, referencia_id,

@@ -304,9 +304,24 @@ def abrir_ciclo_alta(cur: psycopg.Cursor, membership_id: str, workspace_id: str,
     candado y no hace nada si el ciclo ya pasó de `pending_welcome`), así
     que la segunda llamada termina siendo un no-op completo, nunca una
     excepción cruda ni un `UniqueViolation` contra el índice único de
-    `bienvenida_entregada`."""
+    `bienvenida_entregada`.
+
+    G1d-a3, ítem 1 (regresión corregida): abre el ciclo también cuando la
+    proyección existente ya está `revoked` -- no sólo cuando no hay ninguna
+    proyección todavía. Antes esto sólo miraba `actual is None`, así que una
+    reactivación administrativa tras una revocación (la membresía vuelve a
+    activarse, con una proyección de un ciclo anterior ya cerrado) nunca
+    abría el ciclo siguiente: `_completar_bienvenida` no encontraba ningún
+    `pending_welcome` que completar y el mensaje se perdía en silencio. La
+    base es quien decide si corresponde (`preparar_evento_alta_correo()`
+    exige `actual.estado = 'revoked'` para aceptar un ciclo `ciclo + 1`) --
+    acá sólo se repite esa misma condición para decidir si hay que llamar a
+    `iniciar_ciclo`, nunca una regla nueva. La protección contra la carrera
+    de la primera activación no cambia: la segunda llamada concurrente, ya
+    desbloqueada, encuentra la proyección que dejó la primera (`pending_
+    welcome` de un ciclo que no es `revoked`) y no vuelve a abrir nada."""
     actual = AC.estado(cur, membership_id, bloquear=True)
-    if actual is None:
+    if actual is None or actual["estado"] == "revoked":
         AC.iniciar_ciclo(cur, membership_id, "alta", ahora=ahora)
     _completar_bienvenida(cur, membership_id, workspace_id, chat_id, nombre, ahora)
 
@@ -358,10 +373,21 @@ def _completar_bienvenida(cur: psycopg.Cursor, membership_id: str, workspace_id:
     llegan hasta acá, el segundo espera a que el primero termine y confirme,
     y entonces ve la proyección ya en `awaiting_email` (no `pending_welcome`)
     y devuelve sin escribir nada, en vez de reventar contra el índice único
-    de `bienvenida_entregada` o la transición inválida."""
+    de `bienvenida_entregada` o la transición inválida.
+
+    G1d-a3, ítem 1: las claves de dedupe de las dos entregas incluyen el
+    ciclo, igual que ya hace `abrir_ciclo_existente` para su propio pedido
+    (G1c2, ítem 1) -- `dedupe_key` es única en toda `message_outbox`
+    (`db/esquema.sql`), no por membresía. Sin el ciclo, una reactivación tras
+    `revoked` (ciclo 2) reusaría la MISMA clave que ya gastó la bienvenida o
+    el pedido del ciclo 1, y `enqueue_outbox` la descartaría en silencio
+    (`on conflict (dedupe_key) do nothing`) -- el evento `bienvenida_
+    entregada` quedaría igual registrado, como si el mensaje hubiera salido,
+    cuando en realidad nunca llegó a encolarse de nuevo."""
     actual = AC.estado(cur, membership_id, bloquear=True)
     if actual is not None and actual["estado"] != "pending_welcome":
         return
+    ciclo = actual["ciclo"] if actual is not None else 1
     nombre_preferido = _nombre_preferido(nombre)
     zona = _zona_horaria(cur, workspace_id)
     saludo = saludo_para(ahora, zona)
@@ -369,7 +395,7 @@ def _completar_bienvenida(cur: psycopg.Cursor, membership_id: str, workspace_id:
         cur, workspace_id=workspace_id, chat_id=chat_id,
         text=texto_bienvenida(saludo, nombre_preferido),
         message_type="informativo", scheduled_for=ahora,
-        dedupe_key=f"{workspace_id}:alta-correo:bienvenida:{membership_id}",
+        dedupe_key=f"{workspace_id}:alta-correo:bienvenida:{membership_id}:{ciclo}",
         is_response=True, allow_split=True)
     # Un microsegundo después, no al mismo instante: son dos llamadas
     # separadas a `enqueue_outbox` (no dos partes de un mismo mensaje
@@ -379,7 +405,7 @@ def _completar_bienvenida(cur: psycopg.Cursor, membership_id: str, workspace_id:
     enqueue_outbox(
         cur, workspace_id=workspace_id, chat_id=chat_id, text=TEXTO_PEDIDO_CORREO,
         message_type="informativo", scheduled_for=ahora + timedelta(microseconds=1),
-        dedupe_key=f"{workspace_id}:alta-correo:pedido:{membership_id}",
+        dedupe_key=f"{workspace_id}:alta-correo:pedido:{membership_id}:{ciclo}",
         is_response=True, allow_split=True)
     AC.bienvenida_entregada(cur, membership_id, ahora=ahora)
     AC.transicionar(cur, membership_id, "awaiting_email", actor_kind="sistema",

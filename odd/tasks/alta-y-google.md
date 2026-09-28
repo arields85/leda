@@ -505,7 +505,7 @@ Un worktree nuevo no trae lo que no se versiona.
     Hallazgo para `main`.
     Revisión RDD `review-6e2a912d445df569` (riesgo alto, consentida; cuatro
     lentes): aprobada; reconocimiento emitido.
-  - [ ] **G1d-a3 — Correcciones tras la revisión de G1d-a2.** (1)
+  - [x] **G1d-a3 — Correcciones tras la revisión de G1d-a2.** (1)
     Regresión: `abrir_ciclo_alta` ya no abre un ciclo nuevo si existe una
     proyección de un ciclo anterior (p. ej. reactivación tras `revoked`);
     debe abrirlo, sin perder la protección contra la carrera de la primera
@@ -521,6 +521,19 @@ Un worktree nuevo no trae lo que no se versiona.
     sí. Nota: la migración `0100` se edita en su lugar porque nunca se
     aplicó en ninguna base; si llegara a aplicarse antes de integrar, los
     cambios siguientes irían en una migración nueva `01xx`.
+    Hecho (ruta: delegada, un escritor). RED observados en los ítems 1, 2 y
+    4. Además de lo pedido corrigió dos fallas silenciosas reales: las
+    claves de deduplicación de la bienvenida y el pedido no incluían el
+    ciclo (un ciclo reabierto nunca los habría enviado), y `cli.py
+    despachar` no confirmaba entre el despacho del espacio y el
+    administrativo, por lo que el incidente de plataforma quedaba etiquetado
+    con un espacio. Ítem 3 con guardas de regresión; ítem 5 sin prueba
+    propia (documentación y espacios de nombres de bloqueos). Toques
+    compartidos: `local.py`, `cli.py`, esquema/migración 0100 (sólo la clave
+    del bloqueo). Sin cambios de permisos ni RLS (verificado sobre el diff).
+    Repetición de la sesión: `247 passed`. Suite completa del escritor:
+    `1182 passed, 6 failed` (las 4 de fecha fija de `main` y 2 de migración
+    por contención, que pasan aisladas).
   - [ ] **G1d — Avisos "🛠️ Administración" por el bot de administración.**
     Camino de salida propio (hoy el bot de administración no envía nada y
     `message_outbox` exige `workspace_id`); botones Reenviar correo /

@@ -140,22 +140,23 @@ class Escucha:
         # dejar la conexión compartida en transacción abortada para la
         # vuelta siguiente. `admin()` ya revierte sola su propia transacción
         # al salir por una excepción (`conn.transaction()`), así que sólo
-        # hace falta atajarla acá y dejar el incidente saneado por el mismo
-        # camino que ya usa el webhook de administración
-        # (`gateway._reportar_incidente_admin`, sin `chat_id`/`tg_user`
-        # porque esto no es una respuesta a nadie en particular).
+        # hace falta atajarla acá.
+        #
+        # G1d-a3, ítem 2: el incidente sale por `AA.reportar_fallo_despacho`,
+        # deduplicado por etapa + tipo de error mientras la falla persista --
+        # nunca `gateway._reportar_incidente_admin` (sin deduplicar), que
+        # dejaría un incidente nuevo en cada vuelta de este mismo loop
+        # mientras la condición siguiera sin resolverse.
         from . import avisos_admin as AA
         from .db import admin
-        from .gateway import ETAPA_ADMIN_DESPACHO, _reportar_incidente_admin
+        from .gateway import ETAPA_ADMIN_DESPACHO
 
         try:
             with admin(self.conn) as cur:
                 AA.despachar_todo(cur, ahora=ahora)
             self.conn.commit()
         except Exception as e:  # noqa: BLE001 -- nunca frena el despacho del espacio
-            _reportar_incidente_admin(
-                self.conn, chat_id=None, tg_user=None, error=e,
-                etapa=ETAPA_ADMIN_DESPACHO)
+            AA.reportar_fallo_despacho(self.conn, e, ETAPA_ADMIN_DESPACHO, ahora=ahora)
 
         return resumen
 

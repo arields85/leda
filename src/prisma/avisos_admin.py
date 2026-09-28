@@ -20,6 +20,7 @@ import psycopg
 
 from . import alta_correo as AC
 from .config import config
+from .db import admin
 from .despachador import MAX_INTENTOS, Boton, Transporte, TransporteTelegram
 
 CALLBACK_PREFIJO = "adm"
@@ -108,11 +109,22 @@ def encolar_respuesta(cur: psycopg.Cursor, chat_id: int, texto: str, *,
 # ---------------------------------------------------------------------------
 
 
+# Una sola definición de "administrador de plataforma con Telegram
+# vinculado" (G1d-a3, ítem 3): antes, `_admins_con_telegram` (despachar) y
+# `_reconciliar_entregas` repetían cada una su propio filtro en SQL -- los
+# dos coincidían hoy, pero nada impedía que se separaran con el tiempo (un
+# administrador sin Telegram contando como disponible para uno de los dos
+# caminos y no para el otro). Las dos funciones de abajo ejecutan
+# textualmente esta misma subconsulta, nunca una copia editada a mano.
+_ADMINS_CON_TELEGRAM_SQL = """select u.id as app_user_id, u.telegram_user_id
+                                from app_user u
+                                join platform_role p on p.app_user_id = u.id
+                               where p.rol = 'administrador'
+                                 and u.telegram_user_id is not null"""
+
+
 def _admins_con_telegram(cur: psycopg.Cursor) -> list[dict]:
-    cur.execute(
-        """select u.id as app_user_id, u.telegram_user_id from app_user u
-             join platform_role p on p.app_user_id = u.id
-            where p.rol = 'administrador' and u.telegram_user_id is not null""")
+    cur.execute(_ADMINS_CON_TELEGRAM_SQL)
     return cur.fetchall()
 
 
@@ -129,15 +141,17 @@ def _reconciliar_entregas(cur: psycopg.Cursor, ahora: datetime) -> int:
     otro administrador o no, sin importar cuánto tiempo lleve abierto.
     Correr esto muchas veces (cada vuelta del loop) nunca duplica nada: el
     índice único (`aviso_administrativo_entrega_unica`) es la garantía
-    bajo carrera, no el orden en que Python lo ejecute."""
+    bajo carrera, no el orden en que Python lo ejecute.
+
+    `cross join (_ADMINS_CON_TELEGRAM_SQL)` (G1d-a3, ítem 3): la misma
+    subconsulta que usa `_admins_con_telegram`, nunca un filtro propio --
+    un administrador sin Telegram no cuenta como disponible acá tampoco."""
     cur.execute(
-        """insert into aviso_administrativo_entrega
+        f"""insert into aviso_administrativo_entrega
              (workspace_id, aviso_id, app_user_id, estado, creado_en)
-           select a.workspace_id, a.id, p.app_user_id, 'listo', %s
+           select a.workspace_id, a.id, admins.app_user_id, 'listo', %s
              from aviso_administrativo a
-             join platform_role p on p.rol = 'administrador'
-             join app_user u on u.id = p.app_user_id
-                              and u.telegram_user_id is not null
+            cross join ({_ADMINS_CON_TELEGRAM_SQL}) as admins
             where a.resuelto_en is null
            on conflict (aviso_id, app_user_id) do nothing""",
         (ahora,))
@@ -145,29 +159,43 @@ def _reconciliar_entregas(cur: psycopg.Cursor, ahora: datetime) -> int:
 
 
 def _incidente_plataforma(cur: psycopg.Cursor, resumen: str, *,
-                          ahora: datetime | None = None) -> None:
+                          ahora: datetime | None = None,
+                          referencia_cruda: str | None = None) -> None:
     """Incidente sin espacio propio -- concierne a la plataforma entera, no
     a uno en particular (mismo patrón que otras filas globales de
-    `incident`, `workspace_id` en `null`)."""
+    `incident`, `workspace_id` en `null`).
+
+    `referencia_cruda` es el detalle diagnóstico opcional (p. ej. el texto
+    de una excepción, truncado) -- nunca entra en `resumen_sanitizado`, que
+    es la clave exacta de deduplicación de `_incidente_plataforma_
+    persistente` (G1d-a3, ítem 2/5): dos ocurrencias de la MISMA condición
+    con un detalle distinto (un timeout con otro mensaje de red, por
+    ejemplo) tienen que seguir deduplicando entre sí."""
     cur.execute(
-        """insert into incident (workspace_id, severidad, resumen_sanitizado, at)
-           values (null, 'alta', %s, %s)""",
-        (resumen, _ahora(ahora)))
+        """insert into incident
+             (workspace_id, severidad, resumen_sanitizado, referencia_cruda, at)
+           values (null, 'alta', %s, %s, %s)""",
+        (resumen, referencia_cruda, _ahora(ahora)))
 
 
 VENTANA_DEDUPE_INCIDENTE_PLATAFORMA = timedelta(hours=24)
 
 
 def _incidente_plataforma_persistente(cur: psycopg.Cursor, resumen: str,
-                                      ahora: datetime) -> None:
+                                      ahora: datetime, *,
+                                      referencia_cruda: str | None = None) -> None:
     """Como `_incidente_plataforma`, pero deduplicado por causa exacta
-    mientras el anterior siga vigente: "falta el token" o "no hay ningún
-    administrador vinculado" son condiciones de configuración que
-    persisten mientras nadie las resuelve -- sin este guardia, cada vuelta
-    del loop que despacha (`local.Escucha.tareas_de_fondo`, cada `cli.py
-    despachar`) dejaría un incidente nuevo, en vez de uno solo hasta que se
-    corrija. Distinto de los incidentes de `_fallo` por fila agotada: esos
-    sí son uno por fila, igual que ya hace `despachador._fallo`.
+    (`resumen`) mientras el anterior siga vigente. Tres causas la usan hoy:
+    "falta el token" y "no hay ningún administrador vinculado" (condiciones
+    de configuración que persisten mientras nadie las resuelve, evaluadas en
+    cada `despachar_avisos`/`despachar_respuestas`) y, desde G1d-a3, ítem 2,
+    cualquier excepción no manejada dentro de `despachar_todo` en sí (vía
+    `reportar_fallo_despacho`, llamada desde la contención de
+    `local.Escucha.tareas_de_fondo` y `cli.py despachar`) -- sin este
+    guardia, cada vuelta del loop que despacha dejaría un incidente nuevo,
+    en vez de uno solo hasta que se corrija. Distinto de los incidentes de
+    `_fallo` por fila agotada: esos sí son uno por fila, igual que ya hace
+    `despachador._fallo`.
 
     `incident` no tiene ningún estado de "resuelto" (sólo `at` y
     `notificado_en`, `db/esquema.sql`) -- G1d-a2, ítem 4: en vez de eso, se
@@ -183,8 +211,17 @@ def _incidente_plataforma_persistente(cur: psycopg.Cursor, resumen: str,
     serializa dos vueltas del loop que evalúan la MISMA causa casi al
     mismo tiempo: sin él, las dos pueden ver "no hay ninguno reciente"
     antes de que ninguna inserte, y duplicar el incidente -- el `select`
-    de abajo no es, por sí solo, una garantía bajo carrera."""
-    cur.execute("select pg_advisory_xact_lock(hashtext(%s))", (resumen,))
+    de abajo no es, por sí solo, una garantía bajo carrera. La clave del
+    candado lleva un prefijo namespaced (G1d-a3, ítem 5) -- antes usaba
+    `hashtext(resumen)` a secas, en el mismo espacio de claves de 64 bits
+    que `hashtextextended(texto, 0)` (son la misma función para semilla 0),
+    así que un `resumen` que por coincidencia fuera igual a la clave de
+    otro candado de este mismo espacio (`bloquear_alta_correo_estado`,
+    `cli._correo_verificacion`) los haría chocar entre sí. El prefijo
+    (`"incidente-plataforma:"`) evita esa colisión sin cambiar la
+    deduplicación misma, que sigue siendo por `resumen` exacto."""
+    cur.execute("select pg_advisory_xact_lock(hashtextextended(%s, 0))",
+               (f"incidente-plataforma:{resumen}",))
     cur.execute(
         """select 1 from incident
             where workspace_id is null and resumen_sanitizado = %s
@@ -192,7 +229,38 @@ def _incidente_plataforma_persistente(cur: psycopg.Cursor, resumen: str,
             limit 1""",
         (resumen, ahora - VENTANA_DEDUPE_INCIDENTE_PLATAFORMA))
     if cur.fetchone() is None:
-        _incidente_plataforma(cur, resumen, ahora=ahora)
+        _incidente_plataforma(cur, resumen, ahora=ahora,
+                              referencia_cruda=referencia_cruda)
+
+
+def reportar_fallo_despacho(conn: psycopg.Connection, error: Exception, etapa: str,
+                            *, ahora: datetime | None = None) -> None:
+    """Incidente de la contención alrededor de `despachar_todo` (G1d-a3,
+    ítem 2), llamado desde `local.Escucha.tareas_de_fondo` y `cli.py
+    despachar` cuando esa llamada revienta -- ninguno de los dos puede
+    reusar la conexión de `espacio()`/`admin()` que ya se cerró sola al
+    salir por la excepción, así que abre la suya propia acá.
+
+    Deduplicado con la misma ventana que un incidente de plataforma
+    persistente (`_incidente_plataforma_persistente`), por etapa + tipo de
+    error -- nunca el mensaje crudo de la excepción, que puede variar entre
+    pasadas de la misma condición (el mismo timeout con un detalle de red
+    distinto cada vez, por ejemplo) y rompería la deduplicación por
+    igualdad exacta de `resumen_sanitizado`. Antes, la contención llamaba
+    directamente a `gateway._reportar_incidente_admin`, que inserta sin
+    deduplicar: mientras el error persistiera, cada vuelta del loop de
+    despacho dejaba un incidente nuevo."""
+    ahora = _ahora(ahora)
+    resumen = f"Excepción no manejada en '{etapa}' ({type(error).__name__})."
+    try:
+        with admin(conn) as cur:
+            _incidente_plataforma_persistente(
+                cur, resumen, ahora, referencia_cruda=str(error)[:2000])
+    except Exception:  # noqa: BLE001 -- ni el incidente se pudo registrar
+        try:
+            conn.rollback()
+        except Exception:  # noqa: BLE001
+            pass
 
 
 def _texto_aviso(workspace_nombre: str, texto_saneado: str) -> str:

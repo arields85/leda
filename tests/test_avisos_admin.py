@@ -75,6 +75,20 @@ def _crear_aviso(conn, ws: str, tipo: str = "correo_existente_pendientes",
     return aviso_id
 
 
+def _hacer_administrador_sin_telegram(conn, nombre: str = "Sin Telegram") -> str:
+    """Administrador de plataforma sin ninguna cuenta de Telegram vinculada
+    -- `app_user.telegram_user_id` en `null` (G1d-a3, ítem 3)."""
+    with admin(conn) as cur:
+        cur.execute(
+            "insert into app_user (nombre) values (%s) returning id", (nombre,))
+        app_user_id = str(cur.fetchone()["id"])
+        cur.execute(
+            "insert into platform_role (app_user_id, rol) values (%s, 'administrador')",
+            (app_user_id,))
+    conn.commit()
+    return app_user_id
+
+
 # ===========================================================================
 # A. `partes_de_callback` / `callback_data` -- funciones puras
 # ===========================================================================
@@ -464,6 +478,71 @@ def test_despachar_respuestas_falla_de_transporte_reintenta_con_espera_creciente
 
 
 # ===========================================================================
+# B2. Una sola definición de "administrador con Telegram" (G1d-a3, ítem 3)
+# ===========================================================================
+
+
+def test_administrador_sin_telegram_no_recibe_ni_cuenta_disponible(
+        conn, intake_world, monkeypatch):
+    """`_admins_con_telegram` (despachar) y `_reconciliar_entregas` tienen
+    que coincidir sobre quién cuenta como "administrador con Telegram" --
+    antes cada uno tenía su propio filtro repetido en SQL. Un administrador
+    sin Telegram vinculado nunca aparece en `_admins_con_telegram` ni recibe
+    una fila de entrega, y `despachar_avisos` lo trata igual que "no hay
+    ningún administrador disponible" (incidente de plataforma, nunca una
+    entrega fantasma)."""
+    monkeypatch.setenv("PRISMA_BOT_TOKEN_ADMIN", "prueba:token-admin")
+    ws = intake_world["north-lab"]["id"]
+    _hacer_administrador_sin_telegram(conn)
+    _crear_aviso(conn, ws)
+
+    with admin(conn) as cur:
+        admins = AA._admins_con_telegram(cur)
+    assert admins == []
+
+    doble = TransporteDePrueba()
+    with admin(conn) as cur:
+        resumen = AA.despachar_avisos(cur, doble, ahora=AHORA)
+    conn.commit()
+
+    assert resumen == {"reconciliados": 0, "enviados": 0, "fallidos": 0}
+    assert doble.enviados == []
+    with admin(conn) as cur:
+        cur.execute("select count(*) n from aviso_administrativo_entrega")
+        assert cur.fetchone()["n"] == 0
+        cur.execute(
+            "select resumen_sanitizado from incident where workspace_id is null")
+        [incidente] = cur.fetchall()
+        assert "administrador" in incidente["resumen_sanitizado"]
+
+
+def test_administrador_sin_telegram_conviviendo_con_uno_con_telegram(
+        conn, intake_world, monkeypatch):
+    """Con un administrador sin Telegram y otro con Telegram vinculado, sólo
+    el segundo cuenta y recibe la entrega -- el primero nunca aparece en
+    `_admins_con_telegram` ni en `aviso_administrativo_entrega`."""
+    monkeypatch.setenv("PRISMA_BOT_TOKEN_ADMIN", "prueba:token-admin")
+    ws = intake_world["north-lab"]["id"]
+    sin_telegram = _hacer_administrador_sin_telegram(conn)
+    con_telegram, tg = _hacer_administrador(conn, intake_world, "north-lab", "Morgan Hale")
+    _crear_aviso(conn, ws)
+
+    with admin(conn) as cur:
+        admins = AA._admins_con_telegram(cur)
+    assert [str(a["app_user_id"]) for a in admins] == [con_telegram]
+
+    doble = TransporteDePrueba()
+    with admin(conn) as cur:
+        resumen = AA.despachar_avisos(cur, doble, ahora=AHORA)
+    conn.commit()
+
+    assert resumen["reconciliados"] == 1
+    with admin(conn) as cur:
+        cur.execute("select app_user_id from aviso_administrativo_entrega")
+        assert [str(f["app_user_id"]) for f in cur.fetchall()] == [con_telegram]
+
+
+# ===========================================================================
 # C. Marcar leído / texto libre -- encolan la respuesta puntual
 # ===========================================================================
 
@@ -715,11 +794,135 @@ def test_tareas_de_fondo_contiene_una_falla_del_despacho_administrativo(
         cur.execute("select 1")
         assert cur.fetchone() is not None
 
+    # G1d-a3, ítem 2: el incidente ahora sale por el mismo camino
+    # deduplicado que un incidente de plataforma persistente (`AA.
+    # reportar_fallo_despacho` / `_incidente_plataforma_persistente`) -- sin
+    # columna `etapa` propia (esa tabla de incidentes de plataforma no la
+    # usa), pero la etapa queda identificable dentro del resumen saneado; el
+    # mensaje crudo de la excepción ("boom") nunca entra ahí -- sólo en
+    # `referencia_cruda`, la clave exacta de deduplicación es `resumen_
+    # sanitizado`, no el detalle crudo.
     with admin(conn) as cur:
         cur.execute(
-            "select resumen_sanitizado, referencia_cruda, etapa from incident "
+            "select resumen_sanitizado, referencia_cruda from incident "
             "where workspace_id is null")
         [incidente] = cur.fetchall()
-        assert incidente["etapa"] == gateway.ETAPA_ADMIN_DESPACHO
+        assert gateway.ETAPA_ADMIN_DESPACHO in incidente["resumen_sanitizado"]
         assert "boom" not in incidente["resumen_sanitizado"]
         assert "boom" in (incidente["referencia_cruda"] or "")
+
+
+def test_tareas_de_fondo_con_falla_persistente_deja_un_solo_incidente_por_ventana(
+        conn, intake_world, monkeypatch):
+    """G1d-a3, ítem 2: mientras el despacho administrativo siga fallando,
+    cada vuelta del loop (`local.Escucha.tareas_de_fondo`) no puede dejar un
+    incidente nuevo -- antes, la contención de G1d-a2 llamaba directamente a
+    `gateway._reportar_incidente_admin`, que inserta sin deduplicar, así que
+    una falla que persiste por varias vueltas del loop dejaba un incidente
+    por vuelta. Deduplicado con la misma ventana que un incidente de
+    plataforma persistente, por etapa + tipo de error (`AA.
+    VENTANA_DEDUPE_INCIDENTE_PLATAFORMA`)."""
+    from prisma.local import Escucha
+
+    ws = intake_world["north-lab"]["id"]
+
+    def _revienta(cur, ahora=None, lote=50):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(AA, "despachar_todo", _revienta)
+
+    escucha = Escucha(conn, "north-lab", ws, "prueba:token-espacio")
+    escucha.transporte = TransporteDePrueba()
+
+    for _ in range(3):
+        escucha.tareas_de_fondo(ahora=AHORA)
+
+    with admin(conn) as cur:
+        cur.execute("select count(*) n from incident where workspace_id is null")
+        assert cur.fetchone()["n"] == 1
+
+    # Pasada la ventana, si la condición sigue vigente, se registra uno
+    # nuevo -- nunca fallar en silencio dejando la condición sin ningún
+    # rastro nuevo.
+    despues = AHORA + AA.VENTANA_DEDUPE_INCIDENTE_PLATAFORMA + timedelta(minutes=1)
+    escucha.tareas_de_fondo(ahora=despues)
+
+    with admin(conn) as cur:
+        cur.execute("select count(*) n from incident where workspace_id is null")
+        assert cur.fetchone()["n"] == 2
+
+
+def test_despachar_cli_contiene_una_falla_del_despacho_administrativo(
+        conn, intake_world, monkeypatch, uri):
+    """G1d-a3, ítem 4: si el despacho de avisos administrativos revienta
+    dentro de `python -m prisma despachar <espacio>`, lo del espacio que ya
+    se despachó en la misma corrida sobrevive (se confirma), la conexión
+    sigue usable, queda un solo incidente saneado -- y el comando nunca
+    revienta ni deja de informar el código de salida de siempre."""
+    from prisma import cli, despachador
+    from prisma.salida import enqueue_outbox
+
+    monkeypatch.setattr(cli, "conectar", lambda: conn)
+    monkeypatch.setenv("PRISMA_BOT_TOKEN_NORTH-LAB", "prueba:token-espacio")
+    ws = intake_world["north-lab"]["id"]
+    chat_id = intake_world["north-lab"]["people"]["Morgan Hale"]["telegram"]
+    # `cli.py despachar` no recibe `ahora`: usa el reloj real de la base
+    # (`despachador.despachar` -> `datetime.now(timezone.utc)`), así que el
+    # mensaje tiene que estar programado en el pasado real, nunca en la
+    # fecha ficticia `AHORA` (2028) que usa el resto de este archivo.
+    ya_paso = datetime.now(timezone.utc) - timedelta(minutes=1)
+    with espacio(conn, ws) as cur:
+        enqueue_outbox(
+            cur, workspace_id=ws, chat_id=chat_id, text="hola",
+            message_type="urgente", scheduled_for=ya_paso,
+            dedupe_key="prueba:contencion-cli-g1d-a3", is_response=True)
+    conn.commit()
+
+    doble = TransporteDePrueba()
+    monkeypatch.setattr(despachador, "TransporteTelegram", lambda token: doble)
+
+    def _revienta(cur, ahora=None, lote=50):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(AA, "despachar_todo", _revienta)
+
+    codigo = cli.main(["despachar", "north-lab"])
+
+    assert codigo == 0
+    # El despacho del espacio sí ocurrió, en la misma corrida.
+    assert len(doble.enviados) == 1
+
+    # La conexión sigue usable -- ninguna transacción abortada colgando.
+    with admin(conn) as cur:
+        cur.execute("select 1")
+        assert cur.fetchone() is not None
+
+    # Durable de verdad, no sólo visible dentro de la misma transacción
+    # ambiente -- desde OTRA conexión, el mensaje del espacio ya quedó
+    # marcado entregado y el incidente administrativo está ahí, sin espacio
+    # propio (G1d-a3, ítem 2/4: el commit intermedio de `cli.py despachar`
+    # antes del bloque de administración evita que el disparador
+    # `derivar_espacio_registro` le pegue el `workspace_id` de esta corrida
+    # al incidente de plataforma).
+    other = conectar(uri)
+    try:
+        with admin(other) as cur:
+            cur.execute(
+                "select estado from message_outbox where dedupe_key = %s",
+                ("prueba:contencion-cli-g1d-a3",))
+            assert cur.fetchone()["estado"] == "enviado"
+            cur.execute(
+                "select resumen_sanitizado from incident where workspace_id is null")
+            [incidente] = cur.fetchall()
+            assert gateway.ETAPA_ADMIN_DESPACHO in incidente["resumen_sanitizado"]
+            assert "boom" not in incidente["resumen_sanitizado"]
+    finally:
+        other.close()
+
+    # Una segunda corrida, con la misma falla vigente, no deja un segundo
+    # incidente (mismo mecanismo de deduplicación de ítem 2).
+    codigo = cli.main(["despachar", "north-lab"])
+    assert codigo == 0
+    with admin(conn) as cur:
+        cur.execute("select count(*) n from incident where workspace_id is null")
+        assert cur.fetchone()["n"] == 1

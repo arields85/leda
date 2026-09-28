@@ -563,16 +563,34 @@ def main(argv: list[str] | None = None) -> int:
         # `local.Escucha.tareas_de_fondo`: un error acá no puede frenar el
         # despacho del espacio (ya corrió arriba) ni dejar la conexión en
         # transacción abortada.
+        #
+        # G1d-a3, ítem 2/4: confirma el despacho del espacio ANTES de tocar
+        # el bloque de administración (defecto real encontrado al escribir
+        # la prueba de contención de este comando). Sin este commit
+        # intermedio, `prisma.workspace_id` -- fijado con alcance LOCAL por
+        # `espacio()` -- sigue vigente dentro de la misma transacción
+        # ambiente (`with conn.transaction():` anida como savepoint, no como
+        # transacción real, porque `_id_de()` ya dejó una abierta más
+        # arriba; un `release savepoint` nunca deshace un `set local`, sólo
+        # un `rollback to`/commit real lo hace) hasta el commit final de
+        # `main()`. El disparador `derivar_espacio_registro` (el mismo que
+        # ya usan `audit_log`/`aviso_administrativo`) etiquetaría CUALQUIER
+        # incidente que se registre después con el espacio de esta corrida,
+        # en vez de dejarlo sin espacio (`workspace_id is null`) -- rompiendo
+        # la deduplicación del ítem 2, que filtra justo por eso. Mismo
+        # patrón que ya usa `local.Escucha.tareas_de_fondo` (su propio
+        # `self.conn.commit()` entre el despacho del espacio y el bloque de
+        # administración).
+        conn.commit()
+
         from . import avisos_admin as AA
-        from .gateway import ETAPA_ADMIN_DESPACHO, _reportar_incidente_admin
+        from .gateway import ETAPA_ADMIN_DESPACHO
 
         try:
             with admin(conn) as cur:
                 print(AA.despachar_todo(cur))
         except Exception as e:  # noqa: BLE001 -- nunca frena el despacho del espacio
-            _reportar_incidente_admin(
-                conn, chat_id=None, tg_user=None, error=e,
-                etapa=ETAPA_ADMIN_DESPACHO)
+            AA.reportar_fallo_despacho(conn, e, ETAPA_ADMIN_DESPACHO)
             print("No se pudieron despachar los avisos administrativos; "
                   "quedó registrado.")
 

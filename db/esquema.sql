@@ -2588,8 +2588,14 @@ begin
   -- (`_xact_`): se libera solo al terminar la transacción de quien llama,
   -- nunca hay que soltarlo a mano, y es reentrante dentro de la misma
   -- transacción (mismo patrón que ya usa `cli._correo_verificacion` para su
-  -- propio bloqueo consultivo).
-  perform pg_advisory_xact_lock(hashtextextended(p_membership_id::text, 0));
+  -- propio bloqueo consultivo). La clave lleva un espacio de nombres propio
+  -- (G1d-a3, ítem 5, prefijo `'alta_correo_estado:'`) para no compartir
+  -- claves con otro candado que hashee el mismo texto crudo (`membership_id`
+  -- a secas) para un propósito distinto -- mismo motivo que ya distingue
+  -- `task:<id>` de `task-intake:<espacio>:<membresía>:<chat>` en
+  -- `herramientas.py`/`ingreso_tareas.py`.
+  perform pg_advisory_xact_lock(
+    hashtextextended('alta_correo_estado:' || p_membership_id::text, 0));
 end $$;
 
 -- --- Lectura del envío vigente ----------------------------------------------
