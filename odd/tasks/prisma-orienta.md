@@ -3505,3 +3505,13 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   RED: `18 failed, 16 passed`. GREEN (reejecutado por el orquestador):
   `tests/test_siembra.py tests/test_esqueleto.py tests/test_onboarding.py` ->
   `71 passed`. Suite completa (escritor, corrida aislada): `1008 passed, 108 deselected`.
+  Commit `4885703`. RDD sobre `e71cfa0..4885703`: **alto** (`cli.py`), `review_due`;
+  consentimiento del usuario: revisar. review-05906dd38845fe09, cuatro lentes,
+  aprobada y reconocida; frontera en `4885703`. Seguimientos no bloqueantes
+  **PENDIENTE** (T7c): el `rollback` dentro de los `except` puede fallar si la
+  conexión se cortó y dejar una traza cruda; valores de YAML que no son texto
+  (listas o mapas en `titulo`/`estado_inicial`/dependencias, `tareas` escalar) escapan
+  como `TypeError`; criterio único sobre si los títulos pueden salir en los mensajes
+  de validación; falta una prueba del día de siembra en la zona del espacio; las
+  pruebas del comando buscan "Traceback" en `stdout` cuando va a `stderr`; tipar las
+  tareas validadas. Ninguno afecta una siembra con el archivo versionado.
