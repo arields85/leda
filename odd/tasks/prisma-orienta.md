@@ -3430,3 +3430,16 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   inventados. Sólo `tests/banco/`. Pruebas unitarias del banco: `tests/banco/test_corrida.py`
   -> `57 passed` (escritor); RED/GREEN sobre las cuatro pruebas positivas nuevas.
   No se corrió el banco real.
+  Revisión del tramo `48b6c8a..86a55d9` (T6j + comprobadores): RDD **alto**
+  (`process_boundary`: `tests/test_task_intake.py` lanza procesos), `review_due`;
+  consentimiento del usuario: revisar. review-2c5b0ffee96f45c2, cuatro lentes
+  (riesgo, resiliencia, legibilidad, confiabilidad), aprobada y reconocida; frontera
+  en `86a55d9`. Sin bloqueantes. Seguimientos **PENDIENTE** (T6k): (1) el comprobador
+  de aclaración no empareja candidatas y etiquetas uno a uno, así que una etiqueta
+  acortada que comparte palabras iniciales puede satisfacer dos candidatas y dar un
+  falso "aprobado"; (2) la prueba nueva de dos conexiones entra y sale del contexto
+  de administración a mano, sin `try/finally`, y una falla a mitad puede dejar una
+  transacción abierta que traba el teardown; (3) la prueba que dice cubrir el corte
+  en palabra no llega a esa rama; (4) el `- 1` del corte duro sin explicar, la
+  importación del privado `_ESTADOS_LEGIBLES` y el registro que acredita las pruebas
+  del banco a `test_corrida.py` cuando están en `test_comprobadores.py`.
