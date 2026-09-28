@@ -574,7 +574,7 @@ Un worktree nuevo no trae lo que no se versiona.
   lo leyó).
     Revisión RDD `review-c73c0f22b0e0ce26` (riesgo alto, consentida; cuatro
     lentes): aprobada; reconocimiento emitido.
-  - [ ] **G1d-b2 — Correcciones tras la revisión de G1d-b.** (1) El cuerpo
+  - [x] **G1d-b2 — Correcciones tras la revisión de G1d-b.** (1) El cuerpo
     del correo de verificación quedó con cortes de línea y sangrías copiados
     del documento: debe ser el texto A en párrafos corridos (sólo los saltos
     de párrafo aprobados). (2) Un enlace consumido de un ciclo anterior no
@@ -591,6 +591,23 @@ Un worktree nuevo no trae lo que no se versiona.
     rama para "reenviar por enlace vencido o roto"; respuesta de la vista
     previa fiel al motivo; la prueba de serialización comprueba que el
     segundo hilo estaba efectivamente bloqueado.
+    Hecho (ruta: delegada, un escritor; sin cambios de esquema ni de
+    permisos). Correo A en párrafos corridos (fijado por prueba); enlace
+    consumido responde según el estado actual; "Habilitar" sólo con el
+    ciclo en `pending_email_verification` y el cupo realmente agotado (si
+    ya está `active`, el aviso se resuelve sin efecto; en otro estado no se
+    aplica nada y el administrador recibe "No se habilitó nada."); sin
+    "??:??" (incidente + aviso neutral); retirados `TEXTO_ESTADO_CAMBIO` y
+    `TEXTO_ENLACE_INVALIDO` (ningún camino alcanzable dice "escribime y lo
+    vemos" ni "pedime que te lo reenvíe"); respuestas del bot de
+    administración deduplicadas por toque (`callback_query.id`); una sola
+    rama para reenviar por enlace vencido o roto; prueba de serialización
+    que comprueba el bloqueo. Casos sin texto aprobado resueltos con el
+    aviso neutral existente (ciclo `revoked` o inexistente que toca un
+    enlace). TDD parcial declarado por el escritor; RED reales en los ítems
+    2 y 3. Toque compartido: `gateway._toque_admin` (pasa el id del toque).
+    Repetición de la sesión: `287 passed`. Suite completa del escritor:
+    `4 failed, 1224 passed` (las 4 de fecha fija de `main`).
   - [ ] **G1d — Avisos "🛠️ Administración" por el bot de administración.**
     Camino de salida propio (hoy el bot de administración no envía nada y
     `message_outbox` exige `workspace_id`); botones Reenviar correo /

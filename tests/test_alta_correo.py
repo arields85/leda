@@ -1088,6 +1088,32 @@ def test_proximo_reenvio_ignora_envios_fuera_de_la_ventana(intake_world, conn):
     conn.commit()
 
 
+def test_proximo_reenvio_usa_el_mismo_borde_que_el_limite_por_hora(intake_world, conn):
+    """G1d-b2, ítem 4: `proximo_reenvio_correo` tiene que usar exactamente
+    el mismo borde que `emitir_verificacion_correo` cuenta para el límite
+    de 3/hora (`emitido_en > p_ahora - interval '1 hora'`, sin filtrar por
+    ciclo) -- un envío justo en el borde (ni más viejo ni más nuevo para
+    ninguna de las dos) tiene que quedar excluido de las dos consistentemente,
+    nunca contado por una y no por la otra."""
+    norte = intake_world["north-lab"]
+    m = _membership(intake_world, "north-lab")
+
+    with espacio(conn, norte["id"]) as cur:
+        _hasta_awaiting_email(cur, m, ahora=AHORA)
+        AC.transicionar(cur, m, "pending_email_verification", ahora=AHORA)
+        borde = AHORA - timedelta(hours=1)
+        AC.emitir_verificacion(cur, m, "persona@example.com", "token-borde", ahora=borde)
+
+        # Exactamente en el borde (`emitido_en == p_ahora - 1h`): la
+        # condición estricta (`>`) lo deja FUERA de la ventana -- ninguna
+        # de las dos funciones lo cuenta ni lo usa como el más viejo.
+        assert AC.proximo_reenvio(cur, m, ahora=AHORA) is None
+        siguiente = AC.emitir_verificacion(
+            cur, m, "persona@example.com", "token-siguiente", ahora=AHORA)
+        assert siguiente.ok is True    # sólo 1 envío contado dentro de la hora
+    conn.commit()
+
+
 # ---------------------------------------------------------------------------
 # G1d-b/F: habilitar_intento reabre el cupo de 5 envíos del ciclo vigente
 # ---------------------------------------------------------------------------

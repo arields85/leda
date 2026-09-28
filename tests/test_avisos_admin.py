@@ -47,10 +47,14 @@ def _post_admin_texto(cliente_admin, texto, user_id, chat_id=None, message_id=1)
         headers={"X-Telegram-Bot-Api-Secret-Token": "s3cr3t"})
 
 
-def _post_admin_toque(cliente_admin, callback, user_id, chat_id=None):
+def _post_admin_toque(cliente_admin, callback, user_id, chat_id=None, toque_id="cb1"):
+    """`toque_id` (G1d-b2, ítem 6) simula el `callback_query.id` real de
+    Telegram: el mismo valor en dos llamadas simula una redelivery exacta
+    del mismo webhook (una sola respuesta esperada); valores distintos
+    simulan dos toques genuinos distintos (una respuesta cada uno)."""
     return cliente_admin.post(
         "/telegram/admin",
-        json={"callback_query": {"id": "cb1", "data": callback,
+        json={"callback_query": {"id": toque_id, "data": callback,
                                  "from": {"id": user_id},
                                  "message": {"chat": {"id": chat_id or user_id}}}},
         headers={"X-Telegram-Bot-Api-Secret-Token": "s3cr3t"})
@@ -79,14 +83,28 @@ def _crear_aviso(conn, ws: str, tipo: str = "correo_existente_pendientes",
 def _dejar_pending_verification_con_aviso_agotado(
         conn, ws: str, m: str, nombre: str,
         correo: str = "persona@empresa.com") -> str:
-    """Deja una membresía en `pending_email_verification` con un envío
-    vigente, y el aviso `correo_limite_agotado` ya creado -- el escenario de
-    partida de "Habilitar un nuevo intento" (G1d-b, acción F)."""
+    """Deja una membresía en `pending_email_verification` con el cupo de 5
+    envíos del ciclo REALMENTE agotado, y el aviso `correo_limite_agotado`
+    ya creado -- el escenario de partida de "Habilitar un nuevo intento"
+    (G1d-b, acción F).
+
+    G1d-b2, ítem 3: antes esto emitía un solo envío -- alcanzaba para
+    probar la entrega del aviso, pero no para "Habilitar" una vez que su
+    confirmación empezó a comprobar el cupo del ciclo (`_estado_
+    habilitable`): con un solo envío, el cupo NO está agotado de verdad,
+    así que la comprobación (correcta) lo hubiera rechazado. Los 5 envíos
+    van espaciados más de una hora entre sí para no chocar con el límite
+    de 3/hora (mismo patrón que `test_habilitar_intento_reabre_el_cupo_
+    de_cinco_del_ciclo`, `test_alta_correo.py`)."""
     with espacio(conn, ws) as cur:
         AC.iniciar_ciclo(cur, m, "alta", ahora=AHORA)
         AC.transicionar(cur, m, "awaiting_email", ahora=AHORA)
         AC.transicionar(cur, m, "pending_email_verification", ahora=AHORA)
-        AC.emitir_verificacion(cur, m, correo, "token-agotado", ahora=AHORA)
+        for i in range(5):
+            instante = AHORA + timedelta(hours=2 * i)
+            resultado = AC.emitir_verificacion(
+                cur, m, correo, f"token-agotado-{i}", ahora=instante)
+            assert resultado.ok, resultado.motivo
         aviso_id = AC.crear_aviso(
             cur, AC.TIPO_CORREO_LIMITE_AGOTADO,
             f"{nombre} agotó los 5 envíos del correo de verificación.",
@@ -299,10 +317,16 @@ def test_confirmar_habilitar_serializa_dos_administradores_a_la_vez(
     hilo = threading.Thread(target=segunda_confirmacion)
     try:
         with admin(primera) as cur:
-            assert AA.confirmar_habilitar(cur, aviso_id, admin_id, ahora=AHORA) is True
+            assert (AA.confirmar_habilitar(cur, aviso_id, admin_id, ahora=AHORA)
+                    == AA.RESULTADO_HABILITAR_APLICADO)
             # La primera sigue abierta: la segunda arranca mientras tanto.
             hilo.start()
             hilo.join(timeout=1)
+            # G1d-b2, ítem 7: comprueba que el candado REALMENTE bloqueó a
+            # la segunda (no que, por casualidad de scheduling, corrió
+            # después) -- mientras la transacción de la primera sigue
+            # abierta, el hilo de la segunda tiene que seguir vivo, esperando.
+            assert hilo.is_alive(), "la segunda confirmación no se bloqueó: falta el candado"
         primera.commit()
     finally:
         primera.close()
@@ -310,13 +334,185 @@ def test_confirmar_habilitar_serializa_dos_administradores_a_la_vez(
     assert not hilo.is_alive(), "la segunda confirmación quedó colgada"
 
     assert errores == []
-    assert resultado_segunda == [False]
+    assert resultado_segunda == [AA.RESULTADO_HABILITAR_YA_RESUELTO]
 
     with admin(conn) as cur:
         cur.execute(
             "select count(*) n from alta_correo_evento "
             "where membership_id = %s and tipo = 'intento_habilitado'", (m,))
         assert cur.fetchone()["n"] == 1
+
+
+# ===========================================================================
+# G1d-b2, ítem 3: "Habilitar" comprueba el ciclo vigente, no sólo el aviso
+# ===========================================================================
+
+
+def test_confirmar_habilitar_con_ciclo_ya_active_resuelve_sin_aplicar_nada(
+        cliente_admin, conn, intake_world):
+    """Si la persona ya se verificó sola por otro camino mientras el aviso
+    de "envíos agotados" seguía sin resolver, "Habilitar un nuevo intento"
+    no tiene nada que habilitar -- el aviso se resuelve solo (ya no
+    describe nada vigente), pero nunca se abre un intento nuevo ni se le
+    manda nada a la persona. La respuesta al administrador es "No se
+    habilitó nada." -- cierta: ningún intento nuevo se abrió."""
+    ws = intake_world["north-lab"]["id"]
+    m = intake_world["north-lab"]["people"]["Taylor Quinn"]["membership_id"]
+    _, tg_admin = _hacer_administrador(conn, intake_world, "north-lab", "Morgan Hale")
+    aviso_id = _dejar_pending_verification_con_aviso_agotado(conn, ws, m, "Taylor Quinn")
+    with espacio(conn, ws) as cur:
+        AC.transicionar(cur, m, "active", ahora=AHORA)
+    conn.commit()
+
+    r = _post_admin_toque(
+        cliente_admin, AA.callback_data(AA.ACCION_CONFIRMAR_HABILITAR, aviso_id), tg_admin)
+    assert r.status_code == 200
+
+    with admin(conn) as cur:
+        [aviso] = AC.avisos(cur)
+        assert aviso["resuelto_en"] is not None          # se resolvió solo
+        cur.execute(
+            "select count(*) n from alta_correo_evento "
+            "where membership_id = %s and tipo = 'intento_habilitado'", (m,))
+        assert cur.fetchone()["n"] == 0                  # nunca se abrió un intento nuevo
+        cur.execute("select texto from aviso_administrativo_respuesta where chat_id = %s",
+                   (tg_admin,))
+        assert [f["texto"] for f in cur.fetchall()] == [AA.TEXTO_HABILITAR_CANCELADO]
+    with espacio(conn, ws) as cur:
+        cur.execute("select count(*) n from message_outbox")
+        assert cur.fetchone()["n"] == 0                  # nada nuevo a la persona
+
+
+def test_confirmar_habilitar_con_ciclo_ya_no_pendiente_no_aplica_ni_resuelve(
+        cliente_admin, conn, intake_world):
+    """Si el ciclo pasó a otra cosa que no es `active` ni `pending_email_
+    verification` con el cupo agotado (acá, `awaiting_email` -- la persona
+    pidió cambiar de correo antes de que administración llegara a tocar el
+    botón), no se aplica nada Y el aviso queda tal cual -- nunca "ya
+    estaba resuelto" (no lo estaba) ni "habilitado" (nada se habilitó)."""
+    ws = intake_world["north-lab"]["id"]
+    m = intake_world["north-lab"]["people"]["Taylor Quinn"]["membership_id"]
+    _, tg_admin = _hacer_administrador(conn, intake_world, "north-lab", "Morgan Hale")
+    aviso_id = _dejar_pending_verification_con_aviso_agotado(conn, ws, m, "Taylor Quinn")
+    with espacio(conn, ws) as cur:
+        AC.transicionar(cur, m, "awaiting_email", ahora=AHORA)
+    conn.commit()
+
+    r = _post_admin_toque(
+        cliente_admin, AA.callback_data(AA.ACCION_CONFIRMAR_HABILITAR, aviso_id), tg_admin)
+    assert r.status_code == 200
+
+    with admin(conn) as cur:
+        [aviso] = AC.avisos(cur)
+        assert aviso["resuelto_en"] is None               # sigue abierto, tal cual
+        cur.execute(
+            "select count(*) n from alta_correo_evento "
+            "where membership_id = %s and tipo = 'intento_habilitado'", (m,))
+        assert cur.fetchone()["n"] == 0
+        cur.execute("select texto from aviso_administrativo_respuesta where chat_id = %s",
+                   (tg_admin,))
+        assert [f["texto"] for f in cur.fetchall()] == [AA.TEXTO_HABILITAR_CANCELADO]
+
+
+def test_confirmar_habilitar_con_cupo_no_agotado_de_verdad_no_aplica_ni_resuelve(
+        cliente_admin, conn, intake_world):
+    """El ciclo puede seguir en `pending_email_verification` con el aviso
+    todavía sin resolver aunque el cupo de 5 YA NO esté realmente agotado
+    (un solo envío, acá) -- "Habilitar" no tiene que abrir un intento
+    nuevo sin necesidad; el aviso queda tal cual."""
+    ws = intake_world["north-lab"]["id"]
+    m = intake_world["north-lab"]["people"]["Taylor Quinn"]["membership_id"]
+    _, tg_admin = _hacer_administrador(conn, intake_world, "north-lab", "Morgan Hale")
+    with espacio(conn, ws) as cur:
+        AC.iniciar_ciclo(cur, m, "alta", ahora=AHORA)
+        AC.transicionar(cur, m, "awaiting_email", ahora=AHORA)
+        AC.transicionar(cur, m, "pending_email_verification", ahora=AHORA)
+        AC.emitir_verificacion(cur, m, "taylor.quinn@empresa.com", "token-unico", ahora=AHORA)
+        aviso_id = AC.crear_aviso(
+            cur, AC.TIPO_CORREO_LIMITE_AGOTADO,
+            "Taylor Quinn agotó los 5 envíos del correo de verificación.",
+            referencia_tipo="membership", referencia_id=m, ahora=AHORA)
+    conn.commit()
+
+    r = _post_admin_toque(
+        cliente_admin, AA.callback_data(AA.ACCION_CONFIRMAR_HABILITAR, aviso_id), tg_admin)
+    assert r.status_code == 200
+
+    with admin(conn) as cur:
+        [aviso] = AC.avisos(cur)
+        assert aviso["resuelto_en"] is None
+        cur.execute(
+            "select count(*) n from alta_correo_evento "
+            "where membership_id = %s and tipo = 'intento_habilitado'", (m,))
+        assert cur.fetchone()["n"] == 0
+        cur.execute("select texto from aviso_administrativo_respuesta where chat_id = %s",
+                   (tg_admin,))
+        assert [f["texto"] for f in cur.fetchall()] == [AA.TEXTO_HABILITAR_CANCELADO]
+
+
+def test_preview_habilitar_con_ciclo_ya_active_resuelve_y_no_ofrece_botones(
+        cliente_admin, conn, intake_world):
+    """La vista previa (primer toque de "Habilitar") aplica la misma
+    comprobación de ciclo que la confirmación -- no tiene sentido ofrecer
+    Confirmar/Cancelar para un intento que, al confirmarlo, no haría nada."""
+    ws = intake_world["north-lab"]["id"]
+    m = intake_world["north-lab"]["people"]["Taylor Quinn"]["membership_id"]
+    _, tg = _hacer_administrador(conn, intake_world, "north-lab", "Morgan Hale")
+    aviso_id = _dejar_pending_verification_con_aviso_agotado(conn, ws, m, "Taylor Quinn")
+    with espacio(conn, ws) as cur:
+        AC.transicionar(cur, m, "active", ahora=AHORA)
+    conn.commit()
+
+    r = _post_admin_toque(cliente_admin, AA.callback_data(AA.ACCION_HABILITAR, aviso_id), tg)
+    assert r.status_code == 200
+
+    with admin(conn) as cur:
+        cur.execute("select texto, botones from aviso_administrativo_respuesta")
+        [fila] = cur.fetchall()
+        assert fila["texto"] == AA.TEXTO_HABILITAR_CANCELADO
+        assert not fila["botones"]
+        [aviso] = AC.avisos(cur)
+        assert aviso["resuelto_en"] is not None
+
+
+def test_preview_habilitar_sobre_aviso_de_otro_tipo_no_dice_que_ya_estaba_resuelto(
+        cliente_admin, conn, intake_world):
+    """G1d-b2, ítem 7: antes, cualquier motivo por el que la vista previa
+    no correspondía (aviso inexistente, de otro tipo, sin `membership`) caía
+    en el mismo texto que un aviso REALMENTE resuelto ("Ese aviso ya
+    estaba resuelto."), que sería falso acá -- este aviso nunca estuvo
+    resuelto."""
+    ws = intake_world["north-lab"]["id"]
+    _, tg = _hacer_administrador(conn, intake_world, "north-lab", "Morgan Hale")
+    aviso_id = _crear_aviso(conn, ws)   # tipo por defecto: no es de envíos agotados
+
+    r = _post_admin_toque(cliente_admin, AA.callback_data(AA.ACCION_HABILITAR, aviso_id), tg)
+    assert r.status_code == 200
+
+    with admin(conn) as cur:
+        cur.execute("select texto, botones from aviso_administrativo_respuesta")
+        [fila] = cur.fetchall()
+        assert fila["texto"] == AA.TEXTO_HABILITAR_CANCELADO
+        assert not fila["botones"]
+
+
+def test_preview_habilitar_sobre_aviso_inexistente_no_dice_que_ya_estaba_resuelto(
+        cliente_admin, conn, intake_world):
+    """Mismo ítem 7, para un `aviso_id` que directamente no existe (botón
+    de una versión vieja, o un aviso borrado)."""
+    import uuid
+
+    _, tg = _hacer_administrador(conn, intake_world, "north-lab", "Morgan Hale")
+
+    r = _post_admin_toque(
+        cliente_admin, AA.callback_data(AA.ACCION_HABILITAR, str(uuid.uuid4())), tg)
+    assert r.status_code == 200
+
+    with admin(conn) as cur:
+        cur.execute("select texto, botones from aviso_administrativo_respuesta")
+        [fila] = cur.fetchall()
+        assert fila["texto"] == AA.TEXTO_HABILITAR_CANCELADO
+        assert not fila["botones"]
 
 
 def test_cancelar_habilitar_no_aplica_nada(cliente_admin, conn, intake_world):
@@ -337,6 +533,85 @@ def test_cancelar_habilitar_no_aplica_nada(cliente_admin, conn, intake_world):
         cur.execute(
             "select count(*) n from alta_correo_evento where tipo = 'intento_habilitado'")
         assert cur.fetchone()["n"] == 0
+
+
+# ===========================================================================
+# G1d-b2, ítem 6: las respuestas de administración no se pierden por dedupe
+# ===========================================================================
+
+
+def test_cancelar_habilitar_dos_administradores_reciben_cada_uno_su_respuesta(
+        cliente_admin, conn, intake_world):
+    """Antes, la clave de dedupe de Cancelar era sólo `aviso_id` -- sin el
+    administrador ni el toque, el segundo Cancelar sobre el MISMO aviso se
+    perdía en silencio contra `on conflict (dedupe_key) do nothing` (la
+    fila ya existía con la respuesta del primero)."""
+    ws = intake_world["north-lab"]["id"]
+    m = intake_world["north-lab"]["people"]["Taylor Quinn"]["membership_id"]
+    _, tg1 = _hacer_administrador(conn, intake_world, "north-lab", "Morgan Hale")
+    _, tg2 = _hacer_administrador(conn, intake_world, "north-lab", "Sam North")
+    aviso_id = _dejar_pending_verification_con_aviso_agotado(conn, ws, m, "Taylor Quinn")
+
+    r1 = _post_admin_toque(
+        cliente_admin, AA.callback_data(AA.ACCION_CANCELAR_HABILITAR, aviso_id), tg1,
+        toque_id="cb-admin-1")
+    r2 = _post_admin_toque(
+        cliente_admin, AA.callback_data(AA.ACCION_CANCELAR_HABILITAR, aviso_id), tg2,
+        toque_id="cb-admin-2")
+    assert r1.status_code == 200 and r2.status_code == 200
+
+    with admin(conn) as cur:
+        cur.execute("select chat_id, texto from aviso_administrativo_respuesta")
+        filas = cur.fetchall()
+        assert sorted(f["chat_id"] for f in filas) == sorted([tg1, tg2])
+        assert all(f["texto"] == AA.TEXTO_HABILITAR_CANCELADO for f in filas)
+
+
+def test_cancelar_habilitar_mismo_administrador_dos_previews_recibe_dos_respuestas(
+        cliente_admin, conn, intake_world):
+    """El mismo administrador, tocando "Habilitar" dos veces (dos vistas
+    previas genuinas, cada una con su propio `callback_query.id` real de
+    Telegram) y cancelando las dos, tiene que recibir una respuesta por
+    cada Cancelar -- no es el mismo botón reenviado, son dos decisiones
+    distintas."""
+    ws = intake_world["north-lab"]["id"]
+    m = intake_world["north-lab"]["people"]["Taylor Quinn"]["membership_id"]
+    _, tg = _hacer_administrador(conn, intake_world, "north-lab", "Morgan Hale")
+    aviso_id = _dejar_pending_verification_con_aviso_agotado(conn, ws, m, "Taylor Quinn")
+
+    _post_admin_toque(
+        cliente_admin, AA.callback_data(AA.ACCION_CANCELAR_HABILITAR, aviso_id), tg,
+        toque_id="cb-preview-1")
+    _post_admin_toque(
+        cliente_admin, AA.callback_data(AA.ACCION_CANCELAR_HABILITAR, aviso_id), tg,
+        toque_id="cb-preview-2")
+
+    with admin(conn) as cur:
+        cur.execute("select texto from aviso_administrativo_respuesta where chat_id = %s", (tg,))
+        assert len(cur.fetchall()) == 2
+
+
+def test_cancelar_habilitar_redelivery_exacta_sigue_deduplicando_a_una_sola(
+        cliente_admin, conn, intake_world):
+    """La corrección de arriba no pierde la protección original: una
+    redelivery EXACTA del mismo webhook (Telegram reenvía el mismo
+    `callback_query.id` porque no recibió el ACK a tiempo) sigue
+    deduplicando a una sola respuesta."""
+    ws = intake_world["north-lab"]["id"]
+    m = intake_world["north-lab"]["people"]["Taylor Quinn"]["membership_id"]
+    _, tg = _hacer_administrador(conn, intake_world, "north-lab", "Morgan Hale")
+    aviso_id = _dejar_pending_verification_con_aviso_agotado(conn, ws, m, "Taylor Quinn")
+
+    _post_admin_toque(
+        cliente_admin, AA.callback_data(AA.ACCION_CANCELAR_HABILITAR, aviso_id), tg,
+        toque_id="cb-redelivery")
+    _post_admin_toque(
+        cliente_admin, AA.callback_data(AA.ACCION_CANCELAR_HABILITAR, aviso_id), tg,
+        toque_id="cb-redelivery")
+
+    with admin(conn) as cur:
+        cur.execute("select texto from aviso_administrativo_respuesta where chat_id = %s", (tg,))
+        assert len(cur.fetchall()) == 1
 
 
 def test_toque_habilitar_de_un_no_administrador_no_hace_nada(

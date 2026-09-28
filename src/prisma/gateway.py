@@ -358,6 +358,14 @@ def _toque_admin(conn, toque: dict, tg_user: int | None) -> dict:
     chat_id = (toque.get("message") or {}).get("chat", {}).get("id")
     if partes is None or tg_user is None or chat_id is None:
         return {"ok": True}
+    # G1d-b2, ítem 6: el `id` del `callback_query` -- estable ante una
+    # redelivery exacta del mismo webhook (Telegram reenvía el mismo id),
+    # distinto en cada toque genuino nuevo -- es lo que deja que las claves
+    # de dedupe de `avisos_admin` distingan "el mismo botón, reenviado" de
+    # "un botón nuevo, apretado otra vez" sin volver a usar un timestamp de
+    # pared (vulnerable a lo contrario: mandar dos veces ante una
+    # redelivery real).
+    toque_id = str(toque.get("id") or "")
 
     try:
         acusar_toque(config.token_bot("admin"), toque.get("id", ""))
@@ -379,11 +387,12 @@ def _toque_admin(conn, toque: dict, tg_user: int | None) -> dict:
             if accion == AA.ACCION_LEIDO:
                 AA.marcar_leido_por_toque(cur, aviso_id, quien.app_user_id, chat_id)
             elif accion == AA.ACCION_HABILITAR:
-                AA.mostrar_preview_habilitar(cur, aviso_id, chat_id)
+                AA.mostrar_preview_habilitar(cur, aviso_id, chat_id, quien.app_user_id, toque_id)
             elif accion == AA.ACCION_CONFIRMAR_HABILITAR:
-                AA.confirmar_habilitar_por_toque(cur, aviso_id, quien.app_user_id, chat_id)
+                AA.confirmar_habilitar_por_toque(
+                    cur, aviso_id, quien.app_user_id, chat_id, toque_id)
             elif accion == AA.ACCION_CANCELAR_HABILITAR:
-                AA.cancelar_habilitar_por_toque(cur, aviso_id, chat_id)
+                AA.cancelar_habilitar_por_toque(cur, aviso_id, quien.app_user_id, chat_id, toque_id)
             # Cualquier otra acción es un botón de un tipo que este canal
             # todavía no reconoce (versión vieja, o de un aviso retirado):
             # no hay nada para hacer, y no es un error propio.

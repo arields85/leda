@@ -51,6 +51,25 @@ TEXTO_HABILITAR_YA_RESUELTO = "Ese aviso ya estaba resuelto."
 TEXTO_HABILITAR_CONFIRMADO = "Listo, habilitado."
 TEXTO_HABILITAR_CANCELADO = "No se habilitó nada."
 
+# G1d-b2, ítem 3 (revisión de G1d-b): resultados de `confirmar_habilitar` --
+# antes devolvía un `bool` que confundía "ya estaba resuelto" (un doble tap
+# genuino) con "no corresponde" (el ciclo ya no es el que el aviso
+# describía). Los tres textos aprobados por el usuario (F, 2026-09-28) son
+# ciertos cada uno sólo para su propio caso -- `TEXTO_HABILITAR_CANCELADO`
+# ("No se habilitó nada.") es la única frase de las tres que sigue siendo
+# cierta tanto si no correspondía aplicar nada como si la situación ya se
+# resolvió sola (la persona quedó `active`): en los dos casos, ningún
+# intento nuevo se habilitó.
+RESULTADO_HABILITAR_APLICADO = "aplicado"
+RESULTADO_HABILITAR_YA_RESUELTO = "ya_resuelto"
+RESULTADO_HABILITAR_NO_APLICA = "no_aplica"
+
+_TEXTOS_RESULTADO_HABILITAR = {
+    RESULTADO_HABILITAR_APLICADO: TEXTO_HABILITAR_CONFIRMADO,
+    RESULTADO_HABILITAR_YA_RESUELTO: TEXTO_HABILITAR_YA_RESUELTO,
+    RESULTADO_HABILITAR_NO_APLICA: TEXTO_HABILITAR_CANCELADO,
+}
+
 
 def _ahora(valor: datetime | None) -> datetime:
     return valor or datetime.now(timezone.utc)
@@ -147,19 +166,92 @@ def _texto_preview_habilitar(nombre: str) -> str:
             "queda resuelto.")
 
 
-def mostrar_preview_habilitar(cur: psycopg.Cursor, aviso_id: str, chat_id: int, *,
+# G1d-b2, ítem 3 (revisión de G1d-b): resultado de comprobar si "Habilitar
+# un nuevo intento" tiene sentido para el ciclo VIGENTE de la membresía --
+# antes, ni la vista previa ni la confirmación miraban el ciclo en
+# absoluto, así que las dos podían ofrecerse (o aplicarse) sobre una
+# membresía que ya se verificó sola, cambió de correo, o fue revocada
+# mientras el aviso seguía sin resolver.
+_HABILITAR_APLICA = "aplica"
+_HABILITAR_RESUELTO_SIN_ACCION = "resuelto_sin_accion"
+_HABILITAR_NO_APLICA = "no_aplica"
+
+
+def _estado_habilitable(cur: psycopg.Cursor, membership_id: str) -> str:
+    """Un solo lugar para la comprobación de ciclo que usan la vista previa
+    y la confirmación (ítem 7: nunca dos copias del mismo criterio).
+
+    Devuelve `_HABILITAR_APLICA` sólo si el ciclo vigente sigue en
+    `pending_email_verification` con el cupo de envíos realmente agotado
+    (la misma cuenta que `emitir_verificacion_correo`: envíos posteriores
+    al último `intento_habilitado` del ciclo, o todos si nunca hubo uno).
+
+    `_HABILITAR_RESUELTO_SIN_ACCION` si la membresía ya está `active`: lo
+    que motivaba el aviso ya no existe -- la persona se verificó sola --
+    así que resolverlo es correcto y sin ningún efecto sobre ella (quien
+    llama es responsable de marcarlo resuelto; esta función sólo lee).
+
+    `_HABILITAR_NO_APLICA` para cualquier otro estado (`awaiting_email`,
+    `pending_welcome`, `revoked`, sin ciclo) o si el cupo no está
+    realmente agotado -- ahí NO se resuelve nada: el aviso queda tal cual
+    estaba, para que alguien lo revise.
+
+    Bajo `prisma_admin` (`admin(conn)`, `bypassrls`), las dos consultas de
+    abajo leen `alta_correo_evento`/`alta_correo_verificacion` directo,
+    sin declarar ningún espacio -- mismo privilegio que ya usa `AC.avisos`
+    y el resto de este módulo (`grant all ... to prisma_admin`,
+    `db/esquema.sql`); no hace falta ninguna función `security definer`
+    nueva."""
+    actual = AC.estado(cur, membership_id, bloquear=True)
+    if actual is not None and actual["estado"] == "active":
+        return _HABILITAR_RESUELTO_SIN_ACCION
+    if actual is None or actual["estado"] != "pending_email_verification":
+        return _HABILITAR_NO_APLICA
+    cur.execute(
+        """select max(at) as desde from alta_correo_evento
+            where membership_id = %s and ciclo = %s and tipo = 'intento_habilitado'""",
+        (membership_id, actual["ciclo"]))
+    desde_habilitado = cur.fetchone()["desde"]
+    cur.execute(
+        """select count(*) as n from alta_correo_verificacion
+            where membership_id = %s and ciclo = %s
+              and (%s::timestamptz is null or emitido_en > %s)""",
+        (membership_id, actual["ciclo"], desde_habilitado, desde_habilitado))
+    if cur.fetchone()["n"] < 5:
+        return _HABILITAR_NO_APLICA
+    return _HABILITAR_APLICA
+
+
+def mostrar_preview_habilitar(cur: psycopg.Cursor, aviso_id: str, chat_id: int,
+                              admin_app_user_id: str, toque_id: str, *,
                               ahora: datetime | None = None) -> None:
     """Primer toque de "Habilitar un nuevo intento" (G1d-b, acción F): sólo
     muestra la vista previa con Confirmar/Cancelar -- todavía no aplica
-    nada. Un aviso ya resuelto (doble tap, u otro administrador ya
-    resolvió) recibe una respuesta breve y ninguna acción nueva."""
+    ningún intento nuevo. Un aviso inexistente, ya resuelto, de otro tipo o
+    cuyo ciclo ya no corresponde (ítem 3) recibe una respuesta breve y
+    ninguna acción nueva -- `TEXTO_HABILITAR_YA_RESUELTO` sólo cuando el
+    aviso REALMENTE ya estaba resuelto (ítem 7): cualquier otro motivo usa
+    `TEXTO_HABILITAR_CANCELADO`, cierto en los dos casos (nada se
+    habilitó)."""
     ahora = _ahora(ahora)
+    dedupe_key = f"adm:habilitar-preview:{aviso_id}:{admin_app_user_id}:{toque_id}"
     aviso = _cargar_aviso(cur, aviso_id)
-    if (aviso is None or aviso["resuelto_en"] is not None
-            or aviso["tipo"] != AC.TIPO_CORREO_LIMITE_AGOTADO):
-        encolar_respuesta(
-            cur, chat_id, TEXTO_HABILITAR_YA_RESUELTO,
-            dedupe_key=f"adm:habilitar-preview:{aviso_id}:{ahora.timestamp()}", ahora=ahora)
+    if (aviso is None or aviso["tipo"] != AC.TIPO_CORREO_LIMITE_AGOTADO
+            or aviso["referencia_tipo"] != "membership"):
+        encolar_respuesta(cur, chat_id, TEXTO_HABILITAR_CANCELADO,
+                          dedupe_key=dedupe_key, ahora=ahora)
+        return
+    if aviso["resuelto_en"] is not None:
+        encolar_respuesta(cur, chat_id, TEXTO_HABILITAR_YA_RESUELTO,
+                          dedupe_key=dedupe_key, ahora=ahora)
+        return
+
+    resultado = _estado_habilitable(cur, str(aviso["referencia_id"]))
+    if resultado != _HABILITAR_APLICA:
+        if resultado == _HABILITAR_RESUELTO_SIN_ACCION:
+            AC.marcar_resuelto(cur, aviso_id, admin_app_user_id, ahora=ahora)
+        encolar_respuesta(cur, chat_id, TEXTO_HABILITAR_CANCELADO,
+                          dedupe_key=dedupe_key, ahora=ahora)
         return
 
     cur.execute(
@@ -169,29 +261,41 @@ def mostrar_preview_habilitar(cur: psycopg.Cursor, aviso_id: str, chat_id: int, 
     nombre = fila["nombre"] if fila else "esa persona"
     texto = _texto_preview_habilitar(nombre)
     encolar_respuesta(
-        cur, chat_id, texto,
-        dedupe_key=f"adm:habilitar-preview:{aviso_id}:{ahora.timestamp()}", ahora=ahora,
+        cur, chat_id, texto, dedupe_key=dedupe_key, ahora=ahora,
         botones=[boton_confirmar_habilitar(aviso_id), boton_cancelar_habilitar(aviso_id)])
 
 
 def confirmar_habilitar(cur: psycopg.Cursor, aviso_id: str, admin_app_user_id: str, *,
-                        ahora: datetime | None = None) -> bool:
+                        ahora: datetime | None = None) -> str:
     """Aplica "Habilitar un nuevo intento": todo bajo la misma transacción
-    que ya trae quien llama. `False` si el aviso ya estaba resuelto (doble
-    tap, u otro administrador que confirmó primero) -- entonces no aplica
-    una segunda vez ni manda un segundo aviso a la persona."""
+    que ya trae quien llama. Devuelve `RESULTADO_HABILITAR_APLICADO`,
+    `RESULTADO_HABILITAR_YA_RESUELTO` (el aviso REALMENTE ya estaba
+    resuelto -- doble tap, u otro administrador que confirmó primero: no
+    se aplica una segunda vez ni se manda un segundo aviso a la persona) o
+    `RESULTADO_HABILITAR_NO_APLICA` (ítem 3: el ciclo vigente ya no es
+    `pending_email_verification` con el cupo agotado, o el aviso no existe
+    o no es de este tipo -- si la membresía ya está `active`, el aviso se
+    resuelve solo, sin ningún efecto sobre ella; para cualquier otro
+    estado no se resuelve nada, el aviso queda tal cual estaba)."""
     from . import alta_correo_flujo as ACF
     from .autoridad import Canal, Solicitante
 
     ahora = _ahora(ahora)
     aviso = _cargar_aviso(cur, aviso_id, bloquear=True)
-    if (aviso is None or aviso["resuelto_en"] is not None
-            or aviso["tipo"] != AC.TIPO_CORREO_LIMITE_AGOTADO
+    if (aviso is None or aviso["tipo"] != AC.TIPO_CORREO_LIMITE_AGOTADO
             or aviso["referencia_tipo"] != "membership"):
-        return False
+        return RESULTADO_HABILITAR_NO_APLICA
+    if aviso["resuelto_en"] is not None:
+        return RESULTADO_HABILITAR_YA_RESUELTO
 
     workspace_id = str(aviso["workspace_id"])
     membership_id = str(aviso["referencia_id"])
+
+    resultado = _estado_habilitable(cur, membership_id)
+    if resultado != _HABILITAR_APLICA:
+        if resultado == _HABILITAR_RESUELTO_SIN_ACCION:
+            AC.marcar_resuelto(cur, aviso_id, admin_app_user_id, ahora=ahora)
+        return RESULTADO_HABILITAR_NO_APLICA
 
     cur.execute(
         """select u.id as app_user_id, u.telegram_user_id, u.nombre
@@ -227,40 +331,54 @@ def confirmar_habilitar(cur: psycopg.Cursor, aviso_id: str, admin_app_user_id: s
         workspace_id=workspace_id, membership_id=membership_id, nombre=persona["nombre"])
     ACF.ofrecer_reintento_habilitado(
         cur, quien, workspace_id, persona["telegram_user_id"], ahora, vigente["email"])
-    return True
+    return RESULTADO_HABILITAR_APLICADO
 
 
 def confirmar_habilitar_por_toque(cur: psycopg.Cursor, aviso_id: str, admin_app_user_id: str,
-                                  chat_id: int, *, ahora: datetime | None = None) -> None:
+                                  chat_id: int, toque_id: str, *,
+                                  ahora: datetime | None = None) -> None:
     from .gateway import NOTICIA_NEUTRA_INCIDENTE
 
     ahora = _ahora(ahora)
     try:
-        aplicado = confirmar_habilitar(cur, aviso_id, admin_app_user_id, ahora=ahora)
+        resultado = confirmar_habilitar(cur, aviso_id, admin_app_user_id, ahora=ahora)
     except NoSePuedeAvisar as e:
         _incidente_plataforma_persistente(
             cur, "No se habilitó un nuevo intento de verificación de correo: "
             f"no se puede avisar a la persona ({e}).", ahora)
         encolar_respuesta(
             cur, chat_id, NOTICIA_NEUTRA_INCIDENTE,
-            dedupe_key=f"adm:habilitar-sin-aviso:{aviso_id}:{admin_app_user_id}",
+            dedupe_key=f"adm:habilitar-sin-aviso:{aviso_id}:{admin_app_user_id}:{toque_id}",
             ahora=ahora)
         return
-    texto = TEXTO_HABILITAR_CONFIRMADO if aplicado else TEXTO_HABILITAR_YA_RESUELTO
+    texto = _TEXTOS_RESULTADO_HABILITAR[resultado]
     encolar_respuesta(
         cur, chat_id, texto,
-        dedupe_key=f"adm:habilitar-confirmado:{aviso_id}:{admin_app_user_id}", ahora=ahora)
+        dedupe_key=f"adm:habilitar-confirmado:{aviso_id}:{admin_app_user_id}:{toque_id}",
+        ahora=ahora)
 
 
-def cancelar_habilitar_por_toque(cur: psycopg.Cursor, aviso_id: str, chat_id: int, *,
+def cancelar_habilitar_por_toque(cur: psycopg.Cursor, aviso_id: str, admin_app_user_id: str,
+                                 chat_id: int, toque_id: str, *,
                                  ahora: datetime | None = None) -> None:
     """Cancelar no aplica nada -- ni siquiera revisa si el aviso sigue sin
     resolver: declinar una vista previa nunca es una acción que necesite
-    idempotencia propia."""
+    idempotencia propia.
+
+    G1d-b2, ítem 6 (revisión de G1d-b): la clave de dedupe incluye el
+    administrador y el toque (`callback_query.id` de Telegram) -- antes
+    era sólo `aviso_id`, así que un segundo Cancelar sobre el MISMO aviso
+    (otro administrador, o el mismo tras una vista previa nueva) se
+    perdía en silencio contra `on conflict (dedupe_key) do nothing`: la
+    fila ya existía con la respuesta del primero. `toque_id` sigue
+    protegiendo contra una redelivery exacta del mismo webhook (Telegram
+    reenvía el mismo `callback_query.id`), que sí tiene que deduplicarse a
+    una sola respuesta."""
     ahora = _ahora(ahora)
     encolar_respuesta(
         cur, chat_id, TEXTO_HABILITAR_CANCELADO,
-        dedupe_key=f"adm:habilitar-cancelado:{aviso_id}", ahora=ahora)
+        dedupe_key=f"adm:habilitar-cancelado:{aviso_id}:{admin_app_user_id}:{toque_id}",
+        ahora=ahora)
 
 
 def responder_texto_libre(cur: psycopg.Cursor, chat_id: int, mensaje_id: int | None,

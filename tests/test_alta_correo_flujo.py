@@ -131,6 +131,22 @@ def test_cuerpo_de_verificacion_no_ofrece_responder_el_correo():
     assert "https://t.me/bot?start=pv_abc" in cuerpo
 
 
+def test_cuerpo_de_verificacion_es_el_texto_a_aprobado_en_parrafos_corridos():
+    """G1d-b2, ítem 1: el texto A aprobado por el usuario (2026-09-28) en
+    párrafos corridos -- sólo los saltos de párrafo aprobados, sin cortes
+    de línea ni sangrías a mitad de frase (las que había copiado del
+    documento)."""
+    cuerpo = ACF.cuerpo_verificacion("Marcos", "https://t.me/bot?start=pv_abc")
+    assert cuerpo == (
+        "Hola, Marcos.\n\n"
+        "Para terminar tu alta en Prisma necesito que confirmes que este "
+        "es tu correo laboral.\n\n"
+        "Verificar correo: https://t.me/bot?start=pv_abc\n\n"
+        "Este enlace vence en 24 horas, sirve una sola vez y tiene que "
+        "abrirse con la misma cuenta de Telegram que usás para hablar con "
+        "Prisma.")
+
+
 # ===========================================================================
 # A. Clave apagada: activación idéntica a hoy
 # ===========================================================================
@@ -608,6 +624,36 @@ def test_limite_de_tres_por_hora_dice_a_partir_de_que_hora_reenviar(
     assert _outbox_textos(conn, 71001)[-1] == ACF.texto_limite_hora(esperado)
 
 
+def test_limite_por_hora_sin_hora_calculable_nunca_dice_interrogantes(
+        cliente, conn, intake_world, monkeypatch):
+    """G1d-b2, ítem 4: nunca "??:??" -- si `proximo_reenvio` no puede
+    calcular la hora (no debería pasar mientras el límite siga alineado
+    con `emitir_verificacion_correo`, pero sin ninguna garantía en tiempo
+    de compilación), Prisma registra un incidente saneado y deja el aviso
+    neutral en vez de un texto con un hueco."""
+    ws = intake_world["north-lab"]["id"]
+    m = _membership_id(intake_world, "north-lab", "Taylor Quinn")
+    _habilitar(conn, ws)
+    doble = DobleEnvioCorreo()
+    _sender(conn, ws, monkeypatch, doble)
+    _hasta_pending_verification(cliente, conn, ws, m, 71001, doble)   # envío 1
+    _reenviar(cliente, conn, ws, m, 71001)                             # envío 2
+    _reenviar(cliente, conn, ws, m, 71001)                             # envío 3
+    assert len(doble.enviados) == 3
+    monkeypatch.setattr(AC, "proximo_reenvio",
+                        lambda cur, membership_id, *, ahora=None: None)
+
+    _reenviar(cliente, conn, ws, m, 71001)                             # rechazado
+
+    assert len(doble.enviados) == 3
+    ultimo = _outbox_textos(conn, 71001)[-1]
+    assert "?" not in ultimo
+    assert ultimo == gateway.NOTICIA_NEUTRA_INCIDENTE
+    incidentes = _incidentes(conn, ws)
+    assert len(incidentes) == 1
+    assert "@" not in incidentes[0]["resumen_sanitizado"]
+
+
 # ===========================================================================
 # G. `/start pv_{token}`
 # ===========================================================================
@@ -767,6 +813,79 @@ def test_enlace_ya_usado_dice_que_ya_esta_verificado(cliente, conn, intake_world
 
     assert _outbox_textos(conn, 71001)[-1] == ACF.TEXTO_YA_VERIFICADO
     assert _estado(conn, ws, m)["estado"] == "active"       # sigue activo
+
+
+def test_enlace_consumido_de_ciclo_anterior_pide_el_correo_del_ciclo_actual(
+        cliente, conn, intake_world, monkeypatch):
+    """G1d-b2, ítem 2: un enlace ya usado (consumido con éxito) de un CICLO
+    ANTERIOR no puede decir "Tu correo ya está verificado ✅" si el ciclo
+    de HOY no lo está -- acá, tras revocar y reactivar, el ciclo nuevo
+    todavía está pidiendo el correo (`awaiting_email`)."""
+    ws = intake_world["north-lab"]["id"]
+    m = _membership_id(intake_world, "north-lab", "Taylor Quinn")
+    _habilitar(conn, ws)
+    doble = DobleEnvioCorreo()
+    _sender(conn, ws, monkeypatch, doble)
+    _hasta_pending_verification(cliente, conn, ws, m, 71001, doble)
+    token_viejo = _token_de_enlace(doble.enviados[-1].enlace)
+    _post(cliente, f"/start pv_{token_viejo}", 71001)
+    assert _estado(conn, ws, m)["estado"] == "active"
+
+    # El reloj real (no la constante `AHORA`, futura en este calendario de
+    # prueba) -- `resolver_verificacion_correo` usa `datetime.now(...)`
+    # internamente, así que el ciclo 2 tiene que abrirse en ese mismo
+    # reloj para que el orden del outbox (`programado_para`) quede
+    # cronológico entre la reactivación y el `/start` que sigue.
+    ahora_real = datetime.now(timezone.utc)
+    with espacio(conn, ws) as cur:
+        AC.transicionar(cur, m, "revoked", ahora=ahora_real)
+    conn.commit()
+    with espacio(conn, ws) as cur:
+        ACF.abrir_ciclo_alta(cur, m, ws, 71001, "Taylor Quinn", ahora_real)
+    conn.commit()
+    estado_reactivado = _estado(conn, ws, m)
+    assert estado_reactivado["ciclo"] == 2
+    assert estado_reactivado["estado"] == "awaiting_email"
+
+    _post(cliente, f"/start pv_{token_viejo}", 71001)   # el mismo enlace, ya consumido
+
+    assert _outbox_textos(conn, 71001)[-1] == ACF.TEXTO_PEDIDO_CORREO
+    assert _estado(conn, ws, m)["estado"] == "awaiting_email"   # nada cambió por el enlace viejo
+
+
+def test_enlace_consumido_de_ciclo_anterior_recuerda_el_pendiente_del_ciclo_actual(
+        cliente, conn, intake_world, monkeypatch):
+    """Ídem, pero el ciclo nuevo ya llegó a `pending_email_verification`
+    con un envío propio vigente: el enlace viejo consumido retoma el
+    recordatorio (B2, con botones), nunca "ya verificado"."""
+    ws = intake_world["north-lab"]["id"]
+    m = _membership_id(intake_world, "north-lab", "Taylor Quinn")
+    _habilitar(conn, ws)
+    doble = DobleEnvioCorreo()
+    _sender(conn, ws, monkeypatch, doble)
+    _hasta_pending_verification(cliente, conn, ws, m, 71001, doble)
+    token_viejo = _token_de_enlace(doble.enviados[-1].enlace)
+    _post(cliente, f"/start pv_{token_viejo}", 71001)
+    assert _estado(conn, ws, m)["estado"] == "active"
+
+    # Reloj real -- ver el comentario del test anterior.
+    ahora_real = datetime.now(timezone.utc)
+    with espacio(conn, ws) as cur:
+        AC.transicionar(cur, m, "revoked", ahora=ahora_real)
+    conn.commit()
+    with espacio(conn, ws) as cur:
+        ACF.abrir_ciclo_alta(cur, m, ws, 71001, "Taylor Quinn", ahora_real)
+    conn.commit()
+    _post(cliente, "taylor.quinn@empresa.com", 71001)   # nuevo envío, ya del ciclo 2
+    assert _estado(conn, ws, m)["estado"] == "pending_email_verification"
+    assert _estado(conn, ws, m)["ciclo"] == 2
+
+    _post(cliente, f"/start pv_{token_viejo}", 71001)   # enlace del ciclo 1, ya consumido
+
+    assert _outbox_textos(conn, 71001)[-1] == \
+        ACF.texto_recordatorio_pendiente("taylor.quinn@empresa.com")
+    assert _estado(conn, ws, m)["estado"] == "pending_email_verification"
+    assert _estado(conn, ws, m)["ciclo"] == 2   # nada cambió por el enlace viejo
 
 
 def test_enlace_reemplazado_por_uno_mas_nuevo_ofrece_reenviar_el_ultimo(
@@ -1146,7 +1265,13 @@ def test_boton_elegir_correo_viejo_tras_otro_envio_no_hace_nada(
     elegir, otro mensaje ya manda una dirección distinta y avanza el ciclo a
     `pending_email_verification`. El botón viejo de "elegir" queda gateado
     a `awaiting_email`: al apretarlo, no tiene que emitir nada ni cambiar
-    el correo en verificación."""
+    el correo en verificación.
+
+    G1d-b2, ítem 5: antes esto respondía el texto fijo `TEXTO_ESTADO_
+    CAMBIO` -- un callejón sin salida. Ahora sigue el estado ACTUAL (B9):
+    el ciclo sigue en `pending_email_verification` con un envío vigente,
+    así que retoma el mismo recordatorio (B2, con botones) que un reenvío
+    pedido a mano -- nunca manda ningún correo nuevo por sí solo."""
     ws = intake_world["north-lab"]["id"]
     m = _membership_id(intake_world, "north-lab", "Taylor Quinn")
     _habilitar(conn, ws)
@@ -1164,7 +1289,8 @@ def test_boton_elegir_correo_viejo_tras_otro_envio_no_hace_nada(
 
     _post_toque(cliente, token_viejo, 71001)
 
-    assert _outbox_textos(conn, 71001)[-1] == ACF.TEXTO_ESTADO_CAMBIO
+    assert _outbox_textos(conn, 71001)[-1] == \
+        ACF.texto_recordatorio_pendiente("taylor.quinn@empresa.com")
     assert len(doble.enviados) == envios_antes                 # nada nuevo
     assert _estado(conn, ws, m)["estado"] == "pending_email_verification"
     assert _incidentes(conn, ws) == []                          # nunca un incidente
@@ -1182,7 +1308,12 @@ def test_botones_de_recordatorio_viejos_tras_quedar_active_no_hacen_nada(
     resolución del `pending_action` entero -- la pregunta por el segundo, y
     la prueba llega a ejercitar la relectura de estado de `resolver_toque`
     (G1b2, ítem 3) en vez de la vigencia genérica de un botón, que es un
-    mecanismo distinto y anterior."""
+    mecanismo distinto y anterior.
+
+    G1d-b2, ítem 5: antes, cada botón viejo respondía el texto fijo
+    `TEXTO_ESTADO_CAMBIO` -- ahora sigue el estado ACTUAL (B9): ya
+    `active`, confirma con el texto del pack en vez de un callejón sin
+    salida."""
     ws = intake_world["north-lab"]["id"]
     m = _membership_id(intake_world, "north-lab", "Taylor Quinn")
     _habilitar(conn, ws)
@@ -1202,14 +1333,14 @@ def test_botones_de_recordatorio_viejos_tras_quedar_active_no_hacen_nada(
 
     _post_toque(con_agente, token_reenviar, 71001)
 
-    assert _outbox_textos(conn, 71001)[-1] == ACF.TEXTO_ESTADO_CAMBIO
+    assert _outbox_textos(conn, 71001)[-1] == ACF.texto_verificado("Taylor")
     assert len(doble.enviados) == envios_antes
     assert _estado(conn, ws, m)["estado"] == "active"
     assert _incidentes(conn, ws) == []
 
     _post_toque(con_agente, token_cambiar, 71001)
 
-    assert _outbox_textos(conn, 71001)[-1] == ACF.TEXTO_ESTADO_CAMBIO
+    assert _outbox_textos(conn, 71001)[-1] == ACF.texto_verificado("Taylor")
     assert len(doble.enviados) == envios_antes
     assert _estado(conn, ws, m)["estado"] == "active"
     assert _incidentes(conn, ws) == []
@@ -1225,7 +1356,10 @@ def test_boton_cambiar_a_viejo_tras_quedar_active_no_hace_nada(
     apretado después de que la persona ya verificó (quedó `active`) por
     otra vía: sin efecto, sin incidente -- nunca intenta la transición
     imposible `active -> awaiting_email`, que antes de este endurecimiento
-    llegaba cruda hasta el disparador de la base."""
+    llegaba cruda hasta el disparador de la base.
+
+    G1d-b2, ítem 5: responde según el estado actual (B9) en vez del texto
+    fijo `TEXTO_ESTADO_CAMBIO` retirado en esta corrección."""
     ws = intake_world["north-lab"]["id"]
     m = _membership_id(intake_world, "north-lab", "Taylor Quinn")
     _habilitar(conn, ws)
@@ -1241,7 +1375,7 @@ def test_boton_cambiar_a_viejo_tras_quedar_active_no_hace_nada(
 
     _post_toque(cliente, token_cambiar, 71001)
 
-    assert _outbox_textos(conn, 71001)[-1] == ACF.TEXTO_ESTADO_CAMBIO
+    assert _outbox_textos(conn, 71001)[-1] == ACF.texto_verificado("Taylor")
     assert len(doble.enviados) == envios_antes
     assert _estado(conn, ws, m)["estado"] == "active"
     assert _incidentes(conn, ws) == []
