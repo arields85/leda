@@ -3,7 +3,7 @@
 **Alcance:** Prisma es un producto de gestión de proyectos multi-tenant. CoreWork es
 su primer cliente, no su definición.
 
-**Última actualización documental:** 2026-09-26.
+**Última actualización documental:** 2026-09-28.
 
 ## Resumen
 
@@ -47,6 +47,17 @@ tales. Ver [`INDEX.md`](INDEX.md#documentos-superados).
   explícito del usuario: `main` publicada y siguiendo a `origin/main` (verificado con
   `git ls-remote --heads origin`). Antes del push se verificó que no se versiona ningún
   `.env`, respaldo ni credencial.
+- Rama auxiliar `auxiliar/alta-y-google` (worktree `D:\Proyectos\Prisma-PM-worktrees\alta-y-google`,
+  creada desde `main` en `dec6ae9`, 2026-09-27) para el alta con correo verificado y
+  Google, agenda y reuniones: contrato en
+  [`odd/tasks/alta-y-google.md`](../odd/tasks/alta-y-google.md), alcance en
+  [`ADR 0010`](decisions/0010-correo-verificado-y-google-en-el-producto.md)
+  (**propuesta**, la acepta el usuario). `main` no cambia de comportamiento hasta que
+  el usuario decida integrarla.
+- Migraciones `0013` a `0016` escritas, con rollback y ensayo de paridad en la suite;
+  aplicadas limpio sobre una **copia** de la base local (experimento 1, 2026-09-27).
+  **No aplicadas a la base local**: la tercera ronda usa una base nueva creada desde
+  `db/esquema.sql` completo (`PRUEBA-LOCAL.md` §5).
 
 ## Baseline de pruebas
 
@@ -54,7 +65,14 @@ tales. Ver [`INDEX.md`](INDEX.md#documentos-superados).
 |---|---|
 | Comando | `.venv\Scripts\python.exe -m pytest -q` |
 | Fecha | 2026-09-27 |
-| Resultado exacto | 927 passed, 108 deselected. |
+| Resultado exacto | 1008 passed, 108 deselected. |
+
+Seguimientos de la entrega con evidencia (T6a-T6j), siembra reproducible (T7, T7b) y
+comprobadores del banco, `odd/tasks/prisma-orienta.md`: `1008 passed, 108
+deselected` (corrida aislada del escritor de T7b; cada unidad reejecutó además su
+suite enfocada en el orquestador). Una falla intermitente `tuple concurrently updated`
+en `tests/test_task_intake.py` apareció dos veces sólo cuando otra corrida aplicaba
+el esquema en el mismo servidor a la vez (los roles son del clúster); aislada pasa.
 
 Sesión 2 por Telegram, hallazgos 8 y 9 (entrega con evidencia y revisión, ADR
 0009, `odd/tasks/prisma-orienta.md`): `927 passed, 108 deselected` (216 s) --
@@ -86,6 +104,11 @@ para que la próxima corrección tenga un lugar declarado al que pertenecer.
 - El listener está detenido.
 - No hay Telegram real, base operativa, Docker ni staging en uso.
 - No hay datos ni trabajo real cargados.
+- Los datos ficticios de las sesiones 1 y 2 viven en la base de mantenimiento
+  `postgres` del servidor local (no hay una base llamada `prisma`), la misma a la que
+  apunta `PRISMA_TEST_DB_URL`: las pruebas se conectan ahí sólo para crear y borrar sus
+  bases descartables. Quedan bases residuales `prisma_diag_*`/`prisma_test_*` de
+  corridas viejas. La tercera ronda pasa a una base dedicada nueva.
 
 ## Riesgos prioritarios
 
@@ -153,24 +176,41 @@ construyeron como entrega con evidencia y revisión
 ([`ADR 0009`](decisions/0009-entrega-con-evidencia-y-revision.md), migración `0012`
 aplicada también en la base local) y **todavía no se probaron en vivo**.
 
-Próximo, en este orden: los seguimientos de la revisión de la entrega con evidencia
-(una aprobación anterior sigue valiendo después de "Pedir cambios"; la evidencia nueva se
-descarta al volver a entregar; chequeo de dependencias al pedir cambios; deduplicación
-estable del aviso de entrega; prueba de punta a punta de "Pedir cambios"); después el
-hallazgo 10 (Prisma retoma una pregunta que la persona descartó) y los seguimientos de las
-etiquetas; después la reformulación de referencias por el modelo para `b-0005-b`
-(decisión del usuario: ni bajar el umbral de Jev ni pasarle más contexto), medida con el
-banco real completo sin empeorar ningún escenario; y por último una tercera ronda corta
-por Telegram para probar la entrega con evidencia. Antes de cualquier sesión real:
-comparar la base local con `db/esquema.sql` (hoy al día hasta `0012`).
+**Después de la sesión 2 (2026-09-27/28):** los seguimientos de la entrega con evidencia
+quedaron cerrados y revisados (T6a-T6j, `odd/tasks/prisma-orienta.md`): una aprobación
+anterior no sobrevive a "Pedir cambios" (`0013`); después de "Pedir cambios" la entrega
+pide evidencia nueva y la evidencia enviada se registra siempre (`0014`); "Pedir
+cambios" devuelve la tarea al estado previo a la entrega aunque haya una dependencia
+abierta (`0015`); el aviso de entrega no se duplica ni se pierde; una entrega repetida
+sobre una tarea en revisión suma evidencia sin cambiar estado; evidencia nueva en
+revisión reemplaza el aviso del aprobador; los actos sobre una misma tarea se
+serializan y la hora de cada evento, evidencia y aprobación es la de escritura
+(`0016`). Decisiones del usuario registradas como enmiendas de ADR 0009. Prueba de punta
+a punta de "Pedir cambios" por el webhook. Todo esto **todavía no se probó en vivo**.
 
-Abierto de esta unidad, sin bloquear el cierre de T5:
+Próximo, en este orden:
 
-- **Títulos "(simulado)" en los datos ficticios**, a resolver antes de la próxima sesión
-  real: el título es un campo de compromiso inmutable y no se renombra; no existe script
-  de siembra (las tareas se cargaron a mano). Se resuelve con un script de siembra
-  reproducible sin el sufijo sobre una base de prueba nueva o restaurada
-  (`odd/tasks/prisma-orienta.md`, próximo paso).
+1. **Tercera ronda corta por Telegram** (entrega con evidencia y "Pedir cambios"), sobre
+   una **base nueva** creada desde `db/esquema.sql` y sembrada con
+   `python -m prisma sembrar corework --semilla espacios/corework.semilla-ficticia.yaml`
+   (T7): pasos en `PRUEBA-LOCAL.md` §5, que corre el usuario (respaldo, crear la base,
+   cambiar el nombre de la base en `.env`, esquema, importar, feriados, sembrar,
+   enlaces, escuchar). Los títulos ya no llevan "(simulado)".
+2. El hallazgo 10 (Prisma retoma una pregunta que la persona descartó) y los
+   seguimientos de las etiquetas (review-149a33fa).
+3. La reformulación de referencias por el modelo para `b-0005-b` (decisión del usuario:
+   ni bajar el umbral de Jev ni pasarle más contexto), medida con el banco real
+   completo sin empeorar ningún escenario.
+4. El validador diario de invariantes
+   ([`odd/tasks/validador-invariantes.md`](../odd/tasks/validador-invariantes.md),
+   propuesto tras el experimento 1).
+5. Recuperación del pack de la implementación anterior, en `main`: indicador de
+   "escribiendo" y borrador nativo sin demorar respuestas (pack 05), saludo, tono e
+   íconos por categoría en los botones (pack 06). El alta con correo y Google avanzan en
+   la rama auxiliar.
+
+Abierto, sin bloquear:
+
 - **Autoridad sobre `cancelada`** (T2b): no se resolvió si una autoridad superior al
   responsable puede cancelar una tarea ajena. `PENDIENTE` de decisión explícita.
 - El menú de tarea (T2) todavía no ofrece "Adjuntar evidencia" al aprobador, aunque
