@@ -3681,3 +3681,14 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   Decisión del usuario: la tercera ronda por Telegram va al final, después de los
   íconos por categoría (pack 06), el indicador de "pensando" (pack 05) y el resto de
   lo pendiente, para probar todo junto.
+  Revisión de `ce771be` (#28b): medio, `review_due` (`slice_budget_reached`);
+  consentimiento del usuario: revisar. review-cc9552ab8c6e284c (confiabilidad)
+  aprobada y reconocida; frontera en `ce771be`. Dos hallazgos no bloqueantes -> #28c.
+
+- 2026-09-28: **Fecha fija en `tests/test_aprobacion_cierra_tarea.py`.** Ruta:
+  delegada, un escritor. `AHORA = datetime.now(BA)`: el webhook resuelve el pendiente
+  contra el reloj real, así que un `AHORA` fijo nacía vencido. ROJO `4 failed, 3
+  passed`; VERDE `7 passed`. Suite completa (escritor): `1041 passed, 108 deselected`.
+  Con el mismo patrón de fecha fija, sin romperse hoy porque no pasan por el reloj
+  real: `tests/test_botones.py:84`, `tests/test_modificar.py:142`,
+  `tests/test_pendientes.py:43` y `:182`.

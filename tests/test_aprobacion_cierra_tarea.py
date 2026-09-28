@@ -34,7 +34,11 @@ from prisma.db import admin, espacio
 from prisma.llm import ProveedorGuionado, Respuesta
 
 BA = ZoneInfo("America/Argentina/Buenos_Aires")
-AHORA = datetime(2026, 9, 27, 10, 0, tzinfo=BA)
+# Relativo al reloj real: el webhook (`_tocar`) resuelve el pendiente contra
+# `datetime.now(timezone.utc)` de `gateway.py`, no contra este valor -- un
+# `AHORA` fijo nace vencido apenas pasa la fecha de hoy (visto el 2026-09-28:
+# los `vence_en=AHORA + timedelta(days=1)` de más abajo quedaban en el pasado).
+AHORA = datetime.now(BA)
 
 
 def _quien(cur, nombre, ws):
