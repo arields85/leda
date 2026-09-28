@@ -365,6 +365,18 @@ Un worktree nuevo no trae lo que no se versiona.
     ayude". `nombre_preferido` = primera palabra del nombre guardado (igual
     que `onboarding.bienvenida`). Textos nuevos fuera del pack: pendientes
     de revisión del usuario. Suite: `1047 passed, 108 deselected`.
+    Revisión RDD `review-bf8c04f01554e3f3` (riesgo medio, consentida):
+    aprobada; reconocimiento emitido. Advertencias no bloqueantes → G1b2.
+  - [ ] **G1b2 — Endurecimiento tras la revisión de G1b.** (1) La compuerta
+    sólo actúa en chat privado: en un grupo nunca se piden, muestran ni
+    procesan correos. (2) "Cambiar correo a X" no deja el ciclo en
+    `awaiting_email` si la emisión o el envío fallan (todo dentro del mismo
+    savepoint). (3) Cada botón relee el estado del ciclo antes de actuar; un
+    botón viejo no emite ni transiciona fuera de su estado. (4) Dentro del
+    savepoint, la transición antes del envío: el envío es el último efecto.
+    (5) Pruebas faltantes: recuperación desde `pending_welcome` sin
+    duplicados, límite de 5 envíos con su aviso administrativo, nombre
+    vacío sin `IndexError`.
   - [ ] **G1c — Integrantes ya activos (modo `existente`).** Al encender la
     clave (comando de `cli.py`), a quien ya estaba activo sin correo se le
     pide una vez, sin bloquearlo; en ese modo sólo un mensaje que es
