@@ -194,10 +194,30 @@ def despachar_admin(conn, transporte_admin, ahora: datetime,
                     lote: int = 50) -> dict[str, int]:
     """Una pasada de `despachar_avisos_admin`, con su propio commit. Lo
     llaman `Escucha.tareas_de_fondo` (con el transporte que ya resolvió
-    sondeando) y `Ciclo.tick` (con uno cacheado por token, sin sondear)."""
+    sondeando) y `Ciclo.tick` (con uno cacheado por token, sin sondear).
+
+    Antes de despachar, reconcilia los avisos "🛠️ Administración"
+    (`aviso_administrativo`) todavía sin resolver contra cualquier
+    administrador que se haya vuelto alcanzable desde la última pasada
+    (`avisos_admin.reconciliar_avisos_admin_notice`) -- unificación de G1d
+    con esta unidad (decisión del usuario, 2026-09-28): un solo despacho
+    hacia la administración, para avisos de incidente, avisos
+    administrativos y sus respuestas puntuales (`admin_reply`,
+    `despachador.despachar_respuestas_admin`) por igual. Bajo el mismo
+    `admin()` y el mismo commit que ya envuelve el despacho, así el lote de
+    esta misma pasada ya incluye lo que se acaba de reconciliar. El resumen
+    combina los tres -- quien llama (`Escucha.tareas_de_fondo`) no
+    distingue de dónde vino cada envío/agotado, sólo cuántos hubo."""
+    from . import avisos_admin as AA
+    from .despachador import despachar_respuestas_admin
+
     with admin(conn) as cur:
+        AA.reconciliar_avisos_admin_notice(cur, ahora=ahora)
         resumen = despachar_avisos_admin(cur, transporte_admin, ahora, lote)
+        resumen_respuestas = despachar_respuestas_admin(cur, transporte_admin, ahora, lote)
     conn.commit()
+    for clave in ("enviados", "fallidos", "agotados", "incidentes_sin_registrar"):
+        resumen[clave] += resumen_respuestas[clave]
     return resumen
 
 
