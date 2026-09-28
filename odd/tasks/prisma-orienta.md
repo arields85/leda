@@ -3421,3 +3421,12 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   una migración que sólo cambia un `default` no cambiaba "nada observable" para el
   ensayo de rollback. Enfocada (reejecutada por el orquestador, junto con el banco):
   `288 passed`. Suite completa (escritor): `974 passed, 108 deselected`.
+
+- 2026-09-27: **Banco: comprobadores al día** (hallazgos laterales del experimento 3).
+  Ruta: delegada, el mismo escritor. `comprobar_aclaracion` acepta la etiqueta
+  acortada por palabra con "…" (misma regla que `truncar_etiqueta_boton`) y sigue
+  rechazando una tarea equivocada; `comprobar_personas_mencionadas` suma los estados
+  legibles y "Todavía" al vocabulario conocido, sin dejar de detectar nombres
+  inventados. Sólo `tests/banco/`. Pruebas unitarias del banco: `tests/banco/test_corrida.py`
+  -> `57 passed` (escritor); RED/GREEN sobre las cuatro pruebas positivas nuevas.
+  No se corrió el banco real.

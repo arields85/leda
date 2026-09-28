@@ -17,6 +17,8 @@ from dataclasses import dataclass, field
 
 from prisma.deteccion_pregunta import hace_pregunta as _hace_pregunta
 from prisma.deteccion_pregunta import pide_elegir_en_imperativo as _pide_elegir_en_imperativo
+from prisma.herramientas import _ESTADOS_LEGIBLES
+from prisma.salida import TRUNCAR_ETIQUETA_BOTON
 
 RESULTADOS = ("aprobado", "falla", "no_concluyente", "bloqueado")
 
@@ -184,17 +186,33 @@ _GENERICAS = ("CoreWork", "Prisma", "Dirección", "Referente técnico de área",
              "Sistemas eléctricos y tableros", "Software e interfaz HMI",
              "Gestión", "Google Drive")
 
-# Saludos, muletillas e interjecciones que empiezan una oración con
-# mayúscula: sin esto, "Hola Marcos" arma un candidato de dos palabras donde
-# "Hola" no está en ninguna lista y marca no_concluyente sobre un nombre
-# real. Se descartan ANTES de evaluar el candidato, no se agregan a las
-# palabras conocidas: si sólo queda una palabra desconocida después de
-# descartar el saludo, sigue contando (a diferencia del resto del
-# comprobador, acá 1 palabra alcanza).
+# Hallazgo lateral del Experimento 3 (opinión sombra, `odd/tasks/
+# prisma-orienta.md`): "Bloqueada Todavía"/"Asignada Todavía" marcaban
+# no_concluyente en b-0002/b-0003 -- una palabra de estado
+# (`herramientas._ESTADOS_LEGIBLES`, la misma que
+# renderiza "Estado actual: Bloqueada" o el menú de tarea) seguida de
+# "Todavía" arma un candidato de dos palabras donde ninguna está en el
+# vocabulario conocido, aunque ninguna sea un nombre. Las palabras de estado
+# son vocabulario conocido de verdad (como los días o los meses, más
+# arriba) -- se agregan a `conocidas`, no se descartan.
+_PALABRAS_ESTADO_TAREA = _ESTADOS_LEGIBLES.values()
+
+# Saludos, muletillas e interjecciones que empiezan una oración (o, en un
+# mensaje con varias líneas, una línea) con mayúscula: sin esto, "Hola
+# Marcos" arma un candidato de dos palabras donde "Hola" no está en ninguna
+# lista y marca no_concluyente sobre un nombre real. Se descartan ANTES de
+# evaluar el candidato, no se agregan a las palabras conocidas: si sólo
+# queda una palabra desconocida después de descartar el saludo, sigue
+# contando (a diferencia del resto del comprobador, acá 1 palabra alcanza).
+# "Todavía" entra por el mismo motivo que "Hoy"/"Mañana": un adverbio común
+# que puede empezar una línea con mayúscula sin ser nombre de nadie
+# (Experimento 3, "Bloqueada Todavía"/"Asignada Todavía" -- el patrón de
+# nombre cruza el salto de línea entre "Estado: Bloqueada" y la siguiente).
 _PALABRAS_DESCARTABLES = (
     "Hola", "Buen", "Buenas", "Buenos", "Listo", "Perfecto", "Dale", "Genial",
-    "Tu", "Tus", "Te", "Hoy", "Mañana", "Sí", "No", "Ok", "Che", "Gracias",
-    "Ojo", "Recordá", "Vos", "Bien", "Eso", "Esa", "Ese", "Todo", "Nada", "Claro",
+    "Tu", "Tus", "Te", "Hoy", "Mañana", "Todavía", "Sí", "No", "Ok", "Che",
+    "Gracias", "Ojo", "Recordá", "Vos", "Bien", "Eso", "Esa", "Ese", "Todo",
+    "Nada", "Claro",
 )
 
 
@@ -224,7 +242,7 @@ def comprobar_personas_mencionadas(
     """
     conocidas = _palabras(integrantes) | _palabras(titulos_tareas) \
         | _palabras(nombres_permitidos) | _palabras(_DIAS) | _palabras(_MESES) \
-        | _palabras(_GENERICAS)
+        | _palabras(_GENERICAS) | _palabras(_PALABRAS_ESTADO_TAREA)
 
     candidatos = _PATRON_NOMBRE.findall(evidencia.respuesta_texto)
     desconocidos: list[str] = []
@@ -544,11 +562,50 @@ def comprobaciones_pregunta_con_opciones(
 # ---------------------------------------------------------------------------
 
 
+def _es_forma_ofrecida_del_titulo(etiqueta: str, titulo: str) -> bool:
+    """True si `etiqueta` es el título entero, o su forma acortada real de
+    botón (`salida.acortar_etiqueta_boton`/`etiquetas_boton_distinguibles`;
+    Experimento 3, `odd/tasks/prisma-orienta.md`: comprobador desactualizado
+    por `e7071eb`/`2bee9a9`, hallazgo lateral del experimento de opinión
+    sombra sobre b-0013). El corte real de esas funciones
+    siempre cae en un límite de PALABRA -- nunca a mitad de una, salvo el
+    corte duro histórico (`salida.truncar_etiqueta_boton`, a
+    `TRUNCAR_ETIQUETA_BOTON`) cuando ni la primera palabra entra en el
+    objetivo. El sufijo " — <nombre>" que agrega `gateway._etiqueta_boton`
+    para una tarea ajena nunca se recorta, así que se separa antes de
+    comparar.
+
+    No acepta un prefijo arbitrario: el texto antes de "…" tiene que ser,
+    letra por letra, un prefijo real de `titulo`, Y ese prefijo tiene que
+    terminar justo donde el título tiene un espacio (o termina ahí) -- o
+    alcanzar el corte duro completo. Un título de otra tarea que por
+    casualidad compartiera las primeras letras no pasaría el corte de
+    palabra salvo que además coincidiera de verdad hasta ese espacio."""
+    etiqueta = etiqueta.strip()
+    if etiqueta == titulo:
+        return True
+    base = etiqueta.split(" — ", 1)[0]
+    if base == titulo:
+        return True
+    if not base.endswith("…"):
+        return False
+    prefijo = base[:-1].rstrip()
+    if not prefijo or not titulo.startswith(prefijo):
+        return False
+    resto = titulo[len(prefijo):]
+    corte_de_palabra = resto == "" or resto[0] == " "
+    corte_duro = len(prefijo) >= TRUNCAR_ETIQUETA_BOTON - 1
+    return corte_de_palabra or corte_duro
+
+
 def comprobar_aclaracion(
     etiquetas_ofrecidas: Iterable[str], *, candidatas_esperadas: Iterable[str],
 ) -> ResultadoComprobacion:
     ofrecidas = tuple(etiquetas_ofrecidas)
-    faltantes = [c for c in candidatas_esperadas if c not in ofrecidas]
+    faltantes = [
+        c for c in candidatas_esperadas
+        if not any(_es_forma_ofrecida_del_titulo(o, c) for o in ofrecidas)
+    ]
     if not faltantes:
         return ResultadoComprobacion("aclaracion", "aprobado")
     return ResultadoComprobacion(

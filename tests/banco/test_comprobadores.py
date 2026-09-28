@@ -244,6 +244,42 @@ def test_saludo_seguido_de_persona_desconocida_sigue_marcando():
     assert "Rodrigo" in r.diferencia
 
 
+# --- Defecto de revisión (Experimento 3, `odd/tasks/prisma-orienta.md`,
+# hallazgo lateral de b-0002/b-0003): "Bloqueada Todavía" y "Asignada
+# Todavía" marcaban no_concluyente -- una palabra de estado
+# (`herramientas._ESTADOS_LEGIBLES`) seguida de "Todavía" al empezar la
+# línea siguiente, ninguna de las dos en ninguna lista conocida, aunque
+# ninguna sea un nombre de persona.
+
+
+def test_estado_bloqueada_seguido_de_todavia_no_marca():
+    ev = Evidencia(
+        respuesta_texto="Estado: Bloqueada\nTodavía no llegó el plano.",
+        herramientas_ejecutadas=())
+    r = comprobar_personas_mencionadas(ev, _EQUIPO)
+    assert r.resultado == "aprobado"
+
+
+def test_estado_asignada_seguido_de_todavia_no_marca():
+    ev = Evidencia(
+        respuesta_texto="Estado: Asignada\nTodavía nadie la tomó.",
+        herramientas_ejecutadas=())
+    r = comprobar_personas_mencionadas(ev, _EQUIPO)
+    assert r.resultado == "aprobado"
+
+
+def test_estado_seguido_de_nombre_desconocido_sigue_marcando():
+    """La palabra de estado es vocabulario conocido, pero no vuelve
+    invisible a la palabra que sigue: si es un nombre real desconocido,
+    sigue marcando -- la corrección no debilita la detección real."""
+    ev = Evidencia(
+        respuesta_texto="Estado: Bloqueada\nRodrigo Aguirre la destrabó.",
+        herramientas_ejecutadas=())
+    r = comprobar_personas_mencionadas(ev, _EQUIPO)
+    assert r.resultado == "no_concluyente"
+    assert "Rodrigo Aguirre" in r.diferencia
+
+
 # ---------------------------------------------------------------------------
 # resultado_general
 # ---------------------------------------------------------------------------
@@ -868,3 +904,55 @@ def test_aclaracion_con_candidatas_de_mas_no_le_importa():
          "Es una tarea nueva", "Ninguna, lo escribo"),
         candidatas_esperadas=("Cablear tablero máq. 3",))
     assert r.resultado == "aprobado"
+
+
+# --- Defecto de revisión (Experimento 3, `odd/tasks/prisma-orienta.md`,
+# hallazgo lateral de b-0013): el comprobador comparaba la etiqueta entera
+# contra el título entero, y `e7071eb`/`2bee9a9` empezaron a acortar las
+# etiquetas de botón con "…" (`salida.acortar_etiqueta_boton`) -- toda
+# aclaración con un título largo quedaba `falla` aunque el botón ofrecido
+# fuera exactamente el que el título produce al acortarse.
+
+
+def test_aclaracion_acepta_la_etiqueta_acortada_del_titulo_largo():
+    from prisma.salida import acortar_etiqueta_boton
+
+    titulo = "Actualizar el dashboard de HMI (simulado)"
+    etiqueta = acortar_etiqueta_boton(titulo)
+    assert etiqueta.endswith("…")   # confirma la premisa: el título se acortó
+    r = comprobar_aclaracion((etiqueta,), candidatas_esperadas=(titulo,))
+    assert r.resultado == "aprobado"
+
+
+def test_aclaracion_acepta_la_etiqueta_acortada_con_sufijo_de_responsable():
+    """`gateway._etiqueta_boton` agrega " — <nombre>" después de acortar,
+    para una tarea ajena -- el sufijo nunca se recorta."""
+    from prisma.salida import acortar_etiqueta_boton
+
+    titulo = "Actualizar el dashboard de HMI (simulado)"
+    etiqueta = f"{acortar_etiqueta_boton(titulo)} — Marcos"
+    r = comprobar_aclaracion((etiqueta,), candidatas_esperadas=(titulo,))
+    assert r.resultado == "aprobado"
+
+
+def test_aclaracion_no_acepta_un_prefijo_arbitrario_de_otra_tarea():
+    """No basta con que las primeras letras coincidan: el prefijo tiene que
+    coincidir de verdad, letra por letra, hasta el límite de palabra -- una
+    tarea distinta con otro título no cuela sólo por parecerse al principio."""
+    r = comprobar_aclaracion(
+        ("Actualizar el dashboard de otra…",),
+        candidatas_esperadas=("Actualizar el dashboard de HMI (simulado)",))
+    assert r.resultado == "falla"
+
+
+def test_aclaracion_no_acepta_la_etiqueta_de_una_tarea_distinta():
+    """La forma acortada de la tarea EQUIVOCADA sigue sin contar para la
+    esperada, aunque las dos empiecen distinto."""
+    from prisma.salida import acortar_etiqueta_boton
+
+    esperada = "Actualizar el dashboard de HMI (simulado)"
+    otra = "Revisar gráficos del dashboard HMI (simulado)"
+    r = comprobar_aclaracion(
+        (acortar_etiqueta_boton(otra),), candidatas_esperadas=(esperada,))
+    assert r.resultado == "falla"
+    assert esperada in r.diferencia
