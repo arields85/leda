@@ -681,6 +681,19 @@ Este enlace vence en 24 horas, sirve una sola vez y tiene que
   es trabajo de la sesión principal.
 - E. `{nombre}` = primera palabra del nombre guardado.
 
+- F. Acción de la administración sobre "envíos agotados" (aprobada
+  2026-09-28): el aviso por el bot de administración dice "🛠️ Administración
+  · {equipo}
+{nombre} agotó los 5 envíos del correo de verificación." con
+  **[Habilitar un nuevo intento]** **[Marcar leído]**. Habilitar pasa por
+  vista previa y confirmación (rol revalidado); abre un intento nuevo y a la
+  persona le llega sola: "¿Te mando la verificación a {correo} otra vez?"
+  **[Sí, a {correo}]** **[Usar otro correo]**; el aviso queda resuelto. Los
+  avisos "falta configurar el envío de correo" y "quiénes no dieron su
+  correo" son informativos: sólo **[Marcar leído]**. Con esto B12 pasa a
+  "Se agotaron los envíos de verificación. Ya le avisé a administración y te
+  escribo apenas lo destrabe."
+
 Pendiente: aplicar estos textos (unidad G1t) cuando termine G1d-a, que toca
 los mismos archivos.
 
