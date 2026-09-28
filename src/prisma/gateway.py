@@ -147,6 +147,19 @@ def procesar_update(conn, slug: str, update: dict,
     with conn.cursor() as cur:
         cur.execute("set role prisma_admin")
         ws = _espacio_por_slug(cur, slug)
+    # Tanda 1, G1e, caso 16 ("reinicio"): sin este commit, `conn` queda "en
+    # transacción" desde este `execute` suelto (autocommit=False) para el
+    # resto del dispatch. El camino `/start` (`_activacion` ->
+    # `resolver_verificacion_correo`) abre su propia transacción con
+    # `admin()`/`espacio()` (`conn.transaction()`) asumiendo que es la
+    # primera de la conexión -- si ya hay una abierta, la suya queda
+    # anidada (savepoint) y nunca se confirma sola: la verificación (o la
+    # activación) sólo queda de veras en la base cuando algún commit
+    # AJENO posterior, en la misma conexión, la arrastra consigo. Si el
+    # proceso cae antes, la persona ya recibió "verificado"/"Listo" sin
+    # que quedara ningún recibo real. Cerrar esta transacción de sólo
+    # lectura acá deja siempre `conn` en `IDLE` antes de despachar.
+    conn.commit()
     if ws is None or not ws["activo"]:
         raise HTTPException(status_code=404, detail="espacio no disponible")
     workspace_id = str(ws["id"])
