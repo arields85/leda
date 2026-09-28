@@ -22,6 +22,7 @@ Estas pruebas cubren:
 from __future__ import annotations
 
 import threading
+from contextlib import ExitStack
 from datetime import datetime, timezone
 
 import psycopg
@@ -2199,23 +2200,33 @@ def test_default_de_at_ordena_por_escritura_aunque_b_arranco_antes(
     # B arranca su transacción -- y con ella, su `now()` -- con una consulta
     # real, antes de que A arranque la suya. El cursor queda abierto: B no
     # inserta nada todavía.
+    #
+    # `admin(otra)` se entra y se sale a mano (no con `with`) porque el
+    # bloque de A tiene que quedar intercalado en el medio, con su propio
+    # commit, antes de que B siga escribiendo -- pero eso deja la ventana
+    # abierta a que una falla de A dejara la transacción de B sin cerrar y
+    # trabara el teardown (T6k, seguimiento a review-2c5b0ffe). `ExitStack`
+    # garantiza el `__exit__` de `admin_b` (con la excepción real, si la
+    # hubo) antes de propagarla, y `finally` garantiza el cierre de la
+    # conexión `otra` en cualquier caso.
     otra = conectar(uri)
-    admin_b = admin(otra)
-    cur_b = admin_b.__enter__()
-    cur_b.execute("select 1")
+    try:
+        with ExitStack() as pila:
+            cur_b = pila.enter_context(admin(otra))
+            cur_b.execute("select 1")
 
-    # A arranca DESPUÉS de B, crea su tarea -- e inserta su único
-    # `task_state_event` sin fijar `at` -- y confirma.
-    with admin(conn) as cur_a:
-        tid_a = _tarea(cur_a, ws, titulo="Tarea A (default at)", estado="en_curso")
-    conn.commit()
+            # A arranca DESPUÉS de B, crea su tarea -- e inserta su único
+            # `task_state_event` sin fijar `at` -- y confirma.
+            with admin(conn) as cur_a:
+                tid_a = _tarea(cur_a, ws, titulo="Tarea A (default at)", estado="en_curso")
+            conn.commit()
 
-    # Recién ahora B -- con la transacción abierta desde antes de que A
-    # arrancara -- crea la suya, también sin fijar `at`.
-    tid_b = _tarea(cur_b, ws, titulo="Tarea B (default at)", estado="en_curso")
-    admin_b.__exit__(None, None, None)
-    otra.commit()
-    otra.close()
+            # Recién ahora B -- con la transacción abierta desde antes de que
+            # A arrancara -- crea la suya, también sin fijar `at`.
+            tid_b = _tarea(cur_b, ws, titulo="Tarea B (default at)", estado="en_curso")
+        otra.commit()
+    finally:
+        otra.close()
 
     with admin(conn) as cur:
         cur.execute("select at from task_state_event where task_id = %s", (tid_a,))

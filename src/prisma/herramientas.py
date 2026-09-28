@@ -99,7 +99,12 @@ def _huella(*partes: Any) -> str:
     return hashlib.sha256(crudo.encode("utf-8")).hexdigest()
 
 
-_ESTADOS_LEGIBLES = {
+# Público (T6k, seguimiento a review-2c5b0ffe): el banco conversacional
+# (`tests/banco/comprobadores.py`) necesita este vocabulario -- una palabra
+# de estado ("Bloqueada", "Asignada") es vocabulario conocido, no un nombre
+# de persona -- así que se expone con nombre público en vez de que ese
+# módulo importe un privado de acá.
+ESTADOS_LEGIBLES = {
     "asignada": "Asignada", "en_curso": "En curso", "bloqueada": "Bloqueada",
     "en_revision": "En revisión", "terminada": "Terminada",
     "cancelada": "Cancelada",
@@ -107,7 +112,7 @@ _ESTADOS_LEGIBLES = {
 
 
 def _estado_legible(estado: str | None) -> str:
-    return _ESTADOS_LEGIBLES.get(estado, estado or "sin estado")
+    return ESTADOS_LEGIBLES.get(estado, estado or "sin estado")
 
 
 # El texto exacto que `db/esquema.sql: motivo_no_cierra_tarea` devuelve cuando

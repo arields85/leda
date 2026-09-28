@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 
 from prisma.deteccion_pregunta import hace_pregunta as _hace_pregunta
 from prisma.deteccion_pregunta import pide_elegir_en_imperativo as _pide_elegir_en_imperativo
-from prisma.herramientas import _ESTADOS_LEGIBLES
+from prisma.herramientas import ESTADOS_LEGIBLES
 from prisma.salida import TRUNCAR_ETIQUETA_BOTON
 
 RESULTADOS = ("aprobado", "falla", "no_concluyente", "bloqueado")
@@ -189,13 +189,13 @@ _GENERICAS = ("CoreWork", "Prisma", "Dirección", "Referente técnico de área",
 # Hallazgo lateral del Experimento 3 (opinión sombra, `odd/tasks/
 # prisma-orienta.md`): "Bloqueada Todavía"/"Asignada Todavía" marcaban
 # no_concluyente en b-0002/b-0003 -- una palabra de estado
-# (`herramientas._ESTADOS_LEGIBLES`, la misma que
+# (`herramientas.ESTADOS_LEGIBLES`, la misma que
 # renderiza "Estado actual: Bloqueada" o el menú de tarea) seguida de
 # "Todavía" arma un candidato de dos palabras donde ninguna está en el
 # vocabulario conocido, aunque ninguna sea un nombre. Las palabras de estado
 # son vocabulario conocido de verdad (como los días o los meses, más
 # arriba) -- se agregan a `conocidas`, no se descartan.
-_PALABRAS_ESTADO_TAREA = _ESTADOS_LEGIBLES.values()
+_PALABRAS_ESTADO_TAREA = ESTADOS_LEGIBLES.values()
 
 # Saludos, muletillas e interjecciones que empiezan una oración (o, en un
 # mensaje con varias líneas, una línea) con mayúscula: sin esto, "Hola
@@ -562,6 +562,13 @@ def comprobaciones_pregunta_con_opciones(
 # ---------------------------------------------------------------------------
 
 
+# `salida.truncar_etiqueta_boton` corta a `limite - 1` caracteres y agrega
+# "…" (un carácter) para que el total no supere `limite`: el prefijo de un
+# corte duro real nunca es más largo que esto (T6k, seguimiento a
+# review-2c5b0ffe -- el `- 1` estaba repetido acá sin explicar de dónde salía).
+_LARGO_MAXIMO_PREFIJO_CORTE_DURO = TRUNCAR_ETIQUETA_BOTON - 1
+
+
 def _es_forma_ofrecida_del_titulo(etiqueta: str, titulo: str) -> bool:
     """True si `etiqueta` es el título entero, o su forma acortada real de
     botón (`salida.acortar_etiqueta_boton`/`etiquetas_boton_distinguibles`;
@@ -594,18 +601,53 @@ def _es_forma_ofrecida_del_titulo(etiqueta: str, titulo: str) -> bool:
         return False
     resto = titulo[len(prefijo):]
     corte_de_palabra = resto == "" or resto[0] == " "
-    corte_duro = len(prefijo) >= TRUNCAR_ETIQUETA_BOTON - 1
+    corte_duro = len(prefijo) >= _LARGO_MAXIMO_PREFIJO_CORTE_DURO
     return corte_de_palabra or corte_duro
+
+
+def _candidatas_sin_pareja(
+    candidatas: tuple[str, ...], ofrecidas: tuple[str, ...],
+) -> list[str]:
+    """Empareja cada candidata con, a lo sumo, UNA etiqueta ofrecida
+    distinta -- matching bipartito por caminos aumentantes (algoritmo de
+    Kuhn) -- y devuelve las candidatas que se quedaron sin pareja.
+
+    Corrección de revisión (T6k, seguimiento a review-2c5b0ffe): antes se
+    preguntaba, candidata por candidata, si ALGUNA etiqueta la ofrecía, sin
+    llevar cuenta de cuáles ya estaban usadas -- una sola etiqueta acortada
+    que comparte el mismo prefijo con dos títulos distintos (p. ej.
+    "Actualizar el dashboard…" es forma ofrecida válida tanto de "Actualizar
+    el dashboard" como de "Actualizar el dashboard de HMI") contaba como
+    oferta para las dos y daba un falso "aprobado" cuando en los botones
+    reales sólo había una."""
+    dueno_de_etiqueta: dict[int, int] = {}  # índice de etiqueta -> índice de candidata
+
+    def _intentar(candidata_idx: int, visitadas: set[int]) -> bool:
+        for etiqueta_idx, etiqueta in enumerate(ofrecidas):
+            if etiqueta_idx in visitadas:
+                continue
+            if not _es_forma_ofrecida_del_titulo(etiqueta, candidatas[candidata_idx]):
+                continue
+            visitadas.add(etiqueta_idx)
+            actual = dueno_de_etiqueta.get(etiqueta_idx)
+            if actual is None or _intentar(actual, visitadas):
+                dueno_de_etiqueta[etiqueta_idx] = candidata_idx
+                return True
+        return False
+
+    for candidata_idx in range(len(candidatas)):
+        _intentar(candidata_idx, set())
+
+    emparejadas = set(dueno_de_etiqueta.values())
+    return [c for i, c in enumerate(candidatas) if i not in emparejadas]
 
 
 def comprobar_aclaracion(
     etiquetas_ofrecidas: Iterable[str], *, candidatas_esperadas: Iterable[str],
 ) -> ResultadoComprobacion:
     ofrecidas = tuple(etiquetas_ofrecidas)
-    faltantes = [
-        c for c in candidatas_esperadas
-        if not any(_es_forma_ofrecida_del_titulo(o, c) for o in ofrecidas)
-    ]
+    candidatas = tuple(candidatas_esperadas)
+    faltantes = _candidatas_sin_pareja(candidatas, ofrecidas)
     if not faltantes:
         return ResultadoComprobacion("aclaracion", "aprobado")
     return ResultadoComprobacion(

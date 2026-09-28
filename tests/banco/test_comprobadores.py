@@ -247,7 +247,7 @@ def test_saludo_seguido_de_persona_desconocida_sigue_marcando():
 # --- Defecto de revisión (Experimento 3, `odd/tasks/prisma-orienta.md`,
 # hallazgo lateral de b-0002/b-0003): "Bloqueada Todavía" y "Asignada
 # Todavía" marcaban no_concluyente -- una palabra de estado
-# (`herramientas._ESTADOS_LEGIBLES`) seguida de "Todavía" al empezar la
+# (`herramientas.ESTADOS_LEGIBLES`) seguida de "Todavía" al empezar la
 # línea siguiente, ninguna de las dos en ninguna lista conocida, aunque
 # ninguna sea un nombre de persona.
 
@@ -935,12 +935,29 @@ def test_aclaracion_acepta_la_etiqueta_acortada_con_sufijo_de_responsable():
     assert r.resultado == "aprobado"
 
 
-def test_aclaracion_no_acepta_un_prefijo_arbitrario_de_otra_tarea():
-    """No basta con que las primeras letras coincidan: el prefijo tiene que
-    coincidir de verdad, letra por letra, hasta el límite de palabra -- una
-    tarea distinta con otro título no cuela sólo por parecerse al principio."""
+def test_aclaracion_no_acepta_un_prefijo_de_otra_tarea_que_no_coincide_letra_por_letra():
+    """No basta con que las primeras letras se parezcan: el prefijo antes de
+    "…" tiene que ser, letra por letra, un prefijo real del título -- una
+    tarea distinta con otro título no cuela sólo por empezar parecido."""
     r = comprobar_aclaracion(
         ("Actualizar el dashboard de otra…",),
+        candidatas_esperadas=("Actualizar el dashboard de HMI (simulado)",))
+    assert r.resultado == "falla"
+
+
+def test_aclaracion_no_acepta_un_corte_a_mitad_de_palabra():
+    """Defecto de revisión (T6k, seguimiento a review-2c5b0ffe): la prueba
+    anterior con este nombre decía cubrir "el límite de palabra", pero su
+    prefijo ("...de otra") ni siquiera coincidía letra por letra con el
+    título -- `titulo.startswith(prefijo)` ya daba `False` y la función
+    volvía antes de llegar a `corte_de_palabra`/`corte_duro`. Acá el prefijo
+    SÍ es letra por letra un prefijo real del título ("dashboa" de
+    "dashboard"), pero corta a mitad de esa palabra: ni cae en un límite de
+    palabra (el carácter siguiente no es un espacio) ni alcanza el corte
+    duro (mucho más corto que `TRUNCAR_ETIQUETA_BOTON`), así que de verdad
+    ejercita esa rama y sigue sin aceptarse."""
+    r = comprobar_aclaracion(
+        ("Actualizar el dashboa…",),
         candidatas_esperadas=("Actualizar el dashboard de HMI (simulado)",))
     assert r.resultado == "falla"
 
@@ -956,3 +973,36 @@ def test_aclaracion_no_acepta_la_etiqueta_de_una_tarea_distinta():
         (acortar_etiqueta_boton(otra),), candidatas_esperadas=(esperada,))
     assert r.resultado == "falla"
     assert esperada in r.diferencia
+
+
+# ---------------------------------------------------------------------------
+# comprobar_aclaracion -- emparejamiento uno a uno (T6k, seguimiento a
+# review-2c5b0ffe): la versión anterior preguntaba, por cada candidata
+# esperada, si ALGUNA etiqueta ofrecida la satisfacía, sin llevar cuenta de
+# cuáles etiquetas ya estaban "gastadas" -- una sola etiqueta acortada que es
+# forma ofrecida válida de dos títulos con el mismo prefijo contaba como
+# oferta para las dos y daba un falso "aprobado" con un solo botón real.
+# ---------------------------------------------------------------------------
+
+
+def test_aclaracion_una_etiqueta_no_alcanza_para_dos_candidatas_con_prefijo_comun():
+    """"Actualizar el dashboard…" es forma ofrecida válida tanto de
+    "Actualizar el dashboard" (coincide entera antes del corte) como de
+    "Actualizar el dashboard de HMI" (corta justo en un límite de palabra) --
+    pero sólo hay UN botón, así que sólo puede cubrir una de las dos."""
+    r = comprobar_aclaracion(
+        ("Actualizar el dashboard…",),
+        candidatas_esperadas=("Actualizar el dashboard",
+                              "Actualizar el dashboard de HMI"))
+    assert r.resultado == "falla"
+
+
+def test_aclaracion_cada_candidata_con_su_propia_etiqueta_aprueba():
+    """Mismas dos candidatas que la prueba anterior, pero con un botón
+    propio para cada una: el emparejamiento uno a uno no le exige de más a
+    un caso sin ambigüedad."""
+    r = comprobar_aclaracion(
+        ("Actualizar el dashboard", "Actualizar el dashboard de HMI"),
+        candidatas_esperadas=("Actualizar el dashboard",
+                              "Actualizar el dashboard de HMI"))
+    assert r.resultado == "aprobado"

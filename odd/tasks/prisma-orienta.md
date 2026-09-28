@@ -3533,3 +3533,15 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   respondió "No hay nadie pendiente de activar": el pack ya trae el
   `telegram_user_id` de esas tres personas, así que el import las dejó vinculadas.
   Tercera ronda en curso.
+
+- 2026-09-28: **T6k cerrada — seguimientos de review-2c5b0ffe.** Ruta: delegada, un
+  escritor. `comprobar_aclaracion` empareja candidatas y etiquetas uno a uno (una
+  etiqueta acortada ya no satisface dos candidatas con el mismo comienzo); la prueba
+  de dos conexiones usa `ExitStack` + `try/finally`; una prueba nueva cubre de verdad
+  el corte a mitad de palabra; `_LARGO_MAXIMO_PREFIJO_CORTE_DURO` nombra el `- 1`;
+  `herramientas.ESTADOS_LEGIBLES` pasa a ser público y el banco lo importa por ese
+  nombre. RED/GREEN observado. Enfocada: `tests/banco/test_comprobadores.py
+  tests/banco/test_corrida.py tests/test_entrega_con_evidencia.py` -> `208 passed`
+  (escritor); reejecutada por el orquestador junto con T7c -> `195 passed`
+  (`test_comprobadores`, `test_siembra`, `test_entrega_con_evidencia`). Suite completa
+  (escritor): `1021 passed, 108 deselected`.
