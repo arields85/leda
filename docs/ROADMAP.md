@@ -174,7 +174,10 @@ membresía, y en el alta el espacio todavía no existe.
 ### Tablero de cliente
 
 **Entrega:** la superficie que consume el puerto de lectura y permite al cliente
-ajustar su propia configuración, con cada cambio atribuido en la auditoría.
+ajustar su propia configuración, con cada cambio atribuido en la auditoría. Incluye
+las cadencias del bloque 5 de la entrevista de alta (`nucleo/alta-de-equipo.md`):
+qué días y a qué hora Prisma pide estado, el resumen grupal y el tope de mensajes
+automáticos por persona. Un cambio de cadencia toma efecto sin reiniciar el proceso.
 
 **Depende de:** puerto de lectura (hecho) y su credencial de acceso, cuya
 implementación quedó en pausa sin comitear.
