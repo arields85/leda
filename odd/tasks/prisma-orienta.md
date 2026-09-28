@@ -3936,3 +3936,14 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   propia conexión, después del ACK del webhook. Pruebas del indicador con eventos en vez
   de esperas fijas. ROJO/VERDE observados. Suite completa del escritor: `1202 passed,
   108 deselected`.
+  Revisión de `04878c8`: medio (`slice_budget_reached`, 521 líneas); consentimiento del
+  usuario: revisar. review-587f6330bf9c64b9 (confiabilidad) aprobada y reconocida;
+  frontera en `04878c8`. Hallazgos no bloqueantes, para después de la ronda (afectan a
+  `servir`, no a `escuchar`): R3-001 la espera del retiro (hasta 5 s) corre dentro del
+  turno y en `servir` bloquea el bucle de eventos; R3-004 despacho concurrente en tareas
+  de fondo (confirmar que `for update skip locked` lo cubre, ya probado en #29); R3-002
+  falta la prueba del borrador abandonado; R3-003 una prueba con espera fija de 30 ms.
+
+- 2026-09-28: **Cierre de sesión.** Punto exacto para retomar y guion de la tercera ronda
+  en `docs/STATUS.md`. La ronda va en horario laboral (09:00-17:00), porque fuera de
+  horario los avisos que no son respuesta se postergan.

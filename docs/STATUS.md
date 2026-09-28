@@ -188,62 +188,56 @@ serializan y la hora de cada evento, evidencia y aprobación es la de escritura
 (`0016`). Decisiones del usuario registradas como enmiendas de ADR 0009. Prueba de punta
 a punta de "Pedir cambios" por el webhook. Todo esto **todavía no se probó en vivo**.
 
-**Punto exacto para retomar (cierre de sesión 2026-09-28).** Árbol limpio en `main`,
-frontera de revisión en `dd6ab0a` (review-1b0a5a4777341c90 aprobada y reconocida).
-`main` está por delante de `origin/main` (sin push). Base local de trabajo: `prisma`,
-creada desde el esquema hasta `0016` y sembrada (`PRUEBA-LOCAL.md` §5); la base
-`postgres` conserva los datos de las sesiones 1 y 2, con respaldo
-`db/respaldos/prisma-antes-base-nueva-20260928.dump`. En esta sesión, además de lo de
-arriba: hallazgo 10 (una pregunta descartada no se reabre, `7e816b6`), `b-0005-b`
-(el router reformula referencias, banco real 29 -> 32 aprobados sin empeorar ninguno,
-`844a471`) y cada incidente avisa también al administrador por el bot de
-administración (`dd6ab0a`, migración `0017`).
+**Punto exacto para retomar (cierre de sesión 2026-09-28, noche).** Árbol limpio en
+`main`, por delante de `origin/main` (sin push). Frontera de revisión: ver la última
+entrada de `odd/tasks/prisma-orienta.md`. PostgreSQL local (scoop) no es un servicio:
+tras reiniciar Windows, arrancarlo con `pg_ctl` (`PRUEBA-LOCAL.md`).
 
-Actualización (2026-09-28, más tarde): **#28b cerrada** (backoff 1-2-4-8 minutos, un
-aviso agotado deja incidente sin volver a avisar por el canal caído, el token del bot
-de administración se toma aunque se configure después; detalle en
-`odd/tasks/prisma-orienta.md`). Base `prisma` con la migración `0017` aplicada
-(respaldo `db/respaldos/prisma-antes-0017-20260928.dump`); `PRISMA_BOT_TOKEN_ADMIN`
-configurado por el usuario. PostgreSQL local (scoop) no es un servicio: tras reiniciar
-Windows hay que arrancarlo con `pg_ctl`.
+Cerradas en esta sesión (detalle y evidencia en `odd/tasks/prisma-orienta.md`): avisos
+al administrador con espera entre reintentos y sin fallar en silencio (#28b, #28c);
+administrador alcanzable en modo local (`python -m prisma administrador`, `escuchar`
+lee el bot de administración sin robarle un webhook ajeno; #11, #11b, #11c); una sola
+rutina de fondo para `escuchar` y `servir` con cadencias releídas de la base y
+`--sin-cadencias` (#29, #29b, #29c; arregló que la cadencia del lunes salía el martes);
+el token del bot fuera de todo error guardado o impreso; íconos por categoría en los
+botones y saludo diario al primer mensaje del día a cada persona, decidido al despachar
+(#7, #7b, #7c; migraciones `0018`, `0019`); `escuchar`/`servir` se niegan a arrancar si
+falta una migración; respuesta inmediata e indicador "escribiendo…" con borrador
+nativo sólo si el turno pasa de 1,5 s (#9, #9b, ADR 0011).
 
-Próximo, en este orden (el usuario adelantó la ronda el 2026-09-28: "lo importante es
-probar cómo responde Prisma después de las correcciones"):
+Base local `prisma`: migraciones hasta `0019` aplicadas (respaldos
+`db/respaldos/prisma-antes-0017-20260928.dump` y
+`prisma-antes-0018-0019-20260928.dump`); Ariel De Simone designado administrador de
+plataforma; `PRISMA_BOT_TOKEN_ADMIN` configurado y rotado por el usuario.
 
-*(Cerradas en esta sesión: administrador alcanzable en modo local, #28b, #28c, #11b,
-#11c, #29, #29b y #29c. Con #29, `escuchar` y `servir` comparten una misma rutina de fondo
-(`src/prisma/ciclo.py`): cadencias —releídas de la base en cada pasada, así que un
-cambio toma efecto sin reiniciar—, escalera, despacho de `message_outbox` y, una vez
-por pasada, de `admin_notice`; `--sin-cadencias` las apaga en los dos comandos. Arregló
-además que una cadencia de lunes disparaba el martes: `CronTrigger.from_crontab` de
-APScheduler 3 numera los días distinto del cron estándar.)*
+**Próximo: tercera ronda por Telegram, en horario laboral (09:00-17:00).** Fuera de
+horario, los avisos que no son respuesta (p. ej. el pedido de aprobación a Ismael) se
+postergan al día hábil siguiente y el circuito A se trabaría. Guion:
 
-1. *(Cerradas también: el token fuera de los errores de Telegram, y #7, íconos en los
-   botones —📋 tarea, ➕ Ver más, 💬 Quiero consultar otra cosa, ✅ Confirmar, ✖️ Cancelar,
-   ✏️ Otra opción— y saludo diario "👋 Buen día / Buenas tardes / Buenas noches": el
-   primer mensaje del día a cada persona lo lleva, sea respuesta, cadencia o aviso, y no
-   se repite ese día (decisión del usuario); se decide al despachar. Migraciones
-   `0018_saludo_diario` y `0019_marca_de_bienvenida`.)*
-2. *(#9 cerrada, ADR 0011: la respuesta a quien escribió sale apenas está lista, en
-   `escuchar` y en `servir`; "escribiendo…" y el borrador nativo animado
-   (`sendMessageDraft`, semilla U+2063, sólo en chats privados) aparecen si el turno
-   pasa de 1,5 s y se retiran al terminar, antes de cualquier botón. Sus fallas no
-   bloquean el turno, se imprimen una vez por turno y un retiro fallido deja un
-   incidente.)*
-3. **Tercera ronda por Telegram**: entrega con evidencia y "Pedir cambios" (guion de dos
-   circuitos en `odd/tasks/prisma-orienta.md`), avisos al administrador, íconos, saludo
-   e indicador. Probablemente con `escuchar --sin-cadencias` (se decide al arrancar).
-   Base `prisma` ya con `0018` y `0019` aplicadas (respaldo
-   `db/respaldos/prisma-antes-0018-0019-20260928.dump`). Antes: reiniciar
-   el listener con el código commiteado y que el administrador (Ariel De Simone, ya
-   designado) le escriba al bot de administración con `escuchar` corriendo.
-4. Después de la ronda: **#23** el validador de invariantes
-   (`odd/tasks/validador-invariantes.md`), los escenarios del banco que fallan desde
-   antes de `b-0005-b` (`b-0001`, `b-0001-a`, `b-0002-c`, `b-0013`) y T7d (`sembrar`).
+0. Arrancar `python -m prisma escuchar corework --sin-cadencias` (con el código
+   commiteado; si falta una migración, el comando lo dice y no arranca). Ariel le
+   escribe una vez al bot de administración: la consola muestra `← [admin] ...`.
+1. Saludo e indicador: el primer mensaje del día de cada uno llega con "👋 Buen día" y
+   no se repite; un pedido que tarda muestra "escribiendo…" y la animación, que
+   desaparecen al llegar la respuesta.
+2. Íconos: pedir las tareas propias; cada tarea con 📋, "➕ Ver más" y "💬 Quiero
+   consultar otra cosa".
+3. Circuito A: Ariel entrega "Dashboard de lotes en CoreLabs" con evidencia -> Ismael
+   pide cambios -> Ariel vuelve a entregar con evidencia nueva -> el botón viejo del
+   aviso dice que ya no está vigente -> Ismael aprueba desde el aviso nuevo y la tarea
+   se cierra.
+4. Circuito B: Marcos entrega "Revisar comunicaciones industriales de la comprimidora"
+   (depende de "Programar PLC de la comprimidora", sin terminar) -> Ismael pide cambios
+   y la tarea vuelve a `en_curso`.
+5. Revisar en cada paso: respuesta visible, PostgreSQL, efectos y auditoría; si aparece
+   un incidente, el aviso tiene que llegarle a Ariel por el bot de administración.
 
-Sin bloquear la ronda: `despachador._fallo` (`message_outbox`) reintenta sin espera en
-horario laboral (`cal.dentro_de_jornada(ahora)` devuelve `ahora`); y el bot de
-administración no le contesta nada al administrador cuando le escribe.
+Después de la ronda, sin bloquearla: #23 validador de invariantes
+(`odd/tasks/validador-invariantes.md`); escenarios del banco que fallan desde antes de
+`b-0005-b` (`b-0001`, `b-0001-a`, `b-0002-c`, `b-0013`); T7d (`sembrar`); espera entre
+reintentos en `message_outbox` (`despachador._fallo`); confirmación del bot de
+administración al vincularse; `_activacion` sin commit explícito en /start sin token;
+menores de la revisión del saludo.
 
 La rama auxiliar `auxiliar/alta-y-google` avanza en su sesión (alta con correo y
 Google); `main` cambió mucho desde que se creó, así que le toca traer los cambios de
