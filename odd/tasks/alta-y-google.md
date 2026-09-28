@@ -503,6 +503,24 @@ Un worktree nuevo no trae lo que no se versiona.
     esta unidad: la prueba de `main` usa `AHORA = datetime(2026, 9, 27,
     ...)` fijo y desde el 2026-09-28 la acción pendiente figura vencida.
     Hallazgo para `main`.
+    Revisión RDD `review-6e2a912d445df569` (riesgo alto, consentida; cuatro
+    lentes): aprobada; reconocimiento emitido.
+  - [ ] **G1d-a3 — Correcciones tras la revisión de G1d-a2.** (1)
+    Regresión: `abrir_ciclo_alta` ya no abre un ciclo nuevo si existe una
+    proyección de un ciclo anterior (p. ej. reactivación tras `revoked`);
+    debe abrirlo, sin perder la protección contra la carrera de la primera
+    activación. (2) La contención del despacho administrativo en `local.py`
+    registra un incidente en cada pasada si el error persiste: deduplicar
+    con la misma ventana que los incidentes de plataforma. (3) Una sola
+    definición de "administrador con Telegram" para despachar y reconciliar.
+    (4) Prueba de la contención en `cli.py despachar` (lo del espacio que ya
+    se despachó sobrevive). (5) Docstrings de
+    `_incidente_plataforma_persistente` y `crear_aviso` fieles al código;
+    constante con nombre para los reintentos de `crear_aviso`; claves de
+    bloqueo consultivo con espacio de nombres propio para no chocar entre
+    sí. Nota: la migración `0100` se edita en su lugar porque nunca se
+    aplicó en ninguna base; si llegara a aplicarse antes de integrar, los
+    cambios siguientes irían en una migración nueva `01xx`.
   - [ ] **G1d — Avisos "🛠️ Administración" por el bot de administración.**
     Camino de salida propio (hoy el bot de administración no envía nada y
     `message_outbox` exige `workspace_id`); botones Reenviar correo /
