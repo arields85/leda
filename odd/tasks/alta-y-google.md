@@ -468,6 +468,24 @@ Un worktree nuevo no trae lo que no se versiona.
     1172 passed, 108 deselected`; las dos fallas son pruebas de migración de
     `test_task_intake.py` que pasan aisladas (`4 passed`), el mismo patrón
     de contención ya registrado.
+    Revisión RDD `review-32981fbfd82ee215` (riesgo alto, consentida; cuatro
+    lentes): aprobada; reconocimiento emitido.
+  - [ ] **G1d-a2 — Endurecimiento tras la revisión de G1d-a.** (1) El
+    despacho de avisos en `local.py` queda contenido (try/rollback +
+    incidente): un error de administración nunca frena el despacho de un
+    espacio. (2) Reintentos con espera creciente real (columna de próximo
+    intento), no en cada pasada. (3) La reconciliación de entregas no
+    recorre toda la historia en cada pasada: sólo avisos no resueltos (un
+    administrador nuevo no recibe avisos ya resueltos) y acotada. (4) El
+    incidente "falta token / no hay administrador" se deduplica sólo
+    mientras el anterior sigue abierto: si el problema vuelve, vuelve a
+    quedar registrado (nunca fallar en silencio). (5) El índice único de
+    avisos incluye `workspace_id`, y el respaldo de `crear_aviso` nunca
+    devuelve `None`. (6) El candado de la bienvenida también serializa
+    cuando la fila todavía no existe o la sesión no declaró espacio. (7)
+    Legibilidad: comentario de `verificacion_vigente_correo` en su lugar,
+    retorno muerto de `_fallo` y conteo de `fallidos`, anotación
+    `Transporte | None`, `rollback` con conexión nula en las pruebas.
   - [ ] **G1d — Avisos "🛠️ Administración" por el bot de administración.**
     Camino de salida propio (hoy el bot de administración no envía nada y
     `message_outbox` exige `workspace_id`); botones Reenviar correo /
