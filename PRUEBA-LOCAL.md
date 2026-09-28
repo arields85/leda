@@ -204,11 +204,20 @@ falta tocar código.
 Las 12 tareas ficticias de las sesiones 1 y 2 quedaron con " (simulado)" al
 final del título. No se pueden renombrar: el título es un campo de
 compromiso y `bloquear_estado_directo` (`db/esquema.sql`) lo protege como
-inmutable. La salida es una base **nueva**, sembrada sin el sufijo -- la
-base actual (`postgres`, con los datos de las sesiones 1 y 2) queda intacta
-como respaldo, sin tocarla.
+inmutable. La salida es una base **nueva**, sembrada sin el sufijo -- estos
+pasos no tocan la base actual (`postgres`, con los datos de las sesiones 1 y
+2), pero que quede sin tocar no es lo mismo que tener un respaldo: mientras
+no se corra el paso 1, sigue siendo la única copia. Esa misma base
+`postgres` es además la base de mantenimiento a la que se conecta la suite
+de pruebas (`PRISMA_TEST_DB_URL`, `tests/conftest.py`) para crear y borrar
+sus propias bases descartables (`prisma_test_<id>`, una por sesión de
+pruebas); las pruebas nunca escriben datos de sesión ahí, sólo la usan para
+crear y borrar las suyas, pero nadie debería confiar en dejarla intacta como
+si fuera la copia de respaldo.
 
-**1. Respaldo de la base actual**, antes de cualquier otra cosa:
+**1. Respaldo real de la base actual**, antes de cualquier otra cosa -- este
+`pg_dump` es la única copia independiente de los datos de las sesiones 1 y 2,
+no "no tocar `postgres`":
 
 ```bash
 mkdir -p db/respaldos

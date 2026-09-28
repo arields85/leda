@@ -39,7 +39,7 @@ ningún disparador tenga que saltearse:
 
 `task.evidencia_policy_version` se llena igual que un compromiso real: cuando
 el intake por Telegram resuelve el paso de evidencia
-(`ingreso_tareas.py`, alrededor de la línea 963) lee `version` de
+(`ingreso_tareas.py`, función `_finalize`) lee `version` de
 `task_evidence_policy` para el área del borrador y la copia a
 `task_draft.evidencia_policy_version`; `confirmar_borrador_tarea`
 (`db/esquema.sql`) la copia sin tocarla de ahí a `task.evidencia_policy_version`
@@ -57,6 +57,19 @@ Cada siembra exitosa se audita con una sola fila en `audit_log`
 lleva conteos y el nombre del archivo de semilla, nunca títulos de tarea ni
 nombres de personas. Una siembra rechazada (guardas de arriba) no escribe
 nada, tampoco esa fila: no hubo ningún efecto que auditar.
+
+Seguimientos de la revisión review-943484ef642de774 (T7b,
+`odd/tasks/prisma-orienta.md`): `sembrar` valida toda la semilla contra el
+espacio -- archivo legible y YAML válido, claves requeridas de cada tarea,
+títulos repetidos, referencias de `dependencias` a títulos que no están en
+la misma semilla, y un `estado_inicial` dentro de `asignada`/`en_curso`
+solamente -- antes de insertar la primera fila, así una semilla inválida no
+escribe nada sin depender de que quien llama revierta. Si de todos modos la
+base rechaza una escritura ya validada (un error que esta validación no
+anticipó), `sembrar` no abre su propio SAVEPOINT para revertir: quien la
+llama tiene que correrla dentro de una transacción que se revierta sola ante
+una excepción -- `admin(conn)` (`db.py`) ya lo hace, igual que la CLI
+(`cli.py`, rama `sembrar`) y las pruebas de este módulo.
 """
 
 from __future__ import annotations
@@ -84,6 +97,18 @@ class ResultadoSiembra:
     estados: dict[str, int] = field(default_factory=dict)
 
 
+# Claves que cada tarea de la semilla tiene que traer: sin ellas no hay
+# forma de resolver área, objetivo ni responsable contra el espacio.
+CLAVES_TAREA_REQUERIDAS = ("titulo", "area", "objetivo", "responsable")
+
+# T7b (`odd/tasks/prisma-orienta.md`): el único allow-list posible para
+# `estado_inicial` de una siembra -- "nada preaprobado, nada en revisión"
+# (ADR 0009) queda en código, no sólo en la semilla. Ni `pendiente_aprobacion`
+# ni `en_revision`, tampoco `terminada`, `bloqueada`, `cancelada` o
+# `propuesta`.
+ESTADOS_INICIALES_PERMITIDOS = frozenset({"asignada", "en_curso"})
+
+
 def sembrar(
     cur: psycopg.Cursor,
     workspace_id: str,
@@ -96,7 +121,13 @@ def sembrar(
     Rechaza si el espacio no existe, o si ya tiene alguna tarea (de
     cualquier estado): la siembra nunca se mezcla con datos reales ni con
     una siembra anterior. `dia_semilla` es el día contra el que se resuelven
-    las fechas relativas (`fecha_objetivo.dias`); por defecto, hoy.
+    las fechas relativas (`fecha_objetivo.dias`); por defecto, hoy en la
+    zona horaria del espacio -- nunca la fecha local del host que corre el
+    comando (T7b, `odd/tasks/prisma-orienta.md`).
+
+    Valida toda la semilla contra el espacio antes de insertar la primera
+    fila (ver el docstring del módulo): si algo es inválido, no se escribe
+    nada, sin depender de que quien llama revierta.
     """
     cur.execute("select zona_horaria from workspace where id = %s", (workspace_id,))
     fila = cur.fetchone()
@@ -110,19 +141,60 @@ def sembrar(
             "El espacio ya tiene tareas: la siembra no se mezcla con datos "
             "existentes. Usá un espacio recién importado, sin sembrar todavía.")
 
-    semilla = yaml.safe_load(ruta.read_text(encoding="utf-8"))
-    dia = dia_semilla or date.today()
+    semilla = _cargar_semilla(ruta)
+    dia = dia_semilla or datetime.now(zona).date()
 
-    por_titulo: dict[str, str] = {}
-    estados: dict[str, int] = {}
+    tareas_spec = semilla.get("tareas") or []
+    dependencias_spec = semilla.get("dependencias") or []
 
-    for t in semilla.get("tareas") or []:
+    # --- Validación completa contra el espacio, antes del primer insert ---
+    titulos_vistos: set[str] = set()
+    preparadas: list[dict[str, Any]] = []
+    for t in tareas_spec:
+        if not isinstance(t, dict):
+            raise SiembraInvalida("Cada tarea de la semilla tiene que ser un mapeo.")
+        _validar_claves_requeridas(t)
+
+        titulo = t["titulo"]
+        if titulo in titulos_vistos:
+            raise SiembraInvalida(f"Título repetido en la semilla: '{titulo}'.")
+        titulos_vistos.add(titulo)
+
+        estado_inicial = t.get("estado_inicial", "asignada")
+        if estado_inicial not in ESTADOS_INICIALES_PERMITIDOS:
+            raise SiembraInvalida(
+                f"Estado inicial '{estado_inicial}' no permitido para la siembra: "
+                f"sólo {' o '.join(sorted(ESTADOS_INICIALES_PERMITIDOS))} -- nada "
+                "preaprobado, nada en revisión (ADR 0009).")
+
         area_id = _area_id(cur, workspace_id, t["area"])
         objetivo_id = _objetivo_id(cur, workspace_id, t["objetivo"])
         responsable_id = _membership_id(cur, workspace_id, t["responsable"])
-        fecha = _fecha_objetivo(dia, zona, t.get("fecha_objetivo"))
         version_evidencia = _version_politica_evidencia(cur, workspace_id, area_id, t["area"])
+        fecha = _fecha_objetivo(dia, zona, t.get("fecha_objetivo"))
 
+        preparadas.append({
+            "spec": t, "titulo": titulo, "area_id": area_id,
+            "objetivo_id": objetivo_id, "responsable_id": responsable_id,
+            "version_evidencia": version_evidencia, "fecha": fecha,
+            "estado_inicial": estado_inicial,
+        })
+
+    for d in dependencias_spec:
+        if not isinstance(d, dict):
+            raise SiembraInvalida("Cada dependencia de la semilla tiene que ser un mapeo.")
+        origen, destino = d.get("origen"), d.get("destino")
+        if origen not in titulos_vistos or destino not in titulos_vistos:
+            raise SiembraInvalida(
+                f"La dependencia {origen!r} -> {destino!r} nombra un título "
+                "que no está en esta misma semilla.")
+
+    # --- Escritura: recién acá, con todo ya validado ----------------------
+    por_titulo: dict[str, str] = {}
+    estados: dict[str, int] = {}
+
+    for p in preparadas:
+        t = p["spec"]
         cur.execute(
             """insert into task (workspace_id, objective_id, titulo, descripcion,
                                  area_id, responsable_membership_id, fecha_objetivo,
@@ -130,31 +202,24 @@ def sembrar(
                                  evidencia_policy_version)
                values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                returning id""",
-            (workspace_id, objetivo_id, t["titulo"], t.get("descripcion"), area_id,
-             responsable_id, fecha, t.get("criterio_aceptacion"),
-             list(t.get("evidencia_requerida") or []), version_evidencia),
+            (workspace_id, p["objetivo_id"], p["titulo"], t.get("descripcion"),
+             p["area_id"], p["responsable_id"], p["fecha"], t.get("criterio_aceptacion"),
+             list(t.get("evidencia_requerida") or []), p["version_evidencia"]),
         )
         tarea_id = str(cur.fetchone()["id"])
-        if t["titulo"] in por_titulo:
-            raise SiembraInvalida(f"Título repetido en la semilla: '{t['titulo']}'.")
-        por_titulo[t["titulo"]] = tarea_id
+        por_titulo[p["titulo"]] = tarea_id
 
-        estado_inicial = t.get("estado_inicial", "asignada")
         cur.execute(
             """insert into task_state_event (task_id, estado_nuevo, actor_kind, motivo)
                values (%s, %s, 'sistema', %s)""",
-            (tarea_id, estado_inicial, t.get("motivo_estado_inicial")),
+            (tarea_id, p["estado_inicial"], t.get("motivo_estado_inicial")),
         )
-        estados[estado_inicial] = estados.get(estado_inicial, 0) + 1
+        estados[p["estado_inicial"]] = estados.get(p["estado_inicial"], 0) + 1
 
     n_dependencias = 0
-    for d in semilla.get("dependencias") or []:
-        origen_id = por_titulo.get(d["origen"])
-        destino_id = por_titulo.get(d["destino"])
-        if not origen_id or not destino_id:
-            raise SiembraInvalida(
-                f"La dependencia {d.get('origen')!r} -> {d.get('destino')!r} "
-                "nombra un título que no está en esta misma semilla.")
+    for d in dependencias_spec:
+        origen_id = por_titulo[d["origen"]]
+        destino_id = por_titulo[d["destino"]]
         cur.execute(
             """insert into dependency (workspace_id, origen_task_id, destino_task_id, tipo)
                values (%s, %s, %s, %s)""",
@@ -172,6 +237,39 @@ def sembrar(
         tareas=len(por_titulo), dependencias=n_dependencias, estados=estados)
 
 
+def _cargar_semilla(ruta: Path) -> dict[str, Any]:
+    """Lee y parsea el YAML de la semilla, sin dejar pasar una traza cruda
+    (T7b, `odd/tasks/prisma-orienta.md`): archivo faltante o YAML roto o
+    vacío terminan en `SiembraInvalida`, nunca en una excepción de
+    `pathlib`/`yaml` sin traducir."""
+    try:
+        texto = ruta.read_text(encoding="utf-8")
+    except OSError as e:
+        raise SiembraInvalida(
+            f"No se pudo leer el archivo de semilla '{ruta}' ({type(e).__name__}).") from e
+    try:
+        semilla = yaml.safe_load(texto)
+    except yaml.YAMLError as e:
+        raise SiembraInvalida(
+            f"El archivo de semilla '{ruta}' no es un YAML válido.") from e
+    if not isinstance(semilla, dict):
+        raise SiembraInvalida(
+            f"El archivo de semilla '{ruta}' está vacío o no tiene el formato "
+            "esperado (se esperaba un mapeo con 'tareas' y, opcionalmente, "
+            "'dependencias').")
+    return semilla
+
+
+def _validar_claves_requeridas(t: dict[str, Any]) -> None:
+    faltantes = [c for c in CLAVES_TAREA_REQUERIDAS if c not in t]
+    if not faltantes:
+        return
+    if len(faltantes) == 1:
+        raise SiembraInvalida(f"Falta la clave '{faltantes[0]}' en una tarea de la semilla.")
+    claves = ", ".join(f"'{c}'" for c in faltantes)
+    raise SiembraInvalida(f"Faltan las claves {claves} en una tarea de la semilla.")
+
+
 def _area_id(cur: psycopg.Cursor, ws: str, slug: str) -> str:
     cur.execute("select id from area where workspace_id = %s and slug = %s", (ws, slug))
     fila = cur.fetchone()
@@ -181,14 +279,25 @@ def _area_id(cur: psycopg.Cursor, ws: str, slug: str) -> str:
 
 
 def _objetivo_id(cur: psycopg.Cursor, ws: str, titulo: str) -> str:
+    """`objective.titulo` no tiene `unique` en `db/esquema.sql` (ni solo, ni
+    junto a `workspace_id`): un pack mal armado puede tener dos objetivos con
+    el mismo título en el mismo espacio. Buscar por título y quedarse con
+    `fetchone()` sería arbitrario -- el orden sin `order by` no está
+    garantizado -- así que una siembra que lo haga rechaza en vez de adivinar
+    cuál de los dos es (T7b, `odd/tasks/prisma-orienta.md`)."""
     cur.execute(
         "select id from objective where workspace_id = %s and titulo = %s", (ws, titulo))
-    fila = cur.fetchone()
-    if not fila:
+    filas = cur.fetchall()
+    if not filas:
         raise SiembraInvalida(
             f"El objetivo '{titulo}' no existe en este espacio. "
             "¿Se importó el pack con 'importar --activar'?")
-    return str(fila["id"])
+    if len(filas) > 1:
+        raise SiembraInvalida(
+            f"El objetivo '{titulo}' es ambiguo en este espacio: hay "
+            f"{len(filas)} objetivos con ese título y 'objective.titulo' no es "
+            "único por esquema. Corregí los títulos del pack antes de sembrar.")
+    return str(filas[0]["id"])
 
 
 def _membership_id(cur: psycopg.Cursor, ws: str, nombre: str) -> str:

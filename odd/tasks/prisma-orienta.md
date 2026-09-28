@@ -3488,3 +3488,20 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   chequeaban, y la redacción de `PRUEBA-LOCAL.md` sobre cuál es el respaldo real. No
   aplica la observación sobre la versión de política "arbitraria":
   `task_evidence_policy` tiene clave primaria `(workspace_id, area_id)`.
+
+- 2026-09-27: **T7b cerrada — endurecimiento de `sembrar`** (seguimientos de
+  review-943484ef). Ruta: delegada, un escritor. El comando termina con mensaje claro
+  y código 1 ante archivo faltante, YAML vacío o mal formado, clave faltante o rechazo
+  de la base, y nunca imprime el DETAIL de la base (podía contener títulos); vuelve
+  atrás la conexión. `sembrar` valida todo antes del primer insert (claves, títulos
+  repetidos -- antes se chequeaba después de insertar --, estados permitidos
+  `asignada`/`en_curso`, área, objetivo, responsable, política y dependencias); el
+  día de siembra se calcula en la zona horaria del espacio; `objective.titulo` no es
+  único en el esquema, así que un objetivo ambiguo se rechaza en vez de elegir uno.
+  Pruebas: la de orden legal ahora compara el orden de escritura (`dependency` no
+  tiene columna de hora; se usa `cmin` dentro de la misma transacción), seis
+  `en_curso` y seis `asignada`, y tres pruebas del comando por `prisma.cli.main`.
+  `PRUEBA-LOCAL.md` §5 aclara que el respaldo real es el `pg_dump` del paso 1.
+  RED: `18 failed, 16 passed`. GREEN (reejecutado por el orquestador):
+  `tests/test_siembra.py tests/test_esqueleto.py tests/test_onboarding.py` ->
+  `71 passed`. Suite completa (escritor, corrida aislada): `1008 passed, 108 deselected`.

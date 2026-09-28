@@ -25,6 +25,13 @@ Cubre:
   6. `evidencia_policy_version` queda igual que si la tarea hubiera pasado
      por `confirmar_borrador_tarea`: la versión vigente de
      `task_evidence_policy` para el área de esa tarea, nunca `null`.
+  7. Seguimientos T7b (`odd/tasks/prisma-orienta.md`): toda la validación
+     corre antes del primer insert -- título repetido, `estado_inicial`
+     fuera del allow-list `asignada`/`en_curso`, clave requerida faltante,
+     objetivo ambiguo, archivo de semilla inexistente o YAML roto o vacío --
+     y ninguna deja una fila escrita. La CLI (`cli.py`, rama `sembrar`)
+     nunca deja pasar una traza cruda ni el DETAIL de la base, y revierte la
+     conexión en cualquier rechazo.
 """
 
 from __future__ import annotations
@@ -33,6 +40,7 @@ import json
 import uuid
 from pathlib import Path
 
+import psycopg
 import pytest
 import yaml
 
@@ -85,7 +93,23 @@ def test_sembrar_corework_crea_las_12_tareas_sin_simulado(corework, conn):
     assert len(tareas) == 12
     for t in tareas:
         assert "(simulado)" not in t["titulo"]
-        assert not t["titulo"].endswith(" (simulado)")
+
+
+def test_sembrar_corework_seis_en_curso_y_seis_asignada(corework, conn):
+    """Estados iniciales documentados en el YAML y en T7
+    (`odd/tasks/prisma-orienta.md`): seis `en_curso` -- una por responsable
+    con aprobador -- y seis `asignada`, ninguna en otro estado."""
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        r = sembrar(cur, ws, SEMILLA_COREWORK)
+
+        cur.execute(
+            """select estado, count(*) as n from task
+                where workspace_id = %s group by estado""", (ws,))
+        por_estado = {f["estado"]: f["n"] for f in cur.fetchall()}
+
+    assert r.estados == {"en_curso": 6, "asignada": 6}
+    assert por_estado == {"en_curso": 6, "asignada": 6}
 
 
 def test_sembrar_corework_no_preaprueba_ni_deja_nada_en_revision(corework, conn):
@@ -169,6 +193,31 @@ def test_sembrar_corework_una_sola_dependencia_bloqueante_abierta_en_orden_legal
     assert len(con_bloqueo_abierto) == 1
     assert str(con_bloqueo_abierto[0]["id"]) == str(dep["destino_id"])
     assert n_en_curso >= 1
+
+    # `dependency` no tiene ninguna columna de fecha (`db/esquema.sql`): no
+    # se puede comparar por timestamp contra `task_state_event.at`, como sí
+    # se podría entre `task_state_event` y `evidence`/`approval` desde T6j.
+    # `cmin` -- el contador de comandos de PostgreSQL dentro de esta misma
+    # transacción -- es la prueba honesta que sí existe: `sembrar` inserta
+    # todos los `task_state_event` iniciales antes de insertar ninguna
+    # `dependency` (docstring del módulo), así que el evento que puso en
+    # curso a la tarea destino tiene que haberse escrito en un comando
+    # anterior al de la dependencia que la señala.
+    with admin(conn) as cur:
+        cur.execute(
+            """select cmin::text::bigint as cmin from task_state_event
+                where task_id = %s and estado_nuevo = 'en_curso'""",
+            (dep["destino_id"],))
+        cmin_evento = cur.fetchone()["cmin"]
+
+        cur.execute(
+            """select cmin::text::bigint as cmin from dependency
+                where workspace_id = %s and destino_task_id = %s
+                  and tipo = 'bloqueante'""",
+            (ws, dep["destino_id"]))
+        cmin_dependencia = cur.fetchone()["cmin"]
+
+    assert cmin_dependencia > cmin_evento
 
 
 def test_sembrar_corework_evidencia_requerida_coherente_con_la_politica_del_pack(corework, conn):
@@ -366,6 +415,175 @@ def test_sembrar_rechaza_dependencia_con_titulo_fuera_de_la_semilla(corework, co
         with pytest.raises(SiembraInvalida, match="no está en esta misma semilla"):
             sembrar(cur, ws, ruta)
 
+        cur.execute("select count(*) as n from task where workspace_id = %s", (ws,))
+        assert cur.fetchone()["n"] == 0  # la tarea válida tampoco se coló
+
+
+def test_sembrar_rechaza_titulo_repetido_en_la_semilla(corework, conn, tmp_path):
+    ws = corework.workspace_id
+    tarea = {
+        "titulo": "Tarea repetida",
+        "area": "ot",
+        "objetivo": "Conectar y automatizar equipos para que produzcan y entreguen datos",
+        "responsable": "Nahuel Gimenez",
+        "criterio_aceptacion": "Criterio",
+        "evidencia_requerida": ["explicacion"],
+        "estado_inicial": "asignada",
+    }
+    ruta = _semilla_minima(tmp_path, tareas=[tarea, dict(tarea)])
+
+    with admin(conn) as cur:
+        with pytest.raises(SiembraInvalida, match="Título repetido"):
+            sembrar(cur, ws, ruta)
+
+        cur.execute("select count(*) as n from task where workspace_id = %s", (ws,))
+        assert cur.fetchone()["n"] == 0  # ni siquiera la primera se escribió
+
+
+@pytest.mark.parametrize("estado_inicial", [
+    "propuesta", "pendiente_aprobacion", "en_revision", "terminada",
+    "bloqueada", "cancelada",
+])
+def test_sembrar_rechaza_estado_inicial_no_permitido(corework, conn, tmp_path, estado_inicial):
+    """Sólo `asignada`/`en_curso` -- "nada preaprobado, nada en revisión"
+    (ADR 0009) en código, no sólo en la semilla."""
+    ws = corework.workspace_id
+    ruta = _semilla_minima(tmp_path, tareas=[{
+        "titulo": "Tarea con estado prohibido",
+        "area": "ot",
+        "objetivo": "Conectar y automatizar equipos para que produzcan y entreguen datos",
+        "responsable": "Nahuel Gimenez",
+        "criterio_aceptacion": "Criterio",
+        "evidencia_requerida": ["explicacion"],
+        "estado_inicial": estado_inicial,
+    }])
+
+    with admin(conn) as cur:
+        with pytest.raises(SiembraInvalida, match="no permitido"):
+            sembrar(cur, ws, ruta)
+
+        cur.execute("select count(*) as n from task where workspace_id = %s", (ws,))
+        assert cur.fetchone()["n"] == 0
+
+
+@pytest.mark.parametrize("clave", ["titulo", "area", "objetivo", "responsable"])
+def test_sembrar_rechaza_tarea_sin_clave_requerida(corework, conn, tmp_path, clave):
+    ws = corework.workspace_id
+    tarea = {
+        "titulo": "Tarea incompleta",
+        "area": "ot",
+        "objetivo": "Conectar y automatizar equipos para que produzcan y entreguen datos",
+        "responsable": "Nahuel Gimenez",
+        "criterio_aceptacion": "Criterio",
+        "evidencia_requerida": ["explicacion"],
+        "estado_inicial": "asignada",
+    }
+    del tarea[clave]
+    ruta = _semilla_minima(tmp_path, tareas=[tarea])
+
+    with admin(conn) as cur:
+        with pytest.raises(SiembraInvalida, match=f"clave.*'{clave}'"):
+            sembrar(cur, ws, ruta)
+
+        cur.execute("select count(*) as n from task where workspace_id = %s", (ws,))
+        assert cur.fetchone()["n"] == 0
+
+
+def test_sembrar_rechaza_objetivo_ambiguo(corework, conn, tmp_path):
+    """`objective.titulo` no tiene `unique` en `db/esquema.sql`: un segundo
+    objetivo con el mismo título en el mismo espacio tiene que rechazar la
+    siembra, nunca elegir uno de los dos en silencio (T7b)."""
+    ws = corework.workspace_id
+    titulo = "Conectar y automatizar equipos para que produzcan y entreguen datos"
+
+    with admin(conn) as cur:
+        cur.execute(
+            "select tipo from objective where workspace_id = %s and titulo = %s",
+            (ws, titulo))
+        tipo = cur.fetchone()["tipo"]
+        cur.execute(
+            """insert into objective (workspace_id, tipo, titulo, estado)
+               values (%s, %s, %s, 'activo')""",
+            (ws, tipo, titulo))
+
+    ruta = _semilla_minima(tmp_path, tareas=[{
+        "titulo": "Tarea contra un objetivo ambiguo",
+        "area": "ot",
+        "objetivo": titulo,
+        "responsable": "Nahuel Gimenez",
+        "criterio_aceptacion": "Criterio",
+        "evidencia_requerida": ["explicacion"],
+        "estado_inicial": "asignada",
+    }])
+
+    with admin(conn) as cur:
+        with pytest.raises(SiembraInvalida, match="ambiguo"):
+            sembrar(cur, ws, ruta)
+
+        cur.execute("select count(*) as n from task where workspace_id = %s", (ws,))
+        assert cur.fetchone()["n"] == 0
+
+
+def test_sembrar_rechaza_archivo_de_semilla_inexistente(corework, conn, tmp_path):
+    ws = corework.workspace_id
+    ruta = tmp_path / "no-existe.yaml"
+
+    with admin(conn) as cur:
+        with pytest.raises(SiembraInvalida, match="No se pudo leer"):
+            sembrar(cur, ws, ruta)
+
+        cur.execute("select count(*) as n from task where workspace_id = %s", (ws,))
+        assert cur.fetchone()["n"] == 0
+
+
+def test_sembrar_rechaza_yaml_vacio(corework, conn, tmp_path):
+    ws = corework.workspace_id
+    ruta = tmp_path / "vacia.yaml"
+    ruta.write_text("", encoding="utf-8")
+
+    with admin(conn) as cur:
+        with pytest.raises(SiembraInvalida, match="vacío"):
+            sembrar(cur, ws, ruta)
+
+        cur.execute("select count(*) as n from task where workspace_id = %s", (ws,))
+        assert cur.fetchone()["n"] == 0
+
+
+def test_sembrar_rechaza_yaml_malformado(corework, conn, tmp_path):
+    ws = corework.workspace_id
+    ruta = tmp_path / "rota.yaml"
+    ruta.write_text("tareas: [a, b\n  - esto no cierra", encoding="utf-8")
+
+    with admin(conn) as cur:
+        with pytest.raises(SiembraInvalida, match="no es un YAML válido"):
+            sembrar(cur, ws, ruta)
+
+        cur.execute("select count(*) as n from task where workspace_id = %s", (ws,))
+        assert cur.fetchone()["n"] == 0
+
+
+def test_sembrar_deja_que_la_base_rechace_una_autodependencia_y_no_escribe_nada(
+        corework, conn, tmp_path):
+    """`sembrar` no valida `origen != destino` en Python -- ya la rechaza el
+    disparador `trg_evitar_ciclo_dependencia` (`db/esquema.sql`, una
+    dependencia de una tarea hacia sí misma es un ciclo de largo uno) -- así
+    que esto llega a la base como un rechazo real. `sembrar` no abre su
+    propio SAVEPOINT (docstring del módulo): sin la transacción de
+    `admin(conn)` revirtiendo alrededor, la tarea ya insertada quedaría
+    escrita."""
+    ws = corework.workspace_id
+    ruta = _semilla_minima(tmp_path, dependencias=[
+        {"origen": "Tarea de prueba A", "destino": "Tarea de prueba A", "tipo": "bloqueante"},
+    ])
+
+    with pytest.raises(psycopg.Error):
+        with admin(conn) as cur:
+            sembrar(cur, ws, ruta)
+
+    with admin(conn) as cur:
+        cur.execute("select count(*) as n from task where workspace_id = %s", (ws,))
+        assert cur.fetchone()["n"] == 0
+
 
 # ---------------------------------------------------------------------------
 # 3. Idempotente por rechazo
@@ -385,3 +603,74 @@ def test_sembrar_es_idempotente_por_rechazo(corework, conn, tmp_path):
 
         cur.execute("select count(*) as n from task where workspace_id = %s", (ws,))
         assert cur.fetchone()["n"] == 1  # la segunda corrida no duplicó nada
+
+
+# ---------------------------------------------------------------------------
+# 7. La CLI (`cli.py`, rama `sembrar`): nunca una traza cruda ni el DETAIL de
+#    la base, siempre rollback en el rechazo (T7b, `odd/tasks/prisma-orienta.md`)
+# ---------------------------------------------------------------------------
+
+def test_cli_sembrar_ok_imprime_solo_conteos_y_commitea(corework, conn, monkeypatch, capsys):
+    import prisma.cli as cli
+
+    monkeypatch.setattr(cli, "conectar", lambda: conn)
+    codigo = cli.main(["sembrar", "corework", "--semilla", str(SEMILLA_COREWORK)])
+
+    assert codigo == 0
+    salida = capsys.readouterr().out
+    assert "12 tareas y 1 dependencias sembradas." in salida
+    assert "asignada: 6" in salida
+    assert "en_curso: 6" in salida
+    # nunca títulos de tarea ni nombres de personas en la salida de éxito
+    for dato_privado in ("comprimidora", "Marcos", "Mariano"):
+        assert dato_privado not in salida
+
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        cur.execute("select count(*) as n from task where workspace_id = %s", (ws,))
+        assert cur.fetchone()["n"] == 12
+
+
+def test_cli_sembrar_rechazo_de_validacion_sin_traza_y_sin_escribir_nada(
+        corework, conn, tmp_path, monkeypatch, capsys):
+    import prisma.cli as cli
+
+    monkeypatch.setattr(cli, "conectar", lambda: conn)
+    ruta_inexistente = tmp_path / "no-existe.yaml"
+
+    codigo = cli.main(["sembrar", "corework", "--semilla", str(ruta_inexistente)])
+
+    assert codigo == 1
+    salida = capsys.readouterr().out
+    assert "Traceback" not in salida
+    assert "no se pudo leer" in salida.lower()
+
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        cur.execute("select count(*) as n from task where workspace_id = %s", (ws,))
+        assert cur.fetchone()["n"] == 0
+
+
+def test_cli_sembrar_rechazo_de_la_base_no_muestra_detalle_ni_escribe_nada(
+        corework, conn, tmp_path, monkeypatch, capsys):
+    import prisma.cli as cli
+
+    monkeypatch.setattr(cli, "conectar", lambda: conn)
+    ruta = _semilla_minima(tmp_path, dependencias=[
+        {"origen": "Tarea de prueba A", "destino": "Tarea de prueba A", "tipo": "bloqueante"},
+    ])
+
+    codigo = cli.main(["sembrar", "corework", "--semilla", str(ruta)])
+
+    assert codigo == 1
+    salida = capsys.readouterr().out
+    assert "Traceback" not in salida
+    assert "La base rechazó la siembra" in salida
+    assert "DETAIL" not in salida.upper()
+    assert "constraint" not in salida.lower()
+    assert "Tarea de prueba A" not in salida
+
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        cur.execute("select count(*) as n from task where workspace_id = %s", (ws,))
+        assert cur.fetchone()["n"] == 0

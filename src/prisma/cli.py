@@ -403,13 +403,23 @@ def main(argv: list[str] | None = None) -> int:
     if a.cmd == "sembrar":
         from pathlib import Path
 
+        import psycopg
+
         from .siembra import SiembraInvalida, sembrar
 
         try:
             with admin(conn) as cur:
                 r = sembrar(cur, ws, Path(a.semilla))
         except SiembraInvalida as e:
+            conn.rollback()
             print(str(e))
+            return 1
+        except psycopg.Error as e:
+            # Nunca el DETAIL crudo de la base acá: puede traer la fila
+            # entera que la violó (títulos de tarea incluidos). Sólo el tipo
+            # de error, nunca su mensaje (T7b, `odd/tasks/prisma-orienta.md`).
+            conn.rollback()
+            print(f"La base rechazó la siembra ({type(e).__name__}). No se guardó nada.")
             return 1
         conn.commit()
         print(f"{r.tareas} tareas y {r.dependencias} dependencias sembradas.")
