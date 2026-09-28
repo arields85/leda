@@ -883,6 +883,17 @@ ficticios, una interacción por vez; el primer defecto detiene el lote.
   informativo con quiénes faltan. El bloqueo hasta verificar rige sólo para
   las altas nuevas con la clave encendida.
 
+### Decisiones del usuario para G2
+
+- **Decisión abierta 1 resuelta (2026-09-28): una cuenta de Google por
+  espacio, la cuenta de Prisma, para empezar.** El administrador la
+  autoriza una vez; Prisma envía desde ahí los correos de verificación y
+  crea los eventos como organizadora, invitando a cada integrante por su
+  correo verificado. Los integrantes no autorizan nada. Límite aceptado:
+  Prisma no lee la agenda personal de cada integrante y los eventos figuran
+  organizados por Prisma. La autorización por integrante puede sumarse
+  después para quien la necesite.
+
 ### Textos del alta con correo aprobados por el usuario (2026-09-28)
 
 Regla general aprobada: ningún mensaje termina en "escribime y lo vemos" ni
