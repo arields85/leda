@@ -572,6 +572,25 @@ Un worktree nuevo no trae lo que no se versiona.
   bot de administración está en `.env` del worktree
   (`PRISMA_BOT_TOKEN_ADMIN`; el archivo existe y git lo ignora; la sesión no
   lo leyó).
+    Revisión RDD `review-c73c0f22b0e0ce26` (riesgo alto, consentida; cuatro
+    lentes): aprobada; reconocimiento emitido.
+  - [ ] **G1d-b2 — Correcciones tras la revisión de G1d-b.** (1) El cuerpo
+    del correo de verificación quedó con cortes de línea y sangrías copiados
+    del documento: debe ser el texto A en párrafos corridos (sólo los saltos
+    de párrafo aprobados). (2) Un enlace consumido de un ciclo anterior no
+    puede decir "Tu correo ya está verificado ✅" si el ciclo actual no lo
+    está: responder según el estado actual (B9). (3) "Habilitar un nuevo
+    intento" comprueba el estado del ciclo (sólo `pending_email_verification`
+    con el límite agotado); si no corresponde, no aplica nada y lo dice. (4)
+    Nunca "??:??" en B11: si no se puede calcular la hora, incidente + aviso
+    neutral. (5) Ningún texto alcanzable termina en "escribime y lo vemos" o
+    "pedime que te lo reenvíe" (`TEXTO_ESTADO_CAMBIO`,
+    `TEXTO_ENLACE_INVALIDO`): reemplazarlos por el paso siguiente según el
+    estado. (6) Las respuestas del bot de administración no se pierden por
+    deduplicación (Cancelar dos veces, dos administradores). (7) Una sola
+    rama para "reenviar por enlace vencido o roto"; respuesta de la vista
+    previa fiel al motivo; la prueba de serialización comprueba que el
+    segundo hilo estaba efectivamente bloqueado.
   - [ ] **G1d — Avisos "🛠️ Administración" por el bot de administración.**
     Camino de salida propio (hoy el bot de administración no envía nada y
     `message_outbox` exige `workspace_id`); botones Reenviar correo /
