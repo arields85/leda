@@ -37,10 +37,28 @@ detecte pasa por este mismo `registrar_incidente`, con `workspace_id` en
 
 from __future__ import annotations
 
+import re
 import uuid
 from datetime import datetime, timezone
 
 from .db import registrar_auditoria
+
+# Segunda capa de defensa (R1-001, revisión 2026-09-28): traduce cualquier
+# token de bot de Telegram que haya llegado sin traducir hasta acá -- la
+# URL completa de la API (`api.telegram.org/bot<token>/...`) o el patrón
+# `bot<digitos>:<token>` suelto -- antes de guardarlo. `despachador.py` ya
+# traduce el error en el origen (`pedido_telegram`/`ErrorTelegram`); esto
+# es la red de contención si algo aguas arriba se olvida.
+_RE_TOKEN_TELEGRAM = re.compile(
+    r"(?:https?://)?api\.telegram\.org/bot[^\s'\"]*|bot\d+:[A-Za-z0-9_-]+")
+
+
+def redactar_secreto_telegram(texto: str | None) -> str | None:
+    """Reemplaza cada coincidencia por `bot<oculto>`. `None` y cadena
+    vacía pasan sin cambios."""
+    if not texto:
+        return texto
+    return _RE_TOKEN_TELEGRAM.sub("bot<oculto>", texto)
 
 # Qué tipo de fila referencia `incident.referencia_id` -- mismo patrón
 # polimórfico que `audit_log.sujeto_tipo`/`sujeto_id`, sin clave foránea:
@@ -200,6 +218,7 @@ def registrar_incidente(cur, workspace_id: str | None, resumen: str, *,
 
     Devuelve el id del incidente insertado."""
     incident_id = str(uuid.uuid4())
+    referencia_cruda = redactar_secreto_telegram(referencia_cruda)
 
     resumen_final = resumen
     notificado_admin_en = None

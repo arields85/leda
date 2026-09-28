@@ -3823,3 +3823,18 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   consultar otra cosa, ✅ Confirmar, ✖️ Cancelar, ✏️ Otra opción) y el saludo diario va
   con la unidad del pack 06 (ya registrado en STATUS, ADR 0010 y
   `odd/tasks/alta-y-google.md`).
+  Evaluación de `55e3512` contra la frontera `c4e877e`: medio, `under_budget` (353).
+
+- 2026-09-28: **Token del bot fuera de los errores de Telegram (tarea de seguridad).**
+  Ruta: delegada, el mismo escritor de #29c. El mensaje de `httpx.HTTPStatusError`
+  incluye la URL, que lleva el token, y se guardaba en `message_outbox.ultimo_error`
+  (desde antes de hoy), `admin_notice.ultimo_error` e `incident.referencia_cruda`
+  (hallazgo R1-001 de review-6d62b73c). Corregido en el origen: `pedido_telegram`
+  convierte cualquier falla de una llamada a Telegram en `ErrorTelegram` (tipo, código
+  HTTP y `description`, `from None`), en los 12 llamados de `src/prisma/`
+  (despachador, local, gateway, cli). Defensa en profundidad:
+  `incidentes.redactar_secreto_telegram` tapa `api.telegram.org/bot...` y
+  `bot<dígitos>:<token>` en `referencia_cruda` y `ultimo_error`. ROJO de las 18 pruebas
+  nuevas con los archivos de `HEAD`, VERDE con el cambio. Suite completa del escritor:
+  `1136 passed, 108 deselected`. Las bases locales `prisma` y `postgres` no tenían filas
+  con el token (consulta de conteo del orquestador).

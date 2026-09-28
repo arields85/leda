@@ -21,7 +21,7 @@ from .autoridad import (Canal, Denegado, identificar, identificar_en_espacio)
 from .config import config
 from .db import (admin, autoridad, conectar, conectar_autoridad, espacio,
                  registrar_auditoria)
-from .despachador import acusar_toque, mantener_chat_activo
+from .despachador import acusar_toque, mantener_chat_activo, pedido_telegram
 from .incidentes import (REFERENCIA_INBOUND_MESSAGE, REFERENCIA_PENDING_ACTION,
                          registrar_incidente)
 from .salida import TRUNCAR_ETIQUETA_BOTON as TRUNCAR_TITULO_BOTON
@@ -2295,8 +2295,8 @@ def registrar_webhooks(cliente=None) -> dict[str, bool]:
     cliente = cliente or httpx.Client(timeout=15)
     resultado: dict[str, bool] = {}
     for slug, token in config.espacios_con_token().items():
-        r = cliente.post(
-            f"https://api.telegram.org/bot{token}/setWebhook",
+        r = pedido_telegram(
+            cliente.post, f"https://api.telegram.org/bot{token}/setWebhook",
             json={"url": f"{config.base_url}/telegram/{slug}",
                   "secret_token": config.webhook_secret,
                   "allowed_updates": ["message", "callback_query"]})

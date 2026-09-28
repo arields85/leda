@@ -28,7 +28,8 @@ from . import ciclo
 from .calendario import Calendario
 from .config import config, recargar_dotenv
 from .db import admin, conectar_autoridad, espacio
-from .despachador import Transporte, TransporteTelegram
+from .despachador import (Transporte, TransporteTelegram, pedido_telegram,
+                          texto_error_seguro)
 from .gateway import (ETAPA_TOQUE_BOTON, ETAPA_TURNO_TEXTO, procesar_update,
                       reportar_incidente_no_manejado)
 from .incidentes import registrar_incidente
@@ -77,12 +78,11 @@ def _imprimir(texto: str = "") -> None:
 
 
 def _error_sin_url(e: Exception) -> str:
-    """Describe un error de red sin su mensaje: el de httpx incluye la URL,
-    y la URL de la API de Telegram lleva el token del bot (`/bot<token>/`)."""
-    respuesta = getattr(e, "response", None)
-    if respuesta is not None:
-        return f"{type(e).__name__} HTTP {respuesta.status_code}"
-    return type(e).__name__
+    """Alias local de `despachador.texto_error_seguro` -- una sola
+    implementación compartida (R1-001, revisión 2026-09-28): el mensaje de
+    httpx incluye la URL, y la URL de la API de Telegram lleva el token
+    del bot (`/bot<token>/`)."""
+    return texto_error_seguro(e)
 
 
 def _parar(*_):
@@ -158,14 +158,15 @@ class Escucha:
 
     def recibir(self, espera: int = 25) -> int:
         try:
-            r = self.http.get(
+            r = pedido_telegram(
+                self.http.get,
                 f"https://api.telegram.org/bot{self.token}/getUpdates",
                 # callback_query va sí o sí: Telegram no entrega lo que no se
                 # le pide, y sin esto los botones se dibujan pero el toque no
                 # llega nunca. No da error: sencillamente no pasa nada.
                 params={"offset": self.offset, "timeout": espera,
                         "allowed_updates": '["message","callback_query"]'})
-            r.raise_for_status()
+            pedido_telegram(r.raise_for_status)
             updates = r.json().get("result", [])
         except Exception as e:  # noqa: BLE001
             _imprimir(f"  (sin conexión con Telegram: {_error_sin_url(e)})")
@@ -224,11 +225,12 @@ class Escucha:
         token_admin = self._admin_bot.token
 
         try:
-            r = self.http.get(
+            r = pedido_telegram(
+                self.http.get,
                 f"https://api.telegram.org/bot{token_admin}/getUpdates",
                 params={"offset": self.offset_admin, "timeout": 0,
                         "allowed_updates": '["message"]'})
-            r.raise_for_status()
+            pedido_telegram(r.raise_for_status)
             updates = r.json().get("result", [])
         except Exception as e:  # noqa: BLE001
             _imprimir("  (sin conexión con el bot de administración: "
@@ -312,9 +314,10 @@ class Escucha:
             # 5s, no 15s: corre en el único hilo del listener -- una demora
             # larga acá le resta esa misma demora a `recibir` (R4-001,
             # revisión 2026-09-28).
-            r = httpx.get(f"https://api.telegram.org/bot{token}/getWebhookInfo",
-                         timeout=5)
-            r.raise_for_status()
+            r = pedido_telegram(
+                httpx.get, f"https://api.telegram.org/bot{token}/getWebhookInfo",
+                timeout=5)
+            pedido_telegram(r.raise_for_status)
             cuerpo = r.json()
             if not cuerpo.get("ok"):
                 raise RuntimeError("getWebhookInfo respondió ok=false")
@@ -439,14 +442,16 @@ def escuchar(conn, slug: str, workspace_id: str, *,
     e = Escucha(conn, slug, workspace_id, token,
                 authority_conn=authority_conn, con_cadencias=con_cadencias)
 
-    r = httpx.get(f"https://api.telegram.org/bot{token}/getMe", timeout=15).json()
+    r = pedido_telegram(
+        httpx.get, f"https://api.telegram.org/bot{token}/getMe", timeout=15).json()
     if not r.get("ok"):
         raise SystemExit("El token del bot no es válido.")
     usuario = r["result"]["username"]
 
     # Un webhook activo bloquea getUpdates: si quedó de una prueba anterior,
     # se saca.
-    httpx.post(f"https://api.telegram.org/bot{token}/deleteWebhook", timeout=15)
+    pedido_telegram(
+        httpx.post, f"https://api.telegram.org/bot{token}/deleteWebhook", timeout=15)
 
     _imprimir(f"Escuchando como @{usuario} — espacio '{slug}'.")
     _imprimir("Ctrl+C para cortar.\n")

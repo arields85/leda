@@ -239,14 +239,19 @@ def main(argv: list[str] | None = None) -> int:
         # No necesita base: sólo pregunta a Telegram qué llegó.
         import httpx
 
+        from .despachador import pedido_telegram
+
         token = config.token_bot(a.slug)
-        httpx.post(f"https://api.telegram.org/bot{token}/deleteWebhook", timeout=15)
+        pedido_telegram(
+            httpx.post, f"https://api.telegram.org/bot{token}/deleteWebhook",
+            timeout=15)
         print("Agregá el bot al grupo y escribí cualquier cosa ahí.")
         print("Esperando…\n")
         offset = 0
         for _ in range(12):
-            r = httpx.get(f"https://api.telegram.org/bot{token}/getUpdates",
-                          params={"offset": offset, "timeout": 20}, timeout=30)
+            r = pedido_telegram(
+                httpx.get, f"https://api.telegram.org/bot{token}/getUpdates",
+                params={"offset": offset, "timeout": 20}, timeout=30)
             vistos = set()
             for u in r.json().get("result", []):
                 offset = u["update_id"] + 1
@@ -367,10 +372,12 @@ def main(argv: list[str] | None = None) -> int:
     if a.cmd == "enlaces":
         import httpx
 
+        from .despachador import pedido_telegram
         from .onboarding import generar_enlaces, pendientes_de_activar
 
         token = config.token_bot(a.slug)
-        r = httpx.get(f"https://api.telegram.org/bot{token}/getMe", timeout=15)
+        r = pedido_telegram(
+            httpx.get, f"https://api.telegram.org/bot{token}/getMe", timeout=15)
         usuario = r.json()["result"]["username"]
 
         with admin(conn) as cur:

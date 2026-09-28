@@ -11,12 +11,20 @@ import time
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
+import httpx
+import pytest
+
 from prisma import ciclo, reloj
 from prisma.calendario import Calendario
 from prisma.db import admin, espacio
 from prisma.despachador import TransporteDePrueba
 
 BA = ZoneInfo("America/Argentina/Buenos_Aires")
+
+# Token de bot falso, sólo para probar que un error de Telegram no lo
+# filtra -- nunca se compara contra `os.environ` (regla de seguridad del
+# proyecto: no afirmar directo contra variables de entorno).
+TOKEN_FALSO = "123456789:AAAA-SECRETO-DE-PRUEBA-FALSO"
 
 
 def _tarea(cur, ws, *, area="ot", persona="Marcos Tarquini", vence=None,
@@ -1513,3 +1521,191 @@ def test_reportar_fallo_no_suprime_si_la_escritura_del_incidente_falla(
         total = cur.fetchone()["n"]
     conn.commit()
     assert total == 1
+
+
+# ---------------------------------------------------------------------------
+# R1-001 (revisión 2026-09-28): un error de la API de Telegram nunca lleva
+# la URL del pedido -- la URL de la API de Telegram lleva el token del bot.
+# ---------------------------------------------------------------------------
+
+def test_pedido_telegram_traduce_un_401_con_descripcion_sin_token():
+    from prisma import despachador as desp
+
+    pedido = httpx.Request(
+        "POST", f"https://api.telegram.org/bot{TOKEN_FALSO}/sendMessage")
+    respuesta = httpx.Response(
+        401, request=pedido,
+        json={"ok": False, "error_code": 401, "description": "Unauthorized"})
+
+    with pytest.raises(desp.ErrorTelegram) as info:
+        desp.pedido_telegram(respuesta.raise_for_status)
+
+    error = info.value
+    filtra = TOKEN_FALSO in str(error) or TOKEN_FALSO in repr(error)
+    assert not filtra, "el error traducido filtra el token del bot"
+    assert str(error) == "HTTPStatusError HTTP 401: Unauthorized"
+
+
+def test_pedido_telegram_traduce_un_500_sin_descripcion_sin_token():
+    from prisma import despachador as desp
+
+    pedido = httpx.Request(
+        "POST", f"https://api.telegram.org/bot{TOKEN_FALSO}/sendMessage")
+    respuesta = httpx.Response(500, request=pedido)  # sin cuerpo JSON
+
+    with pytest.raises(desp.ErrorTelegram) as info:
+        desp.pedido_telegram(respuesta.raise_for_status)
+
+    error = info.value
+    filtra = TOKEN_FALSO in str(error) or TOKEN_FALSO in repr(error)
+    assert not filtra, "el error traducido filtra el token del bot"
+    assert str(error) == "HTTPStatusError HTTP 500"
+
+
+def test_pedido_telegram_traduce_un_error_de_conexion_que_lleva_la_url():
+    """Un error de red puede traer la URL en su propio mensaje -- no sólo un
+    `HTTPStatusError` -- y se traduce igual, sin mirar `str(e)` del original."""
+    from prisma import despachador as desp
+
+    url = f"https://api.telegram.org/bot{TOKEN_FALSO}/getUpdates"
+    pedido = httpx.Request("GET", url)
+    error_original = httpx.ConnectError(f"sin red para {url}", request=pedido)
+
+    def _falla():
+        raise error_original
+
+    with pytest.raises(desp.ErrorTelegram) as info:
+        desp.pedido_telegram(_falla)
+
+    error = info.value
+    filtra = TOKEN_FALSO in str(error) or TOKEN_FALSO in repr(error)
+    assert not filtra, "el error traducido filtra el token del bot"
+    assert str(error) == "ConnectError"
+
+
+def test_pedido_telegram_corta_la_cadena_de_excepciones():
+    """`from None`: ni `__cause__` ni el traceback del error ya traducido
+    arrastran el original -- que sí llevaba el token."""
+    from prisma import despachador as desp
+
+    def _falla():
+        raise RuntimeError(f"secreto en bot{TOKEN_FALSO}")
+
+    with pytest.raises(desp.ErrorTelegram) as info:
+        desp.pedido_telegram(_falla)
+
+    error = info.value
+    assert error.__cause__ is None
+    assert error.__suppress_context__ is True
+
+
+def test_texto_error_seguro_no_retraduce_un_error_ya_traducido():
+    from prisma import despachador as desp
+
+    ya_traducido = desp.ErrorTelegram("HTTPStatusError HTTP 401: Unauthorized")
+    assert desp.texto_error_seguro(ya_traducido) == str(ya_traducido)
+
+
+def test_acusar_toque_traduce_el_error_sin_filtrar_el_token():
+    from prisma import despachador as desp
+
+    class _ClienteQueFalla:
+        def post(self, url, json=None):
+            pedido = httpx.Request("POST", url)
+            raise httpx.HTTPStatusError(
+                "fallo", request=pedido,
+                response=httpx.Response(
+                    400, request=pedido,
+                    json={"ok": False, "description": "Bad Request: query is too old"}))
+
+    with pytest.raises(desp.ErrorTelegram) as info:
+        desp.acusar_toque(TOKEN_FALSO, "callback-1", cliente=_ClienteQueFalla())
+
+    error = info.value
+    filtra = TOKEN_FALSO in str(error) or TOKEN_FALSO in repr(error)
+    assert not filtra, "acusar_toque filtra el token del bot al fallar"
+    assert "400" in str(error)
+
+
+def test_mantener_chat_activo_traduce_el_error_del_ping_de_typing(monkeypatch):
+    """El `sendChatAction` de fondo hoy descarta su error entero (es
+    cosmético) -- pero pasa por el mismo traductor que el resto de las
+    llamadas a Telegram, así que si algún día deja de descartarse, ya no
+    puede filtrar el token."""
+    from prisma import despachador as desp
+
+    capturados: list[Exception] = []
+    original = desp.pedido_telegram
+
+    def _pedido_que_registra(fn, *a, **k):
+        try:
+            return original(fn, *a, **k)
+        except desp.ErrorTelegram as e:
+            capturados.append(e)
+            raise
+
+    monkeypatch.setattr(desp, "pedido_telegram", _pedido_que_registra)
+
+    class _ClienteQueFalla:
+        def post(self, url, json=None):
+            pedido = httpx.Request("POST", url)
+            raise httpx.HTTPStatusError(
+                "fallo", request=pedido, response=httpx.Response(401, request=pedido))
+
+    with desp.mantener_chat_activo(
+            TOKEN_FALSO, 123, cliente=_ClienteQueFalla(), intervalo=0.01,
+            espera_cierre=0.5):
+        time.sleep(0.1)
+
+    assert capturados, "el ping de typing nunca intentó llamar a Telegram"
+    for error in capturados:
+        filtra = TOKEN_FALSO in str(error) or TOKEN_FALSO in repr(error)
+        assert not filtra, "el ping de typing filtra el token del bot"
+
+
+def test_despachar_no_guarda_el_token_en_ultimo_error_si_telegram_falla(
+        corework, conn):
+    """`message_outbox.ultimo_error` -- lo que queda tras `_fallo` -- nunca
+    lleva el token del bot, ni siquiera cuando el transporte real de
+    Telegram es el que fallò (R1-001, revisión 2026-09-28): antes,
+    `TransporteTelegram.enviar` dejaba escapar el `HTTPStatusError` de
+    httpx tal cual, y su `str()` lleva la URL completa con el token."""
+    from prisma import despachador as desp
+
+    class _ClienteQueFalla:
+        def post(self, url, json=None):
+            pedido = httpx.Request("POST", url)
+            raise httpx.HTTPStatusError(
+                "fallo", request=pedido,
+                response=httpx.Response(
+                    401, request=pedido,
+                    json={"ok": False, "description": "Unauthorized"}))
+
+    ws = corework.workspace_id
+    ahora = datetime(2026, 7, 27, 10, 0, tzinfo=BA)
+
+    with espacio(conn, ws) as cur:
+        cur.execute(
+            """insert into message_outbox
+                 (workspace_id, chat_id, cuerpo, estado, programado_para,
+                  dedupe_key)
+               values (%s, 6002, 'mensaje de prueba', 'listo', %s, %s)""",
+            (ws, ahora, "prueba-r1-001-ultimo-error"))
+    conn.commit()
+
+    transporte = desp.TransporteTelegram(TOKEN_FALSO, cliente=_ClienteQueFalla())
+    with espacio(conn, ws) as cur:
+        cal = Calendario.desde_base(cur, ws)
+        desp.despachar(cur, ws, transporte, cal, ahora)
+    conn.commit()
+
+    with admin(conn) as cur:
+        cur.execute(
+            "select ultimo_error from message_outbox where dedupe_key = %s",
+            ("prueba-r1-001-ultimo-error",))
+        ultimo_error = cur.fetchone()["ultimo_error"]
+    conn.commit()
+
+    filtra = TOKEN_FALSO in (ultimo_error or "")
+    assert not filtra, "message_outbox.ultimo_error guarda el token del bot"
+    assert "401" in ultimo_error

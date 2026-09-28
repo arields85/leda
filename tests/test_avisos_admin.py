@@ -28,6 +28,33 @@ from prisma.db import admin, espacio, registrar_auditoria
 from prisma.despachador import (BACKOFF_MINUTOS_AVISO_ADMIN, MAX_INTENTOS,
                                 TransporteDePrueba, despachar_avisos_admin)
 
+# Token de bot falso, sólo para probar que un error de Telegram no lo
+# filtra -- nunca se compara contra `os.environ` (regla de seguridad del
+# proyecto, ya establecida más abajo en este archivo: comparación por
+# booleano, nunca `assert ... not in os.environ`).
+TOKEN_FALSO = "123456789:AAAA-SECRETO-DE-PRUEBA-FALSO"
+
+
+class _ClienteTelegramQueFalla:
+    """Doble de `httpx.Client` para `TransporteTelegram`: cualquier pedido
+    responde un error real de httpx (401 por default), con el mismo cuerpo
+    JSON que manda Telegram, para probar la traducción de R1-001 sin pegarle
+    nunca a la API real."""
+
+    def __init__(self, status_code: int = 401,
+                descripcion: str | None = "Unauthorized") -> None:
+        self.status_code = status_code
+        self.descripcion = descripcion
+
+    def post(self, url, json=None):
+        pedido = httpx.Request("POST", url)
+        cuerpo = {"ok": False, "error_code": self.status_code}
+        if self.descripcion:
+            cuerpo["description"] = self.descripcion
+        raise httpx.HTTPStatusError(
+            "fallo", request=pedido,
+            response=httpx.Response(self.status_code, request=pedido, json=cuerpo))
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -232,6 +259,84 @@ def test_el_aviso_nunca_lleva_referencia_cruda_ni_algo_parecido_a_un_secreto(
     assert "postgresql://" not in cuerpo
     assert "no se pudo conectar" not in cuerpo    # el str() completo, no sólo el secreto
     assert "probando la conexión" in cuerpo        # el disparador sí sale
+
+
+# ---------------------------------------------------------------------------
+# R1-001 (revisión 2026-09-28): segunda capa de defensa -- `redactar_secreto_
+# telegram` oculta un token de bot que haya llegado sin traducir hasta
+# `referencia_cruda`, sin tocar ningún otro secreto (p. ej. la cadena de
+# conexión de arriba, que el diseño SÍ deja en `referencia_cruda` a
+# propósito -- ver el test anterior).
+# ---------------------------------------------------------------------------
+
+def test_redactar_secreto_telegram_oculta_la_url_completa():
+    from prisma.incidentes import redactar_secreto_telegram
+
+    texto = (f"Client error '401 Unauthorized' for url "
+            f"'https://api.telegram.org/bot{TOKEN_FALSO}/sendMessage'")
+    redactado = redactar_secreto_telegram(texto)
+
+    filtra = TOKEN_FALSO in redactado
+    assert not filtra, "la redacción no ocultó la URL completa"
+    assert "bot<oculto>" in redactado
+
+
+def test_redactar_secreto_telegram_oculta_el_token_suelto():
+    from prisma.incidentes import redactar_secreto_telegram
+
+    texto = f"token filtrado en un log: bot{TOKEN_FALSO}"
+    redactado = redactar_secreto_telegram(texto)
+
+    filtra = TOKEN_FALSO in redactado
+    assert not filtra, "la redacción no ocultó el token suelto"
+    assert "bot<oculto>" in redactado
+
+
+def test_redactar_secreto_telegram_no_toca_texto_sin_token():
+    from prisma.incidentes import redactar_secreto_telegram
+
+    texto = "Un mensaje no se pudo entregar tras 5 intentos."
+    assert redactar_secreto_telegram(texto) == texto
+
+
+def test_redactar_secreto_telegram_no_toca_otros_secretos():
+    """Sólo el patrón de Telegram -- la cadena de conexión de arriba sigue
+    intacta en `referencia_cruda`: es el diseño del test anterior, no un
+    olvido de esta redacción."""
+    from prisma.incidentes import redactar_secreto_telegram
+
+    texto = "no se pudo conectar: postgresql://prisma_app:s3cr3t-p4ss@db.interno:5432/prisma"
+    assert redactar_secreto_telegram(texto) == texto
+
+
+def test_redactar_secreto_telegram_pasa_none_y_vacio_sin_cambios():
+    from prisma.incidentes import redactar_secreto_telegram
+
+    assert redactar_secreto_telegram(None) is None
+    assert redactar_secreto_telegram("") == ""
+
+
+def test_registrar_incidente_redacta_referencia_cruda(conn, corework):
+    """Segunda capa de defensa: aunque algo aguas arriba se olvide de
+    traducir un error de Telegram antes de llamar a `registrar_incidente`,
+    el token no llega a `incident.referencia_cruda`."""
+    ws = corework.workspace_id
+    referencia_con_token = (
+        f"HTTPStatusError: Client error for url "
+        f"'https://api.telegram.org/bot{TOKEN_FALSO}/sendMessage'")
+
+    with admin(conn) as cur:
+        incident_id = incidentes.registrar_incidente(
+            cur, ws, "Falló algo en una prueba.", etapa="prueba_directa",
+            referencia_cruda=referencia_con_token, avisar_admin=False)
+        cur.execute("select referencia_cruda from incident where id = %s",
+                    (incident_id,))
+        fila = cur.fetchone()
+    conn.commit()
+
+    filtra = TOKEN_FALSO in (fila["referencia_cruda"] or "")
+    assert not filtra, "registrar_incidente guarda el token del bot"
+    assert "bot<oculto>" in fila["referencia_cruda"]
 
 
 def test_cada_aviso_admin_deja_un_acceso_a_conversacion_en_audit_log(
@@ -521,6 +626,59 @@ def test_despachar_avisos_admin_agotado_registra_incidente_sin_avisar_de_nuevo(
     assert incidente["notificado_admin_en"] is None  # nunca se reenvía por el mismo canal
     assert "no se avisó a la administración" in incidente["resumen_sanitizado"].lower()
     assert total_avisos == 1  # el guard: NO se encoló un admin_notice nuevo
+
+
+def test_despachar_avisos_admin_agotado_no_guarda_el_token_ni_en_ultimo_error_ni_en_incidente(
+        conn, corework):
+    """R1-001 (revisión 2026-09-28): `admin_notice.ultimo_error` e
+    `incident.referencia_cruda` -- lo que deja un aviso admin que agota
+    MAX_INTENTOS contra el transporte REAL de Telegram -- nunca llevan el
+    token del bot. Antes, `TransporteTelegram.enviar` dejaba escapar el
+    `HTTPStatusError` de httpx tal cual, y su `str()` lleva la URL completa
+    con el token."""
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        _administrador(cur, "Admin R1-001", 659001, chat_id=659001)
+        incidentes.registrar_incidente(
+            cur, ws, "Falló algo en una prueba.", etapa="prueba_directa")
+        cur.execute("select id from admin_notice limit 1")
+        notice_id = cur.fetchone()["id"]
+    conn.commit()
+
+    transporte = despachador.TransporteTelegram(
+        TOKEN_FALSO, cliente=_ClienteTelegramQueFalla())
+    ahora = datetime.now(timezone.utc)
+    fila = None
+    for _ in range(MAX_INTENTOS):
+        with admin(conn) as cur:
+            despachar_avisos_admin(cur, transporte, ahora)
+            cur.execute(
+                """select estado, ultimo_error, programado_para from admin_notice
+                    where id = %s""", (notice_id,))
+            fila = cur.fetchone()
+        conn.commit()
+
+        filtra = TOKEN_FALSO in (fila["ultimo_error"] or "")
+        assert not filtra, "admin_notice.ultimo_error guarda el token del bot"
+        if fila["estado"] == "fallido":
+            break
+        ahora = fila["programado_para"]
+
+    assert fila["estado"] == "fallido"
+    assert "401" in fila["ultimo_error"]
+
+    with admin(conn) as cur:
+        cur.execute(
+            """select referencia_cruda from incident
+                where referencia_tipo = %s and referencia_id = %s""",
+            (incidentes.REFERENCIA_ADMIN_NOTICE, notice_id))
+        incidente = cur.fetchone()
+    conn.commit()
+
+    assert incidente is not None
+    filtra_incidente = TOKEN_FALSO in (incidente["referencia_cruda"] or "")
+    assert not filtra_incidente, "incident.referencia_cruda guarda el token del bot"
+    assert "401" in incidente["referencia_cruda"]
 
 
 def test_despachar_avisos_admin_si_registrar_incidente_falla_no_pierde_el_lote(
@@ -1213,3 +1371,81 @@ def test_error_de_red_se_describe_sin_la_url_que_lleva_el_token():
     assert not filtra_token, "la descripción del error incluye el token"
     assert descripcion == "HTTPStatusError HTTP 401"
     assert descripcion_conexion == "ConnectError"
+
+
+# ---------------------------------------------------------------------------
+# R1-001 (revisión 2026-09-28): la traducción al origen (`pedido_telegram`)
+# cubre también `recibir` y `_obtener_transporte_admin` -- antes de esta
+# unidad, un `raise_for_status()` fallido ahí dejaba escapar el
+# `HTTPStatusError` de httpx tal cual hasta `_error_sin_url`, que sólo
+# protegía la impresión, no el objeto excepción en sí.
+# ---------------------------------------------------------------------------
+
+def test_recibir_no_imprime_el_token_si_telegram_devuelve_401(conn, corework, capsys):
+    from prisma.local import Escucha
+
+    class _HttpQueFalla:
+        def get(self, url, params=None):
+            pedido = httpx.Request("GET", url)
+            raise httpx.HTTPStatusError(
+                "fallo", request=pedido,
+                response=httpx.Response(
+                    401, request=pedido,
+                    json={"ok": False, "description": "Unauthorized"}))
+
+    ws = corework.workspace_id
+    e = Escucha(conn, "corework", ws, TOKEN_FALSO, cliente=_HttpQueFalla())
+
+    n = e.recibir(espera=0)
+
+    assert n == 0
+    salida = capsys.readouterr().out
+    filtra = TOKEN_FALSO in salida
+    assert not filtra, "la consola del listener muestra el token del bot"
+    assert "HTTPStatusError HTTP 401: Unauthorized" in salida
+
+
+def test_obtener_transporte_admin_no_imprime_el_token_si_getwebhookinfo_falla(
+        conn, corework, monkeypatch, capsys):
+    from prisma import config as config_modulo
+    from prisma import local as local_modulo
+    from prisma.local import Escucha
+
+    ws = corework.workspace_id
+    _fijar_token_admin(monkeypatch, config_modulo, token=TOKEN_FALSO)
+
+    def _get_que_falla(url, timeout=None):
+        pedido = httpx.Request("GET", url)
+        raise httpx.HTTPStatusError(
+            "fallo", request=pedido,
+            response=httpx.Response(
+                401, request=pedido, json={"ok": False, "description": "Unauthorized"}))
+
+    monkeypatch.setattr(local_modulo.httpx, "get", _get_que_falla)
+
+    e = Escucha(conn, "corework", ws, "tok", cliente=_HttpAdminFalso())
+    transporte = e._obtener_transporte_admin()
+
+    assert transporte is None
+    salida = capsys.readouterr().out
+    filtra = TOKEN_FALSO in salida
+    assert not filtra, "la consola muestra el token del bot de administración"
+    assert "HTTPStatusError HTTP 401: Unauthorized" in salida
+
+
+def test_registrar_webhooks_no_filtra_el_token_si_setwebhook_falla(monkeypatch):
+    from prisma import config as config_modulo
+
+    monkeypatch.setattr(
+        config_modulo.Config, "espacios_con_token",
+        lambda self: {"corework": TOKEN_FALSO})
+
+    cliente_falso = _ClienteTelegramQueFalla(
+        status_code=400, descripcion="Bad Request: chat not found")
+    with pytest.raises(despachador.ErrorTelegram) as info:
+        gateway.registrar_webhooks(cliente=cliente_falso)
+
+    error = info.value
+    filtra = TOKEN_FALSO in str(error) or TOKEN_FALSO in repr(error)
+    assert not filtra, "registrar_webhooks filtra el token del bot"
+    assert "400" in str(error)

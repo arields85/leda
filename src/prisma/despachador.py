@@ -24,8 +24,63 @@ from typing import NamedTuple, Protocol
 import psycopg
 
 from .calendario import Calendario
-from .incidentes import REFERENCIA_ADMIN_NOTICE, registrar_incidente
+from .incidentes import (REFERENCIA_ADMIN_NOTICE, redactar_secreto_telegram,
+                         registrar_incidente)
 from .salida import prepare_buttons, prepare_payload
+
+
+class ErrorTelegram(RuntimeError):
+    """Error al llamar a la API de Telegram, ya traducido: nunca lleva la
+    URL del pedido -- la URL de la API de Telegram lleva el token del bot
+    (`/bot<token>/`), y el mensaje de httpx (y su `repr`) la incluye
+    entera. Sólo el tipo de error original, el estado HTTP si lo hay, y la
+    `description` que Telegram manda en el cuerpo cuando la hay. Seguro de
+    guardar, imprimir o auditar tal cual (R1-001, revisión 2026-09-28)."""
+
+
+def _descripcion_telegram(respuesta) -> str | None:
+    """La `description` del cuerpo de una respuesta de error de Telegram,
+    si la hay y el cuerpo es JSON -- nunca nada más de la respuesta ni del
+    pedido que la originó."""
+    try:
+        cuerpo = respuesta.json()
+    except Exception:  # noqa: BLE001 -- el cuerpo puede no ser JSON
+        return None
+    return cuerpo.get("description") if isinstance(cuerpo, dict) else None
+
+
+def _mensaje_seguro_http(e: Exception) -> str:
+    """Describe cualquier error de red sin su mensaje original -- el de
+    httpx incluye la URL entera. Sirve para un error de la API de
+    Telegram o de cualquier otra: sin `.response`, sólo queda el tipo."""
+    respuesta = getattr(e, "response", None)
+    if respuesta is None:
+        return type(e).__name__
+    base = f"{type(e).__name__} HTTP {respuesta.status_code}"
+    detalle = _descripcion_telegram(respuesta)
+    return f"{base}: {detalle}" if detalle else base
+
+
+def texto_error_seguro(e: Exception) -> str:
+    """Texto de un error seguro de imprimir o guardar -- nunca la URL de
+    la API de Telegram. Sirve tanto para un `ErrorTelegram` ya traducido
+    (por `pedido_telegram`) como para cualquier otro error que todavía no
+    pasó por ahí."""
+    return str(e) if isinstance(e, ErrorTelegram) else _mensaje_seguro_http(e)
+
+
+def pedido_telegram(fn, *args, **kwargs):
+    """Ejecuta `fn(*args, **kwargs)` -- un pedido a la API de Telegram, o
+    su `raise_for_status` -- y traduce cualquier excepción a
+    `ErrorTelegram` antes de dejarla salir. Es el único lugar por donde
+    puede escaparse un error con la URL (y el token) sin traducir, así que
+    toda llamada a la API de Telegram pasa por acá (R1-001, revisión
+    2026-09-28). `from None` corta la cadena: ni el `repr` ni un traceback
+    del error ya traducido arrastran el original."""
+    try:
+        return fn(*args, **kwargs)
+    except Exception as e:  # noqa: BLE001 -- se traduce, nunca se deja escapar
+        raise ErrorTelegram(_mensaje_seguro_http(e)) from None
 
 
 class Boton(NamedTuple):
@@ -84,8 +139,8 @@ class TransporteTelegram:
             cuerpo["reply_markup"] = {"inline_keyboard": [
                 [{"text": label, "callback_data": callback}]
                 for label, callback in prepared_buttons]}
-        r = self._cliente.post(self._url, json=cuerpo)
-        r.raise_for_status()
+        r = pedido_telegram(self._cliente.post, self._url, json=cuerpo)
+        pedido_telegram(r.raise_for_status)
         return r.json()["result"]["message_id"]
 
     def cerrar(self) -> None:
@@ -133,7 +188,8 @@ def mantener_chat_activo(token: str, chat_id: int, *, cliente=None,
         try:
             while not detener.is_set():
                 try:
-                    http.post(
+                    pedido_telegram(
+                        http.post,
                         f"https://api.telegram.org/bot{token}/sendChatAction",
                         json={"chat_id": chat_id, "action": "typing"})
                 except Exception:  # noqa: BLE001 - es una señal cosmética
@@ -191,8 +247,9 @@ def acusar_toque(token: str, callback_id: str, cliente=None) -> None:
     import httpx
 
     cliente = cliente or httpx.Client(timeout=5)
-    cliente.post(f"https://api.telegram.org/bot{token}/answerCallbackQuery",
-                 json={"callback_query_id": callback_id})
+    pedido_telegram(
+        cliente.post, f"https://api.telegram.org/bot{token}/answerCallbackQuery",
+        json={"callback_query_id": callback_id})
 
 
 MAX_INTENTOS = 5
@@ -486,7 +543,10 @@ def despachar_avisos_admin(cur: psycopg.Cursor, transporte: Transporte,
             agotado = intentos >= MAX_INTENTOS
             estado = "fallido" if agotado else "listo"
             proximo = None if agotado else _proximo_intento_admin(intentos, ahora)
-            ultimo_error = str(e)[:500]
+            # Redactado antes de recortar (R1-001, revisión 2026-09-28):
+            # recortar primero podría cortar un token a la mitad y dejar
+            # el resto sin que el patrón lo reconozca.
+            ultimo_error = redactar_secreto_telegram(str(e))[:500]
             cur.execute(
                 """update admin_notice
                       set intentos = %s, ultimo_error = %s, estado = %s,
@@ -531,12 +591,16 @@ def _fallo(cur, workspace_id: str, m, error: Exception, cal: Calendario,
     intentos = m["intentos"] + 1
     estado = "fallido" if intentos >= MAX_INTENTOS else "listo"
     proximo = cal.dentro_de_jornada(ahora) if estado == "listo" else None
+    # Redactado antes de recortar (R1-001, revisión 2026-09-28): recortar
+    # primero podría cortar un token a la mitad y dejar el resto sin que
+    # el patrón lo reconozca.
+    ultimo_error = redactar_secreto_telegram(str(error))[:500]
     cur.execute(
         """update message_outbox
               set intentos = %s, ultimo_error = %s, estado = %s,
                   programado_para = coalesce(%s, programado_para)
             where id = %s""",
-        (intentos, str(error)[:500], estado, proximo, m["id"]))
+        (intentos, ultimo_error, estado, proximo, m["id"]))
     if estado == "fallido":
         registrar_incidente(
             cur, workspace_id,

@@ -65,7 +65,7 @@ tales. Ver [`INDEX.md`](INDEX.md#documentos-superados).
 |---|---|
 | Comando | `.venv\Scripts\python.exe -m pytest -q` |
 | Fecha | 2026-09-28 |
-| Resultado exacto | 1118 passed, 108 deselected (corrida del escritor de #29c). |
+| Resultado exacto | 1136 passed, 108 deselected (corrida del escritor del token en los errores de Telegram). |
 
 Seguimientos de la entrega con evidencia (T6a-T6j), siembra reproducible (T7, T7b) y
 comprobadores del banco, `odd/tasks/prisma-orienta.md`: `1008 passed, 108
@@ -218,11 +218,11 @@ por pasada, de `admin_notice`; `--sin-cadencias` las apaga en los dos comandos. 
 además que una cadencia de lunes disparaba el martes: `CronTrigger.from_crontab` de
 APScheduler 3 numera los días distinto del cron estándar.)*
 
-1. **Errores de Telegram sin el token:** el mensaje de `httpx.HTTPStatusError` incluye
-   la URL, que lleva el token del bot, y ese texto se guarda en
-   `message_outbox.ultimo_error`, `admin_notice.ultimo_error` e
-   `incident.referencia_cruda`. Corregir en el transporte y revisar la base `prisma`.
-2. Íconos por categoría en los botones, saludo y tono (pack 06).
+1. *(Errores de Telegram sin el token, cerrada: cada llamada a la API de Telegram levanta
+   `ErrorTelegram` sin URL ni token, y `ultimo_error` y `referencia_cruda` pasan por
+   `redactar_secreto_telegram`. Las bases locales no tenían filas con el token.)*
+2. Íconos en los botones (📋 tarea, ➕ Ver más, 💬 Quiero consultar otra cosa, ✅ Confirmar,
+   ✖️ Cancelar, ✏️ Otra opción, aprobados por el usuario) y saludo diario (pack 06).
 3. Indicador de "escribiendo" y borrador nativo animado sólo si la respuesta tarda,
    sin demorarla nunca (pack 05).
 4. **#23** el validador de invariantes (`odd/tasks/validador-invariantes.md`: cada 30
