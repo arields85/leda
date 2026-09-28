@@ -477,15 +477,29 @@ def _intentar_envio(cur: psycopg.Cursor, workspace_id: str, transporte: Transpor
     falla, el mismo punto de retorno que deshace la marca deshace la reserva
     del saludo con él (`saludo.reclamar_y_anteponer` ya corre en su propio
     SAVEPOINT anidado, así que una falla SÓLO del saludo -- tabla faltante,
-    zona inválida -- no le impide a este mensaje salir sin saludo)."""
+    zona inválida -- no le impide a este mensaje salir sin saludo). Si
+    anteponerlo no entraría en el límite real de Telegram, tampoco reclama
+    la reserva (R3-003, revisión 2026-09-28+3) -- el mensaje sale igual, sin
+    saludo.
+
+    `saludo.reclamar_y_anteponer` nunca reporta su propia falla: la
+    reportamos ACÁ, DESPUÉS de que el punto de retorno de arriba se resolvió
+    -- éxito o fallo -- nunca todavía adentro (R4-002/R3-001, revisión
+    2026-09-28+3): reportarla ahí se perdía si el envío fallaba después, el
+    SAVEPOINT entero se revertía con el incidente adentro, y la marca "ya
+    reportado" en memoria no se revierte con él -- la falla real nunca se
+    volvía a reportar."""
+    falla_saludo: Exception | None = None
     try:
         with cur.connection.transaction():
             _marcar_enviado(cur, ahora, m["id"])
-            texto = saludo.reclamar_y_anteponer(
+            botones = _botones(cur, m)
+            texto, falla_saludo = saludo.reclamar_y_anteponer(
                 cur, workspace_id=workspace_id,
                 membership_id=m["destinatario_membership_id"], zona=cal.zona,
-                ahora=ahora, texto=m["cuerpo"], es_bienvenida=m["es_bienvenida"])
-            tg_id = transporte.enviar(m["chat_id"], texto, _botones(cur, m))
+                ahora=ahora, texto=m["cuerpo"], has_buttons=bool(botones),
+                es_bienvenida=m["es_bienvenida"])
+            tg_id = transporte.enviar(m["chat_id"], texto, botones)
             try:
                 with cur.connection.transaction():
                     _guardar_id_telegram(cur, tg_id, m["id"])
@@ -494,7 +508,11 @@ def _intentar_envio(cur: psycopg.Cursor, workspace_id: str, transporte: Transpor
                      f"{m['id']} ({type(exc_id).__name__}).")
     except Exception as e:  # noqa: BLE001 — se registra, no se propaga
         _fallo(cur, workspace_id, m, e, cal, ahora)
+        if falla_saludo is not None:
+            saludo.reportar_falla(cur, workspace_id, falla_saludo)
         return False
+    if falla_saludo is not None:
+        saludo.reportar_falla(cur, workspace_id, falla_saludo)
     return True
 
 

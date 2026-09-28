@@ -27,10 +27,22 @@ from prisma import saludo as S
 from prisma.calendario import Calendario
 from prisma.db import admin, conectar, espacio
 from prisma.despachador import TransporteDePrueba, despachar
-from prisma.incidentes import registrar_incidente
 from prisma.salida import BUTTON_TEXT_LIMIT, TELEGRAM_TEXT_LIMIT, enqueue_outbox
 
 BA = ZoneInfo("America/Argentina/Buenos_Aires")
+
+
+@pytest.fixture(autouse=True)
+def _limpiar_supresor_de_fallas():
+    """R3-002 (revisión 2026-09-28+3): `saludo._FALLAS_SALUDO_REPORTADAS` es
+    un `set` global de proceso -- sin este reseteo, las pruebas de "se
+    reportó una sola vez" dependían del orden real en el que pytest las
+    corriera (una prueba anterior con el mismo `(workspace_id, tipo de
+    error)` ya lo dejaba marcado, y la siguiente prueba veía "cero
+    incidentes nuevos" por la razón equivocada)."""
+    S._FALLAS_SALUDO_REPORTADAS.clear()
+    yield
+    S._FALLAS_SALUDO_REPORTADAS.clear()
 
 
 def _membership_id(cur, ws: str, nombre: str) -> str:
@@ -81,14 +93,6 @@ def test_saludo_convierte_de_verdad_a_la_zona_del_espacio_no_solo_lee_utc():
     assert local.date() == date(2026, 1, 14)
     assert S.saludo_por_hora(local.hour) == S.SALUDO_NOCHE
     assert S.fecha_local(momento, BA) == date(2026, 1, 14)
-
-
-def test_zona_de_workspace_lee_la_zona_real_del_espacio(conn, intake_world):
-    with admin(conn) as cur:
-        norte = S.zona_de_workspace(cur, intake_world["north-lab"]["id"])
-        oeste = S.zona_de_workspace(cur, intake_world["west-studio"]["id"])
-    assert norte == ZoneInfo("America/Argentina/Buenos_Aires")
-    assert oeste == ZoneInfo("Europe/Madrid")
 
 
 # ---------------------------------------------------------------------------
@@ -195,11 +199,12 @@ def test_dos_reclamos_concurrentes_de_la_misma_persona_gana_uno_solo(
 def test_mensaje_de_grupo_nunca_reclama_ni_lleva_saludo(corework, conn):
     ws = corework.workspace_id
     with admin(conn) as cur:
-        resultado = S.reclamar_y_anteponer(
+        resultado, falla = S.reclamar_y_anteponer(
             cur, workspace_id=ws, membership_id=None, zona=BA,
             ahora=datetime(2026, 9, 28, 14, 0, tzinfo=timezone.utc),
             texto="Estado del equipo: 3 asignada.")
     assert resultado == "Estado del equipo: 3 asignada."
+    assert falla is None
 
 
 def test_bienvenida_reclama_sin_anteponer_nada(corework, conn):
@@ -209,17 +214,19 @@ def test_bienvenida_reclama_sin_anteponer_nada(corework, conn):
         _limpiar_saludo(cur, mid)
         ahora = datetime(2026, 9, 28, 14, 0, tzinfo=timezone.utc)  # 11:00 Buenos Aires
 
-        resultado = S.reclamar_y_anteponer(
+        resultado, falla = S.reclamar_y_anteponer(
             cur, workspace_id=ws, membership_id=mid, zona=BA, ahora=ahora,
             texto="Listo, Marcos. Soy Prisma.", es_bienvenida=True)
         assert resultado == "Listo, Marcos. Soy Prisma."   # sin "👋" antepuesto
+        assert falla is None
 
         # Pero SÍ quedó reclamada: un mensaje normal después, mismo día, no
         # vuelve a saludar.
-        siguiente = S.reclamar_y_anteponer(
+        siguiente, falla2 = S.reclamar_y_anteponer(
             cur, workspace_id=ws, membership_id=mid, zona=BA,
             ahora=ahora + timedelta(hours=1), texto="Tenés una tarea abierta.")
         assert siguiente == "Tenés una tarea abierta."
+        assert falla2 is None
 
 
 def test_primer_mensaje_normal_del_dia_antepone_el_saludo_y_el_segundo_no(
@@ -230,15 +237,17 @@ def test_primer_mensaje_normal_del_dia_antepone_el_saludo_y_el_segundo_no(
         _limpiar_saludo(cur, mid)
         ahora = datetime(2026, 9, 28, 14, 0, tzinfo=timezone.utc)  # 11:00 Buenos Aires
 
-        primero = S.reclamar_y_anteponer(
+        primero, falla1 = S.reclamar_y_anteponer(
             cur, workspace_id=ws, membership_id=mid, zona=BA, ahora=ahora,
             texto="Tenés una tarea abierta.")
-        segundo = S.reclamar_y_anteponer(
+        segundo, falla2 = S.reclamar_y_anteponer(
             cur, workspace_id=ws, membership_id=mid, zona=BA,
             ahora=ahora + timedelta(minutes=5), texto="Otra cosa más.")
 
     assert primero == f"{S.SALUDO_MANANA}\n\nTenés una tarea abierta."
     assert segundo == "Otra cosa más."
+    assert falla1 is None
+    assert falla2 is None
 
 
 # ---------------------------------------------------------------------------
@@ -266,11 +275,13 @@ def test_falla_del_upsert_manda_igual_sin_saludo_y_reporta_un_incidente(
 
         monkeypatch.setattr(S, "reclamar_saludo", _explota)
 
-        resultado = S.reclamar_y_anteponer(
+        resultado, falla = S.reclamar_y_anteponer(
             cur, workspace_id=ws, membership_id=mid, zona=BA,
             ahora=datetime(2026, 9, 28, 14, 0, tzinfo=timezone.utc),
             texto="Tenés una tarea abierta.")
         assert resultado == "Tenés una tarea abierta."      # sale sin saludo
+        assert falla is not None
+        S.reportar_falla(cur, ws, falla)
 
         cur.execute(
             """select resumen_sanitizado, referencia_cruda from incident
@@ -294,13 +305,14 @@ def test_zona_invalida_manda_igual_sin_saludo(corework, conn):
         mid = _membership_id(cur, ws, "Marcos Tarquini")
         _limpiar_saludo(cur, mid)
 
-        resultado = S.reclamar_y_anteponer(
+        resultado, falla = S.reclamar_y_anteponer(
             cur, workspace_id=ws, membership_id=mid,
             zona="no-es-una-zona",  # rompe adentro de `ahora.astimezone(zona)`
             ahora=datetime(2026, 9, 28, 14, 0, tzinfo=timezone.utc),
             texto="Tenés una tarea abierta.")
 
     assert resultado == "Tenés una tarea abierta."
+    assert falla is not None
 
 
 def test_una_falla_repetida_se_reporta_una_sola_vez(corework, conn, monkeypatch):
@@ -316,14 +328,55 @@ def test_una_falla_repetida_se_reporta_una_sola_vez(corework, conn, monkeypatch)
 
         monkeypatch.setattr(S, "reclamar_saludo", _explota)
         for _ in range(3):
-            S.reclamar_y_anteponer(
+            _, falla = S.reclamar_y_anteponer(
                 cur, workspace_id=ws, membership_id=mid, zona=BA,
                 ahora=datetime(2026, 9, 28, 14, 0, tzinfo=timezone.utc),
                 texto="x")
+            assert falla is not None
+            S.reportar_falla(cur, ws, falla)
 
         cur.execute("select count(*) n from incident where workspace_id = %s", (ws,))
         despues = cur.fetchone()["n"]
     assert despues == antes + 1     # deduplicado, no tres incidentes
+
+
+# ---------------------------------------------------------------------------
+# R4-003 (revisión 2026-09-28+3): sin las migraciones 0018/0019, CUALQUIER
+# despacho o encolado de un mensaje personal rompe con UndefinedTable/
+# UndefinedColumn -- `verificar_migraciones` es el chequeo de arranque que
+# `cli.py` corre antes de `escuchar`/`servir`. Cursor falso: no hace falta
+# tocar el esquema real de la sesión de pruebas para simular "falta algo".
+# ---------------------------------------------------------------------------
+
+class _CursorFalso:
+    """Devuelve, en orden, cada uno de `resultados` -- un por `execute`. Sin
+    tocar ninguna base real: `verificar_migraciones` hace como mucho dos
+    consultas, siempre de sólo lectura sobre el catálogo."""
+
+    def __init__(self, resultados: list[dict]):
+        self._resultados = list(resultados)
+        self._actual = None
+
+    def execute(self, *a, **k):
+        self._actual = self._resultados.pop(0)
+
+    def fetchone(self):
+        return self._actual
+
+
+def test_verificar_migraciones_todo_al_dia_devuelve_none(corework, conn):
+    with admin(conn) as cur:
+        assert S.verificar_migraciones(cur) is None
+
+
+def test_verificar_migraciones_sin_greeting_state_nombra_la_0018():
+    cur = _CursorFalso([{"ok": False}])
+    assert S.verificar_migraciones(cur) == "0018_saludo_diario.sql"
+
+
+def test_verificar_migraciones_sin_es_bienvenida_nombra_la_0019():
+    cur = _CursorFalso([{"ok": True}, {"ok": False}])
+    assert S.verificar_migraciones(cur) == "0019_marca_de_bienvenida.sql"
 
 
 # ---------------------------------------------------------------------------
@@ -403,18 +456,15 @@ def _cal(cur, ws):
     return Calendario.desde_base(cur, ws)
 
 
-def _mid_y_tg(cur, ws, nombre):
-    cur.execute(
-        """select m.id as mid, u.telegram_user_id as tg
-             from membership m join app_user u on u.id = m.app_user_id
-            where m.workspace_id = %s and u.nombre = %s""",
-        (ws, nombre))
-    fila = cur.fetchone()
-    return str(fila["mid"]), fila["tg"]
-
-
 def test_respuesta_primero_lleva_saludo_y_la_cadencia_despues_no(
         intake_world, conn):
+    """R2-002 (revisión 2026-09-28+3): con las dos filas programadas al
+    mismo `programado_para`, el orden real entre ellas quedaba librado al
+    orden físico con el que Postgres las devolviera -- la aserción original
+    sólo comprobaba "una de las dos saluda", nunca CUÁL. Acá la respuesta
+    queda programada estrictamente antes que la cadencia, así que el orden
+    de despacho es determinístico y se puede comprobar cuál de las dos lleva
+    el saludo de verdad."""
     ws = intake_world["north-lab"]["id"]
     mid = intake_world["north-lab"]["people"]["Taylor Quinn"]["membership_id"]
     tg = intake_world["north-lab"]["people"]["Taylor Quinn"]["telegram"]
@@ -429,16 +479,16 @@ def test_respuesta_primero_lleva_saludo_y_la_cadencia_despues_no(
         enqueue_outbox(
             cur, workspace_id=ws, chat_id=tg, text="Arranca la semana.",
             recipient_membership_id=mid, message_type="seguimiento",
-            scheduled_for=AHORA_HABIL, dedupe_key="test:respuesta-primero:2")
+            scheduled_for=AHORA_HABIL + timedelta(seconds=1),
+            dedupe_key="test:respuesta-primero:2")
         transporte = TransporteDePrueba()
-        despachar(cur, ws, transporte, cal, AHORA_HABIL)
+        despachar(cur, ws, transporte, cal, AHORA_HABIL + timedelta(seconds=1))
     conn.commit()
 
-    enviados = sorted(transporte.enviados, key=lambda e: e.texto)
-    cuerpos = [e.texto for e in transporte.enviados]
-    saludados = [c for c in cuerpos if c.startswith("👋")]
-    assert len(saludados) == 1
-    assert saludados[0].startswith(f"{S.SALUDO_MANANA}\n\n")
+    assert len(transporte.enviados) == 2
+    respuesta, cadencia = transporte.enviados
+    assert respuesta.texto == f"{S.SALUDO_MANANA}\n\nTenés una tarea abierta."
+    assert cadencia.texto == "Arranca la semana."
 
 
 def test_cadencia_primero_lleva_saludo_y_la_respuesta_despues_no(
@@ -642,12 +692,119 @@ def test_envio_fallido_revierte_la_reserva_del_saludo(intake_world, conn):
     assert transporte_ok.enviados[0].texto.startswith(f"{S.SALUDO_MANANA}\n\n")
 
 
+def test_fila_sin_margen_sale_sin_saludo_y_no_consume_la_reserva(
+        intake_world, conn):
+    """R3-003 (revisión 2026-09-28+3), a nivel de despacho: una fila que ya
+    quedó encolada SIN el margen reservado -- acá, insertada directo en
+    `message_outbox` para simular ese caso, porque ningún cuerpo que pase
+    por `enqueue_outbox` puede llegar tan al límite -- tiene que salir
+    igual, sin saludo, en lugar de romper en cada reintento. Y la reserva
+    del día no se consume: el próximo mensaje que sí entra con margen
+    todavía puede llevar el saludo."""
+    ws = intake_world["north-lab"]["id"]
+    mid = intake_world["north-lab"]["people"]["Taylor Quinn"]["membership_id"]
+    tg = intake_world["north-lab"]["people"]["Taylor Quinn"]["telegram"]
+
+    with espacio(conn, ws) as cur:
+        _limpiar_saludo(cur, mid)
+        cal = _cal(cur, ws)
+        cuerpo = "x" * TELEGRAM_TEXT_LIMIT   # sin margen: no le cabe el saludo
+        cur.execute(
+            """insert into message_outbox
+                 (workspace_id, chat_id, destinatario_membership_id, cuerpo,
+                  estado, programado_para, dedupe_key, es_respuesta)
+               values (%s, %s, %s, %s, 'listo', %s, %s, true)""",
+            (ws, tg, mid, cuerpo, AHORA_HABIL, "test:sin-margen:1"))
+        transporte = TransporteDePrueba()
+        despachar(cur, ws, transporte, cal, AHORA_HABIL)
+
+        assert len(transporte.enviados) == 1
+        assert transporte.enviados[0].texto == cuerpo   # sin saludo antepuesto
+
+        cur.execute("select ultima_fecha_local from greeting_state "
+                    "where membership_id = %s", (mid,))
+        assert cur.fetchone() is None      # la reserva sigue libre
+
+        # El próximo mensaje, con margen de sobra, sí saluda.
+        enqueue_outbox(
+            cur, workspace_id=ws, chat_id=tg, text="Tenés una tarea abierta.",
+            recipient_membership_id=mid, is_response=True,
+            scheduled_for=AHORA_HABIL + timedelta(minutes=1),
+            dedupe_key="test:sin-margen:2")
+        despachar(cur, ws, transporte, cal, AHORA_HABIL + timedelta(minutes=1))
+    conn.commit()
+
+    assert len(transporte.enviados) == 2
+    assert transporte.enviados[1].texto.startswith(f"{S.SALUDO_MANANA}\n\n")
+
+
+def test_falla_del_saludo_con_envio_fallido_se_reporta_una_sola_vez(
+        intake_world, conn, monkeypatch):
+    """R4-002/R3-001 (revisión 2026-09-28+3), a nivel de despacho: si el
+    saludo falla Y el envío TAMBIÉN falla en el mismo intento, el
+    SAVEPOINT que deshace la marca 'enviado' no puede llevarse el
+    incidente del saludo con él -- tiene que sobrevivir a ese envío
+    fallido, reportarse una sola vez, y no duplicarse en el reintento."""
+    ws = intake_world["north-lab"]["id"]
+    mid = intake_world["north-lab"]["people"]["Sam Noble"]["membership_id"]
+    tg = intake_world["north-lab"]["people"]["Sam Noble"]["telegram"]
+
+    def _explota(*a, **k):
+        raise RuntimeError("falla de saludo simulada en despacho")
+
+    monkeypatch.setattr(S, "reclamar_saludo", _explota)
+
+    with espacio(conn, ws) as cur:
+        _limpiar_saludo(cur, mid)
+    # `prisma_app` sólo tiene `insert` sobre `incident` (`db/esquema.sql`);
+    # los conteos se leen por la conexión administrativa, como en el resto
+    # de la suite (`tests/test_menu_tarea.py`, por ejemplo).
+    with admin(conn) as cur:
+        cur.execute("select count(*) n from incident where workspace_id = %s", (ws,))
+        antes = cur.fetchone()["n"]
+
+    transporte_falla = TransporteDePrueba(falla_en={tg})
+    with espacio(conn, ws) as cur:
+        cal = _cal(cur, ws)
+        enqueue_outbox(
+            cur, workspace_id=ws, chat_id=tg, text="Tenés una tarea.",
+            recipient_membership_id=mid, is_response=True,
+            scheduled_for=AHORA_HABIL, dedupe_key="test:saludo-y-envio-fallidos:1")
+        resumen = despachar(cur, ws, transporte_falla, cal, AHORA_HABIL)
+        assert resumen["fallidos"] == 1
+
+    with admin(conn) as cur:
+        cur.execute("select count(*) n from incident where workspace_id = %s", (ws,))
+        despues_del_primero = cur.fetchone()["n"]
+    assert despues_del_primero == antes + 1      # el saludo se reportó igual
+
+    # Reintento: el envío vuelve a fallar y el saludo sigue roto -- no
+    # duplica el incidente.
+    with espacio(conn, ws) as cur:
+        cal = _cal(cur, ws)
+        cur.execute("update message_outbox set estado = 'listo' "
+                    "where dedupe_key = 'test:saludo-y-envio-fallidos:1'")
+        despachar(cur, ws, transporte_falla, cal, AHORA_HABIL + timedelta(minutes=1))
+
+    with admin(conn) as cur:
+        cur.execute("select count(*) n from incident where workspace_id = %s", (ws,))
+        despues_del_segundo = cur.fetchone()["n"]
+
+    assert despues_del_segundo == antes + 1      # sigue siendo uno solo
+
+
 def test_bienvenida_por_activacion_reclama_y_la_respuesta_del_dia_no_repite(
         conn, intake_world, monkeypatch):
-    """R3-004: el camino de activación (`gateway._activacion`, `/start
-    <token>`) encola la bienvenida con `es_bienvenida=True`; al
-    despacharla, reclama la reserva del día sin saludo propio, y la primera
-    respuesta real de esa misma fecha local no vuelve a saludar."""
+    """R3-004 (revisión 2026-09-28+3): la versión original despachaba con
+    `datetime.now(timezone.utc)` real y volvía a despachar una hora
+    después -- en la última hora local antes de medianoche, ese salto de
+    una hora cruzaba a la fecha local siguiente y la segunda respuesta
+    volvía a ganar el saludo del día, rompiendo la aserción de abajo.
+    `_activacion` no recibe un reloj inyectado -- programa la bienvenida
+    con el `now()` real de la base -- así que acá se lee ESE mismo
+    `programado_para` ya confirmado y el segundo despacho avanza sólo un
+    segundo desde él, nunca una hora entera: no puede cruzar una
+    medianoche local."""
     from prisma import gateway
 
     ws = intake_world["north-lab"]["id"]
@@ -665,23 +822,27 @@ def test_bienvenida_por_activacion_reclama_y_la_respuesta_del_dia_no_repite(
     assert resultado == {"ok": True}
     conn.commit()
 
-    # `_activacion` programa la bienvenida con su propio reloj real
-    # (`datetime.now`), así que esta prueba despacha con "ahora" real
-    # también -- es `es_respuesta=True`, salta el chequeo de horario, así
-    # que no importa qué hora sea de verdad.
-    ahora = datetime.now(timezone.utc)
+    with admin(conn) as cur:
+        cur.execute(
+            "select programado_para from message_outbox where dedupe_key = %s",
+            (f"{ws}:alta:{tg_user}",))
+        ahora = cur.fetchone()["programado_para"]
+
     with espacio(conn, ws) as cur:
         cal = _cal(cur, ws)
         transporte = TransporteDePrueba()
+        # `es_respuesta=True`: salta el chequeo de horario, así que no
+        # importa qué hora local sea de verdad.
         despachar(cur, ws, transporte, cal, ahora)
         assert len(transporte.enviados) == 1
         assert not transporte.enviados[0].texto.startswith("👋")  # bienvenida sola
 
+        siguiente = ahora + timedelta(seconds=1)
         enqueue_outbox(
             cur, workspace_id=ws, chat_id=tg_user, text="Tenés tareas abiertas.",
             recipient_membership_id=mid, is_response=True,
-            scheduled_for=ahora, dedupe_key="test:bienvenida-activacion:1")
-        despachar(cur, ws, transporte, cal, ahora + timedelta(hours=1))
+            scheduled_for=siguiente, dedupe_key="test:bienvenida-activacion:1")
+        despachar(cur, ws, transporte, cal, siguiente)
     conn.commit()
 
     assert len(transporte.enviados) == 2

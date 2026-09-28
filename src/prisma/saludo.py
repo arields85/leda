@@ -63,7 +63,7 @@ from zoneinfo import ZoneInfo
 import psycopg
 
 from .incidentes import registrar_incidente
-from .salida import telegram_utf16_units
+from .salida import BUTTON_TEXT_LIMIT, TELEGRAM_TEXT_LIMIT, telegram_utf16_units
 
 SALUDO_MANANA = "👋 Buen día"
 SALUDO_TARDE = "👋 Buenas tardes"
@@ -79,19 +79,6 @@ def saludo_por_hora(hora_local: int) -> str:
     if 12 <= hora_local < 20:
         return SALUDO_TARDE
     return SALUDO_NOCHE
-
-
-def zona_de_workspace(cur: psycopg.Cursor, workspace_id: str) -> ZoneInfo:
-    """La zona horaria del espacio, sin depender de que exista
-    `work_calendar` (a diferencia de `calendario.Calendario.desde_base`).
-    `despachador._intentar_envio` no la usa -- ya tiene `cal.zona`, validada
-    de antes -- pero queda disponible para cualquier otro punto que necesite
-    la zona sin construir un `Calendario` completo."""
-    cur.execute("select zona_horaria from workspace where id = %s", (workspace_id,))
-    fila = cur.fetchone()
-    if not fila:
-        raise LookupError(f"El espacio {workspace_id} no existe.")
-    return ZoneInfo(fila["zona_horaria"])
 
 
 def fecha_local(momento: datetime, zona: ZoneInfo) -> date:
@@ -127,6 +114,32 @@ def reclamar_saludo(cur: psycopg.Cursor, *, workspace_id: str,
     return cur.fetchone() is not None
 
 
+def verificar_migraciones(cur: psycopg.Cursor) -> str | None:
+    """El nombre de la migración que falta aplicar para que el saludo diario
+    no rompa `despachar`/`enqueue_outbox`, o `None` si ya está todo (R4-003,
+    revisión 2026-09-28+3): sin `greeting_state` (migración 0018) o sin
+    `message_outbox.es_bienvenida` (migración 0019), CUALQUIER despacho o
+    encolado de un mensaje personal levanta `UndefinedTable`/
+    `UndefinedColumn` y deja de mandarse todo -- no es un caso que la
+    protección de `reclamar_y_anteponer` pueda absorber (esa es para que el
+    SALUDO decorativo no tire abajo un envío que por lo demás anda bien; acá
+    directamente falta una columna que el `insert` de cualquier mensaje
+    necesita). Se llama una sola vez, al arrancar `escuchar`/`servir`
+    (`cli.py`) -- nunca en cada `despachar`: no hay fallback en tiempo de
+    ejecución para una columna faltante, el proceso no arranca."""
+    cur.execute("select to_regclass('prisma.greeting_state') is not null as ok")
+    if not cur.fetchone()["ok"]:
+        return "0018_saludo_diario.sql"
+    cur.execute(
+        """select exists (
+             select 1 from information_schema.columns
+              where table_schema = 'prisma' and table_name = 'message_outbox'
+                and column_name = 'es_bienvenida') as ok""")
+    if not cur.fetchone()["ok"]:
+        return "0019_marca_de_bienvenida.sql"
+    return None
+
+
 # Cuánto le hace falta a un saludo, con su separador, en el peor caso -- para
 # que `salida.enqueue_outbox` le reserve ese margen a CUALQUIER mensaje
 # dirigido a una persona (revisión 2026-09-28+2): el texto ya se guarda
@@ -143,22 +156,38 @@ MARGEN_SALUDO = (
 
 
 # ---------------------------------------------------------------------------
-# Falla protegida (R4-001/R4-002, revisión 2026-09-28+1): un saludo es
-# decorativo y nunca puede tirar abajo un envío real -- ni porque
-# `greeting_state` todavía no exista (el listener arrancó antes de aplicar la
-# migración 0019), ni por una `zona_horaria` inválida, ni por cualquier otra
-# falla del upsert. Mismo patrón de fondo que `ciclo.SupresorDeRepetidos`/
-# `reportar_fallo` (marcar recién DESPUÉS de escribir el incidente, para que
-# un incidente que no se pudo registrar se reintente la próxima vez) -- sin
-# importarlo de `ciclo.py` para no crear un ciclo de imports
-# (`ciclo -> despachador -> saludo -> ciclo`).
+# Falla protegida (R4-001/R4-002, revisión 2026-09-28+1; R4-002/R3-001,
+# revisión 2026-09-28+3): un saludo es decorativo y nunca puede tirar abajo
+# un envío real -- ni porque `greeting_state` todavía no exista (el listener
+# arrancó antes de aplicar la migración 0018), ni por una `zona_horaria`
+# inválida, ni por cualquier otra falla del upsert.
+#
+# `reclamar_y_anteponer` NUNCA escribe el incidente ella misma: sólo lo
+# hacía antes, y como corre dentro del mismo SAVEPOINT (mark-then-send) que
+# `despachador._intentar_envio` abre para marcar 'enviado' y llamar a
+# Telegram, un envío que fallara DESPUÉS revertía ese SAVEPOINT entero --
+# con el incidente adentro -- mientras que la marca "ya reportado" en el
+# `set` de memoria NO se revierte (no es parte de la transacción), así que
+# la falla real nunca se volvía a reportar. Ahora `reclamar_y_anteponer`
+# sólo devuelve la excepción (si la hay); el LLAMADOR la reporta recién
+# después de que el envío se resuelva -- éxito o fallo --, en el mismo nivel
+# donde `despachador._fallo` ya escribe sin este problema.
+#
+# `reportar_falla` marca en el `set` recién DESPUÉS de escribir el incidente
+# con éxito (mismo patrón de fondo que `ciclo.SupresorDeRepetidos`/
+# `reportar_fallo`, sin importarlo de `ciclo.py` para no crear un ciclo de
+# imports -- `ciclo -> despachador -> saludo -> ciclo`).
 # ---------------------------------------------------------------------------
 
 _FALLAS_SALUDO_REPORTADAS: set[tuple[str | None, str]] = set()
 
 
-def _reportar_falla_saludo(cur: psycopg.Cursor, workspace_id: str,
-                           error: Exception) -> None:
+def reportar_falla(cur: psycopg.Cursor, workspace_id: str,
+                   error: Exception) -> None:
+    """Reporta una falla que devolvió `reclamar_y_anteponer`, deduplicado
+    por `(workspace_id, tipo de error)`. Llamarla recién DESPUÉS de que el
+    envío del mensaje se resolvió (éxito o fallo) -- nunca todavía dentro
+    del SAVEPOINT que lo intenta, o un envío fallido se la lleva puesta."""
     clave = (workspace_id, type(error).__name__)
     if clave in _FALLAS_SALUDO_REPORTADAS:
         return
@@ -175,44 +204,67 @@ def _reportar_falla_saludo(cur: psycopg.Cursor, workspace_id: str,
 
 
 def _reclamar_protegido(cur: psycopg.Cursor, *, workspace_id: str,
-                        membership_id: str, zona: ZoneInfo,
-                        ahora: datetime) -> str | None:
-    """El saludo que corresponde, o `None`, en su propio SAVEPOINT: si algo
-    falla (tabla faltante, zona inválida, lo que sea), se revierte SOLO este
-    punto -- el resto de la transacción de despacho (la marca 'enviado' que
-    ya corrió antes) sigue intacta -- se reporta una vez, deduplicado, y se
-    devuelve `None` para que el mensaje salga sin saludo."""
+                        membership_id: str, zona: ZoneInfo, ahora: datetime,
+                        texto: str, has_buttons: bool,
+                        chequear_ajuste: bool
+                        ) -> tuple[str | None, Exception | None]:
+    """El saludo que corresponde, o `None`, y la excepción, si algo falló --
+    nunca la reporta, eso lo hace el llamador después de resolver el envío
+    (ver el comentario de arriba). Todo en un SAVEPOINT propio: si algo
+    falla, se revierte SOLO este punto -- el resto de la transacción de
+    despacho (la marca 'enviado' que ya corrió antes) sigue intacta.
+
+    `chequear_ajuste` (R3-003, revisión 2026-09-28+3): si anteponer el
+    saludo empujaría `texto` fuera del límite real de Telegram -- una fila
+    ya encolada sin el margen reservado (`salida.MARGEN_SALUDO`), por
+    ejemplo -- ni siquiera intenta reclamar la reserva: el mensaje tiene que
+    salir igual, sin saludo, y sin haber gastado la reserva del día por un
+    mensaje que en definitiva no la llevó. Se chequea ANTES del `upsert`
+    (nunca hace falta deshacerlo). No aplica a la bienvenida
+    (`chequear_ajuste=False`): nunca antepone nada, así que ningún ajuste de
+    texto puede hacerla superar el límite."""
     punto = cur.connection.transaction(force_rollback=False)
     try:
         with punto:
             saludo = saludo_por_hora(ahora.astimezone(zona).hour)
+            if chequear_ajuste:
+                limite = BUTTON_TEXT_LIMIT if has_buttons else TELEGRAM_TEXT_LIMIT
+                if telegram_utf16_units(f"{saludo}\n\n{texto}") > limite:
+                    return None, None
             ganado = reclamar_saludo(
                 cur, workspace_id=workspace_id, membership_id=membership_id,
                 fecha=fecha_local(ahora, zona))
-            return saludo if ganado else None
+            return (saludo if ganado else None), None
     except Exception as exc:  # noqa: BLE001 -- decorativo, nunca tira el envío
-        _reportar_falla_saludo(cur, workspace_id, exc)
-        return None
+        return None, exc
 
 
 def reclamar_y_anteponer(cur: psycopg.Cursor, *, workspace_id: str,
                          membership_id: str | None, zona: ZoneInfo,
                          ahora: datetime, texto: str,
-                         es_bienvenida: bool = False) -> str:
+                         has_buttons: bool = False,
+                         es_bienvenida: bool = False
+                         ) -> tuple[str, Exception | None]:
     """Lo que llama `despachador._intentar_envio`, dentro de su propio
     SAVEPOINT (mark-then-send): decide si corresponde el saludo para
     `membership_id` en la fecha local de `ahora` (zona del espacio) y lo
     antepone a `texto` -- o lo reclama sin anteponer nada, si `es_bienvenida`
     (pack 06 §3, T28: la bienvenida ya es su propio saludo).
 
+    Devuelve `(texto_final, falla)`: `falla` es la excepción que hubo, si la
+    hubo -- el LLAMADOR es quien decide cuándo reportarla (`reportar_falla`,
+    recién después de que el envío se resuelva; ver el comentario de más
+    arriba), nunca esta función.
+
     `membership_id=None` -- un mensaje de grupo -- nunca reclama ni antepone
     nada (decisión del usuario, 2026-09-28+2: los mensajes de grupo ni llevan
     ni consumen el saludo personal)."""
     if not membership_id:
-        return texto
-    saludo = _reclamar_protegido(
+        return texto, None
+    saludo, falla = _reclamar_protegido(
         cur, workspace_id=workspace_id, membership_id=membership_id,
-        zona=zona, ahora=ahora)
+        zona=zona, ahora=ahora, texto=texto, has_buttons=has_buttons,
+        chequear_ajuste=not es_bienvenida)
     if es_bienvenida or not saludo:
-        return texto
-    return f"{saludo}\n\n{texto}"
+        return texto, falla
+    return f"{saludo}\n\n{texto}", falla

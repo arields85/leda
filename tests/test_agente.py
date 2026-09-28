@@ -28,6 +28,35 @@ def _quien(cur, nombre, ws):
     return identificar(cur, cur.fetchone()["t"], Canal.ESPACIO, ws)
 
 
+def test_encolar_texto_con_opciones_no_rompe_en_la_ventana_del_margen_del_saludo(
+        corework, conn):
+    """R4-001 (revisión 2026-09-28+3): `_encolar_texto_con_opciones` decidía
+    "entra con los botones" (`cabe_con_botones`) contra `BUTTON_TEXT_LIMIT`
+    completo, sin el margen que `enqueue_outbox` sí le resta a un mensaje
+    personal (`saludo.MARGEN_SALUDO`) -- un texto en esa ventana exacta
+    pasaba la decisión de acá y `enqueue_outbox` lo rechazaba después, en
+    todos los reintentos."""
+    from prisma.agente import _encolar_texto_con_opciones
+    from prisma.saludo import MARGEN_SALUDO
+    from prisma.salida import BUTTON_TEXT_LIMIT
+
+    ws = corework.workspace_id
+    # Justo en la ventana: entra en BUTTON_TEXT_LIMIT pero no en
+    # BUTTON_TEXT_LIMIT - MARGEN_SALUDO, que es lo que de verdad va a
+    # comprobar `enqueue_outbox` para un mensaje con destinatario.
+    texto = "x" * (BUTTON_TEXT_LIMIT - MARGEN_SALUDO + 5)
+    assert len(texto) <= BUTTON_TEXT_LIMIT
+    assert len(texto) > BUTTON_TEXT_LIMIT - MARGEN_SALUDO
+
+    with espacio(conn, ws) as cur:
+        quien = _quien(cur, "Marcos Tarquini", ws)
+        _encolar_texto_con_opciones(
+            cur, quien, chat_id=9101, texto=texto,
+            opciones=[("Confirmar", True)], ahora=AHORA,
+            dedupe_prefijo="test-margen", texto_corto="Elegí una opción:",
+            args={"pregunta": texto})
+
+
 def _tarea(cur, ws, titulo="Programar PLC", area="ot", persona="Marcos Tarquini"):
     cur.execute(
         """insert into objective (workspace_id, tipo, titulo)

@@ -37,10 +37,10 @@ from .db import registrar_auditoria
 from .deteccion_pregunta import hace_pregunta
 from .incidentes import registrar_incidente
 from .llm import Llamada, Proveedor, Respuesta
-from .salida import (BUTTON_TEXT_LIMIT, ETIQUETA_CANCELAR, ETIQUETA_CONFIRMAR,
+from .salida import (ETIQUETA_CANCELAR, ETIQUETA_CONFIRMAR, cabe_en_mensaje,
                      enqueue_outbox, etiquetas_de_tarea,
                      normalize_visible_text, prepare_payload,
-                     telegram_utf16_units, with_no_effect_status)
+                     with_no_effect_status)
 
 MAX_VUELTAS = 5
 
@@ -665,8 +665,12 @@ def _encolar_texto_con_opciones(cur, quien: Solicitante, chat_id: int,
     `pending_action.args` (igual para las tres opciones de un mismo cierre,
     nunca algo por opción)."""
     opciones = list(opciones)
-    cabe_con_botones = (
-        telegram_utf16_units(normalize_visible_text(texto)) <= BUTTON_TEXT_LIMIT)
+    # `cabe_en_mensaje` ya descuenta el margen del saludo diario (R4-001,
+    # revisión 2026-09-28+3): comparar a mano contra `BUTTON_TEXT_LIMIT`
+    # dejaba pasar un texto que `enqueue_outbox` rechazaba después, en todos
+    # los reintentos -- este mensaje siempre es personal (`quien.
+    # membership_id`, nunca uno de grupo).
+    cabe_con_botones = cabe_en_mensaje(texto, has_buttons=True)
     resumen_botones = texto if cabe_con_botones else texto_corto
 
     p = P.registrar(cur, quien, herramienta=P.SENTINEL_OPCIONES_MODELO,

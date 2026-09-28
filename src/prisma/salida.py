@@ -371,7 +371,7 @@ def prepare_payload(text: Any, *, dedupe_key: str, has_buttons: bool = False,
                     margen: int = 0) -> list[PreparedPayload]:
     """`margen` reserva unidades UTF-16 del límite real de Telegram, sin
     ocuparlas todavía -- lo usa `enqueue_outbox` para cualquier mensaje
-    dirigido a una persona (revisión 2026-09-28+2, R... saludo diario): el
+    dirigido a una persona (saludo diario, revisión 2026-09-28+2): el
     texto se recorta o se parte ACÁ, al encolar, mucho antes de que
     `despachador._intentar_envio` sepa si le va a anteponer el saludo del
     día -- sin este margen, un mensaje ya justo en el límite se pasaría en
@@ -436,6 +436,40 @@ def _prefix_index(text: str, max_units: int) -> int:
     return low
 
 
+def margen_saludo(*, personal: bool) -> int:
+    """Cuánto hay que reservarle al saludo diario en el presupuesto de un
+    mensaje -- `saludo.MARGEN_SALUDO` si `personal` (tiene
+    `recipient_membership_id`: nunca uno de grupo), 0 si no. Importado
+    adentro, no al nivel del módulo: `saludo.py` ya importa de acá
+    (`telegram_utf16_units`); importarlo arriba armaría un ciclo.
+
+    Única fuente de este número (R4-001, revisión 2026-09-28+3): antes
+    `enqueue_outbox` lo calculaba a mano y `agente._encolar_texto_con_
+    opciones` decidía si un texto "entra con los botones" contra el límite
+    COMPLETO, sin este descuento -- un texto en esa ventana exacta pasaba
+    esa decisión y `enqueue_outbox` lo rechazaba después, en todos los
+    reintentos. Todo el que decida si un texto entra, antes de encolarlo,
+    tiene que usar `cabe_en_mensaje` (más abajo), que ya aplica este mismo
+    margen."""
+    if not personal:
+        return 0
+    from .saludo import MARGEN_SALUDO
+    return MARGEN_SALUDO
+
+
+def cabe_en_mensaje(texto: Any, *, has_buttons: bool, personal: bool = True) -> bool:
+    """Si `texto` entra en un mensaje de Telegram, con el mismo margen del
+    saludo diario que después va a aplicar `enqueue_outbox`/`prepare_payload`
+    -- la única función que cualquier punto de salida tiene que usar para
+    decidir "entra o no entra" ANTES de encolar (por ejemplo, para elegir si
+    manda el texto largo junto con los botones o aparte), en vez de comparar
+    a mano contra `BUTTON_TEXT_LIMIT`/`TELEGRAM_TEXT_LIMIT` -- eso fue
+    exactamente el bug de R4-001."""
+    limite = (BUTTON_TEXT_LIMIT if has_buttons else TELEGRAM_TEXT_LIMIT) - \
+        margen_saludo(personal=personal)
+    return telegram_utf16_units(normalize_visible_text(texto)) <= limite
+
+
 def enqueue_outbox(cur, *, workspace_id: str, chat_id: int,
                    text: Any, dedupe_key: str,
                    recipient_membership_id: str | None = None,
@@ -452,12 +486,7 @@ def enqueue_outbox(cur, *, workspace_id: str, chat_id: int,
     # trae `recipient_membership_id`) reserva el margen del saludo diario
     # ANTES de partir/recortar -- `despachador._intentar_envio` decide recién
     # al enviar si de verdad le antepone el saludo (revisión 2026-09-28+2).
-    # Importado adentro, no al nivel del módulo: `saludo.py` ya importa de
-    # acá (`telegram_utf16_units`); importarlo arriba armaría un ciclo.
-    margen = 0
-    if recipient_membership_id is not None:
-        from .saludo import MARGEN_SALUDO
-        margen = MARGEN_SALUDO
+    margen = margen_saludo(personal=recipient_membership_id is not None)
     payloads = prepare_payload(
         text, dedupe_key=dedupe_key, has_buttons=has_buttons,
         allow_split=allow_split, margen=margen,

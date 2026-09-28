@@ -21,6 +21,7 @@ import sys
 from .calendario import Calendario, cargar_feriados_ar
 from .config import config
 from .db import admin, conectar, espacio, registrar_auditoria
+from .saludo import verificar_migraciones
 
 
 def _revertir_sin_traza(conn) -> None:
@@ -45,6 +46,23 @@ def _id_de(conn, slug: str) -> str:
     if not fila:
         sys.exit(f"No existe el espacio '{slug}'.")
     return str(fila["id"])
+
+
+def _verificar_esquema_o_salir(conn) -> int | None:
+    """R4-003 (revisión 2026-09-28+3): sin `greeting_state` ni
+    `message_outbox.es_bienvenida`, cada `despachar`/`enqueue_outbox` rompe
+    con `UndefinedTable`/`UndefinedColumn` en el primer mensaje, tirando
+    abajo todo el despacho. `servir` y `escuchar` son los dos puntos donde
+    arranca el despacho sostenido -- rechazar arrancar acá, con un mensaje
+    claro, es más barato que dejar que la falla aparezca recién en el
+    primer envío real."""
+    with admin(conn) as cur:
+        falta = verificar_migraciones(cur)
+    if falta is None:
+        return None
+    print(f"Falta aplicar la migración '{falta}'. Ejecutá "
+          f"'python -m prisma esquema' antes de arrancar.")
+    return 1
 
 
 def _resolver_integrante(cur, ws: str, nombre: str) -> list[dict]:
@@ -231,6 +249,13 @@ def main(argv: list[str] | None = None) -> int:
         import uvicorn
         from .reloj import montar
 
+        conn_chequeo = conectar()
+        try:
+            codigo = _verificar_esquema_o_salir(conn_chequeo)
+        finally:
+            conn_chequeo.close()
+        if codigo is not None:
+            return codigo
         montar(lambda: conectar(), con_cadencias=not a.sin_cadencias).start()
         uvicorn.run("prisma.gateway:app", host="0.0.0.0", port=a.puerto)
         return 0
@@ -441,6 +466,9 @@ def main(argv: list[str] | None = None) -> int:
 
     if a.cmd == "escuchar":
         from .local import escuchar
+        codigo = _verificar_esquema_o_salir(conn)
+        if codigo is not None:
+            return codigo
         escuchar(conn, a.slug, ws, con_cadencias=not a.sin_cadencias)
         return 0
 

@@ -3887,3 +3887,16 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   incluido el alta, que pasaba el límite (R3-003, ROJO `PayloadValidationError` con 82
   unidades, VERDE); docstring de `con_icono`; prueba de la activación con token;
   `SALUDO_NOCHE`. Suite completa del escritor: `1178 passed, 108 deselected`.
+  Revisión de `eb16f87`: alto (`high_risk`, 1353 líneas); consentimiento del usuario:
+  revisar. review-2b75c37b8ba42aaa (4 lentes) aprobada y reconocida; frontera en
+  `eb16f87`. Hallazgos no bloqueantes -> #7c.
+
+- 2026-09-28: **#7c cerrada — seguimientos de review-2b75c37b.** Ruta: el mismo
+  escritor. `escuchar` y `servir` se niegan a arrancar si falta una migración que el
+  código necesita, y nombran el archivo (sin ella, toda la mensajería fallaba). Un
+  mensaje donde el saludo no entra en el límite de Telegram sale sin saludo y no gasta el
+  del día; `cabe_en_mensaje` es la única medida de si un texto entra con botones. La
+  falla del saludo se reporta después de resolver el envío, así no se pierde si el envío
+  falla, y una sola vez. Pruebas sin dependencia del orden ni de la medianoche. ROJO
+  observado (prueba de arranque, fila sin margen, reporte perdido). Suite completa del
+  escritor: `1185 passed, 108 deselected`.
