@@ -207,12 +207,30 @@ def despachar_admin(conn, transporte_admin, ahora: datetime,
     `admin()` y el mismo commit que ya envuelve el despacho, así el lote de
     esta misma pasada ya incluye lo que se acaba de reconciliar. El resumen
     combina los tres -- quien llama (`Escucha.tareas_de_fondo`) no
-    distingue de dónde vino cada envío/agotado, sólo cuántos hubo."""
+    distingue de dónde vino cada envío/agotado, sólo cuántos hubo.
+
+    G1d-c2, ítem 3: la reconciliación corre en su propio SAVEPOINT (mismo
+    patrón que el registro del incidente dentro de `despachar_avisos_admin`)
+    -- un error suyo (una fila corrupta, una consulta que revienta) nunca
+    frena la entrega de los avisos de incidente de T28 en esta misma pasada:
+    antes, si `reconciliar_avisos_admin_notice` reventaba, la excepción salía
+    de `despachar_admin` sin que `despachar_avisos_admin`/`despachar_
+    respuestas_admin` llegaran siquiera a correr. El fallo queda como
+    incidente (nunca en silencio) y el resto de la pasada sigue."""
     from . import avisos_admin as AA
     from .despachador import despachar_respuestas_admin
 
     with admin(conn) as cur:
-        AA.reconciliar_avisos_admin_notice(cur, ahora=ahora)
+        try:
+            with cur.connection.transaction():
+                AA.reconciliar_avisos_admin_notice(cur, ahora=ahora)
+        except Exception as e:  # noqa: BLE001 -- se aísla, nunca frena el despacho
+            registrar_incidente(
+                cur, None,
+                f"Falló la reconciliación de avisos administrativos "
+                f"({type(e).__name__}).",
+                severidad="alta", referencia_cruda=str(e)[:2000],
+                etapa="despachar_admin_reconciliacion")
         resumen = despachar_avisos_admin(cur, transporte_admin, ahora, lote)
         resumen_respuestas = despachar_respuestas_admin(cur, transporte_admin, ahora, lote)
     conn.commit()

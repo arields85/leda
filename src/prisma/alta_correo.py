@@ -32,6 +32,13 @@ CLAVE_HABILITADO = "correo_verificacion.habilitado"
 # reconoce para ofrecer "Habilitar un nuevo intento").
 TIPO_CORREO_LIMITE_AGOTADO = "correo_limite_agotado"
 
+# Tipo de aviso administrativo "no hay emisor de correo configurado"
+# (`alta_correo_flujo._emitir_y_enviar`). G1d-c2, ítem 2: un solo aviso
+# pendiente POR ESPACIO -- se crea con `referencia_tipo="workspace"`,
+# `referencia_id=workspace_id`, nunca por membresía, porque el problema es
+# del espacio entero, no de quien lo pisó primero.
+TIPO_CORREO_SIN_EMISOR = "correo_sin_emisor"
+
 ESTADOS_VALIDOS = (
     "pending_welcome", "awaiting_email", "pending_email_verification",
     "active", "revoked",
@@ -66,17 +73,32 @@ def habilitado(cur: psycopg.Cursor, workspace_id: str) -> bool:
     conexión de administración (`admin()`) ve todos los espacios, y sin este
     filtro leería la clave de cualquiera, no la del que llama (G1a2, hallazgo
     de la revisión).
-    """
+
+    G1d-c2, ítem 8: un valor guardado inválido (JSON roto, o algo que no es
+    ni `true` ni `false`) nunca revienta -- se trata como APAGADA, el lado
+    seguro ("ninguna protección se degrada en silencio" corre en las dos
+    direcciones: acá, degradarse hacia MENOS efecto es lo seguro), y deja un
+    incidente saneado en vez de fallar en silencio o adivinar."""
     cur.execute(
         "select valor from workspace_setting where workspace_id = %s and clave = %s",
         (workspace_id, CLAVE_HABILITADO))
     fila = cur.fetchone()
     if not fila:
         return False
-    valor = fila["valor"]
-    if isinstance(valor, str):
-        valor = json.loads(valor)
-    return bool(valor)
+    try:
+        valor = fila["valor"]
+        if isinstance(valor, str):
+            valor = json.loads(valor)
+        return bool(valor)
+    except (TypeError, ValueError, json.JSONDecodeError):
+        from .incidentes import registrar_incidente
+
+        registrar_incidente(
+            cur, workspace_id,
+            f"El valor guardado de {CLAVE_HABILITADO!r} no es válido -- "
+            "se lo trató como apagado.",
+            severidad="media", etapa="alta_correo_config_invalida")
+        return False
 
 
 # ---------------------------------------------------------------------------
@@ -325,19 +347,34 @@ def habilitar_intento(cur: psycopg.Cursor, membership_id: str, *,
 def dominios_permitidos(cur: psycopg.Cursor, workspace_id: str) -> list[str] | None:
     """Lista de dominios habilitados para el correo laboral, o `None` si el
     espacio no restringió ninguno (`workspace_setting`, clave
-    `correo_verificacion.dominios`, lista JSON de dominios en minúsculas)."""
+    `correo_verificacion.dominios`, lista JSON de dominios en minúsculas).
+
+    G1d-c2, ítem 8: un valor guardado inválido (JSON roto, o algo que no es
+    una lista) nunca revienta -- se trata como SIN restricción (`None`, el
+    lado seguro para este dato: negarle a alguien un dominio por un valor
+    corrupto sería un bloqueo sin causa real) y deja un incidente saneado."""
     cur.execute(
         "select valor from workspace_setting where workspace_id = %s and clave = %s",
         (workspace_id, "correo_verificacion.dominios"))
     fila = cur.fetchone()
     if not fila:
         return None
-    valor = fila["valor"]
-    if isinstance(valor, str):
-        valor = json.loads(valor)
-    if not valor:
+    try:
+        valor = fila["valor"]
+        if isinstance(valor, str):
+            valor = json.loads(valor)
+        if not valor:
+            return None
+        return [str(d).strip().lower() for d in valor]
+    except (TypeError, ValueError, json.JSONDecodeError):
+        from .incidentes import registrar_incidente
+
+        registrar_incidente(
+            cur, workspace_id,
+            "El valor guardado de 'correo_verificacion.dominios' no es "
+            "válido -- se lo trató como sin restricción.",
+            severidad="media", etapa="alta_correo_config_invalida")
         return None
-    return [str(d).strip().lower() for d in valor]
 
 
 def elegibles_existente(cur: psycopg.Cursor, workspace_id: str) -> list[dict]:
@@ -498,18 +535,27 @@ def avisos(cur: psycopg.Cursor, *, solo_no_leidos: bool = False,
 
 
 def marcar_leido(cur: psycopg.Cursor, aviso_id: str, app_user_id: str,
-                  *, ahora: datetime | None = None) -> None:
+                  *, ahora: datetime | None = None) -> bool:
+    """Marca el aviso leído. Devuelve si esta llamada realmente cambió algo
+    (G1d-c2, ítem 8) -- `False` si el aviso no existe o ya estaba leído, para
+    que quien llama pueda distinguir "lo acabo de marcar" de "ya estaba así"
+    en vez de asumir siempre lo primero."""
     cur.execute(
         """update aviso_administrativo
               set leido_en = %s, leido_por = %s
             where id = %s and leido_en is null""",
         (_ahora(ahora), app_user_id, aviso_id))
+    return cur.rowcount > 0
 
 
 def marcar_resuelto(cur: psycopg.Cursor, aviso_id: str, app_user_id: str,
-                     *, ahora: datetime | None = None) -> None:
+                     *, ahora: datetime | None = None) -> bool:
+    """Marca el aviso resuelto. Devuelve si esta llamada realmente cambió
+    algo (G1d-c2, ítem 8) -- `False` si el aviso no existe o ya estaba
+    resuelto, mismo motivo que `marcar_leido`."""
     cur.execute(
         """update aviso_administrativo
               set resuelto_en = %s, resuelto_por = %s
             where id = %s and resuelto_en is null""",
         (_ahora(ahora), app_user_id, aviso_id))
+    return cur.rowcount > 0

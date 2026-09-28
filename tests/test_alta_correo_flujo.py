@@ -153,14 +153,12 @@ def test_cuerpo_de_verificacion_es_el_texto_a_aprobado_en_parrafos_corridos():
 
 
 @pytest.fixture
-def sin_activar(conn, tmp_path):
-    import os
-
+def sin_activar(conn, tmp_path, monkeypatch):
     import yaml
     from prisma.importador import importar
     from tests.conftest import RAIZ
 
-    os.environ["PRISMA_BOT_TOKEN_COREWORK"] = "prueba:token"
+    monkeypatch.setenv("PRISMA_BOT_TOKEN_COREWORK", "prueba:token")
     pack = yaml.safe_load((RAIZ / "espacios" / "corework.yaml").read_text("utf-8"))
     pack["telegram"]["grupo_gestion_id"] = -1001
     pack["evidencia"]["estructura_drive"] = "drive://corework"
@@ -443,6 +441,33 @@ def test_sin_emisor_configurado_incidente_y_aviso_administrativo(
     assert any(a["tipo"] == "correo_sin_emisor" for a in avisos)
     for a in avisos:
         assert "taylor.quinn@empresa.com" not in a["texto_saneado"]
+
+
+def test_sin_emisor_dos_personas_distintas_dedupean_incidente_y_aviso_por_espacio(
+        cliente, conn, intake_world):
+    """G1d-c2, ítem 2: "sin emisor configurado" es un problema del ESPACIO,
+    no de quien lo pisa primero. Antes, cada integrante distinto que
+    tropezaba con esto abría su propio incidente y su propio aviso
+    administrativo (la referencia era la membresía); ahora, mientras el
+    primero siga sin resolverse, un segundo intento -- de otra persona --
+    no duplica ninguno de los dos. Cada persona sigue recibiendo el aviso
+    neutral en cada intento."""
+    ws = intake_world["north-lab"]["id"]
+    m1 = _membership_id(intake_world, "north-lab", "Taylor Quinn")
+    m2 = _membership_id(intake_world, "north-lab", "Sam North")
+    _habilitar(conn, ws)
+    _abrir_awaiting_email(conn, ws, m1)
+    _abrir_awaiting_email(conn, ws, m2)
+    # No se parchea `obtener_emisor_configurado`: sigue devolviendo `None`.
+
+    _post(cliente, "taylor.quinn@empresa.com", 71001)
+    _post(cliente, "sam.north@empresa.com", 71002)
+
+    assert _outbox_textos(conn, 71001)[-1] == gateway.NOTICIA_NEUTRA_INCIDENTE
+    assert _outbox_textos(conn, 71002)[-1] == gateway.NOTICIA_NEUTRA_INCIDENTE
+    assert len(_incidentes(conn, ws)) == 1
+    avisos_sin_emisor = [a for a in _avisos(conn, ws) if a["tipo"] == "correo_sin_emisor"]
+    assert len(avisos_sin_emisor) == 1
 
 
 def test_ningun_correo_ni_token_en_incidentes_ni_avisos(
@@ -1767,3 +1792,101 @@ def test_dos_abrir_ciclo_alta_concurrentes_de_una_reactivacion_no_duplican_el_ci
             "where membership_id = %s and ciclo = 2 and tipo = 'bienvenida_entregada'",
             (m,))
         assert cur.fetchone()["n"] == 1
+
+
+# ===========================================================================
+# L. G1d-c2 -- correcciones de las revisiones de la rama unificada
+# ===========================================================================
+
+
+def test_cambiar_a_con_dominio_no_habilitado_se_rechaza_con_el_texto_aprobado(
+        cliente, conn, intake_world, monkeypatch):
+    """G1d-c2, ítem 1: "Cambiar correo a X" pasa por la MISMA validación de
+    dominios habilitados que cualquier otro correo nuevo -- antes
+    `resolver_toque` saltaba directo a `_emitir_y_enviar` para este botón, así
+    que un dominio no habilitado se colaba sin pasar por el filtro que
+    `_validar_y_emitir` ya aplica a un correo tipeado."""
+    ws = intake_world["north-lab"]["id"]
+    m = _membership_id(intake_world, "north-lab", "Taylor Quinn")
+    _habilitar(conn, ws)
+    with admin(conn) as cur:
+        cur.execute(
+            "insert into workspace_setting (workspace_id, clave, valor) "
+            "values (%s, 'correo_verificacion.dominios', '[\"empresa.com\"]')",
+            (ws,))
+    conn.commit()
+    doble = DobleEnvioCorreo()
+    _sender(conn, ws, monkeypatch, doble)
+    _hasta_pending_verification(cliente, conn, ws, m, 71001, doble)
+    envios_antes = len(doble.enviados)
+
+    _post(cliente, "en realidad usá taylor.q@otraempresa.com", 71001)
+    token = _token_boton(conn, ws, m, ACF.etiqueta_usar_nuevo("taylor.q@otraempresa.com"))
+    assert token
+
+    _post_toque(cliente, token, 71001)
+
+    assert _outbox_textos(conn, 71001)[-1] == ACF.TEXTO_DOMINIO_NO_HABILITADO
+    assert len(doble.enviados) == envios_antes             # nunca se mandó nada
+    fila = _estado(conn, ws, m)
+    assert fila["estado"] == "pending_email_verification"  # nunca awaiting_email
+
+
+def test_reactivacion_con_ciclo_ya_active_nunca_deja_a_la_persona_en_silencio(
+        cliente, conn, intake_world, monkeypatch):
+    """G1d-c2, ítem 5: `abrir_ciclo_alta` sobre una membresía cuyo ciclo ya
+    avanzó más allá de la bienvenida (acá, ya `active`) tiene que responder
+    algo -- antes, `_completar_bienvenida` sólo actúa sobre `pending_welcome`
+    y devolvía sin escribir nada para cualquier otro estado, así que la
+    persona no recibía ningún mensaje."""
+    ws = intake_world["north-lab"]["id"]
+    m = _membership_id(intake_world, "north-lab", "Taylor Quinn")
+    _habilitar(conn, ws)
+    doble = DobleEnvioCorreo()
+    _sender(conn, ws, monkeypatch, doble)
+    ultimo_envio = _hasta_pending_verification(cliente, conn, ws, m, 71001, doble)
+    token = _token_de_enlace(ultimo_envio.enlace)
+    with espacio(conn, ws) as cur:
+        AC.reservar_verificacion(cur, token, m, ahora=datetime.now(timezone.utc))
+        AC.completar_verificacion(cur, token, m, ahora=datetime.now(timezone.utc))
+    conn.commit()
+    assert _estado(conn, ws, m)["estado"] == "active"
+
+    with espacio(conn, ws) as cur:
+        ACF.abrir_ciclo_alta(cur, m, ws, 71001, "Taylor Quinn",
+                             datetime.now(timezone.utc))
+    conn.commit()
+
+    assert _outbox_textos(conn, 71001)[-1] == ACF.texto_verificado("Taylor")
+    assert _estado(conn, ws, m)["estado"] == "active"       # sin tocar el ciclo
+
+
+def test_enlace_consumido_pending_verification_sin_envio_vigente_usa_el_enrutador(
+        cliente, conn, intake_world, monkeypatch):
+    """G1d-c2, ítem 9: un enlace ya consumido, con el ciclo actual en
+    `pending_email_verification` pero SIN ningún envío vigente, tiene que
+    seguir el mismo enrutador único por estado (`_responder_estado_actual`,
+    B9/B10) -- antes, una copia desalineada de ese enrutador llamaba a
+    `_recordatorio` sin comprobar que hubiera algo vigente que recordar."""
+    from prisma.autoridad import identificar_en_espacio
+
+    ws = intake_world["north-lab"]["id"]
+    m = _membership_id(intake_world, "north-lab", "Taylor Quinn")
+    _habilitar(conn, ws)
+    doble = DobleEnvioCorreo()
+    _sender(conn, ws, monkeypatch, doble)
+    _hasta_pending_verification(cliente, conn, ws, m, 71001, doble)
+    with admin(conn) as cur:
+        cur.execute(
+            "update alta_correo_verificacion set vigente = false "
+            "where membership_id = %s", (m,))
+    conn.commit()
+
+    with espacio(conn, ws) as cur:
+        quien = identificar_en_espacio(cur, 71001, ws)
+        ACF._responder_falla_verificacion(
+            cur, quien, ws, 71001, datetime.now(timezone.utc),
+            "verification_token_consumed")
+    conn.commit()
+
+    assert _outbox_textos(conn, 71001)[-1] == ACF.TEXTO_SIN_ENVIO_VIGENTE

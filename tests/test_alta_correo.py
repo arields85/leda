@@ -101,7 +101,6 @@ def test_correccion_de_correo_vuelve_de_pending_verification_a_awaiting_email(
     ("pending_welcome", "pending_email_verification"),
     ("pending_welcome", "active"),
     ("awaiting_email", "active"),
-    ("pending_email_verification", "revoked"),
     ("active", "awaiting_email"),
 ])
 def test_las_transiciones_invalidas_las_rechaza_la_base(
@@ -120,6 +119,40 @@ def test_las_transiciones_invalidas_las_rechaza_la_base(
 
         with pytest.raises(psycopg.Error), conn.transaction():
             AC.transicionar(cur, m, hacia, ahora=AHORA)
+    conn.commit()
+
+
+@pytest.mark.parametrize("desde", [
+    "pending_welcome", "awaiting_email", "pending_email_verification",
+])
+def test_revocar_un_ciclo_trabado_a_mitad_del_alta_abre_uno_nuevo(
+        intake_world, conn, desde):
+    """G1d-c2, ítem 7: antes, `revoked` sólo se podía alcanzar desde
+    `active` -- un ciclo trabado a mitad del alta (por ejemplo, alguien que
+    nunca contestó el correo de verificación) no tenía ningún evento válido
+    para revocarlo y volver a abrir uno nuevo. Ahora la base acepta `revoked`
+    también desde `pending_welcome`, `awaiting_email` y `pending_email_
+    verification` -- sin ninguna superficie nueva, sólo el camino por
+    evento (`AC.transicionar`) que ya usa una revocación desde `active`."""
+    norte = intake_world["north-lab"]
+    m = _membership(intake_world, "north-lab")
+
+    with espacio(conn, norte["id"]) as cur:
+        AC.iniciar_ciclo(cur, m, "alta", ahora=AHORA)
+        camino = ["awaiting_email", "pending_email_verification"]
+        for paso in camino:
+            if AC.estado(cur, m)["estado"] == desde:
+                break
+            AC.transicionar(cur, m, paso, ahora=AHORA)
+        assert AC.estado(cur, m)["estado"] == desde
+
+        AC.transicionar(cur, m, "revoked", ahora=AHORA)
+        assert AC.estado(cur, m)["estado"] == "revoked"
+
+        AC.iniciar_ciclo(cur, m, "alta", ahora=AHORA)
+        fila = AC.estado(cur, m)
+        assert fila["ciclo"] == 2
+        assert fila["estado"] == "pending_welcome"
     conn.commit()
 
 

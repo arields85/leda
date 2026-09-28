@@ -666,7 +666,7 @@ Un worktree nuevo no trae lo que no se versiona.
     `review-220c54b04c7c78f3` (recorrido/gateway/cli, cuatro lentes),
     `review-1083f9b7bcb58c4b` (pruebas). Suite sobre la rama rebasada:
     `1306 passed, 108 deselected`.
-  - [ ] **G1d-c2 — Correcciones de las revisiones de la rama unificada.**
+  - [x] **G1d-c2 — Correcciones de las revisiones de la rama unificada.**
     (1) Filtro de dominios salteable por "Cambiar correo a X": toda
     dirección pasa por la misma validación. (2) Sin emisor configurado,
     cada intento crea un incidente y un aviso nuevos: deduplicar (un aviso
@@ -687,6 +687,20 @@ Un worktree nuevo no trae lo que no se versiona.
     `monkeypatch.setenv`. (11) El envío del correo con el enlace ocurre
     dentro de la transacción: documentar el límite honestamente o mover el
     envío después del commit con reconciliación (decidir en la unidad).
+    Hecho (ruta: delegada, un escritor). Una sola validación de correo para
+    todos los caminos; aviso `correo_sin_emisor` e incidente deduplicados
+    por espacio; reconciliación aislada en savepoint en
+    `ciclo.despachar_admin`; pruebas del despacho de `admin_reply`;
+    reactivación con ciclo en `pending_email_verification` o `active`
+    responde por el enrutador de estado (no `onboarding.bienvenida`,
+    excluida por C6 con la clave encendida); `admin_notice` exige
+    exactamente una referencia; revocar desde cualquier estado previo a
+    `active`; `marcar_leido`/`marcar_resuelto` devuelven si cambiaron algo;
+    configuración inválida → apagado/sin restricción + incidente; un solo
+    enrutador para el enlace consumido; límite de envío dentro de la
+    transacción documentado. Sin textos nuevos ni cambios de permisos. TDD
+    parcial declarado por el escritor. Toque a `main`: `ciclo.py`
+    (savepoint). Suite del escritor: `1323 passed, 108 deselected`.
   - [ ] **G1d — Avisos "🛠️ Administración" por el bot de administración.**
     Camino de salida propio (hoy el bot de administración no envía nada y
     `message_outbox` exige `workspace_id`); botones Reenviar correo /

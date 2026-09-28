@@ -361,7 +361,8 @@ def saludo_para(ahora: datetime, zona: ZoneInfo) -> str:
 
 
 def abrir_ciclo_alta(cur: psycopg.Cursor, membership_id: str, workspace_id: str,
-                     chat_id: int, nombre: str, ahora: datetime) -> None:
+                     chat_id: int, nombre: str, ahora: datetime, *,
+                     app_user_id: str | None = None) -> None:
     """Activación con la clave encendida: abre `pending_welcome` y completa
     los pasos hasta `awaiting_email`, en la misma transacción que
     `onboarding.activar()` ya viene usando.
@@ -394,11 +395,54 @@ def abrir_ciclo_alta(cur: psycopg.Cursor, membership_id: str, workspace_id: str,
     `iniciar_ciclo`, nunca una regla nueva. La protección contra la carrera
     de la primera activación no cambia: la segunda llamada concurrente, ya
     desbloqueada, encuentra la proyección que dejó la primera (`pending_
-    welcome` de un ciclo que no es `revoked`) y no vuelve a abrir nada."""
+    welcome` de un ciclo que no es `revoked`) y no vuelve a abrir nada.
+
+    G1d-c2, ítem 5: si la proyección ya está en `pending_email_verification`
+    o `active` -- p. ej. una reactivación administrativa que revincula la
+    cuenta de Telegram de alguien que ya venía verificando o ya había
+    verificado, sin haber pasado por `revoked` --, esto nunca puede quedar en
+    silencio: `_completar_bienvenida` no escribe nada para esos estados (sólo
+    actúa sobre `pending_welcome`), así que antes la persona no recibía
+    ningún mensaje. Ahora sigue el mismo enrutador por estado (B9,
+    `_responder_estado_actual`) que ya usa el resto del recorrido -- nunca
+    `onboarding.bienvenida` (la vieja, con tareas abiertas), que C6 excluye
+    mientras la clave está encendida, y que además no tiene sentido para
+    alguien a mitad de verificar: `pending_email_verification` retoma el
+    recordatorio o "todavía no tengo tu correo", y `active` confirma con el
+    texto ya verificado (`texto_verificado`/`texto_verificado_existente`).
+
+    `awaiting_email` queda deliberadamente FUERA de este enrutador nuevo, a
+    diferencia de los otros dos: es el estado en el que `_completar_
+    bienvenida` deja el ciclo al completar la bienvenida, así que dos
+    llamadas concurrentes de ESTA MISMA función sobre la primera activación
+    (el candado de arriba) legítimamente dejan a la segunda viendo
+    `awaiting_email` recién escrito por la primera -- silencioso a propósito
+    (`test_dos_abrir_ciclo_alta_concurrentes_de_una_primera_activacion_no_
+    revientan`): sólo dos mensajes, nunca un tercero "pedido de correo"
+    duplicado por la carrera. Ninguna reactivación real (una persona ya
+    verificando, no una carrera del mismo evento) queda entonces en
+    silencio: para llegar hasta acá alguien tuvo que escribir un correo
+    primero, lo que sólo pasa en un turno posterior, nunca dentro de la
+    misma carrera de apertura."""
     actual = AC.estado(cur, membership_id, bloquear=True)
     if actual is None or actual["estado"] == "revoked":
         AC.iniciar_ciclo(cur, membership_id, "alta", ahora=ahora)
-    _completar_bienvenida(cur, membership_id, workspace_id, chat_id, nombre, ahora)
+        _completar_bienvenida(cur, membership_id, workspace_id, chat_id, nombre, ahora)
+        return
+    if actual["estado"] in ("pending_welcome", "awaiting_email"):
+        _completar_bienvenida(cur, membership_id, workspace_id, chat_id, nombre, ahora)
+        return
+
+    from .autoridad import Canal, Solicitante
+
+    if app_user_id is None:
+        cur.execute("select app_user_id from membership where id = %s", (membership_id,))
+        fila = cur.fetchone()
+        app_user_id = str(fila["app_user_id"]) if fila else None
+    quien = Solicitante(app_user_id=app_user_id, canal=Canal.ESPACIO,
+                        workspace_id=workspace_id, membership_id=membership_id,
+                        nombre=nombre)
+    _responder_estado_actual(cur, quien, workspace_id, chat_id, ahora)
 
 
 def abrir_ciclo_existente(cur: psycopg.Cursor, membership_id: str, workspace_id: str,
@@ -695,19 +739,36 @@ def _atender_awaiting_email(cur, quien, texto: str, workspace_id: str, chat_id: 
                       bot_username_resolver, nombre_preferido)
 
 
+def _texto_rechazo_formato_o_dominio(cur, workspace_id: str, email: str) -> str | None:
+    """Única validación de formato + dominios habilitados (G1d-c2, ítem 1):
+    antes, "Cambiar correo a X" (`resolver_toque`, `SENTINEL_CAMBIO`) saltaba
+    directo a `_emitir_y_enviar` sin pasar por acá, así que una dirección con
+    un dominio no habilitado (o mal formada) podía colarse por ese botón
+    aunque `_validar_y_emitir` la hubiera rechazado si hubiera llegado como
+    texto libre. Ahora los dos únicos caminos que emiten una verificación por
+    una dirección nueva -- un correo tipeado y "Cambiar correo a X" -- llaman
+    a esta misma función antes de `_emitir_y_enviar`.
+
+    Devuelve el texto de rechazo que corresponde, o `None` si el correo pasa
+    las dos validaciones."""
+    if not _formato_valido(email):
+        return TEXTO_DIRECCION_INCOMPLETA
+    permitidos = AC.dominios_permitidos(cur, workspace_id)
+    dominio = email.rpartition("@")[2]
+    if permitidos is not None and dominio not in permitidos:
+        return TEXTO_DOMINIO_NO_HABILITADO
+    return None
+
+
 def _validar_y_emitir(cur, quien, correo_crudo: str, workspace_id: str, chat_id: int,
                       ahora: datetime, bot_username_resolver, nombre_preferido: str
                       ) -> None:
     from .gateway import _responder
 
     email = AC.normalizar_correo(correo_crudo)
-    if not _formato_valido(email):
-        _responder(cur, workspace_id, chat_id, quien, TEXTO_DIRECCION_INCOMPLETA, ahora)
-        return
-    permitidos = AC.dominios_permitidos(cur, workspace_id)
-    dominio = email.rpartition("@")[2]
-    if permitidos is not None and dominio not in permitidos:
-        _responder(cur, workspace_id, chat_id, quien, TEXTO_DOMINIO_NO_HABILITADO, ahora)
+    rechazo = _texto_rechazo_formato_o_dominio(cur, workspace_id, email)
+    if rechazo is not None:
+        _responder(cur, workspace_id, chat_id, quien, rechazo, ahora)
         return
     _emitir_y_enviar(cur, quien, email, workspace_id, chat_id, ahora,
                      bot_username_resolver, nombre_preferido, TEXTO_GRACIAS_ENVIADO)
@@ -739,24 +800,57 @@ def _emitir_y_enviar(cur, quien, email: str, workspace_id: str, chat_id: int,
     Dentro del savepoint, el envío es lo ÚLTIMO que pasa (G1b2, ítem 4): si
     una escritura posterior fallara, ya no hay nada posterior que pueda
     fallar sin haber mandado el correo -- nunca un correo entregado con un
-    enlace que la base terminó sin registrar."""
+    enlace que la base terminó sin registrar.
+
+    Límite conocido, documentado honestamente en vez de resuelto (G1d-c2,
+    ítem 11): el envío ocurre DENTRO de la transacción de la petición, no
+    después de su `commit`. El savepoint de arriba sólo aísla los pasos de
+    ESTA función entre sí -- protege contra que el registro del envío quede
+    sin el correo salido, o viceversa, DENTRO de esta llamada -- pero no
+    protege contra que el `commit` externo (de quien llama, `gateway.
+    procesar_update`) falle DESPUÉS de que el correo ya salió: en ese caso
+    poco frecuente, el enlace que la persona recibió referencia un token que
+    la base nunca terminó de confirmar. Esto no deja a la persona varada ni
+    en silencio: abrir ese enlace más tarde no encuentra el token
+    (`verification_token_invalid`, B6 -- "roto/inexistente"), y si el ciclo
+    sigue en `pending_email_verification` Prisma le manda uno nuevo sola
+    (`_reenviar_por_enlace_roto_o_vencido`) sin que tenga que pedirlo; y el
+    fallo del `commit` en sí ya pasa por la misma red de contención de
+    `gateway.procesar_update` (incidente + aviso neutral), nunca sin
+    registrar. Mover el envío a DESPUÉS del `commit` evitaría este límite,
+    pero exige una reconciliación propia -- encolar el envío como un hecho
+    aparte, con su propio reintento e idempotencia, para no perderlo si el
+    proceso cae entre el `commit` y el envío -- que esta unidad no construye;
+    queda para cuando haga falta, no se inventa acá."""
     from .gateway import ETAPA_ALTA_CORREO, NOTICIA_NEUTRA_INCIDENTE, _responder
     from .incidentes import registrar_incidente
 
     sender = obtener_emisor_configurado(cur, workspace_id)
     if sender is None:
-        registrar_incidente(
-            cur, workspace_id,
-            "La verificación de correo está encendida pero no hay emisor "
-            "de correo configurado.",
-            severidad="alta", app_user_id=quien.app_user_id, chat_id=chat_id,
-            etapa=ETAPA_ALTA_CORREO)
-        AC.crear_aviso(
-            cur, "correo_sin_emisor",
-            "La verificación de correo está encendida pero no hay un emisor "
-            "de correo configurado para el espacio.",
-            workspace_id=workspace_id, referencia_tipo="membership",
-            referencia_id=quien.membership_id, ahora=ahora)
+        # G1d-c2, ítem 2: "sin emisor configurado" es un problema del
+        # ESPACIO, no de la persona que justo lo pisó -- antes la referencia
+        # era `quien.membership_id`, así que cada integrante distinto que
+        # tropezaba con esto abría su propio incidente y su propio aviso
+        # (el índice único de `crear_aviso` sólo dedupea dentro de la MISMA
+        # referencia). Ahora la referencia es el espacio: un solo aviso
+        # pendiente por espacio, sin importar quién lo dispare, y mientras
+        # siga sin resolver tampoco se registra un incidente nuevo por cada
+        # intento (`registrar_incidente` no tiene ningún dedupe propio). La
+        # persona sigue recibiendo el aviso neutral en cada intento -- nunca
+        # silencio para ella, sólo se deja de repetir el ruido administrativo.
+        if not AC.aviso_pendiente(cur, AC.TIPO_CORREO_SIN_EMISOR, "workspace", workspace_id):
+            registrar_incidente(
+                cur, workspace_id,
+                "La verificación de correo está encendida pero no hay emisor "
+                "de correo configurado.",
+                severidad="alta", app_user_id=quien.app_user_id, chat_id=chat_id,
+                etapa=ETAPA_ALTA_CORREO)
+            AC.crear_aviso(
+                cur, AC.TIPO_CORREO_SIN_EMISOR,
+                "La verificación de correo está encendida pero no hay un emisor "
+                "de correo configurado para el espacio.",
+                workspace_id=workspace_id, referencia_tipo="workspace",
+                referencia_id=workspace_id, ahora=ahora)
         _responder(cur, workspace_id, chat_id, quien, NOTICIA_NEUTRA_INCIDENTE, ahora)
         return
 
@@ -1067,9 +1161,17 @@ def resolver_toque(cur, quien, workspace_id: str, chat_id: int, herramienta: str
         if eleccion.get("accion") == "mantener":
             _responder(cur, workspace_id, chat_id, quien, TEXTO_MANTENER_CONFIRMADO, ahora)
             return
+        # G1d-c2, ítem 1: misma validación de formato + dominios habilitados
+        # que cualquier otro correo nuevo -- antes este botón saltaba directo
+        # a `_emitir_y_enviar` y se saltaba el filtro de dominios.
+        email = AC.normalizar_correo(eleccion["email"])
+        rechazo = _texto_rechazo_formato_o_dominio(cur, workspace_id, email)
+        if rechazo is not None:
+            _responder(cur, workspace_id, chat_id, quien, rechazo, ahora)
+            return
         # La transición a `awaiting_email` va DENTRO del savepoint de
         # `_emitir_y_enviar` (`transicion_previa`), no antes -- G1b2, ítem 2.
-        _emitir_y_enviar(cur, quien, eleccion["email"], workspace_id, chat_id, ahora,
+        _emitir_y_enviar(cur, quien, email, workspace_id, chat_id, ahora,
                          bot_username_resolver, nombre_preferido, TEXTO_GRACIAS_ENVIADO,
                          transicion_previa="awaiting_email")
         return
@@ -1268,21 +1370,24 @@ def _responder_falla_verificacion(cur, quien, workspace_id: str, chat_id: int,
         return
 
     if motivo == "verification_token_consumed":
-        # G1d-b2, ítem 2: un enlace YA usado no siempre significa que el
+        # G1d-c2, ítem 9: un enlace YA usado no siempre significa que el
         # ciclo ACTUAL siga verificado -- puede venir de un ciclo anterior
         # al vigente (revocación y reactivación, por ejemplo). B7 ("Tu
         # correo ya está verificado ✅") sólo es cierto si el ciclo de HOY
-        # está `active`; si no, se sigue desde el estado actual (B9).
+        # está `active`; para cualquier otro estado se sigue el mismo
+        # enrutador único (B9, `_responder_estado_actual`) que ya usan
+        # `resolver_toque` y el resto de este motivo tipado -- antes había
+        # acá una copia desalineada de ese mismo enrutador (`awaiting_email`
+        # y `pending_email_verification` repetidos a mano) que, a diferencia
+        # del original, nunca comprobaba si había un envío vigente: un enlace
+        # consumido sobre un ciclo `pending_email_verification` SIN ningún
+        # envío vigente caía en `_recordatorio` (que arma "esa dirección" sin
+        # avisar de nada raro) en vez de "Todavía no tengo tu correo"
+        # (`TEXTO_SIN_ENVIO_VIGENTE`, B10) -- la misma copia nunca llegaba a
+        # exhibir la falla, sólo la disimulaba.
         actual = AC.estado(cur, quien.membership_id)
-        estado = actual["estado"] if actual else None
-        if estado == "active":
+        if actual is not None and actual["estado"] == "active":
             _responder(cur, workspace_id, chat_id, quien, TEXTO_YA_VERIFICADO, ahora)
-            return
-        if estado == "awaiting_email":
-            _responder(cur, workspace_id, chat_id, quien, TEXTO_PEDIDO_CORREO, ahora)
-            return
-        if estado == "pending_email_verification":
-            _recordatorio(cur, quien, workspace_id, chat_id, ahora)
             return
         _responder_estado_actual(cur, quien, workspace_id, chat_id, ahora)
         return
