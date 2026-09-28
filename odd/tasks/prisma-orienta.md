@@ -3524,3 +3524,12 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   creada en el mismo servidor. La base `postgres` sigue intacta (12 tareas). Sin
   imprimir la URL ni credenciales (cargadas como las carga la suite). Quedan para el
   usuario los pasos 3 a 7.
+
+- 2026-09-28 (usuario): **base nueva lista y listener corriendo.** El usuario cambió
+  `PRISMA_DB_URL` y `PRISMA_AUTHORITY_DB_URL` a la base `prisma` y corrió `esquema`
+  ("Esquema aplicado."), `importar corework --activar` (v1, activo; 4 personas sin
+  Telegram), `feriados corework`, `sembrar` ("12 tareas y 1 dependencias sembradas.
+  asignada: 6, en_curso: 6") y `escuchar corework`. `enlaces --solo Ismael Ariel Marcos`
+  respondió "No hay nadie pendiente de activar": el pack ya trae el
+  `telegram_user_id` de esas tres personas, así que el import las dejó vinculadas.
+  Tercera ronda en curso.
