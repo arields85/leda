@@ -1,6 +1,6 @@
 # ADR 0010: Correo verificado y acceso a Google entran al alcance del producto
 
-- **Estado:** propuesta (pendiente de aceptación del usuario)
+- **Estado:** aceptada (usuario, 2026-09-27)
 - **Fecha:** 2026-09-27
 - **Alcance:** `AGENTS.md` (lista de "fuera de alcance"), alta de integrantes
   (`src/prisma/onboarding.py`, `db/esquema.sql: activation_token`), un módulo

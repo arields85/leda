@@ -1,6 +1,6 @@
 # Alta con correo verificado y acceso a Google (rama auxiliar)
 
-**Estado:** propuesto (no iniciado — pendiente de G0: matriz aprobada y ADR 0010 aceptado)
+**Estado:** G0 cerrada (matriz aprobada, ADR 0010 aceptada, 2026-09-27) — próximo: G1
 **Creado:** 2026-09-27
 **Origen:** decisión del usuario, 2026-09-27; [`ADR 0010`](../../docs/decisions/0010-correo-verificado-y-google-en-el-producto.md).
 **Rama/worktree:** `auxiliar/alta-y-google`, `D:\Proyectos\Prisma-PM-worktrees\alta-y-google`.
@@ -278,7 +278,7 @@ Un worktree nuevo no trae lo que no se versiona.
 
 ## Tareas
 
-- [ ] **G0 — Matriz de aceptación y OK del usuario.** Antes de escribir
+- [x] **G0 — Matriz de aceptación y OK del usuario.** Antes de escribir
   código: presentar la matriz que exige `00-LEER-PRIMERO.md` ("Instrucción
   breve para la IA receptora"): capacidades y estados, contratos, permisos y
   plan de validación, para G1 a G6, con el mapa de casos de `VALIDACION`.
@@ -294,6 +294,376 @@ Un worktree nuevo no trae lo que no se versiona.
   cierre: con la clave apagada, activar por Telegram funciona exactamente
   igual que hoy; encendida, el correo se pide, se verifica y queda registrado
   como hecho auditable aparte.
+  - [x] **G1a — Esquema del alta con correo.** Migración `0100` + rollback:
+    eventos de alta append-only con proyección por disparador (estados de
+    §4, `review_required`, modo `alta`/`existente`); token de verificación
+    sin privilegios de `prisma_app` y funciones `security definer` de
+    `prisma_owner` (emitir, reservar 5 min, consumir, vencer 24 h, límites
+    3/h y 5/ciclo); contacto verificado por integrante con alta idempotente
+    por función; avisos administrativos persistentes (leído ≠ resuelto).
+    Todo con `workspace_id`, RLS forzada y `aislamiento_espacio`. Pruebas:
+    transiciones válidas e inválidas, aislamiento entre espacios,
+    `prisma_app` sin acceso directo, paridad migración/rollback,
+    `test_capacidades`.
+    Hecho (ruta: delegada, un escritor; disparador: esquema, migración,
+    rollback, capa Python y pruebas). Tablas `alta_correo_evento` (append-only)
+    + proyección `alta_correo_estado` con grafo validado en la base,
+    `alta_correo_contacto`, `alta_correo_verificacion` (sólo por funciones,
+    como `acceso_tablero`), `aviso_administrativo`. Seguimiento para G1d:
+    hoy `prisma_app` tiene `update` directo sobre `aviso_administrativo`;
+    marcar leído/resuelto debe quedar sólo para el canal de administración.
+    Revisión RDD `review-d95ced9967467a93` (riesgo medio, consentida por el
+    usuario, lente de confiabilidad): un hallazgo CRITICAL
+    (`completar_verificacion_correo` escribía el contacto antes de validar el
+    estado) corregido en `7a21374` con prueba nueva (RED observado → GREEN;
+    suite completa `993 passed, 108 deselected`); validación dirigida
+    aprobada; reconocimiento emitido (autoridad consumida).
+  - [x] **G1a2 — Endurecimiento tras la revisión** (hallazgos no bloqueantes
+    de la misma revisión): `emitir_verificacion_correo` bloquea la
+    proyección y exige `awaiting_email` o `pending_email_verification`
+    (límites 3/h y 5/ciclo sin carrera; la carrera sobre el índice único
+    devuelve un motivo tipado, no una excepción); `completar` fija el espacio
+    del token antes de tocar tablas con RLS; pruebas de los caminos de falla
+    de `completar` (`verification_state_changed`, `email_in_use` tras la
+    reserva, `verification_token_busy` sin reserva o vencida) verificando que
+    no queda contacto y que la reserva se libera; `habilitado()` filtra por
+    el espacio; `prisma_app` sin `update` directo sobre
+    `aviso_administrativo` si G1d no lo necesita.
+    Hecho (ruta: delegada, un escritor). Motivos nuevos
+    `verification_state_invalid` y `verification_conflict`; prueba real de
+    concurrencia con dos conexiones (RED: `UniqueViolation` sin capturar →
+    GREEN); `reservar`/`completar` funcionan sin espacio declarado (RED:
+    `verification_token_invalid` → GREEN); `habilitado(cur, workspace_id)`
+    filtra por espacio. Los tres caminos de falla de `completar` resultaron
+    guardas de regresión (ya correctos). El `update` de `prisma_app` sobre
+    `aviso_administrativo` queda para G1d. Suite: `1000 passed, 108
+    deselected`; repetición parcial de la sesión: `133 passed`.
+    Revisión RDD `review-36cb59bfd957a460` (riesgo medio, consentida):
+    aprobada sin correcciones; reconocimiento emitido. Advertencia aplicada:
+    la prueba de concurrencia ya no puede colgarse (barrera y `join` con
+    tiempo de espera). Sugerencia pendiente, menor: ninguna prueba alcanza
+    la rama defensiva `verification_conflict` (el bloqueo la vuelve
+    inalcanzable en la práctica).
+  - [x] **G1b — Recorrido del alta con correo.** `alta_correo.py` con puerto
+    de envío (`Protocol`) y doble de prueba; sin emisor configurado con la
+    clave encendida → incidente + aviso neutral, nunca "enviado".
+    Bienvenida y pedido de correo del pack al activar (clave encendida);
+    recepción del correo, envío, `/start pv_{token}` en
+    `gateway._activacion`, reenviar/cambiar, mensajes literales de §5,
+    control antes del despacho conversacional para el modo `alta`.
+    Hecho (ruta: delegada, un escritor; `alta_correo_flujo.py` nuevo;
+    toques compartidos: `gateway.py` — `_bot_username`, `/start pv_`,
+    compuerta previa al agente, botones en `_toque` —, esquema y migración
+    0100 — función `verificacion_vigente_correo` —, rollback 0100). TDD: el
+    escritor declaró que no escribió todas las pruebas antes del código;
+    hubo RED reales (transición faltante, RLS bajo `admin()`, orden del
+    outbox) antes del GREEN. La sesión corrigió dos defectos antes del
+    commit, con RED observado: el error de `getMe` filtraba el token del bot
+    a `incident.referencia_cruda` (ahora error saneado), y el texto de
+    límite agotado decía "Le avisé a administración" cuando el aviso todavía
+    no se entrega (G1d) — ahora "Quedó registrado para que administración te
+    ayude". `nombre_preferido` = primera palabra del nombre guardado (igual
+    que `onboarding.bienvenida`). Textos nuevos fuera del pack: pendientes
+    de revisión del usuario. Suite: `1047 passed, 108 deselected`.
+    Revisión RDD `review-bf8c04f01554e3f3` (riesgo medio, consentida):
+    aprobada; reconocimiento emitido. Advertencias no bloqueantes → G1b2.
+  - [x] **G1b2 — Endurecimiento tras la revisión de G1b.** (1) La compuerta
+    sólo actúa en chat privado: en un grupo nunca se piden, muestran ni
+    procesan correos. (2) "Cambiar correo a X" no deja el ciclo en
+    `awaiting_email` si la emisión o el envío fallan (todo dentro del mismo
+    savepoint). (3) Cada botón relee el estado del ciclo antes de actuar; un
+    botón viejo no emite ni transiciona fuera de su estado. (4) Dentro del
+    savepoint, la transición antes del envío: el envío es el último efecto.
+    (5) Pruebas faltantes: recuperación desde `pending_welcome` sin
+    duplicados, límite de 5 envíos con su aviso administrativo, nombre
+    vacío sin `IndexError`.
+    Hecho (ruta: delegada, un escritor; RED de todo el lote antes de los
+    arreglos: `13 failed, 2 passed`). En un grupo, el mensaje de un
+    integrante con el alta pendiente no se procesa ni se responde (no es una
+    falla: el pedido de correo va por privado). Textos nuevos sólo para
+    nombre vacío (bienvenida, ✅ y correo sin nombre), pendientes de revisión
+    junto con los demás. Toque compartido: `gateway.procesar_update`
+    (compuerta sólo en privado; bloqueo en grupo). Suite: `1062 passed, 108
+    deselected`; repetición de la sesión: `96 passed` en las pruebas del
+    alta con correo.
+    Revisión RDD `review-e40fae6aa783e90f` (riesgo medio, consentida):
+    aprobada; reconocimiento emitido. Seguimientos no bloqueantes: (a) dos
+    mensajes simultáneos en `pending_welcome` pueden chocar contra el índice
+    único de la bienvenida (termina en incidente + aviso neutral, no en datos
+    corruptos) → bloquear la proyección al completar; (b) el aviso
+    `correo_limite_agotado` "una sola vez" no resiste concurrencia → índice
+    único parcial en `aviso_administrativo`. Ambos entran en G1d, que ya
+    toca esa tabla.
+  - [x] **G1c — Integrantes ya activos (modo `existente`).** Al encender la
+    clave (comando de `cli.py`), a quien ya estaba activo sin correo se le
+    pide una vez, sin bloquearlo; en ese modo sólo un mensaje que es
+    exactamente una dirección de correo entra al recorrido, el resto va al
+    agente como siempre.
+    Hecho (ruta: delegada, un escritor). Comando `correo-verificacion
+    <espacio> --activar|--desactivar` (toque compartido: `cli.py`, comando
+    nuevo; `gateway.procesar_update`, derivación a `atender_existente` en
+    privado). Corrigió un defecto real con RED observado: con la clave
+    apagada, un integrante a mitad del ciclo `alta` seguía bloqueado
+    (`gate` y `bloqueada_para_negocio` no miraban la clave). El resto de las
+    pruebas se escribió junto con el código, no antes (desvío de TDD
+    declarado por el escritor). Texto nuevo pendiente de revisión:
+    "✅ Gracias, {nombre}. Tu correo quedó verificado." (y sin nombre).
+    Suite de la sesión: `1 failed, 1075 passed, 108 deselected`; la falla
+    (`test_0008_motivo_no_arranca_tarea_llega_por_migracion`) y las dos que
+    vio el escritor son pruebas de migración ajenas a esta unidad que
+    fallaron con `tuple concurrently updated` y pasan aisladas
+    (`5 passed`): contención de catálogo con otra suite corriendo contra el
+    mismo servidor. `PENDIENTE`: confirmar con una corrida sin concurrencia.
+    Revisión RDD `review-7c6ef19f12bf541c` (riesgo alto por `cli.py`,
+    consentida; cuatro lentes): aprobada; reconocimiento emitido.
+  - [x] **G1c2 — Endurecimiento tras la revisión de G1c.** (1) La clave de
+    deduplicación del pedido de correo incluye el ciclo: un ciclo reabierto
+    tras revocar sin verificar vuelve a recibir el pedido (hoy quedaría
+    deduplicado y nunca saldría). (2) "Exactamente una dirección" estricto:
+    rechaza URLs con `@`, `usuario@host:ruta`, dos `@` y puntuación final.
+    (3) Pruebas faltantes: `pending_email_verification` en modo `existente`
+    (misma dirección → al agente, sin recordatorio; distinta → propuesta de
+    cambio); con la clave apagada, un integrante a mitad del `alta` deja de
+    ser bloqueado también en grupo; reapertura de un ciclo revocado sin
+    contacto. (4) La consulta de elegibilidad de `--activar` filtra por
+    `workspace_id` explícito y toma un bloqueo para corridas superpuestas.
+    (5) Legibilidad: un solo conjunto de estados abiertos compartido, el
+    comentario de `gateway` corregido, fixtures compartidas en un módulo
+    común.
+    Hecho (ruta: delegada, un escritor; TDD con RED por ítem). RED
+    observados: el pedido del ciclo 2 quedaba deduplicado (1 en vez de 2);
+    las cuatro formas laxas entraban al recorrido; faltaba
+    `elegibles_existente`. Las pruebas del punto 3 son guardas de regresión
+    (el código ya era correcto). Un punto final después de la dirección se
+    rechaza (va al agente). Toques compartidos: `cli.py` (consulta con
+    `workspace_id` explícito + bloqueo consultivo por espacio), `gateway.py`
+    (sólo comentario). Suite del escritor: `1087 passed, 108 deselected`;
+    repetición de la sesión: `121 passed` en las pruebas del alta con correo.
+    Revisión RDD `review-33cd2defb2564552` (riesgo alto por `cli.py`,
+    consentida; cuatro lentes): aprobada; reconocimiento emitido.
+    Seguimientos no bloqueantes que entran en G1d: la prueba del bloqueo
+    consultivo tiene que comprobar que la corrida en segundo plano terminó
+    bien (código 0, ciclos abiertos); la prueba de filtro por espacio tiene
+    que probar filas de otro espacio con resultado no vacío; la parte local
+    estricta rechaza puntos al inicio, al final y consecutivos; docstring
+    confuso sobre URL; chequeo redundante de vacío.
+  - [x] **G1d-a — Entrega de avisos por el bot de administración.** Hecho
+    (ruta: delegada, un escritor). `avisos_admin.py`: entrega por
+    administrador (`aviso_administrativo_entrega`), reintentos e incidente,
+    botón **Marcar leído** (rol revalidado), texto libre → guía sin acción;
+    enganchado al mismo ciclo que despacha el outbox (`local.py`, `cli.py
+    despachar`). Aviso único por referencia (índice parcial), bienvenida con
+    candado, parte local estricta sin puntos inválidos, pruebas de la
+    revisión de G1c2 mejoradas. El escritor declaró que la entrega y el
+    webhook no se hicieron con prueba primero. Toques compartidos:
+    `gateway.py` (rama de administración), `local.py`, `cli.py`,
+    `tests/conftest.py` (truncado de `aviso_administrativo_respuesta`),
+    esquema/migración/rollback 0100. La sesión corrigió antes del commit una
+    regresión de privilegios con RED observado: el escritor había dado
+    `update` sobre `alta_correo_estado` a `prisma_app` para tomar un
+    candado, y con eso `prisma_app` podía fijar la marca de sesión y
+    escribir `active` sin verificar; ahora el candado se toma con
+    `bloquear_alta_correo_estado()` (`security definer`, `prisma_owner`) y
+    `prisma_app` vuelve a sólo `select`. Suite de la sesión: `2 failed,
+    1172 passed, 108 deselected`; las dos fallas son pruebas de migración de
+    `test_task_intake.py` que pasan aisladas (`4 passed`), el mismo patrón
+    de contención ya registrado.
+    Revisión RDD `review-32981fbfd82ee215` (riesgo alto, consentida; cuatro
+    lentes): aprobada; reconocimiento emitido.
+  - [x] **G1d-a2 — Endurecimiento tras la revisión de G1d-a.** (1) El
+    despacho de avisos en `local.py` queda contenido (try/rollback +
+    incidente): un error de administración nunca frena el despacho de un
+    espacio. (2) Reintentos con espera creciente real (columna de próximo
+    intento), no en cada pasada. (3) La reconciliación de entregas no
+    recorre toda la historia en cada pasada: sólo avisos no resueltos (un
+    administrador nuevo no recibe avisos ya resueltos) y acotada. (4) El
+    incidente "falta token / no hay administrador" se deduplica sólo
+    mientras el anterior sigue abierto: si el problema vuelve, vuelve a
+    quedar registrado (nunca fallar en silencio). (5) El índice único de
+    avisos incluye `workspace_id`, y el respaldo de `crear_aviso` nunca
+    devuelve `None`. (6) El candado de la bienvenida también serializa
+    cuando la fila todavía no existe o la sesión no declaró espacio. (7)
+    Legibilidad: comentario de `verificacion_vigente_correo` en su lugar,
+    retorno muerto de `_fallo` y conteo de `fallidos`, anotación
+    `Transporte | None`, `rollback` con conexión nula en las pruebas.
+    Hecho (ruta: delegada, un escritor). Despacho administrativo contenido
+    en `local.py`/`cli.py`; `proximo_intento_en` con espera `2**(n-1)`
+    minutos; reconciliación en una sola sentencia sobre avisos no
+    resueltos; incidentes de plataforma deduplicados en una ventana de 24 h
+    (la tabla `incident` no tiene estado de resolución) con bloqueo
+    consultivo; `workspace_id` en el índice único de avisos;
+    `bloquear_alta_correo_estado` pasa a bloqueo consultivo por membresía
+    (sirve sin fila y sin espacio declarado). TDD débil declarado por el
+    escritor en varios ítems (pruebas en verde al primer intento, RED
+    razonado sobre el código anterior). Sin cambios de permisos ni RLS
+    (verificado sobre el diff). Pruebas del alta con correo, avisos,
+    migraciones y capacidades: `241 passed`. Suite completa del escritor:
+    `7 failed, 1175 passed`: 3 de migración por contención (pasan aisladas)
+    y 4 de `tests/test_aprobacion_cierra_tarea.py`, que fallan igual sin
+    esta unidad: la prueba de `main` usa `AHORA = datetime(2026, 9, 27,
+    ...)` fijo y desde el 2026-09-28 la acción pendiente figura vencida.
+    Hallazgo para `main`.
+    Revisión RDD `review-6e2a912d445df569` (riesgo alto, consentida; cuatro
+    lentes): aprobada; reconocimiento emitido.
+  - [x] **G1d-a3 — Correcciones tras la revisión de G1d-a2.** (1)
+    Regresión: `abrir_ciclo_alta` ya no abre un ciclo nuevo si existe una
+    proyección de un ciclo anterior (p. ej. reactivación tras `revoked`);
+    debe abrirlo, sin perder la protección contra la carrera de la primera
+    activación. (2) La contención del despacho administrativo en `local.py`
+    registra un incidente en cada pasada si el error persiste: deduplicar
+    con la misma ventana que los incidentes de plataforma. (3) Una sola
+    definición de "administrador con Telegram" para despachar y reconciliar.
+    (4) Prueba de la contención en `cli.py despachar` (lo del espacio que ya
+    se despachó sobrevive). (5) Docstrings de
+    `_incidente_plataforma_persistente` y `crear_aviso` fieles al código;
+    constante con nombre para los reintentos de `crear_aviso`; claves de
+    bloqueo consultivo con espacio de nombres propio para no chocar entre
+    sí. Nota: la migración `0100` se edita en su lugar porque nunca se
+    aplicó en ninguna base; si llegara a aplicarse antes de integrar, los
+    cambios siguientes irían en una migración nueva `01xx`.
+    Hecho (ruta: delegada, un escritor). RED observados en los ítems 1, 2 y
+    4. Además de lo pedido corrigió dos fallas silenciosas reales: las
+    claves de deduplicación de la bienvenida y el pedido no incluían el
+    ciclo (un ciclo reabierto nunca los habría enviado), y `cli.py
+    despachar` no confirmaba entre el despacho del espacio y el
+    administrativo, por lo que el incidente de plataforma quedaba etiquetado
+    con un espacio. Ítem 3 con guardas de regresión; ítem 5 sin prueba
+    propia (documentación y espacios de nombres de bloqueos). Toques
+    compartidos: `local.py`, `cli.py`, esquema/migración 0100 (sólo la clave
+    del bloqueo). Sin cambios de permisos ni RLS (verificado sobre el diff).
+    Repetición de la sesión: `247 passed`. Suite completa del escritor:
+    `1182 passed, 6 failed` (las 4 de fecha fija de `main` y 2 de migración
+    por contención, que pasan aisladas).
+    Revisión RDD `review-b80bd0e2a9b99326` (riesgo alto, consentida; cuatro
+    lentes): aprobada, sólo advertencias menores; reconocimiento emitido.
+    Pasan a G1d-b: si falla también el registro del incidente,
+    `reportar_fallo_despacho` no deja rastro (debe escribir a stderr y
+    `cli.py` no debe decir "quedó registrado"); docstrings inexactos
+    (conexión, `hashtext`, columna `etapa`); prueba del camino de doble falla.
+  - [x] **G1d-b + G1t — Acción "Habilitar un nuevo intento" y textos
+    aprobados.** Aplicar la sección "Textos del alta con correo aprobados
+    por el usuario" (regla sin callejones sin salida, B1-B12, C, sin
+    variantes sin nombre) y la acción F del administrador.
+    Hecho (ruta: delegada, un escritor). Textos B1-B12, C y F aplicados
+    literalmente; sin variantes sin nombre (un nombre vacío es un error de
+    datos → incidente + aviso neutral); evento `intento_habilitado` que
+    reinicia el tope de 5 por ciclo; funciones `existe_verificacion_correo`
+    (sólo booleano) y `proximo_reenvio_correo` (hora de B11). El escritor
+    declaró pruebas después del código para la reescritura de B1-B12. La
+    sesión corrigió antes del commit, con RED observado: (a) si a la persona
+    no se la podía avisar, el aviso quedaba resuelto y el administrador
+    recibía "Listo, habilitado." — ahora no se aplica nada, queda un
+    incidente y el administrador recibe el aviso neutral; (b) dos
+    administradores confirmando a la vez aplicaban dos veces — ahora el
+    aviso se bloquea al confirmar. Cambios de permisos, justificados:
+    `prisma_owner` lee `alta_correo_evento` (para contar desde el último
+    `intento_habilitado`), `prisma_admin` ejecuta
+    `verificacion_vigente_correo`, y las dos funciones nuevas sólo para
+    `prisma_app`. Suite de la sesión: `4 failed, 1210 passed, 108
+    deselected` (las 4 de fecha fija de `main`). Textos nuevos del bot de administración:
+    la vista previa del administrador ("¿Habilitar un nuevo intento de
+    verificación de correo para {nombre}? Le vuelvo a preguntar por su
+    correo y este aviso queda resuelto."), "Ese aviso ya estaba resuelto.",
+    "Listo, habilitado.", "No se habilitó nada." — aprobados por el usuario
+    (2026-09-28). El evento del
+    administrador se registra con `actor_kind = 'persona'` (el enum
+    `tipo_actor` de `main` no tiene `administrador`).
+- Requisito de la Tanda 2 cumplido por el usuario (2026-09-28): el token del
+  bot de administración está en `.env` del worktree
+  (`PRISMA_BOT_TOKEN_ADMIN`; el archivo existe y git lo ignora; la sesión no
+  lo leyó).
+    Revisión RDD `review-c73c0f22b0e0ce26` (riesgo alto, consentida; cuatro
+    lentes): aprobada; reconocimiento emitido.
+  - [x] **G1d-b2 — Correcciones tras la revisión de G1d-b.** (1) El cuerpo
+    del correo de verificación quedó con cortes de línea y sangrías copiados
+    del documento: debe ser el texto A en párrafos corridos (sólo los saltos
+    de párrafo aprobados). (2) Un enlace consumido de un ciclo anterior no
+    puede decir "Tu correo ya está verificado ✅" si el ciclo actual no lo
+    está: responder según el estado actual (B9). (3) "Habilitar un nuevo
+    intento" comprueba el estado del ciclo (sólo `pending_email_verification`
+    con el límite agotado); si no corresponde, no aplica nada y lo dice. (4)
+    Nunca "??:??" en B11: si no se puede calcular la hora, incidente + aviso
+    neutral. (5) Ningún texto alcanzable termina en "escribime y lo vemos" o
+    "pedime que te lo reenvíe" (`TEXTO_ESTADO_CAMBIO`,
+    `TEXTO_ENLACE_INVALIDO`): reemplazarlos por el paso siguiente según el
+    estado. (6) Las respuestas del bot de administración no se pierden por
+    deduplicación (Cancelar dos veces, dos administradores). (7) Una sola
+    rama para "reenviar por enlace vencido o roto"; respuesta de la vista
+    previa fiel al motivo; la prueba de serialización comprueba que el
+    segundo hilo estaba efectivamente bloqueado.
+    Hecho (ruta: delegada, un escritor; sin cambios de esquema ni de
+    permisos). Correo A en párrafos corridos (fijado por prueba); enlace
+    consumido responde según el estado actual; "Habilitar" sólo con el
+    ciclo en `pending_email_verification` y el cupo realmente agotado (si
+    ya está `active`, el aviso se resuelve sin efecto; en otro estado no se
+    aplica nada y el administrador recibe "No se habilitó nada."); sin
+    "??:??" (incidente + aviso neutral); retirados `TEXTO_ESTADO_CAMBIO` y
+    `TEXTO_ENLACE_INVALIDO` (ningún camino alcanzable dice "escribime y lo
+    vemos" ni "pedime que te lo reenvíe"); respuestas del bot de
+    administración deduplicadas por toque (`callback_query.id`); una sola
+    rama para reenviar por enlace vencido o roto; prueba de serialización
+    que comprueba el bloqueo. Casos sin texto aprobado resueltos con el
+    aviso neutral existente (ciclo `revoked` o inexistente que toca un
+    enlace). TDD parcial declarado por el escritor; RED reales en los ítems
+    2 y 3. Toque compartido: `gateway._toque_admin` (pasa el id del toque).
+    Repetición de la sesión: `287 passed`. Suite completa del escritor:
+    `4 failed, 1224 passed` (las 4 de fecha fija de `main`).
+    Revisión RDD `review-9ab28ed86c392725` (riesgo medio, consentida):
+    aprobada; reconocimiento emitido. Seguimientos que pasan a G1e: enlace
+    consumido con ciclo pendiente sin envío vigente debe usar el mismo
+    enrutador por estado; el cupo de 5 y el conteo desde el último
+    `intento_habilitado` viven en un solo lugar (la base), no duplicados en
+    `avisos_admin`; pruebas sin mezclar reloj fijo y reloj real; pruebas del
+    respaldo neutral de `_responder_estado_actual` y de `pending_welcome`;
+    registrar cuando un toque llega sin id.
+  - [x] **G1d-c — Unificación con los avisos al administrador de `main`
+    (decisión del usuario, 2026-09-28).** `main` construyó en paralelo
+    (T28) el aviso de cada incidente al administrador por el bot de
+    administración: `registrar_incidente` como punto único de escritura en
+    `incident`, cola `admin_notice` (migración 0017) con reintentos,
+    `despachar_avisos_admin`, designación con `python -m prisma
+    administrador` y lectura del bot en modo local. Decisión: una sola vía
+    hacia el administrador, la de `main`. Los avisos del alta con correo se
+    entregan por esa cola (con botones); los incidentes de esta rama pasan
+    por `registrar_incidente`; se conservan el estado leído/resuelto de
+    `aviso_administrativo` y los botones Marcar leído / Habilitar un nuevo
+    intento; se eliminan la cola de entrega y las respuestas propias
+    (`aviso_administrativo_entrega`, `aviso_administrativo_respuesta`) y su
+    despacho. Integración: respaldo de la rama en
+    `auxiliar/alta-y-google-pre-unificacion` (`65facaf`); la rama se rehízo
+    sobre `main` (`10950c6`) aplicando todo su diff como un solo parche y
+    resolviendo los conflictos una vez (`cli.py`, `local.py`,
+    `tests/conftest.py`, `tests/test_avisos_admin.py`).
+    Hecho (ruta: delegada, un escritor). `admin_notice` (de `main`) se
+    extiende desde la migración 0100 de esta rama: `incident_id` pasa a
+    opcional, `aviso_administrativo_id` y `botones`, y la función
+    `avisar_aviso_administrativo_admin` (sólo `prisma_admin`). Las
+    respuestas puntuales del bot van por una tabla hermana, `admin_reply`,
+    con el mismo despacho (una prueba de `main` cuenta todas las filas de
+    `admin_notice`, y esas pruebas quedan idénticas a `main`). Un solo
+    despacho: `ciclo.despachar_admin` reconcilia los avisos del alta y
+    despacha avisos y respuestas. Los incidentes de la rama pasan por
+    `incidentes.registrar_incidente`; se corrigió una importación rota tras
+    el cambio de `main` (`gateway._registrar_incidente` ya no existe). Se
+    eliminaron `aviso_administrativo_entrega`, `aviso_administrativo_respuesta`
+    y todo el despacho propio. Pruebas propias en
+    `tests/test_avisos_alta_correo.py`; `tests/test_avisos_admin.py` idéntico
+    a `main`. Toques a archivos de `main`, mínimos: `despachador.py`
+    (botones en la entrega y `despachar_respuestas_admin`), `ciclo.py`
+    (reconciliación y respuestas en el mismo ciclo), `incidentes.py`
+    (referencia `admin_reply`), `gateway.py` (red de contención del canal
+    por `registrar_incidente`). El escritor declaró que no fue TDD estricto
+    (implementación y pruebas juntas). Suite del escritor: `1288 passed,
+    108 deselected`; repetición de la sesión: `304 passed` en las pruebas
+    relacionadas.
+  - [ ] **G1d — Avisos "🛠️ Administración" por el bot de administración.**
+    Camino de salida propio (hoy el bot de administración no envía nada y
+    `message_outbox` exige `workspace_id`); botones Reenviar correo /
+    Cambiar correo con vista previa y confirmación; aviso informativo de
+    quiénes faltan dar su correo; texto libre → respuesta breve sin acción.
+  - [ ] **G1e — Tanda 1** (escenarios de banco `g-` o `TestClient`) con
+    A01-A05, X01, X02 y los casos de `01` §9. La Tanda 2 por Telegram real
+    espera a G2 (C4).
 - [ ] **G2 — Credencial de Google por espacio.** Tabla dedicada sin
   privilegios de `prisma_app` (patrón `acceso_tablero`), cifrado en reposo,
   flujo OAuth mínimo. Depende de las decisiones abiertas 1, 4 y 6.
@@ -323,6 +693,218 @@ Necesitan al usuario: G0 (las dos aprobaciones), G2 (decisiones 1/4/6 y el
 proyecto de Google Cloud), G3-G4 (cuenta real con datos ficticios), G6
 (decisiones 2/3), y cada rebanada una sesión real por Telegram (Tanda 2 de
 `VALIDACION`) antes de darla por cerrada.
+
+## Matriz de aceptación G0 (aprobada por el usuario, 2026-09-27)
+
+Responde a la "Instrucción breve para la IA receptora" de `00-LEER-PRIMERO.md`:
+capacidades y estados, contratos, permisos y plan de validación. El pack
+define el qué; el repositorio, el cómo. Nada de esto habilita efectos
+externos: todo nace apagado por espacio (`correo_verificacion.habilitado`,
+`google.habilitado` en `workspace_setting`).
+
+### 1. Capacidades y estados
+
+| Rebanada | Capacidad (etiqueta del pack) | Estados | Cómo en este repositorio |
+|---|---|---|---|
+| G1 | Alta con correo verificado (V) | `pending_welcome` → `awaiting_email` → `pending_email_verification` → `active`; corregir vuelve a `awaiting_email`; `revoked` sólo por revocación explícita; marca aparte `review_required` (causa y fecha) | Tabla append-only de eventos de alta con `workspace_id` y RLS forzada; proyección por disparador (patrón `task_state_event`/`bloquear_estado_directo`); `prisma_app` sólo inserta eventos. Con la clave encendida, `onboarding.activar` emite `pending_welcome` en la misma transacción; con la clave apagada no emite nada |
+| G1 | Token de verificación (I) | emitido → reservado (5 min) → consumido / vencido (24 h) | Tabla sin privilegios de `prisma_app`, acceso sólo por funciones `security definer` de `prisma_owner` (patrón `acceso_tablero`); se guarda SHA-256, comparación con `hmac.compare_digest`; hash y reserva se borran al verificar; enlace `https://t.me/{bot}?start=pv_{token}` resuelto en `gateway._activacion` por el prefijo `pv_` |
+| G1 | Reenvío y corrección (I) | máx. 3 envíos por hora y 5 por ciclo (incluye el inicial); reenviar renueva hash, recibo y vencimiento | Límites contados sobre los eventos de envío, no sobre un contador mutable |
+| G1 | Contacto verificado (V) | un correo activo por integrante; normalizado (trim + minúsculas) | Alta idempotente por función estrecha: mismo integrante → no-op; activo de otro integrante del espacio → rechazo |
+| G1 | Recuperación administrativa (I/D) | `review_required` hasta resolución; leída ≠ resuelta | Superficie según decisión abierta 5 |
+| G2 | Credencial de Google por espacio (V para el uso; D para las cinco puertas) | sin autorizar → vigente → requiere reautorización / revocada | Tabla dedicada sin privilegios de `prisma_app`, cifrada en reposo, eventos de autorización/revocación; scopes habilitados como dato en `workspace_setting`, separados de la credencial; las cinco puertas de `02` §2 se comprueban antes de ofrecer una operación |
+| G3 | Consultar agenda (V/D) | lectura sin estado | Herramienta `consultar_agenda` con calendario, rango, zona y máximo explícitos; separa confirmado/tentativo/cancelado/sin respuesta; cero resultados → "No encontré eventos en ese calendario entre estas fechas"; caída → "No pude comprobarlo ahora" + incidente |
+| G4 | Crear/modificar/retirar evento, responder invitación (V) | `prepared` → `executing` (persistido antes de llamar) → `executed` / `failed` / `incierto` (P: timeout, sin reintento) ; `cancelled`, `expired` | Herramientas discretas sobre `Preparacion`/`pending_action`; la operación externa lleva registro propio por eventos con clave idempotente y recibo normalizado (`tipo` + id externo). Diseño presentado antes de construir |
+| G5 | Reunión mensual, agenda e informe previo, minuta (D/P) | reunión: programada → anunciada (−8 días, 15:00) → agenda publicada (−2 días, 16:00) → realizada; reprogramar invalida preparaciones | Cadencia como dato; acuerdos entran por el flujo de borrador → tarea existente; la minuta se enlaza (`evidence.drive_file_id` u homólogo) y nunca cierra una tarea |
+| G6 | Gmail, Drive, Docs (V en piloto) | mismos estados que G4 | Según decisiones 2 y 3; Gmail sólo a destinatarios internos verificados; Drive sin compartir público ni a dominio |
+
+Fuera: Sheets, Contacts, Meet, Slides, grabación/transcripción, correo externo,
+verificación por respuesta de correo (`01` §7), saludo diario e indicador.
+
+### 2. Contratos
+
+- **Mensajes visibles de G1:** los de `01` §5, textuales (bienvenida,
+  pedido de correo, "Gracias. Te envié…", "✅ Gracias, {nombre_preferido}…",
+  botones **Reenviar correo** / **Cambiar correo**, `Cambiar correo a {email}`
+  / `Mantener correo anterior`, correo no reconocido, dominio no habilitado,
+  dirección incompleta, correo ya asociado). Correo de verificación: asunto
+  `Confirmá tu correo laboral en Prisma`, botón **Verificar correo**, 24 h, un
+  uso, misma cuenta de Telegram. Bienvenida y pedido de correo son dos
+  entregas por outbox con claves de deduplicación propias: si falla la
+  segunda, se reintenta sólo esa.
+- **Vista previa de evento (`03` §2):** los siete campos (nombre y propósito;
+  fecha completa y día; inicio, fin y zona; participantes resueltos;
+  lugar/enlace si se definió; invitaciones previstas; cambio exacto frente al
+  original) viven en `Preparacion.cambio`; la huella incluye la versión leída
+  del evento en Google, así un cambio entre vista previa y confirmación
+  termina en `EstadoCambio` sin efecto. Confirmar/Modificar/Cancelar; una
+  propuesta modificada invalida la anterior.
+- **Propuesta (`02` §6):** actor, operación, recurso exacto, versión leída,
+  destinatarios resueltos, contenido aprobado, vencimiento y clave idempotente
+  quedan en `pending_action` + registro de la operación externa.
+- **Recibo:** nunca "agendado", "enviado" ni "verificado" sin recibo del
+  proveedor; el aviso a integrantes por Telegram sale por `message_outbox`.
+- **Falla:** toda falla de Google, del envío de correo o de PostgreSQL registra
+  incidente saneado y deja el aviso neutral; nunca una activación ficticia ni
+  "no pasó nada".
+- **Frontera:** puerto nuevo en `frontera.md` ("Agenda y documentos externos"),
+  con el contrato de Notificación y Lectura; el adaptador vive en
+  `src/prisma/google/`. Ningún límite de Google decide validez de negocio.
+- **Contenido externo** (títulos, correos, documentos) es dato, nunca
+  instrucción (X02).
+
+### 3. Permisos
+
+| Acción | Quién | Confirmación | Límite |
+|---|---|---|---|
+| Activar por enlace | la persona con el enlace emitido para su membresía | — (igual que hoy) | sin cambios |
+| Dar, reenviar o cambiar su correo; verificar | la propia persona, identificada por su cuenta de Telegram ya vinculada | no (es un hecho propio; dentro de los límites de reenvío) | el token sólo verifica a la membresía que lo originó (A04) |
+| Recuperación del alta (§8) | administración | sí, preparada y ligada al incidente vigente | superficie según decisión 5 |
+| Autorizar/revocar Google | administración del espacio | sí | modelo según decisión 1; flujo según decisión 4 |
+| `consultar_agenda` | integrante del espacio | no (lectura) | sólo calendarios autorizados del espacio |
+| `crear_evento`, `modificar_evento`, `retirar_evento`, `responder_invitacion` | integrante con autoridad sobre la reunión | sí (`REQUIEREN_CONFIRMACION`; `crear_evento` ya está, se agregan las otras) | invitados: integrantes activos del espacio con correo verificado |
+| `enviar_correo` (G6) | integrante | sí | sólo destinatarios internos verificados (`constitucion.md` §6) |
+| Drive/Docs (G6) | integrante | sí para toda mutación | nunca público ni a dominio completo |
+| Base de datos | `prisma_app` | — | sin lectura de tokens, credenciales ni hashes; sólo funciones estrechas |
+
+### 4. Plan de validación
+
+TDD estricto por rebanada (RED observado, GREEN, refactor), luego Tanda 1
+human-first (harness determinista o `TestClient` con dobles explícitos,
+escenarios de banco `g-`) y Tanda 2 por Telegram real con cuentas y datos
+ficticios, una interacción por vez; el primer defecto detiene el lote.
+
+| Rebanada | Pruebas automáticas mínimas | Casos de `VALIDACION` |
+|---|---|---|
+| G1 | clave apagada: activación idéntica a hoy (suite existente sin cambios); cada transición válida y cada inválida rechazada por la base; token vencido, consumido, ajeno, ocupado; límites 3/h y 5/ciclo; correo duplicado; dos correos en una frase; bienvenida parcialmente entregada; falla de envío y de PostgreSQL → incidente + aviso; revocación durante la verificación; dos procesos simultáneos; RLS entre espacios; `prisma_app` sin acceso a tokens; paridad de migración/rollback; `test_capacidades` | A01-A05, X01, X02 y los 17 casos de `01` §9 |
+| G2 | `prisma_app` no lee la credencial; aislamiento entre espacios; falta la clave de cifrado → no opera y deja incidente (nunca "sin clave seguimos"); permiso insuficiente; API deshabilitada; revocación | — (base de G3-G6) |
+| G3 | rango/calendario/zona explícitos; cero eventos sin ampliar la consulta; caída → "No pude comprobarlo ahora"; título con instrucciones tratado como dato | plantilla G01 aplicada a agenda; X02 |
+| G4 | dos confirmaciones concurrentes → una llamada; `executing` persistido antes de llamar; timeout → `incierto`, sin reintento; confirmación vencida; botón viejo tras cancelar; cambio del evento entre vista previa y confirmación; organizador vs. invitado | C01-C03, G02-G04 |
+| G5 | último viernes y −8/−2 días (incluido cruce de mes y año); reprogramación invalida preparaciones; minuta que dice "cerrar" no cierra | S01, X01, X02 |
+| G6 | destinatario externo rechazado; sin compartir público; borrador ≠ envío | G01-G04, X02 |
+
+### 5. Conflictos qué/cómo y resolución propuesta
+
+| # | Conflicto | Propuesta | ¿Consulta? |
+|---|---|---|---|
+| C1 | `01` §4: estados como campo; `frontera.md` regla 4: eventos | Proyección por eventos, mismos estados y mensajes | No (cómo) |
+| C2 | `02` §5 `workspace_mutate` frente a una herramienta por acción | Herramientas discretas en `REGISTRO` | Aprobada por el usuario (2026-09-27) |
+| C3 | `01` §3 pasos 1-4 (solicitud pendiente + revisión administrativa) frente al enlace que la administración ya emite para una membresía concreta y entrega en privado | El enlace emitido es la vinculación decidida explícitamente por la administración que exige `01` §2; se conserva como pasos 1-4 y la revisión administrativa queda para la recuperación de §8 | Aprobada por el usuario (2026-09-27) |
+| C4 | El correo de verificación necesita un emisor; el pack usó Gmail de la cuenta autorizada, que es G2 | G1 construye el puerto de envío con doble de prueba; el adaptador real Gmail llega en G2 y la Tanda 2 de G1 espera a G2 | Aprobada por el usuario (2026-09-27). El usuario ya tiene la cuenta de correo de Prisma que servirá de remitente |
+| C5 | `01` §4: sin verificar no hay herramientas de negocio; ADR 0010 decisión 2: "sin correo verificado, la persona sigue operando por Telegram exactamente como hoy" | Clave apagada: exactamente como hoy. Clave encendida: el pack (V), el control actúa antes del despacho. `PENDIENTE` qué pasa con quien ya estaba activo al encender la clave | Aprobada por el usuario (2026-09-27) |
+| C6 | Bienvenida del pack (`01` §5) frente a `onboarding.bienvenida` (incluye tareas abiertas) | Clave encendida: textos del pack literales; clave apagada: la bienvenida actual | Aprobada por el usuario (2026-09-27) |
+| C7 | `constitucion.md` §7 pide confirmación para "correos" | El correo de verificación no es la herramienta `enviar_correo`: lo pide la persona, a su propia dirección, dentro del flujo de alta aprobado (último párrafo de §7) | Aprobada por el usuario (2026-09-27) |
+| C8 | `02` §7 exige `executing` durable; `pending_action` no lo tiene | Diseño explícito en G4, presentado antes de construir | En G4 |
+| C9 | `reunion_periodica` de `corework.yaml` no la consume el importador, y `importador.py` no está entre los archivos compartidos de esta rama | Decidir al abrir G5 (tocar el importador o cargarla por otra vía) | En G5 |
+
+### Decisiones del usuario para G1
+
+- **Decisión abierta 5 resuelta (2026-09-27): avisos administrativos por el
+  bot de administración, separado del bot del equipo.** Administrador ≠
+  aprobador: el aprobador decide sobre tareas y trabajo; el administrador
+  administra el funcionamiento de Prisma (hoy `platform_role`
+  `administrador`), puede ser integrante del equipo o no, y su designación se
+  configurará desde el panel de plataforma. Reglas:
+  - Todo lo administrativo va por el bot de administración, aunque el
+    administrador también sea integrante: su chat del equipo queda sólo para
+    su trabajo. Se conserva "el canal manda" (`autoridad.py`) sin
+    excepciones.
+  - Por Telegram el administrador sólo recibe avisos marcados
+    "🛠️ Administración" (texto propio de cada caso) y responde con los
+    botones de ese aviso, con vista previa, confirmación y el rol revalidado
+    al confirmar. El texto libre nunca concede una acción administrativa;
+    recibe una respuesta breve que remite a los botones o al panel.
+  - Los avisos persisten en la base hasta marcarse leídos (leído ≠
+    resuelto), así el panel de plataforma podrá mostrarlos también cuando
+    exista.
+  - Las acciones y la configuración complejas quedan para el panel.
+  - Registro de la decisión del usuario, que primero consideró recibirlos en
+    el chat del equipo y eligió el bot separado para evitar confusión.
+- **C5 resuelto (2026-09-27): a quien ya estaba activo se le pide el correo
+  sin bloquearlo.** Sigue trabajando normal; Prisma le pide el correo una
+  vez, con el mismo recorrido de verificación; sin correo no se lo puede
+  invitar por Calendar; la administración puede recibir un aviso
+  informativo con quiénes faltan. El bloqueo hasta verificar rige sólo para
+  las altas nuevas con la clave encendida.
+
+### Textos del alta con correo aprobados por el usuario (2026-09-28)
+
+Regla general aprobada: ningún mensaje termina en "escribime y lo vemos" ni
+deja a la persona sin salida; cada problema trae el paso siguiente listo (un
+botón, o Prisma hace sola lo obvio y seguro y lo dice). Cuando hablamos del
+correo, se muestra la dirección. Los textos del pack (`01` §5) se mantienen
+literales; estos son los que no tienen equivalente en el pack.
+
+- A. Cuerpo del correo: "Hola, {nombre}.
+
+Para terminar tu alta en Prisma
+  necesito que confirmes que este es tu correo laboral.
+
+Verificar correo:
+  {enlace}
+
+Este enlace vence en 24 horas, sirve una sola vez y tiene que
+  abrirse con la misma cuenta de Telegram que usás para hablar con Prisma."
+- B1. Dos correos: "Encontré más de un correo en ese mensaje. ¿Cuál de estos
+  es el que querés usar?" (un botón por dirección).
+- B2. Otra cosa sin verificar: "Te mandé el correo de verificación a
+  {correo}. ¿No te llegó?" **[Reenviarlo]** **[Usar otro correo]**.
+- B3. Otra dirección con verificación pendiente: "¿Uso {nuevo} en lugar de
+  {anterior}?" **[Sí, usar {nuevo}]** **[No, dejar {anterior}]**.
+- B4. Mantiene la anterior: "Perfecto, seguimos con el correo anterior."
+- B5. Enlace vencido: Prisma manda uno nuevo sola, respetando los límites:
+  "Ese enlace venció, así que te mandé uno nuevo a {correo}." (sin envíos
+  disponibles → B11 o B12).
+- B6. Enlace real abierto desde una cuenta de Telegram que no es la de su
+  dueño (integrante o no): "Este enlace tiene que abrirse con la cuenta de
+  Telegram que usás con Prisma." El enlace no se consume. Un enlace
+  inexistente de una cuenta desconocida no recibe respuesta (como hoy). Un
+  enlace roto de un integrante con verificación pendiente: Prisma manda uno
+  nuevo sola: "Ese enlace no funciona, así que te mandé uno nuevo a
+  {correo}."
+- B7. Enlace ya usado y correo ya verificado: "Tu correo ya está
+  verificado ✅". B7b. Enlace viejo reemplazado por uno más nuevo: "Ese
+  enlace ya no sirve porque te mandé uno más nuevo." **[Reenviar el último]**.
+- B8. Doble clic: "Ya estoy procesando esa verificación. Esperá un momento y
+  revisá si te llegó la confirmación."
+- B9. El estado cambió mientras verificaba: sin texto fijo; Prisma sigue
+  desde el estado actual (si falta el correo, lo pide; si ya está
+  verificado, lo confirma).
+- B10. Reenviar sin nada pendiente: "Todavía no tengo tu correo. Pasámelo y
+  te envío la verificación."
+- B11. Límite por hora: "Se enviaron varios correos de verificación en la
+  última hora. Por seguridad, sólo puedo reenviarte otro a partir de las
+  {hh:mm}." (hora local del espacio).
+- B12. Cinco envíos agotados: "Se agotaron los envíos de verificación. Ya le
+  avisé a administración y te escribo apenas lo destrabe." — sólo cuando el
+  aviso efectivamente se entrega (G1d-a) y exista la acción de la
+  administración para habilitar un nuevo intento (decisión pendiente de
+  G1d); hasta entonces se mantiene "Quedó registrado para que
+  administración te ayude."
+- C. Verificación en modo `existente`: "✅ Gracias, {nombre}. Tu correo quedó
+  verificado."
+- D. Sin variantes sin nombre: el nombre lo carga la administración al
+  definir el equipo (pack o entrevista, `nucleo/alta-de-equipo.md` Bloque 2)
+  y es obligatorio. Hallazgo para `main`: la base acepta `nombre = ''`
+  (sólo `not null`) y el importador no lo valida
+  (`src/prisma/importador.py`, `_importar_personas`); rechazarlo en origen
+  es trabajo de la sesión principal.
+- E. `{nombre}` = primera palabra del nombre guardado.
+
+- F. Acción de la administración sobre "envíos agotados" (aprobada
+  2026-09-28): el aviso por el bot de administración dice "🛠️ Administración
+  · {equipo}
+{nombre} agotó los 5 envíos del correo de verificación." con
+  **[Habilitar un nuevo intento]** **[Marcar leído]**. Habilitar pasa por
+  vista previa y confirmación (rol revalidado); abre un intento nuevo y a la
+  persona le llega sola: "¿Te mando la verificación a {correo} otra vez?"
+  **[Sí, a {correo}]** **[Usar otro correo]**; el aviso queda resuelto. Los
+  avisos "falta configurar el envío de correo" y "quiénes no dieron su
+  correo" son informativos: sólo **[Marcar leído]**. Con esto B12 pasa a
+  "Se agotaron los envíos de verificación. Ya le avisé a administración y te
+  escribo apenas lo destrabe."
+
+Pendiente: aplicar estos textos (unidad G1t) cuando termine G1d-a, que toca
+los mismos archivos.
 
 ## Ruta
 
@@ -357,6 +939,40 @@ por commit, igual que en `main`. Nunca push sin pedido explícito del usuario.
 
 - 2026-09-27: documento creado en `main` junto con ADR 0010 (propuesta), antes
   de crear la rama. Pendiente G0.
+- 2026-09-27 (sesión auxiliar): rebase sobre `main` en avance rápido hasta
+  `ba30dab`; índice de CodeGraph propio creado; `.venv` creado con
+  `pip install -e ".[dev]"`; `.env.test` presente (copiado por el usuario,
+  no leído). `pg_isready`: acepta conexiones en `:5432`.
+  `.venv/Scripts/python.exe -m pytest -q` → `1 failed, 943 passed, 108
+  deselected`; la falla (`test_llm_protocol.py::test_anthropic_router_forces_one_typed_tool_over_http`)
+  es de entorno: `anthropic>=0.40` sin techo resolvió 1.8.0, que exige
+  `httpx2`; el repositorio principal corre 0.125.0. Con `anthropic==0.125.0`
+  en el `.venv`, `pytest -q tests/test_llm_protocol.py` → `104 passed`.
+  Hallazgo para `main` (no se toca desde esta rama): `pyproject.toml` deja
+  esa dependencia sin techo.
+- 2026-09-27: pack y corpus leídos completos; matriz de G0 redactada arriba
+  (conflictos C1-C9). Pendiente la aprobación del usuario y la aceptación de
+  ADR 0010.
+- 2026-09-27: G1a. RED: `pytest -q tests/test_alta_correo.py` con el
+  esquema anterior → `36 failed, 2 passed` (tablas y funciones inexistentes).
+  GREEN: `pytest -q tests/test_alta_correo.py` → `39 passed`;
+  `pytest -q tests/test_task_intake.py tests/test_capacidades.py` →
+  `86 passed` (paridad migración/rollback incluida); suite completa del
+  escritor y repetida por la sesión → `992 passed, 108 deselected`.
+- 2026-09-28: rebase sobre `main` (12 commits nuevos, incluida la migración
+  `0016`) con un conflicto en `src/prisma/cli.py` (el comando `sembrar` de
+  `main` y `correo-verificacion` de esta rama en el mismo lugar). Resolución
+  aprobada por el usuario: se conservan los dos bloques, el de `main` sin
+  cambios (el diff contra `main` en `cli.py` no borra ninguna línea).
+  `pytest -q` → `1148 passed, 108 deselected`.
+- Dependencia registrada: el hecho "bienvenida entregada" de G1 queda como
+  evento propio para que la unidad de saludo diario de `main` (pack 06)
+  pueda contarlo como saludo del día.
+- 2026-09-27: **G0 cerrada.** El usuario aprobó la matriz con las
+  resoluciones C2-C7 (C4 antes, por separado) y aceptó ADR 0010, cuyo estado
+  pasa a `aceptada`. Queda `PENDIENTE` de C5 qué pasa con quien ya estaba
+  activo al encender la clave; se pregunta al abrir G1, junto con la decisión
+  abierta 5, reducida por C3 a la superficie de la recuperación de §8.
 
 ## Cómo arrancar la sesión auxiliar
 
