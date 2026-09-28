@@ -344,13 +344,27 @@ Un worktree nuevo no trae lo que no se versiona.
     tiempo de espera). Sugerencia pendiente, menor: ninguna prueba alcanza
     la rama defensiva `verification_conflict` (el bloqueo la vuelve
     inalcanzable en la práctica).
-  - [ ] **G1b — Recorrido del alta con correo.** `alta_correo.py` con puerto
+  - [x] **G1b — Recorrido del alta con correo.** `alta_correo.py` con puerto
     de envío (`Protocol`) y doble de prueba; sin emisor configurado con la
     clave encendida → incidente + aviso neutral, nunca "enviado".
     Bienvenida y pedido de correo del pack al activar (clave encendida);
     recepción del correo, envío, `/start pv_{token}` en
     `gateway._activacion`, reenviar/cambiar, mensajes literales de §5,
     control antes del despacho conversacional para el modo `alta`.
+    Hecho (ruta: delegada, un escritor; `alta_correo_flujo.py` nuevo;
+    toques compartidos: `gateway.py` — `_bot_username`, `/start pv_`,
+    compuerta previa al agente, botones en `_toque` —, esquema y migración
+    0100 — función `verificacion_vigente_correo` —, rollback 0100). TDD: el
+    escritor declaró que no escribió todas las pruebas antes del código;
+    hubo RED reales (transición faltante, RLS bajo `admin()`, orden del
+    outbox) antes del GREEN. La sesión corrigió dos defectos antes del
+    commit, con RED observado: el error de `getMe` filtraba el token del bot
+    a `incident.referencia_cruda` (ahora error saneado), y el texto de
+    límite agotado decía "Le avisé a administración" cuando el aviso todavía
+    no se entrega (G1d) — ahora "Quedó registrado para que administración te
+    ayude". `nombre_preferido` = primera palabra del nombre guardado (igual
+    que `onboarding.bienvenida`). Textos nuevos fuera del pack: pendientes
+    de revisión del usuario. Suite: `1047 passed, 108 deselected`.
   - [ ] **G1c — Integrantes ya activos (modo `existente`).** Al encender la
     clave (comando de `cli.py`), a quien ya estaba activo sin correo se le
     pide una vez, sin bloquearlo; en ese modo sólo un mensaje que es

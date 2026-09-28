@@ -19,6 +19,7 @@ drop trigger if exists trg_derivar_espacio_aviso_administrativo on aviso_adminis
 drop index if exists aviso_administrativo_pendientes;
 drop table if exists aviso_administrativo;
 
+drop function if exists verificacion_vigente_correo(uuid);
 drop function if exists completar_verificacion_correo(text, uuid, timestamptz);
 drop function if exists reservar_verificacion_correo(text, uuid, timestamptz);
 drop function if exists emitir_verificacion_correo(uuid, text, text, text, timestamptz);

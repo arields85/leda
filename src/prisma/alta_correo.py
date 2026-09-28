@@ -237,6 +237,38 @@ def completar_verificacion(cur: psycopg.Cursor, token: str, membership_id: str,
     return ResultadoVerificacion(ok=fila["ok"], motivo=fila["motivo"])
 
 
+def verificacion_vigente(cur: psycopg.Cursor, membership_id: str) -> dict | None:
+    """El envío de verificación en pie (email + vencimiento), o `None`.
+
+    Nunca expone el hash del token: sólo lo que el flujo conversacional
+    (G1b) necesita para comparar un correo recién tipeado contra el que ya
+    se pidió verificar (`verificacion_vigente_correo`, security definer:
+    `prisma_app` no tiene ningún privilegio directo sobre
+    `alta_correo_verificacion`).
+    """
+    cur.execute("select email, expira_en from verificacion_vigente_correo(%s)",
+                (membership_id,))
+    return cur.fetchone()
+
+
+def dominios_permitidos(cur: psycopg.Cursor, workspace_id: str) -> list[str] | None:
+    """Lista de dominios habilitados para el correo laboral, o `None` si el
+    espacio no restringió ninguno (`workspace_setting`, clave
+    `correo_verificacion.dominios`, lista JSON de dominios en minúsculas)."""
+    cur.execute(
+        "select valor from workspace_setting where workspace_id = %s and clave = %s",
+        (workspace_id, "correo_verificacion.dominios"))
+    fila = cur.fetchone()
+    if not fila:
+        return None
+    valor = fila["valor"]
+    if isinstance(valor, str):
+        valor = json.loads(valor)
+    if not valor:
+        return None
+    return [str(d).strip().lower() for d in valor]
+
+
 def contacto_verificado(cur: psycopg.Cursor, membership_id: str) -> dict | None:
     """El correo verificado de una membresía y desde cuándo, o `None`."""
     cur.execute(

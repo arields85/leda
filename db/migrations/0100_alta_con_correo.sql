@@ -596,6 +596,22 @@ begin
   return query select true, null::text;
 end $$;
 
+-- --- Lectura del envío vigente ----------------------------------------------
+--
+-- Sólo lo necesita el flujo conversacional (G1b) para saber si un correo
+-- tipeado mientras hay una verificación pendiente es igual al que ya se
+-- pidió verificar, o es una dirección distinta que hay que proponer antes de
+-- cambiarla. Nunca expone el hash del token: sólo el correo y su vencimiento.
+create or replace function verificacion_vigente_correo(p_membership_id uuid)
+returns table (email text, expira_en timestamptz)
+language plpgsql security definer set search_path = prisma, public, pg_temp as $$
+begin
+  return query
+    select a.email, a.expira_en from alta_correo_verificacion a
+     where a.membership_id = p_membership_id and a.vigente
+     order by a.emitido_en desc limit 1;
+end $$;
+
 -- =========================================================================
 -- Avisos administrativos -- "🛠️ Administración" (G1d los entrega)
 -- =========================================================================
@@ -679,6 +695,7 @@ alter function reservar_verificacion_correo(text, uuid, timestamptz)
   owner to prisma_owner;
 alter function completar_verificacion_correo(text, uuid, timestamptz)
   owner to prisma_owner;
+alter function verificacion_vigente_correo(uuid) owner to prisma_owner;
 
 revoke execute on function emitir_verificacion_correo(uuid, text, text, text, timestamptz)
   from public;
@@ -686,11 +703,13 @@ revoke execute on function reservar_verificacion_correo(text, uuid, timestamptz)
   from public;
 revoke execute on function completar_verificacion_correo(text, uuid, timestamptz)
   from public;
+revoke execute on function verificacion_vigente_correo(uuid) from public;
 grant execute on function emitir_verificacion_correo(uuid, text, text, text, timestamptz)
   to prisma_app;
 grant execute on function reservar_verificacion_correo(text, uuid, timestamptz)
   to prisma_app;
 grant execute on function completar_verificacion_correo(text, uuid, timestamptz)
   to prisma_app;
+grant execute on function verificacion_vigente_correo(uuid) to prisma_app;
 
 commit;

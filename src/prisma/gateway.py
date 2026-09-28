@@ -66,6 +66,42 @@ def _authority_conn():
     return _authority_conn._c
 
 
+def _bot_username(slug: str) -> str:
+    """Usuario público del bot de un espacio (para el enlace `t.me/...?start=`).
+
+    Brecha real, registrada para G1b: no hay ninguna columna ni ajuste que
+    lo guarde todavía -- `cli.py` (comando `enlaces`) lo resuelve igual,
+    contra `getMe` de Telegram, en el momento de imprimir los enlaces de
+    activación. Esta es la misma fuente, centralizada acá porque el
+    recorrido de verificación de correo (G1b) también necesita construir
+    `https://t.me/{bot}?start=pv_{token}` y no tiene, como `cli.py`, a un
+    operador copiando la salida a mano.
+
+    Se cachea en memoria por proceso: una sola llamada de red por slug,
+    nunca una por mensaje. Las pruebas reemplazan esta función entera por
+    un doble -- nunca llaman a Telegram de verdad.
+    """
+    if slug not in _bot_username._cache:
+        import httpx
+
+        # El error de httpx lleva la URL con el token del bot, y ese texto
+        # termina en `incident.referencia_cruda`: se reemplaza por uno saneado.
+        try:
+            r = httpx.get(
+                f"https://api.telegram.org/bot{config.token_bot(slug)}/getMe",
+                timeout=15)
+            r.raise_for_status()
+            usuario = r.json()["result"]["username"]
+        except (httpx.HTTPError, KeyError, ValueError) as e:
+            raise RuntimeError(
+                f"No se pudo obtener el usuario del bot ({type(e).__name__}).") from None
+        _bot_username._cache[slug] = usuario
+    return _bot_username._cache[slug]
+
+
+_bot_username._cache = {}
+
+
 def _espacio_por_slug(cur, slug: str) -> dict[str, Any] | None:
     cur.execute("select id, slug, activo from workspace where slug = %s", (slug,))
     return cur.fetchone()
@@ -203,9 +239,27 @@ def procesar_update(conn, slug: str, update: dict,
     # perder el recibo de la fase 1.
     try:
         with espacio(conn, workspace_id) as cur:
+            from datetime import datetime, timezone
+
+            atendido_alta_correo = False
+            if texto.strip():
+                from . import alta_correo_flujo as ACF
+
+                # G1b: mientras esta membresía esté en modo `alta` por debajo
+                # de `active`, el control actúa ACÁ, antes de intake y del
+                # turno del agente -- ninguna herramienta de negocio corre
+                # para quien todavía no verificó su correo. Con la clave
+                # apagada (o ya `active`), `gate` no hace nada y devuelve
+                # `False` de inmediato: el resto de esta rama queda igual
+                # que hoy.
+                atendido_alta_correo = ACF.gate(
+                    cur, quien, texto, chat_id=chat_id, workspace_id=workspace_id,
+                    ahora=datetime.now(timezone.utc),
+                    bot_username_resolver=lambda: _bot_username(slug))
+
             handled_intake_text = False
-            if texto.strip() and chat_type == "private":
-                from datetime import datetime, timezone
+            if (not atendido_alta_correo and texto.strip()
+                    and chat_type == "private"):
                 from .ingreso_tareas import handle_active_text
 
                 handled_intake_text = handle_active_text(
@@ -213,7 +267,7 @@ def procesar_update(conn, slug: str, update: dict,
                     source_raw_text=texto, now=datetime.now(timezone.utc),
                 ) is not None
 
-            if texto.strip() and not handled_intake_text:
+            if not atendido_alta_correo and texto.strip() and not handled_intake_text:
                 with mantener_chat_activo(config.token_bot(slug), chat_id):
                     _turno(cur, quien, texto, workspace_id, chat_id, entrante_id)
 
@@ -248,6 +302,17 @@ def _activacion(conn, workspace_id: str, texto: str, tg_user: int,
 
     partes = texto.split(maxsplit=1)
 
+    if len(partes) >= 2 and partes[1].strip().startswith("pv_"):
+        # Verificación de correo (G1b), no activación por enlace: el prefijo
+        # `pv_` decide antes de tratar el resto como un `activation_token`.
+        # El camino de abajo (token de activación) sigue igual para
+        # cualquier otro valor, incluido uno que por casualidad empezara con
+        # otra cosa.
+        from . import alta_correo_flujo as ACF
+
+        return ACF.resolver_verificacion_correo(
+            conn, workspace_id, partes[1].strip()[len("pv_"):], tg_user, chat_id)
+
     if len(partes) < 2:
         # /start sin token. Si la persona ya está vinculada —porque su
         # identificador vino en el pack— igual corresponde saludarla: ese
@@ -279,6 +344,44 @@ def _activacion(conn, workspace_id: str, texto: str, tg_user: int,
         except ActivacionInvalida as e:
             cuerpo = str(e) + " Pedile uno nuevo a quien te lo pasó."
         else:
+            from datetime import datetime, timezone
+
+            from . import alta_correo as AC
+
+            if AC.habilitado(cur, workspace_id):
+                # C6 (aprobada por el usuario): con la clave encendida, la
+                # bienvenida de `onboarding.bienvenida` NO se manda -- van
+                # los dos mensajes literales del pack (`alta_correo_flujo`),
+                # y el ciclo pasa a `awaiting_email` en la misma transacción
+                # que `activar()` ya abrió acá.
+                cur.execute(
+                    """select m.id as membership_id from membership m
+                         join app_user u on u.id = m.app_user_id
+                        where u.telegram_user_id = %s and m.workspace_id = %s
+                          and m.activo""",
+                    (tg_user, workspace_id))
+                membership_id = str(cur.fetchone()["membership_id"])
+                registrar_auditoria(
+                    cur, accion="activacion", workspace_id=workspace_id,
+                    actor_kind="persona", detalle={"nombre": nombre})
+
+                # `alta_correo_evento` deriva su `workspace_id` por
+                # disparador (`preparar_evento_alta_correo`, security
+                # definer de `prisma_owner`, que NO saltea la política de
+                # aislamiento): sin ningún espacio fijado en la sesión de
+                # `admin()` no encuentra la membresía aunque exista. Se fija
+                # acá para el resto de esta transacción, que termina en el
+                # `return` de abajo -- no hace falta restaurarlo.
+                cur.execute(
+                    "select set_config('prisma.workspace_id', %s, true)",
+                    (workspace_id,))
+
+                from . import alta_correo_flujo as ACF
+
+                ACF.abrir_ciclo_alta(cur, membership_id, workspace_id, chat_id,
+                                     nombre, datetime.now(timezone.utc))
+                return {"ok": True}
+
             cuerpo = bienvenida(cur, workspace_id, nombre)
             registrar_auditoria(
                 cur, accion="activacion", workspace_id=workspace_id,
@@ -305,6 +408,7 @@ def _toque(conn, workspace_id: str, slug: str, toque: dict,
     """
     from datetime import datetime, timezone
 
+    from . import alta_correo_flujo as ACF
     from . import herramientas as H
     from . import pendientes as P
     from .autoridad import Denegado as NoPuede
@@ -419,6 +523,15 @@ def _toque(conn, workspace_id: str, slug: str, toque: dict,
                     _resolver_toque_dato_menu_tarea(
                         cur, quien, workspace_id, chat_id, resuelta.args, ahora,
                         pending_action_id=pending_action_id)
+                elif resuelta.herramienta in ACF.SENTINELS:
+                    # G1b: elegir entre varios correos, Reenviar/Cambiar
+                    # correo, o Cambiar a la dirección nueva/Mantener la
+                    # anterior. Tampoco es una herramienta real -- igual que
+                    # los sentinelas de arriba.
+                    ACF.resolver_toque(
+                        cur, quien, workspace_id, chat_id, resuelta.herramienta,
+                        resuelta.args, ahora,
+                        bot_username_resolver=lambda: _bot_username(slug))
                 else:
                     from .agente import VIGENCIA_PENDIENTE
 
@@ -2123,6 +2236,9 @@ ETAPA_TURNO_TEXTO = "turno_texto"
 ETAPA_TOQUE_BOTON = "toque_boton"
 ETAPA_ACTIVACION = "activacion"
 ETAPA_ACCION_MENU = "accion_menu"
+# G1b (rama auxiliar/alta-y-google): recorrido del alta con correo --
+# pedido/emisión/reenvío de verificación y `/start pv_{token}`.
+ETAPA_ALTA_CORREO = "alta_correo"
 
 # Qué tipo de fila referencia `incident.referencia_id` -- mismo patrón
 # polimórfico que `audit_log.sujeto_tipo`/`sujeto_id`, sin clave foránea:
