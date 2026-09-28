@@ -104,6 +104,20 @@ def texto_verificado(nombre_preferido: str) -> str:
             "normalmente.")
 
 
+def texto_verificado_existente(nombre_preferido: str) -> str:
+    """Variante de `texto_verificado` para el modo `existente` (G1c).
+
+    El texto del pack ("ya podés conversar conmigo normalmente") está
+    pensado para quien recién se está dando de alta -- a quien ya estaba
+    trabajando normalmente le suena como si algo la hubiera estado
+    bloqueando, cuando C5 exige exactamente lo contrario (nunca bloqueada).
+    Texto NUEVO, sin equivalente literal en el pack -- reportado para
+    revisión del usuario, igual que el resto de los textos nuevos de este
+    módulo."""
+    quien_agradece = f", {nombre_preferido}" if nombre_preferido else ""
+    return f"✅ Gracias{quien_agradece}. Tu correo quedó verificado."
+
+
 def cuerpo_verificacion(nombre_preferido: str, enlace: str) -> str:
     """Cuerpo del correo de verificación.
 
@@ -280,6 +294,27 @@ def abrir_ciclo_alta(cur: psycopg.Cursor, membership_id: str, workspace_id: str,
     _completar_bienvenida(cur, membership_id, workspace_id, chat_id, nombre, ahora)
 
 
+def abrir_ciclo_existente(cur: psycopg.Cursor, membership_id: str, workspace_id: str,
+                          chat_id: int, ahora: datetime) -> None:
+    """Encender la clave (comando `correo-verificacion --activar` de
+    `cli.py`, G1c) para quien ya estaba activo sin correo: abre el ciclo
+    directamente en `awaiting_email` -- C5, sin bienvenida, que ya recibió
+    cuando activó por enlace -- y encola el mismo pedido de correo del pack,
+    con su propia clave de dedupe (nunca la de `abrir_ciclo_alta`, para que
+    nunca puedan pisarse).
+
+    No hay ningún guardia de idempotencia acá adentro: lo pone quien llama
+    (`cli.py`), que sólo invoca esto para membresías sin ningún ciclo
+    abierto todavía -- una segunda corrida del comando ya no las vuelve a
+    encontrar elegibles."""
+    AC.iniciar_ciclo(cur, membership_id, "existente", ahora=ahora)
+    enqueue_outbox(
+        cur, workspace_id=workspace_id, chat_id=chat_id, text=TEXTO_PEDIDO_CORREO,
+        message_type="informativo", scheduled_for=ahora,
+        dedupe_key=f"{workspace_id}:alta-correo:pedido-existente:{membership_id}",
+        is_response=True, allow_split=True)
+
+
 def _completar_bienvenida(cur: psycopg.Cursor, membership_id: str, workspace_id: str,
                           chat_id: int, nombre: str, ahora: datetime) -> None:
     """Bienvenida + pedido de correo (dos entregas, claves de dedupe propias)
@@ -334,7 +369,8 @@ def _gateada(actual: dict | None) -> bool:
             and actual["estado"] in _ESTADOS_BLOQUEANTES)
 
 
-def bloqueada_para_negocio(cur: psycopg.Cursor, membership_id: str) -> bool:
+def bloqueada_para_negocio(cur: psycopg.Cursor, membership_id: str,
+                           workspace_id: str) -> bool:
     """`True` si esta membresía sigue en modo `alta` por debajo de `active`.
 
     La usan los chats que no son privados -- `gate()` sólo corre en privado
@@ -342,7 +378,12 @@ def bloqueada_para_negocio(cur: psycopg.Cursor, membership_id: str) -> bool:
     pedir/mostrar/procesar un correo, o dejaba pasar el mensaje a una
     herramienta de negocio para quien todavía no verificó el suyo). En un
     grupo no hay recorrido de correo que ofrecer: la respuesta correcta es
-    no hacer nada -- ni responder ni rutear a ningún lado."""
+    no hacer nada -- ni responder ni rutear a ningún lado.
+
+    G1c: la clave apagada corta esto también -- ver el docstring de `gate`,
+    mismo motivo."""
+    if not AC.habilitado(cur, workspace_id):
+        return False
     return _gateada(AC.estado(cur, membership_id))
 
 
@@ -354,7 +395,17 @@ def gate(cur: psycopg.Cursor, quien: Any, texto: str, *, chat_id: int,
     membresía no está en modo `alta` con un ciclo abierto por debajo de
     `active` (incluye la clave apagada, donde nunca hay ciclo). Sólo tiene
     sentido llamarla en un chat privado -- ver `bloqueada_para_negocio`
-    para lo que corresponde en cualquier otro tipo de chat."""
+    para lo que corresponde en cualquier otro tipo de chat.
+
+    G1c: la clave apagada corta el control de inmediato, incluso si quedó
+    un ciclo `alta` abierto de cuando estaba encendida -- comando
+    `correo-verificacion --desactivar` de `cli.py`: "con la clave apagada,
+    NO corre ningún gate ni recorrido de correo para nadie". Antes esta
+    función no comprobaba la clave, sólo el ciclo, así que alguien a mitad
+    de verificar quedaba bloqueado para siempre aunque administración
+    apagara la clave después."""
+    if not AC.habilitado(cur, workspace_id):
+        return False
     actual = AC.estado(cur, quien.membership_id)
     if not _gateada(actual):
         return False
@@ -375,6 +426,78 @@ def gate(cur: psycopg.Cursor, quien: Any, texto: str, *, chat_id: int,
     else:
         _atender_pending_verification(cur, quien, texto, workspace_id, chat_id,
                                       ahora, bot_username_resolver, nombre_preferido)
+    return True
+
+
+# ---------------------------------------------------------------------------
+# G1c -- modo `existente`: nunca bloquea (C5); sólo intercepta un mensaje que
+# ES un correo, de punta a punta.
+# ---------------------------------------------------------------------------
+
+_EMAIL_UNICO = re.compile(r"^[^\s<>()\[\]{}\"']+@[^\s<>()\[\]{}\"']+$")
+
+
+def _solo_un_correo(texto: str) -> str | None:
+    """El texto recortado (sin espacios en los extremos) si es, de punta a
+    punta, un único candidato a correo -- ni antes ni después hay otra
+    palabra. `None` para cualquier otra cosa: vacío, varias palabras, un
+    correo en medio de una frase.
+
+    A diferencia de `extraer_correos` (que busca candidatos DENTRO de una
+    frase libre, para el modo `alta` donde cada mensaje tiene que
+    responderse de un modo u otro), esto es lo único que en modo `existente`
+    distingue "la persona me está dando su correo" de un mensaje cualquiera
+    que tiene que seguir su curso hacia intake/el agente."""
+    candidato = (texto or "").strip()
+    if not candidato or any(c.isspace() for c in candidato) or "@" not in candidato:
+        return None
+    return candidato if _EMAIL_UNICO.match(candidato) else None
+
+
+def atender_existente(cur: psycopg.Cursor, quien: Any, texto: str, *, chat_id: int,
+                      workspace_id: str, ahora: datetime,
+                      bot_username_resolver: Callable[[], str]) -> bool:
+    """`True` si el mensaje quedó atendido por el recorrido de correo en
+    modo `existente` -- `False` para cualquier otro caso, que sigue como
+    cualquier mensaje normal hacia intake/el agente (C5: a quien ya estaba
+    activo Prisma le pide el correo una vez, SIN bloquearlo; "se les pide
+    una vez" -- nunca un recordatorio ni una segunda pedida).
+
+    A diferencia de `gate` (modo `alta`, bloqueante, que tiene que responder
+    algo a CADA mensaje mientras esté gateada), esta función nunca contesta
+    "no reconocí un correo" ni ofrece un recordatorio con botones: eso sería
+    fastidiar a alguien que ya venía trabajando con normalidad. Sólo actúa
+    cuando el mensaje, de punta a punta, es un correo (`_solo_un_correo`);
+    cualquier otra cosa -- incluida la clave apagada, o cualquier estado que
+    no sea modo `existente` por debajo de `active` -- devuelve `False` de
+    inmediato sin tocar nada. Sólo tiene sentido llamarla en un chat privado
+    (nunca se procesa un correo en un grupo); quien llama (`gateway.py`) ya
+    lo garantiza, igual que con `gate`."""
+    if not AC.habilitado(cur, workspace_id):
+        return False
+    actual = AC.estado(cur, quien.membership_id)
+    if (actual is None or actual["modo"] != "existente"
+            or actual["estado"] not in ("awaiting_email", "pending_email_verification")):
+        return False
+    correo = _solo_un_correo(texto)
+    if correo is None:
+        return False
+
+    nombre_preferido = _nombre_preferido(quien.nombre)
+    if actual["estado"] == "awaiting_email":
+        _validar_y_emitir(cur, quien, correo, workspace_id, chat_id, ahora,
+                          bot_username_resolver, nombre_preferido)
+        return True
+
+    # `pending_email_verification`: mismo criterio de comparación que
+    # `_atender_pending_verification`, pero sin caer nunca en
+    # `_recordatorio` -- ver el docstring. Si el correo es exactamente el
+    # que ya está vigente, no hay ninguna instrucción nueva que atender: se
+    # deja pasar como cualquier mensaje (nunca un recordatorio).
+    vigente = AC.verificacion_vigente(cur, quien.membership_id)
+    if vigente is not None and AC.normalizar_correo(correo) == vigente["email"]:
+        return False
+    _proponer_cambio(cur, quien, correo, workspace_id, chat_id, ahora)
     return True
 
 
@@ -727,8 +850,17 @@ def resolver_verificacion_correo(conn, workspace_id: str, token: str, tg_user: i
                                           completado.motivo)
             return {"ok": True}
 
-        _responder(cur, workspace_id, chat_id, quien,
-                  texto_verificado(_nombre_preferido(quien.nombre)), ahora)
+        # G1c: el texto final difiere por modo -- `texto_verificado` (el del
+        # pack) da por hecho que la persona recién se está dando de alta;
+        # quien ya estaba activa (`existente`) necesita la variante propia
+        # (ver su docstring). El modo no cambia dentro de un ciclo, así que
+        # leer la proyección ya actualizada alcanza.
+        nombre_preferido = _nombre_preferido(quien.nombre)
+        proyeccion = AC.estado(cur, quien.membership_id)
+        texto_exito = (texto_verificado_existente(nombre_preferido)
+                       if proyeccion and proyeccion["modo"] == "existente"
+                       else texto_verificado(nombre_preferido))
+        _responder(cur, workspace_id, chat_id, quien, texto_exito, ahora)
     return {"ok": True}
 
 

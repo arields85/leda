@@ -266,9 +266,21 @@ def procesar_update(conn, slug: str, update: dict,
                         cur, quien, texto, chat_id=chat_id, workspace_id=workspace_id,
                         ahora=datetime.now(timezone.utc),
                         bot_username_resolver=lambda: _bot_username(slug))
+                    if not atendido_alta_correo:
+                        # G1c, modo `existente` (C5): `gate` ya devolvió
+                        # `False` de inmediato para esta membresía -- nunca
+                        # está "gateada" en este modo, así que nunca bloquea
+                        # a quien ya trabajaba con normalidad. Esto es lo que
+                        # falta para que, de todos modos, un único mensaje
+                        # que sea exactamente un correo entre al recorrido en
+                        # vez de seguir de largo hacia intake/el agente.
+                        atendido_alta_correo = ACF.atender_existente(
+                            cur, quien, texto, chat_id=chat_id, workspace_id=workspace_id,
+                            ahora=datetime.now(timezone.utc),
+                            bot_username_resolver=lambda: _bot_username(slug))
                 else:
                     bloqueada_en_grupo = ACF.bloqueada_para_negocio(
-                        cur, quien.membership_id)
+                        cur, quien.membership_id, workspace_id)
 
             handled_intake_text = False
             if (not atendido_alta_correo and not bloqueada_en_grupo and texto.strip()

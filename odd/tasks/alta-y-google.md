@@ -394,11 +394,26 @@ Un worktree nuevo no trae lo que no se versiona.
     `correo_limite_agotado` "una sola vez" no resiste concurrencia → índice
     único parcial en `aviso_administrativo`. Ambos entran en G1d, que ya
     toca esa tabla.
-  - [ ] **G1c — Integrantes ya activos (modo `existente`).** Al encender la
+  - [x] **G1c — Integrantes ya activos (modo `existente`).** Al encender la
     clave (comando de `cli.py`), a quien ya estaba activo sin correo se le
     pide una vez, sin bloquearlo; en ese modo sólo un mensaje que es
     exactamente una dirección de correo entra al recorrido, el resto va al
     agente como siempre.
+    Hecho (ruta: delegada, un escritor). Comando `correo-verificacion
+    <espacio> --activar|--desactivar` (toque compartido: `cli.py`, comando
+    nuevo; `gateway.procesar_update`, derivación a `atender_existente` en
+    privado). Corrigió un defecto real con RED observado: con la clave
+    apagada, un integrante a mitad del ciclo `alta` seguía bloqueado
+    (`gate` y `bloqueada_para_negocio` no miraban la clave). El resto de las
+    pruebas se escribió junto con el código, no antes (desvío de TDD
+    declarado por el escritor). Texto nuevo pendiente de revisión:
+    "✅ Gracias, {nombre}. Tu correo quedó verificado." (y sin nombre).
+    Suite de la sesión: `1 failed, 1075 passed, 108 deselected`; la falla
+    (`test_0008_motivo_no_arranca_tarea_llega_por_migracion`) y las dos que
+    vio el escritor son pruebas de migración ajenas a esta unidad que
+    fallaron con `tuple concurrently updated` y pasan aisladas
+    (`5 passed`): contención de catálogo con otra suite corriendo contra el
+    mismo servidor. `PENDIENTE`: confirmar con una corrida sin concurrencia.
   - [ ] **G1d — Avisos "🛠️ Administración" por el bot de administración.**
     Camino de salida propio (hoy el bot de administración no envía nada y
     `message_outbox` exige `workspace_id`); botones Reenviar correo /
