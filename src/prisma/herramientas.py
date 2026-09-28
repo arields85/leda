@@ -927,8 +927,9 @@ def _bloquear_tarea(cur, tarea_id) -> None:
     al handler.
 
     El lock por sí solo NO alcanza (corrección del orquestador tras revisar
-    T6f): serializa el ORDEN DE EJECUCIÓN, pero `approval.at`, `evidence.at`
-    y `task_state_event.at` (`db/esquema.sql`) tienen `default now()`, que en
+    T6f): serializa el ORDEN DE EJECUCIÓN, pero -- hasta T6j
+    (`odd/tasks/prisma-orienta.md`) -- `approval.at`, `evidence.at` y
+    `task_state_event.at` (`db/esquema.sql`) tenían `default now()`, que en
     PostgreSQL es la hora de INICIO de la transacción, no la del `insert`. En
     el gateway la transacción arranca mucho antes de llegar acá -- ruteo,
     llamada al modelo, fase 2 --, así que la transacción B puede haber
@@ -939,14 +940,20 @@ def _bloquear_tarea(cur, tarea_id) -> None:
     cuenta con `e.at > último rechazado.at`) -- y, por la misma razón,
     `estado_previo_a_bloqueo`/`estado_previo_a_revision`, que ordenan
     `task_state_event` por `at desc` -- juzgarían mal con esa hora de
-    arranque. Por eso cada `insert` en `approval`, `evidence` y
-    `task_state_event` dentro de estos cuatro handlers fija `at =
-    clock_timestamp()` de forma explícita (columna `not null default now()`,
-    sin trigger que la reescriba ni la prohíba -- verificado en
-    `db/esquema.sql`): `clock_timestamp()` es la hora real en el momento del
-    `insert`, ya con el lock tomado, así que el orden de los `at` coincide
-    con el orden serializado en el que las transacciones realmente
-    escribieron."""
+    arranque.
+
+    T6j cambió el `default` de las tres columnas a `clock_timestamp()`
+    (migración `0016`, `db/esquema.sql`) para que ese orden valga para
+    cualquier escritor, no sólo para estos cuatro handlers -- el defecto no
+    era exclusivo de ellos, cualquier otra transacción que insertara en
+    `approval`, `evidence` o `task_state_event` bajo carga estaba expuesta
+    igual. Cada `insert` de estos cuatro handlers sigue fijando `at =
+    clock_timestamp()` de forma explícita: ya es redundante con el nuevo
+    default, pero queda -- en vez de sacarlo para no duplicar -- porque es
+    justo en el punto donde el lock se tomó y el orden importa de verdad, y
+    documenta ahí por qué (sin depender de que quien lea este comentario
+    también haya visto el de la migración `0016`, ni de que el default de la
+    columna no cambie de nuevo sin que alguien note esto)."""
     cur.execute("select pg_advisory_xact_lock(hashtextextended(%s, 0))",
                (f"task:{tarea_id}",))
 

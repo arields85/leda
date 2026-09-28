@@ -123,7 +123,7 @@ gestión.
     quien la revisa.
     Sumar pruebas: previo nulo -> `asignada`; rama `en_revision` de
     `_preparar_actualizar_estado` sin confirmar.
-  - [ ] **T6j — La hora de escritura como regla del esquema** (review-5085907d).
+  - [x] **T6j — La hora de escritura como regla del esquema** (review-5085907d).
     Sólo los cuatro actos bloqueados fijan `at = clock_timestamp()`; el resto de
     quienes escriben `task_state_event`, `evidence` y `approval` (transiciones del
     sistema, cargas administrativas) sigue con `now()`. Cambiar el `default` de
@@ -3405,3 +3405,19 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   aprobada y reconocida; frontera en `48b6c8a`. Un WARNING (prueba de botones
   huérfanos sin chequear el estado de la acción que queda) y una sugerencia (relojes
   mezclados entre escritores) -> T6j.
+
+- 2026-09-27: **T6j cerrada — la hora de escritura como regla del esquema.** Ruta:
+  delegada, un escritor. El `default` de `at` en `task_state_event`, `evidence` y
+  `approval` pasa de `now()` a `clock_timestamp()`
+  (`db/migrations/0016_hora_de_escritura_como_regla_del_esquema.sql` y su rollback;
+  **no aplicada todavía a la base local**, igual que 0013-0015). Los cuatro actos
+  bloqueados conservan su `clock_timestamp()` explícito. `blocker` no hace falta:
+  nadie lo ordena por `at` contra esas tablas. Pruebas: la de botones huérfanos
+  ahora exige que la acción que queda esté `esperando` y sea la del único mensaje;
+  una nueva prueba que el `default` ordena por hora de escritura entre dos
+  transacciones; la prueba del empate de evidencia fuerza el empate a mano, porque
+  con `clock_timestamp()` dos filas de una misma transacción ya no comparten hora.
+  `tests/test_task_intake.py::_retrato_de_aislamiento` suma `column_default`: sin eso,
+  una migración que sólo cambia un `default` no cambiaba "nada observable" para el
+  ensayo de rollback. Enfocada (reejecutada por el orquestador, junto con el banco):
+  `288 passed`. Suite completa (escritor): `974 passed, 108 deselected`.

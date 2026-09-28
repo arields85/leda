@@ -424,7 +424,11 @@ create table task_state_event (
   actor_kind       tipo_actor not null,
   actor_app_user_id uuid references app_user(id),
   motivo           text,
-  at               timestamptz not null default now()
+  -- T6j (`odd/tasks/prisma-orienta.md`): `clock_timestamp()`, no `now()` --
+  -- `now()` es la hora de INICIO de la transacción, y `motivo_no_cierra_tarea`,
+  -- `evidencia_pendiente` y `estado_previo_a_bloqueo`/`estado_previo_a_revision`
+  -- ordenan o comparan por `at` entre esta tabla, `evidence` y `approval`.
+  at               timestamptz not null default clock_timestamp()
 );
 
 create index task_state_event_task on task_state_event (task_id, at desc);
@@ -481,7 +485,8 @@ create table evidence (
   drive_file_id  text,
   sha256         text,
   entregado_por  uuid references membership(id),
-  at             timestamptz not null default now()
+  -- T6j: mismo motivo que `task_state_event.at`, más arriba.
+  at             timestamptz not null default clock_timestamp()
 );
 
 create table approval (
@@ -494,7 +499,8 @@ create table approval (
   comentario             text,
   pack_hash              text,
   nucleo_hash            text,
-  at                     timestamptz not null default now()
+  -- T6j: mismo motivo que `task_state_event.at`, más arriba.
+  at                     timestamptz not null default clock_timestamp()
 );
 
 create index approval_sujeto on approval (sujeto_tipo, sujeto_id);

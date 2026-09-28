@@ -1375,10 +1375,15 @@ def test_evidencia_pendiente_empate_de_at_en_la_misma_transaccion_falla_cerrado(
         corework, conn):
     """Sugerencia pendiente de review-e719d807: `evidencia_pendiente`
     compara con `>` estricto contra el último `rechazado` -- si el
-    `approval` y la `evidence` nueva quedan con el mismo `at` (los dos
-    insertados en la misma transacción, mismo `now()`), el empate tiene que
-    fallar cerrado: sigue pendiente, para que un cambio futuro de `>` a `>=`
-    no pase inadvertido."""
+    `approval` y la `evidence` nueva quedan con el mismo `at`, el empate
+    tiene que fallar cerrado: sigue pendiente, para que un cambio futuro de
+    `>` a `>=` no pase inadvertido.
+
+    T6j (`odd/tasks/prisma-orienta.md`, migración 0016) cambió el `default`
+    de estas columnas a `clock_timestamp()`, que ya NO repite el mismo valor
+    entre dos inserts de una misma transacción como hacía `now()` -- el
+    empate ya no sale solo por compartir transacción. Se fija `at` a mano,
+    igual en las dos filas, para seguir probando el empate a propósito."""
     ws = corework.workspace_id
     with admin(conn) as cur:
         tid = _tarea(cur, ws, estado="en_revision")
@@ -1387,18 +1392,19 @@ def test_evidencia_pendiente_empate_de_at_en_la_misma_transaccion_falla_cerrado(
                 where m.workspace_id = %s and u.nombre = %s""",
             (ws, "Marcos Tarquini"))
         marcos_id = cur.fetchone()["id"]
+        cur.execute("select clock_timestamp() as ahora")
+        empate = cur.fetchone()["ahora"]
         cur.execute(
             """insert into approval (workspace_id, sujeto_tipo, sujeto_id,
-                                     aprobador_membership_id, decision, comentario)
-               values (%s, 'tarea', %s, %s, 'rechazado', 'Ajustar algo')""",
-            (ws, tid, marcos_id))
+                                     aprobador_membership_id, decision, comentario, at)
+               values (%s, 'tarea', %s, %s, 'rechazado', 'Ajustar algo', %s)""",
+            (ws, tid, marcos_id, empate))
         cur.execute(
-            """insert into evidence (workspace_id, task_id, tipo, uri)
-               values (%s, %s, 'texto', 'Ya corregido.')""", (ws, tid))
+            """insert into evidence (workspace_id, task_id, tipo, uri, at)
+               values (%s, %s, 'texto', 'Ya corregido.', %s)""", (ws, tid, empate))
 
         # Confirma la premisa del empate antes de comprobar el resultado:
-        # los dos inserts, en la misma transacción, comparten el mismo
-        # `now()`.
+        # las dos filas comparten el mismo `at`, fijado a mano.
         cur.execute(
             """select (select at from approval where sujeto_id = %s
                         order by at desc limit 1)
@@ -1853,7 +1859,13 @@ def test_notificar_entrega_repetido_en_la_misma_transaccion_no_deja_pending_acti
     ya insertó su fila antes de intentarlo. Con el corte de T6h (comprobar
     `message_outbox` antes de armar nada), la segunda llamada no llega a
     crear esa segunda `pending_action`: tantas acciones esperando como
-    mensajes salieron."""
+    mensajes salieron.
+
+    T6j (revisión sobre T6h): contar no alcanza -- un WARNING de la revisión
+    de T6f/T6h notó que esta prueba nunca comprobó el ESTADO de la acción
+    que queda ni que fuera la misma que espera el único mensaje. Ahora
+    comprueba que la `pending_action` que sobrevive está `esperando` y que
+    su id es el `pending_action_id` de la única fila de `message_outbox`."""
     from prisma import pendientes as P
 
     ws = corework.workspace_id
@@ -1874,17 +1886,23 @@ def test_notificar_entrega_repetido_en_la_misma_transaccion_no_deja_pending_acti
     with admin(conn) as cur:
         tg_marcos = _tg(cur, "Marcos Tarquini")
         cur.execute(
-            """select count(*) n from pending_action
+            """select id, estado from pending_action
                 where workspace_id = %s and chat_id = %s and herramienta = %s
                   and args ->> 'tarea_id' = %s and args ->> 'aviso' = %s""",
             (ws, tg_marcos, P.SENTINEL_MENU_TAREA, str(tid), P.AVISO_ENTREGA))
-        n_avisos_pendientes = cur.fetchone()["n"]
+        avisos_pendientes = cur.fetchall()
         cur.execute(
-            """select count(*) n from message_outbox
+            """select pending_action_id from message_outbox
                 where workspace_id = %s and chat_id = %s and dedupe_key like %s""",
             (ws, tg_marcos, f"{ws}:entrega:%"))
-        n_mensajes = cur.fetchone()["n"]
-    assert n_avisos_pendientes == n_mensajes == 1
+        mensajes = cur.fetchall()
+    assert len(avisos_pendientes) == len(mensajes) == 1
+    # Revisión del orquestador tras T6h: un solo aviso y un solo mensaje no
+    # bastan por sí solos -- hacía falta comprobar que es EL MISMO aviso el
+    # que espera el botón del único mensaje que salió, no uno huérfano al
+    # lado de un mensaje que apunta a otro lado.
+    assert avisos_pendientes[0]["estado"] == "esperando"
+    assert str(avisos_pendientes[0]["id"]) == str(mensajes[0]["pending_action_id"])
 
 
 def test_evidencia_nueva_en_revision_no_retira_el_menu_general_del_aprobador(
@@ -2150,3 +2168,61 @@ def test_at_de_clock_timestamp_ordena_evidencia_despues_de_rechazado_aunque_b_ar
 
     assert at_evidencia > at_rechazado
     assert pendiente is False   # la evidencia nueva cuenta: llegó después
+
+
+# ---------------------------------------------------------------------------
+# 14. El `default` de la columna también ordena por escritura (T6j,
+#     `odd/tasks/prisma-orienta.md`, review-5085907d): la sección 13 sólo
+#     prueba los cuatro handlers que `_bloquear_tarea` bloquea y que fijan
+#     `at = clock_timestamp()` a mano. Cualquier otro escritor -- una
+#     transición del sistema, una carga administrativa -- pasaba por el
+#     `default now()` de la columna y quedaba expuesto al mismo defecto sin
+#     que ningún lock ni ningún handler lo cubriera. La migración 0016 cambia
+#     ese `default` a `clock_timestamp()`.
+# ---------------------------------------------------------------------------
+
+def test_default_de_at_ordena_por_escritura_aunque_b_arranco_antes(
+        corework, conn, uri):
+    """No pasa por `H.ejecutar` ni por ninguno de los cuatro handlers de
+    `_bloquear_tarea`: dos tareas nuevas, cada una con su único
+    `task_state_event` insertado por `_tarea()` sin fijar `at` a mano -- el
+    mismo camino que toma cualquier escritor fuera de esos cuatro. La
+    conexión B arranca su transacción -- con una consulta real, para fijar
+    su `now()` -- antes de que la conexión A arranque la suya; recién
+    después de que A inserte su fila y confirme, B -- que ya estaba
+    esperando desde antes -- inserta la suya. Con `default now()` el `at` de
+    B (la hora en que arrancó, antes que A) quedaría ANTERIOR al de A,
+    aunque escribió después; con `clock_timestamp()` (migración 0016) el
+    orden de los `at` sigue el orden real en que se escribió."""
+    ws = corework.workspace_id
+
+    # B arranca su transacción -- y con ella, su `now()` -- con una consulta
+    # real, antes de que A arranque la suya. El cursor queda abierto: B no
+    # inserta nada todavía.
+    otra = conectar(uri)
+    admin_b = admin(otra)
+    cur_b = admin_b.__enter__()
+    cur_b.execute("select 1")
+
+    # A arranca DESPUÉS de B, crea su tarea -- e inserta su único
+    # `task_state_event` sin fijar `at` -- y confirma.
+    with admin(conn) as cur_a:
+        tid_a = _tarea(cur_a, ws, titulo="Tarea A (default at)", estado="en_curso")
+    conn.commit()
+
+    # Recién ahora B -- con la transacción abierta desde antes de que A
+    # arrancara -- crea la suya, también sin fijar `at`.
+    tid_b = _tarea(cur_b, ws, titulo="Tarea B (default at)", estado="en_curso")
+    admin_b.__exit__(None, None, None)
+    otra.commit()
+    otra.close()
+
+    with admin(conn) as cur:
+        cur.execute("select at from task_state_event where task_id = %s", (tid_a,))
+        at_a = cur.fetchone()["at"]
+        cur.execute("select at from task_state_event where task_id = %s", (tid_b,))
+        at_b = cur.fetchone()["at"]
+    # El punto del test: B arrancó su transacción antes que A, pero escribió
+    # después -- el `default` de la columna tiene que reflejar ese orden
+    # real, sin que ningún handler haya fijado `at` a mano.
+    assert at_b > at_a

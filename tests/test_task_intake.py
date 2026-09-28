@@ -1582,7 +1582,14 @@ def test_workspace_correlation_constraints_and_rls_reject_cross_tenant_children(
 
 
 def _retrato_de_aislamiento(url, tablas):
-    """Cómo quedó el aislamiento de unas tablas, leído del catálogo real."""
+    """Cómo quedó el aislamiento de unas tablas, leído del catálogo real.
+
+    `column_default` entra a propósito (T6j, migración 0016): una migración
+    puede cambiar sólo el `default` de una columna que ya existe -- ni el
+    tipo, ni la nulabilidad, ni ningún privilegio -- y sin este campo
+    `test_los_rollbacks_devuelven_la_base_al_estado_anterior` la daría por
+    "no cambió nada observable", igual que si el rollback fuera vacío.
+    """
     import psycopg
     from psycopg.rows import dict_row
 
@@ -1590,7 +1597,7 @@ def _retrato_de_aislamiento(url, tablas):
     with psycopg.connect(url, autocommit=True, row_factory=dict_row) as db:
         for tabla in tablas:
             columnas = db.execute(
-                """select column_name, data_type, is_nullable
+                """select column_name, data_type, is_nullable, column_default
                      from information_schema.columns
                     where table_schema = 'prisma' and table_name = %s
                     order by column_name""", (tabla,)).fetchall()
