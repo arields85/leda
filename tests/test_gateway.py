@@ -6,10 +6,14 @@ sombrero y que un desconocido no obtenga información.
 
 from __future__ import annotations
 
+import asyncio
+import json
 from contextlib import contextmanager, nullcontext
 
 import pytest
+from fastapi import BackgroundTasks
 from fastapi.testclient import TestClient
+from starlette.requests import Request
 
 from prisma import gateway
 from prisma.db import admin
@@ -18,8 +22,10 @@ from prisma.llm import ProveedorGuionado, Respuesta
 
 
 @pytest.fixture
-def cliente(corework, conn, monkeypatch):
+def cliente(corework, conn, uri, monkeypatch):
     import dataclasses
+
+    from prisma.db import conectar as conectar_de_verdad
 
     monkeypatch.setattr(gateway, "_conn", lambda: conn)
     monkeypatch.setattr(gateway, "mantener_chat_activo",
@@ -30,6 +36,12 @@ def cliente(corework, conn, monkeypatch):
     transporte_falso = TransporteDePrueba()
     monkeypatch.setattr(gateway, "_transporte_de",
                         lambda slug, token: transporte_falso)
+    # R3-003: el despacho de fondo abre su PROPIA conexión (`conectar()`,
+    # nunca la `_conn()` compartida -- corre en otro hilo). En la prueba
+    # apunta a la misma base efímera (`uri`), pero es una conexión real y
+    # aparte -- fiel a lo que pasa en producción, y sin pisar `conn` (que
+    # la propia prueba sigue usando para sus asserts).
+    monkeypatch.setattr(gateway, "conectar", lambda: conectar_de_verdad(uri))
     monkeypatch.setattr(
         gateway, "config",
         dataclasses.replace(gateway.config, webhook_secret="s3cr3t"))
@@ -45,6 +57,30 @@ def _update(user_id: int, texto: str = "hola", chat: int | None = None):
     return {"message": {"message_id": 1, "text": texto,
                         "chat": {"id": chat or user_id},
                         "from": {"id": user_id}}}
+
+
+def _request_con_cuerpo(payload: dict) -> Request:
+    """Un `Request` de Starlette con el cuerpo ya listo, para llamar a
+    `gateway.webhook` directamente (sin pasar por `TestClient`) -- R3-003:
+    `TestClient` espera a que las tareas de fondo terminen antes de que
+    `.post()` devuelva (verificado empíricamente), así que no sirve para
+    probar que el webhook responde SIN esperarlas. Llamar a la función de
+    la ruta a mano, con un `BackgroundTasks` real, deja ver exactamente qué
+    quedó agendado antes de que la corrutina termine."""
+    cuerpo = json.dumps(payload).encode("utf-8")
+    entregado = {"listo": False}
+
+    async def receive():
+        if entregado["listo"]:
+            return {"type": "http.disconnect"}
+        entregado["listo"] = True
+        return {"type": "http.request", "body": cuerpo, "more_body": False}
+
+    scope = {
+        "type": "http", "method": "POST", "path": "/telegram/corework",
+        "headers": [(b"content-type", b"application/json")],
+    }
+    return Request(scope, receive)
 
 
 def test_rechaza_sin_secreto(cliente):
@@ -106,6 +142,47 @@ def test_respuesta_no_espera_al_proximo_tick(cliente, conn):
     # Nadie corrió ningún tick de fondo todavía: si esto pasa, es porque el
     # despacho ocurrió adentro del propio pedido del webhook.
     assert len(cliente.transporte.enviados) == 1
+
+
+def test_webhook_no_despacha_en_linea_lo_deja_de_tarea_de_fondo(
+        cliente, conn, monkeypatch):
+    """R3-003 (revisión del padre sobre commit e2a094e): `webhook()` es
+    `async def` y antes llamaba a `_despachar_ahora` -- síncrono, puede
+    hacer un POST real a Telegram -- ANTES de devolver el ACK, bloqueando
+    el bucle de eventos si el envío es lento (y arriesgando que Telegram
+    reintregue el update por falta de un ACK a tiempo). Ahora el despacho
+    corre como tarea de FastAPI de fondo, después de la respuesta.
+
+    `TestClient` no sirve para probar esto (espera a que las tareas de
+    fondo terminen antes de que `.post()` devuelva, verificado
+    empíricamente) -- se llama a la función de la ruta directamente, con
+    un `BackgroundTasks` real, y se comprueba que nada corrió todavía."""
+    corridos = []
+    monkeypatch.setattr(gateway, "_despachar_ahora_en_fondo",
+                        lambda slug: corridos.append(slug))
+
+    with admin(conn) as cur:
+        cur.execute("select telegram_user_id t from app_user "
+                    "where nombre = 'Marcos Tarquini'")
+        tg = cur.fetchone()["t"]
+
+    async def _pedir():
+        tareas = BackgroundTasks()
+        request = _request_con_cuerpo(_update(tg, "¿qué tengo?"))
+        resultado = await gateway.webhook(
+            "corework", request, tareas,
+            x_telegram_bot_api_secret_token="s3cr3t")
+        return tareas, resultado
+
+    tareas, resultado = asyncio.run(_pedir())
+
+    assert resultado == {"ok": True}
+    # Todavía no corrió -- sólo quedó agendada para después de la respuesta.
+    assert corridos == []
+    assert len(tareas.tasks) == 1
+
+    asyncio.run(tareas())   # lo que Starlette haría después de mandar el ACK
+    assert corridos == ["corework"]
 
 
 def test_webhook_mantiene_typing_solo_durante_el_turno(

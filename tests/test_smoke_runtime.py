@@ -213,21 +213,40 @@ def test_typing_thread_start_failure_degrades_and_closes_owned_client(monkeypatc
 
 class _ClienteIndicador:
     """Doble de `httpx.Client` para typing + borrador + su retiro. Devuelve
-    ids de mensaje incrementales para `sendMessage`, como Telegram."""
+    ids de mensaje incrementales para `sendMessage`, como Telegram.
+
+    Cada endpoint tiene su propio `threading.Event` (`esperar`) -- se marca
+    SIEMPRE, incluso si esa llamada después falla, para esperar de forma
+    determinista a que se intentó en vez de un `sleep` fijo adivinado
+    (R3-004/R3-005, revisión del padre sobre el commit e2a094e)."""
+
+    _ENDPOINTS = ("/sendMessageDraft", "/sendMessage", "/deleteMessage",
+                 "/sendChatAction")
 
     def __init__(self, falla_en: frozenset[str] = frozenset()) -> None:
         self.llamadas: list[tuple[str, dict]] = []
         self.falla_en = falla_en
         self._siguiente_id = 900
+        self._lock = threading.Lock()
+        self._eventos = {endpoint: threading.Event() for endpoint in self._ENDPOINTS}
 
     def post(self, url, json=None):
-        self.llamadas.append((url, json))
+        with self._lock:
+            self.llamadas.append((url, json))
+        for endpoint, evento in self._eventos.items():
+            if url.endswith(endpoint):
+                evento.set()
         if any(url.endswith(sufijo) for sufijo in self.falla_en):
             raise ConnectionError("fallo simulado")
         return _RespuestaIndicador(url, self)
 
     def urls(self, sufijo: str) -> list[dict]:
         return [cuerpo for url, cuerpo in self.llamadas if url.endswith(sufijo)]
+
+    def esperar(self, endpoint: str, timeout: float = 1.0) -> bool:
+        """Bloquea hasta que se INTENTÓ (llegó o falló) una llamada a
+        `endpoint`, acotado a `timeout` -- nunca un `sleep` a ciegas."""
+        return self._eventos[endpoint].wait(timeout)
 
 
 class _RespuestaIndicador:
@@ -257,14 +276,14 @@ def test_indicador_no_aparece_si_la_respuesta_esta_lista_antes_del_umbral():
     assert http.llamadas == []
 
 
-def test_indicador_aparece_recien_despues_del_umbral(monkeypatch):
+def test_indicador_aparece_recien_despues_del_umbral():
     from prisma.despachador import SEMILLA_INDICADOR, mantener_chat_activo
 
     http = _ClienteIndicador()
     with mantener_chat_activo(
             "token-prueba", 123, cliente=http, chat_type="private",
             umbral=0.02, intervalo=0.01):
-        time.sleep(0.08)
+        assert http.esperar("/sendMessageDraft")
 
     borradores = http.urls("/sendMessageDraft")
     assert len(borradores) == 1
@@ -279,7 +298,9 @@ def test_borrador_se_retira_con_mensaje_transitorio_silencioso_y_borrado():
     with mantener_chat_activo(
             "token-prueba", 123, cliente=http, chat_type="private",
             umbral=0.01, intervalo=0.01):
-        time.sleep(0.05)
+        assert http.esperar("/sendMessageDraft")
+    # El retiro corre en el `finally` del `with`, ANTES de que este bloque
+    # termine de salir -- para cuando llegamos acá ya se resolvió (o falló).
 
     envios = http.urls("/sendMessage")
     assert len(envios) == 1
@@ -297,7 +318,7 @@ def test_grupo_nunca_intenta_el_borrador_sólo_escribiendo():
     with mantener_chat_activo(
             "token-prueba", 123, cliente=http, chat_type="group",
             umbral=0.01, intervalo=0.01):
-        time.sleep(0.05)
+        assert http.esperar("/sendChatAction")
 
     assert http.urls("/sendMessageDraft") == []
     assert http.urls("/sendMessage") == []
@@ -305,7 +326,12 @@ def test_grupo_nunca_intenta_el_borrador_sólo_escribiendo():
     assert http.urls("/sendChatAction")
 
 
-def test_fallo_al_mandar_o_retirar_el_borrador_no_rompe_el_turno():
+def test_fallo_al_mandar_y_retirar_el_borrador_se_intenta_una_vez_cada_uno_y_no_rompe_el_turno(
+        capsys):
+    """R3-004/R3-005: además de no romper el turno, las dos fallas (mandar
+    Y retirar) tienen que haberse INTENTADO de verdad -- no sólo "no
+    reventó" -- y cada una imprime exactamente una vez (mismo criterio que
+    `_reportar_falla_indicador`: a lo sumo una vez por tipo y por turno)."""
     from prisma.despachador import mantener_chat_activo
 
     http = _ClienteIndicador(falla_en=frozenset(
@@ -314,10 +340,20 @@ def test_fallo_al_mandar_o_retirar_el_borrador_no_rompe_el_turno():
     with mantener_chat_activo(
             "token-prueba", 123, cliente=http, chat_type="private",
             umbral=0.01, intervalo=0.01):
-        time.sleep(0.03)
+        assert http.esperar("/sendMessageDraft")
         procesado.append(True)
 
     assert procesado == [True]   # nunca se rompió ni se propagó la falla
+    # Las dos se intentaron de verdad, una vez cada una -- mandar el
+    # borrador (falló) y retirarlo (también falló, en su propio `sendMessage`
+    # transitorio; nunca llega a `deleteMessage`).
+    assert len(http.urls("/sendMessageDraft")) == 1
+    assert len(http.urls("/sendMessage")) == 1
+
+    salida = capsys.readouterr().out
+    lineas = salida.splitlines()
+    assert len([l for l in lineas if "(borrador)" in l]) == 1
+    assert len([l for l in lineas if "(retiro)" in l]) == 1
 
 
 def test_draft_id_es_distinto_en_cada_activacion():
@@ -329,8 +365,10 @@ def test_draft_id_es_distinto_en_cada_activacion():
         with mantener_chat_activo(
                 "token-prueba", 123, cliente=http, chat_type="private",
                 umbral=0.01, intervalo=0.01):
-            time.sleep(0.03)
-        ids.append(http.urls("/sendMessageDraft")[0]["draft_id"])
+            assert http.esperar("/sendMessageDraft")
+        borradores = http.urls("/sendMessageDraft")
+        assert len(borradores) == 1   # nunca indexar sin probar que llegó
+        ids.append(borradores[0]["draft_id"])
 
     assert ids[0] != ids[1]
 
@@ -345,7 +383,7 @@ def test_retiro_ya_ocurrio_cuando_el_llamador_manda_la_respuesta_real():
     with mantener_chat_activo(
             "token-prueba", 123, cliente=http, chat_type="private",
             umbral=0.01, intervalo=0.01):
-        time.sleep(0.03)
+        assert http.esperar("/sendMessageDraft")
     posicion_retiro = next(
         i for i, (url, _) in enumerate(http.llamadas) if url.endswith("/deleteMessage"))
     http.post("https://api.telegram.org/bottoken-prueba/sendMessage",
@@ -410,3 +448,118 @@ def test_fallo_al_retirar_se_imprime_por_turno_y_registra_un_solo_incidente(
         # Deduplicado por proceso (mismo criterio que `saludo.reportar_falla`):
         # dos turnos con la misma falla, un solo incidente.
         assert cur.fetchone()["n"] == 1
+
+
+# ---------------------------------------------------------------------------
+# R3-001 (revisión del padre sobre commit e2a094e): el retiro no puede
+# llegar antes que el propio borrador.
+# ---------------------------------------------------------------------------
+
+class _RespuestaRetiroLento:
+    def __init__(self, url: str, cliente: "_ClienteBorradorLento") -> None:
+        self._url = url
+        self._cliente = cliente
+
+    def raise_for_status(self):
+        return None
+
+    def json(self):
+        if self._url.endswith("/sendMessage"):
+            self._cliente._siguiente_id += 1
+            return {"ok": True, "result": {"message_id": self._cliente._siguiente_id}}
+        return {"ok": True, "result": True}
+
+
+class _ClienteBorradorLento:
+    """`sendMessageDraft` queda bloqueado hasta que el propio caso de
+    prueba lo suelta -- simula que la llamada sigue en vuelo justo cuando
+    el turno termina, el escenario exacto de R3-001. Cada llamada registra
+    si el borrador YA se había resuelto en ese momento -- la prueba de la
+    invariante no mira el orden en que se registraron los pedidos (el de
+    retiro nunca se bloquea, así que igual quedaría antes en la lista),
+    sino si, cuando el de retiro se hizo, el del borrador ya había vuelto."""
+
+    def __init__(self) -> None:
+        self.llamadas: list[tuple[str, dict, bool]] = []
+        self.borrador_en_curso = threading.Event()
+        self.borrador_resuelto = threading.Event()
+        self.soltar_borrador = threading.Event()
+        self._siguiente_id = 900
+
+    def post(self, url, json=None):
+        ya_resuelto = self.borrador_resuelto.is_set()
+        self.llamadas.append((url, json, ya_resuelto))
+        if url.endswith("/sendMessageDraft"):
+            self.borrador_en_curso.set()
+            self.soltar_borrador.wait(5)
+            self.borrador_resuelto.set()
+        return _RespuestaRetiroLento(url, self)
+
+
+def test_el_retiro_nunca_llega_antes_de_que_el_borrador_termine():
+    """El hilo marca `activado` ANTES de llamar a `sendMessageDraft`
+    (`despachador.py`, `ciclo`): un `join` que agotó `espera_cierre` no
+    garantiza que esa llamada ya haya vuelto. Si el turno termina justo
+    cuando el borrador recién empezaba a mandarse, y esa llamada es lenta,
+    retirar de inmediato puede llegar a Telegram ANTES que el propio
+    borrador -- el borrador queda visible."""
+    from prisma.despachador import mantener_chat_activo
+
+    http = _ClienteBorradorLento()
+    with mantener_chat_activo(
+            "token-prueba", 123, cliente=http, chat_type="private",
+            umbral=0.01, intervalo=0.05, espera_cierre=0.05):
+        assert http.borrador_en_curso.wait(0.5)
+        # Se suelta un poco después, desde otro hilo, para que la llamada
+        # del borrador siga en vuelo cuando este bloque `with` empiece a
+        # salir (el `finally` de `mantener_chat_activo` ya corre).
+        threading.Timer(0.15, http.soltar_borrador.set).start()
+
+    _, _, borrador_ya_resuelto_al_retirar = next(
+        (u, j, r) for u, j, r in http.llamadas
+        if u.endswith("/sendMessage") and not u.endswith("Draft"))
+    assert borrador_ya_resuelto_al_retirar, (
+        "el retiro llegó a Telegram antes de que el borrador terminara "
+        "de intentarse (R3-001)")
+
+
+# ---------------------------------------------------------------------------
+# R3-002 (revisión del padre sobre commit e2a094e): una falla al REGISTRAR
+# el incidente del retiro no puede abortar la transacción del turno.
+# ---------------------------------------------------------------------------
+
+def test_fallo_al_registrar_el_incidente_de_retiro_no_aborta_el_turno(
+        conn, corework, monkeypatch, capsys):
+    from prisma import despachador
+    from prisma.db import admin, espacio
+    from prisma.despachador import mantener_chat_activo
+
+    ws = corework.workspace_id
+    http = _ClienteIndicador(falla_en=frozenset({"/sendMessage"}))
+
+    def _registrar_que_rompe(cur, *a, **k):
+        # Un error SQL real (no sólo una excepción de Python): deja la
+        # transacción en curso abortada en PostgreSQL si nadie la aísla en
+        # su propio SAVEPOINT.
+        cur.execute("select 1/0")
+
+    monkeypatch.setattr(despachador, "registrar_incidente", _registrar_que_rompe)
+
+    with espacio(conn, ws) as cur:
+        with mantener_chat_activo(
+                "token-prueba", 123, cliente=http, chat_type="private",
+                umbral=0.01, intervalo=0.01, cur=cur, workspace_id=ws):
+            time.sleep(0.03)
+        # Si `_reportar_falla_retiro` hubiera dejado la transacción
+        # abortada (R3-002), esta consulta -- en la MISMA transacción --
+        # ya fallaría con "current transaction is aborted".
+        cur.execute("select 1 as uno")
+        assert cur.fetchone()["uno"] == 1
+    conn.commit()   # tampoco debe fallar
+
+    salida = capsys.readouterr().out
+    assert "no se pudo registrar el incidente" in salida
+    with admin(conn) as cur:
+        cur.execute(
+            "select count(*) n from incident where etapa = 'indicador_actividad'")
+        assert cur.fetchone()["n"] == 0   # el registro rompió: no quedó fila

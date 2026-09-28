@@ -238,3 +238,96 @@ proyecto sin necesidad: no cuesta nada hacerlas visibles sin inundar.
   Una prueba visual real contra Telegram (batería mínima del pack 05, § 10)
   queda pendiente de una sesión progresiva por Telegram real, fuera del
   alcance de esta unidad (sólo pruebas deterministas, sin llamadas de red).
+
+## Enmienda (2026-09-28): revisión de confiabilidad sobre el commit `e2a094e`
+
+Task #9b, sobre los hallazgos R3-001 a R3-005 de la revisión del padre. Tres
+correcciones de comportamiento, dos de prueba.
+
+### R3-001 -- el retiro nunca puede llegar antes que el propio borrador
+
+El hilo de `mantener_chat_activo` marca `activado` **antes** de llamar a
+`sendMessageDraft` (para que un turno rapidísimo nunca cuente como
+"activado" a medias). Pero el `finally` del bloque `with` sólo esperaba
+`espera_cierre` (0.25 s por defecto) a que el hilo entero terminara, y
+después miraba `activado` sin más: si el turno terminaba justo cuando el
+hilo recién había arrancado esa llamada, y era lenta, retirar de inmediato
+podía llegar a Telegram **antes** que el propio borrador -- exactamente el
+riesgo que la decisión 3 original quería evitar.
+
+Corrección: un evento nuevo, `borrador_intentado`, que el hilo marca
+apenas ese intento (éxito o falla) termina. Antes de retirar, el `finally`
+espera ese evento, acotado a `timeout_borrador` (nuevo parámetro, por
+defecto el mismo timeout que ya tiene el cliente HTTP propio, 5 s) --
+nunca más de lo que esa llamada puede tardar en resolverse sola. Si
+resuelve a tiempo, retira; si no (un cliente colgado más allá de su propio
+timeout, un caso ya patológico), abandona el retiro en vez de arriesgar el
+orden, y lo reporta como una falla de "retiro" más (print + incidente,
+sección "Política de fallas").
+
+**Trade-off, reportado en vez de decidido en silencio:** en el peor caso
+(Telegram lento justo en ese instante), esta espera puede sumarle hasta
+`timeout_borrador` a lo que tarda `mantener_chat_activo` en salir -- y
+como el despacho de la respuesta real corre DESPUÉS de este bloque
+(`gateway._despachar_ahora_en_fondo` ya corre en su propia tarea de fondo,
+pero recién se agenda cuando `_turno` retorna), esa espera retrasa el
+momento en que la respuesta queda agendada para despacharse. Es acotado
+(nunca más que una llamada HTTP), y sólo se paga en el camino ya lento
+(Telegram tardando en responder DE TODAS FORMAS) -- pero es un retraso
+real, no cero, y se documenta acá en vez de asumir que "esperar un poco
+más" no tiene costo.
+
+### R3-002 -- una falla al registrar el incidente del retiro no puede abortar el turno
+
+`_reportar_falla_retiro` llamaba a `registrar_incidente` directo sobre el
+cursor del turno, sin aislar. Un error SQL real ahí (no sólo una excepción
+de Python) deja la transacción de PostgreSQL abortada; cualquier
+`insert`/`update` posterior en la MISMA transacción -- incluida la
+respuesta que el turno ya encoló -- se pierde al llegar al `commit`, por un
+incidente que ni siquiera es sobre ella.
+
+Corrección: el mismo patrón que ya usa `_reportar_falla_saludo_aislada` --
+el `insert` corre adentro de `with cur.connection.transaction():` (un
+SAVEPOINT). Si falla, se revierte sólo ese SAVEPOINT; el resto de la
+transacción sigue sirviendo.
+
+### R3-003 -- el despacho inmediato no puede bloquear el bucle de eventos de `servir`
+
+`webhook()` es `async def`, pero llamaba a `_despachar_ahora` -- síncrono,
+puede hacer un `POST` real a Telegram -- en línea, antes del `return`. Un
+envío lento bloqueaba el bucle de eventos entero (nada más se atendía
+mientras tanto) y corría el riesgo de que Telegram reintente la entrega
+del update por no recibir el ACK a tiempo.
+
+Corrección: `webhook()` agenda `_despachar_ahora_en_fondo` como
+`BackgroundTasks` de FastAPI en vez de llamarla en línea -- corre después
+de mandar la respuesta, en su propio hilo (`anyio.to_thread.run_sync`).
+Esa función abre su PROPIA conexión (`conectar()`, nunca la `_conn()`
+cacheada que usa el resto del pedido: una conexión de psycopg no es segura
+de usar desde dos hilos a la vez) y la cierra siempre al terminar --
+**trade-off deliberado**: una conexión nueva por despacho de fondo, en vez
+de una agrupada/reusada, a cambio de eliminar por completo el riesgo de
+que dos hilos compartan una. Sigue siendo best-effort y no en silencio
+(`texto_error_seguro`, sin incidente propio -- redundante con el que ya
+deja el tick de fondo si el envío de verdad se agota).
+
+`TestClient` no sirve para probar esto (verificado empíricamente: espera a
+que las tareas de fondo terminen antes de que `.post()` devuelva) --
+`tests/test_gateway.py` llama a la función de la ruta directamente, con un
+`BackgroundTasks` real, para comprobar que nada corrió todavía cuando la
+respuesta ya está lista.
+
+Por esto, `tests/conftest.py` deshabilita `gateway.conectar` por defecto
+además de `gateway._transporte_de` -- mismo criterio, mismo riesgo (una
+conexión real contra lo que sea que `config.db_url` resuelva en el
+entorno de pruebas).
+
+### R3-004/R3-005 -- pruebas deterministas del indicador
+
+`tests/test_smoke_runtime.py`: los `sleep` fijos alrededor del borrador se
+reemplazan por esperas sobre eventos (`_ClienteIndicador.esperar`, uno por
+endpoint, marcado apenas se intenta esa llamada -- éxito o falla). Indexar
+`http.urls(...)​[0]` ahora siempre va después de un `assert len(...) == 1`.
+La prueba de "falla al mandar y retirar" pasa a comprobar, además de que
+el turno no se rompe, que las dos llamadas se intentaron de verdad (una
+vez cada una) y que cada una imprimió exactamente una línea.

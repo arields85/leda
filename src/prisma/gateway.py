@@ -15,7 +15,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import APIRouter, FastAPI, Header, HTTPException, Request
+from fastapi import (APIRouter, BackgroundTasks, FastAPI, Header,
+                     HTTPException, Request)
 from fastapi.responses import HTMLResponse
 
 from .autoridad import (Canal, Denegado, identificar, identificar_en_espacio)
@@ -24,7 +25,8 @@ from .config import config
 from .db import (admin, autoridad, conectar, conectar_autoridad, espacio,
                  registrar_auditoria)
 from .despachador import (TransporteTelegram, acusar_toque, despachar,
-                          mantener_chat_activo, pedido_telegram)
+                          mantener_chat_activo, pedido_telegram,
+                          texto_error_seguro)
 from .incidentes import (REFERENCIA_INBOUND_MESSAGE, REFERENCIA_PENDING_ACTION,
                          registrar_incidente)
 from .salida import TRUNCAR_ETIQUETA_BOTON as TRUNCAR_TITULO_BOTON
@@ -121,7 +123,13 @@ def _despachar_ahora(conn, slug: str) -> None:
     es su propio `conn.transaction()`, que revierte sólo lo suyo al
     propagar la excepción); lo único que queda por resolver acá es dejar la
     conexión sin una transacción a medias, y la forma segura de hacerlo sin
-    tirar nada por la borda es confirmar, no revertir."""
+    tirar nada por la borda es confirmar, no revertir.
+
+    No fatal no es en silencio (regla del proyecto, revisión del padre
+    sobre el commit e2a094e): una falla se imprime, con el tipo y el estado
+    HTTP si lo hay (`texto_error_seguro`), nunca texto crudo, URL ni token.
+    Sin incidente propio -- sería redundante con el que ya deja el tick de
+    fondo si el envío de verdad se agota."""
     try:
         with conn.cursor() as cur:
             cur.execute("set role prisma_admin")
@@ -134,8 +142,9 @@ def _despachar_ahora(conn, slug: str) -> None:
             with espacio(conn, workspace_id) as cur:
                 cal = Calendario.desde_base(cur, workspace_id)
                 despachar(cur, workspace_id, transporte, cal, ahora)
-    except Exception:  # noqa: BLE001 -- best-effort, ver docstring
-        pass
+    except Exception as e:  # noqa: BLE001 -- best-effort, ver docstring
+        print(f"  ! el despacho inmediato no llegó a completarse "
+             f"({texto_error_seguro(e)}).")
     finally:
         try:
             conn.commit()
@@ -143,15 +152,48 @@ def _despachar_ahora(conn, slug: str) -> None:
             pass
 
 
+def _despachar_ahora_en_fondo(slug: str) -> None:
+    """Corre `_despachar_ahora` como tarea de FastAPI de fondo, DESPUÉS de
+    que la respuesta ya salió (R3-003, revisión 2026-09-28 sobre el commit
+    e2a094e): antes, `webhook()` llamaba a `_despachar_ahora` en línea,
+    ANTES del `return` -- un envío lento a Telegram bloqueaba el bucle de
+    eventos entero (nada más se atendía mientras tanto) y corría el riesgo
+    de que Telegram reintente la entrega del update por no recibir el ACK a
+    tiempo. `BackgroundTasks` corre las tareas sync en su propio hilo
+    (`anyio.to_thread.run_sync`) recién después de mandar la respuesta.
+
+    Conexión propia (`conectar()`), nunca la `_conn()` cacheada que usa el
+    resto del pedido: una tarea de fondo corre en otro hilo, y una conexión
+    de psycopg no es segura de usar desde dos hilos a la vez. Se cierra
+    siempre, sea o no que el despacho haya salido bien -- es de un solo
+    uso."""
+    try:
+        conn = conectar()
+    except Exception as e:  # noqa: BLE001 -- best-effort, nunca en silencio
+        print(f"  ! el despacho inmediato de fondo no pudo conectar a la "
+             f"base ({texto_error_seguro(e)}).")
+        return
+    try:
+        _despachar_ahora(conn, slug)
+    finally:
+        try:
+            conn.close()
+        except Exception:  # noqa: BLE001
+            pass
+
+
 @router.post("/telegram/{slug}")
-async def webhook(slug: str, request: Request,
+async def webhook(slug: str, request: Request, background_tasks: BackgroundTasks,
                   x_telegram_bot_api_secret_token: str = Header(default="")):
     if config.webhook_secret and x_telegram_bot_api_secret_token != config.webhook_secret:
         raise HTTPException(status_code=403, detail="origen no verificado")
 
     update = await request.json()
     resultado = procesar_update(_conn(), slug, update)
-    _despachar_ahora(_conn(), slug)
+    # R3-003: se agenda, no se llama en línea -- corre DESPUÉS del ACK, en
+    # un hilo aparte, para que un envío lento nunca bloquee el bucle de
+    # eventos (ver `_despachar_ahora_en_fondo`).
+    background_tasks.add_task(_despachar_ahora_en_fondo, slug)
     return resultado
 
 

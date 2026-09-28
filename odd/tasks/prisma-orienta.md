@@ -3923,3 +3923,16 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   en Telegram real, en la ronda.
   Base `prisma`: respaldo `db/respaldos/prisma-antes-0018-0019-20260928.dump` y
   migraciones `0018` y `0019` aplicadas; `saludo.verificar_migraciones` -> `None`.
+  Revisión de `d1e3e1e..e2a094e`: medio (`slice_budget_reached`, 1025 líneas);
+  consentimiento del usuario: revisar. review-2758883d40d83428 (confiabilidad)
+  aprobada y reconocida; frontera en `e2a094e`. Hallazgos no bloqueantes -> #9b.
+
+- 2026-09-28: **#9b cerrada — seguimientos de review-2758883d.** Ruta: el mismo
+  escritor. El retiro del borrador espera a que termine el envío del borrador (acotado a
+  5 s) o lo abandona reportándolo: ya no puede llegar antes y dejarlo visible. Costo
+  aceptado y registrado en ADR 0011: si Telegram tarda en recibir el borrador, el turno
+  puede demorar hasta 5 s más en ese caso. El incidente de un retiro fallido va en su
+  propio savepoint. En `servir`, el despacho inmediato corre como tarea de fondo con su
+  propia conexión, después del ACK del webhook. Pruebas del indicador con eventos en vez
+  de esperas fijas. ROJO/VERDE observados. Suite completa del escritor: `1202 passed,
+  108 deselected`.

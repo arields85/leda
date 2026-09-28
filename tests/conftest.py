@@ -140,16 +140,32 @@ def _sin_despacho_inmediato_por_defecto(monkeypatch):
     hacia adelante -- corrompiendo el escenario que la prueba armó, sin que
     la prueba haya pedido nada de esto.
 
+    También deshabilita `gateway.conectar` (R3-003, revisión 2026-09-28
+    sobre el commit e2a094e): desde que el despacho corre como tarea de
+    FastAPI de fondo, con su propia conexión, esa conexión se abre con
+    `conectar()` sin argumentos -- que usa `config.db_url`, no la base
+    efímera de estas pruebas. Sin este resguardo, cualquier prueba con
+    `TestClient(gateway.app)` (`BackgroundTasks` corre en línea con
+    `TestClient`, verificado empíricamente) intentaría una conexión real a
+    lo que sea que `config.db_url` resuelva en este entorno -- en el mejor
+    caso, una excepción rápida; en el peor, una conexión lenta contra un
+    host inalcanzable.
+
     Las pruebas que sí quieren verificar el despacho inmediato
     (`test_gateway.py`, `test_local.py`) reemplazan `gateway._transporte_de`
-    de nuevo, con su propio `TransporteDePrueba` -- corre después de esta
-    fixture (autouse), así que gana."""
+    y/o `gateway.conectar` de nuevo, con su propio doble o con una conexión
+    real a la base efímera (`uri`) -- corren después de esta fixture
+    (autouse), así que ganan."""
     from prisma import gateway
 
     def _sin_transporte(slug, token):
         raise LookupError("despacho inmediato deshabilitado en esta prueba")
 
+    def _sin_conexion_de_fondo():
+        raise LookupError("conexión de fondo deshabilitada en esta prueba")
+
     monkeypatch.setattr(gateway, "_transporte_de", _sin_transporte)
+    monkeypatch.setattr(gateway, "conectar", _sin_conexion_de_fondo)
 
 
 @pytest.fixture

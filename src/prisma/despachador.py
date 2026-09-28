@@ -237,24 +237,42 @@ def _reportar_falla_retiro(cur, workspace_id: str | None, error: Exception) -> N
     `mantener_chat_activo` tiene una transacción a mano (pruebas, u otro
     llamador futuro sin base). Nunca texto crudo de la excepción en el
     resumen (Constitución §10); `referencia_cruda` lleva lo mismo que ya
-    imprime `_reportar_falla_indicador`, seguro de guardar."""
+    imprime `_reportar_falla_indicador`, seguro de guardar.
+
+    El `insert` corre en su propio SAVEPOINT (`cur.connection.transaction()`)
+    -- mismo patrón que `_reportar_falla_saludo_aislada` (R3-002, revisión
+    2026-09-28): `cur` es la MISMA transacción que ya procesa el turno
+    (`gateway.procesar_update` le pasa su propio cursor), así que si el
+    `insert` fallara sin este aislamiento, PostgreSQL deja la transacción
+    entera abortada -- la respuesta que el turno ya encoló se perdería al
+    llegar al `commit`, por un incidente que ni siquiera es sobre ella."""
     if cur is None:
         return
     clave = (workspace_id, "retiro_borrador")
     if clave in _FALLAS_RETIRO_REPORTADAS:
         return
     try:
-        registrar_incidente(
-            cur, workspace_id,
-            "El borrador nativo del indicador de actividad no se pudo "
-            "retirar; puede haber quedado visible para la persona.",
-            referencia_cruda=texto_error_seguro(error),
-            etapa="indicador_actividad", severidad="media")
+        with cur.connection.transaction():
+            registrar_incidente(
+                cur, workspace_id,
+                "El borrador nativo del indicador de actividad no se pudo "
+                "retirar; puede haber quedado visible para la persona.",
+                referencia_cruda=texto_error_seguro(error),
+                etapa="indicador_actividad", severidad="media")
     except Exception as exc:  # noqa: BLE001 -- ni esto puede tirar el turno
         print(f"  ! no se pudo registrar el incidente del indicador de "
              f"actividad ({type(exc).__name__}).")
         return
     _FALLAS_RETIRO_REPORTADAS.add(clave)
+
+
+# Timeout del cliente HTTP propio de `mantener_chat_activo` (typing, borrador
+# y el cliente dedicado del retiro) -- una sola constante para que las tres
+# llamadas nunca queden desincronizadas entre sí, y para que
+# `timeout_borrador` (más abajo) tenga el mismo valor por defecto que el
+# cliente al que le pone cota: nunca tiene sentido esperar más de lo que esa
+# llamada puede tardar en resolverse sola.
+_TIMEOUT_CLIENTE_INDICADOR = 5.0
 
 
 @contextmanager
@@ -263,6 +281,7 @@ def mantener_chat_activo(token: str, chat_id: int, *, cliente=None,
                          umbral: float = 1.5, intervalo: float = 4.0,
                          nombre_hilo: str = "prisma-typing",
                          espera_cierre: float = 0.25,
+                         timeout_borrador: float = _TIMEOUT_CLIENTE_INDICADOR,
                          cur=None, workspace_id: str | None = None):
     """Indicador de actividad mientras se procesa un turno: "escribiendo…"
     y, en chat privado, un borrador nativo -- ninguno de los dos aparece si
@@ -291,17 +310,30 @@ def mantener_chat_activo(token: str, chat_id: int, *, cliente=None,
     más -- el borrador puede quedar visible para la persona --, así que
     además se registra un incidente si hay `cur` (mismo cursor/transacción
     que ya procesa el turno), deduplicado por proceso
-    (`_reportar_falla_retiro`)."""
+    (`_reportar_falla_retiro`).
+
+    El retiro nunca puede llegar antes que el propio borrador (R3-001,
+    revisión 2026-09-28 sobre el commit e2a094e): el hilo marca `activado`
+    ANTES de llamar a `sendMessageDraft`, así que un `hilo.join` que agotó
+    `espera_cierre` no prueba que esa llamada ya volvió -- si el turno
+    termina justo cuando recién empezaba, y la llamada es lenta, retirar de
+    inmediato podía llegar a Telegram primero y dejar el borrador visible.
+    Antes de intentar retirar, se espera (acotado a `timeout_borrador`, el
+    mismo timeout que ya tiene el cliente HTTP: nunca más de lo que esa
+    llamada puede tardar en resolverse sola) a que el intento de mandar el
+    borrador -- éxito o falla -- termine de verdad. Si ni con ese margen
+    resolvió, se abandona el retiro en vez de arriesgar el orden."""
     import httpx
 
     try:
-        http = cliente or httpx.Client(timeout=5)
+        http = cliente or httpx.Client(timeout=_TIMEOUT_CLIENTE_INDICADOR)
     except Exception:  # noqa: BLE001 - cosmetic
         yield
         return
     owned_client = cliente is None
     detener = threading.Event()
     activado = threading.Event()
+    borrador_intentado = threading.Event()
     intenta_borrador = (chat_type or "").lower() == "private"
     draft_id = random.randint(1, 2**31 - 1)
     impresos: set[str] = set()
@@ -316,6 +348,11 @@ def mantener_chat_activo(token: str, chat_id: int, *, cliente=None,
                     _enviar_borrador_semilla(http, token, chat_id, draft_id)
                 except Exception as e:  # noqa: BLE001 - no fatal, se reporta
                     _reportar_falla_indicador(impresos, "borrador", e)
+                finally:
+                    # Se marca pase lo que pase (éxito o falla): es lo que
+                    # el retiro espera para saber que ya no está en vuelo
+                    # (R3-001, ver docstring).
+                    borrador_intentado.set()
             while not detener.is_set():
                 try:
                     _enviar_chat_action(http, token, chat_id)
@@ -351,15 +388,25 @@ def mantener_chat_activo(token: str, chat_id: int, *, cliente=None,
         # cuando el llamador no inyectó uno, así que nunca compite por el
         # mismo cliente que el hilo de typing todavía puede estar cerrando.
         if activado.is_set() and intenta_borrador:
-            try:
-                if owned_client:
-                    with httpx.Client(timeout=5) as http_retiro:
-                        _retirar_borrador(http_retiro, token, chat_id)
-                else:
-                    _retirar_borrador(http, token, chat_id)
-            except Exception as e:  # noqa: BLE001 - no fatal, pero pesa más
-                _reportar_falla_indicador(impresos, "retiro", e)
-                _reportar_falla_retiro(cur, workspace_id, e)
+            if not borrador_intentado.wait(timeout_borrador):
+                # Ni con ese margen se resolvió (cliente colgado más allá
+                # de su propio timeout) -- abandonar el retiro en vez de
+                # arriesgar que llegue antes que un borrador que todavía no
+                # se sabe si se mandó (R3-001).
+                falla = TimeoutError(
+                    "el borrador no terminó de intentarse a tiempo para retirarlo")
+                _reportar_falla_indicador(impresos, "retiro", falla)
+                _reportar_falla_retiro(cur, workspace_id, falla)
+            else:
+                try:
+                    if owned_client:
+                        with httpx.Client(timeout=_TIMEOUT_CLIENTE_INDICADOR) as http_retiro:
+                            _retirar_borrador(http_retiro, token, chat_id)
+                    else:
+                        _retirar_borrador(http, token, chat_id)
+                except Exception as e:  # noqa: BLE001 - no fatal, pero pesa más
+                    _reportar_falla_indicador(impresos, "retiro", e)
+                    _reportar_falla_retiro(cur, workspace_id, e)
 
 
 def acusar_toque(token: str, callback_id: str, cliente=None) -> None:
