@@ -1457,3 +1457,61 @@ def test_crear_aviso_concurrente_no_duplica_el_mismo_pendiente(
 
     with espacio(conn, ws) as cur:
         assert len(AC.avisos(cur)) == 1
+
+
+# ---------------------------------------------------------------------------
+# Configuración corrupta: nunca enciende, nunca inventa dominios, un solo
+# incidente (seguimiento de la revisión de G1d-c2)
+# ---------------------------------------------------------------------------
+
+
+def _guardar_setting(conn, workspace_id, clave, valor_json):
+    with admin(conn) as cur:
+        cur.execute(
+            """insert into workspace_setting (workspace_id, clave, valor)
+               values (%s, %s, %s::jsonb)
+               on conflict (workspace_id, clave) do update set valor = excluded.valor""",
+            (workspace_id, clave, valor_json))
+    conn.commit()
+
+
+def _incidentes_config(conn, workspace_id):
+    with admin(conn) as cur:
+        cur.execute(
+            "select count(*) n from incident where workspace_id = %s "
+            "and etapa = 'alta_correo_config_invalida'", (workspace_id,))
+        return cur.fetchone()["n"]
+
+
+@pytest.mark.parametrize("valor", ["1", '"true"', "[true]", '{"on": true}', '"si"'])
+def test_una_clave_corrupta_nunca_enciende_la_verificacion(intake_world, conn, valor):
+    ws = intake_world["north-lab"]["id"]
+    _guardar_setting(conn, ws, AC.CLAVE_HABILITADO, valor)
+
+    with espacio(conn, ws) as cur:
+        assert AC.habilitado(cur, ws) is False
+    conn.commit()
+    assert _incidentes_config(conn, ws) == 1
+
+
+@pytest.mark.parametrize("valor", ['{"empresa.com": 1}', '"empresa.com"', "[1, 2]", "7"])
+def test_dominios_corruptos_nunca_se_leen_como_una_lista(intake_world, conn, valor):
+    ws = intake_world["north-lab"]["id"]
+    _guardar_setting(conn, ws, "correo_verificacion.dominios", valor)
+
+    with espacio(conn, ws) as cur:
+        assert AC.dominios_permitidos(cur, ws) is None
+    conn.commit()
+    assert _incidentes_config(conn, ws) == 1
+
+
+def test_una_configuracion_corrupta_deja_un_solo_incidente_aunque_se_lea_muchas_veces(
+        intake_world, conn):
+    ws = intake_world["north-lab"]["id"]
+    _guardar_setting(conn, ws, AC.CLAVE_HABILITADO, "1")
+
+    for _ in range(3):
+        with espacio(conn, ws) as cur:
+            AC.habilitado(cur, ws)
+        conn.commit()
+    assert _incidentes_config(conn, ws) == 1

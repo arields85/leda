@@ -18,7 +18,6 @@ igual que hoy.
 from __future__ import annotations
 
 import hashlib
-import json
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
@@ -85,20 +84,33 @@ def habilitado(cur: psycopg.Cursor, workspace_id: str) -> bool:
     fila = cur.fetchone()
     if not fila:
         return False
-    try:
-        valor = fila["valor"]
-        if isinstance(valor, str):
-            valor = json.loads(valor)
-        return bool(valor)
-    except (TypeError, ValueError, json.JSONDecodeError):
-        from .incidentes import registrar_incidente
+    valor = fila["valor"]
+    # Sólo el booleano JSON cuenta: `1`, `"true"`, una lista o un objeto
+    # son valores corruptos y nunca encienden la verificación.
+    if isinstance(valor, bool):
+        return valor
+    _config_invalida(cur, workspace_id, CLAVE_HABILITADO, "apagado")
+    return False
 
-        registrar_incidente(
-            cur, workspace_id,
-            f"El valor guardado de {CLAVE_HABILITADO!r} no es válido -- "
-            "se lo trató como apagado.",
-            severidad="media", etapa="alta_correo_config_invalida")
-        return False
+
+def _config_invalida(cur: psycopg.Cursor, workspace_id: str, clave: str,
+                     trato: str) -> None:
+    """Deja constancia de una configuración corrupta UNA vez mientras siga
+    sin resolver: un aviso administrativo por espacio y clave hace de
+    candado de deduplicación (`prisma_app` no puede leer `incident`), y
+    recién cuando ese aviso es nuevo se registra el incidente. Así un valor
+    roto no genera un incidente por cada mensaje que lo lee."""
+    tipo = f"correo_config_invalida:{clave}"
+    if aviso_pendiente(cur, tipo, "workspace", workspace_id):
+        return
+    texto = (f"El valor guardado de {clave!r} no es válido -- se lo trató "
+             f"como {trato}.")
+    crear_aviso(cur, tipo, texto, workspace_id=workspace_id,
+                referencia_tipo="workspace", referencia_id=workspace_id)
+    from .incidentes import registrar_incidente
+
+    registrar_incidente(cur, workspace_id, texto, severidad="media",
+                        etapa="alta_correo_config_invalida")
 
 
 # ---------------------------------------------------------------------------
@@ -359,22 +371,15 @@ def dominios_permitidos(cur: psycopg.Cursor, workspace_id: str) -> list[str] | N
     fila = cur.fetchone()
     if not fila:
         return None
-    try:
-        valor = fila["valor"]
-        if isinstance(valor, str):
-            valor = json.loads(valor)
-        if not valor:
-            return None
-        return [str(d).strip().lower() for d in valor]
-    except (TypeError, ValueError, json.JSONDecodeError):
-        from .incidentes import registrar_incidente
-
-        registrar_incidente(
-            cur, workspace_id,
-            "El valor guardado de 'correo_verificacion.dominios' no es "
-            "válido -- se lo trató como sin restricción.",
-            severidad="media", etapa="alta_correo_config_invalida")
-        return None
+    valor = fila["valor"]
+    # Sólo una lista JSON de textos es una lista de dominios: un objeto, un
+    # texto suelto o una lista con otra cosa son valores corruptos.
+    if isinstance(valor, list) and all(isinstance(d, str) for d in valor):
+        dominios = [d.strip().lower() for d in valor if d.strip()]
+        return dominios or None
+    _config_invalida(cur, workspace_id, "correo_verificacion.dominios",
+                     "sin restricción")
+    return None
 
 
 def elegibles_existente(cur: psycopg.Cursor, workspace_id: str) -> list[dict]:

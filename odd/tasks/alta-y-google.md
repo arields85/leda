@@ -706,6 +706,13 @@ Un worktree nuevo no trae lo que no se versiona.
     resolución aprobada por el usuario: unir la línea sin tocar `main` y
     aplicar la misma protección a `despachar_respuestas_admin`, que guardaba
     el error con el token del bot (RED observado → GREEN).
+    Revisión RDD `review-7cf4977599152a66` (riesgo medio, consentida):
+    aprobada; reconocimiento emitido. La sesión corrigió sus advertencias
+    con RED observado (7 casos): la clave sólo se enciende con el booleano
+    JSON `true` (un `1`, un texto o una lista son corruptos → apagada); los
+    dominios sólo se leen de una lista de textos; una configuración corrupta
+    deja un solo incidente mientras siga pendiente (un aviso por espacio y
+    clave hace de candado, porque `prisma_app` no puede leer `incident`).
   - [ ] **G1d — Avisos "🛠️ Administración" por el bot de administración.**
     Camino de salida propio (hoy el bot de administración no envía nada y
     `message_outbox` exige `workspace_id`); botones Reenviar correo /
