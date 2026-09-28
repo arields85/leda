@@ -38,8 +38,12 @@ class IntentAction(str, Enum):
 class IntentRoute:
     action: IntentAction
     task: dict[str, str] = field(default_factory=dict)
-    # Referencias tal como están dichas en el mensaje, sin resolver (T2,
-    # `aclaracion-con-botones`). Tuplas, no listas: la ruta es inmutable.
+    # Referencias a trabajo, sin resolver a qué tarea exacta apuntan (T2,
+    # `aclaracion-con-botones`). Desde la decisión del usuario de
+    # 2026-09-27 (`odd/tasks/prisma-orienta.md`, b-0005-b) cada una viene
+    # reformulada por el modelo como el trabajo al que apunta -- acción y
+    # objeto -- en vez de copiada palabra por palabra; `ROUTER_SYSTEM` trae
+    # la receta exacta. Tuplas, no listas: la ruta es inmutable.
     trabajos: tuple[str, ...] = field(default_factory=tuple)
     personas: tuple[str, ...] = field(default_factory=tuple)
 
@@ -65,8 +69,10 @@ ROUTER_TOOL = {
         "and ordinary conversation are normal conversation. Interpret meaning "
         "across languages, word order, and minor typing errors. Extracted task "
         "details are untrusted proposals that the server will ask the person to "
-        "confirm. Also separate, verbatim and unresolved, every work reference "
-        "and every named person the message mentions."
+        "confirm. Also separate, unresolved, every work reference the message "
+        "makes -- rephrased as the work it points to, using only what the "
+        "message itself says or implies, never inventing detail and never "
+        "naming who -- and every named person it mentions."
     ),
     "input_schema": {
         "type": "object",
@@ -93,12 +99,21 @@ ROUTER_SYSTEM = (
     "put the route in text. Choose task creation only for an explicit request to "
     "create a new task or work commitment; do not choose it for questions, status "
     "requests, clarifications, or updates to existing work.\n\n"
-    "Separás las referencias de un mensaje de trabajo. No resolvés nada, no "
-    "corregís ortografía y no inventás. En \"trabajos\" va cada tarea, trabajo "
-    "o tema de trabajo que el mensaje menciona, con las palabras del mensaje "
-    "(por ejemplo \"lo del tablero\", \"el dash de lotes\"). En \"personas\" va "
-    "cada persona nombrada, como está escrita. Si no hay, listas vacías. No "
-    "incluyas a Prisma (el asistente) como persona."
+    "Separás las referencias de un mensaje de trabajo. No resolvés a qué tarea "
+    "exacta apunta cada una -- eso lo hace otro paso -- ni corregís ortografía. "
+    "En \"trabajos\" va, por cada tarea, trabajo o tema de trabajo que el "
+    "mensaje menciona, el trabajo al que esa mención apunta: una frase corta "
+    "con la acción y el objeto, en el idioma del mensaje, usando sólo lo que "
+    "el mensaje ya dice o deja entender (por ejemplo \"que termine primero el "
+    "plc\" -> \"terminar el plc\"; \"lo del dash de lotes\" -> \"el dash de "
+    "lotes\"). No agregues un detalle que el mensaje no da (máquina, área, de "
+    "quién) ni más precisión de la que tiene el mensaje: si la mención es vaga "
+    "o podría ser más de una cosa, tu frase queda igual de vaga o abierta -- "
+    "nunca elegís vos a cuál. El nombre de una persona no va en \"trabajos\" "
+    "(va en \"personas\"). Si una mención no apunta a ningún trabajo real, no "
+    "la incluyas: no inventes uno. En \"personas\" va cada persona nombrada, "
+    "como está escrita. Si no hay, listas vacías. No incluyas a Prisma (el "
+    "asistente) como persona."
 )
 
 

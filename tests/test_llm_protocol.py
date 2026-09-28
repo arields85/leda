@@ -84,11 +84,29 @@ def test_router_system_keeps_the_measured_reference_wording():
     instrucción hizo que el enrutador perdiera tareas reales ("el switch" en
     "El switch ya se cambio ahora queda el tablero de la 4"; 55 de 60 iguales
     frente a 57 de 60 con la instrucción medida en T2). Las referencias que
-    sobran las descarta el código (`gateway`, T7 punto A(2)), no el modelo."""
-    assert ("(por ejemplo \"lo del tablero\", \"el dash de lotes\"). En "
-            "\"personas\" va") in llm.ROUTER_SYSTEM
+    sobran las descarta el código (`gateway`, T7 punto A(2)), no el modelo --
+    esa parte de la receta no cambió.
+
+    Lo que sí cambió (decisión del usuario, 2026-09-27,
+    `odd/tasks/prisma-orienta.md`, b-0005-b): la FORMA de cada referencia ya
+    no es una copia literal del mensaje -- es el trabajo al que esa mención
+    apunta (acción + objeto), para que Jev reciba una referencia más
+    resoluble sin bajar `jev.CORTE_CLARA` ni darle más contexto. Guardas que
+    la reformulación no puede romper: no inventar un detalle que el mensaje
+    no da, no meter nombres de persona en "trabajos", mantener la misma
+    vaguedad del mensaje cuando la mención es vaga (para que una referencia
+    genuinamente ambigua siga ambigua), y no inventar un trabajo donde la
+    mención no apunta a ninguno."""
     assert "Separás las referencias de un mensaje de trabajo." in llm.ROUTER_SYSTEM
     assert "No incluyas a Prisma (el asistente) como persona." in llm.ROUTER_SYSTEM
+    assert ("el trabajo al que esa mención apunta: una frase corta "
+            "con la acción y el objeto") in llm.ROUTER_SYSTEM
+    assert ("por ejemplo \"que termine primero el plc\" -> \"terminar el "
+            "plc\"") in llm.ROUTER_SYSTEM
+    assert "El nombre de una persona no va en \"trabajos\"" in llm.ROUTER_SYSTEM
+    assert ("si la mención es vaga o podría ser más de una cosa, tu frase "
+            "queda igual de vaga o abierta") in llm.ROUTER_SYSTEM
+    assert "no inventes uno" in llm.ROUTER_SYSTEM
 
 
 def test_guided_provider_exposes_typed_routes_separately_from_main_turns():

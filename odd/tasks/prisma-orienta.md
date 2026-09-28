@@ -3583,3 +3583,25 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   tests/test_memoria.py tests/test_lista_botones.py tests/test_menu_tarea.py
   tests/test_pregunta_sin_opciones.py` -> `101 passed`. Suite completa (escritor):
   `1027 passed, 108 deselected`.
+
+- 2026-09-28: **`b-0005-b` cerrado — el router reformula cada referencia como el
+  trabajo al que apunta** (decisión del usuario del 2026-09-27: ni bajar
+  `jev.CORTE_CLARA` ni darle más contexto a Jev). Ruta: delegada, un escritor.
+  `llm.ROUTER_TOOL`/`ROUTER_SYSTEM`: en `trabajos` va el trabajo (acción + objeto, en
+  el idioma del mensaje) en lugar de la copia literal, con guardas explícitas: no
+  inventar detalles, nombres de personas sólo en `personas`, una mención vaga sigue
+  igual de vaga (no elegir candidata), y ningún trabajo inventado cuando la mención
+  no apunta a trabajo real. Banco real completo n=1 (`nan`/`deepseek-v4-flash`, 36
+  escenarios), mismo código salvo el cambio: antes
+  `banco-20260928T111730Z.json` -> 29 aprobado, 7 falla (b-0001, b-0001-a, b-0001-b,
+  b-0002-c, b-0005-b, b-0013, b-0016); después `banco-20260928T113448Z.json` -> 32
+  aprobado, 4 falla (b-0001, b-0001-a, b-0002-c, b-0013, las cuatro ya fallaban antes).
+  Ningún escenario empeoró; mejoraron b-0001-b, b-0005-b y b-0016. Los de guarda
+  (b-0008, b-0009, b-0010, b-0014) siguieron aprobados: Prisma sigue preguntando en vez
+  de adivinar. Límite honesto: una sola corrida por escenario (n=1), así que las
+  mejoras de b-0001-b y b-0016 pueden ser ruido; no se corrió n=3. **Abierto**: b-0001,
+  b-0001-a, b-0002-c y b-0013 fallan en las dos corridas, sin relación con las
+  referencias; revisar por qué (b-0013 sigue fallando después de arreglar su
+  comprobador). Determinista: `tests/test_llm_protocol.py
+  tests/test_resolucion_referencias.py` -> `139 passed` (reejecutado por el
+  orquestador); suite completa (escritor): `1027 passed, 108 deselected`.
