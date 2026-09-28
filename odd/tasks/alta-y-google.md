@@ -894,6 +894,12 @@ ficticios, una interacción por vez; el primer defecto detiene el lote.
   organizados por Prisma. La autorización por integrante puede sumarse
   después para quien la necesite.
 
+- **Decisión abierta 4 resuelta (2026-09-28): la autorización se hace con
+  un comando en la computadora del administrador** (`python -m prisma google
+  autorizar <espacio>`, flujo de OAuth con redirección a la propia máquina):
+  sin dirección pública nueva expuesta a internet. Cuando exista el panel de
+  plataforma, la autorización puede pasar ahí.
+
 ### Textos del alta con correo aprobados por el usuario (2026-09-28)
 
 Regla general aprobada: ningún mensaje termina en "escribime y lo vemos" ni
