@@ -1339,6 +1339,42 @@ def test_ciclo_tick_cierra_la_conexion_antes_de_descartarla_si_falla_al_listar_e
     assert c._conn is None          # y se descartó de verdad
 
 
+def test_ciclo_tick_descarta_la_conexion_aunque_falle_el_reporte(monkeypatch):
+    """Si el reporte del incidente también falla, la conexión rota igual se
+    cierra y se descarta: la pasada siguiente no la reusa."""
+
+    class _ConexionFalsa:
+        closed = False
+        cierres = 0
+
+        def rollback(self) -> None:
+            pass
+
+        def close(self) -> None:
+            self.cierres += 1
+            self.closed = True
+
+    def _admin_roto(conn):
+        raise RuntimeError("no se pudo listar espacios activos")
+
+    def _reporte_roto(*args, **kwargs):
+        raise RuntimeError("tampoco se pudo reportar")
+
+    monkeypatch.setattr(ciclo, "admin", _admin_roto)
+    monkeypatch.setattr(ciclo, "reportar_fallo", _reporte_roto)
+
+    fake = _ConexionFalsa()
+    c = ciclo.Ciclo(lambda: fake, arranque=datetime(2026, 1, 1, tzinfo=timezone.utc))
+
+    try:
+        c.tick(ahora=datetime(2026, 1, 2, tzinfo=timezone.utc))
+    except RuntimeError:
+        pass
+
+    assert fake.cierres == 1
+    assert c._conn is None
+
+
 # ---------------------------------------------------------------------------
 # R3-004 (revisión 2026-09-28): reconexión de `Ciclo._conectar`
 # ---------------------------------------------------------------------------

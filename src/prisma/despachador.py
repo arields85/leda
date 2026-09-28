@@ -464,8 +464,9 @@ def _intentar_envio(cur: psycopg.Cursor, workspace_id: str, transporte: Transpor
     igual que antes. `telegram_message_id` sólo se conoce después de
     enviar: se guarda en un punto de retorno propio, anidado, cuyo fallo NO
     puede deshacer la marca 'enviado' de la fila -- el mensaje ya se
-    entregó, y perder ese id no amerita reenviarlo. Ese fallo se reporta
-    (nunca en silencio) sin el texto crudo de la excepción."""
+    entregó, y perder ese id no amerita reenviarlo. Ese fallo se imprime por
+    consola (sin el texto crudo de la excepción) y la fila queda con
+    `telegram_message_id` nulo; no se registra un incidente."""
     try:
         with cur.connection.transaction():
             _marcar_enviado(cur, ahora, m["id"])

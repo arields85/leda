@@ -3838,3 +3838,12 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   nuevas con los archivos de `HEAD`, VERDE con el cambio. Suite completa del escritor:
   `1136 passed, 108 deselected`. Las bases locales `prisma` y `postgres` no tenían filas
   con el token (consulta de conteo del orquestador).
+  Revisión de `c4e877e..5a6c82a` (#29c y el token): alto (`high_risk`, 967 líneas);
+  consentimiento del usuario: revisar. review-709174f82057e0c2 (4 lentes) aprobada y
+  reconocida; frontera en `5a6c82a`. Seguimientos aplicados inline por el orquestador:
+  R3-001/R4-001, la conexión rota se cierra y descarta en un `finally` aunque falle el
+  reporte (ROJO `0 == 1`, VERDE); R2-001, el docstring de `_intentar_envio` dice que la
+  falla al guardar el id sólo se imprime. Sin cambios: R3-002 (nadie en `src/` atrapa
+  excepciones de `httpx` por tipo) y R2-002 (alias `_error_sin_url`, cosmético).
+  `tests/test_ciclo.py tests/test_avisos_admin.py` -> `100 passed`; la suite completa
+  queda para después de #7, que corre en paralelo.

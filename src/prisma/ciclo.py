@@ -401,30 +401,26 @@ class Ciclo:
             conn.commit()
             self._fallas.recuperada((None, "listar_espacios"))
         except Exception as e:  # noqa: BLE001
-            # La conexión puede haber quedado inservible -- nunca se
-            # reintenta con la misma rota cada pasada: se descarta para que
-            # la próxima reconecte sola. Se cierra ANTES de descartarla
-            # (R3-002, revisión 2026-09-28): antes se ponía `self._conn` en
-            # `None` sin cerrarla, y una falla persistente filtraba una
-            # conexión por pasada. El reporte del incidente todavía la
-            # necesita viva, así que el cierre va DESPUÉS de intentarlo.
+            # La conexión puede haber quedado inservible: se reporta con ella
+            # y después, pase lo que pase con el reporte, se cierra y se
+            # descarta para que la pasada siguiente reconecte.
             _revertir_best_effort(conn)
-            if conn is None:
-                # Sin conexión, ni siquiera se puede INTENTAR escribir el
-                # incidente -- se deduplica en memoria y sólo se imprime:
-                # reintentar el `insert` en cada pasada contra una base
-                # inalcanzable sería el mismo aluvión que se evita acá.
-                if self._fallas.debe_reportar((None, "listar_espacios")):
-                    print(f"  ! el ciclo de fondo no pudo conectar a la base "
-                         f"({type(e).__name__}).")
-            elif reportar_fallo(
-                    conn, self._fallas, None, "listar_espacios",
-                    f"Falló el ciclo de fondo al listar espacios activos "
-                    f"({type(e).__name__}).", e):
-                print(f"  ! el ciclo de fondo no pudo listar espacios activos: "
-                     f"{type(e).__name__}")
-            _cerrar_best_effort(conn)
-            self._conn = None
+            try:
+                if conn is None:
+                    # Sin conexión no se puede escribir el incidente: se
+                    # deduplica en memoria y sólo se imprime.
+                    if self._fallas.debe_reportar((None, "listar_espacios")):
+                        print(f"  ! el ciclo de fondo no pudo conectar a la base "
+                             f"({type(e).__name__}).")
+                elif reportar_fallo(
+                        conn, self._fallas, None, "listar_espacios",
+                        f"Falló el ciclo de fondo al listar espacios activos "
+                        f"({type(e).__name__}).", e):
+                    print(f"  ! el ciclo de fondo no pudo listar espacios activos: "
+                         f"{type(e).__name__}")
+            finally:
+                _cerrar_best_effort(conn)
+                self._conn = None
             resultados["_error"] = {"tipo": type(e).__name__}
             return resultados
 
