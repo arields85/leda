@@ -13,13 +13,12 @@ from zoneinfo import ZoneInfo
 import psycopg
 from psycopg.types.json import Jsonb
 
-from . import saludo as S
 from .autoridad import Solicitante
 from .db import registrar_auditoria
 from .incidentes import registrar_incidente
 from .salida import (BUTTON_TEXT_LIMIT, ICONO_CANCELAR, ICONO_OTRA_OPCION,
-                     ICONO_TAREA, ICONO_VER_MAS, PayloadValidationError,
-                     con_icono, enqueue_outbox, normalize_visible_text,
+                     ICONO_VER_MAS, PayloadValidationError, con_icono,
+                     enqueue_outbox, etiquetas_de_tarea, normalize_visible_text,
                      prepare_buttons, prepare_payload, telegram_utf16_units,
                      with_no_effect_status)
 
@@ -776,9 +775,14 @@ def _open_entity_page(cur, request, who, field, query, offset, now):
     # Cada candidata es un botón que representa algo que va a quedar dentro
     # de la tarea en curso (objetivo, responsable, área) -- mismo ícono que
     # cualquier otro botón de tarea (íconos, decisión del usuario,
-    # 2026-09-28).
-    options = [(con_icono(label, ICONO_TAREA), "select", stored)
-              for label, _, stored in candidates]
+    # 2026-09-28), armado con `salida.etiquetas_de_tarea` -- la receta única
+    # (R2-002/R3-003, revisión 2026-09-28+1): antes esta etiqueta se
+    # iconizaba sin descontarle el costo del ícono al presupuesto, así que
+    # una candidata (un objetivo, una persona) con un nombre cerca del límite
+    # podía superarlo y romper la validación del botón.
+    etiquetas = etiquetas_de_tarea([label for label, _, _ in candidates])
+    options = [(etiqueta, "select", stored)
+              for etiqueta, (_, _, stored) in zip(etiquetas, candidates)]
     if has_more:
         options.append((VER_MAS, "more", {
             "field": field, "query": query,
@@ -1170,14 +1174,6 @@ def _cancel(cur, request, who, now, enqueue=True):
 
 
 def _enqueue(cur, request, text, now, dedupe, choice_set_id=None):
-    # Punto único de salida del alta conversacional de tareas (saludo diario,
-    # pack 06, decisión del usuario, 2026-09-28): este intake puede ser el
-    # primer contacto del día -- `gateway.procesar_update` lo atiende ANTES
-    # de `_turno`, así que ninguno de los puntos que hookea `gateway.py` lo
-    # ve.
-    text = S.anteponer_si_corresponde_ws(
-        cur, workspace_id=str(request["workspace_id"]),
-        membership_id=str(request["membership_id"]), ahora=now, texto=text)
     enqueue_outbox(
         cur, workspace_id=str(request["workspace_id"]), chat_id=request["chat_id"],
         recipient_membership_id=str(request["membership_id"]), text=text,

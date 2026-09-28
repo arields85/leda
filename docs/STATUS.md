@@ -65,7 +65,7 @@ tales. Ver [`INDEX.md`](INDEX.md#documentos-superados).
 |---|---|
 | Comando | `.venv\Scripts\python.exe -m pytest -q` |
 | Fecha | 2026-09-28 |
-| Resultado exacto | 1164 passed, 108 deselected (corrida del escritor de #7, íconos y saludo diario). |
+| Resultado exacto | 1178 passed, 108 deselected (corrida del escritor de #7b). |
 
 Seguimientos de la entrega con evidencia (T6a-T6j), siembra reproducible (T7, T7b) y
 comprobadores del banco, `odd/tasks/prisma-orienta.md`: `1008 passed, 108
@@ -220,8 +220,10 @@ APScheduler 3 numera los días distinto del cron estándar.)*
 
 1. *(Cerradas también: el token fuera de los errores de Telegram, y #7, íconos en los
    botones —📋 tarea, ➕ Ver más, 💬 Quiero consultar otra cosa, ✅ Confirmar, ✖️ Cancelar,
-   ✏️ Otra opción— y saludo diario "👋 Buen día / Buenas tardes / Buenas noches", una vez
-   por persona por día local, con la migración `0018_saludo_diario`.)*
+   ✏️ Otra opción— y saludo diario "👋 Buen día / Buenas tardes / Buenas noches": el
+   primer mensaje del día a cada persona lo lleva, sea respuesta, cadencia o aviso, y no
+   se repite ese día (decisión del usuario); se decide al despachar. Migraciones
+   `0018_saludo_diario` y `0019_marca_de_bienvenida`.)*
 2. **#9** indicador de "escribiendo" y borrador nativo animado sólo si la respuesta
    tarda, sin demorarla nunca (pack 05). Incluye despachar la respuesta apenas está
    lista (hoy espera el fin del lote en `escuchar` y hasta 20 s en `servir`) y un ADR
@@ -229,7 +231,7 @@ APScheduler 3 numera los días distinto del cron estándar.)*
 3. **Tercera ronda por Telegram**: entrega con evidencia y "Pedir cambios" (guion de dos
    circuitos en `odd/tasks/prisma-orienta.md`), avisos al administrador, íconos, saludo
    e indicador. Probablemente con `escuchar --sin-cadencias` (se decide al arrancar).
-   Antes: respaldo, aplicar `0018` (y lo que agregue #9) a la base `prisma`, reiniciar
+   Antes: respaldo, aplicar `0018`, `0019` (y lo que agregue #9) a la base `prisma`, reiniciar
    el listener con el código commiteado y que el administrador (Ariel De Simone, ya
    designado) le escriba al bot de administración con `escuchar` corriendo.
 4. Después de la ronda: **#23** el validador de invariantes

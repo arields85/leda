@@ -3866,3 +3866,24 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   escritor: `1164 passed, 108 deselected`.
   Decisión del usuario: la tercera ronda se adelanta y va después de #7 y #9; el
   validador, el banco y T7d quedan para después.
+  Revisión de `5a6c82a..e83a280`: alto (`high_risk`, 1575 líneas); consentimiento del
+  usuario: revisar. review-8d6f0278927a99b8 (4 lentes) aprobada y reconocida; frontera
+  en `e83a280`. Hallazgos no bloqueantes -> #7b.
+
+- 2026-09-28: **#7b cerrada — el saludo se decide al despachar.** Decisión del usuario:
+  el primer mensaje del día a cada persona lleva el saludo, sea respuesta, cadencia,
+  recordatorio o aviso que dispara otro, y no se repite ese día aunque la persona
+  conteste. Por eso el saludo pasó de los enganches al armar la respuesta (agente,
+  gateway, ingreso) a un único punto en `despachador._intentar_envio`: se reclama con la
+  fecha local del envío real, dentro del mismo savepoint que marca y envía (un envío
+  fallido deshace el reclamo; un mensaje postergado o descartado no lo gasta). Un
+  mensaje al grupo no saluda ni gasta el saludo de nadie (criterio del orquestador, a
+  confirmar). La bienvenida del alta se marca con `message_outbox.es_bienvenida`
+  (migración `0019`) y reclama el día sin prefijo. `enqueue_outbox` reserva
+  `MARGEN_SALUDO` en los mensajes personales para no pasar el límite de Telegram. Si el
+  saludo falla (sin tabla, zona inválida), el mensaje sale sin saludo y se reporta una
+  vez. Resueltos también: el saludo ya no queda guardado en la pregunta (R3-001/R3-002);
+  `salida.etiquetas_de_tarea` es la única receta de botones de tarea con ícono (R2-002),
+  incluido el alta, que pasaba el límite (R3-003, ROJO `PayloadValidationError` con 82
+  unidades, VERDE); docstring de `con_icono`; prueba de la activación con token;
+  `SALUDO_NOCHE`. Suite completa del escritor: `1178 passed, 108 deselected`.

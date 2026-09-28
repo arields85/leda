@@ -77,9 +77,10 @@ def telegram_utf16_units(text: str) -> int:
 
 def con_icono(etiqueta: str, icono: str) -> str:
     """Antepone el ícono de una categoría a una etiqueta de botón ya armada
-    (truncada y desambiguada). El ícono se agrega siempre al final, nunca se
-    recorta -- mismo criterio que el sufijo de responsable en
-    `gateway._etiqueta_boton`."""
+    (truncada y desambiguada): el ícono va siempre al PRINCIPIO, como prefijo,
+    y nunca se recorta -- mismo criterio de "nunca se recorta" que el sufijo
+    de responsable en `gateway._etiqueta_boton` (que sí va al final; el
+    ícono y ese sufijo son los dos extremos de la misma etiqueta)."""
     return f"{icono} {etiqueta}"
 
 
@@ -326,6 +327,28 @@ def etiquetas_boton_distinguibles(
     return resultado
 
 
+def etiquetas_de_tarea(titulos: list[str], *, fijas: list[bool] | None = None,
+                       objetivo: int = OBJETIVO_ETIQUETA_BOTON,
+                       limite: int = TRUNCAR_ETIQUETA_BOTON) -> list[str]:
+    """La receta completa de un botón de tarea (íconos, decisión del usuario,
+    2026-09-28): descuenta `costo_icono(ICONO_TAREA)` de `objetivo`/`limite`
+    ANTES de truncar y desambiguar -- para que el ícono cuente hacia el mismo
+    presupuesto que el texto, nunca aparte -- y antepone `ICONO_TAREA` recién
+    DESPUÉS, sobre cada etiqueta ya corta y distinguible.
+
+    Única fuente de esta cuenta (R2-002, revisión 2026-09-28+1): antes estaba
+    copiada a mano en `agente._opciones_lista_tareas`,
+    `herramientas._ofrecer_opciones`, `gateway._mostrar_mas_tareas`,
+    `_pedir_eleccion_dependencia`, `_candidatas_para_botones` e
+    `ingreso_tareas._open_entity_page` -- la última de ésas se había quedado
+    afuera de la cuenta (R3-003), exactamente el riesgo de copiarla en vez de
+    compartirla."""
+    costo = costo_icono(ICONO_TAREA)
+    cortas = etiquetas_boton_distinguibles(
+        titulos, fijas=fijas, objetivo=objetivo - costo, limite=limite - costo)
+    return [con_icono(etiqueta, ICONO_TAREA) for etiqueta in cortas]
+
+
 def prepare_buttons(buttons: Iterable[Any]) -> list[tuple[str, str]]:
     prepared = []
     for button in buttons:
@@ -344,29 +367,38 @@ def prepare_buttons(buttons: Iterable[Any]) -> list[tuple[str, str]]:
 
 
 def prepare_payload(text: Any, *, dedupe_key: str, has_buttons: bool = False,
-                    buttons: Iterable[Any] = (),
-                    allow_split: bool = False) -> list[PreparedPayload]:
+                    buttons: Iterable[Any] = (), allow_split: bool = False,
+                    margen: int = 0) -> list[PreparedPayload]:
+    """`margen` reserva unidades UTF-16 del límite real de Telegram, sin
+    ocuparlas todavía -- lo usa `enqueue_outbox` para cualquier mensaje
+    dirigido a una persona (revisión 2026-09-28+2, R... saludo diario): el
+    texto se recorta o se parte ACÁ, al encolar, mucho antes de que
+    `despachador._intentar_envio` sepa si le va a anteponer el saludo del
+    día -- sin este margen, un mensaje ya justo en el límite se pasaría en
+    cuanto se le antepusiera "👋 Buenas noches\\n\\n". Por omisión es 0: no
+    cambia nada para quien no lo pasa (transporte, banco, cualquier llamada
+    vieja)."""
     normalized = normalize_visible_text(text)
     if not normalized:
         raise PayloadValidationError("El mensaje visible no puede quedar vacío.")
     prepared_buttons = prepare_buttons(buttons)
     has_buttons = has_buttons or bool(prepared_buttons)
-    limit = BUTTON_TEXT_LIMIT if has_buttons else TELEGRAM_TEXT_LIMIT
+    limit = (BUTTON_TEXT_LIMIT if has_buttons else TELEGRAM_TEXT_LIMIT) - margen
     if telegram_utf16_units(normalized) <= limit:
         return [PreparedPayload(normalized, dedupe_key)]
     if has_buttons:
         raise PayloadValidationError(
-            f"Un mensaje con botones no puede exceder {BUTTON_TEXT_LIMIT} unidades UTF-16.")
+            f"Un mensaje con botones no puede exceder {limit} unidades UTF-16.")
     if not allow_split:
         raise PayloadValidationError(
-            f"El mensaje no puede exceder {TELEGRAM_TEXT_LIMIT} unidades UTF-16.")
+            f"El mensaje no puede exceder {limit} unidades UTF-16.")
 
     chunks = _split(normalized)
     total = len(chunks)
     result = []
     for index, chunk in enumerate(chunks, 1):
         rendered = f"({index}/{total})\n{chunk}"
-        if telegram_utf16_units(rendered) > TELEGRAM_TEXT_LIMIT:
+        if telegram_utf16_units(rendered) > TELEGRAM_TEXT_LIMIT - margen:
             raise PayloadValidationError("No se pudo dividir el mensaje de forma segura.")
         result.append(PreparedPayload(
             rendered, f"{dedupe_key}:part:{index:03d}-of-{total:03d}"))
@@ -413,11 +445,22 @@ def enqueue_outbox(cur, *, workspace_id: str, chat_id: int,
                    is_response: bool = False,
                    pending_action_id: str | None = None,
                    intake_choice_set_id: str | None = None,
-                   allow_split: bool = False) -> int:
+                   allow_split: bool = False,
+                   es_bienvenida: bool = False) -> int:
     has_buttons = pending_action_id is not None or intake_choice_set_id is not None
+    # Cualquier mensaje dirigido a una persona (nunca uno de grupo, que no
+    # trae `recipient_membership_id`) reserva el margen del saludo diario
+    # ANTES de partir/recortar -- `despachador._intentar_envio` decide recién
+    # al enviar si de verdad le antepone el saludo (revisión 2026-09-28+2).
+    # Importado adentro, no al nivel del módulo: `saludo.py` ya importa de
+    # acá (`telegram_utf16_units`); importarlo arriba armaría un ciclo.
+    margen = 0
+    if recipient_membership_id is not None:
+        from .saludo import MARGEN_SALUDO
+        margen = MARGEN_SALUDO
     payloads = prepare_payload(
         text, dedupe_key=dedupe_key, has_buttons=has_buttons,
-        allow_split=allow_split,
+        allow_split=allow_split, margen=margen,
     )
     # Defecto pre-existente encontrado en la revisión del orquestador sobre
     # T3a (`tests/test_lista_botones.py:511-512`): un mensaje partido manda
@@ -439,15 +482,15 @@ def enqueue_outbox(cur, *, workspace_id: str, chat_id: int,
             """insert into message_outbox
                  (workspace_id, chat_id, destinatario_membership_id, tipo, cuerpo,
                   estado, programado_para, vence_en, dedupe_key, es_respuesta,
-                  pending_action_id, intake_choice_set_id)
+                  pending_action_id, intake_choice_set_id, es_bienvenida)
                values (%s, %s, %s, %s, %s, %s,
                        coalesce(%s, now()) + %s * interval '1 microsecond',
-                       %s, %s, %s, %s, %s)
+                       %s, %s, %s, %s, %s, %s)
                on conflict (dedupe_key) do nothing""",
             (workspace_id, chat_id, recipient_membership_id, message_type,
              payload.text, state, scheduled_for, index,
              expires_at, payload.dedupe_key,
-             is_response, pending_action_id, intake_choice_set_id),
+             is_response, pending_action_id, intake_choice_set_id, es_bienvenida),
         )
         inserted += cur.rowcount
     return inserted

@@ -26,8 +26,9 @@ from prisma.db import admin, autoridad, conectar, espacio
 from prisma.despachador import TransporteDePrueba, despachar
 from prisma.llm import (IntentAction, IntentRoute, ProveedorAnthropic,
                         Respuesta, RoutingError)
-from prisma.salida import (ICONO_TAREA, con_icono, etiqueta_sin_icono,
-                           etiquetas_coinciden)
+from prisma.salida import (BUTTON_LABEL_LIMIT, ICONO_TAREA, con_icono,
+                           etiqueta_sin_icono, etiquetas_coinciden,
+                           telegram_utf16_units)
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -586,6 +587,46 @@ def test_ambiguous_known_entities_are_server_candidates_with_other(
         assert any("Sam North" in x for x in people)
         assert any("Sam Noble" in x for x in people)
         assert con_icono("Para mí", ICONO_TAREA) in people and I.OTHER in people
+
+
+def test_intake_candidate_label_near_the_limit_still_fits_with_its_icon(
+        intake_world, conn):
+    """R3-003 (revisión 2026-09-28+2): `_open_entity_page` iconizaba la
+    etiqueta de una candidata (objetivo, responsable, área) sin descontarle
+    el costo del ícono al presupuesto -- a diferencia de los otros cinco
+    lugares que arman botones de tarea. Un objetivo con un título largo,
+    cerca del límite real de Telegram, tiene que seguir entrando en un botón
+    válido en vez de romper `prepare_buttons`."""
+    ws = intake_world["north-lab"]["id"]
+    # 79 caracteres: pasa el chequeo de configuración de
+    # `ingreso_tareas.CONFIG_LABEL_LIMIT` (80, sobre el título CRUDO, sin
+    # ícono) pero el ícono + espacio (3 unidades) lo empuja a 82 -- por
+    # encima de `BUTTON_LABEL_LIMIT` (80) si no se le descuenta el costo del
+    # ícono al presupuesto ANTES de truncar (el bug real de R3-003: no
+    # alcanza con un título disparatadamente largo, que ya lo frena esa otra
+    # validación -- tiene que ser uno que la pasa de vuelta por el margen
+    # exacto que le come el ícono).
+    base = "Reduce el atraso de entregas en la planta industrial de la empresa "
+    titulo_largo = (base * 2)[:79]
+    assert telegram_utf16_units(titulo_largo) == 79
+    assert telegram_utf16_units(f"{ICONO_TAREA} {titulo_largo}") > BUTTON_LABEL_LIMIT
+    with admin(conn) as cur:
+        cur.execute(
+            """insert into objective (workspace_id, tipo, titulo, estado)
+               values (%s, 'operativo', %s, 'activo')""",
+            (ws, titulo_largo))
+    with espacio(conn, ws) as cur:
+        actor, outcome = _start(cur, intake_world, objective=None)
+        _choose(cur, actor, outcome.request_id, "Sí")
+        choices = _active_choices(cur, outcome.request_id)
+
+    # `intake_world["north-lab"]` ya trae tres objetivos de fixture -- busca
+    # específicamente la candidata del título largo, no cualquiera.
+    candidata = next(
+        c for c in choices
+        if c != I.OTHER and titulo_largo.startswith(etiqueta_sin_icono(c).rstrip("…")))
+    assert candidata.startswith(f"{ICONO_TAREA} ")
+    assert telegram_utf16_units(candidata) <= BUTTON_LABEL_LIMIT
 
 
 def test_objective_exact_free_text_match_is_not_limited_to_first_page(
@@ -1687,7 +1728,8 @@ def test_los_rollbacks_devuelven_la_base_al_estado_anterior():
     from psycopg.sql import SQL, Identifier
 
     tablas = ("task_state_event", "objective_state_event",
-              "absence", "audit_log", "incident", "greeting_state")
+              "absence", "audit_log", "incident", "greeting_state",
+              "message_outbox")
     nombre = f"prisma_rollback_{uuid.uuid4().hex[:10]}"
     with psycopg.connect(maintenance, autocommit=True) as control:
         control.execute(SQL("create database {}").format(Identifier(nombre)))
@@ -1754,7 +1796,7 @@ def test_instalacion_limpia_y_base_migrada_convergen_en_el_aislamiento():
     # porque las bases de prueba se construyen desde el esquema limpio.
     tablas = ("task_state_event", "objective_state_event",
               "absence", "audit_log", "incident", "acceso_tablero",
-              "greeting_state")
+              "greeting_state", "message_outbox")
     con_politica = set(tablas) - {"acceso_tablero"}
     sufijo = uuid.uuid4().hex[:10]
     nombres = {"limpia": f"prisma_limpia_{sufijo}",

@@ -573,6 +573,11 @@ create table message_outbox (
   -- no escribir fuera de horario es para lo que Prisma inicia; dejar a una
   -- persona esperando hasta mañana porque son las 17:05 es peor.
   es_respuesta            boolean not null default false,
+  -- Saludo diario (pack 06 §3, T28; revisión 2026-09-28+2): esta fila ES la
+  -- bienvenida de incorporación -- el despachador reclama la reserva del día
+  -- por ella sin anteponerle nada, nunca una categoría de `tipo` (que la
+  -- presentación de grupo también usa como 'informativo' sin ser un saludo).
+  es_bienvenida           boolean not null default false,
   requiere_confirmacion   boolean not null default false,
   confirmado_por          uuid references app_user(id),
   confirmado_en           timestamptz,

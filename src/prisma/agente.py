@@ -30,7 +30,6 @@ import psycopg
 
 from . import herramientas as H
 from . import pendientes as P
-from . import saludo as S
 from .autoridad import Denegado, Solicitante
 from .calendario import Calendario
 from .contexto import construir, historial, revisar_salida
@@ -39,9 +38,7 @@ from .deteccion_pregunta import hace_pregunta
 from .incidentes import registrar_incidente
 from .llm import Llamada, Proveedor, Respuesta
 from .salida import (BUTTON_TEXT_LIMIT, ETIQUETA_CANCELAR, ETIQUETA_CONFIRMAR,
-                     ICONO_TAREA, OBJETIVO_ETIQUETA_BOTON,
-                     TRUNCAR_ETIQUETA_BOTON, con_icono, costo_icono,
-                     enqueue_outbox, etiquetas_boton_distinguibles,
+                     enqueue_outbox, etiquetas_de_tarea,
                      normalize_visible_text, prepare_payload,
                      telegram_utf16_units, with_no_effect_status)
 
@@ -476,7 +473,6 @@ def _ejecutar_una(cur, quien: Solicitante, c: Llamada, ctx, acciones,
 
 def _encolar_respuesta(cur, quien: Solicitante, chat_id: int, texto: str,
                        cal: Calendario, ahora: datetime) -> None:
-    texto = S.anteponer_si_corresponde(cur, quien, ahora, texto)
     enqueue_outbox(
         cur, workspace_id=quien.workspace_id, chat_id=chat_id, text=texto,
         recipient_membership_id=quien.membership_id, scheduled_for=ahora,
@@ -505,16 +501,14 @@ def _encolar_confirmacion(cur, quien: Solicitante, chat_id: int,
                if e.huella is not None else None)
     # El resumen ya es la vista previa completa -- recurso, estado actual,
     # cambio propuesto y el aviso de que todavía no se aplicó nada (ADR 0005,
-    # decisión 1) -- el saludo del día, si corresponde, se antepone ANTES de
-    # esa vista previa, nunca la reemplaza.
-    resumen = S.anteponer_si_corresponde(cur, quien, ahora, e.resumen)
+    # decisión 1) -- así que sale tal cual, sin envoltorio.
     p = P.registrar(cur, quien, herramienta=e.herramienta, args=e.argumentos,
-                    resumen=resumen, vence_en=ahora + VIGENCIA_PENDIENTE,
+                    resumen=e.resumen, vence_en=ahora + VIGENCIA_PENDIENTE,
                     chat_id=chat_id, huella=e.huella, opciones=opciones)
     enqueue_outbox(
         cur, workspace_id=quien.workspace_id, chat_id=chat_id,
         recipient_membership_id=quien.membership_id,
-        text=resumen, scheduled_for=ahora,
+        text=e.resumen, scheduled_for=ahora,
         dedupe_key=(f"{quien.workspace_id}:confirmar:{e.herramienta}:"
                     f"{ahora.timestamp()}"), is_response=True,
         pending_action_id=p.id,
@@ -531,13 +525,12 @@ def _encolar_eleccion(cur, quien: Solicitante, chat_id: int,
     """
     from .pendientes import registrar
 
-    resumen = S.anteponer_si_corresponde(cur, quien, ahora, e.resumen)
     p = registrar(cur, quien, herramienta=e.herramienta, args=e.argumentos,
-                  resumen=resumen, vence_en=ahora + VIGENCIA_PENDIENTE,
+                  resumen=e.resumen, vence_en=ahora + VIGENCIA_PENDIENTE,
                   campo=e.campo, opciones=e.opciones, chat_id=chat_id)
     enqueue_outbox(
         cur, workspace_id=quien.workspace_id, chat_id=chat_id,
-        recipient_membership_id=quien.membership_id, text=resumen,
+        recipient_membership_id=quien.membership_id, text=e.resumen,
         scheduled_for=ahora,
         dedupe_key=(f"{quien.workspace_id}:elegir:{e.herramienta}:"
                     f"{ahora.timestamp()}"), is_response=True,
@@ -618,19 +611,14 @@ def _opciones_lista_tareas(tareas: list[dict]) -> list[tuple[str, dict]]:
     # Etiquetas cortas por límite de palabra, distinguibles entre sí dentro
     # de esta página (hallazgo de sesión 2 por Telegram: un título completo
     # recortado a mitad de palabra no entra cómodo en un botón de teléfono;
-    # `salida.etiquetas_boton_distinguibles` corre sobre TODA la página para
-    # que dos títulos parecidos nunca corten igual). El presupuesto se achica
-    # por `costo_icono(ICONO_TAREA)` ANTES de truncar/desambiguar (íconos,
-    # decisión del usuario, 2026-09-28): el ícono se antepone recién después,
-    # así el total (ícono + texto) entra en el mismo objetivo/límite que
-    # tenía el texto solo.
-    _costo = costo_icono(ICONO_TAREA)
-    etiquetas = etiquetas_boton_distinguibles(
-        [normalize_visible_text(t["titulo"]) for t in primera],
-        objetivo=OBJETIVO_ETIQUETA_BOTON - _costo,
-        limite=TRUNCAR_ETIQUETA_BOTON - _costo)
+    # `salida.etiquetas_de_tarea` corre `etiquetas_boton_distinguibles` sobre
+    # TODA la página para que dos títulos parecidos nunca corten igual, y le
+    # antepone el ícono de tarea con su mismo descuento de presupuesto --
+    # receta única (R2-002, revisión 2026-09-28+1), antes copiada a mano acá.
+    etiquetas = etiquetas_de_tarea(
+        [normalize_visible_text(t["titulo"]) for t in primera])
     opciones = [
-        (con_icono(etiqueta, ICONO_TAREA),
+        (etiqueta,
          {"tipo": "tarea", "tarea_id": str(t["id"]), "titulo": t["titulo"],
           "accion": "menu"})
         for t, etiqueta in zip(primera, etiquetas)]
@@ -677,13 +665,6 @@ def _encolar_texto_con_opciones(cur, quien: Solicitante, chat_id: int,
     `pending_action.args` (igual para las tres opciones de un mismo cierre,
     nunca algo por opción)."""
     opciones = list(opciones)
-    # El saludo del día, si corresponde, se antepone ANTES de decidir si el
-    # texto entra con los botones -- cuenta para ese presupuesto como
-    # cualquier otro carácter (saludo diario, pack 06, decisión del usuario,
-    # 2026-09-28). Nunca se antepone a `texto_corto`: ese es sólo el pie de
-    # los botones cuando el texto largo ya salió aparte, primero -- el
-    # saludo ya apareció ahí.
-    texto = S.anteponer_si_corresponde(cur, quien, ahora, texto)
     cabe_con_botones = (
         telegram_utf16_units(normalize_visible_text(texto)) <= BUTTON_TEXT_LIMIT)
     resumen_botones = texto if cabe_con_botones else texto_corto

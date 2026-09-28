@@ -1366,10 +1366,12 @@ def test_ciclo_tick_descarta_la_conexion_aunque_falle_el_reporte(monkeypatch):
     fake = _ConexionFalsa()
     c = ciclo.Ciclo(lambda: fake, arranque=datetime(2026, 1, 1, tzinfo=timezone.utc))
 
-    try:
+    # El `finally` que cierra y descarta la conexión corre antes de que la
+    # segunda falla (la del propio reporte) se propague -- `tick()` SÍ
+    # levanta acá, no la traga (R3-005, revisión 2026-09-28+2: antes esta
+    # prueba aceptaba cualquiera de los dos resultados).
+    with pytest.raises(RuntimeError, match="tampoco se pudo reportar"):
         c.tick(ahora=datetime(2026, 1, 2, tzinfo=timezone.utc))
-    except RuntimeError:
-        pass
 
     assert fake.cierres == 1
     assert c._conn is None

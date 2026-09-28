@@ -23,6 +23,7 @@ from typing import NamedTuple, Protocol
 
 import psycopg
 
+from . import saludo
 from .calendario import Calendario
 from .incidentes import (REFERENCIA_ADMIN_NOTICE, redactar_secreto_telegram,
                          registrar_incidente)
@@ -372,7 +373,8 @@ def despachar(cur: psycopg.Cursor, workspace_id: str, transporte: Transporte,
         """
          select id, workspace_id, chat_id, cuerpo, tipo,
                 destinatario_membership_id, intentos,
-                vence_en, es_respuesta, pending_action_id, intake_choice_set_id
+                vence_en, es_respuesta, pending_action_id, intake_choice_set_id,
+                es_bienvenida
           from message_outbox
          where workspace_id = %s
            and estado = 'listo'
@@ -466,11 +468,24 @@ def _intentar_envio(cur: psycopg.Cursor, workspace_id: str, transporte: Transpor
     puede deshacer la marca 'enviado' de la fila -- el mensaje ya se
     entregó, y perder ese id no amerita reenviarlo. Ese fallo se imprime por
     consola (sin el texto crudo de la excepción) y la fila queda con
-    `telegram_message_id` nulo; no se registra un incidente."""
+    `telegram_message_id` nulo; no se registra un incidente.
+
+    El saludo diario (revisión 2026-09-28+2) se decide y reclama ACÁ, entre
+    la marca y el envío: es el único punto que sabe qué mensaje sale primero
+    de verdad en la fecha local de la persona -- una cadencia pospuesta o un
+    mensaje que agotó su tope diario nunca llegan hasta acá. Si el envío
+    falla, el mismo punto de retorno que deshace la marca deshace la reserva
+    del saludo con él (`saludo.reclamar_y_anteponer` ya corre en su propio
+    SAVEPOINT anidado, así que una falla SÓLO del saludo -- tabla faltante,
+    zona inválida -- no le impide a este mensaje salir sin saludo)."""
     try:
         with cur.connection.transaction():
             _marcar_enviado(cur, ahora, m["id"])
-            tg_id = transporte.enviar(m["chat_id"], m["cuerpo"], _botones(cur, m))
+            texto = saludo.reclamar_y_anteponer(
+                cur, workspace_id=workspace_id,
+                membership_id=m["destinatario_membership_id"], zona=cal.zona,
+                ahora=ahora, texto=m["cuerpo"], es_bienvenida=m["es_bienvenida"])
+            tg_id = transporte.enviar(m["chat_id"], texto, _botones(cur, m))
             try:
                 with cur.connection.transaction():
                     _guardar_id_telegram(cur, tg_id, m["id"])
