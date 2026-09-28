@@ -56,6 +56,10 @@ REFERENCIA_PENDING_ACTION = "pending_action"
 # (mismo patrón polimórfico, sin clave foránea), así que agregar este valor
 # no necesita una migración.
 REFERENCIA_ADMIN_NOTICE = "admin_notice"
+# Igual que arriba, pero para una respuesta puntual del bot de administración
+# (`admin_reply`, migración 0100: confirmación de un botón, guía de texto
+# libre) que agotó sus reintentos -- `despachador.despachar_respuestas_admin`.
+REFERENCIA_ADMIN_REPLY = "admin_reply"
 
 # Tope del texto disparador en el aviso -- decisión del usuario, 2026-09-28:
 # acotado, y el aviso dice cuándo lo recortó.

@@ -123,7 +123,9 @@ def conn(uri):
                      escalation_route, cadence_job, glossary_term, holiday,
                      work_calendar, persona_config, workspace_setting,
                      workspace_version, workspace, app_user, platform_role,
-                     audit_log, incident, admin_notice
+                     audit_log, incident, admin_notice, admin_reply,
+                     alta_correo_evento, alta_correo_estado, alta_correo_contacto,
+                     alta_correo_verificacion, aviso_administrativo
             restart identity cascade""")
     c.commit()
     c.close()

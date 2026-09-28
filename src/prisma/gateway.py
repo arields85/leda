@@ -12,12 +12,13 @@ from __future__ import annotations
 
 import unicodedata
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Callable
 
 from fastapi import APIRouter, FastAPI, Header, HTTPException, Request
 from fastapi.responses import HTMLResponse
 
-from .autoridad import (Canal, Denegado, identificar, identificar_en_espacio)
+from .autoridad import (Canal, Denegado, identificar_administrador,
+                        identificar_en_espacio)
 from .config import config
 from .db import (admin, autoridad, conectar, conectar_autoridad, espacio,
                  registrar_auditoria)
@@ -68,6 +69,42 @@ def _authority_conn():
     return _authority_conn._c
 
 
+def _bot_username(slug: str) -> str:
+    """Usuario público del bot de un espacio (para el enlace `t.me/...?start=`).
+
+    Brecha real, registrada para G1b: no hay ninguna columna ni ajuste que
+    lo guarde todavía -- `cli.py` (comando `enlaces`) lo resuelve igual,
+    contra `getMe` de Telegram, en el momento de imprimir los enlaces de
+    activación. Esta es la misma fuente, centralizada acá porque el
+    recorrido de verificación de correo (G1b) también necesita construir
+    `https://t.me/{bot}?start=pv_{token}` y no tiene, como `cli.py`, a un
+    operador copiando la salida a mano.
+
+    Se cachea en memoria por proceso: una sola llamada de red por slug,
+    nunca una por mensaje. Las pruebas reemplazan esta función entera por
+    un doble -- nunca llaman a Telegram de verdad.
+    """
+    if slug not in _bot_username._cache:
+        import httpx
+
+        # El error de httpx lleva la URL con el token del bot, y ese texto
+        # termina en `incident.referencia_cruda`: se reemplaza por uno saneado.
+        try:
+            r = httpx.get(
+                f"https://api.telegram.org/bot{config.token_bot(slug)}/getMe",
+                timeout=15)
+            r.raise_for_status()
+            usuario = r.json()["result"]["username"]
+        except (httpx.HTTPError, KeyError, ValueError) as e:
+            raise RuntimeError(
+                f"No se pudo obtener el usuario del bot ({type(e).__name__}).") from None
+        _bot_username._cache[slug] = usuario
+    return _bot_username._cache[slug]
+
+
+_bot_username._cache = {}
+
+
 def _espacio_por_slug(cur, slug: str) -> dict[str, Any] | None:
     cur.execute("select id, slug, activo from workspace where slug = %s", (slug,))
     return cur.fetchone()
@@ -104,19 +141,7 @@ def procesar_update(conn, slug: str, update: dict,
     canal = Canal.ADMINISTRACION if slug == "admin" else Canal.ESPACIO
 
     if canal is Canal.ADMINISTRACION:
-        if not mensaje:
-            return {"ok": True}
-        with conn.cursor() as cur:
-            cur.execute("set role prisma_admin")
-            try:
-                quien = identificar(cur, tg_user, canal, None)
-            except Denegado:
-                return {"ok": True}
-            registrar_auditoria(
-                cur, accion="mensaje_admin", actor_app_user_id=quien.app_user_id,
-                actor_kind="persona", detalle={"chat_id": chat_id})
-        conn.commit()
-        return {"ok": True}
+        return _procesar_admin(conn, mensaje, toque, tg_user, chat_id, texto)
 
     with conn.cursor() as cur:
         cur.execute("set role prisma_admin")
@@ -156,7 +181,8 @@ def procesar_update(conn, slug: str, update: dict,
     # /start va antes de identificar: quien lo manda todavía no está vinculado.
     if texto.startswith("/start"):
         try:
-            return _activacion(conn, workspace_id, texto, tg_user, chat_id)
+            return _activacion(conn, workspace_id, texto, tg_user, chat_id,
+                               bot_username_resolver=lambda: _bot_username(slug))
         except Exception as e:  # noqa: BLE001
             conn.rollback()
             reportar_incidente_no_manejado(
@@ -205,9 +231,55 @@ def procesar_update(conn, slug: str, update: dict,
     # perder el recibo de la fase 1.
     try:
         with espacio(conn, workspace_id) as cur:
+            from datetime import datetime, timezone
+
+            atendido_alta_correo = False
+            bloqueada_en_grupo = False
+            if texto.strip():
+                from . import alta_correo_flujo as ACF
+
+                # G1b: mientras esta membresía esté en modo `alta` por debajo
+                # de `active`, el control actúa ACÁ, antes de intake y del
+                # turno del agente -- ninguna herramienta de negocio corre
+                # para quien todavía no verificó su correo. Con la clave
+                # apagada (o ya `active`), `gate` no hace nada y devuelve
+                # `False` de inmediato: el resto de esta rama queda igual
+                # que hoy.
+                #
+                # G1b2, ítem 1: `gate` sólo tiene sentido en un chat privado
+                # -- no hay recorrido de correo por grupo. Antes corría para
+                # cualquier chat, y en un grupo llegaba a pedir/mostrar/
+                # procesar un correo por ahí. En cualquier otro tipo de chat,
+                # si la membresía sigue gateada, la respuesta es no hacer
+                # nada -- ni responder, ni dejarla llegar a intake o al
+                # agente: todavía no está verificada.
+                if chat_type == "private":
+                    atendido_alta_correo = ACF.gate(
+                        cur, quien, texto, chat_id=chat_id, workspace_id=workspace_id,
+                        ahora=datetime.now(timezone.utc),
+                        bot_username_resolver=lambda: _bot_username(slug))
+                    if not atendido_alta_correo:
+                        # G1c, modo `existente` (C5): `gate` puede haber
+                        # devuelto `False` por cualquiera de sus propios
+                        # motivos -- clave apagada, ya `active`, o esta
+                        # membresía en modo `existente` (que `gate` nunca
+                        # gatea). `atender_existente` no depende de cuál
+                        # haya sido: vuelve a comprobar la clave, el modo y
+                        # el estado por su cuenta, así que corre sin
+                        # bloquear a nadie que ya trabajaba con normalidad,
+                        # y sólo intercepta un único mensaje que sea, de
+                        # punta a punta, un correo.
+                        atendido_alta_correo = ACF.atender_existente(
+                            cur, quien, texto, chat_id=chat_id, workspace_id=workspace_id,
+                            ahora=datetime.now(timezone.utc),
+                            bot_username_resolver=lambda: _bot_username(slug))
+                else:
+                    bloqueada_en_grupo = ACF.bloqueada_para_negocio(
+                        cur, quien.membership_id, workspace_id)
+
             handled_intake_text = False
-            if texto.strip() and chat_type == "private":
-                from datetime import datetime, timezone
+            if (not atendido_alta_correo and not bloqueada_en_grupo and texto.strip()
+                    and chat_type == "private"):
                 from .ingreso_tareas import handle_active_text
 
                 handled_intake_text = handle_active_text(
@@ -215,7 +287,8 @@ def procesar_update(conn, slug: str, update: dict,
                     source_raw_text=texto, now=datetime.now(timezone.utc),
                 ) is not None
 
-            if texto.strip() and not handled_intake_text:
+            if (not atendido_alta_correo and not bloqueada_en_grupo and texto.strip()
+                    and not handled_intake_text):
                 with mantener_chat_activo(config.token_bot(slug), chat_id):
                     _turno(cur, quien, texto, workspace_id, chat_id, entrante_id)
 
@@ -238,17 +311,160 @@ def procesar_update(conn, slug: str, update: dict,
     return {"ok": True}
 
 
+def _procesar_admin(conn, mensaje: dict | None, toque: dict | None,
+                    tg_user: int | None, chat_id: int | None, texto: str) -> dict:
+    """Canal de administración (G1d, "Decisiones del usuario para G1"):
+    sólo avisos "🛠️ Administración" y sus botones -- nunca ninguna acción
+    de negocio ni herramienta del `REGISTRO`. Un desconocido (no
+    `platform_role administrador`) no recibe respuesta, igual que hoy.
+    """
+    if toque:
+        return _toque_admin(conn, toque, tg_user)
+    if not mensaje:
+        return {"ok": True}
+
+    from . import avisos_admin as AA
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute("set role prisma_admin")
+            try:
+                quien = identificar_administrador(cur, tg_user)
+            except Denegado:
+                return {"ok": True}      # desconocido: no se le responde
+            registrar_auditoria(
+                cur, accion="mensaje_admin", actor_app_user_id=quien.app_user_id,
+                actor_kind="persona", detalle={"chat_id": chat_id})
+            if texto.strip():
+                # Decisión del usuario: texto libre nunca concede ninguna
+                # acción administrativa -- sólo una guía breve a los
+                # botones del aviso o al panel.
+                AA.responder_texto_libre(cur, chat_id, mensaje.get("message_id"))
+        conn.commit()
+    except Exception as e:  # noqa: BLE001
+        conn.rollback()
+        _reportar_incidente_admin(
+            conn, chat_id=chat_id, tg_user=tg_user, error=e, etapa=ETAPA_ADMIN)
+    return {"ok": True}
+
+
+def _toque_admin(conn, toque: dict, tg_user: int | None) -> dict:
+    """"Marcar leído" de un aviso administrativo, y el recorrido de
+    "Habilitar un nuevo intento" (G1d-b, acción F): vista previa, Confirmar,
+    Cancelar."""
+    from . import avisos_admin as AA
+
+    callback = toque.get("data") or ""
+    partes = AA.partes_de_callback(callback)
+    chat_id = (toque.get("message") or {}).get("chat", {}).get("id")
+    if partes is None or tg_user is None or chat_id is None:
+        return {"ok": True}
+    # G1d-b2, ítem 6: el `id` del `callback_query` -- estable ante una
+    # redelivery exacta del mismo webhook (Telegram reenvía el mismo id),
+    # distinto en cada toque genuino nuevo -- es lo que deja que las claves
+    # de dedupe de `avisos_admin` distingan "el mismo botón, reenviado" de
+    # "un botón nuevo, apretado otra vez" sin volver a usar un timestamp de
+    # pared (vulnerable a lo contrario: mandar dos veces ante una
+    # redelivery real).
+    toque_id = str(toque.get("id") or "")
+
+    try:
+        acusar_toque(config.token_bot("admin"), toque.get("id", ""))
+    except Exception:  # noqa: BLE001 -- sólo el reloj del teléfono de alguien
+        pass
+
+    accion, aviso_id = partes
+    try:
+        with conn.cursor() as cur:
+            cur.execute("set role prisma_admin")
+            try:
+                quien = identificar_administrador(cur, tg_user)
+            except Denegado:
+                return {"ok": True}      # desconocido: no se le responde
+            registrar_auditoria(
+                cur, accion=f"toque_admin:{accion}",
+                actor_app_user_id=quien.app_user_id, actor_kind="persona",
+                detalle={"chat_id": chat_id, "aviso_id": aviso_id})
+            if accion == AA.ACCION_LEIDO:
+                AA.marcar_leido_por_toque(cur, aviso_id, quien.app_user_id, chat_id)
+            elif accion == AA.ACCION_HABILITAR:
+                AA.mostrar_preview_habilitar(cur, aviso_id, chat_id, quien.app_user_id, toque_id)
+            elif accion == AA.ACCION_CONFIRMAR_HABILITAR:
+                AA.confirmar_habilitar_por_toque(
+                    cur, aviso_id, quien.app_user_id, chat_id, toque_id)
+            elif accion == AA.ACCION_CANCELAR_HABILITAR:
+                AA.cancelar_habilitar_por_toque(cur, aviso_id, quien.app_user_id, chat_id, toque_id)
+            # Cualquier otra acción es un botón de un tipo que este canal
+            # todavía no reconoce (versión vieja, o de un aviso retirado):
+            # no hay nada para hacer, y no es un error propio.
+        conn.commit()
+    except Exception as e:  # noqa: BLE001
+        conn.rollback()
+        _reportar_incidente_admin(
+            conn, chat_id=chat_id, tg_user=tg_user, error=e, etapa=ETAPA_ADMIN)
+    return {"ok": True}
+
+
+def _reportar_incidente_admin(conn, *, chat_id: int | None, tg_user: int | None,
+                              error: Exception, etapa: str) -> None:
+    """Red de contención del canal de administración -- mismo espíritu que
+    `reportar_incidente_no_manejado`, pero sin `workspace_id`: el bot de
+    administración no tiene ningún espacio al que atarse, así que no puede
+    reusar `espacio()`/`enqueue_outbox`.
+
+    Unificación de G1d con T28 (decisión del usuario, 2026-09-28):
+    `incidentes.registrar_incidente` es el único punto de escritura en
+    `incident` -- nunca un insert a mano acá -- y ya arma, sola, el aviso a
+    cada administrador de plataforma alcanzable (`admin_notice`), igual que
+    `local._reportar_incidente_admin_no_manejado` para el modo local por
+    polling. Nunca una cola de respuestas propia de este canal."""
+    from .incidentes import registrar_incidente
+
+    resumen = f"Excepción no manejada en '{etapa}' ({type(error).__name__})."
+    try:
+        with conn.cursor() as cur:
+            cur.execute("set role prisma_admin")
+            registrar_incidente(
+                cur, None, resumen, severidad="alta",
+                referencia_cruda=str(error)[:2000], etapa=etapa, chat_id=chat_id)
+        conn.commit()
+    except Exception:  # noqa: BLE001 -- ni el incidente se pudo registrar
+        try:
+            conn.rollback()
+        except Exception:  # noqa: BLE001
+            pass
+
+
 def _activacion(conn, workspace_id: str, texto: str, tg_user: int,
-                chat_id: int) -> dict:
+                chat_id: int, *,
+                bot_username_resolver: Callable[[], str] | None = None) -> dict:
     """Canjea el token de un enlace de activación.
 
     Requiere permisos de administración porque escribe en app_user, que es
     global. Es la única operación de un bot de espacio que los necesita, y
     está acotada a esto.
+
+    `bot_username_resolver` sólo lo necesita el camino `pv_` de abajo (G1t/
+    B5-B6: reenviar un enlace nuevo requiere reconstruir `t.me/{bot}?
+    start=pv_{token}`) -- se le pasa `None` por defecto para no romper a
+    quien llama a esta función sin pasar por el webhook real, como
+    `test_salida.py`, que nunca ejercita ese camino.
     """
     from .onboarding import ActivacionInvalida, activar, bienvenida
 
     partes = texto.split(maxsplit=1)
+
+    if len(partes) >= 2 and partes[1].strip().startswith("pv_"):
+        # Verificación de correo (G1b), no activación por enlace: el prefijo
+        # `pv_` decide antes de tratar el resto como un `activation_token`.
+        # El camino de abajo (token de activación) sigue igual para
+        # cualquier otro valor, incluido uno que por casualidad empezara con
+        # otra cosa.
+        from . import alta_correo_flujo as ACF
+
+        return ACF.resolver_verificacion_correo(
+            conn, workspace_id, partes[1].strip()[len("pv_"):], tg_user, chat_id,
+            bot_username_resolver=bot_username_resolver)
 
     if len(partes) < 2:
         # /start sin token. Si la persona ya está vinculada —porque su
@@ -281,6 +497,44 @@ def _activacion(conn, workspace_id: str, texto: str, tg_user: int,
         except ActivacionInvalida as e:
             cuerpo = str(e) + " Pedile uno nuevo a quien te lo pasó."
         else:
+            from datetime import datetime, timezone
+
+            from . import alta_correo as AC
+
+            if AC.habilitado(cur, workspace_id):
+                # C6 (aprobada por el usuario): con la clave encendida, la
+                # bienvenida de `onboarding.bienvenida` NO se manda -- van
+                # los dos mensajes literales del pack (`alta_correo_flujo`),
+                # y el ciclo pasa a `awaiting_email` en la misma transacción
+                # que `activar()` ya abrió acá.
+                cur.execute(
+                    """select m.id as membership_id from membership m
+                         join app_user u on u.id = m.app_user_id
+                        where u.telegram_user_id = %s and m.workspace_id = %s
+                          and m.activo""",
+                    (tg_user, workspace_id))
+                membership_id = str(cur.fetchone()["membership_id"])
+                registrar_auditoria(
+                    cur, accion="activacion", workspace_id=workspace_id,
+                    actor_kind="persona", detalle={"nombre": nombre})
+
+                # `alta_correo_evento` deriva su `workspace_id` por
+                # disparador (`preparar_evento_alta_correo`, security
+                # definer de `prisma_owner`, que NO saltea la política de
+                # aislamiento): sin ningún espacio fijado en la sesión de
+                # `admin()` no encuentra la membresía aunque exista. Se fija
+                # acá para el resto de esta transacción, que termina en el
+                # `return` de abajo -- no hace falta restaurarlo.
+                cur.execute(
+                    "select set_config('prisma.workspace_id', %s, true)",
+                    (workspace_id,))
+
+                from . import alta_correo_flujo as ACF
+
+                ACF.abrir_ciclo_alta(cur, membership_id, workspace_id, chat_id,
+                                     nombre, datetime.now(timezone.utc))
+                return {"ok": True}
+
             cuerpo = bienvenida(cur, workspace_id, nombre)
             registrar_auditoria(
                 cur, accion="activacion", workspace_id=workspace_id,
@@ -307,6 +561,7 @@ def _toque(conn, workspace_id: str, slug: str, toque: dict,
     """
     from datetime import datetime, timezone
 
+    from . import alta_correo_flujo as ACF
     from . import herramientas as H
     from . import pendientes as P
     from .autoridad import Denegado as NoPuede
@@ -421,6 +676,15 @@ def _toque(conn, workspace_id: str, slug: str, toque: dict,
                     _resolver_toque_dato_menu_tarea(
                         cur, quien, workspace_id, chat_id, resuelta.args, ahora,
                         pending_action_id=pending_action_id)
+                elif resuelta.herramienta in ACF.SENTINELS:
+                    # G1b: elegir entre varios correos, Reenviar/Cambiar
+                    # correo, o Cambiar a la dirección nueva/Mantener la
+                    # anterior. Tampoco es una herramienta real -- igual que
+                    # los sentinelas de arriba.
+                    ACF.resolver_toque(
+                        cur, quien, workspace_id, chat_id, resuelta.herramienta,
+                        resuelta.args, ahora,
+                        bot_username_resolver=lambda: _bot_username(slug))
                 else:
                     from .agente import VIGENCIA_PENDIENTE
 
@@ -2104,15 +2368,6 @@ def _incidente_jev_no_configurado(cur, workspace_id: str,
         app_user_id=app_user_id)
 
 
-def _routing_incident(cur, quien, error) -> None:
-    cur.execute(
-        """insert into incident (workspace_id, severidad, resumen_sanitizado)
-           values (%s, 'media', %s)""",
-        (quien.workspace_id,
-         f"Falló el enrutamiento tipado ({type(error).__name__})."),
-    )
-
-
 NOTICIA_NEUTRA_INCIDENTE = "No pude completar eso. Ya quedó registrado para revisarlo."
 
 # Etapas nombradas (T2b, corrección de trazabilidad, 2026-09-25): en qué
@@ -2127,6 +2382,12 @@ ETAPA_TURNO_TEXTO = "turno_texto"
 ETAPA_TOQUE_BOTON = "toque_boton"
 ETAPA_ACTIVACION = "activacion"
 ETAPA_ACCION_MENU = "accion_menu"
+# G1b (rama auxiliar/alta-y-google): recorrido del alta con correo --
+# pedido/emisión/reenvío de verificación y `/start pv_{token}`.
+ETAPA_ALTA_CORREO = "alta_correo"
+# G1d (rama auxiliar/alta-y-google): canal de administración -- toque de
+# "Marcar leído" o texto libre en el bot de administración.
+ETAPA_ADMIN = "admin"
 
 def _routing_incident(cur, quien, error) -> None:
     registrar_incidente(

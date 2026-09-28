@@ -10,6 +10,8 @@
     python -m prisma escuchar corework         long polling + cadencias + escalera + despacho
     python -m prisma servir                   webhook + cadencias + escalera + despacho
     python -m prisma servir --sin-cadencias    igual, sin disparar cadencias automáticas
+    python -m prisma correo-verificacion corework --activar
+    python -m prisma correo-verificacion corework --desactivar
 """
 
 from __future__ import annotations
@@ -143,6 +145,91 @@ def _estado(conn, ws: str, slug: str) -> int:
     return 0
 
 
+def _correo_verificacion(conn, ws: str, activar: bool) -> int:
+    """Comando `correo-verificacion <espacio> --activar|--desactivar`
+    (rama auxiliar, G1c). Enciende o apaga `correo_verificacion.habilitado`
+    -- la misma clave que ya gobierna el alta con correo (G1a-G1b2) -- y,
+    sólo al activar, atiende a quien YA estaba activo sin correo (C5: se le
+    pide una vez, sin bloquearlo).
+
+    Idempotente: `--activar` abre un ciclo en modo `existente` y encola el
+    pedido sólo para quien esté activo, con Telegram ya vinculado, sin
+    correo verificado y sin ningún ciclo abierto todavía -- correrlo dos
+    veces no repite nada, porque la segunda vez esa condición ya no
+    encuentra a nadie (quienes se procesaron en la primera ya tienen un
+    ciclo abierto). Un integrante que todavía no activó su enlace no entra
+    acá: le llega por el modo `alta` cuando lo haga.
+
+    `--desactivar` sólo apaga la clave: los ciclos y datos ya creados quedan
+    como están. `gate`/`atender_existente` (`alta_correo_flujo.py`) vuelven
+    a comprobar la clave antes de actuar, así que con la clave apagada
+    ninguno de los dos hace nada para nadie, tenga o no un ciclo a medio
+    camino.
+
+    G1c2, ítem 4: `--activar` toma un bloqueo consultivo de transacción,
+    con clave en el espacio (mismo patrón que
+    `ingreso_tareas.handle_active_text`), antes de leer la elegibilidad --
+    dos corridas superpuestas para el mismo espacio se serializan, así
+    ninguna puede abrir un ciclo ni encolar un pedido duplicado para la
+    misma persona con la otra corrida todavía sin confirmar."""
+    import json
+    from datetime import datetime, timezone
+
+    from . import alta_correo as AC
+    from . import alta_correo_flujo as ACF
+    from .db import registrar_auditoria
+
+    ahora = datetime.now(timezone.utc)
+    nombres_pendientes: list[str] = []
+    with espacio(conn, ws) as cur:
+        if activar:
+            cur.execute(
+                "select pg_advisory_xact_lock(hashtextextended(%s, 0))",
+                (f"correo-verificacion:activar:{ws}",))
+        cur.execute(
+            """insert into workspace_setting (workspace_id, clave, valor)
+                 values (%s, %s, %s)
+               on conflict (workspace_id, clave) do update set valor = excluded.valor""",
+            (ws, AC.CLAVE_HABILITADO, json.dumps(activar)))
+        registrar_auditoria(
+            cur, accion=("correo_verificacion_activado" if activar
+                        else "correo_verificacion_desactivado"),
+            workspace_id=ws, actor_kind="sistema")
+
+        if activar:
+            # `no verified contact` + `no open cycle`: el mismo integrante
+            # nunca aparece dos veces en corridas distintas de este
+            # comando, porque la primera corrida ya le abre un ciclo.
+            for fila in AC.elegibles_existente(cur, ws):
+                ACF.abrir_ciclo_existente(
+                    cur, str(fila["membership_id"]), ws, fila["telegram_user_id"], ahora)
+                nombres_pendientes.append(fila["nombre"])
+            if nombres_pendientes:
+                # Nombres, nunca correos ni cuerpos de mensaje -- la entrega
+                # de este aviso por el bot de administración es G1d.
+                AC.crear_aviso(
+                    cur, "correo_existente_pendientes",
+                    "Se les pidió el correo laboral a quienes ya estaban "
+                    "activos sin uno: " + ", ".join(nombres_pendientes) + ".",
+                    workspace_id=ws, referencia_tipo="workspace",
+                    referencia_id=ws, ahora=ahora)
+    conn.commit()
+
+    if activar:
+        print("Verificación de correo activada.")
+        if nombres_pendientes:
+            print(f"Se les pidió el correo a {len(nombres_pendientes)} "
+                  "integrante(s) ya activo(s):")
+            for nombre in nombres_pendientes:
+                print(f"  {nombre}")
+        else:
+            print("Nadie quedó pendiente: todos ya tienen correo verificado "
+                  "o un ciclo abierto.")
+    else:
+        print("Verificación de correo desactivada.")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="prisma")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -196,6 +283,12 @@ def main(argv: list[str] | None = None) -> int:
 
     cor = sub.add_parser("correr")     # dispara una cadencia a mano
     cor.add_argument("slug"); cor.add_argument("nombre")
+
+    cve = sub.add_parser("correo-verificacion")   # rama auxiliar, G1c
+    cve.add_argument("slug")
+    cve_flags = cve.add_mutually_exclusive_group(required=True)
+    cve_flags.add_argument("--activar", action="store_true")
+    cve_flags.add_argument("--desactivar", action="store_true")
 
     srv = sub.add_parser("servir")
     srv.add_argument("--puerto", type=int, default=8080)
@@ -519,6 +612,9 @@ def main(argv: list[str] | None = None) -> int:
         for estado, n in sorted(r.estados.items()):
             print(f"  {estado}: {n}")
         return 0
+
+    if a.cmd == "correo-verificacion":
+        return _correo_verificacion(conn, ws, a.activar)
 
     with espacio(conn, ws) as cur:
         cal = Calendario.desde_base(cur, ws)
