@@ -847,3 +847,38 @@ def test_bienvenida_por_activacion_reclama_y_la_respuesta_del_dia_no_repite(
 
     assert len(transporte.enviados) == 2
     assert transporte.enviados[1].texto == "Tenés tareas abiertas."  # sin saludo
+
+
+def test_falla_al_reportar_la_falla_del_saludo_no_deshace_un_envio_exitoso(
+        intake_world, conn, monkeypatch):
+    """Si el saludo falla y después también falla su reporte, un mensaje ya
+    entregado queda 'enviado': la pasada siguiente no lo reenvía."""
+    ws = intake_world["north-lab"]["id"]
+    mid = intake_world["north-lab"]["people"]["Sam Noble"]["membership_id"]
+    tg = intake_world["north-lab"]["people"]["Sam Noble"]["telegram"]
+
+    def _saludo_roto(*a, **k):
+        raise RuntimeError("falla de saludo simulada")
+
+    def _reporte_roto(*a, **k):
+        raise RuntimeError("falla del reporte simulada")
+
+    monkeypatch.setattr(S, "reclamar_saludo", _saludo_roto)
+    monkeypatch.setattr(S, "reportar_falla", _reporte_roto)
+
+    transporte = TransporteDePrueba()
+    with espacio(conn, ws) as cur:
+        _limpiar_saludo(cur, mid)
+        cal = _cal(cur, ws)
+        enqueue_outbox(
+            cur, workspace_id=ws, chat_id=tg, text="Tenés una tarea.",
+            recipient_membership_id=mid, is_response=True,
+            scheduled_for=AHORA_HABIL, dedupe_key="test:reporte-de-saludo-roto:1")
+        despachar(cur, ws, transporte, cal, AHORA_HABIL)
+        despachar(cur, ws, transporte, cal, AHORA_HABIL + timedelta(minutes=1))
+        cur.execute("select estado from message_outbox "
+                    "where dedupe_key = 'test:reporte-de-saludo-roto:1'")
+        estado = cur.fetchone()["estado"]
+
+    assert len(transporte.enviados) == 1
+    assert estado == "enviado"

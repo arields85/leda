@@ -508,12 +508,24 @@ def _intentar_envio(cur: psycopg.Cursor, workspace_id: str, transporte: Transpor
                      f"{m['id']} ({type(exc_id).__name__}).")
     except Exception as e:  # noqa: BLE001 — se registra, no se propaga
         _fallo(cur, workspace_id, m, e, cal, ahora)
-        if falla_saludo is not None:
-            saludo.reportar_falla(cur, workspace_id, falla_saludo)
-        return False
+        enviado = False
+    else:
+        enviado = True
     if falla_saludo is not None:
-        saludo.reportar_falla(cur, workspace_id, falla_saludo)
-    return True
+        _reportar_falla_saludo_aislada(cur, workspace_id, falla_saludo)
+    return enviado
+
+
+def _reportar_falla_saludo_aislada(cur, workspace_id: str,
+                                   falla: Exception) -> None:
+    """Reporta la falla del saludo en su propio savepoint: si el reporte
+    también falla, no puede deshacer la marca de un mensaje ya entregado."""
+    try:
+        with cur.connection.transaction():
+            saludo.reportar_falla(cur, workspace_id, falla)
+    except Exception as e:  # noqa: BLE001 — el mensaje ya salió
+        print(f"  ! no se pudo reportar la falla del saludo "
+              f"({type(e).__name__}).")
 
 
 def despachar_avisos_admin(cur: psycopg.Cursor, transporte: Transporte,

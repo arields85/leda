@@ -3900,3 +3900,11 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   falla, y una sola vez. Pruebas sin dependencia del orden ni de la medianoche. ROJO
   observado (prueba de arranque, fila sin margen, reporte perdido). Suite completa del
   escritor: `1185 passed, 108 deselected`.
+  Revisión de `d1e3e1e`: alto (`high_risk`, 583 líneas); consentimiento del usuario:
+  revisar. review-2b89536f9f52c5de (4 lentes) aprobada y reconocida; frontera en
+  `d1e3e1e`. Aplicado inline por el orquestador: R4-001/R3-001, el reporte de la falla
+  del saludo corre en su propio savepoint después del envío y una falla suya ya no deshace
+  la marca de un mensaje entregado (ROJO: la excepción escapaba del despacho; VERDE).
+  Quedan para después de la ronda (menores): R2-001 segunda medida de "entra en el
+  mensaje" dentro de `saludo._reclamar_protegido`, R3-002 la prueba cuenta todos los
+  incidentes del espacio, R2-002/R2-004/R2-005/R3-003/R3-004 docstrings y pruebas.
