@@ -31,10 +31,11 @@ from prisma.autoridad import Canal, identificar
 from prisma.calendario import Calendario
 from prisma.db import admin, espacio
 from prisma.llm import Llamada, ProveedorGuionado, Respuesta
-from prisma.salida import BUTTON_TEXT_LIMIT, telegram_utf16_units
+from prisma.salida import (BUTTON_TEXT_LIMIT, ICONO_TAREA, ICONO_VER_MAS,
+                           con_icono, telegram_utf16_units)
 
 ETIQUETAS_CIERRE_GENERICO = ["Es una tarea nueva", "Es sobre una tarea existente",
-                            "Quiero consultar otra cosa"]
+                            P.ETIQUETA_SALIR_OPCIONES]
 
 
 def _quien(cur, nombre, ws):
@@ -247,7 +248,8 @@ def test_lista_de_tareas_con_pregunta_no_agrega_el_cierre_generico(
         etiquetas = [f["etiqueta"] for f in _opciones(cur, pid)]
 
     # La lista de T3, no el cierre genérico de T4b.
-    assert etiquetas == ["Tarea 1", "Tarea 2", "Quiero consultar otra cosa"]
+    assert etiquetas == [con_icono("Tarea 1", ICONO_TAREA), con_icono("Tarea 2", ICONO_TAREA),
+                        P.ETIQUETA_SALIR_OPCIONES]
 
 
 def test_ofrecer_opciones_no_agrega_el_cierre_generico(corework, conn, monkeypatch):
@@ -273,7 +275,7 @@ def test_ofrecer_opciones_no_agrega_el_cierre_generico(corework, conn, monkeypat
         pid = _pendiente_opciones(cur, ws)
         etiquetas = [f["etiqueta"] for f in _opciones(cur, pid)]
 
-    assert etiquetas == ["A", "B", "Quiero consultar otra cosa"]
+    assert etiquetas == ["A", "B", P.ETIQUETA_SALIR_OPCIONES]
 
 
 # ---------------------------------------------------------------------------
@@ -388,7 +390,7 @@ def test_sin_entrante_id_no_ofrece_es_una_tarea_nueva(corework, conn, monkeypatc
         pid = _pendiente_opciones(cur, ws)
         etiquetas = [f["etiqueta"] for f in _opciones(cur, pid)]
 
-    assert etiquetas == ["Es sobre una tarea existente", "Quiero consultar otra cosa"]
+    assert etiquetas == ["Es sobre una tarea existente", P.ETIQUETA_SALIR_OPCIONES]
 
 
 # ---------------------------------------------------------------------------
@@ -422,9 +424,11 @@ def test_tocar_es_sobre_una_tarea_existente_lista_las_propias_y_abre_el_menu(
         pid2 = _pendiente_opciones(cur, ws)
         filas = _opciones(cur, pid2)
     etiquetas = [f["etiqueta"] for f in filas]
-    assert etiquetas == ["Cablear tablero máq. 3", "Revisar accesos VPN",
-                        "Quiero consultar otra cosa"]
-    tarea1 = next(f for f in filas if f["etiqueta"] == "Cablear tablero máq. 3")
+    assert etiquetas == [con_icono("Cablear tablero máq. 3", ICONO_TAREA),
+                        con_icono("Revisar accesos VPN", ICONO_TAREA),
+                        P.ETIQUETA_SALIR_OPCIONES]
+    tarea1 = next(f for f in filas
+                 if f["etiqueta"] == con_icono("Cablear tablero máq. 3", ICONO_TAREA))
     assert tarea1["valor"] == {"tipo": "tarea", "tarea_id": tid,
                               "titulo": "Cablear tablero máq. 3", "accion": "menu"}
 
@@ -441,7 +445,7 @@ def test_tocar_es_sobre_una_tarea_existente_lista_las_propias_y_abre_el_menu(
             (ws, P.SENTINEL_MENU_TAREA))
         pid_menu = str(cur.fetchone()["id"])
         etiquetas_menu = [f["etiqueta"] for f in _opciones(cur, pid_menu)]
-    assert "Ver detalle" in etiquetas_menu
+    assert con_icono("Ver detalle", ICONO_TAREA) in etiquetas_menu
 
 
 def test_tocar_es_sobre_una_tarea_existente_pagina_con_mas_de_cuatro(
@@ -470,8 +474,8 @@ def test_tocar_es_sobre_una_tarea_existente_pagina_con_mas_de_cuatro(
     with admin(conn) as cur:
         pid2 = _pendiente_opciones(cur, ws)
         etiquetas = [f["etiqueta"] for f in _opciones(cur, pid2)]
-    assert etiquetas == ["Tarea propia 1", "Tarea propia 2", "Tarea propia 3",
-                        "Tarea propia 4", "Ver más", "Quiero consultar otra cosa"]
+    assert etiquetas == [con_icono(f"Tarea propia {n}", ICONO_TAREA) for n in range(1, 5)] + [
+                        P.ETIQUETA_VER_MAS, P.ETIQUETA_SALIR_OPCIONES]
 
 
 def test_tocar_es_sobre_una_tarea_existente_pagina_mas_alla_del_limite_viejo(
@@ -509,8 +513,8 @@ def test_tocar_es_sobre_una_tarea_existente_pagina_mas_alla_del_limite_viejo(
         filas = _opciones(cur, pid_actual)
     while True:
         vistas += [f["etiqueta"] for f in filas if f["etiqueta"] not in
-                  ("Ver más", "Quiero consultar otra cosa")]
-        ver_mas = next((f for f in filas if f["etiqueta"] == "Ver más"), None)
+                  (P.ETIQUETA_VER_MAS, P.ETIQUETA_SALIR_OPCIONES)]
+        ver_mas = next((f for f in filas if f["etiqueta"] == P.ETIQUETA_VER_MAS), None)
         if ver_mas is None:
             break
         assert _tocar(cliente, ver_mas["token"], tg).status_code == 200
@@ -518,7 +522,8 @@ def test_tocar_es_sobre_una_tarea_existente_pagina_mas_alla_del_limite_viejo(
             pid_actual = _pendiente_opciones(cur, ws)
             filas = _opciones(cur, pid_actual)
 
-    assert sorted(vistas) == sorted(f"Tarea propia {n}" for n in range(1, total + 1))
+    assert sorted(vistas) == sorted(con_icono(f"Tarea propia {n}", ICONO_TAREA)
+                                  for n in range(1, total + 1))
 
 
 def test_tocar_es_sobre_una_tarea_existente_orden_deterministico_por_id(
@@ -576,8 +581,8 @@ def test_tocar_es_sobre_una_tarea_existente_orden_deterministico_por_id(
     with admin(conn) as cur:
         pid2 = _pendiente_opciones(cur, ws)
         etiquetas = [f["etiqueta"] for f in _opciones(cur, pid2)
-                    if f["etiqueta"] not in ("Ver más", "Quiero consultar otra cosa")]
-    assert etiquetas == esperado
+                    if f["etiqueta"] not in (P.ETIQUETA_VER_MAS, P.ETIQUETA_SALIR_OPCIONES)]
+    assert etiquetas == [con_icono(e, ICONO_TAREA) for e in esperado]
 
 
 def test_tocar_es_sobre_una_tarea_existente_sin_tareas_activas_dice_que_no_hay(
@@ -605,7 +610,7 @@ def test_tocar_es_sobre_una_tarea_existente_sin_tareas_activas_dice_que_no_hay(
             """select cuerpo from message_outbox where chat_id = %s
                 order by programado_para desc limit 1""", (tg,))
         cuerpo = cur.fetchone()["cuerpo"]
-    assert [f["etiqueta"] for f in filas] == ["Quiero consultar otra cosa"]
+    assert [f["etiqueta"] for f in filas] == [P.ETIQUETA_SALIR_OPCIONES]
     assert "no ten" in cuerpo.lower()
 
 
@@ -627,7 +632,7 @@ def test_tocar_salida_del_cierre_generico_cierra_sin_efecto(
                  ahora=datetime.now(timezone.utc))
         pid = _pendiente_opciones(cur, ws)
         salir = next(o for o in _opciones(cur, pid)
-                    if o["etiqueta"] == "Quiero consultar otra cosa")
+                    if o["etiqueta"] == P.ETIQUETA_SALIR_OPCIONES)
 
     llamadas_antes = len(proveedor.recibidos)
     assert _tocar(cliente, salir["token"], tg).status_code == 200

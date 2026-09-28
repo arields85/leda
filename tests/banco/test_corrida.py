@@ -14,6 +14,7 @@ import pytest
 import prisma.jev as jev
 from prisma import agente, herramientas
 from prisma import pendientes as P
+from prisma.salida import etiqueta_sin_icono
 from prisma.autoridad import Canal, identificar
 from prisma.db import admin, espacio
 from prisma.jev import ClienteJevGuionado
@@ -885,7 +886,10 @@ def test_ejecutar_escenario_aclaracion_tapea_la_candidata_elegida_sin_aplicar_na
             "elegir": etiqueta_a})
 
     assert r.bloqueado is False, r.motivo_bloqueo
-    assert set(r.etiquetas_aclaracion_ofrecidas) >= {etiqueta_a, etiqueta_b}
+    # Ícono de tarea aparte (íconos, decisión del usuario, 2026-09-28): las
+    # candidatas de aclaración son botones de tarea.
+    ofrecidas_sin_icono = {etiqueta_sin_icono(e) for e in r.etiquetas_aclaracion_ofrecidas}
+    assert ofrecidas_sin_icono >= {etiqueta_a, etiqueta_b}
     assert r.herramientas_ejecutadas == ["actualizar_estado"]
     # Nada de lo que las 8 herramientas escriben cambió mientras se
     # preguntaba con botones ni antes del toque en Confirmar -- la

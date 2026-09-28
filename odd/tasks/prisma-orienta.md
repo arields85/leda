@@ -3847,3 +3847,22 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   excepciones de `httpx` por tipo) y R2-002 (alias `_error_sin_url`, cosmético).
   `tests/test_ciclo.py tests/test_avisos_admin.py` -> `100 passed`; la suite completa
   queda para después de #7, que corre en paralelo.
+
+- 2026-09-28: **#7 cerrada — íconos en los botones y saludo diario (pack 06).** Ruta:
+  mapeo delegado (sólo lectura) y un escritor. Íconos aprobados por el usuario en
+  `salida.py` (fuente única: `con_icono`, `costo_icono` en unidades UTF-16,
+  `etiquetas_coinciden`): el ícono entra en el mismo límite de la etiqueta, la
+  desambiguación trabaja sobre el texto y un toque se resuelve con o sin ícono.
+  Saludo diario (`saludo.py`, migración `0018_saludo_diario`, tabla `greeting_state`
+  con `workspace_id` y RLS forzada): "👋 Buen día" 05-11:59, "👋 Buenas tardes"
+  12-19:59, "👋 Buenas noches" 20-04:59 en la zona del espacio; una reserva atómica por
+  persona y fecha local (`insert ... on conflict ... where ... > ...`), dentro de la
+  misma transacción que la respuesta. La bienvenida del alta reclama el saludo del día.
+  Juicio del escritor, pendiente de confirmar por el usuario: no saludan las cadencias,
+  la escalera ni los avisos que dispara otra persona (pedido de aprobación, entrega al
+  aprobador, presentación al grupo). `tests/conftest.py` reserva el saludo de todos los
+  sembrados para que las pruebas ajenas no saluden. Un solo commit: íconos y saludo
+  comparten hunks en `agente.py`, `gateway.py` e `ingreso_tareas.py`. Suite completa del
+  escritor: `1164 passed, 108 deselected`.
+  Decisión del usuario: la tercera ronda se adelanta y va después de #7 y #9; el
+  validador, el banco y T7d quedan para después.

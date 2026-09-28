@@ -65,7 +65,7 @@ tales. Ver [`INDEX.md`](INDEX.md#documentos-superados).
 |---|---|
 | Comando | `.venv\Scripts\python.exe -m pytest -q` |
 | Fecha | 2026-09-28 |
-| Resultado exacto | 1136 passed, 108 deselected (corrida del escritor del token en los errores de Telegram). |
+| Resultado exacto | 1164 passed, 108 deselected (corrida del escritor de #7, íconos y saludo diario). |
 
 Seguimientos de la entrega con evidencia (T6a-T6j), siembra reproducible (T7, T7b) y
 comprobadores del banco, `odd/tasks/prisma-orienta.md`: `1008 passed, 108
@@ -207,8 +207,8 @@ de administración se toma aunque se configure después; detalle en
 configurado por el usuario. PostgreSQL local (scoop) no es un servicio: tras reiniciar
 Windows hay que arrancarlo con `pg_ctl`.
 
-Próximo, en este orden (confirmado por el usuario el 2026-09-28; la ronda por Telegram
-va **al final**, para probar todo junto):
+Próximo, en este orden (el usuario adelantó la ronda el 2026-09-28: "lo importante es
+probar cómo responde Prisma después de las correcciones"):
 
 *(Cerradas en esta sesión: administrador alcanzable en modo local, #28b, #28c, #11b,
 #11c, #29, #29b y #29c. Con #29, `escuchar` y `servir` comparten una misma rutina de fondo
@@ -218,26 +218,23 @@ por pasada, de `admin_notice`; `--sin-cadencias` las apaga en los dos comandos. 
 además que una cadencia de lunes disparaba el martes: `CronTrigger.from_crontab` de
 APScheduler 3 numera los días distinto del cron estándar.)*
 
-1. *(Errores de Telegram sin el token, cerrada: cada llamada a la API de Telegram levanta
-   `ErrorTelegram` sin URL ni token, y `ultimo_error` y `referencia_cruda` pasan por
-   `redactar_secreto_telegram`. Las bases locales no tenían filas con el token.)*
-2. Íconos en los botones (📋 tarea, ➕ Ver más, 💬 Quiero consultar otra cosa, ✅ Confirmar,
-   ✖️ Cancelar, ✏️ Otra opción, aprobados por el usuario) y saludo diario (pack 06).
-3. Indicador de "escribiendo" y borrador nativo animado sólo si la respuesta tarda,
-   sin demorarla nunca (pack 05).
-4. **#23** el validador de invariantes (`odd/tasks/validador-invariantes.md`: cada 30
-   minutos los urgentes, una vez por día los estructurales, a mano, aviso único por
-   violación al administrador).
-5. Escenarios del banco que fallan desde antes de `b-0005-b`: `b-0001`, `b-0001-a`,
-   `b-0002-c`, `b-0013`.
-6. T7d (`sembrar`).
-7. **Tercera ronda por Telegram**, al final: entrega con evidencia y "Pedir cambios"
-   (guion de dos circuitos en `odd/tasks/prisma-orienta.md`), más avisos al
-   administrador, íconos e indicador de "pensando". Probablemente con
-   `escuchar --sin-cadencias`, para acotarla (se decide al arrancar). Antes: aplicar las
-   migraciones nuevas a la base `prisma` con respaldo, que el administrador (Ariel De
-   Simone, ya designado en la base `prisma`) le escriba al bot de administración con
-   `escuchar` corriendo, y reiniciar el listener con el código commiteado.
+1. *(Cerradas también: el token fuera de los errores de Telegram, y #7, íconos en los
+   botones —📋 tarea, ➕ Ver más, 💬 Quiero consultar otra cosa, ✅ Confirmar, ✖️ Cancelar,
+   ✏️ Otra opción— y saludo diario "👋 Buen día / Buenas tardes / Buenas noches", una vez
+   por persona por día local, con la migración `0018_saludo_diario`.)*
+2. **#9** indicador de "escribiendo" y borrador nativo animado sólo si la respuesta
+   tarda, sin demorarla nunca (pack 05). Incluye despachar la respuesta apenas está
+   lista (hoy espera el fin del lote en `escuchar` y hasta 20 s en `servir`) y un ADR
+   para el borrador, que sería una excepción nueva a "todo sale por la cola".
+3. **Tercera ronda por Telegram**: entrega con evidencia y "Pedir cambios" (guion de dos
+   circuitos en `odd/tasks/prisma-orienta.md`), avisos al administrador, íconos, saludo
+   e indicador. Probablemente con `escuchar --sin-cadencias` (se decide al arrancar).
+   Antes: respaldo, aplicar `0018` (y lo que agregue #9) a la base `prisma`, reiniciar
+   el listener con el código commiteado y que el administrador (Ariel De Simone, ya
+   designado) le escriba al bot de administración con `escuchar` corriendo.
+4. Después de la ronda: **#23** el validador de invariantes
+   (`odd/tasks/validador-invariantes.md`), los escenarios del banco que fallan desde
+   antes de `b-0005-b` (`b-0001`, `b-0001-a`, `b-0002-c`, `b-0013`) y T7d (`sembrar`).
 
 Sin bloquear la ronda: `despachador._fallo` (`message_outbox`) reintenta sin espera en
 horario laboral (`cal.dentro_de_jornada(ahora)` devuelve `ahora`); y el bot de

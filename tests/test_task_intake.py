@@ -26,6 +26,8 @@ from prisma.db import admin, autoridad, conectar, espacio
 from prisma.despachador import TransporteDePrueba, despachar
 from prisma.llm import (IntentAction, IntentRoute, ProveedorAnthropic,
                         Respuesta, RoutingError)
+from prisma.salida import (ICONO_TAREA, con_icono, etiqueta_sin_icono,
+                           etiquetas_coinciden)
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -103,7 +105,11 @@ def _active_choices(cur, request_id):
 
 
 def _choose(cur, actor, request_id, label, chat_id=71001):
-    token = _active_choices(cur, request_id)[label]
+    # Ignora el ícono de categoría (íconos, decisión del usuario,
+    # 2026-09-28): ver `salida.etiquetas_coinciden`.
+    opciones = _active_choices(cur, request_id)
+    etiqueta = next(e for e in opciones if etiquetas_coinciden(e, label))
+    token = opciones[etiqueta]
     return I.resolve_choice(cur, actor, token=token, chat_id=chat_id, now=NOW)
 
 
@@ -229,7 +235,8 @@ def test_objective_callback_commits_once_dispatches_next_prompt_and_replays_iner
         "enviados": 1, "pospuestos": 0, "fallidos": 0, "descartados": 0}
     assert len(transport.enviados) == 1
     assert {button.etiqueta for button in transport.enviados[0].botones} == {
-        "Para mí", "Sam North 1", "Sam Noble 1", "Otra opción"}
+        con_icono("Para mí", ICONO_TAREA), con_icono("Sam North 1", ICONO_TAREA),
+        con_icono("Sam Noble 1", ICONO_TAREA), I.OTHER}
 
 
 @pytest.mark.parametrize("invalid", ("actor", "chat", "request", "version"))
@@ -428,7 +435,7 @@ def test_model_values_are_proposed_with_exact_inbound_lineage(intake_world, conn
                        {"title", "objective", "responsible", "due_date",
                         "acceptance_criterion"} for f in fields)
         assert set(_active_choices(cur, outcome.request_id)) == {
-            "Sí", "No", "Otra opción"}
+            "Sí", "No", I.OTHER}
         assert actor.nombre and actor.nombre not in outcome.text
 
 
@@ -446,7 +453,7 @@ def test_one_active_request_offers_explicit_conflict_choices(intake_world, conn)
         assert cur.fetchone()["n"] == 1
         assert second.request_id == first.request_id
         assert set(_active_choices(cur, first.request_id)) == {
-            "Continuar borrador", "Cancelar borrador", "Empezar otro",
+            "Continuar borrador", I.CANCELAR_BORRADOR, "Empezar otro",
         }
 
 
@@ -501,7 +508,7 @@ def test_concurrent_starts_converge_without_unique_violation(
         )
         assert cur.fetchone()["n"] == 1
         assert set(_active_choices(cur, outcomes[0].request_id)) == {
-            "Continuar borrador", "Cancelar borrador", "Empezar otro",
+            "Continuar borrador", I.CANCELAR_BORRADOR, "Empezar otro",
         }
 
 
@@ -511,7 +518,7 @@ def test_other_atomically_invalidates_siblings_and_opens_exact_slot(
     with espacio(conn, ws) as cur:
         actor, outcome = _start(cur, intake_world)
         choices = _active_choices(cur, outcome.request_id)
-        other = choices["Otra opción"]
+        other = choices[I.OTHER]
         stale_confirm = choices["Sí"]
         I.resolve_choice(cur, actor, token=other, chat_id=71001, now=NOW)
         replay = I.resolve_choice(cur, actor, token=stale_confirm,
@@ -572,13 +579,13 @@ def test_ambiguous_known_entities_are_server_candidates_with_other(
         _choose(cur, actor, outcome.request_id, "Sí")
         objective_choices = _active_choices(cur, outcome.request_id)
         assert any("Reduce service delay" in x for x in objective_choices)
-        assert "Otra opción" in objective_choices
+        assert I.OTHER in objective_choices
         objective = next(x for x in objective_choices if "Reduce service delay" in x)
         _choose(cur, actor, outcome.request_id, objective)
         people = _active_choices(cur, outcome.request_id)
         assert any("Sam North" in x for x in people)
         assert any("Sam Noble" in x for x in people)
-        assert "Para mí" in people and "Otra opción" in people
+        assert con_icono("Para mí", ICONO_TAREA) in people and I.OTHER in people
 
 
 def test_objective_exact_free_text_match_is_not_limited_to_first_page(
@@ -600,7 +607,7 @@ def test_objective_exact_free_text_match_is_not_limited_to_first_page(
     with espacio(conn, ws) as cur:
         actor, outcome = _start(cur, intake_world, objective=None)
         _choose(cur, actor, outcome.request_id, "Sí")
-        assert "Ver más" in _active_choices(cur, outcome.request_id)
+        assert I.VER_MAS in _active_choices(cur, outcome.request_id)
         _choose(cur, actor, outcome.request_id, "Otra opción")
         cur.execute(
             """insert into inbound_message
@@ -642,10 +649,10 @@ def test_candidate_pages_are_bounded_and_reach_every_objective(
         while True:
             choices = _active_choices(cur, outcome.request_id)
             assert len(choices) <= I.CANDIDATE_PAGE_SIZE + 2
-            assert "Otra opción" in choices
-            shown.update(label for label in choices
-                         if label not in {"Ver más", "Otra opción"})
-            if "Ver más" not in choices:
+            assert I.OTHER in choices
+            shown.update(etiqueta_sin_icono(label) for label in choices
+                         if label not in {I.VER_MAS, I.OTHER})
+            if I.VER_MAS not in choices:
                 break
             _choose(cur, actor, outcome.request_id, "Ver más")
         assert inserted <= shown
@@ -671,11 +678,11 @@ def test_no_match_model_proposal_still_pages_known_objectives_before_free_text(
         while True:
             choices = _active_choices(cur, outcome.request_id)
             assert len(choices) <= I.CANDIDATE_PAGE_SIZE + 2
-            assert "Otra opción" in choices
-            assert "Cancelar borrador" not in choices
-            shown.update(label for label in choices
-                         if label not in {"Ver más", "Otra opción"})
-            if "Ver más" not in choices:
+            assert I.OTHER in choices
+            assert I.CANCELAR_BORRADOR not in choices
+            shown.update(etiqueta_sin_icono(label) for label in choices
+                         if label not in {I.VER_MAS, I.OTHER})
+            if I.VER_MAS not in choices:
                 break
             _choose(cur, _actor(cur, intake_world), outcome.request_id, "Ver más")
         assert inserted <= shown
@@ -697,7 +704,7 @@ def test_empty_entity_set_offers_simple_cancel_instead_of_free_text(
             cur, intake_world, objective="missing", buttons_first=True)
         assert outcome.text == I.NO_CANDIDATES
         assert set(_active_choices(cur, outcome.request_id)) == {
-            "Cancelar borrador"}
+            I.CANCELAR_BORRADOR}
         assert not any(term in outcome.text.casefold()
                        for term in ("intake", "request_id", "draft_id"))
         cur.execute(
@@ -850,7 +857,7 @@ def test_oversized_server_configuration_fails_closed_without_user_field_loop(
         last = outcome
         for _ in range(8):
             choices = _active_choices(cur, outcome.request_id)
-            if set(choices) == {"Cancelar borrador"}:
+            if set(choices) == {I.CANCELAR_BORRADOR}:
                 break
             preferred = next((label for label in choices if label == I.CONFIRM), None)
             preferred = preferred or next(
@@ -862,7 +869,7 @@ def test_oversized_server_configuration_fails_closed_without_user_field_loop(
             assert preferred
             last = _choose(cur, actor, outcome.request_id, preferred)
         assert last.text == I.CONFIG_ERROR
-        assert set(_active_choices(cur, outcome.request_id)) == {"Cancelar borrador"}
+        assert set(_active_choices(cur, outcome.request_id)) == {I.CANCELAR_BORRADOR}
         cur.execute(
             """select count(*) n from task_intake_free_text_slot
                 where request_id = %s and estado = 'active'""",
@@ -950,7 +957,7 @@ def test_choice_race_has_one_winner_and_persisted_inert_loser(
             other.close()
 
     threads = [threading.Thread(target=click, args=(tokens[label],))
-               for label in ("Sí", "Otra opción")]
+               for label in ("Sí", I.OTHER)]
     for thread in threads:
         thread.start()
     for thread in threads:
@@ -1252,7 +1259,7 @@ def test_varied_task_creation_routes_open_server_choices_first(
                     (request["task_draft_id"],))
         assert cur.fetchone()["estado"] == "open"
         choices = _active_choices(cur, str(request["id"]))
-        assert "Otra opción" in choices
+        assert I.OTHER in choices
         assert any("Reduce service delay" in label for label in choices)
         cur.execute(
             """select * from message_outbox
@@ -1589,6 +1596,15 @@ def _retrato_de_aislamiento(url, tablas):
     tipo, ni la nulabilidad, ni ningún privilegio -- y sin este campo
     `test_los_rollbacks_devuelven_la_base_al_estado_anterior` la daría por
     "no cambió nada observable", igual que si el rollback fuera vacío.
+
+    `to_regclass(%s)` en vez de `%s::regclass` (pack 06, migración 0018,
+    `greeting_state`): la primera migración que crea una tabla nueva y
+    todavía no existe en instantáneas anteriores de la cadena -- necesario
+    para que `test_los_rollbacks_devuelven_la_base_al_estado_anterior` pueda
+    seguir esa misma tabla desde ANTES de que exista (0002-0017) sin que el
+    cast reviente por relación inexistente; `to_regclass` devuelve `null` en
+    vez de fallar, y las tres consultas de abajo devuelven cero filas para
+    una tabla que todavía no está.
     """
     import psycopg
     from psycopg.rows import dict_row
@@ -1603,15 +1619,15 @@ def _retrato_de_aislamiento(url, tablas):
                     order by column_name""", (tabla,)).fetchall()
             seguridad = db.execute(
                 """select relrowsecurity, relforcerowsecurity
-                     from pg_class where oid = %s::regclass""",
+                     from pg_class where oid = to_regclass(%s)""",
                 (f"prisma.{tabla}",)).fetchone()
             politicas = db.execute(
                 """select polname, pg_get_expr(polqual, polrelid) as expresion
-                     from pg_policy where polrelid = %s::regclass
+                     from pg_policy where polrelid = to_regclass(%s)
                     order by polname""", (f"prisma.{tabla}",)).fetchall()
             disparadores = db.execute(
                 """select tgname from pg_trigger
-                    where tgrelid = %s::regclass and not tgisinternal
+                    where tgrelid = to_regclass(%s) and not tgisinternal
                     order by tgname""", (f"prisma.{tabla}",)).fetchall()
             permisos = db.execute(
                 """select privilege_type from information_schema.role_table_grants
@@ -1671,7 +1687,7 @@ def test_los_rollbacks_devuelven_la_base_al_estado_anterior():
     from psycopg.sql import SQL, Identifier
 
     tablas = ("task_state_event", "objective_state_event",
-              "absence", "audit_log", "incident")
+              "absence", "audit_log", "incident", "greeting_state")
     nombre = f"prisma_rollback_{uuid.uuid4().hex[:10]}"
     with psycopg.connect(maintenance, autocommit=True) as control:
         control.execute(SQL("create database {}").format(Identifier(nombre)))
@@ -1737,7 +1753,8 @@ def test_instalacion_limpia_y_base_migrada_convergen_en_el_aislamiento():
     # sus privilegios sí tienen que converger: divergían, y nada lo veía
     # porque las bases de prueba se construyen desde el esquema limpio.
     tablas = ("task_state_event", "objective_state_event",
-              "absence", "audit_log", "incident", "acceso_tablero")
+              "absence", "audit_log", "incident", "acceso_tablero",
+              "greeting_state")
     con_politica = set(tablas) - {"acceso_tablero"}
     sufijo = uuid.uuid4().hex[:10]
     nombres = {"limpia": f"prisma_limpia_{sufijo}",

@@ -21,6 +21,7 @@ from fastapi.testclient import TestClient
 from prisma import gateway
 from prisma import herramientas as H
 from prisma import pendientes as P
+from prisma.salida import ETIQUETA_CANCELAR, ETIQUETA_CONFIRMAR
 from prisma.agente import responder
 from prisma.autoridad import Canal, Denegado, identificar
 from prisma.calendario import Calendario
@@ -102,7 +103,7 @@ def test_los_tres_botones_aparecen_en_orden_en_la_herramienta_que_escribe(
             """select etiqueta from pending_action_option
                 where pending_action_id = %s order by orden""", (pid,))
         etiquetas = [f["etiqueta"] for f in cur.fetchall()]
-        assert etiquetas == ["Confirmar", "Modificar", "Cancelar"]
+        assert etiquetas == [ETIQUETA_CONFIRMAR, "Modificar", ETIQUETA_CANCELAR]
 
 
 def test_la_confirmacion_vieja_sin_preparar_sigue_con_dos_botones(
@@ -126,7 +127,7 @@ def test_la_confirmacion_vieja_sin_preparar_sigue_con_dos_botones(
                  join pending_action p on p.id = o.pending_action_id
                 where p.herramienta = 'cambiar_fecha' order by o.orden""")
         etiquetas = [f["etiqueta"] for f in cur.fetchall()]
-        assert etiquetas == ["Confirmar", "Cancelar"]
+        assert etiquetas == [ETIQUETA_CONFIRMAR, ETIQUETA_CANCELAR]
 
 
 def test_elegir_entre_personas_no_lleva_los_botones_de_confirmacion(

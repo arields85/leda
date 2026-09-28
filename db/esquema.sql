@@ -158,6 +158,24 @@ create table absence (
 
 create index absence_ws on absence (workspace_id, membership_id);
 
+-- Saludo diario (pack 06; `saludo.py`). Una fila por persona -- nunca por
+-- turno ni por chat -- con la última fecha LOCAL (zona del espacio,
+-- `workspace.zona_horaria`) en la que ya se le antepuso el saludo a una
+-- respuesta. "No saludar de nuevo" es la reserva de esta tabla, nunca una
+-- instrucción al modelo (el pack de referencia registra que esa instrucción
+-- sola no alcanzaba). `reclamar_saludo` (`saludo.py`) hace el `upsert`
+-- atómico; la bienvenida de incorporación (`onboarding.bienvenida`)
+-- reclama esta misma fila sin pasar por el saludo por hora -- cuenta como el
+-- saludo de esa fecha (pack 06 §3).
+create table greeting_state (
+  membership_id       uuid primary key references membership(id) on delete cascade,
+  workspace_id        uuid not null references workspace(id) on delete cascade,
+  ultima_fecha_local  date not null
+);
+
+comment on table greeting_state is
+  'Saludo diario (pack 06): última fecha local en la que ya se saludó a esta persona. Una fila por membership, nunca por turno -- reclamada atómicamente por saludo.reclamar_saludo.';
+
 -- Telegram no permite que un bot inicie una conversación privada con alguien
 -- que nunca le escribió. Cada persona tiene que abrir su enlace una vez.
 --
@@ -2036,7 +2054,7 @@ begin
     'task_intake_field','task_intake_choice_set','task_intake_choice',
     'task_intake_free_text_slot',
     'cadence_job','escalation_route','glossary_term','approval_policy',
-    'workspace_setting','message_template','permission']
+    'workspace_setting','message_template','permission','greeting_state']
   loop
     execute format('alter table %I enable row level security', t);
     execute format('alter table %I force row level security', t);

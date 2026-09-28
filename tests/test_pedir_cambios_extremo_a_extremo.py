@@ -29,6 +29,7 @@ from fastapi.testclient import TestClient
 
 from prisma import gateway
 from prisma import pendientes as P
+from prisma.salida import etiquetas_coinciden
 from prisma.agente import responder
 from prisma.autoridad import Canal, identificar
 from prisma.calendario import Calendario
@@ -174,7 +175,8 @@ def _confirmar(cliente, conn, ws, herramienta, chat_id, tg_user):
     real, nunca `herramientas.ejecutar` directo."""
     with admin(conn) as cur:
         pid = _pendiente(cur, ws, herramienta, chat_id=chat_id)
-        token = next(f["token"] for f in _opciones(cur, pid) if f["etiqueta"] == "Confirmar")
+        token = next(f["token"] for f in _opciones(cur, pid)
+                    if etiquetas_coinciden(f["etiqueta"], "Confirmar"))
     return _tocar(cliente, token, tg_user)
 
 
@@ -210,7 +212,9 @@ def _abrir_menu(cliente, conn, ws, monkeypatch, tarea_id, quien_nombre, tg, *,
 
 
 def _tocar_etiqueta(cliente, filas, etiqueta, tg):
-    fila = next(f for f in filas if f["etiqueta"] == etiqueta)
+    # Ignora el ícono de categoría (íconos, decisión del usuario,
+    # 2026-09-28): ver `salida.etiquetas_coinciden`.
+    fila = next(f for f in filas if etiquetas_coinciden(f["etiqueta"], etiqueta))
     assert _tocar(cliente, fila["token"], tg).status_code == 200
 
 

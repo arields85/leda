@@ -26,6 +26,7 @@ from prisma.calendario import Calendario
 from prisma.db import admin, espacio
 from prisma.despachador import TransporteDePrueba, despachar
 from prisma.llm import ProveedorGuionado, Respuesta
+from prisma.salida import ETIQUETA_CANCELAR, ETIQUETA_CONFIRMAR
 
 BA = ZoneInfo("America/Argentina/Buenos_Aires")
 AHORA = datetime(2026, 7, 27, 10, 0, tzinfo=BA)
@@ -96,7 +97,7 @@ def test_un_mensaje_con_accion_pendiente_sale_con_sus_opciones(corework, conn):
 
         assert transporte.enviados[0].texto == "Confirmame esto"
         etiquetas = [b.etiqueta for b in transporte.enviados[0].botones]
-        assert etiquetas == ["Confirmar", "Cancelar"]
+        assert etiquetas == [ETIQUETA_CONFIRMAR, ETIQUETA_CANCELAR]
 
 
 def test_un_mensaje_comun_sale_sin_botones(corework, conn):

@@ -27,7 +27,9 @@ from typing import Any
 import psycopg
 
 from .autoridad import Denegado, Solicitante
-from .salida import normalize_visible_text, prepare_buttons, prepare_payload
+from .salida import (ETIQUETA_CANCELAR, ETIQUETA_CONFIRMAR, ICONO_SALIR_OPCIONES,
+                     ICONO_VER_MAS, con_icono, etiquetas_coinciden,
+                     normalize_visible_text, prepare_buttons, prepare_payload)
 
 # Lo que Telegram manda de vuelta al apretar un botón. El tope son 64 bytes,
 # así que viaja un token corto y la acción queda en la base.
@@ -76,14 +78,14 @@ AVISO_ENTREGA = "entrega"
 # 1: "siempre hay una salida"). Vive acá, no repetida en cada lugar que la
 # usa, para que el menú de tarea (T2) y `ofrecer_opciones` (T1) muestren
 # exactamente la misma etiqueta.
-ETIQUETA_SALIR_OPCIONES = "Quiero consultar otra cosa"
+ETIQUETA_SALIR_OPCIONES = con_icono("Quiero consultar otra cosa", ICONO_SALIR_OPCIONES)
 
 # T3 (`prisma-orienta`, ADR 0007 punto 3): la lista de tareas que arma el
 # servidor cuando el modelo usa `consultar_tareas` pagina con este botón, sin
 # volver a llamar al modelo -- mismo lugar que `ETIQUETA_SALIR_OPCIONES` para
 # que `agente.py` (arma la primera página) y `gateway.py` (arma las
 # siguientes al tocar "Ver más") muestren la misma etiqueta.
-ETIQUETA_VER_MAS = "Ver más"
+ETIQUETA_VER_MAS = con_icono("Ver más", ICONO_VER_MAS)
 
 
 @dataclass(frozen=True)
@@ -165,8 +167,8 @@ def registrar(cur: psycopg.Cursor, quien: Solicitante, *, herramienta: str,
     los llamados a `registrar` (elegir, borrador) no la usan.
     """
     resumen = normalize_visible_text(resumen)
-    a_crear = opciones if opciones is not None else [("Confirmar", True),
-                                                      ("Cancelar", False)]
+    a_crear = opciones if opciones is not None else [(ETIQUETA_CONFIRMAR, True),
+                                                      (ETIQUETA_CANCELAR, False)]
     prepare_payload(resumen, dedupe_key="pending", has_buttons=True)
     prepare_buttons([(etiqueta, "p:placeholder") for etiqueta, _ in a_crear])
     cur.execute(
@@ -231,8 +233,12 @@ def opciones(cur: psycopg.Cursor, pendiente_id: str) -> list[Opcion]:
 
 def opcion_por_etiqueta(cur: psycopg.Cursor, pendiente_id: str,
                         etiqueta: str) -> Opcion:
+    """Busca una opción por su etiqueta, sin importar el ícono de categoría
+    (`salida.etiquetas_coinciden`): así una prueba o el banco que sigue
+    tocando "Confirmar" sin ícono encuentra igual el botón real, ya armado
+    como "✅ Confirmar"."""
     for o in opciones(cur, pendiente_id):
-        if o.etiqueta == etiqueta:
+        if etiquetas_coinciden(o.etiqueta, etiqueta):
             return o
     raise LookupError(f"La acción {pendiente_id} no ofrece '{etiqueta}'.")
 

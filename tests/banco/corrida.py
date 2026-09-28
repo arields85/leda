@@ -25,6 +25,7 @@ from prisma.db import admin
 from prisma.jev import ClienteJevGuionado
 from prisma.llm import (IntentAction, IntentRoute, Llamada, Proveedor,
                         ProveedorGuionado, Respuesta)
+from prisma.salida import etiquetas_coinciden
 
 # 'objective', 'evidence' y 'approval' se agregaron en T4 (banco-conversacional
 # -> vista-previa-y-confirmacion): son las tablas que escriben crear_objetivo,
@@ -585,13 +586,17 @@ def _candidatas_tarea_por_titulo(opciones: list[dict]) -> list[tuple[str, str]]:
 def _resolver_opcion_toque(opciones: list[dict], toque: dict) -> dict | None:
     """Resuelve un toque genérico de escenario (T4) contra las opciones
     REALES de una acción pendiente (`_opciones_pendiente`). `etiqueta`:
-    coincidencia exacta de texto. `indice`: posición 0-based en el orden en
-    que se ofrecieron (`pending_action_option.orden`, ya el orden de
-    `_opciones_pendiente`). `None` si ninguna opción matchea -- nunca se
+    coincidencia de texto ignorando el ícono de categoría de cualquiera de
+    las dos etiquetas (íconos, decisión del usuario, 2026-09-28; ver
+    `salida.etiquetas_coinciden`) -- un escenario escrito con la etiqueta
+    "pelada" sigue tocando la opción real. `indice`: posición 0-based en el
+    orden en que se ofrecieron (`pending_action_option.orden`, ya el orden
+    de `_opciones_pendiente`). `None` si ninguna opción matchea -- nunca se
     inventa un token; la falta queda visible como corrida `bloqueado` (el
     escenario pidió un toque que la propuesta real no ofrece)."""
     if "etiqueta" in toque:
-        return next((o for o in opciones if o["etiqueta"] == toque["etiqueta"]), None)
+        return next((o for o in opciones
+                    if etiquetas_coinciden(o["etiqueta"], toque["etiqueta"])), None)
     indice = toque["indice"]
     return opciones[indice] if 0 <= indice < len(opciones) else None
 
@@ -820,9 +825,15 @@ def ejecutar_escenario(
                 else:
                     etiquetas_aclaracion_ofrecidas.extend(
                         o["etiqueta"] for o in opciones_aclaracion)
+                    # Ignora el ícono de categoría (íconos, decisión del
+                    # usuario, 2026-09-28): un escenario que pide "elegir" por
+                    # la etiqueta pelada sigue resolviendo la opción real, ya
+                    # armada con su "📋 ".
                     token = next(
                         (o["token"] for o in opciones_aclaracion
-                         if o["etiqueta"] == aclaracion_esperada.get("elegir")), None)
+                         if etiquetas_coinciden(o["etiqueta"],
+                                                aclaracion_esperada.get("elegir") or "")),
+                        None)
                 if token is not None:
                     coincidencias_aclaracion.append((pid, token))
 

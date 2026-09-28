@@ -34,7 +34,8 @@ from prisma.calendario import Calendario
 from prisma.contexto import PREAMBULO, construir
 from prisma.db import admin, espacio
 from prisma.llm import Llamada, ProveedorGuionado, Respuesta
-from prisma.salida import (BUTTON_TEXT_LIMIT, OBJETIVO_ETIQUETA_BOTON,
+from prisma.salida import (BUTTON_TEXT_LIMIT, ICONO_TAREA,
+                             OBJETIVO_ETIQUETA_BOTON, etiqueta_sin_icono,
                              normalize_visible_text, telegram_utf16_units)
 
 
@@ -150,7 +151,7 @@ def test_opciones_de_texto_arman_botones_con_la_salida(corework, conn, monkeypat
 
     etiquetas = [f["etiqueta"] for f in filas]
     assert etiquetas == ["El Dashboard de lotes", "La Integración de datos",
-                        "Quiero consultar otra cosa"]
+                        "💬 Quiero consultar otra cosa"]
 
 
 # ---------------------------------------------------------------------------
@@ -590,7 +591,10 @@ def test_etiqueta_del_modelo_corta_se_respeta_tal_cual(corework, conn, monkeypat
         pid = _pendiente_opciones(cur, ws)
         etiqueta = _opciones(cur, pid)[0]["etiqueta"]
 
-    assert etiqueta == etiqueta_modelo    # exacta: ni cortada ni con "…"
+    # Ícono de tarea aparte (T1 vía `ofrecer_opciones`, íconos): el texto
+    # elegido por el modelo sigue exacto, ni cortado ni con "…".
+    assert etiqueta.startswith(f"{ICONO_TAREA} ")
+    assert etiqueta_sin_icono(etiqueta) == etiqueta_modelo
 
 
 def test_etiqueta_del_modelo_larga_se_acorta_en_limite_de_palabra(
@@ -615,8 +619,10 @@ def test_etiqueta_del_modelo_larga_se_acorta_en_limite_de_palabra(
         pid = _pendiente_opciones(cur, ws)
         etiqueta = _opciones(cur, pid)[0]["etiqueta"]
 
-    assert etiqueta.endswith("…")
-    sin_elipsis = etiqueta[:-1].rstrip()
+    assert etiqueta.startswith(f"{ICONO_TAREA} ")
+    sin_icono = etiqueta_sin_icono(etiqueta)
+    assert sin_icono.endswith("…")
+    sin_elipsis = sin_icono[:-1].rstrip()
     assert etiqueta_modelo.startswith(sin_elipsis)
     assert sin_elipsis in [
         " ".join(etiqueta_modelo.split(" ")[:n])
@@ -644,8 +650,10 @@ def test_etiqueta_de_tarea_sin_etiqueta_propia_sale_del_titulo(
         pid = _pendiente_opciones(cur, ws)
         etiqueta = _opciones(cur, pid)[0]["etiqueta"]
 
-    assert etiqueta.endswith("…")
-    assert titulo.startswith(etiqueta[:-1].rstrip())
+    assert etiqueta.startswith(f"{ICONO_TAREA} ")
+    sin_icono = etiqueta_sin_icono(etiqueta)
+    assert sin_icono.endswith("…")
+    assert titulo.startswith(sin_icono[:-1].rstrip())
 
 
 # ---------------------------------------------------------------------------
@@ -738,7 +746,7 @@ def test_salida_cierra_sin_efecto_y_no_llama_al_modelo(
                  ahora=datetime.now(timezone.utc))
         pid = _pendiente_opciones(cur, ws)
         salir = next(o for o in _opciones(cur, pid)
-                    if o["etiqueta"] == "Quiero consultar otra cosa")
+                    if o["etiqueta"] == P.ETIQUETA_SALIR_OPCIONES)
         tg = _telegram_id(cur, "Marcos Tarquini")
 
     llamadas_antes = len(proveedor.recibidos)
@@ -784,7 +792,7 @@ def test_salida_nombra_la_pregunta_cerrada_en_vez_de_un_texto_fijo(
                  ahora=datetime.now(timezone.utc))
         pid = _pendiente_opciones(cur, ws)
         salir = next(o for o in _opciones(cur, pid)
-                    if o["etiqueta"] == "Quiero consultar otra cosa")
+                    if o["etiqueta"] == P.ETIQUETA_SALIR_OPCIONES)
         tg = _telegram_id(cur, "Marcos Tarquini")
 
     assert _tocar(cliente, salir["token"], tg).status_code == 200
@@ -827,7 +835,7 @@ def test_traer_el_tema_de_nuevo_reabre_la_pregunta_normalmente(
                  ahora=datetime.now(timezone.utc))
         pid = _pendiente_opciones(cur, ws)
         salir = next(o for o in _opciones(cur, pid)
-                    if o["etiqueta"] == "Quiero consultar otra cosa")
+                    if o["etiqueta"] == P.ETIQUETA_SALIR_OPCIONES)
         tg = _telegram_id(cur, "Marcos Tarquini")
 
     assert _tocar(cliente, salir["token"], tg).status_code == 200

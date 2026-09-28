@@ -27,9 +27,11 @@ from psycopg.types.json import Jsonb
 from .autoridad import (Denegado, Solicitante, puede_aprobar_tarea,
                          requiere_confirmacion, verificar)
 from .incidentes import registrar_incidente
-from .salida import (OBJETIVO_ETIQUETA_BOTON, enqueue_outbox,
-                     etiquetas_boton_distinguibles, normalize_visible_text,
-                     telegram_utf16_units, truncar_etiqueta_boton)
+from .salida import (ICONO_TAREA, OBJETIVO_ETIQUETA_BOTON,
+                     TRUNCAR_ETIQUETA_BOTON, con_icono, costo_icono,
+                     enqueue_outbox, etiquetas_boton_distinguibles,
+                     normalize_visible_text, telegram_utf16_units,
+                     truncar_etiqueta_boton)
 
 
 @dataclass(frozen=True)
@@ -406,11 +408,18 @@ def _ofrecer_opciones(cur, quien: Solicitante, pregunta, opciones):
             else:
                 bases.append(et or v["titulo"])
                 fijas.append(False)
-        etiquetas = etiquetas_boton_distinguibles(bases, fijas=fijas)
+        # El presupuesto se achica por `costo_icono(ICONO_TAREA)` antes de
+        # truncar/desambiguar (íconos, decisión del usuario, 2026-09-28): el
+        # ícono se antepone recién después de este armado, sobre la etiqueta
+        # ya corta -- mismo criterio que `agente._opciones_lista_tareas`.
+        _costo = costo_icono(ICONO_TAREA)
+        etiquetas = etiquetas_boton_distinguibles(
+            bases, fijas=fijas, objetivo=OBJETIVO_ETIQUETA_BOTON - _costo,
+            limite=TRUNCAR_ETIQUETA_BOTON - _costo)
         for i, etiqueta in zip(indices_tarea, etiquetas):
             if not etiqueta:
                 raise Denegado("La etiqueta de una opción no puede quedar vacía.")
-            validadas[i]["etiqueta"] = etiqueta
+            validadas[i]["etiqueta"] = con_icono(etiqueta, ICONO_TAREA)
 
     armadas: list[OpcionOfrecida] = []
     for v in validadas:

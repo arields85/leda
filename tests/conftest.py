@@ -45,6 +45,28 @@ class _SensitiveUrl(str):
         return "<redacted-db-url>"
 
 
+def _blindar_contra_saludo(cur, workspace_id: str) -> None:
+    """Marca a todas las personas de un espacio como ya saludadas hoy, en una
+    fecha muy lejana (saludo diario, pack 06).
+
+    El saludo es una nueva pieza determinística que se antepone a la primera
+    respuesta del día de cualquier persona: sin esto, cada prueba que arma un
+    `Solicitante` recién creado por estas fixtures compartidas se volvería,
+    sin quererlo, una prueba del saludo -- decenas de aserciones de texto
+    exacto en pruebas que no tienen nada que ver con el pack 06 empezarían a
+    fallar por un "👋 Buen día" que nadie pidió. Una fecha bien futura (nunca
+    alcanzada por el `ahora` fijo de ninguna prueba) hace que
+    `saludo.reclamar_saludo` nunca vuelva a ganar la reserva para estas
+    personas. Las pruebas que SÍ ejercitan el saludo (`tests/test_saludo.py`)
+    manejan su propia fila de `greeting_state`, sin pasar por acá."""
+    cur.execute(
+        """insert into greeting_state (membership_id, workspace_id, ultima_fecha_local)
+             select id, workspace_id, date '9999-12-31' from membership
+              where workspace_id = %s
+           on conflict (membership_id) do nothing""",
+        (workspace_id,))
+
+
 def _aplicar_esquema(url: str) -> None:
     import psycopg
 
@@ -182,6 +204,10 @@ def corework(conn, tmp_path):
     tmp = tmp_path / "corework.yaml"
     tmp.write_text(yaml.safe_dump(pack, allow_unicode=True), "utf-8")
     r = importar(conn, tmp, activar=True)
+    from prisma.db import admin
+
+    with admin(conn) as cur:
+        _blindar_contra_saludo(cur, r.workspace_id)
     conn.commit()
     return r
 
@@ -298,6 +324,7 @@ def intake_world(conn):
                     (ws, f"{title} {index + 1}"),
                 )
                 objectives.append(str(cur.fetchone()["id"]))
+            _blindar_contra_saludo(cur, ws)
             workspaces[slug] = {
                 "id": ws, "areas": areas, "people": people,
                 "objectives": objectives,

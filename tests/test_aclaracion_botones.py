@@ -31,7 +31,7 @@ from prisma.db import admin, espacio
 from prisma.jev import ClienteJevGuionado
 from prisma.llm import (IntentAction, IntentRoute, Llamada, ProveedorGuionado,
                         Respuesta)
-from prisma.salida import acortar_etiqueta_boton
+from prisma.salida import ICONO_TAREA, acortar_etiqueta_boton, con_icono
 
 
 def _quien(cur, nombre, ws):
@@ -220,8 +220,10 @@ def test_botones_propia_primero_ajena_con_nombre_y_titulo_truncado(
     # Límite de palabra, no de carácter, y sin dejar "la" (palabra de función)
     # justo antes de la elipsis (hallazgo 7).
     assert corto == "Actualizar toda…"
-    assert etiquetas == ["Programar PLC", "Cablear tablero máq. 3 — Mariano",
-                        f"{corto} — Mariano", "Ninguna, lo escribo"]
+    assert etiquetas == [con_icono("Programar PLC", ICONO_TAREA),
+                        con_icono("Cablear tablero máq. 3 — Mariano", ICONO_TAREA),
+                        con_icono(f"{corto} — Mariano", ICONO_TAREA),
+                        "Ninguna, lo escribo"]
     assert valores[0] == propia
     assert valores[1] == ajena
     assert valores[2] == larga
@@ -260,7 +262,7 @@ def test_elegir_candidata_retoma_y_llega_a_la_vista_previa_sin_aplicar_nada(
         pid = _aclaracion_esperando(cur, ws)
         filas = _opciones(cur, pid)
         primera = filas[0]                     # "Cablear tablero máq. 3" (T1, 0.5)
-        assert primera["etiqueta"] == "Cablear tablero máq. 3"
+        assert primera["etiqueta"] == con_icono("Cablear tablero máq. 3", ICONO_TAREA)
         token = primera["token"]
         tg = _telegram_id(cur, "Marcos Tarquini")
 
@@ -633,9 +635,9 @@ def test_alta_de_tarea_con_referencia_varias_pregunta_en_vez_de_arrancar_sola(
     etiquetas = [f["etiqueta"] for f in filas]
     valores = [f["valor"] for f in filas]
     assert etiquetas[-2:] == ["Es una tarea nueva", "Ninguna, lo escribo"]
-    assert etiquetas[0] == "Cablear tablero máq. 3"          # propia primero, sin nombre
+    assert etiquetas[0] == con_icono("Cablear tablero máq. 3", ICONO_TAREA)  # propia primero, sin nombre
     assert valores[0] == propia
-    assert "Revisar accesos VPN — Mariano" in etiquetas
+    assert con_icono("Revisar accesos VPN — Mariano", ICONO_TAREA) in etiquetas
     assert valores[1] == ajena
 
     with admin(conn) as cur:

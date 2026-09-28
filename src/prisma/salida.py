@@ -33,6 +33,22 @@ TRUNCAR_ETIQUETA_BOTON = 48
 # duro histórico, ahora sólo el último recurso cuando ni una palabra entera
 # entra en el objetivo).
 OBJETIVO_ETIQUETA_BOTON = 30
+# Iconos de botón (decisión del usuario, 2026-09-28, pack 06 §6: "función,
+# no decoración"). Única fuente de la verdad de qué ícono le corresponde a
+# cada categoría de botón -- nunca repetido en cada módulo que arma botones.
+# `➕`/`💬`/`✅`/`✖️`/`✏️` son fijos, uno por categoría; `📋` marca cualquier
+# botón que representa una tarea (lista de tareas, candidatas de aclaración o
+# de dependencia, acciones del menú de una tarea, candidatas del alta
+# conversacional).
+ICONO_TAREA = "📋"
+ICONO_VER_MAS = "➕"
+ICONO_SALIR_OPCIONES = "💬"
+ICONO_CONFIRMAR = "✅"
+ICONO_CANCELAR = "✖️"
+ICONO_OTRA_OPCION = "✏️"
+_ICONOS_CONOCIDOS = (ICONO_TAREA, ICONO_VER_MAS, ICONO_SALIR_OPCIONES,
+                    ICONO_CONFIRMAR, ICONO_CANCELAR, ICONO_OTRA_OPCION)
+
 NO_EFFECT_STATUS = "Estado: sin cambios."
 _NO_EFFECT_PATTERNS = tuple(re.compile(pattern, re.IGNORECASE) for pattern in (
     r"\bno se (?:registr[oó]|modific[oó]|cambi[oó]) (?:nada|ning[uú]n cambio)\b",
@@ -57,6 +73,49 @@ class PreparedPayload:
 
 def telegram_utf16_units(text: str) -> int:
     return len(text.encode("utf-16-le")) // 2
+
+
+def con_icono(etiqueta: str, icono: str) -> str:
+    """Antepone el ícono de una categoría a una etiqueta de botón ya armada
+    (truncada y desambiguada). El ícono se agrega siempre al final, nunca se
+    recorta -- mismo criterio que el sufijo de responsable en
+    `gateway._etiqueta_boton`."""
+    return f"{icono} {etiqueta}"
+
+
+def costo_icono(icono: str) -> int:
+    """Cuánto le resta un ícono, más el espacio que lo separa del texto, al
+    presupuesto de una etiqueta de botón -- en unidades UTF-16
+    (`telegram_utf16_units`), la misma medida que usa Telegram para decidir
+    si un botón entra. Un emoji del plano astral como `ICONO_TAREA` ocupa dos
+    unidades UTF-16 aunque Python lo cuente como un solo carácter
+    (`len()`): quien arma una etiqueta de tarea tiene que descontar esto del
+    objetivo/límite ANTES de truncar el texto, para que el total (ícono +
+    texto) siga entrando en el mismo presupuesto que tenía el texto solo."""
+    return telegram_utf16_units(f"{icono} ")
+
+
+def etiqueta_sin_icono(etiqueta: str) -> str:
+    """La etiqueta sin su ícono de categoría, si tiene uno de los fijos de
+    arriba. El ícono es una marca visual, nunca parte de la identidad de la
+    opción -- ver `etiquetas_coinciden`."""
+    for icono in _ICONOS_CONOCIDOS:
+        prefijo = f"{icono} "
+        if etiqueta.startswith(prefijo):
+            return etiqueta[len(prefijo):]
+    return etiqueta
+
+
+def etiquetas_coinciden(a: str, b: str) -> bool:
+    """Compara dos etiquetas de botón ignorando el ícono de categoría de
+    cualquiera de las dos -- para que un toque simulado con la etiqueta
+    "pelada" (bancos, pruebas, código anterior a los íconos) siga resolviendo
+    la opción real, ya armada con su ícono."""
+    return etiqueta_sin_icono(a) == etiqueta_sin_icono(b)
+
+
+ETIQUETA_CONFIRMAR = con_icono("Confirmar", ICONO_CONFIRMAR)
+ETIQUETA_CANCELAR = con_icono("Cancelar", ICONO_CANCELAR)
 
 
 def normalize_visible_text(raw: Any) -> str:

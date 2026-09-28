@@ -13,12 +13,15 @@ from zoneinfo import ZoneInfo
 import psycopg
 from psycopg.types.json import Jsonb
 
+from . import saludo as S
 from .autoridad import Solicitante
 from .db import registrar_auditoria
 from .incidentes import registrar_incidente
-from .salida import (BUTTON_TEXT_LIMIT, PayloadValidationError, enqueue_outbox,
-                     normalize_visible_text, prepare_buttons, prepare_payload,
-                     telegram_utf16_units, with_no_effect_status)
+from .salida import (BUTTON_TEXT_LIMIT, ICONO_CANCELAR, ICONO_OTRA_OPCION,
+                     ICONO_TAREA, ICONO_VER_MAS, PayloadValidationError,
+                     con_icono, enqueue_outbox, normalize_visible_text,
+                     prepare_buttons, prepare_payload, telegram_utf16_units,
+                     with_no_effect_status)
 
 
 CALLBACK_PREFIX = "i:"
@@ -30,7 +33,12 @@ FIELDS = (
 )
 CONFIRM = "Sí"
 REJECT = "No"
-OTHER = "Otra opción"
+OTHER = con_icono("Otra opción", ICONO_OTRA_OPCION)
+# Íconos de botón (decisión del usuario, 2026-09-28): "Ver más" y "Cancelar
+# borrador" se repiten en varios puntos de este módulo -- una sola etiqueta
+# por texto, nunca un literal por lugar.
+VER_MAS = con_icono("Ver más", ICONO_VER_MAS)
+CANCELAR_BORRADOR = con_icono("Cancelar borrador", ICONO_CANCELAR)
 USER_FIELD_LIMITS = {
     "title": 200,
     "description": 800,
@@ -182,7 +190,7 @@ def start(cur: psycopg.Cursor, who: Solicitante, *, chat_id: int,
             "Ya hay un borrador de tarea en curso. Elegí cómo seguir.",
             [
                 ("Continuar borrador", "continue", None),
-                ("Cancelar borrador", "cancel", None),
+                (CANCELAR_BORRADOR, "cancel", None),
                 ("Empezar otro", "start_new", payload),
             ],
             now, kind="conflict",
@@ -582,7 +590,7 @@ def _configuration_error(cur, request, who, field, now):
     )
     return _open_choices(
         cur, request, None, CONFIG_ERROR,
-        [("Cancelar borrador", "cancel", None)], now, kind="config_error",
+        [(CANCELAR_BORRADOR, "cancel", None)], now, kind="config_error",
     )
 
 
@@ -762,19 +770,24 @@ def _open_entity_page(cur, request, who, field, query, offset, now):
     if not candidates:
         return _open_choices(
             cur, request, field, NO_CANDIDATES,
-            [("Cancelar borrador", "cancel", None)], now,
+            [(CANCELAR_BORRADOR, "cancel", None)], now,
             kind=f"no_candidates_{field}",
         )
-    options = [(label, "select", stored) for label, _, stored in candidates]
+    # Cada candidata es un botón que representa algo que va a quedar dentro
+    # de la tarea en curso (objetivo, responsable, área) -- mismo ícono que
+    # cualquier otro botón de tarea (íconos, decisión del usuario,
+    # 2026-09-28).
+    options = [(con_icono(label, ICONO_TAREA), "select", stored)
+              for label, _, stored in candidates]
     if has_more:
-        options.append(("Ver más", "more", {
+        options.append((VER_MAS, "more", {
             "field": field, "query": query,
             "offset": offset + CANDIDATE_PAGE_SIZE,
         }))
     options.append((OTHER, "other", None))
     if no_match:
         prompt = ("No encontré esa opción. Elegí una de las opciones vigentes "
-                  "o tocá «Otra opción».")
+                  f"o tocá «{OTHER}».")
     else:
         prompt = (_candidate_prompt(field) if not query else
                   f"Opciones que coinciden con «{query}».")
@@ -1157,6 +1170,14 @@ def _cancel(cur, request, who, now, enqueue=True):
 
 
 def _enqueue(cur, request, text, now, dedupe, choice_set_id=None):
+    # Punto único de salida del alta conversacional de tareas (saludo diario,
+    # pack 06, decisión del usuario, 2026-09-28): este intake puede ser el
+    # primer contacto del día -- `gateway.procesar_update` lo atiende ANTES
+    # de `_turno`, así que ninguno de los puntos que hookea `gateway.py` lo
+    # ve.
+    text = S.anteponer_si_corresponde_ws(
+        cur, workspace_id=str(request["workspace_id"]),
+        membership_id=str(request["membership_id"]), ahora=now, texto=text)
     enqueue_outbox(
         cur, workspace_id=str(request["workspace_id"]), chat_id=request["chat_id"],
         recipient_membership_id=str(request["membership_id"]), text=text,

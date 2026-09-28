@@ -31,7 +31,8 @@ from prisma.autoridad import Canal, identificar
 from prisma.calendario import Calendario
 from prisma.db import admin, espacio
 from prisma.llm import Llamada, ProveedorGuionado, Respuesta
-from prisma.salida import (BUTTON_TEXT_LIMIT, etiquetas_boton_distinguibles,
+from prisma.salida import (BUTTON_TEXT_LIMIT, ICONO_TAREA, con_icono,
+                           etiqueta_sin_icono, etiquetas_boton_distinguibles,
                            telegram_utf16_units)
 
 # ---------------------------------------------------------------------------
@@ -47,6 +48,13 @@ def _quien(cur, nombre, ws):
 def _telegram_id(cur, nombre) -> int:
     cur.execute("select telegram_user_id t from integrante where nombre = %s", (nombre,))
     return cur.fetchone()["t"]
+
+
+def _t(*titulos: str) -> list[str]:
+    """Cada título de tarea con su ícono de categoría (íconos, decisión del
+    usuario, 2026-09-28) -- para no repetir `con_icono(..., ICONO_TAREA)` en
+    cada lista esperada de este archivo."""
+    return [con_icono(t, ICONO_TAREA) for t in titulos]
 
 
 def _tarea(cur, ws, *, titulo, area="ot", persona="Marcos Tarquini",
@@ -168,7 +176,7 @@ def test_lista_de_hasta_cuatro_tareas_arma_botones_y_tocar_una_abre_el_menu(
         tg = _telegram_id(cur, "Marcos Tarquini")
 
     etiquetas = [f["etiqueta"] for f in filas]
-    assert etiquetas == ["Tarea 1", "Tarea 2", "Tarea 3", P.ETIQUETA_SALIR_OPCIONES]
+    assert etiquetas == _t("Tarea 1", "Tarea 2", "Tarea 3") + [P.ETIQUETA_SALIR_OPCIONES]
     for n, (f, tid) in enumerate(zip(filas[:3], ids), start=1):
         assert f["valor"] == {"tipo": "tarea", "tarea_id": tid,
                               "titulo": f"Tarea {n}", "accion": "menu"}
@@ -182,8 +190,8 @@ def test_lista_de_hasta_cuatro_tareas_arma_botones_y_tocar_una_abre_el_menu(
     etiquetas_menu = [f["etiqueta"] for f in menu_filas]
     # Responsable, "asignada": el menú de §4.6 -- prueba que de verdad se
     # abrió el menú de T2, no que se retomó la conversación con el modelo.
-    assert "Ver detalle" in etiquetas_menu
-    assert "Empezar" in etiquetas_menu
+    assert con_icono("Ver detalle", ICONO_TAREA) in etiquetas_menu
+    assert con_icono("Empezar", ICONO_TAREA) in etiquetas_menu
 
 
 # ---------------------------------------------------------------------------
@@ -248,7 +256,7 @@ def test_mas_de_cuatro_tareas_pagina_con_ver_mas_sin_llamar_al_modelo(
         tg = _telegram_id(cur, "Marcos Tarquini")
 
     etiquetas = [f["etiqueta"] for f in filas]
-    assert etiquetas == ["Tarea 1", "Tarea 2", "Tarea 3", "Tarea 4",
+    assert etiquetas == _t("Tarea 1", "Tarea 2", "Tarea 3", "Tarea 4") + [
                         P.ETIQUETA_VER_MAS, P.ETIQUETA_SALIR_OPCIONES]
     ver_mas = next(f for f in filas if f["etiqueta"] == P.ETIQUETA_VER_MAS)
     assert ver_mas["valor"] == {"tipo": "ver_mas", "tarea_ids": ids[4:]}
@@ -262,7 +270,7 @@ def test_mas_de_cuatro_tareas_pagina_con_ver_mas_sin_llamar_al_modelo(
         pid2 = _pendiente(cur, ws, P.SENTINEL_OPCIONES_MODELO)
         filas2 = _opciones(cur, pid2)
     etiquetas2 = [f["etiqueta"] for f in filas2]
-    assert etiquetas2 == ["Tarea 5", "Tarea 6", P.ETIQUETA_SALIR_OPCIONES]
+    assert etiquetas2 == _t("Tarea 5", "Tarea 6") + [P.ETIQUETA_SALIR_OPCIONES]
 
 
 def test_ver_mas_de_tareas_terminadas_no_dice_que_ya_no_estan_disponibles(
@@ -302,7 +310,7 @@ def test_ver_mas_de_tareas_terminadas_no_dice_que_ya_no_estan_disponibles(
         pid2 = _pendiente(cur, ws, P.SENTINEL_OPCIONES_MODELO)
         filas2 = _opciones(cur, pid2)
     etiquetas2 = [f["etiqueta"] for f in filas2]
-    assert etiquetas2 == ["Tarea terminada 5", "Tarea terminada 6",
+    assert etiquetas2 == _t("Tarea terminada 5", "Tarea terminada 6") + [
                           P.ETIQUETA_SALIR_OPCIONES]
 
 
@@ -350,9 +358,9 @@ def test_ver_mas_tarea_que_se_cierra_mientras_tanto_se_queda_en_la_pagina(
     # existir. La primera página de esta misma lista ya podía traer tareas
     # cerradas (si el modelo hubiera pedido terminadas), así que la segunda
     # tiene que ser consistente con la primera.
-    assert etiquetas2 == ["Tarea 5", "Tarea 6", P.ETIQUETA_SALIR_OPCIONES]
+    assert etiquetas2 == _t("Tarea 5", "Tarea 6") + [P.ETIQUETA_SALIR_OPCIONES]
 
-    fila5 = next(f for f in filas2 if f["etiqueta"] == "Tarea 5")
+    fila5 = next(f for f in filas2 if f["etiqueta"] == con_icono("Tarea 5", ICONO_TAREA))
     assert _tocar(cliente, fila5["token"], tg).status_code == 200
 
     with admin(conn) as cur:
@@ -361,7 +369,7 @@ def test_ver_mas_tarea_que_se_cierra_mientras_tanto_se_queda_en_la_pagina(
     # El menú, al abrirse, recalcula por el estado ACTUAL de la tarea: para
     # una "cancelada" (responsable) sólo ofrece "Ver detalle" -- no hace
     # falta que "Ver más" filtre por estado, el menú ya lo hace.
-    assert etiquetas_menu == ["Ver detalle", P.ETIQUETA_SALIR_OPCIONES]
+    assert etiquetas_menu == _t("Ver detalle") + [P.ETIQUETA_SALIR_OPCIONES]
 
 
 # ---------------------------------------------------------------------------
@@ -480,9 +488,9 @@ def test_varias_llamadas_con_filas_se_unen_por_orden_de_aparicion(
         filas = _opciones(cur, pid)
 
     etiquetas = [f["etiqueta"] for f in filas]
-    assert etiquetas == ["Tarea Ariel 1", "Tarea Ariel 2", "Tarea Martín 1",
-                        "Tarea Martín 2", P.ETIQUETA_VER_MAS,
-                        P.ETIQUETA_SALIR_OPCIONES]
+    assert etiquetas == _t("Tarea Ariel 1", "Tarea Ariel 2", "Tarea Martín 1",
+                          "Tarea Martín 2") + [P.ETIQUETA_VER_MAS,
+                                             P.ETIQUETA_SALIR_OPCIONES]
     ver_mas = next(f for f in filas if f["etiqueta"] == P.ETIQUETA_VER_MAS)
     assert ver_mas["valor"] == {"tipo": "ver_mas", "tarea_ids": lucas_ids}
     for n, (f, tid) in enumerate(zip(filas[:2], ariel_ids), start=1):
@@ -534,7 +542,7 @@ def test_ver_mas_nunca_muestra_una_tarea_de_otro_espacio(intake_world, conn):
         pid = _pendiente(cur, norte["id"], P.SENTINEL_OPCIONES_MODELO)
         etiquetas = [f["etiqueta"] for f in _opciones(cur, pid)]
 
-    assert etiquetas == ["Tarea del norte", P.ETIQUETA_SALIR_OPCIONES]
+    assert etiquetas == _t("Tarea del norte") + [P.ETIQUETA_SALIR_OPCIONES]
 
 
 # ---------------------------------------------------------------------------
@@ -608,7 +616,7 @@ def test_lista_con_respuesta_larga_se_parte_y_los_botones_van_aparte(
     assert (max(f["programado_para"] for f in partes_texto)
            < mensajes_botones[0]["programado_para"])
 
-    assert etiquetas == ["Tarea 1", "Tarea 2", "Tarea 3", "Tarea 4",
+    assert etiquetas == _t("Tarea 1", "Tarea 2", "Tarea 3", "Tarea 4") + [
                         P.ETIQUETA_VER_MAS, P.ETIQUETA_SALIR_OPCIONES]
 
 
@@ -683,8 +691,10 @@ def test_mostrar_mas_tareas_acorta_titulos_largos_en_limite_de_palabra(
         etiqueta = next(f["etiqueta"] for f in _opciones(cur, pid)
                         if f["etiqueta"] != P.ETIQUETA_SALIR_OPCIONES)
 
-    assert etiqueta.endswith("…")
-    assert titulo_largo.startswith(etiqueta[:-1].rstrip())
+    assert etiqueta.startswith(f"{ICONO_TAREA} ")
+    sin_icono = etiqueta_sin_icono(etiqueta)
+    assert sin_icono.endswith("…")
+    assert titulo_largo.startswith(sin_icono[:-1].rstrip())
 
 
 def test_mostrar_mas_tareas_distingue_titulos_que_colisionan_al_acortar(
@@ -711,8 +721,10 @@ def test_mostrar_mas_tareas_distingue_titulos_que_colisionan_al_acortar(
         etiquetas = [f["etiqueta"] for f in _opciones(cur, pid)
                     if f["etiqueta"] != P.ETIQUETA_SALIR_OPCIONES]
 
-    assert etiquetas == etiquetas_boton_distinguibles([titulo_a, titulo_b])
-    assert etiquetas == [titulo_a, titulo_b]      # los dos títulos enteros entran en el corte duro
+    assert etiquetas == [con_icono(e, ICONO_TAREA)
+                        for e in etiquetas_boton_distinguibles([titulo_a, titulo_b])]
+    # los dos títulos enteros entran en el corte duro, con el ícono de tarea aparte
+    assert etiquetas == [con_icono(titulo_a, ICONO_TAREA), con_icono(titulo_b, ICONO_TAREA)]
 
 
 def test_ver_mas_de_mas_de_ocho_tareas_arma_una_tercera_pagina(
@@ -743,7 +755,7 @@ def test_ver_mas_de_mas_de_ocho_tareas_arma_una_tercera_pagina(
         pid2 = _pendiente(cur, ws, P.SENTINEL_OPCIONES_MODELO)
         filas2 = _opciones(cur, pid2)
     etiquetas2 = [f["etiqueta"] for f in filas2]
-    assert etiquetas2 == ["Tarea 5", "Tarea 6", "Tarea 7", "Tarea 8",
+    assert etiquetas2 == _t("Tarea 5", "Tarea 6", "Tarea 7", "Tarea 8") + [
                           P.ETIQUETA_VER_MAS, P.ETIQUETA_SALIR_OPCIONES]
     ver_mas2 = next(f for f in filas2 if f["etiqueta"] == P.ETIQUETA_VER_MAS)
     assert ver_mas2["valor"] == {"tipo": "ver_mas", "tarea_ids": ids[8:]}
@@ -754,4 +766,4 @@ def test_ver_mas_de_mas_de_ocho_tareas_arma_una_tercera_pagina(
         pid3 = _pendiente(cur, ws, P.SENTINEL_OPCIONES_MODELO)
         filas3 = _opciones(cur, pid3)
     etiquetas3 = [f["etiqueta"] for f in filas3]
-    assert etiquetas3 == ["Tarea 9", "Tarea 10", P.ETIQUETA_SALIR_OPCIONES]
+    assert etiquetas3 == _t("Tarea 9", "Tarea 10") + [P.ETIQUETA_SALIR_OPCIONES]

@@ -30,7 +30,9 @@ from prisma.autoridad import Canal, identificar
 from prisma.calendario import Calendario
 from prisma.db import admin, espacio
 from prisma.llm import Llamada, ProveedorGuionado, Respuesta
-from prisma.salida import etiquetas_boton_distinguibles
+from prisma.salida import (ETIQUETA_CANCELAR, ETIQUETA_CONFIRMAR, ICONO_TAREA,
+                           con_icono, etiqueta_sin_icono,
+                           etiquetas_boton_distinguibles, etiquetas_coinciden)
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -163,8 +165,19 @@ def _abrir_menu(cliente, conn, ws, monkeypatch, tarea_id, quien_nombre, *,
 
 
 def _tocar_accion(cliente, conn, ws, filas, etiqueta, tg):
-    fila = next(f for f in filas if f["etiqueta"] == etiqueta)
+    # Compara sin el ícono de categoría (íconos, decisión del usuario,
+    # 2026-09-28): las pruebas siguen pasando el nombre de la acción "pelado"
+    # ("Empezar"), y la opción real ya sale armada con su "📋 " -- ver
+    # `salida.etiquetas_coinciden`.
+    fila = next(f for f in filas if etiquetas_coinciden(f["etiqueta"], etiqueta))
     assert _tocar(cliente, fila["token"], tg).status_code == 200
+
+
+def _t(*etiquetas: str) -> list[str]:
+    """Cada acción del menú con su ícono de tarea (íconos, decisión del
+    usuario, 2026-09-28) -- `gateway._encolar_menu_tarea` se lo antepone a
+    cada `menu_tarea.AccionMenu.etiqueta`."""
+    return [con_icono(e, ICONO_TAREA) for e in etiquetas]
 
 
 # ---------------------------------------------------------------------------
@@ -179,8 +192,8 @@ def test_menu_responsable_asignada(cliente, conn, corework, monkeypatch):
 
     _, filas, _ = _abrir_menu(cliente, conn, ws, monkeypatch, tid, "Nahuel Gimenez")
     etiquetas = [f["etiqueta"] for f in filas]
-    assert etiquetas == ["Ver detalle", "Empezar", "Ya la terminé",
-                        "Informar un bloqueo", "Depende de otra tarea",
+    assert etiquetas == _t("Ver detalle", "Empezar", "Ya la terminé",
+                        "Informar un bloqueo", "Depende de otra tarea") + [
                         P.ETIQUETA_SALIR_OPCIONES]
 
 
@@ -192,8 +205,8 @@ def test_menu_responsable_en_curso(cliente, conn, corework, monkeypatch):
 
     _, filas, _ = _abrir_menu(cliente, conn, ws, monkeypatch, tid, "Nahuel Gimenez")
     etiquetas = [f["etiqueta"] for f in filas]
-    assert etiquetas == ["Ver detalle", "Ya la terminé", "Informar un bloqueo",
-                        "Depende de otra tarea", P.ETIQUETA_SALIR_OPCIONES]
+    assert etiquetas == _t("Ver detalle", "Ya la terminé", "Informar un bloqueo",
+                        "Depende de otra tarea") + [P.ETIQUETA_SALIR_OPCIONES]
 
 
 # ---------------------------------------------------------------------------
@@ -267,7 +280,7 @@ def test_menu_responsable_bloqueada(cliente, conn, corework, monkeypatch):
 
     _, filas, _ = _abrir_menu(cliente, conn, ws, monkeypatch, tid, "Nahuel Gimenez")
     etiquetas = [f["etiqueta"] for f in filas]
-    assert etiquetas == ["Ver detalle", "Ya se destrabó", P.ETIQUETA_SALIR_OPCIONES]
+    assert etiquetas == _t("Ver detalle", "Ya se destrabó") + [P.ETIQUETA_SALIR_OPCIONES]
 
 
 def test_menu_responsable_en_revision(cliente, conn, corework, monkeypatch):
@@ -278,7 +291,7 @@ def test_menu_responsable_en_revision(cliente, conn, corework, monkeypatch):
 
     _, filas, _ = _abrir_menu(cliente, conn, ws, monkeypatch, tid, "Nahuel Gimenez")
     etiquetas = [f["etiqueta"] for f in filas]
-    assert etiquetas == ["Ver detalle", "Adjuntar evidencia", P.ETIQUETA_SALIR_OPCIONES]
+    assert etiquetas == _t("Ver detalle", "Adjuntar evidencia") + [P.ETIQUETA_SALIR_OPCIONES]
 
 
 def test_menu_responsable_terminada(conn, corework):
@@ -361,7 +374,7 @@ def test_menu_responsable_en_revision_sin_aprobacion_no_ofrece_cerrar_tarea(
     _, filas, _ = _abrir_menu(cliente, conn, ws, monkeypatch, tid, "Nahuel Gimenez")
     etiquetas = [f["etiqueta"] for f in filas]
     assert "Cerrar tarea" not in etiquetas
-    assert etiquetas == ["Ver detalle", "Adjuntar evidencia", P.ETIQUETA_SALIR_OPCIONES]
+    assert etiquetas == _t("Ver detalle", "Adjuntar evidencia") + [P.ETIQUETA_SALIR_OPCIONES]
 
 
 def test_cerrar_tarea_desde_el_menu_termina_en_vista_previa(
@@ -388,7 +401,7 @@ def test_cerrar_tarea_desde_el_menu_termina_en_vista_previa(
 
     pid_menu, filas, tg = _abrir_menu(cliente, conn, ws, monkeypatch, tid,
                                       "Nahuel Gimenez")
-    assert "Cerrar tarea" in [f["etiqueta"] for f in filas]
+    assert any(etiquetas_coinciden(f["etiqueta"], "Cerrar tarea") for f in filas)
     _tocar_accion(cliente, conn, ws, filas, "Cerrar tarea", tg)
 
     with admin(conn) as cur:
@@ -415,7 +428,7 @@ def test_menu_aprobador_en_revision(cliente, conn, corework, monkeypatch):
     # Marcos Tarquini es el aprobador de Nahuel Gimenez (aprobado_por: marcos).
     _, filas, _ = _abrir_menu(cliente, conn, ws, monkeypatch, tid, "Marcos Tarquini")
     etiquetas = [f["etiqueta"] for f in filas]
-    assert etiquetas == ["Ver detalle y evidencia", "Aprobar", "Pedir cambios",
+    assert etiquetas == _t("Ver detalle y evidencia", "Aprobar", "Pedir cambios") + [
                         P.ETIQUETA_SALIR_OPCIONES]
 
 
@@ -431,8 +444,8 @@ def test_menu_aprobador_en_revision_sin_evidencia_no_ofrece_aprobar(
 
     _, filas, _ = _abrir_menu(cliente, conn, ws, monkeypatch, tid, "Marcos Tarquini")
     etiquetas = [f["etiqueta"] for f in filas]
-    assert "Aprobar" not in etiquetas
-    assert etiquetas == ["Ver detalle y evidencia", "Pedir cambios",
+    assert not any(etiquetas_coinciden(e, "Aprobar") for e in etiquetas)
+    assert etiquetas == _t("Ver detalle y evidencia", "Pedir cambios") + [
                         P.ETIQUETA_SALIR_OPCIONES]
 
 
@@ -444,7 +457,7 @@ def test_menu_aprobador_otro_estado(cliente, conn, corework, monkeypatch):
 
     _, filas, _ = _abrir_menu(cliente, conn, ws, monkeypatch, tid, "Marcos Tarquini")
     etiquetas = [f["etiqueta"] for f in filas]
-    assert etiquetas == ["Ver detalle", P.ETIQUETA_SALIR_OPCIONES]
+    assert etiquetas == _t("Ver detalle") + [P.ETIQUETA_SALIR_OPCIONES]
 
 
 def test_menu_otra_persona(cliente, conn, corework, monkeypatch):
@@ -457,7 +470,7 @@ def test_menu_otra_persona(cliente, conn, corework, monkeypatch):
     # de una tarea de OT.
     _, filas, _ = _abrir_menu(cliente, conn, ws, monkeypatch, tid, "Ariel De Simone")
     etiquetas = [f["etiqueta"] for f in filas]
-    assert etiquetas == ["Ver detalle", "Mi trabajo depende de esta tarea",
+    assert etiquetas == _t("Ver detalle", "Mi trabajo depende de esta tarea") + [
                         P.ETIQUETA_SALIR_OPCIONES]
 
 
@@ -479,9 +492,9 @@ def test_empezar_no_se_ofrece_con_dependencia_bloqueante_sin_terminar(
 
     _, filas, _ = _abrir_menu(cliente, conn, ws, monkeypatch, destino, "Nahuel Gimenez")
     etiquetas = [f["etiqueta"] for f in filas]
-    assert "Empezar" not in etiquetas
-    assert etiquetas == ["Ver detalle", "Ya la terminé", "Informar un bloqueo",
-                        "Depende de otra tarea", P.ETIQUETA_SALIR_OPCIONES]
+    assert not any(etiquetas_coinciden(e, "Empezar") for e in etiquetas)
+    assert etiquetas == _t("Ver detalle", "Ya la terminé", "Informar un bloqueo",
+                        "Depende de otra tarea") + [P.ETIQUETA_SALIR_OPCIONES]
 
 
 # ---------------------------------------------------------------------------
@@ -519,8 +532,9 @@ def test_pedir_eleccion_dependencia_acorta_y_distingue_titulos_largos(
         pid = _pendiente(cur, ws, P.SENTINEL_DATO_MENU_TAREA)
         etiquetas = [f["etiqueta"] for f in _opciones(cur, pid)]
 
-    assert etiquetas == etiquetas_boton_distinguibles([titulo_a, titulo_b])
-    assert etiquetas == [titulo_a, titulo_b]      # los dos títulos enteros entran en el corte duro
+    assert etiquetas == _t(*etiquetas_boton_distinguibles([titulo_a, titulo_b]))
+    # los dos títulos enteros entran en el corte duro, con el ícono de tarea aparte
+    assert etiquetas == _t(titulo_a, titulo_b)
 
 
 # ---------------------------------------------------------------------------
@@ -578,7 +592,7 @@ def test_ya_la_termine_pide_evidencia_si_falta_y_termina_en_vista_previa(
             """select etiqueta from pending_action_option
                 where pending_action_id = %s order by orden""", (fila["id"],))
         assert [f["etiqueta"] for f in cur.fetchall()] == [
-            "Confirmar", "Modificar", "Cancelar"]
+            ETIQUETA_CONFIRMAR, "Modificar", ETIQUETA_CANCELAR]
 
 
 def test_ya_la_termine_pasa_directo_a_vista_previa_si_ya_tiene_evidencia(
@@ -613,7 +627,7 @@ def test_ya_la_termine_pasa_directo_a_vista_previa_si_ya_tiene_evidencia(
             """select etiqueta from pending_action_option
                 where pending_action_id = %s order by orden""", (fila["id"],))
         assert [f["etiqueta"] for f in cur.fetchall()] == [
-            "Confirmar", "Modificar", "Cancelar"]
+            ETIQUETA_CONFIRMAR, "Modificar", ETIQUETA_CANCELAR]
 
 
 def test_empezar_termina_en_vista_previa_a_en_curso(cliente, conn, corework, monkeypatch):
@@ -735,8 +749,8 @@ def test_ver_detalle_no_llama_al_modelo(cliente, conn, corework, monkeypatch):
         cur.execute(
             """select etiqueta from pending_action_option
                 where pending_action_id = %s order by orden""", (nuevo_pid,))
-        assert [f["etiqueta"] for f in cur.fetchall()] == [
-            "Ver detalle", "Ya se destrabó", P.ETIQUETA_SALIR_OPCIONES]
+        assert [f["etiqueta"] for f in cur.fetchall()] == _t(
+            "Ver detalle", "Ya se destrabó") + [P.ETIQUETA_SALIR_OPCIONES]
 
 
 # ---------------------------------------------------------------------------
@@ -815,7 +829,7 @@ def test_toque_repetido_no_aplica_dos_veces(cliente, conn, corework, monkeypatch
 
     pid_menu, filas, tg = _abrir_menu(cliente, conn, ws, monkeypatch, tid,
                                       "Nahuel Gimenez")
-    token = next(f for f in filas if f["etiqueta"] == "Empezar")["token"]
+    token = next(f for f in filas if etiquetas_coinciden(f["etiqueta"], "Empezar"))["token"]
 
     assert _tocar(cliente, token, tg).status_code == 200
     assert _tocar(cliente, token, tg).status_code == 200    # de nuevo, no rompe
@@ -878,7 +892,7 @@ def test_tarea_id_en_mayusculas_coincide_al_validar(
         pid = _pendiente(cur, ws, P.SENTINEL_OPCIONES_MODELO)
         filas = _opciones(cur, pid)
 
-    assert filas[0]["etiqueta"] == "Cablear tablero máq. 3"
+    assert filas[0]["etiqueta"] == con_icono("Cablear tablero máq. 3", ICONO_TAREA)
     assert filas[0]["valor"]["tarea_id"] == tid.lower()
 
 
@@ -1153,7 +1167,7 @@ def test_excepcion_no_manejada_en_un_toque_registra_incidente_y_avisa(
 
     monkeypatch.setattr(gateway, "_resolver_toque_menu_tarea", _explota)
 
-    token = next(f for f in filas if f["etiqueta"] == "Empezar")["token"]
+    token = next(f for f in filas if etiquetas_coinciden(f["etiqueta"], "Empezar"))["token"]
     r = _tocar(cliente, token, tg)
     assert r.status_code == 200
 

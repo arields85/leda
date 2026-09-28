@@ -13,14 +13,21 @@ from prisma.calendario import Calendario
 from prisma.db import admin, espacio
 from prisma.despachador import Boton, TransporteTelegram
 from prisma.llm import ProveedorGuionado, Respuesta
-from prisma.salida import (BUTTON_TEXT_LIMIT, OBJETIVO_ETIQUETA_BOTON,
+from prisma.salida import (BUTTON_LABEL_LIMIT, BUTTON_TEXT_LIMIT,
+                             ETIQUETA_CANCELAR, ETIQUETA_CONFIRMAR,
+                             ICONO_CANCELAR, ICONO_CONFIRMAR,
+                             ICONO_OTRA_OPCION, ICONO_SALIR_OPCIONES,
+                             ICONO_TAREA, ICONO_VER_MAS,
+                             OBJETIVO_ETIQUETA_BOTON,
                              TELEGRAM_TEXT_LIMIT, TRUNCAR_ETIQUETA_BOTON,
                              NO_EFFECT_STATUS, PayloadValidationError,
-                             acortar_etiqueta_boton, enqueue_outbox,
+                             acortar_etiqueta_boton, con_icono, costo_icono,
+                             enqueue_outbox, etiqueta_sin_icono,
                              etiquetas_boton_distinguibles,
-                             normalize_visible_text, prepare_buttons,
-                             prepare_payload, telegram_utf16_units,
-                             truncar_etiqueta_boton, with_no_effect_status)
+                             etiquetas_coinciden, normalize_visible_text,
+                             prepare_buttons, prepare_payload,
+                             telegram_utf16_units, truncar_etiqueta_boton,
+                             with_no_effect_status)
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -440,3 +447,87 @@ def test_invalid_button_metadata_is_rejected_before_enqueue():
         prepare_payload("Choose", dedupe_key="bad-callback", has_buttons=True,
                         buttons=[SimpleNamespace(etiqueta="ok",
                                                  callback_data="p:" + "x" * 80)])
+
+
+# ---------------------------------------------------------------------------
+# Íconos de botón (decisión del usuario, 2026-09-28): cada categoría de botón
+# lleva un ícono fijo, nunca decorativo. Single source of truth: `salida.py`.
+# ---------------------------------------------------------------------------
+
+def test_con_icono_antepone_el_icono_con_un_espacio():
+    assert con_icono("Confirmar", ICONO_CONFIRMAR) == "✅ Confirmar"
+    assert con_icono("Ver más", ICONO_VER_MAS) == "➕ Ver más"
+
+
+def test_etiquetas_fijas_de_confirmar_y_cancelar():
+    # Únicas -- todo el código que arma el par Confirmar/Cancelar reusa estas
+    # dos constantes, nunca un literal repetido.
+    assert ETIQUETA_CONFIRMAR == "✅ Confirmar"
+    assert ETIQUETA_CANCELAR == "✖️ Cancelar"
+
+
+def test_costo_icono_mide_en_unidades_utf16_no_en_caracteres():
+    # 📋 es del plano astral: dos unidades UTF-16 aunque Python lo cuente
+    # como un solo carácter (`len()` daría 1). Con el espacio que lo separa
+    # del texto, el costo real es 3, no 2.
+    assert len(ICONO_TAREA) == 1                    # un solo `str` codepoint
+    assert telegram_utf16_units(ICONO_TAREA) == 2    # dos unidades UTF-16
+    assert costo_icono(ICONO_TAREA) == 3
+    assert costo_icono(ICONO_TAREA) == telegram_utf16_units(f"{ICONO_TAREA} ")
+
+
+def test_etiqueta_sin_icono_quita_solo_un_icono_conocido_al_principio():
+    assert etiqueta_sin_icono("📋 Revisar tablero") == "Revisar tablero"
+    assert etiqueta_sin_icono("✅ Confirmar") == "Confirmar"
+    # Sin ícono conocido al frente: se devuelve intacta.
+    assert etiqueta_sin_icono("Revisar tablero") == "Revisar tablero"
+    assert etiqueta_sin_icono("Modificar") == "Modificar"
+
+
+def test_etiquetas_coinciden_ignora_el_icono_de_cualquiera_de_las_dos():
+    assert etiquetas_coinciden("Confirmar", "✅ Confirmar")
+    assert etiquetas_coinciden("✅ Confirmar", "Confirmar")
+    assert etiquetas_coinciden("✅ Confirmar", "✅ Confirmar")
+    assert not etiquetas_coinciden("Confirmar", "✖️ Cancelar")
+    assert not etiquetas_coinciden("Confirmar", "Cancelar")
+
+
+def test_etiqueta_de_tarea_con_icono_y_titulo_largo_sigue_entrando_en_el_limite():
+    """El ícono cuenta hacia el límite de la etiqueta (decisión del usuario):
+    quien arma un botón de tarea tiene que descontar `costo_icono` del
+    objetivo/límite ANTES de truncar el texto -- el mismo patrón que usan
+    `agente._opciones_lista_tareas`, `herramientas._ofrecer_opciones` y
+    `gateway._candidatas_para_botones`/`_mostrar_mas_tareas`/`_pedir_
+    eleccion_dependencia`."""
+    titulo_largo = "Revisar comunicaciones industriales de la compresora principal"
+    costo = costo_icono(ICONO_TAREA)
+
+    corto = acortar_etiqueta_boton(
+        titulo_largo, objetivo=OBJETIVO_ETIQUETA_BOTON - costo,
+        limite=TRUNCAR_ETIQUETA_BOTON - costo)
+    etiqueta = con_icono(corto, ICONO_TAREA)
+
+    assert etiqueta.startswith(f"{ICONO_TAREA} ")
+    assert titulo_largo.startswith(etiqueta_sin_icono(etiqueta).rstrip("…"))
+    # El total (ícono + texto) sigue en el mismo objetivo "lindo" que tenía
+    # el texto solo, y muy por debajo del límite técnico real de Telegram.
+    assert telegram_utf16_units(etiqueta) <= OBJETIVO_ETIQUETA_BOTON
+    assert telegram_utf16_units(etiqueta) <= BUTTON_LABEL_LIMIT
+
+
+def test_etiquetas_de_tarea_que_colisionan_siguen_distinguibles_con_icono():
+    titulo_a = "Revisar tablero de la máquina 3"
+    titulo_b = "Revisar tablero de la máquina 4"
+    costo = costo_icono(ICONO_TAREA)
+
+    cortas = etiquetas_boton_distinguibles(
+        [titulo_a, titulo_b], objetivo=OBJETIVO_ETIQUETA_BOTON - costo,
+        limite=TRUNCAR_ETIQUETA_BOTON - costo)
+    etiquetas = [con_icono(e, ICONO_TAREA) for e in cortas]
+
+    assert len(set(etiquetas)) == 2                  # siguen distinguibles
+    assert all(e.startswith(f"{ICONO_TAREA} ") for e in etiquetas)
+    assert all(telegram_utf16_units(e) <= BUTTON_LABEL_LIMIT for e in etiquetas)
+    # Tocar por la etiqueta pelada (una prueba, el banco) sigue resolviendo
+    # la opción real ya armada con su ícono.
+    assert etiquetas_coinciden(etiquetas[0], etiqueta_sin_icono(etiquetas[0]))

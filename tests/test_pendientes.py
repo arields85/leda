@@ -76,6 +76,27 @@ def test_confirmar_devuelve_la_accion_lista_para_ejecutar(corework, conn):
         assert r.args["fecha_objetivo"] == "2026-08-20"
 
 
+def test_opcion_por_etiqueta_ignora_el_icono_de_categoria(corework, conn):
+    """Íconos de botón (decisión del usuario, 2026-09-28): `registrar` arma
+    la opción real como "✅ Confirmar" (`salida.ETIQUETA_CONFIRMAR`), pero
+    buscarla por la etiqueta "pelada" -- código anterior a los íconos,
+    pruebas, el banco -- sigue encontrando el mismo botón. El ícono es una
+    marca visual, nunca parte de la identidad de la opción."""
+    ws = corework.workspace_id
+    with espacio(conn, ws) as cur:
+        quien = _quien(cur, "Marcos Tarquini", ws)
+        p = _registrar_confirmacion(cur, quien)
+
+        pelada = P.opcion_por_etiqueta(cur, p.id, "Confirmar")
+        con_icono = P.opcion_por_etiqueta(cur, p.id, "✅ Confirmar")
+
+        assert pelada.etiqueta == "✅ Confirmar"
+        assert pelada.token == con_icono.token
+
+        with pytest.raises(LookupError):
+            P.opcion_por_etiqueta(cur, p.id, "Cancelar borrador")
+
+
 def test_confirmar_dos_veces_ejecuta_una_sola(corework, conn):
     """Dos toques al mismo botón no pueden mover la fecha dos veces."""
     ws = corework.workspace_id

@@ -24,10 +24,13 @@ from .db import (admin, autoridad, conectar, conectar_autoridad, espacio,
 from .despachador import acusar_toque, mantener_chat_activo, pedido_telegram
 from .incidentes import (REFERENCIA_INBOUND_MESSAGE, REFERENCIA_PENDING_ACTION,
                          registrar_incidente)
+from . import saludo as S
 from .salida import TRUNCAR_ETIQUETA_BOTON as TRUNCAR_TITULO_BOTON
-from .salida import (enqueue_outbox, etiquetas_boton_distinguibles,
-                     normalize_visible_text, truncar_etiqueta_boton,
-                     with_no_effect_status)
+from .salida import (ETIQUETA_CANCELAR, ETIQUETA_CONFIRMAR, ICONO_TAREA,
+                     OBJETIVO_ETIQUETA_BOTON, TRUNCAR_ETIQUETA_BOTON,
+                     con_icono, costo_icono, enqueue_outbox,
+                     etiquetas_boton_distinguibles, normalize_visible_text,
+                     truncar_etiqueta_boton, with_no_effect_status)
 
 app = FastAPI(title="Prisma", docs_url=None, redoc_url=None)
 router = APIRouter()
@@ -250,6 +253,8 @@ def _activacion(conn, workspace_id: str, texto: str, tg_user: int,
 
     partes = texto.split(maxsplit=1)
 
+    from datetime import datetime, timezone
+
     if len(partes) < 2:
         # /start sin token. Si la persona ya está vinculada —porque su
         # identificador vino en el pack— igual corresponde saludarla: ese
@@ -258,7 +263,7 @@ def _activacion(conn, workspace_id: str, texto: str, tg_user: int,
 
         with admin(conn) as cur:
             cur.execute(
-                """select u.nombre from membership m
+                """select m.id as membership_id, u.nombre from membership m
                      join app_user u on u.id = m.app_user_id
                     where m.workspace_id = %s and u.telegram_user_id = %s
                       and m.activo""",
@@ -266,6 +271,13 @@ def _activacion(conn, workspace_id: str, texto: str, tg_user: int,
             fila = cur.fetchone()
             if not fila:
                 return {"ok": True}      # desconocido: no se le responde
+            # La bienvenida cuenta como el saludo del día (pack 06 §3, T28):
+            # reclama la reserva sin anteponer nada -- el texto de
+            # `bienvenida` ya es su propio saludo fijo.
+            S.reclamar_para_bienvenida(
+                cur, workspace_id=workspace_id,
+                membership_id=str(fila["membership_id"]),
+                ahora=datetime.now(timezone.utc))
             enqueue_outbox(
                 cur, workspace_id=workspace_id, chat_id=chat_id,
                 text=bienvenida(cur, workspace_id, fila["nombre"]),
@@ -285,6 +297,20 @@ def _activacion(conn, workspace_id: str, texto: str, tg_user: int,
             registrar_auditoria(
                 cur, accion="activacion", workspace_id=workspace_id,
                 actor_kind="persona", detalle={"nombre": nombre})
+            # Misma reserva que arriba (pack 06 §3, T28): recién activada, la
+            # bienvenida es el primer -- y por hoy, único -- contacto.
+            cur.execute(
+                """select m.id as membership_id from membership m
+                     join app_user u on u.id = m.app_user_id
+                    where m.workspace_id = %s and u.telegram_user_id = %s
+                      and m.activo""",
+                (workspace_id, tg_user))
+            fila_membership = cur.fetchone()
+            if fila_membership:
+                S.reclamar_para_bienvenida(
+                    cur, workspace_id=workspace_id,
+                    membership_id=str(fila_membership["membership_id"]),
+                    ahora=datetime.now(timezone.utc))
 
         enqueue_outbox(
             cur, workspace_id=workspace_id, chat_id=chat_id, text=cuerpo,
@@ -445,13 +471,15 @@ def _toque(conn, workspace_id: str, slug: str, toque: dict,
                             args=e.argumentos, resumen=e.resumen,
                             vence_en=ahora + VIGENCIA_PENDIENTE, chat_id=chat_id,
                             huella=e.huella,
-                            opciones=[("Confirmar", True), ("Modificar", "modificar"),
-                                     ("Cancelar", False)])
+                            opciones=[(ETIQUETA_CONFIRMAR, True), ("Modificar", "modificar"),
+                                     (ETIQUETA_CANCELAR, False)])
                         enqueue_outbox(
                             cur, workspace_id=workspace_id, chat_id=chat_id,
                             recipient_membership_id=quien.membership_id,
-                            text=("La situación cambió desde que te mostré esto. "
-                                  f"Vista previa nueva:\n\n{e.resumen}"),
+                            text=S.anteponer_si_corresponde(
+                                cur, quien, ahora,
+                                "La situación cambió desde que te mostré esto. "
+                                f"Vista previa nueva:\n\n{e.resumen}"),
                             scheduled_for=ahora,
                             dedupe_key=(f"{workspace_id}:cambio:{e.herramienta}:"
                                        f"{ahora.timestamp()}"),
@@ -619,7 +647,14 @@ def _resolver_toque_borrador(conn, authority_conn, workspace_id, token,
 
 def _responder(cur, workspace_id: str, chat_id: int, quien, texto: str,
                ahora) -> None:
-    """La respuesta al toque sale por la cola, como cualquier otra."""
+    """La respuesta al toque sale por la cola, como cualquier otra.
+
+    Punto único que usan casi todas las ramas de `_toque` (saludo diario,
+    pack 06): `saludo.anteponer_si_corresponde` decide y reclama de forma
+    atómica, en esta misma transacción, si corresponde anteponer el saludo
+    del día -- nunca deja pasar dos veces a la misma persona en la misma
+    fecha local, sin que este helper tenga que saberlo."""
+    texto = S.anteponer_si_corresponde(cur, quien, ahora, texto)
     enqueue_outbox(
         cur, workspace_id=workspace_id, chat_id=chat_id, text=texto,
         recipient_membership_id=quien.membership_id, scheduled_for=ahora,
@@ -903,7 +938,8 @@ def _preguntar_por_botones(cur, quien, workspace_id: str, chat_id: int, ahora,
     siguiente["pendientes"] = estado["pendientes"][1:]
     siguiente["referencia_actual"] = referencia
 
-    pregunta = f"¿A cuál te referís con «{referencia}»?"
+    pregunta = S.anteponer_si_corresponde(
+        cur, quien, ahora, f"¿A cuál te referís con «{referencia}»?")
     p = P.registrar(cur, quien, herramienta=_SENTINEL_ACLARACION, args=siguiente,
                     resumen=pregunta, vence_en=ahora + VIGENCIA_PENDIENTE,
                     campo="eleccion", opciones=opciones, chat_id=chat_id)
@@ -1164,12 +1200,16 @@ def _mostrar_mas_tareas(cur, quien, workspace_id: str, chat_id: int,
         # Mismas etiquetas cortas y distinguibles que la primera página
         # (`agente._opciones_lista_tareas`) -- esta es la página siguiente
         # de la misma lista, calculada aparte porque no vuelve a llamar al
-        # modelo.
+        # modelo. Mismo descuento de presupuesto por `costo_icono` que esa
+        # función (íconos, decisión del usuario, 2026-09-28).
+        _costo = costo_icono(ICONO_TAREA)
         etiquetas = etiquetas_boton_distinguibles(
-            [normalize_visible_text(titulo) for _, titulo in pagina])
+            [normalize_visible_text(titulo) for _, titulo in pagina],
+            objetivo=OBJETIVO_ETIQUETA_BOTON - _costo,
+            limite=TRUNCAR_ETIQUETA_BOTON - _costo)
         opciones = [
-            (etiqueta, {"tipo": "tarea", "tarea_id": tid, "titulo": titulo,
-                       "accion": "menu"})
+            (con_icono(etiqueta, ICONO_TAREA),
+             {"tipo": "tarea", "tarea_id": tid, "titulo": titulo, "accion": "menu"})
             for (tid, titulo), etiqueta in zip(pagina, etiquetas)]
         if resto:
             opciones.append((P.ETIQUETA_VER_MAS,
@@ -1177,6 +1217,7 @@ def _mostrar_mas_tareas(cur, quien, workspace_id: str, chat_id: int,
                               "tarea_ids": [tid for tid, _ in resto]}))
         opciones.append((P.ETIQUETA_SALIR_OPCIONES, {"tipo": "salida"}))
 
+    resumen = S.anteponer_si_corresponde(cur, quien, ahora, resumen)
     p = P.registrar(cur, quien, herramienta=P.SENTINEL_OPCIONES_MODELO,
                     args={"pregunta": resumen}, resumen=resumen,
                     vence_en=ahora + VIGENCIA_PENDIENTE, campo="eleccion",
@@ -1227,6 +1268,7 @@ def _mostrar_tareas_propias(cur, quien, workspace_id: str, chat_id: int,
         opciones = _opciones_lista_tareas(tareas)
         opciones.append((P.ETIQUETA_SALIR_OPCIONES, {"tipo": "salida"}))
 
+    resumen = S.anteponer_si_corresponde(cur, quien, ahora, resumen)
     p = P.registrar(cur, quien, herramienta=P.SENTINEL_OPCIONES_MODELO,
                     args={"pregunta": resumen}, resumen=resumen,
                     vence_en=ahora + VIGENCIA_PENDIENTE, campo="eleccion",
@@ -1268,12 +1310,18 @@ def _encolar_menu_tarea(cur, quien, workspace_id: str, chat_id: int,
                   "Esa tarea ya no está disponible.", ahora)
         return
 
-    opciones = [(a.etiqueta, {"accion": a.codigo}) for a in menu.acciones]
+    # Cada acción del menú es una acción SOBRE una tarea -- mismo ícono que
+    # cualquier otro botón de tarea (íconos, decisión del usuario,
+    # 2026-09-28); `menu_tarea.calcular_menu` calcula el menú en sí, sin
+    # conocer presentación, así que el ícono se agrega acá, en el adaptador.
+    opciones = [(con_icono(a.etiqueta, ICONO_TAREA), {"accion": a.codigo})
+               for a in menu.acciones]
     opciones.append((P.ETIQUETA_SALIR_OPCIONES, {"accion": "salir"}))
     # Encabezado corto -- responsable y estado (T2, hallazgo 4 de sesión 2
     # por Telegram) -- y una sola pregunta debajo, nunca dos.
     pregunta = f"{M.encabezado_menu(menu)}\n¿Qué querés hacer?"
     resumen = f"{encabezado}\n\n{pregunta}" if encabezado else pregunta
+    resumen = S.anteponer_si_corresponde(cur, quien, ahora, resumen)
 
     p = P.registrar(cur, quien, herramienta=P.SENTINEL_MENU_TAREA,
                     args={"tarea_id": menu.tarea_id, "titulo": menu.titulo},
@@ -1308,14 +1356,16 @@ def _encolar_vista_previa_menu(cur, quien, workspace_id: str, chat_id: int,
     from . import pendientes as P
     from .agente import VIGENCIA_PENDIENTE
 
-    opciones = ([("Confirmar", True), ("Modificar", "modificar"), ("Cancelar", False)]
+    opciones = ([(ETIQUETA_CONFIRMAR, True), ("Modificar", "modificar"),
+                (ETIQUETA_CANCELAR, False)]
                if e.huella is not None else None)
+    resumen = S.anteponer_si_corresponde(cur, quien, ahora, e.resumen)
     p = P.registrar(cur, quien, herramienta=e.herramienta, args=e.argumentos,
-                    resumen=e.resumen, vence_en=ahora + VIGENCIA_PENDIENTE,
+                    resumen=resumen, vence_en=ahora + VIGENCIA_PENDIENTE,
                     chat_id=chat_id, huella=e.huella, opciones=opciones)
     enqueue_outbox(
         cur, workspace_id=workspace_id, chat_id=chat_id,
-        recipient_membership_id=quien.membership_id, text=e.resumen,
+        recipient_membership_id=quien.membership_id, text=resumen,
         scheduled_for=ahora,
         dedupe_key=f"{workspace_id}:confirmar-menu:{p.id}",
         is_response=True, pending_action_id=p.id,
@@ -1417,6 +1467,7 @@ def _pedir_dato_menu_tarea(cur, quien, workspace_id: str, chat_id: int, *,
     from . import pendientes as P
     from .agente import VIGENCIA_PENDIENTE
 
+    pregunta = S.anteponer_si_corresponde(cur, quien, ahora, pregunta)
     args = {"accion": accion, "tarea_id": tarea_id, "titulo": titulo}
     if extra:
         args.update(extra)
@@ -1449,9 +1500,15 @@ def _pedir_eleccion_dependencia(cur, quien, workspace_id: str, chat_id: int, *,
 
     # Etiquetas cortas y distinguibles entre sí (hallazgo de sesión 2 por
     # Telegram): las candidatas de dependencia son títulos de tarea como
-    # cualquier otro botón server-armado.
-    etiquetas = etiquetas_boton_distinguibles([t for _, t in candidatas])
-    opciones = [(etiqueta, tid) for (tid, _), etiqueta in zip(candidatas, etiquetas)]
+    # cualquier otro botón server-armado -- mismo ícono y mismo descuento de
+    # presupuesto (íconos, decisión del usuario, 2026-09-28).
+    _costo = costo_icono(ICONO_TAREA)
+    etiquetas = etiquetas_boton_distinguibles(
+        [t for _, t in candidatas], objetivo=OBJETIVO_ETIQUETA_BOTON - _costo,
+        limite=TRUNCAR_ETIQUETA_BOTON - _costo)
+    opciones = [(con_icono(etiqueta, ICONO_TAREA), tid)
+               for (tid, _), etiqueta in zip(candidatas, etiquetas)]
+    pregunta = S.anteponer_si_corresponde(cur, quien, ahora, pregunta)
     p = P.registrar(cur, quien, herramienta=P.SENTINEL_DATO_MENU_TAREA,
                     args={"accion": accion, "tarea_id": tarea_id, "titulo": titulo},
                     resumen=pregunta, vence_en=ahora + VIGENCIA_PENDIENTE,
@@ -1899,11 +1956,19 @@ def _candidatas_para_botones(tareas_por_id: dict, resolucion, membership_id: str
                     and tarea.responsable_membership_id == membership_id)
         entradas.append((es_propia, tarea))
 
-    cortos = etiquetas_boton_distinguibles([tarea.titulo for _, tarea in entradas])
+    # Mismo ícono y mismo descuento de presupuesto que cualquier otro botón de
+    # tarea (íconos, decisión del usuario, 2026-09-28): se antepone ANTES del
+    # sufijo de responsable de `_etiqueta_boton`, que tampoco se recorta.
+    _costo = costo_icono(ICONO_TAREA)
+    cortos = etiquetas_boton_distinguibles(
+        [tarea.titulo for _, tarea in entradas],
+        objetivo=OBJETIVO_ETIQUETA_BOTON - _costo,
+        limite=TRUNCAR_ETIQUETA_BOTON - _costo)
 
     propias, ajenas = [], []
     for (es_propia, tarea), corto in zip(entradas, cortos):
-        etiqueta = _etiqueta_boton(corto, tarea.responsable, ajena=not es_propia)
+        etiqueta = _etiqueta_boton(con_icono(corto, ICONO_TAREA), tarea.responsable,
+                                   ajena=not es_propia)
         item = {"id": tarea.id, "etiqueta": etiqueta, "titulo": tarea.titulo}
         (propias if es_propia else ajenas).append(item)
     return propias + ajenas
