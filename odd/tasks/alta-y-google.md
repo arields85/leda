@@ -1034,6 +1034,13 @@ por commit, igual que en `main`. Nunca push sin pedido explícito del usuario.
   Corregido con un `commit` en cada punto. Hallazgo para `main`: afecta a su
   activación por enlace. Suite del escritor: `1361 passed, 108 deselected`.
   Pendiente de G1: la Tanda 2 por Telegram real, que espera a G2 (Gmail).
+- 2026-09-28: revisión RDD `review-030fac3e314b48ba` (configuración
+  corrupta + Tanda 1, riesgo medio, consentida): aprobada; reconocimiento
+  emitido. Seguimientos menores pendientes: un `null` JSON en la clave o en
+  los dominios hoy cuenta como corrupto (debería tratarse como ausente, sin
+  incidente); dos lecturas simultáneas de una configuración corrupta pueden
+  dejar dos incidentes (el candado del aviso es "consultar y después
+  crear").
 - Dependencia registrada: el hecho "bienvenida entregada" de G1 queda como
   evento propio para que la unidad de saludo diario de `main` (pack 06)
   pueda contarlo como saludo del día.
