@@ -900,6 +900,15 @@ ficticios, una interacción por vez; el primer defecto detiene el lote.
   sin dirección pública nueva expuesta a internet. Cuando exista el panel de
   plataforma, la autorización puede pasar ahí.
 
+- **Decisión abierta 6 resuelta (2026-09-28): cifrado en la aplicación con
+  una clave en el entorno.** La credencial se cifra en Python antes de
+  guardarse (biblioteca `cryptography`, Fernet con varias claves para rotar:
+  la nueva cifra, las viejas descifran, y un comando re-cifra todo); la clave
+  vive en `PRISMA_CLAVE_CREDENCIALES`, fuera de la base y de git. Sin clave,
+  Prisma no usa Google y registra un incidente; nunca guarda sin cifrar.
+  Suma la dependencia `cryptography` en `pyproject.toml` (archivo de `main`,
+  se lista para la integración). Un KMS externo queda para producción.
+
 ### Textos del alta con correo aprobados por el usuario (2026-09-28)
 
 Regla general aprobada: ningún mensaje termina en "escribime y lo vemos" ni
