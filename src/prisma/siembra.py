@@ -70,12 +70,21 @@ anticipó), `sembrar` no abre su propio SAVEPOINT para revertir: quien la
 llama tiene que correrla dentro de una transacción que se revierta sola ante
 una excepción -- `admin(conn)` (`db.py`) ya lo hace, igual que la CLI
 (`cli.py`, rama `sembrar`) y las pruebas de este módulo.
+
+Regla única sobre qué puede mostrarse en un mensaje (T7c, seguimiento a
+review-05906dd3): un mensaje de validación (`SiembraInvalida`) SÍ puede
+nombrar títulos u otros valores del archivo de semilla -- es el insumo
+propio de quien corre el comando, ya versionado en el repositorio, no el
+dato de un tercero. Un error de la base (`psycopg.Error`) NUNCA puede
+mostrar su `DETAIL` ni su mensaje: puede traer la fila entera que violó la
+restricción. La CLI (`cli.py`, rama `sembrar`) aplica esta regla mostrando
+sólo `type(e).__name__` para un `psycopg.Error`, nunca `str(e)`.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import date, datetime, time, timedelta
+from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -97,6 +106,23 @@ class ResultadoSiembra:
     estados: dict[str, int] = field(default_factory=dict)
 
 
+@dataclass
+class _TareaPreparada:
+    """Una tarea de la semilla ya resuelta contra el espacio -- reemplaza el
+    diccionario sin tipar que armaba la validación (T7c, seguimiento a
+    review-05906dd3): los nombres de campo quedan fijos y comprobables,
+    en vez de claves de `dict[str, Any]` sueltas."""
+
+    spec: dict[str, Any]
+    titulo: str
+    area_id: str
+    objetivo_id: str
+    responsable_id: str
+    version_evidencia: int
+    fecha: datetime | None
+    estado_inicial: str
+
+
 # Claves que cada tarea de la semilla tiene que traer: sin ellas no hay
 # forma de resolver área, objetivo ni responsable contra el espacio.
 CLAVES_TAREA_REQUERIDAS = ("titulo", "area", "objetivo", "responsable")
@@ -108,6 +134,14 @@ CLAVES_TAREA_REQUERIDAS = ("titulo", "area", "objetivo", "responsable")
 # `propuesta`.
 ESTADOS_INICIALES_PERMITIDOS = frozenset({"asignada", "en_curso"})
 
+# T7c (seguimiento a review-05906dd3): estos campos de una tarea de la
+# semilla tienen que ser texto ANTES de cualquier comprobación de
+# pertenencia (`in titulos_vistos`, `in ESTADOS_INICIALES_PERMITIDOS`) -- un
+# valor no hasheable ahí (una lista o un mapa del YAML donde se esperaba
+# texto) levanta `TypeError` en Python, no `SiembraInvalida`.
+_CAMPOS_DE_TAREA_QUE_TIENEN_QUE_SER_TEXTO = (
+    "titulo", "area", "objetivo", "responsable", "estado_inicial")
+
 
 def sembrar(
     cur: psycopg.Cursor,
@@ -115,15 +149,23 @@ def sembrar(
     ruta: Path,
     *,
     dia_semilla: date | None = None,
+    ahora: datetime | None = None,
 ) -> ResultadoSiembra:
     """Carga `ruta` en `workspace_id`. Tiene que correr bajo `admin(conn)`.
 
     Rechaza si el espacio no existe, o si ya tiene alguna tarea (de
     cualquier estado): la siembra nunca se mezcla con datos reales ni con
     una siembra anterior. `dia_semilla` es el día contra el que se resuelven
-    las fechas relativas (`fecha_objetivo.dias`); por defecto, hoy en la
-    zona horaria del espacio -- nunca la fecha local del host que corre el
-    comando (T7b, `odd/tasks/prisma-orienta.md`).
+    las fechas relativas (`fecha_objetivo.dias`) y, si se pasa, salta el
+    cálculo de abajo. Sin él, el día sale de `ahora` (aware; por defecto el
+    instante real, `datetime.now(timezone.utc)`) convertido a la zona
+    horaria del espacio -- nunca la fecha local del host que corre el
+    comando (T7b, `odd/tasks/prisma-orienta.md`). `ahora` es el instante
+    inyectable que hace ESE cálculo comprobable (T7c, seguimiento a
+    review-05906dd3): antes no había forma de fijarlo, así que un defecto
+    ahí (usar UTC o la zona del host en vez de la del espacio) sólo se
+    hubiera visto en una corrida real que cruzara la medianoche entre dos
+    zonas.
 
     Valida toda la semilla contra el espacio antes de insertar la primera
     fila (ver el docstring del módulo): si algo es inválido, no se escribe
@@ -142,18 +184,20 @@ def sembrar(
             "existentes. Usá un espacio recién importado, sin sembrar todavía.")
 
     semilla = _cargar_semilla(ruta)
-    dia = dia_semilla or datetime.now(zona).date()
+    momento = ahora if ahora is not None else datetime.now(timezone.utc)
+    dia = dia_semilla or momento.astimezone(zona).date()
 
-    tareas_spec = semilla.get("tareas") or []
-    dependencias_spec = semilla.get("dependencias") or []
+    tareas_spec = _validar_lista(semilla.get("tareas") or [], "tareas")
+    dependencias_spec = _validar_lista(semilla.get("dependencias") or [], "dependencias")
 
     # --- Validación completa contra el espacio, antes del primer insert ---
     titulos_vistos: set[str] = set()
-    preparadas: list[dict[str, Any]] = []
+    preparadas: list[_TareaPreparada] = []
     for t in tareas_spec:
         if not isinstance(t, dict):
             raise SiembraInvalida("Cada tarea de la semilla tiene que ser un mapeo.")
         _validar_claves_requeridas(t)
+        _validar_tipos_de_tarea(t)
 
         titulo = t["titulo"]
         if titulo in titulos_vistos:
@@ -173,17 +217,21 @@ def sembrar(
         version_evidencia = _version_politica_evidencia(cur, workspace_id, area_id, t["area"])
         fecha = _fecha_objetivo(dia, zona, t.get("fecha_objetivo"))
 
-        preparadas.append({
-            "spec": t, "titulo": titulo, "area_id": area_id,
-            "objetivo_id": objetivo_id, "responsable_id": responsable_id,
-            "version_evidencia": version_evidencia, "fecha": fecha,
-            "estado_inicial": estado_inicial,
-        })
+        preparadas.append(_TareaPreparada(
+            spec=t, titulo=titulo, area_id=area_id, objetivo_id=objetivo_id,
+            responsable_id=responsable_id, version_evidencia=version_evidencia,
+            fecha=fecha, estado_inicial=estado_inicial,
+        ))
 
     for d in dependencias_spec:
         if not isinstance(d, dict):
             raise SiembraInvalida("Cada dependencia de la semilla tiene que ser un mapeo.")
         origen, destino = d.get("origen"), d.get("destino")
+        for campo, valor in (("origen", origen), ("destino", destino)):
+            if valor is not None and not isinstance(valor, str):
+                raise SiembraInvalida(
+                    f"'{campo}' de una dependencia de la semilla tiene que ser "
+                    f"texto, no {type(valor).__name__}.")
         if origen not in titulos_vistos or destino not in titulos_vistos:
             raise SiembraInvalida(
                 f"La dependencia {origen!r} -> {destino!r} nombra un título "
@@ -194,7 +242,7 @@ def sembrar(
     estados: dict[str, int] = {}
 
     for p in preparadas:
-        t = p["spec"]
+        t = p.spec
         cur.execute(
             """insert into task (workspace_id, objective_id, titulo, descripcion,
                                  area_id, responsable_membership_id, fecha_objetivo,
@@ -202,19 +250,19 @@ def sembrar(
                                  evidencia_policy_version)
                values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                returning id""",
-            (workspace_id, p["objetivo_id"], p["titulo"], t.get("descripcion"),
-             p["area_id"], p["responsable_id"], p["fecha"], t.get("criterio_aceptacion"),
-             list(t.get("evidencia_requerida") or []), p["version_evidencia"]),
+            (workspace_id, p.objetivo_id, p.titulo, t.get("descripcion"),
+             p.area_id, p.responsable_id, p.fecha, t.get("criterio_aceptacion"),
+             list(t.get("evidencia_requerida") or []), p.version_evidencia),
         )
         tarea_id = str(cur.fetchone()["id"])
-        por_titulo[p["titulo"]] = tarea_id
+        por_titulo[p.titulo] = tarea_id
 
         cur.execute(
             """insert into task_state_event (task_id, estado_nuevo, actor_kind, motivo)
                values (%s, %s, 'sistema', %s)""",
-            (tarea_id, p["estado_inicial"], t.get("motivo_estado_inicial")),
+            (tarea_id, p.estado_inicial, t.get("motivo_estado_inicial")),
         )
-        estados[p["estado_inicial"]] = estados.get(p["estado_inicial"], 0) + 1
+        estados[p.estado_inicial] = estados.get(p.estado_inicial, 0) + 1
 
     n_dependencias = 0
     for d in dependencias_spec:
@@ -268,6 +316,30 @@ def _validar_claves_requeridas(t: dict[str, Any]) -> None:
         raise SiembraInvalida(f"Falta la clave '{faltantes[0]}' en una tarea de la semilla.")
     claves = ", ".join(f"'{c}'" for c in faltantes)
     raise SiembraInvalida(f"Faltan las claves {claves} en una tarea de la semilla.")
+
+
+def _validar_tipos_de_tarea(t: dict[str, Any]) -> None:
+    """Valida el TIPO de los campos de texto de una tarea antes de que
+    `sembrar` los use en una comprobación de pertenencia (T7c, seguimiento a
+    review-05906dd3) -- ver `_CAMPOS_DE_TAREA_QUE_TIENEN_QUE_SER_TEXTO`."""
+    for campo in _CAMPOS_DE_TAREA_QUE_TIENEN_QUE_SER_TEXTO:
+        if campo in t and not isinstance(t[campo], str):
+            raise SiembraInvalida(
+                f"'{campo}' de una tarea de la semilla tiene que ser texto, "
+                f"no {type(t[campo]).__name__}.")
+
+
+def _validar_lista(valor: Any, clave: str) -> list[Any]:
+    """`tareas`/`dependencias` tienen que ser listas (T7c, seguimiento a
+    review-05906dd3): un escalar no vacío en `tareas` (p. ej. un entero) es
+    iterable o no según el tipo -- si no lo es, `for t in tareas_spec`
+    levanta `TypeError`, no `SiembraInvalida`, antes de llegar a ninguna
+    validación de tarea."""
+    if not isinstance(valor, list):
+        raise SiembraInvalida(
+            f"'{clave}' de la semilla tiene que ser una lista, no "
+            f"{type(valor).__name__}.")
+    return valor
 
 
 def _area_id(cur: psycopg.Cursor, ws: str, slug: str) -> str:

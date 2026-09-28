@@ -3545,3 +3545,14 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   (escritor); reejecutada por el orquestador junto con T7c -> `195 passed`
   (`test_comprobadores`, `test_siembra`, `test_entrega_con_evidencia`). Suite completa
   (escritor): `1021 passed, 108 deselected`.
+
+- 2026-09-28: **T7c cerrada — seguimientos de review-05906dd3 sobre `sembrar`.** Ruta:
+  delegada, el mismo escritor. `rollback` protegido (`cli._revertir_sin_traza`) para
+  que una conexión cortada no termine en traza cruda; tipos validados antes de
+  cualquier comparación (listas y textos), siempre `SiembraInvalida`; regla única en
+  el módulo: los mensajes de validación pueden nombrar valores del archivo de
+  siembra, los errores de la base nunca muestran su DETAIL; `sembrar(ahora=...)`
+  inyectable y prueba del día en la zona del espacio (01:00 UTC del 1/1 sigue siendo
+  31/12 en Buenos Aires); las pruebas del comando miran también `stderr`;
+  `_TareaPreparada` en lugar de diccionarios. RED/GREEN observado. `tests/test_siembra.py`
+  -> `44 passed` (escritor). Suite completa (escritor): `1021 passed, 108 deselected`.

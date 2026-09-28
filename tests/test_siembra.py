@@ -32,13 +32,21 @@ Cubre:
      y ninguna deja una fila escrita. La CLI (`cli.py`, rama `sembrar`)
      nunca deja pasar una traza cruda ni el DETAIL de la base, y revierte la
      conexión en cualquier rechazo.
+  8. Seguimientos T7c (review-05906dd3): un valor de tipo equivocado en la
+     semilla (una lista donde se espera texto, un escalar donde se espera
+     una lista) rechaza con `SiembraInvalida`, nunca con `TypeError`; el día
+     de la siembra sale de la zona horaria del espacio, no de la del host; y
+     un `conn.rollback()` que vuelve a fallar (conexión ya cortada) no tapa
+     el mensaje limpio de la CLI ni termina en una traza cruda.
 """
 
 from __future__ import annotations
 
 import json
 import uuid
+from datetime import date, datetime, time, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import psycopg
 import pytest
@@ -641,9 +649,10 @@ def test_cli_sembrar_rechazo_de_validacion_sin_traza_y_sin_escribir_nada(
     codigo = cli.main(["sembrar", "corework", "--semilla", str(ruta_inexistente)])
 
     assert codigo == 1
-    salida = capsys.readouterr().out
-    assert "Traceback" not in salida
-    assert "no se pudo leer" in salida.lower()
+    captura = capsys.readouterr()
+    assert "Traceback" not in captura.out
+    assert "Traceback" not in captura.err
+    assert "no se pudo leer" in captura.out.lower()
 
     ws = corework.workspace_id
     with admin(conn) as cur:
@@ -663,8 +672,10 @@ def test_cli_sembrar_rechazo_de_la_base_no_muestra_detalle_ni_escribe_nada(
     codigo = cli.main(["sembrar", "corework", "--semilla", str(ruta)])
 
     assert codigo == 1
-    salida = capsys.readouterr().out
+    captura = capsys.readouterr()
+    salida = captura.out
     assert "Traceback" not in salida
+    assert "Traceback" not in captura.err
     assert "La base rechazó la siembra" in salida
     assert "DETAIL" not in salida.upper()
     assert "constraint" not in salida.lower()
@@ -674,3 +685,129 @@ def test_cli_sembrar_rechazo_de_la_base_no_muestra_detalle_ni_escribe_nada(
     with admin(conn) as cur:
         cur.execute("select count(*) as n from task where workspace_id = %s", (ws,))
         assert cur.fetchone()["n"] == 0
+
+
+# ---------------------------------------------------------------------------
+# 8. Seguimientos T7c (review-05906dd3)
+# ---------------------------------------------------------------------------
+
+
+def test_cli_sembrar_rollback_roto_no_impide_el_mensaje_limpio(
+        corework, conn, tmp_path, monkeypatch, capsys):
+    """Si la conexión ya está cortada, `conn.rollback()` puede volver a
+    fallar -- eso no puede tapar el mensaje limpio que la rama ya decidió
+    mostrar ni terminar en una traza cruda de esta segunda falla."""
+    import prisma.cli as cli
+
+    def _rollback_roto():
+        raise psycopg.OperationalError("conexión cortada")
+
+    monkeypatch.setattr(cli, "conectar", lambda: conn)
+    monkeypatch.setattr(conn, "rollback", _rollback_roto)
+    ruta_inexistente = tmp_path / "no-existe.yaml"
+
+    codigo = cli.main(["sembrar", "corework", "--semilla", str(ruta_inexistente)])
+
+    assert codigo == 1
+    captura = capsys.readouterr()
+    assert "Traceback" not in captura.out
+    assert "Traceback" not in captura.err
+    assert "no se pudo leer" in captura.out.lower()
+
+
+def test_sembrar_rechaza_tareas_escalar_en_vez_de_lista(corework, conn, tmp_path):
+    """`tareas: 5` (un escalar no vacío) es sólo un `int`, no iterable: antes
+    de este seguimiento, `for t in tareas_spec` levantaba `TypeError` en vez
+    de `SiembraInvalida`."""
+    ws = corework.workspace_id
+    ruta = tmp_path / "semilla.yaml"
+    ruta.write_text("tareas: 5\n", encoding="utf-8")
+
+    with admin(conn) as cur:
+        with pytest.raises(SiembraInvalida, match="'tareas'.*lista"):
+            sembrar(cur, ws, ruta)
+
+
+@pytest.mark.parametrize(
+    "campo", ["titulo", "area", "objetivo", "responsable", "estado_inicial"])
+def test_sembrar_rechaza_campo_de_tarea_que_no_es_texto(corework, conn, tmp_path, campo):
+    """Antes de este seguimiento, un valor no hasheable acá (una lista)
+    escapaba como `TypeError` en la primera comprobación de pertenencia que
+    lo tocaba (`in titulos_vistos` para 'titulo', `in
+    ESTADOS_INICIALES_PERMITIDOS` para 'estado_inicial') en vez de
+    `SiembraInvalida`."""
+    ws = corework.workspace_id
+    tarea = {
+        "titulo": "Tarea con campo mal tipado",
+        "area": "ot",
+        "objetivo": "Conectar y automatizar equipos para que produzcan y entreguen datos",
+        "responsable": "Nahuel Gimenez",
+        "criterio_aceptacion": "Criterio",
+        "evidencia_requerida": ["explicacion"],
+        "estado_inicial": "asignada",
+    }
+    tarea[campo] = ["no es texto"]
+    ruta = _semilla_minima(tmp_path, tareas=[tarea])
+
+    with admin(conn) as cur:
+        with pytest.raises(SiembraInvalida, match=f"'{campo}'.*texto"):
+            sembrar(cur, ws, ruta)
+
+        cur.execute("select count(*) as n from task where workspace_id = %s", (ws,))
+        assert cur.fetchone()["n"] == 0
+
+
+@pytest.mark.parametrize("campo", ["origen", "destino"])
+def test_sembrar_rechaza_campo_de_dependencia_que_no_es_texto(corework, conn, tmp_path, campo):
+    """Mismo defecto que con los campos de tarea, pero del lado de
+    `dependencias`: `origen`/`destino` no hasheables escapaban como
+    `TypeError` en `origen not in titulos_vistos`."""
+    ws = corework.workspace_id
+    dependencia = {"origen": "Tarea de prueba A", "destino": "Tarea de prueba A",
+                   "tipo": "bloqueante"}
+    dependencia[campo] = ["no es texto"]
+    ruta = _semilla_minima(tmp_path, dependencias=[dependencia])
+
+    with admin(conn) as cur:
+        with pytest.raises(SiembraInvalida, match=f"'{campo}'.*texto"):
+            sembrar(cur, ws, ruta)
+
+        cur.execute("select count(*) as n from task where workspace_id = %s", (ws,))
+        assert cur.fetchone()["n"] == 0
+
+
+def test_sembrar_calcula_el_dia_en_la_zona_horaria_del_espacio_no_la_del_host(
+        corework, conn, tmp_path):
+    """El día contra el que se resuelven las fechas relativas
+    (`fecha_objetivo.dias`) tiene que salir de la zona horaria DEL ESPACIO
+    (T7b), nunca de la del host que corre el comando -- pero antes de este
+    seguimiento no había forma de fijar el instante para probarlo: un
+    defecto acá (usar UTC, o la fecha local del host) sólo se hubiera visto
+    en una corrida real que cruzara la medianoche entre dos zonas. `ahora`
+    (inyectable) fija el instante: la 01:00 UTC del 1° de enero de 2026 es
+    todavía 31 de diciembre de 2025 en America/Argentina/Buenos_Aires
+    (UTC-3, sin horario de verano)."""
+    ws = corework.workspace_id
+    ruta = _semilla_minima(tmp_path, tareas=[{
+        "titulo": "Tarea de zona horaria",
+        "area": "ot",
+        "objetivo": "Conectar y automatizar equipos para que produzcan y entreguen datos",
+        "responsable": "Nahuel Gimenez",
+        "criterio_aceptacion": "Criterio",
+        "evidencia_requerida": ["explicacion"],
+        "estado_inicial": "asignada",
+        "fecha_objetivo": {"dias": 0},
+    }])
+    ahora_utc = datetime(2026, 1, 1, 1, 0, tzinfo=timezone.utc)
+    zona = ZoneInfo("America/Argentina/Buenos_Aires")
+    esperado = datetime.combine(date(2025, 12, 31), time(0, 0), tzinfo=zona)
+
+    with admin(conn) as cur:
+        sembrar(cur, ws, ruta, ahora=ahora_utc)
+
+        cur.execute(
+            "select fecha_objetivo from task where workspace_id = %s and titulo = %s",
+            (ws, "Tarea de zona horaria"))
+        fecha_objetivo = cur.fetchone()["fecha_objetivo"]
+
+    assert fecha_objetivo == esperado

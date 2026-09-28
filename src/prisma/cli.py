@@ -21,6 +21,20 @@ from .config import config
 from .db import admin, conectar, espacio
 
 
+def _revertir_sin_traza(conn) -> None:
+    """`conn.rollback()` puede volver a fallar si la conexión ya está rota
+    (T7c, seguimiento a review-05906dd3) -- sin este guard, esa segunda
+    falla tapaba el mensaje limpio que la rama que la llama ya decidió
+    mostrar y terminaba en una traza cruda de la propia falla del rollback.
+    Si el rollback en sí falla, no hay nada más para hacer con esta
+    conexión: se ignora acá para que el comando pueda terminar con su
+    mensaje y su código de salida."""
+    try:
+        conn.rollback()
+    except Exception:
+        pass
+
+
 def _id_de(conn, slug: str) -> str:
     with conn.cursor() as cur:
         cur.execute("set role prisma_admin")
@@ -411,14 +425,14 @@ def main(argv: list[str] | None = None) -> int:
             with admin(conn) as cur:
                 r = sembrar(cur, ws, Path(a.semilla))
         except SiembraInvalida as e:
-            conn.rollback()
+            _revertir_sin_traza(conn)
             print(str(e))
             return 1
         except psycopg.Error as e:
             # Nunca el DETAIL crudo de la base acá: puede traer la fila
             # entera que la violó (títulos de tarea incluidos). Sólo el tipo
             # de error, nunca su mensaje (T7b, `odd/tasks/prisma-orienta.md`).
-            conn.rollback()
+            _revertir_sin_traza(conn)
             print(f"La base rechazó la siembra ({type(e).__name__}). No se guardó nada.")
             return 1
         conn.commit()
