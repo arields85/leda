@@ -5,6 +5,8 @@ vez por pasada -- lo que hoy usan `local.Escucha.tareas_de_fondo` y `servir`.
 
 from __future__ import annotations
 
+import threading
+import time
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
@@ -111,6 +113,37 @@ def test_cadencias_vencidas_no_repone_disparo_anterior_al_arranque(corework, con
     assert "objetivos_semanales" not in {j["nombre"] for j in vencidas}
 
 
+def test_cadencias_vencidas_no_repone_disparo_perdido_tras_reiniciar(corework, conn):
+    """R3-001: si el proceso corrió hace dos semanas (`ultima_corrida` vieja)
+    y se reinició recién el martes -- perdiéndose el disparo del lunes en el
+    medio -- el piso de búsqueda tiene que ser el MÁS TARDE de los dos
+    (`arranque`), no `ultima_corrida` sola: si no, se repone el lunes
+    perdido, contra la mecánica §12 ("una ventana que ya pasó no se envía
+    tarde")."""
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        _tarea(cur, ws, vence=datetime(2026, 8, 14, 17, 0, tzinfo=BA))
+    conn.commit()
+
+    dos_lunes_atras = datetime(2026, 7, 13, 9, 15, tzinfo=BA)
+    with espacio(conn, ws) as cur:
+        cur.execute(
+            "update cadence_job set ultima_corrida = %s "
+            "where workspace_id = %s and nombre = 'objetivos_semanales'",
+            (dos_lunes_atras, ws))
+    conn.commit()
+
+    # El proceso se reinicia el martes 21 -- el lunes 20 (intermedio) se
+    # perdió y no debe reponerse.
+    arranque = datetime(2026, 7, 21, 9, 0, tzinfo=BA)
+    ahora = datetime(2026, 7, 21, 9, 16, tzinfo=BA)
+    with espacio(conn, ws) as cur:
+        vencidas, fallidas, ok = ciclo.cadencias_vencidas(cur, ws, ahora, arranque)
+
+    assert "objetivos_semanales" not in {j["nombre"] for j in vencidas}
+    assert fallidas == []
+
+
 def test_cadencias_vencidas_no_repite_tras_actualizar_ultima_corrida(corework, conn):
     ws = corework.workspace_id
     with admin(conn) as cur:
@@ -191,7 +224,8 @@ def test_cadencias_vencidas_aisla_una_fila_con_cron_invalido(corework, conn):
         vencidas, fallidas, ok = ciclo.cadencias_vencidas(cur, ws, ahora, arranque)
 
     assert "objetivos_semanales" in {j["nombre"] for j in vencidas}
-    assert [j["nombre"] for j, _e in fallidas] == ["cadencia_rota"]
+    assert [j["nombre"] for j, _e, _c in fallidas] == ["cadencia_rota"]
+    assert [c for _j, _e, c in fallidas] == [ciclo.CAUSA_CRON_INVALIDO]
     assert "cadencia_rota" not in {j["nombre"] for j in ok}
 
 
@@ -214,7 +248,8 @@ def test_ejecutar_ciclo_espacio_con_cadencia_rota_sigue_despachando_las_demas(
 
     assert resumen["cadencias_encoladas"] == 1     # objetivos_semanales, igual
     assert resumen["enviados"] == 1                 # despacho sin frenarse
-    assert [j["nombre"] for j, _e in resumen["cadencias_fallidas"]] == ["cadencia_rota"]
+    assert [j["nombre"] for j, _e, _c in resumen["cadencias_fallidas"]] == ["cadencia_rota"]
+    assert [c for _j, _e, c in resumen["cadencias_fallidas"]] == [ciclo.CAUSA_CRON_INVALIDO]
 
 
 def test_cadencia_que_falla_en_la_base_al_ejecutarse_no_aborta_el_ciclo(
@@ -241,7 +276,10 @@ def test_cadencia_que_falla_en_la_base_al_ejecutarse_no_aborta_el_ciclo(
     # Escalera y despacho corrieron sobre la misma transacción, sin abortar.
     assert isinstance(resumen["escalera_encoladas"], int)
     assert "enviados" in resumen
-    assert [j["nombre"] for j, _e in resumen["cadencias_fallidas"]] == ["objetivos_semanales"]
+    assert [j["nombre"] for j, _e, _c in resumen["cadencias_fallidas"]] == ["objetivos_semanales"]
+    # El cron era válido: lo que falló fue la ejecución, causa distinta de
+    # un cron roto (R4-002/R2-001/R3-005).
+    assert [c for _j, _e, c in resumen["cadencias_fallidas"]] == [ciclo.CAUSA_FALLO_EJECUCION]
     assert "objetivos_semanales" not in [j["nombre"] for j in resumen["cadencias_ok"]]
 
 
@@ -306,6 +344,40 @@ def test_dia_semana_apscheduler_rango_de_nombres_no_se_traduce():
 
 def test_dia_semana_apscheduler_asterisco_dispara_todos_los_dias():
     assert _dias_que_disparan("*") == set(_NOMBRES_DIA)
+
+
+def test_dia_semana_apscheduler_rango_1_a_7_es_toda_la_semana():
+    """R3-002: `%7` sobre las PUNTAS antes de ordenar convertía "1-7" en
+    "1-0", invertido, y el rango se rechazaba -- 7 es la otra forma de
+    domingo, no un día aparte de una semana."""
+    assert _dias_que_disparan("1-7") == set(_NOMBRES_DIA)
+
+
+def test_dia_semana_apscheduler_rango_5_a_7_es_viernes_a_domingo():
+    assert _dias_que_disparan("5-7") == {"viernes", "sabado", "domingo"}
+
+
+def test_dia_semana_apscheduler_rango_0_a_7_es_toda_la_semana():
+    """0 y 7 son el mismo domingo: "0-7" no puede quedar como "sólo
+    domingo" (`range(0 % 7, 7 % 7 + 1)` daba eso)."""
+    assert _dias_que_disparan("0-7") == set(_NOMBRES_DIA)
+
+
+def test_dia_semana_apscheduler_valor_fuera_de_rango_se_rechaza():
+    """R3-002: "9" no es un día de semana -- ni siquiera con la otra forma
+    de domingo (7) -- y `%7` lo plegaba en silencio a "martes" (2) en vez de
+    rechazarlo."""
+    import pytest
+
+    with pytest.raises(ValueError):
+        ciclo._expandir_dia_cron("9")
+
+
+def test_dia_semana_apscheduler_rango_fuera_de_rango_se_rechaza():
+    import pytest
+
+    with pytest.raises(ValueError):
+        ciclo._expandir_dia_cron("1-9")
 
 
 # ---------------------------------------------------------------------------
@@ -489,6 +561,128 @@ def test_ciclo_tick_corre_escalera_en_espacio_activo_sin_cadence_job(
     assert "error" not in resultados["north-lab"]
     assert resultados["north-lab"]["escalera_encoladas"] == 1
     assert resultados["north-lab"]["enviados"] == 1
+
+
+# ---------------------------------------------------------------------------
+# R4-001: un mensaje ya entregado y marcado no se reenvía porque OTRO
+# mensaje del mismo lote falló después
+# ---------------------------------------------------------------------------
+
+def test_despachar_no_reenvia_el_primero_si_el_segundo_falla_al_marcarse(
+        corework, conn, monkeypatch):
+    """Antes, sólo el ENVÍO estaba protegido: si la marca de 'enviado' (el
+    UPDATE posterior) fallaba, la excepción escapaba de `despachar` sin
+    contenerse y el `rollback` de la transacción entera -- compartida con la
+    escalera -- devolvía a 'listo' TAMBIÉN los mensajes anteriores del mismo
+    lote, que se reenviaban en la próxima pasada."""
+    from prisma import despachador as desp
+
+    ws = corework.workspace_id
+    ahora = datetime(2026, 7, 27, 10, 0, tzinfo=BA)  # lunes, en horario
+
+    with espacio(conn, ws) as cur:
+        for i in range(2):
+            cur.execute(
+                """insert into message_outbox
+                     (workspace_id, chat_id, cuerpo, estado, programado_para,
+                      dedupe_key)
+                   values (%s, %s, %s, 'listo', %s, %s)""",
+                (ws, 5000 + i, f"mensaje de prueba {i}",
+                 ahora - timedelta(microseconds=2 - i), f"prueba-r4-001-{i}"))
+    conn.commit()
+
+    llamadas = {"n": 0}
+    original = desp._marcar_enviado
+
+    def _falla_en_el_segundo(cur, ahora, tg_id, outbox_id):
+        llamadas["n"] += 1
+        if llamadas["n"] == 2:
+            raise RuntimeError("falla simulada al marcar 'enviado'")
+        return original(cur, ahora, tg_id, outbox_id)
+
+    monkeypatch.setattr(desp, "_marcar_enviado", _falla_en_el_segundo)
+
+    transporte = TransporteDePrueba()
+    with espacio(conn, ws) as cur:
+        cal = Calendario.desde_base(cur, ws)
+        r1 = desp.despachar(cur, ws, transporte, cal, ahora)
+    conn.commit()
+
+    assert r1["enviados"] == 1   # el primero se entregó y quedó marcado
+    assert r1["fallidos"] == 1   # el segundo falló al marcarse
+
+    # "próxima pasada": si el primero hubiera vuelto a 'listo' por un
+    # rollback de todo el lote, se reenviaría acá.
+    monkeypatch.setattr(desp, "_marcar_enviado", original)
+    transporte2 = TransporteDePrueba()
+    with espacio(conn, ws) as cur:
+        cal = Calendario.desde_base(cur, ws)
+        r2 = desp.despachar(cur, ws, transporte2, cal, ahora)
+    conn.commit()
+
+    assert len(transporte2.enviados) == 1   # sólo el segundo (reintento)
+    assert r2["enviados"] == 1
+
+
+# ---------------------------------------------------------------------------
+# R3-004: `servir` y `escuchar` evaluando la misma cadencia a la vez no la
+# encolan dos veces
+# ---------------------------------------------------------------------------
+
+def test_ejecutar_cadencia_evaluada_a_la_vez_por_dos_conexiones_no_duplica(
+        corework, conn, uri):
+    """Lo que evita encolar la misma cadencia dos veces cuando `servir` y
+    `escuchar` la evalúan casi al mismo tiempo es el `dedupe_key` ÚNICO de
+    `message_outbox` -- no una coordinación en Python -- así que tiene que
+    seguir siéndolo bajo concurrencia real, no sólo en llamadas
+    secuenciales."""
+    from prisma.db import conectar
+
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        _tarea(cur, ws, vence=datetime(2026, 8, 14, 17, 0, tzinfo=BA))
+    conn.commit()
+
+    ahora = datetime(2026, 7, 27, 9, 16, tzinfo=BA)
+    with espacio(conn, ws) as cur:
+        cal = Calendario.desde_base(cur, ws)
+
+    otra = conectar(uri)
+    resultado_otra: dict = {}
+    seguir = threading.Event()
+
+    def _en_otro_hilo():
+        with espacio(otra, ws) as cur2:
+            seguir.wait(timeout=5)
+            resultado_otra["n"] = reloj.ejecutar_cadencia(
+                cur2, ws, "objetivos_semanales", cal, ahora)
+        otra.commit()
+
+    hilo = threading.Thread(target=_en_otro_hilo)
+    hilo.start()
+    try:
+        with espacio(conn, ws) as cur1:
+            n1 = reloj.ejecutar_cadencia(cur1, ws, "objetivos_semanales", cal, ahora)
+            # La otra conexión intenta el mismo `insert` AHORA, mientras esta
+            # transacción sigue abierta -- Postgres la obliga a esperar en
+            # vez de dejarla pasar sin ver este `insert` todavía sin commit.
+            seguir.set()
+            time.sleep(0.2)
+        conn.commit()
+    finally:
+        hilo.join(timeout=5)
+        otra.close()
+
+    assert "n" in resultado_otra
+    n2 = resultado_otra["n"]
+    assert n1 + n2 == 1   # sólo una de las dos transacciones lo encoló
+
+    with admin(conn) as cur:
+        cur.execute(
+            "select count(*) n from message_outbox where workspace_id = %s", (ws,))
+        total = cur.fetchone()["n"]
+    conn.commit()
+    assert total == 1
 
 
 # ---------------------------------------------------------------------------
@@ -912,3 +1106,161 @@ def test_ciclo_cierra_el_transporte_viejo_si_el_token_cambia(
 
     assert len(creados) == 2       # se construyó uno nuevo
     assert primero.cerrado         # y se cerró el viejo
+
+
+# ---------------------------------------------------------------------------
+# R4-003/R3-003: una conexión por ciclo, no una nueva por pasada
+# ---------------------------------------------------------------------------
+
+def test_ciclo_tick_reusa_la_conexion_entre_pasadas(conn, corework, monkeypatch):
+    """Antes, `tick` llamaba a `conn_factory()` en cada pasada y nunca
+    cerraba la anterior: una conexión nueva cada `INTERVALO_SEGUNDOS`, para
+    siempre."""
+    conteo = {"n": 0}
+
+    def _fabrica():
+        conteo["n"] += 1
+        return conn
+
+    c = ciclo.Ciclo(_fabrica, arranque=datetime(2026, 1, 1, tzinfo=timezone.utc))
+    ahora = datetime(2026, 1, 2, tzinfo=timezone.utc)
+    c.tick(ahora=ahora)
+    c.tick(ahora=ahora)
+    c.tick(ahora=ahora)
+
+    assert conteo["n"] == 1
+
+
+def test_ciclo_tick_conexion_inalcanzable_se_reporta_una_vez_sin_traceback(capsys):
+    """Si `conn_factory()` (o el primer uso de la conexión) falla, `tick` no
+    puede dejar escapar la excepción -- eso rompería el job de APScheduler
+    cada `INTERVALO_SEGUNDOS`, sin deduplicar nada -- y tiene que reintentar
+    conectar en la próxima pasada, no quedarse pegado a la misma conexión
+    rota."""
+    intentos = {"n": 0}
+
+    def _fabrica_rota():
+        intentos["n"] += 1
+        raise ConnectionError("no hay servidor en este puerto")
+
+    c = ciclo.Ciclo(_fabrica_rota, arranque=datetime(2026, 1, 1, tzinfo=timezone.utc))
+    ahora = datetime(2026, 1, 2, tzinfo=timezone.utc)
+
+    for _ in range(3):
+        r = c.tick(ahora=ahora)   # no debe levantar
+        assert r == {"_error": {"tipo": "ConnectionError"}}
+
+    assert intentos["n"] == 3     # reintenta conectar en cada pasada
+    salida = capsys.readouterr().out
+    assert salida.count("no pudo conectar") == 1   # deduplicado, no un aluvión
+
+
+# ---------------------------------------------------------------------------
+# R4-002/R2-001/R3-005: causa distinta en el texto según qué falló
+# ---------------------------------------------------------------------------
+
+def test_reportar_cadencias_rotas_distingue_cron_invalido_de_fallo_en_ejecucion(
+        conn, corework):
+    """Un cron VÁLIDO que falla al ejecutarse no puede quedar reportado como
+    "cron inválido" -- son causas distintas, con textos distintos y claves
+    de deduplicación distintas (para que una no suprima a la otra)."""
+    ws = corework.workspace_id
+    supresor = ciclo.SupresorDeRepetidos()
+
+    resumen_cron_invalido = {
+        "cadencias_ok": [],
+        "cadencias_fallidas": [
+            ({"nombre": "objetivos_semanales"}, ValueError("mal"),
+             ciclo.CAUSA_CRON_INVALIDO)],
+    }
+    reportados = []
+    ciclo.reportar_cadencias_rotas(
+        conn, supresor, ws, "corework", resumen_cron_invalido,
+        imprimir=reportados.append)
+    assert len(reportados) == 1
+    assert "cron inválido" in reportados[0]
+
+    resumen_fallo_ejecucion = {
+        "cadencias_ok": [],
+        "cadencias_fallidas": [
+            ({"nombre": "cierre_semanal"}, ZeroDivisionError("x"),
+             ciclo.CAUSA_FALLO_EJECUCION)],
+    }
+    reportados2 = []
+    ciclo.reportar_cadencias_rotas(
+        conn, supresor, ws, "corework", resumen_fallo_ejecucion,
+        imprimir=reportados2.append)
+    assert len(reportados2) == 1
+    assert "cron inválido" not in reportados2[0]
+    assert "falló al ejecutarse" in reportados2[0]
+
+
+# ---------------------------------------------------------------------------
+# R2-002: una sola implementación del reporte de cadencias rotas, y que
+# imprime sólo cuando `reportar_fallo` de verdad reportó
+# ---------------------------------------------------------------------------
+
+def test_reportar_cadencias_rotas_imprime_solo_cuando_reportar_fallo_reporta(
+        conn, corework):
+    """`ciclo.reportar_cadencias_rotas` es ahora la única implementación que
+    usan `Ciclo.tick` y `Escucha.tareas_de_fondo` (R2-002): antes,
+    `tareas_de_fondo` tenía su propia copia que imprimía en cada pasada sin
+    mirar si `reportar_fallo` de verdad reportó, a diferencia de `Ciclo`."""
+    ws = corework.workspace_id
+    supresor = ciclo.SupresorDeRepetidos()
+
+    def _resumen() -> dict:
+        return {
+            "cadencias_ok": [],
+            "cadencias_fallidas": [
+                ({"nombre": "objetivos_semanales"}, ValueError("mal"),
+                 ciclo.CAUSA_CRON_INVALIDO)],
+        }
+
+    llamadas_imprimir: list[str] = []
+    ciclo.reportar_cadencias_rotas(
+        conn, supresor, ws, "corework", _resumen(), imprimir=llamadas_imprimir.append)
+    ciclo.reportar_cadencias_rotas(
+        conn, supresor, ws, "corework", _resumen(), imprimir=llamadas_imprimir.append)
+
+    # La misma falla, sin recuperarse en el medio: se imprime (y se
+    # registra el incidente) sólo la primera vez.
+    assert len(llamadas_imprimir) == 1
+
+
+# ---------------------------------------------------------------------------
+# R3-006: la supresión de un fallo se marca sólo después de escribirlo
+# ---------------------------------------------------------------------------
+
+def test_reportar_fallo_no_suprime_si_la_escritura_del_incidente_falla(
+        conn, corework, monkeypatch):
+    """Antes, `debe_reportar` marcaba la clave como reportada ANTES de
+    escribir el incidente: si la escritura fallaba, esa falla quedaba
+    deduplicada para siempre -- ni el reintento de la próxima pasada podía
+    volver a escribirla."""
+    ws = corework.workspace_id
+    intentos = {"n": 0}
+    original = ciclo.registrar_incidente
+
+    def _falla_la_primera_vez(cur, *a, **k):
+        intentos["n"] += 1
+        if intentos["n"] == 1:
+            raise RuntimeError("falla simulada al escribir el incidente")
+        return original(cur, *a, **k)
+
+    monkeypatch.setattr(ciclo, "registrar_incidente", _falla_la_primera_vez)
+
+    supresor = ciclo.SupresorDeRepetidos()
+    r1 = ciclo.reportar_fallo(
+        conn, supresor, ws, "prueba", "algo falló en la prueba", RuntimeError("x"))
+    assert r1 is False   # la escritura falló: no se marca como reportado
+
+    r2 = ciclo.reportar_fallo(
+        conn, supresor, ws, "prueba", "algo falló en la prueba", RuntimeError("x"))
+    assert r2 is True    # se reintenta y esta vez se escribe
+
+    with admin(conn) as cur:
+        cur.execute("select count(*) n from incident where workspace_id = %s", (ws,))
+        total = cur.fetchone()["n"]
+    conn.commit()
+    assert total == 1

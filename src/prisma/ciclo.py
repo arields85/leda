@@ -11,8 +11,10 @@ Una cadencia vencida se calcula, no se programa de antemano: en cada pasada
 se relee `cadence_job` y se compara su cron contra `ultima_corrida` (o el
 arranque del proceso, si nunca corrió) con `CronTrigger.get_next_fire_time`.
 Así un cambio en la base -- un pack nuevo, un horario editado -- se aplica en
-la próxima pasada, sin reiniciar el proceso. Nunca repone un disparo anterior
-al arranque del proceso: `arranque` es el piso de búsqueda.
+la próxima pasada, sin reiniciar el proceso. El piso de búsqueda es el MÁS
+TARDE entre `ultima_corrida` y el arranque del proceso: nunca repone un
+disparo anterior al arranque, ni uno cuya ventana ya pasó antes de un
+reinicio con una corrida vieja.
 
 Un cron roto (edición a mano, futuro tablero de cliente) no frena a las
 demás cadencias del espacio ni a la escalera ni al despacho: se aísla por
@@ -45,7 +47,13 @@ _RE_TOKEN_DIA = re.compile(r"^(?P<base>\*|\d+(?:-\d+)?)(?:/(?P<paso>\d+))?$")
 def _expandir_dia_cron(token: str) -> list[int]:
     """Un token del campo día-de-semana estándar (`*`, `n`, `n-m`, con o sin
     `/paso`) a la lista de valores 0-6 (domingo=0) que representa -- 7, la
-    otra forma de domingo, se pliega a 0."""
+    otra forma de domingo, se pliega a 0.
+
+    El rango y el paso se validan y se aplican sobre los valores CRUDOS
+    (0-7), antes de plegar 7 a 0 (R3-002, revisión 2026-09-28+1): plegar
+    antes rompía "1-7" (toda la semana) en "1-0", invertido, y aceptaba
+    cualquier entero fuera de 0-7 plegándolo en silencio (`9 % 7` = 2,
+    martes) en vez de rechazarlo como cadencia rota."""
     m = _RE_TOKEN_DIA.match(token)
     if not m:
         raise ValueError(f"día de semana no reconocido: {token!r}")
@@ -56,16 +64,20 @@ def _expandir_dia_cron(token: str) -> list[int]:
         primero, ultimo = 0, 6
     elif "-" in base:
         a, b = base.split("-", 1)
-        primero, ultimo = int(a) % 7, int(b) % 7
-        if primero > ultimo:
-            raise ValueError(f"rango de día de semana invertido: {token!r}")
+        primero, ultimo = int(a), int(b)
     else:
-        primero = ultimo = int(base) % 7
+        primero = ultimo = int(base)
 
-    valores = list(range(primero, ultimo + 1))
+    for valor in (primero, ultimo):
+        if not 0 <= valor <= 7:
+            raise ValueError(f"día de semana fuera de rango (0-7): {token!r}")
+    if primero > ultimo:
+        raise ValueError(f"rango de día de semana invertido: {token!r}")
+
+    crudos = range(primero, ultimo + 1)
     if paso:
-        valores = [v for v in valores if (v - primero) % paso == 0]
-    return valores
+        crudos = [v for v in crudos if (v - primero) % paso == 0]
+    return sorted({v % 7 for v in crudos})
 
 
 def _dia_semana_apscheduler(valor: str) -> str:
@@ -101,30 +113,37 @@ def _trigger_de(cron: str, zona_horaria: str):
 
 def cadencias_vencidas(
     cur, workspace_id: str, ahora: datetime, arranque: datetime,
-) -> tuple[list[dict], list[tuple[dict, Exception]], list[dict]]:
+) -> tuple[list[dict], list[tuple[dict, Exception, str]], list[dict]]:
     """`cadence_job` activos con un disparo entre su última corrida (o el
-    arranque del proceso) y ahora.
+    arranque del proceso, el que sea más tarde) y ahora.
 
     Devuelve `(vencidas, fallidas, ok)`: un cron roto, o cualquier valor que
-    APScheduler rechace, va a `fallidas` sin frenar la evaluación de las
-    demás filas. `ok` son todas las que se pudieron evaluar (vencidas o no)
-    -- lo que necesita quien llama para marcar una falla anterior como
-    recuperada."""
+    APScheduler rechace, va a `fallidas` (con su causa, `CAUSA_CRON_INVALIDO`
+    acá) sin frenar la evaluación de las demás filas. `ok` son todas las que
+    se pudieron evaluar (vencidas o no) -- lo que necesita quien llama para
+    marcar una falla anterior como recuperada."""
     cur.execute(
         """select c.id, c.nombre, c.cron, c.ultima_corrida, w.zona_horaria
              from cadence_job c join workspace w on w.id = c.workspace_id
             where c.workspace_id = %s and c.activo and w.activo""",
         (workspace_id,))
     vencidas: list[dict] = []
-    fallidas: list[tuple[dict, Exception]] = []
+    fallidas: list[tuple[dict, Exception, str]] = []
     ok: list[dict] = []
     for job in cur.fetchall():
         try:
-            desde = job["ultima_corrida"] or arranque
+            # El piso de búsqueda es el MÁS TARDE de los dos, nunca la
+            # última corrida sola (R3-001, revisión 2026-09-28+1): un
+            # reinicio con una corrida vieja repondría un disparo cuya
+            # ventana ya pasó, contra la mecánica §12 ("un mensaje de
+            # cadencia cuya ventana ya pasó no se envía tarde, se
+            # descarta").
+            ultima = job["ultima_corrida"]
+            desde = max(ultima, arranque) if ultima is not None else arranque
             trigger = _trigger_de(job["cron"], job["zona_horaria"])
             siguiente = trigger.get_next_fire_time(desde, ahora)
         except Exception as e:  # noqa: BLE001 -- una cadencia rota no frena a las demás
-            fallidas.append((job, e))
+            fallidas.append((job, e, CAUSA_CRON_INVALIDO))
             continue
         ok.append(job)
         if siguiente is not None and siguiente <= ahora:
@@ -137,14 +156,14 @@ def ejecutar_ciclo_espacio(cur, workspace_id: str, transporte, ahora: datetime,
                           lote: int = 50) -> dict:
     """Cadencias vencidas (si `con_cadencias`) + escalera + despacho, de un
     espacio. Mismo resumen que `despachar`, con `cadencias_encoladas`,
-    `escalera_encoladas`, `cadencias_fallidas` (lista de `(job, error)`, para
-    que quien llama la reporte deduplicada) y `cadencias_ok` (para marcar una
-    falla anterior como recuperada) agregados. Una cadencia rota nunca frena
-    la escalera ni el despacho."""
+    `escalera_encoladas`, `cadencias_fallidas` (lista de `(job, error,
+    causa)`, para que quien llama la reporte deduplicada) y `cadencias_ok`
+    (para marcar una falla anterior como recuperada) agregados. Una cadencia
+    rota nunca frena la escalera ni el despacho."""
     cal = Calendario.desde_base(cur, workspace_id)
 
     cadencias_encoladas = 0
-    fallidas: list[tuple[dict, Exception]] = []
+    fallidas: list[tuple[dict, Exception, str]] = []
     ok: list[dict] = []
     if con_cadencias:
         vencidas, fallidas, ok = cadencias_vencidas(cur, workspace_id, ahora, arranque)
@@ -156,7 +175,10 @@ def ejecutar_ciclo_espacio(cur, workspace_id: str, transporte, ahora: datetime,
                     cadencias_encoladas += reloj.ejecutar_cadencia(
                         cur, workspace_id, job["nombre"], cal, ahora)
             except Exception as e:  # noqa: BLE001 -- se reporta, no se propaga
-                fallidas.append((job, e))
+                # El cron ya era válido (pasó `cadencias_vencidas`): lo que
+                # falló fue EJECUTARLA, causa distinta de un cron roto
+                # (R4-002/R2-001/R3-005, revisión 2026-09-28+1).
+                fallidas.append((job, e, CAUSA_FALLO_EJECUCION))
                 ok = [j for j in ok if j["id"] != job["id"]]
 
     escalera_encoladas = reloj.ejecutar_escalera(cur, workspace_id, cal, ahora)
@@ -191,21 +213,64 @@ class SupresorDeRepetidos:
         self._activas: set[tuple] = set()
 
     def debe_reportar(self, clave: tuple) -> bool:
+        """Marca y decide en un solo paso -- para un aviso que no tiene nada
+        más que escribir aparte (sólo consola, sin incidente en la base:
+        p. ej. cuando ni hay conexión para intentarlo)."""
         if clave in self._activas:
             return False
         self._activas.add(clave)
         return True
 
+    def activa(self, clave: tuple) -> bool:
+        """Sólo consulta, sin marcar (R3-006, revisión 2026-09-28+1): la
+        usa `reportar_fallo`, que necesita decidir ANTES de escribir el
+        incidente, y marcar recién si la escritura salió bien."""
+        return clave in self._activas
+
+    def marcar(self, clave: tuple) -> None:
+        self._activas.add(clave)
+
     def recuperada(self, clave: tuple) -> None:
         self._activas.discard(clave)
+
+
+def _revertir_best_effort(conn) -> None:
+    """`rollback` best-effort compartido -- antes había una copia idéntica
+    en `Ciclo._revertir` y otra en `Escucha._revertir` (R2-004, revisión
+    2026-09-28+1). Nunca deja escapar una excepción propia, y tolera
+    `conn=None` (todavía no se pudo conectar)."""
+    if conn is None:
+        return
+    try:
+        conn.rollback()
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def _resumen_vacio() -> dict:
+    """Resumen sin ningún efecto -- lo usa quien necesita seguir el resto
+    del ciclo (reportar cadencias rotas, avisar admin) después de una
+    pasada que falló entera y no llegó a construir uno real (R2-003,
+    revisión 2026-09-28+1)."""
+    return {"enviados": 0, "pospuestos": 0, "fallidos": 0, "descartados": 0,
+            "cadencias_encoladas": 0, "escalera_encoladas": 0,
+            "cadencias_fallidas": [], "cadencias_ok": []}
 
 
 def reportar_fallo(conn, supresor: SupresorDeRepetidos, workspace_id: str | None,
                    clave: str, descripcion: str, error: Exception) -> bool:
     """Un incidente por `(workspace_id, clave)` mientras esa falla persiste.
     Nunca deja escapar una excepción propia -- si ni esto funciona, sólo se
-    pierde el aviso. Devuelve si esta vez se reportó de verdad."""
-    if not supresor.debe_reportar((workspace_id, clave)):
+    pierde el aviso. Devuelve si esta vez se reportó de verdad.
+
+    La clave se marca como reportada sólo DESPUÉS de escribir el incidente
+    (R3-006, revisión 2026-09-28+1): antes se marcaba antes de escribir, así
+    que si la escritura fallaba esa falla quedaba deduplicada para siempre,
+    sin que ni el reintento de la próxima pasada pudiera volver a
+    registrarla. Si la escritura falla, se avisa por consola -- nunca en
+    silencio -- y se devuelve `False` para que la próxima pasada reintente."""
+    tupla = (workspace_id, clave)
+    if supresor.activa(tupla):
         return False
     try:
         with admin(conn) as cur:
@@ -213,12 +278,54 @@ def reportar_fallo(conn, supresor: SupresorDeRepetidos, workspace_id: str | None
                 cur, workspace_id, descripcion, severidad="alta",
                 referencia_cruda=str(error)[:2000], etapa="ciclo_de_fondo")
         conn.commit()
-    except Exception:  # noqa: BLE001 -- el aviso se pierde, el ciclo sigue
-        try:
-            conn.rollback()
-        except Exception:  # noqa: BLE001
-            pass
+    except Exception as exc:  # noqa: BLE001 -- no se marca: se reintenta la próxima vez
+        _revertir_best_effort(conn)
+        print(f"  ! no se pudo registrar el incidente de fondo "
+             f"({type(exc).__name__}): {descripcion}")
+        return False
+    supresor.marcar(tupla)
     return True
+
+
+# Causa de una cadencia en `cadencias_fallidas`: distingue un cron que
+# APScheduler rechazó de uno válido que falló al EJECUTARSE
+# (R4-002/R2-001/R3-005, revisión 2026-09-28+1) -- antes las dos quedaban
+# reportadas como "cron inválido", aunque el cron fuera correcto.
+CAUSA_CRON_INVALIDO = "cron_invalido"
+CAUSA_FALLO_EJECUCION = "fallo_en_ejecucion"
+
+
+def _texto_cadencia_fallida(causa: str, nombre: str, slug: str,
+                            error: Exception) -> tuple[str, str]:
+    tipo = type(error).__name__
+    if causa == CAUSA_CRON_INVALIDO:
+        return (
+            f"Cron inválido en la cadencia '{nombre}' de '{slug}' ({tipo}).",
+            f"  ! la cadencia '{nombre}' de '{slug}' tiene un cron inválido: {tipo}")
+    return (
+        f"La cadencia '{nombre}' de '{slug}' falló al ejecutarse ({tipo}).",
+        f"  ! la cadencia '{nombre}' de '{slug}' falló al ejecutarse: {tipo}")
+
+
+def reportar_cadencias_rotas(conn, supresor: SupresorDeRepetidos,
+                             workspace_id: str, slug: str, resumen: dict, *,
+                             imprimir=print) -> None:
+    """Aísla y reporta -- deduplicado -- lo que `cadencias_vencidas` encontró
+    roto en este espacio, sin frenar el resto del ciclo. Única implementación
+    compartida por `Ciclo.tick` y `Escucha.tareas_de_fondo` (R2-002, revisión
+    2026-09-28+1): antes cada uno tenía su propia copia, y la de
+    `tareas_de_fondo` imprimía en cada pasada sin mirar si `reportar_fallo`
+    de verdad reportó."""
+    for job in resumen.pop("cadencias_ok", []):
+        nombre = job["nombre"]
+        supresor.recuperada((workspace_id, f"cadencia:{nombre}:{CAUSA_CRON_INVALIDO}"))
+        supresor.recuperada((workspace_id, f"cadencia:{nombre}:{CAUSA_FALLO_EJECUCION}"))
+    for job, error, causa in resumen.pop("cadencias_fallidas", []):
+        nombre = job["nombre"]
+        descripcion, texto_consola = _texto_cadencia_fallida(causa, nombre, slug, error)
+        clave = f"cadencia:{nombre}:{causa}"
+        if reportar_fallo(conn, supresor, workspace_id, clave, descripcion, error):
+            imprimir(texto_consola)
 
 
 # Intervalo del job único que arma `reloj.montar` para `servir`. Acotado y
@@ -244,6 +351,10 @@ class Ciclo:
         self.arranque = arranque or datetime.now(timezone.utc)
         self._fallas = SupresorDeRepetidos()
         self._transportes: dict[str, tuple[str, TransporteTelegram]] = {}
+        # Una sola conexión por CICLO, no una nueva por pasada
+        # (R4-003/R3-003, revisión 2026-09-28+1): `_conectar` la reusa
+        # mientras siga viva y reconecta sola si se cerró o se descartó.
+        self._conn = None
 
     def _transporte_de(self, slug: str, token: str) -> TransporteTelegram:
         actual = self._transportes.get(slug)
@@ -255,24 +366,44 @@ class Ciclo:
         self._transportes[slug] = (token, nuevo)
         return nuevo
 
+    def _conectar(self):
+        if self._conn is None or self._conn.closed:
+            self._conn = self.conn_factory()
+        return self._conn
+
     def tick(self, ahora: datetime | None = None, *,
             con_cadencias: bool = True, lote: int = 50) -> dict[str, dict]:
         ahora = ahora or datetime.now(timezone.utc)
-        conn = self.conn_factory()
         resultados: dict[str, dict] = {}
 
+        conn = None
         try:
+            conn = self._conectar()
             with admin(conn) as cur:
                 cur.execute("select id, slug from workspace where activo order by slug")
                 activos = cur.fetchall()
             conn.commit()
             self._fallas.recuperada((None, "listar_espacios"))
         except Exception as e:  # noqa: BLE001
-            self._revertir(conn)
-            reportar_fallo(
-                conn, self._fallas, None, "listar_espacios",
-                f"Falló el ciclo de fondo al listar espacios activos "
-                f"({type(e).__name__}).", e)
+            # La conexión puede haber quedado inservible -- nunca se
+            # reintenta con la misma rota cada pasada: se descarta para que
+            # la próxima reconecte sola.
+            _revertir_best_effort(conn)
+            self._conn = None
+            if conn is None:
+                # Sin conexión, ni siquiera se puede INTENTAR escribir el
+                # incidente -- se deduplica en memoria y sólo se imprime:
+                # reintentar el `insert` en cada pasada contra una base
+                # inalcanzable sería el mismo aluvión que se evita acá.
+                if self._fallas.debe_reportar((None, "listar_espacios")):
+                    print(f"  ! el ciclo de fondo no pudo conectar a la base "
+                         f"({type(e).__name__}).")
+            elif reportar_fallo(
+                    conn, self._fallas, None, "listar_espacios",
+                    f"Falló el ciclo de fondo al listar espacios activos "
+                    f"({type(e).__name__}).", e):
+                print(f"  ! el ciclo de fondo no pudo listar espacios activos: "
+                     f"{type(e).__name__}")
             resultados["_error"] = {"tipo": type(e).__name__}
             return resultados
 
@@ -301,10 +432,10 @@ class Ciclo:
                         con_cadencias=con_cadencias, lote=lote)
                 conn.commit()
                 self._fallas.recuperada((ws_id, "tick"))
-                self._reportar_cadencias_rotas(conn, ws_id, slug, resumen)
+                reportar_cadencias_rotas(conn, self._fallas, ws_id, slug, resumen)
                 resultados[slug] = resumen
             except Exception as e:  # noqa: BLE001
-                self._revertir(conn)
+                _revertir_best_effort(conn)
                 resultados[slug] = {"error": type(e).__name__}
                 if reportar_fallo(
                         conn, self._fallas, ws_id, "tick",
@@ -322,31 +453,10 @@ class Ciclo:
                 resultados["_admin"] = despachar_admin(conn, transporte_admin, ahora, lote)
                 self._fallas.recuperada((None, "admin"))
             except Exception as e:  # noqa: BLE001
-                self._revertir(conn)
+                _revertir_best_effort(conn)
                 resultados["_admin"] = {"error": type(e).__name__}
                 reportar_fallo(
                     conn, self._fallas, None, "admin",
                     f"Falló el aviso a la administración ({type(e).__name__}).", e)
 
         return resultados
-
-    def _reportar_cadencias_rotas(self, conn, workspace_id: str, slug: str,
-                                  resumen: dict) -> None:
-        """Aísla y reporta -- deduplicado -- lo que `cadencias_vencidas`
-        encontró roto en este espacio, sin frenar el resto del ciclo."""
-        for job in resumen.pop("cadencias_ok", []):
-            self._fallas.recuperada((workspace_id, f"cadencia:{job['nombre']}"))
-        for job, error in resumen.pop("cadencias_fallidas", []):
-            nombre = job["nombre"]
-            if reportar_fallo(
-                    conn, self._fallas, workspace_id, f"cadencia:{nombre}",
-                    f"Cron inválido en la cadencia '{nombre}' de '{slug}' "
-                    f"({type(error).__name__}).", error):
-                print(f"  ! la cadencia '{nombre}' de '{slug}' tiene un cron "
-                     f"inválido: {type(error).__name__}")
-
-    def _revertir(self, conn) -> None:
-        try:
-            conn.rollback()
-        except Exception:  # noqa: BLE001
-            pass

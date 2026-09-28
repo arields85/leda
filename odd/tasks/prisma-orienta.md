@@ -3789,3 +3789,22 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   siguiente puede encolar la de la semana en curso (la deduplicación semanal evita el
   doble envío).
   Decisión del usuario: orden del resto de la sesión confirmado (ver `docs/STATUS.md`).
+  Revisión de `94a323d..10950c6`: alto (`high_risk`, 1807 líneas); consentimiento del
+  usuario: revisar. review-6d62b73c11f777b8 (4 lentes) aprobada y reconocida; frontera
+  en `10950c6`. Hallazgos no bloqueantes -> #29b (R1-001, texto crudo del error en
+  `incident.referencia_cruda`, va con la tarea del token en los errores de Telegram).
+
+- 2026-09-28: **#29b cerrada — seguimientos de review-6d62b73c.** Ruta: delegada, un
+  escritor; ROJO observado por ítem (15 fallas antes de implementar). Envío y marca de
+  `enviado` de cada mensaje en un savepoint propio dentro de `despachar`: una falla
+  posterior ya no devuelve a 'listo' lo que salió (queda la ventana inevitable entre
+  enviar y confirmar: entrega al menos una vez). `Ciclo` reutiliza una conexión y
+  reconecta si se cae; una base inalcanzable se avisa una vez, sin traza cada 20 s.
+  `cadencias_vencidas` busca desde el mayor entre la última corrida y el arranque (no
+  repone un lunes perdido tras reiniciar). Días: `1-7`, `5-7`, `0-7` bien; valores fuera
+  de 0-7 se rechazan como cadencia rota. Causa distinta en el incidente para cron
+  inválido y para falla al ejecutarse. Un solo `reportar_cadencias_rotas` para
+  `escuchar` y `servir`, que imprime sólo cuando reporta. El supresor marca un fallo
+  como reportado sólo después de escribir el incidente. Probado sin cambios de código:
+  dos conexiones evaluando la misma cadencia a la vez no la encolan dos veces
+  (`dedupe_key` único). Suite completa del escritor: `1113 passed, 108 deselected`.

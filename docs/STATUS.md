@@ -65,7 +65,7 @@ tales. Ver [`INDEX.md`](INDEX.md#documentos-superados).
 |---|---|
 | Comando | `.venv\Scripts\python.exe -m pytest -q` |
 | Fecha | 2026-09-28 |
-| Resultado exacto | 1100 passed, 108 deselected (orquestador, después de #29). |
+| Resultado exacto | 1113 passed, 108 deselected (corrida del escritor de #29b). |
 
 Seguimientos de la entrega con evidencia (T6a-T6j), siembra reproducible (T7, T7b) y
 comprobadores del banco, `odd/tasks/prisma-orienta.md`: `1008 passed, 108
@@ -211,7 +211,7 @@ Próximo, en este orden (confirmado por el usuario el 2026-09-28; la ronda por T
 va **al final**, para probar todo junto):
 
 *(Cerradas en esta sesión: administrador alcanzable en modo local, #28b, #28c, #11b,
-#11c y #29. Con #29, `escuchar` y `servir` comparten una misma rutina de fondo
+#11c, #29 y #29b. Con #29, `escuchar` y `servir` comparten una misma rutina de fondo
 (`src/prisma/ciclo.py`): cadencias —releídas de la base en cada pasada, así que un
 cambio toma efecto sin reiniciar—, escalera, despacho de `message_outbox` y, una vez
 por pasada, de `admin_notice`; `--sin-cadencias` las apaga en los dos comandos. Arregló

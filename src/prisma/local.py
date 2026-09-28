@@ -345,10 +345,7 @@ class Escucha:
         return self._admin_bot.transporte
 
     def _revertir(self) -> None:
-        try:
-            self.conn.rollback()
-        except Exception:  # noqa: BLE001
-            pass
+        ciclo._revertir_best_effort(self.conn)
 
     def tareas_de_fondo(self, ahora: datetime | None = None) -> dict[str, int]:
         ahora = ahora or datetime.now(timezone.utc)
@@ -366,23 +363,16 @@ class Escucha:
                 f"Falló la pasada de fondo de '{self.slug}' "
                 f"({type(e).__name__}).", e)
             _imprimir(f"  ! la pasada de fondo falló: {_error_sin_url(e)}")
-            resumen = {"enviados": 0, "pospuestos": 0, "fallidos": 0,
-                      "descartados": 0, "cadencias_encoladas": 0,
-                      "escalera_encoladas": 0, "cadencias_fallidas": [],
-                      "cadencias_ok": []}
+            resumen = ciclo._resumen_vacio()
 
-        # Una cadencia con cron roto no frena a las demás (se aisló en
-        # `ciclo.cadencias_vencidas`): se reporta acá, deduplicada.
-        for job in resumen.pop("cadencias_ok", []):
-            self._fallas.recuperada((self.ws, f"cadencia:{job['nombre']}"))
-        for job, error in resumen.pop("cadencias_fallidas", []):
-            nombre = job["nombre"]
-            ciclo.reportar_fallo(
-                self.conn, self._fallas, self.ws, f"cadencia:{nombre}",
-                f"Cron inválido en la cadencia '{nombre}' de '{self.slug}' "
-                f"({type(error).__name__}).", error)
-            _imprimir(f"  ! cadencia '{nombre}' con cron inválido: "
-                      f"{_error_sin_url(error)}")
+        # Una cadencia rota (cron inválido, o uno válido que falló al
+        # ejecutarse) no frena a las demás: se aisló en
+        # `ciclo.cadencias_vencidas`/`ciclo.ejecutar_ciclo_espacio`, y se
+        # reporta acá con la misma implementación compartida que usa
+        # `Ciclo.tick` (R2-002, revisión 2026-09-28+1).
+        ciclo.reportar_cadencias_rotas(
+            self.conn, self._fallas, self.ws, self.slug, resumen,
+            imprimir=_imprimir)
 
         for _ in range(resumen["enviados"]):
             _imprimir("  → enviado")

@@ -334,19 +334,10 @@ def despachar(cur: psycopg.Cursor, workspace_id: str, transporte: Transporte,
         # Contestarle a quien escribió no es "escribir fuera de horario", ni
         # cuenta contra el tope de mensajes automáticos: no es automático.
         if m["es_respuesta"]:
-            try:
-                tg_id = transporte.enviar(m["chat_id"], m["cuerpo"],
-                                          _botones(cur, m))
-            except Exception as e:  # noqa: BLE001
-                _fallo(cur, workspace_id, m, e, cal, ahora)
+            if _intentar_envio(cur, workspace_id, transporte, cal, ahora, m):
+                resumen["enviados"] += 1
+            else:
                 resumen["fallidos"] += 1
-                continue
-            cur.execute(
-                """update message_outbox
-                      set estado = 'enviado', enviado_en = %s, telegram_message_id = %s
-                    where id = %s""",
-                (ahora, tg_id, m["id"]))
-            resumen["enviados"] += 1
             continue
 
         # Un mensaje de cadencia cuya ventana ya pasó no se manda tarde.
@@ -374,22 +365,48 @@ def despachar(cur: psycopg.Cursor, workspace_id: str, transporte: Transporte,
             resumen["pospuestos"] += 1
             continue
 
-        try:
-            tg_id = transporte.enviar(m["chat_id"], m["cuerpo"],
-                                      _botones(cur, m))
-        except Exception as e:  # noqa: BLE001 — el error se registra, no se propaga
-            _fallo(cur, workspace_id, m, e, cal, ahora)
+        if _intentar_envio(cur, workspace_id, transporte, cal, ahora, m):
+            resumen["enviados"] += 1
+        else:
             resumen["fallidos"] += 1
-            continue
-
-        cur.execute(
-            """update message_outbox
-                  set estado = 'enviado', enviado_en = %s, telegram_message_id = %s
-                where id = %s""",
-            (ahora, tg_id, m["id"]))
-        resumen["enviados"] += 1
 
     return resumen
+
+
+def _marcar_enviado(cur: psycopg.Cursor, ahora: datetime, tg_id: int, outbox_id) -> None:
+    cur.execute(
+        """update message_outbox
+              set estado = 'enviado', enviado_en = %s, telegram_message_id = %s
+            where id = %s""",
+        (ahora, tg_id, outbox_id))
+
+
+def _intentar_envio(cur: psycopg.Cursor, workspace_id: str, transporte: Transporte,
+                    cal: Calendario, ahora: datetime, m) -> bool:
+    """Envía un mensaje y lo marca 'enviado' en un único punto de retorno
+    propio. Devuelve si se entregó.
+
+    Antes, sólo el ENVÍO estaba protegido: si la marca posterior (el UPDATE
+    que pasa la fila a 'enviado') fallaba, la excepción escapaba de
+    `despachar` sin contenerse -- y como corre dentro de la misma
+    transacción que la escalera y el resto del lote, el `rollback` que
+    seguía devolvía a 'listo' TAMBIÉN los mensajes de este mismo lote que ya
+    se habían marcado 'enviado' antes, y se reenviaban en la próxima pasada
+    (R4-001, revisión 2026-09-28+1).
+
+    Ahora el envío y la marca van juntos dentro de un punto de retorno
+    propio (`SAVEPOINT`): si cualquiera de los dos falla, se aísla acá --
+    nunca deshace lo que ya quedó marcado en un mensaje anterior del mismo
+    lote -- y se cuenta como fallido, igual que un envío que falló
+    directamente."""
+    try:
+        with cur.connection.transaction():
+            tg_id = transporte.enviar(m["chat_id"], m["cuerpo"], _botones(cur, m))
+            _marcar_enviado(cur, ahora, tg_id, m["id"])
+    except Exception as e:  # noqa: BLE001 — se registra, no se propaga
+        _fallo(cur, workspace_id, m, e, cal, ahora)
+        return False
+    return True
 
 
 def despachar_avisos_admin(cur: psycopg.Cursor, transporte: Transporte,
