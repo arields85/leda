@@ -90,12 +90,15 @@ def estado(cur: psycopg.Cursor, membership_id: str) -> dict | None:
 
 
 def iniciar_ciclo(cur: psycopg.Cursor, membership_id: str, modo: str,
-                   *, ahora: datetime | None = None) -> None:
+                   *, ahora: datetime | None = None) -> int:
     """Abre un ciclo nuevo: el primero de la membresía, o el siguiente tras un `revoked`.
 
     La base decide si corresponde (el disparador rechaza abrir un ciclo
     nuevo si el anterior no llegó a `revoked`); acá sólo se calcula el
-    número de ciclo y el estado de arranque según el modo.
+    número de ciclo y el estado de arranque según el modo. Devuelve el
+    número de ciclo abierto -- quien llama lo necesita, por ejemplo, para
+    que una clave de dedupe por ciclo (G1c2, ítem 1) nunca reutilice la de
+    un ciclo anterior.
     """
     if modo not in MODOS_VALIDOS:
         raise ValueError(f"modo inválido: {modo!r}")
@@ -108,6 +111,7 @@ def iniciar_ciclo(cur: psycopg.Cursor, membership_id: str, modo: str,
               actor_kind, at)
            values (%s, %s, 'transicion', %s, null, %s, 'sistema', %s)""",
         (membership_id, ciclo, modo, estado_nuevo, _ahora(ahora)))
+    return ciclo
 
 
 def transicionar(cur: psycopg.Cursor, membership_id: str, estado_nuevo: str,
@@ -267,6 +271,34 @@ def dominios_permitidos(cur: psycopg.Cursor, workspace_id: str) -> list[str] | N
     if not valor:
         return None
     return [str(d).strip().lower() for d in valor]
+
+
+def elegibles_existente(cur: psycopg.Cursor, workspace_id: str) -> list[dict]:
+    """Integrantes activos de `workspace_id`, con Telegram vinculado, sin
+    correo verificado y sin ningún ciclo de alta con correo abierto todavía
+    (o con uno ya `revoked`) -- a quien `correo-verificacion --activar`
+    (`cli.py`, G1c) tiene que poner en modo `existente`.
+
+    Filtra explícitamente por `workspace_id`, no sólo por RLS (G1c2, ítem
+    4): bajo una conexión de administración (`admin()`, `bypassrls`), sin
+    este filtro esta consulta podría devolver integrantes de cualquier
+    espacio si la sesión quedara apuntando al equivocado -- mismo motivo
+    que ya exige `habilitado()` (G1a2).
+    """
+    cur.execute(
+        """select i.membership_id, i.nombre, i.telegram_user_id
+             from integrante i
+             left join alta_correo_contacto c
+               on c.membership_id = i.membership_id and c.workspace_id = i.workspace_id
+             left join alta_correo_estado e
+               on e.membership_id = i.membership_id and e.workspace_id = i.workspace_id
+            where i.workspace_id = %s
+              and i.activo and i.telegram_user_id is not null
+              and c.membership_id is null
+              and (e.membership_id is null or e.estado = 'revoked')
+            order by i.nombre""",
+        (workspace_id,))
+    return cur.fetchall()
 
 
 def contacto_verificado(cur: psycopg.Cursor, membership_id: str) -> dict | None:

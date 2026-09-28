@@ -306,12 +306,21 @@ def abrir_ciclo_existente(cur: psycopg.Cursor, membership_id: str, workspace_id:
     No hay ningún guardia de idempotencia acá adentro: lo pone quien llama
     (`cli.py`), que sólo invoca esto para membresías sin ningún ciclo
     abierto todavía -- una segunda corrida del comando ya no las vuelve a
-    encontrar elegibles."""
-    AC.iniciar_ciclo(cur, membership_id, "existente", ahora=ahora)
+    encontrar elegibles.
+
+    La clave de dedupe incluye el ciclo (G1c2, ítem 1): sin él, un ciclo
+    `existente` revocado antes de verificar (nunca crea
+    `alta_correo_contacto`, así que la elegibilidad vuelve a contar a esa
+    membresía) reabre el ciclo siguiente en la próxima corrida, pero el
+    pedido nuevo se deduplicaría en silencio contra la clave del ciclo
+    anterior (`enqueue_outbox` hace `on conflict (dedupe_key) do nothing`)
+    y nunca saldría -- una falla silenciosa que ninguna excepción
+    delataría."""
+    ciclo = AC.iniciar_ciclo(cur, membership_id, "existente", ahora=ahora)
     enqueue_outbox(
         cur, workspace_id=workspace_id, chat_id=chat_id, text=TEXTO_PEDIDO_CORREO,
         message_type="informativo", scheduled_for=ahora,
-        dedupe_key=f"{workspace_id}:alta-correo:pedido-existente:{membership_id}",
+        dedupe_key=f"{workspace_id}:alta-correo:pedido-existente:{membership_id}:{ciclo}",
         is_response=True, allow_split=True)
 
 
@@ -357,11 +366,18 @@ def _completar_bienvenida(cur: psycopg.Cursor, membership_id: str, workspace_id:
 # El control (gate) -- antepuesto al despacho conversacional
 # ---------------------------------------------------------------------------
 
+# Estados abiertos que comparten los dos modos (G1c2, ítem 5: una sola
+# fuente, en vez de repetir la tupla en `atender_existente`): mientras la
+# proyección esté en uno de éstos, todavía no hay contacto verificado.
+# `pending_welcome` sólo existe en modo `alta` -- `existente` arranca
+# directo en `awaiting_email` (C5: a quien ya estaba activo no se le repite
+# la bienvenida) y nunca lo atraviesa, así que no entra en el conjunto
+# compartido.
+_ESTADOS_ABIERTOS_COMUNES = ("awaiting_email", "pending_email_verification")
 # Los tres estados por debajo de `active` en modo `alta` -- mientras la
 # proyección esté en uno de éstos, ninguna herramienta de negocio puede
 # correr para esta membresía, sea el chat que sea (G1b2, ítem 1).
-_ESTADOS_BLOQUEANTES = ("pending_welcome", "awaiting_email",
-                       "pending_email_verification")
+_ESTADOS_BLOQUEANTES = ("pending_welcome",) + _ESTADOS_ABIERTOS_COMUNES
 
 
 def _gateada(actual: dict | None) -> bool:
@@ -434,7 +450,15 @@ def gate(cur: psycopg.Cursor, quien: Any, texto: str, *, chat_id: int,
 # ES un correo, de punta a punta.
 # ---------------------------------------------------------------------------
 
-_EMAIL_UNICO = re.compile(r"^[^\s<>()\[\]{}\"']+@[^\s<>()\[\]{}\"']+$")
+# Parte local estricta (G1c2, ítem 2): a diferencia de `extraer_correos`
+# (que sólo separa candidatos DENTRO de una frase libre, sin validar
+# formato), esto tiene que decidir por sí solo si el mensaje ENTERO es
+# "exactamente una dirección de correo" -- así que no puede aceptar nada
+# que sirva para otra cosa. Deliberadamente sin "/" ni ":": son justo lo
+# que distingue una URL con credenciales (`http://usuario@host`) o un
+# host con puerto/ruta (`usuario@host:8080`, `usuario@host/ruta`) de una
+# dirección real.
+_LOCAL_ESTRICTO = re.compile(r"^[A-Za-z0-9.!#$%&'*+=?^_`{|}~-]+$")
 
 
 def _solo_un_correo(texto: str) -> str | None:
@@ -447,11 +471,28 @@ def _solo_un_correo(texto: str) -> str | None:
     frase libre, para el modo `alta` donde cada mensaje tiene que
     responderse de un modo u otro), esto es lo único que en modo `existente`
     distingue "la persona me está dando su correo" de un mensaje cualquiera
-    que tiene que seguir su curso hacia intake/el agente."""
+    que tiene que seguir su curso hacia intake/el agente.
+
+    Regla única y estricta (G1c2, ítem 2, corrigiendo el regex laxo
+    anterior, que aceptaba URLs con `@`, `usuario@host:ruta`, dos `@` y
+    puntuación final): el mensaje entero tiene que ser una parte local
+    (`_LOCAL_ESTRICTO`) seguida de exactamente un `@` y un dominio con
+    puntos (`_DOMINIO_VALIDO`, el mismo que ya exige `_formato_valido` para
+    el modo `alta`) -- ese dominio, por construcción, nunca termina en un
+    separador (`.`, `,`, etc.), así que un solo punto o coma final ya
+    alcanza para rechazar el mensaje entero: más seguro y consistente que
+    aceptarlo y confiar en que quien lo tipeó no quiso decir otra cosa."""
     candidato = (texto or "").strip()
-    if not candidato or any(c.isspace() for c in candidato) or "@" not in candidato:
+    if not candidato or any(c.isspace() for c in candidato):
         return None
-    return candidato if _EMAIL_UNICO.match(candidato) else None
+    if candidato.count("@") != 1:
+        return None
+    local, _, dominio = candidato.partition("@")
+    if not local or not dominio:
+        return None
+    if not _LOCAL_ESTRICTO.match(local) or not _DOMINIO_VALIDO.match(dominio):
+        return None
+    return candidato
 
 
 def atender_existente(cur: psycopg.Cursor, quien: Any, texto: str, *, chat_id: int,
@@ -477,7 +518,7 @@ def atender_existente(cur: psycopg.Cursor, quien: Any, texto: str, *, chat_id: i
         return False
     actual = AC.estado(cur, quien.membership_id)
     if (actual is None or actual["modo"] != "existente"
-            or actual["estado"] not in ("awaiting_email", "pending_email_verification")):
+            or actual["estado"] not in _ESTADOS_ABIERTOS_COMUNES):
         return False
     correo = _solo_un_correo(texto)
     if correo is None:

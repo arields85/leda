@@ -7,21 +7,22 @@ entra al recorrido de verificación. El comando `correo-verificacion` de
 `cli.py` es lo que abre esos ciclos en modo `existente` al encender la
 clave.
 
-Reutiliza los dobles y fixtures de `test_alta_correo_flujo.py` (G1b/G1b2):
-mismo mundo (`intake_world`), mismo doble de envío de correo, mismo cliente
-de pruebas contra el webhook.
+Reutiliza los dobles y fixtures de `tests/alta_correo_ayudas.py` (compartidos
+con `test_alta_correo_flujo.py`, G1b/G1b2): mismo mundo (`intake_world`),
+mismo doble de envío de correo, mismo cliente de pruebas contra el webhook.
 """
 
 from __future__ import annotations
 
+import threading
 from datetime import datetime
 
 from prisma import alta_correo as AC
 from prisma import alta_correo_flujo as ACF
 from prisma import cli
-from prisma.db import admin, espacio
+from prisma.db import admin, conectar, espacio
 
-from tests.test_alta_correo_flujo import (
+from tests.alta_correo_ayudas import (
     AHORA,
     DobleEnvioCorreo,
     _abrir_awaiting_email,
@@ -33,6 +34,7 @@ from tests.test_alta_correo_flujo import (
     _post,
     _post_grupo,
     _sender,
+    _token_boton,
     _token_de_enlace,
     cliente,
     con_agente,
@@ -107,6 +109,29 @@ def test_solo_un_correo_ninguno_para_texto_vacio_o_sin_arroba():
 def test_solo_un_correo_ninguno_si_hay_otras_palabras():
     assert ACF._solo_un_correo("mi correo es taylor.quinn@empresa.com, gracias") is None
     assert ACF._solo_un_correo("taylor.quinn@empresa.com y otra cosa") is None
+
+
+def test_solo_un_correo_rechaza_url_con_arroba():
+    """G1c2, ítem 2: una URL con credenciales tiene un único `@`, pero no
+    es "exactamente una dirección de correo" -- el `.` esperando el nombre
+    de usuario en la parte local no puede llevar `://`."""
+    assert ACF._solo_un_correo("http://taylor@empresa.com") is None
+    assert ACF._solo_un_correo("https://taylor.quinn@empresa.com/ruta") is None
+
+
+def test_solo_un_correo_rechaza_host_con_puerto_o_ruta():
+    assert ACF._solo_un_correo("taylor@empresa.com:8080") is None
+    assert ACF._solo_un_correo("taylor@empresa.com/ruta") is None
+
+
+def test_solo_un_correo_rechaza_dos_arrobas():
+    assert ACF._solo_un_correo("taylor@empresa.com@otra.com") is None
+
+
+def test_solo_un_correo_rechaza_puntuacion_final():
+    assert ACF._solo_un_correo("taylor.quinn@empresa.com.") is None
+    assert ACF._solo_un_correo("taylor.quinn@empresa.com,") is None
+    assert ACF._solo_un_correo("taylor.quinn@empresa.com!") is None
 
 
 # ===========================================================================
@@ -218,6 +243,146 @@ def test_activar_no_toca_a_quien_ya_tiene_un_ciclo_abierto(conn, intake_world, m
         assert fila["ciclo"] == 1
         assert fila["estado"] == "awaiting_email"
     assert _outbox_textos(conn, 71001) == []    # el pedido de _abrir_existente no pasó por outbox
+
+
+def test_activar_reabre_ciclo_revocado_sin_verificar_y_pide_de_nuevo(
+        conn, intake_world, monkeypatch):
+    """G1c2, ítem 1: la clave de dedupe del pedido de correo tiene que
+    incluir el ciclo. Sin eso, un ciclo `existente` revocado antes de
+    verificar (nunca llegó a crear `alta_correo_contacto`, así que la
+    elegibilidad vuelve a contarlo) abre el ciclo 2 en la próxima
+    `--activar`, pero el pedido nuevo se deduplica en silencio contra la
+    clave del ciclo 1 y nunca sale -- una falla silenciosa."""
+    ws = intake_world["north-lab"]["id"]
+    m = _membership_id(intake_world, "north-lab", "Taylor Quinn")
+
+    codigo1 = _correo_verificacion(monkeypatch, conn, "north-lab", activar=True)
+    assert codigo1 == 0
+    with espacio(conn, ws) as cur:
+        assert AC.estado(cur, m)["ciclo"] == 1
+    assert _outbox_textos(conn, 71001) == [ACF.TEXTO_PEDIDO_CORREO]
+
+    # El ciclo 1 se revoca sin haber verificado nunca (nunca se llamó
+    # `completar_verificacion`, así que jamás se creó
+    # `alta_correo_contacto`) -- transiciones directas, mismo mecanismo que
+    # usa `test_alta_correo.py` para probar el grafo de estados.
+    with espacio(conn, ws) as cur:
+        AC.transicionar(cur, m, "pending_email_verification", ahora=AHORA)
+        AC.transicionar(cur, m, "active", ahora=AHORA)
+        AC.transicionar(cur, m, "revoked", ahora=AHORA)
+    conn.commit()
+
+    codigo2 = _correo_verificacion(monkeypatch, conn, "north-lab", activar=True)
+    assert codigo2 == 0
+
+    with espacio(conn, ws) as cur:
+        fila = AC.estado(cur, m)
+        assert fila["ciclo"] == 2
+        assert fila["estado"] == "awaiting_email"
+        assert fila["modo"] == "existente"
+    # El pedido del ciclo 2 tiene que salir aparte -- nunca deduplicado
+    # contra la clave del ciclo 1.
+    assert _outbox_textos(conn, 71001) == \
+        [ACF.TEXTO_PEDIDO_CORREO, ACF.TEXTO_PEDIDO_CORREO]
+
+
+# ===========================================================================
+# B2. G1c2, ítem 4: filtro explícito por espacio y bloqueo de corridas
+#     superpuestas de `--activar`
+# ===========================================================================
+
+
+def test_elegibles_existente_nunca_devuelve_datos_de_otro_espacio_bajo_admin(
+        conn, intake_world):
+    """Bajo `admin()` (bypassa RLS), si el filtro de esta consulta
+    dependiera sólo de la sesión ambiente, alcanzaría con que esa sesión
+    quedara apuntando al espacio equivocado para devolver integrantes de
+    otro. Con el filtro explícito por `workspace_id` (mismo motivo que ya
+    exige `habilitado()`, G1a2), pedir north-lab mientras la sesión quedó
+    en west-studio nunca devuelve a nadie de west-studio."""
+    ws_a = intake_world["north-lab"]["id"]
+    ws_b = intake_world["west-studio"]["id"]
+
+    with admin(conn) as cur:
+        cur.execute("select set_config('prisma.workspace_id', %s, true)", (ws_b,))
+        filas = AC.elegibles_existente(cur, ws_a)
+
+    membership_ids_b = {p["membership_id"]
+                        for p in intake_world["west-studio"]["people"].values()}
+    assert filas == []
+    assert not membership_ids_b & {str(f["membership_id"]) for f in filas}
+
+
+def test_elegibles_existente_devuelve_los_del_espacio_pedido(conn, intake_world):
+    ws_a = intake_world["north-lab"]["id"]
+
+    with admin(conn) as cur:
+        cur.execute("select set_config('prisma.workspace_id', %s, true)", (ws_a,))
+        filas = AC.elegibles_existente(cur, ws_a)
+
+    nombres = {f["nombre"] for f in filas}
+    assert nombres == {p["name"] for p in intake_world["north-lab"]["people"].values()}
+
+
+def test_activar_toma_un_bloqueo_por_espacio_para_corridas_superpuestas(
+        conn, intake_world, uri, monkeypatch):
+    """G1c2, ítem 4: dos `--activar` superpuestas para el mismo espacio no
+    pueden abrir ciclos ni encolar pedidos duplicados. Se prueba que la
+    corrida real toma un bloqueo consultivo de transacción, con clave en el
+    espacio (mismo patrón que `ingreso_tareas.handle_active_text`) --
+    mientras lo tiene tomado y sin confirmar, otra conexión que lo pida sin
+    esperar (`pg_try_advisory_xact_lock`) tiene que fallar."""
+    ws = intake_world["north-lab"]["id"]
+    conn.commit()
+    clave = f"correo-verificacion:activar:{ws}"
+
+    tomado = threading.Event()
+    seguir = threading.Event()
+    original = AC.elegibles_existente
+
+    def _pausa(cur, workspace_id):
+        tomado.set()
+        assert seguir.wait(timeout=5), "nunca llegó la señal de continuar"
+        return original(cur, workspace_id)
+
+    monkeypatch.setattr(AC, "elegibles_existente", _pausa)
+
+    conexion_hilo = conectar(uri)
+    monkeypatch.setattr(cli, "conectar", lambda: conexion_hilo)
+
+    hilo = threading.Thread(
+        target=cli.main, args=(["correo-verificacion", "north-lab", "--activar"],))
+    hilo.start()
+    try:
+        assert tomado.wait(timeout=5), "la corrida de fondo nunca tomó el bloqueo"
+
+        segunda = conectar(uri)
+        try:
+            with espacio(segunda, ws) as cur2:
+                cur2.execute(
+                    "select pg_try_advisory_xact_lock(hashtextextended(%s, 0)) ok",
+                    (clave,))
+                assert cur2.fetchone()["ok"] is False
+            segunda.rollback()
+        finally:
+            segunda.close()
+    finally:
+        seguir.set()
+        hilo.join(timeout=5)
+        assert not hilo.is_alive(), "la corrida de fondo no terminó"
+        conexion_hilo.close()
+
+    # Liberado (la corrida terminó y confirmó): una tercera conexión puede
+    # tomarlo sin esperar.
+    tercera = conectar(uri)
+    try:
+        with espacio(tercera, ws) as cur3:
+            cur3.execute(
+                "select pg_try_advisory_xact_lock(hashtextextended(%s, 0)) ok", (clave,))
+            assert cur3.fetchone()["ok"] is True
+        tercera.rollback()
+    finally:
+        tercera.close()
 
 
 # ===========================================================================
@@ -332,6 +497,71 @@ def test_existente_grupo_no_cambia_nada(con_agente, conn, intake_world):
     assert _outbox_textos(conn, -5001)[-1] == "Anotado."
     assert _outbox_textos(conn, 71001) == []
     assert _estado(conn, ws, m)["estado"] == "awaiting_email"    # nunca se procesó el correo
+
+
+def test_existente_pending_verification_mismo_correo_va_al_agente_sin_recordatorio(
+        con_agente, conn, intake_world, monkeypatch):
+    """G1c2, ítem 3(a): en `pending_email_verification`, el mismo correo que
+    ya está vigente no es una instrucción nueva -- pasa de largo hacia el
+    agente, nunca un recordatorio con botones (a diferencia del modo
+    `alta`, donde cualquier texto libre en ese estado sí lo ofrece)."""
+    ws = intake_world["north-lab"]["id"]
+    m = _membership_id(intake_world, "north-lab", "Taylor Quinn")
+    _habilitar(conn, ws)
+    doble = DobleEnvioCorreo()
+    _sender(conn, ws, monkeypatch, doble)
+    _abrir_existente(conn, ws, m)
+    _post(con_agente, "taylor.quinn@empresa.com", 71001)
+    assert _estado(conn, ws, m)["estado"] == "pending_email_verification"
+
+    _post(con_agente, "taylor.quinn@empresa.com", 71001)
+
+    assert _outbox_textos(conn, 71001)[-1] == "Anotado."
+    assert len(doble.enviados) == 1                         # sin reenvío
+    assert _estado(conn, ws, m)["estado"] == "pending_email_verification"
+
+
+def test_existente_pending_verification_correo_distinto_propone_cambio(
+        con_agente, conn, intake_world, monkeypatch):
+    """G1c2, ítem 3(a): una dirección distinta a la vigente sí es una
+    instrucción nueva -- la propuesta de cambio (`Cambiar correo a X` /
+    `Mantener correo anterior`), igual que en modo `alta`."""
+    ws = intake_world["north-lab"]["id"]
+    m = _membership_id(intake_world, "north-lab", "Taylor Quinn")
+    _habilitar(conn, ws)
+    doble = DobleEnvioCorreo()
+    _sender(conn, ws, monkeypatch, doble)
+    _abrir_existente(conn, ws, m)
+    _post(con_agente, "taylor.quinn@empresa.com", 71001)
+    assert _estado(conn, ws, m)["estado"] == "pending_email_verification"
+
+    _post(con_agente, "taylor.q@otradireccion.com", 71001)
+
+    assert _outbox_textos(conn, 71001)[-1] == ACF.TEXTO_PROPONE_CAMBIO
+    assert _token_boton(conn, ws, m, ACF.etiqueta_cambiar_a("taylor.q@otradireccion.com"))
+    assert len(doble.enviados) == 1                         # ningún envío nuevo todavía
+    assert _estado(conn, ws, m)["estado"] == "pending_email_verification"
+
+
+def test_desactivar_deja_de_bloquear_en_grupo_a_mitad_del_alta(
+        con_agente, conn, intake_world, monkeypatch):
+    """G1c2, ítem 3(b): con la clave apagada, un integrante a mitad del
+    `alta` deja de estar bloqueado también en un chat de GRUPO -- su
+    mensaje llega a procesamiento normal (regresión: `bloqueada_para_negocio`
+    ya comprueba la clave, este es el caso que faltaba probar)."""
+    ws = intake_world["north-lab"]["id"]
+    m = _membership_id(intake_world, "north-lab", "Taylor Quinn")
+    _habilitar(conn, ws)
+    _abrir_awaiting_email(conn, ws, m)
+
+    codigo = _correo_verificacion(monkeypatch, conn, "north-lab", activar=False)
+    assert codigo == 0
+
+    resp = _post_grupo(con_agente, "hola equipo", 71001, chat_id=-5001)
+
+    assert resp.status_code == 200
+    assert _outbox_textos(conn, -5001)[-1] == "Anotado."
+    assert _estado(conn, ws, m)["estado"] == "awaiting_email"      # ciclo intacto, sin tocar
 
 
 # ===========================================================================

@@ -138,7 +138,14 @@ def _correo_verificacion(conn, ws: str, activar: bool) -> int:
     como están. `gate`/`atender_existente` (`alta_correo_flujo.py`) vuelven
     a comprobar la clave antes de actuar, así que con la clave apagada
     ninguno de los dos hace nada para nadie, tenga o no un ciclo a medio
-    camino."""
+    camino.
+
+    G1c2, ítem 4: `--activar` toma un bloqueo consultivo de transacción,
+    con clave en el espacio (mismo patrón que
+    `ingreso_tareas.handle_active_text`), antes de leer la elegibilidad --
+    dos corridas superpuestas para el mismo espacio se serializan, así
+    ninguna puede abrir un ciclo ni encolar un pedido duplicado para la
+    misma persona con la otra corrida todavía sin confirmar."""
     import json
     from datetime import datetime, timezone
 
@@ -149,6 +156,10 @@ def _correo_verificacion(conn, ws: str, activar: bool) -> int:
     ahora = datetime.now(timezone.utc)
     nombres_pendientes: list[str] = []
     with espacio(conn, ws) as cur:
+        if activar:
+            cur.execute(
+                "select pg_advisory_xact_lock(hashtextextended(%s, 0))",
+                (f"correo-verificacion:activar:{ws}",))
         cur.execute(
             """insert into workspace_setting (workspace_id, clave, valor)
                  values (%s, %s, %s)
@@ -163,18 +174,7 @@ def _correo_verificacion(conn, ws: str, activar: bool) -> int:
             # `no verified contact` + `no open cycle`: el mismo integrante
             # nunca aparece dos veces en corridas distintas de este
             # comando, porque la primera corrida ya le abre un ciclo.
-            cur.execute(
-                """select i.membership_id, i.nombre, i.telegram_user_id
-                     from integrante i
-                     left join alta_correo_contacto c
-                       on c.membership_id = i.membership_id
-                     left join alta_correo_estado e
-                       on e.membership_id = i.membership_id
-                    where i.activo and i.telegram_user_id is not null
-                      and c.membership_id is null
-                      and (e.membership_id is null or e.estado = 'revoked')
-                    order by i.nombre""")
-            for fila in cur.fetchall():
+            for fila in AC.elegibles_existente(cur, ws):
                 ACF.abrir_ciclo_existente(
                     cur, str(fila["membership_id"]), ws, fila["telegram_user_id"], ahora)
                 nombres_pendientes.append(fila["nombre"])

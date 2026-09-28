@@ -416,7 +416,7 @@ Un worktree nuevo no trae lo que no se versiona.
     mismo servidor. `PENDIENTE`: confirmar con una corrida sin concurrencia.
     Revisión RDD `review-7c6ef19f12bf541c` (riesgo alto por `cli.py`,
     consentida; cuatro lentes): aprobada; reconocimiento emitido.
-  - [ ] **G1c2 — Endurecimiento tras la revisión de G1c.** (1) La clave de
+  - [x] **G1c2 — Endurecimiento tras la revisión de G1c.** (1) La clave de
     deduplicación del pedido de correo incluye el ciclo: un ciclo reabierto
     tras revocar sin verificar vuelve a recibir el pedido (hoy quedaría
     deduplicado y nunca saldría). (2) "Exactamente una dirección" estricto:
@@ -430,6 +430,15 @@ Un worktree nuevo no trae lo que no se versiona.
     (5) Legibilidad: un solo conjunto de estados abiertos compartido, el
     comentario de `gateway` corregido, fixtures compartidas en un módulo
     común.
+    Hecho (ruta: delegada, un escritor; TDD con RED por ítem). RED
+    observados: el pedido del ciclo 2 quedaba deduplicado (1 en vez de 2);
+    las cuatro formas laxas entraban al recorrido; faltaba
+    `elegibles_existente`. Las pruebas del punto 3 son guardas de regresión
+    (el código ya era correcto). Un punto final después de la dirección se
+    rechaza (va al agente). Toques compartidos: `cli.py` (consulta con
+    `workspace_id` explícito + bloqueo consultivo por espacio), `gateway.py`
+    (sólo comentario). Suite del escritor: `1087 passed, 108 deselected`;
+    repetición de la sesión: `121 passed` en las pruebas del alta con correo.
   - [ ] **G1d — Avisos "🛠️ Administración" por el bot de administración.**
     Camino de salida propio (hoy el bot de administración no envía nada y
     `message_outbox` exige `workspace_id`); botones Reenviar correo /
