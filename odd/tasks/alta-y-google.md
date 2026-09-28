@@ -670,6 +670,12 @@ por commit, igual que en `main`. Nunca push sin pedido explícito del usuario.
   `pytest -q tests/test_task_intake.py tests/test_capacidades.py` →
   `86 passed` (paridad migración/rollback incluida); suite completa del
   escritor y repetida por la sesión → `992 passed, 108 deselected`.
+- 2026-09-28: rebase sobre `main` (12 commits nuevos, incluida la migración
+  `0016`) con un conflicto en `src/prisma/cli.py` (el comando `sembrar` de
+  `main` y `correo-verificacion` de esta rama en el mismo lugar). Resolución
+  aprobada por el usuario: se conservan los dos bloques, el de `main` sin
+  cambios (el diff contra `main` en `cli.py` no borra ninguna línea).
+  `pytest -q` → `1148 passed, 108 deselected`.
 - Dependencia registrada: el hecho "bienvenida entregada" de G1 queda como
   evento propio para que la unidad de saludo diario de `main` (pack 06)
   pueda contarlo como saludo del día.
