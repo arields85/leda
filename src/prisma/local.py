@@ -28,8 +28,8 @@ from . import ciclo
 from .calendario import Calendario
 from .config import config, recargar_dotenv
 from .db import admin, conectar_autoridad, espacio
-from .despachador import (Transporte, TransporteTelegram, pedido_telegram,
-                          texto_error_seguro)
+from .despachador import (Transporte, TransporteTelegram, despachar,
+                          pedido_telegram, texto_error_seguro)
 from .gateway import (ETAPA_TOQUE_BOTON, ETAPA_TURNO_TEXTO, procesar_update,
                       reportar_incidente_no_manejado)
 from .incidentes import registrar_incidente
@@ -203,7 +203,44 @@ class Escucha:
                     self.conn, workspace_id=self.ws, chat_id=chat_id,
                     tg_user=tg_user, error=e, etapa=etapa)
                 _imprimir(f"  ! no se pudo procesar: {type(e).__name__}")
+            else:
+                self._despachar_ahora()
         return len(updates)
+
+    def _despachar_ahora(self, ahora: datetime | None = None) -> None:
+        """Despacha lo que ya está `listo` en la cola de este espacio apenas
+        se procesa un update, en vez de esperar a `tareas_de_fondo` al final
+        de la vuelta (`una_vuelta` la corre recién después de agotar todo el
+        lote de `recibir` y de sondear el bot de administración) -- ADR
+        0011, decisión 1.
+
+        Best-effort a propósito, mismo criterio que `gateway._despachar_ahora`:
+        una falla acá nunca frena la escucha ni duplica nada --
+        `tareas_de_fondo` sigue siendo la red de contención que despacha (y,
+        si hace falta, reporta el incidente de) lo que esto no llegue a
+        despachar.
+
+        Nunca revierte (`self._revertir()`/`conn.rollback()`): mismo motivo
+        que `gateway._despachar_ahora` -- `procesar_update` (p. ej.
+        `gateway._activacion`, la rama sin token) puede dejar trabajo propio
+        ya encolado sin un `commit` explícito propio sobre esta misma
+        conexión compartida, confiando en el próximo `conn.transaction()`
+        para confirmarlo. Revertir acá de vuelta lo borraría sin que tenga
+        nada que ver con esta llamada. Una falla DENTRO de `despachar` ya se
+        aisló sola (`espacio(...)` es su propio `conn.transaction()`, que
+        revierte sólo lo suyo al propagar); confirmar, no revertir, es la
+        forma segura de dejar la conexión sin una transacción a medias."""
+        try:
+            with espacio(self.conn, self.ws) as cur:
+                cal = Calendario.desde_base(cur, self.ws)
+                despachar(cur, self.ws, self.transporte, cal, ahora)
+        except Exception:  # noqa: BLE001 -- best-effort, ver docstring
+            pass
+        finally:
+            try:
+                self.conn.commit()
+            except Exception:  # noqa: BLE001
+                pass
 
     def recibir_admin(self) -> int:
         """Sondea el bot de administración, aparte del bot del espacio que

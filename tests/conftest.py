@@ -125,6 +125,33 @@ def uri(tmp_path_factory) -> Iterator[str]:
     yield _servidor_efimero(tmp_path_factory.mktemp("pgdata"))
 
 
+@pytest.fixture(autouse=True)
+def _sin_despacho_inmediato_por_defecto(monkeypatch):
+    """El despacho inmediato del webhook (ADR 0011,
+    `gateway._despachar_ahora`) queda inerte por defecto en cualquier
+    prueba.
+
+    Sin esto, cualquier prueba que ya reemplaza `config.token_bot` (para
+    poder procesar un turno por `TestClient(gateway.app)` sin que falte el
+    token -- no para pedir un envío real a Telegram) dispararía un intento
+    de despacho real apenas vuelve el webhook: en el mejor caso, una llamada
+    de red de sobra contra un token inventado; en el peor, Telegram la
+    rechaza y `despachador._fallo` reprograma `message_outbox.programado_para`
+    hacia adelante -- corrompiendo el escenario que la prueba armó, sin que
+    la prueba haya pedido nada de esto.
+
+    Las pruebas que sí quieren verificar el despacho inmediato
+    (`test_gateway.py`, `test_local.py`) reemplazan `gateway._transporte_de`
+    de nuevo, con su propio `TransporteDePrueba` -- corre después de esta
+    fixture (autouse), así que gana."""
+    from prisma import gateway
+
+    def _sin_transporte(slug, token):
+        raise LookupError("despacho inmediato deshabilitado en esta prueba")
+
+    monkeypatch.setattr(gateway, "_transporte_de", _sin_transporte)
+
+
 @pytest.fixture
 def conn(uri):
     from prisma.db import conectar

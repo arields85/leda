@@ -12,16 +12,19 @@ from __future__ import annotations
 
 import unicodedata
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, FastAPI, Header, HTTPException, Request
 from fastapi.responses import HTMLResponse
 
 from .autoridad import (Canal, Denegado, identificar, identificar_en_espacio)
+from .calendario import Calendario
 from .config import config
 from .db import (admin, autoridad, conectar, conectar_autoridad, espacio,
                  registrar_auditoria)
-from .despachador import acusar_toque, mantener_chat_activo, pedido_telegram
+from .despachador import (TransporteTelegram, acusar_toque, despachar,
+                          mantener_chat_activo, pedido_telegram)
 from .incidentes import (REFERENCIA_INBOUND_MESSAGE, REFERENCIA_PENDING_ACTION,
                          registrar_incidente)
 from .salida import TRUNCAR_ETIQUETA_BOTON as TRUNCAR_TITULO_BOTON
@@ -74,6 +77,72 @@ def _espacio_por_slug(cur, slug: str) -> dict[str, Any] | None:
     return cur.fetchone()
 
 
+# Despacho inmediato (ADR 0011, decisión 1): un `TransporteTelegram` cacheado
+# por slug -- mismo criterio que `ciclo.Ciclo._transporte_de` -- para no abrir
+# un cliente HTTP nuevo en cada webhook. `_transporte_de` es un nombre de
+# módulo, no un método, justamente para que las pruebas lo reemplacen entero
+# (mismo patrón que `_conn`/`mantener_chat_activo`) sin tocar el cliente HTTP
+# real.
+_transportes: dict[str, tuple[str, TransporteTelegram]] = {}
+
+
+def _transporte_de(slug: str, token: str) -> TransporteTelegram:
+    actual = _transportes.get(slug)
+    if actual is not None and actual[0] == token:
+        return actual[1]
+    if actual is not None:
+        actual[1].cerrar()
+    nuevo = TransporteTelegram(token)
+    _transportes[slug] = (token, nuevo)
+    return nuevo
+
+
+def _despachar_ahora(conn, slug: str) -> None:
+    """Despacha lo que ya está `listo` en la cola de este espacio apenas se
+    procesó un update, en vez de esperar el resto de la pasada de `escuchar`
+    o el próximo tick de `servir` (`ciclo.INTERVALO_SEGUNDOS`).
+
+    Best-effort a propósito (ADR 0011, decisión 1): nunca puede impedir el
+    ACK a Telegram ni duplicar un envío -- `despachador.despachar` ya es
+    seguro de llamar más de una vez (`for update skip locked`, marca-antes-
+    de-enviar), y el tick de fondo (`ciclo.Ciclo.tick` /
+    `Escucha.tareas_de_fondo`) sigue siendo la red de contención que
+    reintenta y, si hace falta, registra el incidente de lo que esto no
+    llegue a despachar. Por eso una falla acá se descarta en silencio, sin
+    incidente propio -- sería redundante con ese camino.
+
+    Nunca revierte (`conn.rollback()`): algunos caminos de
+    `procesar_update` (`_activacion`, sin token) dejan su propio trabajo ya
+    encolado pero todavía sin un `commit` explícito propio -- confían en
+    que lo confirme el próximo `with ...conn.transaction()` sobre la misma
+    conexión. Revertir acá de vuelta esa transacción ambiente borraría ese
+    trabajo, que no tiene nada que ver con esta llamada. Cualquier falla
+    DENTRO de `despachar` ya se aisló sola (el `with espacio(...)` de abajo
+    es su propio `conn.transaction()`, que revierte sólo lo suyo al
+    propagar la excepción); lo único que queda por resolver acá es dejar la
+    conexión sin una transacción a medias, y la forma segura de hacerlo sin
+    tirar nada por la borda es confirmar, no revertir."""
+    try:
+        with conn.cursor() as cur:
+            cur.execute("set role prisma_admin")
+            ws = _espacio_por_slug(cur, slug)
+        if ws is not None and ws["activo"]:
+            workspace_id = str(ws["id"])
+            token = config.token_bot(slug)
+            transporte = _transporte_de(slug, token)
+            ahora = datetime.now(timezone.utc)
+            with espacio(conn, workspace_id) as cur:
+                cal = Calendario.desde_base(cur, workspace_id)
+                despachar(cur, workspace_id, transporte, cal, ahora)
+    except Exception:  # noqa: BLE001 -- best-effort, ver docstring
+        pass
+    finally:
+        try:
+            conn.commit()
+        except Exception:  # noqa: BLE001
+            pass
+
+
 @router.post("/telegram/{slug}")
 async def webhook(slug: str, request: Request,
                   x_telegram_bot_api_secret_token: str = Header(default="")):
@@ -81,7 +150,9 @@ async def webhook(slug: str, request: Request,
         raise HTTPException(status_code=403, detail="origen no verificado")
 
     update = await request.json()
-    return procesar_update(_conn(), slug, update)
+    resultado = procesar_update(_conn(), slug, update)
+    _despachar_ahora(_conn(), slug)
+    return resultado
 
 
 def procesar_update(conn, slug: str, update: dict,
@@ -217,7 +288,9 @@ def procesar_update(conn, slug: str, update: dict,
                 ) is not None
 
             if texto.strip() and not handled_intake_text:
-                with mantener_chat_activo(config.token_bot(slug), chat_id):
+                with mantener_chat_activo(config.token_bot(slug), chat_id,
+                                          chat_type=chat_type, cur=cur,
+                                          workspace_id=workspace_id):
                     _turno(cur, quien, texto, workspace_id, chat_id, entrante_id)
 
         conn.commit()

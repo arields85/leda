@@ -1692,7 +1692,7 @@ def test_mantener_chat_activo_traduce_el_error_del_ping_de_typing(monkeypatch):
 
     with desp.mantener_chat_activo(
             TOKEN_FALSO, 123, cliente=_ClienteQueFalla(), intervalo=0.01,
-            espera_cierre=0.5):
+            espera_cierre=0.5, umbral=0):
         time.sleep(0.1)
 
     assert capturados, "el ping de typing nunca intentó llamar a Telegram"

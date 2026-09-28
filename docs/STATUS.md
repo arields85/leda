@@ -65,7 +65,7 @@ tales. Ver [`INDEX.md`](INDEX.md#documentos-superados).
 |---|---|
 | Comando | `.venv\Scripts\python.exe -m pytest -q` |
 | Fecha | 2026-09-28 |
-| Resultado exacto | 1185 passed, 108 deselected (corrida del escritor de #7c). |
+| Resultado exacto | 1199 passed, 108 deselected (corrida del escritor de #9). |
 
 Seguimientos de la entrega con evidencia (T6a-T6j), siembra reproducible (T7, T7b) y
 comprobadores del banco, `odd/tasks/prisma-orienta.md`: `1008 passed, 108
@@ -224,14 +224,17 @@ APScheduler 3 numera los días distinto del cron estándar.)*
    primer mensaje del día a cada persona lo lleva, sea respuesta, cadencia o aviso, y no
    se repite ese día (decisión del usuario); se decide al despachar. Migraciones
    `0018_saludo_diario` y `0019_marca_de_bienvenida`.)*
-2. **#9** indicador de "escribiendo" y borrador nativo animado sólo si la respuesta
-   tarda, sin demorarla nunca (pack 05). Incluye despachar la respuesta apenas está
-   lista (hoy espera el fin del lote en `escuchar` y hasta 20 s en `servir`) y un ADR
-   para el borrador, que sería una excepción nueva a "todo sale por la cola".
+2. *(#9 cerrada, ADR 0011: la respuesta a quien escribió sale apenas está lista, en
+   `escuchar` y en `servir`; "escribiendo…" y el borrador nativo animado
+   (`sendMessageDraft`, semilla U+2063, sólo en chats privados) aparecen si el turno
+   pasa de 1,5 s y se retiran al terminar, antes de cualquier botón. Sus fallas no
+   bloquean el turno, se imprimen una vez por turno y un retiro fallido deja un
+   incidente.)*
 3. **Tercera ronda por Telegram**: entrega con evidencia y "Pedir cambios" (guion de dos
    circuitos en `odd/tasks/prisma-orienta.md`), avisos al administrador, íconos, saludo
    e indicador. Probablemente con `escuchar --sin-cadencias` (se decide al arrancar).
-   Antes: respaldo, aplicar `0018`, `0019` (y lo que agregue #9) a la base `prisma`, reiniciar
+   Base `prisma` ya con `0018` y `0019` aplicadas (respaldo
+   `db/respaldos/prisma-antes-0018-0019-20260928.dump`). Antes: reiniciar
    el listener con el código commiteado y que el administrador (Ariel De Simone, ya
    designado) le escriba al bot de administración con `escuchar` corriendo.
 4. Después de la ronda: **#23** el validador de invariantes

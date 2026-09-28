@@ -3908,3 +3908,18 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   Quedan para después de la ronda (menores): R2-001 segunda medida de "entra en el
   mensaje" dentro de `saludo._reclamar_protegido`, R3-002 la prueba cuenta todos los
   incidentes del espacio, R2-002/R2-004/R2-005/R3-003/R3-004 docstrings y pruebas.
+
+- 2026-09-28: **#9 cerrada — respuesta inmediata e indicador de actividad (pack 05,
+  ADR 0011).** Ruta: mapeo delegado y un escritor. La respuesta se despacha apenas
+  termina `procesar_update` (en `Escucha.recibir`, update por update, y en la ruta del
+  webhook de `servir`), en vez de esperar el fin del lote o la pasada de 20 s.
+  `mantener_chat_activo` arranca "escribiendo…" y el borrador nativo sólo si el turno
+  pasa de 1,5 s (inyectable), con `draft_id` aleatorio por turno, y los retira al
+  terminar (mensaje transitorio silencioso + `deleteMessage`). Por revisión del
+  orquestador, sus fallas ya no son silenciosas: una línea por tipo y por turno, y un
+  retiro fallido deja un incidente deduplicado. Hallazgo aparte: `_activacion` no hace
+  commit explícito en /start sin token (tarea nueva). ROJO/VERDE observados. Suite
+  completa del escritor: `1199 passed, 108 deselected`. Pendiente: verificación visual
+  en Telegram real, en la ronda.
+  Base `prisma`: respaldo `db/respaldos/prisma-antes-0018-0019-20260928.dump` y
+  migraciones `0018` y `0019` aplicadas; `saludo.verificar_migraciones` -> `None`.

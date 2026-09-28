@@ -15,6 +15,7 @@ sin tocar Telegram.
 from __future__ import annotations
 
 import json
+import random
 import threading
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -169,32 +170,157 @@ def _close_client_bounded(client, timeout: float) -> None:
         pass
 
 
+# Indicador de actividad (ADR 0011, decisión 2): "escribiendo…"
+# (`sendChatAction`) y, en chat privado, un borrador nativo
+# (`sendMessageDraft`), sembrado con el carácter invisible U+2063. Nunca
+# texto vacío, aunque la API admita un placeholder vacío desde Bot API
+# 10.0 -- cambiar la semilla es una decisión visual aparte, no un reemplazo
+# silencioso (pack recuperado PRISMA-PACK-RECONSTRUCCION-20260925/05).
+SEMILLA_INDICADOR = "⁣"
+
+
+def _enviar_chat_action(http, token: str, chat_id: int) -> None:
+    pedido_telegram(
+        http.post, f"https://api.telegram.org/bot{token}/sendChatAction",
+        json={"chat_id": chat_id, "action": "typing"})
+
+
+def _enviar_borrador_semilla(http, token: str, chat_id: int, draft_id: int) -> None:
+    pedido_telegram(
+        http.post, f"https://api.telegram.org/bot{token}/sendMessageDraft",
+        json={"chat_id": chat_id, "draft_id": draft_id, "text": SEMILLA_INDICADOR})
+
+
+def _retirar_borrador(http, token: str, chat_id: int) -> None:
+    """Retira el borrador nativo materializando la semilla como mensaje
+    normal -- silencioso, para no sonar ni vibrar por un mensaje que se
+    borra al instante -- y borrándolo enseguida por su `message_id` real:
+    `sendMessageDraft` no tiene uno propio (mecanismo recuperado del pack
+    05, sección 5)."""
+    r = pedido_telegram(
+        http.post, f"https://api.telegram.org/bot{token}/sendMessage",
+        json={"chat_id": chat_id, "text": SEMILLA_INDICADOR,
+              "disable_notification": True})
+    cuerpo = r.json()
+    message_id = (cuerpo.get("result") or {}).get("message_id")
+    if message_id is not None:
+        pedido_telegram(
+            http.post, f"https://api.telegram.org/bot{token}/deleteMessage",
+            json={"chat_id": chat_id, "message_id": message_id})
+
+
+def _reportar_falla_indicador(impresos: set[str], kind: str, error: Exception) -> None:
+    """Imprime a lo sumo una vez por `kind` (`typing`/`borrador`/`retiro`) y
+    por invocación de `mantener_chat_activo` -- `impresos` es local a cada
+    invocación, así que el refresco de typing cada `intervalo` nunca
+    imprime más de una vez por turno, aunque seguido falle (regla del
+    proyecto: nunca en silencio, pero tampoco en aluvión). Nunca texto
+    crudo, URL ni token: sólo lo que ya deja `texto_error_seguro`."""
+    if kind in impresos:
+        return
+    impresos.add(kind)
+    print(f"  ! indicador de actividad ({kind}): {texto_error_seguro(error)}")
+
+
+# Un borrador que no se pudo retirar puede quedar visible para la persona --
+# pesa más que un typing o un borrador que no salió, así que además del
+# print de arriba, se registra un incidente. Deduplicado por `(workspace_id,
+# 'retiro_borrador')` mientras el proceso siga vivo -- mismo patrón que
+# `saludo._FALLAS_SALUDO_REPORTADAS`/`saludo.reportar_falla`: un incidente
+# por falla persistente, no uno por turno.
+_FALLAS_RETIRO_REPORTADAS: set[tuple[str | None, str]] = set()
+
+
+def _reportar_falla_retiro(cur, workspace_id: str | None, error: Exception) -> None:
+    """Registra el incidente de una falla al retirar el borrador, si hay
+    cursor -- `cur` es opcional porque no toda invocación de
+    `mantener_chat_activo` tiene una transacción a mano (pruebas, u otro
+    llamador futuro sin base). Nunca texto crudo de la excepción en el
+    resumen (Constitución §10); `referencia_cruda` lleva lo mismo que ya
+    imprime `_reportar_falla_indicador`, seguro de guardar."""
+    if cur is None:
+        return
+    clave = (workspace_id, "retiro_borrador")
+    if clave in _FALLAS_RETIRO_REPORTADAS:
+        return
+    try:
+        registrar_incidente(
+            cur, workspace_id,
+            "El borrador nativo del indicador de actividad no se pudo "
+            "retirar; puede haber quedado visible para la persona.",
+            referencia_cruda=texto_error_seguro(error),
+            etapa="indicador_actividad", severidad="media")
+    except Exception as exc:  # noqa: BLE001 -- ni esto puede tirar el turno
+        print(f"  ! no se pudo registrar el incidente del indicador de "
+             f"actividad ({type(exc).__name__}).")
+        return
+    _FALLAS_RETIRO_REPORTADAS.add(clave)
+
+
 @contextmanager
 def mantener_chat_activo(token: str, chat_id: int, *, cliente=None,
-                         intervalo: float = 4.0,
+                         chat_type: str | None = None,
+                         umbral: float = 1.5, intervalo: float = 4.0,
                          nombre_hilo: str = "prisma-typing",
-                         espera_cierre: float = 0.25):
-    """Refresca la acción técnica `typing` mientras se procesa un turno."""
+                         espera_cierre: float = 0.25,
+                         cur=None, workspace_id: str | None = None):
+    """Indicador de actividad mientras se procesa un turno: "escribiendo…"
+    y, en chat privado, un borrador nativo -- ninguno de los dos aparece si
+    la respuesta está lista antes de `umbral` segundos (decisión del
+    usuario, 2026-09-27: nunca un destello en una respuesta rápida; ADR
+    0011, decisión 2).
+
+    El borrador sólo se intenta si `chat_type` es `"private"` -- Bot API
+    9.5 sólo lo abrió ahí; en grupo o canal degrada en silencio a sólo
+    typing. Al salir del bloque -- éxito, excepción o sin ninguna respuesta
+    nueva --, si el borrador se llegó a mostrar, se retira (ADR 0011,
+    decisión 3): queda indistinguible de una respuesta sin botones, y es
+    estrictamente más seguro que un borrador visible justo antes de
+    botones, el caso difícil del pack recuperado.
+
+    El `draft_id` es aleatorio por invocación -- nunca un contador de
+    proceso (el código recuperado lo marcaba como pendiente: un contador no
+    garantiza unicidad entre varios workers).
+
+    Toda falla de red acá es no fatal (Constitución §10): nunca bloquea ni
+    duplica la respuesta real. Pero "no fatal" no es "en silencio" (regla
+    del proyecto): cada una se imprime, a lo sumo una vez por tipo
+    (`typing`/`borrador`/`retiro`) y por invocación -- el refresco de
+    typing cada `intervalo` nunca inunda la consola --, y nunca con texto
+    crudo, URL ni token (`texto_error_seguro`). Una falla al RETIRAR pesa
+    más -- el borrador puede quedar visible para la persona --, así que
+    además se registra un incidente si hay `cur` (mismo cursor/transacción
+    que ya procesa el turno), deduplicado por proceso
+    (`_reportar_falla_retiro`)."""
     import httpx
 
     try:
         http = cliente or httpx.Client(timeout=5)
-    except Exception:  # noqa: BLE001 - typing is cosmetic
+    except Exception:  # noqa: BLE001 - cosmetic
         yield
         return
     owned_client = cliente is None
     detener = threading.Event()
+    activado = threading.Event()
+    intenta_borrador = (chat_type or "").lower() == "private"
+    draft_id = random.randint(1, 2**31 - 1)
+    impresos: set[str] = set()
 
-    def refrescar() -> None:
+    def ciclo() -> None:
         try:
+            if detener.wait(umbral):
+                return  # ya terminó antes del umbral: nunca se muestra nada
+            activado.set()
+            if intenta_borrador:
+                try:
+                    _enviar_borrador_semilla(http, token, chat_id, draft_id)
+                except Exception as e:  # noqa: BLE001 - no fatal, se reporta
+                    _reportar_falla_indicador(impresos, "borrador", e)
             while not detener.is_set():
                 try:
-                    pedido_telegram(
-                        http.post,
-                        f"https://api.telegram.org/bot{token}/sendChatAction",
-                        json={"chat_id": chat_id, "action": "typing"})
-                except Exception:  # noqa: BLE001 - es una señal cosmética
-                    pass
+                    _enviar_chat_action(http, token, chat_id)
+                except Exception as e:  # noqa: BLE001 - no fatal, se reporta
+                    _reportar_falla_indicador(impresos, "typing", e)
                 detener.wait(intervalo)
         finally:
             if owned_client:
@@ -204,9 +330,9 @@ def mantener_chat_activo(token: str, chat_id: int, *, cliente=None,
                     pass
 
     try:
-        hilo = threading.Thread(target=refrescar, name=nombre_hilo, daemon=True)
+        hilo = threading.Thread(target=ciclo, name=nombre_hilo, daemon=True)
         hilo.start()
-    except Exception:  # noqa: BLE001 - typing is cosmetic
+    except Exception:  # noqa: BLE001 - cosmetic
         if owned_client:
             _close_client_bounded(http, espera_cierre)
         yield
@@ -217,8 +343,23 @@ def mantener_chat_activo(token: str, chat_id: int, *, cliente=None,
         detener.set()
         try:
             hilo.join(timeout=espera_cierre)
-        except Exception:  # noqa: BLE001 - typing is cosmetic
+        except Exception:  # noqa: BLE001 - cosmetic
             pass
+        # El cliente que refresca typing se cierra adentro del propio hilo
+        # (si es propio, arriba de `ciclo`, sin cambios respecto de antes) --
+        # el retiro del borrador usa un cliente PROPIO y de corta vida
+        # cuando el llamador no inyectó uno, así que nunca compite por el
+        # mismo cliente que el hilo de typing todavía puede estar cerrando.
+        if activado.is_set() and intenta_borrador:
+            try:
+                if owned_client:
+                    with httpx.Client(timeout=5) as http_retiro:
+                        _retirar_borrador(http_retiro, token, chat_id)
+                else:
+                    _retirar_borrador(http, token, chat_id)
+            except Exception as e:  # noqa: BLE001 - no fatal, pero pesa más
+                _reportar_falla_indicador(impresos, "retiro", e)
+                _reportar_falla_retiro(cur, workspace_id, e)
 
 
 def acusar_toque(token: str, callback_id: str, cliente=None) -> None:
