@@ -386,6 +386,14 @@ Un worktree nuevo no trae lo que no se versiona.
     (compuerta sólo en privado; bloqueo en grupo). Suite: `1062 passed, 108
     deselected`; repetición de la sesión: `96 passed` en las pruebas del
     alta con correo.
+    Revisión RDD `review-e40fae6aa783e90f` (riesgo medio, consentida):
+    aprobada; reconocimiento emitido. Seguimientos no bloqueantes: (a) dos
+    mensajes simultáneos en `pending_welcome` pueden chocar contra el índice
+    único de la bienvenida (termina en incidente + aviso neutral, no en datos
+    corruptos) → bloquear la proyección al completar; (b) el aviso
+    `correo_limite_agotado` "una sola vez" no resiste concurrencia → índice
+    único parcial en `aviso_administrativo`. Ambos entran en G1d, que ya
+    toca esa tabla.
   - [ ] **G1c — Integrantes ya activos (modo `existente`).** Al encender la
     clave (comando de `cli.py`), a quien ya estaba activo sin correo se le
     pide una vez, sin bloquearlo; en ese modo sólo un mensaje que es
