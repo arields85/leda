@@ -534,6 +534,16 @@ Un worktree nuevo no trae lo que no se versiona.
     Repetición de la sesión: `247 passed`. Suite completa del escritor:
     `1182 passed, 6 failed` (las 4 de fecha fija de `main` y 2 de migración
     por contención, que pasan aisladas).
+    Revisión RDD `review-b80bd0e2a9b99326` (riesgo alto, consentida; cuatro
+    lentes): aprobada, sólo advertencias menores; reconocimiento emitido.
+    Pasan a G1d-b: si falla también el registro del incidente,
+    `reportar_fallo_despacho` no deja rastro (debe escribir a stderr y
+    `cli.py` no debe decir "quedó registrado"); docstrings inexactos
+    (conexión, `hashtext`, columna `etapa`); prueba del camino de doble falla.
+  - [ ] **G1d-b + G1t — Acción "Habilitar un nuevo intento" y textos
+    aprobados.** Aplicar la sección "Textos del alta con correo aprobados
+    por el usuario" (regla sin callejones sin salida, B1-B12, C, sin
+    variantes sin nombre) y la acción F del administrador.
   - [ ] **G1d — Avisos "🛠️ Administración" por el bot de administración.**
     Camino de salida propio (hoy el bot de administración no envía nada y
     `message_outbox` exige `workspace_id`); botones Reenviar correo /
