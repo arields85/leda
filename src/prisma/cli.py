@@ -558,10 +558,23 @@ def main(argv: list[str] | None = None) -> int:
         # también despacha los avisos "🛠️ Administración" pendientes -- el
         # bot de administración es uno solo para toda la plataforma, así
         # que se hace bajo `admin()`, no dentro del `espacio()` de arriba.
+        #
+        # G1d-a2, ítem 1: contenido -- mismo motivo que
+        # `local.Escucha.tareas_de_fondo`: un error acá no puede frenar el
+        # despacho del espacio (ya corrió arriba) ni dejar la conexión en
+        # transacción abortada.
         from . import avisos_admin as AA
+        from .gateway import ETAPA_ADMIN_DESPACHO, _reportar_incidente_admin
 
-        with admin(conn) as cur:
-            print(AA.despachar_todo(cur))
+        try:
+            with admin(conn) as cur:
+                print(AA.despachar_todo(cur))
+        except Exception as e:  # noqa: BLE001 -- nunca frena el despacho del espacio
+            _reportar_incidente_admin(
+                conn, chat_id=None, tg_user=None, error=e,
+                etapa=ETAPA_ADMIN_DESPACHO)
+            print("No se pudieron despachar los avisos administrativos; "
+                  "quedó registrado.")
 
     conn.commit()
     return 0

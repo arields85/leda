@@ -10,7 +10,8 @@ transporte que ya usa `despachador.py` -- nunca Telegram real.
 from __future__ import annotations
 
 import dataclasses
-from datetime import datetime, timezone
+import threading
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from fastapi.testclient import TestClient
@@ -18,7 +19,7 @@ from fastapi.testclient import TestClient
 from prisma import alta_correo as AC
 from prisma import avisos_admin as AA
 from prisma import gateway
-from prisma.db import admin, espacio
+from prisma.db import admin, conectar, espacio
 from prisma.despachador import TransporteDePrueba
 
 AHORA = datetime(2028, 3, 15, 12, 0, tzinfo=timezone.utc)
@@ -175,6 +176,66 @@ def test_despachar_avisos_a_administrador_nuevo_no_repite_a_los_ya_entregados(
     assert {e.chat_id for e in doble.enviados} == {tg_a, tg_b}
 
 
+def test_reconciliar_entregas_no_crea_para_avisos_ya_resueltos(
+        conn, intake_world, monkeypatch):
+    """G1d-a2, ítem 3: la reconciliación no recorre toda la historia --
+    sólo avisos no resueltos. Uno ya resuelto nunca recibe una entrega
+    nueva, aunque siga existiendo."""
+    monkeypatch.setenv("PRISMA_BOT_TOKEN_ADMIN", "prueba:token-admin")
+    ws = intake_world["north-lab"]["id"]
+    admin_id, tg = _hacer_administrador(conn, intake_world, "north-lab", "Morgan Hale")
+    resuelto_id = _crear_aviso(conn, ws, texto="ya resuelto")
+    abierto_id = _crear_aviso(
+        conn, ws, tipo="correo_sin_emisor", texto="todavía abierto")
+    with admin(conn) as cur:
+        AC.marcar_resuelto(cur, resuelto_id, admin_id, ahora=AHORA)
+    conn.commit()
+
+    doble = TransporteDePrueba()
+    with admin(conn) as cur:
+        resumen = AA.despachar_avisos(cur, doble, ahora=AHORA)
+    conn.commit()
+
+    assert resumen["reconciliados"] == 1
+    with admin(conn) as cur:
+        cur.execute(
+            "select aviso_id from aviso_administrativo_entrega")
+        assert [str(f["aviso_id"]) for f in cur.fetchall()] == [abierto_id]
+
+
+def test_administrador_nuevo_recibe_avisos_leidos_pero_no_resueltos(
+        conn, intake_world, monkeypatch):
+    """G1d-a2, ítem 3: leído no es resuelto -- un administrador que se suma
+    después sigue recibiendo un aviso que otro administrador ya marcó
+    leído, mientras siga sin resolverse."""
+    monkeypatch.setenv("PRISMA_BOT_TOKEN_ADMIN", "prueba:token-admin")
+    ws = intake_world["north-lab"]["id"]
+    admin_a, tg_a = _hacer_administrador(conn, intake_world, "north-lab", "Morgan Hale")
+    aviso_id = _crear_aviso(conn, ws)
+    with admin(conn) as cur:
+        AA.despachar_avisos(cur, TransporteDePrueba(), ahora=AHORA)
+        AC.marcar_leido(cur, aviso_id, admin_a, ahora=AHORA)
+    conn.commit()
+
+    admin_b, tg_b = _hacer_administrador(conn, intake_world, "north-lab", "Taylor Quinn")
+    doble = TransporteDePrueba()
+    with admin(conn) as cur:
+        resumen = AA.despachar_avisos(cur, doble, ahora=AHORA)
+    conn.commit()
+
+    # `admin_a` ya tenía su entrega desde antes de leerlo; sólo `admin_b`
+    # es nuevo acá, y el aviso leído (no resuelto) también cuenta para él.
+    assert resumen["reconciliados"] == 1
+    assert resumen["enviados"] == 1
+    with admin(conn) as cur:
+        cur.execute(
+            "select app_user_id from aviso_administrativo_entrega "
+            "where aviso_id = %s", (aviso_id,))
+        entregados = {str(f["app_user_id"]) for f in cur.fetchall()}
+    assert entregados == {admin_a, admin_b}
+    assert {e.chat_id for e in doble.enviados} == {tg_b}
+
+
 def test_despachar_avisos_sin_administrador_deja_incidente_y_no_revienta(
         conn, intake_world, monkeypatch):
     monkeypatch.setenv("PRISMA_BOT_TOKEN_ADMIN", "prueba:token-admin")
@@ -217,6 +278,83 @@ def test_despachar_avisos_sin_administrador_deja_un_solo_incidente_por_causa(
         assert cur.fetchone()["n"] == 1
 
 
+def test_incidente_plataforma_persistente_uno_nuevo_pasada_la_ventana(
+        conn, intake_world, monkeypatch):
+    """G1d-a2, ítem 4: `incident` no tiene estado de "resuelto", así que la
+    deduplicación usa una ventana de tiempo
+    (`AA.VENTANA_DEDUPE_INCIDENTE_PLATAFORMA`). Si el problema sigue (o
+    volvió) después de la ventana, se registra un incidente nuevo -- nunca
+    fallar en silencio dejando la condición sin ningún rastro nuevo."""
+    monkeypatch.setenv("PRISMA_BOT_TOKEN_ADMIN", "prueba:token-admin")
+    ws = intake_world["north-lab"]["id"]
+    _crear_aviso(conn, ws)
+
+    doble = TransporteDePrueba()
+    with admin(conn) as cur:
+        AA.despachar_avisos(cur, doble, ahora=AHORA)
+    conn.commit()
+
+    with admin(conn) as cur:
+        cur.execute("select count(*) n from incident where workspace_id is null")
+        assert cur.fetchone()["n"] == 1
+
+    despues = AHORA + AA.VENTANA_DEDUPE_INCIDENTE_PLATAFORMA + timedelta(minutes=1)
+    with admin(conn) as cur:
+        AA.despachar_avisos(cur, doble, ahora=despues)
+    conn.commit()
+
+    with admin(conn) as cur:
+        cur.execute("select count(*) n from incident where workspace_id is null")
+        assert cur.fetchone()["n"] == 2
+
+
+def test_incidente_plataforma_persistente_concurrente_no_duplica(
+        conn, intake_world, uri):
+    """G1d-a2, ítem 4: dos vueltas del loop que evalúan la MISMA causa casi
+    al mismo tiempo, desde conexiones distintas, no pueden las dos ver "no
+    hay ninguno reciente" antes de que ninguna inserte -- el candado
+    transaccional por causa exacta las serializa."""
+    resumen = "causa de prueba concurrente"
+
+    barrier = threading.Barrier(2, timeout=30)
+    outcomes: list[str] = []
+    failures: list[Exception] = []
+
+    def registrar() -> None:
+        other = None
+        try:
+            other = conectar(uri)
+            with admin(other) as cur:
+                barrier.wait()
+                AA._incidente_plataforma_persistente(cur, resumen, AHORA)
+            other.commit()
+            outcomes.append("ok")
+        except Exception as exc:  # noqa: BLE001 -- justo lo que se prueba que no pase
+            failures.append(exc)
+            barrier.abort()
+            if other is not None:
+                other.rollback()
+        finally:
+            if other is not None:
+                other.close()
+
+    threads = [threading.Thread(target=registrar) for _ in range(2)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=60)
+    assert not any(thread.is_alive() for thread in threads), "un hilo quedó colgado"
+
+    assert failures == [], [type(e).__name__ for e in failures]
+    assert outcomes == ["ok", "ok"]
+
+    with admin(conn) as cur:
+        cur.execute(
+            "select count(*) n from incident "
+            "where workspace_id is null and resumen_sanitizado = %s", (resumen,))
+        assert cur.fetchone()["n"] == 1
+
+
 def test_despachar_avisos_sin_token_deja_incidente_y_no_revienta(
         conn, intake_world, monkeypatch):
     monkeypatch.delenv("PRISMA_BOT_TOKEN_ADMIN", raising=False)
@@ -241,36 +379,88 @@ def test_despachar_avisos_sin_token_deja_incidente_y_no_revienta(
         assert "token" in incidente["resumen_sanitizado"]
 
 
-def test_despachar_avisos_falla_de_transporte_reintenta_y_agota(
+def test_despachar_avisos_falla_de_transporte_reintenta_con_espera_creciente_y_agota(
         conn, intake_world, monkeypatch):
+    """G1d-a2, ítem 2: después de una falla, la fila no se reintenta en la
+    vuelta inmediatamente siguiente -- sólo pasada la espera creciente real
+    (`AA._retraso_reintento`); agotados los `MAX_INTENTOS`, queda `fallido`
+    con un solo incidente."""
     monkeypatch.setenv("PRISMA_BOT_TOKEN_ADMIN", "prueba:token-admin")
     ws = intake_world["north-lab"]["id"]
     _, tg = _hacer_administrador(conn, intake_world, "north-lab", "Morgan Hale")
     _crear_aviso(conn, ws)
 
     doble = TransporteDePrueba(falla_en={tg})
-    for _ in range(5):
+    momento = AHORA
+    for intento in range(1, AA.MAX_INTENTOS + 1):
         with admin(conn) as cur:
-            resumen = AA.despachar_avisos(cur, doble, ahora=AHORA)
+            resumen = AA.despachar_avisos(cur, doble, ahora=momento)
         conn.commit()
-        assert resumen["fallidos"] == 1
+        reconciliados_esperados = 1 if intento == 1 else 0
+        assert resumen == {
+            "reconciliados": reconciliados_esperados, "enviados": 0, "fallidos": 1,
+        }, intento
+
+        # Inmediatamente después (mismo instante): todavía no toca reintentar.
+        with admin(conn) as cur:
+            resumen_inmediato = AA.despachar_avisos(cur, doble, ahora=momento)
+        conn.commit()
+        assert resumen_inmediato == {
+            "reconciliados": 0, "enviados": 0, "fallidos": 0,
+        }, intento
+
+        momento = momento + AA._retraso_reintento(intento)
 
     with admin(conn) as cur:
         cur.execute(
-            "select estado, intentos from aviso_administrativo_entrega")
+            "select estado, intentos, proximo_intento_en "
+            "from aviso_administrativo_entrega")
         [fila] = cur.fetchall()
         assert fila["estado"] == "fallido"
-        assert fila["intentos"] == 5
+        assert fila["intentos"] == AA.MAX_INTENTOS
+        assert fila["proximo_intento_en"] is None
         cur.execute(
             "select resumen_sanitizado from incident where workspace_id is null")
         [incidente] = cur.fetchall()
         assert "no se pudo entregar" in incidente["resumen_sanitizado"]
 
-    # Ya agotado: una sexta vuelta no lo vuelve a intentar.
+    # Ya agotado: ni pasado más tiempo se lo vuelve a intentar.
     with admin(conn) as cur:
-        resumen = AA.despachar_avisos(cur, doble, ahora=AHORA)
+        resumen = AA.despachar_avisos(
+            cur, doble, ahora=momento + timedelta(hours=1))
     conn.commit()
     assert resumen == {"reconciliados": 0, "enviados": 0, "fallidos": 0}
+
+
+def test_despachar_respuestas_falla_de_transporte_reintenta_con_espera_creciente(
+        conn, intake_world, monkeypatch):
+    """G1d-a2, ítem 2: mismo backoff real para
+    `aviso_administrativo_respuesta`."""
+    monkeypatch.setenv("PRISMA_BOT_TOKEN_ADMIN", "prueba:token-admin")
+    admin_id, tg = _hacer_administrador(conn, intake_world, "north-lab", "Morgan Hale")
+
+    with admin(conn) as cur:
+        AA.responder_texto_libre(cur, tg, 1, ahora=AHORA)
+
+    doble = TransporteDePrueba(falla_en={tg})
+    with admin(conn) as cur:
+        resumen = AA.despachar_respuestas(cur, doble, ahora=AHORA)
+    conn.commit()
+    assert resumen == {"enviados": 0, "fallidos": 1}
+
+    # Mismo instante: todavía no toca reintentar.
+    with admin(conn) as cur:
+        resumen_inmediato = AA.despachar_respuestas(cur, doble, ahora=AHORA)
+    conn.commit()
+    assert resumen_inmediato == {"enviados": 0, "fallidos": 0}
+
+    # Pasada la espera del primer intento, sí se reintenta.
+    momento = AHORA + AA._retraso_reintento(1)
+    doble.falla_en.clear()
+    with admin(conn) as cur:
+        resumen = AA.despachar_respuestas(cur, doble, ahora=momento)
+    conn.commit()
+    assert resumen == {"enviados": 1, "fallidos": 0}
 
 
 # ===========================================================================
@@ -479,3 +669,57 @@ def test_texto_libre_repetido_por_reintento_de_telegram_no_duplica_la_guia(
     with admin(conn) as cur:
         cur.execute("select count(*) n from aviso_administrativo_respuesta")
         assert cur.fetchone()["n"] == 1
+
+
+# ===========================================================================
+# F. Contención del despacho administrativo (G1d-a2, ítem 1)
+# ===========================================================================
+
+
+def test_tareas_de_fondo_contiene_una_falla_del_despacho_administrativo(
+        conn, intake_world, monkeypatch):
+    """Si el despacho de avisos administrativos revienta, el despacho del
+    espacio -- que ya corrió en la misma vuelta -- no se pierde, la
+    conexión compartida sigue usable (nunca queda en transacción abortada),
+    y queda un incidente saneado -- nunca frena el ciclo que sigue
+    escuchando updates (`local.Escucha.una_vuelta`)."""
+    from prisma.local import Escucha
+    from prisma.salida import enqueue_outbox
+
+    ws = intake_world["north-lab"]["id"]
+    chat_id = intake_world["north-lab"]["people"]["Morgan Hale"]["telegram"]
+    with espacio(conn, ws) as cur:
+        enqueue_outbox(
+            cur, workspace_id=ws, chat_id=chat_id, text="hola",
+            message_type="urgente", scheduled_for=AHORA,
+            dedupe_key="prueba:contencion-g1d-a2", is_response=True)
+    conn.commit()
+
+    def _revienta(cur, ahora=None, lote=50):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(AA, "despachar_todo", _revienta)
+
+    escucha = Escucha(conn, "north-lab", ws, "prueba:token-espacio")
+    escucha.transporte = TransporteDePrueba()
+
+    resumen = escucha.tareas_de_fondo(ahora=AHORA)
+
+    # El despacho del espacio sí ocurrió, en la misma vuelta.
+    assert resumen["enviados"] == 1
+    assert len(escucha.transporte.enviados) == 1
+
+    # La conexión compartida sigue usable -- ninguna transacción abortada
+    # colgando de la falla de arriba.
+    with admin(conn) as cur:
+        cur.execute("select 1")
+        assert cur.fetchone() is not None
+
+    with admin(conn) as cur:
+        cur.execute(
+            "select resumen_sanitizado, referencia_cruda, etapa from incident "
+            "where workspace_id is null")
+        [incidente] = cur.fetchall()
+        assert incidente["etapa"] == gateway.ETAPA_ADMIN_DESPACHO
+        assert "boom" not in incidente["resumen_sanitizado"]
+        assert "boom" in (incidente["referencia_cruda"] or "")

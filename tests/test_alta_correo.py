@@ -1131,6 +1131,38 @@ def test_crear_aviso_es_insertar_o_nada_para_el_mismo_pendiente(
     conn.commit()
 
 
+def test_crear_aviso_con_la_misma_referencia_en_dos_espacios_no_colisiona(
+        intake_world, conn):
+    """G1d-a2, ítem 5: el índice único incluye `workspace_id`. La misma
+    referencia (tipo + referencia_tipo + referencia_id) en dos espacios
+    distintos son dos avisos independientes -- el aislamiento entre
+    clientes no puede depender de que `referencia_id` sea, por casualidad,
+    distinto entre espacios."""
+    norte = intake_world["north-lab"]
+    oeste = intake_world["west-studio"]
+    referencia_compartida = "00000000-0000-0000-0000-000000000001"
+
+    with espacio(conn, norte["id"]) as cur:
+        id_norte = AC.crear_aviso(
+            cur, "correo_limite_agotado", "texto norte",
+            referencia_tipo="membership", referencia_id=referencia_compartida,
+            ahora=AHORA)
+    with espacio(conn, oeste["id"]) as cur:
+        id_oeste = AC.crear_aviso(
+            cur, "correo_limite_agotado", "texto oeste",
+            referencia_tipo="membership", referencia_id=referencia_compartida,
+            ahora=AHORA)
+    conn.commit()
+
+    assert id_norte != id_oeste
+    with espacio(conn, norte["id"]) as cur:
+        [fila] = AC.avisos(cur)
+        assert fila["texto_saneado"] == "texto norte"
+    with espacio(conn, oeste["id"]) as cur:
+        [fila] = AC.avisos(cur)
+        assert fila["texto_saneado"] == "texto oeste"
+
+
 def test_crear_aviso_concurrente_no_duplica_el_mismo_pendiente(
         intake_world, conn, uri):
     """Mismo escenario que arriba, pero con dos conexiones reales
@@ -1158,7 +1190,8 @@ def test_crear_aviso_concurrente_no_duplica_el_mismo_pendiente(
         except Exception as exc:  # noqa: BLE001 -- justo lo que se prueba que no pase
             failures.append(exc)
             barrier.abort()
-            other.rollback()
+            if other is not None:
+                other.rollback()
         finally:
             if other is not None:
                 other.close()

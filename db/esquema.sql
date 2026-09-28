@@ -2562,27 +2562,42 @@ begin
   return query select true, null::text;
 end $$;
 
+-- --- Candado de la proyección ------------------------------------------------
+--
+-- Serializa lecturas que deciden si hace falta escribir
+-- (`alta_correo.estado(..., bloquear=True)`, usado por
+-- `alta_correo_flujo._completar_bienvenida` y por `abrir_ciclo_alta` antes de
+-- abrir el ciclo). Vive en una función para no conceder `update` a
+-- `prisma_app`: con ese privilegio podría fijar la marca de sesión que
+-- desactiva el disparador y escribir la proyección directamente.
+create or replace function bloquear_alta_correo_estado(p_membership_id uuid)
+returns void
+language plpgsql security definer set search_path = prisma, public, pg_temp as $$
+begin
+  -- Candado transaccional por membresía (G1d-a2, ítem 6), no un `for update`
+  -- sobre la fila: tiene que serializar TAMBIÉN cuando la fila todavía no
+  -- existe (la proyección se crea recién con el primer evento -- quien abre
+  -- el ciclo toma este candado ANTES de `iniciar_ciclo`) o cuando quien
+  -- llama no declaró ningún espacio en la sesión (`admin()`, sin
+  -- `prisma.workspace_id`): un `for update` sobre `alta_correo_estado` no
+  -- encuentra ninguna fila en esos dos casos -- en el segundo, porque
+  -- `prisma_owner` no ignora la RLS y la política de aislamiento compara
+  -- contra `NULL`, aunque la fila exista -- y entonces no serializa nada. El
+  -- advisory lock no pasa por la tabla ni por la RLS: sólo depende de
+  -- `p_membership_id`, así que sirve en los dos casos. Es transaccional
+  -- (`_xact_`): se libera solo al terminar la transacción de quien llama,
+  -- nunca hay que soltarlo a mano, y es reentrante dentro de la misma
+  -- transacción (mismo patrón que ya usa `cli._correo_verificacion` para su
+  -- propio bloqueo consultivo).
+  perform pg_advisory_xact_lock(hashtextextended(p_membership_id::text, 0));
+end $$;
+
 -- --- Lectura del envío vigente ----------------------------------------------
 --
 -- Sólo lo necesita el flujo conversacional (G1b) para saber si un correo
 -- tipeado mientras hay una verificación pendiente es igual al que ya se
 -- pidió verificar, o es una dirección distinta que hay que proponer antes de
 -- cambiarla. Nunca expone el hash del token: sólo el correo y su vencimiento.
-create or replace function bloquear_alta_correo_estado(p_membership_id uuid)
-returns void
-language plpgsql security definer set search_path = prisma, public, pg_temp as $$
-begin
-  -- Candado de fila para serializar lecturas que deciden si escribir
-  -- (`alta_correo.estado(..., bloquear=True)`). Vive en una función para no
-  -- conceder `update` a `prisma_app`: con ese privilegio podría fijar la
-  -- marca de sesión que desactiva el disparador y escribir la proyección.
-  -- `prisma_owner` no ignora la RLS, así que sólo alcanza filas del espacio
-  -- declarado en la sesión.
-  perform 1 from alta_correo_estado
-   where membership_id = p_membership_id
-   for update;
-end $$;
-
 create or replace function verificacion_vigente_correo(p_membership_id uuid)
 returns table (email text, expira_en timestamptz)
 language plpgsql security definer set search_path = prisma, public, pg_temp as $$
@@ -2620,9 +2635,14 @@ create index aviso_administrativo_pendientes
 -- `null` (un aviso sin referencia puntual) nunca colisiona entre sí, porque
 -- Postgres trata cada `null` como distinto en un índice único -- mismo
 -- comportamiento que ya tenía `aviso_pendiente()` en Python, ahora también
--- garantizado por la base bajo carrera.
+-- garantizado por la base bajo carrera. `workspace_id` va primero en el
+-- índice (G1d-a2, ítem 5): el aislamiento entre clientes es el invariante
+-- número uno del producto, y no puede depender de que `referencia_id` sea,
+-- por casualidad, distinto entre espacios -- dos espacios con el mismo
+-- (tipo, referencia) son dos avisos independientes, nunca uno "pisando" al
+-- otro.
 create unique index aviso_administrativo_pendiente_unico
-  on aviso_administrativo (tipo, referencia_tipo, referencia_id)
+  on aviso_administrativo (workspace_id, tipo, referencia_tipo, referencia_id)
   where resuelto_en is null;
 
 comment on table aviso_administrativo is
@@ -2644,7 +2664,10 @@ create trigger trg_derivar_espacio_aviso_administrativo
 --
 -- Una fila por (aviso, administrador): permite reintentos y backoff por
 -- destinatario, igual que `despachador._fallo`, sin que la falla de
--- entregarle a uno bloquee a los demás.
+-- entregarle a uno bloquee a los demás. `proximo_intento_en` (G1d-a2, ítem
+-- 2) es la espera creciente real entre reintentos -- `null` significa
+-- "listo para intentarse ya"; el despacho sólo toma filas cuya marca ya
+-- pasó, en vez de reintentar en cada vuelta del loop.
 create table aviso_administrativo_entrega (
   id                  uuid primary key default gen_random_uuid(),
   workspace_id        uuid not null references workspace(id) on delete cascade,
@@ -2654,6 +2677,7 @@ create table aviso_administrativo_entrega (
                         check (estado in ('listo', 'enviado', 'fallido')),
   intentos            integer not null default 0,
   ultimo_error        text,
+  proximo_intento_en  timestamptz,
   telegram_message_id bigint,
   delivered_at        timestamptz,
   creado_en           timestamptz not null default now(),
@@ -2683,6 +2707,7 @@ create table aviso_administrativo_respuesta (
                         check (estado in ('listo', 'enviado', 'fallido')),
   intentos            integer not null default 0,
   ultimo_error        text,
+  proximo_intento_en  timestamptz,
   telegram_message_id bigint,
   enviado_en          timestamptz,
   dedupe_key          text not null,

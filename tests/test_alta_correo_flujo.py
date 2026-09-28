@@ -1106,7 +1106,8 @@ def test_dos_completar_bienvenida_concurrentes_no_revientan(conn, intake_world, 
         except Exception as exc:  # noqa: BLE001 -- justo lo que se prueba que no pase
             failures.append(exc)
             barrier.abort()
-            other.rollback()
+            if other is not None:
+                other.rollback()
         finally:
             if other is not None:
                 other.close()
@@ -1129,6 +1130,63 @@ def test_dos_completar_bienvenida_concurrentes_no_revientan(conn, intake_world, 
             "where membership_id = %s and tipo = 'bienvenida_entregada'", (m,))
         assert cur.fetchone()["n"] == 1
     assert _estado(conn, ws, m)["estado"] == "awaiting_email"
+
+
+def test_dos_abrir_ciclo_alta_concurrentes_de_una_primera_activacion_no_revientan(
+        conn, intake_world, uri):
+    """G1d-a2, ítem 6: dos activaciones simultáneas de la MISMA membresía
+    ANTES de que exista ninguna fila de `alta_correo_estado` -- dos
+    entregas del mismo enlace, un reintento de Telegram -- no pueden abrir
+    las dos un ciclo nuevo ni reventar contra la validación de transiciones
+    de la base. El candado de `abrir_ciclo_alta` (advisory lock, no un
+    `for update` de fila) sirve incluso antes de que la proyección exista;
+    quien se desbloquea segundo ya encuentra el ciclo abierto por el
+    primero y no vuelve a abrir uno."""
+    ws = intake_world["north-lab"]["id"]
+    m = _membership_id(intake_world, "north-lab", "Taylor Quinn")
+    # Ningún ciclo abierto todavía -- ni siquiera se llamó `iniciar_ciclo`.
+
+    barrier = threading.Barrier(2, timeout=30)
+    outcomes: list[str] = []
+    failures: list[Exception] = []
+
+    def activar() -> None:
+        other = None
+        try:
+            other = conectar(uri)
+            with espacio(other, ws) as cur:
+                barrier.wait()
+                ACF.abrir_ciclo_alta(cur, m, ws, 71001, "Taylor Quinn", AHORA)
+            other.commit()
+            outcomes.append("ok")
+        except Exception as exc:  # noqa: BLE001 -- justo lo que se prueba que no pase
+            failures.append(exc)
+            barrier.abort()
+            if other is not None:
+                other.rollback()
+        finally:
+            if other is not None:
+                other.close()
+
+    threads = [threading.Thread(target=activar) for _ in range(2)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=60)
+    assert not any(thread.is_alive() for thread in threads), "un hilo quedó colgado"
+
+    assert failures == [], [type(e).__name__ for e in failures]
+    assert outcomes == ["ok", "ok"]
+
+    textos = _outbox_textos(conn, 71001)
+    assert len(textos) == 2
+    with admin(conn) as cur:
+        cur.execute(
+            "select count(*) n from alta_correo_evento "
+            "where membership_id = %s and tipo = 'bienvenida_entregada'", (m,))
+        assert cur.fetchone()["n"] == 1
+    assert _estado(conn, ws, m)["estado"] == "awaiting_email"
+    assert _estado(conn, ws, m)["ciclo"] == 1
 
 
 def test_limite_de_cinco_por_ciclo_agota_y_crea_aviso_una_vez(

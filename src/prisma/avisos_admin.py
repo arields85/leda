@@ -14,7 +14,7 @@ sólo se asume ya identificado ("el canal manda", `autoridad.py`).
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import psycopg
 
@@ -116,80 +116,130 @@ def _admins_con_telegram(cur: psycopg.Cursor) -> list[dict]:
     return cur.fetchall()
 
 
-def _reconciliar_entregas(cur: psycopg.Cursor, ahora: datetime,
-                          admins: list[dict]) -> int:
-    """Una fila de entrega por (aviso, administrador) que todavía no la
-    tiene -- insertar-o-nada (`on conflict do nothing`), así correr esto
-    muchas veces (cada vuelta del loop) nunca duplica nada ni pisa una
-    entrega que ya estaba en curso."""
-    if not admins:
-        return 0
-    cur.execute("select id, workspace_id from aviso_administrativo")
-    avisos = cur.fetchall()
-    creadas = 0
-    for aviso in avisos:
-        for adm in admins:
-            cur.execute(
-                """insert into aviso_administrativo_entrega
-                     (workspace_id, aviso_id, app_user_id, estado, creado_en)
-                   values (%s, %s, %s, 'listo', %s)
-                   on conflict (aviso_id, app_user_id) do nothing""",
-                (aviso["workspace_id"], aviso["id"], adm["app_user_id"], ahora))
-            creadas += cur.rowcount
-    return creadas
+def _reconciliar_entregas(cur: psycopg.Cursor, ahora: datetime) -> int:
+    """Una fila de entrega por (aviso no resuelto, administrador con
+    Telegram) que todavía no la tiene -- una sola sentencia de conjunto
+    (`insert ... select ... on conflict do nothing`), no un `insert` por
+    combinación en Python (G1d-a2, ítem 3): así no recorre toda la
+    historia de avisos, incluidos los ya resueltos, en cada vuelta del
+    loop -- el universo que importa acotarse es "lo que todavía está
+    abierto", no "todo lo que existió alguna vez". Leído no es resuelto
+    (`aviso_administrativo`, comentario de tabla): un administrador nuevo
+    sigue recibiendo cualquier aviso todavía abierto, lo haya leído ya
+    otro administrador o no, sin importar cuánto tiempo lleve abierto.
+    Correr esto muchas veces (cada vuelta del loop) nunca duplica nada: el
+    índice único (`aviso_administrativo_entrega_unica`) es la garantía
+    bajo carrera, no el orden en que Python lo ejecute."""
+    cur.execute(
+        """insert into aviso_administrativo_entrega
+             (workspace_id, aviso_id, app_user_id, estado, creado_en)
+           select a.workspace_id, a.id, p.app_user_id, 'listo', %s
+             from aviso_administrativo a
+             join platform_role p on p.rol = 'administrador'
+             join app_user u on u.id = p.app_user_id
+                              and u.telegram_user_id is not null
+            where a.resuelto_en is null
+           on conflict (aviso_id, app_user_id) do nothing""",
+        (ahora,))
+    return cur.rowcount
 
 
-def _incidente_plataforma(cur: psycopg.Cursor, resumen: str) -> None:
+def _incidente_plataforma(cur: psycopg.Cursor, resumen: str, *,
+                          ahora: datetime | None = None) -> None:
     """Incidente sin espacio propio -- concierne a la plataforma entera, no
     a uno en particular (mismo patrón que otras filas globales de
     `incident`, `workspace_id` en `null`)."""
     cur.execute(
-        """insert into incident (workspace_id, severidad, resumen_sanitizado)
-           values (null, 'alta', %s)""",
-        (resumen,))
+        """insert into incident (workspace_id, severidad, resumen_sanitizado, at)
+           values (null, 'alta', %s, %s)""",
+        (resumen, _ahora(ahora)))
 
 
-def _incidente_plataforma_persistente(cur: psycopg.Cursor, resumen: str) -> None:
-    """Como `_incidente_plataforma`, pero una sola vez por causa exacta:
-    "falta el token" o "no hay ningún administrador vinculado" son
-    condiciones de configuración que persisten mientras nadie las
-    resuelve -- sin este guardia, cada vuelta del loop que despacha
-    (`local.Escucha.tareas_de_fondo`, cada `cli.py despachar`) dejaría un
-    incidente nuevo, en vez de uno solo hasta que se corrija. Distinto de
-    los incidentes de `_fallo` por fila agotada: esos sí son uno por fila,
-    igual que ya hace `despachador._fallo`."""
+VENTANA_DEDUPE_INCIDENTE_PLATAFORMA = timedelta(hours=24)
+
+
+def _incidente_plataforma_persistente(cur: psycopg.Cursor, resumen: str,
+                                      ahora: datetime) -> None:
+    """Como `_incidente_plataforma`, pero deduplicado por causa exacta
+    mientras el anterior siga vigente: "falta el token" o "no hay ningún
+    administrador vinculado" son condiciones de configuración que
+    persisten mientras nadie las resuelve -- sin este guardia, cada vuelta
+    del loop que despacha (`local.Escucha.tareas_de_fondo`, cada `cli.py
+    despachar`) dejaría un incidente nuevo, en vez de uno solo hasta que se
+    corrija. Distinto de los incidentes de `_fallo` por fila agotada: esos
+    sí son uno por fila, igual que ya hace `despachador._fallo`.
+
+    `incident` no tiene ningún estado de "resuelto" (sólo `at` y
+    `notificado_en`, `db/esquema.sql`) -- G1d-a2, ítem 4: en vez de eso, se
+    usa una ventana de tiempo (`VENTANA_DEDUPE_INCIDENTE_PLATAFORMA`, 24
+    horas, documentada acá porque es una aproximación, no una fecha de
+    resolución real): dentro de la ventana, un incidente reciente con la
+    misma causa exacta alcanza; pasada la ventana, si el problema sigue (o
+    volvió después de haberse arreglado), se registra uno nuevo -- nunca
+    fallar en silencio dejando que la condición persista sin ningún rastro
+    nuevo.
+
+    El candado transaccional por causa exacta (`pg_advisory_xact_lock`)
+    serializa dos vueltas del loop que evalúan la MISMA causa casi al
+    mismo tiempo: sin él, las dos pueden ver "no hay ninguno reciente"
+    antes de que ninguna inserte, y duplicar el incidente -- el `select`
+    de abajo no es, por sí solo, una garantía bajo carrera."""
+    cur.execute("select pg_advisory_xact_lock(hashtext(%s))", (resumen,))
     cur.execute(
         """select 1 from incident
-            where workspace_id is null and resumen_sanitizado = %s limit 1""",
-        (resumen,))
+            where workspace_id is null and resumen_sanitizado = %s
+              and at >= %s
+            limit 1""",
+        (resumen, ahora - VENTANA_DEDUPE_INCIDENTE_PLATAFORMA))
     if cur.fetchone() is None:
-        _incidente_plataforma(cur, resumen)
+        _incidente_plataforma(cur, resumen, ahora=ahora)
 
 
 def _texto_aviso(workspace_nombre: str, texto_saneado: str) -> str:
     return f"🛠️ Administración\n\n{workspace_nombre}\n{texto_saneado}"
 
 
+def _retraso_reintento(intentos: int) -> timedelta:
+    """Espera creciente real antes del próximo intento (G1d-a2, ítem 2): 1,
+    2, 4, 8 minutos según cuántos intentos ya se gastaron. A diferencia de
+    `despachador._fallo` -- que reprograma para la próxima ventana de
+    horario laboral, porque ahí "reintentar" significa "esperar a que
+    alguien esté despierto" -- acá no hay calendario (el bot de
+    administración manda en cualquier momento): lo que se toma prestado de
+    `despachador._fallo` es la idea, no la fórmula -- una marca de "próximo
+    intento" que el despacho respeta, en vez de reintentar en cada vuelta
+    del loop."""
+    return timedelta(minutes=2 ** (intentos - 1))
+
+
 def _fallo(cur: psycopg.Cursor, tabla: str, fila_id: str, intentos_previos: int,
-           error: Exception, ahora: datetime, *, incidente: str) -> bool:
-    """Aplica el mismo backoff que `despachador._fallo`: reintenta hasta
-    `MAX_INTENTOS`, después queda `fallido` y deja un incidente saneado --
-    nunca el texto del aviso ni un cuerpo de conversación. Devuelve `True`
-    si esta fue la falla definitiva (para que quien llama cuente bien)."""
+           error: Exception, ahora: datetime, *, incidente: str) -> None:
+    """Reintenta hasta `MAX_INTENTOS`, con una espera creciente real entre
+    intentos (`_retraso_reintento`) en vez de en cada vuelta del loop;
+    agotados los intentos, la fila queda `fallido` y deja un incidente
+    saneado -- nunca el texto del aviso ni un cuerpo de conversación.
+
+    `resumen['fallidos']` (de quien llama) cuenta cada intento que falló en
+    esta pasada, sea o no el definitivo -- no sólo las filas que terminaron
+    `fallido` (G1d-a2, ítem 2: antes, esta función devolvía si la falla
+    había sido definitiva, pero ningún llamador usaba ese valor -- un
+    retorno muerto que además insinuaba, al revés de la realidad, que
+    `fallidos` sólo contaba fallas definitivas)."""
     intentos = intentos_previos + 1
     definitiva = intentos >= MAX_INTENTOS
     estado = "fallido" if definitiva else "listo"
+    proximo = None if definitiva else ahora + _retraso_reintento(intentos)
     cur.execute(
         f"""update {tabla}
-              set intentos = %s, ultimo_error = %s, estado = %s
+              set intentos = %s, ultimo_error = %s, estado = %s,
+                  proximo_intento_en = %s
             where id = %s""",
-        (intentos, str(error)[:500], estado, fila_id))
+        (intentos, str(error)[:500], estado, proximo, fila_id))
     if definitiva:
-        _incidente_plataforma(cur, incidente)
-    return definitiva
+        _incidente_plataforma(cur, incidente, ahora=ahora)
 
 
-def despachar_avisos(cur: psycopg.Cursor, transporte: Transporte, *,
+def despachar_avisos(cur: psycopg.Cursor, transporte: Transporte | None, *,
                      ahora: datetime | None = None, lote: int = 50) -> dict[str, int]:
     """Entrega los avisos "🛠️ Administración" pendientes a cada
     administrador con Telegram vinculado.
@@ -203,14 +253,14 @@ def despachar_avisos(cur: psycopg.Cursor, transporte: Transporte, *,
     resumen = {"reconciliados": 0, "enviados": 0, "fallidos": 0}
 
     admins = _admins_con_telegram(cur)
-    resumen["reconciliados"] = _reconciliar_entregas(cur, ahora, admins)
+    resumen["reconciliados"] = _reconciliar_entregas(cur, ahora)
 
     if not admins:
         cur.execute("select count(*) n from aviso_administrativo")
         if cur.fetchone()["n"] > 0:
             _incidente_plataforma_persistente(
                 cur, "Hay avisos administrativos sin ningún administrador "
-                "de plataforma con Telegram vinculado.")
+                "de plataforma con Telegram vinculado.", ahora)
         return resumen
 
     cur.execute("select count(*) n from aviso_administrativo_entrega "
@@ -223,7 +273,7 @@ def despachar_avisos(cur: psycopg.Cursor, transporte: Transporte, *,
     except LookupError:
         _incidente_plataforma_persistente(
             cur, "Falta el token del bot de administración: no se pudieron "
-            "entregar avisos pendientes.")
+            "entregar avisos pendientes.", ahora)
         return resumen
 
     if transporte is None:
@@ -237,10 +287,11 @@ def despachar_avisos(cur: psycopg.Cursor, transporte: Transporte, *,
              join aviso_administrativo a on a.id = e.aviso_id
              join workspace w on w.id = a.workspace_id
             where e.estado = 'listo'
+              and (e.proximo_intento_en is null or e.proximo_intento_en <= %s)
             order by e.creado_en
             limit %s
             for update of e skip locked""",
-        (lote,))
+        (ahora, lote))
     pendientes = cur.fetchall()
 
     for fila in pendientes:
@@ -265,7 +316,7 @@ def despachar_avisos(cur: psycopg.Cursor, transporte: Transporte, *,
     return resumen
 
 
-def despachar_respuestas(cur: psycopg.Cursor, transporte: Transporte, *,
+def despachar_respuestas(cur: psycopg.Cursor, transporte: Transporte | None, *,
                          ahora: datetime | None = None, lote: int = 50) -> dict[str, int]:
     """Entrega las respuestas puntuales en cola (confirmaciones, guía de
     texto libre). Mismo patrón de reintentos que `despachar_avisos`."""
@@ -282,7 +333,7 @@ def despachar_respuestas(cur: psycopg.Cursor, transporte: Transporte, *,
     except LookupError:
         _incidente_plataforma_persistente(
             cur, "Falta el token del bot de administración: no se pudieron "
-            "entregar respuestas pendientes.")
+            "entregar respuestas pendientes.", ahora)
         return resumen
 
     if transporte is None:
@@ -291,10 +342,11 @@ def despachar_respuestas(cur: psycopg.Cursor, transporte: Transporte, *,
     cur.execute(
         """select id, chat_id, texto, intentos from aviso_administrativo_respuesta
             where estado = 'listo'
+              and (proximo_intento_en is null or proximo_intento_en <= %s)
             order by creado_en
             limit %s
             for update skip locked""",
-        (lote,))
+        (ahora, lote))
     pendientes = cur.fetchall()
 
     for fila in pendientes:

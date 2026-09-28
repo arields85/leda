@@ -2373,6 +2373,11 @@ ETAPA_ALTA_CORREO = "alta_correo"
 # G1d (rama auxiliar/alta-y-google): canal de administración -- toque de
 # "Marcar leído" o texto libre en el bot de administración.
 ETAPA_ADMIN = "admin"
+# G1d-a2 (rama auxiliar/alta-y-google): el despacho de avisos administrativos
+# en segundo plano (`local.Escucha.tareas_de_fondo`, `cli.py despachar`), no
+# un toque ni un mensaje del webhook -- etapa propia para no confundir un
+# error de despacho con uno del canal de administración interactivo.
+ETAPA_ADMIN_DESPACHO = "admin_despacho"
 
 # Qué tipo de fila referencia `incident.referencia_id` -- mismo patrón
 # polimórfico que `audit_log.sujeto_tipo`/`sujeto_id`, sin clave foránea:

@@ -289,8 +289,25 @@ def abrir_ciclo_alta(cur: psycopg.Cursor, membership_id: str, workspace_id: str,
                      chat_id: int, nombre: str, ahora: datetime) -> None:
     """Activación con la clave encendida: abre `pending_welcome` y completa
     los pasos hasta `awaiting_email`, en la misma transacción que
-    `onboarding.activar()` ya viene usando."""
-    AC.iniciar_ciclo(cur, membership_id, "alta", ahora=ahora)
+    `onboarding.activar()` ya viene usando.
+
+    El candado (`bloquear=True`, G1d-a2, ítem 6) se toma ACÁ, antes de
+    `AC.iniciar_ciclo`, cuando la proyección todavía no existe para nadie --
+    es un advisory lock, no un candado de fila, así que sirve incluso antes
+    de que la fila exista. Sin esto, dos activaciones simultáneas de la
+    MISMA membresía (dos entregas del mismo enlace, un reintento de
+    Telegram) pueden las dos ver que no hay ningún ciclo abierto y las dos
+    intentar abrir el primero: la segunda, al desbloquearse, ya encuentra el
+    ciclo que abrió y avanzó la primera -- por eso sólo llama a
+    `iniciar_ciclo` si todavía no hay ninguna proyección. `_completar_
+    bienvenida` ya es idempotente por su cuenta (vuelve a tomar el mismo
+    candado y no hace nada si el ciclo ya pasó de `pending_welcome`), así
+    que la segunda llamada termina siendo un no-op completo, nunca una
+    excepción cruda ni un `UniqueViolation` contra el índice único de
+    `bienvenida_entregada`."""
+    actual = AC.estado(cur, membership_id, bloquear=True)
+    if actual is None:
+        AC.iniciar_ciclo(cur, membership_id, "alta", ahora=ahora)
     _completar_bienvenida(cur, membership_id, workspace_id, chat_id, nombre, ahora)
 
 

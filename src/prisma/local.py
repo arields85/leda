@@ -134,12 +134,28 @@ class Escucha:
         # skip locked` en `avisos_admin` hace que correr esto una vez por
         # cada espacio que escucha (`escuchar <slug>`, un proceso por bot)
         # nunca duplique un envío.
+        #
+        # G1d-a2, ítem 1: contenido -- un error acá nunca puede frenar el
+        # despacho del espacio (ya corrió arriba, en esta misma vuelta) ni
+        # dejar la conexión compartida en transacción abortada para la
+        # vuelta siguiente. `admin()` ya revierte sola su propia transacción
+        # al salir por una excepción (`conn.transaction()`), así que sólo
+        # hace falta atajarla acá y dejar el incidente saneado por el mismo
+        # camino que ya usa el webhook de administración
+        # (`gateway._reportar_incidente_admin`, sin `chat_id`/`tg_user`
+        # porque esto no es una respuesta a nadie en particular).
         from . import avisos_admin as AA
         from .db import admin
+        from .gateway import ETAPA_ADMIN_DESPACHO, _reportar_incidente_admin
 
-        with admin(self.conn) as cur:
-            AA.despachar_todo(cur, ahora=ahora)
-        self.conn.commit()
+        try:
+            with admin(self.conn) as cur:
+                AA.despachar_todo(cur, ahora=ahora)
+            self.conn.commit()
+        except Exception as e:  # noqa: BLE001 -- nunca frena el despacho del espacio
+            _reportar_incidente_admin(
+                self.conn, chat_id=None, tg_user=None, error=e,
+                etapa=ETAPA_ADMIN_DESPACHO)
 
         return resumen
 

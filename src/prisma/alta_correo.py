@@ -350,30 +350,53 @@ def crear_aviso(cur: psycopg.Cursor, tipo: str, texto_saneado: str,
     Sin referencia (`referencia_tipo`/`referencia_id` en `None`), el índice
     nunca colisiona -- Postgres trata cada `null` como distinto -- así que
     ese caso siempre inserta una fila nueva, como antes.
-    """
-    cur.execute(
-        """insert into aviso_administrativo
-             (workspace_id, tipo, texto_saneado, referencia_tipo, referencia_id,
-              creado_en)
-           values (%s, %s, %s, %s, %s, %s)
-           on conflict (tipo, referencia_tipo, referencia_id)
-             where resuelto_en is null
-           do nothing
-           returning id""",
-        (workspace_id, tipo, texto_saneado, referencia_tipo, referencia_id,
-         _ahora(ahora)))
-    fila = cur.fetchone()
-    if fila is not None:
-        return str(fila["id"])
 
-    # Carrera perdida (o alguien se adelantó): ya hay uno pendiente igual.
-    cur.execute(
-        """select id from aviso_administrativo
-            where tipo = %s and referencia_tipo is not distinct from %s
-              and referencia_id is not distinct from %s and resuelto_en is null
-            order by creado_en desc limit 1""",
-        (tipo, referencia_tipo, referencia_id))
-    return str(cur.fetchone()["id"])
+    El índice incluye `workspace_id` (G1d-a2, ítem 5): el mismo (tipo,
+    referencia) en dos espacios distintos son dos avisos independientes,
+    nunca uno pisando al otro.
+
+    Nunca devuelve `None` ni revienta con `TypeError` (G1d-a2, ítem 5,
+    hallazgo de la revisión): entre el "insertar o nada" que pierde la
+    carrera y la lectura de abajo hay una ventana angosta en la que quien
+    ganó la carrera puede haber marcado su aviso resuelto -- ahí ya no
+    queda ningún pendiente vivo contra el que haber chocado, así que el
+    próximo intento de este mismo bucle vuelve a insertar sin tropezar en
+    vez de leer una fila que ya no está."""
+    ahora = _ahora(ahora)
+    for _ in range(3):
+        cur.execute(
+            """insert into aviso_administrativo
+                 (workspace_id, tipo, texto_saneado, referencia_tipo, referencia_id,
+                  creado_en)
+               values (%s, %s, %s, %s, %s, %s)
+               on conflict (workspace_id, tipo, referencia_tipo, referencia_id)
+                 where resuelto_en is null
+               do nothing
+               returning id""",
+            (workspace_id, tipo, texto_saneado, referencia_tipo, referencia_id,
+             ahora))
+        fila = cur.fetchone()
+        if fila is not None:
+            return str(fila["id"])
+
+        # Carrera perdida (o alguien se adelantó): ya hay uno pendiente
+        # igual. `workspace_id` sólo filtra cuando quien llama lo dio
+        # explícito (conexión de administración); dentro de `espacio()` la
+        # RLS ya acota esto al espacio de la sesión.
+        cur.execute(
+            """select id from aviso_administrativo
+                where (%s::uuid is null or workspace_id = %s)
+                  and tipo = %s and referencia_tipo is not distinct from %s
+                  and referencia_id is not distinct from %s and resuelto_en is null
+                order by creado_en desc limit 1""",
+            (workspace_id, workspace_id, tipo, referencia_tipo, referencia_id))
+        fila = cur.fetchone()
+        if fila is not None:
+            return str(fila["id"])
+
+    raise RuntimeError(
+        "crear_aviso: no se pudo crear ni encontrar un aviso pendiente tras "
+        "varios intentos (carrera inusual).")
 
 
 def aviso_pendiente(cur: psycopg.Cursor, tipo: str, referencia_tipo: str,

@@ -470,7 +470,7 @@ Un worktree nuevo no trae lo que no se versiona.
     de contención ya registrado.
     Revisión RDD `review-32981fbfd82ee215` (riesgo alto, consentida; cuatro
     lentes): aprobada; reconocimiento emitido.
-  - [ ] **G1d-a2 — Endurecimiento tras la revisión de G1d-a.** (1) El
+  - [x] **G1d-a2 — Endurecimiento tras la revisión de G1d-a.** (1) El
     despacho de avisos en `local.py` queda contenido (try/rollback +
     incidente): un error de administración nunca frena el despacho de un
     espacio. (2) Reintentos con espera creciente real (columna de próximo
@@ -486,6 +486,23 @@ Un worktree nuevo no trae lo que no se versiona.
     Legibilidad: comentario de `verificacion_vigente_correo` en su lugar,
     retorno muerto de `_fallo` y conteo de `fallidos`, anotación
     `Transporte | None`, `rollback` con conexión nula en las pruebas.
+    Hecho (ruta: delegada, un escritor). Despacho administrativo contenido
+    en `local.py`/`cli.py`; `proximo_intento_en` con espera `2**(n-1)`
+    minutos; reconciliación en una sola sentencia sobre avisos no
+    resueltos; incidentes de plataforma deduplicados en una ventana de 24 h
+    (la tabla `incident` no tiene estado de resolución) con bloqueo
+    consultivo; `workspace_id` en el índice único de avisos;
+    `bloquear_alta_correo_estado` pasa a bloqueo consultivo por membresía
+    (sirve sin fila y sin espacio declarado). TDD débil declarado por el
+    escritor en varios ítems (pruebas en verde al primer intento, RED
+    razonado sobre el código anterior). Sin cambios de permisos ni RLS
+    (verificado sobre el diff). Pruebas del alta con correo, avisos,
+    migraciones y capacidades: `241 passed`. Suite completa del escritor:
+    `7 failed, 1175 passed`: 3 de migración por contención (pasan aisladas)
+    y 4 de `tests/test_aprobacion_cierra_tarea.py`, que fallan igual sin
+    esta unidad: la prueba de `main` usa `AHORA = datetime(2026, 9, 27,
+    ...)` fijo y desde el 2026-09-28 la acción pendiente figura vencida.
+    Hallazgo para `main`.
   - [ ] **G1d — Avisos "🛠️ Administración" por el bot de administración.**
     Camino de salida propio (hoy el bot de administración no envía nada y
     `message_outbox` exige `workspace_id`); botones Reenviar correo /
