@@ -414,6 +414,22 @@ Un worktree nuevo no trae lo que no se versiona.
     fallaron con `tuple concurrently updated` y pasan aisladas
     (`5 passed`): contención de catálogo con otra suite corriendo contra el
     mismo servidor. `PENDIENTE`: confirmar con una corrida sin concurrencia.
+    Revisión RDD `review-7c6ef19f12bf541c` (riesgo alto por `cli.py`,
+    consentida; cuatro lentes): aprobada; reconocimiento emitido.
+  - [ ] **G1c2 — Endurecimiento tras la revisión de G1c.** (1) La clave de
+    deduplicación del pedido de correo incluye el ciclo: un ciclo reabierto
+    tras revocar sin verificar vuelve a recibir el pedido (hoy quedaría
+    deduplicado y nunca saldría). (2) "Exactamente una dirección" estricto:
+    rechaza URLs con `@`, `usuario@host:ruta`, dos `@` y puntuación final.
+    (3) Pruebas faltantes: `pending_email_verification` en modo `existente`
+    (misma dirección → al agente, sin recordatorio; distinta → propuesta de
+    cambio); con la clave apagada, un integrante a mitad del `alta` deja de
+    ser bloqueado también en grupo; reapertura de un ciclo revocado sin
+    contacto. (4) La consulta de elegibilidad de `--activar` filtra por
+    `workspace_id` explícito y toma un bloqueo para corridas superpuestas.
+    (5) Legibilidad: un solo conjunto de estados abiertos compartido, el
+    comentario de `gateway` corregido, fixtures compartidas en un módulo
+    común.
   - [ ] **G1d — Avisos "🛠️ Administración" por el bot de administración.**
     Camino de salida propio (hoy el bot de administración no envía nada y
     `message_outbox` exige `workspace_id`); botones Reenviar correo /
