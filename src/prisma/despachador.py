@@ -661,7 +661,7 @@ def despachar_respuestas_admin(cur: psycopg.Cursor, transporte: Transporte,
             agotado = intentos >= MAX_INTENTOS
             estado = "fallido" if agotado else "listo"
             proximo = None if agotado else _proximo_intento_admin(intentos, ahora)
-            ultimo_error = str(e)[:500]
+            ultimo_error = redactar_secreto_telegram(str(e))[:500]
             cur.execute(
                 """update admin_reply
                       set intentos = %s, ultimo_error = %s, estado = %s,

@@ -701,6 +701,11 @@ Un worktree nuevo no trae lo que no se versiona.
     transacción documentado. Sin textos nuevos ni cambios de permisos. TDD
     parcial declarado por el escritor. Toque a `main`: `ciclo.py`
     (savepoint). Suite del escritor: `1323 passed, 108 deselected`.
+    Rebase sobre `main` (`4f41c0c`) con un conflicto de una línea de
+    `import` en `despachador.py` (`main` agregó `redactar_secreto_telegram`);
+    resolución aprobada por el usuario: unir la línea sin tocar `main` y
+    aplicar la misma protección a `despachar_respuestas_admin`, que guardaba
+    el error con el token del bot (RED observado → GREEN).
   - [ ] **G1d — Avisos "🛠️ Administración" por el bot de administración.**
     Camino de salida propio (hoy el bot de administración no envía nada y
     `message_outbox` exige `workspace_id`); botones Reenviar correo /

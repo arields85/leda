@@ -1137,6 +1137,29 @@ def test_despachar_respuestas_admin_reintenta_si_el_transporte_falla(conn):
     assert fila["ultimo_error"]
 
 
+def test_despachar_respuestas_admin_no_guarda_el_token_del_bot_en_el_error(conn):
+    """Mismo resguardo que `main` aplica a `admin_notice` (5a6c82a): el
+    error de un envío fallido puede traer la URL con el token del bot, y
+    lo que se guarda en `ultimo_error` nunca lo lleva."""
+    _insertar_admin_reply(conn, 672010)
+    secreto = "123456789:AAHsecretoDelBotDeAdministracion_xyz"
+
+    class TransporteQueFiltra:
+        def enviar(self, chat_id, texto, botones=None):
+            raise RuntimeError(
+                f"Error en https://api.telegram.org/bot{secreto}/sendMessage")
+
+    with admin(conn) as cur:
+        despachador.despachar_respuestas_admin(
+            cur, TransporteQueFiltra(), datetime.now(timezone.utc))
+        cur.execute("select ultimo_error from admin_reply limit 1")
+        fila = cur.fetchone()
+    conn.commit()
+
+    assert fila["ultimo_error"]
+    assert secreto not in fila["ultimo_error"]
+
+
 def test_despachar_respuestas_admin_agotado_registra_incidente(conn):
     """B: agotar `MAX_INTENTOS` deja un incidente apuntando a la fila de
     `admin_reply` que se agotó -- nunca desaparece en silencio."""
