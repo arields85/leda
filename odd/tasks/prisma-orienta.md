@@ -3643,3 +3643,13 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   tests/test_capacidades.py tests/test_task_intake.py` -> `102 passed`. Suite completa
   (escritor, dos veces): `1037 passed, 108 deselected`. **Migración 0017 no aplicada a
   la base `prisma`**: aplicarla antes de reiniciar el listener.
+  Revisión del tramo `cb9cd2d..dd6ab0a` (hallazgo 10, `b-0005-b`, #28): medio,
+  `review_due`; consentimiento del usuario: revisar. review-1b0a5a4777341c90
+  (confiabilidad) aprobada y reconocida; frontera en `dd6ab0a`. Dos WARNING reales
+  -> **#28b**, primero en la próxima sesión: sin espera entre reintentos, un aviso al
+  administrador que agota sus intentos queda `fallido` sin incidente ni aviso (viola
+  "nunca fallar en silencio"); `local._obtener_transporte_admin` cachea la ausencia del
+  token para toda la vida del proceso.
+
+- 2026-09-28: **Cierre de sesión.** Punto exacto para retomar en `docs/STATUS.md`
+  ("Punto exacto para retomar"). Tercera ronda por Telegram pendiente.

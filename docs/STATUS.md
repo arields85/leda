@@ -64,8 +64,8 @@ tales. Ver [`INDEX.md`](INDEX.md#documentos-superados).
 | Campo | Valor |
 |---|---|
 | Comando | `.venv\Scripts\python.exe -m pytest -q` |
-| Fecha | 2026-09-27 |
-| Resultado exacto | 1008 passed, 108 deselected. |
+| Fecha | 2026-09-28 |
+| Resultado exacto | 1037 passed, 108 deselected. |
 
 Seguimientos de la entrega con evidencia (T6a-T6j), siembra reproducible (T7, T7b) y
 comprobadores del banco, `odd/tasks/prisma-orienta.md`: `1008 passed, 108
@@ -188,26 +188,48 @@ serializan y la hora de cada evento, evidencia y aprobación es la de escritura
 (`0016`). Decisiones del usuario registradas como enmiendas de ADR 0009. Prueba de punta
 a punta de "Pedir cambios" por el webhook. Todo esto **todavía no se probó en vivo**.
 
+**Punto exacto para retomar (cierre de sesión 2026-09-28).** Árbol limpio en `main`,
+frontera de revisión en `dd6ab0a` (review-1b0a5a4777341c90 aprobada y reconocida).
+`main` está por delante de `origin/main` (sin push). Base local de trabajo: `prisma`,
+creada desde el esquema hasta `0016` y sembrada (`PRUEBA-LOCAL.md` §5); la base
+`postgres` conserva los datos de las sesiones 1 y 2, con respaldo
+`db/respaldos/prisma-antes-base-nueva-20260928.dump`. En esta sesión, además de lo de
+arriba: hallazgo 10 (una pregunta descartada no se reabre, `7e816b6`), `b-0005-b`
+(el router reformula referencias, banco real 29 -> 32 aprobados sin empeorar ninguno,
+`844a471`) y cada incidente avisa también al administrador por el bot de
+administración (`dd6ab0a`, migración `0017`).
+
 Próximo, en este orden:
 
-1. **Tercera ronda corta por Telegram** (entrega con evidencia y "Pedir cambios"), sobre
-   una **base nueva** creada desde `db/esquema.sql` y sembrada con
-   `python -m prisma sembrar corework --semilla espacios/corework.semilla-ficticia.yaml`
-   (T7): pasos en `PRUEBA-LOCAL.md` §5, que corre el usuario (respaldo, crear la base,
-   cambiar el nombre de la base en `.env`, esquema, importar, feriados, sembrar,
-   enlaces, escuchar). Los títulos ya no llevan "(simulado)".
-2. El hallazgo 10 (Prisma retoma una pregunta que la persona descartó) y los
-   seguimientos de las etiquetas (review-149a33fa).
-3. La reformulación de referencias por el modelo para `b-0005-b` (decisión del usuario:
-   ni bajar el umbral de Jev ni pasarle más contexto), medida con el banco real
-   completo sin empeorar ningún escenario.
-4. El validador diario de invariantes
-   ([`odd/tasks/validador-invariantes.md`](../odd/tasks/validador-invariantes.md),
-   propuesto tras el experimento 1).
-5. Recuperación del pack de la implementación anterior, en `main`: indicador de
-   "escribiendo" y borrador nativo sin demorar respuestas (pack 05), saludo, tono e
-   íconos por categoría en los botones (pack 06). El alta con correo y Google avanzan en
-   la rama auxiliar.
+1. **#28b** (review-1b0a5a47, antes de usar los avisos en serio): `despachar_avisos_admin`
+   reintenta sin espera y un aviso que agota sus intentos queda `fallido` sin incidente
+   ni aviso -- viola "nunca fallar en silencio"; el transporte del bot de administración
+   se prueba una sola vez por proceso y no toma el token si se configura después;
+   probar el paso a `fallido`.
+2. **Preparar la base `prisma` para la ronda:** respaldo, aplicar
+   `db/migrations/0017_aviso_incidente_administracion.sql` (la base se creó con el
+   esquema hasta `0016`), configurar `PRISMA_BOT_TOKEN_ADMIN` en `.env` (el usuario), y
+   que el administrador le escriba una vez al bot de administración (Telegram no deja
+   que el bot inicie la conversación). Reiniciar el listener para que cargue el código
+   commiteado.
+3. **Tercera ronda corta por Telegram** (entrega con evidencia y "Pedir cambios"):
+   guion de dos circuitos en `odd/tasks/prisma-orienta.md` (entrada "la tercera ronda
+   por Telegram queda pendiente"), con Ismael, Ariel y Marcos ya vinculados.
+4. **#29** unificar en `escuchar` (y en `servir`) las rutinas programadas, el despacho
+   de la cola y de los avisos al administrador (en `servir` hoy nadie despacha
+   `message_outbox` ni `admin_notice`: `reloj.py` sólo encola), con opción para apagar
+   las cadencias en pruebas; después **#23** el validador de invariantes
+   (`odd/tasks/validador-invariantes.md`: cada 30 minutos los urgentes, una vez por día
+   los estructurales, a mano, aviso único por violación al administrador).
+5. Escenarios del banco que fallan desde antes de `b-0005-b`: `b-0001`, `b-0001-a`,
+   `b-0002-c`, `b-0013`.
+6. Recuperación del pack en `main`: indicador de "escribiendo" y borrador nativo sin
+   demorar respuestas (pack 05); saludo, tono e íconos por categoría en los botones
+   (pack 06). Menores: T7d (`sembrar`).
+
+La rama auxiliar `auxiliar/alta-y-google` avanza en su sesión (alta con correo y
+Google); `main` cambió mucho desde que se creó, así que le toca traer los cambios de
+`main` antes de su próxima rebanada.
 
 Abierto, sin bloquear:
 
