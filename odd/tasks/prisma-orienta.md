@@ -3515,3 +3515,12 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   de validación; falta una prueba del día de siembra en la zona del espacio; las
   pruebas del comando buscan "Traceback" en `stdout` cuando va a `stderr`; tipar las
   tareas validadas. Ninguno afecta una siembra con el archivo versionado.
+
+- 2026-09-28 (orquestador): **pasos 1 y 2 de `PRUEBA-LOCAL.md` §5 hechos.** Respaldo
+  `db/respaldos/prisma-antes-base-nueva-20260928.dump` (263.842 bytes, formato
+  personalizado de `pg_dump` sobre la base `postgres`; `pg_restore -l` lo lee: 46
+  entradas de datos, entre ellas `task`, `task_state_event`, `approval`, `evidence`;
+  no se ensayó una restauración completa de este archivo). Base vacía `prisma`
+  creada en el mismo servidor. La base `postgres` sigue intacta (12 tareas). Sin
+  imprimir la URL ni credenciales (cargadas como las carga la suite). Quedan para el
+  usuario los pasos 3 a 7.
