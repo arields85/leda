@@ -25,8 +25,8 @@ import psycopg
 
 from . import saludo
 from .calendario import Calendario
-from .incidentes import (REFERENCIA_ADMIN_NOTICE, redactar_secreto_telegram,
-                         registrar_incidente)
+from .incidentes import (REFERENCIA_ADMIN_NOTICE, REFERENCIA_ADMIN_REPLY,
+                         redactar_secreto_telegram, registrar_incidente)
 from .salida import prepare_buttons, prepare_payload
 
 
@@ -526,7 +526,13 @@ def despachar_avisos_admin(cur: psycopg.Cursor, transporte: Transporte,
     Reusable por el validador de invariantes diario que se agregue después
     (`odd/tasks/validador-invariantes.md`): el mismo camino que entrega un
     aviso de incidente entrega cualquier otro aviso que ese proceso encole
-    en `admin_notice`.
+    en `admin_notice` -- y, desde la unificación de G1d con esta unidad
+    (decisión del usuario, 2026-09-28), también entrega los avisos "🛠️
+    Administración" (`aviso_administrativo`, vía `avisos_admin`) y las
+    respuestas puntuales del bot de administración: todos comparten esta
+    misma cola y este mismo despacho, con o sin botones
+    (`admin_notice.botones`, `null` para lo que no lleva ninguno -- todo lo
+    de antes de esa unificación).
 
     El registro de ESE incidente corre en un punto de retorno propio
     (SAVEPOINT, mismo patrón que `agente._ejecutar_una`) -- hallazgo R3-002
@@ -542,7 +548,7 @@ def despachar_avisos_admin(cur: psycopg.Cursor, transporte: Transporte,
                "incidentes_sin_registrar": 0}
 
     cur.execute(
-        """select id, workspace_id, chat_id, cuerpo, intentos
+        """select id, workspace_id, chat_id, cuerpo, intentos, botones
              from admin_notice
             where estado = 'listo' and programado_para <= %s
             order by programado_para
@@ -552,8 +558,14 @@ def despachar_avisos_admin(cur: psycopg.Cursor, transporte: Transporte,
     pendientes = cur.fetchall()
 
     for n in pendientes:
+        # `botones` (G1d unificado con esta unidad, 2026-09-28): un aviso de
+        # incidente nunca los lleva (`null`), así que su entrega no cambia;
+        # un aviso "🛠️ Administración" o una respuesta puntual del bot de
+        # administración pueden traer los suyos.
+        botones = ([Boton(b["etiqueta"], b["callback_data"]) for b in n["botones"]]
+                  if n["botones"] else None)
         try:
-            tg_id = transporte.enviar(n["chat_id"], n["cuerpo"])
+            tg_id = transporte.enviar(n["chat_id"], n["cuerpo"], botones)
         except Exception as e:  # noqa: BLE001 — se registra, no se propaga
             intentos = n["intentos"] + 1
             agotado = intentos >= MAX_INTENTOS
@@ -594,6 +606,93 @@ def despachar_avisos_admin(cur: psycopg.Cursor, transporte: Transporte,
 
         cur.execute(
             """update admin_notice
+                  set estado = 'enviado', enviado_en = %s, telegram_message_id = %s
+                where id = %s""",
+            (ahora, tg_id, n["id"]))
+        resumen["enviados"] += 1
+
+    return resumen
+
+
+def despachar_respuestas_admin(cur: psycopg.Cursor, transporte: Transporte,
+                               ahora: datetime | None = None,
+                               lote: int = 50) -> dict[str, int]:
+    """Entrega las respuestas puntuales del bot de administración
+    (`admin_reply`, G1d unificado con T28, decisión del usuario,
+    2026-09-28): confirmación de un botón ("Marcado como leído.", "Listo,
+    habilitado.", ...), la guía breve ante texto libre, el aviso neutral de
+    la propia red de contención del canal.
+
+    Aparte de `admin_notice`/`despachar_avisos_admin` a propósito: una
+    respuesta puntual es sólo para EL administrador que la disparó -- nunca
+    un fan-out a todos los alcanzables -- así que no necesita guardar a qué
+    administrador en particular corresponde, ni una referencia obligatoria a
+    un incidente o un aviso administrativo. "Un solo camino hacia la
+    administración" es un solo despacho (`ciclo.despachar_admin` llama a los dos, bajo el mismo
+    `admin()` y el mismo commit), no necesariamente una sola tabla --
+    dividir en dos evita que una respuesta puntual se mezcle con la cuenta
+    de avisos de incidente que ya hacían pruebas existentes sobre
+    `admin_notice` (T28) antes de que este aviso administrativo existiera.
+
+    Mismo backoff y mismo criterio de "nunca fallar en silencio" que
+    `despachar_avisos_admin` -- ver ahí el porqué de cada paso; no se repite
+    acá."""
+    ahora = ahora or datetime.now(timezone.utc)
+    resumen = {"enviados": 0, "fallidos": 0, "agotados": 0,
+               "incidentes_sin_registrar": 0}
+
+    cur.execute(
+        """select id, chat_id, cuerpo, intentos, botones
+             from admin_reply
+            where estado = 'listo' and programado_para <= %s
+            order by programado_para
+            limit %s
+            for update skip locked""",
+        (ahora, lote))
+    pendientes = cur.fetchall()
+
+    for n in pendientes:
+        botones = ([Boton(b["etiqueta"], b["callback_data"]) for b in n["botones"]]
+                  if n["botones"] else None)
+        try:
+            tg_id = transporte.enviar(n["chat_id"], n["cuerpo"], botones)
+        except Exception as e:  # noqa: BLE001 — se registra, no se propaga
+            intentos = n["intentos"] + 1
+            agotado = intentos >= MAX_INTENTOS
+            estado = "fallido" if agotado else "listo"
+            proximo = None if agotado else _proximo_intento_admin(intentos, ahora)
+            ultimo_error = str(e)[:500]
+            cur.execute(
+                """update admin_reply
+                      set intentos = %s, ultimo_error = %s, estado = %s,
+                          programado_para = coalesce(%s, programado_para)
+                    where id = %s""",
+                (intentos, ultimo_error, estado, proximo, n["id"]))
+            resumen["fallidos"] += 1
+            if agotado:
+                resumen["agotados"] += 1
+                try:
+                    with cur.connection.transaction(force_rollback=False):
+                        registrar_incidente(
+                            cur, None,
+                            f"Una respuesta del bot de administración no se pudo "
+                            f"entregar tras {MAX_INTENTOS} intentos.",
+                            severidad="alta", referencia_cruda=ultimo_error,
+                            referencia_tipo=REFERENCIA_ADMIN_REPLY,
+                            referencia_id=n["id"], chat_id=n["chat_id"],
+                            avisar_admin=False)
+                except Exception as exc_incidente:  # noqa: BLE001 — se aísla, no se propaga
+                    resumen["incidentes_sin_registrar"] += 1
+                    cur.execute(
+                        """update admin_reply
+                              set ultimo_error = ultimo_error || %s
+                            where id = %s""",
+                        (f" · incidente no registrado: "
+                         f"{type(exc_incidente).__name__}", n["id"]))
+            continue
+
+        cur.execute(
+            """update admin_reply
                   set estado = 'enviado', enviado_en = %s, telegram_message_id = %s
                 where id = %s""",
             (ahora, tg_id, n["id"]))
