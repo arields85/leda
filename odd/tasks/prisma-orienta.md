@@ -3605,3 +3605,15 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   comprobador). Determinista: `tests/test_llm_protocol.py
   tests/test_resolucion_referencias.py` -> `139 passed` (reejecutado por el
   orquestador); suite completa (escritor): `1027 passed, 108 deselected`.
+
+- 2026-09-28 (usuario): **la tercera ronda por Telegram queda pendiente para la próxima
+  sesión.** No se llegó a probar ningún circuito. La base `prisma` queda lista y
+  sembrada (12 tareas: seis `en_curso`, seis `asignada`, una dependencia bloqueante),
+  con Ismael, Ariel y Marcos ya vinculados. Guion de la ronda: circuito A (Ariel
+  entrega "Dashboard de lotes en CoreLabs" con evidencia -> Ismael pide cambios -> Ariel
+  vuelve a entregar con evidencia nueva -> el botón viejo del aviso dice que ya no
+  está vigente -> Ismael aprueba desde el aviso nuevo y la tarea se cierra) y circuito
+  B (Marcos entrega "Revisar comunicaciones industriales de la comprimidora", que
+  depende de "Programar PLC" sin terminar -> Ismael pide cambios y la tarea vuelve a
+  `en_curso`). Antes de arrancar: reiniciar el listener para que cargue el código ya
+  commiteado.
