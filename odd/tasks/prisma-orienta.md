@@ -3617,3 +3617,29 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   depende de "Programar PLC" sin terminar -> Ismael pide cambios y la tarea vuelve a
   `en_curso`). Antes de arrancar: reiniciar el listener para que cargue el código ya
   commiteado.
+
+- 2026-09-28: **#28 cerrada — cada incidente se avisa también al administrador de
+  plataforma** (decisión del usuario; `nucleo/constitucion.md` §10 ya lo exigía y no se
+  cumplía: hasta hoy sólo se avisaba a la persona afectada). Ruta: delegada, un
+  escritor; corrección del usuario a mitad de camino: el aviso incluye el texto que
+  disparó la falla (constitución §2: el administrador accede a las conversaciones;
+  §12: ese acceso se audita). `message_outbox` no sirve para esto (exige espacio y
+  membresía; los administradores son globales), así que hay tabla nueva
+  `admin_notice` y función `security definer` `avisar_incidente_admin` (mismo patrón
+  que `emitir_acceso_tablero`), columna `incident.notificado_admin_en`, migración
+  `db/migrations/0017_aviso_incidente_administracion.sql` y su rollback. Un único punto
+  de entrada, `src/prisma/incidentes.registrar_incidente()`, reemplaza los `insert into
+  incident` repartidos. El aviso lleva el texto de la persona (o el resumen de la acción
+  tocada) hasta 1000 caracteres, quién, etapa, severidad, resumen saneado, id,
+  espacio y hora; nunca `referencia_cruda` (puede traer secretos). Cada aviso deja una
+  fila de `audit_log` (`aviso_incidente_admin`, sólo ids). Alcanzable = el
+  administrador ya le escribió alguna vez al bot de administración (Telegram no deja
+  que un bot inicie la conversación). `local.tareas_de_fondo` despacha los avisos
+  con `despachador.despachar_avisos_admin`; sin `PRISMA_BOT_TOKEN_ADMIN` quedan en cola.
+  Hallazgo lateral: en modo `servir` nadie despacha `message_outbox` ni
+  `admin_notice` (`reloj.py` sólo encola) -- entra en #29. RED/GREEN observado (el RED
+  encontró que la auditoría no recibía la referencia). Enfocada (reejecutada por el
+  orquestador): `tests/test_avisos_admin.py tests/test_gateway.py
+  tests/test_capacidades.py tests/test_task_intake.py` -> `102 passed`. Suite completa
+  (escritor, dos veces): `1037 passed, 108 deselected`. **Migración 0017 no aplicada a
+  la base `prisma`**: aplicarla antes de reiniciar el listener.

@@ -23,8 +23,9 @@ import httpx
 
 from .calendario import Calendario
 from .config import config
-from .db import conectar_autoridad, espacio
-from .despachador import TransporteTelegram, despachar
+from .db import admin, conectar_autoridad, espacio
+from .despachador import (Transporte, TransporteTelegram, despachar,
+                          despachar_avisos_admin)
 from .gateway import (ETAPA_TOQUE_BOTON, ETAPA_TURNO_TEXTO, procesar_update,
                       reportar_incidente_no_manejado)
 from .reloj import ejecutar_cadencia, ejecutar_escalera
@@ -62,6 +63,8 @@ class Escucha:
         self.offset = 0
         self.transporte = TransporteTelegram(token, cliente=httpx.Client(timeout=15))
         self.authority_conn = authority_conn
+        self._transporte_admin: Transporte | None = None
+        self._transporte_admin_probado = False
 
     # -- ciclo -------------------------------------------------------------
 
@@ -118,6 +121,23 @@ class Escucha:
                 _imprimir(f"  ! no se pudo procesar: {type(e).__name__}")
         return len(updates)
 
+    def _obtener_transporte_admin(self) -> Transporte | None:
+        """El bot de administración es opcional en desarrollo local: si
+        `PRISMA_BOT_TOKEN_ADMIN` no está configurado, los avisos de
+        incidente quedan encolados en `admin_notice` igual (los arma
+        `incidentes.registrar_incidente`) y se entregan solos en cuanto se
+        configure el token, sin perder nada mientras tanto."""
+        if self._transporte_admin_probado:
+            return self._transporte_admin
+        self._transporte_admin_probado = True
+        try:
+            token = config.token_bot("admin")
+        except LookupError:
+            return None
+        self._transporte_admin = TransporteTelegram(
+            token, cliente=httpx.Client(timeout=15))
+        return self._transporte_admin
+
     def tareas_de_fondo(self, ahora: datetime | None = None) -> dict[str, int]:
         ahora = ahora or datetime.now(timezone.utc)
         with espacio(self.conn, self.ws) as cur:
@@ -127,6 +147,18 @@ class Escucha:
         self.conn.commit()
         for _ in range(resumen["enviados"]):
             _imprimir("  → enviado")
+
+        # El aviso a la administración (T28, Constitución §10) no está
+        # acotado a este espacio -- puede venir de cualquiera, o de ninguno
+        # -- así que se despacha aparte, bajo rol `prisma_admin`.
+        transporte_admin = self._obtener_transporte_admin()
+        if transporte_admin is not None:
+            with admin(self.conn) as cur:
+                resumen_admin = despachar_avisos_admin(cur, transporte_admin, ahora)
+            self.conn.commit()
+            resumen["avisos_admin_enviados"] = resumen_admin["enviados"]
+            for _ in range(resumen_admin["enviados"]):
+                _imprimir("  → aviso admin enviado")
         return resumen
 
     def correr_cadencia(self, nombre: str, ahora: datetime | None = None) -> int:

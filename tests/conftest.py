@@ -123,7 +123,7 @@ def conn(uri):
                      escalation_route, cadence_job, glossary_term, holiday,
                      work_calendar, persona_config, workspace_setting,
                      workspace_version, workspace, app_user, platform_role,
-                     audit_log, incident
+                     audit_log, incident, admin_notice
             restart identity cascade""")
     c.commit()
     c.close()

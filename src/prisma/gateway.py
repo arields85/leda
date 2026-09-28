@@ -22,6 +22,8 @@ from .config import config
 from .db import (admin, autoridad, conectar, conectar_autoridad, espacio,
                  registrar_auditoria)
 from .despachador import acusar_toque, mantener_chat_activo
+from .incidentes import (REFERENCIA_INBOUND_MESSAGE, REFERENCIA_PENDING_ACTION,
+                         registrar_incidente)
 from .salida import TRUNCAR_ETIQUETA_BOTON as TRUNCAR_TITULO_BOTON
 from .salida import (enqueue_outbox, etiquetas_boton_distinguibles,
                      normalize_visible_text, truncar_etiqueta_boton,
@@ -1391,7 +1393,7 @@ def _mensaje_resultado_menu(cur, quien, herramienta: str, resultado, *,
     se sabe si es cierto."""
     if isinstance(resultado, dict) and ("falta" in resultado or "error" in resultado):
         return resultado.get("falta") or resultado.get("error")
-    _registrar_incidente(
+    registrar_incidente(
         cur, quien.workspace_id,
         f"_ejecutar_accion_menu: resultado inesperado sin excepción de "
         f"'{herramienta}' (ninguna herramienta del menú debería llegar "
@@ -1777,7 +1779,7 @@ def _resolver_referencias_del_turno(cur, quien, texto: str, route,
 
     cliente_jev = jev_modulo.desde_base(config.openrouter_api_key)
     if cliente_jev is None:
-        _incidente_jev_no_configurado(cur, workspace_id)
+        _incidente_jev_no_configurado(cur, workspace_id, quien.app_user_id)
         resultados = {referencia: (None, jev_modulo.JevError(
             "No hay credencial de Jev configurada."))
             for referencia in trabajos}
@@ -2086,18 +2088,20 @@ def _auditar_resolucion(cur, quien, workspace_id: str, resultados: dict) -> None
         detalle=detalle)
 
 
-def _incidente_jev_no_configurado(cur, workspace_id: str) -> None:
+def _incidente_jev_no_configurado(cur, workspace_id: str,
+                                  app_user_id: str | None) -> None:
     """El mensaje traía referencias a tarea pero no hay credencial de Jev
     (`PRISMA_OPENROUTER_API_KEY`): Prisma le pide al modelo que pregunte en
     vez de adivinar (decisión del usuario, 2026-09-24), y esto queda
     registrado para que la falta de configuración no pase inadvertida. Sin
-    secretos ni texto del mensaje, igual que `_routing_incident`."""
-    cur.execute(
-        """insert into incident (workspace_id, severidad, resumen_sanitizado)
-           values (%s, 'media', %s)""",
-        (workspace_id,
-         "El mensaje tenía referencias a tarea, pero no hay credencial de "
-         "Jev configurada (PRISMA_OPENROUTER_API_KEY)."))
+    secretos, igual que `_routing_incident` -- el aviso a la administración
+    SÍ lleva el mensaje que disparó esto (Constitución §2/§10/§12,
+    corrección del usuario, 2026-09-28), nunca la persona."""
+    registrar_incidente(
+        cur, workspace_id,
+        "El mensaje tenía referencias a tarea, pero no hay credencial de "
+        "Jev configurada (PRISMA_OPENROUTER_API_KEY).",
+        app_user_id=app_user_id)
 
 
 def _routing_incident(cur, quien, error) -> None:
@@ -2124,52 +2128,11 @@ ETAPA_TOQUE_BOTON = "toque_boton"
 ETAPA_ACTIVACION = "activacion"
 ETAPA_ACCION_MENU = "accion_menu"
 
-# Qué tipo de fila referencia `incident.referencia_id` -- mismo patrón
-# polimórfico que `audit_log.sujeto_tipo`/`sujeto_id`, sin clave foránea:
-# apunta a texto o a un toque, nunca lo copia (docs/ROADMAP.md: la
-# retención de `inbound_message` es por cliente).
-REFERENCIA_INBOUND_MESSAGE = "inbound_message"
-REFERENCIA_PENDING_ACTION = "pending_action"
-
-
 def _routing_incident(cur, quien, error) -> None:
-    cur.execute(
-        """insert into incident (workspace_id, severidad, resumen_sanitizado)
-           values (%s, 'media', %s)""",
-        (quien.workspace_id,
-         f"Falló el enrutamiento tipado ({type(error).__name__})."),
-    )
-
-
-def _registrar_incidente(cur, workspace_id: str, resumen: str, *,
-                         severidad: str = "media",
-                         referencia_cruda: str | None = None,
-                         etapa: str | None = None,
-                         referencia_tipo: str | None = None,
-                         referencia_id: str | None = None,
-                         chat_id: int | None = None,
-                         app_user_id: str | None = None,
-                         notificado_en=None) -> None:
-    """Inserta un incidente sanitizado -- decisión del usuario, 2026-09-25:
-    un error nunca pasa en silencio, y el incidente tiene que hacer
-    encontrable la causa (corrección posterior del usuario, misma fecha).
-
-    `resumen` es legible para una persona y no lleva texto de mensajes;
-    `referencia_cruda` es la traza técnica completa (tipo y mensaje de la
-    excepción), sólo para quien administra. `referencia_tipo` +
-    `referencia_id` apuntan a la fila que originó esto -- el
-    `inbound_message` o la `pending_action` -- sin copiar su contenido: el
-    texto se abre desde ahí, bajo la retención por cliente que define
-    `docs/ROADMAP.md`. Helper compartido para que quien necesite registrar
-    un incidente no arme el `insert` a mano en cada lugar nuevo."""
-    cur.execute(
-        """insert into incident (workspace_id, severidad, resumen_sanitizado,
-                                 referencia_cruda, etapa, referencia_tipo,
-                                 referencia_id, chat_id, app_user_id,
-                                 notificado_en)
-           values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
-        (workspace_id, severidad, resumen, referencia_cruda, etapa,
-         referencia_tipo, referencia_id, chat_id, app_user_id, notificado_en))
+    registrar_incidente(
+        cur, quien.workspace_id,
+        f"Falló el enrutamiento tipado ({type(error).__name__}).",
+        app_user_id=quien.app_user_id)
 
 
 def reportar_incidente_no_manejado(conn, *, workspace_id: str | None,
@@ -2250,7 +2213,7 @@ def reportar_incidente_no_manejado(conn, *, workspace_id: str | None,
 
     try:
         with espacio(conn, workspace_id) as cur:
-            _registrar_incidente(
+            registrar_incidente(
                 cur, workspace_id, resumen, severidad="alta",
                 referencia_cruda=str(error)[:2000], etapa=etapa,
                 referencia_tipo=referencia_tipo, referencia_id=referencia_id,

@@ -24,6 +24,7 @@ from typing import NamedTuple, Protocol
 import psycopg
 
 from .calendario import Calendario
+from .incidentes import registrar_incidente
 from .salida import prepare_buttons, prepare_payload
 
 
@@ -368,6 +369,62 @@ def despachar(cur: psycopg.Cursor, workspace_id: str, transporte: Transporte,
     return resumen
 
 
+def despachar_avisos_admin(cur: psycopg.Cursor, transporte: Transporte,
+                           ahora: datetime | None = None,
+                           lote: int = 50) -> dict[str, int]:
+    """Entrega los avisos de incidente encolados para la administración de
+    plataforma (`admin_notice`, T28, Constitución §10).
+
+    Corre bajo rol `prisma_admin`: un aviso no tiene un único espacio dueño
+    -- puede venir de cualquiera, o de ninguno (incidente global) -- así que
+    no hay un `espacio()` que lo acote, a diferencia de `despachar`.
+
+    No aplica el calendario ni el tope diario de `despachar`: esa mecánica
+    protege a un integrante de un equipo de mensajes automáticos fuera de
+    horario; esto es una alerta operativa para quien administra la
+    plataforma, no un mensaje de cadencia.
+
+    Reusable por el validador de invariantes diario que se agregue después
+    (`odd/tasks/validador-invariantes.md`): el mismo camino que entrega un
+    aviso de incidente entrega cualquier otro aviso que ese proceso encole
+    en `admin_notice`."""
+    ahora = ahora or datetime.now(timezone.utc)
+    resumen = {"enviados": 0, "fallidos": 0}
+
+    cur.execute(
+        """select id, chat_id, cuerpo, intentos
+             from admin_notice
+            where estado = 'listo' and programado_para <= %s
+            order by programado_para
+            limit %s
+            for update skip locked""",
+        (ahora, lote))
+    pendientes = cur.fetchall()
+
+    for n in pendientes:
+        try:
+            tg_id = transporte.enviar(n["chat_id"], n["cuerpo"])
+        except Exception as e:  # noqa: BLE001 — se registra, no se propaga
+            intentos = n["intentos"] + 1
+            estado = "fallido" if intentos >= MAX_INTENTOS else "listo"
+            cur.execute(
+                """update admin_notice
+                      set intentos = %s, ultimo_error = %s, estado = %s
+                    where id = %s""",
+                (intentos, str(e)[:500], estado, n["id"]))
+            resumen["fallidos"] += 1
+            continue
+
+        cur.execute(
+            """update admin_notice
+                  set estado = 'enviado', enviado_en = %s, telegram_message_id = %s
+                where id = %s""",
+            (ahora, tg_id, n["id"]))
+        resumen["enviados"] += 1
+
+    return resumen
+
+
 def _fallo(cur, workspace_id: str, m, error: Exception, cal: Calendario,
            ahora: datetime) -> None:
     intentos = m["intentos"] + 1
@@ -380,11 +437,10 @@ def _fallo(cur, workspace_id: str, m, error: Exception, cal: Calendario,
             where id = %s""",
         (intentos, str(error)[:500], estado, proximo, m["id"]))
     if estado == "fallido":
-        cur.execute(
-            """insert into incident (workspace_id, severidad, resumen_sanitizado)
-               values (%s, 'alta', %s)""",
-            (workspace_id,
-             f"Un mensaje no se pudo entregar tras {MAX_INTENTOS} intentos."))
+        registrar_incidente(
+            cur, workspace_id,
+            f"Un mensaje no se pudo entregar tras {MAX_INTENTOS} intentos.",
+            severidad="alta")
 
 
 def _ya_recibio(cur, membership_id: str, ahora: datetime) -> int:

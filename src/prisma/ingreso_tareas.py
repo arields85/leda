@@ -15,6 +15,7 @@ from psycopg.types.json import Jsonb
 
 from .autoridad import Solicitante
 from .db import registrar_auditoria
+from .incidentes import registrar_incidente
 from .salida import (BUTTON_TEXT_LIMIT, PayloadValidationError, enqueue_outbox,
                      normalize_visible_text, prepare_buttons, prepare_payload,
                      telegram_utf16_units, with_no_effect_status)
@@ -568,12 +569,10 @@ def _evidence_deliverable(items) -> bool:
 
 def _configuration_error(cur, request, who, field, now):
     request_id = str(request["id"])
-    cur.execute(
-        """insert into incident (workspace_id, severidad, resumen_sanitizado)
-           values (%s, 'media', %s)""",
-        (who.workspace_id,
-         "Una opción configurada del intake excede el contrato visible."),
-    )
+    registrar_incidente(
+        cur, who.workspace_id,
+        "Una opción configurada del intake excede el contrato visible.",
+        app_user_id=who.app_user_id)
     registrar_auditoria(
         cur, accion="configuracion_intake_invalida",
         workspace_id=who.workspace_id,

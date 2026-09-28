@@ -1247,6 +1247,11 @@ create table incident (
   referencia_cruda     text,
   at                   timestamptz not null default now(),
   notificado_en        timestamptz,
+  -- Aviso a la administración de plataforma (Constitución §10; T28, decisión
+  -- del usuario, 2026-09-28): igual que `notificado_en` para la persona
+  -- afectada, nunca queda puesto si nadie fue avisado de verdad. Lo llena
+  -- `incidentes.registrar_incidente`, nunca a mano.
+  notificado_admin_en  timestamptz,
   -- Trazabilidad (T2b, corrección del usuario sobre incidentes, 2026-09-25):
   -- el incidente tiene que hacer encontrable la causa, sin copiar texto de
   -- conversación. `etapa` es el punto de entrada donde se atrapó la
@@ -1363,6 +1368,115 @@ create table conversation_access_log (
   sujeto_app_user_id  uuid references app_user(id),
   motivo              text
 );
+
+-- =========================================================================
+-- Aviso de incidentes a la administración de plataforma
+--
+-- Constitución §10: "Los incidentes se registran sanitizados y se avisan al
+-- administrador de plataforma por su canal." T28 (decisión del usuario,
+-- 2026-09-28) es la primera unidad que lo cumple: hasta acá sólo se avisaba
+-- a la persona afectada (`gateway.NOTICIA_NEUTRA_INCIDENTE`) y quien
+-- administra la plataforma tenía que correr `python -m prisma incidentes
+-- <slug>` para enterarse.
+-- =========================================================================
+
+-- Cola de salida del bot de administración. Vive aparte de `message_outbox`
+-- a propósito: esa cola es por espacio (`workspace_id not null`, y
+-- `destinatario_membership_id` referencia una `membership`, que también es
+-- por espacio), y un administrador de plataforma no tiene por qué ser
+-- integrante de ningún equipo -- se lo identifica por `platform_role` +
+-- `app_user`, ambas globales. `incident_id` no lleva clave foránea a
+-- propósito, mismo patrón que `incident.referencia_id`: lo llena
+-- `avisar_incidente_admin` ANTES de que exista la fila de `incident` (la
+-- arma la misma transacción, en ese orden, porque el texto del aviso no
+-- necesita el resumen que arma Python del lado de la aplicación) y una
+-- clave foránea en ese sentido rompería el insert.
+create table admin_notice (
+  id                       uuid primary key default gen_random_uuid(),
+  incident_id              uuid not null,
+  workspace_id             uuid references workspace(id) on delete set null,
+  destinatario_app_user_id uuid not null references app_user(id) on delete cascade,
+  chat_id                  bigint not null,
+  cuerpo                   text not null,
+  estado                   estado_salida not null default 'listo',
+  programado_para          timestamptz not null default now(),
+  enviado_en               timestamptz,
+  telegram_message_id      bigint,
+  dedupe_key               text not null unique,
+  intentos                 integer not null default 0,
+  ultimo_error             text
+);
+
+comment on table admin_notice is
+  'Cola de salida del bot de administración: un aviso por incidente y por administrador de plataforma alcanzable. Sin política de aislamiento por espacio -- no tiene un único espacio dueño -- y sin concesión a prisma_app: sólo la escribe avisar_incidente_admin() (security definer) y sólo la despacha prisma_admin (despachador.despachar_avisos_admin).';
+
+-- Fan-out del aviso de un incidente a cada administrador de plataforma
+-- alcanzable. `security definer`, mismo motivo que `emitir_acceso_tablero`/
+-- `resolver_acceso_tablero`: necesita leer `platform_role` y `audit_log`
+-- (tablas globales, o sin concesión de lectura a prisma_app, que prisma_app
+-- no puede consultar directamente -- mismo motivo por el que existe la
+-- vista `integrante`) desde una sesión que puede estar acotada a un espacio,
+-- o a ninguno (un incidente global, sin cliente en particular).
+--
+-- El texto del aviso (`p_cuerpo`) lo arma Python (`incidentes.py`) ANTES de
+-- llamar acá -- decisión del usuario, 2026-09-28, corrigiendo el alcance
+-- original de esta unidad: el aviso SÍ tiene que incluir qué lo disparó
+-- (Constitución §2, el administrador "accede a las conversaciones privadas
+-- entre Prisma y los integrantes"; §10 exige avisarle sanitizado, no
+-- ocultarle el disparador). Armarlo en Python, no acá, es porque necesita
+-- leer `inbound_message`/`pending_action` (ya concedidas a `prisma_app`,
+-- sin falta de elevación) y la vista `integrante` -- nada que justifique
+-- `security definer` para esa parte.
+--
+-- "Alcanzable" es haberle escrito al menos una vez al bot de administración
+-- (`gateway.procesar_update`, canal ADMINISTRACION, `accion = 'mensaje_admin'`
+-- en `audit_log`): Telegram no deja que un bot le escriba primero a alguien
+-- que nunca le escribió, así que sin ese registro no hay a qué chat_id
+-- mandarle nada. Se toma el chat_id del `mensaje_admin` más reciente de
+-- cada administrador.
+--
+-- Devuelve el `app_user_id` de cada administrador AL QUE RECIÉN SE LE
+-- ENCOLÓ un aviso nuevo (nunca el de uno que ya lo tenía por un
+-- reprocesamiento -- `if found` después del `insert ... on conflict do
+-- nothing` lo distingue): Python usa esa lista, y sólo ésa, para dejar un
+-- `audit_log` por cada aviso de verdad nuevo (Constitución §12, "el acceso
+-- del administrador a conversaciones también se registra").
+--
+-- Dedupe por incidente + administrador (`admin_notice.dedupe_key`, único):
+-- reprocesar el mismo incidente no le duplica el aviso a nadie, pero cada
+-- administrador alcanzable recibe el suyo -- por eso la clave combina el id
+-- del incidente con el del administrador, no sólo el primero.
+create function avisar_incidente_admin(
+    p_incident_id uuid, p_workspace_id uuid, p_cuerpo text)
+returns table(app_user_id uuid)
+language plpgsql security definer set search_path = prisma, public, pg_temp as $$
+declare v_admin record;
+begin
+  for v_admin in
+    select distinct on (p.app_user_id) p.app_user_id as app_user_id,
+           nullif(a.detalle->>'chat_id', '')::bigint as chat_id
+      from platform_role p
+      join audit_log a on a.actor_app_user_id = p.app_user_id
+                       and a.accion = 'mensaje_admin'
+     where p.rol = 'administrador'
+     order by p.app_user_id, a.at desc
+  loop
+    if v_admin.chat_id is not null then
+      insert into admin_notice
+        (incident_id, workspace_id, destinatario_app_user_id, chat_id, cuerpo,
+         dedupe_key)
+      values
+        (p_incident_id, p_workspace_id, v_admin.app_user_id, v_admin.chat_id,
+         p_cuerpo,
+         'aviso-admin:' || p_incident_id::text || ':' || v_admin.app_user_id::text)
+      on conflict (dedupe_key) do nothing;
+      if found then
+        app_user_id := v_admin.app_user_id;
+        return next;
+      end if;
+    end if;
+  end loop;
+end $$;
 
 -- =========================================================================
 -- Reglas
@@ -2029,6 +2143,19 @@ revoke execute on function resolver_acceso_tablero(text) from public;
 grant execute on function emitir_acceso_tablero(uuid, text, timestamptz)
   to prisma_app;
 grant execute on function resolver_acceso_tablero(text) to prisma_app;
+
+-- Aviso de incidentes a la administración de plataforma (T28). Mismo motivo
+-- que las dos funciones de arriba: `security definer`, dueño `prisma_owner`,
+-- ejecutable por `prisma_app` (la mayoría de los incidentes se registran
+-- desde una sesión acotada a un espacio) y por `prisma_admin` (la consola y
+-- el validador de invariantes, que corren sin espacio fijado).
+alter function avisar_incidente_admin(uuid, uuid, text)
+  owner to prisma_owner;
+
+revoke execute on function avisar_incidente_admin(uuid, uuid, text)
+  from public;
+grant execute on function avisar_incidente_admin(uuid, uuid, text)
+  to prisma_app, prisma_admin;
 
 -- El agente no consulta app_user directamente: lo haría por encima del
 -- aislamiento, porque esa tabla es global. Usa esta vista, que pasa por

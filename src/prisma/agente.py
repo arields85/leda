@@ -35,6 +35,7 @@ from .calendario import Calendario
 from .contexto import construir, historial, revisar_salida
 from .db import registrar_auditoria
 from .deteccion_pregunta import hace_pregunta
+from .incidentes import registrar_incidente
 from .llm import Llamada, Proveedor, Respuesta
 from .salida import (BUTTON_TEXT_LIMIT, enqueue_outbox,
                      etiquetas_boton_distinguibles, normalize_visible_text,
@@ -813,11 +814,9 @@ def _encolar_opciones_genericas(cur, quien: Solicitante, chat_id: int,
 
 
 def _incidente(cur, quien: Solicitante, error: Exception) -> None:
-    """Registro sanitizado. Al integrante no le llega nada de esto."""
-    cur.execute(
-        """insert into incident (workspace_id, severidad, resumen_sanitizado,
-                                 referencia_cruda)
-           values (%s, 'media', %s, %s)""",
-        (quien.workspace_id,
-         f"Falló un turno de conversación ({type(error).__name__}).",
-         str(error)[:2000]))
+    """Registro sanitizado. Al integrante no le llega nada de esto -- a la
+    administración de plataforma sí (`incidentes.registrar_incidente`)."""
+    registrar_incidente(
+        cur, quien.workspace_id,
+        f"Falló un turno de conversación ({type(error).__name__}).",
+        referencia_cruda=str(error)[:2000], app_user_id=quien.app_user_id)
