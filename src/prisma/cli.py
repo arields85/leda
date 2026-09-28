@@ -46,11 +46,15 @@ def _id_de(conn, slug: str) -> str:
 
 
 def _resolver_integrante(cur, ws: str, nombre: str) -> list[dict]:
-    """Empareja por subcadena, sin importar mayúsculas -- mismo criterio que
-    `onboarding.generar_enlaces` con `--solo` (T7,
-    `odd/tasks/prisma-orienta.md`), pero sobre todo integrante activo del
-    espacio, esté o no vinculado a Telegram: designar administrador no
-    depende de que ya haya activado su cuenta (T11)."""
+    """Empareja por subcadena, sin importar mayúsculas -- mismo punto de
+    partida que `onboarding.generar_enlaces` con `--solo` (T7,
+    `odd/tasks/prisma-orienta.md`), pero además prefiere una coincidencia
+    EXACTA sobre cualquier coincidencia parcial, cosa que `--solo` no hace:
+    otorgar un rol privilegiado no puede quedar ambiguo sólo porque el
+    nombre completo de alguien es substring del de otra persona. Busca
+    sobre todo integrante activo del espacio, esté o no vinculado a
+    Telegram: designar administrador no depende de que ya haya activado su
+    cuenta (T11)."""
     cur.execute(
         """select m.app_user_id, u.nombre, u.telegram_user_id
              from membership m join app_user u on u.id = m.app_user_id

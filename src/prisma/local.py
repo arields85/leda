@@ -18,6 +18,7 @@ import signal
 import sys
 import time
 from datetime import datetime, timedelta, timezone
+from urllib.parse import urlsplit
 
 import httpx
 
@@ -37,6 +38,13 @@ _seguir = True
 # token todavía no aparece -- el listener corre cada unos segundos y sin
 # este tope le pegaría al disco en cada pasada.
 _RELECTURA_DOTENV_CADA = timedelta(minutes=1)
+
+# Cada cuánto `_obtener_transporte_admin` puede volver a consultar
+# `getWebhookInfo` sobre el bot de administración mientras esa consulta
+# sigue sin resolverse a favor (falla, o el bot sigue detrás de un webhook)
+# -- mismo motivo que `_RELECTURA_DOTENV_CADA`: sin este tope, cada vuelta
+# del listener le pegaría a la API de Telegram para nada.
+_RECONSULTA_WEBHOOK_ADMIN_CADA = timedelta(minutes=1)
 
 # Etapa de la red de contención (T11) para un update del canal de
 # administración que se escapó de `gateway.procesar_update` sin que nada
@@ -121,6 +129,8 @@ class Escucha:
         self._token_admin: str | None = None
         self._ultimo_reintento_dotenv: datetime | None = None
         self._avisado_falta_token_admin = False
+        self._ultimo_chequeo_webhook_admin: datetime | None = None
+        self._avisado_webhook_admin_activo = False
 
     # -- ciclo -------------------------------------------------------------
 
@@ -193,9 +203,18 @@ class Escucha:
         if transporte_admin is None:
             return 0
 
+        token_admin = self._token_admin_resuelto()
+        if token_admin is None:
+            # No debería pasar -- `_obtener_transporte_admin` sólo cachea el
+            # transporte junto con el token -- pero nunca en silencio si
+            # pasara (R2-001, revisión 2026-09-28).
+            _imprimir("  ! transporte de administración sin token asociado "
+                      "-- se salta esta vuelta")
+            return 0
+
         try:
             r = self.http.get(
-                f"https://api.telegram.org/bot{self._token_admin}/getUpdates",
+                f"https://api.telegram.org/bot{token_admin}/getUpdates",
                 params={"offset": self.offset_admin, "timeout": 0,
                         "allowed_updates": '["message"]'})
             r.raise_for_status()
@@ -225,6 +244,15 @@ class Escucha:
                 _imprimir(f"  ! no se pudo procesar [admin]: {type(e).__name__}")
         return len(updates)
 
+    def _token_admin_resuelto(self) -> str | None:
+        """El token de administración, sólo cuando ya hay un transporte
+        confirmado -- `_obtener_transporte_admin` cachea los dos juntos, en
+        el mismo momento. Explícito en vez de que `recibir_admin` arme la
+        URL de `getUpdates` leyendo `self._token_admin` como un efecto
+        lateral de esa función (R2-001, revisión 2026-09-28): así esa URL
+        nunca puede terminar armada con `None`."""
+        return self._token_admin if self._transporte_admin is not None else None
+
     def _obtener_transporte_admin(self) -> Transporte | None:
         """El bot de administración es opcional en desarrollo local: si
         `PRISMA_BOT_TOKEN_ADMIN` no está configurado, los avisos de
@@ -233,13 +261,21 @@ class Escucha:
         configure el token, sin perder nada mientras tanto.
 
         Nunca cachea la AUSENCIA del token -- sólo el transporte, una vez
-        que lo encuentra: `config._cargar_dotenv` sólo lee `.env` una vez,
-        al importar el módulo, así que cachear la ausencia dejaría a este
-        proceso sin ver un token agregado después hasta reiniciarlo. Por
-        eso, mientras falta, cada pasada relee `.env`
-        (`config.recargar_dotenv`, sin pisar lo que ya esté en el entorno) —
-        acotado a `_RELECTURA_DOTENV_CADA` para no pegarle al disco en cada
-        vuelta del listener, que corre cada unos segundos."""
+        que lo encuentra y confirma que puede sondearlo (ver más abajo):
+        `config._cargar_dotenv` sólo lee `.env` una vez, al importar el
+        módulo, así que cachear la ausencia dejaría a este proceso sin ver
+        un token agregado después hasta reiniciarlo. Por eso, mientras
+        falta, cada pasada relee `.env` (`config.recargar_dotenv`, sin
+        pisar lo que ya esté en el entorno) -- acotado a
+        `_RELECTURA_DOTENV_CADA` para no pegarle al disco en cada vuelta del
+        listener, que corre cada unos segundos.
+
+        Antes de sondear, sólo CONSULTA `getWebhookInfo` (R1-001, revisión
+        2026-09-28): borrar el webhook a ciegas le robaría los updates a un
+        bot servido por webhook en otro lado, como el de producción. Si hay
+        uno puesto, no lo toca ni sondea, avisa una vez y vuelve a consultar
+        cada `_RECONSULTA_WEBHOOK_ADMIN_CADA`; una consulta fallida se avisa
+        y se reintenta igual, nunca se da por buena."""
         if self._transporte_admin is not None:
             return self._transporte_admin
 
@@ -259,25 +295,42 @@ class Escucha:
                           "configure)")
             return None
 
+        if (self._ultimo_chequeo_webhook_admin is not None
+                and ahora - self._ultimo_chequeo_webhook_admin
+                    < _RECONSULTA_WEBHOOK_ADMIN_CADA):
+            return None
+        self._ultimo_chequeo_webhook_admin = ahora
+
+        try:
+            r = httpx.get(f"https://api.telegram.org/bot{token}/getWebhookInfo",
+                         timeout=15)
+            r.raise_for_status()
+            cuerpo = r.json()
+            if not cuerpo.get("ok"):
+                raise RuntimeError("getWebhookInfo respondió ok=false")
+            webhook_url = (cuerpo.get("result") or {}).get("url") or ""
+        except Exception as e:  # noqa: BLE001
+            _imprimir("  (no se pudo confirmar si el bot de administración "
+                      "tiene un webhook puesto -- se reintenta en una "
+                      f"vuelta posterior: {_error_sin_url(e)})")
+            return None
+
+        if webhook_url:
+            if not self._avisado_webhook_admin_activo:
+                self._avisado_webhook_admin_activo = True
+                host = urlsplit(webhook_url).netloc or "otro servidor"
+                _imprimir(
+                    "  ! el bot de administración ya tiene un webhook puesto "
+                    f"en '{host}' -- no se sondea acá para no robarle los "
+                    "updates (probablemente `servir` en producción). Si es "
+                    "un resto de una prueba local anterior sobre ESTE "
+                    "bot, sacalo a mano (`deleteWebhook`, ver "
+                    "PRUEBA-LOCAL.md) y esta vuelta lo detecta sola.")
+            return None
+
         self._token_admin = token
         self._transporte_admin = TransporteTelegram(
             token, cliente=httpx.Client(timeout=15))
-
-        # Un webhook activo bloquea getUpdates (mismo motivo que en
-        # `escuchar`, más abajo, para el bot del espacio): si quedó uno de
-        # una prueba anterior sobre el bot de administración, se saca la
-        # primera vez que el token aparece -- este bloque sólo corre una vez
-        # por proceso, porque `self._transporte_admin` ya queda cacheado de
-        # acá en más. Nunca en silencio si falla, pero tampoco frena el
-        # listener: `recibir_admin` va a mostrar el problema de nuevo en la
-        # próxima vuelta si el webhook seguía puesto.
-        try:
-            httpx.post(f"https://api.telegram.org/bot{token}/deleteWebhook",
-                      timeout=15)
-        except Exception as e:  # noqa: BLE001
-            _imprimir("  (no se pudo confirmar que el bot de administración "
-                      f"no tenga un webhook puesto: {_error_sin_url(e)})")
-
         return self._transporte_admin
 
     def tareas_de_fondo(self, ahora: datetime | None = None) -> dict[str, int]:

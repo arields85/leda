@@ -3727,3 +3727,18 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   dos pruebas, orquestador: `1053 passed, 108 deselected`. Pendiente del
   administrador: el bot no le responde nada cuando le escribe (sólo identifica y
   audita), así que no hay confirmación visible de que quedó vinculado.
+  Revisión de `d50b385..ce78ba4`: alto (`high_risk`, 914 líneas); consentimiento del
+  usuario: revisar. review-ba8899a3e4982579 (4 lentes) aprobada y reconocida; frontera
+  en `ce78ba4`. Hallazgos no bloqueantes -> #11b.
+
+- 2026-09-28: **#11b cerrada — seguimientos de review-ba8899a3.** Ruta: delegada, un
+  escritor. R1-001/R4-001/R3-002: `escuchar` ya no borra a ciegas el webhook del bot de
+  administración; consulta `getWebhookInfo` y, si hay uno puesto, no lo toca ni sondea,
+  avisa una vez (sólo el host) y vuelve a consultar cada minuto; una consulta fallida se
+  avisa y se reintenta. R2-001: `_token_admin_resuelto` hace explícito el token.
+  R2-002/R2-003: docstrings corregidos. R3-001: la prueba del savepoint ahora falla
+  dentro de la base (`select 1/0`); sin el savepoint da `InFailedSqlTransaction` (ROJO
+  observado), con él pasa. `PRUEBA-LOCAL.md` explica cómo sacar a mano un webhook viejo
+  del bot de administración local. Suite completa (escritor): `1056 passed, 108
+  deselected`. Sin cambios: el `deleteWebhook` del bot del espacio al arrancar
+  `escuchar`, anterior a esta unidad.

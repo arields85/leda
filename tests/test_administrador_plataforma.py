@@ -4,10 +4,12 @@ Hasta esta unidad, nadie podía llegar a ser "alcanzable"
 (`db/esquema.sql`, `avisar_incidente_admin`) en desarrollo local: ningún
 comando otorgaba `platform_role`, sólo lo insertaban las pruebas a mano.
 `python -m prisma administrador <slug> <nombre>` resuelve a la persona por
-nombre entre los integrantes del espacio (mismo criterio de emparejamiento
-por subcadena que `enlaces --solo`, `cli._resolver_integrante`) y le otorga
-el rol de forma idempotente (`on conflict do nothing`), auditando sólo la
-vez que de verdad se otorga.
+nombre entre los integrantes del espacio -- mismo punto de partida que
+`enlaces --solo` (emparejar por subcadena, `cli._resolver_integrante`), pero
+además prefiere una coincidencia exacta sobre cualquier coincidencia
+parcial, cosa que `--solo` no hace -- y le otorga el rol de forma
+idempotente (`on conflict do nothing`), auditando sólo la vez que de verdad
+se otorga.
 
 Cubre: coincidencia única otorga y audita; nombre ambiguo y nombre
 inexistente no otorgan nada y salen con código distinto de cero; una

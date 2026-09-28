@@ -334,3 +334,18 @@ administración. Sin ese mensaje no hay a qué `chat_id` mandarle nada.
 Hacelo mientras el listener está corriendo: Telegram descarta las
 actualizaciones no leídas después de 24 horas, así que un mensaje mandado
 con el listener apagado se puede perder.
+
+**Nunca pongas en `PRISMA_BOT_TOKEN_ADMIN` el token de un bot de
+administración que ya está servido por webhook en otro lado** (p. ej. el
+de producción, el que atiende `servir`): antes de sondear, `escuchar`
+CONSULTA si el bot ya tiene un webhook puesto -- si lo tiene, nunca lo toca
+ni lo sondea, para no robarle los updates a quien lo está sirviendo; sólo
+avisa por consola, una vez. Si ese aviso aparece y el webhook es un resto
+de una prueba local anterior sobre ESTE MISMO bot de administración (nunca
+sobre uno de producción), sacalo a mano una vez con:
+
+```bash
+curl "https://api.telegram.org/bot<token>/deleteWebhook"
+```
+
+y la vuelta siguiente del listener lo detecta sola, sin reiniciar nada.
