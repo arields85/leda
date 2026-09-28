@@ -65,7 +65,7 @@ tales. Ver [`INDEX.md`](INDEX.md#documentos-superados).
 |---|---|
 | Comando | `.venv\Scripts\python.exe -m pytest -q` |
 | Fecha | 2026-09-28 |
-| Resultado exacto | 1041 passed, 108 deselected (corrida del escritor de la fecha fija, después de #28b). |
+| Resultado exacto | 1042 passed, 108 deselected (corrida del escritor de #28c). |
 
 Seguimientos de la entrega con evidencia (T6a-T6j), siembra reproducible (T7, T7b) y
 comprobadores del banco, `odd/tasks/prisma-orienta.md`: `1008 passed, 108
@@ -214,11 +214,9 @@ para probar todo junto):
    `platform_role` 'administrador' y ningún comando lo asigna; `escuchar` no lee el bot
    de administración (`mensaje_admin` sólo se registra por el webhook de `servir`). Sin
    esto, ningún aviso de incidente llega en la ronda local.
-2. **#28c**, seguimientos no bloqueantes de review-cc9552ab (aprobada y reconocida,
-   frontera en `ce771be`): una prueba de `tests/test_avisos_admin.py` deja
-   `PRISMA_BOT_TOKEN_ADMIN` en el entorno para las pruebas siguientes; y si falla el
-   registro del incidente de un aviso agotado, el lote no se confirma y los avisos ya
-   enviados se reenvían (aislar con un savepoint, sin callarlo).
+2. *(#28c cerrada: la prueba ya no deja `PRISMA_BOT_TOKEN_ADMIN` en el entorno, y el
+   incidente de un aviso agotado se escribe en un savepoint: si falla, el lote se
+   confirma igual y el fallo se cuenta, se imprime y queda en `ultimo_error`.)*
 3. **#29** unificar en `escuchar` (y en `servir`) las rutinas programadas, el despacho
    de la cola y de los avisos al administrador (en `servir` hoy nadie despacha
    `message_outbox` ni `admin_notice`: `reloj.py` sólo encola), con opción para apagar

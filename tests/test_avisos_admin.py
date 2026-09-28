@@ -14,6 +14,7 @@ el modo local (`local.Escucha.tareas_de_fondo`).
 
 from __future__ import annotations
 
+import os
 import uuid
 from contextlib import nullcontext
 from datetime import datetime, timedelta, timezone
@@ -21,7 +22,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from fastapi.testclient import TestClient
 
-from prisma import gateway, incidentes
+from prisma import despachador, gateway, incidentes
 from prisma.db import admin, espacio, registrar_auditoria
 from prisma.despachador import (BACKOFF_MINUTOS_AVISO_ADMIN, MAX_INTENTOS,
                                 TransporteDePrueba, despachar_avisos_admin)
@@ -359,7 +360,8 @@ def test_despachar_avisos_admin_entrega_por_el_transporte_del_bot_de_administrac
         fila = cur.fetchone()
     conn.commit()
 
-    assert resumen == {"enviados": 1, "fallidos": 0, "agotados": 0}
+    assert resumen == {"enviados": 1, "fallidos": 0, "agotados": 0,
+                       "incidentes_sin_registrar": 0}
     assert len(transporte.enviados) == 1
     assert transporte.enviados[0].chat_id == 644001
     assert fila["estado"] == "enviado"
@@ -381,7 +383,8 @@ def test_despachar_avisos_admin_reintenta_si_el_transporte_falla(conn, corework)
         fila = cur.fetchone()
     conn.commit()
 
-    assert resumen == {"enviados": 0, "fallidos": 1, "agotados": 0}
+    assert resumen == {"enviados": 0, "fallidos": 1, "agotados": 0,
+                       "incidentes_sin_registrar": 0}
     assert fila["estado"] == "listo"          # menos de MAX_INTENTOS: reintenta
     assert fila["intentos"] == 1
     assert fila["ultimo_error"]
@@ -421,7 +424,8 @@ def test_despachar_avisos_admin_pospone_con_backoff_creciente(conn, corework):
         with admin(conn) as cur:
             resumen_inmediato = despachar_avisos_admin(cur, transporte, ahora)
         conn.commit()
-        assert resumen_inmediato == {"enviados": 0, "fallidos": 0, "agotados": 0}
+        assert resumen_inmediato == {"enviados": 0, "fallidos": 0, "agotados": 0,
+                                     "incidentes_sin_registrar": 0}
 
         ahora = fila["programado_para"]  # simula que pasó el backoff
 
@@ -468,6 +472,7 @@ def test_despachar_avisos_admin_agotado_registra_incidente_sin_avisar_de_nuevo(
     assert fila["intentos"] == MAX_INTENTOS
     assert resumen["agotados"] == 1
     assert resumen["fallidos"] == 1
+    assert resumen["incidentes_sin_registrar"] == 0  # el registro sí funcionó acá
 
     with admin(conn) as cur:
         cur.execute(
@@ -486,6 +491,90 @@ def test_despachar_avisos_admin_agotado_registra_incidente_sin_avisar_de_nuevo(
     assert incidente["notificado_admin_en"] is None  # nunca se reenvía por el mismo canal
     assert "no se avisó a la administración" in incidente["resumen_sanitizado"].lower()
     assert total_avisos == 1  # el guard: NO se encoló un admin_notice nuevo
+
+
+def test_despachar_avisos_admin_si_registrar_incidente_falla_no_pierde_el_lote(
+        conn, corework, monkeypatch):
+    """R3-002 (revisión de confiabilidad, 2026-09-28, aceptado): antes, si
+    `registrar_incidente` (la propia escritura del incidente cuando un
+    aviso agota MAX_INTENTOS) fallaba, la excepción salía de
+    `despachar_avisos_admin` sin nada que la atajara -- la transacción del
+    lote quedaba sin `commit`, así que quien llama (`local.tareas_de_fondo`)
+    nunca confirmaba nada: un aviso YA entregado en el mismo lote volvía a
+    'listo' en la base y Telegram lo recibía de nuevo, y el aviso agotado ni
+    siquiera guardaba su intento actualizado.
+
+    El registro del incidente corre ahora en un punto de retorno (mismo
+    patrón que `agente._ejecutar_una`/`gateway._iniciar_alta_guiada`:
+    `cur.connection.transaction(force_rollback=False)` como SAVEPOINT
+    anidado dentro de la transacción abierta): si falla, sólo se deshace
+    esa escritura -- el resto del lote, incluido el `update` que ya dejó el
+    aviso agotado en 'fallido' con su intento al día, sigue en pie. Nunca en
+    silencio (regla del proyecto): se cuenta en el resumen."""
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        # Los dos administradores YA existen antes del único incidente que
+        # se registra: `avisar_incidente_admin` fanea a cada administrador
+        # alcanzable, sin filtrar por espacio -- si se creara el segundo
+        # admin después de un primer `registrar_incidente`, un segundo
+        # llamado volvería a avisarle también al primero (dedupe por
+        # incidente + administrador, no por administrador solo) y el lote
+        # quedaría con tres avisos en vez de dos.
+        _administrador(cur, "Admin Lote Ok", 671001, chat_id=671001)
+        _administrador(cur, "Admin Lote Agotado", 671002, chat_id=671002)
+        incidentes.registrar_incidente(
+            cur, ws, "Falló algo en una prueba (lote con dos avisos).",
+            etapa="prueba_directa")
+        cur.execute(
+            "select id, chat_id from admin_notice where chat_id in (671001, 671002)")
+        por_chat = {f["chat_id"]: f["id"] for f in cur.fetchall()}
+        ok_id = por_chat[671001]
+        agotado_id = por_chat[671002]
+        # Ya viene con MAX_INTENTOS - 1: este intento lo agota.
+        cur.execute("update admin_notice set intentos = %s where id = %s",
+                    (MAX_INTENTOS - 1, agotado_id))
+    conn.commit()
+
+    transporte = TransporteDePrueba(falla_en={671002})
+    monkeypatch.setattr(
+        despachador, "registrar_incidente",
+        lambda *a, **k: (_ for _ in ()).throw(
+            RuntimeError("fallo simulado registrando el incidente")))
+
+    ahora = datetime.now(timezone.utc)
+    with admin(conn) as cur:
+        resumen = despachar_avisos_admin(cur, transporte, ahora)
+        cur.execute(
+            """select id, estado, intentos, ultimo_error from admin_notice
+                where id in (%s, %s)""",
+            (ok_id, agotado_id))
+        filas = {f["id"]: f for f in cur.fetchall()}
+    conn.commit()  # si el savepoint no aislara la falla, este commit no llegaría a correr
+
+    assert resumen["enviados"] == 1
+    assert resumen["agotados"] == 1
+    assert resumen["incidentes_sin_registrar"] == 1
+
+    # El aviso entregado bien en el mismo lote quedó 'enviado' -- no volvió
+    # a 'listo' para que Telegram lo reciba dos veces.
+    assert filas[ok_id]["estado"] == "enviado"
+    # El agotado quedó 'fallido' con su intento actualizado, aunque el
+    # incidente no se haya podido registrar.
+    assert filas[agotado_id]["estado"] == "fallido"
+    assert filas[agotado_id]["intentos"] == MAX_INTENTOS
+    # La marca queda en el propio `ultimo_error`, inspeccionable desde
+    # PostgreSQL además de en el resumen que ve el proceso.
+    assert "incidente no registrado" in filas[agotado_id]["ultimo_error"]
+    # El que se entregó bien nunca falló: sigue sin `ultimo_error`.
+    assert filas[ok_id]["ultimo_error"] is None
+
+    with admin(conn) as cur:
+        cur.execute(
+            "select count(*) n from incident where referencia_id = %s",
+            (agotado_id,))
+        total_incidentes = cur.fetchone()["n"]
+    conn.commit()
+    assert total_incidentes == 0  # el insert del incidente se deshizo, sólo ese
 
 
 def test_tareas_de_fondo_despacha_los_avisos_admin_en_el_modo_local(conn, corework):
@@ -611,25 +700,69 @@ def test_obtener_transporte_admin_relee_env_cuando_el_token_llega_despues(
     arrancó, sin releerlo nunca se vería hasta reiniciar el proceso.
     `_obtener_transporte_admin` relee `.env` (sin pisar lo que ya está en el
     entorno, throttleado para no pegarle al disco en cada pasada) para
-    cubrir ese caso."""
+    cubrir ese caso.
+
+    R3-001 (revisión de confiabilidad, 2026-09-28): si esta máquina tiene un
+    `.env` real con `PRISMA_BOT_TOKEN_ADMIN` (`config._cargar_dotenv` ya lo
+    puso en `os.environ` al importar el módulo, una sola vez), la variable
+    llega puesta y `monkeypatch.delenv(..., raising=False)` sí anota un
+    undo -- el caso que rompía es el contrario, variable ausente al entrar.
+    Se saca a mano ANTES de tocar `monkeypatch` (no con `monkeypatch.delenv`:
+    sería la misma línea que se está probando) para ejercer ese caso sin
+    depender de si esta máquina tiene el token real cargado, y se restaura
+    a mano al final -- nunca queda de este archivo, y nunca se imprime ni se
+    compara el valor real en un `assert` (`AssertionError` expone el valor
+    de cada operando: repetir la cadena real ahí la dejaría en la salida de
+    la prueba)."""
     from prisma import config as config_modulo
     from prisma.local import Escucha
 
-    monkeypatch.delenv("PRISMA_BOT_TOKEN_ADMIN", raising=False)
-    dotenv = tmp_path / ".env"
-    dotenv.write_text("", encoding="utf-8")
-    monkeypatch.setattr(config_modulo, "RAIZ", tmp_path)
+    valor_real = os.environ.pop("PRISMA_BOT_TOKEN_ADMIN", None)
+    try:
+        # `setenv` antes de `delenv` fuerza que monkeypatch anote un undo
+        # SIEMPRE, esté o no la variable puesta al entrar (R3-001): un
+        # `delenv(..., raising=False)` solo, con la variable ya ausente, no
+        # anota nada para deshacer.
+        monkeypatch.setenv("PRISMA_BOT_TOKEN_ADMIN", "placeholder-antes-de-recargar")
+        monkeypatch.delenv("PRISMA_BOT_TOKEN_ADMIN")
+        dotenv = tmp_path / ".env"
+        dotenv.write_text("", encoding="utf-8")
+        monkeypatch.setattr(config_modulo, "RAIZ", tmp_path)
 
-    ws = corework.workspace_id
-    e = Escucha(conn, "corework", ws, "tok")
+        ws = corework.workspace_id
+        e = Escucha(conn, "corework", ws, "tok")
 
-    assert e._obtener_transporte_admin() is None
-    assert e._transporte_admin is None
+        assert e._obtener_transporte_admin() is None
+        assert e._transporte_admin is None
 
-    # El token se agrega al archivo mientras el proceso sigue corriendo.
-    dotenv.write_text("PRISMA_BOT_TOKEN_ADMIN=tok-admin-nuevo\n", encoding="utf-8")
-    e._ultimo_reintento_dotenv = None  # sin esperar el throttle real en la prueba
+        # El token se agrega al archivo mientras el proceso sigue corriendo.
+        dotenv.write_text("PRISMA_BOT_TOKEN_ADMIN=tok-admin-nuevo\n", encoding="utf-8")
+        e._ultimo_reintento_dotenv = None  # sin esperar el throttle real en la prueba
 
-    transporte = e._obtener_transporte_admin()
-    assert transporte is not None
-    assert e._transporte_admin is transporte
+        transporte = e._obtener_transporte_admin()
+        assert transporte is not None
+        assert e._transporte_admin is transporte
+
+        # `recargar_dotenv` escribe el token en `os.environ` con
+        # `setdefault`, por fuera de `monkeypatch` -- si el `setenv`/
+        # `delenv` de arriba no dejaran un undo anotado, ese token de
+        # prueba se filtraría a cada prueba posterior del mismo proceso.
+        # Se fuerza el undo ahora mismo (el fixture lo repite al cerrar la
+        # prueba, sin efecto porque ya no queda nada pendiente) para
+        # comprobar acá, no en otra prueba, que no quedó nada puesto.
+        monkeypatch.undo()
+        # Comparación por booleano, nunca `assert "..." not in os.environ`
+        # directo: si esta prueba fallara, la introspección de `pytest`
+        # imprimiría `os.environ` completo en el diff -- y esta máquina
+        # puede tener un token real puesto (regla del proyecto: nunca
+        # imprimir un secreto en un diagnóstico).
+        quedo_filtrado = "PRISMA_BOT_TOKEN_ADMIN" in os.environ
+        assert not quedo_filtrado, (
+            "PRISMA_BOT_TOKEN_ADMIN quedó puesto en os.environ tras la "
+            "prueba -- se filtraría a cualquier prueba posterior del mismo "
+            "proceso")
+    finally:
+        if valor_real is not None:
+            os.environ["PRISMA_BOT_TOKEN_ADMIN"] = valor_real
+        else:
+            os.environ.pop("PRISMA_BOT_TOKEN_ADMIN", None)

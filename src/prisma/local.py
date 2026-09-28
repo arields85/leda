@@ -185,6 +185,8 @@ class Escucha:
             self.conn.commit()
             resumen["avisos_admin_enviados"] = resumen_admin["enviados"]
             resumen["avisos_admin_agotados"] = resumen_admin["agotados"]
+            resumen["avisos_admin_incidentes_sin_registrar"] = (
+                resumen_admin["incidentes_sin_registrar"])
             for _ in range(resumen_admin["enviados"]):
                 _imprimir("  → aviso admin enviado")
             for _ in range(resumen_admin["agotados"]):
@@ -192,6 +194,15 @@ class Escucha:
                 # (despachador.despachar_avisos_admin) -- visible acá también.
                 _imprimir("  ! aviso admin agotado tras reintentos -- ver "
                           f"`python -m prisma incidentes {self.slug}`")
+            for _ in range(resumen_admin["incidentes_sin_registrar"]):
+                # Nunca en silencio (regla del proyecto): además de agotar
+                # reintentos, el propio incidente no se pudo registrar
+                # (punto de retorno de `despachar_avisos_admin`, R3-002) --
+                # el aviso queda 'fallido' con su intento al día igual, y
+                # `ultimo_error` en `admin_notice` lleva la marca para
+                # inspeccionar en PostgreSQL.
+                _imprimir("  ! aviso admin agotado sin poder registrar su "
+                          "incidente -- ver `ultimo_error` en `admin_notice`")
         return resumen
 
     def correr_cadencia(self, nombre: str, ahora: datetime | None = None) -> int:

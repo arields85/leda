@@ -3692,3 +3692,19 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   Con el mismo patrón de fecha fija, sin romperse hoy porque no pasan por el reloj
   real: `tests/test_botones.py:84`, `tests/test_modificar.py:142`,
   `tests/test_pendientes.py:43` y `:182`.
+  Evaluación de `d50b385` contra la frontera `ce771be`: medio, `under_budget` (27
+  líneas), queda pendiente en la rebanada.
+
+- 2026-09-28: **#28c cerrada — seguimientos de review-cc9552ab.** Ruta: delegada, un
+  escritor. R3-001: la prueba del `.env` releído dejaba `PRISMA_BOT_TOKEN_ADMIN` en el
+  entorno (`delenv(raising=False)` sin nada que restaurar y `recargar_dotenv` escribe
+  con `setdefault`); ahora `setenv` + `delenv` registran siempre el deshacer. R3-002:
+  el incidente de un aviso agotado se escribe dentro de un savepoint; si falla, el lote
+  se confirma igual (los avisos ya entregados no se reenvían), se cuenta en
+  `incidentes_sin_registrar`, el listener lo imprime y `ultimo_error` lleva una marca.
+  ROJO/VERDE observados por el escritor. `tests/test_avisos_admin.py` -> `15 passed`;
+  suite completa (escritor): `1042 passed, 108 deselected`. Incidente de seguridad de
+  la sesión: una aserción sobre `os.environ` hizo que pytest imprimiera el entorno
+  completo, con el token real del bot de administración, en la salida de una
+  herramienta del escritor; se reescribió la aserción para que no pueda volver a
+  imprimirlo y se recomendó al usuario rotar el token.

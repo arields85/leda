@@ -412,9 +412,20 @@ def despachar_avisos_admin(cur: psycopg.Cursor, transporte: Transporte,
     Reusable por el validador de invariantes diario que se agregue después
     (`odd/tasks/validador-invariantes.md`): el mismo camino que entrega un
     aviso de incidente entrega cualquier otro aviso que ese proceso encole
-    en `admin_notice`."""
+    en `admin_notice`.
+
+    El registro de ESE incidente corre en un punto de retorno propio
+    (SAVEPOINT, mismo patrón que `agente._ejecutar_una`) -- hallazgo R3-002
+    de la revisión, 2026-09-28. Quien llama hace un único `commit` al final
+    del lote: si la escritura del incidente fallara sin este aislamiento, el
+    lote entero se revertiría y los avisos ya entregados volverían a
+    `'listo'` y se reenviarían. Con él se deshace sólo esa escritura, y el
+    fallo no queda en silencio: se cuenta en
+    `resumen["incidentes_sin_registrar"]` y deja una marca en el
+    `ultimo_error` del aviso."""
     ahora = ahora or datetime.now(timezone.utc)
-    resumen = {"enviados": 0, "fallidos": 0, "agotados": 0}
+    resumen = {"enviados": 0, "fallidos": 0, "agotados": 0,
+               "incidentes_sin_registrar": 0}
 
     cur.execute(
         """select id, workspace_id, chat_id, cuerpo, intentos
@@ -434,23 +445,34 @@ def despachar_avisos_admin(cur: psycopg.Cursor, transporte: Transporte,
             agotado = intentos >= MAX_INTENTOS
             estado = "fallido" if agotado else "listo"
             proximo = None if agotado else _proximo_intento_admin(intentos, ahora)
+            ultimo_error = str(e)[:500]
             cur.execute(
                 """update admin_notice
                       set intentos = %s, ultimo_error = %s, estado = %s,
                           programado_para = coalesce(%s, programado_para)
                     where id = %s""",
-                (intentos, str(e)[:500], estado, proximo, n["id"]))
+                (intentos, ultimo_error, estado, proximo, n["id"]))
             resumen["fallidos"] += 1
             if agotado:
                 resumen["agotados"] += 1
-                registrar_incidente(
-                    cur, n["workspace_id"],
-                    f"Un aviso a la administración no se pudo entregar "
-                    f"tras {MAX_INTENTOS} intentos.",
-                    severidad="alta", referencia_cruda=str(e)[:500],
-                    referencia_tipo=REFERENCIA_ADMIN_NOTICE,
-                    referencia_id=n["id"], chat_id=n["chat_id"],
-                    avisar_admin=False)
+                try:
+                    with cur.connection.transaction(force_rollback=False):
+                        registrar_incidente(
+                            cur, n["workspace_id"],
+                            f"Un aviso a la administración no se pudo entregar "
+                            f"tras {MAX_INTENTOS} intentos.",
+                            severidad="alta", referencia_cruda=ultimo_error,
+                            referencia_tipo=REFERENCIA_ADMIN_NOTICE,
+                            referencia_id=n["id"], chat_id=n["chat_id"],
+                            avisar_admin=False)
+                except Exception as exc_incidente:  # noqa: BLE001 — se aísla, no se propaga
+                    resumen["incidentes_sin_registrar"] += 1
+                    cur.execute(
+                        """update admin_notice
+                              set ultimo_error = ultimo_error || %s
+                            where id = %s""",
+                        (f" · incidente no registrado: "
+                         f"{type(exc_incidente).__name__}", n["id"]))
             continue
 
         cur.execute(
