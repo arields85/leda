@@ -4077,3 +4077,13 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   PostgreSQL local estaba colgado desde las 22:02 (autovacuum terminó con 0xC0000142 y
   el postmaster no pudo reiniciar hijos); se cerró el proceso y la recuperación desde WAL
   terminó limpia.
+  Commit `beda9a5`. RDD: riesgo alto (`cli.py`, frontera de proceso), consentimiento del
+  usuario, `review-291d29d62a75ce69` con cuatro lentes, aprobada y reconocida (autoridad
+  consumida); frontera de revisión en `beda9a5`. Siete sugerencias no bloqueantes, para
+  después: el mapeo proveedor -> clave está escrito dos veces en `config.py` (una tabla
+  única); `desde_base` sin tipo en `claves`; comentar por qué las pruebas comparan con
+  `is True` (no imprimir claves); ninguna prueba recorre los tres caminos de `gateway`
+  con la clave faltante; faltan casos `gemini`/`anthropic` en `desde_base`; con un
+  proveedor desconocido y sin clave, el error nombra la clave en vez del proveedor
+  (verificar la dirección antes que la clave); la clave faltante ahora corta el turno al
+  construir el proveedor (antes fallaba en la llamada), con el mismo incidente.
