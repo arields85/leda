@@ -1,6 +1,6 @@
 # Alta con correo verificado y acceso a Google (rama auxiliar)
 
-**Estado:** G0 y G1 cerradas salvo la Tanda 2 por Telegram (espera a G2d); G2a cerrada — próximo: G2b (ver "Cómo retomar", al final)
+**Estado:** G0 y G1 cerradas salvo la Tanda 2 por Telegram (espera a G2d); G2a y G2b cerradas — próximo: G2b-2 (seguimientos) y G2c (ver "Cómo retomar", al final)
 **Creado:** 2026-09-27
 **Origen:** decisión del usuario, 2026-09-27; [`ADR 0010`](../../docs/decisions/0010-correo-verificado-y-google-en-el-producto.md).
 **Rama/worktree:** `auxiliar/alta-y-google`, `D:\Proyectos\Prisma-PM-worktrees\alta-y-google`.
@@ -732,7 +732,7 @@ Un worktree nuevo no trae lo que no se versiona.
     ni guarda texto sin cifrar. Comando `python -m prisma google clave-nueva`
     que imprime una clave nueva para copiar al `.env` (no escribe archivos).
     `cryptography` en `pyproject.toml` (toque listado para la integración).
-  - [ ] **G2b — Tabla, eventos y funciones.** Migración
+  - [x] **G2b — Tabla, eventos y funciones.** (`62421a9`, 2026-09-29) Migración
     `0101_credencial_google.sql` + rollback + `esquema.sql`: tabla dedicada
     con `workspace_id` y RLS forzado, sin ningún privilegio de `prisma_app`;
     acceso sólo por funciones `security definer` con propietario explícito
@@ -741,6 +741,15 @@ Un worktree nuevo no trae lo que no se versiona.
     `frontera.md`); cuenta autorizada y permisos concedidos; permisos
     habilitados como dato en `workspace_setting`, separados de la
     credencial. Comando `python -m prisma google recifrar` (rotación).
+  - [ ] **G2b-2 — Seguimientos de la revisión de G2b.** (1) R4: la marca
+    de reautorización compara la credencial que se usó (compare-and-set)
+    para que un `invalid_grant` tardío no invalide una credencial recién
+    reautorizada; (2) R3: `google recifrar` informa las credenciales que
+    cambiaron durante la rotación en lugar de omitirlas en silencio, con
+    prueba del conteo exacto; (3) R2/R3: los incidentes por configuración
+    corrupta de Google llevan su propia etapa, no `alta_correo_…`; (4)
+    menores: constante `ESTADOS` sin uso, conexión de `recifrar` sin cerrar,
+    `truncate` de `prisma_admin` sobre la tabla de eventos.
   - [ ] **G2c — Autorización local.** `python -m prisma google autorizar
     <espacio>`: OAuth de escritorio con redirección a la propia máquina,
     PKCE S256 y `state`; permisos `openid email gmail.send calendar.events`;
@@ -1152,6 +1161,30 @@ por commit, igual que en `main`. Nunca push sin pedido explícito del usuario.
   comprueba la fecha local reservada. `pytest -q tests/test_alta_correo_flujo.py`
   → `68 passed`. RDD: medio, `under_budget` (13 líneas), pendiente en el
   tramo.
+- 2026-09-29: **G2b cerrada** (`62421a9`, delegada, un escritor; disparador:
+  migración/rollback `0101`, `esquema.sql`, `google/credenciales.py`,
+  `cli.py`, pruebas). RED: `ImportError: cannot import name 'credenciales'
+  from 'prisma.google'`; `tests/test_google_cifrado.py` → `2 failed, 24
+  passed` (seguimientos de G2a). GREEN: `pytest -q
+  tests/test_google_credenciales.py tests/test_google_cifrado.py` → `88
+  passed` (repetido por la sesión principal: `88 passed`);
+  `tests/test_capacidades.py tests/test_task_intake.py` → `87 passed`
+  (paridad de rollbacks con `0101` incluida); suite completa → `1658 passed,
+  129 deselected`. Esquema: `credencial_google` (carga Fernet opaca, cuenta,
+  permisos), `credencial_google_evento` (sólo agregar;
+  `autorizada`/`reautorizacion_requerida`/`revocada`, motivo saneado),
+  `credencial_google_estado` (proyección por disparador); RLS forzado y
+  ningún privilegio de `prisma_app`. Funciones `security definer` de
+  `prisma_owner`: `prisma_app` ejecuta sólo leer, estado y marcar
+  reautorización (el espacio sale de la sesión); `prisma_admin` guarda,
+  revoca, lista y reemplaza con compare-and-swap (espacio explícito). `google
+  recifrar` carga la clave antes de conectarse. Seguimientos de G2a
+  (R2-001, R2-003, R2-004, R3) resueltos.
+  RDD: riesgo alto, rango `4e25345..62421a9` (2008 líneas, incluye
+  `6804939` y `718f0b6`); consentimiento concedido por el usuario; cuatro
+  lentes; **aprobada** y acusada (`review-b78c81ec367b0d93`, autoridad
+  consumida). Frontera revisada: `62421a9`. Hallazgos no bloqueantes →
+  G2b-2.
 - Dependencia registrada: el hecho "bienvenida entregada" de G1 queda como
   evento propio para que la unidad de saludo diario de `main` (pack 06)
   pueda contarlo como saludo del día.
@@ -1183,8 +1216,8 @@ En el worktree `D:\Proyectos\Prisma-PM-worktrees\alta-y-google`, rama
 ## Cómo retomar (punto exacto, actualizado el 2026-09-29)
 
 **Estado de la rama.** `auxiliar/alta-y-google`, rebasada sobre `main`
-(`a667170`, 2026-09-29); último commit de código `6804939`; árbol limpio.
-Suite completa (en `4e25345`): `1595 passed, 129 deselected`. Respaldos:
+(`a667170`, 2026-09-29); último commit de código `62421a9`; árbol limpio.
+Suite completa (en `62421a9`): `1658 passed, 129 deselected`. Respaldos:
 `auxiliar/alta-y-google-pre-unificacion`,
 `auxiliar/alta-y-google-unificada-un-commit` y
 `auxiliar/alta-y-google-pre-rebase-0929`.
@@ -1192,8 +1225,8 @@ Suite completa (en `4e25345`): `1595 passed, 129 deselected`. Respaldos:
 **Hecho.** G0; G1 completa (esquema 0100, recorrido, integrantes ya activos,
 avisos al administrador unificados con el canal de `main`, "Habilitar un
 nuevo intento", textos aprobados, Tanda 1); G2a (cifrado con rotación,
-`google clave-nueva`, `cryptography`). Frontera revisada por RDD: `4e25345`;
-pendiente en el tramo sólo `6804939` (13 líneas, prueba).
+`google clave-nueva`, `cryptography`); G2b (tabla `0101`, eventos,
+funciones, `google recifrar`). Frontera revisada por RDD: `62421a9`.
 
 **Pendiente de G1.** Sólo la Tanda 2 por Telegram real: necesita el envío
 real de Gmail (G2d).
@@ -1217,10 +1250,10 @@ y clave en `PRISMA_CLAVE_CREDENCIALES`; permisos `gmail.send` y
    genera) y guardarla en el `.env`.
 4. Ya hecho: `PRISMA_BOT_TOKEN_ADMIN` en el `.env` del worktree.
 
-**Primer paso concreto de la próxima sesión.** Delegar G2b (tabla,
-eventos y funciones `security definer`, migración `0101`, comando `google
-recifrar`), después G2c y G2d, según "Tareas". Antes de la migración,
-rebasar y confirmar que `main` no se acercó a `0100`.
+**Primer paso concreto de la próxima sesión.** G2b-2 (seguimientos de la
+revisión de G2b; `0101` todavía no se integró, así que se corrige en el
+lugar), después G2c y G2d, según "Tareas". Rebasar sobre `main` al cerrar
+G2 (2 commits nuevos en `main` al 2026-09-29, sin migraciones).
 
 **Seguimientos menores anotados.** `null` JSON en la configuración tratado
 como corrupto; posible doble incidente por configuración corrupta
@@ -1230,12 +1263,8 @@ simultánea; varios mensajes del alta con correo no pasan
 
 **Seguimientos de la revisión de G2a** (no bloqueantes,
 `review-843233574c729737`):
-- R2-001: `google clave-nueva` menciona `google recifrar`, que todavía no
-  existe; el docstring de `cifrado.py` habla de `rotar`. Se resuelve en G2b.
-- R2-003, R2-004 y R3 (`descifrar_texto`): la prueba busca la clave por
-  "única línea de 44 caracteres"; `descifrar` y `rotar` repiten el mismo
-  `try/except`; `descifrar_texto` deja escapar un `UnicodeDecodeError` sin
-  tipar. Van con G2b, que toca `cifrado.py`.
+- R2-001, R2-003, R2-004 y R3 (`descifrar_texto`): resueltos en G2b
+  (`62421a9`).
 - R4 (inferencial): si la bienvenida falla y se reintenta más tarde, el
   pedido de correo puede reclamar el saludo del día y la persona recibir dos
   saludos. Depende del reintento del despachador (de `main`); no probado.
