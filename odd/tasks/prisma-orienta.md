@@ -194,7 +194,8 @@ gestión.
       Acotar cada intento (~20 s, configurable en `model_config.parametros`) con
       reintento, para que un cuelgue cueste ~20 s y no más de 90.
 - [ ] **T8d — Responder en un solo viaje (postergada).** Decisión del usuario
-  (2026-09-29): después de T9 y T10. Evitar la vuelta de datos del responder
+  (2026-09-29): es una optimización; va después de T11 (la prioridad es que Prisma
+  responda y se comporte como se espera: T9, T10 y la cuarta ronda). Evitar la vuelta de datos del responder
   (`consultar_tareas` y similares) cuando el dato ya viaja en el contexto, reconstruyendo
   los botones de lista desde el contexto (ADR 0007 §3). Es la palanca que puede acercar
   el turno a menos de 4 s; medir con el banco.
@@ -4272,3 +4273,7 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   de `tests/test_pregunta_pendiente.py` fallaron; GREEN enfocadas 275 passed (repetidas por
   el orquestador: 165 passed); suite completa 1309 passed, 108 deselected. El prompt del
   ruteo con pregunta pendiente todavía no se midió con el modelo real (R1a-2).
+
+- 2026-09-29: **Orden de trabajo (decisión del usuario).** Primero comportamiento: T9
+  (R1a-2, R1b, R1c, R2, R3, R4, H19) y T10; después T11 (cuarta ronda por Telegram). Las
+  mejoras y optimizaciones (T8d y el resto) quedan para después de T11.

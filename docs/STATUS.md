@@ -234,7 +234,8 @@ entrega después de "Pedir cambios" no volvió a revisión (R3-H20); el B no se 
   máximo de 20 s por intento con 2 reintentos (`9818354`) contra cuelgues de ~93 s de
   NaN (~1,3 % de las llamadas). El ruteo en paralelo (ADR 0012) se probó y se revirtió
   (`ccf5c73`): poca ganancia y más cuelgues con pedidos simultáneos.
-- Postergada (T8d): responder en un solo viaje cuando el dato ya está en el contexto.
+- Postergada (T8d, optimización): responder en un solo viaje cuando el dato ya está
+  en el contexto; va después de T11.
 
 **Próximo, en este orden (decisión del usuario, 2026-09-29):**
 
@@ -253,6 +254,8 @@ entrega después de "Pedir cambios" no volvió a revisión (R3-H20); el B no se 
    lista), R3-H8 ("hola" suelto), R3-H9 ("Gracias. La tarea pasó a revisión."),
    R3-H10, R3-H11, R3-H12, R3-H14, R3-H4.
 3. **Cuarta ronda por Telegram** (T11), en horario laboral, con los circuitos A y B.
+4. **Después de T11, mejoras y optimizaciones**: T8d y lo que sigue abajo. La prioridad
+   es que Prisma responda y se comporte como se espera (decisión del usuario, 2026-09-29).
 
 Después, sin bloquear: #23 validador de invariantes
 (`odd/tasks/validador-invariantes.md`); escenarios del banco que fallan desde antes de
