@@ -59,6 +59,9 @@ MODIFY_FIELD_LABELS = {
     "responsible": "Responsable", "area": "Área", "due_date": "Fecha objetivo",
     "acceptance_criterion": "Criterio de aceptación",
 }
+# Salir del selector sin cambiar nada: vuelve a mostrar la vista previa actual.
+# Redacción pendiente de revisión de voz en T10.
+BACK_TO_SUMMARY = "Volver al resumen"
 CHOICE_FIELDS = ("objective", "responsible", "area")
 NOT_YOURS = "Eso se lo pregunté a otra persona del equipo."
 USER_FIELD_LIMITS = {
@@ -375,6 +378,9 @@ def resolve_choice(cur: psycopg.Cursor, who: Solicitante, *, token: str,
         )
     elif action == "modify_field":
         outcome = _ask_field_change(cur, request, who, choice["valor"]["field"], now)
+    elif action == "back_to_summary":
+        # Sin cambiar ningún dato: la vista previa vuelve tal como estaba.
+        outcome = _finalize(cur, request, who, now)
     elif action == "more":
         page = choice["valor"]
         outcome = _open_entity_page(
@@ -728,7 +734,8 @@ def open_modify_picker(cur: psycopg.Cursor, who: Solicitante, question_id: str,
                        now: datetime, *, via: str) -> IntakeOutcome | None:
     """Modificar en la vista previa del borrador (T9-R1c-3, ADR 0005 decisión 1):
     la cierra sin aplicar nada -- la tarea se crea sólo con Confirmar -- y abre el
-    selector "qué dato cambiar", con un botón por dato. `question_id` es el de la
+    selector "qué dato cambiar", con un botón por dato y otro para volver al resumen
+    sin cambiar nada (`BACK_TO_SUMMARY`). `question_id` es el de la
     vista previa (`open_intake_question`, `QUESTION_CONFIRMATION`); `via` es cómo
     llegó la persona (`boton` o `texto`, un mensaje que corrige) y sólo se
     audita. `None` si la vista previa ya no esperaba: no abre nada."""
@@ -743,6 +750,7 @@ def open_modify_picker(cur: psycopg.Cursor, who: Solicitante, question_id: str,
         detalle={"request_id": str(request["id"]), "via": via})
     options = [(MODIFY_FIELD_LABELS[field], "modify_field", {"field": field})
                for field in MODIFY_FIELD_LABELS]
+    options.append((BACK_TO_SUMMARY, "back_to_summary", None))
     return _open_choices(cur, request, None, MODIFY_PICKER_PROMPT, options, now,
                          kind=MODIFY_PICKER_KIND)
 

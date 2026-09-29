@@ -37,8 +37,9 @@ from tests.test_task_intake import (_RoutingProvider, _active_choices,
                                     _callback_client, _choose,
                                     _post_intake_callback, _start)
 
-ETIQUETAS_DEL_SELECTOR = ["Título", "Descripción", "Objetivo", "Responsable",
+ETIQUETAS_DE_LOS_DATOS = ["Título", "Descripción", "Objetivo", "Responsable",
                           "Área", "Fecha objetivo", "Criterio de aceptación"]
+ETIQUETAS_DEL_SELECTOR = ETIQUETAS_DE_LOS_DATOS + ["Volver al resumen"]
 AVISO_TOQUE_YA_USADO = ("Ese pedido ya no está vigente. Si sigue haciendo falta, "
                         "escribime y lo vemos de nuevo.")
 
@@ -746,3 +747,99 @@ def test_repreguntar_un_dato_del_alta_que_no_es_de_modificar_no_lleva_bloque(
     fila = _ultima_salida(conn, user, antes)
     assert fila["bloque_copiable"] is None
     assert fila["cuerpo"] == I.free_text_question("title")
+
+
+# --------------------------------------------- [Volver al resumen] en el selector
+
+def _tocar_volver(conn, client, user, rid):
+    return _elegir_dato(conn, client, user, rid, "Volver al resumen")
+
+
+def test_el_selector_ofrece_un_boton_por_dato_y_volver_al_resumen(
+        intake_world, conn, monkeypatch):
+    rid, pid, client, user = _modificar(conn, monkeypatch, intake_world)
+
+    assert list(_opciones_activas(conn, rid)) == ETIQUETAS_DE_LOS_DATOS + [
+        "Volver al resumen"]
+
+
+def test_volver_al_resumen_muestra_la_vista_previa_actual_sin_cambiar_nada(
+        intake_world, conn, monkeypatch):
+    rid, pid, client, user = _modificar(conn, monkeypatch, intake_world)
+    campos_antes = _campos(conn, rid)
+    resumen_antes = _previews(conn, rid)[0]["resumen"]
+    antes = _salidas(conn, user)
+
+    _tocar_volver(conn, client, user, rid)
+
+    assert _campos(conn, rid) == campos_antes                 # nada cambió
+    previews = _previews(conn, rid)
+    assert [p["estado"] for p in previews] == ["cancelada", "esperando"]
+    assert previews[-1]["resumen"] == resumen_antes           # el mismo resumen
+    assert _etiquetas_de_la_vista_previa(conn, previews[-1]["id"]) == [
+        "Confirmar", "Modificar", "Cancelar"]
+    salidas = _nuevas(conn, user, antes)                      # una sola respuesta
+    assert [str(f["pending_action_id"]) for f in salidas] == [str(previews[-1]["id"])]
+    assert _es_respuesta(conn, previews[-1]["id"]) is True
+    assert _conjunto_activo(conn, rid) is None                # el selector se cerró
+    assert _tareas(conn) == 0 and _solicitud(conn, rid) == "active"
+
+
+def test_volver_al_resumen_escrito_es_tocar_el_boton(intake_world, conn, monkeypatch):
+    rid, pid, client, user = _modificar(conn, monkeypatch, intake_world)
+    campos_antes = _campos(conn, rid)
+    antes = _salidas(conn, user)
+
+    provider = _responder_con(conn, monkeypatch, intake_world, "volver al resumen")
+
+    assert provider.main_calls == 0
+    assert _campos(conn, rid) == campos_antes
+    previews = _previews(conn, rid)
+    assert [p["estado"] for p in previews] == ["cancelada", "esperando"]
+    assert [str(f["pending_action_id"]) for f in _nuevas(conn, user, antes)] == [
+        str(previews[-1]["id"])]
+
+
+def test_volver_al_resumen_dos_veces_dice_que_ya_no_esta_vigente(
+        intake_world, conn, monkeypatch):
+    rid, pid, client, user = _modificar(conn, monkeypatch, intake_world)
+    token = _opciones_activas(conn, rid)["Volver al resumen"]
+    assert _post_intake_callback(client, token, user).status_code == 200
+    antes = _salidas(conn, user)
+
+    assert _post_intake_callback(client, token, user).status_code == 200
+
+    assert [f["cuerpo"] for f in _nuevas(conn, user, antes)] == [AVISO_TOQUE_YA_USADO]
+    assert [p["estado"] for p in _previews(conn, rid)] == ["cancelada", "esperando"]
+
+
+def test_un_boton_del_selector_de_antes_no_vale_despues_de_volver_al_resumen(
+        intake_world, conn, monkeypatch):
+    rid, pid, client, user = _modificar(conn, monkeypatch, intake_world)
+    viejo = _opciones_activas(conn, rid)["Título"]
+    _tocar_volver(conn, client, user, rid)
+    antes = _salidas(conn, user)
+
+    _post_intake_callback(client, viejo, user)
+
+    assert [f["cuerpo"] for f in _nuevas(conn, user, antes)] == [AVISO_TOQUE_YA_USADO]
+    assert _conjunto_activo(conn, rid) is None
+
+
+def test_despues_de_volver_al_resumen_solo_confirmar_crea_la_tarea(
+        intake_world, conn, monkeypatch, authority_conn):
+    rid, pid, client, user = _modificar(conn, monkeypatch, intake_world)
+    _tocar_volver(conn, client, user, rid)
+    ws = intake_world["north-lab"]["id"]
+    nueva = _previews(conn, rid)[-1]["id"]
+    with admin(conn) as cur:
+        confirmar = P.opcion_por_etiqueta(cur, nueva, "Confirmar").token
+    assert _tareas(conn) == 0
+
+    with autoridad(authority_conn) as cur:
+        resuelta = P.resolver_borrador(cur, ws, confirmar, user, user)
+
+    assert resuelta and resuelta.task_id
+    with admin(conn) as cur:
+        cur.execute("select titulo from task")
+        assert [f["titulo"] for f in cur.fetchall()] == [TITULO]
