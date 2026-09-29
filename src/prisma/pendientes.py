@@ -147,8 +147,10 @@ class ModificacionAbierta:
     `pending_action`, salvo con los centinelas del alta guiada
     (`gateway._TIPO_DE_ALTA`), donde es el id de un
     `task_intake_free_text_slot`, de un `task_intake_choice_set` o de la vista
-    previa del borrador. Quien lo usa mira `herramienta` antes de tratarlo
-    como una fila de `pending_action`.
+    previa del borrador. Con `gateway._SENTINEL_VISTA_PREVIA` es la fila de la
+    vista previa de un cambio (`ver_vista_previa_abierta`), que todavía espera
+    su Confirmar. Quien lo usa mira `herramienta` antes de tratarlo como una
+    fila de `pending_action`.
     """
     pregunta_id: str
     herramienta: str
@@ -380,6 +382,94 @@ def consumir_modificacion(cur: psycopg.Cursor, pending_action_id: str,
             returning id""",
         (ahora, pending_action_id))
     return cur.fetchone() is not None
+
+
+def ver_vista_previa_abierta(cur: psycopg.Cursor, quien: Solicitante,
+                             chat_id: int, ahora: datetime,
+                             herramientas) -> Pendiente | None:
+    """Lee, sin consumirla, la vista previa de un cambio que esta persona pidió
+    en este chat y que espera su Confirmar (T9-R1d-1b, ADR 0013 regla 1,
+    enmienda "una sola rama abierta"): la `pending_action` de una herramienta
+    que escribe (`herramientas`, los nombres reales del registro), todavía
+    `esperando`, sin vencer y de esta persona en este chat.
+
+    Se arma siempre con el `Solicitante` de quien pidió el cambio
+    (`agente._encolar_confirmacion`, `gateway._encolar_vista_previa_menu`), así
+    que su `membership_id` es el de quien la pidió y quien debe confirmarla. Lo
+    que le llega a alguien para decidir sobre lo que pidió otra persona es otra
+    clase de fila y queda afuera: el aviso de entrega (`SENTINEL_MENU_TAREA`),
+    la vista previa del borrador del alta (`draft_id`), una elección con
+    botones (`campo`: pregunta "cuál", no espera un Confirmar) y una
+    Modificación ya pedida (`modificar_pedido_en`). Si hay varias, la más
+    reciente."""
+    cur.execute(
+        """select id from pending_action
+            where workspace_id = %(ws)s and membership_id = %(mid)s
+              and chat_id = %(chat)s and estado = 'esperando'
+              and vence_en > %(ahora)s and campo is null and draft_id is null
+              and modificar_pedido_en is null and herramienta = any(%(tools)s)
+            order by creado_en desc
+            limit 1""",
+        {"ahora": ahora, "ws": quien.workspace_id, "mid": quien.membership_id,
+         "chat": chat_id, "tools": list(herramientas)})
+    f = cur.fetchone()
+    return buscar(cur, str(f["id"])) if f else None
+
+
+def vista_previa_esperando(cur: psycopg.Cursor, pending_action_id: str,
+                           ahora: datetime) -> bool:
+    """Si la vista previa sigue esperando: ni resuelta, ni cancelada, ni
+    vencida. Sin consumirla."""
+    cur.execute(
+        """select 1 from pending_action
+            where id = %s and estado = 'esperando' and vence_en > %s""",
+        (pending_action_id, ahora))
+    return cur.fetchone() is not None
+
+
+def cancelar_vista_previa(cur: psycopg.Cursor, quien: Solicitante,
+                          pending_action_id: str, ahora: datetime) -> bool:
+    """Cancela la vista previa por el mismo camino que su botón Cancelar
+    (`resolver_pendiente`: queda `cancelada` y no se aplica nada). De un solo
+    uso: `True` sólo si esta llamada la cerró; si otro camino ya la había
+    resuelto o venció, `False`."""
+    cur.execute(
+        """update pending_action
+              set estado = 'cancelada', resuelta_en = %(ahora)s,
+                  resuelta_por = %(quien)s
+            where id = %(id)s and estado = 'esperando' and vence_en > %(ahora)s
+              and membership_id = %(mid)s
+            returning id""",
+        {"ahora": ahora, "quien": quien.app_user_id, "id": pending_action_id,
+         "mid": quien.membership_id})
+    return cur.fetchone() is not None
+
+
+def modificar_vista_previa(cur: psycopg.Cursor, quien: Solicitante,
+                           pending_action_id: str,
+                           ahora: datetime) -> ModificacionAbierta | None:
+    """Cierra la vista previa como Modificar (`resolver_pendiente`: `cancelada`
+    con `modificar_pedido_en`, no se aplica nada) y, como el mensaje que la
+    corrige ya llegó, la deja consumida en el mismo paso: no queda una segunda
+    pregunta abierta. Devuelve lo que un Modificar tocado dejaría para el turno
+    (la herramienta, sus argumentos y su resumen), o `None` si otro camino ya
+    la había resuelto o venció."""
+    cur.execute(
+        """update pending_action
+              set estado = 'cancelada', resuelta_en = %(ahora)s,
+                  resuelta_por = %(quien)s, modificar_pedido_en = %(ahora)s,
+                  modificacion_consumida_en = %(ahora)s
+            where id = %(id)s and estado = 'esperando' and vence_en > %(ahora)s
+              and membership_id = %(mid)s
+            returning id, herramienta, args, resumen""",
+        {"ahora": ahora, "quien": quien.app_user_id, "id": pending_action_id,
+         "mid": quien.membership_id})
+    f = cur.fetchone()
+    if not f:
+        return None
+    return ModificacionAbierta(pregunta_id=str(f["id"]),
+                               herramienta=f["herramienta"],
+                               args=f["args"] or {}, resumen=f["resumen"])
 
 
 def pending_action_id_de(cur: psycopg.Cursor, token: str) -> str | None:

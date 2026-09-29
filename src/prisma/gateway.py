@@ -34,7 +34,8 @@ from .ingreso_tareas import (QUESTION_CHOICE, QUESTION_CONFIRMATION,
 from .salida import TRUNCAR_ETIQUETA_BOTON as TRUNCAR_TITULO_BOTON
 from .salida import (ETIQUETA_CANCELAR, ETIQUETA_CONFIRMAR, ICONO_CANCELAR,
                      ICONO_CONFIRMAR, ICONO_OTRA_OPCION, ICONO_TAREA,
-                     con_icono, enqueue_outbox, etiquetas_de_tarea,
+                     cabe_en_mensaje, con_icono, enqueue_outbox,
+                     etiquetas_de_tarea,
                      normalize_visible_text, truncar_etiqueta_boton,
                      with_no_effect_status)
 
@@ -68,6 +69,10 @@ _TIPO_DE_ALTA = {
     _SENTINEL_ALTA_CONFIRMACION: QUESTION_CONFIRMATION,
 }
 _SENTINEL_DE_ALTA = {tipo: centinela for centinela, tipo in _TIPO_DE_ALTA.items()}
+# La vista previa de un cambio que la persona pidió y espera su Confirmar
+# (T9-R1d-1b): tampoco es una pregunta de `pending_action` que se consuma como
+# Modificar. Su `args` lleva la herramienta real y sus argumentos.
+_SENTINEL_VISTA_PREVIA = "_vista_previa_cambio"
 _OPCION_NINGUNA = "__ninguna__"
 _OPCION_NUEVA = "__nueva__"
 _ETIQUETA_NINGUNA = "Ninguna, lo escribo"
@@ -153,6 +158,16 @@ AVISO_ALTA_DEJADA = "Listo, dejé de lado el borrador de la tarea{titulo}."
 AVISO_ALTA_NO_SE_CORRIGE = (
     "El borrador ya está armado y no lo puedo cambiar desde acá: si algún dato "
     "no es el correcto, cancelalo y armá la tarea de nuevo.")
+# La vista previa de un cambio que la persona pidió y espera su Confirmar
+# (T9-R1d-1b, ADR 0013 regla 1, enmienda): el cambio se aplica sólo con el
+# botón Confirmar. Un mensaje que dice "sí" no lo aplica: se dice y se le
+# vuelve a mostrar la vista previa con sus botones. Redacción pendiente de
+# revisión de voz en T10.
+NOMBRE_VISTA_PREVIA = "el cambio que te mostré"
+AVISO_VISTA_PREVIA_SE_CONFIRMA_CON_EL_BOTON = (
+    "Ese cambio se confirma con el botón Confirmar, no con un mensaje.")
+AVISO_VISTA_PREVIA_DEJADA = (
+    "Listo, dejé de lado el cambio que te mostré: no apliqué nada.")
 # Cuánto de la vista previa que se corrige le llega al ruteo como contexto.
 _LIMITE_PROPUESTA_PARA_RUTEO = 400
 
@@ -899,7 +914,9 @@ def _turno(cur, quien, texto: str, workspace_id: str, chat_id: int,
     # evidencia), Modificar (T3, ADR 0005 decisión 1: "¿Qué querés cambiar?"),
     # "Ninguna, lo escribo" (T4, decisión 4) y las del alta guiada (T9-R1c: un
     # campo de texto libre, una elección con botones, el borrador esperando
-    # su confirmación; sólo en un chat privado: `alta_privada`). Ninguna se
+    # su confirmación; sólo en un chat privado: `alta_privada`) y la vista
+    # previa de un cambio que la persona pidió y espera su Confirmar
+    # (T9-R1d-1b; la precedencia está en `_ver_pregunta_abierta`). Ninguna se
     # toma ya sin mirar el mensaje (T9-R1a, T9-R1b y T9-R1c, ADR 0013 regla 1):
     # se lee la pregunta abierta sin consumirla y el ruteo tipado la relaciona
     # con el mensaje. Con una pregunta abierta, `otro_tema` no se atiende
@@ -1021,13 +1038,17 @@ class _Pregunta:
     corregir, y queda como `dudoso`. `corrige_aviso`, si viene, es lo que se
     dice cuando el mensaje corrige y en ese tipo no hay camino para hacerlo
     (el borrador ya armado): en vez de los botones de `dudoso`, lo dice una
-    vez y la pregunta queda abierta."""
+    vez y la pregunta queda abierta. `corrige_modifica` dice que en ese tipo el
+    mensaje que corrige es el de Modificar sin haber tocado el botón (la vista
+    previa de un cambio): la propuesta se cierra como Modificar y el mensaje es
+    la corrección."""
     nombre: str
     para_ruteo: str
     pregunta: str
     dejada: str
     corrige_responde: bool
     corrige_aviso: str | None = None
+    corrige_modifica: bool = False
 
 
 def _para_ruteo(descripcion: str, pregunta: str) -> str:
@@ -1066,7 +1087,8 @@ def _no_proponer_de(abierta) -> dict | None:
     la herramienta y el id que la pregunta que se deja de lado tenía
     pendientes, como datos (`NoProponer` de `agente`, guardado como dict para
     que viaje en el estado de la aclaración). Modificar: la herramienta de la
-    propuesta y su id; dato del menú: la herramienta a la que lleva la acción.
+    propuesta y su id (igual la vista previa de un cambio, T9-R1d-1b); dato del
+    menú: la herramienta a la que lleva la acción.
     "Ninguna, lo escribo" y las preguntas del alta no tienen tarea conocida:
     sin guarda."""
     from . import pendientes as P
@@ -1074,17 +1096,23 @@ def _no_proponer_de(abierta) -> dict | None:
     if abierta.herramienta == _SENTINEL_ACLARACION or (
             abierta.herramienta in _TIPO_DE_ALTA):
         return None
+    args = abierta.args
     if abierta.herramienta == P.SENTINEL_DATO_MENU_TAREA:
         herramienta, campo = _HERRAMIENTA_DE_DATO_MENU.get(
-            abierta.args.get("accion"), (None, None))
+            args.get("accion"), (None, None))
     else:
-        # Modificar: el id de la propuesta es el de su herramienta --
-        # `bloqueo_id` en `resolver_bloqueo`, `dependencia_id` al quitar una
-        # dependencia, `tarea_id` en el resto. Una herramienta con dos ids
-        # (`crear_dependencia`) o ninguno conocido queda sin guarda.
-        herramienta = abierta.herramienta
-        campo = next((c for c in _CAMPOS_DE_ID if c in abierta.args), None)
-    valor = abierta.args.get(campo) if campo else None
+        # Modificar, o la vista previa de un cambio (T9-R1d-1b, que guarda su
+        # herramienta y sus argumentos en `args`): el id de la propuesta es el
+        # de su herramienta -- `bloqueo_id` en `resolver_bloqueo`,
+        # `dependencia_id` al quitar una dependencia, `tarea_id` en el resto.
+        # Una herramienta con dos ids (`crear_dependencia`) o ninguno conocido
+        # queda sin guarda.
+        if abierta.herramienta == _SENTINEL_VISTA_PREVIA:
+            herramienta, args = args["herramienta"], args["argumentos"]
+        else:
+            herramienta = abierta.herramienta
+        campo = next((c for c in _CAMPOS_DE_ID if c in args), None)
+    valor = args.get(campo) if campo else None
     if not herramienta or valor is None:
         return None
     return {"herramienta": herramienta, "campo": campo, "valor": str(valor)}
@@ -1096,13 +1124,25 @@ def _pregunta_de(abierta) -> _Pregunta:
     escribo" (el pedido original y la referencia, guardados en sus `args`), una
     pregunta del alta guiada (un campo de texto libre, una elección con
     botones o el borrador esperando confirmación; su `resumen` es la pregunta
-    que se hizo) o, con cualquier otra `herramienta`, una corrección de
-    Modificar (la vista previa que se corrige es su `resumen`)."""
+    que se hizo), la vista previa de un cambio que la persona pidió (su
+    `resumen` es la vista previa) o, con cualquier otra `herramienta`, una
+    corrección de Modificar (la vista previa que se corrige es su `resumen`)."""
     from . import pendientes as P
 
     args = abierta.args
     if abierta.herramienta in _TIPO_DE_ALTA:
         return _pregunta_del_alta(abierta)
+    if abierta.herramienta == _SENTINEL_VISTA_PREVIA:
+        propuesta = abierta.resumen[:_LIMITE_PROPUESTA_PARA_RUTEO]
+        descripcion = (
+            "la vista previa de un cambio que la persona pidió, con los "
+            "botones Confirmar, Modificar y Cancelar: el cambio se aplica sólo "
+            f"con Confirmar. La vista previa dice: «{propuesta}»")
+        return _Pregunta(
+            nombre=NOMBRE_VISTA_PREVIA,
+            para_ruteo=_para_ruteo(descripcion, "¿Lo confirmás?"),
+            pregunta=abierta.resumen, dejada=AVISO_VISTA_PREVIA_DEJADA,
+            corrige_responde=False, corrige_modifica=True)
     if abierta.herramienta == P.SENTINEL_DATO_MENU_TAREA:
         descripcion = _descripcion_dato_menu(args)
         pregunta = _pregunta_dato_menu(args.get("accion"), args.get("titulo", ""))
@@ -1201,6 +1241,17 @@ def _atender_pregunta_pendiente(cur, quien, texto: str, abierta, proveedor, cal,
                                      entrante_id)
             return None
         return route
+    if comando is RespectoPendiente.CORRIGE and pregunta.corrige_modifica:
+        # El camino de Modificar sin haber tocado el botón: la vista previa se
+        # cierra sin aplicar nada y este mensaje es la corrección. Si otro
+        # camino ya la había cerrado, el mensaje sigue por el camino normal.
+        modificacion = _cerrar_como_modificar(cur, quien, abierta, ahora)
+        if modificacion is None:
+            return route
+        _seguir_camino_normal(cur, quien, texto, route, proveedor, cal, chat_id,
+                              workspace_id, ahora, entrante_id,
+                              modificacion=modificacion)
+        return None
     if comando is RespectoPendiente.CANCELA:
         _dejar_pregunta_pendiente(cur, quien, workspace_id, chat_id, abierta,
                                   ahora)
@@ -1238,6 +1289,10 @@ def _repreguntar(cur, quien, workspace_id: str, chat_id: int, abierta,
     """Vuelve a hacer la pregunta abierta (`charla`, `no_puedo`, un mensaje que
     no era la opción). Una elección del alta la vuelve a mandar con sus
     botones: sus opciones son las únicas respuestas. Las demás, como texto."""
+    if abierta.herramienta == _SENTINEL_VISTA_PREVIA:
+        _mostrar_vista_previa(cur, quien, workspace_id, chat_id, abierta, ahora,
+                              entrante_id, prefijo=prefijo.strip())
+        return
     if abierta.herramienta == _SENTINEL_ALTA_ELECCION:
         from .ingreso_tareas import resend_choice_prompt
 
@@ -1273,6 +1328,13 @@ def _seguir_con_la_respuesta(cur, quien, texto: str, abierta, route, proveedor,
         # confirma y el borrador sigue esperando.
         _responder(cur, workspace_id, chat_id, quien, abierta.resumen, ahora)
         return
+    if abierta.herramienta == _SENTINEL_VISTA_PREVIA:
+        # Lo mismo con la vista previa de un cambio: sólo el botón Confirmar
+        # lo aplica. Se dice y se la vuelve a mostrar con sus botones.
+        _mostrar_vista_previa(
+            cur, quien, workspace_id, chat_id, abierta, ahora, entrante_id,
+            prefijo=AVISO_VISTA_PREVIA_SE_CONFIRMA_CON_EL_BOTON)
+        return
     if abierta.herramienta == P.SENTINEL_DATO_MENU_TAREA:
         _resumir_dato_menu_tarea(cur, quien, texto, abierta, chat_id,
                                  workspace_id, ahora)
@@ -1304,6 +1366,55 @@ def _dejar_pregunta_pendiente(cur, quien, workspace_id: str, chat_id: int,
     _responder(cur, workspace_id, chat_id, quien, texto, ahora)
 
 
+def _cerrar_como_modificar(cur, quien, abierta, ahora):
+    """La corrección escrita de la vista previa de un cambio (T9-R1d-1b): la
+    cierra como el botón Modificar (`pendientes.modificar_vista_previa`, sin
+    aplicar nada) y devuelve lo que ese toque dejaría para el turno, o `None`
+    si otro camino ya la había cerrado. Audita lo mismo que el botón."""
+    from . import pendientes as P
+
+    modificacion = P.modificar_vista_previa(cur, quien, abierta.pregunta_id,
+                                            ahora)
+    if modificacion is not None:
+        registrar_auditoria(
+            cur, accion=f"modificar:{modificacion.herramienta}",
+            workspace_id=quien.workspace_id, actor_app_user_id=quien.app_user_id,
+            actor_kind="persona",
+            detalle={"args": modificacion.args, "via": "texto"})
+    return modificacion
+
+
+def _mostrar_vista_previa(cur, quien, workspace_id: str, chat_id: int, abierta,
+                          ahora, entrante_id: str | None, *,
+                          prefijo: str = "") -> None:
+    """Vuelve a mostrar la vista previa de un cambio con sus botones
+    (`charla`, `no_puedo`, "Seguir", o un mensaje que quiso confirmar sin el
+    botón), con `prefijo` delante si viene. Es un solo mensaje: el mismo texto
+    con los mismos botones de siempre (`despachador` arma los botones de la
+    `pending_action`; el toque de cualquiera de los dos mensajes resuelve una
+    sola vez). Si el prefijo no deja entrar la vista previa con sus botones,
+    sale sólo el prefijo, sin botones, y la vista previa sigue esperando. Si ya
+    no esperaba, se dice."""
+    from . import pendientes as P
+
+    if not P.vista_previa_esperando(cur, abierta.pregunta_id, ahora):
+        _responder(cur, workspace_id, chat_id, quien, AVISO_DATO_YA_NO_PENDIENTE,
+                   ahora)
+        return
+    texto = f"{prefijo}\n\n{abierta.resumen}" if prefijo else abierta.resumen
+    if not cabe_en_mensaje(texto, has_buttons=True):
+        _responder(cur, workspace_id, chat_id, quien,
+                   prefijo or AVISO_VISTA_PREVIA_SE_CONFIRMA_CON_EL_BOTON, ahora)
+        return
+    enqueue_outbox(
+        cur, workspace_id=workspace_id, chat_id=chat_id,
+        recipient_membership_id=quien.membership_id, text=texto,
+        scheduled_for=ahora,
+        dedupe_key=(f"{workspace_id}:vista-previa:{abierta.pregunta_id}:"
+                    f"{entrante_id or ahora.timestamp()}"),
+        is_response=True, pending_action_id=abierta.pregunta_id)
+
+
 def _ver_pregunta_abierta(cur, quien, chat_id: int, ahora, *, alta: bool):
     """La pregunta abierta de esta persona en este chat, sin consumirla.
 
@@ -1320,7 +1431,19 @@ def _ver_pregunta_abierta(cur, quien, chat_id: int, ahora, *, alta: bool):
     confirmación): si hay una y también una pregunta de `pending_action`, el
     alta tiene precedencia, como antes de T9-R1c-1 (el alta leía el mensaje antes
     de que `_turno` mirara nada); la otra queda abierta y se retoma cuando el
-    alta termina o se deja. Sin `alta`, sólo las de `pending_action`."""
+    alta termina o se deja. Sin `alta`, sólo las de `pending_action`.
+
+    Última, la vista previa de un cambio que la persona pidió y espera su
+    Confirmar (T9-R1d-1b, `pendientes.ver_vista_previa_abierta`). Precedencia:
+    alta, después el dato o la corrección que se pidió por escrito (Modificar,
+    "Ninguna, lo escribo", el dato de una acción del menú) y por último la vista
+    previa. Las que piden un dato consumen el mensaje siguiente y son lo último
+    que la persona abrió; la vista previa sigue esperando su Confirmar y vuelve
+    a ser la rama abierta cuando esas se cierran. No lo son la vista previa de
+    otra persona ni lo que le llega a alguien para decidir (el aviso de entrega,
+    el borrador que espera a otro aprobador): ese es un mensaje que inicia
+    Prisma."""
+    from . import herramientas as H
     from . import pendientes as P
     from .ingreso_tareas import open_intake_question
 
@@ -1335,7 +1458,16 @@ def _ver_pregunta_abierta(cur, quien, chat_id: int, ahora, *, alta: bool):
                 pregunta_id=pregunta["id"],
                 herramienta=_SENTINEL_DE_ALTA[pregunta["tipo"]], args=args,
                 resumen=pregunta["resumen"])
-    return P.ver_modificacion_abierta(cur, quien, chat_id, ahora)
+    abierta = P.ver_modificacion_abierta(cur, quien, chat_id, ahora)
+    if abierta is not None:
+        return abierta
+    vista = P.ver_vista_previa_abierta(cur, quien, chat_id, ahora, H.REGISTRO)
+    if vista is None:
+        return None
+    return P.ModificacionAbierta(
+        pregunta_id=vista.id, herramienta=_SENTINEL_VISTA_PREVIA,
+        args={"herramienta": vista.herramienta, "argumentos": vista.args},
+        resumen=vista.resumen)
 
 
 def _consumir_pregunta(cur, quien, abierta, ahora) -> bool:
@@ -1344,7 +1476,8 @@ def _consumir_pregunta(cur, quien, abierta, ahora) -> bool:
     campo del alta no se consume acá sino en `consume_pending_text`, junto con
     su validación (un texto vacío o demasiado largo deja el campo abierto), y
     la elección en `resolve_choice`; el borrador esperando confirmación no se
-    consume nunca con un mensaje: acá sólo se comprueba que siga esperando."""
+    consume nunca con un mensaje: acá sólo se comprueba que siga esperando. Lo
+    mismo la vista previa de un cambio (T9-R1d-1b): sólo su botón la aplica."""
     from . import pendientes as P
     from .ingreso_tareas import intake_question_active
 
@@ -1352,6 +1485,8 @@ def _consumir_pregunta(cur, quien, abierta, ahora) -> bool:
         return intake_question_active(cur, quien,
                                       _TIPO_DE_ALTA[abierta.herramienta],
                                       abierta.pregunta_id)
+    if abierta.herramienta == _SENTINEL_VISTA_PREVIA:
+        return P.vista_previa_esperando(cur, abierta.pregunta_id, ahora)
     return P.consumir_modificacion(cur, abierta.pregunta_id, ahora)
 
 
@@ -1359,7 +1494,8 @@ def _dejar_de_lado(cur, quien, abierta, ahora) -> bool:
     """Deja de lado la pregunta abierta: `True` si esta llamada la cerró. Una
     fila de `pending_action` se consume; una pregunta del alta cancela su
     borrador, porque sin ese dato, esa elección o esa confirmación el alta no
-    sigue."""
+    sigue. La vista previa de un cambio (T9-R1d-1b) se cancela por el mismo
+    camino que su botón Cancelar: no se aplica nada."""
     from . import pendientes as P
     from .ingreso_tareas import cancel_from_intake_question
 
@@ -1367,6 +1503,8 @@ def _dejar_de_lado(cur, quien, abierta, ahora) -> bool:
         return cancel_from_intake_question(
             cur, quien, _TIPO_DE_ALTA[abierta.herramienta],
             abierta.pregunta_id, ahora)
+    if abierta.herramienta == _SENTINEL_VISTA_PREVIA:
+        return P.cancelar_vista_previa(cur, quien, abierta.pregunta_id, ahora)
     return P.consumir_modificacion(cur, abierta.pregunta_id, ahora)
 
 
@@ -1523,6 +1661,7 @@ def _resolver_toque_respuesta_dato_menu(cur, quien, workspace_id: str,
         # se hace nada.
         route = None
         if (abierta.herramienta != P.SENTINEL_DATO_MENU_TAREA
+                and abierta.herramienta != _SENTINEL_VISTA_PREVIA
                 and abierta.herramienta not in _TIPO_DE_ALTA):
             route, error = _rutear(proveedor, texto)
             if route is None:
@@ -1559,6 +1698,8 @@ def _sigue_abierta(cur, quien, chat_id: int, abierta, ahora) -> bool:
         return intake_question_active(cur, quien,
                                       _TIPO_DE_ALTA[abierta.herramienta],
                                       abierta.pregunta_id)
+    if abierta.herramienta == _SENTINEL_VISTA_PREVIA:
+        return P.vista_previa_esperando(cur, abierta.pregunta_id, ahora)
     vigente = P.ver_modificacion_abierta(cur, quien, chat_id, ahora)
     return vigente is not None and vigente.pregunta_id == abierta.pregunta_id
 
