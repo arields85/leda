@@ -4396,5 +4396,16 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   RDD: R1c-0 solo medio bajo el umbral; el tramo `3bcaa99..24fe1e3` alto (1528 líneas),
   consentida por el usuario, revisión `review-06b7019b060dbffb` (4 lentes) **aprobada y
   reconocida**; frontera de revisión en `24fe1e3`. Ocho observaciones no bloqueantes,
-  anotadas como seguimientos en T9-R1c-2. Pendiente: suite completa del padre, banco real
-  `b-0021` (n=3).
+  anotadas como seguimientos en T9-R1c-2. Suite completa del padre: 1427 passed, 1 failed
+  (la misma prueba de migración) y en una segunda corrida **1428 passed, 174 deselected**:
+  es intermitente (2 de 3 corridas completas; sola siempre pasa) y no toca este código
+  (arma su base desde `BASELINE_REF` y aplica `0002`); falta capturar su traceback.
+  Banco real `b-0021` (n=3, `nan/deepseek-v4-flash`): **24/27**. El ruteo acertó siempre
+  (`otro_tema` 3/3 en `b-0021-c`). Las 3 fallas son `b-0021-c`: la consulta "¿qué tareas
+  tengo abiertas?" responde con la lista de tareas, que siempre lleva botones
+  (`agente._opciones_lista_tareas`), y por la condición de la regla 1 ("si la respuesta no
+  dejó otra interacción pendiente") no sale el retome; la pregunta del título sigue
+  abierta. Es lo mismo que se notó en `b-0020`. El escenario espera algo que la regla
+  excluye: decisión pedida al usuario (retome sin botones cuando la respuesta ya trae los
+  suyos, o ajustar el escenario). Además, `b-0021-c-2` resumió sin nombrar la tarea
+  (redacción, R3-H7, T10).
