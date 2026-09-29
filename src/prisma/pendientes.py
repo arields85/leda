@@ -28,8 +28,9 @@ import psycopg
 
 from .autoridad import Denegado, Solicitante
 from .salida import (ETIQUETA_CANCELAR, ETIQUETA_CONFIRMAR, ICONO_SALIR_OPCIONES,
-                     ICONO_VER_MAS, con_icono, etiquetas_coinciden,
-                     normalize_visible_text, prepare_buttons, prepare_payload)
+                     ICONO_VER_MAS, con_icono, etiqueta_sin_icono,
+                     etiquetas_coinciden, normalize_visible_text,
+                     prepare_buttons, prepare_payload)
 
 # Lo que Telegram manda de vuelta al apretar un botón. El tope son 64 bytes,
 # así que viaja un token corto y la acción queda en la base.
@@ -399,9 +400,9 @@ def ver_vista_previa_abierta(cur: psycopg.Cursor, quien: Solicitante,
     que le llega a alguien para decidir sobre lo que pidió otra persona es otra
     clase de fila y queda afuera: el aviso de entrega (`SENTINEL_MENU_TAREA`),
     la vista previa del borrador del alta (`draft_id`), una elección con
-    botones (`campo`: pregunta "cuál", no espera un Confirmar) y una
-    Modificación ya pedida (`modificar_pedido_en`). Si hay varias, la más
-    reciente."""
+    botones (`campo`: pregunta "cuál", no espera un Confirmar; es otra rama,
+    `ver_eleccion_abierta`) y una Modificación ya pedida
+    (`modificar_pedido_en`). Si hay varias, la más reciente."""
     cur.execute(
         """select id from pending_action
             where workspace_id = %(ws)s and membership_id = %(mid)s
@@ -414,6 +415,69 @@ def ver_vista_previa_abierta(cur: psycopg.Cursor, quien: Solicitante,
          "chat": chat_id, "tools": list(herramientas)})
     f = cur.fetchone()
     return buscar(cur, str(f["id"])) if f else None
+
+
+# Las filas con `campo` que ofrecen caminos y no son una pregunta que la
+# persona deba responder (T9-R1d-1c): las opciones que arma `ofrecer_opciones`
+# y las listas de tareas (`SENTINEL_OPCIONES_MODELO`, con "Quiero consultar
+# otra cosa"), el menú de una tarea y el aviso de entrega que le llega al
+# aprobador (`SENTINEL_MENU_TAREA`) y la pregunta con botones de la propia
+# rama (`SENTINEL_RESPUESTA_DATO_MENU`, que ya es el retome de la pregunta que
+# sigue abierta).
+_OFERTAS_DE_CAMINO = (SENTINEL_OPCIONES_MODELO, SENTINEL_MENU_TAREA,
+                      SENTINEL_RESPUESTA_DATO_MENU)
+
+
+def ver_eleccion_abierta(cur: psycopg.Cursor, quien: Solicitante, chat_id: int,
+                         ahora: datetime) -> Pendiente | None:
+    """Lee, sin consumirla, la elección con botones que Prisma le pidió a esta
+    persona en este chat y que sigue esperando su respuesta (T9-R1d-1c, ADR 0013
+    regla 1, enmienda "una sola rama abierta"): la aclaración "¿A cuál te
+    referís?", la de con cuál otra tarea se declara una dependencia o la que
+    pide una herramienta (`NecesitaElegir`). Es una `pending_action` de esta
+    persona en este chat, `esperando`, sin vencer, con `campo` (sus botones
+    devuelven un valor) y que no es ninguna de las ofertas de camino
+    (`_OFERTAS_DE_CAMINO`) ni un borrador del alta ni una Modificación ya
+    pedida (`modificar_pedido_en`: su dato se escribe, otra pregunta). Si hay
+    varias, la más reciente."""
+    cur.execute(
+        """select id from pending_action
+            where workspace_id = %(ws)s and membership_id = %(mid)s
+              and chat_id = %(chat)s and estado = 'esperando'
+              and vence_en > %(ahora)s and campo is not null
+              and draft_id is null and modificar_pedido_en is null
+              and not herramienta = any(%(ofertas)s)
+            order by creado_en desc
+            limit 1""",
+        {"ahora": ahora, "ws": quien.workspace_id, "mid": quien.membership_id,
+         "chat": chat_id, "ofertas": list(_OFERTAS_DE_CAMINO)})
+    f = cur.fetchone()
+    return buscar(cur, str(f["id"])) if f else None
+
+
+def opcion_escrita(cur: psycopg.Cursor, pending_action_id: str, texto: str, *,
+                   nombres: dict[str, str] | None = None) -> Opcion | None:
+    """La única opción activa de una elección que `texto` dice exactamente, o
+    `None` (T9-R1d-1c). Igual que la elección del alta
+    (`ingreso_tareas.resolve_typed_choice`): mismo texto normalizado y sin
+    mayúsculas, sin el ícono del botón; ninguna coincidencia parcial ni
+    aproximada. `nombres` agrega el nombre completo de una opción (por el
+    valor que devuelve), que el botón puede acortar. Con cero o con varias
+    opciones que coincidan, no hay ninguna: las opciones son las únicas
+    respuestas y el modelo nunca elige por la persona."""
+    buscado = normalize_visible_text(texto).casefold()
+    if not buscado:
+        return None
+    coinciden = []
+    for opcion in opciones(cur, pending_action_id):
+        claves = {normalize_visible_text(
+            etiqueta_sin_icono(opcion.etiqueta)).casefold()}
+        nombre = (nombres or {}).get(str(opcion.valor))
+        if nombre:
+            claves.add(normalize_visible_text(nombre).casefold())
+        if buscado in claves:
+            coinciden.append(opcion)
+    return coinciden[0] if len(coinciden) == 1 else None
 
 
 def vista_previa_esperando(cur: psycopg.Cursor, pending_action_id: str,

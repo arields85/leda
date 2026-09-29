@@ -35,7 +35,7 @@ from .salida import TRUNCAR_ETIQUETA_BOTON as TRUNCAR_TITULO_BOTON
 from .salida import (ETIQUETA_CANCELAR, ETIQUETA_CONFIRMAR, ICONO_CANCELAR,
                      ICONO_CONFIRMAR, ICONO_OTRA_OPCION, ICONO_TAREA,
                      cabe_en_mensaje, con_icono, enqueue_outbox,
-                     etiquetas_de_tarea,
+                     etiqueta_sin_icono, etiquetas_de_tarea,
                      normalize_visible_text, truncar_etiqueta_boton,
                      with_no_effect_status)
 
@@ -73,6 +73,11 @@ _SENTINEL_DE_ALTA = {tipo: centinela for centinela, tipo in _TIPO_DE_ALTA.items(
 # (T9-R1d-1b): tampoco es una pregunta de `pending_action` que se consuma como
 # Modificar. Su `args` lleva la herramienta real y sus argumentos.
 _SENTINEL_VISTA_PREVIA = "_vista_previa_cambio"
+# La elección con botones que Prisma le pidió a la persona y espera su respuesta
+# (T9-R1d-1c): la aclaración "¿A cuál te referís?", la de la otra tarea de una
+# dependencia, la de una herramienta con un argumento ambiguo. Su `args` lleva la
+# `herramienta` real de la fila (o su centinela) y sus `argumentos`.
+_SENTINEL_ELECCION = "_eleccion_abierta"
 _OPCION_NINGUNA = "__ninguna__"
 _OPCION_NUEVA = "__nueva__"
 _ETIQUETA_NINGUNA = "Ninguna, lo escribo"
@@ -168,6 +173,11 @@ AVISO_VISTA_PREVIA_SE_CONFIRMA_CON_EL_BOTON = (
     "Ese cambio se confirma con el botón Confirmar, no con un mensaje.")
 AVISO_VISTA_PREVIA_DEJADA = (
     "Listo, dejé de lado el cambio que te mostré: no apliqué nada.")
+# La elección con botones que la persona no respondió (T9-R1d-1c): la de la
+# aclaración de una referencia tiene su propio aviso (`AVISO_ACLARACION_DEJADA`).
+# Redacción pendiente de revisión de voz en T10.
+NOMBRE_ELECCION_PENDIENTE = "la elección que te pedí"
+AVISO_ELECCION_DEJADA = "Listo, dejé de lado la elección: no hice nada."
 # Cuánto de la vista previa que se corrige le llega al ruteo como contexto.
 _LIMITE_PROPUESTA_PARA_RUTEO = 400
 
@@ -652,185 +662,8 @@ def _toque(conn, workspace_id: str, slug: str, toque: dict,
                 _responder(cur, workspace_id, chat_id, quien,
                            PREGUNTA_MODIFICAR, ahora)
             elif not draft_token:
-                if resuelta.task_id:
-                    _responder(cur, workspace_id, chat_id, quien,
-                               "Hecho. La tarea quedó comprometida.", ahora)
-                elif resuelta.herramienta == _SENTINEL_ACLARACION:
-                    # T4: no es una herramienta real -- `H.ejecutar` la
-                    # rechazaría -- es la elección de un botón de aclaración.
-                    _resolver_toque_aclaracion(
-                        cur, quien, workspace_id, chat_id, token, resuelta.args, ahora)
-                elif resuelta.herramienta == P.SENTINEL_OPCIONES_MODELO:
-                    # T1, ADR 0007: tampoco es una herramienta real -- es la
-                    # elección de una opción que ofreció el modelo con
-                    # `ofrecer_opciones`. No vuelve a llamarla: retoma la
-                    # conversación con el modelo.
-                    _resolver_toque_opcion_modelo(
-                        cur, quien, workspace_id, chat_id, resuelta.args, ahora)
-                elif resuelta.herramienta == P.SENTINEL_MENU_TAREA:
-                    # T2, ADR 0007 §4.6: el menú de acciones de una tarea.
-                    # Cada opción es una acción calculada por código, no una
-                    # herramienta -- `_resolver_toque_menu_tarea` la
-                    # despacha. Se le pasa el id de la `pending_action` ya
-                    # resuelta (T2b, trazabilidad): si algo revienta más
-                    # adelante, el incidente apunta a esta fila.
-                    _resolver_toque_menu_tarea(
-                        cur, quien, workspace_id, chat_id, resuelta.args, ahora,
-                        pending_action_id=pending_action_id)
-                elif resuelta.herramienta == P.SENTINEL_RESPUESTA_DATO_MENU:
-                    # T9-R1a-2 y T9-R1d: los botones de `dudoso` y de la
-                    # pregunta de la rama (`otro_tema`) sobre una pregunta
-                    # pendiente que sigue abierta.
-                    _resolver_toque_respuesta_dato_menu(
-                        cur, quien, workspace_id, chat_id, resuelta.args, ahora)
-                elif resuelta.herramienta == P.SENTINEL_DATO_MENU_TAREA:
-                    # T2: la elección, con botones, de con cuál otra tarea se
-                    # declara una dependencia -- la única forma de este
-                    # sentinel que se resuelve por toque (la otra, un dato en
-                    # texto libre, la retoma `_turno` cuando llega el mensaje).
-                    _resolver_toque_dato_menu_tarea(
-                        cur, quien, workspace_id, chat_id, resuelta.args, ahora,
-                        pending_action_id=pending_action_id)
-                else:
-                    from .agente import VIGENCIA_PENDIENTE
-
-                    prep_capturada: dict = {}
-                    try:
-                        resultado = H.ejecutar(
-                            cur, quien, resuelta.herramienta, resuelta.args,
-                            ya_confirmada=True, chat_id=chat_id,
-                            huella_previa=resuelta.huella,
-                            preparacion=prep_capturada)
-                    except Denegado as e:
-                        _responder(cur, workspace_id, chat_id, quien, str(e), ahora)
-                    except H.EstadoCambio as e:
-                        # La situación cambió entre la vista previa y el
-                        # toque (ADR 0005, decisión 1): no se aplica nada, se
-                        # arma una vista previa nueva y una acción pendiente
-                        # nueva. Sigue siendo la vista previa de una
-                        # herramienta que escribe, así que conserva sus tres
-                        # botones (T3).
-                        nueva = P.registrar(
-                            cur, quien, herramienta=e.herramienta,
-                            args=e.argumentos, resumen=e.resumen,
-                            vence_en=ahora + VIGENCIA_PENDIENTE, chat_id=chat_id,
-                            huella=e.huella,
-                            opciones=[(ETIQUETA_CONFIRMAR, True), ("Modificar", "modificar"),
-                                     (ETIQUETA_CANCELAR, False)])
-                        enqueue_outbox(
-                            cur, workspace_id=workspace_id, chat_id=chat_id,
-                            recipient_membership_id=quien.membership_id,
-                            text=("La situación cambió desde que te mostré esto. "
-                                 f"Vista previa nueva:\n\n{e.resumen}"),
-                            scheduled_for=ahora,
-                            dedupe_key=(f"{workspace_id}:cambio:{e.herramienta}:"
-                                       f"{ahora.timestamp()}"),
-                            is_response=True, pending_action_id=nueva.id,
-                        )
-                    else:
-                        # `aprobar_tarea` (ADR 0008, hallazgo 5 de sesión 2
-                        # por Telegram) siempre escribe la aprobación, aun
-                        # cuando `cerrada` sea `False` -- a diferencia de
-                        # `actualizar_estado`/`preparar` en general, donde
-                        # `cerrada`/`iniciada` en `False` significa que
-                        # `preparar` frenó ANTES de escribir nada. Sin este
-                        # distingo, el rechazo genérico de abajo auditaría la
-                        # aprobación como `herramienta_rechazada` y nunca le
-                        # confirmaría a quien aprobó que sí quedó registrada.
-                        aprobacion_registrada = (
-                            resuelta.herramienta == "aprobar_tarea"
-                            and isinstance(resultado, dict)
-                            and resultado.get("aprobada"))
-                        if not aprobacion_registrada and isinstance(resultado, dict) and (
-                                resultado.get("error")
-                                or resultado.get("cerrada") is False
-                                or resultado.get("iniciada") is False
-                                or resultado.get("en_revision") is False):
-                            # La preparación se corrió de nuevo al confirmar
-                            # (`ya_confirmada=True`) y encontró un
-                            # impedimento de negocio -- la situación cambió
-                            # entre la vista previa y el toque (sin llegar a
-                            # `EstadoCambio`, porque la huella puede seguir
-                            # coincidiendo aunque el estado ya no admita la
-                            # transición), o el propio handler encontró la
-                            # misma condición al aplicar. Mismo defecto de
-                            # fondo que el corregido en `agente._ejecutar_una`
-                            # (banco b-0005-a): nunca auditar como ejecutado
-                            # (`herramienta:<nombre>`) lo que no escribió
-                            # nada, y nunca decirle "Hecho" a la persona por
-                            # algo que no pasó. Mismo mensaje específico que
-                            # ya usa `_mensaje_resultado_menu` para el mismo
-                            # tipo de rechazo, en vez de un genérico "No se
-                            # aplicó el cambio.".
-                            registrar_auditoria(
-                                cur, accion=f"herramienta_rechazada:{resuelta.herramienta}",
-                                workspace_id=workspace_id,
-                                actor_app_user_id=quien.app_user_id,
-                                actor_kind="persona",
-                                detalle={"args": resuelta.args, "via": "boton",
-                                        "rechazo": resultado})
-                            _responder(
-                                cur, workspace_id, chat_id, quien,
-                                resultado.get("falta") or resultado.get("error")
-                                or "No se aplicó el cambio.", ahora)
-                        else:
-                            registrar_auditoria(
-                                cur, accion=f"herramienta:{resuelta.herramienta}",
-                                workspace_id=workspace_id,
-                                actor_app_user_id=quien.app_user_id,
-                                actor_kind="persona",
-                                detalle={"args": resuelta.args, "via": "boton"})
-                            if isinstance(resultado, dict) and resultado.get("draft_id"):
-                                if resultado.get("pendiente_revision"):
-                                    texto = ("Guardé el borrador y envié la vista previa "
-                                             "a quien puede confirmarlo.")
-                                else:
-                                    texto = ("Guardé el pedido como borrador; todavía "
-                                             "está incompleto.")
-                                _responder(cur, workspace_id, chat_id, quien, texto, ahora)
-                            elif aprobacion_registrada:
-                                # Hallazgo 5, sesión 2 por Telegram,
-                                # 2026-09-27: acá el bot decía "Hecho. Tarea:
-                                # X · Estado actual: En revisión · se aprueba
-                                # el trabajo" -- la vista previa, no lo que
-                                # pasó. El resultado, en pasado, corto.
-                                titulo = resultado.get("titulo") or "esa tarea"
-                                if resultado.get("cerrada"):
-                                    texto = f"Listo: aprobaste «{titulo}». Quedó terminada."
-                                else:
-                                    texto = (f"Listo: aprobaste «{titulo}»; para cerrarla "
-                                             f"todavía: {resultado.get('falta')}")
-                                _responder(cur, workspace_id, chat_id, quien, texto, ahora)
-                            elif (resuelta.herramienta == "actualizar_estado"
-                                  and isinstance(resultado, dict) and "estado" in resultado):
-                                # Mismo hallazgo: acá decía "... Estado actual:
-                                # Asignada · Nuevo estado: En revisión" -- el
-                                # estado VIEJO, después de aplicar el cambio.
-                                # `_actualizar_estado` no devuelve el título
-                                # (otros tests comparan su resultado con
-                                # `{"estado": ...}` exacto), así que se lee acá.
-                                cur.execute(
-                                    "select titulo from task where id = %s",
-                                    (resuelta.args.get("tarea_id"),))
-                                fila_tarea = cur.fetchone()
-                                titulo = fila_tarea["titulo"] if fila_tarea else "esa tarea"
-                                _responder(
-                                    cur, workspace_id, chat_id, quien,
-                                    f"Listo: «{titulo}» pasó a "
-                                    f"{H._estado_legible(resultado['estado'])}.", ahora)
-                            elif prep_capturada.get("cambio"):
-                                # El recibo cuenta qué cambió, no un "Hecho."
-                                # solo (T2, punto 3): reusa la descripción
-                                # que ya se había mostrado en la vista
-                                # previa, porque la huella coincidió -- el
-                                # estado sigue siendo ese. Sigue así para
-                                # cualquier otra herramienta del menú: sólo
-                                # `aprobar_tarea` y `actualizar_estado` (arriba)
-                                # tienen fraseo específico del resultado.
-                                _responder(cur, workspace_id, chat_id, quien,
-                                          f"Hecho. {prep_capturada['cambio']}", ahora)
-                            else:
-                                _responder(cur, workspace_id, chat_id, quien, "Hecho.", ahora)
+                _seguir_resuelta(cur, quien, workspace_id, chat_id, token,
+                                 resuelta, pending_action_id, ahora)
     except Exception as e:  # noqa: BLE001
         # `conn.commit()`/`conn.rollback()` no se pueden llamar todavía acá
         # adentro -- psycopg3 los rechaza mientras el contexto de
@@ -851,6 +684,197 @@ def _toque(conn, workspace_id: str, slug: str, toque: dict,
             tg_user, chat_id, quien, ahora)
 
     return {"ok": True}
+
+
+def _seguir_resuelta(cur, quien, workspace_id: str, chat_id: int, token: str,
+                     resuelta, pending_action_id: str | None, ahora) -> None:
+    """Lo que sigue a una opción ya resuelta (`pendientes.resolver`) que no se
+    cerró ni se corrige: cada centinela sigue su camino y una herramienta real
+    se ejecuta con la elección completada. Lo comparten el toque (`_toque`) y la
+    opción de una elección dicha por escrito (`_tomar_opcion`, T9-R1d-1c): dos
+    caminos para una misma cosa, sin copiar la lista."""
+    from . import herramientas as H
+    from . import pendientes as P
+
+    if resuelta.task_id:
+        _responder(cur, workspace_id, chat_id, quien,
+                   "Hecho. La tarea quedó comprometida.", ahora)
+    elif resuelta.herramienta == _SENTINEL_ACLARACION:
+        # T4: no es una herramienta real -- `H.ejecutar` la
+        # rechazaría -- es la elección de un botón de aclaración.
+        _resolver_toque_aclaracion(
+            cur, quien, workspace_id, chat_id, token, resuelta.args, ahora)
+    elif resuelta.herramienta == P.SENTINEL_OPCIONES_MODELO:
+        # T1, ADR 0007: tampoco es una herramienta real -- es la
+        # elección de una opción que ofreció el modelo con
+        # `ofrecer_opciones`. No vuelve a llamarla: retoma la
+        # conversación con el modelo.
+        _resolver_toque_opcion_modelo(
+            cur, quien, workspace_id, chat_id, resuelta.args, ahora)
+    elif resuelta.herramienta == P.SENTINEL_MENU_TAREA:
+        # T2, ADR 0007 §4.6: el menú de acciones de una tarea.
+        # Cada opción es una acción calculada por código, no una
+        # herramienta -- `_resolver_toque_menu_tarea` la
+        # despacha. Se le pasa el id de la `pending_action` ya
+        # resuelta (T2b, trazabilidad): si algo revienta más
+        # adelante, el incidente apunta a esta fila.
+        _resolver_toque_menu_tarea(
+            cur, quien, workspace_id, chat_id, resuelta.args, ahora,
+            pending_action_id=pending_action_id)
+    elif resuelta.herramienta == P.SENTINEL_RESPUESTA_DATO_MENU:
+        # T9-R1a-2 y T9-R1d: los botones de `dudoso` y de la
+        # pregunta de la rama (`otro_tema`) sobre una pregunta
+        # pendiente que sigue abierta.
+        _resolver_toque_respuesta_dato_menu(
+            cur, quien, workspace_id, chat_id, resuelta.args, ahora)
+    elif resuelta.herramienta == P.SENTINEL_DATO_MENU_TAREA:
+        # T2: la elección, con botones, de con cuál otra tarea se
+        # declara una dependencia -- la única forma de este
+        # sentinel que se resuelve por toque (la otra, un dato en
+        # texto libre, la retoma `_turno` cuando llega el mensaje).
+        _resolver_toque_dato_menu_tarea(
+            cur, quien, workspace_id, chat_id, resuelta.args, ahora,
+            pending_action_id=pending_action_id)
+    else:
+        from .agente import VIGENCIA_PENDIENTE
+
+        prep_capturada: dict = {}
+        try:
+            resultado = H.ejecutar(
+                cur, quien, resuelta.herramienta, resuelta.args,
+                ya_confirmada=True, chat_id=chat_id,
+                huella_previa=resuelta.huella,
+                preparacion=prep_capturada)
+        except Denegado as e:
+            _responder(cur, workspace_id, chat_id, quien, str(e), ahora)
+        except H.EstadoCambio as e:
+            # La situación cambió entre la vista previa y el
+            # toque (ADR 0005, decisión 1): no se aplica nada, se
+            # arma una vista previa nueva y una acción pendiente
+            # nueva. Sigue siendo la vista previa de una
+            # herramienta que escribe, así que conserva sus tres
+            # botones (T3).
+            nueva = P.registrar(
+                cur, quien, herramienta=e.herramienta,
+                args=e.argumentos, resumen=e.resumen,
+                vence_en=ahora + VIGENCIA_PENDIENTE, chat_id=chat_id,
+                huella=e.huella,
+                opciones=[(ETIQUETA_CONFIRMAR, True), ("Modificar", "modificar"),
+                         (ETIQUETA_CANCELAR, False)])
+            enqueue_outbox(
+                cur, workspace_id=workspace_id, chat_id=chat_id,
+                recipient_membership_id=quien.membership_id,
+                text=("La situación cambió desde que te mostré esto. "
+                     f"Vista previa nueva:\n\n{e.resumen}"),
+                scheduled_for=ahora,
+                dedupe_key=(f"{workspace_id}:cambio:{e.herramienta}:"
+                           f"{ahora.timestamp()}"),
+                is_response=True, pending_action_id=nueva.id,
+            )
+        else:
+            # `aprobar_tarea` (ADR 0008, hallazgo 5 de sesión 2
+            # por Telegram) siempre escribe la aprobación, aun
+            # cuando `cerrada` sea `False` -- a diferencia de
+            # `actualizar_estado`/`preparar` en general, donde
+            # `cerrada`/`iniciada` en `False` significa que
+            # `preparar` frenó ANTES de escribir nada. Sin este
+            # distingo, el rechazo genérico de abajo auditaría la
+            # aprobación como `herramienta_rechazada` y nunca le
+            # confirmaría a quien aprobó que sí quedó registrada.
+            aprobacion_registrada = (
+                resuelta.herramienta == "aprobar_tarea"
+                and isinstance(resultado, dict)
+                and resultado.get("aprobada"))
+            if not aprobacion_registrada and isinstance(resultado, dict) and (
+                    resultado.get("error")
+                    or resultado.get("cerrada") is False
+                    or resultado.get("iniciada") is False
+                    or resultado.get("en_revision") is False):
+                # La preparación se corrió de nuevo al confirmar
+                # (`ya_confirmada=True`) y encontró un
+                # impedimento de negocio -- la situación cambió
+                # entre la vista previa y el toque (sin llegar a
+                # `EstadoCambio`, porque la huella puede seguir
+                # coincidiendo aunque el estado ya no admita la
+                # transición), o el propio handler encontró la
+                # misma condición al aplicar. Mismo defecto de
+                # fondo que el corregido en `agente._ejecutar_una`
+                # (banco b-0005-a): nunca auditar como ejecutado
+                # (`herramienta:<nombre>`) lo que no escribió
+                # nada, y nunca decirle "Hecho" a la persona por
+                # algo que no pasó. Mismo mensaje específico que
+                # ya usa `_mensaje_resultado_menu` para el mismo
+                # tipo de rechazo, en vez de un genérico "No se
+                # aplicó el cambio.".
+                registrar_auditoria(
+                    cur, accion=f"herramienta_rechazada:{resuelta.herramienta}",
+                    workspace_id=workspace_id,
+                    actor_app_user_id=quien.app_user_id,
+                    actor_kind="persona",
+                    detalle={"args": resuelta.args, "via": "boton",
+                            "rechazo": resultado})
+                _responder(
+                    cur, workspace_id, chat_id, quien,
+                    resultado.get("falta") or resultado.get("error")
+                    or "No se aplicó el cambio.", ahora)
+            else:
+                registrar_auditoria(
+                    cur, accion=f"herramienta:{resuelta.herramienta}",
+                    workspace_id=workspace_id,
+                    actor_app_user_id=quien.app_user_id,
+                    actor_kind="persona",
+                    detalle={"args": resuelta.args, "via": "boton"})
+                if isinstance(resultado, dict) and resultado.get("draft_id"):
+                    if resultado.get("pendiente_revision"):
+                        texto = ("Guardé el borrador y envié la vista previa "
+                                 "a quien puede confirmarlo.")
+                    else:
+                        texto = ("Guardé el pedido como borrador; todavía "
+                                 "está incompleto.")
+                    _responder(cur, workspace_id, chat_id, quien, texto, ahora)
+                elif aprobacion_registrada:
+                    # Hallazgo 5, sesión 2 por Telegram,
+                    # 2026-09-27: acá el bot decía "Hecho. Tarea:
+                    # X · Estado actual: En revisión · se aprueba
+                    # el trabajo" -- la vista previa, no lo que
+                    # pasó. El resultado, en pasado, corto.
+                    titulo = resultado.get("titulo") or "esa tarea"
+                    if resultado.get("cerrada"):
+                        texto = f"Listo: aprobaste «{titulo}». Quedó terminada."
+                    else:
+                        texto = (f"Listo: aprobaste «{titulo}»; para cerrarla "
+                                 f"todavía: {resultado.get('falta')}")
+                    _responder(cur, workspace_id, chat_id, quien, texto, ahora)
+                elif (resuelta.herramienta == "actualizar_estado"
+                      and isinstance(resultado, dict) and "estado" in resultado):
+                    # Mismo hallazgo: acá decía "... Estado actual:
+                    # Asignada · Nuevo estado: En revisión" -- el
+                    # estado VIEJO, después de aplicar el cambio.
+                    # `_actualizar_estado` no devuelve el título
+                    # (otros tests comparan su resultado con
+                    # `{"estado": ...}` exacto), así que se lee acá.
+                    cur.execute(
+                        "select titulo from task where id = %s",
+                        (resuelta.args.get("tarea_id"),))
+                    fila_tarea = cur.fetchone()
+                    titulo = fila_tarea["titulo"] if fila_tarea else "esa tarea"
+                    _responder(
+                        cur, workspace_id, chat_id, quien,
+                        f"Listo: «{titulo}» pasó a "
+                        f"{H._estado_legible(resultado['estado'])}.", ahora)
+                elif prep_capturada.get("cambio"):
+                    # El recibo cuenta qué cambió, no un "Hecho."
+                    # solo (T2, punto 3): reusa la descripción
+                    # que ya se había mostrado en la vista
+                    # previa, porque la huella coincidió -- el
+                    # estado sigue siendo ese. Sigue así para
+                    # cualquier otra herramienta del menú: sólo
+                    # `aprobar_tarea` y `actualizar_estado` (arriba)
+                    # tienen fraseo específico del resultado.
+                    _responder(cur, workspace_id, chat_id, quien,
+                              f"Hecho. {prep_capturada['cambio']}", ahora)
+                else:
+                    _responder(cur, workspace_id, chat_id, quien, "Hecho.", ahora)
 
 
 def _resolver_toque_borrador(conn, authority_conn, workspace_id, token,
@@ -1093,6 +1117,11 @@ def _no_proponer_de(abierta) -> dict | None:
     sin guarda."""
     from . import pendientes as P
 
+    if abierta.herramienta == _SENTINEL_ELECCION:
+        # La elección con botones (T9-R1d-1c) guarda la fila que la abrió: se
+        # trata como esa pregunta -- la aclaración y la dependencia no tienen
+        # guarda; una herramienta, la de sus argumentos si ya llevan el id.
+        return _no_proponer_de(_fila_de_la_eleccion(abierta))
     if abierta.herramienta == _SENTINEL_ACLARACION or (
             abierta.herramienta in _TIPO_DE_ALTA):
         return None
@@ -1132,6 +1161,8 @@ def _pregunta_de(abierta) -> _Pregunta:
     args = abierta.args
     if abierta.herramienta in _TIPO_DE_ALTA:
         return _pregunta_del_alta(abierta)
+    if abierta.herramienta == _SENTINEL_ELECCION:
+        return _pregunta_de_la_eleccion(abierta)
     if abierta.herramienta == _SENTINEL_VISTA_PREVIA:
         propuesta = abierta.resumen[:_LIMITE_PROPUESTA_PARA_RUTEO]
         descripcion = (
@@ -1167,6 +1198,45 @@ def _pregunta_de(abierta) -> _Pregunta:
         para_ruteo=_para_ruteo(descripcion, PREGUNTA_MODIFICAR),
         pregunta=PREGUNTA_MODIFICAR, dejada=AVISO_MODIFICACION_DEJADA,
         corrige_responde=True)
+
+
+def _fila_de_la_eleccion(abierta):
+    """La pregunta abierta tal como la guarda la fila que abrió la elección:
+    su `herramienta` (real o un centinela), sus `argumentos` y su resumen."""
+    from . import pendientes as P
+
+    return P.ModificacionAbierta(
+        pregunta_id=abierta.pregunta_id, herramienta=abierta.args["herramienta"],
+        args=abierta.args["argumentos"], resumen=abierta.resumen)
+
+
+def _pregunta_de_la_eleccion(abierta) -> _Pregunta:
+    """El adaptador de la elección con botones (T9-R1d-1c). Al ruteo le llegan
+    la pregunta y sus opciones: el mensaje responde sólo si dice una de ellas.
+    `corrige` no es la respuesta: lo decide la persona con los botones de
+    `dudoso`. Dejarla de lado la cancela sin hacer nada."""
+    from . import pendientes as P
+
+    fila = _fila_de_la_eleccion(abierta)
+    opciones = ", ".join(f"«{o}»" for o in abierta.args.get("opciones") or [])
+    con_opciones = f"{abierta.resumen} (las opciones son: {opciones})"
+    if fila.herramienta == _SENTINEL_ACLARACION:
+        referencia = fila.args.get("referencia_actual", "")
+        nombre = f"la tarea a la que te referías con «{referencia}»"
+        descripcion = (f"a qué tarea se refería con «{referencia}» en su "
+                       f"mensaje «{fila.args.get('mensaje', '')}»")
+        dejada = AVISO_ACLARACION_DEJADA
+    elif fila.herramienta == P.SENTINEL_DATO_MENU_TAREA:
+        nombre = f"la elección de la otra tarea para «{fila.args.get('titulo', '')}»"
+        descripcion = f"{nombre}, una pregunta con botones"
+        dejada = AVISO_ELECCION_DEJADA
+    else:
+        nombre = NOMBRE_ELECCION_PENDIENTE
+        descripcion = f"{nombre}, una pregunta con botones"
+        dejada = AVISO_ELECCION_DEJADA
+    return _Pregunta(
+        nombre=nombre, para_ruteo=_para_ruteo(descripcion, con_opciones),
+        pregunta=abierta.resumen, dejada=dejada, corrige_responde=False)
 
 
 def _pregunta_del_alta(abierta) -> _Pregunta:
@@ -1289,9 +1359,10 @@ def _repreguntar(cur, quien, workspace_id: str, chat_id: int, abierta,
     """Vuelve a hacer la pregunta abierta (`charla`, `no_puedo`, un mensaje que
     no era la opción). Una elección del alta la vuelve a mandar con sus
     botones: sus opciones son las únicas respuestas. Las demás, como texto."""
-    if abierta.herramienta == _SENTINEL_VISTA_PREVIA:
-        _mostrar_vista_previa(cur, quien, workspace_id, chat_id, abierta, ahora,
-                              entrante_id, prefijo=prefijo.strip())
+    if abierta.herramienta in (_SENTINEL_VISTA_PREVIA, _SENTINEL_ELECCION):
+        _mostrar_pregunta_con_botones(
+            cur, quien, workspace_id, chat_id, abierta, ahora, entrante_id,
+            prefijo=prefijo.strip())
         return
     if abierta.herramienta == _SENTINEL_ALTA_ELECCION:
         from .ingreso_tareas import resend_choice_prompt
@@ -1331,9 +1402,13 @@ def _seguir_con_la_respuesta(cur, quien, texto: str, abierta, route, proveedor,
     if abierta.herramienta == _SENTINEL_VISTA_PREVIA:
         # Lo mismo con la vista previa de un cambio: sólo el botón Confirmar
         # lo aplica. Se dice y se la vuelve a mostrar con sus botones.
-        _mostrar_vista_previa(
+        _mostrar_pregunta_con_botones(
             cur, quien, workspace_id, chat_id, abierta, ahora, entrante_id,
             prefijo=AVISO_VISTA_PREVIA_SE_CONFIRMA_CON_EL_BOTON)
+        return
+    if abierta.herramienta == _SENTINEL_ELECCION:
+        _seguir_con_la_eleccion_abierta(cur, quien, texto, abierta, chat_id,
+                                        workspace_id, ahora, entrante_id)
         return
     if abierta.herramienta == P.SENTINEL_DATO_MENU_TAREA:
         _resumir_dato_menu_tarea(cur, quien, texto, abierta, chat_id,
@@ -1384,12 +1459,13 @@ def _cerrar_como_modificar(cur, quien, abierta, ahora):
     return modificacion
 
 
-def _mostrar_vista_previa(cur, quien, workspace_id: str, chat_id: int, abierta,
-                          ahora, entrante_id: str | None, *,
-                          prefijo: str = "") -> None:
-    """Vuelve a mostrar la vista previa de un cambio con sus botones
-    (`charla`, `no_puedo`, "Seguir", o un mensaje que quiso confirmar sin el
-    botón), con `prefijo` delante si viene. Es un solo mensaje: el mismo texto
+def _mostrar_pregunta_con_botones(cur, quien, workspace_id: str, chat_id: int,
+                                  abierta, ahora, entrante_id: str | None, *,
+                                  prefijo: str = "") -> None:
+    """Vuelve a mostrar, con sus botones, la vista previa de un cambio o la
+    elección con botones que la persona no respondió (`charla`, `no_puedo`,
+    "Seguir", un mensaje que quiso confirmar sin el botón o que no dijo una de
+    las opciones), con `prefijo` delante si viene. Es un solo mensaje: el mismo texto
     con los mismos botones de siempre (`despachador` arma los botones de la
     `pending_action`; el toque de cualquiera de los dos mensajes resuelve una
     sola vez). Si el prefijo no deja entrar la vista previa con sus botones, la
@@ -1438,16 +1514,21 @@ def _ver_pregunta_abierta(cur, quien, chat_id: int, ahora, *, alta: bool):
     de que `_turno` mirara nada); la otra queda abierta y se retoma cuando el
     alta termina o se deja. Sin `alta`, sólo las de `pending_action`.
 
-    Última, la vista previa de un cambio que la persona pidió y espera su
+    Después, la elección con botones que Prisma le pidió y ella no respondió
+    (T9-R1d-1c, `pendientes.ver_eleccion_abierta`: la aclaración "¿A cuál te
+    referís?", la de la otra tarea de una dependencia, la de una herramienta) y,
+    última, la vista previa de un cambio que la persona pidió y espera su
     Confirmar (T9-R1d-1b, `pendientes.ver_vista_previa_abierta`). Precedencia:
     alta, después el dato o la corrección que se pidió por escrito (Modificar,
-    "Ninguna, lo escribo", el dato de una acción del menú) y por último la vista
-    previa. Las que piden un dato consumen el mensaje siguiente y son lo último
-    que la persona abrió; la vista previa sigue esperando su Confirmar y vuelve
-    a ser la rama abierta cuando esas se cierran. No lo son la vista previa de
-    otra persona ni lo que le llega a alguien para decidir (el aviso de entrega,
-    el borrador que espera a otro aprobador): ese es un mensaje que inicia
-    Prisma."""
+    "Ninguna, lo escribo", el dato de una acción del menú), después la elección
+    y por último la vista previa. Las que piden un dato consumen el mensaje
+    siguiente y son lo último que la persona abrió; una elección abre al
+    terminar el turno y es más nueva que una vista previa que sigue esperando su
+    Confirmar, que vuelve a ser la rama abierta cuando esas se cierran. No son
+    una rama las ofertas de camino (listas de tareas, el menú de una tarea,
+    "Quiero consultar otra cosa"), la vista previa o la elección de otra persona
+    ni lo que le llega a alguien para decidir (el aviso de entrega, el borrador
+    que espera a otro aprobador): ese es un mensaje que inicia Prisma."""
     from . import herramientas as H
     from . import pendientes as P
     from .ingreso_tareas import open_intake_question
@@ -1466,6 +1547,15 @@ def _ver_pregunta_abierta(cur, quien, chat_id: int, ahora, *, alta: bool):
     abierta = P.ver_modificacion_abierta(cur, quien, chat_id, ahora)
     if abierta is not None:
         return abierta
+    eleccion = P.ver_eleccion_abierta(cur, quien, chat_id, ahora)
+    if eleccion is not None:
+        return P.ModificacionAbierta(
+            pregunta_id=eleccion.id, herramienta=_SENTINEL_ELECCION,
+            args={"herramienta": eleccion.herramienta,
+                  "argumentos": eleccion.args, "campo": eleccion.campo,
+                  "opciones": [etiqueta_sin_icono(o.etiqueta)
+                               for o in eleccion.opciones]},
+            resumen=eleccion.resumen)
     vista = P.ver_vista_previa_abierta(cur, quien, chat_id, ahora, H.REGISTRO)
     if vista is None:
         return None
@@ -1482,7 +1572,8 @@ def _consumir_pregunta(cur, quien, abierta, ahora) -> bool:
     su validación (un texto vacío o demasiado largo deja el campo abierto), y
     la elección en `resolve_choice`; el borrador esperando confirmación no se
     consume nunca con un mensaje: acá sólo se comprueba que siga esperando. Lo
-    mismo la vista previa de un cambio (T9-R1d-1b): sólo su botón la aplica."""
+    mismo la vista previa de un cambio (T9-R1d-1b): sólo su botón la aplica; y
+    la elección con botones (T9-R1d-1c): se resuelve al tomar una opción."""
     from . import pendientes as P
     from .ingreso_tareas import intake_question_active
 
@@ -1490,7 +1581,7 @@ def _consumir_pregunta(cur, quien, abierta, ahora) -> bool:
         return intake_question_active(cur, quien,
                                       _TIPO_DE_ALTA[abierta.herramienta],
                                       abierta.pregunta_id)
-    if abierta.herramienta == _SENTINEL_VISTA_PREVIA:
+    if abierta.herramienta in (_SENTINEL_VISTA_PREVIA, _SENTINEL_ELECCION):
         return P.vista_previa_esperando(cur, abierta.pregunta_id, ahora)
     return P.consumir_modificacion(cur, abierta.pregunta_id, ahora)
 
@@ -1500,7 +1591,8 @@ def _dejar_de_lado(cur, quien, abierta, ahora) -> bool:
     fila de `pending_action` se consume; una pregunta del alta cancela su
     borrador, porque sin ese dato, esa elección o esa confirmación el alta no
     sigue. La vista previa de un cambio (T9-R1d-1b) se cancela por el mismo
-    camino que su botón Cancelar: no se aplica nada."""
+    camino que su botón Cancelar: no se aplica nada; la elección con botones
+    (T9-R1d-1c), por el mismo (queda `cancelada` y sus botones ya no valen)."""
     from . import pendientes as P
     from .ingreso_tareas import cancel_from_intake_question
 
@@ -1508,7 +1600,7 @@ def _dejar_de_lado(cur, quien, abierta, ahora) -> bool:
         return cancel_from_intake_question(
             cur, quien, _TIPO_DE_ALTA[abierta.herramienta],
             abierta.pregunta_id, ahora)
-    if abierta.herramienta == _SENTINEL_VISTA_PREVIA:
+    if abierta.herramienta in (_SENTINEL_VISTA_PREVIA, _SENTINEL_ELECCION):
         return P.cancelar_vista_previa(cur, quien, abierta.pregunta_id, ahora)
     return P.consumir_modificacion(cur, abierta.pregunta_id, ahora)
 
@@ -1527,6 +1619,46 @@ def _seguir_con_el_campo_del_alta(cur, quien, texto: str, abierta, chat_id: int,
     if resultado is None:
         _responder(cur, workspace_id, chat_id, quien, AVISO_DATO_YA_NO_PENDIENTE,
                    ahora)
+
+
+def _seguir_con_la_eleccion_abierta(cur, quien, texto: str, abierta,
+                                    chat_id: int, workspace_id: str, ahora,
+                                    entrante_id: str | None) -> None:
+    """El mensaje responde a una elección con botones (T9-R1d-1c): si dice
+    exactamente UNA de sus opciones, sigue como el toque (`_tomar_opcion`); si
+    no, la elección vuelve a mostrarse con sus botones, porque las opciones son
+    las únicas respuestas y el modelo nunca elige por la persona (igual que la
+    elección del alta)."""
+    from . import pendientes as P
+
+    fila = _fila_de_la_eleccion(abierta)
+    # El botón de una candidata muestra el título acortado: el título entero
+    # también la identifica.
+    nombres = {c["id"]: c["titulo"]
+               for candidatas in (fila.args.get("candidatas") or {}).values()
+               for c in candidatas if c.get("id") and c.get("titulo")}
+    opcion = P.opcion_escrita(cur, abierta.pregunta_id, texto, nombres=nombres)
+    if opcion is None:
+        _repreguntar(cur, quien, workspace_id, chat_id, abierta,
+                     _pregunta_de(abierta), ahora, entrante_id)
+        return
+    _tomar_opcion(cur, quien, workspace_id, chat_id, opcion.token, ahora)
+
+
+def _tomar_opcion(cur, quien, workspace_id: str, chat_id: int, token: str,
+                  ahora) -> None:
+    """La opción de una elección dicha por escrito se toma como el toque
+    (`_toque`): se resuelve la acción por su token y sigue el camino de
+    `_seguir_resuelta`. Si otro camino la había resuelto en el medio, se dice."""
+    from . import pendientes as P
+
+    resuelta = P.resolver(cur, token, app_user_id=quien.app_user_id, ahora=ahora)
+    if resuelta is None:
+        _responder(cur, workspace_id, chat_id, quien, AVISO_DATO_YA_NO_PENDIENTE,
+                   ahora)
+        return
+    _seguir_resuelta(cur, quien, workspace_id, chat_id, token, resuelta,
+                     P.pending_action_id_de(cur, token), ahora)
 
 
 def _seguir_con_la_eleccion_del_alta(cur, quien, texto: str, abierta,
@@ -1666,7 +1798,8 @@ def _resolver_toque_respuesta_dato_menu(cur, quien, workspace_id: str,
         # se hace nada.
         route = None
         if (abierta.herramienta != P.SENTINEL_DATO_MENU_TAREA
-                and abierta.herramienta != _SENTINEL_VISTA_PREVIA
+                and abierta.herramienta not in (_SENTINEL_VISTA_PREVIA,
+                                                _SENTINEL_ELECCION)
                 and abierta.herramienta not in _TIPO_DE_ALTA):
             route, error = _rutear(proveedor, texto)
             if route is None:
@@ -1703,7 +1836,7 @@ def _sigue_abierta(cur, quien, chat_id: int, abierta, ahora) -> bool:
         return intake_question_active(cur, quien,
                                       _TIPO_DE_ALTA[abierta.herramienta],
                                       abierta.pregunta_id)
-    if abierta.herramienta == _SENTINEL_VISTA_PREVIA:
+    if abierta.herramienta in (_SENTINEL_VISTA_PREVIA, _SENTINEL_ELECCION):
         return P.vista_previa_esperando(cur, abierta.pregunta_id, ahora)
     vigente = P.ver_modificacion_abierta(cur, quien, chat_id, ahora)
     return vigente is not None and vigente.pregunta_id == abierta.pregunta_id

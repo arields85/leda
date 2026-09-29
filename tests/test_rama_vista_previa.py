@@ -430,10 +430,12 @@ def test_una_aprobacion_que_le_piden_a_la_persona_no_es_una_rama_suya(
                                                     antes)
 
 
-def test_una_eleccion_de_una_herramienta_no_es_una_vista_previa(
-        cliente, conn, corework, monkeypatch):
+def test_una_eleccion_de_una_herramienta_no_es_una_vista_previa(conn, corework):
     # `NecesitaElegir` guarda la herramienta real pero con `campo`: pregunta
-    # "¿cuál de estas?", no espera un Confirmar.
+    # "¿cuál de estas?", no espera un Confirmar. Es otra rama, la de la elección
+    # (`test_rama_eleccion`, T9-R1d-1c), no una vista previa.
+    from prisma import herramientas as H
+
     ws = corework.workspace_id
     with admin(conn) as cur:
         tid = _tarea(cur, ws)
@@ -448,13 +450,11 @@ def test_una_eleccion_de_una_herramienta_no_es_una_vista_previa(
                     campo="tarea_id", opciones=[("Programar PLC", tid)],
                     vence_en=datetime.now(timezone.utc) + timedelta(hours=8),
                     chat_id=tg)
-    conn.commit()
-    proveedor = _con_rutas(monkeypatch, [_ruta(None)],
-                           guion=[Respuesta(texto=RESPUESTA)])
-    antes = _salidas(conn, tg)
+        ahora = datetime.now(timezone.utc)
+        assert P.ver_vista_previa_abierta(cur, quien, tg, ahora, H.REGISTRO) is None
+        abierta = gateway._ver_pregunta_abierta(cur, quien, tg, ahora, alta=False)
 
-    _sin_pregunta_el_mensaje_sigue_el_camino_normal(cliente, conn, tg, proveedor,
-                                                    antes)
+    assert abierta.herramienta == gateway._SENTINEL_ELECCION
 
 
 # ---------------------------------------------------------------------------
