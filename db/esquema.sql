@@ -578,6 +578,10 @@ create table message_outbox (
   -- por ella sin anteponerle nada, nunca una categoría de `tipo` (que la
   -- presentación de grupo también usa como 'informativo' sin ser un saludo).
   es_bienvenida           boolean not null default false,
+  -- T9-R1c-3: lo que la persona había escrito, para que lo copie con un toque --
+  -- el final de `cuerpo`. El transporte lo marca como bloque (entidad `pre`) y,
+  -- si entra en 256 unidades UTF-16, agrega el botón de copiar.
+  bloque_copiable         text,
   requiere_confirmacion   boolean not null default false,
   confirmado_por          uuid references app_user(id),
   confirmado_en           timestamptz,
@@ -1217,6 +1221,14 @@ returns table (resultado text, task_id uuid, pending_action_id uuid, replay bool
 language plpgsql security definer
 set search_path = prisma, public, pg_temp as $$
 begin
+  perform set_config('prisma.workspace_id', p_workspace_id::text, true);
+  -- Modificar no confirma (T9-R1c-3): su token nunca llega a la conversión.
+  if exists (select 1 from pending_action_option o
+              where o.token = p_token and o.workspace_id = p_workspace_id
+                and o.valor = to_jsonb('modificar'::text)) then
+    return query select 'inexistente'::text, null::uuid, null::uuid, false;
+    return;
+  end if;
   return query
     select c.resultado, c.task_id, c.pending_action_id, c.replay
       from confirmar_borrador_tarea(

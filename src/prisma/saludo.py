@@ -137,6 +137,15 @@ def verificar_migraciones(cur: psycopg.Cursor) -> str | None:
                 and column_name = 'es_bienvenida') as ok""")
     if not cur.fetchone()["ok"]:
         return "0019_marca_de_bienvenida.sql"
+    # Lo mismo con `message_outbox.bloque_copiable` (migración 0020, T9-R1c-3):
+    # el `insert` de `enqueue_outbox` y el `select` del despachador la nombran.
+    cur.execute(
+        """select exists (
+             select 1 from information_schema.columns
+              where table_schema = 'prisma' and table_name = 'message_outbox'
+                and column_name = 'bloque_copiable') as ok""")
+    if not cur.fetchone()["ok"]:
+        return "0020_bloque_copiable.sql"
     return None
 
 

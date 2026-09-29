@@ -29,7 +29,8 @@ from . import saludo
 from .calendario import Calendario
 from .incidentes import (REFERENCIA_ADMIN_NOTICE, redactar_secreto_telegram,
                          registrar_incidente)
-from .salida import prepare_buttons, prepare_payload
+from .salida import (ETIQUETA_COPIAR, cabe_en_boton_de_copiar, entidad_de_bloque,
+                     prepare_buttons, prepare_payload)
 
 
 class ErrorTelegram(RuntimeError):
@@ -87,21 +88,28 @@ def pedido_telegram(fn, *args, **kwargs):
 
 
 class Boton(NamedTuple):
+    """Un botón inline. Con `copiar` es el botón de copiar de Telegram
+    (`copy_text`, T9-R1c-3): no lleva callback."""
     etiqueta: str
     callback_data: str
+    copiar: str | None = None
 
 
 class Entregado(NamedTuple):
-    """Lo que se entregó. Es tupla para que `(chat_id, texto)` siga sirviendo."""
+    """Lo que se entregó. Es tupla para que `(chat_id, texto)` siga sirviendo.
+    `bloque` es el bloque que se copia con un toque, si el mensaje lo llevaba."""
     chat_id: int
     texto: str
     botones: list[Boton]
+    bloque: str | None = None
 
 
 class Transporte(Protocol):
     def enviar(self, chat_id: int, texto: str,
                botones: list[Boton] | None = None) -> int:
-        """Devuelve el identificador del mensaje entregado."""
+        """Devuelve el identificador del mensaje entregado. Un mensaje con un
+        bloque copiable (T9-R1c-3) se entrega con `bloque=...` además: sólo los
+        mensajes que lo llevan pasan ese argumento."""
 
 
 @dataclass
@@ -110,15 +118,19 @@ class TransporteDePrueba:
     falla_en: set[int] = field(default_factory=set)
 
     def enviar(self, chat_id: int, texto: str,
-               botones: list[Boton] | None = None) -> int:
+               botones: list[Boton] | None = None,
+               bloque: str | None = None) -> int:
         prepared_buttons = prepare_buttons(botones or [])
         payload = prepare_payload(
             texto, dedupe_key="transport", has_buttons=bool(prepared_buttons),
         )[0]
+        if bloque is not None:
+            entidad_de_bloque(payload.text, bloque)
         if chat_id in self.falla_en:
             raise ConnectionError(f"no se pudo entregar a {chat_id}")
         self.enviados.append(Entregado(
-            chat_id, payload.text, [Boton(*button) for button in prepared_buttons]))
+            chat_id, payload.text, [Boton(*button) for button in prepared_buttons],
+            bloque))
         return len(self.enviados)
 
 
@@ -129,19 +141,25 @@ class TransporteTelegram:
         self._cliente = cliente or httpx.Client(timeout=15)
 
     def enviar(self, chat_id: int, texto: str,
-               botones: list[Boton] | None = None) -> int:
+               botones: list[Boton] | None = None,
+               bloque: str | None = None) -> int:
         prepared_buttons = prepare_buttons(botones or [])
         payload = prepare_payload(
             texto, dedupe_key="transport", has_buttons=bool(prepared_buttons),
         )[0]
         cuerpo: dict = {"chat_id": chat_id, "text": payload.text,
                          "disable_notification": False}
+        if bloque is not None:
+            # El bloque que se copia con un toque (T9-R1c-3): una entidad `pre`
+            # sobre el final del texto que de verdad se manda.
+            cuerpo["entities"] = [entidad_de_bloque(payload.text, bloque)]
         if prepared_buttons:
             # Uno por fila: las etiquetas son nombres de personas o frases
             # cortas, y en el teléfono dos por fila se cortan.
             cuerpo["reply_markup"] = {"inline_keyboard": [
-                [{"text": label, "callback_data": callback}]
-                for label, callback in prepared_buttons]}
+                [{"text": label, "copy_text": {"text": resto[0]}} if resto
+                 else {"text": label, "callback_data": callback}]
+                for label, callback, *resto in prepared_buttons]}
         r = pedido_telegram(self._cliente.post, self._url, json=cuerpo)
         pedido_telegram(r.raise_for_status)
         return r.json()["result"]["message_id"]
@@ -466,6 +484,13 @@ def _botones(cur, m) -> list[Boton]:
     Se leen al despachar, no al encolar: entre que Prisma pregunta y el
     mensaje sale puede pasar tiempo, y lo que vale es lo vigente al entregar.
     """
+    if m.get("bloque_copiable"):
+        # El mensaje que muestra lo que la persona había escrito (T9-R1c-3): el
+        # botón de copiar sólo si entra en el límite de Telegram; el bloque sale
+        # igual, marcado en el texto.
+        if cabe_en_boton_de_copiar(m["bloque_copiable"]):
+            return [Boton(ETIQUETA_COPIAR, "", m["bloque_copiable"])]
+        return []
     if m.get("intake_choice_set_id"):
         from .ingreso_tareas import callback_data
 
@@ -671,7 +696,7 @@ def despachar(cur: psycopg.Cursor, workspace_id: str, transporte: Transporte,
              select id, workspace_id, chat_id, cuerpo, tipo,
                     destinatario_membership_id, intentos,
                     vence_en, es_respuesta, pending_action_id, intake_choice_set_id,
-                    es_bienvenida
+                    es_bienvenida, bloque_copiable
               from message_outbox
              where workspace_id = %(ws)s
                and estado = 'listo'
@@ -838,7 +863,11 @@ def _intentar_envio(cur: psycopg.Cursor, workspace_id: str, transporte: Transpor
                 membership_id=m["destinatario_membership_id"], zona=cal.zona,
                 ahora=ahora, texto=m["cuerpo"], has_buttons=bool(botones),
                 es_bienvenida=m["es_bienvenida"])
-            tg_id = transporte.enviar(m["chat_id"], texto, botones)
+            if m["bloque_copiable"]:
+                tg_id = transporte.enviar(m["chat_id"], texto, botones,
+                                          bloque=m["bloque_copiable"])
+            else:
+                tg_id = transporte.enviar(m["chat_id"], texto, botones)
             try:
                 with cur.connection.transaction():
                     _guardar_id_telegram(cur, tg_id, m["id"])

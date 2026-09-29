@@ -13,6 +13,10 @@ TELEGRAM_TEXT_LIMIT = 4096
 BUTTON_TEXT_LIMIT = 3900
 BUTTON_LABEL_LIMIT = 80
 CALLBACK_DATA_BYTES = 64
+# Lo que entra en el botón de copiar de Telegram (`copy_text`): 1 a 256. Se mide
+# en unidades UTF-16, la medida de siempre de este módulo, que es la más
+# estricta de las dos posibles.
+COPY_TEXT_LIMIT = 256
 _SPLIT_BODY_LIMIT = 4000
 # Cuántos caracteres de una etiqueta de botón entran cómodos en una pantalla
 # de teléfono antes de truncar con "…" (medido a ojo; más chico que
@@ -46,8 +50,10 @@ ICONO_SALIR_OPCIONES = "💬"
 ICONO_CONFIRMAR = "✅"
 ICONO_CANCELAR = "✖️"
 ICONO_OTRA_OPCION = "✏️"
+ICONO_COPIAR = "📄"
 _ICONOS_CONOCIDOS = (ICONO_TAREA, ICONO_VER_MAS, ICONO_SALIR_OPCIONES,
-                    ICONO_CONFIRMAR, ICONO_CANCELAR, ICONO_OTRA_OPCION)
+                    ICONO_CONFIRMAR, ICONO_CANCELAR, ICONO_OTRA_OPCION,
+                    ICONO_COPIAR)
 
 NO_EFFECT_STATUS = "Estado: sin cambios."
 _NO_EFFECT_PATTERNS = tuple(re.compile(pattern, re.IGNORECASE) for pattern in (
@@ -117,6 +123,9 @@ def etiquetas_coinciden(a: str, b: str) -> bool:
 
 ETIQUETA_CONFIRMAR = con_icono("Confirmar", ICONO_CONFIRMAR)
 ETIQUETA_CANCELAR = con_icono("Cancelar", ICONO_CANCELAR)
+# El botón que copia al portapapeles lo que la persona había escrito (T9-R1c-3).
+# Redacción pendiente de revisión de voz en T10.
+ETIQUETA_COPIAR = con_icono("Copiar", ICONO_COPIAR)
 
 
 def normalize_visible_text(raw: Any) -> str:
@@ -349,21 +358,53 @@ def etiquetas_de_tarea(titulos: list[str], *, fijas: list[bool] | None = None,
     return [con_icono(etiqueta, ICONO_TAREA) for etiqueta in cortas]
 
 
-def prepare_buttons(buttons: Iterable[Any]) -> list[tuple[str, str]]:
+def prepare_buttons(buttons: Iterable[Any]) -> list[tuple]:
+    """Valida los botones. Uno de callback sale como `(etiqueta, callback)`; uno
+    de copiar (`copiar`, el texto que copia al tocarlo, 1 a `COPY_TEXT_LIMIT`
+    unidades) como `(etiqueta, "", copiar)`: no lleva callback."""
     prepared = []
     for button in buttons:
+        as_tuple = isinstance(button, tuple)
         label = normalize_visible_text(
-            getattr(button, "etiqueta", button[0] if isinstance(button, tuple) else ""))
-        callback = str(getattr(
-            button, "callback_data", button[1] if isinstance(button, tuple) else ""))
+            getattr(button, "etiqueta", button[0] if as_tuple else ""))
         if not label or telegram_utf16_units(label) > BUTTON_LABEL_LIMIT:
             raise PayloadValidationError(
                 f"La etiqueta de un botón excede {BUTTON_LABEL_LIMIT} unidades UTF-16.")
+        copiar = getattr(button, "copiar", button[2] if as_tuple and len(button) > 2
+                         else None)
+        if copiar is not None:
+            if not copiar or telegram_utf16_units(copiar) > COPY_TEXT_LIMIT:
+                raise PayloadValidationError(
+                    f"El texto de un botón de copiar tiene de 1 a {COPY_TEXT_LIMIT} "
+                    "unidades UTF-16.")
+            prepared.append((label, "", copiar))
+            continue
+        callback = str(getattr(
+            button, "callback_data", button[1] if as_tuple else ""))
         if not callback or len(callback.encode("utf-8")) > CALLBACK_DATA_BYTES:
             raise PayloadValidationError(
                 f"El callback de un botón excede {CALLBACK_DATA_BYTES} bytes.")
         prepared.append((label, callback))
     return prepared
+
+
+def cabe_en_boton_de_copiar(bloque: str) -> bool:
+    """Si `bloque` entra en el botón de copiar de Telegram (1 a 256)."""
+    return 0 < telegram_utf16_units(bloque) <= COPY_TEXT_LIMIT
+
+
+def entidad_de_bloque(texto: str, bloque: str) -> dict:
+    """La entidad `pre` de Telegram que marca `bloque` -- un bloque que se copia
+    con un toque -- dentro de `texto`. El bloque es siempre el final del texto:
+    su posición se calcula sobre el texto que de verdad se manda (con el saludo
+    diario ya antepuesto, si lo hubo), en unidades UTF-16, y no se guarda en
+    ninguna parte. Un bloque vacío o que no es el final del texto: error."""
+    if not bloque or not texto.endswith(bloque):
+        raise PayloadValidationError(
+            "El bloque copiable tiene que ser el final del texto del mensaje.")
+    return {"type": "pre",
+            "offset": telegram_utf16_units(texto[:len(texto) - len(bloque)]),
+            "length": telegram_utf16_units(bloque)}
 
 
 def prepare_payload(text: Any, *, dedupe_key: str, has_buttons: bool = False,
@@ -480,8 +521,23 @@ def enqueue_outbox(cur, *, workspace_id: str, chat_id: int,
                    pending_action_id: str | None = None,
                    intake_choice_set_id: str | None = None,
                    allow_split: bool = False,
-                   es_bienvenida: bool = False) -> int:
-    has_buttons = pending_action_id is not None or intake_choice_set_id is not None
+                   es_bienvenida: bool = False,
+                   bloque_copiable: str | None = None) -> int:
+    """Encola un mensaje visible. `bloque_copiable` (T9-R1c-3) es lo que la
+    persona había escrito, para que lo copie con un toque: el final del texto
+    (`entidad_de_bloque`), que el transporte marca como bloque y, si entra en
+    `COPY_TEXT_LIMIT`, también sale con el botón de copiar. Un mensaje con
+    bloque no se parte."""
+    if bloque_copiable is not None:
+        bloque_copiable = normalize_visible_text(bloque_copiable)
+        if allow_split or not normalize_visible_text(text).endswith(bloque_copiable):
+            raise PayloadValidationError(
+                "El bloque copiable tiene que ser el final de un mensaje que "
+                "no se parte.")
+        entidad_de_bloque(normalize_visible_text(text), bloque_copiable)
+    has_buttons = (pending_action_id is not None or intake_choice_set_id is not None
+                   or (bloque_copiable is not None
+                       and cabe_en_boton_de_copiar(bloque_copiable)))
     # Cualquier mensaje dirigido a una persona (nunca uno de grupo, que no
     # trae `recipient_membership_id`) reserva el margen del saludo diario
     # ANTES de partir/recortar -- `despachador._intentar_envio` decide recién
@@ -511,15 +567,17 @@ def enqueue_outbox(cur, *, workspace_id: str, chat_id: int,
             """insert into message_outbox
                  (workspace_id, chat_id, destinatario_membership_id, tipo, cuerpo,
                   estado, programado_para, vence_en, dedupe_key, es_respuesta,
-                  pending_action_id, intake_choice_set_id, es_bienvenida)
+                  pending_action_id, intake_choice_set_id, es_bienvenida,
+                  bloque_copiable)
                values (%s, %s, %s, %s, %s, %s,
                        coalesce(%s, now()) + %s * interval '1 microsecond',
-                       %s, %s, %s, %s, %s, %s)
+                       %s, %s, %s, %s, %s, %s, %s)
                on conflict (dedupe_key) do nothing""",
             (workspace_id, chat_id, recipient_membership_id, message_type,
              payload.text, state, scheduled_for, index,
              expires_at, payload.dedupe_key,
-             is_response, pending_action_id, intake_choice_set_id, es_bienvenida),
+             is_response, pending_action_id, intake_choice_set_id, es_bienvenida,
+             bloque_copiable),
         )
         inserted += cur.rowcount
     return inserted
