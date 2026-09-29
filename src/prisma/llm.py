@@ -230,14 +230,29 @@ class ProveedorGuionado:
         return self.guion.pop(0)
 
 
+# Tiempo máximo por intento y reintentos de los proveedores conversacionales,
+# ajustables con `timeout_s` y `reintentos` en `model_config.parametros`. NaN
+# colgó ~93-95 s el 1,3 % de las llamadas (5 de 385) y el SDK esperaba hasta
+# 600 s; las llamadas normales tardan 1-4 s (p90 ~5 s).
+TIMEOUT_MODELO_S = 20
+REINTENTOS_MODELO = 2
+
+
+def _tiempos(parametros: dict) -> tuple[float, int]:
+    return (parametros.get("timeout_s", TIMEOUT_MODELO_S),
+            parametros.get("reintentos", REINTENTOS_MODELO))
+
+
 class ProveedorAnthropic:
     def __init__(self, modelo: str, api_key: str, parametros: dict | None = None,
                  cliente=None) -> None:
         import anthropic
 
-        self._c = cliente or anthropic.Anthropic(api_key=api_key)
-        self._modelo = modelo
         self._param = parametros or {}
+        timeout, reintentos = _tiempos(self._param)
+        self._c = cliente or anthropic.Anthropic(
+            api_key=api_key, timeout=timeout, max_retries=reintentos)
+        self._modelo = modelo
 
     def route_intent(self, text: str) -> IntentRoute:
         r = self._c.messages.create(
@@ -290,8 +305,20 @@ class ProveedorGemini:
 
         self._modelo = modelo
         self._param = parametros or {}
+        timeout, self._reintentos = _tiempos(self._param)
         self._http = cliente or httpx.Client(
-            timeout=60, headers={"x-goog-api-key": api_key})
+            timeout=timeout, headers={"x-goog-api-key": api_key})
+
+    def _post(self, url: str, cuerpo: dict):
+        """POST con reintento sólo ante timeout (no ante 5xx); lo demás propaga."""
+        import httpx
+
+        for intento in range(self._reintentos + 1):
+            try:
+                return self._http.post(url, json=cuerpo)
+            except httpx.TimeoutException:
+                if intento == self._reintentos:
+                    raise
 
     def route_intent(self, text: str) -> IntentRoute:
         body = {
@@ -307,8 +334,8 @@ class ProveedorGemini:
                 "mode": "ANY", "allowedFunctionNames": [ROUTER_TOOL["name"]],
             }},
         }
-        response = self._http.post(
-            f"{GEMINI_BASE}/models/{self._modelo}:generateContent", json=body)
+        response = self._post(
+            f"{GEMINI_BASE}/models/{self._modelo}:generateContent", body)
         response.raise_for_status()
         candidates = response.json().get("candidates") or []
         parts = [
@@ -346,8 +373,8 @@ class ProveedorGemini:
                  "parameters": _limpiar_esquema(h["input_schema"])}
                 for h in herramientas]}]
 
-        r = self._http.post(
-            f"{GEMINI_BASE}/models/{self._modelo}:generateContent", json=cuerpo)
+        r = self._post(
+            f"{GEMINI_BASE}/models/{self._modelo}:generateContent", cuerpo)
         r.raise_for_status()
         datos = r.json()
 
@@ -441,9 +468,12 @@ class ProveedorCompatible:
                  parametros: dict | None = None, cliente=None) -> None:
         import openai
 
-        self._c = cliente or openai.OpenAI(api_key=api_key, base_url=base_url)
-        self._modelo = modelo
         self._param = parametros or {}
+        timeout, reintentos = _tiempos(self._param)
+        self._c = cliente or openai.OpenAI(
+            api_key=api_key, base_url=base_url,
+            timeout=timeout, max_retries=reintentos)
+        self._modelo = modelo
 
     def route_intent(self, text: str) -> IntentRoute:
         response = self._c.chat.completions.create(

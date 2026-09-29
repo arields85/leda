@@ -58,6 +58,12 @@ usa `PRISMA_OPENROUTER_API_KEY` (la misma de Jev) y los demás
 `PRISMA_LLM_API_KEY`; si falta la que corresponde, Prisma lo registra como
 incidente en vez de usar la otra.
 
+Cada llamada al modelo tiene un tiempo máximo por intento y reintentos acotados,
+para que un pedido colgado del proveedor no deje esperando a la persona más de lo
+razonable. Se ajustan en `parametros` de `model_config` con `timeout_s` (por
+defecto 20 segundos) y `reintentos` (por defecto 2). Un timeout que agota los
+reintentos se trata como cualquier otro error del proveedor: incidente y disculpa.
+
 ## 3. Dar de alta a los tres
 
 ```bash

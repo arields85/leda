@@ -152,7 +152,7 @@ gestión.
     exige PostgreSQL 13+: consultarla sólo sin evidencia y fijar la versión mínima;
     (3) ninguna prueba verifica la forma de la clave (`tarea_id` + transacción) ni
     que dos tareas en la misma transacción no colisionen.
-- [ ] **T8 — Latencia de la ronda 3 (R3-H21).** Orden decidido por el usuario el
+- [x] **T8 — Latencia de la ronda 3 (R3-H21).** Orden decidido por el usuario el
   2026-09-28: después de leer el manual de personalidad (hecho el 2026-09-28, ver
   Progreso).
   - [x] **T8a — Clave del proveedor conversacional según el proveedor.** Hoy
@@ -167,7 +167,7 @@ gestión.
     Resultado (ver Progreso): ningún modelo llega a 4 s porque cada turno hace unas tres
     llamadas seguidas. Decisión del usuario (2026-09-28): se mantiene
     `nan/deepseek-v4-flash` y se ataca la cantidad de llamadas (T8c).
-  - [ ] **T8c — Menos llamadas seguidas por turno.** Diseñar antes de escribir código
+  - [x] **T8c — Menos llamadas seguidas por turno.** Diseñar antes de escribir código
     cómo bajar las llamadas al modelo de cada turno (hoy: una de ruteo tipado más una
     mediana de dos del ciclo de herramientas, hasta cuatro), sin perder las garantías
     del ruteo ni de las herramientas; medir con el mismo banco y el mismo complemento de
@@ -186,10 +186,10 @@ gestión.
       (0 tokens en 8/8) pero no acelera: por defecto 2,90 s, `none` 2,27 s, `high` 1,81 s
       de mediana. La variación del servidor pesa más que ~100 tokens de razonamiento, y
       apagarlo arriesga la calidad.
-    - [x] **T8c-3 — (revertida el 2026-09-29, ver Progreso) Ruteo en paralelo con la primera llamada del responder**, sólo en
+    - [x] ~~**T8c-3 — Ruteo en paralelo con la primera llamada del responder**~~ **Revertida el 2026-09-29** (`ccf5c73`, ver Progreso y ADR 0012)., sólo en
       conversación normal sin referencias a tareas; se descarta si el ruteo elige otro
       camino.
-    - [ ] **T8c-4 — Tiempo máximo por llamada al modelo.** NaN cuelga a veces un pedido
+    - [x] **T8c-4 — Tiempo máximo por llamada al modelo.** NaN cuelga a veces un pedido
       unos 93-95 s (~1,3 % de las llamadas en serie) y el cliente hoy espera hasta 600 s.
       Acotar cada intento (~20 s, configurable en `model_config.parametros`) con
       reintento, para que un cuelgue cueste ~20 s y no más de 90.
@@ -4189,3 +4189,21 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   cuelga pedidos ~93-95 s: 5 de 385 llamadas en serie, 7 de 180 con especulación. Se
   revierte el código de `46278f3` (archivos idénticos a `16ec246`); ADR 0012 queda como
   revertida con la evidencia. En su lugar, T8c-4.
+
+- 2026-09-29: **T8c-4 — tiempo máximo por llamada al modelo.** `llm.TIMEOUT_MODELO_S = 20`
+  y `REINTENTOS_MODELO = 2`, ajustables con `timeout_s`/`reintentos` en
+  `model_config.parametros`; `ProveedorCompatible` y `ProveedorAnthropic` los pasan al SDK
+  (verificado en el código instalado de openai 3.17.0: un timeout con reintentos
+  disponibles se reintenta); `ProveedorGemini` usa el timeout en su `httpx.Client` y
+  reintenta sólo ante timeout. Un timeout agotado sigue el camino de siempre (incidente y
+  disculpa; en el ruteo, sus dos intentos y el incidente de ruteo). Peor caso: una llamada
+  ~61 s (3 x 20 s), ruteo totalmente caído ~123 s (sus dos intentos multiplican los del
+  SDK); un cuelgue típico (~1,3 %) pasa de ~93 s a ~20 s más el reintento. TDD: RED
+  `pytest -q tests/test_tiempo_maximo_modelo.py` -> 8 failed, 3 passed (el SDK ya
+  reintentaba timeouts; faltaban los límites); GREEN enfocadas -> 121 passed (repetida por
+  el orquestador); suite completa -> 1224 passed, 108 deselected. `PRUEBA-LOCAL.md`
+  documenta los parámetros. Sin medición con el banco: los cuelgues son ~1,3 % y una
+  corrida de ~100 llamadas no los reproduce de forma confiable. Revisión de la reversión
+  (`review-c6ae4f044c96005a`, cuatro lentes) aprobada y reconocida; frontera en `ccf5c73`.
+  T8 queda cerrada: turno de ~12,6 s a ~9,4 s de mediana en el banco (T8c-1) y sin cuelgues
+  de más de ~20 s por intento (T8c-4). Próximo: T9.
