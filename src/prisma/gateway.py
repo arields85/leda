@@ -109,12 +109,24 @@ AVISO_DATO_YA_NO_PENDIENTE = (
 PREGUNTA_ES_EL_DATO = "¿Esto es {descripcion}?"
 ETIQUETA_ES_EL_DATO = con_icono("Sí, es eso", ICONO_CONFIRMAR)
 ETIQUETA_NO_ES_EL_DATO = con_icono("No, es otra cosa", ICONO_OTRA_OPCION)
-# Retome después de `otro_tema`, dentro de la misma respuesta, con un botón
-# para soltar la pregunta. Redacción pendiente de revisión de voz en T10.
-RETOMAR_DATO_PENDIENTE = "¿Seguimos con {descripcion}? {pregunta}"
-ETIQUETA_DEJAR_DATO = con_icono("Dejarlo", ICONO_CANCELAR)
+# Comando `otro_tema` con una pregunta abierta (T9-R1d-1a, ADR 0013 regla 1,
+# enmienda "una sola rama de conversación abierta"): Prisma no atiende el
+# mensaje; pregunta una vez, con dos botones, si se sigue con lo pendiente o se
+# lo deja para ver lo otro. Redacción pendiente de revisión de voz en T10.
+PREGUNTA_RAMA_ABIERTA = "Estábamos con {nombre}. ¿Seguimos con eso?"
+ETIQUETA_SEGUIR_RAMA = con_icono("Seguir con eso", ICONO_CONFIRMAR)
+ETIQUETA_DEJAR_RAMA = con_icono("Dejarlo y ver lo otro", ICONO_CANCELAR)
+# "Seguir" tocado cuando la pregunta ya la cerró otro camino. Redacción
+# pendiente de revisión de voz en T10.
+AVISO_RAMA_YA_CERRADA = (
+    "Esa pregunta ya no estaba pendiente, así que no hay nada que retomar.")
+# El botón ya se usó, venció o es de antes de que existiera lo que hacía.
+# Redacción pendiente de revisión de voz en T10.
+AVISO_PEDIDO_NO_VIGENTE = (
+    "Ese pedido ya no está vigente. Si sigue haciendo falta, escribime y lo "
+    "vemos de nuevo.")
 _ELECCION_DATO_SI = "si"
-_ELECCION_DATO_NO = "no"
+_ELECCION_DATO_SEGUIR = "seguir"
 _ELECCION_DATO_DEJAR = "dejar"
 
 # Las otras dos preguntas que dejan el mensaje siguiente como respuesta
@@ -604,8 +616,7 @@ def _toque(conn, workspace_id: str, slug: str, toque: dict,
                 # Vencida, ya usada, o de otro espacio. Para la persona es lo
                 # mismo: ese pedido ya no está en pie.
                 _responder(cur, workspace_id, chat_id, quien,
-                           "Ese pedido ya no está vigente. Si sigue haciendo "
-                           "falta, escribime y lo vemos de nuevo.", ahora)
+                           AVISO_PEDIDO_NO_VIGENTE, ahora)
             elif not draft_token and resuelta.cancelada:
                 _responder(cur, workspace_id, chat_id, quien,
                            "Listo, no lo hago.", ahora)
@@ -649,8 +660,9 @@ def _toque(conn, workspace_id: str, slug: str, toque: dict,
                         cur, quien, workspace_id, chat_id, resuelta.args, ahora,
                         pending_action_id=pending_action_id)
                 elif resuelta.herramienta == P.SENTINEL_RESPUESTA_DATO_MENU:
-                    # T9-R1a-2: los botones de `dudoso` y del retome de una
-                    # pregunta de dato del menú que sigue abierta.
+                    # T9-R1a-2 y T9-R1d: los botones de `dudoso` y de la
+                    # pregunta de la rama (`otro_tema`) sobre una pregunta
+                    # pendiente que sigue abierta.
                     _resolver_toque_respuesta_dato_menu(
                         cur, quien, workspace_id, chat_id, resuelta.args, ahora)
                 elif resuelta.herramienta == P.SENTINEL_DATO_MENU_TAREA:
@@ -872,9 +884,8 @@ def _turno(cur, quien, texto: str, workspace_id: str, chat_id: int,
            entrante_id: str | None = None, *, alta_privada: bool = False) -> None:
     from datetime import datetime, timezone
 
-    from . import pendientes as P
     from .calendario import Calendario
-    from .llm import RespectoPendiente, desde_base
+    from .llm import desde_base
 
     now = datetime.now(timezone.utc)
     cal = Calendario.desde_base(cur, workspace_id)
@@ -888,11 +899,10 @@ def _turno(cur, quien, texto: str, workspace_id: str, chat_id: int,
     # su confirmación; sólo en un chat privado: `alta_privada`). Ninguna se
     # toma ya sin mirar el mensaje (T9-R1a, T9-R1b y T9-R1c, ADR 0013 regla 1):
     # se lee la pregunta abierta sin consumirla y el ruteo tipado la relaciona
-    # con el mensaje. Sólo
-    # `otro_tema` (o una pregunta que otro turno ya consumió) sigue por el
-    # camino normal, con la ruta ya obtenida.
+    # con el mensaje. Con una pregunta abierta, `otro_tema` no se atiende
+    # (T9-R1d, enmienda de la regla 1): sólo sigue por el camino normal, con la
+    # ruta ya obtenida, una pregunta que otro turno ya consumió.
     route = None
-    retomar = None
     abierta = _ver_pregunta_abierta(cur, quien, chat_id, now, alta=alta_privada)
     if abierta is not None:
         route = _atender_pregunta_pendiente(cur, quien, texto, abierta, proveedor,
@@ -900,10 +910,6 @@ def _turno(cur, quien, texto: str, workspace_id: str, chat_id: int,
                                             entrante_id)
         if route is None:
             return
-        # Sólo `otro_tema` retoma la pregunta al terminar: la otra forma de
-        # llegar acá con una ruta ya obtenida es que otro turno la consumió.
-        if route.respecto_pendiente is RespectoPendiente.OTRO_TEMA:
-            retomar = abierta
 
     if route is None:
         route, last_error = _rutear(proveedor, texto)
@@ -912,26 +918,14 @@ def _turno(cur, quien, texto: str, workspace_id: str, chat_id: int,
             return
 
     _seguir_camino_normal(cur, quien, texto, route, proveedor, cal, chat_id,
-                          workspace_id, now, entrante_id, retomar=retomar)
+                          workspace_id, now, entrante_id)
 
 
 def _seguir_camino_normal(cur, quien, texto: str, route, proveedor, cal,
                           chat_id: int, workspace_id: str, ahora,
-                          entrante_id: str | None, *, modificacion=None,
-                          retomar=None) -> None:
+                          entrante_id: str | None, *, modificacion=None) -> None:
     """El camino de siempre para un mensaje ya ruteado: resolver las
-    referencias, y aclarar con botones, dar el alta guiada o responder.
-
-    `retomar`, si viene, es la pregunta abierta (dato del menú, Modificar o
-    "Ninguna, lo escribo") que sigue abierta mientras se atiende otro tema
-    (T9-R1a-2 y T9-R1b, ADR 0013 regla 1, `otro_tema`):
-    al terminar, `_retomar_dato_pendiente` la vuelve a hacer dentro de la
-    misma respuesta, salvo que el turno haya dejado otra interacción
-    pendiente."""
-    interacciones_antes = (_interacciones_pendientes(cur, quien, workspace_id,
-                                                     chat_id)
-                           if retomar is not None else 0)
-
+    referencias, y aclarar con botones, dar el alta guiada o responder."""
     # Resolver antes de actuar (T3, ADR 0005 decisión 6 / ADR 0006): las
     # referencias a tarea que separó el enrutador se resuelven contra las
     # tareas activas del espacio, bajo el mismo cursor con RLS que ya tiene
@@ -952,20 +946,8 @@ def _seguir_camino_normal(cur, quien, texto: str, route, proveedor, cal,
 
     estado = _estado_inicial_aclaracion(texto, entrante_id, route, referencias,
                                         modificacion)
-    if retomar is not None:
-        # `otro_tema` con una pregunta abierta: el responder lo sabe (regla 1).
-        bloque = _bloque_pregunta_pendiente(_pregunta_de(retomar))
-        previo = estado["bloque_base"]
-        estado["bloque_base"] = f"{previo}\n\n{bloque}" if previo else bloque
-        # Y el código lo garantiza: lo que quedó pendiente no se propone de
-        # nuevo (T9-R1b-3, banco b-0020-c: las instrucciones solas no alcanzan).
-        estado["no_proponer"] = _no_proponer_de(retomar)
     _avanzar_aclaracion(cur, quien, workspace_id, chat_id, ahora, proveedor, cal,
                        estado)
-
-    if retomar is not None:
-        _retomar_dato_pendiente(cur, quien, workspace_id, chat_id, retomar,
-                                interacciones_antes, ahora)
 
 
 def _rutear(proveedor, texto: str, pendiente: str | None = None):
@@ -1020,9 +1002,9 @@ def _descripcion_dato_menu(args: dict) -> str:
 class _Pregunta:
     """Lo que hace falta saber de una pregunta pendiente para tratarla igual
     sea cual sea (T9-R1b, ADR 0013 regla 1): es el adaptador mínimo de cada
-    tipo. Todo lo demás (el ruteo, los siete comandos, los botones, el retome)
-    es común. `nombre` es la frase corta con que se la nombra en los botones
-    ("¿Esto es …?", "¿Seguimos con …?"); `para_ruteo` es lo que recibe el
+    tipo. Todo lo demás (el ruteo, los siete comandos, los botones) es común.
+    `nombre` es la frase corta con que se la nombra en las preguntas con
+    botones ("¿Esto es …?", "Estábamos con …"); `para_ruteo` es lo que recibe el
     modelo; `pregunta` es la que se le hizo a la persona, la misma al volver a
     hacerla; `dejada` es lo que se dice al dejarla de lado. `corrige_responde`
     dice si un mensaje que corrige algo anterior es la respuesta: en una
@@ -1046,76 +1028,6 @@ def _para_ruteo(descripcion: str, pregunta: str) -> str:
     no veía que se había pedido un link (ADR 0013 regla 1: se interpreta
     contra la pregunta real)."""
     return f"{descripcion} (la pregunta que se le hizo fue: «{pregunta}»)"
-
-
-# Marca del bloque de contexto de confianza que el responder recibe cuando la
-# persona cambió de tema con una pregunta abierta (T9-R1b-2, ADR 0013 regla 1).
-MARCA_PREGUNTA_PENDIENTE = "# Pregunta pendiente"
-
-
-def _bloque_pregunta_pendiente(pregunta: _Pregunta) -> str:
-    """Contexto de confianza del servidor (nunca texto de la persona) para el
-    turno de `otro_tema`: sin él, el modelo veía la propuesta o el dato
-    pendiente en el historial y volvía a proponerlo por su cuenta (banco
-    b-0020-c: después de "Modificar", una consulta terminó con
-    `registrar_bloqueo` otra vez). Se agrega donde los otros bloques de
-    contexto (`contexto_referencias`), no en el `PREAMBULO`."""
-    return (
-        f"{MARCA_PREGUNTA_PENDIENTE}\n\n"
-        f"Hay una pregunta abierta para la persona: {pregunta.nombre}. Se le "
-        f"hizo así: «{pregunta.pregunta}». El sistema se la vuelve a hacer "
-        "solo cuando termines. Respondé únicamente el mensaje actual: no la "
-        "vuelvas a proponer ni ejecutes de nuevo lo que quedó pendiente.")
-
-
-# Qué herramienta produce, sobre qué id de sus argumentos, cada acción del menú
-# que pide un dato (`_resumir_dato_menu_tarea`): lo que queda pendiente con la
-# persona mientras se atiende otro tema.
-_HERRAMIENTA_DE_DATO_MENU = {
-    "informar_bloqueo": ("registrar_bloqueo", "tarea_id"),
-    "destrabar": ("resolver_bloqueo", "bloqueo_id"),
-    "adjuntar_evidencia": ("adjuntar_evidencia", "tarea_id"),
-    "terminar": ("actualizar_estado", "tarea_id"),
-    "pedir_cambios": ("pedir_cambios_tarea", "tarea_id"),
-}
-
-
-# Los argumentos que identifican sobre qué actúa una herramienta que escribe.
-# `_no_proponer_de` toma el primero que esté presente, en este orden de
-# preferencia. Hoy ninguna herramienta trae dos de estos ids a la vez, así que
-# el orden no decide nada: `crear_dependencia` usa `origen_tarea_id` y
-# `destino_tarea_id` (ninguno está en la lista: sin guarda) y
-# `quitar_dependencia` sólo `dependencia_id`. Una herramienta nueva con dos de
-# estos ids tomaría el primero de la lista: revisar el orden al agregarla.
-_CAMPOS_DE_ID = ("tarea_id", "bloqueo_id", "dependencia_id")
-
-
-def _no_proponer_de(abierta) -> dict | None:
-    """La guarda de `otro_tema` (T9-R1b-3, ADR 0013 regla 1): la herramienta y
-    el id que la pregunta abierta deja pendientes, como datos (`NoProponer`
-    de `agente`, guardado como dict para que viaje en el estado de la
-    aclaración). Modificar: la herramienta de la propuesta y su id;
-    dato del menú: la herramienta a la que lleva la acción. "Ninguna, lo
-    escribo" y las preguntas del alta no tienen tarea conocida: sin guarda."""
-    from . import pendientes as P
-
-    if abierta.herramienta == _SENTINEL_ACLARACION or (
-            abierta.herramienta in _TIPO_DE_ALTA):
-        return None
-    if abierta.herramienta == P.SENTINEL_DATO_MENU_TAREA:
-        herramienta, campo = _HERRAMIENTA_DE_DATO_MENU.get(
-            abierta.args.get("accion"), (None, None))
-    else:
-        # Modificar: el id de la propuesta es el de su herramienta --
-        # `bloqueo_id` en `resolver_bloqueo`, `dependencia_id` al quitar una
-        # dependencia, `tarea_id` en el resto. Una herramienta con dos ids
-        # (`crear_dependencia`) o ninguno conocido queda sin guarda.
-        herramienta = abierta.herramienta
-        campo = next((c for c in _CAMPOS_DE_ID if c in abierta.args), None)
-    valor = abierta.args.get(campo) if campo else None
-    if not herramienta or valor is None:
-        return None
-    return {"herramienta": herramienta, "campo": campo, "valor": str(valor)}
 
 
 def _pregunta_de(abierta) -> _Pregunta:
@@ -1207,11 +1119,11 @@ def _atender_pregunta_pendiente(cur, quien, texto: str, abierta, proveedor, cal,
     exactamente una respuesta visible.
 
     Devuelve `None` cuando el turno ya terminó, o la ruta ya obtenida cuando
-    el mensaje sigue por el camino normal (`otro_tema`, o una pregunta que
-    otro turno consumió antes) -- sin un segundo ruteo. La pregunta se
-    consume sólo con `responde` (y `corrige`, si en ese tipo corregir es
-    responder) y `cancela`, o con los botones que deja `dudoso`; si el ruteo
-    falla, queda abierta."""
+    el mensaje sigue por el camino normal (una pregunta que otro turno
+    consumió antes) -- sin un segundo ruteo. La pregunta se consume sólo con
+    `responde` (y `corrige`, si en ese tipo corregir es responder) y
+    `cancela`, o con los botones que dejan `dudoso` y `otro_tema`; si el
+    ruteo falla, queda abierta."""
     from .llm import RespectoPendiente
 
     pregunta = _pregunta_de(abierta)
@@ -1234,7 +1146,11 @@ def _atender_pregunta_pendiente(cur, quien, texto: str, abierta, proveedor, cal,
                                   ahora)
         return None
     if comando is RespectoPendiente.OTRO_TEMA:
-        return route
+        # Una sola rama abierta (T9-R1d, enmienda de la regla 1): el mensaje
+        # no se atiende hasta que la persona decida qué pasa con lo pendiente.
+        _preguntar_por_la_rama(cur, quien, workspace_id, chat_id, texto, abierta,
+                               entrante_id, ahora)
+        return None
     if comando is RespectoPendiente.NO_PUEDO:
         _repreguntar(cur, quien, workspace_id, chat_id, abierta, pregunta, ahora,
                      entrante_id, prefijo=f"{AVISO_NO_PUEDO_DATO_PENDIENTE} ")
@@ -1434,23 +1350,54 @@ def _preguntar_si_es_el_dato(cur, quien, workspace_id: str, chat_id: int,
     pregunta abierta; el texto original y la pregunta (id, tipo y datos) quedan
     en los `args` de la acción de un solo uso que resuelve el toque
     (`_resolver_toque_respuesta_dato_menu`)."""
+    _preguntar_con_botones_sobre_la_rama(
+        cur, quien, workspace_id, chat_id, texto, abierta, entrante_id, ahora,
+        resumen=PREGUNTA_ES_EL_DATO.format(
+            descripcion=_pregunta_de(abierta).nombre),
+        opciones=[(ETIQUETA_ES_EL_DATO, _ELECCION_DATO_SI),
+                  (ETIQUETA_NO_ES_EL_DATO, _ELECCION_DATO_DEJAR)],
+        clave="dato-dudoso")
+
+
+def _preguntar_por_la_rama(cur, quien, workspace_id: str, chat_id: int,
+                           texto: str, abierta, entrante_id: str | None,
+                           ahora) -> None:
+    """Comando `otro_tema` con una pregunta abierta (T9-R1d, enmienda de la
+    regla 1 del ADR 0013): el mensaje no se atiende; una sola pregunta con dos
+    botones sobre lo pendiente. El mensaje (su texto y su id de mensaje
+    entrante) queda guardado con los botones para atenderlo si la persona deja
+    lo pendiente, sin pedirle que lo repita."""
+    _preguntar_con_botones_sobre_la_rama(
+        cur, quien, workspace_id, chat_id, texto, abierta, entrante_id, ahora,
+        resumen=PREGUNTA_RAMA_ABIERTA.format(
+            nombre=_pregunta_de(abierta).nombre),
+        opciones=[(ETIQUETA_SEGUIR_RAMA, _ELECCION_DATO_SEGUIR),
+                  (ETIQUETA_DEJAR_RAMA, _ELECCION_DATO_DEJAR)],
+        clave="rama-abierta")
+
+
+def _preguntar_con_botones_sobre_la_rama(cur, quien, workspace_id: str,
+                                         chat_id: int, texto: str, abierta,
+                                         entrante_id: str | None, ahora, *,
+                                         resumen: str, opciones: list,
+                                         clave: str) -> None:
+    """La pregunta con botones que deja `dudoso` u `otro_tema`. Sólo hay una
+    viva por persona y chat: los botones de la anterior pierden vigencia (un
+    toque tardío se contesta como cualquier pedido que ya no está vigente)."""
     from . import pendientes as P
     from .agente import VIGENCIA_PENDIENTE
 
+    P.retirar_preguntas_de_rama(cur, quien, chat_id, ahora)
     p = P.registrar(
         cur, quien, herramienta=P.SENTINEL_RESPUESTA_DATO_MENU,
         args={**_args_de_la_pregunta(abierta), "texto": texto,
               "entrante_id": entrante_id},
-        resumen=PREGUNTA_ES_EL_DATO.format(
-            descripcion=_pregunta_de(abierta).nombre),
-        vence_en=ahora + VIGENCIA_PENDIENTE, campo="eleccion",
-        opciones=[(ETIQUETA_ES_EL_DATO, _ELECCION_DATO_SI),
-                  (ETIQUETA_NO_ES_EL_DATO, _ELECCION_DATO_NO)],
-        chat_id=chat_id)
+        resumen=resumen, vence_en=ahora + VIGENCIA_PENDIENTE, campo="eleccion",
+        opciones=opciones, chat_id=chat_id)
     enqueue_outbox(
         cur, workspace_id=workspace_id, chat_id=chat_id,
         recipient_membership_id=quien.membership_id, text=p.resumen,
-        scheduled_for=ahora, dedupe_key=f"{workspace_id}:dato-dudoso:{p.id}",
+        scheduled_for=ahora, dedupe_key=f"{workspace_id}:{clave}:{p.id}",
         is_response=True, pending_action_id=p.id)
 
 
@@ -1473,81 +1420,28 @@ def _pregunta_abierta_de_toque(args: dict):
         args=args.get("dato") or {}, resumen=args.get("resumen") or "")
 
 
-def _interacciones_pendientes(cur, quien, workspace_id: str, chat_id: int) -> int:
-    """Cuánto le quedó esperando a la persona en este chat: mensajes con
-    botones encolados (una vista previa, una elección, una aclaración, el
-    cierre genérico, el alta guiada con botones -- todo lo que espera un
-    toque sale por `message_outbox` con `pending_action_id` o
-    `intake_choice_set_id`) más el alta guiada activa, que espera un texto.
-    `_seguir_camino_normal` compara antes y después del turno, así que no
-    depende de qué camino lo atendió ni de qué devolvió."""
-    cur.execute(
-        """select count(*) n from message_outbox
-            where workspace_id = %s and chat_id = %s
-              and (pending_action_id is not null
-                   or intake_choice_set_id is not null)""",
-        (workspace_id, chat_id))
-    botones = cur.fetchone()["n"]
-    cur.execute(
-        """select count(*) n from task_intake_request
-            where workspace_id = %s and membership_id = %s and chat_id = %s
-              and estado = 'active'""",
-        (workspace_id, quien.membership_id, chat_id))
-    return botones + cur.fetchone()["n"]
-
-
-def _retomar_dato_pendiente(cur, quien, workspace_id: str, chat_id: int,
-                            abierta, interacciones_antes: int, ahora) -> None:
-    """Después de atender otro tema (comando `otro_tema`), vuelve a la
-    pregunta abierta dentro de la misma respuesta: una parte más, con un
-    botón para dejarla. No agrega nada si el turno dejó otra interacción
-    pendiente (la pregunta sigue abierta igual), ni si la pregunta ya no es
-    la abierta de esta persona."""
-    from datetime import timedelta
-
-    from . import pendientes as P
-    from .agente import VIGENCIA_PENDIENTE
-
-    if _interacciones_pendientes(cur, quien, workspace_id,
-                                 chat_id) > interacciones_antes:
-        return
-    vigente = _ver_pregunta_abierta(
-        cur, quien, chat_id, ahora, alta=abierta.herramienta in _TIPO_DE_ALTA)
-    if vigente is None or vigente.pregunta_id != abierta.pregunta_id:
-        return
-
-    pregunta = _pregunta_de(abierta)
-    texto = RETOMAR_DATO_PENDIENTE.format(descripcion=pregunta.nombre,
-                                          pregunta=pregunta.pregunta)
-    p = P.registrar(
-        cur, quien, herramienta=P.SENTINEL_RESPUESTA_DATO_MENU,
-        args=_args_de_la_pregunta(abierta),
-        resumen=texto, vence_en=ahora + VIGENCIA_PENDIENTE, campo="eleccion",
-        opciones=[(ETIQUETA_DEJAR_DATO, _ELECCION_DATO_DEJAR)],
-        chat_id=chat_id)
-    # Una parte más de la misma respuesta: un milisegundo después, para que
-    # salga detrás de las partes del texto (que se ordenan por microsegundos).
-    enqueue_outbox(
-        cur, workspace_id=workspace_id, chat_id=chat_id,
-        recipient_membership_id=quien.membership_id, text=p.resumen,
-        scheduled_for=ahora + timedelta(milliseconds=1),
-        dedupe_key=f"{workspace_id}:dato-retomar:{p.id}", is_response=True,
-        pending_action_id=p.id)
-
-
 def _resolver_toque_respuesta_dato_menu(cur, quien, workspace_id: str,
                                         chat_id: int, args: dict, ahora) -> None:
-    """Alguien tocó un botón de `SENTINEL_RESPUESTA_DATO_MENU`
-    (T9-R1a-2, generalizado en T9-R1b a cualquier pregunta pendiente): "Sí,
-    es eso" y "No, es otra cosa" del comando `dudoso`, o "Dejarlo" del
-    retome. Cada uno deja exactamente una respuesta."""
+    """Alguien tocó un botón de `SENTINEL_RESPUESTA_DATO_MENU` (T9-R1a-2,
+    generalizado en T9-R1b a cualquier pregunta pendiente): "Sí, es eso" y "No,
+    es otra cosa" del comando `dudoso`, o "Seguir" y "Dejarlo y ver lo otro" de
+    la pregunta de la rama (`otro_tema`, T9-R1d). Cada uno deja exactamente una
+    respuesta."""
     from . import pendientes as P
     from .calendario import Calendario
     from .llm import desde_base
 
     eleccion = args.get("eleccion")
     abierta = _pregunta_abierta_de_toque(args)
-    texto = args.get("texto") or ""
+    texto = args.get("texto")
+
+    if texto is None:
+        # El botón "Dejarlo" del retome de antes de T9-R1d: ya no hay retome ni
+        # mensaje guardado que atender. Se contesta como un pedido que ya no
+        # está vigente, sin cerrar la pregunta.
+        _responder(cur, workspace_id, chat_id, quien, AVISO_PEDIDO_NO_VIGENTE,
+                   ahora)
+        return
 
     # Auditoría: la elección y la tarea, nunca el texto de la persona.
     registrar_auditoria(
@@ -1555,9 +1449,8 @@ def _resolver_toque_respuesta_dato_menu(cur, quien, workspace_id: str,
         actor_app_user_id=quien.app_user_id, actor_kind="persona",
         detalle={"eleccion": eleccion, "tarea_id": abierta.args.get("tarea_id")})
 
-    if eleccion == _ELECCION_DATO_DEJAR:
-        _dejar_pregunta_pendiente(cur, quien, workspace_id, chat_id, abierta,
-                                  ahora)
+    if eleccion == _ELECCION_DATO_SEGUIR:
+        _seguir_con_la_pregunta(cur, quien, workspace_id, chat_id, abierta, ahora)
         return
 
     proveedor = desde_base(cur, workspace_id, config)
@@ -1585,15 +1478,62 @@ def _resolver_toque_respuesta_dato_menu(cur, quien, workspace_id: str,
                                  args.get("entrante_id"))
         return
 
-    # "No, es otra cosa": el texto original va por el camino normal, y la
-    # pregunta sigue abierta (con el retome, si nada más quedó esperando).
+    # "Dejarlo y ver lo otro", y "No, es otra cosa" de `dudoso` (`no` es el
+    # valor de las preguntas de antes de T9-R1d): la misma salida.
+    _dejar_y_ver_lo_otro(cur, quien, workspace_id, chat_id, abierta, texto,
+                         args.get("entrante_id"), proveedor, cal, ahora)
+
+
+def _sigue_abierta(cur, quien, chat_id: int, abierta, ahora) -> bool:
+    """Si la pregunta de un botón sigue siendo la abierta de esta persona: no
+    la cerró ni la reemplazó otro camino. Sin consumirla."""
+    from . import pendientes as P
+    from .ingreso_tareas import intake_question_active
+
+    if abierta.herramienta in _TIPO_DE_ALTA:
+        return intake_question_active(cur, quien,
+                                      _TIPO_DE_ALTA[abierta.herramienta],
+                                      abierta.pregunta_id)
+    vigente = P.ver_modificacion_abierta(cur, quien, chat_id, ahora)
+    return vigente is not None and vigente.pregunta_id == abierta.pregunta_id
+
+
+def _seguir_con_la_pregunta(cur, quien, workspace_id: str, chat_id: int,
+                            abierta, ahora) -> None:
+    """"Seguir" de la pregunta de la rama: vuelve a hacer la pregunta pendiente
+    (una elección del alta, con sus botones). Si ya no estaba abierta, lo dice
+    y no manda nada más."""
+    if not _sigue_abierta(cur, quien, chat_id, abierta, ahora):
+        _responder(cur, workspace_id, chat_id, quien, AVISO_RAMA_YA_CERRADA,
+                   ahora)
+        return
+    _repreguntar(cur, quien, workspace_id, chat_id, abierta,
+                 _pregunta_de(abierta), ahora, None)
+
+
+def _dejar_y_ver_lo_otro(cur, quien, workspace_id: str, chat_id: int, abierta,
+                         texto: str, entrante_id: str | None, proveedor, cal,
+                         ahora) -> None:
+    """"Dejarlo y ver lo otro": cierra lo pendiente por el mismo camino que
+    `cancela` y, en la misma respuesta, atiende el mensaje guardado por el
+    camino normal, como si no hubiera pregunta abierta. Se rutea antes de
+    cerrar, así un ruteo caído no pierde la pregunta. Si otro camino ya la
+    había cerrado, el mensaje se atiende igual (nunca se pierde lo que la
+    persona pidió) y no se dice que se dejó nada de lado."""
+    from datetime import timedelta
+
     route, error = _rutear(proveedor, texto)
     if route is None:
         _avisar_ruteo_caido(cur, quien, error, workspace_id, chat_id, ahora)
         return
+    if _dejar_de_lado(cur, quien, abierta, ahora):
+        # La primera parte de la misma respuesta: un milisegundo antes, para
+        # que salga delante de lo que diga el camino normal.
+        _responder(cur, workspace_id, chat_id, quien,
+                   _pregunta_de(abierta).dejada,
+                   ahora - timedelta(milliseconds=1))
     _seguir_camino_normal(cur, quien, texto, route, proveedor, cal, chat_id,
-                          workspace_id, ahora, args.get("entrante_id"),
-                          retomar=abierta)
+                          workspace_id, ahora, entrante_id)
 
 
 def _iniciar_alta_guiada(cur, quien, chat_id: int, entrante_id: str | None,
@@ -1698,7 +1638,6 @@ def _estado_inicial_aclaracion(texto: str, entrante_id: str | None, route,
             {"herramienta": modificacion.herramienta, "args": modificacion.args,
              "resumen": modificacion.resumen}
             if modificacion is not None else None),
-        "no_proponer": None,
     }
 
 
@@ -1741,13 +1680,11 @@ def _avanzar_aclaracion(cur, quien, workspace_id: str, chat_id: int, ahora,
                             workspace_id, ahora)
         return
 
-    from .agente import NoProponer, responder
-    guarda = estado.get("no_proponer")
+    from .agente import responder
     responder(cur, quien, estado["mensaje"], proveedor, cal, chat_id,
              ahora=ahora, entrante_id=estado["entrante_id"],
              contexto_referencias=contexto,
-             tareas_resueltas_claras=estado["titulos_resueltas"],
-             no_proponer=NoProponer(**guarda) if guarda else None)
+             tareas_resueltas_claras=estado["titulos_resueltas"])
 
 
 def _preguntar_por_botones(cur, quien, workspace_id: str, chat_id: int, ahora,

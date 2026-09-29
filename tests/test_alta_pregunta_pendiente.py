@@ -221,55 +221,6 @@ def test_cancela_nombra_la_tarea_si_ya_tiene_titulo(
     assert TITULO_ALTA in _filas_del_chat(conn, tg)[-1]["cuerpo"]
 
 
-def test_otro_tema_atiende_el_mensaje_y_retoma_la_pregunta(
-        cliente, conn, corework, monkeypatch):
-    ws = corework.workspace_id
-    tg, rid = _abrir_alta(conn, ws)
-    proveedor = _con_rutas(
-        monkeypatch, [_ruta(RespectoPendiente.OTRO_TEMA)],
-        guion=[Respuesta(texto="Un bloqueo es algo que frena una tarea.")])
-    antes = _salidas(conn, tg)
-
-    _mensaje_privado(cliente, tg, "¿qué es un bloqueo?")
-
-    assert _campo_del_slot(conn) == "title"                   # sigue abierta
-    assert _campo(conn, rid, "title")["estado"] == "missing"
-    assert _salidas(conn, tg) == antes + 2                    # texto + retome
-    filas = _filas_del_chat(conn, tg)
-    assert filas[-2]["cuerpo"].startswith("Un bloqueo es")
-    assert filas[-1]["cuerpo"].startswith("¿Seguimos con")
-    assert PREGUNTA_TITULO in filas[-1]["cuerpo"]
-    assert filas[-1]["pending_action_id"] is not None         # con su botón
-    # El responder sabe que hay una pregunta abierta y no la propone de nuevo.
-    assert gateway.MARCA_PREGUNTA_PENDIENTE in proveedor.recibidos[-1][0]
-
-
-def test_dejarlo_del_retome_cancela_el_borrador_y_el_segundo_toque_se_avisa(
-        cliente, conn, corework, monkeypatch):
-    ws = corework.workspace_id
-    tg, rid = _abrir_alta(conn, ws)
-    _con_rutas(monkeypatch, [_ruta(RespectoPendiente.OTRO_TEMA)],
-               guion=[Respuesta(texto="Un bloqueo frena una tarea.")])
-    _mensaje_privado(cliente, tg, "¿qué es un bloqueo?")
-    token = _boton(conn, "Dejarlo")
-    antes = _salidas(conn, tg)
-
-    assert _tocar(cliente, token, tg).status_code == 200
-
-    assert _request(conn, rid)["estado"] == "cancelled"
-    assert _salidas(conn, tg) == antes + 1
-    assert "dejé de lado" in _filas_del_chat(conn, tg)[-1]["cuerpo"]
-
-    antes = _salidas(conn, tg)
-    assert _tocar(cliente, token, tg).status_code == 200      # toque tardío
-    assert _request(conn, rid)["estado"] == "cancelled"
-    # Una sola respuesta, la del pedido que ya no está vigente (el botón ya se
-    # usó: `_toque` no llega a `_dejar_pregunta_pendiente`); no repite "dejé
-    # de lado".
-    assert _salidas(conn, tg) == antes + 1
-    assert _filas_del_chat(conn, tg)[-1]["cuerpo"] == AVISO_TOQUE_YA_USADO
-
-
 def test_dudoso_pregunta_con_botones_y_si_es_eso_toma_el_campo(
         cliente, conn, corework, monkeypatch):
     ws = corework.workspace_id
@@ -305,23 +256,6 @@ def test_los_campos_de_texto_libre_tienen_nombre_y_limite_para_cada_uno():
     # Un campo de texto libre sin nombre rompería (KeyError) cada mensaje del
     # chat mientras esté abierto: `_pregunta_de` lo nombra con `FREE_TEXT_NAMES`.
     assert set(I.FREE_TEXT_NAMES) == set(I.USER_FIELD_LIMITS)
-
-
-def test_dudoso_no_es_otra_cosa_sigue_el_camino_normal_y_deja_abierta_la_pregunta(
-        cliente, conn, corework, monkeypatch):
-    ws = corework.workspace_id
-    tg, rid = _abrir_alta(conn, ws)
-    proveedor = _con_rutas(
-        monkeypatch, [_ruta(RespectoPendiente.DUDOSO), _ruta(None)],
-        guion=[Respuesta(texto="Tenés que decirme el título.")])
-    _mensaje_privado(cliente, tg, "puede ser")
-    token = _boton(conn, "No, es otra cosa")
-
-    assert _tocar(cliente, token, tg).status_code == 200
-
-    assert _campo_del_slot(conn) == "title"
-    assert _campo(conn, rid, "title")["estado"] == "missing"
-    assert gateway.MARCA_PREGUNTA_PENDIENTE in proveedor.recibidos[-1][0]
 
 
 def test_corrige_todavia_no_tiene_camino_en_el_alta_y_se_trata_como_dudoso(

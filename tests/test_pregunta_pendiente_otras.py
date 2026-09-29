@@ -236,47 +236,6 @@ def test_cancela_cierra_sin_efecto_y_lo_dice(
 
 
 @pytest.mark.parametrize("kind", KINDS)
-def test_otro_tema_atiende_y_retoma_en_la_misma_respuesta(
-        cliente, conn, corework, monkeypatch, kind):
-    ws = corework.workspace_id
-    tg, _tid = _abrir(kind, cliente, conn, ws)
-    proveedor = _con_rutas(
-        monkeypatch, [_ruta(RespectoPendiente.OTRO_TEMA)],
-        guion=[Respuesta(texto="Tenés dos tareas abiertas.")])
-    antes = _salidas(conn, tg)
-
-    _mensaje(cliente, tg, "¿qué tengo pendiente?")
-
-    filas = _filas_del_chat(conn, tg)
-    assert len(proveedor.ruteados) == 1                       # sin segundo ruteo
-    assert _salidas(conn, tg) == antes + 2                    # dos partes de UNA
-    assert filas[-2]["cuerpo"] == "Tenés dos tareas abiertas."
-    assert filas[-1]["cuerpo"].startswith("¿Seguimos con")
-    assert PREGUNTAS[kind] in filas[-1]["cuerpo"]
-    assert filas[-1]["pending_action_id"] is not None         # con "Dejarlo"
-    assert _abiertas(conn) == 1                               # sigue abierta
-    assert _vistas_previas(conn) == 0
-
-
-@pytest.mark.parametrize("kind", KINDS)
-def test_dejarlo_del_retome_cierra_como_cancela(
-        cliente, conn, corework, monkeypatch, kind):
-    ws = corework.workspace_id
-    tg, tid = _abrir(kind, cliente, conn, ws)
-    _con_rutas(monkeypatch, [_ruta(RespectoPendiente.OTRO_TEMA)],
-               guion=[Respuesta(texto="Hoy hace buen día.")])
-    _mensaje(cliente, tg, "¿cómo está el clima?")
-    antes = _salidas(conn, tg)
-
-    _tocar_boton(cliente, conn, ws, "Dejarlo", tg)
-
-    assert _abiertas(conn) == 0
-    assert _salidas(conn, tg) == antes + 1
-    assert _ultimo_cuerpo(conn, tg) == DEJADAS[kind]
-    assert _bloqueos(conn, tid) == 0
-
-
-@pytest.mark.parametrize("kind", KINDS)
 def test_no_puedo_avisa_repite_la_pregunta_y_no_consume(
         cliente, conn, corework, monkeypatch, kind):
     ws = corework.workspace_id
@@ -331,25 +290,6 @@ def test_dudoso_si_consume_y_sigue_con_el_texto_original(
     assert CONTEXTOS[kind] in _contexto_del_agente(proveedor)
     assert _salidas(conn, tg) == antes + 1
     assert _ultimo_cuerpo(conn, tg) == "Anotado."
-
-
-@pytest.mark.parametrize("kind", KINDS)
-def test_dudoso_no_atiende_el_texto_normal_y_la_pregunta_sigue(
-        cliente, conn, corework, monkeypatch, kind):
-    ws = corework.workspace_id
-    tg, _tid = _abrir(kind, cliente, conn, ws)
-    proveedor = _con_rutas(monkeypatch, [_ruta(RespectoPendiente.DUDOSO),
-                                         _ruta(None)],
-                           guion=[Respuesta(texto="Tenés dos tareas abiertas.")])
-    _mensaje(cliente, tg, "¿qué tengo pendiente?")
-    antes = _salidas(conn, tg)
-
-    _tocar_boton(cliente, conn, ws, "No", tg)
-
-    assert proveedor.pendientes[-1] is None                   # sin pregunta
-    assert _abiertas(conn) == 1                               # sigue abierta
-    assert _salidas(conn, tg) == antes + 2                    # respuesta + retome
-    assert _filas_del_chat(conn, tg)[-1]["cuerpo"].startswith("¿Seguimos con")
 
 
 @pytest.mark.parametrize("kind", KINDS)
@@ -619,46 +559,13 @@ def test_una_referencia_sin_resolucion_ni_error_se_ignora_sin_romper(
 
 
 # ---------------------------------------------------------------------------
-# `otro_tema`: el responder sabe que hay una pregunta pendiente
+# `otro_tema` (T9-R1d): el mensaje no se atiende hasta que la persona decide;
+# al dejar lo pendiente se atiende como un turno normal, referencias incluidas
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("kind", KINDS)
-def test_otro_tema_le_dice_al_responder_que_hay_una_pregunta_pendiente(
-        cliente, conn, corework, monkeypatch, kind):
-    ws = corework.workspace_id
-    tg, _tid = _abrir(kind, cliente, conn, ws)
-    proveedor = _con_rutas(
-        monkeypatch, [_ruta(RespectoPendiente.OTRO_TEMA)],
-        guion=[Respuesta(texto="Tenés dos tareas abiertas.")])
-
-    _mensaje(cliente, tg, "¿qué tareas tengo abiertas?")
-
-    sistema = _contexto_del_agente(proveedor)
-    assert gateway.MARCA_PREGUNTA_PENDIENTE in sistema
-    assert PREGUNTAS[kind] in sistema                         # la pregunta abierta
-    assert "no la vuelvas a proponer" in sistema
-
-
-def test_sin_pregunta_pendiente_el_responder_no_recibe_ese_bloque(
+def test_dejar_y_ver_lo_otro_resuelve_las_referencias_del_mensaje_guardado(
         cliente, conn, corework, monkeypatch):
-    ws = corework.workspace_id
-    with espacio(conn, ws) as cur:
-        tg = _telegram_id(cur, PERSONA)
-    conn.commit()
-    proveedor = _con_rutas(monkeypatch, [_ruta(None)],
-                           guion=[Respuesta(texto="Tenés dos tareas abiertas.")])
-
-    _mensaje(cliente, tg, "¿qué tareas tengo abiertas?")
-
-    assert gateway.MARCA_PREGUNTA_PENDIENTE not in _contexto_del_agente(proveedor)
-
-
-def test_otro_tema_con_trabajos_resuelve_las_referencias_como_un_turno_normal(
-        cliente, conn, corework, monkeypatch):
-    # Seguimiento de review-e95b2d47b01f0161: `otro_tema` es un turno normal,
-    # así que sus `trabajos` sí se resuelven (y el bloque de la pregunta
-    # pendiente viaja junto con el de las referencias).
     ws = corework.workspace_id
     tg, _tid = _abrir_modificar(cliente, conn, ws)
     doble = ClienteJevGuionado(guion=[
@@ -666,16 +573,19 @@ def test_otro_tema_con_trabajos_resuelve_las_referencias_como_un_turno_normal(
                                        "ninguna": 1.0}}}])
     monkeypatch.setattr(jev_modulo, "desde_base", lambda api_key: doble)
     proveedor = _con_rutas(
-        monkeypatch, [_ruta_con_trabajos(RespectoPendiente.OTRO_TEMA)],
+        monkeypatch, [_ruta_con_trabajos(RespectoPendiente.OTRO_TEMA),
+                      _ruta_con_trabajos(None)],
         guion=[Respuesta(texto="No encontré esa tarea.")])
 
     _mensaje(cliente, tg, "¿cómo va el variador roto?")
 
-    assert doble.pedidos, "las referencias de un otro_tema sí se resuelven"
-    sistema = _contexto_del_agente(proveedor)
-    assert SUSTANTIVO in sistema
-    assert gateway.MARCA_PREGUNTA_PENDIENTE in sistema
-    assert _abiertas(conn) == 1
+    assert doble.pedidos == []                                # todavía no se atiende
+    assert proveedor.recibidos == []
+    _tocar_boton(cliente, conn, ws, "Dejarlo", tg)
+
+    assert doble.pedidos, "las referencias del mensaje guardado sí se resuelven"
+    assert SUSTANTIVO in _contexto_del_agente(proveedor)
+    assert _abiertas(conn) == 0                               # lo pendiente se dejó
 
 
 # ---------------------------------------------------------------------------

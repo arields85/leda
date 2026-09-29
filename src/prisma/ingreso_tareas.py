@@ -44,12 +44,6 @@ CANCELAR_BORRADOR = con_icono("Cancelar borrador", ICONO_CANCELAR)
 DRAFT_AWAITING_CONFIRMATION = (
     "El borrador de la tarea está esperando confirmación: se confirma con el "
     "botón Confirmar del resumen, no con un mensaje.")
-# Lo mismo cuando quien escribe no es quien confirma (ADR 0013 regla 3, estado
-# real): dice quién confirma en vez de dar a entender que puede hacerlo.
-DRAFT_AWAITING_APPROVER = (
-    "El borrador de la tarea está esperando la confirmación de {approver}: la "
-    "tarea se crea cuando esa persona toca Confirmar en el resumen que le "
-    "llegó, no con un mensaje.")
 CHOICE_FALLBACK_PROMPT = "Elegí una opción para seguir con la tarea."
 USER_FIELD_LIMITS = {
     "title": 200,
@@ -509,11 +503,16 @@ def handle_active_text(cur: psycopg.Cursor, who: Solicitante, *, chat_id: int,
         return IntakeOutcome(request_id, prompt, inert=True)
 
     cur.execute(
-        """select 1 from pending_action
+        """select membership_id from pending_action
             where draft_id = %s and estado = 'esperando' limit 1""",
         (request["task_draft_id"],),
     )
-    if cur.fetchone():
+    waiting = cur.fetchone()
+    if waiting and str(waiting["membership_id"]) != str(who.membership_id):
+        # Espera la confirmación de otra persona: no es una rama abierta de
+        # quien lo pidió y su mensaje sigue el camino normal.
+        return None
+    if waiting:
         prompt = DRAFT_AWAITING_CONFIRMATION
     else:
         prompt = with_no_effect_status(
@@ -535,24 +534,6 @@ FREE_TEXT_NAMES = {
     "due_date": "la fecha objetivo",
     "acceptance_criterion": "el criterio de aceptación",
 }
-
-
-def awaiting_confirmation_text(approver_name: str | None) -> str:
-    """Lo que se le dice a quien escribe con su borrador esperando la
-    confirmación. `approver_name` es el de quien confirma si no es quien
-    escribe (`None` si es la misma persona: el botón es suyo)."""
-    if not approver_name:
-        return DRAFT_AWAITING_CONFIRMATION
-    return DRAFT_AWAITING_APPROVER.format(approver=approver_name)
-
-
-def _approver_name_for_writer(who: Solicitante, approver_id,
-                              approver_name) -> str | None:
-    """El nombre de quien confirma, o `None` si es quien escribe. Sin nombre
-    legible se dice igual que es otra persona, nunca que puede confirmar."""
-    if approver_id is None or str(approver_id) == str(who.membership_id):
-        return None
-    return approver_name or "otra persona"
 
 
 def free_text_question(field: str) -> str:
@@ -604,7 +585,11 @@ def open_intake_question(cur: psycopg.Cursor, who: Solicitante,
     la vista previa (su `pending_action`); `resumen` es la pregunta que se le
     hizo; `opciones` (sólo en una elección) son las etiquetas de sus botones,
     sin íconos. Con varias, gana el campo de texto libre, después la elección:
-    una solicitud tiene una sola a la vez."""
+    una solicitud tiene una sola a la vez. La vista previa del borrador es una
+    pregunta abierta sólo de quien tiene el botón Confirmar (el aprobador):
+    si confirma otra persona, quien lo pidió no tiene una rama abierta (ADR
+    0013 regla 1, enmienda del 2026-09-29) y sus mensajes siguen el camino
+    normal."""
     slot = open_free_text_slot(cur, who, chat_id)
     if slot is not None:
         return {"tipo": QUESTION_FREE_TEXT, "id": slot["slot_id"],
@@ -634,28 +619,22 @@ def open_intake_question(cur: psycopg.Cursor, who: Solicitante,
                 "resumen": _first_choice_prompt(cur, row["id"]),
                 "opciones": options}
     cur.execute(
-        f"""select p.id, r.id request_id, {_TITLE_OF_REQUEST} titulo,
-                   p.membership_id approver_id,
-                   (select i.nombre from integrante i
-                     where i.membership_id = p.membership_id) approver_name
+        f"""select p.id, r.id request_id, {_TITLE_OF_REQUEST} titulo
               from task_intake_request r
               join pending_action p on p.draft_id = r.task_draft_id
                                    and p.workspace_id = r.workspace_id
              where r.workspace_id = %s and r.membership_id = %s
                and r.chat_id = %s and r.estado = 'active'
-               and p.estado = 'esperando'
+               and p.estado = 'esperando' and p.membership_id = %s
              order by p.creado_en desc limit 1""",
-        (who.workspace_id, who.membership_id, chat_id),
+        (who.workspace_id, who.membership_id, chat_id, who.membership_id),
     )
     row = cur.fetchone()
     if row:
         return {"tipo": QUESTION_CONFIRMATION, "id": str(row["id"]),
                 "request_id": str(row["request_id"]), "campo": None,
                 "titulo": _text_or_none(row["titulo"]),
-                "resumen": awaiting_confirmation_text(
-                    _approver_name_for_writer(
-                        who, row["approver_id"], row["approver_name"])),
-                "opciones": None}
+                "resumen": DRAFT_AWAITING_CONFIRMATION, "opciones": None}
     return None
 
 

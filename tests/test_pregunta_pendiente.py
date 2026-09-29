@@ -22,7 +22,7 @@ from prisma import jev as jev_modulo
 from prisma import pendientes as P
 from prisma.jev import ClienteJevGuionado
 from prisma.db import admin, espacio
-from prisma.llm import (IntentAction, IntentRoute, Llamada, ProveedorGuionado,
+from prisma.llm import (IntentAction, IntentRoute, ProveedorGuionado,
                          RespectoPendiente, Respuesta, RouteEnvelope)
 
 from tests.test_menu_tarea import (_abrir_menu, _mensaje, _opciones,  # noqa: F401
@@ -202,23 +202,6 @@ def test_cancela_cierra_sin_efecto_y_el_siguiente_mensaje_rutea_normal(
     assert "dos tareas abiertas" in _ultimo_cuerpo(conn, tg)
 
 
-def test_otro_tema_atiende_el_mensaje_con_una_sola_llamada_de_ruteo(
-        cliente, conn, corework, monkeypatch):
-    ws = corework.workspace_id
-    _tid, tg = _abrir_pregunta(cliente, conn, ws, monkeypatch, "Ya la terminé")
-    proveedor = _con_rutas(
-        monkeypatch, [_ruta(RespectoPendiente.OTRO_TEMA)],
-        guion=[Respuesta(texto="Tenés dos tareas abiertas.")])
-
-    _mensaje(cliente, tg, "¿qué tengo pendiente?")
-
-    assert len(proveedor.ruteados) == 1          # sin segundo ruteo
-    assert len(proveedor.recibidos) == 1         # el agente respondió una vez
-    # Las dos partes de la misma respuesta: lo del agente y el retome.
-    assert "dos tareas abiertas" in _filas_del_chat(conn, tg)[-2]["cuerpo"]
-    assert _abiertas(conn) == 1                  # la pregunta sigue abierta
-
-
 def test_no_puedo_avisa_repite_la_pregunta_y_no_consume(
         cliente, conn, corework, monkeypatch):
     ws = corework.workspace_id
@@ -338,7 +321,7 @@ def test_ver_no_consume_y_consumir_es_de_un_solo_uso(
 
 
 # ---------------------------------------------------------------------------
-# T9-R1a-2: dudoso y corrige con botones, retome de otro tema, seguimientos
+# T9-R1a-2: dudoso y corrige con botones, seguimientos
 # ---------------------------------------------------------------------------
 
 DESCRIPCION = f"la evidencia de la entrega de «{TITULO}»"
@@ -441,31 +424,6 @@ def test_dudoso_si_con_la_pregunta_ya_consumida_lo_dice_y_no_hace_nada(
         assert cur.fetchone()["n"] == 0
 
 
-def test_dudoso_no_sigue_el_camino_normal_y_la_pregunta_queda_abierta(
-        cliente, conn, corework, monkeypatch):
-    ws = corework.workspace_id
-    proveedor, tg, _tid = _preguntar_si_es_el_dato(
-        cliente, conn, ws, monkeypatch, RespectoPendiente.DUDOSO,
-        "¿qué tengo pendiente?")
-    proveedor.rutas.append(_ruta(None))
-    proveedor.guion.append(Respuesta(texto="Tenés dos tareas abiertas."))
-    antes = _salidas(conn, tg)
-
-    _tocar_boton(cliente, conn, ws, P.SENTINEL_RESPUESTA_DATO_MENU, "No", tg)
-
-    # El texto original se rutea de nuevo, sin la pregunta pendiente, y lo
-    # atiende el agente como cualquier mensaje.
-    assert proveedor.ruteados == ["¿qué tengo pendiente?"] * 2
-    assert proveedor.pendientes[-1] is None
-    assert len(proveedor.recibidos) == 1
-    assert "dos tareas abiertas" in _filas_del_chat(conn, tg)[-2]["cuerpo"]
-    assert _abiertas(conn) == 1                               # sigue abierta
-    assert _vista_previa(conn, "actualizar_estado") is None
-    # Una respuesta: el texto del agente y el retome como su segunda parte.
-    assert _salidas(conn, tg) == antes + 2
-    assert _filas_del_chat(conn, tg)[-1]["cuerpo"].startswith("¿Seguimos con")
-
-
 def test_dudoso_tocado_dos_veces_no_repite_el_efecto(
         cliente, conn, corework, monkeypatch):
     ws = corework.workspace_id
@@ -480,90 +438,6 @@ def test_dudoso_tocado_dos_veces_no_repite_el_efecto(
 
     assert _salidas(conn, tg) == antes + 1                    # sólo un aviso
     assert "ya no está vigente" in _ultimo_cuerpo(conn, tg)
-
-
-def test_otro_tema_sin_otra_interaccion_retoma_en_la_misma_respuesta(
-        cliente, conn, corework, monkeypatch):
-    ws = corework.workspace_id
-    _tid, tg = _abrir_pregunta(cliente, conn, ws, monkeypatch, "Ya la terminé")
-    _con_rutas(monkeypatch, [_ruta(RespectoPendiente.OTRO_TEMA)],
-               guion=[Respuesta(texto="Hoy hace buen día.")])
-    antes = _salidas(conn, tg)
-
-    _mensaje(cliente, tg, "¿cómo está el clima?")
-
-    filas = _filas_del_chat(conn, tg)
-    assert _salidas(conn, tg) == antes + 2         # las dos partes de UNA respuesta
-    assert filas[-2]["cuerpo"] == "Hoy hace buen día."
-    assert filas[-2]["pending_action_id"] is None
-    assert filas[-1]["cuerpo"] == gateway.RETOMAR_DATO_PENDIENTE.format(
-        descripcion=DESCRIPCION, pregunta=gateway.PREGUNTA_DATO_EVIDENCIA_ENTREGA)
-    assert filas[-1]["pending_action_id"] is not None
-    assert [o["etiqueta"]
-            for o in _botones_de(conn, ws, P.SENTINEL_RESPUESTA_DATO_MENU)] == [
-        gateway.ETIQUETA_DEJAR_DATO]
-    assert _abiertas(conn) == 1                               # sigue abierta
-
-
-def test_otro_tema_que_deja_una_interaccion_pendiente_no_agrega_el_retome(
-        cliente, conn, corework, monkeypatch):
-    ws = corework.workspace_id
-    tid, tg = _abrir_pregunta(cliente, conn, ws, monkeypatch, "Ya la terminé")
-    guion = [Respuesta(llamadas=[Llamada("c1", "ofrecer_opciones", {
-        "pregunta": "¿De qué tarea hablamos?",
-        "opciones": [{"tarea_id": tid, "accion": "menu"}]})])]
-    _con_rutas(monkeypatch, [_ruta(RespectoPendiente.OTRO_TEMA)], guion=guion)
-    antes = _salidas(conn, tg)
-
-    _mensaje(cliente, tg, "quiero ver otra tarea")
-
-    assert _salidas(conn, tg) == antes + 1
-    assert _filas_del_chat(conn, tg)[-1]["pending_action_id"] is not None
-    with admin(conn) as cur:
-        cur.execute("select count(*) n from pending_action where herramienta = %s",
-                    (P.SENTINEL_RESPUESTA_DATO_MENU,))
-        assert cur.fetchone()["n"] == 0
-    assert _abiertas(conn) == 1                               # la pregunta sigue
-
-
-def test_dejarlo_cierra_la_pregunta_como_cancela(
-        cliente, conn, corework, monkeypatch):
-    ws = corework.workspace_id
-    tid, tg = _abrir_pregunta(cliente, conn, ws, monkeypatch, "Ya la terminé")
-    _con_rutas(monkeypatch, [_ruta(RespectoPendiente.OTRO_TEMA)],
-               guion=[Respuesta(texto="Hoy hace buen día.")])
-    _mensaje(cliente, tg, "¿cómo está el clima?")
-    antes = _salidas(conn, tg)
-
-    _tocar_boton(cliente, conn, ws, P.SENTINEL_RESPUESTA_DATO_MENU, "Dejarlo", tg)
-
-    assert _abiertas(conn) == 0
-    assert _salidas(conn, tg) == antes + 1
-    assert _ultimo_cuerpo(conn, tg) == gateway.AVISO_DATO_DEJADO_DE_LADO.format(
-        descripcion=DESCRIPCION)
-    with admin(conn) as cur:
-        cur.execute("select estado from task where id = %s", (tid,))
-        assert cur.fetchone()["estado"] == "asignada"
-
-
-def test_dejarlo_con_la_pregunta_ya_consumida_no_dice_que_la_dejo(
-        cliente, conn, corework, monkeypatch):
-    ws = corework.workspace_id
-    _tid, tg = _abrir_pregunta(cliente, conn, ws, monkeypatch, "Ya la terminé")
-    _con_rutas(monkeypatch, [_ruta(RespectoPendiente.OTRO_TEMA)],
-               guion=[Respuesta(texto="Hoy hace buen día.")])
-    _mensaje(cliente, tg, "¿cómo está el clima?")
-    with admin(conn) as cur:
-        cur.execute(
-            """update pending_action set modificacion_consumida_en = now()
-                where herramienta = %s""", (P.SENTINEL_DATO_MENU_TAREA,))
-    conn.commit()
-    antes = _salidas(conn, tg)
-
-    _tocar_boton(cliente, conn, ws, P.SENTINEL_RESPUESTA_DATO_MENU, "Dejarlo", tg)
-
-    assert _salidas(conn, tg) == antes + 1
-    assert _ultimo_cuerpo(conn, tg) == gateway.AVISO_DATO_YA_NO_PENDIENTE
 
 
 # --- Seguimientos de review-c10ae20ecdf4cfa0 -------------------------------
@@ -626,8 +500,8 @@ def test_cancela_con_la_pregunta_ya_consumida_no_dice_que_la_dejo(
     (RespectoPendiente.CHARLA, [], 1),
     (RespectoPendiente.DUDOSO, [], 1),
     (RespectoPendiente.NO_PUEDO, [], 1),
-    # Una respuesta con dos partes: el texto del agente y el retome.
-    (RespectoPendiente.OTRO_TEMA, [Respuesta(texto="Hoy hace buen día.")], 2),
+    # La pregunta de la rama (T9-R1d): una respuesta con dos botones.
+    (RespectoPendiente.OTRO_TEMA, [], 1),
 ])
 def test_cada_comando_deja_una_sola_respuesta_para_el_mensaje(
         cliente, conn, corework, monkeypatch, comando, guion, filas):

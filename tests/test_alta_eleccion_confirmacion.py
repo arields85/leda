@@ -81,7 +81,12 @@ def _alta_en_confirmacion(conn, world, responsable="Sam North") -> tuple[str, st
             _choose(cur, actor, rid, etiqueta, chat_id=user)
         _choose(cur, actor, rid, "Sí", chat_id=user)
         final = _choose(cur, actor, rid, "Sí", chat_id=user)
-        assert I.open_intake_question(cur, actor, user)["tipo"] == "confirmation"
+        # Quien escribe sólo tiene la pregunta abierta si es quien confirma.
+        pregunta = I.open_intake_question(cur, actor, user)
+        if responsable == "Sam North":
+            assert pregunta["tipo"] == "confirmation"
+        else:
+            assert pregunta is None
     conn.commit()
     return rid, final.pending_action_id
 
@@ -330,25 +335,42 @@ def test_cancela_con_una_eleccion_abierta_cancela_el_borrador_y_lo_dice(
         titulo=f" «{TITULO}»")
 
 
-def test_otro_tema_con_una_eleccion_abierta_atiende_el_mensaje_y_la_retoma(
+def test_otro_tema_con_una_eleccion_abierta_pregunta_por_la_rama_sin_atender_el_mensaje(
         intake_world, conn, monkeypatch):
     rid = _alta_con_eleccion(conn, intake_world)
     user = _usuario(intake_world)
     conjunto = _conjunto_activo(conn, rid)
     antes = _salidas(conn, user)
-    provider = _RoutingProvider([_ruta(RespectoPendiente.OTRO_TEMA),
-                                 IntentRoute(IntentAction.NORMAL_CONVERSATION)],
-                                answer="Un bloqueo frena una tarea.")
+    provider = _RoutingProvider([_ruta(RespectoPendiente.OTRO_TEMA)])
 
     _escribir(conn, monkeypatch, intake_world, provider, "¿qué es un bloqueo?")
 
-    assert provider.main_calls == 1
+    assert provider.main_calls == 0
     assert _conjunto_activo(conn, rid) == conjunto            # la elección sigue
     salidas = _nuevas(conn, user, antes)
-    assert len(salidas) == 2                          # respuesta + retome
-    assert salidas[-2]["cuerpo"] == "Un bloqueo frena una tarea."
-    assert salidas[-1]["cuerpo"].startswith("¿Seguimos con")
-    assert salidas[-1]["pending_action_id"]                   # con "Dejarlo"
+    assert [f["cuerpo"] for f in salidas] == [gateway.PREGUNTA_RAMA_ABIERTA.format(
+        nombre="la elección sobre el objetivo de la tarea nueva")]
+    assert salidas[0]["pending_action_id"]                    # con sus botones
+
+
+def test_seguir_con_una_eleccion_abierta_la_vuelve_a_mostrar_con_sus_botones(
+        intake_world, conn, monkeypatch):
+    rid = _alta_con_eleccion(conn, intake_world)
+    user = _usuario(intake_world)
+    conjunto = _conjunto_activo(conn, rid)
+    provider = _RoutingProvider([_ruta(RespectoPendiente.OTRO_TEMA)])
+    _escribir(conn, monkeypatch, intake_world, provider, "¿qué es un bloqueo?")
+    antes = _salidas(conn, user)
+    client = _callback_client(conn, monkeypatch)
+
+    assert _tocar_boton(client, conn, _token_de(conn, "Seguir"),
+                        user).status_code == 200
+
+    assert _conjunto_activo(conn, rid) == conjunto
+    salidas = _nuevas(conn, user, antes)
+    assert len(salidas) == 1
+    assert str(salidas[0]["intake_choice_set_id"]) == conjunto  # con sus botones
+    assert salidas[0]["cuerpo"] == _pregunta(antes, conjunto)
 
 
 @pytest.mark.parametrize("comando", [
@@ -394,12 +416,14 @@ def test_dudoso_y_corrige_con_una_eleccion_abierta_preguntan_con_botones(
     assert salidas[-1]["pending_action_id"]
 
 
-def test_dejarlo_del_retome_de_una_eleccion_cancela_el_borrador(
+def test_dejar_con_una_eleccion_abierta_cancela_el_borrador_y_atiende_el_mensaje(
         intake_world, conn, monkeypatch):
     rid = _alta_con_eleccion(conn, intake_world)
     user = _usuario(intake_world)
-    provider = _RoutingProvider([_ruta(RespectoPendiente.OTRO_TEMA),
-                                 IntentRoute(IntentAction.NORMAL_CONVERSATION)])
+    provider = _RoutingProvider(
+        [_ruta(RespectoPendiente.OTRO_TEMA),
+         IntentRoute(IntentAction.NORMAL_CONVERSATION)],
+        answer="Un bloqueo frena una tarea.")
     _escribir(conn, monkeypatch, intake_world, provider, "¿qué es un bloqueo?")
     client = _callback_client(conn, monkeypatch)
     antes = _salidas(conn, user)
@@ -408,27 +432,9 @@ def test_dejarlo_del_retome_de_una_eleccion_cancela_el_borrador(
                         user).status_code == 200
 
     assert _solicitud(conn, rid) == "cancelled"
-    nuevas = _nuevas(conn, user, antes)
-    assert len(nuevas) == 1
-    assert nuevas[0]["cuerpo"] == gateway.AVISO_ALTA_DEJADA.format(
-        titulo=f" «{TITULO}»")
-
-
-def test_dejarlo_del_retome_del_borrador_esperando_lo_cancela(
-        intake_world, conn, monkeypatch):
-    rid, pid = _alta_en_confirmacion(conn, intake_world)
-    user = _usuario(intake_world)
-    provider = _RoutingProvider([_ruta(RespectoPendiente.OTRO_TEMA),
-                                 IntentRoute(IntentAction.NORMAL_CONVERSATION)])
-    _escribir(conn, monkeypatch, intake_world, provider, "¿qué es un bloqueo?")
-    client = _callback_client(conn, monkeypatch)
-    antes = _salidas(conn, user)
-
-    assert _tocar_boton(client, conn, _token_de(conn, "Dejarlo"),
-                        user).status_code == 200
-
-    assert _solicitud(conn, rid) == "cancelled"
-    assert len(_nuevas(conn, user, antes)) == 1
+    assert [f["cuerpo"] for f in _nuevas(conn, user, antes)] == [
+        gateway.AVISO_ALTA_DEJADA.format(titulo=f" «{TITULO}»"),
+        "Un bloqueo frena una tarea."]
 
 
 def test_si_es_eso_del_dudoso_con_un_texto_que_no_es_la_opcion_repite_la_pregunta(
@@ -547,33 +553,52 @@ def test_quien_escribe_es_el_aprobador_la_respuesta_no_nombra_a_nadie(
     assert "Morgan Hale" not in salidas[0]["cuerpo"]
 
 
-@pytest.mark.parametrize("comando", [
-    RespectoPendiente.RESPONDE, RespectoPendiente.CHARLA, RespectoPendiente.CORRIGE])
-def test_quien_escribe_no_es_el_aprobador_la_respuesta_dice_quien_confirma(
-        comando, intake_world, conn, monkeypatch):
+# Una rama está abierta para quien tiene que responderla (ADR 0013 regla 1,
+# enmienda del 2026-09-29): el borrador que espera la confirmación de otra
+# persona no es una rama abierta de quien lo pidió. Sus mensajes siguen el camino
+# normal: sin ruteo contra la pregunta, sin pregunta de la rama.
+@pytest.mark.parametrize("texto", ["¿qué es un bloqueo?", "sí, dale", "hola"])
+def test_quien_escribe_no_es_el_aprobador_su_mensaje_sigue_el_camino_normal(
+        texto, intake_world, conn, monkeypatch):
     rid, pid = _alta_en_confirmacion(conn, intake_world,
                                      responsable="Para mí")
     user = _usuario(intake_world)
-    aprobador = intake_world["north-lab"]["people"]["Morgan Hale"]["name"]
     antes = _salidas(conn, user)
-    provider = _RoutingProvider([_ruta(comando)])
+    provider = _RoutingProvider([IntentRoute(IntentAction.NORMAL_CONVERSATION)],
+                                answer="Un bloqueo frena una tarea.")
 
-    _escribir(conn, monkeypatch, intake_world, provider, "sí, dale")
+    _escribir(conn, monkeypatch, intake_world, provider, texto)
 
-    _sin_conversion(conn, rid, pid)
+    _sin_conversion(conn, rid, pid)                # el borrador sigue esperando
+    assert provider.pending_calls == [None]        # ruteado sin pregunta pendiente
+    assert provider.main_calls == 1                # lo atendió el agente
     salidas = _nuevas(conn, user, antes)
-    assert len(salidas) == 1
-    cuerpo = salidas[0]["cuerpo"]
-    assert cuerpo.endswith(I.awaiting_confirmation_text(aprobador))
-    assert aprobador in cuerpo and "Confirmar" in cuerpo
-    assert cuerpo != I.DRAFT_AWAITING_CONFIRMATION
-    # La vista previa con los botones le llegó al aprobador, no a quien escribe.
+    assert [f["cuerpo"] for f in salidas] == ["Un bloqueo frena una tarea."]
+    assert salidas[0]["pending_action_id"] is None  # sin botones de rama
+    # La vista previa con los botones sigue siendo del aprobador, no de quien escribe.
     with admin(conn) as cur:
         cur.execute(
             """select o.chat_id from message_outbox o
                 where o.pending_action_id = %s""", (pid,))
         assert cur.fetchone()["chat_id"] == (
             intake_world["north-lab"]["people"]["Morgan Hale"]["telegram"])
+
+
+def test_quien_escribe_es_el_aprobador_su_otro_tema_abre_la_pregunta_de_la_rama(
+        intake_world, conn, monkeypatch):
+    rid, pid = _alta_en_confirmacion(conn, intake_world, responsable="Sam North")
+    user = _usuario(intake_world)
+    antes = _salidas(conn, user)
+    provider = _RoutingProvider([_ruta(RespectoPendiente.OTRO_TEMA)])
+
+    _escribir(conn, monkeypatch, intake_world, provider, "¿qué es un bloqueo?")
+
+    _sin_conversion(conn, rid, pid)
+    assert provider.main_calls == 0
+    salidas = _nuevas(conn, user, antes)
+    assert [f["cuerpo"] for f in salidas] == [gateway.PREGUNTA_RAMA_ABIERTA.format(
+        nombre="la confirmación del borrador de la tarea nueva")]
+    assert salidas[0]["pending_action_id"]                    # con sus botones
 
 
 def test_corrige_no_cambia_el_borrador_y_dice_que_no_se_cambia_desde_un_mensaje(
@@ -615,23 +640,44 @@ def test_cancela_con_el_borrador_esperando_lo_cancela_y_lo_dice(
         titulo=f" «{TITULO}»")
 
 
-def test_otro_tema_con_el_borrador_esperando_atiende_el_mensaje_y_lo_retoma(
+def test_seguir_con_el_borrador_esperando_repite_el_estado_sin_convertir(
         intake_world, conn, monkeypatch):
     rid, pid = _alta_en_confirmacion(conn, intake_world)
     user = _usuario(intake_world)
-    antes = _salidas(conn, user)
-    provider = _RoutingProvider([_ruta(RespectoPendiente.OTRO_TEMA),
-                                 IntentRoute(IntentAction.NORMAL_CONVERSATION)],
-                                answer="Un bloqueo frena una tarea.")
-
+    provider = _RoutingProvider([_ruta(RespectoPendiente.OTRO_TEMA)])
     _escribir(conn, monkeypatch, intake_world, provider, "¿qué es un bloqueo?")
+    client = _callback_client(conn, monkeypatch)
+    antes = _salidas(conn, user)
+
+    assert _tocar_boton(client, conn, _token_de(conn, "Seguir"),
+                        user).status_code == 200
 
     _sin_conversion(conn, rid, pid)
-    assert provider.main_calls == 1
-    salidas = _nuevas(conn, user, antes)
-    assert len(salidas) == 2
-    assert salidas[-2]["cuerpo"] == "Un bloqueo frena una tarea."
-    assert salidas[-1]["cuerpo"].startswith("¿Seguimos con")
+    assert [f["cuerpo"] for f in _nuevas(conn, user, antes)] == [
+        I.DRAFT_AWAITING_CONFIRMATION]
+    assert provider.main_calls == 0
+
+
+def test_dejar_con_el_borrador_esperando_lo_cancela_y_atiende_el_mensaje(
+        intake_world, conn, monkeypatch):
+    rid, pid = _alta_en_confirmacion(conn, intake_world)
+    user = _usuario(intake_world)
+    provider = _RoutingProvider(
+        [_ruta(RespectoPendiente.OTRO_TEMA),
+         IntentRoute(IntentAction.NORMAL_CONVERSATION)],
+        answer="Un bloqueo frena una tarea.")
+    _escribir(conn, monkeypatch, intake_world, provider, "¿qué es un bloqueo?")
+    client = _callback_client(conn, monkeypatch)
+    antes = _salidas(conn, user)
+
+    assert _tocar_boton(client, conn, _token_de(conn, "Dejarlo"),
+                        user).status_code == 200
+
+    assert _solicitud(conn, rid) == "cancelled"
+    assert [f["cuerpo"] for f in _nuevas(conn, user, antes)] == [
+        gateway.AVISO_ALTA_DEJADA.format(titulo=f" «{TITULO}»"),
+        "Un bloqueo frena una tarea."]
+    assert provider.pending_calls[-1] is None
 
 
 @pytest.mark.parametrize("comando", [

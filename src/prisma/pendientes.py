@@ -70,13 +70,15 @@ SENTINEL_OPCIONES_MODELO = "_opciones_modelo"
 SENTINEL_MENU_TAREA = "_menu_tarea"
 SENTINEL_DATO_MENU_TAREA = "_dato_menu_tarea"
 # `SENTINEL_RESPUESTA_DATO_MENU` (T9-R1a-2, ADR 0013 regla 1) son los botones
-# de un solo uso que acompañan a una pregunta de un dato del menú que sigue
-# abierta: "¿Esto es <el dato>?" con "Sí, es eso" / "No, es otra cosa"
-# (comando `dudoso`), y el retome "¿Seguimos con <el dato>?" con "Dejarlo"
-# (después de `otro_tema`). No es una herramienta real: `_toque` la
-# intercepta. `campo="eleccion"` devuelve el botón tocado en `args["eleccion"]`
-# (`si`, `no` o `dejar`); `args` guarda el id de la pregunta abierta, sus
-# propios `args` (`dato`) y, para `si`/`no`, el texto original de la persona.
+# de un solo uso que acompañan a una pregunta pendiente que sigue abierta:
+# "¿Esto es <el dato>?" con "Sí, es eso" / "No, es otra cosa" (comando
+# `dudoso`), y "Estábamos con <el dato>. ¿Seguimos con eso?" con "Seguir" /
+# "Dejarlo y ver lo otro" (comando `otro_tema`, T9-R1d). No es una herramienta
+# real: `_toque` la intercepta. `campo="eleccion"` devuelve el botón tocado en
+# `args["eleccion"]` (`si`, `seguir` o `dejar`; `no` en las de antes de T9-R1d);
+# `args` guarda el id de la pregunta abierta, sus propios `args` (`dato`) y el
+# mensaje que causó la pregunta (`texto` y `entrante_id`), que se atiende si la
+# persona deja lo pendiente.
 SENTINEL_RESPUESTA_DATO_MENU = "_respuesta_dato_menu"
 # Marca en `args` del aviso de entrega al aprobador (ADR 0009), que comparte
 # `SENTINEL_MENU_TAREA` con el menú general de la tarea: es lo que permite
@@ -460,6 +462,34 @@ def retirar_avisos_de_entrega(cur: psycopg.Cursor, workspace_id: str, tarea_id: 
         {"ahora": ahora, "ws": workspace_id, "mid": aprobador_membership_id,
          "herramienta": SENTINEL_MENU_TAREA, "tarea_id": str(tarea_id),
          "aviso": AVISO_ENTREGA})
+    ids = [str(f["id"]) for f in cur.fetchall()]
+    if ids:
+        cur.execute(
+            "update pending_action_option set activa = false "
+            "where pending_action_id = any(%s::uuid[])",
+            (ids,))
+    return ids
+
+
+def retirar_preguntas_de_rama(cur: psycopg.Cursor, quien: Solicitante,
+                              chat_id: int, ahora: datetime) -> list[str]:
+    """T9-R1d (ADR 0013 regla 1, enmienda "una sola rama abierta"): vence las
+    preguntas con botones sobre una rama (`SENTINEL_RESPUESTA_DATO_MENU`) que
+    esta persona todavía tenga `esperando` en este chat. Se llama al armar una
+    nueva, así sólo hay una viva: un toque tardío en la anterior encuentra la
+    acción ya cerrada y se contesta como cualquier pedido que no está vigente.
+    Mismo criterio y mismo patrón de dos pasos que `retirar_avisos_de_entrega`.
+
+    Devuelve los ids retirados."""
+    cur.execute(
+        """update pending_action
+              set estado = 'vencida', resuelta_en = %(ahora)s
+            where workspace_id = %(ws)s and membership_id = %(mid)s
+              and chat_id = %(chat)s and herramienta = %(herramienta)s
+              and estado = 'esperando'
+            returning id""",
+        {"ahora": ahora, "ws": quien.workspace_id, "mid": quien.membership_id,
+         "chat": chat_id, "herramienta": SENTINEL_RESPUESTA_DATO_MENU})
     ids = [str(f["id"]) for f in cur.fetchall()]
     if ids:
         cur.execute(

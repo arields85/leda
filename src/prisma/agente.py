@@ -25,7 +25,6 @@ import re
 import unicodedata
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
-from typing import NamedTuple
 
 import psycopg
 
@@ -73,8 +72,7 @@ def responder(cur: psycopg.Cursor, quien: Solicitante, texto_entrante: str,
               entrante_id: str | None = None,
               modificacion: P.ModificacionAbierta | None = None,
               contexto_referencias: str | None = None,
-              tareas_resueltas_claras: dict[str, str] | None = None,
-              no_proponer: NoProponer | None = None) -> Resultado:
+              tareas_resueltas_claras: dict[str, str] | None = None) -> Resultado:
     """`modificacion`, si viene, es la propuesta anterior que la persona pidió
     corregir (T3, ADR 0005 decisión 1): se agrega al sistema como contexto de
     confianza del servidor, nunca como texto de la persona, para que el
@@ -103,13 +101,7 @@ def responder(cur: psycopg.Cursor, quien: Solicitante, texto_entrante: str,
     contexto (p. ej. el bloque de "tareas abiertas" que ya trae
     `contexto.construir`, o cualquier otra herramienta) quedaba sin proteger.
     La comprobación ya no depende de qué herramienta corrió, ni de que haya
-    corrido alguna.
-
-    `no_proponer`, si viene, es lo que quedó pendiente con la persona mientras
-    se atiende otro tema (`gateway._seguir_camino_normal`, T9-R1b-3, ADR 0013
-    regla 1): una llamada a esa misma herramienta sobre esa misma tarea no se
-    ejecuta ni se prepara, y el modelo recibe el rechazo. Es la garantía en
-    código; el bloque de contexto sólo ayuda."""
+    corrido alguna."""
     ahora = ahora or datetime.now(timezone.utc)
     ctx = construir(cur, quien, texto_entrante, ahora=ahora)
     sistema = ctx.sistema
@@ -168,10 +160,6 @@ def responder(cur: psycopg.Cursor, quien: Solicitante, texto_entrante: str,
             pendientes_antes = (len(confirmaciones) + len(elegir_pendiente)
                                 + len(opciones_pendientes))
             for c in r.llamadas:
-                if repite_lo_pendiente(c, no_proponer):
-                    resultados.append(_rechazar_lo_pendiente(
-                        cur, quien, c, ctx))
-                    continue
                 if not c.nombre.startswith("consultar_"):
                     intentos_mutacion.append(c.nombre)
                 resultados.append(
@@ -287,48 +275,6 @@ def responder(cur: psycopg.Cursor, quien: Solicitante, texto_entrante: str,
     auditar(salida)
 
     return Resultado(salida, acciones, confirmaciones, elecciones=elecciones)
-
-
-class NoProponer(NamedTuple):
-    """Lo que no se puede volver a proponer en este turno: una herramienta
-    sobre un id (`campo` de sus argumentos, normalmente `tarea_id`) que ya
-    espera a la persona. Es un dato, no texto: la guarda mira sólo la
-    herramienta y el id de la llamada."""
-    herramienta: str
-    campo: str
-    valor: str
-
-
-RECHAZO_LO_PENDIENTE = (
-    "Eso ya está pendiente con la persona y el sistema vuelve a ello solo. "
-    "No lo propongas de nuevo: respondé únicamente el mensaje actual.")
-
-
-def repite_lo_pendiente(c: Llamada, no_proponer: NoProponer | None) -> bool:
-    """La llamada es a la misma herramienta sobre el mismo id que ya quedó
-    pendiente (`NoProponer`). Otra herramienta, u otro id, no."""
-    if no_proponer is None or c.nombre != no_proponer.herramienta:
-        return False
-    valor = c.args.get(no_proponer.campo) if isinstance(c.args, dict) else None
-    return valor is not None and str(valor) == no_proponer.valor
-
-
-def _rechazar_lo_pendiente(cur, quien: Solicitante, c: Llamada, ctx) -> dict:
-    """Un rechazo más para el modelo, como el de cualquier llamada que no se
-    aplica: no se ejecuta ni se prepara nada, no cuenta como acción ni como
-    intento fallido, y se audita igual que `herramienta_rechazada:` (los
-    argumentos de la llamada, nunca el texto de la persona)."""
-    registrar_auditoria(
-        cur, accion=f"herramienta_rechazada:{c.nombre}",
-        workspace_id=quien.workspace_id, actor_app_user_id=quien.app_user_id,
-        actor_kind="prisma",
-        detalle={"args": c.args, "rechazo": {"error": RECHAZO_LO_PENDIENTE}},
-        pack_hash=ctx.pack_hash, nucleo_hash=ctx.nucleo_hash)
-    return {"type": "tool_result", "tool_use_id": c.id,
-            "content": json.dumps(
-                {"ejecutado": False, "explicacion": RECHAZO_LO_PENDIENTE},
-                ensure_ascii=False),
-            "is_error": True}
 
 
 def _normalizar_comparacion(texto: str) -> str:

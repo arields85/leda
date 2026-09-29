@@ -1690,8 +1690,7 @@ def test_ejecutar_escenario_escribir_la_opcion_de_la_eleccion_abierta_del_alta(
 
 
 @pytest.mark.parametrize(("comando", "texto", "estado", "dice"), [
-    (RespectoPendiente.RESPONDE, "sí, dale", "active",
-     "esperando la confirmación de"),
+    (RespectoPendiente.RESPONDE, "sí, dale", "active", "esperando confirmación"),
     (RespectoPendiente.CORRIGE, "cambiale la fecha", "active",
      "no lo puedo cambiar"),
     (RespectoPendiente.CANCELA, "no, cancelalo", "cancelled", "dejé de lado"),
@@ -1701,8 +1700,11 @@ def test_ejecutar_escenario_llega_al_borrador_esperando_y_lo_interpreta(
     ws = corework.workspace_id
     _sembrar_objetivo_para_el_alta(conn, ws)
 
+    # Quien escribe es quien confirma (Ismael aprueba lo de Marcos): sólo
+    # entonces el borrador esperando es una pregunta abierta suya (ADR 0013
+    # regla 1, enmienda: una rama está abierta para quien debe responderla).
     r = ejecutar_escenario(
-        conn, ws, "corework", "Marcos Tarquini", ["armame una tarea nueva"],
+        conn, ws, "corework", "Ismael Soschinski", ["armame una tarea nueva"],
         _interno_con_borrador(comando), escenario_id="b-test-borrador",
         indice=0, toques=_TOQUES_HASTA_EL_BORRADOR, mensajes_tras_toques=[texto])
 
@@ -1722,8 +1724,9 @@ def test_ejecutar_escenario_llega_al_borrador_esperando_y_lo_interpreta(
 # seis toques que dependen de encontrar sus botones.
 # ---------------------------------------------------------------------------
 
+# Quien escribe es quien confirma: Ismael aprueba lo de Marcos.
 _BORRADOR_DE_ALTA = {
-    "solicitante": "Marcos Tarquini", "titulo": "Cablear tablero norte",
+    "solicitante": "Ismael Soschinski", "titulo": "Cablear tablero norte",
     "objetivo": _TITULO_OBJETIVO_ALTA, "responsable": "Marcos Tarquini",
     "area": "ot", "fecha_objetivo": "2030-12-30",
     "criterio_aceptacion": "Prueba firmada"}
@@ -1744,7 +1747,7 @@ def test_sembrar_borrador_de_alta_deja_la_vista_previa_esperando(corework, conn)
     _sembrar_borrador_de_alta(conn, ws)
 
     with espacio(conn, ws) as cur:
-        quien, tg = _quien(cur, ws)
+        quien, tg = _quien(cur, ws, "Ismael Soschinski")
         pregunta = I.open_intake_question(cur, quien, tg)
         assert pregunta["tipo"] == I.QUESTION_CONFIRMATION
         assert pregunta["titulo"] == "Cablear tablero norte"
@@ -1790,13 +1793,14 @@ def test_ejecutar_escenario_sobre_el_borrador_sembrado_no_lo_convierte(
                     respecto_pendiente=RespectoPendiente.RESPONDE)])
 
     r = ejecutar_escenario(
-        conn, ws, "corework", "Marcos Tarquini", [], interno,
+        conn, ws, "corework", "Ismael Soschinski", [], interno,
         escenario_id="b-test-sembrado", indice=0,
         mensajes_tras_toques=["sí, dale"])
 
     assert r.bloqueado is False, r.motivo_bloqueo
-    # Marcos no confirma lo suyo: la respuesta dice quién lo hace.
-    assert "esperando la confirmación de Ismael Soschinski" in r.respuesta_texto
+    # Ismael es quien confirma: el mensaje no convierte el borrador y la
+    # respuesta dice cómo se confirma.
+    assert "esperando confirmación" in r.respuesta_texto
     assert len(interno.pendientes) == 1 and "borrador" in interno.pendientes[0]
     # Lo sembrado no cuenta como respuesta ni se confirma solo.
     assert r.conteos_antes_del_toque is None
@@ -1804,3 +1808,4 @@ def test_ejecutar_escenario_sobre_el_borrador_sembrado_no_lo_convierte(
     with admin(conn) as cur:
         cur.execute("select estado from task_intake_request")
         assert cur.fetchone()["estado"] == "active"
+
