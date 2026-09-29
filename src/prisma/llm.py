@@ -201,6 +201,9 @@ class ProveedorGuionado:
     recibidos: list[tuple[str, list]] = field(default_factory=list)
     rutas: list[IntentRoute | RouteEnvelope] = field(default_factory=list)
     ruteados: list[str] = field(default_factory=list)
+    # ADR 0012: sólo las pruebas de la especulación lo encienden; el resto de
+    # las pruebas y los replays siguen llamando en serie.
+    admite_especulacion: bool = False
 
     def route_intent(self, text: str) -> IntentRoute:
         self.ruteados.append(text)
@@ -231,6 +234,7 @@ class ProveedorGuionado:
 
 
 class ProveedorAnthropic:
+    admite_especulacion = True  # ADR 0012: HTTP puro, seguro en otro hilo
     def __init__(self, modelo: str, api_key: str, parametros: dict | None = None,
                  cliente=None) -> None:
         import anthropic
@@ -283,6 +287,8 @@ class ProveedorGemini:
     el formato nuevo. Se habla por HTTP directo: son dos traducciones de
     formato y ninguna dependencia extra.
     """
+
+    admite_especulacion = True  # ADR 0012: HTTP puro, seguro en otro hilo
 
     def __init__(self, modelo: str, api_key: str, parametros: dict | None = None,
                  cliente=None) -> None:
@@ -436,6 +442,8 @@ class ProveedorCompatible:
     texto vienen en bloques; acá el texto va en `content` y las herramientas
     en `tool_calls`. El resto del sistema no se entera.
     """
+
+    admite_especulacion = True  # ADR 0012: HTTP puro, seguro en otro hilo
 
     def __init__(self, modelo: str, api_key: str, base_url: str,
                  parametros: dict | None = None, cliente=None) -> None:

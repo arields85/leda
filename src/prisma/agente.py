@@ -23,6 +23,7 @@ from __future__ import annotations
 import json
 import re
 import unicodedata
+from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 
@@ -66,14 +67,110 @@ INCOMPLETO = ("Me quedé a mitad de camino con esto. Lo dejo anotado para "
               "revisarlo; si es urgente, decímelo y lo retomamos.")
 
 
+@dataclass
+class Preparacion:
+    """Lo que `responder` le manda al modelo en su primera vuelta, ya leído de
+    la base. Se arma en el hilo principal (`preparar`, la única parte que toca
+    el cursor) para que la primera llamada al modelo -- puro HTTP -- pueda
+    correr en otro hilo sin acceso a la base (ADR 0012)."""
+
+    ctx: object
+    sistema: str
+    mensajes: list[dict]
+    esquemas: list[dict]
+
+
+def preparar(cur: psycopg.Cursor, quien: Solicitante, texto_entrante: str,
+             chat_id: int, ahora: datetime, entrante_id: str | None = None,
+             modificacion: P.ModificacionAbierta | None = None,
+             contexto_referencias: str | None = None) -> Preparacion:
+    """Lecturas de la base y armado del sistema, los mensajes y los esquemas
+    de `responder`. Hilo principal únicamente: usa `cur`."""
+    ctx = construir(cur, quien, texto_entrante, ahora=ahora)
+    sistema = ctx.sistema
+    if contexto_referencias:
+        sistema = sistema + "\n\n---\n\n" + contexto_referencias
+    if modificacion is not None:
+        sistema = sistema + "\n\n---\n\n" + _bloque_modificacion(modificacion)
+    # Lo que se dijeron hace un rato. `entrante_id` es la fila que el gateway
+    # ya guardó de este mismo mensaje: sin excluirla, viajaría dos veces.
+    mensajes: list[dict] = historial(cur, chat_id, ahora, entrante_id)
+    mensajes.append({"role": "user", "content": texto_entrante})
+    return Preparacion(ctx, sistema, mensajes, H.esquemas())
+
+
+# Hilos donde corre la primera llamada especulativa (ADR 0012). Acotado: NaN
+# admite 7 pedidos concurrentes y cada turno usa a lo sumo uno de estos.
+_EJECUTOR_ESPECULACION = ThreadPoolExecutor(
+    max_workers=4, thread_name_prefix="prisma-especulacion")
+
+
+class Especulacion:
+    """La primera llamada de `responder` lanzada en paralelo con el ruteo
+    (ADR 0012). El hilo trabajador sólo recibe datos ya preparados y llama a
+    `proveedor.responder`: nunca toca la base, la cola ni Telegram. Si el
+    ruteo decide otro camino se `descartar`; el resultado nunca se usa."""
+
+    def __init__(self, proveedor: Proveedor, preparacion: Preparacion) -> None:
+        self.proveedor = proveedor
+        self.preparacion = preparacion
+        self.usada = False
+        self.descartada = False
+        # Una copia de `mensajes`: el ciclo del responder agrega a la original.
+        self.futuro: Future = _EJECUTOR_ESPECULACION.submit(
+            proveedor.responder, preparacion.sistema,
+            list(preparacion.mensajes), preparacion.esquemas)
+
+    def usar(self) -> Future:
+        self.usada = True
+        return self.futuro
+
+    def descartar(self) -> None:
+        """Idempotente; no hace nada si la respuesta ya se usó. Si la llamada
+        sigue en vuelo termina en segundo plano y su resultado se ignora; un
+        proveedor que graba llamadas (el grabador del banco) se entera por
+        `descartar_respuesta` para no dejar en su registro una que un replay
+        no repetiría."""
+        if self.usada or self.descartada:
+            return
+        self.descartada = True
+        self.futuro.add_done_callback(self._olvidar)
+
+    def _olvidar(self, futuro: Future) -> None:
+        if futuro.cancelled() or futuro.exception() is not None:
+            return
+        hook = getattr(self.proveedor, "descartar_respuesta", None)
+        if hook is not None:
+            hook(futuro.result())
+
+
+def especular(cur: psycopg.Cursor, quien: Solicitante, texto: str,
+              proveedor: Proveedor, chat_id: int, ahora: datetime,
+              entrante_id: str | None = None) -> Especulacion | None:
+    """Arranca la primera llamada del caso simple (sin modificación ni
+    referencias) si el proveedor lo admite; `None` si no."""
+    if not getattr(proveedor, "admite_especulacion", False):
+        return None
+    prep = preparar(cur, quien, texto, chat_id, ahora, entrante_id)
+    return Especulacion(proveedor, prep)
+
+
 def responder(cur: psycopg.Cursor, quien: Solicitante, texto_entrante: str,
               proveedor: Proveedor, cal: Calendario, chat_id: int,
               ahora: datetime | None = None,
               entrante_id: str | None = None,
               modificacion: P.ModificacionAbierta | None = None,
               contexto_referencias: str | None = None,
-              tareas_resueltas_claras: dict[str, str] | None = None) -> Resultado:
-    """`modificacion`, si viene, es la propuesta anterior que la persona pidió
+              tareas_resueltas_claras: dict[str, str] | None = None,
+              especulacion: Especulacion | None = None) -> Resultado:
+    """`especulacion`, si viene (ADR 0012), trae la preparación y la primera
+    llamada ya lanzadas por `especular`: esa preparación reemplaza a la que
+    se haría acá (así la llamada especulativa y el ciclo mandan exactamente
+    lo mismo) y la primera vuelta usa su resultado en vez de llamar al
+    modelo. Sólo vale para el caso simple: sin `modificacion` ni
+    `contexto_referencias`.
+
+    `modificacion`, si viene, es la propuesta anterior que la persona pidió
     corregir (T3, ADR 0005 decisión 1): se agrega al sistema como contexto de
     confianza del servidor, nunca como texto de la persona, para que el
     modelo pueda volver a llamar a la herramienta con los argumentos
@@ -103,18 +200,13 @@ def responder(cur: psycopg.Cursor, quien: Solicitante, texto_entrante: str,
     La comprobación ya no depende de qué herramienta corrió, ni de que haya
     corrido alguna."""
     ahora = ahora or datetime.now(timezone.utc)
-    ctx = construir(cur, quien, texto_entrante, ahora=ahora)
-    sistema = ctx.sistema
-    if contexto_referencias:
-        sistema = sistema + "\n\n---\n\n" + contexto_referencias
-    if modificacion is not None:
-        sistema = sistema + "\n\n---\n\n" + _bloque_modificacion(modificacion)
-    esquemas = H.esquemas()
-
-    # Lo que se dijeron hace un rato. `entrante_id` es la fila que el gateway
-    # ya guardó de este mismo mensaje: sin excluirla, viajaría dos veces.
-    mensajes: list[dict] = historial(cur, chat_id, ahora, entrante_id)
-    mensajes.append({"role": "user", "content": texto_entrante})
+    if especulacion is not None:
+        prep = especulacion.preparacion
+    else:
+        prep = preparar(cur, quien, texto_entrante, chat_id, ahora, entrante_id,
+                        modificacion, contexto_referencias)
+    ctx, sistema, mensajes, esquemas = (
+        prep.ctx, prep.sistema, prep.mensajes, prep.esquemas)
     acciones: list[str] = []
     confirmaciones: list[str] = []
     elecciones: list[str] = []
@@ -144,8 +236,14 @@ def responder(cur: psycopg.Cursor, quien: Solicitante, texto_entrante: str,
     cerro = False
 
     try:
-        for _ in range(MAX_VUELTAS):
-            r: Respuesta = proveedor.responder(sistema, mensajes, esquemas)
+        for vuelta in range(MAX_VUELTAS):
+            if vuelta == 0 and especulacion is not None:
+                # Ya salió en paralelo con el ruteo (ADR 0012); si falló,
+                # `result()` relanza acá la misma excepción que habría dado
+                # la llamada directa: mismo incidente, misma disculpa.
+                r: Respuesta = especulacion.usar().result()
+            else:
+                r = proveedor.responder(sistema, mensajes, esquemas)
             # Vale el texto de esta vuelta y nada más. Arrastrar el de una
             # anterior manda "voy a crear la tarea" como respuesta final.
             salida = r.texto

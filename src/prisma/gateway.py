@@ -809,42 +809,58 @@ def _turno(cur, quien, texto: str, workspace_id: str, chat_id: int,
                                  workspace_id, now)
         return
 
-    route = None
-    last_error = None
-    for _ in range(2):
-        try:
-            candidate = proveedor.route_intent(texto)
-            if not isinstance(candidate, IntentRoute):
-                raise TypeError("The provider returned an untyped route.")
-            route = candidate
-            break
-        except Exception as exc:  # noqa: BLE001
-            last_error = exc
+    # ADR 0012: en el caso simple (sin corrección abierta) la primera llamada
+    # del responder sólo depende del ruteo si éste elige otro camino, así que
+    # arranca a la vez en otro hilo (sólo HTTP; la lectura de la base se hace
+    # acá, antes). Se descarta salvo que el ruteo y las referencias confirmen
+    # el caso simple; ver `_avanzar_aclaracion`.
+    especulacion = None
+    if modificacion is None:
+        from .agente import especular
 
-    if route is None:
-        _routing_incident(cur, quien, last_error)
-        _responder(
-            cur, workspace_id, chat_id, quien,
-            with_no_effect_status(
-                "No pude entender si querías crear una tarea. "
-                "Decime de otra forma qué necesitás."), now,
-        )
-        return
+        especulacion = especular(cur, quien, texto, proveedor, chat_id, now,
+                                 entrante_id)
+    try:
+        route = None
+        last_error = None
+        for _ in range(2):
+            try:
+                candidate = proveedor.route_intent(texto)
+                if not isinstance(candidate, IntentRoute):
+                    raise TypeError("The provider returned an untyped route.")
+                route = candidate
+                break
+            except Exception as exc:  # noqa: BLE001
+                last_error = exc
 
-    # Resolver antes de actuar (T3, ADR 0005 decisión 6 / ADR 0006): las
-    # referencias a tarea que separó el enrutador se resuelven contra las
-    # tareas activas del espacio, bajo el mismo cursor con RLS que ya tiene
-    # `cur`. Sin referencias no hay nada que resolver. Sin credencial de Jev
-    # (`PRISMA_OPENROUTER_API_KEY` vacía) Prisma no adivina igual: se pide
-    # aclaración como si Jev hubiera fallado (decisión del usuario,
-    # 2026-09-24; ver `_resolver_referencias_del_turno`).
-    referencias = _resolver_referencias_del_turno(cur, quien, texto, route,
-                                                   workspace_id)
+        if route is None:
+            _routing_incident(cur, quien, last_error)
+            _responder(
+                cur, workspace_id, chat_id, quien,
+                with_no_effect_status(
+                    "No pude entender si querías crear una tarea. "
+                    "Decime de otra forma qué necesitás."), now,
+            )
+            return
 
-    estado = _estado_inicial_aclaracion(texto, entrante_id, route, referencias,
-                                        modificacion)
-    _avanzar_aclaracion(cur, quien, workspace_id, chat_id, now, proveedor, cal,
-                       estado)
+        # Resolver antes de actuar (T3, ADR 0005 decisión 6 / ADR 0006): las
+        # referencias a tarea que separó el enrutador se resuelven contra las
+        # tareas activas del espacio, bajo el mismo cursor con RLS que ya
+        # tiene `cur`. Sin referencias no hay nada que resolver. Sin
+        # credencial de Jev (`PRISMA_OPENROUTER_API_KEY` vacía) Prisma no
+        # adivina igual: se pide aclaración como si Jev hubiera fallado
+        # (decisión del usuario, 2026-09-24; ver
+        # `_resolver_referencias_del_turno`).
+        referencias = _resolver_referencias_del_turno(cur, quien, texto, route,
+                                                       workspace_id)
+
+        estado = _estado_inicial_aclaracion(texto, entrante_id, route,
+                                            referencias, modificacion)
+        _avanzar_aclaracion(cur, quien, workspace_id, chat_id, now, proveedor,
+                           cal, estado, especulacion)
+    finally:
+        if especulacion is not None:
+            especulacion.descartar()  # no-op si el responder la usó
 
 
 def _iniciar_alta_guiada(cur, quien, chat_id: int, entrante_id: str | None,
@@ -975,13 +991,18 @@ def _estado_inicial_aclaracion(texto: str, entrante_id: str | None, route,
 
 
 def _avanzar_aclaracion(cur, quien, workspace_id: str, chat_id: int, ahora,
-                       proveedor, cal, estado: dict) -> None:
+                       proveedor, cal, estado: dict, especulacion=None) -> None:
     """Sigue el estado de la aclaración con botones (T4, decisión 2 y 3): si
     queda una referencia ambigua con candidatas por preguntar, la siguiente
     pregunta con botones y el turno termina ahí -- una pregunta a la vez. Si
     no queda ninguna, retoma el mensaje original: a la corrección de
     Modificar si la hay, al alta guiada (b-0005, sólo sin ninguna referencia
-    resuelta) o al agente, con el contexto acumulado."""
+    resuelta) o al agente, con el contexto acumulado.
+
+    `especulacion` (ADR 0012, sólo `_turno`) es la primera llamada del
+    responder lanzada antes de conocer el ruteo. Se le pasa al agente
+    únicamente en el caso simple que ella asumió; en cualquier otro camino
+    no se usa (`_turno` la descarta al terminar)."""
     if estado["pendientes"]:
         _preguntar_por_botones(cur, quien, workspace_id, chat_id, ahora, estado)
         return
@@ -1014,10 +1035,15 @@ def _avanzar_aclaracion(cur, quien, workspace_id: str, chat_id: int, ahora,
         return
 
     from .agente import responder
+    simple = (especulacion is not None
+              and estado["route_action"] == IntentAction.NORMAL_CONVERSATION.value
+              and contexto is None and not estado["hay_clara"]
+              and not estado["titulos_resueltas"])
     responder(cur, quien, estado["mensaje"], proveedor, cal, chat_id,
              ahora=ahora, entrante_id=estado["entrante_id"],
              contexto_referencias=contexto,
-             tareas_resueltas_claras=estado["titulos_resueltas"])
+             tareas_resueltas_claras=estado["titulos_resueltas"],
+             especulacion=especulacion if simple else None)
 
 
 def _preguntar_por_botones(cur, quien, workspace_id: str, chat_id: int, ahora,

@@ -124,6 +124,16 @@ class ProveedorGrabador:
     rutas: list[dict] = field(default_factory=list)
     respuestas: list[dict] = field(default_factory=list)
 
+    def __post_init__(self) -> None:
+        # ADR 0012: con un proveedor que admite especulación, la primera
+        # llamada del responder corre en otro hilo y una descartada no debe
+        # quedar grabada (un replay no especula y la consumiría).
+        self.admite_especulacion = getattr(
+            self.interno, "admite_especulacion", False)
+        self._cierre = threading.Condition()
+        self._en_vuelo = 0
+        self._entradas: list[tuple[Respuesta, dict]] = []
+
     def route_intent(self, text: str) -> IntentRoute:
         inicio = time.perf_counter()
         ruta = self.interno.route_intent(text)
@@ -133,15 +143,39 @@ class ProveedorGrabador:
         return ruta
 
     def responder(self, sistema, mensajes, herramientas) -> Respuesta:
-        inicio = time.perf_counter()
-        r = self.interno.responder(sistema, mensajes, herramientas)
-        latencia = time.perf_counter() - inicio
-        self.respuestas.append({"salida": _respuesta_a_dict(r),
-                                "latencia_s": latencia})
+        with self._cierre:
+            self._en_vuelo += 1
+        try:
+            inicio = time.perf_counter()
+            r = self.interno.responder(sistema, mensajes, herramientas)
+            latencia = time.perf_counter() - inicio
+            entrada = {"salida": _respuesta_a_dict(r), "latencia_s": latencia}
+            with self._cierre:
+                self.respuestas.append(entrada)
+                self._entradas.append((r, entrada))
+        finally:
+            with self._cierre:
+                self._en_vuelo -= 1
+                self._cierre.notify_all()
         return r
 
+    def descartar_respuesta(self, respuesta: Respuesta) -> None:
+        """La llamada especulativa que produjo `respuesta` se descartó: se
+        quita esa entrada exacta (por identidad) de lo grabado."""
+        with self._cierre:
+            for i, (r, entrada) in enumerate(self._entradas):
+                if r is respuesta:
+                    del self._entradas[i]
+                    self.respuestas.remove(entrada)
+                    return
+
     def a_json(self) -> dict:
-        return {"rutas": list(self.rutas), "respuestas": list(self.respuestas)}
+        # Una llamada descartada puede seguir en vuelo: se espera (acotado)
+        # a que termine y se retire antes de serializar.
+        with self._cierre:
+            self._cierre.wait_for(lambda: self._en_vuelo == 0, timeout=60)
+            return {"rutas": list(self.rutas),
+                    "respuestas": list(self.respuestas)}
 
 
 def guionado_desde_grabacion(grabacion: dict) -> ProveedorGuionado:

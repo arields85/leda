@@ -186,7 +186,7 @@ gestión.
       (0 tokens en 8/8) pero no acelera: por defecto 2,90 s, `none` 2,27 s, `high` 1,81 s
       de mediana. La variación del servidor pesa más que ~100 tokens de razonamiento, y
       apagarlo arriesga la calidad.
-    - [ ] **T8c-3 — Ruteo en paralelo con la primera llamada del responder**, sólo en
+    - [x] **T8c-3 — Ruteo en paralelo con la primera llamada del responder**, sólo en
       conversación normal sin referencias a tareas; se descarta si el ruteo elige otro
       camino.
 - [ ] **T9 — Estado de la conversación (ronda 3).** R3-H17, H20, H15, H19, H18, H16,
@@ -4154,3 +4154,18 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   (contenido): el modelo nombró las dos tareas en el texto; camino `consultar_tareas` ->
   texto, que T8c-1 no toca, así que es variación del modelo. Además el escenario
   contradice R3-H7 (con hasta 3 tareas el texto las nombra enteras): actualizarlo en T10.
+
+- 2026-09-28 (noche): **T8c-3 — ruteo en paralelo con la primera llamada del responder**
+  ([`ADR 0012`](../../docs/decisions/0012-ruteo-en-paralelo-con-la-primera-respuesta.md)).
+  `agente.preparar` hace las lecturas de la base en el hilo principal; `Especulacion`
+  lanza la primera llamada en un `ThreadPoolExecutor` de 4 hilos (sólo HTTP) mientras
+  corre el ruteo; `_avanzar_aclaracion` la usa sólo en el caso simple (conversación
+  normal, sin referencias, sin corrección abierta) y `_turno` la descarta en cualquier
+  otro camino. Opt-in por proveedor (`admite_especulacion`); el guionado no especula; el
+  grabador del banco retira las respuestas descartadas. TDD: RED
+  `pytest -q tests/test_especulacion.py` sin el código -> 12 failed, 2 passed; GREEN
+  enfocadas -> 144 passed; suite completa (corrida por el orquestador) -> 1227 passed,
+  108 deselected. Ajuste: el simulacro de Anthropic de `tests/test_task_intake.py`
+  reconoce el ruteo por `tool_choice` y admite una llamada especulativa extra.
+  Seguimiento menor: `ProveedorGrabador.descartar_respuesta` quita la entrada con
+  `list.remove` (igualdad, no identidad).
