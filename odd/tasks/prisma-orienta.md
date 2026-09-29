@@ -271,16 +271,20 @@ gestión.
     retenidos hasta que se cierra (decisión del usuario, opción A); la retención termina
     al vencer la pregunta pendiente (a definir un vencimiento donde no lo haya). Puede
     partirse en R1d-1 (la pregunta de la rama) y R1d-2 (retención en el despacho).
-    - [ ] **T9-R1d-1a** — la pregunta de la rama para las preguntas pendientes que ya
+    - [x] **T9-R1d-1a** — la pregunta de la rama para las preguntas pendientes que ya
       pasan por `_atender_pregunta_pendiente`; "No, es otra cosa" de `dudoso`; quitar
       el retome y `agente.NoProponer`; el borrador que espera a otro aprobador no es rama
       de quien lo pidió; escenarios `b-0020`, `b-0021-c`, `b-0022-b` a la regla nueva.
-    - [ ] **T9-R1d-1a-fix** — reponer la guarda contra volver a proponer lo que la persona
+    - [x] **T9-R1d-1a-fix** — reponer la guarda contra volver a proponer lo que la persona
       acaba de dejar, en el camino "Dejarlo y ver lo otro" (banco `b-0020-f` 0/3: tras
       dejar el bloqueo, el responder lo volvió a proponer desde el historial); el toque
       "dejar" sólo con su valor explícito (`review-2282ebc46e7a48e1`, R3).
     - [ ] **T9-R1d-1b** — la vista previa de un cambio que la persona pidió y espera su
-      Confirmar pasa a ser rama (hoy el texto sigue el turno normal).
+      Confirmar pasa a ser rama (hoy el texto sigue el turno normal). Más los seguimientos
+      de `review-ed284b3aec853536`: probar la guarda para las acciones del menú
+      `destrabar`, `informar_bloqueo`, `adjuntar_evidencia` y `pedir_cambios` (que sus
+      argumentos lleven el id que la guarda compara), y la guarda al retomar tras botones
+      de aclaración.
     - [ ] **T9-R1d-2** — retención de los mensajes que inicia Prisma mientras la persona
       tiene una rama abierta, hasta que vence la pregunta.
   - [ ] **T9-R1c-3 — Modificar en la vista previa del alta** (precisión del ADR 0005
@@ -4528,3 +4532,14 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   responder atendió "¿qué tareas tengo abiertas?" y además volvió a proponer el bloqueo desde
   el historial: quitar la guarda fue prematuro (T9-R1d-1a-fix). `b-0021-i` 1/3: redacción,
   resume sin nombrar la tarea (T10).
+
+- 2026-09-29: **T9-R1d-1a-fix.** `fe2c8ea`: guarda repuesta sólo en el camino "Dejarlo y
+  ver lo otro" (y "No, es otra cosa"): el responder no puede volver a proponer la misma
+  herramienta sobre el mismo objetivo que la persona acaba de dejar; el toque de dejar
+  sólo con su valor explícito (`dejar`, y `no` de botones viejos), cualquier otro valor
+  recibe "ya no está vigente" y la pregunta sigue abierta. Suite del escritor 1543 passed,
+  213 deselected; padre: enfocadas 66 passed. RDD: tramo `e46d157..fe2c8ea` medio, 471
+  líneas, consentida, `review-ed284b3aec853536` **aprobada y reconocida**; frontera en
+  `fe2c8ea` (la observación del `NameError` por la anotación se descartó: `agente.py` tiene
+  `from __future__ import annotations`). Banco real (n=3, 11 escenarios de rama): **33/33**
+  (antes 28/33).
