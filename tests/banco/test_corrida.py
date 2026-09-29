@@ -2365,3 +2365,127 @@ def test_los_escenarios_de_b_0025_cumplen_lo_que_declaran_con_un_modelo_guionado
         {"conteos_delta": conteos_delta(r.conteos_antes, r.conteos_despues)},
         escenario.efectos)
     assert efectos.resultado == "aprobado", efectos.diferencia
+
+
+# ---------------------------------------------------------------------------
+# Una respuesta visible por mensaje (T9-R2): la corrida cuenta las respuestas
+# de cada mensaje entrante y manda mensajes con adjunto.
+# ---------------------------------------------------------------------------
+
+
+def _correr_con(conn, ws, mensajes, **kw):
+    interno = ProveedorGuionado(
+        guion=[Respuesta(texto="Anotado.")] * 4,
+        rutas=[IntentRoute(IntentAction.NORMAL_CONVERSATION)] * 4)
+    return ejecutar_escenario(
+        conn, ws, "corework", "Marcos Tarquini", mensajes, interno,
+        escenario_id="b-test", indice=0, **kw)
+
+
+def test_la_corrida_cuenta_una_respuesta_por_cada_mensaje(corework, conn):
+    r = _correr_con(conn, corework.workspace_id, ["hola", "gracias"])
+
+    assert r.bloqueado is False
+    assert r.respuestas_por_mensaje == (1, 1)
+    assert r.incidentes_de_respuesta == ()
+
+
+@pytest.mark.parametrize("adjunto, epigrafe", [
+    ("foto", None), ("nota_de_voz", None), ("sticker", None),
+    ("foto", "el tablero de la máquina 3")])
+def test_la_corrida_manda_mensajes_con_adjunto_y_cuenta_su_respuesta(
+        adjunto, epigrafe, corework, conn):
+    mensaje = {"adjunto": adjunto, **({"epigrafe": epigrafe} if epigrafe else {})}
+
+    r = _correr_con(conn, corework.workspace_id, [mensaje])
+
+    assert r.bloqueado is False
+    assert r.respuestas_por_mensaje == (1,)
+    if epigrafe is None:
+        assert "fotos, archivos ni audios" in r.respuesta_texto
+    else:
+        assert "Todavía no guardo adjuntos" in r.respuesta_texto
+
+
+def test_un_toque_no_cuenta_como_mensaje_en_la_corrida(corework, conn):
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        ids = sembrar_precondiciones(cur, ws, {"tareas": [
+            {"id": "t1", "titulo": "Programar PLC (simulado)", "area": "ot",
+             "responsable": "Marcos Tarquini"}]})
+    conn.commit()
+    r = _correr_con(conn, ws, ["hola"], toques=[])
+
+    assert r.respuestas_por_mensaje == (1,)
+
+
+def test_la_corrida_ve_un_camino_que_encola_dos_respuestas_aunque_el_control_lo_arregle(
+        corework, conn, monkeypatch):
+    from datetime import timedelta as _td
+
+    from prisma import gateway
+
+    def turno_doble(cur, quien, texto, workspace_id, chat_id, entrante_id=None, **k):
+        ahora = datetime.now(timezone.utc)
+        gateway._responder(cur, workspace_id, chat_id, quien, "Primera.", ahora)
+        gateway._responder(cur, workspace_id, chat_id, quien, "Segunda.",
+                           ahora + _td(seconds=1))
+
+    monkeypatch.setattr(gateway, "_turno", turno_doble)
+
+    r = _correr_con(conn, corework.workspace_id, ["hola"])
+
+    assert r.respuestas_por_mensaje == (2,)
+    assert len(r.incidentes_de_respuesta) == 1
+    assert "se suprimieron 1" in r.incidentes_de_respuesta[0]
+
+
+@pytest.mark.parametrize("id_", ["b-0026-b", "b-0026-c", "b-0026-d", "b-0026-e"])
+def test_la_familia_b_0026_sin_texto_se_cumple_sin_llamar_al_modelo(
+        id_, corework, conn):
+    """Los escenarios de mensajes sin texto no necesitan al modelo: un proveedor
+    sin guion (que fallaría al usarse) alcanza, y todas las comprobaciones del
+    banco -- la de una respuesta por mensaje incluida -- aprueban."""
+    import pathlib
+
+    from tests.banco.comprobadores import (Evidencia, comprobar_contenido,
+                                           comprobar_efectos,
+                                           comprobar_herramientas,
+                                           comprobar_una_respuesta_por_mensaje,
+                                           resultado_general)
+    from tests.banco.escenario import cargar_escenario
+
+    escenario = cargar_escenario(
+        pathlib.Path(__file__).parent / "escenarios" / f"{id_}.yaml")
+    ws = corework.workspace_id
+    en_la_corrida = bool(escenario.toques
+                         and escenario.precondiciones.get("borrador_de_alta"))
+    with admin(conn) as cur:
+        ids = sembrar_precondiciones(cur, ws, escenario.precondiciones,
+                                     sin_borrador_de_alta=en_la_corrida)
+    conn.commit()
+
+    r = ejecutar_escenario(
+        conn, ws, "corework", escenario.actor, escenario.mensajes,
+        ProveedorGuionado(guion=[], rutas=[]), escenario_id=id_, indice=0,
+        toques=list(escenario.toques) or None,
+        mensajes_tras_toques=list(escenario.mensajes_tras_toques) or None,
+        preguntas_sembradas=(
+            {"borrador_de_alta": escenario.precondiciones["borrador_de_alta"]}
+            if en_la_corrida else None))
+
+    assert not r.bloqueado, r.motivo_bloqueo
+    evidencia = Evidencia(respuesta_texto=r.respuesta_texto,
+                          herramientas_ejecutadas=tuple(r.herramientas_ejecutadas),
+                          ofrecio_opciones=r.ofrecio_opciones)
+    comprobaciones = [
+        comprobar_herramientas(evidencia, esperadas=escenario.herramientas_esperadas,
+                               prohibidas=escenario.herramientas_prohibidas),
+        comprobar_contenido(
+            evidencia, menciona=escenario.respuesta_menciona,
+            no_contiene_patron=escenario.respuesta_no_contiene_patron),
+        comprobar_una_respuesta_por_mensaje(
+            r.respuestas_por_mensaje, incidentes=r.incidentes_de_respuesta),
+    ]
+    assert resultado_general(comprobaciones) == "aprobado", [
+        (c.nombre, c.diferencia) for c in comprobaciones]

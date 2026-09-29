@@ -1006,3 +1006,42 @@ def test_aclaracion_cada_candidata_con_su_propia_etiqueta_aprueba():
         candidatas_esperadas=("Actualizar el dashboard",
                               "Actualizar el dashboard de HMI"))
     assert r.resultado == "aprobado"
+
+
+# ---------------------------------------------------------------------------
+# Una respuesta visible por mensaje entrante (T9-R2, ADR 0013 regla 2)
+# ---------------------------------------------------------------------------
+
+import pytest  # noqa: E402
+
+
+def test_una_respuesta_por_mensaje_aprueba_con_un_grupo_por_mensaje():
+    from tests.banco.comprobadores import comprobar_una_respuesta_por_mensaje
+
+    r = comprobar_una_respuesta_por_mensaje((1, 1, 1))
+    assert (r.nombre, r.resultado) == ("una_respuesta_por_mensaje", "aprobado")
+
+
+def test_una_respuesta_por_mensaje_sin_mensajes_aprueba():
+    from tests.banco.comprobadores import comprobar_una_respuesta_por_mensaje
+
+    assert comprobar_una_respuesta_por_mensaje(()).resultado == "aprobado"
+
+
+@pytest.mark.parametrize("conteos, dice", [
+    ((1, 0), "ninguna respuesta"), ((2,), "2 respuestas"), ((1, 3), "3 respuestas")])
+def test_una_respuesta_por_mensaje_falla_con_cero_o_mas_de_una(conteos, dice):
+    from tests.banco.comprobadores import comprobar_una_respuesta_por_mensaje
+
+    r = comprobar_una_respuesta_por_mensaje(conteos)
+    assert r.resultado == "falla" and dice in r.diferencia
+
+
+def test_una_respuesta_por_mensaje_falla_si_el_control_estructural_tuvo_que_actuar():
+    from tests.banco.comprobadores import comprobar_una_respuesta_por_mensaje
+
+    # El control dejó una sola respuesta, pero un camino no la respetó: el
+    # incidente es la evidencia.
+    r = comprobar_una_respuesta_por_mensaje(
+        (1,), incidentes=("Un mensaje quedó sin ninguna respuesta.",))
+    assert r.resultado == "falla" and "control estructural" in r.diferencia

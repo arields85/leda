@@ -655,6 +655,37 @@ def comprobar_aclaracion(
         f"no ofreció botón para {faltantes} (ofrecidas: {sorted(ofrecidas)})")
 
 
+# ---------------------------------------------------------------------------
+# 8. Una respuesta visible por mensaje entrante (T9-R2, ADR 0013 regla 2): en
+# TODO escenario. `corrida.ejecutar_escenario` cuenta, por cada mensaje que la
+# persona mandó, las respuestas independientes que se encolaron (las partes de
+# una misma respuesta y su juego de botones cuentan como una) y los incidentes
+# del control estructural (`respuesta_unica`): ese control deja una sola
+# respuesta en producción, pero que haya tenido que actuar es justamente el
+# defecto que el banco tiene que encontrar.
+# ---------------------------------------------------------------------------
+
+
+def comprobar_una_respuesta_por_mensaje(
+        respuestas_por_mensaje: Iterable[int], *,
+        incidentes: Iterable[str] = ()) -> ResultadoComprobacion:
+    """Aprueba si cada mensaje recibió exactamente una respuesta y el control
+    estructural no tuvo que registrar nada."""
+    conteos = tuple(respuestas_por_mensaje)
+    problemas = []
+    for i, n in enumerate(conteos, 1):
+        if n == 0:
+            problemas.append(f"el mensaje {i} no recibió ninguna respuesta")
+        elif n > 1:
+            problemas.append(f"el mensaje {i} recibió {n} respuestas")
+    for resumen in incidentes:
+        problemas.append(f"el control estructural tuvo que actuar: {resumen}")
+    if problemas:
+        return ResultadoComprobacion(
+            "una_respuesta_por_mensaje", "falla", "; ".join(problemas))
+    return ResultadoComprobacion("una_respuesta_por_mensaje", "aprobado")
+
+
 def resultado_general(comprobaciones: Iterable[ResultadoComprobacion]) -> str:
     """Un sólo `falla` invalida la corrida; si no hay fallas pero hay algo
     `no_concluyente`, la corrida queda `no_concluyente`; si no, `aprobado`."""

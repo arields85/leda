@@ -24,6 +24,14 @@ _CAMPOS_OBLIGATORIOS = ("id", "objetivo", "actor", "mensajes")
 PREGUNTAS_SEMBRADAS = ("borrador_de_alta", "vista_previa", "aclaracion")
 
 
+# Los adjuntos que un escenario puede mandar en lugar de un texto (T9-R2, H15):
+# el nombre del escenario y el campo del `Message` de Telegram que le toca.
+ADJUNTOS_DEL_BANCO = {
+    "foto": "photo", "archivo": "document", "audio": "audio",
+    "nota_de_voz": "voice", "video": "video", "sticker": "sticker",
+}
+
+
 class EscenarioInvalido(ValueError):
     pass
 
@@ -33,7 +41,9 @@ class Escenario:
     id: str
     objetivo: str
     actor: str
-    mensajes: list[str]
+    # Un texto, o un adjunto: `{adjunto: <tipo de ADJUNTOS_DEL_BANCO>, epigrafe:
+    # <texto, opcional>}` (T9-R2).
+    mensajes: list[str | dict]
     herramientas_esperadas: tuple[str, ...] = ()
     herramientas_prohibidas: tuple[str, ...] = ()
     nombres_permitidos: tuple[str, ...] = ()
@@ -86,7 +96,7 @@ class Escenario:
     # evidencia). La respuesta visible que se evalúa es la de estos mensajes
     # y lo que sigue, no la de la pregunta que ya estaba abierta
     # (`corrida.ejecutar_escenario`).
-    mensajes_tras_toques: tuple[str, ...] = ()
+    mensajes_tras_toques: tuple[str | dict, ...] = ()
     # Toques que se hacen DESPUÉS de `mensajes_tras_toques` (T9-R1d, ADR 0013
     # regla 1, enmienda "una sola rama abierta"): sirven para tocar la pregunta
     # que abrió uno de esos mensajes -- la de la rama de conversación, con
@@ -94,6 +104,19 @@ class Escenario:
     # `toques`. La respuesta visible que se evalúa pasa a ser la de estos
     # toques y lo que sigue (`corrida.ejecutar_escenario`).
     toques_tras_mensajes: tuple[dict, ...] = ()
+
+
+def _mensaje_valido(mensaje) -> bool:
+    """Un texto no vacío, o un adjunto `{adjunto, epigrafe?}` de un tipo conocido
+    con, si lo trae, un epígrafe de texto no vacío."""
+    if isinstance(mensaje, str):
+        return bool(mensaje.strip())
+    if not isinstance(mensaje, dict) or not set(mensaje) <= {"adjunto", "epigrafe"}:
+        return False
+    if mensaje.get("adjunto") not in ADJUNTOS_DEL_BANCO:
+        return False
+    epigrafe = mensaje.get("epigrafe", "x")
+    return isinstance(epigrafe, str) and bool(epigrafe.strip())
 
 
 def _validar_toques(datos: dict, campo: str, origen: pathlib.Path) -> None:
@@ -149,9 +172,10 @@ def _validar_estructura(datos: dict, origen: pathlib.Path) -> None:
         and bool(datos.get("mensajes_tras_toques") or datos.get("toques")))
     if (not isinstance(mensajes, list)
             or (not mensajes and not con_pregunta_sembrada)
-            or not all(isinstance(m, str) and m.strip() for m in mensajes)):
+            or not all(_mensaje_valido(m) for m in mensajes)):
         raise EscenarioInvalido(
-            f"{origen}: 'mensajes' tiene que ser una lista no vacía de texto.")
+            f"{origen}: 'mensajes' tiene que ser una lista no vacía de texto "
+            f"o de adjuntos ({sorted(ADJUNTOS_DEL_BANCO)}, con 'epigrafe' opcional).")
 
     for campo in ("herramientas_esperadas", "herramientas_prohibidas",
                  "nombres_permitidos"):
@@ -191,10 +215,10 @@ def _validar_estructura(datos: dict, origen: pathlib.Path) -> None:
 
     tras_toques = datos.get("mensajes_tras_toques", [])
     if (not isinstance(tras_toques, list)
-            or not all(isinstance(m, str) and m.strip() for m in tras_toques)):
+            or not all(_mensaje_valido(m) for m in tras_toques)):
         raise EscenarioInvalido(
             f"{origen}: 'mensajes_tras_toques' tiene que ser una lista de texto "
-            "no vacío.")
+            "no vacío o de adjuntos.")
 
     _validar_toques(datos, "toques_tras_mensajes", origen)
     if datos.get("toques_tras_mensajes") and not tras_toques:

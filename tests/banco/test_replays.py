@@ -23,6 +23,7 @@ from tests.banco.comprobadores import (
     comprobar_personas_mencionadas,
     comprobar_pregunta,
     comprobar_sin_efectos_antes_de_confirmar,
+    comprobar_una_respuesta_por_mensaje,
     resultado_general,
 )
 from tests.banco.conftest import DIR_ESCENARIOS
@@ -95,6 +96,11 @@ def test_replay_reproduce_el_resultado_esperado(archivo_replay, corework, conn):
             resultado.conteos_antes, resultado.conteos_antes_del_toque,
             resultado.conteos_despues,
             herramientas_antes_del_toque=resultado.herramientas_antes_del_toque),
+        # ADR 0013 regla 2 (T9-R2): cada mensaje, exactamente una respuesta
+        # visible -- en todo escenario, sin opt-out.
+        comprobar_una_respuesta_por_mensaje(
+            resultado.respuestas_por_mensaje,
+            incidentes=resultado.incidentes_de_respuesta),
     ]
     # ADR 0007 ("Prisma orienta, no charla"), T4: mismo criterio que
     # `test_banco.py` -- activa por defecto, opt-out explícito por escenario

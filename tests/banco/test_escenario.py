@@ -651,3 +651,61 @@ def test_sin_mensajes_sigue_invalido_con_una_pregunta_sembrada_sin_mensajes_post
         cargar_escenario(_escribir(tmp_path, datos))
 
 
+
+
+# ---------------------------------------------------------------------------
+# Mensajes con adjunto (T9-R2, H15): `{adjunto: <tipo>, epigrafe: <texto>}` en
+# lugar de un texto, en `mensajes` y en `mensajes_tras_toques`.
+# ---------------------------------------------------------------------------
+
+
+def test_carga_un_mensaje_con_adjunto_con_y_sin_epigrafe(tmp_path):
+    datos = dict(_MINIMO)
+    datos["mensajes"] = [{"adjunto": "foto", "epigrafe": "el tablero"},
+                         {"adjunto": "nota_de_voz"}, "hola"]
+    e = cargar_escenario(_escribir(tmp_path, datos))
+    assert e.mensajes == [{"adjunto": "foto", "epigrafe": "el tablero"},
+                          {"adjunto": "nota_de_voz"}, "hola"]
+
+
+def test_un_adjunto_en_mensajes_tras_toques_y_sin_mensajes_propios(tmp_path):
+    datos = dict(_MINIMO)
+    datos.update(mensajes=[], toques=[{"indice": 0}],
+                 precondiciones={"borrador_de_alta": {"titulo": "x"}},
+                 mensajes_tras_toques=[{"adjunto": "foto"}])
+    e = cargar_escenario(_escribir(tmp_path, datos))
+    assert e.mensajes_tras_toques == ({"adjunto": "foto"},)
+
+
+@pytest.mark.parametrize("invalido", [
+    {"adjunto": "holograma"}, {"adjunto": "foto", "epigrafe": ""},
+    {"adjunto": "foto", "epigrafe": 3}, {"epigrafe": "sin adjunto"},
+    {"adjunto": "foto", "otro": "x"}, {"adjunto": None}])
+def test_un_mensaje_con_adjunto_invalido_se_rechaza(tmp_path, invalido):
+    datos = dict(_MINIMO)
+    datos["mensajes"] = [invalido]
+    with pytest.raises(EscenarioInvalido):
+        cargar_escenario(_escribir(tmp_path, datos))
+
+
+def test_la_familia_b_0026_cubre_los_mensajes_sin_texto():
+    # T9-R2: foto con epígrafe, foto sin epígrafe, nota de voz, sticker y foto
+    # sin epígrafe con una pregunta del alta abierta.
+    import pathlib
+
+    directorio = pathlib.Path(__file__).parent / "escenarios"
+    familia = {e.id: e for e in cargar_escenarios(directorio)
+               if e.id == "b-0026" or e.variante_de == "b-0026"}
+
+    assert sorted(familia) == ["b-0026", "b-0026-b", "b-0026-c", "b-0026-d",
+                               "b-0026-e"]
+    assert familia["b-0026"].mensajes[0]["epigrafe"]
+    assert [m["adjunto"] for i in ("b-0026-b", "b-0026-c", "b-0026-d")
+            for m in familia[i].mensajes] == ["foto", "nota_de_voz", "sticker"]
+    assert all("epigrafe" not in m for i in ("b-0026-b", "b-0026-c", "b-0026-d")
+               for m in familia[i].mensajes)
+    abierta = familia["b-0026-e"]
+    assert abierta.mensajes_tras_toques == ({"adjunto": "foto"},)
+    assert abierta.precondiciones.get("borrador_de_alta")
+    for e in familia.values():
+        assert "todavía" in " ".join(e.respuesta_menciona).lower(), e.id

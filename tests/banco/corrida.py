@@ -35,7 +35,11 @@ from prisma.jev import ClienteJevGuionado
 from prisma.llm import (IntentAction, IntentRoute, Llamada, Proveedor,
                         ProveedorGuionado, RespectoPendiente, Respuesta,
                         RouteEnvelope)
+from prisma.respuesta_unica import (ETAPA_RESPUESTA_DUPLICADA, ETAPA_SIN_RESPUESTA,
+                                    grupo_de)
 from prisma.salida import etiquetas_coinciden, etiquetas_de_tarea
+
+from tests.banco.escenario import ADJUNTOS_DEL_BANCO
 
 # 'objective', 'evidence' y 'approval' se agregaron en T4 (banco-conversacional
 # -> vista-previa-y-confirmacion): son las tablas que escriben crear_objetivo,
@@ -676,6 +680,12 @@ class ResultadoCorrida:
     # con candidatas. `comprobadores.comprobar_aclaracion` compara esto
     # contra `Escenario.aclaracion_esperada["candidatas"]`.
     etiquetas_aclaracion_ofrecidas: tuple[str, ...] = ()
+    # Respuestas independientes que se encolaron para cada mensaje que la
+    # persona escribió en la corrida, y los incidentes del control estructural
+    # (`respuesta_unica`) que hubo (T9-R2, ADR 0013 regla 2):
+    # `comprobadores.comprobar_una_respuesta_por_mensaje`.
+    respuestas_por_mensaje: tuple[int, ...] = ()
+    incidentes_de_respuesta: tuple[str, ...] = ()
 
 
 def _conteos(cur, ws: str) -> dict[str, int]:
@@ -942,6 +952,61 @@ def _update_de_texto(message_id: int, texto: str, chat: int, tg_id: int) -> dict
                         "from": {"id": tg_id}}}
 
 
+# Lo mínimo que Telegram manda de cada adjunto: alcanza para que el gateway lo
+# reconozca (`gateway._tipo_de_adjunto`); ningún archivo se descarga.
+_CARGA_DE_ADJUNTO = {
+    "photo": [{"file_id": "banco", "width": 90, "height": 90}],
+    "document": {"file_id": "banco", "file_name": "informe.pdf"},
+    "audio": {"file_id": "banco", "duration": 9},
+    "voice": {"file_id": "banco", "duration": 3},
+    "video": {"file_id": "banco", "duration": 4},
+    "sticker": {"file_id": "banco", "emoji": "x"},
+}
+
+
+def _update_de_mensaje(message_id: int, mensaje: str | dict, chat: int,
+                       tg_id: int) -> dict:
+    """Un mensaje del escenario: un texto, o un adjunto `{adjunto, epigrafe?}`
+    (T9-R2, H15) como lo manda Telegram -- el epígrafe viaja en `caption`."""
+    if isinstance(mensaje, str):
+        return _update_de_texto(message_id, mensaje, chat, tg_id)
+    campo = ADJUNTOS_DEL_BANCO[mensaje["adjunto"]]
+    update = {"message": {"message_id": message_id,
+                          "chat": {"id": chat, "type": "private"},
+                          "from": {"id": tg_id},
+                          campo: _CARGA_DE_ADJUNTO[campo]}}
+    if mensaje.get("epigrafe"):
+        update["message"]["caption"] = mensaje["epigrafe"]
+    return update
+
+
+def respuestas_por_mensaje(cur, workspace_id: str, chat_id: int,
+                           ids_de_mensaje: list[int]) -> tuple[int, ...]:
+    """Cuántas respuestas independientes se encolaron para cada mensaje que la
+    corrida mandó (`ids_de_mensaje`, sus `message_id` de Telegram: el mensaje
+    con el que el escenario siembra un borrador también es una fila de
+    `inbound_message`, pero nadie lo mandó) (T9-R2): las partes de una respuesta y
+    su juego de botones cuentan como una (`respuesta_unica.grupo_de`). Cuenta lo
+    encolado aunque después se haya suprimido: lo que interesa es el camino, no
+    lo que el control dejó. Un toque no es un mensaje: su fila de actividad no
+    tiene texto (`gateway._registrar_toque`)."""
+    cur.execute(
+        """select i.id, o.dedupe_key, o.respuesta_grupo
+             from inbound_message i
+             left join message_outbox o
+               on o.entrante_id = i.id and o.es_respuesta and o.chat_id = i.chat_id
+            where i.workspace_id = %s and i.chat_id = %s
+              and i.telegram_message_id = any(%s) and i.texto is not null
+            order by i.at, i.id""",
+        (workspace_id, chat_id, ids_de_mensaje))
+    grupos: dict[str, set[str]] = {}
+    for fila in cur.fetchall():
+        conjunto = grupos.setdefault(str(fila["id"]), set())
+        if fila["dedupe_key"] is not None:
+            conjunto.add(grupo_de(fila))
+    return tuple(len(g) for g in grupos.values())
+
+
 def _telegram_id(conn, ws: str, nombre: str) -> int:
     with admin(conn) as cur:
         cur.execute(
@@ -960,7 +1025,7 @@ def ejecutar_escenario(
     proveedor_real: Proveedor, *, escenario_id: str, indice: int,
     chat_id: int | None = None, cliente_jev: Any | None = None,
     aclaracion_esperada: dict | None = None, toques: list[dict] | None = None,
-    mensajes_tras_toques: list[str] | None = None,
+    mensajes_tras_toques: list[str | dict] | None = None,
     toques_tras_mensajes: list[dict] | None = None,
     preguntas_sembradas: dict | None = None,
 ) -> ResultadoCorrida:
@@ -1088,13 +1153,15 @@ def ejecutar_escenario(
     # Un `message_id` distinto por mensaje de texto, como los manda Telegram
     # (review-dd7cd3c9cb7e8575). Los toques usan el suyo, aparte.
     ids_de_mensaje = itertools.count(1)
+    mensajes_enviados: list[int] = []
     try:
         if preguntas_sembradas:
             _sembrar_preguntas(conn, workspace_id, tg_id, chat, preguntas_sembradas)
 
         for texto in mensajes:
-            gateway.procesar_update(conn, slug, _update_de_texto(
-                next(ids_de_mensaje), texto, chat, tg_id))
+            mensajes_enviados.append(next(ids_de_mensaje))
+            gateway.procesar_update(conn, slug, _update_de_mensaje(
+                mensajes_enviados[-1], texto, chat, tg_id))
 
         # Aclaración con botones (T4/T6): si el turno dejó una referencia
         # ambigua esperando que se elija una candidata, se tapea la que el
@@ -1177,8 +1244,9 @@ def ejecutar_escenario(
                             (workspace_id,))
                 ids_previos |= {f["id"] for f in cur.fetchall()}
             for texto in mensajes_tras_toques:
-                gateway.procesar_update(conn, slug, _update_de_texto(
-                    next(ids_de_mensaje), texto, chat, tg_id))
+                mensajes_enviados.append(next(ids_de_mensaje))
+                gateway.procesar_update(conn, slug, _update_de_mensaje(
+                    mensajes_enviados[-1], texto, chat, tg_id))
 
         if toques_tras_mensajes:
             # La pregunta que abrió el mensaje (la de la rama) queda fuera de
@@ -1236,6 +1304,15 @@ def ejecutar_escenario(
         respuesta_texto = "\n".join(f["cuerpo"] for f in filas)
         ofrecio_opciones = respuesta_ofrecio_opciones(filas)
         herramientas_ejecutadas = _herramientas_registradas(cur, workspace_id)
+        por_mensaje = respuestas_por_mensaje(cur, workspace_id, chat,
+                                             mensajes_enviados)
+        cur.execute(
+            """select id, resumen_sanitizado from incident
+                where workspace_id = %s and etapa in (%s, %s)""",
+            (workspace_id, ETAPA_SIN_RESPUESTA, ETAPA_RESPUESTA_DUPLICADA))
+        incidentes_de_respuesta = tuple(
+            f["resumen_sanitizado"] for f in cur.fetchall()
+            if f["id"] not in ids_incidentes_previos)
         # `gateway.procesar_update` no propaga que el proveedor haya caído --
         # lo ataja adentro y responde con un mensaje sin efectos (evidencia
         # real, 2026-09-26). Sin este chequeo esa corrida seguía `aprobado`,
@@ -1258,4 +1335,6 @@ def ejecutar_escenario(
         ofrecio_opciones=ofrecio_opciones,
         conteos_antes_del_toque=conteos_antes_del_toque,
         herramientas_antes_del_toque=tuple(herramientas_antes_del_toque),
-        etiquetas_aclaracion_ofrecidas=tuple(etiquetas_aclaracion_ofrecidas))
+        etiquetas_aclaracion_ofrecidas=tuple(etiquetas_aclaracion_ofrecidas),
+        respuestas_por_mensaje=por_mensaje,
+        incidentes_de_respuesta=incidentes_de_respuesta)
