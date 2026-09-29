@@ -292,7 +292,14 @@ gestión.
       mismo turno). Más los seguimientos de `review-0c99f611fc23e0cd`: prueba del caso en
       que la vista previa no entra con botones, y de las vistas previas armadas desde el
       menú (y con `bloqueo_id`).
-    - [ ] **T9-R1d-2** — retención de los mensajes que inicia Prisma mientras la persona
+    - [ ] **T9-R1d-2b** — tras `review-080f1ef080f22e16`: acotar la pasada de
+      `despachar` (hoy, con filas retenidas, sigue pidiendo lotes sin tope dentro de una
+      sola transacción con bloqueos y envíos), alinear su comentario, hacer explícito que
+      una respuesta nunca se retiene, y la ventana de retención que decida el usuario
+      (propuesta: sólo mientras la persona estuvo activa en la rama en los últimos 30
+      minutos; resuelve las preguntas del alta sin vencimiento y el urgente retenido
+      hasta 8 horas).
+    - [x] **T9-R1d-2** — retención de los mensajes que inicia Prisma mientras la persona
       tiene una rama abierta, hasta que vence la pregunta. Más los seguimientos de
       `review-faccc0e9d83561b3`: controlar que una elección sin prefijo entre con sus
       botones al volver a mostrarla; probar la guarda de un turno con una elección
@@ -4585,3 +4592,18 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   Banco real `b-0023`/`b-0024` (n=3): **18/21**; las 3 fallas son de redacción (tras
   "Dejarlo y ver lo otro" la consulta se responde, pero resume sin nombrar las tareas en el
   texto; R3-H7, T10).
+
+- 2026-09-29: **T9-R1d-2.** Ruta: delegada, un escritor. `6d78229`: `despachar` retiene
+  lo que inicia Prisma (no las respuestas) mientras el destinatario tiene una rama abierta
+  en ese chat; una sola definición de rama (`pendientes.ver_rama_abierta`, usada también por
+  `gateway._ver_pregunta_abierta`); la fila retenida queda `listo` y sale en orden al
+  cerrarse o vencer la pregunta; `despachar` informa `retenidos`. Vencimientos: dato
+  pedido por escrito 30 min, elección y vista previa 8 h; las preguntas del alta no vencen,
+  así que todavía no retienen (decisión pedida al usuario). `2109fc9`: una elección larga
+  vuelve a mostrarse en partes; la siembra de la aclaración del banco usa el constructor
+  real. Suite del escritor 1702 passed, 234 deselected; padre: enfocadas 98 passed. RDD:
+  tramo `21884dd..2109fc9` alto, 793 líneas, consentida, `review-080f1ef080f22e16` (4
+  lentes) **aprobada y reconocida**; frontera en `2109fc9`. Observaciones no bloqueantes:
+  la pasada de `despachar` quedó sin tope con filas retenidas (T9-R1d-2b), un urgente se
+  retiene igual que el resto (decisión del usuario), comentario del lazo, `Solicitante`
+  vacío si falta la membresía, orden por milisegundos en el reenvío en partes.
