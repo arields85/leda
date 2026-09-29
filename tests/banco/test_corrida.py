@@ -1459,3 +1459,63 @@ def test_ejecutar_escenario_mensaje_tras_toques_un_link_llega_a_la_vista_previa(
     with admin(conn) as cur:
         cur.execute("select estado from task where id = %s", (tid,))
         assert cur.fetchone()["estado"] == "en_revision"
+
+
+def test_ejecutar_escenario_da_a_cada_mensaje_un_id_de_telegram_distinto(
+        corework, conn):
+    # Seguimiento de review-dd7cd3c9cb7e8575: todos los mensajes de
+    # `mensajes_tras_toques` salían con el mismo `message_id` (1), cosa que
+    # Telegram nunca hace y que un dedupe por id dejaría como un solo mensaje.
+    ws = corework.workspace_id
+    _sembrar_evidencia_pedida(conn, ws)
+    interno = _interno_con_pregunta_abierta([
+        IntentRoute(IntentAction.NORMAL_CONVERSATION,
+                    respecto_pendiente=RespectoPendiente.CHARLA),
+        IntentRoute(IntentAction.NORMAL_CONVERSATION,
+                    respecto_pendiente=RespectoPendiente.CHARLA)])
+
+    r = ejecutar_escenario(
+        conn, ws, "corework", "Marcos Tarquini", ["pasame mis tareas"], interno,
+        escenario_id="b-test-ids-unicos", indice=0,
+        toques=[{"indice": 0}, {"etiqueta": "Ya la terminé"}],
+        mensajes_tras_toques=["hola", "gracias"])
+
+    assert r.bloqueado is False, r.motivo_bloqueo
+    with admin(conn) as cur:
+        cur.execute(
+            """select telegram_message_id from inbound_message
+                where workspace_id = %s order by at""", (ws,))
+        ids = [f["telegram_message_id"] for f in cur.fetchall()]
+    assert len(ids) == 3
+    assert len(set(ids)) == 3
+
+
+def test_ejecutar_escenario_modificar_tocado_un_saludo_no_es_la_correccion(
+        corework, conn):
+    # La mecánica de la familia b-0020 (banco real): el corredor toca
+    # "Modificar" en la vista previa que dejó el primer mensaje y el mensaje
+    # siguiente se interpreta contra "¿Qué querés cambiar?" -- un saludo no la
+    # consume ni deja efectos.
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        ids = sembrar_precondiciones(cur, ws, {
+            "tareas": [{"id": "t1", "titulo": "Cablear tablero (simulado)",
+                       "area": "ot", "responsable": "Nahuel Gimenez"}]})
+    interno = ProveedorGuionado(
+        guion=[Respuesta(llamadas=[Llamada("c1", "registrar_bloqueo", {
+                   "tarea_id": ids["t1"], "causa": "falta el plano"})]),
+               Respuesta(texto="Listo, te lo dejo para confirmar.")],
+        rutas=[IntentRoute(IntentAction.NORMAL_CONVERSATION),
+               IntentRoute(IntentAction.NORMAL_CONVERSATION,
+                           respecto_pendiente=RespectoPendiente.CHARLA)])
+
+    r = ejecutar_escenario(
+        conn, ws, "corework", "Nahuel Gimenez", ["quedé trabado con el cableado"],
+        interno, escenario_id="b-test-modificar-saludo", indice=0,
+        toques=[{"etiqueta": "Modificar"}], mensajes_tras_toques=["hola"])
+
+    assert r.bloqueado is False, r.motivo_bloqueo
+    assert "cambiar" in r.respuesta_texto.lower()        # se vuelve a preguntar
+    assert r.conteos_antes_del_toque is None             # ninguna vista previa nueva
+    assert r.herramientas_ejecutadas == []               # nada se aplicó
+    assert r.conteos_despues["blocker"] == r.conteos_antes["blocker"]

@@ -11,6 +11,7 @@ acordado"). No se usa `agente.responder` directo porque se saltearía
 from __future__ import annotations
 
 import contextlib
+import itertools
 import threading
 import time
 from dataclasses import dataclass, field
@@ -807,10 +808,14 @@ def ejecutar_escenario(
     herramientas_antes_del_toque: list[str] = []
     etiquetas_aclaracion_ofrecidas: list[str] = []
     inicio = time.perf_counter()
+    # Un `message_id` distinto por mensaje de texto, como los manda Telegram
+    # (review-dd7cd3c9cb7e8575). Los toques usan el suyo, aparte.
+    ids_de_mensaje = itertools.count(1)
     try:
         for texto in mensajes:
-            update = {"message": {"message_id": 1, "text": texto,
-                                  "chat": {"id": chat}, "from": {"id": tg_id}}}
+            update = {"message": {"message_id": next(ids_de_mensaje),
+                                  "text": texto, "chat": {"id": chat},
+                                  "from": {"id": tg_id}}}
             gateway.procesar_update(conn, slug, update)
 
         # Aclaración con botones (T4/T6): si el turno dejó una referencia
@@ -893,8 +898,9 @@ def ejecutar_escenario(
                             (workspace_id,))
                 ids_previos |= {f["id"] for f in cur.fetchall()}
             for texto in mensajes_tras_toques:
-                update = {"message": {"message_id": 1, "text": texto,
-                                      "chat": {"id": chat}, "from": {"id": tg_id}}}
+                update = {"message": {"message_id": next(ids_de_mensaje),
+                                      "text": texto, "chat": {"id": chat},
+                                      "from": {"id": tg_id}}}
                 gateway.procesar_update(conn, slug, update)
 
         # El turno pudo haber dejado una propuesta de una herramienta que
