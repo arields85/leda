@@ -1083,6 +1083,16 @@ por commit, igual que en `main`. Nunca push sin pedido explícito del usuario.
   recibe saludo. RED → GREEN. Suite completa: `1403 passed, 108
   deselected`. 92 líneas, por debajo del umbral: su revisión queda
   acumulada para el próximo tramo.
+- 2026-09-29: rebase sobre `main` (`a667170`, 26 commits nuevos: tiempo
+  máximo por llamada al modelo, preguntas pendientes, ADR 0013; sin
+  migraciones ni dependencias nuevas). Respaldo previo:
+  `auxiliar/alta-y-google-pre-rebase-0929`. Un conflicto en `gateway.py`:
+  imports unidos (`datetime` y `Calendario` de `main`; `Callable` e
+  `identificar_administrador` del alta) y la guarda del alta con correo
+  (`atendido_alta_correo`, `bloqueada_en_grupo`) conservada sobre el
+  `mantener_chat_activo` de `main` con `chat_type`, `cur` y `workspace_id`.
+  Suite completa: `.venv/Scripts/python.exe -m pytest -q` → `1570 passed,
+  129 deselected`.
 - Dependencia registrada: el hecho "bienvenida entregada" de G1 queda como
   evento propio para que la unidad de saludo diario de `main` (pack 06)
   pueda contarlo como saludo del día.
@@ -1114,10 +1124,11 @@ En el worktree `D:\Proyectos\Prisma-PM-worktrees\alta-y-google`, rama
 ## Cómo retomar (punto exacto al cierre del 2026-09-28)
 
 **Estado de la rama.** `auxiliar/alta-y-google`, rebasada sobre `main`
-(saludo diario incluido); último commit de código `dc6cd1b`; árbol limpio.
-Suite completa: `1403 passed, 108 deselected`. Respaldos:
-`auxiliar/alta-y-google-pre-unificacion` y
-`auxiliar/alta-y-google-unificada-un-commit`.
+(`a667170`, 2026-09-29); último commit de código `3166f31` (antes
+`dc6cd1b`); árbol limpio. Suite completa: `1570 passed, 129 deselected`.
+Respaldos: `auxiliar/alta-y-google-pre-unificacion`,
+`auxiliar/alta-y-google-unificada-un-commit` y
+`auxiliar/alta-y-google-pre-rebase-0929`.
 
 **Hecho.** G0; G1 completa (esquema 0100, recorrido, integrantes ya activos,
 avisos al administrador unificados con el canal de `main`, "Habilitar un
@@ -1145,8 +1156,8 @@ y clave en `PRISMA_CLAVE_CREDENCIALES`; permisos `gmail.send` y
    genera) y guardarla en el `.env`.
 4. Ya hecho: `PRISMA_BOT_TOKEN_ADMIN` en el `.env` del worktree.
 
-**Primer paso concreto de la próxima sesión.** Rebasar sobre `main`, correr
-la suite, y delegar la unidad G2: migración `0101` (credencial por espacio,
+**Primer paso concreto de la próxima sesión.** Rebase sobre `main` y suite
+ya hechos (2026-09-29). Siguiente: delegar la unidad G2: migración `0101` (credencial por espacio,
 sólo por funciones `security definer`, sin privilegios de `prisma_app`),
 módulo de cifrado con rotación, comando `google autorizar` (OAuth local con
 PKCE), renovación de token (`invalid_grant` → requiere reautorización +
