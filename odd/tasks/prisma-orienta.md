@@ -232,6 +232,31 @@ gestión.
       Más los seguimientos de `review-e95b2d47b01f0161`: prueba de "Sí, es eso" con el
       ruteo caído (Modificar y "Ninguna"); una ruta con contexto que resuelva referencias.
     - [ ] **T9-R1c — Preguntas del alta guiada** (`ingreso_tareas.handle_active_text`).
+      Hoy el alta corre antes de `_turno` y fuera del ruteo tipado: el campo de texto
+      libre toma el mensaje siguiente sin interpretarlo, y con botones o confirmación
+      abiertos el mensaje se traga con un recordatorio.
+      - [x] **T9-R1c-0** — seguimientos de `review-34b692649e0734e7`: guarda de
+        `otro_tema` para "destrabar" (clave `bloqueo_id`) y para Modificar de una
+        herramienta cuyo id no es `tarea_id` (`resolver_bloqueo`); `resolucion is None`
+        en el filtro `solo_claras`; aserción positiva del caso "otra tarea" del dato
+        del menú.
+      - [ ] **T9-R1c-1** — el campo de texto libre del alta pasa por el manejo genérico
+        (`_atender_pregunta_pendiente` con un adaptador en `_pregunta_de`), con su
+        familia del banco. `cancela` cancela el borrador (el mismo camino del botón
+        Cancelar del alta: sin la pregunta el alta no puede seguir); `corrige` usa un
+        camino de cambio de campo si el alta lo tiene, si no los botones de `dudoso`.
+      - [ ] **T9-R1c-2** — texto con botones del alta o confirmación abiertos: la misma
+        regla, en vez de tragarse el mensaje con un recordatorio. Más los seguimientos no
+        bloqueantes de `review-06b7019b060dbffb`: una prueba que ate las claves de
+        `FREE_TEXT_NAMES` a las de `USER_FIELD_LIMITS` (hoy son las mismas 7; un campo
+        nuevo sin nombre rompería cada mensaje del chat); aclarar el comentario de
+        `_CAMPOS_DE_ID` (hoy ninguna herramienta cruza el orden: `crear_dependencia` usa
+        `origen_tarea_id`/`destino_tarea_id`, `quitar_dependencia` sólo `dependencia_id`);
+        el campo `pending_action_id` de `ModificacionAbierta` lleva el id del campo del
+        alta (nombre neutro o tipo propio); afirmar la respuesta exacta del segundo toque
+        de "Dejarlo" y de "Sí, es eso" tardíos en `test_alta_pregunta_pendiente.py`.
+        Compromiso aceptado por la regla 1 (R4): el alta ahora depende del ruteo; con el
+        ruteo caído el campo queda abierto y cada campo suma una llamada de ruteo.
   - [ ] **T9-R2 — Cada mensaje recibe exactamente una respuesta visible** (H15, H19).
     `procesar_update` sólo lee `text` (`gateway.py:213`); control estructural al cerrar
     el mensaje; epígrafe como texto; comprobación del banco y del validador.
@@ -267,6 +292,7 @@ gestión.
 | T8c-1 | delegada, un escritor | `agente.py` y pruebas de varios módulos (ciclo del responder) |
 | T9-R1a-1 | delegada, un escritor | `llm.py`, `pendientes.py`, `gateway.py`, arnés del banco, pruebas |
 | T8c-3 | delegada, un escritor | `gateway.py`, `agente.py`, `llm.py`, arnés del banco, pruebas, ADR 0012 |
+| T9-R1c-0/1 | delegada, un escritor | `gateway.py`, `ingreso_tareas.py`, arnés y escenarios del banco, pruebas |
 
 ## Verificación
 
@@ -4349,3 +4375,26 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   b-0019/b-0020), T11 (cuarta ronda), y recién después optimizaciones (T8d). Método que
   funcionó: un escritor por unidad con TDD, commit, RDD, y la familia del banco real contra
   `nan/deepseek-v4-flash` (n=3) antes de cerrar cada regla.
+
+- 2026-09-29: **T9-R1c-0 y T9-R1c-1.** `73f54f2` (R1c-0): la guarda de `otro_tema` toma
+  el id de cada herramienta (`_CAMPOS_DE_ID`: `tarea_id`, `bloqueo_id`,
+  `dependencia_id`; con dos ids o ninguno, sin guarda), y un `(None, None)` de Jev se trata
+  como resolución fallida en la auditoría y en `solo_claras`. `24fe1e3` (R1c-1): el campo de
+  texto libre del alta ya no se toma en `procesar_update`; `_turno` lo lee con
+  `_ver_pregunta_abierta` (sólo en chat privado, el alta primero) y pasa por
+  `_atender_pregunta_pendiente` con el adaptador `_SENTINEL_ALTA_TEXTO_LIBRE`; consumir,
+  dejar de lado y seguir se generalizaron (`_consumir_pregunta`, `_dejar_de_lado`,
+  `_seguir_con_el_campo_del_alta`). `cancela` cancela el borrador (`_cancel` sin encolar;
+  "Listo, dejé de lado el borrador de la tarea «título»."); `corrige` va a los botones de
+  `dudoso` porque el alta no tiene camino para cambiar un campo ya confirmado desde texto.
+  Familia `b-0021` (9 escenarios); el arnés del banco toca los botones del alta y manda
+  `type: private`. Ruta: delegada, un escritor (el primero se frenó por accidente después
+  del commit de R1c-0; un segundo terminó R1c-1). TDD: RED 18 failed / 2 passed, GREEN 23
+  passed. Verificación del padre: enfocadas (alta, intake, guarda, otras) 161 passed. Suite
+  del escritor 1427 passed, 1 failed (`test_migration_preflight_fails_before_ddl_for_
+  incompatible_unit1a_rows[converted_waiting]`, pasó sola y en la corrida del padre).
+  RDD: R1c-0 solo medio bajo el umbral; el tramo `3bcaa99..24fe1e3` alto (1528 líneas),
+  consentida por el usuario, revisión `review-06b7019b060dbffb` (4 lentes) **aprobada y
+  reconocida**; frontera de revisión en `24fe1e3`. Ocho observaciones no bloqueantes,
+  anotadas como seguimientos en T9-R1c-2. Pendiente: suite completa del padre, banco real
+  `b-0021` (n=3).
