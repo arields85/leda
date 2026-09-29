@@ -30,7 +30,8 @@ from .despachador import (TransporteTelegram, acusar_toque, despachar,
 from .incidentes import (REFERENCIA_INBOUND_MESSAGE, REFERENCIA_PENDING_ACTION,
                          registrar_incidente)
 from .salida import TRUNCAR_ETIQUETA_BOTON as TRUNCAR_TITULO_BOTON
-from .salida import (ETIQUETA_CANCELAR, ETIQUETA_CONFIRMAR, ICONO_TAREA,
+from .salida import (ETIQUETA_CANCELAR, ETIQUETA_CONFIRMAR, ICONO_CANCELAR,
+                     ICONO_CONFIRMAR, ICONO_OTRA_OPCION, ICONO_TAREA,
                      con_icono, enqueue_outbox, etiquetas_de_tarea,
                      normalize_visible_text, truncar_etiqueta_boton,
                      with_no_effect_status)
@@ -78,6 +79,24 @@ _DESCRIPCION_DATO_MENU_GENERICA = "un dato sobre «{titulo}»"
 AVISO_DATO_DEJADO_DE_LADO = "Listo, dejé de lado {descripcion}."
 # Redacción pendiente de revisión de voz en T10.
 AVISO_NO_PUEDO_DATO_PENDIENTE = "Eso todavía no lo puedo hacer."
+# Cuando la pregunta ya la consumió otro turno o un toque (una carrera, o un
+# segundo toque tardío): se dice sin afirmar que "no cambió nada", porque el
+# otro camino pudo haber dejado su propia vista previa.
+# Redacción pendiente de revisión de voz en T10.
+AVISO_DATO_YA_NO_PENDIENTE = (
+    "Esa pregunta ya no estaba pendiente, así que no hice nada con tu mensaje.")
+# Comando `dudoso`: una sola pregunta con dos botones para saber si el mensaje
+# era el dato pendiente. Redacción pendiente de revisión de voz en T10.
+PREGUNTA_ES_EL_DATO = "¿Esto es {descripcion}?"
+ETIQUETA_ES_EL_DATO = con_icono("Sí, es eso", ICONO_CONFIRMAR)
+ETIQUETA_NO_ES_EL_DATO = con_icono("No, es otra cosa", ICONO_OTRA_OPCION)
+# Retome después de `otro_tema`, dentro de la misma respuesta, con un botón
+# para soltar la pregunta. Redacción pendiente de revisión de voz en T10.
+RETOMAR_DATO_PENDIENTE = "¿Seguimos con {descripcion}? {pregunta}"
+ETIQUETA_DEJAR_DATO = con_icono("Dejarlo", ICONO_CANCELAR)
+_ELECCION_DATO_SI = "si"
+_ELECCION_DATO_NO = "no"
+_ELECCION_DATO_DEJAR = "dejar"
 
 # `TRUNCAR_TITULO_BOTON` es un alias de `salida.TRUNCAR_ETIQUETA_BOTON`
 # (importado arriba): la regla de truncado vive ahí, reusada por
@@ -579,6 +598,11 @@ def _toque(conn, workspace_id: str, slug: str, toque: dict,
                     _resolver_toque_menu_tarea(
                         cur, quien, workspace_id, chat_id, resuelta.args, ahora,
                         pending_action_id=pending_action_id)
+                elif resuelta.herramienta == P.SENTINEL_RESPUESTA_DATO_MENU:
+                    # T9-R1a-2: los botones de `dudoso` y del retome de una
+                    # pregunta de dato del menú que sigue abierta.
+                    _resolver_toque_respuesta_dato_menu(
+                        cur, quien, workspace_id, chat_id, resuelta.args, ahora)
                 elif resuelta.herramienta == P.SENTINEL_DATO_MENU_TAREA:
                     # T2: la elección, con botones, de con cuál otra tarea se
                     # declara una dependencia -- la única forma de este
@@ -800,7 +824,7 @@ def _turno(cur, quien, texto: str, workspace_id: str, chat_id: int,
 
     from . import pendientes as P
     from .calendario import Calendario
-    from .llm import desde_base
+    from .llm import RespectoPendiente, desde_base
 
     now = datetime.now(timezone.utc)
     cal = Calendario.desde_base(cur, workspace_id)
@@ -828,12 +852,17 @@ def _turno(cur, quien, texto: str, workspace_id: str, chat_id: int,
     # turno ya consumió) sigue por el camino normal, con la ruta ya obtenida.
     route = None
     modificacion = None
+    retomar = None
     abierta = P.ver_modificacion_abierta(cur, quien, chat_id, now)
     if abierta is not None and abierta.herramienta == P.SENTINEL_DATO_MENU_TAREA:
         route = _atender_dato_pendiente(cur, quien, texto, abierta, proveedor,
-                                        chat_id, workspace_id, now)
+                                        chat_id, workspace_id, now, entrante_id)
         if route is None:
             return
+        # Sólo `otro_tema` retoma la pregunta al terminar: la otra forma de
+        # llegar acá con una ruta ya obtenida es que otro turno la consumió.
+        if route.respecto_pendiente is RespectoPendiente.OTRO_TEMA:
+            retomar = abierta
     else:
         modificacion = P.reclamar_modificacion_abierta(cur, quien, chat_id, now)
         if modificacion is not None and modificacion.herramienta == _SENTINEL_ACLARACION:
@@ -847,6 +876,27 @@ def _turno(cur, quien, texto: str, workspace_id: str, chat_id: int,
             _avisar_ruteo_caido(cur, quien, last_error, workspace_id, chat_id, now)
             return
 
+    _seguir_camino_normal(cur, quien, texto, route, proveedor, cal, chat_id,
+                          workspace_id, now, entrante_id,
+                          modificacion=modificacion, retomar=retomar)
+
+
+def _seguir_camino_normal(cur, quien, texto: str, route, proveedor, cal,
+                          chat_id: int, workspace_id: str, ahora,
+                          entrante_id: str | None, *, modificacion=None,
+                          retomar=None) -> None:
+    """El camino de siempre para un mensaje ya ruteado: resolver las
+    referencias, y aclarar con botones, dar el alta guiada o responder.
+
+    `retomar`, si viene, es la pregunta de un dato del menú que sigue abierta
+    mientras se atiende otro tema (T9-R1a-2, ADR 0013 regla 1, `otro_tema`):
+    al terminar, `_retomar_dato_pendiente` la vuelve a hacer dentro de la
+    misma respuesta, salvo que el turno haya dejado otra interacción
+    pendiente."""
+    interacciones_antes = (_interacciones_pendientes(cur, quien, workspace_id,
+                                                     chat_id)
+                           if retomar is not None else 0)
+
     # Resolver antes de actuar (T3, ADR 0005 decisión 6 / ADR 0006): las
     # referencias a tarea que separó el enrutador se resuelven contra las
     # tareas activas del espacio, bajo el mismo cursor con RLS que ya tiene
@@ -859,8 +909,12 @@ def _turno(cur, quien, texto: str, workspace_id: str, chat_id: int,
 
     estado = _estado_inicial_aclaracion(texto, entrante_id, route, referencias,
                                         modificacion)
-    _avanzar_aclaracion(cur, quien, workspace_id, chat_id, now, proveedor, cal,
+    _avanzar_aclaracion(cur, quien, workspace_id, chat_id, ahora, proveedor, cal,
                        estado)
+
+    if retomar is not None:
+        _retomar_dato_pendiente(cur, quien, workspace_id, chat_id, retomar,
+                                interacciones_antes, ahora)
 
 
 def _rutear(proveedor, texto: str, pendiente: str | None = None):
@@ -912,7 +966,8 @@ def _descripcion_dato_menu(args: dict) -> str:
 
 
 def _atender_dato_pendiente(cur, quien, texto: str, abierta, proveedor,
-                            chat_id: int, workspace_id: str, ahora):
+                            chat_id: int, workspace_id: str, ahora,
+                            entrante_id: str | None = None):
     """Interpreta el mensaje que llega con abierta la pregunta de un dato del
     menú (T9-R1a, ADR 0013 regla 1): el ruteo tipado devuelve un comando de
     la lista cerrada y acá hay un manejo determinista por comando. Todo
@@ -921,8 +976,8 @@ def _atender_dato_pendiente(cur, quien, texto: str, abierta, proveedor,
     Devuelve `None` cuando el turno ya terminó, o la ruta ya obtenida cuando
     el mensaje sigue por el camino normal (`otro_tema`, o una pregunta que
     otro turno consumió antes) -- sin un segundo ruteo. La pregunta se
-    consume sólo con `responde` y `cancela`; si el ruteo falla, queda
-    abierta."""
+    consume sólo con `responde` y `cancela` (o con los botones que deja
+    `dudoso`); si el ruteo falla, queda abierta."""
     from . import pendientes as P
     from .llm import RespectoPendiente
 
@@ -943,10 +998,8 @@ def _atender_dato_pendiente(cur, quien, texto: str, abierta, proveedor,
             return None
         return route
     if comando is RespectoPendiente.CANCELA:
-        P.consumir_modificacion(cur, abierta.pending_action_id, ahora)
-        _responder(cur, workspace_id, chat_id, quien,
-                   AVISO_DATO_DEJADO_DE_LADO.format(
-                       descripcion=_descripcion_dato_menu(abierta.args)), ahora)
+        _dejar_dato_pendiente(cur, quien, workspace_id, chat_id,
+                              abierta.pending_action_id, abierta.args, ahora)
         return None
     if comando is RespectoPendiente.OTRO_TEMA:
         return route
@@ -954,11 +1007,175 @@ def _atender_dato_pendiente(cur, quien, texto: str, abierta, proveedor,
         _responder(cur, workspace_id, chat_id, quien,
                    f"{AVISO_NO_PUEDO_DATO_PENDIENTE} {pregunta}", ahora)
         return None
-    # `charla`, y por ahora también `corrige` y `dudoso`: vuelve a hacer la
-    # misma pregunta sin consumirla. Su manejo completo (botones y el
-    # "¿seguimos?" de `otro_tema`) es la etapa T9-R1a-2.
-    _responder(cur, workspace_id, chat_id, quien, pregunta, ahora)
+    if comando is RespectoPendiente.CHARLA:
+        _responder(cur, workspace_id, chat_id, quien, pregunta, ahora)
+        return None
+    # `dudoso`, y también `corrige`: una pregunta de dato del menú no tiene
+    # una propuesta anterior que corregir (eso es de Modificar), así que un
+    # mensaje que "corrige" sólo puede ser el dato o no serlo, y lo decide la
+    # persona con los botones, igual que ante la duda.
+    _preguntar_si_es_el_dato(cur, quien, workspace_id, chat_id, texto, abierta,
+                             entrante_id, ahora)
     return None
+
+
+def _dejar_dato_pendiente(cur, quien, workspace_id: str, chat_id: int,
+                          pregunta_id: str, dato: dict, ahora) -> None:
+    """La persona deja de lado la pregunta de un dato del menú (`cancela` o el
+    botón "Dejarlo"). Sólo dice que la dejó si de verdad la consumió ahora: si
+    otro camino ya la había consumido, lo dice así, sin afirmar nada más."""
+    from . import pendientes as P
+
+    if P.consumir_modificacion(cur, pregunta_id, ahora):
+        texto = AVISO_DATO_DEJADO_DE_LADO.format(
+            descripcion=_descripcion_dato_menu(dato))
+    else:
+        texto = AVISO_DATO_YA_NO_PENDIENTE
+    _responder(cur, workspace_id, chat_id, quien, texto, ahora)
+
+
+def _preguntar_si_es_el_dato(cur, quien, workspace_id: str, chat_id: int,
+                             texto: str, abierta, entrante_id: str | None,
+                             ahora) -> None:
+    """Comando `dudoso`: una sola pregunta con dos botones. No consume la
+    pregunta abierta; el texto original y el id de esa pregunta quedan en los
+    `args` de la acción de un solo uso que resuelve el toque
+    (`_resolver_toque_respuesta_dato_menu`)."""
+    from . import pendientes as P
+    from .agente import VIGENCIA_PENDIENTE
+
+    p = P.registrar(
+        cur, quien, herramienta=P.SENTINEL_RESPUESTA_DATO_MENU,
+        args={"pregunta_id": abierta.pending_action_id, "dato": abierta.args,
+              "texto": texto, "entrante_id": entrante_id},
+        resumen=PREGUNTA_ES_EL_DATO.format(
+            descripcion=_descripcion_dato_menu(abierta.args)),
+        vence_en=ahora + VIGENCIA_PENDIENTE, campo="eleccion",
+        opciones=[(ETIQUETA_ES_EL_DATO, _ELECCION_DATO_SI),
+                  (ETIQUETA_NO_ES_EL_DATO, _ELECCION_DATO_NO)],
+        chat_id=chat_id)
+    enqueue_outbox(
+        cur, workspace_id=workspace_id, chat_id=chat_id,
+        recipient_membership_id=quien.membership_id, text=p.resumen,
+        scheduled_for=ahora, dedupe_key=f"{workspace_id}:dato-dudoso:{p.id}",
+        is_response=True, pending_action_id=p.id)
+
+
+def _interacciones_pendientes(cur, quien, workspace_id: str, chat_id: int) -> int:
+    """Cuánto le quedó esperando a la persona en este chat: mensajes con
+    botones encolados (una vista previa, una elección, una aclaración, el
+    cierre genérico, el alta guiada con botones -- todo lo que espera un
+    toque sale por `message_outbox` con `pending_action_id` o
+    `intake_choice_set_id`) más el alta guiada activa, que espera un texto.
+    `_seguir_camino_normal` compara antes y después del turno, así que no
+    depende de qué camino lo atendió ni de qué devolvió."""
+    cur.execute(
+        """select count(*) n from message_outbox
+            where workspace_id = %s and chat_id = %s
+              and (pending_action_id is not null
+                   or intake_choice_set_id is not null)""",
+        (workspace_id, chat_id))
+    botones = cur.fetchone()["n"]
+    cur.execute(
+        """select count(*) n from task_intake_request
+            where workspace_id = %s and membership_id = %s and chat_id = %s
+              and estado = 'active'""",
+        (workspace_id, quien.membership_id, chat_id))
+    return botones + cur.fetchone()["n"]
+
+
+def _retomar_dato_pendiente(cur, quien, workspace_id: str, chat_id: int,
+                            abierta, interacciones_antes: int, ahora) -> None:
+    """Después de atender otro tema (comando `otro_tema`), vuelve a la
+    pregunta del dato dentro de la misma respuesta: una parte más, con un
+    botón para dejarla. No agrega nada si el turno dejó otra interacción
+    pendiente (la pregunta sigue abierta igual), ni si la pregunta ya no es
+    la abierta de esta persona."""
+    from datetime import timedelta
+
+    from . import pendientes as P
+    from .agente import VIGENCIA_PENDIENTE
+
+    if _interacciones_pendientes(cur, quien, workspace_id,
+                                 chat_id) > interacciones_antes:
+        return
+    vigente = P.ver_modificacion_abierta(cur, quien, chat_id, ahora)
+    if vigente is None or vigente.pending_action_id != abierta.pending_action_id:
+        return
+
+    texto = RETOMAR_DATO_PENDIENTE.format(
+        descripcion=_descripcion_dato_menu(abierta.args),
+        pregunta=_pregunta_dato_menu(abierta.args.get("accion"),
+                                     abierta.args.get("titulo", "")))
+    p = P.registrar(
+        cur, quien, herramienta=P.SENTINEL_RESPUESTA_DATO_MENU,
+        args={"pregunta_id": abierta.pending_action_id, "dato": abierta.args},
+        resumen=texto, vence_en=ahora + VIGENCIA_PENDIENTE, campo="eleccion",
+        opciones=[(ETIQUETA_DEJAR_DATO, _ELECCION_DATO_DEJAR)],
+        chat_id=chat_id)
+    # Una parte más de la misma respuesta: un milisegundo después, para que
+    # salga detrás de las partes del texto (que se ordenan por microsegundos).
+    enqueue_outbox(
+        cur, workspace_id=workspace_id, chat_id=chat_id,
+        recipient_membership_id=quien.membership_id, text=p.resumen,
+        scheduled_for=ahora + timedelta(milliseconds=1),
+        dedupe_key=f"{workspace_id}:dato-retomar:{p.id}", is_response=True,
+        pending_action_id=p.id)
+
+
+def _resolver_toque_respuesta_dato_menu(cur, quien, workspace_id: str,
+                                        chat_id: int, args: dict, ahora) -> None:
+    """Alguien tocó un botón de `SENTINEL_RESPUESTA_DATO_MENU`
+    (T9-R1a-2): "Sí, es eso" y "No, es otra cosa" del comando `dudoso`, o
+    "Dejarlo" del retome. Cada uno deja exactamente una respuesta."""
+    from . import pendientes as P
+    from .calendario import Calendario
+    from .llm import desde_base
+
+    eleccion = args.get("eleccion")
+    pregunta_id = args.get("pregunta_id")
+    dato = args.get("dato") or {}
+    texto = args.get("texto") or ""
+
+    # Auditoría: la elección y la tarea, nunca el texto de la persona.
+    registrar_auditoria(
+        cur, accion="respuesta_dato_menu", workspace_id=workspace_id,
+        actor_app_user_id=quien.app_user_id, actor_kind="persona",
+        detalle={"eleccion": eleccion, "tarea_id": dato.get("tarea_id")})
+
+    if eleccion == _ELECCION_DATO_DEJAR:
+        _dejar_dato_pendiente(cur, quien, workspace_id, chat_id, pregunta_id,
+                              dato, ahora)
+        return
+
+    if eleccion == _ELECCION_DATO_SI:
+        # Igual que `responde`: se consume la pregunta y sigue el camino del
+        # dato. Si otro camino ya la consumió, se dice y no se hace nada.
+        if not P.consumir_modificacion(cur, pregunta_id, ahora):
+            _responder(cur, workspace_id, chat_id, quien,
+                       AVISO_DATO_YA_NO_PENDIENTE, ahora)
+            return
+        abierta = P.ModificacionAbierta(
+            pending_action_id=pregunta_id,
+            herramienta=P.SENTINEL_DATO_MENU_TAREA, args=dato, resumen="")
+        _resumir_dato_menu_tarea(cur, quien, texto, abierta, chat_id,
+                                 workspace_id, ahora)
+        return
+
+    # "No, es otra cosa": el texto original va por el camino normal, y la
+    # pregunta sigue abierta (con el retome, si nada más quedó esperando).
+    proveedor = desde_base(cur, workspace_id, config)
+    cal = Calendario.desde_base(cur, workspace_id)
+    route, error = _rutear(proveedor, texto)
+    if route is None:
+        _avisar_ruteo_caido(cur, quien, error, workspace_id, chat_id, ahora)
+        return
+    abierta = P.ModificacionAbierta(
+        pending_action_id=pregunta_id, herramienta=P.SENTINEL_DATO_MENU_TAREA,
+        args=dato, resumen="")
+    _seguir_camino_normal(cur, quien, texto, route, proveedor, cal, chat_id,
+                          workspace_id, ahora, args.get("entrante_id"),
+                          retomar=abierta)
 
 
 def _iniciar_alta_guiada(cur, quien, chat_id: int, entrante_id: str | None,

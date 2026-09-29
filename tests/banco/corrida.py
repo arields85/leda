@@ -699,6 +699,7 @@ def ejecutar_escenario(
     proveedor_real: Proveedor, *, escenario_id: str, indice: int,
     chat_id: int | None = None, cliente_jev: Any | None = None,
     aclaracion_esperada: dict | None = None, toques: list[dict] | None = None,
+    mensajes_tras_toques: list[str] | None = None,
 ) -> ResultadoCorrida:
     """Corre un escenario por `gateway.procesar_update`, con
     `proveedor_real` envuelto en `ProveedorGrabador` e inyectado en lugar de
@@ -747,6 +748,16 @@ def ejecutar_escenario(
     levanta `LookupError` -- capturado más abajo como el resto de las fallas
     de infraestructura del escenario: la corrida queda `bloqueado`, nunca
     inventa un toque.
+
+    `mensajes_tras_toques` (T9-R1a-2, ADR 0013 regla 1): mensajes de texto
+    que se mandan después de los toques y antes del Confirmar automático --
+    el corredor no tenía un paso de texto libre entre dos toques, y sin él no
+    se puede contestar la pregunta que abre un toque ("Ya la terminé" pide la
+    evidencia). Como esa pregunta ya salió antes, la respuesta visible que
+    queda en `ResultadoCorrida.respuesta_texto` (y con ella `ofrecio_opciones`)
+    es sólo la de estos mensajes y lo que sigue: así "se volvió a preguntar" o
+    "no hay vista previa" se pueden comprobar sin confundirlo con la pregunta
+    original.
 
     Un fallo durante el procesamiento (por ejemplo, infraestructura del
     escenario mal declarada) deja la corrida `bloqueado`, con el motivo, en
@@ -873,6 +884,18 @@ def ejecutar_escenario(
                 _, objetivo = _resolver_toque_generico(
                     cur, workspace_id, chat, toque, desde_corrida)
             _tocar_opcion(conn, slug, chat, tg_id, objetivo["token"])
+
+        if mensajes_tras_toques:
+            # Lo que ya salió (la lista, el menú, la pregunta abierta) queda
+            # fuera de la respuesta que se evalúa.
+            with admin(conn) as cur:
+                cur.execute("select id from message_outbox where workspace_id = %s",
+                            (workspace_id,))
+                ids_previos |= {f["id"] for f in cur.fetchall()}
+            for texto in mensajes_tras_toques:
+                update = {"message": {"message_id": 1, "text": texto,
+                                      "chat": {"id": chat}, "from": {"id": tg_id}}}
+                gateway.procesar_update(conn, slug, update)
 
         # El turno pudo haber dejado una propuesta de una herramienta que
         # escribe esperando un Confirmar (T1/T2, ADR 0005 decisión 1): el

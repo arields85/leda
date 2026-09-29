@@ -75,6 +75,13 @@ class Escenario:
     # por defecto para todo escenario) -- para un escenario legado que
     # necesite seguir pasando con una pregunta en texto abierto sin botones.
     permite_pregunta_sin_opciones: bool = False
+    # Mensajes de texto que se mandan DESPUÉS de los toques y antes del
+    # Confirmar automático (T9-R1a-2, ADR 0013 regla 1): sirven para contestar
+    # la pregunta que abrió un toque (p. ej. "Ya la terminé" pide la
+    # evidencia). La respuesta visible que se evalúa es la de estos mensajes
+    # y lo que sigue, no la de la pregunta que ya estaba abierta
+    # (`corrida.ejecutar_escenario`).
+    mensajes_tras_toques: tuple[str, ...] = ()
 
 
 def _validar_estructura(datos: dict, origen: pathlib.Path) -> None:
@@ -154,6 +161,13 @@ def _validar_estructura(datos: dict, origen: pathlib.Path) -> None:
                 raise EscenarioInvalido(
                     f"{origen}: 'toques[{i}].indice' tiene que ser un entero >= 0.")
 
+    tras_toques = datos.get("mensajes_tras_toques", [])
+    if (not isinstance(tras_toques, list)
+            or not all(isinstance(m, str) and m.strip() for m in tras_toques)):
+        raise EscenarioInvalido(
+            f"{origen}: 'mensajes_tras_toques' tiene que ser una lista de texto "
+            "no vacío.")
+
     aclaracion_esperada = datos.get("aclaracion_esperada", {})
     if not isinstance(aclaracion_esperada, dict):
         raise EscenarioInvalido(f"{origen}: 'aclaracion_esperada' tiene que ser un mapeo.")
@@ -199,6 +213,7 @@ def cargar_escenario(ruta: pathlib.Path | str) -> Escenario:
         aclaracion_esperada=datos.get("aclaracion_esperada", {}) or {},
         toques=tuple(datos.get("toques", []) or []),
         permite_pregunta_sin_opciones=bool(datos.get("permite_pregunta_sin_opciones", False)),
+        mensajes_tras_toques=tuple(datos.get("mensajes_tras_toques", []) or []),
     )
 
 

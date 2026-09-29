@@ -64,7 +64,8 @@ def test_replay_reproduce_el_resultado_esperado(archivo_replay, corework, conn):
         conn, ws, "corework", escenario.actor, escenario.mensajes, guionado,
         escenario_id=escenario.id, indice=0, cliente_jev=jev_guionado,
         aclaracion_esperada=escenario.aclaracion_esperada or None,
-        toques=list(escenario.toques) or None)
+        toques=list(escenario.toques) or None,
+        mensajes_tras_toques=list(escenario.mensajes_tras_toques) or None)
 
     assert not resultado.bloqueado, resultado.motivo_bloqueo
 

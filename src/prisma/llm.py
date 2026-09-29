@@ -346,6 +346,10 @@ def _tiempos(parametros: dict) -> tuple[float, int]:
             or not math.isfinite(timeout) or timeout <= 0):
         raise ValueError(
             f"timeout_s debe ser un número de segundos mayor que 0; vino {timeout!r}.")
+    # Un JSON escrito `2.0` es un entero lógico: se acepta y se normaliza.
+    if (isinstance(reintentos, float) and math.isfinite(reintentos)
+            and reintentos.is_integer()):
+        reintentos = int(reintentos)
     if (isinstance(reintentos, bool) or not isinstance(reintentos, int)
             or reintentos < 0):
         raise ValueError(

@@ -69,6 +69,15 @@ SENTINEL_OPCIONES_MODELO = "_opciones_modelo"
 # `reclamar_modificacion_abierta`, sin botones).
 SENTINEL_MENU_TAREA = "_menu_tarea"
 SENTINEL_DATO_MENU_TAREA = "_dato_menu_tarea"
+# `SENTINEL_RESPUESTA_DATO_MENU` (T9-R1a-2, ADR 0013 regla 1) son los botones
+# de un solo uso que acompañan a una pregunta de un dato del menú que sigue
+# abierta: "¿Esto es <el dato>?" con "Sí, es eso" / "No, es otra cosa"
+# (comando `dudoso`), y el retome "¿Seguimos con <el dato>?" con "Dejarlo"
+# (después de `otro_tema`). No es una herramienta real: `_toque` la
+# intercepta. `campo="eleccion"` devuelve el botón tocado en `args["eleccion"]`
+# (`si`, `no` o `dejar`); `args` guarda el id de la pregunta abierta, sus
+# propios `args` (`dato`) y, para `si`/`no`, el texto original de la persona.
+SENTINEL_RESPUESTA_DATO_MENU = "_respuesta_dato_menu"
 # Marca en `args` del aviso de entrega al aprobador (ADR 0009), que comparte
 # `SENTINEL_MENU_TAREA` con el menú general de la tarea: es lo que permite
 # retirarlo sin tocar ese menú (`retirar_avisos_de_entrega`).

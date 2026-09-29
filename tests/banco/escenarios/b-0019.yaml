@@ -1,0 +1,48 @@
+id: b-0019
+objetivo: >
+  Una pregunta pendiente es contexto, no una trampa (ADR 0013 regla 1, T9-R1a;
+  hallazgo R3-H17): con la pregunta de la evidencia abierta después de "Ya la
+  terminé", un saludo NO es la evidencia. No se registra evidencia ni se
+  arma una vista previa de entrega con el saludo, y la pregunta le vuelve a
+  quedar delante a la persona. Los dos toques abren la pregunta (los simula
+  el corredor); el mensaje que se evalúa es el que llega después
+  (`mensajes_tras_toques`).
+actor: Marcos Tarquini
+mensajes:
+  - "pasame la lista completa de mis tareas"
+precondiciones:
+  tareas:
+    - id: t1
+      titulo: Programar HMI línea 2 (simulado)
+      area: ot
+      responsable: Marcos Tarquini
+toques:
+  - indice: 0
+  - etiqueta: "Ya la terminé"
+mensajes_tras_toques:
+  - "hola"
+herramientas_prohibidas:
+  - actualizar_estado
+  - adjuntar_evidencia
+  - registrar_bloqueo
+  - resolver_bloqueo
+  - crear_dependencia
+  - aprobar_tarea
+efectos:
+  tareas:
+    t1:
+      estado: asignada
+  conteos_delta:
+    task: 0
+    task_state_event: 0
+    evidence: 0
+    approval: 0
+# La pregunta vuelve a quedar delante de la persona. El fragmento es de la
+# pregunta actual (`gateway.PREGUNTA_DATO_EVIDENCIA_ENTREGA`): si T10 cambia su
+# redacción, actualizar acá.
+respuesta_menciona:
+  - "link"
+# El dato pendiente se pide en texto libre a propósito (no hay opciones que
+# ofrecer): se exime la comprobación de ADR 0007 sobre preguntas sin botones.
+permite_pregunta_sin_opciones: true
+severidad: alta

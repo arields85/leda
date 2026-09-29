@@ -1383,3 +1383,79 @@ def test_ejecutar_escenario_toque_sin_ninguna_pendiente_queda_bloqueado(corework
 
     assert r.bloqueado is True
     assert "no hay ninguna acción pendiente" in r.motivo_bloqueo
+
+
+# ---------------------------------------------------------------------------
+# ejecutar_escenario con `mensajes_tras_toques` (T9-R1a-2): el corredor puede
+# contestar, con texto libre, la pregunta que abrió un toque. La respuesta
+# visible que se evalúa es la de esos mensajes (y la del Confirmar que siga),
+# no la de la pregunta que ya estaba abierta.
+# ---------------------------------------------------------------------------
+
+
+def _sembrar_evidencia_pedida(conn, ws) -> str:
+    with admin(conn) as cur:
+        return sembrar_precondiciones(cur, ws, {
+            "tareas": [{"id": "t1", "titulo": "Programar PLC (simulado)",
+                       "area": "ot", "responsable": "Marcos Tarquini"}],
+        })["t1"]
+
+
+def _interno_con_pregunta_abierta(rutas_pendiente):
+    return ProveedorGuionado(
+        guion=[
+            Respuesta(llamadas=[Llamada("c1", "consultar_tareas", {})]),
+            Respuesta(texto="Tenés una tarea pendiente."),
+        ],
+        rutas=[IntentRoute(IntentAction.NORMAL_CONVERSATION), *rutas_pendiente],
+    )
+
+
+def test_ejecutar_escenario_mensaje_tras_toques_un_saludo_no_es_la_evidencia(
+        corework, conn):
+    ws = corework.workspace_id
+    tid = _sembrar_evidencia_pedida(conn, ws)
+    interno = _interno_con_pregunta_abierta([
+        IntentRoute(IntentAction.NORMAL_CONVERSATION,
+                    respecto_pendiente=RespectoPendiente.CHARLA)])
+
+    r = ejecutar_escenario(
+        conn, ws, "corework", "Marcos Tarquini", ["pasame mis tareas"], interno,
+        escenario_id="b-test-tras-toques", indice=0,
+        toques=[{"indice": 0}, {"etiqueta": "Ya la terminé"}],
+        mensajes_tras_toques=["hola"])
+
+    assert r.bloqueado is False, r.motivo_bloqueo
+    # Sólo la respuesta al saludo: ni la lista ni la primera pregunta.
+    assert "Tenés una tarea pendiente." not in r.respuesta_texto
+    assert r.respuesta_texto.count("pasame un link") == 1
+    assert r.conteos_antes_del_toque is None          # ninguna vista previa
+    assert r.conteos_despues["evidence"] == r.conteos_antes["evidence"]
+    with admin(conn) as cur:
+        cur.execute("select estado from task where id = %s", (tid,))
+        assert cur.fetchone()["estado"] == "asignada"
+
+
+def test_ejecutar_escenario_mensaje_tras_toques_un_link_llega_a_la_vista_previa(
+        corework, conn):
+    ws = corework.workspace_id
+    tid = _sembrar_evidencia_pedida(conn, ws)
+    interno = _interno_con_pregunta_abierta([
+        IntentRoute(IntentAction.NORMAL_CONVERSATION,
+                    respecto_pendiente=RespectoPendiente.RESPONDE)])
+
+    r = ejecutar_escenario(
+        conn, ws, "corework", "Marcos Tarquini", ["pasame mis tareas"], interno,
+        escenario_id="b-test-tras-toques-link", indice=0,
+        toques=[{"indice": 0}, {"etiqueta": "Ya la terminé"}],
+        mensajes_tras_toques=["https://ejemplo.com/pr/12"])
+
+    assert r.bloqueado is False, r.motivo_bloqueo
+    assert "https://ejemplo.com/pr/12" in r.respuesta_texto
+    # Nada se aplicó antes del Confirmar automático.
+    assert r.herramientas_antes_del_toque == ("consultar_tareas",)
+    assert r.conteos_antes_del_toque is not None
+    assert r.conteos_antes_del_toque["evidence"] == r.conteos_antes["evidence"]
+    with admin(conn) as cur:
+        cur.execute("select estado from task where id = %s", (tid,))
+        assert cur.fetchone()["estado"] == "en_revision"

@@ -403,3 +403,30 @@ def test_toques_indice_no_es_entero_es_invalido(tmp_path):
     ruta = _escribir(tmp_path, datos)
     with pytest.raises(EscenarioInvalido):
         cargar_escenario(ruta)
+
+
+# ---------------------------------------------------------------------------
+# mensajes_tras_toques (T9-R1a-2): mensajes de texto que se mandan DESPUÉS de
+# los toques -- para responder, por ejemplo, la pregunta que abrió un toque
+# ("Ya la terminé" pide la evidencia) -- antes del Confirmar automático.
+# ---------------------------------------------------------------------------
+
+
+def test_carga_sin_mensajes_tras_toques_usa_la_tupla_vacia(tmp_path):
+    e = cargar_escenario(_escribir(tmp_path, _MINIMO))
+    assert e.mensajes_tras_toques == ()
+
+
+def test_carga_mensajes_tras_toques(tmp_path):
+    datos = dict(_MINIMO)
+    datos["mensajes_tras_toques"] = ["hola", "gracias!"]
+    e = cargar_escenario(_escribir(tmp_path, datos))
+    assert e.mensajes_tras_toques == ("hola", "gracias!")
+
+
+@pytest.mark.parametrize("invalido", ["hola", ["hola", ""], ["  "], [1], {"a": 1}])
+def test_mensajes_tras_toques_invalidos(tmp_path, invalido):
+    datos = dict(_MINIMO)
+    datos["mensajes_tras_toques"] = invalido
+    with pytest.raises(EscenarioInvalido):
+        cargar_escenario(_escribir(tmp_path, datos))

@@ -182,3 +182,21 @@ def test_parametros_validos_explicitos_se_aceptan():
                             {"timeout_s": 7.5, "reintentos": 0})
     assert p._c.timeout == 7.5
     assert p._c.max_retries == 0
+
+
+# Revisión review-c10ae20ecdf4cfa0: un JSON escrito `2.0` es un entero
+# lógico; se acepta y se normaliza a int. `2.5` sigue siendo inválido.
+@pytest.mark.parametrize("escrito, esperado", [(2.0, 2), (0.0, 0), (3, 3)])
+def test_reintentos_entero_escrito_como_flotante_se_acepta(escrito, esperado):
+    _timeout, reintentos = llm._tiempos({"reintentos": escrito})
+    assert reintentos == esperado
+    assert isinstance(reintentos, int)
+    assert ProveedorAnthropic(
+        "m", "sk-test", {"reintentos": escrito})._c.max_retries == esperado
+
+
+@pytest.mark.parametrize("invalido", [2.5, -1.0, float("nan"), float("inf"), "2", True])
+def test_reintentos_flotante_no_entero_sigue_invalido(invalido):
+    with pytest.raises(ValueError) as exc:
+        llm._tiempos({"reintentos": invalido})
+    assert "reintentos" in str(exc.value)

@@ -1,0 +1,38 @@
+id: b-0019-c
+variante_de: b-0019
+objetivo: >
+  Variante de b-0019: con la pregunta de la evidencia abierta, la persona
+  pide otra cosa ("¿qué tareas tengo?"). Ese pedido no es la evidencia: se
+  atiende por el camino normal sin registrar evidencia ni armar una vista
+  previa de entrega con esa frase, y la pregunta original sigue abierta.
+actor: Marcos Tarquini
+mensajes:
+  - "pasame la lista completa de mis tareas"
+precondiciones:
+  tareas:
+    - id: t1
+      titulo: Programar HMI línea 2 (simulado)
+      area: ot
+      responsable: Marcos Tarquini
+toques:
+  - indice: 0
+  - etiqueta: "Ya la terminé"
+mensajes_tras_toques:
+  - "¿qué tareas tengo?"
+herramientas_prohibidas:
+  - actualizar_estado
+  - adjuntar_evidencia
+  - registrar_bloqueo
+  - resolver_bloqueo
+  - crear_dependencia
+  - aprobar_tarea
+efectos:
+  tareas:
+    t1:
+      estado: asignada
+  conteos_delta:
+    task: 0
+    task_state_event: 0
+    evidence: 0
+    approval: 0
+severidad: alta
