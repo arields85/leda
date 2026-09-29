@@ -582,6 +582,16 @@ create table message_outbox (
   -- el final de `cuerpo`. El transporte lo marca como bloque (entidad `pre`) y,
   -- si entra en 256 unidades UTF-16, agrega el botón de copiar.
   bloque_copiable         text,
+  -- T9-R2 (migración 0021): el mensaje entrante al que responde esta salida. Se
+  -- llena sola con la configuración local `prisma.entrante_id` que deja el gateway
+  -- al procesar un mensaje; nula fuera de uno (toque, cadencia, escalera). La
+  -- clave foránea se declara más abajo, con las demás de la tabla.
+  entrante_id             uuid
+    default nullif(current_setting('prisma.entrante_id', true), '')::uuid,
+  -- T9-R2: la respuesta a la que pertenece la fila cuando una respuesta se
+  -- encola en varias llamadas (texto en partes y mensaje con botones). Nula: la
+  -- fila es su propia respuesta.
+  respuesta_grupo         text,
   requiere_confirmacion   boolean not null default false,
   confirmado_por          uuid references app_user(id),
   confirmado_en           timestamptz,
@@ -854,6 +864,18 @@ alter table message_outbox
     foreign key (workspace_id, intake_choice_set_id)
     references task_intake_choice_set(workspace_id, id)
     on delete set null (intake_choice_set_id);
+
+-- T9-R2: si la retención borra el mensaje entrante, la salida queda. Sobre la
+-- clave primaria y no compuesta con el espacio, como las demás: la compuesta
+-- dependería de la restricción única de la 0002 y volver atrás la 0002 dejaría de
+-- ser posible. El valor lo pone el gateway con un mensaje del mismo espacio.
+alter table message_outbox
+  add constraint message_outbox_entrante
+    foreign key (entrante_id) references inbound_message(id)
+    on delete set null;
+
+create index outbox_por_entrante on message_outbox (entrante_id)
+  where entrante_id is not null;
 
 -- Resolver es una sola llamada a propósito: dos toques al mismo botón compiten
 -- por la misma fila y sólo uno la mueve de 'esperando'. Si esto se hiciera con

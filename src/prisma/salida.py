@@ -525,8 +525,13 @@ def enqueue_outbox(cur, *, workspace_id: str, chat_id: int,
                    intake_choice_set_id: str | None = None,
                    allow_split: bool = False,
                    es_bienvenida: bool = False,
-                   bloque_copiable: str | None = None) -> int:
-    """Encola un mensaje visible. `bloque_copiable` (T9-R1c-3) es lo que la
+                   bloque_copiable: str | None = None,
+                   grupo_respuesta: str | None = None) -> int:
+    """Encola un mensaje visible. `grupo_respuesta` (T9-R2) nombra la respuesta
+    de la que esta fila es una parte cuando una respuesta se encola en varias
+    llamadas (el texto y aparte el mensaje con los botones): el control de "una
+    respuesta por mensaje" cuenta un grupo como UNA respuesta. Sin él, cada
+    llamada es su propia respuesta. `bloque_copiable` (T9-R1c-3) es lo que la
     persona había escrito, para que lo copie con un toque: el final del texto
     (`entidad_de_bloque`), que el transporte marca como bloque y, si entra en
     `COPY_TEXT_LIMIT`, también sale con el botón de copiar. Un mensaje con
@@ -571,16 +576,16 @@ def enqueue_outbox(cur, *, workspace_id: str, chat_id: int,
                  (workspace_id, chat_id, destinatario_membership_id, tipo, cuerpo,
                   estado, programado_para, vence_en, dedupe_key, es_respuesta,
                   pending_action_id, intake_choice_set_id, es_bienvenida,
-                  bloque_copiable)
+                  bloque_copiable, respuesta_grupo)
                values (%s, %s, %s, %s, %s, %s,
                        coalesce(%s, now()) + %s * interval '1 microsecond',
-                       %s, %s, %s, %s, %s, %s, %s)
+                       %s, %s, %s, %s, %s, %s, %s, %s)
                on conflict (dedupe_key) do nothing""",
             (workspace_id, chat_id, recipient_membership_id, message_type,
              payload.text, state, scheduled_for, index,
              expires_at, payload.dedupe_key,
              is_response, pending_action_id, intake_choice_set_id, es_bienvenida,
-             bloque_copiable),
+             bloque_copiable, grupo_respuesta),
         )
         inserted += cur.rowcount
     return inserted

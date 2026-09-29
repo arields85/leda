@@ -52,6 +52,18 @@ def espacio(conn: psycopg.Connection, workspace_id: str) -> Iterator[psycopg.Cur
             yield cur
 
 
+def atar_al_entrante(cur: psycopg.Cursor, entrante_id: str | None) -> None:
+    """Todo lo que esta transacción encole en `message_outbox` queda atado al
+    mensaje entrante `entrante_id` (T9-R2, migración 0021): el valor por
+    omisión de `entrante_id` lee esta configuración local, así que el control de
+    "una respuesta por mensaje" ve lo encolado para ese mensaje sin que cada
+    `insert` lo pase, incluso los de las funciones de la base. Local a la
+    transacción: se va con el commit o el rollback."""
+    if entrante_id:
+        cur.execute("select set_config('prisma.entrante_id', %s, true)",
+                    (str(entrante_id),))
+
+
 @contextlib.contextmanager
 def admin(conn: psycopg.Connection) -> Iterator[psycopg.Cursor]:
     """Transacción de administración: ve todos los espacios.

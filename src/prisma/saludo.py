@@ -146,6 +146,16 @@ def verificar_migraciones(cur: psycopg.Cursor) -> str | None:
                 and column_name = 'bloque_copiable') as ok""")
     if not cur.fetchone()["ok"]:
         return "0020_bloque_copiable.sql"
+    # Y con `message_outbox.entrante_id` (migración 0021, T9-R2): el control de una
+    # respuesta por mensaje la consulta, y el valor por omisión de la columna lee
+    # la configuración que deja el gateway en cada mensaje.
+    cur.execute(
+        """select exists (
+             select 1 from information_schema.columns
+              where table_schema = 'prisma' and table_name = 'message_outbox'
+                and column_name = 'entrante_id') as ok""")
+    if not cur.fetchone()["ok"]:
+        return "0021_respuesta_atada_al_mensaje.sql"
     return None
 
 

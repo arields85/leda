@@ -784,11 +784,13 @@ def _encolar_texto_con_opciones(cur, quien: Solicitante, chat_id: int,
         return
 
     dedupe_key_texto = f"{quien.workspace_id}:{dedupe_prefijo}:{p.id}:texto"
+    # El texto en partes y el mensaje con los botones son UNA respuesta (T9-R2).
+    grupo = f"{quien.workspace_id}:{dedupe_prefijo}:{p.id}"
     enqueue_outbox(
         cur, workspace_id=quien.workspace_id, chat_id=chat_id, text=texto,
         recipient_membership_id=quien.membership_id, scheduled_for=ahora,
         dedupe_key=dedupe_key_texto,
-        is_response=True, allow_split=True,
+        is_response=True, allow_split=True, grupo_respuesta=grupo,
     )
     # `enqueue_outbox` programa cada parte del texto en `ahora +
     # microsegundos(índice)` (0, 1, 2...) para que queden en orden estricto
@@ -811,7 +813,7 @@ def _encolar_texto_con_opciones(cur, quien: Solicitante, chat_id: int,
         recipient_membership_id=quien.membership_id, text=p.resumen,
         scheduled_for=ahora + timedelta(microseconds=len(partes)),
         dedupe_key=f"{quien.workspace_id}:{dedupe_prefijo}:{p.id}:botones",
-        is_response=True, pending_action_id=p.id,
+        is_response=True, pending_action_id=p.id, grupo_respuesta=grupo,
     )
 
 

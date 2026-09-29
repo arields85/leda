@@ -22,8 +22,8 @@ from fastapi.responses import HTMLResponse
 from .autoridad import (Canal, Denegado, identificar, identificar_en_espacio)
 from .calendario import Calendario
 from .config import config
-from .db import (admin, autoridad, conectar, conectar_autoridad, espacio,
-                 registrar_auditoria)
+from .db import (admin, atar_al_entrante, autoridad, conectar,
+                 conectar_autoridad, espacio, registrar_auditoria)
 from .despachador import (TransporteTelegram, acusar_toque, despachar,
                           mantener_chat_activo, pedido_telegram,
                           texto_error_seguro)
@@ -31,6 +31,7 @@ from .incidentes import (REFERENCIA_INBOUND_MESSAGE, REFERENCIA_PENDING_ACTION,
                          registrar_incidente)
 from .ingreso_tareas import (QUESTION_CHOICE, QUESTION_CONFIRMATION,
                              QUESTION_FREE_TEXT)
+from .respuesta_unica import controlar as controlar_una_respuesta
 from .salida import TRUNCAR_ETIQUETA_BOTON as TRUNCAR_TITULO_BOTON
 from .salida import (ETIQUETA_CANCELAR, ETIQUETA_CONFIRMAR, ICONO_CANCELAR,
                      ICONO_CONFIRMAR, ICONO_OTRA_OPCION, ICONO_TAREA,
@@ -336,7 +337,10 @@ def procesar_update(conn, slug: str, update: dict,
     if not mensaje and not toque:
         return {"ok": True}
 
-    texto = mensaje.get("text", "") if mensaje else ""
+    # El epígrafe de una foto o un archivo se procesa como el texto del mensaje
+    # (T9-R2, H15, ADR 0013 regla 2); `adjunto` dice de qué tipo es lo que vino.
+    adjunto = _tipo_de_adjunto(mensaje) if mensaje else None
+    texto = (mensaje.get("text") or mensaje.get("caption") or "") if mensaje else ""
     chat_id = mensaje["chat"]["id"] if mensaje else None
     chat_type = mensaje.get("chat", {}).get("type") if mensaje else None
     tg_user = (mensaje or toque).get("from", {}).get("id")
@@ -393,8 +397,13 @@ def procesar_update(conn, slug: str, update: dict,
             return {"ok": True}
         return resultado
 
+    # Un mensaje que no es de una persona (un aviso del servicio, como el cambio
+    # de título del grupo) no trae texto ni adjunto: no hay nada que responder.
+    if not texto.strip() and adjunto is None:
+        return {"ok": True}
+
     # /start va antes de identificar: quien lo manda todavía no está vinculado.
-    if texto.startswith("/start"):
+    if adjunto is None and texto.startswith("/start"):
         try:
             return _activacion(conn, workspace_id, texto, tg_user, chat_id)
         except Exception as e:  # noqa: BLE001
@@ -432,7 +441,8 @@ def procesar_update(conn, slug: str, update: dict,
             registrar_auditoria(
                 cur, accion="mensaje_recibido", workspace_id=workspace_id,
                 actor_app_user_id=quien.app_user_id, actor_kind="persona",
-                detalle={"chat_id": chat_id})
+                detalle={"chat_id": chat_id,
+                         **({"adjunto": adjunto} if adjunto else {})})
         conn.commit()
     except Exception as e:  # noqa: BLE001
         conn.rollback()
@@ -445,10 +455,12 @@ def procesar_update(conn, slug: str, update: dict,
     # perder el recibo de la fase 1.
     try:
         with espacio(conn, workspace_id) as cur:
+            # Todo lo que se encole de acá hasta el commit responde a este
+            # mensaje (T9-R2): el control de una respuesta por mensaje lo ve.
+            atar_al_entrante(cur, entrante_id)
             handled_intake_text = False
             privado = chat_type == "private"
             if texto.strip() and privado:
-                from datetime import datetime, timezone
                 from .ingreso_tareas import handle_active_text, open_intake_question
 
                 # Una pregunta abierta del alta (un campo de texto libre, una
@@ -468,6 +480,21 @@ def procesar_update(conn, slug: str, update: dict,
                     _turno(cur, quien, texto, workspace_id, chat_id, entrante_id,
                            alta_privada=privado)
 
+            # Control estructural (T9-R2, ADR 0013 regla 2): un mensaje, una
+            # respuesta visible, sea cual sea el camino que la encoló.
+            ahora = datetime.now(timezone.utc)
+            if not texto.strip():
+                # Un adjunto sin epígrafe: nada que interpretar, pero la
+                # persona recibe su respuesta (H15).
+                _responder_sin_texto(cur, quien, workspace_id, chat_id,
+                                     entrante_id, ahora, alta_privada=privado)
+            controlar_una_respuesta(
+                cur, quien, workspace_id=workspace_id, chat_id=chat_id,
+                entrante_id=entrante_id, ahora=ahora,
+                aviso_neutro=NOTICIA_NEUTRA_INCIDENTE,
+                nota_de_la_respuesta=(NOTA_ADJUNTO_NO_GUARDADO
+                                      if adjunto and texto.strip() else None))
+
         conn.commit()
     except Exception as e:  # noqa: BLE001
         # Red de contención final (decisión del usuario, 2026-09-25):
@@ -485,6 +512,39 @@ def procesar_update(conn, slug: str, update: dict,
     # La respuesta sale por la cola, no por acá: Telegram espera un ACK rápido
     # y así el envío conserva idempotencia y auditoría.
     return {"ok": True}
+
+
+# Lo que trae un mensaje de una persona además del texto (Bot API: los campos de
+# `Message` con contenido). Los avisos del servicio (cambio de título, alguien
+# que entra al grupo) no están: no son de una persona.
+_ADJUNTOS = ("photo", "document", "audio", "voice", "video", "video_note",
+             "animation", "sticker", "contact", "location", "venue", "poll",
+             "dice")
+
+# Pendiente de revisión de voz (T10).
+AVISO_SIN_ADJUNTOS = ("Todavía no puedo recibir fotos, archivos ni audios. "
+                      "Mandame el texto o un link.")
+NOTA_ADJUNTO_NO_GUARDADO = ("Todavía no guardo adjuntos: tomé sólo el texto que "
+                            "lo acompañaba.")
+
+
+def _tipo_de_adjunto(mensaje: dict) -> str | None:
+    """Qué adjunto trae el mensaje (foto, archivo, audio, ...), o `None`."""
+    return next((tipo for tipo in _ADJUNTOS if mensaje.get(tipo)), None)
+
+
+def _responder_sin_texto(cur, quien, workspace_id: str, chat_id: int,
+                         entrante_id: str, ahora, *, alta_privada: bool) -> None:
+    """Un adjunto sin epígrafe (T9-R2, H15): una sola respuesta que dice que
+    todavía no se reciben y pide el texto o un link. Si hay una pregunta abierta
+    (una sola rama, ADR 0013 regla 1), la respuesta la vuelve a hacer: el mismo
+    manejo que `no puedo`, sin llamar al modelo."""
+    abierta = _ver_pregunta_abierta(cur, quien, chat_id, ahora, alta=alta_privada)
+    if abierta is None:
+        _responder(cur, workspace_id, chat_id, quien, AVISO_SIN_ADJUNTOS, ahora)
+        return
+    _repreguntar(cur, quien, workspace_id, chat_id, abierta, _pregunta_de(abierta),
+                 ahora, entrante_id, prefijo=f"{AVISO_SIN_ADJUNTOS} ")
 
 
 def _membership_activa(cur, workspace_id: str, tg_user: int) -> dict | None:
@@ -941,15 +1001,18 @@ def _resolver_toque_borrador(conn, authority_conn, workspace_id, token,
 
 
 def _responder(cur, workspace_id: str, chat_id: int, quien, texto: str,
-               ahora, bloque: str | None = None) -> None:
+               ahora, bloque: str | None = None, *,
+               grupo: str | None = None) -> None:
     """La respuesta al toque sale por la cola, como cualquier otra. Con `bloque`
     (lo que la persona tenía, para copiarlo con un toque) el texto termina en él
-    y no se parte."""
+    y no se parte. Con `grupo`, es una parte de una respuesta que se encola en
+    varias llamadas (`enqueue_outbox`, `grupo_respuesta`)."""
     enqueue_outbox(
         cur, workspace_id=workspace_id, chat_id=chat_id, text=texto,
         recipient_membership_id=quien.membership_id, scheduled_for=ahora,
         dedupe_key=f"{workspace_id}:toque:{quien.app_user_id}:{ahora.timestamp()}",
         is_response=True, allow_split=bloque is None, bloque_copiable=bloque,
+        grupo_respuesta=grupo,
     )
 
 
@@ -1531,10 +1594,13 @@ def _mostrar_pregunta_con_botones(cur, quien, workspace_id: str, chat_id: int,
                    ahora)
         return
     texto = f"{prefijo}\n\n{abierta.resumen}" if prefijo else abierta.resumen
+    # Las partes de esta respuesta comparten grupo (T9-R2): son UNA respuesta.
+    grupo = (f"{workspace_id}:vista-previa:{abierta.pregunta_id}:"
+             f"{entrante_id or ahora.timestamp()}")
     if prefijo and not cabe_en_mensaje(texto, has_buttons=True):
         # Dos milisegundos antes, para que salga delante de la vista previa.
         _responder(cur, workspace_id, chat_id, quien, prefijo,
-                   ahora - timedelta(milliseconds=2))
+                   ahora - timedelta(milliseconds=2), grupo=grupo)
         texto = abierta.resumen
     if not cabe_en_mensaje(texto, has_buttons=True):
         # Lo guardado entró con sus botones sin el margen del saludo diario y
@@ -1543,7 +1609,7 @@ def _mostrar_pregunta_con_botones(cur, quien, workspace_id: str, chat_id: int,
         # partes, y la pregunta sigue con un texto corto y sus mismos botones.
         # Nunca falla ni sale sin lo que la persona espera.
         _responder(cur, workspace_id, chat_id, quien, texto,
-                   ahora - timedelta(milliseconds=1))
+                   ahora - timedelta(milliseconds=1), grupo=grupo)
         texto = _TEXTO_BOTONES_GENERICO
     enqueue_outbox(
         cur, workspace_id=workspace_id, chat_id=chat_id,
@@ -1551,7 +1617,8 @@ def _mostrar_pregunta_con_botones(cur, quien, workspace_id: str, chat_id: int,
         scheduled_for=ahora,
         dedupe_key=(f"{workspace_id}:vista-previa:{abierta.pregunta_id}:"
                     f"{entrante_id or ahora.timestamp()}"),
-        is_response=True, pending_action_id=abierta.pregunta_id)
+        is_response=True, pending_action_id=abierta.pregunta_id,
+        grupo_respuesta=grupo)
 
 
 def _ver_pregunta_abierta(cur, quien, chat_id: int, ahora, *, alta: bool):
@@ -3464,6 +3531,9 @@ def reportar_incidente_no_manejado(conn, *, workspace_id: str | None,
                                   "en el espacio.")
                 else:
                     app_user_id = quien.app_user_id
+                    # El aviso es la respuesta al mensaje que falló (T9-R2).
+                    if referencia_tipo == REFERENCIA_INBOUND_MESSAGE:
+                        atar_al_entrante(cur, referencia_id)
                     enqueue_outbox(
                         cur, workspace_id=workspace_id, chat_id=chat_id,
                         recipient_membership_id=quien.membership_id,
