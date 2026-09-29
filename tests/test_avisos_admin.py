@@ -159,7 +159,7 @@ def test_excepcion_no_manejada_en_un_turno_avisa_a_cada_administrador_vinculado(
         _administrador(cur, "Admin Sin Vincular", 611003)  # nunca le escribió al bot
     conn.commit()
 
-    def _explota(cur, quien, texto, workspace_id, chat_id, entrante_id=None):
+    def _explota(cur, quien, texto, workspace_id, chat_id, entrante_id=None, **_):
         raise RuntimeError("falla inesperada de prueba")
 
     monkeypatch.setattr(gateway, "_turno", _explota)
@@ -232,7 +232,7 @@ def test_el_aviso_nunca_lleva_referencia_cruda_ni_algo_parecido_a_un_secreto(
 
     secreto = "postgresql://prisma_app:s3cr3t-p4ss@db.interno:5432/prisma"
 
-    def _explota(cur, quien, texto, workspace_id, chat_id, entrante_id=None):
+    def _explota(cur, quien, texto, workspace_id, chat_id, entrante_id=None, **_):
         raise RuntimeError(f"no se pudo conectar: {secreto}")
 
     monkeypatch.setattr(gateway, "_turno", _explota)
@@ -351,7 +351,7 @@ def test_cada_aviso_admin_deja_un_acceso_a_conversacion_en_audit_log(
         _administrador(cur, "Admin Auditado Dos", 613002, chat_id=613002)
     conn.commit()
 
-    def _explota(cur, quien, texto, workspace_id, chat_id, entrante_id=None):
+    def _explota(cur, quien, texto, workspace_id, chat_id, entrante_id=None, **_):
         raise RuntimeError("falla inesperada de prueba")
 
     monkeypatch.setattr(gateway, "_turno", _explota)

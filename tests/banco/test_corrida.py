@@ -1519,3 +1519,72 @@ def test_ejecutar_escenario_modificar_tocado_un_saludo_no_es_la_correccion(
     assert r.conteos_antes_del_toque is None             # ninguna vista previa nueva
     assert r.herramientas_ejecutadas == []               # nada se aplicó
     assert r.conteos_despues["blocker"] == r.conteos_antes["blocker"]
+
+
+# ---------------------------------------------------------------------------
+# La familia del alta guiada (T9-R1c-1, ADR 0013 regla 1): el corredor tiene
+# que poder llegar a la pregunta de texto libre del alta -- tocando las
+# opciones del alta, que no son filas de `pending_action` -- y mandar los
+# mensajes como los de un chat privado, como Telegram.
+# ---------------------------------------------------------------------------
+
+
+def _interno_con_alta(rutas_pendiente):
+    return ProveedorGuionado(
+        guion=[],
+        rutas=[IntentRoute(IntentAction.START_TASK_INTAKE), *rutas_pendiente])
+
+
+def _sembrar_objetivo_para_el_alta(conn, ws):
+    with admin(conn) as cur:
+        sembrar_precondiciones(cur, ws, {
+            "tareas": [{"id": "t1", "titulo": "Cablear tablero (simulado)",
+                        "area": "ot", "responsable": "Marcos Tarquini"}]})
+
+
+def test_resolver_toque_generico_alcanza_las_opciones_del_alta(corework, conn):
+    from prisma import ingreso_tareas as I
+
+    ws = corework.workspace_id
+    _sembrar_objetivo_para_el_alta(conn, ws)
+    with espacio(conn, ws) as cur:
+        quien, tg = _quien(cur, ws)
+        cur.execute(
+            """insert into inbound_message
+                 (workspace_id, telegram_message_id, chat_id, app_user_id, texto)
+               values (%s, 1, %s, %s, 'armame una tarea') returning id""",
+            (ws, tg, quien.app_user_id))
+        I.start(cur, quien, chat_id=tg, source_inbound_id=str(cur.fetchone()["id"]),
+                source_raw_text="armame una tarea", proposals={},
+                now=datetime.now(timezone.utc), buttons_first=True)
+
+        origen, opcion = _resolver_toque_generico(cur, ws, tg, {"indice": 0},
+                                                  _MUY_ANTES)
+
+    assert opcion["token"]
+    assert opcion["prefijo"] == I.CALLBACK_PREFIX
+    assert opcion["etiqueta"]                       # el objetivo sembrado
+
+
+def test_ejecutar_escenario_llega_a_la_pregunta_del_alta_y_la_interpreta(
+        corework, conn):
+    ws = corework.workspace_id
+    _sembrar_objetivo_para_el_alta(conn, ws)
+    interno = _interno_con_alta([
+        IntentRoute(IntentAction.NORMAL_CONVERSATION,
+                    respecto_pendiente=RespectoPendiente.CHARLA)])
+
+    r = ejecutar_escenario(
+        conn, ws, "corework", "Marcos Tarquini", ["armame una tarea nueva"],
+        interno, escenario_id="b-test-alta", indice=0,
+        toques=[{"indice": 0}], mensajes_tras_toques=["hola"])
+
+    assert r.bloqueado is False, r.motivo_bloqueo
+    # El mensaje llegó a la pregunta abierta del alta y no se tomó como título.
+    assert "título" in r.respuesta_texto
+    assert r.respuesta_texto.count("Escribí el título") == 1
+    assert len(interno.pendientes) == 2 and "título" in interno.pendientes[1]
+    with admin(conn) as cur:
+        cur.execute("""select estado from task_intake_field
+                        where campo = 'title'""")
+        assert cur.fetchone()["estado"] == "missing"

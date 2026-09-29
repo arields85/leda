@@ -49,6 +49,10 @@ router = APIRouter()
 # tarea, o uno de estos dos valores reservados que nunca puede ser un id
 # (los ids de tarea son UUID).
 _SENTINEL_ACLARACION = "_aclarar_referencia"
+# El campo de texto libre que espera el alta guiada de una tarea: no es una
+# fila de `pending_action` sino un `task_intake_free_text_slot`; el centinela
+# sólo nombra el tipo de pregunta abierta (`_pregunta_de`).
+_SENTINEL_ALTA_TEXTO_LIBRE = "_alta_texto_libre"
 _OPCION_NINGUNA = "__ninguna__"
 _OPCION_NUEVA = "__nueva__"
 _ETIQUETA_NINGUNA = "Ninguna, lo escribo"
@@ -109,6 +113,10 @@ AVISO_MODIFICACION_DEJADA = (
     "Listo, dejé de lado la corrección: la propuesta quedó sin aplicar.")
 AVISO_ACLARACION_DEJADA = (
     "Listo, dejé de lado la aclaración: no hice nada con tu pedido.")
+# El campo de texto libre del alta guiada de una tarea (T9-R1c-1): dejarlo
+# cancela el borrador, porque el alta no sigue sin ese dato. Redacción
+# pendiente de revisión de voz en T10.
+AVISO_ALTA_DEJADA = "Listo, dejé de lado el borrador de la tarea{titulo}."
 # Cuánto de la vista previa que se corrige le llega al ruteo como contexto.
 _LIMITE_PROPUESTA_PARA_RUTEO = 400
 
@@ -378,20 +386,25 @@ def procesar_update(conn, slug: str, update: dict,
     try:
         with espacio(conn, workspace_id) as cur:
             handled_intake_text = False
-            if texto.strip() and chat_type == "private":
+            privado = chat_type == "private"
+            if texto.strip() and privado:
                 from datetime import datetime, timezone
-                from .ingreso_tareas import handle_active_text
+                from .ingreso_tareas import handle_active_text, open_free_text_slot
 
-                handled_intake_text = handle_active_text(
-                    cur, quien, chat_id=chat_id, source_inbound_id=entrante_id,
-                    source_raw_text=texto, now=datetime.now(timezone.utc),
-                ) is not None
+                # Un campo de texto libre abierto no se toma acá: `_turno` lo
+                # interpreta como cualquier pregunta pendiente (T9-R1c-1).
+                if open_free_text_slot(cur, quien, chat_id) is None:
+                    handled_intake_text = handle_active_text(
+                        cur, quien, chat_id=chat_id, source_inbound_id=entrante_id,
+                        source_raw_text=texto, now=datetime.now(timezone.utc),
+                    ) is not None
 
             if texto.strip() and not handled_intake_text:
                 with mantener_chat_activo(config.token_bot(slug), chat_id,
                                           chat_type=chat_type, cur=cur,
                                           workspace_id=workspace_id):
-                    _turno(cur, quien, texto, workspace_id, chat_id, entrante_id)
+                    _turno(cur, quien, texto, workspace_id, chat_id, entrante_id,
+                           alta_privada=privado)
 
         conn.commit()
     except Exception as e:  # noqa: BLE001
@@ -833,7 +846,7 @@ def _responder(cur, workspace_id: str, chat_id: int, quien, texto: str,
 
 
 def _turno(cur, quien, texto: str, workspace_id: str, chat_id: int,
-           entrante_id: str | None = None) -> None:
+           entrante_id: str | None = None, *, alta_privada: bool = False) -> None:
     from datetime import datetime, timezone
 
     from . import pendientes as P
@@ -844,17 +857,19 @@ def _turno(cur, quien, texto: str, workspace_id: str, chat_id: int,
     cal = Calendario.desde_base(cur, workspace_id)
     proveedor = desde_base(cur, workspace_id, config)
 
-    # Tres preguntas dejan el mensaje siguiente como su respuesta: el dato que
+    # Cuatro preguntas dejan el mensaje siguiente como su respuesta: el dato que
     # pidió una acción del menú (la causa de un bloqueo, su resolución, la
-    # evidencia), Modificar (T3, ADR 0005 decisión 1: "¿Qué querés cambiar?") y
-    # "Ninguna, lo escribo" (T4, decisión 4). Ninguna se toma ya sin mirar el
-    # mensaje (T9-R1a y T9-R1b, ADR 0013 regla 1): se lee la pregunta abierta
-    # sin consumirla y el ruteo tipado la relaciona con el mensaje. Sólo
+    # evidencia), Modificar (T3, ADR 0005 decisión 1: "¿Qué querés cambiar?"),
+    # "Ninguna, lo escribo" (T4, decisión 4) y un campo de texto libre del alta
+    # guiada (T9-R1c-1, sólo en un chat privado: `alta_privada`). Ninguna se
+    # toma ya sin mirar el mensaje (T9-R1a, T9-R1b y T9-R1c, ADR 0013 regla 1):
+    # se lee la pregunta abierta sin consumirla y el ruteo tipado la relaciona
+    # con el mensaje. Sólo
     # `otro_tema` (o una pregunta que otro turno ya consumió) sigue por el
     # camino normal, con la ruta ya obtenida.
     route = None
     retomar = None
-    abierta = P.ver_modificacion_abierta(cur, quien, chat_id, now)
+    abierta = _ver_pregunta_abierta(cur, quien, chat_id, now, alta=alta_privada)
     if abierta is not None:
         route = _atender_pregunta_pendiente(cur, quien, texto, abierta, proveedor,
                                             cal, chat_id, workspace_id, now,
@@ -1048,10 +1063,10 @@ def _no_proponer_de(abierta) -> dict | None:
     de `agente`, guardado como dict para que viaje en el estado de la
     aclaración). Modificar: la herramienta de la propuesta y su id;
     dato del menú: la herramienta a la que lleva la acción. "Ninguna, lo
-    escribo" no tiene tarea conocida: sin guarda."""
+    escribo" y el campo del alta no tienen tarea conocida: sin guarda."""
     from . import pendientes as P
 
-    if abierta.herramienta == _SENTINEL_ACLARACION:
+    if abierta.herramienta in (_SENTINEL_ACLARACION, _SENTINEL_ALTA_TEXTO_LIBRE):
         return None
     if abierta.herramienta == P.SENTINEL_DATO_MENU_TAREA:
         herramienta, campo = _HERRAMIENTA_DE_DATO_MENU.get(
@@ -1072,12 +1087,25 @@ def _no_proponer_de(abierta) -> dict | None:
 def _pregunta_de(abierta) -> _Pregunta:
     """El adaptador de la pregunta abierta, según lo que la abrió: el dato de
     una acción del menú (`_PREGUNTAS_DATO_MENU`, por acción), "Ninguna, lo
-    escribo" (el pedido original y la referencia, guardados en sus `args`) o,
-    con cualquier otra `herramienta`, una corrección de Modificar (la vista
-    previa que se corrige es su `resumen`)."""
+    escribo" (el pedido original y la referencia, guardados en sus `args`), un
+    campo de texto libre del alta guiada (su `resumen` es la pregunta que se
+    hizo) o, con cualquier otra `herramienta`, una corrección de Modificar (la
+    vista previa que se corrige es su `resumen`)."""
     from . import pendientes as P
 
     args = abierta.args
+    if abierta.herramienta == _SENTINEL_ALTA_TEXTO_LIBRE:
+        from .ingreso_tareas import FREE_TEXT_NAMES
+
+        nombre = f"{FREE_TEXT_NAMES[args['campo']]} de la tarea nueva"
+        descripcion = f"{nombre}, un dato del alta guiada que se le pidió"
+        titulo = args.get("titulo")
+        return _Pregunta(
+            nombre=nombre, para_ruteo=_para_ruteo(descripcion, abierta.resumen),
+            pregunta=abierta.resumen,
+            dejada=AVISO_ALTA_DEJADA.format(
+                titulo=f" «{titulo}»" if titulo else ""),
+            corrige_responde=False)
     if abierta.herramienta == P.SENTINEL_DATO_MENU_TAREA:
         descripcion = _descripcion_dato_menu(args)
         pregunta = _pregunta_dato_menu(args.get("accion"), args.get("titulo", ""))
@@ -1109,9 +1137,10 @@ def _atender_pregunta_pendiente(cur, quien, texto: str, abierta, proveedor, cal,
                                 entrante_id: str | None = None):
     """Interpreta el mensaje que llega con una pregunta abierta (T9-R1a y
     T9-R1b, ADR 0013 regla 1): el ruteo tipado devuelve un comando de la lista
-    cerrada y acá hay un manejo determinista por comando, igual para los tres
-    tipos de pregunta (`_pregunta_de`). Todo camino deja exactamente una
-    respuesta visible.
+    cerrada y acá hay un manejo determinista por comando, igual para todos los
+    tipos de pregunta (`_pregunta_de`), sean una fila de `pending_action` o un
+    campo de texto libre del alta guiada (T9-R1c-1). Todo camino deja
+    exactamente una respuesta visible.
 
     Devuelve `None` cuando el turno ya terminó, o la ruta ya obtenida cuando
     el mensaje sigue por el camino normal (`otro_tema`, o una pregunta que
@@ -1119,7 +1148,6 @@ def _atender_pregunta_pendiente(cur, quien, texto: str, abierta, proveedor, cal,
     consume sólo con `responde` (y `corrige`, si en ese tipo corregir es
     responder) y `cancela`, o con los botones que deja `dudoso`; si el ruteo
     falla, queda abierta."""
-    from . import pendientes as P
     from .llm import RespectoPendiente
 
     pregunta = _pregunta_de(abierta)
@@ -1131,7 +1159,7 @@ def _atender_pregunta_pendiente(cur, quien, texto: str, abierta, proveedor, cal,
     comando = route.respecto_pendiente
     if comando is RespectoPendiente.RESPONDE or (
             comando is RespectoPendiente.CORRIGE and pregunta.corrige_responde):
-        if P.consumir_modificacion(cur, abierta.pending_action_id, ahora):
+        if _consumir_pregunta(cur, quien, abierta, ahora):
             _seguir_con_la_respuesta(cur, quien, texto, abierta, route, proveedor,
                                      cal, chat_id, workspace_id, ahora,
                                      entrante_id)
@@ -1163,9 +1191,13 @@ def _seguir_con_la_respuesta(cur, quien, texto: str, abierta, route, proveedor,
     """El mensaje es la respuesta a la pregunta, ya consumida: sigue el camino
     propio de cada tipo, el de siempre. `route` es la que ya se obtuvo al
     interpretar el mensaje, o `None` si todavía no se rutea (el botón "Sí, es
-    eso"); el dato del menú no la necesita."""
+    eso"); el dato del menú y el campo del alta no la necesitan."""
     from . import pendientes as P
 
+    if abierta.herramienta == _SENTINEL_ALTA_TEXTO_LIBRE:
+        _seguir_con_el_campo_del_alta(cur, quien, texto, abierta, chat_id,
+                                      workspace_id, ahora, entrante_id)
+        return
     if abierta.herramienta == P.SENTINEL_DATO_MENU_TAREA:
         _resumir_dato_menu_tarea(cur, quien, texto, abierta, chat_id,
                                  workspace_id, ahora)
@@ -1190,13 +1222,76 @@ def _dejar_pregunta_pendiente(cur, quien, workspace_id: str, chat_id: int,
     """La persona deja de lado la pregunta abierta (`cancela` o el botón
     "Dejarlo"). Sólo dice que la dejó si de verdad la consumió ahora: si otro
     camino ya la había consumido, lo dice así, sin afirmar nada más."""
-    from . import pendientes as P
-
-    if P.consumir_modificacion(cur, abierta.pending_action_id, ahora):
+    if _dejar_de_lado(cur, quien, abierta, ahora):
         texto = _pregunta_de(abierta).dejada
     else:
         texto = AVISO_DATO_YA_NO_PENDIENTE
     _responder(cur, workspace_id, chat_id, quien, texto, ahora)
+
+
+def _ver_pregunta_abierta(cur, quien, chat_id: int, ahora, *, alta: bool):
+    """La pregunta abierta de esta persona en este chat, sin consumirla. Con
+    `alta` (un chat privado), primero el campo de texto libre del alta guiada:
+    si hay uno abierto y también una pregunta de `pending_action`, el alta
+    tiene precedencia, como antes de T9-R1c-1 (el alta leía el mensaje antes
+    de que `_turno` mirara nada); la otra queda abierta y se retoma cuando el
+    alta termina o se deja. Sin `alta`, sólo las de `pending_action`."""
+    from . import pendientes as P
+    from .ingreso_tareas import free_text_question, open_free_text_slot
+
+    if alta:
+        slot = open_free_text_slot(cur, quien, chat_id)
+        if slot is not None:
+            return P.ModificacionAbierta(
+                pending_action_id=slot["slot_id"],
+                herramienta=_SENTINEL_ALTA_TEXTO_LIBRE,
+                args={"campo": slot["campo"], "titulo": slot["titulo"],
+                      "request_id": slot["request_id"]},
+                resumen=free_text_question(slot["campo"]))
+    return P.ver_modificacion_abierta(cur, quien, chat_id, ahora)
+
+
+def _consumir_pregunta(cur, quien, abierta, ahora) -> bool:
+    """Reclama la pregunta abierta para la respuesta que se va a tomar: `True`
+    si esta llamada la consumió, `False` si otro camino ya lo había hecho. El
+    campo del alta no se consume acá sino en `consume_pending_text`, junto con
+    su validación (un texto vacío o demasiado largo deja el campo abierto):
+    acá sólo se comprueba que siga esperando."""
+    from . import pendientes as P
+    from .ingreso_tareas import free_text_slot_active
+
+    if abierta.herramienta == _SENTINEL_ALTA_TEXTO_LIBRE:
+        return free_text_slot_active(cur, quien, abierta.pending_action_id)
+    return P.consumir_modificacion(cur, abierta.pending_action_id, ahora)
+
+
+def _dejar_de_lado(cur, quien, abierta, ahora) -> bool:
+    """Deja de lado la pregunta abierta: `True` si esta llamada la cerró. Una
+    fila de `pending_action` se consume; el campo del alta cancela su
+    borrador, porque sin ese dato el alta no sigue."""
+    from . import pendientes as P
+    from .ingreso_tareas import cancel_from_free_text_slot
+
+    if abierta.herramienta == _SENTINEL_ALTA_TEXTO_LIBRE:
+        return cancel_from_free_text_slot(cur, quien, abierta.pending_action_id,
+                                          ahora)
+    return P.consumir_modificacion(cur, abierta.pending_action_id, ahora)
+
+
+def _seguir_con_el_campo_del_alta(cur, quien, texto: str, abierta, chat_id: int,
+                                  workspace_id: str, ahora,
+                                  entrante_id: str | None) -> None:
+    """El mensaje es el campo que esperaba el alta: sigue el camino de siempre
+    (`consume_pending_text`: validación, fecha, entidad y el próximo paso).
+    Si el campo ya no estaba abierto, lo dice y no hace nada."""
+    from .ingreso_tareas import consume_pending_text
+
+    resultado = consume_pending_text(
+        cur, quien, chat_id=chat_id, source_inbound_id=entrante_id,
+        source_raw_text=texto, now=ahora, slot_id=abierta.pending_action_id)
+    if resultado is None:
+        _responder(cur, workspace_id, chat_id, quien, AVISO_DATO_YA_NO_PENDIENTE,
+                   ahora)
 
 
 def _preguntar_si_es_el_dato(cur, quien, workspace_id: str, chat_id: int,
@@ -1283,7 +1378,9 @@ def _retomar_dato_pendiente(cur, quien, workspace_id: str, chat_id: int,
     if _interacciones_pendientes(cur, quien, workspace_id,
                                  chat_id) > interacciones_antes:
         return
-    vigente = P.ver_modificacion_abierta(cur, quien, chat_id, ahora)
+    vigente = _ver_pregunta_abierta(
+        cur, quien, chat_id, ahora,
+        alta=abierta.herramienta == _SENTINEL_ALTA_TEXTO_LIBRE)
     if vigente is None or vigente.pending_action_id != abierta.pending_action_id:
         return
 
@@ -1340,13 +1437,14 @@ def _resolver_toque_respuesta_dato_menu(cur, quien, workspace_id: str,
         # no pierde la pregunta. Si otro camino ya la consumió, se dice y no
         # se hace nada.
         route = None
-        if abierta.herramienta != P.SENTINEL_DATO_MENU_TAREA:
+        if abierta.herramienta not in (P.SENTINEL_DATO_MENU_TAREA,
+                                       _SENTINEL_ALTA_TEXTO_LIBRE):
             route, error = _rutear(proveedor, texto)
             if route is None:
                 _avisar_ruteo_caido(cur, quien, error, workspace_id, chat_id,
                                     ahora)
                 return
-        if not P.consumir_modificacion(cur, abierta.pending_action_id, ahora):
+        if not _consumir_pregunta(cur, quien, abierta, ahora):
             _responder(cur, workspace_id, chat_id, quien,
                        AVISO_DATO_YA_NO_PENDIENTE, ahora)
             return

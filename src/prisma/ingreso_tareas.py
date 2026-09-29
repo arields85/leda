@@ -398,15 +398,21 @@ def resolve_choice(cur: psycopg.Cursor, who: Solicitante, *, token: str,
 
 def consume_pending_text(cur: psycopg.Cursor, who: Solicitante, *, chat_id: int,
                          source_inbound_id: str, source_raw_text: str,
-                         now: datetime) -> IntakeOutcome | None:
+                         now: datetime, slot_id: str | None = None,
+                         ) -> IntakeOutcome | None:
+    """Toma el mensaje como el campo que espera el alta. `slot_id`, si viene,
+    es el campo que la persona respondió (el que el gateway leyó al
+    interpretar el mensaje, T9-R1c-1): si ese campo ya no está abierto no se
+    consume ningún otro."""
     cur.execute(
         """select s.*, r.version, r.estado request_estado
              from task_intake_free_text_slot s
              join task_intake_request r on r.id = s.request_id
             where s.workspace_id = %s and r.membership_id = %s
               and r.chat_id = %s and s.estado = 'active' and r.estado = 'active'
+              and (%s::uuid is null or s.id = %s::uuid)
             for update of s, r""",
-        (who.workspace_id, who.membership_id, chat_id),
+        (who.workspace_id, who.membership_id, chat_id, slot_id, slot_id),
     )
     slot = cur.fetchone()
     if not slot:
@@ -457,13 +463,12 @@ def consume_pending_text(cur: psycopg.Cursor, who: Solicitante, *, chat_id: int,
 def handle_active_text(cur: psycopg.Cursor, who: Solicitante, *, chat_id: int,
                        source_inbound_id: str, source_raw_text: str,
                        now: datetime) -> IntakeOutcome | None:
-    consumed = consume_pending_text(
-        cur, who, chat_id=chat_id, source_inbound_id=source_inbound_id,
-        source_raw_text=source_raw_text, now=now,
-    )
-    if consumed is not None:
-        return consumed
+    """Atiende el mensaje de quien tiene un alta activa sin un campo de texto
+    libre abierto: el recordatorio de la elección o del estado del borrador.
 
+    El campo de texto libre ya no se toma acá (T9-R1c-1, ADR 0013 regla 1): un
+    mensaje que responde a una pregunta pendiente se interpreta antes, y lo
+    lee el gateway con `open_free_text_slot` y `consume_pending_text`."""
     cur.execute(
         """select r.*, s.id choice_set_id,
                   (select o.cuerpo from message_outbox o
@@ -504,6 +509,84 @@ def handle_active_text(cur: psycopg.Cursor, who: Solicitante, *, chat_id: int,
     _enqueue(cur, request, prompt, now,
              f"intake:{request_id}:state:{source_inbound_id}")
     return IntakeOutcome(request_id, prompt, inert=True)
+
+
+# Cómo se nombra cada campo de texto libre del alta ante la persona (la
+# pregunta abierta, T9-R1c-1): "¿Seguimos con el título de la tarea nueva?".
+FREE_TEXT_NAMES = {
+    "title": "el título",
+    "description": "la descripción",
+    "objective": "el objetivo",
+    "responsible": "la persona responsable",
+    "area": "el área",
+    "due_date": "la fecha objetivo",
+    "acceptance_criterion": "el criterio de aceptación",
+}
+
+
+def free_text_question(field: str) -> str:
+    """La pregunta que se le hizo a la persona para ese campo, la misma al
+    volver a hacerla."""
+    return _free_text_prompt(field)
+
+
+def open_free_text_slot(cur: psycopg.Cursor, who: Solicitante,
+                        chat_id: int) -> dict | None:
+    """Lee, sin consumir, el campo de texto libre que espera el alta de esta
+    persona en este chat: `{slot_id, request_id, campo, titulo}` (`titulo`, el
+    de la tarea si ya está confirmado) o `None`."""
+    cur.execute(
+        """select s.id slot_id, s.request_id, s.campo,
+                  (select f.valor from task_intake_field f
+                    where f.request_id = r.id and f.campo = 'title'
+                      and f.estado = 'confirmed') titulo
+             from task_intake_free_text_slot s
+             join task_intake_request r on r.id = s.request_id
+            where s.workspace_id = %s and r.membership_id = %s
+              and r.chat_id = %s and s.estado = 'active' and r.estado = 'active'
+            order by s.creado_en desc limit 1""",
+        (who.workspace_id, who.membership_id, chat_id),
+    )
+    row = cur.fetchone()
+    if not row:
+        return None
+    titulo = row["titulo"] if isinstance(row["titulo"], str) else None
+    return {"slot_id": str(row["slot_id"]), "request_id": str(row["request_id"]),
+            "campo": row["campo"], "titulo": titulo}
+
+
+def free_text_slot_active(cur: psycopg.Cursor, who: Solicitante,
+                          slot_id: str) -> bool:
+    """Si ese campo de texto libre sigue esperando la respuesta."""
+    cur.execute(
+        """select 1 from task_intake_free_text_slot s
+             join task_intake_request r on r.id = s.request_id
+            where s.id = %s and s.workspace_id = %s and r.membership_id = %s
+              and s.estado = 'active' and r.estado = 'active'""",
+        (slot_id, who.workspace_id, who.membership_id),
+    )
+    return cur.fetchone() is not None
+
+
+def cancel_from_free_text_slot(cur: psycopg.Cursor, who: Solicitante,
+                               slot_id: str, now: datetime) -> bool:
+    """La persona deja el alta desde la pregunta de un campo de texto libre
+    (T9-R1c-1): cancela el borrador por el mismo camino que el botón "Cancelar
+    borrador", sin encolar su aviso (lo dice el gateway). `False` si ese campo
+    ya no estaba abierto: no cancela nada."""
+    cur.execute(
+        """select r.* from task_intake_free_text_slot s
+             join task_intake_request r on r.id = s.request_id
+            where s.id = %s and s.workspace_id = %s and r.membership_id = %s
+              and s.estado = 'active' and r.estado = 'active'
+            for update of s, r""",
+        (slot_id, who.workspace_id, who.membership_id),
+    )
+    request = cur.fetchone()
+    if not request:
+        return False
+    _cancel(cur, request, who, now, enqueue=False)
+    return True
 
 
 def _reject_user_value(cur, request, field, prompt, inbound_id, now):

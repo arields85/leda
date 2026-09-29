@@ -1099,7 +1099,7 @@ def test_excepcion_no_manejada_en_un_turno_registra_incidente_y_avisa(
     interpretación (`_turno`), no la constancia de haber recibido algo."""
     ws = corework.workspace_id
 
-    def _explota(cur, quien, texto, workspace_id, chat_id, entrante_id=None):
+    def _explota(cur, quien, texto, workspace_id, chat_id, entrante_id=None, **_):
         raise RuntimeError("falla inesperada de prueba")
 
     monkeypatch.setattr(gateway, "_turno", _explota)

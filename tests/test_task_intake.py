@@ -25,7 +25,7 @@ from prisma.calendario import Calendario
 from prisma.db import admin, autoridad, conectar, espacio
 from prisma.despachador import TransporteDePrueba, despachar
 from prisma.llm import (IntentAction, IntentRoute, ProveedorAnthropic,
-                        Respuesta, RoutingError)
+                        RespectoPendiente, Respuesta, RoutingError)
 from prisma.salida import (BUTTON_LABEL_LIMIT, ICONO_TAREA, con_icono,
                            etiqueta_sin_icono, etiquetas_coinciden,
                            telegram_utf16_units)
@@ -1234,10 +1234,12 @@ class _RoutingProvider:
         self.routes = list(routes)
         self.answer = answer
         self.route_calls = []
+        self.pending_calls = []
         self.main_calls = 0
 
-    def route_intent(self, text):
+    def route_intent(self, text, pendiente=None):
         self.route_calls.append(text)
+        self.pending_calls.append(pendiente)
         result = self.routes.pop(0)
         if isinstance(result, Exception):
             raise result
@@ -1398,10 +1400,16 @@ def test_active_choice_state_bypasses_router_and_main_model(
         assert cur.fetchone()["n"] == 2
 
 
-def test_active_free_text_state_bypasses_router_and_main_model(
+def test_active_free_text_state_is_read_as_a_pending_question_not_by_the_main_model(
         intake_world, conn, monkeypatch):
-    provider = _RoutingProvider([IntentRoute(
-        IntentAction.START_TASK_INTAKE, {"objective": "service delay"})])
+    # ADR 0013 rule 1 (T9-R1c-1): the free-text field is a pending question,
+    # so the message goes through one typed routing call that receives it
+    # (never a blind consume), and the answer is still not handled by the
+    # main model.
+    provider = _RoutingProvider([
+        IntentRoute(IntentAction.START_TASK_INTAKE, {"objective": "service delay"}),
+        IntentRoute(IntentAction.NORMAL_CONVERSATION,
+                    respecto_pendiente=RespectoPendiente.RESPONDE)])
     ws, user = _post_message(
         conn, monkeypatch, intake_world, provider,
         "Armemos una tarea para la revisión", message_id=1550)
@@ -1418,7 +1426,9 @@ def test_active_free_text_state_bypasses_router_and_main_model(
         conn, monkeypatch, intake_world, provider,
         "Reduce service delay 1", message_id=1551)
 
-    assert len(provider.route_calls) == 1
+    assert len(provider.route_calls) == 2
+    assert provider.pending_calls[0] is None
+    assert "Escribí parte del nombre del objetivo" in provider.pending_calls[1]
     assert provider.main_calls == 0
     with admin(conn) as cur:
         cur.execute(

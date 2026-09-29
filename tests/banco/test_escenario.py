@@ -430,3 +430,23 @@ def test_mensajes_tras_toques_invalidos(tmp_path, invalido):
     datos["mensajes_tras_toques"] = invalido
     with pytest.raises(EscenarioInvalido):
         cargar_escenario(_escribir(tmp_path, datos))
+
+
+def test_la_familia_del_alta_guiada_carga_y_llega_a_la_pregunta_de_texto_libre():
+    # T9-R1c-1: cada escenario de la familia b-0021 elige el objetivo (un toque
+    # del alta) y manda un único mensaje con la pregunta del título abierta.
+    import pathlib
+
+    directorio = pathlib.Path(__file__).parent / "escenarios"
+    familia = [e for e in cargar_escenarios(directorio)
+               if e.id == "b-0021" or e.variante_de == "b-0021"]
+
+    assert len(familia) >= 9
+    for e in familia:
+        assert e.toques == ({"indice": 0},), e.id
+        assert len(e.mensajes_tras_toques) == 1, e.id
+        assert e.permite_borrador_de_tarea and e.permite_pregunta_sin_opciones
+        assert e.respuesta_menciona, e.id
+    # Los tres tipos de comando que el alta interpreta, cada uno cubierto.
+    mensajes = {e.mensajes_tras_toques[0] for e in familia}
+    assert {"hola", "mejor dejalo", "¿qué tareas tengo abiertas?"} <= mensajes

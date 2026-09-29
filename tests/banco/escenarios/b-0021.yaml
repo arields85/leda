@@ -1,0 +1,46 @@
+id: b-0021
+objetivo: >
+  Una pregunta pendiente es contexto, no una trampa (ADR 0013 regla 1,
+  T9-R1c-1): con el alta guiada esperando el título de la tarea, un título
+  es el dato. Se toma como está y el alta sigue con el paso siguiente (la
+  persona responsable), sin volver a preguntar el título.
+actor: Marcos Tarquini
+mensajes:
+  - "armame una tarea nueva"
+precondiciones:
+  tareas:
+    - id: t1
+      titulo: Cablear tablero de la máquina 3 (simulado)
+      area: ot
+      responsable: Marcos Tarquini
+# El primer toque elige el objetivo (el alta guiada pide primero las opciones
+# con botones); el mensaje que se evalúa es el que llega después, con la
+# pregunta del título abierta (`mensajes_tras_toques`).
+toques:
+  - indice: 0
+mensajes_tras_toques:
+  - "Cablear el tablero norte"
+herramientas_prohibidas:
+  - actualizar_estado
+  - registrar_bloqueo
+  - resolver_bloqueo
+  - crear_dependencia
+  - aprobar_tarea
+efectos:
+  conteos_delta:
+    task: 0
+    task_state_event: 0
+    evidence: 0
+    approval: 0
+# El paso siguiente del alta (`ingreso_tareas._candidate_prompt`): si
+# cambia su redacción, actualizar acá.
+respuesta_menciona:
+  - "responsable"
+respuesta_no_contiene_patron:
+  - "Escribí el título"
+# El alta es justamente lo que se prueba: un borrador es esperable. La
+# pregunta del título es de texto libre a propósito (no hay opciones que
+# ofrecer): se exime la comprobación de ADR 0007 sobre preguntas sin botones.
+permite_borrador_de_tarea: true
+permite_pregunta_sin_opciones: true
+severidad: alta

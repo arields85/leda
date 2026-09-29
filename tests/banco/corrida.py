@@ -20,6 +20,7 @@ from typing import Any
 import prisma.jev as jev_modulo
 import prisma.llm as llm_modulo
 from prisma import gateway
+from prisma import ingreso_tareas as I
 from prisma import pendientes as P
 from prisma.agente import DISCULPA
 from prisma.db import admin
@@ -645,7 +646,9 @@ def _resolver_toque_generico(cur, workspace_id: str, chat_id: int,
               and creado_en >= %s""",
         (workspace_id, chat_id, desde))
     ids_esperando = [str(f["id"]) for f in cur.fetchall()]
-    if not ids_esperando:
+    conjuntos_del_alta = _conjuntos_del_alta_esperando(
+        cur, workspace_id, chat_id, desde)
+    if not ids_esperando and not conjuntos_del_alta:
         raise LookupError(
             f"El escenario pide tocar {toque!r}, pero no hay ninguna acción "
             "pendiente esperando en este chat, en esta corrida.")
@@ -658,6 +661,13 @@ def _resolver_toque_generico(cur, workspace_id: str, chat_id: int,
         objetivo = _resolver_opcion_toque(opciones, toque)
         if objetivo is not None:
             coincidencias.append((pid, objetivo))
+    # Las opciones del alta guiada (T9-R1c-1) son otra fuente de botones: cada
+    # una lleva su prefijo de callback, porque no es el de `pending_action`.
+    for conjunto_id, opciones in conjuntos_del_alta:
+        etiquetas_todas.extend(o["etiqueta"] for o in opciones)
+        objetivo = _resolver_opcion_toque(opciones, toque)
+        if objetivo is not None:
+            coincidencias.append((conjunto_id, objetivo))
 
     if len(coincidencias) > 1:
         raise LookupError(
@@ -671,15 +681,50 @@ def _resolver_toque_generico(cur, workspace_id: str, chat_id: int,
     return coincidencias[0]
 
 
-def _tocar_opcion(conn, slug: str, chat: int, tg_id: int, token: str) -> None:
+def _conjuntos_del_alta_esperando(cur, workspace_id: str, chat_id: int,
+                                  desde) -> list[tuple[str, list[dict]]]:
+    """Los conjuntos de opciones del alta guiada (`task_intake_choice_set`)
+    vigentes en este chat, creados durante esta corrida, como
+    `(id, opciones)`: cada opción con `token`, `etiqueta` y el `prefijo` de
+    callback del alta (`ingreso_tareas.CALLBACK_PREFIX`). Sólo las activas:
+    un botón invalidado ya no se puede tocar."""
+    cur.execute(
+        """select s.id from task_intake_choice_set s
+             join task_intake_request r on r.id = s.request_id
+            where s.workspace_id = %s and r.chat_id = %s
+              and s.estado = 'active' and s.creado_en >= %s""",
+        (workspace_id, chat_id, desde))
+    conjuntos = []
+    for fila in cur.fetchall():
+        cur.execute(
+            """select token, etiqueta, valor from task_intake_choice
+                where choice_set_id = %s and activa order by orden""",
+            (fila["id"],))
+        conjuntos.append((str(fila["id"]), [
+            {**o, "prefijo": I.CALLBACK_PREFIX} for o in cur.fetchall()]))
+    return conjuntos
+
+
+def _tocar_opcion(conn, slug: str, chat: int, tg_id: int, token: str,
+                  prefijo: str = P.CALLBACK_PREFIJO) -> None:
     """Simula el toque de un botón real de Telegram -- mismo camino que
     Confirmar y la aclaración con botones (`gateway.procesar_update` con un
-    `callback_query`)."""
+    `callback_query`). `prefijo` es el del tipo de botón: el de siempre, o el
+    del alta guiada (`ingreso_tareas.CALLBACK_PREFIX`)."""
     callback = {"callback_query": {
         "id": "banco-toque", "from": {"id": tg_id},
-        "data": f"{P.CALLBACK_PREFIJO}{token}",
+        "data": f"{prefijo}{token}",
         "message": {"message_id": 2, "chat": {"id": chat}}}}
     gateway.procesar_update(conn, slug, callback)
+
+
+def _update_de_texto(message_id: int, texto: str, chat: int, tg_id: int) -> dict:
+    """Un mensaje de texto como lo manda Telegram desde un chat privado
+    (`type`: el gateway sólo lee el campo del alta guiada en un chat privado,
+    T9-R1c-1): sin el tipo, el banco nunca ejercitaría ese camino."""
+    return {"message": {"message_id": message_id, "text": texto,
+                        "chat": {"id": chat, "type": "private"},
+                        "from": {"id": tg_id}}}
 
 
 def _telegram_id(conn, ws: str, nombre: str) -> int:
@@ -813,10 +858,8 @@ def ejecutar_escenario(
     ids_de_mensaje = itertools.count(1)
     try:
         for texto in mensajes:
-            update = {"message": {"message_id": next(ids_de_mensaje),
-                                  "text": texto, "chat": {"id": chat},
-                                  "from": {"id": tg_id}}}
-            gateway.procesar_update(conn, slug, update)
+            gateway.procesar_update(conn, slug, _update_de_texto(
+                next(ids_de_mensaje), texto, chat, tg_id))
 
         # Aclaración con botones (T4/T6): si el turno dejó una referencia
         # ambigua esperando que se elija una candidata, se tapea la que el
@@ -888,7 +931,8 @@ def ejecutar_escenario(
             with admin(conn) as cur:
                 _, objetivo = _resolver_toque_generico(
                     cur, workspace_id, chat, toque, desde_corrida)
-            _tocar_opcion(conn, slug, chat, tg_id, objetivo["token"])
+            _tocar_opcion(conn, slug, chat, tg_id, objetivo["token"],
+                          objetivo.get("prefijo", P.CALLBACK_PREFIJO))
 
         if mensajes_tras_toques:
             # Lo que ya salió (la lista, el menú, la pregunta abierta) queda
@@ -898,10 +942,8 @@ def ejecutar_escenario(
                             (workspace_id,))
                 ids_previos |= {f["id"] for f in cur.fetchall()}
             for texto in mensajes_tras_toques:
-                update = {"message": {"message_id": next(ids_de_mensaje),
-                                      "text": texto, "chat": {"id": chat},
-                                      "from": {"id": tg_id}}}
-                gateway.procesar_update(conn, slug, update)
+                gateway.procesar_update(conn, slug, _update_de_texto(
+                    next(ids_de_mensaje), texto, chat, tg_id))
 
         # El turno pudo haber dejado una propuesta de una herramienta que
         # escribe esperando un Confirmar (T1/T2, ADR 0005 decisión 1): el
