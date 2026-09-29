@@ -2322,6 +2322,8 @@ def test_el_corredor_no_confirma_solo_la_vista_previa_de_un_borrador(corework, c
     ("b-0025", [RespectoPendiente.RESPONDE]),
     ("b-0025-b", [RespectoPendiente.RESPONDE]),
     ("b-0025-c", [RespectoPendiente.CORRIGE, RespectoPendiente.RESPONDE]),
+    ("b-0025-d", []),                                   # sólo toques: nada que rutear
+    ("b-0025-e", [RespectoPendiente.RESPONDE]),
 ])
 def test_los_escenarios_de_b_0025_cumplen_lo_que_declaran_con_un_modelo_guionado(
         escenario_id, comandos, corework, conn):

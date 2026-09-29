@@ -404,9 +404,9 @@ def filas_respuesta(cur, workspace_id: str, chat_id: int,
     (`despachador.py::_botones`).
 
     Cuenta también la vista previa de un borrador (`pending_action.draft_id`)
-    que llega a este chat: `ingreso_tareas._finalize` la encola como un mensaje
-    que inicia Prisma (no es `es_respuesta`), pero cuando quien confirma es quien
-    escribe es lo que ve como respuesta a su alta y a su Modificar (T9-R1c-3)."""
+    que llega a este chat: `ingreso_tareas._finalize` la encola como respuesta
+    cuando quien confirma es quien escribe (T9-R1c-3b), y como un mensaje que
+    inicia Prisma cuando confirma otra persona, que es lo que ve ese chat."""
     cur.execute(
         """select id, cuerpo, pending_action_id, intake_choice_set_id
             from message_outbox

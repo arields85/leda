@@ -500,9 +500,24 @@ def test_sin_mensajes_es_valido_con_borrador_sembrado_y_mensajes_posteriores(
     assert e.mensajes == [] and e.mensajes_tras_toques == ("sí, dale",)
 
 
+def test_sin_mensajes_es_valido_con_borrador_sembrado_y_toques(tmp_path):
+    """Sólo toques sobre la pregunta sembrada (b-0025-d): la respuesta que se
+    evalúa es la que deja el último toque."""
+    datos = dict(_MINIMO)
+    datos["mensajes"] = []
+    datos["precondiciones"] = {"borrador_de_alta": _BORRADOR}
+    datos["toques"] = [{"etiqueta": "Modificar"}, {"etiqueta": "Volver al resumen"}]
+
+    e = cargar_escenario(_escribir(tmp_path, datos))
+
+    assert e.mensajes == [] and e.mensajes_tras_toques == ()
+    assert len(e.toques) == 2
+
+
 @pytest.mark.parametrize("cambios", [
     {"precondiciones": {"borrador_de_alta": _BORRADOR}},   # nada que escribir
     {"mensajes_tras_toques": ["sí, dale"]},                # nada sembrado
+    {"toques": [{"etiqueta": "Modificar"}]},               # toques sin nada sembrado
 ])
 def test_sin_mensajes_sigue_invalido_sin_borrador_o_sin_mensajes_posteriores(
         tmp_path, cambios):

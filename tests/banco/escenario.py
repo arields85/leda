@@ -142,11 +142,11 @@ def _validar_estructura(datos: dict, origen: pathlib.Path) -> None:
     # (`precondiciones.borrador_de_alta`, T9-R1c-2b), la vista previa de un
     # cambio (`vista_previa`) o la aclaración con botones (`aclaracion`, T9-R1d-1c)
     # -- no hace falta un primer mensaje: alcanza con lo que se escribe después
-    # de los toques.
+    # de los toques, o con los toques mismos (b-0025-d: Volver al resumen).
     con_pregunta_sembrada = (
         isinstance(datos.get("precondiciones"), dict)
         and any(datos["precondiciones"].get(c) for c in PREGUNTAS_SEMBRADAS)
-        and bool(datos.get("mensajes_tras_toques")))
+        and bool(datos.get("mensajes_tras_toques") or datos.get("toques")))
     if (not isinstance(mensajes, list)
             or (not mensajes and not con_pregunta_sembrada)
             or not all(isinstance(m, str) and m.strip() for m in mensajes)):
