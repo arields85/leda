@@ -310,16 +310,21 @@ def test_activacion_con_clave_encendida_reclama_un_solo_saludo_del_dia(
             "select ultima_fecha_local from greeting_state where membership_id = %s",
             (mid,))
         reserva = cur.fetchone()
-    assert reserva is not None  # la bienvenida sí reclamó la reserva del día
+    # La bienvenida reclamó la reserva de la fecha local del despacho.
+    assert reserva is not None
+    assert reserva["ultima_fecha_local"] == ahora.astimezone(cal.zona).date()
 
-    # Una respuesta posterior de la misma fecha local no repite el saludo.
+    # Una respuesta posterior de la misma fecha local no repite el saludo. Se
+    # despacha en el mismo instante `ahora` para que la fecha local sea la
+    # misma por construcción: sumarle tiempo real haría fallar la prueba
+    # cerca de la medianoche del espacio.
     with espacio(conn, ws) as cur:
         cal = Calendario.desde_base(cur, ws)
         enqueue_outbox(
             cur, workspace_id=ws, chat_id=555009, text="Anotado.",
             recipient_membership_id=mid, is_response=True,
             scheduled_for=ahora, dedupe_key="test:alta-correo-saludo:respuesta")
-        despachar(cur, ws, transporte, cal, ahora + timedelta(hours=1))
+        despachar(cur, ws, transporte, cal, ahora)
     conn.commit()
 
     assert len(transporte.enviados) == 3
