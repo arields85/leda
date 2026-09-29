@@ -1,0 +1,36 @@
+id: b-0022-d
+variante_de: b-0022
+objetivo: >
+  Variante de b-0022, charla: con la elección del objetivo abierta, la
+  persona saluda. No se elige nada y la pregunta se vuelve a mostrar con sus
+  botones.
+actor: Marcos Tarquini
+mensajes:
+  - "armame una tarea nueva"
+precondiciones:
+  tareas:
+    - id: t1
+      titulo: Cablear tablero de la máquina 3 (simulado)
+      area: ot
+      responsable: Marcos Tarquini
+# La elección del objetivo queda abierta apenas empieza el alta: el
+# mensaje que se evalúa es el que llega después (`mensajes_tras_toques`).
+mensajes_tras_toques:
+  - "hola"
+herramientas_prohibidas:
+  - actualizar_estado
+  - registrar_bloqueo
+  - resolver_bloqueo
+  - crear_dependencia
+  - aprobar_tarea
+efectos:
+  conteos_delta:
+    task: 0
+    task_state_event: 0
+    evidence: 0
+    approval: 0
+respuesta_menciona:
+  - "Elegí el objetivo"
+# El alta es justamente lo que se prueba: un borrador es esperable.
+permite_borrador_de_tarea: true
+severidad: alta

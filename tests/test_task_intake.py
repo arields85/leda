@@ -1379,10 +1379,16 @@ def test_router_fails_closed_after_one_retry_without_raw_text(
         assert "start_task_intake" not in body and "request_id" not in body
 
 
-def test_active_choice_state_bypasses_router_and_main_model(
+def test_active_choice_state_is_read_as_a_pending_question_not_by_the_main_model(
         intake_world, conn, monkeypatch):
-    provider = _RoutingProvider([IntentRoute(
-        IntentAction.START_TASK_INTAKE, {"objective": "service delay"})])
+    # ADR 0013 rule 1 (T9-R1c-2): an open choice is a pending question, so the
+    # message goes through one typed routing call that receives it (never a
+    # blind reminder), and a chat remark re-sends the same choice with its
+    # buttons without waking the main model.
+    provider = _RoutingProvider([
+        IntentRoute(IntentAction.START_TASK_INTAKE, {"objective": "service delay"}),
+        IntentRoute(IntentAction.NORMAL_CONVERSATION,
+                    respecto_pendiente=RespectoPendiente.CHARLA)])
     ws, _ = _post_message(
         conn, monkeypatch, intake_world, provider,
         "Armemos una tarea para la revisión", message_id=1500)
@@ -1390,7 +1396,9 @@ def test_active_choice_state_bypasses_router_and_main_model(
         conn, monkeypatch, intake_world, provider,
         "¿cuál de estas opciones conviene?", message_id=1501)
 
-    assert len(provider.route_calls) == 1
+    assert len(provider.route_calls) == 2
+    assert provider.pending_calls[0] is None
+    assert "elección" in provider.pending_calls[1]
     assert provider.main_calls == 0
     with admin(conn) as cur:
         cur.execute("select count(*) n from task_intake_request where workspace_id = %s",

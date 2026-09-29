@@ -1,0 +1,51 @@
+id: b-0022-e
+variante_de: b-0022
+objetivo: >
+  Variante de b-0022, el borrador esperando confirmación: la persona escribe
+  "sí, dale". Un mensaje no confirma el borrador (la conversión es explícita,
+  con el botón Confirmar): Prisma lo dice y el borrador sigue esperando.
+actor: Marcos Tarquini
+mensajes:
+  - "armame una tarea: título «Cablear tablero norte», objetivo el del tablero de la máquina 3, responsable Marcos Tarquini, área OT, para el 30/12/2030, criterio de aceptación: prueba firmada"
+precondiciones:
+  tareas:
+    - id: t1
+      titulo: Cablear tablero de la máquina 3 (simulado)
+      area: ot
+      responsable: Marcos Tarquini
+# Cada paso del alta con botones, en orden (`ingreso_tareas._advance`, con el
+# objetivo primero): el objetivo, el título propuesto, la persona responsable,
+# el área, la fecha propuesta y el criterio propuesto. La vista previa queda
+# esperando la confirmación, sin ningún toque en Confirmar.
+toques:
+  - indice: 0
+  - etiqueta: "Sí"
+  - indice: 0
+  - indice: 0
+  - etiqueta: "Sí"
+  - etiqueta: "Sí"
+mensajes_tras_toques:
+  - "sí, dale"
+herramientas_prohibidas:
+  - actualizar_estado
+  - registrar_bloqueo
+  - resolver_bloqueo
+  - crear_dependencia
+  - aprobar_tarea
+efectos:
+  conteos_delta:
+    task: 0
+    task_state_event: 0
+    evidence: 0
+    approval: 0
+# La respuesta es `ingreso_tareas.DRAFT_AWAITING_CONFIRMATION`: si
+# cambia su redacción, actualizar acá.
+respuesta_menciona:
+  - "esperando confirmación"
+  - "Confirmar"
+# El alta es justamente lo que se prueba: un borrador es esperable.
+permite_borrador_de_tarea: true
+# La respuesta es un texto sin botones a propósito: se exime la
+# comprobación de ADR 0007 sobre preguntas sin opciones.
+permite_pregunta_sin_opciones: true
+severidad: alta

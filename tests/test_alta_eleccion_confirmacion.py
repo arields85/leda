@@ -1,0 +1,569 @@
+"""Una pregunta pendiente es contexto, no una trampa (T9-R1c-2, ADR 0013 regla
+1): las elecciones con botones del alta guiada y la confirmación del borrador.
+
+Hasta ahora `ingreso_tareas.handle_active_text` tragaba el mensaje de quien
+tenía una elección abierta (repetía la pregunta como recordatorio) o un
+borrador esperando confirmación ("El borrador de la tarea está esperando
+confirmación."), sin interpretarlo. Ahora el mensaje pasa por el ruteo tipado y
+el manejo genérico (`gateway._atender_pregunta_pendiente`), como el campo de
+texto libre (T9-R1c-1):
+
+- elección abierta: `responde` toma la opción sólo si el texto es exactamente
+  una de las opciones activas (como el toque); si no, vuelve a mostrar la
+  pregunta con sus botones. El modelo nunca elige la opción.
+- borrador esperando confirmación: la conversión sigue siendo explícita, con el
+  botón Confirmar; ningún mensaje la confirma. `corrige` dice que el borrador
+  no se cambia desde un mensaje; `cancela` lo cancela.
+
+Los ruteos y el modelo se guionan; ninguna prueba toca la red ni el modelo real.
+"""
+
+from __future__ import annotations
+
+import pytest
+
+from prisma import gateway
+from prisma import ingreso_tareas as I
+from prisma import pendientes as P
+from prisma.db import admin, espacio
+from prisma.llm import IntentAction, IntentRoute, RespectoPendiente
+
+from tests.test_task_intake import (NOW, _RoutingProvider, _actor,  # noqa: F401
+                                    _active_choices, _callback_client,
+                                    _choose, _post_message, _start)
+
+TITULO = "Inspect relief valve"
+_ids = iter(range(2000, 3000))
+
+
+def _ruta(comando: RespectoPendiente | None) -> IntentRoute:
+    return IntentRoute(IntentAction.NORMAL_CONVERSATION, respecto_pendiente=comando)
+
+
+def _escribir(conn, monkeypatch, world, provider, texto):
+    return _post_message(conn, monkeypatch, world, provider, texto,
+                         message_id=next(_ids))
+
+
+def _usuario(world) -> int:
+    return world["north-lab"]["people"]["Taylor Quinn"]["telegram"]
+
+
+def _alta_con_eleccion(conn, world) -> str:
+    """El alta con el título confirmado y el objetivo esperando una elección con
+    botones (la propuesta "service delay" deja una sola candidata)."""
+    user = _usuario(world)
+    with espacio(conn, world["north-lab"]["id"]) as cur:
+        actor, outcome = _start(cur, world, chat_id=user, objective="service delay")
+        _choose(cur, actor, outcome.request_id, "Sí", chat_id=user)
+        pregunta = I.open_intake_question(cur, actor, user)
+        assert pregunta["tipo"] == "choice"
+    conn.commit()
+    return outcome.request_id
+
+
+def _alta_en_confirmacion(conn, world) -> tuple[str, str]:
+    """El alta completa: el borrador espera la confirmación. Devuelve el id de
+    la solicitud y el de la `pending_action` de la vista previa."""
+    user = _usuario(world)
+    with espacio(conn, world["north-lab"]["id"]) as cur:
+        actor, outcome = _start(cur, world, chat_id=user)
+        rid = outcome.request_id
+        _choose(cur, actor, rid, "Sí", chat_id=user)
+        cur.execute("""select campo from task_intake_choice_set
+                        where request_id = %s and estado = 'active'""", (rid,))
+        if cur.fetchone()["campo"] == "description":
+            _choose(cur, actor, rid, "Sí", chat_id=user)
+        for parte in ("Reduce service delay", "Sam North", "Field Services"):
+            etiqueta = next(e for e in _active_choices(cur, rid) if parte in e)
+            _choose(cur, actor, rid, etiqueta, chat_id=user)
+        _choose(cur, actor, rid, "Sí", chat_id=user)
+        final = _choose(cur, actor, rid, "Sí", chat_id=user)
+        assert I.open_intake_question(cur, actor, user)["tipo"] == "confirmation"
+    conn.commit()
+    return rid, final.pending_action_id
+
+
+def _salidas(conn, chat_id) -> list[dict]:
+    with admin(conn) as cur:
+        cur.execute(
+            """select id, cuerpo, pending_action_id, intake_choice_set_id
+                 from message_outbox where chat_id = %s
+                order by programado_para, id""", (chat_id,))
+        return cur.fetchall()
+
+
+def _nuevas(conn, chat_id, antes: list[dict]) -> list[dict]:
+    """Lo que salió después de `antes`, en orden de envío. El armado del alta
+    usa un reloj fijo (`NOW`), así que no se compara por posición con lo
+    anterior."""
+    vistos = {fila["id"] for fila in antes}
+    return [f for f in _salidas(conn, chat_id) if f["id"] not in vistos]
+
+
+def _pregunta(salidas: list[dict], conjunto: str) -> str:
+    """El texto con que se hizo la pregunta de la elección `conjunto`."""
+    return next(f["cuerpo"] for f in salidas
+                if str(f["intake_choice_set_id"]) == conjunto)
+
+
+def _solicitud(conn, rid) -> str:
+    with admin(conn) as cur:
+        cur.execute("select estado from task_intake_request where id = %s", (rid,))
+        return cur.fetchone()["estado"]
+
+
+def _campo(conn, rid, campo) -> dict:
+    with admin(conn) as cur:
+        cur.execute("""select estado, valor, source_choice_id, proposed_by
+                         from task_intake_field where request_id = %s and campo = %s""",
+                    (rid, campo))
+        return cur.fetchone()
+
+
+def _conjunto_activo(conn, rid) -> str | None:
+    with admin(conn) as cur:
+        cur.execute("""select id from task_intake_choice_set
+                        where request_id = %s and estado = 'active'""", (rid,))
+        fila = cur.fetchone()
+    return str(fila["id"]) if fila else None
+
+
+def _tocar_boton(client, conn, token, user):
+    return client.post(
+        "/telegram/north-lab",
+        json={"callback_query": {
+            "id": f"cb-{next(_ids)}", "from": {"id": user},
+            "data": P.CALLBACK_PREFIJO + token,
+            "message": {"message_id": 7, "chat": {"id": user}}}},
+        headers={"X-Telegram-Bot-Api-Secret-Token": "test-secret"})
+
+
+def _token_de(conn, etiqueta_parte: str) -> str:
+    with admin(conn) as cur:
+        cur.execute(
+            """select o.token from pending_action_option o
+                 join pending_action p on p.id = o.pending_action_id
+                where o.etiqueta like %s order by p.creado_en desc limit 1""",
+            (f"%{etiqueta_parte}%",))
+        return cur.fetchone()["token"]
+
+
+# ---------------------------------------------------------------- elección
+
+@pytest.mark.parametrize("texto", [
+    "Reduce service delay 1", "reduce service delay 1", "  REDUCE   service delay 1 "])
+def test_elegir_escribiendo_la_opcion_resuelve_como_el_toque(
+        texto, intake_world, conn, monkeypatch):
+    rid = _alta_con_eleccion(conn, intake_world)
+    conjunto = _conjunto_activo(conn, rid)
+    provider = _RoutingProvider([_ruta(RespectoPendiente.RESPONDE)])
+
+    _escribir(conn, monkeypatch, intake_world, provider, texto)
+
+    campo = _campo(conn, rid, "objective")
+    assert campo["estado"] == "confirmed"
+    assert campo["valor"]["id"] == intake_world["north-lab"]["objectives"][0]
+    assert campo["proposed_by"] == "server" and campo["source_choice_id"]
+    assert provider.main_calls == 0
+    # El ruteo recibe la elección abierta y sus opciones como contexto.
+    assert "Reduce service delay 1" in provider.pending_calls[0]
+    assert _conjunto_activo(conn, rid) != conjunto     # sigue la próxima pregunta
+
+
+def test_un_texto_que_no_es_una_opcion_repite_la_pregunta_con_sus_botones(
+        intake_world, conn, monkeypatch):
+    rid = _alta_con_eleccion(conn, intake_world)
+    user = _usuario(intake_world)
+    conjunto = _conjunto_activo(conn, rid)
+    antes = _salidas(conn, user)
+    provider = _RoutingProvider([_ruta(RespectoPendiente.RESPONDE)])
+
+    _escribir(conn, monkeypatch, intake_world, provider, "el de la bomba, creo")
+
+    assert _campo(conn, rid, "objective")["estado"] != "confirmed"
+    assert _conjunto_activo(conn, rid) == conjunto            # sigue abierta
+    salidas = _nuevas(conn, user, antes)
+    assert len(salidas) == 1
+    assert salidas[-1]["cuerpo"] == _pregunta(antes, conjunto)       # la misma pregunta
+    assert str(salidas[-1]["intake_choice_set_id"]) == conjunto  # con sus botones
+
+
+def test_una_opcion_repetida_no_se_elige_sola(intake_world, conn):
+    # Dos opciones con el mismo nombre: escribirlo no alcanza para elegir una.
+    rid = _alta_con_eleccion(conn, intake_world)
+    user = _usuario(intake_world)
+    with espacio(conn, intake_world["north-lab"]["id"]) as cur:
+        actor = _actor(cur, intake_world)
+        cur.execute(
+            """insert into task_intake_choice
+                 (workspace_id, choice_set_id, token, etiqueta, accion, valor, orden)
+               select workspace_id, choice_set_id, 'duplicada-000001', etiqueta,
+                      accion, valor, 99
+                 from task_intake_choice
+                where choice_set_id = %s and accion = 'select' limit 1""",
+            (_conjunto_activo(conn, rid),))
+        conjunto = _conjunto_activo(conn, rid)
+        resuelta = I.resolve_typed_choice(
+            cur, actor, choice_set_id=conjunto, text="Reduce service delay 1",
+            chat_id=user, now=NOW)
+    assert resuelta is None
+    assert _campo(conn, rid, "objective")["estado"] != "confirmed"
+
+
+@pytest.mark.parametrize("texto", ["service", "Reduce service delay", "delay service 1"])
+def test_no_hay_coincidencia_parcial_ni_aproximada(
+        texto, intake_world, conn):
+    rid = _alta_con_eleccion(conn, intake_world)
+    with espacio(conn, intake_world["north-lab"]["id"]) as cur:
+        actor = _actor(cur, intake_world)
+        resuelta = I.resolve_typed_choice(
+            cur, actor, choice_set_id=_conjunto_activo(conn, rid), text=texto,
+            chat_id=_usuario(intake_world), now=NOW)
+    assert resuelta is None
+    assert _campo(conn, rid, "objective")["estado"] != "confirmed"
+
+
+def test_cancela_con_una_eleccion_abierta_cancela_el_borrador_y_lo_dice(
+        intake_world, conn, monkeypatch):
+    rid = _alta_con_eleccion(conn, intake_world)
+    user = _usuario(intake_world)
+    antes = _salidas(conn, user)
+    provider = _RoutingProvider([_ruta(RespectoPendiente.CANCELA)])
+
+    _escribir(conn, monkeypatch, intake_world, provider, "dejá, no la quiero crear")
+
+    assert _solicitud(conn, rid) == "cancelled"
+    assert _conjunto_activo(conn, rid) is None
+    salidas = _nuevas(conn, user, antes)
+    assert len(salidas) == 1
+    assert salidas[-1]["cuerpo"] == gateway.AVISO_ALTA_DEJADA.format(
+        titulo=f" «{TITULO}»")
+
+
+def test_otro_tema_con_una_eleccion_abierta_atiende_el_mensaje_y_la_retoma(
+        intake_world, conn, monkeypatch):
+    rid = _alta_con_eleccion(conn, intake_world)
+    user = _usuario(intake_world)
+    conjunto = _conjunto_activo(conn, rid)
+    antes = _salidas(conn, user)
+    provider = _RoutingProvider([_ruta(RespectoPendiente.OTRO_TEMA),
+                                 IntentRoute(IntentAction.NORMAL_CONVERSATION)],
+                                answer="Un bloqueo frena una tarea.")
+
+    _escribir(conn, monkeypatch, intake_world, provider, "¿qué es un bloqueo?")
+
+    assert provider.main_calls == 1
+    assert _conjunto_activo(conn, rid) == conjunto            # la elección sigue
+    salidas = _nuevas(conn, user, antes)
+    assert len(salidas) == 2                          # respuesta + retome
+    assert salidas[-2]["cuerpo"] == "Un bloqueo frena una tarea."
+    assert salidas[-1]["cuerpo"].startswith("¿Seguimos con")
+    assert salidas[-1]["pending_action_id"]                   # con "Dejarlo"
+
+
+@pytest.mark.parametrize("comando", [
+    RespectoPendiente.CHARLA, RespectoPendiente.NO_PUEDO])
+def test_charla_y_no_puedo_con_una_eleccion_abierta_repiten_la_pregunta_con_botones(
+        comando, intake_world, conn, monkeypatch):
+    rid = _alta_con_eleccion(conn, intake_world)
+    user = _usuario(intake_world)
+    conjunto = _conjunto_activo(conn, rid)
+    antes = _salidas(conn, user)
+    provider = _RoutingProvider([_ruta(comando)])
+
+    _escribir(conn, monkeypatch, intake_world, provider, "hola, che")
+
+    assert _conjunto_activo(conn, rid) == conjunto
+    salidas = _nuevas(conn, user, antes)
+    assert len(salidas) == 1
+    assert str(salidas[-1]["intake_choice_set_id"]) == conjunto
+    assert salidas[-1]["cuerpo"].endswith(_pregunta(antes, conjunto))
+    if comando is RespectoPendiente.NO_PUEDO:
+        assert salidas[-1]["cuerpo"].startswith(gateway.AVISO_NO_PUEDO_DATO_PENDIENTE)
+    else:
+        assert salidas[-1]["cuerpo"] == _pregunta(antes, conjunto)
+
+
+@pytest.mark.parametrize("comando", [
+    RespectoPendiente.DUDOSO, RespectoPendiente.CORRIGE])
+def test_dudoso_y_corrige_con_una_eleccion_abierta_preguntan_con_botones(
+        comando, intake_world, conn, monkeypatch):
+    rid = _alta_con_eleccion(conn, intake_world)
+    user = _usuario(intake_world)
+    conjunto = _conjunto_activo(conn, rid)
+    antes = _salidas(conn, user)
+    provider = _RoutingProvider([_ruta(comando)])
+
+    _escribir(conn, monkeypatch, intake_world, provider, "Reduce service delay 1")
+
+    assert _conjunto_activo(conn, rid) == conjunto            # no se consumió
+    assert _campo(conn, rid, "objective")["estado"] != "confirmed"
+    salidas = _nuevas(conn, user, antes)
+    assert len(salidas) == 1
+    assert salidas[-1]["cuerpo"].startswith("¿Esto es")
+    assert salidas[-1]["pending_action_id"]
+
+
+def test_dejarlo_del_retome_de_una_eleccion_cancela_el_borrador(
+        intake_world, conn, monkeypatch):
+    rid = _alta_con_eleccion(conn, intake_world)
+    user = _usuario(intake_world)
+    provider = _RoutingProvider([_ruta(RespectoPendiente.OTRO_TEMA),
+                                 IntentRoute(IntentAction.NORMAL_CONVERSATION)])
+    _escribir(conn, monkeypatch, intake_world, provider, "¿qué es un bloqueo?")
+    client = _callback_client(conn, monkeypatch)
+    antes = _salidas(conn, user)
+
+    assert _tocar_boton(client, conn, _token_de(conn, "Dejarlo"),
+                        user).status_code == 200
+
+    assert _solicitud(conn, rid) == "cancelled"
+    nuevas = _nuevas(conn, user, antes)
+    assert len(nuevas) == 1
+    assert nuevas[0]["cuerpo"] == gateway.AVISO_ALTA_DEJADA.format(
+        titulo=f" «{TITULO}»")
+
+
+def test_dejarlo_del_retome_del_borrador_esperando_lo_cancela(
+        intake_world, conn, monkeypatch):
+    rid, pid = _alta_en_confirmacion(conn, intake_world)
+    user = _usuario(intake_world)
+    provider = _RoutingProvider([_ruta(RespectoPendiente.OTRO_TEMA),
+                                 IntentRoute(IntentAction.NORMAL_CONVERSATION)])
+    _escribir(conn, monkeypatch, intake_world, provider, "¿qué es un bloqueo?")
+    client = _callback_client(conn, monkeypatch)
+    antes = _salidas(conn, user)
+
+    assert _tocar_boton(client, conn, _token_de(conn, "Dejarlo"),
+                        user).status_code == 200
+
+    assert _solicitud(conn, rid) == "cancelled"
+    assert len(_nuevas(conn, user, antes)) == 1
+
+
+def test_si_es_eso_del_dudoso_con_un_texto_que_no_es_la_opcion_repite_la_pregunta(
+        intake_world, conn, monkeypatch):
+    rid = _alta_con_eleccion(conn, intake_world)
+    user = _usuario(intake_world)
+    conjunto = _conjunto_activo(conn, rid)
+    provider = _RoutingProvider([_ruta(RespectoPendiente.DUDOSO)])
+    _escribir(conn, monkeypatch, intake_world, provider, "el de la bomba")
+    client = _callback_client(conn, monkeypatch)
+    antes = _salidas(conn, user)
+
+    assert _tocar_boton(client, conn, _token_de(conn, "Sí, es eso"),
+                        user).status_code == 200
+
+    assert _campo(conn, rid, "objective")["estado"] != "confirmed"
+    nuevas = _nuevas(conn, user, antes)
+    assert len(nuevas) == 1 and str(nuevas[0]["intake_choice_set_id"]) == conjunto
+
+
+def test_si_es_eso_del_dudoso_toma_la_opcion_escrita(
+        intake_world, conn, monkeypatch):
+    rid = _alta_con_eleccion(conn, intake_world)
+    user = _usuario(intake_world)
+    provider = _RoutingProvider([_ruta(RespectoPendiente.DUDOSO)])
+    _escribir(conn, monkeypatch, intake_world, provider, "Reduce service delay 1")
+    client = _callback_client(conn, monkeypatch)
+    token = _token_de(conn, "Sí, es eso")
+
+    assert _tocar_boton(client, conn, token, user).status_code == 200
+
+    assert _campo(conn, rid, "objective")["estado"] == "confirmed"
+
+
+def test_con_el_ruteo_caido_la_eleccion_queda_abierta_y_hay_una_respuesta(
+        intake_world, conn, monkeypatch):
+    rid = _alta_con_eleccion(conn, intake_world)
+    user = _usuario(intake_world)
+    conjunto = _conjunto_activo(conn, rid)
+    antes = _salidas(conn, user)
+    provider = _RoutingProvider([RuntimeError("caído"), RuntimeError("caído")])
+
+    _escribir(conn, monkeypatch, intake_world, provider, "Reduce service delay 1")
+
+    assert _conjunto_activo(conn, rid) == conjunto
+    assert _campo(conn, rid, "objective")["estado"] != "confirmed"
+    assert len(_nuevas(conn, user, antes)) == 1
+
+
+def test_el_toque_de_una_opcion_sigue_funcionando_igual(
+        intake_world, conn, monkeypatch):
+    rid = _alta_con_eleccion(conn, intake_world)
+    user = _usuario(intake_world)
+    with admin(conn) as cur:
+        cur.execute(
+            """select c.token from task_intake_choice c
+                 join task_intake_choice_set s on s.id = c.choice_set_id
+                where s.request_id = %s and s.estado = 'active'
+                  and c.etiqueta like %s""", (rid, "%Reduce service delay 1%"))
+        token = cur.fetchone()["token"]
+    client = _callback_client(conn, monkeypatch)
+
+    response = client.post(
+        "/telegram/north-lab",
+        json={"callback_query": {
+            "id": "cb-regresion", "from": {"id": user}, "data": I.callback_data(token),
+            "message": {"message_id": 7, "chat": {"id": user}}}},
+        headers={"X-Telegram-Bot-Api-Secret-Token": "test-secret"})
+
+    assert response.status_code == 200
+    assert _campo(conn, rid, "objective")["estado"] == "confirmed"
+
+
+# ------------------------------------------------------------ confirmación
+
+def _sin_conversion(conn, rid, pid):
+    with admin(conn) as cur:
+        cur.execute("select estado from pending_action where id = %s", (pid,))
+        assert cur.fetchone()["estado"] == "esperando"
+        cur.execute("select count(*) n from task where titulo = %s", (TITULO,))
+        assert cur.fetchone()["n"] == 0
+    assert _solicitud(conn, rid) == "active"
+
+
+@pytest.mark.parametrize("texto", ["sí, dale", "confirmalo", "ok"])
+def test_responde_no_convierte_el_borrador_y_dice_como_se_confirma(
+        texto, intake_world, conn, monkeypatch):
+    rid, pid = _alta_en_confirmacion(conn, intake_world)
+    user = _usuario(intake_world)
+    antes = _salidas(conn, user)
+    provider = _RoutingProvider([_ruta(RespectoPendiente.RESPONDE)])
+
+    _escribir(conn, monkeypatch, intake_world, provider, texto)
+
+    _sin_conversion(conn, rid, pid)
+    assert provider.main_calls == 0
+    assert "Confirmar" in provider.pending_calls[0]
+    salidas = _nuevas(conn, user, antes)
+    assert len(salidas) == 1
+    assert salidas[-1]["cuerpo"] == I.DRAFT_AWAITING_CONFIRMATION
+
+
+def test_corrige_no_cambia_el_borrador_y_dice_que_no_se_cambia_desde_un_mensaje(
+        intake_world, conn, monkeypatch):
+    rid, pid = _alta_en_confirmacion(conn, intake_world)
+    user = _usuario(intake_world)
+    antes = _salidas(conn, user)
+    provider = _RoutingProvider([_ruta(RespectoPendiente.CORRIGE)])
+
+    _escribir(conn, monkeypatch, intake_world, provider,
+              "cambiá la fecha para el viernes")
+
+    _sin_conversion(conn, rid, pid)
+    salidas = _nuevas(conn, user, antes)
+    assert len(salidas) == 1
+    assert salidas[-1]["cuerpo"] == (f"{gateway.AVISO_ALTA_NO_SE_CORRIGE} "
+                                     f"{I.DRAFT_AWAITING_CONFIRMATION}")
+
+
+def test_cancela_con_el_borrador_esperando_lo_cancela_y_lo_dice(
+        intake_world, conn, monkeypatch):
+    rid, pid = _alta_en_confirmacion(conn, intake_world)
+    user = _usuario(intake_world)
+    antes = _salidas(conn, user)
+    provider = _RoutingProvider([_ruta(RespectoPendiente.CANCELA)])
+
+    _escribir(conn, monkeypatch, intake_world, provider, "no, cancelalo")
+
+    assert _solicitud(conn, rid) == "cancelled"
+    with admin(conn) as cur:
+        cur.execute("select estado from pending_action where id = %s", (pid,))
+        assert cur.fetchone()["estado"] == "cancelada"
+        cur.execute("select d.estado from task_draft d join task_intake_request r "
+                    "on r.task_draft_id = d.id where r.id = %s", (rid,))
+        assert cur.fetchone()["estado"] == "cancelled"
+    salidas = _nuevas(conn, user, antes)
+    assert len(salidas) == 1
+    assert salidas[-1]["cuerpo"] == gateway.AVISO_ALTA_DEJADA.format(
+        titulo=f" «{TITULO}»")
+
+
+def test_otro_tema_con_el_borrador_esperando_atiende_el_mensaje_y_lo_retoma(
+        intake_world, conn, monkeypatch):
+    rid, pid = _alta_en_confirmacion(conn, intake_world)
+    user = _usuario(intake_world)
+    antes = _salidas(conn, user)
+    provider = _RoutingProvider([_ruta(RespectoPendiente.OTRO_TEMA),
+                                 IntentRoute(IntentAction.NORMAL_CONVERSATION)],
+                                answer="Un bloqueo frena una tarea.")
+
+    _escribir(conn, monkeypatch, intake_world, provider, "¿qué es un bloqueo?")
+
+    _sin_conversion(conn, rid, pid)
+    assert provider.main_calls == 1
+    salidas = _nuevas(conn, user, antes)
+    assert len(salidas) == 2
+    assert salidas[-2]["cuerpo"] == "Un bloqueo frena una tarea."
+    assert salidas[-1]["cuerpo"].startswith("¿Seguimos con")
+
+
+@pytest.mark.parametrize("comando", [
+    RespectoPendiente.CHARLA, RespectoPendiente.NO_PUEDO, RespectoPendiente.DUDOSO])
+def test_charla_no_puedo_y_dudoso_con_el_borrador_esperando_dejan_una_respuesta(
+        comando, intake_world, conn, monkeypatch):
+    rid, pid = _alta_en_confirmacion(conn, intake_world)
+    user = _usuario(intake_world)
+    antes = _salidas(conn, user)
+    provider = _RoutingProvider([_ruta(comando)])
+
+    _escribir(conn, monkeypatch, intake_world, provider, "hola")
+
+    _sin_conversion(conn, rid, pid)
+    assert len(_nuevas(conn, user, antes)) == 1
+
+
+def test_si_es_eso_del_dudoso_con_el_borrador_esperando_tampoco_lo_convierte(
+        intake_world, conn, monkeypatch):
+    rid, pid = _alta_en_confirmacion(conn, intake_world)
+    user = _usuario(intake_world)
+    provider = _RoutingProvider([_ruta(RespectoPendiente.DUDOSO)])
+    _escribir(conn, monkeypatch, intake_world, provider, "sí")
+    client = _callback_client(conn, monkeypatch)
+    antes = _salidas(conn, user)
+
+    assert _tocar_boton(client, conn, _token_de(conn, "Sí, es eso"),
+                        user).status_code == 200
+
+    _sin_conversion(conn, rid, pid)
+    salidas = _nuevas(conn, user, antes)
+    assert len(salidas) == 1
+    assert salidas[-1]["cuerpo"] == I.DRAFT_AWAITING_CONFIRMATION
+
+
+def test_con_el_ruteo_caido_el_borrador_queda_esperando_y_hay_una_respuesta(
+        intake_world, conn, monkeypatch):
+    rid, pid = _alta_en_confirmacion(conn, intake_world)
+    user = _usuario(intake_world)
+    antes = _salidas(conn, user)
+    provider = _RoutingProvider([RuntimeError("caído"), RuntimeError("caído")])
+
+    _escribir(conn, monkeypatch, intake_world, provider, "sí, dale")
+
+    _sin_conversion(conn, rid, pid)
+    assert len(_nuevas(conn, user, antes)) == 1
+
+
+def test_un_mensaje_no_impide_confirmar_con_el_boton(
+        intake_world, conn, monkeypatch, authority_conn):
+    rid, pid = _alta_en_confirmacion(conn, intake_world)
+    ws = intake_world["north-lab"]["id"]
+    provider = _RoutingProvider([_ruta(RespectoPendiente.RESPONDE)])
+    _escribir(conn, monkeypatch, intake_world, provider, "sí, dale")
+    with espacio(conn, ws) as cur:
+        confirmar = P.opcion_por_etiqueta(cur, pid, "Confirmar").token
+        cur.execute(
+            """select telegram_user_id from integrante
+                where membership_id = (select membership_id from pending_action
+                                        where id = %s)""", (pid,))
+        aprobador = cur.fetchone()["telegram_user_id"]
+    conn.commit()
+
+    from prisma.db import autoridad
+    with autoridad(authority_conn) as cur:
+        resuelta = P.resolver_borrador(cur, ws, confirmar, aprobador, aprobador)
+
+    assert resuelta and resuelta.task_id
+    assert _solicitud(conn, rid) == "converted"

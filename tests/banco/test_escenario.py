@@ -450,3 +450,36 @@ def test_la_familia_del_alta_guiada_carga_y_llega_a_la_pregunta_de_texto_libre()
     # Los tres tipos de comando que el alta interpreta, cada uno cubierto.
     mensajes = {e.mensajes_tras_toques[0] for e in familia}
     assert {"hola", "mejor dejalo", "¿qué tareas tengo abiertas?"} <= mensajes
+
+
+_TOQUES_HASTA_EL_BORRADOR = (
+    {"indice": 0}, {"etiqueta": "Sí"}, {"indice": 0}, {"indice": 0},
+    {"etiqueta": "Sí"}, {"etiqueta": "Sí"})
+
+
+def test_la_familia_b_0022_carga_con_la_eleccion_o_el_borrador_abiertos():
+    # T9-R1c-2: cada escenario de la familia b-0022 deja abierta una elección
+    # del alta (sin toques: queda abierta apenas empieza) o el borrador
+    # esperando confirmación (todos los pasos con botones, sin tocar Confirmar),
+    # y manda un único mensaje para interpretar.
+    import pathlib
+
+    directorio = pathlib.Path(__file__).parent / "escenarios"
+    familia = [e for e in cargar_escenarios(directorio)
+               if e.id == "b-0022" or e.variante_de == "b-0022"]
+
+    assert len(familia) >= 8
+    for e in familia:
+        assert len(e.mensajes_tras_toques) == 1, e.id
+        assert e.permite_borrador_de_tarea, e.id
+        assert e.respuesta_menciona, e.id
+        assert e.toques in ((), _TOQUES_HASTA_EL_BORRADOR), e.id
+    # Escribir la opción, otro tema, cancelar y charla con la elección abierta;
+    # confirmar, corregir y cancelar con el borrador esperando.
+    mensajes = {e.mensajes_tras_toques[0] for e in familia}
+    assert {"hola", "no, cancelalo", "sí, dale",
+            "¿qué tareas tengo abiertas?"} <= mensajes
+    con_borrador = [e for e in familia if e.toques]
+    assert len(con_borrador) == 3
+    assert all("Confirmar" not in [t.get("etiqueta") for t in e.toques]
+               for e in con_borrador)

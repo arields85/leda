@@ -1588,3 +1588,84 @@ def test_ejecutar_escenario_llega_a_la_pregunta_del_alta_y_la_interpreta(
         cur.execute("""select estado from task_intake_field
                         where campo = 'title'""")
         assert cur.fetchone()["estado"] == "missing"
+
+
+# ---------------------------------------------------------------------------
+# La familia b-0022 (T9-R1c-2, ADR 0013 regla 1): con una elección del alta o
+# el borrador esperando confirmación, el mensaje se interpreta. El corredor
+# tiene que poder llegar a los dos estados: la elección del objetivo queda
+# abierta apenas empieza el alta; el borrador, tocando cada paso.
+# ---------------------------------------------------------------------------
+
+_TITULO_OBJETIVO_ALTA = "Objetivo simulado de Cablear tablero (simulado)"
+
+_TOQUES_HASTA_EL_BORRADOR = [
+    {"indice": 0},                  # el objetivo (la única candidata)
+    {"etiqueta": "Sí"},             # el título propuesto
+    {"indice": 0},                  # la persona responsable
+    {"indice": 0},                  # el área
+    {"etiqueta": "Sí"},             # la fecha objetivo propuesta
+    {"etiqueta": "Sí"},             # el criterio de aceptación propuesto
+]
+
+
+def _interno_con_borrador(comando):
+    """El alta con todos los datos propuestos en el primer mensaje (así sólo
+    pide confirmar cada uno con botones) y después un mensaje interpretado
+    con el comando dado."""
+    return ProveedorGuionado(guion=[], rutas=[
+        IntentRoute(IntentAction.START_TASK_INTAKE, {
+            "title": "Cablear tablero norte", "objective": "Cablear tablero",
+            "responsible": "Marcos", "area": "OT", "due_date": "2030-12-30",
+            "acceptance_criterion": "Prueba firmada"}),
+        IntentRoute(IntentAction.NORMAL_CONVERSATION,
+                    respecto_pendiente=comando)])
+
+
+def test_ejecutar_escenario_escribir_la_opcion_de_la_eleccion_abierta_del_alta(
+        corework, conn):
+    ws = corework.workspace_id
+    _sembrar_objetivo_para_el_alta(conn, ws)
+    interno = _interno_con_alta([
+        IntentRoute(IntentAction.NORMAL_CONVERSATION,
+                    respecto_pendiente=RespectoPendiente.RESPONDE)])
+
+    # Sin ningún toque: la elección del objetivo ya está abierta.
+    r = ejecutar_escenario(
+        conn, ws, "corework", "Marcos Tarquini", ["armame una tarea nueva"],
+        interno, escenario_id="b-test-eleccion", indice=0,
+        mensajes_tras_toques=[_TITULO_OBJETIVO_ALTA])
+
+    assert r.bloqueado is False, r.motivo_bloqueo
+    assert "Escribí el título" in r.respuesta_texto       # el alta siguió
+    assert len(interno.pendientes) == 2 and "elección" in interno.pendientes[1]
+    with admin(conn) as cur:
+        cur.execute("""select estado from task_intake_field
+                        where campo = 'objective'""")
+        assert cur.fetchone()["estado"] == "confirmed"
+
+
+@pytest.mark.parametrize(("comando", "texto", "estado", "dice"), [
+    (RespectoPendiente.RESPONDE, "sí, dale", "active",
+     "esperando confirmación"),
+    (RespectoPendiente.CORRIGE, "cambiale la fecha", "active",
+     "no lo puedo cambiar"),
+    (RespectoPendiente.CANCELA, "no, cancelalo", "cancelled", "dejé de lado"),
+])
+def test_ejecutar_escenario_llega_al_borrador_esperando_y_lo_interpreta(
+        comando, texto, estado, dice, corework, conn):
+    ws = corework.workspace_id
+    _sembrar_objetivo_para_el_alta(conn, ws)
+
+    r = ejecutar_escenario(
+        conn, ws, "corework", "Marcos Tarquini", ["armame una tarea nueva"],
+        _interno_con_borrador(comando), escenario_id="b-test-borrador",
+        indice=0, toques=_TOQUES_HASTA_EL_BORRADOR, mensajes_tras_toques=[texto])
+
+    assert r.bloqueado is False, r.motivo_bloqueo
+    assert dice in r.respuesta_texto
+    # Ningún mensaje convierte el borrador: no hay tarea nueva.
+    assert r.conteos_despues["task"] == r.conteos_antes["task"]
+    with admin(conn) as cur:
+        cur.execute("select estado from task_intake_request")
+        assert cur.fetchone()["estado"] == estado

@@ -18,8 +18,8 @@ from .db import registrar_auditoria
 from .incidentes import registrar_incidente
 from .salida import (BUTTON_TEXT_LIMIT, ICONO_CANCELAR, ICONO_OTRA_OPCION,
                      ICONO_VER_MAS, PayloadValidationError, con_icono,
-                     enqueue_outbox, etiquetas_de_tarea, normalize_visible_text,
-                     prepare_buttons, prepare_payload, telegram_utf16_units,
+                     enqueue_outbox, etiqueta_sin_icono, etiquetas_de_tarea,
+                     normalize_visible_text, prepare_buttons, prepare_payload, telegram_utf16_units,
                      with_no_effect_status)
 
 
@@ -38,6 +38,13 @@ OTHER = con_icono("Otra opción", ICONO_OTRA_OPCION)
 # por texto, nunca un literal por lugar.
 VER_MAS = con_icono("Ver más", ICONO_VER_MAS)
 CANCELAR_BORRADOR = con_icono("Cancelar borrador", ICONO_CANCELAR)
+# Lo que se le dice a quien escribe mientras su borrador espera la confirmación
+# (T9-R1c-2): la tarea se crea sólo con el botón Confirmar, nunca con un
+# mensaje. Redacción pendiente de revisión de voz en T10.
+DRAFT_AWAITING_CONFIRMATION = (
+    "El borrador de la tarea está esperando confirmación: se confirma con el "
+    "botón Confirmar del resumen, no con un mensaje.")
+CHOICE_FALLBACK_PROMPT = "Elegí una opción para seguir con la tarea."
 USER_FIELD_LIMITS = {
     "title": 200,
     "description": 800,
@@ -463,12 +470,15 @@ def consume_pending_text(cur: psycopg.Cursor, who: Solicitante, *, chat_id: int,
 def handle_active_text(cur: psycopg.Cursor, who: Solicitante, *, chat_id: int,
                        source_inbound_id: str, source_raw_text: str,
                        now: datetime) -> IntakeOutcome | None:
-    """Atiende el mensaje de quien tiene un alta activa sin un campo de texto
-    libre abierto: el recordatorio de la elección o del estado del borrador.
+    """Atiende el mensaje de quien tiene un alta activa y ninguna pregunta
+    abierta que leer: el recordatorio de la elección o del estado del borrador.
 
-    El campo de texto libre ya no se toma acá (T9-R1c-1, ADR 0013 regla 1): un
-    mensaje que responde a una pregunta pendiente se interpreta antes, y lo
-    lee el gateway con `open_free_text_slot` y `consume_pending_text`."""
+    Las preguntas del alta (un campo de texto libre, una elección con botones
+    y el borrador esperando su confirmación) ya no se toman acá (T9-R1c-1 y
+    T9-R1c-2, ADR 0013 regla 1): un mensaje que responde a una pregunta
+    pendiente se interpreta antes, y el gateway las lee con
+    `open_intake_question`. Esto queda para el estado que no es ninguna de
+    ellas, y como red de seguridad de las otras dos."""
     cur.execute(
         """select r.*, s.id choice_set_id,
                   (select o.cuerpo from message_outbox o
@@ -487,7 +497,7 @@ def handle_active_text(cur: psycopg.Cursor, who: Solicitante, *, chat_id: int,
         return None
     request_id = str(request["id"])
     if request["choice_set_id"]:
-        prompt = request["prompt"] or "Elegí una opción para seguir con la tarea."
+        prompt = request["prompt"] or CHOICE_FALLBACK_PROMPT
         _enqueue(
             cur, request, prompt, now,
             f"intake:{request_id}:reminder:{source_inbound_id}",
@@ -501,7 +511,7 @@ def handle_active_text(cur: psycopg.Cursor, who: Solicitante, *, chat_id: int,
         (request["task_draft_id"],),
     )
     if cur.fetchone():
-        prompt = "El borrador de la tarea está esperando confirmación."
+        prompt = DRAFT_AWAITING_CONFIRMATION
     else:
         prompt = with_no_effect_status(
             "No pude continuar el borrador de la tarea. "
@@ -555,37 +565,194 @@ def open_free_text_slot(cur: psycopg.Cursor, who: Solicitante,
             "campo": row["campo"], "titulo": titulo}
 
 
-def free_text_slot_active(cur: psycopg.Cursor, who: Solicitante,
-                          slot_id: str) -> bool:
-    """Si ese campo de texto libre sigue esperando la respuesta."""
+# Las preguntas abiertas del alta (T9-R1c-1 y T9-R1c-2, ADR 0013 regla 1): lo
+# que espera la persona mientras la solicitud está activa. `tipo` dice cuál.
+QUESTION_FREE_TEXT = "free_text"      # un campo de texto libre
+QUESTION_CHOICE = "choice"            # una elección con botones
+QUESTION_CONFIRMATION = "confirmation"  # el borrador esperando su confirmación
+_TITLE_OF_REQUEST = """(select f.valor from task_intake_field f
+                         where f.request_id = r.id and f.campo = 'title'
+                           and f.estado = 'confirmed')"""
+
+
+def open_intake_question(cur: psycopg.Cursor, who: Solicitante,
+                         chat_id: int) -> dict | None:
+    """Lee, sin consumir, la pregunta que espera el alta de esta persona en
+    este chat, o `None`: `{tipo, id, request_id, campo, titulo, resumen,
+    opciones}`. `id` es el del campo de texto libre, el de la elección o el de
+    la vista previa (su `pending_action`); `resumen` es la pregunta que se le
+    hizo; `opciones` (sólo en una elección) son las etiquetas de sus botones,
+    sin íconos. Con varias, gana el campo de texto libre, después la elección:
+    una solicitud tiene una sola a la vez."""
+    slot = open_free_text_slot(cur, who, chat_id)
+    if slot is not None:
+        return {"tipo": QUESTION_FREE_TEXT, "id": slot["slot_id"],
+                "request_id": slot["request_id"], "campo": slot["campo"],
+                "titulo": slot["titulo"],
+                "resumen": free_text_question(slot["campo"]), "opciones": None}
     cur.execute(
-        """select 1 from task_intake_free_text_slot s
-             join task_intake_request r on r.id = s.request_id
-            where s.id = %s and s.workspace_id = %s and r.membership_id = %s
-              and s.estado = 'active' and r.estado = 'active'""",
-        (slot_id, who.workspace_id, who.membership_id),
+        f"""select s.id, s.request_id, s.campo, {_TITLE_OF_REQUEST} titulo,
+                   (select o.cuerpo from message_outbox o
+                     where o.intake_choice_set_id = s.id
+                     order by o.programado_para, o.id limit 1) prompt
+              from task_intake_choice_set s
+              join task_intake_request r on r.id = s.request_id
+             where s.workspace_id = %s and r.membership_id = %s
+               and r.chat_id = %s and s.estado = 'active' and r.estado = 'active'
+             order by s.creado_en desc limit 1""",
+        (who.workspace_id, who.membership_id, chat_id),
     )
-    return cur.fetchone() is not None
-
-
-def cancel_from_free_text_slot(cur: psycopg.Cursor, who: Solicitante,
-                               slot_id: str, now: datetime) -> bool:
-    """La persona deja el alta desde la pregunta de un campo de texto libre
-    (T9-R1c-1): cancela el borrador por el mismo camino que el botón "Cancelar
-    borrador", sin encolar su aviso (lo dice el gateway). `False` si ese campo
-    ya no estaba abierto: no cancela nada."""
+    row = cur.fetchone()
+    if row:
+        cur.execute(
+            """select etiqueta from task_intake_choice
+                where choice_set_id = %s and activa order by orden""",
+            (row["id"],),
+        )
+        return {"tipo": QUESTION_CHOICE, "id": str(row["id"]),
+                "request_id": str(row["request_id"]), "campo": row["campo"],
+                "titulo": _text_or_none(row["titulo"]),
+                "resumen": row["prompt"] or CHOICE_FALLBACK_PROMPT,
+                "opciones": [etiqueta_sin_icono(c["etiqueta"])
+                             for c in cur.fetchall()]}
     cur.execute(
+        f"""select p.id, r.id request_id, {_TITLE_OF_REQUEST} titulo
+              from task_intake_request r
+              join pending_action p on p.draft_id = r.task_draft_id
+                                   and p.workspace_id = r.workspace_id
+             where r.workspace_id = %s and r.membership_id = %s
+               and r.chat_id = %s and r.estado = 'active'
+               and p.estado = 'esperando'
+             order by p.creado_en desc limit 1""",
+        (who.workspace_id, who.membership_id, chat_id),
+    )
+    row = cur.fetchone()
+    if row:
+        return {"tipo": QUESTION_CONFIRMATION, "id": str(row["id"]),
+                "request_id": str(row["request_id"]), "campo": None,
+                "titulo": _text_or_none(row["titulo"]),
+                "resumen": DRAFT_AWAITING_CONFIRMATION, "opciones": None}
+    return None
+
+
+def _text_or_none(value) -> str | None:
+    return value if isinstance(value, str) else None
+
+
+# Cada tipo de pregunta se ata a su solicitud activa por su propia tabla.
+_REQUEST_OF_QUESTION = {
+    QUESTION_FREE_TEXT: (
         """select r.* from task_intake_free_text_slot s
              join task_intake_request r on r.id = s.request_id
             where s.id = %s and s.workspace_id = %s and r.membership_id = %s
-              and s.estado = 'active' and r.estado = 'active'
-            for update of s, r""",
-        (slot_id, who.workspace_id, who.membership_id),
-    )
-    request = cur.fetchone()
+              and s.estado = 'active' and r.estado = 'active'""",
+        "for update of s, r"),
+    QUESTION_CHOICE: (
+        """select r.* from task_intake_choice_set s
+             join task_intake_request r on r.id = s.request_id
+            where s.id = %s and s.workspace_id = %s and r.membership_id = %s
+              and s.estado = 'active' and r.estado = 'active'""",
+        "for update of s, r"),
+    QUESTION_CONFIRMATION: (
+        """select r.* from pending_action p
+             join task_intake_request r on r.task_draft_id = p.draft_id
+                                       and r.workspace_id = p.workspace_id
+            where p.id = %s and p.workspace_id = %s and r.membership_id = %s
+              and p.estado = 'esperando' and r.estado = 'active'""",
+        "for update of p, r"),
+}
+
+
+def _request_of_question(cur, who, kind: str, question_id: str, *, lock: bool):
+    query, lock_clause = _REQUEST_OF_QUESTION[kind]
+    cur.execute(f"{query} {lock_clause if lock else ''}",
+                (question_id, who.workspace_id, who.membership_id))
+    return cur.fetchone()
+
+
+def intake_question_active(cur: psycopg.Cursor, who: Solicitante, kind: str,
+                           question_id: str) -> bool:
+    """Si esa pregunta sigue esperando la respuesta (`tipo` e `id` de
+    `open_intake_question`)."""
+    return _request_of_question(cur, who, kind, question_id, lock=False) is not None
+
+
+def cancel_from_intake_question(cur: psycopg.Cursor, who: Solicitante, kind: str,
+                                question_id: str, now: datetime) -> bool:
+    """La persona deja el alta desde una pregunta abierta (T9-R1c-1 y
+    T9-R1c-2): cancela el borrador por el mismo camino que el botón "Cancelar
+    borrador", sin encolar su aviso (lo dice el gateway). `False` si esa
+    pregunta ya no estaba abierta: no cancela nada."""
+    request = _request_of_question(cur, who, kind, question_id, lock=True)
     if not request:
         return False
     _cancel(cur, request, who, now, enqueue=False)
+    return True
+
+
+def resolve_typed_choice(cur: psycopg.Cursor, who: Solicitante, *,
+                         choice_set_id: str, text: str, chat_id: int,
+                         now: datetime) -> IntakeOutcome | None:
+    """Resuelve la elección abierta con lo que la persona escribió, igual que
+    su toque (`resolve_choice`), sólo si el texto es exactamente UNA de las
+    opciones activas: mismo texto normalizado, sin mayúsculas y sin el ícono
+    del botón. Una opción de entidad (objetivo, persona, área) también se
+    reconoce por su nombre completo, que el botón puede acortar. Ninguna
+    coincidencia parcial ni aproximada: con cero o con varias opciones, no
+    resuelve y devuelve `None`; las opciones son las únicas respuestas."""
+    cur.execute(
+        """select c.token, c.etiqueta, c.valor
+             from task_intake_choice c
+             join task_intake_choice_set s on s.id = c.choice_set_id
+             join task_intake_request r on r.id = s.request_id
+            where s.id = %s and s.workspace_id = %s and r.membership_id = %s
+              and s.estado = 'active' and r.estado = 'active' and c.activa
+            order by c.orden""",
+        (choice_set_id, who.workspace_id, who.membership_id),
+    )
+    wanted = _match_key(text)
+    matches = [row for row in cur.fetchall()
+               if wanted and wanted in _option_keys(row)]
+    if len(matches) != 1:
+        return None
+    return resolve_choice(cur, who, token=matches[0]["token"],
+                          chat_id=chat_id, now=now)
+
+
+def _match_key(text: str) -> str:
+    return normalize_text(text).casefold()
+
+
+def _option_keys(option) -> set[str]:
+    keys = {_match_key(etiqueta_sin_icono(option["etiqueta"]))}
+    value = option["valor"]
+    if isinstance(value, dict):
+        for name in (value.get("title"), value.get("name")):
+            if isinstance(name, str):
+                keys.add(_match_key(name))
+    return keys
+
+
+def resend_choice_prompt(cur: psycopg.Cursor, who: Solicitante,
+                         choice_set_id: str, now: datetime, ref: str,
+                         prefix: str = "") -> bool:
+    """Vuelve a mandar la pregunta de la elección abierta con sus botones
+    (`prefix`, si viene, va delante en el mismo mensaje). `False` si la
+    elección ya no estaba abierta: no manda nada. `ref` distingue este
+    reenvío de otros (el mensaje que lo causó)."""
+    request = _request_of_question(cur, who, QUESTION_CHOICE, choice_set_id,
+                                   lock=False)
+    if not request:
+        return False
+    cur.execute(
+        """select cuerpo from message_outbox where intake_choice_set_id = %s
+            order by programado_para, id limit 1""",
+        (choice_set_id,),
+    )
+    row = cur.fetchone()
+    prompt = row["cuerpo"] if row else CHOICE_FALLBACK_PROMPT
+    _enqueue(cur, request, f"{prefix}{prompt}", now,
+             f"intake:{request['id']}:reask:{ref}", choice_set_id=choice_set_id)
     return True
 
 
