@@ -1529,7 +1529,8 @@ def test_ejecutar_escenario_da_a_cada_mensaje_un_id_de_telegram_distinto(
     with admin(conn) as cur:
         cur.execute(
             """select telegram_message_id from inbound_message
-                where workspace_id = %s order by at""", (ws,))
+                where workspace_id = %s and texto is not null
+                order by at""", (ws,))       # los toques dejan una fila sin texto
         ids = [f["telegram_message_id"] for f in cur.fetchall()]
     assert len(ids) == 3
     assert len(set(ids)) == 3

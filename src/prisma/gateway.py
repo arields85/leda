@@ -569,6 +569,20 @@ def _activacion(conn, workspace_id: str, texto: str, tg_user: int,
     return {"ok": True}
 
 
+def _registrar_toque(cur, workspace_id: str, chat_id: int, quien) -> None:
+    """Deja constancia de que esta persona tocó un botón en este chat (T9-R1d-2b):
+    es actividad, igual que un mensaje escrito, para la ventana que acota la
+    retención de lo que Prisma inicia (`despachador.VENTANA_DE_ACTIVIDAD`). Es una
+    fila de `inbound_message` sin texto ni id de mensaje de Telegram (no se le
+    inventa una clasificación): el historial de la conversación sólo
+    lee las que tienen texto."""
+    cur.execute(
+        """insert into inbound_message
+             (workspace_id, chat_id, app_user_id)
+           values (%s, %s, %s)""",
+        (workspace_id, chat_id, quien.app_user_id))
+
+
 def _toque(conn, workspace_id: str, slug: str, toque: dict,
            tg_user: int | None, authority_conn=None) -> dict:
     """Alguien apretó un botón.
@@ -616,6 +630,7 @@ def _toque(conn, workspace_id: str, slug: str, toque: dict,
             except Denegado:
                 return {"ok": True}      # desconocido: no se le responde
 
+            _registrar_toque(cur, workspace_id, chat_id, quien)
             if intake_token:
                 I.resolve_choice(cur, quien, token=intake_token,
                                  chat_id=chat_id, now=ahora)
@@ -1541,22 +1556,20 @@ def _ver_pregunta_abierta(cur, quien, chat_id: int, ahora, *, alta: bool):
     que espera a otro aprobador): ese es un mensaje que inicia Prisma."""
     from . import herramientas as H
     from . import pendientes as P
-    from .ingreso_tareas import open_intake_question
 
-    if alta:
-        pregunta = open_intake_question(cur, quien, chat_id)
-        if pregunta is not None:
-            args = {"campo": pregunta["campo"], "titulo": pregunta["titulo"],
-                    "request_id": pregunta["request_id"]}
-            if pregunta["opciones"] is not None:
-                args["opciones"] = pregunta["opciones"]
-            return P.ModificacionAbierta(
-                pregunta_id=pregunta["id"],
-                herramienta=_SENTINEL_DE_ALTA[pregunta["tipo"]], args=args,
-                resumen=pregunta["resumen"])
-    rama = P.ver_rama_abierta(cur, quien, chat_id, ahora, H.REGISTRO)
+    rama = P.ver_rama_abierta(cur, quien, chat_id, ahora, H.REGISTRO, alta=alta)
     if rama is None:
         return None
+    if rama.tipo == P.RAMA_ALTA:
+        pregunta = rama.alta
+        args = {"campo": pregunta["campo"], "titulo": pregunta["titulo"],
+                "request_id": pregunta["request_id"]}
+        if pregunta["opciones"] is not None:
+            args["opciones"] = pregunta["opciones"]
+        return P.ModificacionAbierta(
+            pregunta_id=pregunta["id"],
+            herramienta=_SENTINEL_DE_ALTA[pregunta["tipo"]], args=args,
+            resumen=pregunta["resumen"])
     if rama.tipo == P.RAMA_DATO:
         return rama.modificacion
     pendiente = rama.pendiente

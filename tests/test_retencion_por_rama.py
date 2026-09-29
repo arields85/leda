@@ -12,8 +12,9 @@ lo dirigido a esa persona en ese chat, nunca una respuesta, y se reporta:
 "Rama abierta" es la misma definición que usa la conversación
 (`pendientes.ver_rama_abierta`): el dato que se pidió por escrito (Modificar), la
 elección con botones que Prisma pidió y la vista previa del cambio que la persona
-pidió. Las preguntas del alta guiada no tienen vencimiento todavía y no retienen
-(decisión pendiente, ver `odd/tasks/prisma-orienta.md`).
+pidió, más las preguntas del alta guiada. Se retiene sólo mientras la persona
+está activa (`despachador.VENTANA_DE_ACTIVIDAD`): la ventana y las preguntas del
+alta se prueban en `test_retencion_por_actividad.py`.
 """
 
 from __future__ import annotations
@@ -44,7 +45,14 @@ def _telegram_id(cur, nombre: str) -> int:
 
 def _abrir(cur, quien, tg: int, *, herramienta="registrar_bloqueo", campo=None,
            opciones=None, vence=AHORA + timedelta(hours=8)) -> str:
-    """Deja abierta una pregunta de esta persona en su chat."""
+    """Deja abierta una pregunta de esta persona en su chat, y a ella activa: la
+    retención sólo vale mientras escribió o tocó algo en los últimos 30 minutos
+    (T9-R1d-2b), y acá lo hizo a las `AHORA`."""
+    cur.execute(
+        """insert into inbound_message
+             (workspace_id, chat_id, app_user_id, texto, at)
+           values (%s, %s, %s, 'hola', %s)""",
+        (quien.workspace_id, tg, quien.app_user_id, AHORA))
     return P.registrar(
         cur, quien, herramienta=herramienta, args={}, resumen="¿Confirmás?",
         vence_en=vence, campo=campo, opciones=opciones, chat_id=tg).id
