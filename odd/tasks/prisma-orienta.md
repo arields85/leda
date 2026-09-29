@@ -257,7 +257,7 @@ gestión.
         de "Dejarlo" y de "Sí, es eso" tardíos en `test_alta_pregunta_pendiente.py`.
         Compromiso aceptado por la regla 1 (R4): el alta ahora depende del ruteo; con el
         ruteo caído el campo queda abierto y cada campo suma una llamada de ruteo.
-  - [ ] **T9-R1d — Una sola rama de conversación abierta** (enmienda del ADR 0013 regla
+  - [x] **T9-R1d — Una sola rama de conversación abierta** (enmienda del ADR 0013 regla
     1, decisión del usuario del 2026-09-29). Con una pregunta abierta, `otro_tema` ya no
     se atiende: una pregunta con botones **[Seguir con …]** / **[Dejar … y ver lo
     otro]**; Seguir repite la pregunta pendiente; Dejar cierra lo pendiente como
@@ -292,7 +292,7 @@ gestión.
       mismo turno). Más los seguimientos de `review-0c99f611fc23e0cd`: prueba del caso en
       que la vista previa no entra con botones, y de las vistas previas armadas desde el
       menú (y con `bloqueo_id`).
-    - [ ] **T9-R1d-2b** — tras `review-080f1ef080f22e16`: acotar la pasada de
+    - [x] **T9-R1d-2b** — tras `review-080f1ef080f22e16`: acotar la pasada de
       `despachar` (hoy, con filas retenidas, sigue pidiendo lotes sin tope dentro de una
       sola transacción con bloqueos y envíos), alinear su comentario, hacer explícito que
       una respuesta nunca se retiene, y la ventana de retención decidida por el usuario
@@ -312,8 +312,14 @@ gestión.
     `copy_text` si entra en 256 caracteres) para pegarlo, corregirlo y mandarlo; un dato
     con opciones vuelve a mostrar sus botones; cambia sólo ese dato y vuelve la vista
     previa actualizada. `corrige` sobre la vista previa lleva a este camino en vez de
-    `AVISO_ALTA_NO_SE_CORRIGE`. Después de T9-R1d.
+    `AVISO_ALTA_NO_SE_CORRIGE`. Después de T9-R1d. Más los seguimientos de
+    `review-3ebe127d376a4d18`: probar que el mensaje que muestra la elección del alta no
+    se retiene contra su propia rama; que el conteo de `retenidos` respete el vencimiento
+    y el bloqueo de las filas (y que lo vencido de alguien retenido se descarte igual);
+    un reloj único en la prueba del toque; y la prueba del aprobador sin nombre legible.
   - [ ] **T9-R2 — Cada mensaje recibe exactamente una respuesta visible** (H15, H19).
+    Ojo: desde `3255418` cada toque deja una fila de `inbound_message` sin texto (para
+    medir la actividad); el control de una respuesta por mensaje tiene que contemplarlas.
     `procesar_update` sólo lee `text` (`gateway.py:213`); control estructural al cerrar
     el mensaje; epígrafe como texto; comprobación del banco y del validador.
   - [ ] **T9-R3 — Decir el estado real y ofrecer sólo lo posible** (H20, H18, H16).
@@ -4607,3 +4613,16 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   la pasada de `despachar` quedó sin tope con filas retenidas (T9-R1d-2b), un urgente se
   retiene igual que el resto (decisión del usuario), comentario del lazo, `Solicitante`
   vacío si falta la membresía, orden por milisegundos en el reenvío en partes.
+
+- 2026-09-29: **T9-R1d-2b.** Ruta: delegada, un escritor. `3255418`: se retiene sólo si
+  la persona escribió o tocó algo en ese chat en los últimos 30 minutos
+  (`VENTANA_DE_ACTIVIDAD`); la actividad sale de `inbound_message` y cada toque ahora deja
+  una fila sin texto (el historial del modelo ya filtraba `texto` vacío); las preguntas
+  del alta entran en la definición única de rama (`RAMA_ALTA`) y retienen, acotadas por la
+  actividad; la pasada de `despachar` examina como mucho `lote` filas (una fila por vez,
+  y las de alguien retenido se excluyen de la consulta); una respuesta nunca se retiene,
+  explícito en el helper; sin membresía, no se retiene. Suite del escritor 1719 passed, 234
+  deselected; padre: enfocadas 92 passed. RDD: tramo `2109fc9..3255418` medio, 734 líneas,
+  `review-3ebe127d376a4d18` **aprobada y reconocida**; frontera en `3255418`. Con esto
+  T9-R1d queda completo. El usuario dio consentimiento permanente para las revisiones
+  ("aprobar de ahora en adelante las revisiones de forma automática").
