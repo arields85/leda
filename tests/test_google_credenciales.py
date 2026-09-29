@@ -213,14 +213,14 @@ def test_el_ciclo_completo_de_estados(intake_world, conn):
         assert GC.estado(cur) == "vigente"
         cred = GC.leer(cur, cifrador=cifrador)
         assert cred.secreto == "secreto-1"
-        assert cred.autorizada_en is not None
+        assert cred.autorizado_en is not None
         assert cred.cuenta_email == CUENTA
         assert cred.scopes == SCOPES
         assert cred.estado == "vigente"
 
     with espacio(conn, norte) as cur:
         assert GC.marcar_reautorizacion(
-            cur, "invalid_grant", cred.autorizada_en) == GC.MARCADA
+            cur, "invalid_grant", cred.autorizado_en) == GC.MARCADA
     conn.commit()
     with espacio(conn, norte) as cur:
         assert GC.estado(cur) == "requiere_reautorizacion"
@@ -265,12 +265,12 @@ def test_marcar_o_revocar_sin_credencial_vigente_no_emite_nada(intake_world, con
     cred = _leida(conn, norte, cifrador)
     with espacio(conn, norte) as cur:
         assert GC.marcar_reautorizacion(
-            cur, "invalid_grant", cred.autorizada_en) == GC.MARCADA
+            cur, "invalid_grant", cred.autorizado_en) == GC.MARCADA
     conn.commit()
     # Idempotente: ya requiere reautorización, no se repite el evento.
     with espacio(conn, norte) as cur:
         assert GC.marcar_reautorizacion(
-            cur, "invalid_grant", cred.autorizada_en) == GC.SIN_CAMBIO
+            cur, "invalid_grant", cred.autorizado_en) == GC.SIN_CAMBIO
     conn.commit()
     assert len(_eventos(conn, norte)) == 2
 
@@ -281,7 +281,7 @@ def test_marcar_o_revocar_sin_credencial_vigente_no_emite_nada(intake_world, con
     assert len(_eventos(conn, norte)) == 3
     with espacio(conn, norte) as cur:
         assert GC.marcar_reautorizacion(
-            cur, "invalid_grant", cred.autorizada_en) == GC.SIN_CAMBIO
+            cur, "invalid_grant", cred.autorizado_en) == GC.SIN_CAMBIO
 
 
 def test_una_credencial_revocada_devuelve_sin_cambio_aunque_coincida(
@@ -295,7 +295,7 @@ def test_una_credencial_revocada_devuelve_sin_cambio_aunque_coincida(
     conn.commit()
     with espacio(conn, norte) as cur:
         assert GC.marcar_reautorizacion(
-            cur, "invalid_grant", cred.autorizada_en) == GC.SIN_CAMBIO
+            cur, "invalid_grant", cred.autorizado_en) == GC.SIN_CAMBIO
 
 
 def test_un_invalid_grant_tardio_no_pisa_una_credencial_reautorizada(
@@ -310,7 +310,7 @@ def test_un_invalid_grant_tardio_no_pisa_una_credencial_reautorizada(
 
     with espacio(conn, norte) as cur:
         assert GC.marcar_reautorizacion(
-            cur, "invalid_grant", leida_a.autorizada_en) == GC.CREDENCIAL_CAMBIO
+            cur, "invalid_grant", leida_a.autorizado_en) == GC.CREDENCIAL_CAMBIO
     conn.commit()
 
     with espacio(conn, norte) as cur:
@@ -322,7 +322,7 @@ def test_un_invalid_grant_tardio_no_pisa_una_credencial_reautorizada(
     leida_b = _leida(conn, norte, cifrador)
     with espacio(conn, norte) as cur:
         assert GC.marcar_reautorizacion(
-            cur, "invalid_grant", leida_b.autorizada_en) == GC.MARCADA
+            cur, "invalid_grant", leida_b.autorizado_en) == GC.MARCADA
 
 
 def test_recifrar_no_cambia_la_identidad_de_la_credencial_leida(intake_world, conn):
@@ -337,7 +337,7 @@ def test_recifrar_no_cambia_la_identidad_de_la_credencial_leida(intake_world, co
     conn.commit()
     with espacio(conn, norte) as cur:
         assert GC.marcar_reautorizacion(
-            cur, "invalid_grant", leida.autorizada_en) == GC.MARCADA
+            cur, "invalid_grant", leida.autorizado_en) == GC.MARCADA
 
 
 @pytest.mark.parametrize("motivo", [
@@ -351,7 +351,7 @@ def test_el_motivo_es_un_codigo_corto_saneado(intake_world, conn, motivo):
     cred = _leida(conn, norte, cifrador)
     with espacio(conn, norte) as cur:
         with pytest.raises(psycopg.errors.CheckViolation):
-            GC.marcar_reautorizacion(cur, motivo, cred.autorizada_en)
+            GC.marcar_reautorizacion(cur, motivo, cred.autorizado_en)
     conn.rollback()
     assert [e["tipo"] for e in _eventos(conn, norte)] == ["autorizada"]
 
@@ -919,3 +919,45 @@ def test_recifrar_cierra_la_conexion_y_deshace_si_algo_falla(
         cli.main(["google", "recifrar"])
     assert espia.cerrada
     assert espia.rollbacks >= 1
+
+
+def test_recifrar_conserva_el_error_original_si_el_rollback_tambien_falla(
+        intake_world, conn, monkeypatch):
+    """Un `rollback()` roto no puede tapar la falla que lo provocó."""
+    class _RollbackRoto(_ConexionEspia):
+        def rollback(self):
+            self.rollbacks += 1
+            raise ConnectionError("rollback roto")
+
+    espia = _RollbackRoto(conn)
+    monkeypatch.setattr(cli, "conectar", lambda *a, **k: espia)
+    monkeypatch.setenv(cifrado.VARIABLE_CLAVE, _clave())
+
+    def falla(cur, cifrador):
+        raise RuntimeError("falla original")
+
+    monkeypatch.setattr(GC, "recifrar_todo", falla)
+    with pytest.raises(RuntimeError, match="falla original"):
+        cli.main(["google", "recifrar"])
+    assert espia.rollbacks == 1
+    assert espia.cerrada
+
+
+def test_marcar_reautorizacion_falla_cerrado_ante_un_resultado_desconocido():
+    for valor in ("otra_cosa", None, ""):
+        with pytest.raises(GC.ResultadoDesconocido):
+            GC.marcar_reautorizacion(
+                _CursorFalso({"resultado": valor}), "invalid_grant", AHORA)
+    for valor in (GC.MARCADA, GC.SIN_CAMBIO, GC.CREDENCIAL_CAMBIO):
+        assert GC.marcar_reautorizacion(
+            _CursorFalso({"resultado": valor}), "invalid_grant", AHORA) == valor
+
+
+def test_credenciales_no_importa_el_alta_con_correo_al_cargarse():
+    """Sin ciclo posible cuando el alta con correo mande por Gmail."""
+    import subprocess
+    import sys
+
+    codigo = ("import sys, prisma.google.credenciales;"
+              "sys.exit(1 if 'prisma.alta_correo' in sys.modules else 0)")
+    assert subprocess.run([sys.executable, "-c", codigo]).returncode == 0

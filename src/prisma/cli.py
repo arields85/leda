@@ -193,7 +193,8 @@ def _google_recifrar() -> int:
             r = credenciales.recifrar_todo(cur, cifrador)
         conn.commit()
     except BaseException:
-        conn.rollback()
+        # Si el rollback también falla no se pierde la falla original.
+        _revertir_sin_traza(conn)
         raise
     finally:
         conn.close()

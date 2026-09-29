@@ -26,7 +26,7 @@ from datetime import datetime
 import psycopg
 
 from . import cifrado
-from ..alta_correo import registrar_config_invalida
+from ..config_espacio import registrar_config_invalida
 
 CLAVE_HABILITADO = "google.habilitado"
 CLAVE_SCOPES = "google.scopes_habilitados"
@@ -48,6 +48,11 @@ class EstadoDesconocido(RuntimeError):
     de tratarlo como uno válido."""
 
 
+class ResultadoDesconocido(RuntimeError):
+    """`marcar_reautorizacion_google` devolvió algo fuera de sus tres
+    resultados: se falla en vez de pasarlo a quien llama."""
+
+
 @dataclass(frozen=True)
 class CredencialGoogle:
     """La credencial ya descifrada. `secreto` no aparece en `repr`."""
@@ -58,7 +63,7 @@ class CredencialGoogle:
     estado: str
     # Identifica ESTA autorización: quien avisa que Google la rechazó lo
     # devuelve a `marcar_reautorizacion` para no pisar una más nueva.
-    autorizada_en: datetime
+    autorizado_en: datetime
 
 
 @dataclass(frozen=True)
@@ -165,25 +170,30 @@ def leer(cur: psycopg.Cursor, *,
         cuenta_email=fila["cuenta_email"],
         scopes=tuple(fila["scopes"]),
         estado=estado_leido,
-        autorizada_en=fila["autorizado_en"])
+        autorizado_en=fila["autorizado_en"])
 
 
 def marcar_reautorizacion(cur: psycopg.Cursor, motivo: str,
-                         autorizada_en: datetime) -> str:
+                         autorizado_en: datetime) -> str:
     """Google rechazó la credencial: pasa de `vigente` a
     `requiere_reautorizacion`. `motivo` es un código corto (minúsculas,
     dígitos y guion bajo), nunca el cuerpo de un error.
 
-    `autorizada_en` es el de la credencial que quien llama efectivamente
-    usó (`CredencialGoogle.autorizada_en`): la marca es una comparación, y si
+    `autorizado_en` es el de la credencial que quien llama efectivamente
+    usó (`CredencialGoogle.autorizado_en`): la marca es una comparación, y si
     entre la lectura y el rechazo se volvió a autorizar, el rechazo es de la
     credencial vieja y no se toca la nueva. Devuelve `MARCADA`, `SIN_CAMBIO`
     (no había una vigente: ya requería reautorización, revocada o ninguna) o
     `CREDENCIAL_CAMBIO` (la vigente ya no es la usada). Ninguno es un
     error."""
     cur.execute("select marcar_reautorizacion_google(%s, %s) as resultado",
-                (motivo, autorizada_en))
-    return cur.fetchone()["resultado"]
+                (motivo, autorizado_en))
+    resultado = cur.fetchone()["resultado"]
+    if resultado not in (MARCADA, SIN_CAMBIO, CREDENCIAL_CAMBIO):
+        raise ResultadoDesconocido(
+            "La base devolvió un resultado de reautorización de Google "
+            "desconocido.")
+    return resultado
 
 
 # ---------------------------------------------------------------------------
