@@ -83,7 +83,10 @@ def test_escenario_contra_modelo_real(
         aclaracion_esperada=escenario.aclaracion_esperada or None,
         toques=list(escenario.toques) or None,
         mensajes_tras_toques=list(escenario.mensajes_tras_toques) or None,
-        toques_tras_mensajes=list(escenario.toques_tras_mensajes) or None)
+        toques_tras_mensajes=list(escenario.toques_tras_mensajes) or None,
+        preguntas_sembradas={
+            c: escenario.precondiciones[c] for c in ("vista_previa", "aclaracion")
+            if escenario.precondiciones.get(c)} or None)
 
     if resultado.bloqueado:
         entrada = EntradaReporte(

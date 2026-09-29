@@ -15,23 +15,27 @@ import itertools
 import threading
 import time
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from typing import Any
 
 from psycopg.types.json import Jsonb
 
 import prisma.jev as jev_modulo
 import prisma.llm as llm_modulo
+from prisma import agente
 from prisma import gateway
+from prisma import herramientas as H
 from prisma import ingreso_tareas as I
 from prisma import pendientes as P
 from prisma.agente import DISCULPA
-from prisma.autoridad import Canal, Solicitante
-from prisma.db import admin
+from prisma.autoridad import Canal, Solicitante, identificar_en_espacio
+from prisma.calendario import Calendario
+from prisma.db import admin, espacio
 from prisma.jev import ClienteJevGuionado
 from prisma.llm import (IntentAction, IntentRoute, Llamada, Proveedor,
                         ProveedorGuionado, RespectoPendiente, Respuesta,
                         RouteEnvelope)
-from prisma.salida import etiquetas_coinciden
+from prisma.salida import etiquetas_coinciden, etiquetas_de_tarea
 
 # 'objective', 'evidence' y 'approval' se agregaron en T4 (banco-conversacional
 # -> vista-previa-y-confirmacion): son las tablas que escriben crear_objetivo,
@@ -522,6 +526,87 @@ def _sembrar_borrador_de_alta(cur, ws: str, borrador: dict) -> str:
     return solicitud_id
 
 
+def _tarea_por_titulo(cur, ws: str, titulo: str) -> str:
+    """El id de la única tarea del espacio con este título (bajo el cursor con
+    RLS del espacio). Ninguna, o más de una: `LookupError`."""
+    cur.execute("select id from task where workspace_id = %s and titulo = %s",
+                (ws, titulo))
+    filas = cur.fetchall()
+    if len(filas) != 1:
+        raise LookupError(
+            f"Se esperaba una tarea llamada '{titulo}' en este espacio y hay "
+            f"{len(filas)}.")
+    return str(filas[0]["id"])
+
+
+def _sembrar_vista_previa(cur, quien: Solicitante, ws: str, chat: int,
+                          vista_previa: dict) -> None:
+    """Deja esperando la vista previa de un cambio que `quien` pidió, por el
+    mismo camino que el agente (`herramientas.ejecutar` sin `ya_confirmada`
+    levanta `NecesitaConfirmacion` y `agente._encolar_confirmacion` la guarda y
+    la encola con sus tres botones). `vista_previa` trae la `herramienta`, la
+    `tarea` (su título) y sus `args` sin el id; el id lo pone el corredor
+    (`campo_id`, `tarea_id` por omisión). Lo que no deja una vista previa
+    esperando: `LookupError`."""
+    faltan = [c for c in ("herramienta", "tarea") if not vista_previa.get(c)]
+    if faltan:
+        raise LookupError(f"'vista_previa' no trae {faltan}.")
+    args = {**vista_previa.get("args", {}),
+            vista_previa.get("campo_id", "tarea_id"):
+                _tarea_por_titulo(cur, ws, vista_previa["tarea"])}
+    try:
+        H.ejecutar(cur, quien, vista_previa["herramienta"], args, chat_id=chat)
+    except H.NecesitaConfirmacion as e:
+        agente._encolar_confirmacion(
+            cur, quien, chat, e, Calendario.desde_base(cur, ws),
+            datetime.now(timezone.utc))
+    else:
+        raise LookupError(
+            f"'{vista_previa['herramienta']}' no dejó una vista previa esperando.")
+
+
+def _sembrar_aclaracion(cur, quien: Solicitante, ws: str, chat: int,
+                        aclaracion: dict) -> None:
+    """Deja esperando la aclaración con botones de una referencia ambigua
+    (`gateway._preguntar_por_botones`): una tarea por botón, en el orden dado,
+    y "Ninguna, lo escribo". `aclaracion` trae la `referencia`, las `tareas`
+    candidatas (sus títulos) y, opcional, el `mensaje` original."""
+    faltan = [c for c in ("referencia", "tareas") if not aclaracion.get(c)]
+    if faltan:
+        raise LookupError(f"'aclaracion' no trae {faltan}.")
+    titulos = list(aclaracion["tareas"])
+    candidatas = [
+        {"id": _tarea_por_titulo(cur, ws, titulo), "etiqueta": etiqueta,
+         "titulo": titulo}
+        for titulo, etiqueta in zip(titulos, etiquetas_de_tarea(titulos))]
+    referencia = aclaracion["referencia"]
+    estado = {
+        "mensaje": aclaracion.get("mensaje", ""), "entrante_id": None,
+        "route_action": IntentAction.NORMAL_CONVERSATION.value, "route_task": {},
+        "resueltas": {}, "titulos_resueltas": {}, "bloque_base": "",
+        "hay_clara": False, "pendientes": [referencia],
+        "candidatas": {referencia: candidatas}, "modificacion": None,
+        "no_proponer": None}
+    gateway._preguntar_por_botones(cur, quien, ws, chat,
+                                   datetime.now(timezone.utc), estado)
+
+
+def _sembrar_preguntas(conn, ws: str, tg_id: int, chat: int,
+                       preguntas: dict) -> None:
+    """Siembra las preguntas que el escenario declara ya esperando
+    (`Escenario.precondiciones`: `vista_previa`, `aclaracion`), como la persona
+    `tg_id`, en su chat. Van por el circuito real y no por el modelo: un
+    escenario que ejercita lo que pasa con una pregunta abierta no depende de
+    que el modelo (ni Jev) abran exactamente una cosa con un primer mensaje."""
+    with espacio(conn, ws) as cur:
+        quien = identificar_en_espacio(cur, tg_id, ws)
+        if preguntas.get("vista_previa"):
+            _sembrar_vista_previa(cur, quien, ws, chat, preguntas["vista_previa"])
+        if preguntas.get("aclaracion"):
+            _sembrar_aclaracion(cur, quien, ws, chat, preguntas["aclaracion"])
+    conn.commit()
+
+
 def sembrar_precondiciones(cur, ws: str, precondiciones: dict) -> dict[str, str]:
     """Crea el estado ficticio de un escenario (tareas, bloqueos,
     dependencias) bajo una conexión de administración, y devuelve el mapeo
@@ -864,6 +949,7 @@ def ejecutar_escenario(
     aclaracion_esperada: dict | None = None, toques: list[dict] | None = None,
     mensajes_tras_toques: list[str] | None = None,
     toques_tras_mensajes: list[dict] | None = None,
+    preguntas_sembradas: dict | None = None,
 ) -> ResultadoCorrida:
     """Corre un escenario por `gateway.procesar_update`, con
     `proveedor_real` envuelto en `ProveedorGrabador` e inyectado en lugar de
@@ -930,6 +1016,13 @@ def ejecutar_escenario(
     pregunta ya salió: la respuesta visible que se evalúa es sólo la de estos
     toques y lo que sigue.
 
+    `preguntas_sembradas` (T9-R1d-1c): las preguntas que el escenario declara ya
+    esperando (`vista_previa`, `aclaracion`; `Escenario.precondiciones`), que el
+    corredor deja abiertas antes de los mensajes por el mismo camino real
+    (`_sembrar_preguntas`) -- después de marcar el arranque de la corrida, así el
+    Confirmar automático del final todavía encuentra la vista previa. Si el
+    escenario no trae mensajes propios, lo que se evalúa es lo que sigue.
+
     Un fallo durante el procesamiento (por ejemplo, infraestructura del
     escenario mal declarada) deja la corrida `bloqueado`, con el motivo, en
     vez de propagar la excepción -- así una corrida rota no corta el resto
@@ -982,6 +1075,9 @@ def ejecutar_escenario(
     # (review-dd7cd3c9cb7e8575). Los toques usan el suyo, aparte.
     ids_de_mensaje = itertools.count(1)
     try:
+        if preguntas_sembradas:
+            _sembrar_preguntas(conn, workspace_id, tg_id, chat, preguntas_sembradas)
+
         for texto in mensajes:
             gateway.procesar_update(conn, slug, _update_de_texto(
                 next(ids_de_mensaje), texto, chat, tg_id))

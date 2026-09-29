@@ -8,11 +8,17 @@ objetivo: >
   te mostré. ¿Seguimos con eso?"). La consulta no se contesta y no se aplica
   nada antes del Confirmar; ese toque lo simula el corredor al final, sobre la
   vista previa original, que sigue esperando. El mensaje que se evalúa es el que
-  llega después de la vista previa (`mensajes_tras_toques`).
+  llega después de la vista previa (`mensajes_tras_toques`). La vista previa se
+  siembra (T9-R1d-1c): con dos tareas en juego, el primer mensaje dejaba a Jev
+  con una referencia ambigua y abría la aclaración con botones, no la vista previa.
 actor: Nahuel Gimenez
-mensajes:
-  - "quedé trabado con el cableado, todavía no me pasaron el plano que prometieron"
+mensajes: []
 precondiciones:
+  vista_previa:
+    herramienta: registrar_bloqueo
+    tarea: Cablear tablero de la máquina 3 (simulado)
+    args:
+      causa: no me pasaron el plano que prometieron
   tareas:
     - id: t1
       titulo: Cablear tablero de la máquina 3 (simulado)

@@ -555,8 +555,10 @@ def test_toques_tras_mensajes_sin_mensajes_tras_toques_es_invalido(tmp_path):
 
 def test_la_familia_b_0023_carga_con_la_vista_previa_de_un_cambio_esperando():
     # T9-R1d-1b: cada escenario de la familia b-0023 deja la vista previa de un
-    # bloqueo esperando su Confirmar con el primer mensaje (sin ningún toque) y
-    # manda un único mensaje para interpretarla.
+    # bloqueo esperando su Confirmar (sin ningún toque) y manda un único mensaje
+    # para interpretarla. Con dos tareas en juego (b-0023 y b-0023-e) la vista
+    # previa se siembra (T9-R1d-1c): una referencia ambigua para Jev abría la
+    # aclaración y no la vista previa; el resto la deja con el primer mensaje.
     import pathlib
 
     directorio = pathlib.Path(__file__).parent / "escenarios"
@@ -565,12 +567,72 @@ def test_la_familia_b_0023_carga_con_la_vista_previa_de_un_cambio_esperando():
 
     assert len(familia) == 5
     for e in familia:
-        assert len(e.mensajes) == 1 and e.toques == (), e.id
+        assert e.toques == (), e.id
         assert len(e.mensajes_tras_toques) == 1, e.id
         assert e.respuesta_menciona, e.id
+    sembradas = {e.id for e in familia if e.precondiciones.get("vista_previa")}
+    assert sembradas == {"b-0023", "b-0023-e"}
+    for e in familia:
+        # Sembrada o con su primer mensaje, nunca las dos: un solo camino.
+        assert (e.mensajes == []) == (e.id in sembradas), e.id
     # Otro tema, confirmar, corregir y cancelar escribiendo; y dejar tocando.
     mensajes = {e.mensajes_tras_toques[0] for e in familia}
     assert {"¿qué tareas tengo abiertas?", "sí, dale, confirmalo",
             "no, mejor no lo registres"} <= mensajes
     con_toque = [e for e in familia if e.toques_tras_mensajes]
     assert [e.id for e in con_toque] == ["b-0023-e"]
+
+
+def test_la_familia_b_0024_carga_con_la_aclaracion_con_botones_esperando():
+    # T9-R1d-1c: la aclaración "¿A cuál te referís?" es una rama abierta. Se
+    # siembra (no depende de que Jev la abra) y un solo mensaje cambia de tema.
+    import pathlib
+
+    directorio = pathlib.Path(__file__).parent / "escenarios"
+    familia = [e for e in cargar_escenarios(directorio)
+               if e.id == "b-0024" or e.variante_de == "b-0024"]
+
+    assert {e.id for e in familia} == {"b-0024", "b-0024-b"}
+    for e in familia:
+        assert e.mensajes == [] and e.toques == (), e.id
+        assert e.precondiciones["aclaracion"]["tareas"], e.id
+        assert e.mensajes_tras_toques == ("¿qué tareas tengo abiertas?",), e.id
+        assert e.respuesta_menciona, e.id
+    (con_toque,) = [e for e in familia if e.toques_tras_mensajes]
+    assert con_toque.toques_tras_mensajes == ({"etiqueta": "Dejarlo y ver lo otro"},)
+
+
+# ---------------------------------------------------------------------------
+# vista_previa y aclaracion sembradas (T9-R1d-1c): como el borrador del alta,
+# el escenario no necesita un primer mensaje -- sólo lo que se escribe después.
+# ---------------------------------------------------------------------------
+
+_SEMBRADAS = {
+    "vista_previa": {"herramienta": "registrar_bloqueo", "tarea": "Programar PLC",
+                     "args": {"causa": "falta el switch"}},
+    "aclaracion": {"referencia": "el cableado", "tareas": ["Programar PLC"]},
+}
+
+
+@pytest.mark.parametrize("pregunta", sorted(_SEMBRADAS))
+def test_sin_mensajes_es_valido_con_una_pregunta_sembrada_y_mensajes_posteriores(
+        tmp_path, pregunta):
+    datos = {**_MINIMO, "mensajes": [],
+             "precondiciones": {pregunta: _SEMBRADAS[pregunta]},
+             "mensajes_tras_toques": ["hola"]}
+
+    e = cargar_escenario(_escribir(tmp_path, datos))
+
+    assert e.mensajes == [] and e.precondiciones[pregunta] == _SEMBRADAS[pregunta]
+
+
+@pytest.mark.parametrize("pregunta", sorted(_SEMBRADAS))
+def test_sin_mensajes_sigue_invalido_con_una_pregunta_sembrada_sin_mensajes_posteriores(
+        tmp_path, pregunta):
+    datos = {**_MINIMO, "mensajes": [],
+             "precondiciones": {pregunta: _SEMBRADAS[pregunta]}}
+
+    with pytest.raises(EscenarioInvalido):
+        cargar_escenario(_escribir(tmp_path, datos))
+
+

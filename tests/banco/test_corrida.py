@@ -2011,3 +2011,132 @@ def test_ejecutar_escenario_otro_tema_con_la_vista_previa_esperando_pregunta_por
     assert r.herramientas_antes_del_toque == ()          # el otro tema no se atendió
     # La vista previa original siguió esperando: el Confirmar del corredor la aplica.
     assert r.conteos_despues["blocker"] == r.conteos_antes["blocker"] + 1
+
+
+# ---------------------------------------------------------------------------
+# Preguntas sembradas (T9-R1d-1c): la vista previa de un cambio y la aclaración
+# con botones ya esperando, sembradas por el corredor por el mismo camino real
+# (`agente._encolar_confirmacion`, `gateway._preguntar_por_botones`) en vez de
+# depender de que el modelo (y Jev) abran exactamente una cosa con el primer
+# mensaje: banco real b-0023, donde una referencia ambigua abría la aclaración
+# y no la vista previa. Se siembran DESPUÉS de marcar el arranque de la corrida,
+# así el Confirmar automático del final todavía encuentra la vista previa.
+# ---------------------------------------------------------------------------
+
+_VISTA_PREVIA_SEMBRADA = {
+    "herramienta": "registrar_bloqueo", "tarea": "Cablear tablero (simulado)",
+    "args": {"causa": "falta el plano"}}
+_ACLARACION_SEMBRADA = {
+    "mensaje": "quedé trabado con el cableado", "referencia": "el cableado",
+    "tareas": ["Cablear tablero (simulado)", "Revisar variador (simulado)"]}
+
+
+def _sembrar_dos_tareas(conn, ws):
+    with admin(conn) as cur:
+        sembrar_precondiciones(cur, ws, {"tareas": [
+            {"id": "t1", "titulo": "Cablear tablero (simulado)", "area": "ot",
+             "responsable": "Nahuel Gimenez"},
+            {"id": "t2", "titulo": "Revisar variador (simulado)", "area": "ot",
+             "responsable": "Nahuel Gimenez"}]})
+
+
+def _ruta_con(comando):
+    return IntentRoute(IntentAction.NORMAL_CONVERSATION,
+                       respecto_pendiente=comando)
+
+
+def test_ejecutar_escenario_siembra_la_vista_previa_y_el_confirmar_final_la_aplica(
+        corework, conn):
+    ws = corework.workspace_id
+    _sembrar_dos_tareas(conn, ws)
+    interno = ProveedorGuionado(guion=[], rutas=[_ruta_con(RespectoPendiente.RESPONDE)])
+
+    r = ejecutar_escenario(
+        conn, ws, "corework", "Nahuel Gimenez", [], interno,
+        escenario_id="b-test-sembrada", indice=0,
+        mensajes_tras_toques=["sí, dale"],
+        preguntas_sembradas={"vista_previa": _VISTA_PREVIA_SEMBRADA})
+
+    assert r.bloqueado is False, r.motivo_bloqueo
+    assert "botón Confirmar" in r.respuesta_texto            # sólo lo de ese mensaje
+    assert interno.recibidos == []                            # el agente no habló
+    # Nada se aplicó antes del Confirmar del corredor, y ese toque sí la aplica.
+    assert r.herramientas_antes_del_toque == ()
+    assert r.conteos_antes_del_toque["blocker"] == r.conteos_antes["blocker"]
+    assert r.conteos_despues["blocker"] == r.conteos_antes["blocker"] + 1
+    assert r.herramientas_ejecutadas == ["registrar_bloqueo"]
+
+
+def test_ejecutar_escenario_con_una_vista_previa_sembrada_sobre_una_tarea_inexistente_queda_bloqueado(
+        corework, conn):
+    ws = corework.workspace_id
+    _sembrar_dos_tareas(conn, ws)
+    interno = ProveedorGuionado(guion=[], rutas=[])
+
+    r = ejecutar_escenario(
+        conn, ws, "corework", "Nahuel Gimenez", [], interno,
+        escenario_id="b-test-sembrada", indice=0,
+        mensajes_tras_toques=["sí, dale"],
+        preguntas_sembradas={"vista_previa": {
+            **_VISTA_PREVIA_SEMBRADA, "tarea": "Una tarea que no existe"}})
+
+    assert r.bloqueado is True
+    assert "Una tarea que no existe" in r.motivo_bloqueo
+
+
+def test_ejecutar_escenario_con_una_aclaracion_sembrada_otro_tema_pregunta_por_la_rama(
+        corework, conn):
+    ws = corework.workspace_id
+    _sembrar_dos_tareas(conn, ws)
+    interno = ProveedorGuionado(guion=[], rutas=[_ruta_con(RespectoPendiente.OTRO_TEMA)])
+
+    r = ejecutar_escenario(
+        conn, ws, "corework", "Nahuel Gimenez", [], interno,
+        escenario_id="b-test-sembrada", indice=0,
+        mensajes_tras_toques=["¿qué tareas tengo abiertas?"],
+        preguntas_sembradas={"aclaracion": _ACLARACION_SEMBRADA})
+
+    assert r.bloqueado is False, r.motivo_bloqueo
+    assert ("Estábamos con la tarea a la que te referías con «el cableado»"
+            in r.respuesta_texto)
+    assert "Revisar variador" not in r.respuesta_texto       # lo otro no se atendió
+    assert interno.recibidos == []
+    assert r.conteos_antes_del_toque is None                 # nada que confirmar
+    assert r.conteos_despues["blocker"] == r.conteos_antes["blocker"]
+
+
+def test_ejecutar_escenario_con_una_aclaracion_sembrada_toca_dejar_y_atiende_lo_otro(
+        corework, conn):
+    ws = corework.workspace_id
+    _sembrar_dos_tareas(conn, ws)
+    interno = ProveedorGuionado(
+        guion=[Respuesta(texto="Tenés dos tareas abiertas: Revisar variador.")],
+        rutas=[_ruta_con(RespectoPendiente.OTRO_TEMA),
+               IntentRoute(IntentAction.NORMAL_CONVERSATION)])
+
+    r = ejecutar_escenario(
+        conn, ws, "corework", "Nahuel Gimenez", [], interno,
+        escenario_id="b-test-sembrada", indice=0,
+        mensajes_tras_toques=["¿qué tareas tengo abiertas?"],
+        toques_tras_mensajes=[{"etiqueta": "Dejarlo y ver lo otro"}],
+        preguntas_sembradas={"aclaracion": _ACLARACION_SEMBRADA})
+
+    assert r.bloqueado is False, r.motivo_bloqueo
+    assert "dejé de lado la aclaración" in r.respuesta_texto
+    assert "Revisar variador" in r.respuesta_texto
+    assert "Estábamos con" not in r.respuesta_texto
+
+
+def test_ejecutar_escenario_sin_preguntas_sembradas_no_siembra_nada(corework, conn):
+    ws = corework.workspace_id
+    _sembrar_dos_tareas(conn, ws)
+    interno = ProveedorGuionado(guion=[Respuesta(texto="Hola.")],
+                                rutas=[IntentRoute(IntentAction.NORMAL_CONVERSATION)])
+
+    r = ejecutar_escenario(conn, ws, "corework", "Nahuel Gimenez", ["hola"], interno,
+                           escenario_id="b-test-sin-sembrar", indice=0)
+
+    assert r.bloqueado is False, r.motivo_bloqueo
+    with admin(conn) as cur:
+        cur.execute("select count(*) n from pending_action")
+        assert cur.fetchone()["n"] == 0

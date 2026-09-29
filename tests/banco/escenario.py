@@ -18,6 +18,11 @@ SEVERIDADES = ("baja", "media", "alta", "critica")
 
 _CAMPOS_OBLIGATORIOS = ("id", "objetivo", "actor", "mensajes")
 
+# Las precondiciones que dejan una pregunta ya esperando a la persona
+# (`corrida.sembrar_precondiciones` y `corrida.ejecutar_escenario`): con
+# cualquiera de ellas el escenario no necesita un primer mensaje.
+PREGUNTAS_SEMBRADAS = ("borrador_de_alta", "vista_previa", "aclaracion")
+
 
 class EscenarioInvalido(ValueError):
     pass
@@ -133,15 +138,17 @@ def _validar_estructura(datos: dict, origen: pathlib.Path) -> None:
         raise EscenarioInvalido(f"{origen}: 'actor' tiene que ser texto no vacío.")
 
     mensajes = datos["mensajes"]
-    # Con el borrador del alta ya sembrado (`precondiciones.borrador_de_alta`,
-    # T9-R1c-2b) no hace falta un primer mensaje: alcanza con lo que se
-    # escribe después de los toques.
-    con_borrador_sembrado = (
+    # Con una pregunta ya sembrada -- el borrador del alta
+    # (`precondiciones.borrador_de_alta`, T9-R1c-2b), la vista previa de un
+    # cambio (`vista_previa`) o la aclaración con botones (`aclaracion`, T9-R1d-1c)
+    # -- no hace falta un primer mensaje: alcanza con lo que se escribe después
+    # de los toques.
+    con_pregunta_sembrada = (
         isinstance(datos.get("precondiciones"), dict)
-        and bool(datos["precondiciones"].get("borrador_de_alta"))
+        and any(datos["precondiciones"].get(c) for c in PREGUNTAS_SEMBRADAS)
         and bool(datos.get("mensajes_tras_toques")))
     if (not isinstance(mensajes, list)
-            or (not mensajes and not con_borrador_sembrado)
+            or (not mensajes and not con_pregunta_sembrada)
             or not all(isinstance(m, str) and m.strip() for m in mensajes)):
         raise EscenarioInvalido(
             f"{origen}: 'mensajes' tiene que ser una lista no vacía de texto.")
