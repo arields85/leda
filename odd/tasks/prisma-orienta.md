@@ -245,7 +245,7 @@ gestión.
         familia del banco. `cancela` cancela el borrador (el mismo camino del botón
         Cancelar del alta: sin la pregunta el alta no puede seguir); `corrige` usa un
         camino de cambio de campo si el alta lo tiene, si no los botones de `dudoso`.
-      - [ ] **T9-R1c-2** — texto con botones del alta o confirmación abiertos: la misma
+      - [x] **T9-R1c-2** — texto con botones del alta o confirmación abiertos: la misma
         regla, en vez de tragarse el mensaje con un recordatorio. Más los seguimientos no
         bloqueantes de `review-06b7019b060dbffb`: una prueba que ate las claves de
         `FREE_TEXT_NAMES` a las de `USER_FIELD_LIMITS` (hoy son las mismas 7; un campo
@@ -293,6 +293,8 @@ gestión.
 | T9-R1a-1 | delegada, un escritor | `llm.py`, `pendientes.py`, `gateway.py`, arnés del banco, pruebas |
 | T8c-3 | delegada, un escritor | `gateway.py`, `agente.py`, `llm.py`, arnés del banco, pruebas, ADR 0012 |
 | T9-R1c-0/1 | delegada, un escritor | `gateway.py`, `ingreso_tareas.py`, arnés y escenarios del banco, pruebas |
+| T9-R1c-2 | delegada, un escritor | `gateway.py`, `ingreso_tareas.py`, `pendientes.py`, arnés y escenarios del banco, pruebas |
+| T9-R1c-2b | delegada, un escritor | `gateway.py`, `ingreso_tareas.py`, `pendientes.py`, `llm.py` probable, arnés del banco, pruebas |
 
 ## Verificación
 
@@ -4409,3 +4411,39 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   excluye: decisión pedida al usuario (retome sin botones cuando la respuesta ya trae los
   suyos, o ajustar el escenario). Además, `b-0021-c-2` resumió sin nombrar la tarea
   (redacción, R3-H7, T10).
+
+- 2026-09-29: **T9-R1c-2.** Ruta: delegada, un escritor. `1eb0323` (seguimientos de
+  `review-06b7019b060dbffb`: claves de `FREE_TEXT_NAMES` atadas a `USER_FIELD_LIMITS`,
+  comentario de `_CAMPOS_DE_ID`, doble sentido de `pending_action_id` documentado; el
+  segundo toque del mismo botón responde "Ese pedido ya no está vigente…" desde `_toque`,
+  no `AVISO_DATO_YA_NO_PENDIENTE`, y así quedó afirmado). `331a5f6`: la elección con
+  botones del alta (`task_intake_choice_set`) y el borrador esperando confirmación (la
+  `pending_action` de la vista previa, con Confirmar y Cancelar, dirigida al aprobador)
+  pasan por el manejo genérico (`ingreso_tareas.open_intake_question`, centinelas
+  `_SENTINEL_ALTA_ELECCION` y `_SENTINEL_ALTA_CONFIRMACION`, `_pregunta_del_alta`,
+  `_repreguntar`). Elección: `responde` resuelve la opción sólo si el texto coincide con
+  exactamente una (etiqueta normalizada o nombre completo de la entidad, sin coincidencia
+  parcial; el modelo nunca elige); si no, se reenvía la elección con sus botones. El
+  ruteo recibe la lista de opciones. Confirmación: ningún mensaje convierte el borrador
+  (invariante de conversión explícita); `responde` y `charla` dicen que se confirma con el
+  botón; `corrige` dice que el borrador no se cambia desde un mensaje
+  (`AVISO_ALTA_NO_SE_CORRIGE`: cancelarlo y armarlo de nuevo); `cancela` lo cancela.
+  TDD: RED 18 failed / 11 passed, GREEN 32 passed. Suite del escritor 1466 passed, 198
+  deselected. Padre: enfocadas del alta 56 passed. RDD: tramo `24fe1e3..331a5f6` alto
+  (1609 líneas), consentida por el usuario, `review-2435c6d8256a609c` (4 lentes)
+  **aprobada y reconocida**; frontera en `331a5f6`. Banco real `b-0022` (n=3): **16/24**.
+  `b-0022-a` (la opción escrita en minúsculas): `RoutingError` 3/3, defecto real (la
+  grabación no guarda la ruta que falló). `b-0022-e`/`-f` (vista previa): 5 corridas
+  bloqueadas en la preparación (el modelo no armó el alta completa de un mensaje y los
+  toques no encontraron sus botones), no en el comportamiento. Decisiones abiertas del
+  escritor: `corrige` sobre la vista previa del alta (hoy "cancelalo y armalo de nuevo";
+  la vista previa del alta no tiene Modificar), y quién confirma cuando quien escribe no
+  es el aprobador (la respuesta no lo dice; regla 3).
+  - [ ] **T9-R1c-2b** — `RoutingError` de `b-0022-a`; `b-0022-e`/`-f` con el borrador
+    sembrado en la base en vez de recorrer el alta con el modelo; la respuesta dice quién
+    confirma cuando no es quien escribe; y seguimientos de `review-2435c6d8256a609c`:
+    `_TIPO_DE_ALTA` con las constantes `QUESTION_*`; campo neutro para
+    `pending_action_id` (señalado dos veces); consulta del primer cuerpo de una elección
+    en un solo helper; referencia determinista para el reenvío sin `entrante_id` y prueba
+    del reenvío de una elección ya cerrada; afirmar la respuesta al escribir la opción;
+    falla ruidosa si un campo de texto libre no tiene nombre.
