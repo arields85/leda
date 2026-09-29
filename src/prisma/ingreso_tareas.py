@@ -605,7 +605,8 @@ def open_intake_question(cur: psycopg.Cursor, who: Solicitante,
                          chat_id: int) -> dict | None:
     """Lee, sin consumir, la pregunta que espera el alta de esta persona en
     este chat, o `None`: `{tipo, id, request_id, campo, titulo, resumen,
-    opciones}`. `id` es el del campo de texto libre, el de la elección o el de
+    opciones}` (y `bloque` en un campo de texto libre: lo que la persona tenía, si
+    lo está corrigiendo). `id` es el del campo de texto libre, el de la elección o el de
     la vista previa (su `pending_action`); `resumen` es la pregunta que se le
     hizo; `opciones` (sólo en una elección) son las etiquetas de sus botones,
     sin íconos, y `clase` el `tipo` de la elección (`MODIFY_PICKER_KIND` para el
@@ -617,10 +618,15 @@ def open_intake_question(cur: psycopg.Cursor, who: Solicitante,
     normal."""
     slot = open_free_text_slot(cur, who, chat_id)
     if slot is not None:
+        # Un dato ya confirmado que se está corrigiendo (Modificar) lleva lo que la
+        # persona tenía, para volver a mostrárselo al repreguntar (`bloque`).
+        block = text_to_copy(cur, slot["request_id"], slot["campo"],
+                             confirmed_only=True)
         return {"tipo": QUESTION_FREE_TEXT, "id": slot["slot_id"],
                 "request_id": slot["request_id"], "campo": slot["campo"],
                 "titulo": slot["titulo"],
-                "resumen": free_text_question(slot["campo"]), "opciones": None}
+                "resumen": free_text_question(slot["campo"]), "opciones": None,
+                "bloque": block or None}
     cur.execute(
         f"""select s.id, s.request_id, s.campo, s.tipo, {_TITLE_OF_REQUEST} titulo
               from task_intake_choice_set s
@@ -794,13 +800,17 @@ def format_due_date(value) -> str:
         return str(value)
 
 
-def text_to_copy(cur, request_id: str, field: str) -> str:
+def text_to_copy(cur, request_id: str, field: str, *,
+                 confirmed_only: bool = False) -> str:
     """Lo que la persona tenía en un dato de texto, como se le muestra y se
-    copia. Un campo sin fila es un campo vacío: nada que copiar."""
+    copia. Un campo sin fila es un campo vacío: nada que copiar; con
+    `confirmed_only`, tampoco lo que todavía no confirmó (una propuesta)."""
     cur.execute(
-        "select valor from task_intake_field where request_id = %s and campo = %s",
-        (request_id, field))
+        "select estado, valor from task_intake_field "
+        "where request_id = %s and campo = %s", (request_id, field))
     row = cur.fetchone()
+    if row and confirmed_only and row["estado"] != "confirmed":
+        row = None
     current = normalize_text(_text_or_none(row["valor"] if row else None) or "")
     return format_due_date(current) if field == "due_date" and current else current
 

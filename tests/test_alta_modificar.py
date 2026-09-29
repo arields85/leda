@@ -34,7 +34,8 @@ from tests.test_alta_eleccion_confirmacion import (TITULO, _alta_en_confirmacion
                                                    _salidas, _solicitud, _tocar_boton,
                                                    _usuario)
 from tests.test_task_intake import (_RoutingProvider, _active_choices,
-                                    _callback_client, _post_intake_callback)
+                                    _callback_client, _choose,
+                                    _post_intake_callback, _start)
 
 ETIQUETAS_DEL_SELECTOR = ["Título", "Descripción", "Objetivo", "Responsable",
                           "Área", "Fecha objetivo", "Criterio de aceptación"]
@@ -698,3 +699,50 @@ def test_la_fecha_del_bloque_copiable_se_pega_de_vuelta_sin_cambiar_nada(
 
     assert _campos(conn, rid)["due_date"] == ("confirmed", "2028-02-29")
     assert _previews(conn, rid)[-1]["estado"] == "esperando"
+
+
+# -------------------------- volver a preguntar un dato de Modificar trae el bloque
+
+@pytest.mark.parametrize("comando, prefijo", [
+    (RespectoPendiente.CHARLA, ""),
+    (RespectoPendiente.NO_PUEDO, gateway.AVISO_NO_PUEDO_DATO_PENDIENTE + " "),
+])
+@pytest.mark.parametrize("etiqueta, actual", [
+    ("Título", TITULO), ("Fecha objetivo", "29/02/2028")])
+def test_repreguntar_un_dato_de_modificar_tras_una_charla_vuelve_con_su_bloque(
+        comando, prefijo, etiqueta, actual, intake_world, conn, monkeypatch):
+    rid, pid, client, user = _modificar(conn, monkeypatch, intake_world)
+    _elegir_dato(conn, client, user, rid, etiqueta)
+    antes = _salidas(conn, user)
+    provider = _RoutingProvider([_ruta(comando)])
+
+    _escribir(conn, monkeypatch, intake_world, provider, "hola, ¿cómo va?")
+
+    assert len(_nuevas(conn, user, antes)) == 1          # una sola respuesta visible
+    fila = _ultima_salida(conn, user, antes)
+    assert fila["bloque_copiable"] == actual             # lo que tenía, para copiar
+    assert fila["cuerpo"].startswith(prefijo) and fila["cuerpo"].endswith(actual)
+    assert provider.main_calls == 0
+    # El campo sigue abierto y el dato sin cambiar.
+    assert _campos(conn, rid)["title"][1] == TITULO
+
+
+def test_repreguntar_un_dato_del_alta_que_no_es_de_modificar_no_lleva_bloque(
+        intake_world, conn, monkeypatch):
+    """Un campo todavía sin confirmar no tiene nada que copiar."""
+    user = _usuario(intake_world)
+    with espacio(conn, intake_world["north-lab"]["id"]) as cur:
+        actor, outcome = _start(cur, intake_world, chat_id=user)
+        _choose(cur, actor, outcome.request_id, "No", chat_id=user)   # rechaza el título
+        pregunta = I.open_intake_question(cur, actor, user)
+        assert pregunta["tipo"] == I.QUESTION_FREE_TEXT
+        assert pregunta["campo"] == "title" and pregunta["bloque"] is None
+    conn.commit()
+    antes = _salidas(conn, user)
+    provider = _RoutingProvider([_ruta(RespectoPendiente.CHARLA)])
+
+    _escribir(conn, monkeypatch, intake_world, provider, "hola")
+
+    fila = _ultima_salida(conn, user, antes)
+    assert fila["bloque_copiable"] is None
+    assert fila["cuerpo"] == I.free_text_question("title")

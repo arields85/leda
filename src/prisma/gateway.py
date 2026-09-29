@@ -941,13 +941,15 @@ def _resolver_toque_borrador(conn, authority_conn, workspace_id, token,
 
 
 def _responder(cur, workspace_id: str, chat_id: int, quien, texto: str,
-               ahora) -> None:
-    """La respuesta al toque sale por la cola, como cualquier otra."""
+               ahora, bloque: str | None = None) -> None:
+    """La respuesta al toque sale por la cola, como cualquier otra. Con `bloque`
+    (lo que la persona tenía, para copiarlo con un toque) el texto termina en él
+    y no se parte."""
     enqueue_outbox(
         cur, workspace_id=workspace_id, chat_id=chat_id, text=texto,
         recipient_membership_id=quien.membership_id, scheduled_for=ahora,
         dedupe_key=f"{workspace_id}:toque:{quien.app_user_id}:{ahora.timestamp()}",
-        is_response=True, allow_split=True,
+        is_response=True, allow_split=bloque is None, bloque_copiable=bloque,
     )
 
 
@@ -1407,6 +1409,16 @@ def _repreguntar(cur, quien, workspace_id: str, chat_id: int, abierta,
                                 entrante_id, prefix=prefijo):
             return
         texto = AVISO_DATO_YA_NO_PENDIENTE
+    elif abierta.args.get("bloque"):
+        # El dato que se corrige (Modificar): vuelve con lo que la persona tenía,
+        # en el bloque que se copia con un toque.
+        from .ingreso_tareas import modify_text_prompt
+
+        bloque = abierta.args["bloque"]
+        _responder(cur, workspace_id, chat_id, quien,
+                   f"{prefijo}{modify_text_prompt(abierta.args['campo'], bloque)}",
+                   ahora, bloque=bloque)
+        return
     else:
         texto = f"{prefijo}{pregunta.pregunta}"
     _responder(cur, workspace_id, chat_id, quien, texto, ahora)
@@ -1588,6 +1600,8 @@ def _ver_pregunta_abierta(cur, quien, chat_id: int, ahora, *, alta: bool):
         if pregunta["opciones"] is not None:
             args["opciones"] = pregunta["opciones"]
             args["clase"] = pregunta.get("clase")
+        if pregunta.get("bloque"):
+            args["bloque"] = pregunta["bloque"]
         return P.ModificacionAbierta(
             pregunta_id=pregunta["id"],
             herramienta=_SENTINEL_DE_ALTA[pregunta["tipo"]], args=args,
