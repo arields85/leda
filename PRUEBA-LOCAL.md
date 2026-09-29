@@ -288,6 +288,15 @@ todavía (correr `importar` primero). Sólo imprime cuántas tareas y
 dependencias quedaron, y cuántas por estado inicial -- nunca los títulos ni
 los nombres de las personas.
 
+**5b. Configurar el modelo de lenguaje.** Una base nueva no hereda el modelo de
+la anterior: sin este paso, cada mensaje de texto termina en un incidente
+("No hay modelo configurado"). Ver el activo con `python -m prisma modelo` y
+configurarlo, por ejemplo:
+
+```bash
+python -m prisma modelo <identificador> --proveedor openrouter
+```
+
 **6. Volver a vincular las cuentas de Telegram** (son las mismas personas del
 pack, pero es una base nueva: sin activaciones previas). Con `--solo` y los
 nombres de quienes participan de esta ronda, igual que en el punto 3 más

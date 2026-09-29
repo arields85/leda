@@ -205,39 +205,49 @@ botones y saludo diario al primer mensaje del día a cada persona, decidido al d
 falta una migración; respuesta inmediata e indicador "escribiendo…" con borrador
 nativo sólo si el turno pasa de 1,5 s (#9, #9b, ADR 0011).
 
-Base local `prisma`: migraciones hasta `0019` aplicadas (respaldos
+Base local `prisma`: migraciones hasta `0019` aplicadas, modelo `nan`/`deepseek-v4-flash`
+configurado en la ronda (respaldos
 `db/respaldos/prisma-antes-0017-20260928.dump` y
 `prisma-antes-0018-0019-20260928.dump`); Ariel De Simone designado administrador de
 plataforma; `PRISMA_BOT_TOKEN_ADMIN` configurado y rotado por el usuario.
 
-**Próximo: tercera ronda por Telegram, en horario laboral (09:00-17:00).** Fuera de
-horario, los avisos que no son respuesta (p. ej. el pedido de aprobación a Ismael) se
-postergan al día hábil siguiente y el circuito A se trabaría. Guion:
+**Tercera ronda por Telegram hecha y cortada (2026-09-28, 21:00-21:46).** Registro
+completo en `odd/tasks/prisma-orienta.md` (hallazgos R3-H1 a R3-H21). Evaluación del
+usuario: "tarda mucho en responder, se pierde en la conversación, no es para nada
+fluido". Tres causas de fondo: la latencia del modelo (10-17 s por turno con
+`nan`/`deepseek-v4-flash`; 0 s cuando decide el código), el manejo del estado de la
+conversación y ninguna señal al tocar botones. El circuito A quedó cortado: la nueva
+entrega después de "Pedir cambios" no volvió a revisión (R3-H20); el B no se corrió.
 
-0. Arrancar `python -m prisma escuchar corework --sin-cadencias` (con el código
-   commiteado; si falta una migración, el comando lo dice y no arranca). Ariel le
-   escribe una vez al bot de administración: la consola muestra `← [admin] ...`.
-1. Saludo e indicador: el primer mensaje del día de cada uno llega con "👋 Buen día" y
-   no se repite; un pedido que tarda muestra "escribiendo…" y la animación, que
-   desaparecen al llegar la respuesta.
-2. Íconos: pedir las tareas propias; cada tarea con 📋, "➕ Ver más" y "💬 Quiero
-   consultar otra cosa".
-3. Circuito A: Ariel entrega "Dashboard de lotes en CoreLabs" con evidencia -> Ismael
-   pide cambios -> Ariel vuelve a entregar con evidencia nueva -> el botón viejo del
-   aviso dice que ya no está vigente -> Ismael aprueba desde el aviso nuevo y la tarea
-   se cierra.
-4. Circuito B: Marcos entrega "Revisar comunicaciones industriales de la comprimidora"
-   (depende de "Programar PLC de la comprimidora", sin terminar) -> Ismael pide cambios
-   y la tarea vuelve a `en_curso`.
-5. Revisar en cada paso: respuesta visible, PostgreSQL, efectos y auditoría; si aparece
-   un incidente, el aviso tiene que llegarle a Ariel por el bot de administración.
+**Próximo, en este orden (decisión del usuario, 2026-09-28):**
 
-Después de la ronda, sin bloquearla: #23 validador de invariantes
+1. **Leer el manual de personalidad, voz y comportamiento** del trabajo anterior del
+   usuario, como insumo para corregir cómo responde Prisma:
+   `D:\Proyectos\PRISMA-PACK-VERACIDAD-Y-AMBIGUEDAD-20260923\PRISMA-MANUAL-PERSONALIDAD-VOZ-Y-COMPORTAMIENTO-20260928.md`.
+   Medirlo contra el corpus del repo (`nucleo/`, ADR, pruebas), no al revés.
+2. **Cambiar el modelo a uno rápido por OpenRouter** (clave ya configurada,
+   `PRISMA_OPENROUTER_API_KEY`). El usuario propone Gemini 3.8 o GPT Luna 6: listar los
+   identificadores reales con `python -m prisma modelos --proveedor openrouter`, medir
+   la latencia por llamada (ruteo y respuesta) con el banco real y elegir; objetivo menos
+   de 4 s por turno sin empeorar ningún escenario. Configurar con `python -m prisma
+   modelo <id> --proveedor openrouter`.
+3. **Estado de la conversación (críticos):** R3-H17 (un slot pendiente se traga un
+   "hola" como evidencia), R3-H20 (la nueva entrega no vuelve a revisión), R3-H15 (un
+   mensaje sin texto no recibe respuesta), R3-H19 (dos respuestas para un mensaje),
+   R3-H18 (opciones que no se pueden cumplir), R3-H16 (el motivo de "Pedir cambios" no
+   se ve), R3-H5 y R3-H13 (señal al tocar botones; doble toque en silencio).
+4. **Forma de las respuestas:** R3-H1 (aviso de incidente con explicación humana,
+   formato aprobado), R3-H2 (mensaje neutro nuevo, texto aprobado), R3-H3/H7 (regla de
+   lista), R3-H8 ("hola" suelto), R3-H9 ("Gracias. La tarea pasó a revisión."),
+   R3-H10, R3-H11, R3-H12, R3-H14, R3-H4.
+5. **Cuarta ronda por Telegram**, en horario laboral, con los circuitos A y B.
+
+Después, sin bloquear: #23 validador de invariantes
 (`odd/tasks/validador-invariantes.md`); escenarios del banco que fallan desde antes de
 `b-0005-b` (`b-0001`, `b-0001-a`, `b-0002-c`, `b-0013`); T7d (`sembrar`); espera entre
 reintentos en `message_outbox` (`despachador._fallo`); confirmación del bot de
 administración al vincularse; `_activacion` sin commit explícito en /start sin token;
-menores de la revisión del saludo.
+menores de las revisiones del saludo y del indicador en `servir`.
 
 La rama auxiliar `auxiliar/alta-y-google` avanza en su sesión (alta con correo y
 Google); `main` cambió mucho desde que se creó, así que le toca traer los cambios de

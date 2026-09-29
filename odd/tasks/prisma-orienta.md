@@ -3947,3 +3947,89 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
 - 2026-09-28: **Cierre de sesión.** Punto exacto para retomar y guion de la tercera ronda
   en `docs/STATUS.md`. La ronda va en horario laboral (09:00-17:00), porque fuera de
   horario los avisos que no son respuesta se postergan.
+
+- 2026-09-28 (noche): **Tercera ronda por Telegram — cortada por el usuario, con
+  hallazgos.** Base local `prisma`, `escuchar corework --sin-cadencias`, 21:00-21:46
+  (fuera del horario laboral 09:00-17:00: los avisos que no son respuesta quedaron
+  postergados). Participaron Ariel e Ismael; el circuito B no se llegó a correr.
+  Evaluación del usuario: "tarda mucho en responder, se pierde en la conversación, no es
+  para nada fluido".
+
+  **Funcionó:** vinculación del bot de administración (`mensaje_admin` con chat_id) y el
+  aviso de un incidente llegó al administrador por ese bot; saludo "👋 Buenas noches" una
+  sola vez por persona; animación de "escribiendo…" en turnos de texto; íconos; menú con
+  responsable y estado; "💬 Quiero consultar otra cosa" cierra bien; el hallazgo 10 de
+  la sesión 2 se sostiene; entrega con evidencia de texto -> vista previa -> `en_revision`;
+  el aviso al aprobador se postergó a las 09:00 del día hábil; Ismael encontró la entrega
+  preguntando; "Pedir cambios" devolvió la tarea a `en_curso`.
+
+  **Medición (auditoría y cola):** respuesta cuando decide el código (menús, botones,
+  vistas previas): 0 s; cuando interviene el modelo (`nan` / `deepseek-v4-flash`):
+  9,8 / 10,5 / 11,7 / 15,9 / 17,4 / 9,6 s; la foto: nunca.
+
+  **Hallazgos (R3-H):**
+  - H1. El aviso de incidente al administrador necesita explicación humana. Formato
+    aprobado por el usuario: "⚠️ Prisma no pudo responderle a X" / Qué pasó / Qué vio X /
+    Qué hacer / Mensaje / Detalle técnico (hora local del espacio, no UTC). Qué pasó y
+    Qué hacer salen de una tabla determinista de causas conocidas, no del modelo.
+  - H2. El mensaje neutro a la persona es poco claro. Texto nuevo aprobado: "Tuve un
+    problema y no pude responder tu mensaje. Ya quedó registrado para que lo revise un
+    administrador." (`gateway.NOTICIA_NEUTRA_INCIDENTE`).
+  - H3. Lista ambigua: "una todavía asignada y la otra ya en curso" sin decir cuál.
+  - H4. El ícono acorta las etiquetas ("Dashboard de lotes en CoreLabs" ->
+    "Dashboard de lotes…").
+  - H5. El indicador sólo cubre turnos de texto (único punto: `gateway.py:333`); al tocar
+    un botón no hay ninguna señal y la persona toca dos veces.
+  - H6. Preparación: la base nueva no tenía `model_config` (cada texto terminaba en
+    incidente `LookupError`). Resuelto en vivo con `python -m prisma modelo
+    deepseek-v4-flash --proveedor nan` (el de la base vieja) y `PRUEBA-LOCAL.md` §5 paso 5b.
+  - H7. Regla del usuario: con hasta 3 tareas el texto las nombra enteras; con más,
+    resume y los nombres quedan en los botones. Siempre igual (hoy el modelo alterna).
+  - H8. Regla del usuario: un "hola" suelto tras cerrar un tema se contesta con saludo y
+    pregunta abierta ("Hola, Ariel. ¿En qué te ayudo?"), sin repetir la lista.
+  - H9. La confirmación de una entrega debe decir algo como "Gracias. La tarea pasó a
+    revisión.", sin nombrar a quien revisa ni horarios (usuario).
+  - H10. "Modificar" sin ícono al lado de ✅ Confirmar y ✖️ Cancelar (✏️).
+  - H11. La vista previa es un renglón denso separado por puntos; un dato por línea.
+  - H12. Información no pedida: "Los objetivos están todos activos, ninguno esperando
+    cierre" en la respuesta sobre qué aprobar.
+  - H13. Un segundo toque sobre un botón recién usado muestra "Ese pedido ya no está
+    vigente…"; para la misma persona y un toque reciente, absorberlo en silencio.
+  - H14. Redacción: "vuelve a en curso"; el "Hecho." repite la vista previa entera.
+  - H15. **Crítico.** Un mensaje sin texto (foto, archivo, audio) no recibe ninguna
+    respuesta ni deja incidente; el pie de foto también se pierde. Fotos y archivos como
+    evidencia quedaron fuera de ADR 0009 (unidad de aportes del roadmap), pero nunca en
+    silencio: como mínimo, responder que todavía no se pueden recibir y pedir texto o link.
+  - H16. Después de "Pedir cambios", el responsable no ve qué le pidieron: ni la lista ni
+    el menú muestran el motivo, y el modelo dijo "figura todavía en curso, no en
+    revisión", que confunde.
+  - H17. **Crítico.** Con la entrega esperando la evidencia, el "hola" siguiente se tomó
+    como evidencia ("Evidencia: hola").
+  - H18. El modelo ofreció "Adjunto una captura o archivo", una opción que el sistema no
+    puede cumplir.
+  - H19. Un mismo mensaje (el link) produjo dos respuestas en paralelo: una aclaración
+    ("¿A cuál te referís con «subir las capturas»?") y la vista previa.
+  - H20. **Crítico.** La nueva entrega después de "Pedir cambios" terminó como "Nueva
+    evidencia" y la tarea quedó `en_curso` (dos evidencias: el texto de 21:25 y el link de
+    21:45 como tipo `capturas`): el aprobador no tiene nada para aprobar; el circuito se
+    corta.
+  - H21. **Crítico.** Latencia de 10-17 s en cada turno con modelo.
+
+  **Causas de fondo:** (1) latencia del modelo; (2) manejo del estado de la conversación
+  (un slot pendiente se traga cualquier texto, caminos paralelos para un mismo mensaje,
+  la nueva entrega no vuelve a revisión, opciones que no se pueden cumplir, mensajes sin
+  texto ignorados); (3) ninguna señal al tocar botones.
+
+  **Decisiones del usuario para retomar:** cambiar el modelo a uno rápido por OpenRouter
+  (ya hay clave, `PRISMA_OPENROUTER_API_KEY`; el usuario propone Gemini 3.8 o GPT Luna
+  6: verificar los identificadores reales con `python -m prisma modelos --proveedor
+  openrouter`, medir y elegir); leer como insumo el manual de personalidad, voz y
+  comportamiento del trabajo anterior del usuario con otra IA
+  (`D:\Proyectos\PRISMA-PACK-VERACIDAD-Y-AMBIGUEDAD-20260923\PRISMA-MANUAL-PERSONALIDAD-VOZ-Y-COMPORTAMIENTO-20260928.md`),
+  medido contra el corpus del repo como pide `AGENTS.md`.
+
+  **Operación:** listener detenido. Los dos avisos postergados a las 09:00 ("Ariel
+  entregó…", "Ismael pidió cambios…") quedaron `descartado` (ya no reflejaban el estado;
+  cambio reversible sobre datos ficticios). "Dashboard de lotes en CoreLabs" queda
+  `en_curso` con dos evidencias. Consola de la ronda en el scratchpad de la sesión (no
+  versionada).
