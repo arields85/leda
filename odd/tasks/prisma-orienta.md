@@ -189,6 +189,11 @@ gestión.
     - [x] **T8c-3 — Ruteo en paralelo con la primera llamada del responder**, sólo en
       conversación normal sin referencias a tareas; se descarta si el ruteo elige otro
       camino.
+- [ ] **T8d — Responder en un solo viaje (postergada).** Decisión del usuario
+  (2026-09-29): después de T9 y T10. Evitar la vuelta de datos del responder
+  (`consultar_tareas` y similares) cuando el dato ya viaja en el contexto, reconstruyendo
+  los botones de lista desde el contexto (ADR 0007 §3). Es la palanca que puede acercar
+  el turno a menos de 4 s; medir con el banco.
 - [ ] **T9 — Estado de la conversación (ronda 3).** R3-H17, H20, H15, H19, H18, H16,
   H5 y H13.
 - [ ] **T10 — Forma de las respuestas (ronda 3).** R3-H1, H2, H3/H7, H8, H9, H10, H11,
