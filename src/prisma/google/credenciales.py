@@ -20,6 +20,7 @@ También las claves de `workspace_setting` que gobiernan Google por espacio
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 from datetime import datetime
 
@@ -213,6 +214,44 @@ def guardar(cur: psycopg.Cursor, workspace_id: str, secreto: str | bytes,
     cur.execute(
         "select guardar_credencial_google(%s::uuid, %s, %s, %s)",
         (workspace_id, token, cuenta_email, list(scopes)))
+
+
+def guardar_autorizacion(cur: psycopg.Cursor, workspace_id: str, autorizacion, *,
+                         cifrador: cifrado.Cifrador | None = None) -> None:
+    """Guarda lo que salió de `oauth.autorizar` (G2c). El secreto cifrado es
+    un JSON con `refresh_token`, `access_token` y `access_token_expira_en`
+    (ISO, UTC; `null` si Google no informó vencimiento), `cuenta_email` y
+    `scopes`: así G2d puede usar el access token vigente sin renovar de más
+    y renovar con el refresh token cuando venza. `CredencialGoogle.secreto`
+    devuelve ese JSON descifrado. Nada de esto se muestra ni se registra."""
+    vence = autorizacion.access_token_expira_en
+    payload = {
+        "refresh_token": autorizacion.refresh_token,
+        "access_token": autorizacion.access_token,
+        "access_token_expira_en": vence.isoformat() if vence else None,
+        "cuenta_email": autorizacion.cuenta_email,
+        "scopes": list(autorizacion.scopes),
+    }
+    guardar(cur, workspace_id, json.dumps(payload), autorizacion.cuenta_email,
+            autorizacion.scopes, cifrador=cifrador)
+
+
+def resumen(cur: psycopg.Cursor, workspace_id: str) -> dict:
+    """Estado, cuenta y permisos de la credencial del espacio para el comando
+    `google estado` (camino de operación): sin el payload cifrado, así que no
+    hace falta la clave ni se toca ningún secreto. `estado` es
+    `sin_autorizar` si no hay fila de proyección."""
+    cur.execute(
+        """select e.estado, c.cuenta_email, c.scopes
+             from credencial_google_estado e
+             left join credencial_google c on c.workspace_id = e.workspace_id
+            where e.workspace_id = %s""", (workspace_id,))
+    fila = cur.fetchone()
+    if fila is None:
+        return {"estado": "sin_autorizar", "cuenta_email": None, "scopes": ()}
+    return {"estado": _validar_estado(fila["estado"]),
+            "cuenta_email": fila["cuenta_email"],
+            "scopes": tuple(fila["scopes"] or ())}
 
 
 def revocar(cur: psycopg.Cursor, workspace_id: str, motivo: str) -> bool:

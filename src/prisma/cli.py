@@ -12,6 +12,9 @@
     python -m prisma servir --sin-cadencias    igual, sin disparar cadencias automáticas
     python -m prisma correo-verificacion corework --activar
     python -m prisma correo-verificacion corework --desactivar
+    python -m prisma google autorizar corework [--sin-navegador]
+    python -m prisma google activar corework [--desactivar]
+    python -m prisma google estado corework
 """
 
 from __future__ import annotations
@@ -223,6 +226,144 @@ def _google_recifrar() -> int:
     return codigo
 
 
+def _id_de_espacio(conn, slug: str) -> str | None:
+    """El id del espacio por slug, por la conexión de operación; `None` si no
+    existe (a diferencia de `_id_de`, que termina el proceso)."""
+    with admin(conn) as cur:
+        cur.execute("select id from workspace where slug = %s", (slug,))
+        fila = cur.fetchone()
+    return str(fila["id"]) if fila else None
+
+
+def _google_autorizar(slug: str, sin_navegador: bool) -> int:
+    """Comando `google autorizar <espacio> [--sin-navegador]` (G2c): el
+    administrador autoriza la cuenta de Google del espacio desde su propia
+    computadora (ver `google/oauth.py`). Todo lo que puede fallar sin efecto
+    va ANTES de lo irreversible: clave, cliente OAuth y espacio se comprueban
+    antes de abrir nada; el flujo no toca la base; recién con la
+    autorización validada se guarda (cifrada). Nunca se imprime el código,
+    ningún token ni el secreto del cliente."""
+    from .google import credenciales, oauth
+    from .google.cifrado import ErrorCifrado, VARIABLE_CLAVE, cargar
+
+    try:
+        cifrador = cargar()
+    except ErrorCifrado as e:
+        print(f"{e}")
+        print(f"Revisá {VARIABLE_CLAVE} en .env (`python -m prisma google "
+              "clave-nueva` genera una). No se cambió nada.")
+        return 1
+    try:
+        cliente = oauth.cargar_cliente()
+    except oauth.ErrorOAuth as e:
+        print(f"{e} No se cambió nada.")
+        return 1
+
+    conn = conectar()
+    try:
+        ws = _id_de_espacio(conn, slug)
+        conn.commit()
+        if ws is None:
+            print(f"No existe el espacio '{slug}'. No se cambió nada.")
+            return 1
+        try:
+            autorizacion = oauth.autorizar(
+                cliente, http=oauth._nuevo_http(),
+                abrir_navegador=None if sin_navegador else oauth._abrir_navegador,
+                esperar_segundos=oauth.ESPERA_MAXIMA_SEGUNDOS)
+        except oauth.ErrorOAuth as e:
+            print(f"{e} No se guardó nada.")
+            return 1
+        try:
+            with admin(conn) as cur:
+                credenciales.guardar_autorizacion(
+                    cur, ws, autorizacion, cifrador=cifrador)
+            conn.commit()
+        except BaseException:
+            _revertir_sin_traza(conn)
+            raise
+    finally:
+        conn.close()
+
+    print(f"Listo: el espacio '{slug}' quedó autorizado con la cuenta "
+          f"{autorizacion.cuenta_email}.")
+    print("Google sigue apagado para este espacio hasta que corras "
+          f"`python -m prisma google activar {slug}`.")
+    return 0
+
+
+def _google_activar(slug: str, desactivar: bool) -> int:
+    """Comando `google activar <espacio> [--desactivar]` (G2c): enciende o
+    apaga `google.habilitado`, como `correo-verificacion`. Activar exige una
+    credencial `vigente`; desactivar no exige nada."""
+    import json
+
+    from .google import credenciales
+
+    conn = conectar()
+    try:
+        ws = _id_de_espacio(conn, slug)
+        if ws is None:
+            print(f"No existe el espacio '{slug}'.")
+            return 1
+        try:
+            with admin(conn) as cur:
+                if not desactivar:
+                    estado = credenciales.resumen(cur, ws)["estado"]
+                    if estado != "vigente":
+                        print(f"No se activó: la credencial de Google del "
+                              f"espacio '{slug}' está '{estado}'. Autorizala "
+                              f"con `python -m prisma google autorizar {slug}`.")
+                        return 1
+                cur.execute(
+                    """insert into workspace_setting (workspace_id, clave, valor)
+                         values (%s, %s, %s)
+                       on conflict (workspace_id, clave)
+                         do update set valor = excluded.valor""",
+                    (ws, credenciales.CLAVE_HABILITADO,
+                     json.dumps(not desactivar)))
+                registrar_auditoria(
+                    cur, accion=("google_desactivado" if desactivar
+                                 else "google_activado"),
+                    workspace_id=ws, actor_kind="sistema")
+            conn.commit()
+        except BaseException:
+            _revertir_sin_traza(conn)
+            raise
+    finally:
+        conn.close()
+    print(f"Google {'apagado' if desactivar else 'encendido'} para el "
+          f"espacio '{slug}'.")
+    return 0
+
+
+def _google_estado(slug: str) -> int:
+    """Comando `google estado <espacio>` (G2c): estado de la credencial,
+    cuenta, permisos concedidos y si Google está encendido. Sin secretos y
+    sin necesitar la clave de cifrado."""
+    from .google import credenciales
+
+    conn = conectar()
+    try:
+        ws = _id_de_espacio(conn, slug)
+        if ws is None:
+            print(f"No existe el espacio '{slug}'.")
+            return 1
+        with admin(conn) as cur:
+            r = credenciales.resumen(cur, ws)
+            encendido = credenciales.habilitado(cur, ws)
+        conn.commit()
+    finally:
+        conn.close()
+    print(f"Google en '{slug}':")
+    print(f"  Credencial: {r['estado']}")
+    print(f"  Cuenta: {r['cuenta_email'] or '-'}")
+    print("  Permisos concedidos: "
+          + (", ".join(s.rsplit('/', 1)[-1] for s in r['scopes']) or "-"))
+    print(f"  Estado: {'encendido' if encendido else 'apagado'}")
+    return 0
+
+
 def _correo_verificacion(conn, ws: str, activar: bool) -> int:
     """Comando `correo-verificacion <espacio> --activar|--desactivar`
     (rama auxiliar, G1c). Enciende o apaga `correo_verificacion.habilitado`
@@ -372,6 +513,17 @@ def main(argv: list[str] | None = None) -> int:
     goo_sub = goo.add_subparsers(dest="google_cmd", required=True)
     goo_sub.add_parser("clave-nueva", help="genera una clave para "
                        "PRISMA_CLAVE_CREDENCIALES (no escribe archivos)")
+    goa = goo_sub.add_parser("autorizar", help="autoriza la cuenta de Google "
+                             "del espacio desde esta computadora")
+    goa.add_argument("slug")
+    goa.add_argument("--sin-navegador", action="store_true",
+                     help="no abre el navegador: sólo imprime el enlace")
+    gac = goo_sub.add_parser("activar", help="enciende Google para el espacio "
+                             "(exige una credencial vigente)")
+    gac.add_argument("slug")
+    gac.add_argument("--desactivar", action="store_true")
+    goe = goo_sub.add_parser("estado", help="estado de Google en el espacio")
+    goe.add_argument("slug")
     goo_sub.add_parser("recifrar", help="vuelve a cifrar las credenciales "
                        "guardadas con la primera clave de "
                        "PRISMA_CLAVE_CREDENCIALES (rotación)")
@@ -417,6 +569,15 @@ def main(argv: list[str] | None = None) -> int:
               "anteriores después de una coma,")
         print("y después corré `python -m prisma google recifrar`.")
         return 0
+
+    if a.cmd == "google" and a.google_cmd == "autorizar":
+        return _google_autorizar(a.slug, a.sin_navegador)
+
+    if a.cmd == "google" and a.google_cmd == "activar":
+        return _google_activar(a.slug, a.desactivar)
+
+    if a.cmd == "google" and a.google_cmd == "estado":
+        return _google_estado(a.slug)
 
     if a.cmd == "google" and a.google_cmd == "recifrar":
         return _google_recifrar()
