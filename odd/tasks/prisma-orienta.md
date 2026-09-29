@@ -186,9 +186,13 @@ gestión.
       (0 tokens en 8/8) pero no acelera: por defecto 2,90 s, `none` 2,27 s, `high` 1,81 s
       de mediana. La variación del servidor pesa más que ~100 tokens de razonamiento, y
       apagarlo arriesga la calidad.
-    - [x] **T8c-3 — Ruteo en paralelo con la primera llamada del responder**, sólo en
+    - [x] **T8c-3 — (revertida el 2026-09-29, ver Progreso) Ruteo en paralelo con la primera llamada del responder**, sólo en
       conversación normal sin referencias a tareas; se descarta si el ruteo elige otro
       camino.
+    - [ ] **T8c-4 — Tiempo máximo por llamada al modelo.** NaN cuelga a veces un pedido
+      unos 93-95 s (~1,3 % de las llamadas en serie) y el cliente hoy espera hasta 600 s.
+      Acotar cada intento (~20 s, configurable en `model_config.parametros`) con
+      reintento, para que un cuelgue cueste ~20 s y no más de 90.
 - [ ] **T8d — Responder en un solo viaje (postergada).** Decisión del usuario
   (2026-09-29): después de T9 y T10. Evitar la vuelta de datos del responder
   (`consultar_tareas` y similares) cuando el dato ya viaja en el contexto, reconstruyendo
@@ -4174,3 +4178,14 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   reconoce el ruteo por `tool_choice` y admite una llamada especulativa extra.
   Seguimiento menor: `ProveedorGrabador.descartar_respuesta` quita la entrada con
   `list.remove` (igualdad, no identidad).
+
+- 2026-09-29: **T8c-3 revertida (decisión del usuario) y T8c-4 abierta.** RDD de la
+  rebanada `154101a..46278f3` (riesgo alto, cuatro lentes, `review-31b767dbe1a4c1f6`):
+  aprobada y reconocida, frontera en `46278f3`, con avisos sobre el pool compartido de la
+  especulación, una carrera en el grabador del banco y una prueba frágil. Banco: la
+  especulación sólo aplica en 10 de 36 escenarios (conversación normal sin referencias; la
+  mayoría nombra una tarea y pasa por Jev). A/B con el mismo código, 10 escenarios x 3:
+  pared mediana 9,9 s apagada y 9,4 s encendida (-1,1 s mediano por escenario). NaN
+  cuelga pedidos ~93-95 s: 5 de 385 llamadas en serie, 7 de 180 con especulación. Se
+  revierte el código de `46278f3` (archivos idénticos a `16ec246`); ADR 0012 queda como
+  revertida con la evidencia. En su lugar, T8c-4.

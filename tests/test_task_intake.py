@@ -1168,10 +1168,7 @@ class _AnthropicProtocolMock:
 
     def create(self, **kwargs):
         self.calls.append(kwargs)
-        # El ruteo se reconoce por su `tool_choice`, no por el orden: con un
-        # proveedor real la primera llamada del responder sale en paralelo
-        # (ADR 0012) y puede llegar antes.
-        if "tool_choice" in kwargs:
+        if len(self.calls) == 1:
             block = SimpleNamespace(
                 type="tool_use", id="route-1", name="route_intent",
                 input={
@@ -1213,13 +1210,11 @@ def test_real_testclient_gateway_with_mocked_anthropic_protocol(
         headers={"X-Telegram-Bot-Api-Secret-Token": "test-secret"},
     )
     assert response.status_code == 200
-    rutas = [c for c in protocol.calls if "tool_choice" in c]
-    assert len(rutas) == 1
-    assert rutas[0]["tool_choice"] == {"type": "tool", "name": "route_intent"}
-    assert [tool["name"] for tool in rutas[0]["tools"]] == ["route_intent"]
-    # A lo sumo la primera llamada especulativa del responder, descartada
-    # porque el ruteo eligió el alta guiada (ADR 0012).
-    assert len(protocol.calls) <= 2
+    assert protocol.calls[0]["tool_choice"] == {
+        "type": "tool", "name": "route_intent"}
+    assert [tool["name"] for tool in protocol.calls[0]["tools"]] == [
+        "route_intent"]
+    assert len(protocol.calls) == 1
     with admin(conn) as cur:
         cur.execute("select count(*) n from task_intake_request where workspace_id = %s",
                     (ws["id"],))
