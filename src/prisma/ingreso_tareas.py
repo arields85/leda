@@ -793,7 +793,8 @@ def _ask_field_change(cur, request, who, field, now):
     cur.execute(
         "select valor from task_intake_field where request_id = %s and campo = %s",
         (request["id"], field))
-    current = normalize_text(_text_or_none(cur.fetchone()["valor"]) or "")
+    row = cur.fetchone()      # un campo sin fila es un campo vacío: nada que copiar
+    current = normalize_text(_text_or_none(row["valor"] if row else None) or "")
     return _open_free_text(cur, request, field, modify_text_prompt(field, current),
                            now, block=current or None)
 

@@ -644,3 +644,24 @@ def test_si_confirma_otra_persona_su_vista_previa_la_inicia_prisma(
     transporte = _despachar_fuera_de_horario(conn, intake_world["north-lab"]["id"])
     assert [e for e in transporte.enviados
             if e.texto.startswith("Resumen para revisar")] == []
+
+
+def test_un_dato_sin_fila_en_la_solicitud_no_rompe_y_pregunta_como_si_estuviera_vacio(
+        intake_world, conn, monkeypatch):
+    """Un campo sin `task_intake_field` (valor vacío): sin nada que copiar, la
+    pregunta de siempre del campo y su campo abierto; ningún error."""
+    rid, pid, client, user = _modificar(conn, monkeypatch, intake_world)
+    with admin(conn) as cur:
+        cur.execute("delete from task_intake_field where request_id = %s "
+                    "and campo = 'title'", (rid,))
+    antes = _salidas(conn, user)
+
+    _elegir_dato(conn, client, user, rid, "Título")
+
+    fila = _ultima_salida(conn, user, antes)
+    assert fila["bloque_copiable"] is None
+    assert fila["cuerpo"] == I.free_text_question("title")
+    with admin(conn) as cur:
+        cur.execute("select count(*) n from task_intake_free_text_slot "
+                    "where request_id = %s and estado = 'active'", (rid,))
+        assert cur.fetchone()["n"] == 1
