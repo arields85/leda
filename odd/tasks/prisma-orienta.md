@@ -160,10 +160,18 @@ gestión.
     `modelos`): con `openrouter` le mandaría a OpenRouter la clave de otro proveedor.
     OpenRouter usa `PRISMA_OPENROUTER_API_KEY` (la misma de Jev); si falta la clave del
     proveedor configurado, error claro, nunca la otra clave.
-  - [ ] **T8b — Medir y elegir el modelo.** Con el banco real, `google/gemini-3.8-flash`
+  - [x] **T8b — Medir y elegir el modelo.** Con el banco real, `google/gemini-3.8-flash`
     y `openai/gpt-6-luna` contra `nan/deepseek-v4-flash`: latencia por llamada (ruteo y
     respuesta) y escenarios. Objetivo: menos de 4 s por turno sin empeorar ningún
     escenario. Elige el usuario; se configura con `python -m prisma modelo`.
+    Resultado (ver Progreso): ningún modelo llega a 4 s porque cada turno hace unas tres
+    llamadas seguidas. Decisión del usuario (2026-09-28): se mantiene
+    `nan/deepseek-v4-flash` y se ataca la cantidad de llamadas (T8c).
+  - [ ] **T8c — Menos llamadas seguidas por turno.** Diseñar antes de escribir código
+    cómo bajar las llamadas al modelo de cada turno (hoy: una de ruteo tipado más una
+    mediana de dos del ciclo de herramientas, hasta cuatro), sin perder las garantías
+    del ruteo ni de las herramientas; medir con el mismo banco y el mismo complemento de
+    latencias.
 - [ ] **T9 — Estado de la conversación (ronda 3).** R3-H17, H20, H15, H19, H18, H16,
   H5 y H13.
 - [ ] **T10 — Forma de las respuestas (ronda 3).** R3-H1, H2, H3/H7, H8, H9, H10, H11,
@@ -4087,3 +4095,19 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   proveedor desconocido y sin clave, el error nombra la clave en vez del proveedor
   (verificar la dirección antes que la clave); la clave faltante ahora corta el turno al
   construir el proveedor (antes fallaba en la llamada), con el mismo incidente.
+
+- 2026-09-28 (noche): **T8b — medición de modelos con el banco real.** Una corrida por
+  escenario (36), latencia de cada llamada volcada por un complemento de pytest del
+  scratchpad (no versionado) desde la grabación del banco (`rutas`/`respuestas`).
+  `nan/deepseek-v4-flash`: 33/36 aprobados (fallan b-0001-a, b-0001-b, b-0013); ruteo
+  mediana 2,8 s (p90 4,7); respuesta 3,1 s (p90 5,4); modelo por turno 10,0 s (p90
+  17,4). `openrouter google/gemini-3.8-flash`: 29/36 (suma fallas en b-0001, b-0005-b,
+  b-0011, b-0016); ruteo 3,8 s; respuesta 3,3 s; por turno 14,2 s. `openrouter
+  openai/gpt-6-luna`: 7/36, 25 bloqueados por `RoutingError` y 3 por `RateLimitError`;
+  causa verificada con una sonda directa: en una conversación normal manda el objeto
+  `task` con todos los campos vacíos y la validación del ruteo lo rechaza ("Normal
+  conversation cannot contain task proposals."); donde anduvo, ruteo 1,9 s y respuesta
+  2,9 s. Cada turno hace una llamada de ruteo tipado y una mediana de dos del ciclo de
+  herramientas (hasta cuatro), en serie; el modelo conversacional es el 96 % del tiempo
+  del escenario. Con 2-3 s por llamada ningún modelo llega a menos de 4 s por turno.
+  Decisión del usuario: se mantiene deepseek y se diseña cómo bajar las llamadas (T8c).
