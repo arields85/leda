@@ -308,6 +308,11 @@ def main(argv: list[str] | None = None) -> int:
     cve_flags.add_argument("--activar", action="store_true")
     cve_flags.add_argument("--desactivar", action="store_true")
 
+    goo = sub.add_parser("google")     # rama auxiliar, G2
+    goo_sub = goo.add_subparsers(dest="google_cmd", required=True)
+    goo_sub.add_parser("clave-nueva", help="genera una clave para "
+                       "PRISMA_CLAVE_CREDENCIALES (no escribe archivos)")
+
     srv = sub.add_parser("servir")
     srv.add_argument("--puerto", type=int, default=8080)
     srv.add_argument("--sin-cadencias", action="store_true",
@@ -336,6 +341,19 @@ def main(argv: list[str] | None = None) -> int:
             print(f"  {str(e).strip().splitlines()[0]}")
             return 1
         print("Esquema aplicado.")
+        return 0
+
+    if a.cmd == "google" and a.google_cmd == "clave-nueva":
+        # No necesita base ni archivos: sólo genera e imprime la clave.
+        from .google.cifrado import VARIABLE_CLAVE, clave_nueva
+
+        print("Clave nueva para cifrar las credenciales de Google:\n")
+        print(clave_nueva())
+        print(f"\nAgregala al archivo .env como {VARIABLE_CLAVE}=<clave>.")
+        print("Para rotar: poné la clave nueva primero y conservá las "
+              "anteriores después de una coma,")
+        print("y después corré `python -m prisma google recifrar` "
+              "(disponible más adelante).")
         return 0
 
     if a.cmd == "servir":
