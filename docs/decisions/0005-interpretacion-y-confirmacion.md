@@ -12,6 +12,19 @@
    va a cambiar —recurso, estado actual, estado nuevo— y que todavía no se aplicó
    nada, con **Confirmar**, **Modificar** y **Cancelar**. Sin Confirmar no hay
    efecto. Vale para mensajes claros y ambiguos.
+
+   **Precisión (2026-09-29, decisión del usuario): el borrador del alta guiada.** Su
+   vista previa tenía sólo Confirmar y Cancelar, y un dato equivocado obligaba a
+   cancelar y rearmar la tarea. Pasa a tener **Confirmar**, **Modificar** y
+   **Cancelar**. Modificar pregunta qué dato cambiar, con un botón por dato. Un dato de
+   texto muestra lo que la persona había escrito, en un bloque que se copia con un
+   toque (y el botón de copiar de Telegram cuando entra en sus 256 caracteres), para
+   que lo pegue, lo corrija y lo mande; un dato que se elige con botones (responsable,
+   área, objetivo) vuelve a mostrar sus opciones. Cambia sólo ese dato, lo demás queda
+   como estaba, y vuelve la vista previa actualizada con los mismos tres botones. La
+   tarea se sigue creando sólo con Confirmar. Telegram no permite que un bot escriba
+   texto editable en la caja de la persona (sólo un marcador de 1 a 64 caracteres, o
+   una consulta inline precedida por el nombre del bot), por eso se copia y se pega.
 2. **La vista previa es la protección principal.** Detectar la ambigüedad reduce
    preguntas y errores, pero no se confía en esa detección para evitar un efecto
    equivocado.

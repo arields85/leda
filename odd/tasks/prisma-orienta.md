@@ -271,6 +271,14 @@ gestión.
     retenidos hasta que se cierra (decisión del usuario, opción A); la retención termina
     al vencer la pregunta pendiente (a definir un vencimiento donde no lo haya). Puede
     partirse en R1d-1 (la pregunta de la rama) y R1d-2 (retención en el despacho).
+  - [ ] **T9-R1c-3 — Modificar en la vista previa del alta** (precisión del ADR 0005
+    decisión 1, decisión del usuario del 2026-09-29). La vista previa del borrador pasa
+    a **[Confirmar] [Modificar] [Cancelar]**; Modificar pregunta qué dato cambiar (un
+    botón por dato); un dato de texto muestra lo escrito en un bloque copiable (y
+    `copy_text` si entra en 256 caracteres) para pegarlo, corregirlo y mandarlo; un dato
+    con opciones vuelve a mostrar sus botones; cambia sólo ese dato y vuelve la vista
+    previa actualizada. `corrige` sobre la vista previa lleva a este camino en vez de
+    `AVISO_ALTA_NO_SE_CORRIGE`. Después de T9-R1d.
   - [ ] **T9-R2 — Cada mensaje recibe exactamente una respuesta visible** (H15, H19).
     `procesar_update` sólo lee `text` (`gateway.py:213`); control estructural al cerrar
     el mensaje; epígrafe como texto; comprobación del banco y del validador.
