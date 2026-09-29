@@ -708,10 +708,12 @@ def test_la_fecha_del_bloque_copiable_se_pega_de_vuelta_sin_cambiar_nada(
     (RespectoPendiente.CHARLA, ""),
     (RespectoPendiente.NO_PUEDO, gateway.AVISO_NO_PUEDO_DATO_PENDIENTE + " "),
 ])
-@pytest.mark.parametrize("etiqueta, actual", [
-    ("Título", TITULO), ("Fecha objetivo", "29/02/2028")])
+@pytest.mark.parametrize("etiqueta, actual, campo, guardado", [
+    ("Título", TITULO, "title", TITULO),
+    ("Fecha objetivo", "29/02/2028", "due_date", "2028-02-29")])
 def test_repreguntar_un_dato_de_modificar_tras_una_charla_vuelve_con_su_bloque(
-        comando, prefijo, etiqueta, actual, intake_world, conn, monkeypatch):
+        comando, prefijo, etiqueta, actual, campo, guardado, intake_world, conn,
+        monkeypatch):
     rid, pid, client, user = _modificar(conn, monkeypatch, intake_world)
     _elegir_dato(conn, client, user, rid, etiqueta)
     antes = _salidas(conn, user)
@@ -724,8 +726,15 @@ def test_repreguntar_un_dato_de_modificar_tras_una_charla_vuelve_con_su_bloque(
     assert fila["bloque_copiable"] == actual             # lo que tenía, para copiar
     assert fila["cuerpo"].startswith(prefijo) and fila["cuerpo"].endswith(actual)
     assert provider.main_calls == 0
-    # El campo sigue abierto y el dato sin cambiar.
-    assert _campos(conn, rid)["title"][1] == TITULO
+    # El campo que se parametriza (el título o la fecha) sigue sin cambiar y su
+    # espacio de texto libre sigue activo: el mensaje siguiente lo reemplaza.
+    assert _campos(conn, rid)[campo] == ("confirmed", guardado)
+    with espacio(conn, intake_world["north-lab"]["id"]) as cur:
+        from prisma.autoridad import Canal, identificar
+        quien = identificar(cur, user, Canal.ESPACIO,
+                            intake_world["north-lab"]["id"])
+        pregunta = I.open_intake_question(cur, quien, user)
+    assert pregunta["tipo"] == I.QUESTION_FREE_TEXT and pregunta["campo"] == campo
 
 
 def test_repreguntar_un_dato_del_alta_que_no_es_de_modificar_no_lleva_bloque(
@@ -843,3 +852,24 @@ def test_despues_de_volver_al_resumen_solo_confirmar_crea_la_tarea(
     with admin(conn) as cur:
         cur.execute("select titulo from task")
         assert [f["titulo"] for f in cur.fetchall()] == [TITULO]
+
+
+# ---------------- seguimiento de review-5125015caf2e7767: una fecha vacía no es "None"
+
+@pytest.mark.parametrize("vacia", [None, "", "   "])
+def test_una_fecha_objetivo_vacia_no_se_muestra_como_la_palabra_none(vacia):
+    from prisma import ingreso_tareas as I
+
+    assert I.format_due_date(vacia) == ""
+    vista = I.render_preview(
+        title="T", description="", objective="O", area="A", responsible="R",
+        due_date=I.format_due_date(vacia), acceptance_criterion="C",
+        evidence=["explicacion"])
+    assert "None" not in vista
+
+
+def test_una_fecha_iso_sigue_mostrandose_como_dia_mes_anio():
+    from prisma import ingreso_tareas as I
+
+    assert I.format_due_date("2028-02-29") == "29/02/2028"
+    assert I.format_due_date("pasado mañana") == "pasado mañana"   # no ISO: tal cual

@@ -801,7 +801,10 @@ def format_due_date(value) -> str:
     """La fecha objetivo como la lee una persona: DD/MM/AAAA. El dato se guarda
     como fecha ISO (ya resuelta en la zona horaria del espacio, sin hora: no hay
     nada que convertir); lo que se muestra y se pega de vuelta pasa por la
-    resolución de fechas de siempre. Lo que no es una fecha ISO se deja tal cual."""
+    resolución de fechas de siempre. Lo que no es una fecha ISO se deja tal cual;
+    una fecha vacía es vacía, nunca la palabra "None"."""
+    if value is None or not str(value).strip():
+        return ""
     try:
         return date.fromisoformat(value).strftime("%d/%m/%Y")
     except (TypeError, ValueError):
