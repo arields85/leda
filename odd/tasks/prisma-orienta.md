@@ -317,7 +317,7 @@ gestión.
     se retiene contra su propia rama; que el conteo de `retenidos` respete el vencimiento
     y el bloqueo de las filas (y que lo vencido de alguien retenido se descarte igual);
     un reloj único en la prueba del toque; y la prueba del aprobador sin nombre legible.
-  - [ ] **T9-R1c-3b — Ajustes de Modificar en el alta.** La vista previa que sigue a
+  - [x] **T9-R1c-3b — Ajustes de Modificar en el alta.** La vista previa que sigue a
     Modificar, cuando quien pide es quien confirma, sale como respuesta (hoy es un mensaje
     que inicia Prisma y queda sujeto a horario, tope diario y retención: fuera de horario la
     persona no recibiría el resumen corregido); botón [Volver al resumen] en el selector
@@ -4650,3 +4650,16 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   passed, 243 deselected; padre: enfocadas 69 passed. RDD: tramo `3255418..126839f` medio,
   2078 líneas, `review-8563632f45a44f88` **aprobada y reconocida** (consentimiento
   permanente); frontera en `126839f`. Banco real `b-0025` y `b-0022-f` (n=3): **12/12**.
+
+- 2026-09-29: **T9-R1c-3b.** Ruta: delegada, un escritor. `26ec717` (la vista previa
+  del borrador sale como respuesta cuando quien pide es quien confirma), `6d096d9` (un solo
+  reloj en el despacho), `d1fc9bd` (campo sin fila en Modificar), `3b1b228` (fecha objetivo
+  DD/MM/AAAA en la vista previa y el bloque), `0d8a509` (el bloque copiable vuelve al
+  repreguntar), `37aa450` ([Volver al resumen] en el selector), `89e2be5` (`b-0025-d`,
+  `-e`). Suite del escritor 1806 passed, 249 deselected; padre: enfocadas 73 passed. RDD:
+  tramo `126839f..89e2be5` alto, 617 líneas, `review-5125015caf2e7767` (4 lentes)
+  **aprobada y reconocida**; frontera en `89e2be5`. Banco real `b-0025` (n=3): **15/15**.
+  Seguimientos (a T9-R2): una fecha vacía se mostraría como "None" en la vista previa; la
+  prueba parametrizada de repreguntar no controla el campo de la fecha. Sigue pendiente
+  la decisión del usuario sobre Modificar cuando confirma otra persona (A: quien pide
+  revisa antes de enviar; B: el aprobador modifica; C: como está).
