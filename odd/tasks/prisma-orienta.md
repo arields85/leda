@@ -275,6 +275,10 @@ gestión.
       pasan por `_atender_pregunta_pendiente`; "No, es otra cosa" de `dudoso`; quitar
       el retome y `agente.NoProponer`; el borrador que espera a otro aprobador no es rama
       de quien lo pidió; escenarios `b-0020`, `b-0021-c`, `b-0022-b` a la regla nueva.
+    - [ ] **T9-R1d-1a-fix** — reponer la guarda contra volver a proponer lo que la persona
+      acaba de dejar, en el camino "Dejarlo y ver lo otro" (banco `b-0020-f` 0/3: tras
+      dejar el bloqueo, el responder lo volvió a proponer desde el historial); el toque
+      "dejar" sólo con su valor explícito (`review-2282ebc46e7a48e1`, R3).
     - [ ] **T9-R1d-1b** — la vista previa de un cambio que la persona pidió y espera su
       Confirmar pasa a ser rama (hoy el texto sigue el turno normal).
     - [ ] **T9-R1d-2** — retención de los mensajes que inicia Prisma mientras la persona
@@ -291,6 +295,8 @@ gestión.
     `procesar_update` sólo lee `text` (`gateway.py:213`); control estructural al cerrar
     el mensaje; epígrafe como texto; comprobación del banco y del validador.
   - [ ] **T9-R3 — Decir el estado real y ofrecer sólo lo posible** (H20, H18, H16).
+    Incluye (de `review-2282ebc46e7a48e1`): quien pidió un borrador que espera a otro
+    aprobador no recibe un aviso determinista de quién confirma cuando escribe sobre él.
     `adjuntar_evidencia` sobre una tarea en curso deja evidencia sin decirlo
     (`herramientas.py:1552-1559`); `contexto.PREAMBULO` obliga a inventar opciones
     (`contexto.py:70-77`); el motivo de "Pedir cambios" no está en ninguna lectura.
@@ -4506,3 +4512,19 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   **aprobada y reconocida**; frontera en `f284b27`. Banco real `b-0022` (n=3): **24/24**
   (antes 16/24). Seguimientos no bloqueantes: idempotencia del reenvío (a T9-R4); prueba
   del aprobador sin nombre legible (a T9-R1c-3).
+
+- 2026-09-29: **T9-R1d-1a.** Ruta: delegada, un escritor. `ed02e06`: con una pregunta
+  abierta, `otro_tema` recibe la pregunta de la rama ("Estábamos con {nombre}. ¿Seguimos con
+  eso?" [✅ Seguir con eso] [✖️ Dejarlo y ver lo otro]) sin llamar al responder; Dejar cierra
+  como `cancela` y atiende el mensaje guardado en la misma respuesta; "No, es otra cosa" de
+  `dudoso` es Dejar; una sola pregunta de rama viva por chat; el borrador que espera a otro
+  aprobador no es rama de quien lo pidió. Se quitaron el retome posterior, el bloque "#
+  Pregunta pendiente" y `agente.NoProponer` (722 líneas agregadas, 1014 quitadas).
+  `e46d157`: escenarios del banco a la regla nueva y cinco nuevos. Suite del escritor 1529
+  passed, 213 deselected; padre: enfocadas 155 passed. RDD: tramo `f284b27..e46d157` medio,
+  2326 líneas, consentida, `review-2282ebc46e7a48e1` (confiabilidad) **aprobada y
+  reconocida**; frontera en `e46d157`. Banco real (n=3, 11 escenarios): **28/33**.
+  `b-0020-f` 0/3: tras "Dejarlo y ver lo otro" sobre un Modificar de `registrar_bloqueo`, el
+  responder atendió "¿qué tareas tengo abiertas?" y además volvió a proponer el bloqueo desde
+  el historial: quitar la guarda fue prematuro (T9-R1d-1a-fix). `b-0021-i` 1/3: redacción,
+  resume sin nombrar la tarea (T10).
