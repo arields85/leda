@@ -12,8 +12,8 @@ texto libre (T9-R1c-1):
   una de las opciones activas (como el toque); si no, vuelve a mostrar la
   pregunta con sus botones. El modelo nunca elige la opción.
 - borrador esperando confirmación: la conversión sigue siendo explícita, con el
-  botón Confirmar; ningún mensaje la confirma. `corrige` dice que el borrador
-  no se cambia desde un mensaje; `cancela` lo cancela.
+  botón Confirmar; ningún mensaje la confirma. `corrige` abre el selector de
+  Modificar (`test_alta_modificar.py`); `cancela` lo cancela.
 
 Los ruteos y el modelo se guionan; ninguna prueba toca la red ni el modelo real.
 """
@@ -599,23 +599,6 @@ def test_quien_escribe_es_el_aprobador_su_otro_tema_abre_la_pregunta_de_la_rama(
     assert [f["cuerpo"] for f in salidas] == [gateway.PREGUNTA_RAMA_ABIERTA.format(
         nombre="la confirmación del borrador de la tarea nueva")]
     assert salidas[0]["pending_action_id"]                    # con sus botones
-
-
-def test_corrige_no_cambia_el_borrador_y_dice_que_no_se_cambia_desde_un_mensaje(
-        intake_world, conn, monkeypatch):
-    rid, pid = _alta_en_confirmacion(conn, intake_world)
-    user = _usuario(intake_world)
-    antes = _salidas(conn, user)
-    provider = _RoutingProvider([_ruta(RespectoPendiente.CORRIGE)])
-
-    _escribir(conn, monkeypatch, intake_world, provider,
-              "cambiá la fecha para el viernes")
-
-    _sin_conversion(conn, rid, pid)
-    salidas = _nuevas(conn, user, antes)
-    assert len(salidas) == 1
-    assert salidas[-1]["cuerpo"] == (f"{gateway.AVISO_ALTA_NO_SE_CORRIGE} "
-                                     f"{I.DRAFT_AWAITING_CONFIRMATION}")
 
 
 def test_cancela_con_el_borrador_esperando_lo_cancela_y_lo_dice(

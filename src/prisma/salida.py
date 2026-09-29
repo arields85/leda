@@ -123,6 +123,9 @@ def etiquetas_coinciden(a: str, b: str) -> bool:
 
 ETIQUETA_CONFIRMAR = con_icono("Confirmar", ICONO_CONFIRMAR)
 ETIQUETA_CANCELAR = con_icono("Cancelar", ICONO_CANCELAR)
+# El tercer botón de la vista previa (ADR 0005 decisión 1); sin ícono, como en las
+# demás vistas previas.
+ETIQUETA_MODIFICAR = "Modificar"
 # El botón que copia al portapapeles lo que la persona había escrito (T9-R1c-3).
 # Redacción pendiente de revisión de voz en T10.
 ETIQUETA_COPIAR = con_icono("Copiar", ICONO_COPIAR)

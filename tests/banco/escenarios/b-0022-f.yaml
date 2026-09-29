@@ -2,9 +2,9 @@ id: b-0022-f
 variante_de: b-0022
 objetivo: >
   Variante de b-0022, corregir el borrador: con la vista previa esperando, la
-  persona pide cambiar la fecha. El alta no tiene un camino para cambiar un
-  dato ya confirmado desde un mensaje: Prisma lo dice una vez y el borrador
-  sigue esperando.
+  persona pide cambiar la fecha. Un mensaje que corrige lleva al mismo camino
+  que el botón Modificar (T9-R1c-3): Prisma pregunta qué dato cambiar, con un
+  botón por dato, y no aplica nada.
 actor: Ismael Soschinski
 mensajes: []
 precondiciones:
@@ -41,13 +41,10 @@ efectos:
     task_state_event: 0
     evidence: 0
     approval: 0
-# La respuesta es `gateway.AVISO_ALTA_NO_SE_CORRIGE`: si cambia su
-# redacción, actualizar acá.
+# La respuesta es `ingreso_tareas.MODIFY_PICKER_PROMPT`, con un botón por dato: si
+# cambia su redacción, actualizar acá.
 respuesta_menciona:
-  - "no lo puedo cambiar"
+  - "qué dato querés cambiar"
 # El alta es justamente lo que se prueba: un borrador es esperable.
 permite_borrador_de_tarea: true
-# La respuesta es un texto sin botones a propósito: se exime la
-# comprobación de ADR 0007 sobre preguntas sin opciones.
-permite_pregunta_sin_opciones: true
 severidad: alta

@@ -1694,7 +1694,7 @@ def test_ejecutar_escenario_escribir_la_opcion_de_la_eleccion_abierta_del_alta(
 @pytest.mark.parametrize(("comando", "texto", "estado", "dice"), [
     (RespectoPendiente.RESPONDE, "sí, dale", "active", "esperando confirmación"),
     (RespectoPendiente.CORRIGE, "cambiale la fecha", "active",
-     "no lo puedo cambiar"),
+     "Qué dato querés cambiar"),
     (RespectoPendiente.CANCELA, "no, cancelalo", "cancelled", "dejé de lado"),
 ])
 def test_ejecutar_escenario_llega_al_borrador_esperando_y_lo_interpreta(
@@ -1767,7 +1767,7 @@ def test_sembrar_borrador_de_alta_deja_la_vista_previa_esperando(corework, conn)
                     ("Cablear tablero norte",))
         tareas = cur.fetchone()["n"]
     assert "Cablear tablero norte" in salida["cuerpo"]
-    assert salida["botones"] == 2                    # Confirmar y Cancelar
+    assert salida["botones"] == 3            # Confirmar, Modificar y Cancelar
     assert tareas == 0                               # el borrador no es una tarea
 
 

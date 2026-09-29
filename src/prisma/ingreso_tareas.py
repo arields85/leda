@@ -13,10 +13,11 @@ from zoneinfo import ZoneInfo
 import psycopg
 from psycopg.types.json import Jsonb
 
-from .autoridad import Solicitante
+from .autoridad import Denegado, Solicitante
 from .db import registrar_auditoria
 from .incidentes import registrar_incidente
-from .salida import (BUTTON_TEXT_LIMIT, ICONO_CANCELAR, ICONO_OTRA_OPCION,
+from .salida import (BUTTON_TEXT_LIMIT, ETIQUETA_CANCELAR, ETIQUETA_CONFIRMAR,
+                     ETIQUETA_MODIFICAR, ICONO_CANCELAR, ICONO_OTRA_OPCION,
                      ICONO_VER_MAS, PayloadValidationError, con_icono,
                      enqueue_outbox, etiqueta_sin_icono, etiquetas_de_tarea,
                      normalize_visible_text, prepare_buttons, prepare_payload, telegram_utf16_units,
@@ -45,6 +46,21 @@ DRAFT_AWAITING_CONFIRMATION = (
     "El borrador de la tarea está esperando confirmación: se confirma con el "
     "botón Confirmar del resumen, no con un mensaje.")
 CHOICE_FALLBACK_PROMPT = "Elegí una opción para seguir con la tarea."
+# Modificar en la vista previa del borrador (T9-R1c-3, ADR 0005 decisión 1): el
+# selector "qué dato cambiar" es una elección del alta con un botón por dato, y su
+# `tipo` (`task_intake_choice_set.tipo`) lo distingue de las elecciones de un dato.
+# Un dato de texto se corrige copiando y pegando lo que la persona tenía; uno que se
+# elige con botones vuelve a mostrar sus opciones. Redacción pendiente de revisión
+# de voz en T10.
+MODIFY_PICKER_KIND = "modify_picker"
+MODIFY_PICKER_PROMPT = "¿Qué dato querés cambiar del borrador?"
+MODIFY_FIELD_LABELS = {
+    "title": "Título", "description": "Descripción", "objective": "Objetivo",
+    "responsible": "Responsable", "area": "Área", "due_date": "Fecha objetivo",
+    "acceptance_criterion": "Criterio de aceptación",
+}
+CHOICE_FIELDS = ("objective", "responsible", "area")
+NOT_YOURS = "Eso se lo pregunté a otra persona del equipo."
 USER_FIELD_LIMITS = {
     "title": 200,
     "description": 800,
@@ -80,6 +96,10 @@ class IntakeOutcome:
     inert: bool = False
     pending_action_id: str | None = None
     terminal: str | None = None
+    # El botón tocado ya no vale (su elección se usó, se cerró o se reemplazó): el
+    # gateway lo contesta como cualquier otro toque que no está vigente (sólo el
+    # selector de Modificar lo marca). No se persiste: es del toque, no del resultado.
+    stale: bool = False
 
     def as_json(self) -> dict[str, Any]:
         return {
@@ -271,7 +291,7 @@ def resolve_choice(cur: psycopg.Cursor, who: Solicitante, *, token: str,
     cur.execute(
         """select c.id choice_id, c.accion, c.valor, c.activa,
                    s.id choice_set_id, s.request_id, s.campo, s.estado set_estado,
-                   s.resultado set_resultado, s.request_version,
+                   s.resultado set_resultado, s.request_version, s.tipo set_tipo,
                    r.membership_id, r.chat_id, r.estado request_estado,
                    r.version request_current_version
              from task_intake_choice c
@@ -286,18 +306,20 @@ def resolve_choice(cur: psycopg.Cursor, who: Solicitante, *, token: str,
     request_id = str(choice["request_id"])
     if str(choice["membership_id"]) != str(who.membership_id) or choice["chat_id"] != chat_id:
         return IntakeOutcome(request_id, "Ese botón corresponde a otro chat.", inert=True)
+    stale = choice["set_tipo"] == MODIFY_PICKER_KIND
     if choice["set_estado"] != "active" or not choice["activa"]:
         persisted = choice["set_resultado"] or {}
         return IntakeOutcome(
             request_id, persisted.get("text", "Ese botón ya no está vigente."),
             inert=True, pending_action_id=persisted.get("pending_action_id"),
-            terminal=persisted.get("terminal"),
+            terminal=persisted.get("terminal"), stale=stale,
         )
     if choice["request_estado"] != "active":
         return IntakeOutcome(request_id, "Ese borrador ya terminó.", inert=True,
-                             terminal=choice["request_estado"])
+                             terminal=choice["request_estado"], stale=stale)
     if choice["request_version"] != choice["request_current_version"]:
-        return IntakeOutcome(request_id, "Ese botón ya no está vigente.", inert=True)
+        return IntakeOutcome(request_id, "Ese botón ya no está vigente.", inert=True,
+                             stale=stale)
 
     cur.execute(
         """update task_intake_choice_set set estado = 'consumed'
@@ -311,7 +333,7 @@ def resolve_choice(cur: psycopg.Cursor, who: Solicitante, *, token: str,
         return IntakeOutcome(
             request_id, persisted.get("text", "Ese botón ya no está vigente."),
             inert=True, pending_action_id=persisted.get("pending_action_id"),
-            terminal=persisted.get("terminal"),
+            terminal=persisted.get("terminal"), stale=stale,
         )
     cur.execute(
         """update message_outbox set estado = 'descartado'
@@ -351,6 +373,8 @@ def resolve_choice(cur: psycopg.Cursor, who: Solicitante, *, token: str,
             cur, request, choice["campo"],
             _free_text_prompt(choice["campo"]), now,
         )
+    elif action == "modify_field":
+        outcome = _ask_field_change(cur, request, who, choice["valor"]["field"], now)
     elif action == "more":
         page = choice["valor"]
         outcome = _open_entity_page(
@@ -584,7 +608,8 @@ def open_intake_question(cur: psycopg.Cursor, who: Solicitante,
     opciones}`. `id` es el del campo de texto libre, el de la elección o el de
     la vista previa (su `pending_action`); `resumen` es la pregunta que se le
     hizo; `opciones` (sólo en una elección) son las etiquetas de sus botones,
-    sin íconos. Con varias, gana el campo de texto libre, después la elección:
+    sin íconos, y `clase` el `tipo` de la elección (`MODIFY_PICKER_KIND` para el
+    selector de Modificar). Con varias, gana el campo de texto libre, después la elección:
     una solicitud tiene una sola a la vez. La vista previa del borrador es una
     pregunta abierta sólo de quien tiene el botón Confirmar (el aprobador):
     si confirma otra persona, quien lo pidió no tiene una rama abierta (ADR
@@ -597,7 +622,7 @@ def open_intake_question(cur: psycopg.Cursor, who: Solicitante,
                 "titulo": slot["titulo"],
                 "resumen": free_text_question(slot["campo"]), "opciones": None}
     cur.execute(
-        f"""select s.id, s.request_id, s.campo, {_TITLE_OF_REQUEST} titulo
+        f"""select s.id, s.request_id, s.campo, s.tipo, {_TITLE_OF_REQUEST} titulo
               from task_intake_choice_set s
               join task_intake_request r on r.id = s.request_id
              where s.workspace_id = %s and r.membership_id = %s
@@ -615,7 +640,7 @@ def open_intake_question(cur: psycopg.Cursor, who: Solicitante,
         options = [etiqueta_sin_icono(c["etiqueta"]) for c in cur.fetchall()]
         return {"tipo": QUESTION_CHOICE, "id": str(row["id"]),
                 "request_id": str(row["request_id"]), "campo": row["campo"],
-                "titulo": _text_or_none(row["titulo"]),
+                "clase": row["tipo"], "titulo": _text_or_none(row["titulo"]),
                 "resumen": _first_choice_prompt(cur, row["id"]),
                 "opciones": options}
     cur.execute(
@@ -691,6 +716,86 @@ def cancel_from_intake_question(cur: psycopg.Cursor, who: Solicitante, kind: str
         return False
     _cancel(cur, request, who, now, enqueue=False)
     return True
+
+
+def open_modify_picker(cur: psycopg.Cursor, who: Solicitante, question_id: str,
+                       now: datetime, *, via: str) -> IntakeOutcome | None:
+    """Modificar en la vista previa del borrador (T9-R1c-3, ADR 0005 decisión 1):
+    la cierra sin aplicar nada -- la tarea se crea sólo con Confirmar -- y abre el
+    selector "qué dato cambiar", con un botón por dato. `question_id` es el de la
+    vista previa (`open_intake_question`, `QUESTION_CONFIRMATION`); `via` es cómo
+    llegó la persona (`boton` o `texto`, un mensaje que corrige) y sólo se
+    audita. `None` si la vista previa ya no esperaba: no abre nada."""
+    request = _request_of_question(cur, who, QUESTION_CONFIRMATION, question_id,
+                                   lock=True)
+    if not request:
+        return None
+    registrar_auditoria(
+        cur, accion="modificar_ingreso_tarea", workspace_id=who.workspace_id,
+        actor_app_user_id=who.app_user_id, actor_kind="persona",
+        sujeto_tipo="task_draft", sujeto_id=str(request["task_draft_id"]),
+        detalle={"request_id": str(request["id"]), "via": via})
+    options = [(MODIFY_FIELD_LABELS[field], "modify_field", {"field": field})
+               for field in MODIFY_FIELD_LABELS]
+    return _open_choices(cur, request, None, MODIFY_PICKER_PROMPT, options, now,
+                         kind=MODIFY_PICKER_KIND)
+
+
+_MODIFY_OPTION = """select p.id, p.membership_id, p.chat_id, p.estado,
+                  p.vence_en > %s as vigente
+             from pending_action_option o
+             join pending_action p on p.id = o.pending_action_id
+            where o.token = %s and o.workspace_id = %s and p.draft_id is not null
+              and o.valor = to_jsonb('modificar'::text)"""
+
+
+def es_modificar_de_borrador(cur: psycopg.Cursor, who: Solicitante, token: str,
+                             now: datetime) -> bool:
+    """Si `token` es el del botón Modificar de una vista previa de borrador."""
+    cur.execute(_MODIFY_OPTION, (now, token, who.workspace_id))
+    return cur.fetchone() is not None
+
+
+def modify_from_preview(cur: psycopg.Cursor, who: Solicitante, *, token: str,
+                        chat_id: int, now: datetime) -> IntakeOutcome | None:
+    """El botón Modificar de la vista previa del borrador. Sólo lo toca su
+    dueño, en su chat (`Denegado` si no), y sólo mientras la vista previa espera y
+    no venció; `None` si ya no (un toque tardío, un segundo toque)."""
+    cur.execute(_MODIFY_OPTION, (now, token, who.workspace_id))
+    preview = cur.fetchone()
+    if not preview:
+        return None
+    if str(preview["membership_id"]) != str(who.membership_id)             or preview["chat_id"] != chat_id:
+        raise Denegado(NOT_YOURS)
+    if preview["estado"] != "esperando" or not preview["vigente"]:
+        return None
+    return open_modify_picker(cur, who, str(preview["id"]), now, via="boton")
+
+
+def modify_text_prompt(field: str, current: str) -> str:
+    """La pregunta de un dato de texto que se corrige: lo que la persona tenía,
+    al final del mensaje, en el bloque que se copia con un toque. Sin nada que
+    copiar (una descripción vacía), la pregunta de siempre del campo."""
+    if not current:
+        return _free_text_prompt(field)
+    return (f"Esto tenías en {FREE_TEXT_NAMES[field]}. Tocalo para copiarlo, "
+            f"corregilo y mandámelo (hasta {USER_FIELD_LIMITS[field]}): cambio "
+            f"sólo eso.\n\n{current}")
+
+
+def _ask_field_change(cur, request, who, field, now):
+    """Lo que sigue a elegir un dato en el selector de Modificar. Uno de texto
+    abre su campo para que el mensaje siguiente lo reemplace (con su validación de
+    siempre), mostrando lo que tenía; uno que se elige con botones vuelve a
+    mostrar sus opciones. Cambia sólo ese dato: lo demás queda como estaba."""
+    if field in CHOICE_FIELDS:
+        return _open_entity_page(cur, request, who, field, None, 0, now)
+    cur.execute(
+        "select valor from task_intake_field where request_id = %s and campo = %s",
+        (request["id"], field))
+    current = normalize_text(_text_or_none(cur.fetchone()["valor"]) or "")
+    return _open_free_text(cur, request, field, modify_text_prompt(field, current),
+                           now, block=current or None)
 
 
 def resolve_typed_choice(cur: psycopg.Cursor, who: Solicitante, *,
@@ -1094,9 +1199,9 @@ def _open_choices(cur, request, field, prompt, options, now, kind=None):
     return IntakeOutcome(request_id, prompt, changed=True)
 
 
-def _open_free_text(cur, request, field, prompt, now, replace=False):
+def _open_free_text(cur, request, field, prompt, now, replace=False, block=None):
     request_id = str(request["id"])
-    prepare_payload(prompt, dedupe_key="intake-text")
+    prepare_payload(prompt, dedupe_key="intake-text", has_buttons=bool(block))
     cur.execute(
         """update task_intake_free_text_slot set estado = 'invalidated'
             where request_id = %s and estado = 'active'""",
@@ -1110,7 +1215,7 @@ def _open_free_text(cur, request, field, prompt, now, replace=False):
     )
     _enqueue(
         cur, request, prompt, now,
-        f"intake:{request_id}:v{request['version']}:text:{field}",
+        f"intake:{request_id}:v{request['version']}:text:{field}", block=block,
     )
     return IntakeOutcome(request_id, prompt, changed=not replace)
 
@@ -1339,11 +1444,17 @@ def _finalize(cur, request, who, now):
         app_user_id=str(authority["app_user_id"]), canal=Canal.ESPACIO,
         workspace_id=who.workspace_id, membership_id=str(approver_id),
     )
+    # Modificar (T9-R1c-3) es de quien pidió el borrador y lo confirma él mismo:
+    # es quien tiene la rama abierta. Si confirma otra persona, ella sólo ve
+    # Confirmar y Cancelar.
+    options = [(ETIQUETA_CONFIRMAR, True), (ETIQUETA_CANCELAR, False)]
+    if str(approver_id) == str(request["membership_id"]):
+        options.insert(1, (ETIQUETA_MODIFICAR, "modificar"))
     pending = registrar(
         cur, confirmer, herramienta="confirmar_borrador_tarea", args={},
         resumen=preview_text, vence_en=now + timedelta(hours=8),
         chat_id=authority["telegram_user_id"], draft_id=str(request["task_draft_id"]),
-        draft_version=request["version"], preview=preview,
+        draft_version=request["version"], preview=preview, opciones=options,
     )
     enqueue_outbox(
         cur, workspace_id=who.workspace_id,
@@ -1440,12 +1551,12 @@ def _cancel(cur, request, who, now, enqueue=True):
     return IntakeOutcome(request_id, text, changed=True, terminal="cancelled")
 
 
-def _enqueue(cur, request, text, now, dedupe, choice_set_id=None):
+def _enqueue(cur, request, text, now, dedupe, choice_set_id=None, block=None):
     enqueue_outbox(
         cur, workspace_id=str(request["workspace_id"]), chat_id=request["chat_id"],
         recipient_membership_id=str(request["membership_id"]), text=text,
         scheduled_for=now, dedupe_key=dedupe, is_response=True,
-        intake_choice_set_id=choice_set_id,
+        intake_choice_set_id=choice_set_id, bloque_copiable=block,
     )
 
 

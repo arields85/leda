@@ -1,0 +1,584 @@
+"""Modificar en la vista previa del borrador del alta (T9-R1c-3, ADR 0005
+decisión 1, precisión del 2026-09-29; ADR 0013 regla 1, enmienda "una sola rama
+abierta").
+
+La vista previa del borrador pasa a tener Confirmar, Modificar y Cancelar.
+Modificar pregunta qué dato cambiar, con un botón por dato; un dato de texto
+muestra lo que la persona tenía en un bloque que se copia con un toque (y el
+botón de copiar si entra en 256), y el mensaje siguiente lo reemplaza; un dato
+que se elige con botones vuelve a mostrar sus opciones. Cambia sólo ese dato y
+vuelve la vista previa con los mismos tres botones. La tarea se crea sólo con
+Confirmar. `corrige` escrito sobre la vista previa lleva al mismo selector.
+
+Los ruteos y el modelo se guionan; ninguna prueba toca la red ni el modelo real.
+"""
+
+from __future__ import annotations
+
+import pytest
+
+from prisma import gateway
+from prisma import ingreso_tareas as I
+from prisma import pendientes as P
+from prisma.calendario import Calendario
+from prisma.db import admin, autoridad, espacio
+from prisma.despachador import TransporteDePrueba, despachar
+from prisma.llm import RespectoPendiente
+from prisma.salida import COPY_TEXT_LIMIT, ETIQUETA_COPIAR, etiqueta_sin_icono
+
+from tests.test_alta_eleccion_confirmacion import (TITULO, _alta_en_confirmacion,
+                                                   _escribir, _nuevas, _ruta,
+                                                   _salidas, _solicitud, _tocar_boton,
+                                                   _usuario)
+from tests.test_task_intake import (_RoutingProvider, _active_choices,
+                                    _callback_client, _post_intake_callback)
+
+ETIQUETAS_DEL_SELECTOR = ["Título", "Descripción", "Objetivo", "Responsable",
+                          "Área", "Fecha objetivo", "Criterio de aceptación"]
+AVISO_TOQUE_YA_USADO = ("Ese pedido ya no está vigente. Si sigue haciendo falta, "
+                        "escribime y lo vemos de nuevo.")
+
+
+# ----------------------------------------------------------------- ayudas
+
+def _campos(conn, rid) -> dict:
+    with admin(conn) as cur:
+        cur.execute("select campo, estado, valor from task_intake_field "
+                    "where request_id = %s order by campo", (rid,))
+        return {f["campo"]: (f["estado"], f["valor"]) for f in cur.fetchall()}
+
+
+def _previews(conn, rid) -> list[dict]:
+    """Las vistas previas del borrador de la solicitud, la más vieja primero."""
+    with admin(conn) as cur:
+        cur.execute(
+            """select p.id, p.estado, p.resumen from pending_action p
+                 join task_intake_request r on r.task_draft_id = p.draft_id
+                where r.id = %s order by p.creado_en, p.id""", (rid,))
+        return cur.fetchall()
+
+
+def _etiquetas_de_la_vista_previa(conn, pid) -> list[str]:
+    with admin(conn) as cur:
+        return [etiqueta_sin_icono(o.etiqueta) for o in P.opciones(cur, pid)]
+
+
+def _tareas(conn) -> int:
+    with admin(conn) as cur:
+        cur.execute("select count(*) n from task")
+        return cur.fetchone()["n"]
+
+
+def _conjunto_activo(conn, rid):
+    with admin(conn) as cur:
+        cur.execute("""select id, tipo, campo from task_intake_choice_set
+                        where request_id = %s and estado = 'active'""", (rid,))
+        return cur.fetchone()
+
+
+def _opciones_activas(conn, rid) -> dict:
+    """Las etiquetas (sin ícono) de la elección activa y su token."""
+    with admin(conn) as cur:
+        return {etiqueta_sin_icono(e): t
+                for e, t in _active_choices(cur, rid).items()}
+
+
+def _ultima_salida(conn, chat_id, antes: list[dict]) -> dict:
+    """La última salida posterior a `antes` (`_salidas`): el armado del alta usa
+    un reloj fijo, así que no se ordena por hora contra lo anterior."""
+    vistos = {f["id"] for f in antes}
+    with admin(conn) as cur:
+        cur.execute(
+            """select id, cuerpo, bloque_copiable, pending_action_id,
+                      intake_choice_set_id
+                 from message_outbox where chat_id = %s
+                order by programado_para, id""", (chat_id,))
+        filas = [f for f in cur.fetchall() if f["id"] not in vistos]
+    assert filas, "no salió ningún mensaje nuevo"
+    return filas[-1]
+
+
+def _despachar(conn, ws, transporte=None):
+    transporte = transporte or TransporteDePrueba()
+    with espacio(conn, ws) as cur:
+        despachar(cur, ws, transporte, Calendario.desde_base(cur, ws))
+    return transporte
+
+
+def _toque_de_modificar(client, conn, user, pid):
+    with admin(conn) as cur:
+        # Aunque la vista previa ya esté cerrada: un toque tardío usa el mismo
+        # botón de siempre.
+        cur.execute("select token from pending_action_option "
+                    "where pending_action_id = %s and etiqueta = 'Modificar'", (pid,))
+        token = cur.fetchone()["token"]
+    return _tocar_boton(client, conn, token, user)
+
+
+def _modificar(conn, monkeypatch, world, responsable="Sam North"):
+    """El alta en confirmación con Modificar ya tocado: el selector abierto.
+    Devuelve (request_id, id de la vista previa cerrada, cliente, chat)."""
+    rid, pid = _alta_en_confirmacion(conn, world, responsable=responsable)
+    user = _usuario(world)
+    client = _callback_client(conn, monkeypatch)
+    assert _toque_de_modificar(client, conn, user, pid).status_code == 200
+    return rid, pid, client, user
+
+
+def _elegir_dato(conn, client, user, rid, etiqueta):
+    opciones = _opciones_activas(conn, rid)
+    assert _post_intake_callback(client, opciones[etiqueta], user).status_code == 200
+
+
+def _responder_con(conn, monkeypatch, world, texto):
+    provider = _RoutingProvider([_ruta(RespectoPendiente.RESPONDE)])
+    _escribir(conn, monkeypatch, world, provider, texto)
+    return provider
+
+
+# ------------------------------------------------- la vista previa: 3 botones
+
+def test_la_vista_previa_del_alta_ofrece_confirmar_modificar_y_cancelar(
+        intake_world, conn):
+    rid, pid = _alta_en_confirmacion(conn, intake_world, responsable="Sam North")
+
+    assert _etiquetas_de_la_vista_previa(conn, pid) == [
+        "Confirmar", "Modificar", "Cancelar"]
+
+
+def test_si_confirma_otra_persona_la_vista_previa_no_ofrece_modificar(
+        intake_world, conn):
+    """Quien pidió el borrador no es quien confirma: Modificar es de quien tiene
+    la rama abierta, y esa persona no es quien recibe este botón."""
+    rid, pid = _alta_en_confirmacion(conn, intake_world, responsable="Para mí")
+
+    assert _etiquetas_de_la_vista_previa(conn, pid) == ["Confirmar", "Cancelar"]
+
+
+# ----------------------------------------------------- tocar Modificar
+
+def test_tocar_modificar_cierra_la_vista_previa_y_pregunta_que_dato_cambiar(
+        intake_world, conn, monkeypatch):
+    rid, pid = _alta_en_confirmacion(conn, intake_world)
+    user = _usuario(intake_world)
+    client = _callback_client(conn, monkeypatch)
+    antes = _salidas(conn, user)
+
+    assert _toque_de_modificar(client, conn, user, pid).status_code == 200
+
+    # Nada se aplicó: la vista previa quedó cerrada y sigue sin haber tarea.
+    assert [p["estado"] for p in _previews(conn, rid)] == ["cancelada"]
+    assert _tareas(conn) == 0
+    assert _solicitud(conn, rid) == "active"
+    # Una sola respuesta: el selector, con un botón por dato.
+    salidas = _nuevas(conn, user, antes)
+    assert [f["cuerpo"] for f in salidas] == [I.MODIFY_PICKER_PROMPT]
+    assert salidas[0]["intake_choice_set_id"]
+    assert list(_opciones_activas(conn, rid)) == ETIQUETAS_DEL_SELECTOR
+
+
+def test_el_selector_es_la_pregunta_abierta_de_la_rama(intake_world, conn,
+                                                       monkeypatch):
+    rid, pid, client, user = _modificar(conn, monkeypatch, intake_world)
+
+    with espacio(conn, intake_world["north-lab"]["id"]) as cur:
+        from prisma.autoridad import Canal, identificar
+        quien = identificar(cur, user, Canal.ESPACIO,
+                            intake_world["north-lab"]["id"])
+        pregunta = I.open_intake_question(cur, quien, user)
+    assert pregunta["tipo"] == I.QUESTION_CHOICE
+    assert pregunta["request_id"] == rid
+    assert pregunta["opciones"] == ETIQUETAS_DEL_SELECTOR
+
+
+def test_modificar_dos_veces_la_segunda_dice_que_ya_no_esta_vigente(
+        intake_world, conn, monkeypatch):
+    rid, pid, client, user = _modificar(conn, monkeypatch, intake_world)
+    antes = _salidas(conn, user)
+
+    assert _toque_de_modificar(client, conn, user, pid).status_code == 200
+
+    assert [f["cuerpo"] for f in _nuevas(conn, user, antes)] == [AVISO_TOQUE_YA_USADO]
+    assert list(_opciones_activas(conn, rid)) == ETIQUETAS_DEL_SELECTOR
+
+
+def test_modificar_de_una_vista_previa_vencida_dice_que_ya_no_esta_vigente(
+        intake_world, conn, monkeypatch):
+    rid, pid = _alta_en_confirmacion(conn, intake_world)
+    user = _usuario(intake_world)
+    with admin(conn) as cur:
+        cur.execute("update pending_action set vence_en = now() - interval '1 minute' "
+                    "where id = %s", (pid,))
+    client = _callback_client(conn, monkeypatch)
+    antes = _salidas(conn, user)
+
+    _toque_de_modificar(client, conn, user, pid)
+
+    assert [f["cuerpo"] for f in _nuevas(conn, user, antes)] == [AVISO_TOQUE_YA_USADO]
+    assert _conjunto_activo(conn, rid) is None
+    assert _tareas(conn) == 0
+
+
+def test_modificar_tocado_por_otra_persona_no_abre_nada(intake_world, conn,
+                                                        monkeypatch):
+    rid, pid = _alta_en_confirmacion(conn, intake_world)
+    ajena = intake_world["north-lab"]["people"]["Morgan Hale"]["telegram"]
+    client = _callback_client(conn, monkeypatch)
+    antes = _salidas(conn, ajena)
+
+    _toque_de_modificar(client, conn, ajena, pid)
+
+    assert [p["estado"] for p in _previews(conn, rid)] == ["esperando"]
+    assert _conjunto_activo(conn, rid) is None
+    assert [f["cuerpo"] for f in _nuevas(conn, ajena, antes)] == [
+        "Eso se lo pregunté a otra persona del equipo."]
+
+
+# ---------------------------------------------- un dato de texto: copiar y pegar
+
+@pytest.mark.parametrize("campo, etiqueta, actual, nuevo", [
+    ("title", "Título", TITULO, "Inspect pressure valve"),
+    ("acceptance_criterion", "Criterio de aceptación",
+     "Signed test record attached", "Signed and photographed test record"),
+    ("due_date", "Fecha objetivo", "2028-02-29", "10/3/2028"),
+])
+def test_un_dato_de_texto_muestra_lo_que_tenia_en_un_bloque_copiable_y_abre_su_campo(
+        campo, etiqueta, actual, nuevo, intake_world, conn, monkeypatch):
+    rid, pid, client, user = _modificar(conn, monkeypatch, intake_world)
+    antes = _salidas(conn, user)
+
+    _elegir_dato(conn, client, user, rid, etiqueta)
+
+    salidas = _nuevas(conn, user, antes)
+    assert len(salidas) == 1
+    fila = _ultima_salida(conn, user, antes)
+    assert fila["bloque_copiable"] == actual         # lo que tenía, para copiar
+    assert fila["cuerpo"].endswith(actual)
+    assert fila["intake_choice_set_id"] is None and fila["pending_action_id"] is None
+    # El campo queda abierto: el mensaje siguiente lo reemplaza.
+    with espacio(conn, intake_world["north-lab"]["id"]) as cur:
+        from prisma.autoridad import Canal, identificar
+        quien = identificar(cur, user, Canal.ESPACIO,
+                            intake_world["north-lab"]["id"])
+        pregunta = I.open_intake_question(cur, quien, user)
+    assert pregunta["tipo"] == I.QUESTION_FREE_TEXT and pregunta["campo"] == campo
+    assert _tareas(conn) == 0
+
+
+@pytest.mark.parametrize("campo, etiqueta, actual, nuevo", [
+    ("title", "Título", TITULO, "Inspect pressure valve"),
+    ("acceptance_criterion", "Criterio de aceptación",
+     "Signed test record attached", "Signed and photographed test record"),
+    ("due_date", "Fecha objetivo", "2028-02-29", "10/3/2028"),
+])
+def test_el_dato_corregido_cambia_solo_ese_dato_y_vuelve_la_vista_previa(
+        campo, etiqueta, actual, nuevo, intake_world, conn, monkeypatch):
+    rid, pid, client, user = _modificar(conn, monkeypatch, intake_world)
+    _elegir_dato(conn, client, user, rid, etiqueta)
+    campos_antes = _campos(conn, rid)
+    antes = _salidas(conn, user)
+
+    provider = _responder_con(conn, monkeypatch, intake_world, nuevo)
+
+    campos_despues = _campos(conn, rid)
+    cambiados = {c for c in campos_antes if campos_antes[c] != campos_despues[c]}
+    assert cambiados == {campo}                        # sólo ese dato
+    assert provider.main_calls == 0
+    # La vista previa vuelve actualizada, con los mismos tres botones.
+    previews = _previews(conn, rid)
+    assert [p["estado"] for p in previews] == ["cancelada", "esperando"]
+    nueva = previews[-1]
+    valor = campos_despues[campo][1]
+    assert valor != actual and str(valor) in nueva["resumen"]
+    assert _etiquetas_de_la_vista_previa(conn, nueva["id"]) == [
+        "Confirmar", "Modificar", "Cancelar"]
+    salidas = _nuevas(conn, user, antes)
+    assert [str(f["pending_action_id"]) for f in salidas] == [str(nueva["id"])]
+    # Ninguna tarea sin Confirmar.
+    assert _tareas(conn) == 0 and _solicitud(conn, rid) == "active"
+
+
+def test_una_fecha_corregida_pasa_por_su_resolucion_de_siempre(
+        intake_world, conn, monkeypatch):
+    rid, pid, client, user = _modificar(conn, monkeypatch, intake_world)
+    _elegir_dato(conn, client, user, rid, "Fecha objetivo")
+    antes = _salidas(conn, user)
+
+    _responder_con(conn, monkeypatch, intake_world, "quizás pronto")
+
+    # Ambigua: el campo sigue abierto y la vista previa no volvió.
+    assert _campos(conn, rid)["due_date"][1] == "2028-02-29"
+    assert [p["estado"] for p in _previews(conn, rid)] == ["cancelada"]
+    assert _ultima_salida(conn, user, antes)["cuerpo"].startswith("La fecha")
+
+
+def test_un_dato_corregido_demasiado_largo_deja_el_campo_abierto(
+        intake_world, conn, monkeypatch):
+    rid, pid, client, user = _modificar(conn, monkeypatch, intake_world)
+    _elegir_dato(conn, client, user, rid, "Título")
+    antes = _salidas(conn, user)
+
+    _responder_con(conn, monkeypatch, intake_world,
+                   "x" * (I.USER_FIELD_LIMITS["title"] + 1))
+
+    assert _campos(conn, rid)["title"][1] == TITULO
+    assert _ultima_salida(conn, user, antes)["cuerpo"] == I._user_limit_prompt("title")
+    with admin(conn) as cur:
+        cur.execute("select count(*) n from task_intake_free_text_slot "
+                    "where request_id = %s and estado = 'active'", (rid,))
+        assert cur.fetchone()["n"] == 1
+
+
+def test_una_descripcion_vacia_no_muestra_bloque_y_se_puede_agregar(
+        intake_world, conn, monkeypatch):
+    rid, pid, client, user = _modificar(conn, monkeypatch, intake_world)
+    assert _campos(conn, rid)["description"][1] == ""
+    antes = _salidas(conn, user)
+
+    _elegir_dato(conn, client, user, rid, "Descripción")
+
+    fila = _ultima_salida(conn, user, antes)
+    assert fila["bloque_copiable"] is None
+    _responder_con(conn, monkeypatch, intake_world, "Revisar la válvula de alivio")
+    assert _campos(conn, rid)["description"][1] == "Revisar la válvula de alivio"
+    assert _previews(conn, rid)[-1]["estado"] == "esperando"
+
+
+@pytest.mark.parametrize("largo, con_boton", [(COPY_TEXT_LIMIT, True),
+                                              (COPY_TEXT_LIMIT + 1, False)])
+def test_el_boton_de_copiar_esta_hasta_256_caracteres_y_el_bloque_siempre(
+        largo, con_boton, intake_world, conn, monkeypatch):
+    rid, pid, client, user = _modificar(conn, monkeypatch, intake_world)
+    descripcion = "d" * largo
+    with admin(conn) as cur:
+        cur.execute("""update task_intake_field set valor = to_jsonb(%s::text)
+                        where request_id = %s and campo = 'description'""",
+                    (descripcion, rid))
+    _elegir_dato(conn, client, user, rid, "Descripción")
+
+    transporte = _despachar(conn, intake_world["north-lab"]["id"])
+
+    enviado = [e for e in transporte.enviados if e.bloque == descripcion]
+    assert len(enviado) == 1
+    assert enviado[0].texto.endswith(descripcion)
+    assert [b.etiqueta for b in enviado[0].botones] == (
+        [ETIQUETA_COPIAR] if con_boton else [])
+
+
+# ---------------------------------------- un dato con opciones: sus botones
+
+def test_un_dato_con_opciones_vuelve_a_mostrar_sus_botones(intake_world, conn,
+                                                            monkeypatch):
+    rid, pid, client, user = _modificar(conn, monkeypatch, intake_world)
+    antes = _salidas(conn, user)
+
+    _elegir_dato(conn, client, user, rid, "Objetivo")
+
+    salidas = _nuevas(conn, user, antes)
+    assert len(salidas) == 1 and salidas[0]["intake_choice_set_id"]
+    opciones = _opciones_activas(conn, rid)
+    assert any("Raise delivery quality" in e for e in opciones)
+    assert any("Reduce service delay" in e for e in opciones)
+    assert _conjunto_activo(conn, rid)["campo"] == "objective"
+    assert _tareas(conn) == 0
+
+
+def test_elegir_otro_objetivo_cambia_solo_el_objetivo_y_vuelve_la_vista_previa(
+        intake_world, conn, monkeypatch):
+    rid, pid, client, user = _modificar(conn, monkeypatch, intake_world)
+    campos_antes = _campos(conn, rid)
+    _elegir_dato(conn, client, user, rid, "Objetivo")
+    otro = next(t for e, t in _opciones_activas(conn, rid).items()
+                if "Raise delivery quality" in e)
+
+    assert _post_intake_callback(client, otro, user).status_code == 200
+
+    campos_despues = _campos(conn, rid)
+    assert {c for c in campos_antes if campos_antes[c] != campos_despues[c]} == {
+        "objective"}
+    assert campos_despues["objective"][1]["title"] == "Raise delivery quality 1"
+    previews = _previews(conn, rid)
+    assert [p["estado"] for p in previews] == ["cancelada", "esperando"]
+    assert "Raise delivery quality 1" in previews[-1]["resumen"]
+    assert _etiquetas_de_la_vista_previa(conn, previews[-1]["id"]) == [
+        "Confirmar", "Modificar", "Cancelar"]
+    assert _tareas(conn) == 0
+
+
+def test_elegir_un_responsable_de_otra_area_pide_el_area_y_vuelve_la_vista_previa(
+        intake_world, conn, monkeypatch):
+    rid, pid, client, user = _modificar(conn, monkeypatch, intake_world)
+    _elegir_dato(conn, client, user, rid, "Responsable")
+    noble = next(t for e, t in _opciones_activas(conn, rid).items()
+                 if "Sam Noble" in e)
+
+    _post_intake_callback(client, noble, user)
+
+    # Su área es otra: el alta la vuelve a pedir, como siempre.
+    assert _conjunto_activo(conn, rid)["campo"] == "area"
+    area = next(t for e, t in _opciones_activas(conn, rid).items()
+                if "Quality Guild" in e)
+    _post_intake_callback(client, area, user)
+
+    campos = _campos(conn, rid)
+    assert campos["responsible"][1]["name"] == "Sam Noble 1"
+    assert campos["area"][1]["name"] == "Quality Guild"
+    assert _previews(conn, rid)[-1]["estado"] == "esperando"
+    assert "Sam Noble 1" in _previews(conn, rid)[-1]["resumen"]
+
+
+def test_modificar_el_area_vuelve_a_mostrar_su_opcion(intake_world, conn,
+                                                      monkeypatch):
+    rid, pid, client, user = _modificar(conn, monkeypatch, intake_world)
+
+    _elegir_dato(conn, client, user, rid, "Área")
+
+    assert _conjunto_activo(conn, rid)["campo"] == "area"
+    assert any("Field Services" in e for e in _opciones_activas(conn, rid))
+
+
+# ----------------------------------------------- escribir `corrige` en la vista previa
+
+def test_corrige_sobre_la_vista_previa_lleva_al_selector(intake_world, conn,
+                                                         monkeypatch):
+    rid, pid = _alta_en_confirmacion(conn, intake_world)
+    user = _usuario(intake_world)
+    antes = _salidas(conn, user)
+    provider = _RoutingProvider([_ruta(RespectoPendiente.CORRIGE)])
+
+    _escribir(conn, monkeypatch, intake_world, provider,
+              "cambiá la fecha para el viernes")
+
+    assert [p["estado"] for p in _previews(conn, rid)] == ["cancelada"]
+    assert _tareas(conn) == 0 and _solicitud(conn, rid) == "active"
+    salidas = _nuevas(conn, user, antes)
+    assert [f["cuerpo"] for f in salidas] == [I.MODIFY_PICKER_PROMPT]
+    assert list(_opciones_activas(conn, rid)) == ETIQUETAS_DEL_SELECTOR
+    assert provider.main_calls == 0
+
+
+# --------------------------------------------- una sola rama abierta
+
+def test_otro_tema_en_el_selector_pregunta_por_la_rama_y_no_abre_otra(
+        intake_world, conn, monkeypatch):
+    rid, pid, client, user = _modificar(conn, monkeypatch, intake_world)
+    antes = _salidas(conn, user)
+    provider = _RoutingProvider([_ruta(RespectoPendiente.OTRO_TEMA)])
+
+    _escribir(conn, monkeypatch, intake_world, provider, "¿qué es un bloqueo?")
+
+    salidas = _nuevas(conn, user, antes)
+    assert len(salidas) == 1
+    assert salidas[0]["cuerpo"] == gateway.PREGUNTA_RAMA_ABIERTA.format(
+        nombre="qué dato cambiar del borrador de la tarea nueva")
+    assert provider.main_calls == 0
+    assert list(_opciones_activas(conn, rid)) == ETIQUETAS_DEL_SELECTOR
+
+
+def test_otro_tema_en_la_pregunta_del_dato_pregunta_por_la_rama(
+        intake_world, conn, monkeypatch):
+    rid, pid, client, user = _modificar(conn, monkeypatch, intake_world)
+    _elegir_dato(conn, client, user, rid, "Título")
+    antes = _salidas(conn, user)
+    provider = _RoutingProvider([_ruta(RespectoPendiente.OTRO_TEMA)])
+
+    _escribir(conn, monkeypatch, intake_world, provider, "¿qué es un bloqueo?")
+
+    assert [f["cuerpo"] for f in _nuevas(conn, user, antes)] == [
+        gateway.PREGUNTA_RAMA_ABIERTA.format(
+            nombre="el título de la tarea nueva")]
+    assert _campos(conn, rid)["title"][1] == TITULO
+
+
+def test_un_dato_escrito_en_el_selector_elige_ese_dato(intake_world, conn,
+                                                       monkeypatch):
+    """El selector es una elección con botones: escribir exactamente una de sus
+    opciones es tocarla."""
+    rid, pid, client, user = _modificar(conn, monkeypatch, intake_world)
+    antes = _salidas(conn, user)
+
+    _responder_con(conn, monkeypatch, intake_world, "título")
+
+    fila = _ultima_salida(conn, user, antes)
+    assert fila["bloque_copiable"] == TITULO
+
+
+# ------------------------------------------------------ botones que ya no valen
+
+def test_tocar_dos_veces_el_mismo_dato_del_selector_dice_que_ya_no_esta_vigente(
+        intake_world, conn, monkeypatch):
+    rid, pid, client, user = _modificar(conn, monkeypatch, intake_world)
+    token = _opciones_activas(conn, rid)["Título"]
+    assert _post_intake_callback(client, token, user).status_code == 200
+    antes = _salidas(conn, user)
+
+    assert _post_intake_callback(client, token, user).status_code == 200
+
+    assert [f["cuerpo"] for f in _nuevas(conn, user, antes)] == [AVISO_TOQUE_YA_USADO]
+
+
+def test_un_boton_del_selector_de_antes_ya_no_vale_despues_de_cerrarlo(
+        intake_world, conn, monkeypatch):
+    rid, pid, client, user = _modificar(conn, monkeypatch, intake_world)
+    viejo = _opciones_activas(conn, rid)["Objetivo"]
+    _elegir_dato(conn, client, user, rid, "Título")     # el selector se consume
+    _responder_con(conn, monkeypatch, intake_world, "Inspect pressure valve")
+    antes = _salidas(conn, user)
+
+    _post_intake_callback(client, viejo, user)
+
+    assert [f["cuerpo"] for f in _nuevas(conn, user, antes)] == [AVISO_TOQUE_YA_USADO]
+    assert _conjunto_activo(conn, rid) is None
+    assert _tareas(conn) == 0
+
+
+# ------------------------------------ sólo Confirmar convierte el borrador
+
+def test_solo_confirmar_convierte_y_lo_hace_con_el_dato_corregido(
+        intake_world, conn, monkeypatch, authority_conn):
+    rid, pid, client, user = _modificar(conn, monkeypatch, intake_world)
+    _elegir_dato(conn, client, user, rid, "Título")
+    _responder_con(conn, monkeypatch, intake_world, "Inspect pressure valve")
+    ws = intake_world["north-lab"]["id"]
+    nueva = _previews(conn, rid)[-1]["id"]
+    with espacio(conn, ws) as cur:
+        confirmar = P.opcion_por_etiqueta(cur, nueva, "Confirmar").token
+        cur.execute(
+            """select o.token from pending_action_option o
+                where o.pending_action_id = %s and o.valor = 'true'::jsonb""",
+            (pid,))
+        viejo_confirmar = cur.fetchone()["token"]
+    conn.commit()
+    assert _tareas(conn) == 0                      # todo lo anterior: sin efecto
+
+    with autoridad(authority_conn) as cur:
+        # El botón de la vista previa anterior no convierte nada.
+        assert P.resolver_borrador(cur, ws, viejo_confirmar, user, user) is None
+    assert _tareas(conn) == 0
+    with autoridad(authority_conn) as cur:
+        resuelta = P.resolver_borrador(cur, ws, confirmar, user, user)
+
+    assert resuelta and resuelta.task_id
+    with admin(conn) as cur:
+        cur.execute("select titulo from task")
+        assert [f["titulo"] for f in cur.fetchall()] == ["Inspect pressure valve"]
+    assert _solicitud(conn, rid) == "converted"
+
+
+def test_cancelar_despues_de_modificar_cancela_el_borrador(
+        intake_world, conn, monkeypatch, authority_conn):
+    rid, pid, client, user = _modificar(conn, monkeypatch, intake_world)
+    _elegir_dato(conn, client, user, rid, "Título")
+    _responder_con(conn, monkeypatch, intake_world, "Inspect pressure valve")
+    ws = intake_world["north-lab"]["id"]
+    nueva = _previews(conn, rid)[-1]["id"]
+    with admin(conn) as cur:
+        cancelar = P.opcion_por_etiqueta(cur, nueva, "Cancelar").token
+
+    with autoridad(authority_conn) as cur:
+        resuelta = P.resolver_borrador(cur, ws, cancelar, user, user)
+
+    assert resuelta is not None and resuelta.cancelada
+    assert _solicitud(conn, rid) == "cancelled"
+    assert _tareas(conn) == 0
+    assert _previews(conn, rid)[-1]["estado"] == "cancelada"

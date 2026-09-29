@@ -157,12 +157,11 @@ AVISO_ACLARACION_DEJADA = (
 # cancela el borrador, porque el alta no sigue sin ese dato. Redacción
 # pendiente de revisión de voz en T10.
 AVISO_ALTA_DEJADA = "Listo, dejé de lado el borrador de la tarea{titulo}."
-# El borrador ya armado y esperando confirmación (T9-R1c-2): el alta no tiene
-# un camino para cambiar un dato ya confirmado desde un mensaje. Redacción
-# pendiente de revisión de voz en T10.
-AVISO_ALTA_NO_SE_CORRIGE = (
-    "El borrador ya está armado y no lo puedo cambiar desde acá: si algún dato "
-    "no es el correcto, cancelalo y armá la tarea de nuevo.")
+# El borrador ya armado y esperando confirmación (T9-R1c-2): un mensaje que
+# corrige abre el selector de Modificar (T9-R1c-3), el mismo camino que su
+# botón, y el selector se nombra así ante el ruteo y la pregunta de la rama.
+# Redacción pendiente de revisión de voz en T10.
+NOMBRE_SELECTOR_DEL_ALTA = "qué dato cambiar del borrador de la tarea nueva"
 # La vista previa de un cambio que la persona pidió y espera su Confirmar
 # (T9-R1d-1b, ADR 0013 regla 1, enmienda): el cambio se aplica sólo con el
 # botón Confirmar. Un mensaje que dice "sí" no lo aplica: se dice y se le
@@ -632,12 +631,27 @@ def _toque(conn, workspace_id: str, slug: str, toque: dict,
 
             _registrar_toque(cur, workspace_id, chat_id, quien)
             if intake_token:
-                I.resolve_choice(cur, quien, token=intake_token,
-                                 chat_id=chat_id, now=ahora)
+                resultado_alta = I.resolve_choice(cur, quien, token=intake_token,
+                                                  chat_id=chat_id, now=ahora)
+                if resultado_alta.stale:
+                    # El selector de Modificar ya usado o reemplazado: se
+                    # contesta como cualquier otro toque que no está vigente.
+                    _responder(cur, workspace_id, chat_id, quien,
+                               AVISO_PEDIDO_NO_VIGENTE, ahora)
                 return {"ok": True}
 
             try:
                 draft_token = P.es_borrador(cur, token)
+                if draft_token and I.es_modificar_de_borrador(
+                        cur, quien, token, ahora):
+                    # Modificar en la vista previa del borrador (T9-R1c-3): no
+                    # confirma nada -- la conversión es sólo del botón Confirmar --
+                    # y nunca llega a la autoridad del borrador.
+                    if I.modify_from_preview(cur, quien, token=token,
+                                             chat_id=chat_id, now=ahora) is None:
+                        _responder(cur, workspace_id, chat_id, quien,
+                                   AVISO_PEDIDO_NO_VIGENTE, ahora)
+                    return {"ok": True}
                 if not draft_token:
                     resuelta = P.resolver(cur, token,
                                           app_user_id=quien.app_user_id, ahora=ahora)
@@ -1074,10 +1088,10 @@ class _Pregunta:
     hacerla; `dejada` es lo que se dice al dejarla de lado. `corrige_responde`
     dice si un mensaje que corrige algo anterior es la respuesta: en una
     corrección, sí; en un dato del menú no hay propuesta anterior que
-    corregir, y queda como `dudoso`. `corrige_aviso`, si viene, es lo que se
-    dice cuando el mensaje corrige y en ese tipo no hay camino para hacerlo
-    (el borrador ya armado): en vez de los botones de `dudoso`, lo dice una
-    vez y la pregunta queda abierta. `corrige_modifica` dice que en ese tipo el
+    corregir, y queda como `dudoso`. `corrige_abre_selector` dice que en ese
+    tipo el mensaje que corrige abre el selector "qué dato cambiar" (el borrador
+    ya armado, T9-R1c-3): el mismo camino que su botón Modificar, sin aplicar
+    nada. `corrige_modifica` dice que en ese tipo el
     mensaje que corrige es el de Modificar sin haber tocado el botón (la vista
     previa de un cambio): la propuesta se cierra como Modificar y el mensaje es
     la corrección."""
@@ -1086,7 +1100,7 @@ class _Pregunta:
     pregunta: str
     dejada: str
     corrige_responde: bool
-    corrige_aviso: str | None = None
+    corrige_abre_selector: bool = False
     corrige_modifica: bool = False
 
 
@@ -1258,7 +1272,7 @@ def _pregunta_del_alta(abierta) -> _Pregunta:
     """El adaptador de las tres preguntas del alta guiada (T9-R1c). Dejarlas de
     lado cancela el borrador: sin ese dato, esa elección o esa confirmación el
     alta no sigue."""
-    from .ingreso_tareas import FREE_TEXT_NAMES
+    from .ingreso_tareas import FREE_TEXT_NAMES, MODIFY_PICKER_KIND
 
     args = abierta.args
     titulo = args.get("titulo")
@@ -1268,29 +1282,31 @@ def _pregunta_del_alta(abierta) -> _Pregunta:
         # fuerte, no se inventa un nombre.
         nombre = f"{FREE_TEXT_NAMES[args['campo']]} de la tarea nueva"
         descripcion = f"{nombre}, un dato del alta guiada que se le pidió"
-        corrige_aviso = None
+        corrige_abre_selector = False
     elif abierta.herramienta == _SENTINEL_ALTA_ELECCION:
         # Una elección sin campo (la de "ya hay un borrador en curso") no tiene
         # nombre de campo y se nombra en general.
         campo = FREE_TEXT_NAMES.get(args.get("campo"))
         nombre = (f"la elección sobre {campo} de la tarea nueva" if campo
                   else "la elección pendiente de la tarea nueva")
+        if args.get("clase") == MODIFY_PICKER_KIND:
+            nombre = NOMBRE_SELECTOR_DEL_ALTA
         descripcion = f"{nombre}, una pregunta con botones del alta guiada"
         opciones = args.get("opciones") or []
         if opciones:
             descripcion += (" (las opciones son: "
                             + ", ".join(f"«{o}»" for o in opciones) + ")")
-        corrige_aviso = None
+        corrige_abre_selector = False
     else:
         nombre = "la confirmación del borrador de la tarea nueva"
         descripcion = (f"{nombre}: se le mostró el resumen del borrador con los "
-                       "botones Confirmar y Cancelar, y la tarea se crea sólo "
-                       "con Confirmar")
-        corrige_aviso = AVISO_ALTA_NO_SE_CORRIGE
+                       "botones Confirmar, Modificar y Cancelar, y la tarea se "
+                       "crea sólo con Confirmar")
+        corrige_abre_selector = True
     return _Pregunta(
         nombre=nombre, para_ruteo=_para_ruteo(descripcion, abierta.resumen),
         pregunta=abierta.resumen, dejada=dejada, corrige_responde=False,
-        corrige_aviso=corrige_aviso)
+        corrige_abre_selector=corrige_abre_selector)
 
 
 def _atender_pregunta_pendiente(cur, quien, texto: str, abierta, proveedor, cal,
@@ -1337,6 +1353,17 @@ def _atender_pregunta_pendiente(cur, quien, texto: str, abierta, proveedor, cal,
                               workspace_id, ahora, entrante_id,
                               modificacion=modificacion)
         return None
+    if comando is RespectoPendiente.CORRIGE and pregunta.corrige_abre_selector:
+        # Corregir el borrador ya armado (T9-R1c-3): lo mismo que tocar
+        # Modificar. La vista previa se cierra sin aplicar nada y sigue el
+        # selector, dentro de la misma rama. Si otro camino ya la había
+        # cerrado, el mensaje sigue por el camino normal.
+        from .ingreso_tareas import open_modify_picker
+
+        if open_modify_picker(cur, quien, abierta.pregunta_id, ahora,
+                              via="texto") is None:
+            return route
+        return None
     if comando is RespectoPendiente.CANCELA:
         _dejar_pregunta_pendiente(cur, quien, workspace_id, chat_id, abierta,
                                   ahora)
@@ -1350,12 +1377,6 @@ def _atender_pregunta_pendiente(cur, quien, texto: str, abierta, proveedor, cal,
     if comando is RespectoPendiente.NO_PUEDO:
         _repreguntar(cur, quien, workspace_id, chat_id, abierta, pregunta, ahora,
                      entrante_id, prefijo=f"{AVISO_NO_PUEDO_DATO_PENDIENTE} ")
-        return None
-    if comando is RespectoPendiente.CORRIGE and pregunta.corrige_aviso:
-        # Corregir donde no hay camino para hacerlo: se dice una vez y la
-        # pregunta queda abierta.
-        _repreguntar(cur, quien, workspace_id, chat_id, abierta, pregunta, ahora,
-                     entrante_id, prefijo=f"{pregunta.corrige_aviso} ")
         return None
     if comando is RespectoPendiente.CHARLA:
         _repreguntar(cur, quien, workspace_id, chat_id, abierta, pregunta, ahora,
@@ -1566,6 +1587,7 @@ def _ver_pregunta_abierta(cur, quien, chat_id: int, ahora, *, alta: bool):
                 "request_id": pregunta["request_id"]}
         if pregunta["opciones"] is not None:
             args["opciones"] = pregunta["opciones"]
+            args["clase"] = pregunta.get("clase")
         return P.ModificacionAbierta(
             pregunta_id=pregunta["id"],
             herramienta=_SENTINEL_DE_ALTA[pregunta["tipo"]], args=args,
