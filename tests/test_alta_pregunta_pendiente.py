@@ -35,6 +35,9 @@ PERSONA = "Marcos Tarquini"
 TITULO_ALTA = "Cablear tablero norte"
 PREGUNTA_TITULO = "Escribí el título exacto de la tarea"
 PREGUNTA_FECHA = "Escribí la fecha objetivo exacta"
+# La respuesta a un botón que ya se usó (`gateway._toque`, sin constante propia).
+AVISO_TOQUE_YA_USADO = ("Ese pedido ya no está vigente. Si sigue haciendo falta, "
+                        "escribime y lo vemos de nuevo.")
 
 _ids_de_mensaje = itertools.count(700)
 
@@ -257,8 +260,14 @@ def test_dejarlo_del_retome_cancela_el_borrador_y_el_segundo_toque_se_avisa(
     assert _salidas(conn, tg) == antes + 1
     assert "dejé de lado" in _filas_del_chat(conn, tg)[-1]["cuerpo"]
 
+    antes = _salidas(conn, tg)
     assert _tocar(cliente, token, tg).status_code == 200      # toque tardío
     assert _request(conn, rid)["estado"] == "cancelled"
+    # Una sola respuesta, la del pedido que ya no está vigente (el botón ya se
+    # usó: `_toque` no llega a `_dejar_pregunta_pendiente`); no repite "dejé
+    # de lado".
+    assert _salidas(conn, tg) == antes + 1
+    assert _filas_del_chat(conn, tg)[-1]["cuerpo"] == AVISO_TOQUE_YA_USADO
 
 
 def test_dudoso_pregunta_con_botones_y_si_es_eso_toma_el_campo(
@@ -288,7 +297,14 @@ def test_dudoso_pregunta_con_botones_y_si_es_eso_toma_el_campo(
     antes = _salidas(conn, tg)
     assert _tocar(cliente, token, tg).status_code == 200
     assert _campo(conn, rid, "title")["valor"] == "mmm, algo del tablero"
-    assert _salidas(conn, tg) <= antes + 1
+    assert _salidas(conn, tg) == antes + 1
+    assert _filas_del_chat(conn, tg)[-1]["cuerpo"] == AVISO_TOQUE_YA_USADO
+
+
+def test_los_campos_de_texto_libre_tienen_nombre_y_limite_para_cada_uno():
+    # Un campo de texto libre sin nombre rompería (KeyError) cada mensaje del
+    # chat mientras esté abierto: `_pregunta_de` lo nombra con `FREE_TEXT_NAMES`.
+    assert set(I.FREE_TEXT_NAMES) == set(I.USER_FIELD_LIMITS)
 
 
 def test_dudoso_no_es_otra_cosa_sigue_el_camino_normal_y_deja_abierta_la_pregunta(
@@ -426,8 +442,8 @@ def test_un_toque_tardio_sobre_un_campo_ya_cancelado_se_avisa_sin_tomarlo(
 
     assert _campo(conn, rid, "title")["estado"] == "missing"
     assert _salidas(conn, tg) == antes + 1
-    assert (gateway.AVISO_DATO_YA_NO_PENDIENTE
-            in _filas_del_chat(conn, tg)[-1]["cuerpo"])
+    assert (_filas_del_chat(conn, tg)[-1]["cuerpo"]
+            == gateway.AVISO_DATO_YA_NO_PENDIENTE)
 
 
 def test_con_el_alta_y_otra_pregunta_abiertas_el_alta_tiene_precedencia(

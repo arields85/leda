@@ -140,6 +140,12 @@ class ModificacionAbierta:
 
     Reusa lo que ya quedó en la fila de `pending_action` desde que se armó la
     vista previa original: no hace falta guardarlo aparte.
+
+    `pending_action_id` es el id de la pregunta abierta: la fila de
+    `pending_action`, salvo con la herramienta reservada del campo de texto
+    libre del alta guiada (`gateway._SENTINEL_ALTA_TEXTO_LIBRE`), donde es el
+    id de un `task_intake_free_text_slot`. Quien lo usa mira `herramienta`
+    antes de tratarlo como una fila de `pending_action`.
     """
     pending_action_id: str
     herramienta: str

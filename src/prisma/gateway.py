@@ -1052,8 +1052,13 @@ _HERRAMIENTA_DE_DATO_MENU = {
 }
 
 
-# Los argumentos que identifican sobre qué actúa una herramienta que escribe,
-# en orden de preferencia (`_no_proponer_de`).
+# Los argumentos que identifican sobre qué actúa una herramienta que escribe.
+# `_no_proponer_de` toma el primero que esté presente, en este orden de
+# preferencia. Hoy ninguna herramienta trae dos de estos ids a la vez, así que
+# el orden no decide nada: `crear_dependencia` usa `origen_tarea_id` y
+# `destino_tarea_id` (ninguno está en la lista: sin guarda) y
+# `quitar_dependencia` sólo `dependencia_id`. Una herramienta nueva con dos de
+# estos ids tomaría el primero de la lista: revisar el orden al agregarla.
 _CAMPOS_DE_ID = ("tarea_id", "bloqueo_id", "dependencia_id")
 
 
@@ -1230,8 +1235,15 @@ def _dejar_pregunta_pendiente(cur, quien, workspace_id: str, chat_id: int,
 
 
 def _ver_pregunta_abierta(cur, quien, chat_id: int, ahora, *, alta: bool):
-    """La pregunta abierta de esta persona en este chat, sin consumirla. Con
-    `alta` (un chat privado), primero el campo de texto libre del alta guiada:
+    """La pregunta abierta de esta persona en este chat, sin consumirla.
+
+    El campo `pending_action_id` de lo que devuelve tiene dos significados
+    según `herramienta`: el id de la fila de `pending_action`, o, con
+    `_SENTINEL_ALTA_TEXTO_LIBRE`, el id del campo de texto libre del alta
+    (`task_intake_free_text_slot`). Sólo `_consumir_pregunta` y
+    `_dejar_de_lado` lo usan, y cada uno mira `herramienta` primero.
+
+    Con `alta` (un chat privado), primero el campo de texto libre del alta guiada:
     si hay uno abierto y también una pregunta de `pending_action`, el alta
     tiene precedencia, como antes de T9-R1c-1 (el alta leía el mensaje antes
     de que `_turno` mirara nada); la otra queda abierta y se retoma cuando el
