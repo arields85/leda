@@ -19,6 +19,7 @@ import pytest
 from prisma import gateway
 from prisma.db import admin
 from prisma.llm import ProveedorGuionado, Respuesta
+from prisma.respuesta_unica import grupo_de
 
 from tests.test_menu_tarea import _mensaje, cliente  # noqa: F401
 
@@ -40,7 +41,7 @@ def _filas_de_salida(conn, chat_id) -> list[dict]:
     with admin(conn) as cur:
         cur.execute(
             """select id, cuerpo, estado, es_respuesta, entrante_id,
-                      respuesta_grupo, pending_action_id
+                      respuesta_grupo, dedupe_key, pending_action_id
                  from message_outbox where chat_id = %s
                 order by programado_para, dedupe_key""", (chat_id,))
         return cur.fetchall()
@@ -251,8 +252,11 @@ def test_el_epigrafe_se_procesa_como_texto_y_avisa_que_el_adjunto_no_se_guarda(
 
     assert proveedor.ruteados == ["¿qué tengo pendiente?"]     # el epígrafe es el texto
     filas = _visibles(conn, tg)
-    assert [f["cuerpo"] for f in filas][0] == gateway.NOTA_ADJUNTO_NO_GUARDADO
-    assert len({f["respuesta_grupo"] or f["cuerpo"] for f in filas}) >= 1
+    assert [f["cuerpo"] for f in filas] == [gateway.NOTA_ADJUNTO_NO_GUARDADO,
+                                            "Anotado."]
+    # La nota y la respuesta son partes de UNA respuesta: comparten el grupo
+    # (`respuesta_unica.grupo_de`), la fila de la nota incluida.
+    assert len({grupo_de(f) for f in filas}) == 1
     assert _incidentes(conn, corework.workspace_id) == []      # una sola respuesta
     (entrante,) = _entrantes(conn, tg)
     assert entrante["texto"] == "¿qué tengo pendiente?"

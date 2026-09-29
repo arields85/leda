@@ -2410,12 +2410,36 @@ def test_la_corrida_manda_mensajes_con_adjunto_y_cuenta_su_respuesta(
 def test_un_toque_no_cuenta_como_mensaje_en_la_corrida(corework, conn):
     ws = corework.workspace_id
     with admin(conn) as cur:
-        ids = sembrar_precondiciones(cur, ws, {"tareas": [
+        sembrar_precondiciones(cur, ws, {"tareas": [
             {"id": "t1", "titulo": "Programar PLC (simulado)", "area": "ot",
              "responsable": "Marcos Tarquini"}]})
     conn.commit()
-    r = _correr_con(conn, ws, ["hola"], toques=[])
+    interno = ProveedorGuionado(
+        guion=[Respuesta(llamadas=[Llamada("c1", "consultar_tareas", {})]),
+               Respuesta(texto="Tenés una tarea pendiente.")],
+        rutas=[IntentRoute(IntentAction.NORMAL_CONVERSATION)])
 
+    # Tocar la tarea de la lista abre su menú: el toque deja su fila de
+    # actividad (un `inbound_message` sin texto) y una salida propia.
+    r = ejecutar_escenario(
+        conn, ws, "corework", "Marcos Tarquini", ["pasame mis tareas"], interno,
+        escenario_id="b-test-toque-no-cuenta", indice=0, toques=[{"indice": 0}])
+
+    assert r.bloqueado is False, r.motivo_bloqueo
+    with admin(conn) as cur:
+        cur.execute("select count(*) n from inbound_message "
+                    "where workspace_id = %s and texto is null", (ws,))
+        filas_de_toque = cur.fetchone()["n"]
+        cur.execute(
+            """select count(*) n from message_outbox
+                where workspace_id = %s and es_respuesta
+                  and entrante_id is null
+                  and pending_action_id is not null""", (ws,))
+        salidas_del_toque = cur.fetchone()["n"]
+    # El toque ocurrió de verdad, y con salida visible (el menú de la tarea)...
+    assert filas_de_toque >= 1 and salidas_del_toque >= 1
+    # ...pero ni su fila de actividad ni su salida cuentan: un solo mensaje, una
+    # sola respuesta.
     assert r.respuestas_por_mensaje == (1,)
 
 
