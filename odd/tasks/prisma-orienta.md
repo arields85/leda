@@ -266,8 +266,11 @@ gestión.
     (el borrador que espera a otro aprobador no bloquea a quien lo pidió). Quitar el
     retome posterior (`_retomar_dato_pendiente`, `retomar` en `_turno`) y la guarda
     `agente.NoProponer` de R1b-3. Actualizar `b-0020`, `b-0021-c` y `b-0022-b` a la
-    regla nueva. Va después de T9-R1c-2b (mismos archivos). PENDIENTE del ADR: si los
-    mensajes que inicia Prisma esperan mientras hay una rama abierta.
+    regla nueva. Va después de T9-R1c-2b (mismos archivos). Los mensajes que inicia
+    Prisma (cadencias, avisos, escalera) dirigidos a quien tiene una rama abierta quedan
+    retenidos hasta que se cierra (decisión del usuario, opción A); la retención termina
+    al vencer la pregunta pendiente (a definir un vencimiento donde no lo haya). Puede
+    partirse en R1d-1 (la pregunta de la rama) y R1d-2 (retención en el despacho).
   - [ ] **T9-R2 — Cada mensaje recibe exactamente una respuesta visible** (H15, H19).
     `procesar_update` sólo lee `text` (`gateway.py:213`); control estructural al cerrar
     el mensaje; epígrafe como texto; comprobación del banco y del validador.

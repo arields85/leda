@@ -100,8 +100,13 @@ casos.
    - El retome posterior ("¿seguimos con …?") y la guarda que impedía volver a proponer
      lo pendiente durante otro tema quedan sin uso, porque el responder ya no corre con
      una pregunta abierta.
-   PENDIENTE: si los mensajes que Prisma inicia por su cuenta (cadencias, avisos,
-   escalera) esperan mientras la persona tiene una rama abierta.
+   - Los mensajes que Prisma inicia por su cuenta (cadencias, avisos, escalera) también
+     esperan (decisión del usuario, 2026-09-29): mientras una persona tiene una rama
+     abierta, lo que Prisma le iba a mandar queda retenido y sale apenas la rama se
+     cierra. Sólo se retiene lo dirigido a esa persona; a las demás les sigue saliendo.
+     Para que una rama abandonada no silencie el seguimiento, la retención termina
+     cuando la pregunta pendiente vence (su vencimiento de siempre); si un tipo de
+     pregunta no tiene vencimiento, se le define uno antes de retener por él.
 2. **Cada mensaje recibe exactamente una respuesta visible.** Al terminar de procesar un
    mensaje entrante, un control estructural verifica lo encolado para ese mensaje: si
    no salió nada, sale el aviso neutro y se registra el incidente; nunca sale más de una
