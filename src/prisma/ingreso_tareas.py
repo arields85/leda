@@ -486,10 +486,7 @@ def handle_active_text(cur: psycopg.Cursor, who: Solicitante, *, chat_id: int,
     `open_intake_question`. Esto queda para el estado que no es ninguna de
     ellas, y como red de seguridad de las otras dos."""
     cur.execute(
-        """select r.*, s.id choice_set_id,
-                  (select o.cuerpo from message_outbox o
-                    where o.intake_choice_set_id = s.id
-                    order by o.programado_para desc, o.id desc limit 1) prompt
+        """select r.*, s.id choice_set_id
              from task_intake_request r
              left join task_intake_choice_set s
                on s.request_id = r.id and s.estado = 'active'
@@ -503,7 +500,7 @@ def handle_active_text(cur: psycopg.Cursor, who: Solicitante, *, chat_id: int,
         return None
     request_id = str(request["id"])
     if request["choice_set_id"]:
-        prompt = request["prompt"] or CHOICE_FALLBACK_PROMPT
+        prompt = _first_choice_prompt(cur, request["choice_set_id"])
         _enqueue(
             cur, request, prompt, now,
             f"intake:{request_id}:reminder:{source_inbound_id}",
@@ -615,10 +612,7 @@ def open_intake_question(cur: psycopg.Cursor, who: Solicitante,
                 "titulo": slot["titulo"],
                 "resumen": free_text_question(slot["campo"]), "opciones": None}
     cur.execute(
-        f"""select s.id, s.request_id, s.campo, {_TITLE_OF_REQUEST} titulo,
-                   (select o.cuerpo from message_outbox o
-                     where o.intake_choice_set_id = s.id
-                     order by o.programado_para, o.id limit 1) prompt
+        f"""select s.id, s.request_id, s.campo, {_TITLE_OF_REQUEST} titulo
               from task_intake_choice_set s
               join task_intake_request r on r.id = s.request_id
              where s.workspace_id = %s and r.membership_id = %s
@@ -633,12 +627,12 @@ def open_intake_question(cur: psycopg.Cursor, who: Solicitante,
                 where choice_set_id = %s and activa order by orden""",
             (row["id"],),
         )
+        options = [etiqueta_sin_icono(c["etiqueta"]) for c in cur.fetchall()]
         return {"tipo": QUESTION_CHOICE, "id": str(row["id"]),
                 "request_id": str(row["request_id"]), "campo": row["campo"],
                 "titulo": _text_or_none(row["titulo"]),
-                "resumen": row["prompt"] or CHOICE_FALLBACK_PROMPT,
-                "opciones": [etiqueta_sin_icono(c["etiqueta"])
-                             for c in cur.fetchall()]}
+                "resumen": _first_choice_prompt(cur, row["id"]),
+                "opciones": options}
     cur.execute(
         f"""select p.id, r.id request_id, {_TITLE_OF_REQUEST} titulo,
                    p.membership_id approver_id,
@@ -763,24 +757,38 @@ def _option_keys(option) -> set[str]:
     return keys
 
 
-def resend_choice_prompt(cur: psycopg.Cursor, who: Solicitante,
-                         choice_set_id: str, now: datetime, ref: str,
-                         prefix: str = "") -> bool:
-    """Vuelve a mandar la pregunta de la elección abierta con sus botones
-    (`prefix`, si viene, va delante en el mismo mensaje). `False` si la
-    elección ya no estaba abierta: no manda nada. `ref` distingue este
-    reenvío de otros (el mensaje que lo causó)."""
-    request = _request_of_question(cur, who, QUESTION_CHOICE, choice_set_id,
-                                   lock=False)
-    if not request:
-        return False
+def _first_choice_prompt(cur: psycopg.Cursor, choice_set_id) -> str:
+    """El cuerpo con que se hizo la pregunta de una elección: su primer mensaje
+    en `message_outbox` (los reenvíos llevan el mismo `intake_choice_set_id`,
+    a veces con un prefijo), o el genérico si no hay ninguno."""
     cur.execute(
         """select cuerpo from message_outbox where intake_choice_set_id = %s
             order by programado_para, id limit 1""",
         (choice_set_id,),
     )
     row = cur.fetchone()
-    prompt = row["cuerpo"] if row else CHOICE_FALLBACK_PROMPT
+    return row["cuerpo"] if row else CHOICE_FALLBACK_PROMPT
+
+
+def resend_choice_prompt(cur: psycopg.Cursor, who: Solicitante,
+                         choice_set_id: str, now: datetime,
+                         ref: str | None = None, prefix: str = "") -> bool:
+    """Vuelve a mandar la pregunta de la elección abierta con sus botones
+    (`prefix`, si viene, va delante en el mismo mensaje). `False` si la
+    elección ya no estaba abierta: no manda nada. `ref` distingue este
+    reenvío de otros (el mensaje que lo causó); sin él, la referencia es el
+    número de mensajes que la elección ya tiene (`n1`, `n2`, ...): cada
+    reenvío es un mensaje propio y ninguno depende del reloj."""
+    request = _request_of_question(cur, who, QUESTION_CHOICE, choice_set_id,
+                                   lock=False)
+    if not request:
+        return False
+    prompt = _first_choice_prompt(cur, choice_set_id)
+    if ref is None:
+        cur.execute(
+            """select count(*) n from message_outbox
+                where intake_choice_set_id = %s""", (choice_set_id,))
+        ref = f"n{cur.fetchone()['n']}"
     _enqueue(cur, request, f"{prefix}{prompt}", now,
              f"intake:{request['id']}:reask:{ref}", choice_set_id=choice_set_id)
     return True

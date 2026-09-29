@@ -29,6 +29,8 @@ from .despachador import (TransporteTelegram, acusar_toque, despachar,
                           texto_error_seguro)
 from .incidentes import (REFERENCIA_INBOUND_MESSAGE, REFERENCIA_PENDING_ACTION,
                          registrar_incidente)
+from .ingreso_tareas import (QUESTION_CHOICE, QUESTION_CONFIRMATION,
+                             QUESTION_FREE_TEXT)
 from .salida import TRUNCAR_ETIQUETA_BOTON as TRUNCAR_TITULO_BOTON
 from .salida import (ETIQUETA_CANCELAR, ETIQUETA_CONFIRMAR, ICONO_CANCELAR,
                      ICONO_CONFIRMAR, ICONO_OTRA_OPCION, ICONO_TAREA,
@@ -61,9 +63,9 @@ _SENTINEL_ALTA_ELECCION = "_alta_eleccion"
 _SENTINEL_ALTA_CONFIRMACION = "_alta_confirmacion"
 # Qué `tipo` de pregunta del alta (`ingreso_tareas.QUESTION_*`) es cada centinela.
 _TIPO_DE_ALTA = {
-    _SENTINEL_ALTA_TEXTO_LIBRE: "free_text",
-    _SENTINEL_ALTA_ELECCION: "choice",
-    _SENTINEL_ALTA_CONFIRMACION: "confirmation",
+    _SENTINEL_ALTA_TEXTO_LIBRE: QUESTION_FREE_TEXT,
+    _SENTINEL_ALTA_ELECCION: QUESTION_CHOICE,
+    _SENTINEL_ALTA_CONFIRMACION: QUESTION_CONFIRMATION,
 }
 _SENTINEL_DE_ALTA = {tipo: centinela for centinela, tipo in _TIPO_DE_ALTA.items()}
 _OPCION_NINGUNA = "__ninguna__"
@@ -1164,12 +1166,16 @@ def _pregunta_del_alta(abierta) -> _Pregunta:
     args = abierta.args
     titulo = args.get("titulo")
     dejada = AVISO_ALTA_DEJADA.format(titulo=f" «{titulo}»" if titulo else "")
-    campo = FREE_TEXT_NAMES.get(args.get("campo"))
     if abierta.herramienta == _SENTINEL_ALTA_TEXTO_LIBRE:
-        nombre = f"{campo} de la tarea nueva"
+        # Un campo de texto libre sin nombre es un defecto del alta: falla
+        # fuerte, no se inventa un nombre.
+        nombre = f"{FREE_TEXT_NAMES[args['campo']]} de la tarea nueva"
         descripcion = f"{nombre}, un dato del alta guiada que se le pidió"
         corrige_aviso = None
     elif abierta.herramienta == _SENTINEL_ALTA_ELECCION:
+        # Una elección sin campo (la de "ya hay un borrador en curso") no tiene
+        # nombre de campo y se nombra en general.
+        campo = FREE_TEXT_NAMES.get(args.get("campo"))
         nombre = (f"la elección sobre {campo} de la tarea nueva" if campo
                   else "la elección pendiente de la tarea nueva")
         descripcion = f"{nombre}, una pregunta con botones del alta guiada"
@@ -1259,9 +1265,8 @@ def _repreguntar(cur, quien, workspace_id: str, chat_id: int, abierta,
     if abierta.herramienta == _SENTINEL_ALTA_ELECCION:
         from .ingreso_tareas import resend_choice_prompt
 
-        if resend_choice_prompt(cur, quien, abierta.pending_action_id, ahora,
-                                entrante_id or str(ahora.timestamp()),
-                                prefix=prefijo):
+        if resend_choice_prompt(cur, quien, abierta.pregunta_id, ahora,
+                                entrante_id, prefix=prefijo):
             return
         texto = AVISO_DATO_YA_NO_PENDIENTE
     else:
@@ -1326,7 +1331,7 @@ def _dejar_pregunta_pendiente(cur, quien, workspace_id: str, chat_id: int,
 def _ver_pregunta_abierta(cur, quien, chat_id: int, ahora, *, alta: bool):
     """La pregunta abierta de esta persona en este chat, sin consumirla.
 
-    El campo `pending_action_id` de lo que devuelve no siempre es una fila de
+    El campo `pregunta_id` de lo que devuelve no siempre es una fila de
     la Modificación: según `herramienta` es el id de la fila de
     `pending_action` o, con uno de los centinelas del alta (`_TIPO_DE_ALTA`),
     el del campo de texto libre (`task_intake_free_text_slot`), el de la
@@ -1351,7 +1356,7 @@ def _ver_pregunta_abierta(cur, quien, chat_id: int, ahora, *, alta: bool):
             if pregunta["opciones"] is not None:
                 args["opciones"] = pregunta["opciones"]
             return P.ModificacionAbierta(
-                pending_action_id=pregunta["id"],
+                pregunta_id=pregunta["id"],
                 herramienta=_SENTINEL_DE_ALTA[pregunta["tipo"]], args=args,
                 resumen=pregunta["resumen"])
     return P.ver_modificacion_abierta(cur, quien, chat_id, ahora)
@@ -1370,8 +1375,8 @@ def _consumir_pregunta(cur, quien, abierta, ahora) -> bool:
     if abierta.herramienta in _TIPO_DE_ALTA:
         return intake_question_active(cur, quien,
                                       _TIPO_DE_ALTA[abierta.herramienta],
-                                      abierta.pending_action_id)
-    return P.consumir_modificacion(cur, abierta.pending_action_id, ahora)
+                                      abierta.pregunta_id)
+    return P.consumir_modificacion(cur, abierta.pregunta_id, ahora)
 
 
 def _dejar_de_lado(cur, quien, abierta, ahora) -> bool:
@@ -1385,8 +1390,8 @@ def _dejar_de_lado(cur, quien, abierta, ahora) -> bool:
     if abierta.herramienta in _TIPO_DE_ALTA:
         return cancel_from_intake_question(
             cur, quien, _TIPO_DE_ALTA[abierta.herramienta],
-            abierta.pending_action_id, ahora)
-    return P.consumir_modificacion(cur, abierta.pending_action_id, ahora)
+            abierta.pregunta_id, ahora)
+    return P.consumir_modificacion(cur, abierta.pregunta_id, ahora)
 
 
 def _seguir_con_el_campo_del_alta(cur, quien, texto: str, abierta, chat_id: int,
@@ -1399,7 +1404,7 @@ def _seguir_con_el_campo_del_alta(cur, quien, texto: str, abierta, chat_id: int,
 
     resultado = consume_pending_text(
         cur, quien, chat_id=chat_id, source_inbound_id=entrante_id,
-        source_raw_text=texto, now=ahora, slot_id=abierta.pending_action_id)
+        source_raw_text=texto, now=ahora, slot_id=abierta.pregunta_id)
     if resultado is None:
         _responder(cur, workspace_id, chat_id, quien, AVISO_DATO_YA_NO_PENDIENTE,
                    ahora)
@@ -1415,7 +1420,7 @@ def _seguir_con_la_eleccion_del_alta(cur, quien, texto: str, abierta,
     from .ingreso_tareas import resolve_typed_choice
 
     resultado = resolve_typed_choice(
-        cur, quien, choice_set_id=abierta.pending_action_id, text=texto,
+        cur, quien, choice_set_id=abierta.pregunta_id, text=texto,
         chat_id=chat_id, now=ahora)
     if resultado is None or resultado.inert:
         _repreguntar(cur, quien, workspace_id, chat_id, abierta,
@@ -1452,7 +1457,7 @@ def _preguntar_si_es_el_dato(cur, quien, workspace_id: str, chat_id: int,
 def _args_de_la_pregunta(abierta) -> dict:
     """Lo que un botón de `SENTINEL_RESPUESTA_DATO_MENU` guarda para volver a
     armar la pregunta abierta al tocarlo (`_pregunta_abierta_de_toque`)."""
-    return {"pregunta_id": abierta.pending_action_id, "dato": abierta.args,
+    return {"pregunta_id": abierta.pregunta_id, "dato": abierta.args,
             "herramienta": abierta.herramienta, "resumen": abierta.resumen}
 
 
@@ -1463,7 +1468,7 @@ def _pregunta_abierta_de_toque(args: dict):
     from . import pendientes as P
 
     return P.ModificacionAbierta(
-        pending_action_id=args.get("pregunta_id"),
+        pregunta_id=args.get("pregunta_id"),
         herramienta=args.get("herramienta") or P.SENTINEL_DATO_MENU_TAREA,
         args=args.get("dato") or {}, resumen=args.get("resumen") or "")
 
@@ -1508,7 +1513,7 @@ def _retomar_dato_pendiente(cur, quien, workspace_id: str, chat_id: int,
         return
     vigente = _ver_pregunta_abierta(
         cur, quien, chat_id, ahora, alta=abierta.herramienta in _TIPO_DE_ALTA)
-    if vigente is None or vigente.pending_action_id != abierta.pending_action_id:
+    if vigente is None or vigente.pregunta_id != abierta.pregunta_id:
         return
 
     pregunta = _pregunta_de(abierta)
@@ -1718,7 +1723,7 @@ def _avanzar_aclaracion(cur, quien, workspace_id: str, chat_id: int, ahora,
         from .agente import responder
 
         modificacion = P.ModificacionAbierta(
-            pending_action_id="", herramienta=mod["herramienta"],
+            pregunta_id="", herramienta=mod["herramienta"],
             args=mod["args"], resumen=mod["resumen"])
         responder(cur, quien, estado["mensaje"], proveedor, cal, chat_id,
                  ahora=ahora, entrante_id=estado["entrante_id"],
@@ -2589,7 +2594,7 @@ def _resumir_dato_menu_tarea(cur, quien, texto: str, modificacion, chat_id: int,
     try:
         _ejecutar_accion_menu(cur, quien, workspace_id, chat_id, herramienta,
                               call_args, ahora,
-                              pending_action_id=modificacion.pending_action_id)
+                              pending_action_id=modificacion.pregunta_id)
     except Denegado as e:
         _responder(cur, workspace_id, chat_id, quien, str(e), ahora)
     except Exception as e:  # noqa: BLE001

@@ -141,14 +141,14 @@ class ModificacionAbierta:
     Reusa lo que ya quedó en la fila de `pending_action` desde que se armó la
     vista previa original: no hace falta guardarlo aparte.
 
-    `pending_action_id` es el id de la pregunta abierta: la fila de
+    `pregunta_id` es el id de la pregunta abierta: la fila de
     `pending_action`, salvo con los centinelas del alta guiada
     (`gateway._TIPO_DE_ALTA`), donde es el id de un
     `task_intake_free_text_slot`, de un `task_intake_choice_set` o de la vista
     previa del borrador. Quien lo usa mira `herramienta` antes de tratarlo
     como una fila de `pending_action`.
     """
-    pending_action_id: str
+    pregunta_id: str
     herramienta: str
     args: dict[str, Any]
     resumen: str
@@ -329,7 +329,7 @@ def reclamar_modificacion_abierta(cur: psycopg.Cursor, quien: Solicitante,
     f = cur.fetchone()
     if not f:
         return None
-    return ModificacionAbierta(pending_action_id=str(f["id"]),
+    return ModificacionAbierta(pregunta_id=str(f["id"]),
                                herramienta=f["herramienta"],
                                args=f["args"] or {}, resumen=f["resumen"])
 
@@ -358,7 +358,7 @@ def ver_modificacion_abierta(cur: psycopg.Cursor, quien: Solicitante,
     f = cur.fetchone()
     if not f:
         return None
-    return ModificacionAbierta(pending_action_id=str(f["id"]),
+    return ModificacionAbierta(pregunta_id=str(f["id"]),
                                herramienta=f["herramienta"],
                                args=f["args"] or {}, resumen=f["resumen"])
 

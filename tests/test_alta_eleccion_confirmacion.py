@@ -159,6 +159,8 @@ def test_elegir_escribiendo_la_opcion_resuelve_como_el_toque(
         texto, intake_world, conn, monkeypatch):
     rid = _alta_con_eleccion(conn, intake_world)
     conjunto = _conjunto_activo(conn, rid)
+    user = _usuario(intake_world)
+    antes = _salidas(conn, user)
     provider = _RoutingProvider([_ruta(RespectoPendiente.RESPONDE)])
 
     _escribir(conn, monkeypatch, intake_world, provider, texto)
@@ -170,7 +172,36 @@ def test_elegir_escribiendo_la_opcion_resuelve_como_el_toque(
     assert provider.main_calls == 0
     # El ruteo recibe la elección abierta y sus opciones como contexto.
     assert "Reduce service delay 1" in provider.pending_calls[0]
-    assert _conjunto_activo(conn, rid) != conjunto     # sigue la próxima pregunta
+    siguiente = _conjunto_activo(conn, rid)
+    assert siguiente != conjunto                       # sigue la próxima pregunta
+    # Una sola respuesta visible, y es la próxima pregunta del alta.
+    salidas = _nuevas(conn, user, antes)
+    assert len(salidas) == 1
+    assert str(salidas[0]["intake_choice_set_id"]) == siguiente
+    assert salidas[0]["cuerpo"] == _pregunta(salidas, siguiente)
+
+
+def test_una_opcion_que_parece_un_titulo_no_tira_abajo_el_ruteo(
+        intake_world, conn, monkeypatch):
+    """Banco b-0022: la opción escrita parece el título de una tarea y el
+    modelo la rutea como conversación con propuestas de tarea. Con la elección
+    abierta la decisión es `respecto_pendiente`: la opción se toma y no hay
+    RoutingError ni incidente."""
+    from prisma.llm import Llamada, ProveedorGuionado, RouteEnvelope
+
+    rid = _alta_con_eleccion(conn, intake_world)
+    sobre = RouteEnvelope(calls=(Llamada("c", "route_intent", {
+        "action": "normal_conversation", "respecto_pendiente": "responde",
+        "task": {"title": "Reduce service delay 1"}}),))
+    provider = ProveedorGuionado([], rutas=[sobre])
+
+    _escribir(conn, monkeypatch, intake_world, provider,
+              "Reduce service delay 1")
+
+    assert _campo(conn, rid, "objective")["estado"] == "confirmed"
+    with admin(conn) as cur:
+        cur.execute("select count(*) n from incident")
+        assert cur.fetchone()["n"] == 0
 
 
 def test_un_texto_que_no_es_una_opcion_repite_la_pregunta_con_sus_botones(
@@ -189,6 +220,62 @@ def test_un_texto_que_no_es_una_opcion_repite_la_pregunta_con_sus_botones(
     assert len(salidas) == 1
     assert salidas[-1]["cuerpo"] == _pregunta(antes, conjunto)       # la misma pregunta
     assert str(salidas[-1]["intake_choice_set_id"]) == conjunto  # con sus botones
+
+
+def test_reenviar_la_eleccion_sin_mensaje_de_origen_usa_referencias_deterministas(
+        intake_world, conn):
+    rid = _alta_con_eleccion(conn, intake_world)
+    conjunto = _conjunto_activo(conn, rid)
+    user = _usuario(intake_world)
+    antes = _salidas(conn, user)
+    with espacio(conn, intake_world["north-lab"]["id"]) as cur:
+        actor = _actor(cur, intake_world)
+        assert I.resend_choice_prompt(cur, actor, conjunto, NOW, None)
+        assert I.resend_choice_prompt(cur, actor, conjunto, NOW, None)
+    conn.commit()
+
+    # Cada reenvío es un mensaje propio: la referencia no es la misma ni sale
+    # del reloj, así que el segundo no se pierde por la deduplicación.
+    assert len(_nuevas(conn, user, antes)) == 2
+    with admin(conn) as cur:
+        cur.execute("""select dedupe_key from message_outbox
+                        where intake_choice_set_id = %s and dedupe_key like %s
+                        order by dedupe_key""", (conjunto, "%:reask:%"))
+        claves = [f["dedupe_key"] for f in cur.fetchall()]
+    assert claves == [f"intake:{rid}:reask:n1", f"intake:{rid}:reask:n2"]
+
+
+def test_repreguntar_una_eleccion_ya_cerrada_dice_que_ya_no_esta_vigente(
+        intake_world, conn):
+    rid = _alta_con_eleccion(conn, intake_world)
+    user = _usuario(intake_world)
+    ws = intake_world["north-lab"]["id"]
+    with espacio(conn, ws) as cur:
+        actor = _actor(cur, intake_world)
+        abierta = gateway._ver_pregunta_abierta(cur, actor, user, NOW, alta=True)
+        assert abierta.herramienta == gateway._SENTINEL_ALTA_ELECCION
+        etiqueta = next(iter(_active_choices(cur, rid)))
+        _choose(cur, actor, rid, etiqueta, chat_id=user)  # otro camino la cerró
+    conn.commit()
+    antes = _salidas(conn, user)
+
+    with espacio(conn, ws) as cur:
+        gateway._repreguntar(cur, actor, ws, user, abierta,
+                             gateway._pregunta_de(abierta), NOW, None)
+    conn.commit()
+
+    salidas = _nuevas(conn, user, antes)
+    assert [f["cuerpo"] for f in salidas] == [gateway.AVISO_DATO_YA_NO_PENDIENTE]
+
+
+def test_una_pregunta_de_texto_libre_sin_nombre_de_campo_falla_fuerte(
+        intake_world, conn):
+    abierta = P.ModificacionAbierta(
+        pregunta_id="x", herramienta=gateway._SENTINEL_ALTA_TEXTO_LIBRE,
+        args={"campo": "campo_inexistente", "titulo": None}, resumen="¿Cuál?")
+
+    with pytest.raises(KeyError, match="campo_inexistente"):
+        gateway._pregunta_de(abierta)
 
 
 def test_una_opcion_repetida_no_se_elige_sola(intake_world, conn):

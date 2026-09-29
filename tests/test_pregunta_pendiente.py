@@ -324,15 +324,15 @@ def test_ver_no_consume_y_consumir_es_de_un_solo_uso(
         primera = P.ver_modificacion_abierta(cur, quien, tg, ahora)
         segunda = P.ver_modificacion_abierta(cur, quien, tg, ahora)
         assert primera is not None and segunda is not None
-        assert primera.pending_action_id == segunda.pending_action_id
+        assert primera.pregunta_id == segunda.pregunta_id
         assert primera.herramienta == P.SENTINEL_DATO_MENU_TAREA
         assert primera.args["accion"] == "terminar"
         assert _abiertas(conn) == 1                      # mirar no consume
 
         assert P.consumir_modificacion(
-            cur, primera.pending_action_id, ahora) is True
+            cur, primera.pregunta_id, ahora) is True
         assert P.consumir_modificacion(
-            cur, primera.pending_action_id, ahora) is False
+            cur, primera.pregunta_id, ahora) is False
         assert P.ver_modificacion_abierta(cur, quien, tg, ahora) is None
     assert _abiertas(conn) == 0
 

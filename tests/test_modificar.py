@@ -259,7 +259,7 @@ def test_reclamar_modificacion_abierta_es_de_un_solo_uso(corework, conn):
         segunda = P.reclamar_modificacion_abierta(cur, quien, 9100, AHORA)
 
         assert primera is not None
-        assert primera.pending_action_id == pid
+        assert primera.pregunta_id == pid
         assert primera.herramienta == "registrar_bloqueo"
         assert primera.args["causa"] == "falta el switch"
         assert "Todavía no se aplicó ningún cambio." in primera.resumen
@@ -332,7 +332,7 @@ def test_reclamar_modificacion_abierta_solo_ve_la_mas_reciente(corework, conn):
         reclamada = P.reclamar_modificacion_abierta(
             cur, quien, 9100, AHORA + timedelta(seconds=2))
         assert reclamada is not None
-        assert reclamada.pending_action_id == p2
+        assert reclamada.pregunta_id == p2
         assert reclamada.args["causa"] == "segunda"
 
         otra_vez = P.reclamar_modificacion_abierta(
