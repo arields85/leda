@@ -510,18 +510,21 @@ def _botones(cur, m) -> list[Boton]:
             for o in opciones(cur, m["pending_action_id"])]
 
 
-def _preview_vigente(cur, m) -> bool:
+def _preview_vigente(cur, m, ahora: datetime) -> bool:
+    """Si la vista previa que lleva `m` sigue siendo la vigente al `ahora` de la
+    pasada: el mismo reloj que decide el vencimiento del mensaje y lo que se
+    retendría (`_SE_RETENDRIA`)."""
     if not m["pending_action_id"]:
         return True
     cur.execute(
         """select p.estado, p.draft_id, p.membership_id,
-                  p.vence_en > clock_timestamp() as no_vencida,
+                  p.vence_en > %s as no_vencida,
                   d.responsable_membership_id
              from pending_action p
              left join task_draft d on d.id = p.draft_id
             where p.id = %s
             for update of p""",
-        (m["pending_action_id"],))
+        (ahora, m["pending_action_id"]))
     accion = cur.fetchone()
     if not accion or accion["draft_id"] is None:
         return True
@@ -666,7 +669,8 @@ class _Pasada:
 # Lo que, al examinarlo, se retendría en vez de descartarse: no vencido (la regla de
 # `_despachar_fila`: `vence_en < ahora` se descarta) y, si es la vista previa de un
 # borrador, todavía la vigente (`_preview_vigente`: esperando y sin vencer; el cambio
-# de aprobador sólo lo ve el examen). Lo vencido de alguien retenido no espera a que
+# de aprobador sólo lo ve el examen). Ambos con el `ahora` de la pasada: un solo reloj
+# para la cuenta, la exclusión y el examen. Lo vencido de alguien retenido no espera a que
 # se libere: se examina y se descarta como siempre, y no se cuenta como retenido
 # (T9-R1c-3, seguimiento de `review-3ebe127d376a4d18`).
 _SE_RETENDRIA = """
@@ -677,7 +681,7 @@ _SE_RETENDRIA = """
                        where p.id = message_outbox.pending_action_id
                          and p.draft_id is not null
                          and not (p.estado = 'esperando'
-                                  and p.vence_en > clock_timestamp()))"""
+                                  and p.vence_en > %(ahora)s))"""
 
 # Lo retenido sigue `listo` y encabezaría la cola de siempre. Para que no deje sin
 # servicio a lo que viene detrás sin agrandar la pasada, la primera fila que se
@@ -768,7 +772,7 @@ def _retener(cur, workspace_id: str, ahora: datetime, m, rama, resumen: dict,
 def _despachar_fila(cur, workspace_id: str, transporte: Transporte,
                     cal: Calendario, ahora: datetime, tope, m, resumen: dict,
                     pasada: _Pasada) -> None:
-    if not _preview_vigente(cur, m):
+    if not _preview_vigente(cur, m, ahora):
         resumen["descartados"] += 1
         return
     # Contestarle a quien escribió no es "escribir fuera de horario", ni

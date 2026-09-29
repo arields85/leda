@@ -49,21 +49,21 @@ def _activa(cur, quien, tg, cuando) -> None:
         (quien.workspace_id, tg, quien.app_user_id, cuando))
 
 
-def _control(cur, ws, quien, tg) -> None:
+def _control(cur, ws, quien, tg, ahora=DESPUES) -> None:
     """Un aviso de Prisma a la misma persona que no es lo que muestra su rama: sí
     se retiene, y prueba que la retención está en marcha."""
     enqueue_outbox(
         cur, workspace_id=ws, chat_id=tg, text=f"{AVISO} de control",
         recipient_membership_id=quien.membership_id,
-        scheduled_for=DESPUES - timedelta(minutes=3),
+        scheduled_for=ahora - timedelta(minutes=3),
         dedupe_key="retencion:control")
 
 
-def _despachar_alta(conn, ws):
+def _despachar_alta(conn, ws, ahora=DESPUES):
     transporte = TransporteDePrueba()
     with espacio(conn, ws) as cur:
         resumen = despachar(cur, ws, transporte, Calendario.desde_base(cur, ws),
-                            DESPUES)
+                            ahora)
     conn.commit()
     return resumen, transporte
 
@@ -199,3 +199,33 @@ def test_una_vista_previa_que_ya_no_es_la_vigente_se_descarta_y_no_se_cuenta(
         cur.execute("select estado from message_outbox where pending_action_id = %s",
                     (pid,))
         assert cur.fetchone()["estado"] == "descartado"
+
+
+def test_el_reloj_de_la_pasada_decide_la_vigencia_de_la_vista_previa_y_su_conteo(
+        conn, intake_world):
+    """Un solo reloj, el `ahora` del despachador, para el vencimiento del mensaje y
+    para la vigencia de la vista previa. Con un reloj inyectado distinto del de la
+    pared (la vista previa vence 8 horas después de `NOW`, en 2028), a esa hora la
+    vista previa ya no es la vigente: se descarta y no cuenta como retenida."""
+    world = intake_world
+    ws = world["north-lab"]["id"]
+    rid, pid = _alta_en_confirmacion(conn, world, responsable="Para mí")
+    ahora = NOW + timedelta(hours=9)
+    with espacio(conn, ws) as cur:
+        morgan, tg = _persona_del_alta(cur, world, "Morgan Hale")
+        _activa(cur, morgan, tg, ahora - timedelta(minutes=1))
+        P.registrar(cur, morgan, herramienta="registrar_bloqueo", args={},
+                    resumen="¿Confirmás?", vence_en=ahora + timedelta(hours=8),
+                    chat_id=tg)                        # su rama abierta
+        _control(cur, ws, morgan, tg, ahora)
+    conn.commit()
+
+    resumen, transporte = _despachar_alta(conn, ws, ahora)
+
+    assert transporte.enviados == []
+    assert resumen["descartados"] == 1 and resumen["retenidos"] == 1   # sólo el control
+    with admin(conn) as cur:
+        cur.execute("select estado from message_outbox where pending_action_id = %s",
+                    (pid,))
+        assert cur.fetchone()["estado"] == "descartado"
+    assert _estados(conn) == {"control": "listo"}

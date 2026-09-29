@@ -56,7 +56,9 @@ def test_dispatch_and_gateway_contain_stale_preview_and_callback_guards():
     dispatch = (ROOT / "src" / "prisma" / "despachador.py").read_text("utf-8")
     gateway = (ROOT / "src" / "prisma" / "gateway.py").read_text("utf-8")
     assert "def _preview_vigente" in dispatch
-    assert "clock_timestamp()" in dispatch
+    # Un solo reloj: la vigencia de la vista previa usa el `ahora` de la pasada.
+    assert "p.vence_en > %s as no_vencida" in dispatch
+    assert "clock_timestamp()" not in dispatch
     assert "update message_outbox set estado = 'descartado'" in dispatch
     draft_callback = gateway.split("def _resolver_toque_borrador", 1)[1]
     assert "with espacio(conn, workspace_id)" in draft_callback
