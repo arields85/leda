@@ -326,11 +326,18 @@ gestión.
     copiable; y los seguimientos de `review-8563632f45a44f88` (campo sin fila en
     `_ask_field_change`; un solo reloj en el conteo de `retenidos`). Pendiente de
     decisión del usuario: Modificar cuando confirma otra persona.
-  - [ ] **T9-R2 — Cada mensaje recibe exactamente una respuesta visible** (H15, H19).
+  - [x] **T9-R2 — Cada mensaje recibe exactamente una respuesta visible** (H15, H19).
     Ojo: desde `3255418` cada toque deja una fila de `inbound_message` sin texto (para
     medir la actividad); el control de una respuesta por mensaje tiene que contemplarlas.
     `procesar_update` sólo lee `text` (`gateway.py:213`); control estructural al cerrar
     el mensaje; epígrafe como texto; comprobación del banco y del validador.
+  - [ ] **T9-R2b — Seguimientos de la respuesta única.** Encontrar los caminos que encolan
+    más de una respuesta independiente para un mismo mensaje sin marcarlas como grupo (el
+    control ahora descarta todas menos una, con incidente) y agruparlos; revisar los caminos
+    que a propósito no responden (sobre todo en grupos, donde ahora saldría el aviso neutro);
+    y las pruebas débiles de `review-cfe9d0884f17b144` (aserción vacía del epígrafe; la
+    prueba del toque en el banco no toca nada). Evidencia: banco completo con la
+    comprobación nueva.
   - [ ] **T9-R3 — Decir el estado real y ofrecer sólo lo posible** (H20, H18, H16).
     Incluye (de `review-2282ebc46e7a48e1`): quien pidió un borrador que espera a otro
     aprobador no recibe un aviso determinista de quién confirma cuando escribe sobre él.
@@ -4663,3 +4670,22 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   prueba parametrizada de repreguntar no controla el campo de la fecha. Sigue pendiente
   la decisión del usuario sobre Modificar cuando confirma otra persona (A: quien pide
   revisa antes de enviar; B: el aprobador modifica; C: como está).
+
+- 2026-09-29: **T9-R2.** Ruta: delegada, un escritor. `050646e` (fecha vacía sin "None";
+  la prueba de repreguntar controla el campo que parametriza). `1dbafa5`: migración `0021`
+  (`message_outbox.entrante_id` y `respuesta_grupo`; **pendiente de aplicar en la base local
+  junto con `0020`**); cada fila encolada en la fase 2 queda atada al mensaje entrante;
+  `respuesta_unica.controlar` al cerrar el mensaje: sin respuesta, aviso neutro e incidente
+  `sin_respuesta`; con más de una respuesta independiente, queda la que tiene botones (o la
+  primera) y las demás se descartan con incidente `respuesta_duplicada`; las partes y los
+  grupos cuentan como una. Adjuntos (H15): con epígrafe se procesa el texto y se avisa que
+  el adjunto no se guarda; sin epígrafe, "Todavía no puedo recibir fotos, archivos ni
+  audios…" (repregunta si hay una pregunta abierta). Los toques quedan fuera del control.
+  `09f2fea`: la comprobación de una respuesta por mensaje en todos los escenarios del banco
+  y la familia `b-0026`. Hallazgo del escritor: la prueba de migración intermitente falla
+  con `tuple concurrently updated` cuando dos sesiones de pytest usan el servidor a la vez.
+  Padre: suite completa sola **1858 passed, 264 deselected**. RDD: tramo `89e2be5..09f2fea`
+  medio, 1403 líneas, `review-cfe9d0884f17b144` **aprobada y reconocida**; frontera en
+  `09f2fea`. Advertencias: caminos con varias respuestas sin agrupar perderían contenido;
+  en grupos, un mensaje que a propósito no se respondía ahora recibe el aviso neutro
+  (T9-R2b).
