@@ -12,15 +12,21 @@ Los ruteos y el modelo se guionan con `ProveedorGuionado`; nada toca la red.
 
 from __future__ import annotations
 
+import dataclasses
 from datetime import datetime, timezone
 
 import pytest
 
+from prisma import gateway
+from prisma import jev as jev_modulo
 from prisma import pendientes as P
 from prisma.db import admin, espacio
-from prisma.llm import Llamada, RespectoPendiente, Respuesta
+from prisma.jev import ClienteJevGuionado
+from prisma.llm import (IntentAction, IntentRoute, Llamada, RespectoPendiente,
+                        Respuesta)
 
-from tests.test_menu_tarea import (_abrir_menu, _bloquear, _mensaje, _quien,  # noqa: F401
+from tests.test_menu_tarea import (_abrir_menu, _bloquear, _mensaje, _opciones,
+                                   _pendiente, _quien,  # noqa: F401
                                    _tarea as _tarea_menu, _telegram_id,
                                    _tocar, _tocar_accion, cliente)
 from tests.test_modificar import _proponer, _tarea as _tarea_modificar
@@ -269,3 +275,136 @@ def test_dejar_un_modificar_de_resolver_bloqueo_guarda_por_bloqueo_id(
     if not es_el_mismo:
         assert _vistas_previas(conn, "resolver_bloqueo", bloqueo_b,
                                "bloqueo_id") == 1
+
+
+# ---------------------------------------------------------------------------
+# La guarda de cada acción del menú que pide un dato (review-ed284b3aec853536):
+# `gateway._HERRAMIENTA_DE_DATO_MENU` nombra la herramienta y el campo de id
+# que la guarda compara, y los `args` de la pregunta tienen que traerlo.
+# ---------------------------------------------------------------------------
+
+_EVIDENCIA_DE_PRUEBA = "ya está probado"
+
+_ACCIONES_DEL_MENU = {
+    "informar_bloqueo": dict(
+        persona="Nahuel Gimenez", estado="asignada", etiqueta="Informar un bloqueo",
+        herramienta="registrar_bloqueo", campo="tarea_id", clave="tarea",
+        args=lambda d: {"tarea_id": d["tarea"], "causa": CAUSA}),
+    "destrabar": dict(
+        persona="Nahuel Gimenez", estado="asignada", etiqueta="Ya se destrabó",
+        herramienta="resolver_bloqueo", campo="bloqueo_id", clave="bloqueo",
+        bloquear=True,
+        args=lambda d: {"bloqueo_id": d["bloqueo"],
+                        "resolucion": "llegó el switch"}),
+    "adjuntar_evidencia": dict(
+        persona="Nahuel Gimenez", estado="en_revision",
+        etiqueta="Adjuntar evidencia", herramienta="adjuntar_evidencia",
+        campo="tarea_id", clave="tarea",
+        args=lambda d: {"tarea_id": d["tarea"], "tipo": "texto",
+                        "descripcion": _EVIDENCIA_DE_PRUEBA}),
+    "pedir_cambios": dict(
+        persona="Marcos Tarquini", estado="en_revision",
+        etiqueta="Pedir cambios", herramienta="pedir_cambios_tarea",
+        campo="tarea_id", clave="tarea",
+        args=lambda d: {"tarea_id": d["tarea"], "comentario": "falta la foto"}),
+}
+
+
+def _abrir_accion_del_menu(cliente, conn, ws, monkeypatch, caso: dict):
+    """Abre, desde el menú de la tarea A, la pregunta del dato de `caso`.
+    Devuelve (chat, ids de A, ids de B): tarea y, si hay, bloqueo."""
+    with admin(conn) as cur:
+        a = _tarea_menu(cur, ws, titulo=TITULO_MENU, estado=caso["estado"])
+        b = _tarea_menu(cur, ws, titulo="Revisar variador línea 2",
+                        estado=caso["estado"])
+        if caso.get("bloquear"):
+            _bloquear(cur, ws, a)
+            _bloquear(cur, ws, b, causa="Falta un cable")
+    conn.commit()
+    ids_a, ids_b = {"tarea": a}, {"tarea": b}
+    if caso.get("bloquear"):
+        ids_a["bloqueo"], ids_b["bloqueo"] = _bloqueo_de(conn, a), _bloqueo_de(conn, b)
+    _pid, filas, tg = _abrir_menu(cliente, conn, ws, monkeypatch, a,
+                                  caso["persona"])
+    _tocar_accion(cliente, conn, ws, filas, caso["etiqueta"], tg)
+    assert _abiertas(conn) == 1
+    return tg, ids_a, ids_b
+
+
+@pytest.mark.parametrize("es_la_misma", [True, False],
+                         ids=["misma_rechaza", "otra_permite"])
+@pytest.mark.parametrize("accion", list(_ACCIONES_DEL_MENU))
+def test_dejar_un_dato_del_menu_guarda_por_el_id_de_cada_accion(
+        cliente, conn, corework, monkeypatch, accion, es_la_misma):
+    ws = corework.workspace_id
+    caso = _ACCIONES_DEL_MENU[accion]
+    tg, ids_a, ids_b = _abrir_accion_del_menu(cliente, conn, ws, monkeypatch, caso)
+    destino = ids_a if es_la_misma else ids_b
+
+    proveedor = _dejar_y_ver_lo_otro(
+        cliente, conn, ws, tg, monkeypatch,
+        _guion(caso["herramienta"], caso["args"](destino)))
+
+    assert bool(_rechazos(proveedor)) is es_la_misma
+    campo, herramienta = caso["campo"], caso["herramienta"]
+    assert _vistas_previas(conn, herramienta, ids_a[caso["clave"]], campo) == 0
+    if not es_la_misma:
+        # Aserción positiva: sobre otro objetivo la propuesta sí se arma.
+        assert _vistas_previas(conn, herramienta, ids_b[caso["clave"]], campo) == 1
+
+
+# ---------------------------------------------------------------------------
+# La guarda sobrevive a la aclaración con botones: "Dejarlo y ver lo otro" se
+# detiene a preguntar a qué tarea se refiere el mensaje guardado y sigue al
+# tocar una candidata (`_avanzar_aclaracion`).
+# ---------------------------------------------------------------------------
+
+REFERENCIA_DEL_OTRO_MENSAJE = "lo del tablero"
+
+
+@pytest.fixture
+def cliente_con_credencial(cliente, monkeypatch):
+    """Con la credencial de Jev configurada, una referencia ambigua se
+    resuelve con botones en vez de quedar sin resolver."""
+    monkeypatch.setattr(
+        gateway, "config",
+        dataclasses.replace(gateway.config, openrouter_api_key="sk-test-fake"))
+    return cliente
+
+
+@pytest.mark.parametrize("es_la_misma", [True, False],
+                         ids=["misma_tarea_rechaza", "otra_tarea_permite"])
+def test_la_guarda_sigue_vigente_al_retomar_tras_botones_de_aclaracion(
+        cliente_con_credencial, conn, corework, monkeypatch, es_la_misma):
+    cliente = cliente_con_credencial
+    ws = corework.workspace_id
+    tg, a, b = _abrir_modificar(cliente, conn, ws)
+    destino = a if es_la_misma else b
+    monkeypatch.setattr(jev_modulo, "desde_base", lambda api_key: ClienteJevGuionado(
+        guion=[{"alcance": {"probabilities": {"una_tarea": 0.8,
+                                              "varias_tareas": 0.0,
+                                              "ninguna": 0.0}},
+                "tarea": {"probabilities": {"T1": 0.5, "T2": 0.3}}}]))
+    con_referencia = IntentRoute(IntentAction.NORMAL_CONVERSATION,
+                                 trabajos=(REFERENCIA_DEL_OTRO_MENSAJE,))
+    proveedor = _con_rutas(
+        monkeypatch, [_ruta(RespectoPendiente.OTRO_TEMA), con_referencia],
+        guion=_guion("registrar_bloqueo", {"tarea_id": destino, "causa": CAUSA}))
+    _mensaje(cliente, tg, f"¿cómo va {REFERENCIA_DEL_OTRO_MENSAJE}?")
+    previas_a = _vistas_previas(conn, "registrar_bloqueo", a)
+
+    # "Dejarlo" cierra el Modificar y se detiene en la pregunta de la
+    # aclaración: el modelo todavía no habló.
+    _tocar_boton(cliente, conn, ws, "Dejarlo", tg)
+    assert proveedor.recibidos == []
+    with admin(conn) as cur:
+        pid = _pendiente(cur, ws, gateway._SENTINEL_ACLARACION)
+        candidata = _opciones(cur, pid)[0]
+
+    # Tocar una candidata retoma el mensaje guardado, con la guarda puesta.
+    assert _tocar(cliente, candidata["token"], tg).status_code == 200
+
+    assert bool(_rechazos(proveedor)) is es_la_misma
+    assert _vistas_previas(conn, "registrar_bloqueo", a) == previas_a
+    if not es_la_misma:
+        assert _vistas_previas(conn, "registrar_bloqueo", b) == 1
