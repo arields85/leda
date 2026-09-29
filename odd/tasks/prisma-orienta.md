@@ -198,8 +198,36 @@ gestión.
   (`consultar_tareas` y similares) cuando el dato ya viaja en el contexto, reconstruyendo
   los botones de lista desde el contexto (ADR 0007 §3). Es la palanca que puede acercar
   el turno a menos de 4 s; medir con el banco.
-- [ ] **T9 — Estado de la conversación (ronda 3).** R3-H17, H20, H15, H19, H18, H16,
-  H5 y H13.
+- [ ] **T9 — Estado de la conversación (ronda 3), por reglas generales**
+  ([`ADR 0013`](../../docs/decisions/0013-reglas-generales-de-la-conversacion.md)).
+  Decisión del usuario (2026-09-29): no parchear caso por caso; cada regla con su
+  mecanismo, los hallazgos R3 como casos de prueba y familias de variantes. Mapeo de
+  causas en Progreso.
+  - [ ] **T9-R1 — Una pregunta pendiente es contexto, no una trampa** (H17, H19
+    probable, parte de H20). Hoy `_resumir_dato_menu_tarea` acepta cualquier texto no
+    vacío (`gateway.py:1831-1858`) y la marca se consume antes de interpretar; el alta
+    guiada (`ingreso_tareas.handle_active_text`) también toma el mensaje siguiente. El
+    ruteo tipado recibe la pregunta pendiente y devuelve un comando de una lista cerrada
+    (responde, corrige, cancela, otro tema con retome, charla, dudoso, no puedo; patrón
+    de "conversation repair" de los asistentes de tareas, ADR 0013), cada uno con un
+    manejo determinista. Por etapas, un commit cada una:
+    - [ ] **T9-R1a — Contrato del ruteo y dato pedido desde el menú** (el caso de H17:
+      evidencia, causa y resolución de bloqueo, motivo de cambios, adjuntar evidencia).
+    - [ ] **T9-R1b — Corrección abierta** (Modificar y "Ninguna, lo escribo").
+    - [ ] **T9-R1c — Preguntas del alta guiada** (`ingreso_tareas.handle_active_text`).
+  - [ ] **T9-R2 — Cada mensaje recibe exactamente una respuesta visible** (H15, H19).
+    `procesar_update` sólo lee `text` (`gateway.py:213`); control estructural al cerrar
+    el mensaje; epígrafe como texto; comprobación del banco y del validador.
+  - [ ] **T9-R3 — Decir el estado real y ofrecer sólo lo posible** (H20, H18, H16).
+    `adjuntar_evidencia` sobre una tarea en curso deja evidencia sin decirlo
+    (`herramientas.py:1552-1559`); `contexto.PREAMBULO` obliga a inventar opciones
+    (`contexto.py:70-77`); el motivo de "Pedir cambios" no está en ninguna lectura.
+  - [ ] **T9-R4 — Todo toque tiene señal inmediata y es idempotente** (H5, H13). El
+    indicador sólo envuelve `_turno` (`gateway.py:333`); el segundo toque responde "ya no
+    está vigente"; ventana de 10 s para la misma persona.
+  - [ ] **T9-H19 — Reproducir H19 después de R1 y R2**; si persiste, clasificarlo por
+    regla antes de corregir.
+
 - [ ] **T10 — Forma de las respuestas (ronda 3).** R3-H1, H2, H3/H7, H8, H9, H10, H11,
   H12, H14 y H4.
 - [ ] **T11 — Cuarta ronda por Telegram**, en horario laboral, con los circuitos A y B.
@@ -4207,3 +4235,15 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   (`review-c6ae4f044c96005a`, cuatro lentes) aprobada y reconocida; frontera en `ccf5c73`.
   T8 queda cerrada: turno de ~12,6 s a ~9,4 s de mediana en el banco (T8c-1) y sin cuelgues
   de más de ~20 s por intento (T8c-4). Próximo: T9.
+
+- 2026-09-29: **T9 replanteada por reglas generales.** Mapeo de causas por lectura de
+  código (explorador de sólo lectura): H17 verificado (`_resumir_dato_menu_tarea` acepta
+  cualquier texto no vacío; la marca `modificar_pedido_en` se consume en
+  `reclamar_modificacion_abierta` antes de interpretar); H20 mecanismo verificado y
+  disparo inferido (`adjuntar_evidencia` sobre `en_curso` sólo inserta la evidencia);
+  H16 verificado; H15 verificado (sólo se lee `text`); H19 sin causa confirmada; H18
+  inferido (regla del `PREAMBULO`); H5 y H13 verificados. El usuario objetó arreglar
+  casos puntuales ("podrías estar así hasta el infinito"): se adoptan cuatro reglas
+  generales ([`ADR 0013`](../../docs/decisions/0013-reglas-generales-de-la-conversacion.md)),
+  con el costo aceptado de ~2 s de ruteo en las respuestas a un dato pedido. Se descarta
+  la lista de saludos como mecanismo.
