@@ -257,6 +257,17 @@ gestión.
         de "Dejarlo" y de "Sí, es eso" tardíos en `test_alta_pregunta_pendiente.py`.
         Compromiso aceptado por la regla 1 (R4): el alta ahora depende del ruteo; con el
         ruteo caído el campo queda abierto y cada campo suma una llamada de ruteo.
+  - [ ] **T9-R1d — Una sola rama de conversación abierta** (enmienda del ADR 0013 regla
+    1, decisión del usuario del 2026-09-29). Con una pregunta abierta, `otro_tema` ya no
+    se atiende: una pregunta con botones **[Seguir con …]** / **[Dejar … y ver lo
+    otro]**; Seguir repite la pregunta pendiente; Dejar cierra lo pendiente como
+    `cancela` y atiende el mensaje guardado en la misma respuesta. "No, es otra cosa" de
+    `dudoso` es la misma salida. Una rama está abierta sólo para quien debe responderla
+    (el borrador que espera a otro aprobador no bloquea a quien lo pidió). Quitar el
+    retome posterior (`_retomar_dato_pendiente`, `retomar` en `_turno`) y la guarda
+    `agente.NoProponer` de R1b-3. Actualizar `b-0020`, `b-0021-c` y `b-0022-b` a la
+    regla nueva. Va después de T9-R1c-2b (mismos archivos). PENDIENTE del ADR: si los
+    mensajes que inicia Prisma esperan mientras hay una rama abierta.
   - [ ] **T9-R2 — Cada mensaje recibe exactamente una respuesta visible** (H15, H19).
     `procesar_update` sólo lee `text` (`gateway.py:213`); control estructural al cerrar
     el mensaje; epígrafe como texto; comprobación del banco y del validador.
@@ -4447,3 +4458,11 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
     en un solo helper; referencia determinista para el reenvío sin `entrante_id` y prueba
     del reenvío de una elección ya cerrada; afirmar la respuesta al escribir la opción;
     falla ruidosa si un campo de texto libre no tiene nombre.
+
+- 2026-09-29: **Decisión del usuario — una sola rama de conversación abierta.** A partir
+  de `b-0021-c` (la respuesta al otro tema traía sus botones y el retome no salía), el
+  usuario rechazó el recordatorio en texto y decidió cortar de raíz: no se abre una rama
+  nueva hasta cerrar la que empezó (continuar, cancelar o dejarla para hacer otra cosa).
+  Ajuste aceptado: "Dejar y ver lo otro" cierra lo pendiente y atiende en la misma
+  respuesta lo que la persona preguntó, sin que lo repita. Registrado como enmienda del
+  ADR 0013 regla 1 y en `AGENTS.md`; tarea T9-R1d.

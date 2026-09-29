@@ -52,9 +52,10 @@ casos.
    - **corrige**: cambia un dato o una propuesta anterior; se reconstruye la vista previa
      (el mismo camino que Modificar).
    - **cancela**: la persona deja lo pendiente; se cierra y se dice qué se dejó de lado.
-   - **otro tema**: se atiende el mensaje por el camino normal y la pregunta queda
-     abierta; al terminar, si la respuesta no dejó otra interacción pendiente, Prisma
-     retoma dentro de la misma respuesta ("¿seguimos con …?") con botones.
+   - **otro tema** (reemplazado por la enmienda del 2026-09-29, abajo): se atiende el
+     mensaje por el camino normal y la pregunta queda abierta; al terminar, si la
+     respuesta no dejó otra interacción pendiente, Prisma retoma dentro de la misma
+     respuesta ("¿seguimos con …?") con botones.
    - **charla** (saludo, agradecimiento, algo fuera de tema): respuesta breve y la
      pregunta pendiente se vuelve a hacer; no se consume.
    - **dudoso**: una sola pregunta con botones para saber si el mensaje es el dato o es
@@ -73,6 +74,34 @@ casos.
    Ningún camino consume una pregunta pendiente sin ese comando. Los errores internos
    siguen el camino de siempre (regla 2). El modelo nunca decide el efecto: sólo el
    comando.
+
+   **Enmienda (2026-09-29, decisión del usuario): una sola rama de conversación
+   abierta.** No se abre una rama nueva de conversación hasta cerrar la que empezó.
+   Una rama se cierra de tres maneras: se continúa (la persona da el dato), se cancela,
+   o se deja para hacer otra cosa. Prisma dirige (ADR 0007): no atiende otro tema con
+   una pregunta abierta. Evidencia: banco real `b-0021-c` y `b-0020`, donde la respuesta
+   al otro tema traía sus propios botones, el retome no podía salir (un solo juego de
+   botones por respuesta, regla 2) y la pregunta quedaba abierta sin que la persona lo
+   supiera. Con esta enmienda, **otro tema** pasa a ser:
+   - Prisma no atiende el mensaje todavía. Responde una sola pregunta con botones sobre
+     lo pendiente, por ejemplo "Estábamos armando una tarea nueva y me falta el título.
+     ¿Seguimos con eso?" con **[Seguir con la tarea]** y **[Dejarla y ver lo otro]** (la
+     redacción final es de T10).
+   - **Seguir**: vuelve a hacer la pregunta pendiente (una elección, con sus botones).
+   - **Dejar y ver lo otro**: cierra lo pendiente por el mismo camino que `cancela` y,
+     en la misma respuesta, atiende el mensaje que quedó guardado por el camino normal,
+     sin pedirle a la persona que lo repita.
+   - Si en vez de tocar un botón la persona escribe, el mensaje se interpreta otra vez
+     contra la misma pregunta pendiente (la pregunta de la rama no es una rama nueva).
+   - En `dudoso`, "No, es otra cosa" es la misma salida que "Dejar y ver lo otro".
+   - `charla` y `no puedo` no cambian: vuelven a hacer la pregunta pendiente.
+   - Una rama está abierta para quien tiene que responderla: un borrador que espera la
+     confirmación de otra persona no es una rama abierta de quien lo pidió.
+   - El retome posterior ("¿seguimos con …?") y la guarda que impedía volver a proponer
+     lo pendiente durante otro tema quedan sin uso, porque el responder ya no corre con
+     una pregunta abierta.
+   PENDIENTE: si los mensajes que Prisma inicia por su cuenta (cadencias, avisos,
+   escalera) esperan mientras la persona tiene una rama abierta.
 2. **Cada mensaje recibe exactamente una respuesta visible.** Al terminar de procesar un
    mensaje entrante, un control estructural verifica lo encolado para ese mensaje: si
    no salió nada, sale el aviso neutro y se registra el incidente; nunca sale más de una
@@ -108,6 +137,10 @@ agrega además como comprobación del banco y del validador de invariantes
 - Una respuesta a un dato pedido, que hoy no pasa por el modelo (0 s), pasa a costar una
   llamada de ruteo (~2 s en NaN). Decisión del usuario: se acepta por generalidad.
 - Las listas de palabras (saludos, confirmaciones) quedan descartadas como mecanismo.
+- Con la enmienda de una sola rama abierta, cambiar de tema con una pregunta abierta
+  cuesta un toque; a cambio, ese turno no llama al modelo que redacta la respuesta
+  hasta que la persona decide, y desaparecen el retome posterior y la guarda contra
+  volver a proponer lo pendiente.
 - Los hallazgos futuros se clasifican primero por regla; si no entran en ninguna, se
   discute si hace falta una regla nueva antes de parchear.
 - No hace imposible todo error de conversación: la redacción y algunas decisiones de

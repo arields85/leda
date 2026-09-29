@@ -172,7 +172,8 @@ caso con listas de frases o palabras clave no termina nunca. Ante un hallazgo so
 conversa Prisma:
 
 - Clasificarlo primero en una de las reglas del ADR 0013: pregunta pendiente como
-  contexto (comandos cerrados), una respuesta visible por mensaje, estado real y sólo
+  contexto (comandos cerrados; una sola rama de conversación abierta a la vez, enmienda
+  del 2026-09-29), una respuesta visible por mensaje, estado real y sólo
   opciones posibles, toque con señal e idempotente.
 - Corregir el mecanismo de esa regla y probarlo con el caso y con familias de variantes,
   no sólo con la frase observada.
