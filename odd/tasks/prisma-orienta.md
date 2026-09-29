@@ -218,6 +218,10 @@ gestión.
         preguntar, interino).
       - [ ] **T9-R1a-2** — dudoso con botones, retome "¿seguimos?" después de otro tema,
         corrige, y escenarios del banco con familias de variantes (medir el prompt).
+        Seguimientos de `review-c10ae20ecdf4cfa0` (aprobada; frontera en `8c53652`): prueba
+        del caso en que otro turno consumió la pregunta antes de `responde` (una sola
+        respuesta); `cancela` debe mirar el resultado del consumo antes de decir "dejé de
+        lado"; `reintentos` entero escrito como `2.0` debe aceptarse.
     - [ ] **T9-R1b — Corrección abierta** (Modificar y "Ninguna, lo escribo").
     - [ ] **T9-R1c — Preguntas del alta guiada** (`ingreso_tareas.handle_active_text`).
   - [ ] **T9-R2 — Cada mensaje recibe exactamente una respuesta visible** (H15, H19).
