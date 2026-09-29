@@ -948,7 +948,8 @@ def test_ejecutar_escenario_opciones_modelo_ofrece_tareas_y_tapea_para_actualiza
             Respuesta(llamadas=[Llamada("c1", "ofrecer_opciones", {
                 "pregunta": "¿Cuál de las dos tareas del dashboard paso a revisión?",
                 "opciones": [{"tarea_id": tid_a}, {"tarea_id": tid_b}]})]),
-            Respuesta(texto="Ya te mostré las opciones."),
+            # (Sin respuesta de cierre: `ofrecer_opciones` cierra el turno sin
+            # otra llamada al modelo, T8c-1.)
             Respuesta(llamadas=[Llamada(
                        "c2", "actualizar_estado",
                        {"tarea_id": tid_a, "estado": "en_revision",

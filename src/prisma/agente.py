@@ -157,6 +157,8 @@ def responder(cur: psycopg.Cursor, quien: Solicitante, texto_entrante: str,
             mensajes.append({"role": "assistant", "content": _bloques(r)})
             resultados = []
             antes_de_opciones = len(opciones_pendientes)
+            pendientes_antes = (len(confirmaciones) + len(elegir_pendiente)
+                                + len(opciones_pendientes))
             for c in r.llamadas:
                 if not c.nombre.startswith("consultar_"):
                     intentos_mutacion.append(c.nombre)
@@ -173,6 +175,16 @@ def responder(cur: psycopg.Cursor, quien: Solicitante, texto_entrante: str,
                 # terminado para él).
                 texto_al_ofrecer = salida
             mensajes.append({"role": "user", "content": resultados})
+            if (len(confirmaciones) + len(elegir_pendiente)
+                    + len(opciones_pendientes)) > pendientes_antes:
+                # Esta vuelta dejó algo esperando a la persona (vista previa,
+                # elección u `ofrecer_opciones`): el turno ya terminó, y el
+                # resultado de la herramienta le dice al modelo que no agregue
+                # nada. Otra llamada sólo produciría un texto que se descarta
+                # más abajo (banco del 2026-09-28: 24 de 27 turnos, ~2,8 s
+                # cada una). Un rechazo no registra nada pendiente, así que
+                # sigue volviendo al modelo para que lo explique.
+                break
     except Exception as e:  # noqa: BLE001
         _incidente(cur, quien, e)
         _encolar_respuesta(cur, quien, chat_id, DISCULPA, cal, ahora)

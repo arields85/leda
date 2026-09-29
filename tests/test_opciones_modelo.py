@@ -408,6 +408,16 @@ def test_segunda_llamada_a_ofrecer_opciones_en_el_mismo_turno_no_se_muestra(
         Respuesta(texto="listo"),
     ]
     proveedor = _con_proveedor(monkeypatch, guion)
+    # El turno cierra tras esa vuelta (T8c-1) y el modelo ya no vuelve a
+    # leer los resultados: se capturan al salir de `_ejecutar_una`.
+    resultados_vistos: list[dict] = []
+    original = agente._ejecutar_una
+
+    def _capturando(*args, **kwargs):
+        bloque = original(*args, **kwargs)
+        resultados_vistos.append(bloque)
+        return bloque
+    monkeypatch.setattr(agente, "_ejecutar_una", _capturando)
 
     with espacio(conn, ws) as cur:
         quien = _quien(cur, "Marcos Tarquini", ws)
@@ -425,11 +435,10 @@ def test_segunda_llamada_a_ofrecer_opciones_en_el_mismo_turno_no_se_muestra(
         etiquetas = [f["etiqueta"] for f in _opciones(cur, pid)]
     assert etiquetas[:2] == ["A", "B"]           # la primera llamada ganó
 
-    # El modelo tiene que recibir la verdad sobre la segunda llamada, no el
-    # mismo texto de éxito que la primera.
-    ultimos_resultados = proveedor.recibidos[-1][1][-1]["content"]
-    r1 = next(b for b in ultimos_resultados if b["tool_use_id"] == "c1")
-    r2 = next(b for b in ultimos_resultados if b["tool_use_id"] == "c2")
+    # El resultado de la segunda llamada dice la verdad, no el mismo texto de
+    # éxito que la primera.
+    r1 = next(b for b in resultados_vistos if b["tool_use_id"] == "c1")
+    r2 = next(b for b in resultados_vistos if b["tool_use_id"] == "c2")
     assert r1["is_error"] is False
     assert r2["is_error"] is True
     contenido_2 = json.loads(r2["content"])

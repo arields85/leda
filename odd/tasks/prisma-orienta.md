@@ -171,7 +171,24 @@ gestión.
     cómo bajar las llamadas al modelo de cada turno (hoy: una de ruteo tipado más una
     mediana de dos del ciclo de herramientas, hasta cuatro), sin perder las garantías
     del ruteo ni de las herramientas; medir con el mismo banco y el mismo complemento de
-    latencias.
+    latencias. Evidencia (banco con nombres de herramientas, 2026-09-28): en 24 de 27
+    turnos que pasan por el responder la última llamada sigue a una herramienta que ya
+    cerró el turno (`ofrecer_opciones` 10, vistas previas 14), tarda ~2,8 s y su texto se
+    descarta (`agente.py:191-222`). Orden aprobado por el usuario, un commit por paso:
+    - [x] **T8c-1 — Cortar el ciclo cuando la vuelta deja algo pendiente.** Si una vuelta
+      registró una vista previa, un `NecesitaElegir` o `ofrecer_opciones`, el turno
+      termina sin volver a llamar al modelo. Un rechazo (sin nada pendiente) sigue
+      volviendo al modelo para que lo explique.
+    - [x] **T8c-2 — Razonamiento configurable.** Descartada con evidencia (2026-09-28):
+      la documentación de NaN (`/docs/models`) dice que en `deepseek-v4-flash` el
+      razonamiento es adaptativo y el parámetro "no tiene efecto"; la sonda (8 pedidos
+      por variante, con herramientas) muestra que `reasoning_effort: "none"` sí lo apaga
+      (0 tokens en 8/8) pero no acelera: por defecto 2,90 s, `none` 2,27 s, `high` 1,81 s
+      de mediana. La variación del servidor pesa más que ~100 tokens de razonamiento, y
+      apagarlo arriesga la calidad.
+    - [ ] **T8c-3 — Ruteo en paralelo con la primera llamada del responder**, sólo en
+      conversación normal sin referencias a tareas; se descarta si el ruteo elige otro
+      camino.
 - [ ] **T9 — Estado de la conversación (ronda 3).** R3-H17, H20, H15, H19, H18, H16,
   H5 y H13.
 - [ ] **T10 — Forma de las respuestas (ronda 3).** R3-H1, H2, H3/H7, H8, H9, H10, H11,
@@ -193,6 +210,7 @@ gestión.
 | T6d | delegada, un escritor | lectura de `herramientas.py`/`gateway.py`/`pendientes.py` para ubicar la identidad del acto + pruebas |
 | T8a | delegada, un escritor | `config.py`, `llm.py`, `gateway.py` (3 llamadas), `cli.py`, `tests/banco/conftest.py`, pruebas |
 | T8b | inline, corridas del banco real | medición; sin cambios de código |
+| T8c-1 | delegada, un escritor | `agente.py` y pruebas de varios módulos (ciclo del responder) |
 
 ## Verificación
 
@@ -4111,3 +4129,20 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   herramientas (hasta cuatro), en serie; el modelo conversacional es el 96 % del tiempo
   del escenario. Con 2-3 s por llamada ningún modelo llega a menos de 4 s por turno.
   Decisión del usuario: se mantiene deepseek y se diseña cómo bajar las llamadas (T8c).
+
+- 2026-09-28 (noche): **T8c-1 — el ciclo del responder corta cuando la vuelta deja algo
+  pendiente.** `agente.responder` cuenta confirmaciones, `NecesitaElegir` y
+  `ofrecer_opciones` antes y después de cada vuelta; si crecieron, termina sin otra
+  llamada al modelo. Un rechazo sigue volviendo al modelo. TDD: RED
+  `pytest -q tests/test_agente.py -k "cierra_el_turno or vuelve_al_modelo or sigue_llamando"`
+  -> 3 failed (`assert 2 == 1` llamadas), 2 passed (rechazo y consulta, sin cambio);
+  GREEN enfocadas `tests/test_agente.py tests/test_opciones_modelo.py
+  tests/banco/test_replays.py tests/banco/test_corrida.py` -> 114 passed (repetida por el
+  orquestador); suite completa -> 1213 passed, 108 deselected. Ajustes: una prueba de
+  `test_opciones_modelo.py` leía los resultados de la segunda llamada, ahora los captura
+  envolviendo `_ejecutar_una`; `tests/banco/test_corrida.py` tenía una respuesta de
+  cierre guionada que ya no se pide. Quedan dos pruebas con una respuesta final guionada
+  que no se usa (pasan igual).
+  Latencia (T8c-2 descartada): NaN `deepseek-v4-flash` es la versión 4.1 (panel del
+  usuario; mismos conteos de tokens que `deepseek/deepseek-v4.1-flash` de OpenRouter).
+  Llamada simple ~1 s en NaN, ~2,5 s por OpenRouter 4.1.

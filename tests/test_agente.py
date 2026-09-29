@@ -645,3 +645,109 @@ def test_rechazo_de_preparacion_no_bloquea_una_ejecucion_real_despues(
             """select count(*) n from audit_log
                 where accion = 'herramienta_rechazada:crear_dependencia'""")
         assert cur.fetchone()["n"] == 1, "el rechazo previo no cuenta como ejecución"
+
+
+# ---------------------------------------------------------------------------
+# T8c-1: una vuelta que deja algo pendiente cierra el turno sin volver al
+# modelo (el texto de esa última llamada se descartaba igual).
+# ---------------------------------------------------------------------------
+
+def _turno_contando(conn, ws, guion, texto="hola"):
+    proveedor = ProveedorGuionado(list(guion))
+    with espacio(conn, ws) as cur:
+        quien = _quien(cur, "Marcos Tarquini", ws)
+        cal = Calendario.desde_base(cur, ws)
+        r = responder(cur, quien, texto, proveedor, cal, chat_id=9100, ahora=AHORA)
+        cur.execute("select cuerpo, pending_action_id from message_outbox")
+        cola = cur.fetchall()
+    return r, proveedor, cola
+
+
+def test_vista_previa_cierra_el_turno_sin_otra_llamada_al_modelo(corework, conn):
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        tid = _tarea(cur, ws)
+    guion = [
+        Respuesta(llamadas=[Llamada("c1", "actualizar_estado",
+                                    {"tarea_id": tid, "estado": "en_curso"})]),
+        Respuesta(texto="Listo, te pregunté."),
+    ]
+    r, proveedor, cola = _turno_contando(conn, ws, guion, "arranco")
+
+    assert len(proveedor.recibidos) == 1
+    assert r.confirmaciones == ["actualizar_estado"]
+    assert r.texto == ""
+    assert len(cola) == 1 and cola[0]["pending_action_id"]   # sólo la vista previa
+
+
+def test_ofrecer_opciones_cierra_el_turno_con_el_texto_de_esa_vuelta(corework, conn):
+    ws = corework.workspace_id
+    texto = "Tenés dos tareas abiertas: «Programar PLC» y «Revisar comunicaciones»."
+    guion = [
+        Respuesta(texto=texto, llamadas=[Llamada("c1", "ofrecer_opciones", {
+            "pregunta": "¿De cuál te referís?",
+            "opciones": [{"texto": "Programar PLC"},
+                         {"texto": "Revisar comunicaciones"}]})]),
+        Respuesta(texto="Listo, ahí tenés las opciones."),
+    ]
+    r, proveedor, cola = _turno_contando(conn, ws, guion)
+
+    assert len(proveedor.recibidos) == 1
+    assert r.elecciones == ["ofrecer_opciones"]
+    assert r.texto == texto
+    assert len(cola) == 1 and texto in cola[0]["cuerpo"]
+
+
+def test_necesita_elegir_cierra_el_turno_sin_otra_llamada_al_modelo(
+        corework, conn, monkeypatch):
+    """Ninguna herramienta del modelo levanta hoy `NecesitaElegir` de forma
+    natural (sólo `crear_borrador_tarea`, interna): se simula en `ejecutar`."""
+    ws = corework.workspace_id
+
+    def _ambiguo(cur, quien, nombre, args, **kw):
+        e = H.NecesitaElegir("¿A quién?", "responsable_membership_id",
+                             [("Marcos Tarquini", "m1"), ("Martín Forte", "m2")])
+        e.herramienta = nombre
+        raise e
+    monkeypatch.setattr(H, "ejecutar", _ambiguo)
+    guion = [
+        Respuesta(llamadas=[Llamada("c1", "actualizar_estado", {"tarea_id": "x"})]),
+        Respuesta(texto="Listo, elegí."),
+    ]
+    r, proveedor, cola = _turno_contando(conn, ws, guion)
+
+    assert len(proveedor.recibidos) == 1
+    assert r.elecciones == ["actualizar_estado"]
+    assert len(cola) == 1
+
+
+def test_un_rechazo_sin_nada_pendiente_vuelve_al_modelo_para_explicarlo(
+        corework, conn):
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        origen = _tarea(cur, ws, titulo="Programar PLC")
+    guion = [
+        Respuesta(llamadas=[Llamada("c1", "crear_dependencia", {
+            "origen_tarea_id": origen,
+            "destino_tarea_id": "00000000-0000-0000-0000-000000000000"})]),
+        Respuesta(texto="No pude anotar esa dependencia: la tarea no existe."),
+    ]
+    r, proveedor, cola = _turno_contando(conn, ws, guion)
+
+    assert len(proveedor.recibidos) == 2
+    assert "la tarea no existe" in r.texto
+    assert r.confirmaciones == [] and r.elecciones == []
+
+
+def test_una_vuelta_solo_de_consultas_sigue_llamando_al_modelo(corework, conn):
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        _tarea(cur, ws)
+    guion = [
+        Respuesta(llamadas=[Llamada("c1", "consultar_tareas", {})]),
+        Respuesta(texto="Tenés una tarea."),
+    ]
+    r, proveedor, cola = _turno_contando(conn, ws, guion)
+
+    assert len(proveedor.recibidos) == 2
+    assert "Tenés una tarea." in r.texto
