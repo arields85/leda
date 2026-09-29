@@ -152,6 +152,23 @@ gestión.
     exige PostgreSQL 13+: consultarla sólo sin evidencia y fijar la versión mínima;
     (3) ninguna prueba verifica la forma de la clave (`tarea_id` + transacción) ni
     que dos tareas en la misma transacción no colisionen.
+- [ ] **T8 — Latencia de la ronda 3 (R3-H21).** Orden decidido por el usuario el
+  2026-09-28: después de leer el manual de personalidad (hecho el 2026-09-28, ver
+  Progreso).
+  - [x] **T8a — Clave del proveedor conversacional según el proveedor.** Hoy
+    `llm.desde_base` recibe siempre `PRISMA_LLM_API_KEY` (`gateway.py`, banco,
+    `modelos`): con `openrouter` le mandaría a OpenRouter la clave de otro proveedor.
+    OpenRouter usa `PRISMA_OPENROUTER_API_KEY` (la misma de Jev); si falta la clave del
+    proveedor configurado, error claro, nunca la otra clave.
+  - [ ] **T8b — Medir y elegir el modelo.** Con el banco real, `google/gemini-3.8-flash`
+    y `openai/gpt-6-luna` contra `nan/deepseek-v4-flash`: latencia por llamada (ruteo y
+    respuesta) y escenarios. Objetivo: menos de 4 s por turno sin empeorar ningún
+    escenario. Elige el usuario; se configura con `python -m prisma modelo`.
+- [ ] **T9 — Estado de la conversación (ronda 3).** R3-H17, H20, H15, H19, H18, H16,
+  H5 y H13.
+- [ ] **T10 — Forma de las respuestas (ronda 3).** R3-H1, H2, H3/H7, H8, H9, H10, H11,
+  H12, H14 y H4.
+- [ ] **T11 — Cuarta ronda por Telegram**, en horario laboral, con los circuitos A y B.
 
 ## Ruta
 
@@ -166,6 +183,8 @@ gestión.
 | T6a | delegada, un escritor | `db/esquema.sql`, migración y rollback `0013`, pruebas (4 archivos) |
 | T6b | delegada, un escritor | `db/esquema.sql`, migración y rollback `0014`, `herramientas.py`, ADR 0009, pruebas |
 | T6d | delegada, un escritor | lectura de `herramientas.py`/`gateway.py`/`pendientes.py` para ubicar la identidad del acto + pruebas |
+| T8a | delegada, un escritor | `config.py`, `llm.py`, `gateway.py` (3 llamadas), `cli.py`, `tests/banco/conftest.py`, pruebas |
+| T8b | inline, corridas del banco real | medición; sin cambios de código |
 
 ## Verificación
 
@@ -4033,3 +4052,28 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   cambio reversible sobre datos ficticios). "Dashboard de lotes en CoreLabs" queda
   `en_curso` con dos evidencias. Consola de la ronda en el scratchpad de la sesión (no
   versionada).
+
+- 2026-09-28 (noche, después de la ronda 3): **Manual de personalidad leído y T8a.**
+  El manual del usuario se contrastó con `nucleo/`, ADR 0007/0008/0009/0011, el
+  `PREAMBULO` y R3-H1..H21. Da criterio, no mecanismo, para los críticos de estado de la
+  conversación (H15, H17, H19, H20, H13, H5, H16). Sus preguntas de cierre en texto
+  abierto contradicen ADR 0007 (prevalece el repo). Probable causa de H18:
+  `contexto.PREAMBULO` obliga a llamar a `ofrecer_opciones` "con las opciones más
+  razonables que se te ocurran" aunque no haya opciones reales (manual §13: sólo
+  opciones reales). Fuera de alcance: ejemplos de agenda, audio, §28 aprendizaje
+  persistente.
+  T8a: `Config.clave_llm`/`variable_clave_llm`; `llm.desde_base(cur, ws, claves)`
+  resuelve la clave del proveedor configurado y, si falta, `LookupError` con el nombre
+  de la variable (incidente por los tres caminos: `gateway.py:347`, `:261`, `:1256`);
+  `gateway` pasa `config`; `modelos`/`modelo` y el banco usan la clave del proveedor.
+  TDD: RED `pytest -q tests/test_clave_proveedor.py` -> 6 failed; GREEN enfocadas
+  (`tests/test_clave_proveedor.py tests/banco/test_conftest.py tests/test_llm_protocol.py`)
+  -> 112 passed (escritor y repetida por el orquestador); suite completa `pytest -q`
+  -> 1208 passed, 108 deselected. Pendiente: `.env.ejemplo` no se pudo revisar (el
+  sistema de permisos niega su lectura); el usuario confirma si su comentario dice que
+  `PRISMA_OPENROUTER_API_KEY` es sólo para Jev.
+  Candidatos en OpenRouter verificados en el catálogo público:
+  `google/gemini-3.8-flash` y `openai/gpt-6-luna` (ambos con herramientas).
+  PostgreSQL local estaba colgado desde las 22:02 (autovacuum terminó con 0xC0000142 y
+  el postmaster no pudo reiniciar hijos); se cerró el proceso y la recuperación desde WAL
+  terminó limpia.

@@ -779,7 +779,7 @@ def _turno(cur, quien, texto: str, workspace_id: str, chat_id: int,
 
     now = datetime.now(timezone.utc)
     cal = Calendario.desde_base(cur, workspace_id)
-    proveedor = desde_base(cur, workspace_id, config.llm_api_key)
+    proveedor = desde_base(cur, workspace_id, config)
 
     # Modificar (T3, ADR 0005 decisión 1) y "Ninguna, lo escribo" (T4,
     # decisión 4) comparten el mismo mecanismo: si esta persona, en este
@@ -1115,7 +1115,7 @@ def _resolver_toque_aclaracion(cur, quien, workspace_id: str, chat_id: int,
             "ella, nombrala por su título exacto.")
 
     cal = Calendario.desde_base(cur, workspace_id)
-    proveedor = desde_base(cur, workspace_id, config.llm_api_key)
+    proveedor = desde_base(cur, workspace_id, config)
     _avanzar_aclaracion(cur, quien, workspace_id, chat_id, ahora, proveedor, cal,
                        estado)
 
@@ -1249,7 +1249,7 @@ def _resolver_toque_opcion_modelo(cur, quien, workspace_id: str, chat_id: int,
         from .llm import desde_base
 
         cal = Calendario.desde_base(cur, workspace_id)
-        proveedor = desde_base(cur, workspace_id, config.llm_api_key)
+        proveedor = desde_base(cur, workspace_id, config)
         responder(cur, quien, texto_entrante, proveedor, cal, chat_id, ahora=ahora,
                  contexto_referencias=contexto,
                  tareas_resueltas_claras=tareas_resueltas)

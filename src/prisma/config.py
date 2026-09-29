@@ -60,6 +60,20 @@ class Config:
     espacios: Path = RAIZ / "espacios"
     plantillas: Path = RAIZ / "plantillas"
 
+    def clave_llm(self, proveedor: str) -> str:
+        """Credencial del modelo conversacional según el proveedor: OpenRouter
+        usa la suya (la misma de Jev) y el resto `PRISMA_LLM_API_KEY`. Nunca
+        se manda la clave de un proveedor a otro."""
+        if proveedor == "openrouter":
+            return self.openrouter_api_key
+        return self.llm_api_key
+
+    def variable_clave_llm(self, proveedor: str) -> str:
+        """Nombre de la variable de entorno que `clave_llm` lee."""
+        if proveedor == "openrouter":
+            return "PRISMA_OPENROUTER_API_KEY"
+        return "PRISMA_LLM_API_KEY"
+
     def token_bot(self, slug_espacio: str) -> str:
         """Token del bot de un espacio. Un bot por equipo: si dos espacios
         compartieran token, un integrante podría recibir mensajes del otro."""

@@ -298,9 +298,9 @@ def main(argv: list[str] | None = None) -> int:
         # No necesita base: le pregunta directo al proveedor.
         from .llm import BASE_URLS
 
-        clave = config.llm_api_key
+        clave = config.clave_llm(a.proveedor)
         if not clave:
-            print("PRISMA_LLM_API_KEY está vacío en .env.")
+            print(f"{config.variable_clave_llm(a.proveedor)} está vacío en .env.")
             return 1
         try:
             if a.proveedor == "gemini":
@@ -367,8 +367,9 @@ def main(argv: list[str] | None = None) -> int:
                 (a.proveedor, a.nombre))
         conn.commit()
         print(f"Modelo configurado: {a.proveedor} / {a.nombre}")
-        if not config.llm_api_key:
-            print("Ojo: PRISMA_LLM_API_KEY está vacío en .env.")
+        if not config.clave_llm(a.proveedor):
+            print(f"Ojo: {config.variable_clave_llm(a.proveedor)} está vacío "
+                  "en .env.")
         return 0
 
     if a.cmd == "importar":

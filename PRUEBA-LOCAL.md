@@ -53,7 +53,10 @@ python -m prisma modelo <identificador> --proveedor anthropic
 El modelo no va en el pack ni en el núcleo: es configuración, y se cambia sin
 tocar un archivo. Para ver cuáles ofrece un proveedor, `python -m prisma
 modelos --proveedor anthropic`; sin argumentos, `python -m prisma modelo`
-muestra el que está activo.
+muestra el que está activo. La credencial depende del proveedor: `openrouter`
+usa `PRISMA_OPENROUTER_API_KEY` (la misma de Jev) y los demás
+`PRISMA_LLM_API_KEY`; si falta la que corresponde, Prisma lo registra como
+incidente en vez de usar la otra.
 
 ## 3. Dar de alta a los tres
 

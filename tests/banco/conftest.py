@@ -63,22 +63,23 @@ def proveedor_real(request: pytest.FixtureRequest):
     from prisma import llm
     from prisma.config import config
 
-    if not config.llm_api_key:
-        pytest.skip(
-            "Falta la credencial del modelo (PRISMA_LLM_API_KEY): no se puede "
-            "correr el banco contra un modelo real.")
-
     proveedor = request.config.getoption("--banco-proveedor")
     modelo = request.config.getoption("--banco-modelo")
+    clave = config.clave_llm(proveedor)
+
+    if not clave:
+        pytest.skip(
+            f"Falta la credencial del modelo ({config.variable_clave_llm(proveedor)}): "
+            "no se puede correr el banco contra un modelo real.")
 
     if proveedor == "gemini":
-        return llm.ProveedorGemini(modelo, config.llm_api_key)
+        return llm.ProveedorGemini(modelo, clave)
     if proveedor == "anthropic":
-        return llm.ProveedorAnthropic(modelo, config.llm_api_key)
+        return llm.ProveedorAnthropic(modelo, clave)
     base = llm.BASE_URLS.get(proveedor)
     if not base:
         pytest.fail(f"No sé a qué dirección hablarle a '{proveedor}' (ver llm.BASE_URLS).")
-    return llm.ProveedorCompatible(modelo, config.llm_api_key, base)
+    return llm.ProveedorCompatible(modelo, clave, base)
 
 
 def _cliente_jev_real_o_falla(config, *, desde_base=None):

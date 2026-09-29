@@ -532,9 +532,13 @@ def _a_openai(mensajes: list[dict]) -> list[dict]:
     return salida
 
 
-def desde_base(cur, workspace_id: str, api_key: str) -> Proveedor:
+def desde_base(cur, workspace_id: str, claves) -> Proveedor:
     """Arma el proveedor según lo configurado, con preferencia por el ajuste
-    del espacio sobre el global."""
+    del espacio sobre el global.
+
+    `claves` es la fuente de credenciales (`Config`): la clave sale del
+    proveedor configurado y, si falta, se falla nombrando la variable; nunca
+    se usa la de otro proveedor."""
     cur.execute(
         """select proveedor, modelo, parametros from model_config
             where activo and (workspace_id = %s or ambito = 'global')
@@ -547,6 +551,12 @@ def desde_base(cur, workspace_id: str, api_key: str) -> Proveedor:
 
     proveedor = fila["proveedor"]
     parametros = fila["parametros"] or {}
+
+    api_key = claves.clave_llm(proveedor)
+    if not api_key:
+        raise LookupError(
+            f"Falta {claves.variable_clave_llm(proveedor)} para el "
+            f"proveedor '{proveedor}'.")
 
     if proveedor == "gemini":
         return ProveedorGemini(fila["modelo"], api_key, parametros)
