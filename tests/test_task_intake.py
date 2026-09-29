@@ -233,7 +233,8 @@ def test_objective_callback_commits_once_dispatches_next_prompt_and_replays_iner
     conn.commit()
 
     assert summary == {
-        "enviados": 1, "pospuestos": 0, "fallidos": 0, "descartados": 0}
+        "enviados": 1, "pospuestos": 0, "fallidos": 0, "descartados": 0,
+        "retenidos": 0}
     assert len(transport.enviados) == 1
     assert {button.etiqueta for button in transport.enviados[0].botones} == {
         con_icono("Para mí", ICONO_TAREA), con_icono("Sam North 1", ICONO_TAREA),

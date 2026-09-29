@@ -455,6 +455,50 @@ def ver_eleccion_abierta(cur: psycopg.Cursor, quien: Solicitante, chat_id: int,
     return buscar(cur, str(f["id"])) if f else None
 
 
+# Los tres tipos de rama que viven en `pending_action` (T9-R1d-2). Las preguntas
+# del alta guiada (`ingreso_tareas.open_intake_question`) son otra clase de fila.
+RAMA_DATO = "dato"                # la Modificación que pide un dato por escrito
+RAMA_ELECCION = "eleccion"        # la elección con botones que Prisma pidió
+RAMA_VISTA_PREVIA = "vista_previa"  # la vista previa del cambio que ella pidió
+
+
+@dataclass(frozen=True)
+class RamaAbierta:
+    """La rama abierta de una persona en un chat, de las que viven en
+    `pending_action`: `tipo` (`RAMA_*`), su `id` (la fila de `pending_action`) y
+    lo que la describe, en `modificacion` (`RAMA_DATO`) o `pendiente` (los
+    otros dos)."""
+    tipo: str
+    id: str
+    modificacion: ModificacionAbierta | None = None
+    pendiente: Pendiente | None = None
+
+
+def ver_rama_abierta(cur: psycopg.Cursor, quien: Solicitante, chat_id: int,
+                     ahora: datetime, herramientas) -> RamaAbierta | None:
+    """La rama abierta de esta persona en este chat, sin consumirla, de las que
+    viven en `pending_action`, con la precedencia de la conversación: primero el
+    dato o la corrección que se pidió por escrito, después la elección y por
+    último la vista previa (ver `gateway._ver_pregunta_abierta`). Es la única
+    definición de "rama abierta" de estos tres tipos: la comparten el turno de la
+    conversación y la retención de lo que Prisma inicia
+    (`despachador.despachar`, T9-R1d-2), así que no pueden discrepar.
+
+    Cada tipo tiene su vencimiento (el de siempre): la ventana de Modificar
+    (`VENTANA_MODIFICACION`) para el dato, y `vence_en` de la fila para la
+    elección y la vista previa."""
+    abierta = ver_modificacion_abierta(cur, quien, chat_id, ahora)
+    if abierta is not None:
+        return RamaAbierta(RAMA_DATO, abierta.pregunta_id, modificacion=abierta)
+    eleccion = ver_eleccion_abierta(cur, quien, chat_id, ahora)
+    if eleccion is not None:
+        return RamaAbierta(RAMA_ELECCION, eleccion.id, pendiente=eleccion)
+    vista = ver_vista_previa_abierta(cur, quien, chat_id, ahora, herramientas)
+    if vista is not None:
+        return RamaAbierta(RAMA_VISTA_PREVIA, vista.id, pendiente=vista)
+    return None
+
+
 def opcion_escrita(cur: psycopg.Cursor, pending_action_id: str, texto: str, *,
                    nombres: dict[str, str] | None = None) -> Opcion | None:
     """La única opción activa de una elección que `texto` dice exactamente, o

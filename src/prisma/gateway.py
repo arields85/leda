@@ -1544,25 +1544,25 @@ def _ver_pregunta_abierta(cur, quien, chat_id: int, ahora, *, alta: bool):
                 pregunta_id=pregunta["id"],
                 herramienta=_SENTINEL_DE_ALTA[pregunta["tipo"]], args=args,
                 resumen=pregunta["resumen"])
-    abierta = P.ver_modificacion_abierta(cur, quien, chat_id, ahora)
-    if abierta is not None:
-        return abierta
-    eleccion = P.ver_eleccion_abierta(cur, quien, chat_id, ahora)
-    if eleccion is not None:
-        return P.ModificacionAbierta(
-            pregunta_id=eleccion.id, herramienta=_SENTINEL_ELECCION,
-            args={"herramienta": eleccion.herramienta,
-                  "argumentos": eleccion.args, "campo": eleccion.campo,
-                  "opciones": [etiqueta_sin_icono(o.etiqueta)
-                               for o in eleccion.opciones]},
-            resumen=eleccion.resumen)
-    vista = P.ver_vista_previa_abierta(cur, quien, chat_id, ahora, H.REGISTRO)
-    if vista is None:
+    rama = P.ver_rama_abierta(cur, quien, chat_id, ahora, H.REGISTRO)
+    if rama is None:
         return None
+    if rama.tipo == P.RAMA_DATO:
+        return rama.modificacion
+    pendiente = rama.pendiente
+    if rama.tipo == P.RAMA_ELECCION:
+        return P.ModificacionAbierta(
+            pregunta_id=pendiente.id, herramienta=_SENTINEL_ELECCION,
+            args={"herramienta": pendiente.herramienta,
+                  "argumentos": pendiente.args, "campo": pendiente.campo,
+                  "opciones": [etiqueta_sin_icono(o.etiqueta)
+                               for o in pendiente.opciones]},
+            resumen=pendiente.resumen)
     return P.ModificacionAbierta(
-        pregunta_id=vista.id, herramienta=_SENTINEL_VISTA_PREVIA,
-        args={"herramienta": vista.herramienta, "argumentos": vista.args},
-        resumen=vista.resumen)
+        pregunta_id=pendiente.id, herramienta=_SENTINEL_VISTA_PREVIA,
+        args={"herramienta": pendiente.herramienta,
+              "argumentos": pendiente.args},
+        resumen=pendiente.resumen)
 
 
 def _consumir_pregunta(cur, quien, abierta, ahora) -> bool:
