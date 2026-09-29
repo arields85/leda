@@ -1,6 +1,6 @@
 # Alta con correo verificado y acceso a Google (rama auxiliar)
 
-**Estado:** G0 y G1 cerradas salvo la Tanda 2 por Telegram (espera a G2d); G2a y G2b cerradas — próximo: G2b-2 (seguimientos) y G2c (ver "Cómo retomar", al final)
+**Estado:** G0 y G1 cerradas salvo la Tanda 2 por Telegram (espera a G2d); G2a, G2b y G2b-2 cerradas — próximo: G2c (ver "Cómo retomar", al final)
 **Creado:** 2026-09-27
 **Origen:** decisión del usuario, 2026-09-27; [`ADR 0010`](../../docs/decisions/0010-correo-verificado-y-google-en-el-producto.md).
 **Rama/worktree:** `auxiliar/alta-y-google`, `D:\Proyectos\Prisma-PM-worktrees\alta-y-google`.
@@ -741,7 +741,7 @@ Un worktree nuevo no trae lo que no se versiona.
     `frontera.md`); cuenta autorizada y permisos concedidos; permisos
     habilitados como dato en `workspace_setting`, separados de la
     credencial. Comando `python -m prisma google recifrar` (rotación).
-  - [ ] **G2b-2 — Seguimientos de la revisión de G2b.** (1) R4: la marca
+  - [x] **G2b-2 — Seguimientos de la revisión de G2b.** (`1d3ede6`, 2026-09-29) (1) R4: la marca
     de reautorización compara la credencial que se usó (compare-and-set)
     para que un `invalid_grant` tardío no invalide una credencial recién
     reautorizada; (2) R3: `google recifrar` informa las credenciales que
@@ -1185,6 +1185,29 @@ por commit, igual que en `main`. Nunca push sin pedido explícito del usuario.
   lentes; **aprobada** y acusada (`review-b78c81ec367b0d93`, autoridad
   consumida). Frontera revisada: `62421a9`. Hallazgos no bloqueantes →
   G2b-2.
+- 2026-09-29: **G2b-2 cerrada** (`1d3ede6`, delegada, un escritor). `0101`
+  corregida en el lugar (nunca integrada ni aplicada a una base persistente;
+  si alguna base local la hubiera aplicado, hay que recrearla: `create or
+  replace` no cambia el tipo de retorno y dejaría la sobrecarga vieja).
+  (1) `marcar_reautorizacion_google(text, timestamptz)` compara
+  `autorizado_en` bajo el mismo candado que `guardar` y devuelve
+  `marcada`/`sin_cambio`/`credencial_cambio`; (2) `google recifrar` informa
+  las credenciales que cambiaron durante la rotación y sale con 1; (3)
+  etapa propia `google_config_invalida` con
+  `alta_correo.registrar_config_invalida` público; (4) `ESTADOS` validado
+  (`EstadoDesconocido`), conexión de `recifrar` cerrada siempre, `truncate`
+  de `prisma_admin` conservado porque la limpieza de las pruebas
+  (`truncate workspace … cascade` como `prisma_admin`) falla sin él. RED:
+  `32 failed, 39 passed`. GREEN: `pytest -q tests/test_google_credenciales.py
+  tests/test_google_cifrado.py tests/test_alta_correo.py` → `171 passed`;
+  `tests/test_capacidades.py tests/test_task_intake.py` → `87 passed`;
+  suite completa → `1667 passed, 129 deselected`; repetido por la sesión
+  principal: `tests/test_google_credenciales.py` → `71 passed`.
+  RDD: riesgo alto, rango `62421a9..1d3ede6` (533 líneas); consentimiento
+  concedido por el usuario; cuatro lentes; **aprobada** y acusada
+  (`review-9dd8d687fc19c86f`, autoridad consumida). Frontera revisada:
+  `1d3ede6`. Seguimientos menores → G2c (ver "Seguimientos de la revisión
+  de G2b-2").
 - Dependencia registrada: el hecho "bienvenida entregada" de G1 queda como
   evento propio para que la unidad de saludo diario de `main` (pack 06)
   pueda contarlo como saludo del día.
@@ -1216,8 +1239,8 @@ En el worktree `D:\Proyectos\Prisma-PM-worktrees\alta-y-google`, rama
 ## Cómo retomar (punto exacto, actualizado el 2026-09-29)
 
 **Estado de la rama.** `auxiliar/alta-y-google`, rebasada sobre `main`
-(`a667170`, 2026-09-29); último commit de código `62421a9`; árbol limpio.
-Suite completa (en `62421a9`): `1658 passed, 129 deselected`. Respaldos:
+(`a667170`, 2026-09-29); último commit de código `1d3ede6`; árbol limpio.
+Suite completa (en `1d3ede6`): `1667 passed, 129 deselected`. Respaldos:
 `auxiliar/alta-y-google-pre-unificacion`,
 `auxiliar/alta-y-google-unificada-un-commit` y
 `auxiliar/alta-y-google-pre-rebase-0929`.
@@ -1226,7 +1249,8 @@ Suite completa (en `62421a9`): `1658 passed, 129 deselected`. Respaldos:
 avisos al administrador unificados con el canal de `main`, "Habilitar un
 nuevo intento", textos aprobados, Tanda 1); G2a (cifrado con rotación,
 `google clave-nueva`, `cryptography`); G2b (tabla `0101`, eventos,
-funciones, `google recifrar`). Frontera revisada por RDD: `62421a9`.
+funciones, `google recifrar`); G2b-2 (seguimientos de su revisión).
+Frontera revisada por RDD: `1d3ede6`.
 
 **Pendiente de G1.** Sólo la Tanda 2 por Telegram real: necesita el envío
 real de Gmail (G2d).
@@ -1250,9 +1274,9 @@ y clave en `PRISMA_CLAVE_CREDENCIALES`; permisos `gmail.send` y
    genera) y guardarla en el `.env`.
 4. Ya hecho: `PRISMA_BOT_TOKEN_ADMIN` en el `.env` del worktree.
 
-**Primer paso concreto de la próxima sesión.** G2b-2 (seguimientos de la
-revisión de G2b; `0101` todavía no se integró, así que se corrige en el
-lugar), después G2c y G2d, según "Tareas". Rebasar sobre `main` al cerrar
+**Primer paso concreto de la próxima sesión.** G2c (autorización local),
+con los seguimientos de la revisión de G2b-2, y después G2d, según
+"Tareas". Rebasar sobre `main` al cerrar
 G2 (2 commits nuevos en `main` al 2026-09-29, sin migraciones).
 
 **Seguimientos menores anotados.** `null` JSON en la configuración tratado
@@ -1270,6 +1294,20 @@ simultánea; varios mensajes del alta con correo no pasan
   saludos. Depende del reintento del despachador (de `main`); no probado.
   Decidir al integrar.
 - R3 (fecha local en la prueba del saludo): corregido en `6804939`.
+
+**Seguimientos de la revisión de G2b-2** (no bloqueantes,
+`review-9dd8d687fc19c86f`; van con G2c):
+- R3-002/R2-004: `google.credenciales` importa `alta_correo` al cargarse;
+  cuando G2d haga que el alta envíe por Gmail puede quedar un import
+  circular. Mover `registrar_config_invalida` a un módulo neutro.
+- R2-002: el mismo dato se llama `autorizado_en` (SQL) y `autorizada_en`
+  (Python); unificar.
+- R2-003/R3-003: `marcar_reautorizacion` no valida el valor que devuelve la
+  base contra sus tres constantes; fallar cerrado como `estado()`.
+- R3-004: en `google recifrar`, si el `rollback` falla tapa el error
+  original.
+- R4-001/R3-001: `0101` corregida en el lugar; una base que ya la hubiera
+  aplicado debe recrearse (anotado en "Progreso").
 
 **Hallazgos para la sesión principal de `main`.** `anthropic>=0.40` sin
 techo en `pyproject.toml`; `app_user.nombre` acepta `''` y el importador no
