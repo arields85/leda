@@ -305,7 +305,7 @@ gestión.
       botones al volver a mostrarla; probar la guarda de un turno con una elección
       (`NecesitaElegir`) primero; que la siembra de la aclaración del banco no copie a
       mano el estado interno de `_preguntar_por_botones`.
-  - [ ] **T9-R1c-3 — Modificar en la vista previa del alta** (precisión del ADR 0005
+  - [x] **T9-R1c-3 — Modificar en la vista previa del alta** (precisión del ADR 0005
     decisión 1, decisión del usuario del 2026-09-29). La vista previa del borrador pasa
     a **[Confirmar] [Modificar] [Cancelar]**; Modificar pregunta qué dato cambiar (un
     botón por dato); un dato de texto muestra lo escrito en un bloque copiable (y
@@ -317,6 +317,15 @@ gestión.
     se retiene contra su propia rama; que el conteo de `retenidos` respete el vencimiento
     y el bloqueo de las filas (y que lo vencido de alguien retenido se descarte igual);
     un reloj único en la prueba del toque; y la prueba del aprobador sin nombre legible.
+  - [ ] **T9-R1c-3b — Ajustes de Modificar en el alta.** La vista previa que sigue a
+    Modificar, cuando quien pide es quien confirma, sale como respuesta (hoy es un mensaje
+    que inicia Prisma y queda sujeto a horario, tope diario y retención: fuera de horario la
+    persona no recibiría el resumen corregido); botón [Volver al resumen] en el selector
+    (hoy salir sólo se puede cancelando el borrador); la fecha objetivo se muestra en
+    formato de la persona, no ISO; al repreguntar un campo tras una charla vuelve el bloque
+    copiable; y los seguimientos de `review-8563632f45a44f88` (campo sin fila en
+    `_ask_field_change`; un solo reloj en el conteo de `retenidos`). Pendiente de
+    decisión del usuario: Modificar cuando confirma otra persona.
   - [ ] **T9-R2 — Cada mensaje recibe exactamente una respuesta visible** (H15, H19).
     Ojo: desde `3255418` cada toque deja una fila de `inbound_message` sin texto (para
     medir la actividad); el control de una respuesta por mensaje tiene que contemplarlas.
@@ -4626,3 +4635,18 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   `review-3ebe127d376a4d18` **aprobada y reconocida**; frontera en `3255418`. Con esto
   T9-R1d queda completo. El usuario dio consentimiento permanente para las revisiones
   ("aprobar de ahora en adelante las revisiones de forma automática").
+
+- 2026-09-29: **T9-R1c-3.** Ruta: delegada, un escritor. `7bd7c0e`: el transporte manda un
+  bloque copiable (entidad `pre` al final del mensaje, desplazamientos en UTF-16) y un
+  botón `copy_text` cuando el valor entra en 256; migración `0020_bloque_copiable`
+  (`message_outbox.bloque_copiable`, con rollback; **pendiente de aplicar en la base local**:
+  `escuchar` y `servir` no arrancan sin ella). `5f232b9`: la vista previa del borrador tiene
+  [Confirmar] [Modificar] [Cancelar] cuando quien pide es quien confirma; Modificar (o
+  `corrige` escrito) abre el selector de 7 datos; un dato de texto muestra lo escrito en el
+  bloque copiable y reemplaza sólo ese dato; uno con opciones vuelve a sus botones; vuelve
+  la vista previa actualizada; sólo Confirmar convierte (guarda: un token `modificar` nunca
+  convierte). `a96f77d`: `retenidos` cuenta sólo lo realmente retenido y lo vencido de
+  alguien retenido se descarta igual. `820c403`: familia `b-0025`. Suite del escritor 1784
+  passed, 243 deselected; padre: enfocadas 69 passed. RDD: tramo `3255418..126839f` medio,
+  2078 líneas, `review-8563632f45a44f88` **aprobada y reconocida** (consentimiento
+  permanente); frontera en `126839f`. Banco real `b-0025` y `b-0022-f` (n=3): **12/12**.
