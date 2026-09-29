@@ -285,7 +285,7 @@ gestión.
       `destrabar`, `informar_bloqueo`, `adjuntar_evidencia` y `pedir_cambios` (que sus
       argumentos lleven el id que la guarda compara), y la guarda al retomar tras botones
       de aclaración.
-    - [ ] **T9-R1d-1c** — la aclaración con botones ("¿A cuál te referís?", elección de
+    - [x] **T9-R1d-1c** — la aclaración con botones ("¿A cuál te referís?", elección de
       herramienta con `campo`) también es rama, y un turno nunca abre dos cosas: si una
       llamada a herramienta abre una pregunta (elección o vista previa), el turno termina
       ahí (banco `b-0023`: el responder abrió la aclaración y además la vista previa en el
@@ -293,7 +293,11 @@ gestión.
       que la vista previa no entra con botones, y de las vistas previas armadas desde el
       menú (y con `bloqueo_id`).
     - [ ] **T9-R1d-2** — retención de los mensajes que inicia Prisma mientras la persona
-      tiene una rama abierta, hasta que vence la pregunta.
+      tiene una rama abierta, hasta que vence la pregunta. Más los seguimientos de
+      `review-faccc0e9d83561b3`: controlar que una elección sin prefijo entre con sus
+      botones al volver a mostrarla; probar la guarda de un turno con una elección
+      (`NecesitaElegir`) primero; que la siembra de la aclaración del banco no copie a
+      mano el estado interno de `_preguntar_por_botones`.
   - [ ] **T9-R1c-3 — Modificar en la vista previa del alta** (precisión del ADR 0005
     decisión 1, decisión del usuario del 2026-09-29). La vista previa del borrador pasa
     a **[Confirmar] [Modificar] [Cancelar]**; Modificar pregunta qué dato cambiar (un
@@ -4565,3 +4569,19 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   el responder llamó a `registrar_bloqueo` con el título como id (abrió la aclaración "¿A
   cuál te referís?") y siguió hasta armar la vista previa; la aclaración no era rama y el
   mensaje siguiente pasó de largo con dos cosas abiertas (T9-R1d-1c).
+
+- 2026-09-29: **T9-R1d-1c.** Ruta: delegada, un escritor. El escritor corrigió el
+  diagnóstico del padre: en `b-0023` el primer turno sólo abrió la aclaración "¿A cuál te
+  referís?" (Jev dejó la referencia ambigua); el segundo mensaje pasó de largo porque esa
+  aclaración no era rama. `4ab92a8`: un turno termina en la primera pregunta que abre (una
+  llamada posterior que escribe o pregunta se rechaza antes de ejecutarse; las lecturas
+  siguen). `d398e4d`: si el aviso y la vista previa no entran juntos, salen en dos partes.
+  `9e0d82a`: la elección con botones que pidió Prisma (aclaración, elección de la otra
+  tarea de una dependencia, elección de herramienta) es rama; las ofertas de navegación
+  (listas, menú de una tarea, `ofrecer_opciones`) no. `21884dd`: siembra de la pregunta
+  abierta en el banco y familia `b-0024`. Suite del escritor 1680 passed, 234 deselected;
+  padre: enfocadas 187 passed. RDD: tramo `487bff9..21884dd` medio, 2339 líneas,
+  consentida, `review-faccc0e9d83561b3` **aprobada y reconocida**; frontera en `21884dd`.
+  Banco real `b-0023`/`b-0024` (n=3): **18/21**; las 3 fallas son de redacción (tras
+  "Dejarlo y ver lo otro" la consulta se responde, pero resume sin nombrar las tareas en el
+  texto; R3-H7, T10).
