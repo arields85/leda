@@ -91,6 +91,50 @@ def test_grabacion_json_es_serializable_y_recargable():
     assert r2.texto == "Tenés dos tareas."
 
 
+def test_grabador_conserva_la_ruta_que_fallo_y_su_error():
+    """El ruteo que falla también queda en la grabación (banco b-0022: un
+    `RoutingError` 3/3 sin ninguna huella de qué ruta lo causó): la entrada,
+    la pregunta pendiente y el error, y la excepción sigue su camino."""
+    from prisma.llm import RouteEnvelope, RoutingError
+
+    sobre_malo = RouteEnvelope(calls=(Llamada("c", "route_intent", {
+        "action": "normal_conversation"}),))   # falta `respecto_pendiente`
+    interno = ProveedorGuionado(guion=[], rutas=[sobre_malo])
+    g = ProveedorGrabador(interno)
+
+    with pytest.raises(RoutingError):
+        g.route_intent("objetivo simulado", pendiente="¿Cuál es el objetivo?")
+
+    assert len(g.rutas) == 1
+    registro = g.rutas[0]
+    assert registro["entrada"] == "objetivo simulado"
+    assert registro["pendiente"] == "¿Cuál es el objetivo?"
+    assert registro["error"].startswith("RoutingError: ")
+    assert "respecto_pendiente" in registro["error"]
+    assert "salida" not in registro and registro["latencia_s"] >= 0
+
+
+def test_replay_de_una_ruta_fallida_vuelve_a_fallar_en_su_lugar():
+    """Una grabación con un intento fallido y su reintento exitoso se
+    reproduce en el mismo orden: falla y después responde."""
+    import json
+
+    from prisma.llm import RoutingError
+
+    grabacion = json.loads(json.dumps({"rutas": [
+        {"entrada": "x", "error": "RoutingError: Malformed router payload.",
+         "latencia_s": 0.1},
+        {"entrada": "x", "salida": {"action": "normal_conversation",
+                                    "task": {}}, "latencia_s": 0.1}],
+        "respuestas": []}))
+
+    guionado = guionado_desde_grabacion(grabacion)
+
+    with pytest.raises(RoutingError):
+        guionado.route_intent("x")
+    assert guionado.route_intent("x").action is IntentAction.NORMAL_CONVERSATION
+
+
 def test_grabacion_json_redondea_trabajos_y_personas():
     interno = ProveedorGuionado(
         guion=[],

@@ -253,7 +253,14 @@ class RouteEnvelope:
         if any(not isinstance(value, str) for value in task.values()):
             raise RoutingError("Task proposals must be strings.")
         if action is IntentAction.NORMAL_CONVERSATION and task:
-            raise RoutingError("Normal conversation cannot contain task proposals.")
+            if not con_pendiente:
+                raise RoutingError(
+                    "Normal conversation cannot contain task proposals.")
+            # Con una pregunta pendiente la decisión es `respecto_pendiente`;
+            # un mensaje que responde con algo que parece el título de una
+            # tarea deja propuestas de más (banco b-0022). `normal_conversation`
+            # no crea nada: se descartan en vez de perder la decisión válida.
+            task = {}
         trabajos = _referencias_o_vacio(payload.get("trabajos", []))
         personas = _referencias_o_vacio(payload.get("personas", []))
         respecto = None

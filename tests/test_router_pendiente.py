@@ -202,3 +202,56 @@ def test_el_guionado_sin_pendiente_no_agrega_el_campo():
 
     assert proveedor.route_intent("hola").respecto_pendiente is None
     assert proveedor.pendientes == [None]
+
+
+# Un mensaje que responde a una pregunta pendiente puede parecer el título de
+# una tarea ("Objetivo simulado de Cablear tablero…"): el modelo lo ruteó como
+# `normal_conversation` con propuestas de tarea (banco b-0022, RoutingError).
+# Con la pregunta pendiente la decisión es `respecto_pendiente`; las propuestas
+# que sobran no tiran abajo la ruta.
+PAYLOAD_CON_PROPUESTAS_SOBRANTES = {
+    "action": "normal_conversation", "respecto_pendiente": "responde",
+    "trabajos": ["cablear tablero"],
+    "task": {"title": "Cablear tablero", "objective": "Objetivo simulado"}}
+
+
+@pytest.mark.parametrize("adapter", ADAPTADORES)
+def test_con_pendiente_las_propuestas_sobrantes_de_una_conversacion_se_descartan(
+        adapter):
+    proveedor = _proveedor(adapter, dict(PAYLOAD_CON_PROPUESTAS_SOBRANTES), [])
+
+    route = proveedor.route_intent("objetivo simulado", pendiente=PENDIENTE)
+
+    assert route.action is IntentAction.NORMAL_CONVERSATION
+    assert route.respecto_pendiente is RespectoPendiente.RESPONDE
+    assert route.task == {}
+    assert route.trabajos == ("cablear tablero",)
+
+
+@pytest.mark.parametrize("adapter", ADAPTADORES)
+def test_sin_pendiente_una_conversacion_con_propuestas_sigue_rechazada(adapter):
+    payload = dict(PAYLOAD_CON_PROPUESTAS_SOBRANTES)
+    del payload["respecto_pendiente"]
+    proveedor = _proveedor(adapter, payload, [])
+
+    with pytest.raises(RoutingError):
+        proveedor.route_intent("objetivo simulado")
+
+
+def test_con_pendiente_las_propuestas_malformadas_siguen_rechazadas():
+    for task in ({"campo_inventado": "x"}, {"title": 3}):
+        sobre = RouteEnvelope(calls=(Llamada("c", "route_intent", {
+            "action": "normal_conversation", "respecto_pendiente": "responde",
+            "task": task}),))
+        with pytest.raises(RoutingError):
+            sobre.validate(con_pendiente=True)
+
+
+def test_con_pendiente_una_accion_de_tarea_conserva_sus_propuestas():
+    sobre = RouteEnvelope(calls=(Llamada("c", "route_intent", {
+        "action": "start_task_intake", "respecto_pendiente": "otro_tema",
+        "task": {"title": "Cablear tablero"}}),))
+
+    route = sobre.validate(con_pendiente=True)
+
+    assert route.task == {"title": "Cablear tablero"}

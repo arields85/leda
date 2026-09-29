@@ -26,7 +26,8 @@ from prisma.agente import DISCULPA
 from prisma.db import admin
 from prisma.jev import ClienteJevGuionado
 from prisma.llm import (IntentAction, IntentRoute, Llamada, Proveedor,
-                        ProveedorGuionado, RespectoPendiente, Respuesta)
+                        ProveedorGuionado, RespectoPendiente, Respuesta,
+                        RouteEnvelope)
 from prisma.salida import etiquetas_coinciden
 
 # 'objective', 'evidence' y 'approval' se agregaron en T4 (banco-conversacional
@@ -135,13 +136,21 @@ class ProveedorGrabador:
     def route_intent(self, text: str,
                      pendiente: str | None = None) -> IntentRoute:
         inicio = time.perf_counter()
-        ruta = (self.interno.route_intent(text) if pendiente is None
-                else self.interno.route_intent(text, pendiente=pendiente))
-        latencia = time.perf_counter() - inicio
-        registro = {"entrada": text, "salida": _ruta_a_dict(ruta),
-                    "latencia_s": latencia}
+        registro: dict = {"entrada": text}
         if pendiente is not None:
             registro["pendiente"] = pendiente
+        try:
+            ruta = (self.interno.route_intent(text) if pendiente is None
+                    else self.interno.route_intent(text, pendiente=pendiente))
+        except Exception as exc:
+            # El intento que falló también queda: sin él, un `RoutingError` no
+            # deja ninguna huella de qué ruta lo causó (banco b-0022).
+            registro["error"] = f"{type(exc).__name__}: {exc}"
+            registro["latencia_s"] = time.perf_counter() - inicio
+            self.rutas.append(registro)
+            raise
+        registro["salida"] = _ruta_a_dict(ruta)
+        registro["latencia_s"] = time.perf_counter() - inicio
         self.rutas.append(registro)
         return ruta
 
@@ -161,7 +170,10 @@ def guionado_desde_grabacion(grabacion: dict) -> ProveedorGuionado:
     """Reconstruye un `ProveedorGuionado` desde el JSON de una grabación
     (`ProveedorGrabador.a_json()`, ya redondeado por un `json.dumps`/`loads`
     o leído de un archivo de replay)."""
-    rutas = [_dict_a_ruta(r["salida"]) for r in grabacion.get("rutas", [])]
+    # Un intento que falló (`error`, sin `salida`) se reproduce como un sobre
+    # vacío: falla al validar, en el mismo lugar, y el reintento sigue.
+    rutas = [_dict_a_ruta(r["salida"]) if "salida" in r else RouteEnvelope()
+             for r in grabacion.get("rutas", [])]
     guion = [_dict_a_respuesta(r["salida"]) for r in grabacion.get("respuestas", [])]
     return ProveedorGuionado(guion=guion, rutas=rutas)
 
