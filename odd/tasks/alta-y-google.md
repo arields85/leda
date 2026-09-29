@@ -723,7 +723,37 @@ Un worktree nuevo no trae lo que no se versiona.
     espera a G2 (C4).
 - [ ] **G2 — Credencial de Google por espacio.** Tabla dedicada sin
   privilegios de `prisma_app` (patrón `acceso_tablero`), cifrado en reposo,
-  flujo OAuth mínimo. Depende de las decisiones abiertas 1, 4 y 6.
+  flujo OAuth mínimo. Decisiones 1, 2, 3, 4 y 6 resueltas (ver "Decisiones
+  del usuario para G2"). Todo con dobles, sin red, apagado por defecto.
+  - [ ] **G2a — Cifrado de credenciales.** `src/prisma/google/cifrado.py`:
+    `MultiFernet` desde `PRISMA_CLAVE_CREDENCIALES` (varias claves separadas
+    por coma; la primera cifra, todas descifran); errores tipados para clave
+    ausente, clave inválida y dato que ninguna clave descifra; nunca devuelve
+    ni guarda texto sin cifrar. Comando `python -m prisma google clave-nueva`
+    que imprime una clave nueva para copiar al `.env` (no escribe archivos).
+    `cryptography` en `pyproject.toml` (toque listado para la integración).
+  - [ ] **G2b — Tabla, eventos y funciones.** Migración
+    `0101_credencial_google.sql` + rollback + `esquema.sql`: tabla dedicada
+    con `workspace_id` y RLS forzado, sin ningún privilegio de `prisma_app`;
+    acceso sólo por funciones `security definer` con propietario explícito
+    verificado (patrón `acceso_tablero`); estados sin autorizar → vigente →
+    requiere reautorización / revocada proyectados por eventos (regla 4 de
+    `frontera.md`); cuenta autorizada y permisos concedidos; permisos
+    habilitados como dato en `workspace_setting`, separados de la
+    credencial. Comando `python -m prisma google recifrar` (rotación).
+  - [ ] **G2c — Autorización local.** `python -m prisma google autorizar
+    <espacio>`: OAuth de escritorio con redirección a la propia máquina,
+    PKCE S256 y `state`; permisos `openid email gmail.send calendar.events`;
+    canje del código; cuenta autorizada tomada de la identidad; permiso
+    insuficiente → no guarda y lo dice; guarda cifrado. Cliente OAuth en
+    `PRISMA_GOOGLE_CLIENT_ID` / `PRISMA_GOOGLE_CLIENT_SECRET`.
+  - [ ] **G2d — Renovación y envío por Gmail.** Renovación del token;
+    `invalid_grant` → requiere reautorización + aviso al administrador +
+    incidente; sin clave, API deshabilitada o permiso insuficiente → no
+    opera + incidente; las cinco puertas de `02` §2 antes de ofrecer una
+    operación. Adaptador Gmail que implementa `EnvioCorreo` y reemplaza a
+    `obtener_emisor_configurado` (hoy `None`). Puerto nuevo en
+    `docs/architecture/frontera.md`.
 - [ ] **G3 — Lectura de Calendar.** Consultar agenda por rango, calendario y
   zona, sin inventar disponibilidad ni ampliar la consulta.
 - [ ] **G4 — Crear/modificar evento con vista previa y confirmación.**
@@ -916,6 +946,16 @@ ficticios, una interacción por vez; el primer defecto detiene el lote.
   vez). Leer Gmail no se pide (la verificación por respuesta quedó fuera por
   ADR 0010).
 
+- **Identidad de la cuenta autorizada (2026-09-29): se piden también
+  `openid` y `email`.** Sirven sólo para registrar qué cuenta de Google se
+  autorizó y detectar una cuenta equivocada; no dan acceso al correo.
+
+- **Cómo se habla con Google (decisión técnica, 2026-09-29, sin consulta):
+  OAuth y Gmail por REST con `httpx`, que ya es dependencia.** No se suman
+  bibliotecas de Google (`google-auth`, `google-api-python-client`): la única
+  dependencia nueva de G2 sigue siendo `cryptography` (decisión 6). Los
+  dobles de prueba reemplazan el transporte HTTP; ninguna prueba toca la red.
+
 ### Textos del alta con correo aprobados por el usuario (2026-09-28)
 
 Regla general aprobada: ningún mensaje termina en "escribime y lo vemos" ni
@@ -1002,7 +1042,7 @@ los mismos archivos.
 |---|---|---|
 | G0 | inline (matriz, sin código) | — |
 | G1 | delegada, un escritor | `alta_correo.py`, `onboarding.py`, `esquema.sql`, migración/rollback, pruebas |
-| G2 | delegada, un escritor | `google/credenciales.py`, `esquema.sql`, migración/rollback, pruebas |
+| G2 | delegada, un escritor por unidad (G2a-G2d, en serie) | G2a: `google/cifrado.py`, `cli.py`, `pyproject.toml`, pruebas; G2b: `google/credenciales.py`, `esquema.sql`, migración/rollback, pruebas; G2c: `google/oauth.py`, `cli.py`, pruebas; G2d: `google/correo.py`, `alta_correo_flujo.py`, `frontera.md`, pruebas |
 | G3 | delegada, un escritor | `google/calendario_externo.py`, `herramientas.py`, pruebas |
 | G4 | delegada, un escritor | `google/calendario_externo.py`, `herramientas.py`, `gateway.py`, esquema, pruebas |
 | G5 | delegada, un escritor | `google/`, `herramientas.py`, pruebas |
@@ -1143,8 +1183,9 @@ una cuenta de Google por espacio (la de Prisma); autorización por comando
 `python -m prisma google autorizar <espacio>` con redirección local;
 credencial cifrada en la aplicación con `cryptography` (Fernet con rotación)
 y clave en `PRISMA_CLAVE_CREDENCIALES`; permisos `gmail.send` y
-`calendar.events` (más, para saber qué cuenta se autorizó, las identidades
-`openid`/`email`: confirmarlo con el usuario al empezar).
+`calendar.events`, más `openid`/`email` para saber qué cuenta se autorizó
+(confirmado por el usuario el 2026-09-29). G2 partida en G2a-G2d (ver
+"Tareas").
 
 **Lo que necesita el usuario antes o durante G2.**
 1. Proyecto de Google Cloud con las APIs de Gmail y Calendar habilitadas.
