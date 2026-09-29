@@ -212,18 +212,21 @@ gestión.
     (responde, corrige, cancela, otro tema con retome, charla, dudoso, no puedo; patrón
     de "conversation repair" de los asistentes de tareas, ADR 0013), cada uno con un
     manejo determinista. Por etapas, un commit cada una:
-    - [ ] **T9-R1a — Contrato del ruteo y dato pedido desde el menú** (el caso de H17:
+    - [x] **T9-R1a — Contrato del ruteo y dato pedido desde el menú** (el caso de H17:
       evidencia, causa y resolución de bloqueo, motivo de cambios, adjuntar evidencia).
       - [x] **T9-R1a-1** — contrato del ruteo con pregunta pendiente y comandos
         responde, cancela, charla, no puedo y otro tema (corrige y dudoso vuelven a
         preguntar, interino).
-      - [ ] **T9-R1a-2** — dudoso con botones, retome "¿seguimos?" después de otro tema,
+      - [x] **T9-R1a-2** — dudoso con botones, retome "¿seguimos?" después de otro tema,
         corrige, y escenarios del banco con familias de variantes (medir el prompt).
         Seguimientos de `review-c10ae20ecdf4cfa0` (aprobada; frontera en `8c53652`): prueba
         del caso en que otro turno consumió la pregunta antes de `responde` (una sola
         respuesta); `cancela` debe mirar el resultado del consumo antes de decir "dejé de
         lado"; `reintentos` entero escrito como `2.0` debe aceptarse.
-    - [ ] **T9-R1b — Corrección abierta** (Modificar y "Ninguna, lo escribo").
+    - [ ] **T9-R1b — Corrección abierta** (Modificar y "Ninguna, lo escribo"). Incluye los
+      seguimientos de `review-dd7cd3c9cb7e8575`: el arnés del banco manda los mensajes
+      posteriores a los toques con el mismo `message_id`; falta la prueba del botón "No,
+      es otra cosa" cuando falla el ruteo.
     - [ ] **T9-R1c — Preguntas del alta guiada** (`ingreso_tareas.handle_active_text`).
   - [ ] **T9-R2 — Cada mensaje recibe exactamente una respuesta visible** (H15, H19).
     `procesar_update` sólo lee `text` (`gateway.py:213`); control estructural al cerrar
@@ -4277,3 +4280,20 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
 - 2026-09-29: **Orden de trabajo (decisión del usuario).** Primero comportamiento: T9
   (R1a-2, R1b, R1c, R2, R3, R4, H19) y T10; después T11 (cuarta ronda por Telegram). Las
   mejoras y optimizaciones (T8d y el resto) quedan para después de T11.
+
+- 2026-09-29: **T9-R1a-2 y cierre de T9-R1a.** Commit `6164554`: `dudoso` y `corrige` con
+  botones ("✅ Sí, es eso" / "✏️ No, es otra cosa", `SENTINEL_RESPUESTA_DATO_MENU`, un solo
+  uso); después de `otro_tema`, el retome "¿Seguimos con …?" con "✖️ Dejarlo" como otra parte
+  de la misma respuesta, sólo si el turno no dejó otra interacción pendiente (cuenta de filas
+  de `message_outbox` con botones y altas activas, antes y después); `cancela` ya no dice
+  "dejé de lado" si otro turno consumió la pregunta; `reintentos` acepta `2.0`. Banco: campo
+  `mensajes_tras_toques` y familia `b-0019` (saludo, charla, agradecimiento, otro pedido,
+  link, cancelación, ambiguo). Suite completa del escritor: 1344 passed, 129 deselected.
+  RDD `review-dd7cd3c9cb7e8575` (medio, una lente) aprobada y reconocida; frontera en
+  `6164554`. Banco real con deepseek (n=3): 18/21; las 3 fallas fueron el link como
+  evidencia, clasificado `dudoso` (seguro, pero con un toque de más) porque el ruteo sólo
+  veía la descripción y no la pregunta hecha. Arreglo general (`44a5bbc`): el ruteo recibe
+  la descripción más la pregunta literal (`_pendiente_para_ruteo`); TDD con una prueba nueva
+  (RED y GREEN, 124 passed en el grupo). Banco real otra vez: **21/21**; ruteo con pregunta
+  pendiente 1,1-2,5 s. Pendiente para R2: el retome es otra fila de la cola sin vínculo
+  explícito con el mensaje entrante; R2 debe contarla como parte de la misma respuesta.
