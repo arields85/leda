@@ -52,7 +52,7 @@ efectos:
 # los demás datos como estaban.
 respuesta_menciona:
   - "Título: Cablear tablero sur"
-  - "Fecha objetivo: 2030-12-30"
+  - "Fecha objetivo: 30/12/2030"
   - "Criterio de aceptación: Prueba firmada"
 respuesta_no_contiene_patron:
   - "Cablear tablero norte"

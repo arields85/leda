@@ -783,6 +783,28 @@ def modify_text_prompt(field: str, current: str) -> str:
             f"sólo eso.\n\n{current}")
 
 
+def format_due_date(value) -> str:
+    """La fecha objetivo como la lee una persona: DD/MM/AAAA. El dato se guarda
+    como fecha ISO (ya resuelta en la zona horaria del espacio, sin hora: no hay
+    nada que convertir); lo que se muestra y se pega de vuelta pasa por la
+    resolución de fechas de siempre. Lo que no es una fecha ISO se deja tal cual."""
+    try:
+        return date.fromisoformat(value).strftime("%d/%m/%Y")
+    except (TypeError, ValueError):
+        return str(value)
+
+
+def text_to_copy(cur, request_id: str, field: str) -> str:
+    """Lo que la persona tenía en un dato de texto, como se le muestra y se
+    copia. Un campo sin fila es un campo vacío: nada que copiar."""
+    cur.execute(
+        "select valor from task_intake_field where request_id = %s and campo = %s",
+        (request_id, field))
+    row = cur.fetchone()
+    current = normalize_text(_text_or_none(row["valor"] if row else None) or "")
+    return format_due_date(current) if field == "due_date" and current else current
+
+
 def _ask_field_change(cur, request, who, field, now):
     """Lo que sigue a elegir un dato en el selector de Modificar. Uno de texto
     abre su campo para que el mensaje siguiente lo reemplace (con su validación de
@@ -790,11 +812,7 @@ def _ask_field_change(cur, request, who, field, now):
     mostrar sus opciones. Cambia sólo ese dato: lo demás queda como estaba."""
     if field in CHOICE_FIELDS:
         return _open_entity_page(cur, request, who, field, None, 0, now)
-    cur.execute(
-        "select valor from task_intake_field where request_id = %s and campo = %s",
-        (request["id"], field))
-    row = cur.fetchone()      # un campo sin fila es un campo vacío: nada que copiar
-    current = normalize_text(_text_or_none(row["valor"] if row else None) or "")
+    current = text_to_copy(cur, str(request["id"]), field)
     return _open_free_text(cur, request, field, modify_text_prompt(field, current),
                            now, block=current or None)
 
@@ -1389,7 +1407,8 @@ def _finalize(cur, request, who, now):
     preview_text = render_preview(
         title=values["title"], description=values["description"],
         objective=objective["title"], area=area["name"],
-        responsible=responsible["name"], due_date=values["due_date"],
+        responsible=responsible["name"],
+        due_date=format_due_date(values["due_date"]),
         acceptance_criterion=values["acceptance_criterion"],
         evidence=list(policy["evidencia_requerida"]),
     )

@@ -2256,7 +2256,7 @@ def test_el_borrador_sembrado_en_la_corrida_se_toca_por_sus_botones(corework, co
     assert r.bloqueado is False, r.motivo_bloqueo
     # Lo que se evalúa: la vista previa que vuelve, con el dato corregido y sólo ese.
     assert "Título: Cablear tablero sur" in r.respuesta_texto
-    assert "Fecha objetivo: 2030-12-30" in r.respuesta_texto
+    assert "Fecha objetivo: 30/12/2030" in r.respuesta_texto
     assert "Cablear tablero norte" not in r.respuesta_texto
     assert _estados_de_las_vistas_previas(conn) == ["cancelada", "esperando"]
     # El banco no confirma el borrador: no hay tarea nueva.
@@ -2298,7 +2298,7 @@ def test_un_mensaje_que_corrige_la_vista_previa_lleva_al_selector_y_de_ahi_al_da
 
     assert r.bloqueado is False, r.motivo_bloqueo
     # Lo que queda abierto es la pregunta del dato, con lo que tenía para copiar.
-    assert "2030-12-30" in r.respuesta_texto
+    assert "30/12/2030" in r.respuesta_texto
     assert "Esto tenías en la fecha objetivo" in r.respuesta_texto
     assert _estados_de_las_vistas_previas(conn) == ["cancelada"]
     assert r.conteos_despues["task"] == r.conteos_antes["task"]

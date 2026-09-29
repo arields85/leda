@@ -243,7 +243,7 @@ def test_modificar_tocado_por_otra_persona_no_abre_nada(intake_world, conn,
     ("title", "Título", TITULO, "Inspect pressure valve"),
     ("acceptance_criterion", "Criterio de aceptación",
      "Signed test record attached", "Signed and photographed test record"),
-    ("due_date", "Fecha objetivo", "2028-02-29", "10/3/2028"),
+    ("due_date", "Fecha objetivo", "29/02/2028", "10/3/2028"),
 ])
 def test_un_dato_de_texto_muestra_lo_que_tenia_en_un_bloque_copiable_y_abre_su_campo(
         campo, etiqueta, actual, nuevo, intake_world, conn, monkeypatch):
@@ -272,7 +272,7 @@ def test_un_dato_de_texto_muestra_lo_que_tenia_en_un_bloque_copiable_y_abre_su_c
     ("title", "Título", TITULO, "Inspect pressure valve"),
     ("acceptance_criterion", "Criterio de aceptación",
      "Signed test record attached", "Signed and photographed test record"),
-    ("due_date", "Fecha objetivo", "2028-02-29", "10/3/2028"),
+    ("due_date", "Fecha objetivo", "29/02/2028", "10/3/2028"),
 ])
 def test_el_dato_corregido_cambia_solo_ese_dato_y_vuelve_la_vista_previa(
         campo, etiqueta, actual, nuevo, intake_world, conn, monkeypatch):
@@ -292,6 +292,9 @@ def test_el_dato_corregido_cambia_solo_ese_dato_y_vuelve_la_vista_previa(
     assert [p["estado"] for p in previews] == ["cancelada", "esperando"]
     nueva = previews[-1]
     valor = campos_despues[campo][1]
+    if campo == "due_date":
+        assert valor == "2028-03-10"                   # se guarda como fecha...
+        valor = "10/03/2028"                           # ...y se muestra en formato de persona
     assert valor != actual and str(valor) in nueva["resumen"]
     assert _etiquetas_de_la_vista_previa(conn, nueva["id"]) == [
         "Confirmar", "Modificar", "Cancelar"]
@@ -665,3 +668,33 @@ def test_un_dato_sin_fila_en_la_solicitud_no_rompe_y_pregunta_como_si_estuviera_
         cur.execute("select count(*) n from task_intake_free_text_slot "
                     "where request_id = %s and estado = 'active'", (rid,))
         assert cur.fetchone()["n"] == 1
+
+
+# ------------------------------------------- la fecha, en el formato de la persona
+
+def test_la_vista_previa_muestra_la_fecha_en_el_formato_de_la_persona_no_iso(
+        intake_world, conn):
+    rid, pid = _alta_en_confirmacion(conn, intake_world, responsable="Sam North")
+
+    with admin(conn) as cur:
+        cur.execute("select resumen from pending_action where id = %s", (pid,))
+        resumen = cur.fetchone()["resumen"]
+    assert "Fecha objetivo: 29/02/2028\n" in resumen
+    assert "2028-02-29" not in resumen
+    assert _campos(conn, rid)["due_date"][1] == "2028-02-29"     # se guarda como fecha
+
+
+def test_la_fecha_del_bloque_copiable_se_pega_de_vuelta_sin_cambiar_nada(
+        intake_world, conn, monkeypatch):
+    """Lo que la persona pega es lo que se le mostró: la resolución de fechas de
+    siempre lo entiende y la fecha guardada no cambia."""
+    rid, pid, client, user = _modificar(conn, monkeypatch, intake_world)
+    antes = _salidas(conn, user)
+    _elegir_dato(conn, client, user, rid, "Fecha objetivo")
+    bloque = _ultima_salida(conn, user, antes)["bloque_copiable"]
+    assert bloque == "29/02/2028"
+
+    _responder_con(conn, monkeypatch, intake_world, bloque)
+
+    assert _campos(conn, rid)["due_date"] == ("confirmed", "2028-02-29")
+    assert _previews(conn, rid)[-1]["estado"] == "esperando"

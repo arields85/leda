@@ -42,6 +42,6 @@ efectos:
 respuesta_menciona:
   - "qué dato querés cambiar"
   - "Esto tenías en la fecha objetivo"
-  - "2030-12-30"
+  - "30/12/2030"
 permite_borrador_de_tarea: true
 severidad: alta

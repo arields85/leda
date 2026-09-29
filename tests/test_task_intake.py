@@ -772,7 +772,7 @@ def test_preview_is_server_rendered_complete_and_transport_bounded(
         preview = cur.fetchone()["cuerpo"]
         assert I.telegram_text_length(preview) <= I.SAFE_TELEGRAM_TEXT
         for committed in ("Inspect relief valve", "Reduce service delay",
-                          "Sin descripción", "Sam North", "Field Services", "2028-02-29",
+                          "Sin descripción", "Sam North", "Field Services", "29/02/2028",
                           "Signed test record attached", "test record"):
             assert committed in preview
         cur.execute(
