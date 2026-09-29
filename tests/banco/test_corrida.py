@@ -22,6 +22,7 @@ from prisma.llm import (IntentAction, IntentRoute, Llamada, ProveedorGuionado,
                          RespectoPendiente, Respuesta)
 
 from tests.banco.comprobadores import comprobar_aclaracion
+from tests.test_aclaracion_botones import con_credencial  # noqa: F401
 from tests.banco.corrida import (
     ClienteJevGuionadoPorReferencia,
     JevGrabador,
@@ -2140,3 +2141,55 @@ def test_ejecutar_escenario_sin_preguntas_sembradas_no_siembra_nada(corework, co
     with admin(conn) as cur:
         cur.execute("select count(*) n from pending_action")
         assert cur.fetchone()["n"] == 0
+
+
+def test_la_aclaracion_sembrada_es_la_misma_fila_que_crea_el_flujo_real(
+        corework, conn, monkeypatch, con_credencial):
+    """La siembra (`_sembrar_aclaracion`) no copia a mano el estado privado de
+    `gateway._preguntar_por_botones` (review-faccc0e9d83561b3): la fila que deja
+    esperando -- herramienta, pregunta, `campo`, `args`, botones con su orden,
+    etiqueta y valor -- es la que crea el flujo real de un turno con una
+    referencia ambigua, con tareas propias y ajenas."""
+    from prisma import gateway
+    from tests.banco.corrida import _sembrar_aclaracion
+    from tests.test_aclaracion_botones import (_alcance, _con_jev, _con_proveedor,
+                                               _quien, _tarea, _tarea_resp)
+
+    ws = corework.workspace_id
+    mensaje = "avisame de lo del tablero"
+    with admin(conn) as cur:
+        _tarea(cur, ws, titulo="Programar PLC", persona="Marcos Tarquini")
+        _tarea(cur, ws, titulo="Cablear tablero máq. 3", persona="Mariano Naim")
+    conn.commit()
+    _con_jev(monkeypatch, ClienteJevGuionado(guion=[
+        {"alcance": _alcance(una_tarea=0.8),
+         "tarea": _tarea_resp({"T1": 0.5, "T2": 0.3})}]))
+    _con_proveedor(monkeypatch, rutas=[IntentRoute(
+        IntentAction.NORMAL_CONVERSATION, trabajos=("lo del tablero",))])
+
+    def _fila_esperando(cur) -> dict:
+        cur.execute(
+            """select id, herramienta, resumen, campo, args, chat_id
+                 from pending_action
+                where herramienta = %s and estado = 'esperando'""",
+            (gateway._SENTINEL_ACLARACION,))
+        (fila,) = cur.fetchall()
+        cur.execute(
+            """select etiqueta, valor from pending_action_option
+                where pending_action_id = %s order by orden""", (fila["id"],))
+        fila["opciones"] = [(o["etiqueta"], o["valor"]) for o in cur.fetchall()]
+        del fila["id"]
+        return fila
+
+    with espacio(conn, ws) as cur:
+        quien = _quien(cur, "Marcos Tarquini", ws)
+        gateway._turno(cur, quien, mensaje, ws, chat_id=2)
+        real = _fila_esperando(cur)
+        cur.execute("update pending_action set estado = 'cancelada'")
+        _sembrar_aclaracion(cur, quien, ws, 2, {
+            "mensaje": mensaje, "referencia": "lo del tablero",
+            "tareas": ["Programar PLC", "Cablear tablero máq. 3"]})
+        sembrada = _fila_esperando(cur)
+
+    assert sembrada == real
+    assert [e for e, _v in real["opciones"]][1].endswith("— Mariano")  # la ajena

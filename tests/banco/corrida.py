@@ -567,26 +567,19 @@ def _sembrar_vista_previa(cur, quien: Solicitante, ws: str, chat: int,
 
 def _sembrar_aclaracion(cur, quien: Solicitante, ws: str, chat: int,
                         aclaracion: dict) -> None:
-    """Deja esperando la aclaración con botones de una referencia ambigua
-    (`gateway._preguntar_por_botones`): una tarea por botón, en el orden dado,
-    y "Ninguna, lo escribo". `aclaracion` trae la `referencia`, las `tareas`
-    candidatas (sus títulos) y, opcional, el `mensaje` original."""
+    """Deja esperando la aclaración con botones de una referencia ambigua, la que
+    crea el turno real (`gateway._preguntar_por_botones`): su estado lo arma
+    `gateway._estado_de_aclaracion_ambigua` con las mismas piezas que el turno,
+    no una copia de su estado privado. `aclaracion` trae la `referencia`, las
+    `tareas` candidatas (sus títulos, en el orden de Jev) y, opcional, el
+    `mensaje` original."""
     faltan = [c for c in ("referencia", "tareas") if not aclaracion.get(c)]
     if faltan:
         raise LookupError(f"'aclaracion' no trae {faltan}.")
-    titulos = list(aclaracion["tareas"])
-    candidatas = [
-        {"id": _tarea_por_titulo(cur, ws, titulo), "etiqueta": etiqueta,
-         "titulo": titulo}
-        for titulo, etiqueta in zip(titulos, etiquetas_de_tarea(titulos))]
-    referencia = aclaracion["referencia"]
-    estado = {
-        "mensaje": aclaracion.get("mensaje", ""), "entrante_id": None,
-        "route_action": IntentAction.NORMAL_CONVERSATION.value, "route_task": {},
-        "resueltas": {}, "titulos_resueltas": {}, "bloque_base": "",
-        "hay_clara": False, "pendientes": [referencia],
-        "candidatas": {referencia: candidatas}, "modificacion": None,
-        "no_proponer": None}
+    ids = [_tarea_por_titulo(cur, ws, titulo) for titulo in aclaracion["tareas"]]
+    estado = gateway._estado_de_aclaracion_ambigua(
+        cur, quien, ws, aclaracion.get("mensaje", ""), aclaracion["referencia"],
+        ids)
     gateway._preguntar_por_botones(cur, quien, ws, chat,
                                    datetime.now(timezone.utc), estado)
 

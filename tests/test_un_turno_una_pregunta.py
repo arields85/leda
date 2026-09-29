@@ -202,3 +202,36 @@ def test_lo_que_abrio_una_vuelta_no_se_repite_en_la_siguiente(
     _turno(conn, ws, monkeypatch, llamadas)
 
     assert len(_pendientes(conn)) == 1
+
+
+def test_una_escritura_despues_de_una_eleccion_de_herramienta_se_rechaza(
+        corework, conn, monkeypatch):
+    """La elección que pide una herramienta (`NecesitaElegir`) también termina
+    el turno: una escritura que la sigue en la misma vuelta se rechaza antes de
+    ejecutarse (review-faccc0e9d83561b3)."""
+    from prisma import herramientas as H
+
+    ws = corework.workspace_id
+    a, _b = _dos_tareas(conn, ws)
+    ejecutadas: list[str] = []
+
+    def _ambiguo(cur, quien, nombre, args, **kw):
+        ejecutadas.append(nombre)
+        e = H.NecesitaElegir("¿En cuál tarea?", "tarea_id",
+                             [("Programar PLC", a), ("Revisar variador", _b)])
+        e.herramienta = nombre
+        raise e
+
+    monkeypatch.setattr(H, "ejecutar", _ambiguo)
+
+    r, vistos = _turno(conn, ws, monkeypatch, [
+        Llamada("c1", "actualizar_estado", {"causa": "x"}),
+        _bloqueo("c2", a)])
+
+    assert ejecutadas == ["actualizar_estado"]                  # la segunda no corrió
+    assert r.elecciones == ["actualizar_estado"] and r.confirmaciones == []
+    assert len(_pendientes(conn, "actualizar_estado")) == 1     # una sola elección
+    assert _pendientes(conn, "registrar_bloqueo") == []
+    assert _mensajes_con_botones(conn) == 1                     # un juego de botones
+    assert vistos[-1]["is_error"] is True                       # rechazo, con la verdad
+    assert _rechazos(conn, "registrar_bloqueo") == 1            # y auditado

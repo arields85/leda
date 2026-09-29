@@ -673,3 +673,39 @@ def test_ninguna_lo_escribo_sigue_siendo_la_pregunta_de_la_aclaracion_escrita(
     abierta = _abierta_de(conn, ws, e.tg)
     assert abierta.herramienta == gateway._SENTINEL_ACLARACION
     assert _ultimo_cuerpo(conn, e.tg) == gateway.PREGUNTA_ACLARACION_NINGUNA
+
+
+def test_una_eleccion_larga_vuelve_a_mostrarse_con_sus_botones_sin_fallar(
+        cliente, conn, corework, monkeypatch):
+    """La elección que entra con sus botones sólo al límite, sin el margen del
+    saludo, no puede tirar el turno al volver a mostrarse sin prefijo
+    (review-faccc0e9d83561b3): el texto entero sale primero, en partes, y la
+    elección después, con un texto corto y sus botones. Nunca un aviso solo ni
+    una respuesta vacía, ni un incidente."""
+    from prisma.salida import BUTTON_TEXT_LIMIT, telegram_utf16_units
+
+    ws = corework.workspace_id
+    e = _abrir_herramienta(conn, ws)
+    largo = ("¿En cuál tarea? " + "detalle de la elección " * 200)[:BUTTON_TEXT_LIMIT]
+    assert telegram_utf16_units(largo) <= BUTTON_TEXT_LIMIT
+    with admin(conn) as cur:
+        cur.execute("update pending_action set resumen = %s where id = %s",
+                    (largo, e.pid))
+    conn.commit()
+    _con_rutas(monkeypatch, [_ruta(RespectoPendiente.CHARLA)])
+    antes = _filas_del_chat(conn, e.tg)
+
+    _mensaje(cliente, e.tg, "hola")
+
+    assert _estado(conn, e.pid) == "esperando"
+    assert _incidentes(conn, ws) == 0
+    nuevas = _filas_del_chat(conn, e.tg)[len(antes):]
+    assert len(nuevas) >= 2
+    *partes, botones = nuevas
+    assert botones["pending_action_id"] is not None            # los botones, al final
+    assert all(p["pending_action_id"] is None for p in partes)
+    assert botones["cuerpo"].strip()                           # nunca vacío
+    texto = " ".join(p["cuerpo"].split("\n", 1)[-1] for p in partes)
+    assert "detalle de la elección" in texto                   # el texto entero salió
+    assert _tocar_opcion(cliente, conn, e.pid, "Programar PLC",
+                         e.tg).status_code == 200              # y el botón sirve

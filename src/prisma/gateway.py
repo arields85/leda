@@ -1476,6 +1476,7 @@ def _mostrar_pregunta_con_botones(cur, quien, workspace_id: str, chat_id: int,
     from datetime import timedelta
 
     from . import pendientes as P
+    from .agente import _TEXTO_BOTONES_GENERICO
 
     if not P.vista_previa_esperando(cur, abierta.pregunta_id, ahora):
         _responder(cur, workspace_id, chat_id, quien, AVISO_DATO_YA_NO_PENDIENTE,
@@ -1483,10 +1484,19 @@ def _mostrar_pregunta_con_botones(cur, quien, workspace_id: str, chat_id: int,
         return
     texto = f"{prefijo}\n\n{abierta.resumen}" if prefijo else abierta.resumen
     if prefijo and not cabe_en_mensaje(texto, has_buttons=True):
-        # Un milisegundo antes, para que salga delante de la vista previa.
+        # Dos milisegundos antes, para que salga delante de la vista previa.
         _responder(cur, workspace_id, chat_id, quien, prefijo,
-                   ahora - timedelta(milliseconds=1))
+                   ahora - timedelta(milliseconds=2))
         texto = abierta.resumen
+    if not cabe_en_mensaje(texto, has_buttons=True):
+        # Lo guardado entró con sus botones sin el margen del saludo diario y
+        # ahora ya no entra: mismo criterio que
+        # `agente._encolar_texto_con_opciones`. El texto entero sale antes, en
+        # partes, y la pregunta sigue con un texto corto y sus mismos botones.
+        # Nunca falla ni sale sin lo que la persona espera.
+        _responder(cur, workspace_id, chat_id, quien, texto,
+                   ahora - timedelta(milliseconds=1))
+        texto = _TEXTO_BOTONES_GENERICO
     enqueue_outbox(
         cur, workspace_id=workspace_id, chat_id=chat_id,
         recipient_membership_id=quien.membership_id, text=texto,
@@ -1987,6 +1997,32 @@ def _estado_inicial_aclaracion(texto: str, entrante_id: str | None, route,
             if modificacion is not None else None),
         "no_proponer": None,
     }
+
+
+def _estado_de_aclaracion_ambigua(cur, quien, workspace_id: str, texto: str,
+                                  referencia: str,
+                                  candidatas_ids: list[str]) -> dict:
+    """El estado que deja un turno cuya única referencia ambigua es `referencia`
+    (con las tareas `candidatas_ids` en el orden de Jev) y nada más resuelto,
+    armado con las mismas piezas que el turno real
+    (`_resolver_referencias_del_turno`: `_candidatas_para_botones` y
+    `_estado_inicial_aclaracion`), listo para `_preguntar_por_botones`. Lo usa
+    el banco para sembrar esa aclaración sin copiar a mano su estado privado
+    (T9-R1d-2, `tests/banco/corrida.py`)."""
+    from .jev import ResolucionReferencia, TipoResolucion
+    from .llm import IntentAction, IntentRoute
+
+    por_id = {t.id: t for t in _tareas_activas(cur, workspace_id)}
+    resolucion = ResolucionReferencia(TipoResolucion.AMBIGUA,
+                                      candidatas=tuple(candidatas_ids))
+    referencias = _ReferenciasResueltas(
+        bloque=_bloque_contexto_referencias({}, por_id), hay_clara=False,
+        pendientes_boton=((
+            referencia,
+            _candidatas_para_botones(por_id, resolucion, quien.membership_id)),))
+    return _estado_inicial_aclaracion(
+        texto, None, IntentRoute(IntentAction.NORMAL_CONVERSATION), referencias,
+        None)
 
 
 def _avanzar_aclaracion(cur, quien, workspace_id: str, chat_id: int, ahora,
