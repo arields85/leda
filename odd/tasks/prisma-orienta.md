@@ -4146,3 +4146,10 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   Latencia (T8c-2 descartada): NaN `deepseek-v4-flash` es la versión 4.1 (panel del
   usuario; mismos conteos de tokens que `deepseek/deepseek-v4.1-flash` de OpenRouter).
   Llamada simple ~1 s en NaN, ~2,5 s por OpenRouter 4.1.
+  Commit `6c3c936`; RDD: riesgo medio, bajo presupuesto (177 líneas), queda pendiente en
+  la rebanada desde `154101a`. Banco real después de T8c-1 (deepseek por NaN, n=1): 33/36
+  aprobados; en los 27 turnos que pasan por el responder, llamadas por turno de 4 a 3
+  (mediana) y tiempo del modelo por turno de 10,7 s a 7,9 s (-26 %). Falla nueva b-0016
+  (contenido): el modelo nombró las dos tareas en el texto; camino `consultar_tareas` ->
+  texto, que T8c-1 no toca, así que es variación del modelo. Además el escenario
+  contradice R3-H7 (con hasta 3 tareas el texto las nombra enteras): actualizarlo en T10.
