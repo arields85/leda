@@ -146,3 +146,39 @@ def test_desde_base_pasa_los_parametros_al_cliente(proveedor, extra):
     p = llm.desde_base(_Cur(fila), "ws", _Claves())
     assert p._c.timeout == 9
     assert p._c.max_retries == 0
+
+
+# Revisión review-a71d04658d2fc124 (R3-tiempos-sin-validar): un `timeout_s`
+# nulo desactivaría el tiempo máximo y un texto rompería el reintento. Un
+# valor inválido falla nombrando el parámetro, como una clave faltante (T8a);
+# no se reemplaza en silencio por el valor por defecto.
+@pytest.mark.parametrize("parametros, nombre", [
+    ({"timeout_s": None}, "timeout_s"),
+    ({"timeout_s": "20"}, "timeout_s"),
+    ({"timeout_s": 0}, "timeout_s"),
+    ({"timeout_s": -5}, "timeout_s"),
+    ({"timeout_s": True}, "timeout_s"),
+    ({"timeout_s": float("nan")}, "timeout_s"),
+    ({"timeout_s": float("inf")}, "timeout_s"),
+    ({"reintentos": None}, "reintentos"),
+    ({"reintentos": "2"}, "reintentos"),
+    ({"reintentos": -1}, "reintentos"),
+    ({"reintentos": 1.5}, "reintentos"),
+    ({"reintentos": False}, "reintentos"),
+])
+def test_parametros_invalidos_fallan_nombrando_el_parametro(parametros, nombre):
+    for construir in (
+        lambda: ProveedorCompatible("m", "sk-test", "https://example.invalid/v1", parametros),
+        lambda: ProveedorAnthropic("m", "sk-test", parametros),
+        lambda: ProveedorGemini("m", "sk-test", parametros),
+    ):
+        with pytest.raises(ValueError) as exc:
+            construir()
+        assert nombre in str(exc.value)
+
+
+def test_parametros_validos_explicitos_se_aceptan():
+    p = ProveedorCompatible("m", "sk-test", "https://example.invalid/v1",
+                            {"timeout_s": 7.5, "reintentos": 0})
+    assert p._c.timeout == 7.5
+    assert p._c.max_retries == 0

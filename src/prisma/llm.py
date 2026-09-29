@@ -11,6 +11,7 @@ otra clase de veinte líneas y no se toca nada más.
 from __future__ import annotations
 
 import json
+import math
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Protocol
@@ -239,8 +240,21 @@ REINTENTOS_MODELO = 2
 
 
 def _tiempos(parametros: dict) -> tuple[float, int]:
-    return (parametros.get("timeout_s", TIMEOUT_MODELO_S),
-            parametros.get("reintentos", REINTENTOS_MODELO))
+    """Valida los dos parámetros: un `timeout_s` nulo desactivaría el tiempo
+    máximo y un texto rompería el reintento. Un valor inválido falla
+    nombrando el parámetro (como una clave faltante), nunca se reemplaza en
+    silencio por el valor por defecto."""
+    timeout = parametros.get("timeout_s", TIMEOUT_MODELO_S)
+    reintentos = parametros.get("reintentos", REINTENTOS_MODELO)
+    if (isinstance(timeout, bool) or not isinstance(timeout, (int, float))
+            or not math.isfinite(timeout) or timeout <= 0):
+        raise ValueError(
+            f"timeout_s debe ser un número de segundos mayor que 0; vino {timeout!r}.")
+    if (isinstance(reintentos, bool) or not isinstance(reintentos, int)
+            or reintentos < 0):
+        raise ValueError(
+            f"reintentos debe ser un entero de 0 o más; vino {reintentos!r}.")
+    return timeout, reintentos
 
 
 class ProveedorAnthropic:
