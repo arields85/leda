@@ -271,6 +271,14 @@ gestión.
     retenidos hasta que se cierra (decisión del usuario, opción A); la retención termina
     al vencer la pregunta pendiente (a definir un vencimiento donde no lo haya). Puede
     partirse en R1d-1 (la pregunta de la rama) y R1d-2 (retención en el despacho).
+    - [ ] **T9-R1d-1a** — la pregunta de la rama para las preguntas pendientes que ya
+      pasan por `_atender_pregunta_pendiente`; "No, es otra cosa" de `dudoso`; quitar
+      el retome y `agente.NoProponer`; el borrador que espera a otro aprobador no es rama
+      de quien lo pidió; escenarios `b-0020`, `b-0021-c`, `b-0022-b` a la regla nueva.
+    - [ ] **T9-R1d-1b** — la vista previa de un cambio que la persona pidió y espera su
+      Confirmar pasa a ser rama (hoy el texto sigue el turno normal).
+    - [ ] **T9-R1d-2** — retención de los mensajes que inicia Prisma mientras la persona
+      tiene una rama abierta, hasta que vence la pregunta.
   - [ ] **T9-R1c-3 — Modificar en la vista previa del alta** (precisión del ADR 0005
     decisión 1, decisión del usuario del 2026-09-29). La vista previa del borrador pasa
     a **[Confirmar] [Modificar] [Cancelar]**; Modificar pregunta qué dato cambiar (un

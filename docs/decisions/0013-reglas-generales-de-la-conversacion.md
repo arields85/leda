@@ -97,6 +97,14 @@ casos.
    - `charla` y `no puedo` no cambian: vuelven a hacer la pregunta pendiente.
    - Una rama está abierta para quien tiene que responderla: un borrador que espera la
      confirmación de otra persona no es una rama abierta de quien lo pidió.
+   - Qué es una rama: algo que la persona empezó en ese chat y que Prisma espera de ella
+     para terminarlo. Lo son un dato pedido (el del menú, Modificar, "Ninguna, lo
+     escribo", un campo o una elección del alta), la vista previa de un cambio que ella
+     pidió y espera su Confirmar, y la propia pregunta de la rama. No lo son los botones
+     que sólo ofrecen caminos (una lista de tareas, el menú de una tarea), ni lo que
+     empezó otra persona y le llega para decidir (una aprobación que le piden): eso es
+     un mensaje que inicia Prisma, se retiene mientras ella tenga una rama abierta y
+     sigue la escalera si queda sin respuesta, pero no le impide hablar de otra cosa.
    - El retome posterior ("¿seguimos con …?") y la guarda que impedía volver a proponer
      lo pendiente durante otro tema quedan sin uso, porque el responder ya no corre con
      una pregunta abierta.
