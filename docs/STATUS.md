@@ -3,7 +3,7 @@
 **Alcance:** Prisma es un producto de gestión de proyectos multi-tenant. CoreWork es
 su primer cliente, no su definición.
 
-**Última actualización documental:** 2026-09-28.
+**Última actualización documental:** 2026-09-29.
 
 ## Resumen
 
@@ -64,8 +64,8 @@ tales. Ver [`INDEX.md`](INDEX.md#documentos-superados).
 | Campo | Valor |
 |---|---|
 | Comando | `.venv\Scripts\python.exe -m pytest -q` |
-| Fecha | 2026-09-28 |
-| Resultado exacto | 1202 passed, 108 deselected (corrida del escritor de #9b). |
+| Fecha | 2026-09-29 |
+| Resultado exacto | 1224 passed, 108 deselected (corrida del escritor de T8c-4; la reversión de T8c-3 volvió al estado de T8c-1, 1213 passed). |
 
 Seguimientos de la entrega con evidencia (T6a-T6j), siembra reproducible (T7, T7b) y
 comprobadores del banco, `odd/tasks/prisma-orienta.md`: `1008 passed, 108
@@ -219,28 +219,35 @@ fluido". Tres causas de fondo: la latencia del modelo (10-17 s por turno con
 conversación y ninguna señal al tocar botones. El circuito A quedó cortado: la nueva
 entrega después de "Pedir cambios" no volvió a revisión (R3-H20); el B no se corrió.
 
-**Próximo, en este orden (decisión del usuario, 2026-09-28):**
+**Hecho el 2026-09-28/29 (detalle y evidencia en `odd/tasks/prisma-orienta.md`, T8):**
 
-1. **Leer el manual de personalidad, voz y comportamiento** del trabajo anterior del
-   usuario, como insumo para corregir cómo responde Prisma:
-   `D:\Proyectos\PRISMA-PACK-VERACIDAD-Y-AMBIGUEDAD-20260923\PRISMA-MANUAL-PERSONALIDAD-VOZ-Y-COMPORTAMIENTO-20260928.md`.
-   Medirlo contra el corpus del repo (`nucleo/`, ADR, pruebas), no al revés.
-2. **Cambiar el modelo a uno rápido por OpenRouter** (clave ya configurada,
-   `PRISMA_OPENROUTER_API_KEY`). El usuario propone Gemini 3.8 o GPT Luna 6: listar los
-   identificadores reales con `python -m prisma modelos --proveedor openrouter`, medir
-   la latencia por llamada (ruteo y respuesta) con el banco real y elegir; objetivo menos
-   de 4 s por turno sin empeorar ningún escenario. Configurar con `python -m prisma
-   modelo <id> --proveedor openrouter`.
-3. **Estado de la conversación (críticos):** R3-H17 (un slot pendiente se traga un
+- Manual de personalidad leído y contrastado con el corpus: da criterio, no mecanismo,
+  para los críticos de estado; sus preguntas de cierre en texto abierto contradicen ADR
+  0007 (prevalece el repo); probable causa de R3-H18 en `contexto.PREAMBULO` (obliga a
+  ofrecer opciones aunque no haya opciones reales).
+- **No se cambia de modelo.** NaN `deepseek-v4-flash` es la versión 4.1 y es el más
+  rápido por llamada (~1 s aislada; ~2,5 s el mismo modelo por OpenRouter); Gemini 3.8
+  flash fue más lento y aprobó menos escenarios; GPT-6 Luna choca con la validación del
+  ruteo. La lentitud venía de las llamadas en serie de cada turno.
+- Clave por proveedor (`beda9a5`); el ciclo del responder corta cuando la vuelta deja
+  algo pendiente (`6c3c936`): turno mediano en el banco de ~12,6 s a ~9,4 s; tiempo
+  máximo de 20 s por intento con 2 reintentos (`9818354`) contra cuelgues de ~93 s de
+  NaN (~1,3 % de las llamadas). El ruteo en paralelo (ADR 0012) se probó y se revirtió
+  (`ccf5c73`): poca ganancia y más cuelgues con pedidos simultáneos.
+- Postergada (T8d): responder en un solo viaje cuando el dato ya está en el contexto.
+
+**Próximo, en este orden (decisión del usuario, 2026-09-29):**
+
+1. **Estado de la conversación (críticos, T9):** R3-H17 (un slot pendiente se traga un
    "hola" como evidencia), R3-H20 (la nueva entrega no vuelve a revisión), R3-H15 (un
    mensaje sin texto no recibe respuesta), R3-H19 (dos respuestas para un mensaje),
    R3-H18 (opciones que no se pueden cumplir), R3-H16 (el motivo de "Pedir cambios" no
    se ve), R3-H5 y R3-H13 (señal al tocar botones; doble toque en silencio).
-4. **Forma de las respuestas:** R3-H1 (aviso de incidente con explicación humana,
+2. **Forma de las respuestas (T10):** R3-H1 (aviso de incidente con explicación humana,
    formato aprobado), R3-H2 (mensaje neutro nuevo, texto aprobado), R3-H3/H7 (regla de
    lista), R3-H8 ("hola" suelto), R3-H9 ("Gracias. La tarea pasó a revisión."),
    R3-H10, R3-H11, R3-H12, R3-H14, R3-H4.
-5. **Cuarta ronda por Telegram**, en horario laboral, con los circuitos A y B.
+3. **Cuarta ronda por Telegram** (T11), en horario laboral, con los circuitos A y B.
 
 Después, sin bloquear: #23 validador de invariantes
 (`odd/tasks/validador-invariantes.md`); escenarios del banco que fallan desde antes de
