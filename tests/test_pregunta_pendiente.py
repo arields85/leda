@@ -18,7 +18,9 @@ from datetime import datetime, timezone
 import pytest
 
 from prisma import gateway
+from prisma import jev as jev_modulo
 from prisma import pendientes as P
+from prisma.jev import ClienteJevGuionado
 from prisma.db import admin, espacio
 from prisma.llm import (IntentAction, IntentRoute, Llamada, ProveedorGuionado,
                          RespectoPendiente, Respuesta, RouteEnvelope)
@@ -637,3 +639,25 @@ def test_cada_comando_deja_una_sola_respuesta_para_el_mensaje(
     _mensaje(cliente, tg, "mensaje de prueba")
 
     assert _salidas(conn, tg) == antes + filas
+
+
+def test_responder_un_dato_del_menu_no_resuelve_los_trabajos_como_referencias(
+        cliente, conn, corework, monkeypatch):
+    # T9-R1b-2 (ADR 0013 regla 1, banco b-0020): la tarea la fija la pregunta;
+    # un sustantivo del mensaje no abre una búsqueda ni una aclaración.
+    ws = corework.workspace_id
+    _tid, tg = _abrir_pregunta(cliente, conn, ws, monkeypatch, "Informar un bloqueo")
+    doble = ClienteJevGuionado(guion=[])
+    monkeypatch.setattr(jev_modulo, "desde_base", lambda api_key: doble)
+    _con_rutas(monkeypatch, [IntentRoute(
+        IntentAction.NORMAL_CONVERSATION, trabajos=("el variador roto",),
+        respecto_pendiente=RespectoPendiente.RESPONDE)])
+    antes = _salidas(conn, tg)
+
+    _mensaje(cliente, tg, "se rompió el variador")
+
+    assert doble.pedidos == []
+    fila = _vista_previa(conn, "registrar_bloqueo")
+    assert fila is not None and TITULO in fila["resumen"]     # la tarea guardada
+    assert _abiertas(conn) == 0
+    assert _salidas(conn, tg) == antes + 1

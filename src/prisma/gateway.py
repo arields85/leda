@@ -900,11 +900,24 @@ def _seguir_camino_normal(cur, quien, texto: str, route, proveedor, cal,
     # (`PRISMA_OPENROUTER_API_KEY` vacía) Prisma no adivina igual: se pide
     # aclaración como si Jev hubiera fallado (decisión del usuario,
     # 2026-09-24; ver `_resolver_referencias_del_turno`).
-    referencias = _resolver_referencias_del_turno(cur, quien, texto, route,
-                                                   workspace_id)
+    #
+    # Contestar una pregunta pendiente no abre una aclaración (T9-R1b-2, ADR
+    # 0013 regla 1, banco b-0020-b): con `modificacion` la tarea de la
+    # propuesta es el sujeto por defecto y Jev sigue resolviendo las
+    # referencias (una corrección puede cambiar de tarea), pero sólo una
+    # resolución CLARA lo cambia; una ambigua o sin resolver ("el variador
+    # roto") se ignora, sin botones ni texto.
+    referencias = _resolver_referencias_del_turno(
+        cur, quien, texto, route, workspace_id,
+        solo_claras=modificacion is not None)
 
     estado = _estado_inicial_aclaracion(texto, entrante_id, route, referencias,
                                         modificacion)
+    if retomar is not None:
+        # `otro_tema` con una pregunta abierta: el responder lo sabe (regla 1).
+        bloque = _bloque_pregunta_pendiente(_pregunta_de(retomar))
+        previo = estado["bloque_base"]
+        estado["bloque_base"] = f"{previo}\n\n{bloque}" if previo else bloque
     _avanzar_aclaracion(cur, quien, workspace_id, chat_id, ahora, proveedor, cal,
                        estado)
 
@@ -987,6 +1000,26 @@ def _para_ruteo(descripcion: str, pregunta: str) -> str:
     no veía que se había pedido un link (ADR 0013 regla 1: se interpreta
     contra la pregunta real)."""
     return f"{descripcion} (la pregunta que se le hizo fue: «{pregunta}»)"
+
+
+# Marca del bloque de contexto de confianza que el responder recibe cuando la
+# persona cambió de tema con una pregunta abierta (T9-R1b-2, ADR 0013 regla 1).
+MARCA_PREGUNTA_PENDIENTE = "# Pregunta pendiente"
+
+
+def _bloque_pregunta_pendiente(pregunta: _Pregunta) -> str:
+    """Contexto de confianza del servidor (nunca texto de la persona) para el
+    turno de `otro_tema`: sin él, el modelo veía la propuesta o el dato
+    pendiente en el historial y volvía a proponerlo por su cuenta (banco
+    b-0020-c: después de "Modificar", una consulta terminó con
+    `registrar_bloqueo` otra vez). Se agrega donde los otros bloques de
+    contexto (`contexto_referencias`), no en el `PREAMBULO`."""
+    return (
+        f"{MARCA_PREGUNTA_PENDIENTE}\n\n"
+        f"Hay una pregunta abierta para la persona: {pregunta.nombre}. Se le "
+        f"hizo así: «{pregunta.pregunta}». El sistema se la vuelve a hacer "
+        "solo cuando termines. Respondé únicamente el mensaje actual: no la "
+        "vuelvas a proponer ni ejecutes de nuevo lo que quedó pendiente.")
 
 
 def _pregunta_de(abierta) -> _Pregunta:
@@ -2314,7 +2347,9 @@ class _ReferenciasResueltas:
 
 
 def _resolver_referencias_del_turno(cur, quien, texto: str, route,
-                                    workspace_id: str) -> _ReferenciasResueltas | None:
+                                    workspace_id: str, *,
+                                    solo_claras: bool = False
+                                    ) -> _ReferenciasResueltas | None:
     """Resuelve, con Jev, cada referencia a tarea que separó `route_intent`
     contra las tareas activas del espacio (T3, `aclaracion-con-botones`).
 
@@ -2328,6 +2363,10 @@ def _resolver_referencias_del_turno(cur, quien, texto: str, route,
     una -- se le pide al modelo que pregunte, nunca que elija por su cuenta
     -- y se registra un incidente (sin secretos ni texto del mensaje) para
     que la falta de configuración quede visible.
+
+    `solo_claras` (T9-R1b-2): al contestar una pregunta pendiente sólo cuenta
+    una resolución CLARA; el resto (ambigua, varias, ninguna, Jev caído) no
+    abre botones ni deja bloque, como si la referencia no estuviera.
     """
     # T7, punto E: una referencia cuyo texto entero es sólo un estado de
     # tarea ("revisión", "en curso"...) nunca es un trabajo -- se descarta
@@ -2346,6 +2385,8 @@ def _resolver_referencias_del_turno(cur, quien, texto: str, route,
             "No hay credencial de Jev configurada."))
             for referencia in trabajos}
         _auditar_resolucion(cur, quien, workspace_id, resultados)
+        if solo_claras:
+            return None
         return _ReferenciasResueltas(
             bloque=_bloque_contexto_referencias(resultados, {}), hay_clara=False)
 
@@ -2360,6 +2401,16 @@ def _resolver_referencias_del_turno(cur, quien, texto: str, route,
         vocabulario=vocab, quien_escribe=quien.nombre)
 
     _auditar_resolucion(cur, quien, workspace_id, resultados)
+
+    if solo_claras:
+        resultados = {
+            referencia: (resolucion, error)
+            for referencia, (resolucion, error) in resultados.items()
+            if error is None
+            and resolucion.tipo is jev_modulo.TipoResolucion.CLARA
+            and resolucion.tarea_id in por_id}
+        if not resultados:
+            return None
 
     hay_clara = any(
         resolucion is not None and resolucion.tipo is jev_modulo.TipoResolucion.CLARA

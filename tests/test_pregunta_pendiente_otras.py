@@ -19,8 +19,10 @@ from datetime import datetime, timezone
 import pytest
 
 from prisma import gateway
+from prisma import jev as jev_modulo
 from prisma import pendientes as P
 from prisma.db import admin, espacio
+from prisma.jev import ClienteJevGuionado
 from prisma.llm import (IntentAction, IntentRoute, Llamada, ProveedorGuionado,
                         RespectoPendiente, Respuesta, RouteEnvelope)
 
@@ -456,3 +458,219 @@ def test_modificar_la_correccion_real_arma_la_vista_previa_nueva(
         (nueva,) = cur.fetchall()
     assert "variador" in nueva["resumen"]
     assert "propuesta anterior" in _contexto_del_agente(proveedor).lower()
+
+
+# ---------------------------------------------------------------------------
+# Contestar una pregunta pendiente no abre una búsqueda de tareas (T9-R1b-2,
+# ADR 0013 regla 1, banco b-0020-b)
+# ---------------------------------------------------------------------------
+
+SUSTANTIVO = "el variador roto"
+
+
+def _con_jev(monkeypatch, guion=()) -> ClienteJevGuionado:
+    """Un Jev guionado que registra cada pedido (`doble.pedidos`)."""
+    doble = ClienteJevGuionado(guion=list(guion))
+    monkeypatch.setattr(jev_modulo, "desde_base", lambda api_key: doble)
+    return doble
+
+
+def _alcance(**probabilidades) -> dict:
+    return {"probabilities": {"una_tarea": 0.0, "varias_tareas": 0.0,
+                              "ninguna": 0.0, **probabilidades}}
+
+
+# Lo que Jev contesta a `SUSTANTIVO`: sin tarea que coincida, o dudando entre
+# dos (T1 y T2 son las tareas activas, sea cual sea su orden).
+JEV_NINGUNA = [{"alcance": _alcance(ninguna=1.0)}]
+JEV_AMBIGUA = [{"alcance": _alcance(una_tarea=0.8),
+                "tarea": {"probabilities": {"T1": 0.5, "T2": 0.3}}}]
+JEV_CLARA = [{"alcance": _alcance(una_tarea=0.95),
+              "tarea": {"probabilities": {"T1": 0.9}}},
+             {"misma": {"noul": 0.8}}]
+
+
+def _ruta_con_trabajos(comando: RespectoPendiente) -> IntentRoute:
+    return IntentRoute(IntentAction.NORMAL_CONVERSATION, trabajos=(SUSTANTIVO,),
+                       respecto_pendiente=comando)
+
+
+def _aclaraciones(conn) -> int:
+    with admin(conn) as cur:
+        cur.execute("select count(*) n from pending_action where herramienta = %s",
+                    (gateway._SENTINEL_ACLARACION,))
+        return cur.fetchone()["n"]
+
+
+def _otra_tarea(conn, ws) -> str:
+    with admin(conn) as cur:
+        tid = _tarea(cur, ws, titulo="Revisar variador línea 2")
+    conn.commit()
+    return tid
+
+
+def _correccion_de_modificar(tid: str) -> list:
+    return [Respuesta(llamadas=[Llamada("c1", "registrar_bloqueo", {
+                "tarea_id": tid, "causa": "se rompió el variador"})]),
+            Respuesta(texto="listo")]
+
+
+def _nueva_vista_previa(conn) -> dict:
+    with admin(conn) as cur:
+        cur.execute(
+            """select resumen from pending_action
+                where estado = 'esperando' and herramienta = 'registrar_bloqueo'""")
+        (nueva,) = cur.fetchall()
+    return nueva
+
+
+@pytest.mark.parametrize("comando", [
+    RespectoPendiente.RESPONDE, RespectoPendiente.CORRIGE])
+@pytest.mark.parametrize("respuesta_de_jev", [JEV_NINGUNA, JEV_AMBIGUA],
+                         ids=["ninguna", "ambigua"])
+def test_modificar_con_una_referencia_no_clara_sigue_con_la_tarea_de_la_propuesta(
+        cliente, conn, corework, monkeypatch, comando, respuesta_de_jev):
+    ws = corework.workspace_id
+    tg, tid = _abrir_modificar(cliente, conn, ws)
+    _otra_tarea(conn, ws)
+    doble = _con_jev(monkeypatch, respuesta_de_jev)
+    proveedor = _con_rutas(monkeypatch, [_ruta_con_trabajos(comando)],
+                           guion=_correccion_de_modificar(tid))
+    antes = _salidas(conn, tg)
+
+    _mensaje(cliente, tg, "el motivo real es que se rompió el variador")
+
+    assert doble.pedidos                                      # Jev se consulta
+    assert _aclaraciones(conn) == 0                           # sin "¿A cuál…?"
+    assert _abiertas(conn) == 0                               # se consumió
+    sistema = _contexto_del_agente(proveedor)
+    assert "propuesta anterior" in sistema.lower()
+    assert "Referencias a tareas" not in sistema              # como si no estuviera
+    assert "variador" in _nueva_vista_previa(conn)["resumen"]  # la vista previa nueva
+    assert _salidas(conn, tg) == antes + 1                    # una respuesta
+
+
+def test_modificar_con_una_referencia_clara_a_otra_tarea_la_cambia(
+        cliente, conn, corework, monkeypatch):
+    ws = corework.workspace_id
+    tg, tid = _abrir_modificar(cliente, conn, ws)
+    otra = _otra_tarea(conn, ws)
+    doble = _con_jev(monkeypatch, JEV_CLARA)
+    proveedor = _con_rutas(
+        monkeypatch, [_ruta_con_trabajos(RespectoPendiente.CORRIGE)],
+        guion=_correccion_de_modificar(otra))
+
+    _mensaje(cliente, tg, "no, era la del variador")
+
+    assert doble.pedidos
+    assert _aclaraciones(conn) == 0
+    sistema = _contexto_del_agente(proveedor)
+    assert "propuesta anterior" in sistema.lower()
+    assert f"«{SUSTANTIVO}» es la tarea «" in sistema         # la resolución llega
+    assert "Usá esa tarea" in sistema
+
+
+def test_modificar_si_es_eso_con_una_referencia_ambigua_no_abre_aclaracion(
+        cliente, conn, corework, monkeypatch):
+    ws = corework.workspace_id
+    tg, tid = _abrir_modificar(cliente, conn, ws)
+    _otra_tarea(conn, ws)
+    doble = _con_jev(monkeypatch, JEV_AMBIGUA)
+    proveedor = _con_rutas(
+        monkeypatch,
+        [_ruta(RespectoPendiente.DUDOSO),
+         IntentRoute(IntentAction.NORMAL_CONVERSATION, trabajos=(SUSTANTIVO,))],
+        guion=_correccion_de_modificar(tid))
+    _mensaje(cliente, tg, "puede ser el variador")
+    antes = _salidas(conn, tg)
+
+    _tocar_boton(cliente, conn, ws, "Sí", tg)
+
+    assert doble.pedidos
+    assert _aclaraciones(conn) == 0
+    assert "propuesta anterior" in _contexto_del_agente(proveedor).lower()
+    assert "variador" in _nueva_vista_previa(conn)["resumen"]
+    assert _salidas(conn, tg) == antes + 1
+
+
+# ---------------------------------------------------------------------------
+# `otro_tema`: el responder sabe que hay una pregunta pendiente
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("kind", KINDS)
+def test_otro_tema_le_dice_al_responder_que_hay_una_pregunta_pendiente(
+        cliente, conn, corework, monkeypatch, kind):
+    ws = corework.workspace_id
+    tg, _tid = _abrir(kind, cliente, conn, ws)
+    proveedor = _con_rutas(
+        monkeypatch, [_ruta(RespectoPendiente.OTRO_TEMA)],
+        guion=[Respuesta(texto="Tenés dos tareas abiertas.")])
+
+    _mensaje(cliente, tg, "¿qué tareas tengo abiertas?")
+
+    sistema = _contexto_del_agente(proveedor)
+    assert gateway.MARCA_PREGUNTA_PENDIENTE in sistema
+    assert PREGUNTAS[kind] in sistema                         # la pregunta abierta
+    assert "no la vuelvas a proponer" in sistema
+
+
+def test_sin_pregunta_pendiente_el_responder_no_recibe_ese_bloque(
+        cliente, conn, corework, monkeypatch):
+    ws = corework.workspace_id
+    with espacio(conn, ws) as cur:
+        tg = _telegram_id(cur, PERSONA)
+    conn.commit()
+    proveedor = _con_rutas(monkeypatch, [_ruta(None)],
+                           guion=[Respuesta(texto="Tenés dos tareas abiertas.")])
+
+    _mensaje(cliente, tg, "¿qué tareas tengo abiertas?")
+
+    assert gateway.MARCA_PREGUNTA_PENDIENTE not in _contexto_del_agente(proveedor)
+
+
+def test_otro_tema_con_trabajos_resuelve_las_referencias_como_un_turno_normal(
+        cliente, conn, corework, monkeypatch):
+    # Seguimiento de review-e95b2d47b01f0161: `otro_tema` es un turno normal,
+    # así que sus `trabajos` sí se resuelven (y el bloque de la pregunta
+    # pendiente viaja junto con el de las referencias).
+    ws = corework.workspace_id
+    tg, _tid = _abrir_modificar(cliente, conn, ws)
+    doble = ClienteJevGuionado(guion=[
+        {"alcance": {"probabilities": {"una_tarea": 0.0, "varias_tareas": 0.0,
+                                       "ninguna": 1.0}}}])
+    monkeypatch.setattr(jev_modulo, "desde_base", lambda api_key: doble)
+    proveedor = _con_rutas(
+        monkeypatch, [_ruta_con_trabajos(RespectoPendiente.OTRO_TEMA)],
+        guion=[Respuesta(texto="No encontré esa tarea.")])
+
+    _mensaje(cliente, tg, "¿cómo va el variador roto?")
+
+    assert doble.pedidos, "las referencias de un otro_tema sí se resuelven"
+    sistema = _contexto_del_agente(proveedor)
+    assert SUSTANTIVO in sistema
+    assert gateway.MARCA_PREGUNTA_PENDIENTE in sistema
+    assert _abiertas(conn) == 1
+
+
+# ---------------------------------------------------------------------------
+# "Sí, es eso" con el ruteo caído (review-e95b2d47b01f0161)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("kind", KINDS)
+def test_si_es_eso_con_el_ruteo_caido_deja_una_respuesta_y_no_consume(
+        cliente, conn, corework, monkeypatch, kind):
+    ws = corework.workspace_id
+    tg, _tid = _abrir(kind, cliente, conn, ws)
+    malo = RouteEnvelope(calls=())
+    _con_rutas(monkeypatch, [_ruta(RespectoPendiente.DUDOSO), malo, malo])
+    _mensaje(cliente, tg, "puede ser")
+    incidentes = _incidentes(conn, ws)
+    antes = _salidas(conn, tg)
+
+    _tocar_boton(cliente, conn, ws, "Sí", tg)
+
+    assert _incidentes(conn, ws) == incidentes + 1
+    assert _salidas(conn, tg) == antes + 1                    # exactamente una
+    assert _abiertas(conn) == 1                               # no se perdió
