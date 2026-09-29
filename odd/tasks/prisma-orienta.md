@@ -337,7 +337,10 @@ gestión.
     que a propósito no responden (sobre todo en grupos, donde ahora saldría el aviso neutro);
     y las pruebas débiles de `review-cfe9d0884f17b144` (aserción vacía del epígrafe; la
     prueba del toque en el banco no toca nada). Evidencia: banco completo con la
-    comprobación nueva.
+    comprobación nueva. Más: tras "Dejarlo y ver lo otro" sobre una pregunta del alta, el
+    responder vuelve a proponer el alta (`b-0021-i`: "Para armar la tarea nueva, necesito
+    saber dónde cuelga"); causa general: en ese turno el modelo no ve el "dejé de lado"
+    (el historial sólo cuenta lo enviado) y la guarda no cubre el alta.
   - [ ] **T9-R3 — Decir el estado real y ofrecer sólo lo posible** (H20, H18, H16).
     Incluye (de `review-2282ebc46e7a48e1`): quien pidió un borrador que espera a otro
     aprobador no recibe un aviso determinista de quién confirma cuando escribe sobre él.
@@ -4689,3 +4692,12 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   `09f2fea`. Advertencias: caminos con varias respuestas sin agrupar perderían contenido;
   en grupos, un mensaje que a propósito no se respondía ahora recibe el aviso neutro
   (T9-R2b).
+
+- 2026-09-29: **Banco completo (n=1) con la comprobación de una respuesta por mensaje:**
+  76/88. Nuevas fallas: la familia `b-0019` entera, `b-0021` y `b-0025-e` con `RoutingError`
+  ("Malformed router tool arguments/payload": el proveedor devolvió JSON roto, dos veces
+  seguidas); `llm.py` no cambió desde el banco verde anterior, y al repetirlos (n=3) pasaron
+  52/54: inestabilidad del proveedor, sin regresión. Las 2 fallas restantes (`b-0021-i`)
+  muestran que tras dejar el alta el responder la vuelve a proponer (T9-R2b). Ninguna
+  corrida falló la comprobación de una respuesta por mensaje. Siguen `b-0001`, `b-0001-a`,
+  `b-0013` (ya fallaban) y `b-0024-b` (redacción).
