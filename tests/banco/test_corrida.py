@@ -1884,3 +1884,130 @@ def test_ejecutar_escenario_con_un_toque_tras_mensajes_que_no_existe_queda_bloqu
 
     assert r.bloqueado is True
     assert "no lo ofrece" in r.motivo_bloqueo
+
+
+# ---------------------------------------------------------------------------
+# La familia b-0023 (T9-R1d-1b, ADR 0013 regla 1, enmienda): con la vista
+# previa de un cambio esperando su Confirmar (sin ningún toque), el mensaje
+# siguiente se interpreta. El corredor tiene que llegar a ese estado con el
+# primer mensaje, evaluar lo que pasa con el segundo y, si la vista previa
+# sigue esperando, confirmarla sólo al final.
+# ---------------------------------------------------------------------------
+
+
+def _interno_con_vista_previa(comando, guion_extra=(), rutas_extra=()):
+    """El primer mensaje deja la vista previa de un bloqueo (el turno termina
+    ahí, sin otra vuelta del modelo); el segundo se interpreta con `comando`
+    contra ella y, si llega al modelo, consume `guion_extra`."""
+    return ProveedorGuionado(
+        guion=[Respuesta(llamadas=[Llamada("c1", "registrar_bloqueo", {
+                   "tarea_id": "PLACEHOLDER", "causa": "falta el plano"})]),
+               *guion_extra],
+        rutas=[IntentRoute(IntentAction.NORMAL_CONVERSATION),
+               IntentRoute(IntentAction.NORMAL_CONVERSATION,
+                           respecto_pendiente=comando),
+               *rutas_extra])
+
+
+def _sembrar_bloqueo_pedido(conn, ws, interno) -> str:
+    with admin(conn) as cur:
+        ids = sembrar_precondiciones(cur, ws, {
+            "tareas": [{"id": "t1", "titulo": "Cablear tablero (simulado)",
+                       "area": "ot", "responsable": "Nahuel Gimenez"}]})
+    interno.guion[0].llamadas[0].args["tarea_id"] = ids["t1"]
+    return ids["t1"]
+
+
+def _correr_con_vista_previa(conn, ws, interno, texto, **kwargs):
+    return ejecutar_escenario(
+        conn, ws, "corework", "Nahuel Gimenez", ["quedé trabado con el cableado"],
+        interno, escenario_id="b-test-vista-previa", indice=0,
+        mensajes_tras_toques=[texto], **kwargs)
+
+
+def test_ejecutar_escenario_si_dale_escrito_no_aplica_antes_de_confirmar(
+        corework, conn):
+    ws = corework.workspace_id
+    interno = _interno_con_vista_previa(RespectoPendiente.RESPONDE)
+    _sembrar_bloqueo_pedido(conn, ws, interno)
+
+    r = _correr_con_vista_previa(conn, ws, interno, "sí, dale")
+
+    assert r.bloqueado is False, r.motivo_bloqueo
+    assert "botón Confirmar" in r.respuesta_texto
+    # Antes del Confirmar del corredor no se había aplicado nada, y ese toque
+    # sí aplica la vista previa original (siguió esperando).
+    assert r.herramientas_antes_del_toque == ()
+    assert r.conteos_antes_del_toque["blocker"] == r.conteos_antes["blocker"]
+    assert r.conteos_despues["blocker"] == r.conteos_antes["blocker"] + 1
+
+
+def test_ejecutar_escenario_cancelar_escrito_deja_sin_vista_previa_que_confirmar(
+        corework, conn):
+    ws = corework.workspace_id
+    interno = _interno_con_vista_previa(RespectoPendiente.CANCELA)
+    _sembrar_bloqueo_pedido(conn, ws, interno)
+
+    r = _correr_con_vista_previa(conn, ws, interno, "no, mejor no")
+
+    assert r.bloqueado is False, r.motivo_bloqueo
+    assert "dejé de lado" in r.respuesta_texto
+    assert r.conteos_antes_del_toque is None             # nada que confirmar
+    assert r.herramientas_ejecutadas == []
+    assert r.conteos_despues["blocker"] == r.conteos_antes["blocker"]
+
+
+def test_ejecutar_escenario_correccion_escrita_llega_a_una_vista_previa_nueva(
+        corework, conn):
+    ws = corework.workspace_id
+    interno = _interno_con_vista_previa(
+        RespectoPendiente.CORRIGE, guion_extra=[
+            Respuesta(llamadas=[Llamada("c2", "registrar_bloqueo", {
+                "tarea_id": "PLACEHOLDER", "causa": "se rompió el variador"})])])
+    tid = _sembrar_bloqueo_pedido(conn, ws, interno)
+    interno.guion[1].llamadas[0].args["tarea_id"] = tid
+
+    r = _correr_con_vista_previa(conn, ws, interno,
+                                 "el motivo real es que se rompió el variador")
+
+    assert r.bloqueado is False, r.motivo_bloqueo
+    assert "variador" in r.respuesta_texto
+    assert r.conteos_antes_del_toque["blocker"] == r.conteos_antes["blocker"]
+    # Sólo la vista previa corregida se confirma: un único bloqueo.
+    assert r.conteos_despues["blocker"] == r.conteos_antes["blocker"] + 1
+
+
+def test_ejecutar_escenario_toca_dejar_con_la_vista_previa_esperando(
+        corework, conn):
+    ws = corework.workspace_id
+    interno = _interno_con_vista_previa(
+        RespectoPendiente.OTRO_TEMA,
+        guion_extra=[Respuesta(texto="Tenés una tarea abierta.")],
+        rutas_extra=[IntentRoute(IntentAction.NORMAL_CONVERSATION)])
+    _sembrar_bloqueo_pedido(conn, ws, interno)
+
+    r = _correr_con_vista_previa(
+        conn, ws, interno, "¿qué tareas tengo abiertas?",
+        toques_tras_mensajes=[{"etiqueta": "Dejarlo y ver lo otro"}])
+
+    assert r.bloqueado is False, r.motivo_bloqueo
+    assert "dejé de lado" in r.respuesta_texto
+    assert "Tenés una tarea abierta." in r.respuesta_texto
+    assert "Estábamos con" not in r.respuesta_texto
+    assert r.conteos_antes_del_toque is None             # la vista previa se cerró
+    assert r.conteos_despues["blocker"] == r.conteos_antes["blocker"]
+
+
+def test_ejecutar_escenario_otro_tema_con_la_vista_previa_esperando_pregunta_por_la_rama(
+        corework, conn):
+    ws = corework.workspace_id
+    interno = _interno_con_vista_previa(RespectoPendiente.OTRO_TEMA)
+    _sembrar_bloqueo_pedido(conn, ws, interno)
+
+    r = _correr_con_vista_previa(conn, ws, interno, "¿qué tareas tengo abiertas?")
+
+    assert r.bloqueado is False, r.motivo_bloqueo
+    assert "Estábamos con el cambio que te mostré" in r.respuesta_texto
+    assert r.herramientas_antes_del_toque == ()          # el otro tema no se atendió
+    # La vista previa original siguió esperando: el Confirmar del corredor la aplica.
+    assert r.conteos_despues["blocker"] == r.conteos_antes["blocker"] + 1

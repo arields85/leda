@@ -551,3 +551,26 @@ def test_toques_tras_mensajes_sin_mensajes_tras_toques_es_invalido(tmp_path):
     datos["toques_tras_mensajes"] = [{"etiqueta": "Seguir"}]
     with pytest.raises(EscenarioInvalido, match="mensajes_tras_toques"):
         cargar_escenario(_escribir(tmp_path, datos))
+
+
+def test_la_familia_b_0023_carga_con_la_vista_previa_de_un_cambio_esperando():
+    # T9-R1d-1b: cada escenario de la familia b-0023 deja la vista previa de un
+    # bloqueo esperando su Confirmar con el primer mensaje (sin ningún toque) y
+    # manda un único mensaje para interpretarla.
+    import pathlib
+
+    directorio = pathlib.Path(__file__).parent / "escenarios"
+    familia = [e for e in cargar_escenarios(directorio)
+               if e.id == "b-0023" or e.variante_de == "b-0023"]
+
+    assert len(familia) == 5
+    for e in familia:
+        assert len(e.mensajes) == 1 and e.toques == (), e.id
+        assert len(e.mensajes_tras_toques) == 1, e.id
+        assert e.respuesta_menciona, e.id
+    # Otro tema, confirmar, corregir y cancelar escribiendo; y dejar tocando.
+    mensajes = {e.mensajes_tras_toques[0] for e in familia}
+    assert {"¿qué tareas tengo abiertas?", "sí, dale, confirmalo",
+            "no, mejor no lo registres"} <= mensajes
+    con_toque = [e for e in familia if e.toques_tras_mensajes]
+    assert [e.id for e in con_toque] == ["b-0023-e"]

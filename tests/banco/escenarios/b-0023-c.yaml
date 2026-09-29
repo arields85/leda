@@ -1,0 +1,39 @@
+id: b-0023-c
+variante_de: b-0023
+objetivo: >
+  Variante de b-0023, corregir escribiendo: con la vista previa de un bloqueo
+  esperando su Confirmar, la persona escribe la corrección en vez de tocar
+  Modificar. Es el camino de Modificar: la vista previa vieja se cierra sin
+  aplicar nada y llega una vista previa NUEVA con el valor corregido. El
+  corredor confirma sólo esa; queda un único bloqueo, el corregido.
+actor: Nahuel Gimenez
+mensajes:
+  - "quedé trabado con el cableado, todavía no me pasaron el plano que prometieron"
+precondiciones:
+  tareas:
+    - id: t1
+      titulo: Cablear tablero de la máquina 3 (simulado)
+      area: ot
+      responsable: Nahuel Gimenez
+mensajes_tras_toques:
+  - "el motivo real es que se rompió el variador, no el plano"
+herramientas_esperadas:
+  - registrar_bloqueo
+herramientas_prohibidas:
+  - resolver_bloqueo
+  - crear_dependencia
+  - quitar_dependencia
+  - aprobar_tarea
+  - actualizar_estado
+efectos:
+  tareas:
+    t1:
+      estado: bloqueada
+  bloqueos_abiertos:
+    t1: 1
+  conteos_delta:
+    blocker: 1
+# El valor corregido llega a la vista previa nueva.
+respuesta_menciona:
+  - "variador"
+severidad: alta
