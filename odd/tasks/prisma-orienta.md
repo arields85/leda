@@ -286,7 +286,10 @@ gestión.
     `adjuntar_evidencia` sobre una tarea en curso deja evidencia sin decirlo
     (`herramientas.py:1552-1559`); `contexto.PREAMBULO` obliga a inventar opciones
     (`contexto.py:70-77`); el motivo de "Pedir cambios" no está en ninguna lectura.
-  - [ ] **T9-R4 — Todo toque tiene señal inmediata y es idempotente** (H5, H13). El
+  - [ ] **T9-R4 — Todo toque tiene señal inmediata y es idempotente** (H5, H13). Incluye
+    el seguimiento de `review-e11061770c5f40ae`: la referencia del reenvío de una
+    elección sin `entrante_id` sale de un conteo y no es idempotente ante un callback
+    repetido (derivarla del evento que la dispara). El
     indicador sólo envuelve `_turno` (`gateway.py:333`); el segundo toque responde "ya no
     está vigente"; ventana de 10 s para la misma persona.
   - [ ] **T9-H19 — Reproducir H19 después de R1 y R2**; si persiste, clasificarlo por
@@ -4461,7 +4464,7 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   escritor: `corrige` sobre la vista previa del alta (hoy "cancelalo y armalo de nuevo";
   la vista previa del alta no tiene Modificar), y quién confirma cuando quien escribe no
   es el aprobador (la respuesta no lo dice; regla 3).
-  - [ ] **T9-R1c-2b** — `RoutingError` de `b-0022-a`; `b-0022-e`/`-f` con el borrador
+  - [x] **T9-R1c-2b** — `RoutingError` de `b-0022-a`; `b-0022-e`/`-f` con el borrador
     sembrado en la base en vez de recorrer el alta con el modelo; la respuesta dice quién
     confirma cuando no es quien escribe; y seguimientos de `review-2435c6d8256a609c`:
     `_TIPO_DE_ALTA` con las constantes `QUESTION_*`; campo neutro para
@@ -4477,3 +4480,21 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   Ajuste aceptado: "Dejar y ver lo otro" cierra lo pendiente y atiende en la misma
   respuesta lo que la persona preguntó, sin que lo repita. Registrado como enmienda del
   ADR 0013 regla 1 y en `AGENTS.md`; tarea T9-R1d.
+
+- 2026-09-29: **T9-R1c-2b.** Ruta: delegada, un escritor. `9441796`: causa del
+  `RoutingError`: con una pregunta pendiente, el ruteo devolvía `normal_conversation` con
+  propuestas de tarea (el mensaje parecía un título) y `RouteEnvelope.validate` lo
+  rechazaba en los dos intentos; con pregunta pendiente esas propuestas se descartan (sin
+  pregunta, la validación no cambia). Evidencia: 6 fallas idénticas capturadas con un
+  gancho temporal; el grabador del banco ahora guarda el intento de ruteo fallido.
+  `7b95664`: precondición `borrador_de_alta` que siembra el borrador esperando
+  confirmación con el código real (`_advance`, `_finalize`). `8b63aee`: si quien escribe
+  no es el aprobador, la respuesta dice de quién espera la confirmación (regla 3).
+  `f284b27`: seguimientos (`QUESTION_*`, `pending_action_id` → `pregunta_id`, helper del
+  primer cuerpo de una elección, referencia del reenvío sin reloj, falla ruidosa del campo
+  sin nombre, aserciones exactas). Suite del escritor 1491 passed, 198 deselected. Padre:
+  enfocadas 203 passed. RDD: tramo `331a5f6..f284b27` medio, 897 líneas
+  (`slice_budget_reached`), consentida, `review-e11061770c5f40ae` (confiabilidad)
+  **aprobada y reconocida**; frontera en `f284b27`. Banco real `b-0022` (n=3): **24/24**
+  (antes 16/24). Seguimientos no bloqueantes: idempotencia del reenvío (a T9-R4); prueba
+  del aprobador sin nombre legible (a T9-R1c-3).
