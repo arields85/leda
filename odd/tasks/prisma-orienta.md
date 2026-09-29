@@ -211,6 +211,7 @@ gestión.
 | T8a | delegada, un escritor | `config.py`, `llm.py`, `gateway.py` (3 llamadas), `cli.py`, `tests/banco/conftest.py`, pruebas |
 | T8b | inline, corridas del banco real | medición; sin cambios de código |
 | T8c-1 | delegada, un escritor | `agente.py` y pruebas de varios módulos (ciclo del responder) |
+| T8c-3 | delegada, un escritor | `gateway.py`, `agente.py`, `llm.py`, arnés del banco, pruebas, ADR 0012 |
 
 ## Verificación
 
