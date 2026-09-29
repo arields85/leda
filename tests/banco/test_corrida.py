@@ -2194,3 +2194,172 @@ def test_la_aclaracion_sembrada_es_la_misma_fila_que_crea_el_flujo_real(
 
     assert sembrada == real
     assert [e for e, _v in real["opciones"]][1].endswith("— Mariano")  # la ajena
+
+
+# ---------------------------------------------------------------------------
+# La familia b-0025 (T9-R1c-3): Modificar en la vista previa del borrador del
+# alta. El borrador sembrado tiene que existir DENTRO de la corrida para que sus
+# botones cuenten como de ella (`toques`), y el banco no convierte nunca un
+# borrador: sólo su botón Confirmar, por el canal de autoridad.
+# ---------------------------------------------------------------------------
+
+_DOS_TAREAS_PARA_EL_ALTA = [
+    {"id": "t1", "titulo": "Cablear tablero (simulado)", "area": "ot",
+     "responsable": "Marcos Tarquini"},
+    {"id": "t2", "titulo": "Revisar tablero eléctrico (simulado)", "area": "ot",
+     "responsable": "Marcos Tarquini"}]
+_OBJETIVO_OTRO = "Objetivo simulado de Revisar tablero eléctrico (simulado)"
+
+
+def _con_dos_tareas(conn, ws) -> None:
+    with admin(conn) as cur:
+        sembrar_precondiciones(cur, ws, {"tareas": _DOS_TAREAS_PARA_EL_ALTA},)
+    conn.commit()
+
+
+def _responde(*textos) -> ProveedorGuionado:
+    return ProveedorGuionado(guion=[], rutas=[
+        IntentRoute(IntentAction.NORMAL_CONVERSATION, respecto_pendiente=comando)
+        for comando in textos])
+
+
+def _estados_de_las_vistas_previas(conn) -> list[str]:
+    with admin(conn) as cur:
+        cur.execute("select estado from pending_action where draft_id is not null "
+                    "order by creado_en, id")
+        return [f["estado"] for f in cur.fetchall()]
+
+
+def test_sembrar_precondiciones_sin_borrador_de_alta_no_lo_siembra(corework, conn):
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        sembrar_precondiciones(cur, ws, {
+            "tareas": _DOS_TAREAS_PARA_EL_ALTA[:1],
+            "borrador_de_alta": {**_BORRADOR_DE_ALTA}},
+            sin_borrador_de_alta=True)
+        cur.execute("select count(*) n from task_intake_request")
+        assert cur.fetchone()["n"] == 0
+
+
+def test_el_borrador_sembrado_en_la_corrida_se_toca_por_sus_botones(corework, conn):
+    ws = corework.workspace_id
+    _con_dos_tareas(conn, ws)
+    interno = _responde(RespectoPendiente.RESPONDE)
+
+    r = ejecutar_escenario(
+        conn, ws, "corework", "Ismael Soschinski", [], interno,
+        escenario_id="b-test-0025", indice=0,
+        preguntas_sembradas={"borrador_de_alta": _BORRADOR_DE_ALTA},
+        toques=[{"etiqueta": "Modificar"}, {"etiqueta": "Título"}],
+        mensajes_tras_toques=["Cablear tablero sur"])
+
+    assert r.bloqueado is False, r.motivo_bloqueo
+    # Lo que se evalúa: la vista previa que vuelve, con el dato corregido y sólo ese.
+    assert "Título: Cablear tablero sur" in r.respuesta_texto
+    assert "Fecha objetivo: 2030-12-30" in r.respuesta_texto
+    assert "Cablear tablero norte" not in r.respuesta_texto
+    assert _estados_de_las_vistas_previas(conn) == ["cancelada", "esperando"]
+    # El banco no confirma el borrador: no hay tarea nueva.
+    assert r.conteos_despues["task"] == r.conteos_antes["task"]
+    assert r.conteos_antes_del_toque is None
+
+
+def test_el_borrador_sembrado_en_la_corrida_cambia_un_dato_con_opciones(
+        corework, conn):
+    ws = corework.workspace_id
+    _con_dos_tareas(conn, ws)
+    interno = _responde(RespectoPendiente.RESPONDE)
+
+    r = ejecutar_escenario(
+        conn, ws, "corework", "Ismael Soschinski", [], interno,
+        escenario_id="b-test-0025", indice=1,
+        preguntas_sembradas={"borrador_de_alta": {
+            **_BORRADOR_DE_ALTA, "objetivo": _TITULO_OBJETIVO_ALTA}},
+        toques=[{"etiqueta": "Modificar"}, {"etiqueta": "Objetivo"}],
+        mensajes_tras_toques=[_OBJETIVO_OTRO])
+
+    assert r.bloqueado is False, r.motivo_bloqueo
+    assert f"Objetivo: {_OBJETIVO_OTRO}" in r.respuesta_texto
+    assert _estados_de_las_vistas_previas(conn) == ["cancelada", "esperando"]
+    assert r.conteos_despues["task"] == r.conteos_antes["task"]
+
+
+def test_un_mensaje_que_corrige_la_vista_previa_lleva_al_selector_y_de_ahi_al_dato(
+        corework, conn):
+    ws = corework.workspace_id
+    _con_dos_tareas(conn, ws)
+    interno = _responde(RespectoPendiente.CORRIGE, RespectoPendiente.RESPONDE)
+
+    r = ejecutar_escenario(
+        conn, ws, "corework", "Ismael Soschinski", [], interno,
+        escenario_id="b-test-0025", indice=2,
+        preguntas_sembradas={"borrador_de_alta": _BORRADOR_DE_ALTA},
+        toques=[], mensajes_tras_toques=["cambiale la fecha", "Fecha objetivo"])
+
+    assert r.bloqueado is False, r.motivo_bloqueo
+    # Lo que queda abierto es la pregunta del dato, con lo que tenía para copiar.
+    assert "2030-12-30" in r.respuesta_texto
+    assert "Esto tenías en la fecha objetivo" in r.respuesta_texto
+    assert _estados_de_las_vistas_previas(conn) == ["cancelada"]
+    assert r.conteos_despues["task"] == r.conteos_antes["task"]
+
+
+def test_el_corredor_no_confirma_solo_la_vista_previa_de_un_borrador(corework, conn):
+    """Aunque se haya creado durante la corrida y ofrezca Confirmar: convertir un
+    borrador es del botón de su aprobador, por el canal de autoridad."""
+    ws = corework.workspace_id
+    _con_dos_tareas(conn, ws)
+    ahora = datetime.now(timezone.utc)
+    with admin(conn) as cur:
+        sembrar_precondiciones(cur, ws, {"borrador_de_alta": _BORRADOR_DE_ALTA})
+        cur.execute("select telegram_user_id t from integrante where nombre = %s",
+                    ("Ismael Soschinski",))
+        chat = cur.fetchone()["t"]
+        assert _pendiente_para_confirmar(cur, ws, chat, ahora - timedelta(days=1)) is None
+
+
+@pytest.mark.parametrize("escenario_id, comandos", [
+    ("b-0025", [RespectoPendiente.RESPONDE]),
+    ("b-0025-b", [RespectoPendiente.RESPONDE]),
+    ("b-0025-c", [RespectoPendiente.CORRIGE, RespectoPendiente.RESPONDE]),
+])
+def test_los_escenarios_de_b_0025_cumplen_lo_que_declaran_con_un_modelo_guionado(
+        escenario_id, comandos, corework, conn):
+    """Los escenarios de la familia, corridos por el mismo camino que el banco
+    real (`test_banco.py`) pero con el ruteo guionado: lo que declaran
+    (`respuesta_menciona`, `respuesta_no_contiene_patron`, `efectos`) tiene que
+    cumplirse con lo que produce el código, así el banco real sólo mide al
+    modelo."""
+    from tests.banco.comprobadores import Evidencia, comprobar_contenido, comprobar_efectos
+    from tests.banco.conftest import DIR_ESCENARIOS
+    from tests.banco.escenario import cargar_escenario
+
+    escenario = cargar_escenario(DIR_ESCENARIOS / f"{escenario_id}.yaml")
+    ws = corework.workspace_id
+    en_la_corrida = bool(escenario.toques
+                         and escenario.precondiciones.get("borrador_de_alta"))
+    with admin(conn) as cur:
+        sembrar_precondiciones(cur, ws, escenario.precondiciones,
+                               sin_borrador_de_alta=en_la_corrida)
+
+    r = ejecutar_escenario(
+        conn, ws, "corework", escenario.actor, escenario.mensajes,
+        _responde(*comandos), escenario_id=escenario.id, indice=0,
+        toques=list(escenario.toques) or None,
+        mensajes_tras_toques=list(escenario.mensajes_tras_toques) or None,
+        preguntas_sembradas=(
+            {"borrador_de_alta": escenario.precondiciones["borrador_de_alta"]}
+            if en_la_corrida else None))
+
+    assert r.bloqueado is False, r.motivo_bloqueo
+    evidencia = Evidencia(respuesta_texto=r.respuesta_texto,
+                          herramientas_ejecutadas=tuple(r.herramientas_ejecutadas),
+                          ofrecio_opciones=r.ofrecio_opciones)
+    contenido = comprobar_contenido(
+        evidencia, menciona=escenario.respuesta_menciona,
+        no_contiene_patron=escenario.respuesta_no_contiene_patron)
+    assert contenido.resultado == "aprobado", contenido.diferencia
+    efectos = comprobar_efectos(
+        {"conteos_delta": conteos_delta(r.conteos_antes, r.conteos_despues)},
+        escenario.efectos)
+    assert efectos.resultado == "aprobado", efectos.diferencia

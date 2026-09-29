@@ -72,10 +72,16 @@ def test_escenario_contra_modelo_real(
     escenario, indice = escenario_y_corrida
     ws = corework.workspace_id
 
+    # Un borrador de alta cuyos botones el escenario toca se siembra dentro de la
+    # corrida: los toques sólo ven lo creado durante ella (`corrida`).
+    borrador_en_la_corrida = bool(
+        escenario.toques and escenario.precondiciones.get("borrador_de_alta"))
     ids_semilla: dict[str, str] = {}
     if escenario.precondiciones:
         with admin(conn) as cur:
-            ids_semilla = sembrar_precondiciones(cur, ws, escenario.precondiciones)
+            ids_semilla = sembrar_precondiciones(
+                cur, ws, escenario.precondiciones,
+                sin_borrador_de_alta=borrador_en_la_corrida)
 
     resultado = ejecutar_escenario(
         conn, ws, "corework", escenario.actor, escenario.mensajes, proveedor_real,
@@ -85,8 +91,10 @@ def test_escenario_contra_modelo_real(
         mensajes_tras_toques=list(escenario.mensajes_tras_toques) or None,
         toques_tras_mensajes=list(escenario.toques_tras_mensajes) or None,
         preguntas_sembradas={
-            c: escenario.precondiciones[c] for c in ("vista_previa", "aclaracion")
-            if escenario.precondiciones.get(c)} or None)
+            c: escenario.precondiciones[c]
+            for c in ("vista_previa", "aclaracion", "borrador_de_alta")
+            if escenario.precondiciones.get(c)
+            and (c != "borrador_de_alta" or borrador_en_la_corrida)} or None)
 
     if resultado.bloqueado:
         entrada = EntradaReporte(

@@ -1,0 +1,47 @@
+id: b-0025-c
+variante_de: b-0025
+objetivo: >
+  Variante de b-0025, la corrección escrita: con la vista previa esperando, la
+  persona escribe que quiere cambiar la fecha. Un mensaje que corrige lleva al
+  mismo camino que Modificar: Prisma pregunta qué dato cambiar y, cuando la
+  persona escribe "Fecha objetivo", le muestra la fecha que tenía para copiarla
+  y corregirla. Todo dentro de la misma rama; la tarea no se crea.
+actor: Ismael Soschinski
+mensajes: []
+precondiciones:
+  tareas:
+    - id: t1
+      titulo: Cablear tablero de la máquina 3 (simulado)
+      area: ot
+      responsable: Marcos Tarquini
+  borrador_de_alta:
+    solicitante: Ismael Soschinski
+    titulo: Cablear tablero norte
+    objetivo: Objetivo simulado de Cablear tablero de la máquina 3 (simulado)
+    responsable: Marcos Tarquini
+    area: ot
+    fecha_objetivo: "2030-12-30"
+    criterio_aceptacion: Prueba firmada
+mensajes_tras_toques:
+  - "cambiale la fecha para el 5 de enero"
+  - "Fecha objetivo"
+herramientas_prohibidas:
+  - actualizar_estado
+  - registrar_bloqueo
+  - resolver_bloqueo
+  - crear_dependencia
+  - aprobar_tarea
+efectos:
+  conteos_delta:
+    task: 0
+    task_state_event: 0
+    evidence: 0
+    approval: 0
+# La pregunta del selector (`ingreso_tareas.MODIFY_PICKER_PROMPT`) y la del dato
+# con lo que tenía (`modify_text_prompt`): si cambia su redacción, actualizar acá.
+respuesta_menciona:
+  - "qué dato querés cambiar"
+  - "Esto tenías en la fecha objetivo"
+  - "2030-12-30"
+permite_borrador_de_tarea: true
+severidad: alta

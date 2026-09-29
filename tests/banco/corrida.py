@@ -401,11 +401,18 @@ def filas_respuesta(cur, workspace_id: str, chat_id: int,
     `_encolar_confirmacion`/`_encolar_eleccion`) e `intake_choice_set_id`
     (alta guiada de tarea, `ingreso_tareas.py::_open_choices`) -- las mismas
     dos columnas que arma los botones al despachar
-    (`despachador.py::_botones`)."""
+    (`despachador.py::_botones`).
+
+    Cuenta también la vista previa de un borrador (`pending_action.draft_id`)
+    que llega a este chat: `ingreso_tareas._finalize` la encola como un mensaje
+    que inicia Prisma (no es `es_respuesta`), pero cuando quien confirma es quien
+    escribe es lo que ve como respuesta a su alta y a su Modificar (T9-R1c-3)."""
     cur.execute(
         """select id, cuerpo, pending_action_id, intake_choice_set_id
             from message_outbox
-            where workspace_id = %s and chat_id = %s and es_respuesta
+            where workspace_id = %s and chat_id = %s
+              and (es_respuesta or pending_action_id in (
+                     select id from pending_action where draft_id is not null))
             order by programado_para""",
         (workspace_id, chat_id))
     return [f for f in cur.fetchall() if f["id"] not in ids_previos]
@@ -587,10 +594,15 @@ def _sembrar_aclaracion(cur, quien: Solicitante, ws: str, chat: int,
 def _sembrar_preguntas(conn, ws: str, tg_id: int, chat: int,
                        preguntas: dict) -> None:
     """Siembra las preguntas que el escenario declara ya esperando
-    (`Escenario.precondiciones`: `vista_previa`, `aclaracion`), como la persona
-    `tg_id`, en su chat. Van por el circuito real y no por el modelo: un
-    escenario que ejercita lo que pasa con una pregunta abierta no depende de
-    que el modelo (ni Jev) abran exactamente una cosa con un primer mensaje."""
+    (`Escenario.precondiciones`: `vista_previa`, `aclaracion`, y `borrador_de_alta`
+    cuando el escenario toca sus botones, T9-R1c-3), como la persona `tg_id`, en
+    su chat. Van por el circuito real y no por el modelo: un escenario que
+    ejercita lo que pasa con una pregunta abierta no depende de que el modelo (ni
+    Jev) abran exactamente una cosa con un primer mensaje."""
+    if preguntas.get("borrador_de_alta"):
+        with admin(conn) as cur:          # como al sembrar las demás precondiciones
+            _sembrar_borrador_de_alta(cur, ws, preguntas["borrador_de_alta"])
+        conn.commit()
     with espacio(conn, ws) as cur:
         quien = identificar_en_espacio(cur, tg_id, ws)
         if preguntas.get("vista_previa"):
@@ -600,10 +612,15 @@ def _sembrar_preguntas(conn, ws: str, tg_id: int, chat: int,
     conn.commit()
 
 
-def sembrar_precondiciones(cur, ws: str, precondiciones: dict) -> dict[str, str]:
+def sembrar_precondiciones(cur, ws: str, precondiciones: dict, *,
+                           sin_borrador_de_alta: bool = False) -> dict[str, str]:
     """Crea el estado ficticio de un escenario (tareas, bloqueos,
     dependencias) bajo una conexión de administración, y devuelve el mapeo
-    de los IDs locales del escenario (p. ej. 't1') a los UUID reales."""
+    de los IDs locales del escenario (p. ej. 't1') a los UUID reales.
+
+    `sin_borrador_de_alta`: no siembra el borrador acá porque lo siembra la corrida
+    (`_sembrar_preguntas`): un escenario que TOCA los botones de su vista previa la
+    necesita creada durante la corrida, que es lo único que los toques ven."""
     ids: dict[str, str] = {}
     for t in precondiciones.get("tareas", []):
         ids[t["id"]] = _crear_tarea_semilla(
@@ -616,7 +633,7 @@ def sembrar_precondiciones(cur, ws: str, precondiciones: dict) -> dict[str, str]
     for d in precondiciones.get("dependencias", []):
         _crear_dependencia_semilla(cur, ws, ids[d["origen"]], ids[d["destino"]],
                                    tipo=d.get("tipo", "bloqueante"))
-    if precondiciones.get("borrador_de_alta"):
+    if precondiciones.get("borrador_de_alta") and not sin_borrador_de_alta:
         _sembrar_borrador_de_alta(cur, ws, precondiciones["borrador_de_alta"])
     return ids
 
@@ -705,10 +722,13 @@ def _pendiente_para_confirmar(cur, workspace_id: str, chat_id: int,
     Devuelve `(pending_action_id, token_de_confirmar)`, o `None` si no hay
     ninguna de esta corrida o ninguna ofrece Confirmar.
     """
+    # Una vista previa de borrador (`draft_id`) no se confirma sola: su conversión
+    # es sólo del botón Confirmar de su aprobador, por el canal de autoridad
+    # (`gateway._resolver_toque_borrador`), y el banco no la usa (T9-R1c-3).
     cur.execute(
         """select id from pending_action
             where workspace_id = %s and chat_id = %s and estado = 'esperando'
-              and creado_en >= %s""",
+              and creado_en >= %s and draft_id is null""",
         (workspace_id, chat_id, desde))
     candidatas = []
     for fila in cur.fetchall():
@@ -1010,7 +1030,8 @@ def ejecutar_escenario(
     toques y lo que sigue.
 
     `preguntas_sembradas` (T9-R1d-1c): las preguntas que el escenario declara ya
-    esperando (`vista_previa`, `aclaracion`; `Escenario.precondiciones`), que el
+    esperando (`vista_previa`, `aclaracion` y, con toques, `borrador_de_alta`;
+    `Escenario.precondiciones`), que el
     corredor deja abiertas antes de los mensajes por el mismo camino real
     (`_sembrar_preguntas`) -- después de marcar el arranque de la corrida, así el
     Confirmar automático del final todavía encuentra la vista previa. Si el
