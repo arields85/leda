@@ -21,17 +21,31 @@ También las claves de `workspace_setting` que gobiernan Google por espacio
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime
 
 import psycopg
 
 from . import cifrado
+from ..alta_correo import registrar_config_invalida
 
 CLAVE_HABILITADO = "google.habilitado"
 CLAVE_SCOPES = "google.scopes_habilitados"
 
-# Los estados que devuelve `estado()`. "sin_autorizar" es no tener ningún
-# evento; el resto es la proyección de `credencial_google_estado`.
+# Los estados que devuelve `estado()`. "sin_autorizar" es no tener ninguna
+# fila de proyección; el resto es la de `credencial_google_estado`. Un valor
+# fuera de esta lista es un error, no un estado (`_validar_estado`).
 ESTADOS = ("sin_autorizar", "vigente", "requiere_reautorizacion", "revocada")
+
+# Lo que devuelve `marcar_reautorizacion` (los mismos valores que la función
+# de la base).
+MARCADA = "marcada"
+SIN_CAMBIO = "sin_cambio"
+CREDENCIAL_CAMBIO = "credencial_cambio"
+
+
+class EstadoDesconocido(RuntimeError):
+    """La base devolvió un estado que este código no conoce: se falla en vez
+    de tratarlo como uno válido."""
 
 
 @dataclass(frozen=True)
@@ -42,15 +56,21 @@ class CredencialGoogle:
     cuenta_email: str
     scopes: tuple[str, ...]
     estado: str
+    # Identifica ESTA autorización: quien avisa que Google la rechazó lo
+    # devuelve a `marcar_reautorizacion` para no pisar una más nueva.
+    autorizada_en: datetime
 
 
 @dataclass(frozen=True)
 class ResultadoRecifrado:
     """Qué hizo `recifrar_todo`: cuántos se re-cifraron y de qué espacios
-    (sólo el slug, nunca contenido) no se pudo descifrar el dato."""
+    (sólo el slug, nunca contenido) no se pudo descifrar el dato
+    (`ilegibles`) o cambió mientras se rotaba (`cambiadas`: se volvió a
+    autorizar o se revocó entre la lectura y el reemplazo)."""
 
     recifradas: int
     ilegibles: tuple[str, ...]
+    cambiadas: tuple[str, ...] = ()
 
 
 # ---------------------------------------------------------------------------
@@ -71,10 +91,12 @@ def _leer_setting(cur: psycopg.Cursor, workspace_id: str, clave: str):
 def _config_invalida(cur: psycopg.Cursor, workspace_id: str, clave: str) -> None:
     """Un valor corrupto deja constancia UNA vez mientras siga sin resolver:
     el mismo mecanismo (un aviso administrativo por espacio y clave, que hace
-    de candado, y un incidente saneado) que ya usa el alta con correo."""
-    from ..alta_correo import _config_invalida as registrar
-
-    registrar(cur, workspace_id, clave, "apagado")
+    de candado, y un incidente saneado) que ya usa el alta con correo, con el
+    aviso y la etapa propios de Google."""
+    registrar_config_invalida(
+        cur, workspace_id, clave, "apagado",
+        prefijo_aviso="google_config_invalida",
+        etapa="google_config_invalida")
 
 
 def habilitado(cur: psycopg.Cursor, workspace_id: str) -> bool:
@@ -112,10 +134,17 @@ def scopes_habilitados(cur: psycopg.Cursor, workspace_id: str) -> tuple[str, ...
 # ---------------------------------------------------------------------------
 
 
+def _validar_estado(valor: str) -> str:
+    if valor not in ESTADOS:
+        raise EstadoDesconocido(
+            "La base devolvió un estado de credencial de Google desconocido.")
+    return valor
+
+
 def estado(cur: psycopg.Cursor) -> str:
     """El estado de la credencial del espacio de la sesión."""
     cur.execute("select estado_credencial_google() as estado")
-    return cur.fetchone()["estado"]
+    return _validar_estado(cur.fetchone()["estado"])
 
 
 def leer(cur: psycopg.Cursor, *,
@@ -130,20 +159,31 @@ def leer(cur: psycopg.Cursor, *,
     fila = cur.fetchone()
     if fila is None:
         return None
+    estado_leido = _validar_estado(fila["estado"])
     return CredencialGoogle(
         secreto=cifrador.descifrar_texto(fila["token_cifrado"]),
         cuenta_email=fila["cuenta_email"],
         scopes=tuple(fila["scopes"]),
-        estado=fila["estado"])
+        estado=estado_leido,
+        autorizada_en=fila["autorizado_en"])
 
 
-def marcar_reautorizacion(cur: psycopg.Cursor, motivo: str) -> bool:
+def marcar_reautorizacion(cur: psycopg.Cursor, motivo: str,
+                         autorizada_en: datetime) -> str:
     """Google rechazó la credencial: pasa de `vigente` a
     `requiere_reautorizacion`. `motivo` es un código corto (minúsculas,
-    dígitos y guion bajo), nunca el cuerpo de un error. Devuelve si cambió
-    algo (`False` si ya estaba así o no hay credencial)."""
-    cur.execute("select marcar_reautorizacion_google(%s) as cambio", (motivo,))
-    return cur.fetchone()["cambio"]
+    dígitos y guion bajo), nunca el cuerpo de un error.
+
+    `autorizada_en` es el de la credencial que quien llama efectivamente
+    usó (`CredencialGoogle.autorizada_en`): la marca es una comparación, y si
+    entre la lectura y el rechazo se volvió a autorizar, el rechazo es de la
+    credencial vieja y no se toca la nueva. Devuelve `MARCADA`, `SIN_CAMBIO`
+    (no había una vigente: ya requería reautorización, revocada o ninguna) o
+    `CREDENCIAL_CAMBIO` (la vigente ya no es la usada). Ninguno es un
+    error."""
+    cur.execute("select marcar_reautorizacion_google(%s, %s) as resultado",
+                (motivo, autorizada_en))
+    return cur.fetchone()["resultado"]
 
 
 # ---------------------------------------------------------------------------
@@ -179,11 +219,13 @@ def recifrar_todo(cur: psycopg.Cursor,
     vigente). Un payload que ninguna clave configurada descifra se cuenta por
     slug y se deja intacto -- nunca se descarta ni se muestra --, y el resto
     igual se re-cifra. El reemplazo compara contra lo leído: si el espacio
-    se volvió a autorizar en el medio, no se pisa."""
+    se volvió a autorizar o se revocó en el medio, no se pisa y el slug queda
+    en `cambiadas` -- nunca se descarta en silencio."""
     cur.execute("select * from credenciales_google_cifradas()")
     filas = cur.fetchall()
     recifradas = 0
     ilegibles: list[str] = []
+    cambiadas: list[str] = []
     for fila in filas:
         viejo = fila["token_cifrado"]
         try:
@@ -195,4 +237,6 @@ def recifrar_todo(cur: psycopg.Cursor,
                     (fila["workspace_id"], viejo, nuevo))
         if cur.fetchone()["ok"]:
             recifradas += 1
-    return ResultadoRecifrado(recifradas, tuple(ilegibles))
+        else:
+            cambiadas.append(fila["slug"])
+    return ResultadoRecifrado(recifradas, tuple(ilegibles), tuple(cambiadas))

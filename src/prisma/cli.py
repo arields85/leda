@@ -171,8 +171,11 @@ def _google_recifrar() -> int:
     La clave se carga ANTES de abrir la base: sin clave, o con una mal
     formada, no se toca nada (ni se conecta). Lo que ninguna clave
     configurada descifra se informa por slug -- nunca su contenido --, queda
-    intacto y el comando termina con código distinto de cero; el resto igual
-    se re-cifra (correrlo de nuevo es seguro)."""
+    intacto y el comando termina con código distinto de cero; lo que cambió
+    mientras se rotaba (se volvió a autorizar o se revocó) tampoco se pisa: se
+    informa por slug y el código también es distinto de cero, porque la
+    rotación no terminó. El resto igual se re-cifra (correrlo de nuevo es
+    seguro)."""
     from .google import credenciales
     from .google.cifrado import ErrorCifrado, VARIABLE_CLAVE, cargar
 
@@ -185,14 +188,21 @@ def _google_recifrar() -> int:
         return 1
 
     conn = conectar()
-    with admin(conn) as cur:
-        r = credenciales.recifrar_todo(cur, cifrador)
-    conn.commit()
+    try:
+        with admin(conn) as cur:
+            r = credenciales.recifrar_todo(cur, cifrador)
+        conn.commit()
+    except BaseException:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
-    if not r.recifradas and not r.ilegibles:
+    if not r.recifradas and not r.ilegibles and not r.cambiadas:
         print("No hay credenciales de Google guardadas.")
         return 0
     print(f"Credenciales re-cifradas con la clave vigente: {r.recifradas}.")
+    codigo = 0
     if r.ilegibles:
         print(f"Ninguna clave configurada descifra {len(r.ilegibles)} "
               "credencial(es); quedaron intactas:")
@@ -200,8 +210,16 @@ def _google_recifrar() -> int:
             print(f"  {slug}")
         print(f"Revisá que {VARIABLE_CLAVE} conserve la clave con la que se "
               "guardaron, o volvé a autorizar Google en ese espacio.")
-        return 1
-    return 0
+        codigo = 1
+    if r.cambiadas:
+        print(f"Cambiaron mientras se rotaba {len(r.cambiadas)} "
+              "credencial(es); no se re-cifraron:")
+        for slug in r.cambiadas:
+            print(f"  {slug}")
+        print("Volvé a correr `python -m prisma google recifrar` para "
+              "terminarlas.")
+        codigo = 1
+    return codigo
 
 
 def _correo_verificacion(conn, ws: str, activar: bool) -> int:

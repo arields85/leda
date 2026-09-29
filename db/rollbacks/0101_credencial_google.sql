@@ -25,7 +25,7 @@ drop function if exists reemplazar_token_google(uuid, text, text);
 drop function if exists credenciales_google_cifradas();
 drop function if exists revocar_credencial_google(uuid, text);
 drop function if exists guardar_credencial_google(uuid, text, text, text[]);
-drop function if exists marcar_reautorizacion_google(text);
+drop function if exists marcar_reautorizacion_google(text, timestamptz);
 drop function if exists estado_credencial_google();
 drop function if exists leer_credencial_google();
 

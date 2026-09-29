@@ -223,7 +223,8 @@ create trigger trg_bloquear_actualizacion_directa_credencial_google
 -- profundidad.
 
 create or replace function leer_credencial_google()
-returns table (token_cifrado text, cuenta_email text, scopes text[], estado text)
+returns table (token_cifrado text, cuenta_email text, scopes text[], estado text,
+               autorizado_en timestamptz)
 language plpgsql security definer set search_path = prisma, public, pg_temp as $$
 declare espacio uuid := nullif(current_setting('prisma.workspace_id', true), '')::uuid;
 begin
@@ -231,7 +232,7 @@ begin
     raise exception 'leer_credencial_google: no hay un espacio declarado en la sesión';
   end if;
   return query
-    select c.token_cifrado, c.cuenta_email, c.scopes, e.estado
+    select c.token_cifrado, c.cuenta_email, c.scopes, e.estado, c.autorizado_en
       from credencial_google c
       join credencial_google_estado e on e.workspace_id = c.workspace_id
      where c.workspace_id = espacio;
@@ -253,16 +254,25 @@ begin
 end $$;
 
 -- Google rechazó el refresh token (`invalid_grant`): la credencial guardada
--- ya no sirve y hace falta volver a autorizar. Devuelve `true` sólo si
--- efectivamente pasó de `vigente` a `requiere_reautorizacion`; si ya estaba
--- así (o no hay credencial) no repite el evento. El candado consultivo
--- serializa dos avisos simultáneos del mismo espacio.
-create or replace function marcar_reautorizacion_google(p_motivo text)
-returns boolean
+-- ya no sirve y hace falta volver a autorizar. Es una comparación: quien
+-- avisa pasa el `autorizado_en` de la credencial que efectivamente usó (lo
+-- devuelve `leer_credencial_google()`), y sólo se marca si sigue siendo la
+-- vigente. Si mientras tanto el administrador volvió a autorizar, el rechazo
+-- es de la credencial vieja y no se toca la nueva. Devuelve:
+--   'marcada'           pasó de `vigente` a `requiere_reautorizacion`;
+--   'sin_cambio'        no había credencial vigente (ya requería
+--                       reautorización, estaba revocada o no existía);
+--   'credencial_cambio' la vigente ya no es la que se usó: no se emite nada.
+-- El candado consultivo serializa el aviso con `guardar_credencial_google()`
+-- y con otro aviso simultáneo del mismo espacio.
+create or replace function marcar_reautorizacion_google(
+    p_motivo text, p_autorizado_en timestamptz)
+returns text
 language plpgsql security definer set search_path = prisma, public, pg_temp as $$
 declare
   espacio uuid := nullif(current_setting('prisma.workspace_id', true), '')::uuid;
   actual text;
+  vigente_en timestamptz;
 begin
   if espacio is null then
     raise exception 'marcar_reautorizacion_google: no hay un espacio declarado en la sesión';
@@ -273,12 +283,18 @@ begin
   select e.estado into actual from credencial_google_estado e
    where e.workspace_id = espacio;
   if actual is distinct from 'vigente' then
-    return false;
+    return 'sin_cambio';
+  end if;
+
+  select c.autorizado_en into vigente_en from credencial_google c
+   where c.workspace_id = espacio;
+  if vigente_en is distinct from p_autorizado_en then
+    return 'credencial_cambio';
   end if;
 
   insert into credencial_google_evento (workspace_id, tipo, motivo, actor_kind)
     values (espacio, 'reautorizacion_requerida', p_motivo, 'sistema');
-  return true;
+  return 'marcada';
 end $$;
 
 -- =========================================================================
@@ -438,7 +454,7 @@ alter function preparar_evento_credencial_google() owner to prisma_owner;
 alter function aplicar_evento_credencial_google() owner to prisma_owner;
 alter function leer_credencial_google() owner to prisma_owner;
 alter function estado_credencial_google() owner to prisma_owner;
-alter function marcar_reautorizacion_google(text) owner to prisma_owner;
+alter function marcar_reautorizacion_google(text, timestamptz) owner to prisma_owner;
 alter function guardar_credencial_google(uuid, text, text, text[]) owner to prisma_owner;
 alter function revocar_credencial_google(uuid, text) owner to prisma_owner;
 alter function credenciales_google_cifradas() owner to prisma_owner;
@@ -446,7 +462,7 @@ alter function reemplazar_token_google(uuid, text, text) owner to prisma_owner;
 
 revoke execute on function leer_credencial_google() from public;
 revoke execute on function estado_credencial_google() from public;
-revoke execute on function marcar_reautorizacion_google(text) from public;
+revoke execute on function marcar_reautorizacion_google(text, timestamptz) from public;
 revoke execute on function guardar_credencial_google(uuid, text, text, text[]) from public;
 revoke execute on function revocar_credencial_google(uuid, text) from public;
 revoke execute on function credenciales_google_cifradas() from public;
@@ -455,7 +471,7 @@ revoke execute on function reemplazar_token_google(uuid, text, text) from public
 -- Runtime: usar la credencial, avisar que ya no sirve, saber en qué estado está.
 grant execute on function leer_credencial_google() to prisma_app;
 grant execute on function estado_credencial_google() to prisma_app;
-grant execute on function marcar_reautorizacion_google(text) to prisma_app;
+grant execute on function marcar_reautorizacion_google(text, timestamptz) to prisma_app;
 -- Operación: autorizar, revocar y rotar claves. Nunca prisma_app.
 grant execute on function guardar_credencial_google(uuid, text, text, text[]) to prisma_admin;
 grant execute on function revocar_credencial_google(uuid, text) to prisma_admin;

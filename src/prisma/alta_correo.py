@@ -95,12 +95,27 @@ def habilitado(cur: psycopg.Cursor, workspace_id: str) -> bool:
 
 def _config_invalida(cur: psycopg.Cursor, workspace_id: str, clave: str,
                      trato: str) -> None:
+    """Configuración corrupta del alta con correo: ver
+    `registrar_config_invalida`, con el aviso y la etapa del correo."""
+    registrar_config_invalida(
+        cur, workspace_id, clave, trato,
+        prefijo_aviso="correo_config_invalida",
+        etapa="alta_correo_config_invalida")
+
+
+def registrar_config_invalida(cur: psycopg.Cursor, workspace_id: str,
+                              clave: str, trato: str, *, prefijo_aviso: str,
+                              etapa: str) -> None:
     """Deja constancia de una configuración corrupta UNA vez mientras siga
     sin resolver: un aviso administrativo por espacio y clave hace de
     candado de deduplicación (`prisma_app` no puede leer `incident`), y
     recién cuando ese aviso es nuevo se registra el incidente. Así un valor
-    roto no genera un incidente por cada mensaje que lo lee."""
-    tipo = f"correo_config_invalida:{clave}"
+    roto no genera un incidente por cada mensaje que lo lee.
+
+    Compartida con otros módulos de configuración por espacio (Google): cada
+    uno pasa su propio `prefijo_aviso` y su propia `etapa`, para que el
+    incidente nombre de dónde vino y no se confunda con el del correo."""
+    tipo = f"{prefijo_aviso}:{clave}"
     if aviso_pendiente(cur, tipo, "workspace", workspace_id):
         return
     texto = (f"El valor guardado de {clave!r} no es válido -- se lo trató "
@@ -110,7 +125,7 @@ def _config_invalida(cur: psycopg.Cursor, workspace_id: str, clave: str,
     from .incidentes import registrar_incidente
 
     registrar_incidente(cur, workspace_id, texto, severidad="media",
-                        etapa="alta_correo_config_invalida")
+                        etapa=etapa)
 
 
 # ---------------------------------------------------------------------------

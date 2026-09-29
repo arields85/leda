@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import contextlib
 import json
+from datetime import datetime, timezone
 
 import psycopg
 import pytest
@@ -37,7 +38,7 @@ TABLAS = ("credencial_google", "credencial_google_estado",
 FUNCIONES_APP = (
     "leer_credencial_google()",
     "estado_credencial_google()",
-    "marcar_reautorizacion_google(text)",
+    "marcar_reautorizacion_google(text,timestamptz)",
 )
 FUNCIONES_ADMIN = (
     "guardar_credencial_google(uuid,text,text,text[])",
@@ -62,6 +63,15 @@ def _autorizar(conn, workspace_id, cifrador, secreto="refresh-token-de-prueba"):
     with admin(conn) as cur:
         GC.guardar(cur, workspace_id, secreto, CUENTA, SCOPES, cifrador=cifrador)
     conn.commit()
+
+
+AHORA = datetime.now(timezone.utc)
+
+
+def _leida(conn, workspace_id, cifrador):
+    """La credencial tal como la leería el runtime."""
+    with espacio(conn, workspace_id) as cur:
+        return GC.leer(cur, cifrador=cifrador)
 
 
 def _crudo(conn, workspace_id):
@@ -203,12 +213,14 @@ def test_el_ciclo_completo_de_estados(intake_world, conn):
         assert GC.estado(cur) == "vigente"
         cred = GC.leer(cur, cifrador=cifrador)
         assert cred.secreto == "secreto-1"
+        assert cred.autorizada_en is not None
         assert cred.cuenta_email == CUENTA
         assert cred.scopes == SCOPES
         assert cred.estado == "vigente"
 
     with espacio(conn, norte) as cur:
-        assert GC.marcar_reautorizacion(cur, "invalid_grant") is True
+        assert GC.marcar_reautorizacion(
+            cur, "invalid_grant", cred.autorizada_en) == GC.MARCADA
     conn.commit()
     with espacio(conn, norte) as cur:
         assert GC.estado(cur) == "requiere_reautorizacion"
@@ -242,19 +254,23 @@ def test_marcar_o_revocar_sin_credencial_vigente_no_emite_nada(intake_world, con
     cifrador = _cifrador(_clave())
 
     with espacio(conn, norte) as cur:
-        assert GC.marcar_reautorizacion(cur, "invalid_grant") is False
+        assert GC.marcar_reautorizacion(
+            cur, "invalid_grant", AHORA) == GC.SIN_CAMBIO
     with admin(conn) as cur:
         assert GC.revocar(cur, norte, "x") is False
     conn.commit()
     assert _eventos(conn, norte) == []
 
     _autorizar(conn, norte, cifrador)
+    cred = _leida(conn, norte, cifrador)
     with espacio(conn, norte) as cur:
-        assert GC.marcar_reautorizacion(cur, "invalid_grant") is True
+        assert GC.marcar_reautorizacion(
+            cur, "invalid_grant", cred.autorizada_en) == GC.MARCADA
     conn.commit()
     # Idempotente: ya requiere reautorización, no se repite el evento.
     with espacio(conn, norte) as cur:
-        assert GC.marcar_reautorizacion(cur, "invalid_grant") is False
+        assert GC.marcar_reautorizacion(
+            cur, "invalid_grant", cred.autorizada_en) == GC.SIN_CAMBIO
     conn.commit()
     assert len(_eventos(conn, norte)) == 2
 
@@ -264,7 +280,64 @@ def test_marcar_o_revocar_sin_credencial_vigente_no_emite_nada(intake_world, con
     conn.commit()
     assert len(_eventos(conn, norte)) == 3
     with espacio(conn, norte) as cur:
-        assert GC.marcar_reautorizacion(cur, "invalid_grant") is False
+        assert GC.marcar_reautorizacion(
+            cur, "invalid_grant", cred.autorizada_en) == GC.SIN_CAMBIO
+
+
+def test_una_credencial_revocada_devuelve_sin_cambio_aunque_coincida(
+        intake_world, conn):
+    norte = intake_world["north-lab"]["id"]
+    cifrador = _cifrador(_clave())
+    _autorizar(conn, norte, cifrador)
+    cred = _leida(conn, norte, cifrador)
+    with admin(conn) as cur:
+        GC.revocar(cur, norte, "revocada_por_administracion")
+    conn.commit()
+    with espacio(conn, norte) as cur:
+        assert GC.marcar_reautorizacion(
+            cur, "invalid_grant", cred.autorizada_en) == GC.SIN_CAMBIO
+
+
+def test_un_invalid_grant_tardio_no_pisa_una_credencial_reautorizada(
+        intake_world, conn):
+    """R4-001: el runtime leyo el token A, el administrador autorizo el B, y
+    recien ahi llega el `invalid_grant` de A. B sigue vigente."""
+    norte = intake_world["north-lab"]["id"]
+    cifrador = _cifrador(_clave())
+    _autorizar(conn, norte, cifrador, "token-A")
+    leida_a = _leida(conn, norte, cifrador)
+    _autorizar(conn, norte, cifrador, "token-B")
+
+    with espacio(conn, norte) as cur:
+        assert GC.marcar_reautorizacion(
+            cur, "invalid_grant", leida_a.autorizada_en) == GC.CREDENCIAL_CAMBIO
+    conn.commit()
+
+    with espacio(conn, norte) as cur:
+        assert GC.estado(cur) == "vigente"
+        assert GC.leer(cur, cifrador=cifrador).secreto == "token-B"
+    assert [e["tipo"] for e in _eventos(conn, norte)] == ["autorizada", "autorizada"]
+
+    # Con lo que si leyo de B, marca.
+    leida_b = _leida(conn, norte, cifrador)
+    with espacio(conn, norte) as cur:
+        assert GC.marcar_reautorizacion(
+            cur, "invalid_grant", leida_b.autorizada_en) == GC.MARCADA
+
+
+def test_recifrar_no_cambia_la_identidad_de_la_credencial_leida(intake_world, conn):
+    """Rotar la clave no es una nueva autorizacion: quien leyo antes de rotar
+    todavia puede marcar."""
+    norte = intake_world["north-lab"]["id"]
+    vieja, nueva = _clave(), _clave()
+    _autorizar(conn, norte, _cifrador(vieja))
+    leida = _leida(conn, norte, _cifrador(vieja))
+    with admin(conn) as cur:
+        GC.recifrar_todo(cur, _cifrador(nueva, vieja))
+    conn.commit()
+    with espacio(conn, norte) as cur:
+        assert GC.marcar_reautorizacion(
+            cur, "invalid_grant", leida.autorizada_en) == GC.MARCADA
 
 
 @pytest.mark.parametrize("motivo", [
@@ -273,10 +346,12 @@ def test_marcar_o_revocar_sin_credencial_vigente_no_emite_nada(intake_world, con
 ])
 def test_el_motivo_es_un_codigo_corto_saneado(intake_world, conn, motivo):
     norte = intake_world["north-lab"]["id"]
-    _autorizar(conn, norte, _cifrador(_clave()))
+    cifrador = _cifrador(_clave())
+    _autorizar(conn, norte, cifrador)
+    cred = _leida(conn, norte, cifrador)
     with espacio(conn, norte) as cur:
         with pytest.raises(psycopg.errors.CheckViolation):
-            GC.marcar_reautorizacion(cur, motivo)
+            GC.marcar_reautorizacion(cur, motivo, cred.autorizada_en)
     conn.rollback()
     assert [e["tipo"] for e in _eventos(conn, norte)] == ["autorizada"]
 
@@ -345,7 +420,8 @@ def test_un_espacio_no_lee_ni_marca_la_credencial_del_otro(intake_world, conn):
     with espacio(conn, oeste) as cur:
         assert GC.estado(cur) == "sin_autorizar"
         assert GC.leer(cur, cifrador=cifrador) is None
-        assert GC.marcar_reautorizacion(cur, "invalid_grant") is False
+        assert GC.marcar_reautorizacion(
+            cur, "invalid_grant", AHORA) == GC.SIN_CAMBIO
         cur.execute("select * from leer_credencial_google()")
         assert cur.fetchall() == []
     conn.commit()
@@ -467,6 +543,26 @@ def test_las_cuentas_y_scopes_se_validan_al_guardar(intake_world, conn):
     assert _crudo(conn, norte) is None
 
 
+class _CursorFalso:
+    def __init__(self, fila):
+        self._fila = fila
+
+    def execute(self, *a, **k):
+        pass
+
+    def fetchone(self):
+        return self._fila
+
+
+def test_un_estado_desconocido_falla_cerrado_en_vez_de_devolverse():
+    with pytest.raises(GC.EstadoDesconocido):
+        GC.estado(_CursorFalso({"estado": "algo_nuevo"}))
+    fila = {"token_cifrado": "x", "cuenta_email": CUENTA, "scopes": ["a"],
+            "estado": "algo_nuevo", "autorizado_en": AHORA}
+    with pytest.raises(GC.EstadoDesconocido):
+        GC.leer(_CursorFalso(fila), cifrador=_cifrador(_clave()))
+
+
 # ---------------------------------------------------------------------------
 # Configuración por espacio: apagado por defecto, cerrada ante lo corrupto
 # ---------------------------------------------------------------------------
@@ -486,8 +582,24 @@ def _incidentes_config(conn, workspace_id):
     with admin(conn) as cur:
         cur.execute(
             "select count(*) n from incident where workspace_id = %s "
-            "and etapa = 'alta_correo_config_invalida'", (workspace_id,))
+            "and etapa = 'google_config_invalida'", (workspace_id,))
         return cur.fetchone()["n"]
+
+
+def test_una_configuracion_corrupta_usa_la_etapa_y_el_aviso_de_google_no_los_del_correo(
+        intake_world, conn):
+    ws = intake_world["north-lab"]["id"]
+    _guardar_setting(conn, ws, GC.CLAVE_HABILITADO, "1")
+    with espacio(conn, ws) as cur:
+        assert GC.habilitado(cur, ws) is False
+    conn.commit()
+    with admin(conn) as cur:
+        cur.execute("select etapa from incident where workspace_id = %s", (ws,))
+        assert [f["etapa"] for f in cur.fetchall()] == ["google_config_invalida"]
+        cur.execute("select tipo from aviso_administrativo where workspace_id = %s",
+                    (ws,))
+        assert [f["tipo"] for f in cur.fetchall()] == [
+            "google_config_invalida:google.habilitado"]
 
 
 def test_las_claves_de_configuracion_tienen_los_nombres_acordados():
@@ -576,13 +688,33 @@ def test_una_configuracion_corrupta_deja_un_solo_incidente_aunque_se_lea_muchas_
 # ---------------------------------------------------------------------------
 
 
+class _ConexionEspia:
+    """Delega en la conexion de la prueba, pero registra `close`/`rollback`
+    sin cerrar la conexion compartida."""
+
+    def __init__(self, real):
+        self._real = real
+        self.cerrada = False
+        self.rollbacks = 0
+
+    def close(self):
+        self.cerrada = True
+
+    def rollback(self):
+        self.rollbacks += 1
+        self._real.rollback()
+
+    def __getattr__(self, nombre):
+        return getattr(self._real, nombre)
+
+
 @pytest.fixture
 def cli_con_base(conn, monkeypatch):
     llamadas = []
 
     def conectar(*a, **k):
         llamadas.append(1)
-        return conn
+        return _ConexionEspia(conn)
 
     monkeypatch.setattr(cli, "conectar", conectar)
     return llamadas
@@ -607,8 +739,8 @@ def test_recifrar_pasa_todo_a_la_clave_vigente(intake_world, conn, cli_con_base,
         assert GC.leer(cur, cifrador=solo_nueva).secreto == "secreto-norte"
     with espacio(conn, oeste) as cur:
         assert GC.leer(cur, cifrador=solo_nueva).secreto == "secreto-oeste"
-    assert "2" in salida
-    assert "secreto" not in salida
+    assert salida.splitlines() == [
+        "Credenciales re-cifradas con la clave vigente: 2."]
     # Re-cifrar no es un cambio de estado: no emite eventos.
     assert [e["tipo"] for e in _eventos(conn, norte)] == ["autorizada"]
 
@@ -617,7 +749,8 @@ def test_recifrar_sin_credenciales_termina_bien(intake_world, conn, cli_con_base
                                                 monkeypatch, capsys):
     monkeypatch.setenv(cifrado.VARIABLE_CLAVE, _clave())
     assert cli.main(["google", "recifrar"]) == 0
-    assert "No hay credenciales" in capsys.readouterr().out
+    assert capsys.readouterr().out.splitlines() == [
+        "No hay credenciales de Google guardadas."]
 
 
 def test_recifrar_sin_clave_no_cambia_nada_ni_abre_la_base(
@@ -692,3 +825,97 @@ def test_reemplazar_token_no_pisa_una_credencial_que_cambio_en_el_medio(
         assert cur.fetchone()["ok"] is False
     conn.commit()
     assert _crudo(conn, norte) == vigente
+
+
+class _CifradorQueInterviene:
+    """Un cifrador que, al rotar, hace `intervencion()`: simula que la
+    credencial cambio entre que se listo y que se reemplazo."""
+
+    def __init__(self, real, intervencion):
+        self._real = real
+        self._intervencion = intervencion
+
+    def rotar(self, token):
+        self._intervencion()
+        return self._real.rotar(token)
+
+
+def test_recifrar_todo_cuenta_las_que_cambiaron_mientras_se_rotaba(intake_world, conn):
+    norte = intake_world["north-lab"]["id"]
+    oeste = intake_world["west-studio"]["id"]
+    vieja, nueva = _clave(), _clave()
+    _autorizar(conn, norte, _cifrador(vieja), "secreto-norte")
+    _autorizar(conn, oeste, _cifrador(vieja), "secreto-oeste")
+    reautorizada = _cifrador(vieja)
+
+    with admin(conn) as cur:
+        hecho = []
+
+        def cambia_norte():
+            # Sólo la primera vez (norte va primero, por slug).
+            if not hecho:
+                hecho.append(1)
+                GC.guardar(cur, norte, "secreto-nuevo", CUENTA, SCOPES,
+                           cifrador=reautorizada)
+
+        r = GC.recifrar_todo(
+            cur, _CifradorQueInterviene(_cifrador(nueva, vieja), cambia_norte))
+    conn.commit()
+
+    assert r.recifradas == 1
+    assert r.cambiadas == ("north-lab",)
+    assert r.ilegibles == ()
+    # Lo nuevo de norte no se pisó.
+    with espacio(conn, norte) as cur:
+        assert GC.leer(cur, cifrador=reautorizada).secreto == "secreto-nuevo"
+
+
+def test_recifrar_informa_las_que_cambiaron_y_falla_aunque_sean_todas(
+        intake_world, conn, cli_con_base, monkeypatch, capsys):
+    norte = intake_world["north-lab"]["id"]
+    vieja, nueva = _clave(), _clave()
+    _autorizar(conn, norte, _cifrador(vieja), "secreto-norte")
+    real = cifrado.desde_texto(f"{nueva},{vieja}")
+
+    def revoca_en_el_medio():
+        with conn.cursor() as c:
+            c.execute("select revocar_credencial_google(%s::uuid, 'x_y')", (norte,))
+
+    monkeypatch.setattr(
+        cifrado, "cargar", lambda: _CifradorQueInterviene(real, revoca_en_el_medio))
+    assert cli.main(["google", "recifrar"]) == 1
+    salida = capsys.readouterr().out
+
+    assert salida.splitlines() == [
+        "Credenciales re-cifradas con la clave vigente: 0.",
+        "Cambiaron mientras se rotaba 1 credencial(es); no se re-cifraron:",
+        "  north-lab",
+        "Volvé a correr `python -m prisma google recifrar` para terminarlas.",
+    ]
+    assert "No hay credenciales" not in salida
+    assert "secreto" not in salida
+
+
+def test_recifrar_cierra_la_conexion_al_terminar_bien(
+        intake_world, conn, monkeypatch):
+    espia = _ConexionEspia(conn)
+    monkeypatch.setattr(cli, "conectar", lambda *a, **k: espia)
+    monkeypatch.setenv(cifrado.VARIABLE_CLAVE, _clave())
+    assert cli.main(["google", "recifrar"]) == 0
+    assert espia.cerrada
+
+
+def test_recifrar_cierra_la_conexion_y_deshace_si_algo_falla(
+        intake_world, conn, monkeypatch):
+    espia = _ConexionEspia(conn)
+    monkeypatch.setattr(cli, "conectar", lambda *a, **k: espia)
+    monkeypatch.setenv(cifrado.VARIABLE_CLAVE, _clave())
+
+    def falla(cur, cifrador):
+        raise RuntimeError("falla de prueba")
+
+    monkeypatch.setattr(GC, "recifrar_todo", falla)
+    with pytest.raises(RuntimeError):
+        cli.main(["google", "recifrar"])
+    assert espia.cerrada
+    assert espia.rollbacks >= 1
