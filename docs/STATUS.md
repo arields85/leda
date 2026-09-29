@@ -65,7 +65,7 @@ tales. Ver [`INDEX.md`](INDEX.md#documentos-superados).
 |---|---|
 | Comando | `.venv\Scripts\python.exe -m pytest -q` |
 | Fecha | 2026-09-29 |
-| Resultado exacto | 1224 passed, 108 deselected (corrida del escritor de T8c-4; la reversión de T8c-3 volvió al estado de T8c-1, 1213 passed). |
+| Resultado exacto | 1396 passed, 147 deselected (corrida del escritor de T9-R1b-3, commit `3bcaa99`; los 147 deselected son los escenarios del banco real `modelo_real`, incluidas las familias `b-0019` y `b-0020`). |
 
 Seguimientos de la entrega con evidencia (T6a-T6j), siembra reproducible (T7, T7b) y
 comprobadores del banco, `odd/tasks/prisma-orienta.md`: `1008 passed, 108
@@ -188,12 +188,21 @@ serializan y la hora de cada evento, evidencia y aprobación es la de escritura
 (`0016`). Decisiones del usuario registradas como enmiendas de ADR 0009. Prueba de punta
 a punta de "Pedir cambios" por el webhook. Todo esto **todavía no se probó en vivo**.
 
-**Punto exacto para retomar (cierre de sesión 2026-09-28, noche).** Árbol limpio en
-`main`, por delante de `origin/main` (sin push). Frontera de revisión: ver la última
-entrada de `odd/tasks/prisma-orienta.md`. PostgreSQL local (scoop) no es un servicio:
-tras reiniciar Windows, arrancarlo con `pg_ctl` (`PRUEBA-LOCAL.md`).
+**Punto exacto para retomar (cierre de sesión 2026-09-29).** Árbol limpio en `main`, por
+delante de `origin/main` (sin push; lo decide el usuario). Frontera de revisión RDD en
+`3bcaa99` (`review-34b692649e0734e7`, aprobada y reconocida). **Próximo: T9-R1c** — la
+regla 1 del ADR 0013 en las preguntas del alta guiada (`ingreso_tareas.handle_active_text`)
+con el manejo genérico ya existente (`gateway._atender_pregunta_pendiente` más un adaptador
+en `_pregunta_de`), su familia de escenarios del banco y los seguimientos de la revisión
+anotados en la última entrada de `odd/tasks/prisma-orienta.md`. Método: un escritor por
+unidad con TDD, commit, evaluación RDD y la familia del banco real contra
+`nan/deepseek-v4-flash` (n=3) antes de cerrar cada regla. PostgreSQL local (scoop) no es un
+servicio: tras reiniciar Windows, arrancarlo con `pg_ctl` (`PRUEBA-LOCAL.md`); si queda
+colgado (escucha pero `pg_isready` no responde), cerrar el proceso y volver a arrancarlo:
+se recupera solo desde el WAL.
 
-Cerradas en esta sesión (detalle y evidencia en `odd/tasks/prisma-orienta.md`): avisos
+Cerradas en la sesión del 2026-09-28 (noche) (detalle y evidencia en
+`odd/tasks/prisma-orienta.md`): avisos
 al administrador con espera entre reintentos y sin fallar en silencio (#28b, #28c);
 administrador alcanzable en modo local (`python -m prisma administrador`, `escuchar`
 lee el bot de administración sin robarle un webhook ajeno; #11, #11b, #11c); una sola
@@ -244,7 +253,13 @@ entrega después de "Pedir cambios" no volvió a revisión (R3-H20); el B no se 
    usuario del 2026-09-29): pregunta pendiente como contexto con comandos cerrados (patrón
    de "conversation repair" de los asistentes de tareas, adoptado dentro del monolito),
    una respuesta visible por mensaje, estado real y sólo opciones posibles, toque con
-   señal e idempotente. Los hallazgos son casos de prueba: R3-H17 (un slot pendiente se traga un
+   señal e idempotente. **Hecho (2026-09-29):** la regla 1 para el dato del menú (R1a),
+   Modificar y "Ninguna, lo escribo" (R1b, R1b-2, R1b-3), con un solo manejo genérico: el
+   ruteo recibe la pregunta pendiente (descripción y pregunta literal) y devuelve un
+   comando de una lista cerrada; al contestar, la tarea de la pregunta es el sujeto por
+   defecto; con "otro tema" el código rechaza volver a proponer lo pendiente. Banco real:
+   `b-0019` 21/21, `b-0020` 17/18 (la falla restante es de redacción, T10). **Falta:**
+   R1c (alta guiada), R2, R3, R4 y reproducir H19. Los hallazgos son casos de prueba: R3-H17 (un slot pendiente se traga un
    "hola" como evidencia), R3-H20 (la nueva entrega no vuelve a revisión), R3-H15 (un
    mensaje sin texto no recibe respuesta), R3-H19 (dos respuestas para un mensaje),
    R3-H18 (opciones que no se pueden cumplir), R3-H16 (el motivo de "Pedir cambios" no

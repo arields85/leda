@@ -227,7 +227,7 @@ gestión.
       seguimientos de `review-dd7cd3c9cb7e8575`: el arnés del banco manda los mensajes
       posteriores a los toques con el mismo `message_id`; falta la prueba del botón "No,
       es otra cosa" cuando falla el ruteo.
-    - [ ] **T9-R1b-2 — Contestar una pregunta pendiente no abre una búsqueda de tareas;
+    - [x] **T9-R1b-2 — Contestar una pregunta pendiente no abre una búsqueda de tareas;
       otro tema no la vuelve a proponer** (precisión del ADR 0013 regla 1, banco `b-0020`).
       Más los seguimientos de `review-e95b2d47b01f0161`: prueba de "Sí, es eso" con el
       ruteo caído (Modificar y "Ninguna"); una ruta con contexto que resuelva referencias.
@@ -4312,3 +4312,40 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   no la resolvió y Prisma preguntó "¿A cuál te referís?" en vez de corregir (mismo mecanismo
   probable de H19); (2) con `otro_tema`, el modelo volvió a proponer el bloqueo por su cuenta
   (el banco confirma al final y quedó el efecto). Precisión del ADR 0013 regla 1 y T9-R1b-2.
+
+- 2026-09-29: **T9-R1b-2 y T9-R1b-3.** `1950278`: al contestar una pregunta pendiente
+  (`responde`, `corrige`, "Sí, es eso"), la tarea de la pregunta es el sujeto por defecto;
+  Jev se sigue consultando y sólo una resolución CLARA cambia el sujeto; una referencia
+  ambigua o sin resolver no abre "¿A cuál te referís?" (`_resolver_referencias_del_turno(
+  ..., solo_claras=...)`; si falta la credencial de Jev igual se registra el incidente y todo
+  queda en la auditoría). Con `otro_tema`, el responder recibe el bloque de confianza "#
+  Pregunta pendiente". Precisión escrita en ADR 0013 regla 1. Suite 1389 passed. Banco real
+  `b-0020` (n=3): 15/18 (la corrección real pasó de 0/3 a 3/3); "otro tema" seguía
+  volviendo a proponer el bloqueo pese a la instrucción (0/3). `3bcaa99` (R1b-3): guarda
+  determinista en el ciclo del responder (`agente.NoProponer`, `repite_lo_pendiente`): en un
+  turno de `otro_tema` (y "No, es otra cosa") se rechaza, antes de ejecutarla, la misma
+  herramienta sobre la misma tarea que la pregunta pendiente (Modificar: la herramienta de
+  la propuesta; dato del menú: `_HERRAMIENTA_DE_DATO_MENU`; "Ninguna" sin guarda), con un
+  resultado de rechazo al modelo y registro en la auditoría. Suite 1396 passed, 147
+  deselected. Banco real `b-0020`: **17/18**; la única falla (b-0020-c-2) es de redacción: la
+  respuesta resumió la lista sin nombrar "Cablear tablero" (regla de listas R3-H7, T10).
+  Notado para después: cuando `otro_tema` lista tareas, sus botones cuentan como interacción
+  pendiente y no sale el "¿seguimos?" (la pregunta sigue abierta igual).
+
+- 2026-09-29: **Cierre de sesión — punto exacto para retomar.** Árbol limpio en `main`,
+  por delante de `origin/main` (sin push; lo decide el usuario). Hecho: T8 (latencia) y de
+  T9 las etapas R1a, R1b, R1b-2 y R1b-3 (regla 1 del ADR 0013 para el dato del menú,
+  Modificar y "Ninguna, lo escribo"). **Próximo: T9-R1c** — aplicar el manejo genérico
+  (`gateway._atender_pregunta_pendiente` con un adaptador nuevo en `_pregunta_de`) a las
+  preguntas del alta guiada (`ingreso_tareas.handle_active_text`, que hoy toma el mensaje
+  siguiente como el campo pedido), con su familia de escenarios del banco y los
+  seguimientos de la revisión de R1b-2/3 (`review-34b692649e0734e7`, aprobada y reconocida;
+  frontera de revisión en `3bcaa99`): probar la guarda para "destrabar" (clave
+  `bloqueo_id`) y para Modificar de una herramienta cuyo id no es `tarea_id` (p. ej.
+  `resolver_bloqueo`); controlar `resolucion is None` en el filtro `solo_claras`; aserción
+  positiva del caso "otra tarea" del dato del menú. Después, en orden: T9-R2 (una respuesta visible
+  por mensaje; incluye atar el "¿seguimos?" al mensaje entrante), T9-R3, T9-R4, T9-H19
+  (reproducir), T10 (incluye actualizar b-0016 y los fragmentos de redacción que usan
+  b-0019/b-0020), T11 (cuarta ronda), y recién después optimizaciones (T8d). Método que
+  funcionó: un escritor por unidad con TDD, commit, RDD, y la familia del banco real contra
+  `nan/deepseek-v4-flash` (n=3) antes de cerrar cada regla.
