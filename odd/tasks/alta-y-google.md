@@ -1,6 +1,6 @@
 # Alta con correo verificado y acceso a Google (rama auxiliar)
 
-**Estado:** G0 y G1 cerradas salvo la Tanda 2 por Telegram (espera a G2d); G2a, G2b y G2b-2 cerradas — próximo: G2c (ver "Cómo retomar", al final)
+**Estado:** G0 y G1 cerradas salvo la Tanda 2 por Telegram (espera a G2d); G2a, G2b, G2b-2 y G2c cerradas — próximo: G2c-2 (seguimientos) y G2d; en pausa por pedido del usuario (ver "Cómo retomar", al final)
 **Creado:** 2026-09-27
 **Origen:** decisión del usuario, 2026-09-27; [`ADR 0010`](../../docs/decisions/0010-correo-verificado-y-google-en-el-producto.md).
 **Rama/worktree:** `auxiliar/alta-y-google`, `D:\Proyectos\Prisma-PM-worktrees\alta-y-google`.
@@ -750,12 +750,26 @@ Un worktree nuevo no trae lo que no se versiona.
     corrupta de Google llevan su propia etapa, no `alta_correo_…`; (4)
     menores: constante `ESTADOS` sin uso, conexión de `recifrar` sin cerrar,
     `truncate` de `prisma_admin` sobre la tabla de eventos.
-  - [ ] **G2c — Autorización local.** `python -m prisma google autorizar
+  - [x] **G2c — Autorización local.** (`7b693fe`, `de78efa`, 2026-09-29) `python -m prisma google autorizar
     <espacio>`: OAuth de escritorio con redirección a la propia máquina,
     PKCE S256 y `state`; permisos `openid email gmail.send calendar.events`;
     canje del código; cuenta autorizada tomada de la identidad; permiso
     insuficiente → no guarda y lo dice; guarda cifrado. Cliente OAuth en
     `PRISMA_GOOGLE_CLIENT_ID` / `PRISMA_GOOGLE_CLIENT_SECRET`.
+  - [ ] **G2c-2 — Seguimientos de la revisión de G2c.** (1) R4/R3: el
+    servidor local no pone tiempo máximo por conexión: una conexión que no
+    envía nada (la preconexión del navegador) lo cuelga más allá de los 5
+    minutos; (2) R4: `autorizar` tiene la conexión a la base abierta y
+    ociosa durante la espera del navegador; si se corta, el código de Google
+    ya se canjeó y hay que repetir todo: buscar el espacio con una conexión
+    corta y abrir otra sólo para guardar; (3) R3: `google activar` comprueba
+    "vigente" y después enciende sin atomicidad: una revocación en el medio
+    deja Google encendido; (4) R1: un `state` no ASCII rompe
+    `compare_digest` con `TypeError` en lugar de rechazarlo; (5) R1/R3: un
+    pedido local con `state` equivocado corta el flujo en vez de ignorarse;
+    (6) menores: cliente `httpx` sin cerrar, ayudas privadas de `oauth`
+    usadas desde `cli`, estados como texto suelto en `resumen`/`activar`,
+    prueba débil de "sin valores", `_ahora` duplicado.
   - [ ] **G2d — Renovación y envío por Gmail.** Renovación del token;
     `invalid_grant` → requiere reautorización + aviso al administrador +
     incidente; sin clave, API deshabilitada o permiso insuficiente → no
@@ -1208,6 +1222,36 @@ por commit, igual que en `main`. Nunca push sin pedido explícito del usuario.
   (`review-9dd8d687fc19c86f`, autoridad consumida). Frontera revisada:
   `1d3ede6`. Seguimientos menores → G2c (ver "Seguimientos de la revisión
   de G2b-2").
+- 2026-09-29: **G2c cerrada** (delegada, un escritor). `7b693fe`
+  (seguimientos de G2b-2: `src/prisma/config_espacio.py` neutro con
+  `registrar_config_invalida`, `crear_aviso` y `aviso_pendiente`, que
+  `alta_correo` reexporta; `autorizado_en` unificado; `ResultadoDesconocido`;
+  el `rollback` fallido de `recifrar` ya no tapa el error original) y
+  `de78efa` (`google/oauth.py`; `google autorizar <espacio>
+  [--sin-navegador]` con servidor local en `127.0.0.1` y puerto efímero,
+  PKCE S256, `state`, espera de 300 s, canje con `httpx`, comprobación de
+  `refresh_token`, de los permisos concedidos y de la identidad del
+  `id_token` (`iss`, `aud`, `exp`, `email_verified`); carga cifrada con
+  `refresh_token`, `access_token`, vencimiento, cuenta y permisos; `google
+  activar <espacio> [--desactivar]`, que exige credencial vigente; `google
+  estado <espacio>` sin secretos). Cliente OAuth en
+  `PRISMA_GOOGLE_CLIENT_ID` / `PRISMA_GOOGLE_CLIENT_SECRET`. RED:
+  seguimientos → `14 failed, 60 passed`; G2c → `ImportError: cannot import
+  name 'oauth'` (el escritor escribió `oauth.py` antes de las pruebas por
+  error y lo sacó para observar el RED). GREEN: `pytest -q
+  tests/test_google_oauth.py tests/test_google_credenciales.py
+  tests/test_google_cifrado.py tests/test_alta_correo.py` → `225 passed`;
+  `tests/test_capacidades.py tests/test_task_intake.py` → `87 passed`;
+  repetido por la sesión principal: `tests/test_google_oauth.py` → `51
+  passed`. La suite completa del escritor dio `2 failed, 1719 passed` con
+  `tuple concurrently updated` (otra sesión corría pytest desde el
+  repositorio principal contra el mismo PostgreSQL, observado en la lista de
+  procesos); corrida limpia de la sesión principal al terminar la otra:
+  `1721 passed, 129 deselected`.
+  RDD: riesgo alto, rango `1d3ede6..de78efa` (1563 líneas); consentimiento
+  concedido por el usuario; cuatro lentes; **aprobada** y acusada
+  (`review-edb624ca4c33cdac`, autoridad consumida). Frontera revisada:
+  `de78efa`. Hallazgos no bloqueantes → G2c-2.
 - Dependencia registrada: el hecho "bienvenida entregada" de G1 queda como
   evento propio para que la unidad de saludo diario de `main` (pack 06)
   pueda contarlo como saludo del día.
@@ -1239,8 +1283,8 @@ En el worktree `D:\Proyectos\Prisma-PM-worktrees\alta-y-google`, rama
 ## Cómo retomar (punto exacto, actualizado el 2026-09-29)
 
 **Estado de la rama.** `auxiliar/alta-y-google`, rebasada sobre `main`
-(`a667170`, 2026-09-29); último commit de código `1d3ede6`; árbol limpio.
-Suite completa (en `1d3ede6`): `1667 passed, 129 deselected`. Respaldos:
+(`a667170`, 2026-09-29); último commit de código `de78efa`; árbol limpio.
+Suite completa (en `de78efa`): `1721 passed, 129 deselected`. Respaldos:
 `auxiliar/alta-y-google-pre-unificacion`,
 `auxiliar/alta-y-google-unificada-un-commit` y
 `auxiliar/alta-y-google-pre-rebase-0929`.
@@ -1249,8 +1293,9 @@ Suite completa (en `1d3ede6`): `1667 passed, 129 deselected`. Respaldos:
 avisos al administrador unificados con el canal de `main`, "Habilitar un
 nuevo intento", textos aprobados, Tanda 1); G2a (cifrado con rotación,
 `google clave-nueva`, `cryptography`); G2b (tabla `0101`, eventos,
-funciones, `google recifrar`); G2b-2 (seguimientos de su revisión).
-Frontera revisada por RDD: `1d3ede6`.
+funciones, `google recifrar`); G2b-2 (seguimientos de su revisión); G2c
+(`google autorizar`, `activar`, `estado`). Frontera revisada por RDD:
+`de78efa`.
 
 **Pendiente de G1.** Sólo la Tanda 2 por Telegram real: necesita el envío
 real de Gmail (G2d).
@@ -1264,6 +1309,10 @@ y clave en `PRISMA_CLAVE_CREDENCIALES`; permisos `gmail.send` y
 (confirmado por el usuario el 2026-09-29). G2 partida en G2a-G2d (ver
 "Tareas").
 
+**Otra sesión contra el mismo PostgreSQL.** Si la suite completa falla con
+`tuple concurrently updated` en pruebas de migración, comprobar si otra
+sesión corre pytest (lista de procesos) y repetir la corrida cuando termine.
+
 **Lo que necesita el usuario antes o durante G2.**
 1. Proyecto de Google Cloud con las APIs de Gmail y Calendar habilitadas.
 2. Pantalla de consentimiento OAuth y un cliente OAuth de tipo "aplicación
@@ -1274,9 +1323,11 @@ y clave en `PRISMA_CLAVE_CREDENCIALES`; permisos `gmail.send` y
    genera) y guardarla en el `.env`.
 4. Ya hecho: `PRISMA_BOT_TOKEN_ADMIN` en el `.env` del worktree.
 
-**Primer paso concreto de la próxima sesión.** G2c (autorización local),
-con los seguimientos de la revisión de G2b-2, y después G2d, según
-"Tareas". Rebasar sobre `main` al cerrar
+**Primer paso concreto de la próxima sesión.** G2c-2 (seguimientos de la
+revisión de G2c: tiempo máximo por conexión del servidor local, conexión a
+la base corta en `autorizar`, `activar` atómico y menores) y después G2d,
+según "Tareas". El usuario pidió una pausa al cerrar G2c (2026-09-29): no
+arrancar sin su indicación. Rebasar sobre `main` al cerrar
 G2 (2 commits nuevos en `main` al 2026-09-29, sin migraciones).
 
 **Seguimientos menores anotados.** `null` JSON en la configuración tratado
@@ -1296,7 +1347,8 @@ simultánea; varios mensajes del alta con correo no pasan
 - R3 (fecha local en la prueba del saludo): corregido en `6804939`.
 
 **Seguimientos de la revisión de G2b-2** (no bloqueantes,
-`review-9dd8d687fc19c86f`; van con G2c):
+`review-9dd8d687fc19c86f`; resueltos en `7b693fe` salvo la nota sobre
+`0101`):
 - R3-002/R2-004: `google.credenciales` importa `alta_correo` al cargarse;
   cuando G2d haga que el alta envíe por Gmail puede quedar un import
   circular. Mover `registrar_config_invalida` a un módulo neutro.
