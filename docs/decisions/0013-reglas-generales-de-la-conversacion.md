@@ -61,6 +61,12 @@ casos.
      otra cosa.
    - **no puedo**: el mensaje pide algo que Prisma no puede hacer; lo dice una vez,
      ofrece la alternativa real si existe y la pregunta queda abierta.
+   **Precisión (2026-09-29, banco real `b-0020`).** Responder o corregir una pregunta
+   pendiente no abre una búsqueda de tareas: la tarea ya la fija la pregunta, así que
+   con `responde` o `corrige` no se resuelven referencias nuevas (un sustantivo de la
+   corrección, como "el variador", no es una tarea). Y con `otro tema`, el responder
+   sabe que hay una pregunta pendiente que el sistema retoma solo y no la vuelve a
+   proponer por su cuenta.
    Ningún camino consume una pregunta pendiente sin ese comando. Los errores internos
    siguen el camino de siempre (regla 2). El modelo nunca decide el efecto: sólo el
    comando.

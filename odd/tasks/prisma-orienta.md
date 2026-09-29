@@ -223,10 +223,14 @@ gestión.
         del caso en que otro turno consumió la pregunta antes de `responde` (una sola
         respuesta); `cancela` debe mirar el resultado del consumo antes de decir "dejé de
         lado"; `reintentos` entero escrito como `2.0` debe aceptarse.
-    - [ ] **T9-R1b — Corrección abierta** (Modificar y "Ninguna, lo escribo"). Incluye los
+    - [x] **T9-R1b — Corrección abierta** (Modificar y "Ninguna, lo escribo"). Incluye los
       seguimientos de `review-dd7cd3c9cb7e8575`: el arnés del banco manda los mensajes
       posteriores a los toques con el mismo `message_id`; falta la prueba del botón "No,
       es otra cosa" cuando falla el ruteo.
+    - [ ] **T9-R1b-2 — Contestar una pregunta pendiente no abre una búsqueda de tareas;
+      otro tema no la vuelve a proponer** (precisión del ADR 0013 regla 1, banco `b-0020`).
+      Más los seguimientos de `review-e95b2d47b01f0161`: prueba de "Sí, es eso" con el
+      ruteo caído (Modificar y "Ninguna"); una ruta con contexto que resuelva referencias.
     - [ ] **T9-R1c — Preguntas del alta guiada** (`ingreso_tareas.handle_active_text`).
   - [ ] **T9-R2 — Cada mensaje recibe exactamente una respuesta visible** (H15, H19).
     `procesar_update` sólo lee `text` (`gateway.py:213`); control estructural al cerrar
@@ -4297,3 +4301,14 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   (RED y GREEN, 124 passed en el grupo). Banco real otra vez: **21/21**; ruteo con pregunta
   pendiente 1,1-2,5 s. Pendiente para R2: el retome es otra fila de la cola sin vínculo
   explícito con el mensaje entrante; R2 debe contarla como parte de la misma respuesta.
+
+- 2026-09-29: **T9-R1b.** Commit `5371921`: un solo manejo genérico de preguntas pendientes
+  (`_atender_pregunta_pendiente` con el adaptador `_pregunta_de`) para el dato del menú,
+  Modificar y "Ninguna, lo escribo"; ids de mensaje únicos en el banco; familia `b-0020`.
+  Suite del escritor 1376 passed, 147 deselected; enfocadas repetidas 211 passed. RDD
+  `review-e95b2d47b01f0161` (medio) aprobada y reconocida; frontera en `5371921`. Banco real
+  (n=3): 12/18. El ruteo acertó siempre (`corrige`, `otro_tema`); las fallas son después: (1)
+  la corrección "se rompió el variador" sacó "el variador roto" como referencia a tarea, Jev
+  no la resolvió y Prisma preguntó "¿A cuál te referís?" en vez de corregir (mismo mecanismo
+  probable de H19); (2) con `otro_tema`, el modelo volvió a proponer el bloqueo por su cuenta
+  (el banco confirma al final y quedó el efecto). Precisión del ADR 0013 regla 1 y T9-R1b-2.
