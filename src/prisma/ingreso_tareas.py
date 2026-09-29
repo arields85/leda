@@ -44,6 +44,12 @@ CANCELAR_BORRADOR = con_icono("Cancelar borrador", ICONO_CANCELAR)
 DRAFT_AWAITING_CONFIRMATION = (
     "El borrador de la tarea está esperando confirmación: se confirma con el "
     "botón Confirmar del resumen, no con un mensaje.")
+# Lo mismo cuando quien escribe no es quien confirma (ADR 0013 regla 3, estado
+# real): dice quién confirma en vez de dar a entender que puede hacerlo.
+DRAFT_AWAITING_APPROVER = (
+    "El borrador de la tarea está esperando la confirmación de {approver}: la "
+    "tarea se crea cuando esa persona toca Confirmar en el resumen que le "
+    "llegó, no con un mensaje.")
 CHOICE_FALLBACK_PROMPT = "Elegí una opción para seguir con la tarea."
 USER_FIELD_LIMITS = {
     "title": 200,
@@ -534,6 +540,24 @@ FREE_TEXT_NAMES = {
 }
 
 
+def awaiting_confirmation_text(approver_name: str | None) -> str:
+    """Lo que se le dice a quien escribe con su borrador esperando la
+    confirmación. `approver_name` es el de quien confirma si no es quien
+    escribe (`None` si es la misma persona: el botón es suyo)."""
+    if not approver_name:
+        return DRAFT_AWAITING_CONFIRMATION
+    return DRAFT_AWAITING_APPROVER.format(approver=approver_name)
+
+
+def _approver_name_for_writer(who: Solicitante, approver_id,
+                              approver_name) -> str | None:
+    """El nombre de quien confirma, o `None` si es quien escribe. Sin nombre
+    legible se dice igual que es otra persona, nunca que puede confirmar."""
+    if approver_id is None or str(approver_id) == str(who.membership_id):
+        return None
+    return approver_name or "otra persona"
+
+
 def free_text_question(field: str) -> str:
     """La pregunta que se le hizo a la persona para ese campo, la misma al
     volver a hacerla."""
@@ -616,7 +640,10 @@ def open_intake_question(cur: psycopg.Cursor, who: Solicitante,
                 "opciones": [etiqueta_sin_icono(c["etiqueta"])
                              for c in cur.fetchall()]}
     cur.execute(
-        f"""select p.id, r.id request_id, {_TITLE_OF_REQUEST} titulo
+        f"""select p.id, r.id request_id, {_TITLE_OF_REQUEST} titulo,
+                   p.membership_id approver_id,
+                   (select i.nombre from integrante i
+                     where i.membership_id = p.membership_id) approver_name
               from task_intake_request r
               join pending_action p on p.draft_id = r.task_draft_id
                                    and p.workspace_id = r.workspace_id
@@ -631,7 +658,10 @@ def open_intake_question(cur: psycopg.Cursor, who: Solicitante,
         return {"tipo": QUESTION_CONFIRMATION, "id": str(row["id"]),
                 "request_id": str(row["request_id"]), "campo": None,
                 "titulo": _text_or_none(row["titulo"]),
-                "resumen": DRAFT_AWAITING_CONFIRMATION, "opciones": None}
+                "resumen": awaiting_confirmation_text(
+                    _approver_name_for_writer(
+                        who, row["approver_id"], row["approver_name"])),
+                "opciones": None}
     return None
 
 

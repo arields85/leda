@@ -1691,7 +1691,7 @@ def test_ejecutar_escenario_escribir_la_opcion_de_la_eleccion_abierta_del_alta(
 
 @pytest.mark.parametrize(("comando", "texto", "estado", "dice"), [
     (RespectoPendiente.RESPONDE, "sí, dale", "active",
-     "esperando confirmación"),
+     "esperando la confirmación de"),
     (RespectoPendiente.CORRIGE, "cambiale la fecha", "active",
      "no lo puedo cambiar"),
     (RespectoPendiente.CANCELA, "no, cancelalo", "cancelled", "dejé de lado"),
@@ -1795,7 +1795,8 @@ def test_ejecutar_escenario_sobre_el_borrador_sembrado_no_lo_convierte(
         mensajes_tras_toques=["sí, dale"])
 
     assert r.bloqueado is False, r.motivo_bloqueo
-    assert "esperando confirmación" in r.respuesta_texto
+    # Marcos no confirma lo suyo: la respuesta dice quién lo hace.
+    assert "esperando la confirmación de Ismael Soschinski" in r.respuesta_texto
     assert len(interno.pendientes) == 1 and "borrador" in interno.pendientes[0]
     # Lo sembrado no cuenta como respuesta ni se confirma solo.
     assert r.conteos_antes_del_toque is None

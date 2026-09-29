@@ -62,9 +62,11 @@ def _alta_con_eleccion(conn, world) -> str:
     return outcome.request_id
 
 
-def _alta_en_confirmacion(conn, world) -> tuple[str, str]:
+def _alta_en_confirmacion(conn, world, responsable="Sam North") -> tuple[str, str]:
     """El alta completa: el borrador espera la confirmación. Devuelve el id de
-    la solicitud y el de la `pending_action` de la vista previa."""
+    la solicitud y el de la `pending_action` de la vista previa. Quien escribe
+    (Taylor Quinn) aprueba lo de Sam North; lo suyo ("Para mí") lo aprueba
+    Morgan Hale."""
     user = _usuario(world)
     with espacio(conn, world["north-lab"]["id"]) as cur:
         actor, outcome = _start(cur, world, chat_id=user)
@@ -74,7 +76,7 @@ def _alta_en_confirmacion(conn, world) -> tuple[str, str]:
                         where request_id = %s and estado = 'active'""", (rid,))
         if cur.fetchone()["campo"] == "description":
             _choose(cur, actor, rid, "Sí", chat_id=user)
-        for parte in ("Reduce service delay", "Sam North", "Field Services"):
+        for parte in ("Reduce service delay", responsable, "Field Services"):
             etiqueta = next(e for e in _active_choices(cur, rid) if parte in e)
             _choose(cur, actor, rid, etiqueta, chat_id=user)
         _choose(cur, actor, rid, "Sí", chat_id=user)
@@ -440,6 +442,51 @@ def test_responde_no_convierte_el_borrador_y_dice_como_se_confirma(
     salidas = _nuevas(conn, user, antes)
     assert len(salidas) == 1
     assert salidas[-1]["cuerpo"] == I.DRAFT_AWAITING_CONFIRMATION
+
+
+# Regla 3 (ADR 0013, estado real): si quien escribe no es quien confirma, la
+# respuesta dice quién confirma en vez de dar a entender que puede hacerlo.
+def test_quien_escribe_es_el_aprobador_la_respuesta_no_nombra_a_nadie(
+        intake_world, conn, monkeypatch):
+    _alta_en_confirmacion(conn, intake_world, responsable="Sam North")
+    user = _usuario(intake_world)
+    antes = _salidas(conn, user)
+    provider = _RoutingProvider([_ruta(RespectoPendiente.RESPONDE)])
+
+    _escribir(conn, monkeypatch, intake_world, provider, "sí, dale")
+
+    salidas = _nuevas(conn, user, antes)
+    assert [f["cuerpo"] for f in salidas] == [I.DRAFT_AWAITING_CONFIRMATION]
+    assert "Morgan Hale" not in salidas[0]["cuerpo"]
+
+
+@pytest.mark.parametrize("comando", [
+    RespectoPendiente.RESPONDE, RespectoPendiente.CHARLA, RespectoPendiente.CORRIGE])
+def test_quien_escribe_no_es_el_aprobador_la_respuesta_dice_quien_confirma(
+        comando, intake_world, conn, monkeypatch):
+    rid, pid = _alta_en_confirmacion(conn, intake_world,
+                                     responsable="Para mí")
+    user = _usuario(intake_world)
+    aprobador = intake_world["north-lab"]["people"]["Morgan Hale"]["name"]
+    antes = _salidas(conn, user)
+    provider = _RoutingProvider([_ruta(comando)])
+
+    _escribir(conn, monkeypatch, intake_world, provider, "sí, dale")
+
+    _sin_conversion(conn, rid, pid)
+    salidas = _nuevas(conn, user, antes)
+    assert len(salidas) == 1
+    cuerpo = salidas[0]["cuerpo"]
+    assert cuerpo.endswith(I.awaiting_confirmation_text(aprobador))
+    assert aprobador in cuerpo and "Confirmar" in cuerpo
+    assert cuerpo != I.DRAFT_AWAITING_CONFIRMATION
+    # La vista previa con los botones le llegó al aprobador, no a quien escribe.
+    with admin(conn) as cur:
+        cur.execute(
+            """select o.chat_id from message_outbox o
+                where o.pending_action_id = %s""", (pid,))
+        assert cur.fetchone()["chat_id"] == (
+            intake_world["north-lab"]["people"]["Morgan Hale"]["telegram"])
 
 
 def test_corrige_no_cambia_el_borrador_y_dice_que_no_se_cambia_desde_un_mensaje(

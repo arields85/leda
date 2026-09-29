@@ -38,10 +38,11 @@ efectos:
     task_state_event: 0
     evidence: 0
     approval: 0
-# La respuesta es `ingreso_tareas.DRAFT_AWAITING_CONFIRMATION`: si
-# cambia su redacción, actualizar acá.
+# Marcos no es quien confirma lo suyo (el aprobador es Dirección): la respuesta
+# es `ingreso_tareas.DRAFT_AWAITING_APPROVER` y dice quién confirma. Si cambia
+# su redacción, actualizar acá.
 respuesta_menciona:
-  - "esperando confirmación"
+  - "esperando la confirmación de Ismael Soschinski"
   - "Confirmar"
 # El alta es justamente lo que se prueba: un borrador es esperable.
 permite_borrador_de_tarea: true
