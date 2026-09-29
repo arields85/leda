@@ -279,12 +279,19 @@ gestión.
       acaba de dejar, en el camino "Dejarlo y ver lo otro" (banco `b-0020-f` 0/3: tras
       dejar el bloqueo, el responder lo volvió a proponer desde el historial); el toque
       "dejar" sólo con su valor explícito (`review-2282ebc46e7a48e1`, R3).
-    - [ ] **T9-R1d-1b** — la vista previa de un cambio que la persona pidió y espera su
+    - [x] **T9-R1d-1b** — la vista previa de un cambio que la persona pidió y espera su
       Confirmar pasa a ser rama (hoy el texto sigue el turno normal). Más los seguimientos
       de `review-ed284b3aec853536`: probar la guarda para las acciones del menú
       `destrabar`, `informar_bloqueo`, `adjuntar_evidencia` y `pedir_cambios` (que sus
       argumentos lleven el id que la guarda compara), y la guarda al retomar tras botones
       de aclaración.
+    - [ ] **T9-R1d-1c** — la aclaración con botones ("¿A cuál te referís?", elección de
+      herramienta con `campo`) también es rama, y un turno nunca abre dos cosas: si una
+      llamada a herramienta abre una pregunta (elección o vista previa), el turno termina
+      ahí (banco `b-0023`: el responder abrió la aclaración y además la vista previa en el
+      mismo turno). Más los seguimientos de `review-0c99f611fc23e0cd`: prueba del caso en
+      que la vista previa no entra con botones, y de las vistas previas armadas desde el
+      menú (y con `bloqueo_id`).
     - [ ] **T9-R1d-2** — retención de los mensajes que inicia Prisma mientras la persona
       tiene una rama abierta, hasta que vence la pregunta.
   - [ ] **T9-R1c-3 — Modificar en la vista previa del alta** (precisión del ADR 0005
@@ -4543,3 +4550,18 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   `fe2c8ea` (la observación del `NameError` por la anotación se descartó: `agente.py` tiene
   `from __future__ import annotations`). Banco real (n=3, 11 escenarios de rama): **33/33**
   (antes 28/33).
+
+- 2026-09-29: **T9-R1d-1b.** Ruta: delegada, un escritor. `d863f38` (pruebas de la guarda
+  para `destrabar`, `informar_bloqueo`, `adjuntar_evidencia`, `pedir_cambios` y al retomar
+  tras aclaración; no hizo falta corregir), `6a424f1` (la vista previa de un cambio que la
+  persona pidió y espera su Confirmar es rama: `responde` no aplica nada y vuelve a mostrar
+  la vista previa con sus botones; `corrige` va a Modificar con el mensaje como corrección;
+  `cancela` la cancela; `otro_tema` hace la pregunta de la rama con la guarda en Dejar),
+  `487bff9` (familia `b-0023`). Suite del escritor 1584 passed, 228 deselected; padre:
+  enfocadas 101 passed. RDD: tramo `fe2c8ea..487bff9` medio, 1350 líneas, consentida,
+  `review-0c99f611fc23e0cd` **aprobada y reconocida**; frontera en `487bff9`. Banco real
+  `b-0023` (n=3): 10/15; banco completo (n=1): 71/76. Fallan `b-0001-a`, `b-0001-b` y
+  `b-0013`, que ya fallaban antes (sin regresión), y `b-0023`/`b-0023-e`: en un mismo turno
+  el responder llamó a `registrar_bloqueo` con el título como id (abrió la aclaración "¿A
+  cuál te referís?") y siguió hasta armar la vista previa; la aclaración no era rama y el
+  mensaje siguiente pasó de largo con dos cosas abiertas (T9-R1d-1c).
