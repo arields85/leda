@@ -318,6 +318,52 @@ def reclamar_modificacion_abierta(cur: psycopg.Cursor, quien: Solicitante,
                                args=f["args"] or {}, resumen=f["resumen"])
 
 
+def ver_modificacion_abierta(cur: psycopg.Cursor, quien: Solicitante,
+                             chat_id: int,
+                             ahora: datetime) -> ModificacionAbierta | None:
+    """Lee, sin consumir, la misma modificación abierta que reclamaría
+    `reclamar_modificacion_abierta` (mismas reglas de selección: la más
+    reciente sin leer, sin vencer y dentro de `VENTANA_MODIFICACION`).
+
+    Existe para una pregunta pendiente que hay que interpretar antes de
+    decidir si el mensaje la responde (T9-R1a, ADR 0013 regla 1): sólo se
+    consume, con `consumir_modificacion`, cuando el comando es `responde` o
+    `cancela`."""
+    cur.execute(
+        """select id, herramienta, args, resumen from pending_action
+            where workspace_id = %(ws)s and membership_id = %(mid)s
+              and chat_id = %(chat)s and modificar_pedido_en is not null
+              and vence_en > %(ahora)s and modificacion_consumida_en is null
+              and modificar_pedido_en > %(ahora)s - %(ventana)s
+            order by modificar_pedido_en desc
+            limit 1""",
+        {"ahora": ahora, "ws": quien.workspace_id, "mid": quien.membership_id,
+         "chat": chat_id, "ventana": VENTANA_MODIFICACION})
+    f = cur.fetchone()
+    if not f:
+        return None
+    return ModificacionAbierta(pending_action_id=str(f["id"]),
+                               herramienta=f["herramienta"],
+                               args=f["args"] or {}, resumen=f["resumen"])
+
+
+def consumir_modificacion(cur: psycopg.Cursor, pending_action_id: str,
+                          ahora: datetime) -> bool:
+    """Consume, de un solo uso y por id, una modificación abierta. Un solo
+    `update ... where modificacion_consumida_en is null` es atómico: si dos
+    turnos concurrentes intentan consumir la misma, el segundo espera el
+    bloqueo de fila, vuelve a evaluar la condición y no actualiza nada, así
+    que sólo uno recibe `True`."""
+    cur.execute(
+        """update pending_action
+              set modificacion_consumida_en = %s
+            where id = %s and modificar_pedido_en is not null
+              and modificacion_consumida_en is null
+            returning id""",
+        (ahora, pending_action_id))
+    return cur.fetchone() is not None
+
+
 def pending_action_id_de(cur: psycopg.Cursor, token: str) -> str | None:
     """El id de la acción pendiente dueña de un token de opción.
 

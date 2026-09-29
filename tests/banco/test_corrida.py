@@ -18,7 +18,8 @@ from prisma.salida import etiqueta_sin_icono
 from prisma.autoridad import Canal, identificar
 from prisma.db import admin, espacio
 from prisma.jev import ClienteJevGuionado
-from prisma.llm import IntentAction, IntentRoute, Llamada, ProveedorGuionado, Respuesta
+from prisma.llm import (IntentAction, IntentRoute, Llamada, ProveedorGuionado,
+                         RespectoPendiente, Respuesta)
 
 from tests.banco.comprobadores import comprobar_aclaracion
 from tests.banco.corrida import (
@@ -124,6 +125,42 @@ def test_grabacion_vieja_sin_trabajos_ni_personas_sigue_cargando():
     ruta = guionado.route_intent("cualquier cosa")
     assert ruta.trabajos == ()
     assert ruta.personas == ()
+    assert ruta.respecto_pendiente is None
+
+
+def test_grabador_pasa_y_graba_la_pregunta_pendiente_y_su_comando():
+    """T9-R1a: con una pregunta pendiente el grabador la pasa al proveedor
+    interno, la anota junto a la entrada y redondea el comando devuelto."""
+    interno = ProveedorGuionado(guion=[], rutas=[IntentRoute(
+        IntentAction.NORMAL_CONVERSATION,
+        respecto_pendiente=RespectoPendiente.CHARLA)])
+    g = ProveedorGrabador(interno)
+
+    ruta = g.route_intent("hola", pendiente="la evidencia de «X»")
+
+    assert ruta.respecto_pendiente is RespectoPendiente.CHARLA
+    assert interno.pendientes == ["la evidencia de «X»"]
+    import json
+    grabacion = json.loads(json.dumps(g.a_json()))
+    assert grabacion["rutas"][0]["pendiente"] == "la evidencia de «X»"
+    assert grabacion["rutas"][0]["salida"]["respecto_pendiente"] == "charla"
+
+    guionado = guionado_desde_grabacion(grabacion)
+    assert guionado.route_intent(
+        "cualquier cosa", pendiente="p").respecto_pendiente is (
+            RespectoPendiente.CHARLA)
+
+
+def test_grabador_sin_pendiente_no_agrega_claves_nuevas():
+    interno = ProveedorGuionado(guion=[], rutas=[
+        IntentRoute(IntentAction.NORMAL_CONVERSATION)])
+    g = ProveedorGrabador(interno)
+
+    g.route_intent("hola")
+
+    assert "pendiente" not in g.rutas[0]
+    assert "respecto_pendiente" not in g.rutas[0]["salida"]
+    assert interno.pendientes == [None]
 
 
 # ---------------------------------------------------------------------------

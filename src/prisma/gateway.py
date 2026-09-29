@@ -54,6 +54,31 @@ _ETIQUETA_NINGUNA = "Ninguna, lo escribo"
 _ETIQUETA_NUEVA = "Es una tarea nueva"
 _TIPO_ELECCION = {_OPCION_NINGUNA: "ninguna", _OPCION_NUEVA: "nueva"}
 
+# El dato que una acción del menú de una tarea pide escribir (T9-R1a, ADR 0013
+# regla 1): la pregunta que se hace y cómo se la describe al ruteo. Un solo
+# lugar para las dos, así volver a preguntar repite exactamente la pregunta.
+# Redacción pendiente de revisión de voz en T10.
+PREGUNTA_DATO_EVIDENCIA_ENTREGA = "Contame brevemente qué hiciste o pasame un link."
+_PREGUNTAS_DATO_MENU = {
+    "terminar": PREGUNTA_DATO_EVIDENCIA_ENTREGA,
+    "pedir_cambios": "¿Qué falta corregir en «{titulo}»?",
+    "informar_bloqueo": "¿Cuál es la causa del bloqueo de «{titulo}»?",
+    "destrabar": "¿Cómo se destrabó «{titulo}»?",
+    "adjuntar_evidencia": "Contame la evidencia de «{titulo}» (o pegá el enlace).",
+}
+_DESCRIPCIONES_DATO_MENU = {
+    "terminar": "la evidencia de la entrega de «{titulo}»",
+    "pedir_cambios": "qué hay que corregir en «{titulo}»",
+    "informar_bloqueo": "la causa del bloqueo de «{titulo}»",
+    "destrabar": "cómo se destrabó «{titulo}»",
+    "adjuntar_evidencia": "la evidencia de «{titulo}»",
+}
+_DESCRIPCION_DATO_MENU_GENERICA = "un dato sobre «{titulo}»"
+# Redacción pendiente de revisión de voz en T10.
+AVISO_DATO_DEJADO_DE_LADO = "Listo, dejé de lado {descripcion}."
+# Redacción pendiente de revisión de voz en T10.
+AVISO_NO_PUEDO_DATO_PENDIENTE = "Eso todavía no lo puedo hacer."
+
 # `TRUNCAR_TITULO_BOTON` es un alias de `salida.TRUNCAR_ETIQUETA_BOTON`
 # (importado arriba): la regla de truncado vive ahí, reusada por
 # `ofrecer_opciones` (T1, ADR 0007); este nombre se conserva porque las
@@ -775,7 +800,7 @@ def _turno(cur, quien, texto: str, workspace_id: str, chat_id: int,
 
     from . import pendientes as P
     from .calendario import Calendario
-    from .llm import IntentRoute, desde_base
+    from .llm import desde_base
 
     now = datetime.now(timezone.utc)
     cal = Calendario.desde_base(cur, workspace_id)
@@ -795,41 +820,32 @@ def _turno(cur, quien, texto: str, workspace_id: str, chat_id: int,
     # T3) hace que esa corrección también pase por enrutador y Jev, como
     # cualquier turno, antes de llegar a `agente.responder` con el contexto
     # de la propuesta que se está corrigiendo.
-    modificacion = P.reclamar_modificacion_abierta(cur, quien, chat_id, now)
-    if modificacion is not None and modificacion.herramienta == _SENTINEL_ACLARACION:
-        _resumir_aclaracion_ninguna(cur, quien, texto, modificacion, proveedor,
-                                    cal, chat_id, workspace_id, now, entrante_id)
-        return
-    if modificacion is not None and modificacion.herramienta == P.SENTINEL_DATO_MENU_TAREA:
-        # T2: la persona escribió el dato que le faltaba a una acción del
-        # menú (la causa de un bloqueo, su resolución, la evidencia). Pasa
-        # directo a la herramienta -- no hay referencia que resolver, ni
-        # modelo ni Jev de por medio.
-        _resumir_dato_menu_tarea(cur, quien, texto, modificacion, chat_id,
-                                 workspace_id, now)
-        return
-
+    #
+    # El dato que pidió una acción del menú (la causa de un bloqueo, su
+    # resolución, la evidencia) ya no se toma sin mirarlo (T9-R1a, ADR 0013
+    # regla 1): se lee la pregunta abierta sin consumirla y el ruteo tipado
+    # la relaciona con el mensaje. Sólo `otro_tema` (o una pregunta que otro
+    # turno ya consumió) sigue por el camino normal, con la ruta ya obtenida.
     route = None
-    last_error = None
-    for _ in range(2):
-        try:
-            candidate = proveedor.route_intent(texto)
-            if not isinstance(candidate, IntentRoute):
-                raise TypeError("The provider returned an untyped route.")
-            route = candidate
-            break
-        except Exception as exc:  # noqa: BLE001
-            last_error = exc
+    modificacion = None
+    abierta = P.ver_modificacion_abierta(cur, quien, chat_id, now)
+    if abierta is not None and abierta.herramienta == P.SENTINEL_DATO_MENU_TAREA:
+        route = _atender_dato_pendiente(cur, quien, texto, abierta, proveedor,
+                                        chat_id, workspace_id, now)
+        if route is None:
+            return
+    else:
+        modificacion = P.reclamar_modificacion_abierta(cur, quien, chat_id, now)
+        if modificacion is not None and modificacion.herramienta == _SENTINEL_ACLARACION:
+            _resumir_aclaracion_ninguna(cur, quien, texto, modificacion, proveedor,
+                                        cal, chat_id, workspace_id, now, entrante_id)
+            return
 
     if route is None:
-        _routing_incident(cur, quien, last_error)
-        _responder(
-            cur, workspace_id, chat_id, quien,
-            with_no_effect_status(
-                "No pude entender si querías crear una tarea. "
-                "Decime de otra forma qué necesitás."), now,
-        )
-        return
+        route, last_error = _rutear(proveedor, texto)
+        if route is None:
+            _avisar_ruteo_caido(cur, quien, last_error, workspace_id, chat_id, now)
+            return
 
     # Resolver antes de actuar (T3, ADR 0005 decisión 6 / ADR 0006): las
     # referencias a tarea que separó el enrutador se resuelven contra las
@@ -845,6 +861,104 @@ def _turno(cur, quien, texto: str, workspace_id: str, chat_id: int,
                                         modificacion)
     _avanzar_aclaracion(cur, quien, workspace_id, chat_id, now, proveedor, cal,
                        estado)
+
+
+def _rutear(proveedor, texto: str, pendiente: str | None = None):
+    """El ruteo tipado con dos intentos: (ruta, None), o (None, último
+    error) si los dos fallan. `pendiente` es la descripción de la pregunta
+    abierta, si la hay (T9-R1a)."""
+    from .llm import IntentRoute
+
+    last_error = None
+    for _ in range(2):
+        try:
+            candidate = (proveedor.route_intent(texto) if pendiente is None
+                         else proveedor.route_intent(texto, pendiente=pendiente))
+            if not isinstance(candidate, IntentRoute):
+                raise TypeError("The provider returned an untyped route.")
+            return candidate, None
+        except Exception as exc:  # noqa: BLE001
+            last_error = exc
+    return None, last_error
+
+
+def _avisar_ruteo_caido(cur, quien, error, workspace_id: str, chat_id: int,
+                        ahora) -> None:
+    """El ruteo falló dos veces: incidente y el aviso de siempre, sin efecto."""
+    _routing_incident(cur, quien, error)
+    _responder(
+        cur, workspace_id, chat_id, quien,
+        with_no_effect_status(
+            "No pude entender si querías crear una tarea. "
+            "Decime de otra forma qué necesitás."), ahora,
+    )
+
+
+def _pregunta_dato_menu(accion: str | None, titulo: str) -> str:
+    """La pregunta del dato que pide una acción del menú, la misma al pedirlo
+    y al volver a pedirlo."""
+    plantilla = _PREGUNTAS_DATO_MENU.get(accion or "")
+    if plantilla is None:
+        plantilla = _PREGUNTAS_DATO_MENU["adjuntar_evidencia"]
+    return plantilla.format(titulo=titulo)
+
+
+def _descripcion_dato_menu(args: dict) -> str:
+    """Descripción corta del dato pendiente, para el ruteo: sale de la acción
+    y el título guardados al abrir la pregunta."""
+    plantilla = _DESCRIPCIONES_DATO_MENU.get(
+        args.get("accion") or "", _DESCRIPCION_DATO_MENU_GENERICA)
+    return plantilla.format(titulo=args.get("titulo", ""))
+
+
+def _atender_dato_pendiente(cur, quien, texto: str, abierta, proveedor,
+                            chat_id: int, workspace_id: str, ahora):
+    """Interpreta el mensaje que llega con abierta la pregunta de un dato del
+    menú (T9-R1a, ADR 0013 regla 1): el ruteo tipado devuelve un comando de
+    la lista cerrada y acá hay un manejo determinista por comando. Todo
+    camino deja exactamente una respuesta visible.
+
+    Devuelve `None` cuando el turno ya terminó, o la ruta ya obtenida cuando
+    el mensaje sigue por el camino normal (`otro_tema`, o una pregunta que
+    otro turno consumió antes) -- sin un segundo ruteo. La pregunta se
+    consume sólo con `responde` y `cancela`; si el ruteo falla, queda
+    abierta."""
+    from . import pendientes as P
+    from .llm import RespectoPendiente
+
+    route, error = _rutear(proveedor, texto,
+                           pendiente=_descripcion_dato_menu(abierta.args))
+    if route is None:
+        _avisar_ruteo_caido(cur, quien, error, workspace_id, chat_id, ahora)
+        return None
+
+    comando = route.respecto_pendiente
+    pregunta = _pregunta_dato_menu(abierta.args.get("accion"),
+                                   abierta.args.get("titulo", ""))
+
+    if comando is RespectoPendiente.RESPONDE:
+        if P.consumir_modificacion(cur, abierta.pending_action_id, ahora):
+            _resumir_dato_menu_tarea(cur, quien, texto, abierta, chat_id,
+                                     workspace_id, ahora)
+            return None
+        return route
+    if comando is RespectoPendiente.CANCELA:
+        P.consumir_modificacion(cur, abierta.pending_action_id, ahora)
+        _responder(cur, workspace_id, chat_id, quien,
+                   AVISO_DATO_DEJADO_DE_LADO.format(
+                       descripcion=_descripcion_dato_menu(abierta.args)), ahora)
+        return None
+    if comando is RespectoPendiente.OTRO_TEMA:
+        return route
+    if comando is RespectoPendiente.NO_PUEDO:
+        _responder(cur, workspace_id, chat_id, quien,
+                   f"{AVISO_NO_PUEDO_DATO_PENDIENTE} {pregunta}", ahora)
+        return None
+    # `charla`, y por ahora también `corrige` y `dudoso`: vuelve a hacer la
+    # misma pregunta sin consumirla. Su manejo completo (botones y el
+    # "¿seguimos?" de `otro_tema`) es la etapa T9-R1a-2.
+    _responder(cur, workspace_id, chat_id, quien, pregunta, ahora)
+    return None
 
 
 def _iniciar_alta_guiada(cur, quien, chat_id: int, entrante_id: str | None,
@@ -1554,17 +1668,20 @@ def _mensaje_resultado_menu(cur, quien, herramienta: str, resultado, *,
 
 def _pedir_dato_menu_tarea(cur, quien, workspace_id: str, chat_id: int, *,
                            accion: str, tarea_id: str, titulo: str,
-                           pregunta: str, ahora, extra: dict | None = None) -> None:
+                           ahora, extra: dict | None = None) -> None:
     """Pide un dato que ninguna herramienta puede adivinar -- la causa de un
     bloqueo, su resolución, la evidencia -- con el mismo mecanismo que
     "Ninguna, lo escribo" (T4, `aclaracion-con-botones`, decisión 4):
     `marcar_para_corregir`, dentro de la ventana de
     `pendientes.VENTANA_MODIFICACION`. Sin botones -- la respuesta es texto
-    libre -- y `_turno` la recibe antes de rutearla, por el sentinel
-    `SENTINEL_DATO_MENU_TAREA`, sin pasar por el modelo ni por Jev."""
+    libre -- y `_turno` la recibe por el sentinel `SENTINEL_DATO_MENU_TAREA`:
+    el ruteo tipado la relaciona con el mensaje antes de consumirla (T9-R1a,
+    ADR 0013 regla 1, `_atender_dato_pendiente`). La pregunta sale de
+    `_pregunta_dato_menu`, la misma con la que se vuelve a preguntar."""
     from . import pendientes as P
     from .agente import VIGENCIA_PENDIENTE
 
+    pregunta = _pregunta_dato_menu(accion, titulo)
     args = {"accion": accion, "tarea_id": tarea_id, "titulo": titulo}
     if extra:
         args.update(extra)
@@ -1666,9 +1783,7 @@ def _resolver_toque_menu_tarea(cur, quien, workspace_id: str, chat_id: int,
             if M.evidencia_pendiente(cur, tarea_id):
                 _pedir_dato_menu_tarea(
                     cur, quien, workspace_id, chat_id, accion="terminar",
-                    tarea_id=tarea_id, titulo=titulo,
-                    pregunta="Contame brevemente qué hiciste o pasame un link.",
-                    ahora=ahora)
+                    tarea_id=tarea_id, titulo=titulo, ahora=ahora)
                 return
             _ejecutar_accion_menu(cur, quien, workspace_id, chat_id,
                                   "actualizar_estado",
@@ -1683,8 +1798,7 @@ def _resolver_toque_menu_tarea(cur, quien, workspace_id: str, chat_id: int,
         if accion == "pedir_cambios":
             _pedir_dato_menu_tarea(
                 cur, quien, workspace_id, chat_id, accion="pedir_cambios",
-                tarea_id=tarea_id, titulo=titulo,
-                pregunta=f"¿Qué falta corregir en «{titulo}»?", ahora=ahora)
+                tarea_id=tarea_id, titulo=titulo, ahora=ahora)
             return
         if accion == "cerrar_tarea":
             # ADR 0008: mismo `actualizar_estado` que "Ya la terminé" usa
@@ -1700,9 +1814,7 @@ def _resolver_toque_menu_tarea(cur, quien, workspace_id: str, chat_id: int,
         if accion == "informar_bloqueo":
             _pedir_dato_menu_tarea(
                 cur, quien, workspace_id, chat_id, accion="informar_bloqueo",
-                tarea_id=tarea_id, titulo=titulo,
-                pregunta=f"¿Cuál es la causa del bloqueo de «{titulo}»?",
-                ahora=ahora)
+                tarea_id=tarea_id, titulo=titulo, ahora=ahora)
             return
 
         if accion == "destrabar":
@@ -1725,17 +1837,14 @@ def _resolver_toque_menu_tarea(cur, quien, workspace_id: str, chat_id: int,
                 return
             _pedir_dato_menu_tarea(
                 cur, quien, workspace_id, chat_id, accion="destrabar",
-                tarea_id=tarea_id, titulo=titulo,
-                pregunta=f"¿Cómo se destrabó «{titulo}»?", ahora=ahora,
+                tarea_id=tarea_id, titulo=titulo, ahora=ahora,
                 extra={"bloqueo_id": str(abiertos[0]["id"])})
             return
 
         if accion == "adjuntar_evidencia":
             _pedir_dato_menu_tarea(
                 cur, quien, workspace_id, chat_id, accion="adjuntar_evidencia",
-                tarea_id=tarea_id, titulo=titulo,
-                pregunta=f"Contame la evidencia de «{titulo}» (o pegá el enlace).",
-                ahora=ahora)
+                tarea_id=tarea_id, titulo=titulo, ahora=ahora)
             return
 
         if accion in ("depende_de_otra", "mi_trabajo_depende"):

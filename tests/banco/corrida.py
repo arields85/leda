@@ -24,7 +24,7 @@ from prisma.agente import DISCULPA
 from prisma.db import admin
 from prisma.jev import ClienteJevGuionado
 from prisma.llm import (IntentAction, IntentRoute, Llamada, Proveedor,
-                        ProveedorGuionado, Respuesta)
+                        ProveedorGuionado, RespectoPendiente, Respuesta)
 from prisma.salida import etiquetas_coinciden
 
 # 'objective', 'evidence' y 'approval' se agregaron en T4 (banco-conversacional
@@ -87,17 +87,23 @@ def _incidentes_de_proveedor_caido(cur, workspace_id: str, ids_previos: set,
 
 
 def _ruta_a_dict(ruta: IntentRoute) -> dict:
-    return {"action": ruta.action.value, "task": dict(ruta.task),
-            "trabajos": list(ruta.trabajos), "personas": list(ruta.personas)}
+    salida = {"action": ruta.action.value, "task": dict(ruta.task),
+              "trabajos": list(ruta.trabajos), "personas": list(ruta.personas)}
+    if ruta.respecto_pendiente is not None:
+        salida["respecto_pendiente"] = ruta.respecto_pendiente.value
+    return salida
 
 
 def _dict_a_ruta(d: dict) -> IntentRoute:
     # `.get(..., ())` con default: una grabación de antes de T2 no tiene
     # estas dos claves y tiene que seguir cargando (`aclaracion-con-botones`,
-    # T2).
+    # T2); tampoco `respecto_pendiente` (T9-R1a), que sólo existe con una
+    # pregunta pendiente.
+    respecto = d.get("respecto_pendiente")
     return IntentRoute(
         IntentAction(d["action"]), dict(d.get("task", {})),
-        tuple(d.get("trabajos", ())), tuple(d.get("personas", ())))
+        tuple(d.get("trabajos", ())), tuple(d.get("personas", ())),
+        RespectoPendiente(respecto) if respecto is not None else None)
 
 
 def _respuesta_a_dict(r: Respuesta) -> dict:
@@ -124,12 +130,17 @@ class ProveedorGrabador:
     rutas: list[dict] = field(default_factory=list)
     respuestas: list[dict] = field(default_factory=list)
 
-    def route_intent(self, text: str) -> IntentRoute:
+    def route_intent(self, text: str,
+                     pendiente: str | None = None) -> IntentRoute:
         inicio = time.perf_counter()
-        ruta = self.interno.route_intent(text)
+        ruta = (self.interno.route_intent(text) if pendiente is None
+                else self.interno.route_intent(text, pendiente=pendiente))
         latencia = time.perf_counter() - inicio
-        self.rutas.append({"entrada": text, "salida": _ruta_a_dict(ruta),
-                           "latencia_s": latencia})
+        registro = {"entrada": text, "salida": _ruta_a_dict(ruta),
+                    "latencia_s": latencia}
+        if pendiente is not None:
+            registro["pendiente"] = pendiente
+        self.rutas.append(registro)
         return ruta
 
     def responder(self, sistema, mensajes, herramientas) -> Respuesta:

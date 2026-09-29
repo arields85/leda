@@ -213,6 +213,11 @@ gestión.
     manejo determinista. Por etapas, un commit cada una:
     - [ ] **T9-R1a — Contrato del ruteo y dato pedido desde el menú** (el caso de H17:
       evidencia, causa y resolución de bloqueo, motivo de cambios, adjuntar evidencia).
+      - [x] **T9-R1a-1** — contrato del ruteo con pregunta pendiente y comandos
+        responde, cancela, charla, no puedo y otro tema (corrige y dudoso vuelven a
+        preguntar, interino).
+      - [ ] **T9-R1a-2** — dudoso con botones, retome "¿seguimos?" después de otro tema,
+        corrige, y escenarios del banco con familias de variantes (medir el prompt).
     - [ ] **T9-R1b — Corrección abierta** (Modificar y "Ninguna, lo escribo").
     - [ ] **T9-R1c — Preguntas del alta guiada** (`ingreso_tareas.handle_active_text`).
   - [ ] **T9-R2 — Cada mensaje recibe exactamente una respuesta visible** (H15, H19).
@@ -248,6 +253,7 @@ gestión.
 | T8a | delegada, un escritor | `config.py`, `llm.py`, `gateway.py` (3 llamadas), `cli.py`, `tests/banco/conftest.py`, pruebas |
 | T8b | inline, corridas del banco real | medición; sin cambios de código |
 | T8c-1 | delegada, un escritor | `agente.py` y pruebas de varios módulos (ciclo del responder) |
+| T9-R1a-1 | delegada, un escritor | `llm.py`, `pendientes.py`, `gateway.py`, arnés del banco, pruebas |
 | T8c-3 | delegada, un escritor | `gateway.py`, `agente.py`, `llm.py`, arnés del banco, pruebas, ADR 0012 |
 
 ## Verificación
@@ -4247,3 +4253,18 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   generales ([`ADR 0013`](../../docs/decisions/0013-reglas-generales-de-la-conversacion.md)),
   con el costo aceptado de ~2 s de ruteo en las respuestas a un dato pedido. Se descarta
   la lista de saludos como mecanismo.
+
+- 2026-09-29: **T9-R1a-1 — la pregunta pendiente del menú se interpreta (ADR 0013 regla 1).**
+  `route_intent(texto, pendiente=...)` en todos los proveedores: con pregunta pendiente el
+  prompt del ruteo (`ROUTER_SYSTEM_PENDIENTE`) la incluye y el esquema exige
+  `respecto_pendiente` de la lista cerrada (responde, corrige, cancela, otro_tema, charla,
+  dudoso, no_puedo); la validación tipada lo exige sólo con pregunta pendiente.
+  `pendientes.ver_modificacion_abierta` (sin consumir) y `consumir_modificacion` (un solo
+  uso, `update ... where modificacion_consumida_en is null`). `gateway._atender_dato_pendiente`
+  con un manejo por comando; la pregunta sólo se consume con responde o cancela; si el
+  ruteo falla queda abierta. Modificar y "Ninguna, lo escribo" siguen igual (R1b). Suite
+  antes de esta unidad: 1235 passed (validación de parámetros, `ee5b848`). TDD: RED por
+  importación faltante y, con el comportamiento viejo restituido a mano, 13 de 14 pruebas
+  de `tests/test_pregunta_pendiente.py` fallaron; GREEN enfocadas 275 passed (repetidas por
+  el orquestador: 165 passed); suite completa 1309 passed, 108 deselected. El prompt del
+  ruteo con pregunta pendiente todavía no se midió con el modelo real (R1a-2).
