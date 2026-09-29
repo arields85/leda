@@ -593,6 +593,31 @@ def test_modificar_si_es_eso_con_una_referencia_ambigua_no_abre_aclaracion(
     assert _salidas(conn, tg) == antes + 1
 
 
+@pytest.mark.parametrize("solo_claras", [True, False],
+                         ids=["solo_claras", "todas"])
+def test_una_referencia_sin_resolucion_ni_error_se_ignora_sin_romper(
+        conn, corework, monkeypatch, solo_claras):
+    # Seguimiento de review-34b692649e0734e7: el contrato dice que `resolucion`
+    # sólo es `None` con un error, pero un Jev que devolviera `(None, None)`
+    # tiraba `AttributeError` (auditoría y filtro `solo_claras`) y el mensaje
+    # se perdía. Se trata como una referencia no resuelta.
+    ws = corework.workspace_id
+    _con_jev(monkeypatch)
+    monkeypatch.setattr(gateway, "_resolver_en_paralelo",
+                        lambda *a, **k: {SUSTANTIVO: (None, None)})
+    with espacio(conn, ws) as cur:
+        quien = _quien(cur, PERSONA, ws)
+        resultado = gateway._resolver_referencias_del_turno(
+            cur, quien, "el variador roto", _ruta_con_trabajos(None), ws,
+            solo_claras=solo_claras)
+
+    if solo_claras:
+        assert resultado is None                       # como si no estuviera
+    else:
+        assert resultado is not None and not resultado.hay_clara
+        assert resultado.resueltas_claras == {}
+
+
 # ---------------------------------------------------------------------------
 # `otro_tema`: el responder sabe que hay una pregunta pendiente
 # ---------------------------------------------------------------------------

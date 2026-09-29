@@ -1037,11 +1037,16 @@ _HERRAMIENTA_DE_DATO_MENU = {
 }
 
 
+# Los argumentos que identifican sobre qué actúa una herramienta que escribe,
+# en orden de preferencia (`_no_proponer_de`).
+_CAMPOS_DE_ID = ("tarea_id", "bloqueo_id", "dependencia_id")
+
+
 def _no_proponer_de(abierta) -> dict | None:
     """La guarda de `otro_tema` (T9-R1b-3, ADR 0013 regla 1): la herramienta y
     el id que la pregunta abierta deja pendientes, como datos (`NoProponer`
     de `agente`, guardado como dict para que viaje en el estado de la
-    aclaración). Modificar: la herramienta de la propuesta y su `tarea_id`;
+    aclaración). Modificar: la herramienta de la propuesta y su id;
     dato del menú: la herramienta a la que lleva la acción. "Ninguna, lo
     escribo" no tiene tarea conocida: sin guarda."""
     from . import pendientes as P
@@ -1052,7 +1057,12 @@ def _no_proponer_de(abierta) -> dict | None:
         herramienta, campo = _HERRAMIENTA_DE_DATO_MENU.get(
             abierta.args.get("accion"), (None, None))
     else:
-        herramienta, campo = abierta.herramienta, "tarea_id"
+        # Modificar: el id de la propuesta es el de su herramienta --
+        # `bloqueo_id` en `resolver_bloqueo`, `dependencia_id` al quitar una
+        # dependencia, `tarea_id` en el resto. Una herramienta con dos ids
+        # (`crear_dependencia`) o ninguno conocido queda sin guarda.
+        herramienta = abierta.herramienta
+        campo = next((c for c in _CAMPOS_DE_ID if c in abierta.args), None)
     valor = abierta.args.get(campo) if campo else None
     if not herramienta or valor is None:
         return None
@@ -2439,6 +2449,14 @@ def _resolver_referencias_del_turno(cur, quien, texto: str, route,
     resultados = _resolver_en_paralelo(
         cliente_jev, texto=texto, referencias=trabajos, tareas=tareas,
         vocabulario=vocab, quien_escribe=quien.nombre)
+    # `resolucion` sólo es `None` con un error; un `(None, None)` rompe el
+    # contrato y se trata como una resolución que falló, no como un dato.
+    resultados = {
+        referencia: ((resolucion, error)
+                     if resolucion is not None or error is not None
+                     else (None, jev_modulo.JevError(
+                         "Jev no devolvió una resolución.")))
+        for referencia, (resolucion, error) in resultados.items()}
 
     _auditar_resolucion(cur, quien, workspace_id, resultados)
 
@@ -2446,7 +2464,7 @@ def _resolver_referencias_del_turno(cur, quien, texto: str, route,
         resultados = {
             referencia: (resolucion, error)
             for referencia, (resolucion, error) in resultados.items()
-            if error is None
+            if error is None and resolucion is not None
             and resolucion.tipo is jev_modulo.TipoResolucion.CLARA
             and resolucion.tarea_id in por_id}
         if not resultados:

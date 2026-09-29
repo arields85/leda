@@ -22,9 +22,9 @@ from prisma import pendientes as P
 from prisma.db import admin, espacio
 from prisma.llm import Llamada, RespectoPendiente, Respuesta
 
-from tests.test_menu_tarea import (_abrir_menu, _mensaje, _quien,  # noqa: F401
-                                   _tarea as _tarea_menu, _telegram_id, _tocar,
-                                   _tocar_accion, cliente)
+from tests.test_menu_tarea import (_abrir_menu, _bloquear, _mensaje,  # noqa: F401
+                                   _quien, _tarea as _tarea_menu, _telegram_id,
+                                   _tocar, _tocar_accion, cliente)
 from tests.test_modificar import _proponer, _tarea as _tarea_modificar
 from tests.test_pregunta_pendiente_otras import (_abiertas, _con_rutas,
                                                  _filas_del_chat, _ruta,
@@ -36,13 +36,15 @@ TITULO_MENU = "Programar HMI línea 2"
 FRAGMENTO_RECHAZO = "ya está pendiente con la persona"
 
 
-def _vistas_previas(conn, herramienta: str, tarea_id: str) -> int:
-    """Vistas previas esperando Confirmar de `herramienta` sobre `tarea_id`."""
+def _vistas_previas(conn, herramienta: str, valor: str,
+                    campo: str = "tarea_id") -> int:
+    """Vistas previas esperando Confirmar de `herramienta` sobre el id `valor`
+    de su argumento `campo` (`tarea_id`, o `bloqueo_id` en `resolver_bloqueo`)."""
     with admin(conn) as cur:
         cur.execute(
             """select count(*) n from pending_action
                 where estado = 'esperando' and herramienta = %s
-                  and args->>'tarea_id' = %s""", (herramienta, tarea_id))
+                  and args->>%s = %s""", (herramienta, campo, valor))
         return cur.fetchone()["n"]
 
 
@@ -182,7 +184,8 @@ def test_dato_del_menu_otro_tema_guarda_la_herramienta_de_la_accion(
     proveedor = _con_rutas(
         monkeypatch, [_ruta(RespectoPendiente.OTRO_TEMA)],
         guion=_guion("actualizar_estado",
-                     {"tarea_id": destino, "estado": "en_revision"}))
+                     {"tarea_id": destino, "estado": "en_revision",
+                      "evidencia_texto": "quedó probada"}))
 
     _mensaje(cliente, tg, "¿qué tareas tengo abiertas?")
 
@@ -191,6 +194,10 @@ def test_dato_del_menu_otro_tema_guarda_la_herramienta_de_la_accion(
     assert bool(rechazos) is es_la_misma
     if es_la_misma:
         assert _vistas_previas(conn, "actualizar_estado", a) == 0
+    else:
+        # Aserción positiva (review-34b692649e0734e7): sobre otra tarea la
+        # propuesta sí se arma, no sólo "no se rechazó".
+        assert _vistas_previas(conn, "actualizar_estado", b) == 1
     assert _abiertas(conn) == 1
 
 
@@ -234,3 +241,99 @@ def test_no_es_otra_cosa_tambien_tiene_la_guarda(
                for r in _resultados_de_herramientas(proveedor))
     assert _abiertas(conn) == 1
     assert gateway.MARCA_PREGUNTA_PENDIENTE in proveedor.recibidos[0][0]
+
+
+# ---------------------------------------------------------------------------
+# Herramientas cuyo id no es `tarea_id` (T9-R1c-0, review-34b692649e0734e7):
+# `resolver_bloqueo` se identifica por `bloqueo_id`.
+# ---------------------------------------------------------------------------
+
+
+def _bloqueo_de(conn, tarea_id: str) -> str:
+    with admin(conn) as cur:
+        cur.execute("select id from blocker where task_id = %s", (tarea_id,))
+        return str(cur.fetchone()["id"])
+
+
+def _abrir_destrabar(cliente, conn, ws, monkeypatch) -> tuple[int, str, str]:
+    """"Ya se destrabó" sobre el único bloqueo abierto de la tarea A (pide cómo
+    se destrabó) y una tarea B con su propio bloqueo. Devuelve (chat, id del
+    bloqueo de A, id del bloqueo de B)."""
+    with admin(conn) as cur:
+        a = _tarea_menu(cur, ws, titulo=TITULO_MENU, estado="asignada")
+        _bloquear(cur, ws, a)
+        b = _tarea_menu(cur, ws, titulo="Revisar variador línea 2",
+                        estado="asignada")
+        _bloquear(cur, ws, b, causa="Falta un cable")
+    conn.commit()
+    _pid, filas, tg = _abrir_menu(cliente, conn, ws, monkeypatch, a,
+                                  "Nahuel Gimenez")
+    _tocar_accion(cliente, conn, ws, filas, "Ya se destrabó", tg)
+    assert _abiertas(conn) == 1
+    return tg, _bloqueo_de(conn, a), _bloqueo_de(conn, b)
+
+
+@pytest.mark.parametrize("es_el_mismo", [True, False],
+                         ids=["mismo_bloqueo_rechaza", "otro_bloqueo_permite"])
+def test_destrabar_otro_tema_guarda_resolver_bloqueo_por_bloqueo_id(
+        cliente, conn, corework, monkeypatch, es_el_mismo):
+    ws = corework.workspace_id
+    tg, bloqueo_a, bloqueo_b = _abrir_destrabar(cliente, conn, ws, monkeypatch)
+    destino = bloqueo_a if es_el_mismo else bloqueo_b
+    proveedor = _con_rutas(
+        monkeypatch, [_ruta(RespectoPendiente.OTRO_TEMA)],
+        guion=_guion("resolver_bloqueo",
+                     {"bloqueo_id": destino, "resolucion": "llegó el switch"}))
+
+    _mensaje(cliente, tg, "¿qué tareas tengo abiertas?")
+
+    rechazos = [r for r in _resultados_de_herramientas(proveedor)
+                if FRAGMENTO_RECHAZO in r["content"]]
+    assert bool(rechazos) is es_el_mismo
+    assert _vistas_previas(conn, "resolver_bloqueo", bloqueo_a,
+                           "bloqueo_id") == 0
+    assert _vistas_previas(conn, "resolver_bloqueo", bloqueo_b,
+                           "bloqueo_id") == (0 if es_el_mismo else 1)
+    assert _abiertas(conn) == 1
+
+
+@pytest.mark.parametrize("es_el_mismo", [True, False],
+                         ids=["mismo_bloqueo_rechaza", "otro_bloqueo_permite"])
+def test_modificar_de_resolver_bloqueo_otro_tema_guarda_por_bloqueo_id(
+        cliente, conn, corework, monkeypatch, es_el_mismo):
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        a = _tarea_modificar(cur, ws)
+        b = _tarea_modificar(cur, ws, titulo="Revisar variador línea 2")
+        _bloquear(cur, ws, a)
+        _bloquear(cur, ws, b, causa="Falta un cable")
+    conn.commit()
+    bloqueo_a, bloqueo_b = _bloqueo_de(conn, a), _bloqueo_de(conn, b)
+    with espacio(conn, ws) as cur:
+        quien = _quien(cur, PERSONA, ws)
+        tg = _telegram_id(cur, PERSONA)
+        pid = _proponer(cur, ws, quien, "resolver_bloqueo",
+                        {"bloqueo_id": bloqueo_a, "resolucion": "llegó el switch"},
+                        chat_id=tg, ahora=datetime.now(timezone.utc))
+        modificar = P.opcion_por_etiqueta(cur, pid, "Modificar")
+    conn.commit()
+    assert _tocar(cliente, modificar.token, tg).status_code == 200
+    assert _abiertas(conn) == 1
+    previas_a = _vistas_previas(conn, "resolver_bloqueo", bloqueo_a, "bloqueo_id")
+    destino = bloqueo_a if es_el_mismo else bloqueo_b
+    proveedor = _con_rutas(
+        monkeypatch, [_ruta(RespectoPendiente.OTRO_TEMA)],
+        guion=_guion("resolver_bloqueo",
+                     {"bloqueo_id": destino, "resolucion": "llegó el switch"}))
+
+    _mensaje(cliente, tg, "¿qué tareas tengo abiertas?")
+
+    rechazos = [r for r in _resultados_de_herramientas(proveedor)
+                if FRAGMENTO_RECHAZO in r["content"]]
+    assert bool(rechazos) is es_el_mismo
+    assert _vistas_previas(conn, "resolver_bloqueo", bloqueo_a,
+                           "bloqueo_id") == previas_a          # ninguna nueva
+    if not es_el_mismo:
+        assert _vistas_previas(conn, "resolver_bloqueo", bloqueo_b,
+                               "bloqueo_id") == 1
+    assert _abiertas(conn) == 1
