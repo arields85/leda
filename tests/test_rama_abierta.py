@@ -384,3 +384,38 @@ def test_dudoso_no_es_otra_cosa_deja_lo_pendiente_y_atiende_el_mensaje_que_causo
     assert filas[-1]["cuerpo"] == RESPUESTA
     assert proveedor.pendientes[-1] is None                   # sin pregunta abierta
     assert proveedor.recibidos[-1][1][-1]["content"] == OTRO_MENSAJE
+
+
+# ---------------------------------------------------------------------------
+# Un valor de elección inesperado no es "dejar" (review-2282ebc46e7a48e1, R3)
+# ---------------------------------------------------------------------------
+
+
+def test_una_eleccion_inesperada_se_contesta_como_no_vigente_y_no_cierra_nada(
+        mundo, conn, monkeypatch):
+    proveedor = _con_rutas(monkeypatch, [])
+    from datetime import timedelta
+    from prisma.agente import VIGENCIA_PENDIENTE
+    ahora = datetime.now(timezone.utc)
+    with espacio(conn, mundo.ws) as cur:
+        quien = _quien(cur, "Marcos Tarquini" if mundo.kind != "dato_menu"
+                       else "Nahuel Gimenez", mundo.ws)
+        abierta = gateway._ver_pregunta_abierta(
+            cur, quien, mundo.tg, ahora, alta=mundo.kind == "alta_texto")
+        args = {**gateway._args_de_la_pregunta(abierta),
+                "texto": OTRO_MENSAJE, "entrante_id": None}
+        p = P.registrar(
+            cur, quien, herramienta=P.SENTINEL_RESPUESTA_DATO_MENU,
+            args=args, resumen="¿Seguimos con eso?",
+            vence_en=ahora + VIGENCIA_PENDIENTE, campo="eleccion",
+            opciones=[("Otra", "algo_raro")], chat_id=mundo.tg)
+        token = P.opciones(cur, p.id)[0].token
+    conn.commit()
+    antes = _salidas(conn, mundo.tg)
+
+    assert _tocar(mundo.cliente, token, mundo.tg).status_code == 200
+
+    assert _salidas(conn, mundo.tg) == antes + 1              # exactamente una
+    assert _ultimo_cuerpo(conn, mundo.tg) == gateway.AVISO_PEDIDO_NO_VIGENTE
+    assert mundo.sigue_abierta()                              # no se cerró
+    assert proveedor.recibidos == []

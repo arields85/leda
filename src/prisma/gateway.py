@@ -128,6 +128,9 @@ AVISO_PEDIDO_NO_VIGENTE = (
 _ELECCION_DATO_SI = "si"
 _ELECCION_DATO_SEGUIR = "seguir"
 _ELECCION_DATO_DEJAR = "dejar"
+# "Dejarlo y ver lo otro", y "No, es otra cosa" de `dudoso`, que hasta T9-R1d
+# guardaba "no": la misma salida.
+_ELECCIONES_DE_DEJAR = (_ELECCION_DATO_DEJAR, "no")
 
 # Las otras dos preguntas que dejan el mensaje siguiente como respuesta
 # (T9-R1b, ADR 0013 regla 1): la de Modificar y la de "Ninguna, lo escribo".
@@ -923,9 +926,14 @@ def _turno(cur, quien, texto: str, workspace_id: str, chat_id: int,
 
 def _seguir_camino_normal(cur, quien, texto: str, route, proveedor, cal,
                           chat_id: int, workspace_id: str, ahora,
-                          entrante_id: str | None, *, modificacion=None) -> None:
+                          entrante_id: str | None, *, modificacion=None,
+                          no_proponer: dict | None = None) -> None:
     """El camino de siempre para un mensaje ya ruteado: resolver las
-    referencias, y aclarar con botones, dar el alta guiada o responder."""
+    referencias, y aclarar con botones, dar el alta guiada o responder.
+
+    `no_proponer`, si viene, es lo que la persona acaba de dejar de lado
+    (`_no_proponer_de`): el responder no lo vuelve a proponer en este turno
+    (T9-R1d-1a-fix, banco b-0020-f: las instrucciones solas no alcanzan)."""
     # Resolver antes de actuar (T3, ADR 0005 decisión 6 / ADR 0006): las
     # referencias a tarea que separó el enrutador se resuelven contra las
     # tareas activas del espacio, bajo el mismo cursor con RLS que ya tiene
@@ -946,6 +954,7 @@ def _seguir_camino_normal(cur, quien, texto: str, route, proveedor, cal,
 
     estado = _estado_inicial_aclaracion(texto, entrante_id, route, referencias,
                                         modificacion)
+    estado["no_proponer"] = no_proponer
     _avanzar_aclaracion(cur, quien, workspace_id, chat_id, ahora, proveedor, cal,
                        estado)
 
@@ -1028,6 +1037,57 @@ def _para_ruteo(descripcion: str, pregunta: str) -> str:
     no veía que se había pedido un link (ADR 0013 regla 1: se interpreta
     contra la pregunta real)."""
     return f"{descripcion} (la pregunta que se le hizo fue: «{pregunta}»)"
+
+
+# Qué herramienta produce, sobre qué id de sus argumentos, cada acción del menú
+# que pide un dato (`_resumir_dato_menu_tarea`): lo que la persona deja de lado
+# al soltar esa pregunta.
+_HERRAMIENTA_DE_DATO_MENU = {
+    "informar_bloqueo": ("registrar_bloqueo", "tarea_id"),
+    "destrabar": ("resolver_bloqueo", "bloqueo_id"),
+    "adjuntar_evidencia": ("adjuntar_evidencia", "tarea_id"),
+    "terminar": ("actualizar_estado", "tarea_id"),
+    "pedir_cambios": ("pedir_cambios_tarea", "tarea_id"),
+}
+
+
+# Los argumentos que identifican sobre qué actúa una herramienta que escribe.
+# `_no_proponer_de` toma el primero que esté presente, en este orden de
+# preferencia. Hoy ninguna herramienta trae dos de estos ids a la vez, así que
+# el orden no decide nada: `crear_dependencia` usa `origen_tarea_id` y
+# `destino_tarea_id` (ninguno está en la lista: sin guarda) y
+# `quitar_dependencia` sólo `dependencia_id`. Una herramienta nueva con dos de
+# estos ids tomaría el primero de la lista: revisar el orden al agregarla.
+_CAMPOS_DE_ID = ("tarea_id", "bloqueo_id", "dependencia_id")
+
+
+def _no_proponer_de(abierta) -> dict | None:
+    """La guarda de "Dejarlo y ver lo otro" (T9-R1d-1a-fix, ADR 0013 regla 1):
+    la herramienta y el id que la pregunta que se deja de lado tenía
+    pendientes, como datos (`NoProponer` de `agente`, guardado como dict para
+    que viaje en el estado de la aclaración). Modificar: la herramienta de la
+    propuesta y su id; dato del menú: la herramienta a la que lleva la acción.
+    "Ninguna, lo escribo" y las preguntas del alta no tienen tarea conocida:
+    sin guarda."""
+    from . import pendientes as P
+
+    if abierta.herramienta == _SENTINEL_ACLARACION or (
+            abierta.herramienta in _TIPO_DE_ALTA):
+        return None
+    if abierta.herramienta == P.SENTINEL_DATO_MENU_TAREA:
+        herramienta, campo = _HERRAMIENTA_DE_DATO_MENU.get(
+            abierta.args.get("accion"), (None, None))
+    else:
+        # Modificar: el id de la propuesta es el de su herramienta --
+        # `bloqueo_id` en `resolver_bloqueo`, `dependencia_id` al quitar una
+        # dependencia, `tarea_id` en el resto. Una herramienta con dos ids
+        # (`crear_dependencia`) o ninguno conocido queda sin guarda.
+        herramienta = abierta.herramienta
+        campo = next((c for c in _CAMPOS_DE_ID if c in abierta.args), None)
+    valor = abierta.args.get(campo) if campo else None
+    if not herramienta or valor is None:
+        return None
+    return {"herramienta": herramienta, "campo": campo, "valor": str(valor)}
 
 
 def _pregunta_de(abierta) -> _Pregunta:
@@ -1478,8 +1538,13 @@ def _resolver_toque_respuesta_dato_menu(cur, quien, workspace_id: str,
                                  args.get("entrante_id"))
         return
 
-    # "Dejarlo y ver lo otro", y "No, es otra cosa" de `dudoso` (`no` es el
-    # valor de las preguntas de antes de T9-R1d): la misma salida.
+    if eleccion not in _ELECCIONES_DE_DEJAR:
+        # Un valor que ningún botón de hoy deja: no es "dejar" (review R3). Se
+        # contesta como un pedido que ya no está vigente, sin cerrar nada.
+        _responder(cur, workspace_id, chat_id, quien, AVISO_PEDIDO_NO_VIGENTE,
+                   ahora)
+        return
+
     _dejar_y_ver_lo_otro(cur, quien, workspace_id, chat_id, abierta, texto,
                          args.get("entrante_id"), proveedor, cal, ahora)
 
@@ -1532,8 +1597,11 @@ def _dejar_y_ver_lo_otro(cur, quien, workspace_id: str, chat_id: int, abierta,
         _responder(cur, workspace_id, chat_id, quien,
                    _pregunta_de(abierta).dejada,
                    ahora - timedelta(milliseconds=1))
+    # Lo que se acaba de dejar no se propone de nuevo en este turno: el modelo
+    # lo ve en el historial y lo repetía (T9-R1d-1a-fix).
     _seguir_camino_normal(cur, quien, texto, route, proveedor, cal, chat_id,
-                          workspace_id, ahora, entrante_id)
+                          workspace_id, ahora, entrante_id,
+                          no_proponer=_no_proponer_de(abierta))
 
 
 def _iniciar_alta_guiada(cur, quien, chat_id: int, entrante_id: str | None,
@@ -1638,6 +1706,7 @@ def _estado_inicial_aclaracion(texto: str, entrante_id: str | None, route,
             {"herramienta": modificacion.herramienta, "args": modificacion.args,
              "resumen": modificacion.resumen}
             if modificacion is not None else None),
+        "no_proponer": None,
     }
 
 
@@ -1680,11 +1749,13 @@ def _avanzar_aclaracion(cur, quien, workspace_id: str, chat_id: int, ahora,
                             workspace_id, ahora)
         return
 
-    from .agente import responder
+    from .agente import NoProponer, responder
+    guarda = estado.get("no_proponer")
     responder(cur, quien, estado["mensaje"], proveedor, cal, chat_id,
              ahora=ahora, entrante_id=estado["entrante_id"],
              contexto_referencias=contexto,
-             tareas_resueltas_claras=estado["titulos_resueltas"])
+             tareas_resueltas_claras=estado["titulos_resueltas"],
+             no_proponer=NoProponer(**guarda) if guarda else None)
 
 
 def _preguntar_por_botones(cur, quien, workspace_id: str, chat_id: int, ahora,
