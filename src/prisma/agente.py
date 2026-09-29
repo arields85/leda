@@ -107,9 +107,14 @@ def responder(cur: psycopg.Cursor, quien: Solicitante, texto_entrante: str,
 
     `no_proponer`, si viene, es lo que la persona acaba de dejar de lado para
     ver otra cosa (`gateway._dejar_y_ver_lo_otro`, T9-R1d-1a-fix, ADR 0013
-    regla 1, enmienda de la rama abierta): una llamada a esa misma herramienta sobre esa misma tarea no se
-    ejecuta ni se prepara, y el modelo recibe el rechazo. Es la garantía en
-    código; el bloque de contexto sólo ayuda."""
+    regla 1, enmienda de la rama abierta): una llamada a esa misma herramienta
+    sobre esa misma tarea no se ejecuta ni se prepara, y el modelo recibe el
+    rechazo; si lo que se dejó fue el alta de una tarea, tampoco se reabre
+    (`repite_lo_pendiente`). Es la garantía en código. Además el modelo recibe
+    en el sistema, como contexto de confianza del servidor, qué se dejó de lado
+    (`_bloque_dejado`): en este turno no lo ve en ningún otro lado, porque el
+    aviso "dejé de lado" todavía no salió y el historial sólo cuenta lo
+    enviado (T9-R2b, banco real b-0021-i)."""
     ahora = ahora or datetime.now(timezone.utc)
     ctx = construir(cur, quien, texto_entrante, ahora=ahora)
     sistema = ctx.sistema
@@ -117,6 +122,8 @@ def responder(cur: psycopg.Cursor, quien: Solicitante, texto_entrante: str,
         sistema = sistema + "\n\n---\n\n" + contexto_referencias
     if modificacion is not None:
         sistema = sistema + "\n\n---\n\n" + _bloque_modificacion(modificacion)
+    if no_proponer is not None and no_proponer.dejado:
+        sistema = sistema + "\n\n---\n\n" + _bloque_dejado(no_proponer)
     esquemas = H.esquemas()
 
     # Lo que se dijeron hace un rato. `entrante_id` es la fila que el gateway
@@ -170,7 +177,7 @@ def responder(cur: psycopg.Cursor, quien: Solicitante, texto_entrante: str,
             for c in r.llamadas:
                 if repite_lo_pendiente(c, no_proponer):
                     resultados.append(_rechazar_lo_pendiente(
-                        cur, quien, c, ctx))
+                        cur, quien, c, ctx, no_proponer))
                     continue
                 if (len(confirmaciones) + len(elegir_pendiente)
                         + len(opciones_pendientes)) > 0 and not _es_lectura(c):
@@ -302,43 +309,103 @@ def responder(cur: psycopg.Cursor, quien: Solicitante, texto_entrante: str,
 
 
 class NoProponer(NamedTuple):
-    """Lo que no se puede volver a proponer en este turno: una herramienta
-    sobre un id (`campo` de sus argumentos, normalmente `tarea_id`) que ya
-    espera a la persona. Es un dato, no texto: la guarda mira sólo la
-    herramienta y el id de la llamada."""
-    herramienta: str
-    campo: str
-    valor: str
+    """Lo que no se puede volver a proponer en este turno. Es un dato, no
+    texto: la guarda mira sólo la herramienta y los argumentos de la llamada.
+
+    Dos formas, que pueden ir juntas: una herramienta sobre un id (`campo` de
+    sus argumentos, normalmente `tarea_id`) que ya esperaba a la persona
+    (`herramienta`, `campo`, `valor`), y el alta de una tarea (`alta`), que no
+    tiene herramienta ni id porque todavía no existe. `dejado` es cómo se
+    nombra ante el modelo lo que la persona dejó de lado (`_bloque_dejado`)."""
+    herramienta: str | None
+    campo: str | None
+    valor: str | None
+    dejado: str | None = None
+    alta: bool = False
 
 
 RECHAZO_LO_PENDIENTE = (
     "Eso ya está pendiente con la persona y el sistema vuelve a ello solo. "
     "No lo propongas de nuevo: respondé únicamente el mensaje actual.")
+RECHAZO_ALTA_DEJADA = (
+    "La persona acaba de dejar de lado el armado de una tarea nueva y pidió "
+    "otra cosa. No lo retomes ni preguntes por esa tarea: respondé únicamente "
+    "el mensaje actual.")
+
+_HERRAMIENTA_DE_OPCIONES = "ofrecer_opciones"
+_HERRAMIENTA_DE_ALTA = "crear_tarea"
+
+
+def _bloque_dejado(no_proponer: NoProponer) -> str:
+    """Contexto de confianza del servidor (nunca texto de la persona): qué acaba
+    de dejar de lado la persona para preguntar otra cosa. El modelo no lo ve en
+    ningún otro lado en este turno: el aviso "dejé de lado" todavía no salió y el
+    historial sólo cuenta lo enviado."""
+    return (
+        "# Lo que la persona acaba de dejar de lado\n\n"
+        f"La persona acaba de dejar de lado {no_proponer.dejado} para "
+        "preguntar otra cosa, y el sistema ya lo cerró. No lo propongas de "
+        "nuevo, no preguntes por eso ni ofrezcas opciones para retomarlo: "
+        "respondé únicamente el mensaje actual.")
+
+
+def _opciones_solo_de_tareas_existentes(args) -> bool:
+    """Todas las opciones de un `ofrecer_opciones` son tareas que ya existen
+    (`tarea_id`, sin texto libre). Una forma que no se puede leer no cuenta."""
+    opciones = args.get("opciones") if isinstance(args, dict) else None
+    return (isinstance(opciones, list) and bool(opciones) and all(
+        isinstance(o, dict) and o.get("tarea_id") and not o.get("texto")
+        for o in opciones))
+
+
+def _reabre_el_alta(c: Llamada) -> bool:
+    """La llamada empieza el alta de una tarea o hace una pregunta con opciones
+    que puede ser sobre ella. Sólo se distingue por forma, nunca por el texto
+    (ADR 0013: ninguna lista de frases): una opción con `tarea_id` es de una
+    tarea que ya existe, y la tarea nueva no tiene id, así que no puede ser
+    sobre ella; una opción de texto libre (un objetivo, una persona, un área,
+    un título) no se puede distinguir de un campo del alta, y una forma que no
+    se puede leer tampoco. Ante la duda se rechaza: el modelo puede volver a
+    ofrecer opciones en el turno siguiente, cuando la persona lo pida."""
+    if c.nombre == _HERRAMIENTA_DE_ALTA:
+        return True
+    return (c.nombre == _HERRAMIENTA_DE_OPCIONES
+            and not _opciones_solo_de_tareas_existentes(c.args))
 
 
 def repite_lo_pendiente(c: Llamada, no_proponer: NoProponer | None) -> bool:
-    """La llamada es a la misma herramienta sobre el mismo id que ya quedó
-    pendiente (`NoProponer`). Otra herramienta, u otro id, no."""
-    if no_proponer is None or c.nombre != no_proponer.herramienta:
+    """La llamada vuelve a proponer lo que la persona acaba de dejar de lado
+    (`NoProponer`): la misma herramienta sobre el mismo id, o, si lo que se dejó
+    fue el alta de una tarea, reabrirla (`_reabre_el_alta`). Otra herramienta,
+    u otro id, no."""
+    if no_proponer is None:
+        return False
+    if no_proponer.alta and _reabre_el_alta(c):
+        return True
+    if no_proponer.herramienta is None or c.nombre != no_proponer.herramienta:
         return False
     valor = c.args.get(no_proponer.campo) if isinstance(c.args, dict) else None
     return valor is not None and str(valor) == no_proponer.valor
 
 
-def _rechazar_lo_pendiente(cur, quien: Solicitante, c: Llamada, ctx) -> dict:
+def _rechazar_lo_pendiente(cur, quien: Solicitante, c: Llamada, ctx,
+                           no_proponer: NoProponer) -> dict:
     """Un rechazo más para el modelo, como el de cualquier llamada que no se
     aplica: no se ejecuta ni se prepara nada, no cuenta como acción ni como
     intento fallido, y se audita igual que `herramienta_rechazada:` (los
     argumentos de la llamada, nunca el texto de la persona)."""
+    rechazo = (RECHAZO_ALTA_DEJADA
+               if no_proponer.alta and _reabre_el_alta(c)
+               else RECHAZO_LO_PENDIENTE)
     registrar_auditoria(
         cur, accion=f"herramienta_rechazada:{c.nombre}",
         workspace_id=quien.workspace_id, actor_app_user_id=quien.app_user_id,
         actor_kind="prisma",
-        detalle={"args": c.args, "rechazo": {"error": RECHAZO_LO_PENDIENTE}},
+        detalle={"args": c.args, "rechazo": {"error": rechazo}},
         pack_hash=ctx.pack_hash, nucleo_hash=ctx.nucleo_hash)
     return {"type": "tool_result", "tool_use_id": c.id,
             "content": json.dumps(
-                {"ejecutado": False, "explicacion": RECHAZO_LO_PENDIENTE},
+                {"ejecutado": False, "explicacion": rechazo},
                 ensure_ascii=False),
             "is_error": True}
 

@@ -20,6 +20,7 @@ import pytest
 from prisma import gateway
 from prisma import jev as jev_modulo
 from prisma import pendientes as P
+from prisma.agente import NoProponer, repite_lo_pendiente
 from prisma.db import admin, espacio
 from prisma.jev import ClienteJevGuionado
 from prisma.llm import (IntentAction, IntentRoute, Llamada, RespectoPendiente,
@@ -111,13 +112,15 @@ def _guion(herramienta: str, args: dict) -> list[Respuesta]:
             Respuesta(texto="Tenés dos tareas abiertas.")]
 
 
-def _dejar_y_ver_lo_otro(cliente, conn, ws, tg, monkeypatch, guion):
+def _dejar_y_ver_lo_otro(cliente, conn, ws, tg, monkeypatch, guion, *,
+                         escribir=_mensaje):
     """`otro_tema` con la pregunta abierta, y el toque en "Dejarlo y ver lo
-    otro": el mensaje guardado se atiende con el modelo guionado."""
+    otro": el mensaje guardado se atiende con el modelo guionado. `escribir`
+    es cómo se manda el mensaje (el alta sólo se lee en un chat privado)."""
     proveedor = _con_rutas(
         monkeypatch, [_ruta(RespectoPendiente.OTRO_TEMA), _ruta(None)],
         guion=guion)
-    _mensaje(cliente, tg, OTRO_MENSAJE)
+    escribir(cliente, tg, OTRO_MENSAJE)
     _tocar_boton(cliente, conn, ws, "Dejarlo", tg)
     return proveedor
 
@@ -408,3 +411,224 @@ def test_la_guarda_sigue_vigente_al_retomar_tras_botones_de_aclaracion(
     assert _vistas_previas(conn, "registrar_bloqueo", a) == previas_a
     if not es_la_misma:
         assert _vistas_previas(conn, "registrar_bloqueo", b) == 1
+
+
+# ---------------------------------------------------------------------------
+# Lo que se dejó de lado incluye el alta (T9-R2b, banco real b-0021-i 2/3):
+# tras "Dejarlo y ver lo otro" sobre una pregunta del alta, el responder atendió
+# el otro mensaje y siguió con "para armar la tarea nueva, necesito saber dónde
+# cuelga" (`ofrecer_opciones`), reabriendo lo que la persona acababa de soltar.
+# Causa general: en ese turno el modelo no ve que se dejó algo de lado (el
+# aviso "dejé de lado" todavía no salió y el historial sólo cuenta lo enviado) y
+# la guarda de código no tenía caso para el alta (no hay herramienta ni id).
+# Los dos arreglos son un solo mecanismo: el responder recibe, como contexto de
+# confianza, qué se dejó de lado; y la guarda rechaza reabrirlo.
+# ---------------------------------------------------------------------------
+
+FRAGMENTO_RECHAZO_ALTA = "dejar de lado el armado de una tarea nueva"
+PREGUNTA_ALTA_REPROPUESTA = "¿A qué objetivo contribuye la tarea nueva?"
+NOMBRE_DEL_TITULO_DEL_ALTA = "el título de la tarea nueva"
+
+
+def _abrir_alta_de_la_persona(conn, ws) -> tuple[int, str]:
+    """El alta esperando el título, con una tarea del equipo ya existente."""
+    from tests.test_alta_pregunta_pendiente import _abrir_alta
+
+    tg, _request_id = _abrir_alta(conn, ws)
+    with admin(conn) as cur:
+        cur.execute("select id from task limit 1")
+        return tg, str(cur.fetchone()["id"])
+
+
+def _guion_ofrecer(opciones: list[dict]) -> list[Respuesta]:
+    """El modelo consulta las tareas, vuelve a ofrecer opciones y cierra: lo que
+    hizo en el banco real."""
+    return [Respuesta(llamadas=[Llamada("q1", "consultar_tareas", {})]),
+            Respuesta(texto="Tenés una tarea abierta.\n\nPara armar la tarea "
+                            "nueva, necesito saber dónde cuelga.",
+                      llamadas=[Llamada("q2", "ofrecer_opciones", {
+                          "pregunta": PREGUNTA_ALTA_REPROPUESTA,
+                          "opciones": opciones})]),
+            Respuesta(texto="Tenés una tarea abierta.")]
+
+
+def _rechazos_del_alta(proveedor) -> list[dict]:
+    return [r for r in _resultados_de_herramientas(proveedor)
+            if FRAGMENTO_RECHAZO_ALTA in r["content"]]
+
+
+def _opciones_ofrecidas(conn) -> int:
+    with admin(conn) as cur:
+        cur.execute("select count(*) n from pending_action where herramienta = %s",
+                    (P.SENTINEL_OPCIONES_MODELO,))
+        return cur.fetchone()["n"]
+
+
+def _dejar_el_alta_y_ver_lo_otro(cliente, conn, ws, monkeypatch, guion):
+    from tests.test_alta_pregunta_pendiente import _mensaje_privado
+
+    tg, tarea_id = _abrir_alta_de_la_persona(conn, ws)
+    proveedor = _dejar_y_ver_lo_otro(cliente, conn, ws, tg, monkeypatch, guion,
+                                     escribir=_mensaje_privado)
+    return proveedor, tg, tarea_id
+
+
+def test_dejar_el_alta_no_vuelve_a_ofrecer_opciones_sobre_la_tarea_nueva(
+        cliente, conn, corework, monkeypatch):
+    ws = corework.workspace_id
+    proveedor, tg, _tarea = _dejar_el_alta_y_ver_lo_otro(
+        cliente, conn, ws, monkeypatch,
+        _guion_ofrecer([{"texto": "Conectar y automatizar equipos"},
+                        {"texto": "Planos eléctricos correctos"}]))
+
+    (rechazo,) = _rechazos_del_alta(proveedor)
+    assert rechazo["tool_use_id"] == "q2" and rechazo["is_error"] is True
+    assert _opciones_ofrecidas(conn) == 0                # nada quedó esperando
+    # La persona recibe, en una sola respuesta, lo que dejó y lo que pidió.
+    with admin(conn) as cur:
+        cur.execute(
+            """select cuerpo from message_outbox where chat_id = %s
+                order by programado_para, dedupe_key""", (tg,))
+        cuerpos = [f["cuerpo"] for f in cur.fetchall()]
+    assert PREGUNTA_ALTA_REPROPUESTA not in "".join(cuerpos)
+    assert cuerpos[-1] == "Tenés una tarea abierta."
+
+
+def test_el_rechazo_del_alta_se_audita_sin_el_texto_de_la_persona(
+        cliente, conn, corework, monkeypatch):
+    ws = corework.workspace_id
+    _dejar_el_alta_y_ver_lo_otro(
+        cliente, conn, ws, monkeypatch,
+        _guion_ofrecer([{"texto": "Conectar y automatizar equipos"}]))
+
+    with admin(conn) as cur:
+        cur.execute(
+            """select detalle from audit_log
+                where accion = 'herramienta_rechazada:ofrecer_opciones'""")
+        (fila,) = cur.fetchall()
+    assert "opciones" in fila["detalle"]["args"]
+    assert "qué tareas tengo abiertas" not in str(fila["detalle"])
+
+
+def test_el_responder_sabe_que_la_persona_dejo_el_alta_de_lado(
+        cliente, conn, corework, monkeypatch):
+    ws = corework.workspace_id
+    proveedor, _tg, _tarea = _dejar_el_alta_y_ver_lo_otro(
+        cliente, conn, ws, monkeypatch, [Respuesta(texto="Tenés dos tareas.")])
+
+    sistema = proveedor.recibidos[0][0]
+    assert "acaba de dejar de lado" in sistema
+    assert NOMBRE_DEL_TITULO_DEL_ALTA in sistema
+    assert "no lo propongas" in sistema.lower()
+
+
+def test_el_responder_sabe_que_la_persona_dejo_un_modificar_de_lado(
+        cliente, conn, corework, monkeypatch):
+    # El contexto es general: cualquier pregunta que se deja, no sólo el alta.
+    ws = corework.workspace_id
+    tg, _a, _b = _abrir_modificar(cliente, conn, ws)
+
+    proveedor = _dejar_y_ver_lo_otro(
+        cliente, conn, ws, tg, monkeypatch, [Respuesta(texto="Tenés dos tareas.")])
+
+    sistema = proveedor.recibidos[0][0]
+    assert "acaba de dejar de lado" in sistema
+    assert "la corrección de la propuesta" in sistema
+
+
+def test_sin_nada_dejado_de_lado_el_responder_no_recibe_ese_contexto(
+        cliente, conn, corework, monkeypatch):
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        _tarea_modificar(cur, ws)
+    conn.commit()
+    with espacio(conn, ws) as cur:
+        tg = _telegram_id(cur, PERSONA)
+    conn.commit()
+    proveedor = _con_rutas(monkeypatch, [_ruta(None)],
+                           guion=[Respuesta(texto="Tenés una tarea.")])
+
+    _mensaje(cliente, tg, OTRO_MENSAJE)
+
+    assert "acaba de dejar de lado" not in proveedor.recibidos[0][0]
+
+
+def test_dejar_el_alta_permite_ofrecer_tareas_existentes_como_opciones(
+        cliente, conn, corework, monkeypatch):
+    # Una opción de tarea existente no puede ser sobre la tarea nueva (todavía
+    # no tiene id): es una elección sobre lo otro que la persona pidió.
+    ws = corework.workspace_id
+    from tests.test_alta_pregunta_pendiente import _mensaje_privado
+
+    tg, tarea_id = _abrir_alta_de_la_persona(conn, ws)
+    proveedor = _dejar_y_ver_lo_otro(
+        cliente, conn, ws, tg, monkeypatch,
+        _guion_ofrecer([{"tarea_id": tarea_id}]), escribir=_mensaje_privado)
+
+    assert _rechazos_del_alta(proveedor) == []
+    assert _opciones_ofrecidas(conn) == 1
+
+
+def test_dejar_un_modificar_no_bloquea_ofrecer_opciones_de_texto(
+        cliente, conn, corework, monkeypatch):
+    # La regla del alta no se extiende a lo que no es el alta.
+    ws = corework.workspace_id
+    tg, _a, _b = _abrir_modificar(cliente, conn, ws)
+
+    proveedor = _dejar_y_ver_lo_otro(
+        cliente, conn, ws, tg, monkeypatch,
+        _guion_ofrecer([{"texto": "Ver mis tareas"}]))
+
+    assert _rechazos_del_alta(proveedor) == []
+    assert _opciones_ofrecidas(conn) == 1
+
+
+def test_dudoso_no_es_otra_cosa_sobre_el_alta_tambien_tiene_la_guarda(
+        cliente, conn, corework, monkeypatch):
+    from tests.test_alta_pregunta_pendiente import _mensaje_privado
+
+    ws = corework.workspace_id
+    tg, _tarea = _abrir_alta_de_la_persona(conn, ws)
+    proveedor = _con_rutas(
+        monkeypatch, [_ruta(RespectoPendiente.DUDOSO), _ruta(None)],
+        guion=_guion_ofrecer([{"texto": "Conectar y automatizar equipos"}]))
+    assert _mensaje_privado(cliente, tg, "puede ser").status_code == 200
+
+    _tocar_boton(cliente, conn, ws, "No, es otra cosa", tg)
+
+    assert len(_rechazos_del_alta(proveedor)) == 1
+    assert _opciones_ofrecidas(conn) == 0
+
+
+def _llamada(nombre: str, args: dict) -> Llamada:
+    return Llamada("x", nombre, args)
+
+
+def _alta_dejada() -> NoProponer:
+    return NoProponer(None, None, None, dejado=NOMBRE_DEL_TITULO_DEL_ALTA,
+                      alta=True)
+
+
+@pytest.mark.parametrize("llamada, se_rechaza", [
+    # Empezar el alta o preguntar por ella: no se puede.
+    (_llamada("crear_tarea", {}), True),
+    (_llamada("ofrecer_opciones", {"pregunta": "¿Qué objetivo?",
+                                   "opciones": [{"texto": "A"}]}), True),
+    (_llamada("ofrecer_opciones", {"pregunta": "¿Y esta?",
+                                   "opciones": [{"tarea_id": "t1"},
+                                                {"texto": "Otra"}]}), True),
+    (_llamada("ofrecer_opciones", {"pregunta": "¿?", "opciones": []}), True),
+    (_llamada("ofrecer_opciones", {"pregunta": "¿?"}), True),
+    (_llamada("ofrecer_opciones", {"pregunta": "¿?", "opciones": "A"}), True),
+    (_llamada("ofrecer_opciones", {"pregunta": "¿?",
+                                   "opciones": [{"tarea_id": ""}]}), True),
+    # Lo que es de una tarea que ya existe, o no es una pregunta: sí.
+    (_llamada("ofrecer_opciones", {"pregunta": "¿Cuál?",
+                                   "opciones": [{"tarea_id": "t1"},
+                                                {"tarea_id": "t2",
+                                                 "accion": "menu"}]}), False),
+    (_llamada("consultar_tareas", {}), False),
+    (_llamada("registrar_bloqueo", {"tarea_id": "t1", "causa": "x"}), False),
+])
+def test_la_guarda_del_alta_distingue_lo_que_reabre_el_alta(llamada, se_rechaza):
+    assert repite_lo_pendiente(llamada, _alta_dejada()) is se_rechaza

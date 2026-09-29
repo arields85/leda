@@ -1067,7 +1067,7 @@ def _seguir_camino_normal(cur, quien, texto: str, route, proveedor, cal,
     referencias, y aclarar con botones, dar el alta guiada o responder.
 
     `no_proponer`, si viene, es lo que la persona acaba de dejar de lado
-    (`_no_proponer_de`): el responder no lo vuelve a proponer en este turno
+    (`_lo_dejado_de`): el responder no lo vuelve a proponer en este turno
     (T9-R1d-1a-fix, banco b-0020-f: las instrucciones solas no alcanzan)."""
     # Resolver antes de actuar (T3, ADR 0005 decisión 6 / ADR 0006): las
     # referencias a tarea que separó el enrutador se resuelven contra las
@@ -1239,6 +1239,21 @@ def _no_proponer_de(abierta) -> dict | None:
     if not herramienta or valor is None:
         return None
     return {"herramienta": herramienta, "campo": campo, "valor": str(valor)}
+
+
+def _lo_dejado_de(abierta) -> dict:
+    """Todo lo que el responder tiene que saber de la pregunta que la persona
+    acaba de dejar de lado para ver otra cosa (T9-R2b, banco real b-0021-i),
+    como datos (`NoProponer` de `agente`; dict para que viaje en el estado de la
+    aclaración): la guarda de herramienta e id de `_no_proponer_de` cuando la
+    hay, `dejado` (cómo se la nombra ante el modelo, que en ese turno no ve el
+    aviso "dejé de lado" ni la pregunta en el historial) y `alta`, si era una
+    pregunta del alta: sin herramienta ni id, lo que no se puede volver a
+    proponer es armar una tarea nueva."""
+    guarda = _no_proponer_de(abierta) or {
+        "herramienta": None, "campo": None, "valor": None}
+    return {**guarda, "dejado": _pregunta_de(abierta).nombre,
+            "alta": abierta.herramienta in _TIPO_DE_ALTA}
 
 
 def _pregunta_de(abierta) -> _Pregunta:
@@ -2003,10 +2018,11 @@ def _dejar_y_ver_lo_otro(cur, quien, workspace_id: str, chat_id: int, abierta,
                    _pregunta_de(abierta).dejada,
                    ahora - timedelta(milliseconds=1))
     # Lo que se acaba de dejar no se propone de nuevo en este turno: el modelo
-    # lo ve en el historial y lo repetía (T9-R1d-1a-fix).
+    # lo ve en el historial y lo repetía (T9-R1d-1a-fix), o no lo ve (el alta,
+    # T9-R2b): la guarda de código y el contexto salen de la misma pregunta.
     _seguir_camino_normal(cur, quien, texto, route, proveedor, cal, chat_id,
                           workspace_id, ahora, entrante_id,
-                          no_proponer=_no_proponer_de(abierta))
+                          no_proponer=_lo_dejado_de(abierta))
 
 
 def _iniciar_alta_guiada(cur, quien, chat_id: int, entrante_id: str | None,
