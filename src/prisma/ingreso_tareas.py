@@ -1448,7 +1448,8 @@ def _finalize(cur, request, who, now):
     # es quien tiene la rama abierta. Si confirma otra persona, ella sólo ve
     # Confirmar y Cancelar.
     options = [(ETIQUETA_CONFIRMAR, True), (ETIQUETA_CANCELAR, False)]
-    if str(approver_id) == str(request["membership_id"]):
+    requester_confirms = str(approver_id) == str(request["membership_id"])
+    if requester_confirms:
         options.insert(1, (ETIQUETA_MODIFICAR, "modificar"))
     pending = registrar(
         cur, confirmer, herramienta="confirmar_borrador_tarea", args={},
@@ -1462,6 +1463,11 @@ def _finalize(cur, request, who, now):
         recipient_membership_id=str(approver_id), scheduled_for=now,
         dedupe_key=f"intake:{request_id}:preview:v{request['version']}",
         pending_action_id=pending.id,
+        # Quien actúa (un toque o un mensaje) es quien confirma: el resumen le
+        # contesta a ese acto y no queda sujeto a horario, tope ni retención
+        # (ADR 0013 regla 2). Si confirma otra persona, es un mensaje que Prisma
+        # le inicia a ella.
+        is_response=requester_confirms,
     )
     return IntakeOutcome(request_id, preview_text, changed=True,
                          pending_action_id=pending.id)

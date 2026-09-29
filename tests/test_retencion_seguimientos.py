@@ -2,9 +2,10 @@
 inicia (T9-R1d-2 y T9-R1d-2b, cerrados en T9-R1c-3).
 
 - Lo que MUESTRA la propia pregunta abierta del alta nunca se retiene contra su
-  propia rama: `rama.id` es el id del conjunto de opciones (una elección) o el de
-  la `pending_action` de la vista previa (la confirmación), y es justo lo que
-  llevan `intake_choice_set_id` y `pending_action_id` de su mensaje.
+  propia rama: la elección lleva su `intake_choice_set_id` (`rama.id` es el id de su
+  conjunto de opciones). La vista previa del propio borrador es una respuesta al acto
+  de quien la confirma (T9-R1c-3b, ADR 0013 regla 2), así que una respuesta nunca se
+  retiene y ya no necesita una excepción contra su rama.
 - `retenidos` cuenta lo que de verdad queda esperando: no lo vencido, no una vista
   previa que ya no es la vigente, no lo que otro despachador tiene bloqueado. Y lo
   vencido de alguien retenido se descarta igual, sin esperar a que se libere.
@@ -97,7 +98,7 @@ def test_el_mensaje_que_muestra_la_eleccion_del_alta_no_se_retiene_contra_su_ram
     assert _estados(conn) == {"control": "listo"}
 
 
-def test_la_vista_previa_del_propio_borrador_no_se_retiene_contra_su_rama(
+def test_la_vista_previa_del_propio_borrador_es_una_respuesta_y_no_se_retiene(
         conn, intake_world):
     ws = intake_world["north-lab"]["id"]
     rid, pid = _alta_en_confirmacion(conn, intake_world, responsable="Sam North")
@@ -107,7 +108,7 @@ def test_la_vista_previa_del_propio_borrador_no_se_retiene_contra_su_rama(
         assert rama.id == pid                       # la `pending_action` de la vista previa
         cur.execute("select es_respuesta from message_outbox "
                     "where pending_action_id = %s", (pid,))
-        assert cur.fetchone()["es_respuesta"] is False   # la inicia Prisma
+        assert cur.fetchone()["es_respuesta"] is True   # contesta al acto de quien confirma
         _activa(cur, quien, tg, DESPUES - timedelta(minutes=1))
         _control(cur, ws, quien, tg)
     conn.commit()

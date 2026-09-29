@@ -15,6 +15,9 @@ Los ruteos y el modelo se guionan; ninguna prueba toca la red ni el modelo real.
 
 from __future__ import annotations
 
+from datetime import time
+from zoneinfo import ZoneInfo
+
 import pytest
 
 from prisma import gateway
@@ -582,3 +585,62 @@ def test_cancelar_despues_de_modificar_cancela_el_borrador(
     assert _solicitud(conn, rid) == "cancelled"
     assert _tareas(conn) == 0
     assert _previews(conn, rid)[-1]["estado"] == "cancelada"
+
+
+# ------------------------- la vista previa que responde a un acto es una respuesta
+
+def _es_respuesta(conn, pid) -> bool:
+    with admin(conn) as cur:
+        cur.execute("select es_respuesta from message_outbox "
+                    "where pending_action_id = %s", (pid,))
+        return cur.fetchone()["es_respuesta"]
+
+
+def _calendario_cerrado(conn, ws) -> Calendario:
+    """Sin ningún día hábil: todo lo que inicia Prisma queda fuera de horario."""
+    with espacio(conn, ws) as cur:
+        zona = Calendario.desde_base(cur, ws).zona
+    return Calendario(frozenset(), time(9), time(18), frozenset(), zona)
+
+
+def _despachar_fuera_de_horario(conn, ws):
+    transporte = TransporteDePrueba()
+    with espacio(conn, ws) as cur:
+        despachar(cur, ws, transporte, _calendario_cerrado(conn, ws))
+    conn.commit()
+    return transporte
+
+
+def test_la_vista_previa_que_sigue_a_modificar_es_una_respuesta_y_sale_fuera_de_horario(
+        intake_world, conn, monkeypatch):
+    """Quien corrige un dato es quien confirma: la vista previa actualizada le
+    contesta a ese acto (ADR 0013 regla 2), sin horario ni tope diario."""
+    rid, pid, client, user = _modificar(conn, monkeypatch, intake_world)
+    _elegir_dato(conn, client, user, rid, "Título")
+    _responder_con(conn, monkeypatch, intake_world, "Inspect pressure valve")
+    nueva = _previews(conn, rid)[-1]
+
+    assert _es_respuesta(conn, nueva["id"]) is True
+    transporte = _despachar_fuera_de_horario(conn, intake_world["north-lab"]["id"])
+
+    resumenes = [e for e in transporte.enviados
+                 if e.texto.startswith("Resumen para revisar")]
+    assert len(resumenes) == 1 and "Inspect pressure valve" in resumenes[0].texto
+
+
+def test_la_vista_previa_del_alta_de_quien_la_confirma_es_una_respuesta(
+        intake_world, conn):
+    rid, pid = _alta_en_confirmacion(conn, intake_world, responsable="Sam North")
+
+    assert _es_respuesta(conn, pid) is True
+
+
+def test_si_confirma_otra_persona_su_vista_previa_la_inicia_prisma(
+        intake_world, conn):
+    """Para el aprobador es un mensaje que Prisma le inicia: horario y tope."""
+    rid, pid = _alta_en_confirmacion(conn, intake_world, responsable="Para mí")
+
+    assert _es_respuesta(conn, pid) is False
+    transporte = _despachar_fuera_de_horario(conn, intake_world["north-lab"]["id"])
+    assert [e for e in transporte.enviados
+            if e.texto.startswith("Resumen para revisar")] == []
