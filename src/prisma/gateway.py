@@ -1392,9 +1392,13 @@ def _mostrar_vista_previa(cur, quien, workspace_id: str, chat_id: int, abierta,
     botón), con `prefijo` delante si viene. Es un solo mensaje: el mismo texto
     con los mismos botones de siempre (`despachador` arma los botones de la
     `pending_action`; el toque de cualquiera de los dos mensajes resuelve una
-    sola vez). Si el prefijo no deja entrar la vista previa con sus botones,
-    sale sólo el prefijo, sin botones, y la vista previa sigue esperando. Si ya
-    no esperaba, se dice."""
+    sola vez). Si el prefijo no deja entrar la vista previa con sus botones, la
+    respuesta sale en dos partes, con un solo juego de botones: primero el
+    prefijo y después la vista previa sola, completa y con sus botones (así
+    salió la primera vez, así que entra). Nunca sale el prefijo solo: dejaría a
+    la persona sin ver lo que espera. Si ya no esperaba, se dice."""
+    from datetime import timedelta
+
     from . import pendientes as P
 
     if not P.vista_previa_esperando(cur, abierta.pregunta_id, ahora):
@@ -1402,10 +1406,11 @@ def _mostrar_vista_previa(cur, quien, workspace_id: str, chat_id: int, abierta,
                    ahora)
         return
     texto = f"{prefijo}\n\n{abierta.resumen}" if prefijo else abierta.resumen
-    if not cabe_en_mensaje(texto, has_buttons=True):
-        _responder(cur, workspace_id, chat_id, quien,
-                   prefijo or AVISO_VISTA_PREVIA_SE_CONFIRMA_CON_EL_BOTON, ahora)
-        return
+    if prefijo and not cabe_en_mensaje(texto, has_buttons=True):
+        # Un milisegundo antes, para que salga delante de la vista previa.
+        _responder(cur, workspace_id, chat_id, quien, prefijo,
+                   ahora - timedelta(milliseconds=1))
+        texto = abierta.resumen
     enqueue_outbox(
         cur, workspace_id=workspace_id, chat_id=chat_id,
         recipient_membership_id=quien.membership_id, text=texto,

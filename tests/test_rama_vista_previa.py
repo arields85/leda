@@ -550,3 +550,224 @@ def test_los_botones_de_la_vista_previa_siguen_funcionando_como_siempre(
     assert _tocar(cliente, token, tg2).status_code == 200
     assert _ultimo_cuerpo(conn, tg2) == "Listo, no lo hago."
     assert _estado(conn, pid2) == "cancelada"
+
+
+# ---------------------------------------------------------------------------
+# Una vista previa que no entra con el aviso delante (review-0c99f611fc23e0cd)
+# ---------------------------------------------------------------------------
+
+def _causa_que_llena_la_vista_previa() -> str:
+    """Una causa tan larga que la vista previa entra sola con sus botones (así
+    salió la primera vez) pero no con un aviso delante. Se calcula sobre la
+    vista previa real de un bloqueo, no sobre un largo fijo."""
+    from prisma.salida import (BUTTON_TEXT_LIMIT, margen_saludo,
+                               telegram_utf16_units)
+
+    base = ("Tarea: Programar PLC · Causa del bloqueo:  · Estado actual: Asignada "
+            "· la tarea pasa a Bloqueada\n\nTodavía no se aplicó ningún cambio.")
+    limite = BUTTON_TEXT_LIMIT - margen_saludo(personal=True)
+    return "x" * (limite - telegram_utf16_units(base) - 10)
+
+
+def test_con_el_aviso_delante_la_vista_previa_larga_sale_aparte_con_sus_botones(
+        cliente, conn, corework, monkeypatch):
+    from prisma.salida import cabe_en_mensaje
+
+    ws = corework.workspace_id
+    tg, tid, pid = _abrir_vista_previa(conn, ws, causa=_causa_que_llena_la_vista_previa())
+    with admin(conn) as cur:
+        cur.execute("select resumen from pending_action where id = %s", (pid,))
+        resumen = cur.fetchone()["resumen"]
+    aviso = gateway.AVISO_VISTA_PREVIA_SE_CONFIRMA_CON_EL_BOTON
+    assert cabe_en_mensaje(resumen, has_buttons=True)                    # sola, entra
+    assert not cabe_en_mensaje(f"{aviso}\n\n{resumen}", has_buttons=True)  # con aviso, no
+    _con_rutas(monkeypatch, [_ruta(RespectoPendiente.RESPONDE)])
+    antes = _salidas(conn, tg)
+
+    _mensaje(cliente, tg, "sí, dale, confirmá")
+
+    # Una respuesta de dos partes: primero el aviso, después la vista previa
+    # completa con sus botones; nunca el aviso solo.
+    assert _salidas(conn, tg) == antes + 2
+    aviso_fila, vista_fila = _filas_del_chat(conn, tg)[-2:]
+    assert aviso_fila["cuerpo"] == aviso and aviso_fila["pending_action_id"] is None
+    assert vista_fila["cuerpo"] == resumen
+    assert str(vista_fila["pending_action_id"]) == pid
+    assert _estado(conn, pid) == "esperando" and _bloqueos(conn, tid) == 0
+    assert _confirmar(cliente, conn, tg, pid).status_code == 200         # el botón sigue
+    assert _bloqueos(conn, tid) == 1
+
+
+def test_sin_aviso_la_vista_previa_que_entra_sola_sale_en_un_solo_mensaje(
+        cliente, conn, corework, monkeypatch):
+    ws = corework.workspace_id
+    tg, _tid, pid = _abrir_vista_previa(conn, ws, causa=_causa_que_llena_la_vista_previa())
+    _con_rutas(monkeypatch, [_ruta(RespectoPendiente.CHARLA)])
+    antes = _salidas(conn, tg)
+
+    _mensaje(cliente, tg, "hola")
+
+    assert _salidas(conn, tg) == antes + 1
+    assert str(_filas_del_chat(conn, tg)[-1]["pending_action_id"]) == pid
+
+
+# ---------------------------------------------------------------------------
+# Otros orígenes de la vista previa: el menú y `bloqueo_id`
+# (review-0c99f611fc23e0cd)
+# ---------------------------------------------------------------------------
+
+def _abrir_vista_previa_del_menu(cliente, conn, ws, monkeypatch):
+    """Toca "Empezar" en el menú de una tarea: la vista previa de
+    `actualizar_estado` la arma `gateway._encolar_vista_previa_menu`, no el
+    agente. Devuelve (chat, tarea, pending_action)."""
+    from tests.test_menu_tarea import _abrir_menu, _tocar_accion
+
+    with admin(conn) as cur:
+        tid = _tarea(cur, ws)
+    conn.commit()
+    _, filas, tg = _abrir_menu(cliente, conn, ws, monkeypatch, tid, PERSONA)
+    _tocar_accion(cliente, conn, ws, filas, "Empezar", tg)
+    with admin(conn) as cur:
+        cur.execute("select id from pending_action where estado = 'esperando' "
+                    "and herramienta = 'actualizar_estado'")
+        (fila,) = cur.fetchall()
+    return tg, tid, str(fila["id"])
+
+
+def _abierta_de(conn, ws, tg: int):
+    with espacio(conn, ws) as cur:
+        quien = _quien(cur, PERSONA, ws)
+        return gateway._ver_pregunta_abierta(
+            cur, quien, tg, datetime.now(timezone.utc), alta=False)
+
+
+def test_la_vista_previa_armada_desde_el_menu_es_la_rama_abierta(
+        cliente, conn, corework, monkeypatch):
+    ws = corework.workspace_id
+    tg, tid, pid = _abrir_vista_previa_del_menu(cliente, conn, ws, monkeypatch)
+
+    abierta = _abierta_de(conn, ws, tg)
+
+    assert abierta.pregunta_id == pid
+    assert abierta.herramienta == gateway._SENTINEL_VISTA_PREVIA
+    assert gateway._no_proponer_de(abierta) == {
+        "herramienta": "actualizar_estado", "campo": "tarea_id", "valor": tid}
+
+
+def test_con_la_vista_previa_del_menu_responde_no_aplica_nada_y_la_vuelve_a_mostrar(
+        cliente, conn, corework, monkeypatch):
+    ws = corework.workspace_id
+    tg, tid, pid = _abrir_vista_previa_del_menu(cliente, conn, ws, monkeypatch)
+    proveedor = _con_rutas(monkeypatch, [_ruta(RespectoPendiente.RESPONDE)])
+    antes = _salidas(conn, tg)
+
+    _mensaje(cliente, tg, "sí, empezala")
+
+    assert _estado(conn, pid) == "esperando"                  # no se aplicó
+    assert proveedor.recibidos == []
+    assert _salidas(conn, tg) == antes + 1
+    assert "botón Confirmar" in _ultimo_cuerpo(conn, tg)
+    assert str(_filas_del_chat(conn, tg)[-1]["pending_action_id"]) == pid
+
+
+@pytest.mark.parametrize("es_la_misma", [True, False],
+                         ids=["misma_tarea_rechaza", "otra_tarea_permite"])
+def test_dejar_la_vista_previa_del_menu_no_vuelve_a_proponer_lo_mismo(
+        cliente, conn, corework, monkeypatch, es_la_misma):
+    ws = corework.workspace_id
+    tg, tid, pid = _abrir_vista_previa_del_menu(cliente, conn, ws, monkeypatch)
+    with admin(conn) as cur:
+        otra = _tarea(cur, ws, titulo="Revisar variador línea 2")
+    conn.commit()
+    destino = tid if es_la_misma else otra
+    _con_rutas(
+        monkeypatch, [_ruta(RespectoPendiente.OTRO_TEMA), _ruta(None)],
+        guion=[Respuesta(llamadas=[Llamada("q2", "actualizar_estado", {
+                   "tarea_id": destino, "estado": "en_curso"})]),
+               Respuesta(texto=RESPUESTA)])
+    _mensaje(cliente, tg, OTRO_MENSAJE)
+
+    _tocar_boton(cliente, conn, ws, "Dejarlo", tg)
+
+    assert _estado(conn, pid) == "cancelada"
+    with admin(conn) as cur:
+        cur.execute("select args from pending_action where estado = 'esperando' "
+                    "and herramienta = 'actualizar_estado'")
+        esperando = cur.fetchall()
+    if es_la_misma:
+        assert esperando == []                                # no se volvió a proponer
+    else:
+        (nueva,) = esperando
+        assert nueva["args"]["tarea_id"] == otra
+
+
+def _bloqueo_abierto(conn, ws, *, titulo: str) -> tuple[str, str]:
+    """Una tarea de la persona con un bloqueo abierto: (tarea, bloqueo)."""
+    from tests.test_menu_tarea import _bloquear
+
+    with admin(conn) as cur:
+        tid = _tarea(cur, ws, titulo=titulo)
+        _bloquear(cur, ws, tid)
+        cur.execute("select id from blocker where task_id = %s", (tid,))
+        bid = str(cur.fetchone()["id"])
+    conn.commit()
+    return tid, bid
+
+
+def _abrir_vista_previa_de_destrabar(conn, ws, bid: str):
+    """La vista previa de `resolver_bloqueo`, cuyo id es `bloqueo_id`, no
+    `tarea_id`."""
+    with espacio(conn, ws) as cur:
+        quien = _quien(cur, PERSONA, ws)
+        cur.execute("select telegram_user_id t from integrante where nombre = %s",
+                    (PERSONA,))
+        tg = cur.fetchone()["t"]
+        pid = _proponer(cur, ws, quien, "resolver_bloqueo",
+                        {"bloqueo_id": bid, "resolucion": "llegó el switch"},
+                        chat_id=tg, ahora=datetime.now(timezone.utc))
+    conn.commit()
+    return tg, pid
+
+
+def test_una_vista_previa_con_bloqueo_id_es_la_rama_y_su_guarda_compara_el_bloqueo(
+        conn, corework):
+    ws = corework.workspace_id
+    _tid, bid = _bloqueo_abierto(conn, ws, titulo="Programar PLC")
+    tg, pid = _abrir_vista_previa_de_destrabar(conn, ws, bid)
+
+    abierta = _abierta_de(conn, ws, tg)
+
+    assert abierta.pregunta_id == pid
+    assert abierta.herramienta == gateway._SENTINEL_VISTA_PREVIA
+    assert gateway._no_proponer_de(abierta) == {
+        "herramienta": "resolver_bloqueo", "campo": "bloqueo_id", "valor": bid}
+
+
+@pytest.mark.parametrize("es_el_mismo", [True, False],
+                         ids=["mismo_bloqueo_rechaza", "otro_bloqueo_permite"])
+def test_dejar_una_vista_previa_de_destrabar_no_vuelve_a_proponer_el_mismo_bloqueo(
+        cliente, conn, corework, monkeypatch, es_el_mismo):
+    ws = corework.workspace_id
+    _tid, bid = _bloqueo_abierto(conn, ws, titulo="Programar PLC")
+    _otra, otro_bid = _bloqueo_abierto(conn, ws, titulo="Revisar variador línea 2")
+    tg, pid = _abrir_vista_previa_de_destrabar(conn, ws, bid)
+    destino = bid if es_el_mismo else otro_bid
+    _con_rutas(
+        monkeypatch, [_ruta(RespectoPendiente.OTRO_TEMA), _ruta(None)],
+        guion=[Respuesta(llamadas=[Llamada("q2", "resolver_bloqueo", {
+                   "bloqueo_id": destino, "resolucion": "llegó el switch"})]),
+               Respuesta(texto=RESPUESTA)])
+    _mensaje(cliente, tg, OTRO_MENSAJE)
+
+    _tocar_boton(cliente, conn, ws, "Dejarlo", tg)
+
+    assert _estado(conn, pid) == "cancelada"
+    with admin(conn) as cur:
+        cur.execute("select args from pending_action where estado = 'esperando' "
+                    "and herramienta = 'resolver_bloqueo'")
+        esperando = cur.fetchall()
+    if es_el_mismo:
+        assert esperando == []                                # no se volvió a proponer
+    else:
+        (nueva,) = esperando
+        assert nueva["args"]["bloqueo_id"] == otro_bid
