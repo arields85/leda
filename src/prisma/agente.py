@@ -172,6 +172,18 @@ def responder(cur: psycopg.Cursor, quien: Solicitante, texto_entrante: str,
                     resultados.append(_rechazar_lo_pendiente(
                         cur, quien, c, ctx))
                     continue
+                if (len(confirmaciones) + len(elegir_pendiente)
+                        + len(opciones_pendientes)) > 0 and not _es_lectura(c):
+                    # Un turno nunca abre dos cosas (T9-R1d-1c, ADR 0013 regla
+                    # 1 y regla 2): una llamada anterior de esta misma vuelta
+                    # ya dejó algo esperando a la persona (vista previa,
+                    # elección, `ofrecer_opciones`) y el turno termina ahí.
+                    # Una escritura o una pregunta más se rechaza antes de
+                    # ejecutarse o de preparar nada: dos juegos de botones en
+                    # una respuesta no se pueden contestar (banco b-0023).
+                    resultados.append(_rechazar_segunda_pregunta(
+                        cur, quien, c, ctx))
+                    continue
                 if not c.nombre.startswith("consultar_"):
                     intentos_mutacion.append(c.nombre)
                 resultados.append(
@@ -331,6 +343,34 @@ def _rechazar_lo_pendiente(cur, quien: Solicitante, c: Llamada, ctx) -> dict:
             "is_error": True}
 
 
+RECHAZO_SEGUNDA_PREGUNTA = (
+    "Ya le dejaste una pregunta a la persona en este turno y el turno termina "
+    "ahí. No abras otra cosa: esperá su respuesta.")
+
+
+def _es_lectura(c: Llamada) -> bool:
+    """Las lecturas (`consultar_*`) no escriben ni abren nada: el turno puede
+    seguir usándolas aunque ya haya una pregunta abierta."""
+    return c.nombre.startswith("consultar_")
+
+
+def _rechazar_segunda_pregunta(cur, quien: Solicitante, c: Llamada, ctx) -> dict:
+    """Como `_rechazar_lo_pendiente`: la llamada no se ejecuta ni se prepara,
+    no cuenta como acción ni como intento fallido, y se audita como
+    `herramienta_rechazada:` con los argumentos de la llamada."""
+    registrar_auditoria(
+        cur, accion=f"herramienta_rechazada:{c.nombre}",
+        workspace_id=quien.workspace_id, actor_app_user_id=quien.app_user_id,
+        actor_kind="prisma",
+        detalle={"args": c.args, "rechazo": {"error": RECHAZO_SEGUNDA_PREGUNTA}},
+        pack_hash=ctx.pack_hash, nucleo_hash=ctx.nucleo_hash)
+    return {"type": "tool_result", "tool_use_id": c.id,
+            "content": json.dumps(
+                {"ejecutado": False, "explicacion": RECHAZO_SEGUNDA_PREGUNTA},
+                ensure_ascii=False),
+            "is_error": True}
+
+
 def _normalizar_comparacion(texto: str) -> str:
     """Minúsculas, sin acentos, espacios colapsados -- para comparar si un
     título aparece en la respuesta sin importar cómo lo escribió el modelo
@@ -435,23 +475,10 @@ def _ejecutar_una(cur, quien: Solicitante, c: Llamada, ctx, acciones,
             "aclaracion": "Ya le mostré los botones. No elijas vos ni "
                           "supongas cuál era."})
     except H.NecesitaOpciones as e:
-        if opciones_pendientes:
-            # ADR 0007: un solo juego de botones por turno (`responder`
-            # sólo encola `opciones_pendientes[0]`). Sin esta guarda, una
-            # segunda llamada a `ofrecer_opciones` en el mismo turno
-            # quedaba en `opciones_pendientes` sin encolarse nunca, pero el
-            # modelo recibía el mismo texto de éxito que la primera --le
-            # mentía diciéndole que ya se mostraron unos botones que en
-            # realidad no se armaron. Ahora una llamada de más se rechaza
-            # con la verdad, sin sumarse a `elecciones` ni a
-            # `opciones_pendientes`: no cuenta como mostrada.
-            return bloque({
-                "ejecutado": False,
-                "explicacion": "ya ofreciste opciones en este turno; no se "
-                              "mostraron estas",
-                "aclaracion": "Sólo se puede mostrar un juego de botones por "
-                              "turno. No lo anuncies como hecho ni supongas "
-                              "que la persona las vio."}, error=True)
+        # Una segunda llamada a `ofrecer_opciones` (o cualquier otra cosa que
+        # abra una pregunta) en el mismo turno no llega hasta acá: `responder`
+        # la rechaza antes de ejecutarla (`_rechazar_segunda_pregunta`, ADR
+        # 0007: un solo juego de botones por turno; T9-R1d-1c).
         # No se encola acá (fix del orquestador, evidencia de banco
         # b-0001-a): recién `responder`, al cerrar el turno completo, sabe
         # si además queda una confirmación o un `NecesitaElegir` pendiente

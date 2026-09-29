@@ -296,8 +296,10 @@ def test_texto_de_una_vuelta_posterior_a_ofrecer_opciones_se_descarta(
 def test_texto_se_descarta_si_ademas_queda_una_confirmacion_pendiente(
         corework, conn, monkeypatch):
     """Evitar anunciar como hecho algo que no se hizo (ADR 0005) sigue
-    ganando: si en el mismo turno además queda una confirmación esperando,
-    el texto no viaja -- sólo la pregunta con sus botones."""
+    ganando: si en el mismo turno queda una confirmación esperando, el texto
+    del modelo no viaja. Desde T9-R1d-1c un turno nunca abre dos cosas: la
+    pregunta que el modelo pidió después (`ofrecer_opciones`) se rechaza y lo
+    único que sale es la vista previa, con su único juego de botones."""
     ws = corework.workspace_id
     with admin(conn) as cur:
         tid = _tarea(cur, ws, persona="Marcos Tarquini")
@@ -318,15 +320,19 @@ def test_texto_se_descarta_si_ademas_queda_una_confirmacion_pendiente(
         r = responder(cur, quien, "arranco", proveedor, cal, chat_id=1,
                      ahora=datetime.now(timezone.utc))
         assert r.confirmaciones == ["actualizar_estado"]
+        assert r.elecciones == []
         assert r.texto == ""
 
-        pid = _pendiente_opciones(cur, ws)
+        cur.execute("select count(*) n from pending_action where herramienta = %s",
+                    (P.SENTINEL_OPCIONES_MODELO,))
+        assert cur.fetchone()["n"] == 0
         cur.execute(
-            "select cuerpo from message_outbox where pending_action_id = %s", (pid,))
-        cuerpo = cur.fetchone()["cuerpo"]
+            "select cuerpo from message_outbox where chat_id = 1 "
+            "and pending_action_id is not null")
+        (fila,) = cur.fetchall()                 # un solo juego de botones
 
-    assert cuerpo == "¿Seguimos con ésta?"
-    assert "Ya casi termino" not in cuerpo
+    assert "Ya casi termino" not in fila["cuerpo"]
+    assert "¿Seguimos con ésta?" not in fila["cuerpo"]
 
 
 def test_texto_largo_con_opciones_se_parte_y_los_botones_van_aparte(
@@ -409,15 +415,17 @@ def test_segunda_llamada_a_ofrecer_opciones_en_el_mismo_turno_no_se_muestra(
     ]
     proveedor = _con_proveedor(monkeypatch, guion)
     # El turno cierra tras esa vuelta (T8c-1) y el modelo ya no vuelve a
-    # leer los resultados: se capturan al salir de `_ejecutar_una`.
+    # leer los resultados: se capturan al salir de `_ejecutar_una` y del
+    # rechazo de la segunda pregunta (T9-R1d-1c: un turno nunca abre dos cosas).
     resultados_vistos: list[dict] = []
-    original = agente._ejecutar_una
+    for nombre in ("_ejecutar_una", "_rechazar_segunda_pregunta"):
+        original = getattr(agente, nombre)
 
-    def _capturando(*args, **kwargs):
-        bloque = original(*args, **kwargs)
-        resultados_vistos.append(bloque)
-        return bloque
-    monkeypatch.setattr(agente, "_ejecutar_una", _capturando)
+        def _capturando(*args, _original=original, **kwargs):
+            bloque = _original(*args, **kwargs)
+            resultados_vistos.append(bloque)
+            return bloque
+        monkeypatch.setattr(agente, nombre, _capturando)
 
     with espacio(conn, ws) as cur:
         quien = _quien(cur, "Marcos Tarquini", ws)
@@ -442,7 +450,8 @@ def test_segunda_llamada_a_ofrecer_opciones_en_el_mismo_turno_no_se_muestra(
     assert r1["is_error"] is False
     assert r2["is_error"] is True
     contenido_2 = json.loads(r2["content"])
-    assert "ya ofreciste opciones" in contenido_2["explicacion"]
+    assert contenido_2["ejecutado"] is False
+    assert contenido_2["explicacion"] == agente.RECHAZO_SEGUNDA_PREGUNTA
 
 
 # ---------------------------------------------------------------------------
