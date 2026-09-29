@@ -165,6 +165,24 @@ Antes de implementar una fase:
    de esa unidad juntos.
 5. Registrar comando, resultado exacto, escenario operativo y límite de rollback.
 
+**Hallazgos de conversación: reglas generales, no parches**
+([`ADR 0013`](docs/decisions/0013-reglas-generales-de-la-conversacion.md), decisión del
+usuario del 2026-09-29). Las variantes de una conversación son infinitas; arreglar cada
+caso con listas de frases o palabras clave no termina nunca. Ante un hallazgo sobre cómo
+conversa Prisma:
+
+- Clasificarlo primero en una de las reglas del ADR 0013: pregunta pendiente como
+  contexto (comandos cerrados), una respuesta visible por mensaje, estado real y sólo
+  opciones posibles, toque con señal e idempotente.
+- Corregir el mecanismo de esa regla y probarlo con el caso y con familias de variantes,
+  no sólo con la frase observada.
+- Si no entra en ninguna regla, discutir con el usuario una regla nueva antes de
+  parchear.
+- Reparto de trabajo: el modelo interpreta el lenguaje y devuelve un comando de una lista
+  cerrada; el código ejecuta un manejo determinista por comando y garantiza las
+  invariantes. Es el patrón probado de los asistentes de tareas ("conversation repair
+  patterns", por ejemplo en Rasa), adoptado dentro del monolito, no como dependencia.
+
 Al terminar una unidad:
 
 - actualizar `docs/STATUS.md` con hechos comprobados, riesgos y próximo paso;

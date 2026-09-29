@@ -238,7 +238,12 @@ entrega después de "Pedir cambios" no volvió a revisión (R3-H20); el B no se 
 
 **Próximo, en este orden (decisión del usuario, 2026-09-29):**
 
-1. **Estado de la conversación (críticos, T9):** R3-H17 (un slot pendiente se traga un
+1. **Estado de la conversación (críticos, T9), por reglas generales y no por parches**
+   ([`ADR 0013`](decisions/0013-reglas-generales-de-la-conversacion.md), decisión del
+   usuario del 2026-09-29): pregunta pendiente como contexto con comandos cerrados (patrón
+   de "conversation repair" de los asistentes de tareas, adoptado dentro del monolito),
+   una respuesta visible por mensaje, estado real y sólo opciones posibles, toque con
+   señal e idempotente. Los hallazgos son casos de prueba: R3-H17 (un slot pendiente se traga un
    "hola" como evidencia), R3-H20 (la nueva entrega no vuelve a revisión), R3-H15 (un
    mensaje sin texto no recibe respuesta), R3-H19 (dos respuestas para un mensaje),
    R3-H18 (opciones que no se pueden cumplir), R3-H16 (el motivo de "Pedir cambios" no
