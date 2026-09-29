@@ -863,6 +863,7 @@ def ejecutar_escenario(
     chat_id: int | None = None, cliente_jev: Any | None = None,
     aclaracion_esperada: dict | None = None, toques: list[dict] | None = None,
     mensajes_tras_toques: list[str] | None = None,
+    toques_tras_mensajes: list[dict] | None = None,
 ) -> ResultadoCorrida:
     """Corre un escenario por `gateway.procesar_update`, con
     `proveedor_real` envuelto en `ProveedorGrabador` e inyectado en lugar de
@@ -921,6 +922,13 @@ def ejecutar_escenario(
     es sólo la de estos mensajes y lo que sigue: así "se volvió a preguntar" o
     "no hay vista previa" se pueden comprobar sin confundirlo con la pregunta
     original.
+
+    `toques_tras_mensajes` (T9-R1d, ADR 0013 regla 1, enmienda "una sola rama
+    abierta"): botones que se tocan después de `mensajes_tras_toques`, con la
+    misma resolución que `toques` -- sirven para tocar la pregunta de la rama
+    que abrió uno de esos mensajes ("Seguir" o "Dejarlo y ver lo otro"). La
+    pregunta ya salió: la respuesta visible que se evalúa es sólo la de estos
+    toques y lo que sigue.
 
     Un fallo durante el procesamiento (por ejemplo, infraestructura del
     escenario mal declarada) deja la corrida `bloqueado`, con el motivo, en
@@ -1061,6 +1069,20 @@ def ejecutar_escenario(
             for texto in mensajes_tras_toques:
                 gateway.procesar_update(conn, slug, _update_de_texto(
                     next(ids_de_mensaje), texto, chat, tg_id))
+
+        if toques_tras_mensajes:
+            # La pregunta que abrió el mensaje (la de la rama) queda fuera de
+            # la respuesta que se evalúa: importa lo que pasa al tocarla.
+            with admin(conn) as cur:
+                cur.execute("select id from message_outbox where workspace_id = %s",
+                            (workspace_id,))
+                ids_previos |= {f["id"] for f in cur.fetchall()}
+            for toque in toques_tras_mensajes:
+                with admin(conn) as cur:
+                    _, objetivo = _resolver_toque_generico(
+                        cur, workspace_id, chat, toque, desde_corrida)
+                _tocar_opcion(conn, slug, chat, tg_id, objetivo["token"],
+                              objetivo.get("prefijo", P.CALLBACK_PREFIJO))
 
         # El turno pudo haber dejado una propuesta de una herramienta que
         # escribe esperando un Confirmar (T1/T2, ADR 0005 decisión 1): el

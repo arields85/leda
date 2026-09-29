@@ -476,7 +476,7 @@ def test_la_familia_b_0022_carga_con_la_eleccion_o_el_borrador_abiertos():
             "¿qué tareas tengo abiertas?"} <= mensajes
     con_borrador = [e for e in familia
                     if e.precondiciones.get("borrador_de_alta")]
-    assert len(con_borrador) == 3
+    assert len(con_borrador) == 5
     assert all(e.mensajes == [] for e in con_borrador)
 
 
@@ -509,4 +509,45 @@ def test_sin_mensajes_sigue_invalido_sin_borrador_o_sin_mensajes_posteriores(
     datos = {**_MINIMO, "mensajes": [], **cambios}
 
     with pytest.raises(EscenarioInvalido):
+        cargar_escenario(_escribir(tmp_path, datos))
+
+
+# ---------------------------------------------------------------------------
+# toques_tras_mensajes (T9-R1d): botones que se tocan DESPUÉS de los mensajes
+# de `mensajes_tras_toques` -- para tocar la pregunta que abrió un mensaje
+# (la de la rama: "Seguir" o "Dejarlo y ver lo otro").
+# ---------------------------------------------------------------------------
+
+
+def test_carga_sin_toques_tras_mensajes_usa_la_tupla_vacia(tmp_path):
+    e = cargar_escenario(_escribir(tmp_path, _MINIMO))
+    assert e.toques_tras_mensajes == ()
+
+
+def test_carga_toques_tras_mensajes_por_indice_y_por_etiqueta(tmp_path):
+    datos = dict(_MINIMO)
+    datos["mensajes_tras_toques"] = ["¿qué tengo pendiente?"]
+    datos["toques_tras_mensajes"] = [{"etiqueta": "Dejarlo y ver lo otro"},
+                                     {"indice": 0}]
+    e = cargar_escenario(_escribir(tmp_path, datos))
+    assert e.toques_tras_mensajes == ({"etiqueta": "Dejarlo y ver lo otro"},
+                                      {"indice": 0})
+
+
+@pytest.mark.parametrize("invalido", [
+    {"indice": 0}, ["Seguir"], [{}], [{"etiqueta": "Seguir", "indice": 0}],
+    [{"etiqueta": "  "}], [{"indice": -1}], [{"indice": "0"}]])
+def test_toques_tras_mensajes_invalidos(tmp_path, invalido):
+    datos = dict(_MINIMO)
+    datos["mensajes_tras_toques"] = ["hola"]
+    datos["toques_tras_mensajes"] = invalido
+    with pytest.raises(EscenarioInvalido):
+        cargar_escenario(_escribir(tmp_path, datos))
+
+
+def test_toques_tras_mensajes_sin_mensajes_tras_toques_es_invalido(tmp_path):
+    # No hay pregunta que un mensaje haya abierto: el escenario no tiene sentido.
+    datos = dict(_MINIMO)
+    datos["toques_tras_mensajes"] = [{"etiqueta": "Seguir"}]
+    with pytest.raises(EscenarioInvalido, match="mensajes_tras_toques"):
         cargar_escenario(_escribir(tmp_path, datos))

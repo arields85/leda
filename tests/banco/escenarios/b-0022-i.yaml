@@ -1,11 +1,12 @@
-id: b-0022-f
+id: b-0022-i
 variante_de: b-0022
 objetivo: >
-  Variante de b-0022, corregir el borrador: con la vista previa esperando, la
-  persona pide cambiar la fecha. El alta no tiene un camino para cambiar un
-  dato ya confirmado desde un mensaje: Prisma lo dice una vez y el borrador
-  sigue esperando.
-actor: Ismael Soschinski
+  Variante de b-0022, el borrador espera a otra persona (ADR 0013 regla 1,
+  enmienda "una sola rama de conversación abierta", T9-R1d): quien pidió la
+  tarea (Marcos) no es quien tiene el botón Confirmar (Ismael). El borrador no
+  es una rama abierta de Marcos: su consulta sigue el camino normal, sin
+  pregunta de la rama, y aparece la tarea. El borrador sigue esperando.
+actor: Marcos Tarquini
 mensajes: []
 precondiciones:
   tareas:
@@ -15,12 +16,9 @@ precondiciones:
       responsable: Marcos Tarquini
   # El alta ya armada y esperando confirmación, sembrada en la base con las
   # mismas filas que crea el alta real (`corrida._sembrar_borrador_de_alta`).
-  # Quien escribe (Ismael) es quien confirma lo de Marcos: sólo entonces el
-  # borrador es una pregunta abierta suya (ADR 0013 regla 1, enmienda):
-  # lo que se evalúa es lo que pasa con el mensaje que llega después
-  # (`mensajes_tras_toques`), no el armado del alta con el modelo.
+  # Marcos escribe, pero lo suyo lo confirma Ismael.
   borrador_de_alta:
-    solicitante: Ismael Soschinski
+    solicitante: Marcos Tarquini
     titulo: Cablear tablero norte
     objetivo: Objetivo simulado de Cablear tablero de la máquina 3 (simulado)
     responsable: Marcos Tarquini
@@ -28,7 +26,7 @@ precondiciones:
     fecha_objetivo: "2030-12-30"
     criterio_aceptacion: Prueba firmada
 mensajes_tras_toques:
-  - "cambiale la fecha para el 5 de enero"
+  - "¿qué tareas tengo abiertas?"
 herramientas_prohibidas:
   - actualizar_estado
   - registrar_bloqueo
@@ -41,13 +39,12 @@ efectos:
     task_state_event: 0
     evidence: 0
     approval: 0
-# La respuesta es `gateway.AVISO_ALTA_NO_SE_CORRIGE`: si cambia su
-# redacción, actualizar acá.
+# La consulta se atiende de verdad (aparece la tarea) y no hay pregunta de la rama.
 respuesta_menciona:
-  - "no lo puedo cambiar"
+  - "Cablear tablero"
+respuesta_no_contiene_patron:
+  - "Estábamos con"
 # El alta es justamente lo que se prueba: un borrador es esperable.
 permite_borrador_de_tarea: true
-# La respuesta es un texto sin botones a propósito: se exime la
-# comprobación de ADR 0007 sobre preguntas sin opciones.
 permite_pregunta_sin_opciones: true
 severidad: alta

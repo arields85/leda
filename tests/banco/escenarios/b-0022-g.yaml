@@ -3,7 +3,7 @@ variante_de: b-0022
 objetivo: >
   Variante de b-0022, cancelar el borrador: con la vista previa esperando, la
   persona lo cancela. Se cancela el borrador y se dice qué se dejó de lado.
-actor: Marcos Tarquini
+actor: Ismael Soschinski
 mensajes: []
 precondiciones:
   tareas:
@@ -12,11 +12,13 @@ precondiciones:
       area: ot
       responsable: Marcos Tarquini
   # El alta ya armada y esperando confirmación, sembrada en la base con las
-  # mismas filas que crea el alta real (`corrida._sembrar_borrador_de_alta`):
+  # mismas filas que crea el alta real (`corrida._sembrar_borrador_de_alta`).
+  # Quien escribe (Ismael) es quien confirma lo de Marcos: sólo entonces el
+  # borrador es una pregunta abierta suya (ADR 0013 regla 1, enmienda):
   # lo que se evalúa es lo que pasa con el mensaje que llega después
   # (`mensajes_tras_toques`), no el armado del alta con el modelo.
   borrador_de_alta:
-    solicitante: Marcos Tarquini
+    solicitante: Ismael Soschinski
     titulo: Cablear tablero norte
     objetivo: Objetivo simulado de Cablear tablero de la máquina 3 (simulado)
     responsable: Marcos Tarquini

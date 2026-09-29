@@ -1809,3 +1809,78 @@ def test_ejecutar_escenario_sobre_el_borrador_sembrado_no_lo_convierte(
         cur.execute("select estado from task_intake_request")
         assert cur.fetchone()["estado"] == "active"
 
+
+# ---------------------------------------------------------------------------
+# `toques_tras_mensajes` (T9-R1d, ADR 0013 regla 1, enmienda): tocar la
+# pregunta de la rama que abrió un mensaje de `mensajes_tras_toques`. La
+# respuesta que se evalúa es la de ese toque, no la pregunta que ya salió.
+# ---------------------------------------------------------------------------
+
+
+def _interno_con_otro_tema_y_su_respuesta():
+    return ProveedorGuionado(
+        guion=[Respuesta(texto="Tenés una tarea abierta.")],
+        rutas=[IntentRoute(IntentAction.START_TASK_INTAKE),
+               IntentRoute(IntentAction.NORMAL_CONVERSATION,
+                           respecto_pendiente=RespectoPendiente.OTRO_TEMA),
+               IntentRoute(IntentAction.NORMAL_CONVERSATION)])
+
+
+def test_ejecutar_escenario_toca_dejar_despues_del_otro_tema_y_evalua_esa_respuesta(
+        corework, conn):
+    ws = corework.workspace_id
+    _sembrar_objetivo_para_el_alta(conn, ws)
+    interno = _interno_con_otro_tema_y_su_respuesta()
+
+    r = ejecutar_escenario(
+        conn, ws, "corework", "Marcos Tarquini", ["armame una tarea nueva"],
+        interno, escenario_id="b-test-rama", indice=0, toques=[{"indice": 0}],
+        mensajes_tras_toques=["¿qué tareas tengo abiertas?"],
+        toques_tras_mensajes=[{"etiqueta": "Dejarlo y ver lo otro"}])
+
+    assert r.bloqueado is False, r.motivo_bloqueo
+    # Lo que se evalúa: lo que se dejó de lado y lo que se atendió. La pregunta
+    # de la rama, que ya había salido, queda fuera.
+    assert "dejé de lado" in r.respuesta_texto
+    assert "Tenés una tarea abierta." in r.respuesta_texto
+    assert "Estábamos con" not in r.respuesta_texto
+    with admin(conn) as cur:
+        cur.execute("select estado from task_intake_request")
+        assert cur.fetchone()["estado"] == "cancelled"
+
+
+def test_ejecutar_escenario_toca_seguir_y_evalua_la_pregunta_repetida(
+        corework, conn):
+    ws = corework.workspace_id
+    _sembrar_objetivo_para_el_alta(conn, ws)
+    interno = _interno_con_otro_tema_y_su_respuesta()
+
+    r = ejecutar_escenario(
+        conn, ws, "corework", "Marcos Tarquini", ["armame una tarea nueva"],
+        interno, escenario_id="b-test-rama", indice=0, toques=[{"indice": 0}],
+        mensajes_tras_toques=["¿qué tareas tengo abiertas?"],
+        toques_tras_mensajes=[{"etiqueta": "Seguir con eso"}])
+
+    assert r.bloqueado is False, r.motivo_bloqueo
+    assert "Escribí el título" in r.respuesta_texto           # la pregunta pendiente
+    assert "Estábamos con" not in r.respuesta_texto
+    assert interno.recibidos == []                            # el otro tema no se atendió
+    with admin(conn) as cur:
+        cur.execute("select estado from task_intake_request")
+        assert cur.fetchone()["estado"] == "active"
+
+
+def test_ejecutar_escenario_con_un_toque_tras_mensajes_que_no_existe_queda_bloqueado(
+        corework, conn):
+    ws = corework.workspace_id
+    _sembrar_objetivo_para_el_alta(conn, ws)
+
+    r = ejecutar_escenario(
+        conn, ws, "corework", "Marcos Tarquini", ["armame una tarea nueva"],
+        _interno_con_otro_tema_y_su_respuesta(), escenario_id="b-test-rama",
+        indice=0, toques=[{"indice": 0}],
+        mensajes_tras_toques=["¿qué tareas tengo abiertas?"],
+        toques_tras_mensajes=[{"etiqueta": "Un botón que no existe"}])
+
+    assert r.bloqueado is True
+    assert "no lo ofrece" in r.motivo_bloqueo

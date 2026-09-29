@@ -4,7 +4,7 @@ objetivo: >
   Variante de b-0022, el borrador esperando confirmación: la persona escribe
   "sí, dale". Un mensaje no confirma el borrador (la conversión es explícita,
   con el botón Confirmar): Prisma lo dice y el borrador sigue esperando.
-actor: Marcos Tarquini
+actor: Ismael Soschinski
 mensajes: []
 precondiciones:
   tareas:
@@ -13,11 +13,13 @@ precondiciones:
       area: ot
       responsable: Marcos Tarquini
   # El alta ya armada y esperando confirmación, sembrada en la base con las
-  # mismas filas que crea el alta real (`corrida._sembrar_borrador_de_alta`):
+  # mismas filas que crea el alta real (`corrida._sembrar_borrador_de_alta`).
+  # Quien escribe (Ismael) es quien confirma lo de Marcos: sólo entonces el
+  # borrador es una pregunta abierta suya (ADR 0013 regla 1, enmienda):
   # lo que se evalúa es lo que pasa con el mensaje que llega después
   # (`mensajes_tras_toques`), no el armado del alta con el modelo.
   borrador_de_alta:
-    solicitante: Marcos Tarquini
+    solicitante: Ismael Soschinski
     titulo: Cablear tablero norte
     objetivo: Objetivo simulado de Cablear tablero de la máquina 3 (simulado)
     responsable: Marcos Tarquini
@@ -38,11 +40,10 @@ efectos:
     task_state_event: 0
     evidence: 0
     approval: 0
-# Marcos no es quien confirma lo suyo (el aprobador es Dirección): la respuesta
-# es `ingreso_tareas.DRAFT_AWAITING_APPROVER` y dice quién confirma. Si cambia
-# su redacción, actualizar acá.
+# La respuesta es `ingreso_tareas.DRAFT_AWAITING_CONFIRMATION`: dice cómo se
+# confirma. Si cambia su redacción, actualizar acá.
 respuesta_menciona:
-  - "esperando la confirmación de Ismael Soschinski"
+  - "esperando confirmación"
   - "Confirmar"
 # El alta es justamente lo que se prueba: un borrador es esperable.
 permite_borrador_de_tarea: true

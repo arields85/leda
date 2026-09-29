@@ -82,6 +82,39 @@ class Escenario:
     # y lo que sigue, no la de la pregunta que ya estaba abierta
     # (`corrida.ejecutar_escenario`).
     mensajes_tras_toques: tuple[str, ...] = ()
+    # Toques que se hacen DESPUÉS de `mensajes_tras_toques` (T9-R1d, ADR 0013
+    # regla 1, enmienda "una sola rama abierta"): sirven para tocar la pregunta
+    # que abrió uno de esos mensajes -- la de la rama de conversación, con
+    # "Seguir" y "Dejarlo y ver lo otro". Mismo formato y misma resolución que
+    # `toques`. La respuesta visible que se evalúa pasa a ser la de estos
+    # toques y lo que sigue (`corrida.ejecutar_escenario`).
+    toques_tras_mensajes: tuple[dict, ...] = ()
+
+
+def _validar_toques(datos: dict, campo: str, origen: pathlib.Path) -> None:
+    """`toques` y `toques_tras_mensajes` tienen el mismo formato: una lista de
+    mapeos con `etiqueta` o `indice`, exactamente uno de los dos."""
+    toques = datos.get(campo, [])
+    if not isinstance(toques, list):
+        raise EscenarioInvalido(f"{origen}: '{campo}' tiene que ser una lista.")
+    for i, t in enumerate(toques):
+        if not isinstance(t, dict):
+            raise EscenarioInvalido(f"{origen}: '{campo}[{i}]' tiene que ser un mapeo.")
+        tiene_etiqueta = "etiqueta" in t
+        tiene_indice = "indice" in t
+        if tiene_etiqueta == tiene_indice:
+            raise EscenarioInvalido(
+                f"{origen}: '{campo}[{i}]' tiene que traer 'etiqueta' o 'indice', "
+                "exactamente uno de los dos.")
+        if tiene_etiqueta:
+            if not isinstance(t["etiqueta"], str) or not t["etiqueta"].strip():
+                raise EscenarioInvalido(
+                    f"{origen}: '{campo}[{i}].etiqueta' tiene que ser texto no vacío.")
+        else:
+            indice = t["indice"]
+            if not isinstance(indice, int) or isinstance(indice, bool) or indice < 0:
+                raise EscenarioInvalido(
+                    f"{origen}: '{campo}[{i}].indice' tiene que ser un entero >= 0.")
 
 
 def _validar_estructura(datos: dict, origen: pathlib.Path) -> None:
@@ -147,27 +180,7 @@ def _validar_estructura(datos: dict, origen: pathlib.Path) -> None:
         if not isinstance(valor, bool):
             raise EscenarioInvalido(f"{origen}: '{campo}' tiene que ser un booleano.")
 
-    toques = datos.get("toques", [])
-    if not isinstance(toques, list):
-        raise EscenarioInvalido(f"{origen}: 'toques' tiene que ser una lista.")
-    for i, t in enumerate(toques):
-        if not isinstance(t, dict):
-            raise EscenarioInvalido(f"{origen}: 'toques[{i}]' tiene que ser un mapeo.")
-        tiene_etiqueta = "etiqueta" in t
-        tiene_indice = "indice" in t
-        if tiene_etiqueta == tiene_indice:
-            raise EscenarioInvalido(
-                f"{origen}: 'toques[{i}]' tiene que traer 'etiqueta' o 'indice', "
-                "exactamente uno de los dos.")
-        if tiene_etiqueta:
-            if not isinstance(t["etiqueta"], str) or not t["etiqueta"].strip():
-                raise EscenarioInvalido(
-                    f"{origen}: 'toques[{i}].etiqueta' tiene que ser texto no vacío.")
-        else:
-            indice = t["indice"]
-            if not isinstance(indice, int) or isinstance(indice, bool) or indice < 0:
-                raise EscenarioInvalido(
-                    f"{origen}: 'toques[{i}].indice' tiene que ser un entero >= 0.")
+    _validar_toques(datos, "toques", origen)
 
     tras_toques = datos.get("mensajes_tras_toques", [])
     if (not isinstance(tras_toques, list)
@@ -175,6 +188,12 @@ def _validar_estructura(datos: dict, origen: pathlib.Path) -> None:
         raise EscenarioInvalido(
             f"{origen}: 'mensajes_tras_toques' tiene que ser una lista de texto "
             "no vacío.")
+
+    _validar_toques(datos, "toques_tras_mensajes", origen)
+    if datos.get("toques_tras_mensajes") and not tras_toques:
+        raise EscenarioInvalido(
+            f"{origen}: 'toques_tras_mensajes' toca la pregunta que abrió un "
+            "mensaje: hace falta 'mensajes_tras_toques'.")
 
     aclaracion_esperada = datos.get("aclaracion_esperada", {})
     if not isinstance(aclaracion_esperada, dict):
@@ -222,6 +241,7 @@ def cargar_escenario(ruta: pathlib.Path | str) -> Escenario:
         toques=tuple(datos.get("toques", []) or []),
         permite_pregunta_sin_opciones=bool(datos.get("permite_pregunta_sin_opciones", False)),
         mensajes_tras_toques=tuple(datos.get("mensajes_tras_toques", []) or []),
+        toques_tras_mensajes=tuple(datos.get("toques_tras_mensajes", []) or []),
     )
 
 
