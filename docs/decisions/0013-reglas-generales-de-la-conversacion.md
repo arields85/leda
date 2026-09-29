@@ -115,6 +115,12 @@ casos.
      Para que una rama abandonada no silencie el seguimiento, la retención termina
      cuando la pregunta pendiente vence (su vencimiento de siempre); si un tipo de
      pregunta no tiene vencimiento, se le define uno antes de retener por él.
+     **Precisión (2026-09-29, decisión del usuario):** se retiene sólo mientras la
+     persona está activa en la rama, es decir, si escribió o tocó algo en ese chat en
+     los últimos 30 minutos. Una rama abierta pero abandonada no retiene nada: lo que
+     Prisma inicia sale en el momento (un aviso urgente no espera horas) y la rama sigue
+     abierta para cuando la persona vuelva. Con esto las preguntas del alta, que no
+     vencen, también retienen, acotadas por la actividad.
 2. **Cada mensaje recibe exactamente una respuesta visible.** Al terminar de procesar un
    mensaje entrante, un control estructural verifica lo encolado para ese mensaje: si
    no salió nada, sale el aviso neutro y se registra el incidente; nunca sale más de una

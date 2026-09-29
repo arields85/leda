@@ -295,10 +295,10 @@ gestión.
     - [ ] **T9-R1d-2b** — tras `review-080f1ef080f22e16`: acotar la pasada de
       `despachar` (hoy, con filas retenidas, sigue pidiendo lotes sin tope dentro de una
       sola transacción con bloqueos y envíos), alinear su comentario, hacer explícito que
-      una respuesta nunca se retiene, y la ventana de retención que decida el usuario
-      (propuesta: sólo mientras la persona estuvo activa en la rama en los últimos 30
-      minutos; resuelve las preguntas del alta sin vencimiento y el urgente retenido
-      hasta 8 horas).
+      una respuesta nunca se retiene, y la ventana de retención decidida por el usuario
+      (2026-09-29): retener sólo si la persona escribió o tocó algo en ese chat en los
+      últimos 30 minutos; así también retienen las preguntas del alta (sin vencimiento) y
+      un urgente no espera horas por una rama abandonada.
     - [x] **T9-R1d-2** — retención de los mensajes que inicia Prisma mientras la persona
       tiene una rama abierta, hasta que vence la pregunta. Más los seguimientos de
       `review-faccc0e9d83561b3`: controlar que una elección sin prefijo entre con sus
