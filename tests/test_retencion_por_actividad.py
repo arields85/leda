@@ -170,21 +170,32 @@ def test_un_urgente_a_una_persona_activa_se_retiene(corework, conn):
 # Un toque también es actividad
 # ---------------------------------------------------------------------------
 
+def _reloj_de_la_base(conn) -> datetime:
+    """La hora de la base de datos, el reloj con el que un toque queda registrado
+    (`inbound_message.at` por omisión)."""
+    with admin(conn) as cur:
+        cur.execute("select clock_timestamp() ahora")
+        return cur.fetchone()["ahora"]
+
+
 def test_un_toque_cuenta_como_actividad_en_ese_chat(corework, conn, cliente):
+    """Un solo reloj: el de la base, el mismo con el que el toque deja su marca.
+    Antes se mezclaba con `datetime.now` de Python y la ventana de 30 minutos
+    dependía de que los dos coincidieran."""
     ws = corework.workspace_id
+    ahora = _reloj_de_la_base(conn)
     quien, tg, _pid = _preparar(
-        conn, ws, _abrir_vista_previa,
-        vence=datetime.now(timezone.utc) + timedelta(hours=8))
-    _sin_actividad(conn, ws, desde=AHORA - timedelta(hours=3))
-    assert _despachar(conn, ws)[0]["retenidos"] == 0    # inactiva: no retiene
+        conn, ws, _abrir_vista_previa, vence=ahora + timedelta(hours=8))
+    _sin_actividad(conn, ws, desde=ahora - timedelta(hours=3))
+    assert _despachar(conn, ws, ahora)[0]["retenidos"] == 0    # inactiva: no retiene
 
     with espacio(conn, ws) as cur:
         _encolar(cur, ws, quien, tg, clave="despues",
-                 cuando=datetime.now(timezone.utc) - timedelta(minutes=1))
+                 cuando=ahora - timedelta(minutes=1))
     conn.commit()
     _tocar(cliente, "ya-no-vigente", tg)      # un botón viejo también es un toque
 
-    resumen, _transporte = _despachar(conn, ws, datetime.now(timezone.utc))
+    resumen, _transporte = _despachar(conn, ws, _reloj_de_la_base(conn))
 
     assert resumen["retenidos"] == 1
     assert _estados(conn)["despues"] == "listo"

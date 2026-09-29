@@ -663,12 +663,28 @@ class _Pasada:
     retenidos: list[dict] = field(default_factory=list)
 
 
+# Lo que, al examinarlo, se retendría en vez de descartarse: no vencido (la regla de
+# `_despachar_fila`: `vence_en < ahora` se descarta) y, si es la vista previa de un
+# borrador, todavía la vigente (`_preview_vigente`: esperando y sin vencer; el cambio
+# de aprobador sólo lo ve el examen). Lo vencido de alguien retenido no espera a que
+# se libere: se examina y se descarta como siempre, y no se cuenta como retenido
+# (T9-R1c-3, seguimiento de `review-3ebe127d376a4d18`).
+_SE_RETENDRIA = """
+                and (message_outbox.vence_en is null
+                     or message_outbox.vence_en >= %(ahora)s)
+                and not exists (
+                      select 1 from pending_action p
+                       where p.id = message_outbox.pending_action_id
+                         and p.draft_id is not null
+                         and not (p.estado = 'esperando'
+                                  and p.vence_en > clock_timestamp()))"""
+
 # Lo retenido sigue `listo` y encabezaría la cola de siempre. Para que no deje sin
 # servicio a lo que viene detrás sin agrandar la pasada, la primera fila que se
 # retiene de una persona en un chat la excluye del resto de la pasada (salvo sus
-# respuestas y la pregunta de la propia rama, que nunca se retienen): esa fila
-# cuesta una del lote y lo demás suyo ya no se pide.
-_SIN_LO_RETENIDO = """
+# respuestas, la pregunta de la propia rama y lo que se descartaría al examinarlo,
+# que nunca se retienen): esa fila cuesta una del lote y lo demás suyo ya no se pide.
+_SIN_LO_RETENIDO = f"""
        and not exists (
              select 1 from jsonb_to_recordset(%(retenidos)s::jsonb)
                       as x(m uuid, c bigint, rama text)
@@ -676,7 +692,8 @@ _SIN_LO_RETENIDO = """
                 and x.m = message_outbox.destinatario_membership_id
                 and x.c = message_outbox.chat_id
                 and message_outbox.pending_action_id::text is distinct from x.rama
-                and message_outbox.intake_choice_set_id::text is distinct from x.rama)
+                and message_outbox.intake_choice_set_id::text is distinct from x.rama
+                {_SE_RETENDRIA})
 """
 
 
@@ -722,7 +739,10 @@ def _retener(cur, workspace_id: str, ahora: datetime, m, rama, resumen: dict,
              pasada: _Pasada) -> None:
     """`m` no se envía ni se descarta: sigue `listo` en su lugar de la cola y se
     cuenta en `retenidos`. La primera vez que se retiene a una persona en un chat
-    se cuenta también lo suyo que la consulta ya no va a pedir."""
+    se cuenta también lo suyo que la consulta ya no va a pedir, y sólo lo que de
+    verdad se retendría (`_SE_RETENDRIA`) y no está bloqueado por otro despachador:
+    con `skip locked` la cuenta no incluye lo que esa otra pasada tiene en sus manos
+    (y lo que cuenta queda bloqueado hasta cerrar esta pasada, como lo examinado)."""
     resumen["retenidos"] += 1
     clave = {"m": str(m["destinatario_membership_id"]), "c": m["chat_id"],
              "rama": rama.id}
@@ -730,14 +750,17 @@ def _retener(cur, workspace_id: str, ahora: datetime, m, rama, resumen: dict,
         return
     pasada.retenidos.append(clave)
     cur.execute(
-        """select count(*) n from message_outbox
-            where workspace_id = %(ws)s and estado = 'listo'
-              and programado_para <= %(ahora)s
-              and id <> all(%(vistos)s::uuid[])
-              and destinatario_membership_id = %(m)s and chat_id = %(c)s
-              and not es_respuesta
-              and pending_action_id::text is distinct from %(rama)s
-              and intake_choice_set_id::text is distinct from %(rama)s""",
+        f"""select count(*) n from (
+              select 1 from message_outbox
+               where workspace_id = %(ws)s and estado = 'listo'
+                 and programado_para <= %(ahora)s
+                 and id <> all(%(vistos)s::uuid[])
+                 and destinatario_membership_id = %(m)s and chat_id = %(c)s
+                 and not es_respuesta
+                 and pending_action_id::text is distinct from %(rama)s
+                 and intake_choice_set_id::text is distinct from %(rama)s
+                 {_SE_RETENDRIA}
+                 for update skip locked) retenidas""",
         {"ws": workspace_id, "ahora": ahora, "vistos": pasada.vistos, **clave})
     resumen["retenidos"] += cur.fetchone()["n"]
 
