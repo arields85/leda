@@ -163,6 +163,47 @@ def _estado(conn, ws: str, slug: str) -> int:
     return 0
 
 
+def _google_recifrar() -> int:
+    """Comando `google recifrar` (rama auxiliar, G2b): vuelve a cifrar cada
+    credencial de Google guardada con la primera clave de
+    `PRISMA_CLAVE_CREDENCIALES`, para poder retirar las claves viejas.
+
+    La clave se carga ANTES de abrir la base: sin clave, o con una mal
+    formada, no se toca nada (ni se conecta). Lo que ninguna clave
+    configurada descifra se informa por slug -- nunca su contenido --, queda
+    intacto y el comando termina con código distinto de cero; el resto igual
+    se re-cifra (correrlo de nuevo es seguro)."""
+    from .google import credenciales
+    from .google.cifrado import ErrorCifrado, VARIABLE_CLAVE, cargar
+
+    try:
+        cifrador = cargar()
+    except ErrorCifrado as e:
+        print(f"{e}")
+        print(f"Revisá {VARIABLE_CLAVE} en .env (`python -m prisma google "
+              "clave-nueva` genera una). No se cambió nada.")
+        return 1
+
+    conn = conectar()
+    with admin(conn) as cur:
+        r = credenciales.recifrar_todo(cur, cifrador)
+    conn.commit()
+
+    if not r.recifradas and not r.ilegibles:
+        print("No hay credenciales de Google guardadas.")
+        return 0
+    print(f"Credenciales re-cifradas con la clave vigente: {r.recifradas}.")
+    if r.ilegibles:
+        print(f"Ninguna clave configurada descifra {len(r.ilegibles)} "
+              "credencial(es); quedaron intactas:")
+        for slug in r.ilegibles:
+            print(f"  {slug}")
+        print(f"Revisá que {VARIABLE_CLAVE} conserve la clave con la que se "
+              "guardaron, o volvé a autorizar Google en ese espacio.")
+        return 1
+    return 0
+
+
 def _correo_verificacion(conn, ws: str, activar: bool) -> int:
     """Comando `correo-verificacion <espacio> --activar|--desactivar`
     (rama auxiliar, G1c). Enciende o apaga `correo_verificacion.habilitado`
@@ -312,6 +353,9 @@ def main(argv: list[str] | None = None) -> int:
     goo_sub = goo.add_subparsers(dest="google_cmd", required=True)
     goo_sub.add_parser("clave-nueva", help="genera una clave para "
                        "PRISMA_CLAVE_CREDENCIALES (no escribe archivos)")
+    goo_sub.add_parser("recifrar", help="vuelve a cifrar las credenciales "
+                       "guardadas con la primera clave de "
+                       "PRISMA_CLAVE_CREDENCIALES (rotación)")
 
     srv = sub.add_parser("servir")
     srv.add_argument("--puerto", type=int, default=8080)
@@ -352,9 +396,11 @@ def main(argv: list[str] | None = None) -> int:
         print(f"\nAgregala al archivo .env como {VARIABLE_CLAVE}=<clave>.")
         print("Para rotar: poné la clave nueva primero y conservá las "
               "anteriores después de una coma,")
-        print("y después corré `python -m prisma google recifrar` "
-              "(disponible más adelante).")
+        print("y después corré `python -m prisma google recifrar`.")
         return 0
+
+    if a.cmd == "google" and a.google_cmd == "recifrar":
+        return _google_recifrar()
 
     if a.cmd == "servir":
         import uvicorn

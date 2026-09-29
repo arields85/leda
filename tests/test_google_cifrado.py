@@ -22,9 +22,11 @@ def _clave() -> str:
 
 
 def _linea_clave(salida: str) -> str:
-    """La clave impresa: la única línea de 44 caracteres sin espacios."""
-    return next(l.strip() for l in salida.splitlines()
-                if len(l.strip()) == 44 and " " not in l.strip())
+    """La clave impresa: la primera línea no vacía después del encabezado."""
+    lineas = salida.splitlines()
+    encabezado = next(i for i, l in enumerate(lineas)
+                      if l.startswith("Clave nueva"))
+    return next(l.strip() for l in lineas[encabezado + 1:] if l.strip())
 
 
 def test_una_sola_clave_construye_el_cifrador():
@@ -91,6 +93,16 @@ def test_el_token_no_contiene_el_texto_plano():
     token = c.cifrar("refresh-token-de-prueba")
     assert isinstance(token, bytes)
     assert b"refresh-token-de-prueba" not in token
+
+
+def test_descifrar_texto_de_bytes_que_no_son_utf8_falla_tipado():
+    c = cifrado.desde_texto(_clave())
+    token = c.cifrar(b"\xff\xfe\x00")
+    with pytest.raises(TokenNoDescifrable) as e:
+        c.descifrar_texto(token)
+    assert isinstance(e.value, ErrorCifrado)
+    assert not isinstance(e.value, UnicodeDecodeError)
+    assert "\xff" not in str(e.value) + repr(e.value)
 
 
 def test_tipo_no_soportado_se_rechaza():
@@ -171,6 +183,7 @@ def test_google_clave_nueva_imprime_una_clave_fernet_valida(capsys, tmp_path,
     Fernet(clave.encode("ascii"))  # no lanza: es una clave válida
     assert "PRISMA_CLAVE_CREDENCIALES" in salida
     assert "recifrar" in salida
+    assert "disponible más adelante" not in salida
     # No escribe ningún archivo.
     assert list(tmp_path.iterdir()) == []
 

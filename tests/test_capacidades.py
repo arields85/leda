@@ -77,7 +77,11 @@ TABLAS_MUERTAS = ("conversation_access_log", "learning")
 # mismo patrón: el token de verificación sólo se toca desde
 # emitir_verificacion_correo(), reservar_verificacion_correo() y
 # completar_verificacion_correo().
-TABLAS_POR_FUNCION = ("acceso_tablero", "alta_correo_verificacion")
+# `credencial_google` (G2b) también: el payload cifrado sólo se toca desde
+# leer_credencial_google(), guardar_credencial_google(),
+# reemplazar_token_google() y credenciales_google_cifradas().
+TABLAS_POR_FUNCION = ("acceso_tablero", "alta_correo_verificacion",
+                      "credencial_google")
 
 
 def _fuente() -> str:

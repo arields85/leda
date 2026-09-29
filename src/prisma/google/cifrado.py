@@ -4,7 +4,7 @@ La credencial se cifra en Python antes de guardarse (Fernet, de
 `cryptography`) con una o varias claves de `PRISMA_CLAVE_CREDENCIALES`,
 separadas por coma: la primera cifra y todas descifran, así se rota sin cortar
 el servicio (la clave nueva va primero, las viejas se conservan hasta re-cifrar
-todo con `rotar`).
+todo con `python -m prisma google recifrar`, que usa `rotar`).
 
 Reglas:
 - Sin clave, no hay cifrado y no hay uso de Google: se lanza un error tipado.
@@ -59,19 +59,24 @@ class Cifrador:
         return self._multi.encrypt(bytes(plano))
 
     def descifrar(self, token: bytes | str) -> bytes:
-        try:
-            return self._multi.decrypt(token)
-        except (InvalidToken, TypeError, ValueError):
-            raise TokenNoDescifrable(
-                "Ninguna clave configurada descifra el dato.") from None
+        return self._o_no_descifrable(self._multi.decrypt, token)
 
     def descifrar_texto(self, token: bytes | str) -> str:
-        return self.descifrar(token).decode("utf-8")
+        # Un dato que descifra pero no es UTF-8 tampoco es un texto nuestro:
+        # mismo error tipado, sin volcar los bytes.
+        return self._o_no_descifrable(
+            lambda t: self.descifrar(t).decode("utf-8"), token)
 
     def rotar(self, token: bytes | str) -> bytes:
         """Vuelve a cifrar el dato con la primera clave (la vigente)."""
+        return self._o_no_descifrable(self._multi.rotate, token)
+
+    @staticmethod
+    def _o_no_descifrable(operacion, token):
+        """Único lugar donde una falla de descifrado se vuelve el error
+        tipado: el mensaje nunca lleva material de clave ni de dato."""
         try:
-            return self._multi.rotate(token)
+            return operacion(token)
         except (InvalidToken, TypeError, ValueError):
             raise TokenNoDescifrable(
                 "Ninguna clave configurada descifra el dato.") from None
