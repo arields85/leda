@@ -918,6 +918,9 @@ def _seguir_camino_normal(cur, quien, texto: str, route, proveedor, cal,
         bloque = _bloque_pregunta_pendiente(_pregunta_de(retomar))
         previo = estado["bloque_base"]
         estado["bloque_base"] = f"{previo}\n\n{bloque}" if previo else bloque
+        # Y el código lo garantiza: lo que quedó pendiente no se propone de
+        # nuevo (T9-R1b-3, banco b-0020-c: las instrucciones solas no alcanzan).
+        estado["no_proponer"] = _no_proponer_de(retomar)
     _avanzar_aclaracion(cur, quien, workspace_id, chat_id, ahora, proveedor, cal,
                        estado)
 
@@ -1020,6 +1023,40 @@ def _bloque_pregunta_pendiente(pregunta: _Pregunta) -> str:
         f"hizo así: «{pregunta.pregunta}». El sistema se la vuelve a hacer "
         "solo cuando termines. Respondé únicamente el mensaje actual: no la "
         "vuelvas a proponer ni ejecutes de nuevo lo que quedó pendiente.")
+
+
+# Qué herramienta produce, sobre qué id de sus argumentos, cada acción del menú
+# que pide un dato (`_resumir_dato_menu_tarea`): lo que queda pendiente con la
+# persona mientras se atiende otro tema.
+_HERRAMIENTA_DE_DATO_MENU = {
+    "informar_bloqueo": ("registrar_bloqueo", "tarea_id"),
+    "destrabar": ("resolver_bloqueo", "bloqueo_id"),
+    "adjuntar_evidencia": ("adjuntar_evidencia", "tarea_id"),
+    "terminar": ("actualizar_estado", "tarea_id"),
+    "pedir_cambios": ("pedir_cambios_tarea", "tarea_id"),
+}
+
+
+def _no_proponer_de(abierta) -> dict | None:
+    """La guarda de `otro_tema` (T9-R1b-3, ADR 0013 regla 1): la herramienta y
+    el id que la pregunta abierta deja pendientes, como datos (`NoProponer`
+    de `agente`, guardado como dict para que viaje en el estado de la
+    aclaración). Modificar: la herramienta de la propuesta y su `tarea_id`;
+    dato del menú: la herramienta a la que lleva la acción. "Ninguna, lo
+    escribo" no tiene tarea conocida: sin guarda."""
+    from . import pendientes as P
+
+    if abierta.herramienta == _SENTINEL_ACLARACION:
+        return None
+    if abierta.herramienta == P.SENTINEL_DATO_MENU_TAREA:
+        herramienta, campo = _HERRAMIENTA_DE_DATO_MENU.get(
+            abierta.args.get("accion"), (None, None))
+    else:
+        herramienta, campo = abierta.herramienta, "tarea_id"
+    valor = abierta.args.get(campo) if campo else None
+    if not herramienta or valor is None:
+        return None
+    return {"herramienta": herramienta, "campo": campo, "valor": str(valor)}
 
 
 def _pregunta_de(abierta) -> _Pregunta:
@@ -1421,6 +1458,7 @@ def _estado_inicial_aclaracion(texto: str, entrante_id: str | None, route,
             {"herramienta": modificacion.herramienta, "args": modificacion.args,
              "resumen": modificacion.resumen}
             if modificacion is not None else None),
+        "no_proponer": None,
     }
 
 
@@ -1463,11 +1501,13 @@ def _avanzar_aclaracion(cur, quien, workspace_id: str, chat_id: int, ahora,
                             workspace_id, ahora)
         return
 
-    from .agente import responder
+    from .agente import NoProponer, responder
+    guarda = estado.get("no_proponer")
     responder(cur, quien, estado["mensaje"], proveedor, cal, chat_id,
              ahora=ahora, entrante_id=estado["entrante_id"],
              contexto_referencias=contexto,
-             tareas_resueltas_claras=estado["titulos_resueltas"])
+             tareas_resueltas_claras=estado["titulos_resueltas"],
+             no_proponer=NoProponer(**guarda) if guarda else None)
 
 
 def _preguntar_por_botones(cur, quien, workspace_id: str, chat_id: int, ahora,
