@@ -100,7 +100,15 @@ def _validar_estructura(datos: dict, origen: pathlib.Path) -> None:
         raise EscenarioInvalido(f"{origen}: 'actor' tiene que ser texto no vacío.")
 
     mensajes = datos["mensajes"]
-    if (not isinstance(mensajes, list) or not mensajes
+    # Con el borrador del alta ya sembrado (`precondiciones.borrador_de_alta`,
+    # T9-R1c-2b) no hace falta un primer mensaje: alcanza con lo que se
+    # escribe después de los toques.
+    con_borrador_sembrado = (
+        isinstance(datos.get("precondiciones"), dict)
+        and bool(datos["precondiciones"].get("borrador_de_alta"))
+        and bool(datos.get("mensajes_tras_toques")))
+    if (not isinstance(mensajes, list)
+            or (not mensajes and not con_borrador_sembrado)
             or not all(isinstance(m, str) and m.strip() for m in mensajes)):
         raise EscenarioInvalido(
             f"{origen}: 'mensajes' tiene que ser una lista no vacía de texto.")

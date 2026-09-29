@@ -4,25 +4,25 @@ objetivo: >
   Variante de b-0022, cancelar el borrador: con la vista previa esperando, la
   persona lo cancela. Se cancela el borrador y se dice qué se dejó de lado.
 actor: Marcos Tarquini
-mensajes:
-  - "armame una tarea: título «Cablear tablero norte», objetivo el del tablero de la máquina 3, responsable Marcos Tarquini, área OT, para el 30/12/2030, criterio de aceptación: prueba firmada"
+mensajes: []
 precondiciones:
   tareas:
     - id: t1
       titulo: Cablear tablero de la máquina 3 (simulado)
       area: ot
       responsable: Marcos Tarquini
-# Cada paso del alta con botones, en orden (`ingreso_tareas._advance`, con el
-# objetivo primero): el objetivo, el título propuesto, la persona responsable,
-# el área, la fecha propuesta y el criterio propuesto. La vista previa queda
-# esperando la confirmación, sin ningún toque en Confirmar.
-toques:
-  - indice: 0
-  - etiqueta: "Sí"
-  - indice: 0
-  - indice: 0
-  - etiqueta: "Sí"
-  - etiqueta: "Sí"
+  # El alta ya armada y esperando confirmación, sembrada en la base con las
+  # mismas filas que crea el alta real (`corrida._sembrar_borrador_de_alta`):
+  # lo que se evalúa es lo que pasa con el mensaje que llega después
+  # (`mensajes_tras_toques`), no el armado del alta con el modelo.
+  borrador_de_alta:
+    solicitante: Marcos Tarquini
+    titulo: Cablear tablero norte
+    objetivo: Objetivo simulado de Cablear tablero de la máquina 3 (simulado)
+    responsable: Marcos Tarquini
+    area: ot
+    fecha_objetivo: "2030-12-30"
+    criterio_aceptacion: Prueba firmada
 mensajes_tras_toques:
   - "no, cancelalo"
 herramientas_prohibidas:

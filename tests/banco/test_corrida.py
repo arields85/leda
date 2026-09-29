@@ -1713,3 +1713,93 @@ def test_ejecutar_escenario_llega_al_borrador_esperando_y_lo_interpreta(
     with admin(conn) as cur:
         cur.execute("select estado from task_intake_request")
         assert cur.fetchone()["estado"] == estado
+
+
+# ---------------------------------------------------------------------------
+# Precondición `borrador_de_alta` (T9-R1c-2b): el borrador del alta ya
+# esperando confirmación, sembrado en la base con las mismas filas que crea el
+# alta real -- en vez de recorrerla con el modelo (armar todo de un mensaje) y
+# seis toques que dependen de encontrar sus botones.
+# ---------------------------------------------------------------------------
+
+_BORRADOR_DE_ALTA = {
+    "solicitante": "Marcos Tarquini", "titulo": "Cablear tablero norte",
+    "objetivo": _TITULO_OBJETIVO_ALTA, "responsable": "Marcos Tarquini",
+    "area": "ot", "fecha_objetivo": "2030-12-30",
+    "criterio_aceptacion": "Prueba firmada"}
+
+
+def _sembrar_borrador_de_alta(conn, ws, **cambios):
+    with admin(conn) as cur:
+        return sembrar_precondiciones(cur, ws, {
+            "tareas": [{"id": "t1", "titulo": "Cablear tablero (simulado)",
+                        "area": "ot", "responsable": "Marcos Tarquini"}],
+            "borrador_de_alta": {**_BORRADOR_DE_ALTA, **cambios}})
+
+
+def test_sembrar_borrador_de_alta_deja_la_vista_previa_esperando(corework, conn):
+    from prisma import ingreso_tareas as I
+
+    ws = corework.workspace_id
+    _sembrar_borrador_de_alta(conn, ws)
+
+    with espacio(conn, ws) as cur:
+        quien, tg = _quien(cur, ws)
+        pregunta = I.open_intake_question(cur, quien, tg)
+        assert pregunta["tipo"] == I.QUESTION_CONFIRMATION
+        assert pregunta["titulo"] == "Cablear tablero norte"
+        cur.execute("select estado, chat_id from task_intake_request")
+        solicitud = cur.fetchone()
+        assert solicitud["estado"] == "active" and solicitud["chat_id"] == tg
+        cur.execute(
+            """select o.pending_action_id, o.cuerpo, o.chat_id,
+                      (select count(*) from pending_action_option po
+                        where po.pending_action_id = o.pending_action_id) botones
+                 from message_outbox o where o.pending_action_id = %s""",
+            (pregunta["id"],))
+        salida = cur.fetchone()
+        cur.execute("select count(*) n from task where titulo = %s",
+                    ("Cablear tablero norte",))
+        tareas = cur.fetchone()["n"]
+    assert "Cablear tablero norte" in salida["cuerpo"]
+    assert salida["botones"] == 2                    # Confirmar y Cancelar
+    assert tareas == 0                               # el borrador no es una tarea
+
+
+def test_sembrar_borrador_de_alta_sin_un_dato_falla_nombrandolo(corework, conn):
+    ws = corework.workspace_id
+    borrador = {k: v for k, v in _BORRADOR_DE_ALTA.items() if k != "area"}
+
+    with admin(conn) as cur, pytest.raises(LookupError, match="area"):
+        sembrar_precondiciones(cur, ws, {"borrador_de_alta": borrador})
+
+
+def test_sembrar_borrador_de_alta_con_un_objetivo_inexistente_falla(corework, conn):
+    ws = corework.workspace_id
+
+    with pytest.raises(LookupError, match="Objetivo que no existe"):
+        _sembrar_borrador_de_alta(conn, ws, objetivo="Objetivo que no existe")
+
+
+def test_ejecutar_escenario_sobre_el_borrador_sembrado_no_lo_convierte(
+        corework, conn):
+    ws = corework.workspace_id
+    _sembrar_borrador_de_alta(conn, ws)
+    interno = ProveedorGuionado(guion=[], rutas=[
+        IntentRoute(IntentAction.NORMAL_CONVERSATION,
+                    respecto_pendiente=RespectoPendiente.RESPONDE)])
+
+    r = ejecutar_escenario(
+        conn, ws, "corework", "Marcos Tarquini", [], interno,
+        escenario_id="b-test-sembrado", indice=0,
+        mensajes_tras_toques=["sí, dale"])
+
+    assert r.bloqueado is False, r.motivo_bloqueo
+    assert "esperando confirmación" in r.respuesta_texto
+    assert len(interno.pendientes) == 1 and "borrador" in interno.pendientes[0]
+    # Lo sembrado no cuenta como respuesta ni se confirma solo.
+    assert r.conteos_antes_del_toque is None
+    assert r.conteos_despues["task"] == r.conteos_antes["task"]
+    with admin(conn) as cur:
+        cur.execute("select estado from task_intake_request")
+        assert cur.fetchone()["estado"] == "active"

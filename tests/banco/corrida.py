@@ -17,12 +17,15 @@ import time
 from dataclasses import dataclass, field
 from typing import Any
 
+from psycopg.types.json import Jsonb
+
 import prisma.jev as jev_modulo
 import prisma.llm as llm_modulo
 from prisma import gateway
 from prisma import ingreso_tareas as I
 from prisma import pendientes as P
 from prisma.agente import DISCULPA
+from prisma.autoridad import Canal, Solicitante
 from prisma.db import admin
 from prisma.jev import ClienteJevGuionado
 from prisma.llm import (IntentAction, IntentRoute, Llamada, Proveedor,
@@ -419,6 +422,106 @@ def conteos_delta(antes: dict[str, int], despues: dict[str, int]) -> dict[str, i
            for tabla in set(antes) | set(despues)}
 
 
+# Un `telegram_message_id` que ningún escenario usa (los mensajes del corredor
+# empiezan en 1): el mensaje de origen del borrador sembrado.
+_ID_MENSAJE_DEL_BORRADOR = 2_000_000_001
+_DATOS_DEL_BORRADOR_DE_ALTA = ("solicitante", "titulo", "objetivo", "responsable",
+                               "area", "fecha_objetivo", "criterio_aceptacion")
+
+
+def _sembrar_borrador_de_alta(cur, ws: str, borrador: dict) -> str:
+    """Deja el borrador del alta guiada ya esperando su confirmación, con las
+    mismas filas que crea el alta real (`ingreso_tareas.start` y cada
+    confirmación): el borrador, la solicitud con sus ocho campos confirmados y,
+    por `ingreso_tareas._advance`, la vista previa (`pending_action` dirigida
+    al aprobador, con Confirmar y Cancelar, y su mensaje en `message_outbox`).
+    Un escenario que ejercita lo que pasa con el borrador esperando no
+    depende de que el modelo arme el alta completa de un mensaje ni de seis
+    toques que encuentren sus botones (b-0022-e/-f).
+
+    `borrador` trae `solicitante` (quien escribe; el chat es el suyo),
+    `titulo`, `objetivo` (el título de un objetivo del espacio, p. ej. el que
+    crea una tarea de `tareas`), `responsable`, `area` (slug),
+    `fecha_objetivo` (AAAA-MM-DD), `criterio_aceptacion` y, opcional,
+    `descripcion`. Falta un dato o no existe lo que nombra: `LookupError`.
+    Devuelve el id de la solicitud."""
+    faltan = [c for c in _DATOS_DEL_BORRADOR_DE_ALTA if not borrador.get(c)]
+    if faltan:
+        raise LookupError(f"'borrador_de_alta' no trae {faltan}.")
+    # `ingreso_tareas` lee al integrante por la vista `integrante`, acotada al
+    # espacio activo: sin esto, bajo administración no ve a nadie.
+    cur.execute("select set_config('prisma.workspace_id', %s, true)", (ws,))
+    cur.execute(
+        """select u.id app_user_id, u.telegram_user_id, m.id membership_id
+             from membership m join app_user u on u.id = m.app_user_id
+            where m.workspace_id = %s and u.nombre = %s""",
+        (ws, borrador["solicitante"]))
+    quien_fila = cur.fetchone()
+    if not quien_fila or quien_fila["telegram_user_id"] is None:
+        raise LookupError(
+            f"'{borrador['solicitante']}' no puede escribir por Telegram en "
+            "este espacio.")
+    chat = quien_fila["telegram_user_id"]
+    quien = Solicitante(
+        app_user_id=str(quien_fila["app_user_id"]), canal=Canal.ESPACIO,
+        workspace_id=ws, membership_id=str(quien_fila["membership_id"]))
+    cur.execute(
+        "select id, titulo, estado from objective where workspace_id = %s "
+        "and titulo = %s", (ws, borrador["objetivo"]))
+    objetivo = cur.fetchone()
+    if not objetivo:
+        raise LookupError(
+            f"No existe el objetivo '{borrador['objetivo']}' en este espacio.")
+    area_id = _area_id(cur, ws, borrador["area"])
+    cur.execute("select nombre, slug from area where id = %s", (area_id,))
+    area = cur.fetchone()
+    responsable_id = _membership_id(cur, ws, borrador["responsable"])
+    cur.execute("select clock_timestamp() ahora")
+    ahora = cur.fetchone()["ahora"]
+
+    cur.execute("insert into task_draft (workspace_id, creado_por_membership_id) "
+                "values (%s, %s) returning id", (ws, quien.membership_id))
+    borrador_id = str(cur.fetchone()["id"])
+    texto_origen = "Simulado: alta ya armada por el escenario."
+    cur.execute(
+        """insert into inbound_message
+             (workspace_id, telegram_message_id, chat_id, app_user_id, texto)
+           values (%s, %s, %s, %s, %s) returning id""",
+        (ws, _ID_MENSAJE_DEL_BORRADOR, chat, quien.app_user_id, texto_origen))
+    entrante_id = str(cur.fetchone()["id"])
+    cur.execute(
+        """insert into task_intake_request
+             (workspace_id, membership_id, chat_id, task_draft_id,
+              source_inbound_id, source_raw_text)
+           values (%s, %s, %s, %s, %s, %s) returning id""",
+        (ws, quien.membership_id, chat, borrador_id, entrante_id, texto_origen))
+    solicitud_id = str(cur.fetchone()["id"])
+    valores = {
+        "title": borrador["titulo"], "description": borrador.get("descripcion", ""),
+        "due_date": borrador["fecha_objetivo"],
+        "acceptance_criterion": borrador["criterio_aceptacion"],
+        "objective": {"id": str(objetivo["id"]), "title": objetivo["titulo"],
+                      "state": objetivo["estado"]},
+        "responsible": {"id": str(responsable_id), "name": borrador["responsable"],
+                        "area_id": str(area_id)},
+        "area": {"id": str(area_id), "slug": area["slug"], "name": area["nombre"]},
+        # La evidencia la pone `_finalize` desde la política del área.
+        "evidence": {"items": [], "version": 0},
+    }
+    for campo in I.FIELDS:
+        cur.execute(
+            """insert into task_intake_field
+                 (request_id, workspace_id, campo, estado, valor, proposed_by)
+               values (%s, %s, %s, 'confirmed', %s, 'server')""",
+            (solicitud_id, ws, campo, Jsonb(valores[campo])))
+    cur.execute("select * from task_intake_request where id = %s", (solicitud_id,))
+    resultado = I._advance(cur, cur.fetchone(), quien, ahora)
+    if not resultado.pending_action_id:
+        raise LookupError(
+            f"El borrador sembrado no llegó a la vista previa: {resultado.text}")
+    return solicitud_id
+
+
 def sembrar_precondiciones(cur, ws: str, precondiciones: dict) -> dict[str, str]:
     """Crea el estado ficticio de un escenario (tareas, bloqueos,
     dependencias) bajo una conexión de administración, y devuelve el mapeo
@@ -435,6 +538,8 @@ def sembrar_precondiciones(cur, ws: str, precondiciones: dict) -> dict[str, str]
     for d in precondiciones.get("dependencias", []):
         _crear_dependencia_semilla(cur, ws, ids[d["origen"]], ids[d["destino"]],
                                    tipo=d.get("tipo", "bloqueante"))
+    if precondiciones.get("borrador_de_alta"):
+        _sembrar_borrador_de_alta(cur, ws, precondiciones["borrador_de_alta"])
     return ids
 
 
