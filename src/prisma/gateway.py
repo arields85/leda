@@ -965,6 +965,16 @@ def _descripcion_dato_menu(args: dict) -> str:
     return plantilla.format(titulo=args.get("titulo", ""))
 
 
+def _pendiente_para_ruteo(args: dict) -> str:
+    """Lo que recibe el ruteo como pregunta pendiente: la descripción y la
+    pregunta tal como se le hizo a la persona. Con sólo la descripción, el banco
+    real (b-0019-d) marcó un link suelto como `dudoso` porque el modelo no veía
+    que se había pedido un link (ADR 0013 regla 1: se interpreta contra la
+    pregunta real)."""
+    pregunta = _pregunta_dato_menu(args.get("accion"), args.get("titulo", ""))
+    return f"{_descripcion_dato_menu(args)} (la pregunta que se le hizo fue: «{pregunta}»)"
+
+
 def _atender_dato_pendiente(cur, quien, texto: str, abierta, proveedor,
                             chat_id: int, workspace_id: str, ahora,
                             entrante_id: str | None = None):
@@ -982,7 +992,7 @@ def _atender_dato_pendiente(cur, quien, texto: str, abierta, proveedor,
     from .llm import RespectoPendiente
 
     route, error = _rutear(proveedor, texto,
-                           pendiente=_descripcion_dato_menu(abierta.args))
+                           pendiente=_pendiente_para_ruteo(abierta.args))
     if route is None:
         _avisar_ruteo_caido(cur, quien, error, workspace_id, chat_id, ahora)
         return None

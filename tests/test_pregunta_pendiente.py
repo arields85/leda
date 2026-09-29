@@ -131,8 +131,25 @@ def test_el_ruteo_recibe_la_descripcion_de_la_pregunta_pendiente(
     _mensaje(cliente, tg, "hola")
 
     assert proveedor.ruteados == ["hola"]
-    assert proveedor.pendientes == [
-        f"la evidencia de la entrega de «{TITULO}»"]
+    (pendiente,) = proveedor.pendientes
+    assert pendiente.startswith(f"la evidencia de la entrega de «{TITULO}»")
+
+
+def test_el_ruteo_recibe_tambien_la_pregunta_literal(
+        cliente, conn, corework, monkeypatch):
+    # Banco real b-0019-d (2026-09-29): con sólo la descripción ("la evidencia
+    # de la entrega de «…»") el modelo marcó un link suelto como `dudoso` en
+    # 3 de 3 corridas, porque no veía que se había pedido un link. El ruteo
+    # interpreta contra la pregunta tal como se le hizo a la persona.
+    ws = corework.workspace_id
+    _tid, tg = _abrir_pregunta(cliente, conn, ws, monkeypatch, "Ya la terminé")
+    proveedor = _con_rutas(monkeypatch, [_ruta(RespectoPendiente.CHARLA)])
+
+    _mensaje(cliente, tg, "https://ejemplo.com/pr/12")
+
+    (pendiente,) = proveedor.pendientes
+    assert pendiente.startswith(f"la evidencia de la entrega de «{TITULO}»")
+    assert gateway.PREGUNTA_DATO_EVIDENCIA_ENTREGA in pendiente
 
 
 @pytest.mark.parametrize("accion, estado, descripcion", [
@@ -152,7 +169,8 @@ def test_la_descripcion_sigue_a_la_accion_del_menu(
 
     _mensaje(cliente, tg, "hola")
 
-    assert proveedor.pendientes == [descripcion]
+    (pendiente,) = proveedor.pendientes
+    assert pendiente.startswith(descripcion)
 
 
 def test_cancela_cierra_sin_efecto_y_el_siguiente_mensaje_rutea_normal(
@@ -177,8 +195,8 @@ def test_cancela_cierra_sin_efecto_y_el_siguiente_mensaje_rutea_normal(
 
     _mensaje(cliente, tg, "¿qué tengo pendiente?")
 
-    assert proveedor.pendientes == [
-        f"la evidencia de la entrega de «{TITULO}»", None]
+    assert proveedor.pendientes[0].startswith(f"la evidencia de la entrega de «{TITULO}»")
+    assert proveedor.pendientes[1] is None
     assert "dos tareas abiertas" in _ultimo_cuerpo(conn, tg)
 
 
@@ -281,7 +299,8 @@ def test_pedir_cambios_responde_arma_la_vista_previa(
 
     _mensaje(cliente, tg, "Falta el manual del operador")
 
-    assert proveedor.pendientes == [f"qué hay que corregir en «{TITULO}»"]
+    (pendiente,) = proveedor.pendientes
+    assert pendiente.startswith(f"qué hay que corregir en «{TITULO}»")
     fila = _vista_previa(conn, "pedir_cambios_tarea")
     assert fila is not None
     assert "manual del operador" in fila["resumen"].lower()
