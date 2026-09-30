@@ -399,12 +399,15 @@ gestión.
     (10-30 s con modelo) y Telegram reintenta; `inbound_message` no controla
     `telegram_message_id` + chat, así que un reenvío recibe otro turno y otra respuesta.
     Absorber el mismo `message` ya procesado (mismo mecanismo que los toques de T9-R4).
-  - [ ] **T9-H19d — Una reentrega sin respuesta es recuperación, no duplicado**
+  - [x] **T9-H19d — Una reentrega sin respuesta es recuperación, no duplicado**
     (`review-27b8e5e75e13fd7f`, tres lentes): el control de T9-H19b absorbe por "recibido",
     no por "respondido"; si el turno muere después de la fase 1, el reintento de Telegram
     se absorbe y la persona queda sin respuesta; además no tiene límite de tiempo (ids que
     se repiten si cambia el bot). Absorber sólo si hay respuesta o el turno puede seguir en
     curso; si no, procesar con incidente; cota global de tiempo.
+  - [ ] **T9-H19e — Barrido de recibos huérfanos:** un mensaje recibido sin respuesta más
+    allá de la ventana del turno recibe el aviso neutro aprobado y deja incidente (nunca
+    silencio aunque Telegram no reintente).
   - [ ] **T9-H19c — Consulta al usuario:** ¿qué hace Prisma cuando alguien edita un mensaje
     ya enviado (`edited_message`)? Hoy lo trata como un mensaje nuevo.
   - [x] **T10-5c** — Seguimientos de `review-eca94d14a705c5c4`: comparar títulos contra el
@@ -5028,3 +5031,15 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   `review-27b8e5e75e13fd7f` (cuatro lentes) **aprobada y reconocida**; frontera en
   `1f310fe`. Tres lentes marcaron que el control absorbe por "recibido" y no por
   "respondido": a T9-H19d, en curso.
+
+- 2026-09-30: **T9-H19d.** Ruta: delegada, un escritor. `cd2f928`:
+  `gateway._estado_de_entrega` (nuevo / absorber / recuperar): se absorbe una reentrega sólo
+  si el recibo ya tiene respuesta visible o está dentro de `VENTANA_TURNO_EN_CURSO` (10 min;
+  peor caso de un turno ~7 min según `llm.py` y `MAX_VUELTAS`); un recibo más viejo sin
+  respuesta se recupera con fila nueva e incidente `mensaje_recuperado_sin_respuesta`;
+  recibos de más de `COTA_REENTREGA` (24 h, supuesto documentado sobre los reintentos del
+  webhook) no absorben. Auditoría con `telegram_message_id` y el recibo coincidente. Suite
+  del escritor 2125 passed, 309 deselected; padre: 13 passed. RED observado sólo como error
+  de colección (constantes nuevas). RDD: tramo `1f310fe..cd2f928` medio, 271 líneas,
+  `under_budget`. Hueco: si Telegram no reintenta después de la ventana, el silencio
+  persiste: a T9-H19e.
