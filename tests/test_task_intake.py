@@ -1245,11 +1245,13 @@ class _RoutingProvider:
         self.answer = answer
         self.route_calls = []
         self.pending_calls = []
+        self.esperados = []
         self.main_calls = 0
 
-    def route_intent(self, text, pendiente=None):
+    def route_intent(self, text, pendiente=None, valor_esperado=None):
         self.route_calls.append(text)
         self.pending_calls.append(pendiente)
+        self.esperados.append(valor_esperado)
         result = self.routes.pop(0)
         if isinstance(result, Exception):
             raise result
