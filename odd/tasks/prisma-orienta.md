@@ -407,13 +407,22 @@ gestión.
   - [x] **T10-3** — H10: ícono en Modificar y una sola definición de la etiqueta.
   - [x] **T10-4** — H11 y H14: vista previa en filas (un dato por línea) y comprobante
     corto en vez de repetir la vista previa; "y vuelve a estar en curso".
-  - [ ] **T10-2b** — Seguimientos de T10-1..4 y de `review-d7bcc36efe500706`: toda
+  - [x] **T10-2b** — Seguimientos de T10-1..4 y de `review-d7bcc36efe500706`: toda
     preparación que escribe define su comprobante corto (hoy aprobar sale como "Hecho."
     pelado; prueba de conformidad y nunca un comprobante vacío); `_offer_current_review`
     sin fila atada no debe romper, y probar el recorte cuando el encabezado no entra; los
     textos de disculpa ("Perdón, no pude completar eso…" en `gateway.py` y
     `agente.DISCULPA`) pasan al aviso neutro aprobado (H2); los incidentes sin etapa
     reciben etapa y explicación en la tabla del aviso al administrador.
+  - [ ] **T10-2c** — Seguimientos de `review-8a61efa7fc0d08e0`: probar el texto exacto del
+    comprobante de aprobar con y sin pendientes (y que `falta` nunca salga como estructura
+    de Python); prueba del caso ambiguo del corredor del banco (`LookupError`); la prueba de
+    etapas rechaza `etapa=None` y llamadas sólo con `**kwargs`.
+  - [ ] **T9-R5 — Consulta al usuario (regla nueva):** "ya arreglé lo del dashboard, pasalo
+    a revisión" hace dos preguntas seguidas "¿A cuál te referís?" con las mismas dos tareas
+    (una por cada referencia que extrae el ruteo); no entra en ninguna regla del ADR 0013.
+    Propuesta: una elección ya hecha cubre las demás referencias del mismo mensaje con las
+    mismas candidatas. `b-0013` falla por esto hasta que se decida.
   - [ ] **T10-5** — Mecanismo A (H3/H7, H9, H12): guarda de listas de hasta 3 tareas,
     `PREAMBULO` y escenarios (`b-0001`, `b-0001-a`, `b-0016`, `b-0021-c`, `b-0024-b`).
     Necesita respuestas del usuario.
@@ -4937,3 +4946,20 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   con el arnés corregido los botones de aclaración salen bien, pero después del toque no se
   retoma el pedido (ninguna llamada al responder, la tarea queda `asignada`): a T10-2b
   (U5, diagnóstico). `b-0001`, `b-0001-a` y `b-0001-b`, que fallaban, pasaron.
+
+- 2026-09-30: **T10-2b.** Ruta: delegada, un escritor. `0c0bc02`: toda preparación que
+  escribe tiene su comprobante corto (faltaba aprobar: "Listo: aprobaste «X». Quedó
+  terminada."), prueba de conformidad sobre el registro de herramientas y nunca un "Hecho."
+  pelado. `3807414`: un toque sobre una revisión vencida siempre recibe una respuesta (sin
+  fila de la revisión vigente: aviso neutro e incidente `resumen_vigente_sin_fila`).
+  `e12464f`: un solo aviso neutro (H2) para toda respuesta de falla con incidente,
+  incluido `agente.DISCULPA`. `3fb2500`: siete fuentes de incidentes sin etapa ahora la
+  tienen, con explicación en la tabla; prueba AST que exige `etapa=`. `16747b1`: el
+  corredor del banco toca un botón de aclaración nombrado por su título completo cuando el
+  botón lo muestra acortado. Diagnóstico de `b-0013` (repetición determinista): el ruteo
+  saca dos referencias del mismo mensaje y Prisma pregunta dos veces "¿A cuál te referís?"
+  con las mismas candidatas; nada se ejecuta hasta responder la segunda: a T9-R5 (consulta).
+  Suite del escritor 2068 passed, 300 deselected; banco determinista 346 passed; padre:
+  enfocadas 8 passed; banco real `b-0008` pasa, `b-0013` falla como se diagnosticó. RDD:
+  tramo `56a8223..16747b1` medio, 481 líneas, `review-8a61efa7fc0d08e0` **aprobada y
+  reconocida**; frontera en `16747b1`; tres sugerencias a T10-2c.
