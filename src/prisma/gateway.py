@@ -460,8 +460,7 @@ def procesar_update(conn, slug: str, update: dict,
             previo_id = None
             if update.get("message"):
                 estado, previo_id = _estado_de_entrega(
-                    cur, workspace_id, chat_id, mensaje.get("message_id"),
-                    datetime.now(timezone.utc))
+                    cur, workspace_id, chat_id, mensaje.get("message_id"))
             if estado == "absorber":
                 # Una reentrega del webhook (T9-H19b, ADR 0013 regla 2): el mismo
                 # mensaje ya se atendió o se está atendiendo. Ni recibo, ni turno,
@@ -714,32 +713,44 @@ def _registrar_toque(cur, workspace_id: str, chat_id: int, quien, ahora,
     return str(cur.fetchone()["id"])
 
 
+def clave_de_candado_del_mensaje(workspace_id: str, chat_id: int,
+                                 message_id: int) -> str:
+    """La clave del candado de asesor de un mensaje de Telegram. La comparten la
+    recuperación del gateway (`_estado_de_entrega`) y el barrido de huérfanos
+    (`huerfanos.barrer`): así nunca actúan a la vez sobre el mismo mensaje."""
+    return f"mensaje:{workspace_id}:{chat_id}:{message_id}"
+
+
 def _estado_de_entrega(cur, workspace_id: str, chat_id: int,
-                       message_id: int | None, ahora) -> tuple[str, str | None]:
+                       message_id: int | None) -> tuple[str, str | None]:
     """Qué hacer con un `message_id` de este chat: `("nuevo", None)` si nunca se
     recibió (o su recibo pasó `COTA_REENTREGA`), `("absorber", id)` si ya tiene
-    respuesta (`respuesta_unica.sql_respondido`) o su recibo es de dentro de `VENTANA_TURNO_EN_CURSO`, y
-    `("recuperar", id)` si hay recibo pero viejo y sin respuesta (el turno murió).
-    El candado serializa dos entregas simultáneas: la segunda espera el commit de la
-    fase 1 de la primera y ve su fila. Sin `message_id` no hay con qué comparar."""
+    respuesta (`respuesta_unica.sql_respondido`) o su recibo es de dentro de
+    `VENTANA_TURNO_EN_CURSO`, y `("recuperar", id)` si hay recibo pero viejo y sin
+    respuesta (el turno murió). El candado serializa dos entregas simultáneas (y
+    el barrido de huérfanos): la segunda espera el commit de la fase 1 de la primera
+    y ve su fila. Sin `message_id` no hay con qué comparar."""
     if message_id is None:
         return "nuevo", None
     cur.execute(
         "select pg_advisory_xact_lock(hashtextextended(%s, 0))",
-        (f"mensaje:{workspace_id}:{chat_id}:{message_id}",))
+        (clave_de_candado_del_mensaje(workspace_id, chat_id, message_id),))
+    # Las dos edades se miden con el reloj de la base (`now()`), no con el de la
+    # aplicación: el mismo criterio de `huerfanos.barrer` (T9-H19g).
     cur.execute(
-        f"""select i.id, i.at,
+        f"""select i.id, i.at > now() - %s as en_curso,
                   {sql_respondido("i")} as respondido
              from inbound_message i
             where i.workspace_id = %s and i.chat_id = %s
-              and i.telegram_message_id = %s and i.at > %s
+              and i.telegram_message_id = %s and i.at > now() - %s
             order by i.at desc""",
-        (workspace_id, chat_id, message_id, ahora - COTA_REENTREGA))
+        (VENTANA_TURNO_EN_CURSO, workspace_id, chat_id, message_id,
+         COTA_REENTREGA))
     filas = cur.fetchall()
     if not filas:
         return "nuevo", None
     for fila in filas:
-        if fila["respondido"] or fila["at"] > ahora - VENTANA_TURNO_EN_CURSO:
+        if fila["respondido"] or fila["en_curso"]:
             return "absorber", str(fila["id"])
     return "recuperar", str(filas[0]["id"])
 

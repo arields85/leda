@@ -98,6 +98,8 @@ ETAPA_EVIDENCIA_INVALIDA = "politica_de_evidencia_invalida"
 ETAPA_CONFIGURACION_ALTA = "configuracion_alta_invalida"
 # T9-H19e: un recibo viejo sin respuesta que la reentrega no recuperó (`huerfanos`).
 ETAPA_MENSAJE_HUERFANO = "mensaje_huerfano_sin_respuesta"
+# T9-H19g: el aviso de UN huérfano falló y se lo saltea (el resto del barrido sigue).
+ETAPA_MENSAJE_HUERFANO_FALLO = "mensaje_huerfano_fallo_al_avisar"
 
 # Tope del texto disparador en el aviso -- decisión del usuario, 2026-09-28:
 # acotado, y el aviso dice cuándo lo recortó.
@@ -206,6 +208,15 @@ EXPLICACION_POR_ETAPA: dict[str, ExplicacionDeEtapa] = {
         que_hacer=(f"{_BUSCAR_DETALLE} y mirá si hubo un reinicio o un corte del "
                    "servicio a esa hora. {nombre} puede reenviar el mensaje: "
                    "Prisma no lo vuelve a procesar solo.")),
+    "mensaje_huerfano_fallo_al_avisar": ExplicacionDeEtapa(
+        que_paso=("Un mensaje de {nombre} se recibió y quedó sin respuesta, pero "
+                  "la red de fondo no pudo avisarle: falló al escribir el aviso "
+                  "de ese mensaje. Se reintenta en cada pasada y los demás "
+                  "mensajes no se frenan."),
+        que_vio="Nada: todavía no recibió ninguna respuesta a ese mensaje.",
+        que_hacer=(f"{_BUSCAR_DETALLE} y corregí la causa (está en la referencia "
+                   "técnica del incidente); el aviso sale solo en la pasada "
+                   "siguiente. Mientras tanto {nombre} puede reenviar el mensaje.")),
     "sin_respuesta": ExplicacionDeEtapa(
         que_paso=("Un mensaje quedó sin ninguna respuesta de Prisma; el control "
                   "de respuesta única mandó el aviso de problema."),
