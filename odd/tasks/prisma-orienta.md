@@ -341,7 +341,7 @@ gestión.
     responder vuelve a proponer el alta (`b-0021-i`: "Para armar la tarea nueva, necesito
     saber dónde cuelga"); causa general: en ese turno el modelo no ve el "dejé de lado"
     (el historial sólo cuenta lo enviado) y la guarda no cubre el alta.
-  - [ ] **T9-R3 — Decir el estado real y ofrecer sólo lo posible** (H20, H18, H16).
+  - [x] **T9-R3 — Decir el estado real y ofrecer sólo lo posible** (H20, H18, H16).
     Incluye (de T9-R2b): cuando quien pide el alta no es quien confirma, al terminar el alta
     no le sale ninguna respuesta y el control le manda "No pude completar eso" aunque salió
     bien (tiene que decir a quién se le mandó para confirmar); tres resultados del alta
@@ -355,6 +355,11 @@ gestión.
     (`herramientas.py:1552-1559`); `contexto.PREAMBULO` obliga a inventar opciones
     (`contexto.py:70-77`); el motivo de "Pedir cambios" no está en ninguna lectura.
   - [ ] **T9-R4 — Todo toque tiene señal inmediata y es idempotente** (H5, H13). Incluye
+    también: la respuesta de "Dejarlo y ver lo otro" (dos mensajes sin agrupar, fuera del
+    control porque es un toque); el control de una respuesta extendido a los toques; y
+    `review-324fcff7f93c7f19` R3-001: un reintento con el mismo estado trabado del alta se
+    descarta como duplicado y queda sin respuesta (la clave debe incluir el mensaje o toque
+    que lo dispara).
     el seguimiento de `review-e11061770c5f40ae`: la referencia del reenvío de una
     elección sin `entrante_id` sale de un conteo y no es idempotente ante un callback
     repetido (derivarla del evento que la dispara). El
@@ -4720,3 +4725,19 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   `review-467d41b3f96573d5` **aprobada y reconocida**; frontera en `a6056ff`. Banco real
   (n=3): `b-0021-i` 3/3 (antes 1/3); `b-0020-f` 2/3 (una corrida afirmó "registré" lo que
   la guarda rechazó, a T9-R3); `b-0024-b` 1/3 (redacción).
+
+- 2026-09-29: **T9-R3.** Ruta: delegada, un escritor. `a90212d`: quien pide un alta que
+  confirma otra persona recibe "Le mandé el borrador de la tarea a {nombre} para que lo
+  confirme…" (antes, nada y el aviso de falla); los tres estados inertes del alta se
+  encolan como respuesta. `38a13c2`: un turno que intentó un cambio sin que se ejecutara
+  nada (rechazo de la guarda o error) reescribe su respuesta una vez con la corrección del
+  servidor, derivada de los resultados de herramientas y no de frases, y sale con "Estado:
+  sin cambios."; los turnos con vista previa no pasan por ahí. `4bf717c`: evidencia sobre
+  una tarea sin entregar dice que quedó registrada y que la tarea sigue en su estado, con
+  "Ya la terminé" si el menú lo ofrece; el motivo de "Pedir cambios" en el encabezado del
+  menú y en el detalle. `48e110e`: el preámbulo no ofrece archivos ni inventa opciones; el
+  cierre genérico ofrece "Es una tarea nueva" sólo en privado y no tras dejar el alta.
+  `426509f`: familia `b-0027`. Suite del escritor 1940 passed, 276 deselected; padre:
+  enfocadas 51 passed. RDD: tramo `a6056ff..426509f` medio, 1645 líneas,
+  `review-324fcff7f93c7f19` **aprobada y reconocida**; frontera en `426509f`. Banco real
+  `b-0027`, `b-0020-f`, `b-0021-i` (n=3): **18/18**.
