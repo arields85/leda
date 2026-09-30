@@ -876,7 +876,7 @@ def _seguir_resuelta(cur, quien, workspace_id: str, chat_id: int, token: str,
 
     if resuelta.task_id:
         _responder(cur, workspace_id, chat_id, quien,
-                   "Hecho. La tarea quedó comprometida.", ahora)
+                   P.texto_terminal_ingreso(cancelada=False), ahora)
     elif resuelta.herramienta == _SENTINEL_ACLARACION:
         # T4: no es una herramienta real -- `H.ejecutar` la
         # rechazaría -- es la elección de un botón de aclaración.
