@@ -341,3 +341,62 @@ def test_mensaje_post_confirmacion_actualizar_estado(corework, conn, monkeypatch
     assert cuerpo == "Gracias. La tarea «Programar HMI línea 2» pasó a revisión."
     # Nunca el estado viejo después de aplicar el cambio.
     assert "Asignada" not in cuerpo
+
+
+# ---------------------------------------------------------------------------
+# El comprobante de aprobar, armado por la preparación (T10-2c)
+# ---------------------------------------------------------------------------
+
+def _preparar_aprobar(conn, ws, tid) -> dict:
+    """Corre la preparación real de `aprobar_tarea` y devuelve lo que arma
+    (`cambio` y `hecho`), sin confirmar nada."""
+    preparacion: dict = {}
+    with espacio(conn, ws) as cur:
+        marcos = _quien(cur, "Marcos Tarquini", ws)
+        try:
+            H.ejecutar(cur, marcos, "aprobar_tarea", {"tarea_id": tid},
+                       preparacion=preparacion)
+        except H.NecesitaConfirmacion:
+            pass
+    return preparacion
+
+
+def test_comprobante_de_aprobar_cuando_la_aprobacion_alcanza_para_cerrar(
+        corework, conn):
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        tid = _tarea(cur, ws)
+        _evidencia(cur, ws, tid)
+    conn.commit()
+
+    prep = _preparar_aprobar(conn, ws, tid)
+
+    assert prep["hecho"] == "Listo: aprobaste «Programar HMI línea 2». Quedó terminada."
+    assert "Se aprueba «Programar HMI línea 2» y queda terminada" in prep["cambio"]
+
+
+def test_comprobante_de_aprobar_con_pendientes_dice_el_motivo_como_texto(
+        corework, conn):
+    """`falta` es el texto que devuelve `motivo_no_cierra_tarea`: nunca una
+    tupla, lista o diccionario impreso con sus comillas y paréntesis."""
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        origen = _tarea(cur, ws, titulo="Instalar tablero",
+                        persona="Marcos Tarquini", estado="asignada")
+        tid = _tarea(cur, ws)
+        _evidencia(cur, ws, tid)
+        cur.execute(
+            """insert into dependency (workspace_id, origen_task_id,
+                                       destino_task_id, tipo)
+               values (%s, %s, %s, 'bloqueante')""", (ws, origen, tid))
+    conn.commit()
+
+    prep = _preparar_aprobar(conn, ws, tid)
+
+    assert prep["hecho"] == (
+        "Listo: aprobaste «Programar HMI línea 2»; para cerrarla todavía: "
+        "Quedan 1 dependencias bloqueantes sin resolver.")
+    assert "para cerrarla todavía: Quedan 1 dependencias bloqueantes sin resolver." \
+        in prep["cambio"]
+    for texto in (prep["hecho"], prep["cambio"]):
+        assert not any(c in texto for c in "[]{}()") and "'" not in texto

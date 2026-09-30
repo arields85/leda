@@ -23,6 +23,7 @@ from prisma.llm import (IntentAction, IntentRoute, Llamada, ProveedorGuionado,
 
 from tests.banco.comprobadores import comprobar_aclaracion
 from tests.test_aclaracion_botones import con_credencial  # noqa: F401
+from tests.banco import corrida as corrida_modulo
 from tests.banco.corrida import (
     ClienteJevGuionadoPorReferencia,
     JevGrabador,
@@ -1033,6 +1034,62 @@ def test_ejecutar_escenario_aclaracion_elige_por_el_titulo_entero_aunque_el_boto
     with admin(conn) as cur:
         cur.execute("select estado from task where id = %s", (tid_a,))
         assert cur.fetchone()["estado"] == "en_revision"
+
+
+def test_ejecutar_escenario_aclaracion_con_dos_botones_que_cumplen_no_adivina_cual(
+        corework, conn, monkeypatch):
+    """T10-2c: si dos botones de la misma pregunta cumplen la etiqueta a elegir, el
+    corredor no toca ninguno: la corrida queda bloqueada con el motivo "ambiguo" y
+    no se aplica nada (antes tomaba el primero, y un toque equivocado pasaba por
+    conducta de Prisma). Los botones reales llevan etiquetas distinguibles entre sí,
+    así que la ambigüedad se fuerza repitiendo la primera opción de la pregunta."""
+    original = corrida_modulo._opciones_pendiente
+
+    def opciones_con_una_repetida(cur, pendiente_id):
+        opciones = original(cur, pendiente_id)
+        return [*opciones, opciones[0]] if opciones else opciones
+
+    monkeypatch.setattr(corrida_modulo, "_opciones_pendiente",
+                        opciones_con_una_repetida)
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        ids = sembrar_precondiciones(cur, ws, {
+            "tareas": [
+                {"id": "t1", "titulo": "Cablear tablero máq. 3 (simulado)",
+                 "area": "ot", "responsable": "Marcos Tarquini"},
+                {"id": "t2", "titulo": "Revisar tablero máq. 4 (simulado)",
+                 "area": "ot", "responsable": "Marcos Tarquini"},
+            ],
+        })
+    tid_a = ids["t1"]
+    doble_jev = ClienteJevGuionado(guion=[
+        {"alcance": {"probabilities": {"una_tarea": 0.8}},
+         "tarea": {"probabilities": {"T1": 0.5, "T2": 0.3}}},
+    ])
+    interno = ProveedorGuionado(
+        guion=[Respuesta(llamadas=[Llamada(
+                   "c1", "actualizar_estado",
+                   {"tarea_id": tid_a, "estado": "en_revision",
+                    "evidencia_texto": "Ya quedó cableado."})]),
+              Respuesta(texto="listo")],
+        rutas=[IntentRoute(IntentAction.NORMAL_CONVERSATION,
+                           trabajos=("lo del tablero",))],
+    )
+    r = ejecutar_escenario(
+        conn, ws, "corework", "Marcos Tarquini",
+        ["ya termine lo del tablero, pasala a revision"], interno,
+        escenario_id="b-test-aclaracion-ambigua", indice=0, cliente_jev=doble_jev,
+        aclaracion_esperada={
+            "candidatas": ["Cablear tablero máq. 3 (simulado)",
+                           "Revisar tablero máq. 4 (simulado)"],
+            "elegir": "Cablear tablero máq. 3 (simulado)"})
+
+    assert r.bloqueado is True
+    assert "ambiguo" in r.motivo_bloqueo
+    assert r.herramientas_ejecutadas == []
+    with admin(conn) as cur:
+        cur.execute("select estado from task where id = %s", (tid_a,))
+        assert cur.fetchone()["estado"] != "en_revision"
 
 
 def test_ejecutar_escenario_sin_aclaracion_esperada_no_junta_etiquetas(corework, conn):

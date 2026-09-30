@@ -61,19 +61,47 @@ def test_cada_etapa_conocida_tiene_su_explicacion():
         assert explicacion.que_vio.strip(), etapa
 
 
+def _llamadas_sin_etapa_valida(fuente: str, nombre: str = "x.py") -> list[str]:
+    """Llamadas a `registrar_incidente` cuya etapa no está nombrada de forma
+    verificable: sin `etapa=`, con `etapa=None`, o con los argumentos pasados
+    sólo por `**kwargs` (no se puede saber si traen la etapa)."""
+    malas = []
+    for nodo in ast.walk(ast.parse(fuente)):
+        if not (isinstance(nodo, ast.Call)
+                and getattr(nodo.func, "id", getattr(nodo.func, "attr", None))
+                == "registrar_incidente"):
+            continue
+        etapa = next((k.value for k in nodo.keywords if k.arg == "etapa"), None)
+        es_none = isinstance(etapa, ast.Constant) and etapa.value is None
+        if etapa is None or es_none:
+            malas.append(f"{nombre}:{nodo.lineno}")
+    return malas
+
+
 def test_ningun_incidente_se_registra_sin_etapa():
     """Cada `registrar_incidente(...)` de `src/` nombra su etapa (T10-2b): un
     incidente sin etapa cae en la explicación genérica del aviso a la
     administración, que no dice qué vio la persona."""
     sin_etapa = []
     for archivo in sorted(Path(incidentes.__file__).parent.glob("*.py")):
-        for nodo in ast.walk(ast.parse(archivo.read_text(encoding="utf-8"))):
-            if (isinstance(nodo, ast.Call)
-                    and getattr(nodo.func, "id", getattr(nodo.func, "attr", None))
-                    == "registrar_incidente"
-                    and not any(k.arg == "etapa" for k in nodo.keywords)):
-                sin_etapa.append(f"{archivo.name}:{nodo.lineno}")
+        sin_etapa += _llamadas_sin_etapa_valida(
+            archivo.read_text(encoding="utf-8"), archivo.name)
     assert sin_etapa == []
+
+
+def test_la_prueba_de_etapas_rechaza_las_formas_que_no_nombran_una():
+    """T10-2c: la prueba de arriba no se deja engañar por `etapa=None` ni por
+    llamadas con los argumentos pasados sólo por `**kwargs`."""
+    assert _llamadas_sin_etapa_valida(
+        "registrar_incidente(cur, ws, 'r')") == ["x.py:1"]
+    assert _llamadas_sin_etapa_valida(
+        "registrar_incidente(cur, ws, 'r', etapa=None)") == ["x.py:1"]
+    assert _llamadas_sin_etapa_valida(
+        "incidentes.registrar_incidente(cur, ws, 'r', **datos)") == ["x.py:1"]
+    assert _llamadas_sin_etapa_valida(
+        "registrar_incidente(cur, ws, 'r', etapa='turno_texto', **extra)") == []
+    assert _llamadas_sin_etapa_valida(
+        "registrar_incidente(cur, ws, 'r', etapa=ETAPA_TURNO_TEXTO)") == []
 
 
 def test_el_aviso_sigue_el_formato_aprobado_en_orden():
