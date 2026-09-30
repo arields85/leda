@@ -414,7 +414,7 @@ gestión.
     textos de disculpa ("Perdón, no pude completar eso…" en `gateway.py` y
     `agente.DISCULPA`) pasan al aviso neutro aprobado (H2); los incidentes sin etapa
     reciben etapa y explicación en la tabla del aviso al administrador.
-  - [ ] **T10-2c** — Seguimientos de `review-8a61efa7fc0d08e0`: probar el texto exacto del
+  - [x] **T10-2c** — Seguimientos de `review-8a61efa7fc0d08e0`: probar el texto exacto del
     comprobante de aprobar con y sin pendientes (y que `falta` nunca salga como estructura
     de Python); prueba del caso ambiguo del corredor del banco (`LookupError`); la prueba de
     etapas rechaza `etapa=None` y llamadas sólo con `**kwargs`.
@@ -423,7 +423,7 @@ gestión.
     (una por cada referencia que extrae el ruteo); no entra en ninguna regla del ADR 0013.
     Propuesta: una elección ya hecha cubre las demás referencias del mismo mensaje con las
     mismas candidatas. `b-0013` falla por esto hasta que se decida.
-  - [ ] **T10-5** — Mecanismo A (H3/H7, H9, H12): guarda de listas de hasta 3 tareas,
+  - [x] **T10-5** — Mecanismo A (H3/H7, H9, H12): guarda de listas de hasta 3 tareas,
     `PREAMBULO` y escenarios (`b-0001`, `b-0001-a`, `b-0016`, `b-0021-c`, `b-0024-b`).
     Necesita respuestas del usuario.
   - [ ] **T10-6** — Mecanismo B (H8): respuesta a un saludo sin rama abierta. Necesita
@@ -4963,3 +4963,18 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   enfocadas 8 passed; banco real `b-0008` pasa, `b-0013` falla como se diagnosticó. RDD:
   tramo `56a8223..16747b1` medio, 481 líneas, `review-8a61efa7fc0d08e0` **aprobada y
   reconocida**; frontera en `16747b1`; tres sugerencias a T10-2c.
+
+- 2026-09-30: **T10-2c y T10-5.** Ruta: delegada, un escritor; ajuste final inline (un
+  archivo de código y su prueba). `ceafe9b` (T10-2c): texto exacto del comprobante de aprobar
+  con y sin pendientes (`falta` ya es texto), prueba del caso ambiguo del corredor, la prueba
+  de etapas rechaza `etapa=None` y llamadas sólo con `**kwargs`. `194e242` (T10-5, H3/H7/H12):
+  guarda `agente._nombrar_tareas_listadas`: con hasta 3 tareas leídas en el turno, cada título
+  que falta en el texto se antepone como fila "«Título» (estado)"; con más de 3, el texto
+  resume y los nombres quedan en los botones; `PREAMBULO` con la regla H7 y "respondé sólo lo
+  que te preguntaron" (H12); `b-0016` exige los títulos. `33d1557` (padre, TDD: RED 1 failed /
+  16 passed, GREEN 59 passed): si el turno resolvió clara una tarea puntual, la respuesta es
+  sobre esa tarea y la guarda de listas no agrega las demás (señal estructural
+  `tareas_resueltas_claras`, no palabras del modelo; evita información no pedida). Suite
+  completa 2089 passed, 300 deselected. Banco real completo (n=1) antes del ajuste: **98/100**
+  (`b-0013`: T9-R5; `b-0020`: el modelo ofreció opciones en vez de la vista previa, al
+  repetirlo pasa); pasaron `b-0023-e`, `b-0024-b`, `b-0001*`, `b-0016`, `b-0021-h`.
