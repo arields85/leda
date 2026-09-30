@@ -377,11 +377,19 @@ gestión.
     recibir el éxito y además el aviso neutro (decidir una sola respuesta y probar lo que
     ve); `controlar` descarta en silencio una nota cuyo evento no coincide (registrar
     incidente o atarla bien); la prueba del camino sin atar sólo cuenta incidentes.
-  - [ ] **T9-R1c-4 — Quien pide revisa antes de enviar a aprobación** (precisión del ADR
+  - [x] **T9-R1c-4 — Quien pide revisa antes de enviar a aprobación** (precisión del ADR
     0005, decisión del usuario del 2026-09-29, opción A). Cuando confirma otra persona, quien
     pide ve su resumen con [Enviar a aprobación] [Modificar] [Cancelar] (mismo selector de
     datos que T9-R1c-3); al enviar, le llega a quien confirma con Confirmar y Cancelar y a
     quien pide "Le mandé el borrador a {nombre}…". Hasta enviar es rama de quien pide.
+  - [ ] **T9-R1c-4b — Seguimientos de `review-037b056b5ca65e28`.** (1) Si el borrador
+    cambió después de mostrar la revisión, Enviar la marca `vencida` y quien pide queda sin
+    botones (el pedido sigue activo sin pregunta abierta): ofrecer la revisión vigente en
+    vez de un callejón sin salida; (2) probar la rama en la que quien confirma pasó a ser
+    quien pide al momento de enviar (una sola respuesta atada al toque, sin aviso neutro);
+    (3) `test_la_revision_retiene_lo_que_prisma_inicia_como_cualquier_rama` usa el reloj
+    real: derivar de `NOW`. Consulta al usuario abierta: si quien confirma cancela, ¿se le
+    avisa a quien pidió?
   - [ ] **T9-H19 — Reproducir H19 después de R1 y R2**; si persiste, clasificarlo por
     regla antes de corregir.
 
@@ -4837,3 +4845,31 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   233 líneas, `review_due=false` (`under_budget`): queda pendiente en el tramo hasta que un
   commit posterior alcance el presupuesto. Seguimiento chico: `_seguir_resuelta`
   (`gateway.py`) repite el texto de conversión; pasa a `texto_terminal_ingreso` con T9-R1c-4.
+
+- 2026-09-30: **T9-R1c-4.** Ruta: delegada, un escritor (mapeo previo de sólo lectura;
+  `ingreso_tareas.py`, `gateway.py`, `pendientes.py`, `despachador.py`, `salida.py`,
+  esquema, migración, arnés y escenarios del banco, pruebas). `e9b5e37`: migración `0023`
+  (con rollback): `resolver_ingreso_borrador` rechaza el valor `"enviar"` igual que
+  `"modificar"`; sin eso, `confirmar_borrador_tarea` convertía el borrador con cualquier
+  valor distinto de `false` (RED: el token convertía y devolvía la tarea). `76278a6`:
+  cuando confirma otra persona, quien pide recibe su resumen como respuesta con [Enviar a
+  aprobación] [Modificar] [Cancelar] (`pending_action` propia,
+  `pendientes.HERRAMIENTA_REVISION_BORRADOR`); Modificar reusa el selector de T9-R1c-3 y
+  vuelve a la revisión de quien pide; Enviar se intercepta en el gateway, cierra la revisión
+  una sola vez y registra la vista previa de quien confirma (iniciada por Prisma) más "Le
+  mandé el borrador…" como única respuesta al toque; un toque tardío recibe "ya no está
+  vigente"; `NO_ACTIVE_AUTHORITY` se detecta antes de mostrar la revisión; claves
+  `review:v{n}` y `preview:v{n}`; `despachador._preview_vigente` reconoce la revisión.
+  `aa2af40`: siembra del banco y escenarios al flujo real (`b-0022-i`, `b-0027`) y familia
+  `b-0029`. `56747c6`: `_seguir_resuelta` usa `texto_terminal_ingreso`. Suite del escritor
+  2021 passed, 300 deselected; padre: `tests/test_alta_enviar_a_aprobacion.py` 27 passed.
+  RDD: tramo `d5a89da..56747c6` (incluye T9-R4c) medio, 1803 líneas, `slice_budget_reached`,
+  `review-037b056b5ca65e28` (lente de fiabilidad) **aprobada y reconocida**; frontera en
+  `56747c6`; tres advertencias no bloqueantes a T9-R1c-4b. Banco real (n=3, `b-0029*`,
+  `b-0027*`, `b-0022-i`): **25/27**; `b-0027-d` 1/3: en las dos fallas el modelo no intentó
+  aprobar y respondió con la verdad ("la aprobación la firma Marcos"), sin efecto y sin
+  afirmar nada, pero sin "Estado: sin cambios" (esa línea sólo se agrega cuando un intento
+  fue rechazado); no lo toca esta unidad: a T10 (forma de la negativa sin intento).
+  Latencia del responder en esas corridas: ~32 s (a vigilar). Migración `0023` **pendiente
+  de aplicar en la base local `prisma`** (sólo reemplaza una función; sin ella el gateway
+  igual nunca manda "enviar" a la autoridad).
