@@ -5306,3 +5306,19 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   duplicado; la marca de coordinación de las dos vistas previas de borrador sin prueba; dos
   ramas de `reject_draft` sin prueba; patrones prohibidos de `b-0027-e` demasiado amplios.
   Pendiente también: la vista previa vieja de `crear_borrador_tarea` sigue con Cancelar.
+
+- 2026-09-30: **Banco real completo (n=1) después de las correcciones de la ronda 4:**
+  **108/111**. `b-0013` pasa (T9-R5). Fallas: `b-0003-a` (no resolvió el bloqueo; al
+  repetirlo n=3 dio 3/3: variación del modelo); `b-0027-d` (el escenario prohibía "aprobé"
+  aunque viniera negado: "no aprobé nada"); `b-0036` (el comprobador sólo aceptaba "le
+  avisé" con una herramienta del modelo, y el rechazo lo hace el servidor). `ffe4e85`
+  (arnés, sólo `tests/banco/`): `Evidencia.avisos_a_otros` con los avisos realmente
+  encolados a otras personas; "avisé" queda respaldado por un aviso real; patrones
+  prohibidos ciegos a la negación retirados de `b-0027-d` y `b-0027-e`; "pedí cambios" al
+  léxico. Banco determinista 361 passed. Banco real (n=3) `b-0036`, `b-0027-d`, `b-0027-e`:
+  **8/9**; la falla (`b-0027-d`): el modelo intentó aprobar, fue rechazado y cerró con
+  `ofrecer_opciones`; por ese camino el cierre sigue siendo "Estado: sin cambios." y no
+  "«X» sigue en revisión." (el cierre con el estado real de `188aa95` no cubre la rama de
+  opciones ni toma la tarea del intento rechazado). Anotado para después de la ronda, junto
+  con la negativa sin intento. RDD: tramo `4fc1365..ffe4e85` medio, 187 líneas,
+  `under_budget`: pendiente en el tramo.
