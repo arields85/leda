@@ -209,10 +209,17 @@ ausencia y escalamiento sobre solicitudes reales.
 
 **Entrega:** [`ADR 0007`](decisions/0007-prisma-orienta-no-charla.md): cada respuesta que
 espera algo cierra con botones concretos y una salida; las listas de tareas son botones
-y tocar una ofrece las acciones del diseño §4.6 que ya tienen herramienta.
+y tocar una ofrece las acciones del diseño §4.6 que ya tienen herramienta. Tras la
+tercera ronda por Telegram (2026-09-28), las cuatro reglas generales de la conversación
+del [`ADR 0013`](decisions/0013-reglas-generales-de-la-conversacion.md) (pregunta pendiente
+como contexto con una sola rama abierta, una respuesta visible por mensaje y toque, estado
+real, toques con señal e idempotentes), implementadas el 2026-09-29, y la forma de las
+respuestas (T10 de `odd/tasks/prisma-orienta.md`).
 
-**Cierre:** una segunda sesión por Telegram real muestra menos preguntas innecesarias
-y ninguna respuesta vaga que haya que interpretar.
+**Cierre:** la segunda sesión por Telegram real se hizo (2026-09-27) y la tercera
+(2026-09-28) mostró que la conversación seguía perdiéndose; el cierre pasa a ser la
+cuarta ronda (T11), que muestre menos preguntas innecesarias, ninguna respuesta vaga que
+haya que interpretar y ninguna conversación con dos temas abiertos a la vez.
 
 ### Aportes sobre tareas
 
