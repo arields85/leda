@@ -327,7 +327,13 @@ def test_un_toque_no_es_un_mensaje_ni_queda_como_mensaje_sin_respuesta(
         cur.execute("select texto from inbound_message where chat_id = %s", (tg,))
         assert [f["texto"] for f in cur.fetchall()] == [None]
     assert _incidentes(conn, corework.workspace_id, "sin_respuesta") == []
-    assert all(f["entrante_id"] is None for f in _filas_de_salida(conn, tg))
+    # T9-R4: el toque se controla como un mensaje, con su propia fila como el
+    # entrante (la de actividad, sin texto): una sola respuesta atada a ella.
+    with admin(conn) as cur:
+        cur.execute("select id from inbound_message where chat_id = %s", (tg,))
+        (toque,) = cur.fetchall()
+    assert [str(f["entrante_id"]) for f in _filas_de_salida(conn, tg)] == [
+        str(toque["id"])]
 
 
 def test_el_arranque_avisa_que_falta_la_migracion_0021():

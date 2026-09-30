@@ -25,6 +25,7 @@ from prisma.db import admin, espacio
 from prisma.llm import (IntentAction, IntentRoute, ProveedorGuionado,
                          RespectoPendiente, Respuesta, RouteEnvelope)
 
+from tests.toques import envejecer_toques
 from tests.test_menu_tarea import (_abrir_menu, _mensaje, _opciones,  # noqa: F401
                                    _pendiente, _quien, _tarea, _tocar,
                                    _tocar_accion, cliente)
@@ -432,6 +433,7 @@ def test_dudoso_tocado_dos_veces_no_repite_el_efecto(
     fila = next(o for o in _botones_de(conn, ws, P.SENTINEL_RESPUESTA_DATO_MENU)
                 if "Sí" in o["etiqueta"])
     _tocar(cliente, fila["token"], tg)
+    envejecer_toques(conn, 11)                  # fuera de la ventana (T9-R4)
     antes = _salidas(conn, tg)
 
     _tocar(cliente, fila["token"], tg)                        # el mismo botón

@@ -555,6 +555,10 @@ create table inbound_message (
   intencion           text,
   task_id             uuid references task(id),
   at                  timestamptz not null default now(),
+  -- T9-R4 (migración 0022): el callback_data del botón que la persona tocó (una
+  -- fila de toque). Nula en un mensaje escrito y en un toque absorbido por
+  -- repetido dentro de la ventana.
+  boton_callback      text,
   constraint inbound_message_workspace_id_unique unique (workspace_id, id),
   constraint inbound_message_workspace_chat_unique
     unique (workspace_id, id, chat_id)
@@ -876,6 +880,10 @@ alter table message_outbox
 
 create index outbox_por_entrante on message_outbox (entrante_id)
   where entrante_id is not null;
+
+create index inbound_por_boton on inbound_message
+  (workspace_id, chat_id, app_user_id, boton_callback, at)
+  where boton_callback is not null;
 
 -- Resolver es una sola llamada a propósito: dos toques al mismo botón compiten
 -- por la misma fila y sólo uno la mueve de 'esperando'. Si esto se hiciera con

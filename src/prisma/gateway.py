@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import unicodedata
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from fastapi import (APIRouter, BackgroundTasks, FastAPI, Header,
@@ -32,6 +32,7 @@ from .incidentes import (REFERENCIA_INBOUND_MESSAGE, REFERENCIA_PENDING_ACTION,
 from .ingreso_tareas import (QUESTION_CHOICE, QUESTION_CONFIRMATION,
                              QUESTION_FREE_TEXT)
 from .respuesta_unica import controlar as controlar_una_respuesta
+from .respuesta_unica import dejar_nota, limpiar_nota, respuestas_del_mensaje
 from .salida import TRUNCAR_ETIQUETA_BOTON as TRUNCAR_TITULO_BOTON
 from .salida import (ETIQUETA_CANCELAR, ETIQUETA_CONFIRMAR, ICONO_CANCELAR,
                      ICONO_CONFIRMAR, ICONO_OTRA_OPCION, ICONO_TAREA,
@@ -136,6 +137,11 @@ AVISO_RAMA_YA_CERRADA = (
 AVISO_PEDIDO_NO_VIGENTE = (
     "Ese pedido ya no está vigente. Si sigue haciendo falta, escribime y lo "
     "vemos de nuevo.")
+# ADR 0013 regla 4 (T9-R4): el segundo toque del MISMO botón de la misma persona
+# dentro de esta ventana se absorbe (sólo el acuse; ni efecto ni error ni aviso).
+# "El mismo botón" es el mismo `callback_data` en el mismo chat: lleva el token de
+# la opción, único por botón, y queda en `inbound_message.boton_callback`.
+VENTANA_TOQUE_REPETIDO = timedelta(seconds=10)
 _ELECCION_DATO_SI = "si"
 _ELECCION_DATO_SEGUIR = "seguir"
 _ELECCION_DATO_DEJAR = "dejar"
@@ -458,6 +464,7 @@ def procesar_update(conn, slug: str, update: dict,
             # Todo lo que se encole de acá hasta el commit responde a este
             # mensaje (T9-R2): el control de una respuesta por mensaje lo ve.
             atar_al_entrante(cur, entrante_id)
+            limpiar_nota()
             handled_intake_text = False
             privado = chat_type == "private"
             if texto.strip() and privado:
@@ -628,18 +635,43 @@ def _activacion(conn, workspace_id: str, texto: str, tg_user: int,
     return {"ok": True}
 
 
-def _registrar_toque(cur, workspace_id: str, chat_id: int, quien) -> None:
+def _registrar_toque(cur, workspace_id: str, chat_id: int, quien, ahora,
+                     boton: str | None) -> str:
     """Deja constancia de que esta persona tocó un botón en este chat (T9-R1d-2b):
     es actividad, igual que un mensaje escrito, para la ventana que acota la
     retención de lo que Prisma inicia (`despachador.VENTANA_DE_ACTIVIDAD`). Es una
     fila de `inbound_message` sin texto ni id de mensaje de Telegram (no se le
     inventa una clasificación): el historial de la conversación sólo
-    lee las que tienen texto."""
+    lee las que tienen texto.
+
+    `boton` es el `callback_data` que tocó (T9-R4): con él se reconoce el toque
+    repetido. Un toque absorbido pasa `None`, así no prolonga la ventana del
+    primero. Devuelve el id de la fila: es el "mensaje entrante" de este toque
+    para el control de una respuesta visible y para las claves de lo que encole."""
     cur.execute(
         """insert into inbound_message
-             (workspace_id, chat_id, app_user_id)
-           values (%s, %s, %s)""",
-        (workspace_id, chat_id, quien.app_user_id))
+             (workspace_id, chat_id, app_user_id, at, boton_callback)
+           values (%s, %s, %s, %s, %s) returning id""",
+        (workspace_id, chat_id, quien.app_user_id, ahora, boton))
+    return str(cur.fetchone()["id"])
+
+
+def _es_toque_repetido(cur, workspace_id: str, chat_id: int, quien, ahora,
+                       boton: str) -> bool:
+    """El mismo botón, de la misma persona, en el mismo chat, ya procesado dentro
+    de `VENTANA_TOQUE_REPETIDO`. El candado serializa dos entregas simultáneas del
+    mismo toque: la segunda espera el commit de la primera y ve su fila."""
+    cur.execute(
+        "select pg_advisory_xact_lock(hashtextextended(%s, 0))",
+        (f"toque:{workspace_id}:{chat_id}:{quien.app_user_id}:{boton}",))
+    cur.execute(
+        """select 1 from inbound_message
+            where workspace_id = %s and chat_id = %s and app_user_id = %s
+              and boton_callback = %s and at > %s
+            limit 1""",
+        (workspace_id, chat_id, quien.app_user_id, boton,
+         ahora - VENTANA_TOQUE_REPETIDO))
+    return cur.fetchone() is not None
 
 
 def _toque(conn, workspace_id: str, slug: str, toque: dict,
@@ -664,41 +696,80 @@ def _toque(conn, workspace_id: str, slug: str, toque: dict,
     callback = toque.get("data") or ""
     intake_token = I.token_de(callback)
     token = P.token_de(callback)
-    chat_id = (toque.get("message") or {}).get("chat", {}).get("id")
-    if (not token and not intake_token) or tg_user is None or chat_id is None:
-        return {"ok": True}
+    chat = (toque.get("message") or {}).get("chat", {})
+    chat_id = chat.get("id")
+    chat_type = chat.get("type")
 
-    # Antes de trabajar: Telegram quiere el acuse en un par de segundos y lo
-    # que sigue puede tardar más. Si falla, es sólo el reloj girando en el
-    # teléfono de alguien; el trabajo se hace igual.
+    # Antes de trabajar, y para TODO toque (también uno que no es de un botón de
+    # Prisma o que se va a absorber por repetido; ADR 0013 regla 4, H5): Telegram
+    # quiere el acuse en un par de segundos y lo que sigue puede tardar más. Si
+    # falla, es sólo el reloj girando en el teléfono de alguien; el trabajo se
+    # hace igual.
     try:
         acusar_toque(config.token_bot(slug), toque.get("id", ""))
     except Exception:  # noqa: BLE001
         pass
+
+    if (not token and not intake_token) or tg_user is None or chat_id is None:
+        return {"ok": True}
 
     ahora = datetime.now(timezone.utc)
     draft_token = False
     quien = None
     resuelta = None
     pending_action_id = None
+    toque_id = None
 
     try:
-        with espacio(conn, workspace_id) as cur:
+        # El indicador de actividad envuelve todo el procesamiento del toque, con
+        # el mismo criterio que un mensaje (ADR 0011: nada visible antes del
+        # umbral; ADR 0013 regla 4, H5).
+        with espacio(conn, workspace_id) as cur, mantener_chat_activo(
+                config.token_bot(slug), chat_id, chat_type=chat_type, cur=cur,
+                workspace_id=workspace_id):
             try:
                 quien = identificar_en_espacio(cur, tg_user, workspace_id)
             except Denegado:
                 return {"ok": True}      # desconocido: no se le responde
 
-            _registrar_toque(cur, workspace_id, chat_id, quien)
+            if _es_toque_repetido(cur, workspace_id, chat_id, quien, ahora,
+                                  callback):
+                # El mismo botón, de la misma persona, hace instantes (ADR 0013
+                # regla 4, H13): ya se atendió. Sólo el acuse de arriba; ni efecto,
+                # ni error, ni respuesta. Sigue siendo actividad de la persona.
+                _registrar_toque(cur, workspace_id, chat_id, quien, ahora, None)
+                registrar_auditoria(
+                    cur, accion="toque_repetido_absorbido",
+                    workspace_id=workspace_id,
+                    actor_app_user_id=quien.app_user_id, actor_kind="persona",
+                    detalle={"chat_id": chat_id})
+                return {"ok": True}
+
+            toque_id = _registrar_toque(cur, workspace_id, chat_id, quien, ahora,
+                                        callback)
+            # Todo lo que se encole de acá hasta el commit responde a este toque:
+            # el control de una respuesta visible lo ve, como con un mensaje.
+            atar_al_entrante(cur, toque_id)
+            limpiar_nota()
+
+            def cerrar() -> dict:
+                _controlar_una_respuesta(cur, quien, workspace_id, chat_id,
+                                         toque_id, ahora)
+                return {"ok": True}
+
             if intake_token:
                 resultado_alta = I.resolve_choice(cur, quien, token=intake_token,
                                                   chat_id=chat_id, now=ahora)
-                if resultado_alta.stale:
-                    # El selector de Modificar ya usado o reemplazado: se
-                    # contesta como cualquier otro toque que no está vigente.
+                if resultado_alta.stale or (
+                        resultado_alta.inert and not respuestas_del_mensaje(
+                            cur, toque_id, chat_id)):
+                    # El selector de Modificar ya usado o reemplazado, o un botón
+                    # que no se atiende (de otra persona o chat, ya usado, de un
+                    # borrador que terminó) y no dijo nada: se contesta como
+                    # cualquier otro toque que no está vigente (T9-R4).
                     _responder(cur, workspace_id, chat_id, quien,
                                AVISO_PEDIDO_NO_VIGENTE, ahora)
-                return {"ok": True}
+                return cerrar()
 
             try:
                 draft_token = P.es_borrador(cur, token)
@@ -711,7 +782,7 @@ def _toque(conn, workspace_id: str, slug: str, toque: dict,
                                              chat_id=chat_id, now=ahora) is None:
                         _responder(cur, workspace_id, chat_id, quien,
                                    AVISO_PEDIDO_NO_VIGENTE, ahora)
-                    return {"ok": True}
+                    return cerrar()
                 if not draft_token:
                     resuelta = P.resolver(cur, token,
                                           app_user_id=quien.app_user_id, ahora=ahora)
@@ -727,7 +798,7 @@ def _toque(conn, workspace_id: str, slug: str, toque: dict,
                 # puede. La frontera exterior confirma el mensaje encolado y
                 # nada más.
                 _responder(cur, workspace_id, chat_id, quien, str(e), ahora)
-                return {"ok": True}
+                return cerrar()
 
             if not draft_token and resuelta is None:
                 # Vencida, ya usada, o de otro espacio. Para la persona es lo
@@ -753,6 +824,10 @@ def _toque(conn, workspace_id: str, slug: str, toque: dict,
             elif not draft_token:
                 _seguir_resuelta(cur, quien, workspace_id, chat_id, token,
                                  resuelta, pending_action_id, ahora)
+            if not draft_token:
+                # El borrador lo resuelve la autoridad en otra conexión: su
+                # respuesta se controla cuando ya existe (`_resolver_toque_borrador`).
+                return cerrar()
     except Exception as e:  # noqa: BLE001
         # `conn.commit()`/`conn.rollback()` no se pueden llamar todavía acá
         # adentro -- psycopg3 los rechaza mientras el contexto de
@@ -768,9 +843,11 @@ def _toque(conn, workspace_id: str, slug: str, toque: dict,
         raise
 
     if draft_token:
-        return _resolver_toque_borrador(
-            conn, authority_conn or _authority_conn(), workspace_id, token,
-            tg_user, chat_id, quien, ahora)
+        with mantener_chat_activo(config.token_bot(slug), chat_id,
+                                  chat_type=chat_type, workspace_id=workspace_id):
+            return _resolver_toque_borrador(
+                conn, authority_conn or _authority_conn(), workspace_id, token,
+                tg_user, chat_id, quien, ahora, toque_id)
 
     return {"ok": True}
 
@@ -1021,7 +1098,8 @@ def _responder_evidencia_registrada(cur, quien, workspace_id: str, chat_id: int,
 
 
 def _resolver_toque_borrador(conn, authority_conn, workspace_id, token,
-                             tg_user, chat_id, quien, ahora) -> dict:
+                             tg_user, chat_id, quien, ahora,
+                             toque_id: str | None = None) -> dict:
     """Resolve outside the app transaction, then enqueue its response."""
     from . import pendientes as P
 
@@ -1035,23 +1113,42 @@ def _resolver_toque_borrador(conn, authority_conn, workspace_id, token,
     else:
         texto = None
 
-    if resuelta is not None:
-        # The Unit 1A authority function persisted the terminal visible outbox
-        # row in the same transaction as cancel/convert. Replays reuse it.
-        return {"ok": True}
-
     with espacio(conn, workspace_id) as cur:
-        if texto is not None:
-            pass
-        elif resuelta is None:
-            texto = ("Ese pedido ya no está vigente. Si sigue haciendo falta, "
-                     "escribime y lo vemos de nuevo.")
-        elif resuelta.cancelada:
-            texto = "Listo, no lo hago."
+        atar_al_entrante(cur, toque_id)
+        if resuelta is not None and not resuelta.replay:
+            # The Unit 1A authority function persisted the terminal visible outbox
+            # row in the same transaction as cancel/convert. It ran on another
+            # connection before this toque row was committed, so it could not
+            # carry the toque as its entrante: it is bound here, and the control
+            # of one visible response per toque sees it (T9-R4).
+            if toque_id and resuelta.pending_action_id:
+                cur.execute(
+                    """update message_outbox set entrante_id = %s
+                        where workspace_id = %s and entrante_id is null
+                          and dedupe_key like %s""",
+                    (toque_id, workspace_id,
+                     f"{workspace_id}:intake-terminal:"
+                     f"{resuelta.pending_action_id}:%"))
         else:
-            texto = "Hecho. La tarea quedó comprometida."
-        _responder(cur, workspace_id, chat_id, quien, texto, ahora)
+            if texto is None:
+                # Replays reuse the terminal row, which already went out for the
+                # first toque: outside the window, this toque is answered like
+                # any other button that is no longer current.
+                texto = AVISO_PEDIDO_NO_VIGENTE
+            _responder(cur, workspace_id, chat_id, quien, texto, ahora)
+        _controlar_una_respuesta(cur, quien, workspace_id, chat_id, toque_id, ahora)
     return {"ok": True}
+
+
+def _controlar_una_respuesta(cur, quien, workspace_id: str, chat_id: int,
+                             toque_id: str | None, ahora) -> None:
+    """Un toque, una respuesta visible (T9-R4, ADR 0013 regla 2 extendida a los
+    toques): la fila del toque es su "mensaje entrante"."""
+    if toque_id is None:
+        return
+    controlar_una_respuesta(
+        cur, quien, workspace_id=workspace_id, chat_id=chat_id,
+        entrante_id=toque_id, ahora=ahora, aviso_neutro=NOTICIA_NEUTRA_INCIDENTE)
 
 
 def _responder(cur, workspace_id: str, chat_id: int, quien, texto: str,
@@ -2059,18 +2156,15 @@ def _dejar_y_ver_lo_otro(cur, quien, workspace_id: str, chat_id: int, abierta,
     cerrar, así un ruteo caído no pierde la pregunta. Si otro camino ya la
     había cerrado, el mensaje se atiende igual (nunca se pierde lo que la
     persona pidió) y no se dice que se dejó nada de lado."""
-    from datetime import timedelta
-
     route, error = _rutear(proveedor, texto)
     if route is None:
         _avisar_ruteo_caido(cur, quien, error, workspace_id, chat_id, ahora)
         return
     if _dejar_de_lado(cur, quien, abierta, ahora):
-        # La primera parte de la misma respuesta: un milisegundo antes, para
-        # que salga delante de lo que diga el camino normal.
-        _responder(cur, workspace_id, chat_id, quien,
-                   _pregunta_de(abierta).dejada,
-                   ahora - timedelta(milliseconds=1))
+        # La primera parte de la misma respuesta (T9-R4): el control de una
+        # respuesta por toque la agrega, delante de lo que diga el camino normal,
+        # al mismo grupo de la respuesta que conserve (`dejar_nota`).
+        dejar_nota(_pregunta_de(abierta).dejada)
     # Lo que se acaba de dejar no se propone de nuevo en este turno: el modelo
     # lo ve en el historial y lo repetía (T9-R1d-1a-fix), o no lo ve (el alta,
     # T9-R2b): la guarda de código y el contexto salen de la misma pregunta.

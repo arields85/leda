@@ -2433,7 +2433,8 @@ def test_un_toque_no_cuenta_como_mensaje_en_la_corrida(corework, conn):
         cur.execute(
             """select count(*) n from message_outbox
                 where workspace_id = %s and es_respuesta
-                  and entrante_id is null
+                  and entrante_id in (select id from inbound_message
+                                       where texto is null)
                   and pending_action_id is not null""", (ws,))
         salidas_del_toque = cur.fetchone()["n"]
     # El toque ocurrió de verdad, y con salida visible (el menú de la tarea)...

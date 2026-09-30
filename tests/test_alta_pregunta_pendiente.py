@@ -26,6 +26,7 @@ from prisma import ingreso_tareas as I
 from prisma.db import admin, espacio
 from prisma.llm import RespectoPendiente, Respuesta, RouteEnvelope
 
+from tests.toques import envejecer_toques
 from tests.test_menu_tarea import (_quien, _tarea as _tarea_menu,  # noqa: F401
                                    _telegram_id, _tocar, cliente)
 from tests.test_pregunta_pendiente_otras import (_con_rutas, _filas_del_chat,
@@ -244,7 +245,9 @@ def test_dudoso_pregunta_con_botones_y_si_es_eso_toma_el_campo(
     assert campo["valor"] == "mmm, algo del tablero"
     assert _salidas(conn, tg) == antes + 1
 
-    # Un segundo toque, con el campo ya tomado, no lo vuelve a tomar.
+    # Un segundo toque (fuera de la ventana del toque repetido, T9-R4), con el
+    # campo ya tomado, no lo vuelve a tomar.
+    envejecer_toques(conn, 11)
     antes = _salidas(conn, tg)
     assert _tocar(cliente, token, tg).status_code == 200
     assert _campo(conn, rid, "title")["valor"] == "mmm, algo del tablero"

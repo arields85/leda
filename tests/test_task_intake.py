@@ -297,7 +297,16 @@ def test_objective_callback_rejects_wrong_actor_chat_request_or_version(
             "select count(*) n from message_outbox where workspace_id = %s",
             (ws["id"],),
         )
-        assert cur.fetchone()["n"] == choice["outbox_count"]
+        # Un toque que no se atiende (otra persona, otro chat, ya usado o
+        # reemplazado) recibe su única respuesta: que ya no está vigente (T9-R4).
+        assert cur.fetchone()["n"] == choice["outbox_count"] + 1
+        cur.execute(
+            "select cuerpo from message_outbox where workspace_id = %s "
+            "and es_respuesta and entrante_id is not null",
+            (ws["id"],),
+        )
+        assert [f["cuerpo"] for f in cur.fetchall()] == [
+            gateway.AVISO_PEDIDO_NO_VIGENTE]
 
 
 def test_objective_callback_failure_rolls_back_before_outer_commit(
@@ -1748,7 +1757,7 @@ def test_los_rollbacks_devuelven_la_base_al_estado_anterior():
 
     tablas = ("task_state_event", "objective_state_event",
               "absence", "audit_log", "incident", "greeting_state",
-              "message_outbox")
+              "message_outbox", "inbound_message")
     nombre = f"prisma_rollback_{uuid.uuid4().hex[:10]}"
     with psycopg.connect(maintenance, autocommit=True) as control:
         control.execute(SQL("create database {}").format(Identifier(nombre)))
@@ -1815,7 +1824,7 @@ def test_instalacion_limpia_y_base_migrada_convergen_en_el_aislamiento():
     # porque las bases de prueba se construyen desde el esquema limpio.
     tablas = ("task_state_event", "objective_state_event",
               "absence", "audit_log", "incident", "acceso_tablero",
-              "greeting_state", "message_outbox")
+              "greeting_state", "message_outbox", "inbound_message")
     con_politica = set(tablas) - {"acceso_tablero"}
     sufijo = uuid.uuid4().hex[:10]
     nombres = {"limpia": f"prisma_limpia_{sufijo}",

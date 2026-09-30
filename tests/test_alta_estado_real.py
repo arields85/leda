@@ -14,6 +14,8 @@ Los ruteos y el modelo se guionan; ninguna prueba toca la red ni el modelo real.
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 import pytest
 
 from prisma import gateway
@@ -234,3 +236,34 @@ def test_una_eleccion_escrita_con_un_resultado_inerte_no_repregunta(
 
     assert [f["cuerpo"] for f in _nuevas(conn, user, antes)] == [
         "No hay una política de evidencia vigente para esa área."]
+
+
+def test_un_reintento_con_el_mismo_estado_trabado_tambien_recibe_su_respuesta(
+        intake_world, conn):
+    """T9-R4 (review R3-001): la clave de un estado real del alta dependía sólo de
+    la solicitud, el estado y la versión, así que un segundo intento mientras el
+    mismo estado seguía trabado se descartaba como duplicado y la persona no
+    recibía nada. La clave incluye el mensaje o toque que lo dispara: cada
+    intento tiene su respuesta, y una entrega repetida del mismo evento no la
+    duplica."""
+    from prisma.db import atar_al_entrante
+
+    from tests.test_alta_eleccion_confirmacion import _fila_de_evento
+
+    rid = _alta_hasta_el_criterio(conn, intake_world, "Para mí")
+    user = _usuario(intake_world)
+    uno = _fila_de_evento(conn, intake_world)
+    otro = _fila_de_evento(conn, intake_world)
+    antes = _salidas(conn, user)
+
+    for evento in (uno, uno, otro):
+        with espacio(conn, intake_world["north-lab"]["id"]) as cur:
+            atar_al_entrante(cur, evento)
+            resultado = I._say_real_state(
+                cur, I._request(cur, rid), I.NO_EVIDENCE_POLICY,
+                datetime.now(timezone.utc), "no-evidence-policy")
+            assert resultado.responded
+        conn.commit()
+
+    assert [f["cuerpo"] for f in _nuevas(conn, user, antes)] == [
+        I.NO_EVIDENCE_POLICY, I.NO_EVIDENCE_POLICY]

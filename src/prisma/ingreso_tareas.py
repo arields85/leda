@@ -14,7 +14,7 @@ import psycopg
 from psycopg.types.json import Jsonb
 
 from .autoridad import Denegado, Solicitante
-from .db import registrar_auditoria
+from .db import entrante_atado, registrar_auditoria
 from .incidentes import registrar_incidente
 from .salida import (BUTTON_TEXT_LIMIT, ETIQUETA_CANCELAR, ETIQUETA_CONFIRMAR,
                      ETIQUETA_MODIFICAR, ICONO_CANCELAR, ICONO_OTRA_OPCION,
@@ -929,12 +929,16 @@ def resend_choice_prompt(cur: psycopg.Cursor, who: Solicitante,
     elección ya no estaba abierta: no manda nada. `ref` distingue este
     reenvío de otros (el mensaje que lo causó); sin él, la referencia es el
     número de mensajes que la elección ya tiene (`n1`, `n2`, ...): cada
-    reenvío es un mensaje propio y ninguno depende del reloj."""
+    reenvío es un mensaje propio y ninguno depende del reloj. Con un turno atado
+    a un evento (`db.atar_al_entrante`: un mensaje o un toque), la referencia es
+    ese evento (T9-R4): una entrega repetida del mismo evento no reenvía dos
+    veces, y un evento nuevo sí."""
     request = _request_of_question(cur, who, QUESTION_CHOICE, choice_set_id,
                                    lock=False)
     if not request:
         return False
     prompt = _first_choice_prompt(cur, choice_set_id)
+    ref = entrante_atado(cur) or ref
     if ref is None:
         cur.execute(
             """select count(*) n from message_outbox
@@ -1639,8 +1643,14 @@ def _say_real_state(cur, request, text, now, key) -> IntakeOutcome:
     """Un estado real del alta que impide seguir: su texto es la respuesta a quien
     actuó (ADR 0013 regla 3). El resultado sigue siendo inerte (no cambió nada) y
     dice que ya se respondió, para que nadie repregunte encima."""
+    # La clave incluye el mensaje o toque que dispara el estado (T9-R4, review
+    # R3-001): sin eso, un reintento mientras el mismo estado sigue trabado se
+    # descartaba como duplicado y la persona no recibía nada. Sin evento atado
+    # (una llamada directa, sin turno) queda como antes.
+    disparador = entrante_atado(cur)
     _enqueue(cur, request, text, now,
-             f"intake:{request['id']}:state:{key}:v{request['version']}")
+             f"intake:{request['id']}:state:{key}:v{request['version']}"
+             + (f":{disparador}" if disparador else ""))
     return IntakeOutcome(str(request["id"]), text, inert=True, responded=True)
 
 

@@ -156,6 +156,15 @@ def verificar_migraciones(cur: psycopg.Cursor) -> str | None:
                 and column_name = 'entrante_id') as ok""")
     if not cur.fetchone()["ok"]:
         return "0021_respuesta_atada_al_mensaje.sql"
+    # Y con `inbound_message.boton_callback` (migración 0022, T9-R4): el gateway
+    # la escribe en cada toque y la consulta para absorber el toque repetido.
+    cur.execute(
+        """select exists (
+             select 1 from information_schema.columns
+              where table_schema = 'prisma' and table_name = 'inbound_message'
+                and column_name = 'boton_callback') as ok""")
+    if not cur.fetchone()["ok"]:
+        return "0022_toque_con_boton.sql"
     return None
 
 

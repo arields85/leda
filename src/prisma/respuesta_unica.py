@@ -27,13 +27,22 @@ que nadie la pueda tocar); si ninguna o varias, la primera en salir (menor
 `descartado`. El saludo del día no es una respuesta aparte (se antepone al
 despachar) ni el indicador de actividad (ADR 0011, no es una salida).
 
-Los toques quedan fuera: nadie llama a `controlar` con uno, sus salidas no
-llevan `entrante_id` (la regla 4, T9-R4, tiene su propio mecanismo).
+Los toques entran igual (T9-R4): cada toque deja una fila de `inbound_message`
+(`gateway._registrar_toque`) que es su "mensaje entrante", y `gateway._toque` la
+deja puesta con `atar_al_entrante` y llama a `controlar` al terminar. Un toque
+absorbido por repetido (ADR 0013 regla 4) no procesa nada ni se controla: no es
+una respuesta que falte.
+
+Una parte de la respuesta que un camino sólo conoce a mitad de camino (el aviso de
+lo que se dejó de lado, delante de lo que contesta el camino normal) se anota con
+`dejar_nota`: `controlar` la agrega como una parte más de la MISMA respuesta que
+conserva, y si el turno no dejó ninguna, la nota acompaña al aviso neutro.
 """
 
 from __future__ import annotations
 
 import re
+from contextvars import ContextVar
 from datetime import datetime, timedelta
 
 from .incidentes import REFERENCIA_INBOUND_MESSAGE, registrar_incidente
@@ -43,6 +52,22 @@ ETAPA_SIN_RESPUESTA = "sin_respuesta"
 ETAPA_RESPUESTA_DUPLICADA = "respuesta_duplicada"
 
 _PARTE_DE_TEXTO_PARTIDO = re.compile(r":part:\d+-of-\d+$")
+
+# Las notas del turno en curso (`dejar_nota`). Un turno corre entero en un mismo
+# hilo y contexto; cada entrada (mensaje o toque) empieza con `limpiar_nota`.
+_NOTAS: ContextVar[tuple[str, ...]] = ContextVar("notas_de_la_respuesta",
+                                                 default=())
+
+
+def dejar_nota(texto: str) -> None:
+    """Anota algo que la respuesta de este turno tiene que decir además de lo suyo
+    (T9-R4): sale como una parte más de la MISMA respuesta, delante de las demás."""
+    _NOTAS.set(_NOTAS.get() + (texto,))
+
+
+def limpiar_nota() -> None:
+    """Empieza un turno sin notas (un turno que se revirtió no deja las suyas)."""
+    _NOTAS.set(())
 
 
 def grupo_de(fila: dict) -> str:
@@ -89,6 +114,9 @@ def controlar(cur, quien, *, workspace_id: str, chat_id: int, entrante_id: str,
     `nota_de_la_respuesta` es algo que la respuesta tiene que decir además de lo
     suyo (hoy, que el adjunto todavía no se guarda, H15): sale como una parte
     más de la MISMA respuesta, delante de las demás."""
+    notas = ([nota_de_la_respuesta] if nota_de_la_respuesta else []) + list(
+        _NOTAS.get())
+    limpiar_nota()
     respuestas = respuestas_del_mensaje(cur, entrante_id, chat_id)
 
     if not respuestas:
@@ -128,10 +156,10 @@ def controlar(cur, quien, *, workspace_id: str, chat_id: int, entrante_id: str,
         respuestas = [conservada]
 
     (respuesta,) = respuestas
-    if nota_de_la_respuesta:
+    if notas:
         enqueue_outbox(
             cur, workspace_id=workspace_id, chat_id=chat_id,
-            text=nota_de_la_respuesta,
+            text="\n\n".join(notas),
             recipient_membership_id=quien.membership_id,
             scheduled_for=respuesta[0]["programado_para"] - timedelta(milliseconds=1),
             dedupe_key=f"{workspace_id}:nota-de-respuesta:{entrante_id}",

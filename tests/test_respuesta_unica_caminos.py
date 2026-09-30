@@ -26,8 +26,9 @@ Los caminos que hay hoy al procesar un mensaje (revisión estática de cada
    comparten el prefijo de su clave (`respuesta_unica.grupo_de`).
 
 `gateway._dejar_y_ver_lo_otro` (el aviso de lo que se dejó y el mensaje guardado)
-también encola dos mensajes, pero sólo se llega por un toque: los toques quedan
-fuera del control hasta T9-R4.
+también son dos mensajes, pero sólo se llega por un toque (T9-R4): el aviso se anota
+con `respuesta_unica.dejar_nota` y el control lo agrega como una parte más de la
+misma respuesta (`tests/test_toque_idempotente.py`).
 
 Ninguna prueba toca la red ni el modelo real.
 """

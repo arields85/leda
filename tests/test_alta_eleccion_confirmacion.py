@@ -227,6 +227,44 @@ def test_un_texto_que_no_es_una_opcion_repite_la_pregunta_con_sus_botones(
     assert str(salidas[-1]["intake_choice_set_id"]) == conjunto  # con sus botones
 
 
+def _fila_de_evento(conn, world) -> str:
+    """Una fila de `inbound_message` (un mensaje o un toque) para atar lo que se
+    encole con `db.atar_al_entrante`."""
+    with admin(conn) as cur:
+        cur.execute(
+            """insert into inbound_message (workspace_id, chat_id) values
+                 (%s, %s) returning id""",
+            (world["north-lab"]["id"], _usuario(world)))
+        fila = str(cur.fetchone()["id"])
+    conn.commit()
+    return fila
+
+
+def test_reenviar_la_eleccion_sale_del_evento_que_lo_dispara_y_es_idempotente(
+        intake_world, conn):
+    """T9-R4 (review e11061770c5f40ae): sin `ref` explícito la referencia del
+    reenvío sale del evento que lo dispara (el mensaje o el toque al que está
+    atado el turno), no de un conteo: un callback que se entrega dos veces
+    reenvía UNA vez, y otro evento reenvía de nuevo."""
+    from prisma.db import atar_al_entrante
+
+    rid = _alta_con_eleccion(conn, intake_world)
+    conjunto = _conjunto_activo(conn, rid)
+    user = _usuario(intake_world)
+    uno = _fila_de_evento(conn, intake_world)
+    otro = _fila_de_evento(conn, intake_world)
+    antes = _salidas(conn, user)
+
+    for evento in (uno, uno, otro):
+        with espacio(conn, intake_world["north-lab"]["id"]) as cur:
+            atar_al_entrante(cur, evento)
+            assert I.resend_choice_prompt(cur, _actor(cur, intake_world),
+                                          conjunto, NOW, None)
+        conn.commit()
+
+    assert len(_nuevas(conn, user, antes)) == 2
+
+
 def test_reenviar_la_eleccion_sin_mensaje_de_origen_usa_referencias_deterministas(
         intake_world, conn):
     rid = _alta_con_eleccion(conn, intake_world)

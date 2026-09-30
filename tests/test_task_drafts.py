@@ -507,6 +507,68 @@ def test_callback_http_confirma_draft_y_doble_toque_no_duplica(
         assert cur.fetchone()["estado"] == "resuelta"
 
 
+def _salidas_del_chat(conn, chat_id):
+    with admin(conn) as cur:
+        cur.execute(
+            """select cuerpo, es_respuesta, entrante_id, estado from message_outbox
+                where chat_id = %s order by programado_para, dedupe_key""",
+            (chat_id,))
+        return cur.fetchall()
+
+
+def test_doble_toque_del_borrador_en_la_ventana_es_una_sola_respuesta_atada_al_toque(
+        cliente_drafts, corework, conn):
+    """T9-R4: la fila terminal la escribe la autoridad en otra conexión, antes de
+    que el toque se confirme; el gateway la ata al toque y el control de una
+    respuesta la cuenta. El segundo toque, dentro de la ventana, se absorbe."""
+    ws = corework.workspace_id
+    with espacio(conn, ws) as cur:
+        resultado = _crear_preview(cur, ws)
+        token = _token(cur, resultado["pending_action_id"])
+        telegram = _telegram(cur, "Marcos Tarquini")
+    conn.commit()
+    antes = len(_salidas_del_chat(conn, telegram))
+
+    assert _tocar(cliente_drafts, token, telegram).status_code == 200
+    assert _tocar(cliente_drafts, token, telegram).status_code == 200
+
+    (respuesta,) = _salidas_del_chat(conn, telegram)[antes:]
+    assert respuesta["cuerpo"] == "Hecho. La tarea quedó comprometida."
+    with admin(conn) as cur:
+        cur.execute("select id from inbound_message where chat_id = %s "
+                    "and boton_callback is not null", (telegram,))
+        (toque,) = cur.fetchall()
+        cur.execute("select count(*) n from incident where etapa in "
+                    "('sin_respuesta', 'respuesta_duplicada')")
+        assert cur.fetchone()["n"] == 0
+    assert str(respuesta["entrante_id"]) == str(toque["id"])
+
+
+def test_el_toque_del_borrador_fuera_de_la_ventana_dice_que_ya_no_esta_vigente(
+        cliente_drafts, corework, conn):
+    ws = corework.workspace_id
+    with espacio(conn, ws) as cur:
+        resultado = _crear_preview(cur, ws)
+        token = _token(cur, resultado["pending_action_id"])
+        telegram = _telegram(cur, "Marcos Tarquini")
+    conn.commit()
+    assert _tocar(cliente_drafts, token, telegram).status_code == 200
+    with admin(conn) as cur:
+        cur.execute("update inbound_message set at = at - interval '11 seconds' "
+                    "where boton_callback is not null")
+    conn.commit()
+
+    assert _tocar(cliente_drafts, token, telegram).status_code == 200
+
+    cuerpos = [f["cuerpo"] for f in _salidas_del_chat(conn, telegram)]
+    assert cuerpos[-2:] == ["Hecho. La tarea quedó comprometida.",
+                            gateway.AVISO_PEDIDO_NO_VIGENTE]
+    with admin(conn) as cur:
+        cur.execute("select count(*) n from task where source_draft_id = %s",
+                    (resultado["draft_id"],))
+        assert cur.fetchone()["n"] == 1
+
+
 @pytest.mark.parametrize("campo", [
     "responsable_membership_id", "fecha_objetivo", "criterio_aceptacion",
     "evidencia_requerida", "source_draft_id",
