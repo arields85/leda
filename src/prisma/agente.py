@@ -33,7 +33,7 @@ from . import herramientas as H
 from . import pendientes as P
 from .autoridad import Denegado, Solicitante
 from .calendario import Calendario
-from .contexto import construir, historial, revisar_salida
+from .contexto import _sin_markdown, construir, historial, revisar_salida
 from .db import registrar_auditoria
 from .deteccion_pregunta import hace_pregunta
 from .incidentes import (ETAPA_TURNO_CONVERSACION, NOTICIA_NEUTRA_INCIDENTE,
@@ -519,8 +519,13 @@ def _rechazar_segunda_pregunta(cur, quien: Solicitante, c: Llamada, ctx) -> dict
 def _normalizar_comparacion(texto: str) -> str:
     """Minúsculas, sin acentos, espacios colapsados -- para comparar si un
     título aparece en la respuesta sin importar cómo lo escribió el modelo
-    (T5)."""
-    sin_acentos = unicodedata.normalize("NFKD", texto)
+    (T5). Se compara la forma que la persona ve: sin el formato que el texto
+    visible también saca (`_sin_markdown`) y sin el guión bajo de énfasis, que
+    queda literal en el texto pero no es parte de una palabra (T10-5c). El mismo
+    tratamiento se le da al título, así que uno con guión bajo propio se sigue
+    encontrando."""
+    limpio = normalize_visible_text(_sin_markdown(texto)).replace("_", " ")
+    sin_acentos = unicodedata.normalize("NFKD", limpio)
     sin_acentos = "".join(c for c in sin_acentos if not unicodedata.combining(c))
     return re.sub(r"\s+", " ", sin_acentos).strip().casefold()
 
@@ -546,7 +551,7 @@ def _nombrar_tareas_sin_mencionar(
     if not faltantes:
         return texto
     encabezado = "\n".join(f"Sobre «{titulo}»:" for titulo in faltantes)
-    return f"{encabezado}\n\n{texto}"
+    return f"{encabezado}\n\n{texto}" if texto.strip() else encabezado
 
 
 def _titulos_nombrados(texto: str, titulos) -> set[str]:
@@ -558,7 +563,7 @@ def _titulos_nombrados(texto: str, titulos) -> set[str]:
     vacío nunca cuenta como nombrado."""
     restante = _normalizar_comparacion(texto)
     unicos = sorted({_normalizar_comparacion(t) for t in titulos} - {""},
-                    key=len, reverse=True)
+                    key=lambda t: (-len(t), t))
     nombrados: set[str] = set()
     for titulo in unicos:
         antes = r"(?<!\w)" if re.match(r"\w", titulo) else ""

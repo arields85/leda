@@ -195,3 +195,113 @@ def test_dos_tareas_resueltas_una_ausente_nombra_sólo_esa(corework, conn):
         assert r.texto == (
             "Sobre «Cablear tablero máq. 3»:\n\n"
             "Revisar tablero máq. 4 sigue en curso, sin novedades.")
+
+
+# ---------------------------------------------------------------------------
+# T10-5c: seguimientos de review-eca94d14a705c5c4 sobre las guardas de nombres
+# ---------------------------------------------------------------------------
+
+import subprocess
+import sys
+
+from prisma.agente import (_nombrar_tareas_listadas, _nombrar_tareas_sin_mencionar,
+                           _titulos_nombrados)
+
+
+def test_un_titulo_con_enfasis_o_formato_pegado_cuenta_como_nombrado():
+    """El texto visible pierde `**`, `*` y las comillas invertidas
+    (`contexto._sin_markdown`); el guión bajo queda literal y NO es parte del
+    título: `_Revisar variador_` nombra la tarea. Se compara contra la misma forma
+    normalizada, no contra el texto crudo del modelo."""
+    claras = {"t1": "Revisar variador"}
+    for texto in ("Sobre _Revisar variador_ va bien.",
+                  "Sobre __Revisar variador__ va bien.",
+                  "Sobre **Revisar variador** va bien.",
+                  "Sobre *Revisar variador*: va bien.",
+                  "Sobre `Revisar variador`, va bien.",
+                  "Sobre _*Revisar variador*_. Va bien.",
+                  "va bien_Revisar variador_"):
+        assert _nombrar_tareas_sin_mencionar(texto, claras) == texto, texto
+    listadas = [{"id": "t1", "titulo": "Revisar variador", "estado": "asignada"}]
+    assert (_nombrar_tareas_listadas("Tenés _Revisar variador_.", listadas)
+            == "Tenés _Revisar variador_.")
+
+
+def test_un_titulo_con_guion_bajo_propio_se_sigue_encontrando():
+    claras = {"t1": "Ajustar PLC_2"}
+    assert _nombrar_tareas_sin_mencionar("Sobre Ajustar PLC_2 va bien.",
+                                         claras) == "Sobre Ajustar PLC_2 va bien."
+    assert _nombrar_tareas_sin_mencionar("Sobre otra cosa.", claras).startswith(
+        "Sobre «Ajustar PLC_2»:")
+
+
+def test_titulos_de_igual_largo_que_se_pisan_se_resuelven_en_orden_estable():
+    """Con igual largo, el orden entre títulos no puede depender del hash del
+    conjunto: se desempata por el título. "aaa bbb" y "bbb ccc" se pisan en "bbb":
+    el primero por orden alfabético consume la aparición."""
+    assert _titulos_nombrados("aaa bbb ccc", ["bbb ccc", "aaa bbb"]) == {"aaa bbb"}
+    codigo = ("from prisma.agente import _titulos_nombrados as f\n"
+              "print(sorted(f('aaa bbb ccc', ['bbb ccc', 'aaa bbb', 'ccc ddd'])))")
+    salidas = set()
+    for semilla in range(8):
+        r = subprocess.run(
+            [sys.executable, "-c", codigo], capture_output=True, text=True,
+            env={**__import__("os").environ, "PYTHONHASHSEED": str(semilla)})
+        assert r.returncode == 0, r.stderr
+        salidas.add(r.stdout.strip())
+    assert salidas == {"['aaa bbb']"}
+
+
+def test_texto_vacio_deja_el_encabezado_sin_parrafo_final():
+    assert (_nombrar_tareas_sin_mencionar("", {"t1": "Revisar variador"})
+            == "Sobre «Revisar variador»:")
+    assert (_nombrar_tareas_sin_mencionar("  \n", {"t1": "Revisar variador"})
+            == "Sobre «Revisar variador»:")
+
+
+def _ofrecer(texto=None):
+    return Respuesta(texto=texto, llamadas=[Llamada("c1", "ofrecer_opciones", {
+        "pregunta": "¿Cuál preferís?",
+        "opciones": [{"texto": "A"}, {"texto": "B"}]})])
+
+
+def test_la_rama_de_opciones_nombra_la_tarea_una_vez_y_filtra_el_encabezado(
+        corework, conn):
+    """`ofrecer_opciones` con una tarea resuelta clara: el encabezado se antepone
+    ANTES de los filtros de salida (el formato del título sale como en cualquier
+    texto visible) y no se duplica."""
+    ws = corework.workspace_id
+    with espacio(conn, ws) as cur:
+        quien = _quien(cur, "Marcos Tarquini", ws)
+        cal = Calendario.desde_base(cur, ws)
+        r = responder(cur, quien, "algo",
+                      ProveedorGuionado([_ofrecer("Elegí cómo seguimos.")]), cal,
+                      chat_id=9201, ahora=AHORA,
+                      tareas_resueltas_claras={"t1": "Cablear **tablero** 3"})
+        assert r.elecciones == ["ofrecer_opciones"]
+        assert r.texto == "Sobre «Cablear tablero 3»:\n\nElegí cómo seguimos."
+        assert r.texto.count("Sobre «") == 1
+
+
+def test_la_rama_de_opciones_no_repite_un_titulo_ya_nombrado(corework, conn):
+    ws = corework.workspace_id
+    with espacio(conn, ws) as cur:
+        quien = _quien(cur, "Marcos Tarquini", ws)
+        cal = Calendario.desde_base(cur, ws)
+        r = responder(cur, quien, "algo",
+                      ProveedorGuionado([_ofrecer("Sobre _Cablear tablero_: elegí.")]),
+                      cal, chat_id=9202, ahora=AHORA,
+                      tareas_resueltas_claras={"t1": "Cablear tablero"})
+        assert "Sobre «" not in r.texto
+        assert r.texto.count("ablear tablero") == 1
+
+
+def test_la_rama_de_opciones_sin_texto_no_deja_parrafo_vacio(corework, conn):
+    ws = corework.workspace_id
+    with espacio(conn, ws) as cur:
+        quien = _quien(cur, "Marcos Tarquini", ws)
+        cal = Calendario.desde_base(cur, ws)
+        r = responder(cur, quien, "algo", ProveedorGuionado([_ofrecer()]), cal,
+                      chat_id=9203, ahora=AHORA,
+                      tareas_resueltas_claras={"t1": "Cablear tablero"})
+        assert r.texto == "Sobre «Cablear tablero»:"
