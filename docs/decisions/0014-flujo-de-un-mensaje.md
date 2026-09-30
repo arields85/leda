@@ -100,6 +100,29 @@ llamadas al modelo, los incidentes y las veces que la verificación de A rechaz�
 texto. Las pruebas deterministas cubren las garantías (validación, verificación del
 texto, opciones desde el resultado), no la redacción.
 
+**Para bajar el sesgo** (una sola corrida, evaluada por quien conoce el guion y opera
+todas las cuentas):
+
+- el banco real (`tests/banco/`, escenarios `modelo_real`) se corre también con A y con
+  B, para tener una comparación con números además de la evaluación del usuario;
+- las transcripciones de A y B se comparan lado a lado, mensaje por mensaje, no de
+  memoria.
+
+**Criterios fijados antes de ver los datos** (decisión del usuario, 2026-09-30):
+
+- **Éxito:** de los siete hallazgos del alta guiada (R4c-H4 a H10), al menos cinco
+  desaparecen sin código específico para ellos; ningún incidente nuevo; latencia
+  mediana de cinco segundos o menos por respuesta.
+- **Corte:** si A y B quedan parecidas y ninguna mejora claramente sobre la ronda 4, el
+  problema no estaba en la redacción: se busca la causa en otro lado en vez de insistir
+  con el flujo.
+- **Retiro de lo viejo:** un camino cuenta como pasado al flujo sólo cuando se retiraron
+  sus mecanismos anteriores (las expresiones regulares que interpretaban, las
+  correcciones posteriores del texto). Si conviven los dos, no está terminado.
+- **Expectativa:** el flujo no lleva los hallazgos a cero; una ronda nueva siempre prueba
+  superficie nueva. Lo que se espera es que dejen de repetirse las mismas clases de
+  falla.
+
 **Moratoria.** Mientras dura el experimento no se agregan reglas ni parches de
 conversación. Un hallazgo nuevo se registra y se clasifica por etapa del flujo.
 
