@@ -86,7 +86,9 @@ class Preparacion:
 
     `hecho` es el recibo al confirmar: una oración corta con lo que pasó, en
     pasado, armada con los mismos datos que `cambio` (T10-4, R3-H14: el recibo
-    ya no repite la vista previa entera). Vacío, quien confirma dice "Hecho.".
+    ya no repite la vista previa entera). Toda preparación lo define (una prueba
+    de conformidad lo exige); si llegara vacío, quien confirma cuenta el cambio
+    con la vista previa, nunca un "Hecho." solo.
     """
     cambio: str
     huella: str
@@ -1680,7 +1682,11 @@ def _preparar_aprobar_tarea(cur, quien: Solicitante, tarea_id, comentario=None):
         ("Comentario", comentario or None))
     huella = _huella("aprobar_tarea", tarea_id, fila["estado"],
                      fila["responsable_membership_id"], falta)
-    return Preparacion(cambio=cambio, huella=huella)
+    hecho = (f"Listo: aprobaste «{fila['titulo']}». Quedó terminada."
+             if falta is None
+             else f"Listo: aprobaste «{fila['titulo']}»; para cerrarla "
+                  f"todavía: {falta}")
+    return Preparacion(cambio=cambio, huella=huella, hecho=hecho)
 
 
 @herramienta(

@@ -1061,7 +1061,13 @@ def _seguir_resuelta(cur, quien, workspace_id: str, chat_id: int, token: str,
                     _responder(cur, workspace_id, chat_id, quien,
                               prep_capturada["hecho"], ahora)
                 else:
-                    _responder(cur, workspace_id, chat_id, quien, "Hecho.", ahora)
+                    # Nunca un "Hecho." pelado (T10-2b, ADR 0013 regla 2):
+                    # toda preparación define su `hecho`, y una prueba de
+                    # conformidad lo exige; si igual llegara vacío, cuenta
+                    # lo que se aplicó con la descripción de la vista previa.
+                    cambio = prep_capturada.get("cambio")
+                    _responder(cur, workspace_id, chat_id, quien,
+                              f"Hecho.\n{cambio}" if cambio else "Hecho.", ahora)
 
 
 def _responder_evidencia_registrada(cur, quien, workspace_id: str, chat_id: int,
