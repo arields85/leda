@@ -372,7 +372,7 @@ gestión.
     con quien la produce); en `resend_choice_prompt` una `ref` explícita debe ganarle al
     evento atado; el 11 de las pruebas derivado de `VENTANA_TOQUE_REPETIDO`; nombre del
     comprobador del banco (cubre toques).
-  - [ ] **T9-R4c — Seguimientos de `review-c264ebc81ffa5f14`.** Si la fila terminal de la
+  - [x] **T9-R4c — Seguimientos de `review-c264ebc81ffa5f14`.** Si la fila terminal de la
     autoridad no se puede atar al toque, hoy sólo queda un incidente y la persona podría
     recibir el éxito y además el aviso neutro (decidir una sola respuesta y probar lo que
     ve); `controlar` descarta en silencio una nota cuyo evento no coincide (registrar
@@ -4816,3 +4816,24 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   adelante: en grupos, Prisma responde todo, ahora también las fotos. Método: un escritor
   por unidad con TDD, commit, evaluación y revisión RDD (consentimiento permanente), banco
   real de la familia (n=3); nunca dos sesiones de pytest a la vez sobre el servidor local.
+
+- 2026-09-30: **T9-R4c.** Ruta: delegada, un escritor (`gateway.py`, `pendientes.py`,
+  `respuesta_unica.py` y dos archivos de pruebas). `28da5ad`: si la autoridad resolvió un
+  borrador (no reintento) y su fila terminal no se pudo atar al toque, además del incidente
+  sale una sola respuesta atada al toque con el estado real ("Hecho. La tarea quedó
+  comprometida." o "Listo, cancelé el borrador de la tarea.", definidos una vez en
+  `pendientes.texto_terminal_ingreso`, con prueba de conformidad contra lo que escribe la
+  base); ya no sale el aviso neutro "No pude completar eso", que era falso porque el efecto
+  ocurrió (reglas 2 y 3 del ADR 0013). `controlar` deja un incidente `nota_sin_respuesta`
+  por cada evento cuyas notas descarta (sin el texto de la nota). La prueba del camino sin
+  atar mira lo que ve la persona. El escritor no encontró ningún camino de producción que
+  deje una nota ajena: el incidente es defensa en profundidad. Caso de deriva de la clave
+  (la base escribe con una clave que el gateway no reconoce): la fila huérfana saldría
+  además de la respuesta atada; no se cubre porque la prueba de conformidad de la clave
+  (`test_la_clave_de_la_fila_terminal_sale_de_un_solo_lugar`) impide que esa deriva llegue
+  a `main`. TDD: RED 5 failed / 57 passed, GREEN 62 passed
+  (`tests/test_task_drafts.py tests/test_toque_idempotente.py`). Suite del escritor 1986
+  passed, 288 deselected; padre: enfocadas 62 passed. RDD: tramo `d5a89da..28da5ad` medio,
+  233 líneas, `review_due=false` (`under_budget`): queda pendiente en el tramo hasta que un
+  commit posterior alcance el presupuesto. Seguimiento chico: `_seguir_resuelta`
+  (`gateway.py`) repite el texto de conversión; pasa a `texto_terminal_ingreso` con T9-R1c-4.
