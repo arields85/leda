@@ -168,6 +168,17 @@ def _sin_despacho_inmediato_por_defecto(monkeypatch):
     monkeypatch.setattr(gateway, "conectar", _sin_conexion_de_fondo)
 
 
+@pytest.fixture(autouse=True)
+def _sin_fallidos_de_huerfanos_de_otra_prueba():
+    """`huerfanos._FALLIDOS` (la deduplicación en memoria del reporte de un aviso
+    fallido) vive por proceso: una prueba no hereda las marcas de otra (T9-H19h)."""
+    from prisma import huerfanos
+
+    huerfanos._FALLIDOS.clear()
+    yield
+    huerfanos._FALLIDOS.clear()
+
+
 @pytest.fixture
 def conn(uri):
     from prisma.db import conectar

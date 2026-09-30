@@ -390,10 +390,9 @@ class Escucha:
     def tareas_de_fondo(self, ahora: datetime | None = None) -> dict[str, int]:
         ahora = ahora or datetime.now(timezone.utc)
         try:
-            with espacio(self.conn, self.ws) as cur:
-                resumen = ciclo.ejecutar_ciclo_espacio(
-                    cur, self.ws, self.transporte, ahora, self.arranque,
-                    con_cadencias=self.con_cadencias)
+            resumen = ciclo.ejecutar_pasada(
+                self.conn, self.ws, self.transporte, ahora, self.arranque,
+                con_cadencias=self.con_cadencias)
             self.conn.commit()
             self._fallas.recuperada((self.ws, "tick"))
         except Exception as e:  # noqa: BLE001 -- una pasada rota no corta la escucha

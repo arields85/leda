@@ -692,14 +692,16 @@ def _activacion(conn, workspace_id: str, texto: str, tg_user: int,
     return {"ok": True}
 
 
-def _registrar_toque(cur, workspace_id: str, chat_id: int, quien, ahora,
+def _registrar_toque(cur, workspace_id: str, chat_id: int, quien,
                      boton: str | None) -> str:
     """Deja constancia de que esta persona tocó un botón en este chat (T9-R1d-2b):
     es actividad, igual que un mensaje escrito, para la ventana que acota la
     retención de lo que Prisma inicia (`despachador.VENTANA_DE_ACTIVIDAD`). Es una
     fila de `inbound_message` sin texto ni id de mensaje de Telegram (no se le
     inventa una clasificación): el historial de la conversación sólo
-    lee las que tienen texto.
+    lee las que tienen texto. Se fecha con el reloj de la base (el valor por omisión
+    de `at`), el mismo con que se fechan los mensajes escritos y con que se comparan
+    todas las edades de un recibo (T9-H19h).
 
     `boton` es el `callback_data` que tocó (T9-R4): con él se reconoce el toque
     repetido. Un toque absorbido pasa `None`, así no prolonga la ventana del
@@ -707,9 +709,9 @@ def _registrar_toque(cur, workspace_id: str, chat_id: int, quien, ahora,
     para el control de una respuesta visible y para las claves de lo que encole."""
     cur.execute(
         """insert into inbound_message
-             (workspace_id, chat_id, app_user_id, at, boton_callback)
-           values (%s, %s, %s, %s, %s) returning id""",
-        (workspace_id, chat_id, quien.app_user_id, ahora, boton))
+             (workspace_id, chat_id, app_user_id, boton_callback)
+           values (%s, %s, %s, %s) returning id""",
+        (workspace_id, chat_id, quien.app_user_id, boton))
     return str(cur.fetchone()["id"])
 
 
@@ -755,10 +757,11 @@ def _estado_de_entrega(cur, workspace_id: str, chat_id: int,
     return "recuperar", str(filas[0]["id"])
 
 
-def _es_toque_repetido(cur, workspace_id: str, chat_id: int, quien, ahora,
+def _es_toque_repetido(cur, workspace_id: str, chat_id: int, quien,
                        boton: str) -> bool:
     """El mismo botón, de la misma persona, en el mismo chat, ya procesado dentro
-    de `VENTANA_TOQUE_REPETIDO`. El candado serializa dos entregas simultáneas del
+    de `VENTANA_TOQUE_REPETIDO`, medida con el reloj de la base (`now()`), el mismo
+    con que se fecha el toque (T9-H19h). El candado serializa dos entregas simultáneas del
     mismo toque: la segunda espera el commit de la primera y ve su fila."""
     cur.execute(
         "select pg_advisory_xact_lock(hashtextextended(%s, 0))",
@@ -766,10 +769,10 @@ def _es_toque_repetido(cur, workspace_id: str, chat_id: int, quien, ahora,
     cur.execute(
         """select 1 from inbound_message
             where workspace_id = %s and chat_id = %s and app_user_id = %s
-              and boton_callback = %s and at > %s
+              and boton_callback = %s and at > now() - %s
             limit 1""",
         (workspace_id, chat_id, quien.app_user_id, boton,
-         ahora - VENTANA_TOQUE_REPETIDO))
+         VENTANA_TOQUE_REPETIDO))
     return cur.fetchone() is not None
 
 
@@ -784,8 +787,6 @@ def _toque(conn, workspace_id: str, slug: str, toque: dict,
     Ejecutar sigue pasando por `herramientas.ejecutar`: un botón no es un
     segundo portón a la base.
     """
-    from datetime import datetime, timezone
-
     from . import herramientas as H
     from . import pendientes as P
     from .autoridad import Denegado as NoPuede
@@ -831,12 +832,11 @@ def _toque(conn, workspace_id: str, slug: str, toque: dict,
             except Denegado:
                 return {"ok": True}      # desconocido: no se le responde
 
-            if _es_toque_repetido(cur, workspace_id, chat_id, quien, ahora,
-                                  callback):
+            if _es_toque_repetido(cur, workspace_id, chat_id, quien, callback):
                 # El mismo botón, de la misma persona, hace instantes (ADR 0013
                 # regla 4, H13): ya se atendió. Sólo el acuse de arriba; ni efecto,
                 # ni error, ni respuesta. Sigue siendo actividad de la persona.
-                _registrar_toque(cur, workspace_id, chat_id, quien, ahora, None)
+                _registrar_toque(cur, workspace_id, chat_id, quien, None)
                 registrar_auditoria(
                     cur, accion="toque_repetido_absorbido",
                     workspace_id=workspace_id,
@@ -844,7 +844,7 @@ def _toque(conn, workspace_id: str, slug: str, toque: dict,
                     detalle={"chat_id": chat_id})
                 return {"ok": True}
 
-            toque_id = _registrar_toque(cur, workspace_id, chat_id, quien, ahora,
+            toque_id = _registrar_toque(cur, workspace_id, chat_id, quien,
                                         callback)
             # Todo lo que se encole de acá hasta el commit responde a este toque:
             # el control de una respuesta visible lo ve, como con un mensaje.

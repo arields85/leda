@@ -156,11 +156,12 @@ def ejecutar_ciclo_espacio(cur, workspace_id: str, transporte, ahora: datetime,
                           lote: int = 50) -> dict:
     """Cadencias vencidas (si `con_cadencias`) + escalera + despacho, de un
     espacio. Mismo resumen que `despachar`, con `cadencias_encoladas`,
-    `escalera_encoladas`, `huerfanos_avisados` y `huerfanos_fallo` (el barrido de
-    `huerfanos`, T9-H19e), `cadencias_fallidas` (lista de `(job, error,
+    `escalera_encoladas`, `cadencias_fallidas` (lista de `(job, error,
     causa)`, para que quien llama la reporte deduplicada) y `cadencias_ok`
     (para marcar una falla anterior como recuperada) agregados. Una cadencia
-    rota nunca frena la escalera ni el despacho."""
+    rota nunca frena la escalera ni el despacho. El barrido de huérfanos NO corre
+    acá (`ejecutar_pasada` lo corre antes, con sus propias transacciones): sus
+    claves del resumen quedan en cero."""
     cal = Calendario.desde_base(cur, workspace_id)
 
     cadencias_encoladas = 0
@@ -183,23 +184,43 @@ def ejecutar_ciclo_espacio(cur, workspace_id: str, transporte, ahora: datetime,
                 ok = [j for j in ok if j["id"] != job["id"]]
 
     escalera_encoladas = reloj.ejecutar_escalera(cur, workspace_id, cal, ahora)
-    # T9-H19e: antes de despachar, para que el aviso de un mensaje huérfano salga
-    # en esta misma pasada. Con su savepoint: una falla del barrido no frena el
-    # despacho y se reporta (`huerfanos_fallo`), nunca en silencio.
-    huerfanos_avisados = 0
-    huerfanos_fallo = None
-    try:
-        with cur.connection.transaction():
-            huerfanos_avisados = huerfanos.barrer(cur, workspace_id, ahora)
-    except Exception as e:  # noqa: BLE001 -- se reporta, no se propaga
-        huerfanos_fallo = e
     resumen = despachar(cur, workspace_id, transporte, cal, ahora, lote)
     resumen["cadencias_encoladas"] = cadencias_encoladas
     resumen["escalera_encoladas"] = escalera_encoladas
-    resumen["huerfanos_avisados"] = huerfanos_avisados
-    resumen["huerfanos_fallo"] = huerfanos_fallo
+    resumen["huerfanos_avisados"] = 0
+    resumen["huerfanos_fallo"] = None
     resumen["cadencias_fallidas"] = fallidas
     resumen["cadencias_ok"] = ok
+    return resumen
+
+
+def barrer_huerfanos(conn, workspace_id: str,
+                     ahora: datetime) -> tuple[int, Exception | None]:
+    """El barrido de `huerfanos` (T9-H19e) con su falla aislada: `(avisados, fallo)`.
+    Una falla no frena el despacho que sigue y se reporta (`huerfanos_fallo`), nunca
+    en silencio. Deja la conexión limpia (sin transacción abierta)."""
+    try:
+        return huerfanos.barrer(conn, workspace_id, ahora), None
+    except Exception as e:  # noqa: BLE001 -- se reporta, no se propaga
+        _revertir_best_effort(conn)
+        return 0, e
+
+
+def ejecutar_pasada(conn, workspace_id: str, transporte, ahora: datetime,
+                    arranque: datetime, *, con_cadencias: bool = True,
+                    lote: int = 50) -> dict:
+    """Una pasada de fondo de un espacio: primero el barrido de huérfanos, cada recibo
+    en su propia transacción (T9-H19h: su candado por mensaje se suelta enseguida y
+    una reentrega no espera al resto de la pasada), y después `ejecutar_ciclo_espacio`
+    en la transacción del ciclo, para que el aviso de un huérfano salga en esta misma
+    pasada. Quien llama confirma la transacción del ciclo (`conn.commit()`)."""
+    avisados, fallo = barrer_huerfanos(conn, workspace_id, ahora)
+    with espacio(conn, workspace_id) as cur:
+        resumen = ejecutar_ciclo_espacio(
+            cur, workspace_id, transporte, ahora, arranque,
+            con_cadencias=con_cadencias, lote=lote)
+    resumen["huerfanos_avisados"] = avisados
+    resumen["huerfanos_fallo"] = fallo
     return resumen
 
 
@@ -468,10 +489,9 @@ class Ciclo:
 
             try:
                 transporte = self._transporte_de(slug, token)
-                with espacio(conn, ws_id) as cur:
-                    resumen = ejecutar_ciclo_espacio(
-                        cur, ws_id, transporte, ahora, self.arranque,
-                        con_cadencias=con_cadencias, lote=lote)
+                resumen = ejecutar_pasada(
+                    conn, ws_id, transporte, ahora, self.arranque,
+                    con_cadencias=con_cadencias, lote=lote)
                 conn.commit()
                 self._fallas.recuperada((ws_id, "tick"))
                 reportar_cadencias_rotas(conn, self._fallas, ws_id, slug, resumen)

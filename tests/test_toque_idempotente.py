@@ -327,8 +327,8 @@ def test_una_nota_de_otra_entrada_no_se_filtra_a_una_respuesta_ajena(
     with espacio(conn, ws) as cur:
         quien = _quien(cur, PERSONA, ws)
         tg = _telegram_id(cur, PERSONA)
-        primera = gateway._registrar_toque(cur, ws, tg, quien, ahora, None)
-        segunda = gateway._registrar_toque(cur, ws, tg, quien, ahora, None)
+        primera = gateway._registrar_toque(cur, ws, tg, quien, None)
+        segunda = gateway._registrar_toque(cur, ws, tg, quien, None)
         atar_al_entrante(cur, primera)
         dejar_nota(cur, "Nota de la primera entrada.")   # su turno se revierte: nadie la consume
         atar_al_entrante(cur, segunda)
@@ -346,3 +346,59 @@ def test_una_nota_de_otra_entrada_no_se_filtra_a_una_respuesta_ajena(
     assert str(incidente["referencia_id"]) == primera
     assert "primera entrada" not in incidente["resumen_sanitizado"]
     assert _incidentes(conn, ws, ETAPA_SIN_RESPUESTA) == []
+
+
+# --- T9-H19h: un solo reloj para los recibos ----------------------------------------
+
+def _app_desalineada(monkeypatch, delta):
+    """El `datetime.now` que ve el gateway, corrido `delta`."""
+    real = gateway.datetime
+
+    class _Desalineado(real):
+        @classmethod
+        def now(cls, tz=None):
+            return real.now(tz) + delta
+
+    monkeypatch.setattr(gateway, "datetime", _Desalineado)
+
+
+def test_un_toque_se_fecha_con_el_reloj_de_la_base_aunque_la_app_este_desalineada(
+        cliente, conn, corework, monkeypatch):
+    ws = corework.workspace_id
+    tg, token, _tarea = _confirmar_en_curso(conn, ws)
+    _app_desalineada(monkeypatch, timedelta(days=-2))
+
+    _tocar_boton(cliente, token, tg, callback_id="a")
+
+    with admin(conn) as cur:
+        cur.execute("select abs(extract(epoch from now() - at)) < 30 as cerca "
+                    "from inbound_message where boton_callback is not null")
+        assert [f["cerca"] for f in cur.fetchall()] == [True]
+
+
+def test_el_toque_repetido_se_mide_con_el_reloj_de_la_base_con_la_app_adelantada(
+        cliente, conn, corework, monkeypatch):
+    ws = corework.workspace_id
+    tg, token, tarea = _confirmar_en_curso(conn, ws)
+    _tocar_boton(cliente, token, tg, callback_id="a")
+    _app_desalineada(monkeypatch, timedelta(days=30))
+
+    _tocar_boton(cliente, token, tg, callback_id="b")   # hace instantes, para la base
+
+    assert _pasos_a_en_curso(conn, tarea) == 1
+    assert len(_respuestas(conn, tg)) == 1
+    assert not any("no está vigente" in f["cuerpo"] for f in _filas_de_salida(conn, tg))
+
+
+def test_el_toque_repetido_se_mide_con_el_reloj_de_la_base_con_la_app_atrasada(
+        cliente, conn, corework, monkeypatch):
+    ws = corework.workspace_id
+    tg, token, tarea = _confirmar_en_curso(conn, ws)
+    _tocar_boton(cliente, token, tg, callback_id="a")
+    envejecer_toques(conn, FUERA_DE_LA_VENTANA)          # para la base, ya pasó
+    _app_desalineada(monkeypatch, timedelta(days=-30))
+
+    _tocar_boton(cliente, token, tg, callback_id="b")
+
+    cuerpos = [f["cuerpo"] for f in _respuestas(conn, tg)]      # el orden sigue a la app
+    assert len(cuerpos) == 2 and any(gateway.AVISO_PEDIDO_NO_VIGENTE in c for c in cuerpos)

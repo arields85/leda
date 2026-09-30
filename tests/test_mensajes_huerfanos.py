@@ -11,7 +11,10 @@ from __future__ import annotations
 
 import threading
 import time
+from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
+
+from psycopg import Rollback
 
 from prisma import ciclo, gateway, huerfanos
 from prisma.db import admin, conectar, espacio
@@ -74,10 +77,7 @@ def _responder(conn, ws, chat, entrante_id, *, estado="listo"):
 
 
 def _barrer(conn, ws, ahora=None):
-    with espacio(conn, ws) as cur:
-        n = huerfanos.barrer(cur, ws, ahora or _ahora())
-    conn.commit()
-    return n
+    return huerfanos.barrer(conn, ws, ahora or _ahora())
 
 
 def _avisos(conn, chat):
@@ -135,8 +135,8 @@ def test_el_aviso_no_deja_el_entrante_atado_a_lo_que_sigue_en_la_transaccion(
     uid, tg = _persona(conn)
     _recibo(conn, ws, uid, tg, hace=EN_CURSO + timedelta(minutes=1))
 
+    huerfanos.barrer(conn, ws, _ahora())
     with espacio(conn, ws) as cur:
-        huerfanos.barrer(cur, ws, _ahora())
         cur.execute("select nullif(current_setting('prisma.entrante_id', true), '') e")
         assert cur.fetchone()["e"] is None
 
@@ -282,9 +282,7 @@ def test_el_lote_acota_cuantos_se_avisan_por_pasada(corework, conn):
         _recibo(conn, ws, uid, tg, hace=EN_CURSO + timedelta(minutes=1),
                 message_id=100 + i)
 
-    with espacio(conn, ws) as cur:
-        assert huerfanos.barrer(cur, ws, _ahora(), lote=2) == 2
-    conn.commit()
+    assert huerfanos.barrer(conn, ws, _ahora(), lote=2) == 2
     assert _barrer(conn, ws) == 1
     assert _barrer(conn, ws) == 0
 
@@ -314,9 +312,8 @@ def test_sin_membresia_activa_no_sale_ningun_mensaje_y_queda_un_incidente(
     (incidente,) = _incidentes(conn, ws)
     assert str(incidente["referencia_id"]) == recibo
     transporte = TransporteDePrueba()
-    with espacio(conn, ws) as cur:
-        ciclo.ejecutar_ciclo_espacio(cur, ws, transporte, _ahora(),
-                                     _ahora() - timedelta(hours=1), con_cadencias=False)
+    ciclo.ejecutar_pasada(conn, ws, transporte, _ahora(),
+                          _ahora() - timedelta(hours=1), con_cadencias=False)
     conn.commit()
     assert not [e for e in transporte.enviados if NOTICIA_NEUTRA_INCIDENTE in str(e)]
 
@@ -328,10 +325,9 @@ def test_el_ciclo_de_fondo_barre_y_despacha_el_aviso_en_la_misma_pasada(
     _recibo(conn, ws, uid, tg, hace=EN_CURSO + timedelta(minutes=1))
     transporte = TransporteDePrueba()
 
-    with espacio(conn, ws) as cur:
-        resumen = ciclo.ejecutar_ciclo_espacio(
-            cur, ws, transporte, _ahora(), _ahora() - timedelta(hours=1),
-            con_cadencias=False)
+    resumen = ciclo.ejecutar_pasada(
+        conn, ws, transporte, _ahora(), _ahora() - timedelta(hours=1),
+        con_cadencias=False)
     conn.commit()
 
     assert resumen["huerfanos_avisados"] == 1
@@ -416,12 +412,9 @@ def test_un_recibo_envenenado_no_ocupa_el_lugar_de_los_sanos_en_el_lote(
                    message_id=2)
     _envenenar(monkeypatch, veneno)
 
-    with espacio(conn, ws) as cur:                   # lote de uno: el veneno es el
-        assert huerfanos.barrer(cur, ws, _ahora(), lote=1) == 0   # primero, y falla
-    conn.commit()
-    with espacio(conn, ws) as cur:                   # ya reportado, pasa al final
-        assert huerfanos.barrer(cur, ws, _ahora(), lote=1) == 1
-    conn.commit()
+    # lote de uno: el veneno es el primero, y falla; ya reportado, pasa al final
+    assert huerfanos.barrer(conn, ws, _ahora(), lote=1) == 0
+    assert huerfanos.barrer(conn, ws, _ahora(), lote=1) == 1
     assert [str(a["entrante_id"]) for a in _avisos(conn, tg)] == [sano]
 
 
@@ -468,10 +461,20 @@ class _CursorConGancho:
 
 
 def _barrer_con_gancho(conn, ws, gancho):
-    with espacio(conn, ws) as cur:
-        n = huerfanos.barrer(_CursorConGancho(cur, gancho), ws, _ahora())
-    conn.commit()
-    return n
+    """`barrer` con el cursor de cada transacción de recibo envuelto: dispara `gancho`
+    justo antes de que tome el candado del mensaje."""
+    real = huerfanos.espacio
+
+    @contextmanager
+    def con_gancho(c, workspace_id):
+        with real(c, workspace_id) as cur:
+            yield _CursorConGancho(cur, gancho)
+
+    huerfanos.espacio = con_gancho
+    try:
+        return huerfanos.barrer(conn, ws, _ahora())
+    finally:
+        huerfanos.espacio = real
 
 
 def test_una_respuesta_que_llega_entre_elegir_y_escribir_evita_el_aviso(
@@ -525,16 +528,16 @@ def test_si_la_reentrega_tiene_el_candado_del_mensaje_el_barrido_lo_deja_para_de
     assert _barrer(conn, ws) == 1                   # liberado: ahora sí
 
 
-def test_una_reentrega_durante_el_barrido_espera_y_se_absorbe(
+def test_una_reentrega_durante_el_aviso_de_su_recibo_espera_y_se_absorbe(
         cliente, corework, conn, uri, monkeypatch):
-    """Si el barrido ya avisó (aunque no haya hecho commit), la reentrega espera el
-    candado del mensaje, ve el aviso como la respuesta y se absorbe: nunca el aviso
-    neutro Y la respuesta real."""
+    """Mientras la transacción del aviso de un recibo sigue abierta (el aviso ya
+    encolado, sin commit), la reentrega del mismo mensaje espera el candado, ve el
+    aviso como la respuesta y se absorbe: nunca el aviso neutro Y la respuesta real."""
     ws = corework.workspace_id
     proveedor = _con_respuesta_del_modelo(monkeypatch)
     uid, tg = _persona(conn)
     _recibo(conn, ws, uid, tg, hace=EN_CURSO + timedelta(minutes=1), message_id=41)
-    errores = []
+    errores, estado = [], {}
 
     def entregar():
         c = conectar(uri)
@@ -545,19 +548,20 @@ def test_una_reentrega_durante_el_barrido_espera_y_se_absorbe(
         finally:
             c.close()
 
-    barredor = conectar(uri)
     hilo = threading.Thread(target=entregar)
-    try:
-        with espacio(barredor, ws) as cur:
-            assert huerfanos.barrer(cur, ws, _ahora()) == 1
-            hilo.start()
-            time.sleep(1.0)
-            assert hilo.is_alive()                  # espera el candado del mensaje
-        barredor.commit()                           # la reentrega ya puede seguir
-    finally:
-        barredor.close()
+    real = huerfanos.registrar_incidente
+
+    def incidente_con_reentrega(*a, **k):
+        hilo.start()                                # el aviso ya está encolado
+        time.sleep(1.0)
+        estado["espero"] = hilo.is_alive()          # espera el candado del mensaje
+        return real(*a, **k)
+
+    monkeypatch.setattr(huerfanos, "registrar_incidente", incidente_con_reentrega)
+    assert huerfanos.barrer(conn, ws, _ahora()) == 1
     hilo.join(timeout=60)
 
+    assert estado["espero"] is True
     assert not hilo.is_alive() and errores == []
     assert [a["cuerpo"] for a in _avisos(conn, tg)] == [NOTICIA_NEUTRA_INCIDENTE]
     assert proveedor.ruteados == []                 # y no corrió un turno de más
@@ -830,19 +834,19 @@ def test_una_falla_del_barrido_no_frena_el_despacho_y_se_reporta(
                        scheduled_for=_ahora() - timedelta(minutes=1))
     conn.commit()
 
-    def _revienta(cur, workspace_id, ahora, *a, **k):
-        enqueue_outbox(cur, workspace_id=workspace_id, chat_id=tg,
-                       text="Parcial que se revierte", dedupe_key="test:parcial",
-                       recipient_membership_id=membership, scheduled_for=ahora,
-                       is_response=True)
-        raise RuntimeError("falla del barrido")
+    def _revienta(c, workspace_id, ahora, *a, **k):
+        with espacio(c, workspace_id) as cur:
+            enqueue_outbox(cur, workspace_id=workspace_id, chat_id=tg,
+                           text="Parcial que se revierte", dedupe_key="test:parcial",
+                           recipient_membership_id=membership, scheduled_for=ahora,
+                           is_response=True)
+            raise RuntimeError("falla del barrido")
 
     monkeypatch.setattr(huerfanos, "barrer", _revienta)
     transporte = TransporteDePrueba()
-    with espacio(conn, ws) as cur:
-        resumen = ciclo.ejecutar_ciclo_espacio(
-            cur, ws, transporte, _ahora(), _ahora() - timedelta(hours=1),
-            con_cadencias=False)
+    resumen = ciclo.ejecutar_pasada(
+        conn, ws, transporte, _ahora(), _ahora() - timedelta(hours=1),
+        con_cadencias=False)
     conn.commit()
 
     assert resumen["huerfanos_avisados"] == 0
@@ -855,3 +859,108 @@ def test_una_falla_del_barrido_no_frena_el_despacho_y_se_reporta(
 
 def test_la_etapa_del_fallo_de_un_huerfano_tiene_su_explicacion():
     assert huerfanos.ETAPA_MENSAJE_HUERFANO_FALLO in EXPLICACION_POR_ETAPA
+
+
+# --- T9-H19h: lo que dejó la revisión de T9-H19g -------------------------------------
+
+def _cerca_de_ahora_de_la_base(conn, consulta_de_at: str) -> bool:
+    with admin(conn) as cur:
+        cur.execute(f"select abs(extract(epoch from now() - ({consulta_de_at}))) < 30 "
+                    "as cerca")
+        return cur.fetchone()["cerca"]
+
+
+def test_la_marca_de_fallo_no_se_pone_si_el_incidente_no_se_confirmo(
+        corework, conn, monkeypatch, capsys):
+    """La marca en memoria sólo vale si el incidente del fallo quedó confirmado: si
+    la transacción que lo llevaba se pierde, el recibo se reporta de nuevo."""
+    ws = corework.workspace_id
+    uid, tg = _persona(conn)
+    veneno = _recibo(conn, ws, uid, tg, hace=EN_CURSO + timedelta(minutes=30),
+                     message_id=1)
+    _envenenar(monkeypatch, veneno)
+    real_espacio, real_incidente = huerfanos.espacio, huerfanos.registrar_incidente
+    estado = {"perder": True, "escribio": False}
+
+    def incidente(cur, workspace_id, resumen, **kw):
+        if kw.get("etapa") == huerfanos.ETAPA_MENSAJE_HUERFANO_FALLO:
+            estado["escribio"] = True
+        return real_incidente(cur, workspace_id, resumen, **kw)
+
+    @contextmanager
+    def espacio_que_pierde_el_commit(c, workspace_id):
+        estado["escribio"] = False
+        with real_espacio(c, workspace_id) as cur:
+            yield cur
+            if estado["perder"] and estado["escribio"]:
+                raise RuntimeError("falló el commit")     # se revierte todo
+
+    monkeypatch.setattr(huerfanos, "registrar_incidente", incidente)
+    monkeypatch.setattr(huerfanos, "espacio", espacio_que_pierde_el_commit)
+
+    assert huerfanos.barrer(conn, ws, _ahora()) == 0
+
+    assert veneno not in huerfanos._FALLIDOS
+    assert "RuntimeError" in capsys.readouterr().out       # nunca en silencio
+    estado["perder"] = False
+    assert huerfanos.barrer(conn, ws, _ahora()) == 0       # se reporta de nuevo
+    assert veneno in huerfanos._FALLIDOS
+    assert _incidentes_de_etapa(
+        conn, ws, huerfanos.ETAPA_MENSAJE_HUERFANO_FALLO) == [veneno]
+
+
+def test_una_reentrega_durante_el_resto_del_ciclo_no_espera_a_que_termine(
+        cliente, corework, conn, uri, monkeypatch):
+    """El candado del mensaje sólo dura lo que dura el aviso de ese recibo: una
+    reentrega que llega mientras el ciclo sigue (despacho) no espera a su commit."""
+    ws = corework.workspace_id
+    proveedor = _con_respuesta_del_modelo(monkeypatch)
+    uid, tg = _persona(conn)
+    _recibo(conn, ws, uid, tg, hace=EN_CURSO + timedelta(minutes=1), message_id=41)
+    espera = {}
+
+    def entregar():
+        c = conectar(uri)
+        try:
+            gateway.procesar_update(c, "corework", _update(tg))
+        finally:
+            c.close()
+
+    real = ciclo.despachar
+
+    def despachar_con_reentrega(*a, **k):
+        hilo = threading.Thread(target=entregar)
+        hilo.start()
+        hilo.join(timeout=10)                # el ciclo sigue: no puede esperarlo
+        espera["viva"] = hilo.is_alive()
+        return real(*a, **k)
+
+    monkeypatch.setattr(ciclo, "despachar", despachar_con_reentrega)
+    ciclo.ejecutar_pasada(conn, ws, TransporteDePrueba(), _ahora(),
+                          _ahora() - timedelta(hours=1), con_cadencias=False)
+    conn.commit()
+
+    assert espera["viva"] is False
+    assert proveedor.ruteados == []                 # se absorbió: ya tenía su aviso
+
+
+def test_olvidar_fallidos_viejos_descarta_lo_reportado_hace_mas_que_la_cota():
+    viejo = time.monotonic() - COTA.total_seconds() - 1
+    huerfanos._FALLIDOS["viejo"] = viejo
+    huerfanos._FALLIDOS["reciente"] = time.monotonic()
+
+    huerfanos._olvidar_fallidos_viejos()
+
+    assert list(huerfanos._FALLIDOS) == ["reciente"]
+
+
+def test_un_mensaje_escrito_se_fecha_con_el_reloj_de_la_base_aunque_la_app_este_desalineada(
+        cliente, corework, conn, monkeypatch):
+    _con_respuesta_del_modelo(monkeypatch)
+    tg = _tg(conn)
+    _reloj_de_la_aplicacion_desalineado(monkeypatch, timedelta(days=-2))
+
+    _enviar(cliente, _update(tg, message_id=77))
+
+    assert _cerca_de_ahora_de_la_base(
+        conn, "select at from inbound_message where telegram_message_id = 77")
