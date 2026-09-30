@@ -382,14 +382,16 @@ gestión.
     pide ve su resumen con [Enviar a aprobación] [Modificar] [Cancelar] (mismo selector de
     datos que T9-R1c-3); al enviar, le llega a quien confirma con Confirmar y Cancelar y a
     quien pide "Le mandé el borrador a {nombre}…". Hasta enviar es rama de quien pide.
-  - [ ] **T9-R1c-4b — Seguimientos de `review-037b056b5ca65e28`.** (1) Si el borrador
+  - [x] **T9-R1c-4b — Seguimientos de `review-037b056b5ca65e28`.** (1) Si el borrador
     cambió después de mostrar la revisión, Enviar la marca `vencida` y quien pide queda sin
     botones (el pedido sigue activo sin pregunta abierta): ofrecer la revisión vigente en
     vez de un callejón sin salida; (2) probar la rama en la que quien confirma pasó a ser
     quien pide al momento de enviar (una sola respuesta atada al toque, sin aviso neutro);
     (3) `test_la_revision_retiene_lo_que_prisma_inicia_como_cualquier_rama` usa el reloj
-    real: derivar de `NOW`. Consulta al usuario abierta: si quien confirma cancela, ¿se le
-    avisa a quien pidió?
+    real: derivar de `NOW`.
+  - [ ] **T9-R1c-5 — Consulta al usuario abierta:** si quien confirma cancela el borrador
+    que le mandó quien pidió, ¿se le avisa a quien pidió? (hoy el "Listo, cancelé…" sólo
+    le llega a quien confirma).
   - [ ] **T9-H19 — Reproducir H19 después de R1 y R2**; si persiste, clasificarlo por
     regla antes de corregir.
 
@@ -4891,3 +4893,15 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   Latencia del responder en esas corridas: ~32 s (a vigilar). Migración `0023` **pendiente
   de aplicar en la base local `prisma`** (sólo reemplaza una función; sin ella el gateway
   igual nunca manda "enviar" a la autoridad).
+
+- 2026-09-30: **T9-R1c-4b.** Ruta: delegada, un escritor (`ingreso_tareas.py` y pruebas).
+  `0de153e`: si el borrador cambió después de mostrar la revisión, Enviar ya no deja a quien
+  pide sin botones: la única respuesta al toque es la revisión vigente ("el borrador
+  cambió…" más el resumen con los tres botones), sin enviar nada a quien confirma; un toque
+  repetido se absorbe. Probada la rama en la que quien confirma pasó a ser quien pide (una
+  respuesta atada al toque, sin aviso neutro; no necesitó cambio de código). La prueba de
+  retención usa `NOW`. La revisión vigente se rearma desde los campos del alta, como toda
+  vuelta al resumen; hoy ningún camino edita el borrador por fuera de ese flujo. TDD: RED 4
+  de 7 enfocadas (una por error de armado del escritor), GREEN; suite del escritor 2025
+  passed, 300 deselected; banco determinista 342 passed; padre: 31 passed. RDD: tramo
+  `56747c6..0de153e` medio, 247 líneas, `under_budget`: pendiente en el tramo.
