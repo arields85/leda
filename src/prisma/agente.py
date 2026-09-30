@@ -328,7 +328,12 @@ def responder(cur: psycopg.Cursor, quien: Solicitante, texto_entrante: str,
     # (títulos de tareas) pasa por el mismo glosario y la misma normalización
     # que el texto del modelo. La de listas sólo toca una respuesta
     # informativa: un turno sin efecto sale como el aviso "sin cambios".
-    salida = _nombrar_tareas_sin_mencionar(salida, tareas_resueltas_claras)
+    # El cierre con el estado real de la tarea (T10-7) nombra la tarea por su título
+    # exacto: cuando va, el encabezado "Sobre «…»:" sobra.
+    cierre = (_cierre_con_estado_real(cur, tareas_resueltas_claras)
+              if sin_efecto else None)
+    salida = _nombrar_tareas_sin_mencionar(
+        salida, None if cierre else tareas_resueltas_claras)
     if not sin_efecto:
         salida = _nombrar_tareas_listadas(salida, tareas_listadas,
                                           tareas_resueltas_claras)
@@ -341,7 +346,7 @@ def responder(cur: psycopg.Cursor, quien: Solicitante, texto_entrante: str,
     salida = normalize_visible_text(
         revisar_salida(salida, ctx.variantes_prohibidas))
     if sin_efecto:
-        salida = with_no_effect_status(salida)
+        salida = with_no_effect_status(salida, cierre=cierre)
     # T3 (ADR 0007 punto 3): el servidor, no el modelo, garantiza que una
     # lista de tareas salga como botones. Llegar acá ya descartó que el turno
     # haya terminado con otro juego de botones (confirmaciones/elecciones
@@ -618,6 +623,29 @@ def _nombrar_tareas_sin_mencionar(
         return texto
     encabezado = "\n".join(f"Sobre «{titulo}»:" for titulo in faltantes)
     return f"{encabezado}\n\n{texto}" if texto.strip() else encabezado
+
+
+def _cierre_con_estado_real(
+        cur, tareas_resueltas_claras: dict[str, str] | None) -> str | None:
+    """Un cambio intentado que se rechazó cierra con lo que es cierto de la tarea
+    ahora, no con "Estado: sin cambios." (T10-7, decisión del usuario,
+    2026-09-30): "«Programar PLC» sigue en revisión.". Misma técnica que
+    `_nombrar_tareas_sin_mencionar`: el dato sale de la base, no de las palabras del
+    modelo, y la línea nombra la tarea por su título exacto.
+
+    Sólo con UNA tarea clara en el turno: `None` si no la hay (o hay varias), y ahí el
+    aviso sigue siendo "Estado: sin cambios." (`salida.with_no_effect_status`).
+    Un turno que no intentó cambiar nada no lleva esta línea: una consulta sobre una
+    tarea no es una negativa."""
+    if not tareas_resueltas_claras or len(tareas_resueltas_claras) != 1:
+        return None
+    (tarea_id,) = tareas_resueltas_claras
+    cur.execute("select titulo, estado from task where id = %s", (tarea_id,))
+    tarea = cur.fetchone()
+    if not tarea:
+        return None
+    estado = H._estado_legible(tarea["estado"]).lower()
+    return f"«{tarea['titulo']}» sigue {estado}."
 
 
 def _titulos_nombrados(texto: str, titulos) -> set[str]:

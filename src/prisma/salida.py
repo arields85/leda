@@ -157,7 +157,11 @@ def normalize_visible_text(raw: Any) -> str:
     return re.sub(r"[ ]{2,}", " ", text).strip()
 
 
-def with_no_effect_status(raw: Any, *, required: bool = True) -> str:
+def with_no_effect_status(raw: Any, *, required: bool = True,
+                          cierre: str | None = None) -> str:
+    """El texto sin afirmar cambios, cerrado con `NO_EFFECT_STATUS`. Con `cierre`
+    (una línea que el servidor armó con el estado real de la tarea, T10-7), esa
+    línea cierra el mensaje EN LUGAR de "Estado: sin cambios."."""
     text = normalize_visible_text(raw)
     marker = re.compile(
         rf"(?im)^\s*{re.escape(NO_EFFECT_STATUS)}\s*$")
@@ -167,7 +171,8 @@ def with_no_effect_status(raw: Any, *, required: bool = True) -> str:
     for pattern in _NO_EFFECT_PATTERNS:
         text = pattern.sub("", text)
     text = normalize_visible_text(text).strip(" .,;:-")
-    return f"{text}\n\n{NO_EFFECT_STATUS}" if text else NO_EFFECT_STATUS
+    cierre = cierre or NO_EFFECT_STATUS
+    return f"{text}\n\n{cierre}" if text else cierre
 
 
 def truncar_etiqueta_boton(texto: str, *, limite: int = TRUNCAR_ETIQUETA_BOTON) -> str:
