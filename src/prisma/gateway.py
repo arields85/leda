@@ -2672,9 +2672,7 @@ def _resolver_toque_opcion_modelo(cur, quien, workspace_id: str, chat_id: int,
         # el toque podía volver a dispararse en un reintento del webhook.
         _routing_incident(cur, quien, e)
         _responder(cur, workspace_id, chat_id, quien,
-                  "Perdón, no pude retomar la conversación. Ya quedó "
-                  "registrado para que lo revisen. Escribime de nuevo si "
-                  "hace falta.", ahora)
+                  NOTICIA_NEUTRA_INCIDENTE, ahora)
 
 
 def _mostrar_mas_tareas(cur, quien, workspace_id: str, chat_id: int,
@@ -3177,8 +3175,7 @@ def _resolver_toque_menu_tarea(cur, quien, workspace_id: str, chat_id: int,
     except Exception as e:  # noqa: BLE001
         _routing_incident(cur, quien, e)
         _responder(cur, workspace_id, chat_id, quien,
-                  "Perdón, no pude completar eso. Ya quedó registrado para "
-                  "que lo revisen.", ahora)
+                  NOTICIA_NEUTRA_INCIDENTE, ahora)
 
 
 def _resolver_toque_dato_menu_tarea(cur, quien, workspace_id: str, chat_id: int,
@@ -3217,8 +3214,7 @@ def _resolver_toque_dato_menu_tarea(cur, quien, workspace_id: str, chat_id: int,
     except Exception as e:  # noqa: BLE001
         _routing_incident(cur, quien, e)
         _responder(cur, workspace_id, chat_id, quien,
-                  "Perdón, no pude completar eso. Ya quedó registrado para "
-                  "que lo revisen.", ahora)
+                  NOTICIA_NEUTRA_INCIDENTE, ahora)
 
 
 def _resumir_dato_menu_tarea(cur, quien, texto: str, modificacion, chat_id: int,
@@ -3278,8 +3274,7 @@ def _resumir_dato_menu_tarea(cur, quien, texto: str, modificacion, chat_id: int,
     except Exception as e:  # noqa: BLE001
         _routing_incident(cur, quien, e)
         _responder(cur, workspace_id, chat_id, quien,
-                  "Perdón, no pude completar eso. Ya quedó registrado para "
-                  "que lo revisen.", ahora)
+                  NOTICIA_NEUTRA_INCIDENTE, ahora)
 
 
 @dataclass(frozen=True)

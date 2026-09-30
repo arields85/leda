@@ -17,6 +17,7 @@ from prisma.autoridad import Canal, identificar
 from prisma.calendario import Calendario
 from prisma.contexto import construir, revisar_salida
 from prisma.db import admin, espacio
+from prisma.incidentes import NOTICIA_NEUTRA_INCIDENTE
 from prisma.llm import Llamada, ProveedorGuionado, Respuesta
 
 BA = ZoneInfo("America/Argentina/Buenos_Aires")
@@ -259,7 +260,7 @@ def test_falla_del_modelo_no_filtra_detalles_tecnicos(corework, conn):
 
         assert r.incidente
         assert "psycopg" not in r.texto and "socket" not in r.texto
-        assert "no pude completar" in r.texto
+        assert r.texto == NOTICIA_NEUTRA_INCIDENTE
 
         cur.execute("select cuerpo from message_outbox")
         assert "psycopg" not in cur.fetchone()["cuerpo"]

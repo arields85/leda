@@ -36,7 +36,7 @@ from .calendario import Calendario
 from .contexto import construir, historial, revisar_salida
 from .db import registrar_auditoria
 from .deteccion_pregunta import hace_pregunta
-from .incidentes import registrar_incidente
+from .incidentes import NOTICIA_NEUTRA_INCIDENTE, registrar_incidente
 from .llm import Llamada, Proveedor, Respuesta
 from .salida import (ETIQUETA_CANCELAR, ETIQUETA_CONFIRMAR, ETIQUETA_MODIFICAR,
                      cabe_en_mensaje,
@@ -51,8 +51,9 @@ MAX_VUELTAS = 5
 # cambió.
 VIGENCIA_PENDIENTE = timedelta(hours=8)
 
-DISCULPA = ("Perdón, no pude completar la respuesta. Ya quedó registrado para "
-            "que lo revisen.")
+# El aviso neutro aprobado (T10-2b, R3-H2): el mismo texto que ve la persona en
+# cualquier falla que dejó un incidente. Se conserva el nombre por quien ya lo usa.
+DISCULPA = NOTICIA_NEUTRA_INCIDENTE
 
 
 @dataclass
