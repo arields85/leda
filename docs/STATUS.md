@@ -201,7 +201,7 @@ cómo funciona Prisma. Detalle y evidencia de todo en `odd/tasks/prisma-orienta.
 **Cuarta ronda por Telegram (T11) en curso.** Circuito A completo de punta a punta (entrega,
 cambios pedidos, reentrega, aprobación) y circuito B completo; circuito C hasta "Enviar a
 aprobación". Falta: el 01/10 a las 09:00 le llega a Ismael el borrador de Marcos (quedó en
-la cola por estar fuera de horario); Ismael toca ✖️ Rechazar con un motivo y a Marcos le
+la cola por estar fuera de horario, R4b-H6); Ismael toca ✖️ Rechazar con un motivo y a Marcos le
 tiene que llegar "Ismael rechazó el borrador…: motivo". A las 09:00 salen además cinco
 avisos encolados fuera de horario; tres son de «Dashboard de lotes», que ya está
 `terminada`: observar si el despachador descarta los que dejaron de corresponder. El
@@ -221,7 +221,7 @@ orienta la unidad 3. Detalle en `odd/tasks/prisma-orienta.md`.
 2. Altos: R4c-H3 ("No puedo mostrarte la evidencia", falso: el menú la muestra) y R4b-H5
    (la respuesta al motivo de "Pedir cambios" tomada como pedido imposible, "Eso todavía
    no lo puedo hacer"): regla 1 y 3 del ADR 0013.
-3. Alta guiada, decisión del usuario: preguntar primero "¿Qué hay que hacer?" y después el
+3. Alta guiada (R4c-H4), decisión del usuario: preguntar primero "¿Qué hay que hacer?" y después el
    objetivo (el más probable primero); sin bucle al volver a pedir una tarea nueva
    (R4c-H5); sin jerga "(hasta N)" (R4c-H7); fecha que acepte formas naturales o diga el
    formato (R4c-H6); sin claves internas en el resumen (R4c-H8); texto del resumen de quien
@@ -237,7 +237,7 @@ orienta la unidad 3. Detalle en `odd/tasks/prisma-orienta.md`.
    (`crear_borrador_tarea`) con Cancelar; T9-H19i; índice de `inbound_message`; relojes de
    `despachador` y `contexto`.
 Configuración a decidir con el usuario: el resumen "Estado del equipo" va a un grupo de
-Telegram que no existe ("chat not found", un incidente).
+Telegram que no existe ("chat not found", un incidente; R4b-H7).
 
 Hecho el 2026-09-30 (además de lo de la mañana): R4-H7 (las respuestas contaban contra el
 tope diario y postergaban los avisos), R4-H8 (estado real con los cambios pedidos), saludo
