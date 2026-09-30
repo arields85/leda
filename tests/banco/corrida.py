@@ -39,6 +39,7 @@ from prisma.respuesta_unica import (ETAPA_RESPUESTA_DUPLICADA, ETAPA_SIN_RESPUES
                                     grupo_de)
 from prisma.salida import etiquetas_coinciden, etiquetas_de_tarea
 
+from tests.banco.comprobadores import es_forma_ofrecida_del_titulo
 from tests.banco.escenario import ADJUNTOS_DEL_BANCO
 
 # 'objective', 'evidence' y 'approval' se agregaron en T4 (banco-conversacional
@@ -1319,11 +1320,20 @@ def ejecutar_escenario(
                     # usuario, 2026-09-28): un escenario que pide "elegir" por
                     # la etiqueta pelada sigue resolviendo la opción real, ya
                     # armada con su "📋 ".
-                    token = next(
-                        (o["token"] for o in opciones_aclaracion
-                         if etiquetas_coinciden(o["etiqueta"],
-                                                aclaracion_esperada.get("elegir") or "")),
-                        None)
+                    # T10-2b (b-0013): el escenario puede nombrar la candidata por su
+                    # título entero y el botón real lo lleva acortado; se acepta la
+                    # etiqueta pelada o la forma ofrecida del título, y si dos
+                    # botones cumplen no se adivina cuál.
+                    elegir = aclaracion_esperada.get("elegir") or ""
+                    tokens = [o["token"] for o in opciones_aclaracion
+                              if etiquetas_coinciden(o["etiqueta"], elegir)
+                              or es_forma_ofrecida_del_titulo(o["etiqueta"], elegir)]
+                    if len(tokens) > 1:
+                        raise LookupError(
+                            f"La aclaración a elegir ({elegir!r}) coincide con "
+                            f"{len(tokens)} botones de la misma pregunta -- "
+                            "ambiguo, no se adivina cuál.")
+                    token = tokens[0] if tokens else None
                 if token is not None:
                     coincidencias_aclaracion.append((pid, token))
 

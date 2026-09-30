@@ -610,6 +610,11 @@ def _es_forma_ofrecida_del_titulo(etiqueta: str, titulo: str) -> bool:
     return corte_de_palabra or corte_duro
 
 
+# Público: el corredor (`corrida.ejecutar_escenario`) también resuelve con esto qué
+# botón tocar cuando el escenario nombra una candidata por su título entero.
+es_forma_ofrecida_del_titulo = _es_forma_ofrecida_del_titulo
+
+
 def _candidatas_sin_pareja(
     candidatas: tuple[str, ...], ofrecidas: tuple[str, ...],
 ) -> list[str]:

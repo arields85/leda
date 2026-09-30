@@ -989,6 +989,52 @@ def test_ejecutar_escenario_aclaracion_tapea_la_candidata_elegida_sin_aplicar_na
         assert cur.fetchone()["estado"] == "en_revision"
 
 
+def test_ejecutar_escenario_aclaracion_elige_por_el_titulo_entero_aunque_el_boton_lo_acorte(
+        corework, conn):
+    """T10-2b (b-0013): el escenario nombra la candidata por su título entero, pero el
+    botón real lo lleva acortado ("Cablear tablero máq. 3…"). Sin reconocer la forma
+    ofrecida del título el corredor no encontraba el botón, no tocaba nada y la corrida
+    parecía un pedido que Prisma no retomó."""
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        ids = sembrar_precondiciones(cur, ws, {
+            "tareas": [
+                {"id": "t1", "titulo": "Cablear tablero máq. 3 (simulado)",
+                 "area": "ot", "responsable": "Marcos Tarquini"},
+                {"id": "t2", "titulo": "Revisar tablero máq. 4 (simulado)",
+                 "area": "ot", "responsable": "Marcos Tarquini"},
+            ],
+        })
+    tid_a = ids["t1"]
+    doble_jev = ClienteJevGuionado(guion=[
+        {"alcance": {"probabilities": {"una_tarea": 0.8}},
+         "tarea": {"probabilities": {"T1": 0.5, "T2": 0.3}}},
+    ])
+    interno = ProveedorGuionado(
+        guion=[Respuesta(llamadas=[Llamada(
+                   "c1", "actualizar_estado",
+                   {"tarea_id": tid_a, "estado": "en_revision",
+                    "evidencia_texto": "Ya quedó cableado."})]),
+              Respuesta(texto="listo")],
+        rutas=[IntentRoute(IntentAction.NORMAL_CONVERSATION,
+                           trabajos=("lo del tablero",))],
+    )
+    r = ejecutar_escenario(
+        conn, ws, "corework", "Marcos Tarquini",
+        ["ya termine lo del tablero, pasala a revision"], interno,
+        escenario_id="b-test-aclaracion-titulo", indice=0, cliente_jev=doble_jev,
+        aclaracion_esperada={
+            "candidatas": ["Cablear tablero máq. 3 (simulado)",
+                           "Revisar tablero máq. 4 (simulado)"],
+            "elegir": "Cablear tablero máq. 3 (simulado)"})
+
+    assert r.bloqueado is False, r.motivo_bloqueo
+    assert r.herramientas_ejecutadas == ["actualizar_estado"]
+    with admin(conn) as cur:
+        cur.execute("select estado from task where id = %s", (tid_a,))
+        assert cur.fetchone()["estado"] == "en_revision"
+
+
 def test_ejecutar_escenario_sin_aclaracion_esperada_no_junta_etiquetas(corework, conn):
     ws = corework.workspace_id
     interno = ProveedorGuionado(
