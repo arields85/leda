@@ -405,9 +405,14 @@ gestión.
     se absorbe y la persona queda sin respuesta; además no tiene límite de tiempo (ids que
     se repiten si cambia el bot). Absorber sólo si hay respuesta o el turno puede seguir en
     curso; si no, procesar con incidente; cota global de tiempo.
-  - [ ] **T9-H19e — Barrido de recibos huérfanos:** un mensaje recibido sin respuesta más
+  - [x] **T9-H19e — Barrido de recibos huérfanos:** un mensaje recibido sin respuesta más
     allá de la ventana del turno recibe el aviso neutro aprobado y deja incidente (nunca
     silencio aunque Telegram no reintente).
+  - [ ] **T9-H19f — "Respondido" es tener alguna respuesta atada, en cualquier estado:**
+    el código descarta a propósito respuestas reemplazadas (elecciones del alta, vistas
+    previas vencidas al despachar, duplicados); sólo un turno muerto no deja ninguna. Sin
+    esto el barrido mandaría un "Tuve un problema…" falso. Una persona dada de baja no
+    recibe el aviso: un incidente, una vez.
   - [ ] **T9-H19c — Consulta al usuario:** ¿qué hace Prisma cuando alguien edita un mensaje
     ya enviado (`edited_message`)? Hoy lo trata como un mensaje nuevo.
   - [x] **T10-5c** — Seguimientos de `review-eca94d14a705c5c4`: comparar títulos contra el
@@ -5043,3 +5048,15 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   de colección (constantes nuevas). RDD: tramo `1f310fe..cd2f928` medio, 271 líneas,
   `under_budget`. Hueco: si Telegram no reintenta después de la ventana, el silencio
   persiste: a T9-H19e.
+
+- 2026-09-30: **T9-H19e.** Ruta: delegada, un escritor. `07b5e82`: `huerfanos.barrer`
+  (por espacio, bajo RLS, al comienzo de `ciclo.ejecutar_ciclo_espacio`, lote de 50,
+  candado no bloqueante por espacio, en un savepoint): un recibo más viejo que
+  `VENTANA_TURNO_EN_CURSO` y dentro de `COTA_REENTREGA` sin respuesta recibe el aviso
+  neutro aprobado atado al recibo y un incidente `mensaje_huerfano_sin_respuesta`;
+  idempotente. Excluye toques absorbidos, recibos recuperados por uno más nuevo y caminos
+  que no guardan recibo. TDD: RED de comportamiento 10 de 17 con un barrido vacío; suite
+  del escritor 2142 passed, 309 deselected. Revisión del padre: el criterio "sin respuesta
+  no descartada" daría avisos falsos cuando el código descarta a propósito: a T9-H19f.
+  Pendiente sin decidir: índice `(workspace_id, at)` en `inbound_message` antes de que la
+  tabla crezca (migración aparte).
