@@ -189,10 +189,9 @@ serializan y la hora de cada evento, evidencia y aprobación es la de escritura
 a punta de "Pedir cambios" por el webhook. Todo esto **todavía no se probó en vivo**.
 
 **Punto exacto para retomar (2026-09-30).** `main` por delante de `origin/main` (sin push; lo
-decide el usuario). Frontera de revisión RDD en `2f8d37b` (`review-5fe426815909aa70`,
-aprobada y reconocida); `review-bd6e966a7e428940` sobre `2f8d37b..8fc0bf5` (T9-H19h) quedó
-**abierta**: la captura del revisor falló por `529 Overloaded` del proveedor; retomarla con el
-estado de esa revisión antes de dar el tramo por revisado. El usuario dio consentimiento
+decide el usuario). Frontera de revisión RDD en `8fc0bf5` (`review-bd6e966a7e428940`,
+aprobada y reconocida al cuarto intento; los tres primeros fallaron por `529 Overloaded` del
+proveedor). El usuario dio consentimiento
 permanente para las revisiones y pidió parar sólo por decisiones sobre cómo funciona Prisma.
 Detalle y evidencia de todo en `odd/tasks/prisma-orienta.md`.
 

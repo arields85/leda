@@ -422,6 +422,10 @@ gestión.
     falla reportada sólo después del commit; un mismo reloj (el de la base) para todos los
     recibos y comparaciones; cada recibo barrido en su propia transacción corta para no
     retener el candado por todo el ciclo; cota y aislamiento de `_FALLIDOS` probados.
+  - [ ] **T9-H19i — Pruebas del barrido** (`review-bd6e966a7e428940`, después de T11): el
+    hilo de la reentrega que no espera al ciclo tiene que capturar sus errores; la marca de
+    falla probada contra un commit que falla de verdad; cerrar la transacción al cortar por
+    el candado del espacio; la prueba del entrante atado no debe pasar por construcción.
   - [ ] **T9-H19c — Consulta al usuario:** ¿qué hace Prisma cuando alguien edita un mensaje
     ya enviado (`edited_message`)? Hoy lo trata como un mensaje nuevo.
   - [x] **T10-5c** — Seguimientos de `review-eca94d14a705c5c4`: comparar títulos contra el
@@ -5139,3 +5143,8 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   hasta tres tareas con nombre y estado, vista previa en filas, comprobantes cortos, una
   respuesta por mensaje y por toque, señal inmediata al tocar, avisos neutros y aviso al
   administrador (Ariel tiene que escribirle una vez al bot de administración), latencia.
+
+- 2026-09-30: **RDD de T9-H19h:** `review-bd6e966a7e428940` **aprobada y reconocida** al
+  cuarto intento (los tres primeros fallaron por `529 Overloaded` del proveedor); frontera en
+  `8fc0bf5`. Cuatro observaciones sobre la calidad de las pruebas del barrido, sin efecto en
+  el comportamiento: a T9-H19i, después de la ronda.
