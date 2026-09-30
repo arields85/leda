@@ -392,8 +392,19 @@ gestión.
   - [ ] **T9-R1c-5 — Consulta al usuario abierta:** si quien confirma cancela el borrador
     que le mandó quien pidió, ¿se le avisa a quien pidió? (hoy el "Listo, cancelé…" sólo
     le llega a quien confirma).
-  - [ ] **T9-H19 — Reproducir H19 después de R1 y R2**; si persiste, clasificarlo por
+  - [x] **T9-H19 — Reproducir H19 después de R1 y R2**; si persiste, clasificarlo por
     regla antes de corregir.
+  - [ ] **T9-H19b — Un reenvío de Telegram no es un mensaje nuevo** (regla 2 del ADR 0013 e
+    invariante de ejecución única): el webhook procesa el turno entero antes de contestar
+    (10-30 s con modelo) y Telegram reintenta; `inbound_message` no controla
+    `telegram_message_id` + chat, así que un reenvío recibe otro turno y otra respuesta.
+    Absorber el mismo `message` ya procesado (mismo mecanismo que los toques de T9-R4).
+  - [ ] **T9-H19c — Consulta al usuario:** ¿qué hace Prisma cuando alguien edita un mensaje
+    ya enviado (`edited_message`)? Hoy lo trata como un mensaje nuevo.
+  - [ ] **T10-5c** — Seguimientos de `review-eca94d14a705c5c4`: comparar títulos contra el
+    texto normalizado (énfasis con guiones bajos); probar la rama de opciones con tarea
+    resuelta; orden determinista entre títulos de igual largo; texto vacío en
+    `_nombrar_tareas_sin_mencionar`.
 
 - [ ] **T10 — Forma de las respuestas (ronda 3).** R3-H1, H2, H3/H7, H8, H9, H10, H11,
   H12, H14 y H4. Mapeo de sólo lectura del 2026-09-30: cuatro mecanismos generales (A:
@@ -4990,3 +5001,13 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   vacío al final; asserts exactos restaurados en cinco archivos de pruebas. Suite del
   escritor 2101 passed, 300 deselected; padre: 35 passed. RDD: tramo `33d1557..9a0209e`
   medio, 271 líneas, `under_budget`: pendiente en el tramo.
+
+- 2026-09-30: **T9-H19.** Ruta: delegada, un escritor. `f629770`: familia `b-0030` (link como
+  nueva entrega después de "Pedir cambios"; con frase; con una segunda tarea de título
+  parecido). El comprobador del banco ya fallaba ante un duplicado suprimido (lee los
+  incidentes `respuesta_duplicada`). Banco real (n=3): **9/9**: H19 no se reproduce desde un
+  solo mensaje; por lectura de código, un turno nunca arma dos respuestas. Camino que queda:
+  reenvíos de Telegram y mensajes editados (`procesar_update` trata `edited_message` como
+  nuevo y no hay control por `telegram_message_id`): a T9-H19b y T9-H19c. RDD: tramo
+  `33d1557..f629770` (incluye T10-5b) medio, 498 líneas, `review-eca94d14a705c5c4`
+  **aprobada y reconocida**; frontera en `f629770`; seguimientos a T10-5c.
