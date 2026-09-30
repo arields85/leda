@@ -354,17 +354,24 @@ gestión.
     `adjuntar_evidencia` sobre una tarea en curso deja evidencia sin decirlo
     (`herramientas.py:1552-1559`); `contexto.PREAMBULO` obliga a inventar opciones
     (`contexto.py:70-77`); el motivo de "Pedir cambios" no está en ninguna lectura.
-  - [ ] **T9-R4 — Todo toque tiene señal inmediata y es idempotente** (H5, H13). Incluye
+  - [x] **T9-R4 — Todo toque tiene señal inmediata y es idempotente** (H5, H13). Incluye
     también: la respuesta de "Dejarlo y ver lo otro" (dos mensajes sin agrupar, fuera del
     control porque es un toque); el control de una respuesta extendido a los toques; y
     `review-324fcff7f93c7f19` R3-001: un reintento con el mismo estado trabado del alta se
     descarta como duplicado y queda sin respuesta (la clave debe incluir el mensaje o toque
-    que lo dispara).
-    el seguimiento de `review-e11061770c5f40ae`: la referencia del reenvío de una
+    que lo dispara); y el seguimiento de `review-e11061770c5f40ae`: la referencia del reenvío de una
     elección sin `entrante_id` sale de un conteo y no es idempotente ante un callback
     repetido (derivarla del evento que la dispara). El
     indicador sólo envuelve `_turno` (`gateway.py:333`); el segundo toque responde "ya no
     está vigente"; ventana de 10 s para la misma persona.
+  - [ ] **T9-R4b — Seguimientos de `review-d9a1348555f00ca4`.** En el toque sobre un
+    borrador, la marca de "botón ya tocado" se confirma antes de la resolución con
+    autoridad: si ésta falla, el reintento o el reenvío de Telegram se absorbe en silencio
+    (la marca tiene que confirmarse con el efecto, o no absorber si el primero no terminó);
+    la clave de la fila terminal de la autoridad se rearma a mano en el gateway (compartirla
+    con quien la produce); en `resend_choice_prompt` una `ref` explícita debe ganarle al
+    evento atado; el 11 de las pruebas derivado de `VENTANA_TOQUE_REPETIDO`; nombre del
+    comprobador del banco (cubre toques).
   - [ ] **T9-H19 — Reproducir H19 después de R1 y R2**; si persiste, clasificarlo por
     regla antes de corregir.
 
@@ -4741,3 +4748,16 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   enfocadas 51 passed. RDD: tramo `a6056ff..426509f` medio, 1645 líneas,
   `review-324fcff7f93c7f19` **aprobada y reconocida**; frontera en `426509f`. Banco real
   `b-0027`, `b-0020-f`, `b-0021-i` (n=3): **18/18**.
+
+- 2026-09-29: **T9-R4.** Ruta: delegada, un escritor. `761f572`: cada toque se acusa antes
+  de cualquier trabajo y corre bajo el indicador de ADR 0011; el mismo `callback_data` de la
+  misma persona en el mismo chat dentro de 10 s se absorbe (sólo acuse y auditoría);
+  migración `0022` (`inbound_message.boton_callback`; **pendiente de aplicar en la base
+  local junto con `0020` y `0021`**); el control de una respuesta cubre los toques; "Dejarlo
+  y ver lo otro" es una sola respuesta; la clave del estado real del alta y la referencia
+  del reenvío salen del evento que los dispara. `89992a6`: familia `b-0028`. Suite del
+  escritor 1975 passed, 288 deselected; padre: enfocadas 91 passed. Precisión de la regla 4
+  en el ADR 0013 (`f97c5b7`). RDD: tramo `426509f..89992a6` alto, 1336 líneas,
+  `review-d9a1348555f00ca4` (4 lentes) **aprobada y reconocida**; frontera en `89992a6`.
+  Advertencia importante a T9-R4b: en el toque sobre un borrador, si la resolución falla
+  después de marcar el botón, el reintento se absorbe en silencio.
