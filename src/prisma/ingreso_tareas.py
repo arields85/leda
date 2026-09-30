@@ -45,6 +45,20 @@ CANCELAR_BORRADOR = con_icono("Cancelar borrador", ICONO_CANCELAR)
 DRAFT_AWAITING_CONFIRMATION = (
     "El borrador de la tarea está esperando confirmación: se confirma con el "
     "botón Confirmar del resumen, no con un mensaje.")
+# Lo que se le dice a quien terminó el alta cuando no es quien la confirma (T9-R3,
+# ADR 0013 regla 3: cómo quedó y qué falta): a quién se le mandó y que la tarea
+# todavía no existe. Redacción pendiente de revisión de voz en T10.
+# Estados reales del alta que no dejan avanzar: son la respuesta a quien actuó
+# (regla 3), no un aviso neutro. Redacción pendiente de revisión de voz en T10.
+NO_EVIDENCE_POLICY = "No hay una política de evidencia vigente para esa área."
+CONFIRMED_OPTION_STALE = "Alguna opción confirmada ya no está vigente."
+NO_ACTIVE_AUTHORITY = "No hay una autoridad activa que pueda revisar el borrador."
+DRAFT_SENT_TO_APPROVER = (
+    "Le mandé el borrador de la tarea a {name} para que lo confirme. La tarea "
+    "se crea cuando lo confirme.")
+DRAFT_SENT_TO_SOMEONE_ELSE = (
+    "Le mandé el borrador de la tarea a otra persona del equipo para que lo "
+    "confirme. La tarea se crea cuando lo confirme.")
 CHOICE_FALLBACK_PROMPT = "Elegí una opción para seguir con la tarea."
 # Modificar en la vista previa del borrador (T9-R1c-3, ADR 0005 decisión 1): el
 # selector "qué dato cambiar" es una elección del alta con un botón por dato, y su
@@ -103,6 +117,10 @@ class IntakeOutcome:
     # gateway lo contesta como cualquier otro toque que no está vigente (sólo el
     # selector de Modificar lo marca). No se persiste: es del toque, no del resultado.
     stale: bool = False
+    # El texto del resultado ya se encoló como la respuesta a quien actuó (un
+    # estado real del alta, ADR 0013 regla 3): quien llama no vuelve a preguntar
+    # ni encola otro texto encima. Tampoco se persiste.
+    responded: bool = False
 
     def as_json(self) -> dict[str, Any]:
         return {
@@ -113,6 +131,15 @@ class IntakeOutcome:
             "pending_action_id": self.pending_action_id,
             "terminal": self.terminal,
         }
+
+
+def draft_sent_text(approver_name) -> str:
+    """El aviso de a quién se le mandó el borrador; sin un nombre legible no se
+    inventa ninguno."""
+    name = normalize_text(approver_name) if isinstance(approver_name, str) else ""
+    if not name:
+        return DRAFT_SENT_TO_SOMEONE_ELSE
+    return DRAFT_SENT_TO_APPROVER.format(name=name)
 
 
 def normalize_text(raw: str) -> str:
@@ -1052,11 +1079,8 @@ def _advance(cur, request, who, now, *, buttons_first=False) -> IntakeOutcome:
             )
             policy = cur.fetchone()
             if not policy:
-                return IntakeOutcome(
-                    request_id,
-                    "No hay una política de evidencia vigente para esa área.",
-                    inert=True,
-                )
+                return _say_real_state(cur, request, NO_EVIDENCE_POLICY, now,
+                                       "no-evidence-policy")
             if not _evidence_deliverable(policy["evidencia_requerida"]):
                 return _configuration_error(cur, request, who, "evidence", now)
             cur.execute(
@@ -1352,8 +1376,8 @@ def _finalize(cur, request, who, now):
     current_area = cur.fetchone()
     if not current_objective or not current_responsible or not current_responsible["activo"] \
        or not current_area:
-        return IntakeOutcome(request_id,
-                             "Alguna opción confirmada ya no está vigente.", inert=True)
+        return _say_real_state(cur, request, CONFIRMED_OPTION_STALE, now,
+                               "stale-option")
     objective = {"id": str(current_objective["id"]),
                  "title": current_objective["titulo"],
                  "state": current_objective["estado"]}
@@ -1394,9 +1418,8 @@ def _finalize(cur, request, who, now):
     )
     policy = cur.fetchone()
     if not policy:
-        return IntakeOutcome(request_id,
-                              "No hay una política de evidencia vigente para esa área.",
-                              inert=True)
+        return _say_real_state(cur, request, NO_EVIDENCE_POLICY, now,
+                               "no-evidence-policy")
     if not _evidence_deliverable(policy["evidencia_requerida"]):
         return _configuration_error(cur, request, who, "evidence", now)
     cur.execute(
@@ -1455,7 +1478,7 @@ def _finalize(cur, request, who, now):
     preview = cur.fetchone()["preview"]
     cur.execute(
         """select m.aprobador_membership_id, aprobador.app_user_id,
-                  aprobador.telegram_user_id
+                  aprobador.telegram_user_id, aprobador.nombre aprobador_nombre
              from membership m
              left join integrante aprobador
                on aprobador.membership_id = m.aprobador_membership_id
@@ -1467,16 +1490,15 @@ def _finalize(cur, request, who, now):
     if approver_id is None:
         cur.execute(
             """select i.membership_id aprobador_membership_id, i.app_user_id,
-                      i.telegram_user_id
+                      i.telegram_user_id, i.nombre aprobador_nombre
                  from integrante i join rol r on r.id = i.rol_id
                 where r.autoridad_final and i.activo"""
         )
         authority = cur.fetchone()
         approver_id = authority["aprobador_membership_id"] if authority else None
     if not authority or not approver_id or authority["telegram_user_id"] is None:
-        return IntakeOutcome(request_id,
-                              "No hay una autoridad activa que pueda revisar el borrador.",
-                              inert=True)
+        return _say_real_state(cur, request, NO_ACTIVE_AUTHORITY, now,
+                               "no-active-authority")
 
     from .autoridad import Canal
     from .pendientes import registrar
@@ -1510,6 +1532,12 @@ def _finalize(cur, request, who, now):
         # le inicia a ella.
         is_response=requester_confirms,
     )
+    if not requester_confirms:
+        # Quien terminó el alta no recibe la vista previa: se le dice cómo quedó
+        # el borrador y quién lo confirma (regla 3). Sin esto el control de una
+        # respuesta por mensaje le mandaba el aviso neutro aunque todo salió bien.
+        _enqueue(cur, request, draft_sent_text(authority["aprobador_nombre"]), now,
+                 f"intake:{request_id}:sent:v{request['version']}")
     return IntakeOutcome(request_id, preview_text, changed=True,
                          pending_action_id=pending.id)
 
@@ -1605,6 +1633,15 @@ def _enqueue(cur, request, text, now, dedupe, choice_set_id=None, block=None):
         scheduled_for=now, dedupe_key=dedupe, is_response=True,
         intake_choice_set_id=choice_set_id, bloque_copiable=block,
     )
+
+
+def _say_real_state(cur, request, text, now, key) -> IntakeOutcome:
+    """Un estado real del alta que impide seguir: su texto es la respuesta a quien
+    actuó (ADR 0013 regla 3). El resultado sigue siendo inerte (no cambió nada) y
+    dice que ya se respondió, para que nadie repregunte encima."""
+    _enqueue(cur, request, text, now,
+             f"intake:{request['id']}:state:{key}:v{request['version']}")
+    return IntakeOutcome(str(request["id"]), text, inert=True, responded=True)
 
 
 def _request(cur, request_id):

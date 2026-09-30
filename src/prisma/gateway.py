@@ -1814,7 +1814,7 @@ def _seguir_con_la_eleccion_del_alta(cur, quien, texto: str, abierta,
     resultado = resolve_typed_choice(
         cur, quien, choice_set_id=abierta.pregunta_id, text=texto,
         chat_id=chat_id, now=ahora)
-    if resultado is None or resultado.inert:
+    if resultado is None or (resultado.inert and not resultado.responded):
         _repreguntar(cur, quien, workspace_id, chat_id, abierta,
                      _pregunta_de(abierta), ahora, entrante_id)
 
