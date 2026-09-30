@@ -1990,7 +1990,7 @@ def test_sembrar_borrador_enviado_a_aprobacion_lo_deja_esperando_a_quien_confirm
     assert confirmacion["estado"] == "esperando"
     assert confirmacion["chat_id"] == tg_ismael
     assert [etiqueta_sin_icono(e) for e in confirmacion["botones"]] == [
-        "Confirmar", "Cancelar"]
+        "Confirmar", "Rechazar"]
 
 
 def test_sembrar_borrador_enviado_a_aprobacion_por_quien_lo_confirma_falla(
@@ -2492,6 +2492,32 @@ def test_el_borrador_sembrado_en_la_corrida_se_toca_por_sus_botones(corework, co
     # El banco no confirma el borrador: no hay tarea nueva.
     assert r.conteos_despues["task"] == r.conteos_antes["task"]
     assert r.conteos_antes_del_toque is None
+
+
+def test_b_0036_rechazar_el_borrador_de_otra_persona_pide_el_motivo_y_lo_cancela(
+        corework, conn):
+    """La forma scripteada de b-0036: Ismael confirma lo que pidió Marcos, toca
+    Rechazar, da el motivo, y el corredor evalúa el recibo: rechazó y le avisó a
+    quien lo pidió; ninguna tarea nueva."""
+    ws = corework.workspace_id
+    _con_dos_tareas(conn, ws)
+    interno = _responde(RespectoPendiente.RESPONDE)
+
+    r = ejecutar_escenario(
+        conn, ws, "corework", "Ismael Soschinski", [], interno,
+        escenario_id="b-test-0036", indice=0,
+        preguntas_sembradas={"borrador_de_alta": {
+            **_BORRADOR_DE_OTRO_APROBADOR, "enviado_a_aprobacion": True}},
+        toques=[{"etiqueta": "Rechazar"}],
+        mensajes_tras_toques=["falta definir bien el alcance"])
+
+    assert r.bloqueado is False, r.motivo_bloqueo
+    assert "rechacé el borrador de la tarea «Cablear tablero norte»" in r.respuesta_texto
+    assert "Marcos Tarquini" in r.respuesta_texto
+    assert r.conteos_despues["task"] == r.conteos_antes["task"]
+    with admin(conn) as cur:
+        cur.execute("select estado from task_intake_request")
+        assert cur.fetchone()["estado"] == "cancelled"
 
 
 def test_el_borrador_sembrado_en_la_corrida_cambia_un_dato_con_opciones(
