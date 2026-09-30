@@ -5116,3 +5116,26 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   borrada. Luego en la base real con el mismo resultado; `saludo.verificar_migraciones` ->
   `None`. `psql -f` con `ON_ERROR_STOP=1`, `PGCLIENTENCODING=UTF8`; ningún proceso de Prisma
   escribía en la base.
+
+- 2026-09-30: **Base nueva para la cuarta ronda** (autorización del usuario: "rearmamos la
+  base con datos ficticios nuevos"). Respaldo `db/respaldos/prisma-antes-ronda4-20260930.dump`
+  (532 entradas legibles, 12 tareas); con cero conexiones abiertas y `PRISMA_DB_URL`
+  verificada contra la base esperada, `drop database prisma` / `create database prisma`;
+  luego `python -m prisma esquema`, `importar corework --activar`, `feriados corework`,
+  `sembrar corework --semilla espacios/corework.semilla-ficticia.yaml` (12 tareas: 6
+  asignadas, 6 en curso, 1 dependencia), `modelo deepseek-v4-flash --proveedor nan`,
+  `administrador corework "Ariel De Simone"`. Ariel, Ismael y Marcos quedan activos (el
+  pack trae sus Telegram); `verificar_migraciones` -> `None`; la base rechaza "enviar" y la
+  función sigue siendo de `prisma_owner`. El usuario maneja todas las cuentas de prueba.
+
+  **Guion de T11** (horario laboral; datos ficticios): circuito A — Ariel entrega "Dashboard
+  de lotes en CoreLabs" con evidencia, Ismael pide cambios, Ariel vuelve a entregar con
+  evidencia nueva, el botón viejo dice que ya no está vigente, Ismael aprueba desde el aviso
+  nuevo y la tarea se cierra; circuito B — Marcos entrega "Revisar comunicaciones
+  industriales de la comprimidora" (depende de "Programar PLC" sin terminar), Ismael pide
+  cambios y la tarea vuelve a en curso; circuito C (nuevo, T9-R1c-4) — Marcos pide una tarea
+  nueva por el alta guiada, ve su resumen con [Enviar a aprobación] [Modificar] [Cancelar],
+  corrige un dato con Modificar, la envía, Ismael la confirma. Observar además: listas de
+  hasta tres tareas con nombre y estado, vista previa en filas, comprobantes cortos, una
+  respuesta por mensaje y por toque, señal inmediata al tocar, avisos neutros y aviso al
+  administrador (Ariel tiene que escribirle una vez al bot de administración), latencia.

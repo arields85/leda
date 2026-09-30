@@ -233,7 +233,7 @@ botones y saludo diario al primer mensaje del día a cada persona, decidido al d
 falta una migración; respuesta inmediata e indicador "escribiendo…" con borrador
 nativo sólo si el turno pasa de 1,5 s (#9, #9b, ADR 0011).
 
-Base local `prisma`: migraciones hasta `0023` aplicadas (`0023` el 2026-09-30, con respaldo `db/respaldos/prisma-antes-0023-20260930.dump`, 532 entradas, y ensayo previo en una copia descartable; `verificar_migraciones` -> `None`) (`0020` a `0022` el 2026-09-29, con
+Base local `prisma` **rearmada el 2026-09-30 para la cuarta ronda** con datos ficticios nuevos (respaldo previo `db/respaldos/prisma-antes-ronda4-20260930.dump`; esquema completo, pack, feriados, semilla ficticia, modelo `nan`/`deepseek-v4-flash`, Ariel administrador; Ariel, Ismael y Marcos activos). Antes: migraciones hasta `0023` aplicadas (`0023` el 2026-09-30, con respaldo `db/respaldos/prisma-antes-0023-20260930.dump`, 532 entradas, y ensayo previo en una copia descartable; `verificar_migraciones` -> `None`) (`0020` a `0022` el 2026-09-29, con
 respaldo `db/respaldos/prisma-antes-0020-0022-20260929.dump` y ensayo previo en una copia
 descartable; `saludo.verificar_migraciones` -> `None`); modelo `nan`/`deepseek-v4-flash`
 configurado en la ronda (respaldos
