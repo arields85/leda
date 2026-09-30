@@ -5330,3 +5330,28 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   `administrador`): 12 tareas; `verificar_migraciones` -> `None`; columna
   `message_outbox.es_coordinacion` presente. `escuchar corework` arrancado. Ariel tiene que
   volver a escribirle al bot de administración (base nueva).
+
+- 2026-09-30: **T11 retomada (tarde) — hallazgos R4b.** El listener lanzado por el agente se
+  cortó por el límite de tiempo de sus tareas en segundo plano; el usuario lo corre en su
+  propia terminal. Confirmado en vivo: saludo en una línea, "Dale, escribime qué
+  necesitás.", título entero en el botón, encabezado del menú en filas, íconos por acción,
+  link directo a la vista previa, "Gracias… pasó a revisión." y **el aviso de entrega le
+  llegó a Ismael** (R4-H7 resuelto en vivo).
+  - R4b-H1. "quiero entregar el dash de lotes": el modelo pidió la evidencia con sus
+    palabras, sin intentar el cambio, con botones de lista; U3 sólo cubre el intento
+    rechazado. Se llegó por el menú ("Ya la terminé").
+  - R4b-H2. El aviso a Ismael arranca con "👋 Buenas tardes" en un bloque aparte.
+  - R4b-H3. Los botones del aviso (Aprobar, Pedir cambios) sin íconos.
+  - R4b-H4. Evidencia mostrada como "- (texto) https://…".
+  - R4b-H5. **Medio-alto.** A "¿Qué falta corregir en «X»?", la respuesta "necesito
+    capturas de pantalla" recibió "Eso todavía no lo puedo hacer." y la misma pregunta: el
+    ruteo tomó el motivo como un pedido que Prisma no puede cumplir (capturas). Regla 1 del
+    ADR 0013: con una pregunta de texto libre abierta, el mensaje es la respuesta. Hubo que
+    reformular ("tiene que enviar capturas…").
+  - R4b-H6. El aviso "Ismael pidió cambios…" a Ariel (17:35) quedó programado para el
+    01/10 09:00: fuera del horario laboral del espacio, lo que inicia Prisma espera al día
+    siguiente (regla vigente; el tope ya no interviene). Afecta la ronda de hoy.
+  - R4b-H7. Incidente `entrega_mensaje`: el resumen "Estado del equipo" al chat del grupo
+    falló 5 veces con "chat not found" (el bot no está en ese grupo); no se avisó al
+    administrador porque Ariel no volvió a escribirle al bot de administración tras el
+    rearmado.
