@@ -4929,3 +4929,11 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   banco determinista 345 passed; padre: enfocadas 28 passed. RDD: tramo `56747c6..56a8223`
   (incluye T9-R1c-4b) medio, 1031 líneas, `review-d7bcc36efe500706` (fiabilidad)
   **aprobada y reconocida**; frontera en `56a8223`; dos advertencias a T10-2b.
+
+- 2026-09-30: **Banco real completo (n=1) después de T9-R1c-4 y T10-1..4:** **94/100**
+  (antes 71/76). Fallas: `b-0021` y `b-0021-a` por `RoutingError` del proveedor (JSON de
+  ruteo malformado, conocido): al repetirlas pasan; `b-0023-e`, `b-0024-b` (no nombran
+  "Revisar variador") y `b-0021-h` (no nombra el título): regla H7, a T10-5; `b-0013`:
+  con el arnés corregido los botones de aclaración salen bien, pero después del toque no se
+  retoma el pedido (ninguna llamada al responder, la tarea queda `asignada`): a T10-2b
+  (U5, diagnóstico). `b-0001`, `b-0001-a` y `b-0001-b`, que fallaban, pasaron.
