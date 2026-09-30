@@ -19,6 +19,8 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
+import pytest
+
 from prisma import pendientes as P
 from prisma.calendario import Calendario
 from prisma.db import admin, espacio
@@ -41,29 +43,60 @@ def _guion(monkeypatch, *respuestas) -> ProveedorGuionado:
     return proveedor
 
 
-def _en_horario(conn, ws) -> datetime:
-    """Un `ahora` de la pasada dentro de la jornada. El webhook escribe con el
-    reloj real, así que se corre la línea de tiempo de lo que ya escribió hasta
-    ese `ahora`: las distancias entre la actividad de la persona, los avisos y sus
-    vencimientos son las mismas que tuvo la ronda; sólo cambia la hora del día."""
-    real = datetime.now(timezone.utc)
-    with espacio(conn, ws) as cur:
-        cal = Calendario.desde_base(cur, ws)
-    ahora = cal.dentro_de_jornada(real + timedelta(seconds=5))
-    delta = ahora - real
-    with admin(conn) as cur:
-        cur.execute("update inbound_message set at = at + %s where workspace_id = %s",
-                    (delta, ws))
-        cur.execute(
-            """update message_outbox
-                  set programado_para = programado_para + %(d)s,
-                      vence_en = vence_en + %(d)s
-                where workspace_id = %(ws)s""", {"d": delta, "ws": ws})
-        cur.execute(
-            """update pending_action set vence_en = vence_en + %(d)s
-                where workspace_id = %(ws)s""", {"d": delta, "ws": ws})
-    conn.commit()
-    return ahora
+# La pasada del despachador corre a una hora FIJA de la jornada -- un martes a las
+# 10:00 de Buenos Aires, en el pasado de cualquier ejecución --, no a la que marque
+# el reloj de quien corre la suite.
+_AHORA_FIJO = datetime(2026, 9, 29, 13, 0, tzinfo=timezone.utc)
+
+_FILAS_A_MOVER = (
+    ("inbound_message", ("at",)),
+    ("message_outbox", ("programado_para", "vence_en")),
+    ("pending_action", ("vence_en",)),
+)
+
+
+class _Reloj:
+    """Lleva lo que la ronda escribió con el reloj real (el webhook no acepta un
+    reloj) a la hora fija de la pasada, sin cambiar las distancias entre la
+    actividad de la persona, los avisos y sus vencimientos: sólo cambia la hora
+    del día. Cada fila se mueve UNA vez, aunque `en_horario` se llame varias veces
+    en el mismo test (la ronda del tercer test la llama dos): moverla de nuevo
+    la sacaría de la jornada según la hora en que corra la suite."""
+
+    def __init__(self, conn, ws) -> None:
+        self._conn = conn
+        self._ws = ws
+        self._movidas: dict[str, set] = {tabla: set() for tabla, _ in _FILAS_A_MOVER}
+        with espacio(conn, ws) as cur:
+            self._cal = Calendario.desde_base(cur, ws)
+        # Un `ahora` fuera de la jornada volvería a mover las filas hasta la
+        # próxima: el test se rompería por el calendario, no por lo que prueba.
+        assert self._cal.en_horario(self.ahora), "la hora fija dejó de ser laboral"
+
+    @property
+    def ahora(self) -> datetime:
+        return _AHORA_FIJO + timedelta(seconds=5)
+
+    def en_horario(self) -> datetime:
+        desfase = _AHORA_FIJO - datetime.now(timezone.utc)
+        with admin(self._conn) as cur:
+            for tabla, columnas in _FILAS_A_MOVER:
+                cur.execute(f"select id from {tabla} where workspace_id = %s",
+                            (self._ws,))
+                nuevas = ({f["id"] for f in cur.fetchall()} - self._movidas[tabla])
+                if not nuevas:
+                    continue
+                cambios = ", ".join(f"{c} = {c} + %(d)s" for c in columnas)
+                cur.execute(f"update {tabla} set {cambios} where id = any(%(ids)s)",
+                            {"d": desfase, "ids": list(nuevas)})
+                self._movidas[tabla] |= nuevas
+        self._conn.commit()
+        return self.ahora
+
+
+@pytest.fixture
+def reloj(conn, corework) -> _Reloj:
+    return _Reloj(conn, corework.workspace_id)
 
 
 def _pasada(conn, ws, ahora):
@@ -138,7 +171,7 @@ def _pedir_cambios(cliente, conn, ws, tg_aprob) -> None:
 # ---------------------------------------------------------------------------
 
 def test_entrega_por_texto_sin_evidencia_cierra_la_pregunta_de_opciones_y_el_aviso_sale(
-        cliente, conn, corework, monkeypatch):
+        cliente, conn, corework, monkeypatch, reloj):
     """(a) Pide entregar por texto sin evidencia: la guarda rechaza y el servidor
     abre la pregunta de evidencia de "Ya la terminé" (`_dato_menu_tarea`, R4-H3).
     Contesta con un link POR TEXTO -> vista previa -> Confirmar. Esa pregunta no
@@ -167,14 +200,14 @@ def test_entrega_por_texto_sin_evidencia_cierra_la_pregunta_de_opciones_y_el_avi
         assert cur.fetchone()["estado"] == "en_revision"
     assert _esperando(conn, ws, tg_resp) == []
 
-    resumen, transporte = _pasada(conn, ws, _en_horario(conn, ws))
+    resumen, transporte = _pasada(conn, ws, reloj.en_horario())
 
     assert any("Nahuel Gimenez entregó" in t for t in _enviados_a(transporte, tg_aprob))
     assert resumen["retenidos"] == 0
 
 
 def test_pedir_cambios_cierra_su_dato_y_el_aviso_al_responsable_sale(
-        cliente, conn, corework, monkeypatch):
+        cliente, conn, corework, monkeypatch, reloj):
     """(b) El aprobador toca "Pedir cambios" en el aviso, escribe el motivo, ve la
     vista previa y confirma. Su pregunta del motivo (`_dato_menu_tarea`) no queda
     `esperando` y el aviso "pidió cambios" le sale al responsable."""
@@ -186,7 +219,7 @@ def test_pedir_cambios_cierra_su_dato_y_el_aviso_al_responsable_sale(
     assert _esperando(conn, ws, tg_aprob) == []
     assert _esperando(conn, ws, tg_resp) == []
 
-    resumen, transporte = _pasada(conn, ws, _en_horario(conn, ws))
+    resumen, transporte = _pasada(conn, ws, reloj.en_horario())
 
     assert any("Marcos Tarquini pidió cambios" in t
                for t in _enviados_a(transporte, tg_resp))
@@ -194,7 +227,7 @@ def test_pedir_cambios_cierra_su_dato_y_el_aviso_al_responsable_sale(
 
 
 def test_ya_la_termine_cierra_su_dato_y_la_segunda_entrega_llega_al_aprobador(
-        cliente, conn, corework, monkeypatch):
+        cliente, conn, corework, monkeypatch, reloj):
     """(c) Ronda completa: entrega, cambios pedidos, "Ya la terminé" otra vez con
     evidencia nueva. Ninguno de los dos queda con una pregunta `esperando` y el
     aviso de la segunda entrega sale hacia el aprobador."""
@@ -203,7 +236,7 @@ def test_ya_la_termine_cierra_su_dato_y_la_segunda_entrega_llega_al_aprobador(
     _entregar_por_el_menu(cliente, conn, ws, monkeypatch, tid, tg_resp)
     _pedir_cambios(cliente, conn, ws, tg_aprob)
     # Lo que se acumuló hasta acá sale antes de la segunda entrega.
-    _pasada(conn, ws, _en_horario(conn, ws))
+    _pasada(conn, ws, reloj.en_horario())
 
     filas = _abrir_menu(cliente, conn, ws, monkeypatch, tid, "Nahuel Gimenez", tg_resp)
     _tocar_etiqueta(cliente, filas, "Ya la terminé", tg_resp)
@@ -216,7 +249,7 @@ def test_ya_la_termine_cierra_su_dato_y_la_segunda_entrega_llega_al_aprobador(
     assert _esperando(conn, ws, tg_resp) == []
     assert _esperando(conn, ws, tg_aprob) == []
 
-    resumen, transporte = _pasada(conn, ws, _en_horario(conn, ws))
+    resumen, transporte = _pasada(conn, ws, reloj.en_horario())
 
     assert any("Nahuel Gimenez entregó" in t and "certificado adjunto" in t
                for t in _enviados_a(transporte, tg_aprob))
@@ -367,7 +400,7 @@ def test_escribir_contesta_la_pregunta_abierta_y_retira_sus_botones_genericos(
 # ---------------------------------------------------------------------------
 
 def test_el_aviso_con_sus_botones_no_es_una_rama_ni_retiene_a_otros_ni_a_si_mismo(
-        corework, conn):
+        corework, conn, reloj):
     """Un aviso todavía sin responder (ni siquiera enviado) no es una conversación
     en la que la persona esté: no la retiene a ella ni a otros avisos, ni se
     retiene a sí mismo (ADR 0013: "lo que empezó otra persona y le llega para
@@ -399,7 +432,7 @@ def test_el_aviso_con_sus_botones_no_es_una_rama_ni_retiene_a_otros_ni_a_si_mism
                                   alta=True) is None
     conn.commit()
 
-    resumen, transporte = _pasada(conn, ws, _en_horario(conn, ws))
+    resumen, transporte = _pasada(conn, ws, reloj.en_horario())
 
     assert resumen["retenidos"] == 0
     assert {e.texto for e in transporte.enviados
@@ -410,7 +443,7 @@ def test_el_aviso_con_sus_botones_no_es_una_rama_ni_retiene_a_otros_ni_a_si_mism
 # El tope diario cuenta lo automático, no lo que se le contesta
 # ---------------------------------------------------------------------------
 
-def test_las_respuestas_no_cuentan_contra_el_tope_diario_de_avisos(corework, conn):
+def test_las_respuestas_no_cuentan_contra_el_tope_diario_de_avisos(corework, conn, reloj):
     """`despachar` dice que contestarle a quien escribió "no cuenta contra el tope
     de mensajes automáticos: no es automático" (ADR 0011), y el tope de corework es
     de 3 por día. Una persona que ya recibió más de tres respuestas hoy sigue
@@ -431,7 +464,49 @@ def test_las_respuestas_no_cuentan_contra_el_tope_diario_de_avisos(corework, con
                        - timedelta(minutes=1), dedupe_key="tope:aviso")
     conn.commit()
 
-    resumen, transporte = _pasada(conn, ws, _en_horario(conn, ws))
+    resumen, transporte = _pasada(conn, ws, reloj.en_horario())
 
     assert "Aviso de Prisma" in _enviados_a(transporte, 9005)
     assert resumen["pospuestos"] == 0
+
+
+def test_los_avisos_ya_enviados_hoy_si_cuentan_contra_el_tope_diario(
+        corework, conn, reloj):
+    """El otro borde del tope: lo que Prisma inicia sí cuenta. Con tres avisos ya
+    enviados hoy (el tope de corework), el siguiente se posterga al día hábil
+    siguiente aunque la persona haya recibido además respuestas."""
+    ws = corework.workspace_id
+    with espacio(conn, ws) as cur:
+        nahuel = _quien(cur, "Nahuel Gimenez", ws)
+        tg = 9006
+        for i in range(3):
+            enqueue_outbox(cur, workspace_id=ws, chat_id=tg, text=f"Aviso {i}",
+                           recipient_membership_id=nahuel.membership_id,
+                           dedupe_key=f"tope2:enviado{i}")
+        enqueue_outbox(cur, workspace_id=ws, chat_id=tg, text="Una respuesta",
+                       recipient_membership_id=nahuel.membership_id,
+                       dedupe_key="tope2:respuesta", is_response=True)
+        enqueue_outbox(cur, workspace_id=ws, chat_id=tg, text="Aviso que sobra",
+                       recipient_membership_id=nahuel.membership_id,
+                       scheduled_for=datetime.now(timezone.utc)
+                       - timedelta(minutes=1), dedupe_key="tope2:sobra")
+    ahora = reloj.en_horario()
+    with admin(conn) as cur:
+        # Los tres primeros salieron hoy, hace una hora, y la respuesta no cuenta.
+        cur.execute(
+            """update message_outbox
+                  set estado = 'enviado', enviado_en = %s
+                where workspace_id = %s and dedupe_key like 'tope2:enviado%%'
+                   or dedupe_key = 'tope2:respuesta'""",
+            (ahora - timedelta(hours=1), ws))
+    conn.commit()
+
+    resumen, transporte = _pasada(conn, ws, ahora)
+
+    assert "Aviso que sobra" not in _enviados_a(transporte, tg)
+    assert resumen["pospuestos"] == 1
+    with admin(conn) as cur:
+        cur.execute("select estado, programado_para from message_outbox "
+                    "where dedupe_key = 'tope2:sobra'")
+        fila = cur.fetchone()
+    assert fila["estado"] == "listo" and fila["programado_para"].date() > ahora.date()
