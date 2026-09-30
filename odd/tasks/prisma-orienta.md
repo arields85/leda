@@ -5248,3 +5248,22 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   Seguimientos en curso: no cortar el reintento cuando el mensaje ya trae un link; no tapar
   otro rechazo del mismo turno; idempotencia de la guarda con motivos largos; nombre en
   blanco; dos saludos antes de un despacho; escenario negativo "hola, ¿cómo va el PLC?".
+
+- 2026-09-30: **Decisiones del usuario sobre las consultas abiertas.**
+  1. **Los avisos de coordinación quedan fuera del tope diario** ("deben llegar todos los
+     avisos"): te entregaron algo para revisar, te pidieron cambios, un borrador para
+     confirmar, una aprobación. El tope de `nucleo/mecanica-pm.md` §10 (volumen de contacto;
+     3 en corework) sigue para seguimientos, recordatorios de la escalera y cadencias.
+  2. **T9-R1c-5:** el botón de quien confirma el borrador de otra persona no se llama
+     "Cancelar" sino **"Rechazar"**, y a quien lo pidió se le avisa. Pendiente de
+     confirmar: si Rechazar pide el motivo.
+  3. **T9-R5:** una elección ya hecha vale para todo el mensaje; Prisma no pregunta dos
+     veces "¿A cuál te referís?" con las mismas candidatas ("no tiene utilidad, y molesta").
+  4. **T9-H19c:** un mensaje editado se ignora; para otra cosa se escribe un mensaje nuevo.
+  5. **T10-6:** el saludo en una línea lleva los tres botones genéricos (como quedó en
+     `53fe191`).
+  6. **T10-7:** una negativa sin intento cierra con el estado real de la tarea ("«X» sigue
+     en revisión."), no con "Estado: sin cambios.".
+  7. **R4-H6:** un ícono por acción en el menú de tarea; tabla propuesta al usuario:
+     📋 Ver detalle / Ver detalle y evidencia, ▶️ Empezar, 🏁 Ya la terminé, ⛔ Informar un
+     bloqueo, 🔗 Depende de otra tarea, ✅ Aprobar, ✏️ Pedir cambios.
