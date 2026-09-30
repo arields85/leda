@@ -16,6 +16,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Protocol
 
+from .valores import CAMPOS_DEL_VALOR, OPCION_NINGUNA, TipoValor, ValorEsperado
+
 
 @dataclass
 class Llamada:
@@ -67,6 +69,11 @@ class IntentRoute:
     # Sólo con una pregunta pendiente (`route_intent(..., pendiente=...)`);
     # `None` en cualquier otro ruteo.
     respecto_pendiente: RespectoPendiente | None = None
+    # Sólo con una pregunta pendiente que espera un valor (ADR 0014, M1): el
+    # objeto cerrado `valor` ya normalizado por el modelo (`fecha_iso`,
+    # `opcion_id`, `texto`). Vacío si el mensaje no trae valor o si vino mal
+    # formado: nunca se inventa. El código lo valida (`valores.validar_valor`).
+    valor: dict[str, str] = field(default_factory=dict)
 
 
 class RoutingError(ValueError):
@@ -82,6 +89,9 @@ _TASK_PROPOSALS = (
 # límite realista a un mensaje humano.
 MAX_REFERENCIAS_POR_CAMPO = 20
 MAX_LONGITUD_REFERENCIA = 200
+# Cota de cada campo de `valor`: acota lo que un modelo adversarial puede
+# devolver; el límite real de cada dato lo aplica `valores.validar_valor`.
+MAX_LONGITUD_VALOR = 2000
 ROUTER_TOOL = {
     "name": "route_intent",
     "description": (
@@ -173,24 +183,109 @@ ROUTER_SYSTEM_PENDIENTE = (
 )
 
 
-def _herramienta_del_ruteo(pendiente: str | None) -> dict:
+_DIAS = ("lunes", "martes", "miércoles", "jueves", "viernes", "sábado",
+         "domingo")
+
+
+def _pide_valor(pendiente: str | None,
+                esperado: ValorEsperado | None) -> bool:
+    """El ruteo pide `valor` sólo con una pregunta pendiente que espera algo."""
+    return (pendiente is not None and esperado is not None
+            and esperado.tipo is not TipoValor.NINGUNO)
+
+
+def _esquema_valor(esperado: ValorEsperado) -> dict:
+    """El objeto cerrado y opcional `valor`. Con opciones ofrecidas, el id es
+    de lista cerrada (los ids ofrecidos o "ninguna")."""
+    opcion_id: dict[str, Any] = {
+        "type": "string",
+        "description": "The id of the offered option the message chooses, "
+                       "or \"ninguna\" if it rejects all of them."}
+    if esperado.tipo is TipoValor.OPCION and esperado.opciones:
+        opcion_id["enum"] = [o.id for o in esperado.opciones] + [OPCION_NINGUNA]
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "description": (
+            "The value the message brings for the pending question, already "
+            "normalized. Omit it if the message does not bring one."),
+        "properties": {
+            "fecha_iso": {"type": "string",
+                          "description": "A date as YYYY-MM-DD."},
+            "opcion_id": opcion_id,
+            "texto": {"type": "string",
+                      "description": "Free text, as the person meant it."},
+        },
+    }
+
+
+def _herramienta_del_ruteo(pendiente: str | None,
+                           esperado: ValorEsperado | None = None) -> dict:
     """`ROUTER_TOOL`, o una copia con `respecto_pendiente` obligatorio cuando
-    hay una pregunta pendiente. Nunca muta el esquema global."""
+    hay una pregunta pendiente, y `valor` (opcional) si esa pregunta espera
+    uno. Nunca muta el esquema global."""
     if pendiente is None:
         return ROUTER_TOOL
     esquema = ROUTER_TOOL["input_schema"]
+    propiedades = {**esquema["properties"],
+                   "respecto_pendiente": _ESQUEMA_RESPECTO_PENDIENTE}
+    if _pide_valor(pendiente, esperado):
+        propiedades["valor"] = _esquema_valor(esperado)
     return {**ROUTER_TOOL, "input_schema": {
         **esquema,
-        "properties": {**esquema["properties"],
-                       "respecto_pendiente": _ESQUEMA_RESPECTO_PENDIENTE},
+        "properties": propiedades,
         "required": [*esquema["required"], "respecto_pendiente"],
     }}
 
 
-def _sistema_del_ruteo(pendiente: str | None) -> str:
+_NO_INVENTAR = (
+    " No inventes un valor: si el mensaje no lo trae, omití \"valor\".")
+
+
+def _bloque_valor(esperado: ValorEsperado) -> str:
+    """Lo que el modelo necesita para completar `valor` según el tipo que
+    espera la pregunta pendiente (ADR 0014, M1)."""
+    intro = ("\n\nAdemás, si el mensaje trae el dato que la pregunta pidió, "
+             "completá \"valor\" ya normalizado. ")
+    if esperado.tipo is TipoValor.FECHA:
+        if esperado.hoy is None:
+            raise ValueError("Pedir una fecha necesita el día de hoy.")
+        hoy = esperado.hoy
+        return (
+            intro + f"La pregunta espera una fecha. Hoy es "
+            f"{_DIAS[hoy.weekday()]} {hoy.isoformat()}. Completá "
+            "valor.fecha_iso con la fecha que el mensaje indica, en formato "
+            "AAAA-MM-DD, resolviendo las expresiones relativas y las formas "
+            "informales a partir de hoy (\"mañana\", \"el viernes\", \"4 de "
+            "octubre\", \"04 / 10\", \"4de octubre\"). Si no dice el año, es el "
+            "próximo que todavía no pasó." + _NO_INVENTAR)
+    if esperado.tipo is TipoValor.OPCION:
+        listado = "; ".join(f"{o.id} = «{o.etiqueta}»" for o in esperado.opciones)
+        return (
+            intro + "La pregunta espera una elección entre estas opciones "
+            f"(id = etiqueta): {listado}. Completá valor.opcion_id con el id de "
+            "la opción que el mensaje elige (vale el sentido, no la etiqueta "
+            f"exacta), o \"{OPCION_NINGUNA}\" si el mensaje rechaza todas. "
+            "Nunca escribas una etiqueta en lugar del id." + _NO_INVENTAR)
+    if esperado.tipo is TipoValor.ENTIDAD:
+        return (
+            intro + "La pregunta espera la referencia a algo que ya existe "
+            "(una tarea, una persona). Completá valor.texto con esa "
+            "referencia tal como el mensaje la escribe." + _NO_INVENTAR)
+    return (
+        intro + "La pregunta espera un texto libre. Completá valor.texto con "
+        "lo que la persona quiso decir, tal como lo dijo, sin agregar, "
+        "resumir ni corregir nada." + _NO_INVENTAR)
+
+
+def _sistema_del_ruteo(pendiente: str | None,
+                       esperado: ValorEsperado | None = None) -> str:
     if pendiente is None:
         return ROUTER_SYSTEM
-    return ROUTER_SYSTEM + ROUTER_SYSTEM_PENDIENTE.format(pendiente=pendiente)
+    sistema = ROUTER_SYSTEM + ROUTER_SYSTEM_PENDIENTE.format(pendiente=pendiente)
+    if _pide_valor(pendiente, esperado):
+        sistema += _bloque_valor(esperado)
+    return sistema
 
 
 def _referencias_o_vacio(valor: Any) -> tuple[str, ...]:
@@ -222,16 +317,40 @@ def _referencias_o_vacio(valor: Any) -> tuple[str, ...]:
     return tuple(referencias)
 
 
+def _valor_o_vacio(valor: Any) -> dict[str, str]:
+    """`valor` es lo que el modelo normalizó para la pregunta pendiente, no una
+    orden: igual que `trabajos`/`personas`, una forma inesperada nunca tira
+    abajo el ruteo ni rescata un dato a medias. El objeto entero degrada a
+    `{}` -- "sin valor", y la pregunta queda abierta -- si no es un objeto, si
+    trae una clave fuera de `valores.CAMPOS_DEL_VALOR`, si algún campo no es
+    texto, queda vacío tras recortar o supera `MAX_LONGITUD_VALOR`. Los campos
+    se devuelven recortados."""
+    if not isinstance(valor, dict):
+        return {}
+    limpio: dict[str, str] = {}
+    for clave, dato in valor.items():
+        if clave not in CAMPOS_DEL_VALOR or not isinstance(dato, str):
+            return {}
+        texto = dato.strip()
+        if not texto or len(texto) > MAX_LONGITUD_VALOR:
+            return {}
+        limpio[clave] = texto
+    return limpio
+
+
 @dataclass(frozen=True)
 class RouteEnvelope:
     content: tuple[Any, ...] = ()
     calls: tuple[Llamada, ...] = ()
 
-    def validate(self, con_pendiente: bool = False) -> IntentRoute:
+    def validate(self, con_pendiente: bool = False,
+                 con_valor: bool = False) -> IntentRoute:
         """`con_pendiente`: el ruteo se pidió con una pregunta pendiente, así
         que `respecto_pendiente` es obligatorio y de la lista cerrada; sin
         ella, el campo es un campo desconocido y se rechaza como cualquier
-        otro."""
+        otro. `con_valor`: además se pidió `valor` (opcional; un `valor` mal
+        formado es "sin valor", `_valor_o_vacio`); sin pedirlo, también es un
+        campo desconocido."""
         if self.content:
             raise RoutingError("Router returned content beside its tool call.")
         if len(self.calls) != 1 or self.calls[0].nombre != ROUTER_TOOL["name"]:
@@ -241,6 +360,8 @@ class RouteEnvelope:
         campos_conocidos = {"action", "task", "trabajos", "personas"}
         if con_pendiente:
             campos_conocidos.add("respecto_pendiente")
+        if con_valor:
+            campos_conocidos.add("valor")
         if (not isinstance(payload, dict) or "action" not in payload
                 or set(payload) - campos_conocidos):
             raise RoutingError("Malformed router payload.")
@@ -276,12 +397,15 @@ class RouteEnvelope:
             except ValueError as exc:
                 raise RoutingError(
                     "Missing or unknown respecto_pendiente.") from exc
-        return IntentRoute(action, dict(task), trabajos, personas, respecto)
+        valor = _valor_o_vacio(payload.get("valor")) if con_valor else {}
+        return IntentRoute(action, dict(task), trabajos, personas, respecto,
+                           valor)
 
 
 class Proveedor(Protocol):
-    def route_intent(self, text: str,
-                     pendiente: str | None = None) -> IntentRoute: ...
+    def route_intent(self, text: str, pendiente: str | None = None,
+                     valor_esperado: ValorEsperado | None = None,
+                     ) -> IntentRoute: ...
 
     def responder(self, sistema: str, mensajes: list[dict[str, Any]],
                   herramientas: list[dict[str, Any]]) -> Respuesta: ...
@@ -301,11 +425,16 @@ class ProveedorGuionado:
     # La pregunta pendiente con la que se pidió cada ruteo (`None` sin ella),
     # en el mismo orden que `ruteados`.
     pendientes: list[str | None] = field(default_factory=list)
+    # Lo que esperaba cada ruteo (`None` si no se pidió un valor).
+    esperados: list[ValorEsperado | None] = field(default_factory=list)
 
-    def route_intent(self, text: str,
-                     pendiente: str | None = None) -> IntentRoute:
+    def route_intent(self, text: str, pendiente: str | None = None,
+                     valor_esperado: ValorEsperado | None = None,
+                     ) -> IntentRoute:
         self.ruteados.append(text)
         self.pendientes.append(pendiente)
+        self.esperados.append(valor_esperado)
+        con_valor = _pide_valor(pendiente, valor_esperado)
         if not self.rutas:
             scripted: IntentRoute | RouteEnvelope = IntentRoute(
                 IntentAction.NORMAL_CONVERSATION)
@@ -327,11 +456,14 @@ class ProveedorGuionado:
                 respecto = respecto or RespectoPendiente.RESPONDE
             if respecto is not None:
                 payload["respecto_pendiente"] = respecto.value
+            if con_valor and scripted.valor:
+                payload["valor"] = dict(scripted.valor)
             scripted = RouteEnvelope(calls=(
                 Llamada("guided-route", ROUTER_TOOL["name"], payload),))
         if not isinstance(scripted, RouteEnvelope):
             raise RoutingError("Guided router returned an invalid envelope.")
-        return scripted.validate(con_pendiente=pendiente is not None)
+        return scripted.validate(con_pendiente=pendiente is not None,
+                                 con_valor=con_valor)
 
     def responder(self, sistema, mensajes, herramientas) -> Respuesta:
         self.recibidos.append((sistema, list(mensajes)))
@@ -381,14 +513,15 @@ class ProveedorAnthropic:
             api_key=api_key, timeout=timeout, max_retries=reintentos)
         self._modelo = modelo
 
-    def route_intent(self, text: str,
-                     pendiente: str | None = None) -> IntentRoute:
+    def route_intent(self, text: str, pendiente: str | None = None,
+                     valor_esperado: ValorEsperado | None = None,
+                     ) -> IntentRoute:
         r = self._c.messages.create(
             model=self._modelo,
             max_tokens=min(self._param.get("max_tokens", 1024), 512),
             temperature=0,
-            system=_sistema_del_ruteo(pendiente),
-            tools=[_herramienta_del_ruteo(pendiente)],
+            system=_sistema_del_ruteo(pendiente, valor_esperado),
+            tools=[_herramienta_del_ruteo(pendiente, valor_esperado)],
             tool_choice={"type": "tool", "name": ROUTER_TOOL["name"]},
             messages=[{"role": "user", "content": text}],
         )
@@ -398,7 +531,8 @@ class ProveedorAnthropic:
         )
         content = tuple(b for b in r.content if b.type != "tool_use")
         return RouteEnvelope(content=content, calls=calls).validate(
-            con_pendiente=pendiente is not None)
+            con_pendiente=pendiente is not None,
+            con_valor=_pide_valor(pendiente, valor_esperado))
 
     def responder(self, sistema, mensajes, herramientas) -> Respuesta:
         r = self._c.messages.create(
@@ -449,12 +583,13 @@ class ProveedorGemini:
                 if intento == self._reintentos:
                     raise
 
-    def route_intent(self, text: str,
-                     pendiente: str | None = None) -> IntentRoute:
-        herramienta = _herramienta_del_ruteo(pendiente)
+    def route_intent(self, text: str, pendiente: str | None = None,
+                     valor_esperado: ValorEsperado | None = None,
+                     ) -> IntentRoute:
+        herramienta = _herramienta_del_ruteo(pendiente, valor_esperado)
         body = {
             "system_instruction": {"parts": [
-                {"text": _sistema_del_ruteo(pendiente)}]},
+                {"text": _sistema_del_ruteo(pendiente, valor_esperado)}]},
             "contents": [{"role": "user", "parts": [{"text": text}]}],
             "generationConfig": {"temperature": 0, "maxOutputTokens": 512},
             "tools": [{"function_declarations": [{
@@ -488,7 +623,8 @@ class ProveedorGemini:
             if not isinstance(part.get("functionCall"), dict)
         )
         return RouteEnvelope(content=content, calls=calls).validate(
-            con_pendiente=pendiente is not None)
+            con_pendiente=pendiente is not None,
+            con_valor=_pide_valor(pendiente, valor_esperado))
 
     def responder(self, sistema, mensajes, herramientas) -> Respuesta:
         contenidos, _ = _a_gemini(mensajes)
@@ -608,15 +744,17 @@ class ProveedorCompatible:
             timeout=timeout, max_retries=reintentos)
         self._modelo = modelo
 
-    def route_intent(self, text: str,
-                     pendiente: str | None = None) -> IntentRoute:
-        herramienta = _herramienta_del_ruteo(pendiente)
+    def route_intent(self, text: str, pendiente: str | None = None,
+                     valor_esperado: ValorEsperado | None = None,
+                     ) -> IntentRoute:
+        herramienta = _herramienta_del_ruteo(pendiente, valor_esperado)
         response = self._c.chat.completions.create(
             model=self._modelo,
             max_tokens=min(self._param.get("max_tokens", 1024), 512),
             temperature=0,
             messages=[{"role": "system",
-                       "content": _sistema_del_ruteo(pendiente)},
+                       "content": _sistema_del_ruteo(pendiente,
+                                                     valor_esperado)},
                       {"role": "user", "content": text}],
             tools=[{"type": "function", "function": {
                 "name": herramienta["name"],
@@ -644,7 +782,8 @@ class ProveedorCompatible:
         except (TypeError, ValueError, json.JSONDecodeError) as exc:
             raise RoutingError("Malformed router tool arguments.") from exc
         return RouteEnvelope(content=content, calls=tuple(calls)).validate(
-            con_pendiente=pendiente is not None)
+            con_pendiente=pendiente is not None,
+            con_valor=_pide_valor(pendiente, valor_esperado))
 
     def responder(self, sistema, mensajes, herramientas) -> Respuesta:
         r = self._c.chat.completions.create(

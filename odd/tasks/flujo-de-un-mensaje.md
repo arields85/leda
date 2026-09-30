@@ -151,6 +151,25 @@ PR planificado: la integración a `main` la decide el usuario después del exper
   ni copiar el de `main` (regla de denegación). Esas pruebas no se ejecutaron: F1 queda
   sin tildar hasta correrlas con `PRISMA_TEST_DB_URL`.
 
+- 2026-09-30, F2 (ruta: delegada, 2+ archivos no triviales). Hecho: `valores.py`
+  (`TipoValor`, `Opcion`, `opciones_numeradas`, `ValorEsperado`, `validar_valor` ->
+  `Aceptado | Rechazado` con `motivo`, `razon`, `se_acepta`); `llm.py` (`IntentRoute.valor`,
+  objeto cerrado `valor` en el esquema con `opcion_id` de lista cerrada, bloque de sistema
+  por tipo con el día de hoy, `RouteEnvelope.validate(con_valor=)`, degradación de un
+  `valor` mal formado a `{}`, `route_intent(..., valor_esperado=)` en los cuatro
+  proveedores, `ProveedorGuionado.esperados` y `valor` guionable); `gateway.py`
+  (`_Pregunta.valor_esperado` en cada adaptador, `_valor_esperado_de` con el día de hoy
+  de la zona del espacio, `_rutear` lo pasa sólo si hay uno); `tests/banco/corrida.py`
+  (el grabador reenvía y graba `valor`). No cambia qué consume cada pregunta.
+  RED: `test_valores.py` y `test_router_valor.py` fallaron al colectar (`ImportError` /
+  `AttributeError: MAX_LONGITUD_VALOR`); `test_pregunta_valor_esperado.py` 27 failed
+  (sin `valor_esperado` ni `_valor_esperado_de`); el grabador del banco falló con
+  `TypeError` (sin `valor_esperado`). GREEN: `pytest -q tests/test_valores.py
+  tests/test_router_valor.py tests/test_pregunta_valor_esperado.py` -> 199 passed
+  ; suite completa sin base: 1001 passed, 1531 skipped.
+  **Sin base no se pudo correr la suite completa** (ver F1): tareas F1 y F2 sin tildar
+  hasta correr `pytest -q` con `PRISMA_TEST_DB_URL` (línea base de `main`: 2279 passed).
+
 ## Próximo paso
 
 F1.

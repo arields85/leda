@@ -11,7 +11,7 @@ conozca la URL podría hacerse pasar por el gateway.
 from __future__ import annotations
 
 import unicodedata
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -33,6 +33,7 @@ from .incidentes import (ETAPA_ENRUTAMIENTO, ETAPA_JEV_NO_CONFIGURADO,
 from .ingreso_tareas import (QUESTION_CHOICE, QUESTION_CONFIRMATION,
                              QUESTION_FREE_TEXT)
 from .respuesta_unica import controlar as controlar_una_respuesta
+from .valores import TipoValor, ValorEsperado, opciones_numeradas
 from .respuesta_unica import (dejar_nota, limpiar_nota, respuestas_del_mensaje,
                               sql_respondido)
 from .salida import TRUNCAR_ETIQUETA_BOTON as TRUNCAR_TITULO_BOTON
@@ -1523,17 +1524,25 @@ def _responder_saludo_suelto(cur, quien, texto: str, cal, chat_id: int, ahora,
         entrante_id, texto, lleva_su_saludo=del_dia is not None, es_saludo=True)
 
 
-def _rutear(proveedor, texto: str, pendiente: str | None = None):
+def _rutear(proveedor, texto: str, pendiente: str | None = None,
+            valor_esperado: ValorEsperado | None = None):
     """El ruteo tipado con dos intentos: (ruta, None), o (None, último
     error) si los dos fallan. `pendiente` es la descripción de la pregunta
-    abierta, si la hay (T9-R1a)."""
+    abierta, si la hay (T9-R1a); `valor_esperado` (ADR 0014, M1) es lo que esa
+    pregunta espera, y sólo se le pasa al proveedor cuando hay uno: un
+    proveedor que no sabe de valores se llama como siempre."""
     from .llm import IntentRoute
 
     last_error = None
     for _ in range(2):
         try:
-            candidate = (proveedor.route_intent(texto) if pendiente is None
-                         else proveedor.route_intent(texto, pendiente=pendiente))
+            if pendiente is None:
+                candidate = proveedor.route_intent(texto)
+            elif valor_esperado is None:
+                candidate = proveedor.route_intent(texto, pendiente=pendiente)
+            else:
+                candidate = proveedor.route_intent(
+                    texto, pendiente=pendiente, valor_esperado=valor_esperado)
             if not isinstance(candidate, IntentRoute):
                 raise TypeError("The provider returned an untyped route.")
             return candidate, None
@@ -1588,7 +1597,10 @@ class _Pregunta:
     nada. `corrige_modifica` dice que en ese tipo el
     mensaje que corrige es el de Modificar sin haber tocado el botón (la vista
     previa de un cambio): la propuesta se cierra como Modificar y el mensaje es
-    la corrección."""
+    la corrección. `valor_esperado` (ADR 0014, M1) dice qué tipo de valor
+    espera la pregunta y, si ofrece botones, las opciones con sus ids: el
+    ruteo se lo pasa al modelo para que devuelva `valor` ya normalizado; no
+    cambia qué consume la pregunta."""
     nombre: str
     para_ruteo: str
     pregunta: str
@@ -1596,6 +1608,34 @@ class _Pregunta:
     corrige_responde: bool
     corrige_abre_selector: bool = False
     corrige_modifica: bool = False
+    valor_esperado: ValorEsperado | None = None
+
+
+def _valor_esperado_de(esperado: ValorEsperado | None, cal,
+                       ahora) -> ValorEsperado | None:
+    """Lo que espera la pregunta, con el día de hoy en la zona del espacio si
+    es una fecha: el reloj entra acá, una sola vez por turno."""
+    if esperado is None or esperado.tipo is not TipoValor.FECHA:
+        return esperado
+    return replace(esperado, hoy=ahora.astimezone(cal.zona).date())
+
+
+def _esperado_de_opciones(etiquetas) -> ValorEsperado:
+    """Una elección con botones: las opciones con ids "1", "2", ... en el
+    orden mostrado; sin opciones, nada que completar."""
+    etiquetas = list(etiquetas or [])
+    if not etiquetas:
+        return ValorEsperado(TipoValor.NINGUNO)
+    return ValorEsperado(TipoValor.OPCION, opciones_numeradas(etiquetas))
+
+
+# Qué tipo de valor espera cada campo de texto libre del alta guiada; los que no
+# están son texto.
+_TIPO_DE_CAMPO_DEL_ALTA = {
+    "due_date": TipoValor.FECHA,
+    "responsible": TipoValor.ENTIDAD,
+    "area": TipoValor.ENTIDAD,
+}
 
 
 def _para_ruteo(descripcion: str, pregunta: str) -> str:
@@ -1711,7 +1751,8 @@ def _pregunta_de(abierta) -> _Pregunta:
             nombre=NOMBRE_VISTA_PREVIA,
             para_ruteo=_para_ruteo(descripcion, "¿Lo confirmás?"),
             pregunta=abierta.resumen, dejada=AVISO_VISTA_PREVIA_DEJADA,
-            corrige_responde=False, corrige_modifica=True)
+            corrige_responde=False, corrige_modifica=True,
+            valor_esperado=ValorEsperado(TipoValor.NINGUNO))
     if abierta.herramienta == P.SENTINEL_DATO_MENU_TAREA:
         descripcion = _descripcion_dato_menu(args)
         pregunta = _pregunta_dato_menu(args.get("accion"), args.get("titulo", ""))
@@ -1719,7 +1760,8 @@ def _pregunta_de(abierta) -> _Pregunta:
             nombre=descripcion, para_ruteo=_para_ruteo(descripcion, pregunta),
             pregunta=pregunta,
             dejada=AVISO_DATO_DEJADO_DE_LADO.format(descripcion=descripcion),
-            corrige_responde=False)
+            corrige_responde=False,
+            valor_esperado=ValorEsperado(TipoValor.TEXTO))
     if abierta.herramienta == _SENTINEL_ACLARACION:
         referencia = args.get("referencia_actual", "")
         descripcion = (f"a qué tarea se refería con «{referencia}» en su "
@@ -1728,14 +1770,15 @@ def _pregunta_de(abierta) -> _Pregunta:
             nombre=f"la tarea a la que te referías con «{referencia}»",
             para_ruteo=_para_ruteo(descripcion, PREGUNTA_ACLARACION_NINGUNA),
             pregunta=PREGUNTA_ACLARACION_NINGUNA,
-            dejada=AVISO_ACLARACION_DEJADA, corrige_responde=True)
+            dejada=AVISO_ACLARACION_DEJADA, corrige_responde=True,
+            valor_esperado=ValorEsperado(TipoValor.ENTIDAD))
     propuesta = abierta.resumen[:_LIMITE_PROPUESTA_PARA_RUTEO]
     descripcion = f"qué cambiar de la propuesta que se le mostró: «{propuesta}»"
     return _Pregunta(
         nombre="la corrección de la propuesta",
         para_ruteo=_para_ruteo(descripcion, PREGUNTA_MODIFICAR),
         pregunta=PREGUNTA_MODIFICAR, dejada=AVISO_MODIFICACION_DEJADA,
-        corrige_responde=True)
+        corrige_responde=True, valor_esperado=ValorEsperado(TipoValor.TEXTO))
 
 
 def _fila_de_la_eleccion(abierta):
@@ -1774,7 +1817,8 @@ def _pregunta_de_la_eleccion(abierta) -> _Pregunta:
         dejada = AVISO_ELECCION_DEJADA
     return _Pregunta(
         nombre=nombre, para_ruteo=_para_ruteo(descripcion, con_opciones),
-        pregunta=abierta.resumen, dejada=dejada, corrige_responde=False)
+        pregunta=abierta.resumen, dejada=dejada, corrige_responde=False,
+        valor_esperado=_esperado_de_opciones(abierta.args.get("opciones")))
 
 
 def _pregunta_del_alta(abierta) -> _Pregunta:
@@ -1792,6 +1836,8 @@ def _pregunta_del_alta(abierta) -> _Pregunta:
         nombre = f"{FREE_TEXT_NAMES[args['campo']]} de la tarea nueva"
         descripcion = f"{nombre}, un dato del alta guiada que se le pidió"
         corrige_abre_selector = False
+        valor_esperado = ValorEsperado(
+            _TIPO_DE_CAMPO_DEL_ALTA.get(args["campo"], TipoValor.TEXTO))
     elif abierta.herramienta == _SENTINEL_ALTA_ELECCION:
         # Una elección sin campo (la de "ya hay un borrador en curso") no tiene
         # nombre de campo y se nombra en general.
@@ -1806,6 +1852,7 @@ def _pregunta_del_alta(abierta) -> _Pregunta:
             descripcion += (" (las opciones son: "
                             + ", ".join(f"«{o}»" for o in opciones) + ")")
         corrige_abre_selector = False
+        valor_esperado = _esperado_de_opciones(opciones)
     elif args.get("revision"):
         # Quien pidió el borrador lo revisa antes de enviarlo a quien lo confirma
         # (T9-R1c-4): sus botones son otros y la tarea todavía no se puede crear.
@@ -1814,16 +1861,19 @@ def _pregunta_del_alta(abierta) -> _Pregunta:
                        "botones Enviar a aprobación, Modificar y Cancelar, y otra "
                        "persona lo confirma después de que lo envíe")
         corrige_abre_selector = True
+        valor_esperado = ValorEsperado(TipoValor.NINGUNO)
     else:
         nombre = "la confirmación del borrador de la tarea nueva"
         descripcion = (f"{nombre}: se le mostró el resumen del borrador con los "
                        "botones Confirmar, Modificar y Cancelar, y la tarea se "
                        "crea sólo con Confirmar")
         corrige_abre_selector = True
+        valor_esperado = ValorEsperado(TipoValor.NINGUNO)
     return _Pregunta(
         nombre=nombre, para_ruteo=_para_ruteo(descripcion, abierta.resumen),
         pregunta=abierta.resumen, dejada=dejada, corrige_responde=False,
-        corrige_abre_selector=corrige_abre_selector)
+        corrige_abre_selector=corrige_abre_selector,
+        valor_esperado=valor_esperado)
 
 
 def _atender_pregunta_pendiente(cur, quien, texto: str, abierta, proveedor, cal,
@@ -1851,7 +1901,9 @@ def _atender_pregunta_pendiente(cur, quien, texto: str, abierta, proveedor, cal,
     from .llm import RespectoPendiente
 
     pregunta = _pregunta_de(abierta)
-    route, error = _rutear(proveedor, texto, pendiente=pregunta.para_ruteo)
+    route, error = _rutear(
+        proveedor, texto, pendiente=pregunta.para_ruteo,
+        valor_esperado=_valor_esperado_de(pregunta.valor_esperado, cal, ahora))
     if route is None:
         _avisar_ruteo_caido(cur, quien, error, workspace_id, chat_id, ahora)
         return None

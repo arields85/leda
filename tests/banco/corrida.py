@@ -108,6 +108,8 @@ def _ruta_a_dict(ruta: IntentRoute) -> dict:
               "trabajos": list(ruta.trabajos), "personas": list(ruta.personas)}
     if ruta.respecto_pendiente is not None:
         salida["respecto_pendiente"] = ruta.respecto_pendiente.value
+    if ruta.valor:
+        salida["valor"] = dict(ruta.valor)
     return salida
 
 
@@ -120,7 +122,8 @@ def _dict_a_ruta(d: dict) -> IntentRoute:
     return IntentRoute(
         IntentAction(d["action"]), dict(d.get("task", {})),
         tuple(d.get("trabajos", ())), tuple(d.get("personas", ())),
-        RespectoPendiente(respecto) if respecto is not None else None)
+        RespectoPendiente(respecto) if respecto is not None else None,
+        dict(d.get("valor", {})))
 
 
 def _respuesta_a_dict(r: Respuesta) -> dict:
@@ -147,15 +150,27 @@ class ProveedorGrabador:
     rutas: list[dict] = field(default_factory=list)
     respuestas: list[dict] = field(default_factory=list)
 
-    def route_intent(self, text: str,
-                     pendiente: str | None = None) -> IntentRoute:
+    def route_intent(self, text: str, pendiente: str | None = None,
+                     valor_esperado=None) -> IntentRoute:
         inicio = time.perf_counter()
         registro: dict = {"entrada": text}
         if pendiente is not None:
             registro["pendiente"] = pendiente
+        if valor_esperado is not None:
+            registro["valor_esperado"] = {
+                "tipo": valor_esperado.tipo.value,
+                "opciones": [[o.id, o.etiqueta]
+                             for o in valor_esperado.opciones],
+                "hoy": (valor_esperado.hoy.isoformat()
+                        if valor_esperado.hoy else None)}
         try:
-            ruta = (self.interno.route_intent(text) if pendiente is None
-                    else self.interno.route_intent(text, pendiente=pendiente))
+            if pendiente is None:
+                ruta = self.interno.route_intent(text)
+            elif valor_esperado is None:
+                ruta = self.interno.route_intent(text, pendiente=pendiente)
+            else:
+                ruta = self.interno.route_intent(
+                    text, pendiente=pendiente, valor_esperado=valor_esperado)
         except Exception as exc:
             # El intento que falló también queda: sin él, un `RoutingError` no
             # deja ninguna huella de qué ruta lo causó (banco b-0022).
