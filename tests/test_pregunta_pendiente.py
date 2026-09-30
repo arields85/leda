@@ -450,8 +450,8 @@ def _consumida_por_otro_turno(monkeypatch):
     y se la consume acá, así que `consumir_modificacion` devuelve `False`."""
     real = P.consumir_modificacion
 
-    def consumir(cur, pending_action_id, ahora):
-        real(cur, pending_action_id, ahora)
+    def consumir(cur, pending_action_id, ahora, **kw):
+        real(cur, pending_action_id, ahora, **kw)
         return False
 
     monkeypatch.setattr(P, "consumir_modificacion", consumir)

@@ -308,6 +308,18 @@ def resolver(cur: psycopg.Cursor, token: str, *, app_user_id: str,
                     cancelada=f["cancelada"], huella=f.get("huella"))
 
 
+# El cierre de una pregunta cuyo mensaje de respuesta ya llegó (R4-H7): sólo una
+# fila que sigue `esperando` cambia de estado; la que ya cerró otro camino
+# (`cancelada` por Modificar, `resuelta` por un toque) conserva el suyo. Va dentro
+# del `set` de un `update` que recibe `cierre` (`resuelta` o `cancelada`) y
+# `ahora`; todas las expresiones del `set` leen la fila de antes del `update`.
+_CERRAR_SI_ESPERA = """
+              estado = case when estado = 'esperando'
+                            then %(cierre)s::estado_pendiente else estado end,
+              resuelta_en = case when estado = 'esperando'
+                                 then %(ahora)s else resuelta_en end"""
+
+
 def reclamar_modificacion_abierta(cur: psycopg.Cursor, quien: Solicitante,
                                   chat_id: int,
                                   ahora: datetime) -> ModificacionAbierta | None:
@@ -324,10 +336,15 @@ def reclamar_modificacion_abierta(cur: psycopg.Cursor, quien: Solicitante,
     se tocó Modificar, aunque la propuesta en sí venza mucho después: un
     mensaje de horas más tarde ya es otra conversación, y tratarlo como
     corrección le haría saltear el enrutador de intención.
+
+    Reclamarla la cierra (R4-H7): una fila que sigue `esperando` -- el dato que
+    pidió una acción del menú -- pasa a `resuelta`, así no queda abierta una
+    pregunta cuyo flujo ya siguió. Las que ya cerró Modificar o "Ninguna, lo
+    escribo" conservan su estado.
     """
     cur.execute(
-        """update pending_action
-              set modificacion_consumida_en = %(ahora)s
+        f"""update pending_action
+              set modificacion_consumida_en = %(ahora)s, {_CERRAR_SI_ESPERA}
             where id = (
                     select id from pending_action
                      where workspace_id = %(ws)s and membership_id = %(mid)s
@@ -339,7 +356,7 @@ def reclamar_modificacion_abierta(cur: psycopg.Cursor, quien: Solicitante,
                      for update skip locked)
             returning id, herramienta, args, resumen""",
         {"ahora": ahora, "ws": quien.workspace_id, "mid": quien.membership_id,
-         "chat": chat_id, "ventana": VENTANA_MODIFICACION})
+         "chat": chat_id, "ventana": VENTANA_MODIFICACION, "cierre": "resuelta"})
     f = cur.fetchone()
     if not f:
         return None
@@ -378,19 +395,27 @@ def ver_modificacion_abierta(cur: psycopg.Cursor, quien: Solicitante,
 
 
 def consumir_modificacion(cur: psycopg.Cursor, pending_action_id: str,
-                          ahora: datetime) -> bool:
+                          ahora: datetime, *, cancelada: bool = False) -> bool:
     """Consume, de un solo uso y por id, una modificación abierta. Un solo
     `update ... where modificacion_consumida_en is null` es atómico: si dos
     turnos concurrentes intentan consumir la misma, el segundo espera el
     bloqueo de fila, vuelve a evaluar la condición y no actualiza nada, así
-    que sólo uno recibe `True`."""
+    que sólo uno recibe `True`.
+
+    Consumir la pregunta la cierra en el mismo paso (R4-H7, ADR 0013 regla 1:
+    una rama se cierra cuando su flujo termina): una fila que sigue `esperando`
+    -- el dato que pidió una acción del menú, que no pasa por Confirmar ni
+    Cancelar -- queda `resuelta` si la persona la respondió y `cancelada` si la
+    dejó de lado (`cancelada`). Una que ya cerró otro camino (Modificar) no
+    cambia de estado."""
     cur.execute(
-        """update pending_action
-              set modificacion_consumida_en = %s
-            where id = %s and modificar_pedido_en is not null
+        f"""update pending_action
+              set modificacion_consumida_en = %(ahora)s, {_CERRAR_SI_ESPERA}
+            where id = %(id)s and modificar_pedido_en is not null
               and modificacion_consumida_en is null
             returning id""",
-        (ahora, pending_action_id))
+        {"ahora": ahora, "id": pending_action_id,
+         "cierre": "cancelada" if cancelada else "resuelta"})
     return cur.fetchone() is not None
 
 
@@ -711,6 +736,35 @@ def retirar_preguntas_de_rama(cur: psycopg.Cursor, quien: Solicitante,
             returning id""",
         {"ahora": ahora, "ws": quien.workspace_id, "mid": quien.membership_id,
          "chat": chat_id, "herramienta": SENTINEL_RESPUESTA_DATO_MENU})
+    ids = [str(f["id"]) for f in cur.fetchall()]
+    if ids:
+        cur.execute(
+            "update pending_action_option set activa = false "
+            "where pending_action_id = any(%s::uuid[])",
+            (ids,))
+    return ids
+
+
+def retirar_opciones_de_pregunta_abierta(cur: psycopg.Cursor, quien: Solicitante,
+                                         chat_id: int, ahora: datetime) -> list[str]:
+    """R4-H7: la persona escribió, así que respondió por escrito la pregunta abierta
+    con la que terminó la respuesta anterior. Vence los botones genéricos que el
+    servidor le había agregado a esa pregunta (`SENTINEL_OPCIONES_MODELO` con
+    `cierre_generico`, `agente._encolar_opciones_genericas`): existen porque la
+    respuesta terminó preguntando en texto abierto y, contestada, ya no hay
+    pregunta que responder. No toca las otras ofertas de camino (una lista de
+    tareas sigue sirviendo para tocar la que sigue) ni lo de otra persona u otro
+    chat. Mismo criterio y mismo patrón de dos pasos que
+    `retirar_preguntas_de_rama`. Devuelve los ids retirados."""
+    cur.execute(
+        """update pending_action
+              set estado = 'vencida', resuelta_en = %(ahora)s
+            where workspace_id = %(ws)s and membership_id = %(mid)s
+              and chat_id = %(chat)s and herramienta = %(herramienta)s
+              and estado = 'esperando' and args ->> 'cierre_generico' = 'true'
+            returning id""",
+        {"ahora": ahora, "ws": quien.workspace_id, "mid": quien.membership_id,
+         "chat": chat_id, "herramienta": SENTINEL_OPCIONES_MODELO})
     ids = [str(f["id"]) for f in cur.fetchall()]
     if ids:
         cur.execute(

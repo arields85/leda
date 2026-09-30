@@ -1338,6 +1338,13 @@ def _turno(cur, quien, texto: str, workspace_id: str, chat_id: int,
     cal = Calendario.desde_base(cur, workspace_id)
     proveedor = desde_base(cur, workspace_id, config)
 
+    # Escribir contesta la pregunta abierta con la que terminó la respuesta
+    # anterior: sus botones genéricos ya no valen (R4-H7). Antes de todo lo
+    # demás, para no retirar los que arme este mismo turno.
+    from . import pendientes as P
+
+    P.retirar_opciones_de_pregunta_abierta(cur, quien, chat_id, now)
+
     # Estas preguntas dejan el mensaje siguiente como su respuesta: el dato que
     # pidió una acción del menú (la causa de un bloqueo, su resolución, la
     # evidencia), Modificar (T3, ADR 0005 decisión 1: "¿Qué querés cambiar?"),
@@ -1735,7 +1742,7 @@ def _atender_pregunta_pendiente(cur, quien, texto: str, abierta, proveedor, cal,
     comando = route.respecto_pendiente
     if comando is RespectoPendiente.RESPONDE or (
             comando is RespectoPendiente.CORRIGE and pregunta.corrige_responde):
-        if _consumir_pregunta(cur, quien, abierta, ahora):
+        if _consumir_pregunta(cur, quien, chat_id, abierta, ahora):
             _seguir_con_la_respuesta(cur, quien, texto, abierta, route, proveedor,
                                      cal, chat_id, workspace_id, ahora,
                                      entrante_id)
@@ -1879,7 +1886,7 @@ def _dejar_pregunta_pendiente(cur, quien, workspace_id: str, chat_id: int,
     """La persona deja de lado la pregunta abierta (`cancela` o el botón
     "Dejarlo"). Sólo dice que la dejó si de verdad la consumió ahora: si otro
     camino ya la había consumido, lo dice así, sin afirmar nada más."""
-    if _dejar_de_lado(cur, quien, abierta, ahora):
+    if _dejar_de_lado(cur, quien, chat_id, abierta, ahora):
         texto = _pregunta_de(abierta).dejada
     else:
         texto = AVISO_DATO_YA_NO_PENDIENTE
@@ -2027,7 +2034,7 @@ def _ver_pregunta_abierta(cur, quien, chat_id: int, ahora, *, alta: bool):
         resumen=pendiente.resumen)
 
 
-def _consumir_pregunta(cur, quien, abierta, ahora) -> bool:
+def _consumir_pregunta(cur, quien, chat_id: int, abierta, ahora) -> bool:
     """Reclama la pregunta abierta para la respuesta que se va a tomar: `True`
     si esta llamada la consumió, `False` si otro camino ya lo había hecho. El
     campo del alta no se consume acá sino en `consume_pending_text`, junto con
@@ -2045,10 +2052,26 @@ def _consumir_pregunta(cur, quien, abierta, ahora) -> bool:
                                       abierta.pregunta_id)
     if abierta.herramienta in (_SENTINEL_VISTA_PREVIA, _SENTINEL_ELECCION):
         return P.vista_previa_esperando(cur, abierta.pregunta_id, ahora)
-    return P.consumir_modificacion(cur, abierta.pregunta_id, ahora)
+    return _cerrar_la_rama(cur, quien, chat_id, abierta, ahora)
 
 
-def _dejar_de_lado(cur, quien, abierta, ahora) -> bool:
+def _cerrar_la_rama(cur, quien, chat_id: int, abierta, ahora, *,
+                    cancelada: bool = False) -> bool:
+    """La pregunta de un dato o de una corrección se cierra al consumirla
+    (`pendientes.consumir_modificacion`: `resuelta` si se respondió, `cancelada`
+    si se dejó de lado) y con ella los botones que la acompañaban ("¿Esto es la
+    evidencia?", "¿Seguimos con eso?"), que ya no valen (R4-H7, ADR 0013 regla 1:
+    una rama se cierra cuando su flujo termina). `True` si esta llamada la cerró."""
+    from . import pendientes as P
+
+    if not P.consumir_modificacion(cur, abierta.pregunta_id, ahora,
+                                   cancelada=cancelada):
+        return False
+    P.retirar_preguntas_de_rama(cur, quien, chat_id, ahora)
+    return True
+
+
+def _dejar_de_lado(cur, quien, chat_id: int, abierta, ahora) -> bool:
     """Deja de lado la pregunta abierta: `True` si esta llamada la cerró. Una
     fila de `pending_action` se consume; una pregunta del alta cancela su
     borrador, porque sin ese dato, esa elección o esa confirmación el alta no
@@ -2064,7 +2087,7 @@ def _dejar_de_lado(cur, quien, abierta, ahora) -> bool:
             abierta.pregunta_id, ahora)
     if abierta.herramienta in (_SENTINEL_VISTA_PREVIA, _SENTINEL_ELECCION):
         return P.cancelar_vista_previa(cur, quien, abierta.pregunta_id, ahora)
-    return P.consumir_modificacion(cur, abierta.pregunta_id, ahora)
+    return _cerrar_la_rama(cur, quien, chat_id, abierta, ahora, cancelada=True)
 
 
 def _seguir_con_el_campo_del_alta(cur, quien, texto: str, abierta, chat_id: int,
@@ -2268,7 +2291,7 @@ def _resolver_toque_respuesta_dato_menu(cur, quien, workspace_id: str,
                 _avisar_ruteo_caido(cur, quien, error, workspace_id, chat_id,
                                     ahora)
                 return
-        if not _consumir_pregunta(cur, quien, abierta, ahora):
+        if not _consumir_pregunta(cur, quien, chat_id, abierta, ahora):
             _responder(cur, workspace_id, chat_id, quien,
                        AVISO_DATO_YA_NO_PENDIENTE, ahora)
             return
@@ -2330,7 +2353,7 @@ def _dejar_y_ver_lo_otro(cur, quien, workspace_id: str, chat_id: int, abierta,
     if route is None:
         _avisar_ruteo_caido(cur, quien, error, workspace_id, chat_id, ahora)
         return
-    if _dejar_de_lado(cur, quien, abierta, ahora):
+    if _dejar_de_lado(cur, quien, chat_id, abierta, ahora):
         # La primera parte de la misma respuesta (T9-R4): el camino normal que
         # sigue encola lo suyo y `respuesta_unica.controlar`, al cerrar la
         # entrada (`_toque`, o el mensaje en `procesar_update`), agrega esta nota

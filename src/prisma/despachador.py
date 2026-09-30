@@ -1076,6 +1076,12 @@ def _ya_recibio(cur, membership_id: str, ahora: datetime) -> int:
 
     El tope es por persona, no por espacio: alguien en tres equipos no debería
     recibir tres seguimientos el mismo día.
+
+    Sólo cuenta lo que Prisma inicia: una respuesta a lo que la persona escribió o
+    tocó (`es_respuesta`) "no es automática" y nunca cuenta contra el tope
+    (`_despachar_fila`, ADR 0011). Contarlas dejaba sin su aviso a quien
+    conversaba con Prisma: tres respuestas del día alcanzaban para posponer al
+    día hábil siguiente el "X entregó…" o el "X pidió cambios…" (R4-H7).
     """
     cur.execute(
         """
@@ -1085,6 +1091,7 @@ def _ya_recibio(cur, membership_id: str, ahora: datetime) -> int:
           join membership m2 on m2.app_user_id = m.app_user_id
          where m2.id = %s
            and o.estado = 'enviado'
+           and not o.es_respuesta
            and o.enviado_en::date = %s
         """,
         (membership_id, ahora.date()))

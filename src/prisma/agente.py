@@ -1131,8 +1131,11 @@ def _encolar_opciones_genericas(cur, quien: Solicitante, chat_id: int,
     _encolar_texto_con_opciones(
         cur, quien, chat_id, texto, opciones, ahora,
         dedupe_prefijo="opciones-genericas", texto_corto=_TEXTO_BOTONES_GENERICO,
+        # `cierre_generico` marca la pregunta abierta que estos botones acompañan:
+        # la próxima respuesta escrita de la persona la contesta y los retira
+        # (`pendientes.retirar_opciones_de_pregunta_abierta`, R4-H7).
         args={"pregunta": texto, "entrante_id": entrante_id,
-             "mensaje_original": texto_entrante})
+             "mensaje_original": texto_entrante, "cierre_generico": True})
 
 
 def _incidente(cur, quien: Solicitante, error: Exception) -> None:
