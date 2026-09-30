@@ -36,7 +36,8 @@ una respuesta que falte.
 Una parte de la respuesta que un camino sólo conoce a mitad de camino (el aviso de
 lo que se dejó de lado, delante de lo que contesta el camino normal) se anota con
 `dejar_nota`: `controlar` la agrega como una parte más de la MISMA respuesta que
-conserva, y si el turno no dejó ninguna, la nota acompaña al aviso neutro.
+conserva, y si el turno no dejó ninguna, la nota acompaña al aviso neutro. Una nota
+de otro evento no sale en esa respuesta: deja un incidente (`nota_sin_respuesta`).
 """
 
 from __future__ import annotations
@@ -51,6 +52,7 @@ from .salida import enqueue_outbox
 
 ETAPA_SIN_RESPUESTA = "sin_respuesta"
 ETAPA_RESPUESTA_DUPLICADA = "respuesta_duplicada"
+ETAPA_NOTA_SIN_RESPUESTA = "nota_sin_respuesta"
 
 _PARTE_DE_TEXTO_PARTIDO = re.compile(r":part:\d+-of-\d+$")
 
@@ -110,6 +112,25 @@ def _describir(grupo: list[dict]) -> str:
             f"{'con' if _ofrece_botones(grupo) else 'sin'} botones)")
 
 
+def _incidentes_de_notas_ajenas(cur, quien, workspace_id: str, chat_id: int,
+                                eventos: list[str | None]) -> None:
+    """Una nota que no es de este evento no sale en su respuesta, pero tampoco se
+    pierde en silencio (T9-R4c): un incidente por evento, sin el texto de la nota
+    (`incident` no lleva contenido de conversaciones), con el evento que la dejó
+    como referencia cuando lo tiene."""
+    for evento in dict.fromkeys(eventos):
+        cantidad = eventos.count(evento)
+        registrar_incidente(
+            cur, workspace_id,
+            f"{cantidad} {'nota' if cantidad == 1 else 'notas'} de un turno "
+            "que no llegó a su respuesta se descartó"
+            f"{'' if evento else ' (sin evento entrante)'}: no salió en la "
+            "respuesta de otro evento.",
+            severidad="alta", etapa=ETAPA_NOTA_SIN_RESPUESTA,
+            referencia_tipo=REFERENCIA_INBOUND_MESSAGE if evento else None,
+            referencia_id=evento, chat_id=chat_id, app_user_id=quien.app_user_id)
+
+
 def controlar(cur, quien, *, workspace_id: str, chat_id: int, entrante_id: str,
               ahora: datetime, aviso_neutro: str,
               nota_de_la_respuesta: str | None = None) -> int:
@@ -121,7 +142,9 @@ def controlar(cur, quien, *, workspace_id: str, chat_id: int, entrante_id: str,
     más de la MISMA respuesta, delante de las demás."""
     notas = ([nota_de_la_respuesta] if nota_de_la_respuesta else []) + [
         texto for evento, texto in _NOTAS.get() if evento == str(entrante_id)]
+    ajenas = [evento for evento, _ in _NOTAS.get() if evento != str(entrante_id)]
     limpiar_nota()
+    _incidentes_de_notas_ajenas(cur, quien, workspace_id, chat_id, ajenas)
     respuestas = respuestas_del_mensaje(cur, entrante_id, chat_id)
 
     if not respuestas:

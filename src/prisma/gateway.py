@@ -1132,6 +1132,14 @@ def _resolver_toque_borrador(conn, authority_conn, workspace_id, token,
             if atadas != 1:
                 _incidente_fila_terminal(cur, workspace_id, chat_id, quien,
                                          resuelta.pending_action_id, atadas)
+            if atadas == 0:
+                # El efecto sí ocurrió: la persona recibe una sola respuesta,
+                # atada al toque, con el estado real y no el aviso neutro de que
+                # no se pudo (ADR 0013 reglas 2 y 3, T9-R4c). Con más de una
+                # fila atada el control conserva una y suprime el resto.
+                _responder(cur, workspace_id, chat_id, quien,
+                           P.texto_terminal_ingreso(cancelada=resuelta.cancelada),
+                           ahora)
         elif atadas != 1:
             if texto is None:
                 # Replays reuse the terminal row, which already went out for the
@@ -1163,8 +1171,9 @@ def _atar_fila_terminal(cur, workspace_id: str, toque_id: str,
 def _incidente_fila_terminal(cur, workspace_id: str, chat_id: int, quien,
                              pending_action_id: str, atadas: int) -> None:
     """La autoridad resolvió el borrador pero su fila terminal no se pudo atar al
-    toque (la clave cambió, o hay más de una): nunca en silencio. El control de
-    una respuesta deja además el aviso neutro."""
+    toque (la clave cambió, o hay más de una): nunca en silencio. Si no ató ninguna,
+    quien llama responde con el estado real; si ató varias, el control de una
+    respuesta conserva una."""
     registrar_incidente(
         cur, workspace_id,
         "La respuesta terminal de un borrador no se pudo atar a su toque "

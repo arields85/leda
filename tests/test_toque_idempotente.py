@@ -339,3 +339,10 @@ def test_una_nota_de_otra_entrada_no_se_filtra_a_una_respuesta_ajena(
 
     cuerpos = [f["cuerpo"] for f in _respuestas(conn, tg)]
     assert cuerpos == ["Respuesta de la segunda."]
+    # Nunca en silencio (T9-R4c): la nota que no se dijo deja su incidente,
+    # atado al evento que la dejó y sin su texto.
+    (incidente,) = _incidentes(conn, ws, "nota_sin_respuesta")
+    assert incidente["referencia_tipo"] == "inbound_message"
+    assert str(incidente["referencia_id"]) == primera
+    assert "primera entrada" not in incidente["resumen_sanitizado"]
+    assert _incidentes(conn, ws, ETAPA_SIN_RESPUESTA) == []

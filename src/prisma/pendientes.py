@@ -733,6 +733,16 @@ def clave_terminal_ingreso(workspace_id: str, pending_action_id: str,
     return f"{workspace_id}:intake-terminal:{pending_action_id}:{resultado}"
 
 
+def texto_terminal_ingreso(*, cancelada: bool) -> str:
+    """El texto de la fila terminal que escribe la función de la autoridad al
+    cancelar o convertir un borrador. Definido una vez de este lado: cuando el
+    gateway no puede atar esa fila al toque, dice con estos mismos textos lo que
+    realmente pasó en vez de un aviso que afirmaría lo contrario (T9-R4c). Una
+    prueba compara ambos con lo que escribe la base."""
+    return ("Listo, cancelé el borrador de la tarea." if cancelada
+            else "Hecho. La tarea quedó comprometida.")
+
+
 def resolver_borrador(cur: psycopg.Cursor, workspace_id: str, token: str,
                        telegram_user_id: int, chat_id: int) -> Resuelta | None:
     """Commit through prisma_gateway using DB identity and DB time."""

@@ -800,10 +800,12 @@ def _incidentes_de(conn, etapa):
         return cur.fetchall()
 
 
-def _preview_y_toque(conn, ws):
+def _preview_y_toque(conn, ws, etiqueta=None):
     with espacio(conn, ws) as cur:
         resultado = _crear_preview(cur, ws)
-        token = _token(cur, resultado["pending_action_id"])
+        token = (P.opcion_por_etiqueta(cur, resultado["pending_action_id"],
+                                       etiqueta).token
+                 if etiqueta else _token(cur, resultado["pending_action_id"]))
         telegram = _telegram(cur, "Marcos Tarquini")
     conn.commit()
     return resultado, token, telegram, len(_salidas_del_chat(conn, telegram))
@@ -906,10 +908,42 @@ def test_la_clave_de_la_fila_terminal_sale_de_un_solo_lugar(
     assert fila["entrante_id"] is not None
 
 
-def test_si_cambia_la_clave_del_productor_la_fila_sin_atar_deja_un_incidente(
-        cliente_drafts, corework, conn, monkeypatch):
+@pytest.mark.parametrize("etiqueta,estado", [
+    ("Confirmar", "converted"),
+    ("Cancelar", "cancelled"),
+])
+def test_los_textos_terminales_de_python_son_los_que_escribe_la_base(
+        cliente_drafts, corework, conn, etiqueta, estado):
+    """T9-R4c: los textos del estado real que el gateway dice cuando no pudo atar
+    la fila terminal se definen una vez (`pendientes.texto_terminal_ingreso`) y
+    son los que escribe la función de la autoridad en la base."""
     ws = corework.workspace_id
-    resultado, token, telegram, antes = _preview_y_toque(conn, ws)
+    resultado, token, telegram, antes = _preview_y_toque(
+        conn, ws, etiqueta=etiqueta)
+
+    assert _tocar(cliente_drafts, token, telegram).status_code == 200
+
+    with admin(conn) as cur:
+        cur.execute("select cuerpo from message_outbox where dedupe_key = %s",
+                    (P.clave_terminal_ingreso(
+                        ws, resultado["pending_action_id"], estado),))
+        (fila,) = cur.fetchall()
+    assert fila["cuerpo"] == P.texto_terminal_ingreso(
+        cancelada=(estado == "cancelled"))
+
+
+@pytest.mark.parametrize("etiqueta,cancelada", [
+    ("Confirmar", False),
+    ("Cancelar", True),
+])
+def test_si_cambia_la_clave_del_productor_la_persona_ve_el_estado_real(
+        cliente_drafts, corework, conn, monkeypatch, etiqueta, cancelada):
+    """T9-R4c (ADR 0013 reglas 2 y 3): si la fila terminal no se puede atar al
+    toque, queda el incidente y la persona recibe UNA respuesta atada al toque con
+    lo que realmente pasó, nunca el aviso neutro de que no se pudo."""
+    ws = corework.workspace_id
+    resultado, token, telegram, antes = _preview_y_toque(
+        conn, ws, etiqueta=etiqueta)
     monkeypatch.setattr(
         P, "clave_terminal_ingreso",
         lambda ws_, pa, estado: f"{ws_}:terminal-otra-forma:{pa}:{estado}")
@@ -917,3 +951,14 @@ def test_si_cambia_la_clave_del_productor_la_fila_sin_atar_deja_un_incidente(
     assert _tocar(cliente_drafts, token, telegram).status_code == 200
 
     assert len(_incidentes_de(conn, gateway.ETAPA_FILA_TERMINAL_SIN_ATAR)) == 1
+    with admin(conn) as cur:
+        cur.execute(
+            """select o.cuerpo from message_outbox o
+                 join inbound_message i on i.id = o.entrante_id
+                where o.chat_id = %s and i.boton_callback is not null
+                  and o.es_respuesta and o.estado <> 'descartado'""",
+            (telegram,))
+        visibles = [f["cuerpo"] for f in cur.fetchall()]
+    assert visibles == [P.texto_terminal_ingreso(cancelada=cancelada)]
+    assert gateway.NOTICIA_NEUTRA_INCIDENTE not in _cuerpos(conn, telegram, antes)
+    assert _incidentes_de(conn, "sin_respuesta") == []
