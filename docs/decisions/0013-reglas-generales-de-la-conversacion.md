@@ -144,6 +144,12 @@ casos.
    veces el mismo botón no produce un error ni un efecto duplicado: el segundo toque de
    la misma persona dentro de una ventana corta (10 segundos) se absorbe; fuera de esa
    ventana, o de otra persona, se responde como hoy.
+   **Precisión (2026-09-29, T9-R4):** "el mismo botón" es el mismo `callback_data`, de la
+   misma persona en el mismo chat (el token dentro del `callback_data` es único por
+   opción); la ventana se mide desde el toque anterior que sí se procesó. El toque
+   absorbido recibe sólo el acuse del toque, queda en la auditoría y no extiende la
+   ventana. Cada toque procesado recibe exactamente una respuesta visible, con el mismo
+   control que los mensajes (regla 2).
 
 **Cómo se prueba.** Cada regla con su mecanismo, el caso de la ronda 3 y familias de
 variantes (distintas formas de saludar, cambiar de tema, responder a medias, mandar un
