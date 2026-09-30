@@ -85,6 +85,11 @@ NOTICIA_NEUTRA_INCIDENTE = (
     "Tuve un problema y no pude responder tu mensaje. Ya quedó registrado "
     "para que lo revise un administrador.")
 
+# Etapas de incidente propias de este módulo y de quien lo comparte (T10-2b): una
+# constante con nombre por cada punto donde el código registra un incidente, cada una
+# con su entrada en `EXPLICACION_POR_ETAPA`.
+ETAPA_RESUMEN_VIGENTE_SIN_FILA = "resumen_vigente_sin_fila"
+
 # Tope del texto disparador en el aviso -- decisión del usuario, 2026-09-28:
 # acotado, y el aviso dice cuándo lo recortó.
 LIMITE_TEXTO_DISPARADOR = 1000
@@ -212,6 +217,13 @@ EXPLICACION_POR_ETAPA: dict[str, ExplicacionDeEtapa] = {
         que_vio="Nada: no le llegó el saludo.",
         que_hacer=(f"{_BUSCAR_DETALLE}. El saludo no sale hasta que se "
                    "corrija.")),
+    ETAPA_RESUMEN_VIGENTE_SIN_FILA: ExplicacionDeEtapa(
+        que_paso=("Se tocó Enviar a aprobación sobre un resumen que el borrador "
+                  "dejó atrás, y el resumen vigente no quedó encolado para "
+                  "{nombre}."),
+        que_vio=NOTICIA_NEUTRA_INCIDENTE,
+        que_hacer=(f"{_BUSCAR_DETALLE}. El borrador sigue vivo: pedile a "
+                   "{nombre} que lo retome desde su mensaje o que lo cancele.")),
     "indicador_actividad": ExplicacionDeEtapa(
         que_paso=("No se pudo retirar el borrador nativo del indicador de "
                   "actividad; puede haber quedado visible."),

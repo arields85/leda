@@ -15,7 +15,8 @@ from psycopg.types.json import Jsonb
 
 from .autoridad import Denegado, Solicitante
 from .db import entrante_atado, registrar_auditoria
-from .incidentes import registrar_incidente
+from .incidentes import (ETAPA_RESUMEN_VIGENTE_SIN_FILA, NOTICIA_NEUTRA_INCIDENTE,
+                         REFERENCIA_PENDING_ACTION, registrar_incidente)
 from .pendientes import HERRAMIENTA_REVISION_BORRADOR
 from .salida import (BUTTON_TEXT_LIMIT, ETIQUETA_CANCELAR, ETIQUETA_CONFIRMAR,
                      ETIQUETA_ENVIAR, ETIQUETA_MODIFICAR, ICONO_CANCELAR, ICONO_OTRA_OPCION,
@@ -951,6 +952,11 @@ def _offer_current_review(cur, who: Solicitante, request_id: str,
             "select id, cuerpo from message_outbox where pending_action_id = %s",
             (outcome.pending_action_id,))
         row = cur.fetchone()
+        if row is None:
+            # El resumen vigente quedó registrado pero su mensaje no: quien tocó no
+            # puede quedarse sin respuesta ni recibir un error. Un incidente, y el
+            # aviso neutro como la única respuesta a su toque.
+            return _resumen_vigente_sin_fila(cur, who, request_id, outcome, now)
         text = f"{DRAFT_CHANGED_REVIEW_AGAIN}\n\n{row['cuerpo']}"
         try:
             prepare_payload(text, dedupe_key="intake-review-changed",
@@ -960,6 +966,23 @@ def _offer_current_review(cur, who: Solicitante, request_id: str,
         cur.execute("update message_outbox set cuerpo = %s where id = %s",
                     (text, row["id"]))
     return outcome
+
+
+def _resumen_vigente_sin_fila(cur, who: Solicitante, request_id: str,
+                              outcome: IntakeOutcome, now: datetime) -> IntakeOutcome:
+    request = _request(cur, request_id)
+    registrar_incidente(
+        cur, who.workspace_id,
+        "El resumen vigente de un borrador se registró pero su mensaje no quedó "
+        "encolado; quien tocó Enviar a aprobación recibió el aviso neutro.",
+        severidad="alta", etapa=ETAPA_RESUMEN_VIGENTE_SIN_FILA,
+        referencia_tipo=REFERENCIA_PENDING_ACTION,
+        referencia_id=outcome.pending_action_id, chat_id=request["chat_id"],
+        app_user_id=who.app_user_id, notificado_en=now)
+    _enqueue(cur, request, NOTICIA_NEUTRA_INCIDENTE, now,
+             f"intake:{request_id}:review-missing:v{request['version']}")
+    return IntakeOutcome(request_id, NOTICIA_NEUTRA_INCIDENTE, inert=True,
+                         responded=True)
 
 
 def modify_text_prompt(field: str, current: str) -> str:
