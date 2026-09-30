@@ -23,7 +23,7 @@ from typing import NamedTuple
 import psycopg
 
 from .autoridad import Solicitante, puede_aprobar_tarea
-from .herramientas import _estado_legible
+from .herramientas import _estado_legible, _filas
 
 # Cuántas tareas candidatas ofrece, como máximo, la elección de "de cuál de
 # mis tareas depende" / "cuál de mis tareas depende de ésta" (mismo tope que
@@ -172,17 +172,18 @@ def encabezado_menu(menu: MenuTarea) -> str:
     Telegram, 2026-09-27): con la lista de tareas movida a botones (T3) y el
     texto resumiendo en vez de enumerar, lo único que se perdía era saber DE
     QUIÉN es la tarea y en qué estado está sin tocarla y abrir "Ver
-    detalle". Una sola línea, antes de la única pregunta del menú.
+    detalle". Un dato por línea, como las vistas previas (`herramientas._filas`,
+    R4-H5, decisión del usuario, 2026-09-30), antes de la única pregunta del menú.
 
-    "tuya" cuando quien toca ES la responsable (`relacion == "responsable"`)
+    "vos" cuando quien toca ES la responsable (`relacion == "responsable"`)
     -- nunca su propio nombre; el nombre real sólo para un aprobador u otra
     persona."""
-    quien = "tuya" if menu.relacion == "responsable" else (
+    quien = "vos" if menu.relacion == "responsable" else (
         menu.responsable_nombre or "sin asignar")
-    encabezado = f"«{menu.titulo}» · {quien} · {_estado_legible(menu.estado)}"
-    if menu.cambios_pedidos:
-        encabezado += f"\n{menu.cambios_pedidos}"
-    return encabezado
+    return _filas(
+        (None, f"«{menu.titulo}»"), ("Responsable", quien),
+        ("Estado", _estado_legible(menu.estado)),
+        (None, menu.cambios_pedidos))
 
 
 class CambiosPedidos(NamedTuple):

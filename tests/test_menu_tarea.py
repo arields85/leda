@@ -256,7 +256,7 @@ def test_encabezado_del_menu_muestra_responsable_y_estado(
     assert resumen.count("?") == 1          # una sola pregunta
 
 
-def test_encabezado_del_menu_dice_tuya_para_la_propia_responsable(
+def test_encabezado_del_menu_dice_vos_para_la_propia_responsable(
         cliente, conn, corework, monkeypatch):
     ws = corework.workspace_id
     with admin(conn) as cur:
@@ -266,7 +266,7 @@ def test_encabezado_del_menu_dice_tuya_para_la_propia_responsable(
     _abrir_menu(cliente, conn, ws, monkeypatch, tid, "Nahuel Gimenez")
     resumen = _resumen_menu(conn, ws)
 
-    assert "tuya" in resumen.lower()
+    assert "Responsable: vos" in resumen
     assert "Nahuel Gimenez" not in resumen   # nunca su propio nombre
     assert resumen.count("?") == 1
 

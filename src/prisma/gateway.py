@@ -3166,7 +3166,7 @@ def _encolar_menu_tarea(cur, quien, workspace_id: str, chat_id: int,
     opciones.append((P.ETIQUETA_SALIR_OPCIONES, {"accion": "salir"}))
     # Encabezado corto -- responsable y estado (T2, hallazgo 4 de sesión 2
     # por Telegram) -- y una sola pregunta debajo, nunca dos.
-    pregunta = f"{M.encabezado_menu(menu)}\n¿Qué querés hacer?"
+    pregunta = f"{M.encabezado_menu(menu)}\n\n¿Qué querés hacer?"
     resumen = f"{encabezado}\n\n{pregunta}" if encabezado else pregunta
 
     p = P.registrar(cur, quien, herramienta=P.SENTINEL_MENU_TAREA,
