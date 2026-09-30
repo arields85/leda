@@ -5428,3 +5428,11 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   resultado estructurado (fecha válida y futura, opción existente) y lo muestra en la
   vista previa para confirmar. Dejar de agregar reglas de formato al código. Si el usuario
   la acepta, va como ADR y gobierna la unidad del alta guiada del orden de trabajo.
+
+- 2026-09-30: **R4c-H10 (observación del usuario, alta guiada).** Con Marcos creando una
+  tarea para él o para Nahuel, Prisma preguntó "Elegí el área." con una sola opción real
+  ("OT y automatización") más ✏️ Otra opción: una pregunta cuya respuesta ya está
+  determinada. Regla propuesta, general: si un dato tiene una sola opción posible, no se
+  pregunta; se completa solo y se muestra en el resumen (se puede cambiar con Modificar); y
+  "Otra opción" sólo aparece si de verdad hay otra posible (regla 3 del ADR 0013, "sólo
+  opciones posibles"; "Prisma ayuda, no fastidia"). Va con la unidad del alta guiada.

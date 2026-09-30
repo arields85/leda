@@ -225,7 +225,8 @@ orienta la unidad 3. Detalle en `odd/tasks/prisma-orienta.md`.
    objetivo (el más probable primero); sin bucle al volver a pedir una tarea nueva
    (R4c-H5); sin jerga "(hasta N)" (R4c-H7); fecha que acepte formas naturales o diga el
    formato (R4c-H6); sin claves internas en el resumen (R4c-H8); texto del resumen de quien
-   pide (R4c-H9).
+   pide (R4c-H9); no preguntar un dato con una sola opción posible, como el área cuando
+   Marcos sólo puede asignar en OT (R4c-H10).
 4. Medios: una sola confirmación para la reentrega tras cambios pedidos (R4c-H1); vista
    previa de Aprobar sin Modificar y con la evidencia (R4c-H2); "quiero entregar…" sin
    intento abre la pregunta de evidencia (R4b-H1).
