@@ -25,6 +25,14 @@
    tarea se sigue creando sólo con Confirmar. Telegram no permite que un bot escriba
    texto editable en la caja de la persona (sólo un marcador de 1 a 64 caracteres, o
    una consulta inline precedida por el nombre del bot), por eso se copia y se pega.
+
+   **Precisión (2026-09-29, decisión del usuario): quien pide revisa antes de enviar.**
+   Cuando el borrador lo confirma otra persona (por ejemplo, la jefa de quien pide), quien
+   lo pidió ve primero su propio resumen con **[Enviar a aprobación]**, **[Modificar]** y
+   **[Cancelar]**: corrige lo que haga falta con el mismo selector de datos y recién al
+   enviar le llega a quien confirma, que lo recibe con Confirmar y Cancelar. El que conoce
+   los datos es quien pide; quien confirma recibe algo ya revisado. Hasta que lo envía, es
+   una rama abierta de quien pide; después, la rama pasa a quien confirma.
 2. **La vista previa es la protección principal.** Detectar la ambigüedad reduce
    preguntas y errores, pero no se confía en esa detección para evitar un efecto
    equivocado.

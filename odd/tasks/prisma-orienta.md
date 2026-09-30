@@ -372,6 +372,11 @@ gestión.
     con quien la produce); en `resend_choice_prompt` una `ref` explícita debe ganarle al
     evento atado; el 11 de las pruebas derivado de `VENTANA_TOQUE_REPETIDO`; nombre del
     comprobador del banco (cubre toques).
+  - [ ] **T9-R1c-4 — Quien pide revisa antes de enviar a aprobación** (precisión del ADR
+    0005, decisión del usuario del 2026-09-29, opción A). Cuando confirma otra persona, quien
+    pide ve su resumen con [Enviar a aprobación] [Modificar] [Cancelar] (mismo selector de
+    datos que T9-R1c-3); al enviar, le llega a quien confirma con Confirmar y Cancelar y a
+    quien pide "Le mandé el borrador a {nombre}…". Hasta enviar es rama de quien pide.
   - [ ] **T9-H19 — Reproducir H19 después de R1 y R2**; si persiste, clasificarlo por
     regla antes de corregir.
 
@@ -4761,3 +4766,8 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   `review-d9a1348555f00ca4` (4 lentes) **aprobada y reconocida**; frontera en `89992a6`.
   Advertencia importante a T9-R4b: en el toque sobre un borrador, si la resolución falla
   después de marcar el botón, el reintento se absorbe en silencio.
+
+- 2026-09-29: **Decisión del usuario — quien pide revisa antes de enviar (opción A).**
+  Precisión del ADR 0005; tarea T9-R1c-4. Además autorizó aplicar `0020`, `0021` y `0022` en
+  la base local: respaldo `db/respaldos/prisma-antes-0020-0022-20260929.dump` (525 entradas
+  legibles con `pg_restore -l`).
