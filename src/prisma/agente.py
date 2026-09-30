@@ -618,13 +618,30 @@ def _titulos_nombrados(texto: str, titulos) -> set[str]:
                     key=lambda t: (-len(t), t))
     nombrados: set[str] = set()
     for titulo in unicos:
-        antes = r"(?<!\w)" if re.match(r"\w", titulo) else ""
-        despues = r"(?!\w)" if re.search(r"\w$", titulo) else ""
-        patron = re.compile(antes + re.escape(titulo) + despues)
+        patron = _patron_de_frase(titulo)
         if patron.search(restante):
             nombrados.add(titulo)
             restante = patron.sub(" ", restante)
     return nombrados
+
+
+def _patron_de_frase(frase: str) -> re.Pattern:
+    """El patrón de una frase ya normalizada como frase ENTERA: acotada por
+    caracteres que no son de palabra (no un pedazo de otra palabra)."""
+    antes = r"(?<!\w)" if re.match(r"\w", frase) else ""
+    despues = r"(?!\w)" if re.search(r"\w$", frase) else ""
+    return re.compile(antes + re.escape(frase) + despues)
+
+
+def _sin_titulos(texto: str, titulos) -> str:
+    """`texto` normalizado (`_normalizar_comparacion`) sin las apariciones enteras
+    de `titulos`: lo que queda es lo que la respuesta dice además de nombrar la
+    tarea. Los títulos más largos se quitan primero, como en `_titulos_nombrados`."""
+    restante = _normalizar_comparacion(texto)
+    for titulo in sorted({_normalizar_comparacion(t) for t in titulos} - {""},
+                         key=lambda t: (-len(t), t)):
+        restante = _patron_de_frase(titulo).sub(" ", restante)
+    return restante
 
 
 # Regla del usuario (T10-5, R3-H7): con hasta tres tareas el texto las nombra
@@ -674,7 +691,13 @@ def _cambios_pedidos_sin_mencionar(
     respuesta, se agrega al final la línea del menú -- quién los pidió y qué falta
     --: el modelo puede escribir "sigue en curso, sin cambios" de una tarea a la
     que se los pidieron. No toca el texto del modelo ni repite lo que ya dice, así
-    que aplicarla dos veces da lo mismo."""
+    que aplicarla dos veces da lo mismo.
+
+    "Ya lo dice" es el hecho entero: quién los pidió Y el motivo completo, cada
+    uno como frase entera (`_patron_de_frase`) en lo que la respuesta dice además
+    del título de la tarea (`_sin_titulos`). Un motivo corto o genérico ("calidad",
+    "certificado") coincide de casualidad con otra palabra o con un pedazo del
+    título, y no alcanza."""
     if not tareas_resueltas_claras or len(tareas_resueltas_claras) != 1:
         return texto
     from .menu_tarea import cambios_pedidos_vigentes
@@ -683,9 +706,15 @@ def _cambios_pedidos_sin_mencionar(
     pedido = cambios_pedidos_vigentes(cur, tarea_id)
     if pedido is None:
         return texto
-    # El motivo del menú se acota con "…": se busca lo que sí es del motivo.
-    motivo = _normalizar_comparacion(pedido.motivo.removesuffix("…"))
-    if motivo and motivo in _normalizar_comparacion(texto):
+    dicho = _sin_titulos(texto, tareas_resueltas_claras.values())
+    motivo = _normalizar_comparacion(pedido.completo or pedido.motivo)
+    motivo_dicho = bool(motivo) and _patron_de_frase(motivo).search(dicho)
+    # Quien los pidió se nombra completo o por su nombre de pila.
+    nombres = [_normalizar_comparacion(n) for n in
+               (pedido.por, (pedido.por or "").split()[0] if pedido.por else "")]
+    quien_dicho = not pedido.por or any(
+        n and _patron_de_frase(n).search(dicho) for n in nombres)
+    if motivo_dicho and quien_dicho:
         return texto
     return f"{texto}\n\n{pedido.linea}" if texto.strip() else pedido.linea
 

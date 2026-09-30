@@ -191,3 +191,79 @@ def test_sin_tarea_clara_la_lista_sigue_ofreciendo_todas(corework, conn):
     etiquetas = _botones(conn, fila["pending_action_id"])
     assert any("Dashboard" in e for e in etiquetas)
     assert any("Reporte" in e for e in etiquetas)
+
+
+# ---------------------------------------------------------------------------
+# 4. Ya dicho = el hecho entero (quién y el motivo completo), no un pedazo
+# ---------------------------------------------------------------------------
+
+def _sembrar_pedido(conn, ws, *, titulo, motivo, por="Marcos Tarquini"):
+    with admin(conn) as cur:
+        ids = sembrar_precondiciones(cur, ws, {"tareas": [{
+            "id": "t1", "titulo": titulo, "area": "ot",
+            "responsable": "Nahuel Gimenez",
+            "cambios_pedidos": {"por": por, "motivo": motivo}}]})
+    conn.commit()
+    return ids
+
+
+def test_un_motivo_de_una_palabra_que_aparece_de_casualidad_no_da_el_hecho_por_dicho(
+        corework, conn):
+    ws = corework.workspace_id
+    ids = _sembrar_pedido(conn, ws, titulo="Dashboard de lotes", motivo="certificado")
+    dicho = ("«Dashboard de lotes» sigue en curso, esperando el certificado del "
+             "proveedor.")
+
+    fila = _turno(conn, ws, _leer_y_responder(dicho),
+                  {ids["t1"]: "Dashboard de lotes"})
+
+    assert "Cambios pedidos por Marcos Tarquini: certificado" in fila["cuerpo"]
+
+
+def test_un_motivo_que_es_un_pedazo_del_titulo_no_se_da_por_dicho(corework, conn):
+    ws = corework.workspace_id
+    ids = _sembrar_pedido(conn, ws, titulo="Certificado de calidad",
+                          motivo="calidad")
+
+    fila = _turno(conn, ws, _leer_y_responder("«Certificado de calidad» sigue en curso."),
+                  {ids["t1"]: "Certificado de calidad"})
+
+    assert "Cambios pedidos por Marcos Tarquini: calidad" in fila["cuerpo"]
+
+
+def test_el_motivo_sin_quien_lo_pidio_no_alcanza(corework, conn):
+    ws = corework.workspace_id
+    ids = _sembrar(conn, ws)
+
+    fila = _turno(conn, ws, _leer_y_responder(
+        f"«Dashboard de lotes» sigue en curso: {MOTIVO}."),
+        {ids["t1"]: "Dashboard de lotes"})
+
+    assert LINEA in fila["cuerpo"]
+
+
+def test_quien_y_el_motivo_completo_dichos_con_el_nombre_de_pila_no_se_repiten(
+        corework, conn):
+    ws = corework.workspace_id
+    ids = _sembrar(conn, ws)
+    dicho = f"«Dashboard de lotes» volvió a estar en curso: Marcos pidió {MOTIVO}."
+
+    fila = _turno(conn, ws, _leer_y_responder(dicho),
+                  {ids["t1"]: "Dashboard de lotes"})
+
+    assert "Cambios pedidos por" not in fila["cuerpo"]
+
+
+def test_un_motivo_largo_dicho_entero_no_se_repite(corework, conn):
+    """El motivo del menú se acota con "…"; la comparación usa el completo."""
+    ws = corework.workspace_id
+    largo = ("falta la captura del tablero con la hora visible y el certificado "
+             "de calibración firmado por el proveedor de la planta norte, más el "
+             "informe de la prueba de aceptación en sitio")
+    ids = _sembrar_pedido(conn, ws, titulo="Dashboard de lotes", motivo=largo)
+    dicho = f"«Dashboard de lotes» sigue en curso. Marcos Tarquini pidió: {largo}."
+
+    fila = _turno(conn, ws, _leer_y_responder(dicho),
+                  {ids["t1"]: "Dashboard de lotes"})
+
+    assert "Cambios pedidos por" not in fila["cuerpo"]

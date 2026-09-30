@@ -187,9 +187,13 @@ def encabezado_menu(menu: MenuTarea) -> str:
 
 class CambiosPedidos(NamedTuple):
     """Los cambios pedidos vigentes de una tarea: `motivo` (el texto que dejó quien
-    los pidió, en una línea y acotado) y `linea`, lo que se muestra."""
+    los pidió, en una línea y acotado) y `linea`, lo que se muestra. `por` es
+    quien los pidió (`None` si no se sabe) y `completo` el motivo entero, sin
+    acotar: lo que compara la guarda de `agente._cambios_pedidos_sin_mencionar`."""
     motivo: str
     linea: str
+    por: str | None = None
+    completo: str = ""
 
 
 def cambios_pedidos(cur: psycopg.Cursor, tarea_id: str) -> str | None:
@@ -222,10 +226,12 @@ def cambios_pedidos_vigentes(cur: psycopg.Cursor,
     motivo = " ".join((fila["comentario"] or "").split()) if fila else ""
     if not motivo:
         return None
+    completo = motivo
     if len(motivo) > LIMITE_MOTIVO_CAMBIOS:
         motivo = motivo[:LIMITE_MOTIVO_CAMBIOS - 1].rstrip() + "…"
     quien = f" por {fila['nombre']}" if fila["nombre"] else ""
-    return CambiosPedidos(motivo=motivo, linea=f"Cambios pedidos{quien}: {motivo}")
+    return CambiosPedidos(motivo=motivo, linea=f"Cambios pedidos{quien}: {motivo}",
+                          por=fila["nombre"] or None, completo=completo)
 
 
 def bloqueos_abiertos(cur: psycopg.Cursor, tarea_id: str) -> list[dict]:
