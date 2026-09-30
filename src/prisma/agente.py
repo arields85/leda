@@ -309,7 +309,8 @@ def responder(cur: psycopg.Cursor, quien: Solicitante, texto_entrante: str,
         # confirmaciones/elecciones de una herramienta (ya cerraron el turno
         # antes, línea ~161).
         _encolar_opciones_genericas(cur, quien, chat_id, salida, ahora,
-                                    entrante_id, texto_entrante)
+                                    entrante_id, texto_entrante,
+                                    no_proponer=no_proponer)
     else:
         _encolar_respuesta(cur, quien, chat_id, salida, cal, ahora)
     auditar(salida)
@@ -997,10 +998,21 @@ _ETIQUETA_TAREA_EXISTENTE_GENERICA = "Es sobre una tarea existente"
 _TEXTO_BOTONES_GENERICO = "Elegí una opción:"
 
 
+def _puede_ofrecer_alta(chat_id: int, entrante_id: str | None,
+                        no_proponer: NoProponer | None) -> bool:
+    """Las opciones que arma el código salen de lo que el sistema puede hacer en
+    ese momento (ADR 0013 regla 3): el alta guiada sólo arranca en un chat privado
+    (`ingreso_tareas.start`) y con el mensaje de origen, y no se vuelve a ofrecer
+    si la persona acaba de dejarla de lado."""
+    return (entrante_id is not None and chat_id > 0
+            and not (no_proponer is not None and no_proponer.alta))
+
+
 def _encolar_opciones_genericas(cur, quien: Solicitante, chat_id: int,
                                 texto: str, ahora: datetime,
                                 entrante_id: str | None,
-                                texto_entrante: str) -> None:
+                                texto_entrante: str,
+                                no_proponer: NoProponer | None = None) -> None:
     """Decisión del usuario (2026-09-26, evidencia
     `tests/banco/reportes/replay-candidato-b-0007-*.json`): cuando Prisma
     necesita algo de la persona pero no tiene opciones concretas para
@@ -1038,7 +1050,7 @@ def _encolar_opciones_genericas(cur, quien: Solicitante, chat_id: int,
     `entrante_id`): si esa segunda vuelta también cierra preguntando en
     texto abierto, sólo quedan las otras dos opciones."""
     opciones = []
-    if entrante_id is not None:
+    if _puede_ofrecer_alta(chat_id, entrante_id, no_proponer):
         opciones.append((_ETIQUETA_TAREA_NUEVA_GENERICA, {"tipo": "tarea_nueva"}))
     opciones.append((_ETIQUETA_TAREA_EXISTENTE_GENERICA, {"tipo": "tarea_existente"}))
     opciones.append((P.ETIQUETA_SALIR_OPCIONES, {"tipo": "salida"}))

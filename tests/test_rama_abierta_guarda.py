@@ -440,12 +440,15 @@ def _abrir_alta_de_la_persona(conn, ws) -> tuple[int, str]:
         return tg, str(cur.fetchone()["id"])
 
 
+TEXTO_RECHAZADO = ("Tenés una tarea abierta.\n\nPara armar la tarea nueva, "
+                   "necesito saber dónde cuelga.")
+
+
 def _guion_ofrecer(opciones: list[dict]) -> list[Respuesta]:
     """El modelo consulta las tareas, vuelve a ofrecer opciones y cierra: lo que
     hizo en el banco real."""
     return [Respuesta(llamadas=[Llamada("q1", "consultar_tareas", {})]),
-            Respuesta(texto="Tenés una tarea abierta.\n\nPara armar la tarea "
-                            "nueva, necesito saber dónde cuelga.",
+            Respuesta(texto=TEXTO_RECHAZADO,
                       llamadas=[Llamada("q2", "ofrecer_opciones", {
                           "pregunta": PREGUNTA_ALTA_REPROPUESTA,
                           "opciones": opciones})]),
@@ -491,6 +494,15 @@ def test_dejar_el_alta_no_vuelve_a_ofrecer_opciones_sobre_la_tarea_nueva(
                 order by programado_para, dedupe_key""", (tg,))
         cuerpos = [f["cuerpo"] for f in cur.fetchall()]
     assert PREGUNTA_ALTA_REPROPUESTA not in "".join(cuerpos)
+    # El texto que acompañaba a la llamada rechazada ("Para armar la tarea nueva,
+    # necesito saber dónde cuelga", banco b-0021-i) nunca llega al outbox, ni
+    # descartado: la persona no lo lee y la salida no lo guarda.
+    assert TEXTO_RECHAZADO not in "".join(cuerpos)
+    assert "Para armar la tarea nueva" not in "".join(cuerpos)
+    with admin(conn) as cur:
+        cur.execute("select count(*) n from message_outbox "
+                    "where cuerpo like '%%Para armar la tarea nueva%%'")
+        assert cur.fetchone()["n"] == 0
     assert cuerpos[-1] == "Tenés una tarea abierta."
 
 
@@ -632,3 +644,90 @@ def _alta_dejada() -> NoProponer:
 ])
 def test_la_guarda_del_alta_distingue_lo_que_reabre_el_alta(llamada, se_rechaza):
     assert repite_lo_pendiente(llamada, _alta_dejada()) is se_rechaza
+
+
+# ---------------------------------------------------------------------------
+# T9-R3 (seguimientos de review-467d41b3f96573d5). La guarda del alta y lo que
+# se dejó de lado viajan en el estado de la aclaración y siguen vigentes al
+# retomar el mensaje tras los botones; y una pregunta legítima con opciones de
+# texto sobre lo otro, que la guarda del alta rechaza, termina bien para la
+# persona.
+# ---------------------------------------------------------------------------
+
+def test_la_guarda_del_alta_y_lo_dejado_sobreviven_a_los_botones_de_aclaracion(
+        cliente_con_credencial, conn, corework, monkeypatch):
+    from tests.test_alta_pregunta_pendiente import _mensaje_privado
+
+    cliente = cliente_con_credencial
+    ws = corework.workspace_id
+    tg, _tarea_existente = _abrir_alta_de_la_persona(conn, ws)
+    monkeypatch.setattr(jev_modulo, "desde_base", lambda api_key: ClienteJevGuionado(
+        guion=[{"alcance": {"probabilities": {"una_tarea": 0.8,
+                                              "varias_tareas": 0.0,
+                                              "ninguna": 0.0}},
+                "tarea": {"probabilities": {"T1": 0.5, "T2": 0.3}}}]))
+    con_referencia = IntentRoute(IntentAction.NORMAL_CONVERSATION,
+                                 trabajos=(REFERENCIA_DEL_OTRO_MENSAJE,))
+    proveedor = _con_rutas(
+        monkeypatch, [_ruta(RespectoPendiente.OTRO_TEMA), con_referencia],
+        guion=_guion_ofrecer([{"texto": "Conectar y automatizar equipos"}]))
+    assert _mensaje_privado(
+        cliente, tg, f"¿cómo va {REFERENCIA_DEL_OTRO_MENSAJE}?").status_code == 200
+
+    # "Dejarlo" cierra el alta y se detiene en la aclaración: el modelo todavía no
+    # habló, y lo dejado de lado ya viaja en el estado guardado de esa pregunta.
+    _tocar_boton(cliente, conn, ws, "Dejarlo", tg)
+    assert proveedor.recibidos == []
+    with admin(conn) as cur:
+        pid = _pendiente(cur, ws, gateway._SENTINEL_ACLARACION)
+        cur.execute("select args from pending_action where id = %s", (pid,))
+        guardado = cur.fetchone()["args"]["no_proponer"]
+        candidata = _opciones(cur, pid)[0]
+    assert guardado["alta"] is True
+    assert guardado["dejado"] == NOMBRE_DEL_TITULO_DEL_ALTA
+
+    # Al tocar una candidata se retoma con la guarda puesta y el modelo lo sabe.
+    assert _tocar(cliente, candidata["token"], tg).status_code == 200
+
+    assert len(_rechazos_del_alta(proveedor)) == 1
+    assert _opciones_ofrecidas(conn) == 0
+    sistema = proveedor.recibidos[0][0]
+    assert "acaba de dejar de lado" in sistema
+    assert NOMBRE_DEL_TITULO_DEL_ALTA in sistema
+
+
+def test_una_pregunta_de_texto_sobre_lo_otro_rechazada_por_el_alta_termina_bien(
+        cliente, conn, corework, monkeypatch):
+    """La persona deja el alta y pregunta otra cosa; el modelo quiere elegir con
+    opciones de texto (la guarda del alta las rechaza: no se puede distinguir de un
+    campo del alta) y termina preguntando. Lo que ve: lo que dejó de lado y una sola
+    pregunta con botones que el sistema puede cumplir -- sin volver a ofrecerle
+    armar la tarea nueva que acaba de soltar, y sin decir que se hizo algo."""
+    ws = corework.workspace_id
+    guion = [Respuesta(llamadas=[Llamada("q1", "ofrecer_opciones", {
+                 "pregunta": "¿Cuál querés ver?",
+                 "opciones": [{"texto": "Las mías"}, {"texto": "Las del equipo"}]})]),
+             Respuesta(texto="¿Querés ver tus tareas o las del equipo?")]
+
+    proveedor, tg, _tarea = _dejar_el_alta_y_ver_lo_otro(
+        cliente, conn, ws, monkeypatch, guion)
+
+    assert len(_rechazos_del_alta(proveedor)) == 1
+    with admin(conn) as cur:
+        cur.execute(
+            """select cuerpo, pending_action_id from message_outbox
+                where chat_id = %s order by programado_para, dedupe_key""", (tg,))
+        filas = cur.fetchall()
+        # La pregunta de la rama ya había salido con sus botones; la última es
+        # la del cierre de este turno.
+        botones = [f for f in filas if f["pending_action_id"]][-1]
+        cur.execute("select etiqueta from pending_action_option "
+                    "where pending_action_id = %s order by orden",
+                    (botones["pending_action_id"],))
+        etiquetas = [f["etiqueta"] for f in cur.fetchall()]
+    cuerpos = [f["cuerpo"] for f in filas]
+    assert "¿Querés ver tus tareas o las del equipo?" in botones["cuerpo"]
+    assert "Estado: sin cambios" not in "".join(cuerpos)     # nada se intentó cambiar
+    assert not any("tarea nueva" in e for e in etiquetas)    # lo soltó
+    assert any("tarea existente" in e for e in etiquetas)
+    assert P.ETIQUETA_SALIR_OPCIONES in etiquetas
