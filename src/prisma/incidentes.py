@@ -96,6 +96,8 @@ ETAPA_ENTREGA_MENSAJE = "entrega_mensaje"
 ETAPA_ENTREGA_AVISO_ADMIN = "entrega_aviso_admin"
 ETAPA_EVIDENCIA_INVALIDA = "politica_de_evidencia_invalida"
 ETAPA_CONFIGURACION_ALTA = "configuracion_alta_invalida"
+# T9-H19e: un recibo viejo sin respuesta que la reentrega no recuperó (`huerfanos`).
+ETAPA_MENSAJE_HUERFANO = "mensaje_huerfano_sin_respuesta"
 
 # Tope del texto disparador en el aviso -- decisión del usuario, 2026-09-28:
 # acotado, y el aviso dice cuándo lo recortó.
@@ -196,6 +198,14 @@ EXPLICACION_POR_ETAPA: dict[str, ExplicacionDeEtapa] = {
         que_vio="La respuesta a su mensaje, con demora.",
         que_hacer=(f"{_BUSCAR_DETALLE} y mirá si hubo un reinicio o un corte del "
                    "servicio a esa hora. No hace falta avisarle a {nombre}.")),
+    "mensaje_huerfano_sin_respuesta": ExplicacionDeEtapa(
+        que_paso=("Un mensaje de {nombre} se recibió pero su turno murió antes de "
+                  "responderlo (un reinicio o un corte del proceso) y Telegram no "
+                  "lo reentregó: la red de fondo lo encontró sin respuesta."),
+        que_vio=NOTICIA_NEUTRA_INCIDENTE,
+        que_hacer=(f"{_BUSCAR_DETALLE} y mirá si hubo un reinicio o un corte del "
+                   "servicio a esa hora. {nombre} puede reenviar el mensaje: "
+                   "Prisma no lo vuelve a procesar solo.")),
     "sin_respuesta": ExplicacionDeEtapa(
         que_paso=("Un mensaje quedó sin ninguna respuesta de Prisma; el control "
                   "de respuesta única mandó el aviso de problema."),

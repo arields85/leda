@@ -33,7 +33,7 @@ from .config import config
 from .db import admin, espacio
 from .despachador import TransporteTelegram, despachar, despachar_avisos_admin
 from .incidentes import registrar_incidente
-from . import reloj
+from . import huerfanos, reloj
 
 # ---------------------------------------------------------------------------
 # Día de semana: cron estándar (domingo=0 o 7) vs. el propio de APScheduler
@@ -156,7 +156,8 @@ def ejecutar_ciclo_espacio(cur, workspace_id: str, transporte, ahora: datetime,
                           lote: int = 50) -> dict:
     """Cadencias vencidas (si `con_cadencias`) + escalera + despacho, de un
     espacio. Mismo resumen que `despachar`, con `cadencias_encoladas`,
-    `escalera_encoladas`, `cadencias_fallidas` (lista de `(job, error,
+    `escalera_encoladas`, `huerfanos_avisados` y `huerfanos_fallo` (el barrido de
+    `huerfanos`, T9-H19e), `cadencias_fallidas` (lista de `(job, error,
     causa)`, para que quien llama la reporte deduplicada) y `cadencias_ok`
     (para marcar una falla anterior como recuperada) agregados. Una cadencia
     rota nunca frena la escalera ni el despacho."""
@@ -182,9 +183,21 @@ def ejecutar_ciclo_espacio(cur, workspace_id: str, transporte, ahora: datetime,
                 ok = [j for j in ok if j["id"] != job["id"]]
 
     escalera_encoladas = reloj.ejecutar_escalera(cur, workspace_id, cal, ahora)
+    # T9-H19e: antes de despachar, para que el aviso de un mensaje huérfano salga
+    # en esta misma pasada. Con su savepoint: una falla del barrido no frena el
+    # despacho y se reporta (`huerfanos_fallo`), nunca en silencio.
+    huerfanos_avisados = 0
+    huerfanos_fallo = None
+    try:
+        with cur.connection.transaction():
+            huerfanos_avisados = huerfanos.barrer(cur, workspace_id, ahora)
+    except Exception as e:  # noqa: BLE001 -- se reporta, no se propaga
+        huerfanos_fallo = e
     resumen = despachar(cur, workspace_id, transporte, cal, ahora, lote)
     resumen["cadencias_encoladas"] = cadencias_encoladas
     resumen["escalera_encoladas"] = escalera_encoladas
+    resumen["huerfanos_avisados"] = huerfanos_avisados
+    resumen["huerfanos_fallo"] = huerfanos_fallo
     resumen["cadencias_fallidas"] = fallidas
     resumen["cadencias_ok"] = ok
     return resumen
@@ -271,6 +284,7 @@ def _resumen_vacio() -> dict:
     return {"enviados": 0, "pospuestos": 0, "fallidos": 0, "descartados": 0,
             "retenidos": 0,
             "cadencias_encoladas": 0, "escalera_encoladas": 0,
+            "huerfanos_avisados": 0, "huerfanos_fallo": None,
             "cadencias_fallidas": [], "cadencias_ok": []}
 
 
@@ -333,6 +347,16 @@ def reportar_cadencias_rotas(conn, supresor: SupresorDeRepetidos,
     2026-09-28+1): antes cada uno tenía su propia copia, y la de
     `tareas_de_fondo` imprimía en cada pasada sin mirar si `reportar_fallo`
     de verdad reportó."""
+    fallo = resumen.pop("huerfanos_fallo", None)
+    clave_barrido = "barrido_huerfanos"
+    if fallo is None:
+        supresor.recuperada((workspace_id, clave_barrido))
+    elif reportar_fallo(
+            conn, supresor, workspace_id, clave_barrido,
+            f"Falló el barrido de mensajes huérfanos de '{slug}' "
+            f"({type(fallo).__name__}).", fallo):
+        imprimir(f"  ! el barrido de mensajes huérfanos de '{slug}' falló: "
+                 f"{type(fallo).__name__}")
     for job in resumen.pop("cadencias_ok", []):
         nombre = job["nombre"]
         supresor.recuperada((workspace_id, f"cadencia:{nombre}:{CAUSA_CRON_INVALIDO}"))
