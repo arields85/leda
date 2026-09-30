@@ -5355,3 +5355,24 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
     falló 5 veces con "chat not found" (el bot no está en ese grupo); no se avisó al
     administrador porque Ariel no volvió a escribirle al bot de administración tras el
     rearmado.
+
+- 2026-09-30 (tarde): **Circuito A completo de punta a punta por primera vez** (entrega,
+  cambios pedidos, nueva entrega, aprobación: la tarea quedó `terminada`) y **circuito B
+  completo** (entrega, cambios pedidos, vuelve a en curso con el motivo visible). Sin
+  incidentes nuevos. Confirmado: "¿qué pasó con mi tarea?" nombra los cambios pedidos
+  (R4-H8), una lista de dos tareas con estado y motivo (H7), "Dale, escribime qué
+  necesitás.", comprobante de aprobación.
+  - R4c-H1. **Medio.** Después de "Pedir cambios", el link nuevo entró como "agregar
+    evidencia" (vista previa y Confirmar) y después hizo falta "Ya la terminé" (otra vista
+    previa y Confirmar): dos confirmaciones para una sola reentrega, aunque el modelo había
+    dicho "lo adjunto como evidencia para que Ismael pueda revisarlo".
+  - R4c-H2. **Medio.** La vista previa de "Aprobar" ofrece ✏️ Modificar ("¿Qué querés
+    cambiar?" no tiene sentido para una aprobación) y no deja ver la evidencia antes de
+    aprobar.
+  - R4c-H3. **Alto.** "quiero ver la evidencia de la tarea de ariel": "No puedo mostrarte
+    el contenido de la evidencia… desde este chat", falso: "Ver detalle y evidencia" la
+    muestra (regla 3). La aclaración ofreció también una tarea sin evidencia.
+  - R4c-H4. **Alto (uso).** "quiero crear una tarea nueva" empieza por "Elegí el objetivo
+    de la tarea" antes de preguntar qué hay que hacer; la respuesta natural ("revisar el
+    variador de la comprimidora") recibió "No encontré esa opción" y la misma pregunta dos
+    veces; "(hasta 120)" es jerga técnica.
