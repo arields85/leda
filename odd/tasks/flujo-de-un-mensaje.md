@@ -133,6 +133,24 @@ PR planificado: la integración a `main` la decide el usuario después del exper
   `importador.py:591-616`). Pendiente verificar si el importador rechaza claves de
   paquete desconocidas.
 
+- 2026-09-30, F1 (ruta: delegada, 2+ archivos no triviales). Verificado: el importador
+  no rechaza claves de pack desconocidas (sólo `CLAVES_PROHIBIDAS`), no hace falta
+  migración; `prisma.__file__` resuelve dentro del worktree durante pytest.
+  Hecho: sección `conversacion.redaccion` en `espacios/corework.yaml` (B), siembra en
+  `importador._importar_ajustes` y advertencia en `validar` ante una variante
+  desconocida; `redaccion.py` (`variante_redaccion(cur, workspace_id)`,
+  `interpretar_variante`, `redactar`, variante B; A cae en B),
+  `resultado_turno.py`, `valores.py` (sólo `TipoValor`, F2 lo amplía).
+  RED: `tests/test_redaccion.py` falló por módulo inexistente (`ImportError` al
+  colectar, después `AttributeError` del stub); con los módulos, 3 pruebas del
+  importador fallaron antes de implementarlo (`{} != {'redaccion': ...}`, `KeyError:
+  'redaccion'`, sin advertencia). GREEN: `pytest -q tests/test_redaccion.py` ->
+  30 passed, 17 skipped.
+  **Límite de la verificación:** las 17 pruebas con base (`corework`, `conn`) quedaron
+  SALTADAS: el worktree no tiene `.env.test` (no versionado) y el agente no puede leer
+  ni copiar el de `main` (regla de denegación). Esas pruebas no se ejecutaron: F1 queda
+  sin tildar hasta correrlas con `PRISMA_TEST_DB_URL`.
+
 ## Próximo paso
 
 F1.

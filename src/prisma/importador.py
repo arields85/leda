@@ -97,6 +97,12 @@ def validar(pack: dict[str, Any]) -> tuple[list[str], list[str]]:
         bloqueantes.append(
             f"Hay {len(finales)} roles con autoridad final. Tiene que haber uno.")
 
+    redaccion = (pack.get("conversacion") or {}).get("redaccion")
+    if redaccion is not None and redaccion not in ("A", "B"):
+        advertencias.append(
+            f"conversacion.redaccion vale '{redaccion}': las variantes son A y "
+            f"B. Sin una variante válida Prisma usa B y lo registra.")
+
     slugs_rol = {r["slug"] for r in roles}
     for p in personas:
         if not p.get("area"):
@@ -606,6 +612,11 @@ def _importar_ajustes(cur, ws, pack) -> None:
     urgencia = pack.get("urgencia")
     if urgencia:
         ajustes["urgencia"] = urgencia
+    # Cómo se redactan las respuestas (ADR 0014): el interruptor A/B del
+    # experimento, un dato del espacio. `redaccion.variante_redaccion` lo lee.
+    variante = (pack.get("conversacion") or {}).get("redaccion")
+    if variante:
+        ajustes["redaccion"] = {"variante": variante}
 
     for clave, valor in ajustes.items():
         cur.execute(

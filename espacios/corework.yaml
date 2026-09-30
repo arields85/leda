@@ -288,6 +288,12 @@ limites_de_contacto:
   max_mensajes_automaticos_por_persona_por_dia: 3
   consolidar_en_un_envio: true
 
+# Cómo se redactan las respuestas (ADR 0014): A = el modelo redacta sobre el
+# resultado del turno y el código lo verifica; B = plantillas del código. Es el
+# interruptor del experimento; sin esta sección, o con otro valor, rige B.
+conversacion:
+  redaccion: B
+
 # ---------------------------------------------------------------------------
 # Urgencia, atrasos y escalamiento
 # ---------------------------------------------------------------------------
