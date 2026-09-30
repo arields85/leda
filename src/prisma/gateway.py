@@ -1387,6 +1387,15 @@ def _seguir_camino_normal(cur, quien, texto: str, route, proveedor, cal,
     `no_proponer`, si viene, es lo que la persona acaba de dejar de lado
     (`_lo_dejado_de`): el responder no lo vuelve a proponer en este turno
     (T9-R1d-1a-fix, banco b-0020-f: las instrucciones solas no alcanzan)."""
+    from .llm import IntentAction
+
+    # Un saludo suelto es un comando cerrado del ruteo (R4-H1, R3-H8): el código
+    # lo contesta, sin texto libre del modelo y sin repetir la lista de tareas.
+    if route.action is IntentAction.GREETING and modificacion is None:
+        _responder_saludo_suelto(cur, quien, texto, cal, chat_id, ahora,
+                                 entrante_id)
+        return
+
     # Resolver antes de actuar (T3, ADR 0005 decisión 6 / ADR 0006): las
     # referencias a tarea que separó el enrutador se resuelven contra las
     # tareas activas del espacio, bajo el mismo cursor con RLS que ya tiene
@@ -1410,6 +1419,23 @@ def _seguir_camino_normal(cur, quien, texto: str, route, proveedor, cal,
     estado["no_proponer"] = no_proponer
     _avanzar_aclaracion(cur, quien, workspace_id, chat_id, ahora, proveedor, cal,
                        estado)
+
+
+def _responder_saludo_suelto(cur, quien, texto: str, cal, chat_id: int, ahora,
+                             entrante_id: str | None) -> None:
+    """La respuesta a un saludo suelto sin rama abierta (R4-H1, R3-H8): UNA línea
+    y una pregunta abierta, con los botones genéricos de siempre. Si el saludo del
+    día todavía le toca a la persona, la línea lo lleva y el despachador no lo
+    antepone otra vez (`saludo.linea_de_saludo`); si ya lo recibió, "Hola {nombre}".
+    El texto lo arma el código: ningún texto del modelo llega a la persona."""
+    from . import saludo as S
+    from .agente import _encolar_opciones_genericas
+
+    del_dia = S.saludo_del_dia_pendiente(
+        cur, membership_id=quien.membership_id, zona=cal.zona, ahora=ahora)
+    _encolar_opciones_genericas(
+        cur, quien, chat_id, S.linea_de_saludo(quien.nombre, del_dia), ahora,
+        entrante_id, texto, lleva_su_saludo=del_dia is not None)
 
 
 def _rutear(proveedor, texto: str, pendiente: str | None = None):

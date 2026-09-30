@@ -55,7 +55,7 @@ def test_anthropic_router_forces_one_typed_tool_over_http():
     assert body["tool_choice"] == {"type": "tool", "name": "route_intent"}
     assert [tool["name"] for tool in body["tools"]] == ["route_intent"]
     assert body["tools"][0]["input_schema"]["properties"]["action"]["enum"] == [
-        "start_task_intake", "normal_conversation",
+        "start_task_intake", "normal_conversation", "bare_greeting",
     ]
 
 

@@ -33,6 +33,9 @@ class Respuesta:
 class IntentAction(str, Enum):
     START_TASK_INTAKE = "start_task_intake"
     NORMAL_CONVERSATION = "normal_conversation"
+    # Un saludo suelto, sin nada más, y sin pregunta pendiente (R4-H1, R3-H8):
+    # el código lo contesta con una línea fija, no el modelo.
+    GREETING = "bare_greeting"
 
 
 class RespectoPendiente(str, Enum):
@@ -116,7 +119,10 @@ ROUTER_SYSTEM = (
     "Return exactly one route_intent tool call. Never answer the person and never "
     "put the route in text. Choose task creation only for an explicit request to "
     "create a new task or work commitment; do not choose it for questions, status "
-    "requests, clarifications, or updates to existing work.\n\n"
+    "requests, clarifications, or updates to existing work. Choose bare_greeting "
+    "only when the whole message is nothing but a greeting (\"hola\", \"buenas\", "
+    "\"buen día\") with no question, request, work reference or any other "
+    "content; a greeting followed by anything else is normal_conversation.\n\n"
     "Separás las referencias de un mensaje de trabajo. No resolvés a qué tarea "
     "exacta apunta cada una -- eso lo hace otro paso -- ni corregís ortografía. "
     "En \"trabajos\" va, por cada tarea, trabajo o tema de trabajo que el "
@@ -252,10 +258,10 @@ class RouteEnvelope:
             raise RoutingError("Malformed task proposals.")
         if any(not isinstance(value, str) for value in task.values()):
             raise RoutingError("Task proposals must be strings.")
-        if action is IntentAction.NORMAL_CONVERSATION and task:
+        if action is not IntentAction.START_TASK_INTAKE and task:
             if not con_pendiente:
                 raise RoutingError(
-                    "Normal conversation cannot contain task proposals.")
+                    "Only task creation can contain task proposals.")
             # Con una pregunta pendiente la decisión es `respecto_pendiente`;
             # un mensaje que responde con algo que parece el título de una
             # tarea deja propuestas de más (banco b-0022). `normal_conversation`

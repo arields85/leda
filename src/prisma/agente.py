@@ -984,7 +984,8 @@ _TEXTO_BOTONES_LISTA_TAREAS = "Elegí una tarea:"
 def _encolar_texto_con_opciones(cur, quien: Solicitante, chat_id: int,
                                 texto: str, opciones: list[tuple[str, dict]],
                                 ahora: datetime, *, dedupe_prefijo: str,
-                                texto_corto: str, args: dict) -> None:
+                                texto_corto: str, args: dict,
+                                lleva_su_saludo: bool = False) -> None:
     """Botones de T1 (`pendientes.SENTINEL_OPCIONES_MODELO`) junto con un
     texto que puede superar `BUTTON_TEXT_LIMIT` -- extraído de T3
     (revisión del orquestador sobre `_encolar_respuesta_con_tareas`, T3a)
@@ -1007,6 +1008,12 @@ def _encolar_texto_con_opciones(cur, quien: Solicitante, chat_id: int,
     `despachador.despachar`) para que la entrega quede determinística: el
     texto primero -- todas sus partes, en orden -- y los botones después,
     nunca al revés.
+
+    `lleva_su_saludo` (R4-H1): el texto ya trae el saludo del día en su propia
+    línea (`saludo.linea_de_saludo`), así que la fila se encola como su propio
+    saludo (`es_bienvenida`) y el despachador reclama la reserva del día sin
+    anteponerle otro. Sólo aplica al mensaje con botones en uno (un saludo
+    siempre entra).
 
     `dedupe_prefijo` distingue el mecanismo que llama (`lista-tareas`,
     `opciones-genericas`, `opciones-modelo`) para que las claves de una
@@ -1036,6 +1043,7 @@ def _encolar_texto_con_opciones(cur, quien: Solicitante, chat_id: int,
             scheduled_for=ahora,
             dedupe_key=f"{quien.workspace_id}:{dedupe_prefijo}:{p.id}",
             is_response=True, pending_action_id=p.id,
+            es_bienvenida=lleva_su_saludo,
         )
         return
 
@@ -1133,7 +1141,8 @@ def _encolar_opciones_genericas(cur, quien: Solicitante, chat_id: int,
                                 texto: str, ahora: datetime,
                                 entrante_id: str | None,
                                 texto_entrante: str,
-                                no_proponer: NoProponer | None = None) -> None:
+                                no_proponer: NoProponer | None = None, *,
+                                lleva_su_saludo: bool = False) -> None:
     """Decisión del usuario (2026-09-26, evidencia
     `tests/banco/reportes/replay-candidato-b-0007-*.json`): cuando Prisma
     necesita algo de la persona pero no tiene opciones concretas para
@@ -1182,7 +1191,8 @@ def _encolar_opciones_genericas(cur, quien: Solicitante, chat_id: int,
         # la próxima respuesta escrita de la persona la contesta y los retira
         # (`pendientes.retirar_opciones_de_pregunta_abierta`, R4-H7).
         args={"pregunta": texto, "entrante_id": entrante_id,
-             "mensaje_original": texto_entrante, "cierre_generico": True})
+             "mensaje_original": texto_entrante, "cierre_generico": True},
+        lleva_su_saludo=lleva_su_saludo)
 
 
 def _incidente(cur, quien: Solicitante, error: Exception) -> None:

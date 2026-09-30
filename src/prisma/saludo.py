@@ -114,6 +114,42 @@ def reclamar_saludo(cur: psycopg.Cursor, *, workspace_id: str,
     return cur.fetchone() is not None
 
 
+def saludo_del_dia_pendiente(cur: psycopg.Cursor, *, membership_id: str | None,
+                             zona: ZoneInfo, ahora: datetime) -> str | None:
+    """El saludo que le toca a esta persona ahora (`👋 Buen día`, ...), o `None`
+    si ya recibió el de su fecha local. Sólo LEE `greeting_state`: la reserva
+    se sigue reclamando al despachar (`reclamar_y_anteponer`); acá se decide
+    únicamente cómo se arma el texto de una respuesta que va a ser lo primero
+    que la persona reciba hoy (`linea_de_saludo`). Sin `membership_id` o con
+    cualquier falla de lectura -- el saludo es decorativo, nunca tira abajo una
+    respuesta -- devuelve `None`."""
+    if not membership_id:
+        return None
+    try:
+        with cur.connection.transaction():
+            cur.execute(
+                "select ultima_fecha_local from greeting_state "
+                "where membership_id = %s", (membership_id,))
+            fila = cur.fetchone()
+            hoy = fecha_local(ahora, zona)
+            if fila is not None and fila["ultima_fecha_local"] >= hoy:
+                return None
+            return saludo_por_hora(ahora.astimezone(zona).hour)
+    except Exception:  # noqa: BLE001 -- decorativo, nunca tira el envío
+        return None
+
+
+def linea_de_saludo(nombre: str | None, saludo_del_dia: str | None) -> str:
+    """La respuesta a un saludo suelto, en UNA línea (R4-H1, decisión del
+    usuario, 2026-09-30): con el saludo del día por dar, "👋 Buen día Ariel, ¿en
+    qué te ayudo?"; si ya lo recibió, "Hola Ariel, ¿en qué te ayudo?". Sólo el
+    primer nombre; sin nombre no se inventa uno."""
+    primero = nombre.split()[0] if nombre and nombre.split() else None
+    apertura = saludo_del_dia or "Hola"
+    quien = f" {primero}" if primero else ""
+    return f"{apertura}{quien}, ¿en qué te ayudo?"
+
+
 def verificar_migraciones(cur: psycopg.Cursor) -> str | None:
     """El nombre de la migración que falta aplicar para que el saludo diario
     no rompa `despachar`/`enqueue_outbox`, o `None` si ya está todo (R4-003,

@@ -1,0 +1,37 @@
+id: b-0031
+objetivo: >
+  Un saludo suelto sin rama abierta se contesta con UNA línea y una pregunta
+  abierta (R4-H1, R3-H8; ADR 0013): el modelo sólo clasifica el mensaje como un
+  saludo suelto (`bare_greeting`) y el código arma la respuesta, sin repetir la
+  lista de tareas ni mandar el texto en dos partes. Con tareas abiertas a mano, el
+  saludo no las menciona.
+actor: Marcos Tarquini
+mensajes:
+  - "hola"
+precondiciones:
+  tareas:
+    - id: t1
+      titulo: Programar PLC de la comprimidora (simulado)
+      area: ot
+      responsable: Marcos Tarquini
+herramientas_prohibidas:
+  - actualizar_estado
+  - registrar_bloqueo
+  - resolver_bloqueo
+  - crear_dependencia
+  - aprobar_tarea
+  - adjuntar_evidencia
+  - crear_objetivo
+efectos:
+  conteos_delta:
+    task: 0
+    task_state_event: 0
+    evidence: 0
+    approval: 0
+respuesta_menciona:
+  - "¿en qué te ayudo?"
+# Una sola línea: sin saltos y sin repetir el saludo del día en otra parte.
+respuesta_no_contiene_patron:
+  - "\n"
+  - "PLC"
+severidad: media
