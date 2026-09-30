@@ -5376,3 +5376,10 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
     de la tarea" antes de preguntar qué hay que hacer; la respuesta natural ("revisar el
     variador de la comprimidora") recibió "No encontré esa opción" y la misma pregunta dos
     veces; "(hasta 120)" es jerga técnica.
+
+- 2026-09-30: **Decisión del usuario — el alta guiada pregunta primero qué hay que hacer.**
+  Orden: "¿Qué hay que hacer?" (título) y después el objetivo, con el más probable primero
+  (⭐) y ✏️ Otra opción; si el mensaje ya trae la tarea ("necesito crear una tarea: …"), se
+  toma el título y se salta al objetivo. Corrige R4c-H4; junto con R4c-H5 (bucle al volver a
+  pedir una tarea nueva a mitad del alta) y la jerga "(hasta 120)" / "(hasta 200)". Para
+  después de la ronda.
