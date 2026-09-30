@@ -7,7 +7,7 @@ acto. Hasta que lo envía es SU rama abierta y a quien confirma no le llega nada
 Modificar es el de T9-R1c-3 (mismo selector) pero cada cambio vuelve al resumen de
 quien pide. Enviar a aprobación lo intercepta el gateway (nunca llega a la
 autoridad): cierra la revisión de una vez, le manda el borrador a quien confirma
-con Confirmar y Cancelar y le dice a quien pide a quién se lo mandó.
+con Confirmar y Rechazar y le dice a quien pide a quién se lo mandó.
 
 Los ruteos y el modelo se guionan; ninguna prueba toca la red ni el modelo real.
 """
@@ -40,7 +40,7 @@ from tests.toques import FUERA_DE_LA_VENTANA, envejecer_toques
 
 APROBADOR = "Morgan Hale"          # quien aprueba lo de Taylor Quinn en el mundo de prueba
 ETIQUETAS_DE_LA_REVISION = ["Enviar a aprobación", "Modificar", "Cancelar"]
-ETIQUETAS_DEL_APROBADOR = ["Confirmar", "Cancelar"]
+ETIQUETAS_DEL_APROBADOR = ["Confirmar", "Rechazar"]
 
 
 # ----------------------------------------------------------------- ayudas
@@ -225,7 +225,7 @@ def test_enviar_le_manda_el_borrador_a_quien_confirma_y_le_dice_a_quien_pide(
         cur.execute("select es_respuesta from message_outbox where id = %s",
                     (nuevas[0]["id"],))
         assert cur.fetchone()["es_respuesta"] is True
-    # A quien confirma, el mismo resumen con Confirmar y Cancelar, iniciado por Prisma.
+    # A quien confirma, el mismo resumen con Confirmar y Rechazar, iniciado por Prisma.
     (revision, confirmacion) = _acciones(conn, rid)
     assert revision["estado"] == "cancelada" and confirmacion["estado"] == "esperando"
     assert confirmacion["chat_id"] == tg_aprobador

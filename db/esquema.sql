@@ -1258,12 +1258,13 @@ language plpgsql security definer
 set search_path = prisma, public, pg_temp as $$
 begin
   perform set_config('prisma.workspace_id', p_workspace_id::text, true);
-  -- Modificar (T9-R1c-3) y Enviar a aprobación (T9-R1c-4) no confirman: sus
-  -- tokens nunca llegan a la conversión.
+  -- Modificar (T9-R1c-3), Enviar a aprobación (T9-R1c-4) y Rechazar (2026-09-30)
+  -- no confirman: sus tokens nunca llegan a la conversión.
   if exists (select 1 from pending_action_option o
               where o.token = p_token and o.workspace_id = p_workspace_id
                 and o.valor in (to_jsonb('modificar'::text),
-                                to_jsonb('enviar'::text))) then
+                                to_jsonb('enviar'::text),
+                                to_jsonb('rechazar'::text))) then
     return query select 'inexistente'::text, null::uuid, null::uuid, false;
     return;
   end if;

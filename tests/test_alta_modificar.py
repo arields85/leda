@@ -162,7 +162,7 @@ def test_si_confirma_otra_persona_su_vista_previa_no_ofrece_modificar(
     su resumen previo al envío (T9-R1c-4, `test_alta_enviar_a_aprobacion.py`)."""
     rid, pid = _alta_enviada(conn, intake_world)
 
-    assert _etiquetas_de_la_vista_previa(conn, pid) == ["Confirmar", "Cancelar"]
+    assert _etiquetas_de_la_vista_previa(conn, pid) == ["Confirmar", "Rechazar"]
 
 
 # ----------------------------------------------------- tocar Modificar

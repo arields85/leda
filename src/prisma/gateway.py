@@ -100,6 +100,7 @@ _PREGUNTAS_DATO_MENU = {
     "informar_bloqueo": "¿Cuál es la causa del bloqueo de «{titulo}»?",
     "destrabar": "¿Cómo se destrabó «{titulo}»?",
     "adjuntar_evidencia": "Contame la evidencia de «{titulo}» (o pegá el enlace).",
+    "rechazar_borrador": "¿Por qué rechazás el borrador de «{titulo}»?",
 }
 _DESCRIPCIONES_DATO_MENU = {
     "terminar": "la evidencia de la entrega de «{titulo}»",
@@ -107,6 +108,7 @@ _DESCRIPCIONES_DATO_MENU = {
     "informar_bloqueo": "la causa del bloqueo de «{titulo}»",
     "destrabar": "cómo se destrabó «{titulo}»",
     "adjuntar_evidencia": "la evidencia de «{titulo}»",
+    "rechazar_borrador": "el motivo por el que rechaza el borrador de «{titulo}»",
 }
 _DESCRIPCION_DATO_MENU_GENERICA = "un dato sobre «{titulo}»"
 # Redacción pendiente de revisión de voz en T10.
@@ -137,6 +139,10 @@ AVISO_RAMA_YA_CERRADA = (
     "Esa pregunta ya no estaba pendiente, así que no hay nada que retomar.")
 # El botón ya se usó, venció o es de antes de que existiera lo que hacía.
 # Redacción pendiente de revisión de voz en T10.
+# El motivo llegó cuando el borrador ya no esperaba su decisión (se confirmó, venció
+# o lo cancelaron): no se rechaza ni se avisa nada.
+AVISO_BORRADOR_YA_NO_ESPERA = (
+    "Ese borrador ya no estaba esperando tu decisión, así que no rechacé nada.")
 AVISO_PEDIDO_NO_VIGENTE = (
     "Ese pedido ya no está vigente. Si sigue haciendo falta, escribime y lo "
     "vemos de nuevo.")
@@ -909,6 +915,25 @@ def _toque(conn, workspace_id: str, slug: str, toque: dict,
                                              chat_id=chat_id, now=ahora) is None:
                         _responder(cur, workspace_id, chat_id, quien,
                                    AVISO_PEDIDO_NO_VIGENTE, ahora)
+                    return cerrar()
+                if draft_token and I.es_rechazar_de_borrador(cur, quien, token,
+                                                             ahora):
+                    # Rechazar el borrador de otra persona (2026-09-30): no
+                    # cancela nada todavía ni llega a la autoridad; pide el
+                    # motivo, y con él se cancela y se le avisa a quien lo pidió
+                    # (`_resumir_dato_menu_tarea`). La vista previa sigue vigente
+                    # hasta entonces.
+                    rechazo = I.reject_from_preview(cur, quien, token=token,
+                                                    chat_id=chat_id, now=ahora)
+                    if rechazo is None:
+                        _responder(cur, workspace_id, chat_id, quien,
+                                   AVISO_PEDIDO_NO_VIGENTE, ahora)
+                    else:
+                        _pedir_dato_menu_tarea(
+                            cur, quien, workspace_id, chat_id,
+                            accion="rechazar_borrador", tarea_id="",
+                            titulo=rechazo["titulo"], ahora=ahora,
+                            extra={"draft_id": rechazo["draft_id"]})
                     return cerrar()
                 if draft_token and I.es_enviar_de_borrador(cur, quien, token,
                                                            ahora):
@@ -3482,6 +3507,17 @@ def _resumir_dato_menu_tarea(cur, quien, texto: str, modificacion, chat_id: int,
     if not dato:
         _responder(cur, workspace_id, chat_id, quien,
                   "Contame un poco más, así lo registro.", ahora)
+        return
+
+    if accion == "rechazar_borrador":
+        # El motivo de quien confirma el borrador de otra persona: cancela el
+        # borrador y le avisa a quien lo pidió, todo en este turno.
+        from . import ingreso_tareas as I
+
+        recibo = I.reject_draft(cur, quien, draft_id=args.get("draft_id"),
+                                reason=dato, now=ahora)
+        _responder(cur, workspace_id, chat_id, quien,
+                   recibo or AVISO_BORRADOR_YA_NO_ESPERA, ahora)
         return
 
     if accion == "informar_bloqueo":

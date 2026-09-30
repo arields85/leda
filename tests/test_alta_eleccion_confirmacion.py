@@ -92,7 +92,7 @@ def _alta_en_confirmacion(conn, world, responsable="Sam North") -> tuple[str, st
 def _alta_enviada(conn, world, responsable="Para mí") -> tuple[str, str]:
     """El alta que confirma otra persona, ya enviada a aprobación por quien la
     pidió (T9-R1c-4): devuelve el id de la solicitud y el de la `pending_action`
-    de la vista previa de quien confirma, con Confirmar y Cancelar."""
+    de la vista previa de quien confirma, con Confirmar y Rechazar."""
     rid, revision = _alta_en_confirmacion(conn, world, responsable=responsable)
     user = _usuario(world)
     ws = world["north-lab"]["id"]

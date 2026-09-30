@@ -123,6 +123,9 @@ def etiquetas_coinciden(a: str, b: str) -> bool:
 
 ETIQUETA_CONFIRMAR = con_icono("Confirmar", ICONO_CONFIRMAR)
 ETIQUETA_CANCELAR = con_icono("Cancelar", ICONO_CANCELAR)
+# El botón de quien confirma el borrador de OTRA persona en lugar de Cancelar
+# (decisión del usuario, 2026-09-30): pide el motivo y se lo pasa a quien lo pidió.
+ETIQUETA_RECHAZAR = con_icono("Rechazar", ICONO_CANCELAR)
 # El tercer botón de la vista previa (ADR 0005 decisión 1). Único lugar donde se
 # escribe la etiqueta: con ✏️ ("alternativa que permite escribir o modificar",
 # manual de voz §9) junto a Confirmar y Cancelar (T10-3, R3-H10). Una opción se

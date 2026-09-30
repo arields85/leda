@@ -20,7 +20,8 @@ from .incidentes import (ETAPA_CONFIGURACION_ALTA, ETAPA_RESUMEN_VIGENTE_SIN_FIL
                          REFERENCIA_PENDING_ACTION, registrar_incidente)
 from .pendientes import HERRAMIENTA_REVISION_BORRADOR
 from .salida import (BUTTON_TEXT_LIMIT, ETIQUETA_CANCELAR, ETIQUETA_CONFIRMAR,
-                     ETIQUETA_ENVIAR, ETIQUETA_MODIFICAR, ICONO_CANCELAR, ICONO_OTRA_OPCION,
+                     ETIQUETA_ENVIAR, ETIQUETA_MODIFICAR, ETIQUETA_RECHAZAR,
+                     ICONO_CANCELAR, ICONO_OTRA_OPCION,
                      ICONO_VER_MAS, PayloadValidationError, con_icono,
                      enqueue_outbox, etiqueta_sin_icono, etiquetas_de_tarea,
                      normalize_visible_text, prepare_buttons, prepare_payload, telegram_utf16_units,
@@ -814,8 +815,12 @@ def open_modify_picker(cur: psycopg.Cursor, who: Solicitante, question_id: str,
 # autoridad: los intercepta el gateway (la conversión es sólo del botón Confirmar).
 VALUE_MODIFY = "modificar"
 VALUE_SEND = "enviar"
+# Rechazar, el botón de quien confirma el borrador de otra persona: pide el motivo
+# y cancela recién con él (`reject_from_preview`, `reject_draft`). Nunca llega a la
+# autoridad: `resolver_ingreso_borrador` lo rechaza (migración 0025).
+VALUE_REJECT = "rechazar"
 
-_DRAFT_BUTTON = """select p.id, p.membership_id, p.chat_id, p.estado,
+_DRAFT_BUTTON = """select p.id, p.draft_id, p.membership_id, p.chat_id, p.estado,
                   p.vence_en > %s as vigente
              from pending_action_option o
              join pending_action p on p.id = o.pending_action_id
@@ -839,6 +844,91 @@ def es_enviar_de_borrador(cur: psycopg.Cursor, who: Solicitante, token: str,
     """Si `token` es el del botón Enviar a aprobación del resumen de quien pidió
     el borrador (T9-R1c-4)."""
     return _draft_button(cur, who, token, now, VALUE_SEND) is not None
+
+
+def es_rechazar_de_borrador(cur: psycopg.Cursor, who: Solicitante, token: str,
+                            now: datetime) -> bool:
+    """Si `token` es el del botón Rechazar de la vista previa que ve quien confirma
+    el borrador de otra persona."""
+    return _draft_button(cur, who, token, now, VALUE_REJECT) is not None
+
+
+def reject_from_preview(cur: psycopg.Cursor, who: Solicitante, *, token: str,
+                        chat_id: int, now: datetime) -> dict | None:
+    """El botón Rechazar de la vista previa de quien confirma. No cancela nada: dice
+    de qué borrador se trata (`draft_id`, `titulo`) para que el gateway le pida el
+    motivo. Sólo lo toca quien confirma, en su chat (`Denegado` si no), y sólo
+    mientras la vista previa espera y no venció; `None` si ya no (un toque tardío)."""
+    button = _draft_button(cur, who, token, now, VALUE_REJECT)
+    if not button:
+        return None
+    if str(button["membership_id"]) != str(who.membership_id) \
+            or button["chat_id"] != chat_id:
+        raise Denegado(NOT_YOURS)
+    if button["estado"] != "esperando" or not button["vigente"]:
+        return None
+    cur.execute("select titulo from task_draft where id = %s", (button["draft_id"],))
+    draft = cur.fetchone()
+    if not draft:
+        return None
+    return {"draft_id": str(button["draft_id"]), "titulo": draft["titulo"]}
+
+
+def rejected_text(title: str, requester_name: str) -> str:
+    """El recibo de quien rechazó: lo que hizo y a quién le avisó."""
+    return (f"Listo, rechacé el borrador de la tarea «{title}» y le avisé a "
+            f"{requester_name}.")
+
+
+def rejection_notice_text(rejecter_name: str, title: str, reason: str) -> str:
+    """El aviso de coordinación a quien pidió el borrador: quién lo rechazó, cuál y
+    por qué."""
+    return (f"{rejecter_name} rechazó el borrador de la tarea «{title}»: "
+            f"{reason}")
+
+
+def reject_draft(cur: psycopg.Cursor, who: Solicitante, *, draft_id: str,
+                 reason: str, now: datetime) -> str | None:
+    """Rechaza el borrador de otra persona con el motivo que quien confirma acaba de
+    dar: lo cancela por el mismo camino que Cancelar (`_cancel`, con el motivo en la
+    auditoría), le encola a quien lo pidió el aviso de coordinación y devuelve el
+    recibo de quien rechazó, que el gateway le dice como respuesta a su mensaje.
+    Todo en la transacción del turno: o pasa todo o nada.
+
+    `None` si ya no correspondía -- el borrador se confirmó, venció o lo cancelaron
+    entre el toque y el motivo, o `who` no es quien confirma --: no cambia ni avisa
+    nada. Sólo rechaza quien tiene la vista previa vigente, la misma que Confirmar
+    convertiría."""
+    cur.execute(
+        """select p.id from pending_action p
+            where p.draft_id = %s and p.membership_id = %s
+              and p.estado = 'esperando' and p.vence_en > %s
+              and p.workspace_id = %s
+            for update""",
+        (draft_id, who.membership_id, now, who.workspace_id))
+    if not cur.fetchone():
+        return None
+    cur.execute(
+        """select * from task_intake_request
+            where task_draft_id = %s and workspace_id = %s and estado = 'active'
+            for update""", (draft_id, who.workspace_id))
+    request = cur.fetchone()
+    if not request or str(request["membership_id"]) == str(who.membership_id):
+        return None
+    cur.execute("select titulo from task_draft where id = %s", (draft_id,))
+    title = cur.fetchone()["titulo"]
+    cur.execute("select nombre from integrante where membership_id = %s",
+                (request["membership_id"],))
+    requester = cur.fetchone()
+    _cancel(cur, request, who, now, enqueue=False, reason=reason)
+    enqueue_outbox(
+        cur, workspace_id=str(request["workspace_id"]), chat_id=request["chat_id"],
+        recipient_membership_id=str(request["membership_id"]),
+        text=rejection_notice_text(who.nombre, title, reason),
+        scheduled_for=now, dedupe_key=f"intake:{request['id']}:rejected-notice",
+        allow_split=True, es_coordinacion=True,
+    )
+    return rejected_text(title, requester["nombre"] if requester else "quien lo pidió")
 
 
 def modify_from_preview(cur: psycopg.Cursor, who: Solicitante, *, token: str,
@@ -1745,7 +1835,7 @@ def _send_to_confirmer(cur, request, now, preview_text, preview, version,
 
     Modificar (T9-R1c-3) es de quien pidió el borrador y lo confirma él mismo: es
     quien tiene la rama abierta. Si confirma otra persona, ella sólo ve Confirmar y
-    Cancelar (T9-R1c-4: quien pidió ya lo revisó y lo envió)."""
+    Rechazar (T9-R1c-4: quien pidió ya lo revisó y lo envió)."""
     from .autoridad import Canal
     from .pendientes import registrar
 
@@ -1755,10 +1845,14 @@ def _send_to_confirmer(cur, request, now, preview_text, preview, version,
         app_user_id=str(authority["app_user_id"]), canal=Canal.ESPACIO,
         workspace_id=workspace_id, membership_id=approver_id,
     )
-    options = [(ETIQUETA_CONFIRMAR, True), (ETIQUETA_CANCELAR, False)]
     requester_confirms = approver_id == str(request["membership_id"])
     if requester_confirms:
-        options.insert(1, (ETIQUETA_MODIFICAR, VALUE_MODIFY))
+        options = [(ETIQUETA_CONFIRMAR, True), (ETIQUETA_MODIFICAR, VALUE_MODIFY),
+                   (ETIQUETA_CANCELAR, False)]
+    else:
+        # Quien confirma lo de otra persona lo rechaza, con un motivo que le llega
+        # a quien lo pidió (2026-09-30); cancelar lo propio sigue siendo Cancelar.
+        options = [(ETIQUETA_CONFIRMAR, True), (ETIQUETA_RECHAZAR, VALUE_REJECT)]
     pending = registrar(
         cur, confirmer, herramienta="confirmar_borrador_tarea", args={},
         resumen=preview_text, vence_en=now + timedelta(hours=8),
@@ -1827,7 +1921,7 @@ def telegram_text_length(text: str) -> int:
     return telegram_utf16_units(text)
 
 
-def _cancel(cur, request, who, now, enqueue=True):
+def _cancel(cur, request, who, now, enqueue=True, reason=None):
     request_id = str(request["id"])
     result = {"estado": "cancelled", "request_id": request_id}
     cur.execute(
@@ -1853,11 +1947,15 @@ def _cancel(cur, request, who, now, enqueue=True):
         (request["task_draft_id"],),
     )
     _invalidate_open_inputs(cur, request_id)
+    # Un rechazo (quien confirma lo de otra persona) deja su motivo en la auditoría.
     registrar_auditoria(
-        cur, accion="cancelar_ingreso_tarea", workspace_id=who.workspace_id,
+        cur, accion=("cancelar_ingreso_tarea" if reason is None
+                     else "rechazar_ingreso_tarea"),
+        workspace_id=who.workspace_id,
         actor_app_user_id=who.app_user_id, actor_kind="persona",
         sujeto_tipo="task_draft", sujeto_id=str(request["task_draft_id"]),
-        detalle={"request_id": request_id},
+        detalle={"request_id": request_id,
+                 **({} if reason is None else {"motivo": reason})},
     )
     text = "Listo, cancelé el borrador de la tarea."
     if enqueue:
