@@ -5408,3 +5408,23 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   corregir por prioridad: altos R4c-H3 y R4b-H5; alta guiada (orden decidido por el usuario,
   R4c-H5 a H9); medios R4c-H1, R4c-H2, R4b-H1; forma R4b-H2 a H4; pendientes anteriores.
   Frontera RDD `4fc1365`; `ffe4e85` sin revisar (arnés). Listener en la terminal del usuario.
+
+- 2026-09-30: **Observación del usuario sobre la ronda 4 (para abrir la próxima sesión).**
+  Funciona bien la capa de datos: Prisma sabe con quién habla, da datos correctos de sus
+  tareas y no mezcla las de otras personas; los flujos avanzan y se van corrigiendo. Pero
+  "todo es muy robótico": "estamos combinando Jev, PostgreSQL y un modelo de razonamiento
+  y sólo siento que estamos usando Jev y SQL; la parte más humana, la de comprensión, que
+  sería el modelo, no noto que esté actuando". Ejemplo: la fecha "4de octubre" rechazada
+  por formato cuando cualquier modelo la entiende.
+  Verificado en el código: la fecha del alta guiada la interpreta sólo
+  `ingreso_tareas._parse_absolute_date` con expresiones regulares ("4de octubre" falla
+  porque exige espacio entre el número y "de"; "04 / 10" porque no admite espacios junto a
+  la barra); el modelo no participa. Lo mismo pasa en el resto del alta: el objetivo sólo
+  se elige de la lista ("No encontré esa opción") y los textos piden valores "exactos".
+  **Propuesta a discutir con el usuario** (consistente con el ADR 0013, "el modelo
+  interpreta, el código garantiza"): en las respuestas de texto libre, el modelo interpreta
+  y normaliza el valor (una fecha dicha de cualquier forma, el objetivo más parecido a lo
+  que la persona escribió, el título a partir de su frase) y el código sólo valida el
+  resultado estructurado (fecha válida y futura, opción existente) y lo muestra en la
+  vista previa para confirmar. Dejar de agregar reglas de formato al código. Si el usuario
+  la acepta, va como ADR y gobierna la unidad del alta guiada del orden de trabajo.

@@ -205,6 +205,14 @@ avisos encolados fuera de horario; tres son de «Dashboard de lotes», que ya es
 listener lo corre el usuario en su propia terminal (`.\.venv\Scripts\python.exe -m
 prisma escuchar corework`): las tareas en segundo plano del agente se cortan por tiempo.
 
+**Antes de corregir, discutir con el usuario (su observación del cierre):** la capa de
+datos funciona bien, pero la conversación se siente "robótica": el modelo casi no
+interviene donde hace falta comprensión (la fecha del alta la interpretan sólo expresiones
+regulares; el objetivo sólo se elige de una lista). Propuesta: en las respuestas de texto
+libre el modelo interpreta y normaliza, el código valida y la vista previa confirma
+(ADR 0013, "el modelo interpreta, el código garantiza"). Si se acepta, va como ADR y
+orienta la unidad 3. Detalle en `odd/tasks/prisma-orienta.md`.
+
 **Próximo, en orden (unidades con TDD, commit y revisión RDD):**
 1. Terminar el circuito C a las 09:00 y observar los avisos viejos.
 2. Altos: R4c-H3 ("No puedo mostrarte la evidencia", falso: el menú la muestra) y R4b-H5
