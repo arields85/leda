@@ -72,6 +72,19 @@ def test_solo_se_agregan_las_que_faltan():
     assert "«Cablear tablero» (asignada)" not in salida
 
 
+def test_si_el_turno_resolvio_una_tarea_puntual_la_respuesta_no_es_una_lista():
+    """Si la persona preguntó por una tarea concreta (el turno la resolvió
+    clara), la respuesta es sobre esa tarea aunque la lectura haya traído otras:
+    agregar las demás sería información no pedida (H12). La nombra
+    `_nombrar_tareas_sin_mencionar`; la guarda de listas no se mete."""
+    filas = [_fila("Cablear tablero", "asignada", 1),
+             _fila("Revisar variador", "en_curso", 2),
+             _fila("Calibrar sensor", "bloqueada", 3)]
+    texto = "Está asignada; arrancala cuando puedas."
+    assert _nombrar_tareas_listadas(
+        texto, filas, tareas_resueltas_claras={"id-1": "Cablear tablero"}) == texto
+
+
 def test_la_respuesta_que_ya_las_nombra_a_todas_no_se_toca():
     filas = [_fila("Cablear tablero", "asignada", 1),
              _fila("Revisar variador", "en_curso", 2)]

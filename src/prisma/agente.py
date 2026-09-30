@@ -294,7 +294,8 @@ def responder(cur: psycopg.Cursor, quien: Solicitante, texto_entrante: str,
     salida = normalize_visible_text(
         revisar_salida(salida, ctx.variantes_prohibidas))
     salida = _nombrar_tareas_sin_mencionar(salida, tareas_resueltas_claras)
-    salida = _nombrar_tareas_listadas(salida, tareas_listadas)
+    salida = _nombrar_tareas_listadas(salida, tareas_listadas,
+                                      tareas_resueltas_claras)
     if sin_efecto:
         salida = with_no_effect_status(salida)
     # T3 (ADR 0007 punto 3): el servidor, no el modelo, garantiza que una
@@ -547,7 +548,9 @@ def _nombrar_tareas_sin_mencionar(
 MAX_TAREAS_NOMBRADAS = 3
 
 
-def _nombrar_tareas_listadas(texto: str, tareas_listadas: list[dict]) -> str:
+def _nombrar_tareas_listadas(
+        texto: str, tareas_listadas: list[dict],
+        tareas_resueltas_claras: dict[str, str] | None = None) -> str:
     """Protección determinística de las listas (T10-5, R3-H3 y R3-H7), con la
     misma técnica que `_nombrar_tareas_sin_mencionar`: se comprueba contra lo
     que las lecturas trajeron en este turno (`tareas_listadas`), no contra las
@@ -557,8 +560,14 @@ def _nombrar_tareas_listadas(texto: str, tareas_listadas: list[dict]) -> str:
     una lista como "una asignada y la otra en curso" nunca queda sin decir cuál
     es cuál (H3). Con más tareas, o sin ninguna, el texto no se toca: resume, y los
     nombres los llevan los botones (`_opciones_lista_tareas`). No toca el resto del
-    texto ni repite lo que ya nombra, así que aplicarla dos veces da lo mismo."""
-    if not tareas_listadas or len(tareas_listadas) > MAX_TAREAS_NOMBRADAS:
+    texto ni repite lo que ya nombra, así que aplicarla dos veces da lo mismo.
+
+    Si el turno resolvió clara una tarea puntual (`tareas_resueltas_claras`), la
+    persona preguntó por esa tarea y la respuesta no es una lista, aunque la
+    lectura haya traído otras: agregarlas sería información no pedida (H12). Esa
+    la nombra `_nombrar_tareas_sin_mencionar`."""
+    if (tareas_resueltas_claras or not tareas_listadas
+            or len(tareas_listadas) > MAX_TAREAS_NOMBRADAS):
         return texto
     comparable = _normalizar_comparacion(texto)
     filas = [f"«{t['titulo']}» ({H._estado_legible(t.get('estado')).lower()})"
