@@ -5322,3 +5322,11 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   opciones ni toma la tarea del intento rechazado). Anotado para después de la ronda, junto
   con la negativa sin intento. RDD: tramo `4fc1365..ffe4e85` medio, 187 líneas,
   `under_budget`: pendiente en el tramo.
+
+- 2026-09-30: **Base rearmada para retomar T11** (autorización del usuario). Respaldo
+  `db/respaldos/prisma-antes-ronda4b-20260930.dump` (526 entradas legibles); misma secuencia
+  que en el primer rearmado (`drop`/`create` con cero conexiones y `PRISMA_DB_URL`
+  verificada, `esquema`, `importar --activar`, `feriados`, `sembrar`, `modelo`,
+  `administrador`): 12 tareas; `verificar_migraciones` -> `None`; columna
+  `message_outbox.es_coordinacion` presente. `escuchar corework` arrancado. Ariel tiene que
+  volver a escribirle al bot de administración (base nueva).
