@@ -189,9 +189,12 @@ serializan y la hora de cada evento, evidencia y aprobación es la de escritura
 a punta de "Pedir cambios" por el webhook. Todo esto **todavía no se probó en vivo**.
 
 **Punto exacto para retomar (cierre de sesión 2026-09-30, noche).** `main` por delante de
-`origin/main` (sin push; lo decide el usuario). Frontera de revisión RDD en `4fc1365`
-(`review-d8f0e2e86a8a0d34`, aprobada y reconocida); sin revisar: `ffe4e85` (sólo el arnés
-del banco, `tests/banco/`, `under_budget`), se revisa con el próximo cambio de código.
+`origin/main` (sin push; lo decide el usuario). Frontera de revisión RDD en `d4eefc7`
+(`review-cb3deef4705ea11f`, aprobada y reconocida; todo el código revisado). Esa revisión
+dejó dos advertencias sobre el arnés del banco para el punto 6: cualquier aviso a otra
+persona respalda un "le avisé" (debería ser un aviso de coordinación a la persona
+nombrada) y en `b-0027-d` hay que verificar que un intento rechazado de `aprobar_tarea` no
+cuente como herramienta ejecutada.
 Consentimiento permanente del usuario para las revisiones; parar sólo por decisiones sobre
 cómo funciona Prisma. Detalle y evidencia de todo en `odd/tasks/prisma-orienta.md`.
 
