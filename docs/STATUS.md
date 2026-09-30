@@ -215,8 +215,7 @@ la regla T9-R5; `b-0020` pasó al repetirlo).
 pidió?), T9-R5 (regla nueva: no preguntar dos veces "¿A cuál te referís?" con las mismas
 candidatas en un mismo mensaje), T9-H19c (¿qué hace Prisma con un mensaje editado?), T10-6
 (saludo sin rama abierta: ¿con botones o sin?), T10-7 (negativa sin intento: ¿"Estado: sin
-cambios" o el estado de la tarea?), autorización para aplicar la migración `0023` en la base
-local, T11 (cuarta ronda por Telegram con las cuentas del usuario) y el push. Método y
+cambios" o el estado de la tarea?), T11 (cuarta ronda por Telegram con las cuentas del usuario) y el push. Método y
 precauciones de siempre: un escritor por unidad con TDD, nunca dos sesiones de pytest a la vez
 sobre el servidor local; PostgreSQL local (scoop) se arranca con `pg_ctl` tras reiniciar
 Windows (`PRUEBA-LOCAL.md`); si queda colgado, cerrar el proceso y volver a arrancarlo.
@@ -234,7 +233,7 @@ botones y saludo diario al primer mensaje del día a cada persona, decidido al d
 falta una migración; respuesta inmediata e indicador "escribiendo…" con borrador
 nativo sólo si el turno pasa de 1,5 s (#9, #9b, ADR 0011).
 
-Base local `prisma`: migraciones hasta `0022` aplicadas (`0023` pendiente de autorización) (`0020` a `0022` el 2026-09-29, con
+Base local `prisma`: migraciones hasta `0023` aplicadas (`0023` el 2026-09-30, con respaldo `db/respaldos/prisma-antes-0023-20260930.dump`, 532 entradas, y ensayo previo en una copia descartable; `verificar_migraciones` -> `None`) (`0020` a `0022` el 2026-09-29, con
 respaldo `db/respaldos/prisma-antes-0020-0022-20260929.dump` y ensayo previo en una copia
 descartable; `saludo.verificar_migraciones` -> `None`); modelo `nan`/`deepseek-v4-flash`
 configurado en la ronda (respaldos

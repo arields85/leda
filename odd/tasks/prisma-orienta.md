@@ -5108,3 +5108,11 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   después de T11 (cuarta ronda por Telegram): ya hay bastante para probar y la ronda puede
   cambiar las prioridades. Antes de la ronda: aplicar `0023` en la base local (con
   autorización), cerrar la revisión de T9-H19h y el gate de sesión progresiva de `AGENTS.md`.
+
+- 2026-09-30: **Migración `0023` aplicada en la base local `prisma`** (autorización del
+  usuario). Respaldo `db/respaldos/prisma-antes-0023-20260930.dump` (532 entradas legibles
+  con `pg_restore -l`); ensayo en una copia descartable restaurada del respaldo: antes
+  `resolver_ingreso_borrador` no rechazaba "enviar", después sí, dueño `prisma_owner`; copia
+  borrada. Luego en la base real con el mismo resultado; `saludo.verificar_migraciones` ->
+  `None`. `psql -f` con `ON_ERROR_STOP=1`, `PGCLIENTENCODING=UTF8`; ningún proceso de Prisma
+  escribía en la base.
