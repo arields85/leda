@@ -5195,3 +5195,15 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
     tarde recibió "Ese pedido ya no está vigente…" (fuera de la ventana de 10 s).
   - R4-H11. El aviso de entrega hecho a las 08:53 quedó programado para las 09:00 (horario
     laboral): comportamiento esperado, anotado porque el usuario no lo vio llegar.
+
+- 2026-09-30: **Corrección del diagnóstico de R4-H7.** La causa anotada arriba (ramas sin
+  cerrar que retenían los avisos) era una inferencia del orquestador y resultó **falsa**: el
+  escritor reprodujo la ronda y `ver_rama_abierta` devuelve `None` aun con esas filas. La
+  causa real, confirmada después en la base de la ronda: `despachador._ya_recibio` contaba
+  las respuestas contra `max_mensajes_automaticos_por_persona_por_dia` (3 en corework); con
+  12 y 8 respuestas enviadas, el tope postergó los tres avisos al día siguiente
+  (`programado_para` 01/10 09:00; la primera lectura mostró sólo la hora y se leyó como del
+  mismo día). El código de `_despachar_fila` y el ADR 0011 ya decían que una respuesta no
+  cuenta. Las filas sin cerrar eran reales pero inertes; se cierran igual.
+  Pregunta abierta para el usuario: ¿un aviso de coordinación (te entregaron algo para
+  revisar, te pidieron cambios) debe contar contra el tope diario de mensajes automáticos?
