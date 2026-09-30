@@ -156,7 +156,8 @@ autorización explícita y un entorno descartable confirmado.
 
 Antes de implementar una fase:
 
-1. Confirmar que `docs/STATUS.md` sigue vigente contra el repositorio.
+1. Confirmar que `docs/STATUS.md` sigue vigente contra el repositorio y escribir el
+   chequeo de rumbo ("Cómo pensamos juntos", punto 3, más abajo).
 2. Elegir el menor circuito útil de extremo a extremo que pruebe comprensión,
    respuesta, coordinación o reducción de carga humana.
 3. Resolver sólo las decisiones y guardas que bloquean ese circuito; no adelantar
@@ -179,40 +180,90 @@ conversa Prisma:
   no sólo con la frase observada.
 - Si no entra en ninguna regla, discutir con el usuario una regla nueva antes de
   parchear.
+- Si el hallazgo vuelve después de corregir el mecanismo de su regla, el mecanismo no
+  alcanza: es un disparador para parar y revisar el flujo ("Cómo pensamos juntos",
+  punto 4).
 - Reparto de trabajo: el modelo interpreta el lenguaje y devuelve un comando de una lista
   cerrada; el código ejecuta un manejo determinista por comando y garantiza las
   invariantes. Es el patrón probado de los asistentes de tareas ("conversation repair
   patterns", por ejemplo en Rasa), adoptado dentro del monolito, no como dependencia.
 
-**Lecciones de trabajo (2026-09-30, al cerrar la ronda 4).** Vigentes para toda sesión:
+### Cómo pensamos juntos (usuario y agente)
 
-- **Probar en real enseguida** (decisión del usuario). Construir la porción más chica
-  que se pueda probar y llevarla a Telegram real con datos ficticios cuanto antes. Todo
-  plan nombra primero su prueba real más temprana y recorta el alcance para llegar a
-  ella. La documentación registra decisiones, no ensayos; las mediciones baratas (banco,
-  repeticiones) corren en paralelo con la construcción. Diseñar mucho sin probar costó
-  horas.
-- **Lo sólido no se simplifica.** La base, el aislamiento entre clientes, las
-  confirmaciones y la auditoría funcionan. Ninguna propuesta de "simplificar" (un
-  framework de agente, un modelo con SQL libre, reglas en el prompt en vez de
-  garantías) reemplaza esas garantías: las instrucciones gobiernan el comportamiento;
-  el código y la base, lo que no puede pasar nunca
-  ([`ADR 0014`](docs/decisions/0014-flujo-de-un-mensaje.md), alternativas).
-- **El problema de la conversación es dónde participa el modelo, no la falta de
-  reglas.** Un camino pasa al flujo del ADR 0014 sólo cuando se retiraron sus
-  mecanismos viejos; si conviven, no está terminado y el sistema queda peor.
-- **Separar modelo de flujo.** Antes de atribuir una falla de comprensión al flujo,
-  saber cuánto aporta el modelo: Prisma usa un modelo "flash" chico, elegido por
-  velocidad. Medirlo con el banco es barato.
-- **La superficie crece más rápido de lo que se estabiliza.** Cada ronda prueba
-  funcionalidad nueva, y por eso los hallazgos no bajan. Decisión del usuario: la
-  funcionalidad nueva queda congelada hasta que el núcleo de la conversación (alta,
-  entrega, aprobación) cumpla en una prueba real los criterios del ADR 0014. Alcance
-  en `docs/ROADMAP.md`, "Orden de entrega". No construir funcionalidad nueva mientras
-  rija, aunque se pida de pasada: anotarla en el roadmap y recordar el congelamiento.
-- **Ningún proyecto externo resuelve esto listo para usar.** Un PM conversacional
-  multi-cliente con garantías es un problema propio. Relevar proyectos externos para
-  tomar ideas, no bases ([`docs/research/`](docs/research/)).
+Acordado con el usuario el 2026-09-30, al cerrar la ronda 4. Vigente para toda sesión.
+
+**Por qué existe.** Dos veces el proyecto subió de nivel porque el usuario frenó y
+propuso mirar desde arriba (reglas generales en el ADR 0013, el flujo en el ADR 0014).
+El agente seguía el orden documentado y corregía hallazgo por hallazgo: cada arreglo era
+razonable, las pruebas pasaban y parecía progreso, y nada dentro de la tarea decía
+"pará". El agente empieza cada sesión de cero y ve el pasado sólo por los documentos;
+el usuario tiene la memoria de las rondas. Por eso la señal de parar tiene que estar
+escrita en el proceso, no depender de que alguien la note.
+
+**1. Roles complementarios.** El usuario aporta continuidad entre rondas, contexto
+operativo y criterio de producto; el agente, razonamiento amplio, conocimiento y
+velocidad. Ninguno tiene la razón por defecto.
+
+**2. Toda propuesta se evalúa antes de ejecutarse.** Lo que propone el usuario se
+verifica contra el código y los documentos, se cuestiona y se debate, con alternativas y
+sus costos, salvo que diga "hacelo sí o sí". La evaluación es proporcional: en algo
+chico y reversible, la objeción en una línea y se sigue; en lo que cambia producto,
+arquitectura o días de trabajo, se debate antes de empezar. Estar de acuerdo también se
+fundamenta.
+
+**3. Chequeo de rumbo, escrito.** Antes de empezar una unidad o una ronda, y al volver
+de cada prueba real, el agente responde por escrito en el documento de la unidad
+(`odd/tasks/…`) o en `docs/STATUS.md`:
+
+- ¿Qué clase de problema ataca esto, y ya apareció antes con otra forma?
+- ¿Es un mecanismo general o un caso?
+- ¿Qué haría innecesaria la próxima ronda?
+- ¿Sigue valiendo la hipótesis que justificó este camino?
+
+Si una respuesta no convence, se para y se discute con el usuario antes de seguir. No es
+un trámite: se razona antes de gastar una ronda, no después de varias.
+
+**4. Disparadores que obligan a parar**, sin esperar al chequeo:
+
+- un arreglo que agrega un caso especial (una frase, una condición o una bandera para
+  el caso observado);
+- la misma función o el mismo camino tocado por dos arreglos seguidos;
+- la misma clase de hallazgo en dos rondas;
+- pruebas en verde y el usuario dice que se siente mal;
+- un hallazgo que contradice un ADR vigente.
+
+Al dispararse uno, se revisa el mecanismo o el flujo, no el caso.
+
+**5. Probar en real enseguida** (decisión del usuario). Construir la porción más chica
+que se pueda probar y llevarla a Telegram real con datos ficticios cuanto antes. Todo
+plan nombra primero su prueba real más temprana y recorta el alcance para llegar a ella.
+Las mediciones baratas (banco, repeticiones) corren en paralelo con la construcción. La
+documentación registra decisiones y su porqué, no ensayos.
+
+**6. Lo sólido no se simplifica.** La base, el aislamiento entre clientes, las
+confirmaciones y la auditoría funcionan. Ninguna propuesta de "simplificar" (un
+framework de agente, un modelo con SQL libre, reglas en el prompt en vez de garantías)
+las reemplaza: las instrucciones gobiernan el comportamiento; el código y la base, lo
+que no puede pasar nunca
+([`ADR 0014`](docs/decisions/0014-flujo-de-un-mensaje.md), alternativas).
+
+**7. Un camino pasa al flujo nuevo sólo cuando se retiró lo viejo.** El problema de la
+conversación es dónde participa el modelo, no la falta de reglas. Si los mecanismos
+viejos conviven con los nuevos, el camino no está terminado y el sistema queda peor.
+
+**8. Separar modelo de flujo.** Antes de atribuir una falla de comprensión al flujo,
+medir cuánto aporta el modelo: Prisma usa un modelo "flash" chico, elegido por
+velocidad, y medirlo con el banco es barato.
+
+**9. Funcionalidad nueva congelada** (decisión del usuario) hasta que alta, entrega y
+aprobación cumplan en una prueba real los criterios del ADR 0014. Alcance en
+`docs/ROADMAP.md`, "Orden de entrega". Lo que se pida de pasada se anota en el roadmap y
+se recuerda el congelamiento.
+
+**10. Proyectos externos: ideas, no bases.** Un PM conversacional multi-cliente con
+garantías es un problema propio ([`docs/research/`](docs/research/)).
+
+### Al terminar una unidad
 
 Al terminar una unidad:
 
