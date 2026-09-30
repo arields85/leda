@@ -123,6 +123,14 @@ todas las cuentas):
   superficie nueva. Lo que se espera es que dejen de repetirse las mismas clases de
   falla.
 
+**Prueba posterior: flujo frente a modelo** (decisión del usuario, 2026-09-30). Prisma
+usa NaN `deepseek-v4-flash`, elegido por velocidad (`docs/STATUS.md`). Que la
+conversación se sienta robótica puede venir del flujo (el modelo encerrado donde tendría
+que comprender) o del modelo (uno chico entiende peor el lenguaje desprolijo). Para no
+mezclar las dos causas, el experimento A/B se corre con el modelo actual. Una vez elegida
+la variante, el banco real se corre sobre el mismo flujo con un modelo más capaz y se
+compara la comprensión ganada con la latencia y el costo agregados.
+
 **Moratoria.** Mientras dura el experimento no se agregan reglas ni parches de
 conversación. Un hallazgo nuevo se registra y se clasifica por etapa del flujo.
 
