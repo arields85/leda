@@ -2,10 +2,11 @@ id: b-0022-i
 variante_de: b-0022
 objetivo: >
   Variante de b-0022, el borrador espera a otra persona (ADR 0013 regla 1,
-  enmienda "una sola rama de conversación abierta", T9-R1d): quien pidió la
-  tarea (Marcos) no es quien tiene el botón Confirmar (Ismael). El borrador no
-  es una rama abierta de Marcos: su consulta sigue el camino normal, sin
-  pregunta de la rama, y aparece la tarea. El borrador sigue esperando.
+  enmienda "una sola rama de conversación abierta", T9-R1d; T9-R1c-4): quien
+  pidió la tarea (Marcos) no es quien tiene el botón Confirmar (Ismael) y ya
+  se lo envió con Enviar a aprobación. El borrador no es una rama abierta de
+  Marcos: su consulta sigue el camino normal, sin pregunta de la rama, y
+  aparece la tarea. El borrador sigue esperando a Ismael.
 actor: Marcos Tarquini
 mensajes: []
 precondiciones:
@@ -16,8 +17,11 @@ precondiciones:
       responsable: Marcos Tarquini
   # El alta ya armada y esperando confirmación, sembrada en la base con las
   # mismas filas que crea el alta real (`corrida._sembrar_borrador_de_alta`).
-  # Marcos escribe, pero lo suyo lo confirma Ismael.
+  # Marcos escribe, pero lo suyo lo confirma Ismael: mientras Marcos no lo envía
+  # es su rama abierta (b-0029); acá ya lo envió (`enviado_a_aprobacion`) y el
+  # borrador espera a Ismael.
   borrador_de_alta:
+    enviado_a_aprobacion: true
     solicitante: Marcos Tarquini
     titulo: Cablear tablero norte
     objetivo: Objetivo simulado de Cablear tablero de la máquina 3 (simulado)

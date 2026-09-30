@@ -1771,6 +1771,76 @@ def test_sembrar_borrador_de_alta_deja_la_vista_previa_esperando(corework, conn)
     assert tareas == 0                               # el borrador no es una tarea
 
 
+# Quien escribe (Marcos) no es quien confirma lo suyo (Ismael): T9-R1c-4.
+_BORRADOR_DE_OTRO_APROBADOR = {**_BORRADOR_DE_ALTA, "solicitante": "Marcos Tarquini"}
+
+
+def _acciones_del_borrador(conn) -> list[dict]:
+    with admin(conn) as cur:
+        cur.execute(
+            """select p.estado, p.chat_id, p.herramienta,
+                      array(select etiqueta from pending_action_option o
+                             where o.pending_action_id = p.id order by o.orden) botones
+                 from pending_action p where p.draft_id is not null
+                order by p.creado_en, p.id""")
+        return cur.fetchall()
+
+
+def test_sembrar_borrador_de_otro_aprobador_deja_el_resumen_de_quien_pide_esperando(
+        corework, conn):
+    from prisma import ingreso_tareas as I
+    from prisma.salida import etiqueta_sin_icono
+
+    ws = corework.workspace_id
+    _sembrar_borrador_de_alta(conn, ws, **_BORRADOR_DE_OTRO_APROBADOR)
+
+    with espacio(conn, ws) as cur:
+        quien, tg = _quien(cur, ws, "Marcos Tarquini")
+        pregunta = I.open_intake_question(cur, quien, tg)
+        _, tg_ismael = _quien(cur, ws, "Ismael Soschinski")
+        cur.execute("select count(*) n from message_outbox where chat_id = %s",
+                    (tg_ismael,))
+        al_aprobador = cur.fetchone()["n"]
+    assert pregunta["tipo"] == I.QUESTION_CONFIRMATION and pregunta["revision"]
+    (accion,) = _acciones_del_borrador(conn)
+    assert accion["estado"] == "esperando" and accion["chat_id"] == tg
+    assert [etiqueta_sin_icono(e) for e in accion["botones"]] == [
+        "Enviar a aprobación", "Modificar", "Cancelar"]
+    assert al_aprobador == 0                     # todavía no le llega nada
+
+
+def test_sembrar_borrador_enviado_a_aprobacion_lo_deja_esperando_a_quien_confirma(
+        corework, conn):
+    from prisma import ingreso_tareas as I
+    from prisma.salida import etiqueta_sin_icono
+
+    ws = corework.workspace_id
+    _sembrar_borrador_de_alta(conn, ws, **_BORRADOR_DE_OTRO_APROBADOR,
+                              enviado_a_aprobacion=True)
+
+    with espacio(conn, ws) as cur:
+        quien, tg = _quien(cur, ws, "Marcos Tarquini")
+        assert I.open_intake_question(cur, quien, tg) is None   # ya no es su rama
+        _, tg_ismael = _quien(cur, ws, "Ismael Soschinski")
+    # Las dos filas se crean en la misma transacción: se distinguen por su herramienta.
+    por_herramienta = {a["herramienta"]: a for a in _acciones_del_borrador(conn)}
+    revision = por_herramienta["revisar_borrador_tarea"]
+    confirmacion = por_herramienta["confirmar_borrador_tarea"]
+    assert revision["estado"] == "cancelada"
+    assert confirmacion["estado"] == "esperando"
+    assert confirmacion["chat_id"] == tg_ismael
+    assert [etiqueta_sin_icono(e) for e in confirmacion["botones"]] == [
+        "Confirmar", "Cancelar"]
+
+
+def test_sembrar_borrador_enviado_a_aprobacion_por_quien_lo_confirma_falla(
+        corework, conn):
+    ws = corework.workspace_id
+
+    with pytest.raises(LookupError, match="enviado_a_aprobacion"):
+        _sembrar_borrador_de_alta(conn, ws, enviado_a_aprobacion=True)
+
+
 def test_sembrar_borrador_de_alta_sin_un_dato_falla_nombrandolo(corework, conn):
     ws = corework.workspace_id
     borrador = {k: v for k, v in _BORRADOR_DE_ALTA.items() if k != "area"}
@@ -2553,11 +2623,13 @@ def test_ejecutar_escenario_termina_el_alta_por_toque_y_dice_quien_confirma(
     _sembrar_objetivo_para_el_alta(conn, ws)
     interno = _responde(RespectoPendiente.RESPONDE)
 
+    # Terminar el alta le deja a quien pide su resumen para revisar (T9-R1c-4); recién
+    # al enviarlo se le dice a quién se le mandó.
     r = ejecutar_escenario(
         conn, ws, "corework", "Nahuel Gimenez", [], interno,
         escenario_id="b-test-0027", indice=0,
         preguntas_sembradas={"borrador_de_alta": _ALTA_DE_OTRO_APROBADOR},
-        toques=[{"etiqueta": "Sí"}])
+        toques=[{"etiqueta": "Sí"}, {"etiqueta": "Enviar a aprobación"}])
 
     assert r.bloqueado is False, r.motivo_bloqueo
     assert "Marcos Tarquini" in r.respuesta_texto
@@ -2676,3 +2748,60 @@ def test_la_corrida_confirma_dos_veces_y_la_herramienta_corre_una_sola_vez(
     with admin(conn) as cur:
         cur.execute("select estado from task where id = %s", (tid,))
         assert cur.fetchone()["estado"] == "en_revision"
+
+
+# ---------------------------------------------------------------------------
+# La familia b-0029 (T9-R1c-4): quien pide revisa su resumen antes de enviarlo a
+# aprobación. Con el ruteo guionado, lo que declaran los escenarios tiene que
+# cumplirse con lo que produce el código; el banco real sólo mide al modelo.
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("escenario_id, comandos", [
+    ("b-0029", []),                                     # sólo el toque de Sí
+    ("b-0029-b", [RespectoPendiente.RESPONDE]),         # el título corregido
+    ("b-0029-c", [RespectoPendiente.OTRO_TEMA]),
+    ("b-0029-d", [RespectoPendiente.RESPONDE]),
+])
+def test_los_escenarios_de_b_0029_cumplen_lo_que_declaran_con_un_modelo_guionado(
+        escenario_id, comandos, corework, conn):
+    from tests.banco.comprobadores import (Evidencia, comprobar_contenido,
+                                           comprobar_efectos,
+                                           comprobar_una_respuesta_por_entrada)
+    from tests.banco.conftest import DIR_ESCENARIOS
+    from tests.banco.escenario import cargar_escenario
+
+    escenario = cargar_escenario(DIR_ESCENARIOS / f"{escenario_id}.yaml")
+    ws = corework.workspace_id
+    en_la_corrida = bool(escenario.toques
+                         and escenario.precondiciones.get("borrador_de_alta"))
+    with admin(conn) as cur:
+        sembrar_precondiciones(cur, ws, escenario.precondiciones,
+                               sin_borrador_de_alta=en_la_corrida)
+
+    r = ejecutar_escenario(
+        conn, ws, "corework", escenario.actor, escenario.mensajes,
+        _responde(*comandos), escenario_id=escenario.id, indice=0,
+        toques=list(escenario.toques) or None,
+        mensajes_tras_toques=list(escenario.mensajes_tras_toques) or None,
+        toques_tras_mensajes=list(escenario.toques_tras_mensajes) or None,
+        preguntas_sembradas=(
+            {"borrador_de_alta": escenario.precondiciones["borrador_de_alta"]}
+            if en_la_corrida else None))
+
+    assert r.bloqueado is False, r.motivo_bloqueo
+    evidencia = Evidencia(respuesta_texto=r.respuesta_texto,
+                          herramientas_ejecutadas=tuple(r.herramientas_ejecutadas),
+                          ofrecio_opciones=r.ofrecio_opciones)
+    contenido = comprobar_contenido(
+        evidencia, menciona=escenario.respuesta_menciona,
+        no_contiene_patron=escenario.respuesta_no_contiene_patron)
+    assert contenido.resultado == "aprobado", contenido.diferencia
+    efectos = comprobar_efectos(
+        {"conteos_delta": conteos_delta(r.conteos_antes, r.conteos_despues)},
+        escenario.efectos)
+    assert efectos.resultado == "aprobado", efectos.diferencia
+    comprobacion = comprobar_una_respuesta_por_entrada(
+        r.respuestas_por_mensaje, incidentes=r.incidentes_de_respuesta)
+    assert comprobacion.resultado == "aprobado", comprobacion.diferencia
+    # Cada toque recibió una sola respuesta.
+    assert all(n == 1 for n in r.respuestas_por_toque), r.respuestas_por_toque

@@ -1,12 +1,11 @@
-id: b-0027
+id: b-0029-b
+variante_de: b-0029
 objetivo: >
-  Decir el estado real (ADR 0013 regla 3, T9-R3): quien pide el alta de una tarea
-  suya no es quien la confirma. Con el último dato esperando su Sí, la persona
-  toca Sí (el alta termina y ve su propio resumen, b-0029) y después toca Enviar a
-  aprobación (T9-R1c-4). Su respuesta al envío dice a quién se le mandó el borrador
-  para que lo confirme y que la tarea todavía no existe; nunca el aviso neutro "No
-  pude completar eso" (el flujo salió bien). El borrador queda esperando a su
-  aprobador y no se crea ninguna tarea.
+  Variante de b-0029, corregir y enviar: con su resumen esperando, quien pide
+  toca Modificar, elige el título y manda el corregido. Cambia sólo el título y
+  vuelve SU resumen (no le llega nada a su aprobador). Al tocar Enviar a
+  aprobación, la respuesta dice a quién se le mandó el borrador para que lo
+  confirme y que la tarea todavía no existe. No se crea ninguna tarea.
 actor: Nahuel Gimenez
 mensajes: []
 precondiciones:
@@ -15,9 +14,8 @@ precondiciones:
       titulo: Cablear tablero de la máquina 3 (simulado)
       area: ot
       responsable: Marcos Tarquini
-  # Nahuel pide el alta de una tarea suya: su aprobador es Marcos. El último dato
-  # (el criterio de aceptación) queda propuesto, esperando su Sí
-  # (`corrida._sembrar_borrador_de_alta`, `criterio_por_confirmar`).
+  # El alta ya armada, con su resumen esperando la revisión de Nahuel
+  # (`corrida._sembrar_borrador_de_alta`); lo confirma Marcos.
   borrador_de_alta:
     solicitante: Nahuel Gimenez
     titulo: Cablear tablero norte
@@ -26,9 +24,12 @@ precondiciones:
     area: ot
     fecha_objetivo: "2030-12-30"
     criterio_aceptacion: Prueba firmada
-    criterio_por_confirmar: true
 toques:
-  - etiqueta: "Sí"
+  - etiqueta: "Modificar"
+  - etiqueta: "Título"
+mensajes_tras_toques:
+  - "Cablear tablero sur"
+toques_tras_mensajes:
   - etiqueta: "Enviar a aprobación"
 herramientas_prohibidas:
   - actualizar_estado

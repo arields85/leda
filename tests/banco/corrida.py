@@ -474,8 +474,10 @@ def _sembrar_borrador_de_alta(cur, ws: str, borrador: dict) -> str:
     """Deja el borrador del alta guiada ya esperando su confirmación, con las
     mismas filas que crea el alta real (`ingreso_tareas.start` y cada
     confirmación): el borrador, la solicitud con sus ocho campos confirmados y,
-    por `ingreso_tareas._advance`, la vista previa (`pending_action` dirigida
-    al aprobador, con Confirmar y Cancelar, y su mensaje en `message_outbox`).
+    por `ingreso_tareas._advance`, la vista previa. Si confirma quien escribe,
+    es su `pending_action` con Confirmar, Modificar y Cancelar. Si confirma otra
+    persona (T9-R1c-4), es el resumen de quien escribe, con Enviar a aprobación,
+    Modificar y Cancelar, y a quien confirma todavía no le llega nada.
     Un escenario que ejercita lo que pasa con el borrador esperando no
     depende de que el modelo arme el alta completa de un mensaje ni de seis
     toques que encuentren sus botones (b-0022-e/-f).
@@ -484,9 +486,11 @@ def _sembrar_borrador_de_alta(cur, ws: str, borrador: dict) -> str:
     `titulo`, `objetivo` (el título de un objetivo del espacio, p. ej. el que
     crea una tarea de `tareas`), `responsable`, `area` (slug),
     `fecha_objetivo` (AAAA-MM-DD), `criterio_aceptacion` y, opcional,
-    `descripcion` y `criterio_por_confirmar` (el criterio de aceptación queda
-    propuesto, esperando su Sí/No: el escenario lo termina con un toque). Falta un
-    dato o no existe lo que nombra: `LookupError`.
+    `descripcion`, `criterio_por_confirmar` (el criterio de aceptación queda
+    propuesto, esperando su Sí/No: el escenario lo termina con un toque) y
+    `enviado_a_aprobacion` (quien escribe ya tocó Enviar a aprobación: el borrador
+    espera a quien lo confirma, como después del envío real). Falta un dato o no
+    existe lo que nombra: `LookupError`.
     Devuelve el id de la solicitud."""
     faltan = [c for c in _DATOS_DEL_BORRADOR_DE_ALTA if not borrador.get(c)]
     if faltan:
@@ -572,7 +576,33 @@ def _sembrar_borrador_de_alta(cur, ws: str, borrador: dict) -> str:
     if not resultado.pending_action_id:
         raise LookupError(
             f"El borrador sembrado no llegó a la vista previa: {resultado.text}")
+    if borrador.get("enviado_a_aprobacion"):
+        _enviar_borrador_sembrado(cur, quien, chat, resultado.pending_action_id,
+                                  ahora)
     return solicitud_id
+
+
+def _enviar_borrador_sembrado(cur, quien: Solicitante, chat: int,
+                              revision_id: str, ahora) -> None:
+    """Toca Enviar a aprobación en el resumen sembrado de quien escribe, por el
+    mismo camino que el toque real (`ingreso_tareas.send_to_approval`): su resumen
+    se cierra y el borrador queda esperando a quien lo confirma. Si no lo confirma
+    otra persona no hay resumen que enviar: `LookupError`."""
+    cur.execute(
+        """select token from pending_action_option
+            where pending_action_id = %s and valor = to_jsonb(%s::text)""",
+        (revision_id, I.VALUE_SEND))
+    fila = cur.fetchone()
+    if not fila:
+        raise LookupError(
+            "'enviado_a_aprobacion' pide enviar el borrador a quien lo confirma, "
+            "pero lo confirma quien lo escribe: no hay nada que enviar.")
+    enviado = I.send_to_approval(cur, quien, token=fila["token"], chat_id=chat,
+                                 now=ahora)
+    if enviado is None or enviado.inert:
+        raise LookupError(
+            "El borrador sembrado no se pudo enviar a aprobación"
+            + (f": {enviado.text}" if enviado is not None else "."))
 
 
 def _tarea_por_titulo(cur, ws: str, titulo: str) -> str:
