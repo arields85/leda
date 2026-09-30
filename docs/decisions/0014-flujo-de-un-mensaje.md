@@ -1,6 +1,6 @@
 # ADR 0014: El flujo de un mensaje, con un dueño por etapa
 
-- **Estado:** propuesta
+- **Estado:** aceptada (decisión del usuario, 2026-09-30)
 - **Fecha:** 2026-09-30
 - **Alcance:** el camino de cada mensaje y de cada toque (`gateway`, `llm`, `jev`,
   `agente`, `contexto`, `ingreso_tareas`, `pendientes`, `herramientas`). Amplía el
@@ -46,8 +46,13 @@ cada cosa, cada corrección es un parche en el lugar donde se vio la falla.
 Cada mensaje recorre seis etapas. Cada etapa tiene **un solo dueño**, y ninguna otra
 pieza decide lo que le toca a ese dueño.
 
-1. **Contexto (PostgreSQL).** Se lee el estado vigente: quién escribe, sus tareas, la
-   rama abierta y sus opciones. Nadie supone estado que no se leyó.
+1. **Contexto (PostgreSQL).** Se lee el estado del trabajo (quién escribe, sus tareas,
+   sus estados, quién aprueba, la evidencia), el estado de la conversación (la rama
+   abierta, la pregunta pendiente, las opciones ofrecidas, los borradores y las vistas
+   previas) y el historial reciente de lo que efectivamente se dijo (lo que la persona
+   escribió y lo que Prisma envió, no lo que quedó en la cola). PostgreSQL guarda y
+   entrega; quien comprende la conversación es el modelo (etapa 2). Nadie supone nada
+   que no se leyó, ni siquiera qué se le preguntó recién a la persona.
 2. **Interpretar (modelo).** El modelo devuelve el comando, de la lista cerrada del
    ADR 0013, **y los valores normalizados** que el mensaje trae para la pregunta
    pendiente: una fecha en formato ISO, la opción elegida por su identificador entre
@@ -113,8 +118,8 @@ elegida (o la combinación) y su evidencia.
 - Las correcciones posteriores del texto del modelo (`agente.py`) dejan de hacer falta
   en los caminos que pasan al flujo; con A las reemplaza la verificación contra el
   resultado del turno.
-- El rol de Jev queda declarado: decidir entre candidatos de la base con duda. La
-  precisión se lleva a `architecture/frontera.md` cuando este ADR se acepte.
+- El rol de Jev queda declarado: decidir entre candidatos de la base con duda. Figura
+  como puerto y adaptador en `architecture/frontera.md`.
 
 ## Alternativas consideradas
 

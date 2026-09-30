@@ -76,7 +76,8 @@ Un puerto es un contrato que el núcleo define y un adaptador implementa.
 | Notificación | Entrega un mensaje dirigido a una persona, sin conocer su transporte. |
 | Lectura | Expone consultas agregadas del estado para cualquier superficie de lectura. Implementado en `src/prisma/lectura.py`; ninguna de sus funciones recibe el espacio, lo toman de la sesión. |
 | Configuración | Materializa y modifica la configuración de un cliente. Tiene dos productores: el paquete versionado, que la siembra una vez, y la edición desde el tablero del cliente. El paquete es formato de transporte, no fuente de verdad: después de sembrar, manda la base. Toda edición queda atribuida en la auditoría. |
-| Razonamiento | Interpreta lenguaje natural y devuelve salida tipada y validada. |
+| Razonamiento | Interpreta lenguaje natural y devuelve salida tipada y validada: el comando y los valores normalizados de lo que la persona dijo. Redacta la respuesta a partir del resultado del turno ([`ADR 0014`](../decisions/0014-flujo-de-un-mensaje.md)). |
+| Decisión con duda | Elige entre candidatos de la base (una tarea, una persona, un objetivo) con probabilidades; el núcleo aplica los cortes. No interpreta lenguaje libre ni decide efectos ([`ADR 0014`](../decisions/0014-flujo-de-un-mensaje.md)). |
 
 ## Adaptadores
 
@@ -84,6 +85,7 @@ Un puerto es un contrato que el núcleo define y un adaptador implementa.
 |---|---|---|
 | Telegram | Existe | `src/prisma/despachador.py:66` |
 | Proveedores LLM | Existen | `src/prisma/llm.py` |
+| Jev (decisión con duda) | Existe | `src/prisma/jev.py`; hoy sólo resuelve referencias a tareas. |
 | Importador de paquetes | Existe | `src/prisma/importador.py:211` |
 | Tablero de cliente | No existe | Sólo hay webhook y salud en `src/prisma/gateway.py:47,434`. Alcanza un solo espacio. **No es de sólo lectura:** consume el puerto de Lectura y también el de Configuración. |
 | Panel de plataforma | No existe | Alcanza todos los espacios: da de alta clientes y conduce la entrevista de alta. Su autenticación es una decisión abierta. |

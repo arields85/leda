@@ -208,34 +208,35 @@ avisos encolados fuera de horario; tres son de «Dashboard de lotes», que ya es
 listener lo corre el usuario en su propia terminal (`.\.venv\Scripts\python.exe -m
 prisma escuchar corework`): las tareas en segundo plano del agente se cortan por tiempo.
 
-**Antes de corregir, discutir con el usuario (su observación del cierre):** la capa de
-datos funciona bien, pero la conversación se siente "robótica": el modelo casi no
-interviene donde hace falta comprensión (la fecha del alta la interpretan sólo expresiones
-regulares; el objetivo sólo se elige de una lista). Propuesta: en las respuestas de texto
-libre el modelo interpreta y normaliza, el código valida y la vista previa confirma
-(ADR 0013, "el modelo interpreta, el código garantiza"). Si se acepta, va como ADR y
-orienta la unidad 3. Detalle en `odd/tasks/prisma-orienta.md`.
+**Cambio de rumbo (decisión del usuario, 2026-09-30, noche): se deja de corregir hallazgo
+por hallazgo.** La capa de datos funciona, pero la conversación se siente "robótica" y
+cada ronda trae hallazgos nuevos del mismo tipo. Se aceptó el
+[`ADR 0014`](decisions/0014-flujo-de-un-mensaje.md): el flujo de un mensaje en seis
+etapas, cada una con un solo dueño (contexto en PostgreSQL, interpretar con el modelo,
+decidir con duda con Jev, garantizar con código, persistir en PostgreSQL, responder a
+partir del resultado del turno). La redacción de la respuesta se decide por experimento:
+**A** (el modelo redacta todo sobre el resultado, con verificación del código) frente a
+**B** (plantillas para los efectos). **Moratoria:** no se agregan reglas ni parches de
+conversación mientras dure el experimento; los hallazgos nuevos se registran y se
+clasifican por etapa.
 
-**Próximo, en orden (unidades con TDD, commit y revisión RDD):**
-1. Terminar el circuito C a las 09:00 y observar los avisos viejos.
-2. Altos: R4c-H3 ("No puedo mostrarte la evidencia", falso: el menú la muestra) y R4b-H5
-   (la respuesta al motivo de "Pedir cambios" tomada como pedido imposible, "Eso todavía
-   no lo puedo hacer"): regla 1 y 3 del ADR 0013.
-3. Alta guiada (R4c-H4), decisión del usuario: preguntar primero "¿Qué hay que hacer?" y después el
-   objetivo (el más probable primero); sin bucle al volver a pedir una tarea nueva
-   (R4c-H5); sin jerga "(hasta N)" (R4c-H7); fecha que acepte formas naturales o diga el
-   formato (R4c-H6); sin claves internas en el resumen (R4c-H8); texto del resumen de quien
-   pide (R4c-H9); no preguntar un dato con una sola opción posible, como el área cuando
-   Marcos sólo puede asignar en OT (R4c-H10).
-4. Medios: una sola confirmación para la reentrega tras cambios pedidos (R4c-H1); vista
-   previa de Aprobar sin Modificar y con la evidencia (R4c-H2); "quiero entregar…" sin
-   intento abre la pregunta de evidencia (R4b-H1).
-5. Forma: saludo del día en los avisos en una línea (R4b-H2), íconos en los botones de los
-   avisos (R4b-H3), sin "(texto)" en la evidencia (R4b-H4).
-6. Pendientes anteriores: cierre con el estado real en la rama de opciones y en la negativa
-   sin intento; observaciones no bloqueantes de las revisiones; vista previa vieja
-   (`crear_borrador_tarea`) con Cancelar; T9-H19i; índice de `inbound_message`; relojes de
-   `despachador` y `contexto`.
+**Próximo, en orden:**
+1. Terminar el circuito C a las 09:00 y observar los avisos viejos (prueba del código
+   actual).
+2. Aplicar el flujo del ADR 0014, acotado a los caminos de los hallazgos pendientes de la
+   ronda 4, con las variantes A y B seleccionables por configuración del espacio. Esos
+   hallazgos son el guion de la prueba, no una lista de correcciones: R4c-H3, R4b-H5,
+   R4c-H4 a H10 (alta guiada; el orden "¿Qué hay que hacer?" primero sigue decidido),
+   R4c-H1, R4c-H2, R4b-H1, R4b-H2 a H4.
+3. Prueba por Telegram real, datos ficticios y base nueva: el mismo guion con A y con B.
+   El usuario anota por respuesta si mejoró, empeoró o quedó igual respecto de la ronda 4;
+   se registran latencia, llamadas al modelo, incidentes y rechazos de la verificación de A.
+4. Registrar el resultado como enmienda del ADR 0014 y extender el flujo al resto.
+
+Quedan en espera, sin descartar: cierre con el estado real en la rama de opciones y en la
+negativa sin intento; observaciones no bloqueantes de las revisiones; vista previa vieja
+(`crear_borrador_tarea`) con Cancelar; T9-H19i; índice de `inbound_message`; relojes de
+`despachador` y `contexto`; las dos advertencias del arnés del banco (arriba).
 Configuración a decidir con el usuario: el resumen "Estado del equipo" va a un grupo de
 Telegram que no existe ("chat not found", un incidente; R4b-H7).
 
