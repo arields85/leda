@@ -5229,3 +5229,22 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   En curso: R4-H1, H2, H3, H9 (saludo en una línea, "Dale, escribime qué necesitás",
   pregunta real de evidencia, una sola confirmación). R4-H4, H5, H6, H10 quedan para después
   de la ronda.
+
+- 2026-09-30: **R4-H1, H2, H3, H9 corregidos.** Ruta: delegada, un escritor. `53fe191`:
+  comando cerrado de ruteo `bare_greeting`; el código responde sin texto del modelo: "👋
+  Buen día {nombre}, ¿en qué te ayudo?" cuando corresponde el saludo del día (fila
+  `es_bienvenida`, sin prefijo duplicado al despachar) y "Hola {nombre}, ¿en qué te ayudo?"
+  si ya se dio; conserva los botones genéricos. `9340d50`: al dejar de lado el saludo,
+  "Dale, escribime qué necesitás." (marca `args.saludo`). `04a6141`: un rechazo tipado
+  `falta_tipo = evidencia_de_entrega` sobre una sola tarea abre la misma pregunta de
+  evidencia que "Ya la terminé", sin botones genéricos ni prosa del modelo. `3497da9`: con
+  la pregunta de evidencia abierta, una entidad `url`/`text_link` de Telegram convierte el
+  `dudoso` del ruteo en `responde` y va directo a la vista previa. `5572ac3`: la guarda de
+  cambios pedidos omite su línea sólo si están el nombre y el motivo completos. `38263b8`:
+  pruebas de despacho con reloj fijo y los dos lados del tope. Suite del escritor 2224
+  passed, 324 deselected; padre: 25 passed. RDD: tramo `1c2195c..38263b8` medio, 1484
+  líneas, `review-167e3c98261bbc91` **aprobada y reconocida**; frontera en `38263b8`. Banco
+  real (n=3) `b-0031`, `b-0032`, `b-0033`, `b-0034`, `b-0034-b`, `b-0001-b`: **18/18**.
+  Seguimientos en curso: no cortar el reintento cuando el mensaje ya trae un link; no tapar
+  otro rechazo del mismo turno; idempotencia de la guarda con motivos largos; nombre en
+  blanco; dos saludos antes de un despacho; escenario negativo "hola, ¿cómo va el PLC?".
