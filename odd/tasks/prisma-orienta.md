@@ -408,11 +408,16 @@ gestión.
   - [x] **T9-H19e — Barrido de recibos huérfanos:** un mensaje recibido sin respuesta más
     allá de la ventana del turno recibe el aviso neutro aprobado y deja incidente (nunca
     silencio aunque Telegram no reintente).
-  - [ ] **T9-H19f — "Respondido" es tener alguna respuesta atada, en cualquier estado:**
+  - [x] **T9-H19f — "Respondido" es tener alguna respuesta atada, en cualquier estado:**
     el código descarta a propósito respuestas reemplazadas (elecciones del alta, vistas
     previas vencidas al despachar, duplicados); sólo un turno muerto no deja ninguna. Sin
     esto el barrido mandaría un "Tuve un problema…" falso. Una persona dada de baja no
     recibe el aviso: un incidente, una vez.
+  - [ ] **T9-H19g — Barrido robusto** (`review-1fa0eb52f1e2f0e2`): aislamiento por recibo
+    (un recibo que falla no frena el lote), el mismo candado por mensaje que la
+    recuperación del gateway, pruebas con turnos reales que no deben quedar huérfanos,
+    predicado de espacio explícito en la membresía, reporte de la falla del barrido
+    probado, reloj de la base.
   - [ ] **T9-H19c — Consulta al usuario:** ¿qué hace Prisma cuando alguien edita un mensaje
     ya enviado (`edited_message`)? Hoy lo trata como un mensaje nuevo.
   - [x] **T10-5c** — Seguimientos de `review-eca94d14a705c5c4`: comparar títulos contra el
@@ -5060,3 +5065,12 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   no descartada" daría avisos falsos cuando el código descarta a propósito: a T9-H19f.
   Pendiente sin decidir: índice `(workspace_id, at)` en `inbound_message` antes de que la
   tabla crezca (migración aparte).
+
+- 2026-09-30: **T9-H19f.** Ruta: delegada, un escritor. `bfb8f76`: "respondido" = alguna
+  fila de respuesta atada al recibo en cualquier estado (`respuesta_unica.sql_respondido`,
+  compartida por el barrido y `_estado_de_entrega`), así las respuestas descartadas a
+  propósito no generan avisos falsos ni turnos repetidos; una persona dada de baja no
+  recibe el aviso: un incidente y una fila descartada como marca de idempotencia. Suite del
+  escritor 2145 passed, 309 deselected; padre: 19 passed. RDD: tramo `1f310fe..bfb8f76`
+  (T9-H19d, T9-H19e, T9-H19f) medio, 838 líneas, `review-1fa0eb52f1e2f0e2` **aprobada y
+  reconocida**; frontera en `bfb8f76`; advertencias a T9-H19g, en curso.
