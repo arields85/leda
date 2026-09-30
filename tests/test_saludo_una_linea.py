@@ -17,16 +17,19 @@ from __future__ import annotations
 import re
 from datetime import datetime, timezone
 
+import pytest
+
 from prisma import pendientes as P
 from prisma import saludo as S
 from prisma.calendario import Calendario
 from prisma.db import admin, espacio
 from prisma.despachador import TransporteDePrueba, despachar
 from prisma.llm import (IntentAction, IntentRoute, Llamada, ProveedorGuionado,
-                        Respuesta, RouteEnvelope, ROUTER_TOOL, ROUTER_SYSTEM)
+                        Respuesta, RouteEnvelope, RoutingError, ROUTER_TOOL,
+                        ROUTER_SYSTEM)
 
 from tests.test_pedir_cambios_extremo_a_extremo import (  # noqa: F401
-    _mensaje, _opciones, _pendiente, _tg, cliente)
+    _mensaje, _opciones, _pendiente, _tarea, _tg, cliente)
 
 UNA_LINEA_DEL_DIA = re.compile(
     r"^👋 (Buen día|Buenas tardes|Buenas noches) Nahuel, ¿en qué te ayudo\?$")
@@ -93,11 +96,9 @@ def test_el_saludo_suelto_es_un_comando_de_la_lista_cerrada_del_ruteo():
 def test_un_saludo_con_propuestas_de_tarea_sigue_siendo_invalido():
     sobre = RouteEnvelope(calls=(Llamada("r", "route_intent", {
         "action": IntentAction.GREETING.value, "task": {"title": "X"}}),))
-    try:
+    with pytest.raises(RoutingError, match="Only task creation can contain task "
+                                           "proposals"):
         sobre.validate()
-    except Exception:
-        return
-    raise AssertionError("un saludo no puede traer propuestas de tarea")
 
 
 # ---------------------------------------------------------------------------
@@ -181,6 +182,55 @@ def test_el_saludo_del_dia_no_se_duplica_con_el_del_despachador_ni_se_repite(
 
     assert len(primero) == 1 and UNA_LINEA_DEL_DIA.match(primero[0])
     assert segundo == [UNA_LINEA_SIN_SALUDO_DEL_DIA]
+
+
+def test_dos_saludos_antes_de_un_despacho_solo_el_primero_lleva_el_saludo_del_dia(
+        cliente, conn, corework, monkeypatch):
+    """Dos "hola" encolados antes de que el despachador corra: los dos se armarían
+    con el saludo del día pendiente, y como cada uno se marca como su propio saludo
+    (`es_bienvenida`) el despachador no antepone nada a ninguno. Sólo el primero lo
+    lleva; el segundo es el "Hola {nombre}" de siempre."""
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        tg = _tg(cur, "Nahuel Gimenez")
+    conn.commit()
+    _saludo_pendiente(conn, ws, "Nahuel Gimenez")
+    _guion(monkeypatch, IntentRoute(IntentAction.GREETING),
+           IntentRoute(IntentAction.GREETING))
+
+    assert _mensaje(cliente, tg, "hola").status_code == 200
+    assert _mensaje(cliente, tg, "buenas").status_code == 200
+
+    enviados = [e.texto for e in _despachar(conn, ws).enviados if e.chat_id == tg]
+    assert len(enviados) == 2, enviados
+    assert UNA_LINEA_DEL_DIA.match(enviados[0]), enviados[0]
+    assert enviados[1] == UNA_LINEA_SIN_SALUDO_DEL_DIA
+
+
+def test_un_saludo_seguido_de_un_pedido_se_contesta_sobre_la_tarea_no_con_la_linea_fija(
+        cliente, conn, corework, monkeypatch):
+    """Banco b-0035: "hola, ¿cómo va el PLC?" no es un saludo suelto -- el ruteo lo
+    deja como conversación normal --, así que responde el modelo sobre la tarea y
+    nunca sale la línea fija del saludo."""
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        _tarea(cur, ws, titulo="Programar PLC de la comprimidora (simulado)")
+        tg = _tg(cur, "Nahuel Gimenez")
+    conn.commit()
+    _saludo_pendiente(conn, ws, "Nahuel Gimenez")
+    proveedor = _guion(
+        monkeypatch, IntentRoute(IntentAction.NORMAL_CONVERSATION),
+        respuestas=[
+            Respuesta(llamadas=[Llamada("c1", "consultar_tareas", {})]),
+            Respuesta(texto="«Programar PLC de la comprimidora (simulado)» sigue "
+                            "en curso.")])
+
+    assert _mensaje(cliente, tg, "hola, ¿cómo va el PLC?").status_code == 200
+
+    assert proveedor.recibidos, "el modelo tenía que contestar el pedido"
+    enviados = [e.texto for e in _despachar(conn, ws).enviados if e.chat_id == tg]
+    assert enviados and "PLC" in enviados[0], enviados
+    assert not any("¿en qué te ayudo?" in t for t in enviados), enviados
 
 
 def test_una_persona_sin_nombre_no_lo_inventa():

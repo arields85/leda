@@ -134,6 +134,16 @@ def saludo_del_dia_pendiente(cur: psycopg.Cursor, *, membership_id: str | None,
             hoy = fecha_local(ahora, zona)
             if fila is not None and fila["ultima_fecha_local"] >= hoy:
                 return None
+            # Una línea que ya lleva el saludo del día y todavía no salió: la
+            # reserva se reclama recién al despachar, así que un segundo saludo
+            # encolado antes también lo llevaría (el despachador no antepone nada a
+            # una fila marcada como su propio saludo). Sólo el primero lo lleva.
+            cur.execute(
+                "select 1 from message_outbox where destinatario_membership_id = %s "
+                "and es_bienvenida and estado in ('pendiente', 'listo') limit 1",
+                (membership_id,))
+            if cur.fetchone() is not None:
+                return None
             return saludo_por_hora(ahora.astimezone(zona).hour)
     except Exception:  # noqa: BLE001 -- decorativo, nunca tira el envío
         return None
