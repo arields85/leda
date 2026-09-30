@@ -40,7 +40,8 @@ from .salida import (ETIQUETA_CANCELAR, ETIQUETA_CONFIRMAR, ETIQUETA_MODIFICAR,
                      ICONO_CANCELAR,
                      ICONO_CONFIRMAR, ICONO_OTRA_OPCION, ICONO_TAREA,
                      cabe_en_mensaje, con_icono, enqueue_outbox,
-                     etiqueta_sin_icono, etiquetas_de_tarea,
+                     etiqueta_de_accion_menu, etiqueta_sin_icono,
+                     etiquetas_de_tarea,
                      normalize_visible_text, truncar_etiqueta_boton,
                      with_no_effect_status)
 
@@ -1282,7 +1283,7 @@ def _responder_evidencia_registrada(cur, quien, workspace_id: str, chat_id: int,
         cur, quien, herramienta=P.SENTINEL_MENU_TAREA,
         args={"tarea_id": menu.tarea_id, "titulo": menu.titulo}, resumen=texto,
         vence_en=ahora + VIGENCIA_PENDIENTE, campo="eleccion", chat_id=chat_id,
-        opciones=[(con_icono(entregable.etiqueta, ICONO_TAREA),
+        opciones=[(etiqueta_de_accion_menu(entregable.codigo, entregable.etiqueta),
                    {"accion": entregable.codigo})])
     enqueue_outbox(
         cur, workspace_id=workspace_id, chat_id=chat_id,
@@ -3156,12 +3157,12 @@ def _encolar_menu_tarea(cur, quien, workspace_id: str, chat_id: int,
                   "Esa tarea ya no está disponible.", ahora)
         return
 
-    # Cada acción del menú es una acción SOBRE una tarea -- mismo ícono que
-    # cualquier otro botón de tarea (íconos, decisión del usuario,
-    # 2026-09-28); `menu_tarea.calcular_menu` calcula el menú en sí, sin
-    # conocer presentación, así que el ícono se agrega acá, en el adaptador.
-    opciones = [(con_icono(a.etiqueta, ICONO_TAREA), {"accion": a.codigo})
-               for a in menu.acciones]
+    # Cada acción del menú lleva el ícono de SU acción (R4-H6, decisión del
+    # usuario, 2026-09-30; `salida.ICONOS_DE_ACCION_MENU`);
+    # `menu_tarea.calcular_menu` calcula el menú en sí, sin conocer
+    # presentación, así que el ícono se agrega acá, en el adaptador.
+    opciones = [(etiqueta_de_accion_menu(a.codigo, a.etiqueta),
+                 {"accion": a.codigo}) for a in menu.acciones]
     opciones.append((P.ETIQUETA_SALIR_OPCIONES, {"accion": "salir"}))
     # Encabezado corto -- responsable y estado (T2, hallazgo 4 de sesión 2
     # por Telegram) -- y una sola pregunta debajo, nunca dos.

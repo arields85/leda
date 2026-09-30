@@ -51,9 +51,28 @@ ICONO_CONFIRMAR = "✅"
 ICONO_CANCELAR = "✖️"
 ICONO_OTRA_OPCION = "✏️"
 ICONO_COPIAR = "📄"
+# Un ícono por acción del menú de una tarea (R4-H6, decisión del usuario,
+# 2026-09-30): antes todas llevaban `ICONO_TAREA` y no se distinguían a simple
+# vista. Única fuente de la tabla aprobada -- `etiqueta_de_accion_menu` la aplica
+# y nada compara el texto de la etiqueta: cada opción se identifica por su código.
+ICONO_EMPEZAR = "▶️"
+ICONO_TERMINAR = "🏁"
+ICONO_BLOQUEO = "⛔"
+ICONO_DEPENDENCIA = "🔗"
+ICONOS_DE_ACCION_MENU = {
+    "ver_detalle": ICONO_TAREA,
+    "ver_detalle_evidencia": ICONO_TAREA,
+    "empezar": ICONO_EMPEZAR,
+    "terminar": ICONO_TERMINAR,
+    "informar_bloqueo": ICONO_BLOQUEO,
+    "depende_de_otra": ICONO_DEPENDENCIA,
+    "aprobar": ICONO_CONFIRMAR,
+    "pedir_cambios": ICONO_OTRA_OPCION,
+}
 _ICONOS_CONOCIDOS = (ICONO_TAREA, ICONO_VER_MAS, ICONO_SALIR_OPCIONES,
                     ICONO_CONFIRMAR, ICONO_CANCELAR, ICONO_OTRA_OPCION,
-                    ICONO_COPIAR)
+                    ICONO_COPIAR, ICONO_EMPEZAR, ICONO_TERMINAR, ICONO_BLOQUEO,
+                    ICONO_DEPENDENCIA)
 
 NO_EFFECT_STATUS = "Estado: sin cambios."
 _NO_EFFECT_PATTERNS = tuple(re.compile(pattern, re.IGNORECASE) for pattern in (
@@ -88,6 +107,13 @@ def con_icono(etiqueta: str, icono: str) -> str:
     de responsable en `gateway._etiqueta_boton` (que sí va al final; el
     ícono y ese sufijo son los dos extremos de la misma etiqueta)."""
     return f"{icono} {etiqueta}"
+
+
+def etiqueta_de_accion_menu(codigo: str, etiqueta: str) -> str:
+    """La etiqueta de un botón del menú de una tarea con el ícono de SU acción
+    (`ICONOS_DE_ACCION_MENU`); una acción sin ícono propio conserva el de categoría
+    (`ICONO_TAREA`)."""
+    return con_icono(etiqueta, ICONOS_DE_ACCION_MENU.get(codigo, ICONO_TAREA))
 
 
 def costo_icono(icono: str) -> int:

@@ -33,7 +33,7 @@ from prisma.db import admin, espacio
 from prisma.llm import Llamada, ProveedorGuionado, Respuesta
 from prisma.salida import (ETIQUETA_CANCELAR, ETIQUETA_CONFIRMAR,
                            ETIQUETA_MODIFICAR, ICONO_TAREA,
-                           con_icono, etiqueta_sin_icono,
+                           con_icono, etiqueta_de_accion_menu, etiqueta_sin_icono,
                            etiquetas_boton_distinguibles, etiquetas_coinciden)
 
 # ---------------------------------------------------------------------------
@@ -175,11 +175,21 @@ def _tocar_accion(cliente, conn, ws, filas, etiqueta, tg):
     assert _tocar(cliente, fila["token"], tg).status_code == 200
 
 
+_CODIGO_DE_LA_ETIQUETA = {
+    "Ver detalle": "ver_detalle", "Ver detalle y evidencia": "ver_detalle_evidencia",
+    "Empezar": "empezar", "Ya la terminé": "terminar",
+    "Informar un bloqueo": "informar_bloqueo",
+    "Depende de otra tarea": "depende_de_otra", "Aprobar": "aprobar",
+    "Pedir cambios": "pedir_cambios"}
+
+
 def _t(*etiquetas: str) -> list[str]:
-    """Cada acción del menú con su ícono de tarea (íconos, decisión del
-    usuario, 2026-09-28) -- `gateway._encolar_menu_tarea` se lo antepone a
-    cada `menu_tarea.AccionMenu.etiqueta`."""
-    return [con_icono(e, ICONO_TAREA) for e in etiquetas]
+    """Cada acción del menú con el ícono de SU acción (R4-H6, decisión del usuario,
+    2026-09-30; `salida.ICONOS_DE_ACCION_MENU`) o, si no tiene uno propio, el de
+    tarea (2026-09-28) -- `gateway._encolar_menu_tarea` se lo antepone a cada
+    `menu_tarea.AccionMenu.etiqueta`."""
+    return [etiqueta_de_accion_menu(_CODIGO_DE_LA_ETIQUETA.get(e, ""), e)
+            for e in etiquetas]
 
 
 # ---------------------------------------------------------------------------
