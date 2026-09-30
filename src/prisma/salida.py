@@ -123,15 +123,17 @@ def etiquetas_coinciden(a: str, b: str) -> bool:
 
 ETIQUETA_CONFIRMAR = con_icono("Confirmar", ICONO_CONFIRMAR)
 ETIQUETA_CANCELAR = con_icono("Cancelar", ICONO_CANCELAR)
-# El tercer botón de la vista previa (ADR 0005 decisión 1); sin ícono, como en las
-# demás vistas previas.
-ETIQUETA_MODIFICAR = "Modificar"
+# El tercer botón de la vista previa (ADR 0005 decisión 1). Único lugar donde se
+# escribe la etiqueta: con ✏️ ("alternativa que permite escribir o modificar",
+# manual de voz §9) junto a Confirmar y Cancelar (T10-3, R3-H10). Una opción se
+# identifica por su valor o su token, nunca por este texto.
+ETIQUETA_MODIFICAR = con_icono("Modificar", ICONO_OTRA_OPCION)
 # El primer botón del resumen que ve quien pidió el borrador cuando lo confirma otra
-# persona (T9-R1c-4, ADR 0005 decisión 1, precisión del 2026-09-29); sin ícono, como
-# Modificar. Redacción pendiente de revisión de voz en T10.
+# persona (T9-R1c-4, ADR 0005 decisión 1, precisión del 2026-09-29); sin ícono: el
+# manual de voz §9 no tiene uno para "enviar" y ✅ está reservado a un resultado
+# confirmado, no a una acción (T10-3).
 ETIQUETA_ENVIAR = "Enviar a aprobación"
 # El botón que copia al portapapeles lo que la persona había escrito (T9-R1c-3).
-# Redacción pendiente de revisión de voz en T10.
 ETIQUETA_COPIAR = con_icono("Copiar", ICONO_COPIAR)
 
 

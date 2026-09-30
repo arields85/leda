@@ -34,7 +34,8 @@ from .ingreso_tareas import (QUESTION_CHOICE, QUESTION_CONFIRMATION,
 from .respuesta_unica import controlar as controlar_una_respuesta
 from .respuesta_unica import dejar_nota, limpiar_nota, respuestas_del_mensaje
 from .salida import TRUNCAR_ETIQUETA_BOTON as TRUNCAR_TITULO_BOTON
-from .salida import (ETIQUETA_CANCELAR, ETIQUETA_CONFIRMAR, ICONO_CANCELAR,
+from .salida import (ETIQUETA_CANCELAR, ETIQUETA_CONFIRMAR, ETIQUETA_MODIFICAR,
+                     ICONO_CANCELAR,
                      ICONO_CONFIRMAR, ICONO_OTRA_OPCION, ICONO_TAREA,
                      cabe_en_mensaje, con_icono, enqueue_outbox,
                      etiqueta_sin_icono, etiquetas_de_tarea,
@@ -937,7 +938,7 @@ def _seguir_resuelta(cur, quien, workspace_id: str, chat_id: int, token: str,
                 args=e.argumentos, resumen=e.resumen,
                 vence_en=ahora + VIGENCIA_PENDIENTE, chat_id=chat_id,
                 huella=e.huella,
-                opciones=[(ETIQUETA_CONFIRMAR, True), ("Modificar", "modificar"),
+                opciones=[(ETIQUETA_CONFIRMAR, True), (ETIQUETA_MODIFICAR, "modificar"),
                          (ETIQUETA_CANCELAR, False)])
             enqueue_outbox(
                 cur, workspace_id=workspace_id, chat_id=chat_id,
@@ -2857,7 +2858,7 @@ def _encolar_vista_previa_menu(cur, quien, workspace_id: str, chat_id: int,
     from . import pendientes as P
     from .agente import VIGENCIA_PENDIENTE
 
-    opciones = ([(ETIQUETA_CONFIRMAR, True), ("Modificar", "modificar"),
+    opciones = ([(ETIQUETA_CONFIRMAR, True), (ETIQUETA_MODIFICAR, "modificar"),
                 (ETIQUETA_CANCELAR, False)]
                if e.huella is not None else None)
     p = P.registrar(cur, quien, herramienta=e.herramienta, args=e.argumentos,

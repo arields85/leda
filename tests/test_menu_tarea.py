@@ -30,7 +30,8 @@ from prisma.autoridad import Canal, identificar
 from prisma.calendario import Calendario
 from prisma.db import admin, espacio
 from prisma.llm import Llamada, ProveedorGuionado, Respuesta
-from prisma.salida import (ETIQUETA_CANCELAR, ETIQUETA_CONFIRMAR, ICONO_TAREA,
+from prisma.salida import (ETIQUETA_CANCELAR, ETIQUETA_CONFIRMAR,
+                           ETIQUETA_MODIFICAR, ICONO_TAREA,
                            con_icono, etiqueta_sin_icono,
                            etiquetas_boton_distinguibles, etiquetas_coinciden)
 
@@ -592,7 +593,7 @@ def test_ya_la_termine_pide_evidencia_si_falta_y_termina_en_vista_previa(
             """select etiqueta from pending_action_option
                 where pending_action_id = %s order by orden""", (fila["id"],))
         assert [f["etiqueta"] for f in cur.fetchall()] == [
-            ETIQUETA_CONFIRMAR, "Modificar", ETIQUETA_CANCELAR]
+            ETIQUETA_CONFIRMAR, ETIQUETA_MODIFICAR, ETIQUETA_CANCELAR]
 
 
 def test_ya_la_termine_pasa_directo_a_vista_previa_si_ya_tiene_evidencia(
@@ -627,7 +628,7 @@ def test_ya_la_termine_pasa_directo_a_vista_previa_si_ya_tiene_evidencia(
             """select etiqueta from pending_action_option
                 where pending_action_id = %s order by orden""", (fila["id"],))
         assert [f["etiqueta"] for f in cur.fetchall()] == [
-            ETIQUETA_CONFIRMAR, "Modificar", ETIQUETA_CANCELAR]
+            ETIQUETA_CONFIRMAR, ETIQUETA_MODIFICAR, ETIQUETA_CANCELAR]
 
 
 def test_empezar_termina_en_vista_previa_a_en_curso(cliente, conn, corework, monkeypatch):

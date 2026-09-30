@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
@@ -531,3 +532,31 @@ def test_etiquetas_de_tarea_que_colisionan_siguen_distinguibles_con_icono():
     # Tocar por la etiqueta pelada (una prueba, el banco) sigue resolviendo
     # la opción real ya armada con su ícono.
     assert etiquetas_coinciden(etiquetas[0], etiqueta_sin_icono(etiquetas[0]))
+
+
+# --- T10-3 (R3-H10): Modificar lleva su ícono, como Confirmar y Cancelar, y su
+# etiqueta se define una sola vez.
+
+
+def test_modificar_lleva_el_icono_de_alternativa_junto_a_confirmar_y_cancelar():
+    from prisma.salida import ETIQUETA_MODIFICAR
+
+    assert ETIQUETA_MODIFICAR == con_icono("Modificar", ICONO_OTRA_OPCION)
+    assert ETIQUETA_MODIFICAR.startswith("✏️ ")
+    assert etiqueta_sin_icono(ETIQUETA_MODIFICAR) == "Modificar"
+    # Un toque simulado con la etiqueta pelada sigue resolviendo la opción real.
+    assert etiquetas_coinciden(ETIQUETA_MODIFICAR, "Modificar")
+
+
+def test_ningun_modulo_arma_el_boton_modificar_con_un_literal():
+    """El botón se arma sólo con `salida.ETIQUETA_MODIFICAR`: un literal
+    "Modificar" suelto en una lista de opciones vuelve a dejar el botón sin
+    ícono en ese camino."""
+    literales = []
+    for archivo in (ROOT / "src" / "prisma").glob("*.py"):
+        if archivo.name == "salida.py":
+            continue
+        for numero, linea in enumerate(archivo.read_text(encoding="utf-8").splitlines(), 1):
+            if re.search(r'\(\s*"Modificar"\s*,', linea):
+                literales.append(f"{archivo.name}:{numero}")
+    assert literales == []

@@ -27,7 +27,8 @@ from prisma.calendario import Calendario
 from prisma.db import admin, autoridad, espacio
 from prisma.despachador import TransporteDePrueba, despachar
 from prisma.llm import RespectoPendiente
-from prisma.salida import COPY_TEXT_LIMIT, ETIQUETA_COPIAR, etiqueta_sin_icono
+from prisma.salida import (COPY_TEXT_LIMIT, ETIQUETA_COPIAR, ETIQUETA_MODIFICAR,
+                           etiqueta_sin_icono)
 
 from tests.test_alta_eleccion_confirmacion import (TITULO, _alta_en_confirmacion,
                                                    _alta_enviada, _escribir,
@@ -117,7 +118,8 @@ def _toque_de_modificar(client, conn, user, pid):
         # Aunque la vista previa ya esté cerrada: un toque tardío usa el mismo
         # botón de siempre.
         cur.execute("select token from pending_action_option "
-                    "where pending_action_id = %s and etiqueta = 'Modificar'", (pid,))
+                    "where pending_action_id = %s and etiqueta = %s",
+                    (pid, ETIQUETA_MODIFICAR))
         token = cur.fetchone()["token"]
     return _tocar_boton(client, conn, token, user)
 

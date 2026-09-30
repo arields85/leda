@@ -38,7 +38,8 @@ from .db import registrar_auditoria
 from .deteccion_pregunta import hace_pregunta
 from .incidentes import registrar_incidente
 from .llm import Llamada, Proveedor, Respuesta
-from .salida import (ETIQUETA_CANCELAR, ETIQUETA_CONFIRMAR, cabe_en_mensaje,
+from .salida import (ETIQUETA_CANCELAR, ETIQUETA_CONFIRMAR, ETIQUETA_MODIFICAR,
+                     cabe_en_mensaje,
                      enqueue_outbox, etiquetas_de_tarea,
                      normalize_visible_text, prepare_payload,
                      with_no_effect_status)
@@ -724,7 +725,7 @@ def _encolar_confirmacion(cur, quien: Solicitante, chat_id: int,
     # -- hoy, `REQUIEREN_CONFIRMACION` sin `preparar`, que ninguna de las 8
     # usa -- mantiene sus dos botones de siempre: no tiene una preparación
     # que una corrección pueda volver a correr.
-    opciones = ([(ETIQUETA_CONFIRMAR, True), ("Modificar", "modificar"),
+    opciones = ([(ETIQUETA_CONFIRMAR, True), (ETIQUETA_MODIFICAR, "modificar"),
                 (ETIQUETA_CANCELAR, False)]
                if e.huella is not None else None)
     # El resumen ya es la vista previa completa -- recurso, estado actual,
