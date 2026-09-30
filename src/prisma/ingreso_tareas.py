@@ -53,6 +53,12 @@ DRAFT_AWAITING_SEND = (
     "El borrador de la tarea está esperando tu revisión: se envía a aprobación con "
     "el botón Enviar a aprobación del resumen, no con un mensaje. Con Modificar "
     "cambiás un dato y con Cancelar lo cancelás.")
+# Antes del resumen vigente, cuando quien pidió toca Enviar a aprobación sobre uno que
+# el borrador dejó atrás (T9-R1c-4b): nada se envió y tiene que mirar de nuevo.
+# Redacción pendiente de revisión de voz en T10.
+DRAFT_CHANGED_REVIEW_AGAIN = (
+    "El borrador cambió desde que lo revisaste. Mirá de nuevo este resumen antes de "
+    "enviarlo:")
 # Lo que se le dice a quien terminó el alta cuando no es quien la confirma (T9-R3,
 # ADR 0013 regla 3: cómo quedó y qué falta): a quién se le mandó y que la tarea
 # todavía no existe. Redacción pendiente de revisión de voz en T10.
@@ -853,7 +859,8 @@ def send_to_approval(cur: psycopg.Cursor, who: Solicitante, *, token: str,
     """El botón Enviar a aprobación del resumen de quien pidió el borrador (T9-R1c-4,
     ADR 0005 decisión 1). Sólo lo toca su dueño, en su chat (`Denegado` si no), y
     sólo mientras el resumen espera y no venció; `None` si ya no (un toque tardío, un
-    segundo toque, un resumen que el borrador dejó atrás).
+    segundo toque). Un resumen que el borrador dejó atrás no se envía: se vence y la
+    respuesta es el resumen vigente para revisarlo (`_offer_current_review`).
 
     Cierra su resumen de una vez (`cancelada`, marcada `enviada`: el borrador sigue
     vivo) y le registra a quien confirma su propia acción con Confirmar y Cancelar,
@@ -889,7 +896,7 @@ def send_to_approval(cur: psycopg.Cursor, who: Solicitante, *, token: str,
         cur.execute(
             "update pending_action_option set activa = false "
             "where pending_action_id = %s", (button["id"],))
-        return None
+        return _offer_current_review(cur, who, request_id, now)
     authority = _find_confirmer(cur, _draft_responsible(cur, request))
     if authority is None:
         return _say_real_state(cur, request, NO_ACTIVE_AUTHORITY, now,
@@ -923,6 +930,36 @@ def send_to_approval(cur: psycopg.Cursor, who: Solicitante, *, token: str,
     _enqueue(cur, request, text, now, f"intake:{request_id}:sent:v{version}")
     return IntakeOutcome(request_id, text, changed=True,
                          pending_action_id=pending.id)
+
+
+def _offer_current_review(cur, who: Solicitante, request_id: str,
+                          now: datetime) -> IntakeOutcome:
+    """El resumen que quien pidió tenía delante quedó atrás del borrador: la respuesta
+    a su toque es el resumen vigente, con sus botones (ADR 0013 reglas 2 y 3: un solo
+    mensaje con el estado real y una opción posible; nunca una persona sin botón). Se
+    arma como toda vuelta al resumen (`_finalize`: sube la versión de la solicitud y
+    rehace el resumen desde sus datos), y no se le manda nada a quien confirma."""
+    cur.execute(
+        """update task_intake_request
+              set version = version + 1, actualizado_en = %s
+            where id = %s returning *""", (now, request_id))
+    outcome = _finalize(cur, cur.fetchone(), who, now)
+    if outcome.pending_action_id is not None:
+        # El aviso encabeza el mismo mensaje: una sola respuesta. Si con él no cabe
+        # en un mensaje, el resumen sale solo.
+        cur.execute(
+            "select id, cuerpo from message_outbox where pending_action_id = %s",
+            (outcome.pending_action_id,))
+        row = cur.fetchone()
+        text = f"{DRAFT_CHANGED_REVIEW_AGAIN}\n\n{row['cuerpo']}"
+        try:
+            prepare_payload(text, dedupe_key="intake-review-changed",
+                            has_buttons=True)
+        except PayloadValidationError:
+            return outcome
+        cur.execute("update message_outbox set cuerpo = %s where id = %s",
+                    (text, row["id"]))
+    return outcome
 
 
 def modify_text_prompt(field: str, current: str) -> str:

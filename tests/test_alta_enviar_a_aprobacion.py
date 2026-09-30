@@ -17,6 +17,7 @@ from __future__ import annotations
 from datetime import timedelta
 
 import pytest
+from psycopg.types.json import Jsonb
 
 from prisma import ingreso_tareas as I
 from prisma import pendientes as P
@@ -172,12 +173,11 @@ def test_la_revision_retiene_lo_que_prisma_inicia_como_cualquier_rama(
     rid, pid = _alta_en_revision(conn, intake_world)
     user = _usuario(intake_world)
     ws = intake_world["north-lab"]["id"]
-    from datetime import datetime, timezone
 
+    # A la hora del armado (`NOW`), no al reloj real: la revisión vence 8 h después.
     with espacio(conn, ws) as cur:
         quien = identificar(cur, user, Canal.ESPACIO, ws)
-        rama = P.ver_rama_abierta(cur, quien, user, datetime.now(timezone.utc),
-                                  H.REGISTRO, alta=True)
+        rama = P.ver_rama_abierta(cur, quien, user, NOW, H.REGISTRO, alta=True)
 
     assert rama is not None and rama.tipo == P.RAMA_ALTA
 
@@ -308,6 +308,140 @@ def test_un_toque_tardio_de_enviar_no_lo_manda_de_nuevo_y_dice_que_ya_no_esta_vi
     assert [f["cuerpo"] for f in _nuevas(conn, user, antes)] == [AVISO_TOQUE_YA_USADO]
     assert _salidas(conn, _tg_aprobador(intake_world)) == del_aprobador
     assert len(_acciones(conn, rid)) == 2
+
+
+def _opciones_de(conn, pid) -> list[str]:
+    """Las opciones activas de la acción (las de una acción cerrada, ninguna)."""
+    with admin(conn) as cur:
+        cur.execute("select etiqueta from pending_action_option "
+                    "where pending_action_id = %s and activa", (pid,))
+        return [etiqueta_sin_icono(f["etiqueta"]) for f in cur.fetchall()]
+
+
+def _dejar_atras_el_resumen(conn, rid, titulo="Inspect pressure valve"):
+    """El borrador siguió después de que quien pide vio su resumen: cambia un dato
+    (en el dato de la solicitud y en el borrador) y sube la versión."""
+    with admin(conn) as cur:
+        cur.execute("update task_intake_field set valor = to_jsonb(%s::text) "
+                    "where request_id = %s and campo = 'title'", (titulo, rid))
+        cur.execute(
+            """update task_draft set titulo = %s, version = version + 1
+                where id = (select task_draft_id from task_intake_request
+                             where id = %s)""", (titulo, rid))
+    conn.commit()
+
+
+def test_enviar_un_resumen_que_el_borrador_dejo_atras_ofrece_la_revision_vigente(
+        intake_world, conn, monkeypatch):
+    rid, pid = _alta_en_revision(conn, intake_world)
+    user = _usuario(intake_world)
+    client = _callback_client(conn, monkeypatch)
+    _dejar_atras_el_resumen(conn, rid)
+    antes = _salidas(conn, user)
+
+    _tocar(client, conn, user, pid, "Enviar a aprobación")
+
+    # UNA respuesta atada al toque: el resumen vigente con sus tres botones, y no
+    # sólo "ya no está vigente" (ADR 0013 reglas 2 y 3).
+    (unica,) = _nuevas(conn, user, antes)
+    (vieja, nueva) = _acciones(conn, rid)
+    assert vieja["estado"] == "vencida" and nueva["estado"] == "esperando"
+    assert str(unica["pending_action_id"]) == str(nueva["id"])
+    assert unica["cuerpo"].startswith(I.DRAFT_CHANGED_REVIEW_AGAIN)
+    assert nueva["resumen"] in unica["cuerpo"]
+    assert "Inspect pressure valve" in nueva["resumen"]
+    assert nueva["preview"]["titulo"] == "Inspect pressure valve"
+    assert nueva["chat_id"] == user and _fila(conn, nueva["id"])["es_respuesta"] is True
+    assert _etiquetas(conn, nueva["id"]) == ETIQUETAS_DE_LA_REVISION
+    assert _opciones_de(conn, pid) == []          # los botones viejos ya no valen
+    # Nada llegó a quien confirma, y la revisión vigente es la rama abierta.
+    assert _salidas(conn, _tg_aprobador(intake_world)) == []
+    assert str(_pregunta_abierta(conn, intake_world, user)["id"]) == str(nueva["id"])
+    assert _tareas(conn) == 0 and _solicitud(conn, rid) == "active"
+
+
+def test_el_toque_repetido_sobre_el_resumen_que_quedo_atras_no_ofrece_dos_revisiones(
+        intake_world, conn, monkeypatch):
+    rid, pid = _alta_en_revision(conn, intake_world)
+    user = _usuario(intake_world)
+    client = _callback_client(conn, monkeypatch)
+    _dejar_atras_el_resumen(conn, rid)
+    _tocar(client, conn, user, pid, "Enviar a aprobación")
+    de_quien_pide = _salidas(conn, user)
+
+    _tocar(client, conn, user, pid, "Enviar a aprobación")       # dentro de la ventana
+
+    assert _salidas(conn, user) == de_quien_pide
+    assert [a["estado"] for a in _acciones(conn, rid)] == ["vencida", "esperando"]
+    assert _salidas(conn, _tg_aprobador(intake_world)) == []
+
+
+def test_despues_de_la_revision_vigente_enviar_manda_lo_que_quien_pide_reviso(
+        intake_world, conn, monkeypatch):
+    rid, pid = _alta_en_revision(conn, intake_world)
+    user = _usuario(intake_world)
+    client = _callback_client(conn, monkeypatch)
+    _dejar_atras_el_resumen(conn, rid)
+    _tocar(client, conn, user, pid, "Enviar a aprobación")
+    (_, nueva) = _acciones(conn, rid)
+    antes = _salidas(conn, user)
+
+    _tocar(client, conn, user, nueva["id"], "Enviar a aprobación")
+
+    assert [f["cuerpo"] for f in _nuevas(conn, user, antes)] == [
+        I.draft_sent_text(_nombre_del_aprobador(conn, intake_world))]
+    (_, _, confirmacion) = _acciones(conn, rid)
+    assert confirmacion["estado"] == "esperando"
+    assert confirmacion["chat_id"] == _tg_aprobador(intake_world)
+    assert confirmacion["preview"] == nueva["preview"]
+    assert "Inspect pressure valve" in confirmacion["resumen"]
+    assert _etiquetas(conn, confirmacion["id"]) == ETIQUETAS_DEL_APROBADOR
+
+
+def _pasar_la_aprobacion_a_quien_pide(conn, world, rid, pid):
+    """Al momento de enviar, quien aprueba lo del borrador es quien lo pidió: la
+    persona responsable pasa a ser alguien a quien Taylor Quinn aprueba (Sam North).
+    Sólo cambia la persona responsable: el resumen que quien pide revisó sigue siendo
+    el vigente (su vista previa se actualiza con el borrador)."""
+    sam = world["north-lab"]["people"]["Sam North"]["membership_id"]
+    with admin(conn) as cur:
+        cur.execute(
+            "update task_draft set responsable_membership_id = %s "
+            "where id = (select task_draft_id from task_intake_request where id = %s)",
+            (sam, rid))
+        cur.execute("select task_draft_id from task_intake_request where id = %s",
+                    (rid,))
+        vigente, _ = I._current_preview(cur, cur.fetchone()["task_draft_id"])
+        cur.execute("update pending_action set preview = %s where id = %s",
+                    (Jsonb(vigente), pid))
+    conn.commit()
+
+
+def test_si_al_enviar_quien_aprueba_paso_a_ser_quien_pide_recibe_una_sola_respuesta(
+        intake_world, conn, monkeypatch):
+    """La revisión se armó con otra persona como aprobadora; al enviar, quien aprueba
+    es quien pidió: el resumen con Confirmar, Modificar y Cancelar es LA respuesta a
+    su toque, sin aviso neutro encima y sin mandarle nada a la otra persona."""
+    user = _usuario(intake_world)
+    rid, pid = _alta_en_revision(conn, intake_world)
+    assert _etiquetas(conn, pid) == ETIQUETAS_DE_LA_REVISION
+    _pasar_la_aprobacion_a_quien_pide(conn, intake_world, rid, pid)
+    client = _callback_client(conn, monkeypatch)
+    antes = _salidas(conn, user)
+
+    _tocar(client, conn, user, pid, "Enviar a aprobación")
+
+    (unica,) = _nuevas(conn, user, antes)
+    (revision, confirmacion) = _acciones(conn, rid)
+    assert revision["estado"] == "cancelada" and confirmacion["estado"] == "esperando"
+    assert str(unica["pending_action_id"]) == str(confirmacion["id"])
+    assert unica["cuerpo"] == revision["resumen"]
+    assert not unica["cuerpo"].startswith("No pude completar eso")
+    assert confirmacion["chat_id"] == user
+    assert _etiquetas(conn, confirmacion["id"]) == [
+        "Confirmar", "Modificar", "Cancelar"]
+    assert _fila(conn, confirmacion["id"])["es_respuesta"] is True
+    assert _salidas(conn, _tg_aprobador(intake_world)) == []
 
 
 def test_los_otros_botones_de_la_revision_ya_enviada_no_valen(intake_world, conn,
@@ -560,8 +694,8 @@ def test_si_quien_pide_es_quien_confirma_nada_cambia(intake_world, conn):
 def test_un_resumen_que_el_borrador_dejo_atras_no_se_envia(intake_world, conn,
                                                            monkeypatch):
     """Lo que recibe quien confirma es lo que quien pide revisó: si el borrador
-    cambió después de ese resumen, enviarlo no manda nada y se contesta como un
-    botón que ya no está vigente."""
+    cambió después de ese resumen, enviarlo no manda nada a quien confirma (quien
+    pide recibe el resumen vigente para revisarlo: T9-R1c-4b)."""
     rid, pid = _alta_en_revision(conn, intake_world)
     user = _usuario(intake_world)
     client = _callback_client(conn, monkeypatch)
@@ -574,7 +708,7 @@ def test_un_resumen_que_el_borrador_dejo_atras_no_se_envia(intake_world, conn,
 
     _tocar(client, conn, user, pid, "Enviar a aprobación")
 
-    assert [f["cuerpo"] for f in _nuevas(conn, user, antes)] == [AVISO_TOQUE_YA_USADO]
+    assert len(_nuevas(conn, user, antes)) == 1
     assert _salidas(conn, _tg_aprobador(intake_world)) == []
-    assert [a["estado"] for a in _acciones(conn, rid)] == ["vencida"]
+    assert [a["estado"] for a in _acciones(conn, rid)] == ["vencida", "esperando"]
     assert _tareas(conn) == 0
