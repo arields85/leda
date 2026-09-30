@@ -39,7 +39,9 @@ from __future__ import annotations
 
 import re
 import uuid
+from dataclasses import dataclass
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 
 from .db import registrar_auditoria
 
@@ -74,6 +76,14 @@ REFERENCIA_PENDING_ACTION = "pending_action"
 # (mismo patrón polimórfico, sin clave foránea), así que agregar este valor
 # no necesita una migración.
 REFERENCIA_ADMIN_NOTICE = "admin_notice"
+
+# Lo que ve la persona cuando algo falla y ningún camino específico le contestó
+# (T10-2, R3-H2, texto aprobado por el usuario). Vive acá, no en `gateway.py`,
+# porque el aviso a la administración cuenta que la persona vio esto
+# (`EXPLICACION_POR_ETAPA`); `gateway` lo sigue exponiendo con el mismo nombre.
+NOTICIA_NEUTRA_INCIDENTE = (
+    "Tuve un problema y no pude responder tu mensaje. Ya quedó registrado "
+    "para que lo revise un administrador.")
 
 # Tope del texto disparador en el aviso -- decisión del usuario, 2026-09-28:
 # acotado, y el aviso dice cuándo lo recortó.
@@ -117,26 +127,178 @@ def _texto_disparador(cur, referencia_tipo: str | None,
     return texto
 
 
+@dataclass(frozen=True)
+class ExplicacionDeEtapa:
+    """Qué pasó, qué vio la persona y qué hacer, en lenguaje llano, para una
+    etapa de incidente (T10-2, R3-H1). `que_vio` y `que_hacer` pueden nombrar a
+    la persona con `{nombre}`."""
+    que_paso: str
+    que_vio: str
+    que_hacer: str
+
+
+_BUSCAR_DETALLE = "Buscá el detalle con `python -m prisma incidentes <espacio>`"
+
+# Tabla determinista, nunca el modelo: una entrada por etapa con la que el código
+# registra un incidente (las constantes `ETAPA_*` de `gateway`, `respuesta_unica`
+# y `local`, más los literales de `ciclo`, `saludo` y `despachador`). Una etapa
+# sin entrada cae en `_EXPLICACION_GENERICA`;
+# `tests/test_aviso_incidente_legible.py` falla si una etapa conocida queda sin
+# entrada.
+EXPLICACION_POR_ETAPA: dict[str, ExplicacionDeEtapa] = {
+    "turno_texto": ExplicacionDeEtapa(
+        que_paso=("Falló algo dentro de Prisma mientras procesaba un mensaje de "
+                  "texto, y ningún control más específico lo atajó."),
+        que_vio=NOTICIA_NEUTRA_INCIDENTE,
+        que_hacer=(f"{_BUSCAR_DETALLE} y corregí la causa. Después podés "
+                   "pedirle a {nombre} que reenvíe el mensaje.")),
+    "toque_boton": ExplicacionDeEtapa(
+        que_paso=("Falló algo dentro de Prisma mientras procesaba el toque de "
+                  "un botón, y ningún control más específico lo atajó."),
+        que_vio=NOTICIA_NEUTRA_INCIDENTE,
+        que_hacer=(f"{_BUSCAR_DETALLE} y corregí la causa. Revisá que lo que "
+                   "{nombre} quería hacer no haya quedado a medias.")),
+    "activacion": ExplicacionDeEtapa(
+        que_paso="Falló algo al activar a la persona en el espacio.",
+        que_vio=NOTICIA_NEUTRA_INCIDENTE,
+        que_hacer=(f"{_BUSCAR_DETALLE} y confirmá que {{nombre}} quedó "
+                   "activada; si no, repetí la activación.")),
+    "accion_menu": ExplicacionDeEtapa(
+        que_paso=("Un botón del menú de una tarea llegó a una acción que "
+                  "terminó sin un resultado que Prisma pueda confirmar."),
+        que_vio=NOTICIA_NEUTRA_INCIDENTE,
+        que_hacer=("Revisá el estado de la tarea antes de repetir la acción, "
+                   "porque no se sabe si algo cambió, y pasale el detalle "
+                   "técnico a quien desarrolla.")),
+    "fila_terminal_sin_atar": ExplicacionDeEtapa(
+        que_paso=("La respuesta final de un borrador no se pudo asociar al "
+                  "toque que la provocó."),
+        que_vio=("La respuesta con el estado real del borrador, no el aviso "
+                 "de problema."),
+        que_hacer=("Confirmá que {nombre} recibió una sola respuesta y que el "
+                   "borrador está en el estado que espera.")),
+    "sin_respuesta": ExplicacionDeEtapa(
+        que_paso=("Un mensaje quedó sin ninguna respuesta de Prisma; el control "
+                  "de respuesta única mandó el aviso de problema."),
+        que_vio=NOTICIA_NEUTRA_INCIDENTE,
+        que_hacer=(f"{_BUSCAR_DETALLE} para ver qué camino no contestó y "
+                   "corregilo. {nombre} puede reenviar el mensaje.")),
+    "respuesta_duplicada": ExplicacionDeEtapa(
+        que_paso=("Un mismo mensaje generó más de una respuesta; se conservó "
+                  "una y se descartaron las demás."),
+        que_vio="Una sola respuesta, la que se conservó.",
+        que_hacer=("No hace falta avisarle a {nombre}. Mirá en el resumen qué "
+                   "camino respondió de más y corregilo.")),
+    "nota_sin_respuesta": ExplicacionDeEtapa(
+        que_paso=("Una nota que un turno dejó para su respuesta no llegó a "
+                  "salir, porque le tocaba a otro mensaje."),
+        que_vio="La respuesta de su mensaje, sin esa nota.",
+        que_hacer=("Revisá el resumen: si la nota era importante, avisale a "
+                   "{nombre}.")),
+    "mensaje_admin": ExplicacionDeEtapa(
+        que_paso=("Falló el procesamiento de un mensaje enviado al bot de "
+                  "administración."),
+        que_vio="Nada: este canal no manda ningún aviso de problema.",
+        que_hacer=(f"{_BUSCAR_DETALLE} y avisale a {{nombre}} si lo que "
+                   "pidió tiene que repetirse.")),
+    "ciclo_de_fondo": ExplicacionDeEtapa(
+        que_paso=("Falló una tarea del ciclo de fondo (cadencias, avisos y "
+                  "demás trabajo sin un mensaje de por medio)."),
+        que_vio="Nada: ocurrió en segundo plano.",
+        que_hacer=(f"{_BUSCAR_DETALLE}. Mientras no se corrija, lo que esa "
+                   "tarea tenía que hacer no se hace.")),
+    "saludo_diario": ExplicacionDeEtapa(
+        que_paso="Falló el envío del saludo del día.",
+        que_vio="Nada: no le llegó el saludo.",
+        que_hacer=(f"{_BUSCAR_DETALLE}. El saludo no sale hasta que se "
+                   "corrija.")),
+    "indicador_actividad": ExplicacionDeEtapa(
+        que_paso=("No se pudo retirar el borrador nativo del indicador de "
+                  "actividad; puede haber quedado visible."),
+        que_vio=("Posiblemente un texto de \"escribiendo\" o un borrador que "
+                 "no desapareció."),
+        que_hacer=(f"{_BUSCAR_DETALLE} y verificá que el chat de {{nombre}} "
+                   "no tenga un borrador suelto.")),
+}
+
+_EXPLICACION_GENERICA = ExplicacionDeEtapa(
+    que_paso=("Prisma registró un problema en una parte que todavía no tiene "
+              "una explicación propia; el resumen técnico dice dónde."),
+    que_vio=("No se puede saber con este registro qué vio {nombre}; "
+             "revisá su chat."),
+    que_hacer=f"{_BUSCAR_DETALLE} y decidí si hay que avisarle a {{nombre}}.")
+
+
+def _hora_local(momento: datetime, zona_horaria: str | None) -> str:
+    """La hora del aviso en la zona del espacio (`workspace.zona_horaria`),
+    no en UTC, con la zona a la vista; sin espacio (incidente global), UTC dicho
+    como tal."""
+    if zona_horaria:
+        try:
+            zona = ZoneInfo(zona_horaria)
+        except Exception:  # noqa: BLE001 -- una zona rota no puede tirar el aviso
+            zona = None
+        if zona is not None:
+            hora = momento.astimezone(zona).strftime("%d/%m %H:%M")
+            return f"{hora} (hora local, {zona_horaria})"
+    return f"{momento.astimezone(timezone.utc).strftime('%d/%m %H:%M')} UTC"
+
+
+def armar_aviso_admin(*, incident_id: str, slug: str | None,
+                      zona_horaria: str | None, momento: datetime,
+                      etapa: str | None, severidad: str, resumen: str,
+                      nombre: str | None, mensaje: str) -> str:
+    """El aviso a la administración de plataforma (T10-2, R3-H1, formato
+    aprobado por el usuario): qué le pasó a la persona primero, lo técnico al
+    final. `que_paso`/`que_vio`/`que_hacer` salen de `EXPLICACION_POR_ETAPA`;
+    `mensaje` es el disparador que el aviso ya mostraba, sin nada nuevo."""
+    explicacion = EXPLICACION_POR_ETAPA.get(etapa or "", _EXPLICACION_GENERICA)
+    quien = nombre or "la persona"
+    titulo = (f"⚠️ Prisma no pudo responderle a {nombre}" if nombre
+              else "⚠️ Prisma tuvo un problema")
+    return "\n".join((
+        titulo,
+        "",
+        "Qué pasó",
+        explicacion.que_paso,
+        "",
+        f"Qué vio {quien}",
+        explicacion.que_vio.format(nombre=quien),
+        "",
+        "Qué hacer",
+        explicacion.que_hacer.format(nombre=quien),
+        "",
+        "Mensaje",
+        mensaje,
+        "",
+        "Detalle técnico",
+        f"Incidente {incident_id[:8]} · espacio {slug or 'global'} · "
+        f"etapa {etapa or 'sin etapa'} · severidad {severidad}",
+        _hora_local(momento, zona_horaria),
+        f"Resumen: {resumen}",
+    ))
+
+
 def _texto_aviso_admin(cur, incident_id: str, workspace_id: str | None, *,
                        etapa: str | None, severidad: str, resumen: str,
                        referencia_tipo: str | None,
                        referencia_id: str | None,
-                       app_user_id: str | None) -> str:
-    slug = None
+                       app_user_id: str | None,
+                       momento: datetime | None = None) -> str:
+    slug = zona_horaria = None
     if workspace_id is not None:
-        cur.execute("select slug from workspace where id = %s", (workspace_id,))
+        cur.execute("select slug, zona_horaria from workspace where id = %s",
+                    (workspace_id,))
         fila = cur.fetchone()
-        slug = fila["slug"] if fila else None
+        if fila:
+            slug, zona_horaria = fila["slug"], fila["zona_horaria"]
 
-    ahora = datetime.now(timezone.utc)
-    return "\n".join((
-        f"Incidente {incident_id[:8]} · espacio={slug or 'global'} · "
-        f"etapa={etapa or 'sin etapa'} · severidad={severidad} · "
-        f"{ahora.strftime('%d/%m %H:%M')} UTC",
-        f"Quién: {_quien_disparo(cur, app_user_id) or '(no identificado)'}",
-        f"Resumen: {resumen}",
-        f"Disparador: {_texto_disparador(cur, referencia_tipo, referencia_id)}",
-    ))
+    return armar_aviso_admin(
+        incident_id=incident_id, slug=slug, zona_horaria=zona_horaria,
+        momento=momento or datetime.now(timezone.utc), etapa=etapa,
+        severidad=severidad, resumen=resumen,
+        nombre=_quien_disparo(cur, app_user_id),
+        mensaje=_texto_disparador(cur, referencia_tipo, referencia_id))
 
 
 def avisar_incidente_admin(cur, incident_id: str, *, workspace_id: str | None,

@@ -27,8 +27,8 @@ from .db import (admin, atar_al_entrante, autoridad, conectar,
 from .despachador import (TransporteTelegram, acusar_toque, despachar,
                           mantener_chat_activo, pedido_telegram,
                           texto_error_seguro)
-from .incidentes import (REFERENCIA_INBOUND_MESSAGE, REFERENCIA_PENDING_ACTION,
-                         registrar_incidente)
+from .incidentes import (NOTICIA_NEUTRA_INCIDENTE, REFERENCIA_INBOUND_MESSAGE,
+                         REFERENCIA_PENDING_ACTION, registrar_incidente)
 from .ingreso_tareas import (QUESTION_CHOICE, QUESTION_CONFIRMATION,
                              QUESTION_FREE_TEXT)
 from .respuesta_unica import controlar as controlar_una_respuesta
@@ -3690,7 +3690,6 @@ def _routing_incident(cur, quien, error) -> None:
     )
 
 
-NOTICIA_NEUTRA_INCIDENTE = "No pude completar eso. Ya quedó registrado para revisarlo."
 
 # Etapas nombradas (T2b, corrección de trazabilidad, 2026-09-25): en qué
 # punto de entrada se atrapó la excepción no manejada. No pretenden cubrir

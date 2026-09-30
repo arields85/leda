@@ -208,6 +208,10 @@ def test_excepcion_no_manejada_en_un_turno_avisa_a_cada_administrador_vinculado(
             assert "falla inesperada de prueba" not in cuerpo
             # Quién: la persona identificada.
             assert "Nahuel Gimenez" in cuerpo
+            # Formato llano (T10-2): abre con lo que le pasó a la persona y la
+            # hora sale en la zona del espacio, no en UTC.
+            assert cuerpo.startswith("⚠️ Prisma no pudo responderle a Nahuel Gimenez")
+            assert "UTC" not in cuerpo
             # Prefijo del incidente, espacio, etapa, severidad y hora -- lo
             # mínimo para encontrar el detalle con
             # `python -m prisma incidentes corework`.
