@@ -5400,3 +5400,11 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
     CoreLabs», que ya está `terminada` (entrega nueva a Ismael y cambios pedidos a Ariel
     quedaron viejos). No está verificado si el despachador descarta los que ya no
     corresponden.
+
+- 2026-09-30: **Cierre de sesión — punto exacto para retomar.** Decisión del usuario: corte
+  limpio y continuar en una sesión nueva. Estado y orden de trabajo en `docs/STATUS.md`,
+  "Punto exacto para retomar (cierre de sesión 2026-09-30, noche)": terminar el circuito C
+  el 01/10 a las 09:00 (rechazo de Ismael con motivo) y observar los avisos viejos; después
+  corregir por prioridad: altos R4c-H3 y R4b-H5; alta guiada (orden decidido por el usuario,
+  R4c-H5 a H9); medios R4c-H1, R4c-H2, R4b-H1; forma R4b-H2 a H4; pendientes anteriores.
+  Frontera RDD `4fc1365`; `ffe4e85` sin revisar (arnés). Listener en la terminal del usuario.

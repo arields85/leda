@@ -188,43 +188,54 @@ serializan y la hora de cada evento, evidencia y aprobación es la de escritura
 (`0016`). Decisiones del usuario registradas como enmiendas de ADR 0009. Prueba de punta
 a punta de "Pedir cambios" por el webhook. Todo esto **todavía no se probó en vivo**.
 
-**Punto exacto para retomar (2026-09-30).** `main` por delante de `origin/main` (sin push; lo
-decide el usuario). Frontera de revisión RDD en `8fc0bf5` (`review-bd6e966a7e428940`,
-aprobada y reconocida al cuarto intento; los tres primeros fallaron por `529 Overloaded` del
-proveedor). El usuario dio consentimiento
-permanente para las revisiones y pidió parar sólo por decisiones sobre cómo funciona Prisma.
-Detalle y evidencia de todo en `odd/tasks/prisma-orienta.md`.
+**Punto exacto para retomar (cierre de sesión 2026-09-30, noche).** `main` por delante de
+`origin/main` (sin push; lo decide el usuario). Frontera de revisión RDD en `4fc1365`
+(`review-d8f0e2e86a8a0d34`, aprobada y reconocida); sin revisar: `ffe4e85` (sólo el arnés
+del banco, `tests/banco/`, `under_budget`), se revisa con el próximo cambio de código.
+Consentimiento permanente del usuario para las revisiones; parar sólo por decisiones sobre
+cómo funciona Prisma. Detalle y evidencia de todo en `odd/tasks/prisma-orienta.md`.
 
-Hecho el 2026-09-30, cada unidad con TDD, commit y revisión RDD aprobada salvo la última:
-T9-R4c (una sola respuesta con el estado real si la fila terminal no se ata al toque; ninguna
-nota descartada en silencio); T9-R1c-4 y T9-R1c-4b (quien pide revisa su borrador con [Enviar
-a aprobación] [Modificar] [Cancelar] antes de que le llegue a quien confirma; migración
-`0023`: la base rechaza el valor "enviar"); T10-1 a T10-5c (arnés del banco, aviso neutro y
-aviso de incidente al administrador con los textos aprobados y hora local, ✏️ en Modificar,
-vista previa con un dato por línea y comprobante corto, "Gracias. La tarea «X» pasó a
-revisión.", listas de hasta tres tareas nombradas con su estado sólo en respuestas
-informativas); T9-H19 (no se reproduce desde un solo mensaje: familia `b-0030` 9/9) y
-T9-H19b a T9-H19h (una reentrega del webhook de Telegram ya atendida se absorbe; una
-reentrega sin respuesta se recupera; un barrido de recibos huérfanos manda el aviso neutro y
-deja incidente si un turno murió; todo recibo con el reloj de la base). Suite completa: 2179
-passed, 309 deselected. Banco real completo (n=1) después de T10-5: 98/100 (`b-0013` espera
-la regla T9-R5; `b-0020` pasó al repetirlo).
+**Cuarta ronda por Telegram (T11) en curso.** Circuito A completo de punta a punta (entrega,
+cambios pedidos, reentrega, aprobación) y circuito B completo; circuito C hasta "Enviar a
+aprobación". Falta: el 01/10 a las 09:00 le llega a Ismael el borrador de Marcos (quedó en
+la cola por estar fuera de horario); Ismael toca ✖️ Rechazar con un motivo y a Marcos le
+tiene que llegar "Ismael rechazó el borrador…: motivo". A las 09:00 salen además cinco
+avisos encolados fuera de horario; tres son de «Dashboard de lotes», que ya está
+`terminada`: observar si el despachador descarta los que dejaron de corresponder. El
+listener lo corre el usuario en su propia terminal (`.\.venv\Scripts\python.exe -m
+prisma escuchar corework`): las tareas en segundo plano del agente se cortan por tiempo.
 
-**Para arrancar la cuarta ronda (T11), en este orden:** (1) si se reinició Windows, levantar
-PostgreSQL con `pg_ctl` (`PRUEBA-LOCAL.md`) y comprobar `pg_isready`; (2) desde la cuenta de
-Ariel, escribirle una vez al bot de administración (la base es nueva y no conoce ese chat);
-(3) arrancar `python -m prisma escuchar corework`; (4) seguir el guion de
-`odd/tasks/prisma-orienta.md` (circuitos A, B y C). El usuario maneja todas las cuentas de
-prueba.
+**Próximo, en orden (unidades con TDD, commit y revisión RDD):**
+1. Terminar el circuito C a las 09:00 y observar los avisos viejos.
+2. Altos: R4c-H3 ("No puedo mostrarte la evidencia", falso: el menú la muestra) y R4b-H5
+   (la respuesta al motivo de "Pedir cambios" tomada como pedido imposible, "Eso todavía
+   no lo puedo hacer"): regla 1 y 3 del ADR 0013.
+3. Alta guiada, decisión del usuario: preguntar primero "¿Qué hay que hacer?" y después el
+   objetivo (el más probable primero); sin bucle al volver a pedir una tarea nueva
+   (R4c-H5); sin jerga "(hasta N)" (R4c-H7); fecha que acepte formas naturales o diga el
+   formato (R4c-H6); sin claves internas en el resumen (R4c-H8); texto del resumen de quien
+   pide (R4c-H9).
+4. Medios: una sola confirmación para la reentrega tras cambios pedidos (R4c-H1); vista
+   previa de Aprobar sin Modificar y con la evidencia (R4c-H2); "quiero entregar…" sin
+   intento abre la pregunta de evidencia (R4b-H1).
+5. Forma: saludo del día en los avisos en una línea (R4b-H2), íconos en los botones de los
+   avisos (R4b-H3), sin "(texto)" en la evidencia (R4b-H4).
+6. Pendientes anteriores: cierre con el estado real en la rama de opciones y en la negativa
+   sin intento; observaciones no bloqueantes de las revisiones; vista previa vieja
+   (`crear_borrador_tarea`) con Cancelar; T9-H19i; índice de `inbound_message`; relojes de
+   `despachador` y `contexto`.
+Configuración a decidir con el usuario: el resumen "Estado del equipo" va a un grupo de
+Telegram que no existe ("chat not found", un incidente).
 
-**Esperan al usuario:** T9-R1c-5 (si quien confirma cancela el borrador, ¿se le avisa a quien
-pidió?), T9-R5 (regla nueva: no preguntar dos veces "¿A cuál te referís?" con las mismas
-candidatas en un mismo mensaje), T9-H19c (¿qué hace Prisma con un mensaje editado?), T10-6
-(saludo sin rama abierta: ¿con botones o sin?), T10-7 (negativa sin intento: ¿"Estado: sin
-cambios" o el estado de la tarea?), T11 (cuarta ronda por Telegram con las cuentas del usuario) y el push. Método y
-precauciones de siempre: un escritor por unidad con TDD, nunca dos sesiones de pytest a la vez
-sobre el servidor local; PostgreSQL local (scoop) se arranca con `pg_ctl` tras reiniciar
-Windows (`PRUEBA-LOCAL.md`); si queda colgado, cerrar el proceso y volver a arrancarlo.
+Hecho el 2026-09-30 (además de lo de la mañana): R4-H7 (las respuestas contaban contra el
+tope diario y postergaban los avisos), R4-H8 (estado real con los cambios pedidos), saludo
+en una línea, "Dale, escribime qué necesitás.", pregunta de evidencia real, link directo a
+la vista previa, y las decisiones del usuario: avisos de coordinación fuera del tope
+(precisión en `nucleo/mecanica-pm.md` §10, migración `0024`), Rechazar con motivo y aviso a
+quien pidió (migración `0025`), no preguntar dos veces lo mismo, mensaje editado ignorado,
+cierre con el estado real tras un cambio rechazado, íconos por acción en el menú. Suite
+completa: 2279 passed, 333 deselected. Banco real completo (n=1): 108/111 (las tres fallas
+explicadas; dos eran del arnés y se corrigieron en `ffe4e85`).
 
 Cerradas en la sesión del 2026-09-28 (noche) (detalle y evidencia en
 `odd/tasks/prisma-orienta.md`): avisos
@@ -239,7 +250,7 @@ botones y saludo diario al primer mensaje del día a cada persona, decidido al d
 falta una migración; respuesta inmediata e indicador "escribiendo…" con borrador
 nativo sólo si el turno pasa de 1,5 s (#9, #9b, ADR 0011).
 
-Base local `prisma` **rearmada el 2026-09-30 para la cuarta ronda** con datos ficticios nuevos (respaldo previo `db/respaldos/prisma-antes-ronda4-20260930.dump`; esquema completo, pack, feriados, semilla ficticia, modelo `nan`/`deepseek-v4-flash`, Ariel administrador; Ariel, Ismael y Marcos activos). Antes: migraciones hasta `0023` aplicadas (`0023` el 2026-09-30, con respaldo `db/respaldos/prisma-antes-0023-20260930.dump`, 532 entradas, y ensayo previo en una copia descartable; `verificar_migraciones` -> `None`) (`0020` a `0022` el 2026-09-29, con
+Base local `prisma` **rearmada dos veces el 2026-09-30 para la cuarta ronda** (la segunda con respaldo `db/respaldos/prisma-antes-ronda4b-20260930.dump`; migraciones hasta `0025`) con datos ficticios nuevos (respaldo previo `db/respaldos/prisma-antes-ronda4-20260930.dump`; esquema completo, pack, feriados, semilla ficticia, modelo `nan`/`deepseek-v4-flash`, Ariel administrador; Ariel, Ismael y Marcos activos). Antes: migraciones hasta `0023` aplicadas (`0023` el 2026-09-30, con respaldo `db/respaldos/prisma-antes-0023-20260930.dump`, 532 entradas, y ensayo previo en una copia descartable; `verificar_migraciones` -> `None`) (`0020` a `0022` el 2026-09-29, con
 respaldo `db/respaldos/prisma-antes-0020-0022-20260929.dump` y ensayo previo en una copia
 descartable; `saludo.verificar_migraciones` -> `None`); modelo `nan`/`deepseek-v4-flash`
 configurado en la ronda (respaldos
