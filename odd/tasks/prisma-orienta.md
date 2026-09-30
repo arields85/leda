@@ -5383,3 +5383,20 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   toma el título y se salta al objetivo. Corrige R4c-H4; junto con R4c-H5 (bucle al volver a
   pedir una tarea nueva a mitad del alta) y la jerga "(hasta 120)" / "(hasta 200)". Para
   después de la ronda.
+
+- 2026-09-30 (tarde): **Circuito C hasta "Enviar a aprobación"**: el resumen de quien pide
+  con Enviar a aprobación / ✏️ Modificar / Cancelar y "Le mandé el borrador de la tarea a
+  Ismael Soschinski para que lo confirme…" funcionan en vivo. El borrador a Ismael quedó en
+  la cola para el 01/10 09:00 (`es_coordinacion`, fuera de horario).
+  - R4c-H6. **Medio.** Fecha: "4de octubre" y "04 / 10" reciben "La fecha es ambigua o no
+    tiene un formato reconocido." sin decir qué formato sirve; recién "04/10/2026" pasó.
+  - R4c-H7. **Medio.** Jerga en cada campo: "(hasta 200)", "(hasta 64)", "(hasta 500)".
+  - R4c-H8. **Medio.** El resumen muestra claves internas: "Evidencia: explicacion,
+    resultado_de_prueba, captura, archivo".
+  - R4c-H9. **Bajo.** El resumen de quien pide dice "Al confirmar se comprometen todos los
+    datos mostrados." aunque su botón es Enviar a aprobación; muestra "Descripción: Sin
+    descripción" sin haberla preguntado.
+  - A observar el 01/10 09:00: salen seis avisos juntos; tres son de «Dashboard de lotes en
+    CoreLabs», que ya está `terminada` (entrega nueva a Ismael y cambios pedidos a Ariel
+    quedaron viejos). No está verificado si el despachador descarta los que ya no
+    corresponden.
