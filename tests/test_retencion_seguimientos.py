@@ -26,7 +26,8 @@ from prisma.despachador import TransporteDePrueba, despachar
 from prisma.salida import enqueue_outbox
 
 from tests.test_alta_eleccion_confirmacion import (_alta_con_eleccion,
-                                                   _alta_en_confirmacion)
+                                                   _alta_en_confirmacion,
+                                                   _alta_enviada)
 from tests.test_retencion_por_rama import (AHORA, AVISO, _abrir_vista_previa,
                                            _despachar, _encolar, _estados,
                                            _preparar)
@@ -175,7 +176,7 @@ def test_una_vista_previa_que_ya_no_es_la_vigente_se_descarta_y_no_se_cuenta(
     previa vigente: se descarta como siempre, no queda contada como retenida."""
     world = intake_world
     ws = world["north-lab"]["id"]
-    rid, pid = _alta_en_confirmacion(conn, world, responsable="Para mí")
+    rid, pid = _alta_enviada(conn, world)
     with espacio(conn, ws) as cur:
         morgan, tg = _persona_del_alta(cur, world, "Morgan Hale")
         _activa(cur, morgan, tg, DESPUES - timedelta(minutes=1))
@@ -212,7 +213,7 @@ def test_el_reloj_de_la_pasada_decide_la_vigencia_de_la_vista_previa_y_su_conteo
     vista previa ya no es la vigente: se descarta y no cuenta como retenida."""
     world = intake_world
     ws = world["north-lab"]["id"]
-    rid, pid = _alta_en_confirmacion(conn, world, responsable="Para mí")
+    rid, pid = _alta_enviada(conn, world)
     ahora = NOW + timedelta(hours=9)
     with espacio(conn, ws) as cur:
         morgan, tg = _persona_del_alta(cur, world, "Morgan Hale")
@@ -226,7 +227,10 @@ def test_el_reloj_de_la_pasada_decide_la_vigencia_de_la_vista_previa_y_su_conteo
     resumen, transporte = _despachar_alta(conn, ws, ahora)
 
     assert [e for e in transporte.enviados if e.chat_id == tg] == []
-    assert resumen["descartados"] == 1 and resumen["retenidos"] == 1   # sólo el control
+    # Se descartan la vista previa vencida y el resumen de quien pidió el borrador,
+    # que ya no está esperando desde que lo envió (T9-R1c-4) y nadie despachó a
+    # tiempo; sólo queda retenido el control.
+    assert resumen["descartados"] == 2 and resumen["retenidos"] == 1
     with admin(conn) as cur:
         cur.execute("select estado from message_outbox where pending_action_id = %s",
                     (pid,))

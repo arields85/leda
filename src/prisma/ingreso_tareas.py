@@ -16,8 +16,9 @@ from psycopg.types.json import Jsonb
 from .autoridad import Denegado, Solicitante
 from .db import entrante_atado, registrar_auditoria
 from .incidentes import registrar_incidente
+from .pendientes import HERRAMIENTA_REVISION_BORRADOR
 from .salida import (BUTTON_TEXT_LIMIT, ETIQUETA_CANCELAR, ETIQUETA_CONFIRMAR,
-                     ETIQUETA_MODIFICAR, ICONO_CANCELAR, ICONO_OTRA_OPCION,
+                     ETIQUETA_ENVIAR, ETIQUETA_MODIFICAR, ICONO_CANCELAR, ICONO_OTRA_OPCION,
                      ICONO_VER_MAS, PayloadValidationError, con_icono,
                      enqueue_outbox, etiqueta_sin_icono, etiquetas_de_tarea,
                      normalize_visible_text, prepare_buttons, prepare_payload, telegram_utf16_units,
@@ -45,6 +46,13 @@ CANCELAR_BORRADOR = con_icono("Cancelar borrador", ICONO_CANCELAR)
 DRAFT_AWAITING_CONFIRMATION = (
     "El borrador de la tarea está esperando confirmación: se confirma con el "
     "botón Confirmar del resumen, no con un mensaje.")
+# Lo que se le dice a quien pidió el borrador mientras su resumen espera su revisión
+# (T9-R1c-4): cuando lo confirma otra persona, se le envía sólo con el botón Enviar a
+# aprobación, nunca con un mensaje. Redacción pendiente de revisión de voz en T10.
+DRAFT_AWAITING_SEND = (
+    "El borrador de la tarea está esperando tu revisión: se envía a aprobación con "
+    "el botón Enviar a aprobación del resumen, no con un mensaje. Con Modificar "
+    "cambiás un dato y con Cancelar lo cancelás.")
 # Lo que se le dice a quien terminó el alta cuando no es quien la confirma (T9-R3,
 # ADR 0013 regla 3: cómo quedó y qué falta): a quién se le mandó y que la tarea
 # todavía no existe. Redacción pendiente de revisión de voz en T10.
@@ -560,17 +568,18 @@ def handle_active_text(cur: psycopg.Cursor, who: Solicitante, *, chat_id: int,
         return IntakeOutcome(request_id, prompt, inert=True)
 
     cur.execute(
-        """select membership_id from pending_action
-            where draft_id = %s and estado = 'esperando' limit 1""",
+        """select membership_id, herramienta from pending_action
+            where draft_id = %s and estado = 'esperando'
+            order by creado_en desc limit 1""",
         (request["task_draft_id"],),
     )
     waiting = cur.fetchone()
     if waiting and str(waiting["membership_id"]) != str(who.membership_id):
-        # Espera la confirmación de otra persona: no es una rama abierta de
-        # quien lo pidió y su mensaje sigue el camino normal.
+        # Espera la confirmación de otra persona (ya se la envió): no es una rama
+        # abierta de quien lo pidió y su mensaje sigue el camino normal.
         return None
     if waiting:
-        prompt = DRAFT_AWAITING_CONFIRMATION
+        prompt = _awaiting_prompt(waiting["herramienta"])
     else:
         prompt = with_no_effect_status(
             "No pude continuar el borrador de la tarea. "
@@ -645,10 +654,11 @@ def open_intake_question(cur: psycopg.Cursor, who: Solicitante,
     sin íconos, y `clase` el `tipo` de la elección (`MODIFY_PICKER_KIND` para el
     selector de Modificar). Con varias, gana el campo de texto libre, después la elección:
     una solicitud tiene una sola a la vez. La vista previa del borrador es una
-    pregunta abierta sólo de quien tiene el botón Confirmar (el aprobador):
-    si confirma otra persona, quien lo pidió no tiene una rama abierta (ADR
-    0013 regla 1, enmienda del 2026-09-29) y sus mensajes siguen el camino
-    normal."""
+    pregunta abierta sólo de quien tiene sus botones: quien confirma o, si lo
+    confirma otra persona, quien lo pidió mientras revisa su resumen antes de
+    enviarlo (`revision`, T9-R1c-4: Enviar a aprobación, Modificar y Cancelar).
+    Una vez enviado, quien lo pidió no tiene una rama abierta (ADR 0013 regla 1,
+    enmienda del 2026-09-29) y sus mensajes siguen el camino normal."""
     slot = open_free_text_slot(cur, who, chat_id)
     if slot is not None:
         # Un dato ya confirmado que se está corrigiendo (Modificar) lleva lo que la
@@ -683,7 +693,8 @@ def open_intake_question(cur: psycopg.Cursor, who: Solicitante,
                 "resumen": _first_choice_prompt(cur, row["id"]),
                 "opciones": options}
     cur.execute(
-        f"""select p.id, r.id request_id, {_TITLE_OF_REQUEST} titulo
+        f"""select p.id, p.herramienta, r.id request_id,
+                   {_TITLE_OF_REQUEST} titulo
               from task_intake_request r
               join pending_action p on p.draft_id = r.task_draft_id
                                    and p.workspace_id = r.workspace_id
@@ -698,8 +709,17 @@ def open_intake_question(cur: psycopg.Cursor, who: Solicitante,
         return {"tipo": QUESTION_CONFIRMATION, "id": str(row["id"]),
                 "request_id": str(row["request_id"]), "campo": None,
                 "titulo": _text_or_none(row["titulo"]),
-                "resumen": DRAFT_AWAITING_CONFIRMATION, "opciones": None}
+                "resumen": _awaiting_prompt(row["herramienta"]), "opciones": None,
+                "revision": row["herramienta"] == HERRAMIENTA_REVISION_BORRADOR}
     return None
+
+
+def _awaiting_prompt(tool: str) -> str:
+    """Lo que se le dice a quien escribe mientras su resumen espera un botón: su
+    revisión antes de enviar a aprobación (T9-R1c-4) o la confirmación del borrador.
+    Cada uno nombra los botones que esa persona de verdad tiene."""
+    return (DRAFT_AWAITING_SEND if tool == HERRAMIENTA_REVISION_BORRADOR
+            else DRAFT_AWAITING_CONFIRMATION)
 
 
 def _text_or_none(value) -> str | None:
@@ -782,19 +802,35 @@ def open_modify_picker(cur: psycopg.Cursor, who: Solicitante, question_id: str,
                          kind=MODIFY_PICKER_KIND)
 
 
-_MODIFY_OPTION = """select p.id, p.membership_id, p.chat_id, p.estado,
+# Los valores de los botones de la vista previa del borrador que no llegan a la
+# autoridad: los intercepta el gateway (la conversión es sólo del botón Confirmar).
+VALUE_MODIFY = "modificar"
+VALUE_SEND = "enviar"
+
+_DRAFT_BUTTON = """select p.id, p.membership_id, p.chat_id, p.estado,
                   p.vence_en > %s as vigente
              from pending_action_option o
              join pending_action p on p.id = o.pending_action_id
             where o.token = %s and o.workspace_id = %s and p.draft_id is not null
-              and o.valor = to_jsonb('modificar'::text)"""
+              and o.valor = to_jsonb(%s::text)"""
+
+
+def _draft_button(cur, who: Solicitante, token: str, now: datetime, value: str):
+    cur.execute(_DRAFT_BUTTON, (now, token, who.workspace_id, value))
+    return cur.fetchone()
 
 
 def es_modificar_de_borrador(cur: psycopg.Cursor, who: Solicitante, token: str,
                              now: datetime) -> bool:
     """Si `token` es el del botón Modificar de una vista previa de borrador."""
-    cur.execute(_MODIFY_OPTION, (now, token, who.workspace_id))
-    return cur.fetchone() is not None
+    return _draft_button(cur, who, token, now, VALUE_MODIFY) is not None
+
+
+def es_enviar_de_borrador(cur: psycopg.Cursor, who: Solicitante, token: str,
+                          now: datetime) -> bool:
+    """Si `token` es el del botón Enviar a aprobación del resumen de quien pidió
+    el borrador (T9-R1c-4)."""
+    return _draft_button(cur, who, token, now, VALUE_SEND) is not None
 
 
 def modify_from_preview(cur: psycopg.Cursor, who: Solicitante, *, token: str,
@@ -802,15 +838,91 @@ def modify_from_preview(cur: psycopg.Cursor, who: Solicitante, *, token: str,
     """El botón Modificar de la vista previa del borrador. Sólo lo toca su
     dueño, en su chat (`Denegado` si no), y sólo mientras la vista previa espera y
     no venció; `None` si ya no (un toque tardío, un segundo toque)."""
-    cur.execute(_MODIFY_OPTION, (now, token, who.workspace_id))
-    preview = cur.fetchone()
+    preview = _draft_button(cur, who, token, now, VALUE_MODIFY)
     if not preview:
         return None
-    if str(preview["membership_id"]) != str(who.membership_id)             or preview["chat_id"] != chat_id:
+    if str(preview["membership_id"]) != str(who.membership_id)        or preview["chat_id"] != chat_id:
         raise Denegado(NOT_YOURS)
     if preview["estado"] != "esperando" or not preview["vigente"]:
         return None
     return open_modify_picker(cur, who, str(preview["id"]), now, via="boton")
+
+
+def send_to_approval(cur: psycopg.Cursor, who: Solicitante, *, token: str,
+                     chat_id: int, now: datetime) -> IntakeOutcome | None:
+    """El botón Enviar a aprobación del resumen de quien pidió el borrador (T9-R1c-4,
+    ADR 0005 decisión 1). Sólo lo toca su dueño, en su chat (`Denegado` si no), y
+    sólo mientras el resumen espera y no venció; `None` si ya no (un toque tardío, un
+    segundo toque, un resumen que el borrador dejó atrás).
+
+    Cierra su resumen de una vez (`cancelada`, marcada `enviada`: el borrador sigue
+    vivo) y le registra a quien confirma su propia acción con Confirmar y Cancelar,
+    con la vista previa vigente del borrador al enviar; a quien pidió le dice a quién
+    se lo mandó (la respuesta a su toque). Si no hay a quién mandárselo, lo dice y su
+    resumen sigue abierto: nada se cierra sin haberse enviado."""
+    button = _draft_button(cur, who, token, now, VALUE_SEND)
+    if not button:
+        return None
+    if str(button["membership_id"]) != str(who.membership_id)        or button["chat_id"] != chat_id:
+        raise Denegado(NOT_YOURS)
+    cur.execute(
+        """select r.*, p.resumen review_text, p.preview review_preview
+             from pending_action p
+             join task_intake_request r on r.task_draft_id = p.draft_id
+                                       and r.workspace_id = p.workspace_id
+            where p.id = %s and p.estado = 'esperando' and p.vence_en > %s
+              and r.estado = 'active'
+            for update of p, r""",
+        (button["id"], now),
+    )
+    request = cur.fetchone()
+    if not request:
+        return None
+    request_id = str(request["id"])
+    preview, version = _current_preview(cur, request["task_draft_id"])
+    if preview != request["review_preview"]:
+        # El borrador siguió después de ese resumen: lo que vio quien pide ya no es
+        # lo que se enviaría. Nunca se manda lo que no revisó.
+        cur.execute(
+            "update pending_action set estado = 'vencida' where id = %s",
+            (button["id"],))
+        cur.execute(
+            "update pending_action_option set activa = false "
+            "where pending_action_id = %s", (button["id"],))
+        return None
+    authority = _find_confirmer(cur, _draft_responsible(cur, request))
+    if authority is None:
+        return _say_real_state(cur, request, NO_ACTIVE_AUTHORITY, now,
+                               "no-active-authority")
+    cur.execute(
+        """update pending_action
+              set estado = 'cancelada', resuelta_en = %s, resuelta_por = %s,
+                  resultado = jsonb_build_object('resultado', 'enviada')
+            where id = %s and estado = 'esperando'""",
+        (now, who.app_user_id, button["id"]),
+    )
+    cur.execute(
+        "update pending_action_option set activa = false "
+        "where pending_action_id = %s", (button["id"],))
+    registrar_auditoria(
+        cur, accion="enviar_ingreso_tarea_a_aprobacion",
+        workspace_id=who.workspace_id, actor_app_user_id=who.app_user_id,
+        actor_kind="persona", sujeto_tipo="task_draft",
+        sujeto_id=str(request["task_draft_id"]),
+        detalle={"request_id": request_id,
+                 "confirmador_membership_id":
+                     str(authority["aprobador_membership_id"])})
+    pending, requester_confirms = _send_to_confirmer(
+        cur, request, now, request["review_text"], preview, version, authority)
+    if requester_confirms:
+        # Cambió quién aprueba y ahora es quien pidió: el resumen que recibe, con
+        # sus tres botones, es la respuesta a su toque.
+        return IntakeOutcome(request_id, request["review_text"], changed=True,
+                             pending_action_id=pending.id)
+    text = draft_sent_text(authority["aprobador_nombre"])
+    _enqueue(cur, request, text, now, f"intake:{request_id}:sent:v{version}")
+    return IntakeOutcome(request_id, text, changed=True,
+                         pending_action_id=pending.id)
 
 
 def modify_text_prompt(field: str, current: str) -> str:
@@ -1465,6 +1577,24 @@ def _finalize(cur, request, who, now):
     except PayloadValidationError:
         return _configuration_error(cur, request, who, "aggregate", now)
 
+    preview, _ = _current_preview(cur, request["task_draft_id"])
+    authority = _find_confirmer(cur, responsible["id"])
+    if authority is None:
+        return _say_real_state(cur, request, NO_ACTIVE_AUTHORITY, now,
+                               "no-active-authority")
+    if str(authority["aprobador_membership_id"]) != str(request["membership_id"]):
+        # Confirma otra persona (T9-R1c-4): quien pidió el borrador lo revisa primero
+        # y es él quien lo envía; a quien confirma no le llega nada todavía.
+        return _offer_review(cur, request, who, now, preview_text, preview)
+    pending, _ = _send_to_confirmer(cur, request, now, preview_text, preview,
+                                    request["version"], authority)
+    return IntakeOutcome(request_id, preview_text, changed=True,
+                         pending_action_id=pending.id)
+
+
+def _current_preview(cur, draft_id):
+    """La vista previa vigente del borrador tal como la revalida la autoridad
+    (`confirmar_borrador_tarea`) y su versión."""
     cur.execute(
         """select jsonb_build_object(
                'draft_id', id::text, 'version', version,
@@ -1475,11 +1605,25 @@ def _finalize(cur, request, who, now):
                'fecha_objetivo', fecha_objetivo::text,
                'criterio_aceptacion', criterio_aceptacion,
                'evidencia_requerida', to_jsonb(evidencia_requerida),
-               'evidencia_policy_version', evidencia_policy_version) preview
+               'evidencia_policy_version', evidencia_policy_version) preview,
+               version
              from task_draft where id = %s""",
-        (request["task_draft_id"],),
+        (draft_id,),
     )
-    preview = cur.fetchone()["preview"]
+    row = cur.fetchone()
+    return row["preview"], row["version"]
+
+
+def _draft_responsible(cur, request):
+    cur.execute("select responsable_membership_id from task_draft where id = %s",
+                (request["task_draft_id"],))
+    return cur.fetchone()["responsable_membership_id"]
+
+
+def _find_confirmer(cur, responsible_id):
+    """Quien confirma el borrador de esa persona responsable (su aprobador o, sin
+    uno, la autoridad final) con Telegram, o `None` si no hay a quién mandárselo:
+    `{aprobador_membership_id, app_user_id, telegram_user_id, aprobador_nombre}`."""
     cur.execute(
         """select m.aprobador_membership_id, aprobador.app_user_id,
                   aprobador.telegram_user_id, aprobador.nombre aprobador_nombre
@@ -1487,7 +1631,7 @@ def _finalize(cur, request, who, now):
              left join integrante aprobador
                on aprobador.membership_id = m.aprobador_membership_id
             where m.id = %s""",
-        (responsible["id"],),
+        (responsible_id,),
     )
     authority = cur.fetchone()
     approver_id = authority["aprobador_membership_id"] if authority else None
@@ -1501,34 +1645,70 @@ def _finalize(cur, request, who, now):
         authority = cur.fetchone()
         approver_id = authority["aprobador_membership_id"] if authority else None
     if not authority or not approver_id or authority["telegram_user_id"] is None:
-        return _say_real_state(cur, request, NO_ACTIVE_AUTHORITY, now,
-                               "no-active-authority")
+        return None
+    return authority
 
+
+def _offer_review(cur, request, who, now, preview_text, preview):
+    """El resumen de quien pidió el borrador cuando lo confirma otra persona
+    (T9-R1c-4): la misma vista previa con Enviar a aprobación, Modificar y Cancelar,
+    como respuesta a su acto (ADR 0013 regla 2). Es una rama abierta suya hasta que
+    lo envía. A quien confirma no le llega nada."""
+    from .pendientes import registrar
+
+    request_id = str(request["id"])
+    pending = registrar(
+        cur, who, herramienta=HERRAMIENTA_REVISION_BORRADOR, args={},
+        resumen=preview_text, vence_en=now + timedelta(hours=8),
+        chat_id=request["chat_id"], draft_id=str(request["task_draft_id"]),
+        draft_version=request["version"], preview=preview,
+        opciones=[(ETIQUETA_ENVIAR, VALUE_SEND), (ETIQUETA_MODIFICAR, VALUE_MODIFY),
+                  (ETIQUETA_CANCELAR, False)],
+    )
+    enqueue_outbox(
+        cur, workspace_id=who.workspace_id, chat_id=request["chat_id"],
+        text=preview_text, recipient_membership_id=str(request["membership_id"]),
+        scheduled_for=now,
+        # Distinta de la de la vista previa de quien confirma (`preview`).
+        dedupe_key=f"intake:{request_id}:review:v{request['version']}",
+        pending_action_id=pending.id, is_response=True,
+    )
+    return IntakeOutcome(request_id, preview_text, changed=True,
+                         pending_action_id=pending.id)
+
+
+def _send_to_confirmer(cur, request, now, preview_text, preview, version,
+                       authority):
+    """Registra la vista previa del borrador para quien lo confirma y la encola.
+    Devuelve la acción y si quien confirma es quien pidió el borrador.
+
+    Modificar (T9-R1c-3) es de quien pidió el borrador y lo confirma él mismo: es
+    quien tiene la rama abierta. Si confirma otra persona, ella sólo ve Confirmar y
+    Cancelar (T9-R1c-4: quien pidió ya lo revisó y lo envió)."""
     from .autoridad import Canal
     from .pendientes import registrar
 
+    approver_id = str(authority["aprobador_membership_id"])
+    workspace_id = str(request["workspace_id"])
     confirmer = Solicitante(
         app_user_id=str(authority["app_user_id"]), canal=Canal.ESPACIO,
-        workspace_id=who.workspace_id, membership_id=str(approver_id),
+        workspace_id=workspace_id, membership_id=approver_id,
     )
-    # Modificar (T9-R1c-3) es de quien pidió el borrador y lo confirma él mismo:
-    # es quien tiene la rama abierta. Si confirma otra persona, ella sólo ve
-    # Confirmar y Cancelar.
     options = [(ETIQUETA_CONFIRMAR, True), (ETIQUETA_CANCELAR, False)]
-    requester_confirms = str(approver_id) == str(request["membership_id"])
+    requester_confirms = approver_id == str(request["membership_id"])
     if requester_confirms:
-        options.insert(1, (ETIQUETA_MODIFICAR, "modificar"))
+        options.insert(1, (ETIQUETA_MODIFICAR, VALUE_MODIFY))
     pending = registrar(
         cur, confirmer, herramienta="confirmar_borrador_tarea", args={},
         resumen=preview_text, vence_en=now + timedelta(hours=8),
         chat_id=authority["telegram_user_id"], draft_id=str(request["task_draft_id"]),
-        draft_version=request["version"], preview=preview, opciones=options,
+        draft_version=version, preview=preview, opciones=options,
     )
     enqueue_outbox(
-        cur, workspace_id=who.workspace_id,
+        cur, workspace_id=workspace_id,
         chat_id=authority["telegram_user_id"], text=preview_text,
-        recipient_membership_id=str(approver_id), scheduled_for=now,
-        dedupe_key=f"intake:{request_id}:preview:v{request['version']}",
+        recipient_membership_id=approver_id, scheduled_for=now,
+        dedupe_key=f"intake:{request['id']}:preview:v{version}",
         pending_action_id=pending.id,
         # Quien actúa (un toque o un mensaje) es quien confirma: el resumen le
         # contesta a ese acto y no queda sujeto a horario, tope ni retención
@@ -1536,14 +1716,8 @@ def _finalize(cur, request, who, now):
         # le inicia a ella.
         is_response=requester_confirms,
     )
-    if not requester_confirms:
-        # Quien terminó el alta no recibe la vista previa: se le dice cómo quedó
-        # el borrador y quién lo confirma (regla 3). Sin esto el control de una
-        # respuesta por mensaje le mandaba el aviso neutro aunque todo salió bien.
-        _enqueue(cur, request, draft_sent_text(authority["aprobador_nombre"]), now,
-                 f"intake:{request_id}:sent:v{request['version']}")
-    return IntakeOutcome(request_id, preview_text, changed=True,
-                         pending_action_id=pending.id)
+    return pending, requester_confirms
+
 
 
 def render_preview(*, title, description="", objective, area, responsible, due_date,

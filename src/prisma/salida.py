@@ -126,6 +126,10 @@ ETIQUETA_CANCELAR = con_icono("Cancelar", ICONO_CANCELAR)
 # El tercer botón de la vista previa (ADR 0005 decisión 1); sin ícono, como en las
 # demás vistas previas.
 ETIQUETA_MODIFICAR = "Modificar"
+# El primer botón del resumen que ve quien pidió el borrador cuando lo confirma otra
+# persona (T9-R1c-4, ADR 0005 decisión 1, precisión del 2026-09-29); sin ícono, como
+# Modificar. Redacción pendiente de revisión de voz en T10.
+ETIQUETA_ENVIAR = "Enviar a aprobación"
 # El botón que copia al portapapeles lo que la persona había escrito (T9-R1c-3).
 # Redacción pendiente de revisión de voz en T10.
 ETIQUETA_COPIAR = con_icono("Copiar", ICONO_COPIAR)

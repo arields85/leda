@@ -30,7 +30,8 @@ from prisma.llm import RespectoPendiente
 from prisma.salida import COPY_TEXT_LIMIT, ETIQUETA_COPIAR, etiqueta_sin_icono
 
 from tests.test_alta_eleccion_confirmacion import (TITULO, _alta_en_confirmacion,
-                                                   _escribir, _nuevas, _ruta,
+                                                   _alta_enviada, _escribir,
+                                                   _nuevas, _ruta,
                                                    _salidas, _solicitud, _tocar_boton,
                                                    _usuario)
 from tests.toques import FUERA_DE_LA_VENTANA, envejecer_toques
@@ -152,11 +153,12 @@ def test_la_vista_previa_del_alta_ofrece_confirmar_modificar_y_cancelar(
         "Confirmar", "Modificar", "Cancelar"]
 
 
-def test_si_confirma_otra_persona_la_vista_previa_no_ofrece_modificar(
+def test_si_confirma_otra_persona_su_vista_previa_no_ofrece_modificar(
         intake_world, conn):
     """Quien pidió el borrador no es quien confirma: Modificar es de quien tiene
-    la rama abierta, y esa persona no es quien recibe este botón."""
-    rid, pid = _alta_en_confirmacion(conn, intake_world, responsable="Para mí")
+    la rama abierta, y esa persona no es quien recibe este botón. Lo tuvo antes, en
+    su resumen previo al envío (T9-R1c-4, `test_alta_enviar_a_aprobacion.py`)."""
+    rid, pid = _alta_enviada(conn, intake_world)
 
     assert _etiquetas_de_la_vista_previa(conn, pid) == ["Confirmar", "Cancelar"]
 
@@ -646,7 +648,7 @@ def test_la_vista_previa_del_alta_de_quien_la_confirma_es_una_respuesta(
 def test_si_confirma_otra_persona_su_vista_previa_la_inicia_prisma(
         intake_world, conn):
     """Para el aprobador es un mensaje que Prisma le inicia: horario y tope."""
-    rid, pid = _alta_en_confirmacion(conn, intake_world, responsable="Para mí")
+    rid, pid = _alta_enviada(conn, intake_world)
 
     assert _es_respuesta(conn, pid) is False
     transporte = _despachar_fuera_de_horario(conn, intake_world["north-lab"]["id"])

@@ -24,7 +24,8 @@ from prisma.db import admin, espacio
 from prisma.llm import RespectoPendiente
 
 from tests.test_alta_eleccion_confirmacion import (_escribir, _nuevas, _ruta,
-                                                   _salidas, _usuario)
+                                                   _salidas, _tocar_boton,
+                                                   _usuario)
 from tests.test_task_intake import (_RoutingProvider, _active_choices,
                                     _callback_client, _choose,
                                     _post_intake_callback, _start)
@@ -74,6 +75,19 @@ def _es_respuesta(conn, chat_id, cuerpo) -> bool:
 APROBADOR = "Morgan Hale"          # quien aprueba lo de Taylor Quinn en el mundo de prueba
 
 
+def _enviar_a_aprobacion(conn, monkeypatch, user):
+    """Quien pidió el alta toca Enviar a aprobación en su resumen (T9-R1c-4)."""
+    with admin(conn) as cur:
+        cur.execute(
+            """select o.token from pending_action_option o
+                 join pending_action p on p.id = o.pending_action_id
+                where o.etiqueta = 'Enviar a aprobación' and p.estado = 'esperando'
+                  and p.chat_id = %s""", (user,))
+        token = cur.fetchone()["token"]
+    client = _callback_client(conn, monkeypatch)
+    assert _tocar_boton(client, conn, token, user).status_code == 200
+
+
 def _telegram_del_aprobador(world) -> int:
     return world["north-lab"]["people"][APROBADOR]["telegram"]
 
@@ -88,7 +102,7 @@ def _enviado(conn, world) -> str:
 
 # --------------------------------------------- quien pide no es quien confirma
 
-def test_por_el_toque_quien_pide_el_alta_recibe_a_quien_se_le_mando(
+def test_por_el_toque_quien_pide_el_alta_recibe_su_resumen_y_al_enviarlo_a_quien_se_le_mando(
         intake_world, conn, monkeypatch):
     rid = _alta_hasta_el_criterio(conn, intake_world, "Para mí")
     user = _usuario(intake_world)
@@ -97,10 +111,20 @@ def test_por_el_toque_quien_pide_el_alta_recibe_a_quien_se_le_mando(
 
     _tocar_si(conn, monkeypatch, rid, user)
 
+    # Primero su propio resumen para revisar (T9-R1c-4), como respuesta a su toque;
+    # a quien confirma todavía no le llega nada.
+    (resumen,) = _nuevas(conn, user, antes)
+    assert resumen["pending_action_id"] and _es_respuesta(
+        conn, user, resumen["cuerpo"])
+    assert _salidas(conn, _telegram_del_aprobador(intake_world)) == []
+
+    antes = _salidas(conn, user)
+    _enviar_a_aprobacion(conn, monkeypatch, user)
+
     assert [f["cuerpo"] for f in _nuevas(conn, user, antes)] == [enviado]
     assert APROBADOR in enviado
     assert _es_respuesta(conn, user, enviado)
-    # La vista previa con los botones sigue siendo del aprobador.
+    # La vista previa con los botones es ahora del aprobador.
     assert any(f["pending_action_id"]
                for f in _salidas(conn, _telegram_del_aprobador(intake_world)))
 
@@ -116,9 +140,16 @@ def test_por_el_mensaje_quien_pide_el_alta_recibe_una_sola_respuesta_sin_inciden
 
     _escribir(conn, monkeypatch, intake_world, provider, CRITERIO)
 
-    assert [f["cuerpo"] for f in _nuevas(conn, user, antes)] == [enviado]
-    assert provider.main_calls == 0
+    (resumen,) = _nuevas(conn, user, antes)          # su resumen para revisar
+    assert resumen["pending_action_id"] and provider.main_calls == 0
     ws = intake_world["north-lab"]["id"]
+    assert _incidentes(conn, ws, "sin_respuesta") == []
+    assert _incidentes(conn, ws, "respuesta_duplicada") == []
+
+    antes = _salidas(conn, user)
+    _enviar_a_aprobacion(conn, monkeypatch, user)
+
+    assert [f["cuerpo"] for f in _nuevas(conn, user, antes)] == [enviado]
     assert _incidentes(conn, ws, "sin_respuesta") == []
     assert _incidentes(conn, ws, "respuesta_duplicada") == []
 

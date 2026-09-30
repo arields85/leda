@@ -517,7 +517,7 @@ def _preview_vigente(cur, m, ahora: datetime) -> bool:
     if not m["pending_action_id"]:
         return True
     cur.execute(
-        """select p.estado, p.draft_id, p.membership_id,
+        """select p.estado, p.draft_id, p.membership_id, p.herramienta,
                   p.vence_en > %s as no_vencida,
                   d.responsable_membership_id
              from pending_action p
@@ -528,6 +528,26 @@ def _preview_vigente(cur, m, ahora: datetime) -> bool:
     accion = cur.fetchone()
     if not accion or accion["draft_id"] is None:
         return True
+    from .pendientes import HERRAMIENTA_REVISION_BORRADOR
+
+    if accion["herramienta"] == HERRAMIENTA_REVISION_BORRADOR:
+        # El resumen de quien pidió el borrador (T9-R1c-4) es suyo aunque no sea
+        # quien aprueba: sigue vigente mientras espera, sin vencer, y su dueño
+        # esté activo.
+        cur.execute("select activo from membership where id = %s for share",
+                    (accion["membership_id"],))
+        dueno = cur.fetchone()
+        vigente = (accion["estado"] == "esperando" and accion["no_vencida"]
+                   and bool(dueno and dueno["activo"]))
+        if not vigente:
+            cur.execute(
+                """update pending_action set estado = 'vencida'
+                    where id = %s and estado = 'esperando'""",
+                (m["pending_action_id"],))
+            cur.execute(
+                "update message_outbox set estado = 'descartado' where id = %s",
+                (m["id"],))
+        return vigente
     cur.execute(
         """select destinatario.activo as destinatario_activo,
                   responsable.aprobador_membership_id as aprobador_actual

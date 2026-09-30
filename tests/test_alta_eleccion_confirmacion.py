@@ -81,14 +81,32 @@ def _alta_en_confirmacion(conn, world, responsable="Sam North") -> tuple[str, st
             _choose(cur, actor, rid, etiqueta, chat_id=user)
         _choose(cur, actor, rid, "Sí", chat_id=user)
         final = _choose(cur, actor, rid, "Sí", chat_id=user)
-        # Quien escribe sólo tiene la pregunta abierta si es quien confirma.
+        # Quien escribe tiene la pregunta abierta: la confirmación si es quien
+        # confirma, o su revisión antes de enviar a aprobación (T9-R1c-4).
         pregunta = I.open_intake_question(cur, actor, user)
-        if responsable == "Sam North":
-            assert pregunta["tipo"] == "confirmation"
-        else:
-            assert pregunta is None
+        assert pregunta["tipo"] == "confirmation"
     conn.commit()
     return rid, final.pending_action_id
+
+
+def _alta_enviada(conn, world, responsable="Para mí") -> tuple[str, str]:
+    """El alta que confirma otra persona, ya enviada a aprobación por quien la
+    pidió (T9-R1c-4): devuelve el id de la solicitud y el de la `pending_action`
+    de la vista previa de quien confirma, con Confirmar y Cancelar."""
+    rid, revision = _alta_en_confirmacion(conn, world, responsable=responsable)
+    user = _usuario(world)
+    ws = world["north-lab"]["id"]
+    with espacio(conn, ws) as cur:
+        token = P.opcion_por_etiqueta(cur, revision, "Enviar a aprobación").token
+        assert I.send_to_approval(cur, _actor(cur, world), token=token, chat_id=user,
+                                  now=NOW) is not None
+        cur.execute(
+            """select p.id from pending_action p
+                 join task_intake_request r on r.task_draft_id = p.draft_id
+                where r.id = %s and p.estado = 'esperando'""", (rid,))
+        (fila,) = cur.fetchall()
+    conn.commit()
+    return rid, str(fila["id"])
 
 
 def _salidas(conn, chat_id) -> list[dict]:
@@ -592,14 +610,14 @@ def test_quien_escribe_es_el_aprobador_la_respuesta_no_nombra_a_nadie(
 
 
 # Una rama está abierta para quien tiene que responderla (ADR 0013 regla 1,
-# enmienda del 2026-09-29): el borrador que espera la confirmación de otra
-# persona no es una rama abierta de quien lo pidió. Sus mensajes siguen el camino
-# normal: sin ruteo contra la pregunta, sin pregunta de la rama.
+# enmienda del 2026-09-29): el borrador que ya se envió a la confirmación de otra
+# persona (T9-R1c-4; antes de enviarlo, el resumen es rama de quien lo pidió) no es
+# una rama abierta de quien lo pidió. Sus mensajes siguen el camino normal: sin
+# ruteo contra la pregunta, sin pregunta de la rama.
 @pytest.mark.parametrize("texto", ["¿qué es un bloqueo?", "sí, dale", "hola"])
 def test_quien_escribe_no_es_el_aprobador_su_mensaje_sigue_el_camino_normal(
         texto, intake_world, conn, monkeypatch):
-    rid, pid = _alta_en_confirmacion(conn, intake_world,
-                                     responsable="Para mí")
+    rid, pid = _alta_enviada(conn, intake_world)
     user = _usuario(intake_world)
     antes = _salidas(conn, user)
     provider = _RoutingProvider([IntentRoute(IntentAction.NORMAL_CONVERSATION)],

@@ -783,6 +783,18 @@ def _toque(conn, workspace_id: str, slug: str, toque: dict,
                         _responder(cur, workspace_id, chat_id, quien,
                                    AVISO_PEDIDO_NO_VIGENTE, ahora)
                     return cerrar()
+                if draft_token and I.es_enviar_de_borrador(cur, quien, token,
+                                                           ahora):
+                    # Enviar a aprobación (T9-R1c-4): el resumen de quien pidió el
+                    # borrador se cierra y le llega a quien confirma. Tampoco
+                    # confirma nada ni llega nunca a la autoridad del borrador; un
+                    # toque repetido o tardío encuentra el resumen ya cerrado y se
+                    # contesta como cualquier botón que no está vigente.
+                    if I.send_to_approval(cur, quien, token=token,
+                                          chat_id=chat_id, now=ahora) is None:
+                        _responder(cur, workspace_id, chat_id, quien,
+                                   AVISO_PEDIDO_NO_VIGENTE, ahora)
+                    return cerrar()
                 if not draft_token:
                     resuelta = P.resolver(cur, token,
                                           app_user_id=quien.app_user_id, ahora=ahora)
@@ -1572,6 +1584,14 @@ def _pregunta_del_alta(abierta) -> _Pregunta:
             descripcion += (" (las opciones son: "
                             + ", ".join(f"«{o}»" for o in opciones) + ")")
         corrige_abre_selector = False
+    elif args.get("revision"):
+        # Quien pidió el borrador lo revisa antes de enviarlo a quien lo confirma
+        # (T9-R1c-4): sus botones son otros y la tarea todavía no se puede crear.
+        nombre = "la revisión del borrador de la tarea nueva"
+        descripcion = (f"{nombre}: se le mostró el resumen del borrador con los "
+                       "botones Enviar a aprobación, Modificar y Cancelar, y otra "
+                       "persona lo confirma después de que lo envíe")
+        corrige_abre_selector = True
     else:
         nombre = "la confirmación del borrador de la tarea nueva"
         descripcion = (f"{nombre}: se le mostró el resumen del borrador con los "
@@ -1879,6 +1899,8 @@ def _ver_pregunta_abierta(cur, quien, chat_id: int, ahora, *, alta: bool):
             args["clase"] = pregunta.get("clase")
         if pregunta.get("bloque"):
             args["bloque"] = pregunta["bloque"]
+        if pregunta.get("revision"):
+            args["revision"] = True
         return P.ModificacionAbierta(
             pregunta_id=pregunta["id"],
             herramienta=_SENTINEL_DE_ALTA[pregunta["tipo"]], args=args,

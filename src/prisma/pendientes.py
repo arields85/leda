@@ -39,6 +39,15 @@ CALLBACK_PREFIJO = "p:"
 # Cuánto espera Prisma la corrección después de un toque en Modificar.
 VENTANA_MODIFICACION = timedelta(minutes=30)
 
+# `herramienta` de la acción pendiente que es el resumen de quien pidió el borrador
+# del alta cuando lo confirma otra persona (T9-R1c-4): la revisión antes de enviar a
+# aprobación. Lleva el `draft_id` del borrador como la vista previa de quien confirma
+# (`herramienta="confirmar_borrador_tarea"`), pero es de quien pide, no de quien
+# aprueba: el despachador no la juzga contra el aprobador vigente
+# (`despachador._preview_vigente`) y `ingreso_tareas.open_intake_question` la nombra
+# con sus propios botones. Nunca es un nombre real del `REGISTRO` de `herramientas.py`.
+HERRAMIENTA_REVISION_BORRADOR = "revisar_borrador_tarea"
+
 # `herramienta` reservada para una acción pendiente armada por
 # `ofrecer_opciones` (T1, ADR 0007 "Prisma orienta, no charla"): nunca es un
 # nombre real del `REGISTRO` de `herramientas.py` -- lo arma `agente.py`
