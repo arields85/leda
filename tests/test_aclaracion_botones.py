@@ -291,8 +291,11 @@ def test_elegir_candidata_retoma_y_llega_a_la_vista_previa_sin_aplicar_nada(
 # Dos referencias ambiguas: una pregunta a la vez
 # ---------------------------------------------------------------------------
 
-def test_dos_referencias_ambiguas_preguntan_una_por_vez(
+def test_dos_referencias_con_las_mismas_candidatas_se_preguntan_una_sola_vez(
         cliente, conn, corework, monkeypatch, con_credencial):
+    """Una elección ya hecha vale para todo el mensaje (T9-R5, decisión del usuario,
+    2026-09-30): si la segunda referencia tiene las mismas candidatas que la que la
+    persona ya resolvió, Prisma no vuelve a preguntar "¿A cuál te referís?"."""
     ws = corework.workspace_id
     with admin(conn) as cur:
         tid_tablero = _tarea(cur, ws, titulo="Cablear tablero máq. 3",
@@ -327,25 +330,69 @@ def test_dos_referencias_ambiguas_preguntan_una_por_vez(
     assert _tocar(cliente, opcion1["token"], tg).status_code == 200
 
     with admin(conn) as cur:
-        cur.execute(
-            """select id, resumen from pending_action
-                where herramienta = %s and estado = 'esperando'""",
-            (gateway._SENTINEL_ACLARACION,))
-        filas = cur.fetchall()
-        assert len(filas) == 1, "la segunda pregunta reemplaza a la primera"
-        assert "lo del hmi" in filas[0]["resumen"]
-        pid2 = str(filas[0]["id"])
-        opcion2 = _opciones(cur, pid2)[0]
-
-    assert _tocar(cliente, opcion2["token"], tg).status_code == 200
-
-    with admin(conn) as cur:
         cur.execute("select count(*) n from pending_action where estado = 'esperando'")
-        assert cur.fetchone()["n"] == 0, "ya no queda ninguna pregunta pendiente"
+        assert cur.fetchone()["n"] == 0, "la elección ya hecha cubre la otra referencia"
+        cur.execute(
+            """select count(*) n from message_outbox
+                where pending_action_id in (select id from pending_action
+                       where herramienta = %s)""", (gateway._SENTINEL_ACLARACION,))
+        assert cur.fetchone()["n"] == 1, "se preguntó una sola vez"
 
     sistema, _ = proveedor.recibidos[-1]
     assert "lo del tablero" in sistema and "lo del hmi" in sistema
     assert sistema.count("Usá esa tarea") == 2
+
+
+def _estado_con_dos_pendientes(candidatas_a, candidatas_b):
+    def cands(ids):
+        return [{"id": i, "titulo": f"Tarea {i}", "etiqueta": f"Tarea {i}"}
+                for i in ids]
+
+    return {
+        "pendientes": ["lo del tablero", "lo del hmi"],
+        "candidatas": {"lo del tablero": cands(candidatas_a),
+                       "lo del hmi": cands(candidatas_b)},
+        "resueltas": {}, "titulos_resueltas": {}, "bloque_base": "",
+        "hay_clara": False,
+    }
+
+
+def test_una_referencia_con_otras_candidatas_se_sigue_preguntando():
+    estado = _estado_con_dos_pendientes(["a", "b"], ["b", "c"])
+    # La persona ya eligió "a" para la primera (así la dejó `_resolver_toque_aclaracion`).
+    estado["pendientes"] = ["lo del hmi"]
+    estado["resueltas"] = {"lo del tablero": "a"}
+    estado["titulos_resueltas"] = {"a": "Tarea a"}
+
+    siguiente = gateway._reusar_elecciones_ya_hechas(estado)
+
+    assert siguiente["pendientes"] == ["lo del hmi"]
+    assert siguiente["resueltas"] == {"lo del tablero": "a"}
+
+
+def test_el_mismo_conjunto_en_otro_orden_cuenta_como_las_mismas_candidatas():
+    estado = _estado_con_dos_pendientes(["a", "b"], ["b", "a"])
+    estado["pendientes"] = ["lo del hmi"]
+    estado["resueltas"] = {"lo del tablero": "a"}
+    estado["titulos_resueltas"] = {"a": "Tarea a"}
+
+    siguiente = gateway._reusar_elecciones_ya_hechas(estado)
+
+    assert siguiente["pendientes"] == []
+    assert siguiente["resueltas"] == {"lo del tablero": "a", "lo del hmi": "a"}
+    assert "«lo del hmi» es la tarea «Tarea a» (a)" in siguiente["bloque_base"]
+
+
+def test_una_referencia_clara_desde_el_arranque_no_cubre_a_las_ambiguas():
+    """Sólo cuenta lo que la persona eligió en esta aclaración: una referencia que
+    resolvió Jev (sin candidatas preguntadas) no es una elección suya."""
+    estado = _estado_con_dos_pendientes(["a", "b"], ["a", "b"])
+    estado["pendientes"] = ["lo del hmi"]
+    estado["resueltas"] = {"otra": "a"}
+    estado["titulos_resueltas"] = {"a": "Tarea a"}
+
+    assert gateway._reusar_elecciones_ya_hechas(estado)["pendientes"] == ["lo del hmi"]
+
 
 
 # ---------------------------------------------------------------------------

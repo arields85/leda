@@ -2609,6 +2609,59 @@ def _estado_de_aclaracion_ambigua(cur, quien, workspace_id: str, texto: str,
         None)
 
 
+def _dar_por_resuelta(estado: dict, referencia: str, tarea_id: str,
+                      titulo: str) -> dict:
+    """El estado de la aclaración con `referencia` resuelta a `tarea_id`: la
+    elección de la persona, o la que ya hizo para las mismas candidatas
+    (`_reusar_elecciones_ya_hechas`). Una copia: no toca `estado`."""
+    siguiente = dict(estado)
+    siguiente["resueltas"] = {**estado.get("resueltas", {}), referencia: tarea_id}
+    siguiente["titulos_resueltas"] = {
+        **estado.get("titulos_resueltas", {}), tarea_id: titulo}
+    siguiente["hay_clara"] = True
+    siguiente["bloque_base"] = estado.get("bloque_base", "") + (
+        f"\n- «{referencia}» es la tarea «{titulo}» ({tarea_id}). Usá "
+        "esa tarea; no la vuelvas a resolver. Si contestás algo sobre "
+        "ella, nombrala por su título exacto.")
+    return siguiente
+
+
+def _reusar_elecciones_ya_hechas(estado: dict) -> dict:
+    """Una elección ya hecha vale para todo el mensaje (T9-R5, decisión del
+    usuario, 2026-09-30: preguntar dos veces lo mismo "no tiene utilidad, y
+    molesta"). Si una referencia pendiente tiene las MISMAS candidatas (el mismo
+    conjunto de tareas, en cualquier orden) que otra que la persona ya resolvió
+    eligiendo en esta aclaración, se resuelve con esa misma elección y no se
+    pregunta. Sólo cuenta lo que la persona eligió acá -- una referencia con
+    candidatas guardadas en `candidatas` --, no lo que se resolvió clara desde el
+    arranque. Una copia: no toca `estado`."""
+    candidatas = estado.get("candidatas", {})
+    elegidas = {conjunto_de_candidatas(candidatas[referencia]): tarea_id
+                for referencia, tarea_id in estado.get("resueltas", {}).items()
+                if referencia in candidatas}
+    if not elegidas:
+        return estado
+    siguiente = dict(estado)
+    pendientes = []
+    for referencia in estado["pendientes"]:
+        propias = candidatas.get(referencia, [])
+        tarea_id = elegidas.get(conjunto_de_candidatas(propias))
+        if tarea_id is None or not propias:
+            pendientes.append(referencia)
+            continue
+        titulo = next((c["titulo"] for c in propias if c["id"] == tarea_id),
+                      tarea_id)
+        siguiente = _dar_por_resuelta(siguiente, referencia, tarea_id, titulo)
+    siguiente["pendientes"] = pendientes
+    return siguiente
+
+
+def conjunto_de_candidatas(candidatas: list[dict]) -> frozenset:
+    """Las tareas que se ofrecieron para una referencia, como conjunto de ids: dos
+    referencias con el mismo conjunto son la misma pregunta."""
+    return frozenset(str(c["id"]) for c in candidatas)
+
+
 def _avanzar_aclaracion(cur, quien, workspace_id: str, chat_id: int, ahora,
                        proveedor, cal, estado: dict) -> None:
     """Sigue el estado de la aclaración con botones (T4, decisión 2 y 3): si
@@ -2616,7 +2669,10 @@ def _avanzar_aclaracion(cur, quien, workspace_id: str, chat_id: int, ahora,
     pregunta con botones y el turno termina ahí -- una pregunta a la vez. Si
     no queda ninguna, retoma el mensaje original: a la corrección de
     Modificar si la hay, al alta guiada (b-0005, sólo sin ninguna referencia
-    resuelta) o al agente, con el contexto acumulado."""
+    resuelta) o al agente, con el contexto acumulado. Antes de preguntar, una
+    referencia con las mismas candidatas que otra que la persona ya eligió se
+    resuelve con esa elección (`_reusar_elecciones_ya_hechas`)."""
+    estado = _reusar_elecciones_ya_hechas(estado)
     if estado["pendientes"]:
         _preguntar_por_botones(cur, quien, workspace_id, chat_id, ahora, estado)
         return
@@ -2774,14 +2830,7 @@ def _resolver_toque_aclaracion(cur, quien, workspace_id: str, chat_id: int,
         candidatos = args.get("candidatas", {}).get(referencia, [])
         titulo = next((c["titulo"] for c in candidatos if c["id"] == eleccion),
                       eleccion)
-        estado["resueltas"] = {**args.get("resueltas", {}), referencia: eleccion}
-        estado["titulos_resueltas"] = {
-            **args.get("titulos_resueltas", {}), eleccion: titulo}
-        estado["hay_clara"] = True
-        estado["bloque_base"] = args.get("bloque_base", "") + (
-            f"\n- «{referencia}» es la tarea «{titulo}» ({eleccion}). Usá "
-            "esa tarea; no la vuelvas a resolver. Si contestás algo sobre "
-            "ella, nombrala por su título exacto.")
+        estado = _dar_por_resuelta(estado, referencia, eleccion, titulo)
 
     cal = Calendario.desde_base(cur, workspace_id)
     proveedor = desde_base(cur, workspace_id, config)

@@ -990,6 +990,63 @@ def test_ejecutar_escenario_aclaracion_tapea_la_candidata_elegida_sin_aplicar_na
         assert cur.fetchone()["estado"] == "en_revision"
 
 
+def test_b_0013_con_dos_referencias_a_las_mismas_candidatas_llega_a_su_efecto(
+        corework, conn):
+    """T9-R5 (banco b-0013): "ya arregle lo del dashboard, pasalo a revision" trae dos
+    referencias con las mismas dos candidatas. La persona elige una vez y esa
+    elección vale para todo el mensaje: Prisma no vuelve a preguntar, retoma el
+    pedido y la tarea elegida llega a `en_revision`."""
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        ids = sembrar_precondiciones(cur, ws, {
+            "tareas": [
+                {"id": "t1", "titulo": "Actualizar el dashboard de HMI (simulado)",
+                 "area": "corelabs", "responsable": "Ariel De Simone",
+                 "evidencia_requerida": []},
+                {"id": "t2", "titulo": "Revisar gráficos del dashboard HMI (simulado)",
+                 "area": "corelabs", "responsable": "Ariel De Simone"},
+            ],
+        })
+    tid_a = ids["t1"]
+
+    respuesta_jev = {"alcance": {"probabilities": {"una_tarea": 0.8}},
+                     "tarea": {"probabilities": {"T1": 0.5, "T2": 0.3}}}
+    doble_jev = ClienteJevGuionado(guion=[dict(respuesta_jev), dict(respuesta_jev)])
+    interno = ProveedorGuionado(
+        guion=[Respuesta(llamadas=[Llamada(
+                   "c1", "actualizar_estado",
+                   {"tarea_id": tid_a, "estado": "en_revision"})]),
+              Respuesta(texto="listo")],
+        rutas=[IntentRoute(IntentAction.NORMAL_CONVERSATION,
+                           trabajos=("arreglar el dashboard",
+                                     "pasar el dashboard a revisión"))],
+    )
+
+    r = ejecutar_escenario(
+        conn, ws, "corework", "Ariel De Simone",
+        ["ya arregle lo del dashboard, pasalo a revision"], interno,
+        escenario_id="b-test-aclaracion-una-vez", indice=0, cliente_jev=doble_jev,
+        aclaracion_esperada={
+            "candidatas": ["Actualizar el dashboard de HMI (simulado)",
+                           "Revisar gráficos del dashboard HMI (simulado)"],
+            "elegir": "Actualizar el dashboard de HMI (simulado)"})
+
+    assert r.bloqueado is False, r.motivo_bloqueo
+    assert r.herramientas_ejecutadas == ["actualizar_estado"]
+    with admin(conn) as cur:
+        cur.execute("select estado from task where id = %s", (tid_a,))
+        assert cur.fetchone()["estado"] == "en_revision"
+        cur.execute("select count(*) n from pending_action where estado = 'esperando' "
+                    "and herramienta = %s", (gateway_sentinel(),))
+        assert cur.fetchone()["n"] == 0, "no quedó una segunda pregunta abierta"
+
+
+def gateway_sentinel() -> str:
+    from prisma import gateway
+
+    return gateway._SENTINEL_ACLARACION
+
+
 def test_ejecutar_escenario_aclaracion_elige_por_el_titulo_entero_aunque_el_boton_lo_acorte(
         corework, conn):
     """T10-2b (b-0013): el escenario nombra la candidata por su título entero, pero el
