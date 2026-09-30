@@ -357,8 +357,8 @@ def test_responde_con_la_pregunta_ya_consumida_sigue_el_camino_normal_una_vez(
                            guion=[Respuesta(texto="Anotado, seguimos.")])
     real = P.consumir_modificacion
 
-    def consumida_por_otro_turno(cur, pending_action_id, ahora):
-        real(cur, pending_action_id, ahora)
+    def consumida_por_otro_turno(cur, pending_action_id, ahora, **kw):
+        real(cur, pending_action_id, ahora, **kw)
         return False
 
     monkeypatch.setattr(P, "consumir_modificacion", consumida_por_otro_turno)
