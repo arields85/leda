@@ -5207,3 +5207,25 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   cuenta. Las filas sin cerrar eran reales pero inertes; se cierran igual.
   Pregunta abierta para el usuario: ¿un aviso de coordinación (te entregaron algo para
   revisar, te pidieron cambios) debe contar contra el tope diario de mensajes automáticos?
+
+- 2026-09-30: **R4-H7 y R4-H8 corregidos.** Ruta: delegada, un escritor. `a5666ba`: las
+  respuestas ya no cuentan contra el tope diario de mensajes automáticos
+  (`despachador._ya_recibio` excluye `es_respuesta`); además se cierran las preguntas que
+  quedaban `esperando` al terminar su flujo (`pendientes.consumir_modificacion` y
+  `reclamar_modificacion_abierta` cierran en la misma sentencia; `gateway._cerrar_la_rama`;
+  las preguntas genéricas `_opciones_modelo` quedan marcadas `cierre_generico` y se retiran
+  en el siguiente turno de texto); el `_menu_tarea` de un aviso no es rama. `3fdbaf6`: los
+  dobles de prueba aceptan el parámetro nuevo. `1c2195c`: `menu_tarea.cambios_pedidos_vigentes`
+  es la fuente única de los cambios pedidos (menú, `consultar_tareas`, guarda); con una sola
+  tarea clara y el motivo ausente del texto, el servidor agrega "Cambios pedidos por {nombre}:
+  {motivo}" y ofrece sólo el botón de esa tarea. Pruebas nuevas:
+  `tests/test_ramas_cerradas_al_terminar_el_flujo.py` (reproduce la ronda con despacho) y
+  `tests/test_estado_real_tras_cambios_pedidos.py`. Suite completa (padre): 2198 passed, 309
+  deselected. RDD: tramo `8fc0bf5..1c2195c` medio, 1044 líneas, `review-6d5141f30b944746`
+  **aprobada y reconocida**; frontera en `1c2195c`. Seguimientos: la guarda del motivo por
+  subcadena y las pruebas de despacho atadas al reloj real van con la unidad siguiente; el
+  resto (rutas de `_cerrar_la_rama` sin prueba propia, consulta N+1 de `consultar_tareas`,
+  asserts negativos débiles) queda anotado para después de la ronda.
+  En curso: R4-H1, H2, H3, H9 (saludo en una línea, "Dale, escribime qué necesitás",
+  pregunta real de evidencia, una sola confirmación). R4-H4, H5, H6, H10 quedan para después
+  de la ronda.
