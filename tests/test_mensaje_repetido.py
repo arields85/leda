@@ -7,8 +7,10 @@ mecanismo de los toques (T9-R4): un candado de asesor por
 (espacio, chat, `message_id`) y luego la consulta, en la fase 1, que confirma
 antes de la fase 2 larga; la segunda entrega espera ese commit y ve la fila.
 
-`edited_message` NO entra: hoy se trata como un mensaje nuevo y esa decisión es del
-usuario (T9-H19c); estas pruebas fijan el comportamiento actual.
+`edited_message` es otra cosa: un mensaje editado se IGNORA (T9-H19c, decisión del
+usuario, 2026-09-30) -- ni turno, ni respuesta, ni efecto, ni recibo --, sólo su
+auditoría (`mensaje_editado_ignorado`). Para pedir otra cosa, la persona escribe un
+mensaje nuevo.
 """
 
 from __future__ import annotations
@@ -115,20 +117,47 @@ def test_un_mensaje_sin_message_id_se_atiende_como_siempre(
     assert _auditorias(conn, "mensaje_repetido_absorbido") == 0
 
 
-def test_un_mensaje_editado_se_sigue_tratando_como_nuevo(
-        cliente, conn, corework, monkeypatch):
-    """Fija el comportamiento de hoy (T9-H19c es una decisión del usuario): la
-    edición de un mensaje ya atendido, con el mismo `message_id`, recibe su turno."""
+def test_un_mensaje_editado_se_ignora(cliente, conn, corework, monkeypatch):
+    """La edición de un mensaje ya atendido no recibe turno, ni respuesta, ni deja un
+    recibo nuevo: sólo queda su auditoría."""
     _con_respuesta_del_modelo(monkeypatch)
     tg = _tg(conn)
 
     _enviar(cliente, _update(tg, message_id=41))
+    visibles = len(_visibles(conn, tg))
     _enviar(cliente, _update(tg, texto="hola, editado", message_id=41,
                              clave="edited_message"))
 
-    assert len(_entrantes(conn, tg, 41)) == 2
-    assert len(_visibles(conn, tg)) == 2
+    assert len(_entrantes(conn, tg, 41)) == 1
+    assert len(_visibles(conn, tg)) == visibles
+    assert _auditorias(conn, "mensaje_editado_ignorado") == 1
     assert _auditorias(conn, "mensaje_repetido_absorbido") == 0
+
+
+def test_un_mensaje_editado_sin_original_tampoco_recibe_turno(
+        cliente, conn, corework, monkeypatch):
+    """Ignorarlo no depende de haber visto el original: una edición sola (el original
+    llegó antes de que Prisma estuviera atendiendo) tampoco se atiende."""
+    _con_respuesta_del_modelo(monkeypatch)
+    tg = _tg(conn)
+
+    _enviar(cliente, _update(tg, texto="¿qué tengo pendiente?", message_id=52,
+                             clave="edited_message"))
+
+    assert _entrantes(conn, tg, 52) == []
+    assert _visibles(conn, tg) == []
+    assert _auditorias(conn, "mensaje_editado_ignorado") == 1
+
+
+def test_una_edicion_de_start_no_activa_nada(cliente, conn, corework, monkeypatch):
+    _con_respuesta_del_modelo(monkeypatch)
+    tg = _tg(conn)
+
+    _enviar(cliente, _update(tg, texto="/start abc", message_id=53,
+                             clave="edited_message"))
+
+    assert _visibles(conn, tg) == []
+    assert _auditorias(conn, "mensaje_editado_ignorado") == 1
 
 
 def test_dos_entregas_simultaneas_se_atienden_una_sola_vez(

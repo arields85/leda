@@ -355,6 +355,24 @@ async def webhook(slug: str, request: Request, background_tasks: BackgroundTasks
     return resultado
 
 
+def _ignorar_mensaje_editado(conn, workspace_id: str, tg_user: int | None,
+                             chat_id: int | None, mensaje: dict) -> dict:
+    """La única huella de un mensaje editado: su auditoría, atribuida a quien lo
+    editó si es del equipo (a un desconocido no se le explica nada)."""
+    with espacio(conn, workspace_id) as cur:
+        try:
+            quien = identificar_en_espacio(cur, tg_user, workspace_id)
+        except Denegado:
+            return {"ok": True}
+        registrar_auditoria(
+            cur, accion="mensaje_editado_ignorado", workspace_id=workspace_id,
+            actor_app_user_id=quien.app_user_id, actor_kind="persona",
+            detalle={"chat_id": chat_id,
+                     "telegram_message_id": mensaje.get("message_id")})
+    conn.commit()
+    return {"ok": True}
+
+
 def procesar_update(conn, slug: str, update: dict,
                     authority_conn=None) -> dict:
     """Atiende un update de Telegram.
@@ -428,6 +446,14 @@ def procesar_update(conn, slug: str, update: dict,
             return {"ok": True}
         return resultado
 
+    if update.get("edited_message") and not update.get("message"):
+        # Un mensaje editado se ignora (T9-H19c, decisión del usuario,
+        # 2026-09-30): ni turno, ni respuesta, ni efecto; sólo su auditoría. Para
+        # pedir otra cosa, la persona escribe un mensaje nuevo. Va antes de todo lo
+        # demás: una edición de "/start" tampoco activa nada.
+        return _ignorar_mensaje_editado(conn, workspace_id, tg_user, chat_id,
+                                        mensaje)
+
     # Un mensaje que no es de una persona (un aviso del servicio, como el cambio
     # de título del grupo) no trae texto ni adjunto: no hay nada que responder.
     if not texto.strip() and adjunto is None:
@@ -471,8 +497,7 @@ def procesar_update(conn, slug: str, update: dict,
                 # Una reentrega del webhook (T9-H19b, ADR 0013 regla 2): el mismo
                 # mensaje ya se atendió o se está atendiendo. Ni recibo, ni turno,
                 # ni respuesta; sólo su auditoría. Una edición (`edited_message`)
-                # no entra: su tratamiento es una decisión pendiente del usuario
-                # (T9-H19c).
+                # es otra cosa: se ignora antes de llegar acá (T9-H19c).
                 registrar_auditoria(
                     cur, accion="mensaje_repetido_absorbido",
                     workspace_id=workspace_id,
