@@ -258,7 +258,8 @@ def test_una_lectura_no_pide_ninguna_reescritura(corework, conn):
                    Respuesta(texto="Tenés una tarea abierta.")])
 
     assert len(proveedor.recibidos) == 2
-    assert cuerpos == ["Tenés una tarea abierta."]
+    # T10-5 (H7): con una sola tarea el servidor la nombra, pero sin reescritura.
+    assert len(cuerpos) == 1 and cuerpos[0].endswith("Tenés una tarea abierta.")
 
 
 def test_una_conversacion_sin_herramientas_sale_tal_cual(corework, conn):

@@ -17,15 +17,13 @@ precondiciones:
       titulo: Revisar comunicaciones industriales (simulado)
       area: ot
       responsable: Marcos Tarquini
-# Hallazgo 4 (sesión 2 por Telegram, 2026-09-27): una corrida real listó las
-# tareas en botones (T3) Y ADEMÁS las enumeró una por una en el texto ("-
-# Backup de servidores... (simulado)" x 12) -- el texto tiene que resumir,
-# nunca repetir lo que ya muestran los botones. Ninguna de las dos tareas de
-# este escenario tiene un estado notable (bloqueada/en revisión/vencida), así
-# que una respuesta que cumple la regla no tiene motivo para nombrar a
-# ninguna por su título -- si aparece cualquiera de los dos, es que las
-# enumeró.
-respuesta_no_contiene_patron:
+# Regla del usuario (R3-H7, T10-5): con hasta tres tareas el texto las nombra
+# enteras, siempre -- el servidor lo garantiza (`agente._nombrar_tareas_listadas`)
+# y los botones las muestran igual. Esta lista tiene dos. Lo que sigue prohibido es
+# lo del hallazgo 4 (sesión 2 por Telegram, 2026-09-27): con más de tres, enumerarlas
+# una por una en el texto ("- Backup de servidores... (simulado)" x 12); eso lo
+# cubre la prueba de la guarda, no este escenario.
+respuesta_menciona:
   - "Programar PLC de la comprimidora"
   - "Revisar comunicaciones industriales"
 herramientas_prohibidas:

@@ -127,8 +127,8 @@ def test_titulo_presente_con_otra_forma_no_se_toca(corework, conn):
 
 
 def test_sin_referencia_resuelta_no_se_toca(corework, conn):
-    """Sin `tareas_resueltas_claras` (el default), no hay nada que proteger:
-    el turno queda exactamente como antes de esta unidad."""
+    """Sin `tareas_resueltas_claras` (el default), la guarda de T5 no antepone
+    ningún "Sobre «...»:". (La lista de una sola tarea sí se nombra: T10-5, H7.)"""
     ws = corework.workspace_id
     with admin(conn) as cur:
         _tarea(cur, ws, titulo="Cablear tablero máq. 3")
@@ -143,7 +143,8 @@ def test_sin_referencia_resuelta_no_se_toca(corework, conn):
         r = responder(cur, quien, "¿qué tengo?", ProveedorGuionado(guion), cal,
                       chat_id=9103, ahora=AHORA)
 
-        assert r.texto == "Va bien, avanza rápido."
+        assert "Sobre «" not in r.texto
+        assert r.texto.endswith("Va bien, avanza rápido.")
 
 
 def test_herramienta_de_escritura_con_vista_previa_no_se_toca(corework, conn):

@@ -1051,7 +1051,8 @@ def test_reglas_del_contexto_piden_ofrecer_opciones(corework, conn):
     # hizo dos preguntas seguidas ("¿En qué te ayudo? ¿Por dónde
     # arrancamos?"). Nunca más de una por turno.
     assert "más de una pregunta" in PREAMBULO.lower()
-    # Hallazgo 4 (misma sesión): con la lista de tareas en botones (T3), el
-    # texto no puede volver a enumerar cada tarea -- eso es lo que hacía la
-    # respuesta real ("- Backup de servidores... (simulado)" x 12).
+    # Hallazgo 4 (misma sesión): con la lista de tareas en botones (T3), una
+    # lista larga no se enumera en el texto -- eso es lo que hacía la respuesta
+    # real ("- Backup de servidores... (simulado)" x 12). T10-5 (H7): hasta tres
+    # se nombran; el límite lo prueba `test_lista_nombra_tareas`.
     assert "no las enumeres" in PREAMBULO.lower()

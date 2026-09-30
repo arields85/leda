@@ -37,6 +37,8 @@ efectos:
     approval: 0
 # La pregunta de la rama (`gateway.PREGUNTA_RAMA_ABIERTA`; si T10 cambia su
 # redacción, actualizar acá) y la consulta sin contestar: la tarea no aparece.
+# La regla H7 (T10-5: hasta tres tareas se nombran) rige cuando la consulta se contesta;
+# acá no se contesta -- la respuesta es la pregunta de la rama --, así que sigue sin nombrarla.
 respuesta_menciona:
   - "Estábamos con"
   - "Seguimos con eso"

@@ -294,6 +294,7 @@ def responder(cur: psycopg.Cursor, quien: Solicitante, texto_entrante: str,
     salida = normalize_visible_text(
         revisar_salida(salida, ctx.variantes_prohibidas))
     salida = _nombrar_tareas_sin_mencionar(salida, tareas_resueltas_claras)
+    salida = _nombrar_tareas_listadas(salida, tareas_listadas)
     if sin_efecto:
         salida = with_no_effect_status(salida)
     # T3 (ADR 0007 punto 3): el servidor, no el modelo, garantiza que una
@@ -539,6 +540,33 @@ def _nombrar_tareas_sin_mencionar(
         return texto
     encabezado = "\n".join(f"Sobre «{titulo}»:" for titulo in faltantes)
     return f"{encabezado}\n\n{texto}"
+
+
+# Regla del usuario (T10-5, R3-H7): con hasta tres tareas el texto las nombra
+# enteras; con más, resume y los nombres quedan en los botones.
+MAX_TAREAS_NOMBRADAS = 3
+
+
+def _nombrar_tareas_listadas(texto: str, tareas_listadas: list[dict]) -> str:
+    """Protección determinística de las listas (T10-5, R3-H3 y R3-H7), con la
+    misma técnica que `_nombrar_tareas_sin_mencionar`: se comprueba contra lo
+    que las lecturas trajeron en este turno (`tareas_listadas`), no contra las
+    palabras del modelo, que alterna entre nombrar y resumir. Con hasta
+    `MAX_TAREAS_NOMBRADAS` tareas, cada una cuyo título no aparece en el texto se
+    antepone como una fila "«Título» (estado)": el estado va atado al nombre, así
+    una lista como "una asignada y la otra en curso" nunca queda sin decir cuál
+    es cuál (H3). Con más tareas, o sin ninguna, el texto no se toca: resume, y los
+    nombres los llevan los botones (`_opciones_lista_tareas`). No toca el resto del
+    texto ni repite lo que ya nombra, así que aplicarla dos veces da lo mismo."""
+    if not tareas_listadas or len(tareas_listadas) > MAX_TAREAS_NOMBRADAS:
+        return texto
+    comparable = _normalizar_comparacion(texto)
+    filas = [f"«{t['titulo']}» ({H._estado_legible(t.get('estado')).lower()})"
+             for t in tareas_listadas
+             if _normalizar_comparacion(t["titulo"]) not in comparable]
+    if not filas:
+        return texto
+    return "\n".join(filas) + f"\n\n{texto}"
 
 
 def _bloque_modificacion(m: P.ModificacionAbierta) -> str:
