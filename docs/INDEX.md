@@ -36,6 +36,12 @@ cliente, no su definición.
 | Decisión sobre Prisma que orienta con opciones concretas, no charla | [`decisions/0007-prisma-orienta-no-charla.md`](decisions/0007-prisma-orienta-no-charla.md) |
 | Decisión sobre que aprobar cierra la tarea, en el mismo acto, si se puede | [`decisions/0008-la-aprobacion-cierra-la-tarea.md`](decisions/0008-la-aprobacion-cierra-la-tarea.md) |
 | Decisión sobre entrega con evidencia y revisión | [`decisions/0009-entrega-con-evidencia-y-revision.md`](decisions/0009-entrega-con-evidencia-y-revision.md) |
+| Decisión sobre correo verificado y Google (propuesta) | [`decisions/0010-correo-verificado-y-google-en-el-producto.md`](decisions/0010-correo-verificado-y-google-en-el-producto.md) |
+| Decisión sobre respuesta inmediata e indicador de actividad | [`decisions/0011-respuesta-inmediata-e-indicador-de-actividad.md`](decisions/0011-respuesta-inmediata-e-indicador-de-actividad.md) |
+| Decisión sobre ruteo en paralelo con la primera respuesta | [`decisions/0012-ruteo-en-paralelo-con-la-primera-respuesta.md`](decisions/0012-ruteo-en-paralelo-con-la-primera-respuesta.md) |
+| Decisión sobre las reglas generales de la conversación | [`decisions/0013-reglas-generales-de-la-conversacion.md`](decisions/0013-reglas-generales-de-la-conversacion.md) |
+| Decisión sobre el flujo de un mensaje, con un dueño por etapa, y el experimento A/B | [`decisions/0014-flujo-de-un-mensaje.md`](decisions/0014-flujo-de-un-mensaje.md) |
+| Relevamientos de proyectos externos (Hermes Agent) | [`research/hermes-agent.md`](research/hermes-agent.md) |
 | Reglas para futuras sesiones | [`../AGENTS.md`](../AGENTS.md) |
 | Configuración del primer cliente | [`../espacios/corework.yaml`](../espacios/corework.yaml) |
 

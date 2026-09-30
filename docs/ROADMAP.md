@@ -269,6 +269,16 @@ profundizar antes del ADR de esta unidad: el modo en la nube y su control de acc
 por proyecto, cómo decide `mem_judge` los conflictos, y si conviene como
 componente, como servicio aparte o sólo como referencia de diseño.
 
+**Insumo: Hermes Agent** (Nous Research, MIT; relevamiento del 2026-09-30 en
+[`research/hermes-agent.md`](research/hermes-agent.md)). No sirve como base: agente
+personal, memoria en archivos y SQLite, aislamiento por perfil y no por espacio, y
+aprende solo por defecto. Sí aporta el mecanismo de esta unidad: después de un turno en
+el que la persona corrigió a Prisma, un paso aparte detecta qué se podría aprender (un
+apodo, un sinónimo del equipo, la tarea a la que apuntaba una referencia) y lo
+**propone**; se guarda sólo cuando alguien lo confirma, con las reglas de arriba. En el
+flujo del [`ADR 0014`](decisions/0014-flujo-de-un-mensaje.md), lo aprendido vive en
+PostgreSQL (etapa 1) y le llega a Jev como pista (etapa 3).
+
 **Idea a investigar, no decidida: memoria por integrante** (propuesta del usuario,
 2026-09-24, inspirada en los proyectos de Engram). Tratar la conversación de cada
 integrante como un espacio de memoria propio, para que Prisma recuerde lo que habló
