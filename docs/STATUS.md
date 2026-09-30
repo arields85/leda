@@ -188,34 +188,38 @@ serializan y la hora de cada evento, evidencia y aprobación es la de escritura
 (`0016`). Decisiones del usuario registradas como enmiendas de ADR 0009. Prueba de punta
 a punta de "Pedir cambios" por el webhook. Todo esto **todavía no se probó en vivo**.
 
-**Punto exacto para retomar (cierre de sesión 2026-09-29, noche).** `main` publicado en
-`origin` (push pedido por el usuario). Frontera de revisión RDD en `d5a89da`
-(`review-c264ebc81ffa5f14`, aprobada y reconocida; el usuario dio consentimiento permanente
-para las revisiones y pidió parar sólo por decisiones sobre cómo funciona Prisma). Detalle y
-evidencia de todo en `odd/tasks/prisma-orienta.md`.
+**Punto exacto para retomar (2026-09-30).** `main` por delante de `origin/main` (sin push; lo
+decide el usuario). Frontera de revisión RDD en `2f8d37b` (`review-5fe426815909aa70`,
+aprobada y reconocida); `review-bd6e966a7e428940` sobre `2f8d37b..8fc0bf5` (T9-H19h) quedó
+**abierta**: la captura del revisor falló por `529 Overloaded` del proveedor; retomarla con el
+estado de esa revisión antes de dar el tramo por revisado. El usuario dio consentimiento
+permanente para las revisiones y pidió parar sólo por decisiones sobre cómo funciona Prisma.
+Detalle y evidencia de todo en `odd/tasks/prisma-orienta.md`.
 
-Hecho en la sesión: **las cuatro reglas del ADR 0013 implementadas**, cada una con revisión
-aprobada y su banco real en verde salvo redacción. Regla 1: todas las preguntas del alta
-guiada pasan por el manejo genérico (T9-R1c) y, por decisión del usuario, **una sola rama de
-conversación abierta a la vez** (T9-R1d: con una pregunta abierta, otro tema recibe
-"¿Seguimos con eso?" [Seguir] / [Dejarlo y ver lo otro]; aclaraciones con botones y la vista
-previa del propio cambio también son rama; un turno nunca abre dos cosas; lo que inicia
-Prisma se retiene sólo mientras la persona está activa en la rama, 30 minutos). Regla 2:
-cada mensaje y cada toque reciben exactamente una respuesta; fotos, audios y archivos
-también (T9-R2). Regla 3: estado real, sin afirmar lo que no se hizo (T9-R3). Regla 4: señal
-inmediata e idempotencia de los toques (T9-R4). Además [Modificar] en el borrador del alta
-con selector de dato y bloque copiable (T9-R1c-3, ADR 0005). Suite completa: 1983 passed.
+Hecho el 2026-09-30, cada unidad con TDD, commit y revisión RDD aprobada salvo la última:
+T9-R4c (una sola respuesta con el estado real si la fila terminal no se ata al toque; ninguna
+nota descartada en silencio); T9-R1c-4 y T9-R1c-4b (quien pide revisa su borrador con [Enviar
+a aprobación] [Modificar] [Cancelar] antes de que le llegue a quien confirma; migración
+`0023`: la base rechaza el valor "enviar"); T10-1 a T10-5c (arnés del banco, aviso neutro y
+aviso de incidente al administrador con los textos aprobados y hora local, ✏️ en Modificar,
+vista previa con un dato por línea y comprobante corto, "Gracias. La tarea «X» pasó a
+revisión.", listas de hasta tres tareas nombradas con su estado sólo en respuestas
+informativas); T9-H19 (no se reproduce desde un solo mensaje: familia `b-0030` 9/9) y
+T9-H19b a T9-H19h (una reentrega del webhook de Telegram ya atendida se absorbe; una
+reentrega sin respuesta se recupera; un barrido de recibos huérfanos manda el aviso neutro y
+deja incidente si un turno murió; todo recibo con el reloj de la base). Suite completa: 2179
+passed, 309 deselected. Banco real completo (n=1) después de T10-5: 98/100 (`b-0013` espera
+la regla T9-R5; `b-0020` pasó al repetirlo).
 
-**Próximo, en orden:** T9-R4c (seguimientos chicos de la última revisión), T9-R1c-4 (quien
-pide una tarea que confirma otra persona revisa su resumen antes de enviarlo: decisión del
-usuario, ADR 0005), T9-H19 (reproducir las dos respuestas a un mensaje), T10 (forma de las
-respuestas; junta las fallas de redacción del banco), T11 (cuarta ronda por Telegram con las
-cuentas del usuario). Método: un escritor por unidad con TDD, commit, evaluación y revisión
-RDD, banco real de la familia contra `nan/deepseek-v4-flash` (n=3); nunca dos sesiones de
-pytest a la vez sobre el servidor local (las pruebas de migración chocan con `tuple
-concurrently updated`). PostgreSQL local (scoop) no es un servicio: tras reiniciar Windows,
-arrancarlo con `pg_ctl` (`PRUEBA-LOCAL.md`); si queda colgado (escucha pero `pg_isready` no
-responde), cerrar el proceso y volver a arrancarlo: se recupera solo desde el WAL.
+**Esperan al usuario:** T9-R1c-5 (si quien confirma cancela el borrador, ¿se le avisa a quien
+pidió?), T9-R5 (regla nueva: no preguntar dos veces "¿A cuál te referís?" con las mismas
+candidatas en un mismo mensaje), T9-H19c (¿qué hace Prisma con un mensaje editado?), T10-6
+(saludo sin rama abierta: ¿con botones o sin?), T10-7 (negativa sin intento: ¿"Estado: sin
+cambios" o el estado de la tarea?), autorización para aplicar la migración `0023` en la base
+local, T11 (cuarta ronda por Telegram con las cuentas del usuario) y el push. Método y
+precauciones de siempre: un escritor por unidad con TDD, nunca dos sesiones de pytest a la vez
+sobre el servidor local; PostgreSQL local (scoop) se arranca con `pg_ctl` tras reiniciar
+Windows (`PRUEBA-LOCAL.md`); si queda colgado, cerrar el proceso y volver a arrancarlo.
 
 Cerradas en la sesión del 2026-09-28 (noche) (detalle y evidencia en
 `odd/tasks/prisma-orienta.md`): avisos
@@ -230,7 +234,7 @@ botones y saludo diario al primer mensaje del día a cada persona, decidido al d
 falta una migración; respuesta inmediata e indicador "escribiendo…" con borrador
 nativo sólo si el turno pasa de 1,5 s (#9, #9b, ADR 0011).
 
-Base local `prisma`: migraciones hasta `0022` aplicadas (`0020` a `0022` el 2026-09-29, con
+Base local `prisma`: migraciones hasta `0022` aplicadas (`0023` pendiente de autorización) (`0020` a `0022` el 2026-09-29, con
 respaldo `db/respaldos/prisma-antes-0020-0022-20260929.dump` y ensayo previo en una copia
 descartable; `saludo.verificar_migraciones` -> `None`); modelo `nan`/`deepseek-v4-flash`
 configurado en la ronda (respaldos
