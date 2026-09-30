@@ -418,7 +418,7 @@ gestión.
     recuperación del gateway, pruebas con turnos reales que no deben quedar huérfanos,
     predicado de espacio explícito en la membresía, reporte de la falla del barrido
     probado, reloj de la base.
-  - [ ] **T9-H19h — Últimos ajustes del barrido** (`review-5fe426815909aa70`): la marca de
+  - [x] **T9-H19h — Últimos ajustes del barrido** (`review-5fe426815909aa70`): la marca de
     falla reportada sólo después del commit; un mismo reloj (el de la base) para todos los
     recibos y comparaciones; cada recibo barrido en su propia transacción corta para no
     retener el candado por todo el ciclo; cota y aislamiento de `_FALLIDOS` probados.
@@ -5089,3 +5089,16 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   escritor 2172 passed, 309 deselected; padre: 46 passed. RDD: tramo `bfb8f76..2f8d37b` medio,
   787 líneas, `review-5fe426815909aa70` **aprobada y reconocida**; frontera en `2f8d37b`;
   seguimientos a T9-H19h, en curso.
+
+- 2026-09-30: **T9-H19h.** Ruta: delegada, un escritor. `8fc0bf5`: la marca de falla
+  reportada se pone sólo después de confirmar el incidente (transacción propia); todo recibo
+  (mensaje y toque) se fecha con el reloj de la base y toda comparación usa `now()`,
+  incluida la ventana de toque repetido; el barrido corre en `ciclo.ejecutar_pasada` antes
+  de la transacción del ciclo, con una transacción corta por recibo (el candado por mensaje
+  se libera al confirmar cada recibo; sin desbloqueo de sesión); cota de `_FALLIDOS
+  probada y limpiada entre pruebas. Suite del escritor 2179 passed, 309 deselected; padre:
+  116 passed. RDD: tramo `2f8d37b..8fc0bf5` medio, 488 líneas, `review-bd6e966a7e428940`
+  abierta: la captura del revisor falló tres veces por `529 Overloaded` del proveedor
+  (servidor saturado, no del código); **pendiente de revisión**, no se da por revisado.
+  Pendiente menor: `despachador._activa_en_el_chat` y el historial de `contexto` comparan
+  `inbound_message.at` con el reloj de la aplicación.
