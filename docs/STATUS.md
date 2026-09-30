@@ -188,28 +188,34 @@ serializan y la hora de cada evento, evidencia y aprobación es la de escritura
 (`0016`). Decisiones del usuario registradas como enmiendas de ADR 0009. Prueba de punta
 a punta de "Pedir cambios" por el webhook. Todo esto **todavía no se probó en vivo**.
 
-**Punto para retomar (2026-09-29, tarde).** `main` por delante de `origin/main` (sin push;
-lo decide el usuario). Frontera de revisión RDD en `126839f`
-(`review-8563632f45a44f88`, aprobada y reconocida; el usuario dio consentimiento
-permanente para las revisiones). Hecho en el día (detalle y evidencia en
-`odd/tasks/prisma-orienta.md`): **T9-R1c** — todas las preguntas del alta guiada (campo de
-texto libre, elección con botones, borrador esperando confirmación) pasan por el manejo
-genérico de la regla 1; **T9-R1d** — enmienda del ADR 0013, decisión del usuario: **una
-sola rama de conversación abierta a la vez** (con una pregunta abierta, otro tema recibe
-"¿Seguimos con eso?" [Seguir] / [Dejarlo y ver lo otro]; la aclaración con botones y la
-vista previa del propio cambio también son rama; un turno nunca abre dos cosas; lo que
-inicia Prisma se retiene sólo mientras la persona está activa en la rama, 30 minutos);
-**T9-R1c-3** — [Modificar] en el borrador del alta con selector de dato y bloque copiable
-(precisión del ADR 0005). Banco real de las familias nuevas `b-0021` a `b-0025`: verde
-salvo fallas de redacción (listas sin nombrar tareas, T10). Banco completo (n=1) después de
-T9-R1d-1b: 71/76, sin regresiones (`b-0001-a`, `b-0001-b`, `b-0013` ya fallaban).
-**En curso: T9-R1c-3b** (ajustes de Modificar). **Después:** T9-R2 (contemplar las filas
-sin texto que ahora deja cada toque en `inbound_message`), T9-R3, T9-R4, T9-H19, T10, T11.
-Método: un escritor por unidad con TDD, commit, evaluación RDD y la familia del banco real
-contra `nan/deepseek-v4-flash` (n=3). PostgreSQL local (scoop) no es un servicio: tras
-reiniciar Windows, arrancarlo con `pg_ctl` (`PRUEBA-LOCAL.md`); si queda colgado (escucha
-pero `pg_isready` no responde), cerrar el proceso y volver a arrancarlo: se recupera solo
-desde el WAL.
+**Punto exacto para retomar (cierre de sesión 2026-09-29, noche).** `main` publicado en
+`origin` (push pedido por el usuario). Frontera de revisión RDD en `d5a89da`
+(`review-c264ebc81ffa5f14`, aprobada y reconocida; el usuario dio consentimiento permanente
+para las revisiones y pidió parar sólo por decisiones sobre cómo funciona Prisma). Detalle y
+evidencia de todo en `odd/tasks/prisma-orienta.md`.
+
+Hecho en la sesión: **las cuatro reglas del ADR 0013 implementadas**, cada una con revisión
+aprobada y su banco real en verde salvo redacción. Regla 1: todas las preguntas del alta
+guiada pasan por el manejo genérico (T9-R1c) y, por decisión del usuario, **una sola rama de
+conversación abierta a la vez** (T9-R1d: con una pregunta abierta, otro tema recibe
+"¿Seguimos con eso?" [Seguir] / [Dejarlo y ver lo otro]; aclaraciones con botones y la vista
+previa del propio cambio también son rama; un turno nunca abre dos cosas; lo que inicia
+Prisma se retiene sólo mientras la persona está activa en la rama, 30 minutos). Regla 2:
+cada mensaje y cada toque reciben exactamente una respuesta; fotos, audios y archivos
+también (T9-R2). Regla 3: estado real, sin afirmar lo que no se hizo (T9-R3). Regla 4: señal
+inmediata e idempotencia de los toques (T9-R4). Además [Modificar] en el borrador del alta
+con selector de dato y bloque copiable (T9-R1c-3, ADR 0005). Suite completa: 1983 passed.
+
+**Próximo, en orden:** T9-R4c (seguimientos chicos de la última revisión), T9-R1c-4 (quien
+pide una tarea que confirma otra persona revisa su resumen antes de enviarlo: decisión del
+usuario, ADR 0005), T9-H19 (reproducir las dos respuestas a un mensaje), T10 (forma de las
+respuestas; junta las fallas de redacción del banco), T11 (cuarta ronda por Telegram con las
+cuentas del usuario). Método: un escritor por unidad con TDD, commit, evaluación y revisión
+RDD, banco real de la familia contra `nan/deepseek-v4-flash` (n=3); nunca dos sesiones de
+pytest a la vez sobre el servidor local (las pruebas de migración chocan con `tuple
+concurrently updated`). PostgreSQL local (scoop) no es un servicio: tras reiniciar Windows,
+arrancarlo con `pg_ctl` (`PRUEBA-LOCAL.md`); si queda colgado (escucha pero `pg_isready` no
+responde), cerrar el proceso y volver a arrancarlo: se recupera solo desde el WAL.
 
 Cerradas en la sesión del 2026-09-28 (noche) (detalle y evidencia en
 `odd/tasks/prisma-orienta.md`): avisos
@@ -224,9 +230,9 @@ botones y saludo diario al primer mensaje del día a cada persona, decidido al d
 falta una migración; respuesta inmediata e indicador "escribiendo…" con borrador
 nativo sólo si el turno pasa de 1,5 s (#9, #9b, ADR 0011).
 
-Base local `prisma`: migraciones hasta `0019` aplicadas; **`0020_bloque_copiable` todavía
-no** (`escuchar` y `servir` no arrancan sin ella: aplicarla con respaldo antes de la próxima
-sesión real); modelo `nan`/`deepseek-v4-flash`
+Base local `prisma`: migraciones hasta `0022` aplicadas (`0020` a `0022` el 2026-09-29, con
+respaldo `db/respaldos/prisma-antes-0020-0022-20260929.dump` y ensayo previo en una copia
+descartable; `saludo.verificar_migraciones` -> `None`); modelo `nan`/`deepseek-v4-flash`
 configurado en la ronda (respaldos
 `db/respaldos/prisma-antes-0017-20260928.dump` y
 `prisma-antes-0018-0019-20260928.dump`); Ariel De Simone designado administrador de

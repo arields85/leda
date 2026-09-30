@@ -364,7 +364,7 @@ gestión.
     repetido (derivarla del evento que la dispara). El
     indicador sólo envuelve `_turno` (`gateway.py:333`); el segundo toque responde "ya no
     está vigente"; ventana de 10 s para la misma persona.
-  - [ ] **T9-R4b — Seguimientos de `review-d9a1348555f00ca4`.** En el toque sobre un
+  - [x] **T9-R4b — Seguimientos de `review-d9a1348555f00ca4`.** En el toque sobre un
     borrador, la marca de "botón ya tocado" se confirma antes de la resolución con
     autoridad: si ésta falla, el reintento o el reenvío de Telegram se absorbe en silencio
     (la marca tiene que confirmarse con el efecto, o no absorber si el primero no terminó);
@@ -372,6 +372,11 @@ gestión.
     con quien la produce); en `resend_choice_prompt` una `ref` explícita debe ganarle al
     evento atado; el 11 de las pruebas derivado de `VENTANA_TOQUE_REPETIDO`; nombre del
     comprobador del banco (cubre toques).
+  - [ ] **T9-R4c — Seguimientos de `review-c264ebc81ffa5f14`.** Si la fila terminal de la
+    autoridad no se puede atar al toque, hoy sólo queda un incidente y la persona podría
+    recibir el éxito y además el aviso neutro (decidir una sola respuesta y probar lo que
+    ve); `controlar` descarta en silencio una nota cuyo evento no coincide (registrar
+    incidente o atarla bien); la prueba del camino sin atar sólo cuenta incidentes.
   - [ ] **T9-R1c-4 — Quien pide revisa antes de enviar a aprobación** (precisión del ADR
     0005, decisión del usuario del 2026-09-29, opción A). Cuando confirma otra persona, quien
     pide ve su resumen con [Enviar a aprobación] [Modificar] [Cancelar] (mismo selector de
@@ -4771,3 +4776,43 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   Precisión del ADR 0005; tarea T9-R1c-4. Además autorizó aplicar `0020`, `0021` y `0022` en
   la base local: respaldo `db/respaldos/prisma-antes-0020-0022-20260929.dump` (525 entradas
   legibles con `pg_restore -l`).
+
+- 2026-09-29: **T9-R4b.** Ruta: delegada, un escritor. `6486a26` (una `ref` explícita gana
+  en el reenvío), `6194f50` (ventana de las pruebas derivada de `VENTANA_TOQUE_REPETIDO`;
+  el comprobador del banco se llama `comprobar_una_respuesta_por_entrada`), `d5a89da` (clave
+  terminal compartida `pendientes.clave_terminal_ingreso`, con prueba de conformidad contra
+  la del SQL; en un reintento de toque sobre un borrador ya convertido se ata la fila
+  terminal pendiente en vez de responder "ya no está vigente"; las notas quedan atadas a su
+  evento). El escritor mostró que la premisa de R4-001 no se reproduce cuando la autoridad
+  falla (la transacción ya está abierta y el rollback quita la marca); el hueco real era el
+  de la fila terminal sin atar. Suite del escritor 1983 passed, 288 deselected; padre:
+  enfocadas 81 passed. RDD: tramo `89992a6..d5a89da` medio, 471 líneas,
+  `review-c264ebc81ffa5f14` **aprobada y reconocida**; frontera en `d5a89da`. Seguimientos a
+  T9-R4c.
+
+- 2026-09-29: **Migraciones `0020`, `0021`, `0022` aplicadas en la base local `prisma`**
+  (autorización del usuario). Respaldo `db/respaldos/prisma-antes-0020-0022-20260929.dump`
+  (525 entradas); ensayo en una copia descartable restaurada del respaldo: las tres
+  aplicaron y `saludo.verificar_migraciones` pasó de `0020_bloque_copiable.sql` a `None`;
+  copia borrada. Luego en la base real, con el mismo resultado (`None`). Con `psql -f`,
+  `ON_ERROR_STOP=1`, `PGCLIENTENCODING=UTF8`, como dueño del esquema; ningún proceso de
+  Prisma escribía en la base.
+
+- 2026-09-29: **Cierre de sesión — punto exacto para retomar.** `main` publicado en
+  `origin` (push pedido por el usuario). Frontera de revisión RDD en `d5a89da`
+  (`review-c264ebc81ffa5f14`). Base local con migraciones hasta `0022`. Hecho en la sesión:
+  T9-R1c (0, 1, 2, 2b, 3, 3b), T9-R1d (1a, 1a-fix, 1b, 1c, 2, 2b), T9-R2, T9-R2b, T9-R3,
+  T9-R4, T9-R4b: las cuatro reglas del ADR 0013 implementadas, con su banco real en verde
+  salvo redacción. Decisiones del usuario de la sesión: una sola rama abierta (enmienda ADR
+  0013), los mensajes de Prisma esperan sólo mientras la persona está activa en la rama (30
+  min), [Modificar] con selector y bloque copiable en el borrador del alta (ADR 0005), quien
+  pide revisa antes de enviar a aprobación (opción A, ADR 0005), consentimiento permanente
+  para las revisiones RDD y parar sólo por decisiones sobre cómo funciona Prisma.
+  **Próximo, en orden:** T9-R4c (seguimientos chicos de la última revisión), T9-R1c-4 (quien
+  pide revisa antes de enviar), T9-H19 (reproducir las dos respuestas a un mensaje), T10
+  (forma de las respuestas: redacción, voz, listas que nombren las tareas; junta las fallas
+  de redacción del banco: `b-0001`, `b-0001-a`, `b-0013`, `b-0024-b`, `b-0021-c`), T11
+  (cuarta ronda por Telegram con las cuentas del usuario). Consulta anotada para más
+  adelante: en grupos, Prisma responde todo, ahora también las fotos. Método: un escritor
+  por unidad con TDD, commit, evaluación y revisión RDD (consentimiento permanente), banco
+  real de la familia (n=3); nunca dos sesiones de pytest a la vez sobre el servidor local.
