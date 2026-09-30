@@ -394,14 +394,20 @@ gestión.
     le llega a quien confirma).
   - [x] **T9-H19 — Reproducir H19 después de R1 y R2**; si persiste, clasificarlo por
     regla antes de corregir.
-  - [ ] **T9-H19b — Un reenvío de Telegram no es un mensaje nuevo** (regla 2 del ADR 0013 e
+  - [x] **T9-H19b — Un reenvío de Telegram no es un mensaje nuevo** (regla 2 del ADR 0013 e
     invariante de ejecución única): el webhook procesa el turno entero antes de contestar
     (10-30 s con modelo) y Telegram reintenta; `inbound_message` no controla
     `telegram_message_id` + chat, así que un reenvío recibe otro turno y otra respuesta.
     Absorber el mismo `message` ya procesado (mismo mecanismo que los toques de T9-R4).
+  - [ ] **T9-H19d — Una reentrega sin respuesta es recuperación, no duplicado**
+    (`review-27b8e5e75e13fd7f`, tres lentes): el control de T9-H19b absorbe por "recibido",
+    no por "respondido"; si el turno muere después de la fase 1, el reintento de Telegram
+    se absorbe y la persona queda sin respuesta; además no tiene límite de tiempo (ids que
+    se repiten si cambia el bot). Absorber sólo si hay respuesta o el turno puede seguir en
+    curso; si no, procesar con incidente; cota global de tiempo.
   - [ ] **T9-H19c — Consulta al usuario:** ¿qué hace Prisma cuando alguien edita un mensaje
     ya enviado (`edited_message`)? Hoy lo trata como un mensaje nuevo.
-  - [ ] **T10-5c** — Seguimientos de `review-eca94d14a705c5c4`: comparar títulos contra el
+  - [x] **T10-5c** — Seguimientos de `review-eca94d14a705c5c4`: comparar títulos contra el
     texto normalizado (énfasis con guiones bajos); probar la rama de opciones con tarea
     resuelta; orden determinista entre títulos de igual largo; texto vacío en
     `_nombrar_tareas_sin_mencionar`.
@@ -5011,3 +5017,14 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   nuevo y no hay control por `telegram_message_id`): a T9-H19b y T9-H19c. RDD: tramo
   `33d1557..f629770` (incluye T10-5b) medio, 498 líneas, `review-eca94d14a705c5c4`
   **aprobada y reconocida**; frontera en `f629770`; seguimientos a T10-5c.
+
+- 2026-09-30: **T9-H19b y T10-5c.** Ruta: delegada, un escritor. `9b5f345`: un `message`
+  cuyo `telegram_message_id` + chat ya tiene fila se absorbe (candado consultivo como los
+  toques de T9-R4, antes del turno largo; `edited_message` sigue como hoy, a T9-H19c).
+  `1f310fe`: la guarda de nombres compara sobre la forma visible del texto (énfasis y
+  marcas), orden determinista entre títulos de igual largo, sin párrafo vacío, rama de
+  opciones probada. Suite del escritor 2118 passed, 309 deselected; padre: 6 passed. RDD:
+  tramo `f629770..1f310fe` **alto** (una prueba lanza subprocesos), 400 líneas,
+  `review-27b8e5e75e13fd7f` (cuatro lentes) **aprobada y reconocida**; frontera en
+  `1f310fe`. Tres lentes marcaron que el control absorbe por "recibido" y no por
+  "respondido": a T9-H19d, en curso.
