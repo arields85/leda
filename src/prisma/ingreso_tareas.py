@@ -927,18 +927,18 @@ def resend_choice_prompt(cur: psycopg.Cursor, who: Solicitante,
     """Vuelve a mandar la pregunta de la elección abierta con sus botones
     (`prefix`, si viene, va delante en el mismo mensaje). `False` si la
     elección ya no estaba abierta: no manda nada. `ref` distingue este
-    reenvío de otros (el mensaje que lo causó); sin él, la referencia es el
-    número de mensajes que la elección ya tiene (`n1`, `n2`, ...): cada
-    reenvío es un mensaje propio y ninguno depende del reloj. Con un turno atado
-    a un evento (`db.atar_al_entrante`: un mensaje o un toque), la referencia es
-    ese evento (T9-R4): una entrega repetida del mismo evento no reenvía dos
-    veces, y un evento nuevo sí."""
+    reenvío de otros (el mensaje que lo causó) y, si viene, siempre gana (T9-R4b).
+    Sin él, con un turno atado a un evento (`db.atar_al_entrante`: un mensaje o un
+    toque), la referencia es ese evento (T9-R4): una entrega repetida del mismo
+    evento no reenvía dos veces, y un evento nuevo sí. Sin ninguno de los dos, es
+    el número de mensajes que la elección ya tiene (`n1`, `n2`, ...): cada
+    reenvío es un mensaje propio y ninguno depende del reloj."""
     request = _request_of_question(cur, who, QUESTION_CHOICE, choice_set_id,
                                    lock=False)
     if not request:
         return False
     prompt = _first_choice_prompt(cur, choice_set_id)
-    ref = entrante_atado(cur) or ref
+    ref = ref or entrante_atado(cur)
     if ref is None:
         cur.execute(
             """select count(*) n from message_outbox

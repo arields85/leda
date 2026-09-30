@@ -768,3 +768,25 @@ def test_un_mensaje_no_impide_confirmar_con_el_boton(
 
     assert resuelta and resuelta.task_id
     assert _solicitud(conn, rid) == "converted"
+
+
+def test_una_referencia_explicita_le_gana_al_evento_atado(intake_world, conn):
+    # T9-R4b (R2-002): dos reenvíos con referencias explícitas distintas dentro de
+    # un mismo turno atado salen los dos; la referencia del evento es sólo el
+    # valor por omisión.
+    from prisma.db import atar_al_entrante
+
+    rid = _alta_con_eleccion(conn, intake_world)
+    conjunto = _conjunto_activo(conn, rid)
+    user = _usuario(intake_world)
+    evento = _fila_de_evento(conn, intake_world)
+    antes = _salidas(conn, user)
+
+    with espacio(conn, intake_world["north-lab"]["id"]) as cur:
+        atar_al_entrante(cur, evento)
+        actor = _actor(cur, intake_world)
+        assert I.resend_choice_prompt(cur, actor, conjunto, NOW, "uno")
+        assert I.resend_choice_prompt(cur, actor, conjunto, NOW, "dos")
+    conn.commit()
+
+    assert len(_nuevas(conn, user, antes)) == 2
