@@ -139,31 +139,23 @@ def _pedir_cambios(cliente, conn, ws, tg_aprob) -> None:
 
 def test_entrega_por_texto_sin_evidencia_cierra_la_pregunta_de_opciones_y_el_aviso_sale(
         cliente, conn, corework, monkeypatch):
-    """(a) Pide entregar por texto sin evidencia: la guarda rechaza, la respuesta
-    termina con una pregunta abierta y el servidor le pone las tres opciones
-    genéricas (`_opciones_modelo`). Contesta con un link POR TEXTO -> vista previa
-    -> Confirmar. La pregunta genérica no puede quedar `esperando` y el aviso al
-    aprobador sale, aunque los dos estuvieron activos hace segundos."""
+    """(a) Pide entregar por texto sin evidencia: la guarda rechaza y el servidor
+    abre la pregunta de evidencia de "Ya la terminé" (`_dato_menu_tarea`, R4-H3).
+    Contesta con un link POR TEXTO -> vista previa -> Confirmar. Esa pregunta no
+    puede quedar `esperando` y el aviso al aprobador sale, aunque los dos
+    estuvieron activos hace segundos."""
     ws = corework.workspace_id
     tid, tg_resp, tg_aprob = _escenario(conn, ws)
 
     _guion(monkeypatch,
            Respuesta(llamadas=[Llamada("c1", "actualizar_estado", {
-               "tarea_id": tid, "estado": "en_revision"})]),
-           Respuesta(texto="Listo, la entrego."),
-           # La reescritura del turno que intentó cambiar algo y no pudo.
-           Respuesta(texto="Para entregarla necesito la evidencia. Contame en una "
-                           "línea qué quedó hecho o pasame el link"))
+               "tarea_id": tid, "estado": "en_revision"})]))
     assert _mensaje(cliente, tg_resp,
                     "Entregá la tarea Programar HMI línea 2").status_code == 200
     with admin(conn) as cur:
-        assert _pendiente(cur, ws, P.SENTINEL_OPCIONES_MODELO, chat_id=tg_resp)
+        assert _pendiente(cur, ws, P.SENTINEL_DATO_MENU_TAREA, chat_id=tg_resp)
 
-    _guion(monkeypatch,
-           Respuesta(llamadas=[Llamada("c2", "actualizar_estado", {
-               "tarea_id": tid, "estado": "en_revision",
-               "evidencia_texto": "https://ejemplo.test/tablero"})]),
-           Respuesta(texto="Revisá el resumen y confirmá."))
+    _guion(monkeypatch)
     assert _mensaje(cliente, tg_resp,
                     "https://ejemplo.test/tablero").status_code == 200
     assert _confirmar(cliente, conn, ws, "actualizar_estado", tg_resp,

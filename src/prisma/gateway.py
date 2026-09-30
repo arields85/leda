@@ -2545,13 +2545,12 @@ def _avanzar_aclaracion(cur, quien, workspace_id: str, chat_id: int, ahora,
     mod = estado["modificacion"]
     if mod is not None:
         from . import pendientes as P
-        from .agente import responder
 
         modificacion = P.ModificacionAbierta(
             pregunta_id="", herramienta=mod["herramienta"],
             args=mod["args"], resumen=mod["resumen"])
-        responder(cur, quien, estado["mensaje"], proveedor, cal, chat_id,
-                 ahora=ahora, entrante_id=estado["entrante_id"],
+        _correr_agente(cur, quien, workspace_id, estado["mensaje"], proveedor, cal,
+                      chat_id, ahora=ahora, entrante_id=estado["entrante_id"],
                  modificacion=modificacion, contexto_referencias=contexto,
                  tareas_resueltas_claras=estado["titulos_resueltas"])
         return
@@ -2566,13 +2565,44 @@ def _avanzar_aclaracion(cur, quien, workspace_id: str, chat_id: int, ahora,
                             workspace_id, ahora)
         return
 
-    from .agente import NoProponer, responder
+    from .agente import NoProponer
     guarda = estado.get("no_proponer")
-    responder(cur, quien, estado["mensaje"], proveedor, cal, chat_id,
-             ahora=ahora, entrante_id=estado["entrante_id"],
+    _correr_agente(cur, quien, workspace_id, estado["mensaje"], proveedor, cal,
+                  chat_id, ahora=ahora, entrante_id=estado["entrante_id"],
              contexto_referencias=contexto,
              tareas_resueltas_claras=estado["titulos_resueltas"],
              no_proponer=NoProponer(**guarda) if guarda else None)
+
+
+def _correr_agente(cur, quien, workspace_id: str, texto: str, proveedor, cal,
+                   chat_id: int, *, ahora, **kwargs):
+    """`agente.responder` y, si el turno se resumió en pedir entregar una tarea
+    sin la evidencia que exige (R4-H3), la pregunta de evidencia de "Ya la
+    terminé": la respuesta de ese turno es esa pregunta y nada más."""
+    from .agente import responder
+
+    resultado = responder(cur, quien, texto, proveedor, cal, chat_id, ahora=ahora,
+                          **kwargs)
+    if resultado.pedir_evidencia:
+        _pedir_evidencia_de_entrega(cur, quien, workspace_id, chat_id,
+                                    resultado.pedir_evidencia, ahora)
+    return resultado
+
+
+def _pedir_evidencia_de_entrega(cur, quien, workspace_id: str, chat_id: int,
+                                tarea_id: str, ahora) -> None:
+    """Abre la misma pregunta de evidencia que abre "Ya la terminé" (acción
+    `terminar` del menú, `_pedir_dato_menu_tarea`): el mensaje siguiente de la
+    persona es la evidencia y el resto del flujo es el de siempre. Como no viene
+    de un menú que ya muestre la tarea, el texto la nombra por su título."""
+    cur.execute("select titulo from task where id = %s", (tarea_id,))
+    fila = cur.fetchone()
+    titulo = fila["titulo"] if fila else ""
+    _pedir_dato_menu_tarea(
+        cur, quien, workspace_id, chat_id, accion="terminar", tarea_id=tarea_id,
+        titulo=titulo, ahora=ahora,
+        encabezado=f"Para entregar «{titulo}» necesito la evidencia." if titulo
+        else None)
 
 
 def _preguntar_por_botones(cur, quien, workspace_id: str, chat_id: int, ahora,
@@ -2804,13 +2834,13 @@ def _resolver_toque_opcion_modelo(cur, quien, workspace_id: str, chat_id: int,
         tareas_resueltas = None
 
     try:
-        from .agente import responder
         from .calendario import Calendario
         from .llm import desde_base
 
         cal = Calendario.desde_base(cur, workspace_id)
         proveedor = desde_base(cur, workspace_id, config)
-        responder(cur, quien, texto_entrante, proveedor, cal, chat_id, ahora=ahora,
+        _correr_agente(cur, quien, workspace_id, texto_entrante, proveedor, cal,
+                      chat_id, ahora=ahora,
                  contexto_referencias=contexto,
                  tareas_resueltas_claras=tareas_resueltas)
     except Exception as e:  # noqa: BLE001
@@ -3112,7 +3142,8 @@ def _mensaje_resultado_menu(cur, quien, herramienta: str, resultado, *,
 
 def _pedir_dato_menu_tarea(cur, quien, workspace_id: str, chat_id: int, *,
                            accion: str, tarea_id: str, titulo: str,
-                           ahora, extra: dict | None = None) -> None:
+                           ahora, extra: dict | None = None,
+                           encabezado: str | None = None) -> None:
     """Pide un dato que ninguna herramienta puede adivinar -- la causa de un
     bloqueo, su resolución, la evidencia -- con el mismo mecanismo que
     "Ninguna, lo escribo" (T4, `aclaracion-con-botones`, decisión 4):
@@ -3121,7 +3152,9 @@ def _pedir_dato_menu_tarea(cur, quien, workspace_id: str, chat_id: int, *,
     libre -- y `_turno` la recibe por el sentinel `SENTINEL_DATO_MENU_TAREA`:
     el ruteo tipado la relaciona con el mensaje antes de consumirla (T9-R1a,
     ADR 0013 regla 1, `_atender_dato_pendiente`). La pregunta sale de
-    `_pregunta_dato_menu`, la misma con la que se vuelve a preguntar."""
+    `_pregunta_dato_menu`, la misma con la que se vuelve a preguntar.
+    `encabezado` es lo que se dice antes de la pregunta cuando la persona no viene
+    de un menú que ya muestre la tarea; la pregunta guardada es siempre la misma."""
     from . import pendientes as P
     from .agente import VIGENCIA_PENDIENTE
 
@@ -3138,7 +3171,8 @@ def _pedir_dato_menu_tarea(cur, quien, workspace_id: str, chat_id: int, *,
     # mensaje -- no la marca de tiempo, igual que arriba.
     enqueue_outbox(
         cur, workspace_id=workspace_id, chat_id=chat_id,
-        recipient_membership_id=quien.membership_id, text=pregunta,
+        recipient_membership_id=quien.membership_id,
+        text=f"{encabezado} {pregunta}" if encabezado else pregunta,
         scheduled_for=ahora, dedupe_key=f"{workspace_id}:dato-menu:{p.id}",
         is_response=True,
     )

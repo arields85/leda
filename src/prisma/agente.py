@@ -64,6 +64,10 @@ class Resultado:
     confirmaciones: list[str]
     incidente: bool = False
     elecciones: list[str] = field(default_factory=list)
+    # La tarea cuya entrega se pidió sin la evidencia que exige (R4-H3): el turno
+    # no encoló ninguna respuesta y quien lo llamó abre la pregunta de evidencia
+    # (`gateway._correr_agente`).
+    pedir_evidencia: str | None = None
 
 
 INCOMPLETO = ("Me quedé a mitad de camino con esto. Lo dejo anotado para "
@@ -158,6 +162,9 @@ def responder(cur: psycopg.Cursor, quien: Solicitante, texto_entrante: str,
     # ofrecía en los botones sólo las de la última consulta. Vacía si
     # ninguna trajo filas.
     tareas_listadas: list[dict] = []
+    # Las tareas cuya entrega rechazó la guarda por falta de evidencia en este
+    # turno (motivo tipado de la herramienta, R4-H3).
+    evidencia_faltante: list[str] = []
     salida = ""
     cerro = False
 
@@ -204,7 +211,8 @@ def responder(cur: psycopg.Cursor, quien: Solicitante, texto_entrante: str,
                     _ejecutar_una(cur, quien, c, ctx, acciones, confirmaciones,
                                   elecciones, elegir_pendiente, opciones_pendientes,
                                   tareas_listadas, chat_id, cal,
-                                  ahora, entrante_id, texto_entrante))
+                                  ahora, entrante_id, texto_entrante,
+                                  evidencia_faltante))
             if len(opciones_pendientes) > antes_de_opciones and texto_al_ofrecer is None:
                 # El texto de ESTA vuelta -- la que llamó a `ofrecer_opciones`
                 # --, no el de una vuelta posterior: el modelo suele repetir
@@ -213,6 +221,12 @@ def responder(cur: psycopg.Cursor, quien: Solicitante, texto_entrante: str,
                 # terminado para él).
                 texto_al_ofrecer = salida
             mensajes.append({"role": "user", "content": resultados})
+            if _evidencia_a_pedir(evidencia_faltante, intentos_mutacion, acciones,
+                                  confirmaciones, elecciones,
+                                  tareas_resueltas_claras) is not None:
+                # La respuesta es la pregunta de evidencia (más abajo): otra
+                # vuelta sólo produciría un texto que se descarta.
+                break
             if (len(confirmaciones) + len(elegir_pendiente)
                     + len(opciones_pendientes)) > pendientes_antes:
                 # Esta vuelta dejó algo esperando a la persona (vista previa,
@@ -235,6 +249,15 @@ def responder(cur: psycopg.Cursor, quien: Solicitante, texto_entrante: str,
             detalle={"acciones": acciones, "confirmaciones": confirmaciones,
                      "elecciones": elecciones, "dijo": texto},
             pack_hash=ctx.pack_hash, nucleo_hash=ctx.nucleo_hash)
+
+    # Pidió entregar una tarea suya sin la evidencia que exige y nada más pasó:
+    # la respuesta es la pregunta de evidencia de "Ya la terminé", que arma quien
+    # llamó (R4-H3). No se encola nada acá ni se le pide otro texto al modelo.
+    pedir = _evidencia_a_pedir(evidencia_faltante, intentos_mutacion, acciones,
+                               confirmaciones, elecciones, tareas_resueltas_claras)
+    if pedir is not None:
+        auditar("")
+        return Resultado("", acciones, confirmaciones, pedir_evidencia=pedir)
 
     # Algo quedó esperando a la persona y ya salió (o sale acá abajo) el
     # mensaje que se lo pide, con sus botones.
@@ -332,6 +355,29 @@ def responder(cur: psycopg.Cursor, quien: Solicitante, texto_entrante: str,
     auditar(salida)
 
     return Resultado(salida, acciones, confirmaciones, elecciones=elecciones)
+
+
+def _evidencia_a_pedir(evidencia_faltante: list[str], intentos_mutacion: list[str],
+                       acciones: list[str], confirmaciones: list[str],
+                       elecciones: list[str],
+                       tareas_resueltas_claras: dict[str, str] | None) -> str | None:
+    """La tarea a la que hay que pedirle la evidencia de la entrega, o `None`.
+    Sólo cuando el turno se resume en UN rechazo por falta de esa evidencia (el
+    motivo tipado, nunca el texto del modelo) sobre UNA tarea -- la herramienta
+    ya comprobó que es de la persona --, no dejó nada esperando ni ejecutó ningún
+    otro cambio, y la tarea no contradice a la que el turno resolvió como clara.
+    Cualquier otra combinación sigue el camino de siempre: no se adivina."""
+    tareas = set(evidencia_faltante)
+    if len(tareas) != 1 or confirmaciones or elecciones:
+        return None
+    if set(intentos_mutacion) != {"actualizar_estado"}:
+        return None
+    if any(not accion.startswith("consultar_") for accion in acciones):
+        return None
+    (tarea_id,) = tareas
+    if tareas_resueltas_claras and tarea_id not in tareas_resueltas_claras:
+        return None
+    return tarea_id
 
 
 def _es_cambio(c: Llamada) -> bool:
@@ -692,7 +738,8 @@ def _bloques(r: Respuesta) -> list[dict]:
 def _ejecutar_una(cur, quien: Solicitante, c: Llamada, ctx, acciones,
                   confirmaciones, elecciones, elegir_pendiente,
                   opciones_pendientes, tareas_listadas, chat_id,
-                  cal, ahora, entrante_id, texto_entrante) -> dict:
+                  cal, ahora, entrante_id, texto_entrante,
+                  evidencia_faltante: list[str] | None = None) -> dict:
     """Ejecuta una herramienta y devuelve el bloque de resultado para el modelo.
 
     Los rechazos no son excepciones que cortan el turno: son información que
@@ -783,6 +830,9 @@ def _ejecutar_una(cur, quien: Solicitante, c: Llamada, ctx, acciones,
             actor_app_user_id=quien.app_user_id, actor_kind="prisma",
             detalle={"args": c.args, "rechazo": resultado},
             pack_hash=ctx.pack_hash, nucleo_hash=ctx.nucleo_hash)
+        if (evidencia_faltante is not None and c.nombre == "actualizar_estado"
+                and resultado.get("falta_tipo") == H.FALTA_EVIDENCIA_DE_ENTREGA):
+            evidencia_faltante.append(str(c.args.get("tarea_id")))
         return bloque({
             "ejecutado": False,
             "explicacion": resultado.get("error") or resultado.get("falta")

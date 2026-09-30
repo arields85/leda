@@ -962,6 +962,17 @@ def crear_borrador_tarea(cur, quien: Solicitante, titulo, objetivo_id=None,
 _MOTIVO_FALTA_EVIDENCIA_ENTREGA = (
     "Falta la evidencia requerida. Contame brevemente qué hiciste o pasame "
     "un link.")
+# El motivo tipado del mismo rechazo (R4-H3): quien lo consume decide por este
+# valor y nunca por el texto, que es para el modelo.
+FALTA_EVIDENCIA_DE_ENTREGA = "evidencia_de_entrega"
+
+
+def _falta_evidencia_de_entrega() -> dict:
+    """El rechazo de pasar una tarea a revisión sin la evidencia que exige su
+    política (ADR 0009): `en_revision` no ocurrió y `falta_tipo` dice por qué."""
+    return {"en_revision": False, "falta": _MOTIVO_FALTA_EVIDENCIA_ENTREGA,
+            "falta_tipo": FALTA_EVIDENCIA_DE_ENTREGA}
+
 
 # T6g (`odd/tasks/prisma-orienta.md`; review-e719d807, review-09452c69):
 # decisión del usuario (2026-09-27) -- "ya la terminé" sobre una tarea que YA
@@ -1100,7 +1111,7 @@ def _preparar_actualizar_estado(cur, quien: Solicitante, tarea_id, estado,
         # entregó).
         cur.execute("select evidencia_pendiente(%s) as f", (tarea_id,))
         if cur.fetchone()["f"] and not (evidencia_texto or "").strip():
-            return {"en_revision": False, "falta": _MOTIVO_FALTA_EVIDENCIA_ENTREGA}
+            return _falta_evidencia_de_entrega()
 
     if estado == "en_curso":
         restaura_en_curso = False
@@ -1212,7 +1223,7 @@ def _actualizar_estado(cur, quien: Solicitante, tarea_id, estado, motivo=None,
         pendiente = cur.fetchone()["f"]
         evidencia_texto = (evidencia_texto or "").strip()
         if pendiente and not evidencia_texto:
-            return {"en_revision": False, "falta": _MOTIVO_FALTA_EVIDENCIA_ENTREGA}
+            return _falta_evidencia_de_entrega()
         if evidencia_texto:
             # T6b (`odd/tasks/prisma-orienta.md`, decisión del usuario
             # 2026-09-27): antes, este insert corría sólo cuando
