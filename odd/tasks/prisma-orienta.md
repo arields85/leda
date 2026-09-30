@@ -394,7 +394,25 @@ gestión.
     regla antes de corregir.
 
 - [ ] **T10 — Forma de las respuestas (ronda 3).** R3-H1, H2, H3/H7, H8, H9, H10, H11,
-  H12, H14 y H4.
+  H12, H14 y H4. Mapeo de sólo lectura del 2026-09-30: cuatro mecanismos generales (A:
+  las listas nombran las tareas y la respuesta se queda en lo pedido; B: voz y saludo; C:
+  textos fijos y botones en un solo lugar; D: una negativa sin intento dice el estado real).
+  Unidades, de la más chica a la más grande:
+  - [ ] **T10-1** — Arnés: `comprobadores._es_forma_ofrecida_del_titulo` no saca el ícono
+    de la etiqueta (`b-0013` falla por el arnés, no por Prisma).
+  - [ ] **T10-2** — H2 (texto aprobado del aviso neutro) y H1 (aviso de incidente al
+    administrador en lenguaje llano y hora local).
+  - [ ] **T10-3** — H10: ícono en Modificar y una sola definición de la etiqueta.
+  - [ ] **T10-4** — H11 y H14: vista previa en filas (un dato por línea) y comprobante
+    corto en vez de repetir la vista previa; "y vuelve a estar en curso".
+  - [ ] **T10-5** — Mecanismo A (H3/H7, H9, H12): guarda de listas de hasta 3 tareas,
+    `PREAMBULO` y escenarios (`b-0001`, `b-0001-a`, `b-0016`, `b-0021-c`, `b-0024-b`).
+    Necesita respuestas del usuario.
+  - [ ] **T10-6** — Mecanismo B (H8): respuesta a un saludo sin rama abierta. Necesita
+    respuesta del usuario (¿con botones o sin?).
+  - [ ] **T10-7** — Mecanismo D (`b-0027-d`): estado real en una negativa sin intento.
+    Necesita respuesta del usuario (¿"Estado: sin cambios" o el estado de la tarea?).
+  - [ ] **T10-H4** — Verificar con un título real que el ícono ya no acorta etiquetas.
 - [ ] **T11 — Cuarta ronda por Telegram**, en horario laboral, con los circuitos A y B.
 
 ## Ruta
