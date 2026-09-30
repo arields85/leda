@@ -5280,3 +5280,29 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   máximo, con precisión fechada en `nucleo/mecanica-pm.md` §10; Rechazar con motivo y
   aviso; no preguntar dos veces; mensaje editado ignorado; negativa con el estado real;
   íconos por acción; encabezado del menú y largo de etiquetas).
+
+- 2026-09-30: **Decisiones del usuario implementadas.** Ruta: delegada, un escritor.
+  `b92ad89` (U1): columna `message_outbox.es_coordinacion` (migración `0024`); el despachador
+  no aplica ni cuenta el tope para esas filas; marcados: `herramientas._avisar` (aprobación,
+  cambios pedidos, dependencia), aviso de entrega, vista previa del borrador a quien
+  aprueba, `_send_to_confirmer` y el aviso de rechazo; seguimientos (`escalera`, bloqueos,
+  dependencias, cadencias) siguen con tope. `9d3ac54` (U2): ✖️ Rechazar para quien confirma
+  el borrador de otra persona; abre la pregunta del motivo; `ingreso_tareas.reject_draft`
+  cancela, audita `rechazar_ingreso_tarea` con el motivo, da el comprobante y avisa a quien
+  pidió; migración `0025`: `resolver_ingreso_borrador` rechaza el valor `rechazar`. `7a7dd43`
+  (U3): una elección ya hecha cubre las demás referencias con las mismas candidatas.
+  `0665496` (U4): `edited_message` se ignora con auditoría `mensaje_editado_ignorado`.
+  `188aa95` (U5): con una sola tarea clara y un cambio rechazado, el cierre es "«X» sigue
+  {estado}." en lugar de "Estado: sin cambios.". **No implementado:** la negativa sin
+  intento (el servidor no distingue una negativa de una respuesta informativa; agregar la
+  línea a toda respuesta sobre una tarea rompía el comportamiento de T5); queda pendiente
+  con una señal del ruteo. `a24c70a`: escenario `b-0036`. `92765af` (U6): íconos por acción
+  (`salida.ICONOS_DE_ACCION_MENU`). `ac10063`, `4fc1365` (U7): encabezado del menú en filas;
+  presupuesto de etiqueta de 30 a 40. Suite del escritor 2279 passed, 333 deselected; padre:
+  25 passed. RDD: tramo `38263b8..4fc1365` (incluye `c86f16f`, `d368bb1`) medio, 2094 líneas,
+  `review-d8f0e2e86a8a0d34` **aprobada y reconocida**; frontera en `4fc1365`. Observaciones
+  no bloqueantes para después de la ronda: prueba por el webhook de dos aclaraciones con
+  candidatas distintas; la línea de cierre se agrega después de los filtros y sin comprobar
+  duplicado; la marca de coordinación de las dos vistas previas de borrador sin prueba; dos
+  ramas de `reject_draft` sin prueba; patrones prohibidos de `b-0027-e` demasiado amplios.
+  Pendiente también: la vista previa vieja de `crear_borrador_tarea` sigue con Cancelar.
