@@ -291,3 +291,31 @@ def test_el_token_de_modificar_no_llega_a_convertir_el_borrador(
 
     resuelta = _confirmar(authority_conn, ws, confirmar, aprobador)
     assert resuelta is not None and resuelta.task_id
+
+
+def test_el_token_de_enviar_no_llega_a_convertir_el_borrador(
+        corework, conn, authority_conn):
+    """Enviar a aprobación (T9-R1c-4) es del gateway, que lo intercepta: nunca
+    llega a la autoridad. Si llegara, `confirmar_borrador_tarea` (que sólo
+    distingue `false` de todo lo demás) convertiría el borrador. La envoltura
+    `resolver_ingreso_borrador` lo trata como inexistente, igual que a Modificar
+    (migración 0023): defensa en profundidad."""
+    from prisma import pendientes as P
+    from prisma.db import autoridad
+    from tests.test_task_drafts import _crear_preview, _telegram
+
+    ws = corework.workspace_id
+    with espacio(conn, ws) as cur:
+        preview = _crear_preview(cur, ws)
+        pid = preview["pending_action_id"]
+        enviar = P._crear_opcion(cur, ws, pid, "Enviar a aprobación", "enviar", 2).token
+        aprobador = _telegram(cur, "Marcos Tarquini")
+    conn.commit()
+
+    with autoridad(authority_conn) as cur:
+        assert P.resolver_borrador(cur, ws, enviar, aprobador, aprobador) is None
+    with admin(conn) as cur:
+        cur.execute("select count(*) n from task")
+        assert cur.fetchone()["n"] == 0
+        cur.execute("select estado from pending_action where id = %s", (pid,))
+        assert cur.fetchone()["estado"] == "esperando"
