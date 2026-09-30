@@ -331,7 +331,7 @@ gestión.
     medir la actividad); el control de una respuesta por mensaje tiene que contemplarlas.
     `procesar_update` sólo lee `text` (`gateway.py:213`); control estructural al cerrar
     el mensaje; epígrafe como texto; comprobación del banco y del validador.
-  - [ ] **T9-R2b — Seguimientos de la respuesta única.** Encontrar los caminos que encolan
+  - [x] **T9-R2b — Seguimientos de la respuesta única.** Encontrar los caminos que encolan
     más de una respuesta independiente para un mismo mensaje sin marcarlas como grupo (el
     control ahora descarta todas menos una, con incidente) y agruparlos; revisar los caminos
     que a propósito no responden (sobre todo en grupos, donde ahora saldría el aviso neutro);
@@ -342,6 +342,13 @@ gestión.
     saber dónde cuelga"); causa general: en ese turno el modelo no ve el "dejé de lado"
     (el historial sólo cuenta lo enviado) y la guarda no cubre el alta.
   - [ ] **T9-R3 — Decir el estado real y ofrecer sólo lo posible** (H20, H18, H16).
+    Incluye (de T9-R2b): cuando quien pide el alta no es quien confirma, al terminar el alta
+    no le sale ninguna respuesta y el control le manda "No pude completar eso" aunque salió
+    bien (tiene que decir a quién se le mandó para confirmar); tres resultados del alta
+    ("No hay una política de evidencia vigente…", "Alguna opción confirmada ya no está
+    vigente.", "No hay una autoridad activa…") devuelven un texto que nadie encola; tras
+    "Dejarlo" con la guarda, el modelo afirmó "registré" lo que la guarda le rechazó
+    (`b-0020-f-1`). Y las pruebas pendientes de `review-467d41b3f96573d5`.
     Incluye (de `review-2282ebc46e7a48e1`): quien pidió un borrador que espera a otro
     aprobador no recibe un aviso determinista de quién confirma cuando escribe sobre él.
     `adjuntar_evidencia` sobre una tarea en curso deja evidencia sin decirlo
@@ -4701,3 +4708,15 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   muestran que tras dejar el alta el responder la vuelve a proponer (T9-R2b). Ninguna
   corrida falló la comprobación de una respuesta por mensaje. Siguen `b-0001`, `b-0001-a`,
   `b-0013` (ya fallaban) y `b-0024-b` (redacción).
+
+- 2026-09-29: **T9-R2b.** Ruta: delegada, un escritor. `da04e13`: tras dejar una pregunta,
+  el responder recibe un bloque "Lo que la persona acaba de dejar de lado" y, si era del
+  alta, la guarda rechaza reabrirla (`crear_tarea`, u `ofrecer_opciones` salvo que todas las
+  opciones sean tareas existentes). `d816f81`, `a6056ff`: pruebas reales del epígrafe, del
+  toque y de cada camino con varios mensajes (todos ya estaban agrupados). Hallazgo: cuando
+  quien pide el alta no es quien confirma, al terminar no le sale nada y el control manda "No
+  pude completar eso" (a T9-R3). Suite del escritor 1883 passed, 264 deselected; padre:
+  enfocadas 67 passed. RDD: tramo `09f2fea..a6056ff` medio, 615 líneas,
+  `review-467d41b3f96573d5` **aprobada y reconocida**; frontera en `a6056ff`. Banco real
+  (n=3): `b-0021-i` 3/3 (antes 1/3); `b-0020-f` 2/3 (una corrida afirmó "registré" lo que
+  la guarda rechazó, a T9-R3); `b-0024-b` 1/3 (redacción).
