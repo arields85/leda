@@ -776,3 +776,144 @@ def test_dispatch_descarta_preview_obsoleta_sin_entregar(
         cur.execute("select estado from message_outbox where pending_action_id = %s",
                     (resultado["pending_action_id"],))
         assert cur.fetchone()["estado"] == "descartado"
+
+
+def _que_falle_una_vez(monkeypatch, objeto, nombre):
+    """Reemplaza `objeto.nombre` por un envoltorio que levanta la primera vez y
+    después llama al original."""
+    original = getattr(objeto, nombre)
+    llamadas = []
+
+    def envoltorio(*args, **kwargs):
+        llamadas.append(1)
+        if len(llamadas) == 1:
+            raise RuntimeError("falla de prueba")
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(objeto, nombre, envoltorio)
+    return llamadas
+
+
+def _incidentes_de(conn, etapa):
+    with admin(conn) as cur:
+        cur.execute("select resumen_sanitizado from incident where etapa = %s", (etapa,))
+        return cur.fetchall()
+
+
+def _preview_y_toque(conn, ws):
+    with espacio(conn, ws) as cur:
+        resultado = _crear_preview(cur, ws)
+        token = _token(cur, resultado["pending_action_id"])
+        telegram = _telegram(cur, "Marcos Tarquini")
+    conn.commit()
+    return resultado, token, telegram, len(_salidas_del_chat(conn, telegram))
+
+
+def _cuerpos(conn, chat_id, desde=0):
+    return [f["cuerpo"] for f in _salidas_del_chat(conn, chat_id)[desde:]]
+
+
+def test_si_la_autoridad_falla_el_reintento_en_la_ventana_se_procesa(
+        cliente_drafts, corework, conn, monkeypatch):
+    """T9-R4b (R4-001): la marca del botón se confirma antes de la resolución con
+    autoridad; si ésta falla, el primer toque no terminó y no absorbe al reintento.
+    El fallo mismo deja su incidente y el aviso neutro."""
+    ws = corework.workspace_id
+    resultado, token, telegram, antes = _preview_y_toque(conn, ws)
+    _que_falle_una_vez(monkeypatch, P, "resolver_borrador")
+
+    assert _tocar(cliente_drafts, token, telegram).status_code == 200
+
+    assert len(_incidentes_de(conn, gateway.ETAPA_TOQUE_BOTON)) == 1
+    assert _cuerpos(conn, telegram, antes) == [gateway.NOTICIA_NEUTRA_INCIDENTE]
+    with admin(conn) as cur:
+        cur.execute("select count(*) n from task where source_draft_id = %s",
+                    (resultado["draft_id"],))
+        assert cur.fetchone()["n"] == 0
+
+    assert _tocar(cliente_drafts, token, telegram).status_code == 200
+
+    assert _cuerpos(conn, telegram, antes)[-1] == "Hecho. La tarea quedó comprometida."
+    assert len(_incidentes_de(conn, gateway.ETAPA_TOQUE_BOTON)) == 1
+    with admin(conn) as cur:
+        cur.execute("select count(*) n from task where source_draft_id = %s",
+                    (resultado["draft_id"],))
+        assert cur.fetchone()["n"] == 1
+
+
+def test_si_falla_la_respuesta_tras_la_autoridad_el_reintento_no_queda_en_silencio(
+        cliente_drafts, corework, conn, monkeypatch):
+    """La autoridad ya convirtió el borrador y dejó su fila terminal; falla la
+    transacción que la ata al toque. El reintento en la ventana se procesa: es una
+    repetición de lo ya hecho, ata la fila terminal a este toque y no agrega un
+    "ya no está vigente"."""
+    ws = corework.workspace_id
+    resultado, token, telegram, antes = _preview_y_toque(conn, ws)
+    _que_falle_una_vez(monkeypatch, gateway, "_controlar_una_respuesta")
+
+    assert _tocar(cliente_drafts, token, telegram).status_code == 200
+    assert len(_incidentes_de(conn, gateway.ETAPA_TOQUE_BOTON)) == 1
+
+    assert _tocar(cliente_drafts, token, telegram).status_code == 200
+
+    cuerpos = _cuerpos(conn, telegram, antes)
+    assert cuerpos.count("Hecho. La tarea quedó comprometida.") == 1
+    assert gateway.AVISO_PEDIDO_NO_VIGENTE not in cuerpos
+    assert _incidentes_de(conn, "sin_respuesta") == []
+    assert _incidentes_de(conn, "respuesta_duplicada") == []
+
+
+def test_un_toque_completo_sigue_absorbiendo_al_segundo(
+        cliente_drafts, corework, conn, monkeypatch):
+    ws = corework.workspace_id
+    resultado, token, telegram, antes = _preview_y_toque(conn, ws)
+    llamadas = []
+    original = P.resolver_borrador
+    monkeypatch.setattr(P, "resolver_borrador",
+                        lambda *a, **k: llamadas.append(1) or original(*a, **k))
+
+    assert _tocar(cliente_drafts, token, telegram).status_code == 200
+    assert _tocar(cliente_drafts, token, telegram).status_code == 200
+
+    assert len(llamadas) == 1
+    assert _cuerpos(conn, telegram, antes) == ["Hecho. La tarea quedó comprometida."]
+
+
+@pytest.mark.parametrize("etiqueta,estado,cuerpo", [
+    ("Confirmar", "converted", "Hecho. La tarea quedó comprometida."),
+    ("Cancelar", "cancelled", "Listo, cancelé el borrador de la tarea."),
+])
+def test_la_clave_de_la_fila_terminal_sale_de_un_solo_lugar(
+        cliente_drafts, corework, conn, etiqueta, estado, cuerpo):
+    """T9-R4b (R2-001): la función de la base produce la clave; el gateway la ata
+    al toque con la definición compartida de `pendientes`."""
+    ws = corework.workspace_id
+    with espacio(conn, ws) as cur:
+        resultado = _crear_preview(cur, ws)
+        token = P.opcion_por_etiqueta(cur, resultado["pending_action_id"],
+                                      etiqueta).token
+        telegram = _telegram(cur, "Marcos Tarquini")
+    conn.commit()
+
+    assert _tocar(cliente_drafts, token, telegram).status_code == 200
+
+    with admin(conn) as cur:
+        cur.execute("select dedupe_key, entrante_id from message_outbox "
+                    "where chat_id = %s and cuerpo = %s", (telegram, cuerpo))
+        (fila,) = cur.fetchall()
+    assert fila["dedupe_key"] == P.clave_terminal_ingreso(
+        ws, resultado["pending_action_id"], estado)
+    assert fila["entrante_id"] is not None
+
+
+def test_si_cambia_la_clave_del_productor_la_fila_sin_atar_deja_un_incidente(
+        cliente_drafts, corework, conn, monkeypatch):
+    ws = corework.workspace_id
+    resultado, token, telegram, antes = _preview_y_toque(conn, ws)
+    monkeypatch.setattr(
+        P, "clave_terminal_ingreso",
+        lambda ws_, pa, estado: f"{ws_}:terminal-otra-forma:{pa}:{estado}")
+
+    assert _tocar(cliente_drafts, token, telegram).status_code == 200
+
+    assert len(_incidentes_de(conn, gateway.ETAPA_FILA_TERMINAL_SIN_ATAR)) == 1

@@ -45,6 +45,7 @@ import re
 from contextvars import ContextVar
 from datetime import datetime, timedelta
 
+from .db import entrante_atado
 from .incidentes import REFERENCIA_INBOUND_MESSAGE, registrar_incidente
 from .salida import enqueue_outbox
 
@@ -53,16 +54,20 @@ ETAPA_RESPUESTA_DUPLICADA = "respuesta_duplicada"
 
 _PARTE_DE_TEXTO_PARTIDO = re.compile(r":part:\d+-of-\d+$")
 
-# Las notas del turno en curso (`dejar_nota`). Un turno corre entero en un mismo
-# hilo y contexto; cada entrada (mensaje o toque) empieza con `limpiar_nota`.
-_NOTAS: ContextVar[tuple[str, ...]] = ContextVar("notas_de_la_respuesta",
-                                                 default=())
+# Las notas del turno en curso (`dejar_nota`), cada una con el evento entrante al
+# que quedó atado el turno que la dejó. Un turno corre entero en un mismo hilo y
+# contexto. `controlar` sólo dice las de SU evento y descarta el resto (T9-R4b):
+# la nota de un turno que se revirtió, o de una entrada cuyo camino no llamó a
+# `limpiar_nota`, no puede salir en la respuesta de otra.
+_NOTAS: ContextVar[tuple[tuple[str | None, str], ...]] = ContextVar(
+    "notas_de_la_respuesta", default=())
 
 
-def dejar_nota(texto: str) -> None:
+def dejar_nota(cur, texto: str) -> None:
     """Anota algo que la respuesta de este turno tiene que decir además de lo suyo
-    (T9-R4): sale como una parte más de la MISMA respuesta, delante de las demás."""
-    _NOTAS.set(_NOTAS.get() + (texto,))
+    (T9-R4): sale como una parte más de la MISMA respuesta, delante de las demás.
+    Queda atada al evento entrante del turno (`db.atar_al_entrante`)."""
+    _NOTAS.set(_NOTAS.get() + ((entrante_atado(cur), texto),))
 
 
 def limpiar_nota() -> None:
@@ -114,8 +119,8 @@ def controlar(cur, quien, *, workspace_id: str, chat_id: int, entrante_id: str,
     `nota_de_la_respuesta` es algo que la respuesta tiene que decir además de lo
     suyo (hoy, que el adjunto todavía no se guarda, H15): sale como una parte
     más de la MISMA respuesta, delante de las demás."""
-    notas = ([nota_de_la_respuesta] if nota_de_la_respuesta else []) + list(
-        _NOTAS.get())
+    notas = ([nota_de_la_respuesta] if nota_de_la_respuesta else []) + [
+        texto for evento, texto in _NOTAS.get() if evento == str(entrante_id)]
     limpiar_nota()
     respuestas = respuestas_del_mensaje(cur, entrante_id, chat_id)
 

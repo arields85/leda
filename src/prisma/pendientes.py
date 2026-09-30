@@ -721,6 +721,18 @@ def es_borrador(cur: psycopg.Cursor, token: str) -> bool:
     return bool(fila and fila["es_borrador"])
 
 
+def clave_terminal_ingreso(workspace_id: str, pending_action_id: str,
+                           resultado: str) -> str:
+    """La `dedupe_key` de la fila terminal visible que escribe la función de la
+    autoridad (`confirmar_borrador_tarea` y la cancelación, en `db/esquema.sql`)
+    al convertir o cancelar un borrador. La única definición del formato del lado
+    de Python: el gateway la usa para atar esa fila al toque (T9-R4b) y una
+    prueba compara lo que produce la base con lo que dice esta función.
+    `resultado` es `converted` o `cancelled`; `%` da el patrón de `like` de
+    cualquiera de los dos."""
+    return f"{workspace_id}:intake-terminal:{pending_action_id}:{resultado}"
+
+
 def resolver_borrador(cur: psycopg.Cursor, workspace_id: str, token: str,
                        telegram_user_id: int, chat_id: int) -> Resuelta | None:
     """Commit through prisma_gateway using DB identity and DB time."""

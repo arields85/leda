@@ -1115,21 +1115,24 @@ def _resolver_toque_borrador(conn, authority_conn, workspace_id, token,
 
     with espacio(conn, workspace_id) as cur:
         atar_al_entrante(cur, toque_id)
+        # The Unit 1A authority function persisted the terminal visible outbox
+        # row in the same transaction as cancel/convert. It ran on another
+        # connection before this toque row was committed, so it could not
+        # carry the toque as its entrante: it is bound here, and the control
+        # of one visible response per toque sees it (T9-R4).
+        # A replay whose terminal row nobody had bound also binds one row: the first
+        # toque did not finish (its response transaction failed after the authority
+        # committed) and this retry completes it instead of saying "no longer
+        # current" (T9-R4b).
+        atadas = 0
+        if resuelta is not None and toque_id and resuelta.pending_action_id:
+            atadas = _atar_fila_terminal(cur, workspace_id, toque_id,
+                                         resuelta.pending_action_id)
         if resuelta is not None and not resuelta.replay:
-            # The Unit 1A authority function persisted the terminal visible outbox
-            # row in the same transaction as cancel/convert. It ran on another
-            # connection before this toque row was committed, so it could not
-            # carry the toque as its entrante: it is bound here, and the control
-            # of one visible response per toque sees it (T9-R4).
-            if toque_id and resuelta.pending_action_id:
-                cur.execute(
-                    """update message_outbox set entrante_id = %s
-                        where workspace_id = %s and entrante_id is null
-                          and dedupe_key like %s""",
-                    (toque_id, workspace_id,
-                     f"{workspace_id}:intake-terminal:"
-                     f"{resuelta.pending_action_id}:%"))
-        else:
+            if atadas != 1:
+                _incidente_fila_terminal(cur, workspace_id, chat_id, quien,
+                                         resuelta.pending_action_id, atadas)
+        elif atadas != 1:
             if texto is None:
                 # Replays reuse the terminal row, which already went out for the
                 # first toque: outside the window, this toque is answered like
@@ -1138,6 +1141,38 @@ def _resolver_toque_borrador(conn, authority_conn, workspace_id, token,
             _responder(cur, workspace_id, chat_id, quien, texto, ahora)
         _controlar_una_respuesta(cur, quien, workspace_id, chat_id, toque_id, ahora)
     return {"ok": True}
+
+
+def _atar_fila_terminal(cur, workspace_id: str, toque_id: str,
+                        pending_action_id: str) -> int:
+    """Ata al toque la fila terminal de la autoridad que todavía no tiene mensaje
+    entrante, y devuelve cuántas ató. La clave sale de
+    `pendientes.clave_terminal_ingreso`, la definición única del formato; quien
+    llama exige exactamente una y, si no, deja un incidente."""
+    from . import pendientes as P
+
+    cur.execute(
+        """update message_outbox set entrante_id = %s
+            where workspace_id = %s and entrante_id is null
+              and dedupe_key like %s""",
+        (toque_id, workspace_id,
+         P.clave_terminal_ingreso(workspace_id, pending_action_id, "%")))
+    return cur.rowcount
+
+
+def _incidente_fila_terminal(cur, workspace_id: str, chat_id: int, quien,
+                             pending_action_id: str, atadas: int) -> None:
+    """La autoridad resolvió el borrador pero su fila terminal no se pudo atar al
+    toque (la clave cambió, o hay más de una): nunca en silencio. El control de
+    una respuesta deja además el aviso neutro."""
+    registrar_incidente(
+        cur, workspace_id,
+        "La respuesta terminal de un borrador no se pudo atar a su toque "
+        f"(filas atadas: {atadas}, esperadas: 1).",
+        etapa=ETAPA_FILA_TERMINAL_SIN_ATAR,
+        referencia_tipo=REFERENCIA_PENDING_ACTION,
+        referencia_id=pending_action_id, chat_id=chat_id,
+        app_user_id=quien.app_user_id)
 
 
 def _controlar_una_respuesta(cur, quien, workspace_id: str, chat_id: int,
@@ -2161,10 +2196,13 @@ def _dejar_y_ver_lo_otro(cur, quien, workspace_id: str, chat_id: int, abierta,
         _avisar_ruteo_caido(cur, quien, error, workspace_id, chat_id, ahora)
         return
     if _dejar_de_lado(cur, quien, abierta, ahora):
-        # La primera parte de la misma respuesta (T9-R4): el control de una
-        # respuesta por toque la agrega, delante de lo que diga el camino normal,
-        # al mismo grupo de la respuesta que conserve (`dejar_nota`).
-        dejar_nota(_pregunta_de(abierta).dejada)
+        # La primera parte de la misma respuesta (T9-R4): el camino normal que
+        # sigue encola lo suyo y `respuesta_unica.controlar`, al cerrar la
+        # entrada (`_toque`, o el mensaje en `procesar_update`), agrega esta nota
+        # delante, en el mismo grupo de la respuesta que conserve. La nota va
+        # atada al evento de este turno (`dejar_nota`): si el turno se revierte
+        # no puede salir en la respuesta de otro.
+        dejar_nota(cur, _pregunta_de(abierta).dejada)
     # Lo que se acaba de dejar no se propone de nuevo en este turno: el modelo
     # lo ve en el historial y lo repetía (T9-R1d-1a-fix), o no lo ve (el alta,
     # T9-R2b): la guarda de código y el contexto salen de la misma pregunta.
@@ -3633,6 +3671,7 @@ NOTICIA_NEUTRA_INCIDENTE = "No pude completar eso. Ya quedó registrado para rev
 # paso interno.
 ETAPA_TURNO_TEXTO = "turno_texto"
 ETAPA_TOQUE_BOTON = "toque_boton"
+ETAPA_FILA_TERMINAL_SIN_ATAR = "fila_terminal_sin_atar"
 ETAPA_ACTIVACION = "activacion"
 ETAPA_ACCION_MENU = "accion_menu"
 

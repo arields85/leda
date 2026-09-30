@@ -313,3 +313,29 @@ def test_dejarlo_y_ver_lo_otro_es_una_sola_respuesta(
     assert len({grupo_de(f) for f in filas}) == 1     # una sola respuesta
     for etapa in (ETAPA_SIN_RESPUESTA, ETAPA_RESPUESTA_DUPLICADA):
         assert _incidentes(conn, ws, etapa) == []
+
+
+def test_una_nota_de_otra_entrada_no_se_filtra_a_una_respuesta_ajena(
+        conn, corework):
+    """T9-R4b (R2-003): una entrada cuyo turno se revirtió deja su nota sin
+    consumir; la siguiente, aunque su camino de entrada no la limpie, no la dice."""
+    from prisma.db import atar_al_entrante
+    from prisma.respuesta_unica import controlar, dejar_nota
+
+    ws = corework.workspace_id
+    ahora = datetime.now(timezone.utc)
+    with espacio(conn, ws) as cur:
+        quien = _quien(cur, PERSONA, ws)
+        tg = _telegram_id(cur, PERSONA)
+        primera = gateway._registrar_toque(cur, ws, tg, quien, ahora, None)
+        segunda = gateway._registrar_toque(cur, ws, tg, quien, ahora, None)
+        atar_al_entrante(cur, primera)
+        dejar_nota(cur, "Nota de la primera entrada.")   # su turno se revierte: nadie la consume
+        atar_al_entrante(cur, segunda)
+        gateway._responder(cur, ws, tg, quien, "Respuesta de la segunda.", ahora)
+        controlar(cur, quien, workspace_id=ws, chat_id=tg, entrante_id=segunda,
+                  ahora=ahora, aviso_neutro=gateway.NOTICIA_NEUTRA_INCIDENTE)
+    conn.commit()
+
+    cuerpos = [f["cuerpo"] for f in _respuestas(conn, tg)]
+    assert cuerpos == ["Respuesta de la segunda."]
