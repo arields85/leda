@@ -722,7 +722,7 @@ class ResultadoCorrida:
     # Respuestas independientes que se encolaron para cada mensaje que la
     # persona escribió en la corrida, y los incidentes del control estructural
     # (`respuesta_unica`) que hubo (T9-R2, ADR 0013 regla 2):
-    # `comprobadores.comprobar_una_respuesta_por_mensaje`.
+    # `comprobadores.comprobar_una_respuesta_por_entrada`.
     respuestas_por_mensaje: tuple[int, ...] = ()
     incidentes_de_respuesta: tuple[str, ...] = ()
     # Lo mismo por cada toque que se procesó (T9-R4, regla 2 extendida a los

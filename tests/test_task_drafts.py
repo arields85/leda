@@ -20,6 +20,8 @@ from prisma.despachador import TransporteDePrueba, despachar
 from prisma.llm import Llamada, ProveedorGuionado, Respuesta
 from prisma.salida import NO_EFFECT_STATUS
 
+from tests.toques import FUERA_DE_LA_VENTANA, envejecer_toques
+
 
 AHORA = datetime(2026, 8, 12, 15, 0, tzinfo=timezone.utc)
 
@@ -553,10 +555,7 @@ def test_el_toque_del_borrador_fuera_de_la_ventana_dice_que_ya_no_esta_vigente(
         telegram = _telegram(cur, "Marcos Tarquini")
     conn.commit()
     assert _tocar(cliente_drafts, token, telegram).status_code == 200
-    with admin(conn) as cur:
-        cur.execute("update inbound_message set at = at - interval '11 seconds' "
-                    "where boton_callback is not null")
-    conn.commit()
+    envejecer_toques(conn, FUERA_DE_LA_VENTANA)
 
     assert _tocar(cliente_drafts, token, telegram).status_code == 200
 

@@ -33,7 +33,7 @@ from tests.test_alta_eleccion_confirmacion import (TITULO, _alta_en_confirmacion
                                                    _escribir, _nuevas, _ruta,
                                                    _salidas, _solicitud, _tocar_boton,
                                                    _usuario)
-from tests.toques import envejecer_toques
+from tests.toques import FUERA_DE_LA_VENTANA, envejecer_toques
 from tests.test_task_intake import (_RoutingProvider, _active_choices,
                                     _callback_client, _choose,
                                     _post_intake_callback, _start)
@@ -200,7 +200,7 @@ def test_el_selector_es_la_pregunta_abierta_de_la_rama(intake_world, conn,
 def test_modificar_dos_veces_la_segunda_dice_que_ya_no_esta_vigente(
         intake_world, conn, monkeypatch):
     rid, pid, client, user = _modificar(conn, monkeypatch, intake_world)
-    envejecer_toques(conn, 11)                  # fuera de la ventana (T9-R4)
+    envejecer_toques(conn, FUERA_DE_LA_VENTANA)                  # fuera de la ventana (T9-R4)
     antes = _salidas(conn, user)
 
     assert _toque_de_modificar(client, conn, user, pid).status_code == 200
@@ -520,7 +520,7 @@ def test_tocar_dos_veces_el_mismo_dato_del_selector_dice_que_ya_no_esta_vigente(
     rid, pid, client, user = _modificar(conn, monkeypatch, intake_world)
     token = _opciones_activas(conn, rid)["Título"]
     assert _post_intake_callback(client, token, user).status_code == 200
-    envejecer_toques(conn, 11)                  # fuera de la ventana (T9-R4)
+    envejecer_toques(conn, FUERA_DE_LA_VENTANA)                  # fuera de la ventana (T9-R4)
     antes = _salidas(conn, user)
 
     assert _post_intake_callback(client, token, user).status_code == 200
@@ -817,7 +817,7 @@ def test_volver_al_resumen_dos_veces_dice_que_ya_no_esta_vigente(
     rid, pid, client, user = _modificar(conn, monkeypatch, intake_world)
     token = _opciones_activas(conn, rid)["Volver al resumen"]
     assert _post_intake_callback(client, token, user).status_code == 200
-    envejecer_toques(conn, 11)                  # fuera de la ventana (T9-R4)
+    envejecer_toques(conn, FUERA_DE_LA_VENTANA)                  # fuera de la ventana (T9-R4)
     antes = _salidas(conn, user)
 
     assert _post_intake_callback(client, token, user).status_code == 200

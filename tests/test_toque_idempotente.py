@@ -28,7 +28,8 @@ from prisma.respuesta_unica import (ETAPA_RESPUESTA_DUPLICADA,
                                     ETAPA_SIN_RESPUESTA)
 
 from tests.test_botones import _quien, _tarea, _telegram_id, cliente  # noqa: F401
-from tests.toques import envejecer_toques
+from tests.toques import (FUERA_DE_LA_VENTANA, MITAD_DE_LA_VENTANA_MAS_UNO,
+                          envejecer_toques)
 from tests.test_una_respuesta import _filas_de_salida, _incidentes, _tg
 
 PERSONA = "Marcos Tarquini"
@@ -123,7 +124,7 @@ def test_fuera_de_la_ventana_el_segundo_toque_se_contesta_como_siempre(
     ws = corework.workspace_id
     tg, token, tarea = _confirmar_en_curso(conn, ws)
     _tocar_boton(cliente, token, tg, callback_id="a")
-    envejecer_toques(conn, 11)
+    envejecer_toques(conn, FUERA_DE_LA_VENTANA)
 
     _tocar_boton(cliente, token, tg, callback_id="b")
 
@@ -136,9 +137,9 @@ def test_un_toque_absorbido_no_prolonga_la_ventana(cliente, conn, corework):
     ws = corework.workspace_id
     tg, token, _tarea_id = _confirmar_en_curso(conn, ws)
     _tocar_boton(cliente, token, tg, callback_id="a")
-    envejecer_toques(conn, 6)
-    _tocar_boton(cliente, token, tg, callback_id="b")        # absorbido, a los 6 s
-    envejecer_toques(conn, 6)                              # el primero, a los 12 s
+    envejecer_toques(conn, MITAD_DE_LA_VENTANA_MAS_UNO)
+    _tocar_boton(cliente, token, tg, callback_id="b")        # absorbido, a mitad de la ventana
+    envejecer_toques(conn, MITAD_DE_LA_VENTANA_MAS_UNO)     # el primero, fuera de la ventana
 
     _tocar_boton(cliente, token, tg, callback_id="c")
 

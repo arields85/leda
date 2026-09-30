@@ -2476,7 +2476,7 @@ def test_la_familia_b_0026_sin_texto_se_cumple_sin_llamar_al_modelo(
     from tests.banco.comprobadores import (Evidencia, comprobar_contenido,
                                            comprobar_efectos,
                                            comprobar_herramientas,
-                                           comprobar_una_respuesta_por_mensaje,
+                                           comprobar_una_respuesta_por_entrada,
                                            resultado_general)
     from tests.banco.escenario import cargar_escenario
 
@@ -2509,7 +2509,7 @@ def test_la_familia_b_0026_sin_texto_se_cumple_sin_llamar_al_modelo(
         comprobar_contenido(
             evidencia, menciona=escenario.respuesta_menciona,
             no_contiene_patron=escenario.respuesta_no_contiene_patron),
-        comprobar_una_respuesta_por_mensaje(
+        comprobar_una_respuesta_por_entrada(
             r.respuestas_por_mensaje, incidentes=r.incidentes_de_respuesta),
     ]
     assert resultado_general(comprobaciones) == "aprobado", [

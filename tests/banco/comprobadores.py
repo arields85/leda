@@ -656,9 +656,9 @@ def comprobar_aclaracion(
 
 
 # ---------------------------------------------------------------------------
-# 8. Una respuesta visible por mensaje entrante (T9-R2, ADR 0013 regla 2): en
-# TODO escenario. `corrida.ejecutar_escenario` cuenta, por cada mensaje que la
-# persona mandó, las respuestas independientes que se encolaron (las partes de
+# 8. Una respuesta visible por entrada, mensaje o toque (T9-R2 y T9-R4, ADR 0013
+# regla 2): en TODO escenario. `corrida.ejecutar_escenario` cuenta, por cada
+# mensaje que la persona mandó, las respuestas independientes que se encolaron (las partes de
 # una misma respuesta y su juego de botones cuentan como una) y los incidentes
 # del control estructural (`respuesta_unica`): ese control deja una sola
 # respuesta en producción, pero que haya tenido que actuar es justamente el
@@ -666,7 +666,7 @@ def comprobar_aclaracion(
 # ---------------------------------------------------------------------------
 
 
-def comprobar_una_respuesta_por_mensaje(
+def comprobar_una_respuesta_por_entrada(
         respuestas_por_mensaje: Iterable[int], *,
         incidentes: Iterable[str] = (),
         respuestas_por_toque: Iterable[int] = ()) -> ResultadoComprobacion:
@@ -686,8 +686,8 @@ def comprobar_una_respuesta_por_mensaje(
         problemas.append(f"el control estructural tuvo que actuar: {resumen}")
     if problemas:
         return ResultadoComprobacion(
-            "una_respuesta_por_mensaje", "falla", "; ".join(problemas))
-    return ResultadoComprobacion("una_respuesta_por_mensaje", "aprobado")
+            "una_respuesta_por_entrada", "falla", "; ".join(problemas))
+    return ResultadoComprobacion("una_respuesta_por_entrada", "aprobado")
 
 
 def resultado_general(comprobaciones: Iterable[ResultadoComprobacion]) -> str:

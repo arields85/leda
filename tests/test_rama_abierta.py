@@ -28,7 +28,7 @@ from prisma.llm import RespectoPendiente, Respuesta, RouteEnvelope
 
 from tests.test_alta_pregunta_pendiente import (_abrir_alta, _campo_del_slot,
                                                 _mensaje_privado, _request)
-from tests.toques import envejecer_toques
+from tests.toques import FUERA_DE_LA_VENTANA, envejecer_toques
 from tests.test_menu_tarea import _mensaje, _quien, _tocar, cliente  # noqa: F401
 from tests.test_pregunta_pendiente import TITULO, _abrir_pregunta
 from tests.test_pregunta_pendiente_otras import (REFERENCIA,
@@ -276,7 +276,7 @@ def test_dejar_tocado_dos_veces_no_repite_el_efecto(mundo, conn, monkeypatch):
     assert len(proveedor.recibidos) == 1
 
     # Fuera de la ventana se contesta como siempre.
-    envejecer_toques(conn, 11)
+    envejecer_toques(conn, FUERA_DE_LA_VENTANA)
     assert _tocar(mundo.cliente, token, mundo.tg).status_code == 200
 
     assert _salidas(conn, mundo.tg) == antes + 1              # sólo un aviso
