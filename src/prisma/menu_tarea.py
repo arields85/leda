@@ -18,6 +18,7 @@ preparar la vista previa (§4.6: "ofrecer no autoriza").
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import NamedTuple
 
 import psycopg
 
@@ -184,14 +185,31 @@ def encabezado_menu(menu: MenuTarea) -> str:
     return encabezado
 
 
+class CambiosPedidos(NamedTuple):
+    """Los cambios pedidos vigentes de una tarea: `motivo` (el texto que dejó quien
+    los pidió, en una línea y acotado) y `linea`, lo que se muestra."""
+    motivo: str
+    linea: str
+
+
 def cambios_pedidos(cur: psycopg.Cursor, tarea_id: str) -> str | None:
+    """La línea de los cambios pedidos vigentes de la tarea, lista para mostrar;
+    `None` si no hay pedido vigente (`cambios_pedidos_vigentes`)."""
+    pedido = cambios_pedidos_vigentes(cur, tarea_id)
+    return pedido.linea if pedido else None
+
+
+def cambios_pedidos_vigentes(cur: psycopg.Cursor,
+                             tarea_id: str) -> CambiosPedidos | None:
     """El motivo vigente de "Pedir cambios" (T9-R3, ADR 0013 regla 3, H16): lo que
     falta en la tarea se ve en toda lectura de ella, no sólo en el aviso que se
     mandó. Vigente = el último `rechazado` de la tarea mientras ésta esté por
     hacerse (`asignada`/`en_curso`): "Pedir cambios" es lo único que la devuelve
     a ese estado desde la revisión, y la nueva entrega la vuelve a `en_revision`,
-    que cierra el pedido. Una línea lista para mostrar; `None` si no hay pedido
-    vigente."""
+    que cierra el pedido. Es la única fuente: el menú, las lecturas de tareas del
+    modelo (`herramientas._consultar_tareas`) y la guarda que garantiza que la
+    respuesta lo diga (`agente._cambios_pedidos_sin_mencionar`) leen de acá.
+    `None` si no hay pedido vigente."""
     cur.execute(
         """select a.comentario, i.nombre
              from approval a
@@ -207,7 +225,7 @@ def cambios_pedidos(cur: psycopg.Cursor, tarea_id: str) -> str | None:
     if len(motivo) > LIMITE_MOTIVO_CAMBIOS:
         motivo = motivo[:LIMITE_MOTIVO_CAMBIOS - 1].rstrip() + "…"
     quien = f" por {fila['nombre']}" if fila["nombre"] else ""
-    return f"Cambios pedidos{quien}: {motivo}"
+    return CambiosPedidos(motivo=motivo, linea=f"Cambios pedidos{quien}: {motivo}")
 
 
 def bloqueos_abiertos(cur: psycopg.Cursor, tarea_id: str) -> list[dict]:

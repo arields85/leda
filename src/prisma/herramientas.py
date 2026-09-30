@@ -625,7 +625,9 @@ def esquemas() -> list[dict[str, Any]]:
 
 @herramienta(
     "consultar_tareas", "consultar",
-    "Lista tareas del equipo. Sin filtros devuelve las del solicitante.",
+    "Lista tareas del equipo. Sin filtros devuelve las del solicitante. Si a una "
+    "tarea le pidieron cambios y todavía no se volvió a entregar, trae "
+    "`cambios_pedidos` (quién y qué falta): es parte de su estado, decilo.",
     {"responsable": {"type": "string", "description": "nombre de la persona"},
      "estado": {"type": "string", "enum": ["asignada", "en_curso", "bloqueada",
                                            "en_revision", "terminada"]},
@@ -655,7 +657,18 @@ def _consultar_tareas(cur, quien: Solicitante, responsable=None, estado=None,
 
     sql.append("order by t.fecha_objetivo nulls last limit 25")
     cur.execute(" ".join(sql), params)
-    return [dict(f) for f in cur.fetchall()]
+    filas = [dict(f) for f in cur.fetchall()]
+    # Lo que la tarea tiene pendiente por un pedido de cambios es parte de su
+    # estado real (R4-H8, ADR 0013 regla 3): de la misma fuente que el menú, para
+    # que el modelo no diga "sin cambios" de una tarea a la que se los pidieron.
+    from .menu_tarea import cambios_pedidos
+
+    for fila in filas:
+        if fila["estado"] in ("asignada", "en_curso"):
+            linea = cambios_pedidos(cur, fila["id"])
+            if linea:
+                fila["cambios_pedidos"] = linea
+    return filas
 
 
 @herramienta(

@@ -299,6 +299,12 @@ def responder(cur: psycopg.Cursor, quien: Solicitante, texto_entrante: str,
     if not sin_efecto:
         salida = _nombrar_tareas_listadas(salida, tareas_listadas,
                                           tareas_resueltas_claras)
+        salida = _cambios_pedidos_sin_mencionar(cur, salida,
+                                                tareas_resueltas_claras)
+    # Con una tarea clara, la persona habló de ella: los botones son los suyos,
+    # no la lista de todas las que trajo la lectura (R4-H8).
+    tareas_listadas = _solo_la_tarea_resuelta(tareas_listadas,
+                                              tareas_resueltas_claras)
     salida = normalize_visible_text(
         revisar_salida(salida, ctx.variantes_prohibidas))
     if sin_efecto:
@@ -610,6 +616,47 @@ def _nombrar_tareas_listadas(
         return texto
     encabezado = "\n".join(filas)
     return f"{encabezado}\n\n{texto}" if texto.strip() else encabezado
+
+
+def _cambios_pedidos_sin_mencionar(
+        cur, texto: str, tareas_resueltas_claras: dict[str, str] | None) -> str:
+    """Protección determinística del estado real (R4-H8, ADR 0013 regla 3), con la
+    misma técnica que `_nombrar_tareas_sin_mencionar`: se compara un dato guardado
+    con el texto, no las palabras del modelo. Si el turno resolvió UNA tarea clara
+    y tiene cambios pedidos vigentes (`menu_tarea.cambios_pedidos_vigentes`, la
+    misma fuente que el encabezado del menú) cuyo motivo no aparece en la
+    respuesta, se agrega al final la línea del menú -- quién los pidió y qué falta
+    --: el modelo puede escribir "sigue en curso, sin cambios" de una tarea a la
+    que se los pidieron. No toca el texto del modelo ni repite lo que ya dice, así
+    que aplicarla dos veces da lo mismo."""
+    if not tareas_resueltas_claras or len(tareas_resueltas_claras) != 1:
+        return texto
+    from .menu_tarea import cambios_pedidos_vigentes
+
+    (tarea_id,) = tareas_resueltas_claras
+    pedido = cambios_pedidos_vigentes(cur, tarea_id)
+    if pedido is None:
+        return texto
+    # El motivo del menú se acota con "…": se busca lo que sí es del motivo.
+    motivo = _normalizar_comparacion(pedido.motivo.removesuffix("…"))
+    if motivo and motivo in _normalizar_comparacion(texto):
+        return texto
+    return f"{texto}\n\n{pedido.linea}" if texto.strip() else pedido.linea
+
+
+def _solo_la_tarea_resuelta(
+        tareas_listadas: list[dict],
+        tareas_resueltas_claras: dict[str, str] | None) -> list[dict]:
+    """Si el turno resolvió UNA tarea clara y la lectura la trajo, los botones de
+    la respuesta son los de esa tarea (tocarla abre su menú) y no la lista de todo
+    lo que la lectura devolvió: la persona preguntó por ésa (R4-H8; misma razón
+    que `_nombrar_tareas_listadas`). Si la lectura no la trajo, la lista queda
+    como estaba: no se inventa un botón que el turno no leyó."""
+    if not tareas_resueltas_claras or len(tareas_resueltas_claras) != 1:
+        return tareas_listadas
+    (tarea_id,) = tareas_resueltas_claras
+    propias = [t for t in tareas_listadas if str(t["id"]) == str(tarea_id)]
+    return propias or tareas_listadas
 
 
 def _bloque_modificacion(m: P.ModificacionAbierta) -> str:
