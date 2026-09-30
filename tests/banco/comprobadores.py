@@ -18,7 +18,7 @@ from dataclasses import dataclass, field
 from prisma.deteccion_pregunta import hace_pregunta as _hace_pregunta
 from prisma.deteccion_pregunta import pide_elegir_en_imperativo as _pide_elegir_en_imperativo
 from prisma.herramientas import ESTADOS_LEGIBLES
-from prisma.salida import TRUNCAR_ETIQUETA_BOTON
+from prisma.salida import TRUNCAR_ETIQUETA_BOTON, etiqueta_sin_icono
 
 RESULTADOS = ("aprobado", "falla", "no_concluyente", "bloqueado")
 
@@ -587,8 +587,13 @@ def _es_forma_ofrecida_del_titulo(etiqueta: str, titulo: str) -> bool:
     terminar justo donde el título tiene un espacio (o termina ahí) -- o
     alcanzar el corte duro completo. Un título de otra tarea que por
     casualidad compartiera las primeras letras no pasaría el corte de
-    palabra salvo que además coincidiera de verdad hasta ese espacio."""
-    etiqueta = etiqueta.strip()
+    palabra salvo que además coincidiera de verdad hasta ese espacio.
+
+    El ícono de categoría que el botón real lleva delante
+    (`salida.con_icono`) se saca antes de comparar: es una marca visual, no
+    parte del título (T10-1; mismo criterio que `salida.etiquetas_coinciden`,
+    con el que la corrida resuelve el toque)."""
+    etiqueta = etiqueta_sin_icono(etiqueta.strip())
     if etiqueta == titulo:
         return True
     base = etiqueta.split(" — ", 1)[0]

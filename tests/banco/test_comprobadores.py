@@ -1064,3 +1064,38 @@ def test_una_respuesta_por_toque_aprueba_con_un_grupo_por_toque():
 
     assert comprobar_una_respuesta_por_entrada(
         (1,), respuestas_por_toque=(1, 1)).resultado == "aprobado"
+
+
+# --- T10-1 (R3-H4/b-0013): el botón real lleva un ícono de categoría delante
+# (`salida.con_icono`); es una marca visual, no parte del título. El
+# comprobador tiene que compararlo sin él, igual que el toque simulado
+# (`salida.etiquetas_coinciden`).
+
+
+def test_aclaracion_acepta_la_etiqueta_con_icono_del_titulo_entero():
+    from prisma.salida import ICONO_TAREA, con_icono
+
+    titulo = "Dashboard de lotes en CoreLabs"
+    r = comprobar_aclaracion(
+        (con_icono(titulo, ICONO_TAREA),), candidatas_esperadas=(titulo,))
+    assert r.resultado == "aprobado"
+
+
+def test_aclaracion_acepta_la_etiqueta_con_icono_acortada_y_con_sufijo():
+    from prisma.salida import ICONO_TAREA, acortar_etiqueta_boton, con_icono
+
+    titulo = "Actualizar el dashboard de HMI (simulado)"
+    acortada = acortar_etiqueta_boton(titulo)
+    assert acortada.endswith("…")
+    etiqueta = con_icono(f"{acortada} — Jev", ICONO_TAREA)
+    r = comprobar_aclaracion((etiqueta,), candidatas_esperadas=(titulo,))
+    assert r.resultado == "aprobado"
+
+
+def test_aclaracion_con_icono_sigue_fallando_si_el_titulo_es_otro():
+    from prisma.salida import ICONO_TAREA, con_icono
+
+    r = comprobar_aclaracion(
+        (con_icono("Revisar tablero máq. 4", ICONO_TAREA),),
+        candidatas_esperadas=("Cablear tablero máq. 3",))
+    assert r.resultado == "falla"
