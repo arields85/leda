@@ -541,8 +541,10 @@ def procesar_update(conn, slug: str, update: dict,
                 with mantener_chat_activo(config.token_bot(slug), chat_id,
                                           chat_type=chat_type, cur=cur,
                                           workspace_id=workspace_id):
-                    _turno(cur, quien, texto, workspace_id, chat_id, entrante_id,
-                           alta_privada=privado)
+                    enlaces = _enlaces_del_mensaje(mensaje)
+                    _turno(cur, quien, _con_enlaces_ocultos(texto, enlaces),
+                           workspace_id, chat_id, entrante_id,
+                           alta_privada=privado, con_enlace=bool(enlaces))
 
             # Control estructural (T9-R2, ADR 0013 regla 2): un mensaje, una
             # respuesta visible, sea cual sea el camino que la encoló.
@@ -590,6 +592,32 @@ AVISO_SIN_ADJUNTOS = ("Todavía no puedo recibir fotos, archivos ni audios. "
                       "Mandame el texto o un link.")
 NOTA_ADJUNTO_NO_GUARDADO = ("Todavía no guardo adjuntos: tomé sólo el texto que "
                             "lo acompañaba.")
+
+
+# Las entidades de Telegram que son un enlace: `url` (el enlace está escrito en el
+# texto) y `text_link` (el texto visible lleva un enlace escondido). Es la señal
+# estructural de que un mensaje tiene forma de evidencia (R4-H9); nunca se mira el
+# texto.
+_ENTIDADES_DE_ENLACE = ("url", "text_link")
+
+
+def _enlaces_del_mensaje(mensaje: dict) -> list[dict]:
+    """Las entidades de enlace del texto (`entities`) o del epígrafe
+    (`caption_entities`) de un mensaje."""
+    entidades = [*(mensaje.get("entities") or []),
+                 *(mensaje.get("caption_entities") or [])]
+    return [e for e in entidades
+            if isinstance(e, dict) and e.get("type") in _ENTIDADES_DE_ENLACE]
+
+
+def _con_enlaces_ocultos(texto: str, enlaces: list[dict]) -> str:
+    """El texto del turno con la dirección de cada `text_link` cuando no está ya
+    escrita: el enlace es lo que se recibió y no se pierde detrás de un texto
+    visible. El recibo (`inbound_message`) guarda el texto tal cual llegó."""
+    ocultos = [e["url"] for e in enlaces
+               if e.get("type") == "text_link" and e.get("url")
+               and e["url"] not in texto]
+    return f"{texto} ({', '.join(ocultos)})" if ocultos else texto
 
 
 def _tipo_de_adjunto(mensaje: dict) -> str | None:
@@ -1328,7 +1356,8 @@ def _responder(cur, workspace_id: str, chat_id: int, quien, texto: str,
 
 
 def _turno(cur, quien, texto: str, workspace_id: str, chat_id: int,
-           entrante_id: str | None = None, *, alta_privada: bool = False) -> None:
+           entrante_id: str | None = None, *, alta_privada: bool = False,
+           con_enlace: bool = False) -> None:
     from datetime import datetime, timezone
 
     from .calendario import Calendario
@@ -1363,7 +1392,7 @@ def _turno(cur, quien, texto: str, workspace_id: str, chat_id: int,
     if abierta is not None:
         route = _atender_pregunta_pendiente(cur, quien, texto, abierta, proveedor,
                                             cal, chat_id, workspace_id, now,
-                                            entrante_id)
+                                            entrante_id, con_enlace=con_enlace)
         if route is None:
             return
 
@@ -1743,7 +1772,8 @@ def _pregunta_del_alta(abierta) -> _Pregunta:
 
 def _atender_pregunta_pendiente(cur, quien, texto: str, abierta, proveedor, cal,
                                 chat_id: int, workspace_id: str, ahora,
-                                entrante_id: str | None = None):
+                                entrante_id: str | None = None, *,
+                                con_enlace: bool = False):
     """Interpreta el mensaje que llega con una pregunta abierta (T9-R1a y
     T9-R1b, ADR 0013 regla 1): el ruteo tipado devuelve un comando de la lista
     cerrada y acá hay un manejo determinista por comando, igual para todos los
@@ -1756,7 +1786,12 @@ def _atender_pregunta_pendiente(cur, quien, texto: str, abierta, proveedor, cal,
     consumió antes) -- sin un segundo ruteo. La pregunta se consume sólo con
     `responde` (y `corrige`, si en ese tipo corregir es responder) y
     `cancela`, o con los botones que dejan `dudoso` y `otro_tema`; si el
-    ruteo falla, queda abierta."""
+    ruteo falla, queda abierta.
+
+    `con_enlace` (R4-H9): el mensaje trae una entidad de enlace de Telegram. Con
+    la pregunta de evidencia abierta, esa señal estructural resuelve la duda del
+    ruteo: es la respuesta y sigue directo la vista previa, sin preguntar "¿Esto
+    es la evidencia?". Sólo la duda; lo demás que decidió el ruteo se respeta."""
     from .llm import RespectoPendiente
 
     pregunta = _pregunta_de(abierta)
@@ -1766,6 +1801,9 @@ def _atender_pregunta_pendiente(cur, quien, texto: str, abierta, proveedor, cal,
         return None
 
     comando = route.respecto_pendiente
+    if (con_enlace and comando is RespectoPendiente.DUDOSO
+            and _es_pregunta_de_evidencia(abierta)):
+        comando = RespectoPendiente.RESPONDE
     if comando is RespectoPendiente.RESPONDE or (
             comando is RespectoPendiente.CORRIGE and pregunta.corrige_responde):
         if _consumir_pregunta(cur, quien, chat_id, abierta, ahora):
@@ -1819,6 +1857,19 @@ def _atender_pregunta_pendiente(cur, quien, texto: str, abierta, proveedor, cal,
     _preguntar_si_es_el_dato(cur, quien, workspace_id, chat_id, texto, abierta,
                              entrante_id, ahora)
     return None
+
+
+# Las acciones del menú cuyo dato es una evidencia (R4-H9).
+_ACCIONES_DE_EVIDENCIA = ("terminar", "adjuntar_evidencia")
+
+
+def _es_pregunta_de_evidencia(abierta) -> bool:
+    """La pregunta abierta pide una evidencia: la entrega ("Ya la terminé") o
+    "Adjuntar evidencia"."""
+    from . import pendientes as P
+
+    return (abierta.herramienta == P.SENTINEL_DATO_MENU_TAREA
+            and abierta.args.get("accion") in _ACCIONES_DE_EVIDENCIA)
 
 
 def _repreguntar(cur, quien, workspace_id: str, chat_id: int, abierta,

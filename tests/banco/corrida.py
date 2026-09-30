@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import contextlib
 import itertools
+import re
 import threading
 import time
 from dataclasses import dataclass, field
@@ -37,7 +38,8 @@ from prisma.llm import (IntentAction, IntentRoute, Llamada, Proveedor,
                         RouteEnvelope)
 from prisma.respuesta_unica import (ETAPA_RESPUESTA_DUPLICADA, ETAPA_SIN_RESPUESTA,
                                     grupo_de)
-from prisma.salida import etiquetas_coinciden, etiquetas_de_tarea
+from prisma.salida import (etiquetas_coinciden, etiquetas_de_tarea,
+                           telegram_utf16_units)
 
 from tests.banco.comprobadores import es_forma_ofrecida_del_titulo
 from tests.banco.escenario import ADJUNTOS_DEL_BANCO
@@ -1034,13 +1036,36 @@ def _tocar_veces(conn, workspace_id: str, slug: str, chat: int, tg_id: int,
         _tocar_opcion(conn, slug, chat, tg_id, token, prefijo)
 
 
+# Lo que el servidor de Telegram marca como enlace (`url`) en un texto: con
+# esquema, con `www.` o un dominio con un final conocido. Simula al servidor de
+# Telegram, no al producto: el gateway decide sólo por las entidades que recibe
+# (R4-H9), nunca por el texto.
+_ENLACE_DE_TELEGRAM = re.compile(
+    r"(?:https?://|www\.)\S+"
+    r"|\b[a-z0-9-]+(?:\.[a-z0-9-]+)*\.(?:com|net|org|io|ar|dev|app)\b(?:/\S*)?",
+    re.IGNORECASE)
+
+
+def _entidades_de_enlace(texto: str) -> list[dict]:
+    """Las entidades `url` que Telegram le pondría a `texto`, con `offset` y
+    `length` en unidades UTF-16 como las manda la Bot API."""
+    return [{"type": "url",
+             "offset": telegram_utf16_units(texto[:m.start()]),
+             "length": telegram_utf16_units(m.group(0))}
+            for m in _ENLACE_DE_TELEGRAM.finditer(texto)]
+
+
 def _update_de_texto(message_id: int, texto: str, chat: int, tg_id: int) -> dict:
     """Un mensaje de texto como lo manda Telegram desde un chat privado
     (`type`: el gateway sólo lee el campo del alta guiada en un chat privado,
-    T9-R1c-1): sin el tipo, el banco nunca ejercitaría ese camino."""
-    return {"message": {"message_id": message_id, "text": texto,
-                        "chat": {"id": chat, "type": "private"},
-                        "from": {"id": tg_id}}}
+    T9-R1c-1): sin el tipo, el banco nunca ejercitaría ese camino. Con las
+    entidades de enlace que Telegram le pondría (R4-H9)."""
+    mensaje = {"message_id": message_id, "text": texto,
+               "chat": {"id": chat, "type": "private"}, "from": {"id": tg_id}}
+    entidades = _entidades_de_enlace(texto)
+    if entidades:
+        mensaje["entities"] = entidades
+    return {"message": mensaje}
 
 
 # Lo mínimo que Telegram manda de cada adjunto: alcanza para que el gateway lo

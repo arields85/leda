@@ -2959,3 +2959,14 @@ def test_los_escenarios_de_b_0030_cumplen_lo_que_declaran_con_un_modelo_guionado
         respuestas_por_toque=r.respuestas_por_toque)
     assert una.resultado == "aprobado", una.diferencia
     assert r.respuestas_por_mensaje == (1, 1)     # la lista y el link
+
+
+def test_el_banco_marca_los_enlaces_como_lo_hace_telegram():
+    """R4-H9: el gateway decide por las entidades que recibe, así que el banco le
+    manda las que el servidor de Telegram pondría (`url`, en unidades UTF-16)."""
+    from tests.banco.corrida import _update_de_texto
+
+    con_enlace = _update_de_texto(1, "listo 😀 en google.com", 7, 7)["message"]
+    assert con_enlace["entities"] == [{"type": "url", "offset": 12, "length": 10}]
+    sin_enlace = _update_de_texto(2, "ya quedó andando en la planta", 7, 7)["message"]
+    assert "entities" not in sin_enlace
