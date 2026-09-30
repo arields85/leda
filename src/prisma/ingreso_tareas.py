@@ -1775,7 +1775,7 @@ def _send_to_confirmer(cur, request, now, preview_text, preview, version,
         # contesta a ese acto y no queda sujeto a horario, tope ni retención
         # (ADR 0013 regla 2). Si confirma otra persona, es un mensaje que Prisma
         # le inicia a ella.
-        is_response=requester_confirms,
+        is_response=requester_confirms, es_coordinacion=not requester_confirms,
     )
     return pending, requester_confirms
 

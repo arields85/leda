@@ -953,6 +953,7 @@ def crear_borrador_tarea(cur, quien: Solicitante, titulo, objetivo_id=None,
         recipient_membership_id=str(aprobador_id), scheduled_for=ahora,
         dedupe_key=(f"{quien.workspace_id}:draft-preview:{borrador['id']}:"
                     f"{borrador['version']}"), pending_action_id=pendiente.id,
+        es_coordinacion=True,
     )
     return {"draft_id": str(borrador["id"]), "completa": True,
             "pendiente_revision": True, "notificada": True,
@@ -1937,15 +1938,18 @@ def _persona(cur, membership_id):
 
 def _avisar(cur, quien: Solicitante, destinatario_membership_id, texto, *,
            dedupe_key, tipo="normal") -> None:
-    """Un aviso automático más: si la persona todavía no activó el chat, se
-    omite en silencio, igual que la escalera y la cadencia."""
+    """Un aviso de coordinación: lo que otra persona hizo sobre trabajo compartido
+    y quien lo recibe necesita para actuar o enterarse (aprobación, cambios
+    pedidos, dependencia). Fuera del tope diario (`es_coordinacion`). Si la persona
+    todavía no activó el chat, se omite en silencio, igual que la escalera y la
+    cadencia."""
     persona = _persona(cur, destinatario_membership_id)
     if not persona or persona["telegram_user_id"] is None:
         return
     enqueue_outbox(
         cur, workspace_id=quien.workspace_id, chat_id=persona["telegram_user_id"],
         text=texto, recipient_membership_id=destinatario_membership_id,
-        message_type=tipo, dedupe_key=dedupe_key)
+        message_type=tipo, dedupe_key=dedupe_key, es_coordinacion=True)
 
 
 def _enlace_portal_tarea(tarea_id) -> str | None:
@@ -2049,7 +2053,8 @@ def _notificar_entrega_al_aprobador(cur, quien: Solicitante, tarea_id, titulo,
     enqueue_outbox(
         cur, workspace_id=quien.workspace_id, chat_id=aprobador["telegram_user_id"],
         text=texto, recipient_membership_id=str(aprobador_membership_id),
-        scheduled_for=ahora, dedupe_key=dedupe_key, pending_action_id=p.id)
+        scheduled_for=ahora, dedupe_key=dedupe_key, pending_action_id=p.id,
+        es_coordinacion=True)
 
 
 def _avisar_evidencia_nueva_en_revision(cur, quien: Solicitante, tarea_id, titulo,

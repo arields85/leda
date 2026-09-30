@@ -532,8 +532,13 @@ def enqueue_outbox(cur, *, workspace_id: str, chat_id: int,
                    allow_split: bool = False,
                    es_bienvenida: bool = False,
                    bloque_copiable: str | None = None,
-                   grupo_respuesta: str | None = None) -> int:
-    """Encola un mensaje visible. `grupo_respuesta` (T9-R2) nombra la respuesta
+                   grupo_respuesta: str | None = None,
+                   es_coordinacion: bool = False) -> int:
+    """Encola un mensaje visible. `es_coordinacion` marca el aviso causado
+    directamente por el acto de otra persona sobre trabajo compartido (una
+    entrega para revisar, cambios pedidos, una aprobación, un borrador para
+    confirmar o rechazado): no cuenta contra el tope diario de mensajes
+    automáticos ni lo posterga (`despachador._ya_recibio`); los seguimientos sí. `grupo_respuesta` (T9-R2) nombra la respuesta
     de la que esta fila es una parte cuando una respuesta se encola en varias
     llamadas (el texto y aparte el mensaje con los botones): el control de "una
     respuesta por mensaje" cuenta un grupo como UNA respuesta. Sin él, cada
@@ -582,16 +587,16 @@ def enqueue_outbox(cur, *, workspace_id: str, chat_id: int,
                  (workspace_id, chat_id, destinatario_membership_id, tipo, cuerpo,
                   estado, programado_para, vence_en, dedupe_key, es_respuesta,
                   pending_action_id, intake_choice_set_id, es_bienvenida,
-                  bloque_copiable, respuesta_grupo)
+                  bloque_copiable, respuesta_grupo, es_coordinacion)
                values (%s, %s, %s, %s, %s, %s,
                        coalesce(%s, now()) + %s * interval '1 microsecond',
-                       %s, %s, %s, %s, %s, %s, %s, %s)
+                       %s, %s, %s, %s, %s, %s, %s, %s, %s)
                on conflict (dedupe_key) do nothing""",
             (workspace_id, chat_id, recipient_membership_id, message_type,
              payload.text, state, scheduled_for, index,
              expires_at, payload.dedupe_key,
              is_response, pending_action_id, intake_choice_set_id, es_bienvenida,
-             bloque_copiable, grupo_respuesta),
+             bloque_copiable, grupo_respuesta, es_coordinacion),
         )
         inserted += cur.rowcount
     return inserted

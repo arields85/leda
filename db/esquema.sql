@@ -582,6 +582,12 @@ create table message_outbox (
   -- por ella sin anteponerle nada, nunca una categoría de `tipo` (que la
   -- presentación de grupo también usa como 'informativo' sin ser un saludo).
   es_bienvenida           boolean not null default false,
+  -- Aviso de coordinación (migración 0024, decisión del usuario 2026-09-30): lo
+  -- que una persona hizo sobre trabajo compartido y otra necesita para actuar o
+  -- enterarse (entrega para revisar, cambios pedidos, aprobación, borrador para
+  -- confirmar o rechazado). No cuenta contra el tope diario de mensajes
+  -- automáticos ni lo posterga; los seguimientos (cadencias, escalera) sí.
+  es_coordinacion         boolean not null default false,
   -- T9-R1c-3: lo que la persona había escrito, para que lo copie con un toque --
   -- el final de `cuerpo`. El transporte lo marca como bloque (entidad `pre`) y,
   -- si entra en 256 unidades UTF-16, agrega el botón de copiar.

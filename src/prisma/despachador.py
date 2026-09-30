@@ -738,7 +738,7 @@ def despachar(cur: psycopg.Cursor, workspace_id: str, transporte: Transporte,
              select id, workspace_id, chat_id, cuerpo, tipo,
                     destinatario_membership_id, intentos,
                     vence_en, es_respuesta, pending_action_id, intake_choice_set_id,
-                    es_bienvenida, bloque_copiable
+                    es_bienvenida, bloque_copiable, es_coordinacion
               from message_outbox
              where workspace_id = %(ws)s
                and estado = 'listo'
@@ -830,8 +830,11 @@ def _despachar_fila(cur, workspace_id: str, transporte: Transporte,
         resumen["pospuestos"] += 1
         return
 
-    if tope and m["destinatario_membership_id"] and _ya_recibio(
-            cur, m["destinatario_membership_id"], ahora) >= tope:
+    # Un aviso de coordinación (`es_coordinacion`) llega siempre: el tope es de los
+    # seguimientos (decisión del usuario, 2026-09-30).
+    if (tope and not m["es_coordinacion"] and m["destinatario_membership_id"]
+            and _ya_recibio(cur, m["destinatario_membership_id"], ahora)
+            >= tope):
         cur.execute(
             "update message_outbox set programado_para = %s where id = %s",
             (cal.dentro_de_jornada(cal.sumar_habiles(ahora, 1)), m["id"]))
@@ -1082,6 +1085,11 @@ def _ya_recibio(cur, membership_id: str, ahora: datetime) -> int:
     (`_despachar_fila`, ADR 0011). Contarlas dejaba sin su aviso a quien
     conversaba con Prisma: tres respuestas del día alcanzaban para posponer al
     día hábil siguiente el "X entregó…" o el "X pidió cambios…" (R4-H7).
+
+    Tampoco cuentan los avisos de coordinación (`es_coordinacion`: lo que otra
+    persona hizo sobre trabajo compartido y esta necesita para actuar o
+    enterarse): no consumen la cuota de los seguimientos, que es lo único que el
+    tope limita (decisión del usuario, 2026-09-30).
     """
     cur.execute(
         """
@@ -1092,6 +1100,7 @@ def _ya_recibio(cur, membership_id: str, ahora: datetime) -> int:
          where m2.id = %s
            and o.estado = 'enviado'
            and not o.es_respuesta
+           and not o.es_coordinacion
            and o.enviado_en::date = %s
         """,
         (membership_id, ahora.date()))

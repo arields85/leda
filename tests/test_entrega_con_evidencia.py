@@ -195,6 +195,12 @@ def test_actualizar_estado_a_en_revision_notifica_al_aprobador_con_botones(
         assert "Nahuel Gimenez entregó" in cuerpo
         assert "Programar HMI línea 2" in cuerpo
         assert "Listo." in cuerpo
+        # Un aviso de coordinación: fuera del tope diario de mensajes automáticos.
+        cur.execute(
+            "select es_coordinacion from message_outbox "
+            "where workspace_id = %s and chat_id = %s and cuerpo = %s",
+            (ws, tg_marcos, cuerpo))
+        assert cur.fetchone()["es_coordinacion"] is True
 
         cur.execute(
             """select po.etiqueta from pending_action pa
