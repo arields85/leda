@@ -144,6 +144,22 @@ AVISO_PEDIDO_NO_VIGENTE = (
 # "El mismo botón" es el mismo `callback_data` en el mismo chat: lleva el token de
 # la opción, único por botón, y queda en `inbound_message.boton_callback`.
 VENTANA_TOQUE_REPETIDO = timedelta(seconds=10)
+# T9-H19d: el recibo de la fase 1 significa "recibido", no "respondido". Una
+# reentrega del mismo mensaje se absorbe sólo si (a) ya tiene una respuesta visible,
+# o (b) su recibo es lo bastante reciente como para que el turno siga corriendo.
+# La duración de un turno está acotada: cada llamada al modelo tarda a lo sumo
+# `llm.TIMEOUT_MODELO_S` (20 s) x (1 + `REINTENTOS_MODELO` = 2) = 60 s, y un turno
+# encadena el enrutamiento (2 intentos) y hasta `agente.MAX_VUELTAS` (5) vueltas:
+# ~7 min en el peor caso teórico, 10-30 s en el normal. 10 min queda por encima.
+# Un recibo más viejo y sin respuesta es un turno muerto (reinicio, OOM): la
+# reentrega es la recuperación.
+VENTANA_TURNO_EN_CURSO = timedelta(minutes=10)
+# Cota global: la Bot API guarda las actualizaciones a lo sumo 24 horas ("they will
+# not be kept longer than 24 hours", getUpdates) y del webhook sólo dice que
+# reintenta "una cantidad razonable de veces" (SUPUESTO: no reentrega más allá de
+# esa cota). Un recibo más viejo nunca absorbe: si Telegram reinicia la numeración
+# (cambia el token del bot), un mensaje nuevo puede chocar con un id viejo.
+COTA_REENTREGA = timedelta(hours=24)
 _ELECCION_DATO_SI = "si"
 _ELECCION_DATO_SEGUIR = "seguir"
 _ELECCION_DATO_DEJAR = "dejar"
@@ -429,6 +445,7 @@ def procesar_update(conn, slug: str, update: dict,
     # exacto, en vez de perderlo junto con la reversión.
     quien = None
     entrante_id = None
+    estado = "nuevo"
     try:
         with espacio(conn, workspace_id) as cur:
             try:
@@ -439,17 +456,24 @@ def procesar_update(conn, slug: str, update: dict,
                 # A un desconocido no se le explica por qué no se le responde.
                 return {"ok": True}
 
-            if update.get("message") and _es_mensaje_repetido(
-                    cur, workspace_id, chat_id, mensaje.get("message_id")):
-                # Un reenvío de Telegram (T9-H19b, ADR 0013 regla 2): el mismo
-                # mensaje ya se recibió. Ni recibo, ni turno, ni respuesta; sólo
-                # su auditoría. Una edición (`edited_message`) no entra: su
-                # tratamiento es una decisión pendiente del usuario (T9-H19c).
+            previo_id = None
+            if update.get("message"):
+                estado, previo_id = _estado_de_entrega(
+                    cur, workspace_id, chat_id, mensaje.get("message_id"),
+                    datetime.now(timezone.utc))
+            if estado == "absorber":
+                # Una reentrega del webhook (T9-H19b, ADR 0013 regla 2): el mismo
+                # mensaje ya se atendió o se está atendiendo. Ni recibo, ni turno,
+                # ni respuesta; sólo su auditoría. Una edición (`edited_message`)
+                # no entra: su tratamiento es una decisión pendiente del usuario
+                # (T9-H19c).
                 registrar_auditoria(
                     cur, accion="mensaje_repetido_absorbido",
                     workspace_id=workspace_id,
                     actor_app_user_id=quien.app_user_id, actor_kind="persona",
-                    detalle={"chat_id": chat_id})
+                    detalle={"chat_id": chat_id,
+                             "telegram_message_id": mensaje.get("message_id"),
+                             "entrante_previo_id": previo_id})
             else:
                 cur.execute(
                     """insert into inbound_message
@@ -463,9 +487,25 @@ def procesar_update(conn, slug: str, update: dict,
                     cur, accion="mensaje_recibido", workspace_id=workspace_id,
                     actor_app_user_id=quien.app_user_id, actor_kind="persona",
                     detalle={"chat_id": chat_id,
-                             **({"adjunto": adjunto} if adjunto else {})})
+                             **({"adjunto": adjunto} if adjunto else {}),
+                             **({"recupera_entrante_id": previo_id}
+                                if estado == "recuperar" else {})})
+                if estado == "recuperar":
+                    # Un recibo viejo sin respuesta: su turno murió. Se atiende de
+                    # nuevo con un recibo nuevo (así `controlar` y las claves de
+                    # lo que se encole se atan a este mensaje y no al muerto) y
+                    # queda el incidente, para que no pase en silencio.
+                    registrar_incidente(
+                        cur, workspace_id,
+                        "Un mensaje recibido no llegó a responderse (su turno "
+                        "murió); la reentrega de Telegram lo retomó y se atiende "
+                        f"de nuevo (recibo anterior {previo_id}).",
+                        severidad="media", etapa=ETAPA_MENSAJE_RECUPERADO,
+                        referencia_tipo=REFERENCIA_INBOUND_MESSAGE,
+                        referencia_id=entrante_id, chat_id=chat_id,
+                        app_user_id=quien.app_user_id)
         conn.commit()
-        if entrante_id is None:
+        if estado == "absorber":
             return {"ok": True}
     except Exception as e:  # noqa: BLE001
         conn.rollback()
@@ -673,22 +713,37 @@ def _registrar_toque(cur, workspace_id: str, chat_id: int, quien, ahora,
     return str(cur.fetchone()["id"])
 
 
-def _es_mensaje_repetido(cur, workspace_id: str, chat_id: int,
-                         message_id: int | None) -> bool:
-    """Este `message_id` de este chat ya se recibió (un reenvío del webhook). El
-    candado serializa dos entregas simultáneas: la segunda espera el commit de la
+def _estado_de_entrega(cur, workspace_id: str, chat_id: int,
+                       message_id: int | None, ahora) -> tuple[str, str | None]:
+    """Qué hacer con un `message_id` de este chat: `("nuevo", None)` si nunca se
+    recibió (o su recibo pasó `COTA_REENTREGA`), `("absorber", id)` si ya tiene
+    respuesta visible o su recibo es de dentro de `VENTANA_TURNO_EN_CURSO`, y
+    `("recuperar", id)` si hay recibo pero viejo y sin respuesta (el turno murió).
+    El candado serializa dos entregas simultáneas: la segunda espera el commit de la
     fase 1 de la primera y ve su fila. Sin `message_id` no hay con qué comparar."""
     if message_id is None:
-        return False
+        return "nuevo", None
     cur.execute(
         "select pg_advisory_xact_lock(hashtextextended(%s, 0))",
         (f"mensaje:{workspace_id}:{chat_id}:{message_id}",))
     cur.execute(
-        """select 1 from inbound_message
-            where workspace_id = %s and chat_id = %s and telegram_message_id = %s
-            limit 1""",
-        (workspace_id, chat_id, message_id))
-    return cur.fetchone() is not None
+        """select i.id, i.at,
+                  exists (select 1 from message_outbox o
+                           where o.entrante_id = i.id and o.chat_id = i.chat_id
+                             and o.es_respuesta and o.estado <> 'descartado')
+                  as respondido
+             from inbound_message i
+            where i.workspace_id = %s and i.chat_id = %s
+              and i.telegram_message_id = %s and i.at > %s
+            order by i.at desc""",
+        (workspace_id, chat_id, message_id, ahora - COTA_REENTREGA))
+    filas = cur.fetchall()
+    if not filas:
+        return "nuevo", None
+    for fila in filas:
+        if fila["respondido"] or fila["at"] > ahora - VENTANA_TURNO_EN_CURSO:
+            return "absorber", str(fila["id"])
+    return "recuperar", str(filas[0]["id"])
 
 
 def _es_toque_repetido(cur, workspace_id: str, chat_id: int, quien, ahora,
@@ -3729,6 +3784,9 @@ ETAPA_TOQUE_BOTON = "toque_boton"
 ETAPA_FILA_TERMINAL_SIN_ATAR = "fila_terminal_sin_atar"
 ETAPA_ACTIVACION = "activacion"
 ETAPA_ACCION_MENU = "accion_menu"
+# T9-H19d: el turno de un mensaje murió después de su recibo y la reentrega de
+# Telegram lo retomó (un turno nuevo, con recibo nuevo).
+ETAPA_MENSAJE_RECUPERADO = "mensaje_recuperado_sin_respuesta"
 
 def _routing_incident(cur, quien, error) -> None:
     registrar_incidente(

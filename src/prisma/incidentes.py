@@ -189,6 +189,13 @@ EXPLICACION_POR_ETAPA: dict[str, ExplicacionDeEtapa] = {
                  "de problema."),
         que_hacer=("Confirmá que {nombre} recibió una sola respuesta y que el "
                    "borrador está en el estado que espera.")),
+    "mensaje_recuperado_sin_respuesta": ExplicacionDeEtapa(
+        que_paso=("Un mensaje de {nombre} se recibió pero su turno murió antes de "
+                  "responderlo (un reinicio o un corte del proceso); Telegram lo "
+                  "reentregó y Prisma lo atendió de nuevo."),
+        que_vio="La respuesta a su mensaje, con demora.",
+        que_hacer=(f"{_BUSCAR_DETALLE} y mirá si hubo un reinicio o un corte del "
+                   "servicio a esa hora. No hace falta avisarle a {nombre}.")),
     "sin_respuesta": ExplicacionDeEtapa(
         que_paso=("Un mensaje quedó sin ninguna respuesta de Prisma; el control "
                   "de respuesta única mandó el aviso de problema."),

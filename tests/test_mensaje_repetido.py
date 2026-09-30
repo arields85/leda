@@ -18,15 +18,16 @@ import time
 
 from prisma import gateway
 from prisma.db import admin, conectar
+from prisma.incidentes import EXPLICACION_POR_ETAPA
 
 from tests.test_una_respuesta import (_con_respuesta_del_modelo, _filas_de_salida,
                                       _tg)
 from tests.test_menu_tarea import cliente  # noqa: F401
 
 
-def _update(tg, texto="hola", message_id=41, chat=None, clave="message"):
+def _update(tg, texto="hola", message_id=41, clave="message"):
     return {clave: {"message_id": message_id, "text": texto,
-                    "chat": {"id": chat or tg, "type": "private"},
+                    "chat": {"id": tg, "type": "private"},
                     "from": {"id": tg}}}
 
 
@@ -137,7 +138,7 @@ def test_dos_entregas_simultaneas_se_atienden_una_sola_vez(
     el candado, la segunda la alcanzaría en esa ventana y las dos insertarían."""
     _con_respuesta_del_modelo(monkeypatch)
     tg = _tg(conn)
-    real = gateway._es_mensaje_repetido
+    real = gateway._estado_de_entrega
     primera = threading.Event()
 
     def demorada(*args, **kwargs):
@@ -147,7 +148,7 @@ def test_dos_entregas_simultaneas_se_atienden_una_sola_vez(
             time.sleep(1.0)
         return resultado
 
-    monkeypatch.setattr(gateway, "_es_mensaje_repetido", demorada)
+    monkeypatch.setattr(gateway, "_estado_de_entrega", demorada)
     errores = []
 
     def entregar(espera):
@@ -167,7 +168,140 @@ def test_dos_entregas_simultaneas_se_atienden_una_sola_vez(
     for h in hilos:
         h.join(timeout=60)
 
+    assert not any(h.is_alive() for h in hilos)     # ninguna quedó colgada
     assert errores == []
     assert len(_entrantes(conn, tg)) == 1
     assert len(_visibles(conn, tg)) == 1
     assert _auditorias(conn, "mensaje_repetido_absorbido") == 1
+
+
+# --- T9-H19d: absorber sólo lo que se atendió o puede estar atendiéndose -------------
+# El recibo de la fase 1 significa "recibido", no "respondido": si el turno del primer
+# envío murió después de confirmarlo (reinicio, OOM), la reentrega es la recuperación.
+
+EN_CURSO = int(gateway.VENTANA_TURNO_EN_CURSO.total_seconds())
+COTA = int(gateway.COTA_REENTREGA.total_seconds())
+
+
+def _recibo_sin_respuesta(conn, tg, message_id, hace_s):
+    """Un recibo de la fase 1 cuyo turno nunca encoló nada, de hace `hace_s`."""
+    with admin(conn) as cur:
+        cur.execute(
+            """insert into inbound_message
+                 (workspace_id, telegram_message_id, chat_id, app_user_id, texto, at)
+               select m.workspace_id, %s, %s, u.id, 'hola',
+                      now() - make_interval(secs => %s)
+                 from app_user u join membership m on m.app_user_id = u.id
+                where u.telegram_user_id = %s limit 1 returning id""",
+            (message_id, tg, hace_s, tg))
+        fila = cur.fetchone()
+    conn.commit()
+    return str(fila["id"])
+
+
+def _envejecer(conn, message_id, segundos):
+    with admin(conn) as cur:
+        cur.execute("""update inbound_message set at = at - make_interval(secs => %s)
+                        where telegram_message_id = %s""", (segundos, message_id))
+    conn.commit()
+
+
+def _detalles(conn, accion):
+    with admin(conn) as cur:
+        cur.execute("select detalle from audit_log where accion = %s", (accion,))
+        return [f["detalle"] for f in cur.fetchall()]
+
+
+def _incidentes_de(conn, etapa):
+    with admin(conn) as cur:
+        cur.execute("select referencia_id from incident where etapa = %s", (etapa,))
+        return cur.fetchall()
+
+
+def test_la_reentrega_de_un_turno_muerto_se_recupera_una_sola_vez(
+        cliente, conn, corework, monkeypatch):
+    proveedor = _con_respuesta_del_modelo(monkeypatch)
+    tg = _tg(conn)
+    previo = _recibo_sin_respuesta(conn, tg, 41, EN_CURSO + 60)
+
+    _enviar(cliente, _update(tg))
+    _enviar(cliente, _update(tg))             # y la siguiente reentrega ya se absorbe
+
+    assert len(_visibles(conn, tg)) == 1
+    assert len(proveedor.ruteados) == 1
+    assert len(_entrantes(conn, tg, 41)) == 2       # el recibo muerto y el nuevo
+    incidentes = _incidentes_de(conn, gateway.ETAPA_MENSAJE_RECUPERADO)
+    assert len(incidentes) == 1
+    assert str(incidentes[0]["referencia_id"]) != previo
+    assert _auditorias(conn, "mensaje_repetido_absorbido") == 1
+
+
+def test_la_reentrega_dentro_de_la_ventana_sin_respuesta_todavia_se_absorbe(
+        cliente, conn, corework, monkeypatch):
+    proveedor = _con_respuesta_del_modelo(monkeypatch)
+    tg = _tg(conn)
+    _recibo_sin_respuesta(conn, tg, 41, EN_CURSO - 60)   # su turno puede seguir
+
+    _enviar(cliente, _update(tg))
+
+    assert len(_entrantes(conn, tg, 41)) == 1
+    assert _visibles(conn, tg) == []
+    assert proveedor.ruteados == []
+    assert _auditorias(conn, "mensaje_repetido_absorbido") == 1
+    assert _incidentes_de(conn, gateway.ETAPA_MENSAJE_RECUPERADO) == []
+
+
+def test_la_reentrega_de_un_mensaje_ya_respondido_se_absorbe_aunque_sea_vieja(
+        cliente, conn, corework, monkeypatch):
+    proveedor = _con_respuesta_del_modelo(monkeypatch)
+    tg = _tg(conn)
+    _enviar(cliente, _update(tg))
+    _envejecer(conn, 41, EN_CURSO + 60)
+
+    _enviar(cliente, _update(tg))
+
+    assert len(_entrantes(conn, tg, 41)) == 1
+    assert len(_visibles(conn, tg)) == 1
+    assert len(proveedor.ruteados) == 1
+    assert _incidentes_de(conn, gateway.ETAPA_MENSAJE_RECUPERADO) == []
+
+
+def test_un_recibo_mas_viejo_que_la_cota_nunca_absorbe(
+        cliente, conn, corework, monkeypatch):
+    """Si Telegram reinicia la numeración (cambió el token del bot), un mensaje
+    nuevo puede chocar con un id viejo: pasado lo que Telegram reentrega, es nuevo."""
+    _con_respuesta_del_modelo(monkeypatch)
+    tg = _tg(conn)
+    _enviar(cliente, _update(tg))
+    _envejecer(conn, 41, COTA + 60)
+
+    _enviar(cliente, _update(tg))
+
+    assert len(_entrantes(conn, tg, 41)) == 2
+    assert len(_visibles(conn, tg)) == 2
+    assert _auditorias(conn, "mensaje_repetido_absorbido") == 0
+    assert _incidentes_de(conn, gateway.ETAPA_MENSAJE_RECUPERADO) == []
+
+
+def test_la_auditoria_de_lo_absorbido_dice_cual_mensaje_y_cual_recibo(
+        cliente, conn, corework, monkeypatch):
+    _con_respuesta_del_modelo(monkeypatch)
+    tg = _tg(conn)
+    _enviar(cliente, _update(tg, message_id=77))
+    previo = str(_entrantes(conn, tg, 77)[0]["id"])
+
+    _enviar(cliente, _update(tg, message_id=77))
+
+    (detalle,) = _detalles(conn, "mensaje_repetido_absorbido")
+    assert detalle["telegram_message_id"] == 77
+    assert detalle["entrante_previo_id"] == previo
+
+
+def test_la_etapa_de_recuperacion_tiene_su_explicacion():
+    assert gateway.ETAPA_MENSAJE_RECUPERADO == "mensaje_recuperado_sin_respuesta"
+    assert gateway.ETAPA_MENSAJE_RECUPERADO in EXPLICACION_POR_ETAPA
+
+
+def test_las_ventanas_son_coherentes():
+    assert (gateway.VENTANA_TOQUE_REPETIDO < gateway.VENTANA_TURNO_EN_CURSO
+            < gateway.COTA_REENTREGA)

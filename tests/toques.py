@@ -3,6 +3,8 @@ otras pruebas, para que cualquiera la importe sin ciclos."""
 
 from __future__ import annotations
 
+import itertools
+
 from prisma.db import admin
 from prisma.gateway import VENTANA_TOQUE_REPETIDO
 
@@ -24,7 +26,8 @@ def envejecer_toques(conn, segundos: int) -> None:
     conn.commit()
 
 
-_IDS_DE_MENSAJE = __import__("itertools").count(1000)
+# Arranca lejos de los ids fijos de las pruebas (41, 42, 77), para no chocar.
+_IDS_DE_MENSAJE = itertools.count(1000)
 
 
 def id_de_mensaje() -> int:
