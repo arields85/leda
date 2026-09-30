@@ -143,8 +143,8 @@ def test_sin_referencia_resuelta_no_se_toca(corework, conn):
         r = responder(cur, quien, "¿qué tengo?", ProveedorGuionado(guion), cal,
                       chat_id=9103, ahora=AHORA)
 
-        assert "Sobre «" not in r.texto
-        assert r.texto.endswith("Va bien, avanza rápido.")
+        assert r.texto == ("«Cablear tablero máq. 3» (asignada)\n\n"
+                           "Va bien, avanza rápido.")
 
 
 def test_herramienta_de_escritura_con_vista_previa_no_se_toca(corework, conn):

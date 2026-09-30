@@ -171,8 +171,8 @@ def test_lista_de_hasta_cuatro_tareas_arma_botones_y_tocar_una_abre_el_menu(
         r = responder(cur, quien, "qué tengo pendiente", proveedor, cal, chat_id=1,
                      ahora=datetime.now(timezone.utc))
         # T10-5 (H7): con hasta tres tareas el servidor las nombra en el texto.
-        assert r.texto.endswith("\n\nTenés 3 tareas abiertas.")
-        assert all(f"«Tarea {n}»" in r.texto for n in (1, 2, 3))
+        assert r.texto == ("«Tarea 1» (asignada)\n«Tarea 2» (asignada)\n"
+                           "«Tarea 3» (asignada)\n\nTenés 3 tareas abiertas.")
         pid = _pendiente(cur, ws, P.SENTINEL_OPCIONES_MODELO)
         filas = _opciones(cur, pid)
         tg = _telegram_id(cur, "Marcos Tarquini")
@@ -645,8 +645,8 @@ def test_lista_con_respuesta_corta_sigue_yendo_junto_con_los_botones(
 
     assert len(filas) == 1
     assert filas[0]["pending_action_id"] is not None
-    assert filas[0]["cuerpo"].endswith("\n\nTenés 2 tareas abiertas.")
-    assert "«Tarea 1»" in filas[0]["cuerpo"] and "«Tarea 2»" in filas[0]["cuerpo"]
+    assert filas[0]["cuerpo"] == ("«Tarea 1» (asignada)\n«Tarea 2» (asignada)\n\n"
+                                  "Tenés 2 tareas abiertas.")
 
 
 # ---------------------------------------------------------------------------

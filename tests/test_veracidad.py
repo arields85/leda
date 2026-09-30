@@ -209,5 +209,5 @@ def test_lo_que_si_ejecuto_lo_puede_contar(corework, conn):
                       chat_id=9004, ahora=AHORA)
 
         # T10-5 (H7): la única tarea listada se nombra; el texto del modelo sale entero.
-        assert r.texto.endswith("Tenés una tarea abierta.")
+        assert r.texto == "«Programar PLC» (asignada)\n\nTenés una tarea abierta."
         assert r.acciones == ["consultar_tareas"]

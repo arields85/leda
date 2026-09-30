@@ -248,10 +248,10 @@ def responder(cur: psycopg.Cursor, quien: Solicitante, texto_entrante: str,
             # se hizo (confirmación/`NecesitaElegir` pendiente), pero una
             # pregunta con opciones no anuncia nada: sólo da contexto. Mismas
             # protecciones de veracidad que la salida normal.
-            texto_opciones = normalize_visible_text(
-                revisar_salida(texto_al_ofrecer or "", ctx.variantes_prohibidas))
-            texto_opciones = _nombrar_tareas_sin_mencionar(
-                texto_opciones, tareas_resueltas_claras)
+            texto_opciones = normalize_visible_text(revisar_salida(
+                _nombrar_tareas_sin_mencionar(
+                    texto_al_ofrecer or "", tareas_resueltas_claras),
+                ctx.variantes_prohibidas))
             # `ofrecer_opciones` en sí no es una mutación que haya fallado --
             # es la pregunta -- así que no cuenta para "se intentó cambiar
             # algo y no se aplicó nada".
@@ -291,11 +291,16 @@ def responder(cur: psycopg.Cursor, quien: Solicitante, texto_entrante: str,
     elif not salida.strip():
         salida = "Anotado."
 
+    # Las guardas de nombres van ANTES de los filtros de salida: lo que agregan
+    # (títulos de tareas) pasa por el mismo glosario y la misma normalización
+    # que el texto del modelo. La de listas sólo toca una respuesta
+    # informativa: un turno sin efecto sale como el aviso "sin cambios".
+    salida = _nombrar_tareas_sin_mencionar(salida, tareas_resueltas_claras)
+    if not sin_efecto:
+        salida = _nombrar_tareas_listadas(salida, tareas_listadas,
+                                          tareas_resueltas_claras)
     salida = normalize_visible_text(
         revisar_salida(salida, ctx.variantes_prohibidas))
-    salida = _nombrar_tareas_sin_mencionar(salida, tareas_resueltas_claras)
-    salida = _nombrar_tareas_listadas(salida, tareas_listadas,
-                                      tareas_resueltas_claras)
     if sin_efecto:
         salida = with_no_effect_status(salida)
     # T3 (ADR 0007 punto 3): el servidor, no el modelo, garantiza que una
@@ -534,13 +539,35 @@ def _nombrar_tareas_sin_mencionar(
     modelo, y sólo se antepone lo que de verdad falta."""
     if not tareas_resueltas_claras:
         return texto
-    comparable = _normalizar_comparacion(texto)
+    nombrados = _titulos_nombrados(texto, tareas_resueltas_claras.values())
     faltantes = [titulo for titulo in tareas_resueltas_claras.values()
-                if _normalizar_comparacion(titulo) not in comparable]
+                 if _normalizar_comparacion(titulo)
+                 and _normalizar_comparacion(titulo) not in nombrados]
     if not faltantes:
         return texto
     encabezado = "\n".join(f"Sobre «{titulo}»:" for titulo in faltantes)
     return f"{encabezado}\n\n{texto}"
+
+
+def _titulos_nombrados(texto: str, titulos) -> set[str]:
+    """Cuáles de `titulos` (normalizados con `_normalizar_comparacion`) aparecen
+    en `texto` como título ENTERO: acotado por caracteres que no son de palabra,
+    no como un pedazo de otra palabra ni de otro título más largo. Los títulos
+    más largos se buscan primero y consumen sus apariciones, así "Revisar
+    variador" no se da por nombrado por leer "Revisar variador 2". Un título
+    vacío nunca cuenta como nombrado."""
+    restante = _normalizar_comparacion(texto)
+    unicos = sorted({_normalizar_comparacion(t) for t in titulos} - {""},
+                    key=len, reverse=True)
+    nombrados: set[str] = set()
+    for titulo in unicos:
+        antes = r"(?<!\w)" if re.match(r"\w", titulo) else ""
+        despues = r"(?!\w)" if re.search(r"\w$", titulo) else ""
+        patron = re.compile(antes + re.escape(titulo) + despues)
+        if patron.search(restante):
+            nombrados.add(titulo)
+            restante = patron.sub(" ", restante)
+    return nombrados
 
 
 # Regla del usuario (T10-5, R3-H7): con hasta tres tareas el texto las nombra
@@ -569,13 +596,15 @@ def _nombrar_tareas_listadas(
     if (tareas_resueltas_claras or not tareas_listadas
             or len(tareas_listadas) > MAX_TAREAS_NOMBRADAS):
         return texto
-    comparable = _normalizar_comparacion(texto)
+    nombrados = _titulos_nombrados(texto, (t["titulo"] for t in tareas_listadas))
     filas = [f"«{t['titulo']}» ({H._estado_legible(t.get('estado')).lower()})"
              for t in tareas_listadas
-             if _normalizar_comparacion(t["titulo"]) not in comparable]
+             if _normalizar_comparacion(t["titulo"])
+             and _normalizar_comparacion(t["titulo"]) not in nombrados]
     if not filas:
         return texto
-    return "\n".join(filas) + f"\n\n{texto}"
+    encabezado = "\n".join(filas)
+    return f"{encabezado}\n\n{texto}" if texto.strip() else encabezado
 
 
 def _bloque_modificacion(m: P.ModificacionAbierta) -> str:

@@ -207,3 +207,186 @@ def test_el_preambulo_pide_responder_lo_pedido_sin_estado_no_pedido():
     texto = " ".join(contexto.PREAMBULO.lower().split())
     assert "sólo lo que te preguntaron" in texto
     assert "no pedido" in texto
+
+
+# ---------------------------------------------------------------------------
+# Sólo toca una respuesta informativa (revisión review-5e28a95f618e8212, 1)
+# ---------------------------------------------------------------------------
+
+def _dos_tareas(conn, ws):
+    with admin(conn) as cur:
+        t1 = _tarea(cur, ws, titulo="Cablear tablero", estado="asignada",
+                    dias_para_vencer=1)
+        _tarea(cur, ws, titulo="Revisar variador", estado="en_curso",
+               dias_para_vencer=2)
+    conn.commit()
+    return t1
+
+
+def _turno_con_guion(conn, ws, monkeypatch, guion, **kwargs):
+    proveedor = _con_proveedor(monkeypatch, guion)
+    with espacio(conn, ws) as cur:
+        quien = _quien(cur, "Marcos Tarquini", ws)
+        return responder(cur, quien, "qué tengo pendiente", proveedor,
+                         Calendario.desde_base(cur, ws), chat_id=1,
+                         ahora=datetime.now(timezone.utc), **kwargs)
+
+
+def test_un_turno_sin_efecto_no_antepone_filas_a_la_respuesta_reescrita(
+        conn, corework, monkeypatch):
+    """El turno leyó tareas pero además intentó un cambio que no se aplicó: la
+    respuesta es el aviso "sin cambios", no una lista."""
+    from prisma.agente import NoProponer
+    from prisma.salida import NO_EFFECT_STATUS
+    ws = corework.workspace_id
+    tid = _dos_tareas(conn, ws)
+    guion = [
+        Respuesta(llamadas=[
+            Llamada("c1", "consultar_tareas", {}),
+            Llamada("c2", "registrar_bloqueo",
+                    {"tarea_id": tid, "causa": "falta el switch"})]),
+        Respuesta(texto="Listo, quedó registrado."),
+        Respuesta(texto="No se hizo ningún cambio.")]
+
+    r = _turno_con_guion(conn, ws, monkeypatch, guion, no_proponer=NoProponer(
+        "registrar_bloqueo", "tarea_id", tid, dejado="el bloqueo"))
+
+    assert r.texto == f"No se hizo ningún cambio\n\n{NO_EFFECT_STATUS}"
+
+
+def test_un_turno_que_termina_en_vista_previa_no_recibe_filas(
+        conn, corework, monkeypatch):
+    ws = corework.workspace_id
+    tid = _dos_tareas(conn, ws)
+    guion = [
+        Respuesta(llamadas=[Llamada("c1", "consultar_tareas", {})]),
+        Respuesta(llamadas=[Llamada("c2", "actualizar_estado",
+                                    {"tarea_id": tid, "estado": "en_curso"})]),
+        Respuesta(texto="Listo.")]
+
+    r = _turno_con_guion(conn, ws, monkeypatch, guion)
+
+    assert r.confirmaciones == ["actualizar_estado"]
+    assert r.texto == ""
+
+
+def test_un_turno_que_ofrece_opciones_no_recibe_filas(conn, corework, monkeypatch):
+    ws = corework.workspace_id
+    _dos_tareas(conn, ws)
+    guion = [
+        Respuesta(llamadas=[Llamada("c1", "consultar_tareas", {})]),
+        Respuesta(texto="Tenés dos tareas.", llamadas=[Llamada(
+            "c2", "ofrecer_opciones", {
+                "pregunta": "¿Cuál preferís?",
+                "opciones": [{"texto": "Cablear tablero"},
+                             {"texto": "Revisar variador"}]})])]
+
+    r = _turno_con_guion(conn, ws, monkeypatch, guion)
+
+    assert r.elecciones == ["ofrecer_opciones"]
+    assert r.texto == "Tenés dos tareas."
+
+
+def test_un_turno_que_no_cierra_no_recibe_filas(conn, corework, monkeypatch):
+    from prisma.agente import INCOMPLETO, MAX_VUELTAS
+    ws = corework.workspace_id
+    _dos_tareas(conn, ws)
+    guion = [Respuesta(texto="Sigo.", llamadas=[Llamada(f"c{n}", "consultar_tareas", {})])
+             for n in range(MAX_VUELTAS)]
+
+    r = _turno_con_guion(conn, ws, monkeypatch, guion)
+
+    assert r.texto == INCOMPLETO
+
+
+def test_un_turno_con_incidente_no_recibe_filas(conn, corework, monkeypatch):
+    from prisma.agente import DISCULPA
+    ws = corework.workspace_id
+    _dos_tareas(conn, ws)
+    guion = [Respuesta(llamadas=[Llamada("c1", "consultar_tareas", {})])]
+
+    class _Cae(type(_con_proveedor(monkeypatch, []))):
+        def responder(self, sistema, mensajes, herramientas):
+            if len(self.recibidos) >= 1:
+                raise RuntimeError("el proveedor no respondió")
+            return super().responder(sistema, mensajes, herramientas)
+
+    proveedor = _Cae(guion=guion)
+    monkeypatch.setattr("prisma.llm.desde_base", lambda cur, ws, key: proveedor)
+    with espacio(conn, ws) as cur:
+        quien = _quien(cur, "Marcos Tarquini", ws)
+        r = responder(cur, quien, "qué tengo pendiente", proveedor,
+                      Calendario.desde_base(cur, ws), chat_id=1,
+                      ahora=datetime.now(timezone.utc))
+
+    assert r.texto == DISCULPA
+
+
+# ---------------------------------------------------------------------------
+# Coincidencia de títulos por título entero (revisión, 2)
+# ---------------------------------------------------------------------------
+
+def test_un_titulo_que_es_fragmento_de_otro_listado_no_se_da_por_nombrado():
+    filas = [_fila("Revisar variador", n=1), _fila("Revisar variador 2", n=2)]
+    salida = _nombrar_tareas_listadas("Sólo va bien Revisar variador 2.", filas)
+    assert salida.startswith("«Revisar variador» (asignada)\n\n")
+    assert "«Revisar variador 2»" not in salida
+
+
+def test_ambos_nombrados_no_agrega_nada_aunque_uno_contenga_al_otro():
+    filas = [_fila("Revisar variador", n=1), _fila("Revisar variador 2", n=2)]
+    texto = "Van Revisar variador 2 y también revisar variador."
+    assert _nombrar_tareas_listadas(texto, filas) == texto
+
+
+def test_un_titulo_dentro_de_otras_palabras_no_cuenta_como_nombrado():
+    fila = _fila("Cable")
+    salida = _nombrar_tareas_listadas("Hay que cablear el tablero.", [fila])
+    assert salida.startswith("«Cable» (asignada)")
+    salida = _nombrar_tareas_listadas("Falta el cable del tablero.", [fila])
+    assert salida == "Falta el cable del tablero."
+
+
+def test_un_titulo_vacio_no_cuenta_como_nombrado_ni_produce_fila():
+    filas = [_fila("", n=1), _fila("   ", n=2), _fila("Cablear tablero", n=3)]
+    salida = _nombrar_tareas_listadas("Tenés tres.", filas)
+    assert salida == "«Cablear tablero» (asignada)\n\nTenés tres."
+    assert _nombrar_tareas_listadas("Tenés una.", filas[:2]) == "Tenés una."
+
+
+def test_sobre_la_tarea_resuelta_exige_el_titulo_entero():
+    from prisma.agente import _nombrar_tareas_sin_mencionar
+    salida = _nombrar_tareas_sin_mencionar(
+        "Sólo va bien Revisar variador 2.",
+        {"a": "Revisar variador", "b": "Revisar variador 2"})
+    assert salida.startswith("Sobre «Revisar variador»:\n\n")
+    assert "Sobre «Revisar variador 2»" not in salida
+    salida = _nombrar_tareas_sin_mencionar(
+        "Va bien el revariador.", {"a": "variador"})
+    assert salida.startswith("Sobre «variador»:\n\n")
+    texto = "Sólo va bien Revisar variador."
+    assert _nombrar_tareas_sin_mencionar(texto, {"a": "Revisar variador"}) == texto
+    assert _nombrar_tareas_sin_mencionar(texto, {"a": ""}) == texto
+
+
+# ---------------------------------------------------------------------------
+# Las filas pasan por los mismos filtros de salida (revisión, 3) y el texto
+# vacío no deja un párrafo en blanco (revisión, 4)
+# ---------------------------------------------------------------------------
+
+def test_las_filas_del_servidor_pasan_por_el_glosario_de_salida(
+        conn, corework, monkeypatch):
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        _tarea(cur, ws, titulo="Revisar corelab", estado="asignada",
+               dias_para_vencer=1)
+    conn.commit()
+
+    r = _responder(conn, ws, monkeypatch, "Tenés 1 tarea abierta.")
+
+    assert r.texto == "«Revisar CoreLabs» (asignada)\n\nTenés 1 tarea abierta."
+
+
+def test_un_texto_vacio_no_deja_un_parrafo_en_blanco():
+    assert _nombrar_tareas_listadas("", [_fila("Cablear tablero")]) == \
+        "«Cablear tablero» (asignada)"
