@@ -23,7 +23,7 @@ from prisma.salida import (BUTTON_LABEL_LIMIT, BUTTON_TEXT_LIMIT,
                              TELEGRAM_TEXT_LIMIT, TRUNCAR_ETIQUETA_BOTON,
                              NO_EFFECT_STATUS, PayloadValidationError,
                              acortar_etiqueta_boton, con_icono, costo_icono,
-                             enqueue_outbox, etiqueta_sin_icono,
+                             enqueue_outbox, etiqueta_sin_icono, etiquetas_de_tarea,
                              etiquetas_boton_distinguibles,
                              etiquetas_coinciden, normalize_visible_text,
                              prepare_buttons, prepare_payload,
@@ -299,7 +299,8 @@ def test_acortar_etiqueta_boton_es_seguro_para_prepare_buttons_con_acentos():
 
 
 def test_etiquetas_boton_distinguibles_extiende_las_que_colisionan():
-    titulos = ["Revisar tablero de la máquina 3", "Revisar tablero de la máquina 4"]
+    titulos = ["Revisar tablero de la línea de producción 3",
+               "Revisar tablero de la línea de producción 4"]
     cortas_sin_distinguir = [acortar_etiqueta_boton(t) for t in titulos]
     assert cortas_sin_distinguir[0] == cortas_sin_distinguir[1]     # colisionan
 
@@ -308,6 +309,25 @@ def test_etiquetas_boton_distinguibles_extiende_las_que_colisionan():
     assert len(set(distinguidas)) == 2
     assert distinguidas[0] != distinguidas[1]
     assert "3" in distinguidas[0] and "4" in distinguidas[1]
+
+
+def test_un_titulo_ordinario_entra_entero_en_su_boton():
+    """R4-H4 (decisión del usuario, 2026-09-30): los botones de lista cortaban
+    "Dashboard de lotes…" aunque el título entero entraba de sobra. Con el
+    objetivo de 40 caracteres un título ordinario sale entero, con su ícono."""
+    titulo = "Dashboard de lotes de producción"
+
+    assert len(titulo) < OBJETIVO_ETIQUETA_BOTON - costo_icono(ICONO_TAREA)
+    assert etiquetas_de_tarea([titulo]) == [f"📋 {titulo}"]
+
+
+def test_los_titulos_ordinarios_siguen_siendo_distinguibles_entre_si():
+    titulos = ["Dashboard de lotes de producción", "Dashboard de lotes de calidad"]
+
+    etiquetas = etiquetas_de_tarea(titulos)
+
+    assert etiquetas == [f"📋 {t}" for t in titulos]
+    assert len(set(etiquetas)) == 2
 
 
 def test_etiquetas_boton_distinguibles_no_toca_las_que_no_colisionan():
@@ -341,9 +361,12 @@ def test_etiquetas_boton_distinguibles_respeta_etiquetas_fijas_como_obstaculo():
     ("Cambiar switch industrial de la línea dos", "Cambiar switch industrial…"),
 ])
 def test_acortar_etiqueta_boton_no_termina_en_palabra_de_funcion(largo, esperado):
-    assert len(largo) > OBJETIVO_ETIQUETA_BOTON
+    # La regla de la palabra de función no depende del objetivo por omisión (que
+    # subió de 30 a 40, R4-H4): se prueba con el objetivo de los títulos de acá.
+    objetivo = 30
+    assert len(largo) > objetivo
 
-    corta = acortar_etiqueta_boton(largo)
+    corta = acortar_etiqueta_boton(largo, objetivo=objetivo)
 
     assert corta == esperado
     ultima_palabra = corta[:-1].rstrip().rsplit(" ", 1)[-1].casefold()

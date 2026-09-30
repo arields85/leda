@@ -31,12 +31,16 @@ TRUNCAR_ETIQUETA_BOTON = 48
 # teléfono chico). Un botón inline de Telegram ocupa el ancho disponible del
 # chat; en una pantalla angosta de referencia (iPhone SE, ~320pt de ancho) el
 # texto del botón, con su padding, entra sin ajustar renglón hasta unos
-# 28-32 caracteres con la tipografía de sistema que usa Telegram -- 30 queda
-# en el medio de ese rango, con margen de sobra para acentos y mayúsculas
-# más anchas. Bastante más chico que `TRUNCAR_ETIQUETA_BOTON` (48, el corte
-# duro histórico, ahora sólo el último recurso cuando ni una palabra entera
-# entra en el objetivo).
-OBJETIVO_ETIQUETA_BOTON = 30
+# 28-32 caracteres con la tipografía de sistema que usa Telegram. Ese cálculo
+# a ojo quedó corto (R4-H4, cuarta ronda por Telegram, 2026-09-30): con 30 el
+# botón cortaba "Dashboard de lotes…" aunque el título entero entraba de sobra en
+# el teléfono real del usuario. Se sube a 40 -- menos que el corte duro de 48
+# (`TRUNCAR_ETIQUETA_BOTON`, el último recurso cuando ni una palabra entera entra)
+# y que el tope técnico de 80 (`BUTTON_LABEL_LIMIT`) --, así que un título
+# ordinario sale entero y sólo el largo de verdad se corta, en un límite de
+# palabra. Los botones siguen siendo distinguibles: los que colisionan crecen
+# palabra por palabra (`etiquetas_boton_distinguibles`).
+OBJETIVO_ETIQUETA_BOTON = 40
 # Iconos de botón (decisión del usuario, 2026-09-28, pack 06 §6: "función,
 # no decoración"). Única fuente de la verdad de qué ícono le corresponde a
 # cada categoría de botón -- nunca repetido en cada módulo que arma botones.

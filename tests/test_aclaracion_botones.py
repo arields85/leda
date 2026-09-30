@@ -187,7 +187,11 @@ def test_botones_propia_primero_ajena_con_nombre_y_titulo_truncado(
 
     Adaptación 2 (hallazgo 7, sesión 2 por Telegram, 2026-09-27): el corte de
     palabra tampoco puede dejar una palabra de función ("la") justo antes de
-    la elipsis -- "Actualizar toda la…" pasa a "Actualizar toda…"."""
+    la elipsis -- "Actualizar toda la…" pasa a "Actualizar toda…".
+
+    Adaptación 3 (R4-H4, decisión del usuario, 2026-09-30): el objetivo pasó de
+    30 a 40 caracteres, así que un título ordinario entra entero y sólo el largo
+    de verdad se corta, en el mismo límite de palabra."""
     ws = corework.workspace_id
     titulo_largo = "Actualizar toda la documentación técnica del área completa"
     assert len(titulo_largo) > gateway.TRUNCAR_TITULO_BOTON
@@ -216,10 +220,9 @@ def test_botones_propia_primero_ajena_con_nombre_y_titulo_truncado(
     etiquetas = [f["etiqueta"] for f in filas]
     valores = [f["valor"] for f in filas]
 
-    corto = acortar_etiqueta_boton(titulo_largo)
-    # Límite de palabra, no de carácter, y sin dejar "la" (palabra de función)
-    # justo antes de la elipsis (hallazgo 7).
-    assert corto == "Actualizar toda…"
+    # Límite de palabra, no de carácter: el título largo se corta (con el sufijo del
+    # responsable, que cuenta hacia el mismo presupuesto), el ordinario no.
+    corto = "Actualizar toda la documentación…"
     assert etiquetas == [con_icono("Programar PLC", ICONO_TAREA),
                         con_icono("Cablear tablero máq. 3 — Mariano", ICONO_TAREA),
                         con_icono(f"{corto} — Mariano", ICONO_TAREA),

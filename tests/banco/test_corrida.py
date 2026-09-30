@@ -952,14 +952,12 @@ def test_ejecutar_escenario_aclaracion_tapea_la_candidata_elegida_sin_aplicar_na
     )
 
     # Adaptación deliberada (hallazgo 2, sesión 2 por Telegram): la
-    # aclaración con botones (`_SENTINEL_ACLARACION`) ahora arma la etiqueta
-    # con `salida.acortar_etiqueta_boton` (límite de palabra, objetivo ~30),
-    # no con el título completo -- acá los dos títulos superan el objetivo y
-    # su "(simulado)" queda afuera, igual que en una corrida real (el propio
-    # hallazgo del usuario: "los títulos de sesión terminan en
-    # '(simulado)', el corte por palabra normalmente lo deja afuera").
-    etiqueta_a = "Cablear tablero máq. 3…"
-    etiqueta_b = "Revisar tablero máq. 4…"
+    # aclaración con botones (`_SENTINEL_ACLARACION`) arma la etiqueta con
+    # `salida.acortar_etiqueta_boton` (límite de palabra, objetivo 40 desde R4-H4,
+    # 2026-09-30), no con el título completo -- acá los dos títulos (33 caracteres)
+    # entran enteros con su "(simulado)".
+    etiqueta_a = "Cablear tablero máq. 3 (simulado)"
+    etiqueta_b = "Revisar tablero máq. 4 (simulado)"
     r = ejecutar_escenario(
         conn, ws, "corework", "Marcos Tarquini",
         ["ya termine lo del tablero, pasala a revision"], interno,

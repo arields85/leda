@@ -32,8 +32,8 @@ from prisma.calendario import Calendario
 from prisma.db import admin, espacio
 from prisma.llm import Llamada, ProveedorGuionado, Respuesta
 from prisma.salida import (BUTTON_TEXT_LIMIT, ICONO_TAREA, con_icono,
-                           etiqueta_sin_icono, etiquetas_boton_distinguibles,
-                           telegram_utf16_units)
+                           etiqueta_de_accion_menu, etiqueta_sin_icono,
+                           etiquetas_boton_distinguibles, telegram_utf16_units)
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -192,8 +192,8 @@ def test_lista_de_hasta_cuatro_tareas_arma_botones_y_tocar_una_abre_el_menu(
     etiquetas_menu = [f["etiqueta"] for f in menu_filas]
     # Responsable, "asignada": el menú de §4.6 -- prueba que de verdad se
     # abrió el menú de T2, no que se retomó la conversación con el modelo.
-    assert con_icono("Ver detalle", ICONO_TAREA) in etiquetas_menu
-    assert con_icono("Empezar", ICONO_TAREA) in etiquetas_menu
+    assert etiqueta_de_accion_menu("ver_detalle", "Ver detalle") in etiquetas_menu
+    assert etiqueta_de_accion_menu("empezar", "Empezar") in etiquetas_menu
 
 
 # ---------------------------------------------------------------------------
