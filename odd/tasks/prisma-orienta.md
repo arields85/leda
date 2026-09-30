@@ -5148,3 +5148,13 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   cuarto intento (los tres primeros fallaron por `529 Overloaded` del proveedor); frontera en
   `8fc0bf5`. Cuatro observaciones sobre la calidad de las pruebas del barrido, sin efecto en
   el comportamiento: a T9-H19i, después de la ronda.
+
+- 2026-09-30: **Cierre de la sesión — punto exacto para retomar.** Todo el código de la
+  sesión con revisión RDD aprobada y reconocida (frontera `8fc0bf5`); suite completa 2179
+  passed, 309 deselected; banco real completo 98/100. Base local rearmada para T11 con datos
+  ficticios nuevos. **Próximo:** T11 cuando el usuario vuelva: `pg_isready` (o `pg_ctl`
+  tras reiniciar Windows), Ariel le escribe una vez al bot de administración, arrancar
+  `python -m prisma escuchar corework`, guion A/B/C de arriba. Después de la ronda: las
+  consultas abiertas (T9-R1c-5, T9-R5, T9-H19c, T10-6, T10-7), T9-H19i y los pendientes
+  menores (índice de `inbound_message`, relojes de `despachador` y `contexto`). `main` sin
+  push (lo decide el usuario).

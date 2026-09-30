@@ -210,6 +210,13 @@ deja incidente si un turno murió; todo recibo con el reloj de la base). Suite c
 passed, 309 deselected. Banco real completo (n=1) después de T10-5: 98/100 (`b-0013` espera
 la regla T9-R5; `b-0020` pasó al repetirlo).
 
+**Para arrancar la cuarta ronda (T11), en este orden:** (1) si se reinició Windows, levantar
+PostgreSQL con `pg_ctl` (`PRUEBA-LOCAL.md`) y comprobar `pg_isready`; (2) desde la cuenta de
+Ariel, escribirle una vez al bot de administración (la base es nueva y no conoce ese chat);
+(3) arrancar `python -m prisma escuchar corework`; (4) seguir el guion de
+`odd/tasks/prisma-orienta.md` (circuitos A, B y C). El usuario maneja todas las cuentas de
+prueba.
+
 **Esperan al usuario:** T9-R1c-5 (si quien confirma cancela el borrador, ¿se le avisa a quien
 pidió?), T9-R5 (regla nueva: no preguntar dos veces "¿A cuál te referís?" con las mismas
 candidatas en un mismo mensaje), T9-H19c (¿qué hace Prisma con un mensaje editado?), T10-6
