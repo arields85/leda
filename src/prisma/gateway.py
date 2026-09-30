@@ -934,6 +934,15 @@ def _seguir_resuelta(cur, quien, workspace_id: str, chat_id: int, token: str,
                         texto = (f"Listo: aprobaste «{titulo}»; para cerrarla "
                                  f"todavía: {resultado.get('falta')}")
                     _responder(cur, workspace_id, chat_id, quien, texto, ahora)
+                elif (resuelta.herramienta == "adjuntar_evidencia"
+                      and isinstance(resultado, dict)
+                      and resultado.get("evidencia_id")):
+                    # ADR 0013 regla 3 (H20): la evidencia quedó registrada, pero
+                    # la tarea sigue donde estaba -- se lee su estado real y se
+                    # dice, con la entrega como opción si de verdad se puede.
+                    _responder_evidencia_registrada(
+                        cur, quien, workspace_id, chat_id,
+                        resuelta.args.get("tarea_id"), ahora)
                 elif (resuelta.herramienta == "actualizar_estado"
                       and isinstance(resultado, dict) and "estado" in resultado):
                     # Mismo hallazgo: acá decía "... Estado actual:
@@ -964,6 +973,51 @@ def _seguir_resuelta(cur, quien, workspace_id: str, chat_id: int, token: str,
                               f"Hecho. {prep_capturada['cambio']}", ahora)
                 else:
                     _responder(cur, workspace_id, chat_id, quien, "Hecho.", ahora)
+
+
+def _responder_evidencia_registrada(cur, quien, workspace_id: str, chat_id: int,
+                                    tarea_id, ahora) -> None:
+    """La respuesta a una evidencia registrada (ADR 0013 regla 3, H20): dice cómo
+    quedó la tarea (su estado vigente, leído de la base) y qué falta. Sobre una
+    tarea todavía sin entregar, la entrega es un botón -- el mismo del menú de la
+    tarea, sólo si el menú lo ofrece hoy --, nunca algo que se haga sola: la
+    entrega sigue siendo explícita. Redacción pendiente de revisión de voz en T10."""
+    from . import herramientas as H
+    from . import menu_tarea as M
+    from . import pendientes as P
+    from .agente import VIGENCIA_PENDIENTE
+
+    menu = M.calcular_menu(cur, quien, tarea_id) if tarea_id else None
+    if menu is None:
+        _responder(cur, workspace_id, chat_id, quien,
+                   "La evidencia quedó registrada.", ahora)
+        return
+    estado = H._estado_legible(menu.estado).lower()
+    entregable = next((a for a in menu.acciones if a.codigo == "terminar"), None)
+    if menu.estado == "en_revision":
+        texto = (f"La evidencia quedó registrada en «{menu.titulo}». La tarea "
+                 "sigue en revisión.")
+    elif entregable is not None:
+        texto = (f"La evidencia quedó registrada en «{menu.titulo}». La tarea "
+                 f"sigue {estado}: todavía no la entregaste, así que nadie la "
+                 "puede revisar.")
+    else:
+        texto = (f"La evidencia quedó registrada en «{menu.titulo}». La tarea "
+                 f"está {estado}.")
+    if entregable is None:
+        _responder(cur, workspace_id, chat_id, quien, texto, ahora)
+        return
+    p = P.registrar(
+        cur, quien, herramienta=P.SENTINEL_MENU_TAREA,
+        args={"tarea_id": menu.tarea_id, "titulo": menu.titulo}, resumen=texto,
+        vence_en=ahora + VIGENCIA_PENDIENTE, campo="eleccion", chat_id=chat_id,
+        opciones=[(con_icono(entregable.etiqueta, ICONO_TAREA),
+                   {"accion": entregable.codigo})])
+    enqueue_outbox(
+        cur, workspace_id=workspace_id, chat_id=chat_id,
+        recipient_membership_id=quien.membership_id, text=p.resumen,
+        scheduled_for=ahora, dedupe_key=f"{workspace_id}:evidencia-registrada:{p.id}",
+        is_response=True, pending_action_id=p.id)
 
 
 def _resolver_toque_borrador(conn, authority_conn, workspace_id, token,

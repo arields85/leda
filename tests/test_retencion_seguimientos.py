@@ -186,14 +186,17 @@ def test_una_vista_previa_que_ya_no_es_la_vigente_se_descarta_y_no_se_cuenta(
     conn.commit()
 
     resumen, transporte = _despachar_alta(conn, ws)
-    assert transporte.enviados == [] and resumen["retenidos"] == 2   # control y vista previa
+    assert [e for e in transporte.enviados if e.chat_id == tg] == []
+    assert resumen["retenidos"] == 2                       # control y vista previa
 
     with admin(conn) as cur:                           # el borrador se cancela
         cur.execute("update pending_action set estado = 'cancelada' where id = %s",
                     (pid,))
     resumen, transporte = _despachar_alta(conn, ws)
 
-    assert transporte.enviados == []
+    # A quien pidió el borrador sí le sale su respuesta (T9-R3): el aviso de
+    # quién lo confirma. Lo que no sale es lo dirigido a Morgan.
+    assert [e for e in transporte.enviados if e.chat_id == tg] == []
     assert resumen["descartados"] == 1 and resumen["retenidos"] == 1
     with admin(conn) as cur:
         cur.execute("select estado from message_outbox where pending_action_id = %s",
@@ -222,7 +225,7 @@ def test_el_reloj_de_la_pasada_decide_la_vigencia_de_la_vista_previa_y_su_conteo
 
     resumen, transporte = _despachar_alta(conn, ws, ahora)
 
-    assert transporte.enviados == []
+    assert [e for e in transporte.enviados if e.chat_id == tg] == []
     assert resumen["descartados"] == 1 and resumen["retenidos"] == 1   # sólo el control
     with admin(conn) as cur:
         cur.execute("select estado from message_outbox where pending_action_id = %s",

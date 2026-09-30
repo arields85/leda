@@ -30,6 +30,11 @@ from .herramientas import _estado_legible
 # la salida").
 MAX_CANDIDATAS_DEPENDENCIA = 4
 
+# Cuánto del motivo de "Pedir cambios" entra en una lectura de la tarea: comparte
+# el mensaje con los botones (límite de Telegram), así que un motivo muy largo se
+# acorta en vez de dejar la lectura sin salir.
+LIMITE_MOTIVO_CAMBIOS = 300
+
 
 @dataclass(frozen=True)
 class AccionMenu:
@@ -45,6 +50,9 @@ class MenuTarea:
     relacion: str      # "responsable" | "aprobador" | "otra"
     responsable_nombre: str | None
     acciones: list[AccionMenu]
+    # "Cambios pedidos por X: motivo" mientras la tarea espera la nueva entrega
+    # (T9-R3, H16); `None` si no hay un pedido vigente.
+    cambios_pedidos: str | None = None
 
 
 def _tarea_para_menu(cur: psycopg.Cursor, tarea_id: str) -> dict | None:
@@ -154,7 +162,8 @@ def calcular_menu(cur: psycopg.Cursor, quien: Solicitante,
 
     return MenuTarea(tarea_id=str(tarea_id), titulo=fila["titulo"], estado=estado,
                      relacion=relacion, responsable_nombre=fila["responsable_nombre"],
-                     acciones=acciones)
+                     acciones=acciones,
+                     cambios_pedidos=cambios_pedidos(cur, tarea_id))
 
 
 def encabezado_menu(menu: MenuTarea) -> str:
@@ -169,7 +178,36 @@ def encabezado_menu(menu: MenuTarea) -> str:
     persona."""
     quien = "tuya" if menu.relacion == "responsable" else (
         menu.responsable_nombre or "sin asignar")
-    return f"«{menu.titulo}» · {quien} · {_estado_legible(menu.estado)}"
+    encabezado = f"«{menu.titulo}» · {quien} · {_estado_legible(menu.estado)}"
+    if menu.cambios_pedidos:
+        encabezado += f"\n{menu.cambios_pedidos}"
+    return encabezado
+
+
+def cambios_pedidos(cur: psycopg.Cursor, tarea_id: str) -> str | None:
+    """El motivo vigente de "Pedir cambios" (T9-R3, ADR 0013 regla 3, H16): lo que
+    falta en la tarea se ve en toda lectura de ella, no sólo en el aviso que se
+    mandó. Vigente = el último `rechazado` de la tarea mientras ésta esté por
+    hacerse (`asignada`/`en_curso`): "Pedir cambios" es lo único que la devuelve
+    a ese estado desde la revisión, y la nueva entrega la vuelve a `en_revision`,
+    que cierra el pedido. Una línea lista para mostrar; `None` si no hay pedido
+    vigente."""
+    cur.execute(
+        """select a.comentario, i.nombre
+             from approval a
+             join task t on t.id = a.sujeto_id
+             left join integrante i on i.membership_id = a.aprobador_membership_id
+            where a.sujeto_tipo = 'tarea' and a.sujeto_id = %s
+              and a.decision = 'rechazado' and t.estado in ('asignada', 'en_curso')
+            order by a.at desc limit 1""", (tarea_id,))
+    fila = cur.fetchone()
+    motivo = " ".join((fila["comentario"] or "").split()) if fila else ""
+    if not motivo:
+        return None
+    if len(motivo) > LIMITE_MOTIVO_CAMBIOS:
+        motivo = motivo[:LIMITE_MOTIVO_CAMBIOS - 1].rstrip() + "…"
+    quien = f" por {fila['nombre']}" if fila["nombre"] else ""
+    return f"Cambios pedidos{quien}: {motivo}"
 
 
 def bloqueos_abiertos(cur: psycopg.Cursor, tarea_id: str) -> list[dict]:
@@ -252,6 +290,9 @@ def detalle_tarea(cur: psycopg.Cursor, tarea_id: str, *,
     if fila["criterio_aceptacion"]:
         lineas.append(f"Criterio de aceptación: {fila['criterio_aceptacion']}")
     lineas.append(f"Aprobador: {fila['aprobador_nombre'] or 'sin definir'}")
+    pedidos = cambios_pedidos(cur, tarea_id)
+    if pedidos:
+        lineas.append(pedidos)
 
     bloqueos = bloqueos_abiertos(cur, tarea_id)
     if bloqueos:
