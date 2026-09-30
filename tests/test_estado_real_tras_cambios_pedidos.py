@@ -267,3 +267,63 @@ def test_un_motivo_largo_dicho_entero_no_se_repite(corework, conn):
                   {ids["t1"]: "Dashboard de lotes"})
 
     assert "Cambios pedidos por" not in fila["cuerpo"]
+
+
+# ---------------------------------------------------------------------------
+# 5. Idempotencia y bordes de la guarda (revisión review-167e3c98261bbc91)
+# ---------------------------------------------------------------------------
+
+def _guarda(conn, ws, claras, texto):
+    from prisma.agente import _cambios_pedidos_sin_mencionar
+
+    with espacio(conn, ws) as cur:
+        return _cambios_pedidos_sin_mencionar(cur, texto, claras)
+
+
+def test_aplicar_la_guarda_dos_veces_con_un_motivo_largo_da_lo_mismo(corework, conn):
+    """La línea que agrega lleva el motivo acotado con puntos suspensivos: la
+    segunda aplicación tiene que reconocerla, no agregarla otra vez."""
+    from prisma.menu_tarea import LIMITE_MOTIVO_CAMBIOS
+
+    ws = corework.workspace_id
+    motivo = "falta el detalle de la captura " * 20
+    assert len(motivo) > LIMITE_MOTIVO_CAMBIOS
+    ids = _sembrar_pedido(conn, ws, titulo="Dashboard de lotes", motivo=motivo)
+    claras = {ids["t1"]: "Dashboard de lotes"}
+
+    una = _guarda(conn, ws, claras, FALSO)
+    dos = _guarda(conn, ws, claras, una)
+
+    assert "Cambios pedidos por Marcos Tarquini" in una
+    assert dos == una
+
+
+def test_aplicar_la_guarda_dos_veces_con_el_titulo_dentro_del_motivo_da_lo_mismo(
+        corework, conn):
+    ws = corework.workspace_id
+    ids = _sembrar_pedido(conn, ws, titulo="Dashboard de lotes",
+                          motivo="el Dashboard de lotes no muestra el turno noche")
+    claras = {ids["t1"]: "Dashboard de lotes"}
+
+    una = _guarda(conn, ws, claras, FALSO)
+    dos = _guarda(conn, ws, claras, una)
+
+    assert "Cambios pedidos por Marcos Tarquini" in una
+    assert dos == una
+
+
+def test_quien_pidio_los_cambios_con_un_nombre_en_blanco_no_rompe_la_guarda(
+        monkeypatch):
+    from prisma import menu_tarea
+    from prisma.agente import _cambios_pedidos_sin_mencionar
+
+    pedido = menu_tarea.CambiosPedidos(
+        motivo=MOTIVO, linea=f"Cambios pedidos por    : {MOTIVO}", por="   ",
+        completo=MOTIVO)
+    monkeypatch.setattr(menu_tarea, "cambios_pedidos_vigentes",
+                        lambda cur, tarea_id: pedido)
+
+    salida = _cambios_pedidos_sin_mencionar(
+        None, "«Dashboard de lotes» sigue en curso.", {"t1": "Dashboard de lotes"})
+
+    assert MOTIVO in salida

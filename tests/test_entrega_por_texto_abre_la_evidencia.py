@@ -135,3 +135,109 @@ def test_otro_rechazo_no_abre_la_pregunta_de_evidencia(
         cur.execute("select count(*) n from pending_action where workspace_id = %s "
                     "and herramienta = %s", (ws, P.SENTINEL_DATO_MENU_TAREA))
         assert cur.fetchone()["n"] == 0
+
+
+# ---------------------------------------------------------------------------
+# Revisión review-167e3c98261bbc91: la evidencia puede venir en el mismo mensaje
+# ---------------------------------------------------------------------------
+
+def _entregar_con(tid, evidencia):
+    return Respuesta(llamadas=[Llamada("c2", "actualizar_estado", {
+        "tarea_id": tid, "estado": "en_revision", "evidencia_texto": evidencia})])
+
+
+def _hay_pendiente(conn, ws, herramienta: str, tg: int) -> bool:
+    with admin(conn) as cur:
+        cur.execute("select 1 from pending_action where workspace_id = %s and "
+                    "herramienta = %s and chat_id = %s and estado = 'esperando'",
+                    (ws, herramienta, tg))
+        return cur.fetchone() is not None
+
+
+def test_con_un_enlace_en_el_mensaje_el_modelo_puede_reintentar_con_la_evidencia(
+        cliente, conn, corework, monkeypatch):
+    """El mensaje trae un enlace (entidad `url`) y el modelo, en su primera llamada,
+    la omitió: el rechazo no corta el turno, el modelo reintenta con la evidencia y
+    la persona llega a la vista previa sin que se le pida reenviarla."""
+    from tests.test_evidencia_con_enlace_va_a_la_vista_previa import _con_entidades
+
+    ws = corework.workspace_id
+    tid, tg = _escenario(conn, ws)
+    proveedor = _guion(
+        monkeypatch, _entregar(tid),
+        _entregar_con(tid, "https://ejemplo.test/tablero"),
+        Respuesta(texto="Listo, mirá la vista previa."))
+    texto = "entrego la tarea: https://ejemplo.test/tablero"
+
+    assert _con_entidades(cliente, tg, texto, [
+        {"type": "url", "offset": 20, "length": 28}]).status_code == 200
+
+    assert len(proveedor.recibidos) >= 2
+    assert _hay_pendiente(conn, ws, "actualizar_estado", tg)
+    assert not _hay_pendiente(conn, ws, P.SENTINEL_DATO_MENU_TAREA, tg)
+    salidas = _salidas(conn, ws, tg)
+    assert not any(gateway.PREGUNTA_DATO_EVIDENCIA_ENTREGA in s["cuerpo"]
+                   for s in salidas), [s["cuerpo"] for s in salidas]
+
+
+def test_con_un_enlace_si_el_modelo_no_reintenta_igual_se_pide_la_evidencia(
+        cliente, conn, corework, monkeypatch):
+    """Si al final del turno el único resultado sigue siendo el rechazo por falta de
+    evidencia, se abre la pregunta de siempre."""
+    from tests.test_evidencia_con_enlace_va_a_la_vista_previa import _con_entidades
+
+    ws = corework.workspace_id
+    tid, tg = _escenario(conn, ws)
+    _guion(monkeypatch, _entregar(tid), Respuesta(texto="Falta la evidencia."))
+
+    assert _con_entidades(cliente, tg, "entrego la tarea, mirá https://x.test", [
+        {"type": "url", "offset": 26, "length": 14}]).status_code == 200
+
+    salidas = _salidas(conn, ws, tg)
+    assert len(salidas) == 1, [s["cuerpo"] for s in salidas]
+    assert gateway.PREGUNTA_DATO_EVIDENCIA_ENTREGA in salidas[0]["cuerpo"]
+    assert _hay_pendiente(conn, ws, P.SENTINEL_DATO_MENU_TAREA, tg)
+
+
+def test_sin_enlace_se_corta_en_la_primera_vuelta(
+        cliente, conn, corework, monkeypatch):
+    """Sin la señal estructural se conserva el corte temprano: una sola vuelta del
+    modelo y la pregunta de evidencia."""
+    ws = corework.workspace_id
+    tid, tg = _escenario(conn, ws)
+    proveedor = _guion(monkeypatch, _entregar(tid),
+                       _entregar_con(tid, "algo"), Respuesta(texto="Listo."))
+
+    assert _mensaje(cliente, tg, "quiero entregar la tarea").status_code == 200
+
+    assert len(proveedor.recibidos) == 1
+    assert _hay_pendiente(conn, ws, P.SENTINEL_DATO_MENU_TAREA, tg)
+    assert not _hay_pendiente(conn, ws, "actualizar_estado", tg)
+
+
+def test_un_rechazo_por_evidencia_mezclado_con_otro_no_se_convierte_en_la_pregunta(
+        cliente, conn, corework, monkeypatch):
+    """Si otra llamada `actualizar_estado` del mismo turno se rechazó por otro motivo
+    (una tarea que no es de la persona), esa causa no puede quedar sin decirse: el
+    turno sigue el camino de siempre, que informa que no se aplicó nada."""
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        propia = _tarea(cur, ws)
+        ajena = _tarea(cur, ws, titulo="Reporte semanal", persona="Marcos Tarquini")
+        tg = _tg(cur, "Nahuel Gimenez")
+    conn.commit()
+    _guion(monkeypatch,
+           Respuesta(llamadas=[
+               Llamada("c1", "actualizar_estado",
+                       {"tarea_id": propia, "estado": "en_revision"}),
+               Llamada("c2", "actualizar_estado",
+                       {"tarea_id": ajena, "estado": "en_revision"})]),
+           Respuesta(texto="No pude entregar ninguna."),
+           Respuesta(texto="No pude entregar ninguna."))
+
+    assert _mensaje(cliente, tg, "entrego las dos").status_code == 200
+
+    assert not _hay_pendiente(conn, ws, P.SENTINEL_DATO_MENU_TAREA, tg)
+    salidas = _salidas(conn, ws, tg)
+    assert len(salidas) == 1, [s["cuerpo"] for s in salidas]
+    assert gateway.PREGUNTA_DATO_EVIDENCIA_ENTREGA not in salidas[0]["cuerpo"]

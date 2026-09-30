@@ -1403,19 +1403,23 @@ def _turno(cur, quien, texto: str, workspace_id: str, chat_id: int,
             return
 
     _seguir_camino_normal(cur, quien, texto, route, proveedor, cal, chat_id,
-                          workspace_id, now, entrante_id)
+                          workspace_id, now, entrante_id, con_enlace=con_enlace)
 
 
 def _seguir_camino_normal(cur, quien, texto: str, route, proveedor, cal,
                           chat_id: int, workspace_id: str, ahora,
                           entrante_id: str | None, *, modificacion=None,
-                          no_proponer: dict | None = None) -> None:
+                          no_proponer: dict | None = None,
+                          con_enlace: bool = False) -> None:
     """El camino de siempre para un mensaje ya ruteado: resolver las
     referencias, y aclarar con botones, dar el alta guiada o responder.
 
     `no_proponer`, si viene, es lo que la persona acaba de dejar de lado
     (`_lo_dejado_de`): el responder no lo vuelve a proponer en este turno
-    (T9-R1d-1a-fix, banco b-0020-f: las instrucciones solas no alcanzan)."""
+    (T9-R1d-1a-fix, banco b-0020-f: las instrucciones solas no alcanzan).
+
+    `con_enlace`: el mensaje trae una entidad de enlace de Telegram; el agente no
+    corta el turno al primer rechazo por falta de evidencia (`agente.responder`)."""
     from .llm import IntentAction
 
     # Un saludo suelto es un comando cerrado del ruteo (R4-H1, R3-H8): el código
@@ -1446,6 +1450,7 @@ def _seguir_camino_normal(cur, quien, texto: str, route, proveedor, cal,
     estado = _estado_inicial_aclaracion(texto, entrante_id, route, referencias,
                                         modificacion)
     estado["no_proponer"] = no_proponer
+    estado["con_enlace"] = con_enlace
     _avanzar_aclaracion(cur, quien, workspace_id, chat_id, ahora, proveedor, cal,
                        estado)
 
@@ -1821,7 +1826,7 @@ def _atender_pregunta_pendiente(cur, quien, texto: str, abierta, proveedor, cal,
             return route
         _seguir_camino_normal(cur, quien, texto, route, proveedor, cal, chat_id,
                               workspace_id, ahora, entrante_id,
-                              modificacion=modificacion)
+                              modificacion=modificacion, con_enlace=con_enlace)
         return None
     if comando is RespectoPendiente.CORRIGE and pregunta.corrige_abre_selector:
         # Corregir el borrador ya armado (T9-R1c-3): lo mismo que tocar
@@ -2549,6 +2554,7 @@ def _estado_inicial_aclaracion(texto: str, entrante_id: str | None, route,
              "resumen": modificacion.resumen}
             if modificacion is not None else None),
         "no_proponer": None,
+        "con_enlace": False,
     }
 
 
@@ -2603,7 +2609,8 @@ def _avanzar_aclaracion(cur, quien, workspace_id: str, chat_id: int, ahora,
         _correr_agente(cur, quien, workspace_id, estado["mensaje"], proveedor, cal,
                       chat_id, ahora=ahora, entrante_id=estado["entrante_id"],
                  modificacion=modificacion, contexto_referencias=contexto,
-                 tareas_resueltas_claras=estado["titulos_resueltas"])
+                 tareas_resueltas_claras=estado["titulos_resueltas"],
+                 con_enlace=estado.get("con_enlace", False))
         return
 
     # b-0005: una referencia resuelta -- clara desde el arranque, o elegida
@@ -2622,7 +2629,8 @@ def _avanzar_aclaracion(cur, quien, workspace_id: str, chat_id: int, ahora,
                   chat_id, ahora=ahora, entrante_id=estado["entrante_id"],
              contexto_referencias=contexto,
              tareas_resueltas_claras=estado["titulos_resueltas"],
-             no_proponer=NoProponer(**guarda) if guarda else None)
+             no_proponer=NoProponer(**guarda) if guarda else None,
+             con_enlace=estado.get("con_enlace", False))
 
 
 def _correr_agente(cur, quien, workspace_id: str, texto: str, proveedor, cal,

@@ -81,7 +81,8 @@ def responder(cur: psycopg.Cursor, quien: Solicitante, texto_entrante: str,
               modificacion: P.ModificacionAbierta | None = None,
               contexto_referencias: str | None = None,
               tareas_resueltas_claras: dict[str, str] | None = None,
-              no_proponer: NoProponer | None = None) -> Resultado:
+              no_proponer: NoProponer | None = None,
+              con_enlace: bool = False) -> Resultado:
     """`modificacion`, si viene, es la propuesta anterior que la persona pidió
     corregir (T3, ADR 0005 decisión 1): se agrega al sistema como contexto de
     confianza del servidor, nunca como texto de la persona, para que el
@@ -121,7 +122,13 @@ def responder(cur: psycopg.Cursor, quien: Solicitante, texto_entrante: str,
     en el sistema, como contexto de confianza del servidor, qué se dejó de lado
     (`_bloque_dejado`): en este turno no lo ve en ningún otro lado, porque el
     aviso "dejé de lado" todavía no salió y el historial sólo cuenta lo
-    enviado (T9-R2b, banco real b-0021-i)."""
+    enviado (T9-R2b, banco real b-0021-i).
+
+    `con_enlace`: el mensaje trae una entidad de enlace de Telegram (`url` o
+    `text_link`, la misma señal estructural de `gateway._enlaces_del_mensaje`). La
+    evidencia de una entrega puede venir ya en el mensaje: un rechazo por falta de
+    ella no corta el turno, así el modelo puede reintentar con `evidencia_texto`.
+    Si al final el único resultado sigue siendo ese rechazo, se pide igual."""
     ahora = ahora or datetime.now(timezone.utc)
     ctx = construir(cur, quien, texto_entrante, ahora=ahora)
     sistema = ctx.sistema
@@ -221,11 +228,14 @@ def responder(cur: psycopg.Cursor, quien: Solicitante, texto_entrante: str,
                 # terminado para él).
                 texto_al_ofrecer = salida
             mensajes.append({"role": "user", "content": resultados})
-            if _evidencia_a_pedir(evidencia_faltante, intentos_mutacion, acciones,
-                                  confirmaciones, elecciones,
-                                  tareas_resueltas_claras) is not None:
+            if not con_enlace and _evidencia_a_pedir(
+                    evidencia_faltante, intentos_mutacion, acciones,
+                    confirmaciones, elecciones, tareas_resueltas_claras) is not None:
                 # La respuesta es la pregunta de evidencia (más abajo): otra
-                # vuelta sólo produciría un texto que se descarta.
+                # vuelta sólo produciría un texto que se descarta. Con un enlace
+                # en el mensaje no se corta: puede ser la evidencia que el
+                # modelo omitió, y reintentar cuesta una vuelta, no una
+                # pregunta de más a la persona.
                 break
             if (len(confirmaciones) + len(elegir_pendiente)
                     + len(opciones_pendientes)) > pendientes_antes:
@@ -362,15 +372,19 @@ def _evidencia_a_pedir(evidencia_faltante: list[str], intentos_mutacion: list[st
                        elecciones: list[str],
                        tareas_resueltas_claras: dict[str, str] | None) -> str | None:
     """La tarea a la que hay que pedirle la evidencia de la entrega, o `None`.
-    Sólo cuando el turno se resume en UN rechazo por falta de esa evidencia (el
+    Sólo cuando el turno se resume en rechazos por falta de esa evidencia (el
     motivo tipado, nunca el texto del modelo) sobre UNA tarea -- la herramienta
-    ya comprobó que es de la persona --, no dejó nada esperando ni ejecutó ningún
-    otro cambio, y la tarea no contradice a la que el turno resolvió como clara.
-    Cualquier otra combinación sigue el camino de siempre: no se adivina."""
+    ya comprobó que es de la persona --, y ése es el ÚNICO intento de cambio del
+    turno: ningún otro rechazado por otra causa (que quedaría sin decirse), nada
+    esperando ni ningún otro cambio ejecutado, y la tarea no contradice a la que
+    el turno resolvió como clara. Cualquier otra combinación sigue el camino de
+    siempre: no se adivina."""
     tareas = set(evidencia_faltante)
     if len(tareas) != 1 or confirmaciones or elecciones:
         return None
-    if set(intentos_mutacion) != {"actualizar_estado"}:
+    # Cada rechazo por evidencia es un intento de `actualizar_estado`: si hubo más
+    # intentos que rechazos por evidencia, otro se rechazó (o pasó) por su cuenta.
+    if len(intentos_mutacion) != len(evidencia_faltante):
         return None
     if any(not accion.startswith("consultar_") for accion in acciones):
         return None
@@ -706,12 +720,17 @@ def _cambios_pedidos_sin_mencionar(
     pedido = cambios_pedidos_vigentes(cur, tarea_id)
     if pedido is None:
         return texto
+    if _patron_de_frase(_normalizar_comparacion(pedido.linea)).search(
+            _normalizar_comparacion(texto)):
+        # Su propia línea (acotada, con el motivo entero dentro del título o con
+        # puntos suspensivos): reconocerla es lo que la hace idempotente.
+        return texto
     dicho = _sin_titulos(texto, tareas_resueltas_claras.values())
     motivo = _normalizar_comparacion(pedido.completo or pedido.motivo)
     motivo_dicho = bool(motivo) and _patron_de_frase(motivo).search(dicho)
     # Quien los pidió se nombra completo o por su nombre de pila.
     nombres = [_normalizar_comparacion(n) for n in
-               (pedido.por, (pedido.por or "").split()[0] if pedido.por else "")]
+               (pedido.por, *(pedido.por or "").split()[:1])]
     quien_dicho = not pedido.por or any(
         n and _patron_de_frase(n).search(dicho) for n in nombres)
     if motivo_dicho and quien_dicho:
