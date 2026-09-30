@@ -165,6 +165,9 @@ def test_accion_denegada_no_toca_la_base(corework, conn):
     guion = [
         Respuesta(llamadas=[Llamada("c1", "aprobar_tarea", {"tarea_id": tid})]),
         Respuesta(texto="Eso lo tiene que aprobar Marcos, que es el referente de OT."),
+        # T9-R3: un turno que intentó cambiar algo sin lograrlo reescribe su
+        # respuesta una vez, sabiendo qué no se ejecutó.
+        Respuesta(texto="Eso lo tiene que aprobar Marcos, que es el referente de OT."),
     ]
     with espacio(conn, ws) as cur:
         quien = _quien(cur, "Nahuel Gimenez", ws)
@@ -576,6 +579,7 @@ def test_rechazo_de_preparacion_no_bloquea_una_ejecucion_real_despues(
                                     {"origen_tarea_id": origen,
                                      "destino_tarea_id": id_inexistente})]),
         Respuesta(texto="Anoté la dependencia."),
+        Respuesta(texto="No se hizo ningún cambio en las dependencias."),
     ]
     with espacio(conn, ws) as cur:
         quien = _quien(cur, "Marcos Tarquini", ws)
@@ -588,7 +592,7 @@ def test_rechazo_de_preparacion_no_bloquea_una_ejecucion_real_despues(
         assert cur.fetchone()["n"] == 0
 
         # El modelo recibe la verdad: un error, no un "listo".
-        _, mensajes_recibidos = proveedor_rechazo.recibidos[-1]
+        _, mensajes_recibidos = proveedor_rechazo.recibidos[1]
         bloque_rechazo = mensajes_recibidos[-1]["content"][0]
         assert bloque_rechazo["is_error"] is True
 
@@ -731,10 +735,12 @@ def test_un_rechazo_sin_nada_pendiente_vuelve_al_modelo_para_explicarlo(
             "origen_tarea_id": origen,
             "destino_tarea_id": "00000000-0000-0000-0000-000000000000"})]),
         Respuesta(texto="No pude anotar esa dependencia: la tarea no existe."),
+        # La reescritura (T9-R3) sale con el mismo motivo.
+        Respuesta(texto="No pude anotar esa dependencia: la tarea no existe."),
     ]
     r, proveedor, cola = _turno_contando(conn, ws, guion)
 
-    assert len(proveedor.recibidos) == 2
+    assert len(proveedor.recibidos) == 3
     assert "la tarea no existe" in r.texto
     assert r.confirmaciones == [] and r.elecciones == []
 

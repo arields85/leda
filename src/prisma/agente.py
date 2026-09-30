@@ -176,6 +176,10 @@ def responder(cur: psycopg.Cursor, quien: Solicitante, texto_entrante: str,
                                 + len(opciones_pendientes))
             for c in r.llamadas:
                 if repite_lo_pendiente(c, no_proponer):
+                    # Un cambio que la guarda no dejó pasar también es un
+                    # intento sin efecto (T9-R3): la respuesta se comprueba.
+                    if _es_cambio(c):
+                        intentos_mutacion.append(c.nombre)
                     resultados.append(_rechazar_lo_pendiente(
                         cur, quien, c, ctx, no_proponer))
                     continue
@@ -191,7 +195,7 @@ def responder(cur: psycopg.Cursor, quien: Solicitante, texto_entrante: str,
                     resultados.append(_rechazar_segunda_pregunta(
                         cur, quien, c, ctx))
                     continue
-                if not c.nombre.startswith("consultar_"):
+                if _es_cambio(c):
                     intentos_mutacion.append(c.nombre)
                 resultados.append(
                     _ejecutar_una(cur, quien, c, ctx, acciones, confirmaciones,
@@ -249,8 +253,7 @@ def responder(cur: psycopg.Cursor, quien: Solicitante, texto_entrante: str,
             # es la pregunta -- así que no cuenta para "se intentó cambiar
             # algo y no se aplicó nada".
             intentos_reales = [n for n in intentos_mutacion if n != "ofrecer_opciones"]
-            if intentos_reales and not any(
-                    not accion.startswith("consultar_") for accion in acciones):
+            if _intento_sin_efecto(intentos_reales, acciones):
                 texto_opciones = with_no_effect_status(texto_opciones)
         if opciones_pendientes:
             # Se encola acá, recién ahora que se sabe si el resto del turno
@@ -275,14 +278,20 @@ def responder(cur: psycopg.Cursor, quien: Solicitante, texto_entrante: str,
         return Resultado(INCOMPLETO, acciones, confirmaciones,
                          incidente=True, elecciones=elecciones)
 
-    if not salida.strip():
+    sin_efecto = _intento_sin_efecto(intentos_mutacion, acciones)
+    if sin_efecto:
+        # Lo que dijo el modelo no se toma tal cual (T9-R3): se comprueba contra
+        # lo ejecutado, no contra las palabras que use.
+        salida = _reescribir_sin_afirmar_cambios(
+            cur, quien, proveedor, sistema, mensajes, esquemas, salida,
+            intentos_mutacion)
+    elif not salida.strip():
         salida = "Anotado."
 
     salida = normalize_visible_text(
         revisar_salida(salida, ctx.variantes_prohibidas))
     salida = _nombrar_tareas_sin_mencionar(salida, tareas_resueltas_claras)
-    if intentos_mutacion and not any(
-            not accion.startswith("consultar_") for accion in acciones):
+    if sin_efecto:
         salida = with_no_effect_status(salida)
     # T3 (ADR 0007 punto 3): el servidor, no el modelo, garantiza que una
     # lista de tareas salga como botones. Llegar acá ya descartó que el turno
@@ -308,6 +317,62 @@ def responder(cur: psycopg.Cursor, quien: Solicitante, texto_entrante: str,
     return Resultado(salida, acciones, confirmaciones, elecciones=elecciones)
 
 
+def _es_cambio(c: Llamada) -> bool:
+    """La llamada intenta cambiar algo: ni una lectura ni una pregunta con
+    opciones (que nunca cambian nada)."""
+    return not _es_lectura(c) and c.nombre != _HERRAMIENTA_DE_OPCIONES
+
+
+def _intento_sin_efecto(intentos_mutacion: list[str], acciones: list[str]) -> bool:
+    """El turno intentó cambiar algo y ninguna herramienta que cambia algo se
+    ejecutó: sale de lo que pasó en el turno (los resultados de las herramientas),
+    no de lo que el modelo escribió."""
+    return bool(intentos_mutacion) and not any(
+        not accion.startswith("consultar_") for accion in acciones)
+
+
+def _correccion_sin_efecto(intentos_mutacion: list[str]) -> str:
+    no_ejecutadas = ", ".join(dict.fromkeys(intentos_mutacion))
+    return (
+        "# Corrección del servidor\n\n"
+        f"En este turno no se ejecutó ninguna de tus llamadas que cambian algo "
+        f"({no_ejecutadas}). {NADA_SE_REGISTRO} No se aprobó, cerró, adjuntó "
+        "ni avisó nada. Volvé a escribir tu respuesta a la persona: decile lo "
+        "que sí pasó (no se hizo ningún cambio) y respondé lo que corresponda de "
+        "su mensaje. No afirmes ni insinúes que hiciste algo. No llames "
+        "herramientas.")
+
+
+def _reescribir_sin_afirmar_cambios(cur, quien: Solicitante, proveedor, sistema,
+                                    mensajes: list[dict], esquemas, salida: str,
+                                    intentos_mutacion: list[str]) -> str:
+    """Una sola reescritura de la respuesta de un turno que intentó cambiar algo
+    sin lograrlo (T9-R3, banco real b-0020-f-1: el modelo vio el rechazo y aun así
+    escribió "registré"). El modelo recibe, como mensaje del servidor, qué no se
+    ejecutó; sólo cuenta su texto. Sin texto, o si el proveedor falla (queda el
+    incidente), devuelve vacío: sale sólo el estado "sin cambios", nunca lo que el
+    modelo había escrito."""
+    correccion = _correccion_sin_efecto(intentos_mutacion)
+    nuevos = list(mensajes)
+    if salida.strip():
+        nuevos.append({"role": "assistant", "content": salida})
+        nuevos.append({"role": "user", "content": correccion})
+    else:
+        # Dos mensajes seguidos de la persona no los acepta ningún proveedor: la
+        # corrección va como un bloque más del último.
+        ultimo = dict(nuevos[-1])
+        contenido = ultimo["content"]
+        ultimo["content"] = (
+            [*contenido, {"type": "text", "text": correccion}]
+            if isinstance(contenido, list) else f"{contenido}\n\n{correccion}")
+        nuevos[-1] = ultimo
+    try:
+        return proveedor.responder(sistema, nuevos, esquemas).texto or ""
+    except Exception as e:  # noqa: BLE001
+        _incidente(cur, quien, e)
+        return ""
+
+
 class NoProponer(NamedTuple):
     """Lo que no se puede volver a proponer en este turno. Es un dato, no
     texto: la guarda mira sólo la herramienta y los argumentos de la llamada.
@@ -324,6 +389,9 @@ class NoProponer(NamedTuple):
     alta: bool = False
 
 
+# Lo que el modelo tiene que saber sin ambigüedad de una llamada rechazada (banco
+# real b-0020-f-1: vio el rechazo y escribió "registré"). T9-R3.
+NADA_SE_REGISTRO = "No se registró ni se cambió nada."
 RECHAZO_LO_PENDIENTE = (
     "Eso ya está pendiente con la persona y el sistema vuelve a ello solo. "
     "No lo propongas de nuevo: respondé únicamente el mensaje actual.")
@@ -397,6 +465,14 @@ def _rechazar_lo_pendiente(cur, quien: Solicitante, c: Llamada, ctx,
     rechazo = (RECHAZO_ALTA_DEJADA
                if no_proponer.alta and _reabre_el_alta(c)
                else RECHAZO_LO_PENDIENTE)
+    return _resultado_rechazado(cur, quien, c, ctx, rechazo)
+
+
+def _resultado_rechazado(cur, quien: Solicitante, c: Llamada, ctx,
+                         rechazo: str) -> dict:
+    """El resultado de una llamada que el servidor no ejecutó ni preparó (una
+    guarda): se audita y le dice al modelo, sin ambigüedad, que no se registró ni
+    se cambió nada (`NADA_SE_REGISTRO`)."""
     registrar_auditoria(
         cur, accion=f"herramienta_rechazada:{c.nombre}",
         workspace_id=quien.workspace_id, actor_app_user_id=quien.app_user_id,
@@ -405,7 +481,8 @@ def _rechazar_lo_pendiente(cur, quien: Solicitante, c: Llamada, ctx,
         pack_hash=ctx.pack_hash, nucleo_hash=ctx.nucleo_hash)
     return {"type": "tool_result", "tool_use_id": c.id,
             "content": json.dumps(
-                {"ejecutado": False, "explicacion": rechazo},
+                {"ejecutado": False, "explicacion": rechazo,
+                 "aclaracion": f"{NADA_SE_REGISTRO} No lo anuncies como hecho."},
                 ensure_ascii=False),
             "is_error": True}
 
@@ -425,17 +502,7 @@ def _rechazar_segunda_pregunta(cur, quien: Solicitante, c: Llamada, ctx) -> dict
     """Como `_rechazar_lo_pendiente`: la llamada no se ejecuta ni se prepara,
     no cuenta como acción ni como intento fallido, y se audita como
     `herramienta_rechazada:` con los argumentos de la llamada."""
-    registrar_auditoria(
-        cur, accion=f"herramienta_rechazada:{c.nombre}",
-        workspace_id=quien.workspace_id, actor_app_user_id=quien.app_user_id,
-        actor_kind="prisma",
-        detalle={"args": c.args, "rechazo": {"error": RECHAZO_SEGUNDA_PREGUNTA}},
-        pack_hash=ctx.pack_hash, nucleo_hash=ctx.nucleo_hash)
-    return {"type": "tool_result", "tool_use_id": c.id,
-            "content": json.dumps(
-                {"ejecutado": False, "explicacion": RECHAZO_SEGUNDA_PREGUNTA},
-                ensure_ascii=False),
-            "is_error": True}
+    return _resultado_rechazado(cur, quien, c, ctx, RECHAZO_SEGUNDA_PREGUNTA)
 
 
 def _normalizar_comparacion(texto: str) -> str:
