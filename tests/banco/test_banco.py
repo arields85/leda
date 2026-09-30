@@ -110,7 +110,8 @@ def test_escenario_contra_modelo_real(
     integrantes, titulos = _roster_y_titulos(conn, ws)
     evidencia = Evidencia(respuesta_texto=resultado.respuesta_texto,
                           herramientas_ejecutadas=tuple(resultado.herramientas_ejecutadas),
-                          ofrecio_opciones=resultado.ofrecio_opciones)
+                          ofrecio_opciones=resultado.ofrecio_opciones,
+                          avisos_a_otros=resultado.avisos_a_otros)
 
     with admin(conn) as cur:
         efectos_observados = recolectar_efectos(cur, ids_semilla)

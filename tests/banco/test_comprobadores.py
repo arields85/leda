@@ -6,6 +6,7 @@ evidencia de una corrida contra el modelo real. TDD estricto (protocolo,
 from __future__ import annotations
 
 from tests.banco.comprobadores import (
+    AvisoEncolado,
     Evidencia,
     ResultadoComprobacion,
     comprobaciones_pregunta_con_opciones,
@@ -102,6 +103,60 @@ def test_afirma_avisar_con_una_herramienta_que_notifica_aprueba():
                    herramientas_ejecutadas=("crear_dependencia",))
     r = comprobar_accion_sin_herramienta(ev)
     assert r.resultado == "aprobado"
+
+
+def test_afirma_avisar_con_un_aviso_encolado_a_otra_persona_aprueba():
+    """El aviso lo encola el servidor (no una herramienta del modelo): un
+    `message_outbox` de coordinación para otra persona respalda "le avisé"."""
+    ev = Evidencia(
+        respuesta_texto="Listo, rechacé el borrador y le avisé a Marcos.",
+        herramientas_ejecutadas=(),
+        avisos_a_otros=(AvisoEncolado(destinatario="Marcos Tarquini",
+                                      es_coordinacion=True),))
+    r = comprobar_accion_sin_herramienta(ev)
+    assert r.resultado == "aprobado", r.diferencia
+
+
+def test_afirma_avisar_sin_aviso_encolado_ni_herramienta_falla():
+    ev = Evidencia(respuesta_texto="Listo, le avisé a Marcos.",
+                   herramientas_ejecutadas=(), avisos_a_otros=())
+    r = comprobar_accion_sin_herramienta(ev)
+    assert r.resultado == "falla"
+    assert "le avisé" in r.diferencia
+
+
+def test_un_aviso_encolado_no_respalda_otras_afirmaciones():
+    ev = Evidencia(
+        respuesta_texto="Ya resolví el bloqueo y le avisé a Marcos.",
+        avisos_a_otros=(AvisoEncolado(destinatario="Marcos Tarquini",
+                                      es_coordinacion=True),))
+    r = comprobar_accion_sin_herramienta(ev)
+    assert r.resultado == "falla"
+    assert "'resolví'" in r.diferencia
+    assert "avisé" not in r.diferencia
+
+
+def test_afirma_pedir_cambios_sin_la_herramienta_falla():
+    ev = Evidencia(respuesta_texto="Listo, pedí cambios en Programar PLC.")
+    r = comprobar_accion_sin_herramienta(ev)
+    assert r.resultado == "falla"
+    assert "pedí cambios" in r.diferencia
+
+
+def test_afirma_pedir_cambios_con_la_herramienta_aprueba():
+    ev = Evidencia(respuesta_texto="Listo, pedí cambios en Programar PLC.",
+                   herramientas_ejecutadas=("pedir_cambios_tarea",))
+    assert comprobar_accion_sin_herramienta(ev).resultado == "aprobado"
+
+
+def test_negar_haber_pedido_cambios_no_es_un_reclamo():
+    ev = Evidencia(respuesta_texto="No se registró ningún cambio: no pedí cambios.")
+    assert comprobar_accion_sin_herramienta(ev).resultado == "aprobado"
+
+
+def test_negar_haber_aprobado_no_es_un_reclamo():
+    ev = Evidencia(respuesta_texto="No se registró ningún cambio: no aprobé nada.")
+    assert comprobar_accion_sin_herramienta(ev).resultado == "aprobado"
 
 
 def test_deteccion_ignora_mayusculas_pero_no_el_acento_del_verbo():

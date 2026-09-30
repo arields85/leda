@@ -2516,6 +2516,36 @@ def test_b_0036_rechazar_el_borrador_de_otra_persona_pide_el_motivo_y_lo_cancela
     with admin(conn) as cur:
         cur.execute("select estado from task_intake_request")
         assert cur.fetchone()["estado"] == "cancelled"
+    # Lo que el recibo afirma ("le avisé a Marcos") es un efecto real: el aviso
+    # de coordinación quedó encolado para Marcos, no para el actor.
+    assert [(a.destinatario, a.es_coordinacion) for a in r.avisos_a_otros] == [
+        ("Marcos Tarquini", True)]
+
+    # El escenario real, con los comprobadores del banco (no sólo contenido y
+    # efectos): el recibo del servidor no puede marcar "acción sin herramienta".
+    from tests.banco.comprobadores import (
+        Evidencia, comprobar_accion_sin_herramienta, comprobar_contenido,
+        comprobar_herramientas, comprobar_una_respuesta_por_entrada)
+    from tests.banco.conftest import DIR_ESCENARIOS
+    from tests.banco.escenario import cargar_escenario
+
+    escenario = cargar_escenario(DIR_ESCENARIOS / "b-0036.yaml")
+    evidencia = Evidencia(respuesta_texto=r.respuesta_texto,
+                          herramientas_ejecutadas=tuple(r.herramientas_ejecutadas),
+                          ofrecio_opciones=r.ofrecio_opciones,
+                          avisos_a_otros=r.avisos_a_otros)
+    for c in (
+            comprobar_herramientas(evidencia,
+                                   esperadas=escenario.herramientas_esperadas,
+                                   prohibidas=escenario.herramientas_prohibidas),
+            comprobar_accion_sin_herramienta(evidencia),
+            comprobar_contenido(
+                evidencia, menciona=escenario.respuesta_menciona,
+                no_contiene_patron=escenario.respuesta_no_contiene_patron),
+            comprobar_una_respuesta_por_entrada(
+                r.respuestas_por_mensaje, incidentes=r.incidentes_de_respuesta,
+                respuestas_por_toque=r.respuestas_por_toque)):
+        assert c.resultado == "aprobado", f"{c.nombre}: {c.diferencia}"
 
 
 def test_el_borrador_sembrado_en_la_corrida_cambia_un_dato_con_opciones(

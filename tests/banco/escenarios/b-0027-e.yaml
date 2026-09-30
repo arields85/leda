@@ -36,6 +36,6 @@ respuesta_menciona:
   - "«Programar PLC (simulado)» sigue en revisión."
 respuesta_no_contiene_patron:
   - "Estado: sin cambios"
-  - "pedí cambios"
-  - "avisé"
+  # "pedí cambios" y "avisé" tampoco van acá: matchean el negativo veraz ("no pedí
+  # cambios"). Los cubre `comprobar_accion_sin_herramienta`, con negación.
 severidad: alta

@@ -41,7 +41,7 @@ from prisma.respuesta_unica import (ETAPA_RESPUESTA_DUPLICADA, ETAPA_SIN_RESPUES
 from prisma.salida import (etiquetas_coinciden, etiquetas_de_tarea,
                            telegram_utf16_units)
 
-from tests.banco.comprobadores import es_forma_ofrecida_del_titulo
+from tests.banco.comprobadores import AvisoEncolado, es_forma_ofrecida_del_titulo
 from tests.banco.escenario import ADJUNTOS_DEL_BANCO
 
 # 'objective', 'evidence' y 'approval' se agregaron en T4 (banco-conversacional
@@ -451,6 +451,30 @@ def filas_respuesta(cur, workspace_id: str, chat_id: int,
     return [f for f in cur.fetchall() if f["id"] not in ids_previos]
 
 
+def avisos_a_otros(cur, workspace_id: str, chat_id: int,
+                   ids_previos: set) -> tuple[AvisoEncolado, ...]:
+    """Mensajes que Prisma inició durante la corrida para personas DISTINTAS
+    del actor: filas nuevas de `message_outbox` que no son respuesta
+    (`es_respuesta` falso) y cuyo chat no es el del actor. Es el efecto real
+    detrás de un "le avisé" que escribe el servidor -- p. ej. el rechazo de un
+    borrador ajeno (`ingreso_tareas.reject_draft`) -- y no una herramienta del
+    modelo. `ids_previos` es lo que ya existía al arrancar la corrida, no lo
+    que se fue descartando de la respuesta turno a turno."""
+    cur.execute(
+        """select o.id, o.es_coordinacion,
+                  coalesce(u.nombre, o.chat_id::text) as destinatario
+             from message_outbox o
+             left join app_user u on u.telegram_user_id = o.chat_id
+            where o.workspace_id = %s and o.chat_id <> %s
+              and not o.es_respuesta
+            order by o.programado_para, o.id""",
+        (workspace_id, chat_id))
+    return tuple(
+        AvisoEncolado(destinatario=f["destinatario"],
+                      es_coordinacion=f["es_coordinacion"])
+        for f in cur.fetchall() if f["id"] not in ids_previos)
+
+
 def respuesta_ofrecio_opciones(filas: list[dict]) -> bool:
     """True si alguna fila de la respuesta ofreció una elección con botones
     (`filas_respuesta`: `pending_action_id` o `intake_choice_set_id` no
@@ -732,6 +756,9 @@ class ResultadoCorrida:
     bloqueado: bool = False
     motivo_bloqueo: str = ""
     ofrecio_opciones: bool = False
+    # Avisos que Prisma encoló durante la corrida para otras personas
+    # (`avisos_a_otros`): respaldan un "le avisé" que no sale de una herramienta.
+    avisos_a_otros: tuple[AvisoEncolado, ...] = ()
     # Conteos por tabla justo antes de simular el toque en Confirmar (T4,
     # ADR 0005 decisión 1) -- `None` si el turno no dejó ninguna propuesta
     # con botón Confirmar, y entonces no hay nada que tocar ni que comprobar
@@ -1275,6 +1302,7 @@ def ejecutar_escenario(
         cur.execute("select id from message_outbox where workspace_id = %s",
                     (workspace_id,))
         ids_previos = {f["id"] for f in cur.fetchall()}
+        ids_previos_al_arrancar = set(ids_previos)
         cur.execute("select id from incident where workspace_id = %s",
                     (workspace_id,))
         ids_incidentes_previos = {f["id"] for f in cur.fetchall()}
@@ -1458,6 +1486,7 @@ def ejecutar_escenario(
         filas = filas_respuesta(cur, workspace_id, chat, ids_previos)
         respuesta_texto = "\n".join(f["cuerpo"] for f in filas)
         ofrecio_opciones = respuesta_ofrecio_opciones(filas)
+        avisos = avisos_a_otros(cur, workspace_id, chat, ids_previos_al_arrancar)
         herramientas_ejecutadas = _herramientas_registradas(cur, workspace_id)
         por_mensaje = respuestas_por_mensaje(cur, workspace_id, chat,
                                              mensajes_enviados)
@@ -1488,7 +1517,7 @@ def ejecutar_escenario(
         conteos_despues=despues, latencia_total_s=latencia_total,
         grabacion={**grabador.a_json(), "jev": jev_grabador.a_json()},
         bloqueado=bloqueado, motivo_bloqueo=motivo_bloqueo,
-        ofrecio_opciones=ofrecio_opciones,
+        ofrecio_opciones=ofrecio_opciones, avisos_a_otros=avisos,
         conteos_antes_del_toque=conteos_antes_del_toque,
         herramientas_antes_del_toque=tuple(herramientas_antes_del_toque),
         etiquetas_aclaracion_ofrecidas=tuple(etiquetas_aclaracion_ofrecidas),

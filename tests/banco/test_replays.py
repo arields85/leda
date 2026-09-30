@@ -75,7 +75,8 @@ def test_replay_reproduce_el_resultado_esperado(archivo_replay, corework, conn):
     evidencia = Evidencia(
         respuesta_texto=resultado.respuesta_texto,
         herramientas_ejecutadas=tuple(resultado.herramientas_ejecutadas),
-        ofrecio_opciones=resultado.ofrecio_opciones)
+        ofrecio_opciones=resultado.ofrecio_opciones,
+        avisos_a_otros=resultado.avisos_a_otros)
 
     with admin(conn) as cur:
         efectos_observados = recolectar_efectos(cur, ids_semilla)
@@ -164,7 +165,8 @@ def _corrida_pregunta_en_texto_abierto(conn, ws: str, escenario_id: str):
     return Evidencia(
         respuesta_texto=resultado.respuesta_texto,
         herramientas_ejecutadas=tuple(resultado.herramientas_ejecutadas),
-        ofrecio_opciones=resultado.ofrecio_opciones)
+        ofrecio_opciones=resultado.ofrecio_opciones,
+        avisos_a_otros=resultado.avisos_a_otros)
 
 
 def test_permite_pregunta_sin_opciones_deja_pasar_una_pregunta_en_texto_abierto(
