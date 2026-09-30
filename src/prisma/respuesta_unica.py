@@ -83,6 +83,22 @@ def grupo_de(fila: dict) -> str:
         "", fila["dedupe_key"])
 
 
+def sql_respondido(recibo: str) -> str:
+    """Fragmento SQL: el recibo `recibo` (alias de una fila de `inbound_message`) ya
+    tiene respuesta. Es el criterio único de "este turno no murió" (T9-H19f) que
+    comparten `gateway._estado_de_entrega` y `huerfanos.barrer`.
+
+    Cuenta una fila de respuesta en CUALQUIER estado. Lo que el código descarta a
+    propósito antes de enviar (un juego de opciones reemplazado, una vista previa que
+    ya no es vigente al despachar, el duplicado que `controlar` suprime) o lo que
+    falló al entregarse (con su propio incidente) es la respuesta de un turno que
+    vivió; un turno que murió no deja NINGUNA fila de respuesta (murió antes de
+    encolar o su transacción se revirtió). No confundir con `respuestas_del_mensaje`,
+    que cuenta las visibles para garantizar una sola."""
+    return (f"exists (select 1 from message_outbox o where o.entrante_id = {recibo}.id"
+            f" and o.chat_id = {recibo}.chat_id and o.es_respuesta)")
+
+
 def respuestas_del_mensaje(cur, entrante_id: str, chat_id: int) -> list[list[dict]]:
     """Las respuestas visibles encoladas para el mensaje: una lista de filas por
     respuesta, en el orden en que salen. No cuenta lo descartado."""

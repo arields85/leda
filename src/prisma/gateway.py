@@ -33,7 +33,8 @@ from .incidentes import (ETAPA_ENRUTAMIENTO, ETAPA_JEV_NO_CONFIGURADO,
 from .ingreso_tareas import (QUESTION_CHOICE, QUESTION_CONFIRMATION,
                              QUESTION_FREE_TEXT)
 from .respuesta_unica import controlar as controlar_una_respuesta
-from .respuesta_unica import dejar_nota, limpiar_nota, respuestas_del_mensaje
+from .respuesta_unica import (dejar_nota, limpiar_nota, respuestas_del_mensaje,
+                              sql_respondido)
 from .salida import TRUNCAR_ETIQUETA_BOTON as TRUNCAR_TITULO_BOTON
 from .salida import (ETIQUETA_CANCELAR, ETIQUETA_CONFIRMAR, ETIQUETA_MODIFICAR,
                      ICONO_CANCELAR,
@@ -717,7 +718,7 @@ def _estado_de_entrega(cur, workspace_id: str, chat_id: int,
                        message_id: int | None, ahora) -> tuple[str, str | None]:
     """Qué hacer con un `message_id` de este chat: `("nuevo", None)` si nunca se
     recibió (o su recibo pasó `COTA_REENTREGA`), `("absorber", id)` si ya tiene
-    respuesta visible o su recibo es de dentro de `VENTANA_TURNO_EN_CURSO`, y
+    respuesta (`respuesta_unica.sql_respondido`) o su recibo es de dentro de `VENTANA_TURNO_EN_CURSO`, y
     `("recuperar", id)` si hay recibo pero viejo y sin respuesta (el turno murió).
     El candado serializa dos entregas simultáneas: la segunda espera el commit de la
     fase 1 de la primera y ve su fila. Sin `message_id` no hay con qué comparar."""
@@ -727,11 +728,8 @@ def _estado_de_entrega(cur, workspace_id: str, chat_id: int,
         "select pg_advisory_xact_lock(hashtextextended(%s, 0))",
         (f"mensaje:{workspace_id}:{chat_id}:{message_id}",))
     cur.execute(
-        """select i.id, i.at,
-                  exists (select 1 from message_outbox o
-                           where o.entrante_id = i.id and o.chat_id = i.chat_id
-                             and o.es_respuesta and o.estado <> 'descartado')
-                  as respondido
+        f"""select i.id, i.at,
+                  {sql_respondido("i")} as respondido
              from inbound_message i
             where i.workspace_id = %s and i.chat_id = %s
               and i.telegram_message_id = %s and i.at > %s

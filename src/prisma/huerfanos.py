@@ -19,13 +19,20 @@ Qué es un huérfano. Un recibo de esta pasada que:
   Un toque absorbido por repetido (`gateway._registrar_toque(..., None)`) no trae
   texto, ni id de Telegram, ni botón, y por diseño no responde: se excluye. Un
   desconocido nunca deja recibo (`procesar_update` lo descarta antes de la fase 1);
-- no tiene una respuesta visible (`respuesta_unica.respuestas_del_mensaje`);
+- no tiene ninguna fila de respuesta, en cualquier estado
+  (`respuesta_unica.sql_respondido`): un turno muerto no deja ninguna, y lo que el
+  código descartó a propósito o falló al entregarse no es un turno muerto;
 - no tiene un recibo más nuevo del mismo mensaje: si la reentrega lo recuperó, el
   recibo muerto queda atrás y sólo cuenta el último (con respuesta o sin ella).
 
-Idempotente por estructura: el aviso lleva una clave de deduplicación por recibo y,
-una vez encolado, el recibo ya tiene su respuesta. Un candado de asesor no bloqueante
-por espacio evita que dos procesos barran a la vez.
+Quien ya no es integrante activo del espacio no recibe ningún mensaje: queda el
+incidente y una marca (una fila de respuesta `descartado`, sin destinatario, con la
+clave del aviso) atada al recibo. Es la marca más simple que cierra el barrido sin
+tabla ni columna nuevas: para el criterio único el recibo queda "respondido".
+
+Idempotente por estructura: el aviso (o la marca) lleva una clave de deduplicación
+por recibo y, una vez encolado, el recibo ya tiene su respuesta. Un candado de asesor
+no bloqueante por espacio evita que dos procesos barran a la vez.
 """
 
 from __future__ import annotations
@@ -37,12 +44,13 @@ from .gateway import COTA_REENTREGA as COTA
 from .gateway import VENTANA_TURNO_EN_CURSO as VENTANA
 from .incidentes import (ETAPA_MENSAJE_HUERFANO, NOTICIA_NEUTRA_INCIDENTE,
                          REFERENCIA_INBOUND_MESSAGE, registrar_incidente)
+from .respuesta_unica import sql_respondido
 from .salida import enqueue_outbox
 
 # Cuántos recibos se avisan por pasada: lo que queda sale en la siguiente.
 LOTE_HUERFANOS = 50
 
-_HUERFANOS = """
+_HUERFANOS = f"""
     select i.id, i.chat_id, i.app_user_id, m.membership_id
       from inbound_message i
       left join integrante m
@@ -52,13 +60,7 @@ _HUERFANOS = """
        and i.app_user_id is not null
        and (i.boton_callback is not null or i.texto is not null
             or i.telegram_message_id is not null)
-       and not exists (
-            select 1 from message_outbox o
-             where o.entrante_id = i.id and o.chat_id = i.chat_id
-               and o.es_respuesta and o.estado <> 'descartado')
-       and not exists (
-            select 1 from message_outbox o
-             where o.dedupe_key = i.workspace_id::text || ':huerfano:' || i.id::text)
+       and not {sql_respondido("i")}
        and not exists (
             select 1 from inbound_message j
              where j.workspace_id = i.workspace_id and j.chat_id = i.chat_id
@@ -85,22 +87,23 @@ def barrer(cur, workspace_id: str, ahora: datetime,
         # El aviso es la respuesta a ese recibo (T9-R2); la atadura es sólo suya, no
         # de lo que se encole después en esta misma transacción.
         atar_al_entrante(cur, entrante_id)
+        activo = h["membership_id"] is not None
         enqueue_outbox(
             cur, workspace_id=workspace_id, chat_id=h["chat_id"],
             text=NOTICIA_NEUTRA_INCIDENTE,
-            recipient_membership_id=(str(h["membership_id"])
-                                     if h["membership_id"] else None),
+            recipient_membership_id=str(h["membership_id"]) if activo else None,
             scheduled_for=ahora, dedupe_key=f"{workspace_id}:huerfano:{entrante_id}",
-            is_response=True)
+            is_response=True, state="listo" if activo else "descartado")
         cur.execute("select set_config('prisma.entrante_id', '', true)")
         registrar_incidente(
             cur, workspace_id,
             "Un mensaje recibido no llegó a responderse (su turno murió y Telegram "
-            "no lo reentregó): salió el aviso neutro."
-            + ("" if h["membership_id"] else
-               " La persona ya no tiene una membresía activa en el espacio."),
+            "no lo reentregó)"
+            + (": salió el aviso neutro." if activo else
+               ", pero la persona ya no es integrante activa del espacio: no salió "
+               "ningún mensaje."),
             severidad="alta", etapa=ETAPA_MENSAJE_HUERFANO,
             referencia_tipo=REFERENCIA_INBOUND_MESSAGE, referencia_id=entrante_id,
             chat_id=h["chat_id"], app_user_id=str(h["app_user_id"]),
-            notificado_en=ahora)
+            notificado_en=ahora if activo else None)
     return len(huerfanos)

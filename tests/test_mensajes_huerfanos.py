@@ -144,13 +144,46 @@ def test_un_recibo_con_respuesta_no_se_toca(corework, conn):
     assert len(_avisos(conn, tg)) == 1 and _incidentes(conn, ws) == []
 
 
-def test_una_respuesta_descartada_no_cuenta_como_respuesta(corework, conn):
+def test_una_respuesta_descartada_a_proposito_sigue_siendo_una_respuesta(
+        corework, conn):
+    """Lo que el código descarta antes de enviar (un juego de opciones reemplazado, una
+    vista previa que ya no es vigente al despachar, el duplicado que `controlar`
+    suprime) es la respuesta de ese turno: el turno no murió, la persona ya tiene
+    una respuesta posterior o la decisión ya no corresponde. Un aviso de "tuve un
+    problema" sería falso."""
     ws = corework.workspace_id
     uid, tg = _persona(conn)
     recibo = _recibo(conn, ws, uid, tg, hace=EN_CURSO + timedelta(minutes=1))
     _responder(conn, ws, tg, recibo, estado="descartado")
 
-    assert _barrer(conn, ws) == 1
+    assert _barrer(conn, ws) == 0
+    assert len(_avisos(conn, tg)) == 1 and _incidentes(conn, ws) == []
+
+
+def test_una_vista_previa_descartada_al_despachar_no_se_avisa_como_huerfana(
+        corework, conn):
+    ws = corework.workspace_id
+    uid, tg = _persona(conn)
+    recibo = _recibo(conn, ws, uid, tg, hace=EN_CURSO + timedelta(minutes=1))
+    _responder(conn, ws, tg, recibo, estado="listo")
+    with admin(conn) as cur:
+        cur.execute("update message_outbox set estado = 'descartado' "
+                    "where entrante_id = %s", (recibo,))
+    conn.commit()
+
+    assert _barrer(conn, ws) == 0
+    assert _incidentes(conn, ws) == []
+
+
+def test_una_respuesta_fallida_no_se_avisa_como_huerfana(corework, conn):
+    """Una falla de entrega tiene su propio camino de incidente."""
+    ws = corework.workspace_id
+    uid, tg = _persona(conn)
+    recibo = _recibo(conn, ws, uid, tg, hace=EN_CURSO + timedelta(minutes=1))
+    _responder(conn, ws, tg, recibo, estado="fallido")
+
+    assert _barrer(conn, ws) == 0
+    assert len(_avisos(conn, tg)) == 1 and _incidentes(conn, ws) == []
 
 
 def test_un_toque_absorbido_no_es_un_mensaje_sin_respuesta(corework, conn):
@@ -240,11 +273,14 @@ def test_el_lote_acota_cuantos_se_avisan_por_pasada(corework, conn):
     assert _barrer(conn, ws) == 0
 
 
-def test_sin_membresia_activa_el_aviso_sale_sin_destinatario_y_lo_dice_el_incidente(
+def test_sin_membresia_activa_no_sale_ningun_mensaje_y_queda_un_incidente(
         corework, conn):
+    """Quien ya no es integrante no recibe mensajes de Prisma: queda el incidente
+    (sin contenido) y una marca descartada atada al recibo, que hace idempotente el
+    barrido."""
     ws = corework.workspace_id
     uid, tg = _persona(conn)
-    _recibo(conn, ws, uid, tg, hace=EN_CURSO + timedelta(minutes=1))
+    recibo = _recibo(conn, ws, uid, tg, hace=EN_CURSO + timedelta(minutes=1))
     with admin(conn) as cur:
         cur.execute("update membership set activo = false where app_user_id = %s",
                     (uid,))
@@ -253,9 +289,20 @@ def test_sin_membresia_activa_el_aviso_sale_sin_destinatario_y_lo_dice_el_incide
     assert _barrer(conn, ws) == 1
     assert _barrer(conn, ws) == 0                     # y no se repite
 
-    (aviso,) = _avisos(conn, tg)
-    assert aviso["destinatario_membership_id"] is None
-    assert len(_incidentes(conn, ws)) == 1
+    (marca,) = _avisos(conn, tg)
+    assert str(marca["entrante_id"]) == recibo
+    assert marca["destinatario_membership_id"] is None
+    with admin(conn) as cur:
+        cur.execute("select estado from message_outbox where chat_id = %s", (tg,))
+        assert [f["estado"] for f in cur.fetchall()] == ["descartado"]
+    (incidente,) = _incidentes(conn, ws)
+    assert str(incidente["referencia_id"]) == recibo
+    transporte = TransporteDePrueba()
+    with espacio(conn, ws) as cur:
+        ciclo.ejecutar_ciclo_espacio(cur, ws, transporte, AHORA,
+                                     AHORA - timedelta(hours=1), con_cadencias=False)
+    conn.commit()
+    assert not [e for e in transporte.enviados if NOTICIA_NEUTRA_INCIDENTE in str(e)]
 
 
 def test_el_ciclo_de_fondo_barre_y_despacha_el_aviso_en_la_misma_pasada(

@@ -236,6 +236,31 @@ def test_la_reentrega_de_un_turno_muerto_se_recupera_una_sola_vez(
     assert _auditorias(conn, "mensaje_repetido_absorbido") == 1
 
 
+def test_la_reentrega_de_un_turno_cuya_respuesta_se_descarto_a_proposito_se_absorbe(
+        cliente, conn, corework, monkeypatch):
+    """Una respuesta que el código descartó antes de enviar (opciones reemplazadas,
+    vista previa ya no vigente) sigue siendo la respuesta de ese turno: el turno no
+    murió, así que la reentrega no lo vuelve a correr."""
+    proveedor = _con_respuesta_del_modelo(monkeypatch)
+    tg = _tg(conn)
+    previo = _recibo_sin_respuesta(conn, tg, 41, EN_CURSO + 60)
+    with admin(conn) as cur:
+        cur.execute(
+            """insert into message_outbox
+                 (workspace_id, chat_id, tipo, cuerpo, estado, es_respuesta,
+                  entrante_id, dedupe_key)
+               select workspace_id, chat_id, 'normal', 'ok', 'descartado', true,
+                      id, 'test:' || id::text
+                 from inbound_message where id = %s""", (previo,))
+    conn.commit()
+
+    _enviar(cliente, _update(tg))
+
+    assert len(_entrantes(conn, tg, 41)) == 1
+    assert proveedor.ruteados == []
+    assert _incidentes_de(conn, gateway.ETAPA_MENSAJE_RECUPERADO) == []
+
+
 def test_la_reentrega_dentro_de_la_ventana_sin_respuesta_todavia_se_absorbe(
         cliente, conn, corework, monkeypatch):
     proveedor = _con_respuesta_del_modelo(monkeypatch)
