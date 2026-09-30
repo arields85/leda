@@ -60,6 +60,17 @@ reutiliza al cerrar el aislamiento entre clientes.
 
 ## Orden de entrega
 
+**Congelamiento de funcionalidad nueva (decisión del usuario, 2026-09-30).** No se
+construye funcionalidad nueva hasta que el alta de tareas, la entrega con evidencia y la
+aprobación cumplan en una prueba real los criterios del
+[`ADR 0014`](decisions/0014-flujo-de-un-mensaje.md). Queda congelado: flujos nuevos (la
+rama de correo verificado, Google y agenda del ADR 0010), capacidades nuevas en medio de
+una ronda, el tablero y el panel. Sigue abierto: mejorar esos tres caminos, corregir
+fallas reales y anotar ideas en este roadmap sin construirlas. Motivo: cada ronda
+probaba superficie nueva y los hallazgos no bajaban; una función construida sobre una
+conversación que todavía no funciona hereda sus problemas. Se levanta al cumplir los
+criterios.
+
 ### Línea base versionada
 
 **Entrega:** el trabajo acumulado queda registrado en un commit con historia

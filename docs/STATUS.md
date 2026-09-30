@@ -238,9 +238,9 @@ con `deepseek/deepseek-v4-pro` y `anthropic/claude-sonnet-5.5` por OpenRouter, m
 corrida del modelo actual la misma noche, para saber cuánto de lo "robótico" viene del
 modelo y no del flujo. `PENDIENTE`: resultado.
 
-`PENDIENTE`, decisión del usuario: congelar funcionalidad nueva hasta que alta, entrega y
-aprobación cumplan los criterios del ADR 0014 (recomendación, `AGENTS.md`, "Lecciones de
-trabajo").
+**Funcionalidad nueva congelada** (decisión del usuario, 2026-09-30) hasta que alta,
+entrega y aprobación cumplan en una prueba real los criterios del ADR 0014. Alcance en
+`ROADMAP.md`, "Orden de entrega".
 
 Quedan en espera, sin descartar: cierre con el estado real en la rama de opciones y en la
 negativa sin intento; observaciones no bloqueantes de las revisiones; vista previa vieja

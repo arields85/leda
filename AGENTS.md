@@ -205,10 +205,11 @@ conversa Prisma:
   saber cuánto aporta el modelo: Prisma usa un modelo "flash" chico, elegido por
   velocidad. Medirlo con el banco es barato.
 - **La superficie crece más rápido de lo que se estabiliza.** Cada ronda prueba
-  funcionalidad nueva, y por eso los hallazgos no bajan. Recomendación registrada en
-  `docs/STATUS.md`, pendiente de decisión del usuario: no sumar funcionalidad hasta que
-  el núcleo de la conversación (alta, entrega, aprobación) cumpla los criterios del
-  ADR 0014.
+  funcionalidad nueva, y por eso los hallazgos no bajan. Decisión del usuario: la
+  funcionalidad nueva queda congelada hasta que el núcleo de la conversación (alta,
+  entrega, aprobación) cumpla en una prueba real los criterios del ADR 0014. Alcance
+  en `docs/ROADMAP.md`, "Orden de entrega". No construir funcionalidad nueva mientras
+  rija, aunque se pida de pasada: anotarla en el roadmap y recordar el congelamiento.
 - **Ningún proyecto externo resuelve esto listo para usar.** Un PM conversacional
   multi-cliente con garantías es un problema propio. Relevar proyectos externos para
   tomar ideas, no bases ([`docs/research/`](docs/research/)).
