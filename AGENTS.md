@@ -184,6 +184,35 @@ conversa Prisma:
   invariantes. Es el patrón probado de los asistentes de tareas ("conversation repair
   patterns", por ejemplo en Rasa), adoptado dentro del monolito, no como dependencia.
 
+**Lecciones de trabajo (2026-09-30, al cerrar la ronda 4).** Vigentes para toda sesión:
+
+- **Probar en real enseguida** (decisión del usuario). Construir la porción más chica
+  que se pueda probar y llevarla a Telegram real con datos ficticios cuanto antes. Todo
+  plan nombra primero su prueba real más temprana y recorta el alcance para llegar a
+  ella. La documentación registra decisiones, no ensayos; las mediciones baratas (banco,
+  repeticiones) corren en paralelo con la construcción. Diseñar mucho sin probar costó
+  horas.
+- **Lo sólido no se simplifica.** La base, el aislamiento entre clientes, las
+  confirmaciones y la auditoría funcionan. Ninguna propuesta de "simplificar" (un
+  framework de agente, un modelo con SQL libre, reglas en el prompt en vez de
+  garantías) reemplaza esas garantías: las instrucciones gobiernan el comportamiento;
+  el código y la base, lo que no puede pasar nunca
+  ([`ADR 0014`](docs/decisions/0014-flujo-de-un-mensaje.md), alternativas).
+- **El problema de la conversación es dónde participa el modelo, no la falta de
+  reglas.** Un camino pasa al flujo del ADR 0014 sólo cuando se retiraron sus
+  mecanismos viejos; si conviven, no está terminado y el sistema queda peor.
+- **Separar modelo de flujo.** Antes de atribuir una falla de comprensión al flujo,
+  saber cuánto aporta el modelo: Prisma usa un modelo "flash" chico, elegido por
+  velocidad. Medirlo con el banco es barato.
+- **La superficie crece más rápido de lo que se estabiliza.** Cada ronda prueba
+  funcionalidad nueva, y por eso los hallazgos no bajan. Recomendación registrada en
+  `docs/STATUS.md`, pendiente de decisión del usuario: no sumar funcionalidad hasta que
+  el núcleo de la conversación (alta, entrega, aprobación) cumpla los criterios del
+  ADR 0014.
+- **Ningún proyecto externo resuelve esto listo para usar.** Un PM conversacional
+  multi-cliente con garantías es un problema propio. Relevar proyectos externos para
+  tomar ideas, no bases ([`docs/research/`](docs/research/)).
+
 Al terminar una unidad:
 
 - actualizar `docs/STATUS.md` con hechos comprobados, riesgos y próximo paso;

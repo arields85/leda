@@ -233,6 +233,15 @@ clasifican por etapa.
    se registran latencia, llamadas al modelo, incidentes y rechazos de la verificación de A.
 4. Registrar el resultado como enmienda del ADR 0014 y extender el flujo al resto.
 
+En paralelo (decisión del usuario, 2026-09-30): el banco real sobre el código de `main`
+con `deepseek/deepseek-v4-pro` y `anthropic/claude-sonnet-5.5` por OpenRouter, más una
+corrida del modelo actual la misma noche, para saber cuánto de lo "robótico" viene del
+modelo y no del flujo. `PENDIENTE`: resultado.
+
+`PENDIENTE`, decisión del usuario: congelar funcionalidad nueva hasta que alta, entrega y
+aprobación cumplan los criterios del ADR 0014 (recomendación, `AGENTS.md`, "Lecciones de
+trabajo").
+
 Quedan en espera, sin descartar: cierre con el estado real en la rama de opciones y en la
 negativa sin intento; observaciones no bloqueantes de las revisiones; vista previa vieja
 (`crear_borrador_tarea`) con Cancelar; T9-H19i; índice de `inbound_message`; relojes de
