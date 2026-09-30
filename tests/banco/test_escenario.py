@@ -762,3 +762,19 @@ def test_la_familia_b_0028_cubre_el_toque_repetido_y_una_respuesta_por_toque():
     assert familia["b-0028-c"].toques_tras_mensajes == (
         {"etiqueta": "Dejarlo y ver lo otro"},)
     assert familia["b-0028-d"].confirmar["cada_s"] > 10       # fuera de la ventana
+
+
+def test_la_familia_b_0030_reproduce_h19_con_el_link_tras_pedir_cambios():
+    # T9-H19: la nueva entrega después de "Pedir cambios", como un link solo, con
+    # una frase vaga y con otra tarea parecida en la lista.
+    import pathlib
+
+    directorio = pathlib.Path(__file__).parent / "escenarios"
+    familia = {e.id: e for e in cargar_escenarios(directorio)
+               if e.id == "b-0030" or e.variante_de == "b-0030"}
+
+    assert sorted(familia) == ["b-0030", "b-0030-b", "b-0030-c"]
+    for e in familia.values():
+        assert e.mensajes_tras_toques and "https://example.com/capturas" in (
+            e.mensajes_tras_toques[0])
+        assert any(t.get("cambios_pedidos") for t in e.precondiciones["tareas"])

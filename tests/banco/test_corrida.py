@@ -2908,3 +2908,54 @@ def test_los_escenarios_de_b_0029_cumplen_lo_que_declaran_con_un_modelo_guionado
     assert comprobacion.resultado == "aprobado", comprobacion.diferencia
     # Cada toque recibió una sola respuesta.
     assert all(n == 1 for n in r.respuestas_por_toque), r.respuestas_por_toque
+
+
+# ---------------------------------------------------------------------------
+# La familia b-0030 (T9-H19): el link de la nueva entrega después de "Pedir
+# cambios" recibe UNA respuesta, sin aclaración en paralelo ni incidente de
+# `respuesta_duplicada`. Con el ruteo guionado, lo que declaran los escenarios se
+# cumple con lo que produce el código; el banco real sólo mide al modelo.
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("escenario_id", ["b-0030", "b-0030-b", "b-0030-c"])
+def test_los_escenarios_de_b_0030_cumplen_lo_que_declaran_con_un_modelo_guionado(
+        escenario_id, corework, conn):
+    from tests.banco.comprobadores import (Evidencia, comprobar_contenido,
+                                           comprobar_efectos,
+                                           comprobar_una_respuesta_por_entrada)
+    from tests.banco.conftest import DIR_ESCENARIOS
+    from tests.banco.escenario import cargar_escenario
+
+    escenario = cargar_escenario(DIR_ESCENARIOS / f"{escenario_id}.yaml")
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        ids = sembrar_precondiciones(cur, ws, escenario.precondiciones)
+    conn.commit()
+    interno = _interno_con_pregunta_abierta([
+        IntentRoute(IntentAction.NORMAL_CONVERSATION,
+                    respecto_pendiente=RespectoPendiente.RESPONDE)])
+
+    r = ejecutar_escenario(
+        conn, ws, "corework", escenario.actor, escenario.mensajes, interno,
+        escenario_id=escenario.id, indice=0,
+        toques=list(escenario.toques) or None,
+        mensajes_tras_toques=list(escenario.mensajes_tras_toques) or None)
+
+    assert r.bloqueado is False, r.motivo_bloqueo
+    evidencia = Evidencia(respuesta_texto=r.respuesta_texto,
+                          herramientas_ejecutadas=tuple(r.herramientas_ejecutadas),
+                          ofrecio_opciones=r.ofrecio_opciones)
+    contenido = comprobar_contenido(
+        evidencia, menciona=escenario.respuesta_menciona,
+        no_contiene_patron=escenario.respuesta_no_contiene_patron)
+    assert contenido.resultado == "aprobado", contenido.diferencia
+    with admin(conn) as cur:
+        observados = recolectar_efectos(cur, ids)
+    observados["conteos_delta"] = conteos_delta(r.conteos_antes, r.conteos_despues)
+    efectos = comprobar_efectos(observados, escenario.efectos)
+    assert efectos.resultado == "aprobado", efectos.diferencia
+    una = comprobar_una_respuesta_por_entrada(
+        r.respuestas_por_mensaje, incidentes=r.incidentes_de_respuesta,
+        respuestas_por_toque=r.respuestas_por_toque)
+    assert una.resultado == "aprobado", una.diferencia
+    assert r.respuestas_por_mensaje == (1, 1)     # la lista y el link
