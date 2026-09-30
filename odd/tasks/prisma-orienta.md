@@ -5158,3 +5158,40 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   consultas abiertas (T9-R1c-5, T9-R5, T9-H19c, T10-6, T10-7), T9-H19i y los pendientes
   menores (índice de `inbound_message`, relojes de `despachador` y `contexto`). `main` sin
   push (lo decide el usuario).
+
+- 2026-09-30: **Cuarta ronda por Telegram (T11), en curso — hallazgos R4.** Base nueva,
+  `escuchar corework`, cuentas de Ariel e Ismael manejadas por el usuario. Circuito A hasta
+  la segunda entrega. Cero incidentes. Funcionó: evidencia por link tomada, vista previa en
+  filas, ✏️ Modificar, "Gracias. La tarea «X» pasó a revisión.", lista de una tarea
+  nombrada, "vuelve a estar en curso", motivo de los cambios en el menú de quien entrega.
+  - R4-H1. Saludo en dos partes ("👋 Buen día" y "Hola Ariel, ¿en qué te ayudo?"). Regla
+    del usuario: una sola línea, "👋 Buen día Ariel, ¿en qué te ayudo?".
+  - R4-H2. "Dale, dejamos de lado «Hola Ariel, ¿en qué te ayudo?». Escribime qué
+    necesitás." Regla del usuario: "Dale, escribime qué necesitás." (un saludo no es un
+    tema que se deja de lado).
+  - R4-H3. Pedir la entrega por texto sin evidencia: texto correcto (rechazo de la guarda,
+    "Estado: sin cambios"), pero con los tres botones genéricos, que contradicen el pedido
+    de evidencia; la pregunta queda como `_opciones_modelo` y no como la pregunta de
+    evidencia de "Ya la terminé". El usuario no supo dónde poner el link.
+  - R4-H4. El botón de la lista corta el título ("📋 Dashboard de lotes…") habiendo lugar.
+  - R4-H5. Encabezado del menú de tarea con puntos medios y "En revisión"/"En curso" con
+    mayúscula ("«X» · Ariel De Simone · En revisión").
+  - R4-H6. Ver detalle, Aprobar, Pedir cambios, Ya la terminé: todos con el mismo 📋.
+  - R4-H7. **Alto.** Los avisos que inicia Prisma no salen: "Ariel entregó…" a Ismael (dos
+    veces) y "Ismael pidió cambios…" a Ariel quedaron `listo` sin enviar. Causa verificada
+    en la base: los flujos terminados dejan su pregunta en `esperando` (`_opciones_modelo`
+    de R4-H3 tras contestar con el link; `_dato_menu_tarea` de pedir cambios y de terminar
+    después de confirmar; `_menu_tarea` del aviso), así que la persona figura con una rama
+    abierta y, como estuvo activa hace menos de 30 minutos, `despachador._rama_activa_de`
+    retiene todo lo que Prisma le inicia. Corta los pasos 4 y 5 del circuito A y bloquearía
+    el B y el C. Regla 1 del ADR 0013: una rama se cierra cuando su flujo termina.
+  - R4-H8. **Alto.** "¿Qué pasó con mi tarea?" después de que pidieron cambios: "sigue en
+    curso… No tuvo cambios de estado." Es falso (pasó a revisión y volvió con cambios
+    pedidos) y no menciona el motivo; regla 3. Además repite los botones de las dos tareas.
+  - R4-H9. Con la pregunta de evidencia abierta, mandar el link dispara "¿Esto es la
+    evidencia de la entrega de «X»?" [Sí, es eso] [No, es otra cosa] y recién después la
+    vista previa con Confirmar: dos confirmaciones para un dato que se acababa de pedir.
+  - R4-H10. A Ismael, después de confirmar "Pedir cambios", un segundo toque 39 s más
+    tarde recibió "Ese pedido ya no está vigente…" (fuera de la ventana de 10 s).
+  - R4-H11. El aviso de entrega hecho a las 08:53 quedó programado para las 09:00 (horario
+    laboral): comportamiento esperado, anotado porque el usuario no lo vio llegar.
