@@ -1142,7 +1142,8 @@ def _encolar_opciones_genericas(cur, quien: Solicitante, chat_id: int,
                                 entrante_id: str | None,
                                 texto_entrante: str,
                                 no_proponer: NoProponer | None = None, *,
-                                lleva_su_saludo: bool = False) -> None:
+                                lleva_su_saludo: bool = False,
+                                es_saludo: bool = False) -> None:
     """Decisión del usuario (2026-09-26, evidencia
     `tests/banco/reportes/replay-candidato-b-0007-*.json`): cuando Prisma
     necesita algo de la persona pero no tiene opciones concretas para
@@ -1191,7 +1192,10 @@ def _encolar_opciones_genericas(cur, quien: Solicitante, chat_id: int,
         # la próxima respuesta escrita de la persona la contesta y los retira
         # (`pendientes.retirar_opciones_de_pregunta_abierta`, R4-H7).
         args={"pregunta": texto, "entrante_id": entrante_id,
-             "mensaje_original": texto_entrante, "cierre_generico": True},
+             "mensaje_original": texto_entrante, "cierre_generico": True,
+             # El saludo suelto no es un tema (R4-H2): al dejarlo de lado no se
+             # lo nombra. Se decide por esta marca, nunca por el texto.
+             **({"saludo": True} if es_saludo else {})},
         lleva_su_saludo=lleva_su_saludo)
 
 

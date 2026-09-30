@@ -1435,7 +1435,7 @@ def _responder_saludo_suelto(cur, quien, texto: str, cal, chat_id: int, ahora,
         cur, membership_id=quien.membership_id, zona=cal.zona, ahora=ahora)
     _encolar_opciones_genericas(
         cur, quien, chat_id, S.linea_de_saludo(quien.nombre, del_dia), ahora,
-        entrante_id, texto, lleva_su_saludo=del_dia is not None)
+        entrante_id, texto, lleva_su_saludo=del_dia is not None, es_saludo=True)
 
 
 def _rutear(proveedor, texto: str, pendiente: str | None = None):
@@ -2686,7 +2686,7 @@ def _resolver_toque_aclaracion(cur, quien, workspace_id: str, chat_id: int,
 LIMITE_PREGUNTA_CERRADA = 160
 
 
-def _texto_cierre_opciones(pregunta: str) -> str:
+def _texto_cierre_opciones(pregunta: str, *, es_tema: bool = True) -> str:
     """Texto de "Quiero consultar otra cosa" (hallazgo 10, sesión 2 por
     Telegram, 2026-09-27, evidencia real: Marcos tocó la salida sobre "¿Sobre
     cuál de tus tareas avanzaste?", escribió "hols" y Prisma volvió a
@@ -2700,9 +2700,13 @@ def _texto_cierre_opciones(pregunta: str) -> str:
     Nombrar acá la pregunta cerrada deja ese hecho en el propio historial --
     el mismo mecanismo que ya lee `contexto.historial`, sin una tabla ni un
     campo nuevo -- y la regla nueva de `contexto.PREAMBULO` le dice al modelo
-    que no la retome sin que la persona la traiga de nuevo."""
+    que no la retome sin que la persona la traiga de nuevo.
+
+    Sólo se nombra lo que es un tema real (una tarea, una propuesta, un alta): un
+    saludo no lo es (`es_tema=False`, R4-H2, decisión del usuario, 2026-09-30) y
+    se cierra con "Dale, escribime qué necesitás." a secas."""
     pregunta = (pregunta or "").strip()
-    if not pregunta:
+    if not pregunta or not es_tema:
         return "Dale, escribime qué necesitás."
     corta = truncar_etiqueta_boton(pregunta, limite=LIMITE_PREGUNTA_CERRADA)
     return f"Dale, dejamos de lado «{corta}». Escribime qué necesitás."
@@ -2743,7 +2747,8 @@ def _resolver_toque_opcion_modelo(cur, quien, workspace_id: str, chat_id: int,
 
     if tipo == "salida":
         _responder(cur, workspace_id, chat_id, quien,
-                  _texto_cierre_opciones(pregunta), ahora)
+                  _texto_cierre_opciones(pregunta, es_tema=not args.get("saludo")),
+                  ahora)
         return
 
     if tipo == "ver_mas":
