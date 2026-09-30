@@ -301,7 +301,7 @@ def test_pedir_cambios_punta_a_punta_por_telegram(cliente, conn, corework, monke
         cur.execute("select resumen from pending_action where id = %s",
                    (pid_vista_cambios,))
         resumen_cambios = cur.fetchone()["resumen"]
-    assert "vuelve a en curso" in resumen_cambios.lower()
+    assert "vuelve a estar en curso" in resumen_cambios.lower()
     assert "certificado del proveedor" in resumen_cambios.lower()
 
     assert _confirmar(cliente, conn, ws, "pedir_cambios_tarea", tg_marcos,

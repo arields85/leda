@@ -338,6 +338,6 @@ def test_mensaje_post_confirmacion_actualizar_estado(corework, conn, monkeypatch
                 where workspace_id = %s and chat_id = %s
                order by programado_para desc limit 1""", (ws, tg))
         cuerpo = cur.fetchone()["cuerpo"]
-    assert cuerpo == "Listo: «Programar HMI línea 2» pasó a En revisión."
+    assert cuerpo == "Gracias. La tarea «Programar HMI línea 2» pasó a revisión."
     # Nunca el estado viejo después de aplicar el cambio.
     assert "Asignada" not in cuerpo

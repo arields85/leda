@@ -1048,19 +1048,18 @@ def _seguir_resuelta(cur, quien, workspace_id: str, chat_id: int, token: str,
                     titulo = fila_tarea["titulo"] if fila_tarea else "esa tarea"
                     _responder(
                         cur, workspace_id, chat_id, quien,
-                        f"Listo: «{titulo}» pasó a "
-                        f"{H._estado_legible(resultado['estado'])}.", ahora)
-                elif prep_capturada.get("cambio"):
-                    # El recibo cuenta qué cambió, no un "Hecho."
-                    # solo (T2, punto 3): reusa la descripción
-                    # que ya se había mostrado en la vista
-                    # previa, porque la huella coincidió -- el
-                    # estado sigue siendo ese. Sigue así para
-                    # cualquier otra herramienta del menú: sólo
+                        H.recibo_de_estado(titulo, resultado["estado"]), ahora)
+                elif prep_capturada.get("hecho"):
+                    # El recibo cuenta qué pasó, no un "Hecho." solo
+                    # (T2, punto 3) ni la vista previa entera otra vez
+                    # (T10-4, R3-H14): la oración corta que armó la
+                    # misma preparación (`Preparacion.hecho`), con los
+                    # datos de la vista previa, porque la huella
+                    # coincidió -- el estado sigue siendo ese. Sólo
                     # `aprobar_tarea` y `actualizar_estado` (arriba)
                     # tienen fraseo específico del resultado.
                     _responder(cur, workspace_id, chat_id, quien,
-                              f"Hecho. {prep_capturada['cambio']}", ahora)
+                              prep_capturada["hecho"], ahora)
                 else:
                     _responder(cur, workspace_id, chat_id, quien, "Hecho.", ahora)
 

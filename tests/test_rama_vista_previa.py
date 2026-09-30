@@ -563,8 +563,8 @@ def _causa_que_llena_la_vista_previa() -> str:
     from prisma.salida import (BUTTON_TEXT_LIMIT, margen_saludo,
                                telegram_utf16_units)
 
-    base = ("Tarea: Programar PLC · Causa del bloqueo:  · Estado actual: Asignada "
-            "· la tarea pasa a Bloqueada\n\nTodavía no se aplicó ningún cambio.")
+    base = ("Tarea: Programar PLC\nCausa del bloqueo: \nEstado actual: Asignada\n"
+            "Nuevo estado: Bloqueada\n\nTodavía no se aplicó ningún cambio.")
     limite = BUTTON_TEXT_LIMIT - margen_saludo(personal=True)
     return "x" * (limite - telegram_utf16_units(base) - 10)
 

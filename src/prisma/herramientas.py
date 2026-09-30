@@ -81,11 +81,16 @@ class Preparacion:
     en términos humanos, y una huella del estado que se leyó para armarlo.
 
     `cambio` no incluye el aviso de que todavía no se aplicó nada -- eso lo
-    agrega `resumen`, que es lo que se muestra en la vista previa. `cambio`
-    solo se reusa como base del recibo cuando se confirma.
+    agrega `resumen`, que es lo que se muestra en la vista previa. Se arma con
+    `_filas`: un dato por línea (T10-4, R3-H11).
+
+    `hecho` es el recibo al confirmar: una oración corta con lo que pasó, en
+    pasado, armada con los mismos datos que `cambio` (T10-4, R3-H14: el recibo
+    ya no repite la vista previa entera). Vacío, quien confirma dice "Hecho.".
     """
     cambio: str
     huella: str
+    hecho: str = ""
 
     @property
     def resumen(self) -> str:
@@ -114,6 +119,33 @@ ESTADOS_LEGIBLES = {
 
 def _estado_legible(estado: str | None) -> str:
     return ESTADOS_LEGIBLES.get(estado, estado or "sin estado")
+
+
+def _estar(estado: str | None) -> str:
+    """El estado como algo en lo que la tarea "está" ("estar en curso", "estar
+    asignada"): se lee bien con cualquiera, a diferencia de "a en curso" o de
+    una mayúscula en mitad de la oración (T10-4, R3-H14)."""
+    return f"estar {_estado_legible(estado).lower()}"
+
+
+def recibo_de_estado(titulo: str, estado: str) -> str:
+    """Lo que se le dice a la persona cuando la tarea pasó de estado. Entregar
+    (`en_revision`) es el caso que la persona vive como algo que hizo ella: se
+    lo agradece y dice a dónde fue la tarea (R3-H9: sin nombrar a quien revisa
+    ni horarios). El resto dice el estado nuevo, en minúscula, con `_estar`."""
+    if estado == "en_revision":
+        return f"Gracias. La tarea «{titulo}» pasó a revisión."
+    return f"La tarea «{titulo}» pasó a {_estar(estado)}."
+
+
+def _filas(*filas: tuple[str | None, str | None]) -> str:
+    """La vista previa de un cambio: un dato por línea (T10-4, R3-H11). Cada
+    fila es `(etiqueta, valor)`, o `(None, frase)` para una frase suelta; una
+    fila sin valor no sale. Único lugar donde se arma el renglón: las
+    preparaciones pasan sus datos, no juntan texto a mano."""
+    return "\n".join(
+        valor if etiqueta is None else f"{etiqueta}: {valor}"
+        for etiqueta, valor in filas if valor is not None)
 
 
 # El texto exacto que `db/esquema.sql: motivo_no_cierra_tarea` devuelve cuando
@@ -513,10 +545,10 @@ def ejecutar(cur: psycopg.Cursor, quien: Solicitante, nombre: str,
     manda quien confirma por botón. Si la preparación, corrida de nuevo,
     devuelve una huella distinta, no se aplica nada (`EstadoCambio`).
 
-    `preparacion`, si se pasa un dict, se completa con `cambio` y `huella` de
-    la última preparación corrida acá -- así quien llama arma un recibo que
-    cuenta qué cambió, sin que `ejecutar` deje de devolver sólo el resultado
-    del handler.
+    `preparacion`, si se pasa un dict, se completa con `cambio`, `hecho` y
+    `huella` de la última preparación corrida acá -- así quien llama arma un
+    recibo que cuenta qué pasó, sin que `ejecutar` deje de devolver sólo el
+    resultado del handler.
     """
     if nombre == "crear_tarea":
         raise Denegado(
@@ -540,6 +572,7 @@ def ejecutar(cur: psycopg.Cursor, quien: Solicitante, nombre: str,
             return prep
         if preparacion is not None:
             preparacion["cambio"] = prep.cambio
+            preparacion["hecho"] = prep.hecho
             preparacion["huella"] = prep.huella
         if not ya_confirmada:
             raise NecesitaConfirmacion(prep.resumen, nombre, dict(args),
@@ -684,14 +717,14 @@ def _preparar_crear_objetivo(cur, quien: Solicitante, titulo, tipo,
                              "este equipo"}
         padre_titulo, padre_estado = padre["titulo"], padre["estado"]
 
-    cambio = f"Nuevo objetivo ({tipo}): {titulo}"
-    if padre_titulo:
-        cambio += f" · cuelga de «{padre_titulo}»"
-    if fecha_objetivo:
-        cambio += f" · fecha objetivo: {fecha_objetivo}"
+    cambio = _filas(
+        ("Nuevo objetivo", titulo), ("Tipo", tipo),
+        ("Cuelga de", f"«{padre_titulo}»" if padre_titulo else None),
+        ("Fecha objetivo", fecha_objetivo or None))
     huella = _huella("crear_objetivo", titulo, tipo, padre_id, padre_estado,
                      descripcion, fecha_objetivo)
-    return Preparacion(cambio=cambio, huella=huella)
+    return Preparacion(cambio=cambio, huella=huella,
+                       hecho=f"Creé el objetivo «{titulo}».")
 
 
 @herramienta(
@@ -1032,11 +1065,16 @@ def _preparar_actualizar_estado(cur, quien: Solicitante, tarea_id, estado,
             evidencia_texto = (evidencia_texto or "").strip()
             if not evidencia_texto:
                 return {"error": _AVISO_YA_EN_REVISION}
-            cambio = (f"Tarea: {fila['titulo']} · ya está en revisión · se "
-                     f"suma la evidencia para quien la revisa: {evidencia_texto}")
+            cambio = _filas(
+                ("Tarea", fila["titulo"]),
+                (None, "Ya está en revisión: se suma la evidencia para quien "
+                       "la revisa."),
+                ("Evidencia", evidencia_texto))
             huella = _huella("actualizar_estado_evidencia_en_revision",
                              tarea_id, evidencia_texto)
-            return Preparacion(cambio=cambio, huella=huella)
+            return Preparacion(
+                cambio=cambio, huella=huella,
+                hecho=f"Sumé la evidencia a «{fila['titulo']}» para quien la revisa.")
 
         # ADR 0009 (hallazgo 8, sesión 2 por Telegram, 2026-09-27): Ariel
         # tocó "Ya la terminé" y la tarea pasó a `en_revision` sin ninguna
@@ -1069,14 +1107,16 @@ def _preparar_actualizar_estado(cur, quien: Solicitante, tarea_id, estado,
             if impedimento:
                 return {"iniciada": False, "falta": impedimento}
 
-    cambio = (f"Tarea: {fila['titulo']} · Estado actual: "
-             f"{_estado_legible(fila['estado'])} · Nuevo estado: "
-             f"{_estado_legible(estado)}")
-    if estado == "en_revision" and evidencia_texto:
-        cambio += f" · Evidencia: {evidencia_texto.strip()}"
+    cambio = _filas(
+        ("Tarea", fila["titulo"]),
+        ("Estado actual", _estado_legible(fila["estado"])),
+        ("Nuevo estado", _estado_legible(estado)),
+        ("Evidencia", (evidencia_texto or "").strip()
+         if estado == "en_revision" and evidencia_texto else None))
     huella = _huella("actualizar_estado", tarea_id, fila["estado"], estado,
                      evidencia_texto)
-    return Preparacion(cambio=cambio, huella=huella)
+    return Preparacion(cambio=cambio, huella=huella,
+                       hecho=recibo_de_estado(fila["titulo"], estado))
 
 
 @herramienta(
@@ -1316,16 +1356,19 @@ def _preparar_registrar_bloqueo(cur, quien: Solicitante, tarea_id, causa,
     if fila["estado"] in ("terminada", "cancelada"):
         return {"error": "esa tarea ya está cerrada, no se le puede agregar un bloqueo"}
 
-    cambio = f"Tarea: {fila['titulo']} · Causa del bloqueo: {causa}"
-    if impacto:
-        cambio += f" · Impacto: {impacto}"
-    if fila["estado"] == "bloqueada":
-        cambio += " · se suma a los bloqueos abiertos; la tarea sigue Bloqueada"
-    else:
-        cambio += (f" · Estado actual: {_estado_legible(fila['estado'])} · "
-                  f"la tarea pasa a Bloqueada")
+    ya_bloqueada = fila["estado"] == "bloqueada"
+    cambio = _filas(
+        ("Tarea", fila["titulo"]), ("Causa del bloqueo", causa),
+        ("Impacto", impacto or None),
+        ("Estado actual", _estado_legible(fila["estado"])),
+        (None, "Se suma a los bloqueos abiertos; la tarea sigue bloqueada."
+         if ya_bloqueada else None),
+        ("Nuevo estado", None if ya_bloqueada else _estado_legible("bloqueada")))
+    hecho = (f"Registré el bloqueo en «{fila['titulo']}»: "
+             + ("se suma a los bloqueos abiertos y la tarea sigue bloqueada."
+                if ya_bloqueada else "la tarea quedó bloqueada."))
     huella = _huella("registrar_bloqueo", tarea_id, fila["estado"])
-    return Preparacion(cambio=cambio, huella=huella)
+    return Preparacion(cambio=cambio, huella=huella, hecho=hecho)
 
 
 @herramienta(
@@ -1406,14 +1449,23 @@ def _preparar_resolver_bloqueo(cur, quien: Solicitante, bloqueo_id, resolucion):
                        (fila["task_id"],))
             vuelve_a = cur.fetchone()["previo"]
 
-    cambio = f"Tarea: {fila['titulo']} · Bloqueo: {fila['causa']} · Resolución: {resolucion}"
+    sigue_bloqueada = not vuelve_a and fila["estado"] == "bloqueada"
+    cambio = _filas(
+        ("Tarea", fila["titulo"]), ("Bloqueo", fila["causa"]),
+        ("Resolución", resolucion),
+        (None, f"La tarea vuelve a {_estar(vuelve_a)}." if vuelve_a else None),
+        (None, "La tarea sigue bloqueada: hay otros bloqueos abiertos."
+         if sigue_bloqueada else None))
+    base = f"Resolví el bloqueo de «{fila['titulo']}»"
     if vuelve_a:
-        cambio += f" · la tarea vuelve a {_estado_legible(vuelve_a)}"
-    elif fila["estado"] == "bloqueada":
-        cambio += " · la tarea sigue Bloqueada (hay otros bloqueos abiertos)"
+        hecho = f"{base}: la tarea volvió a {_estar(vuelve_a)}."
+    elif sigue_bloqueada:
+        hecho = f"{base}. La tarea sigue bloqueada: quedan otros bloqueos abiertos."
+    else:
+        hecho = f"{base}."
     huella = _huella("resolver_bloqueo", bloqueo_id, fila["resuelto_en"],
                      fila["estado"], quedan_abiertos)
-    return Preparacion(cambio=cambio, huella=huella)
+    return Preparacion(cambio=cambio, huella=huella, hecho=hecho)
 
 
 @herramienta(
@@ -1517,9 +1569,11 @@ def _preparar_adjuntar_evidencia(cur, quien: Solicitante, tarea_id, tipo,
             "No podés adjuntar evidencia a una tarea que no es tuya ni que revisás.")
 
     detalle = uri or descripcion or "(sin detalle)"
-    cambio = f"Tarea: {fila['titulo']} · Nueva evidencia ({tipo}): {detalle}"
+    cambio = _filas(("Tarea", fila["titulo"]), ("Nueva evidencia", detalle),
+                    ("Tipo", tipo))
     huella = _huella("adjuntar_evidencia", tarea_id, tipo, uri, descripcion)
-    return Preparacion(cambio=cambio, huella=huella)
+    return Preparacion(cambio=cambio, huella=huella,
+                       hecho=f"Registré la evidencia en «{fila['titulo']}».")
 
 
 @herramienta(
@@ -1616,13 +1670,14 @@ def _preparar_aprobar_tarea(cur, quien: Solicitante, tarea_id, comentario=None):
     motivo = cur.fetchone()["m"]
     falta = None if motivo in (None, _MOTIVO_FALTA_APROBACION) else motivo
 
-    cambio = f"Se aprueba «{fila['titulo']}»"
     # Sin la palabra "falta" repetida (hallazgo 9, sesión 2 por Telegram,
     # 2026-09-27): el motivo que devuelve `motivo_no_cierra_tarea` ya
     # empieza diciendo qué falta ("Falta la evidencia requerida.", etc.).
-    cambio += " y queda terminada" if falta is None else f"; para cerrarla todavía: {falta}"
-    if comentario:
-        cambio += f" · Comentario: {comentario}"
+    cambio = _filas(
+        (None, f"Se aprueba «{fila['titulo']}»"
+         + (" y queda terminada" if falta is None
+            else f"; para cerrarla todavía: {falta}")),
+        ("Comentario", comentario or None))
     huella = _huella("aprobar_tarea", tarea_id, fila["estado"],
                      fila["responsable_membership_id"], falta)
     return Preparacion(cambio=cambio, huella=huella)
@@ -1757,10 +1812,14 @@ def _preparar_pedir_cambios_tarea(cur, quien: Solicitante, tarea_id, comentario=
 
     destino = _destino_pedir_cambios(cur, tarea_id)
 
-    cambio = (f"Se piden cambios en «{fila['titulo']}»: {comentario} · "
-             f"vuelve a {_estado_legible(destino).lower()}")
+    cambio = _filas(
+        (None, f"Se piden cambios en «{fila['titulo']}»."),
+        ("Qué falta corregir", comentario),
+        (None, f"La tarea vuelve a {_estar(destino)}."))
     huella = _huella("pedir_cambios_tarea", tarea_id, fila["estado"], comentario, destino)
-    return Preparacion(cambio=cambio, huella=huella)
+    return Preparacion(
+        cambio=cambio, huella=huella,
+        hecho=f"Pedí cambios en «{fila['titulo']}»: la tarea volvió a {_estar(destino)}.")
 
 
 @herramienta(
@@ -1826,8 +1885,8 @@ def _pedir_cambios_tarea(cur, quien: Solicitante, tarea_id, comentario=None):
 
     _avisar(
         cur, quien, fila["responsable_membership_id"],
-        (f"{quien.nombre} pidió cambios en «{fila['titulo']}»: {comentario} "
-         f"· vuelve a {_estado_legible(destino).lower()}"),
+        (f"{quien.nombre} pidió cambios en «{fila['titulo']}»: {comentario}\n"
+         f"La tarea vuelve a {_estar(destino)}."),
         dedupe_key=f"{quien.workspace_id}:pedir_cambios:{decision_id}")
 
     return {"pedido": True, "titulo": fila["titulo"]}
@@ -2139,11 +2198,15 @@ def _preparar_crear_dependencia(cur, quien: Solicitante, origen_tarea_id,
             "responsable de ninguna de las dos, ni referente de quien lo es.")
 
     tipo_legible = "bloqueante" if tipo == "bloqueante" else "informativa"
-    cambio = (f"Tarea «{destino['titulo']}» pasa a depender de "
-             f"«{origen['titulo']}» ({tipo_legible})")
+    cambio = _filas(("Tarea", destino["titulo"]),
+                    ("Pasa a depender de", origen["titulo"]),
+                    ("Tipo", tipo_legible))
     huella = _huella("crear_dependencia", origen_tarea_id, destino_tarea_id,
                      tipo, origen["estado"], destino["estado"])
-    return Preparacion(cambio=cambio, huella=huella)
+    return Preparacion(
+        cambio=cambio, huella=huella,
+        hecho=(f"Registré que «{destino['titulo']}» depende de "
+               f"«{origen['titulo']}» ({tipo_legible})."))
 
 
 @herramienta(
@@ -2221,10 +2284,13 @@ def _preparar_quitar_dependencia(cur, quien: Solicitante, dependencia_id):
             "No podés quitar esa dependencia: no sos responsable de ninguna "
             "de las dos tareas, ni referente de quien lo es.")
 
-    cambio = (f"Se elimina la dependencia entre «{fila['destino_titulo']}» y "
-             f"«{fila['origen_titulo']}»")
+    cambio = _filas(("Tarea", fila["destino_titulo"]),
+                    ("Deja de depender de", fila["origen_titulo"]))
     huella = _huella("quitar_dependencia", dependencia_id)
-    return Preparacion(cambio=cambio, huella=huella)
+    return Preparacion(
+        cambio=cambio, huella=huella,
+        hecho=(f"Eliminé la dependencia entre «{fila['destino_titulo']}» y "
+               f"«{fila['origen_titulo']}»."))
 
 
 @herramienta(

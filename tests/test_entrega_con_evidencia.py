@@ -1014,7 +1014,7 @@ def test_pedir_cambios_con_dependencia_bloqueante_abierta_vuelve_a_en_curso(
 
         tg_nahuel = _tg(cur, "Nahuel Gimenez")
         cuerpo = _outbox_ultimo(cur, ws, tg_nahuel)
-    assert "vuelve a en curso" in cuerpo.lower()
+    assert "vuelve a estar en curso" in cuerpo.lower()
 
 
 def test_pedir_cambios_entregada_sin_arrancar_con_dependencia_abierta_vuelve_a_asignada(
@@ -1112,7 +1112,7 @@ def test_pedir_cambios_vista_previa_nombra_el_destino_real(corework, conn):
                       {"tarea_id": tid_en_curso, "comentario": "Ajustar algo."})
             assert False, "tenía que pedir confirmación"
         except H.NecesitaConfirmacion as e:
-            assert "vuelve a en curso" in e.resumen.lower()
+            assert "vuelve a estar en curso" in e.resumen.lower()
 
     with espacio(conn, ws) as cur:
         marcos = _quien(cur, "Marcos Tarquini", ws)
@@ -1121,7 +1121,7 @@ def test_pedir_cambios_vista_previa_nombra_el_destino_real(corework, conn):
                       {"tarea_id": tid_asignada, "comentario": "Ajustar algo."})
             assert False, "tenía que pedir confirmación"
         except H.NecesitaConfirmacion as e:
-            assert "vuelve a asignada" in e.resumen.lower()
+            assert "vuelve a estar asignada" in e.resumen.lower()
 
 
 def test_actualizar_estado_en_curso_desde_en_revision_con_previo_en_curso_no_rechaza(
