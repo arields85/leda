@@ -709,3 +709,56 @@ def test_la_familia_b_0026_cubre_los_mensajes_sin_texto():
     assert abierta.precondiciones.get("borrador_de_alta")
     for e in familia.values():
         assert "todavía" in " ".join(e.respuesta_menciona).lower(), e.id
+
+
+# ---------------------------------------------------------------------------
+# Tocar dos veces el mismo botón (T9-R4): `veces` y `cada_s` en un toque, y
+# `confirmar` para el Confirmar automático.
+# ---------------------------------------------------------------------------
+
+
+def test_carga_un_toque_repetido_y_un_confirmar_repetido(tmp_path):
+    datos = dict(_MINIMO)
+    datos.update(toques=[{"indice": 0, "veces": 2, "cada_s": 3}],
+                 confirmar={"veces": 2, "cada_s": 4.5})
+    e = cargar_escenario(_escribir(tmp_path, datos))
+    assert e.toques == ({"indice": 0, "veces": 2, "cada_s": 3},)
+    assert e.confirmar == {"veces": 2, "cada_s": 4.5}
+
+
+@pytest.mark.parametrize("toque", [
+    {"indice": 0, "veces": 0}, {"indice": 0, "veces": "2"},
+    {"indice": 0, "veces": True}, {"indice": 0, "cada_s": -1},
+    {"indice": 0, "cada_s": "3"}])
+def test_un_toque_repetido_invalido_se_rechaza(tmp_path, toque):
+    datos = dict(_MINIMO)
+    datos["toques"] = [toque]
+    with pytest.raises(EscenarioInvalido):
+        cargar_escenario(_escribir(tmp_path, datos))
+
+
+@pytest.mark.parametrize("confirmar", [
+    {"veces": 0}, {"cada_s": -2}, {"otra": 1}, [2], "dos"])
+def test_un_confirmar_repetido_invalido_se_rechaza(tmp_path, confirmar):
+    datos = dict(_MINIMO)
+    datos["confirmar"] = confirmar
+    with pytest.raises(EscenarioInvalido):
+        cargar_escenario(_escribir(tmp_path, datos))
+
+
+def test_la_familia_b_0028_cubre_el_toque_repetido_y_una_respuesta_por_toque():
+    # T9-R4: doble Confirmar dentro de la ventana, doble toque en la lista,
+    # "Dejarlo y ver lo otro" como una sola respuesta y el segundo toque fuera de
+    # la ventana.
+    import pathlib
+
+    directorio = pathlib.Path(__file__).parent / "escenarios"
+    familia = {e.id: e for e in cargar_escenarios(directorio)
+               if e.id == "b-0028" or e.variante_de == "b-0028"}
+
+    assert sorted(familia) == ["b-0028", "b-0028-b", "b-0028-c", "b-0028-d"]
+    assert familia["b-0028"].confirmar == {"veces": 2, "cada_s": 3}
+    assert familia["b-0028-b"].toques == ({"indice": 0, "veces": 2, "cada_s": 3},)
+    assert familia["b-0028-c"].toques_tras_mensajes == (
+        {"etiqueta": "Dejarlo y ver lo otro"},)
+    assert familia["b-0028-d"].confirmar["cada_s"] > 10       # fuera de la ventana

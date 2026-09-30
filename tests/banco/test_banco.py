@@ -91,6 +91,7 @@ def test_escenario_contra_modelo_real(
         toques=list(escenario.toques) or None,
         mensajes_tras_toques=list(escenario.mensajes_tras_toques) or None,
         toques_tras_mensajes=list(escenario.toques_tras_mensajes) or None,
+        confirmar=escenario.confirmar or None,
         preguntas_sembradas={
             c: escenario.precondiciones[c]
             for c in ("vista_previa", "aclaracion", "borrador_de_alta")
@@ -135,7 +136,8 @@ def test_escenario_contra_modelo_real(
         # visible -- en todo escenario, sin opt-out.
         comprobar_una_respuesta_por_mensaje(
             resultado.respuestas_por_mensaje,
-            incidentes=resultado.incidentes_de_respuesta),
+            incidentes=resultado.incidentes_de_respuesta,
+            respuestas_por_toque=resultado.respuestas_por_toque),
     ]
     # ADR 0007 ("Prisma orienta, no charla"), T4: activa por defecto para
     # todo escenario -- `permite_pregunta_sin_opciones` es el opt-out

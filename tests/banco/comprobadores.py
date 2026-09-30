@@ -668,16 +668,20 @@ def comprobar_aclaracion(
 
 def comprobar_una_respuesta_por_mensaje(
         respuestas_por_mensaje: Iterable[int], *,
-        incidentes: Iterable[str] = ()) -> ResultadoComprobacion:
+        incidentes: Iterable[str] = (),
+        respuestas_por_toque: Iterable[int] = ()) -> ResultadoComprobacion:
     """Aprueba si cada mensaje recibió exactamente una respuesta y el control
-    estructural no tuvo que registrar nada."""
-    conteos = tuple(respuestas_por_mensaje)
+    estructural no tuvo que registrar nada. La regla alcanza a cada toque que se
+    procesó (T9-R4): uno absorbido por repetido no cuenta, no es una respuesta
+    que falte."""
     problemas = []
-    for i, n in enumerate(conteos, 1):
-        if n == 0:
-            problemas.append(f"el mensaje {i} no recibió ninguna respuesta")
-        elif n > 1:
-            problemas.append(f"el mensaje {i} recibió {n} respuestas")
+    for cosa, conteos in (("mensaje", tuple(respuestas_por_mensaje)),
+                          ("toque", tuple(respuestas_por_toque))):
+        for i, n in enumerate(conteos, 1):
+            if n == 0:
+                problemas.append(f"el {cosa} {i} no recibió ninguna respuesta")
+            elif n > 1:
+                problemas.append(f"el {cosa} {i} recibió {n} respuestas")
     for resumen in incidentes:
         problemas.append(f"el control estructural tuvo que actuar: {resumen}")
     if problemas:

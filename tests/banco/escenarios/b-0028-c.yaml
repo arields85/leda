@@ -1,0 +1,61 @@
+id: b-0028-c
+variante_de: b-0028
+objetivo: >
+  Variante de b-0028, "Dejarlo y ver lo otro" es una sola respuesta (ADR 0013
+  regla 2 extendida a los toques): con la aclaración de una referencia ambigua
+  esperando, la persona pide otra cosa y Prisma pregunta si sigue con lo pendiente;
+  toca "Dejarlo y ver lo otro". Lo que se dejó de lado y la atención del mensaje
+  guardado salen como UNA respuesta del toque, sin incidente del control de una
+  respuesta por toque.
+actor: Nahuel Gimenez
+mensajes: []
+precondiciones:
+  aclaracion:
+    mensaje: "quedé trabado con el cableado, todavía no me pasaron el plano que prometieron"
+    referencia: el cableado
+    tareas:
+      - Cablear tablero de la máquina 3 (simulado)
+      - Cablear tablero de la máquina 4 (simulado)
+  tareas:
+    - id: t1
+      titulo: Cablear tablero de la máquina 3 (simulado)
+      area: ot
+      responsable: Nahuel Gimenez
+    - id: t2
+      titulo: Cablear tablero de la máquina 4 (simulado)
+      area: ot
+      responsable: Nahuel Gimenez
+    - id: t3
+      titulo: Revisar variador de la línea 2 (simulado)
+      area: ot
+      responsable: Nahuel Gimenez
+mensajes_tras_toques:
+  - "¿qué tareas tengo abiertas?"
+# El toque en la pregunta de la rama (`gateway.ETIQUETA_DEJAR_RAMA`; si T10
+# cambia su redacción, actualizar acá).
+toques_tras_mensajes:
+  - etiqueta: "Dejarlo y ver lo otro"
+herramientas_prohibidas:
+  - registrar_bloqueo
+  - resolver_bloqueo
+  - crear_dependencia
+  - quitar_dependencia
+  - aprobar_tarea
+  - actualizar_estado
+efectos:
+  conteos_delta:
+    task: 0
+    blocker: 0
+    task_state_event: 0
+    evidence: 0
+    approval: 0
+# El texto del aviso es del código (`_Pregunta.dejada`); lo que el modelo diga de
+# las tareas no se exige: importa que sea UNA respuesta (el comprobador de una
+# respuesta por toque y el incidente del control).
+respuesta_menciona:
+  - "dejé de lado la aclaración"
+respuesta_no_contiene_patron:
+  - "Estábamos con"
+  - "No pude completar"
+permite_pregunta_sin_opciones: true
+severidad: alta

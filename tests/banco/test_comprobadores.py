@@ -1045,3 +1045,22 @@ def test_una_respuesta_por_mensaje_falla_si_el_control_estructural_tuvo_que_actu
     r = comprobar_una_respuesta_por_mensaje(
         (1,), incidentes=("Un mensaje quedó sin ninguna respuesta.",))
     assert r.resultado == "falla" and "control estructural" in r.diferencia
+
+
+@pytest.mark.parametrize("por_toque, dice", [
+    ((0,), "el toque 1 no recibió ninguna respuesta"),
+    ((1, 2), "el toque 2 recibió 2 respuestas")])
+def test_una_respuesta_por_toque_falla_con_cero_o_mas_de_una(por_toque, dice):
+    """T9-R4: la regla 2 se extiende a los toques que se procesaron (uno absorbido
+    por repetido no se cuenta: no es una respuesta que falte)."""
+    from tests.banco.comprobadores import comprobar_una_respuesta_por_mensaje
+
+    r = comprobar_una_respuesta_por_mensaje((1,), respuestas_por_toque=por_toque)
+    assert r.resultado == "falla" and dice in r.diferencia
+
+
+def test_una_respuesta_por_toque_aprueba_con_un_grupo_por_toque():
+    from tests.banco.comprobadores import comprobar_una_respuesta_por_mensaje
+
+    assert comprobar_una_respuesta_por_mensaje(
+        (1,), respuestas_por_toque=(1, 1)).resultado == "aprobado"

@@ -66,7 +66,8 @@ def test_replay_reproduce_el_resultado_esperado(archivo_replay, corework, conn):
         escenario_id=escenario.id, indice=0, cliente_jev=jev_guionado,
         aclaracion_esperada=escenario.aclaracion_esperada or None,
         toques=list(escenario.toques) or None,
-        mensajes_tras_toques=list(escenario.mensajes_tras_toques) or None)
+        mensajes_tras_toques=list(escenario.mensajes_tras_toques) or None,
+        confirmar=escenario.confirmar or None)
 
     assert not resultado.bloqueado, resultado.motivo_bloqueo
 
@@ -100,7 +101,8 @@ def test_replay_reproduce_el_resultado_esperado(archivo_replay, corework, conn):
         # visible -- en todo escenario, sin opt-out.
         comprobar_una_respuesta_por_mensaje(
             resultado.respuestas_por_mensaje,
-            incidentes=resultado.incidentes_de_respuesta),
+            incidentes=resultado.incidentes_de_respuesta,
+            respuestas_por_toque=resultado.respuestas_por_toque),
     ]
     # ADR 0007 ("Prisma orienta, no charla"), T4: mismo criterio que
     # `test_banco.py` -- activa por defecto, opt-out explícito por escenario

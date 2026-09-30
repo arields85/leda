@@ -2591,3 +2591,88 @@ def test_sembrar_cambios_pedidos_sin_el_motivo_falla_nombrandolo(corework, conn)
             "id": "t1", "titulo": "Programar PLC (simulado)", "area": "ot",
             "responsable": "Nahuel Gimenez",
             "cambios_pedidos": {"por": "Marcos Tarquini"}}]})
+
+
+# ---------------------------------------------------------------------------
+# Tocar dos veces el mismo botón (T9-R4, ADR 0013 regla 4): `veces` y `cada_s`
+# en un toque, y `confirmar` para el Confirmar automático. El reloj de la corrida
+# es real: el intervalo se simula envejeciendo los toques ya registrados
+# (`inbound_message.at`), sin dormir.
+# ---------------------------------------------------------------------------
+
+
+def _sembrar_tarea_en_curso_posible(conn, ws) -> str:
+    with admin(conn) as cur:
+        return sembrar_precondiciones(cur, ws, {
+            "tareas": [{"id": "t1", "titulo": "Programar PLC (simulado)",
+                       "area": "ot", "responsable": "Marcos Tarquini",
+                       "evidencia_requerida": []}]})["t1"]
+
+
+def _lista_de_tareas():
+    return ProveedorGuionado(
+        guion=[Respuesta(llamadas=[Llamada("c1", "consultar_tareas", {})]),
+               Respuesta(texto="Tenés una tarea pendiente.")],
+        rutas=[IntentRoute(IntentAction.NORMAL_CONVERSATION)])
+
+
+def _absorbidos(conn, ws) -> int:
+    with admin(conn) as cur:
+        cur.execute("select count(*) n from audit_log where workspace_id = %s "
+                    "and accion = 'toque_repetido_absorbido'", (ws,))
+        return cur.fetchone()["n"]
+
+
+def test_la_corrida_toca_dos_veces_el_mismo_boton_dentro_de_la_ventana(
+        corework, conn):
+    ws = corework.workspace_id
+    _sembrar_tarea_en_curso_posible(conn, ws)
+
+    r = ejecutar_escenario(
+        conn, ws, "corework", "Marcos Tarquini", ["pasame mis tareas"],
+        _lista_de_tareas(), escenario_id="b-test-doble-toque", indice=0,
+        toques=[{"indice": 0, "veces": 2, "cada_s": 3}])
+
+    assert r.bloqueado is False, r.motivo_bloqueo
+    assert _absorbidos(conn, ws) == 1
+    assert r.respuestas_por_toque == (1,)            # el absorbido no cuenta
+    assert "ya no está vigente" not in r.respuesta_texto
+    assert r.incidentes_de_respuesta == ()
+
+
+def test_la_corrida_toca_dos_veces_el_mismo_boton_fuera_de_la_ventana(
+        corework, conn):
+    ws = corework.workspace_id
+    _sembrar_tarea_en_curso_posible(conn, ws)
+
+    r = ejecutar_escenario(
+        conn, ws, "corework", "Marcos Tarquini", ["pasame mis tareas"],
+        _lista_de_tareas(), escenario_id="b-test-doble-toque-lento", indice=0,
+        toques=[{"indice": 0, "veces": 2, "cada_s": 12}])
+
+    assert r.bloqueado is False, r.motivo_bloqueo
+    assert _absorbidos(conn, ws) == 0
+    assert r.respuestas_por_toque == (1, 1)           # cada uno, su respuesta
+    assert "ya no está vigente" in r.respuesta_texto
+
+
+def test_la_corrida_confirma_dos_veces_y_la_herramienta_corre_una_sola_vez(
+        corework, conn):
+    ws = corework.workspace_id
+    tid = _sembrar_tarea_en_curso_posible(conn, ws)
+
+    r = ejecutar_escenario(
+        conn, ws, "corework", "Marcos Tarquini", ["pasame mis tareas"],
+        _lista_de_tareas(), escenario_id="b-test-doble-confirmar", indice=0,
+        toques=[{"indice": 0}, {"etiqueta": "Ya la terminé"}],
+        confirmar={"veces": 2, "cada_s": 3})
+
+    assert r.bloqueado is False, r.motivo_bloqueo
+    assert _absorbidos(conn, ws) == 1
+    assert r.herramientas_ejecutadas.count("actualizar_estado") == 1
+    assert r.conteos_despues["task_state_event"] == (
+        r.conteos_antes["task_state_event"] + 1)
+    assert r.incidentes_de_respuesta == ()
+    with admin(conn) as cur:
+        cur.execute("select estado from task where id = %s", (tid,))
+        assert cur.fetchone()["estado"] == "en_revision"

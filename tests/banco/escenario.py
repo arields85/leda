@@ -104,6 +104,11 @@ class Escenario:
     # `toques`. La respuesta visible que se evalúa pasa a ser la de estos
     # toques y lo que sigue (`corrida.ejecutar_escenario`).
     toques_tras_mensajes: tuple[dict, ...] = ()
+    # El Confirmar automático del final se toca `veces` veces, con `cada_s`
+    # segundos entre uno y otro (T9-R4, ADR 0013 regla 4): `{"veces": 2,
+    # "cada_s": 3}` prueba que un doble toque dentro de la ventana se absorbe.
+    # Vacío: se toca una vez, como siempre.
+    confirmar: dict = field(default_factory=dict)
 
 
 def _mensaje_valido(mensaje) -> bool:
@@ -121,7 +126,8 @@ def _mensaje_valido(mensaje) -> bool:
 
 def _validar_toques(datos: dict, campo: str, origen: pathlib.Path) -> None:
     """`toques` y `toques_tras_mensajes` tienen el mismo formato: una lista de
-    mapeos con `etiqueta` o `indice`, exactamente uno de los dos."""
+    mapeos con `etiqueta` o `indice`, exactamente uno de los dos, y opcionalmente
+    `veces` y `cada_s` (T9-R4: tocar el mismo botón más de una vez)."""
     toques = datos.get(campo, [])
     if not isinstance(toques, list):
         raise EscenarioInvalido(f"{origen}: '{campo}' tiene que ser una lista.")
@@ -143,6 +149,20 @@ def _validar_toques(datos: dict, campo: str, origen: pathlib.Path) -> None:
             if not isinstance(indice, int) or isinstance(indice, bool) or indice < 0:
                 raise EscenarioInvalido(
                     f"{origen}: '{campo}[{i}].indice' tiene que ser un entero >= 0.")
+        _validar_repeticion(t, f"{campo}[{i}]", origen)
+
+
+def _validar_repeticion(datos: dict, donde: str, origen: pathlib.Path) -> None:
+    """`veces` (entero >= 1) y `cada_s` (número >= 0), ambos opcionales."""
+    veces = datos.get("veces", 1)
+    if not isinstance(veces, int) or isinstance(veces, bool) or veces < 1:
+        raise EscenarioInvalido(
+            f"{origen}: '{donde}.veces' tiene que ser un entero >= 1.")
+    cada_s = datos.get("cada_s", 0)
+    if (not isinstance(cada_s, (int, float)) or isinstance(cada_s, bool)
+            or cada_s < 0):
+        raise EscenarioInvalido(
+            f"{origen}: '{donde}.cada_s' tiene que ser un número >= 0.")
 
 
 def _validar_estructura(datos: dict, origen: pathlib.Path) -> None:
@@ -220,6 +240,12 @@ def _validar_estructura(datos: dict, origen: pathlib.Path) -> None:
             f"{origen}: 'mensajes_tras_toques' tiene que ser una lista de texto "
             "no vacío o de adjuntos.")
 
+    confirmar = datos.get("confirmar", {}) or {}
+    if not isinstance(confirmar, dict) or not set(confirmar) <= {"veces", "cada_s"}:
+        raise EscenarioInvalido(
+            f"{origen}: 'confirmar' tiene que ser un mapeo con 'veces' y/o 'cada_s'.")
+    _validar_repeticion(confirmar, "confirmar", origen)
+
     _validar_toques(datos, "toques_tras_mensajes", origen)
     if datos.get("toques_tras_mensajes") and not tras_toques:
         raise EscenarioInvalido(
@@ -273,6 +299,7 @@ def cargar_escenario(ruta: pathlib.Path | str) -> Escenario:
         permite_pregunta_sin_opciones=bool(datos.get("permite_pregunta_sin_opciones", False)),
         mensajes_tras_toques=tuple(datos.get("mensajes_tras_toques", []) or []),
         toques_tras_mensajes=tuple(datos.get("toques_tras_mensajes", []) or []),
+        confirmar=datos.get("confirmar", {}) or {},
     )
 
 

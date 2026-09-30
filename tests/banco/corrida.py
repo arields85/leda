@@ -725,6 +725,9 @@ class ResultadoCorrida:
     # `comprobadores.comprobar_una_respuesta_por_mensaje`.
     respuestas_por_mensaje: tuple[int, ...] = ()
     incidentes_de_respuesta: tuple[str, ...] = ()
+    # Lo mismo por cada toque que se procesó (T9-R4, regla 2 extendida a los
+    # toques): un toque absorbido por repetido no se procesa ni se cuenta.
+    respuestas_por_toque: tuple[int, ...] = ()
 
 
 def _conteos(cur, ws: str) -> dict[str, int]:
@@ -982,6 +985,24 @@ def _tocar_opcion(conn, slug: str, chat: int, tg_id: int, token: str,
     gateway.procesar_update(conn, slug, callback)
 
 
+def _tocar_veces(conn, workspace_id: str, slug: str, chat: int, tg_id: int,
+                 token: str, prefijo: str = P.CALLBACK_PREFIJO, *,
+                 veces: int = 1, cada_s: float = 0) -> None:
+    """Toca `veces` el MISMO botón (T9-R4, ADR 0013 regla 4). El reloj de la
+    corrida es real: para simular `cada_s` segundos entre un toque y el
+    siguiente se envejecen los toques ya registrados (`inbound_message.at`), sin
+    dormir. El botón se resuelve una vez: la segunda vez ya no está 'esperando'."""
+    for i in range(veces):
+        if i and cada_s:
+            with admin(conn) as cur:
+                cur.execute(
+                    """update inbound_message set at = at - make_interval(secs => %s)
+                        where workspace_id = %s and chat_id = %s
+                          and boton_callback is not null""",
+                    (cada_s, workspace_id, chat))
+        _tocar_opcion(conn, slug, chat, tg_id, token, prefijo)
+
+
 def _update_de_texto(message_id: int, texto: str, chat: int, tg_id: int) -> dict:
     """Un mensaje de texto como lo manda Telegram desde un chat privado
     (`type`: el gateway sólo lee el campo del alta guiada en un chat privado,
@@ -1046,6 +1067,28 @@ def respuestas_por_mensaje(cur, workspace_id: str, chat_id: int,
     return tuple(len(g) for g in grupos.values())
 
 
+def respuestas_por_toque(cur, workspace_id: str, chat_id: int) -> tuple[int, ...]:
+    """Cuántas respuestas independientes se encolaron para cada toque que se
+    procesó en la corrida (T9-R4): las filas de toque con su botón
+    (`boton_callback`). Un toque absorbido por repetido no lo guarda, así que no
+    cuenta: no es una respuesta que falte."""
+    cur.execute(
+        """select i.id, o.dedupe_key, o.respuesta_grupo
+             from inbound_message i
+             left join message_outbox o
+               on o.entrante_id = i.id and o.es_respuesta and o.chat_id = i.chat_id
+            where i.workspace_id = %s and i.chat_id = %s
+              and i.boton_callback is not null
+            order by i.at, i.id""",
+        (workspace_id, chat_id))
+    grupos: dict[str, set[str]] = {}
+    for fila in cur.fetchall():
+        conjunto = grupos.setdefault(str(fila["id"]), set())
+        if fila["dedupe_key"] is not None:
+            conjunto.add(grupo_de(fila))
+    return tuple(len(g) for g in grupos.values())
+
+
 def _telegram_id(conn, ws: str, nombre: str) -> int:
     with admin(conn) as cur:
         cur.execute(
@@ -1067,6 +1110,7 @@ def ejecutar_escenario(
     mensajes_tras_toques: list[str | dict] | None = None,
     toques_tras_mensajes: list[dict] | None = None,
     preguntas_sembradas: dict | None = None,
+    confirmar: dict | None = None,
 ) -> ResultadoCorrida:
     """Corre un escenario por `gateway.procesar_update`, con
     `proveedor_real` envuelto en `ProveedorGrabador` e inyectado en lugar de
@@ -1132,6 +1176,11 @@ def ejecutar_escenario(
     que abrió uno de esos mensajes ("Seguir" o "Dejarlo y ver lo otro"). La
     pregunta ya salió: la respuesta visible que se evalúa es sólo la de estos
     toques y lo que sigue.
+
+    Un toque puede traer `veces` y `cada_s` (T9-R4): se toca ese mismo botón
+    `veces` veces, con `cada_s` segundos entre uno y otro (simulados, sin dormir).
+    `confirmar` (`{"veces": N, "cada_s": S}`) hace lo mismo con el Confirmar
+    automático del final: sin él se toca una vez.
 
     `preguntas_sembradas` (T9-R1d-1c): las preguntas que el escenario declara ya
     esperando (`vista_previa`, `aclaracion` y, con toques, `borrador_de_alta`;
@@ -1272,8 +1321,9 @@ def ejecutar_escenario(
             with admin(conn) as cur:
                 _, objetivo = _resolver_toque_generico(
                     cur, workspace_id, chat, toque, desde_corrida)
-            _tocar_opcion(conn, slug, chat, tg_id, objetivo["token"],
-                          objetivo.get("prefijo", P.CALLBACK_PREFIJO))
+            _tocar_veces(conn, workspace_id, slug, chat, tg_id, objetivo["token"],
+                         objetivo.get("prefijo", P.CALLBACK_PREFIJO),
+                         veces=toque.get("veces", 1), cada_s=toque.get("cada_s", 0))
 
         if mensajes_tras_toques:
             # Lo que ya salió (la lista, el menú, la pregunta abierta) queda
@@ -1298,8 +1348,11 @@ def ejecutar_escenario(
                 with admin(conn) as cur:
                     _, objetivo = _resolver_toque_generico(
                         cur, workspace_id, chat, toque, desde_corrida)
-                _tocar_opcion(conn, slug, chat, tg_id, objetivo["token"],
-                              objetivo.get("prefijo", P.CALLBACK_PREFIJO))
+                _tocar_veces(conn, workspace_id, slug, chat, tg_id,
+                             objetivo["token"],
+                             objetivo.get("prefijo", P.CALLBACK_PREFIJO),
+                             veces=toque.get("veces", 1),
+                             cada_s=toque.get("cada_s", 0))
 
         # El turno pudo haber dejado una propuesta de una herramienta que
         # escribe esperando un Confirmar (T1/T2, ADR 0005 decisión 1): el
@@ -1321,11 +1374,9 @@ def ejecutar_escenario(
 
         if pendiente is not None:
             _, token = pendiente
-            toque = {"callback_query": {
-                "id": "banco-confirmar", "from": {"id": tg_id},
-                "data": f"{P.CALLBACK_PREFIJO}{token}",
-                "message": {"message_id": 2, "chat": {"id": chat}}}}
-            gateway.procesar_update(conn, slug, toque)
+            _tocar_veces(conn, workspace_id, slug, chat, tg_id, token,
+                         veces=(confirmar or {}).get("veces", 1),
+                         cada_s=(confirmar or {}).get("cada_s", 0))
     except Exception as exc:  # noqa: BLE001 -- una corrida rota queda bloqueada, no cae la suite
         conn.rollback()
         bloqueado = True
@@ -1345,6 +1396,7 @@ def ejecutar_escenario(
         herramientas_ejecutadas = _herramientas_registradas(cur, workspace_id)
         por_mensaje = respuestas_por_mensaje(cur, workspace_id, chat,
                                              mensajes_enviados)
+        por_toque = respuestas_por_toque(cur, workspace_id, chat)
         cur.execute(
             """select id, resumen_sanitizado from incident
                 where workspace_id = %s and etapa in (%s, %s)""",
@@ -1376,4 +1428,5 @@ def ejecutar_escenario(
         herramientas_antes_del_toque=tuple(herramientas_antes_del_toque),
         etiquetas_aclaracion_ofrecidas=tuple(etiquetas_aclaracion_ofrecidas),
         respuestas_por_mensaje=por_mensaje,
-        incidentes_de_respuesta=incidentes_de_respuesta)
+        incidentes_de_respuesta=incidentes_de_respuesta,
+        respuestas_por_toque=por_toque)
