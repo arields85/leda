@@ -413,11 +413,15 @@ gestión.
     previas vencidas al despachar, duplicados); sólo un turno muerto no deja ninguna. Sin
     esto el barrido mandaría un "Tuve un problema…" falso. Una persona dada de baja no
     recibe el aviso: un incidente, una vez.
-  - [ ] **T9-H19g — Barrido robusto** (`review-1fa0eb52f1e2f0e2`): aislamiento por recibo
+  - [x] **T9-H19g — Barrido robusto** (`review-1fa0eb52f1e2f0e2`): aislamiento por recibo
     (un recibo que falla no frena el lote), el mismo candado por mensaje que la
     recuperación del gateway, pruebas con turnos reales que no deben quedar huérfanos,
     predicado de espacio explícito en la membresía, reporte de la falla del barrido
     probado, reloj de la base.
+  - [ ] **T9-H19h — Últimos ajustes del barrido** (`review-5fe426815909aa70`): la marca de
+    falla reportada sólo después del commit; un mismo reloj (el de la base) para todos los
+    recibos y comparaciones; cada recibo barrido en su propia transacción corta para no
+    retener el candado por todo el ciclo; cota y aislamiento de `_FALLIDOS` probados.
   - [ ] **T9-H19c — Consulta al usuario:** ¿qué hace Prisma cuando alguien edita un mensaje
     ya enviado (`edited_message`)? Hoy lo trata como un mensaje nuevo.
   - [x] **T10-5c** — Seguimientos de `review-eca94d14a705c5c4`: comparar títulos contra el
@@ -5074,3 +5078,14 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   escritor 2145 passed, 309 deselected; padre: 19 passed. RDD: tramo `1f310fe..bfb8f76`
   (T9-H19d, T9-H19e, T9-H19f) medio, 838 líneas, `review-1fa0eb52f1e2f0e2` **aprobada y
   reconocida**; frontera en `bfb8f76`; advertencias a T9-H19g, en curso.
+
+- 2026-09-30: **T9-H19g.** Ruta: delegada, un escritor. `2f8d37b`: un savepoint por recibo
+  (un recibo que falla deja incidente `mensaje_huerfano_fallo` y el resto sigue); el barrido
+  toma el mismo candado por mensaje que el gateway (try-lock, vuelve a comprobar bajo el
+  candado); once pruebas con turnos reales (texto, toques, toque absorbido, token
+  desconocido, mensaje editado, repetido, adjuntos, aviso neutro, recuperación): ninguno
+  queda huérfano; predicado de espacio explícito en la membresía; reporte de la falla del
+  barrido y despacho que sigue probados; ventana y cota con el reloj de la base. Suite del
+  escritor 2172 passed, 309 deselected; padre: 46 passed. RDD: tramo `bfb8f76..2f8d37b` medio,
+  787 líneas, `review-5fe426815909aa70` **aprobada y reconocida**; frontera en `2f8d37b`;
+  seguimientos a T9-H19h, en curso.
