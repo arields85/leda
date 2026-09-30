@@ -426,6 +426,7 @@ gestión.
   - [x] **T10-5** — Mecanismo A (H3/H7, H9, H12): guarda de listas de hasta 3 tareas,
     `PREAMBULO` y escenarios (`b-0001`, `b-0001-a`, `b-0016`, `b-0021-c`, `b-0024-b`).
     Necesita respuestas del usuario.
+  - [x] **T10-5b** — Seguimientos de `review-5e28a95f618e8212` (guarda de listas).
   - [ ] **T10-6** — Mecanismo B (H8): respuesta a un saludo sin rama abierta. Necesita
     respuesta del usuario (¿con botones o sin?).
   - [ ] **T10-7** — Mecanismo D (`b-0027-d`): estado real en una negativa sin intento.
@@ -4978,3 +4979,14 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   completa 2089 passed, 300 deselected. Banco real completo (n=1) antes del ajuste: **98/100**
   (`b-0013`: T9-R5; `b-0020`: el modelo ofreció opciones en vez de la vista previa, al
   repetirlo pasa); pasaron `b-0023-e`, `b-0024-b`, `b-0001*`, `b-0016`, `b-0021-h`.
+
+- 2026-09-30: **T10-5b.** Ruta: delegada, un escritor. RDD de T10-2c/T10-5:
+  `review-5e28a95f618e8212` **aprobada y reconocida**; frontera en `33d1557`. `9a0209e`: la
+  guarda de listas no se aplica a una respuesta "sin cambios" (vista previa, opciones,
+  turno incompleto y disculpa ya salían antes; ahora quedan fijados por pruebas); un título
+  cuenta como nombrado sólo si aparece entero (límites de palabra, títulos más largos
+  primero y consumidos; un título vacío nunca), también en `_nombrar_tareas_sin_mencionar`;
+  las filas agregadas pasan por `revisar_salida` y `normalize_visible_text`; sin párrafo
+  vacío al final; asserts exactos restaurados en cinco archivos de pruebas. Suite del
+  escritor 2101 passed, 300 deselected; padre: 35 passed. RDD: tramo `33d1557..9a0209e`
+  medio, 271 líneas, `under_budget`: pendiente en el tramo.
