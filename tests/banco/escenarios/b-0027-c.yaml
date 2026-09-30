@@ -1,0 +1,42 @@
+id: b-0027-c
+variante_de: b-0027
+objetivo: >
+  Variante de b-0027, leer una tarea después de "Pedir cambios" (R3-H16): la
+  persona abre su tarea desde la lista y el encabezado del menú muestra el motivo
+  que le pidieron corregir, hasta la nueva entrega. Sólo se lee: no cambia nada.
+actor: Nahuel Gimenez
+mensajes:
+  - "pasame la lista completa de mis tareas"
+precondiciones:
+  tareas:
+    - id: t1
+      titulo: Programar PLC (simulado)
+      area: ot
+      responsable: Nahuel Gimenez
+      cambios_pedidos:
+        por: Marcos Tarquini
+        motivo: falta la captura del tablero con la hora visible
+toques:
+  - indice: 0
+herramientas_prohibidas:
+  - actualizar_estado
+  - registrar_bloqueo
+  - resolver_bloqueo
+  - crear_dependencia
+  - aprobar_tarea
+  - adjuntar_evidencia
+efectos:
+  tareas:
+    t1:
+      estado: asignada
+  conteos_delta:
+    task: 0
+    task_state_event: 0
+    evidence: 0
+    approval: 0
+# `menu_tarea.cambios_pedidos`: si T10 cambia su redacción, actualizar acá.
+respuesta_menciona:
+  - "Programar PLC"
+  - "Cambios pedidos por Marcos Tarquini"
+  - "falta la captura del tablero con la hora visible"
+severidad: alta

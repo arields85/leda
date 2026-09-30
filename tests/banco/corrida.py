@@ -307,7 +307,8 @@ def _membership_id(cur, ws: str, nombre: str):
 def _crear_tarea_semilla(cur, ws: str, *, titulo: str, area: str, responsable: str,
                          estado: str = "asignada", fecha_objetivo=None,
                          criterio_aceptacion: str = "Simulado: criterio de prueba del banco.",
-                         evidencia_requerida: list[str] | None = None) -> str:
+                         evidencia_requerida: list[str] | None = None,
+                         cambios_pedidos: dict | None = None) -> str:
     """`evidencia_requerida` (ADR 0009): por omisión sigue exigiendo
     `['explicacion']`, igual que siempre -- un escenario puede pasar `[]`
     cuando lo que ejercita es otra cosa (p. ej. un toque genérico que llega
@@ -332,7 +333,32 @@ def _crear_tarea_semilla(cur, ws: str, *, titulo: str, area: str, responsable: s
     cur.execute(
         "insert into task_state_event (task_id, estado_nuevo, actor_kind, at) "
         "values (%s, %s, 'sistema', clock_timestamp())", (tid, estado))
+    if cambios_pedidos:
+        _pedir_cambios_semilla(cur, ws, str(tid), cambios_pedidos)
     return str(tid)
+
+
+def _pedir_cambios_semilla(cur, ws: str, tarea_id: str, cambios: dict) -> None:
+    """Deja la tarea como la deja "Pedir cambios" (T9-R3, H16): entregada, el
+    `rechazado` del aprobador `por` con su `motivo` y de vuelta por hacer
+    (`asignada`, el destino de una tarea cuyo estado previo no se conoce: no pasa
+    por el gate de arranque). `cambios` trae `por` y `motivo`."""
+    faltan = [c for c in ("por", "motivo") if not cambios.get(c)]
+    if faltan:
+        raise LookupError(f"'cambios_pedidos' no trae {faltan}.")
+    cur.execute(
+        "insert into task_state_event (task_id, estado_anterior, estado_nuevo, "
+        "actor_kind, at) values (%s, 'asignada', 'en_revision', 'sistema', "
+        "clock_timestamp())", (tarea_id,))
+    cur.execute(
+        """insert into approval (workspace_id, sujeto_tipo, sujeto_id,
+                                 aprobador_membership_id, decision, comentario, at)
+           values (%s, 'tarea', %s, %s, 'rechazado', %s, clock_timestamp())""",
+        (ws, tarea_id, _membership_id(cur, ws, cambios["por"]), cambios["motivo"]))
+    cur.execute(
+        "insert into task_state_event (task_id, estado_anterior, estado_nuevo, "
+        "actor_kind, motivo, at) values (%s, 'en_revision', 'asignada', 'sistema', "
+        "%s, clock_timestamp())", (tarea_id, cambios["motivo"]))
 
 
 def _crear_bloqueo_semilla(cur, ws: str, tarea_id: str, *, causa: str,
@@ -458,7 +484,9 @@ def _sembrar_borrador_de_alta(cur, ws: str, borrador: dict) -> str:
     `titulo`, `objetivo` (el título de un objetivo del espacio, p. ej. el que
     crea una tarea de `tareas`), `responsable`, `area` (slug),
     `fecha_objetivo` (AAAA-MM-DD), `criterio_aceptacion` y, opcional,
-    `descripcion`. Falta un dato o no existe lo que nombra: `LookupError`.
+    `descripcion` y `criterio_por_confirmar` (el criterio de aceptación queda
+    propuesto, esperando su Sí/No: el escenario lo termina con un toque). Falta un
+    dato o no existe lo que nombra: `LookupError`.
     Devuelve el id de la solicitud."""
     faltan = [c for c in _DATOS_DEL_BORRADOR_DE_ALTA if not borrador.get(c)]
     if faltan:
@@ -524,13 +552,23 @@ def _sembrar_borrador_de_alta(cur, ws: str, borrador: dict) -> str:
         "evidence": {"items": [], "version": 0},
     }
     for campo in I.FIELDS:
+        # `criterio_por_confirmar`: el último dato del alta queda propuesto, con
+        # sus botones Sí/No esperando: el escenario lo termina con un toque.
+        estado = ("proposed" if campo == "acceptance_criterion"
+                  and borrador.get("criterio_por_confirmar") else "confirmed")
         cur.execute(
             """insert into task_intake_field
                  (request_id, workspace_id, campo, estado, valor, proposed_by)
-               values (%s, %s, %s, 'confirmed', %s, 'server')""",
-            (solicitud_id, ws, campo, Jsonb(valores[campo])))
+               values (%s, %s, %s, %s, %s, 'server')""",
+            (solicitud_id, ws, campo, estado, Jsonb(valores[campo])))
     cur.execute("select * from task_intake_request where id = %s", (solicitud_id,))
     resultado = I._advance(cur, cur.fetchone(), quien, ahora)
+    if borrador.get("criterio_por_confirmar"):
+        if not resultado.changed or resultado.pending_action_id:
+            raise LookupError(
+                "El borrador sembrado tenía que quedar esperando el último dato: "
+                f"{resultado.text}")
+        return solicitud_id
     if not resultado.pending_action_id:
         raise LookupError(
             f"El borrador sembrado no llegó a la vista previa: {resultado.text}")
@@ -630,7 +668,8 @@ def sembrar_precondiciones(cur, ws: str, precondiciones: dict, *,
         ids[t["id"]] = _crear_tarea_semilla(
             cur, ws, titulo=t["titulo"], area=t["area"], responsable=t["responsable"],
             estado=t.get("estado", "asignada"), fecha_objetivo=t.get("fecha_objetivo"),
-            evidencia_requerida=t.get("evidencia_requerida"))
+            evidencia_requerida=t.get("evidencia_requerida"),
+            cambios_pedidos=t.get("cambios_pedidos"))
     for b in precondiciones.get("bloqueos", []):
         _crear_bloqueo_semilla(cur, ws, ids[b["tarea"]], causa=b["causa"],
                                abierto_por=b.get("abierto_por"))

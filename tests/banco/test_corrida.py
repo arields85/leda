@@ -2513,3 +2513,80 @@ def test_la_familia_b_0026_sin_texto_se_cumple_sin_llamar_al_modelo(
     ]
     assert resultado_general(comprobaciones) == "aprobado", [
         (c.nombre, c.diferencia) for c in comprobaciones]
+
+
+# ---------------------------------------------------------------------------
+# T9-R3 (familia b-0027): estados reales. `criterio_por_confirmar` deja el último
+# dato del alta esperando su Sí/No; `cambios_pedidos` deja una tarea como la deja
+# "Pedir cambios".
+# ---------------------------------------------------------------------------
+
+# Nahuel pide el alta de lo suyo: lo confirma Marcos, su aprobador.
+_ALTA_DE_OTRO_APROBADOR = {
+    "solicitante": "Nahuel Gimenez", "titulo": "Cablear tablero norte",
+    "objetivo": _TITULO_OBJETIVO_ALTA, "responsable": "Nahuel Gimenez",
+    "area": "ot", "fecha_objetivo": "2030-12-30",
+    "criterio_aceptacion": "Prueba firmada", "criterio_por_confirmar": True}
+
+
+def test_sembrar_criterio_por_confirmar_deja_esperando_el_ultimo_dato(corework, conn):
+    from prisma import ingreso_tareas as I
+
+    ws = corework.workspace_id
+    _sembrar_objetivo_para_el_alta(conn, ws)
+    with admin(conn) as cur:
+        sembrar_precondiciones(cur, ws, {"borrador_de_alta": _ALTA_DE_OTRO_APROBADOR})
+
+    with espacio(conn, ws) as cur:
+        quien, tg = _quien(cur, ws, "Nahuel Gimenez")
+        pregunta = I.open_intake_question(cur, quien, tg)
+        cur.execute("select count(*) n from pending_action where draft_id is not null")
+        vistas_previas = cur.fetchone()["n"]
+    assert pregunta["tipo"] == I.QUESTION_CHOICE
+    assert vistas_previas == 0                 # todavía nadie tiene qué confirmar
+
+
+def test_ejecutar_escenario_termina_el_alta_por_toque_y_dice_quien_confirma(
+        corework, conn):
+    ws = corework.workspace_id
+    _sembrar_objetivo_para_el_alta(conn, ws)
+    interno = _responde(RespectoPendiente.RESPONDE)
+
+    r = ejecutar_escenario(
+        conn, ws, "corework", "Nahuel Gimenez", [], interno,
+        escenario_id="b-test-0027", indice=0,
+        preguntas_sembradas={"borrador_de_alta": _ALTA_DE_OTRO_APROBADOR},
+        toques=[{"etiqueta": "Sí"}])
+
+    assert r.bloqueado is False, r.motivo_bloqueo
+    assert "Marcos Tarquini" in r.respuesta_texto
+    assert "No pude completar" not in r.respuesta_texto
+    assert r.conteos_despues["task"] == r.conteos_antes["task"]
+
+
+def test_sembrar_cambios_pedidos_deja_la_tarea_por_hacer_con_su_motivo(corework, conn):
+    from prisma import menu_tarea as M
+
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        ids = sembrar_precondiciones(cur, ws, {"tareas": [{
+            "id": "t1", "titulo": "Programar PLC (simulado)", "area": "ot",
+            "responsable": "Nahuel Gimenez",
+            "cambios_pedidos": {"por": "Marcos Tarquini",
+                                "motivo": "falta la captura con la hora"}}]})
+
+    with espacio(conn, ws) as cur:
+        cur.execute("select estado from task where id = %s", (ids["t1"],))
+        assert cur.fetchone()["estado"] == "asignada"
+        assert M.cambios_pedidos(cur, ids["t1"]) == (
+            "Cambios pedidos por Marcos Tarquini: falta la captura con la hora")
+
+
+def test_sembrar_cambios_pedidos_sin_el_motivo_falla_nombrandolo(corework, conn):
+    ws = corework.workspace_id
+
+    with admin(conn) as cur, pytest.raises(LookupError, match="motivo"):
+        sembrar_precondiciones(cur, ws, {"tareas": [{
+            "id": "t1", "titulo": "Programar PLC (simulado)", "area": "ot",
+            "responsable": "Nahuel Gimenez",
+            "cambios_pedidos": {"por": "Marcos Tarquini"}}]})
