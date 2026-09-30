@@ -400,13 +400,20 @@ gestión.
   las listas nombran las tareas y la respuesta se queda en lo pedido; B: voz y saludo; C:
   textos fijos y botones en un solo lugar; D: una negativa sin intento dice el estado real).
   Unidades, de la más chica a la más grande:
-  - [ ] **T10-1** — Arnés: `comprobadores._es_forma_ofrecida_del_titulo` no saca el ícono
+  - [x] **T10-1** — Arnés: `comprobadores._es_forma_ofrecida_del_titulo` no saca el ícono
     de la etiqueta (`b-0013` falla por el arnés, no por Prisma).
-  - [ ] **T10-2** — H2 (texto aprobado del aviso neutro) y H1 (aviso de incidente al
+  - [x] **T10-2** — H2 (texto aprobado del aviso neutro) y H1 (aviso de incidente al
     administrador en lenguaje llano y hora local).
-  - [ ] **T10-3** — H10: ícono en Modificar y una sola definición de la etiqueta.
-  - [ ] **T10-4** — H11 y H14: vista previa en filas (un dato por línea) y comprobante
+  - [x] **T10-3** — H10: ícono en Modificar y una sola definición de la etiqueta.
+  - [x] **T10-4** — H11 y H14: vista previa en filas (un dato por línea) y comprobante
     corto en vez de repetir la vista previa; "y vuelve a estar en curso".
+  - [ ] **T10-2b** — Seguimientos de T10-1..4 y de `review-d7bcc36efe500706`: toda
+    preparación que escribe define su comprobante corto (hoy aprobar sale como "Hecho."
+    pelado; prueba de conformidad y nunca un comprobante vacío); `_offer_current_review`
+    sin fila atada no debe romper, y probar el recorte cuando el encabezado no entra; los
+    textos de disculpa ("Perdón, no pude completar eso…" en `gateway.py` y
+    `agente.DISCULPA`) pasan al aviso neutro aprobado (H2); los incidentes sin etapa
+    reciben etapa y explicación en la tabla del aviso al administrador.
   - [ ] **T10-5** — Mecanismo A (H3/H7, H9, H12): guarda de listas de hasta 3 tareas,
     `PREAMBULO` y escenarios (`b-0001`, `b-0001-a`, `b-0016`, `b-0021-c`, `b-0024-b`).
     Necesita respuestas del usuario.
@@ -4905,3 +4912,20 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   de 7 enfocadas (una por error de armado del escritor), GREEN; suite del escritor 2025
   passed, 300 deselected; banco determinista 342 passed; padre: 31 passed. RDD: tramo
   `56747c6..0de153e` medio, 247 líneas, `under_budget`: pendiente en el tramo.
+
+- 2026-09-30: **T10-1 a T10-4.** Ruta: delegada, un escritor (arnés, `incidentes.py`,
+  `gateway.py`, `agente.py`, `salida.py`, `herramientas.py`, pruebas). `31caed3`: el
+  comprobador del banco compara etiquetas sin el ícono (T10-1). `e1bc84d`: aviso neutro con
+  el texto aprobado (H2, ahora en `incidentes.NOTICIA_NEUTRA_INCIDENTE`) y aviso de incidente
+  al administrador con el formato aprobado (H1): "⚠️ Prisma no pudo responderle a
+  {nombre}", Qué pasó / Qué vio / Qué hacer / Mensaje / Detalle técnico, hora local del
+  espacio, tabla determinista `EXPLICACION_POR_ETAPA` con prueba que exige una entrada por
+  etapa. `4597de9`: Modificar con ✏️ desde una sola definición (H10); Enviar a aprobación
+  queda sin ícono (el manual no le asigna uno y ✅ es de resultado confirmado).
+  `56a8223`: vista previa con un dato por línea desde una sola función (H11); "vuelve a
+  estar en curso" (H14); comprobante corto `Preparacion.hecho` en vez de repetir la vista
+  previa (H14); entrega: "Gracias. La tarea «X» pasó a revisión." (H9; se conserva el
+  título, la regla dice "algo como"). Suite del escritor 2058 passed, 300 deselected;
+  banco determinista 345 passed; padre: enfocadas 28 passed. RDD: tramo `56747c6..56a8223`
+  (incluye T9-R1c-4b) medio, 1031 líneas, `review-d7bcc36efe500706` (fiabilidad)
+  **aprobada y reconocida**; frontera en `56a8223`; dos advertencias a T10-2b.
