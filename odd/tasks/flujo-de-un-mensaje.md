@@ -91,10 +91,10 @@ definir el flujo y medirlo con pruebas reales.
 
 Corte 1, para la primera prueba real (alta guiada con A y B):
 
-- [ ] **F1.** Interruptor `redaccion` en `workspace_setting` (paquete e importador),
+- [x] **F1.** Interruptor (`1d848ab`; verificado con base, ver progreso) `redaccion` en `workspace_setting` (paquete e importador),
   `resultado_turno.py` y `redaccion.py` con la variante B. Ruta: delegada (2+ archivos
   no triviales).
-- [ ] **F2.** M1 en el ruteo (`llm.py`: esquema, validación, proveedor simulado con valor
+- [x] **F2.** M1 en el ruteo (`3ff59af`, doble de prueba corregido en `f6e6c19`) (`llm.py`: esquema, validación, proveedor simulado con valor
   guionable, instrucciones por tipo) y `valores.py`. Ruta: delegada.
 - [ ] **F3.** Alta guiada con el flujo: título primero y objetivo después (el más probable
   primero), valores por M1, dato con una sola opción completado solo, textos por
@@ -170,6 +170,18 @@ PR planificado: la integración a `main` la decide el usuario después del exper
   **Sin base no se pudo correr la suite completa** (ver F1): tareas F1 y F2 sin tildar
   hasta correr `pytest -q` con `PRISMA_TEST_DB_URL` (línea base de `main`: 2279 passed).
 
+- 2026-09-30, verificación de F1 y F2 con base (`.env.test` ya en el worktree). Suite
+  completa desde el worktree: 58 fallas, todas por el mismo defecto de prueba, no de código:
+  el doble `_RoutingProvider` de `tests/test_task_intake.py` no aceptaba `valor_esperado`,
+  que el gateway ahora le pasa siempre a las preguntas del alta (F2), así que el ruteo
+  fallaba dos veces y las pruebas del alta veían "proposed" en vez de "confirmed".
+  Corrección (`f6e6c19`, sólo el doble). Con ella, suite completa: 2531 passed, 1 failed,
+  333 deselected. La falla
+  (`test_aviso_incidente_legible::test_ningun_incidente_se_registra_sin_etapa`) la causó una
+  edición en curso de `redaccion.py` (con error de sintaxis) mientras corría la suite, porque
+  esa prueba lee `src/` como texto; vuelta a correr en limpio, junto con `test_task_intake.py`:
+  97 passed. La línea base de `main` (2279) más las pruebas nuevas de F1 y F2 da lo observado.
+
 ## Próximo paso
 
-F1.
+F3.
