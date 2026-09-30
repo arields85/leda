@@ -5255,8 +5255,7 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
      confirmar, una aprobación. El tope de `nucleo/mecanica-pm.md` §10 (volumen de contacto;
      3 en corework) sigue para seguimientos, recordatorios de la escalera y cadencias.
   2. **T9-R1c-5:** el botón de quien confirma el borrador de otra persona no se llama
-     "Cancelar" sino **"Rechazar"**, y a quien lo pidió se le avisa. Pendiente de
-     confirmar: si Rechazar pide el motivo.
+     "Cancelar" sino **"Rechazar"**, y a quien lo pidió se le avisa. Rechazar **pide el motivo** (como "Pedir cambios") y se lo pasa a quien pidió.
   3. **T9-R5:** una elección ya hecha vale para todo el mensaje; Prisma no pregunta dos
      veces "¿A cuál te referís?" con las mismas candidatas ("no tiene utilidad, y molesta").
   4. **T9-H19c:** un mensaje editado se ignora; para otra cosa se escribe un mensaje nuevo.
