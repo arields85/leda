@@ -1,5 +1,12 @@
 # Interpretación, aclaración y confirmación
 
+> **Diseño vivo hasta 2026-09-29.** Las decisiones que gobiernan hoy son el
+> [`ADR 0005`](../decisions/0005-interpretacion-y-confirmacion.md),
+> [`ADR 0006`](../decisions/0006-jev-para-resolver-referencias-e-intencion.md),
+> [`ADR 0013`](../decisions/0013-reglas-generales-de-la-conversacion.md) y el
+> [`ADR 0014`](../decisions/0014-flujo-de-un-mensaje.md); ante una discrepancia con este
+> documento, prevalecen ellos.
+
 **Estado:** diseño vivo. Las decisiones de la sección 3 quedaron aceptadas en
 [`ADR 0005`](../decisions/0005-interpretacion-y-confirmacion.md); la receta de
 resolución (secciones 4 y 5) sigue en validación y se ajusta acá sin reabrirlo.
