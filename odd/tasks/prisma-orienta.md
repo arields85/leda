@@ -5102,3 +5102,9 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   (servidor saturado, no del código); **pendiente de revisión**, no se da por revisado.
   Pendiente menor: `despachador._activa_en_el_chat` y el historial de `contexto` comparan
   `inbound_message.at` con el reloj de la aplicación.
+
+- 2026-09-30: **Decisión del usuario — primero la ronda de pruebas.** Las consultas
+  abiertas (T9-R1c-5, T9-R5, T9-H19c, T10-6, T10-7) y los pendientes menores quedan para
+  después de T11 (cuarta ronda por Telegram): ya hay bastante para probar y la ronda puede
+  cambiar las prioridades. Antes de la ronda: aplicar `0023` en la base local (con
+  autorización), cerrar la revisión de T9-H19h y el gate de sesión progresiva de `AGENTS.md`.
