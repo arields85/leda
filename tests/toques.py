@@ -22,3 +22,13 @@ def envejecer_toques(conn, segundos: int) -> None:
         cur.execute("update inbound_message set at = at - make_interval(secs => %s) "
                     "where boton_callback is not null", (segundos,))
     conn.commit()
+
+
+_IDS_DE_MENSAJE = __import__("itertools").count(1000)
+
+
+def id_de_mensaje() -> int:
+    """Un `message_id` distinto por mensaje, como los numera Telegram: dos
+    mensajes con el mismo id en el mismo chat son un reenvío y se absorben
+    (T9-H19b)."""
+    return next(_IDS_DE_MENSAJE)

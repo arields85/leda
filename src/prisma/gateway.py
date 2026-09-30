@@ -439,19 +439,34 @@ def procesar_update(conn, slug: str, update: dict,
                 # A un desconocido no se le explica por qué no se le responde.
                 return {"ok": True}
 
-            cur.execute(
-                """insert into inbound_message
-                     (workspace_id, telegram_message_id, chat_id, app_user_id, texto)
-                   values (%s, %s, %s, %s, %s) returning id""",
-                (workspace_id, mensaje.get("message_id"), chat_id,
-                 quien.app_user_id, texto))
-            entrante_id = str(cur.fetchone()["id"])
-            registrar_auditoria(
-                cur, accion="mensaje_recibido", workspace_id=workspace_id,
-                actor_app_user_id=quien.app_user_id, actor_kind="persona",
-                detalle={"chat_id": chat_id,
-                         **({"adjunto": adjunto} if adjunto else {})})
+            if update.get("message") and _es_mensaje_repetido(
+                    cur, workspace_id, chat_id, mensaje.get("message_id")):
+                # Un reenvío de Telegram (T9-H19b, ADR 0013 regla 2): el mismo
+                # mensaje ya se recibió. Ni recibo, ni turno, ni respuesta; sólo
+                # su auditoría. Una edición (`edited_message`) no entra: su
+                # tratamiento es una decisión pendiente del usuario (T9-H19c).
+                registrar_auditoria(
+                    cur, accion="mensaje_repetido_absorbido",
+                    workspace_id=workspace_id,
+                    actor_app_user_id=quien.app_user_id, actor_kind="persona",
+                    detalle={"chat_id": chat_id})
+            else:
+                cur.execute(
+                    """insert into inbound_message
+                         (workspace_id, telegram_message_id, chat_id, app_user_id,
+                          texto)
+                       values (%s, %s, %s, %s, %s) returning id""",
+                    (workspace_id, mensaje.get("message_id"), chat_id,
+                     quien.app_user_id, texto))
+                entrante_id = str(cur.fetchone()["id"])
+                registrar_auditoria(
+                    cur, accion="mensaje_recibido", workspace_id=workspace_id,
+                    actor_app_user_id=quien.app_user_id, actor_kind="persona",
+                    detalle={"chat_id": chat_id,
+                             **({"adjunto": adjunto} if adjunto else {})})
         conn.commit()
+        if entrante_id is None:
+            return {"ok": True}
     except Exception as e:  # noqa: BLE001
         conn.rollback()
         reportar_incidente_no_manejado(
@@ -656,6 +671,24 @@ def _registrar_toque(cur, workspace_id: str, chat_id: int, quien, ahora,
            values (%s, %s, %s, %s, %s) returning id""",
         (workspace_id, chat_id, quien.app_user_id, ahora, boton))
     return str(cur.fetchone()["id"])
+
+
+def _es_mensaje_repetido(cur, workspace_id: str, chat_id: int,
+                         message_id: int | None) -> bool:
+    """Este `message_id` de este chat ya se recibió (un reenvío del webhook). El
+    candado serializa dos entregas simultáneas: la segunda espera el commit de la
+    fase 1 de la primera y ve su fila. Sin `message_id` no hay con qué comparar."""
+    if message_id is None:
+        return False
+    cur.execute(
+        "select pg_advisory_xact_lock(hashtextextended(%s, 0))",
+        (f"mensaje:{workspace_id}:{chat_id}:{message_id}",))
+    cur.execute(
+        """select 1 from inbound_message
+            where workspace_id = %s and chat_id = %s and telegram_message_id = %s
+            limit 1""",
+        (workspace_id, chat_id, message_id))
+    return cur.fetchone() is not None
 
 
 def _es_toque_repetido(cur, workspace_id: str, chat_id: int, quien, ahora,

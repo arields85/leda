@@ -21,6 +21,7 @@ from datetime import datetime, timezone
 import pytest
 from fastapi.testclient import TestClient
 
+from tests.toques import id_de_mensaje
 from prisma import gateway
 from prisma import herramientas as H
 from prisma import jev as jev_modulo
@@ -116,7 +117,7 @@ def _tocar(cliente, token, user_id):
 def _mensaje(cliente, user_id, texto):
     return cliente.post(
         "/telegram/corework",
-        json={"message": {"message_id": 2, "text": texto,
+        json={"message": {"message_id": id_de_mensaje(), "text": texto,
                           "chat": {"id": user_id}, "from": {"id": user_id}}},
         headers={"X-Telegram-Bot-Api-Secret-Token": "s3cr3t"})
 
