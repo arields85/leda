@@ -9,6 +9,7 @@ todo ya resuelto.
 
 from __future__ import annotations
 
+import ast
 import re
 from datetime import datetime, timezone
 from pathlib import Path
@@ -35,7 +36,7 @@ def _aviso(**cambios) -> str:
 def _etapas_conocidas() -> set[str]:
     """Cada etapa con la que el código registra un incidente: las constantes
     `ETAPA_*` de los módulos y los literales `etapa="..."` de `src/`."""
-    etapas = {valor for modulo in (gateway, respuesta_unica, local)
+    etapas = {valor for modulo in (gateway, respuesta_unica, local, incidentes)
               for nombre, valor in vars(modulo).items()
               if nombre.startswith("ETAPA_") and isinstance(valor, str)}
     for archivo in Path(incidentes.__file__).parent.glob("*.py"):
@@ -58,6 +59,21 @@ def test_cada_etapa_conocida_tiene_su_explicacion():
     for etapa, explicacion in EXPLICACION_POR_ETAPA.items():
         assert explicacion.que_paso.strip() and explicacion.que_hacer.strip(), etapa
         assert explicacion.que_vio.strip(), etapa
+
+
+def test_ningun_incidente_se_registra_sin_etapa():
+    """Cada `registrar_incidente(...)` de `src/` nombra su etapa (T10-2b): un
+    incidente sin etapa cae en la explicación genérica del aviso a la
+    administración, que no dice qué vio la persona."""
+    sin_etapa = []
+    for archivo in sorted(Path(incidentes.__file__).parent.glob("*.py")):
+        for nodo in ast.walk(ast.parse(archivo.read_text(encoding="utf-8"))):
+            if (isinstance(nodo, ast.Call)
+                    and getattr(nodo.func, "id", getattr(nodo.func, "attr", None))
+                    == "registrar_incidente"
+                    and not any(k.arg == "etapa" for k in nodo.keywords)):
+                sin_etapa.append(f"{archivo.name}:{nodo.lineno}")
+    assert sin_etapa == []
 
 
 def test_el_aviso_sigue_el_formato_aprobado_en_orden():

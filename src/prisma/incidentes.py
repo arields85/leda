@@ -89,6 +89,13 @@ NOTICIA_NEUTRA_INCIDENTE = (
 # constante con nombre por cada punto donde el código registra un incidente, cada una
 # con su entrada en `EXPLICACION_POR_ETAPA`.
 ETAPA_RESUMEN_VIGENTE_SIN_FILA = "resumen_vigente_sin_fila"
+ETAPA_TURNO_CONVERSACION = "turno_conversacion"
+ETAPA_ENRUTAMIENTO = "enrutamiento"
+ETAPA_JEV_NO_CONFIGURADO = "jev_no_configurado"
+ETAPA_ENTREGA_MENSAJE = "entrega_mensaje"
+ETAPA_ENTREGA_AVISO_ADMIN = "entrega_aviso_admin"
+ETAPA_EVIDENCIA_INVALIDA = "politica_de_evidencia_invalida"
+ETAPA_CONFIGURACION_ALTA = "configuracion_alta_invalida"
 
 # Tope del texto disparador en el aviso -- decisión del usuario, 2026-09-28:
 # acotado, y el aviso dice cuándo lo recortó.
@@ -224,6 +231,58 @@ EXPLICACION_POR_ETAPA: dict[str, ExplicacionDeEtapa] = {
         que_vio=NOTICIA_NEUTRA_INCIDENTE,
         que_hacer=(f"{_BUSCAR_DETALLE}. El borrador sigue vivo: pedile a "
                    "{nombre} que lo retome desde su mensaje o que lo cancele.")),
+    ETAPA_TURNO_CONVERSACION: ExplicacionDeEtapa(
+        que_paso=("Falló el turno de conversación con {nombre}: el proveedor del "
+                  "modelo, el armado del turno o una herramienta levantó un "
+                  "error."),
+        que_vio=NOTICIA_NEUTRA_INCIDENTE,
+        que_hacer=(_BUSCAR_DETALLE + " y corregí la causa (proveedor caído, "
+                   "clave vencida o un defecto). Después {nombre} puede "
+                   "reenviar el mensaje.")),
+    ETAPA_ENRUTAMIENTO: ExplicacionDeEtapa(
+        que_paso=("Falló el enrutamiento de un mensaje o de un toque de "
+                  "{nombre}: Prisma no pudo decidir a qué paso de la "
+                  "conversación correspondía."),
+        que_vio=NOTICIA_NEUTRA_INCIDENTE,
+        que_hacer=(_BUSCAR_DETALLE + " y revisá que lo que {nombre} quería "
+                   "hacer no haya quedado a medias.")),
+    ETAPA_JEV_NO_CONFIGURADO: ExplicacionDeEtapa(
+        que_paso=("El mensaje de {nombre} nombraba una tarea, pero falta la "
+                  "credencial del modelo que la identifica "
+                  "(PRISMA_OPENROUTER_API_KEY)."),
+        que_vio=("Una pregunta para aclarar de qué tarea habla, en vez de una "
+                 "respuesta adivinada."),
+        que_hacer=("Configurá la credencial y reiniciá el servicio. Hasta "
+                   "entonces Prisma pregunta en vez de resolver la tarea.")),
+    ETAPA_ENTREGA_MENSAJE: ExplicacionDeEtapa(
+        que_paso=("Un mensaje para {nombre} no se pudo entregar por Telegram "
+                  "después de varios intentos."),
+        que_vio="Nada: el mensaje nunca le llegó.",
+        que_hacer=("Revisá que Telegram responda y que {nombre} no haya "
+                   "bloqueado el bot. Después decidí si hay que reenviarle lo "
+                   "que faltó.")),
+    ETAPA_ENTREGA_AVISO_ADMIN: ExplicacionDeEtapa(
+        que_paso=("Un aviso a la administración de la plataforma no se pudo "
+                  "entregar después de varios intentos."),
+        que_vio="Nada: es un aviso interno, no le llega a nadie más.",
+        que_hacer=(_BUSCAR_DETALLE + " y revisá que cada administrador haya "
+                   "escrito al bot de administración y que Telegram responda.")),
+    ETAPA_EVIDENCIA_INVALIDA: ExplicacionDeEtapa(
+        que_paso=("La evidencia que exige la política de un área tiene más "
+                  "texto del que Telegram puede mostrar."),
+        que_vio=("Que no se puede mostrar una opción configurada del espacio y "
+                 "que le pida a quien lo administra que la revise."),
+        que_hacer=("Acortá la política de evidencia del área (menos ítems o "
+                   "textos más cortos) y avisale a {nombre} que puede "
+                   "reintentar.")),
+    ETAPA_CONFIGURACION_ALTA: ExplicacionDeEtapa(
+        que_paso=("Una opción configurada del alta de tareas (objetivo, "
+                  "responsable, área o evidencia) tiene más texto del que "
+                  "Telegram puede mostrar."),
+        que_vio=("Que no se puede mostrar una opción configurada, con el botón "
+                 "para cancelar el borrador."),
+        que_hacer=("Corregí o acortá la opción configurada. El borrador de "
+                   "{nombre} sigue abierto hasta que lo cancele.")),
     "indicador_actividad": ExplicacionDeEtapa(
         que_paso=("No se pudo retirar el borrador nativo del indicador de "
                   "actividad; puede haber quedado visible."),

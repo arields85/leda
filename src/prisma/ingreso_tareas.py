@@ -15,7 +15,8 @@ from psycopg.types.json import Jsonb
 
 from .autoridad import Denegado, Solicitante
 from .db import entrante_atado, registrar_auditoria
-from .incidentes import (ETAPA_RESUMEN_VIGENTE_SIN_FILA, NOTICIA_NEUTRA_INCIDENTE,
+from .incidentes import (ETAPA_CONFIGURACION_ALTA, ETAPA_RESUMEN_VIGENTE_SIN_FILA,
+                         NOTICIA_NEUTRA_INCIDENTE,
                          REFERENCIA_PENDING_ACTION, registrar_incidente)
 from .pendientes import HERRAMIENTA_REVISION_BORRADOR
 from .salida import (BUTTON_TEXT_LIMIT, ETIQUETA_CANCELAR, ETIQUETA_CONFIRMAR,
@@ -1194,7 +1195,7 @@ def _configuration_error(cur, request, who, field, now):
     registrar_incidente(
         cur, who.workspace_id,
         "Una opción configurada del intake excede el contrato visible.",
-        app_user_id=who.app_user_id)
+        etapa=ETAPA_CONFIGURACION_ALTA, app_user_id=who.app_user_id)
     registrar_auditoria(
         cur, accion="configuracion_intake_invalida",
         workspace_id=who.workspace_id,

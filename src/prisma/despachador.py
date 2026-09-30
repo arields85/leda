@@ -27,7 +27,8 @@ from psycopg.types.json import Jsonb
 
 from . import saludo
 from .calendario import Calendario
-from .incidentes import (REFERENCIA_ADMIN_NOTICE, redactar_secreto_telegram,
+from .incidentes import (ETAPA_ENTREGA_AVISO_ADMIN, ETAPA_ENTREGA_MENSAJE,
+                         REFERENCIA_ADMIN_NOTICE, redactar_secreto_telegram,
                          registrar_incidente)
 from .salida import (ETIQUETA_COPIAR, cabe_en_boton_de_copiar, entidad_de_bloque,
                      prepare_buttons, prepare_payload)
@@ -1024,6 +1025,7 @@ def despachar_avisos_admin(cur: psycopg.Cursor, transporte: Transporte,
                             f"Un aviso a la administración no se pudo entregar "
                             f"tras {MAX_INTENTOS} intentos.",
                             severidad="alta", referencia_cruda=ultimo_error,
+                            etapa=ETAPA_ENTREGA_AVISO_ADMIN,
                             referencia_tipo=REFERENCIA_ADMIN_NOTICE,
                             referencia_id=n["id"], chat_id=n["chat_id"],
                             avisar_admin=False)
@@ -1066,7 +1068,7 @@ def _fallo(cur, workspace_id: str, m, error: Exception, cal: Calendario,
         registrar_incidente(
             cur, workspace_id,
             f"Un mensaje no se pudo entregar tras {MAX_INTENTOS} intentos.",
-            severidad="alta")
+            severidad="alta", etapa=ETAPA_ENTREGA_MENSAJE)
 
 
 def _ya_recibio(cur, membership_id: str, ahora: datetime) -> int:

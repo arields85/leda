@@ -26,7 +26,7 @@ from psycopg.types.json import Jsonb
 
 from .autoridad import (Denegado, Solicitante, puede_aprobar_tarea,
                          requiere_confirmacion, verificar)
-from .incidentes import registrar_incidente
+from .incidentes import ETAPA_EVIDENCIA_INVALIDA, registrar_incidente
 from .salida import (OBJETIVO_ETIQUETA_BOTON, enqueue_outbox,
                      etiquetas_de_tarea, normalize_visible_text,
                      telegram_utf16_units, truncar_etiqueta_boton)
@@ -835,7 +835,7 @@ def crear_borrador_tarea(cur, quien: Solicitante, titulo, objetivo_id=None,
             registrar_incidente(
                 cur, quien.workspace_id,
                 "La política de evidencia excede el contrato visible.",
-                app_user_id=quien.app_user_id)
+                etapa=ETAPA_EVIDENCIA_INVALIDA, app_user_id=quien.app_user_id)
             raise Denegado(
                 "No puedo mostrar una opción configurada de este espacio. "
                 "Pedile a quien lo administra que la revise.")

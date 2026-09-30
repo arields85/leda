@@ -27,7 +27,8 @@ from .db import (admin, atar_al_entrante, autoridad, conectar,
 from .despachador import (TransporteTelegram, acusar_toque, despachar,
                           mantener_chat_activo, pedido_telegram,
                           texto_error_seguro)
-from .incidentes import (NOTICIA_NEUTRA_INCIDENTE, REFERENCIA_INBOUND_MESSAGE,
+from .incidentes import (ETAPA_ENRUTAMIENTO, ETAPA_JEV_NO_CONFIGURADO,
+                         NOTICIA_NEUTRA_INCIDENTE, REFERENCIA_INBOUND_MESSAGE,
                          REFERENCIA_PENDING_ACTION, registrar_incidente)
 from .ingreso_tareas import (QUESTION_CHOICE, QUESTION_CONFIRMATION,
                              QUESTION_FREE_TEXT)
@@ -3679,17 +3680,7 @@ def _incidente_jev_no_configurado(cur, workspace_id: str,
         cur, workspace_id,
         "El mensaje tenía referencias a tarea, pero no hay credencial de "
         "Jev configurada (PRISMA_OPENROUTER_API_KEY).",
-        app_user_id=app_user_id)
-
-
-def _routing_incident(cur, quien, error) -> None:
-    cur.execute(
-        """insert into incident (workspace_id, severidad, resumen_sanitizado)
-           values (%s, 'media', %s)""",
-        (quien.workspace_id,
-         f"Falló el enrutamiento tipado ({type(error).__name__})."),
-    )
-
+        etapa=ETAPA_JEV_NO_CONFIGURADO, app_user_id=app_user_id)
 
 
 # Etapas nombradas (T2b, corrección de trazabilidad, 2026-09-25): en qué
@@ -3710,7 +3701,7 @@ def _routing_incident(cur, quien, error) -> None:
     registrar_incidente(
         cur, quien.workspace_id,
         f"Falló el enrutamiento tipado ({type(error).__name__}).",
-        app_user_id=quien.app_user_id)
+        etapa=ETAPA_ENRUTAMIENTO, app_user_id=quien.app_user_id)
 
 
 def reportar_incidente_no_manejado(conn, *, workspace_id: str | None,
