@@ -298,6 +298,15 @@ tres equipos no recibe tres mensajes de seguimiento el mismo día.
   alcanza, se posterga el de menor urgencia, no se descarta.
 - Prisma marca explícitamente los mensajes que no requieren respuesta.
 
+**Precisión (2026-09-30, decisión del usuario): los avisos de coordinación quedan
+fuera del máximo.** El máximo limita el seguimiento que Prisma inicia por su cuenta:
+pedidos de estado, recordatorios de la escalera, cadencias y resúmenes. No limita el
+aviso que una persona necesita para trabajar porque otra hizo algo: le entregaron una
+tarea para revisar, le pidieron cambios, le aprobaron una entrega, le llegó un
+borrador para confirmar o le rechazaron uno. Esos avisos llegan siempre, no cuentan
+dentro del máximo y no se postergan por él. Una respuesta de Prisma a lo que la
+persona escribió o tocó tampoco cuenta: no es un mensaje automático.
+
 ---
 
 ## 11. Tipos de mensaje

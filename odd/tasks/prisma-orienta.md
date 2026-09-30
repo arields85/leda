@@ -5266,3 +5266,17 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   7. **R4-H6:** un ícono por acción en el menú de tarea; tabla propuesta al usuario:
      📋 Ver detalle / Ver detalle y evidencia, ▶️ Empezar, 🏁 Ya la terminé, ⛔ Informar un
      bloqueo, 🔗 Depende de otra tarea, ✅ Aprobar, ✏️ Pedir cambios.
+
+- 2026-09-30: **Seguimientos de `review-167e3c98261bbc91`.** Ruta: delegada, un escritor.
+  `c86f16f`: con un link en el mensaje no se corta el reintento del modelo (si igual sólo
+  queda el rechazo por evidencia, se abre la pregunta); la pregunta de evidencia sólo
+  reemplaza el turno cuando todo intento de cambio fue ese rechazo (otro rechazo del mismo
+  turno se informa); la guarda de cambios pedidos reconoce su propia línea (idempotente);
+  nombre en blanco sin `IndexError`. `d368bb1`: sólo el primer saludo encolado lleva el
+  saludo del día; escenario negativo `b-0035` ("hola, ¿cómo va el PLC?"). Suite del
+  escritor 2233 passed, 327 deselected; padre: 25 passed. RDD: tramo `38263b8..d368bb1`
+  medio, 372 líneas, `under_budget`: pendiente en el tramo.
+  En curso: la unidad de las decisiones del usuario (avisos de coordinación fuera del
+  máximo, con precisión fechada en `nucleo/mecanica-pm.md` §10; Rechazar con motivo y
+  aviso; no preguntar dos veces; mensaje editado ignorado; negativa con el estado real;
+  íconos por acción; encabezado del menú y largo de etiquetas).
