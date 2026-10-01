@@ -434,8 +434,11 @@ def test_un_cuerpo_sin_cierre_no_se_confunde_con_el_cierre():
 
 
 @pytest.mark.parametrize(("clave", "legible"), [
-    ("resultado_de_prueba", "resultado de prueba"),
-    ("captura", "captura"),
+    ("resultado_de_prueba", "Resultado de prueba"),
+    ("captura", "Captura"),
+    ("explicacion", "Explicación"),
+    ("archivo", "Archivo"),
+    ("foto", "Foto"),
     ("  foto__de_la_placa ", "foto de la placa"),
 ])
 def test_un_nombre_interno_del_pack_se_lee_sin_guiones_bajos(clave, legible):

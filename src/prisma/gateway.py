@@ -1344,6 +1344,54 @@ def _aviso_aislado(cur, quien, avisar, destinatario: str, workspace_id: str,
             chat_id=chat_id, app_user_id=quien.app_user_id)
 
 
+def _estado_de_avisos(cur, quien, workspace_id: str, chat_id: int,
+                      pending_action_id: str, ahora) -> str:
+    """Las líneas de estado real de los avisos de coordinación que causó el toque
+    (`ingreso_tareas.linea_de_estado_de_avisos`). Leerlo nunca tira el turno: si
+    falla, queda un incidente y la respuesta sale sin la línea."""
+    from . import ingreso_tareas as I
+
+    try:
+        with cur.connection.transaction():
+            return I.linea_de_estado_de_avisos(
+                cur, quien, pending_action_id=pending_action_id, now=ahora)
+    except Exception as exc:  # noqa: BLE001 -- un aviso nunca tira el turno
+        registrar_incidente(
+            cur, workspace_id,
+            "No se pudo leer el estado de los avisos de una tarea recién creada: "
+            "la respuesta de quien confirmó salió sin decir cuándo se enteran.",
+            severidad="media", etapa=ETAPA_AVISO_COORDINACION,
+            referencia_cruda=texto_error_seguro(exc)[:2000],
+            referencia_tipo=REFERENCIA_PENDING_ACTION,
+            referencia_id=pending_action_id,
+            chat_id=chat_id, app_user_id=quien.app_user_id)
+        return ""
+
+
+def _sumar_a_la_respuesta_terminal(cur, workspace_id: str,
+                                   pending_action_id: str, lineas: str) -> None:
+    """Suma las líneas al final de la fila terminal ("Hecho...") que ya es la
+    respuesta del toque: sigue siendo UN mensaje visible (ADR 0013 regla 2). Sólo
+    si la fila todavía no salió; una que ya salió no se toca (queda un incidente,
+    nunca un segundo mensaje)."""
+    from . import pendientes as P
+
+    cur.execute(
+        """update message_outbox set cuerpo = cuerpo || E'\n' || %s
+            where workspace_id = %s and estado = 'listo' and enviado_en is null
+              and dedupe_key = %s""",
+        (lineas, workspace_id,
+         P.clave_terminal_ingreso(workspace_id, pending_action_id, "converted")))
+    if cur.rowcount != 1:
+        registrar_incidente(
+            cur, workspace_id,
+            "La respuesta de quien confirmó una tarea ya había salido: no se le "
+            "pudo sumar cuándo se enteran los demás.",
+            severidad="baja", etapa=ETAPA_AVISO_COORDINACION,
+            referencia_tipo=REFERENCIA_PENDING_ACTION,
+            referencia_id=pending_action_id)
+
+
 def _resolver_toque_borrador(conn, authority_conn, workspace_id, token,
                              tg_user, chat_id, quien, ahora,
                              toque_id: str | None = None) -> dict:
@@ -1373,6 +1421,7 @@ def _resolver_toque_borrador(conn, authority_conn, workspace_id, token,
         # committed) and this retry completes it instead of saying "no longer
         # current" (T9-R4b).
         atadas = 0
+        estado_de_avisos = ""
         if resuelta is not None and toque_id and resuelta.pending_action_id:
             atadas = _atar_fila_terminal(cur, workspace_id, toque_id,
                                          resuelta.pending_action_id)
@@ -1388,6 +1437,14 @@ def _resolver_toque_borrador(conn, authority_conn, workspace_id, token,
                         (I.notify_responsible_of_assignment, "al responsable")):
                     _aviso_aislado(cur, quien, avisar, destinatario, workspace_id,
                                    chat_id, resuelta.pending_action_id, ahora)
+                # Quien confirma sabe en la misma respuesta si, y cuándo, se
+                # enteran los demás (constitución §8 y ADR 0013 regla 3).
+                estado_de_avisos = _estado_de_avisos(
+                    cur, quien, workspace_id, chat_id, resuelta.pending_action_id,
+                    ahora)
+            if estado_de_avisos and atadas == 1:
+                _sumar_a_la_respuesta_terminal(
+                    cur, workspace_id, resuelta.pending_action_id, estado_de_avisos)
             if atadas != 1:
                 _incidente_fila_terminal(cur, workspace_id, chat_id, quien,
                                          resuelta.pending_action_id, atadas)
@@ -1396,9 +1453,11 @@ def _resolver_toque_borrador(conn, authority_conn, workspace_id, token,
                 # atada al toque, con el estado real y no el aviso neutro de que
                 # no se pudo (ADR 0013 reglas 2 y 3, T9-R4c). Con más de una
                 # fila atada el control conserva una y suprime el resto.
-                _responder(cur, workspace_id, chat_id, quien,
-                           P.texto_terminal_ingreso(cancelada=resuelta.cancelada),
-                           ahora)
+                texto_terminal = P.texto_terminal_ingreso(
+                    cancelada=resuelta.cancelada)
+                if estado_de_avisos:
+                    texto_terminal += "\n" + estado_de_avisos
+                _responder(cur, workspace_id, chat_id, quien, texto_terminal, ahora)
         elif atadas != 1:
             if texto is None:
                 # Replays reuse the terminal row, which already went out for the

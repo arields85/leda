@@ -120,12 +120,27 @@ def _registrar_anomalia(cur, workspace_id: str, valor) -> None:
 # Variante B: plantillas
 # ---------------------------------------------------------------------------
 
+# Los tipos de evidencia que define el pack (`espacios/corework.yaml`,
+# `evidencia_requerida`) como los lee una persona, con tilde y mayúscula inicial
+# (constitución §10: nunca una clave interna a la vista). El pack todavía no trae
+# una etiqueta propia por tipo (PENDIENTE): hasta entonces esta tabla es la única
+# fuente, y un tipo que no está acá no se inventa -- sólo se separan sus palabras.
+ETIQUETAS_DE_EVIDENCIA = {
+    "explicacion": "Explicación",
+    "resultado_de_prueba": "Resultado de prueba",
+    "captura": "Captura",
+    "archivo": "Archivo",
+    "foto": "Foto",
+}
+
+
 def nombre_legible(clave: str) -> str:
     """Un nombre interno del pack (`resultado_de_prueba`) como lo lee una
-    persona (`resultado de prueba`). Sólo separa las palabras: el pack todavía
-    no trae una etiqueta propia por tipo de evidencia (PENDIENTE), así que no
-    se inventa ninguna."""
-    return " ".join(clave.replace("_", " ").split())
+    persona (`Resultado de prueba`): con la tabla de arriba; si el tipo no
+    está, sólo separa las palabras."""
+    normalizada = clave.strip()
+    return ETIQUETAS_DE_EVIDENCIA.get(
+        normalizada, " ".join(clave.replace("_", " ").split()))
 
 
 @dataclass(frozen=True)

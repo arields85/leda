@@ -20,6 +20,7 @@ from .incidentes import (ETAPA_CONFIGURACION_ALTA, ETAPA_CRITERIO_SIN_PROPUESTA,
                          ETAPA_RESUMEN_VIGENTE_SIN_FILA, ETAPA_VALOR_SIN_INTERPRETAR, NOTICIA_NEUTRA_INCIDENTE,
                          REFERENCIA_INBOUND_MESSAGE, REFERENCIA_PENDING_ACTION,
                          registrar_incidente)
+from .calendario import Calendario, cuando_legible
 from .pendientes import HERRAMIENTA_REVISION_BORRADOR
 from .redaccion import (TextoRedactado, _resumen_b, nombre_legible,
                         redactar_partes, redactar_turno, variante_redaccion)
@@ -27,7 +28,7 @@ from .resultado_turno import (Cambio, Falta, OpcionDisponible, Rechazo,
                               ResultadoTurno, Resumen, SinCambio, ValorAceptado)
 from .salida import (BUTTON_TEXT_LIMIT, ETIQUETA_CANCELAR, ETIQUETA_CONFIRMAR,
                      ETIQUETA_ENVIAR, ETIQUETA_MODIFICAR, ETIQUETA_RECHAZAR,
-                     ICONO_CANCELAR, ICONO_OTRA_OPCION, ICONO_RECOMENDADA,
+                     ICONO_CANCELAR, ICONO_EMPEZAR, ICONO_OTRA_OPCION, ICONO_RECOMENDADA,
                      ICONO_VER_MAS, PayloadValidationError, con_icono,
                      enqueue_outbox, etiqueta_sin_icono, etiquetas_de_tarea,
                      normalize_visible_text, prepare_buttons, prepare_payload, telegram_utf16_units,
@@ -54,6 +55,11 @@ OTHER = con_icono("Otra opción", ICONO_OTRA_OPCION)
 # por texto, nunca un literal por lugar.
 VER_MAS = con_icono("Ver más", ICONO_VER_MAS)
 CANCELAR_BORRADOR = con_icono("Cancelar borrador", ICONO_CANCELAR)
+# El menú del borrador en curso lleva ícono en sus tres botones (hallazgo de la prueba
+# real del 2026-10-01): ▶️ para seguir (el mismo de empezar) y ➕ para uno nuevo (el
+# mismo de agregar); no se inventa un ícono nuevo.
+CONTINUAR_BORRADOR = con_icono("Continuar borrador", ICONO_EMPEZAR)
+EMPEZAR_OTRO = con_icono("Empezar otro", ICONO_VER_MAS)
 # Lo que se le dice a quien escribe mientras su borrador espera la confirmación
 # (T9-R1c-2): la tarea se crea sólo con el botón Confirmar, nunca con un
 # mensaje. Redacción pendiente de revisión de voz en T10.
@@ -221,9 +227,9 @@ def start(cur: psycopg.Cursor, who: Solicitante, *, chat_id: int,
             texto_del_conflicto
             or "Ya hay un borrador de tarea en curso. Elegí cómo seguir.",
             [
-                ("Continuar borrador", "continue", None),
+                (CONTINUAR_BORRADOR, "continue", None),
                 (CANCELAR_BORRADOR, "cancel", None),
-                ("Empezar otro", "start_new", payload),
+                (EMPEZAR_OTRO, "start_new", payload),
             ],
             now, kind="conflict",
         )
@@ -1398,6 +1404,15 @@ def approval_notice_text(confirmer_name: str, title: str) -> str:
             "la tarea quedó creada.")
 
 
+def _inicio_de_jornada(cur: psycopg.Cursor, workspace_id: str,
+                       now: datetime) -> datetime:
+    """Cuándo sale un aviso de coordinación: ahora, dentro del horario; si no, el
+    próximo inicio de jornada (constitución §8). El despachador posterga igual
+    ese mismo instante; encolarlo ya en él deja en la fila la hora real, la que
+    se le dice a quien confirma (`linea_de_estado_de_avisos`)."""
+    return Calendario.desde_base(cur, workspace_id).dentro_de_jornada(now)
+
+
 def notify_requester_of_approval(cur: psycopg.Cursor, who: Solicitante, *,
                                  pending_action_id: str, now: datetime) -> bool:
     """Le avisa a quien pidió el borrador que `who` (quien confirma) lo convirtió en
@@ -1423,7 +1438,7 @@ def notify_requester_of_approval(cur: psycopg.Cursor, who: Solicitante, *,
         cur, workspace_id=str(request["workspace_id"]), chat_id=request["chat_id"],
         recipient_membership_id=str(request["membership_id"]),
         text=approval_notice_text(who.nombre, request["titulo"]),
-        scheduled_for=now, dedupe_key=f"intake:{request_id}:approved-notice",
+        scheduled_for=_inicio_de_jornada(cur, str(request["workspace_id"]), now), dedupe_key=f"intake:{request_id}:approved-notice",
         allow_split=True, es_coordinacion=True,
     )
     if not enqueued:
@@ -1503,7 +1518,7 @@ def notify_responsible_of_assignment(cur: psycopg.Cursor, who: Solicitante, *,
         text=assignment_notice_text(
             requester["nombre"] if requester else "Alguien", task["titulo"],
             task["due_date"], task["criterio_aceptacion"] or ""),
-        scheduled_for=now, dedupe_key=f"intake:{request_id}:assigned-notice",
+        scheduled_for=_inicio_de_jornada(cur, str(task["workspace_id"]), now), dedupe_key=f"intake:{request_id}:assigned-notice",
         allow_split=True, es_coordinacion=True,
     )
     if not enqueued:
@@ -1514,6 +1529,64 @@ def notify_responsible_of_assignment(cur: psycopg.Cursor, who: Solicitante, *,
         actor_kind="persona", sujeto_tipo="task", sujeto_id=str(task["task_id"]),
         detalle=detail)
     return True
+
+
+def linea_de_estado_de_avisos(cur: psycopg.Cursor, who: Solicitante, *,
+                              pending_action_id: str, now: datetime) -> str:
+    """Lo que quien confirma debe saber de los avisos que acaba de causar, en
+    líneas para sumar a su única respuesta ("Hecho..."): quién todavía no se
+    entera y cuándo ("X lo va a ver mañana a las 08:00, cuando empiece el
+    horario") o que no se le pudo avisar (sin chat activado). Si el aviso sale
+    ahora, o no se encoló (falló: ya hay un incidente), no dice nada. Lee el
+    estado real: la hora de la fila encolada y si el chat existe."""
+    cur.execute(
+        """select r.id request_id, r.membership_id requester_id, w.zona_horaria,
+                  t.responsable_membership_id responsible_id
+             from pending_action p
+             join task_intake_request r on r.task_draft_id = p.draft_id
+                                       and r.workspace_id = p.workspace_id
+             join workspace w on w.id = p.workspace_id
+             left join task t on t.source_draft_id = r.task_draft_id
+            where p.id = %s and p.workspace_id = %s""",
+        (pending_action_id, who.workspace_id))
+    base = cur.fetchone()
+    if not base:
+        return ""
+    request_id = str(base["request_id"])
+    zona = ZoneInfo(base["zona_horaria"])
+    lineas = []
+    destinatarios = ((base["requester_id"], "approved-notice"),
+                     (base["responsible_id"], "assigned-notice"))
+    for membership_id, aviso in destinatarios:
+        if membership_id is None or str(membership_id) == str(who.membership_id):
+            continue
+        if aviso == "assigned-notice" and str(membership_id) == str(
+                base["requester_id"]):
+            continue                      # a quien pidió le llega el de aprobación
+        cur.execute("select nombre from integrante where membership_id = %s",
+                    (membership_id,))
+        persona = cur.fetchone()
+        nombre = persona["nombre"] if persona else "Esa persona"
+        cur.execute(
+            "select programado_para from message_outbox where dedupe_key = %s "
+            "and workspace_id = %s", (f"intake:{request_id}:{aviso}",
+                                      who.workspace_id))
+        fila = cur.fetchone()
+        if fila and fila["programado_para"] > now:
+            lineas.append(
+                f"{nombre} lo va a ver "
+                f"{cuando_legible(fila['programado_para'], now, zona)}, cuando "
+                "empiece el horario.")
+        elif not fila and aviso == "assigned-notice":
+            # Sin fila y sin chat activado el aviso se omitió (la auditoría lo
+            # registra); con chat y sin fila falló y su incidente ya lo cubre.
+            cur.execute("select telegram_user_id from integrante "
+                        "where membership_id = %s", (membership_id,))
+            chat = cur.fetchone()
+            if chat and chat["telegram_user_id"] is None:
+                lineas.append(f"{nombre} todavía no activó su chat con Prisma, "
+                              "así que no le pude avisar.")
+    return "\n".join(lineas)
 
 
 def modify_from_preview(cur: psycopg.Cursor, who: Solicitante, *, token: str,

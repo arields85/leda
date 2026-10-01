@@ -96,6 +96,26 @@ class Calendario:
         return datetime.combine(d, self.hora_inicio, tzinfo=self.zona)
 
 
+DIAS_LEGIBLES = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado",
+                 "domingo"]
+
+
+def cuando_legible(momento: datetime, ahora: datetime, zona: ZoneInfo) -> str:
+    """Un instante como lo dice una persona, en la hora local del espacio: "hoy a
+    las 08:00", "mañana a las 08:00", "el lunes a las 08:00" (dentro de la semana)
+    o "el 15/10 a las 08:00"."""
+    local = momento.astimezone(zona)
+    dias = (local.date() - ahora.astimezone(zona).date()).days
+    hora = local.strftime("%H:%M")
+    if dias <= 0:
+        return f"hoy a las {hora}"
+    if dias == 1:
+        return f"mañana a las {hora}"
+    if dias < 7:
+        return f"el {DIAS_LEGIBLES[local.weekday()]} a las {hora}"
+    return f"el {local.strftime('%d/%m')} a las {hora}"
+
+
 FERIADOS_AR_2026 = [
     date(2026, 1, 1), date(2026, 2, 16), date(2026, 2, 17), date(2026, 3, 24),
     date(2026, 4, 2), date(2026, 4, 3), date(2026, 5, 1), date(2026, 5, 25),

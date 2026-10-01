@@ -442,7 +442,7 @@ def test_one_active_request_offers_explicit_conflict_choices(intake_world, conn)
         assert cur.fetchone()["n"] == 1
         assert second.request_id == first.request_id
         assert set(_active_choices(cur, first.request_id)) == {
-            "Continuar borrador", I.CANCELAR_BORRADOR, "Empezar otro",
+            I.CONTINUAR_BORRADOR, I.CANCELAR_BORRADOR, I.EMPEZAR_OTRO,
         }
 
 
@@ -497,7 +497,7 @@ def test_concurrent_starts_converge_without_unique_violation(
         )
         assert cur.fetchone()["n"] == 1
         assert set(_active_choices(cur, outcomes[0].request_id)) == {
-            "Continuar borrador", I.CANCELAR_BORRADOR, "Empezar otro",
+            I.CONTINUAR_BORRADOR, I.CANCELAR_BORRADOR, I.EMPEZAR_OTRO,
         }
 
 

@@ -100,3 +100,24 @@ def test_el_menu_del_aprobador_lleva_un_icono_por_accion(corework, conn):
 
     for codigo in ("ver_detalle_evidencia", "aprobar", "pedir_cambios"):
         assert etiquetas[codigo].startswith(f"{TABLA_APROBADA[codigo]} "), codigo
+
+
+def test_el_menu_del_borrador_en_curso_lleva_icono_en_sus_tres_botones(
+        intake_world, conn):
+    """(i) "Continuar borrador" y "Empezar otro" salían sin ícono mientras
+    "Cancelar borrador" sí lo llevaba. Mismas constantes de `salida`, sin literales:
+    ▶️ seguir (el de empezar/retomar) y ➕ uno nuevo (el de agregar)."""
+    from prisma.salida import ICONO_CANCELAR, ICONO_EMPEZAR, ICONO_VER_MAS
+
+    from tests.test_task_intake import _active_choices, _start
+
+    ws = intake_world["north-lab"]["id"]
+    with espacio(conn, ws) as cur:
+        _, primero = _start(cur, intake_world)
+        _start(cur, intake_world, raw="Otra tarea", title="Calibrar el sensor")
+        etiquetas = _active_choices(cur, primero.request_id)
+
+    assert sorted(etiquetas) == sorted([
+        f"{ICONO_EMPEZAR} Continuar borrador",
+        f"{ICONO_CANCELAR} Cancelar borrador",
+        f"{ICONO_VER_MAS} Empezar otro"])

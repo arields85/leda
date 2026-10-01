@@ -152,7 +152,7 @@ def test_el_proximo_pedido_de_una_tarea_ofrece_continuar_el_borrador_guardado(
                         where s.id = %s order by o.orden""",
                     (nuevas[0]["intake_choice_set_id"],))
         etiquetas = [f["etiqueta"] for f in cur.fetchall()]
-    assert "Continuar borrador" in etiquetas
+    assert I.CONTINUAR_BORRADOR in etiquetas
 
     # Continuar retoma el borrador donde estaba, ya sin la marca de pausa.
     ws = intake_world["north-lab"]["id"]

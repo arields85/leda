@@ -15,6 +15,12 @@ Todo por el webhook real.
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
+
+import pytest
+
+from prisma import gateway
 from prisma.db import admin
 
 from tests.test_alta_conducida import (Chat, _en, _modelo,  # noqa: F401
@@ -329,3 +335,133 @@ def test_si_un_aviso_falla_quien_confirma_igual_recibe_su_respuesta_y_queda_un_i
     assert "al responsable" in inc["resumen_sanitizado"]
     assert inc["referencia_tipo"] == "pending_action"
     assert str(inc["referencia_id"]) == str(pid)
+
+
+# ------------------------------- (h) quien confirma sabe si, y cuándo, se enteran
+
+HECHO = "Hecho. La tarea quedó comprometida."
+# El calendario del espacio de prueba: lunes a viernes de 08:00 a 18:00, Buenos Aires
+# (UTC-3).
+LUNES_A_LAS_12 = datetime(2028, 2, 28, 15, 0, tzinfo=timezone.utc)
+LUNES_A_LAS_1830 = datetime(2028, 2, 28, 21, 30, tzinfo=timezone.utc)
+VIERNES_A_LAS_1830 = datetime(2028, 3, 3, 21, 30, tzinfo=timezone.utc)
+
+
+def _reloj(monkeypatch, momento) -> None:
+    """El `datetime.now` que ve el gateway, fijo en `momento`."""
+    real = gateway.datetime
+
+    class _Fijo(real):
+        @classmethod
+        def now(cls, tz=None):
+            return momento.astimezone(tz) if tz else momento
+
+    monkeypatch.setattr(gateway, "datetime", _Fijo)
+
+
+def _respuesta_a(conn, chat_id, antes) -> str:
+    """El único mensaje visible que recibió quien confirmó, con su texto."""
+    (fila,) = _nuevas(conn, chat_id, antes)
+    return fila["cuerpo"]
+
+
+@pytest.mark.parametrize("momento, cuando", [
+    (LUNES_A_LAS_1830, "mañana a las 08:00"),
+    (VIERNES_A_LAS_1830, "el lunes a las 08:00"),
+])
+def test_fuera_de_horario_quien_confirma_sabe_cuando_lo_va_a_ver_el_responsable(
+        momento, cuando, intake_world, conn, monkeypatch, authority_conn):
+    """Caso real: Ismael confirmó a las 18:00 y el aviso a Ariel quedó para el
+    02/10 a las 09:00; Ismael no lo sabía. Una sola respuesta, con la hora real."""
+    rid, pid = _alta_en_confirmacion(conn, intake_world, responsable="Sam North")
+    client = _cliente(conn, monkeypatch, authority_conn)
+    _reloj(monkeypatch, momento)
+    pide = _usuario(intake_world)
+    responsable = _chat(intake_world, "Sam North")
+    antes = _salidas(conn, pide)
+
+    _tocar(client, conn, pide, pid, "Confirmar")
+
+    assert _respuesta_a(conn, pide, antes) == (
+        f"{HECHO}\n{_nombre(conn, responsable)} lo va a ver {cuando}, "
+        "cuando empiece el horario.")
+    with admin(conn) as cur:     # la hora dicha es la de la fila encolada
+        cur.execute("select programado_para from message_outbox "
+                    "where chat_id = %s and cuerpo like '%%te asignó%%'",
+                    (responsable,))
+        (fila,) = cur.fetchall()
+    assert fila["programado_para"].astimezone(ZoneInfo(
+        "America/Argentina/Buenos_Aires")).strftime("%H:%M") == "08:00"
+
+
+def test_sin_chat_activado_quien_confirma_sabe_que_no_se_le_pudo_avisar(
+        intake_world, conn, monkeypatch, authority_conn):
+    rid, pid = _alta_en_confirmacion(conn, intake_world, responsable="Sam North")
+    app_user = intake_world["north-lab"]["people"]["Sam North"]["app_user_id"]
+    with admin(conn) as cur:
+        cur.execute("select nombre from app_user where id = %s", (app_user,))
+        nombre = cur.fetchone()["nombre"]
+        cur.execute("update app_user set telegram_user_id = null where id = %s",
+                    (app_user,))
+    conn.commit()
+    client = _cliente(conn, monkeypatch, authority_conn)
+    _reloj(monkeypatch, LUNES_A_LAS_12)
+    pide = _usuario(intake_world)
+    antes = _salidas(conn, pide)
+
+    _tocar(client, conn, pide, pid, "Confirmar")
+
+    assert _respuesta_a(conn, pide, antes) == (
+        f"{HECHO}\n{nombre} todavía no activó su chat con Prisma, así que no le "
+        "pude avisar.")
+
+
+def test_dentro_de_horario_y_con_chat_la_respuesta_no_agrega_nada(
+        intake_world, conn, monkeypatch, authority_conn):
+    rid, pid = _alta_en_confirmacion(conn, intake_world, responsable="Sam North")
+    client = _cliente(conn, monkeypatch, authority_conn)
+    _reloj(monkeypatch, LUNES_A_LAS_12)
+    pide = _usuario(intake_world)
+    antes = _salidas(conn, pide)
+
+    _tocar(client, conn, pide, pid, "Confirmar")
+
+    assert _respuesta_a(conn, pide, antes) == HECHO
+
+
+def test_fuera_de_horario_quien_confirma_sabe_cuando_se_entera_quien_pidio(
+        intake_world, conn, monkeypatch, authority_conn):
+    """El aviso de aprobación es igual de simple: mismo estado, misma respuesta."""
+    rid, pid = _alta_enviada(conn, intake_world, responsable="Para mí")
+    client = _cliente(conn, monkeypatch, authority_conn)
+    _reloj(monkeypatch, LUNES_A_LAS_1830)
+    aprobador = _tg_aprobador(intake_world)
+    pide = _usuario(intake_world)
+    antes = _salidas(conn, aprobador)
+
+    _tocar(client, conn, aprobador, pid, "Confirmar")
+
+    assert _respuesta_a(conn, aprobador, antes) == (
+        f"{HECHO}\n{_nombre(conn, pide)} lo va a ver mañana a las 08:00, "
+        "cuando empiece el horario.")
+
+
+def test_si_el_aviso_falla_la_respuesta_no_agrega_nada_y_queda_el_incidente(
+        intake_world, conn, monkeypatch, authority_conn):
+    """El aislamiento sigue: un aviso que no se pudo encolar no deja una línea de
+    estado inventada; su incidente ya lo cubre."""
+    from prisma import ingreso_tareas as I
+
+    def _rompe(*args, **kwargs):
+        raise RuntimeError("falla del aviso")
+
+    monkeypatch.setattr(I, "notify_responsible_of_assignment", _rompe)
+    rid, pid = _alta_en_confirmacion(conn, intake_world, responsable="Sam North")
+    client = _cliente(conn, monkeypatch, authority_conn)
+    _reloj(monkeypatch, LUNES_A_LAS_1830)
+    pide = _usuario(intake_world)
+    antes = _salidas(conn, pide)
+
+    _tocar(client, conn, pide, pid, "Confirmar")
+
+    assert _respuesta_a(conn, pide, antes) == HECHO

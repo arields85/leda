@@ -162,7 +162,8 @@ def test_el_resumen_si_muestra_la_descripcion_que_la_persona_dio(
 
 def test_el_resumen_nombra_los_tipos_de_evidencia_como_los_lee_una_persona(
         intake_world, conn):
-    """R4c-H8: "Evidencia: explicacion, resultado_de_prueba, captura, archivo"."""
+    """R4c-H8: "Evidencia: explicacion, resultado_de_prueba, captura, archivo". Los
+    nombres con tilde y mayúscula inicial: "Explicación, Resultado de prueba..."."""
     ws = intake_world["north-lab"]
     with admin(conn) as cur:
         cur.execute("""update task_evidence_policy
@@ -171,8 +172,8 @@ def test_el_resumen_nombra_los_tipos_de_evidencia_como_los_lee_una_persona(
                         where workspace_id = %s""", (ws["id"],))
     _, pid = _alta_en_confirmacion(conn, intake_world, responsable="Sam North")
     resumen = _resumen(conn, pid)
-    assert "Evidencia: explicacion, resultado de prueba, captura" in resumen
-    assert "resultado_de_prueba" not in resumen
+    assert "Evidencia: Explicación, Resultado de prueba, Captura" in resumen
+    assert "resultado_de_prueba" not in resumen and "explicacion" not in resumen
 
 
 def test_el_resumen_de_quien_pide_dice_lo_que_hace_su_boton_y_el_de_quien_confirma_el_suyo(

@@ -1474,7 +1474,7 @@ Tramo `f60c3ca..51fa9e6` (`81bb60a`, `9d1bee2`, `20cd9c8`, `51fa9e6`; 994 línea
   incidente `aviso_coordinacion`; (2) el aviso de asignación no nombra la fecha si la
   tarea no tiene (un espacio puede no exigirla). RED 2 failed, GREEN 135 passed
   (asignación, aprobación, enviar a aprobación, incidentes legibles, rechazo, conducida).
-- Pendiente (h): si el responsable no activó su chat, el aviso no sale y sólo queda en la
+- Pendiente (h) (RESUELTO, ver "Estado real para quien confirma, evidencia legible e íconos"): si el responsable no activó su chat, el aviso no sale y sólo queda en la
   auditoría; a quien creó la tarea no se le dice que el otro no se enteró.
 
 
@@ -1554,7 +1554,7 @@ Diseño B elegido por el usuario. Ruta declarada: un solo escritor (encargo expl
 - Verificado en real (18:47-18:49): con el borrador pausado, "¿qué tarea dejaste guardada?"
   respondió el borrador con Continuar / Cancelar / Empezar otro en un solo mensaje, sin
   aclaración equivocada; Cancelar lo canceló. Pendiente (b) cerrado en real.
-- Pendiente (i), visual: en ese menú "Continuar borrador" y "Empezar otro" salen sin ícono
+- Pendiente (i), visual (RESUELTO, ver la misma entrada): en ese menú "Continuar borrador" y "Empezar otro" salen sin ícono
   (Cancelar sí lo tiene).
 
 ### Lo que Prisma puede ofrecer, como hecho (2026-10-01)
@@ -1616,3 +1616,49 @@ Diseño B elegido por el usuario. Ruta declarada: un solo escritor (encargo expl
   prometer un día; el menú del borrador y Cancelar, bien. Cuatro turnos, todos al primer
   intento. Pendientes (a) y (f) cerrados en real. Queda el detalle de "rango" como palabra
   técnica.
+
+### Estado real para quien confirma, evidencia legible e íconos (2026-10-01)
+
+- **(h) Quien confirma sabe si, y cuándo, se enteran los demás.**
+  - **Causa.** La respuesta "Hecho. La tarea quedó comprometida." la escribe la autoridad
+    (`db/esquema.sql`) antes de que el gateway encole los avisos, y los avisos salían con
+    `scheduled_for=now`: fuera de horario el despachador los posterga recién al enviar
+    (constitución §8), así que ni la fila ni la respuesta decían nada; sin chat activado sólo
+    quedaba la auditoría. Caso real: Ismael confirmó a las 18:00 y el aviso a Ariel quedó para el
+    02/10 09:00 sin que él lo supiera.
+  - **Arreglo.** Los dos avisos (`notify_requester_of_approval`, `notify_responsible_of_assignment`)
+    se encolan en `_inicio_de_jornada` (próximo instante hábil; es el mismo que calcularía el
+    despachador), de modo que la fila guarda la hora real. `ingreso_tareas.linea_de_estado_de_avisos`
+    lee ese estado (hora de la fila, o responsable sin chat) y el gateway suma la línea a la fila
+    terminal con `_sumar_a_la_respuesta_terminal`: sigue siendo UN mensaje visible (ADR 0013 regla 2),
+    con estado real (regla 3). Textos: "<Nombre> lo va a ver mañana a las 08:00, cuando empiece el
+    horario." (también "el lunes a las 08:00", "el 15/10 a las 08:00"; `calendario.cuando_legible`) y
+    "<Nombre> todavía no activó su chat con Prisma, así que no le pude avisar." Si el aviso sale ya,
+    no se agrega nada; si un aviso falló, tampoco (su incidente ya lo cubre; `_aviso_aislado` intacto).
+    El aviso de aprobación a quien pidió usa la misma línea (era igual de simple).
+  - **Límite.** Si la fila terminal ya salió antes de sumarle la línea (ventana de milisegundos con
+    el despachador), no se toca ni se manda un segundo mensaje: queda un incidente `baja`.
+  - **RED.** `tests/test_aviso_de_asignacion.py` (nuevos): 4 failed, 4 passed (las otras dos nuevas,
+    "dentro de horario no agrega nada" y "aviso fallido no agrega nada", son guardas que ya pasaban).
+  - **GREEN.** El archivo: 17 passed.
+- **Evidencia con nombres legibles.**
+  - **Causa.** `nombre_legible` sólo reemplazaba guiones bajos: `explicacion` salía sin tilde ni
+    mayúscula porque el pack no trae etiquetas por tipo de evidencia (PENDIENTE) y no había tabla.
+  - **Arreglo en el origen.** `redaccion.ETIQUETAS_DE_EVIDENCIA` (explicacion, resultado_de_prueba,
+    captura, archivo, foto -> "Explicación", "Resultado de prueba", "Captura", "Archivo", "Foto");
+    un tipo fuera de la tabla conserva el comportamiento anterior (no se inventa). Cubre el resumen
+    y el hecho que ve el modelo en el alta conducida.
+  - **RED.** `test_redaccion.py -k nombre_interno`: 5 failed, 1 passed. **GREEN.** La tanda enfocada.
+- **(i) Íconos del menú del borrador en curso.** Causa: las etiquetas eran literales sin ícono.
+  Arreglo: `ingreso_tareas.CONTINUAR_BORRADOR = con_icono(..., ICONO_EMPEZAR)` (▶️) y
+  `EMPEZAR_OTRO = con_icono(..., ICONO_VER_MAS)` (➕); no hay un ícono propio de "seguir" ni de
+  "nuevo", se reutilizaron los más cercanos sin inventar lenguaje visual. RED
+  `tests/test_iconos_del_menu.py`: 1 failed, 12 passed; GREEN (más `test_task_intake`, conducida,
+  dejarlo, pausado): 166 passed.
+- **Pruebas cambiadas.** `test_task_intake.py` (dos aserciones de etiquetas: ahora las constantes
+  con ícono), `test_alta_dejarlo_conserva_el_borrador.py` (la etiqueta con ícono),
+  `test_alta_guiada_texto.py` (evidencia "Explicación, Resultado de prueba, Captura"),
+  `test_redaccion.py` (la tabla legible con mayúscula).
+- **Tanda enfocada** (10 archivos pedidos más los de `rg -l "explicacion|nombre_legible|Continuar
+  borrador|Empezar otro"`, 32 archivos): 853 passed. No se corrió la suite completa.
+- Pendientes (h) e (i): resueltos, a verificar en la próxima corrida real.
