@@ -26,9 +26,18 @@ from tests.test_task_intake import _callback_client
 PREGUNTA_B = "¿Qué hay que hacer?"
 
 
+def _json(texto, pregunta=None, afirma=()):
+    return json.dumps({"texto": texto, "pregunta": pregunta, "afirma": list(afirma)},
+                      ensure_ascii=False)
+
+
+APERTURA = "Listo, ya está el borrador. Revisalo:"
+
+
 class _Eco:
     """Un modelo que escribe distinto de las plantillas pero fiel a los
-    hechos: la pregunta con una frase delante y el resumen con viñetas."""
+    hechos: la pregunta con una frase delante y, con un resumen, sólo la
+    apertura (los datos y el cierre los agrega el código)."""
 
     def __init__(self):
         self.redactados: list[dict] = []
@@ -37,15 +46,17 @@ class _Eco:
         datos = json.loads(hechos)
         self.redactados.append(datos)
         if "resumen" in datos:
-            r = datos["resumen"]
-            return (r["titulo"] + "\n" + "\n".join(
-                f"- {x['dato']}: {x['valor']}" for x in r["datos"]))
+            return _json(APERTURA)
         partes = []
         if "rechazo" in datos:
             partes.append(f"{datos['rechazo']['razon']} {datos['rechazo']['se_acepta']}")
+        pregunta = None
         if "falta" in datos:
             partes.append(datos["falta"].get("pregunta") or "¿Me lo decís?")
-        return "Dale. " + " ".join(partes)
+            if "?" not in partes[-1]:       # un buen modelo pide con signos
+                partes.append("¿Cuál?")
+            pregunta = datos["falta"]["campo"]
+        return _json("Dale. " + " ".join(partes), pregunta)
 
 
 def _con_variante(conn, ws, variante, monkeypatch, proveedor):
@@ -110,7 +121,7 @@ def test_si_el_verificador_rechaza_sale_la_pregunta_de_b_una_sola_vez(
         intake_world, conn, monkeypatch):
     ws = intake_world["north-lab"]["id"]
     _con_variante(conn, ws, "A", monkeypatch, ProveedorGuionado(
-        guion=[], borradores=["Anoté tu pedido y ya lo cancelé, ¿qué más?"]))
+        guion=[], borradores=[_json("Anoté tu pedido, ¿qué más?")]))
 
     with espacio(conn, ws) as cur:
         _, outcome = _empezar(cur, intake_world, chat=73003)
@@ -119,7 +130,7 @@ def test_si_el_verificador_rechaza_sale_la_pregunta_de_b_una_sola_vez(
     assert outcome.text == PREGUNTA_B and cuerpos == [PREGUNTA_B]
     (intento,) = _intentos(conn, ws)
     assert intento["resultado"] == "rechazada"
-    assert intento["motivo"].startswith("accion_no_ocurrida")
+    assert intento["motivo"].startswith("falta_pregunta")
     assert _incidentes(conn) == 1
 
 
@@ -151,7 +162,7 @@ def test_con_a_el_resumen_lo_redacta_el_modelo_una_vez_y_el_cierre_es_del_codigo
     with admin(conn) as cur:
         cur.execute("select resumen from pending_action where id = %s", (pid,))
         texto = cur.fetchone()["resumen"]
-    assert texto.startswith("Resumen para revisar\n- Título: ")
+    assert texto.startswith(APERTURA + "\n\nResumen para revisar\nTítulo: ")
     assert texto.endswith("\n\n" + I.CIERRE_CONFIRMAR)
     assert "Con Confirmar" not in json.dumps(resumenes[0], ensure_ascii=False)
     assert all(i["resultado"] == "aceptada" for i in _intentos(conn, ws))
@@ -165,7 +176,7 @@ def test_con_a_enviar_a_aprobacion_conserva_el_cuerpo_del_modelo_con_el_cierre_d
     rid, pid = _alta_en_revision(conn, intake_world)
     (revision, *_) = _acciones(conn, rid)
     cuerpo = revision["args"]["cuerpo_resumen"]
-    assert cuerpo.startswith("Resumen para revisar\n- Título: ")
+    assert cuerpo.startswith(APERTURA + "\n\nResumen para revisar\nTítulo: ")
     assert revision["resumen"] == cuerpo + "\n\n" + I.cierre_enviar("Morgan Hale 1")
     antes = len([d for d in eco.redactados if "resumen" in d])
     assert antes == 1                                 # un solo borrador para los dos cierres
@@ -196,7 +207,7 @@ def test_si_el_modelo_falla_en_el_resumen_sale_el_de_b_con_su_cierre(
     with admin(conn) as cur:
         cur.execute("select resumen from pending_action where id = %s", (pid,))
         texto = cur.fetchone()["resumen"]
-    assert texto.startswith("Resumen para revisar\nTítulo: ")      # B, sin viñetas
+    assert texto.startswith("Resumen para revisar\nTítulo: ")      # B, sin apertura
     assert texto.endswith("\n\n" + I.CIERRE_CONFIRMAR)
     assert [i["resultado"] for i in _intentos(conn, ws)].count("error") == 1
     assert _incidentes(conn) == 1

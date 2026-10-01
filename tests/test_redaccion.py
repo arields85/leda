@@ -265,7 +265,7 @@ def test_el_resultado_del_turno_es_inmutable_y_sin_transporte():
         r.cambios = ()
     campos = {f.name for f in dataclasses.fields(ResultadoTurno)}
     assert campos == {"cambios", "sin_cambios", "estado", "falta", "opciones",
-                      "valores_aceptados", "rechazo", "resumen"}
+                      "valores_aceptados", "rechazo", "resumen", "entendido"}
     # Frontera regla 2: ni chat ni formato de Telegram en el resultado.
     assert not {"chat_id", "teclado", "html", "parse_mode"} & campos
 

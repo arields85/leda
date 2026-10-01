@@ -1670,7 +1670,8 @@ def _open_choices(cur, request, field, prompt, options, now, kind=None, *,
         # La pregunta de un dato sale por la redacción del espacio (ADR 0014,
         # etapa 6); el aviso que va delante no es la pregunta.
         prompt = prefijo + _decir(cur, request, ResultadoTurno(falta=Falta(
-            _SUJETO_DEL_CAMPO[field], TipoValor.OPCION, pregunta=prompt)))
+            _SUJETO_DEL_CAMPO[field], TipoValor.OPCION, pregunta=prompt,
+            campo=field)))
     else:
         prompt = prefijo + prompt
     prepare_payload(prompt, dedupe_key="intake-choice", has_buttons=True)
@@ -1704,7 +1705,7 @@ def _open_free_text(cur, request, field, prompt, now, replace=False, block=None,
     request_id = str(request["id"])
     prompt = prefijo + _decir(cur, request, ResultadoTurno(falta=Falta(
         _SUJETO_DEL_CAMPO[field], TIPO_DE_CAMPO.get(field, TipoValor.TEXTO),
-        pregunta=prompt)))
+        pregunta=prompt, campo=field)))
     prepare_payload(prompt, dedupe_key="intake-text", has_buttons=bool(block))
     cur.execute(
         """update task_intake_free_text_slot set estado = 'invalidated'

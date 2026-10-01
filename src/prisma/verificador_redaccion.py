@@ -1,35 +1,42 @@
 """Verificador del texto que redacta el modelo en la variante A (ADR 0014,
 etapa 6, mecanismo M4).
 
-Determinista, sin modelo, y general: opera sobre los hechos estructurados de
-`ResultadoTurno`, no sobre frases (ADR 0013). Un texto sale sólo si
+Determinista, sin modelo, y general: sólo comprueba lo que el código puede
+verificar contra los hechos estructurados de `ResultadoTurno`, sin listas de
+palabras ni morfología (ADR 0013: ninguna frase observada, ningún verbo que
+"suena a hecho"). El modelo contesta una salida estructurada
+(`{"texto", "pregunta", "afirma"}`, ver `leer_borrador`) y un borrador sale sólo si
 
-- no afirma lo que los hechos no tienen: números y fechas que no están, un
-  estado del dominio que no figura, una acción hecha en primera persona sin un
-  cambio que la respalde, claves internas;
-- trae lo que los hechos exigen: los nombres citados, los valores aceptados,
-  los estados, los datos del resumen, la pregunta de lo que falta y lo
-  esencial de lo que dicen un rechazo, un cambio o un "no cambió";
-- tiene un largo razonable.
+- cada fecha, número, título entre «», y nombre propio que dice existe en los
+  hechos (la comparación es normalizada: sin tildes ni mayúsculas, una fecha dicha
+  de otra forma vale);
+- `pregunta` es el dato que falta (de una lista cerrada: su identificador) y el
+  texto pregunta; sin dato que falte, no abre una pregunta;
+- `afirma` (identificadores cerrados) cuenta cada cambio del resultado y ninguno
+  que no esté en `cambios`;
+- trae lo que los hechos exigen: los nombres citados, los valores aceptados, los
+  estados, lo entendido (si es corto) y lo esencial de un rechazo o un "no cambió";
+- no trae claves internas ni llaves y tiene un largo razonable.
 
 `verificar` devuelve `None` si el texto sirve, o el motivo del rechazo
-(`familia: detalle`) para registrarlo. No entiende el sentido: ante la duda
-rechaza, y quien llama manda la plantilla de la variante B.
+(`familia: detalle`) para registrarlo. Ante la duda rechaza, y quien llama manda
+la plantilla de la variante B.
 
-Límites declarados (se ajustan mirando los motivos registrados, no por frase):
-la detección de acciones hechas es morfológica (primera persona del pretérito,
-`-é` o `-í`) y puede rechazar un "Entendí" inocente; un cambio extra dicho con
-las palabras de un cambio real no se distingue.
+Límite declarado: `afirma` es lo que el modelo dice de sí mismo. Un efecto
+contado en el texto y omitido de `afirma` no se detecta (sin morfología ni
+listas, el código no puede leer el sentido); se mira en los motivos y en la
+transcripción de la prueba, no se parcha por frase.
 """
 
 from __future__ import annotations
 
+import json
 import re
 import unicodedata
-from dataclasses import fields, is_dataclass
+from dataclasses import dataclass, fields, is_dataclass, replace
 from enum import Enum
 
-from .resultado_turno import ResultadoTurno
+from .resultado_turno import ResultadoTurno, ids_de_cambios
 
 LARGO_MAXIMO = 3500
 # Contra la plantilla de B: la respuesta del modelo no puede ser mucho más
@@ -37,23 +44,61 @@ LARGO_MAXIMO = 3500
 FACTOR_LARGO = 3
 MARGEN_LARGO = 200
 COBERTURA_MINIMA = 0.5
+# Lo entendido de más de este largo (un criterio escrito largo) se puede resumir:
+# se exige copiar un valor corto (una fecha, un nombre), no un párrafo.
+LARGO_ENTENDIDO_EXIGIDO = 80
 
 _MESES = ("enero", "febrero", "marzo", "abril", "mayo", "junio", "julio",
           "agosto", "septiembre", "octubre", "noviembre", "diciembre")
 _MES_NUMERO = {m: i + 1 for i, m in enumerate(_MESES)} | {"setiembre": 9}
 
-# Vocabulario de estados del dominio (`estado_tarea` y sus sinónimos
-# corrientes): una raíz de estas en el texto exige que los hechos la tengan.
-_ESTADOS = ("propuest", "pendiente de aprob", "asignad", "en curso", "bloquead",
-            "en revision", "terminad", "cancelad", "completad", "finalizad",
-            "cerrad", "aprobad", "rechazad", "entregad", "vencid", "atrasad")
-
-_ACCION_1RA_PERSONA = re.compile(r"\b[a-zñ]{3,}é\b|\b[a-zñ]{4,}í\b",
-                                 re.IGNORECASE)
 _CLAVE_INTERNA = re.compile(r"\b[a-z]+(?:_[a-z0-9]+)+\b")
 _CITADO = re.compile(r"«([^»]+)»")
 _FECHA_NUMERICA = re.compile(r"\b(\d{1,2})\s*[/.\-]\s*(\d{1,2})(?:\s*[/.\-]\s*\d{2,4})?\b")
 _FECHA_CON_MES = re.compile(r"\b(\d{1,2})\s*(?:de\s+)?(" + "|".join(_MES_NUMERO) + r")\b")
+_LETRAS = "A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9_"
+_PALABRA = re.compile(rf"[{_LETRAS}]+")
+_CAPITALIZADA = re.compile(rf"(?<![{_LETRAS}])[A-ZÁÉÍÓÚÜÑ][{_LETRAS}]*")
+# Lo que, antes de una palabra, la deja al principio de una oración: la
+# mayúscula inicial no es un nombre propio.
+_FIN_DE_ORACION = ".!?:;\n¿¡-–—•*(\"'"
+
+
+@dataclass(frozen=True)
+class Borrador:
+    """La salida estructurada del modelo: el texto, el dato que dice pedir
+    (`pregunta`, identificador cerrado o `None`) y los efectos que cuenta
+    (`afirma`, identificadores cerrados de `cambios`)."""
+    texto: str
+    pregunta: str | None
+    afirma: tuple[str, ...]
+
+
+def leer_borrador(crudo: str) -> Borrador | str:
+    """El `Borrador` que dice el JSON del modelo, o el motivo (`formato: ...`)
+    si no es la salida pedida. Tolera vallas de código y texto alrededor del
+    objeto: lee el primer objeto JSON que encuentra."""
+    crudo = (crudo or "").strip()
+    inicio = crudo.find("{")
+    if inicio < 0:
+        return "formato: el modelo no devolvió un objeto JSON"
+    try:
+        datos, _ = json.JSONDecoder().raw_decode(crudo[inicio:])
+    except ValueError:
+        return "formato: el JSON del modelo no se puede leer"
+    if not isinstance(datos, dict):
+        return "formato: la salida no es un objeto"
+    texto = datos.get("texto")
+    if not isinstance(texto, str) or not texto.strip():
+        return "formato: falta el `texto`"
+    pregunta = datos.get("pregunta")
+    if pregunta is not None and not isinstance(pregunta, str):
+        return "formato: `pregunta` no es un identificador ni null"
+    afirma = datos.get("afirma", [])
+    if (not isinstance(afirma, list)
+            or not all(isinstance(a, str) for a in afirma)):
+        return "formato: `afirma` no es una lista de identificadores"
+    return Borrador(texto.strip(), pregunta or None, tuple(afirma))
 
 
 def _norm(texto: str) -> str:
@@ -62,8 +107,10 @@ def _norm(texto: str) -> str:
     return " ".join(sin_marcas.casefold().split())
 
 
-def _textos(objeto) -> list[str]:
-    """Todos los textos de los hechos: lo que el texto puede nombrar."""
+def _textos(objeto, *, con_opciones: bool = False) -> list[str]:
+    """Todos los textos de los hechos: lo que el texto puede nombrar. Las
+    opciones (los botones) sólo entran como nombres que se pueden decir, no
+    como hechos que se exigen; el cierre del resumen es del código."""
     if isinstance(objeto, str):
         return [objeto]
     if isinstance(objeto, Enum) or objeto is None:
@@ -71,12 +118,13 @@ def _textos(objeto) -> list[str]:
     if is_dataclass(objeto):
         salida: list[str] = []
         for campo in fields(objeto):
-            if campo.name in ("opciones", "cierre"):
-                continue          # los botones y el cierre no son hechos que decir
-            salida += _textos(getattr(objeto, campo.name))
+            if campo.name == "cierre" or (campo.name == "opciones"
+                                          and not con_opciones):
+                continue
+            salida += _textos(getattr(objeto, campo.name), con_opciones=con_opciones)
         return salida
     if isinstance(objeto, (tuple, list)):
-        return [t for item in objeto for t in _textos(item)]
+        return [t for item in objeto for t in _textos(item, con_opciones=con_opciones)]
     return []
 
 
@@ -103,8 +151,8 @@ def _raices(texto_norm: str) -> set[str]:
 
 
 def _cubre(libre_norm: str, raices_texto: set[str]) -> bool:
-    """El texto dice lo esencial de un hecho redactado a mano (qué cambió, por
-    qué no, por qué se rechazó): al menos la mitad de sus palabras con
+    """El texto dice lo esencial de un hecho redactado a mano (por qué no
+    cambió, por qué se rechazó): al menos la mitad de sus palabras con
     contenido, por raíz, y siempre que el hecho tenga alguna."""
     raices = _raices(libre_norm)
     if not raices:
@@ -122,9 +170,24 @@ def _aparece(valor: str, texto_norm: str, fechas_texto: set[tuple[int, int]]) ->
     return bool(fechas_valor) and fechas_valor <= fechas_texto
 
 
-def verificar(resultado: ResultadoTurno, texto: str,
+def _nombre_propio_inventado(texto: str, palabras_hechos: set[str]) -> str | None:
+    """La primera palabra con mayúscula inicial, en medio de una oración y fuera
+    de las comillas «», que los hechos no tienen: un nombre que el texto no puede
+    sacar de ningún lado. La mayúscula al empezar una oración no cuenta."""
+    sin_citas = _CITADO.sub(" ", texto)
+    for m in _CAPITALIZADA.finditer(sin_citas):
+        antes = sin_citas[:m.start()].rstrip()
+        if not antes or antes[-1] in _FIN_DE_ORACION:
+            continue
+        if _norm(m.group()) not in palabras_hechos:
+            return m.group()
+    return None
+
+
+def verificar(resultado: ResultadoTurno, borrador: Borrador,
               texto_b: str | None = None) -> str | None:
-    """`None` si el texto sirve; si no, el motivo `familia: detalle`."""
+    """`None` si el borrador sirve; si no, el motivo `familia: detalle`."""
+    texto = borrador.texto
     if not texto or not texto.strip():
         return "vacio: el modelo no devolvió texto"
     largo_maximo = LARGO_MAXIMO
@@ -133,73 +196,76 @@ def verificar(resultado: ResultadoTurno, texto: str,
     if len(texto) > largo_maximo:
         return f"largo: {len(texto)} caracteres, máximo {largo_maximo}"
 
-    hechos = _textos(resultado)
-    hechos_norm = _norm(" ".join(hechos))
+    todos = _textos(resultado, con_opciones=True)
+    todos_norm = _norm(" ".join(todos))
     t = _norm(texto)
 
     if "{" in texto or "}" in texto:
         return "formato_interno: el texto trae llaves"
     for clave in _CLAVE_INTERNA.findall(texto):
-        if clave not in hechos_norm:
+        if clave not in todos_norm:
             return f"clave_interna: {clave}"
 
-    # Una acción hecha en primera persona necesita un cambio que la respalde.
-    respaldo = bool(resultado.cambios or resultado.valores_aceptados
-                    or resultado.resumen)
-    if not respaldo:
-        for m in _ACCION_1RA_PERSONA.finditer(texto):
-            if texto[max(0, m.start() - 3):m.start()].lower() != "no ":
-                return f"accion_no_ocurrida: {m.group(0)}"
-
     # Números, fechas y meses que los hechos no tienen.
-    fechas_hechos = _fechas(hechos_norm)
+    fechas_hechos = _fechas(todos_norm)
     fechas_texto = _fechas(t)
-    sobrantes = _numeros(t) - _numeros(hechos_norm)
+    sobrantes = _numeros(t) - _numeros(todos_norm)
     if sobrantes:
         return f"numero_inventado: {sorted(sobrantes)[0]}"
     for dia, mes in sorted(fechas_texto - fechas_hechos):
         return f"fecha_distinta: {dia:02d}/{mes:02d}"
-    meses_texto = _meses(t, fechas_texto) - _meses(hechos_norm, fechas_hechos)
+    meses_texto = _meses(t, fechas_texto) - _meses(todos_norm, fechas_hechos)
     if meses_texto:
         return f"mes_inventado: {_MESES[sorted(meses_texto)[0] - 1]}"
 
-    # Estados del dominio que los hechos no tienen.
-    for raiz in _ESTADOS:
-        if re.search(rf"\b{raiz}", t) and not re.search(rf"\b{raiz}", hechos_norm):
-            return f"estado_inventado: {raiz}"
+    # Títulos y nombres: los citados y los propios tienen que estar en los hechos.
+    for citado in _CITADO.findall(texto):
+        if _norm(citado) not in todos_norm:
+            return f"nombre_inventado: «{citado}»"
+    palabras_hechos = {_norm(p) for p in _PALABRA.findall(" ".join(todos))}
+    inventado = _nombre_propio_inventado(texto, palabras_hechos)
+    if inventado:
+        return f"nombre_inventado: {inventado}"
 
-    # Lo que los hechos exigen.
-    for hecho in hechos:
+    # Efectos: los que cuenta tienen que ser cambios del resultado, y todos.
+    ids = ids_de_cambios(resultado)
+    for efecto in borrador.afirma:
+        if efecto not in ids:
+            return f"efecto_no_ocurrido: {efecto}"
+    omitido = [i for i in ids if i not in borrador.afirma]
+    if omitido:
+        return f"efecto_omitido: {omitido[0]}"
+
+    # El dato que falta: el modelo dice cuál pide y el texto pregunta.
+    if resultado.falta:
+        if borrador.pregunta != resultado.falta.clave or not _hay_pregunta(texto):
+            return f"falta_pregunta: {resultado.falta.dato}"
+    elif borrador.pregunta is not None or _hay_pregunta(texto):
+        return "pregunta_sin_falta: no hay ningún dato que pedir"
+
+    # Lo que los hechos exigen. Los datos del resumen los agrega el código: no se
+    # exigen en el texto del modelo.
+    sin_resumen = replace(resultado, resumen=None)
+    for hecho in _textos(sin_resumen):
         for citado in _CITADO.findall(hecho):
             if _norm(citado) not in t:
                 return f"falta_hecho: «{citado}»"
     exigidos: list[str] = [v.mostrado for v in resultado.valores_aceptados]
     exigidos += [e.estado for e in resultado.estado]
-    if resultado.resumen:
-        exigidos += [valor for _, valor in resultado.resumen.lineas]
+    exigidos += [v.mostrado for v in resultado.entendido
+                 if len(v.mostrado) <= LARGO_ENTENDIDO_EXIGIDO]
     for valor in exigidos:
         if not _aparece(valor, t, fechas_texto):
             return f"falta_hecho: {valor}"
-    libres = [c.que for c in resultado.cambios]
-    libres += [s.motivo for s in resultado.sin_cambios]
+    libres = [s.motivo for s in resultado.sin_cambios]
     if resultado.rechazo:
         libres += [resultado.rechazo.razon, resultado.rechazo.se_acepta]
     raices_texto = _raices(t)
     for libre in libres:
         if not _cubre(_norm(libre), raices_texto):
             return f"falta_hecho: {libre}"
-    if resultado.falta and not _pregunta_hecha(resultado.falta.pregunta, texto, t,
-                                               raices_texto):
-        return f"falta_pregunta: {resultado.falta.dato}"
     return None
 
 
-def _pregunta_hecha(pregunta: str | None, texto: str, texto_norm: str,
-                    raices_texto: set[str]) -> bool:
-    """El texto hace la pregunta: trae un signo de pregunta o, si lo que se pide
-    está dicho como instrucción ("Escribí parte del nombre del objetivo."),
-    cubre lo esencial de esa instrucción."""
-    if "?" in texto:
-        return True
-    return bool(pregunta) and bool(_raices(_norm(pregunta))) and _cubre(
-        _norm(pregunta), raices_texto)
+def _hay_pregunta(texto: str) -> bool:
+    return "?" in texto or "¿" in texto

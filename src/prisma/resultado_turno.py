@@ -23,6 +23,10 @@ class Cambio:
     """Algo que este turno cambió de verdad."""
     sujeto: str   # "la tarea «Revisar PLC»"
     que: str      # "quedó en curso"
+    # Identificador cerrado del efecto: el modelo lo devuelve en `afirma` para
+    # decir qué efectos cuenta su texto, y el verificador lo compara con los
+    # hechos. Sin uno propio se numera por posición (`ids_de_cambios`).
+    id: str = ""
 
 
 @dataclass(frozen=True)
@@ -45,6 +49,13 @@ class Falta:
     dato: str                    # "la fecha objetivo"
     tipo: TipoValor
     pregunta: str | None = None  # la pregunta tal como se hace, si ya existe
+    # Identificador cerrado del dato (el campo): el modelo lo devuelve en
+    # `pregunta` para decir qué dato pide su texto. Sin uno propio, `dato`.
+    campo: str = ""
+
+    @property
+    def clave(self) -> str:
+        return self.campo or self.dato
 
 
 @dataclass(frozen=True)
@@ -92,6 +103,10 @@ class ResultadoTurno:
     valores_aceptados: tuple[ValorAceptado, ...] = ()
     rechazo: Rechazo | None = None
     resumen: Resumen | None = None
+    # Lo que el turno entendió de la persona (un valor ya validado, mostrado como
+    # se va a ver). Es contexto para que el modelo lo diga en su mensaje: la
+    # plantilla de B no lo dice, así que B no cambia.
+    entendido: tuple[ValorAceptado, ...] = ()
 
     @property
     def vacio(self) -> bool:
@@ -99,3 +114,9 @@ class ResultadoTurno:
         return not (self.cambios or self.sin_cambios or self.estado
                     or self.falta or self.valores_aceptados or self.rechazo
                     or self.resumen)
+
+
+def ids_de_cambios(resultado: ResultadoTurno) -> tuple[str, ...]:
+    """Los identificadores cerrados de los efectos del turno, en orden: el `id`
+    de cada cambio o, si no tiene, `c1`, `c2`, ..."""
+    return tuple(c.id or f"c{i}" for i, c in enumerate(resultado.cambios, 1))

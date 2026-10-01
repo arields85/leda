@@ -29,6 +29,11 @@ REPREGUNTA_B = ("Con eso no me alcanza para fijar un día. Decime el día exacto
                 "por ejemplo «el viernes» o «el 4 de octubre».")
 
 
+def _json(texto, pregunta=None, afirma=()):
+    return json.dumps({"texto": texto, "pregunta": pregunta, "afirma": list(afirma)},
+                      ensure_ascii=False)
+
+
 def _variante(conn, ws, variante: str) -> None:
     with admin(conn) as cur:
         cur.execute("""insert into workspace_setting (workspace_id, clave, valor)
@@ -76,14 +81,15 @@ def test_con_a_la_repregunta_la_escribe_el_modelo_en_una_sola_respuesta(
     pregunta = f"Dale, la semana que viene. {REPREGUNTA_B}"
 
     tg, proveedor, salidas, _ = _repreguntar_dia(
-        cliente, conn, ws, monkeypatch, [pregunta])
+        cliente, conn, ws, monkeypatch, [_json(pregunta)])
 
     assert salidas == 1 and _campo_del_slot(conn) == "due_date"
     assert len(proveedor.redactados) == 1                 # el modelo redactó
     assert _filas_del_chat(conn, tg)[-1]["cuerpo"] == pregunta
 
 
-@pytest.mark.parametrize("error", [RuntimeError("cayó"), "Dale, anotado."])
+@pytest.mark.parametrize("error", [RuntimeError("cayó"),
+                                   _json("Dale, anotado."), "Dale, anotado."])
 def test_con_a_si_el_modelo_falla_o_no_pasa_la_verificacion_sale_la_de_b(
         error, cliente, conn, corework, monkeypatch):
     ws = corework.workspace_id

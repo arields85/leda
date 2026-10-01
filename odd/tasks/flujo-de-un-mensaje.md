@@ -464,3 +464,28 @@ aprobados y reconocidos, sin correcciones. Advertencias no bloqueantes:
   `verificar` fuera del try que cae a B.
 - [ ] R14. `redaccion.py:278-281`: el texto completo de una excepción del proveedor va a
   `audit_log`/`incident`; confirmar que ninguna URL con credencial pueda terminar ahí.
+
+## Etapa 6 completa con A y menos latencia (2026-10-01, decisión del usuario)
+
+Chequeo de rumbo (escrito antes de empezar; ADR 0014, "Resultado de la primera vuelta A/B").
+
+1. Clase de problema: la redacción de A quedó a medias (el modelo escribía una frase
+   delante de una pregunta de plantilla: "mitad planilla, mitad modelo"), el verificador
+   rechazó falsamente 3 de 18 borradores (heurística morfológica de primera persona) y
+   cada texto y cada toque pagaba una llamada lenta (10,3 s y 7,8 s de mediana). Además
+   el orden de dos mensajes de un mismo turno salió invertido (F-A1) y la charla breve
+   sonó rara (F-A2).
+2. Mecanismo, no caso: (a) el modelo escribe el mensaje entero desde el resultado del
+   turno, con salida estructurada `{texto, pregunta, afirma}`; (b) el verificador sólo
+   comprueba lo verificable contra hechos estructurados (fechas, números, nombres y
+   títulos que existen en los hechos; `pregunta` es el campo que falta y el texto
+   pregunta; `afirma` es un subconjunto de `cambios`), sin listas de palabras ni
+   morfología; (c) plazo propio corto sin reintentos y caída inmediata a la plantilla;
+   (d) F-A1: el despacho se serializa por espacio (dos pasadas concurrentes y
+   `skip locked` saltaban la fila que la otra estaba enviando).
+3. Qué haría innecesaria la próxima ronda: la tabla de motivos de rechazo y la mediana de
+   la llamada de redacción (`python -m prisma redaccion corework`); ningún rechazo por
+   una forma verbal; ningún par de mensajes del turno en orden inverso.
+4. Hipótesis vigente: un modelo flash redacta el mensaje entero sobre hechos dentro de
+   un plazo de 3 s con pocas caídas a B, y un pedido corto baja la mediana. Se mide, no
+   se asume; si el plazo corta la mayoría de las redacciones, se para y se discute.

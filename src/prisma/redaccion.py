@@ -28,9 +28,9 @@ import psycopg
 from .db import registrar_auditoria
 from .incidentes import (ETAPA_CHARLA_SIN_RESPUESTA, ETAPA_REDACCION_RECHAZADA,
                          registrar_incidente)
-from .resultado_turno import ResultadoTurno, Resumen
+from .resultado_turno import ResultadoTurno, Resumen, ids_de_cambios
 from .valores import TipoValor  # noqa: F401 -- el tipo de `Falta.tipo`
-from .verificador_redaccion import verificar
+from .verificador_redaccion import leer_borrador, verificar
 
 CLAVE_REDACCION = "redaccion"
 VARIANTES = ("A", "B")
@@ -179,29 +179,28 @@ def redactar(resultado: ResultadoTurno, variante: str) -> str:
 # ---------------------------------------------------------------------------
 
 SISTEMA_REDACCION = (
-    "Sos Prisma, una asistente que coordina el trabajo de un equipo por "
-    "Telegram. Escribí el mensaje que la persona va a leer, a partir de los "
-    "hechos en JSON que te paso.\n"
-    "- Español neutro con voseo (decís, mirá, pasame), cálido y corto: una a "
-    "cuatro oraciones.\n"
-    "- Usá SOLO los hechos del JSON. No agregues cambios, fechas, nombres, "
-    "estados ni números que no estén, y no prometas nada.\n"
-    "- Copiá tal cual los nombres entre «», los títulos, los valores y las "
-    "fechas.\n"
-    "- Si hay `falta`, terminá con esa pregunta (con su signo de pregunta); si "
-    "trae `pregunta`, hacela con tus palabras o tal cual.\n"
-    "- Si hay `rechazo`, decí la razón y qué sirve.\n"
-    "- Si hay `resumen`, escribí el título y después una línea `Dato: valor` por "
-    "cada dato, sin agregar nada más: el cierre lo agrega el sistema.\n"
-    "- Sin jerga técnica, sin claves internas, sin Markdown, sin emojis, y no "
-    "nombres botones: los botones los pone el sistema.\n"
-    "Devolvé únicamente el texto del mensaje.")
+    "Sos Prisma, asistente de un equipo de trabajo por Telegram. Escribí el "
+    "mensaje que la persona va a leer, a partir de los hechos en JSON.\n"
+    "Voz: cordial, clara y breve (una a tres oraciones), con voseo, sin jerga, "
+    "claves internas, Markdown ni emojis. Ayudá: decí lo que entendiste y qué "
+    "falta, con tus palabras.\n"
+    "Usá SOLO los hechos: ninguna fecha, nombre, estado, número ni cambio que "
+    "no esté. Los títulos y nombres, copiados tal cual y entre «». No nombres "
+    "botones ni enumeres las `opciones`: son lo que la persona ve para elegir y "
+    "sólo te dicen para qué sirve la pregunta.\n"
+    "Si hay `falta`, terminá pidiendo ese dato con signos de pregunta. Si hay "
+    "`rechazo`, decí la razón y qué sirve. Si hay `charla`, contestala en pocas "
+    "palabras antes de pedir el dato. Si hay `resumen`, escribí sólo una frase "
+    "de apertura sin preguntas: el sistema agrega el resumen y el cierre.\n"
+    "Respondé SOLO este JSON, sin nada más: "
+    "{\"texto\": \"...\", \"pregunta\": <el `campo` de `falta`, o null>, "
+    "\"afirma\": [<los `id` de `cambios` que el texto cuenta como hechos>]}")
 
 
 def serializar_hechos(r: ResultadoTurno) -> str:
-    """Los hechos del turno como los lee el modelo (JSON). Sin las opciones
-    (los botones los dibuja el transporte, no el modelo) y sin el cierre del
-    resumen (lo agrega el código)."""
+    """Los hechos del turno como los lee el modelo (JSON). Las opciones van
+    sólo como etiquetas de contexto (los botones los dibuja el transporte, no
+    el modelo) y sin el cierre del resumen (lo agrega el código)."""
     datos: dict = {}
     if r.resumen:
         datos["resumen"] = {
@@ -211,21 +210,28 @@ def serializar_hechos(r: ResultadoTurno) -> str:
         datos["rechazo"] = {"razon": r.rechazo.razon,
                             "se_acepta": r.rechazo.se_acepta}
     if r.cambios:
-        datos["cambios"] = [{"sujeto": c.sujeto, "que": c.que} for c in r.cambios]
+        datos["cambios"] = [{"id": i, "sujeto": c.sujeto, "que": c.que}
+                            for i, c in zip(ids_de_cambios(r), r.cambios)]
     if r.sin_cambios:
         datos["sin_cambios"] = [{"sujeto": c.sujeto, "motivo": c.motivo}
                                 for c in r.sin_cambios]
     if r.valores_aceptados:
         datos["valores_aceptados"] = [
             {"dato": v.dato, "mostrado": v.mostrado} for v in r.valores_aceptados]
+    if r.entendido:
+        datos["entendido"] = [{"dato": v.dato, "valor": v.mostrado}
+                              for v in r.entendido]
     if r.estado:
         datos["estado"] = [{"sujeto": e.sujeto, "estado": e.estado}
                            for e in r.estado]
     if r.falta:
-        falta = {"dato": r.falta.dato, "tipo": r.falta.tipo.value}
+        falta = {"campo": r.falta.clave, "dato": r.falta.dato,
+                 "tipo": r.falta.tipo.value}
         if r.falta.pregunta:
             falta["pregunta"] = r.falta.pregunta
         datos["falta"] = falta
+    if r.opciones:
+        datos["opciones"] = [o.etiqueta for o in r.opciones]
     return json.dumps(datos, ensure_ascii=False)
 
 
@@ -260,37 +266,59 @@ def _registrar_intento(cur, workspace_id: str, resultado: str, motivo: str | Non
         etapa=ETAPA_REDACCION_RECHAZADA, avisar_admin=False)
 
 
+def _motivo_de_error(exc: Exception) -> str:
+    """Qué falló, sin el texto de la excepción de un proveedor (podría traer una
+    dirección o una credencial): el tipo y, de las excepciones propias, su
+    mensaje (una configuración que falta)."""
+    if isinstance(exc, (LookupError, ValueError)):
+        return f"{type(exc).__name__}: {exc}"
+    return type(exc).__name__
+
+
 def redactar_turno(cur, workspace_id: str, resultado: ResultadoTurno, variante: str,
-                   *, proveedor=None) -> TextoRedactado:
+                   *, proveedor=None,
+                   base: TextoRedactado | None = None) -> TextoRedactado:
     """El texto de un turno con la variante del espacio. Con A, el modelo
-    redacta sobre los hechos y el código lo verifica; si no sirve, o el modelo
-    falla o se cuelga, sale la plantilla de B (reemplaza, nunca se suma: es UNA
-    respuesta) y queda registrado con la duración de la llamada. El cierre del
-    resumen es siempre del código."""
-    base = redactar_partes(resultado, variante)       # valida y arma B
+    redacta el mensaje entero sobre los hechos (salida estructurada) y el
+    código lo verifica; si no sirve, o el modelo falla o se cuelga, sale la
+    plantilla de B (reemplaza, nunca se suma: es UNA respuesta) y queda
+    registrado con la duración de la llamada. `base` es la plantilla de B cuando
+    no es la genérica (un texto que B ya tenía antes de existir el resultado).
+    Con un resumen, el modelo escribe sólo la apertura: los datos y el cierre son
+    siempre del código."""
+    base = base or redactar_partes(resultado, variante)   # valida y arma B
     if variante != "A":
         return base
     inicio = _reloj()
+    duracion_ms = 0
+    caracteres = 0
     try:
         modelo = proveedor or proveedor_de_redaccion(cur, workspace_id)
-        borrador = modelo.redactar(SISTEMA_REDACCION, serializar_hechos(resultado))
+        crudo = modelo.redactar(SISTEMA_REDACCION, serializar_hechos(resultado))
+        duracion_ms = round((_reloj() - inicio) * 1000)
+        caracteres = len((crudo or "").strip())
+        borrador = leer_borrador(crudo)
+        # El verificador corre dentro del mismo `try`: un defecto suyo cae a B
+        # y queda registrado, nunca deja al turno sin texto (R13).
+        motivo = (borrador if isinstance(borrador, str)
+                  else verificar(resultado, borrador, base.texto))
     except psycopg.Error:
         raise                       # la transacción no sigue: no es del modelo
     except Exception as exc:        # un modelo que falla o se cuelga: sale B
-        _registrar_intento(cur, workspace_id, "error",
-                           f"{type(exc).__name__}: {exc}",
-                           round((_reloj() - inicio) * 1000), 0)
+        _registrar_intento(cur, workspace_id, "error", _motivo_de_error(exc),
+                           duracion_ms or round((_reloj() - inicio) * 1000),
+                           caracteres)
         return base
-    duracion_ms = round((_reloj() - inicio) * 1000)
-    borrador = (borrador or "").strip()
-    motivo = verificar(resultado, borrador, base.texto)
     if motivo:
         _registrar_intento(cur, workspace_id, "rechazada", motivo, duracion_ms,
-                           len(borrador))
+                           caracteres)
         return base
     _registrar_intento(cur, workspace_id, "aceptada", None, duracion_ms,
-                       len(borrador))
-    return TextoRedactado(borrador, base.cierre)
+                       caracteres)
+    if resultado.resumen:
+        return TextoRedactado(
+            f"{borrador.texto}\n\n{_resumen_b(resultado.resumen)}", base.cierre)
+    return TextoRedactado(borrador.texto, base.cierre)
 
 
 # ---------------------------------------------------------------------------
@@ -345,8 +373,7 @@ def redactar_charla(cur, workspace_id: str, mensaje: str, pregunta: str, *,
     except psycopg.Error:
         raise                       # la transacción no sigue: no es del modelo
     except Exception as exc:        # un modelo que falla o se cuelga
-        _registrar_charla_sin_respuesta(
-            cur, workspace_id, f"{type(exc).__name__}: {exc}")
+        _registrar_charla_sin_respuesta(cur, workspace_id, _motivo_de_error(exc))
         return ""
     borrador = (borrador or "").strip()
     motivo = motivo_de_charla_invalida(borrador)
