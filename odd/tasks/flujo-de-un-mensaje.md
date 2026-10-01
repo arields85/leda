@@ -1099,6 +1099,11 @@ sin prueba) quedan como deuda menor de esta rama.
 - **Modelo puro, sin red** en el alta conducida: sin plazo propio ni plantillas que tapen al
   modelo; ante una falla, el aviso neutro (constitución §10) y el incidente. Confirma la
   decisión del escritor de abajo.
+- **Primero fluidez y facilidad de uso, después latencia** (tras la primera corrida
+  conversada: "fluidez increíble", latencias de 5 a 58 s por respuesta). El criterio de 5 s
+  del ADR 0014 sigue vigente: cambia el orden, no el criterio. Hasta que el alta conversada
+  funcione de punta a punta, los hallazgos de latencia se registran y no se atacan; los
+  reintentos por contrato sí se corrigen, porque son a la vez fallas de uso.
 - **El tope de 7 botones no es una decisión real:** CoreWork tiene 5 objetivos operativos, a
   lo sumo 2 por área, y el alta ofrece sólo los del área de quien pide. El tope de 40
   opciones es un techo técnico. Un objetivo es algo a cumplir con muchas tareas debajo; más
