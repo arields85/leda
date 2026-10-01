@@ -220,11 +220,20 @@ prueba real los criterios del ADR 0014. Alcance en [`ROADMAP.md`](ROADMAP.md), "
 entrega". Después, según el roadmap: aportes sobre tareas, aprendizaje de apodos y
 aclaraciones, conversación de bloqueos.
 
-**Punto exacto para retomar (2026-10-01, tarde).** `main` sin push: sólo documentación y
-`tools/leer_conversacion.py` desde la ronda 4 (su código sigue siendo el de la ronda 4).
-La rama `feat/flujo-de-un-mensaje` lleva el experimento; revisada con RDD hasta `8cf3fa7`
-(linajes en el documento de la unidad); lo posterior (`bdc2905`, `f223fe7` y el aviso de
-asignación al responsable, en curso) queda por revisar. Base `prisma_flujo`: `alta =
-conversada` activado, sin `horizonte_tarea` (vale 2 meses). Base `prisma`: la de la ronda
-4. Listener del worktree lo corre el usuario. Consentimiento permanente para commits y
-revisiones RDD; chequeo de rumbo escrito antes de cada unidad (`AGENTS.md`).
+**Punto exacto para retomar (2026-10-01, noche).** `main` sin push: sólo documentación y
+`tools/leer_conversacion.py` desde la ronda 4 (su código sigue siendo el de la ronda 4);
+inventario de la plataforma en [`product/plataforma-pendientes.md`](product/plataforma-pendientes.md).
+La rama `feat/flujo-de-un-mensaje` lleva el experimento, revisada con RDD hasta `83743a2`
+(`review-16296c4f68eaa688`; los linajes de cada tramo, en el documento de la unidad);
+`5cd32b6` (correcciones de esa revisión) queda por revisar. Suite completa en `5cd32b6`:
+3411 passed. Hecho en la tarde, todo verificado en Telegram real salvo lo marcado: avisos
+de aprobación y de asignación con el estado real para quien confirma (fuera de horario, sin
+chat); el camino general ve el borrador pausado; el modelo sólo ofrece lo que existe (fecha
+concreta hasta el límite, sin "dividir" ni "objetivo"); evidencia legible e íconos del
+menú; "escribiendo…" sin hueco al final (sin verificar en real); **respuesta en stream real**
+detrás del ajuste `stream`, prendido en `prisma_flujo` (sin verificar en real). Base
+`prisma_flujo`: `alta = conversada` y `stream` activados, sin `horizonte_tarea` (vale 2
+meses). Pendientes de la rama: (e) Dirección recibe el objetivo estratégico solo (decisión
+del usuario); calidad del criterio aceptado (medir con el banco); el detalle de "rango".
+Consentimiento permanente para commits y revisiones RDD; chequeo de rumbo escrito antes de
+cada unidad (`AGENTS.md`).
