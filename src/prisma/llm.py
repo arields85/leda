@@ -17,6 +17,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Protocol
 
+from .alta_turno import (DESCRIPCION_HERRAMIENTA, ESQUEMA_SALIDA,
+                         NOMBRE_HERRAMIENTA)
 from .valores import (CAMPOS_DEL_VALOR, FALTAS_POR_TIPO, FALTAS_VALIDAS,
                       OPCION_NINGUNA, VERIFICABLES_VALIDOS, TipoValor,
                       ValorEsperado)
@@ -214,6 +216,40 @@ ROUTER_SYSTEM_CONVERSACION = (
     "preguntó, no tratar de otra cosa.")
 
 
+def _alternados(historial: list[dict[str, Any]] | None) -> list[dict]:
+    """La conversación como los proveedores estrictos la aceptan: el primer
+    mensaje es de la persona y nunca hay dos seguidos del mismo lado (se unen en
+    uno, en orden). Un mensaje sin texto no cuenta. `contexto.historial` ya lo
+    garantiza; esto es la red de quien llame con otra fuente."""
+    mensajes: list[dict] = []
+    for m in historial or []:
+        if not m.get("content"):
+            continue
+        if not mensajes and m["role"] != "user":
+            continue
+        if mensajes and mensajes[-1]["role"] == m["role"]:
+            mensajes[-1] = {"role": m["role"],
+                            "content": f"{mensajes[-1]['content']}\n{m['content']}"}
+            continue
+        mensajes.append({"role": m["role"], "content": m["content"]})
+    return mensajes
+
+
+def _mensajes_de_conduccion(historial: list[dict[str, Any]] | None,
+                            hechos: str) -> list[dict]:
+    """Los mensajes del turno del alta conducida: la conversación reciente y, al
+    final, los hechos del turno como un mensaje de la persona (si la conversación
+    terminó con un mensaje suyo sin responder, se le suman). Siempre alternados."""
+    mensajes = _alternados(historial)
+    contenido = f"Hechos de este turno (JSON):\n{hechos}"
+    if mensajes and mensajes[-1]["role"] == "user":
+        mensajes[-1] = {"role": "user",
+                        "content": f"{mensajes[-1]['content']}\n\n{contenido}"}
+    else:
+        mensajes.append({"role": "user", "content": contenido})
+    return mensajes
+
+
 def _mensajes_del_ruteo(text: str,
                         historial: list[dict[str, Any]] | None) -> list[dict]:
     """La conversación reciente seguida del mensaje actual, como mensajes previos
@@ -222,10 +258,7 @@ def _mensajes_del_ruteo(text: str,
     admiten dos seguidos del mismo lado: se descarta un arranque de Prisma y, si
     la conversación terminó con un mensaje de la persona sin responder, el actual
     se le suma."""
-    mensajes = [{"role": m["role"], "content": m["content"]}
-                for m in (historial or [])]
-    while mensajes and mensajes[0]["role"] != "user":
-        mensajes.pop(0)
+    mensajes = _alternados(historial)
     if mensajes and mensajes[-1]["role"] == "user":
         mensajes[-1] = {"role": "user",
                         "content": f"{mensajes[-1]['content']}\n{text}"}
@@ -524,6 +557,38 @@ class Proveedor(Protocol):
                  plazo: float | None = None,
                  historial: list[dict[str, Any]] | None = None) -> str: ...
 
+    def conducir_alta(self, sistema: str, historial: list[dict[str, Any]],
+                      hechos: str, *, plazo: float | None = None,
+                      ) -> dict[str, Any] | str: ...
+
+
+# El turno del alta conducida (ADR 0014, enmienda del 2026-10-01): una salida
+# estructurada con los valores, el texto y lo que se pide. Más larga que una
+# redacción, pero acotada. Sin plazo propio queda el timeout HTTP del cliente, para
+# que un modelo colgado no bloquee al oyente indefinidamente.
+MAX_TOKENS_CONDUCCION = 700
+
+
+class SalidaDeConduccionInvalida(ValueError):
+    """El modelo no devolvió la llamada a `conducir_alta` (o sus argumentos no se
+    pueden leer): un error del modelo, no una salida mal formada del contrato."""
+
+
+def _argumentos_de_conduccion(argumentos, contenido: str | None):
+    """La salida del modelo: los argumentos de su llamada a `conducir_alta` (un
+    objeto o su JSON), o su texto si dejó el JSON ahí. Sin nada usable, el error."""
+    if isinstance(argumentos, dict):
+        return argumentos
+    if isinstance(argumentos, str):
+        try:
+            return json.loads(argumentos)
+        except ValueError as exc:
+            raise SalidaDeConduccionInvalida(
+                "Los argumentos de conducir_alta no son JSON.") from exc
+    if contenido and contenido.strip():
+        return contenido
+    raise SalidaDeConduccionInvalida("El modelo no llamó a conducir_alta.")
+
 
 # Tope de la redacción de un turno (ADR 0014, variante A): un mensaje de pocas
 # oraciones más su JSON, no una conversación. Un tope mayor sólo alarga una
@@ -613,6 +678,27 @@ class ProveedorGuionado:
     # La conversación con la que se pidió cada redacción (`[]` sin ella).
     historiales_redactados: list[list[dict[str, Any]]] = field(
         default_factory=list)
+    # Las salidas de `conducir_alta`, en orden: un objeto, un texto (JSON, o algo que
+    # no lo es) o una excepción que se lanza. Un guion que se agota es un defecto de
+    # la prueba y falla fuerte.
+    conducciones: list[dict[str, Any] | str | BaseException] = field(
+        default_factory=list)
+    conducidos: list[tuple[str, list, str]] = field(default_factory=list)
+    # El plazo con que se pidió cada conducción (`None` sin plazo).
+    plazos_de_conduccion: list[float | None] = field(default_factory=list)
+
+    def conducir_alta(self, sistema: str, historial: list[dict[str, Any]],
+                      hechos: str, *, plazo: float | None = None,
+                      ) -> dict[str, Any] | str:
+        self.conducidos.append(
+            (sistema, [dict(m) for m in (historial or [])], hechos))
+        self.plazos_de_conduccion.append(plazo)
+        if not self.conducciones:
+            raise RuntimeError("El guion de conducir_alta se agotó.")
+        salida = self.conducciones.pop(0)
+        if isinstance(salida, BaseException):
+            raise salida
+        return salida
 
     def redactar(self, sistema: str, hechos: str, *,
                  plazo: float | None = None,
@@ -752,6 +838,24 @@ class ProveedorAnthropic:
                     for b in r.content if b.type == "tool_use"]
         return Respuesta(texto=texto.strip(), llamadas=llamadas)
 
+    def conducir_alta(self, sistema: str, historial: list[dict[str, Any]],
+                      hechos: str, *, plazo: float | None = None,
+                      ) -> dict[str, Any] | str:
+        r = _con_plazo(self._c, plazo).messages.create(
+            model=self._modelo,
+            max_tokens=min(self._param.get("max_tokens", 1024),
+                           MAX_TOKENS_CONDUCCION),
+            temperature=self._param.get("temperature", 0.3),
+            system=sistema,
+            tools=[{"name": NOMBRE_HERRAMIENTA,
+                    "description": DESCRIPCION_HERRAMIENTA,
+                    "input_schema": ESQUEMA_SALIDA}],
+            tool_choice={"type": "tool", "name": NOMBRE_HERRAMIENTA},
+            messages=_mensajes_de_conduccion(historial, hechos))
+        llamada = next((b for b in r.content if b.type == "tool_use"), None)
+        return _argumentos_de_conduccion(
+            llamada.input if llamada is not None else None, None)
+
     def redactar(self, sistema: str, hechos: str, *,
                  plazo: float | None = None,
                  historial: list[dict[str, Any]] | None = None) -> str:
@@ -882,6 +986,37 @@ class ProveedorGemini:
             for i, p in enumerate(partes) if "functionCall" in p]
         return Respuesta(texto=texto.strip(), llamadas=llamadas)
 
+    def conducir_alta(self, sistema: str, historial: list[dict[str, Any]],
+                      hechos: str, *, plazo: float | None = None,
+                      ) -> dict[str, Any] | str:
+        cuerpo = {
+            "system_instruction": {"parts": [{"text": sistema}]},
+            "contents": [
+                {"role": "user" if m["role"] == "user" else "model",
+                 "parts": [{"text": m["content"]}]}
+                for m in _mensajes_de_conduccion(historial, hechos)],
+            "generationConfig": {
+                "temperature": self._param.get("temperature", 0.3),
+                "maxOutputTokens": min(self._param.get("max_tokens", 1024),
+                                       MAX_TOKENS_CONDUCCION),
+            },
+            "tools": [{"function_declarations": [{
+                "name": NOMBRE_HERRAMIENTA,
+                "description": DESCRIPCION_HERRAMIENTA,
+                "parameters": _limpiar_esquema(ESQUEMA_SALIDA)}]}],
+            "toolConfig": {"functionCallingConfig": {
+                "mode": "ANY", "allowedFunctionNames": [NOMBRE_HERRAMIENTA]}},
+        }
+        r = self._post(
+            f"{GEMINI_BASE}/models/{self._modelo}:generateContent", cuerpo, plazo)
+        r.raise_for_status()
+        partes = [p for c in (r.json().get("candidates") or [])
+                  for p in ((c.get("content") or {}).get("parts") or [])]
+        llamada = next((p["functionCall"] for p in partes
+                        if isinstance(p.get("functionCall"), dict)), None)
+        return _argumentos_de_conduccion(
+            (llamada.get("args") if llamada else None), None)
+
     def redactar(self, sistema: str, hechos: str, *,
                  plazo: float | None = None,
                  historial: list[dict[str, Any]] | None = None) -> str:
@@ -907,10 +1042,19 @@ class ProveedorGemini:
 
 def _limpiar_esquema(esquema: dict) -> dict:
     """Gemini rechaza claves que no conoce; OpenAI las tolera."""
-    permitidas = {"type", "description", "enum", "items", "properties", "required"}
+    permitidas = {"type", "description", "enum", "items", "properties", "required",
+                  "nullable"}
     if not isinstance(esquema, dict):
         return esquema
     salida = {k: v for k, v in esquema.items() if k in permitidas}
+    if isinstance(salida.get("type"), list):
+        # Gemini no admite un tipo en lista: el tipo y que puede ser nulo.
+        tipos = [t for t in salida["type"] if t != "null"]
+        salida["type"] = tipos[0] if tipos else "string"
+        if "null" in esquema["type"]:
+            salida["nullable"] = True
+    if isinstance(salida.get("enum"), list):
+        salida["enum"] = [v for v in salida["enum"] if v is not None]
     if "properties" in salida:
         salida["properties"] = {k: _limpiar_esquema(v)
                                 for k, v in salida["properties"].items()}
@@ -1048,6 +1192,28 @@ class ProveedorCompatible:
                             args=json.loads(c.function.arguments or "{}"))
                     for c in (m.tool_calls or [])]
         return Respuesta(texto=(m.content or "").strip(), llamadas=llamadas)
+
+    def conducir_alta(self, sistema: str, historial: list[dict[str, Any]],
+                      hechos: str, *, plazo: float | None = None,
+                      ) -> dict[str, Any] | str:
+        r = _con_plazo(self._c, plazo).chat.completions.create(
+            model=self._modelo,
+            max_tokens=min(self._param.get("max_tokens", 1024),
+                           MAX_TOKENS_CONDUCCION),
+            temperature=self._param.get("temperature", 0.3),
+            messages=[{"role": "system", "content": sistema},
+                      *_mensajes_de_conduccion(historial, hechos)],
+            tools=[{"type": "function", "function": {
+                "name": NOMBRE_HERRAMIENTA,
+                "description": DESCRIPCION_HERRAMIENTA,
+                "parameters": ESQUEMA_SALIDA}}],
+            tool_choice={"type": "function",
+                         "function": {"name": NOMBRE_HERRAMIENTA}})
+        mensaje = r.choices[0].message if r.choices else None
+        llamada = next(iter((mensaje.tool_calls or []) if mensaje else []), None)
+        return _argumentos_de_conduccion(
+            llamada.function.arguments if llamada is not None else None,
+            mensaje.content if mensaje is not None else None)
 
     def redactar(self, sistema: str, hechos: str, *,
                  plazo: float | None = None,
