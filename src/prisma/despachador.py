@@ -681,10 +681,13 @@ def _rama_que_retiene(cur, m, ahora: datetime, cache: dict):
 class _Pasada:
     """Lo que una pasada de `despachar` va aprendiendo: las filas ya examinadas,
     la rama de cada persona y chat, y a quién dejó de pedirle filas porque lo que
-    Prisma le inicia se retiene."""
+    Prisma le inicia se retiene. `chats_en_falla` son los chats donde un envío
+    falló en esta pasada: no se les envía nada más hasta la próxima, para que lo
+    que falló salga primero (F-A1)."""
     vistos: list[str] = field(default_factory=list)
     ramas: dict = field(default_factory=dict)
     retenidos: list[dict] = field(default_factory=list)
+    chats_en_falla: list[int] = field(default_factory=list)
 
 
 # Lo que, al examinarlo, se retendría en vez de descartarse: no vencido (la regla de
@@ -753,19 +756,27 @@ def despachar(cur: psycopg.Cursor, workspace_id: str, transporte: Transporte,
                and estado = 'listo'
                and programado_para <= %(ahora)s
                and id <> all(%(vistos)s::uuid[])
+               and chat_id <> all(%(chats_en_falla)s::bigint[])
                {_SIN_LO_RETENIDO}
              order by programado_para
              limit 1
              for update skip locked
             """,
             {"ws": workspace_id, "ahora": ahora, "vistos": pasada.vistos,
-             "retenidos": Jsonb(pasada.retenidos)})
+             "retenidos": Jsonb(pasada.retenidos),
+             "chats_en_falla": pasada.chats_en_falla})
         m = cur.fetchone()
         if m is None:
             break
         pasada.vistos.append(str(m["id"]))
+        fallidos = resumen["fallidos"]
         _despachar_fila(cur, workspace_id, transporte, cal, ahora, tope, m,
                         resumen, pasada)
+        if resumen["fallidos"] > fallidos:
+            # Un envío que falla se reintenta en la próxima pasada: seguir con lo que
+            # viene detrás en el mismo chat lo dejaría salir primero (el aviso de una
+            # respuesta detrás de su pregunta, F-A1).
+            pasada.chats_en_falla.append(m["chat_id"])
     return resumen
 
 
@@ -1065,7 +1076,11 @@ def _fallo(cur, workspace_id: str, m, error: Exception, cal: Calendario,
            ahora: datetime) -> None:
     intentos = m["intentos"] + 1
     estado = "fallido" if intentos >= MAX_INTENTOS else "listo"
-    proximo = cal.dentro_de_jornada(ahora) if estado == "listo" else None
+    # Una respuesta conserva su lugar en la cola (F-A1): reprogramada al `ahora` de
+    # la pasada saldría detrás de las partes que la siguen. El resto de lo que
+    # Prisma envía se reprograma como siempre.
+    proximo = (cal.dentro_de_jornada(ahora)
+               if estado == "listo" and not m["es_respuesta"] else None)
     # Redactado antes de recortar (R1-001, revisión 2026-09-28): recortar
     # primero podría cortar un token a la mitad y dejar el resto sin que
     # el patrón lo reconozca.

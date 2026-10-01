@@ -155,3 +155,67 @@ def test_el_despacho_serializado_no_bloquea_a_otro_espacio(corework, conn, uri):
         primera.liberar.set()
         h1.join(timeout=10)
     assert errores == []
+
+
+# --- un envío fallido no deja pasar a las demás partes (F-A1, 08:32:34) -------------
+
+class _FallaUnaVez(TransporteDePrueba):
+    """Un transporte cuyo primer envío falla (Telegram con un tiempo de espera o
+    un 429) y después anda."""
+
+    def __init__(self, orden: list[str]):
+        super().__init__()
+        self.orden = orden
+        self.falla = True
+
+    def enviar(self, chat_id, texto, *args, **kwargs):
+        if self.falla:
+            self.falla = False
+            raise ConnectionError("tiempo de espera agotado")
+        self.orden.append(texto)
+        return super().enviar(chat_id, texto, *args, **kwargs)
+
+
+def _pasada(conn, ws, transporte, ahora):
+    with espacio(conn, ws) as cur:
+        cal = Calendario.desde_base(cur, ws)
+        resumen = despachar(cur, ws, transporte, cal, ahora)
+    conn.commit()
+    return resumen
+
+
+def test_si_falla_el_envio_de_una_parte_las_demas_no_la_pasan_por_delante(
+        corework, conn):
+    """Una parte que falla se reprogramaba al `ahora` de la pasada, detrás de las
+    demás, y la pasada seguía con la siguiente: la pregunta salía antes que el aviso
+    que va delante. Ahora la pasada no sigue con el resto de ese chat y el reintento
+    conserva su lugar."""
+    ws = corework.workspace_id
+    ahora = datetime.now(timezone.utc) - timedelta(seconds=5)
+    _encolar_la_respuesta(conn, ws, ahora)
+    orden: list[str] = []
+    transporte = _FallaUnaVez(orden)
+
+    primera = _pasada(conn, ws, transporte, datetime.now(timezone.utc))
+    assert orden == []                          # la pregunta no se adelantó
+    assert primera["fallidos"] == 1 and primera["enviados"] == 0
+
+    _pasada(conn, ws, transporte, datetime.now(timezone.utc))
+    assert orden == ["NOTA", "PREGUNTA"]
+
+
+def test_un_chat_con_un_envio_fallido_no_frena_a_los_otros(corework, conn):
+    ws = corework.workspace_id
+    ahora = datetime.now(timezone.utc) - timedelta(seconds=5)
+    _encolar_la_respuesta(conn, ws, ahora)
+    with espacio(conn, ws) as cur:
+        enqueue_outbox(cur, workspace_id=ws, chat_id=CHAT + 1, text="OTRO",
+                       scheduled_for=ahora, dedupe_key=f"{ws}:orden:otro",
+                       is_response=True)
+    conn.commit()
+    transporte = TransporteDePrueba(falla_en={CHAT})
+
+    resumen = _pasada(conn, ws, transporte, datetime.now(timezone.utc))
+
+    assert [e.texto for e in transporte.enviados] == ["OTRO"]
+    assert resumen["enviados"] == 1 and resumen["fallidos"] == 1
