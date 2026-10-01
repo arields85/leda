@@ -357,14 +357,34 @@ runner del checkout principal, RED observado antes de cada implementación.
   incidente `valor_sin_interpretar` lleva `referencia_tipo`/`referencia_id` del mensaje y el chat.
   RED: 2 failed en `test_aviso_incidente_legible.py` y 4 en `test_alta_guiada_flujo.py`; GREEN: 15 y 4
   passed.
-- [ ] **F-B5** (sin cambio de código, decisión pendiente). "voy a enviar videos" volvió a mostrar la
+- [x] **F-B5** (worktree `flujo-variante-a`, `49e81bb`). "voy a enviar videos" volvió a mostrar la
   misma pregunta y nada más: de los comandos de `_atender_pregunta_pendiente`, el único que repregunta
-  sin prefijo ni botones es `charla` (`no_puedo` antepone "Eso todavía no lo puedo hacer.", `dudoso`
-  y `otro_tema` muestran botones, `responde` sin valor genera incidente). No hay registro del
-  comando que devolvió el modelo: es por descarte. Brecha de mecanismo: el ADR 0013 (regla 1) dice
-  de `charla` "respuesta breve y la pregunta pendiente se vuelve a hacer"; el código sólo la
-  vuelve a hacer. Qué dice la respuesta breve (plantilla del código en B, el modelo en A) es una
-  decisión de voz del usuario: ver el informe.
+  sin prefijo ni botones es `charla`. Brecha de mecanismo: el ADR 0013 (regla 1) dice de `charla`
+  "respuesta breve y la pregunta pendiente se vuelve a hacer"; el código sólo la volvía a hacer.
+  Decisión (ADR 0014, ya aceptado: "el modelo redacta sólo la charla y las preguntas"): la respuesta
+  breve la redacta el modelo en las dos variantes (`redaccion.redactar_charla`) y sale delante de la
+  pregunta, en la misma respuesta visible (prefijo de `_repreguntar`). Si el modelo falla o su texto
+  no es una oración corta sin pregunta (`motivo_de_charla_invalida`), sale sólo la pregunta y queda un
+  incidente de baja severidad (`charla_sin_respuesta`, sin aviso a la administración). Además, el
+  ruteo define de forma general `responde` (contenido que podría responder la pregunta; si no está
+  claro, `dudoso`, no `charla`) y limita `charla` a saludos, agradecimientos y conversación suelta
+  sin relación (`ROUTER_SYSTEM_PENDIENTE`); sin listas de frases.
+  RED (con `src` sin los cambios): 18 failed en `tests/test_charla_breve.py`. GREEN: 18 passed. Una prueba
+  existente (`test_rama_eleccion`, elección larga) ahora guiona la respuesta breve. Caracterización
+  (ya verde tras el merge, sin código nuevo): `tests/test_valor_incompleto_variante_a.py` (4 passed)
+  prueba que la repregunta de `valor.falta` (F-B1) sale por `redactar_turno`: plantilla en B, modelo
+  más verificador en A, de B si falla.
+
+- 2026-10-01, F-B5 y merge, chequeo de rumbo (escrito antes de implementar).
+  1. Clase de problema: un comando cerrado del ruteo con manejo incompleto respecto del ADR 0013
+     (`charla` sin respuesta breve) y una definición del comando demasiado laxa que clasifica como
+     charla un mensaje con contenido ("voy a enviar videos").
+  2. Mecanismo, no caso: la respuesta breve sale del modelo con un verificador determinista de forma
+     (no de frases) y las definiciones del ruteo son semánticas generales; ninguna lista de palabras.
+  3. Qué haría innecesaria la próxima ronda: el incidente `charla_sin_respuesta` (motivo) y las
+     pruebas por familias; el comando que devolvió el modelo sigue sin registrarse (hueco conocido).
+  4. Hipótesis: el modelo redacta una oración breve y fiel sin hechos que verificar; si los
+     rechazos fueran la regla, se mira el motivo antes de tocar el verificador.
 
 Verificación (desde el worktree, runner del checkout principal): `pytest -q` completo ->
 **2634 passed, 333 deselected, 0 failed** (línea base anterior 2573; +61 pruebas). Antes, enfocada:
@@ -417,3 +437,9 @@ Advertencias no bloqueantes, a resolver después de la primera prueba real:
 - [ ] R9. `ingreso_tareas.py:1459-1471`: el dato de una sola opción pisa sin comparar un
   valor que la persona propuso (por ejemplo, un responsable nombrado); debería decir que
   esa opción no es posible.
+
+Verificación de la rama `feat/flujo-variante-a` tras el merge de F-B1..F-B4 (`b87f1cb`) y F-B5
+(`49e81bb`): `pytest -q` completo -> **2705 passed** tras el merge (sin conflictos de código; sólo
+este documento) y **2727 passed, 333 deselected, 0 failed** tras F-B5. Para probar la variante A en
+vivo: escucha con `PYTHONPATH=src` desde este worktree y `redaccion = {"variante": "A"}` en el
+espacio; el `.env` no se copia al worktree.
