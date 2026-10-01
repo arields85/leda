@@ -100,5 +100,10 @@ Observaciones (no son fallas del mecanismo):
   misma intención y la rama le pide confirmar. Fricción menor (regla de una rama).
 - **F-B7 (producto).** "no lo se, voy a ver" quedó como criterio de aceptación porque la
   persona lo confirmó. El invariante exige un criterio, y Prisma lo aceptó vacío de
-  contenido. Pregunta de producto: ¿Prisma tendría que ayudar a formular un criterio
-  verificable?
+  contenido. **Respuesta del usuario (2026-09-30): sí; Prisma ayuda y facilita, no sólo
+  dirige, y sin burocracia.** Ya está mandado en `nucleo/mecanica-pm.md` §13.2 ("¿El
+  resultado esperado es concreto y verificable?… Si alguna respuesta falta, Prisma
+  pregunta antes de crear"): es una brecha entre núcleo y código, no una decisión nueva.
+  Mecanismo (etapa 2): el modelo evalúa si el criterio es verificable y, si no lo es,
+  propone uno a partir del título y de lo que la persona dijo, con botones para usarlo o
+  escribir otro; el código no crea la tarea con un criterio que la persona no eligió.
