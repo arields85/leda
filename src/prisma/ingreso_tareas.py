@@ -495,6 +495,7 @@ def consume_pending_text(cur: psycopg.Cursor, who: Solicitante, *, chat_id: int,
                          source_inbound_id: str, source_raw_text: str,
                          now: datetime, slot_id: str | None = None,
                          valor: dict | None = None,
+                         propuestas: dict | None = None,
                          ) -> IntakeOutcome | None:
     """Toma el mensaje como el campo que espera el alta. `slot_id`, si viene,
     es el campo que la persona respondió (el que el gateway leyó al
@@ -574,9 +575,35 @@ def consume_pending_text(cur: psycopg.Cursor, who: Solicitante, *, chat_id: int,
                 where request_id = %s and campo = 'acceptance_criterion'""",
             (Jsonb(propuesta), source_inbound_id, source_raw_text, now, request_id))
         return _advance(cur, request, who, now, rechazo=RECHAZO_CRITERIO)
+    avisos = ""
+    if field == "title" and propuestas is not None:
+        avisos = _rehacer_propuestas(cur, request_id, propuestas, source_inbound_id,
+                                     source_raw_text, now, who.workspace_id)
     _confirm_user_value(cur, request_id, field, value, source_inbound_id,
                         source_raw_text, now)
-    return _advance(cur, request, who, now)
+    return _advance(cur, request, who, now, prefijo=avisos)
+
+
+def _rehacer_propuestas(cur, request_id, propuestas, inbound_id, raw, now,
+                        workspace_id) -> str:
+    """El título lo dio un mensaje que es en sí un pedido de tarea nueva (F-B8): lo
+    propuesto por otro mensaje y que nadie confirmó era de la tarea que ese otro
+    mensaje pedía (por ejemplo, el que se dejó de lado para ver otra cosa), no de
+    esta. Esas propuestas caen, y quedan las que trae el mensaje nuevo. Lo que la
+    persona ya confirmó en esta alta no se toca. Devuelve el aviso de lo que el
+    mensaje nuevo propuso y no sirvió, como `_store_proposals`."""
+    cur.execute(
+        """update task_intake_field
+              set estado = 'missing', valor = null, proposed_by = null,
+                  source_inbound_id = null, source_raw_text = null,
+                  source_choice_id = null, version = version + 1,
+                  actualizado_en = %s
+            where request_id = %s and estado = 'proposed' and proposed_by = 'model'
+              and source_inbound_id is distinct from %s""",
+        (now, request_id, inbound_id))
+    propias = {k: v for k, v in propuestas.items() if k != "title"}
+    return _store_proposals(cur, request_id, propias, inbound_id, raw, now,
+                            workspace_id)
 
 
 def _rechazar_valor(cur, request, who, field, rechazo: Rechazado, inbound_id,

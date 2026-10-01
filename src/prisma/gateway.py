@@ -2351,11 +2351,18 @@ def _seguir_con_el_campo_del_alta(cur, quien, texto: str, abierta, route,
     sigue el camino de siempre (entidad y el próximo paso). Si el campo ya no
     estaba abierto, lo dice y no hace nada."""
     from .ingreso_tareas import consume_pending_text
+    from .llm import IntentAction
 
+    # F-B8: un título que llega como un pedido de tarea nueva ("necesito crear una
+    # tarea: ...") define una tarea propia: lo que propusieron otros mensajes y
+    # nadie confirmó no es de ella. Las propuestas de este mensaje sí.
+    es_otro_pedido = (abierta.args.get("campo") == "title"
+                      and route.action is IntentAction.START_TASK_INTAKE)
     resultado = consume_pending_text(
         cur, quien, chat_id=chat_id, source_inbound_id=entrante_id,
         source_raw_text=texto, now=ahora, slot_id=abierta.pregunta_id,
-        valor=route.valor)
+        valor=route.valor,
+        propuestas=dict(route.task) if es_otro_pedido else None)
     if resultado is None:
         _responder(cur, workspace_id, chat_id, quien, AVISO_DATO_YA_NO_PENDIENTE,
                    ahora)
