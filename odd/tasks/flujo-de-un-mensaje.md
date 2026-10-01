@@ -99,8 +99,9 @@ Corte 1, para la primera prueba real (alta guiada con A y B):
 - [x] **F3.** (`08f6281`, `74e2918`) Alta guiada con el flujo: título primero y objetivo después (el más probable
   primero), valores por M1, dato con una sola opción completado solo, textos por
   `redaccion`. Retira `_parse_absolute_date` de la ruta del usuario. Ruta: delegada.
-- [ ] **F6a.** Variante A para el alta guiada: `redactar` del proveedor, verificador y
-  registro de rechazos. Ruta: delegada.
+- [x] **F6a.** Variante A para el alta guiada: `redactar` del proveedor, verificador y
+  registro de rechazos. Ruta: delegada. (`c48f38b` R8; el commit de A y verificador, ver
+  progreso.)
 - [ ] **F7.** Base nueva para la prueba (`PRUEBA-LOCAL.md` §5), listener del worktree con
   `PYTHONPATH=src`. Ruta: inline (operativa, sin código).
 - [ ] **F8a.** Guion del corte 1 (R4c-H4 a H10) con columna mejoró / empeoró / igual y
@@ -237,6 +238,70 @@ PR planificado: la integración a `main` la decide el usuario después del exper
   Decisiones de implementación a revisar: el selector de Modificar deja de ofrecer un dato sin
   otra opción (hoy, siempre "Área"); el título propuesto se toma sin confirmar.
 
+- 2026-10-01, F6a, chequeo de rumbo (escrito antes de empezar; worktree
+  `flujo-variante-a`, rama `feat/flujo-variante-a` desde `1832bfe`).
+  1. Clase de problema: la redacción de la respuesta (etapa 6): un texto que afirma algo
+     fuera de los hechos (un cambio que no ocurrió, otra fecha, un estado inventado) o que
+     suena a plantilla. Ya apareció con otras formas (R4b-H2 a H4, R4c-H7 a H9).
+  2. Mecanismo general, no un caso: el verificador es determinista y opera sobre los hechos
+     estructurados (literales que deben aparecer, fechas y números que no pueden inventarse,
+     vocabulario de estados del dominio, verbos de acción en primera persona sólo si hubo un
+     cambio, largo), no sobre frases observadas. Límite declarado: no entiende el sentido; lo
+     dudoso se rechaza y sale B.
+  3. Qué haría innecesaria la próxima ronda: el registro de cada borrador (aceptado,
+     rechazado, falló) con su duración. Una familia de rechazo se mira como mecanismo del
+     verificador, no se parcha por frase; y A o B se decide con la mediana medida.
+  4. Hipótesis vigente: un modelo "flash" redacta sobre hechos con mediana ≤ 5 s (criterio
+     del ADR 0014). Se mide, no se asume (AGENTS, "Cómo pensamos juntos", punto 8). Si la
+     mediana pasa de 5 s o los rechazos son la regla, se para y se discute con el usuario.
+
+- 2026-10-01, F6a hecho (worktree `flujo-variante-a`, rama `feat/flujo-variante-a`; dos
+  commits: `c48f38b` R8 y el de la variante A).
+  **Commit 1 (R8).** `redaccion.TextoRedactado` (cuerpo y cierre como partes),
+  `render_resumen`, cuerpo guardado en `pending_action.args["cuerpo_resumen"]` de la
+  revisión; `send_to_approval` lo usa en vez de cortar el texto. RED: 5 fallas
+  (`AttributeError: redactar_partes`, `KeyError: cuerpo_resumen`); GREEN: 255 passed en 6
+  archivos. Las filas de revisión viejas (sin `cuerpo_resumen`, vigencia 8 h) fallarían al
+  enviar con un `KeyError` (incidente de turno): sólo existen en una base anterior a este commit.
+  **Commit 2 (A).** `llm.py`: `redactar(sistema, hechos) -> str` sin herramientas en los cuatro
+  proveedores (mismo timeout y reintento del cliente; tope de 400 tokens) y borradores
+  guionables en `ProveedorGuionado`. `verificador_redaccion.py`: determinista, sobre los
+  hechos (no por frases): números, fechas y meses que los hechos no tienen; vocabulario de
+  estados del dominio; acción en primera persona (`-é`/`-í`) sólo con un cambio, valor
+  aceptado o resumen que la respalde; claves internas; nombres citados «…», valores aceptados,
+  estados y datos del resumen exigidos; lo esencial (≥ 50 % de las raíces) de cambios, "no
+  cambió" y rechazos; la pregunta de lo que falta; largo contra la plantilla de B.
+  `redaccion.redactar_turno`: con A llama al modelo y verifica; si no sirve o el modelo falla
+  sale B (reemplaza, una sola respuesta) y cada intento queda en `audit_log`
+  (`redaccion_variante_a`: resultado aceptada/rechazada/error, motivo, `duracion_ms`) y los no
+  aceptados además en un incidente de baja severidad, etapa `redaccion_rechazada`, sin aviso a
+  la administración. El cierre del resumen es siempre del código; el resumen se redacta una vez
+  para los dos cierres. B queda idéntica: `redactar`/`redactar_partes` no llaman al modelo.
+  CLI nueva `python -m prisma redaccion <slug>`.
+  RED: `test_verificador_redaccion.py` (`ModuleNotFoundError`), `test_llm_redactar.py` (9
+  failed), `test_redaccion_a.py` (13 failed, 1 passed), `test_alta_guiada_variante_a.py` (7
+  failed, 1 passed: el caso de B), `test_cli.py` (2 failed, `invalid choice: 'redaccion'`).
+  El caso "pregunta dicha como instrucción sin signo de pregunta" se agregó después del código
+  (sin RED previo). GREEN: focalizadas 155 passed; suite completa desde el worktree
+  (`python -m pytest -q`): 2644 passed, 333 deselected, 0 failed (línea base 2573).
+  Pruebas viejas actualizadas: `test_alta_guiada_texto` (el espía sigue la función nueva),
+  `test_alta_enviar_a_aprobacion` (cuerpo desde `args`), `test_redaccion` (renombrada).
+  **Cómo leer la latencia.** `python -m prisma redaccion corework` (con `PYTHONPATH=src` desde
+  el worktree): llamadas, aceptadas/rechazadas/errores, mediana (criterio ADR 0014: ≤ 5 s),
+  mediana de las aceptadas, p90 y máximo de la llamada de redacción. Los motivos:
+  `python -m prisma incidentes corework` (etapa `redaccion_rechazada`). Cada intento es una
+  fila de `audit_log` con `accion = 'redaccion_variante_a'` y `detalle->>'duracion_ms'`.
+  **Pasar la prueba real a A:** editar `conversacion.redaccion: A` en `espacios/corework.yaml`
+  y `python -m prisma importar corework --activar` (reaplica todo el pack, idempotente), o el
+  `update` directo de `workspace_setting` (clave `redaccion`, valor `{"variante": "A"}`),
+  más acotado. No hace falta reiniciar: la variante se lee de la base en cada turno. El
+  listener tiene que correr el código de este worktree (`PYTHONPATH=src`); el del worktree
+  `flujo-de-un-mensaje` no trae F6a.
+  **Límites declarados del verificador:** la detección de acciones hechas es morfológica y
+  rechaza un "Entendí" inocente (cae en B y queda el motivo); un cambio extra dicho con las
+  palabras de un cambio real no se distingue. Mirar los motivos registrados antes de tocar
+  el verificador (ADR 0013).
+
 ## Chequeo de rumbo: correcciones de la corrida B (2026-09-30)
 
 - **Clase de problema.** El contrato del valor del ruteo es binario (hay valor / no hay valor) y
@@ -292,14 +357,34 @@ runner del checkout principal, RED observado antes de cada implementación.
   incidente `valor_sin_interpretar` lleva `referencia_tipo`/`referencia_id` del mensaje y el chat.
   RED: 2 failed en `test_aviso_incidente_legible.py` y 4 en `test_alta_guiada_flujo.py`; GREEN: 15 y 4
   passed.
-- [ ] **F-B5** (sin cambio de código, decisión pendiente). "voy a enviar videos" volvió a mostrar la
+- [x] **F-B5** (worktree `flujo-variante-a`, `49e81bb`). "voy a enviar videos" volvió a mostrar la
   misma pregunta y nada más: de los comandos de `_atender_pregunta_pendiente`, el único que repregunta
-  sin prefijo ni botones es `charla` (`no_puedo` antepone "Eso todavía no lo puedo hacer.", `dudoso`
-  y `otro_tema` muestran botones, `responde` sin valor genera incidente). No hay registro del
-  comando que devolvió el modelo: es por descarte. Brecha de mecanismo: el ADR 0013 (regla 1) dice
-  de `charla` "respuesta breve y la pregunta pendiente se vuelve a hacer"; el código sólo la
-  vuelve a hacer. Qué dice la respuesta breve (plantilla del código en B, el modelo en A) es una
-  decisión de voz del usuario: ver el informe.
+  sin prefijo ni botones es `charla`. Brecha de mecanismo: el ADR 0013 (regla 1) dice de `charla`
+  "respuesta breve y la pregunta pendiente se vuelve a hacer"; el código sólo la volvía a hacer.
+  Decisión (ADR 0014, ya aceptado: "el modelo redacta sólo la charla y las preguntas"): la respuesta
+  breve la redacta el modelo en las dos variantes (`redaccion.redactar_charla`) y sale delante de la
+  pregunta, en la misma respuesta visible (prefijo de `_repreguntar`). Si el modelo falla o su texto
+  no es una oración corta sin pregunta (`motivo_de_charla_invalida`), sale sólo la pregunta y queda un
+  incidente de baja severidad (`charla_sin_respuesta`, sin aviso a la administración). Además, el
+  ruteo define de forma general `responde` (contenido que podría responder la pregunta; si no está
+  claro, `dudoso`, no `charla`) y limita `charla` a saludos, agradecimientos y conversación suelta
+  sin relación (`ROUTER_SYSTEM_PENDIENTE`); sin listas de frases.
+  RED (con `src` sin los cambios): 18 failed en `tests/test_charla_breve.py`. GREEN: 18 passed. Una prueba
+  existente (`test_rama_eleccion`, elección larga) ahora guiona la respuesta breve. Caracterización
+  (ya verde tras el merge, sin código nuevo): `tests/test_valor_incompleto_variante_a.py` (4 passed)
+  prueba que la repregunta de `valor.falta` (F-B1) sale por `redactar_turno`: plantilla en B, modelo
+  más verificador en A, de B si falla.
+
+- 2026-10-01, F-B5 y merge, chequeo de rumbo (escrito antes de implementar).
+  1. Clase de problema: un comando cerrado del ruteo con manejo incompleto respecto del ADR 0013
+     (`charla` sin respuesta breve) y una definición del comando demasiado laxa que clasifica como
+     charla un mensaje con contenido ("voy a enviar videos").
+  2. Mecanismo, no caso: la respuesta breve sale del modelo con un verificador determinista de forma
+     (no de frases) y las definiciones del ruteo son semánticas generales; ninguna lista de palabras.
+  3. Qué haría innecesaria la próxima ronda: el incidente `charla_sin_respuesta` (motivo) y las
+     pruebas por familias; el comando que devolvió el modelo sigue sin registrarse (hueco conocido).
+  4. Hipótesis: el modelo redacta una oración breve y fiel sin hechos que verificar; si los
+     rechazos fueran la regla, se mira el motivo antes de tocar el verificador.
 
 Verificación (desde el worktree, runner del checkout principal): `pytest -q` completo ->
 **2634 passed, 333 deselected, 0 failed** (línea base anterior 2573; +61 pruebas). Antes, enfocada:
@@ -312,7 +397,8 @@ el listener; sin la `0026` el listener no arranca (`verificar_migraciones`).
 
 ## Próximo paso
 
-F6a (variante A del alta) y la prueba real F7/F8a.
+F7/F8a: la prueba real del alta con A y con B (`python -m prisma redaccion corework` para la
+mediana).
 
 ## Revisión RDD por commit (2026-10-01)
 
@@ -341,9 +427,19 @@ Advertencias no bloqueantes, a resolver después de la primera prueba real:
 - [ ] R7. `ingreso_tareas.py:1194-1198` y `:456`: centinela `Rechazado` con campos vacíos y
   `valor=None` por defecto en `consume_pending_text` (un llamador que no lo pase convierte
   toda respuesta en `SIN_VALOR`).
-- [ ] R8. `ingreso_tareas.py:2074-2078`: `_con_cierre` corta el resumen en el último doble
+- [x] R8. `ingreso_tareas.py:2074-2078`: `_con_cierre` corta el resumen en el último doble
   salto de línea; con otra redacción (variante A) el cuerpo puede quedar vacío. Resolver
-  antes de F6a.
+  antes de F6a. Resuelto en F6a (commit 1): `redaccion.TextoRedactado` (cuerpo y cierre
+  como partes), `render_resumen`, y el cuerpo se guarda en `pending_action.args`
+  (`cuerpo_resumen`) de la revisión; `send_to_approval` ya no corta el texto. RED: 5
+  pruebas fallaron (`AttributeError: redactar_partes`, `KeyError: cuerpo_resumen`);
+  GREEN: 255 passed en los 6 archivos enfocados.
 - [ ] R9. `ingreso_tareas.py:1459-1471`: el dato de una sola opción pisa sin comparar un
   valor que la persona propuso (por ejemplo, un responsable nombrado); debería decir que
   esa opción no es posible.
+
+Verificación de la rama `feat/flujo-variante-a` tras el merge de F-B1..F-B4 (`b87f1cb`) y F-B5
+(`49e81bb`): `pytest -q` completo -> **2705 passed** tras el merge (sin conflictos de código; sólo
+este documento) y **2727 passed, 333 deselected, 0 failed** tras F-B5. Para probar la variante A en
+vivo: escucha con `PYTHONPATH=src` desde este worktree y `redaccion = {"variante": "A"}` en el
+espacio; el `.env` no se copia al worktree.

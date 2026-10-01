@@ -124,3 +124,35 @@ def test_escuchar_rechaza_arrancar_si_falta_una_migracion(
 
     assert cli.main(["escuchar", "corework"]) == 1
     assert llamadas == []
+
+
+def test_redaccion_imprime_la_latencia_y_los_rechazos_de_la_variante_a(
+        conn, corework, monkeypatch, capsys):
+    """F6a: cómo se lee la mediana de la prueba A/B, sin entrar a la base."""
+    from prisma import redaccion
+    from prisma.db import admin, registrar_auditoria
+
+    monkeypatch.setattr(cli, "conectar", lambda *a, **k: conn)
+    with admin(conn) as cur:
+        for resultado, ms in (("aceptada", 1000), ("aceptada", 3000),
+                              ("rechazada", 5000), ("error", 10000)):
+            registrar_auditoria(
+                cur, accion=redaccion.ACCION_REDACCION_A,
+                workspace_id=corework.workspace_id, actor_kind="prisma",
+                detalle={"resultado": resultado, "duracion_ms": ms,
+                         "caracteres": 10})
+
+    assert cli.main(["redaccion", "corework"]) == 0
+
+    salida = capsys.readouterr().out
+    assert "llamadas: 4" in salida
+    assert "aceptadas: 2" in salida and "rechazadas: 1" in salida
+    assert "errores: 1" in salida
+    assert "mediana: 4,0 s" in salida
+
+
+def test_redaccion_sin_intentos_no_inventa_una_mediana(conn, corework, monkeypatch,
+                                                       capsys):
+    monkeypatch.setattr(cli, "conectar", lambda *a, **k: conn)
+    assert cli.main(["redaccion", "corework"]) == 0
+    assert "Sin intentos de la variante A." in capsys.readouterr().out

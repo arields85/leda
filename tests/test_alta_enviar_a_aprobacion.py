@@ -82,7 +82,7 @@ def _acciones(conn, rid) -> list[dict]:
     with admin(conn) as cur:
         cur.execute(
             """select p.id, p.estado, p.resumen, p.membership_id, p.chat_id,
-                      p.draft_version, p.preview, p.herramienta
+                      p.draft_version, p.preview, p.herramienta, p.args
                  from pending_action p
                  join task_intake_request r on r.task_draft_id = p.draft_id
                 where r.id = %s order by p.creado_en, p.id""", (rid,))
@@ -207,6 +207,29 @@ def test_la_revision_no_se_descarta_al_despachar_aunque_su_dueno_no_sea_el_aprob
 
 # ---------------------------------------------------- Enviar a aprobación
 
+def test_enviar_arma_el_texto_de_quien_confirma_con_el_cuerpo_guardado_no_cortando_el_texto(
+        intake_world, conn, monkeypatch):
+    """R8: el cuerpo del resumen se guarda aparte del cierre. Aunque el texto
+    visible de la revisión no tenga la forma `cuerpo + párrafo de cierre`
+    (otra redacción), quien confirma recibe el cuerpo completo, nunca sólo el
+    cierre."""
+    rid, pid = _alta_en_revision(conn, intake_world)
+    (revision, *_) = _acciones(conn, rid)
+    cuerpo = revision["args"]["cuerpo_resumen"]
+    assert cuerpo and I.cierre_enviar("Morgan Hale 1") not in cuerpo
+    with admin(conn) as cur:
+        cur.execute("update pending_action set resumen = %s where id = %s",
+                    ("Un resumen en un solo párrafo, sin cierre aparte.", pid))
+    user = _usuario(intake_world)
+    client = _callback_client(conn, monkeypatch)
+
+    _tocar(client, conn, user, pid, "Enviar a aprobación")
+
+    (_, confirmacion) = _acciones(conn, rid)
+    assert _fila(conn, confirmacion["id"])["cuerpo"] == (
+        cuerpo + "\n\n" + I.CIERRE_CONFIRMAR)
+
+
 def test_enviar_le_manda_el_borrador_a_quien_confirma_y_le_dice_a_quien_pide(
         intake_world, conn, monkeypatch):
     rid, pid = _alta_en_revision(conn, intake_world)
@@ -234,7 +257,8 @@ def test_enviar_le_manda_el_borrador_a_quien_confirma_y_le_dice_a_quien_pide(
     fila = _fila(conn, confirmacion["id"])
     assert fila["chat_id"] == tg_aprobador and fila["es_respuesta"] is False
     # Los mismos datos; el cierre dice lo que hace el botón de cada uno (R4c-H9).
-    assert fila["cuerpo"] == I._con_cierre(revision["resumen"], I.CIERRE_CONFIRMAR)
+    cuerpo = revision["args"]["cuerpo_resumen"]
+    assert fila["cuerpo"] == I._con_cierre(cuerpo, I.CIERRE_CONFIRMAR)
     assert revision["resumen"].endswith(I.cierre_enviar("Morgan Hale 1"))
     # La versión y la vista previa son las del borrador vigente al enviar.
     assert confirmacion["draft_version"] == revision["draft_version"]
@@ -437,7 +461,8 @@ def test_si_al_enviar_quien_aprueba_paso_a_ser_quien_pide_recibe_una_sola_respue
     (revision, confirmacion) = _acciones(conn, rid)
     assert revision["estado"] == "cancelada" and confirmacion["estado"] == "esperando"
     assert str(unica["pending_action_id"]) == str(confirmacion["id"])
-    assert unica["cuerpo"] == I._con_cierre(revision["resumen"], I.CIERRE_CONFIRMAR)
+    assert unica["cuerpo"] == I._con_cierre(
+        revision["args"]["cuerpo_resumen"], I.CIERRE_CONFIRMAR)
     assert not unica["cuerpo"].startswith("No pude completar eso")
     assert confirmacion["chat_id"] == user
     assert _etiquetas(conn, confirmacion["id"]) == [

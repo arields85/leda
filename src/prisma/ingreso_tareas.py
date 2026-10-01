@@ -19,7 +19,8 @@ from .incidentes import (ETAPA_CONFIGURACION_ALTA, ETAPA_RESUMEN_VIGENTE_SIN_FIL
                          REFERENCIA_INBOUND_MESSAGE, REFERENCIA_PENDING_ACTION,
                          registrar_incidente)
 from .pendientes import HERRAMIENTA_REVISION_BORRADOR
-from .redaccion import nombre_legible, redactar, variante_redaccion
+from .redaccion import (TextoRedactado, nombre_legible, redactar_partes,
+                        redactar_turno, variante_redaccion)
 from .resultado_turno import Falta, Rechazo, ResultadoTurno, Resumen
 from .salida import (BUTTON_TEXT_LIMIT, ETIQUETA_CANCELAR, ETIQUETA_CONFIRMAR,
                      ETIQUETA_ENVIAR, ETIQUETA_MODIFICAR, ETIQUETA_RECHAZAR,
@@ -563,7 +564,9 @@ def _rechazar_valor(cur, request, who, field, rechazo: Rechazado, inbound_id,
 def _decir(cur, request, resultado: ResultadoTurno) -> str:
     """El texto de un resultado con la variante de redacción del espacio (ADR
     0014, etapa 6)."""
-    return redactar(resultado, variante_redaccion(cur, str(request["workspace_id"])))
+    workspace_id = str(request["workspace_id"])
+    return redactar_turno(cur, workspace_id, resultado,
+                          variante_redaccion(cur, workspace_id)).texto
 
 
 def handle_active_text(cur: psycopg.Cursor, who: Solicitante, *, chat_id: int,
@@ -1000,7 +1003,7 @@ def send_to_approval(cur: psycopg.Cursor, who: Solicitante, *, token: str,
     if str(button["membership_id"]) != str(who.membership_id)        or button["chat_id"] != chat_id:
         raise Denegado(NOT_YOURS)
     cur.execute(
-        """select r.*, p.resumen review_text, p.preview review_preview
+        """select r.*, p.args review_args, p.preview review_preview
              from pending_action p
              join task_intake_request r on r.task_draft_id = p.draft_id
                                        and r.workspace_id = p.workspace_id
@@ -1047,7 +1050,8 @@ def send_to_approval(cur: psycopg.Cursor, who: Solicitante, *, token: str,
                  "confirmador_membership_id":
                      str(authority["aprobador_membership_id"])})
     # Quien confirma recibe el mismo resumen con el cierre de SU botón.
-    texto_para_confirmar = _con_cierre(request["review_text"], CIERRE_CONFIRMAR)
+    texto_para_confirmar = _con_cierre(
+        request["review_args"]["cuerpo_resumen"], CIERRE_CONFIRMAR)
     pending, requester_confirms = _send_to_confirmer(
         cur, request, now, texto_para_confirmar, preview, version, authority)
     if requester_confirms:
@@ -1893,7 +1897,9 @@ def _finalize(cur, request, who, now):
         evidence=list(policy["evidencia_requerida"]),
         variante=variante_redaccion(cur, str(request["workspace_id"])),
     )
-    preview_text = render_preview(**datos)
+    resumen = render_resumen(**datos, cur=cur,
+                             workspace_id=str(request["workspace_id"]))
+    preview_text = resumen.texto
     try:
         prepare_payload(preview_text, dedupe_key="intake-preview", has_buttons=True)
     except PayloadValidationError:
@@ -1908,14 +1914,15 @@ def _finalize(cur, request, who, now):
         # Confirma otra persona (T9-R1c-4): quien pidió el borrador lo revisa primero
         # y es él quien lo envía; a quien confirma no le llega nada todavía. Su
         # resumen dice lo que hace su botón, no el de quien confirma (R4c-H9).
-        texto_de_revision = render_preview(
-            **datos, cierre=cierre_enviar(authority["aprobador_nombre"]))
+        texto_de_revision = resumen.con_cierre(
+            cierre_enviar(authority["aprobador_nombre"])).texto
         try:
             prepare_payload(texto_de_revision, dedupe_key="intake-review",
                             has_buttons=True)
         except PayloadValidationError:
             return _configuration_error(cur, request, who, "aggregate", now)
-        return _offer_review(cur, request, who, now, texto_de_revision, preview)
+        return _offer_review(cur, request, who, now, texto_de_revision, preview,
+                             resumen.cuerpo)
     pending, _ = _send_to_confirmer(cur, request, now, preview_text, preview,
                                     request["version"], authority)
     return IntakeOutcome(request_id, preview_text, changed=True,
@@ -1979,16 +1986,21 @@ def _find_confirmer(cur, responsible_id):
     return authority
 
 
-def _offer_review(cur, request, who, now, preview_text, preview):
+def _offer_review(cur, request, who, now, preview_text, preview, cuerpo_resumen):
     """El resumen de quien pidió el borrador cuando lo confirma otra persona
     (T9-R1c-4): la misma vista previa con Enviar a aprobación, Modificar y Cancelar,
     como respuesta a su acto (ADR 0013 regla 2). Es una rama abierta suya hasta que
-    lo envía. A quien confirma no le llega nada."""
+    lo envía. A quien confirma no le llega nada.
+
+    El cuerpo del resumen se guarda aparte de su cierre (`args`): al enviar, quien
+    confirma recibe el mismo cuerpo con el cierre de SU botón, sin recuperarlo
+    cortando el texto visible (R8)."""
     from .pendientes import registrar
 
     request_id = str(request["id"])
     pending = registrar(
-        cur, who, herramienta=HERRAMIENTA_REVISION_BORRADOR, args={},
+        cur, who, herramienta=HERRAMIENTA_REVISION_BORRADOR,
+        args={"cuerpo_resumen": cuerpo_resumen},
         resumen=preview_text, vence_en=now + timedelta(hours=8),
         chat_id=request["chat_id"], draft_id=str(request["task_draft_id"]),
         draft_version=request["version"], preview=preview,
@@ -2069,12 +2081,14 @@ def cierre_enviar(confirma: str | None) -> str:
             "confirme: la tarea se crea cuando lo confirme.")
 
 
-def render_preview(*, title, description="", objective, area, responsible, due_date,
+def render_resumen(*, title, description="", objective, area, responsible, due_date,
                    acceptance_criterion, evidence, cierre=CIERRE_CONFIRMAR,
-                   variante="B"):
-    """El resumen para revisar, redactado por `redaccion` (ADR 0014, etapa 6).
-    Sólo muestra lo que tiene: una descripción que nadie dio no se dice "sin
-    descripción". La evidencia se nombra como la lee una persona."""
+                   variante="B", cur=None, workspace_id=None) -> TextoRedactado:
+    """El resumen para revisar, redactado por `redaccion` (ADR 0014, etapa 6), en
+    cuerpo y cierre. Con `cur` la variante A puede llamar al modelo (y registra el
+    intento); sin él son las plantillas. Sólo muestra lo que tiene: una
+    descripción que nadie dio no se dice "sin descripción". La evidencia se
+    nombra como la lee una persona."""
     evidence_text = (", ".join(nombre_legible(e) for e in evidence)
                      if evidence else "No requiere evidencia")
     lineas = [("Título", title)]
@@ -2084,15 +2098,22 @@ def render_preview(*, title, description="", objective, area, responsible, due_d
                ("Responsable", responsible), ("Fecha objetivo", due_date),
                ("Criterio de aceptación", acceptance_criterion),
                ("Evidencia", evidence_text)]
-    return redactar(ResultadoTurno(resumen=Resumen(
-        "Resumen para revisar", tuple(lineas), cierre)), variante)
+    resultado = ResultadoTurno(resumen=Resumen(
+        "Resumen para revisar", tuple(lineas), cierre))
+    if cur is None:
+        return redactar_partes(resultado, variante)
+    return redactar_turno(cur, workspace_id, resultado, variante)
 
 
-def _con_cierre(texto: str, cierre: str) -> str:
-    """El mismo resumen con otro cierre: el cierre es siempre el último
-    párrafo (`render_preview`)."""
-    cuerpo = texto.rpartition("\n\n")[0]
-    return f"{cuerpo}\n\n{cierre}"
+def render_preview(**datos) -> str:
+    """El resumen para revisar como un solo texto (`render_resumen`)."""
+    return render_resumen(**datos).texto
+
+
+def _con_cierre(cuerpo: str, cierre: str) -> str:
+    """El mismo cuerpo de resumen con otro cierre: el cuerpo es el que se guardó
+    al armarlo, no un texto que se vuelve a cortar (R8)."""
+    return TextoRedactado(cuerpo, cierre).texto
 
 
 def _preview_offenders(**values):

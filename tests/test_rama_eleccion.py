@@ -692,7 +692,10 @@ def test_una_eleccion_larga_vuelve_a_mostrarse_con_sus_botones_sin_fallar(
         cur.execute("update pending_action set resumen = %s where id = %s",
                     (largo, e.pid))
     conn.commit()
-    _con_rutas(monkeypatch, [_ruta(RespectoPendiente.CHARLA)])
+    # La respuesta breve de la charla (F-B5) también va delante: es parte del
+    # prefijo que no debe tirar el turno.
+    _con_rutas(monkeypatch, [_ruta(RespectoPendiente.CHARLA)]).borradores = [
+        "Hola, un gusto."]
     antes = _filas_del_chat(conn, e.tg)
 
     _mensaje(cliente, e.tg, "hola")
