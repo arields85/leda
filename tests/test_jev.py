@@ -668,3 +668,46 @@ def test_sin_quien_escribe_no_agrega_el_campo_ni_cambia_las_instrucciones():
     for instruccion in (jev.INSTRUCCION_ALCANCE, jev.INSTRUCCION_TAREA,
                         jev.INSTRUCCION_VERIFICACION):
         assert "quien" not in instruccion.lower()
+
+
+# ------------------------------------------- el objetivo más probable (F-B10)
+
+OBJETIVOS = [("a", "Conectar equipos"), ("b", "Planos eléctricos"),
+             ("c", "Servidores")]
+
+
+def _probabilidades(**p):
+    return {"objetivo": {"probabilities": p}}
+
+
+def test_ordenar_objetivos_pone_primero_al_que_jev_elige_sin_duda():
+    cliente = ClienteJevGuionado([_probabilidades(O1=0.05, O2=0.93, O3=0.02)])
+    orden = jev.ordenar_objetivos(cliente, titulo="Calibrar los sensores",
+                                  objetivos=OBJETIVOS, vocabulario="OT: oficina")
+    assert orden.clara and orden.ids == ("b", "a", "c")
+    state, preguntas = cliente.pedidos[0]
+    assert state == {"tarea": "Calibrar los sensores",
+                     "vocabulario_del_equipo": "OT: oficina"}
+    assert preguntas["objetivo"]["criteria"] == {
+        "O1": "Conectar equipos", "O2": "Planos eléctricos", "O3": "Servidores"}
+
+
+def test_con_duda_no_se_destaca_ninguno_y_el_orden_es_el_de_llegada():
+    cliente = ClienteJevGuionado([_probabilidades(O1=0.45, O2=0.45, O3=0.1)])
+    orden = jev.ordenar_objetivos(cliente, titulo="x", objetivos=OBJETIVOS)
+    assert not orden.clara and orden.ids == ("a", "b", "c")
+
+
+def test_un_solo_objetivo_no_llama_a_jev():
+    cliente = ClienteJevGuionado([])
+    orden = jev.ordenar_objetivos(cliente, titulo="x", objetivos=OBJETIVOS[:1])
+    assert orden.ids == ("a",) and not orden.clara and not cliente.pedidos
+
+
+@pytest.mark.parametrize("respuesta", [{}, {"objetivo": {}},
+                                       {"objetivo": {"probabilities": {}}},
+                                       {"objetivo": {"probabilities": {"Z9": 0.9}}}])
+def test_una_respuesta_sin_forma_es_un_error_de_jev(respuesta):
+    with pytest.raises(JevError):
+        jev.ordenar_objetivos(ClienteJevGuionado([respuesta]), titulo="x",
+                              objetivos=OBJETIVOS)

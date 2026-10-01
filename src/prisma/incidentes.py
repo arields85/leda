@@ -92,6 +92,9 @@ ETAPA_RESUMEN_VIGENTE_SIN_FILA = "resumen_vigente_sin_fila"
 ETAPA_TURNO_CONVERSACION = "turno_conversacion"
 ETAPA_ENRUTAMIENTO = "enrutamiento"
 ETAPA_JEV_NO_CONFIGURADO = "jev_no_configurado"
+# F-B10: Jev no pudo ordenar los objetivos candidatos por la tarea (no respondió o
+# falta la credencial): se ofrecen en el orden de siempre, sin destacar ninguno.
+ETAPA_OBJETIVO_SIN_ORDENAR = "objetivo_sin_ordenar"
 ETAPA_ENTREGA_MENSAJE = "entrega_mensaje"
 ETAPA_ENTREGA_AVISO_ADMIN = "entrega_aviso_admin"
 ETAPA_EVIDENCIA_INVALIDA = "politica_de_evidencia_invalida"
@@ -294,6 +297,14 @@ EXPLICACION_POR_ETAPA: dict[str, ExplicacionDeEtapa] = {
                  "respuesta adivinada."),
         que_hacer=("Configurá la credencial y reiniciá el servicio. Hasta "
                    "entonces Prisma pregunta en vez de resolver la tarea.")),
+    ETAPA_OBJETIVO_SIN_ORDENAR: ExplicacionDeEtapa(
+        que_paso=("Al pedir el objetivo de una tarea nueva, Jev no pudo decir cuál "
+                  "es el más probable (no respondió o falta la credencial "
+                  "PRISMA_OPENROUTER_API_KEY)."),
+        que_vio=("Nada raro: los objetivos de su área, en el orden de siempre y sin "
+                 "ninguno destacado con una estrella."),
+        que_hacer=("Si fue la credencial, configurala y reiniciá el servicio. No "
+                   "hace falta que {nombre} haga nada.")),
     ETAPA_ENTREGA_MENSAJE: ExplicacionDeEtapa(
         que_paso=("Un mensaje para {nombre} no se pudo entregar por Telegram "
                   "después de varios intentos."),

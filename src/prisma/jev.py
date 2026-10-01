@@ -256,6 +256,58 @@ def _extraer_noul(respuesta: Any, pregunta: str) -> float:
     return float(valor)
 
 
+# --------------------------------------------------- el objetivo más probable
+
+INSTRUCCION_OBJETIVO = (
+    "Alguien quiere crear esta tarea. ¿A cuál de estos objetivos pertenece? "
+    "Elegí el que la contiene mejor, según su título y el vocabulario del equipo.")
+
+
+@dataclass(frozen=True)
+class OrdenDeObjetivos:
+    """Los candidatos ordenados por qué tan probable es que la tarea sea de cada
+    uno. `clara` sólo es verdadera cuando Jev decide entre ellos sin duda (mismos
+    cortes que una referencia a tarea): sólo entonces el primero se destaca. Si
+    no, `ids` queda en el orden en que llegaron: no se afirma una elección que
+    Jev no hizo."""
+    ids: tuple[str, ...]
+    clara: bool = False
+
+
+def ordenar_objetivos(cliente: Jev, *, titulo: str,
+                      objetivos: Sequence[tuple[str, str]],
+                      vocabulario: str = "") -> OrdenDeObjetivos:
+    """Ordena `objetivos` (pares `(id, título)`) según la tarea `titulo` con una
+    sola llamada a Jev (etapa 3 del ADR 0014: Jev decide entre las candidatas que
+    salen de la base). Las opciones viajan con claves cortas ("O1".."On"), como
+    las de una referencia a tarea. Una respuesta de Jev con otra forma levanta
+    `JevError`: quien llama ofrece el orden de siempre y lo registra."""
+    ids = tuple(id_ for id_, _ in objetivos)
+    if len(ids) < 2:
+        return OrdenDeObjetivos(ids)
+    claves = [f"O{i}" for i in range(1, len(ids) + 1)]
+    por_clave = dict(zip(claves, ids))
+    state = {"tarea": titulo}
+    if vocabulario:
+        state["vocabulario_del_equipo"] = vocabulario
+    respuesta = cliente.decidir(state, {
+        "objetivo": {"type": "choice", "instructions": INSTRUCCION_OBJETIVO,
+                     "criteria": {clave: titulo_objetivo for clave, (_, titulo_objetivo)
+                                  in zip(claves, objetivos)}}})
+    probabilidades = {clave: p for clave, p in
+                      _extraer_probabilidades(respuesta, "objetivo").items()
+                      if clave in por_clave}
+    ordenadas = sorted(probabilidades.items(), key=lambda kv: -kv[1])
+    if not ordenadas:
+        raise JevError("Respuesta de Jev sin probabilidades para los objetivos.")
+    top_p = ordenadas[0][1]
+    segundo_p = ordenadas[1][1] if len(ordenadas) > 1 else 0.0
+    if not (top_p >= CORTE_CLARA and (top_p - segundo_p) >= MARGEN_CLARA):
+        return OrdenDeObjetivos(ids)
+    primero = por_clave[ordenadas[0][0]]
+    return OrdenDeObjetivos((primero, *(i for i in ids if i != primero)), clara=True)
+
+
 def resolver_referencia_tarea(
         cliente: Jev, *, mensaje: str, referencia: str,
         tareas: Sequence[TareaCandidata], vocabulario: str,

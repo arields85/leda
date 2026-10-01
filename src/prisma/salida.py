@@ -55,6 +55,8 @@ ICONO_CONFIRMAR = "✅"
 ICONO_CANCELAR = "✖️"
 ICONO_OTRA_OPCION = "✏️"
 ICONO_COPIAR = "📄"
+# F-B10: el candidato que Jev elige sin duda entre varios (el objetivo más probable).
+ICONO_RECOMENDADA = "⭐"
 # Un ícono por acción del menú de una tarea (R4-H6, decisión del usuario,
 # 2026-09-30): antes todas llevaban `ICONO_TAREA` y no se distinguían a simple
 # vista. Única fuente de la tabla aprobada -- `etiqueta_de_accion_menu` la aplica
@@ -76,7 +78,7 @@ ICONOS_DE_ACCION_MENU = {
 _ICONOS_CONOCIDOS = (ICONO_TAREA, ICONO_VER_MAS, ICONO_SALIR_OPCIONES,
                     ICONO_CONFIRMAR, ICONO_CANCELAR, ICONO_OTRA_OPCION,
                     ICONO_COPIAR, ICONO_EMPEZAR, ICONO_TERMINAR, ICONO_BLOQUEO,
-                    ICONO_DEPENDENCIA)
+                    ICONO_DEPENDENCIA, ICONO_RECOMENDADA)
 
 NO_EFFECT_STATUS = "Estado: sin cambios."
 _NO_EFFECT_PATTERNS = tuple(re.compile(pattern, re.IGNORECASE) for pattern in (

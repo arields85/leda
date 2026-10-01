@@ -14,8 +14,8 @@ from psycopg.types.json import Jsonb
 
 from .autoridad import Denegado, Solicitante
 from .db import entrante_atado, registrar_auditoria
-from .incidentes import (ETAPA_CONFIGURACION_ALTA, ETAPA_RESUMEN_VIGENTE_SIN_FILA,
-                         ETAPA_VALOR_SIN_INTERPRETAR, NOTICIA_NEUTRA_INCIDENTE,
+from .incidentes import (ETAPA_CONFIGURACION_ALTA, ETAPA_OBJETIVO_SIN_ORDENAR,
+                         ETAPA_RESUMEN_VIGENTE_SIN_FILA, ETAPA_VALOR_SIN_INTERPRETAR, NOTICIA_NEUTRA_INCIDENTE,
                          REFERENCIA_INBOUND_MESSAGE, REFERENCIA_PENDING_ACTION,
                          registrar_incidente)
 from .pendientes import HERRAMIENTA_REVISION_BORRADOR
@@ -25,7 +25,7 @@ from .resultado_turno import (Cambio, Falta, OpcionDisponible, Rechazo,
                               ResultadoTurno, Resumen, SinCambio, ValorAceptado)
 from .salida import (BUTTON_TEXT_LIMIT, ETIQUETA_CANCELAR, ETIQUETA_CONFIRMAR,
                      ETIQUETA_ENVIAR, ETIQUETA_MODIFICAR, ETIQUETA_RECHAZAR,
-                     ICONO_CANCELAR, ICONO_OTRA_OPCION,
+                     ICONO_CANCELAR, ICONO_OTRA_OPCION, ICONO_RECOMENDADA,
                      ICONO_VER_MAS, PayloadValidationError, con_icono,
                      enqueue_outbox, etiqueta_sin_icono, etiquetas_de_tarea,
                      normalize_visible_text, prepare_buttons, prepare_payload, telegram_utf16_units,
@@ -1715,6 +1715,9 @@ def _open_entity_page(cur, request, who, field, query, offset, now, *,
             cur, request, who, field, None, offset=0)
     if not _candidates_deliverable(field, candidates):
         return _configuration_error(cur, request, who, field, now)
+    recomendada = False
+    if field == "objective" and not query and offset == 0 and len(candidates) > 1:
+        candidates, recomendada = _ordenar_objetivos(cur, request, who, candidates)
     if not candidates:
         return _open_choices(
             cur, request, field, NO_CANDIDATES,
@@ -1730,6 +1733,8 @@ def _open_entity_page(cur, request, who, field, query, offset, now, *,
     # una candidata (un objetivo, una persona) con un nombre cerca del límite
     # podía superarlo y romper la validación del botón.
     etiquetas = etiquetas_de_tarea([label for label, _, _ in candidates])
+    if recomendada:
+        etiquetas[0] = con_icono(etiqueta_sin_icono(etiquetas[0]), ICONO_RECOMENDADA)
     options = [(etiqueta, "select", stored)
               for etiqueta, (_, _, stored) in zip(etiquetas, candidates)]
     if has_more:
@@ -1747,11 +1752,72 @@ def _open_entity_page(cur, request, who, field, query, offset, now, *,
                           "Estas son las opciones que hay.")
     else:
         prompt = (_candidate_prompt(field) if not query else
-                  f"Opciones que coinciden con «{query}».")
+                  f"Para «{query}» encontré estas opciones. {_candidate_prompt(field)}")
+        if recomendada:
+            prompt = f"{prompt} {MARCA_RECOMENDADA}"
         busqueda = str(query) if query else None
+    pregunta = _candidate_prompt(field)
+    if recomendada:
+        pregunta = f"{pregunta} {MARCA_RECOMENDADA}"
     return _open_choices(cur, request, field, prompt, options, now,
-                         prefijo=prefijo, pregunta=_candidate_prompt(field),
+                         prefijo=prefijo, pregunta=pregunta,
                          rechazo=rechazo, busqueda=busqueda)
+
+
+# El aviso del objetivo que Jev eligió sin duda: va en la misma pregunta.
+MARCA_RECOMENDADA = f"Con {ICONO_RECOMENDADA} marqué el que más se parece a la tarea."
+# Una falta de credencial se registra una vez por espacio y proceso (es un dato de
+# configuración, no una falla por pregunta); una falla de Jev, cada vez que ocurre.
+_SIN_ORDENAR_AVISADO: set[str] = set()
+
+
+def _ordenar_objetivos(cur, request, who, candidates):
+    """Los objetivos candidatos con el más probable primero (F-B10, etapa 3 del ADR
+    0014): Jev decide entre los candidatos que salieron de la base según el título
+    de la tarea. Devuelve `(candidatos, destacado)`; `destacado` sólo es verdadero
+    con una decisión clara, y entonces el primero lleva la estrella. Con duda, sin
+    Jev o con una falla, quedan en el orden de siempre y se registra (nunca en
+    silencio)."""
+    from . import jev as jev_modulo
+    from .config import config
+    from .contexto import vocabulario
+
+    workspace_id = str(who.workspace_id)
+    cur.execute(
+        """select valor from task_intake_field
+            where request_id = %s and campo = 'title'""", (request["id"],))
+    fila = cur.fetchone()
+    titulo = normalize_text(str(fila["valor"] or "")) if fila else ""
+    if not titulo:
+        return candidates, False
+    cliente = jev_modulo.desde_base(config.openrouter_api_key)
+    if cliente is None:
+        if workspace_id not in _SIN_ORDENAR_AVISADO:
+            _SIN_ORDENAR_AVISADO.add(workspace_id)
+            registrar_incidente(
+                cur, workspace_id,
+                "Falta la credencial de Jev (PRISMA_OPENROUTER_API_KEY): los "
+                "objetivos se ofrecen en el orden de siempre, sin destacar el más "
+                "probable.", severidad="baja", etapa=ETAPA_OBJETIVO_SIN_ORDENAR,
+                app_user_id=who.app_user_id, avisar_admin=False)
+        return candidates, False
+    try:
+        orden = jev_modulo.ordenar_objetivos(
+            cliente, titulo=titulo,
+            objetivos=[(ident, label) for label, ident, _ in candidates],
+            vocabulario=vocabulario(cur, workspace_id))
+    except psycopg.Error:
+        raise                       # la transacción no sigue: no es de Jev
+    except Exception as exc:        # Jev caído o con una respuesta sin forma
+        registrar_incidente(
+            cur, workspace_id,
+            "Jev no pudo ordenar los objetivos por la tarea: se ofrecen en el orden "
+            "de siempre, sin destacar el más probable.", severidad="baja",
+            referencia_cruda=type(exc).__name__, etapa=ETAPA_OBJETIVO_SIN_ORDENAR,
+            app_user_id=who.app_user_id, avisar_admin=False)
+        return candidates, False
+    por_id = {ident: (label, ident, stored) for label, ident, stored in candidates}
+    return [por_id[ident] for ident in orden.ids], orden.clara
 
 
 def _hay_otra_opcion(cur, request, who, field, mostradas, offset, has_more) -> bool:
