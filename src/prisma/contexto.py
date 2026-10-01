@@ -171,7 +171,8 @@ def vocabulario(cur: psycopg.Cursor, workspace_id: str) -> str:
 
 def construir(cur: psycopg.Cursor, quien: Solicitante,
               texto_entrante: str = "",
-              ahora: datetime | None = None) -> Contexto:
+              ahora: datetime | None = None,
+              chat_id: int | None = None) -> Contexto:
     nucleo_txt, nucleo_hash = _nucleo()
     ahora = ahora or datetime.now(timezone.utc)
 
@@ -287,7 +288,9 @@ def construir(cur: psycopg.Cursor, quien: Solicitante,
     # como el tema del mensaje. Es un dato; la oferta de seguirlo la hace el código.
     from .ingreso_tareas import borrador_pausado, hecho_del_borrador_pausado
 
-    pausado = borrador_pausado(cur, quien)
+    # El mismo chat que mira el ruteo (`gateway._turno`): quien responde no puede
+    # saber de un borrador sobre el que el código de este turno no va a actuar.
+    pausado = borrador_pausado(cur, quien, chat_id) if chat_id is not None else None
     if pausado is not None:
         bloques.append("# Borrador de tarea guardado\n\n"
                        + hecho_del_borrador_pausado(pausado))

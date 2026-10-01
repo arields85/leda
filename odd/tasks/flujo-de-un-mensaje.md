@@ -1539,3 +1539,15 @@ Diseño B elegido por el usuario. Ruta declarada: un solo escritor (encargo expl
   que no cambian.
 - Pendiente (b) de la corrida del 2026-10-01 ("la pausa que el camino general no conoce"): resuelto. Falta
   confirmarlo en una prueba real por Telegram.
+- RDD `3bd7f85..7faead3` (cuatro lentes), linaje `review-9b9e456cc4c197c1`: aprobada y
+  reconocida. Corregido después: (1) el contexto de quien responde leía el borrador pausado
+  de cualquier chat y el ruteo sólo del chat actual (en un grupo, el modelo podía nombrar un
+  borrador sobre el que el código no actúa): ahora `contexto.construir` recibe el `chat_id`
+  del turno; (2) el incidente `aviso_coordinacion` no decía qué aviso falló ni de qué
+  pedido: ahora nombra al destinatario (pasado de forma explícita, no por el nombre de la
+  función) y apunta al `pending_action`. RED 2 failed, GREEN 139 passed. (3) Por qué salió
+  `source_draft_id` de `PROMESAS_SIN_CUMPLIR` (`cfa5450`): el aviso de asignación lo lee
+  para ir del borrador a la tarea (`ingreso_tareas.py`, `join task t on t.source_draft_id`)
+  y el esquema lo completa al convertir; la trazabilidad dejó de ser una promesa.
+  Quedan las SUGGESTION (imports locales, comentario de la etapa, conteo del RED, probar
+  que si falla el primer aviso el segundo sale).

@@ -130,7 +130,7 @@ def responder(cur: psycopg.Cursor, quien: Solicitante, texto_entrante: str,
     ella no corta el turno, así el modelo puede reintentar con `evidencia_texto`.
     Si al final el único resultado sigue siendo ese rechazo, se pide igual."""
     ahora = ahora or datetime.now(timezone.utc)
-    ctx = construir(cur, quien, texto_entrante, ahora=ahora)
+    ctx = construir(cur, quien, texto_entrante, ahora=ahora, chat_id=chat_id)
     sistema = ctx.sistema
     if contexto_referencias:
         sistema = sistema + "\n\n---\n\n" + contexto_referencias

@@ -1322,8 +1322,8 @@ def _responder_evidencia_registrada(cur, quien, workspace_id: str, chat_id: int,
         is_response=True, pending_action_id=p.id)
 
 
-def _aviso_aislado(cur, quien, avisar, workspace_id: str, chat_id: int,
-                  pending_action_id: str, ahora) -> None:
+def _aviso_aislado(cur, quien, avisar, destinatario: str, workspace_id: str,
+                  chat_id: int, pending_action_id: str, ahora) -> None:
     """Un aviso de coordinación tras comprometer una tarea, en su propio savepoint:
     si falla, no se lleva la respuesta de quien confirma (el toque siguiente sería
     una repetición y nada se reintentaría); queda un incidente."""
@@ -1331,12 +1331,16 @@ def _aviso_aislado(cur, quien, avisar, workspace_id: str, chat_id: int,
         with cur.connection.transaction():
             avisar(cur, quien, pending_action_id=pending_action_id, now=ahora)
     except Exception as exc:  # noqa: BLE001 -- un aviso nunca tira el turno
+        # Cuál aviso y de qué borrador: sin eso, quien administra no puede avisar
+        # a mano a la persona que no se enteró.
         registrar_incidente(
             cur, workspace_id,
-            "Un aviso de coordinación de una tarea recién creada no se pudo "
-            "encolar: la otra persona no se enteró.",
+            f"El aviso {destinatario} de una tarea recién creada no se pudo "
+            "encolar: esa persona no se enteró.",
             severidad="media", etapa=ETAPA_AVISO_COORDINACION,
             referencia_cruda=texto_error_seguro(exc)[:2000],
+            referencia_tipo=REFERENCIA_PENDING_ACTION,
+            referencia_id=pending_action_id,
             chat_id=chat_id, app_user_id=quien.app_user_id)
 
 
@@ -1379,10 +1383,11 @@ def _resolver_toque_borrador(conn, authority_conn, workspace_id, token,
                 # Y el responsable, si no es ninguno de los dos, se entera de que
                 # la tarea es suya. Cada aviso va aislado: si falla, queda un
                 # incidente y la respuesta de quien confirma sale igual.
-                for avisar in (I.notify_requester_of_approval,
-                               I.notify_responsible_of_assignment):
-                    _aviso_aislado(cur, quien, avisar, workspace_id, chat_id,
-                                   resuelta.pending_action_id, ahora)
+                for avisar, destinatario in (
+                        (I.notify_requester_of_approval, "a quien pidió la tarea"),
+                        (I.notify_responsible_of_assignment, "al responsable")):
+                    _aviso_aislado(cur, quien, avisar, destinatario, workspace_id,
+                                   chat_id, resuelta.pending_action_id, ahora)
             if atadas != 1:
                 _incidente_fila_terminal(cur, workspace_id, chat_id, quien,
                                          resuelta.pending_action_id, atadas)

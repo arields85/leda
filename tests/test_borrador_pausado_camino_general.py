@@ -282,3 +282,22 @@ def test_el_ruteo_ofrece_paused_draft_y_el_hecho_sólo_con_un_borrador_guardado(
         "input_schema"]["properties"]["action"]["enum"]   # el global no muta
     assert HECHO not in llm._sistema_del_ruteo(None)
     assert HECHO in llm._sistema_del_ruteo(None, None, None, HECHO)
+
+
+def test_el_contexto_de_la_respuesta_mira_el_mismo_chat_que_el_ruteo(
+        intake_world, conn):
+    """Quien responde no puede saber de un borrador sobre el que el código de este
+    turno no va a actuar: el hecho sale sólo en el chat del borrador (revisión RDD
+    `review-9b9e456cc4c197c1`, R2/R3)."""
+    from prisma.contexto import construir
+
+    rid = _alta_con_eleccion(conn, intake_world)
+    _pausar(conn, intake_world, rid)
+    user = _usuario(intake_world)
+    ws = intake_world["north-lab"]["id"]
+    with espacio(conn, ws) as cur:
+        quien = _actor(cur, intake_world)
+        assert HECHO in construir(cur, quien, "hola", ahora=NOW, chat_id=user).sistema
+        assert "en pausa" not in construir(cur, quien, "hola", ahora=NOW,
+                                           chat_id=user + 1).sistema
+        assert "en pausa" not in construir(cur, quien, "hola", ahora=NOW).sistema

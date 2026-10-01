@@ -322,5 +322,10 @@ def test_si_un_aviso_falla_quien_confirma_igual_recibe_su_respuesta_y_queda_un_i
     assert _tareas(conn) == 1
     assert any("comprometida" in s["cuerpo"] for s in _nuevas(conn, pide, antes))
     with admin(conn) as cur:
-        cur.execute("select etapa from incident where etapa = 'aviso_coordinacion'")
-        assert len(cur.fetchall()) == 1
+        cur.execute("select resumen_sanitizado, referencia_tipo, referencia_id "
+                    "from incident where etapa = 'aviso_coordinacion'")
+        (inc,) = cur.fetchall()
+    # Dice cuál aviso falló y de qué pedido, para poder avisar a mano.
+    assert "al responsable" in inc["resumen_sanitizado"]
+    assert inc["referencia_tipo"] == "pending_action"
+    assert str(inc["referencia_id"]) == str(pid)
