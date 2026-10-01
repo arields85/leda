@@ -167,42 +167,43 @@ desactualizan con cada cambio, así que conviene contrastar contra el símbolo.
 
 ## Próximo paso
 
-Orden vigente (decisión del usuario, 2026-09-30). **Moratoria:** no se agregan reglas ni
-parches de conversación mientras dure el experimento; los hallazgos nuevos se registran y
-se clasifican por etapa del ADR 0014.
+Orden vigente (2026-10-01). **Moratoria:** no se agregan reglas ni parches de
+conversación de caso; los hallazgos se registran y se clasifican por etapa del ADR 0014.
 
-1. **Circuito C (base `prisma`).** El 01/10 a las 09:00 le llega a Ismael el borrador de
-   Marcos; Ismael toca ✖️ Rechazar con un motivo y a Marcos le debe llegar "Ismael
-   rechazó el borrador…: motivo". Salen además avisos encolados fuera de horario; tres
-   son de «Dashboard de lotes», ya `terminada`: observar si el despachador descarta los
-   que dejaron de corresponder. Es la prueba del código actual.
-2. **Flujo del ADR 0014 en la rama `feat/flujo-de-un-mensaje`** (F3 en curso), acotado a
-   los caminos de los hallazgos pendientes de la ronda 4, con las variantes A y B
-   seleccionables por configuración del espacio. Esos hallazgos son el guion de la
-   prueba, no una lista de correcciones: R4c-H3, R4b-H5, R4c-H4 a H10 (alta guiada; el
-   orden "¿Qué hay que hacer?" primero sigue decidido), R4c-H1, R4c-H2, R4b-H1, R4b-H2 a
-   H4. Lista con una línea por hallazgo en `odd/tasks/prisma-orienta.md`.
-3. **Prueba por Telegram real**, datos ficticios y base `prisma_flujo`: el mismo guion con
-   A y con B. El usuario anota por respuesta si mejoró, empeoró o quedó igual respecto de
-   la ronda 4; se registran latencia, llamadas al modelo, incidentes y rechazos de la
-   verificación de A.
-4. **Enmienda del ADR 0014** con el resultado y extender el flujo al resto. Después, la
-   prueba de seguimiento flujo contra modelo (ADR 0014).
-
-En paralelo: banco de modelos (ver "Operación"), para saber cuánto de lo "robótico" viene
-del modelo y no del flujo.
+1. **Circuito C (base `prisma`, código de `main`).** El 01/10 a las 09:00 le llega a
+   Ismael el borrador de Marcos; Ismael toca ✖️ Rechazar con un motivo y a Marcos le debe
+   llegar "Ismael rechazó el borrador…: motivo". Observar si el despachador descarta los
+   avisos de «Dashboard de lotes», ya `terminada`. Requiere cortar el listener del
+   worktree y arrancar el de `main` (`.\.venv\Scripts\python.exe -m prisma escuchar
+   corework` desde `D:\Proyectos\Prisma-PM`): un solo listener por bot.
+2. **Ronda siguiente del flujo (base `prisma_flujo`, variante A, rama
+   `feat/flujo-de-un-mensaje`).** Listener desde el worktree con `PYTHONPATH=src`. Guion
+   "Corrida siguiente" en `odd/tasks/flujo-de-un-mensaje-guion.md` de esa rama. Prueba la
+   etapa 6 completa (el modelo redacta el mensaje entero a partir del resultado del turno,
+   verificador sin listas de palabras, plazo propio de redacción, despacho en orden) y el
+   paquete "Prisma propone": objetivos sólo del área de quien pide, el más probable con
+   ⭐ elegido por Jev, criterio verificable propuesto, propuestas ligadas a su tarea. Más
+   los casos todavía no probados: la tarea en el primer mensaje y "4de octubre". Migración
+   `0027` ya aplicada a `prisma_flujo` (respaldo
+   `db/respaldos/prisma_flujo-antes-0027-20261001.dump`) y áreas asignadas a los objetivos.
+3. **Medir y decidir.** Latencia por respuesta contra la línea base (8,7 s de mediana en
+   textos; toques 0,9 s en B, 7,8 s en la primera A), redacciones aceptadas y rechazadas
+   (`python -m prisma redaccion corework`), incidentes. Si se cumple, enmienda del ADR
+   0014 y extender el flujo a entrega y aprobación (corte 2). Queda abierta la decisión
+   del usuario F-B9 (¿corregir errores de tipeo obvios en los textos?).
 
 **Funcionalidad nueva congelada** hasta que alta, entrega y aprobación cumplan en una
 prueba real los criterios del ADR 0014. Alcance en [`ROADMAP.md`](ROADMAP.md), "Orden de
 entrega". Después, según el roadmap: aportes sobre tareas, aprendizaje de apodos y
 aclaraciones, conversación de bloqueos.
 
-**Punto exacto para retomar.** `main` con la documentación condensada en `7c2531b` (la
-historia en `historial/`; frontera de revisión en `ec3109a`: el tramo de la condensación
-no se pudo revisar con RDD porque las copias de historial exceden el contexto del
-revisor; se verificaron por hash y una revisión independiente de los textos curados no
-encontró reglas perdidas), sin push. Continuar por el punto 1 (el 01/10 a las 09:00); el punto 2 avanza
-en el worktree `flujo-de-un-mensaje` leyendo primero `odd/tasks/flujo-de-un-mensaje.md`
-de esa rama. Consentimiento permanente del usuario para commits y revisiones RDD; parar
+**Punto exacto para retomar.** `main` sin push, con la documentación condensada en
+`7c2531b` (historia en `historial/`; ese tramo no se pudo revisar con RDD porque las
+copias exceden el contexto del revisor: verificado por hash y revisión independiente) y
+las enmiendas del ADR 0014 (`cabb55b`, `6f3c60a`) y la constitución (`7f54f93`). El código
+del flujo vive en la rama `feat/flujo-de-un-mensaje` (worktree `flujo-de-un-mensaje`),
+revisado con RDD commit por commit; su estado y evidencia, en
+`odd/tasks/flujo-de-un-mensaje.md` y el guion de esa rama. Continuar por el punto 1 (el
+01/10 a las 09:00) y después el 2. Consentimiento permanente del usuario para commits y revisiones RDD; parar
 sólo por decisiones sobre cómo funciona Prisma. Antes de cada unidad, el chequeo de rumbo
 escrito de `AGENTS.md` ("Cómo pensamos juntos").
