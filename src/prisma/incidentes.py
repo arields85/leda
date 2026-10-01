@@ -127,6 +127,7 @@ ETAPA_INTERRUPTOR_ALTA = "interruptor_alta"
 # El ajuste `horizonte_tarea` del espacio (el margen máximo de la fecha de una
 # tarea) no tiene un valor que se entienda: se usan los 2 meses por omisión.
 ETAPA_HORIZONTE_TAREA = "horizonte_tarea"
+ETAPA_AVISO_COORDINACION = "aviso_coordinacion"
 # T9-H19e: un recibo viejo sin respuesta que la reentrega no recuperó (`huerfanos`).
 ETAPA_MENSAJE_HUERFANO = "mensaje_huerfano_sin_respuesta"
 # T9-H19g: el aviso de UN huérfano falló y se lo saltea (el resto del barrido sigue).
@@ -417,6 +418,13 @@ EXPLICACION_POR_ETAPA: dict[str, ExplicacionDeEtapa] = {
         que_vio="Nada raro: el alta guiada de siempre, un dato por vez.",
         que_hacer=("Corregí el ajuste `alta` del espacio (`conversada` o "
                    "`guiada`). No hace falta que {nombre} haga nada.")),
+    ETAPA_AVISO_COORDINACION: ExplicacionDeEtapa(
+        que_paso=("Un aviso de coordinación de una tarea recién creada (a quien la "
+                  "pidió o a su responsable) no se pudo encolar."),
+        que_vio=("{nombre} recibió su respuesta normal; la otra persona no recibió "
+                 "el aviso."),
+        que_hacer=("Avisale a mano a la persona que no se enteró y pasale el detalle "
+                   "técnico a quien desarrolla.")),
     ETAPA_HORIZONTE_TAREA: ExplicacionDeEtapa(
         que_paso=("El ajuste `horizonte_tarea` del espacio no tiene un valor "
                   "válido (`meses` debe ser un entero de 1 o más): se usan los "

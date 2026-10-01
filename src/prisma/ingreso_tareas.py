@@ -1381,15 +1381,16 @@ def notify_requester_of_approval(cur: psycopg.Cursor, who: Solicitante, *,
     return True
 
 
-def assignment_notice_text(assigner_name: str, title: str, due_date: date,
+def assignment_notice_text(assigner_name: str, title: str, due_date: date | None,
                            criterion: str) -> str:
     """El aviso de coordinación al responsable de una tarea que le asignó otra
     persona: quién, cuál, para cuándo y cómo se da por hecha. Mismo estilo que los
     avisos de aprobación y de rechazo; no promete botones ni acciones que no
     existen."""
-    return (f"{assigner_name} te asignó la tarea «{title}», para el "
-            f"{due_date.strftime('%d/%m/%Y')}. Se da por hecha cuando: "
-            f"{criterion.rstrip('.')}.")
+    # Un espacio puede no exigir fecha (mecánica §2): sin ella, no se nombra.
+    cuando = f", para el {due_date.strftime('%d/%m/%Y')}" if due_date else ""
+    return (f"{assigner_name} te asignó la tarea «{title}»{cuando}. Se da por hecha "
+            f"cuando: {criterion.rstrip('.')}.")
 
 
 def notify_responsible_of_assignment(cur: psycopg.Cursor, who: Solicitante, *,

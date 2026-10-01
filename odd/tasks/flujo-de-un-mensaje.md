@@ -1466,3 +1466,13 @@ Tramo `f60c3ca..51fa9e6` (`81bb60a`, `9d1bee2`, `20cd9c8`, `51fa9e6`; 994 línea
   `test_task_intake`, `test_avisos_de_coordinacion_fuera_del_tope`, `test_salida` y todo
   archivo que menciona "Hecho. La tarea quedó comprometida", `confirmar_borrador` o
   `_resolver_toque_borrador`): 498 passed. Ninguna prueba existente cambió.
+- RDD `8cf3fa7..3bd7f85`, linaje `review-bcbc908a89c8c112`: aprobada y reconocida. Sus dos
+  WARNING se corrigieron: (1) los avisos de aprobación y de asignación corrían en la misma
+  transacción que la respuesta de quien confirma; si uno fallaba, se perdía también
+  "Hecho" y el toque siguiente era repetición (nada se reintentaba, falla silenciosa).
+  Ahora cada aviso va en su savepoint (`gateway._aviso_aislado`) y, si falla, queda un
+  incidente `aviso_coordinacion`; (2) el aviso de asignación no nombra la fecha si la
+  tarea no tiene (un espacio puede no exigirla). RED 2 failed, GREEN 135 passed
+  (asignación, aprobación, enviar a aprobación, incidentes legibles, rechazo, conducida).
+- Pendiente (h): si el responsable no activó su chat, el aviso no sale y sólo queda en la
+  auditoría; a quien creó la tarea no se le dice que el otro no se enteró.

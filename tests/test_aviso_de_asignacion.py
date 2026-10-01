@@ -286,3 +286,41 @@ def test_en_el_alta_conversacional_el_responsable_tambien_recibe_el_aviso(
     (aviso,) = _asignaciones(conn, responsable)
     assert aviso["cuerpo"] == _texto_esperado(conn, c.usuario, rid)
 
+
+
+# ------------------------------------------------------------ el texto, sin fecha
+
+def test_el_aviso_sin_fecha_no_la_nombra_y_no_duplica_el_punto():
+    from datetime import date
+
+    from prisma import ingreso_tareas as I
+
+    con = I.assignment_notice_text("Morgan", "Medir", date(2026, 10, 15), "Anda.")
+    assert con == ("Morgan te asignó la tarea «Medir», para el 15/10/2026. "
+                   "Se da por hecha cuando: Anda.")
+    sin = I.assignment_notice_text("Morgan", "Medir", None, "Anda")
+    assert sin == "Morgan te asignó la tarea «Medir». Se da por hecha cuando: Anda."
+
+
+# ------------------------------- un aviso que falla no se lleva la respuesta
+
+def test_si_un_aviso_falla_quien_confirma_igual_recibe_su_respuesta_y_queda_un_incidente(
+        intake_world, conn, monkeypatch, authority_conn):
+    from prisma import ingreso_tareas as I
+
+    rid, pid = _alta_en_confirmacion(conn, intake_world, responsable="Sam North")
+    client = _cliente(conn, monkeypatch, authority_conn)
+    pide = _usuario(intake_world)
+    antes = _salidas(conn, pide)
+
+    def _rompe(*_a, **_k):
+        raise RuntimeError("falla de prueba")
+    monkeypatch.setattr(I, "notify_responsible_of_assignment", _rompe)
+
+    _tocar(client, conn, pide, pid, "Confirmar")
+
+    assert _tareas(conn) == 1
+    assert any("comprometida" in s["cuerpo"] for s in _nuevas(conn, pide, antes))
+    with admin(conn) as cur:
+        cur.execute("select etapa from incident where etapa = 'aviso_coordinacion'")
+        assert len(cur.fetchall()) == 1
