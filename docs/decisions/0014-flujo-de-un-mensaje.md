@@ -138,6 +138,26 @@ mezclar las dos causas, el experimento A/B se corre con el modelo actual. Una ve
 la variante, el banco real se corre sobre el mismo flujo con un modelo más capaz y se
 compara la comprensión ganada con la latencia y el costo agregados.
 
+**Resultado de la primera vuelta A/B (2026-10-01, decisión del usuario).** Corridas por
+Telegram del 30/09 y 01/10 sobre el alta guiada (detalle en
+`odd/tasks/flujo-de-un-mensaje-guion.md`, rama `feat/flujo-de-un-mensaje`):
+
+- La etapa 2 (el modelo interpreta los valores) fue lo que más mejoró la experiencia:
+  objetivos, fechas y criterios dichos con palabras propias, ya sin "No encontré esa
+  opción" ni rechazos de formato. Con B el usuario la sintió "más fluida y humana" aunque
+  los textos eran plantillas.
+- A, tal como se construyó, se sintió mejor que B pero "mitad planilla, mitad modelo": el
+  modelo sólo escribía una frase delante de la pregunta de plantilla. Costo medido:
+  textos 10,3 s de mediana (B 8,7 s) y toques 7,8 s (B 0,9 s); 3 de 18 redacciones
+  rechazadas, las tres por un error del verificador.
+- **Decisión:** el modelo es el intermediario al principio y al final (humano → modelo →
+  lógica determinista con Jev, SQL y reglas → resultado → modelo → humano). La etapa 6 se
+  completa: el modelo redacta el mensaje entero a partir del resultado del turno, el
+  código pone los botones y verifica los hechos. Se acepta el costo de latencia, pero se
+  trabaja para achicarlo antes de la próxima prueba (pedido corto para redactar, plazo
+  propio sin reintentos con caída a la plantilla, medición por respuesta) y se vuelve a
+  medir contra la línea base.
+
 **Moratoria.** Mientras dura el experimento no se agregan reglas ni parches de
 conversación. Un hallazgo nuevo se registra y se clasifica por etapa del flujo.
 
