@@ -3,7 +3,7 @@
 **Alcance:** Prisma es un producto de gestión de proyectos multi-tenant. CoreWork es
 su primer cliente, no su definición.
 
-**Última actualización documental:** 2026-09-30.
+**Última actualización documental:** 2026-10-01.
 
 Historia de sesiones y unidades cerradas:
 [`historial/STATUS-hasta-2026-09-30.md`](historial/STATUS-hasta-2026-09-30.md)
@@ -187,31 +187,27 @@ conversación de caso; los hallazgos se registran y se clasifican por etapa del 
      escribime y lo vemos de nuevo.": un callejón sin salida, contra "ningún mensaje deja a
      la persona sin un próximo paso".
    El rechazo con motivo queda por probar con un borrador nuevo.
-2. **Alta conducida por el modelo (rama `feat/flujo-de-un-mensaje`, base
-   `prisma_flujo`).** Decisión del usuario del 01/10 (enmienda del
-   [`ADR 0014`](decisions/0014-flujo-de-un-mensaje.md) "el alta conducida por el
-   modelo"): la prueba de la mañana mostró que el alta seguía trabada (formulario de un
-   campo por turno, ruteo y redacción sin ver la conversación, "Dejarlo" borraba el
-   trabajo). Ya está en la rama: historial a los modelos, "Dejarlo" pausa, modelo puro
-   sin plazo ni plantillas (`MODELO_PURO`), M1 (contrato del turno,
-   `src/prisma/alta_turno.py`, `16fa0ff`), M2 (llamada `conducir_alta` en los
-   proveedores, `03263de`) y **M3** (el alta conducida de punta a punta detrás de
-   `workspace_setting` `alta = conversada`, `src/prisma/alta_conducida.py`, `deaade0`;
-   guion "Corrida conversada" de 15 pasos en el guion de la rama, `271e462`).
-   Verificación de M3 **parcial**: suite completa 3195 passed, 2 failed (una corregida en
-   el mismo commit, `test_capacidades`; la otra preexistente e intermitente,
-   `test_redaccion_modelo_puro::test_si_el_verificador_rechaza…`, pasa sola); falta
-   repetir la suite completa. M1-M3 sin revisión RDD todavía (tramo
-   `b7ed862..271e462`). Para activar en `prisma_flujo`:
-   `insert into workspace_setting (workspace_id, clave, valor) select id, 'alta',
-   '"conversada"'::jsonb from workspace where slug = 'corework' on conflict
-   (workspace_id, clave) do update set valor = excluded.valor;` (apagar: borrar la fila o
-   `'"guiada"'`). Decisiones abiertas del usuario: tope de 7 botones por dato (el modelo
-   conoce hasta 40 opciones); si el alta conducida necesita un equivalente de
-   `MODELO_PURO=False`.
-3. **Medir y decidir.** Latencia por respuesta contra la línea base (8,7 s de mediana en
-   textos), turnos por tarea, lo que entiende mal, incidentes. Si cumple: retirar el
-   formulario viejo del alta (M4-M9) y extender el patrón a entrega y aprobación.
+2. **Alta conducida por el modelo: primera prueba real hecha (01/10), favorable.** Rama
+   `feat/flujo-de-un-mensaje`, base `prisma_flujo` con `alta = conversada` activado.
+   Resultado y **criterios de adopción** en la enmienda del
+   [`ADR 0014`](decisions/0014-flujo-de-un-mensaje.md) "Resultado de la primera prueba
+   del alta conducida": ningún hallazgo de comprensión; 83 % de los turnos del modelo
+   aceptados al primer intento (90 % desde la corrección del verificador); textos 13,0 s
+   de mediana por respuesta pero menos turnos por tarea (el usuario prioriza fluidez,
+   después latencia). Correcciones del día, todas revisadas con RDD por tramos y
+   registradas con su evidencia en `odd/tasks/flujo-de-un-mensaje.md`: propuesta de
+   criterio con un solo camino, verificador sólo con invariantes (sin "?"), hechos con el
+   botón real y la regla de fechas, margen de 2 meses por espacio (`horizonte_tarea`),
+   aviso al aprobar un borrador y nombre de quien lo manda. Suite completa en `13c7ae5`:
+   3285 passed.
+3. **Próxima prueba: la de adopción.** Por Telegram real, con alguien que no conozca el
+   guion y al menos tres altas. Si cumple los criterios del ADR 0014, retirar el alta
+   guiada (M4-M9) y pasar el patrón a entrega y aprobación. Pendientes de la rama antes o
+   durante esa prueba: (a) y (f) el modelo promete lo que no existe ("la retomamos el
+   lunes", "lo tomamos como objetivo"); (b) el borrador pausado no lo ve el camino
+   general y deja una aclaración trabada; (e) alguien de Dirección recibe el objetivo
+   estratégico completado solo; (g) el indicador "escribiendo…" se corta; evidencia con
+   claves internas ("explicacion"); calidad del criterio aceptado ("envío videos").
 4. **Hallazgos del circuito C (código de `main`):** C-1 a C-3 (arriba) y repetir el
    rechazo con motivo con un borrador nuevo.
 
@@ -224,14 +220,11 @@ prueba real los criterios del ADR 0014. Alcance en [`ROADMAP.md`](ROADMAP.md), "
 entrega". Después, según el roadmap: aportes sobre tareas, aprendizaje de apodos y
 aclaraciones, conversación de bloqueos.
 
-**Punto exacto para retomar (cierre de sesión 2026-10-01, ~10:45).** `main` sin push
-(sólo documentación y `tools/leer_conversacion.py` desde la ronda 4; el código de `main`
-sigue siendo el de la ronda 4). La rama `feat/flujo-de-un-mensaje` lleva todo el
-experimento, revisado con RDD hasta `b7ed862` (`review-497ccb005edb819a`); M1 y M2
-(`16fa0ff`, `03263de`) y lo que haya dejado M3 quedan por revisar. Base `prisma_flujo`:
-migraciones `0026` y `0027` aplicadas (respaldos en `db/respaldos/`), áreas asignadas a
-los objetivos, variante A, `alta = conversada` todavía sin activar. Base `prisma`: la de
-la ronda 4, sin migraciones nuevas. Listeners detenidos. Lista de tareas de la sesión:
-historial OK, M1 OK, M2 OK, M3 OK (verificación parcial), después suite completa y revisión, prueba conversada, M4-M9,
-hallazgos del circuito C. Consentimiento permanente para commits y revisiones RDD;
-chequeo de rumbo escrito antes de cada unidad (`AGENTS.md`).
+**Punto exacto para retomar (2026-10-01, tarde).** `main` sin push: sólo documentación y
+`tools/leer_conversacion.py` desde la ronda 4 (su código sigue siendo el de la ronda 4).
+La rama `feat/flujo-de-un-mensaje` lleva el experimento; revisada con RDD hasta `8cf3fa7`
+(linajes en el documento de la unidad); lo posterior (`bdc2905`, `f223fe7` y el aviso de
+asignación al responsable, en curso) queda por revisar. Base `prisma_flujo`: `alta =
+conversada` activado, sin `horizonte_tarea` (vale 2 meses). Base `prisma`: la de la ronda
+4. Listener del worktree lo corre el usuario. Consentimiento permanente para commits y
+revisiones RDD; chequeo de rumbo escrito antes de cada unidad (`AGENTS.md`).

@@ -197,6 +197,59 @@ conversación. Un hallazgo nuevo se registra y se clasifica por etapa del flujo.
 El resultado del experimento se registra como enmienda de este ADR, con la variante
 elegida (o la combinación) y su evidencia.
 
+**Resultado de la primera prueba del alta conducida (2026-10-01).** Corrida por Telegram
+real con datos ficticios, base `prisma_flujo`, rama `feat/flujo-de-un-mensaje`, ajuste
+`alta = conversada`, modelo `deepseek-v4-flash`, cuentas Marcos, Ariel e Ismael operadas
+por el usuario. Detalle de cada hallazgo, su causa, corrección, pruebas y revisión en
+`odd/tasks/flujo-de-un-mensaje.md` de esa rama.
+
+- **Comprensión:** ningún hallazgo del día fue de interpretación. Mensajes desprolijos
+  (uno con texto pegado por error en el medio, "miercoles q viene", "lo compruebo
+  miediendo con el tester") se entendieron; varios datos por mensaje y correcciones
+  escritas sobre el resumen funcionaron. El usuario: "fluidez increíble", "cambio
+  rotundo".
+- **Turnos del modelo** (auditoría `alta_conducida_turno`): 54 en el día, 45 aceptados al
+  primer intento (83 %); desde la corrección del verificador (12:44), 38 de 42 (90 %).
+  Cinco turnos terminaron en el aviso neutro con incidente, todos antes de las
+  correcciones de la tarde.
+- **Clase de los hallazgos:** todos fueron de costura entre el modelo y el código, no de
+  comprensión: una propuesta de criterio dicha y no registrada; un botón nombrado que no
+  se mostraba; la frase del turno de quien pide llegando a quien aprueba; las fechas
+  descritas como "los próximos 14 días"; y reglas de estilo del formulario viejo dentro
+  del verificador (preguntar sólo lo que falta; exigir "?"). Se corrigieron por mecanismo
+  y casi todas **quitando** reglas, no agregándolas: el verificador quedó en invariantes
+  (no inventar fechas, números, nombres ni botones; pedir algo cuando falta un dato;
+  botones que coinciden con lo que se pregunta).
+- **Latencia por respuesta** (mensaje entrante → primera respuesta enviada): textos 13,0 s
+  de mediana (línea base 8,7 s), toques 11,9 s (antes 0,9 s, los respondía el código).
+  **Tiempo por tarea:** menos turnos por alta (la de Ariel, tres turnos y 72 s del primer
+  mensaje al resumen, contando lo que tardó en escribir; antes, un dato por turno). El
+  usuario lo percibe más rápido. Decisión del usuario: primero fluidez y facilidad de uso,
+  después latencia; el objetivo de cinco segundos sigue vigente.
+- **Decisiones del usuario en la corrida:** modelo puro sin plantillas de respaldo; el
+  verificador cuida sólo invariantes; margen máximo de la fecha de una tarea por espacio
+  (2 meses por omisión, `horizonte_tarea` del pack); avisos de coordinación al aprobar un
+  borrador y nombre de quien lo manda.
+- **No probado todavía:** el alta guiada sigue conviviendo (los peores hallazgos, una
+  aclaración trabada después de pausar, salieron de esa convivencia); entrega y
+  aprobación siguen con el flujo anterior; la muestra es chica y la operó quien conoce el
+  guion.
+
+**Criterios de adopción del alta conducida** (decisión del usuario, 2026-10-01, fijados
+antes de la próxima prueba):
+
+- **Prueba:** por Telegram real, con al menos una persona que no conozca el guion y al
+  menos tres altas completas.
+- **Éxito:** al menos nueve de cada diez turnos del modelo aceptados al primer intento;
+  ningún mensaje que deje a la persona sin un próximo paso; ninguna clase de falla de
+  esta ronda que se repita. Se mide además el tiempo por tarea (primer mensaje → resumen)
+  junto con la latencia por respuesta.
+- **Si cumple:** se retira el alta guiada (M4-M9 de la rama: el formulario, sus
+  expresiones regulares y sus correcciones posteriores) y el mismo patrón pasa a entrega
+  y aprobación, en ese orden.
+- **Si no cumple:** se revisa el diseño del contrato y del verificador antes de expandir,
+  no hallazgo por hallazgo.
+
 ## Consecuencias
 
 - Con A, cada turno suma una llamada al modelo para redactar sobre el resultado: más
