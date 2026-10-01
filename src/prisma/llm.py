@@ -358,10 +358,12 @@ def _bloque_valor(esperado: ValorEsperado) -> str:
             "\"detalle\" y ningún texto." + _NO_INVENTAR)
     texto = (
         intro + "La pregunta espera un texto libre. Completá valor.texto con "
-        "lo que la persona quiso decir, tal como lo dijo, sin agregar, "
-        "resumir ni corregir nada. Si responde pero es tan general que no "
-        "sirve como el dato, devolvé valor.falta = \"detalle\" y ningún "
-        "texto." + _NO_INVENTAR)
+        "lo que la persona quiso decir, con sus palabras, corrigiendo sólo los "
+        "errores de tipeo obvios (letras de más, de menos o cambiadas, tildes "
+        "que faltan) sin cambiar el sentido ni los nombres propios: sin "
+        "agregar, resumir ni reescribir nada más. Si responde pero es tan "
+        "general que no sirve como el dato, devolvé valor.falta = "
+        "\"detalle\" y ningún texto." + _NO_INVENTAR)
     if esperado.juzga_verificable:
         titulo = f" La tarea es: «{esperado.contexto}»." if esperado.contexto else ""
         texto += (
