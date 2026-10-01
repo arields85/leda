@@ -702,6 +702,16 @@ def _entendido_del_turno(cur, request_id: str, now: datetime
     return tuple(dados)
 
 
+def _quien_escribe(cur, request) -> tuple[str, ...]:
+    """El nombre de la persona del alta: un nombre que el turno ya conoce y el
+    verificador deja decir sin que esté en los hechos."""
+    cur.execute(
+        "select nombre from integrante where membership_id = %s",
+        (request["membership_id"],))
+    fila = cur.fetchone()
+    return (fila["nombre"],) if fila and fila["nombre"] else ()
+
+
 def _decir_pregunta(cur, request, field: str, tipo: TipoValor, prompt: str,
                     now: datetime, *, pregunta: str | None = None, opciones=(),
                     rechazo: Rechazo | None = None,
@@ -727,7 +737,8 @@ def _decir_pregunta(cur, request, field: str, tipo: TipoValor, prompt: str,
                        for o in opciones),
         entendido=entendido, rechazo=rechazo,
         valores_aceptados=((ValorAceptado(_SUJETO_DEL_CAMPO[field], propuesto),)
-                           if propuesto else ()))
+                           if propuesto else ()),
+        nombres_conocidos=_quien_escribe(cur, request))
     return redactar_turno(cur, workspace_id, resultado, "A",
                           base=TextoRedactado(prompt)).texto
 
@@ -746,7 +757,8 @@ def _decir_envio(cur, request, aprobador_nombre) -> str:
         cambios=(Cambio("el borrador de la tarea",
                         f"quedó enviado a {nombre or 'otra persona del equipo'} "
                         "para que lo confirme", id="borrador_enviado"),),
-        sin_cambios=(SinCambio("la tarea", "se crea cuando lo confirme"),))
+        sin_cambios=(SinCambio("la tarea", "se crea cuando lo confirme"),),
+        nombres_conocidos=_quien_escribe(cur, request))
     return redactar_turno(cur, workspace_id, resultado, "A",
                           base=TextoRedactado(base)).texto
 

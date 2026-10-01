@@ -1969,7 +1969,8 @@ def _atender_pregunta_pendiente(cur, quien, texto: str, abierta, proveedor, cal,
             completo = redactar_charla_con_pregunta(
                 cur, workspace_id, texto, pregunta.pregunta,
                 abierta.args.get("campo") or "pendiente", pregunta.nombre,
-                proveedor=proveedor).texto
+                proveedor=proveedor,
+                nombres=(quien.nombre,) if quien.nombre else ()).texto
             _repreguntar(cur, quien, workspace_id, chat_id, abierta, pregunta,
                          ahora, entrante_id, texto_completo=completo)
             return None

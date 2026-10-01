@@ -17,6 +17,9 @@ from dataclasses import dataclass
 
 from .valores import TipoValor
 
+# El nombre con que Prisma se presenta: siempre es un nombre conocido del turno.
+NOMBRE_ASISTENTE = "Prisma"
+
 
 @dataclass(frozen=True)
 class Cambio:
@@ -111,6 +114,9 @@ class ResultadoTurno:
     # agradecimiento): contexto para que el modelo conteste en pocas palabras
     # antes de pedir el dato. B no lo dice.
     charla: str | None = None
+    # Los nombres que el turno ya conoce (quien escribe): el verificador los deja
+    # decir sin que estén entre los hechos. No se le cuentan al modelo.
+    nombres_conocidos: tuple[str, ...] = ()
 
     @property
     def vacio(self) -> bool:

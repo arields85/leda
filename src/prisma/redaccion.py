@@ -19,6 +19,7 @@ texto plano. Los botones los dibuja quien transporta, desde
 from __future__ import annotations
 
 import json
+import re
 import statistics
 import time
 from dataclasses import dataclass
@@ -298,13 +299,39 @@ def _motivo_de_timeout(exc: BaseException, plazo: float) -> str:
     return f"timeout: {type(_timeout_de(exc)).__name__}"
 
 
+_URL = re.compile(r"\b[a-zA-Z][a-zA-Z0-9+.-]*://\S*|\bwww\.\S+")
+_CREDENCIAL = re.compile(r"(?i)\b(?:authorization|bearer|basic)\b[:\s]*\S*(?:\s+\S+)?")
+_ASIGNACION = re.compile(r"\S*=\S*")
+_CONSULTA = re.compile(r"\?\S*")
+_OPACO = re.compile(r"\b(?=[\w-]*\d)(?=[\w-]*[A-Za-z])[\w-]{12,}\b")
+_LARGO_RAZON = 120
+# Los únicos tipos cuyo mensaje es del propio proyecto (una configuración que
+# falta). Un subtipo (un error de JSON, de URL, de HTTP) trae texto de un tercero.
+_TIPOS_CON_RAZON = (LookupError, ValueError, KeyError)
+
+
+def _razon_corta(mensaje: str) -> str:
+    """El mensaje sin nada que parezca una dirección, una credencial o un
+    parámetro (`clave=valor`, `?consulta`, un identificador opaco), y corto."""
+    for patron, reemplazo in ((_URL, "[dirección]"), (_CREDENCIAL, "[credencial]"),
+                              (_ASIGNACION, "[parámetro]"), (_CONSULTA, ""),
+                              (_OPACO, "[opaco]")):
+        mensaje = patron.sub(reemplazo, mensaje)
+    return " ".join(mensaje.split())[:_LARGO_RAZON]
+
+
 def _motivo_de_error(exc: Exception) -> str:
-    """Qué falló, sin el texto de la excepción de un proveedor (podría traer una
-    dirección o una credencial): el tipo y, de las excepciones propias, su
-    mensaje (una configuración que falta)."""
-    if isinstance(exc, (LookupError, ValueError)):
-        return f"{type(exc).__name__}: {exc}"
-    return type(exc).__name__
+    """Qué falló, sin el texto de la excepción de un tercero (podría traer una
+    dirección con credencial): siempre el tipo y, sólo de `LookupError`,
+    `ValueError` y `KeyError` tal cual (los del propio proyecto, una configuración
+    que falta), una razón corta depurada. Nunca el mensaje de un error de HTTP,
+    de URL o de JSON, aunque hereden de `ValueError`."""
+    nombre = type(exc).__name__
+    if type(exc) in _TIPOS_CON_RAZON:
+        razon = _razon_corta(str(exc))
+        if razon:
+            return f"{nombre}: {razon}"
+    return nombre
 
 
 def redactar_turno(cur, workspace_id: str, resultado: ResultadoTurno, variante: str,
@@ -400,7 +427,8 @@ def motivo_de_charla_invalida(texto: str) -> str | None:
 
 def redactar_charla_con_pregunta(cur, workspace_id: str, mensaje: str,
                                  pregunta: str, campo: str, dato: str, *,
-                                 proveedor=None) -> TextoRedactado:
+                                 proveedor=None,
+                                 nombres: tuple[str, ...] = ()) -> TextoRedactado:
     """Con A, la charla y la pregunta pendiente son UN mensaje natural del modelo
     (F-A2): contesta en pocas palabras y pide el dato, en vez de una frase suelta
     delante de la plantilla. `campo` y `dato` identifican la pregunta (el campo
@@ -408,7 +436,8 @@ def redactar_charla_con_pregunta(cur, workspace_id: str, mensaje: str,
     plantilla de B) y queda registrado."""
     resultado = ResultadoTurno(
         charla=mensaje,
-        falta=Falta(dato, TipoValor.TEXTO, pregunta=pregunta, campo=campo))
+        falta=Falta(dato, TipoValor.TEXTO, pregunta=pregunta, campo=campo),
+        nombres_conocidos=nombres)
     return redactar_turno(cur, workspace_id, resultado, "A", proveedor=proveedor,
                           base=TextoRedactado(pregunta))
 

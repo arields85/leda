@@ -265,6 +265,76 @@ def test_un_error_con_timeout_en_el_nombre_no_es_un_timeout(corework, conn):
     assert _intentos(conn, ws)[0]["resultado"] == "error"
 
 
+# ----------------------- R14: el motivo de una falla no guarda lo que trae el mensaje
+
+SECRETO = "SECRETO-9f3a7c1d"
+MENSAJES_CON_CREDENCIAL = [
+    f"URL inválida https://api.ejemplo.com/v1/models?key={SECRETO}&x=1",
+    f"falló la llamada a api.ejemplo.com con api_key={SECRETO}",
+    f"Authorization: Bearer {SECRETO}",
+    f"GET /v1/chat?token={SECRETO} devolvió 401",
+    f"no se pudo leer http://usuario:{SECRETO}@host/ruta",
+]
+
+
+class _ErrorHttpDeUnCliente(httpx.HTTPError):
+    pass
+
+
+class _ErrorDeJson(ValueError):
+    pass
+
+
+def _motivo(conn, ws, excepcion):
+    p = ProveedorGuionado(guion=[], borradores=[excepcion])
+    _redactar(conn, ws, EN_CURSO, p)
+    (intento,) = _intentos(conn, ws)
+    return intento["motivo"]
+
+
+@pytest.mark.parametrize("mensaje", MENSAJES_CON_CREDENCIAL)
+@pytest.mark.parametrize("tipo", [
+    ValueError, LookupError, KeyError, _ErrorDeJson, _ErrorHttpDeUnCliente,
+    httpx.InvalidURL, httpx.UnsupportedProtocol, RuntimeError])
+def test_el_secreto_de_una_excepcion_no_llega_a_la_auditoria_ni_al_incidente(
+        corework, conn, tipo, mensaje):
+    ws = corework.workspace_id
+    motivo = _motivo(conn, ws, tipo(mensaje))
+
+    assert SECRETO not in motivo and "?" not in motivo and "api_key" not in motivo
+    assert motivo.startswith(tipo.__name__)
+    for incidente in _incidentes(conn, ws):
+        assert SECRETO not in incidente["referencia_cruda"]
+    with admin(conn) as cur:
+        cur.execute("select detalle::text t from audit_log where workspace_id = %s",
+                    (ws,))
+        assert all(SECRETO not in f["t"] for f in cur.fetchall())
+
+
+def test_una_configuracion_que_falta_sigue_diciendo_que_falta(corework, conn):
+    """Un `ValueError`/`LookupError` propio, sin nada parecido a una dirección,
+    conserva su razón corta: es lo que permite arreglar la configuración."""
+    ws = corework.workspace_id
+    motivo = _motivo(conn, ws, LookupError("no hay un modelo configurado"))
+    assert motivo == "LookupError: no hay un modelo configurado"
+
+
+def test_la_razon_corta_tiene_tope(corework, conn):
+    ws = corework.workspace_id
+    assert len(_motivo(conn, ws, ValueError("x" * 5000))) <= 160
+
+
+def test_un_error_http_o_de_json_guarda_sólo_su_tipo(corework, conn):
+    ws = corework.workspace_id
+    assert _motivo(conn, ws, _ErrorDeJson("Expecting value: line 1")) == "_ErrorDeJson"
+    with admin(conn) as cur:
+        cur.execute("delete from audit_log where workspace_id = %s and accion = %s",
+                    (ws, redaccion.ACCION_REDACCION_A))
+    assert _motivo(conn, ws, httpx.HTTPStatusError(
+        "401 en https://x/?key=SECRETO", request=httpx.Request("GET", "https://x/"),
+        response=httpx.Response(401))) == "HTTPStatusError"
+
+
 # ------------------------------------------- todo proveedor acepta el `plazo`
 
 def _proveedores():

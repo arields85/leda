@@ -170,6 +170,48 @@ def test_un_nombre_que_esta_en_los_hechos_pasa_aunque_no_vaya_entre_comillas():
             pregunta="due_date")
 
 
+@pytest.mark.parametrize("texto", [
+    "Dale, Ismael. ¿Para cuándo debería estar?",
+    "Gracias Ismael Gómez, ¿para cuándo debería estar?",
+])
+def test_el_nombre_de_quien_escribe_es_un_nombre_conocido_del_turno(texto):
+    conocido = ResultadoTurno(falta=PREGUNTA.falta, nombres_conocidos=("Ismael Gómez",))
+    _acepta(conocido, texto, pregunta="due_date")
+
+
+@pytest.mark.parametrize("texto", [
+    "Soy Prisma y te ayudo con esto. ¿Para cuándo debería estar?",
+    "Dale, con Prisma queda anotado. ¿Para cuándo debería estar?",
+])
+def test_el_nombre_del_propio_asistente_es_un_nombre_conocido(texto):
+    _acepta(PREGUNTA, texto, pregunta="due_date")
+
+
+@pytest.mark.parametrize("texto", [
+    "Gracias José, ¿para cuándo debería estar?",
+    "Dale, se lo paso a Marcos. ¿Para cuándo debería estar?",
+    "Ismael y Marcos lo ven. ¿Para cuándo debería estar?",
+])
+def test_conocer_unos_nombres_no_habilita_los_que_no_se_conocen(texto):
+    conocido = ResultadoTurno(falta=PREGUNTA.falta,
+                              nombres_conocidos=("Ismael Gómez", "Nahuel"))
+    _rechaza(conocido, texto, "nombre_inventado", pregunta="due_date")
+
+
+def test_un_nombre_de_persona_conocido_no_deja_pasar_un_titulo_inventado():
+    conocido = ResultadoTurno(
+        cambios=EN_CURSO.cambios, estado=EN_CURSO.estado,
+        nombres_conocidos=("Ismael",))
+    assert verificar(conocido, _b("Listo, Ismael: «Revisar el PLC» quedó en curso.",
+                                  afirma=["en_curso"])) is not None
+
+
+def test_los_nombres_conocidos_no_se_le_cuentan_al_modelo():
+    from prisma.redaccion import serializar_hechos
+    conocido = ResultadoTurno(falta=PREGUNTA.falta, nombres_conocidos=("Ismael",))
+    assert "Ismael" not in serializar_hechos(conocido)
+
+
 def test_un_nombre_de_las_opciones_cuenta_como_un_hecho_pero_no_se_exige():
     con_opciones = ResultadoTurno(
         falta=Falta("el objetivo", TipoValor.OPCION, campo="objective"),

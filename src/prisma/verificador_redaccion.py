@@ -8,7 +8,8 @@ palabras ni morfología (ADR 0013: ninguna frase observada, ningún verbo que
 (`{"texto", "pregunta", "afirma"}`, ver `leer_borrador`) y un borrador sale sólo si
 
 - cada fecha, número, título entre «», y nombre propio que dice existe en los
-  hechos (la comparación es normalizada: sin tildes ni mayúsculas, una fecha dicha
+  hechos o es un nombre que el turno ya conoce (quien escribe, el propio
+  asistente: `ResultadoTurno.nombres_conocidos`) (la comparación es normalizada: sin tildes ni mayúsculas, una fecha dicha
   de otra forma vale);
 - `pregunta` es el dato que falta (de una lista cerrada: su identificador) y el
   texto pregunta; sin dato que falte, no abre una pregunta;
@@ -36,7 +37,7 @@ import unicodedata
 from dataclasses import dataclass, fields, is_dataclass, replace
 from enum import Enum
 
-from .resultado_turno import ResultadoTurno, ids_de_cambios
+from .resultado_turno import NOMBRE_ASISTENTE, ResultadoTurno, ids_de_cambios
 
 LARGO_MAXIMO = 3500
 # Contra la plantilla de B: la respuesta del modelo no puede ser mucho más
@@ -222,7 +223,10 @@ def verificar(resultado: ResultadoTurno, borrador: Borrador,
     for citado in _CITADO.findall(texto):
         if _norm(citado) not in todos_norm:
             return f"nombre_inventado: «{citado}»"
-    palabras_hechos = {_norm(p) for p in _PALABRA.findall(" ".join(todos))}
+    # Lo que el texto puede nombrar: los hechos y los nombres que el turno ya
+    # conoce (quien escribe, el propio asistente); los de otras personas, no.
+    permitidos = todos + list(resultado.nombres_conocidos) + [NOMBRE_ASISTENTE]
+    palabras_hechos = {_norm(p) for p in _PALABRA.findall(" ".join(permitidos))}
     inventado = _nombre_propio_inventado(texto, palabras_hechos)
     if inventado:
         return f"nombre_inventado: {inventado}"

@@ -24,7 +24,7 @@ from tests.test_alta_eleccion_confirmacion import _usuario
 from tests.test_alta_guiada_flujo import (CHAT, TITULO, _alta_en_el_objetivo, _campo,
                                           _cuerpos, _decir_fecha, _empezar, _en_la_fecha,
                                           _escribir, _nuevas, _ruta, _salidas, _slot)
-from tests.test_task_intake import NOW, _RoutingProvider, _callback_client
+from tests.test_task_intake import NOW, _RoutingProvider, _actor, _callback_client
 
 
 def _json(texto, pregunta=None, afirma=()):
@@ -111,6 +111,39 @@ def test_la_pregunta_sale_entera_del_modelo_con_lo_que_se_entendio(
     assert any("Reduce service delay" in o for o in hechos["opciones"])
     assert all(o == o.strip() and not o.startswith(("📌", "⭐")) for o in hechos["opciones"])
     assert [i["resultado"] for i in _intentos(conn, ws)] == ["aceptada"]
+
+
+def test_el_modelo_puede_nombrar_a_quien_escribe_y_a_prisma(
+        intake_world, conn, monkeypatch):
+    """Los nombres que el turno ya conoce (la persona, el asistente) no son
+    "nombres inventados": el verificador los deja pasar sin que estén en los
+    hechos (R-verificador). Los de otras personas siguen sin pasar."""
+    ws = intake_world["north-lab"]["id"]
+    with espacio(conn, ws) as cur:
+        nombre = _actor(cur, intake_world).nombre
+    mensaje = (f"Dale, {nombre}: tomé «{TITULO}» como título y Prisma sigue con "
+               "vos. ¿De cuál de estos objetivos es?")
+    modelo = _Modelo(_json(mensaje, "objective"))
+    _a(conn, ws, monkeypatch, modelo)
+
+    with espacio(conn, ws) as cur:
+        _, outcome = _empezar(cur, intake_world, title=TITULO)
+        cuerpos = _cuerpos(cur, outcome.request_id)
+
+    assert cuerpos == [mensaje]
+    assert [i["resultado"] for i in _intentos(conn, ws)] == ["aceptada"]
+
+
+def test_un_nombre_de_otra_persona_sigue_rechazado(intake_world, conn, monkeypatch):
+    ws = intake_world["north-lab"]["id"]
+    modelo = _Modelo(_json(f"Dale, Zulema: tomé «{TITULO}» como título. "
+                           "¿De cuál de estos objetivos es?", "objective"))
+    _a(conn, ws, monkeypatch, modelo)
+    with espacio(conn, ws) as cur:
+        _empezar(cur, intake_world, title=TITULO)
+    (intento,) = _intentos(conn, ws)
+    assert intento["resultado"] == "rechazada"
+    assert intento["motivo"].startswith("nombre_inventado")
 
 
 def test_una_fecha_aceptada_llega_como_entendida_y_el_mensaje_la_dice(
