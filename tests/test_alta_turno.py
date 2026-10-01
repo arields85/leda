@@ -421,10 +421,12 @@ def test_un_numero_inventado_se_rechaza():
                      pregunta=["responsible"]).startswith("numero_inventado")
 
 
-def test_la_pregunta_tiene_que_ser_de_algo_que_falta():
+def test_se_puede_preguntar_por_un_dato_que_ya_esta_confirmado():
+    """El verificador guarda invariantes, no estilo: volver a pedir un dato (uno
+    que se corrige, o cuyo valor se rechazó) está permitido si algo falta y la
+    respuesta pregunta."""
     h = hechos(borrador={"title": confirmado(mostrado="Calibrar", ref="Calibrar")})
-    motivo = verificar(h, texto="¿Qué hay que hacer?", pregunta=["title"])
-    assert motivo.startswith("pregunta_fuera_de_faltan")
+    assert verificar(h, texto="¿Qué hay que hacer?", pregunta=["title"]) is None
 
 
 def test_con_datos_pendientes_hay_que_preguntar_algo():
@@ -433,12 +435,12 @@ def test_con_datos_pendientes_hay_que_preguntar_algo():
                      pregunta=["title"]).startswith("falta_pregunta")
 
 
-def test_lo_que_se_acaba_de_completar_ya_no_se_puede_preguntar():
+def test_preguntar_por_lo_que_se_acaba_de_completar_no_lo_rechaza_el_verificador():
     h = hechos()
     motivo = verificar(h, texto="Anotado. ¿Para cuándo?",
                        valores={"due_date": {"fecha_iso": "2028-03-03"}},
                        pregunta=["due_date"])
-    assert motivo.startswith("pregunta_fuera_de_faltan")
+    assert motivo is None
 
 
 def completo():
@@ -448,8 +450,11 @@ def completo():
 
 def test_con_todo_completo_el_texto_no_pregunta():
     assert verificar(completo(), texto="Ya está todo, revisalo.") is None
-    assert verificar(completo(), texto="¿Está todo bien?").startswith(
-        "pregunta_sin_falta")
+
+
+def test_con_todo_completo_una_pregunta_no_se_rechaza():
+    """Preguntar sin que falte nada es estilo, no invariante."""
+    assert verificar(completo(), texto="¿Está todo bien?") is None
 
 
 def test_al_tocar_modificar_con_todo_completo_se_puede_preguntar_que_cambiar():
@@ -459,6 +464,38 @@ def test_al_tocar_modificar_con_todo_completo_se_puede_preguntar_que_cambiar():
     assert verificar(h, texto="Claro, ¿qué querés cambiar?") is None
 
 
+# La familia de la corrección: nada falta, la persona cambia un dato (o el valor
+# nuevo se rechazó) y la respuesta lo vuelve a pedir.
+
+_CORRECCIONES = [
+    ("due_date", {"due_date": {"fecha_iso": "2028-02-15"}},   # fecha pasada
+     "Esa fecha ya pasó. ¿Para cuándo la necesitás?"),
+    ("objective", {"objective": {"opcion_id": "O9"}},          # fuera del conjunto
+     "Ese objetivo no está entre los posibles. ¿Cuál elegís?"),
+    ("responsible", {"responsible": {"opcion_id": "R9"}},
+     "Ese responsable no está entre los posibles. ¿Quién la hace?"),
+]
+
+
+@pytest.mark.parametrize("campo,valores,texto", _CORRECCIONES)
+def test_con_todo_completo_un_valor_rechazado_se_puede_volver_a_pedir(
+        campo, valores, texto):
+    h = completo()
+    s = leer(intencion="corrige", texto=texto, valores=valores, corrige=[campo],
+             pregunta=[campo])
+    a = T.aplicar_valores(s, h)
+    assert a.rechazos and not a.asignaciones        # el código rechazó el valor
+    assert T.verificar_turno(s, h, a) is None       # y volver a pedirlo vale
+
+
+@pytest.mark.parametrize("campo", ["objective", "responsible"])
+def test_los_botones_de_un_dato_confirmado_que_se_pregunta_sirven(campo):
+    h = completo()
+    s = leer(intencion="corrige", texto="¿Cuál preferís?", corrige=[campo],
+             pregunta=[campo], botones=campo)
+    assert T.verificar_turno(s, h, T.aplicar_valores(s, h)) is None
+
+
 def test_los_botones_son_de_un_dato_con_opciones_y_que_se_pregunta():
     assert verificar(texto="¿A qué objetivo pertenece?", pregunta=["objective"],
                      botones="objective") is None
@@ -466,7 +503,7 @@ def test_los_botones_son_de_un_dato_con_opciones_y_que_se_pregunta():
                      botones="objective").startswith("botones")
     h = hechos(borrador={"objective": confirmado(mostrado="x", ref="x")})
     assert verificar(h, texto="¿Quién?", pregunta=["responsible"],
-                     botones="objective").startswith("botones")
+                     botones="objective").startswith("botones_sin_pregunta")
 
 
 def test_un_texto_demasiado_largo_se_rechaza():

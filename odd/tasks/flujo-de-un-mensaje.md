@@ -1157,3 +1157,61 @@ unidades de commit propias.
   `test_aceptar_sin_propuesta_vigente_se_rechaza` (ya no hay acción de aceptar); el caso de
   `acepta_propuesta` suelto se suma a los rechazos de formato; en
   `test_un_criterio_que_no_se_puede_comprobar_se_propone_otro_y_se_acepta` el modelo acepta con `{texto}`.
+
+### Hallazgo: el verificador cuidaba estilo, no sólo invariantes (2026-10-01)
+
+- **Caso observado.** En una prueba real la persona tocó Modificar y dijo "cambiá la fecha al 15 de
+  agosto" (una fecha pasada). El código rechazó el valor, con razón, y el modelo, con razón, pidió otra
+  fecha. `verificar_turno` rechazó los dos intentos con `pregunta_fuera_de_faltan: due_date`: la fecha no
+  "faltaba" (seguía guardada la vieja del viernes). La persona recibió el aviso neutro de falla. De 10
+  intentos rechazados ese día, 6 eran reglas de estilo.
+- **Razonamiento del disparador (AGENTS.md, "Cómo pensamos juntos", punto 4).** Se iba a agregar un segundo
+  caso especial junto al de Modificar (`h.evento.get("toque") != "modificar"` en `pregunta_sin_falta`), y era
+  el segundo arreglo seguido en este módulo. Se paró y se revisó el mecanismo, no el caso. Punto 6: "las
+  instrucciones gobiernan el comportamiento; el código y la base, lo que no puede pasar nunca". Las reglas de
+  estilo heredadas del alta por formulario no son garantías: rechazan comportamiento correcto del modelo.
+- **Decisión del usuario.** El verificador del alta conducida guarda sólo invariantes y coherencia de la
+  interfaz de texto.
+- **Se conserva.** `verificar_afirmaciones` (ni fechas, números ni nombres inventados; largo);
+  `falta_pregunta` (si algo sigue faltando tras el turno, la respuesta pregunta: ningún mensaje deja a la
+  persona sin próximo paso); `botones_sin_pregunta` (los botones son de un dato por el que la respuesta
+  pregunta: lo que se muestra coincide con lo que se dice); los retornos tempranos `otro_tema`, `cancelar`
+  y `dejar`.
+- **Se quita.** `pregunta_fuera_de_faltan` (preguntar por un dato que no falta, por ejemplo uno que se
+  corrige); `pregunta_sin_falta` con su excepción de Modificar (preguntar sin que falte nada);
+  `botones_fuera_de_faltan` (botones de un dato que se corrige). `SISTEMA_ALTA` ya no dice "sólo de lo que
+  falte DESPUÉS de este mensaje": pedí lo que falta; si la persona cambia un dato o un valor se rechazó,
+  podés volver a pedirlo.
+- **Botones de un dato confirmado.** Las opciones siguen saliendo sólo del conjunto del código
+  (`_opciones_de_ahora`). El toque (`conducir_toque`) guarda con `_guardar` directo, sin pasar por
+  `_ya_confirmado`: no hace falta `corrige` para que un toque aplique. Sí había un hueco en `_responder`: con
+  nada faltando, la rama `not faltan` devolvía antes de armar `salida.botones`, así que el texto prometía
+  botones que no salían. Arreglo mínimo: con nada faltando y sin cambio aplicado, los botones se arman; con un
+  cambio aplicado sigue saliendo el resumen. Además, una pregunta del modelo (`salida.pregunta`) con nada
+  faltando ya no arma el resumen detrás de la pregunta: se dice la pregunta y el resumen vuelve cuando se
+  aplica un cambio (antes, tras Modificar, la pregunta habría salido pegada a un resumen con Confirmar).
+- **Riesgo aceptado.** El modelo puede volver a preguntar un dato ya confirmado, o preguntar sin que falte
+  nada. Ninguna garantía se rompe: el código sigue validando cada valor, el límite de autoridad de las
+  opciones y el botón Confirmar como único camino a la tarea. Tras una pregunta con nada faltando la persona
+  queda sin resumen a la vista hasta su próxima respuesta.
+- **RED.** `tests/test_alta_turno.py tests/test_alta_conducida.py`: 11 failed, 140 passed (9 de unidad:
+  pregunta de dato confirmado, pregunta con nada faltando, valor rechazado de fecha, objetivo y responsable
+  que se vuelve a pedir, botones de objetivo y responsable confirmados, y el motivo `botones_sin_pregunta`;
+  2 de extremo a extremo: Modificar + fecha pasada, y Modificar + botones de responsable + toque).
+- **GREEN.** `tests/test_alta_turno.py tests/test_alta_conducida.py tests/test_conducir_alta_proveedores.py
+  tests/test_capacidades.py tests/test_redaccion_modelo_puro.py`: 186 passed;
+  `tests/test_verificador_redaccion.py` (otro verificador, el del camino anterior, con su propio
+  `pregunta_sin_falta` que no se toca): 68 passed.
+- **Pruebas cambiadas.** `test_la_pregunta_tiene_que_ser_de_algo_que_falta` pasó a
+  `test_se_puede_preguntar_por_un_dato_que_ya_esta_confirmado`;
+  `test_lo_que_se_acaba_de_completar_ya_no_se_puede_preguntar` pasó a
+  `test_preguntar_por_lo_que_se_acaba_de_completar_no_lo_rechaza_el_verificador`; en
+  `test_con_todo_completo_el_texto_no_pregunta` la aserción de `pregunta_sin_falta` pasó a
+  `test_con_todo_completo_una_pregunta_no_se_rechaza`; `test_los_botones_son_de_un_dato_con_opciones_y_que_se_pregunta`
+  espera ahora `botones_sin_pregunta` (el caso de botones de un dato confirmado ya no se rechaza). Todas
+  afirmaban reglas retiradas.
+- **Hallazgos pendientes de la misma corrida (no se arreglan ahora).**
+  - (a) Con `intencion: dejar`, la respuesta prometió "la retomamos el lunes": un compromiso a futuro para el
+    que Prisma no tiene mecanismo (constitución §4).
+  - (b) Tras pausar, "¿qué tarea dejaste para el lunes?" fue al camino general, que no conoce el borrador
+    pausado y ofreció tareas que no tenían que ver.

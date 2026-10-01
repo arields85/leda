@@ -23,8 +23,9 @@ garantiza):
   opciones contra el conjunto, textos contra el límite de cada dato. Un valor
   para un dato ya confirmado sólo se aplica si el modelo lo listó en `corrige`.
 - El texto del modelo se verifica contra los hechos (`verificar_turno`): ninguna
-  fecha, número ni nombre fuera de lo que el turno conoce, y la pregunta es de
-  algo que de verdad falta.
+  fecha, número ni nombre fuera de lo que el turno conoce; si algo sigue faltando,
+  la respuesta pregunta; y los botones son de un dato por el que se pregunta. El
+  estilo de la conversación no se verifica: lo gobiernan las instrucciones.
 - Lo que la persona escribió viaja marcado como dato, nunca como instrucción.
 - Nada se compromete sin el botón de confirmar: este módulo no crea tareas.
 """
@@ -496,23 +497,15 @@ def verificar_turno(salida: SalidaTurno, h: HechosTurno, a: Aplicacion) -> str |
         return motivo
     if salida.intencion in ("cancelar", "dejar"):
         return None
+    # Sólo invariantes (la persona nunca queda sin un próximo paso y lo que se
+    # muestra coincide con lo que se dice). Qué dato se pregunta, y si se vuelve a
+    # preguntar uno ya confirmado (se corrige, o su valor nuevo se rechazó), lo
+    # decide la conversación, no el verificador.
     faltan = a.faltan_tras(h)
-    for campo in salida.pregunta:
-        if campo not in faltan:
-            return f"pregunta_fuera_de_faltan: {campo}"
-    if faltan:
-        if not salida.pregunta or not _hay_pregunta(salida.texto):
-            return f"falta_pregunta: {_SUJETOS[faltan[0]]}"
-    elif (salida.intencion != "ayuda" and h.evento.get("toque") != "modificar"
-          and (salida.pregunta or _hay_pregunta(salida.texto))):
-        # Tocar Modificar con todo completo es la única vez que se pregunta algo
-        # sin que falte un dato: qué quiere cambiar la persona.
-        return "pregunta_sin_falta: no hay ningún dato que pedir"
-    if salida.botones:
-        if salida.botones not in faltan:
-            return f"botones_fuera_de_faltan: {salida.botones}"
-        if salida.botones not in salida.pregunta:
-            return f"botones_sin_pregunta: {salida.botones}"
+    if faltan and (not salida.pregunta or not _hay_pregunta(salida.texto)):
+        return f"falta_pregunta: {_SUJETOS[faltan[0]]}"
+    if salida.botones and salida.botones not in salida.pregunta:
+        return f"botones_sin_pregunta: {salida.botones}"
     return None
 
 

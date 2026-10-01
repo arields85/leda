@@ -780,32 +780,96 @@ def test_empezar_otro_borrador_cancela_el_pausado_y_el_modelo_conduce_el_nuevo(c
         "mensaje_de_la_persona": "necesito crear otra tarea: pintar el tablero"}
 
 
-def test_el_boton_modificar_del_resumen_se_lo_deja_al_modelo(chat, conn):
-    c, _ = _hasta_el_resumen(chat)
-    c.modelo.conducciones.append(salida(
-        "Claro, ¿qué querés cambiar?", intencion="ayuda"))
-    cliente = _callback_client(conn, c.monkeypatch)
+def _tocar_modificar(c) -> list[dict]:
+    """Toca el botón Modificar del resumen vigente (una acción pendiente, no un
+    botón de elección del alta conducida)."""
+    cliente = _callback_client(c.conn, c.monkeypatch)
     c.monkeypatch.setattr("prisma.llm.desde_base", lambda *a: c.modelo)
-    with admin(conn) as cur:
+    with admin(c.conn) as cur:
         cur.execute(
             """select o.token from pending_action_option o
                  join pending_action p on p.id = o.pending_action_id
                 where p.estado = 'esperando' and o.etiqueta like %s""",
             ("%Modificar%",))
         token = cur.fetchone()["token"]
-    antes = _salidas(conn, c.usuario)
-
+    antes = _salidas(c.conn, c.usuario)
     respuesta = cliente.post(
         "/telegram/north-lab",
         json={"callback_query": {
-            "id": "cb-modificar", "from": {"id": c.usuario},
+            "id": f"cb-modificar-{next(_toques)}", "from": {"id": c.usuario},
             "data": "p:" + token,
             "message": {"message_id": 7, "chat": {"id": c.usuario}}}},
         headers={"X-Telegram-Bot-Api-Secret-Token": "test-secret"})
-
     assert respuesta.status_code == 200
-    assert _cuerpos(_nuevas(conn, c.usuario, antes)) == ["Claro, ¿qué querés cambiar?"]
+    return _nuevas(c.conn, c.usuario, antes)
+
+
+def test_el_boton_modificar_del_resumen_se_lo_deja_al_modelo(chat, conn):
+    c, _ = _hasta_el_resumen(chat)
+    c.modelo.conducciones.append(salida(
+        "Claro, ¿qué querés cambiar?", intencion="ayuda"))
+
+    nuevas = _tocar_modificar(c)
+
+    assert _cuerpos(nuevas) == ["Claro, ¿qué querés cambiar?"]
     assert c.hechos()["evento"] == {"toque": "modificar"}
+
+
+def test_tras_modificar_una_fecha_rechazada_se_vuelve_a_pedir_sin_incidente(chat):
+    """El verificador guarda invariantes, no estilo: con todo completo (la fecha
+    vieja sigue guardada) el valor nuevo es una fecha pasada, el código lo rechaza
+    y el modelo, con razón, vuelve a pedir la fecha. Esa pregunta llega tal cual."""
+    c, _ = _hasta_el_resumen(chat)
+    c.modelo.conducciones.append(salida("Claro, ¿qué querés cambiar?",
+                                        intencion="ayuda"))
+    _tocar_modificar(c)
+    fecha_guardada = c.campo("due_date")["valor"]
+    c.modelo.conducciones.append(salida(
+        "Esa fecha ya pasó. ¿Para cuándo la necesitás?", intencion="corrige",
+        corrige=["due_date"], valores={"due_date": {"fecha_iso": _en(-3)}},
+        pregunta=["due_date"]))
+    c.modelo.conducciones.append(salida(      # el reintento, ya sin el valor rechazado
+        "Esa fecha ya pasó. ¿Para cuándo la necesitás?",
+        intencion="corrige", corrige=["due_date"], pregunta=["due_date"]))
+
+    nuevas = c.escribir("cambiá la fecha al 15 de agosto")
+
+    assert _cuerpos(nuevas) == ["Esa fecha ya pasó. ¿Para cuándo la necesitás?"]
+    assert any("ya pasó" in r for r in c.hechos()["rechazos_anteriores"])
+    assert c.incidentes("alta_conducida_fallida") == []
+    assert c.campo("due_date")["valor"] == fecha_guardada       # nada cambió
+    c.modelo.conducciones.append(salida(
+        "Listo, cambiada.", intencion="corrige", corrige=["due_date"],
+        valores={"due_date": {"fecha_iso": _en(6)}}))
+
+    nuevas = c.escribir("el lunes")
+
+    assert len(nuevas) == 1 and "Resumen para revisar" in nuevas[0]["cuerpo"]
+    assert datetime.fromisoformat(_en(6)).strftime("%d/%m/%Y") in nuevas[0]["cuerpo"]
+
+
+def test_tras_modificar_los_botones_de_un_dato_confirmado_se_arman_y_el_toque_lo_cambia(
+        chat):
+    c, _ = _hasta_el_resumen(chat)
+    c.modelo.conducciones.append(salida("Claro, ¿qué querés cambiar?",
+                                        intencion="ayuda"))
+    _tocar_modificar(c)
+    c.modelo.conducciones.append(salida(
+        "Dale, ¿quién la hace?", intencion="corrige", corrige=["responsible"],
+        pregunta=["responsible"], botones="responsible"))
+
+    nuevas = c.escribir("quiero cambiar el responsable")
+
+    assert _cuerpos(nuevas) == ["Dale, ¿quién la hace?"]
+    assert any("Sam Noble" in e for e in c.etiquetas())        # las opciones del código
+    c.modelo.conducciones.append(salida("Listo, revisalo."))
+
+    nuevas = c.tocar("Sam Noble")
+
+    assert c.campo("responsible")["valor"]["name"].startswith("Sam Noble")
+    assert len(nuevas) == 1 and "Resumen para revisar" in nuevas[0]["cuerpo"]
+    assert "Responsable: Sam Noble" in nuevas[0]["cuerpo"]
+    assert c.incidentes("alta_conducida_fallida") == []
 
 
 # ----------------------------------------------------------------- si el modelo falla

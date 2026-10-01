@@ -598,8 +598,18 @@ def _responder(cur, who, request, salida: T.SalidaTurno, h: T.HechosTurno,
     faltan = aplicacion.faltan_tras(h)
     cambio = bool(aplicacion.asignaciones)
     if not faltan:
-        if cambio or (evento.get("toque") != "modificar"
-                      and not _resumen_abierto(cur, request)):
+        if cambio:
+            return ResultadoConducido(_resumen(cur, who, request, salida.texto,
+                                               now))
+        if salida.botones:
+            # Un dato ya confirmado que la persona cambia: sus opciones son las del
+            # código y el toque las guarda (`conducir_toque`, sin pasar por `corrige`).
+            return ResultadoConducido(_botones(
+                cur, request, salida.botones,
+                _opciones_de_ahora(cur, request, who, salida.botones),
+                salida.texto, now))
+        if (evento.get("toque") != "modificar" and not salida.pregunta
+                and not _resumen_abierto(cur, request)):
             return ResultadoConducido(_resumen(cur, who, request, salida.texto,
                                                now))
         return ResultadoConducido(_decir(cur, request, salida.texto, now))
