@@ -80,3 +80,25 @@ Nota de experiencia del usuario: "se sintió más fluido y humano este flujo"; l
 sintieron muy estructurados. Explicación: en la variante B todos los textos visibles del alta
 son plantillas del código; el modelo sólo interpretó (etapa 2). La comprensión mejoró la
 experiencia aun con redacción plantillada; la variante A prueba la redacción.
+
+## Corrida B con F-B1 a F-B4, 2026-09-30 23:12-23:25 (Marcos)
+
+Leída de la base (`inbound_message`, `message_outbox`, `audit_log`); sin incidentes nuevos.
+
+| # | Resultado | Nota |
+|---|---|---|
+| 6 | Mejoró | "la semana que viene" → repregunta el día exacto, sin incidente (F-B1). "el miercoles que viene" → 07/10/2026; "el viernes" → 02/10/2026; "07-10" aceptada. |
+| 7 | Mejoró | "ayer" → "Esa fecha ya pasó. Decime una fecha desde hoy en adelante." |
+| 7b | Mejoró | "no lo se, voy a ver" → "¿Esto es el criterio…?" → "Sí, es eso" lo tomó, sin incidente (F-B2). |
+| 8 | Mejoró | "ah, y necesito otra tarea para Nahuel" en la revisión → una sola pregunta por la rama, sin bucle. |
+| 8b | Mejoró | Con "poner un cable" enviado a Ismael, "ahora quiero hacer otra tarea" arrancó la nueva sin tocar la enviada (F-B3). El borrador cancelado a las 22:02 quedó `descartado` en la cola de Ismael. |
+
+Observaciones (no son fallas del mecanismo):
+
+- **F-B6.** Con la pregunta "¿Qué hay que hacer?" abierta, "quiero crear otra tarea" contestó
+  "Estábamos con el título de la tarea nueva. ¿Seguimos con eso?": la persona repite la
+  misma intención y la rama le pide confirmar. Fricción menor (regla de una rama).
+- **F-B7 (producto).** "no lo se, voy a ver" quedó como criterio de aceptación porque la
+  persona lo confirmó. El invariante exige un criterio, y Prisma lo aceptó vacío de
+  contenido. Pregunta de producto: ¿Prisma tendría que ayudar a formular un criterio
+  verificable?
