@@ -1610,3 +1610,9 @@ Diseño B elegido por el usuario. Ruta declarada: un solo escritor (encargo expl
   (suma dividir/partir/tareas más cortas) y `test_el_rechazo_por_fecha_lejana_no_ofrece_tomarla_como_objetivo`
   (afirmaba "dividila"). Nuevas: la guía de un tema a la vez y el extremo a extremo en `test_alta_conducida`.
 - **Límite honesto.** Guía al modelo; se confirma en la próxima corrida real por Telegram.
+- Verificado en real (19:19-19:21, tras `fbe92b3`): fecha fuera del margen → "la dejo para el
+  01/12/2026, o decime otra fecha", sólo sobre la fecha; "si" → tomó el límite y recién
+  después preguntó el objetivo; "dejala para después" → "lo retomamos cuando quieras", sin
+  prometer un día; el menú del borrador y Cancelar, bien. Cuatro turnos, todos al primer
+  intento. Pendientes (a) y (f) cerrados en real. Queda el detalle de "rango" como palabra
+  técnica.
