@@ -170,12 +170,23 @@ desactualizan con cada cambio, así que conviene contrastar contra el símbolo.
 Orden vigente (2026-10-01). **Moratoria:** no se agregan reglas ni parches de
 conversación de caso; los hallazgos se registran y se clasifican por etapa del ADR 0014.
 
-1. **Circuito C (base `prisma`, código de `main`).** El 01/10 a las 09:00 le llega a
-   Ismael el borrador de Marcos; Ismael toca ✖️ Rechazar con un motivo y a Marcos le debe
-   llegar "Ismael rechazó el borrador…: motivo". Observar si el despachador descarta los
-   avisos de «Dashboard de lotes», ya `terminada`. Requiere cortar el listener del
-   worktree y arrancar el de `main` (`.\.venv\Scripts\python.exe -m prisma escuchar
-   corework` desde `D:\Proyectos\Prisma-PM`): un solo listener por bot.
+1. **Circuito C (base `prisma`, código de `main`), corrido el 01/10 a las 09:00: no se
+   pudo hacer, y dejó tres hallazgos del código de `main`.**
+   - **C-1 (falla silenciosa, alta).** La vista previa de aprobación del borrador de Marcos
+     vence 8 h después de crearse (creada 30/09 18:19, venció 01/10 02:19), pero quedó
+     retenida por estar fuera del horario laboral hasta las 09:00; al salir ya estaba
+     vencida y el despachador la descartó sin avisar a nadie (`despachador.py:572-586`).
+     Marcos sigue creyendo que se la mandó a Ismael. Contradice "nunca fallar en
+     silencio".
+   - **C-2.** Los avisos encolados que dejaron de corresponder salen igual: a Ariel
+     "pidió cambios" y "aprobó" de «Dashboard de lotes» (ya `terminada`), y a Ismael
+     "entregó" con Aprobar / Pedir cambios sobre esa tarea terminada y sobre «Revisar
+     comunicaciones…», donde él ya había pedido cambios.
+   - **C-3.** Tocar "Aprobar" en el aviso viejo no tuvo efecto (la tarea sigue `terminada`;
+     bien), pero respondió "Ese pedido ya no está vigente. Si sigue haciendo falta,
+     escribime y lo vemos de nuevo.": un callejón sin salida, contra "ningún mensaje deja a
+     la persona sin un próximo paso".
+   El rechazo con motivo queda por probar con un borrador nuevo.
 2. **Ronda siguiente del flujo (base `prisma_flujo`, variante A, rama
    `feat/flujo-de-un-mensaje`).** Listener desde el worktree con `PYTHONPATH=src`. Guion
    "Corrida siguiente" en `odd/tasks/flujo-de-un-mensaje-guion.md` de esa rama. Prueba la
