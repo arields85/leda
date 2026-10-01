@@ -51,11 +51,11 @@ de `workspace_setting` (se cambia por SQL).
 | Qué | Hoy | Notas |
 |---|---|---|
 | Identidad, glosario, vocabulario y niveles (`espacio`, `glosario`, `niveles`) | Pack | Nombres visibles de cada nivel de trabajo (mecánica §1) |
-| Áreas, roles y personas (`areas`, `roles`, `personas`) | Pack | Quién aprueba a quién (`aprobado_por`) define el botón Confirmar o Enviar a aprobación |
+| Integrantes y roles: alta y baja de personas, su área, su rol, a quién aprueban y quién las aprueba, ausencias (`areas`, `roles`, `personas`) | Pack, reimportando | Pedido del usuario (2026-10-01). Quién aprueba a quién (`aprobado_por`) define el botón Confirmar o Enviar a aprobación. Una baja no puede dejar tareas sin responsable ni un área sin aprobador (validaciones de `nucleo/alta-de-equipo.md`) |
 | Política de aprobación (`aprobacion`) | Pack | Pendiente: quién aprueba una excepción cuando quien pide ya es el aprobador ("Trabajo que no entra en una tarea") |
 | Evidencia por área (`evidencia`) | Pack | Hoy se muestra con claves internas ("explicacion"): falta su nombre legible |
-| Calendario laboral, horario y feriados (`calendario`) | Pack + `python -m prisma feriados <espacio>` | CoreWork, 09:00-17:00. Fuera de horario Prisma no escribe (constitución §8): un aviso de las 18 sale a las 9 del día siguiente |
-| Cadencias, reunión periódica (`cadencia`, `reunion_periodica`) | Pack | |
+| Horario laboral del equipo, horarios distintos por persona y feriados (`calendario`) | Pack + `python -m prisma feriados <espacio>` | Pedido del usuario (2026-10-01): define cuándo salen los avisos. CoreWork, 09:00-17:00. Fuera de horario Prisma no escribe (constitución §8): un aviso de las 18 sale a las 9 del día siguiente. Horario por persona: alta de equipo, bloque 2, pregunta 6. Urgencia fuera de horario sólo por regla aprobada (mecánica §11) |
+| Cadencias: qué pide Prisma, qué días y a qué hora (estado, resumen grupal, cierre semanal, informe), y la reunión periódica a preparar (`cadencia`, `reunion_periodica`) | Pack | Pedido del usuario (2026-10-01). Una cadencia fuera del horario declarado advierte al configurarla (alta de equipo, "Advierten, pero no impiden") |
 | Límites de contacto (`limites_de_contacto`) | Pack → `workspace_setting['limites_de_contacto']` | Los avisos de coordinación quedan fuera del tope (mecánica §10) |
 | Tiempos de respuesta, urgencia, escalamiento, bloqueos (`tiempos_de_respuesta`, `urgencia`, `escalamiento`, `bloqueos`) | Pack (`bloqueos` → `workspace_setting`) | |
 | Tono y conversación (`persona`, `conversacion`) | Pack | |
