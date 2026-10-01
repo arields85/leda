@@ -62,7 +62,8 @@ DEJADAS = {
         descripcion=NOMBRES["dato_menu"]),
     "modificar": gateway.AVISO_MODIFICACION_DEJADA,
     "ninguna": gateway.AVISO_ACLARACION_DEJADA,
-    "alta_texto": gateway.AVISO_ALTA_DEJADA.format(titulo=""),
+    # El alta no se cancela al dejarla para ver otra cosa (F-C6): se guarda.
+    "alta_texto": gateway.AVISO_ALTA_PAUSADA.format(titulo=""),
 }
 
 
@@ -100,7 +101,9 @@ class _Mundo:
 
     def esta_cerrada_por_dejarla(self) -> bool:
         if self.kind == "alta_texto":
-            return _request(self.conn, self.request_id)["estado"] == "cancelled"
+            # Guardada y pausada: sigue activa y sin ninguna pregunta abierta.
+            return (_request(self.conn, self.request_id)["estado"] == "active"
+                    and _campo_del_slot(self.conn) is None)
         return _abiertas(self.conn) == 0
 
     def cerrar_por_otro_camino(self):

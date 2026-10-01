@@ -480,7 +480,7 @@ def test_dudoso_y_corrige_con_una_eleccion_abierta_preguntan_con_botones(
     assert salidas[-1]["pending_action_id"]
 
 
-def test_dejar_con_una_eleccion_abierta_cancela_el_borrador_y_atiende_el_mensaje(
+def test_dejar_con_una_eleccion_abierta_guarda_el_borrador_y_atiende_el_mensaje(
         intake_world, conn, monkeypatch):
     rid = _alta_con_eleccion(conn, intake_world)
     user = _usuario(intake_world)
@@ -495,9 +495,9 @@ def test_dejar_con_una_eleccion_abierta_cancela_el_borrador_y_atiende_el_mensaje
     assert _tocar_boton(client, conn, _token_de(conn, "Dejarlo"),
                         user).status_code == 200
 
-    assert _solicitud(conn, rid) == "cancelled"
+    assert _solicitud(conn, rid) == "active"      # guardado, no cancelado (F-C6)
     assert [f["cuerpo"] for f in _nuevas(conn, user, antes)] == [
-        gateway.AVISO_ALTA_DEJADA.format(titulo=f" «{TITULO}»"),
+        gateway.AVISO_ALTA_PAUSADA.format(titulo=f" «{TITULO}»"),
         "Un bloqueo frena una tarea."]
 
 
@@ -707,7 +707,7 @@ def test_seguir_con_el_borrador_esperando_repite_el_estado_sin_convertir(
     assert provider.main_calls == 0
 
 
-def test_dejar_con_el_borrador_esperando_lo_cancela_y_atiende_el_mensaje(
+def test_dejar_con_el_borrador_esperando_lo_guarda_y_atiende_el_mensaje(
         intake_world, conn, monkeypatch):
     rid, pid = _alta_en_confirmacion(conn, intake_world)
     user = _usuario(intake_world)
@@ -722,9 +722,9 @@ def test_dejar_con_el_borrador_esperando_lo_cancela_y_atiende_el_mensaje(
     assert _tocar_boton(client, conn, _token_de(conn, "Dejarlo"),
                         user).status_code == 200
 
-    assert _solicitud(conn, rid) == "cancelled"
+    assert _solicitud(conn, rid) == "active"      # guardado, no cancelado (F-C6)
     assert [f["cuerpo"] for f in _nuevas(conn, user, antes)] == [
-        gateway.AVISO_ALTA_DEJADA.format(titulo=f" «{TITULO}»"),
+        gateway.AVISO_ALTA_PAUSADA.format(titulo=f" «{TITULO}»"),
         "Un bloqueo frena una tarea."]
     assert provider.pending_calls[-1] is None
 

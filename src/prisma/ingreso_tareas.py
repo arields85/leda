@@ -410,7 +410,8 @@ def resolve_choice(cur: psycopg.Cursor, who: Solicitante, *, token: str,
     _cerrar_botones_de(cur, choice["choice_set_id"], choice["choice_id"])
     cur.execute(
         """update task_intake_request
-              set version = version + 1, actualizado_en = %s
+              set version = version + 1, actualizado_en = %s,
+                  terminal_result = null
             where id = %s returning *""",
         (now, request_id),
     )
@@ -826,6 +827,10 @@ def handle_active_text(cur: psycopg.Cursor, who: Solicitante, *, chat_id: int,
     request = cur.fetchone()
     if not request:
         return None
+    if (request["terminal_result"] or {}).get(PAUSADO):
+        # Un borrador pausado no es una rama abierta (F-C6): el mensaje sigue el
+        # camino normal, no se traga con un recordatorio.
+        return None
     request_id = str(request["id"])
     if request["choice_set_id"]:
         prompt = _first_choice_prompt(cur, request["choice_set_id"])
@@ -910,6 +915,8 @@ def open_free_text_slot(cur: psycopg.Cursor, who: Solicitante,
 QUESTION_FREE_TEXT = "free_text"      # un campo de texto libre
 QUESTION_CHOICE = "choice"            # una elección con botones
 QUESTION_CONFIRMATION = "confirmation"  # el borrador esperando su confirmación
+# La marca de un borrador pausado en `terminal_result` (`pause_from_intake_question`).
+PAUSADO = "pausado"
 _TITLE_OF_REQUEST = """(select f.valor from task_intake_field f
                          where f.request_id = r.id and f.campo = 'title'
                            and f.estado = 'confirmed')"""
@@ -1048,6 +1055,34 @@ def cancel_from_intake_question(cur: psycopg.Cursor, who: Solicitante, kind: str
     if not request:
         return False
     _cancel(cur, request, who, now, enqueue=False)
+    return True
+
+
+def pause_from_intake_question(cur: psycopg.Cursor, who: Solicitante, kind: str,
+                               question_id: str, now: datetime) -> bool:
+    """La persona deja el alta para ver otra cosa ("Dejarlo y ver lo otro"): el
+    borrador se GUARDA, no se cancela (F-C6: lo perdía detrás de una clasificación
+    que puede fallar). Queda activo y pausado -- sin ninguna pregunta abierta que
+    tome sus mensajes siguientes ni botones vivos --, y el próximo pedido de una
+    tarea ofrece continuarlo (`start`: "Ya hay un borrador en curso"). Sólo un
+    Cancelar explícito lo cancela. La pausa es una marca en `terminal_result` de la
+    solicitud (que un borrador activo no usa), sin cambiar el esquema; `Continuar`
+    la quita (`resolve_choice`). `False` si esa pregunta ya no estaba abierta."""
+    request = _request_of_question(cur, who, kind, question_id, lock=True)
+    if not request:
+        return False
+    request_id = str(request["id"])
+    cur.execute(
+        """update task_intake_request
+              set terminal_result = %s, version = version + 1, actualizado_en = %s
+            where id = %s""",
+        (Jsonb({PAUSADO: True}), now, request_id))
+    _invalidate_open_inputs(cur, request_id)
+    registrar_auditoria(
+        cur, accion="pausar_ingreso_tarea", workspace_id=who.workspace_id,
+        actor_app_user_id=who.app_user_id, actor_kind="persona",
+        sujeto_tipo="task_draft", sujeto_id=str(request["task_draft_id"]),
+        detalle={"request_id": request_id})
     return True
 
 

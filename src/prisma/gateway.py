@@ -192,6 +192,10 @@ AVISO_ACLARACION_DEJADA = (
 # cancela el borrador, porque el alta no sigue sin ese dato. Redacción
 # pendiente de revisión de voz en T10.
 AVISO_ALTA_DEJADA = "Listo, dejé de lado el borrador de la tarea{titulo}."
+# "Dejarlo y ver lo otro" no cancela el borrador (F-C6): lo guarda, y el próximo
+# pedido de una tarea ofrece continuarlo.
+AVISO_ALTA_PAUSADA = ("Listo, dejé guardado el borrador de la tarea{titulo}. "
+                      "Cuando quieras, lo retomamos.")
 # El borrador ya armado y esperando confirmación (T9-R1c-2): un mensaje que
 # corrige abre el selector de Modificar (T9-R1c-3), el mismo camino que su
 # botón, y el selector se nombra así ante el ruteo y la pregunta de la rama.
@@ -1625,6 +1629,10 @@ class _Pregunta:
     corrige_abre_selector: bool = False
     corrige_modifica: bool = False
     valor_esperado: ValorEsperado | None = None
+    # Lo que se dice al dejarla para ver otra cosa SIN perder el trabajo (F-C6):
+    # sólo el alta, que guarda su borrador. Las demás preguntas no tienen nada
+    # que guardar y se cierran con `dejada`.
+    pausada: str | None = None
 
 
 def _valor_esperado_de(esperado: ValorEsperado | None, cal,
@@ -1885,7 +1893,9 @@ def _pregunta_del_alta(abierta) -> _Pregunta:
         nombre=nombre, para_ruteo=_para_ruteo(descripcion, abierta.resumen),
         pregunta=abierta.resumen, dejada=dejada, corrige_responde=False,
         corrige_abre_selector=corrige_abre_selector,
-        valor_esperado=valor_esperado)
+        valor_esperado=valor_esperado,
+        pausada=AVISO_ALTA_PAUSADA.format(
+            titulo=f" «{titulo}»" if titulo else ""))
 
 
 def _atender_pregunta_pendiente(cur, quien, texto: str, abierta, proveedor, cal,
@@ -2358,20 +2368,25 @@ def _cerrar_la_rama(cur, quien, chat_id: int, abierta, ahora, *,
     return True
 
 
-def _dejar_de_lado(cur, quien, chat_id: int, abierta, ahora) -> bool:
+def _dejar_de_lado(cur, quien, chat_id: int, abierta, ahora, *,
+                   conservar: bool = False) -> bool:
     """Deja de lado la pregunta abierta: `True` si esta llamada la cerró. Una
     fila de `pending_action` se consume; una pregunta del alta cancela su
     borrador, porque sin ese dato, esa elección o esa confirmación el alta no
-    sigue. La vista previa de un cambio (T9-R1d-1b) se cancela por el mismo
+    sigue -- salvo con `conservar` (dejarla para ver otra cosa, F-C6): el
+    borrador queda guardado y pausado (`ingreso_tareas.pause_from_intake_question`)
+    y sólo un Cancelar explícito lo cancela. La vista previa de un cambio (T9-R1d-1b) se cancela por el mismo
     camino que su botón Cancelar: no se aplica nada; la elección con botones
     (T9-R1d-1c), por el mismo (queda `cancelada` y sus botones ya no valen)."""
     from . import pendientes as P
-    from .ingreso_tareas import cancel_from_intake_question
+    from .ingreso_tareas import (cancel_from_intake_question,
+                                 pause_from_intake_question)
 
     if abierta.herramienta in _TIPO_DE_ALTA:
-        return cancel_from_intake_question(
-            cur, quien, _TIPO_DE_ALTA[abierta.herramienta],
-            abierta.pregunta_id, ahora)
+        cerrar = (pause_from_intake_question if conservar
+                  else cancel_from_intake_question)
+        return cerrar(cur, quien, _TIPO_DE_ALTA[abierta.herramienta],
+                      abierta.pregunta_id, ahora)
     if abierta.herramienta in (_SENTINEL_VISTA_PREVIA, _SENTINEL_ELECCION):
         return P.cancelar_vista_previa(cur, quien, abierta.pregunta_id, ahora)
     return _cerrar_la_rama(cur, quien, chat_id, abierta, ahora, cancelada=True)
@@ -2655,14 +2670,15 @@ def _dejar_y_ver_lo_otro(cur, quien, workspace_id: str, chat_id: int, abierta,
     if route is None:
         _avisar_ruteo_caido(cur, quien, error, workspace_id, chat_id, ahora)
         return
-    if _dejar_de_lado(cur, quien, chat_id, abierta, ahora):
+    pregunta = _pregunta_de(abierta)
+    if _dejar_de_lado(cur, quien, chat_id, abierta, ahora, conservar=True):
         # La primera parte de la misma respuesta (T9-R4): el camino normal que
         # sigue encola lo suyo y `respuesta_unica.controlar`, al cerrar la
         # entrada (`_toque`, o el mensaje en `procesar_update`), agrega esta nota
         # delante, en el mismo grupo de la respuesta que conserve. La nota va
         # atada al evento de este turno (`dejar_nota`): si el turno se revierte
         # no puede salir en la respuesta de otro.
-        dejar_nota(cur, _pregunta_de(abierta).dejada)
+        dejar_nota(cur, pregunta.pausada or pregunta.dejada)
     # Lo que se acaba de dejar no se propone de nuevo en este turno: el modelo
     # lo ve en el historial y lo repetía (T9-R1d-1a-fix), o no lo ve (el alta,
     # T9-R2b): la guarda de código y el contexto salen de la misma pregunta.

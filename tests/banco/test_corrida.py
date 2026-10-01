@@ -2076,12 +2076,12 @@ def test_ejecutar_escenario_toca_dejar_despues_del_otro_tema_y_evalua_esa_respue
     assert r.bloqueado is False, r.motivo_bloqueo
     # Lo que se evalúa: lo que se dejó de lado y lo que se atendió. La pregunta
     # de la rama, que ya había salido, queda fuera.
-    assert "dejé de lado" in r.respuesta_texto
+    assert "dejé guardado" in r.respuesta_texto
     assert "Tenés una tarea abierta." in r.respuesta_texto
     assert "Estábamos con" not in r.respuesta_texto
     with admin(conn) as cur:
         cur.execute("select estado from task_intake_request")
-        assert cur.fetchone()["estado"] == "cancelled"
+        assert cur.fetchone()["estado"] == "active"
 
 
 def test_ejecutar_escenario_toca_seguir_y_evalua_la_pregunta_repetida(
