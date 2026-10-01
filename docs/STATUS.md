@@ -187,34 +187,42 @@ conversación de caso; los hallazgos se registran y se clasifican por etapa del 
      escribime y lo vemos de nuevo.": un callejón sin salida, contra "ningún mensaje deja a
      la persona sin un próximo paso".
    El rechazo con motivo queda por probar con un borrador nuevo.
-2. **Ronda siguiente del flujo (base `prisma_flujo`, variante A, rama
-   `feat/flujo-de-un-mensaje`).** Listener desde el worktree con `PYTHONPATH=src`. Guion
-   "Corrida siguiente" en `odd/tasks/flujo-de-un-mensaje-guion.md` de esa rama. Prueba la
-   etapa 6 completa (el modelo redacta el mensaje entero a partir del resultado del turno,
-   verificador sin listas de palabras, plazo propio de redacción, despacho en orden) y el
-   paquete "Prisma propone": objetivos sólo del área de quien pide, el más probable con
-   ⭐ elegido por Jev, criterio verificable propuesto, propuestas ligadas a su tarea. Más
-   los casos todavía no probados: la tarea en el primer mensaje y "4de octubre". Migración
-   `0027` ya aplicada a `prisma_flujo` (respaldo
-   `db/respaldos/prisma_flujo-antes-0027-20261001.dump`) y áreas asignadas a los objetivos.
+2. **Alta conducida por el modelo (rama `feat/flujo-de-un-mensaje`, base
+   `prisma_flujo`).** Decisión del usuario del 01/10 (enmienda del
+   [`ADR 0014`](decisions/0014-flujo-de-un-mensaje.md) "el alta conducida por el
+   modelo"): la prueba de la mañana mostró que el alta seguía trabada (formulario de un
+   campo por turno, ruteo y redacción sin ver la conversación, "Dejarlo" borraba el
+   trabajo). Ya está en la rama: historial a los modelos, "Dejarlo" pausa, modelo puro
+   sin plazo ni plantillas (`MODELO_PURO`), M1 (contrato del turno,
+   `src/prisma/alta_turno.py`) y M2 (llamada `conducir_alta` en los proveedores). **M3**
+   (el alta conducida de punta a punta, interruptor `workspace_setting` `alta =
+   conversada`) estaba en construcción al cerrar la sesión: ver el estado real en
+   `git log` de la rama y en `odd/tasks/flujo-de-un-mensaje.md`. Después: revisión RDD,
+   activar el interruptor en `prisma_flujo` y probar con el guion "Corrida conversada"
+   del guion de la rama (o escribirlo si M3 no llegó a dejarlo).
 3. **Medir y decidir.** Latencia por respuesta contra la línea base (8,7 s de mediana en
-   textos; toques 0,9 s en B, 7,8 s en la primera A), redacciones aceptadas y rechazadas
-   (`python -m prisma redaccion corework`), incidentes. Si se cumple, enmienda del ADR
-   0014 y extender el flujo a entrega y aprobación (corte 2). Queda abierta la decisión
-   del usuario F-B9 (¿corregir errores de tipeo obvios en los textos?).
+   textos), turnos por tarea, lo que entiende mal, incidentes. Si cumple: retirar el
+   formulario viejo del alta (M4-M9) y extender el patrón a entrega y aprobación.
+4. **Hallazgos del circuito C (código de `main`):** C-1 a C-3 (arriba) y repetir el
+   rechazo con motivo con un borrador nuevo.
+
+Lectura de las pruebas: `python tools/leer_conversacion.py [minutos] [desde HH:MM]`
+(con `PYTHONPATH=src` desde el worktree para `prisma_flujo`) muestra la conversación con
+los botones ofrecidos y la etiqueta de cada toque; no sacar conclusiones sin los botones.
 
 **Funcionalidad nueva congelada** hasta que alta, entrega y aprobación cumplan en una
 prueba real los criterios del ADR 0014. Alcance en [`ROADMAP.md`](ROADMAP.md), "Orden de
 entrega". Después, según el roadmap: aportes sobre tareas, aprendizaje de apodos y
 aclaraciones, conversación de bloqueos.
 
-**Punto exacto para retomar.** `main` sin push, con la documentación condensada en
-`7c2531b` (historia en `historial/`; ese tramo no se pudo revisar con RDD porque las
-copias exceden el contexto del revisor: verificado por hash y revisión independiente) y
-las enmiendas del ADR 0014 (`cabb55b`, `6f3c60a`) y la constitución (`7f54f93`). El código
-del flujo vive en la rama `feat/flujo-de-un-mensaje` (worktree `flujo-de-un-mensaje`),
-revisado con RDD commit por commit; su estado y evidencia, en
-`odd/tasks/flujo-de-un-mensaje.md` y el guion de esa rama. Continuar por el punto 1 (el
-01/10 a las 09:00) y después el 2. Consentimiento permanente del usuario para commits y revisiones RDD; parar
-sólo por decisiones sobre cómo funciona Prisma. Antes de cada unidad, el chequeo de rumbo
-escrito de `AGENTS.md` ("Cómo pensamos juntos").
+**Punto exacto para retomar (cierre de sesión 2026-10-01, ~10:45).** `main` sin push
+(sólo documentación y `tools/leer_conversacion.py` desde la ronda 4; el código de `main`
+sigue siendo el de la ronda 4). La rama `feat/flujo-de-un-mensaje` lleva todo el
+experimento, revisado con RDD hasta `b7ed862` (`review-497ccb005edb819a`); M1 y M2
+(`16fa0ff`, `03263de`) y lo que haya dejado M3 quedan por revisar. Base `prisma_flujo`:
+migraciones `0026` y `0027` aplicadas (respaldos en `db/respaldos/`), áreas asignadas a
+los objetivos, variante A, `alta = conversada` todavía sin activar. Base `prisma`: la de
+la ronda 4, sin migraciones nuevas. Listeners detenidos. Lista de tareas de la sesión:
+historial OK, M1 OK, M2 OK, M3 en curso, después revisión, prueba conversada, M4-M9,
+hallazgos del circuito C. Consentimiento permanente para commits y revisiones RDD;
+chequeo de rumbo escrito antes de cada unidad (`AGENTS.md`).
