@@ -574,7 +574,8 @@ def consume_pending_text(cur: psycopg.Cursor, who: Solicitante, *, chat_id: int,
                       actualizado_en = %s
                 where request_id = %s and campo = 'acceptance_criterion'""",
             (Jsonb(propuesta), source_inbound_id, source_raw_text, now, request_id))
-        return _advance(cur, request, who, now, rechazo=RECHAZO_CRITERIO)
+        return _advance(cur, request, who, now, rechazo=RECHAZO_CRITERIO,
+                        campo_del_rechazo="acceptance_criterion")
     avisos = ""
     if field == "title" and propuestas is not None:
         avisos = _rehacer_propuestas(cur, request_id, propuestas, source_inbound_id,
@@ -1624,11 +1625,13 @@ def _configuration_error(cur, request, who, field, now):
 
 
 def _advance(cur, request, who, now, *, prefijo: str = "",
-             rechazo: Rechazo | None = None) -> IntakeOutcome:
+             rechazo: Rechazo | None = None,
+             campo_del_rechazo: str | None = None) -> IntakeOutcome:
     """Sigue con el próximo dato que falta, en el orden de `FIELDS`. `prefijo`
     (lo que se dice antes de la pregunta, en el mismo mensaje) sólo va delante
     de la primera pregunta que se abre. `rechazo`, si viene, es por qué lo que la
-    persona dijo no sirvió y se le propone un valor: va delante de la propuesta."""
+    persona dijo no sirvió y se le propone un valor: va delante de la propuesta de
+    `campo_del_rechazo` y de ninguna otra (el aviso es de ese dato)."""
     request_id = str(request["id"])
     cur.execute(
         """select campo, estado, valor from task_intake_field
@@ -1665,14 +1668,15 @@ def _advance(cur, request, who, now, *, prefijo: str = "",
             if row["estado"] == "proposed":
                 prompt = _proposal_prompt(field, row["valor"])
                 pregunta = None
-                if rechazo is not None:
+                del_campo = rechazo if field == campo_del_rechazo else None
+                if del_campo is not None:
                     pregunta = prompt
-                    prompt = f"{rechazo.razon} {rechazo.se_acepta}\n\n{prompt}"
+                    prompt = f"{del_campo.razon} {del_campo.se_acepta}\n\n{prompt}"
                 return _open_choices(
                     cur, request, field, prompt,
                     [(CONFIRM, "confirm", None), (REJECT, "reject", None),
                      (OTHER, "other", None)], now, prefijo=prefijo,
-                    pregunta=pregunta, rechazo=rechazo,
+                    pregunta=pregunta, rechazo=del_campo,
                     propuesto=_mostrar_valor(field, row["valor"]),
                 )
             return _open_free_text(cur, request, field, _free_text_prompt(field),

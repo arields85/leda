@@ -243,6 +243,86 @@ def test_si_el_modelo_no_puede_juzgar_lo_confirmado_se_toma_tal_cual(proveedor):
     assert error is None and route.valor == {"texto": NO_SE}
 
 
+def _confirmar(ruta):
+    return gateway._ruta_de_lo_confirmado(
+        _Proveedor(ruta), NO_SE, _abierta_del_criterio(), _cal_hoy(), NOW)
+
+
+@pytest.mark.parametrize("accion", [IntentAction.START_TASK_INTAKE,
+                                    IntentAction.GREETING])
+def test_otra_accion_del_modelo_no_descarta_lo_que_la_persona_confirmo(accion):
+    """El criterio confirmado con el botón es el valor: una ruta del modelo con
+    otra acción no lo reemplaza ni lo hace desaparecer."""
+    route, error = _confirmar(IntentRoute(
+        accion, respecto_pendiente=RespectoPendiente.RESPONDE,
+        valor=_no_verificable()))
+    assert error is None
+    assert route.action is IntentAction.NORMAL_CONVERSATION
+    assert route.respecto_pendiente is RespectoPendiente.RESPONDE
+    assert route.valor == {"texto": NO_SE}
+
+
+@pytest.mark.parametrize("respecto", [RespectoPendiente.CANCELA,
+                                      RespectoPendiente.OTRO_TEMA,
+                                      RespectoPendiente.CHARLA,
+                                      RespectoPendiente.DUDOSO, None])
+def test_si_el_modelo_dice_que_no_responde_se_toma_lo_confirmado_tal_cual(respecto):
+    route, error = _confirmar(IntentRoute(
+        IntentAction.NORMAL_CONVERSATION, respecto_pendiente=respecto,
+        valor=_no_verificable()))
+    assert error is None and route.respecto_pendiente is RespectoPendiente.RESPONDE
+    assert route.valor == {"texto": NO_SE}
+
+
+@pytest.mark.parametrize("reescrito", [
+    "otra cosa que escribió el modelo", "  " + NO_SE + " (ampliado)", "no lo sé"])
+def test_el_modelo_no_reescribe_el_texto_confirmado(reescrito):
+    """Del juicio del modelo sólo se toma el veredicto; el texto es el que la
+    persona confirmó."""
+    route, _ = _confirmar(IntentRoute(
+        IntentAction.NORMAL_CONVERSATION,
+        respecto_pendiente=RespectoPendiente.RESPONDE,
+        valor=_no_verificable(texto=reescrito)))
+    assert route.valor["texto"] == NO_SE
+    assert route.valor["verificable"] == "no" and route.valor["propuesta"] == PROPUESTA
+
+
+@pytest.mark.parametrize("valor", [
+    {"falta": "sin_valor"}, {"falta": "sin_valor", "verificable": "no"}, {}])
+def test_un_valor_del_modelo_sin_texto_no_cambia_lo_confirmado(valor):
+    route, error = _confirmar(IntentRoute(
+        IntentAction.NORMAL_CONVERSATION,
+        respecto_pendiente=RespectoPendiente.RESPONDE, valor=valor))
+    assert error is None and route.valor == {"texto": NO_SE}
+
+
+# ------------------------ el rechazo del criterio va al campo del criterio
+
+def test_el_rechazo_del_criterio_no_va_delante_de_la_propuesta_de_otro_campo(
+        intake_world, conn):
+    ws = intake_world["north-lab"]["id"]
+    with espacio(conn, ws) as cur:
+        actor, rid, _ = _en_el_criterio(cur, intake_world)
+        # Otro dato todavía propuesto, antes del criterio en el orden del alta.
+        cur.execute("""update task_intake_field
+                          set estado = 'proposed', proposed_by = 'model'
+                        where request_id = %s and campo = 'due_date'""", (rid,))
+        resultado = _decir(cur, actor, ws, _no_verificable())
+        assert _conjunto_activo(cur, rid) == "due_date"    # la propuesta de la fecha
+    assert I.RECHAZO_CRITERIO.razon not in resultado.text
+    assert I.RECHAZO_CRITERIO.se_acepta not in resultado.text
+
+
+def test_el_rechazo_del_criterio_sigue_yendo_delante_de_su_propia_propuesta(
+        intake_world, conn):
+    ws = intake_world["north-lab"]["id"]
+    with espacio(conn, ws) as cur:
+        actor, rid, _ = _en_el_criterio(cur, intake_world)
+        resultado = _decir(cur, actor, ws, _no_verificable())
+        assert _conjunto_activo(cur, rid) == "acceptance_criterion"
+    assert resultado.text.startswith(I.RECHAZO_CRITERIO.razon)
+
+
 # ------------------------------------------------------- con la variante A
 
 class _ModeloEco(_Eco):

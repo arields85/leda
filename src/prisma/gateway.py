@@ -2114,12 +2114,23 @@ def _ruta_de_lo_confirmado(proveedor, texto: str, abierta, cal, ahora):
     pregunta = _pregunta_de(abierta)
     esperado = _valor_esperado_de(pregunta.valor_esperado, cal, ahora)
     if esperado is not None and esperado.juzga_verificable:
-        # F-B7: lo confirmado igual se juzga (concreto y verificable). Si el modelo
-        # no puede, sale tal cual: la persona ya confirmó que es su respuesta.
+        # F-B7: lo confirmado igual se juzga (concreto y verificable), pero del
+        # juicio sólo se toma el veredicto, y sólo si el modelo dice que el mensaje
+        # responde a la pregunta: el texto es el que la persona confirmó, nunca uno
+        # reescrito, y otra acción u otro comando no lo descartan. Si el modelo no
+        # puede, sale tal cual: la persona ya confirmó que es su respuesta.
         route, _ = _rutear(proveedor, texto, pendiente=pregunta.para_ruteo,
                            valor_esperado=replace(esperado, confirmado=True))
-        if route is not None and route.valor.get("texto"):
-            return route, None
+        if (route is not None
+                and route.action is IntentAction.NORMAL_CONVERSATION
+                and route.respecto_pendiente is RespectoPendiente.RESPONDE):
+            veredicto = {c: route.valor[c] for c in ("verificable", "propuesta")
+                         if route.valor.get(c)}
+            if veredicto and route.valor.get("texto"):
+                return IntentRoute(
+                    IntentAction.NORMAL_CONVERSATION,
+                    respecto_pendiente=RespectoPendiente.RESPONDE,
+                    valor={"texto": texto, **veredicto}), None
     if esperado is not None and esperado.tipo in (TipoValor.TEXTO,
                                                    TipoValor.ENTIDAD):
         return IntentRoute(IntentAction.NORMAL_CONVERSATION,
