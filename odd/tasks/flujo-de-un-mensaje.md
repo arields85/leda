@@ -96,7 +96,7 @@ Corte 1, para la primera prueba real (alta guiada con A y B):
   no triviales).
 - [x] **F2.** M1 en el ruteo (`3ff59af`, doble de prueba corregido en `f6e6c19`) (`llm.py`: esquema, validación, proveedor simulado con valor
   guionable, instrucciones por tipo) y `valores.py`. Ruta: delegada.
-- [ ] **F3.** Alta guiada con el flujo: título primero y objetivo después (el más probable
+- [x] **F3.** (`08f6281`, `74e2918`) Alta guiada con el flujo: título primero y objetivo después (el más probable
   primero), valores por M1, dato con una sola opción completado solo, textos por
   `redaccion`. Retira `_parse_absolute_date` de la ruta del usuario. Ruta: delegada.
 - [ ] **F6a.** Variante A para el alta guiada: `redactar` del proveedor, verificador y
@@ -182,6 +182,61 @@ PR planificado: la integración a `main` la decide el usuario después del exper
   esa prueba lee `src/` como texto; vuelta a correr en limpio, junto con `test_task_intake.py`:
   97 passed. La línea base de `main` (2279) más las pruebas nuevas de F1 y F2 da lo observado.
 
+- 2026-09-30, F3 (ruta: delegada, 2+ archivos no triviales; dos commits).
+  **F3a `08f6281`** orden y valores: el alta empieza por "¿Qué hay que hacer?" y sigue con el
+  objetivo; un título que trae el mensaje se toma (`proposed` -> `confirmed`, sin repreguntar).
+  Los valores salen de `route.valor` y los valida `valores.validar_valor`
+  (`consume_pending_text(valor=)`, `resolve_typed_choice(valor=)`): una fecha dicha de cualquier
+  forma, una opción por su id ("1", "2", ...), "ninguna" (+ `texto`) para algo que no se ofreció.
+  Un valor que no sirve deja la misma pregunta abierta y dice la razón (`Rechazo` en
+  `ResultadoTurno`, sin incidente); uno que falta (`SIN_VALOR`) deja la pregunta abierta, registra
+  un incidente (`ETAPA_VALOR_SIN_INTERPRETAR`) y antepone el aviso neutro. La fecha que propone el
+  ruteo al empezar se valida y, si no sirve, se dice en el primer mensaje
+  (`_store_proposals`); el esquema le pide sólo una fecha completa en `AAAA-MM-DD`, sin el día
+  de hoy no resuelve relativas (se preguntan después, cuando el código sí tiene el día).
+  **F3b `74e2918`** un dato con una sola opción (`_unica_opcion`) se completa solo; "Otra opción"
+  sólo si hay otra (`_hay_otra_opcion`); el selector de Modificar no ofrece un dato sin otra
+  opción; preguntas y resumen salen por `redaccion` con la variante del espacio
+  (`variante_redaccion`), `ResultadoTurno.rechazo` y `.resumen` nuevos, `render_preview` sin
+  "Sin descripción", sin "(hasta N)", con el cierre del botón de cada quien
+  (`CIERRE_CONFIRMAR`, `cierre_enviar`).
+  RED observado: `test_alta_guiada_flujo.py` contra el código anterior: 27 failed, 1 passed;
+  `test_redaccion.py` falló al colectar (`ImportError: Rechazo`); `test_alta_guiada_texto.py`
+  contra F3a: 11 failed, 3 passed. GREEN y verificación (desde el worktree, runner del
+  checkout principal): `pytest -q tests/test_alta_guiada_flujo.py tests/test_redaccion.py` -> 80
+  passed (F3a); `pytest -q tests/test_alta_guiada_texto.py tests/test_alta_guiada_flujo.py` -> 42
+  passed; suite completa al cierre: `pytest -q` -> 2573 passed, 333 deselected, 0 failed.
+  Cobertura de hallazgos: R4c-H4 `test_sin_la_tarea_en_el_mensaje_pregunta_primero...`,
+  `test_una_eleccion_escrita_se_resuelve_por_el_id...`; R4c-H5
+  `test_pedir_otra_tarea_a_mitad_del_alta_no_reinicia_ni_entra_en_bucle` (ya pasaba con el
+  mecanismo de la regla 1: se agregó como prueba, no hubo RED); R4c-H6
+  `test_una_fecha_dicha_de_cualquier_forma...` ("4de octubre", "04 / 10" guionados como
+  `fecha_iso`), `test_una_fecha_que_no_sirve...`; R4c-H7 `test_ninguna_pregunta_del_alta_lleva_
+  limites...`; R4c-H8 `test_el_resumen_nombra_los_tipos_de_evidencia...`; R4c-H9
+  `test_el_resumen_de_quien_pide_dice_lo_que_hace_su_boton...`,
+  `test_el_resumen_no_dice_sin_descripcion...`; R4c-H10 `test_el_area_con_una_sola_opcion...`,
+  `test_un_objetivo_unico...`, `test_quien_solo_puede_asignarse_a_si_mismo...`,
+  `test_otra_opcion_solo_aparece_si_hay_otra...`.
+  Retirado: `_parse_absolute_date`, `_next_occurrence`, `resolve_date`, `AmbiguousDate`,
+  `_MONTHS`, la comparación de etiquetas de `resolve_typed_choice` (`_match_key`,
+  `_option_keys`) y el parámetro `buttons_first`. Pruebas viejas que fijaban el orden o los
+  textos se actualizaron (título sin confirmar, área que no se elige, "Otra opción" ausente con
+  todas las opciones en pantalla, respuestas escritas con `valor` guionado) y las de
+  `resolve_date` se reemplazaron por las de M1.
+  **No migrado todavía:** (1) un valor escrito que no es una de las opciones se busca con
+  `_entity_candidates` / `_resolve_user_entity` (consulta a la base por nombre): es la etapa 3
+  del ADR 0014 y pasa a Jev después; (2) el objetivo más probable primero con la estrella: Jev
+  no está conectado al alta (hace falta un cliente en `ingreso_tareas`, paginar todos los
+  objetivos y no sólo la página, un ícono nuevo en `salida`, un incidente por falta de
+  credencial en cada pregunta, y las pruebas con incidentes contados lo sentirían): más que el
+  adaptador de ≤ 80 líneas que se autorizó, así que queda el orden actual (por título) y se
+  informa como brecha; (3) los nombres legibles de la evidencia: el pack no tiene etiquetas por
+  tipo, `redaccion.nombre_legible` sólo separa palabras ("resultado de prueba",
+  "explicacion" sin tilde); (4) `pendientes.opcion_escrita` (elecciones de otras ramas) sigue
+  comparando etiquetas: es F4/F5, no el alta.
+  Decisiones de implementación a revisar: el selector de Modificar deja de ofrecer un dato sin
+  otra opción (hoy, siempre "Área"); el título propuesto se toma sin confirmar.
+
 ## Próximo paso
 
-F3.
+F6a (variante A del alta) y la prueba real F7/F8a.
