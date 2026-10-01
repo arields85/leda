@@ -113,7 +113,7 @@ Observaciones (no son fallas del mecanismo):
 | # | Resultado | Nota |
 |---|---|---|
 | 9 | Mejoró | Resumen sin "Sin descripción"; el cierre coincide con el botón. |
-| 10 | Mixto | "necesito crear una tarea: calibrar los sensores de la linea 2" como respuesta a "¿Qué hay que hacer?" → pasó al objetivo. Pero el responsable se preguntó como "Opciones que coinciden con «Nahuel»" (Para mí / Nahuel Gimenez) y Marcos eligió "Para mí": el "para Nahuel" venía del mensaje dejado de lado ("ah, y necesito otra tarea para Nahuel"), no de esta tarea (ver F-B8). Corregido el 2026-10-01: la primera lectura, sin los botones, lo había contado como acierto. |
+| 10 | No probado | El mensaje llegó como respuesta a un "¿Qué hay que hacer?" que Prisma ya había preguntado (al atender el mensaje dejado de lado), así que no probó el salto de esa pregunta. El título sí quedó bien extraído ("calibrar los sensores de la linea 2", sin "necesito crear una tarea:"). El responsable salió contaminado por el mensaje dejado de lado (F-B8). Observación del usuario: el objetivo se pregunta siempre igual, sin importar el título (hueco ⭐, ver F-B10). Repetir en la corrida A como primer mensaje. |
 | 11 | Mejoró | Ariel: área y responsable completados solos (una sola opción), "manana" → 01/10/2026, resumen y "Enviar a aprobación" a Ismael. El guion esperaba "Confirmar": era un error del guion; quien crea una tarea para sí necesita la aprobación de su aprobador (Marcos creando para Nahuel sí confirmó directo). |
 
 Observaciones:
@@ -138,3 +138,9 @@ textos n=34, mediana 8,7 s, p90 13,7 s, ninguno ≤ 5 s; toques n=23, mediana 0,
 ronda 4 (base `prisma`, 2026-09-30) la mediana de textos fue la misma, 8,7 s (p90 18,6 s,
 ninguno ≤ 5 s). B no agregó latencia, pero el criterio "mediana ≤ 5 s" del ADR 0014 no se
 cumplía tampoco antes: se fijó sin línea base.
+
+- **F-B10 (usuario, 2026-10-01; etapa 3).** El título no influye en el objetivo: siempre
+  aparece la misma lista, en el mismo orden, diga lo que diga la tarea. Es el hueco del
+  objetivo más probable primero (⭐, decisión del usuario para R4c-H4), y con el principio
+  constitucional "ayuda y facilita" pasa a ser el hueco más visible del alta: con un título
+  claro, Prisma tendría que proponer el objetivo (Jev elige entre los candidatos de la base).
