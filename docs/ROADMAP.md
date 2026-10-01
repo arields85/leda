@@ -347,6 +347,19 @@ sin aprobación (`src/prisma/herramientas.py`, `_crear_objetivo`).
 margen o en un objetivo propuesto que la autoridad aprueba; ningún objetivo queda
 `activo` sin esa aprobación.
 
+### Respuesta que se va escribiendo
+
+**Entrega:** en chat privado, la respuesta de Prisma aparece de a poco, como si la fuera
+escribiendo, en vez de llegar de golpe (pedido del usuario del 2026-10-01, anotado bajo el
+congelamiento). La base existe: el borrador nativo de Telegram (`sendMessageDraft`) que ya
+usa el indicador de actividad del ADR 0011. Decisión pendiente antes de construir: hoy el
+texto se verifica antes de salir (no inventa fechas, nombres ni botones, constitución §4);
+mostrarlo mientras el modelo escribe enseña texto sin verificar. Mostrarlo progresivo
+después de verificar es seguro pero no adelanta la respuesta.
+
+**Depende de:** el congelamiento levantado y la unidad de latencia (decisión del usuario:
+primero fluidez, después latencia).
+
 ## Horizonte posterior
 
 No se abordan hasta que las unidades anteriores estén cerradas, y cada uno requiere
