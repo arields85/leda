@@ -16,6 +16,7 @@ from .autoridad import Denegado, Solicitante
 from .db import entrante_atado, registrar_auditoria
 from .incidentes import (ETAPA_CONFIGURACION_ALTA, ETAPA_CRITERIO_SIN_PROPUESTA,
                          ETAPA_OBJETIVO_SIN_ORDENAR, ETAPA_REDACCION_RECHAZADA,
+                         ETAPA_RESUMEN_SIN_CIERRE,
                          ETAPA_RESUMEN_VIGENTE_SIN_FILA, ETAPA_VALOR_SIN_INTERPRETAR, NOTICIA_NEUTRA_INCIDENTE,
                          REFERENCIA_INBOUND_MESSAGE, REFERENCIA_PENDING_ACTION,
                          registrar_incidente)
@@ -2477,8 +2478,21 @@ def render_resumen(*, title, description="", objective, area, responsible, due_d
         "Resumen para revisar", tuple(lineas), cierre))
     if cur is None:
         return redactar_partes(resultado, variante)
-    return redactar_turno(cur, workspace_id, resultado, variante,
-                          historial=historial)
+    texto = redactar_turno(cur, workspace_id, resultado, variante,
+                           historial=historial)
+    if texto.cierre != cierre or not texto.texto.endswith(cierre):
+        # El cierre es del código y nunca falta (F-C5): quien confirma tiene el
+        # botón y necesita el texto que dice qué hace. Si algún camino de la
+        # redacción lo perdió, se vuelve a poner y queda registrado.
+        registrar_incidente(
+            cur, workspace_id,
+            "Un resumen para revisar salió de la redacción sin su cierre: se volvió "
+            "a poner.", severidad="media", etapa=ETAPA_RESUMEN_SIN_CIERRE)
+        cuerpo = texto.cuerpo.rstrip()
+        if cuerpo.endswith(cierre):
+            cuerpo = cuerpo[:-len(cierre)].rstrip()
+        texto = TextoRedactado(cuerpo, cierre, texto.fallida)
+    return texto
 
 
 def render_preview(**datos) -> str:

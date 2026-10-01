@@ -111,6 +111,7 @@ ETAPA_VALOR_SIN_INTERPRETAR = "valor_sin_interpretar"
 # reemplaza; el incidente es el registro, no una falla de la persona.
 ETAPA_REDACCION_RECHAZADA = "redaccion_rechazada"
 ETAPA_REDACCION_FALLIDA = "redaccion_fallida"
+ETAPA_RESUMEN_SIN_CIERRE = "resumen_sin_cierre"
 # ADR 0013 regla 1 (F-B5): la respuesta breve de una `charla` con pregunta
 # pendiente no se pudo redactar (el modelo falló o su texto no sirvió): sale sólo
 # la pregunta.
@@ -372,6 +373,14 @@ EXPLICACION_POR_ETAPA: dict[str, ExplicacionDeEtapa] = {
                  "persona tiene que ver para decidir salieron igual."),
         que_hacer=(f"{_BUSCAR_DETALLE} y mirá los motivos de los dos intentos. "
                    "{nombre} puede volver a escribir.")),
+    ETAPA_RESUMEN_SIN_CIERRE: ExplicacionDeEtapa(
+        que_paso=("El resumen de un borrador de tarea de {nombre} salió de la "
+                  "redacción sin el cierre que nombra el botón (el cierre es del "
+                  "código y nunca falta): un defecto de la redacción."),
+        que_vio=("Nada raro: el resumen salió con su cierre, que se volvió a "
+                 "poner antes de enviarlo."),
+        que_hacer=(f"{_BUSCAR_DETALLE} y mirá qué camino de la redacción devolvió "
+                   "el resumen sin cierre. No hace falta que {nombre} haga nada.")),
     ETAPA_CHARLA_SIN_RESPUESTA: ExplicacionDeEtapa(
         que_paso=("{nombre} escribió una charla (un saludo, un agradecimiento) "
                   "con una pregunta pendiente y el modelo no pudo redactar la "
