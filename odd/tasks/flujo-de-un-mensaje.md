@@ -1551,3 +1551,8 @@ Diseño B elegido por el usuario. Ruta declarada: un solo escritor (encargo expl
   y el esquema lo completa al convertir; la trazabilidad dejó de ser una promesa.
   Quedan las SUGGESTION (imports locales, comentario de la etapa, conteo del RED, probar
   que si falla el primer aviso el segundo sale).
+- Verificado en real (18:47-18:49): con el borrador pausado, "¿qué tarea dejaste guardada?"
+  respondió el borrador con Continuar / Cancelar / Empezar otro en un solo mensaje, sin
+  aclaración equivocada; Cancelar lo canceló. Pendiente (b) cerrado en real.
+- Pendiente (i), visual: en ese menú "Continuar borrador" y "Empezar otro" salen sin ícono
+  (Cancelar sí lo tiene).
