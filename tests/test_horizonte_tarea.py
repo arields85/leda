@@ -68,7 +68,8 @@ def test_el_ajuste_dice_cuantos_meses_y_sin_el_son_dos(
 
 @pytest.mark.parametrize("valor", [
     {"meses": 0}, {"meses": -1}, {"meses": "dos"}, {"meses": 2.5},
-    {"meses": True}, {"meses": None}, {}, "dos", 7, [2]])
+    {"meses": True}, {"meses": None}, {}, "dos", 7, [2],
+    {"meses": 121}, {"meses": 100000}])
 def test_un_valor_invalido_usa_dos_meses_y_deja_un_incidente(
         valor, intake_world, conn):
     ws = intake_world["north-lab"]["id"]
@@ -114,8 +115,9 @@ def test_un_pack_sin_horizonte_no_siembra_nada(conn, tmp_path):
     assert _guardado(conn, r.workspace_id) is None
 
 
-def test_un_pack_con_un_horizonte_invalido_advierte(conn, tmp_path):
-    r = _importar(conn, tmp_path, horizonte_tarea={"meses": "dos"})
+@pytest.mark.parametrize("meses", ["dos", 0, 100000])
+def test_un_pack_con_un_horizonte_invalido_advierte(meses, conn, tmp_path):
+    r = _importar(conn, tmp_path, horizonte_tarea={"meses": meses})
     assert any("horizonte_tarea" in a for a in r.advertencias)
 
 

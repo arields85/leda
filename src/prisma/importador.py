@@ -24,6 +24,7 @@ import psycopg
 import yaml
 
 from .db import admin, registrar_auditoria
+from .ingreso_tareas import HORIZONTE_MAXIMO
 
 
 class PackInvalido(Exception):
@@ -107,11 +108,11 @@ def validar(pack: dict[str, Any]) -> tuple[list[str], list[str]]:
     if horizonte is not None:
         meses = horizonte.get("meses") if isinstance(horizonte, dict) else None
         if not (isinstance(meses, int) and not isinstance(meses, bool)
-                and meses >= 1):
+                and 1 <= meses <= HORIZONTE_MAXIMO):
             advertencias.append(
                 f"horizonte_tarea vale {horizonte!r}: tiene que ser "
-                "`meses: N` con N entero de 1 o más. Sin un valor válido Prisma "
-                "usa 2 meses y lo registra.")
+                f"`meses: N` con N entero de 1 a {HORIZONTE_MAXIMO}. Sin un valor "
+                "válido Prisma usa 2 meses y lo registra.")
 
     # Cada frente del objetivo inicial pertenece a un área que el pack declara: sin
     # eso el objetivo quedaría sin área y el alta lo trataría como estratégico.

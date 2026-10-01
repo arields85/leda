@@ -319,6 +319,9 @@ def _criterio_a_proponer(cur, request_id, who, valor, dicho, inbound_id):
 
 CLAVE_HORIZONTE = "horizonte_tarea"
 HORIZONTE_POR_OMISION = 2
+# El mayor margen que se acepta: más allá es un error de tipeo (y un número enorme
+# rompería el cálculo de la fecha límite).
+HORIZONTE_MAXIMO = 120
 # (espacio, valor) del ajuste ya registrado como inválido por este proceso.
 _anomalias_horizonte: set[tuple[str, str]] = set()
 
@@ -341,7 +344,8 @@ def meses_de_horizonte(cur, workspace_id: str) -> int:
         except ValueError:
             pass
     meses = valor.get("meses") if isinstance(valor, dict) else None
-    if isinstance(meses, int) and not isinstance(meses, bool) and meses >= 1:
+    if (isinstance(meses, int) and not isinstance(meses, bool)
+            and 1 <= meses <= HORIZONTE_MAXIMO):
         return meses
     huella = (workspace_id, json.dumps(valor, sort_keys=True, default=str))
     if huella not in _anomalias_horizonte:

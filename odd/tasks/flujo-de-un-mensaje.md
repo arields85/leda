@@ -1349,3 +1349,20 @@ Tramo `f60c3ca..51fa9e6` (`81bb60a`, `9d1bee2`, `20cd9c8`, `51fa9e6`; 994 línea
   257 passed. Tanda enfocada completa más todo archivo que toca `validar_valor`, `TipoValor.FECHA`,
   importador o fechas objetivo: 1672 passed (9 min), sin fallas; antes de mover fechas fijas de pruebas existentes habia 25 failed, 1647 passed.
 
+
+### Revisión del margen y hallazgos de la prueba siguiente (2026-10-01)
+
+- RDD `324670a..13c7ae5`, linaje `review-bf6f7c2a3a43c18c`: aprobada y reconocida. Su
+  WARNING (un margen enorme, `meses: 100000`, rompía el cálculo del límite en cada pregunta
+  de fecha en vez de usar 2 meses con incidente) se corrigió: tope `HORIZONTE_MAXIMO = 120`
+  en el lector y en el importador. RED 3 failed (valores 121 y 100000, y el importador),
+  GREEN `tests/test_horizonte_tarea.py tests/test_valores_margen.py`: 45 passed. Quedan las
+  dos SUGGESTION (la marca de anomalía antes de confirmar la transacción; una aserción que
+  no puede fallar en `test_sin_margen_los_hechos_no_ponen_limite_superior`).
+- Prueba real 16:02-16:05: fecha, criterio, "Enviar a aprobación" nombrado bien, e Ismael
+  recibió sólo el resumen (sin la frase del turno de Marcos) y confirmó. Todo al primer
+  intento.
+- Hallazgos nuevos, del circuito de aprobación que comparten las dos altas (pendientes):
+  (c) cuando quien confirma aprueba el borrador, a quien lo pidió no le llega ningún aviso:
+  no sabe que su tarea existe (mecánica §10, avisos de coordinación; el rechazo sí avisa);
+  (d) el pedido de aprobación no dice quién lo manda: arranca en "Resumen para revisar".
