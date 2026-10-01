@@ -351,18 +351,38 @@ def _conducir(cur, who, request, evento: dict, now: datetime,
             return _responder(cur, who, request, salida, h, aplicacion, evento,
                               now)
         _auditar(cur, workspace_id, intento, "rechazada", "; ".join(problemas),
-                 inicio)
+                 inicio,
+                 forma=None if isinstance(salida, str)
+                 else _forma_de(salida, h, aplicacion))
         motivos.append("; ".join(problemas))
         rechazos = tuple(problemas)
     return _fallar(cur, who, request, evento, now, motivos)
 
 
+def _forma_de(salida: T.SalidaTurno, h: T.HechosTurno,
+              aplicacion: T.Aplicacion) -> dict:
+    """La forma de una salida del modelo, sin ningún texto libre (ni del modelo ni de
+    la persona: la auditoría es inmutable y una conversación no va ahí). Sirve para
+    diagnosticar por qué se rechazó un intento: qué pidió, qué dio y qué seguía
+    faltando."""
+    return {
+        "intencion": salida.intencion, "pregunta": list(salida.pregunta),
+        "botones": salida.botones, "valores": sorted(salida.valores),
+        "corrige": list(salida.corrige),
+        "texto_tiene_pregunta": T._hay_pregunta(salida.texto),
+        "texto_largo": len(salida.texto),
+        "faltan_tras": list(aplicacion.faltan_tras(h)),
+    }
+
+
 def _auditar(cur, workspace_id: str, intento: int, resultado: str,
-             motivo: str | None, inicio: float) -> None:
+             motivo: str | None, inicio: float, forma: dict | None = None) -> None:
     detalle = {"resultado": resultado, "intento": intento,
                "duracion_ms": round((time.perf_counter() - inicio) * 1000)}
     if motivo:
         detalle["motivo"] = motivo[:300]
+    if forma:
+        detalle["salida"] = forma
     registrar_auditoria(cur, accion=ACCION_TURNO, workspace_id=workspace_id,
                         actor_kind="prisma", detalle=detalle)
 
@@ -437,7 +457,11 @@ def _opciones(cur, request, who, campo: str, filas: dict
             f"{prefijo}{n}", etiqueta, guardado,
             sugerido=clara and n == 1,
             es_quien_escribe=(campo == "responsible"
-                              and ident == str(who.membership_id))))
+                              and ident == str(who.membership_id)),
+            # El botón que mostrará el resumen si esta persona es la responsable: lo
+            # decide el código (`ingreso_tareas.boton_final_de`), el modelo lo lee.
+            boton_final=(I.boton_final_de(cur, ident, request["membership_id"])
+                         if campo == "responsible" else None)))
     return tuple(opciones)
 
 

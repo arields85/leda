@@ -2730,14 +2730,15 @@ def _atender_otro_tema_del_alta(cur, quien, solicitud, texto: str,
     """La persona cambió de tema en medio del alta (decisión del usuario,
     2026-10-01): el borrador ya quedó pausado, así que nada se pierde y no hace falta
     preguntar "¿Seguimos?". Prisma atiende lo otro directamente y, en la misma
-    respuesta, dice que la tarea quedó guardada (`dejar_nota`)."""
+    respuesta, dice que la tarea quedó guardada (`dejar_nota`, `unida`: en el mismo
+    mensaje, antes de lo que contesta el camino normal)."""
     from . import alta_conducida
     from .calendario import Calendario
     from .llm import desde_base
 
     titulo = alta_conducida.titulo_del_borrador(cur, str(solicitud["id"]))
     dejar_nota(cur, AVISO_ALTA_PAUSADA.format(
-        titulo=f" «{titulo}»" if titulo else ""))
+        titulo=f" «{titulo}»" if titulo else ""), unida=True)
     cal = Calendario.desde_base(cur, workspace_id)
     proveedor = desde_base(cur, workspace_id, config)
     route, error = _rutear(proveedor, texto,

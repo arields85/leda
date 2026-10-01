@@ -2344,6 +2344,11 @@ def _finalize(cur, request, who, now, apertura: str | None = None):
                                         else _conversacion_de(cur, request, now)),
                              apertura=apertura)
     preview_text = resumen.texto
+    # La apertura del alta conducida es la frase con que el modelo le contestó a quien
+    # pidió el borrador en SU turno: quien confirma recibe sólo el resumen (el cuerpo
+    # de siempre, sin esa frase). El alta guiada no cambia.
+    cuerpo_para_quien_confirma = (resumen.cuerpo if apertura is None
+                                  else render_resumen(**datos).cuerpo)
     try:
         prepare_payload(preview_text, dedupe_key="intake-preview", has_buttons=True)
     except PayloadValidationError:
@@ -2354,7 +2359,7 @@ def _finalize(cur, request, who, now, apertura: str | None = None):
     if authority is None:
         return _say_real_state(cur, request, NO_ACTIVE_AUTHORITY, now,
                                "no-active-authority")
-    if str(authority["aprobador_membership_id"]) != str(request["membership_id"]):
+    if requiere_aprobacion(authority, request["membership_id"]):
         # Confirma otra persona (T9-R1c-4): quien pidió el borrador lo revisa primero
         # y es él quien lo envía; a quien confirma no le llega nada todavía. Su
         # resumen dice lo que hace su botón, no el de quien confirma (R4c-H9).
@@ -2366,7 +2371,7 @@ def _finalize(cur, request, who, now, apertura: str | None = None):
         except PayloadValidationError:
             return _configuration_error(cur, request, who, "aggregate", now)
         return _offer_review(cur, request, who, now, texto_de_revision, preview,
-                             resumen.cuerpo)
+                             cuerpo_para_quien_confirma)
     pending, _ = _send_to_confirmer(cur, request, now, preview_text, preview,
                                     request["version"], authority)
     return IntakeOutcome(request_id, preview_text, changed=True,
@@ -2428,6 +2433,26 @@ def _find_confirmer(cur, responsible_id):
     if not authority or not approver_id or authority["telegram_user_id"] is None:
         return None
     return authority
+
+
+def requiere_aprobacion(authority, requester_membership_id) -> bool:
+    """Si el borrador lo confirma otra persona (quien pidió lo envía con Enviar a
+    aprobación) y no quien lo pidió (Confirmar). Es la política que decide el botón del
+    resumen: `_finalize` y `boton_final_de` la comparten."""
+    return (str(authority["aprobador_membership_id"])
+            != str(requester_membership_id))
+
+
+def boton_final_de(cur, responsible_id, requester_membership_id) -> str | None:
+    """El botón que cierra el resumen de quien pidió el borrador si `responsible_id`
+    es el responsable (Confirmar o Enviar a aprobación, tal como se muestra), o `None`
+    si no hay a quién mandárselo (`_find_confirmer`) y no se sabe."""
+    authority = _find_confirmer(cur, responsible_id)
+    if authority is None:
+        return None
+    return etiqueta_sin_icono(
+        ETIQUETA_ENVIAR if requiere_aprobacion(authority, requester_membership_id)
+        else ETIQUETA_CONFIRMAR)
 
 
 def _offer_review(cur, request, who, now, preview_text, preview, cuerpo_resumen):

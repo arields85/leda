@@ -48,7 +48,8 @@ from datetime import datetime, timedelta
 
 from .db import entrante_atado
 from .incidentes import REFERENCIA_INBOUND_MESSAGE, registrar_incidente
-from .salida import enqueue_outbox
+from .salida import (PayloadValidationError, enqueue_outbox, margen_saludo,
+                     prepare_payload)
 
 ETAPA_SIN_RESPUESTA = "sin_respuesta"
 ETAPA_RESPUESTA_DUPLICADA = "respuesta_duplicada"
@@ -61,15 +62,18 @@ _PARTE_DE_TEXTO_PARTIDO = re.compile(r":part:\d+-of-\d+$")
 # contexto. `controlar` sólo dice las de SU evento y descarta el resto (T9-R4b):
 # la nota de un turno que se revirtió, o de una entrada cuyo camino no llamó a
 # `limpiar_nota`, no puede salir en la respuesta de otra.
-_NOTAS: ContextVar[tuple[tuple[str | None, str], ...]] = ContextVar(
+_NOTAS: ContextVar[tuple[tuple[str | None, str, bool], ...]] = ContextVar(
     "notas_de_la_respuesta", default=())
 
 
-def dejar_nota(cur, texto: str) -> None:
+def dejar_nota(cur, texto: str, *, unida: bool = False) -> None:
     """Anota algo que la respuesta de este turno tiene que decir además de lo suyo
     (T9-R4): sale como una parte más de la MISMA respuesta, delante de las demás.
-    Queda atada al evento entrante del turno (`db.atar_al_entrante`)."""
-    _NOTAS.set(_NOTAS.get() + ((entrante_atado(cur), texto),))
+    Con `unida` va en el MISMO mensaje, delante del texto de la respuesta (el alta
+    conducida: la persona lee un solo mensaje); si juntos no entran en un mensaje,
+    sale como parte aparte del mismo grupo. Queda atada al evento entrante del turno
+    (`db.atar_al_entrante`)."""
+    _NOTAS.set(_NOTAS.get() + ((entrante_atado(cur), texto, unida),))
 
 
 def limpiar_nota() -> None:
@@ -147,6 +151,30 @@ def _incidentes_de_notas_ajenas(cur, quien, workspace_id: str, chat_id: int,
             referencia_id=evento, chat_id=chat_id, app_user_id=quien.app_user_id)
 
 
+def _unir_al_mensaje(cur, primera: dict, unidas: list[str]) -> list[str]:
+    """Antepone las notas `unidas` al texto del primer mensaje de la respuesta que se
+    conserva, para que la persona lea uno solo. Devuelve las que no se pudieron unir
+    (el mensaje ya salió o con ellas no entra en un mensaje): salen como parte
+    aparte del mismo grupo."""
+    cur.execute(
+        "select id, cuerpo, destinatario_membership_id from message_outbox "
+        "where id = %s and estado = 'listo' for update", (primera["id"],))
+    fila = cur.fetchone()
+    if fila is None:
+        return unidas
+    texto = "\n\n".join([*unidas, fila["cuerpo"]])
+    try:
+        prepare_payload(texto, dedupe_key=primera["dedupe_key"],
+                        has_buttons=_ofrece_botones([primera]),
+                        margen=margen_saludo(
+                            personal=fila["destinatario_membership_id"] is not None))
+    except PayloadValidationError:
+        return unidas
+    cur.execute("update message_outbox set cuerpo = %s where id = %s",
+                (texto, fila["id"]))
+    return []
+
+
 def controlar(cur, quien, *, workspace_id: str, chat_id: int, entrante_id: str,
               ahora: datetime, aviso_neutro: str,
               nota_de_la_respuesta: str | None = None) -> int:
@@ -156,9 +184,12 @@ def controlar(cur, quien, *, workspace_id: str, chat_id: int, entrante_id: str,
     `nota_de_la_respuesta` es algo que la respuesta tiene que decir además de lo
     suyo (hoy, que el adjunto todavía no se guarda, H15): sale como una parte
     más de la MISMA respuesta, delante de las demás."""
+    propias = [(texto, unida) for evento, texto, unida in _NOTAS.get()
+               if evento == str(entrante_id)]
     notas = ([nota_de_la_respuesta] if nota_de_la_respuesta else []) + [
-        texto for evento, texto in _NOTAS.get() if evento == str(entrante_id)]
-    ajenas = [evento for evento, _ in _NOTAS.get() if evento != str(entrante_id)]
+        texto for texto, unida in propias if not unida]
+    unidas = [texto for texto, unida in propias if unida]
+    ajenas = [evento for evento, _, _ in _NOTAS.get() if evento != str(entrante_id)]
     limpiar_nota()
     _incidentes_de_notas_ajenas(cur, quien, workspace_id, chat_id, ajenas)
     respuestas = respuestas_del_mensaje(cur, entrante_id, chat_id)
@@ -200,6 +231,9 @@ def controlar(cur, quien, *, workspace_id: str, chat_id: int, entrante_id: str,
         respuestas = [conservada]
 
     (respuesta,) = respuestas
+    if unidas:
+        sobrantes = _unir_al_mensaje(cur, respuesta[0], unidas)
+        notas = sobrantes + notas
     if notas:
         enqueue_outbox(
             cur, workspace_id=workspace_id, chat_id=chat_id,

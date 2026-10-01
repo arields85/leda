@@ -406,9 +406,71 @@ def test_lo_que_ya_se_dijeron_en_la_conversacion_se_puede_volver_a_decir():
                      pregunta=["responsible"]).startswith(("numero", "nombre"))
 
 
-def test_los_botones_del_resumen_se_pueden_nombrar():
-    assert verificar(completo(), intencion="ayuda",
-                     texto="Con el botón Confirmar se crea la tarea.") is None
+def con_boton(boton, responsable=PER_YO):
+    """Todo completo y el responsable confirmado; `boton` es el que el código
+    mostrará en el resumen para ese responsable (`None`: no se sabe)."""
+    yo = OpcionAlta("R1", PER_YO["name"], PER_YO, es_quien_escribe=True,
+                    boton_final=boton)
+    otra = OpcionAlta("R2", PER_OTRA["name"], PER_OTRA, boton_final=boton)
+    borrador = {c: confirmado(mostrado=c, ref=c) for c in T.CAMPOS_REQUERIDOS}
+    borrador["responsible"] = confirmado(mostrado=responsable["name"],
+                                         ref=responsable["id"])
+    return hechos(borrador=borrador, responsables=(yo, otra))
+
+
+@pytest.mark.parametrize("boton,nombrado", [
+    ("Confirmar", "Con el botón Confirmar se crea la tarea."),
+    ("Enviar a aprobación", "Con el botón Enviar a aprobación se lo mando a quien aprueba."),
+    ("Confirmar", "Podés tocar Modificar o Cancelar si querés cambiar algo."),
+    ("Enviar a aprobación", "Tocá Modificar para cambiar algo, o Cancelar."),
+])
+def test_los_botones_que_el_resumen_va_a_mostrar_se_pueden_nombrar(boton, nombrado):
+    assert verificar(con_boton(boton), intencion="ayuda", texto=nombrado) is None
+
+
+@pytest.mark.parametrize("boton,nombrado,inexistente", [
+    ("Enviar a aprobación", "Confirmá con el botón Confirmar y se crea.", "Confirmar"),
+    ("Enviar a aprobación", "Si está bien, tocá Confirmar.", "Confirmar"),
+    ("Confirmar", "Con el botón Enviar a aprobación se lo mando a Morgan.",
+     "Enviar a aprobación"),
+    ("Confirmar", "Revisalo y tocá «Enviar a aprobación».", "Enviar a aprobación"),
+])
+def test_nombrar_un_boton_que_el_resumen_no_va_a_mostrar_se_rechaza(
+        boton, nombrado, inexistente):
+    motivo = verificar(con_boton(boton), intencion="ayuda", texto=nombrado)
+    assert motivo == f"boton_inexistente: {inexistente}"
+
+
+def test_sin_saber_que_boton_va_a_mostrar_el_resumen_no_se_nombra_ninguno_de_cierre():
+    """Mientras el responsable no está determinado el botón final no se conoce:
+    nunca se nombra uno que quizá no salga. Modificar y Cancelar sí."""
+    h = hechos()
+    assert verificar(h, texto="Después tocás Confirmar. ¿Quién la hace?",
+                     pregunta=["responsible"]).startswith("boton_inexistente")
+    assert verificar(h, texto="Con Modificar o Cancelar cambiás algo. ¿Quién la hace?",
+                     pregunta=["responsible"]) is None
+
+
+def test_el_boton_final_es_el_del_responsable_que_este_turno_asigna():
+    yo = OpcionAlta("R1", PER_YO["name"], PER_YO, es_quien_escribe=True,
+                    boton_final="Confirmar")
+    otra = OpcionAlta("R2", PER_OTRA["name"], PER_OTRA,
+                      boton_final="Enviar a aprobación")
+    borrador = {c: confirmado(mostrado=c, ref=c) for c in T.CAMPOS_REQUERIDOS
+                if c != "responsible"}
+    h = hechos(responsables=(yo, otra), borrador=borrador)
+    valores = {"responsible": {"opcion_id": "R2"}}
+    assert verificar(h, texto="Queda a cargo de Sam North: tocá Enviar a aprobación.",
+                     valores=valores) is None
+    assert verificar(h, texto="Queda a cargo de Sam North: tocá Confirmar.",
+                     valores=valores) == "boton_inexistente: Confirmar"
+
+
+def test_el_texto_de_cancelar_o_dejar_tampoco_nombra_un_boton_que_no_sale():
+    h = con_boton("Enviar a aprobación")
+    assert verificar(h, intencion="dejar",
+                     texto="Queda guardada; después tocás Confirmar."
+                     ).startswith("boton_inexistente")
 
 
 def test_los_nombres_de_las_opciones_y_de_quien_escribe_se_pueden_decir():
@@ -588,7 +650,7 @@ def test_el_esquema_de_la_salida_es_cerrado_y_describe_el_contrato():
 
 def test_la_guia_de_voz_dice_lo_esencial():
     guia = T.SISTEMA_ALTA
-    for clave in ("dato", "nunca inventes", "Confirmar", "conducir_alta"):
+    for clave in ("dato", "nunca inventes", "boton_final", "conducir_alta"):
         assert clave.lower() in guia.lower()
     assert "Entendí que" in guia      # lo nombra para prohibirlo
 
@@ -597,3 +659,67 @@ def test_la_guia_ya_no_menciona_la_clave_de_aceptar_la_propuesta():
     from prisma.alta_turno import ESQUEMA_SALIDA, SISTEMA_ALTA
     assert "acepta_propuesta" not in SISTEMA_ALTA
     assert "acepta_propuesta" not in json.dumps(ESQUEMA_SALIDA)
+
+
+# ------------------------------------------- el botón final y las fechas (corrida 1)
+
+def test_los_hechos_dicen_que_boton_final_va_a_mostrar_el_resumen():
+    yo = OpcionAlta("R1", PER_YO["name"], PER_YO, es_quien_escribe=True,
+                    boton_final="Confirmar")
+    otra = OpcionAlta("R2", PER_OTRA["name"], PER_OTRA,
+                      boton_final="Enviar a aprobación")
+    sin_saber = OpcionAlta("R3", "Sin Jefe", {"id": "x", "name": "Sin Jefe"})
+    datos = json.loads(T.hechos_a_json(hechos(responsables=(yo, otra, sin_saber))))
+    assert datos["opciones"]["responsible"] == [
+        {"id": "R1", "nombre": "Taylor Quinn", "es_quien_escribe": True,
+         "boton_final": "Confirmar"},
+        {"id": "R2", "nombre": "Sam North", "boton_final": "Enviar a aprobación"},
+        {"id": "R3", "nombre": "Sin Jefe"}]
+    assert "boton_final" not in datos            # el responsable todavía no está
+
+
+def test_con_el_responsable_confirmado_los_hechos_traen_el_boton_final():
+    datos = json.loads(T.hechos_a_json(con_boton("Enviar a aprobación")))
+    assert datos["boton_final"] == "Enviar a aprobación"
+
+
+def test_la_guia_nombra_el_boton_final_de_los_hechos_y_no_uno_fijo():
+    guia = T.SISTEMA_ALTA
+    assert "boton_final" in guia
+    assert "confirma con el botón Confirmar" not in guia
+
+
+def test_los_hechos_dicen_que_sirve_cualquier_fecha_desde_hoy_y_no_una_pasada():
+    datos = json.loads(T.hechos_a_json(hechos()))
+    regla = datos["fechas"].lower()
+    assert "desde hoy" in regla and "pasada" in regla
+    assert "proximos_dias" in regla and "límite" in regla
+    assert "desde hoy" in T.ESQUEMA_SALIDA["properties"]["valores"]["properties"][
+        "due_date"]["properties"]["fecha_iso"]["description"].lower()
+    assert "desde hoy" in T.SISTEMA_ALTA.lower()
+
+
+@pytest.mark.parametrize("fecha_iso,dicha", [
+    ("2028-12-15", "15 de diciembre"),            # lejos, fuera de la ventana de 14 días
+    ("2028-04-03", "03/04/2028"),
+    ("2029-01-02", "2 de enero"),
+])
+def test_una_fecha_fuera_de_la_ventana_de_calendario_se_acepta_y_se_puede_decir(
+        fecha_iso, dicha):
+    h = hechos(evento={"mensaje": f"para el {dicha}"})
+    s = leer(texto=f"Anotado para el {dicha}. ¿Quién la hace?",
+             valores={"due_date": {"fecha_iso": fecha_iso}},
+             pregunta=["responsible"])
+    a = T.aplicar_valores(s, h)
+    assert [x.campo for x in a.asignaciones] == ["due_date"] and a.rechazos == ()
+    assert T.verificar_turno(s, h, a) is None
+
+
+def test_una_fecha_pasada_se_rechaza_y_el_texto_puede_nombrar_lo_que_dijo_la_persona():
+    h = hechos(evento={"mensaje": "para el 15 de febrero"})
+    s = leer(texto="El 15 de febrero ya pasó. ¿Para qué otra fecha la querés?",
+             valores={"due_date": {"fecha_iso": "2028-02-15"}},
+             pregunta=["due_date"])
+    a = T.aplicar_valores(s, h)
+    assert a.asignaciones == () and a.rechazos
+    assert T.verificar_turno(s, h, a) is None

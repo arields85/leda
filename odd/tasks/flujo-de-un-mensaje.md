@@ -1215,3 +1215,88 @@ unidades de commit propias.
     que Prisma no tiene mecanismo (constitución §4).
   - (b) Tras pausar, "¿qué tarea dejaste para el lunes?" fue al camino general, que no conoce el borrador
     pausado y ofreció tareas que no tenían que ver.
+
+### Tanda 1-4 de la corrida conversada (2026-10-01)
+
+Cuatro defectos de la corrida real por Telegram. Chequeo de rumbo: los cuatro son la misma clase que ya
+apareció (el contrato o el flujo prometen lo que el estado no hace, ADR 0013 "estado real y sólo opciones
+posibles"; "una respuesta visible por mensaje"); se arreglaron los mecanismos, no las frases observadas.
+Ruta declarada: un solo escritor (encargo explícito). TDD estricto; runner
+`PYTHONPATH=src ...\.venv\Scripts\python.exe -m pytest -q -p no:cacheprovider`.
+
+- **1a. El botón que el texto nombra.**
+  - *Causa.* El modelo decía "confirmá con el botón Confirmar" aunque el resumen de quien necesita
+    aprobación trae Enviar a aprobación; la guía fijaba "Confirmar" y los hechos no decían qué botón saldría.
+  - *Mecanismo.* El código calcula el botón de cierre con la política que ya decide el resumen
+    (`ingreso_tareas.boton_final_de`, que usa `requiere_aprobacion`, la misma comparación de `_finalize`) y
+    lo expone en los hechos: `boton_final` en cada opción de `responsible` y arriba cuando el responsable ya
+    está confirmado (`alta_turno.OpcionAlta.boton_final`). `BOTONES_DEL_RESUMEN` se reemplazó por
+    `BOTONES_SIEMPRE` (Modificar, Cancelar) más el botón aplicable; el verificador rechaza con
+    `boton_inexistente: X` un botón de cierre que el texto nombra (con mayúscula, en medio de una oración) y
+    el resumen no va a mostrar, contando el responsable que el propio turno asigna (`boton_final_tras`). Sin
+    responsable determinado no se nombra ninguno. `SISTEMA_ALTA` remite a `boton_final`.
+  - *RED.* `tests/test_alta_turno.py tests/test_alta_conducida.py tests/test_conducir_alta_proveedores.py
+    tests/test_capacidades.py tests/test_redaccion_modelo_puro.py`: 26 failed, 188 passed (todo el RED de la
+    tanda junto; de esos, 17 son de este ítem).
+- **1b. Las fechas.**
+  - *Causa.* El esquema decía "tomada de `hoy` y `proximos_dias`" y el modelo concluyó que sólo valían esos 14
+    días ("pasame una fecha dentro de los próximos días" ante "el 15 de agosto"). El código acepta cualquier
+    fecha desde hoy (`validar_valor` con `hoy`).
+  - *Mecanismo.* La regla real está en los hechos (`fechas`, `REGLA_DE_FECHAS`), en el esquema y en la guía:
+    cualquier fecha desde hoy en adelante, una pasada no vale, `proximos_dias` es una ayuda de calendario y no
+    un límite. El verificador ya dejaba nombrar una fecha asignada fuera de la ventana (`mostrado`) o dicha
+    por la persona (`evento`): se agregaron pruebas (3 fechas lejanas y una pasada rechazada) que ya pasaban.
+  - *RED.* 1 failed (la regla en hechos/esquema/guía); las pruebas de aceptación y de verificador pasaban
+    antes: confirman que el límite estaba sólo en el texto del contrato.
+- **2. Una frase del modelo es de la persona para la que se escribió.**
+  - *Causa.* `_finalize` guardaba `resumen.cuerpo` (con la apertura del turno de quien pide) en los `args` de
+    la revisión, y Enviar a aprobación se lo mandaba tal cual a quien confirma.
+  - *Mecanismo.* Con `apertura`, el cuerpo que se guarda para quien confirma es el del resumen sin esa frase
+    (`render_resumen(**datos).cuerpo`, el encabezado "Resumen para revisar" y los datos que también recibe
+    quien confirma en el alta guiada con plantilla B; en el alta guiada no se tocó nada). Quien pidió conserva
+    su resumen con su frase; quien confirma recibe los datos con el cierre de SU botón.
+  - *RED.* 1 failed (extremo a extremo: resumen con apertura y luego Enviar a aprobación; el cuerpo del
+    aprobador no debe llevar la apertura y debe llevar los datos y su cierre).
+- **3. Una respuesta visible por mensaje.**
+  - *Causa.* El aviso de la pausa (`dejar_nota`) y la respuesta del camino normal eran dos filas del mismo
+    grupo: una sola respuesta para el control, pero dos mensajes de Telegram.
+  - *Mecanismo.* `dejar_nota(..., unida=True)`: `respuesta_unica.controlar` antepone la nota al texto del
+    primer mensaje de la respuesta que conserva (`_unir_al_mensaje`, el mismo patrón de
+    `_offer_current_review`: si juntos no entran en un mensaje, sale como parte aparte del mismo grupo). Sólo
+    lo usa `_atender_otro_tema_del_alta`; el aviso de "dejarlo y ver lo otro" del alta guiada sigue siendo
+    una parte aparte (no cambia el guiado).
+  - *RED.* 5 failed (la prueba existente de otro tema y 4 nuevas: 3 mensajes distintos de la familia y el caso
+    que no entra junto).
+- **4. Rechazos diagnosticables sin guardar conversación.**
+  - *Causa.* Un intento rechazado guardaba sólo el motivo; no se veía por qué `falta_pregunta: el objetivo`
+    caía en el primer mensaje de cada alta.
+  - *Mecanismo.* La auditoría `alta_conducida_turno` de un intento rechazado lleva `salida` con la forma
+    estructural (`_forma_de`): `intencion`, `pregunta`, `botones`, los nombres de `valores` y `corrige`,
+    `texto_tiene_pregunta`, `texto_largo` y `faltan_tras` (nombres de datos que seguían faltando; agregado
+    porque es lo que decide `falta_pregunta` y no es texto libre). Ningún texto del modelo ni de la persona;
+    con formato roto sólo el motivo, como antes. `falta_pregunta` no se tocó.
+  - *RED.* 2 failed (forma estructural sin texto libre; formato roto sólo con motivo).
+- **Hallazgo del ítem 4: el primer mensaje.** Sin evidencia todavía. Los hechos del primer turno
+  (`arrancar`) se arman con el mismo `_hechos` que cualquier turno: mismas claves, mismo `evento`
+  (`mensaje_de_la_persona`), `faltan` completo y conversación vacía (prueba
+  `test_los_hechos_del_primer_mensaje_son_los_de_cualquier_turno`, que ya pasaba). Hipótesis a confirmar con
+  la próxima corrida y el nuevo `salida` de auditoría, ninguna probada: (1) el modelo, al abrir el alta con un
+  mensaje que trae el título, contesta "anotado" y deja `botones="objective"` sin `pregunta` o sin signo de
+  pregunta, y con la conversación vacía no tiene un ejemplo previo del formato; (2) en el intento 2 los
+  valores válidos del intento 1 ya se guardaron (`_guardar` corre antes de verificar), así que el modelo ve
+  el título confirmado con sólo el motivo y puede repetir la omisión. La auditoría nueva distingue las dos
+  (`pregunta` vacía, `botones` puesto, `texto_tiene_pregunta`).
+- **Pruebas existentes cambiadas.** `test_los_botones_del_resumen_se_pueden_nombrar` pasó a las familias
+  `test_los_botones_que_el_resumen_va_a_mostrar...` (el botón nombrable ahora depende de `boton_final`);
+  `test_la_guia_de_voz_dice_lo_esencial` pide `boton_final` y no "Confirmar" (la guía ya no lo fija);
+  `test_una_duda_con_el_resumen_a_la_vista_no_arma_otro_resumen` hace que el modelo nombre Enviar a
+  aprobación (el botón real de ese mundo; con Confirmar ahora se rechaza con razón);
+  `test_otro_tema_pausa_el_borrador...` espera un solo mensaje (aviso + respuesta).
+- **Hallazgos pendientes de la misma corrida (sin arreglar).**
+  - Los nombres de la evidencia en el resumen salen con las claves crudas ("explicacion, captura").
+  - El modelo aceptó "envío videos" como criterio de aceptación: es evidencia, no un resultado verificable
+    (mecánica §13, pregunta 2). Es comportamiento del modelo: medirlo con el banco antes de tocar la guía.
+  - La rama de aclaración falsa tras una pausa queda abierta y reaparece.
+  - (a) y (b) de la entrada anterior (promesa a futuro con `dejar`; la pausa que el camino general no
+    conoce) siguen sin arreglar.
+- **GREEN (toda la tanda).** `tests/test_alta_turno.py tests/test_alta_conducida.py tests/test_conducir_alta_proveedores.py tests/test_capacidades.py tests/test_redaccion_modelo_puro.py`: 214 passed. Alta guiada y caminos vecinos (`tests/test_task_intake.py`, `test_alta_guiada_variante_a`, `test_alta_modificar`, `test_alta_enviar_a_aprobacion`, `test_alta_eleccion_confirmacion`, `test_alta_estado_real`, `test_alta_guiada_mensaje_entero`, `test_aviso_incidente_legible`, `test_despacho_en_orden`, `test_pregunta_pendiente_otras`, `test_rama_vista_previa`, `test_respuesta_unica_caminos`, `test_rama_abierta_guarda`, `test_rama_abierta`, `test_rama_eleccion`, `test_router_historial`, `test_router_pendiente`, `test_una_respuesta`, `test_toque_idempotente`): 637 passed. No se corrió la suite completa.

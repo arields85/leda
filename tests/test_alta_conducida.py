@@ -640,11 +640,13 @@ def test_un_cambio_tras_el_resumen_lo_reemplaza_por_uno_nuevo(chat, conn):
 def test_una_duda_con_el_resumen_a_la_vista_no_arma_otro_resumen(chat):
     c, primero = _hasta_el_resumen(chat)
     c.modelo.conducciones.append(salida(
-        "Con el botón Confirmar se crea la tarea.", intencion="ayuda"))
+        "Con el botón Enviar a aprobación se lo mando a quien lo confirma.",
+        intencion="ayuda"))
 
     nuevas = c.escribir("¿y si confirmo qué pasa?")
 
-    assert _cuerpos(nuevas) == ["Con el botón Confirmar se crea la tarea."]
+    assert _cuerpos(nuevas) == [
+        "Con el botón Enviar a aprobación se lo mando a quien lo confirma."]
 
 
 # ----------------------------------------------------- cancelar, dejar, otro tema
@@ -702,9 +704,10 @@ def test_otro_tema_pausa_el_borrador_y_se_atiende_lo_otro_diciendo_que_quedo_gua
 
     assert c.estado() == "active"
     assert c.campo("title")["valor"] == "Calibrar los sensores"
+    # UN solo mensaje visible: el aviso de la pausa primero, después la respuesta.
     assert _cuerpos(nuevas) == [
-        gateway.AVISO_ALTA_PAUSADA.format(titulo=" «Calibrar los sensores»"),
-        "Un bloqueo frena una tarea."]
+        gateway.AVISO_ALTA_PAUSADA.format(titulo=" «Calibrar los sensores»")
+        + "\n\nUn bloqueo frena una tarea."]
     assert "¿Seguimos?" not in " ".join(_cuerpos(nuevas))
     with admin(c.conn) as cur:
         cur.execute("select terminal_result from task_intake_request where id = %s",
@@ -964,3 +967,189 @@ def test_cada_mensaje_y_cada_toque_tienen_una_sola_respuesta_visible(chat, conn)
                 where es_respuesta and estado <> 'descartado'
                 group by entrante_id""")
         assert all(f["n"] == 1 for f in cur.fetchall())
+
+
+# ------------------------------------------- tanda 1-4 de la corrida conversada
+
+def _enviar_a_aprobacion(c):
+    """Toca el botón Enviar a aprobación del resumen vigente (una acción pendiente)."""
+    cliente = _callback_client(c.conn, c.monkeypatch)
+    c.monkeypatch.setattr("prisma.llm.desde_base", lambda *a: c.modelo)
+    with admin(c.conn) as cur:
+        cur.execute(
+            """select o.token from pending_action_option o
+                 join pending_action p on p.id = o.pending_action_id
+                where p.estado = 'esperando' and o.etiqueta like %s""",
+            ("%Enviar a aprobación%",))
+        token = cur.fetchone()["token"]
+    antes = _salidas(c.conn, c.usuario)
+    respuesta = cliente.post(
+        "/telegram/north-lab",
+        json={"callback_query": {
+            "id": f"cb-enviar-{next(_toques)}", "from": {"id": c.usuario},
+            "data": "p:" + token,
+            "message": {"message_id": 7, "chat": {"id": c.usuario}}}},
+        headers={"X-Telegram-Bot-Api-Secret-Token": "test-secret"})
+    assert respuesta.status_code == 200
+    return _nuevas(c.conn, c.usuario, antes)
+
+
+def _chat_del_aprobador(c) -> int:
+    return c.world["north-lab"]["people"]["Morgan Hale"]["telegram"]
+
+
+def test_el_aprobador_recibe_el_resumen_sin_la_frase_del_turno_de_quien_pidio(chat):
+    """Una frase del modelo es de la persona para la que se escribió: la apertura de
+    quien pide ("confirmá con el botón…") no viaja al aprobador."""
+    c, resumen = _hasta_el_resumen(chat)
+    assert resumen[0]["cuerpo"].startswith("Listo, revisalo.\n\nResumen para revisar")
+
+    _enviar_a_aprobacion(c)
+
+    (recibido,) = [f for f in _salidas(c.conn, _chat_del_aprobador(c))
+                   if f["pending_action_id"]]
+    cuerpo = recibido["cuerpo"]
+    assert "Listo, revisalo." not in cuerpo
+    assert cuerpo.startswith("Resumen para revisar\nTítulo: Calibrar los sensores")
+    assert "Responsable: Taylor Quinn" in cuerpo
+    assert cuerpo.endswith(I.CIERRE_CONFIRMAR)
+    # Quien pidió conserva SU resumen con su frase (es la respuesta a su turno).
+    with admin(c.conn) as cur:
+        cur.execute("select resumen from pending_action where draft_id = "
+                    "(select task_draft_id from task_intake_request where id = %s) "
+                    "order by creado_en limit 1", (c.rid,))
+        assert cur.fetchone()["resumen"].startswith("Listo, revisalo.")
+
+
+@pytest.mark.parametrize("texto,respuesta", [
+    ("¿qué es un bloqueo?", "Un bloqueo frena una tarea."),
+    ("mostrame mis tareas", "Tenés dos tareas abiertas."),
+    ("¿y qué es un hito?", "Un hito marca un punto de control."),
+])
+def test_cambiar_de_tema_en_medio_del_alta_es_un_solo_mensaje_visible(
+        chat, texto, respuesta):
+    c = _alta_hasta_objetivo(chat)
+    c.modelo.conducciones.append(salida("Eso lo veo aparte.", intencion="otro_tema"))
+    c.modelo.rutas.append(IntentRoute(IntentAction.NORMAL_CONVERSATION))
+    c.modelo.guion.append(Respuesta(texto=respuesta))
+
+    nuevas = c.escribir(texto)
+
+    assert len(nuevas) == 1
+    pausa = gateway.AVISO_ALTA_PAUSADA.format(titulo=" «Calibrar los sensores»")
+    assert nuevas[0]["cuerpo"] == f"{pausa}\n\n{respuesta}"
+    assert c.incidentes("respuesta_duplicada") == []
+
+
+def test_si_el_aviso_de_la_pausa_no_entra_con_la_respuesta_sale_como_primera_parte_del_mismo_grupo(
+        chat):
+    from prisma.respuesta_unica import grupo_de
+
+    c = _alta_hasta_objetivo(chat)
+    c.modelo.conducciones.append(salida("Eso lo veo aparte.", intencion="otro_tema"))
+    c.modelo.rutas.append(IntentRoute(IntentAction.NORMAL_CONVERSATION))
+    largo = "\n\n".join(f"Párrafo {i}. " + "palabra " * 60 for i in range(20))
+    c.modelo.guion.append(Respuesta(texto=largo))
+
+    nuevas = c.escribir("explicame todo sobre los bloqueos")
+
+    assert len(nuevas) >= 2
+    assert nuevas[0]["cuerpo"] == gateway.AVISO_ALTA_PAUSADA.format(
+        titulo=" «Calibrar los sensores»")
+    with admin(c.conn) as cur:
+        cur.execute("select dedupe_key, respuesta_grupo from message_outbox "
+                    "where id = any(%s)", ([f["id"] for f in nuevas],))
+        assert len({grupo_de(f) for f in cur.fetchall()}) == 1   # una sola respuesta
+    assert c.incidentes("respuesta_duplicada") == []
+
+
+def test_los_hechos_dicen_que_boton_final_mostrara_el_resumen_de_esta_persona(chat):
+    """Taylor Quinn necesita aprobación de otra persona: su resumen tiene Enviar a
+    aprobación, no Confirmar; así lo dicen los hechos antes de que el modelo escriba."""
+    c = _alta_hasta_objetivo(chat)
+    c.modelo.conducciones.append(salida(
+        "Dale. ¿Cómo se sabe que está terminada?", pregunta=["acceptance_criterion"]))
+    c.escribir("el objetivo es el de las demoras")
+    hechos = c.hechos()
+    assert hechos["boton_final"] == "Enviar a aprobación"          # ya es responsable
+    por_nombre = {o["nombre"]: o.get("boton_final")
+                  for o in hechos["opciones"]["responsible"]}
+    (yo,) = [b for n, b in por_nombre.items() if n.startswith("Taylor Quinn")]
+    assert yo == "Enviar a aprobación"
+    assert set(por_nombre.values()) <= {"Confirmar", "Enviar a aprobación"}
+
+
+def test_el_modelo_que_nombra_confirmar_cuando_el_resumen_trae_enviar_se_corrige(chat):
+    c, _ = _hasta_el_resumen(chat)
+    c.modelo.conducciones.append(salida(
+        "Con el botón Confirmar se crea la tarea.", intencion="ayuda"))
+    c.modelo.conducciones.append(salida(
+        "Con el botón Enviar a aprobación se lo mando a quien lo confirma.",
+        intencion="ayuda"))
+
+    nuevas = c.escribir("¿y ahora qué hago?")
+
+    assert _cuerpos(nuevas) == [
+        "Con el botón Enviar a aprobación se lo mando a quien lo confirma."]
+    assert c.hechos()["rechazos_anteriores"] == ["boton_inexistente: Confirmar"]
+
+
+def _auditorias(c) -> list[dict]:
+    with admin(c.conn) as cur:
+        cur.execute("select detalle from audit_log where accion = 'alta_conducida_turno' "
+                    "order by at, (detalle->>'intento')::int")
+        return [f["detalle"] for f in cur.fetchall()]
+
+
+def test_un_intento_rechazado_deja_la_forma_de_la_salida_sin_texto_libre(chat):
+    c = chat(
+        salida("Anotado, calibrar sensores del laboratorio central.",
+               valores={"title": {"texto": "Calibrar sensores del laboratorio central"}},
+               pregunta=[]),                      # falta pregunta: se rechaza
+        salida("Anotado. ¿A qué objetivo pertenece?",
+               valores={"title": {"texto": "Calibrar sensores del laboratorio central"}},
+               pregunta=["objective"], botones="objective"))
+
+    c.escribir("necesito crear una tarea: calibrar sensores del laboratorio central")
+
+    rechazada, aceptada = _auditorias(c)
+    assert rechazada["resultado"] == "rechazada" and rechazada["intento"] == 1
+    assert rechazada["motivo"].startswith("falta_pregunta")
+    assert rechazada["salida"] == {
+        "intencion": "continuar", "pregunta": [], "botones": None,
+        "valores": ["title"], "corrige": [], "texto_tiene_pregunta": False,
+        "texto_largo": len("Anotado, calibrar sensores del laboratorio central."),
+        "faltan_tras": ["objective", "responsible", "due_date",
+                        "acceptance_criterion"]}
+    assert "salida" not in aceptada                 # sólo los rechazados
+    # Ningún texto libre (del modelo ni de la persona) en la fila de auditoría.
+    crudo = json.dumps(rechazada, ensure_ascii=False)
+    assert "laboratorio" not in crudo and "Anotado" not in crudo
+
+
+def test_un_intento_con_formato_roto_guarda_solo_el_motivo(chat):
+    c = chat({"intencion": "inventada", "texto": "algo secreto"},
+             salida("¿Qué hay que hacer?", pregunta=["title"]))
+
+    c.escribir("quiero crear una tarea")
+
+    rechazada, _ = _auditorias(c)
+    assert rechazada["motivo"].startswith("formato")
+    assert "salida" not in rechazada
+
+
+def test_los_hechos_del_primer_mensaje_son_los_de_cualquier_turno(chat):
+    """Hallazgo (primer mensaje): no hay una forma distinta de armar los hechos; el
+    primer turno y los siguientes tienen las mismas claves y el mismo `evento`."""
+    c = chat(salida("¿Qué hay que hacer?", pregunta=["title"]),
+             salida("Dale. ¿Para cuándo?", valores={"title": {"texto": "Calibrar"}},
+                    pregunta=["due_date"]))
+    c.escribir("quiero crear una tarea")
+    c.escribir("calibrar")
+
+    primero, segundo = c.hechos(0), c.hechos(1)
+    assert set(primero) == set(segundo)
+    assert set(primero["evento"]) == set(segundo["evento"]) == {"mensaje_de_la_persona"}
+    assert primero["faltan"] == ["title", "objective", "responsible", "due_date",
+                                 "acceptance_criterion"]
+    assert c.modelo.conducidos[0][1] == []          # nada de conversación previa
