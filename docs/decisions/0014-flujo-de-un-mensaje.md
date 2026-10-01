@@ -158,6 +158,39 @@ Telegram del 30/09 y 01/10 sobre el alta guiada (detalle en
   propio sin reintentos con caída a la plantilla, medición por respuesta) y se vuelve a
   medir contra la línea base.
 
+**Enmienda (2026-10-01, decisión del usuario): el alta conducida por el modelo.** La
+prueba de la mañana mostró que el alta seguía trabada aunque el modelo redactara: era
+un formulario de un campo por turno, cada mensaje pasaba por una clasificación cerrada
+que el modelo hacía **sin ver la conversación** (el ruteo y la redacción recibían sólo el
+mensaje actual; la etapa 1 declaraba el historial pero no estaba conectado), y al
+clasificar mal, "¿Seguimos?" → "Dejarlo" borraba el trabajo. El usuario lo resumió: "que
+se comporte como vos, que puedo hablar fluido y me entendés; lo único que se le agrega
+es una base de datos que consulta para dar respuestas concretas, no inventadas".
+
+- El historial reciente de lo que efectivamente se dijo llega al modelo que interpreta y
+  al que redacta.
+- En el alta, cada turno es **una** llamada al modelo con la conversación, el borrador
+  (lo que hay y lo que falta), las opciones permitidas que arma el código (objetivos del
+  área con la sugerencia de Jev, responsables según la autoridad) y el mensaje. El modelo
+  devuelve, en salida estructurada y cerrada: los valores que entendió para cualquier
+  campo (varios por mensaje, en cualquier orden, con correcciones), la intención, el
+  texto completo de la respuesta y qué pide a continuación. El código valida cada valor,
+  guarda los válidos, pone los botones y, si algo no vale, el modelo lo dice con sus
+  palabras. Nada se compromete sin el botón de confirmar.
+- Para el alta, la lista cerrada de comandos de la regla 1 del ADR 0013 (responde,
+  corrige, cancela, otro tema, charla, dudoso, no puedo) deja de usarse: la reemplaza
+  ese contrato. Sigue vigente fuera del alta.
+- Decisiones del usuario: "cancelá" cancela; cambiar de tema **pausa** el borrador, nunca
+  lo borra, y Prisma atiende lo otro directamente avisando que la tarea quedó guardada
+  (ajuste de la enmienda "una sola rama abierta" del ADR 0013 para el alta: nada se
+  pierde, así que no hace falta preguntar "¿Seguimos?"); un borrador pausado se ofrece
+  retomar una sola vez, sin insistir; los toques de botón también los responde el
+  modelo; el resumen para confirmar lleva la lista exacta de datos armada por el código
+  y el modelo escribe alrededor.
+- Sin plazo propio de redacción ni plantillas de respaldo por ahora (pedido del
+  usuario): si el verificador rechaza un texto, el modelo lo vuelve a escribir; si falla
+  dos veces, aviso breve e incidente, nunca un texto armado.
+
 **Moratoria.** Mientras dura el experimento no se agregan reglas ni parches de
 conversación. Un hallazgo nuevo se registra y se clasifica por etapa del flujo.
 
