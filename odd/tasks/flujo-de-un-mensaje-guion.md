@@ -260,3 +260,25 @@ Hallazgos:
   acumulado: 25 llamadas, 18 aceptadas, 3 rechazadas (anoche), 4 vencidas; mediana 4,0 s.
 - No hubo saludo del día: Marcos ya lo había recibido a las 00:23 (regla vigente, un
   saludo por día local).
+
+## Corrida siguiente, 08:22-08:32 (Marcos): el flujo se traba
+
+- "no lo sé" → "Eso es muy general para usarlo así. Contame un poco más de detalle": no
+  propuso un criterio (F-B7 sigue sin aparecer en vivo).
+- **"ayudame, que puedo poner?"** (pedido de ayuda SOBRE la pregunta abierta) → el ruteo lo
+  tomó como otro tema → "Estábamos con el criterio… ¿Seguimos con eso?"; con "Dejarlo y ver
+  lo otro" **se perdió el borrador entero** y recién ahí Prisma ayudó con ejemplos de
+  criterio, ya sin tarea.
+- **"por que anda"** (respuesta al criterio) → otra vez otro tema → "¿Seguimos?" → Dejarlo
+  → **se perdió el borrador** "calibrar los sensores" y salió "No te sigo. ¿Qué querés
+  saber que anda?". Dos mensajes del mismo turno otra vez en orden invertido (08:32:34).
+- Un toque viejo ("Para mí") → "Ese pedido ya no está vigente…".
+
+**Diagnóstico (F-C6, mecanismo).** La conversación del alta es un formulario de un campo
+por turno, gobernado por una clasificación cerrada del mensaje (responde / otro tema /
+charla…) que hace un modelo chico sin entender la conversación. Cuando clasifica mal, la
+regla de una sola rama convierte una respuesta o un pedido de ayuda en "¿Seguimos?", y
+"Dejarlo" borra el trabajo. Las muletillas ("Entendí que…", "Me falta…") vienen de que el
+modelo redacta campo por campo. Pedido del usuario: desactivar la protección de latencia,
+ver al modelo 100 % sin plantillas, y que la conversación fluya "como cuando hablo con
+vos".
