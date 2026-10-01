@@ -329,6 +329,24 @@ datos ficticios, que muestra qué dudas se repiten.
 **Cierre:** medido con mensajes reales, las preguntas repetidas bajan sin ninguna
 elección equivocada sin preguntar.
 
+### Objetivo propuesto desde el alta
+
+**Entrega:** cuando el trabajo que alguien pide no entra en el margen máximo de una
+tarea (ajuste del espacio, 2 meses por omisión; decisión del usuario del 2026-10-01),
+Prisma ofrece dos salidas y la persona elige: dividirlo en tareas dentro del objetivo
+que ya existe, o proponer un objetivo nuevo, que se crea en estado `propuesto` y va a
+aprobación según la política del espacio (mecánica §3 y §7) hasta quedar `activo`. Pedido
+del usuario del 2026-10-01, anotado bajo el congelamiento. Corrige de paso una
+diferencia con el núcleo: hoy `crear_objetivo` crea el objetivo directamente `activo`,
+sin aprobación (`src/prisma/herramientas.py`, `_crear_objetivo`).
+
+**Depende de:** el congelamiento levantado (alta, entrega y aprobación cumpliendo el ADR
+0014) y el margen máximo de la fecha de una tarea (rama `feat/flujo-de-un-mensaje`).
+
+**Cierre:** en una prueba real, un pedido de trabajo largo termina en tareas dentro del
+margen o en un objetivo propuesto que la autoridad aprueba; ningún objetivo queda
+`activo` sin esa aprobación.
+
 ## Horizonte posterior
 
 No se abordan hasta que las unidades anteriores estén cerradas, y cada uno requiere
