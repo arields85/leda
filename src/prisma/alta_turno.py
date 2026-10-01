@@ -40,7 +40,9 @@ from datetime import date, timedelta
 from typing import Any
 
 from .resultado_turno import NOMBRE_ASISTENTE
-from .salida import normalize_visible_text, telegram_utf16_units
+from .salida import (ETIQUETA_CANCELAR, ETIQUETA_CONFIRMAR, ETIQUETA_ENVIAR,
+                     ETIQUETA_MODIFICAR, etiqueta_sin_icono,
+                     normalize_visible_text, telegram_utf16_units)
 from .valores import Rechazado, TipoValor, ValorEsperado, validar_valor
 from .verificador_redaccion import verificar_afirmaciones
 
@@ -77,8 +79,10 @@ LIMITES_POR_OMISION = {
 # Los botones del resumen. Modificar y Cancelar salen siempre; el que cierra el alta
 # es UNO solo y lo decide el código según quién aprueba (`OpcionAlta.boton_final`):
 # el texto sólo puede nombrar los que de verdad se van a mostrar.
-BOTONES_SIEMPRE = ("Modificar", "Cancelar")
-BOTONES_DE_CIERRE = ("Confirmar", "Enviar a aprobación")
+BOTONES_SIEMPRE = tuple(etiqueta_sin_icono(e)
+                        for e in (ETIQUETA_MODIFICAR, ETIQUETA_CANCELAR))
+BOTONES_DE_CIERRE = tuple(etiqueta_sin_icono(e)
+                          for e in (ETIQUETA_CONFIRMAR, ETIQUETA_ENVIAR))
 
 _DIAS = ("lunes", "martes", "miércoles", "jueves", "viernes", "sábado",
          "domingo")
