@@ -144,3 +144,11 @@ cumplía tampoco antes: se fijó sin línea base.
   objetivo más probable primero (⭐, decisión del usuario para R4c-H4), y con el principio
   constitucional "ayuda y facilita" pasa a ser el hueco más visible del alta: con un título
   claro, Prisma tendría que proponer el objetivo (Jev elige entre los candidatos de la base).
+- **F-B11 (usuario, 2026-10-01; etapas 1 y 3).** A Ariel (área Software e interfaz HMI)
+  el alta le ofreció los seis objetivos del espacio, de todas las áreas. Por las tareas
+  sembradas: "Conectar y automatizar equipos…" y "Planos eléctricos…" son de OT,
+  "Construir o adaptar tableros…" de Sistemas eléctricos, "Fortalecer servidores…" de
+  Infraestructura IT; sólo "Robustecer la plataforma…" es de Software, y "Vincular los
+  equipos…" es el estratégico, de todos. Causa en los datos: `objective` no tiene área y
+  la semilla deja `referente_membership_id` vacío, así que hoy el sistema no puede saber
+  qué objetivo es de qué área (la relación sólo se infiere de las tareas). Va con F-B10.
