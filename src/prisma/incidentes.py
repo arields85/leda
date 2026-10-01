@@ -116,6 +116,14 @@ ETAPA_RESUMEN_SIN_CIERRE = "resumen_sin_cierre"
 # pendiente no se pudo redactar (el modelo falló o su texto no sirvió): sale sólo
 # la pregunta.
 ETAPA_CHARLA_SIN_RESPUESTA = "charla_sin_respuesta"
+# ADR 0014, enmienda del 2026-10-01 (el alta conducida por el modelo): el modelo no
+# pudo conducir un turno del alta (dio error, su salida no cumple el contrato o su
+# texto no pasó la verificación, también al reintentar): sale el aviso neutro y lo
+# que ya se entendió queda guardado.
+ETAPA_ALTA_CONDUCIDA_FALLIDA = "alta_conducida_fallida"
+# El ajuste `alta` del espacio no tiene un valor que se entienda: sigue el alta
+# guiada de siempre.
+ETAPA_INTERRUPTOR_ALTA = "interruptor_alta"
 # T9-H19e: un recibo viejo sin respuesta que la reentrega no recuperó (`huerfanos`).
 ETAPA_MENSAJE_HUERFANO = "mensaje_huerfano_sin_respuesta"
 # T9-H19g: el aviso de UN huérfano falló y se lo saltea (el resto del barrido sigue).
@@ -389,6 +397,23 @@ EXPLICACION_POR_ETAPA: dict[str, ExplicacionDeEtapa] = {
                  "breve delante."),
         que_hacer=(f"{_BUSCAR_DETALLE} y mirá el motivo. No hace falta que "
                    "{nombre} haga nada.")),
+    ETAPA_ALTA_CONDUCIDA_FALLIDA: ExplicacionDeEtapa(
+        que_paso=("En el alta conducida por el modelo, el modelo no pudo conducir "
+                  "un turno del alta de {nombre}: dio error, su salida no cumplió "
+                  "el contrato o su texto no pasó la verificación del código, "
+                  "también después de pedírselo otra vez."),
+        que_vio=(NOTICIA_NEUTRA_INCIDENTE + " Si faltaba elegir un objetivo o un "
+                 "responsable, los botones salieron con el nombre del dato; lo que "
+                 "ya se había entendido quedó guardado."),
+        que_hacer=(f"{_BUSCAR_DETALLE} y mirá los motivos de los intentos. Si el "
+                   "modelo está caído, los avisos se agrupan. {nombre} puede "
+                   "volver a escribir.")),
+    ETAPA_INTERRUPTOR_ALTA: ExplicacionDeEtapa(
+        que_paso=("El ajuste `alta` del espacio no vale ni `conversada` ni "
+                  "`guiada`: se usa el alta guiada de siempre."),
+        que_vio="Nada raro: el alta guiada de siempre, un dato por vez.",
+        que_hacer=("Corregí el ajuste `alta` del espacio (`conversada` o "
+                   "`guiada`). No hace falta que {nombre} haga nada.")),
     "indicador_actividad": ExplicacionDeEtapa(
         que_paso=("No se pudo retirar el borrador nativo del indicador de "
                   "actividad; puede haber quedado visible."),
@@ -522,7 +547,8 @@ def registrar_incidente(cur, workspace_id: str | None, resumen: str, *,
                         chat_id: int | None = None,
                         app_user_id: str | None = None,
                         notificado_en=None,
-                        avisar_admin: bool = True) -> str:
+                        avisar_admin: bool = True,
+                        nota_sin_aviso: str | None = None) -> str:
     """Inserta un incidente sanitizado y avisa a la administración de
     plataforma (Constitución §10). Helper compartido para que quien necesite
     registrar un incidente no arme el insert a mano en cada lugar nuevo.
@@ -555,6 +581,11 @@ def registrar_incidente(cur, workspace_id: str | None, resumen: str, *,
     sabe caído -- y el `resumen` deja una nota honesta, mismo criterio que
     cuando nadie es alcanzable.
 
+    `nota_sin_aviso`, si viene, es la razón honesta que queda en el `resumen`
+    cuando no se avisa a la administración: sin ella, la de siempre (el canal de
+    administración falló). Sirve a quien agrupa los avisos (muchos fallos del mismo
+    modelo caído no son una tormenta de avisos) y lo dice tal cual.
+
     Devuelve el id del incidente insertado."""
     incident_id = str(uuid.uuid4())
     referencia_cruda = redactar_secreto_telegram(referencia_cruda)
@@ -576,9 +607,10 @@ def registrar_incidente(cur, workspace_id: str | None, resumen: str, *,
                               "administrador de plataforma tiene el bot de "
                               "administración vinculado.")
     else:
-        resumen_final += (" No se avisó a la administración: el canal de "
-                          "administración es justamente el que falló -- "
-                          "revisar con `python -m prisma incidentes <espacio>`.")
+        resumen_final += nota_sin_aviso or (
+            " No se avisó a la administración: el canal de "
+            "administración es justamente el que falló -- "
+            "revisar con `python -m prisma incidentes <espacio>`.")
 
     cur.execute(
         """insert into incident (id, workspace_id, severidad, resumen_sanitizado,

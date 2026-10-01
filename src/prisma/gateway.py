@@ -565,11 +565,26 @@ def procesar_update(conn, slug: str, update: dict,
             if texto.strip() and privado:
                 from .ingreso_tareas import handle_active_text, open_intake_question
 
+                from . import alta_conducida
+
+                conducida = alta_conducida.solicitud_conducida(cur, quien, chat_id)
+                if conducida is not None:
+                    # El alta conducida por el modelo (ADR 0014, enmienda del
+                    # 2026-10-01): con el ajuste `alta = conversada`, el borrador en
+                    # curso es la rama abierta y cada mensaje es UN turno del modelo
+                    # con la conversación y el borrador, en cualquier orden y con
+                    # correcciones. No pasa por el ruteo cerrado de `_turno`.
+                    handled_intake_text = True
+                    with mantener_chat_activo(config.token_bot(slug), chat_id,
+                                              chat_type=chat_type, cur=cur,
+                                              workspace_id=workspace_id):
+                        _atender_alta_conducida(cur, quien, conducida, texto,
+                                                workspace_id, chat_id, entrante_id)
                 # Una pregunta abierta del alta (un campo de texto libre, una
                 # elección con botones o el borrador esperando su
                 # confirmación) no se toma acá: `_turno` la interpreta como
                 # cualquier pregunta pendiente (T9-R1c-1 y T9-R1c-2).
-                if open_intake_question(cur, quien, chat_id) is None:
+                elif open_intake_question(cur, quien, chat_id) is None:
                     handled_intake_text = handle_active_text(
                         cur, quien, chat_id=chat_id, source_inbound_id=entrante_id,
                         source_raw_text=texto, now=datetime.now(timezone.utc),
@@ -923,8 +938,16 @@ def _toque(conn, workspace_id: str, slug: str, toque: dict,
                 return {"ok": True}
 
             if intake_token:
-                resultado_alta = I.resolve_choice(cur, quien, token=intake_token,
-                                                  chat_id=chat_id, now=ahora)
+                from . import alta_conducida
+
+                if alta_conducida.es_eleccion_conducida(cur, quien, intake_token):
+                    # Un botón del alta conducida por el modelo: el código guarda
+                    # la opción elegida y el modelo contesta el toque.
+                    resultado_alta = alta_conducida.conducir_toque(
+                        cur, quien, token=intake_token, chat_id=chat_id, now=ahora)
+                else:
+                    resultado_alta = I.resolve_choice(
+                        cur, quien, token=intake_token, chat_id=chat_id, now=ahora)
                 if resultado_alta.stale or (
                         resultado_alta.inert and not respuestas_del_mensaje(
                             cur, toque_id, chat_id)):
@@ -2687,6 +2710,51 @@ def _dejar_y_ver_lo_otro(cur, quien, workspace_id: str, chat_id: int, abierta,
                           no_proponer=_lo_dejado_de(abierta))
 
 
+def _atender_alta_conducida(cur, quien, solicitud, texto: str, workspace_id: str,
+                            chat_id: int, entrante_id: str | None) -> None:
+    """El mensaje de quien tiene un alta conducida por el modelo: un turno del
+    modelo (`alta_conducida.conducir_mensaje`) y, si la persona cambió de tema, el
+    borrador queda pausado y el mensaje lo atiende el camino normal."""
+    from . import alta_conducida
+
+    ahora = datetime.now(timezone.utc)
+    resultado = alta_conducida.conducir_mensaje(cur, quien, solicitud, texto, ahora)
+    if resultado.otro_tema:
+        _atender_otro_tema_del_alta(cur, quien, solicitud, texto, workspace_id,
+                                    chat_id, entrante_id, ahora)
+
+
+def _atender_otro_tema_del_alta(cur, quien, solicitud, texto: str,
+                                workspace_id: str, chat_id: int,
+                                entrante_id: str | None, ahora) -> None:
+    """La persona cambió de tema en medio del alta (decisión del usuario,
+    2026-10-01): el borrador ya quedó pausado, así que nada se pierde y no hace falta
+    preguntar "¿Seguimos?". Prisma atiende lo otro directamente y, en la misma
+    respuesta, dice que la tarea quedó guardada (`dejar_nota`)."""
+    from . import alta_conducida
+    from .calendario import Calendario
+    from .llm import desde_base
+
+    titulo = alta_conducida.titulo_del_borrador(cur, str(solicitud["id"]))
+    dejar_nota(cur, AVISO_ALTA_PAUSADA.format(
+        titulo=f" «{titulo}»" if titulo else ""))
+    cal = Calendario.desde_base(cur, workspace_id)
+    proveedor = desde_base(cur, workspace_id, config)
+    route, error = _rutear(proveedor, texto,
+                           historial=_historial_del_turno(cur, chat_id, ahora,
+                                                          entrante_id))
+    if route is None:
+        _avisar_ruteo_caido(cur, quien, error, workspace_id, chat_id, ahora)
+        return
+    # Lo que se acaba de dejar no se propone de nuevo en este turno (como
+    # `_dejar_y_ver_lo_otro`): armar una tarea nueva.
+    _seguir_camino_normal(
+        cur, quien, texto, route, proveedor, cal, chat_id, workspace_id, ahora,
+        entrante_id,
+        no_proponer={"herramienta": None, "campo": None, "valor": None,
+                     "dejado": "el borrador de la tarea nueva", "alta": True})
+
+
 def _iniciar_alta_guiada(cur, quien, chat_id: int, entrante_id: str | None,
                          texto: str, route_task: dict, workspace_id: str,
                          now) -> None:
@@ -2696,14 +2764,21 @@ def _iniciar_alta_guiada(cur, quien, chat_id: int, entrante_id: str | None,
     try:
         if entrante_id is None:
             raise ValueError("Task routing requires a persisted inbound message.")
+        from . import alta_conducida
         from .ingreso_tareas import start
 
         with cur.connection.transaction(force_rollback=False):
             outcome = start(
                 cur, quien, chat_id=chat_id, source_inbound_id=entrante_id,
                 source_raw_text=texto, proposals=route_task, now=now,
+                conducido=alta_conducida.alta_conducida(cur, workspace_id),
             )
-            if not outcome.changed:
+            if outcome.conducir:
+                # El primer turno del modelo, con el mensaje que abrió el alta:
+                # así se toman todos los datos que trae.
+                outcome = alta_conducida.arrancar(cur, quien, outcome.request_id,
+                                                  texto, now)
+            if not (outcome.changed or outcome.responded):
                 raise RuntimeError("Task capture did not open a server-owned prompt.")
     except Exception as exc:  # noqa: BLE001
         _routing_incident(cur, quien, exc)

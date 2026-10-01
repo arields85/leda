@@ -67,6 +67,10 @@ LIMITES_POR_OMISION = {
     "title": 200, "description": 800, "acceptance_criterion": 500,
 }
 
+# Los botones del resumen, que el texto puede nombrar (el cierre del código también
+# los nombra): son palabras del sistema, no nombres inventados.
+BOTONES_DEL_RESUMEN = ("Confirmar", "Modificar", "Cancelar", "Enviar a aprobación")
+
 _DIAS = ("lunes", "martes", "miércoles", "jueves", "viernes", "sábado",
          "domingo")
 _SUJETOS = {
@@ -117,6 +121,10 @@ class HechosTurno:
     evento: Mapping[str, Any] = field(default_factory=lambda: {"mensaje": ""})
     limites: Mapping[str, int] = field(
         default_factory=lambda: dict(LIMITES_POR_OMISION))
+    # Lo que ya se dijeron (los textos de la conversación reciente): el modelo lo lee
+    # aparte, como mensajes. Acá sólo sirve para verificar: lo que ya está dicho en
+    # la conversación se puede volver a decir (una propuesta que la persona acepta).
+    conversacion: tuple[str, ...] = ()
 
     @property
     def faltan(self) -> tuple[str, ...]:
@@ -462,7 +470,7 @@ def _textos_permitidos(h: HechosTurno, a: Aplicacion) -> list[str]:
     sólo como las lee una persona (`dd/mm/aaaa`, nunca ISO: el verificador entiende
     ésas) y lo que esta misma aplicación acaba de guardar."""
     textos = [h.quien_escribe, h.area, h.evidencia, _mostrada(h.hoy),
-              _DIAS[h.hoy.weekday()]]
+              _DIAS[h.hoy.weekday()], *BOTONES_DEL_RESUMEN]
     for n in range(DIAS_DE_CALENDARIO):
         dia = h.hoy + timedelta(days=n)
         textos += [_DIAS[dia.weekday()], _mostrada(dia)]
@@ -474,6 +482,7 @@ def _textos_permitidos(h: HechosTurno, a: Aplicacion) -> list[str]:
     for clave in ("mensaje", "elegida"):
         if isinstance(h.evento.get(clave), str):
             textos.append(h.evento[clave])
+    textos += list(h.conversacion)
     textos += [x.mostrado for x in a.asignaciones]
     textos += list(a.rechazos)
     return [t for t in textos if t]
@@ -504,8 +513,10 @@ def verificar_turno(salida: SalidaTurno, h: HechosTurno, a: Aplicacion) -> str |
     if faltan:
         if not salida.pregunta or not _hay_pregunta(salida.texto):
             return f"falta_pregunta: {_SUJETOS[faltan[0]]}"
-    elif salida.intencion != "ayuda" and (salida.pregunta
-                                          or _hay_pregunta(salida.texto)):
+    elif (salida.intencion != "ayuda" and h.evento.get("toque") != "modificar"
+          and (salida.pregunta or _hay_pregunta(salida.texto))):
+        # Tocar Modificar con todo completo es la única vez que se pregunta algo
+        # sin que falte un dato: qué quiere cambiar la persona.
         return "pregunta_sin_falta: no hay ningún dato que pedir"
     if salida.botones:
         if salida.botones not in faltan:
@@ -587,6 +598,10 @@ SISTEMA_ALTA = (
     "inventes opciones, datos ni hechos.\n"
     "- `corrige`: los datos ya confirmados que la persona cambia. Un valor para "
     "un dato confirmado sólo vale si va acá.\n"
+    "Si la persona no sabe qué poner (\"ayudame\", \"no sé\"), ayudala: con ayuda, "
+    "da un ejemplo de la forma (sin números, fechas ni nombres propios) o proponé "
+    "vos algo concreto en el `texto` y preguntale si le sirve; cuando lo acepte, "
+    "mandalo en `valores`.\n"
     "- `pregunta` (hasta dos) y `botones` (objective o responsible): qué pedís a "
     "continuación, sólo de lo que falte DESPUÉS de este mensaje; si pedís el "
     "objetivo o el responsable, `botones` lleva ese dato. Si ya no falta nada, no "

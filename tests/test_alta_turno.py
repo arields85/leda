@@ -393,6 +393,21 @@ def test_un_nombre_que_dijo_la_persona_si_se_puede_decir():
     assert motivo is None
 
 
+def test_lo_que_ya_se_dijeron_en_la_conversacion_se_puede_volver_a_decir():
+    """Una propuesta que el modelo hizo en un mensaje anterior (con un número que no
+    está en los hechos) se puede repetir al confirmarla."""
+    h = hechos(conversacion=("¿Te sirve «Prueba de 24 h sin fallas»?",))
+    assert verificar(h, texto="Listo, queda «Prueba de 24 h sin fallas». ¿Quién?",
+                     pregunta=["responsible"]) is None
+    assert verificar(texto="Listo, queda «Prueba de 24 h sin fallas». ¿Quién?",
+                     pregunta=["responsible"]).startswith(("numero", "nombre"))
+
+
+def test_los_botones_del_resumen_se_pueden_nombrar():
+    assert verificar(completo(), intencion="ayuda",
+                     texto="Con el botón Confirmar se crea la tarea.") is None
+
+
 def test_los_nombres_de_las_opciones_y_de_quien_escribe_se_pueden_decir():
     assert verificar(texto="Puede ser Sam North o vos, Taylor Quinn. ¿Quién?",
                      pregunta=["responsible"]) is None
@@ -432,6 +447,13 @@ def test_con_todo_completo_el_texto_no_pregunta():
     assert verificar(completo(), texto="Ya está todo, revisalo.") is None
     assert verificar(completo(), texto="¿Está todo bien?").startswith(
         "pregunta_sin_falta")
+
+
+def test_al_tocar_modificar_con_todo_completo_se_puede_preguntar_que_cambiar():
+    h = completo()
+    h = HechosTurno(**{**h.__dict__, "evento": {"toque": "modificar"}})
+    assert verificar(h, intencion="ayuda", texto="Claro, ¿qué querés cambiar?") is None
+    assert verificar(h, texto="Claro, ¿qué querés cambiar?") is None
 
 
 def test_los_botones_son_de_un_dato_con_opciones_y_que_se_pregunta():

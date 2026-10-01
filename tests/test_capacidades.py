@@ -76,8 +76,15 @@ TABLAS_MUERTAS = ("conversation_access_log", "learning")
 TABLAS_POR_FUNCION = ("acceso_tablero",)
 
 
+# Módulos cuyo vocabulario no es el del esquema: el contrato del turno del alta
+# conducida llama `intencion` a la intención que devuelve el modelo en cada turno
+# (no es la columna `intencion` del mensaje entrante, que sigue sin implementarse).
+MODULOS_CON_VOCABULARIO_PROPIO = ("alta_turno.py", "alta_conducida.py")
+
+
 def _fuente() -> str:
-    return "\n".join(p.read_text("utf-8") for p in sorted(FUENTE.glob("*.py")))
+    return "\n".join(p.read_text("utf-8") for p in sorted(FUENTE.glob("*.py"))
+                     if p.name not in MODULOS_CON_VOCABULARIO_PROPIO)
 
 
 def _columnas_por_tabla() -> dict[str, set[str]]:

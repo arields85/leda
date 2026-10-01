@@ -21,8 +21,8 @@ from .incidentes import (ETAPA_CONFIGURACION_ALTA, ETAPA_CRITERIO_SIN_PROPUESTA,
                          REFERENCIA_INBOUND_MESSAGE, REFERENCIA_PENDING_ACTION,
                          registrar_incidente)
 from .pendientes import HERRAMIENTA_REVISION_BORRADOR
-from .redaccion import (TextoRedactado, nombre_legible, redactar_partes,
-                        redactar_turno, variante_redaccion)
+from .redaccion import (TextoRedactado, _resumen_b, nombre_legible,
+                        redactar_partes, redactar_turno, variante_redaccion)
 from .resultado_turno import (Cambio, Falta, OpcionDisponible, Rechazo,
                               ResultadoTurno, Resumen, SinCambio, ValorAceptado)
 from .salida import (BUTTON_TEXT_LIMIT, ETIQUETA_CANCELAR, ETIQUETA_CONFIRMAR,
@@ -144,6 +144,10 @@ class IntakeOutcome:
     # estado real del alta, ADR 0013 regla 3): quien llama no vuelve a preguntar
     # ni encola otro texto encima. Tampoco se persiste.
     responded: bool = False
+    # La solicitud quedó creada y falta el turno del modelo (alta conducida,
+    # `alta_conducida.arrancar`): quien llama lo corre, con el mensaje que la abrió.
+    # Tampoco se persiste.
+    conducir: bool = False
 
     def as_json(self) -> dict[str, Any]:
         return {
@@ -181,7 +185,13 @@ def callback_data(token: str) -> str:
 
 def start(cur: psycopg.Cursor, who: Solicitante, *, chat_id: int,
           source_inbound_id: str, source_raw_text: str,
-          proposals: dict[str, Any], now: datetime) -> IntakeOutcome:
+          proposals: dict[str, Any], now: datetime,
+          conducido: bool = False) -> IntakeOutcome:
+    """Abre el alta. Con `conducido` (el alta conducida por el modelo) la solicitud
+    se crea sin proponer ni preguntar nada: devuelve `conducir` y quien llama corre
+    el primer turno del modelo con el mensaje que la abrió, así los datos que ese
+    mensaje trae se toman todos. Con un borrador en curso, la elección de siempre
+    (continuar, cancelar, empezar otro)."""
     if chat_id <= 0:
         return IntakeOutcome("", "Podemos armar el borrador sólo en un chat privado.",
                              inert=True)
@@ -236,6 +246,8 @@ def start(cur: psycopg.Cursor, who: Solicitante, *, chat_id: int,
                values (%s, %s, %s)""",
             (request_id, who.workspace_id, field),
         )
+    if conducido:
+        return IntakeOutcome(request_id, changed=True, conducir=True)
     avisos = _store_proposals(
         cur, request_id, proposals, source_inbound_id, source_raw_text, now,
         who.workspace_id,
@@ -412,25 +424,33 @@ def resolve_choice(cur: psycopg.Cursor, who: Solicitante, *, token: str,
     cur.execute(
         """update task_intake_request
               set version = version + 1, actualizado_en = %s,
-                  terminal_result = null
+                  terminal_result = case
+                      when terminal_result ? %s
+                      then jsonb_build_object(%s::text, true) else null end
             where id = %s returning *""",
-        (now, request_id),
+        (now, CRITERIO_PROPUESTO, CRITERIO_PROPUESTO, request_id),
     )
     request = cur.fetchone()
     action = choice["accion"]
     if action == "continue":
-        outcome = _advance(cur, request, who, now)
+        outcome = _seguir_con_el_borrador(cur, request, who, now)
     elif action == "cancel":
         outcome = _cancel(cur, request, who, now)
     elif action == "start_new":
         payload = choice["valor"]
         _cancel(cur, request, who, now, enqueue=False)
+        from . import alta_conducida
+
+        conducido = alta_conducida.alta_conducida(cur, who.workspace_id)
         outcome = start(
             cur, who, chat_id=chat_id,
             source_inbound_id=payload["source_inbound_id"],
             source_raw_text=payload["source_raw_text"],
-            proposals=payload["proposals"], now=now,
+            proposals=payload["proposals"], now=now, conducido=conducido,
         )
+        if outcome.conducir:
+            outcome = alta_conducida.arrancar(
+                cur, who, outcome.request_id, payload["source_raw_text"], now)
     elif action == "other":
         outcome = _open_free_text(
             cur, request, choice["campo"],
@@ -491,6 +511,16 @@ def resolve_choice(cur: psycopg.Cursor, who: Solicitante, *, token: str,
         (Jsonb(persisted), choice["choice_id"]),
     )
     return outcome
+
+
+def _seguir_con_el_borrador(cur, request, who, now) -> IntakeOutcome:
+    """"Continuar borrador" (`resolve_choice`): con el alta conducida, el modelo
+    retoma la conversación donde estaba; si no, la próxima pregunta de siempre."""
+    from . import alta_conducida
+
+    if alta_conducida.alta_conducida(cur, who.workspace_id):
+        return alta_conducida.continuar(cur, who, request, now)
+    return _advance(cur, request, who, now)
 
 
 def consume_pending_text(cur: psycopg.Cursor, who: Solicitante, *, chat_id: int,
@@ -923,6 +953,10 @@ QUESTION_CHOICE = "choice"            # una elección con botones
 QUESTION_CONFIRMATION = "confirmation"  # el borrador esperando su confirmación
 # La marca de un borrador pausado en `terminal_result` (`pause_from_intake_question`).
 PAUSADO = "pausado"
+# La marca de que el alta conducida ya le propuso un criterio de aceptación a la
+# persona (una sola propuesta por alta): vive en `terminal_result` junto a la pausa,
+# sin cambiar el esquema, y `resolve_choice` la conserva.
+CRITERIO_PROPUESTO = "criterio_propuesto"
 _TITLE_OF_REQUEST = """(select f.valor from task_intake_field f
                          where f.request_id = r.id and f.campo = 'title'
                            and f.estado = 'confirmed')"""
@@ -1077,10 +1111,19 @@ def pause_from_intake_question(cur: psycopg.Cursor, who: Solicitante, kind: str,
     request = _request_of_question(cur, who, kind, question_id, lock=True)
     if not request:
         return False
+    pause_request(cur, who, request, now)
+    return True
+
+
+def pause_request(cur, who: Solicitante, request, now: datetime) -> None:
+    """Pausa el borrador de `request` (ya leído y bloqueado): lo guarda sin
+    ninguna pregunta abierta ni botones vivos, y lo audita. Lo usan "Dejarlo" y el
+    alta conducida (la persona lo deja para después o cambia de tema)."""
     request_id = str(request["id"])
     cur.execute(
         """update task_intake_request
-              set terminal_result = %s, version = version + 1, actualizado_en = %s
+              set terminal_result = coalesce(terminal_result, '{}'::jsonb) || %s,
+                  version = version + 1, actualizado_en = %s
             where id = %s""",
         (Jsonb({PAUSADO: True}), now, request_id))
     _invalidate_open_inputs(cur, request_id)
@@ -1089,7 +1132,6 @@ def pause_from_intake_question(cur: psycopg.Cursor, who: Solicitante, kind: str,
         actor_app_user_id=who.app_user_id, actor_kind="persona",
         sujeto_tipo="task_draft", sujeto_id=str(request["task_draft_id"]),
         detalle={"request_id": request_id})
-    return True
 
 
 def open_modify_picker(cur: psycopg.Cursor, who: Solicitante, question_id: str,
@@ -1253,6 +1295,15 @@ def modify_from_preview(cur: psycopg.Cursor, who: Solicitante, *, token: str,
         raise Denegado(NOT_YOURS)
     if preview["estado"] != "esperando" or not preview["vigente"]:
         return None
+    from . import alta_conducida
+
+    if alta_conducida.alta_conducida(cur, who.workspace_id):
+        # El alta conducida no tiene un selector de datos: lo conversa el modelo.
+        request = _request_of_question(cur, who, QUESTION_CONFIRMATION,
+                                       str(preview["id"]), lock=True)
+        if not request:
+            return None
+        return alta_conducida.modificar(cur, who, request, now)
     return open_modify_picker(cur, who, str(preview["id"]), now, via="boton")
 
 
@@ -1735,34 +1786,9 @@ def _advance(cur, request, who, now, *, prefijo: str = "",
             return _open_free_text(cur, request, field, _free_text_prompt(field),
                                    now, prefijo=prefijo)
         if field == "evidence":
-            cur.execute(
-                """select valor from task_intake_field
-                    where request_id = %s and campo = 'area'
-                      and estado = 'confirmed'""",
-                (request_id,),
-            )
-            area = cur.fetchone()
-            cur.execute(
-                """select evidencia_requerida, version
-                     from task_evidence_policy
-                    where workspace_id = %s and area_id = %s""",
-                (who.workspace_id, area["valor"]["id"]),
-            )
-            policy = cur.fetchone()
-            if not policy:
-                return _say_real_state(cur, request, NO_EVIDENCE_POLICY, now,
-                                       "no-evidence-policy")
-            if not _evidence_deliverable(policy["evidencia_requerida"]):
-                return _configuration_error(cur, request, who, "evidence", now)
-            cur.execute(
-                """update task_intake_field
-                      set estado = 'confirmed', valor = %s,
-                          proposed_by = 'server', version = version + 1,
-                          actualizado_en = %s
-                    where request_id = %s and campo = 'evidence'""",
-                (Jsonb({"items": list(policy["evidencia_requerida"]),
-                        "version": policy["version"]}), now, request_id),
-            )
+            problema = _completar_evidencia(cur, request, who, now)
+            if problema is not None:
+                return problema
             continue
         unica = _unica_opcion(cur, request, who, field)
         if unica is not None:
@@ -1783,6 +1809,43 @@ def _advance(cur, request, who, now, *, prefijo: str = "",
             prefijo=prefijo,
         )
     return _finalize(cur, request, who, now)
+
+
+def _completar_evidencia(cur, request, who, now) -> IntakeOutcome | None:
+    """La evidencia que exige la política del área ya confirmada del borrador: la
+    pone el servidor, nunca la persona. `None` si quedó completa; si no, el estado
+    real que lo impide (sin política, o una política que no se puede mostrar), ya
+    dicho a quien actuó."""
+    request_id = str(request["id"])
+    cur.execute(
+        """select valor from task_intake_field
+            where request_id = %s and campo = 'area'
+              and estado = 'confirmed'""",
+        (request_id,),
+    )
+    area = cur.fetchone()
+    cur.execute(
+        """select evidencia_requerida, version
+             from task_evidence_policy
+            where workspace_id = %s and area_id = %s""",
+        (who.workspace_id, area["valor"]["id"]),
+    )
+    policy = cur.fetchone()
+    if not policy:
+        return _say_real_state(cur, request, NO_EVIDENCE_POLICY, now,
+                               "no-evidence-policy")
+    if not _evidence_deliverable(policy["evidencia_requerida"]):
+        return _configuration_error(cur, request, who, "evidence", now)
+    cur.execute(
+        """update task_intake_field
+              set estado = 'confirmed', valor = %s,
+                  proposed_by = 'server', version = version + 1,
+                  actualizado_en = %s
+            where request_id = %s and campo = 'evidence'""",
+        (Jsonb({"items": list(policy["evidencia_requerida"]),
+                "version": policy["version"]}), now, request_id),
+    )
+    return None
 
 
 # Los objetivos que se ofrecen a quien pide (F-B11): los de su área. Una persona
@@ -2146,7 +2209,11 @@ def _invalidate_open_inputs(cur, request_id):
     )
 
 
-def _finalize(cur, request, who, now):
+def _finalize(cur, request, who, now, apertura: str | None = None):
+    """Arma el resumen del borrador completo y se lo ofrece a quien confirma. Con
+    `apertura` (el alta conducida: la frase con que el modelo ya contestó el turno)
+    el resumen sale con esa frase delante y sin otra llamada al modelo; los datos y el
+    cierre que nombra el botón siguen siendo del código."""
     request_id = str(request["id"])
     cur.execute(
         "select campo, valor from task_intake_field where request_id = %s",
@@ -2273,7 +2340,9 @@ def _finalize(cur, request, who, now):
     )
     resumen = render_resumen(**datos, cur=cur,
                              workspace_id=str(request["workspace_id"]),
-                             historial=_conversacion_de(cur, request, now))
+                             historial=(None if apertura is not None
+                                        else _conversacion_de(cur, request, now)),
+                             apertura=apertura)
     preview_text = resumen.texto
     try:
         prepare_payload(preview_text, dedupe_key="intake-preview", has_buttons=True)
@@ -2459,7 +2528,7 @@ def cierre_enviar(confirma: str | None) -> str:
 def render_resumen(*, title, description="", objective, area, responsible, due_date,
                    acceptance_criterion, evidence, cierre=CIERRE_CONFIRMAR,
                    variante="B", cur=None, workspace_id=None,
-                   historial=None) -> TextoRedactado:
+                   historial=None, apertura=None) -> TextoRedactado:
     """El resumen para revisar, redactado por `redaccion` (ADR 0014, etapa 6), en
     cuerpo y cierre. Con `cur` la variante A puede llamar al modelo (y registra el
     intento); sin él son las plantillas. Sólo muestra lo que tiene: una
@@ -2476,6 +2545,10 @@ def render_resumen(*, title, description="", objective, area, responsible, due_d
                ("Evidencia", evidence_text)]
     resultado = ResultadoTurno(resumen=Resumen(
         "Resumen para revisar", tuple(lineas), cierre))
+    if apertura is not None:
+        # La frase ya la dijo el modelo en su turno: sólo se arma el resumen.
+        return TextoRedactado(f"{apertura}\n\n{_resumen_b(resultado.resumen)}",
+                              cierre)
     if cur is None:
         return redactar_partes(resultado, variante)
     texto = redactar_turno(cur, workspace_id, resultado, variante,
