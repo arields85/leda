@@ -28,6 +28,11 @@ from tests.test_alta_guiada_flujo import (CHAT, TITULO, _alta_en_el_objetivo, _c
                                           _escribir, _nuevas, _ruta, _salidas, _slot)
 from tests.test_task_intake import NOW, _RoutingProvider, _actor, _callback_client
 
+# Estas pruebas son de la variante A con el plazo propio y el respaldo de plantilla de B
+# (el comportamiento anterior al modelo puro, `redaccion.MODELO_PURO = False`); el modelo
+# puro, el de por omisión, se prueba en `test_redaccion_modelo_puro.py`.
+pytestmark = pytest.mark.usefixtures("con_respaldo_de_plantilla")
+
 
 def _json(texto, pregunta=None, afirma=()):
     return json.dumps({"texto": texto, "pregunta": pregunta, "afirma": list(afirma)},

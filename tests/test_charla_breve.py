@@ -24,6 +24,11 @@ from tests.test_menu_tarea import cliente  # noqa: F401
 from tests.test_pregunta_pendiente_otras import (_con_rutas, _filas_del_chat,
                                                  _ruta, _salidas)
 
+# Estas pruebas son de la variante A con el plazo propio y el respaldo de plantilla de B
+# (el comportamiento anterior al modelo puro, `redaccion.MODELO_PURO = False`); el modelo
+# puro, el de por omisión, se prueba en `test_redaccion_modelo_puro.py`.
+pytestmark = pytest.mark.usefixtures("con_respaldo_de_plantilla")
+
 BREVE = "¡Hola! Un gusto."
 
 

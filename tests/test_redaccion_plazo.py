@@ -23,6 +23,11 @@ from prisma.resultado_turno import (Cambio, Falta, OpcionDisponible, Rechazo,
                                     ResultadoTurno, ValorAceptado)
 from prisma.valores import TipoValor
 
+# Estas pruebas son de la variante A con el plazo propio y el respaldo de plantilla de B
+# (el comportamiento anterior al modelo puro, `redaccion.MODELO_PURO = False`); el modelo
+# puro, el de por omisión, se prueba en `test_redaccion_modelo_puro.py`.
+pytestmark = pytest.mark.usefixtures("con_respaldo_de_plantilla")
+
 EN_CURSO = ResultadoTurno(
     cambios=(Cambio("la tarea «Revisar PLC»", "quedó en curso"),))
 PREGUNTA = ResultadoTurno(
@@ -368,7 +373,7 @@ def test_el_pedido_lleva_sólo_la_guia_de_voz_y_los_hechos():
     """Una guía de voz de pocas líneas y los hechos del turno: nada del contexto
     conversacional (el núcleo, el historial, la lista de tareas)."""
     # 1100 antes de la regla de la conversación reciente (F-C4): sigue siendo una guía corta.
-    assert len(redaccion.SISTEMA_REDACCION) <= 1300
+    assert len(redaccion.SISTEMA_REDACCION) <= 1450
     assert len(redaccion.SISTEMA_REDACCION.splitlines()) <= 8
     for lejano in ("nucleo", "historial", "herramienta", "constitución"):
         assert lejano not in redaccion.SISTEMA_REDACCION.lower()

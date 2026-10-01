@@ -23,6 +23,11 @@ from tests.test_alta_enviar_a_aprobacion import (_acciones, _alta_en_revision, _
 from tests.test_alta_guiada_flujo import _cuerpos, _empezar
 from tests.test_task_intake import _callback_client
 
+# Estas pruebas son de la variante A con el plazo propio y el respaldo de plantilla de B
+# (el comportamiento anterior al modelo puro, `redaccion.MODELO_PURO = False`); el modelo
+# puro, el de por omisión, se prueba en `test_redaccion_modelo_puro.py`.
+pytestmark = pytest.mark.usefixtures("con_respaldo_de_plantilla")
+
 PREGUNTA_B = "¿Qué hay que hacer?"
 
 

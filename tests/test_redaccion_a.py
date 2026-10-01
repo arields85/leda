@@ -23,6 +23,11 @@ from prisma.resultado_turno import (
 )
 from prisma.valores import TipoValor
 
+# Estas pruebas son de la variante A con el plazo propio y el respaldo de plantilla de B
+# (el comportamiento anterior al modelo puro, `redaccion.MODELO_PURO = False`); el modelo
+# puro, el de por omisión, se prueba en `test_redaccion_modelo_puro.py`.
+pytestmark = pytest.mark.usefixtures("con_respaldo_de_plantilla")
+
 EN_CURSO = ResultadoTurno(
     cambios=(Cambio("la tarea «Revisar PLC»", "quedó en curso"),),
     estado=(Estado("«Revisar PLC»", "en curso"),))

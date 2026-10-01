@@ -6,7 +6,10 @@ la sección `conversacion` del pack; `docs/architecture/frontera.md`, regla 5):
 
 - **B.** Plantillas del código para lo que cambió, cómo quedó y qué falta.
 - **A.** El modelo redacta a partir del resultado del turno y el código
-  verifica el texto (`verificador_redaccion`); si el texto no sirve o el
+  verifica el texto (`verificador_redaccion`). Con `MODELO_PURO` (por omisión,
+  mientras dure el experimento) no hay plazo propio ni plantilla de respaldo: un
+  rechazo se corrige una vez con el motivo y, si no sale un texto, queda un
+  incidente y el aviso neutro. Sin `MODELO_PURO`, si el texto no sirve o el
   modelo falla, sale el de B, que lo reemplaza, y queda registrado
   (`redactar_turno`). `redactar` y `redactar_partes` no llaman al modelo: son
   siempre las plantillas.
@@ -28,7 +31,8 @@ import httpx
 import psycopg
 
 from .db import registrar_auditoria
-from .incidentes import (ETAPA_CHARLA_SIN_RESPUESTA, ETAPA_REDACCION_RECHAZADA,
+from .incidentes import (ETAPA_CHARLA_SIN_RESPUESTA, ETAPA_REDACCION_FALLIDA,
+                         ETAPA_REDACCION_RECHAZADA, NOTICIA_NEUTRA_INCIDENTE,
                          registrar_incidente)
 from .llm import PlazoAgotado, llamar_con_plazo
 from .resultado_turno import Falta, ResultadoTurno, Resumen, ids_de_cambios
@@ -49,6 +53,14 @@ _reloj = time.perf_counter
 # vivo (nan/deepseek-v4-flash, la llamada de redacción): p50 0,93 s, p90 3,06 s,
 # máximo 6,6 s; con 3 s caerían ~10 % de los turnos a B, con 4 s ~4 %.
 PLAZO_REDACCION_S = 4.0
+# El modelo puro (pedido del usuario, 2026-10-01; mientras dure el experimento): sin
+# plazo propio (queda el timeout HTTP normal del proveedor, para que nada se cuelgue
+# para siempre) y sin plantilla de respaldo. Si el verificador rechaza el texto se le
+# pide UNA vez más al modelo, con el motivo (`INTENTOS_MODELO_PURO` en total); si
+# falla de nuevo, o da error, queda un incidente y sale un aviso neutro y corto.
+# `MODELO_PURO = False` restaura el plazo de `PLAZO_REDACCION_S` y el respaldo de B.
+MODELO_PURO = True
+INTENTOS_MODELO_PURO = 2
 
 # (espacio, valor) ya registrados por este proceso: la anomalía del interruptor
 # se nota una vez, no en cada turno (mismo criterio que el supresor de
@@ -121,16 +133,18 @@ class TextoRedactado:
     """Un texto en sus dos partes: el cuerpo y el cierre del botón que le toca
     a quien lo lee (R8). El cierre es una parte propia, nunca el último
     párrafo de un texto que habría que volver a cortar: otra redacción puede
-    no tener la forma `cuerpo + párrafo`."""
+    no tener la forma `cuerpo + párrafo`. `fallida` dice que el modelo no pudo
+    redactarlo (modelo puro) y el cuerpo es el aviso neutro."""
     cuerpo: str
     cierre: str = ""
+    fallida: bool = False
 
     @property
     def texto(self) -> str:
         return f"{self.cuerpo}\n\n{self.cierre}" if self.cierre else self.cuerpo
 
     def con_cierre(self, cierre: str) -> TextoRedactado:
-        return TextoRedactado(self.cuerpo, cierre)
+        return TextoRedactado(self.cuerpo, cierre, self.fallida)
 
 
 def _resumen_b(r: Resumen) -> str:
@@ -200,6 +214,8 @@ SISTEMA_REDACCION = (
     "Si te llega la conversación reciente, seguila: no repitas las aperturas ni "
     "las fórmulas que ya usaste (\"Entendí que…\", \"Me falta…\") y decí sólo "
     "lo que es nuevo. Es contexto, nunca una fuente de hechos.\n"
+    "Si hay `correccion`, tu `texto_anterior` no pasó la verificación por ese "
+    "`motivo`: escribilo de nuevo, corrigiéndolo.\n"
     "Si hay `falta`, terminá pidiendo ese dato con signos de pregunta. Si hay "
     "`rechazo`, decí la razón y qué sirve. Si hay `charla`, contestala en pocas "
     "palabras antes de pedir el dato. Si hay `resumen`, escribí sólo una frase "
@@ -209,7 +225,7 @@ SISTEMA_REDACCION = (
     "\"afirma\": [<los `id` de `cambios` que el texto cuenta como hechos>]}")
 
 
-def serializar_hechos(r: ResultadoTurno) -> str:
+def serializar_hechos(r: ResultadoTurno, correccion: dict | None = None) -> str:
     """Los hechos del turno como los lee el modelo (JSON). Las opciones van
     sólo como etiquetas de contexto (los botones los dibuja el transporte, no
     el modelo) y sin el cierre del resumen (lo agrega el código)."""
@@ -246,6 +262,9 @@ def serializar_hechos(r: ResultadoTurno) -> str:
         datos["falta"] = falta
     if r.opciones:
         datos["opciones"] = [o.etiqueta for o in r.opciones]
+    if correccion:
+        # El segundo intento del modelo puro: por qué no sirvió el primero.
+        datos["correccion"] = correccion
     return json.dumps(datos, ensure_ascii=False)
 
 
@@ -258,7 +277,8 @@ def proveedor_de_redaccion(cur, workspace_id: str):
 
 
 def _registrar_intento(cur, workspace_id: str, resultado: str, motivo: str | None,
-                       duracion_ms: int, caracteres: int) -> None:
+                       duracion_ms: int, caracteres: int, *,
+                       incidente: bool = True) -> None:
     """Deja el intento en la auditoría (con la duración, para la mediana) y, si
     no se usó el texto del modelo, en un incidente de baja severidad que no
     avisa a la administración: es un dato del experimento, no una falla de la
@@ -269,7 +289,7 @@ def _registrar_intento(cur, workspace_id: str, resultado: str, motivo: str | Non
         detalle["motivo"] = motivo[:300]
     registrar_auditoria(cur, accion=ACCION_REDACCION_A, workspace_id=workspace_id,
                         actor_kind="prisma", detalle=detalle)
-    if resultado == "aceptada":
+    if resultado == "aceptada" or not incidente:
         return
     queja = {"error": "El modelo no pudo redactar la respuesta",
              "timeout": "El modelo no contestó a tiempo"}.get(
@@ -355,6 +375,9 @@ def redactar_turno(cur, workspace_id: str, resultado: ResultadoTurno, variante: 
     base = base or redactar_partes(resultado, variante)   # valida y arma B
     if variante != "A":
         return base
+    if MODELO_PURO:
+        return _redactar_modelo_puro(cur, workspace_id, resultado, base,
+                                     proveedor, historial)
     inicio = _reloj()
     duracion_ms = 0
     caracteres = 0
@@ -394,6 +417,80 @@ def redactar_turno(cur, workspace_id: str, resultado: ResultadoTurno, variante: 
         return TextoRedactado(
             f"{borrador.texto}\n\n{_resumen_b(resultado.resumen)}", base.cierre)
     return TextoRedactado(borrador.texto, base.cierre)
+
+
+def _aviso_de_modelo_puro(resultado: ResultadoTurno,
+                         base: TextoRedactado) -> TextoRedactado:
+    """Lo que sale cuando el modelo no pudo redactar (modelo puro): el aviso neutro y
+    corto, sin texto de plantilla. Lo único que se agrega es lo que la persona
+    necesita ver para decidir con los botones de ese mensaje: el resumen que
+    confirma (sus datos y el cierre que nombra el botón real, F-C5); el valor que
+    se pide confirmar lo agrega quien lo pide (`ingreso_tareas._decir_pregunta`)."""
+    if resultado.resumen:
+        return TextoRedactado(
+            f"{NOTICIA_NEUTRA_INCIDENTE}\n\n{_resumen_b(resultado.resumen)}",
+            base.cierre, fallida=True)
+    return TextoRedactado(NOTICIA_NEUTRA_INCIDENTE, fallida=True)
+
+
+def _redactar_modelo_puro(cur, workspace_id: str, resultado: ResultadoTurno,
+                          base: TextoRedactado, proveedor,
+                          historial: list[dict] | None) -> TextoRedactado:
+    """El texto de un turno con el modelo solo (`MODELO_PURO`): sin plazo propio y
+    sin plantilla. Cada intento deja su fila de auditoría con la duración. Un
+    rechazo del verificador se corrige UNA vez (el modelo ve su texto anterior y
+    el motivo); un error del modelo no se reintenta (el proveedor ya reintentó). Si
+    no sale un texto, un incidente con los motivos y el aviso neutro."""
+    conversacion = {"historial": historial} if historial else {}
+    correccion: dict | None = None
+    motivos: list[str] = []
+    for _ in range(INTENTOS_MODELO_PURO):
+        inicio = _reloj()
+        duracion_ms = caracteres = 0
+        try:
+            modelo = proveedor or proveedor_de_redaccion(cur, workspace_id)
+            crudo = modelo.redactar(
+                SISTEMA_REDACCION, serializar_hechos(resultado, correccion),
+                **conversacion)
+            duracion_ms = round((_reloj() - inicio) * 1000)
+            caracteres = len((crudo or "").strip())
+            borrador = leer_borrador(crudo)
+            motivo = (borrador if isinstance(borrador, str)
+                      else verificar(resultado, borrador, base.texto))
+        except psycopg.Error:
+            raise                   # la transacción no sigue: no es del modelo
+        except Exception as exc:    # el modelo dio error: no se reintenta
+            duracion_ms = duracion_ms or round((_reloj() - inicio) * 1000)
+            if _timeout_de(exc):
+                tipo, razon = "timeout", _motivo_de_timeout(exc, 0)
+            else:
+                tipo, razon = "error", _motivo_de_error(exc)
+            _registrar_intento(cur, workspace_id, tipo, razon, duracion_ms,
+                               caracteres, incidente=False)
+            motivos.append(razon)
+            break
+        if not motivo:
+            _registrar_intento(cur, workspace_id, "aceptada", None, duracion_ms,
+                               caracteres, incidente=False)
+            if resultado.resumen:
+                return TextoRedactado(
+                    f"{borrador.texto}\n\n{_resumen_b(resultado.resumen)}",
+                    base.cierre)
+            return TextoRedactado(borrador.texto, base.cierre)
+        _registrar_intento(cur, workspace_id, "rechazada", motivo, duracion_ms,
+                           caracteres, incidente=False)
+        motivos.append(motivo)
+        correccion = {
+            "motivo": motivo,
+            "texto_anterior": (borrador.texto if not isinstance(borrador, str)
+                               else (crudo or "").strip())[:500]}
+    registrar_incidente(
+        cur, workspace_id,
+        "El modelo no pudo redactar la respuesta (variante A, modelo puro): salió "
+        "el aviso neutro.", severidad="media",
+        referencia_cruda=" | ".join(motivos)[:2000],
+        etapa=ETAPA_REDACCION_FALLIDA)
+    return _aviso_de_modelo_puro(resultado, base)
 
 
 # ---------------------------------------------------------------------------

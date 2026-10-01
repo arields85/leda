@@ -110,6 +110,7 @@ ETAPA_VALOR_SIN_INTERPRETAR = "valor_sin_interpretar"
 # texto no pasó la verificación del código. Sale la plantilla de B, que lo
 # reemplaza; el incidente es el registro, no una falla de la persona.
 ETAPA_REDACCION_RECHAZADA = "redaccion_rechazada"
+ETAPA_REDACCION_FALLIDA = "redaccion_fallida"
 # ADR 0013 regla 1 (F-B5): la respuesta breve de una `charla` con pregunta
 # pendiente no se pudo redactar (el modelo falló o su texto no sirvió): sale sólo
 # la pregunta.
@@ -362,6 +363,15 @@ EXPLICACION_POR_ETAPA: dict[str, ExplicacionDeEtapa] = {
                  "contenido y los mismos botones."),
         que_hacer=(f"{_BUSCAR_DETALLE} y mirá el motivo del rechazo: sirve para "
                    "decidir entre A y B. No hace falta que {nombre} haga nada.")),
+    ETAPA_REDACCION_FALLIDA: ExplicacionDeEtapa(
+        que_paso=("En la variante A de la redacción (modelo puro, sin plantilla de "
+                  "respaldo), el modelo falló al redactar la respuesta de {nombre}: "
+                  "dio error, o su texto no pasó la verificación del código ni "
+                  "después de pedírselo otra vez."),
+        que_vio=(NOTICIA_NEUTRA_INCIDENTE + " Los botones y los datos que la "
+                 "persona tiene que ver para decidir salieron igual."),
+        que_hacer=(f"{_BUSCAR_DETALLE} y mirá los motivos de los dos intentos. "
+                   "{nombre} puede volver a escribir.")),
     ETAPA_CHARLA_SIN_RESPUESTA: ExplicacionDeEtapa(
         que_paso=("{nombre} escribió una charla (un saludo, un agradecimiento) "
                   "con una pregunta pendiente y el modelo no pudo redactar la "

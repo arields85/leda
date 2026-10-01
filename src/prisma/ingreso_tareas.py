@@ -774,9 +774,14 @@ def _decir_pregunta(cur, request, field: str, tipo: TipoValor, prompt: str,
         valores_aceptados=((ValorAceptado(_SUJETO_DEL_CAMPO[field], propuesto),)
                            if propuesto else ()),
         nombres_conocidos=_quien_escribe(cur, request))
-    return redactar_turno(cur, workspace_id, resultado, "A",
-                          base=TextoRedactado(prompt),
-                          historial=_conversacion_de(cur, request, now)).texto
+    texto = redactar_turno(cur, workspace_id, resultado, "A",
+                           base=TextoRedactado(prompt),
+                           historial=_conversacion_de(cur, request, now))
+    if texto.fallida and propuesto:
+        # El modelo no pudo redactar y los botones confirman un valor: ese valor
+        # sale a la vista, nadie lo confirma a ciegas.
+        return f"{texto.texto}\n\n{propuesto}"
+    return texto.texto
 
 
 def _decir_envio(cur, request, aprobador_nombre) -> str:

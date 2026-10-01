@@ -386,3 +386,14 @@ def intake_world(conn):
     conn.commit()
     return workspaces
 
+
+
+@pytest.fixture
+def con_respaldo_de_plantilla(monkeypatch):
+    """La variante A con el plazo propio y el respaldo de plantilla de B (el
+    comportamiento anterior al modelo puro): `redaccion.MODELO_PURO = False`.
+    Las pruebas del plazo y de las plantillas de respaldo corren así; el modelo
+    puro, el de por omisión, se prueba en `test_redaccion_modelo_puro.py`."""
+    from prisma import redaccion
+
+    monkeypatch.setattr(redaccion, "MODELO_PURO", False)

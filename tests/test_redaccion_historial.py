@@ -27,7 +27,7 @@ from prisma.resultado_turno import Falta, ResultadoTurno
 from prisma.valores import TipoValor
 
 from tests.test_alta_guiada_flujo import CHAT, _empezar, _entrante
-from tests.test_alta_guiada_mensaje_entero import _a
+from tests.test_alta_guiada_mensaje_entero import _Eco as _EcoBase, _a
 
 HISTORIAL = [
     {"role": "user", "content": "necesito crear una tarea"},
@@ -167,18 +167,13 @@ def test_redactar_turno_sin_conversacion_llama_como_antes(intake_world, conn):
 
 # --- el alta guiada -----------------------------------------------------------
 
-class _Eco(ProveedorGuionado):
-    def __init__(self):
-        super().__init__(guion=[])
+class _Eco(_EcoBase):
+    """El buen modelo mínimo del alta (dice lo entendido y pide el dato), que
+    además anota la conversación con la que se lo llamó."""
 
     def redactar(self, sistema, hechos, **kwargs):
-        self.redactados.append((sistema, hechos))
         self.historiales_redactados.append(kwargs.get("historial") or [])
-        d = json.loads(hechos)
-        pregunta = d.get("falta", {}).get("campo")
-        frase = d.get("falta", {}).get("pregunta") or "Listo, revisalo:"
-        return json.dumps({"texto": frase, "pregunta": pregunta, "afirma": []},
-                          ensure_ascii=False)
+        return super().redactar(sistema, hechos)
 
 
 def test_la_pregunta_siguiente_del_alta_ve_lo_que_ya_se_dijeron(
