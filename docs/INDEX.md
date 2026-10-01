@@ -22,6 +22,7 @@ cliente, no su definición.
 | Necesidad | Documento |
 |---|---|
 | Definición del producto y alcance | [`product/que-es-prisma.md`](product/que-es-prisma.md) |
+| Qué tiene que permitir configurar la plataforma (inventario) | [`product/plataforma-pendientes.md`](product/plataforma-pendientes.md) |
 | Frontera entre núcleo y adaptadores | [`architecture/frontera.md`](architecture/frontera.md) |
 | Qué se aprovecha, corrige y descarta, y en qué orden | [`ROADMAP.md`](ROADMAP.md) |
 | Estado, riesgos y próximo paso | [`STATUS.md`](STATUS.md) |

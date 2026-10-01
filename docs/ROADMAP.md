@@ -180,6 +180,9 @@ y auditados); el cambio requiere un ADR nuevo que la reemplace en ese punto.
 quien opera Prisma. El enlace por Telegram no sirve acá: autentica contra una
 membresía, y en el alta el espacio todavía no existe.
 
+Inventario completo de lo que tiene que poder configurarse, con dónde vive hoy cada
+cosa: [`product/plataforma-pendientes.md`](product/plataforma-pendientes.md).
+
 **Cierre:** quien opera Prisma entra, da de alta un espacio y lo activa.
 
 ### Tablero de cliente
