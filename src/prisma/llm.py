@@ -157,9 +157,11 @@ ROUTER_SYSTEM = (
     "o podría ser más de una cosa, tu frase queda igual de vaga o abierta -- "
     "nunca elegís vos a cuál. El nombre de una persona no va en \"trabajos\" "
     "(va en \"personas\"). Si una mención no apunta a ningún trabajo real, no "
-    "la incluyas: no inventes uno. En \"personas\" va cada persona nombrada, "
-    "como está escrita. Si no hay, listas vacías. No incluyas a Prisma (el "
-    "asistente) como persona."
+    "la incluyas: no inventes uno. Si el mensaje pide crear una tarea nueva, la "
+    "tarea nueva y su título no son una referencia: no van en \"trabajos\" (ahí "
+    "van sólo las tareas que ya existen y el mensaje menciona). En \"personas\" "
+    "va cada persona nombrada, como está escrita. Si no hay, listas vacías. No "
+    "incluyas a Prisma (el asistente) como persona."
 )
 
 # Con una pregunta pendiente (T9-R1a, ADR 0013 regla 1) el ruteo suma este

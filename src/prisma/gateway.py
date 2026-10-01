@@ -3839,6 +3839,17 @@ class _ReferenciasResueltas:
     pendientes_boton: tuple[tuple[str, list[dict]], ...] = ()
 
 
+def _frase_normalizada(texto: str) -> str:
+    """El texto sin tildes, mayúsculas, puntuación ni espacios de más: dos frases
+    que sólo difieren en eso son la misma."""
+    import re
+    import unicodedata
+
+    sin_marcas = "".join(c for c in unicodedata.normalize("NFD", texto)
+                         if unicodedata.category(c) != "Mn")
+    return " ".join(re.sub(r"[^\w\s]", " ", sin_marcas.casefold()).split())
+
+
 def _resolver_referencias_del_turno(cur, quien, texto: str, route,
                                     workspace_id: str, *,
                                     solo_claras: bool = False
@@ -3866,6 +3877,17 @@ def _resolver_referencias_del_turno(cur, quien, texto: str, route,
     # antes de tocar Jev o la base, con el mismo criterio que "sin
     # referencias" si no queda ninguna otra.
     trabajos = tuple(t for t in route.trabajos if not _es_referencia_de_estado(t))
+    # F-C1 (ADR 0014, etapas 2 y 3): con la intención explícita de crear, el título
+    # de la tarea nueva no es una referencia a una tarea que ya existe; dos dueños
+    # para lo mismo abrían una aclaración de Jev por la tarea que se está creando.
+    # El ruteo ya dijo cuál es la tarea nueva (`task.title`): la frase que lo repite
+    # no se busca. Lo demás que el mensaje menciona sí.
+    from .llm import IntentAction as _Accion
+
+    titulo_nuevo = (route.task.get("title") or "").strip()
+    if route.action is _Accion.START_TASK_INTAKE and titulo_nuevo:
+        propio = _frase_normalizada(titulo_nuevo)
+        trabajos = tuple(t for t in trabajos if _frase_normalizada(t) != propio)
     if not trabajos:
         return None
 
