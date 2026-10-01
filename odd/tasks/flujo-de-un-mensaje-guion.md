@@ -219,3 +219,9 @@ A o B, a elección. Anotar por paso: mejoró / empeoró / igual, y si tardó.
 en particular `objetivo_sin_ordenar` (Jev sin credencial o caído: los objetivos
 salen en el orden de siempre, sin ⭐) y `criterio_sin_propuesta`; y cualquier
 respuesta que se sienta robótica aunque no esté en la lista.
+
+**Decisión del usuario sobre F-B9 (2026-10-01):** Prisma corrige los errores de tipeo
+obvios en los textos que la persona dicta (título, criterio, motivo): el modelo normaliza
+el valor en la etapa 2 y la corrección queda a la vista en el resumen, cambiable con
+Modificar. Pendiente de implementar después de esta corrida (hoy el título queda tal cual
+y el criterio a veces se corrige).
