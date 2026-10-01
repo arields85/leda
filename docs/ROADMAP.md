@@ -352,6 +352,16 @@ por el usuario el 2026-10-01 y anotadas bajo el congelamiento:
 Mientras tanto, la única salida es una fecha dentro del margen, que Prisma propone
 concreta para aceptarla con un sí.
 
+**Regla de fondo decidida (usuario, 2026-10-01), a construir con esta unidad:** la fecha
+de una tarea no puede pasar la del objetivo al que contribuye; si ese objetivo no tiene
+fecha, vale la del objetivo de arriba. El margen del espacio (`horizonte_tarea`) queda
+como red de seguridad para cuando ningún objetivo de la cadena tiene fecha. Requiere que
+los objetivos tengan fecha (hoy ninguno de CoreWork la tiene: el pack declara
+`horizonte_meses: 12` en el estratégico y el importador no la convierte) y validar la
+fecha cuando se conocen fecha y objetivo, sin importar el orden en que la persona los dé.
+Topes, márgenes y fechas de objetivos son configuración del espacio, a cambiar desde la
+plataforma cuando exista: no se ajusta el comportamiento de Prisma a sus valores actuales.
+
 **Depende de:** el congelamiento levantado (alta, entrega y aprobación cumpliendo el ADR
 0014) y el margen máximo de la fecha de una tarea (rama `feat/flujo-de-un-mensaje`).
 
