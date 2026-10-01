@@ -422,6 +422,13 @@ class Proveedor(Protocol):
     def responder(self, sistema: str, mensajes: list[dict[str, Any]],
                   herramientas: list[dict[str, Any]]) -> Respuesta: ...
 
+    def redactar(self, sistema: str, hechos: str) -> str: ...
+
+
+# Tope de la redacción de un turno (ADR 0014, variante A): un mensaje, no una
+# conversación.
+MAX_TOKENS_REDACCION = 400
+
 
 # ---------------------------------------------------------------------------
 
@@ -439,6 +446,19 @@ class ProveedorGuionado:
     pendientes: list[str | None] = field(default_factory=list)
     # Lo que esperaba cada ruteo (`None` si no se pidió un valor).
     esperados: list[ValorEsperado | None] = field(default_factory=list)
+    # Los borradores de `redactar`, en orden: un texto, o una excepción que se
+    # lanza (un modelo que falla o se cuelga). Sin borrador, texto vacío.
+    borradores: list[str | BaseException] = field(default_factory=list)
+    redactados: list[tuple[str, str]] = field(default_factory=list)
+
+    def redactar(self, sistema: str, hechos: str) -> str:
+        self.redactados.append((sistema, hechos))
+        if not self.borradores:
+            return ""
+        borrador = self.borradores.pop(0)
+        if isinstance(borrador, BaseException):
+            raise borrador
+        return borrador
 
     def route_intent(self, text: str, pendiente: str | None = None,
                      valor_esperado: ValorEsperado | None = None,
@@ -562,6 +582,15 @@ class ProveedorAnthropic:
                     for b in r.content if b.type == "tool_use"]
         return Respuesta(texto=texto.strip(), llamadas=llamadas)
 
+    def redactar(self, sistema: str, hechos: str) -> str:
+        r = self._c.messages.create(
+            model=self._modelo,
+            max_tokens=min(self._param.get("max_tokens", 1024), MAX_TOKENS_REDACCION),
+            temperature=self._param.get("temperature", 0.3),
+            system=sistema,
+            messages=[{"role": "user", "content": hechos}])
+        return "".join(b.text for b in r.content if b.type == "text").strip()
+
 
 GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta"
 
@@ -671,6 +700,25 @@ class ProveedorGemini:
                     args=p["functionCall"].get("args") or {})
             for i, p in enumerate(partes) if "functionCall" in p]
         return Respuesta(texto=texto.strip(), llamadas=llamadas)
+
+    def redactar(self, sistema: str, hechos: str) -> str:
+        cuerpo = {
+            "system_instruction": {"parts": [{"text": sistema}]},
+            "contents": [{"role": "user", "parts": [{"text": hechos}]}],
+            "generationConfig": {
+                "temperature": self._param.get("temperature", 0.3),
+                "maxOutputTokens": min(self._param.get("max_tokens", 1024),
+                                       MAX_TOKENS_REDACCION),
+            },
+        }
+        r = self._post(
+            f"{GEMINI_BASE}/models/{self._modelo}:generateContent", cuerpo)
+        r.raise_for_status()
+        candidatos = r.json().get("candidates") or []
+        if not candidatos:
+            return ""
+        partes = (candidatos[0].get("content") or {}).get("parts") or []
+        return "".join(p["text"] for p in partes if "text" in p).strip()
 
 
 def _limpiar_esquema(esquema: dict) -> dict:
@@ -815,6 +863,15 @@ class ProveedorCompatible:
                             args=json.loads(c.function.arguments or "{}"))
                     for c in (m.tool_calls or [])]
         return Respuesta(texto=(m.content or "").strip(), llamadas=llamadas)
+
+    def redactar(self, sistema: str, hechos: str) -> str:
+        r = self._c.chat.completions.create(
+            model=self._modelo,
+            max_tokens=min(self._param.get("max_tokens", 1024), MAX_TOKENS_REDACCION),
+            temperature=self._param.get("temperature", 0.3),
+            messages=[{"role": "system", "content": sistema},
+                      {"role": "user", "content": hechos}])
+        return (r.choices[0].message.content or "").strip()
 
 
 def _a_openai(mensajes: list[dict]) -> list[dict]:

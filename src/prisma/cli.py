@@ -211,6 +211,7 @@ def main(argv: list[str] | None = None) -> int:
     mds.add_argument("--proveedor", default="gemini")
     sub.add_parser("estado").add_argument("slug")
     sub.add_parser("incidentes").add_argument("slug")
+    sub.add_parser("redaccion").add_argument("slug")
 
     cor = sub.add_parser("correr")     # dispara una cadencia a mano
     cor.add_argument("slug"); cor.add_argument("nombre")
@@ -475,6 +476,30 @@ def main(argv: list[str] | None = None) -> int:
 
     if a.cmd == "estado":
         return _estado(conn, ws, a.slug)
+
+    if a.cmd == "redaccion":
+        # Los intentos de la variante A (ADR 0014): cuántos, cómo terminaron y la
+        # latencia de la llamada de redacción. La mediana de todos es la que mide
+        # el criterio de 5 s por respuesta. El motivo de cada rechazo o falla
+        # está en `incidentes` (etapa=redaccion_rechazada).
+        from .redaccion import estadistica_variante_a
+
+        with admin(conn) as cur:
+            e = estadistica_variante_a(cur, ws)
+        if not e["llamadas"]:
+            print("Sin intentos de la variante A.")
+            return 0
+
+        def seg(ms) -> str:
+            return f"{ms / 1000:.1f} s".replace(".", ",")
+
+        print(f"llamadas: {e['llamadas']}")
+        print(f"aceptadas: {e['aceptadas']}  rechazadas: {e['rechazadas']}  "
+              f"errores: {e['errores']}")
+        print(f"mediana: {seg(e['mediana_ms'])}  (aceptadas: "
+              f"{seg(e['mediana_aceptadas_ms']) if e['aceptadas'] else 'sin datos'})")
+        print(f"p90: {seg(e['p90_ms'])}  máximo: {seg(e['maximo_ms'])}")
+        return 0
 
     if a.cmd == "incidentes":
         with admin(conn) as cur:

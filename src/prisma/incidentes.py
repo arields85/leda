@@ -100,6 +100,10 @@ ETAPA_CONFIGURACION_ALTA = "configuracion_alta_invalida"
 # pedido (una fecha, una opción, un texto). Nunca se inventa: la pregunta sigue
 # abierta.
 ETAPA_VALOR_SIN_INTERPRETAR = "valor_sin_interpretar"
+# ADR 0014, variante A: el modelo no pudo redactar un turno (falló, se colgó) o su
+# texto no pasó la verificación del código. Sale la plantilla de B, que lo
+# reemplaza; el incidente es el registro, no una falla de la persona.
+ETAPA_REDACCION_RECHAZADA = "redaccion_rechazada"
 # T9-H19e: un recibo viejo sin respuesta que la reentrega no recuperó (`huerfanos`).
 ETAPA_MENSAJE_HUERFANO = "mensaje_huerfano_sin_respuesta"
 # T9-H19g: el aviso de UN huérfano falló y se lo saltea (el resto del barrido sigue).
@@ -324,6 +328,14 @@ EXPLICACION_POR_ETAPA: dict[str, ExplicacionDeEtapa] = {
         que_hacer=(f"{_BUSCAR_DETALLE} y mirá si el modelo de ruteo está "
                    "devolviendo el valor de la pregunta pendiente. {nombre} "
                    "puede volver a responder.")),
+    ETAPA_REDACCION_RECHAZADA: ExplicacionDeEtapa(
+        que_paso=("En la variante A de la redacción, el modelo falló al redactar la "
+                  "respuesta o su texto no pasó la verificación del código (dijo "
+                  "algo que los hechos del turno no tienen, o le faltó algo)."),
+        que_vio=("Nada raro: salió la respuesta de la variante B, con el mismo "
+                 "contenido y los mismos botones."),
+        que_hacer=(f"{_BUSCAR_DETALLE} y mirá el motivo del rechazo: sirve para "
+                   "decidir entre A y B. No hace falta que {nombre} haga nada.")),
     "indicador_actividad": ExplicacionDeEtapa(
         que_paso=("No se pudo retirar el borrador nativo del indicador de "
                   "actividad; puede haber quedado visible."),

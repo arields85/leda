@@ -219,20 +219,21 @@ def test_ninguna_pregunta_del_alta_lleva_limites_ni_pide_valores_exactos():
 @pytest.mark.parametrize("variante", ["A", "B"])
 def test_las_preguntas_y_el_resumen_leen_la_variante_del_espacio(
         variante, intake_world, conn, monkeypatch):
-    """F6a sólo tiene que implementar A: el alta ya lee la variante del espacio."""
+    """El alta lee la variante del espacio en cada pregunta y en el resumen."""
     ws = intake_world["north-lab"]["id"]
     with admin(conn) as cur:
         cur.execute("""insert into workspace_setting (workspace_id, clave, valor)
                        values (%s, 'redaccion', %s::jsonb)""",
                     (ws, f'{{"variante": "{variante}"}}'))
     vistas = []
-    real = redaccion.redactar
+    real = redaccion.redactar_turno
 
-    def espia(resultado, v):
+    def espia(cur, workspace_id, resultado, v, **kw):
         vistas.append(v)
-        return real(resultado, v)
+        # Sin modelo: con A, `proveedor` guionado vacío cae en la plantilla.
+        return real(cur, workspace_id, resultado, "B")
 
-    monkeypatch.setattr(I, "redactar", espia)
+    monkeypatch.setattr(I, "redactar_turno", espia)
     with espacio(conn, ws) as cur:
         _empezar(cur, intake_world, chat=72201)          # la pregunta del título
     _alta_en_confirmacion(conn, intake_world, responsable="Sam North")  # el resumen

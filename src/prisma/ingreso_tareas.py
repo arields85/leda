@@ -18,8 +18,8 @@ from .incidentes import (ETAPA_CONFIGURACION_ALTA, ETAPA_RESUMEN_VIGENTE_SIN_FIL
                          ETAPA_VALOR_SIN_INTERPRETAR, NOTICIA_NEUTRA_INCIDENTE,
                          REFERENCIA_PENDING_ACTION, registrar_incidente)
 from .pendientes import HERRAMIENTA_REVISION_BORRADOR
-from .redaccion import (TextoRedactado, nombre_legible, redactar, redactar_partes,
-                        variante_redaccion)
+from .redaccion import (TextoRedactado, nombre_legible, redactar_partes,
+                        redactar_turno, variante_redaccion)
 from .resultado_turno import Falta, Rechazo, ResultadoTurno, Resumen
 from .salida import (BUTTON_TEXT_LIMIT, ETIQUETA_CANCELAR, ETIQUETA_CONFIRMAR,
                      ETIQUETA_ENVIAR, ETIQUETA_MODIFICAR, ETIQUETA_RECHAZAR,
@@ -559,7 +559,9 @@ def _rechazar_valor(cur, request, who, field, rechazo: Rechazado, inbound_id,
 def _decir(cur, request, resultado: ResultadoTurno) -> str:
     """El texto de un resultado con la variante de redacción del espacio (ADR
     0014, etapa 6)."""
-    return redactar(resultado, variante_redaccion(cur, str(request["workspace_id"])))
+    workspace_id = str(request["workspace_id"])
+    return redactar_turno(cur, workspace_id, resultado,
+                          variante_redaccion(cur, workspace_id)).texto
 
 
 def handle_active_text(cur: psycopg.Cursor, who: Solicitante, *, chat_id: int,
@@ -1878,7 +1880,8 @@ def _finalize(cur, request, who, now):
         evidence=list(policy["evidencia_requerida"]),
         variante=variante_redaccion(cur, str(request["workspace_id"])),
     )
-    resumen = render_resumen(**datos)
+    resumen = render_resumen(**datos, cur=cur,
+                             workspace_id=str(request["workspace_id"]))
     preview_text = resumen.texto
     try:
         prepare_payload(preview_text, dedupe_key="intake-preview", has_buttons=True)
@@ -2063,10 +2066,12 @@ def cierre_enviar(confirma: str | None) -> str:
 
 def render_resumen(*, title, description="", objective, area, responsible, due_date,
                    acceptance_criterion, evidence, cierre=CIERRE_CONFIRMAR,
-                   variante="B") -> TextoRedactado:
+                   variante="B", cur=None, workspace_id=None) -> TextoRedactado:
     """El resumen para revisar, redactado por `redaccion` (ADR 0014, etapa 6), en
-    cuerpo y cierre. Sólo muestra lo que tiene: una descripción que nadie dio no
-    se dice "sin descripción". La evidencia se nombra como la lee una persona."""
+    cuerpo y cierre. Con `cur` la variante A puede llamar al modelo (y registra el
+    intento); sin él son las plantillas. Sólo muestra lo que tiene: una
+    descripción que nadie dio no se dice "sin descripción". La evidencia se
+    nombra como la lee una persona."""
     evidence_text = (", ".join(nombre_legible(e) for e in evidence)
                      if evidence else "No requiere evidencia")
     lineas = [("Título", title)]
@@ -2076,8 +2081,11 @@ def render_resumen(*, title, description="", objective, area, responsible, due_d
                ("Responsable", responsible), ("Fecha objetivo", due_date),
                ("Criterio de aceptación", acceptance_criterion),
                ("Evidencia", evidence_text)]
-    return redactar_partes(ResultadoTurno(resumen=Resumen(
-        "Resumen para revisar", tuple(lineas), cierre)), variante)
+    resultado = ResultadoTurno(resumen=Resumen(
+        "Resumen para revisar", tuple(lineas), cierre))
+    if cur is None:
+        return redactar_partes(resultado, variante)
+    return redactar_turno(cur, workspace_id, resultado, variante)
 
 
 def render_preview(**datos) -> str:

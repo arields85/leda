@@ -376,7 +376,8 @@ def test_una_variante_que_no_existe_no_se_redacta_en_silencio():
             cambios=(Cambio("x", "y"),)), "C")
 
 
-def test_a_todavia_cae_en_b():
+def test_redactar_sin_modelo_es_b_tambien_para_a():
+    """El modelo sólo entra por `redactar_turno` (F6a)."""
     r = ResultadoTurno(cambios=(Cambio("la tarea «A»", "quedó creada"),))
     assert redaccion.redactar(r, "A") == redaccion.redactar(r, "B")
 

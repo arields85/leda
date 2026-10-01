@@ -99,8 +99,9 @@ Corte 1, para la primera prueba real (alta guiada con A y B):
 - [x] **F3.** (`08f6281`, `74e2918`) Alta guiada con el flujo: título primero y objetivo después (el más probable
   primero), valores por M1, dato con una sola opción completado solo, textos por
   `redaccion`. Retira `_parse_absolute_date` de la ruta del usuario. Ruta: delegada.
-- [ ] **F6a.** Variante A para el alta guiada: `redactar` del proveedor, verificador y
-  registro de rechazos. Ruta: delegada.
+- [x] **F6a.** Variante A para el alta guiada: `redactar` del proveedor, verificador y
+  registro de rechazos. Ruta: delegada. (`c48f38b` R8; el commit de A y verificador, ver
+  progreso.)
 - [ ] **F7.** Base nueva para la prueba (`PRUEBA-LOCAL.md` §5), listener del worktree con
   `PYTHONPATH=src`. Ruta: inline (operativa, sin código).
 - [ ] **F8a.** Guion del corte 1 (R4c-H4 a H10) con columna mejoró / empeoró / igual y
@@ -254,9 +255,57 @@ PR planificado: la integración a `main` la decide el usuario después del exper
      del ADR 0014). Se mide, no se asume (AGENTS, "Cómo pensamos juntos", punto 8). Si la
      mediana pasa de 5 s o los rechazos son la regla, se para y se discute con el usuario.
 
+- 2026-10-01, F6a hecho (worktree `flujo-variante-a`, rama `feat/flujo-variante-a`; dos
+  commits: `c48f38b` R8 y el de la variante A).
+  **Commit 1 (R8).** `redaccion.TextoRedactado` (cuerpo y cierre como partes),
+  `render_resumen`, cuerpo guardado en `pending_action.args["cuerpo_resumen"]` de la
+  revisión; `send_to_approval` lo usa en vez de cortar el texto. RED: 5 fallas
+  (`AttributeError: redactar_partes`, `KeyError: cuerpo_resumen`); GREEN: 255 passed en 6
+  archivos. Las filas de revisión viejas (sin `cuerpo_resumen`, vigencia 8 h) fallarían al
+  enviar con un `KeyError` (incidente de turno): sólo existen en una base anterior a este commit.
+  **Commit 2 (A).** `llm.py`: `redactar(sistema, hechos) -> str` sin herramientas en los cuatro
+  proveedores (mismo timeout y reintento del cliente; tope de 400 tokens) y borradores
+  guionables en `ProveedorGuionado`. `verificador_redaccion.py`: determinista, sobre los
+  hechos (no por frases): números, fechas y meses que los hechos no tienen; vocabulario de
+  estados del dominio; acción en primera persona (`-é`/`-í`) sólo con un cambio, valor
+  aceptado o resumen que la respalde; claves internas; nombres citados «…», valores aceptados,
+  estados y datos del resumen exigidos; lo esencial (≥ 50 % de las raíces) de cambios, "no
+  cambió" y rechazos; la pregunta de lo que falta; largo contra la plantilla de B.
+  `redaccion.redactar_turno`: con A llama al modelo y verifica; si no sirve o el modelo falla
+  sale B (reemplaza, una sola respuesta) y cada intento queda en `audit_log`
+  (`redaccion_variante_a`: resultado aceptada/rechazada/error, motivo, `duracion_ms`) y los no
+  aceptados además en un incidente de baja severidad, etapa `redaccion_rechazada`, sin aviso a
+  la administración. El cierre del resumen es siempre del código; el resumen se redacta una vez
+  para los dos cierres. B queda idéntica: `redactar`/`redactar_partes` no llaman al modelo.
+  CLI nueva `python -m prisma redaccion <slug>`.
+  RED: `test_verificador_redaccion.py` (`ModuleNotFoundError`), `test_llm_redactar.py` (9
+  failed), `test_redaccion_a.py` (13 failed, 1 passed), `test_alta_guiada_variante_a.py` (7
+  failed, 1 passed: el caso de B), `test_cli.py` (2 failed, `invalid choice: 'redaccion'`).
+  El caso "pregunta dicha como instrucción sin signo de pregunta" se agregó después del código
+  (sin RED previo). GREEN: focalizadas 155 passed; suite completa desde el worktree
+  (`python -m pytest -q`): 2644 passed, 333 deselected, 0 failed (línea base 2573).
+  Pruebas viejas actualizadas: `test_alta_guiada_texto` (el espía sigue la función nueva),
+  `test_alta_enviar_a_aprobacion` (cuerpo desde `args`), `test_redaccion` (renombrada).
+  **Cómo leer la latencia.** `python -m prisma redaccion corework` (con `PYTHONPATH=src` desde
+  el worktree): llamadas, aceptadas/rechazadas/errores, mediana (criterio ADR 0014: ≤ 5 s),
+  mediana de las aceptadas, p90 y máximo de la llamada de redacción. Los motivos:
+  `python -m prisma incidentes corework` (etapa `redaccion_rechazada`). Cada intento es una
+  fila de `audit_log` con `accion = 'redaccion_variante_a'` y `detalle->>'duracion_ms'`.
+  **Pasar la prueba real a A:** editar `conversacion.redaccion: A` en `espacios/corework.yaml`
+  y `python -m prisma importar corework --activar` (reaplica todo el pack, idempotente), o el
+  `update` directo de `workspace_setting` (clave `redaccion`, valor `{"variante": "A"}`),
+  más acotado. No hace falta reiniciar: la variante se lee de la base en cada turno. El
+  listener tiene que correr el código de este worktree (`PYTHONPATH=src`); el del worktree
+  `flujo-de-un-mensaje` no trae F6a.
+  **Límites declarados del verificador:** la detección de acciones hechas es morfológica y
+  rechaza un "Entendí" inocente (cae en B y queda el motivo); un cambio extra dicho con las
+  palabras de un cambio real no se distingue. Mirar los motivos registrados antes de tocar
+  el verificador (ADR 0013).
+
 ## Próximo paso
 
-F6a (variante A del alta) y la prueba real F7/F8a.
+F7/F8a: la prueba real del alta con A y con B (`python -m prisma redaccion corework` para la
+mediana).
 
 ## Revisión RDD por commit (2026-10-01)
 
