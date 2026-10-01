@@ -228,8 +228,7 @@ def _fecha(valor, esperado: ValorEsperado) -> Aceptado | Rechazado:
         return Rechazado(
             MotivoRechazo.FECHA_LEJANA,
             f"Esa fecha pasa del {limite}, lo más lejos que puede ir una tarea.",
-            f"Decime una fecha hasta el {limite}; si lleva más tiempo, dividila "
-            "en tareas más cortas.")
+            f"Decime una fecha hasta el {limite} (puede ser esa misma).")
     return Aceptado(TipoValor.FECHA, fecha)
 
 

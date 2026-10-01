@@ -13,7 +13,7 @@ Todo pasa por el webhook real (`TestClient`): mensajes y toques.
 from __future__ import annotations
 
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -24,6 +24,7 @@ from prisma import gateway, incidentes
 from prisma import ingreso_tareas as I
 from prisma.db import admin, espacio
 from prisma.incidentes import NOTICIA_NEUTRA_INCIDENTE
+from prisma.valores import sumar_meses
 from prisma.llm import (IntentAction, IntentRoute, ProveedorGuionado,
                         Respuesta)
 
@@ -534,6 +535,49 @@ def test_una_propuesta_hecha_solo_en_la_conversacion_se_acepta_mandando_su_texto
     assert criterio["estado"] == "confirmed"
     assert criterio["valor"] == "Informe firmado por calidad"
     assert "Resumen para revisar" in nuevas[0]["cuerpo"]
+    assert c.incidentes(incidentes.ETAPA_ALTA_CONDUCIDA_FALLIDA) == []
+
+
+def test_una_fecha_fuera_del_margen_se_propone_el_limite_y_aceptarla_con_un_si_la_guarda(
+        chat):
+    # Hallazgo real (2026-10-01): "partirla en tareas más cortas" no es una opción
+    # (no hay cómo aceptarlo). Lo que sí existe: proponer el límite y aceptarlo
+    # mandando esa fecha, el mismo camino único que la propuesta de un criterio.
+    limite = date.fromisoformat(_en(0))
+    limite = sumar_meses(limite, 2)
+    lejana = (limite + timedelta(days=45)).isoformat()
+    c = chat(
+        salida("Listo.", valores={"title": {"texto": "Revisar el variador"},
+                                  "responsible": {"opcion_id": "R1"},
+                                  "due_date": {"fecha_iso": lejana}},
+               pregunta=["objective"]),
+        salida(f"Esa fecha queda fuera del rango. ¿Te sirve el "
+               f"{limite.strftime('%d/%m/%Y')}, el último día posible?",
+               valores={"title": {"texto": "Revisar el variador"},
+                        "responsible": {"opcion_id": "R1"}},
+               pregunta=["due_date"]))
+
+    nuevas = c.escribir("revisar el variador, la hago yo, para dentro de tres meses")
+
+    assert len(c.modelo.conducidos) == 2
+    assert any("pasa del" in r for r in c.hechos(1)["rechazos_anteriores"])
+    assert all(not any(p in o for p in ("dividir", "partir", "tareas más cortas"))
+               for o in c.hechos(1)["podes_ofrecer"])
+    assert _cuerpos(nuevas) == [
+        f"Esa fecha queda fuera del rango. ¿Te sirve el "
+        f"{limite.strftime('%d/%m/%Y')}, el último día posible?"]
+    assert c.campo("due_date")["estado"] == "missing"
+    assert c.incidentes(incidentes.ETAPA_ALTA_CONDUCIDA_FALLIDA) == []
+    c.modelo.conducciones.append(salida(
+        "Anotada. ¿A qué objetivo responde?",
+        valores={"due_date": {"fecha_iso": limite.isoformat()}},
+        pregunta=["objective"], botones="objective"))
+
+    c.escribir("sí, dale")
+
+    fecha = c.campo("due_date")
+    assert fecha["estado"] == "confirmed"
+    assert limite.isoformat() in str(fecha["valor"])
     assert c.incidentes(incidentes.ETAPA_ALTA_CONDUCIDA_FALLIDA) == []
 
 

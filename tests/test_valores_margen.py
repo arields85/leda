@@ -61,4 +61,7 @@ def test_el_rechazo_por_fecha_lejana_no_ofrece_tomarla_como_objetivo():
     from prisma.valores import MotivoRechazo
     r = _validar("2027-08-15")
     assert r.motivo is MotivoRechazo.FECHA_LEJANA
-    assert "objetivo" not in r.se_acepta.lower() and "dividila" in r.se_acepta
+    assert "objetivo" not in r.se_acepta.lower()
+    assert not [p for p in ("dividi", "partir", "tareas más cortas")
+                if p in r.se_acepta.lower()]
+    assert "01/12/2026" in r.se_acepta

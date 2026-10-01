@@ -74,8 +74,8 @@ def regla_de_fechas(h: "HechosTurno") -> str:
         f"La fecha de una tarea sirve desde hoy hasta el {limite} inclusive; una "
         "fecha pasada o posterior no es válida. Una fecha sin año es la próxima "
         "que llega dentro de ese rango: si no entra, no es válida para una tarea; "
-        "decilo, proponé una fecha dentro del rango y sugerí dividir el trabajo "
-        "en tareas más cortas. " + ayuda)
+        "decilo y proponé una fecha concreta dentro del rango (por ejemplo el "
+        "límite) para que la acepte con un sí. " + ayuda)
 
 
 # El texto del modelo es una o tres oraciones: lo demás es una respuesta
@@ -202,8 +202,9 @@ def lo_que_se_puede_ofrecer(h: HechosTurno) -> list[str]:
         ofertas.append(f"el botón {h.boton_final} del resumen, que cierra el alta")
     if h.limite_fecha is not None:
         ofertas.append(
-            f"si la fecha no entra: elegir una fecha hasta el "
-            f"{_mostrada(h.limite_fecha)}, o dividir el trabajo en tareas más cortas")
+            "si la fecha no entra: proponer una fecha concreta hasta el límite "
+            f"(por ejemplo el {_mostrada(h.limite_fecha)}) para que la persona la "
+            "acepte con un sí, u otra fecha que ella diga")
     return ofertas
 
 
@@ -684,12 +685,13 @@ SISTEMA_ALTA = (
     "nombre; la fecha como AAAA-MM-DD (sirve desde hoy hasta el límite que dicen "
     "`fechas`, no una pasada ni una posterior; sin año es la próxima que llega "
     "dentro de ese rango; si no entra, no la mandes: decile el límite, proponé "
-    "una fecha dentro del rango y sugerí dividir la tarea; `proximos_dias` es sólo un calendario para resolver \"el "
+    "una fecha concreta dentro del rango (por ejemplo el límite) y, si la persona "
+    "la acepta con un sí, mandá esa fecha en `fecha_iso`; `proximos_dias` es sólo un calendario para resolver \"el "
     "viernes\" o \"la semana que viene\", no un límite; si el día no queda claro, "
     "`{\"falta\": \"dia\"}`); el criterio con `verificable` "
     "(si dice cómo se comprueba que está hecha) y, si no lo es, una `propuesta` "
     "concreta. Si acepta una propuesta (la tuya en la charla o la "
-    "`propuesta_vigente`), mandá ese texto como `texto` del criterio. Nunca "
+    "`propuesta_vigente`), mandá ese texto como `texto` del criterio, o esa fecha como `fecha_iso`. Nunca "
     "inventes opciones, datos ni hechos.\n"
     "- `corrige`: los datos ya confirmados que la persona cambia. Un valor para "
     "un dato confirmado sólo vale si va acá.\n"
@@ -705,7 +707,9 @@ SISTEMA_ALTA = (
     "`responsible`); nombrá sólo ese, Modificar o Cancelar, y ninguno si todavía "
     "no sabés quién es el responsable. Vos nunca creás la tarea.\n"
     "Si hay `rechazos_anteriores`, tu intento anterior tuvo esos problemas: "
-    "corregilos y decilo con naturalidad si importa.\n"
+    "corregilos y decilo con naturalidad si importa. Si lo rechazado es un valor "
+    "que la persona dio (una fecha fuera del rango, por ejemplo), ocupate sólo de "
+    "eso: no preguntes además por otro dato que falte; se pide después.\n"
     "El `texto` usa sólo hechos que están en el JSON (ninguna fecha, nombre ni "
     "número que no esté) y copia los títulos tal cual. Si la persona cancela, "
     "confirmalo; si deja la tarea para después, decile que queda guardada.\n"

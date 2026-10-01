@@ -1585,3 +1585,28 @@ Diseño B elegido por el usuario. Ruta declarada: un solo escritor (encargo expl
 - **Pruebas cambiadas.** `test_los_hechos_dicen_el_margen_de_la_fecha_de_una_tarea` ahora afirma que la regla NO
   nombra "objetivo" (afirmaba la oferta retirada).
 - Pendientes (a) y (f): corregidos, pendientes de verificar en real.
+
+### Sólo opciones posibles en la fecha fuera del margen (2026-10-01)
+
+- **Hallazgo (Telegram real, 19:01).** Ante "revisar el variador de la cinta 2, la hago yo, para el 15 de agosto"
+  (pasado el horizonte de 2 meses) el modelo respondió que la fecha quedaba fuera del rango, que eligiera otra y que
+  "si es mucho para un solo tramo, conviene partirla en tareas más cortas", y en el mismo mensaje preguntó por el
+  objetivo. La persona no supo cómo aceptar la división ni dónde aprobarla.
+- **Causa.** La lista `podes_ofrecer` (commit `eed3b80`) incluía una opción que nadie puede disparar: dividir la
+  tarea no existe. El mismo texto estaba en `regla_de_fechas`, en `SISTEMA_ALTA` y en el rechazo `FECHA_LEJANA` de
+  `valores.py`. Además mezclaba dos temas (la fecha rechazada y el objetivo faltante), contra ADR 0013.
+- **Arreglo.** Se retiró "dividir / tareas más cortas" de los cuatro lugares. La oferta con margen pasó a: "si la
+  fecha no entra: proponer una fecha concreta hasta el límite (por ejemplo el <límite>) para que la persona la
+  acepte con un sí, u otra fecha que ella diga". Aceptar la propuesta es mandar su valor (`due_date.fecha_iso`), el
+  mismo camino único que el criterio propuesto (`81bb60a`); el límite se incluye y valida. Rechazo `FECHA_LEJANA`:
+  "Decime una fecha hasta el <límite> (puede ser esa misma)." Guía nueva en `SISTEMA_ALTA`: si lo rechazado es un
+  valor que la persona dio, ocuparse sólo de eso y no preguntar además por otro dato faltante. Es guía más hechos,
+  no una regla del verificador (`falta_pregunta` se cumple pidiendo la fecha, que sigue faltando).
+- **RED.** Tanda enfocada (`test_alta_turno`, `test_alta_conducida`, `test_valores_margen`, `test_horizonte_tarea`,
+  `test_task_intake`, `test_valores`): 6 failed, 403 passed.
+- **GREEN.** La misma tanda: 409 passed. No se corrió la suite completa.
+- **Pruebas cambiadas.** `test_los_hechos_dicen_el_margen_de_la_fecha_de_una_tarea` (la regla ya no nombra dividir;
+  afirma la propuesta aceptada con un sí), la prueba de la oferta con margen (renombrada), `_PROHIBIDO_OFRECER`
+  (suma dividir/partir/tareas más cortas) y `test_el_rechazo_por_fecha_lejana_no_ofrece_tomarla_como_objetivo`
+  (afirmaba "dividila"). Nuevas: la guía de un tema a la vez y el extremo a extremo en `test_alta_conducida`.
+- **Límite honesto.** Guía al modelo; se confirma en la próxima corrida real por Telegram.

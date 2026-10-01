@@ -707,7 +707,8 @@ def test_los_hechos_dicen_el_margen_de_la_fecha_de_una_tarea():
     assert "desde hoy" in regla and "pasada" in regla
     assert "28/04/2028" in regla and "2028-04-28" in regla
     assert "sin año" in regla or "sin el año" in regla
-    assert "objetivo" not in regla and "dividir" in regla
+    assert "objetivo" not in regla and not [p for p in _NO_ACCIONABLE if p in regla]
+    assert "que la acepte con un sí" in regla
     assert "proximos_dias" in regla
     descripcion = T.ESQUEMA_SALIDA["properties"]["valores"]["properties"][
         "due_date"]["properties"]["fecha_iso"]["description"].lower()
@@ -779,7 +780,11 @@ def test_una_fecha_pasada_se_rechaza_y_el_texto_puede_nombrar_lo_que_dijo_la_per
 # ---------------------------------------------------------------------------
 
 _PROHIBIDO_OFRECER = ("objetivo", "lunes", "recordatorio", "recordar", "agendar",
-                      "avisar", "mañana", "el día")
+                      "avisar", "mañana", "el día", "dividir", "partir",
+                      "tareas más cortas")
+# Dividir una tarea no es algo que la persona pueda disparar: no existe (hallazgo del
+# 2026-10-01, "¿dónde apruebo dividirla?").
+_NO_ACCIONABLE = ("dividir", "dividila", "partir", "tareas más cortas")
 
 
 def _oferta(h) -> list[str]:
@@ -817,12 +822,15 @@ def test_la_oferta_con_todo_completo_incluye_el_boton_real_del_resumen():
     assert not any("Confirmar" in o for o in _oferta(otra))
 
 
-def test_la_oferta_con_margen_de_fecha_ofrece_fecha_hasta_el_limite_o_dividir():
+def test_la_oferta_con_margen_de_fecha_propone_una_fecha_hasta_el_limite_que_se_acepta_con_un_si():
     h = hechos(limite_fecha=date(2028, 4, 28), meses_horizonte=2,
                rechazos_anteriores=("due_date: Esa fecha pasa del 28/04/2028",))
     texto = " ".join(_oferta(h)).lower()
-    assert "28/04/2028" in texto and "dividir" in texto
-    assert "dividir" not in " ".join(_oferta(hechos())).lower()   # sin límite, no hay
+    assert "proponer una fecha concreta hasta el límite" in texto
+    assert "por ejemplo el 28/04/2028" in texto and "con un sí" in texto
+    assert "u otra fecha que ella diga" in texto
+    assert not [p for p in _NO_ACCIONABLE if p in texto]
+    assert "límite" not in " ".join(_oferta(hechos())).lower()   # sin límite, no hay
 
 
 @pytest.mark.parametrize("h", [
@@ -840,3 +848,11 @@ def test_la_guia_manda_ofrecer_solo_lo_de_la_lista_y_no_promete_ni_ofrece_objeti
     assert "podes_ofrecer" in guia and "no prometas" in guia.lower()
     assert "tomarla como un objetivo" not in guia
     assert "objetivo" not in T.regla_de_fechas(hechos(limite_fecha=date(2028, 4, 28)))
+
+
+def test_la_guia_tiene_una_sola_linea_de_un_tema_a_la_vez_y_la_fecha_se_acepta_con_su_valor():
+    guia = T.SISTEMA_ALTA
+    minus = guia.lower()
+    assert not [p for p in _NO_ACCIONABLE if p in minus]
+    assert "ocupate sólo de eso" in guia and "no preguntes además" in guia
+    assert "esa fecha como `fecha_iso`" in guia
