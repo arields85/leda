@@ -2563,9 +2563,10 @@ def test_el_borrador_sembrado_en_la_corrida_cambia_un_dato_con_opciones(
         corework, conn):
     ws = corework.workspace_id
     _con_dos_tareas(conn, ws)
-    # El objetivo de "Objetivo simulado de Revisar tablero" es la 5.ª opción
-    # que ofrece el pack de prueba (las otras son los objetivos del pack).
-    interno = _responde((RespectoPendiente.RESPONDE, {"opcion_id": "5"}))
+    # Ismael es de Dirección, que no tiene objetivos propios en el pack (F-B11):
+    # se le ofrecen el estratégico y los objetivos sin área, por título. "Objetivo
+    # simulado de Revisar tablero" es la 2.ª opción (Cablear, Revisar, Vincular).
+    interno = _responde((RespectoPendiente.RESPONDE, {"opcion_id": "2"}))
 
     r = ejecutar_escenario(
         conn, ws, "corework", "Ismael Soschinski", [], interno,
@@ -2618,7 +2619,7 @@ def test_el_corredor_no_confirma_solo_la_vista_previa_de_un_borrador(corework, c
 
 @pytest.mark.parametrize("escenario_id, comandos", [
     ("b-0025", [(RespectoPendiente.RESPONDE, {"texto": "Cablear tablero sur"})]),
-    ("b-0025-b", [(RespectoPendiente.RESPONDE, {"opcion_id": "5"})]),  # "…de Revisar tablero"
+    ("b-0025-b", [(RespectoPendiente.RESPONDE, {"opcion_id": "2"})]),  # "…de Revisar tablero"
     ("b-0025-c", [RespectoPendiente.CORRIGE,
                   (RespectoPendiente.RESPONDE, {"opcion_id": "5"})]),  # "Fecha objetivo"
     ("b-0025-d", []),                                   # sólo toques: nada que rutear

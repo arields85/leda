@@ -1604,37 +1604,44 @@ def _advance(cur, request, who, now, *, prefijo: str = "") -> IntakeOutcome:
     return _finalize(cur, request, who, now)
 
 
+# Los objetivos que se ofrecen a quien pide (F-B11): los de su área. Una persona
+# no pide tareas de otro sector; lo que cruza áreas va por una dependencia de una
+# tarea propia. Sólo si el área no tiene ningún objetivo propio se ofrecen los que
+# no son de ningún área: el estratégico y los datos anteriores a la migración 0027.
+# Los de otra área no se ofrecen nunca. Los parámetros son (espacio, área, espacio,
+# área), en ese orden.
+_OBJETIVOS_DEL_AREA = """
+      o.workspace_id = %s and o.estado in ('activo', 'propuesto')
+      and (o.area_id = %s
+           or (o.area_id is null and not exists (
+                 select 1 from objective p
+                  where p.workspace_id = o.workspace_id and p.area_id = %s
+                    and p.estado in ('activo', 'propuesto'))))"""
+
+
+def _objetivos_del_area(cur, who, *, filtro: str = "", params=(), offset=0):
+    cur.execute(
+        f"""select o.id, o.titulo, o.estado from objective o
+             where {_OBJETIVOS_DEL_AREA}{filtro}
+             order by o.titulo, o.id limit %s offset %s""",
+        (who.workspace_id, who.area_id, who.area_id, *params,
+         CANDIDATE_PAGE_SIZE + 1, offset))
+    return cur.fetchall()
+
+
 def _entity_candidates(cur, request, who, field, query, offset=0):
     query_text = normalize_text(str(query or "")).casefold()
     if field == "objective":
         if query_text:
-            cur.execute(
-                """select id, titulo, estado from objective
-                    where workspace_id = %s and estado in ('activo', 'propuesto')
-                      and lower(titulo) = lower(%s)
-                    order by titulo, id limit %s offset %s""",
-                (who.workspace_id, normalize_text(str(query)),
-                 CANDIDATE_PAGE_SIZE + 1, offset),
-            )
-            rows = cur.fetchall()
+            rows = _objetivos_del_area(
+                cur, who, filtro=" and lower(o.titulo) = lower(%s)",
+                params=(normalize_text(str(query)),), offset=offset)
             if not rows:
-                cur.execute(
-                    """select id, titulo, estado from objective
-                        where workspace_id = %s and estado in ('activo', 'propuesto')
-                          and position(lower(%s) in lower(titulo)) > 0
-                        order by titulo, id limit %s offset %s""",
-                    (who.workspace_id, normalize_text(str(query)),
-                     CANDIDATE_PAGE_SIZE + 1, offset),
-                )
-                rows = cur.fetchall()
+                rows = _objetivos_del_area(
+                    cur, who, filtro=" and position(lower(%s) in lower(o.titulo)) > 0",
+                    params=(normalize_text(str(query)),), offset=offset)
         else:
-            cur.execute(
-                """select id, titulo, estado from objective
-                    where workspace_id = %s and estado in ('activo', 'propuesto')
-                    order by titulo, id limit %s offset %s""",
-                (who.workspace_id, CANDIDATE_PAGE_SIZE + 1, offset),
-            )
-            rows = cur.fetchall()
+            rows = _objetivos_del_area(cur, who, offset=offset)
         has_more = len(rows) > CANDIDATE_PAGE_SIZE
         chosen = rows[:CANDIDATE_PAGE_SIZE]
         return [(r["titulo"], str(r["id"]),
