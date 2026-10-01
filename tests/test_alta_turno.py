@@ -707,7 +707,7 @@ def test_los_hechos_dicen_el_margen_de_la_fecha_de_una_tarea():
     assert "desde hoy" in regla and "pasada" in regla
     assert "28/04/2028" in regla and "2028-04-28" in regla
     assert "sin año" in regla or "sin el año" in regla
-    assert "objetivo" in regla and "dividir" in regla
+    assert "objetivo" not in regla and "dividir" in regla
     assert "proximos_dias" in regla
     descripcion = T.ESQUEMA_SALIDA["properties"]["valores"]["properties"][
         "due_date"]["properties"]["fecha_iso"]["description"].lower()
@@ -771,3 +771,72 @@ def test_una_fecha_pasada_se_rechaza_y_el_texto_puede_nombrar_lo_que_dijo_la_per
     a = T.aplicar_valores(s, h)
     assert a.asignaciones == () and a.rechazos
     assert T.verificar_turno(s, h, a) is None
+
+
+# ---------------------------------------------------------------------------
+# Lo que Prisma puede ofrecer, como hecho (constitución §4: no prometer lo que no
+# existe; el modelo rellenaba con lo que haría una persona)
+# ---------------------------------------------------------------------------
+
+_PROHIBIDO_OFRECER = ("objetivo", "lunes", "recordatorio", "recordar", "agendar",
+                      "avisar", "mañana", "el día")
+
+
+def _oferta(h) -> list[str]:
+    datos = json.loads(T.hechos_a_json(h))
+    assert "podes_ofrecer" in datos
+    return datos["podes_ofrecer"]
+
+
+def _completo(**cambios):
+    borrador = {c: CampoBorrador("confirmado", "x", "x") for c in T.CAMPOS_REQUERIDOS}
+    borrador["responsible"] = CampoBorrador("confirmado", PER_YO["name"],
+                                            str(PER_YO["id"]))
+    cambios.setdefault("responsables", (OpcionAlta(
+        "R1", PER_YO["name"], PER_YO, es_quien_escribe=True,
+        boton_final="Confirmar"),))
+    return hechos(borrador={**borrador, **cambios.pop("borrador", {})}, **cambios)
+
+
+def test_la_oferta_con_datos_faltantes_es_corta_y_cerrada():
+    oferta = _oferta(hechos())
+    texto = " ".join(oferta).lower()
+    assert "guardar el borrador" in texto and "cuando la persona lo pida" in texto
+    assert "cambiar" in texto and "cancelar" in texto
+    assert not any("botón" in o.lower() for o in oferta)    # nada que cerrar todavía
+    assert len(oferta) <= 5
+
+
+def test_la_oferta_con_todo_completo_incluye_el_boton_real_del_resumen():
+    oferta = _oferta(_completo())
+    assert any("Confirmar" in o for o in oferta)
+    otra = _completo(responsables=(OpcionAlta(
+        "R1", PER_YO["name"], PER_YO, es_quien_escribe=True,
+        boton_final="Enviar a aprobación"),))
+    assert any("Enviar a aprobación" in o for o in _oferta(otra))
+    assert not any("Confirmar" in o for o in _oferta(otra))
+
+
+def test_la_oferta_con_margen_de_fecha_ofrece_fecha_hasta_el_limite_o_dividir():
+    h = hechos(limite_fecha=date(2028, 4, 28), meses_horizonte=2,
+               rechazos_anteriores=("due_date: Esa fecha pasa del 28/04/2028",))
+    texto = " ".join(_oferta(h)).lower()
+    assert "28/04/2028" in texto and "dividir" in texto
+    assert "dividir" not in " ".join(_oferta(hechos())).lower()   # sin límite, no hay
+
+
+@pytest.mark.parametrize("h", [
+    hechos(), _completo(), hechos(limite_fecha=date(2028, 4, 28)),
+    hechos(evento={"mensaje": "dejala para después"}),
+    hechos(evento={"toque": "modificar"})])
+def test_la_oferta_nunca_incluye_objetivos_ni_retomar_un_dia(h):
+    texto = " ".join(_oferta(h)).lower()
+    assert not [p for p in _PROHIBIDO_OFRECER if p in texto], texto
+    assert "guardar el borrador" in texto      # el pausado se retoma si la persona pide
+
+
+def test_la_guia_manda_ofrecer_solo_lo_de_la_lista_y_no_promete_ni_ofrece_objetivos():
+    guia = T.SISTEMA_ALTA
+    assert "podes_ofrecer" in guia and "no prometas" in guia.lower()
+    assert "tomarla como un objetivo" not in guia
+    assert "objetivo" not in T.regla_de_fechas(hechos(limite_fecha=date(2028, 4, 28)))

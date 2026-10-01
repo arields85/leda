@@ -1556,3 +1556,32 @@ Diseño B elegido por el usuario. Ruta declarada: un solo escritor (encargo expl
   aclaración equivocada; Cancelar lo canceló. Pendiente (b) cerrado en real.
 - Pendiente (i), visual: en ese menú "Continuar borrador" y "Empezar otro" salen sin ícono
   (Cancelar sí lo tiene).
+
+### Lo que Prisma puede ofrecer, como hecho (2026-10-01)
+
+- **Causa.** En el alta conducida el modelo no sabía qué puede ofrecer Prisma en ese punto y rellenaba con lo que
+  haría una persona: con `dejar`, "la retomamos el lunes"; tras una fecha fuera del margen, "lo tomamos como
+  objetivo". Ninguna de las dos existe (constitución §4). Además tres textos escritos por el código lo sugerían
+  ellos mismos: `regla_de_fechas`, la guía `SISTEMA_ALTA` y el rechazo `FECHA_LEJANA` de `valores.py`.
+- **Arreglo (un hecho, no una regla del verificador).** `alta_turno.lo_que_se_puede_ofrecer(h)` arma, con el estado
+  del turno, una lista cerrada que `hechos_a_json` entrega como `podes_ofrecer`: guardar el borrador (se retoma
+  cuando la persona lo pida), cambiar cualquier dato, cancelar la tarea; con todo completo y responsable conocido,
+  "el botón <boton_final> del resumen" (reusa `HechosTurno.boton_final`); con margen de fecha, "elegir una fecha
+  hasta el <límite>, o dividir el trabajo en tareas más cortas". Se retiró "tomarlo como un objetivo" de los tres
+  textos. Línea nueva en `SISTEMA_ALTA`: ofrecer sólo lo de `podes_ofrecer` y no prometer acciones futuras que no
+  estén ahí (retomar un día, recordar, crear un objetivo). La respuesta de `dejar` la escribe el modelo, así que la
+  misma lista la cubre; el camino general (`contexto.py`) sólo da el hecho del borrador pausado y la oferta de
+  seguirlo es un texto del código sin día, por lo que no cambió.
+- **Deliberadamente no se hizo.** Un chequeo del verificador que detecte promesas en el texto libre (decisión del
+  usuario: nada de reglas por frases; el verificador sigue con invariantes). Tampoco se ofrece crear un objetivo
+  (congelado), retomar en un día dado ni recordatorios a pedido.
+- **Límite honesto.** Esto guía al modelo; una prueba unitaria no puede demostrar que dejará de prometer. La
+  verificación es la próxima corrida real por Telegram.
+- **RED.** `tests/test_alta_turno.py` + `tests/test_valores_margen.py`: 11 failed (10 nuevos y el existente que
+  exigía "objetivo" en la regla de fechas), 146 passed.
+- **GREEN.** Los dos archivos, 157 passed. Tanda enfocada (`test_alta_turno`, `test_alta_conducida`,
+  `test_conducir_alta_proveedores`, `test_horizonte_tarea`, `test_borrador_pausado_camino_general`,
+  `test_capacidades`, `test_valores_margen`): 278 passed. No se corrió la suite completa.
+- **Pruebas cambiadas.** `test_los_hechos_dicen_el_margen_de_la_fecha_de_una_tarea` ahora afirma que la regla NO
+  nombra "objetivo" (afirmaba la oferta retirada).
+- Pendientes (a) y (f): corregidos, pendientes de verificar en real.

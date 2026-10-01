@@ -54,3 +54,11 @@ def test_sin_margen_no_hay_limite_superior():
     esperado = ValorEsperado(TipoValor.FECHA, hoy=HOY)
     r = validar_valor({"fecha_iso": "2099-01-01"}, esperado, limite_texto=50)
     assert isinstance(r, Aceptado)
+
+
+def test_el_rechazo_por_fecha_lejana_no_ofrece_tomarla_como_objetivo():
+    # Crear un objetivo desde el alta no existe (roadmap): no se ofrece.
+    from prisma.valores import MotivoRechazo
+    r = _validar("2027-08-15")
+    assert r.motivo is MotivoRechazo.FECHA_LEJANA
+    assert "objetivo" not in r.se_acepta.lower() and "dividila" in r.se_acepta

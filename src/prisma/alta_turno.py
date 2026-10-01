@@ -75,8 +75,7 @@ def regla_de_fechas(h: "HechosTurno") -> str:
         "fecha pasada o posterior no es válida. Una fecha sin año es la próxima "
         "que llega dentro de ese rango: si no entra, no es válida para una tarea; "
         "decilo, proponé una fecha dentro del rango y sugerí dividir el trabajo "
-        "en tareas más cortas o tomarlo como un objetivo (los objetivos pueden "
-        "ser más largos). " + ayuda)
+        "en tareas más cortas. " + ayuda)
 
 
 # El texto del modelo es una o tres oraciones: lo demás es una respuesta
@@ -189,6 +188,25 @@ def _mostrada(dia: date) -> str:
     return dia.strftime("%d/%m/%Y")
 
 
+def lo_que_se_puede_ofrecer(h: HechosTurno) -> list[str]:
+    """Lo único que Prisma puede ofrecerle a la persona ahora, armado con el estado de
+    este turno (constitución §4: no prometer lo que no existe). Es una lista cerrada:
+    NO incluye crear un objetivo desde el alta, retomar el borrador un día dado ni
+    recordatorios a pedido; un borrador pausado se retoma sólo si la persona lo pide."""
+    ofertas = [
+        "guardar el borrador, que se retoma cuando la persona lo pida",
+        "cambiar cualquier dato",
+        "cancelar la tarea",
+    ]
+    if not h.faltan and h.boton_final:
+        ofertas.append(f"el botón {h.boton_final} del resumen, que cierra el alta")
+    if h.limite_fecha is not None:
+        ofertas.append(
+            f"si la fecha no entra: elegir una fecha hasta el "
+            f"{_mostrada(h.limite_fecha)}, o dividir el trabajo en tareas más cortas")
+    return ofertas
+
+
 def hechos_a_json(h: HechosTurno) -> str:
     """Los hechos del turno como los lee el modelo. Sin ningún identificador real:
     las opciones llevan ids cortos y lo demás es texto ya legible."""
@@ -229,6 +247,7 @@ def hechos_a_json(h: HechosTurno) -> str:
         "borrador": borrador,
         "faltan": list(h.faltan),
         "opciones": opciones,
+        "podes_ofrecer": lo_que_se_puede_ofrecer(h),
         "evento": evento,
     }
     if h.boton_final:
@@ -665,8 +684,7 @@ SISTEMA_ALTA = (
     "nombre; la fecha como AAAA-MM-DD (sirve desde hoy hasta el límite que dicen "
     "`fechas`, no una pasada ni una posterior; sin año es la próxima que llega "
     "dentro de ese rango; si no entra, no la mandes: decile el límite, proponé "
-    "una fecha dentro del rango y sugerí dividir la tarea o tomarla como un "
-    "objetivo; `proximos_dias` es sólo un calendario para resolver \"el "
+    "una fecha dentro del rango y sugerí dividir la tarea; `proximos_dias` es sólo un calendario para resolver \"el "
     "viernes\" o \"la semana que viene\", no un límite; si el día no queda claro, "
     "`{\"falta\": \"dia\"}`); el criterio con `verificable` "
     "(si dice cómo se comprueba que está hecha) y, si no lo es, una `propuesta` "
@@ -690,4 +708,6 @@ SISTEMA_ALTA = (
     "corregilos y decilo con naturalidad si importa.\n"
     "El `texto` usa sólo hechos que están en el JSON (ninguna fecha, nombre ni "
     "número que no esté) y copia los títulos tal cual. Si la persona cancela, "
-    "confirmalo; si deja la tarea para después, decile que queda guardada.")
+    "confirmalo; si deja la tarea para después, decile que queda guardada.\n"
+    "Ofrecé sólo lo que figura en `podes_ofrecer` y no prometas ninguna acción "
+    "futura que no esté ahí (retomar un día, recordar, crear un objetivo).")
