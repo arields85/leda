@@ -689,14 +689,51 @@ def test_la_guia_nombra_el_boton_final_de_los_hechos_y_no_uno_fijo():
     assert "confirma con el botón Confirmar" not in guia
 
 
-def test_los_hechos_dicen_que_sirve_cualquier_fecha_desde_hoy_y_no_una_pasada():
-    datos = json.loads(T.hechos_a_json(hechos()))
+def test_los_hechos_dicen_el_margen_de_la_fecha_de_una_tarea():
+    h = hechos(limite_fecha=date(2028, 4, 28), meses_horizonte=2)
+    datos = json.loads(T.hechos_a_json(h))
     regla = datos["fechas"].lower()
     assert "desde hoy" in regla and "pasada" in regla
-    assert "proximos_dias" in regla and "límite" in regla
-    assert "desde hoy" in T.ESQUEMA_SALIDA["properties"]["valores"]["properties"][
+    assert "28/04/2028" in regla and "2028-04-28" in regla
+    assert "sin año" in regla or "sin el año" in regla
+    assert "objetivo" in regla and "dividir" in regla
+    assert "proximos_dias" in regla
+    descripcion = T.ESQUEMA_SALIDA["properties"]["valores"]["properties"][
         "due_date"]["properties"]["fecha_iso"]["description"].lower()
-    assert "desde hoy" in T.SISTEMA_ALTA.lower()
+    assert "hasta" in descripcion and "límite" in descripcion
+    guia = T.SISTEMA_ALTA.lower()
+    assert "límite" in guia and "próxima" in guia
+
+
+def test_sin_margen_los_hechos_no_ponen_limite_superior():
+    datos = json.loads(T.hechos_a_json(hechos()))
+    assert "desde hoy" in datos["fechas"].lower()
+    assert "limite_fecha" not in datos["fechas"]
+
+
+@pytest.mark.parametrize("iso,acepta", [
+    ("2028-02-28", True), ("2028-04-28", True),     # hoy y el límite
+    ("2028-04-29", False), ("2029-08-15", False)])
+def test_la_fecha_de_una_tarea_se_valida_contra_el_margen(iso, acepta):
+    h = hechos(limite_fecha=date(2028, 4, 28), meses_horizonte=2)
+    a = T.aplicar_valores(leer(valores={"due_date": {"fecha_iso": iso}}), h)
+    if acepta:
+        assert [x.campo for x in a.asignaciones] == ["due_date"] and not a.rechazos
+    else:
+        assert a.asignaciones == () and len(a.rechazos) == 1
+        assert "28/04/2028" in a.rechazos[0] and "ya pasó" not in a.rechazos[0]
+
+
+def test_el_texto_puede_nombrar_el_limite_y_el_margen_en_meses():
+    h = hechos(limite_fecha=date(2028, 4, 28), meses_horizonte=2,
+               evento={"mensaje": "para el 15 de agosto"})
+    s = leer(texto="Una tarea puede ir hasta el 28/04/2028, 2 meses desde hoy. "
+                   "¿Para qué fecha la querés?",
+             valores={"due_date": {"fecha_iso": "2029-08-15"}},
+             pregunta=["due_date"])
+    a = T.aplicar_valores(s, h)
+    assert a.asignaciones == () and a.rechazos
+    assert T.verificar_turno(s, h, a) is None
 
 
 @pytest.mark.parametrize("fecha_iso,dicha", [

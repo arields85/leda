@@ -1312,3 +1312,40 @@ Tramo `f60c3ca..51fa9e6` (`81bb60a`, `9d1bee2`, `20cd9c8`, `51fa9e6`; 994 línea
   Sin respuesta, `controlar` encola el aviso neutro, relee las respuestas y recién después
   une las notas; la nota de la pausa sale igual.
 - SUGGESTION: falta una prueba del caso en que el primer mensaje ya no está `listo` al unir.
+
+### Margen máximo de la fecha de una tarea (ajuste del espacio) (2026-10-01)
+
+- **Decisión del usuario.** La fecha objetivo de una tarea va de hoy a hoy más N meses; N = 2 por
+  omisión y es configuración del espacio, no una constante del núcleo. Los objetivos pueden ser más
+  largos: la regla es sólo para tareas.
+- **Por qué.** Saca la ambigüedad del año. Una fecha sin año tiene a lo sumo UNA lectura válida: la
+  próxima que llega dentro del margen. Caso de la prueba real: "para el 15 de agosto" lo resolvió el
+  modelo a 2027 (hoy 2026-10-01) y la tarea quedó a casi un año. Ahora eso queda fuera del margen:
+  Prisma dice hasta dónde llega una tarea, sugiere dividirla o tomarla como objetivo, y pide una fecha
+  dentro del rango. En diciembre, "10 de enero" es el próximo enero sin preguntar nada.
+- **Definición.** N meses de calendario: hoy + N meses, recortado al último día del mes
+  (2026-12-31 + 2 = 2027-02-28); el límite se incluye (`valores.sumar_meses`).
+- **Dónde y cómo se cambia.** Clave del pack `horizonte_tarea: {meses: N}` (en `espacios/corework.yaml`,
+  sembrada en 2). El importador la guarda en `workspace_setting['horizonte_tarea']`. La administración
+  de plataforma lo cambia editando el pack y volviendo a importarlo (todavía no hay consola). Sin el
+  ajuste, 2. Valor inválido: usa 2, deja un incidente (`horizonte_tarea`, una vez por proceso) y el
+  importador advierte.
+- **Mecanismo.** `ValorEsperado.hasta` y `MotivoRechazo.FECHA_LEJANA` en `valores.py` (razón propia, nombra
+  el límite en dd/mm/aaaa). `ingreso_tareas.meses_de_horizonte`/`limite_de_fecha` leen el ajuste;
+  `_esperado_del_campo` lo aplica en el alta guiada (valor del ruteo y propuestas del modelo) y
+  `alta_turno` en la conducida (`HechosTurno.limite_fecha`, `meses_horizonte`). La regla de fechas de los
+  hechos y `SISTEMA_ALTA` reemplazan la de 51fa9e6 ("cualquier fecha desde hoy"); el verificador permite
+  nombrar el límite y los meses.
+- **Pruebas existentes cambiadas.** `test_los_hechos_dicen_que_sirve_cualquier_fecha_desde_hoy...` pasó a
+  `test_los_hechos_dicen_el_margen_de_la_fecha_de_una_tarea` (la regla ahora lleva el límite). Fechas
+  fijas lejanas movidas dentro del margen de `NOW` (2028-02-28): `2028-10-04` a `2028-04-04`
+  (y "4 de octubre" a "4 de abril") en `test_alta_guiada_flujo`, `test_alta_guiada_mensaje_entero` y
+  `test_alta_criterio_verificable`. `test_alta_modificar` (`_modificar`) y `tests/banco/test_corrida.py`
+  (`_margen_amplio`) usan fechas fijas con el reloj real: se les da un margen de 120 meses en el
+  espacio.
+- **RED.** `tests/test_valores_margen.py` y `tests/test_horizonte_tarea.py`: error de importación
+  (`sumar_meses` no existía); `tests/test_alta_turno.py`: 6 failed, 123 passed.
+- **GREEN.** `tests/test_valores_margen.py tests/test_horizonte_tarea.py tests/test_alta_turno.py tests/test_valores.py`:
+  257 passed. Tanda enfocada completa más todo archivo que toca `validar_valor`, `TipoValor.FECHA`,
+  importador o fechas objetivo: 1672 passed (9 min), sin fallas; antes de mover fechas fijas de pruebas existentes habia 25 failed, 1647 passed.
+

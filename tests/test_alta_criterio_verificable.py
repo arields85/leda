@@ -34,10 +34,10 @@ NO_SE = "no lo sé, voy a ver"
 def _en_el_criterio(cur, world):
     """El alta con todo confirmado menos el criterio de aceptación, que espera."""
     actor, rid, ws = _en_la_fecha(cur, world)
-    inbound = _entrante(cur, ws, actor, "el 4 de octubre", n=820)
+    inbound = _entrante(cur, ws, actor, "el 4 de abril", n=820)
     I.consume_pending_text(cur, actor, chat_id=CHAT, source_inbound_id=inbound,
-                           source_raw_text="el 4 de octubre", now=NOW,
-                           valor={"fecha_iso": "2028-10-04"})
+                           source_raw_text="el 4 de abril", now=NOW,
+                           valor={"fecha_iso": "2028-04-04"})
     assert _slot(cur, rid) == "acceptance_criterion"
     return actor, rid, ws
 

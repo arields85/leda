@@ -15,7 +15,7 @@ from psycopg.types.json import Jsonb
 from .autoridad import Denegado, Solicitante
 from .db import entrante_atado, registrar_auditoria
 from .incidentes import (ETAPA_CONFIGURACION_ALTA, ETAPA_CRITERIO_SIN_PROPUESTA,
-                         ETAPA_OBJETIVO_SIN_ORDENAR, ETAPA_REDACCION_RECHAZADA,
+                         ETAPA_HORIZONTE_TAREA, ETAPA_OBJETIVO_SIN_ORDENAR, ETAPA_REDACCION_RECHAZADA,
                          ETAPA_RESUMEN_SIN_CIERRE,
                          ETAPA_RESUMEN_VIGENTE_SIN_FILA, ETAPA_VALOR_SIN_INTERPRETAR, NOTICIA_NEUTRA_INCIDENTE,
                          REFERENCIA_INBOUND_MESSAGE, REFERENCIA_PENDING_ACTION,
@@ -33,7 +33,8 @@ from .salida import (BUTTON_TEXT_LIMIT, ETIQUETA_CANCELAR, ETIQUETA_CONFIRMAR,
                      normalize_visible_text, prepare_buttons, prepare_payload, telegram_utf16_units,
                      with_no_effect_status)
 from .valores import (OPCION_NINGUNA, VERIFICABLE_NO, MotivoRechazo, Rechazado,
-                      TipoValor, ValorEsperado, opciones_numeradas, validar_valor)
+                      TipoValor, ValorEsperado, opciones_numeradas, sumar_meses,
+                      validar_valor)
 
 
 CALLBACK_PREFIX = "i:"
@@ -316,10 +317,56 @@ def _criterio_a_proponer(cur, request_id, who, valor, dicho, inbound_id):
     return None
 
 
+CLAVE_HORIZONTE = "horizonte_tarea"
+HORIZONTE_POR_OMISION = 2
+# (espacio, valor) del ajuste ya registrado como inválido por este proceso.
+_anomalias_horizonte: set[tuple[str, str]] = set()
+
+
+def meses_de_horizonte(cur, workspace_id: str) -> int:
+    """Cuántos meses de calendario, desde hoy, puede ir la fecha de una tarea: el
+    ajuste `horizonte_tarea` del espacio (`{"meses": N}`, del pack). Sin él, 2. Un
+    valor que no se entiende usa 2 y deja un incidente (una vez por proceso): un
+    ajuste mal escrito no se ignora en silencio."""
+    cur.execute(
+        "select valor from workspace_setting where workspace_id = %s and clave = %s",
+        (workspace_id, CLAVE_HORIZONTE))
+    fila = cur.fetchone()
+    if not fila:
+        return HORIZONTE_POR_OMISION
+    valor = fila["valor"]
+    if isinstance(valor, str):
+        try:
+            valor = json.loads(valor)
+        except ValueError:
+            pass
+    meses = valor.get("meses") if isinstance(valor, dict) else None
+    if isinstance(meses, int) and not isinstance(meses, bool) and meses >= 1:
+        return meses
+    huella = (workspace_id, json.dumps(valor, sort_keys=True, default=str))
+    if huella not in _anomalias_horizonte:
+        registrar_incidente(
+            cur, workspace_id,
+            "El ajuste `horizonte_tarea` del espacio no tiene un valor válido: "
+            f"se usan {HORIZONTE_POR_OMISION} meses como margen de la fecha de una "
+            "tarea.", severidad="baja",
+            referencia_cruda=f"workspace_setting[{CLAVE_HORIZONTE}]={huella[1]}"[:2000],
+            etapa=ETAPA_HORIZONTE_TAREA, avisar_admin=False)
+        _anomalias_horizonte.add(huella)
+    return HORIZONTE_POR_OMISION
+
+
+def limite_de_fecha(cur, workspace_id: str, hoy: date) -> date:
+    """El último día que vale como fecha objetivo de una tarea (se incluye)."""
+    return sumar_meses(hoy, meses_de_horizonte(cur, workspace_id))
+
+
 def _esperado_del_campo(cur, workspace_id, field: str, now: datetime) -> ValorEsperado:
     tipo = TIPO_DE_CAMPO.get(field, TipoValor.TEXTO)
     if tipo is TipoValor.FECHA:
-        return ValorEsperado(tipo, hoy=_hoy_del_espacio(cur, workspace_id, now))
+        hoy = _hoy_del_espacio(cur, workspace_id, now)
+        return ValorEsperado(tipo, hoy=hoy,
+                             hasta=limite_de_fecha(cur, workspace_id, hoy))
     return ValorEsperado(tipo)
 
 

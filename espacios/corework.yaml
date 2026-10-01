@@ -335,6 +335,12 @@ bloqueos:
   escala_solo_a_los_dias: 5
   ausencia_sin_fecha_de_fin_alerta_a_los_dias: 3
 
+# Margen máximo de la fecha de una tarea: hoy más `meses` meses de calendario (se
+# incluye el último día). Los objetivos pueden ser más largos; esto es sólo para
+# tareas. Sin este dato valen 2 meses. Para cambiarlo: editar acá y volver a importar.
+horizonte_tarea:
+  meses: 2
+
 # ---------------------------------------------------------------------------
 # Tono
 # ---------------------------------------------------------------------------

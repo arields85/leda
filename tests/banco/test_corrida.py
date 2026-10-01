@@ -1854,6 +1854,19 @@ def test_ejecutar_escenario_escribir_la_opcion_de_la_eleccion_abierta_del_alta(
         assert cur.fetchone()["estado"] == "confirmed"
 
 
+def _margen_amplio(conn, ws, meses: int = 120) -> None:
+    """Estos escenarios usan fechas fijas (2030-2031) y el reloj es el real: el
+    espacio tiene un margen de 10 años para que el margen de la fecha de una tarea
+    (por omisión 2 meses) no las limite."""
+    with admin(conn) as cur:
+        cur.execute(
+            "insert into workspace_setting (workspace_id, clave, valor) "
+            "values (%s, 'horizonte_tarea', %s::jsonb) "
+            "on conflict (workspace_id, clave) do update set valor = excluded.valor",
+            (ws, '{"meses": %d}' % meses))
+    conn.commit()
+
+
 @pytest.mark.parametrize(("comando", "texto", "estado", "dice"), [
     (RespectoPendiente.RESPONDE, "sí, dale", "active", "esperando confirmación"),
     (RespectoPendiente.CORRIGE, "cambiale la fecha", "active",
@@ -1863,6 +1876,7 @@ def test_ejecutar_escenario_escribir_la_opcion_de_la_eleccion_abierta_del_alta(
 def test_ejecutar_escenario_llega_al_borrador_esperando_y_lo_interpreta(
         comando, texto, estado, dice, corework, conn):
     ws = corework.workspace_id
+    _margen_amplio(conn, ws)
     _sembrar_objetivo_para_el_alta(conn, ws)
 
     # Quien escribe es quien confirma (Ismael aprueba lo de Marcos): sólo
@@ -2638,6 +2652,7 @@ def test_los_escenarios_de_b_0025_cumplen_lo_que_declaran_con_un_modelo_guionado
 
     escenario = cargar_escenario(DIR_ESCENARIOS / f"{escenario_id}.yaml")
     ws = corework.workspace_id
+    _margen_amplio(conn, ws)
     en_la_corrida = bool(escenario.toques
                          and escenario.precondiciones.get("borrador_de_alta"))
     with admin(conn) as cur:

@@ -159,7 +159,7 @@ def test_una_fecha_aceptada_llega_como_entendida_y_el_mensaje_la_dice(
     with espacio(conn, ws) as cur:
         actor, rid, _ = _en_la_fecha(cur, intake_world)
     modelo = _Modelo(_json(
-        "Dejé la fecha para el 4 de octubre. ¿Cómo sabemos que la tarea quedó "
+        "Dejé la fecha para el 4 de abril. ¿Cómo sabemos que la tarea quedó "
         "terminada?", "acceptance_criterion"))
     _a(conn, ws, monkeypatch, modelo)
 
@@ -168,17 +168,17 @@ def test_una_fecha_aceptada_llega_como_entendida_y_el_mensaje_la_dice(
         inbound = _entrante(cur, ws, actor)
         resultado = I.consume_pending_text(
             cur, actor, chat_id=CHAT, source_inbound_id=inbound,
-            source_raw_text="el 4 de octubre", now=NOW + timedelta(minutes=1),
-            valor={"fecha_iso": "2028-10-04"})
+            source_raw_text="el 4 de abril", now=NOW + timedelta(minutes=1),
+            valor={"fecha_iso": "2028-04-04"})
 
-    assert resultado.text.startswith("Dejé la fecha para el 4 de octubre.")
+    assert resultado.text.startswith("Dejé la fecha para el 4 de abril.")
     (hechos,) = modelo.hechos
-    assert hechos["entendido"] == [{"dato": "la fecha objetivo", "valor": "04/10/2028"}]
+    assert hechos["entendido"] == [{"dato": "la fecha objetivo", "valor": "04/04/2028"}]
     assert hechos["falta"]["campo"] == "acceptance_criterion"
     assert "opciones" not in hechos                  # una pregunta de texto
 
 
-def _entrante(cur, ws, actor, texto="el 4 de octubre", n=830):
+def _entrante(cur, ws, actor, texto="el 4 de abril", n=830):
     from tests.test_alta_guiada_flujo import _entrante as e
     return e(cur, ws, actor, texto, n=n)
 
@@ -377,14 +377,14 @@ def _hasta_la_confirmacion_del_criterio(conn, world, monkeypatch, modelo):
         inbound = _entrante(cur, ws, actor)
         resultado = I.consume_pending_text(
             cur, actor, chat_id=CHAT, source_inbound_id=inbound,
-            source_raw_text="el 4 de octubre", now=NOW + timedelta(minutes=2),
-            valor={"fecha_iso": "2028-10-04"})
+            source_raw_text="el 4 de abril", now=NOW + timedelta(minutes=2),
+            valor={"fecha_iso": "2028-04-04"})
     return ws, resultado
 
 
 def test_lo_que_se_pide_confirmar_sale_tal_cual_en_el_mensaje(
         intake_world, conn, monkeypatch):
-    texto = (f"Dejé la fecha para el 4 de octubre. Tengo este criterio de "
+    texto = (f"Dejé la fecha para el 4 de abril. Tengo este criterio de "
              f"aceptación: {CRITERIO}. ¿Lo confirmás?")
     modelo = _ModeloConCriterio(_json(texto, "acceptance_criterion"))
 
@@ -400,7 +400,7 @@ def test_lo_que_se_pide_confirmar_sale_tal_cual_en_el_mensaje(
 
 def test_si_el_mensaje_cambia_lo_que_se_confirma_sale_el_texto_de_siempre(
         intake_world, conn, monkeypatch):
-    parafraseado = ("Dejé la fecha para el 4 de octubre. El criterio es un acta "
+    parafraseado = ("Dejé la fecha para el 4 de abril. El criterio es un acta "
                     "firmada con fotos. ¿Lo confirmás?")
     modelo = _ModeloConCriterio(_json(parafraseado, "acceptance_criterion"))
 

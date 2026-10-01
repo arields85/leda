@@ -103,6 +103,16 @@ def validar(pack: dict[str, Any]) -> tuple[list[str], list[str]]:
             f"conversacion.redaccion vale '{redaccion}': las variantes son A y "
             f"B. Sin una variante válida Prisma usa B y lo registra.")
 
+    horizonte = pack.get("horizonte_tarea")
+    if horizonte is not None:
+        meses = horizonte.get("meses") if isinstance(horizonte, dict) else None
+        if not (isinstance(meses, int) and not isinstance(meses, bool)
+                and meses >= 1):
+            advertencias.append(
+                f"horizonte_tarea vale {horizonte!r}: tiene que ser "
+                "`meses: N` con N entero de 1 o más. Sin un valor válido Prisma "
+                "usa 2 meses y lo registra.")
+
     # Cada frente del objetivo inicial pertenece a un área que el pack declara: sin
     # eso el objetivo quedaría sin área y el alta lo trataría como estratégico.
     for f in (pack.get("objetivo_inicial") or {}).get("frentes") or []:
@@ -677,6 +687,12 @@ def _importar_ajustes(cur, ws, pack) -> None:
     urgencia = pack.get("urgencia")
     if urgencia:
         ajustes["urgencia"] = urgencia
+    # El margen máximo de la fecha de una tarea (meses de calendario desde hoy): un
+    # dato del espacio. Se guarda tal cual; `ingreso_tareas.meses_de_horizonte` lo
+    # lee, y un valor inválido usa 2 y deja un incidente.
+    horizonte = pack.get("horizonte_tarea")
+    if horizonte is not None:
+        ajustes["horizonte_tarea"] = horizonte
     # Cómo se redactan las respuestas (ADR 0014): el interruptor A/B del
     # experimento, un dato del espacio. `redaccion.variante_redaccion` lo lee.
     variante = (pack.get("conversacion") or {}).get("redaccion")

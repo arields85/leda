@@ -44,6 +44,7 @@ from .incidentes import (ETAPA_ALTA_CONDUCIDA_FALLIDA,
                          ETAPA_CRITERIO_SIN_PROPUESTA, ETAPA_INTERRUPTOR_ALTA,
                          NOTICIA_NEUTRA_INCIDENTE, REFERENCIA_INBOUND_MESSAGE,
                          registrar_incidente)
+from .valores import sumar_meses
 from .salida import (ICONO_RECOMENDADA, con_icono, etiqueta_sin_icono,
                      etiquetas_de_tarea, prepare_buttons, prepare_payload)
 
@@ -482,8 +483,11 @@ def _hechos(cur, request, who, evento: dict, now: datetime,
                               for e in filas["evidence"]["valor"]["items"])
     criterio = borrador["acceptance_criterion"]
     marca = (request["terminal_result"] or {}).get(I.CRITERIO_PROPUESTO)
+    ws = str(request["workspace_id"])
+    hoy = I._hoy_del_espacio(cur, ws, now)
+    meses = I.meses_de_horizonte(cur, ws)
     return T.HechosTurno(
-        hoy=I._hoy_del_espacio(cur, str(request["workspace_id"]), now),
+        hoy=hoy, limite_fecha=sumar_meses(hoy, meses), meses_horizonte=meses,
         quien_escribe=who.nombre or "", borrador=borrador, area=area,
         evidencia=evidencia,
         objetivos=_opciones(cur, request, who, "objective", filas),

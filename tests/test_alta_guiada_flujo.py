@@ -145,7 +145,7 @@ def _en_la_fecha(cur, world):
     return actor, rid, ws
 
 
-def _decir_fecha(cur, world, actor, rid, ws, valor, texto="el 4 de octubre", n=810):
+def _decir_fecha(cur, world, actor, rid, ws, valor, texto="el 4 de abril", n=810):
     inbound = _entrante(cur, ws, actor, texto, n=n)
     return I.consume_pending_text(
         cur, actor, chat_id=CHAT, source_inbound_id=inbound,
@@ -153,8 +153,8 @@ def _decir_fecha(cur, world, actor, rid, ws, valor, texto="el 4 de octubre", n=8
 
 
 @pytest.mark.parametrize(("texto", "iso"), [
-    ("4de octubre", "2028-10-04"),       # R4c-H6: sin espacio
-    ("04 / 10", "2028-10-04"),           # R4c-H6: espacios junto a la barra
+    ("4de abril", "2028-04-04"),       # R4c-H6: sin espacio
+    ("04 / 04", "2028-04-04"),           # R4c-H6: espacios junto a la barra
     ("el viernes 3 de marzo", "2028-03-03"),
     ("mañana", "2028-02-29"),
 ])

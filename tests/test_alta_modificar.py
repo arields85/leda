@@ -129,6 +129,15 @@ def _toque_de_modificar(client, conn, user, pid):
 def _modificar(conn, monkeypatch, world, responsable="Sam North"):
     """El alta en confirmación con Modificar ya tocado: el selector abierto.
     Devuelve (request_id, id de la vista previa cerrada, cliente, chat)."""
+    # Las fechas de estas pruebas son fijas (2028) y el reloj del gateway es el real:
+    # el espacio tiene un margen de 10 años para que no las limite.
+    with admin(conn) as cur:
+        cur.execute(
+            "insert into workspace_setting (workspace_id, clave, valor) "
+            "values (%s, 'horizonte_tarea', '{\"meses\": 120}') "
+            "on conflict (workspace_id, clave) do update set valor = excluded.valor",
+            (world["north-lab"]["id"],))
+    conn.commit()
     rid, pid = _alta_en_confirmacion(conn, world, responsable=responsable)
     user = _usuario(world)
     client = _callback_client(conn, monkeypatch)

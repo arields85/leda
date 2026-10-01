@@ -23,7 +23,7 @@ contrato: salida mal formada, o ni valor ni `falta`.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from enum import Enum
 
 
@@ -98,6 +98,8 @@ class ValorEsperado:
     """Qué espera la pregunta pendiente: el tipo, las opciones ofrecidas (con
     `OPCION`) y el día de hoy en la zona del espacio (con `FECHA`: es lo que
     deja resolver "mañana" y lo que separa una fecha pasada de una vigente).
+    `hasta` (con `FECHA`): el último día que vale (se incluye); sin él, no hay límite
+    superior. Es el margen máximo de la fecha de una tarea (ajuste del espacio).
     `confirmado`: la persona ya confirmó con un botón que el mensaje es la
     respuesta a esta pregunta (el modelo no vuelve a dudar de eso).
     `juzga_verificable` (F-B7): además del texto, el modelo dice si es concreto y
@@ -106,6 +108,7 @@ class ValorEsperado:
     tipo: TipoValor
     opciones: tuple[Opcion, ...] = ()
     hoy: date | None = None
+    hasta: date | None = None
     confirmado: bool = False
     juzga_verificable: bool = False
     contexto: str = ""
@@ -116,6 +119,7 @@ class MotivoRechazo(str, Enum):
     VALOR_INCOMPLETO = "valor_incompleto"
     FECHA_INVALIDA = "fecha_invalida"
     FECHA_PASADA = "fecha_pasada"
+    FECHA_LEJANA = "fecha_lejana"
     OPCION_DESCONOCIDA = "opcion_desconocida"
     TEXTO_VACIO = "texto_vacio"
     TEXTO_LARGO = "texto_largo"
@@ -187,6 +191,16 @@ def _cadena(valor, campo: str) -> str | None:
     return dato.strip() if isinstance(dato, str) else None
 
 
+def sumar_meses(desde: date, meses: int) -> date:
+    """`desde` más `meses` de calendario, recortado al último día del mes si ese
+    día no existe (2026-12-31 + 2 = 2027-02-28)."""
+    indice = desde.year * 12 + (desde.month - 1) + meses
+    anio, mes = divmod(indice, 12)
+    mes += 1
+    ultimo = (date(anio + (mes == 12), mes % 12 + 1, 1) - timedelta(days=1)).day
+    return date(anio, mes, min(desde.day, ultimo))
+
+
 def _fecha(valor, esperado: ValorEsperado) -> Aceptado | Rechazado:
     if esperado.hoy is None:
         raise ValueError("Validar una fecha necesita el día de hoy.")
@@ -209,6 +223,13 @@ def _fecha(valor, esperado: ValorEsperado) -> Aceptado | Rechazado:
     if fecha < esperado.hoy:
         return Rechazado(MotivoRechazo.FECHA_PASADA,
                          "Esa fecha ya pasó.", _se_acepta_fecha())
+    if esperado.hasta is not None and fecha > esperado.hasta:
+        limite = esperado.hasta.strftime("%d/%m/%Y")
+        return Rechazado(
+            MotivoRechazo.FECHA_LEJANA,
+            f"Esa fecha pasa del {limite}, lo más lejos que puede ir una tarea.",
+            f"Decime una fecha hasta el {limite}; si lleva más tiempo, dividila "
+            "en tareas más cortas o tomala como un objetivo.")
     return Aceptado(TipoValor.FECHA, fecha)
 
 

@@ -124,6 +124,9 @@ ETAPA_ALTA_CONDUCIDA_FALLIDA = "alta_conducida_fallida"
 # El ajuste `alta` del espacio no tiene un valor que se entienda: sigue el alta
 # guiada de siempre.
 ETAPA_INTERRUPTOR_ALTA = "interruptor_alta"
+# El ajuste `horizonte_tarea` del espacio (el margen máximo de la fecha de una
+# tarea) no tiene un valor que se entienda: se usan los 2 meses por omisión.
+ETAPA_HORIZONTE_TAREA = "horizonte_tarea"
 # T9-H19e: un recibo viejo sin respuesta que la reentrega no recuperó (`huerfanos`).
 ETAPA_MENSAJE_HUERFANO = "mensaje_huerfano_sin_respuesta"
 # T9-H19g: el aviso de UN huérfano falló y se lo saltea (el resto del barrido sigue).
@@ -414,6 +417,14 @@ EXPLICACION_POR_ETAPA: dict[str, ExplicacionDeEtapa] = {
         que_vio="Nada raro: el alta guiada de siempre, un dato por vez.",
         que_hacer=("Corregí el ajuste `alta` del espacio (`conversada` o "
                    "`guiada`). No hace falta que {nombre} haga nada.")),
+    ETAPA_HORIZONTE_TAREA: ExplicacionDeEtapa(
+        que_paso=("El ajuste `horizonte_tarea` del espacio no tiene un valor "
+                  "válido (`meses` debe ser un entero de 1 o más): se usan los "
+                  "2 meses por omisión como margen máximo de la fecha de una "
+                  "tarea."),
+        que_vio="Nada raro: las fechas de las tareas valen hasta 2 meses desde hoy.",
+        que_hacer=("Corregí `horizonte_tarea.meses` en el pack del espacio y "
+                   "volvé a importarlo. No hace falta que {nombre} haga nada.")),
     "indicador_actividad": ExplicacionDeEtapa(
         que_paso=("No se pudo retirar el borrador nativo del indicador de "
                   "actividad; puede haber quedado visible."),
