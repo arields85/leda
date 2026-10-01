@@ -313,3 +313,57 @@ particular `redaccion_fallida` (el modelo dio error o no pasó la verificación 
 de corregirse: Prisma dijo el aviso neutro) y `resumen_sin_cierre`; la latencia de cada
 respuesta (sin plazo propio, es la del modelo) con `python -m prisma redaccion corework`;
 y cualquier mensaje que se sienta robótico o repetido aunque no esté en la lista.
+
+## Corrida conversada: el alta conducida por el modelo (M1-M3)
+
+Es la primera prueba real de la enmienda del 2026-10-01 del ADR 0014 ("que se comporte
+como vos"): el alta deja de ser un formulario de un campo por turno y cada mensaje, o cada
+toque, es UNA llamada al modelo con la conversación y el borrador. Lo que el código sigue
+garantizando: nada se compromete sin Confirmar, las opciones de objetivo y de responsable
+salen de la base según la autoridad de quien escribe, y un valor que no sirve se dice.
+
+**Cómo prender la prueba** (sólo `prisma_flujo`, con el listener del worktree y
+`PYTHONPATH=src`; **no hay migración**). Con la base a mano (`psql` contra `prisma_flujo`,
+nunca la de producción), el espacio de la prueba:
+
+```sql
+insert into workspace_setting (workspace_id, clave, valor)
+select id, 'alta', '"conversada"'::jsonb from workspace where slug = 'corework'
+on conflict (workspace_id, clave) do update set valor = excluded.valor;
+```
+
+Para apagarla (vuelve el alta guiada de siempre, un dato por vez):
+`delete from workspace_setting where clave = 'alta' and workspace_id = (select id from workspace where slug = 'corework');`
+o con el valor `'"guiada"'`. El ajuste se lee en cada mensaje: no hace falta reiniciar.
+Antes de la corrida: reiniciar el listener, dejar la variante de redacción como esté (no
+interviene) y acordarse de que **cada turno es una llamada al modelo sin plazo propio**:
+anotar cuánto tarda cada respuesta.
+
+Anotar por paso: mejoró / empeoró / igual respecto de "Corrida siguiente 2", y cuánto tardó.
+
+| # | Quién | Mensaje | Qué se espera | Qué mide |
+|---|---|---|---|---|
+| 1 | Marcos | PRIMER mensaje, con varios datos: "necesito crear una tarea: calibrar los sensores de la línea 2, la hago yo y la necesito para el viernes" | Una sola respuesta natural que ya tomó título, responsable (él) y fecha (el viernes, con el día de hoy bien resuelto) y pregunta lo que falta (el objetivo) con los botones de sus objetivos y ⭐ si hay uno claro. Sin "¿Qué hay que hacer?" | varios datos en un mensaje |
+| 2 | Marcos | Tocar un objetivo | El modelo contesta el toque (sigue con lo que falta, sin repetir lo dicho) | toque respondido por el modelo |
+| 3 | Marcos | En el criterio: "ayudame, ¿qué puedo poner?" | Ayuda con un ejemplo de la forma y vuelve a preguntar; NO "¿Seguimos?" ni nada se pierde | F-C6 |
+| 4 | Marcos | "no lo sé" | Propone un criterio concreto (con el título) y pregunta si le sirve | propuesta de criterio (F-B7) |
+| 5 | Marcos | "sí, dale" | El criterio propuesto queda y sale el resumen: la frase de Prisma, la lista exacta de datos y el cierre que nombra el botón ("Con Confirmar…" o "Con Enviar a aprobación…") | resumen del código |
+| 6 | Marcos | "no, el responsable es Nahuel" | Cambia el responsable (si Nahuel está entre los que puede asignar), recalcula el área y vuelve a mostrar UN resumen nuevo; el anterior ya no vale. Si Nahuel no es una opción, lo dice y ofrece las que hay | corrección y frontera de autoridad |
+| 7 | Marcos | "para el 15 de agosto" (una fecha ya pasada) | Lo dice con sus palabras ("esa fecha ya pasó…") y vuelve a preguntar; la fecha anterior no se pierde | fecha inválida, reintento |
+| 8 | Marcos | Con el resumen a la vista: "¿y si confirmo, qué pasa?" | Contesta sin armar otro resumen | ayuda con el resumen a la vista |
+| 9 | Marcos | A mitad de otra alta: "¿qué es un bloqueo?" (otro tema de verdad) | UNA respuesta de dos partes: "Listo, dejé guardado el borrador de la tarea «…». Cuando quieras, lo retomamos." y la respuesta de lo otro. Sin "¿Seguimos?" y el borrador NO se cancela | cambiar de tema pausa |
+| 10 | Marcos | "quiero crear una tarea" | "Ya hay un borrador de tarea en curso. Elegí cómo seguir." (Continuar borrador / Cancelar borrador / Empezar otro), una sola vez | retomar sin insistir |
+| 11 | Marcos | Tocar "Continuar borrador" | El modelo retoma donde estaban, sin repreguntar lo ya tomado | retomar |
+| 12 | Marcos | Con un resumen a la vista, tocar "Modificar" | El modelo pregunta qué quiere cambiar (no hay un selector) y el cambio genera un resumen nuevo | Modificar conversado |
+| 13 | Marcos | "cancelá" a mitad de otra alta | El borrador se cancela y Prisma lo confirma | cancelar explícito |
+| 14 | Ariel | Alta con un solo responsable posible o un solo objetivo propio | Ese dato se completa solo y se ve en el resumen; no se pregunta | un dato con una sola opción |
+| 15 | Marcos | Tocar Confirmar / Enviar a aprobación | La tarea se crea (o se manda) como siempre; ningún mensaje la confirma | el botón sigue siendo el único que compromete |
+
+**Además registrar:** los incidentes (`python -m prisma incidentes corework`), en particular
+`alta_conducida_fallida` (el modelo dio error o su salida no cumplió el contrato ni después
+de reintentar: salió el aviso neutro con "Pendiente: …") y `interruptor_alta`; la latencia de
+cada turno (las filas `alta_conducida_turno` de `audit_log`: resultado, intento y duración);
+si el reintento se usó seguido (señal de que el contrato o la guía necesitan ajuste);
+cualquier dato que el modelo haya entendido mal; y todo mensaje que se sienta robótico o
+repetido aunque no esté en la lista. Si el modelo se cae, los avisos a la administración se
+agrupan (uno cada 10 minutos por espacio); todos los incidentes quedan en la base.

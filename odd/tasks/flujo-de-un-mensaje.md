@@ -987,3 +987,94 @@ TDD: estricto (configuración global del usuario); runner
 
 - Suite completa (`python -m pytest -q` desde el worktree, runner del checkout principal): **3040 passed, 333 deselected, 0 failed** (23 min 17 s; línea previa 2955).
 - Próximo paso: reiniciar el listener del worktree (`PYTHONPATH=src`) y correr "Corrida siguiente 2" del guion. Sin migración.
+
+## Alta conducida por el modelo (2026-10-01, M1-M3)
+
+Chequeo de rumbo (escrito antes de escribir código; enmienda del 2026-10-01 del ADR 0014,
+decisión del usuario "que se comporte como vos").
+
+1. Clase de problema: dónde participa el modelo, no la falta de reglas. El alta es un
+   formulario de un campo por turno: cada mensaje pasa por una clasificación cerrada que
+   se hace sin ver el borrador, y lo que la persona dice de más (varios datos juntos, una
+   corrección, una duda) se pierde o se clasifica mal. Ya apareció antes con otra forma:
+   la pregunta pendiente como contexto (ADR 0013 regla 1), el historial al ruteo (F-C6),
+   "Dejarlo" que destruía el borrador. Es la tercera ronda con la misma clase.
+2. Mecanismo general, no caso: un contrato de turno único (el modelo ve conversación +
+   borrador + faltantes + opciones permitidas y devuelve valores, intención, texto y
+   botones en salida estructurada cerrada); el código valida cada valor contra lo que
+   recalcula en ese turno (opciones por id corto, fechas con el día de hoy, límites),
+   persiste lo válido, pone los botones y el resumen exacto, y nada se compromete sin
+   Confirmar. No hay frase ni palabra clave en el código: se reemplaza el camino, no se
+   parcha. Detrás de un interruptor del espacio (`alta = conversada`) para que lo viejo
+   siga disponible hasta medir (punto 7 de "Cómo pensamos juntos": lo viejo se retira
+   cuando la prueba real lo justifique, no antes).
+3. Qué haría innecesaria la próxima ronda: que varios datos en un mensaje, una corrección
+   ("no, el responsable es Nahuel"), una duda ("ayudame, ¿qué puedo poner?"), un
+   "no sé" o un cambio de tema se resuelvan sin una regla por caso; que dejar el alta o
+   cambiar de tema nunca pierda el borrador y no pregunte "¿Seguimos?".
+4. Hipótesis vigente: un modelo flash que ve conversación y borrador conduce bien el alta
+   si el código le da lo posible y valida lo que devuelve. Es una hipótesis a medir con la
+   prueba real "Corrida conversada" del guion, no un hecho. Riesgos declarados: latencia
+   (una llamada por turno, sin plazo propio) y el límite de lo que el verificador puede
+   comprobar de un texto libre (fechas, nombres y números fuera de los hechos; no el
+   sentido).
+
+Prueba real más temprana: M3 (esqueleto andante) en `prisma_flujo` con `alta = conversada`.
+
+### Tareas
+
+- [x] **M1.** (`16fa0ff`) Contrato del turno (`src/prisma/alta_turno.py`, puro): hechos, salida
+  estructurada cerrada, validación y aplicación de valores (fechas, ids cortos, límites,
+  correcciones, criterio con propuesta).
+- [x] **M2.** (`03263de`) `conducir_alta(sistema, historial, hechos)` en los cuatro proveedores (salida
+  estructurada forzada), historial a prueba de roles no alternados y una guía de voz.
+- [x] **M3.** (`deaade0`, 1969 líneas con pruebas: pasa el heurístico de 400 porque es el
+  esqueleto completo y casi todo son pruebas y el módulo nuevo) Esqueleto andante: interruptor
+  `alta` del espacio, turno por mensaje y por toque, botones desde el conjunto de opciones,
+  resumen del código con frase del modelo, cancelar / dejar / otro tema, una respuesta visible
+  por mensaje, falla visible.
+
+### RED observado y verificación (M1-M3)
+
+- M1: `tests/test_alta_turno.py` falló al colectar (`ImportError`, módulo inexistente); GREEN
+  97 passed (incluye el RED separado de "Modificar con todo completo" y de "conversación
+  permitida en la verificación"). Verificador: `verificar_afirmaciones` extraído sin cambiar
+  `verificar` (100 passed en las pruebas del verificador y la redacción).
+- M2: `tests/test_conducir_alta_proveedores.py` falló al colectar (`ImportError`); GREEN 19
+  passed; con las del ruteo y el protocolo: 376 passed.
+- M3: `tests/test_alta_conducida.py` falló al colectar (`ImportError`); GREEN 41 passed.
+- Suite completa (`python -m pytest -q`, runner del checkout principal, 24 min): 3195 passed,
+  333 deselected, **2 failed**: (1) `test_capacidades::test_las_promesas_sin_cumplir...` por mi
+  vocabulario (`intencion` aparece en `src/`): corregida en el commit de M3 excluyendo los
+  módulos del alta conducida; (2) `test_redaccion_modelo_puro::test_si_el_verificador_rechaza...`
+  es una prueba inestable que ya existía (ordena filas de auditoría por `at`, que es igual
+  dentro de una transacción): falló en la suite y pasa sola y en la corrida enfocada.
+  Después de la corrección: 169 passed en las pruebas del alta, capacidades, incidentes y
+  modelo puro. **No se volvió a correr la suite completa tras la corrección**; estado
+  `partial` hasta correrla.
+
+### Decisiones del escritor (a revisar)
+
+- **Interruptor:** `workspace_setting` `alta`, valor `"conversada"` (o `{"modo": "conversada"}`);
+  ausente o `"guiada"` es el alta de siempre; un valor desconocido es lo de siempre más un
+  incidente (`interruptor_alta`).
+- **Sin plazo propio, siempre:** `MODELO_PURO=False` no restaura nada en el alta conducida.
+- **La propuesta de criterio ya hecha** vive en `terminal_result` de la solicitud
+  (`criterio_propuesto`), junto a la pausa, sin cambiar el esquema; `prisma_app` no puede leer
+  `audit_log`.
+- **Botones:** hasta 7 por dato; el modelo conoce todas las opciones (hasta 40).
+- **Modificar** del resumen no abre el selector: lo conversa el modelo.
+- **Verificación del texto:** puede repetir lo ya dicho en la conversación y nombrar los botones
+  del resumen; no puede inventar fechas, números ni nombres.
+- **Fallas:** incidente `alta_conducida_fallida` (media) por cada una; aviso a la administración
+  uno por espacio cada 10 minutos. Tras una falla: aviso neutro + "Pendiente: el dato" (con
+  botones si es objetivo o responsable; el resumen si ya estaba todo).
+- **Pendiente:** el área sigue saliendo de quien es responsable; sin Jev, los objetivos salen sin
+  ⭐ y queda el incidente de siempre.
+
+Ruta declarada: un solo escritor (el encargo lo pidió así); disparador de escritura de 2+
+archivos no triviales cubierto por esa instrucción explícita.
+TDD: estricto (configuración global del usuario); runner
+`D:\Proyectos\Prisma-PM\.venv\Scripts\python.exe -m pytest` desde el worktree.
+Delivery: ~400 líneas por commit como heurística; M1, M2 y M3 (posible M3a/M3b) son
+unidades de commit propias.
