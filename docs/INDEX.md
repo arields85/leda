@@ -42,6 +42,7 @@ cliente, no su definición.
 | Decisión sobre las reglas generales de la conversación | [`decisions/0013-reglas-generales-de-la-conversacion.md`](decisions/0013-reglas-generales-de-la-conversacion.md) |
 | Decisión sobre el flujo de un mensaje, con un dueño por etapa, y el experimento A/B | [`decisions/0014-flujo-de-un-mensaje.md`](decisions/0014-flujo-de-un-mensaje.md) |
 | Relevamientos de proyectos externos (Hermes Agent) | [`research/hermes-agent.md`](research/hermes-agent.md) |
+| Relevamiento de NotebookLM y respuestas ancladas en fuentes | [`research/notebooklm-y-grounding.md`](research/notebooklm-y-grounding.md) |
 | Copias literales de documentos condensados el 2026-09-30 (`STATUS`, `AGENTS`, diario de Prisma orienta) | [`historial/`](historial/) |
 | Reglas para futuras sesiones | [`../AGENTS.md`](../AGENTS.md) |
 | Configuración del primer cliente | [`../espacios/corework.yaml`](../espacios/corework.yaml) |
