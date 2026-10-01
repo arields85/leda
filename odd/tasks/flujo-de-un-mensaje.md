@@ -302,6 +302,79 @@ PR planificado: la integración a `main` la decide el usuario después del exper
   palabras de un cambio real no se distingue. Mirar los motivos registrados antes de tocar
   el verificador (ADR 0013).
 
+## Chequeo de rumbo: correcciones de la corrida B (2026-09-30)
+
+- **Clase de problema.** El contrato del valor del ruteo es binario (hay valor / no hay valor) y
+  confirmar un "dudoso" no toma lo confirmado: dos caras de que la respuesta a una pregunta
+  pendiente puede ser parcial o confirmada y el sistema sólo sabe "valor o falla". Ya apareció
+  antes como R4b-H5 (una respuesta a una pregunta tratada como imposible). Aparte, F-B3
+  (enviar a aprobación sigue contando como rama abierta) contradice la enmienda del ADR 0013.
+- **Mecanismo o caso.** Mecanismo: un tercer resultado cerrado del valor ("incompleto", con lo
+  que falta por tipo), y confirmar toma el texto confirmado. No hay frases ni palabras clave.
+  F-B3 es el estado de la rama abierta, no un caso.
+- **Qué haría innecesaria la próxima ronda.** Que ninguna respuesta parcial o confirmada acabe
+  en incidente y que iniciar otra tarea nunca toque un borrador que espera a otra persona; con
+  pruebas por familias de variantes.
+- **La hipótesis sigue valiendo.** Sí: la comprensión mejoró ("más fluido y humano"); lo que falla
+  es el contrato entre intérprete y código, no el flujo del ADR 0014.
+
+## Correcciones de la corrida B (2026-09-30)
+
+Ruta: inline por un solo escritor (el encargo lo pidió así; tocó `valores.py`, `llm.py`,
+`gateway.py`, `ingreso_tareas.py`, `incidentes.py`, `saludo.py` y la migración `0026`). TDD estricto,
+runner del checkout principal, RED observado antes de cada implementación.
+
+- [x] **F-B1** (`2ca9664`). Tercer resultado cerrado del `valor` del ruteo: `falta`, de lista cerrada
+  por tipo (`valores.FALTAS_POR_TIPO`: fecha `dia`, elección `cual`, texto/referencia `detalle`). El
+  código lo trata como conversación (`MotivoRechazo.VALOR_INCOMPLETO`): la misma pregunta queda
+  abierta y se repregunta con plantilla propia, sin incidente. El incidente queda para una falla real
+  del contrato: `valor` mal formado, una `falta` que no es del tipo, o `responde` sin valor ni `falta`.
+  Si trae el dato y la `falta`, vale el dato. RED: `test_valores.py` + `test_router_valor.py` 40
+  failed; flujo (`test_alta_guiada_flujo.py`, con el código de `src` anterior) 8 failed. GREEN: 210
+  passed (valores y router), `test_alta_guiada_flujo.py` 37 passed.
+- [x] **F-B2** (`2ca9664`). "Sí, es eso" toma lo confirmado (`gateway._ruta_de_lo_confirmado`): en un
+  campo de texto libre o de referencia el texto confirmado ES el valor (sin segunda llamada al
+  modelo, el código lo valida: resuelve también R5 para ese caso); en fecha o elección el modelo
+  reinterpreta sabiendo que la persona confirmó (`ValorEsperado.confirmado`) y, si aun así no da un
+  valor, es respuesta incompleta (`FALTA_POR_DEFECTO`), no incidente. RED: 6 failed
+  (`test_alta_pregunta_pendiente.py`); GREEN: 27 passed en el archivo. Cambia un resultado visible: el
+  texto confirmado se toma tal cual lo escribió la persona (antes lo normalizaba el modelo).
+  R5 sigue abierto para fecha y elección (el ruteo corre con el cursor de la base abierto).
+- [x] **F-B3** (`2bc10a7`, migración `0026`). Existe en `main` (misma `start()` y mismo índice
+  `task_intake_one_active`): no lo introdujo esta rama. `task_intake_request.enviada_en` se marca al
+  enviar a otra persona; el índice único y toda búsqueda de la rama abierta del pedido
+  ignoran las enviadas; la solicitud sigue `active` (la función que confirma o cancela el borrador la
+  busca así). RED: las 3 pruebas nuevas de comportamiento fallaron ("Ya hay un borrador…") en
+  `test_alta_enviar_a_aprobacion.py`; GREEN: 35 passed; ensayo de
+  migración, rollback y paridad con base limpia (`test_task_intake.py -k "migra or instalacion or
+  rollback or parity"`, ahora con `task_intake_request` en el retrato): 10 passed. Un borrador
+  enviado antes de aplicar la `0026` conserva el comportamiento anterior hasta que termine. El
+  arranque (`saludo.verificar_migraciones`) exige la `0026`. El aviso que ya estaba encolado para
+  quien aprobaba un borrador cancelado no se entrega: `despachador._preview_vigente` descarta
+  la vista previa que dejó de esperar (quien aprueba no se entera de la cancelación).
+- [x] **F-B4** (`9c3fe7b`). `armar_aviso_admin` no completaba `{nombre}` en "Qué pasó" (sólo en "Qué
+  vio" y "Qué hacer"); ahora lo hace y una prueba recorre todas las etapas sin dejar marcadores. El
+  incidente `valor_sin_interpretar` lleva `referencia_tipo`/`referencia_id` del mensaje y el chat.
+  RED: 2 failed en `test_aviso_incidente_legible.py` y 4 en `test_alta_guiada_flujo.py`; GREEN: 15 y 4
+  passed.
+- [ ] **F-B5** (sin cambio de código, decisión pendiente). "voy a enviar videos" volvió a mostrar la
+  misma pregunta y nada más: de los comandos de `_atender_pregunta_pendiente`, el único que repregunta
+  sin prefijo ni botones es `charla` (`no_puedo` antepone "Eso todavía no lo puedo hacer.", `dudoso`
+  y `otro_tema` muestran botones, `responde` sin valor genera incidente). No hay registro del
+  comando que devolvió el modelo: es por descarte. Brecha de mecanismo: el ADR 0013 (regla 1) dice
+  de `charla` "respuesta breve y la pregunta pendiente se vuelve a hacer"; el código sólo la
+  vuelve a hacer. Qué dice la respuesta breve (plantilla del código en B, el modelo en A) es una
+  decisión de voz del usuario: ver el informe.
+
+Verificación (desde el worktree, runner del checkout principal): `pytest -q` completo ->
+**2634 passed, 333 deselected, 0 failed** (línea base anterior 2573; +61 pruebas). Antes, enfocada:
+494 passed (alta, aprobación, rechazo, banco, aviso, saludo). Una corrida completa anterior se
+cortó por el límite de tiempo de la herramienta, no por una falla; se repitió en segundo plano.
+No se vio `tuple concurrently updated`.
+Para reanudar la prueba real: aplicar `db/migrations/0026_borrador_enviado_no_es_rama_abierta.sql`
+a `prisma_flujo` (con `psql -f`, `PGCLIENTENCODING=UTF8`, ver `db/migrations/README.md`) y reiniciar
+el listener; sin la `0026` el listener no arranca (`verificar_migraciones`).
+
 ## Próximo paso
 
 F7/F8a: la prueba real del alta con A y con B (`python -m prisma redaccion corework` para la
@@ -324,10 +397,10 @@ Advertencias no bloqueantes, a resolver después de la primera prueba real:
   variante válida.
 - [ ] R3. `gateway.py:1904-1906`: el respaldo de `_rutear` para proveedores viejos quedó
   sin efecto porque toda pregunta define `valor_esperado`.
-- [ ] R4. `ingreso_tareas.py:534-540`: `SIN_VALOR` registra incidente y aviso neutro
+- [x] R4 (corrida B, `2ca9664`: una respuesta parcial o ambigua es `falta`, no incidente; sigue habiendo incidente si `responde` no trae ni valor ni `falta`). `ingreso_tareas.py:534-540`: `SIN_VALOR` registra incidente y aviso neutro
   también cuando la respuesta fue vaga ("mmm"); una respuesta vaga es conversación, no
   una falla. Observar en la prueba.
-- [ ] R5. `gateway.py:2020-2029`: "Sí, es eso" llama al ruteo con el cursor abierto; si el
+- [ ] R5 (parcial, `2ca9664`: un texto libre confirmado ya no llama al modelo; falta para fecha y elección). `gateway.py:2020-2029`: "Sí, es eso" llama al ruteo con el cursor abierto; si el
   proveedor está lento, el toque falla con el aviso de ruteo caído.
 - [ ] R6. `ingreso_tareas.py:1393-1404`: la rama de confirmación del título quedó sin uso
   (`_CONFIRMA_EL_CAMPO` conserva `title`): retirarla.

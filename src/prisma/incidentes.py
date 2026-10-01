@@ -154,8 +154,8 @@ def _texto_disparador(cur, referencia_tipo: str | None,
 @dataclass(frozen=True)
 class ExplicacionDeEtapa:
     """Qué pasó, qué vio la persona y qué hacer, en lenguaje llano, para una
-    etapa de incidente (T10-2, R3-H1). `que_vio` y `que_hacer` pueden nombrar a
-    la persona con `{nombre}`."""
+    etapa de incidente (T10-2, R3-H1). Los tres pueden nombrar a la persona con
+    `{nombre}` (se completa en `armar_aviso_admin`)."""
     que_paso: str
     que_vio: str
     que_hacer: str
@@ -384,7 +384,7 @@ def armar_aviso_admin(*, incident_id: str, slug: str | None,
         titulo,
         "",
         "Qué pasó",
-        explicacion.que_paso,
+        explicacion.que_paso.format(nombre=quien),
         "",
         f"Qué vio {quien}",
         explicacion.que_vio.format(nombre=quien),

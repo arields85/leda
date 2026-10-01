@@ -208,3 +208,42 @@ def test_los_rechazos_hablan_en_neutro_y_sin_jerga(esperado, valor):
                   "MotivoRechazo", "_"):
         assert marca not in r.mensaje, (marca, r.mensaje)
     assert r.razon.strip() and r.se_acepta.strip()
+
+
+# --- valor incompleto (F-B1): un tercer resultado cerrado ---------------------
+
+@pytest.mark.parametrize("esperado, valor, en_el_texto", [
+    (ValorEsperado(TipoValor.FECHA, hoy=HOY), {"falta": "dia"},
+     ("día", "exacto")),
+    (OPCION_ESPERADA := ValorEsperado(TipoValor.OPCION, OPCIONES),
+     {"falta": "cual"}, ("más de una", "«Cocina»", "«Oficina»")),
+    (ValorEsperado(TipoValor.TEXTO), {"falta": "detalle"}, ("detalle",)),
+    (ValorEsperado(TipoValor.ENTIDAD), {"falta": "detalle"}, ("detalle",)),
+], ids=["fecha", "opcion", "texto", "entidad"])
+def test_un_valor_incompleto_se_rechaza_como_conversacion_y_dice_que_falta(
+        esperado, valor, en_el_texto):
+    r = _validar(esperado, valor)
+    assert isinstance(r, Rechazado)
+    assert r.motivo is MotivoRechazo.VALOR_INCOMPLETO       # no es SIN_VALOR
+    for parte in en_el_texto:
+        assert parte in r.mensaje
+
+
+@pytest.mark.parametrize("esperado, valor", [
+    (ValorEsperado(TipoValor.FECHA, hoy=HOY), {"falta": "cual"}),
+    (ValorEsperado(TipoValor.FECHA, hoy=HOY), {"falta": "inventada"}),
+    (ValorEsperado(TipoValor.OPCION, OPCIONES), {"falta": "dia"}),
+    (ValorEsperado(TipoValor.TEXTO), {"falta": "dia"}),
+])
+def test_una_falta_que_no_corresponde_al_tipo_es_un_valor_que_falta(
+        esperado, valor):
+    """Una falla del contrato (no una respuesta parcial): sigue siendo un
+    incidente."""
+    r = _validar(esperado, valor)
+    assert isinstance(r, Rechazado) and r.motivo is MotivoRechazo.SIN_VALOR
+
+
+def test_si_trae_el_dato_y_la_falta_vale_el_dato():
+    esperado = ValorEsperado(TipoValor.FECHA, hoy=HOY)
+    r = _validar(esperado, {"fecha_iso": "2026-10-04", "falta": "dia"})
+    assert r == Aceptado(TipoValor.FECHA, date(2026, 10, 4))

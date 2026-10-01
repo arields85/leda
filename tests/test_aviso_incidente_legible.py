@@ -117,8 +117,26 @@ def test_el_aviso_sigue_el_formato_aprobado_en_orden():
 def test_que_pasó_y_que_hacer_salen_de_la_tabla_de_la_etapa():
     texto = _aviso(etapa=gateway.ETAPA_TURNO_TEXTO)
     explicacion = EXPLICACION_POR_ETAPA[gateway.ETAPA_TURNO_TEXTO]
-    assert explicacion.que_paso in texto
+    assert explicacion.que_paso.format(nombre="Nahuel Gimenez") in texto
     assert explicacion.que_hacer.format(nombre="Nahuel Gimenez") in texto
+
+
+def test_ninguna_etapa_deja_un_marcador_sin_reemplazar_en_el_aviso():
+    """F-B4: el aviso de `valor_sin_interpretar` mostraba `{nombre}` porque
+    `que_paso` no se completaba. Ninguna sección de ninguna etapa puede dejar un
+    marcador, con o sin persona identificada."""
+    for etapa in [*EXPLICACION_POR_ETAPA, None, "etapa_que_no_existe"]:
+        for nombre in ("Marcos Tarquini", None):
+            texto = _aviso(etapa=etapa, nombre=nombre)
+            explicacion = texto.split("\nMensaje\n")[0]
+            assert "{" not in explicacion and "}" not in explicacion, (
+                etapa, nombre)
+
+
+def test_el_aviso_de_valor_sin_interpretar_nombra_a_la_persona_en_que_paso():
+    texto = _aviso(etapa=incidentes.ETAPA_VALOR_SIN_INTERPRETAR,
+                   nombre="Marcos Tarquini")
+    assert "Marcos Tarquini respondió a una pregunta del alta de tareas" in texto
 
 
 def test_que_vio_la_persona_es_el_aviso_neutro_cuando_la_etapa_lo_manda():

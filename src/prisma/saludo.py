@@ -211,6 +211,15 @@ def verificar_migraciones(cur: psycopg.Cursor) -> str | None:
                 and column_name = 'boton_callback') as ok""")
     if not cur.fetchone()["ok"]:
         return "0022_toque_con_boton.sql"
+    # Y con `task_intake_request.enviada_en` (migración 0026, F-B3): el alta la
+    # consulta al empezar y al leer la pregunta abierta de cada persona.
+    cur.execute(
+        """select exists (
+             select 1 from information_schema.columns
+              where table_schema = 'prisma' and table_name = 'task_intake_request'
+                and column_name = 'enviada_en') as ok""")
+    if not cur.fetchone()["ok"]:
+        return "0026_borrador_enviado_no_es_rama_abierta.sql"
     return None
 
 
