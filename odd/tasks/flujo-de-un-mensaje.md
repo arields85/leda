@@ -397,8 +397,11 @@ el listener; sin la `0026` el listener no arranca (`verificar_migraciones`).
 
 ## Próximo paso
 
-F7/F8a: la prueba real del alta con A y con B (`python -m prisma redaccion corework` para la
-mediana).
+F7/F8a: la segunda vuelta de la prueba real con A (etapa 6 completa): reiniciar el
+listener del worktree (`PYTHONPATH=src`), repetir el guion y leer
+`python -m prisma redaccion corework` (llamadas, aceptadas, rechazadas, errores,
+timeouts, mediana) y `python -m prisma incidentes corework` (motivos de
+`redaccion_rechazada`); comparar contra la línea base de 8,7 s.
 
 ## Revisión RDD por commit (2026-10-01)
 
@@ -455,14 +458,14 @@ aprobados y reconocidos, sin correcciones. Advertencias no bloqueantes:
 - [ ] R11. `ingreso_tareas.py:1054-1059`: `enviada_en` nunca se limpia; si el aprobador
   devuelve el borrador a edición, la solicitud queda invisible para el solicitante. Sin
   pruebas de rechazo ni de vencimiento. Verificar contra "Rechazar con motivo" (`0025`).
-- [ ] R12. `redaccion.py:272-282`: con A, la llamada al modelo corre dentro de la
+- [x] R12 (`2c42650`: plazo propio de 3 s sin reintentos y caída inmediata a B; la llamada sigue dentro de la transacción del turno, acotada a 3 s: ver "Etapa 6 completa"). `redaccion.py:272-282`: con A, la llamada al modelo corre dentro de la
   transacción del turno con los reintentos completos del proveedor; ante una caída, cada
   turno espera todo antes de caer a B. Plazo propio corto o cortar A tras N errores.
-- [ ] R13. `verificador_redaccion.py:202-203`: "hace la pregunta" se cumple con cualquier
+- [x] R13 (`afa5718`: el verificador se rehízo sobre salida estructurada, sin morfología ni listas, y corre dentro del `try` que cae a B). `verificador_redaccion.py:202-203`: "hace la pregunta" se cumple con cualquier
   "?" ("Gracias. ¿Todo bien?" pasa sin la fecha). `:149-152`: la detección de acciones en
   primera persona no descuenta nombres de los hechos ("José"). `redaccion.py:285`:
   `verificar` fuera del try que cae a B.
-- [ ] R14. `redaccion.py:278-281`: el texto completo de una excepción del proveedor va a
+- [x] R14 (`afa5718`: el motivo de una falla guarda el tipo de la excepción, no su texto; sólo las excepciones propias, `LookupError` y `ValueError`, llevan su mensaje). `redaccion.py:278-281`: el texto completo de una excepción del proveedor va a
   `audit_log`/`incident`; confirmar que ninguna URL con credencial pueda terminar ahí.
 
 ## Etapa 6 completa con A y menos latencia (2026-10-01, decisión del usuario)
@@ -489,3 +492,91 @@ Chequeo de rumbo (escrito antes de empezar; ADR 0014, "Resultado de la primera v
 4. Hipótesis vigente: un modelo flash redacta el mensaje entero sobre hechos dentro de
    un plazo de 3 s con pocas caídas a B, y un pedido corto baja la mediana. Se mide, no
    se asume; si el plazo corta la mayoría de las redacciones, se para y se discute.
+
+### Tareas de la etapa 6 completa
+
+- [x] **F-A3** (`afa5718`). Salida estructurada `{texto, pregunta, afirma}` y verificador
+  rehecho (R13, R14). Ruta: inline por un solo escritor (el encargo lo pidió así).
+- [x] **F-A4** (`39d29cb`, `3ddee06`). El modelo escribe el mensaje entero con A: preguntas,
+  rechazo con su pregunta, aviso de envío (efecto) y charla con la pregunta pendiente
+  (F-A2). El resumen: apertura del modelo, datos y cierre del código.
+- [x] **F-A5** (`2c42650`). Plazo propio sin reintentos, caída inmediata a B (R12).
+- [x] **F-A1** (`485aa5c`). Despacho serializado por espacio.
+
+### Qué quedó construido
+
+- **Verificador** (`verificador_redaccion.py`): el modelo contesta JSON. El código verifica
+  sólo contra los hechos: fechas, números y meses; cada título entre «» y cada nombre
+  propio a mitad de oración (mayúscula inicial fuera de comillas, salvo al empezar una
+  oración) tiene que existir en los hechos (incluidas las etiquetas de las opciones);
+  `pregunta` es el `campo` de lo que falta y el texto pregunta (si no falta nada, ni
+  `pregunta` ni signo de pregunta); `afirma` es exactamente el conjunto de `cambios`;
+  se exigen los nombres citados de los hechos, los valores aceptados (también lo que se
+  pide confirmar, de cualquier largo), lo entendido si es corto (<= 80 caracteres) y lo
+  esencial de un rechazo o un "no cambió" (mitad de las raíces). Se retiraron la
+  heurística de primera persona (`-é`/`-í`), el vocabulario de estados y la pregunta
+  "dicha como instrucción".
+- **Mensaje entero** (`ingreso_tareas._decir_pregunta`, `_rechazo_entero`, `_decir_envio`;
+  `redaccion.redactar_charla_con_pregunta`): hechos nuevos `ResultadoTurno.entendido`
+  (lo que la persona dio en este turno, leído de `task_intake_field` por la hora del
+  turno, sin lo que completa el código) y `.charla`; `Falta.campo` y `Cambio.id`; las
+  opciones llegan como etiquetas de contexto. Los botones siguen saliendo del código.
+  B no cambia: `_decir_pregunta` devuelve el texto de siempre sin llamar al modelo, y
+  con A el texto de siempre es la base de caída.
+- **Latencia**: `redaccion.PLAZO_REDACCION_S = 3.0` (parámetro `plazo` de `redactar_turno`),
+  `llm._con_plazo` (cliente por llamada con ese tiempo y sin reintentos; Gemini, un solo
+  intento), tope de salida 256 tokens (antes 400), un timeout se registra con resultado
+  `timeout` y se cuenta aparte en `python -m prisma redaccion corework`.
+- **F-A1**: causa en el código, reproducida con dos conexiones y dos hilos
+  (`tests/test_despacho_en_orden.py`: sin el lock salió `['PREGUNTA', 'NOTA']`). Dos
+  pasadas concurrentes del despachador (el despacho inmediato de después del webhook y
+  el tick de fondo) toman la fila siguiente con `for update skip locked`; la que llega
+  con la primera fila bloqueada por la otra envía la segunda. `despachar` toma ahora
+  `pg_advisory_xact_lock` por espacio y espera. No se leyó la base del usuario: la causa
+  sale de la lectura del código y de la reproducción.
+
+### RED observado y verificación
+
+- F-A3: `tests/test_verificador_redaccion.py` falló al colectar (`ImportError: Borrador`);
+  `tests/test_redaccion_a.py` con el código anterior: 9 failed, 10 passed. GREEN: 59
+  passed (verificador) y 19 passed (redacción A).
+- F-A4: `tests/test_alta_guiada_mensaje_entero.py` y `tests/test_charla_breve.py`: 13 failed
+  contra el código anterior; GREEN: 35 passed. Después, la confirmación de un valor
+  propuesto: 2 failed, GREEN 14 passed en el archivo.
+- F-A5: `tests/test_llm_redactar.py` y `tests/test_redaccion_plazo.py`: 12 failed, 12 passed
+  (las de tamaño ya cumplían); GREEN 99 passed con los archivos de A y el CLI.
+- F-A1: `tests/test_despacho_en_orden.py`: `assert ['PREGUNTA', 'NOTA'] == ['NOTA',
+  'PREGUNTA']`; GREEN 2 passed.
+- Suite completa (`python -m pytest -q` desde el worktree, runner del checkout
+  principal): 2791 passed, 333 deselected, 0 failed tras F-A1 (antes de `3ddee06`);
+  corrida final tras `3ddee06`: **2793 passed, 333 deselected, 0 failed** (línea previa
+  2727; 16 min 54 s).
+
+### Medición (lo observado en pruebas, no en vivo)
+
+- Pedido de redacción: guía de voz 935 caracteres antes y 1032 ahora (el contrato JSON
+  suma ~100); con los hechos de un turno típico, ~1330 caracteres (~380 tokens). El pedido
+  ya era corto antes (nunca llevó el núcleo ni el historial): el cambio de latencia no
+  viene de achicar la entrada.
+- Lo que sí cambia: una sola llamada por turno donde A hacía dos (el rechazo y la
+  pregunta, o la charla y la pregunta), un plazo de 3 s en vez de 20 s por intento y 2
+  reintentos (peor caso antes: ~60 s; ahora 3 s más la plantilla), tope de salida 256.
+- Con el plazo, un modelo que tarda más de 3 s cae a B en el acto y queda como
+  `timeout`: la mediana de las redacciones aceptadas anteriores era 4,5 s, así que la
+  prueba real va a mostrar cuántas caen. Si son muchas, el plazo es un dato para decidir
+  (PENDIENTE: medir en la corrida y decidir con el usuario si se sube).
+
+### Decisiones tomadas por el escritor (a revisar)
+
+- El cierre del resumen sigue siendo del código: cambia por destinatario (`con_cierre`,
+  R8) y es la frase que nombra el botón real; el modelo escribe la apertura.
+- La transacción sigue abierta durante la llamada del modelo: sacarla de ahí exige
+  separar la lectura de hechos de la escritura de cada camino del alta
+  (`task_intake_request ... for update` está tomado). No era seguro dentro de esta
+  unidad; con el plazo la espera está acotada a 3 s.
+- Un efecto contado en el texto y omitido de `afirma` no se detecta (sin morfología ni
+  listas, el código no lee el sentido): límite declarado del verificador.
+- No se agregó un modelo propio para redactar (opcional): `proveedor_de_redaccion` usa el
+  conversacional.
+- Sin cambios: `pendientes`/menú de una tarea, evidencia, reentrega y Aprobar (F4/F5), el
+  texto "Hecho. La tarea quedó comprometida." (lo escribe una función de la base).
