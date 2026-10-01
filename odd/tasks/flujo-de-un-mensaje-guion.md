@@ -107,3 +107,28 @@ Observaciones (no son fallas del mecanismo):
   Mecanismo (etapa 2): el modelo evalúa si el criterio es verificable y, si no lo es,
   propone uno a partir del título y de lo que la persona dijo, con botones para usarlo o
   escribir otro; el código no crea la tarea con un criterio que la persona no eligió.
+
+## Corrida B, pasos 9 a 11, 2026-09-30 23:46-23:52 (Marcos y Ariel)
+
+| # | Resultado | Nota |
+|---|---|---|
+| 9 | Mejoró | Resumen sin "Sin descripción"; el cierre coincide con el botón. |
+| 10 | Mejoró | "necesito crear una tarea: calibrar los sensores de la linea 2" como respuesta a "¿Qué hay que hacer?" → pasó al objetivo. El "para Nahuel" del mensaje guardado llegó como propuesta de responsable. |
+| 11 | Mejoró | Ariel: área y responsable completados solos (una sola opción), "manana" → 01/10/2026, resumen y "Enviar a aprobación" a Ismael. El guion esperaba "Confirmar": era un error del guion; quien crea una tarea para sí necesita la aprobación de su aprobador (Marcos creando para Nahuel sí confirmó directo). |
+
+Observaciones:
+
+- **F-B8.** Con el responsable propuesto desde el mensaje ("para Nahuel"), la pregunta fue
+  "Opciones que coinciden con «Nahuel»." con botones: texto de sistema, no de persona. Con
+  una sola coincidencia, el principio "ayuda y facilita" pide proponerla directamente.
+- **F-B9.** El valor se normaliza distinto según el campo: el criterio corrigió un error de
+  tipeo ("andadndo" → "andando") y el título quedó tal cual ("la ainterfaz"). Pregunta de
+  producto: ¿Prisma corrige errores de tipeo obvios en los textos (visible en el resumen,
+  cambiable con Modificar) o respeta lo escrito?
+- No se probó el caso exacto "4de octubre" (R4c-H6): queda para la corrida A.
+
+**Latencia por respuesta** (mensaje entrante → primera respuesta enviada, de la base):
+textos n=34, mediana 8,7 s, p90 13,7 s, ninguno ≤ 5 s; toques n=23, mediana 0,9 s. En la
+ronda 4 (base `prisma`, 2026-09-30) la mediana de textos fue la misma, 8,7 s (p90 18,6 s,
+ninguno ≤ 5 s). B no agregó latencia, pero el criterio "mediana ≤ 5 s" del ADR 0014 no se
+cumplía tampoco antes: se fijó sin línea base.
