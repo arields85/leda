@@ -160,3 +160,39 @@ cumplía tampoco antes: se fijó sin línea base.
   tiene un solo objetivo operativo, se completa solo (misma regla que R4c-H10); el
   estratégico sólo si el área no tiene objetivos propios. Requiere que el objetivo tenga
   área en los datos (hoy no la tiene).
+
+## Corrida A, 2026-10-01 00:22-00:37 (Marcos y Ariel)
+
+**Impresión del usuario:** se sintió mejor y menos robótico (saludó a Ariel por su nombre),
+pero "todavía capado": la respuesta se siente mitad planilla y mitad modelo.
+
+**Lo que muestra la base (por qué se siente mitad y mitad):** la variante A, tal como está
+construida, deja que el modelo escriba sólo una frase delante de la pregunta de plantilla:
+"Me falta el título. ¿Qué hay que hacer?", "Todavía no puedo avanzar porque me falta un
+dato. ¿A qué objetivo pertenece la tarea?". La pregunta, el resumen y el cierre siguen
+siendo del código, y la frase del modelo repite "me falta…" en casi todos los turnos.
+La etapa 6 del ADR 0014 (redactar a partir del resultado del turno) quedó a medias.
+
+**Números:**
+
+- Redacciones de A: 18; aceptadas 15; rechazadas 3, las tres falsas: el verificador tomó
+  el imperativo "Escribí" como una acción en primera persona (`accion_no_ocurrida`), la
+  debilidad anticipada (R13). Duración de la llamada de redacción: mediana 4,5 s, p90 6,7 s.
+- Latencia por respuesta: textos n=15, mediana 10,3 s (B: 8,7 s), p90 16,4 s; **toques
+  n=11, mediana 7,8 s (B: 0,9 s)**: con A cada toque espera una llamada al modelo.
+
+**Observaciones:**
+
+- **F-A1.** El orden de dos mensajes del mismo turno salió invertido: "Me falta el
+  título… ¿Qué hay que hacer?" llegó antes que "Listo, dejé de lado el borrador…".
+- **F-A2.** La respuesta breve a la charla funciona (F-B5) pero suena rara: "Hola, qué
+  bueno tenerte por acá, seguimos en un momento." y después la pregunta.
+- El paso 1 (la tarea en el primer mensaje) otra vez no se probó como primer mensaje:
+  había una rama abierta. "4de octubre" tampoco se probó.
+- "voy a enviar videos" volvió a quedar como criterio tras "Sí, es eso" (F-B7).
+
+**Propuesta del usuario (2026-10-01):** el modelo como intermediario al principio y al
+final: humano → modelo → lógica lo más determinista posible (Jev, SQL, reglas) → resultado
+→ modelo → humano. Es el diseño del ADR 0014 (etapas 2 y 6); lo que falta es que la etapa
+6 sea completa: que el modelo redacte el mensaje entero a partir del resultado del turno,
+no una frase delante de una plantilla.
