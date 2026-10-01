@@ -113,14 +113,20 @@ Observaciones (no son fallas del mecanismo):
 | # | Resultado | Nota |
 |---|---|---|
 | 9 | Mejoró | Resumen sin "Sin descripción"; el cierre coincide con el botón. |
-| 10 | Mejoró | "necesito crear una tarea: calibrar los sensores de la linea 2" como respuesta a "¿Qué hay que hacer?" → pasó al objetivo. El "para Nahuel" del mensaje guardado llegó como propuesta de responsable. |
+| 10 | Mixto | "necesito crear una tarea: calibrar los sensores de la linea 2" como respuesta a "¿Qué hay que hacer?" → pasó al objetivo. Pero el responsable se preguntó como "Opciones que coinciden con «Nahuel»" (Para mí / Nahuel Gimenez) y Marcos eligió "Para mí": el "para Nahuel" venía del mensaje dejado de lado ("ah, y necesito otra tarea para Nahuel"), no de esta tarea (ver F-B8). Corregido el 2026-10-01: la primera lectura, sin los botones, lo había contado como acierto. |
 | 11 | Mejoró | Ariel: área y responsable completados solos (una sola opción), "manana" → 01/10/2026, resumen y "Enviar a aprobación" a Ismael. El guion esperaba "Confirmar": era un error del guion; quien crea una tarea para sí necesita la aprobación de su aprobador (Marcos creando para Nahuel sí confirmó directo). |
 
 Observaciones:
 
-- **F-B8.** Con el responsable propuesto desde el mensaje ("para Nahuel"), la pregunta fue
-  "Opciones que coinciden con «Nahuel»." con botones: texto de sistema, no de persona. Con
-  una sola coincidencia, el principio "ayuda y facilita" pide proponerla directamente.
+- **F-B8 (etapa 1/2, mecanismo).** Un dato de un mensaje que la persona dejó de lado
+  ("ah, y necesito otra tarea para Nahuel", 23:25) contaminó la tarea siguiente, que era
+  otra ("calibrar los sensores…", 23:47): el responsable se preguntó como "Opciones que
+  coinciden con «Nahuel»" y Marcos eligió "Para mí". Al "dejar y ver lo otro", el mensaje
+  guardado se atiende, pero sus propuestas no pueden sobrevivir a una tarea distinta.
+  Además, el texto "Opciones que coinciden con «…»" es de sistema, no de persona.
+- **Lección de método.** La lectura desde la base mostraba los toques como códigos
+  (`p:…`, `i:…`) y sin los botones ofrecidos; una conclusión (paso 10) salió al revés. El
+  lector ahora resuelve cada toque a su etiqueta y muestra los botones de cada mensaje.
 - **F-B9.** El valor se normaliza distinto según el campo: el criterio corrigió un error de
   tipeo ("andadndo" → "andando") y el título quedó tal cual ("la ainterfaz"). Pregunta de
   producto: ¿Prisma corrige errores de tipeo obvios en los textos (visible en el resumen,
