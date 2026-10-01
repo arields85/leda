@@ -15,7 +15,7 @@ from psycopg.types.json import Jsonb
 from .autoridad import Denegado, Solicitante
 from .db import entrante_atado, registrar_auditoria
 from .incidentes import (ETAPA_CONFIGURACION_ALTA, ETAPA_CRITERIO_SIN_PROPUESTA,
-                         ETAPA_OBJETIVO_SIN_ORDENAR,
+                         ETAPA_OBJETIVO_SIN_ORDENAR, ETAPA_REDACCION_RECHAZADA,
                          ETAPA_RESUMEN_VIGENTE_SIN_FILA, ETAPA_VALOR_SIN_INTERPRETAR, NOTICIA_NEUTRA_INCIDENTE,
                          REFERENCIA_INBOUND_MESSAGE, REFERENCIA_PENDING_ACTION,
                          registrar_incidente)
@@ -651,8 +651,13 @@ def _rechazo_entero(cur, request, who, field, hecho: Rechazo, aviso: str,
     """Un valor que no sirve con la variante A: UN mensaje del modelo con la razón
     y la misma pregunta (antes eran dos llamadas, la razón y la pregunta
     pegadas). Si el modelo no sirve, sale lo de B: la razón sola para un campo de
-    texto, o la razón delante de la pregunta guardada para una elección."""
+    texto, o la razón delante de la pregunta guardada para una elección. Una
+    elección que ya no está abierta no se redacta: no se llama al modelo para un
+    mensaje que no se manda."""
     if choice_set_id is not None:
+        if not _request_of_question(cur, who, QUESTION_CHOICE, choice_set_id,
+                                    lock=False):
+            return IntakeOutcome(str(request["id"]), "", inert=True)
         cur.execute(
             """select etiqueta from task_intake_choice
                 where choice_set_id = %s and activa order by orden""",
@@ -682,20 +687,28 @@ def _mostrar_valor(campo: str, valor) -> str:
 
 
 def _entendido_del_turno(cur, request_id: str, now: datetime
-                         ) -> tuple[ValorAceptado, ...]:
+                         ) -> tuple[ValorAceptado, ...] | None:
     """Lo que la persona dio en ESTE turno, leído de la base: los datos que
-    quedaron confirmados con la hora del turno por lo que dijo o tocó (no los
-    que el código completa solo: la descripción vacía, la evidencia o un dato con
-    una sola opción). Es contexto para que el modelo lo diga en su mensaje."""
+    quedaron confirmados por lo que dijo o tocó (no los que el código completa
+    solo: la descripción vacía, la evidencia o un dato con una sola opción). El
+    turno es el mensaje al que está atado (el dato lo dio ese mensaje) o, para un
+    toque, la hora del turno. Es contexto para que el modelo lo diga en su
+    mensaje. `None` si un dato no tiene cómo nombrarse: quien llama cae a B."""
+    atado = entrante_atado(cur)
     cur.execute(
         """select campo, valor from task_intake_field
-            where request_id = %s and estado = 'confirmed' and actualizado_en = %s
+            where request_id = %s and estado = 'confirmed'
+              and (actualizado_en = %s
+                   or (%s::text is not null and source_inbound_id::text = %s))
               and campo <> all(%s)
               and not (proposed_by = 'server' and source_choice_id is null)
             order by array_position(%s::text[], campo)""",
-        (request_id, now, ["description", "evidence"], list(FIELDS)))
+        (request_id, now, atado, atado,
+         ["description", "evidence"], list(FIELDS)))
     dados = []
     for fila in cur.fetchall():
+        if fila["campo"] not in _SUJETO_DEL_CAMPO:
+            return None
         mostrado = _mostrar_valor(fila["campo"], fila["valor"])
         if mostrado:
             dados.append(ValorAceptado(_SUJETO_DEL_CAMPO[fila["campo"]], mostrado))
@@ -727,7 +740,18 @@ def _decir_pregunta(cur, request, field: str, tipo: TipoValor, prompt: str,
     workspace_id = str(request["workspace_id"])
     if variante_redaccion(cur, workspace_id) != "A":
         return prompt
-    entendido = _entendido_del_turno(cur, str(request["id"]), now)
+    entendido = (_entendido_del_turno(cur, str(request["id"]), now)
+                 if field in _SUJETO_DEL_CAMPO else None)
+    if entendido is None:
+        # Un dato sin cómo nombrarse (un defecto del código, no de la persona):
+        # sale el texto de B y queda registrado; nunca un error en el turno.
+        registrar_incidente(
+            cur, workspace_id,
+            "Un dato del alta no tiene sujeto para redactar (variante A): se usó "
+            "la respuesta de la variante B.", severidad="baja",
+            referencia_cruda=f"campo: {field}",
+            etapa=ETAPA_REDACCION_RECHAZADA, avisar_admin=False)
+        return prompt
     if busqueda:
         entendido += (ValorAceptado("lo que buscaste", busqueda),)
     resultado = ResultadoTurno(

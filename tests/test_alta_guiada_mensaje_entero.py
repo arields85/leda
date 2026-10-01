@@ -16,8 +16,10 @@ import pytest
 
 from prisma import incidentes, redaccion
 from prisma import ingreso_tareas as I
-from prisma.db import admin, espacio
+from prisma.db import admin, atar_al_entrante, espacio
 from prisma.llm import ProveedorGuionado
+from prisma.resultado_turno import Rechazo
+from prisma.valores import TipoValor
 
 from tests.test_alta_enviar_a_aprobacion import _alta_en_revision, _tocar, _fila, _acciones
 from tests.test_alta_eleccion_confirmacion import _usuario
@@ -403,3 +405,113 @@ def test_si_el_mensaje_cambia_lo_que_se_confirma_sale_el_texto_de_siempre(
     assert resultado.text == f"¿Confirmás este criterio de aceptación? {CRITERIO}"
     motivos = [i.get("motivo", "") for i in _intentos(conn, ws)]
     assert any(m.startswith("falta_hecho") for m in motivos)
+
+
+# ------------------------------------------- lo entendido en ESTE turno, robusto
+
+def _alta_con_titulo(cur, world):
+    actor, outcome = _empezar(cur, world, title=TITULO)
+    cur.execute("select source_inbound_id::text i from task_intake_field "
+                "where request_id = %s and campo = 'title'", (outcome.request_id,))
+    return actor, outcome.request_id, cur.fetchone()["i"]
+
+
+def _titulo_entendido(cur, rid, now=NOW):
+    return [v.mostrado for v in I._entendido_del_turno(cur, rid, now)]
+
+
+def test_lo_entendido_sale_del_mensaje_del_turno_aunque_la_hora_no_coincida(
+        intake_world, conn):
+    """Una hora distinta de la del turno (un reloj de la base, una escritura
+    tardía) no deja al modelo sin saber lo que la persona acaba de decir."""
+    ws = intake_world["north-lab"]["id"]
+    with espacio(conn, ws) as cur:
+        _, rid, inbound = _alta_con_titulo(cur, intake_world)
+        cur.execute("update task_intake_field set actualizado_en = %s "
+                    "where request_id = %s", (NOW - timedelta(seconds=7), rid))
+        assert _titulo_entendido(cur, rid) == []               # sin turno atado
+        atar_al_entrante(cur, inbound)
+        assert _titulo_entendido(cur, rid) == [TITULO]
+
+
+def test_lo_dicho_en_otro_mensaje_no_es_de_este_turno(intake_world, conn):
+    ws = intake_world["north-lab"]["id"]
+    with espacio(conn, ws) as cur:
+        _, rid, _ = _alta_con_titulo(cur, intake_world)
+        cur.execute("update task_intake_field set actualizado_en = %s "
+                    "where request_id = %s", (NOW - timedelta(seconds=7), rid))
+        atar_al_entrante(cur, "00000000-0000-0000-0000-00000000dead")
+        assert _titulo_entendido(cur, rid) == []
+
+
+def test_un_toque_sigue_leyendo_lo_confirmado_con_la_hora_del_turno(
+        intake_world, conn):
+    ws = intake_world["north-lab"]["id"]
+    with espacio(conn, ws) as cur:
+        _, rid, _ = _alta_con_titulo(cur, intake_world)
+        assert _titulo_entendido(cur, rid) == [TITULO]          # misma hora, sin atar
+
+
+def test_un_dato_sin_sujeto_cae_a_b_sin_romper_y_queda_registrado(
+        intake_world, conn, monkeypatch):
+    """Si un campo confirmado en el turno no tiene cómo nombrarse, no es un
+    `KeyError`: sale el texto de B, el modelo no se llama y queda un incidente."""
+    ws = intake_world["north-lab"]["id"]
+    modelo = _Modelo(_json("no debería salir", "objective"))
+    _a(conn, ws, monkeypatch, modelo)
+    with espacio(conn, ws) as cur:
+        actor, rid, _ = _alta_con_titulo(cur, intake_world)
+        llamadas = len(modelo.redactados)          # las del alta misma
+        cur.execute("select * from task_intake_request where id = %s", (rid,))
+        request = cur.fetchone()
+        monkeypatch.delitem(I._SUJETO_DEL_CAMPO, "title")
+        texto = I._decir_pregunta(cur, request, "objective", TipoValor.OPCION,
+                                  "¿A qué objetivo pertenece la tarea?", NOW)
+    assert texto == "¿A qué objetivo pertenece la tarea?"
+    assert len(modelo.redactados) == llamadas
+    with admin(conn) as cur:
+        cur.execute("select referencia_cruda from incident where workspace_id = %s "
+                    "and etapa = %s and referencia_cruda like 'campo:%%'",
+                    (ws, incidentes.ETAPA_REDACCION_RECHAZADA))
+        assert [f["referencia_cruda"] for f in cur.fetchall()] == ["campo: objective"]
+
+
+def test_un_campo_sin_sujeto_no_se_redacta(intake_world, conn, monkeypatch):
+    """La evidencia no tiene un sujeto para el modelo: B, sin `KeyError`."""
+    ws = intake_world["north-lab"]["id"]
+    modelo = _Modelo(_json("no debería salir"))
+    _a(conn, ws, monkeypatch, modelo)
+    with espacio(conn, ws) as cur:
+        _, rid, _ = _alta_con_titulo(cur, intake_world)
+        llamadas = len(modelo.redactados)
+        cur.execute("select * from task_intake_request where id = %s", (rid,))
+        texto = I._decir_pregunta(cur, cur.fetchone(), "evidence", TipoValor.TEXTO,
+                                  "¿Qué evidencia vas a adjuntar?", NOW)
+    assert texto == "¿Qué evidencia vas a adjuntar?"
+    assert len(modelo.redactados) == llamadas
+
+
+# ------------------- un rechazo con una elección cerrada no llama al modelo
+
+def test_un_rechazo_sobre_una_eleccion_cerrada_no_llama_al_modelo(
+        intake_world, conn, monkeypatch):
+    ws = intake_world["north-lab"]["id"]
+    modelo = _Modelo(_json("no debería salir", "objective"))
+    _a(conn, ws, monkeypatch, modelo)
+    with espacio(conn, ws) as cur:
+        actor, rid, _ = _alta_con_titulo(cur, intake_world)
+        cur.execute("select id::text from task_intake_choice_set "
+                    "where request_id = %s and estado = 'active'", (rid,))
+        conjunto = cur.fetchone()["id"]
+        cur.execute("select * from task_intake_request where id = %s", (rid,))
+        request = cur.fetchone()
+        cur.execute("update task_intake_choice_set set estado = 'invalidated' "
+                    "where id = %s", (conjunto,))
+        antes = len(_cuerpos(cur, rid))
+        llamadas = len(modelo.redactados)
+        resultado = I._rechazo_entero(
+            cur, request, actor, "objective", Rechazo("No sirve.", "Elegí uno."),
+            "No sirve.\n\n", None, conjunto, NOW)
+        assert len(_cuerpos(cur, rid)) == antes                # no encola nada
+        assert len(modelo.redactados) == llamadas
+    assert resultado.inert and resultado.text == ""
