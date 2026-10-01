@@ -1060,6 +1060,40 @@ Prueba real más temprana: M3 (esqueleto andante) en `prisma_flujo` con `alta = 
   ese orden (`resumen_latencia` sólo cuenta). `tests/test_redaccion_modelo_puro.py`: 13
   passed. Con eso la suite queda sin fallas conocidas.
 
+### Revisión RDD de M1-M3 (2026-10-01)
+
+El tramo `b7ed862..f60c3ca` entero (3714 líneas) superó el presupuesto de contexto del
+revisor (`lens_context_budget_exceeded`, sin autoridad creada); se revisó commit por commit.
+Las cuatro revisiones quedaron aprobadas y reconocidas; la frontera de revisión pasa a
+`f60c3ca`.
+
+| Tramo | Linaje | Observaciones (ninguna bloquea) |
+|---|---|---|
+| M1 `b7ed862..16fa0ff` | `review-fa1481ce471e6c1a` | 1 WARNING, 2 SUGGESTION |
+| M2 `16fa0ff..03263de` | `review-7a12ce5c67834bf0` | 1 WARNING |
+| M3 `03263de..deaade0` | `review-c76e05130ebb23d3` | 2 WARNING, 3 SUGGESTION |
+| docs y prueba `deaade0..f60c3ca` | `review-2ef17df9f6de4697` | 1 SUGGESTION |
+
+Disposición de las WARNING:
+
+- **M1, valores rechazados y texto de éxito** (`alta_turno.py:478`): resuelta por M3, que el
+  revisor de M1 no veía: cualquier rechazo convierte el intento en rechazado y se vuelve a
+  pedir (`alta_conducida.py:345`).
+- **M2, argumentos JSON que no son objeto** (`llm.py:582-587`): inofensiva; `leer_salida`
+  rechaza todo lo que no sea un objeto (`alta_turno.py:272`) y el intento se repite.
+- **M3, un intento sin fila de auditoría** (`alta_conducida.py:339-344`): si `_completar`
+  devuelve un problema de estado real después de guardar, se retorna sin `_auditar`; esa
+  llamada falta en la latencia del experimento. Pendiente, chica.
+- **M3, el freno de avisos sobrevive a un rollback** (`alta_conducida.py:686-707`): el
+  instante del último aviso se fija en memoria antes del incidente; si la transacción
+  vuelve atrás, se pierden incidente y aviso, y durante 10 minutos las fallas siguientes del
+  espacio se dan por avisadas. Roza "nunca fallar en silencio". Pendiente: fijar el freno
+  sólo después de confirmar.
+
+Las SUGGESTION (comparar `acepta_propuesta` con su tipo, cobertura de `verificar` tras el
+refactor, caché de Jev sin invalidar, nota del incidente de ajuste anómalo, caminos de falla
+sin prueba) quedan como deuda menor de esta rama.
+
 ### Decisiones del usuario (2026-10-01)
 
 - **Modelo puro, sin red** en el alta conducida: sin plazo propio ni plantillas que tapen al
