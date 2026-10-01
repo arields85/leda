@@ -126,7 +126,9 @@ def test_si_el_verificador_rechaza_se_vuelve_a_pedir_con_el_motivo(
     assert segundo["correccion"]["motivo"].startswith("falta_pregunta")
     assert "Anoté tu pedido" in segundo["correccion"]["texto_anterior"]
     assert segundo["falta"] == primero["falta"]              # los mismos hechos
-    assert [i["resultado"] for i in _intentos(conn, ws)] == ["rechazada", "aceptada"]
+    # Las dos filas comparten `at` (una transacción, `now()`): la lectura de la
+    # auditoría no tiene orden; el orden de los intentos ya lo prueba `modelo.hechos`.
+    assert sorted(i["resultado"] for i in _intentos(conn, ws)) == ["aceptada", "rechazada"]
     assert _incidentes_de(conn, incidentes.ETAPA_REDACCION_FALLIDA) == []
     assert _incidentes_de(conn, incidentes.ETAPA_REDACCION_RECHAZADA) == []
 

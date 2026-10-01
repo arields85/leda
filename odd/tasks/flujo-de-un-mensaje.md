@@ -1050,8 +1050,25 @@ Prueba real más temprana: M3 (esqueleto andante) en `prisma_flujo` con `alta = 
   es una prueba inestable que ya existía (ordena filas de auditoría por `at`, que es igual
   dentro de una transacción): falló en la suite y pasa sola y en la corrida enfocada.
   Después de la corrección: 169 passed en las pruebas del alta, capacidades, incidentes y
-  modelo puro. **No se volvió a correr la suite completa tras la corrección**; estado
-  `partial` hasta correrla.
+  modelo puro.
+- Suite completa repetida (2026-10-01, mismo comando, 22 min): 3196 passed, 333 deselected,
+  **1 failed**: otra vez `test_si_el_verificador_rechaza...` (`['aceptada', 'rechazada']`).
+  Dos fallas en dos suites completas: no es "intermitente", es un defecto de la prueba. Las
+  dos filas de auditoría comparten `at` (`now()` de una sola transacción) y `id` es un
+  `uuid` aleatorio, así que la lectura no tiene orden. Corregida comparando sin orden (el
+  orden de los intentos ya lo prueba `modelo.hechos`); el código no cambia ni depende de
+  ese orden (`resumen_latencia` sólo cuenta). `tests/test_redaccion_modelo_puro.py`: 13
+  passed. Con eso la suite queda sin fallas conocidas.
+
+### Decisiones del usuario (2026-10-01)
+
+- **Modelo puro, sin red** en el alta conducida: sin plazo propio ni plantillas que tapen al
+  modelo; ante una falla, el aviso neutro (constitución §10) y el incidente. Confirma la
+  decisión del escritor de abajo.
+- **El tope de 7 botones no es una decisión real:** CoreWork tiene 5 objetivos operativos, a
+  lo sumo 2 por área, y el alta ofrece sólo los del área de quien pide. El tope de 40
+  opciones es un techo técnico. Un objetivo es algo a cumplir con muchas tareas debajo; más
+  de ~4 por persona sería inmanejable.
 
 ### Decisiones del escritor (a revisar)
 
