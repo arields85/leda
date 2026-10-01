@@ -93,9 +93,20 @@ eran del arnés y se corrigieron en `ffe4e85`). Corridas anteriores y su detalle
   bot para el listener del worktree. El listener lo corre el usuario en su propia
   terminal (`python -m prisma escuchar corework`); las tareas en segundo plano del
   agente se cortan por tiempo.
-- Banco de modelos en curso sobre `main`: `deepseek/deepseek-v4-pro` y
-  `anthropic/claude-sonnet-5.5` por OpenRouter, contra `deepseek-v4-flash`.
-  Resultado: `PENDIENTE`.
+- Banco real de modelos sobre `main` (2026-09-30, n=1, 111 escenarios; reportes en
+  `tests/banco/reportes/banco-20260930T235543Z.json` y siguientes): pasan `deepseek-v4-flash`
+  110, `deepseek/deepseek-v4-pro` 87, `openai/gpt-5.6-sol` 43 y
+  `anthropic/claude-sonnet-5.5` 7. **No mide comprensión, mide acople al contrato del
+  ruteo:** pro no llama al ruteo exactamente una vez (17 bloqueados), sol pone propuestas
+  de tarea fuera del alta (67), y Sonnet rechaza el `tool_choice` forzado de
+  `llm.py:392,626` (104, infraestructura). Las fallas "de contenido" de pro y sol parecen
+  respuestas razonables que el comprobador no acepta. Conclusión: el sistema y el banco
+  quedaron ajustados al comportamiento de flash, y la pregunta "¿cuánto aporta el
+  modelo?" sigue sin respuesta. Una comparación justa exige un ruteo que no dependa de
+  las particularidades de un modelo (`PENDIENTE`, después del experimento A/B; no es
+  funcionalidad nueva). La latencia del banco es por escenario (mediana de flash 13 s),
+  no por respuesta: el criterio de 5 s del ADR 0014 necesita la medición por respuesta de
+  F6a.
 - Quedan bases residuales `prisma_diag_*`/`prisma_test_*` de corridas viejas en el
   servidor local.
 
