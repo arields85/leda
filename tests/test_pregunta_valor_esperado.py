@@ -36,7 +36,6 @@ def _esperado(abierta):
 @pytest.mark.parametrize("campo, tipo", [
     ("title", TipoValor.TEXTO),
     ("description", TipoValor.TEXTO),
-    ("acceptance_criterion", TipoValor.TEXTO),
     ("objective", TipoValor.ENTIDAD),
     ("responsible", TipoValor.ENTIDAD),
     ("area", TipoValor.ENTIDAD),
@@ -46,6 +45,13 @@ def test_cada_campo_de_texto_libre_del_alta_declara_su_tipo(campo, tipo):
     abierta = _abierta(gateway._SENTINEL_ALTA_TEXTO_LIBRE,
                        {"campo": campo, "titulo": None})
     assert _esperado(abierta) == ValorEsperado(tipo)
+
+
+def test_el_criterio_de_aceptacion_es_texto_y_se_juzga_si_es_verificable():
+    abierta = _abierta(gateway._SENTINEL_ALTA_TEXTO_LIBRE,
+                       {"campo": "acceptance_criterion", "titulo": None})
+    assert _esperado(abierta) == ValorEsperado(TipoValor.TEXTO,
+                                               juzga_verificable=True)
 
 
 def test_todos_los_campos_del_alta_declaran_un_tipo():

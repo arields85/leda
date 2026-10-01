@@ -39,8 +39,18 @@ class TipoValor(str, Enum):
 OPCION_NINGUNA = "ninguna"
 """El id con que el modelo dice que el mensaje rechaza todas las opciones."""
 
-CAMPOS_DEL_VALOR = ("fecha_iso", "opcion_id", "texto", "falta")
+CAMPOS_DEL_VALOR = ("fecha_iso", "opcion_id", "texto", "falta", "verificable",
+                    "propuesta")
 """Las únicas claves de `valor`, el objeto cerrado que devuelve el ruteo."""
+
+VERIFICABLE_SI = "si"
+VERIFICABLE_NO = "no"
+VERIFICABLES_VALIDOS = (VERIFICABLE_SI, VERIFICABLE_NO)
+"""El juicio cerrado del modelo sobre un criterio de aceptación (F-B7): si lo que
+la persona dijo es concreto y se puede comprobar. Sólo se pide con
+`ValorEsperado.juzga_verificable`; `propuesta` es el criterio que el modelo arma
+cuando el juicio es "no" (el código lo valida: nunca se compromete sin que la
+persona lo elija)."""
 
 FALTA_DIA = "dia"
 FALTA_CUAL = "cual"
@@ -89,11 +99,16 @@ class ValorEsperado:
     `OPCION`) y el día de hoy en la zona del espacio (con `FECHA`: es lo que
     deja resolver "mañana" y lo que separa una fecha pasada de una vigente).
     `confirmado`: la persona ya confirmó con un botón que el mensaje es la
-    respuesta a esta pregunta (el modelo no vuelve a dudar de eso)."""
+    respuesta a esta pregunta (el modelo no vuelve a dudar de eso).
+    `juzga_verificable` (F-B7): además del texto, el modelo dice si es concreto y
+    verificable y, si no, propone uno; `contexto` es lo que necesita para armarlo
+    (el título de la tarea)."""
     tipo: TipoValor
     opciones: tuple[Opcion, ...] = ()
     hoy: date | None = None
     confirmado: bool = False
+    juzga_verificable: bool = False
+    contexto: str = ""
 
 
 class MotivoRechazo(str, Enum):

@@ -14,7 +14,8 @@ from psycopg.types.json import Jsonb
 
 from .autoridad import Denegado, Solicitante
 from .db import entrante_atado, registrar_auditoria
-from .incidentes import (ETAPA_CONFIGURACION_ALTA, ETAPA_OBJETIVO_SIN_ORDENAR,
+from .incidentes import (ETAPA_CONFIGURACION_ALTA, ETAPA_CRITERIO_SIN_PROPUESTA,
+                         ETAPA_OBJETIVO_SIN_ORDENAR,
                          ETAPA_RESUMEN_VIGENTE_SIN_FILA, ETAPA_VALOR_SIN_INTERPRETAR, NOTICIA_NEUTRA_INCIDENTE,
                          REFERENCIA_INBOUND_MESSAGE, REFERENCIA_PENDING_ACTION,
                          registrar_incidente)
@@ -30,8 +31,8 @@ from .salida import (BUTTON_TEXT_LIMIT, ETIQUETA_CANCELAR, ETIQUETA_CONFIRMAR,
                      enqueue_outbox, etiqueta_sin_icono, etiquetas_de_tarea,
                      normalize_visible_text, prepare_buttons, prepare_payload, telegram_utf16_units,
                      with_no_effect_status)
-from .valores import (OPCION_NINGUNA, MotivoRechazo, Rechazado, TipoValor,
-                      ValorEsperado, opciones_numeradas, validar_valor)
+from .valores import (OPCION_NINGUNA, VERIFICABLE_NO, MotivoRechazo, Rechazado,
+                      TipoValor, ValorEsperado, opciones_numeradas, validar_valor)
 
 
 CALLBACK_PREFIX = "i:"
@@ -263,6 +264,43 @@ _SUJETO_DEL_CAMPO = {
     "area": "el área", "due_date": "la fecha objetivo",
     "acceptance_criterion": "el criterio de aceptación",
 }
+
+
+# F-B7: lo que se dice cuando lo que la persona escribió como criterio de aceptación
+# no dice cómo se comprueba que la tarea está hecha, y se le propone otro.
+RECHAZO_CRITERIO = Rechazo(
+    "Eso todavía no dice cómo se comprueba que la tarea está hecha.",
+    "Te propongo uno; usalo o escribí otro.")
+
+
+def _criterio_a_proponer(cur, request_id, who, valor, dicho, inbound_id):
+    """El criterio que se le propone a la persona (F-B7), o `None` si se toma lo que
+    escribió. Sólo se propone si el modelo juzgó que lo que dijo no es verificable,
+    si todavía no se le propuso nada en esta alta (una sola propuesta: si insiste
+    con su texto, se acepta) y si el código valida la propuesta (no vacía, dentro
+    del límite y distinta de lo que dijo)."""
+    if not isinstance(valor, dict) or valor.get("verificable") != VERIFICABLE_NO:
+        return None
+    cur.execute(
+        """select 1 from task_intake_choice_set
+            where request_id = %s and campo = 'acceptance_criterion' limit 1""",
+        (request_id,))
+    if cur.fetchone():
+        return None
+    propuesta = normalize_text(str(valor.get("propuesta") or ""))
+    if (propuesta and propuesta != dicho
+            and telegram_text_length(propuesta) <= USER_FIELD_LIMITS[
+                "acceptance_criterion"]):
+        return propuesta
+    registrar_incidente(
+        cur, who.workspace_id,
+        "El modelo juzgó que el criterio de aceptación no es verificable, pero no "
+        "dio una propuesta válida: se tomó el texto de la persona.",
+        severidad="baja", etapa=ETAPA_CRITERIO_SIN_PROPUESTA,
+        app_user_id=who.app_user_id, avisar_admin=False,
+        referencia_tipo=REFERENCIA_INBOUND_MESSAGE if inbound_id else None,
+        referencia_id=inbound_id)
+    return None
 
 
 def _esperado_del_campo(cur, workspace_id, field: str, now: datetime) -> ValorEsperado:
@@ -505,6 +543,9 @@ def consume_pending_text(cur: psycopg.Cursor, who: Solicitante, *, chat_id: int,
                 _user_limit_prompt(field), source_inbound_id, now,
             )
 
+    propuesta = (_criterio_a_proponer(cur, request_id, who, valor, value,
+                                      source_inbound_id)
+                 if field == "acceptance_criterion" else None)
     cur.execute(
         """update task_intake_free_text_slot
               set estado = 'consumed', source_inbound_id = %s,
@@ -521,6 +562,18 @@ def consume_pending_text(cur: psycopg.Cursor, who: Solicitante, *, chat_id: int,
     if field in {"objective", "responsible", "area"}:
         return _resolve_user_entity(cur, request, who, field, value,
                                     source_inbound_id, source_raw_text, now)
+    if propuesta:
+        # La persona no eligió este criterio: queda propuesto, con los botones para
+        # usarlo o escribir otro (F-B7).
+        cur.execute(
+            """update task_intake_field
+                  set estado = 'proposed', valor = %s, proposed_by = 'model',
+                      source_inbound_id = %s, source_raw_text = %s,
+                      source_choice_id = null, version = version + 1,
+                      actualizado_en = %s
+                where request_id = %s and campo = 'acceptance_criterion'""",
+            (Jsonb(propuesta), source_inbound_id, source_raw_text, now, request_id))
+        return _advance(cur, request, who, now, rechazo=RECHAZO_CRITERIO)
     _confirm_user_value(cur, request_id, field, value, source_inbound_id,
                         source_raw_text, now)
     return _advance(cur, request, who, now)
@@ -1507,10 +1560,12 @@ def _configuration_error(cur, request, who, field, now):
     )
 
 
-def _advance(cur, request, who, now, *, prefijo: str = "") -> IntakeOutcome:
+def _advance(cur, request, who, now, *, prefijo: str = "",
+             rechazo: Rechazo | None = None) -> IntakeOutcome:
     """Sigue con el próximo dato que falta, en el orden de `FIELDS`. `prefijo`
     (lo que se dice antes de la pregunta, en el mismo mensaje) sólo va delante
-    de la primera pregunta que se abre."""
+    de la primera pregunta que se abre. `rechazo`, si viene, es por qué lo que la
+    persona dijo no sirvió y se le propone un valor: va delante de la propuesta."""
     request_id = str(request["id"])
     cur.execute(
         """select campo, estado, valor from task_intake_field
@@ -1545,10 +1600,16 @@ def _advance(cur, request, who, now, *, prefijo: str = "") -> IntakeOutcome:
             continue
         if field in {"title", "description", "due_date", "acceptance_criterion"}:
             if row["estado"] == "proposed":
+                prompt = _proposal_prompt(field, row["valor"])
+                pregunta = None
+                if rechazo is not None:
+                    pregunta = prompt
+                    prompt = f"{rechazo.razon} {rechazo.se_acepta}\n\n{prompt}"
                 return _open_choices(
-                    cur, request, field, _proposal_prompt(field, row["valor"]),
+                    cur, request, field, prompt,
                     [(CONFIRM, "confirm", None), (REJECT, "reject", None),
                      (OTHER, "other", None)], now, prefijo=prefijo,
+                    pregunta=pregunta, rechazo=rechazo,
                     propuesto=_mostrar_valor(field, row["valor"]),
                 )
             return _open_free_text(cur, request, field, _free_text_prompt(field),

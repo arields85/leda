@@ -1829,7 +1829,12 @@ def _pregunta_del_alta(abierta) -> _Pregunta:
         descripcion = f"{nombre}, un dato del alta guiada que se le pidió"
         corrige_abre_selector = False
         valor_esperado = ValorEsperado(
-            TIPO_DE_CAMPO.get(args["campo"], TipoValor.TEXTO))
+            TIPO_DE_CAMPO.get(args["campo"], TipoValor.TEXTO),
+            # F-B7: el criterio de aceptación se juzga (concreto y verificable) y
+            # el modelo necesita el título para proponer uno.
+            juzga_verificable=args["campo"] == "acceptance_criterion",
+            contexto=(titulo or "") if args["campo"] == "acceptance_criterion"
+            else "")
     elif abierta.herramienta == _SENTINEL_ALTA_ELECCION:
         # Una elección sin campo (la de "ya hay un borrador en curso") no tiene
         # nombre de campo y se nombra en general.
@@ -2107,6 +2112,13 @@ def _ruta_de_lo_confirmado(proveedor, texto: str, abierta, cal, ahora):
 
     pregunta = _pregunta_de(abierta)
     esperado = _valor_esperado_de(pregunta.valor_esperado, cal, ahora)
+    if esperado is not None and esperado.juzga_verificable:
+        # F-B7: lo confirmado igual se juzga (concreto y verificable). Si el modelo
+        # no puede, sale tal cual: la persona ya confirmó que es su respuesta.
+        route, _ = _rutear(proveedor, texto, pendiente=pregunta.para_ruteo,
+                           valor_esperado=replace(esperado, confirmado=True))
+        if route is not None and route.valor.get("texto"):
+            return route, None
     if esperado is not None and esperado.tipo in (TipoValor.TEXTO,
                                                    TipoValor.ENTIDAD):
         return IntentRoute(IntentAction.NORMAL_CONVERSATION,

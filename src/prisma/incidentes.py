@@ -95,6 +95,9 @@ ETAPA_JEV_NO_CONFIGURADO = "jev_no_configurado"
 # F-B10: Jev no pudo ordenar los objetivos candidatos por la tarea (no respondió o
 # falta la credencial): se ofrecen en el orden de siempre, sin destacar ninguno.
 ETAPA_OBJETIVO_SIN_ORDENAR = "objetivo_sin_ordenar"
+# F-B7: el modelo juzgó que el criterio de aceptación no es verificable pero no dio
+# una propuesta que sirva: se tomó lo que la persona escribió.
+ETAPA_CRITERIO_SIN_PROPUESTA = "criterio_sin_propuesta"
 ETAPA_ENTREGA_MENSAJE = "entrega_mensaje"
 ETAPA_ENTREGA_AVISO_ADMIN = "entrega_aviso_admin"
 ETAPA_EVIDENCIA_INVALIDA = "politica_de_evidencia_invalida"
@@ -305,6 +308,14 @@ EXPLICACION_POR_ETAPA: dict[str, ExplicacionDeEtapa] = {
                  "ninguno destacado con una estrella."),
         que_hacer=("Si fue la credencial, configurala y reiniciá el servicio. No "
                    "hace falta que {nombre} haga nada.")),
+    ETAPA_CRITERIO_SIN_PROPUESTA: ExplicacionDeEtapa(
+        que_paso=("El modelo juzgó que el criterio de aceptación que escribió "
+                  "{nombre} no es verificable, pero no devolvió una propuesta "
+                  "válida para ofrecerle."),
+        que_vio=("Nada raro: se tomó el criterio tal como lo escribió, sin una "
+                 "propuesta."),
+        que_hacer=("Mirá el motivo en el detalle del incidente. No hace falta que "
+                   "{nombre} haga nada.")),
     ETAPA_ENTREGA_MENSAJE: ExplicacionDeEtapa(
         que_paso=("Un mensaje para {nombre} no se pudo entregar por Telegram "
                   "después de varios intentos."),

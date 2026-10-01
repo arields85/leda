@@ -17,7 +17,8 @@ from enum import Enum
 from typing import Any, Protocol
 
 from .valores import (CAMPOS_DEL_VALOR, FALTAS_POR_TIPO, FALTAS_VALIDAS,
-                      OPCION_NINGUNA, TipoValor, ValorEsperado)
+                      OPCION_NINGUNA, VERIFICABLES_VALIDOS, TipoValor,
+                      ValorEsperado)
 
 
 @dataclass
@@ -215,27 +216,38 @@ def _esquema_valor(esperado: ValorEsperado) -> dict:
                        "or \"ninguna\" if it rejects all of them."}
     if esperado.tipo is TipoValor.OPCION and esperado.opciones:
         opcion_id["enum"] = [o.id for o in esperado.opciones] + [OPCION_NINGUNA]
+    propiedades: dict[str, Any] = {
+        "fecha_iso": {"type": "string", "description": "A date as YYYY-MM-DD."},
+        "opcion_id": opcion_id,
+        "texto": {"type": "string", "description": "Free text, as the person meant it."},
+        "falta": {
+            "type": "string",
+            "enum": list(FALTAS_POR_TIPO.get(esperado.tipo, ())),
+            "description": (
+                "Instead of the value: the message does answer the "
+                "question but is incomplete or ambiguous, and this says "
+                "what is missing."),
+        },
+    }
+    if esperado.juzga_verificable:
+        propiedades["verificable"] = {
+            "type": "string", "enum": list(VERIFICABLES_VALIDOS),
+            "description": (
+                "\"si\" if the text is a concrete, verifiable acceptance "
+                "criterion (something that can be checked), \"no\" if it is "
+                "vague, unknown or does not say how to check it.")}
+        propiedades["propuesta"] = {
+            "type": "string",
+            "description": (
+                "Only when verificable is \"no\": one concrete, verifiable "
+                "criterion built from the task title and what the person said.")}
     return {
         "type": "object",
         "additionalProperties": False,
         "description": (
             "The value the message brings for the pending question, already "
             "normalized. Omit it if the message does not bring one."),
-        "properties": {
-            "fecha_iso": {"type": "string",
-                          "description": "A date as YYYY-MM-DD."},
-            "opcion_id": opcion_id,
-            "texto": {"type": "string",
-                      "description": "Free text, as the person meant it."},
-            "falta": {
-                "type": "string",
-                "enum": list(FALTAS_POR_TIPO.get(esperado.tipo, ())),
-                "description": (
-                    "Instead of the value: the message does answer the "
-                    "question but is incomplete or ambiguous, and this says "
-                    "what is missing."),
-            },
-        },
+        "properties": propiedades,
     }
 
 
@@ -306,12 +318,25 @@ def _bloque_valor(esperado: ValorEsperado) -> str:
             "referencia tal como el mensaje la escribe. Si responde pero es "
             "tan general que no identifica nada, devolvé valor.falta = "
             "\"detalle\" y ningún texto." + _NO_INVENTAR)
-    return (
+    texto = (
         intro + "La pregunta espera un texto libre. Completá valor.texto con "
         "lo que la persona quiso decir, tal como lo dijo, sin agregar, "
         "resumir ni corregir nada. Si responde pero es tan general que no "
         "sirve como el dato, devolvé valor.falta = \"detalle\" y ningún "
         "texto." + _NO_INVENTAR)
+    if esperado.juzga_verificable:
+        titulo = f" La tarea es: «{esperado.contexto}»." if esperado.contexto else ""
+        texto += (
+            " Este texto es el criterio de aceptación de la tarea: cómo se va a "
+            "comprobar que está hecha." + titulo + " Además completá "
+            "valor.verificable: \"si\" si el texto dice algo concreto que se "
+            "puede comprobar (un resultado, una medida, algo que se ve o se "
+            "prueba), \"no\" si es vago, dice que no se sabe todavía o no dice "
+            "cómo se comprueba. Con \"no\" completá también valor.propuesta con "
+            "UN criterio concreto y verificable armado con el título de la tarea "
+            "y lo que la persona dijo, sin agregar datos que ninguno de los dos "
+            "tenga (números, nombres, plazos).")
+    return texto
 
 
 def _sistema_del_ruteo(pendiente: str | None,
@@ -371,6 +396,8 @@ def _valor_o_vacio(valor: Any) -> dict[str, str]:
         if not texto or len(texto) > MAX_LONGITUD_VALOR:
             return {}
         if clave == "falta" and texto not in FALTAS_VALIDAS:
+            return {}
+        if clave == "verificable" and texto not in VERIFICABLES_VALIDOS:
             return {}
         limpio[clave] = texto
     return limpio
