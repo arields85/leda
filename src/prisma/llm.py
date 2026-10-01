@@ -448,12 +448,23 @@ class Proveedor(Protocol):
     def responder(self, sistema: str, mensajes: list[dict[str, Any]],
                   herramientas: list[dict[str, Any]]) -> Respuesta: ...
 
-    def redactar(self, sistema: str, hechos: str) -> str: ...
+    def redactar(self, sistema: str, hechos: str, *,
+                 plazo: float | None = None) -> str: ...
 
 
-# Tope de la redacción de un turno (ADR 0014, variante A): un mensaje, no una
-# conversación.
-MAX_TOKENS_REDACCION = 400
+# Tope de la redacción de un turno (ADR 0014, variante A): un mensaje de pocas
+# oraciones más su JSON, no una conversación. Un tope mayor sólo alarga una
+# redacción descontrolada.
+MAX_TOKENS_REDACCION = 256
+
+
+def _con_plazo(cliente, plazo: float | None):
+    """El cliente para UNA llamada: con `plazo`, ese tiempo máximo y sin
+    reintentos (el del cliente es para las llamadas que sí esperan); sin él, el
+    mismo cliente."""
+    if plazo is None:
+        return cliente
+    return cliente.with_options(timeout=plazo, max_retries=0)
 
 
 # ---------------------------------------------------------------------------
@@ -476,9 +487,13 @@ class ProveedorGuionado:
     # lanza (un modelo que falla o se cuelga). Sin borrador, texto vacío.
     borradores: list[str | BaseException] = field(default_factory=list)
     redactados: list[tuple[str, str]] = field(default_factory=list)
+    # El plazo con que se pidió cada redacción (`None` sin plazo).
+    plazos: list[float | None] = field(default_factory=list)
 
-    def redactar(self, sistema: str, hechos: str) -> str:
+    def redactar(self, sistema: str, hechos: str, *,
+                 plazo: float | None = None) -> str:
         self.redactados.append((sistema, hechos))
+        self.plazos.append(plazo)
         if not self.borradores:
             return ""
         borrador = self.borradores.pop(0)
@@ -608,8 +623,9 @@ class ProveedorAnthropic:
                     for b in r.content if b.type == "tool_use"]
         return Respuesta(texto=texto.strip(), llamadas=llamadas)
 
-    def redactar(self, sistema: str, hechos: str) -> str:
-        r = self._c.messages.create(
+    def redactar(self, sistema: str, hechos: str, *,
+                 plazo: float | None = None) -> str:
+        r = _con_plazo(self._c, plazo).messages.create(
             model=self._modelo,
             max_tokens=min(self._param.get("max_tokens", 1024), MAX_TOKENS_REDACCION),
             temperature=self._param.get("temperature", 0.3),
@@ -639,10 +655,13 @@ class ProveedorGemini:
         self._http = cliente or httpx.Client(
             timeout=timeout, headers={"x-goog-api-key": api_key})
 
-    def _post(self, url: str, cuerpo: dict):
-        """POST con reintento sólo ante timeout (no ante 5xx); lo demás propaga."""
+    def _post(self, url: str, cuerpo: dict, plazo: float | None = None):
+        """POST con reintento sólo ante timeout (no ante 5xx); lo demás propaga.
+        Con `plazo`, ese tiempo máximo y un solo intento."""
         import httpx
 
+        if plazo is not None:
+            return self._http.post(url, json=cuerpo, timeout=plazo)
         for intento in range(self._reintentos + 1):
             try:
                 return self._http.post(url, json=cuerpo)
@@ -727,7 +746,8 @@ class ProveedorGemini:
             for i, p in enumerate(partes) if "functionCall" in p]
         return Respuesta(texto=texto.strip(), llamadas=llamadas)
 
-    def redactar(self, sistema: str, hechos: str) -> str:
+    def redactar(self, sistema: str, hechos: str, *,
+                 plazo: float | None = None) -> str:
         cuerpo = {
             "system_instruction": {"parts": [{"text": sistema}]},
             "contents": [{"role": "user", "parts": [{"text": hechos}]}],
@@ -738,7 +758,7 @@ class ProveedorGemini:
             },
         }
         r = self._post(
-            f"{GEMINI_BASE}/models/{self._modelo}:generateContent", cuerpo)
+            f"{GEMINI_BASE}/models/{self._modelo}:generateContent", cuerpo, plazo)
         r.raise_for_status()
         candidatos = r.json().get("candidates") or []
         if not candidatos:
@@ -890,8 +910,9 @@ class ProveedorCompatible:
                     for c in (m.tool_calls or [])]
         return Respuesta(texto=(m.content or "").strip(), llamadas=llamadas)
 
-    def redactar(self, sistema: str, hechos: str) -> str:
-        r = self._c.chat.completions.create(
+    def redactar(self, sistema: str, hechos: str, *,
+                 plazo: float | None = None) -> str:
+        r = _con_plazo(self._c, plazo).chat.completions.create(
             model=self._modelo,
             max_tokens=min(self._param.get("max_tokens", 1024), MAX_TOKENS_REDACCION),
             temperature=self._param.get("temperature", 0.3),

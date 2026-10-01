@@ -172,10 +172,14 @@ def test_si_el_modelo_falla_o_se_cuelga_sale_b_y_queda_registrado(error, corewor
 
     assert texto == redaccion.redactar_partes(EN_CURSO, "B")
     (intento,) = _intentos(conn, ws)
-    assert intento["resultado"] == "error"
-    assert type(error).__name__ in intento["motivo"]
+    if isinstance(error, TimeoutError):
+        assert intento["resultado"] == "timeout"       # se cuenta aparte
+        assert "timeout" in intento["motivo"]
+    else:
+        assert intento["resultado"] == "error"
+        assert type(error).__name__ in intento["motivo"]
     (incidente,) = _incidentes(conn, ws)
-    assert type(error).__name__ in incidente["referencia_cruda"]
+    assert intento["motivo"] in incidente["referencia_cruda"]
 
 
 def test_un_defecto_del_verificador_cae_en_b_y_queda_registrado(
@@ -270,7 +274,7 @@ def test_cada_intento_registra_la_duracion_y_se_resume_con_la_mediana(
     with admin(conn) as cur:
         e = redaccion.estadistica_variante_a(cur, ws)
     assert e["llamadas"] == 4
-    assert (e["aceptadas"], e["rechazadas"], e["errores"]) == (2, 1, 1)
+    assert (e["aceptadas"], e["rechazadas"], e["errores"], e["timeouts"]) == (2, 1, 0, 1)
     assert e["mediana_ms"] == 4000          # entre 3000 y 5000
     assert e["mediana_aceptadas_ms"] == 2000
     assert e["maximo_ms"] == 10000

@@ -42,7 +42,7 @@ class _Eco:
     def __init__(self):
         self.redactados: list[dict] = []
 
-    def redactar(self, sistema: str, hechos: str) -> str:
+    def redactar(self, sistema: str, hechos: str, **_) -> str:
         datos = json.loads(hechos)
         self.redactados.append(datos)
         if "resumen" in datos:
@@ -116,7 +116,8 @@ def test_si_el_modelo_falla_sale_la_pregunta_de_b_una_sola_vez_y_queda_registrad
         cuerpos = _cuerpos(cur, outcome.request_id)
 
     assert outcome.text == PREGUNTA_B and cuerpos == [PREGUNTA_B]
-    assert [i["resultado"] for i in _intentos(conn, ws)] == ["error"]
+    esperado = "timeout" if isinstance(error, TimeoutError) else "error"
+    assert [i["resultado"] for i in _intentos(conn, ws)] == [esperado]
     assert _incidentes(conn) == 1
 
 
@@ -198,7 +199,7 @@ def test_si_el_modelo_falla_en_el_resumen_sale_el_de_b_con_su_cierre(
     ws = intake_world["north-lab"]["id"]
 
     class _SoloElResumenFalla(_Eco):
-        def redactar(self, sistema, hechos):
+        def redactar(self, sistema, hechos, **_):
             if "resumen" in json.loads(hechos):
                 raise TimeoutError("colgado")
             return super().redactar(sistema, hechos)
@@ -212,5 +213,5 @@ def test_si_el_modelo_falla_en_el_resumen_sale_el_de_b_con_su_cierre(
         texto = cur.fetchone()["resumen"]
     assert texto.startswith("Resumen para revisar\nTítulo: ")      # B, sin apertura
     assert texto.endswith("\n\n" + I.CIERRE_CONFIRMAR)
-    assert [i["resultado"] for i in _intentos(conn, ws)].count("error") == 1
+    assert [i["resultado"] for i in _intentos(conn, ws)].count("timeout") == 1
     assert _incidentes(conn) == 1

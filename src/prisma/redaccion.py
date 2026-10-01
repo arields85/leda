@@ -40,6 +40,10 @@ ETAPA_INTERRUPTOR_REDACCION = "interruptor_redaccion"
 # con su duración: de ahí sale la mediana de la prueba (`estadistica_variante_a`).
 ACCION_REDACCION_A = "redaccion_variante_a"
 _reloj = time.perf_counter
+# El plazo de la redacción de A: una llamada, sin reintentos. Pasado el plazo sale
+# la plantilla de B de inmediato y queda registrado. Hoy cada texto y cada toque
+# espera esa llamada; el plazo acota lo peor que la persona puede esperar.
+PLAZO_REDACCION_S = 3.0
 
 # (espacio, valor) ya registrados por este proceso: la anomalía del interruptor
 # se nota una vez, no en cada turno (mismo criterio que el supresor de
@@ -259,13 +263,20 @@ def _registrar_intento(cur, workspace_id: str, resultado: str, motivo: str | Non
                         actor_kind="prisma", detalle=detalle)
     if resultado == "aceptada":
         return
-    queja = ("El modelo no pudo redactar la respuesta" if resultado == "error"
-             else "El texto que redactó el modelo no pasó la verificación")
+    queja = {"error": "El modelo no pudo redactar la respuesta",
+             "timeout": "El modelo no contestó a tiempo"}.get(
+        resultado, "El texto que redactó el modelo no pasó la verificación")
     registrar_incidente(
         cur, workspace_id,
         f"{queja} (variante A): se usó la respuesta de la variante B.",
         severidad="baja", referencia_cruda=(motivo or "")[:2000],
         etapa=ETAPA_REDACCION_RECHAZADA, avisar_admin=False)
+
+
+def _es_timeout(exc: Exception) -> bool:
+    """El modelo no contestó a tiempo: el timeout propio de Python o el de un
+    cliente (`APITimeoutError`, `ReadTimeout`, ...)."""
+    return isinstance(exc, TimeoutError) or "timeout" in type(exc).__name__.lower()
 
 
 def _motivo_de_error(exc: Exception) -> str:
@@ -278,8 +289,8 @@ def _motivo_de_error(exc: Exception) -> str:
 
 
 def redactar_turno(cur, workspace_id: str, resultado: ResultadoTurno, variante: str,
-                   *, proveedor=None,
-                   base: TextoRedactado | None = None) -> TextoRedactado:
+                   *, proveedor=None, base: TextoRedactado | None = None,
+                   plazo: float = PLAZO_REDACCION_S) -> TextoRedactado:
     """El texto de un turno con la variante del espacio. Con A, el modelo
     redacta el mensaje entero sobre los hechos (salida estructurada) y el
     código lo verifica; si no sirve, o el modelo falla o se cuelga, sale la
@@ -287,7 +298,8 @@ def redactar_turno(cur, workspace_id: str, resultado: ResultadoTurno, variante: 
     registrado con la duración de la llamada. `base` es la plantilla de B cuando
     no es la genérica (un texto que B ya tenía antes de existir el resultado).
     Con un resumen, el modelo escribe sólo la apertura: los datos y el cierre son
-    siempre del código."""
+    siempre del código. `plazo` es el tiempo máximo de la llamada, sin
+    reintentos: pasado, sale B."""
     base = base or redactar_partes(resultado, variante)   # valida y arma B
     if variante != "A":
         return base
@@ -296,7 +308,8 @@ def redactar_turno(cur, workspace_id: str, resultado: ResultadoTurno, variante: 
     caracteres = 0
     try:
         modelo = proveedor or proveedor_de_redaccion(cur, workspace_id)
-        crudo = modelo.redactar(SISTEMA_REDACCION, serializar_hechos(resultado))
+        crudo = modelo.redactar(SISTEMA_REDACCION, serializar_hechos(resultado),
+                                plazo=plazo)
         duracion_ms = round((_reloj() - inicio) * 1000)
         caracteres = len((crudo or "").strip())
         borrador = leer_borrador(crudo)
@@ -307,9 +320,14 @@ def redactar_turno(cur, workspace_id: str, resultado: ResultadoTurno, variante: 
     except psycopg.Error:
         raise                       # la transacción no sigue: no es del modelo
     except Exception as exc:        # un modelo que falla o se cuelga: sale B
-        _registrar_intento(cur, workspace_id, "error", _motivo_de_error(exc),
-                           duracion_ms or round((_reloj() - inicio) * 1000),
-                           caracteres)
+        duracion_ms = duracion_ms or round((_reloj() - inicio) * 1000)
+        if _es_timeout(exc):
+            _registrar_intento(cur, workspace_id, "timeout",
+                               f"timeout: más de {plazo:g} s sin respuesta",
+                               duracion_ms, caracteres)
+        else:
+            _registrar_intento(cur, workspace_id, "error", _motivo_de_error(exc),
+                               duracion_ms, caracteres)
         return base
     if motivo:
         _registrar_intento(cur, workspace_id, "rechazada", motivo, duracion_ms,
@@ -386,7 +404,7 @@ def redactar_charla(cur, workspace_id: str, mensaje: str, pregunta: str, *,
         modelo = proveedor or proveedor_de_redaccion(cur, workspace_id)
         borrador = modelo.redactar(SISTEMA_CHARLA, json.dumps(
             {"mensaje": mensaje, "pregunta_pendiente": pregunta},
-            ensure_ascii=False))
+            ensure_ascii=False), plazo=PLAZO_REDACCION_S)
     except psycopg.Error:
         raise                       # la transacción no sigue: no es del modelo
     except Exception as exc:        # un modelo que falla o se cuelga
@@ -430,6 +448,7 @@ def estadistica_variante_a(cur, workspace_id: str) -> dict:
         "aceptadas": len(aceptadas),
         "rechazadas": sum(1 for d in filas if d["resultado"] == "rechazada"),
         "errores": sum(1 for d in filas if d["resultado"] == "error"),
+        "timeouts": sum(1 for d in filas if d["resultado"] == "timeout"),
         "mediana_ms": mediana(todos),
         "mediana_aceptadas_ms": mediana(aceptadas),
         "p90_ms": todos[min(len(todos) - 1, int(len(todos) * 0.9))] if todos else None,

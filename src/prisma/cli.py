@@ -495,7 +495,7 @@ def main(argv: list[str] | None = None) -> int:
 
         print(f"llamadas: {e['llamadas']}")
         print(f"aceptadas: {e['aceptadas']}  rechazadas: {e['rechazadas']}  "
-              f"errores: {e['errores']}")
+              f"errores: {e['errores']}  timeouts: {e['timeouts']}")
         print(f"mediana: {seg(e['mediana_ms'])}  (aceptadas: "
               f"{seg(e['mediana_aceptadas_ms']) if e['aceptadas'] else 'sin datos'})")
         print(f"p90: {seg(e['p90_ms'])}  máximo: {seg(e['maximo_ms'])}")

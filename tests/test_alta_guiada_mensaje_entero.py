@@ -192,7 +192,7 @@ def test_si_el_modelo_falla_el_rechazo_sale_como_el_de_b(
 
     assert resultado.text == ("Esa fecha ya pasó. Decime una fecha desde hoy en "
                               "adelante.")
-    assert [i["resultado"] for i in _intentos(conn, ws)] == ["error"]
+    assert [i["resultado"] for i in _intentos(conn, ws)] == ["timeout"]
 
 
 def test_una_opcion_que_no_se_ofrecio_sale_en_un_solo_mensaje_con_sus_botones(

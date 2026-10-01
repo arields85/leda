@@ -118,7 +118,7 @@ def test_con_a_si_el_mensaje_no_sirve_sale_la_pregunta_sola_y_queda_registrado(
         cur.execute("select detalle from audit_log where workspace_id = %s "
                     "and accion = %s", (ws, redaccion.ACCION_REDACCION_A))
         (intento,) = cur.fetchall()
-    assert intento["detalle"]["resultado"] in ("error", "rechazada")
+    assert intento["detalle"]["resultado"] in ("error", "timeout", "rechazada")
 
 
 @pytest.mark.parametrize("error", [TimeoutError("colgado"), RuntimeError("cayó")])

@@ -135,7 +135,8 @@ def test_redaccion_imprime_la_latencia_y_los_rechazos_de_la_variante_a(
     monkeypatch.setattr(cli, "conectar", lambda *a, **k: conn)
     with admin(conn) as cur:
         for resultado, ms in (("aceptada", 1000), ("aceptada", 3000),
-                              ("rechazada", 5000), ("error", 10000)):
+                              ("rechazada", 5000), ("error", 10000),
+                              ("timeout", 3000)):
             registrar_auditoria(
                 cur, accion=redaccion.ACCION_REDACCION_A,
                 workspace_id=corework.workspace_id, actor_kind="prisma",
@@ -145,10 +146,10 @@ def test_redaccion_imprime_la_latencia_y_los_rechazos_de_la_variante_a(
     assert cli.main(["redaccion", "corework"]) == 0
 
     salida = capsys.readouterr().out
-    assert "llamadas: 4" in salida
+    assert "llamadas: 5" in salida
     assert "aceptadas: 2" in salida and "rechazadas: 1" in salida
-    assert "errores: 1" in salida
-    assert "mediana: 4,0 s" in salida
+    assert "errores: 1" in salida and "timeouts: 1" in salida
+    assert "mediana: 3,0 s" in salida
 
 
 def test_redaccion_sin_intentos_no_inventa_una_mediana(conn, corework, monkeypatch,

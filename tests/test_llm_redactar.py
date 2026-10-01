@@ -144,6 +144,11 @@ class _Mensajes:
 class _Cliente:
     def __init__(self):
         self.messages = _Mensajes()
+        self.opciones = []
+
+    def with_options(self, **kw):
+        self.opciones.append(kw)
+        return self
 
 
 def test_anthropic_redacta_sin_herramientas():
@@ -155,3 +160,68 @@ def test_anthropic_redacta_sin_herramientas():
     assert "tools" not in llamada and "tool_choice" not in llamada
     assert llamada["system"] == "sis"
     assert llamada["messages"] == [{"role": "user", "content": "hechos"}]
+
+
+# ---------------------------------------------------------------- el plazo propio
+
+def test_el_guionado_registra_el_plazo_con_que_se_lo_llamo():
+    p = ProveedorGuionado(guion=[], borradores=["a", "b"])
+    p.redactar("s", "h", plazo=3.0)
+    p.redactar("s", "h")
+    assert p.plazos == [3.0, None]
+
+
+def test_compatible_con_plazo_corta_a_tiempo_y_no_reintenta(monkeypatch):
+    intentos, plazos = [], []
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        intentos.append(1)
+        plazos.append(request.extensions["timeout"]["read"])
+        raise httpx.ReadTimeout("colgado", request=request)
+
+    with pytest.raises(openai.APITimeoutError):
+        _compatible(monkeypatch, respond).redactar("s", "h", plazo=2.5)
+
+    assert len(intentos) == 1                      # sin reintentos (el cliente tiene 2)
+    assert plazos == [2.5]                         # el plazo propio, no el de 20 s
+
+
+def test_compatible_sin_plazo_conserva_su_tiempo_y_sus_reintentos(monkeypatch):
+    intentos = []
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        intentos.append(request.extensions["timeout"]["read"])
+        raise httpx.ReadTimeout("colgado", request=request)
+
+    with pytest.raises(openai.APITimeoutError):
+        _compatible(monkeypatch, respond).redactar("s", "h")
+
+    assert len(intentos) == 3 and set(intentos) == {20}
+
+
+def test_gemini_con_plazo_corta_a_tiempo_y_no_reintenta():
+    intentos = []
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        intentos.append(request.extensions["timeout"]["read"])
+        raise httpx.ReadTimeout("colgado", request=request)
+
+    http = httpx.Client(transport=httpx.MockTransport(respond))
+    with pytest.raises(httpx.ReadTimeout):
+        ProveedorGemini("m", "sk-test", cliente=http).redactar("s", "h", plazo=1.5)
+
+    assert intentos == [1.5]
+
+
+def test_anthropic_con_plazo_pide_un_cliente_sin_reintentos():
+    cliente = _Cliente()
+    ProveedorAnthropic("m", "sk-test", cliente=cliente).redactar("s", "h", plazo=2.0)
+    assert cliente.opciones == [{"timeout": 2.0, "max_retries": 0}]
+
+
+def test_el_tope_de_la_redaccion_es_corto():
+    from prisma.llm import MAX_TOKENS_REDACCION
+
+    # Un mensaje de pocas oraciones más el JSON cabe de sobra: un tope mayor sólo
+    # alarga una redacción descontrolada.
+    assert MAX_TOKENS_REDACCION <= 256
