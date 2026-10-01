@@ -405,6 +405,32 @@ def test_b_el_resumen_lleva_solo_los_datos_que_tiene_y_el_cierre_que_le_toca():
     _sin_jerga(texto)
 
 
+def test_el_resumen_separa_el_cuerpo_y_el_cierre_sin_cortar_el_texto():
+    """R8: el cierre es una parte propia, no el último párrafo de un texto
+    que habría que volver a cortar. Un cuerpo con líneas en blanco no cambia
+    nada."""
+    resumen = Resumen(
+        "Resumen para revisar",
+        (("Título", "Revisar PLC"),
+         ("Descripción", "Primero esto.\n\nDespués esto.")),
+        "Con Confirmar se crea la tarea con estos datos.")
+    partes = redaccion.redactar_partes(ResultadoTurno(resumen=resumen), "B")
+    assert partes.cierre == resumen.cierre
+    assert resumen.cierre not in partes.cuerpo
+    assert partes.cuerpo.startswith("Resumen para revisar\nTítulo: Revisar PLC")
+    assert partes.texto == redaccion.redactar(ResultadoTurno(resumen=resumen), "B")
+    otro = partes.con_cierre("Con Enviar a aprobación se lo mando a Morgan.")
+    assert otro.cuerpo == partes.cuerpo
+    assert otro.texto == (
+        partes.cuerpo + "\n\nCon Enviar a aprobación se lo mando a Morgan.")
+
+
+def test_un_cuerpo_sin_cierre_no_se_confunde_con_el_cierre():
+    partes = redaccion.redactar_partes(
+        ResultadoTurno(cambios=(Cambio("la tarea «A»", "quedó creada"),)), "B")
+    assert partes.cierre == "" and partes.texto == partes.cuerpo
+
+
 @pytest.mark.parametrize(("clave", "legible"), [
     ("resultado_de_prueba", "resultado de prueba"),
     ("captura", "captura"),

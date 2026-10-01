@@ -16,6 +16,7 @@ texto plano. Los botones los dibuja quien transporta, desde
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 
 from .incidentes import registrar_incidente
 from .resultado_turno import ResultadoTurno, Resumen
@@ -92,12 +93,29 @@ def nombre_legible(clave: str) -> str:
     return " ".join(clave.replace("_", " ").split())
 
 
+@dataclass(frozen=True)
+class TextoRedactado:
+    """Un texto en sus dos partes: el cuerpo y el cierre del botón que le toca
+    a quien lo lee (R8). El cierre es una parte propia, nunca el último
+    párrafo de un texto que habría que volver a cortar: otra redacción puede
+    no tener la forma `cuerpo + párrafo`."""
+    cuerpo: str
+    cierre: str = ""
+
+    @property
+    def texto(self) -> str:
+        return f"{self.cuerpo}\n\n{self.cierre}" if self.cierre else self.cuerpo
+
+    def con_cierre(self, cierre: str) -> TextoRedactado:
+        return TextoRedactado(self.cuerpo, cierre)
+
+
 def _resumen_b(r: Resumen) -> str:
     lineas = "\n".join(f"{etiqueta}: {valor}" for etiqueta, valor in r.lineas)
-    return f"{r.titulo}\n{lineas}\n\n{r.cierre}"
+    return f"{r.titulo}\n{lineas}"
 
 
-def _redactar_b(r: ResultadoTurno) -> str:
+def _redactar_b(r: ResultadoTurno) -> TextoRedactado:
     partes: list[str] = []
     if r.resumen:
         partes.append(_resumen_b(r.resumen))
@@ -119,13 +137,15 @@ def _redactar_b(r: ResultadoTurno) -> str:
         partes.append("\n".join(f"{e.sujeto} está {e.estado}." for e in r.estado))
     if r.falta:
         partes.append(r.falta.pregunta or f"Me falta {r.falta.dato}.")
-    return "\n\n".join(partes)
+    # El cierre del resumen va al final, como parte propia (R8).
+    return TextoRedactado("\n\n".join(partes),
+                          r.resumen.cierre if r.resumen else "")
 
 
-def redactar(resultado: ResultadoTurno, variante: str) -> str:
-    """El texto de un turno a partir de sus hechos. Un resultado sin ningún
-    hecho o una variante que no existe son un defecto de quien llama: fallan
-    fuerte, nunca salen como un texto vacío."""
+def redactar_partes(resultado: ResultadoTurno, variante: str) -> TextoRedactado:
+    """El texto de un turno a partir de sus hechos, en cuerpo y cierre. Un
+    resultado sin ningún hecho o una variante que no existe son un defecto de
+    quien llama: fallan fuerte, nunca salen como un texto vacío."""
     if variante not in VARIANTES:
         raise ValueError(f"Variante de redacción desconocida: {variante!r}.")
     if resultado.vacio:
@@ -133,3 +153,8 @@ def redactar(resultado: ResultadoTurno, variante: str) -> str:
     # La variante A (el modelo redacta y el código verifica) llega con F6a;
     # hasta entonces cae en las plantillas.
     return _redactar_b(resultado)
+
+
+def redactar(resultado: ResultadoTurno, variante: str) -> str:
+    """El texto de un turno a partir de sus hechos (`redactar_partes`)."""
+    return redactar_partes(resultado, variante).texto

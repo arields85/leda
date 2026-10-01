@@ -237,6 +237,23 @@ PR planificado: la integración a `main` la decide el usuario después del exper
   Decisiones de implementación a revisar: el selector de Modificar deja de ofrecer un dato sin
   otra opción (hoy, siempre "Área"); el título propuesto se toma sin confirmar.
 
+- 2026-10-01, F6a, chequeo de rumbo (escrito antes de empezar; worktree
+  `flujo-variante-a`, rama `feat/flujo-variante-a` desde `1832bfe`).
+  1. Clase de problema: la redacción de la respuesta (etapa 6): un texto que afirma algo
+     fuera de los hechos (un cambio que no ocurrió, otra fecha, un estado inventado) o que
+     suena a plantilla. Ya apareció con otras formas (R4b-H2 a H4, R4c-H7 a H9).
+  2. Mecanismo general, no un caso: el verificador es determinista y opera sobre los hechos
+     estructurados (literales que deben aparecer, fechas y números que no pueden inventarse,
+     vocabulario de estados del dominio, verbos de acción en primera persona sólo si hubo un
+     cambio, largo), no sobre frases observadas. Límite declarado: no entiende el sentido; lo
+     dudoso se rechaza y sale B.
+  3. Qué haría innecesaria la próxima ronda: el registro de cada borrador (aceptado,
+     rechazado, falló) con su duración. Una familia de rechazo se mira como mecanismo del
+     verificador, no se parcha por frase; y A o B se decide con la mediana medida.
+  4. Hipótesis vigente: un modelo "flash" redacta sobre hechos con mediana ≤ 5 s (criterio
+     del ADR 0014). Se mide, no se asume (AGENTS, "Cómo pensamos juntos", punto 8). Si la
+     mediana pasa de 5 s o los rechazos son la regla, se para y se discute con el usuario.
+
 ## Próximo paso
 
 F6a (variante A del alta) y la prueba real F7/F8a.
@@ -268,9 +285,13 @@ Advertencias no bloqueantes, a resolver después de la primera prueba real:
 - [ ] R7. `ingreso_tareas.py:1194-1198` y `:456`: centinela `Rechazado` con campos vacíos y
   `valor=None` por defecto en `consume_pending_text` (un llamador que no lo pase convierte
   toda respuesta en `SIN_VALOR`).
-- [ ] R8. `ingreso_tareas.py:2074-2078`: `_con_cierre` corta el resumen en el último doble
+- [x] R8. `ingreso_tareas.py:2074-2078`: `_con_cierre` corta el resumen en el último doble
   salto de línea; con otra redacción (variante A) el cuerpo puede quedar vacío. Resolver
-  antes de F6a.
+  antes de F6a. Resuelto en F6a (commit 1): `redaccion.TextoRedactado` (cuerpo y cierre
+  como partes), `render_resumen`, y el cuerpo se guarda en `pending_action.args`
+  (`cuerpo_resumen`) de la revisión; `send_to_approval` ya no corta el texto. RED: 5
+  pruebas fallaron (`AttributeError: redactar_partes`, `KeyError: cuerpo_resumen`);
+  GREEN: 255 passed en los 6 archivos enfocados.
 - [ ] R9. `ingreso_tareas.py:1459-1471`: el dato de una sola opción pisa sin comparar un
   valor que la persona propuso (por ejemplo, un responsable nombrado); debería decir que
   esa opción no es posible.
