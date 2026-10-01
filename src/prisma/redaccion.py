@@ -197,6 +197,9 @@ SISTEMA_REDACCION = (
     "no esté. Los títulos y nombres, copiados tal cual y entre «». No nombres "
     "botones ni enumeres las `opciones`: son lo que la persona ve para elegir y "
     "sólo te dicen para qué sirve la pregunta.\n"
+    "Si te llega la conversación reciente, seguila: no repitas las aperturas ni "
+    "las fórmulas que ya usaste (\"Entendí que…\", \"Me falta…\") y decí sólo "
+    "lo que es nuevo. Es contexto, nunca una fuente de hechos.\n"
     "Si hay `falta`, terminá pidiendo ese dato con signos de pregunta. Si hay "
     "`rechazo`, decí la razón y qué sirve. Si hay `charla`, contestala en pocas "
     "palabras antes de pedir el dato. Si hay `resumen`, escribí sólo una frase "
@@ -336,7 +339,8 @@ def _motivo_de_error(exc: Exception) -> str:
 
 def redactar_turno(cur, workspace_id: str, resultado: ResultadoTurno, variante: str,
                    *, proveedor=None, base: TextoRedactado | None = None,
-                   plazo: float = PLAZO_REDACCION_S) -> TextoRedactado:
+                   plazo: float = PLAZO_REDACCION_S,
+                   historial: list[dict] | None = None) -> TextoRedactado:
     """El texto de un turno con la variante del espacio. Con A, el modelo
     redacta el mensaje entero sobre los hechos (salida estructurada) y el
     código lo verifica; si no sirve, o el modelo falla o se cuelga, sale la
@@ -345,7 +349,9 @@ def redactar_turno(cur, workspace_id: str, resultado: ResultadoTurno, variante: 
     no es la genérica (un texto que B ya tenía antes de existir el resultado).
     Con un resumen, el modelo escribe sólo la apertura: los datos y el cierre son
     siempre del código. `plazo` es el tiempo máximo de la llamada, sin
-    reintentos: pasado, sale B."""
+    reintentos: pasado, sale B. `historial` es la conversación reciente (F-C4): el
+    modelo ve lo que ya dijo y no repite sus fórmulas; es contexto, los hechos
+    siguen siendo lo único que puede afirmar."""
     base = base or redactar_partes(resultado, variante)   # valida y arma B
     if variante != "A":
         return base
@@ -355,8 +361,10 @@ def redactar_turno(cur, workspace_id: str, resultado: ResultadoTurno, variante: 
     try:
         modelo = proveedor or proveedor_de_redaccion(cur, workspace_id)
         hechos = serializar_hechos(resultado)
+        conversacion = {"historial": historial} if historial else {}
         crudo = llamar_con_plazo(
-            lambda: modelo.redactar(SISTEMA_REDACCION, hechos, plazo=plazo), plazo)
+            lambda: modelo.redactar(SISTEMA_REDACCION, hechos, plazo=plazo,
+                                    **conversacion), plazo)
         duracion_ms = round((_reloj() - inicio) * 1000)
         caracteres = len((crudo or "").strip())
         borrador = leer_borrador(crudo)
@@ -428,7 +436,9 @@ def motivo_de_charla_invalida(texto: str) -> str | None:
 def redactar_charla_con_pregunta(cur, workspace_id: str, mensaje: str,
                                  pregunta: str, campo: str, dato: str, *,
                                  proveedor=None,
-                                 nombres: tuple[str, ...] = ()) -> TextoRedactado:
+                                 nombres: tuple[str, ...] = (),
+                                 historial: list[dict] | None = None,
+                                 ) -> TextoRedactado:
     """Con A, la charla y la pregunta pendiente son UN mensaje natural del modelo
     (F-A2): contesta en pocas palabras y pide el dato, en vez de una frase suelta
     delante de la plantilla. `campo` y `dato` identifican la pregunta (el campo
@@ -439,11 +449,11 @@ def redactar_charla_con_pregunta(cur, workspace_id: str, mensaje: str,
         falta=Falta(dato, TipoValor.TEXTO, pregunta=pregunta, campo=campo),
         nombres_conocidos=nombres)
     return redactar_turno(cur, workspace_id, resultado, "A", proveedor=proveedor,
-                          base=TextoRedactado(pregunta))
+                          base=TextoRedactado(pregunta), historial=historial)
 
 
 def redactar_charla(cur, workspace_id: str, mensaje: str, pregunta: str, *,
-                    proveedor=None) -> str:
+                    proveedor=None, historial: list[dict] | None = None) -> str:
     """La respuesta breve a una charla con una pregunta pendiente, en las dos
     variantes (ADR 0014: el modelo redacta la charla y las preguntas). La
     persona la lee delante de la pregunta, en la misma respuesta. `""` si el
@@ -453,9 +463,11 @@ def redactar_charla(cur, workspace_id: str, mensaje: str, pregunta: str, *,
         modelo = proveedor or proveedor_de_redaccion(cur, workspace_id)
         pedido = json.dumps({"mensaje": mensaje, "pregunta_pendiente": pregunta},
                             ensure_ascii=False)
+        conversacion = {"historial": historial} if historial else {}
         borrador = llamar_con_plazo(
             lambda: modelo.redactar(SISTEMA_CHARLA, pedido,
-                                    plazo=PLAZO_REDACCION_S), PLAZO_REDACCION_S)
+                                    plazo=PLAZO_REDACCION_S, **conversacion),
+            PLAZO_REDACCION_S)
     except psycopg.Error:
         raise                       # la transacción no sigue: no es del modelo
     except Exception as exc:        # un modelo que falla o se cuelga

@@ -1987,12 +1987,13 @@ def _atender_pregunta_pendiente(cur, quien, texto: str, abierta, proveedor, cal,
                 cur, workspace_id, texto, pregunta.pregunta,
                 abierta.args.get("campo") or "pendiente", pregunta.nombre,
                 proveedor=proveedor,
-                nombres=(quien.nombre,) if quien.nombre else ()).texto
+                nombres=(quien.nombre,) if quien.nombre else (),
+                historial=historial).texto
             _repreguntar(cur, quien, workspace_id, chat_id, abierta, pregunta,
                          ahora, entrante_id, texto_completo=completo)
             return None
         breve = redactar_charla(cur, workspace_id, texto, pregunta.pregunta,
-                                proveedor=proveedor)
+                                proveedor=proveedor, historial=historial)
         _repreguntar(cur, quien, workspace_id, chat_id, abierta, pregunta, ahora,
                      entrante_id, prefijo=f"{breve}\n\n" if breve else "")
         return None

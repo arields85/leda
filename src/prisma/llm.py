@@ -517,13 +517,31 @@ class Proveedor(Protocol):
                   herramientas: list[dict[str, Any]]) -> Respuesta: ...
 
     def redactar(self, sistema: str, hechos: str, *,
-                 plazo: float | None = None) -> str: ...
+                 plazo: float | None = None,
+                 historial: list[dict[str, Any]] | None = None) -> str: ...
 
 
 # Tope de la redacción de un turno (ADR 0014, variante A): un mensaje de pocas
 # oraciones más su JSON, no una conversación. Un tope mayor sólo alarga una
 # redacción descontrolada.
 MAX_TOKENS_REDACCION = 256
+
+
+def _contenido_de_redaccion(hechos: str,
+                            historial: list[dict[str, Any]] | None) -> str:
+    """Lo que lee el modelo que redacta: los hechos del turno y, delante, la
+    conversación reciente como una transcripción (F-C4: sin ver lo que ya dijo,
+    repetía la misma apertura en cada turno). Es texto dentro del único mensaje,
+    no mensajes previos: el modelo responde un JSON, y unos turnos previos de
+    Prisma en prosa le enseñarían a contestar en prosa. Sin conversación son los
+    hechos tal cual."""
+    if not historial:
+        return hechos
+    lineas = "\n".join(
+        f"{'Persona' if m['role'] == 'user' else 'Prisma'}: {m['content']}"
+        for m in historial)
+    return ("Conversación reciente (lo que ya se dijeron, del más viejo al más "
+            f"nuevo):\n{lineas}\n\nHechos del turno (JSON):\n{hechos}")
 
 
 class PlazoAgotado(TimeoutError):
@@ -588,11 +606,16 @@ class ProveedorGuionado:
     redactados: list[tuple[str, str]] = field(default_factory=list)
     # El plazo con que se pidió cada redacción (`None` sin plazo).
     plazos: list[float | None] = field(default_factory=list)
+    # La conversación con la que se pidió cada redacción (`[]` sin ella).
+    historiales_redactados: list[list[dict[str, Any]]] = field(
+        default_factory=list)
 
     def redactar(self, sistema: str, hechos: str, *,
-                 plazo: float | None = None) -> str:
+                 plazo: float | None = None,
+                 historial: list[dict[str, Any]] | None = None) -> str:
         self.redactados.append((sistema, hechos))
         self.plazos.append(plazo)
+        self.historiales_redactados.append([dict(m) for m in (historial or [])])
         if not self.borradores:
             return ""
         borrador = self.borradores.pop(0)
@@ -726,13 +749,15 @@ class ProveedorAnthropic:
         return Respuesta(texto=texto.strip(), llamadas=llamadas)
 
     def redactar(self, sistema: str, hechos: str, *,
-                 plazo: float | None = None) -> str:
+                 plazo: float | None = None,
+                 historial: list[dict[str, Any]] | None = None) -> str:
         r = _con_plazo(self._c, plazo).messages.create(
             model=self._modelo,
             max_tokens=min(self._param.get("max_tokens", 1024), MAX_TOKENS_REDACCION),
             temperature=self._param.get("temperature", 0.3),
             system=sistema,
-            messages=[{"role": "user", "content": hechos}])
+            messages=[{"role": "user",
+                       "content": _contenido_de_redaccion(hechos, historial)}])
         return "".join(b.text for b in r.content if b.type == "text").strip()
 
 
@@ -854,10 +879,12 @@ class ProveedorGemini:
         return Respuesta(texto=texto.strip(), llamadas=llamadas)
 
     def redactar(self, sistema: str, hechos: str, *,
-                 plazo: float | None = None) -> str:
+                 plazo: float | None = None,
+                 historial: list[dict[str, Any]] | None = None) -> str:
         cuerpo = {
             "system_instruction": {"parts": [{"text": sistema}]},
-            "contents": [{"role": "user", "parts": [{"text": hechos}]}],
+            "contents": [{"role": "user", "parts": [{
+                "text": _contenido_de_redaccion(hechos, historial)}]}],
             "generationConfig": {
                 "temperature": self._param.get("temperature", 0.3),
                 "maxOutputTokens": min(self._param.get("max_tokens", 1024),
@@ -1019,13 +1046,15 @@ class ProveedorCompatible:
         return Respuesta(texto=(m.content or "").strip(), llamadas=llamadas)
 
     def redactar(self, sistema: str, hechos: str, *,
-                 plazo: float | None = None) -> str:
+                 plazo: float | None = None,
+                 historial: list[dict[str, Any]] | None = None) -> str:
         r = _con_plazo(self._c, plazo).chat.completions.create(
             model=self._modelo,
             max_tokens=min(self._param.get("max_tokens", 1024), MAX_TOKENS_REDACCION),
             temperature=self._param.get("temperature", 0.3),
             messages=[{"role": "system", "content": sistema},
-                      {"role": "user", "content": hechos}])
+                      {"role": "user",
+                       "content": _contenido_de_redaccion(hechos, historial)}])
         return (r.choices[0].message.content or "").strip()
 
 

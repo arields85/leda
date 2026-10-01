@@ -367,7 +367,8 @@ def _pedido(resultado) -> int:
 def test_el_pedido_lleva_sólo_la_guia_de_voz_y_los_hechos():
     """Una guía de voz de pocas líneas y los hechos del turno: nada del contexto
     conversacional (el núcleo, el historial, la lista de tareas)."""
-    assert len(redaccion.SISTEMA_REDACCION) <= 1100
+    # 1100 antes de la regla de la conversación reciente (F-C4): sigue siendo una guía corta.
+    assert len(redaccion.SISTEMA_REDACCION) <= 1300
     assert len(redaccion.SISTEMA_REDACCION.splitlines()) <= 8
     for lejano in ("nucleo", "historial", "herramienta", "constitución"):
         assert lejano not in redaccion.SISTEMA_REDACCION.lower()
@@ -379,8 +380,9 @@ def test_el_pedido_lleva_sólo_la_guia_de_voz_y_los_hechos():
                     pregunta="¿Para cuándo la necesitás? Decime la fecha.",
                     campo="due_date"),
         opciones=(OpcionDisponible("Confirmar", "confirmar"),))
-    # Un turno típico: el pedido entero cabe en ~400 tokens (3,5 caracteres por token).
-    assert _pedido(tipica) <= 1400
+    # Un turno típico: el pedido entero cabe en ~480 tokens (3,5 caracteres por token;
+    # ~400 antes de la regla de la conversación reciente).
+    assert _pedido(tipica) <= 1700
 
 
 def test_los_hechos_son_sólo_los_del_resultado():

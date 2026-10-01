@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import secrets
 from dataclasses import dataclass
-from datetime import date, datetime, time, timedelta
+from datetime import date, datetime, time, timedelta, timezone
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -716,6 +716,15 @@ def _entendido_del_turno(cur, request_id: str, now: datetime
     return tuple(dados)
 
 
+def _conversacion_de(cur, request, now: datetime) -> list[dict]:
+    """La conversación reciente de la persona del alta (`contexto.historial`: lo
+    que de verdad se dijeron, sin el mensaje que dispara este turno), para que el
+    modelo que redacta vea lo que ya dijo y no repita sus fórmulas (F-C4)."""
+    from .contexto import historial
+
+    return historial(cur, request["chat_id"], now, entrante_atado(cur))
+
+
 def _quien_escribe(cur, request) -> tuple[str, ...]:
     """El nombre de la persona del alta: un nombre que el turno ya conoce y el
     verificador deja decir sin que esté en los hechos."""
@@ -765,7 +774,8 @@ def _decir_pregunta(cur, request, field: str, tipo: TipoValor, prompt: str,
                            if propuesto else ()),
         nombres_conocidos=_quien_escribe(cur, request))
     return redactar_turno(cur, workspace_id, resultado, "A",
-                          base=TextoRedactado(prompt)).texto
+                          base=TextoRedactado(prompt),
+                          historial=_conversacion_de(cur, request, now)).texto
 
 
 def _decir_envio(cur, request, aprobador_nombre) -> str:
@@ -785,7 +795,9 @@ def _decir_envio(cur, request, aprobador_nombre) -> str:
         sin_cambios=(SinCambio("la tarea", "se crea cuando lo confirme"),),
         nombres_conocidos=_quien_escribe(cur, request))
     return redactar_turno(cur, workspace_id, resultado, "A",
-                          base=TextoRedactado(base)).texto
+                          base=TextoRedactado(base),
+                          historial=_conversacion_de(
+                              cur, request, datetime.now(timezone.utc))).texto
 
 
 def handle_active_text(cur: psycopg.Cursor, who: Solicitante, *, chat_id: int,
@@ -2219,7 +2231,8 @@ def _finalize(cur, request, who, now):
         variante=variante_redaccion(cur, str(request["workspace_id"])),
     )
     resumen = render_resumen(**datos, cur=cur,
-                             workspace_id=str(request["workspace_id"]))
+                             workspace_id=str(request["workspace_id"]),
+                             historial=_conversacion_de(cur, request, now))
     preview_text = resumen.texto
     try:
         prepare_payload(preview_text, dedupe_key="intake-preview", has_buttons=True)
@@ -2404,7 +2417,8 @@ def cierre_enviar(confirma: str | None) -> str:
 
 def render_resumen(*, title, description="", objective, area, responsible, due_date,
                    acceptance_criterion, evidence, cierre=CIERRE_CONFIRMAR,
-                   variante="B", cur=None, workspace_id=None) -> TextoRedactado:
+                   variante="B", cur=None, workspace_id=None,
+                   historial=None) -> TextoRedactado:
     """El resumen para revisar, redactado por `redaccion` (ADR 0014, etapa 6), en
     cuerpo y cierre. Con `cur` la variante A puede llamar al modelo (y registra el
     intento); sin él son las plantillas. Sólo muestra lo que tiene: una
@@ -2423,7 +2437,8 @@ def render_resumen(*, title, description="", objective, area, responsible, due_d
         "Resumen para revisar", tuple(lineas), cierre))
     if cur is None:
         return redactar_partes(resultado, variante)
-    return redactar_turno(cur, workspace_id, resultado, variante)
+    return redactar_turno(cur, workspace_id, resultado, variante,
+                          historial=historial)
 
 
 def render_preview(**datos) -> str:
