@@ -1388,3 +1388,13 @@ Tramo `f60c3ca..51fa9e6` (`81bb60a`, `9d1bee2`, `20cd9c8`, `51fa9e6`; 994 línea
   observados). Ninguno es de estilo.
 - Pendiente (e): alguien de un área sin objetivos operativos (Dirección) recibe el objetivo
   estratégico completado solo; revisar con el usuario si es lo que corresponde.
+- Verificado en real (16:44): el primer mensaje de Ismael entró al primer intento tras
+  `bdc2905` (pidió el criterio en la misma respuesta).
+- Pendiente (f): el modelo ofrece capacidades que Prisma no tiene: "si necesitás más tiempo,
+  lo tomamos como objetivo" (no existe; roadmap "Objetivo propuesto desde el alta") y "la
+  retomamos el lunes" (pendiente a). Misma clase: prometer algo sin mecanismo (§4).
+- Pendiente (g), observado por el usuario: el indicador "escribiendo…" aparece y se va antes
+  de la respuesta. Existe el mecanismo del ADR 0011 (`sendChatAction` con refresco y el
+  borrador nativo `sendMessageDraft` en privado, `despachador.mantener_chat_activo`); el
+  modelo tarda 5-38 s y Telegram apaga el typing a los ~5 s sin refresco. Sin investigar:
+  sospecha en el intervalo de refresco o en el retiro del borrador.
