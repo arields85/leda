@@ -282,3 +282,34 @@ regla de una sola rama convierte una respuesta o un pedido de ayuda en "¿Seguim
 modelo redacta campo por campo. Pedido del usuario: desactivar la protección de latencia,
 ver al modelo 100 % sin plantillas, y que la conversación fluya "como cuando hablo con
 vos".
+
+## Corrida siguiente 2: la conversación con memoria y el modelo solo
+
+Reproduce lo que pasó entre las 08:22 y las 08:32 y lo que cambió desde entonces (el
+ruteo y la redacción ven la conversación; "Dejarlo" guarda el borrador; la redacción de A
+es del modelo solo, sin plazo propio ni plantilla). Antes: reiniciar el listener del
+worktree con `PYTHONPATH=src`; **no hay migración**. Variante `A`. Anotar por paso:
+mejoró / empeoró / igual, y cuánto tardó.
+
+| # | Quién | Mensaje | Qué se espera | Hallazgo |
+|---|---|---|---|---|
+| 1 | Marcos | PRIMER mensaje de la sesión: "necesito crear una tarea: calibrar los sensres de la linea 2" (con los dos errores de tipeo) | Sigue directo al objetivo, sin aclaración de Jev por «calibrar los sensores…» ni "¿A cuál te referís?"; el título ya viene corregido (F-B9) | F-C1, F-B9 |
+| 2 | Marcos | Elegir el objetivo, el responsable y la fecha | Cada mensaje de Prisma continúa el anterior: no repite "Entendí que…" ni "Me falta…" en cada turno | F-C4 |
+| 3 | Marcos | En el criterio: "no lo sé" | Prisma no lo toma como criterio (hoy: lo dice y vuelve a preguntar; la propuesta de criterio de F-B7 sigue sin aparecer en vivo y se rediseña aparte) | F-B7 (pendiente) |
+| 4 | Marcos | "ayudame, que puedo poner?" | NO sale "Estábamos con el criterio… ¿Seguimos con eso?": el ruteo ve que Prisma acaba de pedir el criterio y esto es sobre esa pregunta (`dudoso`/`responde`, nunca `otro_tema`). Con `dudoso`, "¿Esto es el criterio…?" con Sí / No, es otra cosa: no se pierde nada | F-C6 |
+| 5 | Marcos | "por que anda" | Lo mismo que el paso 4 | F-C6 |
+| 6 | Marcos | Un tema de verdad distinto, con el criterio todavía abierto: "¿qué tareas tengo abiertas?" | "Estábamos con el criterio de aceptación de la tarea nueva. ¿Seguimos con eso?" con Seguir / Dejarlo y ver lo otro | ADR 0013 regla 1 |
+| 7 | Marcos | Tocar "Dejarlo y ver lo otro" | UNA respuesta de dos partes, en este orden: "Listo, dejé guardado el borrador de la tarea «Calibrar los sensores de la línea 2». Cuando quieras, lo retomamos." y después la lista de tareas. NO "dejé de lado" y el borrador NO se cancela | F-C6, F-A1 |
+| 8 | Marcos | Un mensaje cualquiera: "gracias" | Sigue el camino normal (no "El borrador está esperando…"): el borrador pausado no es una rama abierta | F-C6 |
+| 9 | Marcos | "quiero crear una tarea" | "Ya hay un borrador de tarea en curso. Elegí cómo seguir." con Continuar borrador / Cancelar borrador / Empezar otro | F-C6 |
+| 10 | Marcos | Tocar "Continuar borrador" | Vuelve a la pregunta donde estaba (el criterio), con el título y lo demás ya tomados; sin preguntar de nuevo lo confirmado | F-C6 |
+| 11 | Marcos | Escribir un criterio concreto y llegar al resumen | El resumen termina siempre en el cierre que nombra el botón ("Con Confirmar se crea la tarea con estos datos."), también si el modelo tardó o falló | F-C5 |
+| 12 | Marcos | Cancelar: escribir "no, cancelá todo" a mitad de otra alta | El borrador se cancela (el cancelar explícito sigue cancelando) | control |
+
+**Además registrar:** el orden de los mensajes de una misma respuesta (si una parte llega
+detrás de otra, anotar la hora y mirar en la base `intentos` y `ultimo_error` de las dos
+filas de `message_outbox`); los incidentes (`python -m prisma incidentes corework`), en
+particular `redaccion_fallida` (el modelo dio error o no pasó la verificación ni después
+de corregirse: Prisma dijo el aviso neutro) y `resumen_sin_cierre`; la latencia de cada
+respuesta (sin plazo propio, es la del modelo) con `python -m prisma redaccion corework`;
+y cualquier mensaje que se sienta robótico o repetido aunque no esté en la lista.
