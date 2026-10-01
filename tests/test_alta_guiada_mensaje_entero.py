@@ -295,3 +295,78 @@ def test_con_b_el_modelo_no_se_llama_y_los_textos_son_los_de_siempre(
         assert resultado.text == ("Esa fecha ya pasó. Decime una fecha desde hoy en "
                                   "adelante.")
     assert modelo.redactados == [] and _intentos(conn, ws) == []
+
+
+# ------------------------------------------------- lo que se confirma, tal cual
+
+CRITERIO = ("Acta de prueba firmada por el responsable de planta, con fotos del "
+            "tablero antes y después de la intervención")
+
+
+class _ModeloConCriterio(_Eco):
+    """Un buen modelo en todo menos en la confirmación del criterio, que se
+    guiona."""
+
+    def __init__(self, *borradores):
+        super().__init__()
+        self.del_criterio = list(borradores)
+
+    def redactar(self, sistema, hechos, **_):
+        d = json.loads(hechos)
+        if d.get("falta", {}).get("campo") == "acceptance_criterion":
+            self.redactados.append((sistema, hechos))
+            return self.del_criterio.pop(0)
+        return super().redactar(sistema, hechos)
+
+
+def _hasta_la_confirmacion_del_criterio(conn, world, monkeypatch, modelo):
+    """El alta con un criterio propuesto por el mensaje: lo último que se
+    contesta es la fecha y lo que sigue es "¿Confirmás este criterio?"."""
+    ws = world["north-lab"]["id"]
+    _a(conn, ws, monkeypatch, modelo)
+    with espacio(conn, ws) as cur:
+        actor, outcome = _empezar(cur, world, title=TITULO,
+                                  acceptance_criterion=CRITERIO)
+        rid = outcome.request_id
+        from tests.test_alta_guiada_flujo import _elegir, _conjunto_activo
+        _elegir(cur, actor, rid, "Reduce service delay")
+        _elegir(cur, actor, rid, "Sam North")
+        if _conjunto_activo(cur, rid) == "area":
+            _elegir(cur, actor, rid, "Field Services")
+        assert _slot(cur, rid) == "due_date"
+        inbound = _entrante(cur, ws, actor)
+        resultado = I.consume_pending_text(
+            cur, actor, chat_id=CHAT, source_inbound_id=inbound,
+            source_raw_text="el 4 de octubre", now=NOW + timedelta(minutes=2),
+            valor={"fecha_iso": "2028-10-04"})
+    return ws, resultado
+
+
+def test_lo_que_se_pide_confirmar_sale_tal_cual_en_el_mensaje(
+        intake_world, conn, monkeypatch):
+    texto = (f"Dejé la fecha para el 4 de octubre. Tengo este criterio de "
+             f"aceptación: {CRITERIO}. ¿Lo confirmás?")
+    modelo = _ModeloConCriterio(_json(texto, "acceptance_criterion"))
+
+    ws, resultado = _hasta_la_confirmacion_del_criterio(
+        conn, intake_world, monkeypatch, modelo)
+
+    assert resultado.text == texto
+    hechos = modelo.hechos[-1]
+    assert hechos["valores_aceptados"] == [
+        {"dato": "el criterio de aceptación", "mostrado": CRITERIO}]
+    assert hechos["falta"]["campo"] == "acceptance_criterion"
+
+
+def test_si_el_mensaje_cambia_lo_que_se_confirma_sale_el_texto_de_siempre(
+        intake_world, conn, monkeypatch):
+    parafraseado = ("Dejé la fecha para el 4 de octubre. El criterio es un acta "
+                    "firmada con fotos. ¿Lo confirmás?")
+    modelo = _ModeloConCriterio(_json(parafraseado, "acceptance_criterion"))
+
+    ws, resultado = _hasta_la_confirmacion_del_criterio(
+        conn, intake_world, monkeypatch, modelo)
+
+    assert resultado.text == f"¿Confirmás este criterio de aceptación? {CRITERIO}"
+    motivos = [i.get("motivo", "") for i in _intentos(conn, ws)]
+    assert any(m.startswith("falta_hecho") for m in motivos)

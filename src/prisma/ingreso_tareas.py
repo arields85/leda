@@ -625,13 +625,15 @@ def _entendido_del_turno(cur, request_id: str, now: datetime
 def _decir_pregunta(cur, request, field: str, tipo: TipoValor, prompt: str,
                     now: datetime, *, pregunta: str | None = None, opciones=(),
                     rechazo: Rechazo | None = None,
-                    busqueda: str | None = None) -> str:
+                    busqueda: str | None = None,
+                    propuesto: str | None = None) -> str:
     """El mensaje con que se pide un dato (ADR 0014, etapa 6 completa). Con B es
     `prompt` tal cual. Con A, el modelo escribe el mensaje entero (lo que
     entendió, el rechazo si lo hubo, la pregunta y para qué sirven las opciones)
     y el código lo verifica; si no sirve, sale `prompt` como con B. `pregunta` es
     la pregunta limpia cuando `prompt` es un aviso (una búsqueda sin
-    resultados)."""
+    resultados). `propuesto` es el valor que se pide confirmar: tiene que salir
+    tal cual en el mensaje (es lo que la persona confirma), de cualquier largo."""
     workspace_id = str(request["workspace_id"])
     if variante_redaccion(cur, workspace_id) != "A":
         return prompt
@@ -643,7 +645,9 @@ def _decir_pregunta(cur, request, field: str, tipo: TipoValor, prompt: str,
                     campo=field),
         opciones=tuple(OpcionDisponible(etiqueta_sin_icono(o), "elegir")
                        for o in opciones),
-        entendido=entendido, rechazo=rechazo)
+        entendido=entendido, rechazo=rechazo,
+        valores_aceptados=((ValorAceptado(_SUJETO_DEL_CAMPO[field], propuesto),)
+                           if propuesto else ()))
     return redactar_turno(cur, workspace_id, resultado, "A",
                           base=TextoRedactado(prompt)).texto
 
@@ -1545,6 +1549,7 @@ def _advance(cur, request, who, now, *, prefijo: str = "") -> IntakeOutcome:
                     cur, request, field, _proposal_prompt(field, row["valor"]),
                     [(CONFIRM, "confirm", None), (REJECT, "reject", None),
                      (OTHER, "other", None)], now, prefijo=prefijo,
+                    propuesto=_mostrar_valor(field, row["valor"]),
                 )
             return _open_free_text(cur, request, field, _free_text_prompt(field),
                                    now, prefijo=prefijo)
@@ -1770,7 +1775,8 @@ def _unica_opcion(cur, request, who, field):
 
 def _open_choices(cur, request, field, prompt, options, now, kind=None, *,
                   prefijo: str = "", pregunta: str | None = None,
-                  rechazo: Rechazo | None = None, busqueda: str | None = None):
+                  rechazo: Rechazo | None = None, busqueda: str | None = None,
+                  propuesto: str | None = None):
     request_id = str(request["id"])
     kind = kind or field or "choice"
     if field is not None and not kind.startswith("no_candidates"):
@@ -1780,7 +1786,7 @@ def _open_choices(cur, request, field, prompt, options, now, kind=None, *,
         prompt = prefijo + _decir_pregunta(
             cur, request, field, TipoValor.OPCION, prompt, now, pregunta=pregunta,
             opciones=[label for label, _, _ in options], rechazo=rechazo,
-            busqueda=busqueda)
+            busqueda=busqueda, propuesto=propuesto)
     elif field is not None:
         prompt = prefijo + prompt
     else:
