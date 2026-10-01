@@ -194,12 +194,21 @@ conversación de caso; los hallazgos se registran y se clasifican por etapa del 
    campo por turno, ruteo y redacción sin ver la conversación, "Dejarlo" borraba el
    trabajo). Ya está en la rama: historial a los modelos, "Dejarlo" pausa, modelo puro
    sin plazo ni plantillas (`MODELO_PURO`), M1 (contrato del turno,
-   `src/prisma/alta_turno.py`) y M2 (llamada `conducir_alta` en los proveedores). **M3**
-   (el alta conducida de punta a punta, interruptor `workspace_setting` `alta =
-   conversada`) estaba en construcción al cerrar la sesión: ver el estado real en
-   `git log` de la rama y en `odd/tasks/flujo-de-un-mensaje.md`. Después: revisión RDD,
-   activar el interruptor en `prisma_flujo` y probar con el guion "Corrida conversada"
-   del guion de la rama (o escribirlo si M3 no llegó a dejarlo).
+   `src/prisma/alta_turno.py`, `16fa0ff`), M2 (llamada `conducir_alta` en los
+   proveedores, `03263de`) y **M3** (el alta conducida de punta a punta detrás de
+   `workspace_setting` `alta = conversada`, `src/prisma/alta_conducida.py`, `deaade0`;
+   guion "Corrida conversada" de 15 pasos en el guion de la rama, `271e462`).
+   Verificación de M3 **parcial**: suite completa 3195 passed, 2 failed (una corregida en
+   el mismo commit, `test_capacidades`; la otra preexistente e intermitente,
+   `test_redaccion_modelo_puro::test_si_el_verificador_rechaza…`, pasa sola); falta
+   repetir la suite completa. M1-M3 sin revisión RDD todavía (tramo
+   `b7ed862..271e462`). Para activar en `prisma_flujo`:
+   `insert into workspace_setting (workspace_id, clave, valor) select id, 'alta',
+   '"conversada"'::jsonb from workspace where slug = 'corework' on conflict
+   (workspace_id, clave) do update set valor = excluded.valor;` (apagar: borrar la fila o
+   `'"guiada"'`). Decisiones abiertas del usuario: tope de 7 botones por dato (el modelo
+   conoce hasta 40 opciones); si el alta conducida necesita un equivalente de
+   `MODELO_PURO=False`.
 3. **Medir y decidir.** Latencia por respuesta contra la línea base (8,7 s de mediana en
    textos), turnos por tarea, lo que entiende mal, incidentes. Si cumple: retirar el
    formulario viejo del alta (M4-M9) y extender el patrón a entrega y aprobación.
@@ -223,6 +232,6 @@ experimento, revisado con RDD hasta `b7ed862` (`review-497ccb005edb819a`); M1 y 
 migraciones `0026` y `0027` aplicadas (respaldos en `db/respaldos/`), áreas asignadas a
 los objetivos, variante A, `alta = conversada` todavía sin activar. Base `prisma`: la de
 la ronda 4, sin migraciones nuevas. Listeners detenidos. Lista de tareas de la sesión:
-historial OK, M1 OK, M2 OK, M3 en curso, después revisión, prueba conversada, M4-M9,
+historial OK, M1 OK, M2 OK, M3 OK (verificación parcial), después suite completa y revisión, prueba conversada, M4-M9,
 hallazgos del circuito C. Consentimiento permanente para commits y revisiones RDD;
 chequeo de rumbo escrito antes de cada unidad (`AGENTS.md`).
