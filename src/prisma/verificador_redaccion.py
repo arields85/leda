@@ -185,19 +185,21 @@ def _nombre_propio_inventado(texto: str, palabras_hechos: set[str]) -> str | Non
     return None
 
 
-def verificar(resultado: ResultadoTurno, borrador: Borrador,
-              texto_b: str | None = None) -> str | None:
-    """`None` si el borrador sirve; si no, el motivo `familia: detalle`."""
-    texto = borrador.texto
+def verificar_afirmaciones(texto: str, textos_de_hechos: list[str], *,
+                           nombres_conocidos=(), largo_maximo: int = LARGO_MAXIMO,
+                           ) -> str | None:
+    """Lo que el texto no puede decir: algo que los hechos no tienen. `None` si
+    sirve; si no, el motivo `familia: detalle`. Es la parte común de toda redacción
+    del modelo (`verificar` y el turno del alta conducida): texto no vacío y de largo
+    razonable, sin llaves ni claves internas, y ningún número, fecha, mes, título
+    entre «» ni nombre propio que no esté en `textos_de_hechos` (o sea un nombre de
+    `nombres_conocidos`)."""
     if not texto or not texto.strip():
         return "vacio: el modelo no devolvió texto"
-    largo_maximo = LARGO_MAXIMO
-    if texto_b is not None:
-        largo_maximo = min(LARGO_MAXIMO, FACTOR_LARGO * len(texto_b) + MARGEN_LARGO)
     if len(texto) > largo_maximo:
         return f"largo: {len(texto)} caracteres, máximo {largo_maximo}"
 
-    todos = _textos(resultado, con_opciones=True)
+    todos = list(textos_de_hechos)
     todos_norm = _norm(" ".join(todos))
     t = _norm(texto)
 
@@ -225,11 +227,30 @@ def verificar(resultado: ResultadoTurno, borrador: Borrador,
             return f"nombre_inventado: «{citado}»"
     # Lo que el texto puede nombrar: los hechos y los nombres que el turno ya
     # conoce (quien escribe, el propio asistente); los de otras personas, no.
-    permitidos = todos + list(resultado.nombres_conocidos) + [NOMBRE_ASISTENTE]
+    permitidos = todos + list(nombres_conocidos)
     palabras_hechos = {_norm(p) for p in _PALABRA.findall(" ".join(permitidos))}
     inventado = _nombre_propio_inventado(texto, palabras_hechos)
     if inventado:
         return f"nombre_inventado: {inventado}"
+    return None
+
+
+def verificar(resultado: ResultadoTurno, borrador: Borrador,
+              texto_b: str | None = None) -> str | None:
+    """`None` si el borrador sirve; si no, el motivo `familia: detalle`."""
+    texto = borrador.texto
+    largo_maximo = LARGO_MAXIMO
+    if texto_b is not None:
+        largo_maximo = min(LARGO_MAXIMO, FACTOR_LARGO * len(texto_b) + MARGEN_LARGO)
+    todos = _textos(resultado, con_opciones=True)
+    motivo = verificar_afirmaciones(
+        texto, todos,
+        nombres_conocidos=(*resultado.nombres_conocidos, NOMBRE_ASISTENTE),
+        largo_maximo=largo_maximo)
+    if motivo:
+        return motivo
+    t = _norm(texto)
+    fechas_texto = _fechas(t)
 
     # Efectos: los que cuenta tienen que ser cambios del resultado, y todos.
     ids = ids_de_cambios(resultado)
