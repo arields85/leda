@@ -18,7 +18,7 @@ from __future__ import annotations
 import json
 
 from .incidentes import registrar_incidente
-from .resultado_turno import ResultadoTurno
+from .resultado_turno import ResultadoTurno, Resumen
 from .valores import TipoValor  # noqa: F401 -- el tipo de `Falta.tipo`
 
 CLAVE_REDACCION = "redaccion"
@@ -84,8 +84,25 @@ def _registrar_anomalia(cur, workspace_id: str, valor) -> None:
 # Variante B: plantillas
 # ---------------------------------------------------------------------------
 
+def nombre_legible(clave: str) -> str:
+    """Un nombre interno del pack (`resultado_de_prueba`) como lo lee una
+    persona (`resultado de prueba`). Sólo separa las palabras: el pack todavía
+    no trae una etiqueta propia por tipo de evidencia (PENDIENTE), así que no
+    se inventa ninguna."""
+    return " ".join(clave.replace("_", " ").split())
+
+
+def _resumen_b(r: Resumen) -> str:
+    lineas = "\n".join(f"{etiqueta}: {valor}" for etiqueta, valor in r.lineas)
+    return f"{r.titulo}\n{lineas}\n\n{r.cierre}"
+
+
 def _redactar_b(r: ResultadoTurno) -> str:
     partes: list[str] = []
+    if r.resumen:
+        partes.append(_resumen_b(r.resumen))
+    if r.rechazo:
+        partes.append(f"{r.rechazo.razon} {r.rechazo.se_acepta}")
     if len(r.cambios) == 1:
         c = r.cambios[0]
         partes.append(f"Listo: {c.sujeto} {c.que}.")

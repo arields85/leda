@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import re
 import secrets
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
@@ -16,9 +15,11 @@ from psycopg.types.json import Jsonb
 from .autoridad import Denegado, Solicitante
 from .db import entrante_atado, registrar_auditoria
 from .incidentes import (ETAPA_CONFIGURACION_ALTA, ETAPA_RESUMEN_VIGENTE_SIN_FILA,
-                         NOTICIA_NEUTRA_INCIDENTE,
+                         ETAPA_VALOR_SIN_INTERPRETAR, NOTICIA_NEUTRA_INCIDENTE,
                          REFERENCIA_PENDING_ACTION, registrar_incidente)
 from .pendientes import HERRAMIENTA_REVISION_BORRADOR
+from .redaccion import redactar, variante_redaccion
+from .resultado_turno import Falta, Rechazo, ResultadoTurno
 from .salida import (BUTTON_TEXT_LIMIT, ETIQUETA_CANCELAR, ETIQUETA_CONFIRMAR,
                      ETIQUETA_ENVIAR, ETIQUETA_MODIFICAR, ETIQUETA_RECHAZAR,
                      ICONO_CANCELAR, ICONO_OTRA_OPCION,
@@ -26,13 +27,17 @@ from .salida import (BUTTON_TEXT_LIMIT, ETIQUETA_CANCELAR, ETIQUETA_CONFIRMAR,
                      enqueue_outbox, etiqueta_sin_icono, etiquetas_de_tarea,
                      normalize_visible_text, prepare_buttons, prepare_payload, telegram_utf16_units,
                      with_no_effect_status)
+from .valores import (OPCION_NINGUNA, MotivoRechazo, Rechazado, TipoValor,
+                      ValorEsperado, opciones_numeradas, validar_valor)
 
 
 CALLBACK_PREFIX = "i:"
 SAFE_TELEGRAM_TEXT = BUTTON_TEXT_LIMIT
 CANDIDATE_PAGE_SIZE = 7
+# El orden en que el alta pregunta (decisión del usuario, 2026-09-30): primero
+# qué hay que hacer y después el objetivo.
 FIELDS = (
-    "title", "description", "objective", "responsible", "area", "due_date",
+    "title", "objective", "description", "responsible", "area", "due_date",
     "evidence", "acceptance_criterion",
 )
 CONFIRM = "Sí"
@@ -118,10 +123,6 @@ NO_CANDIDATES = (
 )
 
 
-class AmbiguousDate(ValueError):
-    pass
-
-
 @dataclass(frozen=True)
 class IntakeOutcome:
     request_id: str
@@ -163,66 +164,6 @@ def normalize_text(raw: str) -> str:
     return normalize_visible_text(raw)
 
 
-_MONTHS = {
-    "enero": 1, "febrero": 2, "marzo": 3, "abril": 4, "mayo": 5,
-    "junio": 6, "julio": 7, "agosto": 8, "septiembre": 9,
-    "setiembre": 9, "octubre": 10, "noviembre": 11, "diciembre": 12,
-}
-
-
-def resolve_date(raw: str, now: datetime, timezone_name: str) -> date:
-    text = normalize_text(raw).casefold()
-    local_today = now.astimezone(ZoneInfo(timezone_name)).date()
-    relative = {"hoy": 0, "mañana": 1, "manana": 1, "pasado mañana": 2,
-                "pasado manana": 2}
-    if text in relative:
-        result = local_today + timedelta(days=relative[text])
-    else:
-        result = _parse_absolute_date(text, local_today)
-    if result < local_today:
-        raise AmbiguousDate("La fecha indicada ya pasó.")
-    return result
-
-
-def _parse_absolute_date(text: str, today: date) -> date:
-    try:
-        if re.fullmatch(r"\d{4}-\d{1,2}-\d{1,2}", text):
-            year, month, day = map(int, text.split("-"))
-            return date(year, month, day)
-
-        numeric = re.fullmatch(r"(\d{1,2})[/-](\d{1,2})(?:[/-](\d{4}))?", text)
-        if numeric:
-            day, month = int(numeric[1]), int(numeric[2])
-            return _next_occurrence(day, month, int(numeric[3]) if numeric[3] else None,
-                                    today)
-
-        named = re.fullmatch(
-            r"(?:el\s+)?(\d{1,2})\s+(?:de\s+)?([a-záéíóú]+)(?:\s+(?:de\s+)?(\d{4}))?",
-            text,
-        )
-        if named and named[2] in _MONTHS:
-            return _next_occurrence(
-                int(named[1]), _MONTHS[named[2]],
-                int(named[3]) if named[3] else None, today,
-            )
-    except ValueError as exc:
-        raise AmbiguousDate("La fecha no es válida.") from exc
-    raise AmbiguousDate("La fecha es ambigua o no tiene un formato reconocido.")
-
-
-def _next_occurrence(day: int, month: int, year: int | None, today: date) -> date:
-    if year is not None:
-        return date(year, month, day)
-    for candidate_year in range(today.year, today.year + 9):
-        try:
-            candidate = date(candidate_year, month, day)
-        except ValueError:
-            continue
-        if candidate >= today:
-            return candidate
-    raise AmbiguousDate("No hay una próxima ocurrencia válida.")
-
-
 def token_de(callback: str) -> str | None:
     if not callback.startswith(CALLBACK_PREFIX):
         return None
@@ -235,8 +176,7 @@ def callback_data(token: str) -> str:
 
 def start(cur: psycopg.Cursor, who: Solicitante, *, chat_id: int,
           source_inbound_id: str, source_raw_text: str,
-          proposals: dict[str, Any], now: datetime,
-          buttons_first: bool = False) -> IntakeOutcome:
+          proposals: dict[str, Any], now: datetime) -> IntakeOutcome:
     if chat_id <= 0:
         return IntakeOutcome("", "Podemos armar el borrador sólo en un chat privado.",
                              inert=True)
@@ -291,24 +231,55 @@ def start(cur: psycopg.Cursor, who: Solicitante, *, chat_id: int,
                values (%s, %s, %s)""",
             (request_id, who.workspace_id, field),
         )
-    _store_proposals(
+    avisos = _store_proposals(
         cur, request_id, proposals, source_inbound_id, source_raw_text, now,
         who.workspace_id,
     )
     cur.execute("select * from task_intake_request where id = %s", (request_id,))
-    return _advance(cur, cur.fetchone(), who, now,
-                    buttons_first=buttons_first)
+    return _advance(cur, cur.fetchone(), who, now, prefijo=avisos)
+
+
+def _hoy_del_espacio(cur, workspace_id, now: datetime) -> date:
+    """El día de hoy en la zona horaria del espacio: el reloj entra por acá."""
+    cur.execute("select zona_horaria from workspace where id = %s", (workspace_id,))
+    return now.astimezone(ZoneInfo(cur.fetchone()["zona_horaria"])).date()
+
+
+# Qué tipo de valor espera cada campo de texto libre del alta (ADR 0014, M1); los
+# que no están son texto. Las entidades (objetivo, persona, área) se buscan
+# después entre las de la base.
+TIPO_DE_CAMPO = {
+    "due_date": TipoValor.FECHA,
+    "objective": TipoValor.ENTIDAD,
+    "responsible": TipoValor.ENTIDAD,
+    "area": TipoValor.ENTIDAD,
+}
+_SUJETO_DEL_CAMPO = {
+    "title": "el título", "description": "la descripción",
+    "objective": "el objetivo", "responsible": "la persona responsable",
+    "area": "el área", "due_date": "la fecha objetivo",
+    "acceptance_criterion": "el criterio de aceptación",
+}
+
+
+def _esperado_del_campo(cur, workspace_id, field: str, now: datetime) -> ValorEsperado:
+    tipo = TIPO_DE_CAMPO.get(field, TipoValor.TEXTO)
+    if tipo is TipoValor.FECHA:
+        return ValorEsperado(tipo, hoy=_hoy_del_espacio(cur, workspace_id, now))
+    return ValorEsperado(tipo)
 
 
 def _store_proposals(cur, request_id, proposals, inbound_id, raw, now, workspace_id):
+    """Guarda lo que el modelo propuso, ya validado por el código. Devuelve el
+    aviso (texto, o vacío) de lo que propuso y no sirvió: una propuesta que no
+    se puede tomar se dice, nunca se descarta sin avisar."""
     key_map = {
         "title": "title", "description": "description",
         "objective": "objective", "responsible": "responsible",
         "area": "area", "due_date": "due_date",
         "acceptance_criterion": "acceptance_criterion",
     }
-    cur.execute("select zona_horaria from workspace where id = %s", (workspace_id,))
-    timezone_name = cur.fetchone()["zona_horaria"]
+    avisos: list[str] = []
     for key, field in key_map.items():
         supplied = proposals.get(key)
         if supplied is None:
@@ -319,10 +290,13 @@ def _store_proposals(cur, request_id, proposals, inbound_id, raw, now, workspace
         if telegram_text_length(value) > USER_FIELD_LIMITS[field]:
             continue
         if field == "due_date":
-            try:
-                value = resolve_date(value, now, timezone_name).isoformat()
-            except AmbiguousDate:
+            esperado = _esperado_del_campo(cur, workspace_id, field, now)
+            resultado = validar_valor({"fecha_iso": value}, esperado,
+                                      limite_texto=USER_FIELD_LIMITS[field])
+            if isinstance(resultado, Rechazado):
+                avisos.append(_aviso_de_propuesta(field, value, resultado))
                 continue
+            value = resultado.valor.isoformat()
         cur.execute(
             """update task_intake_field
                   set estado = 'proposed', valor = %s, proposed_by = 'model',
@@ -331,6 +305,16 @@ def _store_proposals(cur, request_id, proposals, inbound_id, raw, now, workspace
                 where request_id = %s and campo = %s""",
             (Jsonb(value), inbound_id, raw, now, request_id, field),
         )
+    return "\n".join(avisos) + "\n\n" if avisos else ""
+
+
+def _aviso_de_propuesta(field: str, propuesto: str, rechazo: Rechazado) -> str:
+    """Lo que se dice de un dato que el mensaje trajo y no se pudo tomar: cuál,
+    por qué, y que se vuelve a preguntar."""
+    razon = rechazo.razon.rstrip(".")
+    razon = razon[:1].lower() + razon[1:]
+    return (f"No pude tomar {_SUJETO_DEL_CAMPO[field]} que dijiste («{propuesto}»): "
+            f"{razon}. Te lo vuelvo a preguntar más adelante.")
 
 
 def resolve_choice(cur: psycopg.Cursor, who: Solicitante, *, token: str,
@@ -382,18 +366,7 @@ def resolve_choice(cur: psycopg.Cursor, who: Solicitante, *, token: str,
             inert=True, pending_action_id=persisted.get("pending_action_id"),
             terminal=persisted.get("terminal"), stale=stale,
         )
-    cur.execute(
-        """update message_outbox set estado = 'descartado'
-            where intake_choice_set_id = %s
-              and estado in ('pendiente', 'esperando_confirmacion', 'listo')""",
-        (choice["choice_set_id"],),
-    )
-    cur.execute(
-        """update task_intake_choice
-              set activa = false, elegida = (id = %s)
-            where choice_set_id = %s""",
-        (choice["choice_id"], choice["choice_set_id"]),
-    )
+    _cerrar_botones_de(cur, choice["choice_set_id"], choice["choice_id"])
     cur.execute(
         """update task_intake_request
               set version = version + 1, actualizado_en = %s
@@ -480,11 +453,18 @@ def resolve_choice(cur: psycopg.Cursor, who: Solicitante, *, token: str,
 def consume_pending_text(cur: psycopg.Cursor, who: Solicitante, *, chat_id: int,
                          source_inbound_id: str, source_raw_text: str,
                          now: datetime, slot_id: str | None = None,
+                         valor: dict | None = None,
                          ) -> IntakeOutcome | None:
     """Toma el mensaje como el campo que espera el alta. `slot_id`, si viene,
     es el campo que la persona respondió (el que el gateway leyó al
     interpretar el mensaje, T9-R1c-1): si ese campo ya no está abierto no se
-    consume ningún otro."""
+    consume ningún otro.
+
+    `valor` es lo que el modelo interpretó del mensaje para este campo (ADR
+    0014, M1: `fecha_iso`, `texto`); el código sólo lo valida, nunca interpreta
+    el texto. Un valor que no sirve deja el campo abierto y dice la razón; uno
+    que falta (el modelo no pudo interpretar) lo deja abierto, registra un
+    incidente y manda el aviso neutro."""
     cur.execute(
         """select s.*, r.version, r.estado request_estado
              from task_intake_free_text_slot s
@@ -499,19 +479,27 @@ def consume_pending_text(cur: psycopg.Cursor, who: Solicitante, *, chat_id: int,
     if not slot:
         return None
     request_id = str(slot["request_id"])
-    value = normalize_text(source_raw_text)
-    if not value:
-        return _reject_user_value(
-            cur, _request(cur, request_id), slot["campo"],
-            "Necesito un texto no vacío.", source_inbound_id, now,
-        )
-
     field = slot["campo"]
-    if telegram_text_length(value) > USER_FIELD_LIMITS[field]:
-        return _reject_user_value(
-            cur, _request(cur, request_id), field,
-            _user_limit_prompt(field), source_inbound_id, now,
-        )
+    esperado = _esperado_del_campo(cur, who.workspace_id, field, now)
+    resultado = validar_valor(valor, esperado,
+                              limite_texto=USER_FIELD_LIMITS[field])
+    if isinstance(resultado, Rechazado):
+        return _rechazar_valor(cur, _request(cur, request_id), who, field,
+                               resultado, source_inbound_id, now)
+    if field == "due_date":
+        value = resultado.valor.isoformat()
+    else:
+        value = normalize_text(resultado.valor)
+        if not value:
+            return _rechazar_valor(
+                cur, _request(cur, request_id), who, field,
+                Rechazado(MotivoRechazo.TEXTO_VACIO, "Ese texto está vacío.",
+                          "Escribilo de nuevo."), source_inbound_id, now)
+        if telegram_text_length(value) > USER_FIELD_LIMITS[field]:
+            return _reject_user_value(
+                cur, _request(cur, request_id), field,
+                _user_limit_prompt(field), source_inbound_id, now,
+            )
 
     cur.execute(
         """update task_intake_free_text_slot
@@ -526,19 +514,51 @@ def consume_pending_text(cur: psycopg.Cursor, who: Solicitante, *, chat_id: int,
         (now, request_id),
     )
     request = cur.fetchone()
-    if field == "due_date":
-        cur.execute("select zona_horaria from workspace where id = %s",
-                    (who.workspace_id,))
-        try:
-            value = resolve_date(value, now, cur.fetchone()["zona_horaria"]).isoformat()
-        except AmbiguousDate as exc:
-            return _open_free_text(cur, request, field, str(exc), now)
     if field in {"objective", "responsible", "area"}:
         return _resolve_user_entity(cur, request, who, field, value,
                                     source_inbound_id, source_raw_text, now)
     _confirm_user_value(cur, request_id, field, value, source_inbound_id,
                         source_raw_text, now)
     return _advance(cur, request, who, now)
+
+
+def _rechazar_valor(cur, request, who, field, rechazo: Rechazado, inbound_id,
+                    now, *, choice_set_id=None) -> IntakeOutcome:
+    """Un valor que el código no aceptó (ADR 0014, M1). La misma pregunta sigue
+    abierta -- el campo de texto, o la elección con sus botones -- y:
+
+    - un valor que no sirve (una fecha pasada, una opción que no se ofreció) es
+      conversación normal: se dice la razón real y qué sirve, sin incidente;
+    - un valor que falta (`SIN_VALOR`: el modelo no pudo interpretar) es una
+      falla: incidente y el aviso neutro, delante de la misma pregunta."""
+    if rechazo.motivo is MotivoRechazo.SIN_VALOR:
+        registrar_incidente(
+            cur, who.workspace_id,
+            "El modelo no pudo interpretar el valor de la respuesta a una "
+            "pregunta del alta de tareas; la pregunta sigue abierta.",
+            etapa=ETAPA_VALOR_SIN_INTERPRETAR, app_user_id=who.app_user_id)
+        aviso = f"{NOTICIA_NEUTRA_INCIDENTE}\n\n"
+    elif rechazo.motivo is MotivoRechazo.TEXTO_LARGO:
+        aviso = f"{_user_limit_prompt(field)}\n\n"
+    else:
+        aviso = _decir(cur, request, ResultadoTurno(
+            rechazo=Rechazo(rechazo.razon, rechazo.se_acepta))) + "\n\n"
+    if choice_set_id is not None:
+        if resend_choice_prompt(cur, who, choice_set_id, now, prefix=aviso):
+            return IntakeOutcome(str(request["id"]), aviso.strip(), inert=True,
+                                 responded=True)
+        return IntakeOutcome(str(request["id"]), "", inert=True)
+    if rechazo.motivo is MotivoRechazo.SIN_VALOR:
+        texto = aviso + _free_text_prompt(field)
+    else:
+        texto = aviso.strip()
+    return _reject_user_value(cur, request, field, texto, inbound_id, now)
+
+
+def _decir(cur, request, resultado: ResultadoTurno) -> str:
+    """El texto de un resultado con la variante de redacción del espacio (ADR
+    0014, etapa 6)."""
+    return redactar(resultado, variante_redaccion(cur, str(request["workspace_id"])))
 
 
 def handle_active_text(cur: psycopg.Cursor, who: Solicitante, *, chat_id: int,
@@ -1083,7 +1103,7 @@ def modify_text_prompt(field: str, current: str) -> str:
     if not current:
         return _free_text_prompt(field)
     return (f"Esto tenías en {FREE_TEXT_NAMES[field]}. Tocalo para copiarlo, "
-            f"corregilo y mandámelo (hasta {USER_FIELD_LIMITS[field]}): cambio "
+            f"corregilo y mandámelo: cambio "
             f"sólo eso.\n\n{current}")
 
 
@@ -1129,17 +1149,25 @@ def _ask_field_change(cur, request, who, field, now):
 
 
 def resolve_typed_choice(cur: psycopg.Cursor, who: Solicitante, *,
-                         choice_set_id: str, text: str, chat_id: int,
-                         now: datetime) -> IntakeOutcome | None:
-    """Resuelve la elección abierta con lo que la persona escribió, igual que
-    su toque (`resolve_choice`), sólo si el texto es exactamente UNA de las
-    opciones activas: mismo texto normalizado, sin mayúsculas y sin el ícono
-    del botón. Una opción de entidad (objetivo, persona, área) también se
-    reconoce por su nombre completo, que el botón puede acortar. Ninguna
-    coincidencia parcial ni aproximada: con cero o con varias opciones, no
-    resuelve y devuelve `None`; las opciones son las únicas respuestas."""
+                         choice_set_id: str, valor: dict | None, chat_id: int,
+                         now: datetime, source_inbound_id: str | None = None,
+                         source_raw_text: str = "") -> IntakeOutcome | None:
+    """Resuelve la elección abierta con lo que la persona escribió (ADR 0014,
+    M1). El modelo interpreta el mensaje y dice qué opción eligió por su
+    identificador ("1", "2", ... en el orden en que se mostraron, o "ninguna");
+    acá el código sólo valida que sea una de las ofrecidas y sigue como el
+    toque (`resolve_choice`). Ya no se compara texto con etiquetas: eso queda
+    sólo para el toque de un botón.
+
+    - Una opción que no se ofreció, o que falta: la misma elección sigue abierta
+      con sus botones y se dice por qué (`_rechazar_valor`).
+    - "Ninguna" con un texto que nombra algo (objetivo, persona, área): se busca
+      entre los de la base, como siempre (etapa 3 del flujo, todavía sin Jev:
+      PENDIENTE). Sin texto, es "Otra opción" si la elección la tiene.
+    - `None` si no se pudo resolver sin decir nada (la elección ya no está
+      abierta, o "ninguna" sin otra opción): quien llama repite la pregunta."""
     cur.execute(
-        """select c.token, c.etiqueta, c.valor
+        """select c.token, c.etiqueta, c.accion, s.campo, s.request_id
              from task_intake_choice c
              join task_intake_choice_set s on s.id = c.choice_set_id
              join task_intake_request r on r.id = s.request_id
@@ -1148,27 +1176,75 @@ def resolve_typed_choice(cur: psycopg.Cursor, who: Solicitante, *,
             order by c.orden""",
         (choice_set_id, who.workspace_id, who.membership_id),
     )
-    wanted = _match_key(text)
-    matches = [row for row in cur.fetchall()
-               if wanted and wanted in _option_keys(row)]
-    if len(matches) != 1:
+    filas = cur.fetchall()
+    if not filas:
         return None
-    return resolve_choice(cur, who, token=matches[0]["token"],
-                          chat_id=chat_id, now=now)
+    campo = filas[0]["campo"]
+    request = _request(cur, str(filas[0]["request_id"]))
+    opciones = opciones_numeradas(etiqueta_sin_icono(f["etiqueta"]) for f in filas)
+    elegida = validar_valor(valor, ValorEsperado(TipoValor.OPCION, opciones),
+                            limite_texto=0)
+    if isinstance(elegida, Rechazado):
+        return _rechazar_valor(cur, request, who, campo, elegida,
+                               source_inbound_id, now,
+                               choice_set_id=choice_set_id)
+    fila = None if elegida.valor == OPCION_NINGUNA else filas[int(elegida.valor) - 1]
+    texto = normalize_text((valor or {}).get("texto") or "")
+    if campo in CHOICE_FIELDS and texto and (fila is None or fila["accion"] == "other"):
+        if telegram_text_length(texto) > USER_FIELD_LIMITS[campo]:
+            return _rechazar_valor(
+                cur, request, who, campo,
+                Rechazado(MotivoRechazo.TEXTO_LARGO, "", ""), source_inbound_id,
+                now, choice_set_id=choice_set_id)
+        return _resolver_entidad_escrita(
+            cur, who, choice_set_id=choice_set_id, campo=campo, texto=texto,
+            inbound_id=source_inbound_id, raw=source_raw_text, now=now)
+    if fila is None:
+        fila = next((f for f in filas if f["accion"] == "other"), None)
+    if fila is None:
+        return None
+    return resolve_choice(cur, who, token=fila["token"], chat_id=chat_id, now=now)
 
 
-def _match_key(text: str) -> str:
-    return normalize_text(text).casefold()
+def _resolver_entidad_escrita(cur, who, *, choice_set_id, campo, texto, inbound_id,
+                              raw, now) -> IntakeOutcome | None:
+    """La persona escribió algo que no es una de las opciones ofrecidas: cierra
+    la elección y busca lo escrito entre las opciones de la base (objetivos,
+    personas, áreas), como el campo de "Otra opción"."""
+    cur.execute(
+        """update task_intake_choice_set set estado = 'consumed'
+            where id = %s and estado = 'active' returning request_id""",
+        (choice_set_id,))
+    fila = cur.fetchone()
+    if not fila:
+        return None
+    _cerrar_botones_de(cur, choice_set_id, None)
+    cur.execute(
+        """update task_intake_request set version = version + 1, actualizado_en = %s
+            where id = %s returning *""", (now, fila["request_id"]))
+    outcome = _resolve_user_entity(cur, cur.fetchone(), who, campo, texto,
+                                   inbound_id, raw, now)
+    cur.execute("update task_intake_choice_set set resultado = %s where id = %s",
+                (Jsonb(outcome.as_json()), choice_set_id))
+    return outcome
 
 
-def _option_keys(option) -> set[str]:
-    keys = {_match_key(etiqueta_sin_icono(option["etiqueta"]))}
-    value = option["valor"]
-    if isinstance(value, dict):
-        for name in (value.get("title"), value.get("name")):
-            if isinstance(name, str):
-                keys.add(_match_key(name))
-    return keys
+def _cerrar_botones_de(cur, choice_set_id, elegida) -> None:
+    """Una elección que se consumió: su pregunta deja de enviarse y sus botones
+    dejan de valer (`elegida` es el que se tocó, si alguno)."""
+    cur.execute(
+        """update message_outbox set estado = 'descartado'
+            where intake_choice_set_id = %s
+              and estado in ('pendiente', 'esperando_confirmacion', 'listo')""",
+        (choice_set_id,),
+    )
+    cur.execute(
+        """update task_intake_choice
+              set activa = false,
+                  elegida = (%s::uuid is not null and id = %s::uuid)
+            where choice_set_id = %s""",
+        (elegida, elegida, choice_set_id),
+    )
 
 
 def _first_choice_prompt(cur: psycopg.Cursor, choice_set_id) -> str:
@@ -1299,7 +1375,10 @@ def _configuration_error(cur, request, who, field, now):
     )
 
 
-def _advance(cur, request, who, now, *, buttons_first=False) -> IntakeOutcome:
+def _advance(cur, request, who, now, *, prefijo: str = "") -> IntakeOutcome:
+    """Sigue con el próximo dato que falta, en el orden de `FIELDS`. `prefijo`
+    (lo que se dice antes de la pregunta, en el mismo mensaje) sólo va delante
+    de la primera pregunta que se abre."""
     request_id = str(request["id"])
     cur.execute(
         """select campo, estado, valor from task_intake_field
@@ -1307,11 +1386,21 @@ def _advance(cur, request, who, now, *, buttons_first=False) -> IntakeOutcome:
         (request_id, list(FIELDS)),
     )
     fields = {row["campo"]: row for row in cur.fetchall()}
-    field_order = (("objective",) + tuple(f for f in FIELDS if f != "objective")
-                   if buttons_first else FIELDS)
-    for field in field_order:
+    for field in FIELDS:
         row = fields[field]
         if row["estado"] == "confirmed":
+            continue
+        if field == "title" and row["estado"] == "proposed":
+            # La tarea que ya trajo el mensaje se toma como título y se sigue con
+            # el objetivo: no se la vuelve a preguntar (decisión del usuario,
+            # 2026-09-30). Igual se revisa entera en el resumen final.
+            cur.execute(
+                """update task_intake_field
+                      set estado = 'confirmed', version = version + 1,
+                          actualizado_en = %s
+                    where request_id = %s and campo = 'title'""",
+                (now, request_id),
+            )
             continue
         if field == "description" and row["estado"] == "missing":
             cur.execute(
@@ -1325,11 +1414,13 @@ def _advance(cur, request, who, now, *, buttons_first=False) -> IntakeOutcome:
         if field in {"title", "description", "due_date", "acceptance_criterion"}:
             if row["estado"] == "proposed":
                 return _open_choices(
-                    cur, request, field, _proposal_prompt(field, row["valor"]),
+                    cur, request, field,
+                    prefijo + _proposal_prompt(field, row["valor"]),
                     [(CONFIRM, "confirm", None), (REJECT, "reject", None),
                      (OTHER, "other", None)], now,
                 )
-            return _open_free_text(cur, request, field, _free_text_prompt(field), now)
+            return _open_free_text(cur, request, field,
+                                   prefijo + _free_text_prompt(field), now)
         if field == "evidence":
             cur.execute(
                 """select valor from task_intake_field
@@ -1363,6 +1454,7 @@ def _advance(cur, request, who, now, *, buttons_first=False) -> IntakeOutcome:
         return _open_entity_page(
             cur, request, who, field,
             row["valor"] if row["estado"] == "proposed" else None, 0, now,
+            prefijo=prefijo,
         )
     return _finalize(cur, request, who, now)
 
@@ -1458,7 +1550,8 @@ def _entity_candidates(cur, request, who, field, query, offset=0):
     return [], False
 
 
-def _open_entity_page(cur, request, who, field, query, offset, now):
+def _open_entity_page(cur, request, who, field, query, offset, now, *,
+                      prefijo: str = ""):
     candidates, has_more = _entity_candidates(
         cur, request, who, field, query, offset=offset)
     no_match = bool(normalize_text(str(query or ""))) and not candidates
@@ -1498,7 +1591,7 @@ def _open_entity_page(cur, request, who, field, query, offset, now):
     else:
         prompt = (_candidate_prompt(field) if not query else
                   f"Opciones que coinciden con «{query}».")
-    return _open_choices(cur, request, field, prompt, options, now)
+    return _open_choices(cur, request, field, prefijo + prompt, options, now)
 
 
 def _open_choices(cur, request, field, prompt, options, now, kind=None):
@@ -1992,38 +2085,43 @@ def _request(cur, request_id):
     return cur.fetchone()
 
 
+# Las preguntas del alta, en castellano neutro y sin jerga: nada de límites ni de
+# "exacto" (R4c-H7). El límite se dice sólo cuando un valor lo pasa
+# (`_user_limit_prompt`).
+_PREGUNTA_DEL_CAMPO = {
+    "title": "¿Qué hay que hacer?",
+    "description": "Escribí la descripción de la tarea.",
+    "objective": "Escribí parte del nombre del objetivo.",
+    "responsible": "Escribí parte del nombre de la persona responsable.",
+    "area": "Escribí parte del nombre del área.",
+    "due_date": "¿Para cuándo la necesitás? Decime la fecha.",
+    "acceptance_criterion": ("¿Cómo se sabe que la tarea está terminada? "
+                             "Escribí el criterio de aceptación."),
+}
+_CONFIRMA_EL_CAMPO = {
+    "title": "¿Confirmás este título?",
+    "description": "¿Confirmás esta descripción?",
+    "due_date": "¿Confirmás esta fecha objetivo?",
+    "acceptance_criterion": "¿Confirmás este criterio de aceptación?",
+}
+
+
 def _proposal_prompt(field, value):
-    labels = {
-        "title": "título", "description": "descripción",
-        "due_date": "fecha objetivo",
-        "acceptance_criterion": "criterio de aceptación",
-    }
-    return f"¿Confirmás este {labels[field]}? {value}"
+    if field == "due_date":
+        value = format_due_date(value)
+    return f"{_CONFIRMA_EL_CAMPO[field]} {value}"
 
 
 def _candidate_prompt(field):
     return {
-        "objective": "Elegí el objetivo de la tarea.",
-        "responsible": "Elegí a la persona responsable.",
-        "area": "Elegí el área.",
+        "objective": "¿A qué objetivo pertenece la tarea?",
+        "responsible": "¿Quién va a ser responsable de la tarea?",
+        "area": "¿De qué área es la tarea?",
     }[field]
 
 
 def _free_text_prompt(field):
-    return {
-        "title": f"Escribí el título exacto de la tarea (hasta {USER_FIELD_LIMITS['title']}).",
-        "description": ("Escribí la descripción exacta de la tarea "
-                        f"(hasta {USER_FIELD_LIMITS['description']})."),
-        "objective": ("Escribí parte del nombre del objetivo "
-                      f"(hasta {USER_FIELD_LIMITS['objective']})."),
-        "responsible": ("Escribí parte del nombre de la persona responsable "
-                        f"(hasta {USER_FIELD_LIMITS['responsible']})."),
-        "area": ("Escribí parte del nombre del área "
-                 f"(hasta {USER_FIELD_LIMITS['area']})."),
-        "due_date": f"Escribí la fecha objetivo exacta (hasta {USER_FIELD_LIMITS['due_date']}).",
-        "acceptance_criterion": ("Escribí el criterio de aceptación exacto "
-                                 f"(hasta {USER_FIELD_LIMITS['acceptance_criterion']})."),
-    }[field]
+    return _PREGUNTA_DEL_CAMPO[field]
 
 
 def _user_limit_prompt(field):

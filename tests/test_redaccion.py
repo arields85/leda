@@ -16,8 +16,8 @@ import yaml
 from prisma import redaccion
 from prisma.db import admin, espacio
 from prisma.resultado_turno import (
-    Cambio, Falta, OpcionDisponible, ResultadoTurno, SinCambio, Estado,
-    ValorAceptado,
+    Cambio, Falta, OpcionDisponible, Rechazo, ResultadoTurno, Resumen, SinCambio,
+    Estado, ValorAceptado,
 )
 from prisma.valores import TipoValor
 from tests.conftest import RAIZ
@@ -265,7 +265,7 @@ def test_el_resultado_del_turno_es_inmutable_y_sin_transporte():
         r.cambios = ()
     campos = {f.name for f in dataclasses.fields(ResultadoTurno)}
     assert campos == {"cambios", "sin_cambios", "estado", "falta", "opciones",
-                      "valores_aceptados"}
+                      "valores_aceptados", "rechazo", "resumen"}
     # Frontera regla 2: ni chat ni formato de Telegram en el resultado.
     assert not {"chat_id", "teclado", "html", "parse_mode"} & campos
 
@@ -379,3 +379,36 @@ def test_una_variante_que_no_existe_no_se_redacta_en_silencio():
 def test_a_todavia_cae_en_b():
     r = ResultadoTurno(cambios=(Cambio("la tarea «A»", "quedó creada"),))
     assert redaccion.redactar(r, "A") == redaccion.redactar(r, "B")
+
+
+# ---------------------------------------------------------------------------
+# F3: un valor que no sirve, el resumen para revisar y los nombres legibles
+# ---------------------------------------------------------------------------
+
+def test_b_un_rechazo_dice_la_razon_y_que_sirve():
+    r = ResultadoTurno(rechazo=Rechazo("Esa fecha ya pasó.",
+                                       "Decime una fecha desde hoy en adelante."))
+    assert not r.vacio
+    assert redaccion.redactar(r, "B") == (
+        "Esa fecha ya pasó. Decime una fecha desde hoy en adelante.")
+
+
+def test_b_el_resumen_lleva_solo_los_datos_que_tiene_y_el_cierre_que_le_toca():
+    resumen = Resumen(
+        "Resumen para revisar",
+        (("Título", "Revisar PLC"), ("Objetivo", "Bajar la demora")),
+        "Con Confirmar se crea la tarea con estos datos.")
+    texto = redaccion.redactar(ResultadoTurno(resumen=resumen), "B")
+    assert texto == (
+        "Resumen para revisar\nTítulo: Revisar PLC\nObjetivo: Bajar la demora\n\n"
+        "Con Confirmar se crea la tarea con estos datos.")
+    _sin_jerga(texto)
+
+
+@pytest.mark.parametrize(("clave", "legible"), [
+    ("resultado_de_prueba", "resultado de prueba"),
+    ("captura", "captura"),
+    ("  foto__de_la_placa ", "foto de la placa"),
+])
+def test_un_nombre_interno_del_pack_se_lee_sin_guiones_bajos(clave, legible):
+    assert redaccion.nombre_legible(clave) == legible

@@ -43,11 +43,6 @@ def _alta_hasta_el_criterio(conn, world, responsable: str, *,
     with espacio(conn, world["north-lab"]["id"]) as cur:
         actor, outcome = _start(cur, world, chat_id=user)
         rid = outcome.request_id
-        _choose(cur, actor, rid, "Sí", chat_id=user)
-        cur.execute("""select campo from task_intake_choice_set
-                        where request_id = %s and estado = 'active'""", (rid,))
-        if cur.fetchone()["campo"] == "description":
-            _choose(cur, actor, rid, "Sí", chat_id=user)
         for parte in ("Reduce service delay", responsable, "Field Services"):
             etiqueta = next(e for e in _active_choices(cur, rid) if parte in e)
             _choose(cur, actor, rid, etiqueta, chat_id=user)
@@ -136,7 +131,7 @@ def test_por_el_mensaje_quien_pide_el_alta_recibe_una_sola_respuesta_sin_inciden
     user = _usuario(intake_world)
     antes = _salidas(conn, user)
     enviado = _enviado(conn, intake_world)
-    provider = _RoutingProvider([_ruta(RespectoPendiente.RESPONDE)])
+    provider = _RoutingProvider([_ruta(valor={"texto": CRITERIO})])
 
     _escribir(conn, monkeypatch, intake_world, provider, CRITERIO)
 
@@ -227,7 +222,7 @@ def test_por_el_mensaje_el_resultado_inerte_del_alta_es_la_respuesta_sin_aviso_n
     user = _usuario(intake_world)
     sabotaje(conn, intake_world)
     antes = _salidas(conn, user)
-    provider = _RoutingProvider([_ruta(RespectoPendiente.RESPONDE)])
+    provider = _RoutingProvider([_ruta(valor={"texto": CRITERIO})])
 
     _escribir(conn, monkeypatch, intake_world, provider, CRITERIO)
 
@@ -261,7 +256,7 @@ def test_una_eleccion_escrita_con_un_resultado_inerte_no_repregunta(
     user = _usuario(intake_world)
     _sin_politica_de_evidencia(conn, intake_world)
     antes = _salidas(conn, user)
-    provider = _RoutingProvider([_ruta(RespectoPendiente.RESPONDE)])
+    provider = _RoutingProvider([_ruta(valor={"opcion_id": "1"})])
 
     _escribir(conn, monkeypatch, intake_world, provider, "Sí")
 

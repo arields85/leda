@@ -1629,15 +1629,6 @@ def _esperado_de_opciones(etiquetas) -> ValorEsperado:
     return ValorEsperado(TipoValor.OPCION, opciones_numeradas(etiquetas))
 
 
-# Qué tipo de valor espera cada campo de texto libre del alta guiada; los que no
-# están son texto.
-_TIPO_DE_CAMPO_DEL_ALTA = {
-    "due_date": TipoValor.FECHA,
-    "responsible": TipoValor.ENTIDAD,
-    "area": TipoValor.ENTIDAD,
-}
-
-
 def _para_ruteo(descripcion: str, pregunta: str) -> str:
     """Lo que recibe el ruteo como pregunta pendiente: la descripción y la
     pregunta tal como se le hizo a la persona. Con sólo la descripción, el
@@ -1825,7 +1816,7 @@ def _pregunta_del_alta(abierta) -> _Pregunta:
     """El adaptador de las tres preguntas del alta guiada (T9-R1c). Dejarlas de
     lado cancela el borrador: sin ese dato, esa elección o esa confirmación el
     alta no sigue."""
-    from .ingreso_tareas import FREE_TEXT_NAMES, MODIFY_PICKER_KIND
+    from .ingreso_tareas import FREE_TEXT_NAMES, MODIFY_PICKER_KIND, TIPO_DE_CAMPO
 
     args = abierta.args
     titulo = args.get("titulo")
@@ -1837,7 +1828,7 @@ def _pregunta_del_alta(abierta) -> _Pregunta:
         descripcion = f"{nombre}, un dato del alta guiada que se le pidió"
         corrige_abre_selector = False
         valor_esperado = ValorEsperado(
-            _TIPO_DE_CAMPO_DEL_ALTA.get(args["campo"], TipoValor.TEXTO))
+            TIPO_DE_CAMPO.get(args["campo"], TipoValor.TEXTO))
     elif abierta.herramienta == _SENTINEL_ALTA_ELECCION:
         # Una elección sin campo (la de "ya hay un borrador en curso") no tiene
         # nombre de campo y se nombra en general.
@@ -2022,13 +2013,28 @@ def _seguir_con_la_respuesta(cur, quien, texto: str, abierta, route, proveedor,
     eso"); el dato del menú y el campo del alta no la necesitan."""
     from . import pendientes as P
 
-    if abierta.herramienta == _SENTINEL_ALTA_TEXTO_LIBRE:
-        _seguir_con_el_campo_del_alta(cur, quien, texto, abierta, chat_id,
-                                      workspace_id, ahora, entrante_id)
-        return
-    if abierta.herramienta == _SENTINEL_ALTA_ELECCION:
-        _seguir_con_la_eleccion_del_alta(cur, quien, texto, abierta, chat_id,
-                                         workspace_id, ahora, entrante_id)
+    if abierta.herramienta in (_SENTINEL_ALTA_TEXTO_LIBRE,
+                               _SENTINEL_ALTA_ELECCION):
+        # El valor lo interpreta el modelo (ADR 0014, M1): si todavía no se
+        # ruteó con la pregunta (el botón "Sí, es eso"), se rutea ahora.
+        if route is None:
+            pregunta = _pregunta_de(abierta)
+            route, error = _rutear(
+                proveedor, texto, pendiente=pregunta.para_ruteo,
+                valor_esperado=_valor_esperado_de(pregunta.valor_esperado, cal,
+                                                  ahora))
+            if route is None:
+                _avisar_ruteo_caido(cur, quien, error, workspace_id, chat_id,
+                                    ahora)
+                return
+        if abierta.herramienta == _SENTINEL_ALTA_TEXTO_LIBRE:
+            _seguir_con_el_campo_del_alta(cur, quien, texto, abierta, route,
+                                          chat_id, workspace_id, ahora,
+                                          entrante_id)
+        else:
+            _seguir_con_la_eleccion_del_alta(cur, quien, texto, abierta, route,
+                                             chat_id, workspace_id, ahora,
+                                             entrante_id)
         return
     if abierta.herramienta == _SENTINEL_ALTA_CONFIRMACION:
         # El mensaje no confirma el borrador: la conversión es explícita, con
@@ -2275,17 +2281,19 @@ def _dejar_de_lado(cur, quien, chat_id: int, abierta, ahora) -> bool:
     return _cerrar_la_rama(cur, quien, chat_id, abierta, ahora, cancelada=True)
 
 
-def _seguir_con_el_campo_del_alta(cur, quien, texto: str, abierta, chat_id: int,
-                                  workspace_id: str, ahora,
+def _seguir_con_el_campo_del_alta(cur, quien, texto: str, abierta, route,
+                                  chat_id: int, workspace_id: str, ahora,
                                   entrante_id: str | None) -> None:
-    """El mensaje es el campo que esperaba el alta: sigue el camino de siempre
-    (`consume_pending_text`: validación, fecha, entidad y el próximo paso).
-    Si el campo ya no estaba abierto, lo dice y no hace nada."""
+    """El mensaje es el campo que esperaba el alta: el valor que interpretó el
+    modelo (`route.valor`, ADR 0014 M1) lo valida `consume_pending_text` y
+    sigue el camino de siempre (entidad y el próximo paso). Si el campo ya no
+    estaba abierto, lo dice y no hace nada."""
     from .ingreso_tareas import consume_pending_text
 
     resultado = consume_pending_text(
         cur, quien, chat_id=chat_id, source_inbound_id=entrante_id,
-        source_raw_text=texto, now=ahora, slot_id=abierta.pregunta_id)
+        source_raw_text=texto, now=ahora, slot_id=abierta.pregunta_id,
+        valor=route.valor)
     if resultado is None:
         _responder(cur, workspace_id, chat_id, quien, AVISO_DATO_YA_NO_PENDIENTE,
                    ahora)
@@ -2331,18 +2339,20 @@ def _tomar_opcion(cur, quien, workspace_id: str, chat_id: int, token: str,
                      P.pending_action_id_de(cur, token), ahora)
 
 
-def _seguir_con_la_eleccion_del_alta(cur, quien, texto: str, abierta,
+def _seguir_con_la_eleccion_del_alta(cur, quien, texto: str, abierta, route,
                                      chat_id: int, workspace_id: str, ahora,
                                      entrante_id: str | None) -> None:
-    """El mensaje responde a una elección con botones del alta: si es
-    exactamente una de sus opciones, sigue como el toque (`resolve_choice`); si
-    no, la elección vuelve a mostrarse con sus botones, porque las opciones son
-    las únicas respuestas y el modelo nunca elige por la persona."""
+    """El mensaje responde a una elección con botones del alta: el modelo dice
+    qué opción eligió por su identificador (`route.valor`, ADR 0014 M1) y el
+    código valida que sea una de las ofrecidas y sigue como el toque
+    (`resolve_choice`). Si no se puede resolver, la elección vuelve a
+    mostrarse con sus botones: sus opciones son las únicas respuestas."""
     from .ingreso_tareas import resolve_typed_choice
 
     resultado = resolve_typed_choice(
-        cur, quien, choice_set_id=abierta.pregunta_id, text=texto,
-        chat_id=chat_id, now=ahora)
+        cur, quien, choice_set_id=abierta.pregunta_id, valor=route.valor,
+        chat_id=chat_id, now=ahora, source_inbound_id=entrante_id,
+        source_raw_text=texto)
     if resultado is None or (resultado.inert and not resultado.responded):
         _repreguntar(cur, quien, workspace_id, chat_id, abierta,
                      _pregunta_de(abierta), ahora, entrante_id)
@@ -2569,7 +2579,6 @@ def _iniciar_alta_guiada(cur, quien, chat_id: int, entrante_id: str | None,
             outcome = start(
                 cur, quien, chat_id=chat_id, source_inbound_id=entrante_id,
                 source_raw_text=texto, proposals=route_task, now=now,
-                buttons_first=True,
             )
             if not outcome.changed:
                 raise RuntimeError("Task capture did not open a server-owned prompt.")

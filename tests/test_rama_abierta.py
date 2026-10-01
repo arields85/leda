@@ -55,7 +55,7 @@ PREGUNTAS = {
     "dato_menu": gateway.PREGUNTA_DATO_EVIDENCIA_ENTREGA,
     "modificar": gateway.PREGUNTA_MODIFICAR,
     "ninguna": gateway.PREGUNTA_ACLARACION_NINGUNA,
-    "alta_texto": "Escribí el título exacto de la tarea",
+    "alta_texto": "¿Qué hay que hacer?",
 }
 DEJADAS = {
     "dato_menu": gateway.AVISO_DATO_DEJADO_DE_LADO.format(

@@ -139,8 +139,11 @@ def _elegir_dato(conn, client, user, rid, etiqueta):
     assert _post_intake_callback(client, opciones[etiqueta], user).status_code == 200
 
 
-def _responder_con(conn, monkeypatch, world, texto):
-    provider = _RoutingProvider([_ruta(RespectoPendiente.RESPONDE)])
+def _responder_con(conn, monkeypatch, world, texto, valor=None):
+    """Escribe `texto`; el modelo (guionado) lo interpreta como `valor` (ADR 0014,
+    M1), por omisión el texto tal cual."""
+    provider = _RoutingProvider(
+        [_ruta(RespectoPendiente.RESPONDE, valor=valor or {"texto": texto})])
     _escribir(conn, monkeypatch, world, provider, texto)
     return provider
 
@@ -289,7 +292,9 @@ def test_el_dato_corregido_cambia_solo_ese_dato_y_vuelve_la_vista_previa(
     campos_antes = _campos(conn, rid)
     antes = _salidas(conn, user)
 
-    provider = _responder_con(conn, monkeypatch, intake_world, nuevo)
+    provider = _responder_con(
+        conn, monkeypatch, intake_world, nuevo,
+        valor={"fecha_iso": "2028-03-10"} if campo == "due_date" else None)
 
     campos_despues = _campos(conn, rid)
     cambiados = {c for c in campos_antes if campos_antes[c] != campos_despues[c]}
@@ -312,18 +317,20 @@ def test_el_dato_corregido_cambia_solo_ese_dato_y_vuelve_la_vista_previa(
     assert _tareas(conn) == 0 and _solicitud(conn, rid) == "active"
 
 
-def test_una_fecha_corregida_pasa_por_su_resolucion_de_siempre(
+def test_una_fecha_corregida_que_no_sirve_dice_por_que_y_no_cambia_nada(
         intake_world, conn, monkeypatch):
     rid, pid, client, user = _modificar(conn, monkeypatch, intake_world)
     _elegir_dato(conn, client, user, rid, "Fecha objetivo")
     antes = _salidas(conn, user)
 
-    _responder_con(conn, monkeypatch, intake_world, "quizás pronto")
+    _responder_con(conn, monkeypatch, intake_world, "el mes pasado",
+                   valor={"fecha_iso": "2020-01-15"})
 
-    # Ambigua: el campo sigue abierto y la vista previa no volvió.
+    # Pasada: el campo sigue abierto, dice por qué y la vista previa no volvió.
     assert _campos(conn, rid)["due_date"][1] == "2028-02-29"
     assert [p["estado"] for p in _previews(conn, rid)] == ["cancelada"]
-    assert _ultima_salida(conn, user, antes)["cuerpo"].startswith("La fecha")
+    assert _ultima_salida(conn, user, antes)["cuerpo"].startswith(
+        "Esa fecha ya pasó.")
 
 
 def test_un_dato_corregido_demasiado_largo_deja_el_campo_abierto(
@@ -511,7 +518,8 @@ def test_un_dato_escrito_en_el_selector_elige_ese_dato(intake_world, conn,
     rid, pid, client, user = _modificar(conn, monkeypatch, intake_world)
     antes = _salidas(conn, user)
 
-    _responder_con(conn, monkeypatch, intake_world, "título")
+    _responder_con(conn, monkeypatch, intake_world, "título",
+                   valor={"opcion_id": "1"})
 
     fila = _ultima_salida(conn, user, antes)
     assert fila["bloque_copiable"] == TITULO
@@ -703,7 +711,8 @@ def test_la_fecha_del_bloque_copiable_se_pega_de_vuelta_sin_cambiar_nada(
     bloque = _ultima_salida(conn, user, antes)["bloque_copiable"]
     assert bloque == "29/02/2028"
 
-    _responder_con(conn, monkeypatch, intake_world, bloque)
+    _responder_con(conn, monkeypatch, intake_world, bloque,
+                   valor={"fecha_iso": "2028-02-29"})
 
     assert _campos(conn, rid)["due_date"] == ("confirmed", "2028-02-29")
     assert _previews(conn, rid)[-1]["estado"] == "esperando"
@@ -749,8 +758,7 @@ def test_repreguntar_un_dato_del_alta_que_no_es_de_modificar_no_lleva_bloque(
     """Un campo todavía sin confirmar no tiene nada que copiar."""
     user = _usuario(intake_world)
     with espacio(conn, intake_world["north-lab"]["id"]) as cur:
-        actor, outcome = _start(cur, intake_world, chat_id=user)
-        _choose(cur, actor, outcome.request_id, "No", chat_id=user)   # rechaza el título
+        actor, outcome = _start(cur, intake_world, chat_id=user, title=None)
         pregunta = I.open_intake_question(cur, actor, user)
         assert pregunta["tipo"] == I.QUESTION_FREE_TEXT
         assert pregunta["campo"] == "title" and pregunta["bloque"] is None
@@ -806,7 +814,8 @@ def test_volver_al_resumen_escrito_es_tocar_el_boton(intake_world, conn, monkeyp
     campos_antes = _campos(conn, rid)
     antes = _salidas(conn, user)
 
-    provider = _responder_con(conn, monkeypatch, intake_world, "volver al resumen")
+    provider = _responder_con(conn, monkeypatch, intake_world, "volver al resumen",
+                              valor={"opcion_id": "8"})
 
     assert provider.main_calls == 0
     assert _campos(conn, rid) == campos_antes

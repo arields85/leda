@@ -66,7 +66,7 @@ def _actor(cur, world, workspace_slug="north-lab", person="Taylor Quinn"):
 
 
 def _start(cur, world, *, workspace_slug="north-lab", chat_id=71001,
-           raw="Please create the task", buttons_first=False, **changes):
+           raw="Please create the task", **changes):
     item = world[workspace_slug]
     actor = _actor(cur, world, workspace_slug)
     cur.execute(
@@ -81,14 +81,13 @@ def _start(cur, world, *, workspace_slug="north-lab", chat_id=71001,
         "objective": "service delay",
         "responsible": "Sam",
         "area": "Field",
-        "due_date": "29/2",
+        "due_date": "2028-02-29",
         "acceptance_criterion": "Signed test record attached",
     }
     proposals.update(changes)
     outcome = I.start(
         cur, actor, chat_id=chat_id, source_inbound_id=inbound_id,
         source_raw_text=raw, proposals=proposals, now=NOW,
-        buttons_first=buttons_first,
     )
     return actor, outcome
 
@@ -128,7 +127,6 @@ def _objective_callback_setup(conn, world):
     with espacio(conn, ws["id"]) as cur:
         actor, outcome = _start(
             cur, world, chat_id=user, objective="service delay")
-        _choose(cur, actor, outcome.request_id, "Sí", chat_id=user)
         label = next(label for label in _active_choices(cur, outcome.request_id)
                      if "Reduce service delay" in label)
         cur.execute(
@@ -379,18 +377,16 @@ def test_objective_callback_failure_rolls_back_before_outer_commit(
 
 
 def _complete(cur, world, request_id, actor, *, criterion_label="Confirm"):
-    _choose(cur, actor, request_id, "Sí")
+    objective_label = next(label for label in _active_choices(cur, request_id)
+                            if "Reduce service delay" in label)
+    _choose(cur, actor, request_id, objective_label)
     cur.execute(
         """select campo from task_intake_choice_set
             where request_id = %s and estado = 'active'""",
         (request_id,),
     )
-    active_field = cur.fetchone()
-    if active_field and active_field["campo"] == "description":
+    if cur.fetchone()["campo"] == "description":     # si el mensaje la trajo
         _choose(cur, actor, request_id, "Sí")
-    objective_label = next(label for label in _active_choices(cur, request_id)
-                            if "Reduce service delay" in label)
-    _choose(cur, actor, request_id, objective_label)
     responsible_label = next(label for label in _active_choices(cur, request_id)
                              if "Sam North" in label)
     _choose(cur, actor, request_id, responsible_label)
@@ -411,22 +407,6 @@ def test_text_normalization_is_nfc_and_rejects_controls(raw, expected):
     assert I.normalize_text(raw) == expected
 
 
-@pytest.mark.parametrize(("raw", "expected"), (
-    ("29/2", date(2028, 2, 29)),
-    ("1 marzo", date(2028, 3, 1)),
-    ("2028-03-02", date(2028, 3, 2)),
-    ("mañana", date(2028, 2, 29)),
-))
-def test_dates_are_deterministic_in_workspace_timezone(raw, expected):
-    assert I.resolve_date(raw, NOW, "America/Argentina/Buenos_Aires") == expected
-
-
-@pytest.mark.parametrize("raw", ("2027-03-01", "31/02", "algún viernes"))
-def test_past_invalid_or_ambiguous_dates_require_clarification(raw):
-    with pytest.raises(I.AmbiguousDate):
-        I.resolve_date(raw, NOW, "America/Argentina/Buenos_Aires")
-
-
 def test_model_values_are_proposed_with_exact_inbound_lineage(intake_world, conn):
     ws = intake_world["north-lab"]["id"]
     with espacio(conn, ws) as cur:
@@ -442,11 +422,12 @@ def test_model_values_are_proposed_with_exact_inbound_lineage(intake_world, conn
         assert proposed and all(f["source_inbound_id"] for f in proposed)
         assert all(f["source_raw_text"] == "Create it for Sam, 29/2"
                    for f in proposed)
-        assert not any(f["estado"] == "confirmed" and f["campo"] in
-                       {"title", "objective", "responsible", "due_date",
-                        "acceptance_criterion"} for f in fields)
-        assert set(_active_choices(cur, outcome.request_id)) == {
-            "Sí", "No", I.OTHER}
+        # La tarea que trae el mensaje se toma como título (2026-09-30); lo
+        # demás sigue propuesto hasta que la persona lo confirma.
+        assert {f["campo"] for f in fields if f["estado"] == "confirmed"} == {
+            "title"}
+        assert any("Reduce service delay" in label
+                   for label in _active_choices(cur, outcome.request_id))
         assert actor.nombre and actor.nombre not in outcome.text
 
 
@@ -530,7 +511,8 @@ def test_other_atomically_invalidates_siblings_and_opens_exact_slot(
         actor, outcome = _start(cur, intake_world)
         choices = _active_choices(cur, outcome.request_id)
         other = choices[I.OTHER]
-        stale_confirm = choices["Sí"]
+        stale_confirm = next(t for e, t in choices.items()
+                             if "Reduce service delay" in e)
         I.resolve_choice(cur, actor, token=other, chat_id=71001, now=NOW)
         replay = I.resolve_choice(cur, actor, token=stale_confirm,
                                   chat_id=71001, now=NOW)
@@ -541,7 +523,7 @@ def test_other_atomically_invalidates_siblings_and_opens_exact_slot(
             (outcome.request_id,),
         )
         slot = cur.fetchone()
-        assert slot["campo"] == "title"
+        assert slot["campo"] == "objective"
         cur.execute(
             """select count(*) n from task_intake_choice c
                  join task_intake_choice_set s on s.id = c.choice_set_id
@@ -555,8 +537,7 @@ def test_exact_pending_free_text_bypasses_model_and_confirms_source(
         intake_world, conn):
     ws = intake_world["north-lab"]["id"]
     with espacio(conn, ws) as cur:
-        actor, outcome = _start(cur, intake_world)
-        _choose(cur, actor, outcome.request_id, "Otra opción")
+        actor, outcome = _start(cur, intake_world, title=None)
         cur.execute(
             """insert into inbound_message
                  (workspace_id, telegram_message_id, chat_id, app_user_id, texto)
@@ -567,6 +548,7 @@ def test_exact_pending_free_text_bypasses_model_and_confirms_source(
         consumed = I.consume_pending_text(
             cur, actor, chat_id=71001, source_inbound_id=inbound_id,
             source_raw_text="Inspect cafe\u0301 safety loop", now=NOW,
+            valor={"texto": "Inspect cafe\u0301 safety loop"},
         )
         assert consumed and consumed.changed
         cur.execute(
@@ -587,7 +569,6 @@ def test_ambiguous_known_entities_are_server_candidates_with_other(
     ws = intake_world["north-lab"]["id"]
     with espacio(conn, ws) as cur:
         actor, outcome = _start(cur, intake_world)
-        _choose(cur, actor, outcome.request_id, "Sí")
         objective_choices = _active_choices(cur, outcome.request_id)
         assert any("Reduce service delay" in x for x in objective_choices)
         assert I.OTHER in objective_choices
@@ -627,7 +608,6 @@ def test_intake_candidate_label_near_the_limit_still_fits_with_its_icon(
             (ws, titulo_largo))
     with espacio(conn, ws) as cur:
         actor, outcome = _start(cur, intake_world, objective=None)
-        _choose(cur, actor, outcome.request_id, "Sí")
         choices = _active_choices(cur, outcome.request_id)
 
     # `intake_world["north-lab"]` ya trae tres objetivos de fixture -- busca
@@ -657,7 +637,6 @@ def test_objective_exact_free_text_match_is_not_limited_to_first_page(
         )
     with espacio(conn, ws) as cur:
         actor, outcome = _start(cur, intake_world, objective=None)
-        _choose(cur, actor, outcome.request_id, "Sí")
         assert I.VER_MAS in _active_choices(cur, outcome.request_id)
         _choose(cur, actor, outcome.request_id, "Otra opción")
         cur.execute(
@@ -669,7 +648,7 @@ def test_objective_exact_free_text_match_is_not_limited_to_first_page(
         consumed = I.consume_pending_text(
             cur, actor, chat_id=71001,
             source_inbound_id=str(cur.fetchone()["id"]),
-            source_raw_text=target, now=NOW,
+            source_raw_text=target, now=NOW, valor={"texto": target},
         )
         assert consumed and consumed.changed
         cur.execute(
@@ -695,7 +674,6 @@ def test_candidate_pages_are_bounded_and_reach_every_objective(
             )
     with espacio(conn, ws) as cur:
         actor, outcome = _start(cur, intake_world, objective=None)
-        _choose(cur, actor, outcome.request_id, "Sí")
         shown = set()
         while True:
             choices = _active_choices(cur, outcome.request_id)
@@ -723,7 +701,6 @@ def test_no_match_model_proposal_still_pages_known_objectives_before_free_text(
     with espacio(conn, ws) as cur:
         _, outcome = _start(
             cur, intake_world, objective="objective that does not exist",
-            buttons_first=True,
         )
         shown = set()
         while True:
@@ -752,7 +729,7 @@ def test_empty_entity_set_offers_simple_cancel_instead_of_free_text(
         cur.execute("delete from objective where workspace_id = %s", (ws,))
     with espacio(conn, ws) as cur:
         _, outcome = _start(
-            cur, intake_world, objective="missing", buttons_first=True)
+            cur, intake_world, objective="missing")
         assert outcome.text == I.NO_CANDIDATES
         assert set(_active_choices(cur, outcome.request_id)) == {
             I.CANCELAR_BORRADOR}
@@ -835,7 +812,8 @@ def test_arbitrary_long_model_values_never_reach_a_visible_prompt(
                    for row in cur.fetchall())
 
 
-@pytest.mark.parametrize("field", tuple(I.USER_FIELD_LIMITS))
+@pytest.mark.parametrize("field", tuple(f for f in I.USER_FIELD_LIMITS
+                                        if f != "due_date"))  # una fecha no es texto
 def test_arbitrary_long_user_value_reopens_only_the_exact_controlled_field(
         intake_world, conn, field):
     ws = intake_world["north-lab"]["id"]
@@ -864,6 +842,7 @@ def test_arbitrary_long_user_value_reopens_only_the_exact_controlled_field(
         rejected = I.consume_pending_text(
             cur, actor, chat_id=71001,
             source_inbound_id=inbound_id, source_raw_text=huge, now=NOW,
+            valor={"texto": huge},
         )
         assert rejected and rejected.inert
         visible_field = {
@@ -1007,8 +986,9 @@ def test_choice_race_has_one_winner_and_persisted_inert_loser(
         finally:
             other.close()
 
+    candidata = next(label for label in tokens if "Reduce service delay" in label)
     threads = [threading.Thread(target=click, args=(tokens[label],))
-               for label in ("Sí", I.OTHER)]
+               for label in (candidata, I.OTHER)]
     for thread in threads:
         thread.start()
     for thread in threads:
@@ -1398,7 +1378,9 @@ def test_active_choice_state_is_read_as_a_pending_question_not_by_the_main_model
     # blind reminder), and a chat remark re-sends the same choice with its
     # buttons without waking the main model.
     provider = _RoutingProvider([
-        IntentRoute(IntentAction.START_TASK_INTAKE, {"objective": "service delay"}),
+        IntentRoute(IntentAction.START_TASK_INTAKE,
+                    {"title": "Revisar la comprimidora",
+                     "objective": "service delay"}),
         IntentRoute(IntentAction.NORMAL_CONVERSATION,
                     respecto_pendiente=RespectoPendiente.CHARLA)])
     ws, _ = _post_message(
@@ -1427,9 +1409,12 @@ def test_active_free_text_state_is_read_as_a_pending_question_not_by_the_main_mo
     # (never a blind consume), and the answer is still not handled by the
     # main model.
     provider = _RoutingProvider([
-        IntentRoute(IntentAction.START_TASK_INTAKE, {"objective": "service delay"}),
+        IntentRoute(IntentAction.START_TASK_INTAKE,
+                    {"title": "Revisar la comprimidora",
+                     "objective": "service delay"}),
         IntentRoute(IntentAction.NORMAL_CONVERSATION,
-                    respecto_pendiente=RespectoPendiente.RESPONDE)])
+                    respecto_pendiente=RespectoPendiente.RESPONDE,
+                    valor={"texto": "Reduce service delay 1"})])
     ws, user = _post_message(
         conn, monkeypatch, intake_world, provider,
         "Armemos una tarea para la revisión", message_id=1550)

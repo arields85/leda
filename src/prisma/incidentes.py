@@ -96,6 +96,10 @@ ETAPA_ENTREGA_MENSAJE = "entrega_mensaje"
 ETAPA_ENTREGA_AVISO_ADMIN = "entrega_aviso_admin"
 ETAPA_EVIDENCIA_INVALIDA = "politica_de_evidencia_invalida"
 ETAPA_CONFIGURACION_ALTA = "configuracion_alta_invalida"
+# ADR 0014, M1: el modelo no pudo decir el valor que la persona dio para el dato
+# pedido (una fecha, una opción, un texto). Nunca se inventa: la pregunta sigue
+# abierta.
+ETAPA_VALOR_SIN_INTERPRETAR = "valor_sin_interpretar"
 # T9-H19e: un recibo viejo sin respuesta que la reentrega no recuperó (`huerfanos`).
 ETAPA_MENSAJE_HUERFANO = "mensaje_huerfano_sin_respuesta"
 # T9-H19g: el aviso de UN huérfano falló y se lo saltea (el resto del barrido sigue).
@@ -311,6 +315,15 @@ EXPLICACION_POR_ETAPA: dict[str, ExplicacionDeEtapa] = {
                  "para cancelar el borrador."),
         que_hacer=("Corregí o acortá la opción configurada. El borrador de "
                    "{nombre} sigue abierto hasta que lo cancele.")),
+    ETAPA_VALOR_SIN_INTERPRETAR: ExplicacionDeEtapa(
+        que_paso=("{nombre} respondió a una pregunta del alta de tareas y el "
+                  "modelo no pudo decir qué valor traía el mensaje (la fecha, "
+                  "la opción o el texto); Prisma no lo inventó."),
+        que_vio=(NOTICIA_NEUTRA_INCIDENTE + " Y la misma pregunta, que sigue "
+                 "abierta."),
+        que_hacer=(f"{_BUSCAR_DETALLE} y mirá si el modelo de ruteo está "
+                   "devolviendo el valor de la pregunta pendiente. {nombre} "
+                   "puede volver a responder.")),
     "indicador_actividad": ExplicacionDeEtapa(
         que_paso=("No se pudo retirar el borrador nativo del indicador de "
                   "actividad; puede haber quedado visible."),

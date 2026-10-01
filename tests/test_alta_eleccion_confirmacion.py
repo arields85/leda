@@ -36,8 +36,10 @@ TITULO = "Inspect relief valve"
 _ids = iter(range(2000, 3000))
 
 
-def _ruta(comando: RespectoPendiente | None) -> IntentRoute:
-    return IntentRoute(IntentAction.NORMAL_CONVERSATION, respecto_pendiente=comando)
+def _ruta(comando: RespectoPendiente | None = RespectoPendiente.RESPONDE,
+          valor: dict | None = None) -> IntentRoute:
+    return IntentRoute(IntentAction.NORMAL_CONVERSATION,
+                       respecto_pendiente=comando, valor=valor or {})
 
 
 def _escribir(conn, monkeypatch, world, provider, texto):
@@ -55,7 +57,6 @@ def _alta_con_eleccion(conn, world) -> str:
     user = _usuario(world)
     with espacio(conn, world["north-lab"]["id"]) as cur:
         actor, outcome = _start(cur, world, chat_id=user, objective="service delay")
-        _choose(cur, actor, outcome.request_id, "Sí", chat_id=user)
         pregunta = I.open_intake_question(cur, actor, user)
         assert pregunta["tipo"] == "choice"
     conn.commit()
@@ -71,11 +72,6 @@ def _alta_en_confirmacion(conn, world, responsable="Sam North") -> tuple[str, st
     with espacio(conn, world["north-lab"]["id"]) as cur:
         actor, outcome = _start(cur, world, chat_id=user)
         rid = outcome.request_id
-        _choose(cur, actor, rid, "Sí", chat_id=user)
-        cur.execute("""select campo from task_intake_choice_set
-                        where request_id = %s and estado = 'active'""", (rid,))
-        if cur.fetchone()["campo"] == "description":
-            _choose(cur, actor, rid, "Sí", chat_id=user)
         for parte in ("Reduce service delay", responsable, "Field Services"):
             etiqueta = next(e for e in _active_choices(cur, rid) if parte in e)
             _choose(cur, actor, rid, etiqueta, chat_id=user)
@@ -177,14 +173,15 @@ def _token_de(conn, etiqueta_parte: str) -> str:
 # ---------------------------------------------------------------- elección
 
 @pytest.mark.parametrize("texto", [
-    "Reduce service delay 1", "reduce service delay 1", "  REDUCE   service delay 1 "])
+    "Reduce service delay 1", "la primera", "esa, la de la demora de servicio"])
 def test_elegir_escribiendo_la_opcion_resuelve_como_el_toque(
         texto, intake_world, conn, monkeypatch):
     rid = _alta_con_eleccion(conn, intake_world)
     conjunto = _conjunto_activo(conn, rid)
     user = _usuario(intake_world)
     antes = _salidas(conn, user)
-    provider = _RoutingProvider([_ruta(RespectoPendiente.RESPONDE)])
+    # El modelo interpreta qué opción es (ADR 0014, M1); el código sólo valida.
+    provider = _RoutingProvider([_ruta(valor={"opcion_id": "1"})])
 
     _escribir(conn, monkeypatch, intake_world, provider, texto)
 
@@ -215,6 +212,7 @@ def test_una_opcion_que_parece_un_titulo_no_tira_abajo_el_ruteo(
     rid = _alta_con_eleccion(conn, intake_world)
     sobre = RouteEnvelope(calls=(Llamada("c", "route_intent", {
         "action": "normal_conversation", "respecto_pendiente": "responde",
+        "valor": {"opcion_id": "1"},
         "task": {"title": "Reduce service delay 1"}}),))
     provider = ProveedorGuionado([], rutas=[sobre])
 
@@ -233,7 +231,7 @@ def test_un_texto_que_no_es_una_opcion_repite_la_pregunta_con_sus_botones(
     user = _usuario(intake_world)
     conjunto = _conjunto_activo(conn, rid)
     antes = _salidas(conn, user)
-    provider = _RoutingProvider([_ruta(RespectoPendiente.RESPONDE)])
+    provider = _RoutingProvider([_ruta(valor={"opcion_id": "7"})])  # no se ofreció
 
     _escribir(conn, monkeypatch, intake_world, provider, "el de la bomba, creo")
 
@@ -241,8 +239,10 @@ def test_un_texto_que_no_es_una_opcion_repite_la_pregunta_con_sus_botones(
     assert _conjunto_activo(conn, rid) == conjunto            # sigue abierta
     salidas = _nuevas(conn, user, antes)
     assert len(salidas) == 1
-    assert salidas[-1]["cuerpo"] == _pregunta(antes, conjunto)       # la misma pregunta
-    assert str(salidas[-1]["intake_choice_set_id"]) == conjunto  # con sus botones
+    # Dice qué pasó y repite la misma pregunta, con sus botones.
+    assert "no está entre las que te ofrecí" in salidas[-1]["cuerpo"]
+    assert salidas[-1]["cuerpo"].endswith(_pregunta(antes, conjunto))
+    assert str(salidas[-1]["intake_choice_set_id"]) == conjunto
 
 
 def _fila_de_evento(conn, world) -> str:
@@ -339,8 +339,8 @@ def test_una_pregunta_de_texto_libre_sin_nombre_de_campo_falla_fuerte(
         gateway._pregunta_de(abierta)
 
 
-def test_una_opcion_repetida_no_se_elige_sola(intake_world, conn):
-    # Dos opciones con el mismo nombre: escribirlo no alcanza para elegir una.
+def test_una_opcion_repetida_se_elige_por_su_id(intake_world, conn):
+    # Dos opciones con el mismo nombre: el texto no las distingue, el id sí.
     rid = _alta_con_eleccion(conn, intake_world)
     user = _usuario(intake_world)
     with espacio(conn, intake_world["north-lab"]["id"]) as cur:
@@ -355,22 +355,27 @@ def test_una_opcion_repetida_no_se_elige_sola(intake_world, conn):
             (_conjunto_activo(conn, rid),))
         conjunto = _conjunto_activo(conn, rid)
         resuelta = I.resolve_typed_choice(
-            cur, actor, choice_set_id=conjunto, text="Reduce service delay 1",
+            cur, actor, choice_set_id=conjunto, valor={"opcion_id": "3"},
             chat_id=user, now=NOW)
-    assert resuelta is None
-    assert _campo(conn, rid, "objective")["estado"] != "confirmed"
+    assert resuelta is not None and resuelta.changed
+    assert _campo(conn, rid, "objective")["estado"] == "confirmed"
 
 
-@pytest.mark.parametrize("texto", ["service", "Reduce service delay", "delay service 1"])
-def test_no_hay_coincidencia_parcial_ni_aproximada(
-        texto, intake_world, conn):
+@pytest.mark.parametrize("valor", [
+    None, {}, {"texto": "service"}, {"texto": "Reduce service delay"},
+    {"texto": "delay service 1"}])
+def test_el_codigo_ya_no_compara_el_texto_con_las_etiquetas(
+        valor, intake_world, conn):
+    """Sin la opción que dice el modelo no se resuelve nada: ni exacta ni
+    parcial ni aproximada (ADR 0014: la etiqueta exacta sólo vale para el
+    toque)."""
     rid = _alta_con_eleccion(conn, intake_world)
     with espacio(conn, intake_world["north-lab"]["id"]) as cur:
         actor = _actor(cur, intake_world)
         resuelta = I.resolve_typed_choice(
-            cur, actor, choice_set_id=_conjunto_activo(conn, rid), text=texto,
+            cur, actor, choice_set_id=_conjunto_activo(conn, rid), valor=valor,
             chat_id=_usuario(intake_world), now=NOW)
-    assert resuelta is None
+    assert resuelta is not None and resuelta.inert        # rechazada, dicha
     assert _campo(conn, rid, "objective")["estado"] != "confirmed"
 
 
@@ -498,7 +503,8 @@ def test_si_es_eso_del_dudoso_con_un_texto_que_no_es_la_opcion_repite_la_pregunt
     rid = _alta_con_eleccion(conn, intake_world)
     user = _usuario(intake_world)
     conjunto = _conjunto_activo(conn, rid)
-    provider = _RoutingProvider([_ruta(RespectoPendiente.DUDOSO)])
+    provider = _RoutingProvider([_ruta(RespectoPendiente.DUDOSO),
+                                 _ruta(valor={"opcion_id": "7"})])
     _escribir(conn, monkeypatch, intake_world, provider, "el de la bomba")
     client = _callback_client(conn, monkeypatch)
     antes = _salidas(conn, user)
@@ -515,7 +521,8 @@ def test_si_es_eso_del_dudoso_toma_la_opcion_escrita(
         intake_world, conn, monkeypatch):
     rid = _alta_con_eleccion(conn, intake_world)
     user = _usuario(intake_world)
-    provider = _RoutingProvider([_ruta(RespectoPendiente.DUDOSO)])
+    provider = _RoutingProvider([_ruta(RespectoPendiente.DUDOSO),
+                                 _ruta(valor={"opcion_id": "1"})])
     _escribir(conn, monkeypatch, intake_world, provider, "Reduce service delay 1")
     client = _callback_client(conn, monkeypatch)
     token = _token_de(conn, "Sí, es eso")

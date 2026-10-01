@@ -24,7 +24,8 @@ from psycopg.types.json import Jsonb
 from prisma import gateway
 from prisma import ingreso_tareas as I
 from prisma.db import admin, espacio
-from prisma.llm import RespectoPendiente, Respuesta, RouteEnvelope
+from prisma.llm import (IntentAction, IntentRoute, RespectoPendiente, Respuesta,
+                        RouteEnvelope)
 
 from tests.toques import FUERA_DE_LA_VENTANA, envejecer_toques
 from tests.test_menu_tarea import (_quien, _tarea as _tarea_menu,  # noqa: F401
@@ -34,13 +35,21 @@ from tests.test_pregunta_pendiente_otras import (_con_rutas, _filas_del_chat,
 
 PERSONA = "Marcos Tarquini"
 TITULO_ALTA = "Cablear tablero norte"
-PREGUNTA_TITULO = "Escribí el título exacto de la tarea"
-PREGUNTA_FECHA = "Escribí la fecha objetivo exacta"
+PREGUNTA_TITULO = "¿Qué hay que hacer?"
+PREGUNTA_FECHA = "¿Para cuándo la necesitás?"
 # La respuesta a un botón que ya se usó (`gateway._toque`, sin constante propia).
 AVISO_TOQUE_YA_USADO = ("Ese pedido ya no está vigente. Si sigue haciendo falta, "
                         "escribime y lo vemos de nuevo.")
 
 _ids_de_mensaje = itertools.count(700)
+
+
+def _ruta_con_valor(valor: dict,
+                    comando: RespectoPendiente = RespectoPendiente.RESPONDE):
+    """Lo que el ruteo devuelve cuando el mensaje responde: el comando y el valor
+    que interpretó el modelo (ADR 0014, M1)."""
+    return IntentRoute(IntentAction.NORMAL_CONVERSATION,
+                       respecto_pendiente=comando, valor=valor)
 
 
 def _mensaje_privado(cliente, tg, texto):
@@ -137,13 +146,14 @@ def test_responde_toma_el_campo_y_sigue_como_siempre(
         cliente, conn, corework, monkeypatch, texto):
     ws = corework.workspace_id
     tg, rid = _abrir_alta(conn, ws)
-    proveedor = _con_rutas(monkeypatch, [_ruta(RespectoPendiente.RESPONDE)])
+    # El modelo interpreta el título a partir de lo que la persona dijo.
+    proveedor = _con_rutas(monkeypatch, [_ruta_con_valor({"texto": TITULO_ALTA})])
     antes = _salidas(conn, tg)
 
     assert _mensaje_privado(cliente, tg, texto).status_code == 200
 
     campo = _campo(conn, rid, "title")
-    assert campo["estado"] == "confirmed" and campo["valor"] == texto
+    assert campo["estado"] == "confirmed" and campo["valor"] == TITULO_ALTA
     assert _campo_del_slot(conn) != "title"                   # se consumió
     assert _salidas(conn, tg) == antes + 1                    # una respuesta
     assert _request(conn, rid)["estado"] == "active"
@@ -226,7 +236,9 @@ def test_dudoso_pregunta_con_botones_y_si_es_eso_toma_el_campo(
         cliente, conn, corework, monkeypatch):
     ws = corework.workspace_id
     tg, rid = _abrir_alta(conn, ws)
-    _con_rutas(monkeypatch, [_ruta(RespectoPendiente.DUDOSO)])
+    _con_rutas(monkeypatch, [
+        _ruta(RespectoPendiente.DUDOSO),
+        _ruta_con_valor({"texto": "algo del tablero"})])
     antes = _salidas(conn, tg)
 
     _mensaje_privado(cliente, tg, "mmm, algo del tablero")
@@ -242,7 +254,7 @@ def test_dudoso_pregunta_con_botones_y_si_es_eso_toma_el_campo(
 
     campo = _campo(conn, rid, "title")
     assert campo["estado"] == "confirmed"
-    assert campo["valor"] == "mmm, algo del tablero"
+    assert campo["valor"] == "algo del tablero"
     assert _salidas(conn, tg) == antes + 1
 
     # Un segundo toque (fuera de la ventana del toque repetido, T9-R4), con el
@@ -250,7 +262,7 @@ def test_dudoso_pregunta_con_botones_y_si_es_eso_toma_el_campo(
     envejecer_toques(conn, FUERA_DE_LA_VENTANA)
     antes = _salidas(conn, tg)
     assert _tocar(cliente, token, tg).status_code == 200
-    assert _campo(conn, rid, "title")["valor"] == "mmm, algo del tablero"
+    assert _campo(conn, rid, "title")["valor"] == "algo del tablero"
     assert _salidas(conn, tg) == antes + 1
     assert _filas_del_chat(conn, tg)[-1]["cuerpo"] == AVISO_TOQUE_YA_USADO
 
@@ -350,7 +362,7 @@ def test_un_campo_demasiado_largo_se_rechaza_y_la_pregunta_sigue_abierta(
         cliente, conn, corework, monkeypatch):
     ws = corework.workspace_id
     tg, rid = _abrir_alta(conn, ws)
-    _con_rutas(monkeypatch, [_ruta(RespectoPendiente.RESPONDE)])
+    _con_rutas(monkeypatch, [_ruta_con_valor({"texto": "x" * 300})])
     antes = _salidas(conn, tg)
 
     _mensaje_privado(cliente, tg, "x" * 300)

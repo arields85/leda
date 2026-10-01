@@ -1733,10 +1733,13 @@ def test_ejecutar_escenario_modificar_tocado_un_saludo_no_es_la_correccion(
 # ---------------------------------------------------------------------------
 
 
-def _interno_con_alta(rutas_pendiente):
+def _interno_con_alta(rutas_pendiente, propuestas=None):
+    """El alta que arranca el primer mensaje: sin lo que trae el mensaje empieza
+    por "¿Qué hay que hacer?"; con el título, sigue la elección del objetivo."""
     return ProveedorGuionado(
         guion=[],
-        rutas=[IntentRoute(IntentAction.START_TASK_INTAKE), *rutas_pendiente])
+        rutas=[IntentRoute(IntentAction.START_TASK_INTAKE, propuestas or {}),
+               *rutas_pendiente])
 
 
 def _sembrar_objetivo_para_el_alta(conn, ws):
@@ -1759,8 +1762,9 @@ def test_resolver_toque_generico_alcanza_las_opciones_del_alta(corework, conn):
                values (%s, 1, %s, %s, 'armame una tarea') returning id""",
             (ws, tg, quien.app_user_id))
         I.start(cur, quien, chat_id=tg, source_inbound_id=str(cur.fetchone()["id"]),
-                source_raw_text="armame una tarea", proposals={},
-                now=datetime.now(timezone.utc), buttons_first=True)
+                source_raw_text="armame una tarea",
+                proposals={"title": "Armar el tablero"},   # sin título empieza por él
+                now=datetime.now(timezone.utc))
 
         origen, opcion = _resolver_toque_generico(cur, ws, tg, {"indice": 0},
                                                   _MUY_ANTES)
@@ -1781,12 +1785,12 @@ def test_ejecutar_escenario_llega_a_la_pregunta_del_alta_y_la_interpreta(
     r = ejecutar_escenario(
         conn, ws, "corework", "Marcos Tarquini", ["armame una tarea nueva"],
         interno, escenario_id="b-test-alta", indice=0,
-        toques=[{"indice": 0}], mensajes_tras_toques=["hola"])
+        mensajes_tras_toques=["hola"])
 
     assert r.bloqueado is False, r.motivo_bloqueo
     # El mensaje llegó a la pregunta abierta del alta y no se tomó como título.
-    assert "título" in r.respuesta_texto
-    assert r.respuesta_texto.count("Escribí el título") == 1
+    assert "hay que hacer" in r.respuesta_texto
+    assert r.respuesta_texto.count("¿Qué hay que hacer?") == 1
     assert len(interno.pendientes) == 2 and "título" in interno.pendientes[1]
     with admin(conn) as cur:
         cur.execute("""select estado from task_intake_field
@@ -1804,8 +1808,8 @@ def test_ejecutar_escenario_llega_a_la_pregunta_del_alta_y_la_interpreta(
 _TITULO_OBJETIVO_ALTA = "Objetivo simulado de Cablear tablero (simulado)"
 
 _TOQUES_HASTA_EL_BORRADOR = [
-    {"indice": 0},                  # el objetivo (la única candidata)
-    {"etiqueta": "Sí"},             # el título propuesto
+    {"indice": 0},                  # el objetivo (la única candidata; el título
+                                    # que trae el mensaje ya está tomado)
     {"indice": 0},                  # la persona responsable
     {"indice": 0},                  # el área
     {"etiqueta": "Sí"},             # la fecha objetivo propuesta
@@ -1832,7 +1836,9 @@ def test_ejecutar_escenario_escribir_la_opcion_de_la_eleccion_abierta_del_alta(
     _sembrar_objetivo_para_el_alta(conn, ws)
     interno = _interno_con_alta([
         IntentRoute(IntentAction.NORMAL_CONVERSATION,
-                    respecto_pendiente=RespectoPendiente.RESPONDE)])
+                    respecto_pendiente=RespectoPendiente.RESPONDE,
+                    valor={"opcion_id": "1"})],       # lo interpreta el modelo
+        propuestas={"title": "Armar el tablero"})
 
     # Sin ningún toque: la elección del objetivo ya está abierta.
     r = ejecutar_escenario(
@@ -1841,7 +1847,7 @@ def test_ejecutar_escenario_escribir_la_opcion_de_la_eleccion_abierta_del_alta(
         mensajes_tras_toques=[_TITULO_OBJETIVO_ALTA])
 
     assert r.bloqueado is False, r.motivo_bloqueo
-    assert "Escribí el título" in r.respuesta_texto       # el alta siguió
+    assert "responsable" in r.respuesta_texto            # el alta siguió
     assert len(interno.pendientes) == 2 and "elección" in interno.pendientes[1]
     with admin(conn) as cur:
         cur.execute("""select estado from task_intake_field
@@ -2064,7 +2070,7 @@ def test_ejecutar_escenario_toca_dejar_despues_del_otro_tema_y_evalua_esa_respue
 
     r = ejecutar_escenario(
         conn, ws, "corework", "Marcos Tarquini", ["armame una tarea nueva"],
-        interno, escenario_id="b-test-rama", indice=0, toques=[{"indice": 0}],
+        interno, escenario_id="b-test-rama", indice=0,
         mensajes_tras_toques=["¿qué tareas tengo abiertas?"],
         toques_tras_mensajes=[{"etiqueta": "Dejarlo y ver lo otro"}])
 
@@ -2087,12 +2093,12 @@ def test_ejecutar_escenario_toca_seguir_y_evalua_la_pregunta_repetida(
 
     r = ejecutar_escenario(
         conn, ws, "corework", "Marcos Tarquini", ["armame una tarea nueva"],
-        interno, escenario_id="b-test-rama", indice=0, toques=[{"indice": 0}],
+        interno, escenario_id="b-test-rama", indice=0,
         mensajes_tras_toques=["¿qué tareas tengo abiertas?"],
         toques_tras_mensajes=[{"etiqueta": "Seguir con eso"}])
 
     assert r.bloqueado is False, r.motivo_bloqueo
-    assert "Escribí el título" in r.respuesta_texto           # la pregunta pendiente
+    assert "¿Qué hay que hacer?" in r.respuesta_texto         # la pregunta pendiente
     assert "Estábamos con" not in r.respuesta_texto
     assert interno.recibidos == []                            # el otro tema no se atendió
     with admin(conn) as cur:
@@ -2108,7 +2114,7 @@ def test_ejecutar_escenario_con_un_toque_tras_mensajes_que_no_existe_queda_bloqu
     r = ejecutar_escenario(
         conn, ws, "corework", "Marcos Tarquini", ["armame una tarea nueva"],
         _interno_con_otro_tema_y_su_respuesta(), escenario_id="b-test-rama",
-        indice=0, toques=[{"indice": 0}],
+        indice=0,
         mensajes_tras_toques=["¿qué tareas tengo abiertas?"],
         toques_tras_mensajes=[{"etiqueta": "Un botón que no existe"}])
 
@@ -2445,10 +2451,15 @@ def _con_dos_tareas(conn, ws) -> None:
     conn.commit()
 
 
-def _responde(*textos) -> ProveedorGuionado:
-    return ProveedorGuionado(guion=[], rutas=[
-        IntentRoute(IntentAction.NORMAL_CONVERSATION, respecto_pendiente=comando)
-        for comando in textos])
+def _responde(*pasos) -> ProveedorGuionado:
+    """Un ruteo guionado por paso: un comando, o `(comando, valor)` con el valor
+    que el modelo interpretó del mensaje (ADR 0014, M1)."""
+    rutas = []
+    for paso in pasos:
+        comando, valor = paso if isinstance(paso, tuple) else (paso, {})
+        rutas.append(IntentRoute(IntentAction.NORMAL_CONVERSATION,
+                                 respecto_pendiente=comando, valor=valor))
+    return ProveedorGuionado(guion=[], rutas=rutas)
 
 
 def _estados_de_las_vistas_previas(conn) -> list[str]:
@@ -2472,7 +2483,8 @@ def test_sembrar_precondiciones_sin_borrador_de_alta_no_lo_siembra(corework, con
 def test_el_borrador_sembrado_en_la_corrida_se_toca_por_sus_botones(corework, conn):
     ws = corework.workspace_id
     _con_dos_tareas(conn, ws)
-    interno = _responde(RespectoPendiente.RESPONDE)
+    interno = _responde((RespectoPendiente.RESPONDE,
+                         {"texto": "Cablear tablero sur"}))
 
     r = ejecutar_escenario(
         conn, ws, "corework", "Ismael Soschinski", [], interno,
@@ -2552,7 +2564,9 @@ def test_el_borrador_sembrado_en_la_corrida_cambia_un_dato_con_opciones(
         corework, conn):
     ws = corework.workspace_id
     _con_dos_tareas(conn, ws)
-    interno = _responde(RespectoPendiente.RESPONDE)
+    # El objetivo de "Objetivo simulado de Revisar tablero" es la 5.ª opción
+    # que ofrece el pack de prueba (las otras son los objetivos del pack).
+    interno = _responde((RespectoPendiente.RESPONDE, {"opcion_id": "5"}))
 
     r = ejecutar_escenario(
         conn, ws, "corework", "Ismael Soschinski", [], interno,
@@ -2572,7 +2586,8 @@ def test_un_mensaje_que_corrige_la_vista_previa_lleva_al_selector_y_de_ahi_al_da
         corework, conn):
     ws = corework.workspace_id
     _con_dos_tareas(conn, ws)
-    interno = _responde(RespectoPendiente.CORRIGE, RespectoPendiente.RESPONDE)
+    interno = _responde(RespectoPendiente.CORRIGE,
+                        (RespectoPendiente.RESPONDE, {"opcion_id": "6"}))  # la fecha
 
     r = ejecutar_escenario(
         conn, ws, "corework", "Ismael Soschinski", [], interno,
@@ -2603,11 +2618,12 @@ def test_el_corredor_no_confirma_solo_la_vista_previa_de_un_borrador(corework, c
 
 
 @pytest.mark.parametrize("escenario_id, comandos", [
-    ("b-0025", [RespectoPendiente.RESPONDE]),
-    ("b-0025-b", [RespectoPendiente.RESPONDE]),
-    ("b-0025-c", [RespectoPendiente.CORRIGE, RespectoPendiente.RESPONDE]),
+    ("b-0025", [(RespectoPendiente.RESPONDE, {"texto": "Cablear tablero sur"})]),
+    ("b-0025-b", [(RespectoPendiente.RESPONDE, {"opcion_id": "5"})]),  # "…de Revisar tablero"
+    ("b-0025-c", [RespectoPendiente.CORRIGE,
+                  (RespectoPendiente.RESPONDE, {"opcion_id": "6"})]),  # "Fecha objetivo"
     ("b-0025-d", []),                                   # sólo toques: nada que rutear
-    ("b-0025-e", [RespectoPendiente.RESPONDE]),
+    ("b-0025-e", [(RespectoPendiente.RESPONDE, {"fecha_iso": "2031-01-05"})]),
 ])
 def test_los_escenarios_de_b_0025_cumplen_lo_que_declaran_con_un_modelo_guionado(
         escenario_id, comandos, corework, conn):
@@ -2972,7 +2988,8 @@ def test_la_corrida_confirma_dos_veces_y_la_herramienta_corre_una_sola_vez(
 
 @pytest.mark.parametrize("escenario_id, comandos", [
     ("b-0029", []),                                     # sólo el toque de Sí
-    ("b-0029-b", [RespectoPendiente.RESPONDE]),         # el título corregido
+    ("b-0029-b", [(RespectoPendiente.RESPONDE,
+                   {"texto": "Cablear tablero sur"})]),  # el título corregido
     ("b-0029-c", [RespectoPendiente.OTRO_TEMA]),
     ("b-0029-d", [RespectoPendiente.RESPONDE]),
 ])

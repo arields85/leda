@@ -36,8 +36,8 @@ def _esperado(abierta):
 @pytest.mark.parametrize("campo, tipo", [
     ("title", TipoValor.TEXTO),
     ("description", TipoValor.TEXTO),
-    ("objective", TipoValor.TEXTO),
     ("acceptance_criterion", TipoValor.TEXTO),
+    ("objective", TipoValor.ENTIDAD),
     ("responsible", TipoValor.ENTIDAD),
     ("area", TipoValor.ENTIDAD),
     ("due_date", TipoValor.FECHA),

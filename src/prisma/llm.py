@@ -92,6 +92,13 @@ MAX_LONGITUD_REFERENCIA = 200
 # Cota de cada campo de `valor`: acota lo que un modelo adversarial puede
 # devolver; el límite real de cada dato lo aplica `valores.validar_valor`.
 MAX_LONGITUD_VALOR = 2000
+# La fecha que propone el ruteo (ADR 0014, M1): el ruteo no sabe qué día es hoy,
+# así que sólo propone la que el mensaje dice completa, ya normalizada. Una
+# relativa o sin año se pregunta después, cuando el código sí tiene el día.
+_DESCRIPCION_FECHA = (
+    "Only if the message states a complete date (day, month and year): as "
+    "YYYY-MM-DD. Omit it for relative dates (\"tomorrow\", \"Friday\") or dates "
+    "without a year: the server asks for them.")
 ROUTER_TOOL = {
     "name": "route_intent",
     "description": (
@@ -116,8 +123,10 @@ ROUTER_TOOL = {
             "task": {
                 "type": "object",
                 "additionalProperties": False,
-                "properties": {name: {"type": "string"}
-                               for name in _TASK_PROPOSALS},
+                "properties": {
+                    name: ({"type": "string", "description": _DESCRIPCION_FECHA}
+                           if name == "due_date" else {"type": "string"})
+                    for name in _TASK_PROPOSALS},
             },
             "trabajos": {"type": "array", "items": {"type": "string"}},
             "personas": {"type": "array", "items": {"type": "string"}},
@@ -266,7 +275,10 @@ def _bloque_valor(esperado: ValorEsperado) -> str:
             f"(id = etiqueta): {listado}. Completá valor.opcion_id con el id de "
             "la opción que el mensaje elige (vale el sentido, no la etiqueta "
             f"exacta), o \"{OPCION_NINGUNA}\" si el mensaje rechaza todas. "
-            "Nunca escribas una etiqueta en lugar del id." + _NO_INVENTAR)
+            "Nunca escribas una etiqueta en lugar del id. Si el mensaje nombra "
+            "algo que no está entre las opciones (un objetivo, una persona, un "
+            f"área), elegí \"{OPCION_NINGUNA}\" y completá también valor.texto "
+            "con lo que nombra." + _NO_INVENTAR)
     if esperado.tipo is TipoValor.ENTIDAD:
         return (
             intro + "La pregunta espera la referencia a algo que ya existe "

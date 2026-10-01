@@ -64,6 +64,25 @@ class ValorAceptado:
 
 
 @dataclass(frozen=True)
+class Rechazo:
+    """Un valor que el código no aceptó: por qué no sirve y qué sirve, ya en
+    las palabras que lee la persona (`valores.Rechazado`)."""
+    razon: str       # "Esa fecha ya pasó."
+    se_acepta: str   # "Decime una fecha desde hoy en adelante."
+
+
+@dataclass(frozen=True)
+class Resumen:
+    """El resumen de algo para que la persona lo revise: un título, una línea
+    "dato: valor" por cada dato que tiene y lo que pasa con el botón que
+    sigue. Una línea sin valor no se arma: no se muestra un dato que nadie
+    dio."""
+    titulo: str
+    lineas: tuple[tuple[str, str], ...]
+    cierre: str
+
+
+@dataclass(frozen=True)
 class ResultadoTurno:
     cambios: tuple[Cambio, ...] = ()
     sin_cambios: tuple[SinCambio, ...] = ()
@@ -71,9 +90,12 @@ class ResultadoTurno:
     falta: Falta | None = None
     opciones: tuple[OpcionDisponible, ...] = ()
     valores_aceptados: tuple[ValorAceptado, ...] = ()
+    rechazo: Rechazo | None = None
+    resumen: Resumen | None = None
 
     @property
     def vacio(self) -> bool:
         """Sin ningún hecho que decir: las opciones solas no son un mensaje."""
         return not (self.cambios or self.sin_cambios or self.estado
-                    or self.falta or self.valores_aceptados)
+                    or self.falta or self.valores_aceptados or self.rechazo
+                    or self.resumen)
