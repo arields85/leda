@@ -458,14 +458,14 @@ aprobados y reconocidos, sin correcciones. Advertencias no bloqueantes:
 - [ ] R11. `ingreso_tareas.py:1054-1059`: `enviada_en` nunca se limpia; si el aprobador
   devuelve el borrador a edición, la solicitud queda invisible para el solicitante. Sin
   pruebas de rechazo ni de vencimiento. Verificar contra "Rechazar con motivo" (`0025`).
-- [x] R12 (`2c42650`: plazo propio de 3 s sin reintentos y caída inmediata a B; la llamada sigue dentro de la transacción del turno, acotada a 3 s: ver "Etapa 6 completa"). `redaccion.py:272-282`: con A, la llamada al modelo corre dentro de la
+- [x] R12 (`2c42650`; segunda revisión: el plazo era un timeout por fase de httpx y la llamada podía tardar 6-9 s; `fa86a53` lo acota en total, con un hilo, y lo sube a 4 s tras la medición en vivo; antes: plazo propio de 3 s sin reintentos y caída inmediata a B; la llamada sigue dentro de la transacción del turno, acotada a 3 s: ver "Etapa 6 completa"). `redaccion.py:272-282`: con A, la llamada al modelo corre dentro de la
   transacción del turno con los reintentos completos del proveedor; ante una caída, cada
   turno espera todo antes de caer a B. Plazo propio corto o cortar A tras N errores.
-- [x] R13 (`afa5718`: el verificador se rehízo sobre salida estructurada, sin morfología ni listas, y corre dentro del `try` que cae a B). `verificador_redaccion.py:202-203`: "hace la pregunta" se cumple con cualquier
+- [x] R13 (`afa5718`: el verificador se rehízo sobre salida estructurada, sin morfología ni listas, y corre dentro del `try` que cae a B). Segunda revisión: rechazaba «Prisma» y el nombre de la persona; `f9f574e` los incorpora como nombres conocidos del turno (`ResultadoTurno.nombres_conocidos`, `NOMBRE_ASISTENTE`). `verificador_redaccion.py:202-203`: "hace la pregunta" se cumple con cualquier
   "?" ("Gracias. ¿Todo bien?" pasa sin la fecha). `:149-152`: la detección de acciones en
   primera persona no descuenta nombres de los hechos ("José"). `redaccion.py:285`:
   `verificar` fuera del try que cae a B.
-- [x] R14 (`afa5718`: el motivo de una falla guarda el tipo de la excepción, no su texto; sólo las excepciones propias, `LookupError` y `ValueError`, llevan su mensaje). `redaccion.py:278-281`: el texto completo de una excepción del proveedor va a
+- [x] R14 (`afa5718`: el motivo de una falla guarda el tipo de la excepción, no su texto; sólo las excepciones propias, `LookupError` y `ValueError`, llevan su mensaje). Segunda revisión: quedaba parcial porque muchos errores de HTTP, URL y JSON heredan de `ValueError`; `f9f574e` guarda el tipo y, sólo para `LookupError`/`ValueError`/`KeyError` exactos, una razón corta sin direcciones, parámetros ni identificadores opacos. `redaccion.py:278-281`: el texto completo de una excepción del proveedor va a
   `audit_log`/`incident`; confirmar que ninguna URL con credencial pueda terminar ahí.
 
 ## Etapa 6 completa con A y menos latencia (2026-10-01, decisión del usuario)
@@ -674,3 +674,124 @@ hizo al leer el encargo, antes de escribir código).
 
 - Suite completa (`python -m pytest -q` desde el worktree, runner del checkout principal): **2852 passed, 333 deselected, 0 failed** (17 min 48 s; línea previa 2793).
 - PENDIENTE (orquestador): aplicar `0027` a `prisma_flujo` y dar el área a los objetivos existentes; la prueba real de "Corrida siguiente".
+
+## Correcciones de la revisión RDD de la etapa 6 completa (2026-10-01)
+
+Chequeo de rumbo (escrito antes de escribir código; ADR 0014, "Resultado de la primera
+vuelta A/B").
+
+1. Clase de problema: garantías de A que valían en el papel y no en el reloj o en el
+   contrato. El "plazo de 3 s" era un timeout escalar de httpx por fase (hasta 6-9 s
+   reales); el motivo de una falla guardaba mensajes de `ValueError` (R14 quedó a medias);
+   el verificador rechazaba nombres conocidos del turno; el proveedor sin `plazo=` degradaba
+   en silencio. Ya apareció antes con otra forma: R12/R13/R14 de la revisión anterior, es
+   decir, la misma clase en dos rondas (disparador 4 de "Cómo pensamos juntos"). Se revisa
+   el mecanismo, no el caso: el plazo pasa a acotar el tiempo total, y los motivos de falla
+   y el conjunto de nombres permitidos pasan a ser reglas generales.
+2. Mecanismo general, no caso: (a) plazo total de la llamada (hilo y espera acotada, la
+   respuesta tardía se descarta); (b) clasificación de timeouts por tipo de excepción;
+   (c) contrato explícito `redactar(..., plazo=...)` con una prueba por clase de proveedor;
+   (d) motivo de falla = clase de la excepción + razón corta depurada (sin nada parecido a
+   una URL ni a un parámetro); (e) nombres permitidos = conocidos del turno (quien escribe,
+   el nombre del asistente, los de los hechos); (f) "este turno" derivado del origen, no de
+   igualdad de marcas de tiempo, y un campo sin mapeo cae a B; (g) comprobar que la elección
+   sigue abierta antes de llamar al modelo. Ninguna lista de frases.
+3. Qué haría innecesaria la próxima ronda: la tabla de rechazos de
+   `python -m prisma redaccion corework` sin rechazos por "Prisma" ni por el nombre de la
+   persona; la mediana y el porcentaje de `timeout` con el plazo de 4 s; ninguna redacción
+   de más de ~4 s a la vista de la persona.
+4. Hipótesis vigente: un modelo flash redacta el mensaje entero dentro de un plazo. Medido
+   en vivo con `nan`/`deepseek-v4-flash`: p50 0,93 s, p90 3,06 s, máx. 6,6 s; con 3 s caerían
+   ~10 % de los turnos, con 4 s ~4 %. Vale; el plazo pasa a 4 s y se sigue midiendo.
+
+### Tareas
+
+- [x] **C1** (`fa86a53`) Plazo total (4 s por defecto), timeouts por tipo, contrato `plazo=` (puntos 1-3).
+- [x] **C2** (`f9f574e`) R14 completo y regla de nombres propios del verificador (puntos 4-5).
+- [x] **C3** (`0fbd292`) `_entendido_del_turno` robusto y chequeo de elección abierta antes del modelo (puntos 6-7).
+
+### Correcciones de la revisión RDD de `712b9fe` y `c88ce03` (ítems 8 y 9)
+
+Chequeo de rumbo (escrito antes de escribir código).
+
+1. Clase de problema: un dato que el código resuelve en silencio (el área de un frente
+   del pack con un slug que no existe queda `NULL`, y el alta lo trata como estratégico)
+   y una confirmación de la persona que el modelo puede pisar (`_ruta_de_lo_confirmado`
+   toma la ruta del modelo sin mirar su acción, y puede reescribir el texto). Ya apareció
+   antes con otra forma: "nunca fallar en silencio" (valores sin interpretar, R14) y
+   "el código garantiza, el modelo interpreta" (ADR 0014, M1): el valor de un campo de
+   texto confirmado es el texto tal cual (F-B2).
+2. Mecanismo general, no caso: (a) un solo auxiliar que resuelve el slug de área de un
+   frente y falla (`PackInvalido`) si no existe, usado por la inserción y por el
+   completado; `validar` lo reporta como bloqueante; el completado informa cuántas filas
+   actualizó y qué frentes no encontró; (b) del juicio del modelo sobre lo confirmado
+   sólo se toma el veredicto (`verificable`, `propuesta`), validado por la acción y la
+   respuesta a la pregunta; el texto es siempre el confirmado; (c) el aviso de rechazo
+   del criterio va ligado a su campo, no a la primera propuesta que se abra.
+3. Qué haría innecesaria la próxima ronda: ningún objetivo operativo sin área después de
+   importar un pack válido (y un pack con un slug mal escrito que no se importa); ninguna
+   respuesta confirmada que cambie de texto o desaparezca.
+4. Hipótesis vigente: vale. El área es un dato del pack y el criterio confirmado es
+   del usuario; el modelo sólo juzga.
+
+- [x] **C4** (`18317e2`, ítem 8) Slug de área del frente: auxiliar único, fallo y advertencia
+  bloqueante, informe del completado, `COMMENT` en `db/esquema.sql`.
+- [x] **C5** (`3d1c944`, ítem 9) `_ruta_de_lo_confirmado` conserva el texto confirmado y valida la
+  acción; el rechazo del criterio va al campo del criterio.
+
+### Qué quedó construido (correcciones)
+
+- **Plazo total** (`llm.llamar_con_plazo`, `llm.PlazoAgotado`): la llamada de redacción
+  corre en un hilo y se deja de esperar al vencer el plazo (`redactar_turno` y
+  `redactar_charla`); la respuesta tardía se descarta y el intento queda como `timeout`.
+  `PLAZO_REDACCION_S = 4.0` (medido en vivo con `nan`/`deepseek-v4-flash`: p50 0,93 s,
+  p90 3,06 s, máx. 6,6 s; con 3 s caerían ~10 % de los turnos, con 4 s ~4 %). El plazo se
+  sigue pasando al proveedor (acota el hilo que queda colgado).
+- **Timeouts por tipo** (`redaccion._timeout_de`): `PlazoAgotado`, `TimeoutError`,
+  `httpx.TimeoutException`, también si un cliente los envuelve (`__cause__`). "más de N s
+  sin respuesta" sólo para el plazo propio; los demás dicen su tipo.
+- **Contrato `plazo=`**: una prueba por clase de `llm` con `redactar` comprueba que lo
+  acepta como argumento con nombre y por omisión `None` (esa prueba nació en verde: ya se
+  cumplía; protege el contrato).
+- **R14**: `_motivo_de_error` guarda siempre el tipo y, sólo de `LookupError`,
+  `ValueError` y `KeyError` exactos, una razón de <= 120 caracteres sin direcciones,
+  credenciales, `clave=valor`, `?consulta` ni identificadores opacos.
+- **Verificador**: nombres conocidos del turno = quien escribe (leído de `integrante`),
+  el asistente y los de los hechos; los de otras personas siguen rechazados. No se le
+  cuentan al modelo.
+- **`_entendido_del_turno`**: un dato dado por el mensaje al que está atado el turno
+  cuenta aunque la hora no coincida; un toque sigue por la hora del turno; un campo sin
+  sujeto cae a B con un incidente de baja severidad (`campo: <campo>`), sin `KeyError`.
+- **`_rechazo_entero`**: comprueba que la elección siga abierta antes de llamar al modelo.
+- **Ítem 8**: `importador._area_del_frente` (único, falla con `PackInvalido`), `validar`
+  lo reporta como bloqueante, el completado informa cuántos objetivos completó y los
+  frentes sin objetivo; `COMMENT` de `objective.area_id` en `db/esquema.sql`.
+- **Ítem 9**: `_ruta_de_lo_confirmado` toma del modelo sólo el veredicto (`verificable`,
+  `propuesta`) y sólo si la acción es conversación normal y el comando `responde`; el
+  texto es el confirmado. `_advance(..., campo_del_rechazo=...)` ata el aviso del criterio
+  a su campo.
+
+### RED observado y verificación (correcciones)
+
+- C1: `tests/test_redaccion_plazo.py` contra el código anterior: 11 failed, 13 passed (el
+  plazo de 4 s, el corte del tiempo total, los timeouts por tipo; el contrato de
+  `plazo=` pasó desde el inicio). GREEN: 24 passed; con los archivos de A, charla y
+  `llm_redactar`: 95 passed.
+- C2: 32 failed, 104 passed antes de implementar (verificador y `redactar_turno`); GREEN
+  135 passed; la prueba de integración del alta (`nombrar_a_quien_escribe`) falló sin el
+  cambio de `ingreso_tareas` y pasa con él. Regresión: 261 passed (+1 que cambió: la
+  prueba de los campos de `ResultadoTurno` ya incluye `nombres_conocidos`).
+- C3: `tests/test_alta_guiada_mensaje_entero.py`: 4 failed, 18 passed contra el código
+  anterior; GREEN 22 passed; regresión 101 passed (alta, charla, redacción A).
+- C4: `tests/test_objetivo_con_area.py`: 11 failed, 7 passed; GREEN 18 passed; con esqueleto,
+  siembra, onboarding, administrador y esquema de compromiso: 110 passed.
+- C5: `tests/test_alta_criterio_verificable.py`: 11 failed, 29 passed; la prueba de
+  "sólo `falta`" ya pasaba (control); GREEN 40 passed; con alta guiada y mensaje entero:
+  108 passed.
+
+### Resultado final (correcciones)
+
+- Suite completa (`python -m pytest -q` desde el worktree, runner del checkout principal):
+  **2955 passed, 333 deselected, 0 failed** (18 min 37 s; línea previa 2852).
+- Próximo paso: reiniciar el listener del worktree (`PYTHONPATH=src`) y medir en la prueba
+  real la tabla de `python -m prisma redaccion corework` (timeouts con 4 s, rechazos).
