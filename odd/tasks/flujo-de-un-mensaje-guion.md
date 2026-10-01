@@ -24,8 +24,8 @@ la persona, desprolijos.
 
 **Huecos conocidos (no son hallazgos nuevos):**
 
-- El objetivo más probable primero (⭐) no está construido: los objetivos salen en el
-  orden de siempre.
+- (Resuelto en la rama, ver "Corrida siguiente") El objetivo más probable primero (⭐)
+  no estaba construido: los objetivos salían en el orden de siempre.
 - Una fecha relativa en el primer mensaje ("…para el viernes") no se toma todavía: se
   pregunta después.
 - Los tipos de evidencia salen sin tilde ("explicacion").
@@ -196,3 +196,26 @@ final: humano → modelo → lógica lo más determinista posible (Jev, SQL, reg
 → modelo → humano. Es el diseño del ADR 0014 (etapas 2 y 6); lo que falta es que la etapa
 6 sea completa: que el modelo redacte el mensaje entero a partir del resultado del turno,
 no una frase delante de una plantilla.
+
+## Corrida siguiente: "Prisma propone" (F-B7, F-B8, F-B10, F-B11) y lo que falta probar
+
+Antes: aplicar la migración `0027` a `prisma_flujo` y dar su área a los objetivos
+existentes (el orquestador lo hace; ver el reporte del commit). Con `variante`
+A o B, a elección. Anotar por paso: mejoró / empeoró / igual, y si tardó.
+
+| # | Quién | Mensaje | Qué se espera | Hallazgo |
+|---|---|---|---|---|
+| 1 | Marcos | PRIMER mensaje de la sesión, sin rama abierta: "necesito crear una tarea: calibrar los sensores de la línea 2" | Toma el título y salta al objetivo, sin preguntar "¿Qué hay que hacer?" | R4c-H4 (no probado) |
+| 2 | Marcos (OT: dos objetivos propios) | Seguir hasta el objetivo | Sólo los dos objetivos de OT; ninguno de otra área ni el estratégico. Con un título claro, el más probable va primero con ⭐ y se pregunta igual; con uno ambiguo, sin ⭐, en el orden de siempre | F-B10, F-B11 |
+| 3 | Marcos | Escribir parte del nombre de un objetivo de otra área ("servidores") | No lo encuentra: ofrece los de OT con "Para «servidores» encontré estas opciones. ¿A qué objetivo…?" (ya no "Opciones que coinciden con…") | F-B11, nota F-B8 |
+| 4 | Ariel (Software: un solo objetivo propio) | Alta para sí mismo | El objetivo se completa solo y aparece en el resumen; no se pregunta | F-B11 |
+| 5 | Marcos | Fecha: "4de octubre" | La acepta y la muestra (04/10) | R4c-H6 (no probado) |
+| 6 | Marcos | Criterio de aceptación: "no lo sé, voy a ver" (y probar "por fotos") | No lo compromete: dice que todavía no dice cómo se comprueba y propone uno armado con el título, con Sí / No / Otra opción | F-B7 |
+| 7 | Marcos | En el paso 6 tocar "Sí" | El criterio propuesto queda; el resumen lo muestra | F-B7 |
+| 8 | Marcos | En otra alta, tocar "Otra opción" y volver a escribir "no lo sé" | Lo acepta tal cual (una sola propuesta, sin bucle) | F-B7 |
+| 9 | Marcos | A mitad de un alta: "ah, y necesito otra tarea para Nahuel" -> "Dejarlo y ver lo otro" -> a "¿Qué hay que hacer?" contestar "necesito crear una tarea: calibrar los sensores" | El responsable NO viene precargado con Nahuel (es otra tarea); se pregunta normal. Variante: contestar sólo "calibrar los sensores" (sin "necesito crear una tarea") -> el responsable sí sigue siendo Nahuel | F-B8 |
+
+**Además registrar:** incidentes nuevos (`python -m prisma incidentes corework`),
+en particular `objetivo_sin_ordenar` (Jev sin credencial o caído: los objetivos
+salen en el orden de siempre, sin ⭐) y `criterio_sin_propuesta`; y cualquier
+respuesta que se sienta robótica aunque no esté en la lista.

@@ -580,3 +580,97 @@ Chequeo de rumbo (escrito antes de empezar; ADR 0014, "Resultado de la primera v
   conversacional.
 - Sin cambios: `pendientes`/menú de una tarea, evidencia, reentrega y Aprobar (F4/F5), el
   texto "Hecho. La tarea quedó comprometida." (lo escribe una función de la base).
+
+## Prisma propone (2026-10-01): F-B7, F-B8, F-B10, F-B11
+
+Chequeo de rumbo (registrado en el documento al cerrar la unidad; la clasificación se
+hizo al leer el encargo, antes de escribir código).
+
+1. Clase de problema: Prisma sólo dirige. Pregunta lo que falta y no propone ni acota
+   lo que sabe: ofrece los objetivos de todos los sectores en el mismo orden diga lo que
+   diga la tarea (F-B10, F-B11), acepta un criterio de aceptación vacío de contenido
+   (F-B7) y arrastra una propuesta de otro mensaje a otra tarea (F-B8). Principio
+   constitucional "Prisma ayuda y facilita, no sólo dirige" (`nucleo/constitucion.md`
+   §8); `nucleo/mecanica-pm.md` §4 (lo que cruza áreas va por dependencias) y §13.2
+   ("¿El resultado esperado es concreto y verificable?").
+2. Mecanismo, no caso: (a) el objetivo tiene área como DATO (migración `0027`), y la
+   consulta de candidatos del alta ofrece sólo los del área de quien pide; (b) Jev
+   (etapa 3) ordena los candidatos que salen de la base, el código fija los cortes
+   (los de una referencia a tarea) y sólo una decisión clara destaca el primero;
+   (c) el juicio de "verificable" es un campo cerrado del valor del ruteo
+   (`verificable` si/no, `propuesta`), validado por el código, y la propuesta sale por
+   los botones de siempre (Sí / No / Otra opción), con una sola propuesta por alta;
+   (d) una propuesta queda ligada a la tarea que su mensaje pedía: un título que llega
+   como pedido de tarea nueva descarta las propuestas sin confirmar de otros mensajes.
+   Ninguna lista de frases ni palabras clave.
+3. Qué haría innecesaria la próxima ronda: el guion "Corrida siguiente" del archivo de
+   guion; incidentes `objetivo_sin_ordenar` y `criterio_sin_propuesta`.
+4. Hipótesis vigente: con el área en los datos, Jev ordena bien objetivos de pocos
+   candidatos con un título claro (se mide: ⭐ presente o no); un modelo flash juzga
+   bien "verificable" con el título como contexto (se mide con la corrida real).
+
+### Tareas
+
+- [x] **P1** (`712b9fe`) Migración `0027` (`objective.area_id`, FK compuesta al espacio,
+  `area_workspace_id_unique`), rollback, `db/esquema.sql`, importador (área de cada
+  frente del pack; reimportar completa las que faltan sin pisar). Ruta: inline por un
+  solo escritor (el encargo lo pidió así).
+- [x] **P2** (`0d75586`) F-B11: el alta ofrece sólo los objetivos del área de quien pide;
+  un solo objetivo propio se completa solo; el estratégico y un objetivo sin área sólo
+  si el área no tiene propios; los de otra área, nunca. Ajusta dos pruebas del banco
+  que suponían los cinco objetivos del pack para Ismael (Dirección).
+- [x] **P3** (`8717026`) F-B10: `jev.ordenar_objetivos` (una llamada, claves `O1..On`,
+  cortes de una referencia a tarea), ⭐ en el primero con decisión clara, una sola
+  pregunta igual; falla de Jev o duda: orden de siempre, sin ⭐ y registrado
+  (`objetivo_sin_ordenar`, baja, sin aviso a administración; la falta de credencial,
+  una vez por espacio y proceso). Y la nota 5: "Opciones que coinciden con «…»" ->
+  "Para «…» encontré estas opciones. ¿A qué objetivo pertenece la tarea?".
+- [x] **P4** (`c88ce03`) F-B7: `valor.verificable` y `valor.propuesta` (sólo en la
+  pregunta del criterio), la propuesta validada por el código (no vacía, <= 500, distinta
+  de lo dicho; si no sirve, se toma lo escrito y queda `criterio_sin_propuesta`); sale por
+  la plantilla B o por A con la propuesta literal; también al confirmar con "Sí, es eso".
+- [x] **P5** (`b102eec`) F-B8: `consume_pending_text(propuestas=...)`: un título que llega como pedido de tarea nueva (`start_task_intake`) descarta las propuestas sin confirmar de otros mensajes y toma las del mensaje nuevo.
+
+### RED observado y verificación
+
+- P1: `tests/test_objetivo_con_area.py`: 2 failed, 3 passed (las tres que sólo dependen
+  del esquema); GREEN 54 passed con paridad y rollbacks (`-k` objetivo/rollbacks/
+  convergen/aislamiento) y las pruebas del esqueleto y la siembra.
+- P2: `tests/test_alta_objetivos_del_area.py`: 7 failed, 1 passed (el caso de datos
+  viejos); GREEN 8 passed. Regresión: 746 passed en las pruebas del alta; el banco mostró
+  2 fallos por el supuesto de cinco objetivos (corregido en el mismo commit): 361 passed.
+- P3: `tests/test_jev.py` + `tests/test_alta_objetivo_probable.py` contra el código
+  anterior: 15 failed, 50 passed; GREEN 80 passed (con `test_aviso_incidente_legible`).
+- P4: la colección de `tests/test_alta_criterio_verificable.py` falló
+  (`TypeError: ValorEsperado.__init__() got an unexpected keyword argument
+  'juzga_verificable'`); GREEN 68 passed con `test_pregunta_valor_esperado` y
+  `test_aviso_incidente_legible`. Regresión: 1784 passed (alta, task_intake, llm, router,
+  valores, rama, gateway, agente, redacción, verificador, banco).
+- P5: `tests/test_alta_propuestas_ligadas_a_su_tarea.py` contra el código anterior: 3
+  failed, 1 passed (el control: un título que no pide otra tarea conserva la propuesta);
+  GREEN 4 passed. Regresión: 1131 passed (alta, task_intake, rama, pregunta, gateway,
+  agente, botones, toque, banco).
+- Suite completa: ver "Resultado final" más abajo.
+
+### Decisiones tomadas por el escritor (a revisar)
+
+- F-B8 (ambigüedad de producto, devuelta al orquestador): "otra tarea para Nahuel" y el
+  título que llega después SON una sola tarea cuando el título no pide otra; la
+  propuesta cae sólo cuando el mensaje que da el título es en sí un pedido de tarea nueva
+  (la acción `start_task_intake` del ruteo). Es una señal del modelo (cerrada), no una
+  frase. Si el usuario quiere que NINGUNA propuesta de un mensaje dejado de lado sobreviva
+  a un título dado después, es una regla más fuerte: se cambia en `_seguir_con_el_campo_del_alta`.
+- F-B7: sin `verificable` en el valor (el modelo no juzgó) el texto se acepta como
+  siempre; con "no" y una propuesta que no sirve se acepta lo escrito y queda un
+  incidente de baja severidad. Una sola propuesta por alta: se cuenta por haber ofrecido
+  ya una elección del criterio (también la de una propuesta del primer mensaje).
+- F-B10: sólo se ordena la primera página (hasta 7 candidatos) y sin búsqueda escrita.
+  Con duda, el orden es el de siempre (no se reordena sin decisión clara).
+- F-B11: un objetivo estratégico es el que no tiene área; se ofrece, junto con los
+  objetivos sin área de datos viejos, sólo si el área de quien pide no tiene propios.
+  Se usa el área de quien pide (no la del responsable: el objetivo se pregunta antes).
+
+### Resultado final
+
+- Suite completa (`python -m pytest -q` desde el worktree, runner del checkout principal): **2852 passed, 333 deselected, 0 failed** (17 min 48 s; línea previa 2793).
+- PENDIENTE (orquestador): aplicar `0027` a `prisma_flujo` y dar el área a los objetivos existentes; la prueba real de "Corrida siguiente".
