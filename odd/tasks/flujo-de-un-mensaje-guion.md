@@ -225,3 +225,38 @@ obvios en los textos que la persona dicta (título, criterio, motivo): el modelo
 el valor en la etapa 2 y la corrección queda a la vista en el resumen, cambiable con
 Modificar. Pendiente de implementar después de esta corrida (hoy el título queda tal cual
 y el criterio a veces se corrige).
+
+## Corrida siguiente, 2026-10-01 08:11-08:19 (Marcos, variante A)
+
+Leída de la base con los botones resueltos.
+
+| # | Resultado | Nota |
+|---|---|---|
+| 1 | Falló (F-C1) | "necesito crear una tarea: calibrar los sensores de la línea 2" como primer mensaje → "¿A cuál te referís con «…»?" con dos tareas existentes + "Es una tarea nueva". Con "Es una tarea nueva" siguió, y el título se tomó (no preguntó "¿Qué hay que hacer?"). |
+| 2 | Mejoró | Sólo los dos objetivos de OT, con ⭐ en "Conectar y automatizar equipos…" y el texto "Con ⭐ marqué el que más se parece a la tarea." |
+| 3 | Mejoró | "servidores" → "No encontré nada parecido a «servidores». Estas son las opciones que hay." con los dos de OT. |
+| 4 | Mejoró | "4de octubre" → 04/10/2026 (R4c-H6 cerrado en vivo). |
+| 5 | Falló (F-C3) | "no lo sé, voy a ver" → "¿Esto es el criterio…?" (Sí, es eso / No, es otra cosa) → "Sí, es eso" → quedó como criterio, sin propuesta. |
+
+Hallazgos:
+
+- **F-C1 (etapas 2 y 3, contradice ADR 0014).** Con la intención de crear dicha
+  explícitamente, el título de la tarea nueva se trató además como referencia a una tarea
+  existente y Jev abrió una aclaración. Dos dueños para lo mismo: con intención de crear,
+  el título no se busca entre las existentes.
+- **F-C2 (bureaucracia, principio "ayuda y facilita").** Después del objetivo preguntó
+  "¿Confirmás esta descripción?" (Sí / No / ✏️ Otra opción) con la descripción igual al
+  título, y el resumen muestra título y descripción duplicados. Una pregunta que no aporta.
+- **F-C3 (etapa 2, mecanismo).** La propuesta de criterio verificable (F-B7) sólo corre
+  cuando el ruteo devuelve `responde`; con `dudoso` → "Sí, es eso", el texto se toma tal
+  cual sin juzgar si es verificable. Confirmar que es la respuesta no es confirmar que es
+  verificable.
+- **F-C4 (redacción A).** Casi todos los mensajes empiezan con "Entendí que…": otra
+  muletilla que suena a planilla.
+- **F-C5.** El resumen de las 08:18:47 salió sin el cierre que nombra el botón (termina
+  en una línea vacía); coincide con un vencimiento del plazo de redacción a las 08:18.
+- **Latencia en vivo.** 4 vencimientos del plazo de 4 s esta mañana (08:15, 08:16, 08:18 y
+  uno más); la medición en banco (p50 0,9 s) no se reprodujo en vivo. `prisma redaccion`
+  acumulado: 25 llamadas, 18 aceptadas, 3 rechazadas (anoche), 4 vencidas; mediana 4,0 s.
+- No hubo saludo del día: Marcos ya lo había recibido a las 00:23 (regla vigente, un
+  saludo por día local).
