@@ -8,11 +8,15 @@ contexto conversacional. Sin red y sin esperar: el reloj y el modelo se simulan.
 
 from __future__ import annotations
 
+import inspect
 import json
+import threading
+import time
 
+import httpx
 import pytest
 
-from prisma import incidentes, redaccion
+from prisma import incidentes, llm, redaccion
 from prisma.db import admin, espacio
 from prisma.llm import ProveedorGuionado
 from prisma.resultado_turno import (Cambio, Falta, OpcionDisponible, Rechazo,
@@ -41,7 +45,8 @@ class _Reloj:
 
 class _ModeloLento(ProveedorGuionado):
     """Tarda `tarda` segundos (simulados) y respeta el plazo que le piden: si lo
-    pasa, lanza el timeout en el plazo, sin esperar el resto."""
+    pasa, vence en el plazo (`PlazoAgotado`, lo que hace `llamar_con_plazo` con el
+    reloj real), sin esperar el resto."""
 
     def __init__(self, reloj: _Reloj, tarda: float, texto: str = ""):
         super().__init__(guion=[])
@@ -53,7 +58,7 @@ class _ModeloLento(ProveedorGuionado):
         self.plazos.append(plazo)
         if plazo is not None and self.tarda > plazo:
             self.reloj.dormir(plazo)
-            raise TimeoutError("el modelo no contestó a tiempo")
+            raise llm.PlazoAgotado(plazo)
         self.reloj.dormir(self.tarda)
         return self.texto
 
@@ -82,7 +87,7 @@ def _redactar(conn, ws, resultado, proveedor, **kw):
 # ------------------------------------------------------------------ el plazo
 
 def test_el_plazo_por_omision_es_corto_y_se_le_pasa_al_modelo(corework, conn):
-    assert redaccion.PLAZO_REDACCION_S == 3.0
+    assert redaccion.PLAZO_REDACCION_S == 4.0
     ws = corework.workspace_id
     bueno = json.dumps({"texto": "Listo, la tarea «Revisar PLC» quedó en curso.",
                         "pregunta": None, "afirma": ["c1"]}, ensure_ascii=False)
@@ -114,8 +119,8 @@ def test_un_modelo_lento_cae_a_b_dentro_del_plazo_sin_reintentar(
     assert reloj.t == redaccion.PLAZO_REDACCION_S                 # y a tiempo
     (intento,) = _intentos(conn, ws)
     assert intento["resultado"] == "timeout"
-    assert intento["duracion_ms"] == 3000
-    assert "3" in intento["motivo"]
+    assert intento["duracion_ms"] == 4000
+    assert "4" in intento["motivo"]
     (incidente,) = _incidentes(conn, ws)
     assert incidente["severidad"] == "baja" and incidente["notificado_admin_en"] is None
 
@@ -126,7 +131,7 @@ def test_un_modelo_que_contesta_a_tiempo_no_se_corta(corework, conn, monkeypatch
     monkeypatch.setattr(redaccion, "_reloj", reloj)
     bueno = json.dumps({"texto": "Listo, la tarea «Revisar PLC» quedó en curso.",
                         "pregunta": None, "afirma": ["c1"]}, ensure_ascii=False)
-    modelo = _ModeloLento(reloj, tarda=2.9, texto=bueno)
+    modelo = _ModeloLento(reloj, tarda=3.9, texto=bueno)
 
     texto = _redactar(conn, ws, EN_CURSO, modelo)
 
@@ -153,6 +158,134 @@ def test_la_charla_de_b_tambien_tiene_plazo(corework, conn):
     with espacio(conn, ws) as cur:
         redaccion.redactar_charla(cur, ws, "hola", "¿Qué hay que hacer?", proveedor=p)
     assert p.plazos == [redaccion.PLAZO_REDACCION_S]
+
+
+# ---------------------------------------------- el plazo acota el tiempo TOTAL
+
+class _ModeloColgado(ProveedorGuionado):
+    """Ignora el plazo, como un cliente cuyo timeout es por fase (conexión,
+    escritura, lectura): espera hasta que la prueba lo suelta y recién entonces
+    contesta. El plazo del proyecto es el que tiene que cortar."""
+
+    def __init__(self, respuesta: str = ""):
+        super().__init__(guion=[])
+        self.suelta = threading.Event()
+        self.respuesta = respuesta
+
+    def redactar(self, sistema, hechos, *, plazo=None):
+        self.plazos.append(plazo)
+        self.suelta.wait(10)
+        return self.respuesta
+
+
+def test_el_plazo_acota_el_tiempo_total_aunque_el_modelo_lo_ignore(corework, conn):
+    ws = corework.workspace_id
+    bueno = json.dumps({"texto": "Listo, la tarea «Revisar PLC» quedó en curso.",
+                        "pregunta": None, "afirma": ["c1"]}, ensure_ascii=False)
+    modelo = _ModeloColgado(bueno)
+    try:
+        inicio = time.perf_counter()
+        texto = _redactar(conn, ws, EN_CURSO, modelo, plazo=0.1)
+        espera = time.perf_counter() - inicio
+    finally:
+        modelo.suelta.set()                  # la respuesta tardía llega después
+
+    assert espera < 2.0                      # no esperó a un modelo que no contesta
+    assert texto == redaccion.redactar_partes(EN_CURSO, "B")
+    time.sleep(0.2)                          # y la respuesta tardía se descarta
+    (intento,) = _intentos(conn, ws)
+    assert intento["resultado"] == "timeout"
+    assert "0.1 s sin respuesta" in intento["motivo"]
+    assert len(_incidentes(conn, ws)) == 1
+
+
+def test_la_charla_tambien_se_corta_en_el_plazo_total(corework, conn, monkeypatch):
+    ws = corework.workspace_id
+    monkeypatch.setattr(redaccion, "PLAZO_REDACCION_S", 0.1)
+    modelo = _ModeloColgado("¡Hola!")
+    try:
+        inicio = time.perf_counter()
+        with espacio(conn, ws) as cur:
+            breve = redaccion.redactar_charla(cur, ws, "hola", "¿Qué hay que hacer?",
+                                              proveedor=modelo)
+        espera = time.perf_counter() - inicio
+    finally:
+        modelo.suelta.set()
+    assert breve == "" and espera < 2.0
+
+
+def test_un_modelo_rapido_no_paga_nada_por_el_plazo(corework, conn):
+    ws = corework.workspace_id
+    bueno = json.dumps({"texto": "Listo, la tarea «Revisar PLC» quedó en curso.",
+                        "pregunta": None, "afirma": ["c1"]}, ensure_ascii=False)
+    modelo = _ModeloColgado(bueno)
+    modelo.suelta.set()
+    texto = _redactar(conn, ws, EN_CURSO, modelo, plazo=5.0)
+    assert texto.texto == "Listo, la tarea «Revisar PLC» quedó en curso."
+
+
+# ----------------------------------------- los timeouts se clasifican por tipo
+
+class _TimeoutDeUnCliente(Exception):
+    """Como `openai.APITimeoutError`: el cliente envuelve el timeout de httpx."""
+
+
+def _envuelto(causa: BaseException) -> BaseException:
+    try:
+        raise _TimeoutDeUnCliente("Request timed out.") from causa
+    except _TimeoutDeUnCliente as exc:
+        return exc
+
+
+class _NombraTimeoutPeroNoLoEs(Exception):
+    pass
+
+
+@pytest.mark.parametrize("excepcion", [
+    TimeoutError("se agotó"),
+    httpx.ReadTimeout("lectura"),
+    httpx.ConnectTimeout("conexión"),
+    httpx.PoolTimeout("pool"),
+    _envuelto(httpx.ReadTimeout("lectura")),
+])
+def test_un_timeout_se_reconoce_por_su_tipo_y_no_dice_mas_de_lo_que_sabe(
+        corework, conn, excepcion):
+    ws = corework.workspace_id
+    p = ProveedorGuionado(guion=[], borradores=[excepcion])
+    _redactar(conn, ws, EN_CURSO, p)
+    (intento,) = _intentos(conn, ws)
+    assert intento["resultado"] == "timeout"
+    assert "sin respuesta" not in intento["motivo"]       # eso es sólo del plazo propio
+
+
+def test_un_error_con_timeout_en_el_nombre_no_es_un_timeout(corework, conn):
+    ws = corework.workspace_id
+    p = ProveedorGuionado(guion=[], borradores=[_NombraTimeoutPeroNoLoEs("x")])
+    _redactar(conn, ws, EN_CURSO, p)
+    assert _intentos(conn, ws)[0]["resultado"] == "error"
+
+
+# ------------------------------------------- todo proveedor acepta el `plazo`
+
+def _proveedores():
+    return [c for _, c in inspect.getmembers(llm, inspect.isclass)
+            if "redactar" in vars(c)]
+
+
+def test_hay_proveedores_que_comprobar():
+    nombres = {c.__name__ for c in _proveedores()}
+    assert {"Proveedor", "ProveedorGuionado"} <= nombres
+    assert len(nombres) >= 5            # los de cada proveedor real, también
+
+
+@pytest.mark.parametrize("clase", _proveedores(), ids=lambda c: c.__name__)
+def test_todo_proveedor_acepta_el_plazo_como_argumento_con_nombre(clase):
+    """El contrato de `redactar` es parte del tipo: un proveedor sin `plazo=`
+    perdería el plazo sin avisar."""
+    parametro = inspect.signature(clase.redactar).parameters.get("plazo")
+    assert parametro is not None, f"{clase.__name__}.redactar no acepta `plazo`"
+    assert parametro.kind is inspect.Parameter.KEYWORD_ONLY
+    assert parametro.default is None
 
 
 # ------------------------------------------------------------ el tamaño del pedido

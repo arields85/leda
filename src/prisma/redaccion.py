@@ -23,11 +23,13 @@ import statistics
 import time
 from dataclasses import dataclass
 
+import httpx
 import psycopg
 
 from .db import registrar_auditoria
 from .incidentes import (ETAPA_CHARLA_SIN_RESPUESTA, ETAPA_REDACCION_RECHAZADA,
                          registrar_incidente)
+from .llm import PlazoAgotado, llamar_con_plazo
 from .resultado_turno import Falta, ResultadoTurno, Resumen, ids_de_cambios
 from .valores import TipoValor  # noqa: F401 -- el tipo de `Falta.tipo`
 from .verificador_redaccion import leer_borrador, verificar
@@ -40,10 +42,12 @@ ETAPA_INTERRUPTOR_REDACCION = "interruptor_redaccion"
 # con su duración: de ahí sale la mediana de la prueba (`estadistica_variante_a`).
 ACCION_REDACCION_A = "redaccion_variante_a"
 _reloj = time.perf_counter
-# El plazo de la redacción de A: una llamada, sin reintentos. Pasado el plazo sale
-# la plantilla de B de inmediato y queda registrado. Hoy cada texto y cada toque
-# espera esa llamada; el plazo acota lo peor que la persona puede esperar.
-PLAZO_REDACCION_S = 3.0
+# El plazo TOTAL de la redacción de A: una llamada, sin reintentos. Pasado el plazo
+# sale la plantilla de B de inmediato y queda registrado. Cada texto y cada toque
+# espera esa llamada; el plazo acota lo peor que la persona puede esperar. Medido en
+# vivo (nan/deepseek-v4-flash, la llamada de redacción): p50 0,93 s, p90 3,06 s,
+# máximo 6,6 s; con 3 s caerían ~10 % de los turnos a B, con 4 s ~4 %.
+PLAZO_REDACCION_S = 4.0
 
 # (espacio, valor) ya registrados por este proceso: la anomalía del interruptor
 # se nota una vez, no en cada turno (mismo criterio que el supresor de
@@ -273,10 +277,25 @@ def _registrar_intento(cur, workspace_id: str, resultado: str, motivo: str | Non
         etapa=ETAPA_REDACCION_RECHAZADA, avisar_admin=False)
 
 
-def _es_timeout(exc: Exception) -> bool:
-    """El modelo no contestó a tiempo: el timeout propio de Python o el de un
-    cliente (`APITimeoutError`, `ReadTimeout`, ...)."""
-    return isinstance(exc, TimeoutError) or "timeout" in type(exc).__name__.lower()
+def _timeout_de(exc: BaseException) -> BaseException | None:
+    """El timeout que explica la excepción, por su TIPO (no por su nombre): el
+    plazo propio, el de Python o el de httpx, también si un cliente lo envolvió
+    (`APITimeoutError` lo trae como causa)."""
+    visto: set[int] = set()
+    while exc is not None and id(exc) not in visto:
+        if isinstance(exc, (PlazoAgotado, TimeoutError, httpx.TimeoutException)):
+            return exc
+        visto.add(id(exc))
+        exc = exc.__cause__
+    return None
+
+
+def _motivo_de_timeout(exc: BaseException, plazo: float) -> str:
+    """"Más de N s sin respuesta" sólo es verdad para el plazo propio; un timeout
+    de conexión o de pool no dice que el modelo tardó."""
+    if isinstance(_timeout_de(exc), PlazoAgotado):
+        return f"timeout: más de {plazo:g} s sin respuesta"
+    return f"timeout: {type(_timeout_de(exc)).__name__}"
 
 
 def _motivo_de_error(exc: Exception) -> str:
@@ -308,8 +327,9 @@ def redactar_turno(cur, workspace_id: str, resultado: ResultadoTurno, variante: 
     caracteres = 0
     try:
         modelo = proveedor or proveedor_de_redaccion(cur, workspace_id)
-        crudo = modelo.redactar(SISTEMA_REDACCION, serializar_hechos(resultado),
-                                plazo=plazo)
+        hechos = serializar_hechos(resultado)
+        crudo = llamar_con_plazo(
+            lambda: modelo.redactar(SISTEMA_REDACCION, hechos, plazo=plazo), plazo)
         duracion_ms = round((_reloj() - inicio) * 1000)
         caracteres = len((crudo or "").strip())
         borrador = leer_borrador(crudo)
@@ -321,10 +341,10 @@ def redactar_turno(cur, workspace_id: str, resultado: ResultadoTurno, variante: 
         raise                       # la transacción no sigue: no es del modelo
     except Exception as exc:        # un modelo que falla o se cuelga: sale B
         duracion_ms = duracion_ms or round((_reloj() - inicio) * 1000)
-        if _es_timeout(exc):
+        if _timeout_de(exc):
             _registrar_intento(cur, workspace_id, "timeout",
-                               f"timeout: más de {plazo:g} s sin respuesta",
-                               duracion_ms, caracteres)
+                               _motivo_de_timeout(exc, plazo), duracion_ms,
+                               caracteres)
         else:
             _registrar_intento(cur, workspace_id, "error", _motivo_de_error(exc),
                                duracion_ms, caracteres)
@@ -402,9 +422,11 @@ def redactar_charla(cur, workspace_id: str, mensaje: str, pregunta: str, *,
     de baja severidad que no avisa a la administración -- nunca en silencio."""
     try:
         modelo = proveedor or proveedor_de_redaccion(cur, workspace_id)
-        borrador = modelo.redactar(SISTEMA_CHARLA, json.dumps(
-            {"mensaje": mensaje, "pregunta_pendiente": pregunta},
-            ensure_ascii=False), plazo=PLAZO_REDACCION_S)
+        pedido = json.dumps({"mensaje": mensaje, "pregunta_pendiente": pregunta},
+                            ensure_ascii=False)
+        borrador = llamar_con_plazo(
+            lambda: modelo.redactar(SISTEMA_CHARLA, pedido,
+                                    plazo=PLAZO_REDACCION_S), PLAZO_REDACCION_S)
     except psycopg.Error:
         raise                       # la transacción no sigue: no es del modelo
     except Exception as exc:        # un modelo que falla o se cuelga

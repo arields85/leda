@@ -10,6 +10,7 @@ otra clase de veinte líneas y no se toca nada más.
 
 from __future__ import annotations
 
+import concurrent.futures
 import json
 import math
 from dataclasses import dataclass, field
@@ -483,6 +484,34 @@ class Proveedor(Protocol):
 # oraciones más su JSON, no una conversación. Un tope mayor sólo alarga una
 # redacción descontrolada.
 MAX_TOKENS_REDACCION = 256
+
+
+class PlazoAgotado(TimeoutError):
+    """La llamada al modelo no terminó dentro del plazo TOTAL que se le dio (a
+    diferencia de un timeout de red por fase, que es del cliente)."""
+
+    def __init__(self, plazo: float):
+        super().__init__(f"sin respuesta en {plazo:g} s")
+        self.plazo = plazo
+
+
+def llamar_con_plazo(llamada, plazo: float):
+    """El resultado de `llamada()` o `PlazoAgotado`: el plazo acota el tiempo
+    TOTAL que espera quien llama. El timeout de un cliente HTTP es por fase
+    (conexión, escritura, lectura, pool) y la suma de las fases pasa del plazo;
+    acá la llamada corre en un hilo aparte y se deja de esperar al vencer. La
+    respuesta tardía se descarta (el hilo termina solo, acotado por el timeout
+    del cliente). La excepción de la propia llamada se propaga tal cual."""
+    ejecutor = concurrent.futures.ThreadPoolExecutor(
+        max_workers=1, thread_name_prefix="llamada-con-plazo")
+    try:
+        futuro = ejecutor.submit(llamada)
+        terminados, _ = concurrent.futures.wait([futuro], timeout=plazo)
+        if not terminados:
+            raise PlazoAgotado(plazo)
+        return futuro.result()
+    finally:
+        ejecutor.shutdown(wait=False)
 
 
 def _con_plazo(cliente, plazo: float | None):
