@@ -18,8 +18,8 @@ from .incidentes import (ETAPA_CONFIGURACION_ALTA, ETAPA_RESUMEN_VIGENTE_SIN_FIL
                          ETAPA_VALOR_SIN_INTERPRETAR, NOTICIA_NEUTRA_INCIDENTE,
                          REFERENCIA_PENDING_ACTION, registrar_incidente)
 from .pendientes import HERRAMIENTA_REVISION_BORRADOR
-from .redaccion import redactar, variante_redaccion
-from .resultado_turno import Falta, Rechazo, ResultadoTurno
+from .redaccion import nombre_legible, redactar, variante_redaccion
+from .resultado_turno import Falta, Rechazo, ResultadoTurno, Resumen
 from .salida import (BUTTON_TEXT_LIMIT, ETIQUETA_CANCELAR, ETIQUETA_CONFIRMAR,
                      ETIQUETA_ENVIAR, ETIQUETA_MODIFICAR, ETIQUETA_RECHAZAR,
                      ICONO_CANCELAR, ICONO_OTRA_OPCION,
@@ -824,8 +824,12 @@ def open_modify_picker(cur: psycopg.Cursor, who: Solicitante, question_id: str,
         actor_app_user_id=who.app_user_id, actor_kind="persona",
         sujeto_tipo="task_draft", sujeto_id=str(request["task_draft_id"]),
         detalle={"request_id": str(request["id"]), "via": via})
+    # Sólo lo que se puede cambiar (regla 3 del ADR 0013): un dato con una sola
+    # opción posible, como el área de quien tiene un solo lugar, no se ofrece.
     options = [(MODIFY_FIELD_LABELS[field], "modify_field", {"field": field})
-               for field in MODIFY_FIELD_LABELS]
+               for field in MODIFY_FIELD_LABELS
+               if field not in CHOICE_FIELDS
+               or _unica_opcion(cur, request, who, field) is None]
     options.append((BACK_TO_SUMMARY, "back_to_summary", None))
     return _open_choices(cur, request, None, MODIFY_PICKER_PROMPT, options, now,
                          kind=MODIFY_PICKER_KIND)
@@ -1031,12 +1035,14 @@ def send_to_approval(cur: psycopg.Cursor, who: Solicitante, *, token: str,
         detalle={"request_id": request_id,
                  "confirmador_membership_id":
                      str(authority["aprobador_membership_id"])})
+    # Quien confirma recibe el mismo resumen con el cierre de SU botón.
+    texto_para_confirmar = _con_cierre(request["review_text"], CIERRE_CONFIRMAR)
     pending, requester_confirms = _send_to_confirmer(
-        cur, request, now, request["review_text"], preview, version, authority)
+        cur, request, now, texto_para_confirmar, preview, version, authority)
     if requester_confirms:
         # Cambió quién aprueba y ahora es quien pidió: el resumen que recibe, con
         # sus tres botones, es la respuesta a su toque.
-        return IntakeOutcome(request_id, request["review_text"], changed=True,
+        return IntakeOutcome(request_id, texto_para_confirmar, changed=True,
                              pending_action_id=pending.id)
     text = draft_sent_text(authority["aprobador_nombre"])
     _enqueue(cur, request, text, now, f"intake:{request_id}:sent:v{version}")
@@ -1414,13 +1420,12 @@ def _advance(cur, request, who, now, *, prefijo: str = "") -> IntakeOutcome:
         if field in {"title", "description", "due_date", "acceptance_criterion"}:
             if row["estado"] == "proposed":
                 return _open_choices(
-                    cur, request, field,
-                    prefijo + _proposal_prompt(field, row["valor"]),
+                    cur, request, field, _proposal_prompt(field, row["valor"]),
                     [(CONFIRM, "confirm", None), (REJECT, "reject", None),
-                     (OTHER, "other", None)], now,
+                     (OTHER, "other", None)], now, prefijo=prefijo,
                 )
-            return _open_free_text(cur, request, field,
-                                   prefijo + _free_text_prompt(field), now)
+            return _open_free_text(cur, request, field, _free_text_prompt(field),
+                                   now, prefijo=prefijo)
         if field == "evidence":
             cur.execute(
                 """select valor from task_intake_field
@@ -1449,6 +1454,19 @@ def _advance(cur, request, who, now, *, prefijo: str = "") -> IntakeOutcome:
                     where request_id = %s and campo = 'evidence'""",
                 (Jsonb({"items": list(policy["evidencia_requerida"]),
                         "version": policy["version"]}), now, request_id),
+            )
+            continue
+        unica = _unica_opcion(cur, request, who, field)
+        if unica is not None:
+            # Una sola opción posible: no se pregunta. Se completa sola y queda a
+            # la vista en el resumen (decisión del usuario, 2026-09-30).
+            cur.execute(
+                """update task_intake_field
+                      set estado = 'confirmed', valor = %s, proposed_by = 'server',
+                          source_choice_id = null, version = version + 1,
+                          actualizado_en = %s
+                    where request_id = %s and campo = %s""",
+                (Jsonb(unica), now, request_id, field),
             )
             continue
         return _open_entity_page(
@@ -1555,6 +1573,7 @@ def _open_entity_page(cur, request, who, field, query, offset, now, *,
     candidates, has_more = _entity_candidates(
         cur, request, who, field, query, offset=offset)
     no_match = bool(normalize_text(str(query or ""))) and not candidates
+    buscado = normalize_text(str(query or ""))
     if no_match:
         query = None
         offset = 0
@@ -1584,19 +1603,55 @@ def _open_entity_page(cur, request, who, field, query, offset, now, *,
             "field": field, "query": query,
             "offset": offset + CANDIDATE_PAGE_SIZE,
         }))
-    options.append((OTHER, "other", None))
+    if _hay_otra_opcion(cur, request, who, field, candidates, offset, has_more):
+        options.append((OTHER, "other", None))
     if no_match:
-        prompt = ("No encontré esa opción. Elegí una de las opciones vigentes "
-                  f"o tocá «{OTHER}».")
+        prompt = (f"No encontré nada parecido a «{buscado}». Estas son las "
+                  "opciones que hay.")
     else:
         prompt = (_candidate_prompt(field) if not query else
                   f"Opciones que coinciden con «{query}».")
-    return _open_choices(cur, request, field, prefijo + prompt, options, now)
+    return _open_choices(cur, request, field, prompt, options, now,
+                         prefijo=prefijo)
 
 
-def _open_choices(cur, request, field, prompt, options, now, kind=None):
+def _hay_otra_opcion(cur, request, who, field, mostradas, offset, has_more) -> bool:
+    """Si hay otra opción posible además de las que están en pantalla (regla 3 del
+    ADR 0013: sólo opciones posibles). "Otra opción" abre la búsqueda por nombre
+    entre las opciones de la base, así que sin opciones fuera de la pantalla no
+    hay nada que buscar."""
+    if has_more or offset:
+        return True
+    todas, hay_mas = _entity_candidates(cur, request, who, field, None)
+    ids = {candidata[1] for candidata in mostradas}
+    return hay_mas or any(candidata[1] not in ids for candidata in todas)
+
+
+def _unica_opcion(cur, request, who, field):
+    """El valor guardado de la única opción posible de un dato (objetivo,
+    responsable o área), o `None` si hay más de una, ninguna o no se puede
+    mostrar. Un dato con una sola opción no se pregunta: se completa solo."""
+    encontradas = _entity_candidates(cur, request, who, field, None)
+    if not isinstance(encontradas, tuple):
+        return None
+    candidatas, hay_mas = encontradas
+    if hay_mas or len(candidatas) != 1 or not _candidates_deliverable(
+            field, candidatas):
+        return None
+    return candidatas[0][2]
+
+
+def _open_choices(cur, request, field, prompt, options, now, kind=None, *,
+                  prefijo: str = ""):
     request_id = str(request["id"])
     kind = kind or field or "choice"
+    if field is not None:
+        # La pregunta de un dato sale por la redacción del espacio (ADR 0014,
+        # etapa 6); el aviso que va delante no es la pregunta.
+        prompt = prefijo + _decir(cur, request, ResultadoTurno(falta=Falta(
+            _SUJETO_DEL_CAMPO[field], TipoValor.OPCION, pregunta=prompt)))
+    else:
+        prompt = prefijo + prompt
     prepare_payload(prompt, dedupe_key="intake-choice", has_buttons=True)
     prepare_buttons([(label, "i:placeholder") for label, _, _ in options])
     _invalidate_open_inputs(cur, request_id)
@@ -1623,8 +1678,12 @@ def _open_choices(cur, request, field, prompt, options, now, kind=None):
     return IntakeOutcome(request_id, prompt, changed=True)
 
 
-def _open_free_text(cur, request, field, prompt, now, replace=False, block=None):
+def _open_free_text(cur, request, field, prompt, now, replace=False, block=None,
+                    *, prefijo: str = ""):
     request_id = str(request["id"])
+    prompt = prefijo + _decir(cur, request, ResultadoTurno(falta=Falta(
+        _SUJETO_DEL_CAMPO[field], TIPO_DE_CAMPO.get(field, TipoValor.TEXTO),
+        pregunta=prompt)))
     prepare_payload(prompt, dedupe_key="intake-text", has_buttons=bool(block))
     cur.execute(
         """update task_intake_free_text_slot set estado = 'invalidated'
@@ -1808,14 +1867,16 @@ def _finalize(cur, request, who, now):
          values["acceptance_criterion"], policy["evidencia_requerida"],
          policy["version"], request["version"], now, request["task_draft_id"]),
     )
-    preview_text = render_preview(
+    datos = dict(
         title=values["title"], description=values["description"],
         objective=objective["title"], area=area["name"],
         responsible=responsible["name"],
         due_date=format_due_date(values["due_date"]),
         acceptance_criterion=values["acceptance_criterion"],
         evidence=list(policy["evidencia_requerida"]),
+        variante=variante_redaccion(cur, str(request["workspace_id"])),
     )
+    preview_text = render_preview(**datos)
     try:
         prepare_payload(preview_text, dedupe_key="intake-preview", has_buttons=True)
     except PayloadValidationError:
@@ -1828,8 +1889,16 @@ def _finalize(cur, request, who, now):
                                "no-active-authority")
     if str(authority["aprobador_membership_id"]) != str(request["membership_id"]):
         # Confirma otra persona (T9-R1c-4): quien pidió el borrador lo revisa primero
-        # y es él quien lo envía; a quien confirma no le llega nada todavía.
-        return _offer_review(cur, request, who, now, preview_text, preview)
+        # y es él quien lo envía; a quien confirma no le llega nada todavía. Su
+        # resumen dice lo que hace su botón, no el de quien confirma (R4c-H9).
+        texto_de_revision = render_preview(
+            **datos, cierre=cierre_enviar(authority["aprobador_nombre"]))
+        try:
+            prepare_payload(texto_de_revision, dedupe_key="intake-review",
+                            has_buttons=True)
+        except PayloadValidationError:
+            return _configuration_error(cur, request, who, "aggregate", now)
+        return _offer_review(cur, request, who, now, texto_de_revision, preview)
     pending, _ = _send_to_confirmer(cur, request, now, preview_text, preview,
                                     request["version"], authority)
     return IntakeOutcome(request_id, preview_text, changed=True,
@@ -1968,21 +2037,45 @@ def _send_to_confirmer(cur, request, now, preview_text, preview, version,
 
 
 
+# Lo que dice el cierre del resumen sobre el botón que le toca a quien lo lee: no
+# es el mismo para quien confirma (Confirmar) que para quien pidió el borrador y
+# lo revisa antes de enviarlo (Enviar a aprobación, R4c-H9).
+CIERRE_CONFIRMAR = "Con Confirmar se crea la tarea con estos datos."
+
+
+def cierre_enviar(confirma: str | None) -> str:
+    """Lo que dice el resumen de quien pidió el borrador cuando lo confirma otra
+    persona: qué hace su botón y cuándo se crea la tarea."""
+    nombre = normalize_text(confirma) if isinstance(confirma, str) else ""
+    a_quien = nombre or "quien lo confirma"
+    return (f"Con Enviar a aprobación se lo mando a {a_quien} para que lo "
+            "confirme: la tarea se crea cuando lo confirme.")
+
+
 def render_preview(*, title, description="", objective, area, responsible, due_date,
-                   acceptance_criterion, evidence):
-    evidence_text = ", ".join(evidence) if evidence else "No requiere evidencia"
-    return (
-        "Resumen para revisar\n"
-        f"Título: {title}\n"
-        f"Descripción: {description or 'Sin descripción'}\n"
-        f"Objetivo: {objective}\n"
-        f"Área: {area}\n"
-        f"Responsable: {responsible}\n"
-        f"Fecha objetivo: {due_date}\n"
-        f"Criterio de aceptación: {acceptance_criterion}\n"
-        f"Evidencia: {evidence_text}\n\n"
-        "Al confirmar se comprometen todos los datos mostrados."
-    )
+                   acceptance_criterion, evidence, cierre=CIERRE_CONFIRMAR,
+                   variante="B"):
+    """El resumen para revisar, redactado por `redaccion` (ADR 0014, etapa 6).
+    Sólo muestra lo que tiene: una descripción que nadie dio no se dice "sin
+    descripción". La evidencia se nombra como la lee una persona."""
+    evidence_text = (", ".join(nombre_legible(e) for e in evidence)
+                     if evidence else "No requiere evidencia")
+    lineas = [("Título", title)]
+    if description:
+        lineas.append(("Descripción", description))
+    lineas += [("Objetivo", objective), ("Área", area),
+               ("Responsable", responsible), ("Fecha objetivo", due_date),
+               ("Criterio de aceptación", acceptance_criterion),
+               ("Evidencia", evidence_text)]
+    return redactar(ResultadoTurno(resumen=Resumen(
+        "Resumen para revisar", tuple(lineas), cierre)), variante)
+
+
+def _con_cierre(texto: str, cierre: str) -> str:
+    """El mismo resumen con otro cierre: el cierre es siempre el último
+    párrafo (`render_preview`)."""
+    cuerpo = texto.rpartition("\n\n")[0]
+    return f"{cuerpo}\n\n{cierre}"
 
 
 def _preview_offenders(**values):

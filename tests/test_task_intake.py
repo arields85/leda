@@ -236,7 +236,7 @@ def test_objective_callback_commits_once_dispatches_next_prompt_and_replays_iner
     assert len(transport.enviados) == 1
     assert {button.etiqueta for button in transport.enviados[0].botones} == {
         con_icono("Para mí", ICONO_TAREA), con_icono("Sam North 1", ICONO_TAREA),
-        con_icono("Sam Noble 1", ICONO_TAREA), I.OTHER}
+        con_icono("Sam Noble 1", ICONO_TAREA)}       # no hay otra opción que buscar
 
 
 @pytest.mark.parametrize("invalid", ("actor", "chat", "request", "version"))
@@ -389,10 +389,7 @@ def _complete(cur, world, request_id, actor, *, criterion_label="Confirm"):
         _choose(cur, actor, request_id, "Sí")
     responsible_label = next(label for label in _active_choices(cur, request_id)
                              if "Sam North" in label)
-    _choose(cur, actor, request_id, responsible_label)
-    area_label = next(label for label in _active_choices(cur, request_id)
-                      if "Field Services" in label)
-    _choose(cur, actor, request_id, area_label)
+    _choose(cur, actor, request_id, responsible_label)     # el área se completa sola
     _choose(cur, actor, request_id, "Sí")
     return _choose(cur, actor, request_id,
                    "Sí" if criterion_label == "Confirm" else criterion_label)
@@ -577,7 +574,8 @@ def test_ambiguous_known_entities_are_server_candidates_with_other(
         people = _active_choices(cur, outcome.request_id)
         assert any("Sam North" in x for x in people)
         assert any("Sam Noble" in x for x in people)
-        assert con_icono("Para mí", ICONO_TAREA) in people and I.OTHER in people
+        assert con_icono("Para mí", ICONO_TAREA) in people
+        assert I.OTHER not in people     # las tres entran en pantalla: no hay otra
 
 
 def test_intake_candidate_label_near_the_limit_still_fits_with_its_icon(
@@ -758,7 +756,7 @@ def test_preview_is_server_rendered_complete_and_transport_bounded(
         preview = cur.fetchone()["cuerpo"]
         assert I.telegram_text_length(preview) <= I.SAFE_TELEGRAM_TEXT
         for committed in ("Inspect relief valve", "Reduce service delay",
-                          "Sin descripción", "Sam North", "Field Services", "29/02/2028",
+                          "Sam North", "Field Services", "29/02/2028",
                           "Signed test record attached", "test record"):
             assert committed in preview
         cur.execute(

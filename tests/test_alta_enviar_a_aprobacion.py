@@ -233,7 +233,9 @@ def test_enviar_le_manda_el_borrador_a_quien_confirma_y_le_dice_a_quien_pide(
     assert _etiquetas(conn, confirmacion["id"]) == ETIQUETAS_DEL_APROBADOR
     fila = _fila(conn, confirmacion["id"])
     assert fila["chat_id"] == tg_aprobador and fila["es_respuesta"] is False
-    assert fila["cuerpo"] == revision["resumen"]
+    # Los mismos datos; el cierre dice lo que hace el botón de cada uno (R4c-H9).
+    assert fila["cuerpo"] == I._con_cierre(revision["resumen"], I.CIERRE_CONFIRMAR)
+    assert revision["resumen"].endswith(I.cierre_enviar("Morgan Hale 1"))
     # La versión y la vista previa son las del borrador vigente al enviar.
     assert confirmacion["draft_version"] == revision["draft_version"]
     assert confirmacion["preview"] == revision["preview"]
@@ -435,7 +437,7 @@ def test_si_al_enviar_quien_aprueba_paso_a_ser_quien_pide_recibe_una_sola_respue
     (revision, confirmacion) = _acciones(conn, rid)
     assert revision["estado"] == "cancelada" and confirmacion["estado"] == "esperando"
     assert str(unica["pending_action_id"]) == str(confirmacion["id"])
-    assert unica["cuerpo"] == revision["resumen"]
+    assert unica["cuerpo"] == I._con_cierre(revision["resumen"], I.CIERRE_CONFIRMAR)
     assert not unica["cuerpo"].startswith("No pude completar eso")
     assert confirmacion["chat_id"] == user
     assert _etiquetas(conn, confirmacion["id"]) == [
@@ -520,7 +522,7 @@ def test_modificar_en_la_revision_abre_el_mismo_selector_y_no_le_manda_nada_a_qu
 
     assert [a["estado"] for a in _acciones(conn, rid)] == ["cancelada"]
     assert list(_opciones_activas(conn, rid)) == [
-        "Título", "Descripción", "Objetivo", "Responsable", "Área",
+        "Título", "Descripción", "Objetivo", "Responsable",
         "Fecha objetivo", "Criterio de aceptación", "Volver al resumen"]
     assert _salidas(conn, _tg_aprobador(intake_world)) == []
     assert _tareas(conn) == 0

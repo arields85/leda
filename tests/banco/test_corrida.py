@@ -1810,8 +1810,7 @@ _TITULO_OBJETIVO_ALTA = "Objetivo simulado de Cablear tablero (simulado)"
 _TOQUES_HASTA_EL_BORRADOR = [
     {"indice": 0},                  # el objetivo (la única candidata; el título
                                     # que trae el mensaje ya está tomado)
-    {"indice": 0},                  # la persona responsable
-    {"indice": 0},                  # el área
+    {"indice": 0},                  # la persona responsable (el área se completa sola)
     {"etiqueta": "Sí"},             # la fecha objetivo propuesta
     {"etiqueta": "Sí"},             # el criterio de aceptación propuesto
 ]
@@ -2587,7 +2586,7 @@ def test_un_mensaje_que_corrige_la_vista_previa_lleva_al_selector_y_de_ahi_al_da
     ws = corework.workspace_id
     _con_dos_tareas(conn, ws)
     interno = _responde(RespectoPendiente.CORRIGE,
-                        (RespectoPendiente.RESPONDE, {"opcion_id": "6"}))  # la fecha
+                        (RespectoPendiente.RESPONDE, {"opcion_id": "5"}))  # la fecha
 
     r = ejecutar_escenario(
         conn, ws, "corework", "Ismael Soschinski", [], interno,
@@ -2621,7 +2620,7 @@ def test_el_corredor_no_confirma_solo_la_vista_previa_de_un_borrador(corework, c
     ("b-0025", [(RespectoPendiente.RESPONDE, {"texto": "Cablear tablero sur"})]),
     ("b-0025-b", [(RespectoPendiente.RESPONDE, {"opcion_id": "5"})]),  # "…de Revisar tablero"
     ("b-0025-c", [RespectoPendiente.CORRIGE,
-                  (RespectoPendiente.RESPONDE, {"opcion_id": "6"})]),  # "Fecha objetivo"
+                  (RespectoPendiente.RESPONDE, {"opcion_id": "5"})]),  # "Fecha objetivo"
     ("b-0025-d", []),                                   # sólo toques: nada que rutear
     ("b-0025-e", [(RespectoPendiente.RESPONDE, {"fecha_iso": "2031-01-05"})]),
 ])

@@ -43,7 +43,7 @@ def _alta_hasta_el_criterio(conn, world, responsable: str, *,
     with espacio(conn, world["north-lab"]["id"]) as cur:
         actor, outcome = _start(cur, world, chat_id=user)
         rid = outcome.request_id
-        for parte in ("Reduce service delay", responsable, "Field Services"):
+        for parte in ("Reduce service delay", responsable):   # el área se completa sola
             etiqueta = next(e for e in _active_choices(cur, rid) if parte in e)
             _choose(cur, actor, rid, etiqueta, chat_id=user)
         _choose(cur, actor, rid, "Sí", chat_id=user)           # la fecha

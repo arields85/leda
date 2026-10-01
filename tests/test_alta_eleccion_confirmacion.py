@@ -63,18 +63,21 @@ def _alta_con_eleccion(conn, world) -> str:
     return outcome.request_id
 
 
-def _alta_en_confirmacion(conn, world, responsable="Sam North") -> tuple[str, str]:
+def _alta_en_confirmacion(conn, world, responsable="Sam North",
+                          **propuestas) -> tuple[str, str]:
     """El alta completa: el borrador espera la confirmación. Devuelve el id de
     la solicitud y el de la `pending_action` de la vista previa. Quien escribe
     (Taylor Quinn) aprueba lo de Sam North; lo suyo ("Para mí") lo aprueba
     Morgan Hale."""
     user = _usuario(world)
     with espacio(conn, world["north-lab"]["id"]) as cur:
-        actor, outcome = _start(cur, world, chat_id=user)
+        actor, outcome = _start(cur, world, chat_id=user, **propuestas)
         rid = outcome.request_id
-        for parte in ("Reduce service delay", responsable, "Field Services"):
+        for parte in ("Reduce service delay", responsable):   # el área se completa sola
             etiqueta = next(e for e in _active_choices(cur, rid) if parte in e)
             _choose(cur, actor, rid, etiqueta, chat_id=user)
+            if parte == "Reduce service delay" and "description" in propuestas:
+                _choose(cur, actor, rid, "Sí", chat_id=user)   # la descripción
         _choose(cur, actor, rid, "Sí", chat_id=user)
         final = _choose(cur, actor, rid, "Sí", chat_id=user)
         # Quien escribe tiene la pregunta abierta: la confirmación si es quien

@@ -40,8 +40,10 @@ from tests.test_task_intake import (_RoutingProvider, _active_choices,
                                     _callback_client, _choose,
                                     _post_intake_callback, _start)
 
+# El área sale de la persona responsable y cada persona tiene una sola: con una sola
+# opción no hay nada que cambiar y el selector no la ofrece (regla 3, ADR 0013).
 ETIQUETAS_DE_LOS_DATOS = ["Título", "Descripción", "Objetivo", "Responsable",
-                          "Área", "Fecha objetivo", "Criterio de aceptación"]
+                          "Fecha objetivo", "Criterio de aceptación"]
 ETIQUETAS_DEL_SELECTOR = ETIQUETAS_DE_LOS_DATOS + ["Volver al resumen"]
 AVISO_TOQUE_YA_USADO = ("Ese pedido ya no está vigente. Si sigue haciendo falta, "
                         "escribime y lo vemos de nuevo.")
@@ -426,7 +428,7 @@ def test_elegir_otro_objetivo_cambia_solo_el_objetivo_y_vuelve_la_vista_previa(
     assert _tareas(conn) == 0
 
 
-def test_elegir_un_responsable_de_otra_area_pide_el_area_y_vuelve_la_vista_previa(
+def test_elegir_un_responsable_de_otra_area_completa_el_area_y_vuelve_la_vista_previa(
         intake_world, conn, monkeypatch):
     rid, pid, client, user = _modificar(conn, monkeypatch, intake_world)
     _elegir_dato(conn, client, user, rid, "Responsable")
@@ -435,12 +437,8 @@ def test_elegir_un_responsable_de_otra_area_pide_el_area_y_vuelve_la_vista_previ
 
     _post_intake_callback(client, noble, user)
 
-    # Su área es otra: el alta la vuelve a pedir, como siempre.
-    assert _conjunto_activo(conn, rid)["campo"] == "area"
-    area = next(t for e, t in _opciones_activas(conn, rid).items()
-                if "Quality Guild" in e)
-    _post_intake_callback(client, area, user)
-
+    # Su área es otra y es la única que tiene: se completa sola, sin preguntar.
+    assert _conjunto_activo(conn, rid) is None
     campos = _campos(conn, rid)
     assert campos["responsible"][1]["name"] == "Sam Noble 1"
     assert campos["area"][1]["name"] == "Quality Guild"
@@ -448,14 +446,12 @@ def test_elegir_un_responsable_de_otra_area_pide_el_area_y_vuelve_la_vista_previ
     assert "Sam Noble 1" in _previews(conn, rid)[-1]["resumen"]
 
 
-def test_modificar_el_area_vuelve_a_mostrar_su_opcion(intake_world, conn,
-                                                      monkeypatch):
+def test_el_area_no_se_ofrece_en_modificar_porque_no_tiene_otra_opcion(
+        intake_world, conn, monkeypatch):
     rid, pid, client, user = _modificar(conn, monkeypatch, intake_world)
 
-    _elegir_dato(conn, client, user, rid, "Área")
-
-    assert _conjunto_activo(conn, rid)["campo"] == "area"
-    assert any("Field Services" in e for e in _opciones_activas(conn, rid))
+    assert "Área" not in _opciones_activas(conn, rid)
+    assert _campos(conn, rid)["area"][1]["name"] == "Field Services"
 
 
 # ----------------------------------------------- escribir `corrige` en la vista previa
@@ -815,7 +811,7 @@ def test_volver_al_resumen_escrito_es_tocar_el_boton(intake_world, conn, monkeyp
     antes = _salidas(conn, user)
 
     provider = _responder_con(conn, monkeypatch, intake_world, "volver al resumen",
-                              valor={"opcion_id": "8"})
+                              valor={"opcion_id": "7"})
 
     assert provider.main_calls == 0
     assert _campos(conn, rid) == campos_antes
