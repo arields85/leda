@@ -1129,3 +1129,26 @@ TDD: estricto (configuración global del usuario); runner
 `D:\Proyectos\Prisma-PM\.venv\Scripts\python.exe -m pytest` desde el worktree.
 Delivery: ~400 líneas por commit como heurística; M1, M2 y M3 (posible M3a/M3b) son
 unidades de commit propias.
+
+### Hallazgo de la corrida conversada: propuesta sin registro (2026-10-01)
+
+- **Causa.** El contrato daba dos caminos para aceptar un criterio propuesto: `{acepta_propuesta: true}`
+  (sólo válido con una propuesta registrada) y mandar el texto (la guía lo pedía para la propuesta hecha
+  sólo en la charla). El modelo usó el primero con una propuesta no registrada; `_criterio` lo rechazó
+  ("no hay una propuesta vigente para aceptar") en cada intento y el alta cayó al aviso neutro: callejón
+  sin salida. Regla ADR 0013 "estado real": el contrato ofrecía una acción que el estado no siempre permite.
+- **Arreglo (mecanismo).** `acepta_propuesta` se retiró del contrato (`_CLAVES_DEL_CRITERIO`, esquema de
+  `conducir_alta`, `leer_salida`, `_criterio`). Hay un solo camino: aceptar una propuesta (registrada o
+  hecha en la charla) es mandar su texto como `texto` del criterio; un criterio `proposed` pasa a
+  `confirmed` por el camino normal (`_ya_confirmado` sólo frena a `confirmado`). `SISTEMA_ALTA` describe
+  ese camino. `llm.py` no duplica este esquema (importa de `alta_turno`).
+- **RED.** `tests/test_alta_turno.py tests/test_alta_conducida.py`: 2 failed, 141 passed (la clave retirada
+  sin rechazar en `leer_salida`, y la guía/esquema que aún la nombran). Los casos de extremo a extremo con
+  `{texto}` ya pasaban antes: confirman que ese camino es el que funciona.
+- **GREEN.** `tests/test_alta_turno.py tests/test_alta_conducida.py tests/test_conducir_alta_proveedores.py
+  tests/test_capacidades.py tests/test_redaccion_modelo_puro.py`: 178 passed.
+- **Pruebas cambiadas.** `test_aceptar_la_propuesta_confirma_el_texto_guardado...` pasó a
+  `test_aceptar_la_propuesta_vigente_es_mandar_su_texto_como_criterio`; se quitó
+  `test_aceptar_sin_propuesta_vigente_se_rechaza` (ya no hay acción de aceptar); el caso de
+  `acepta_propuesta` suelto se suma a los rechazos de formato; en
+  `test_un_criterio_que_no_se_puede_comprobar_se_propone_otro_y_se_acepta` el modelo acepta con `{texto}`.

@@ -113,6 +113,7 @@ def test_tolera_un_json_en_texto_con_vallas():
     {"valores": {"acceptance_criterion": {"texto": "x", "verificable": "tal vez"}}},
     {"valores": {"acceptance_criterion": {"acepta_propuesta": False}}},
     {"valores": {"acceptance_criterion": {"acepta_propuesta": True, "texto": "x"}}},
+    {"valores": {"acceptance_criterion": {"acepta_propuesta": True}}},
     {"corrige": ["area"]},
     {"corrige": "title"},
     {"pregunta": ["title", "objective", "responsible"]},   # más de dos
@@ -321,21 +322,23 @@ def test_una_propuesta_invalida_se_toma_el_texto_de_la_persona_y_se_marca():
     assert sin.criterio_sin_propuesta is True
 
 
-def test_aceptar_la_propuesta_confirma_el_texto_guardado_no_el_que_dice_el_modelo():
+def test_aceptar_la_propuesta_vigente_es_mandar_su_texto_como_criterio():
     h = hechos(propuesta_vigente="Prueba de 24 h sin fallas",
                propuesta_hecha=True,
                borrador={"acceptance_criterion": CampoBorrador(
                    "propuesto", "Prueba de 24 h sin fallas",
                    "Prueba de 24 h sin fallas")})
-    a = aplicar(h, valores={"acceptance_criterion": {"acepta_propuesta": True}})
+    a = aplicar(h, valores={"acceptance_criterion": {
+        "texto": "Prueba de 24 h sin fallas"}})
     x = a.asignaciones[0]
     assert (x.estado, x.valor) == ("confirmed", "Prueba de 24 h sin fallas")
 
 
-def test_aceptar_sin_propuesta_vigente_se_rechaza():
+def test_un_criterio_propuesto_se_confirma_con_un_texto_sin_propuesta_previa_registrada():
     a = aplicar(hechos(), valores={"acceptance_criterion": {
-        "acepta_propuesta": True}})
-    assert a.asignaciones == () and "propuesta" in a.rechazos[0]
+        "texto": "Informe firmado por calidad"}})
+    x = a.asignaciones[0]
+    assert (x.estado, x.valor) == ("confirmed", "Informe firmado por calidad")
 
 
 def test_un_criterio_propuesto_no_cuenta_como_dato_completo():
@@ -551,3 +554,9 @@ def test_la_guia_de_voz_dice_lo_esencial():
     for clave in ("dato", "nunca inventes", "Confirmar", "conducir_alta"):
         assert clave.lower() in guia.lower()
     assert "Entendí que" in guia      # lo nombra para prohibirlo
+
+
+def test_la_guia_ya_no_menciona_la_clave_de_aceptar_la_propuesta():
+    from prisma.alta_turno import ESQUEMA_SALIDA, SISTEMA_ALTA
+    assert "acepta_propuesta" not in SISTEMA_ALTA
+    assert "acepta_propuesta" not in json.dumps(ESQUEMA_SALIDA)

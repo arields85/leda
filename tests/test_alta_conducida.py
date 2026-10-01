@@ -502,7 +502,8 @@ def test_un_criterio_que_no_se_puede_comprobar_se_propone_otro_y_se_acepta(chat)
 
     c.modelo.conducciones.append(salida(
         "Genial, lo dejo así.",
-        valores={"acceptance_criterion": {"acepta_propuesta": True}}))
+        valores={"acceptance_criterion": {
+            "texto": "Prueba de 24 h sin fallas, con el registro adjunto"}}))
     nuevas = c.escribir("sí, dale")
 
     assert c.hechos()["propuesta_vigente"].startswith("Prueba de 24 h")
@@ -511,6 +512,45 @@ def test_un_criterio_que_no_se_puede_comprobar_se_propone_otro_y_se_acepta(chat)
     assert c.campo("acceptance_criterion")["valor"] == (
         "Prueba de 24 h sin fallas, con el registro adjunto")
     assert "Resumen para revisar" in nuevas[0]["cuerpo"]       # ya está todo
+
+
+@pytest.mark.parametrize("dice", ["me va", "Informe firmado por calidad"])
+def test_una_propuesta_hecha_solo_en_la_conversacion_se_acepta_mandando_su_texto(
+        chat, dice):
+    # Hallazgo de la corrida conversada: Prisma propuso en su respuesta, sin registrar
+    # propuesta; aceptar es mandar el texto como criterio, un solo camino.
+    c = _alta_completa_menos_criterio(chat)
+    c.modelo.conducciones.append(salida(
+        "Podría ser: informe firmado por calidad. ¿Te sirve?",
+        intencion="ayuda", pregunta=["acceptance_criterion"]))
+    c.escribir("ayudame")
+    c.modelo.conducciones.append(salida(
+        "Listo, revisalo.", valores={"acceptance_criterion": {
+            "texto": "Informe firmado por calidad"}}))
+
+    nuevas = c.escribir(dice)
+
+    criterio = c.campo("acceptance_criterion")
+    assert criterio["estado"] == "confirmed"
+    assert criterio["valor"] == "Informe firmado por calidad"
+    assert "Resumen para revisar" in nuevas[0]["cuerpo"]
+    assert c.incidentes(incidentes.ETAPA_ALTA_CONDUCIDA_FALLIDA) == []
+
+
+def test_aceptar_con_la_clave_retirada_se_rechaza_por_formato_y_se_corrige_con_el_texto(
+        chat):
+    c = _alta_completa_menos_criterio(chat)
+    c.modelo.conducciones.append(salida(
+        "Listo.", valores={"acceptance_criterion": {"acepta_propuesta": True}}))
+    c.modelo.conducciones.append(salida(
+        "Listo, revisalo.", valores={"acceptance_criterion": {
+            "texto": "Informe firmado por calidad"}}))
+
+    nuevas = c.escribir("me va")
+
+    assert c.campo("acceptance_criterion")["estado"] == "confirmed"
+    assert "Resumen para revisar" in nuevas[0]["cuerpo"]
+    assert c.incidentes(incidentes.ETAPA_ALTA_CONDUCIDA_FALLIDA) == []
 
 
 def test_si_insiste_con_su_texto_tras_una_propuesta_se_acepta_y_no_se_vuelve_a_proponer(

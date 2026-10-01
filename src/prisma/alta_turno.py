@@ -206,7 +206,7 @@ class SalidaTurno:
 
 _CLAVES_DE_SALIDA = {"intencion", "texto", "valores", "corrige", "pregunta",
                      "botones"}
-_CLAVES_DEL_CRITERIO = {"texto", "verificable", "propuesta", "acepta_propuesta"}
+_CLAVES_DEL_CRITERIO = {"texto", "verificable", "propuesta"}
 _VERIFICABLES = ("si", "no")
 
 
@@ -232,10 +232,6 @@ def _forma_del_valor(campo: str, valor: Any) -> str | None:
             return None
         return "`due_date` es {fecha_iso} o {falta: \"dia\"}"
     elif campo == "acceptance_criterion":
-        if "acepta_propuesta" in claves:
-            if valor != {"acepta_propuesta": True}:
-                return "`acceptance_criterion` acepta la propuesta sólo con {acepta_propuesta: true}"
-            return None
         if not claves <= _CLAVES_DEL_CRITERIO or not _cadena(valor.get("texto")):
             return "`acceptance_criterion` es {texto, verificable?, propuesta?}"
         if "verificable" in valor and valor["verificable"] not in _VERIFICABLES:
@@ -381,12 +377,6 @@ def _criterio(valor: dict, h: HechosTurno, corrige: tuple[str, ...],
     (quedó propuesto), `sin_propuesta` (no verificable sin propuesta válida: se
     toma el texto) o `` (nada especial)."""
     campo = "acceptance_criterion"
-    if valor.get("acepta_propuesta"):
-        actual = h.borrador[campo]
-        if not h.propuesta_vigente or actual.estado != "propuesto":
-            return f"{campo}: no hay una propuesta vigente para aceptar", ""
-        return Asignacion(campo, h.propuesta_vigente, h.propuesta_vigente,
-                          "confirmed", h.propuesta_vigente), ""
     texto, motivo = _texto_de(campo, valor["texto"], h)
     if motivo:
         return motivo, ""
@@ -555,8 +545,7 @@ ESQUEMA_SALIDA = _objeto({
         "acceptance_criterion": _objeto({
             "texto": {"type": "string"},
             "verificable": {"type": "string", "enum": list(_VERIFICABLES)},
-            "propuesta": {"type": "string"},
-            "acepta_propuesta": {"type": "boolean"}}),
+            "propuesta": {"type": "string"}}),
     }),
     "corrige": {"type": "array", "items": {"type": "string",
                                            "enum": list(CAMPOS)}},
@@ -594,7 +583,8 @@ SISTEMA_ALTA = (
     "nombre; la fecha como AAAA-MM-DD resuelta con `hoy` y `proximos_dias` (si el "
     "día no queda claro, `{\"falta\": \"dia\"}`); el criterio con `verificable` "
     "(si dice cómo se comprueba que está hecha) y, si no lo es, una `propuesta` "
-    "concreta; `acepta_propuesta` si acepta la `propuesta_vigente`. Nunca "
+    "concreta. Si acepta una propuesta (la tuya en la charla o la "
+    "`propuesta_vigente`), mandá ese texto como `texto` del criterio. Nunca "
     "inventes opciones, datos ni hechos.\n"
     "- `corrige`: los datos ya confirmados que la persona cambia. Un valor para "
     "un dato confirmado sólo vale si va acá.\n"
