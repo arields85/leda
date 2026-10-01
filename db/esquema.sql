@@ -351,6 +351,9 @@ create table objective (
 
 create index objective_ws on objective (workspace_id, estado);
 create index objective_area on objective (workspace_id, area_id);
+
+comment on column objective.area_id is
+  'F-B11: el área a la que pertenece el objetivo. Nula en un objetivo estratégico (es de todas las áreas) o en un dato anterior a esta columna.';
 create index objective_parent on objective (parent_id);
 
 create function telegram_utf16_units(p_text text) returns integer

@@ -103,6 +103,17 @@ def validar(pack: dict[str, Any]) -> tuple[list[str], list[str]]:
             f"conversacion.redaccion vale '{redaccion}': las variantes son A y "
             f"B. Sin una variante válida Prisma usa B y lo registra.")
 
+    # Cada frente del objetivo inicial pertenece a un área que el pack declara: sin
+    # eso el objetivo quedaría sin área y el alta lo trataría como estratégico.
+    for f in (pack.get("objetivo_inicial") or {}).get("frentes") or []:
+        if not f.get("area"):
+            bloqueantes.append(
+                f"El frente «{f.get('titulo', '?')}» no tiene área asignada.")
+        elif f["area"] not in areas:
+            bloqueantes.append(
+                f"El frente «{f.get('titulo', '?')}» tiene un área que no existe: "
+                f"'{f['area']}'.")
+
     slugs_rol = {r["slug"] for r in roles}
     for p in personas:
         if not p.get("area"):
@@ -288,7 +299,7 @@ def importar(
         _importar_politica_evidencia(cur, ws, pack)
         _importar_cadencia(cur, ws, pack)
         _importar_ajustes(cur, ws, pack)
-        _importar_objetivo_inicial(cur, ws, pack)
+        advertencias += _importar_objetivo_inicial(cur, ws, pack)
 
         registrar_auditoria(
             cur, accion="importar_pack", workspace_id=ws,
@@ -555,7 +566,7 @@ def _a_cron(cuando: str) -> str:
     return f"{int(mm)} {int(hh)} * * {','.join(str(d) for d in sorted(set(dias)))}"
 
 
-def _importar_objetivo_inicial(cur, ws, pack) -> None:
+def _importar_objetivo_inicial(cur, ws, pack) -> list[str]:
     """Crea el objetivo estratégico del pack si todavía no existe.
 
     Sin al menos un objetivo no se puede cargar ninguna tarea: el núcleo no
@@ -563,7 +574,7 @@ def _importar_objetivo_inicial(cur, ws, pack) -> None:
     """
     obj = pack.get("objetivo_inicial")
     if not obj:
-        return
+        return []
 
     cur.execute(
         "select id from objective where workspace_id = %s and titulo = %s",
@@ -571,8 +582,7 @@ def _importar_objetivo_inicial(cur, ws, pack) -> None:
     if cur.fetchone():
         # Datos anteriores a la migración 0027: el objetivo no tenía área. Se
         # completa la que falta; la que ya tiene no se toca.
-        _completar_area_de_los_frentes(cur, ws, obj)
-        return
+        return _completar_area_de_los_frentes(cur, ws, obj)
 
     cur.execute(
         """insert into objective (workspace_id, tipo, titulo, descripcion, estado)
@@ -589,26 +599,63 @@ def _importar_objetivo_inicial(cur, ws, pack) -> None:
         cur.execute(
             """insert into objective (workspace_id, parent_id, tipo, titulo, estado,
                                       area_id)
-               values (%s, %s, 'operativo', %s, 'activo',
-                       (select id from area where workspace_id = %s and slug = %s))
+               values (%s, %s, 'operativo', %s, 'activo', %s)
                returning id""",
-            (ws, raiz, f["titulo"], ws, f.get("area")))
+            (ws, raiz, f["titulo"], _area_del_frente(cur, ws, f)))
         hijo = cur.fetchone()["id"]
         cur.execute(
             """insert into objective_state_event (objective_id, estado_nuevo, actor_kind)
                values (%s, 'activo', 'sistema')""", (hijo,))
+    return []
 
 
-def _completar_area_de_los_frentes(cur, ws, obj) -> None:
+def _area_del_frente(cur, ws, frente) -> str:
+    """El área que el pack asigna a un frente. Un frente sin área, o con un slug
+    que el espacio no tiene, es un pack inválido: nunca un objetivo sin área en
+    silencio (el alta lo trataría como estratégico, de todas las áreas)."""
+    slug = frente.get("area")
+    if slug:
+        cur.execute("select id from area where workspace_id = %s and slug = %s",
+                    (ws, slug))
+        fila = cur.fetchone()
+        if fila:
+            return fila["id"]
+    razon = (f"tiene un área que no existe: '{slug}'" if slug
+             else "no tiene área asignada")
+    raise PackInvalido([f"El frente «{frente.get('titulo', '?')}» {razon}."])
+
+
+def _completar_area_de_los_frentes(cur, ws, obj) -> list[str]:
     """Da a cada frente del pack, si todavía no la tiene, el área que el pack le
-    asigna (F-B11). Nunca cambia un área ya puesta."""
+    asigna (F-B11). Nunca cambia un área ya puesta. Devuelve los avisos para el
+    administrador: cuántos objetivos se completaron y qué frentes del pack no
+    existen como objetivo operativo del espacio (no se les pudo poner área)."""
+    completados = 0
+    sin_objetivo: list[str] = []
     for f in obj.get("frentes") or []:
+        area = _area_del_frente(cur, ws, f)
         cur.execute(
-            """update objective set area_id =
-                      (select id from area where workspace_id = %s and slug = %s)
+            """update objective set area_id = %s
                 where workspace_id = %s and tipo = 'operativo' and titulo = %s
-                  and area_id is null""",
-            (ws, f.get("area"), ws, f["titulo"]))
+                  and area_id is null returning id""",
+            (area, ws, f["titulo"]))
+        completados += len(cur.fetchall())
+        cur.execute(
+            """select 1 from objective
+                where workspace_id = %s and tipo = 'operativo' and titulo = %s""",
+            (ws, f["titulo"]))
+        if not cur.fetchone():
+            sin_objetivo.append(f["titulo"])
+    avisos = []
+    if completados:
+        avisos.append(
+            f"Se completó el área de {completados} objetivo(s) operativo(s) que "
+            f"no la tenían (datos anteriores a la migración 0027).")
+    for titulo in sin_objetivo:
+        avisos.append(
+            f"El frente «{titulo}» del pack no existe como objetivo operativo del "
+            f"espacio: no se le pudo asignar el área.")
+    return avisos
 
 
 def _importar_ajustes(cur, ws, pack) -> None:

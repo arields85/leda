@@ -99,3 +99,135 @@ def test_el_objetivo_sigue_aislado_por_espacio(corework, conn):
         cur.execute("set role prisma_app")
         cur.execute("select count(*) n from objective")
         assert cur.fetchone()["n"] == 0
+
+
+# ------------------------------- un área del pack que no existe no pasa en silencio
+
+def _pack(**cambios):
+    import copy
+
+    import yaml
+    from tests.conftest import RAIZ
+
+    pack = yaml.safe_load((RAIZ / "espacios" / "corework.yaml").read_text("utf-8"))
+    pack = copy.deepcopy(pack)
+    # Los mismos datos que el fixture `corework`: sin ellos se crearían personas
+    # nuevas con los mismos nombres.
+    pack["telegram"]["grupo_gestion_id"] = -1001
+    for i, p in enumerate(pack["personas"]):
+        p["telegram_user_id"] = 9000 + i
+    pack["evidencia"]["estructura_drive"] = "drive://corework"
+    pack.update(cambios)
+    return pack
+
+
+def _escribir(tmp_path, pack):
+    import yaml
+
+    ruta = tmp_path / "pack.yaml"
+    ruta.write_text(yaml.safe_dump(pack, allow_unicode=True), "utf-8")
+    return ruta
+
+
+def _con_area(area, indice=2):
+    pack = _pack()
+    frente = pack["objetivo_inicial"]["frentes"][indice]
+    if area is None:
+        frente.pop("area")
+    else:
+        frente["area"] = area
+    return pack, frente["titulo"]
+
+
+@pytest.mark.parametrize("area", ["itt", "IT", "tecnologia", "", None])
+def test_validar_bloquea_un_frente_con_un_area_que_no_existe_o_sin_area(area):
+    from prisma.importador import validar
+
+    pack, titulo = _con_area(area)
+    bloqueantes, _ = validar(pack)
+    assert any(titulo in b and "área" in b for b in bloqueantes), bloqueantes
+
+
+def test_validar_no_bloquea_los_frentes_del_pack_vigente():
+    from prisma.importador import validar
+
+    bloqueantes, _ = validar(_pack())
+    assert not any("frente" in b.lower() for b in bloqueantes)
+
+
+@pytest.mark.parametrize("area", ["itt", None])
+def test_importar_un_espacio_nuevo_con_un_area_mala_falla_y_no_deja_nada(
+        conn, tmp_path, area):
+    from prisma.importador import PackInvalido, importar
+
+    pack, titulo = _con_area(area)
+    pack["espacio"]["slug"] = "nuevo-por-area"
+    with pytest.raises(PackInvalido) as error:
+        importar(conn, _escribir(tmp_path, pack))
+    assert titulo in str(error.value)
+    with admin(conn) as cur:
+        cur.execute("select count(*) n from objective o join workspace w "
+                    "on w.id = o.workspace_id where w.slug = 'nuevo-por-area'")
+        assert cur.fetchone()["n"] == 0
+
+
+def test_reimportar_con_un_area_mala_falla_y_no_toca_nada(corework, conn, tmp_path):
+    from prisma.importador import PackInvalido, importar
+
+    ws = corework.workspace_id
+    with admin(conn) as cur:
+        cur.execute("update objective set area_id = null where titulo = %s",
+                    ("Fortalecer servidores y mejorar EPPI",))
+    conn.commit()
+    pack, _ = _con_area("itt")
+    with pytest.raises(PackInvalido):
+        importar(conn, _escribir(tmp_path, pack))
+    assert _areas_de_los_objetivos(conn, ws)[
+        "Fortalecer servidores y mejorar EPPI"][1] is None
+
+
+def test_completar_las_areas_informa_cuantas_actualizo(corework, conn, tmp_path):
+    from prisma.importador import importar
+
+    with admin(conn) as cur:
+        cur.execute("update objective set area_id = null where tipo = 'operativo' "
+                    "and titulo in (%s, %s)",
+                    ("Fortalecer servidores y mejorar EPPI",
+                     "Planos eléctricos correctos y documentación útil"))
+    conn.commit()
+    resultado = importar(conn, _escribir(tmp_path, _pack()))
+    assert any("2 objetivo" in a and "área" in a for a in resultado.advertencias), \
+        resultado.advertencias
+    assert _areas_de_los_objetivos(conn, corework.workspace_id)[
+        "Fortalecer servidores y mejorar EPPI"][1] == "it"
+
+
+def test_completar_las_areas_avisa_del_frente_que_no_encuentra(
+        corework, conn, tmp_path):
+    from prisma.importador import importar
+
+    pack = _pack()
+    pack["objetivo_inicial"]["frentes"][2]["titulo"] = "Un frente que se renombró"
+    resultado = importar(conn, _escribir(tmp_path, pack))
+    avisos = [a for a in resultado.advertencias if "Un frente que se renombró" in a]
+    assert len(avisos) == 1 and "área" in avisos[0]
+
+
+def test_reimportar_sin_nada_que_completar_no_agrega_avisos_de_area(
+        corework, conn, tmp_path):
+    from prisma.importador import importar
+
+    resultado = importar(conn, _escribir(tmp_path, _pack()))
+    assert not [a for a in resultado.advertencias if "frente" in a.lower()]
+
+
+def test_el_esquema_documenta_la_columna_como_la_migracion():
+    from tests.conftest import RAIZ
+
+    esquema = (RAIZ / "db" / "esquema.sql").read_text("utf-8")
+    migracion = (RAIZ / "db" / "migrations" / "0027_objetivo_con_area.sql"
+                 ).read_text("utf-8")
+    comentario = next(l for l in migracion.splitlines()
+                      if l.strip().startswith("'F-B11: el área a la que"))
+    assert "comment on column objective.area_id is" in esquema
+    assert comentario.strip() in esquema
