@@ -443,3 +443,24 @@ Verificación de la rama `feat/flujo-variante-a` tras el merge de F-B1..F-B4 (`b
 este documento) y **2727 passed, 333 deselected, 0 failed** tras F-B5. Para probar la variante A en
 vivo: escucha con `PYTHONPATH=src` desde este worktree y `redaccion = {"variante": "A"}` en el
 espacio; el `.env` no se copia al worktree.
+
+## Revisión RDD por commit, segunda tanda (2026-10-01)
+
+`2ca9664`, `9c3fe7b`, `c48f38b`, `49e81bb`: medio, `under_budget`. `2bc10a7`
+(`review-0f71d0ec0d8f5d39`) y `ed0270a` (`review-14ee7d7af0001c72`): alto, 4 lentes,
+aprobados y reconocidos, sin correcciones. Advertencias no bloqueantes:
+
+- [ ] R10. `0026` no rellena `enviada_en` para borradores ya enviados al desplegar (siguen
+  contando como rama abierta hasta terminar). El rollback falla si hay dos activas.
+- [ ] R11. `ingreso_tareas.py:1054-1059`: `enviada_en` nunca se limpia; si el aprobador
+  devuelve el borrador a edición, la solicitud queda invisible para el solicitante. Sin
+  pruebas de rechazo ni de vencimiento. Verificar contra "Rechazar con motivo" (`0025`).
+- [ ] R12. `redaccion.py:272-282`: con A, la llamada al modelo corre dentro de la
+  transacción del turno con los reintentos completos del proveedor; ante una caída, cada
+  turno espera todo antes de caer a B. Plazo propio corto o cortar A tras N errores.
+- [ ] R13. `verificador_redaccion.py:202-203`: "hace la pregunta" se cumple con cualquier
+  "?" ("Gracias. ¿Todo bien?" pasa sin la fecha). `:149-152`: la detección de acciones en
+  primera persona no descuenta nombres de los hechos ("José"). `redaccion.py:285`:
+  `verificar` fuera del try que cae a B.
+- [ ] R14. `redaccion.py:278-281`: el texto completo de una excepción del proveedor va a
+  `audit_log`/`incident`; confirmar que ninguna URL con credencial pueda terminar ahí.
