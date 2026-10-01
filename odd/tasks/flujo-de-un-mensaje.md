@@ -857,17 +857,133 @@ del resumen, "Listo, dejé de lado…"), y F-C2 (descripción igual al título).
 
 ### Tareas
 
-- [ ] **T1.** Historial al ruteo (todos los proveedores) + instrucciones generales.
-- [ ] **T2.** Historial a la redacción + guía ("continuá la conversación, no repitas").
-- [ ] **T3.** Dejarlo y ver lo otro conserva el borrador (pausado); el próximo "quiero
-  crear una tarea" ofrece continuarlo.
-- [ ] **T4.** Modelo puro: sin plazo propio, sin respaldo de plantilla, dos intentos con el
-  motivo del rechazo, incidente + aviso neutro si falla.
-- [ ] **T5.** F-A1 (orden de envío), F-C5 (resumen sin cierre), F-B9 (typos en la etapa 2),
-  F-C1 (crear no busca el título entre las existentes).
-- [ ] **T6.** Guion "Corrida siguiente 2" y cierre del documento.
+- [x] **T1.** (`6978a1b`) Historial al ruteo (todos los proveedores) + instrucciones generales.
+- [x] **T2.** (`a865a49`) Historial a la redacción + guía ("seguila, no repitas, sólo lo nuevo").
+- [x] **T3.** (`d820a57`) Dejarlo y ver lo otro conserva el borrador (pausado); el próximo
+  "quiero crear una tarea" ofrece continuarlo.
+- [x] **T4.** (`644b60a`) Modelo puro: sin plazo propio, sin respaldo de plantilla, dos
+  intentos con el motivo del rechazo, incidente + aviso neutro si falla.
+- [x] **T5.** F-A1 (`36a09e9`), F-C5 (`caf5e2a`), F-C1 (`abffd0a`), F-B9 (`c3540cc`).
+- [x] **T6.** (`04a2c87`) Guion "Corrida siguiente 2" y cierre del documento.
 
 Ruta declarada: un solo escritor (el encargo lo pidió así: "execute directly"); disparador
 de escritura de 2+ archivos no triviales cubierto por esa instrucción explícita.
 TDD: estricto (configuración global del usuario); runner
 `D:\Proyectos\Prisma-PM\.venv\Scripts\python.exe -m pytest` desde el worktree.
+
+### Qué quedó construido (conversación con memoria y modelo puro)
+
+- **T1, historial al ruteo.** `route_intent(..., historial=)` en los cuatro proveedores
+  (`llm.py`): la conversación reciente (misma fuente y límites que `contexto.historial`:
+  sólo lo enviado, en orden, sin el mensaje entrante) como mensajes previos antes del
+  texto actual (un arranque de Prisma se descarta; si la persona tenía un mensaje sin
+  responder, el actual se le suma). `ROUTER_SYSTEM_CONVERSACION` (sólo con historial) y
+  una regla general en `otro_tema`: pedir ayuda con la pregunta, comentarla o decir que no
+  se sabe responderla pertenece a ella, nunca es otro tema. `gateway._rutear` pasa
+  `historial` sólo si hay; `_historial_del_turno` en `_turno`, el toque de `dudoso` y
+  "Dejarlo". El grabador del banco y los dobles de prueba aceptan `historial`.
+- **T2, historial a la redacción.** `redactar(..., historial=)`: transcripción
+  ("Persona:" / "Prisma:") delante de los hechos, dentro del único mensaje (no turnos
+  previos: el modelo contesta un JSON y turnos en prosa le enseñarían a contestar en
+  prosa). La guía: seguir la conversación, no repetir aperturas ni fórmulas, decir sólo lo
+  nuevo; la conversación es contexto, nunca una fuente de hechos (el verificador no
+  cambia). Pasa por el alta (preguntas, rechazos, aviso de envío, resumen) y por la charla.
+  La guía creció de ~1100 a ~1350 caracteres (las cotas de `test_redaccion_plazo` se
+  ajustaron: 1450 y 1700).
+- **T3, Dejarlo conserva el borrador.** `ingreso_tareas.pause_from_intake_question`:
+  invalida la pregunta abierta y los botones (sube la versión), deja la solicitud
+  `active` con la marca `pausado` en `terminal_result` (sin cambiar el esquema) y audita
+  `pausar_ingreso_tarea`. `handle_active_text` no se traga los mensajes de un borrador
+  pausado. "Continuar borrador" (`resolve_choice`) quita la marca. Aviso:
+  `gateway.AVISO_ALTA_PAUSADA` ("Listo, dejé guardado el borrador de la tarea «…».
+  Cuando quieras, lo retomamos."). Sólo "Dejarlo y ver lo otro" y "No, es otra cosa"
+  guardan; "mejor dejalo / cancelá todo" (`cancela`) y los botones de cancelar siguen
+  cancelando.
+- **T4, modelo puro.** `redaccion.MODELO_PURO = True` (restaura el plazo de
+  `PLAZO_REDACCION_S` y el respaldo de B con `False`), `INTENTOS_MODELO_PURO = 2`.
+  Sin plazo propio (queda el timeout HTTP del proveedor); un rechazo del verificador se
+  corrige una vez (el modelo ve `correccion.motivo` y su `texto_anterior`); un error del
+  modelo no se reintenta; si no sale texto: incidente `redaccion_fallida` (media, con
+  aviso a la administración, motivos de los intentos) y `NOTICIA_NEUTRA_INCIDENTE`
+  (`TextoRedactado.fallida`). Lo único que sale además del aviso es lo que la persona
+  necesita para decidir con los botones: el resumen (datos y cierre, del código) y el valor
+  que se pide confirmar. Cada intento sigue dejando su fila de auditoría con la duración.
+  `redactar_charla` (la charla de B) conserva su plazo: B no cambia.
+- **F-A1.** La causa de las 08:32:34 no se pudo confirmar sin las filas de la cola (ver
+  decisiones). El mecanismo que sí se encontró y corrigió: un envío fallido de una parte se
+  reprogramaba al reloj de la pasada (detrás de las demás) y la pasada seguía con la
+  siguiente del mismo chat. Ahora el chat con un envío fallido no recibe más en esa pasada
+  y una respuesta fallida conserva su `programado_para` (`despachador.despachar`, `_fallo`).
+- **F-C5.** `render_resumen` comprueba que el texto termina en su cierre; si algún camino
+  lo perdió, lo vuelve a poner y registra `resumen_sin_cierre`. La causa de las 08:18:47 no
+  se reprodujo: todos los caminos de la redacción (acepta, rechaza dos veces, error,
+  timeout, defecto del verificador) devuelven el cierre; queda la garantía estructural.
+- **F-C1.** `_resolver_referencias_del_turno` descarta de `trabajos` la frase que repite
+  `task.title` con intención de crear (comparación sin tildes, mayúsculas ni puntuación) y
+  `ROUTER_SYSTEM` dice que la tarea nueva y su título no son una referencia. Lo demás que
+  el mensaje menciona se sigue resolviendo.
+- **F-B9.** La instrucción del valor de texto libre pide corregir sólo errores de tipeo
+  obvios sin cambiar sentido ni nombres propios; entidades, fechas y opciones no cambian.
+  El resumen muestra el valor guardado, cambiable con Modificar. Alcance: título,
+  descripción y criterio del alta; los motivos del menú de una tarea todavía toman el texto
+  crudo (F4 de este documento, pendiente).
+
+### RED observado y verificación (conversación con memoria y modelo puro)
+
+- T1: `tests/test_router_historial.py` contra el código anterior: 20 failed, 1 passed (el
+  control del proveedor viejo); GREEN 21 passed. Regresión: 667 passed (router, protocolo,
+  banco) y 857 passed (alta, rama, pregunta, gateway, agente, botones...); tres dobles de
+  prueba con firma vieja se actualizaron.
+- T2: `tests/test_redaccion_historial.py`: 14 failed, 1 passed; GREEN 16 passed. Regresión:
+  1103 passed (alta, banco, charla, gateway, pregunta, rama).
+- T3: `tests/test_alta_dejarlo_conserva_el_borrador.py`: 6 failed, 2 passed (los controles
+  de cancelar); GREEN 8 passed. Siete pruebas anteriores que afirmaban "Dejarlo cancela el
+  borrador" ahora afirman que lo guarda (`test_alta_eleccion_confirmacion`,
+  `test_rama_abierta`, `banco/test_corrida` y el escenario `b-0021-i`): 470 passed.
+- T4: `tests/test_redaccion_modelo_puro.py`: 12 failed, 1 passed (B); GREEN 13 passed. Las
+  pruebas del plazo y del respaldo (`test_redaccion_plazo`, `test_redaccion_a`,
+  `test_alta_guiada_variante_a`, `test_alta_guiada_mensaje_entero`, `test_charla_breve`,
+  `test_valor_incompleto_variante_a`) corren con el fixture `con_respaldo_de_plantilla`
+  (`MODELO_PURO = False`).
+- F-A1: `tests/test_despacho_en_orden.py`: 2 failed, 2 passed; GREEN 4 passed (con
+  `test_ciclo`, `test_retencion_por_rama`, `test_avisos_admin`, `test_botones`,
+  `test_esqueleto`, `test_smoke_runtime`, `test_saludo`: 89 y 242 passed).
+- F-C5: `tests/test_resumen_nunca_sin_cierre.py`: 1 failed, 12 passed (la garantía ya
+  valía en todos los caminos probados; falló sólo la defensa con un camino que lo pierde);
+  GREEN 13 passed.
+- F-C1: `tests/test_crear_no_busca_el_titulo.py`: 6 failed, 2 passed; GREEN 8 passed (con
+  resolución de referencias y aclaración con botones: 166 passed).
+- F-B9: `tests/test_texto_sin_errores_de_tipeo.py`: 2 failed, 2 passed; GREEN 4 passed (con
+  `test_router_valor`: 127 passed).
+
+### Decisiones del escritor (a revisar)
+
+- **Pausa sin migración.** La marca `pausado` vive en `terminal_result` de la solicitud
+  activa. Alternativa descartada: una columna o un estado nuevo (migración y cambio de
+  `check`). Si se prefiere un estado propio, es un cambio chico en `ingreso_tareas`.
+- **Retomar.** Mínimo seguro: el próximo "quiero crear una tarea" ofrece "Continuar
+  borrador / Cancelar borrador / Empezar otro". Costo: si la persona dejó el borrador
+  justamente para pedir OTRA tarea ("ah, y necesito otra tarea para Nahuel"), ahora ve
+  ese paso de elección en vez de empezar directo (antes el borrador viejo se cancelaba).
+- **Ayuda con la pregunta.** No hay un comando nuevo: un mensaje de ayuda sobre la
+  pregunta pendiente es `dudoso` (o `responde`), no `otro_tema`; con `dudoso` sale la
+  confirmación "¿Esto es el criterio…?" (Sí / No, es otra cosa). No es la ayuda de F-C3
+  (queda para el rediseño) pero ya no pierde nada.
+- **Modelo puro: qué sale si falla.** Sólo el aviso neutro; la pregunta que quedó abierta
+  no se dice (sin plantilla, como se pidió), así que con una elección con botones la
+  persona ve el aviso y los botones sin la pregunta. Lo único que se agrega es el resumen y
+  el valor que se pide confirmar (para no confirmar a ciegas). Severidad del incidente:
+  media, con aviso a la administración (el aviso neutro promete "quedó registrado para que
+  lo revise un administrador"); con un modelo caído puede generar muchos avisos.
+- **Historial en la redacción** como transcripción dentro del mensaje, no como turnos.
+- **F-A1: causa sin confirmar.** El bloqueo por espacio ya estaba (`485aa5c`) y no cubre
+  un listener de un solo hilo; se corrigió el mecanismo que sí se encontró (envío fallido).
+  Hay que mirar en `prisma_flujo`, de sólo lectura, `intentos` y `ultimo_error` de las dos
+  filas de `message_outbox` del turno de las 08:32:34: si la nota de "Dejarlo" tiene
+  `intentos > 0`, es esta causa.
+- **F-C5: causa sin aislar** (ver arriba): garantía estructural más incidente.
+
+### Resultado final (conversación con memoria y modelo puro)
+
+- Suite completa (`python -m pytest -q` desde el worktree, runner del checkout principal): **3040 passed, 333 deselected, 0 failed** (23 min 17 s; línea previa 2955).
+- Próximo paso: reiniciar el listener del worktree (`PYTHONPATH=src`) y correr "Corrida siguiente 2" del guion. Sin migración.
