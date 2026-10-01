@@ -1360,6 +1360,11 @@ def _resolver_toque_borrador(conn, authority_conn, workspace_id, token,
                 I.notify_requester_of_approval(
                     cur, quien, pending_action_id=resuelta.pending_action_id,
                     now=ahora)
+                # Y el responsable, si no es ninguno de los dos, se entera de que
+                # la tarea es suya (aviso de coordinación, mecánica §10).
+                I.notify_responsible_of_assignment(
+                    cur, quien, pending_action_id=resuelta.pending_action_id,
+                    now=ahora)
             if atadas != 1:
                 _incidente_fila_terminal(cur, workspace_id, chat_id, quien,
                                          resuelta.pending_action_id, atadas)

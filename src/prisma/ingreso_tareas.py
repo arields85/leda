@@ -1381,6 +1381,84 @@ def notify_requester_of_approval(cur: psycopg.Cursor, who: Solicitante, *,
     return True
 
 
+def assignment_notice_text(assigner_name: str, title: str, due_date: date,
+                           criterion: str) -> str:
+    """El aviso de coordinación al responsable de una tarea que le asignó otra
+    persona: quién, cuál, para cuándo y cómo se da por hecha. Mismo estilo que los
+    avisos de aprobación y de rechazo; no promete botones ni acciones que no
+    existen."""
+    return (f"{assigner_name} te asignó la tarea «{title}», para el "
+            f"{due_date.strftime('%d/%m/%Y')}. Se da por hecha cuando: "
+            f"{criterion.rstrip('.')}.")
+
+
+def notify_responsible_of_assignment(cur: psycopg.Cursor, who: Solicitante, *,
+                                     pending_action_id: str, now: datetime) -> bool:
+    """Le avisa al responsable que `who` (quien confirma) convirtió el borrador en
+    una tarea suya que pidió otra persona: sin esto el responsable no se enteraba
+    (hallazgo de la prueba real del 2026-10-01). Aviso de coordinación (fuera del
+    tope diario), de código y sin modelo, una sola vez por solicitud (`dedupe_key`) y
+    auditado.
+
+    No manda nada si el responsable es quien confirma (lo acaba de hacer él) ni si es
+    quien pidió (a esa persona ya le llega el aviso de aprobación o lo confirmó ella).
+    Va al chat privado del responsable sólo si lo activó (constitución §7): sin chat
+    no se encola nada, igual que el resto de los avisos, pero queda en la auditoría
+    (`omitir_aviso_asignacion_ingreso_tarea`) para no perderse en silencio. Devuelve
+    si lo encoló."""
+    cur.execute(
+        """select r.id, r.workspace_id, r.membership_id requester_id,
+                  t.id task_id, t.titulo, t.criterio_aceptacion,
+                  t.responsable_membership_id responsible_id,
+                  (t.fecha_objetivo at time zone w.zona_horaria)::date due_date
+             from pending_action p
+             join task_intake_request r on r.task_draft_id = p.draft_id
+                                       and r.workspace_id = p.workspace_id
+             join task t on t.source_draft_id = r.task_draft_id
+             join workspace w on w.id = t.workspace_id
+            where p.id = %s and p.workspace_id = %s""",
+        (pending_action_id, who.workspace_id))
+    task = cur.fetchone()
+    if not task or task["responsible_id"] is None:
+        return False
+    responsible_id = str(task["responsible_id"])
+    if responsible_id in (str(who.membership_id), str(task["requester_id"])):
+        return False
+    request_id = str(task["id"])
+    detail = {"request_id": request_id}
+    cur.execute("select telegram_user_id from integrante where membership_id = %s",
+                (responsible_id,))
+    responsible = cur.fetchone()
+    cur.execute("select nombre from integrante where membership_id = %s",
+                (task["requester_id"],))
+    requester = cur.fetchone()
+    if not responsible or responsible["telegram_user_id"] is None:
+        registrar_auditoria(
+            cur, accion="omitir_aviso_asignacion_ingreso_tarea",
+            workspace_id=who.workspace_id, actor_app_user_id=who.app_user_id,
+            actor_kind="persona", sujeto_tipo="task", sujeto_id=str(task["task_id"]),
+            detalle={**detail, "motivo": "sin_chat"})
+        return False
+    enqueued = enqueue_outbox(
+        cur, workspace_id=str(task["workspace_id"]),
+        chat_id=responsible["telegram_user_id"],
+        recipient_membership_id=responsible_id,
+        text=assignment_notice_text(
+            requester["nombre"] if requester else "Alguien", task["titulo"],
+            task["due_date"], task["criterio_aceptacion"] or ""),
+        scheduled_for=now, dedupe_key=f"intake:{request_id}:assigned-notice",
+        allow_split=True, es_coordinacion=True,
+    )
+    if not enqueued:
+        return False
+    registrar_auditoria(
+        cur, accion="avisar_asignacion_ingreso_tarea",
+        workspace_id=who.workspace_id, actor_app_user_id=who.app_user_id,
+        actor_kind="persona", sujeto_tipo="task", sujeto_id=str(task["task_id"]),
+        detalle=detail)
+    return True
+
+
 def modify_from_preview(cur: psycopg.Cursor, who: Solicitante, *, token: str,
                         chat_id: int, now: datetime) -> IntakeOutcome | None:
     """El botón Modificar de la vista previa del borrador. Sólo lo toca su

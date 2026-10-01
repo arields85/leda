@@ -1435,3 +1435,34 @@ Tramo `f60c3ca..51fa9e6` (`81bb60a`, `9d1bee2`, `20cd9c8`, `51fa9e6`; 994 línea
   (lo mismo: ahora el texto de quien confirma empieza con la línea de quien lo manda) y
   `test_alta_conducida` (el aprobador ve la línea y luego el resumen).
 - Pendientes (c) y (d): resueltos.
+
+
+### Aviso de asignación al responsable (2026-10-01)
+
+- **Hallazgo (prueba real).** Ismael creó una tarea para Ariel y Marcos una para Nahuel;
+  cada uno la confirmó directo (es el aprobador de ese responsable). Ni Ariel ni Nahuel
+  recibieron nada: no existía ningún aviso de asignación. Que Ismael no se entere de la
+  tarea de Nahuel es por diseño (mecánica §7: la autoridad del espacio no aprueba tareas
+  menores; el pack dice que Marcos aprueba a Nahuel).
+- **Arreglo.** `ingreso_tareas.notify_responsible_of_assignment`, llamada desde
+  `gateway._resolver_toque_borrador` junto al aviso de aprobación (toque que convirtió el
+  borrador, no replay; vale para el alta guiada y la conversacional, que convergen ahí):
+  encola un aviso de coordinación (`es_coordinacion`, fuera del tope diario), de código y
+  sin modelo, con `dedupe_key` `intake:<solicitud>:assigned-notice` y auditoría
+  `avisar_asignacion_ingreso_tarea`. No manda nada si el responsable es quien confirma o
+  quien pidió (a quien pidió ya le llega el aviso de aprobación). Texto: `<Quien pidió> te
+  asignó la tarea «<título>», para el <dd/mm/aaaa>. Se da por hecha cuando: <criterio>.`
+  Sin botones ni acciones nuevas. Responsable sin chat activado (constitución §7): no se
+  encola nada, igual que `herramientas._avisar`, pero queda la auditoría
+  `omitir_aviso_asignacion_ingreso_tarea` con `motivo: sin_chat`. Sin migración.
+- **Límite.** Hoy el selector sólo ofrece a quien pide y a sus reportes, y la autoridad
+  exige que confirme el aprobador del responsable: un responsable distinto de quien pide
+  Y de quien confirma no se alcanza desde la interfaz. La regla se prueba a nivel de la
+  función; el caso real es el Confirmar directo.
+- **RED.** `tests/test_aviso_de_asignacion.py` (nuevo): 7 failed, 2 passed (los dos que
+  protegen que no se avise de más).
+- **GREEN.** Los 9 del archivo nuevo; tanda enfocada (nuevo, `test_aviso_de_aprobacion`,
+  `test_alta_enviar_a_aprobacion`, `test_alta_conducida`, `test_rechazar_borrador`,
+  `test_task_intake`, `test_avisos_de_coordinacion_fuera_del_tope`, `test_salida` y todo
+  archivo que menciona "Hecho. La tarea quedó comprometida", `confirmar_borrador` o
+  `_resolver_toque_borrador`): 498 passed. Ninguna prueba existente cambió.
