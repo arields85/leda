@@ -151,9 +151,11 @@ class ProveedorGrabador:
     respuestas: list[dict] = field(default_factory=list)
 
     def route_intent(self, text: str, pendiente: str | None = None,
-                     valor_esperado=None) -> IntentRoute:
+                     valor_esperado=None, historial=None) -> IntentRoute:
         inicio = time.perf_counter()
         registro: dict = {"entrada": text}
+        if historial:
+            registro["historial"] = [dict(m) for m in historial]
         if pendiente is not None:
             registro["pendiente"] = pendiente
         if valor_esperado is not None:
@@ -164,13 +166,14 @@ class ProveedorGrabador:
                 "hoy": (valor_esperado.hoy.isoformat()
                         if valor_esperado.hoy else None)}
         try:
-            if pendiente is None:
-                ruta = self.interno.route_intent(text)
-            elif valor_esperado is None:
-                ruta = self.interno.route_intent(text, pendiente=pendiente)
-            else:
-                ruta = self.interno.route_intent(
-                    text, pendiente=pendiente, valor_esperado=valor_esperado)
+            argumentos: dict = {}
+            if pendiente is not None:
+                argumentos["pendiente"] = pendiente
+                if valor_esperado is not None:
+                    argumentos["valor_esperado"] = valor_esperado
+            if historial:
+                argumentos["historial"] = historial
+            ruta = self.interno.route_intent(text, **argumentos)
         except Exception as exc:
             # El intento que falló también queda: sin él, un `RoutingError` no
             # deja ninguna huella de qué ruta lo causó (banco b-0022).

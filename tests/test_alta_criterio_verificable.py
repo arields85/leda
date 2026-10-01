@@ -201,7 +201,8 @@ class _Proveedor:
     def __init__(self, ruta=None, error=None):
         self.ruta, self.error, self.llamadas = ruta, error, []
 
-    def route_intent(self, text, pendiente=None, valor_esperado=None):
+    def route_intent(self, text, pendiente=None, valor_esperado=None,
+                     historial=None):
         self.llamadas.append(valor_esperado)
         if self.error:
             raise self.error

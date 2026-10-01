@@ -162,7 +162,8 @@ def test_el_turno_con_pregunta_pendiente_pasa_el_valor_esperado_al_ruteo(
         monkeypatch):
     llamadas = []
 
-    def rutear(proveedor, texto, pendiente=None, valor_esperado=None):
+    def rutear(proveedor, texto, pendiente=None, valor_esperado=None,
+               historial=None):
         llamadas.append((texto, pendiente, valor_esperado))
         return None, RuntimeError("sin ruteo")
 

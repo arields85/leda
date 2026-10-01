@@ -807,3 +807,67 @@ Chequeo de rumbo (escrito antes de escribir código).
   candidato, aprobado y reconocido (`review-1c13a9b74afef99c`). Frontera de revisión de la
   rama: `16cc7cf`. Notas no bloqueantes: `R3-incidente-campo-sin-sujeto`
   (`ingreso_tareas.py:744-755`, WARNING) y `R3-rechazo-sin-campo` (`:1627-1629`).
+
+## Conversación con memoria y modelo puro (2026-10-01, F-C6)
+
+Chequeo de rumbo (escrito antes de escribir código; ADR 0014 etapa 1, hallazgo F-C6 del
+guion "08:22-08:32").
+
+1. Clase de problema: una etapa del flujo sin el contexto que el ADR 0014 le promete. La
+   etapa 1 dice que el contexto incluye "el historial reciente de lo que efectivamente se
+   dijo", pero sólo `agente.responder` lo recibe (`contexto.historial`); el ruteo
+   (`route_intent`) y la redacción (`redactar`) reciben el mensaje o los hechos sueltos. Ya
+   apareció antes con otra forma: la pregunta pendiente como contexto (ADR 0013 regla 1)
+   se resolvió describiéndola en el sistema del ruteo, sin la conversación; "ayudame, que
+   puedo poner?" y "por que anda" se clasificaron como `otro_tema` por eso. La misma clase
+   en la redacción: el modelo repite "Entendí que…" porque no ve lo que ya dijo. Y dos
+   garantías que valían en el papel: "Dejarlo" destruía el borrador (un efecto
+   irreversible detrás de una clasificación que puede fallar) y el plazo de 4 s caía a
+   una plantilla (la protección de latencia que el usuario quiere apagar por ahora).
+2. Mecanismo general, no caso: (a) el historial reciente (misma fuente y límites que
+   `contexto.historial`: sólo lo enviado, en orden, sin el mensaje entrante) entra como
+   mensajes previos a los dos proveedores de todo tipo, con reglas semánticas generales en
+   las instrucciones (interpretar el mensaje en el contexto de la conversación; no repetir
+   fórmulas ya dichas), sin listas de frases; (b) dejar una rama para ver otra cosa
+   conserva el trabajo y sólo un Cancelar explícito lo borra; (c) el plazo propio y el
+   respaldo de plantilla pasan a una constante/ajuste restaurable, con regeneración
+   acotada y falla visible (incidente + aviso neutro), nunca silenciosa; (d) F-A1, F-C5,
+   F-B9 y F-C1 se corrigen por la regla de su etapa (orden de envío, cierre del resumen
+   como parte propia, normalización en la etapa 2, intención de crear sin búsqueda).
+3. Qué haría innecesaria la próxima ronda: que "ayudame, que puedo poner?" y una respuesta
+   como "por que anda" no se clasifiquen como otro tema cuando la pregunta pendiente es el
+   criterio (se ve en el historial que recibe el ruteo); ningún borrador perdido por
+   "Dejarlo"; ninguna redacción de A que repita la apertura del turno anterior; ningún
+   resumen sin cierre; sin vencimientos del plazo ni respaldos de plantilla en A.
+4. Hipótesis vigente: un modelo flash que ve la conversación clasifica y redacta bien sin
+   que el código le describa cada caso. Vale como hipótesis a medir (no está probada):
+   la prueba real "Corrida siguiente 2" del guion la mide. Con la protección de latencia
+   apagada (decisión del usuario, a restaurar) la latencia pasa a ser la del modelo.
+
+Cambio de alcance (orquestador, decisión del usuario, 2026-10-01): el alta guiada se
+rediseña a continuación como conversación conducida por el modelo (con el historial y el
+estado del borrador; el código valida, persiste, pone botones y la confirmación final).
+Por eso esta unidad hace sólo lo que ese rediseño también necesita. **Se hace:** historial
+al ruteo y a la redacción (T1, T2); conservar el borrador al dejarlo (T3); modelo puro sin
+plazo propio ni plantilla de respaldo, una regeneración (T4); F-A1, F-C5, F-B9, F-C1 (T5).
+**No se hace (se reemplaza con el rediseño):** ayuda dentro de la rama y rediseño de la
+propuesta de criterio (F-B7/F-C3), pasar por el modelo el resto de las plantillas del alta
+("¿Seguimos?", la confirmación `dudoso`, la aclaración dentro del alta, apertura y cierre
+del resumen, "Listo, dejé de lado…"), y F-C2 (descripción igual al título).
+
+### Tareas
+
+- [ ] **T1.** Historial al ruteo (todos los proveedores) + instrucciones generales.
+- [ ] **T2.** Historial a la redacción + guía ("continuá la conversación, no repitas").
+- [ ] **T3.** Dejarlo y ver lo otro conserva el borrador (pausado); el próximo "quiero
+  crear una tarea" ofrece continuarlo.
+- [ ] **T4.** Modelo puro: sin plazo propio, sin respaldo de plantilla, dos intentos con el
+  motivo del rechazo, incidente + aviso neutro si falla.
+- [ ] **T5.** F-A1 (orden de envío), F-C5 (resumen sin cierre), F-B9 (typos en la etapa 2),
+  F-C1 (crear no busca el título entre las existentes).
+- [ ] **T6.** Guion "Corrida siguiente 2" y cierre del documento.
+
+Ruta declarada: un solo escritor (el encargo lo pidió así: "execute directly"); disparador
+de escritura de 2+ archivos no triviales cubierto por esa instrucción explícita.
+TDD: estricto (configuración global del usuario); runner
+`D:\Proyectos\Prisma-PM\.venv\Scripts\python.exe -m pytest` desde el worktree.

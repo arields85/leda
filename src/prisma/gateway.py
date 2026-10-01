@@ -1441,16 +1441,18 @@ def _turno(cur, quien, texto: str, workspace_id: str, chat_id: int,
     # (T9-R1d, enmienda de la regla 1): sólo sigue por el camino normal, con la
     # ruta ya obtenida, una pregunta que otro turno ya consumió.
     route = None
+    conversacion = _historial_del_turno(cur, chat_id, now, entrante_id)
     abierta = _ver_pregunta_abierta(cur, quien, chat_id, now, alta=alta_privada)
     if abierta is not None:
         route = _atender_pregunta_pendiente(cur, quien, texto, abierta, proveedor,
                                             cal, chat_id, workspace_id, now,
-                                            entrante_id, con_enlace=con_enlace)
+                                            entrante_id, con_enlace=con_enlace,
+                                            historial=conversacion)
         if route is None:
             return
 
     if route is None:
-        route, last_error = _rutear(proveedor, texto)
+        route, last_error = _rutear(proveedor, texto, historial=conversacion)
         if route is None:
             _avisar_ruteo_caido(cur, quien, last_error, workspace_id, chat_id, now)
             return
@@ -1525,25 +1527,38 @@ def _responder_saludo_suelto(cur, quien, texto: str, cal, chat_id: int, ahora,
         entrante_id, texto, lleva_su_saludo=del_dia is not None, es_saludo=True)
 
 
+def _historial_del_turno(cur, chat_id: int, ahora,
+                         entrante_id: str | None) -> list[dict]:
+    """La conversación reciente de este chat para el ruteo (ADR 0014, etapa 1):
+    la misma fuente y los mismos límites que ve el agente (`contexto.historial`,
+    sólo lo que de verdad se dijo y se envió, sin el mensaje que se rutea)."""
+    from .contexto import historial
+
+    return historial(cur, chat_id, ahora, entrante_id)
+
+
 def _rutear(proveedor, texto: str, pendiente: str | None = None,
-            valor_esperado: ValorEsperado | None = None):
+            valor_esperado: ValorEsperado | None = None,
+            historial: list[dict] | None = None):
     """El ruteo tipado con dos intentos: (ruta, None), o (None, último
     error) si los dos fallan. `pendiente` es la descripción de la pregunta
     abierta, si la hay (T9-R1a); `valor_esperado` (ADR 0014, M1) es lo que esa
-    pregunta espera, y sólo se le pasa al proveedor cuando hay uno: un
-    proveedor que no sabe de valores se llama como siempre."""
+    pregunta espera; `historial` (F-C6) es la conversación reciente. Cada uno
+    sólo se le pasa al proveedor cuando hay uno: un proveedor que no sabe de
+    valores ni de conversación se llama como siempre."""
     from .llm import IntentRoute
 
+    argumentos: dict = {}
+    if pendiente is not None:
+        argumentos["pendiente"] = pendiente
+        if valor_esperado is not None:
+            argumentos["valor_esperado"] = valor_esperado
+    if historial:
+        argumentos["historial"] = historial
     last_error = None
     for _ in range(2):
         try:
-            if pendiente is None:
-                candidate = proveedor.route_intent(texto)
-            elif valor_esperado is None:
-                candidate = proveedor.route_intent(texto, pendiente=pendiente)
-            else:
-                candidate = proveedor.route_intent(
-                    texto, pendiente=pendiente, valor_esperado=valor_esperado)
+            candidate = proveedor.route_intent(texto, **argumentos)
             if not isinstance(candidate, IntentRoute):
                 raise TypeError("The provider returned an untyped route.")
             return candidate, None
@@ -1876,7 +1891,8 @@ def _pregunta_del_alta(abierta) -> _Pregunta:
 def _atender_pregunta_pendiente(cur, quien, texto: str, abierta, proveedor, cal,
                                 chat_id: int, workspace_id: str, ahora,
                                 entrante_id: str | None = None, *,
-                                con_enlace: bool = False):
+                                con_enlace: bool = False,
+                                historial: list[dict] | None = None):
     """Interpreta el mensaje que llega con una pregunta abierta (T9-R1a y
     T9-R1b, ADR 0013 regla 1): el ruteo tipado devuelve un comando de la lista
     cerrada y acá hay un manejo determinista por comando, igual para todos los
@@ -1900,7 +1916,8 @@ def _atender_pregunta_pendiente(cur, quien, texto: str, abierta, proveedor, cal,
     pregunta = _pregunta_de(abierta)
     route, error = _rutear(
         proveedor, texto, pendiente=pregunta.para_ruteo,
-        valor_esperado=_valor_esperado_de(pregunta.valor_esperado, cal, ahora))
+        valor_esperado=_valor_esperado_de(pregunta.valor_esperado, cal, ahora),
+        historial=historial)
     if route is None:
         _avisar_ruteo_caido(cur, quien, error, workspace_id, chat_id, ahora)
         return None
@@ -1914,7 +1931,7 @@ def _atender_pregunta_pendiente(cur, quien, texto: str, abierta, proveedor, cal,
         if _consumir_pregunta(cur, quien, chat_id, abierta, ahora):
             _seguir_con_la_respuesta(cur, quien, texto, abierta, route, proveedor,
                                      cal, chat_id, workspace_id, ahora,
-                                     entrante_id)
+                                     entrante_id, historial=historial)
             return None
         return route
     if comando is RespectoPendiente.CORRIGE and pregunta.corrige_modifica:
@@ -2035,7 +2052,8 @@ def _repreguntar(cur, quien, workspace_id: str, chat_id: int, abierta,
 
 def _seguir_con_la_respuesta(cur, quien, texto: str, abierta, route, proveedor,
                              cal, chat_id: int, workspace_id: str, ahora,
-                             entrante_id: str | None) -> None:
+                             entrante_id: str | None, *,
+                             historial: list[dict] | None = None) -> None:
     """El mensaje es la respuesta a la pregunta, ya consumida: sigue el camino
     propio de cada tipo, el de siempre. `route` es la que ya se obtuvo al
     interpretar el mensaje, o `None` si todavía no se rutea (el botón "Sí, es
@@ -2049,7 +2067,7 @@ def _seguir_con_la_respuesta(cur, quien, texto: str, abierta, route, proveedor,
         # confirmó que el mensaje es la respuesta (`_ruta_de_lo_confirmado`).
         if route is None:
             route, error = _ruta_de_lo_confirmado(
-                proveedor, texto, abierta, cal, ahora)
+                proveedor, texto, abierta, cal, ahora, historial=historial)
             if route is None:
                 _avisar_ruteo_caido(cur, quien, error, workspace_id, chat_id,
                                     ahora)
@@ -2085,7 +2103,7 @@ def _seguir_con_la_respuesta(cur, quien, texto: str, abierta, route, proveedor,
                                  workspace_id, ahora)
         return
     if route is None:
-        route, error = _rutear(proveedor, texto)
+        route, error = _rutear(proveedor, texto, historial=historial)
         if route is None:
             _avisar_ruteo_caido(cur, quien, error, workspace_id, chat_id, ahora)
             return
@@ -2099,7 +2117,8 @@ def _seguir_con_la_respuesta(cur, quien, texto: str, abierta, route, proveedor,
                           workspace_id, ahora, entrante_id, modificacion=abierta)
 
 
-def _ruta_de_lo_confirmado(proveedor, texto: str, abierta, cal, ahora):
+def _ruta_de_lo_confirmado(proveedor, texto: str, abierta, cal, ahora, *,
+                           historial: list[dict] | None = None):
     """La ruta del mensaje que la persona confirmó como respuesta con "Sí, es
     eso" (F-B2, ADR 0014 M1): (ruta, None), o (None, error) si el ruteo cae.
 
@@ -2120,7 +2139,8 @@ def _ruta_de_lo_confirmado(proveedor, texto: str, abierta, cal, ahora):
         # reescrito, y otra acción u otro comando no lo descartan. Si el modelo no
         # puede, sale tal cual: la persona ya confirmó que es su respuesta.
         route, _ = _rutear(proveedor, texto, pendiente=pregunta.para_ruteo,
-                           valor_esperado=replace(esperado, confirmado=True))
+                           valor_esperado=replace(esperado, confirmado=True),
+                           historial=historial)
         if (route is not None
                 and route.action is IntentAction.NORMAL_CONVERSATION
                 and route.respecto_pendiente is RespectoPendiente.RESPONDE):
@@ -2139,7 +2159,8 @@ def _ruta_de_lo_confirmado(proveedor, texto: str, abierta, cal, ahora):
     route, error = _rutear(
         proveedor, texto, pendiente=pregunta.para_ruteo,
         valor_esperado=(replace(esperado, confirmado=True)
-                        if esperado is not None else None))
+                        if esperado is not None else None),
+        historial=historial)
     falta = FALTA_POR_DEFECTO.get(esperado.tipo) if esperado else None
     if route is not None and not route.valor and falta:
         route = replace(route, valor={"falta": falta})
@@ -2551,6 +2572,9 @@ def _resolver_toque_respuesta_dato_menu(cur, quien, workspace_id: str,
 
     proveedor = desde_base(cur, workspace_id, config)
     cal = Calendario.desde_base(cur, workspace_id)
+    # El mensaje guardado es el que se rutea: la conversación es lo anterior.
+    conversacion = _historial_del_turno(cur, chat_id, ahora,
+                                        args.get("entrante_id"))
 
     if eleccion == _ELECCION_DATO_SI:
         # Igual que `responde`. La corrección y la aclaración necesitan la
@@ -2562,7 +2586,7 @@ def _resolver_toque_respuesta_dato_menu(cur, quien, workspace_id: str,
                 and abierta.herramienta not in (_SENTINEL_VISTA_PREVIA,
                                                 _SENTINEL_ELECCION)
                 and abierta.herramienta not in _TIPO_DE_ALTA):
-            route, error = _rutear(proveedor, texto)
+            route, error = _rutear(proveedor, texto, historial=conversacion)
             if route is None:
                 _avisar_ruteo_caido(cur, quien, error, workspace_id, chat_id,
                                     ahora)
@@ -2573,7 +2597,7 @@ def _resolver_toque_respuesta_dato_menu(cur, quien, workspace_id: str,
             return
         _seguir_con_la_respuesta(cur, quien, texto, abierta, route, proveedor,
                                  cal, chat_id, workspace_id, ahora,
-                                 args.get("entrante_id"))
+                                 args.get("entrante_id"), historial=conversacion)
         return
 
     if eleccion not in _ELECCIONES_DE_DEJAR:
@@ -2584,7 +2608,8 @@ def _resolver_toque_respuesta_dato_menu(cur, quien, workspace_id: str,
         return
 
     _dejar_y_ver_lo_otro(cur, quien, workspace_id, chat_id, abierta, texto,
-                         args.get("entrante_id"), proveedor, cal, ahora)
+                         args.get("entrante_id"), proveedor, cal, ahora,
+                         historial=conversacion)
 
 
 def _sigue_abierta(cur, quien, chat_id: int, abierta, ahora) -> bool:
@@ -2618,14 +2643,14 @@ def _seguir_con_la_pregunta(cur, quien, workspace_id: str, chat_id: int,
 
 def _dejar_y_ver_lo_otro(cur, quien, workspace_id: str, chat_id: int, abierta,
                          texto: str, entrante_id: str | None, proveedor, cal,
-                         ahora) -> None:
+                         ahora, *, historial: list[dict] | None = None) -> None:
     """"Dejarlo y ver lo otro": cierra lo pendiente por el mismo camino que
     `cancela` y, en la misma respuesta, atiende el mensaje guardado por el
     camino normal, como si no hubiera pregunta abierta. Se rutea antes de
     cerrar, así un ruteo caído no pierde la pregunta. Si otro camino ya la
     había cerrado, el mensaje se atiende igual (nunca se pierde lo que la
     persona pidió) y no se dice que se dejó nada de lado."""
-    route, error = _rutear(proveedor, texto)
+    route, error = _rutear(proveedor, texto, historial=historial)
     if route is None:
         _avisar_ruteo_caido(cur, quien, error, workspace_id, chat_id, ahora)
         return
