@@ -18,7 +18,10 @@ botones y tocar una tarea ofrece lo que se puede hacer con ella.
 
 ## Estado final (2026-09-30)
 
-Construido sobre `main`, cada unidad con pruebas y revisión RDD; detalle en el diario.
+Construido sobre `main`, cada unidad con pruebas. Todo el código quedó revisado por RDD
+hasta `d4eefc7` (`review-cb3deef4705ea11f`, aprobada y reconocida), incluido el arnés
+del banco `ffe4e85`, sobre el que la revisión dejó dos advertencias (en `docs/STATUS.md`).
+Detalle en el diario.
 
 - **T1-T4b** (commits `c253d27` a `9681973`): opciones del modelo (`ofrecer_opciones`),
   menú de tarea por estado y relación, autoridad por tarea en `actualizar_estado`,

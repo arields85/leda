@@ -30,8 +30,9 @@ Gobiernan: [`product/que-es-prisma.md`](product/que-es-prisma.md), [`architectur
 ## Estado comprobado
 
 - Fundación multi-tenant con `row level security` forzado y política de aislamiento
-  contra el espacio vigente. La cifra de 28 tablas viene del 2026-09-29;
-  `PENDIENTE` recontarla contra el esquema actual. Aislamiento entre clientes cerrado
+  contra el espacio vigente: 34 tablas (recontadas el 2026-09-30 en `db/esquema.sql`:
+  31 en el bucle de la línea 2104 y `absence`, `audit_log` e `incident` aparte, líneas
+  2149-2160). Aislamiento entre clientes cerrado
   por las migraciones `0003` a `0005`
   ([`architecture/frontera.md`](architecture/frontera.md#cómo-se-cerró-la-regla-1));
   `PENDIENTE` un ensayo de propiedad sobre un clúster enteramente limpio (hoy se
@@ -185,8 +186,11 @@ prueba real los criterios del ADR 0014. Alcance en [`ROADMAP.md`](ROADMAP.md), "
 entrega". Después, según el roadmap: aportes sobre tareas, aprendizaje de apodos y
 aclaraciones, conversación de bloqueos.
 
-**Punto exacto para retomar.** `main` en `be80303` (con la frontera de revisión en
-`ec3109a`), sin push. Continuar por el punto 1 (el 01/10 a las 09:00); el punto 2 avanza
+**Punto exacto para retomar.** `main` con la documentación condensada en `7c2531b` (la
+historia en `historial/`; frontera de revisión en `ec3109a`: el tramo de la condensación
+no se pudo revisar con RDD porque las copias de historial exceden el contexto del
+revisor; se verificaron por hash y una revisión independiente de los textos curados no
+encontró reglas perdidas), sin push. Continuar por el punto 1 (el 01/10 a las 09:00); el punto 2 avanza
 en el worktree `flujo-de-un-mensaje` leyendo primero `odd/tasks/flujo-de-un-mensaje.md`
 de esa rama. Consentimiento permanente del usuario para commits y revisiones RDD; parar
 sólo por decisiones sobre cómo funciona Prisma. Antes de cada unidad, el chequeo de rumbo

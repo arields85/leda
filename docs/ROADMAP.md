@@ -21,7 +21,7 @@ se rehace.
 
 | Activo | Por qué sirve |
 |---|---|
-| Aislamiento por `row level security` | 28 tablas con RLS forzado y política contra el espacio actual (`db/esquema.sql:1474-1492`). El aislamiento lo garantiza la base, no el cuidado de quien escribe la consulta. |
+| Aislamiento por `row level security` | 34 tablas con RLS forzado y política contra el espacio actual (`db/esquema.sql:2104-2160`, recontadas el 2026-09-30). El aislamiento lo garantiza la base, no el cuidado de quien escribe la consulta. |
 | Modelo de roles y membresías | Separa persona, membresía y autoridad; funciona igual para cualquier cliente. |
 | Tablas de configuración por cliente | `area` y `rol` son datos con alcance de espacio (`db/esquema.sql:106,114`), no tipos enumerados. |
 | Estado como proyección de eventos | `bloquear_estado_directo()` impide la escritura directa (`db/esquema.sql:1231`). Es exactamente lo que necesita una superficie de lectura. |

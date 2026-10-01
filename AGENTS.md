@@ -16,7 +16,7 @@ actual; no se reestructura ni reescribe sin una decisión explícita y documenta
 1. `docs/product/que-es-prisma.md`: qué es el producto y qué es configuración de cada cliente.
 2. `docs/architecture/frontera.md`: dónde termina el núcleo y qué reglas lo gobiernan.
 3. `nucleo/` (`constitucion.md`, `mecanica-pm.md`, `alta-de-equipo.md`): comportamiento **obligatorio** de Prisma,
-   no material de consulta. Una auditoría que no lo lea no es una auditoría del proyecto.
+   no material de consulta. Una auditoría que no lo haya leído entero no está terminada.
 4. `docs/capacidades.md`: qué está construido, qué está diseñado sin construir y qué es esquema sin implementación.
 5. `docs/STATUS.md`: estado, riesgos y próximo paso.
 6. `docs/ROADMAP.md`: orden de trabajo vigente.
@@ -251,7 +251,10 @@ registrar su resultado sólo cuando cambie un hecho relevante.
 
 ADR 0003 quedó superada por el cambio de alcance a producto multi-tenant (la amenaza principal pasó a ser el cruce
 entre clientes); no se borra ni se implementa en su secuencia original. Su Corte 0 (catálogo ejecutable de
-propietarios, membresías, grants y ACL) es insumo de la unidad de cierre del aislamiento de `docs/ROADMAP.md`.
+propietarios, membresías, grants y ACL) **no está diferido**: es el control que habría detectado las tablas de
+eventos con `grant insert` sin `workspace_id` ni RLS, e insumo de la unidad de cierre del aislamiento de
+`docs/ROADMAP.md` (detalle en [`ADR 0003`](docs/decisions/0003-authenticated-inbound-boundary.md)). Los controles
+avanzados de privacidad y producción siguen en el horizonte posterior del roadmap.
 
 Antes de cerrar una sesión, y después de su última modificación, operación o commit, contrastar `docs/STATUS.md` y
 los documentos de continuidad afectados con el estado actual de Git, código, esquema, pruebas y operación. Si
