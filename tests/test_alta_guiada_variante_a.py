@@ -194,8 +194,10 @@ def test_con_a_enviar_a_aprobacion_conserva_el_cuerpo_del_modelo_con_el_cierre_d
     _tocar(client, conn, _usuario(intake_world), pid, "Enviar a aprobación")
 
     (_, confirmacion) = _acciones(conn, rid)
-    assert _fila(conn, confirmacion["id"])["cuerpo"] == (
-        cuerpo + "\n\n" + I.CIERRE_CONFIRMAR)
+    recibido = _fila(conn, confirmacion["id"])["cuerpo"]
+    linea, _, resto = recibido.partition("\n\n")      # quién se lo manda (d), 2026-10-01
+    assert linea.endswith(" te manda esta tarea para que la confirmes.")
+    assert resto == cuerpo + "\n\n" + I.CIERRE_CONFIRMAR
     assert len([d for d in eco.redactados if "resumen" in d]) == 1  # no vuelve al modelo
 
 

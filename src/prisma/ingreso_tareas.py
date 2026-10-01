@@ -1334,6 +1334,53 @@ def reject_draft(cur: psycopg.Cursor, who: Solicitante, *, draft_id: str,
     return rejected_text(title, requester["nombre"] if requester else "quien lo pidió")
 
 
+def approval_notice_text(confirmer_name: str, title: str) -> str:
+    """El aviso de coordinación a quien pidió el borrador cuando otra persona lo
+    confirmó: quién lo confirmó y cuál tarea quedó creada. Mismo estilo que el aviso
+    del rechazo (`rejection_notice_text`)."""
+    return (f"{confirmer_name} confirmó el borrador de la tarea «{title}»: "
+            "la tarea quedó creada.")
+
+
+def notify_requester_of_approval(cur: psycopg.Cursor, who: Solicitante, *,
+                                 pending_action_id: str, now: datetime) -> bool:
+    """Le avisa a quien pidió el borrador que `who` (quien confirma) lo convirtió en
+    tarea: sin esto, quien lo pidió no se enteraba de que su tarea existía (el
+    rechazo sí avisaba). Es un aviso de coordinación (fuera del tope diario, igual
+    que el del rechazo), sin modelo, una sola vez por borrador (`dedupe_key`) y
+    auditado. No manda nada si quien confirma es quien pidió (confirmó lo suyo) ni si
+    la acción no es de un borrador. Devuelve si lo encoló."""
+    cur.execute(
+        """select r.id, r.workspace_id, r.chat_id, r.membership_id, r.task_draft_id,
+                  d.titulo
+             from pending_action p
+             join task_intake_request r on r.task_draft_id = p.draft_id
+                                       and r.workspace_id = p.workspace_id
+             join task_draft d on d.id = r.task_draft_id
+            where p.id = %s and p.workspace_id = %s""",
+        (pending_action_id, who.workspace_id))
+    request = cur.fetchone()
+    if not request or str(request["membership_id"]) == str(who.membership_id):
+        return False
+    request_id = str(request["id"])
+    enqueued = enqueue_outbox(
+        cur, workspace_id=str(request["workspace_id"]), chat_id=request["chat_id"],
+        recipient_membership_id=str(request["membership_id"]),
+        text=approval_notice_text(who.nombre, request["titulo"]),
+        scheduled_for=now, dedupe_key=f"intake:{request_id}:approved-notice",
+        allow_split=True, es_coordinacion=True,
+    )
+    if not enqueued:
+        return False
+    registrar_auditoria(
+        cur, accion="avisar_aprobacion_ingreso_tarea",
+        workspace_id=who.workspace_id, actor_app_user_id=who.app_user_id,
+        actor_kind="persona", sujeto_tipo="task_draft",
+        sujeto_id=str(request["task_draft_id"]),
+        detalle={"request_id": request_id})
+    return True
+
+
 def modify_from_preview(cur: psycopg.Cursor, who: Solicitante, *, token: str,
                         chat_id: int, now: datetime) -> IntakeOutcome | None:
     """El botón Modificar de la vista previa del borrador. Sólo lo toca su
@@ -2539,6 +2586,19 @@ def _offer_review(cur, request, who, now, preview_text, preview, cuerpo_resumen)
                          pending_action_id=pending.id)
 
 
+def request_line(requester_name: str | None) -> str:
+    """La primera línea del pedido de aprobación: quién manda la tarea."""
+    return (f"{requester_name or 'Alguien del equipo'} te manda esta tarea para "
+            "que la confirmes.")
+
+
+def _quien_pide(cur, request) -> str:
+    cur.execute("select nombre from integrante where membership_id = %s",
+                (request["membership_id"],))
+    fila = cur.fetchone()
+    return request_line(fila["nombre"] if fila else None)
+
+
 def _send_to_confirmer(cur, request, now, preview_text, preview, version,
                        authority):
     """Registra la vista previa del borrador para quien lo confirma y la encola.
@@ -2557,6 +2617,9 @@ def _send_to_confirmer(cur, request, now, preview_text, preview, version,
         workspace_id=workspace_id, membership_id=approver_id,
     )
     requester_confirms = approver_id == str(request["membership_id"])
+    if not requester_confirms:
+        # Quien confirma lo de otra persona tiene que saber de quién es (2026-10-01).
+        preview_text = f"{_quien_pide(cur, request)}\n\n{preview_text}"
     if requester_confirms:
         options = [(ETIQUETA_CONFIRMAR, True), (ETIQUETA_MODIFICAR, VALUE_MODIFY),
                    (ETIQUETA_CANCELAR, False)]

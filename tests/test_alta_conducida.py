@@ -1010,7 +1010,10 @@ def test_el_aprobador_recibe_el_resumen_sin_la_frase_del_turno_de_quien_pidio(ch
                    if f["pending_action_id"]]
     cuerpo = recibido["cuerpo"]
     assert "Listo, revisalo." not in cuerpo
-    assert cuerpo.startswith("Resumen para revisar\nTítulo: Calibrar los sensores")
+    # Primero, quién se lo manda (hallazgo (d) del 2026-10-01); después, el resumen.
+    linea, resto = cuerpo.split("\n\n", 1)
+    assert linea.endswith(" te manda esta tarea para que la confirmes.")
+    assert resto.startswith("Resumen para revisar\nTítulo: Calibrar los sensores")
     assert "Responsable: Taylor Quinn" in cuerpo
     assert cuerpo.endswith(I.CIERRE_CONFIRMAR)
     # Quien pidió conserva SU resumen con su frase (es la respuesta a su turno).

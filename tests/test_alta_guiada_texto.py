@@ -194,9 +194,12 @@ def test_el_resumen_de_quien_pide_dice_lo_que_hace_su_boton_y_el_de_quien_confir
     de_quien_confirma = _resumen(conn, para_confirmar)
     ultima = de_quien_confirma.split("\n\n")[-1]
     assert "Confirmar" in ultima and "Enviar a aprobación" not in ultima
-    # Los mismos datos, sólo cambia lo que se dice del botón.
+    # Los mismos datos, sólo cambia lo que se dice del botón y la primera línea que
+    # le dice a quien confirma quién se lo manda (hallazgo (d), 2026-10-01).
+    linea, _, sin_la_linea = de_quien_confirma.partition("\n\n")
+    assert linea.endswith(" te manda esta tarea para que la confirmes.")
     assert (de_quien_pide.rpartition("\n\n")[0]
-            == de_quien_confirma.rpartition("\n\n")[0])
+            == sin_la_linea.rpartition("\n\n")[0])
 
 
 def test_quien_confirma_lo_suyo_ve_confirmar(intake_world, conn):

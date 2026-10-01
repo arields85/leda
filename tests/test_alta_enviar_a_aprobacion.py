@@ -28,7 +28,8 @@ from prisma.despachador import TransporteDePrueba, despachar
 from prisma.llm import RespectoPendiente
 from prisma.salida import etiqueta_sin_icono
 
-from tests.test_alta_eleccion_confirmacion import (_alta_en_confirmacion, _escribir,
+from tests.test_alta_eleccion_confirmacion import (_alta_en_confirmacion,
+                                                   _alta_enviada, _escribir,
                                                    _nuevas, _ruta, _salidas,
                                                    _solicitud, _tocar_boton,
                                                    _usuario)
@@ -103,6 +104,14 @@ def _pregunta_abierta(conn, world, user):
         return I.open_intake_question(cur, quien, user)
 
 
+def _linea_de_quien_pide(conn, world) -> str:
+    """La primera línea del pedido de aprobación (hallazgo (d), 2026-10-01)."""
+    with admin(conn) as cur:
+        cur.execute("select nombre from app_user where telegram_user_id = %s",
+                    (_usuario(world),))
+        return I.request_line(cur.fetchone()["nombre"])
+
+
 def _nombre_del_aprobador(conn, world) -> str:
     with admin(conn) as cur:
         cur.execute("select nombre from app_user where telegram_user_id = %s",
@@ -143,6 +152,23 @@ def test_quien_pide_ve_primero_su_resumen_con_enviar_modificar_y_cancelar(
     assert fila["cuerpo"] == accion["resumen"]
     assert accion["resumen"].startswith("Resumen para revisar")
     assert str(salida["pending_action_id"]) == str(pid)
+
+
+def test_el_pedido_de_aprobacion_dice_quien_lo_manda_y_su_resumen_no_cambia(
+        intake_world, conn):
+    """Hallazgo (d) del 2026-10-01: a quien confirma le llegaba el resumen sin decir
+    de quién era. Ahora arranca nombrando a quien pidió; el de quien pidió, igual."""
+    rid, pid = _alta_enviada(conn, intake_world)
+    linea = _linea_de_quien_pide(conn, intake_world)
+
+    (aprobador,) = [a for a in _acciones(conn, rid)
+                    if a["herramienta"] == "confirmar_borrador_tarea"]
+    assert linea.endswith(" te manda esta tarea para que la confirmes.")
+    assert aprobador["resumen"].startswith(linea + "\n\nResumen para revisar\n")
+    assert _fila(conn, pid)["cuerpo"] == aprobador["resumen"]
+    (suyo,) = [a for a in _acciones(conn, rid)
+               if a["herramienta"] != "confirmar_borrador_tarea"]
+    assert suyo["resumen"].startswith("Resumen para revisar\n")
 
 
 def test_hasta_enviarlo_a_quien_confirma_no_le_llega_nada(intake_world, conn):
@@ -227,7 +253,8 @@ def test_enviar_arma_el_texto_de_quien_confirma_con_el_cuerpo_guardado_no_cortan
 
     (_, confirmacion) = _acciones(conn, rid)
     assert _fila(conn, confirmacion["id"])["cuerpo"] == (
-        cuerpo + "\n\n" + I.CIERRE_CONFIRMAR)
+        _linea_de_quien_pide(conn, intake_world) + "\n\n" + cuerpo + "\n\n"
+        + I.CIERRE_CONFIRMAR)
 
 
 def test_enviar_le_manda_el_borrador_a_quien_confirma_y_le_dice_a_quien_pide(
@@ -258,7 +285,9 @@ def test_enviar_le_manda_el_borrador_a_quien_confirma_y_le_dice_a_quien_pide(
     assert fila["chat_id"] == tg_aprobador and fila["es_respuesta"] is False
     # Los mismos datos; el cierre dice lo que hace el botón de cada uno (R4c-H9).
     cuerpo = revision["args"]["cuerpo_resumen"]
-    assert fila["cuerpo"] == I._con_cierre(cuerpo, I.CIERRE_CONFIRMAR)
+    assert fila["cuerpo"] == (
+        _linea_de_quien_pide(conn, intake_world) + "\n\n"
+        + I._con_cierre(cuerpo, I.CIERRE_CONFIRMAR))
     assert revision["resumen"].endswith(I.cierre_enviar("Morgan Hale 1"))
     # La versión y la vista previa son las del borrador vigente al enviar.
     assert confirmacion["draft_version"] == revision["draft_version"]

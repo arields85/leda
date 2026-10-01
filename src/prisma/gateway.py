@@ -1326,6 +1326,7 @@ def _resolver_toque_borrador(conn, authority_conn, workspace_id, token,
                              toque_id: str | None = None) -> dict:
     """Resolve outside the app transaction, then enqueue its response."""
     from . import pendientes as P
+    from . import ingreso_tareas as I
 
     try:
         with autoridad(authority_conn) as authority_cur:
@@ -1353,6 +1354,12 @@ def _resolver_toque_borrador(conn, authority_conn, workspace_id, token,
             atadas = _atar_fila_terminal(cur, workspace_id, toque_id,
                                          resuelta.pending_action_id)
         if resuelta is not None and not resuelta.replay:
+            if resuelta.task_id and not resuelta.cancelada:
+                # Quien confirma lo de otra persona: a quien lo pidió también le
+                # llega que su tarea existe (aviso de coordinación, mecánica §10).
+                I.notify_requester_of_approval(
+                    cur, quien, pending_action_id=resuelta.pending_action_id,
+                    now=ahora)
             if atadas != 1:
                 _incidente_fila_terminal(cur, workspace_id, chat_id, quien,
                                          resuelta.pending_action_id, atadas)

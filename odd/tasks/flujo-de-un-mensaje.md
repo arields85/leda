@@ -1398,3 +1398,40 @@ Tramo `f60c3ca..51fa9e6` (`81bb60a`, `9d1bee2`, `20cd9c8`, `51fa9e6`; 994 línea
   borrador nativo `sendMessageDraft` en privado, `despachador.mantener_chat_activo`); el
   modelo tarda 5-38 s y Telegram apaga el typing a los ~5 s sin refresco. Sin investigar:
   sospecha en el intervalo de refresco o en el retiro del borrador.
+
+
+### Aviso de aprobación a quien pidió y quién manda el pedido (2026-10-01)
+
+- Resuelve los pendientes (c) y (d) de la prueba real (circuito de aprobación que comparten el
+  alta guiada y la conversacional).
+- **Causa (c).** La conversión del borrador la hace la función de la autoridad en la base
+  (`confirmar_borrador_tarea`), que sólo deja la fila terminal para quien confirma. El rechazo
+  sí avisaba a quien pidió (`reject_draft`, aviso de coordinación); la aprobación no tenía
+  ningún aviso equivalente: quien pidió no se enteraba de que su tarea existía.
+- **Arreglo (c).** `ingreso_tareas.notify_requester_of_approval`, llamada desde
+  `gateway._resolver_toque_borrador` cuando el toque convirtió el borrador (no replay): encola un
+  aviso de coordinación (`es_coordinacion`, fuera del tope diario, mismo camino de salida y
+  estilo que el del rechazo), código y sin modelo, con `dedupe_key`
+  `intake:<solicitud>:approved-notice` (una sola vez aunque se repita el toque) y auditoría
+  `avisar_aprobacion_ingreso_tarea`. Si quien pidió es quien confirma, no manda nada. Texto:
+  `<Quien confirmó> confirmó el borrador de la tarea «<título>»: la tarea quedó creada.` Sin
+  migración: no hizo falta un tipo de salida nuevo.
+- **Causa y arreglo (d).** El pedido de aprobación arrancaba en "Resumen para revisar" (se arma
+  en `_send_to_confirmer`, común a las dos altas). Ahora, si confirma otra persona, se antepone
+  `<Nombre> te manda esta tarea para que la confirmes.` más una línea en blanco; el resumen y
+  el cierre de quien confirma no cambian, y el resumen de quien pidió tampoco.
+- **RED.** `tests/test_aviso_de_aprobacion.py` (nuevo): 4 failed, 1 passed (el de
+  autoaprobación, que protege que no se agregue un aviso de más); `test_alta_enviar_a_aprobacion`:
+  1 failed (línea de quien pide); `test_alta_conducida`: 1 failed (misma línea, alta
+  conversacional). Total 6 failed.
+- **GREEN.** Tanda enfocada (los tres archivos del circuito, `test_task_intake`,
+  `test_avisos_de_coordinacion_fuera_del_tope`, `test_alta_turno`, `test_salida`,
+  `test_rechazar_borrador`, el banco y todo archivo que menciona "Enviar a aprobación",
+  `confirmar_borrador`, `send_to_confirmer` o `_offer_review`): primera corrida 780 passed,
+  2 failed (dos pruebas existentes que comparaban el texto de quien confirma);
+  corregidas, esos archivos más los nuevos: 64 passed.
+  Existentes cambiados: `test_alta_enviar_a_aprobacion` (dos pruebas comparaban el texto de
+  quien confirma sin la línea nueva), `test_alta_guiada_variante_a` y `test_alta_guiada_texto`
+  (lo mismo: ahora el texto de quien confirma empieza con la línea de quien lo manda) y
+  `test_alta_conducida` (el aprobador ve la línea y luego el resumen).
+- Pendientes (c) y (d): resueltos.
