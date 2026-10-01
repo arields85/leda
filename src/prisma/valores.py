@@ -10,6 +10,14 @@ en `ValorEsperado.hoy`), ninguna base, ningún transporte.
 Un valor que no sirve se rechaza con la razón real y qué sirve, en castellano
 neutro y sin jerga. Un valor que falta nunca se inventa: es `SIN_VALOR` y la
 pregunta queda abierta (quien llama registra el incidente).
+
+Hay un tercer resultado cerrado entre el valor y la falla: la respuesta es de
+verdad una respuesta pero está incompleta o es ambigua para el tipo esperado
+("la semana que viene": ¿qué día?). El modelo lo dice con `falta`, una lista
+cerrada por tipo (`FALTAS_POR_TIPO`); el código lo trata como conversación
+normal (`VALOR_INCOMPLETO`): la misma pregunta sigue abierta y se repregunta con
+palabras propias, sin incidente. El incidente queda para una falla real del
+contrato: salida mal formada, o ni valor ni `falta`.
 """
 
 from __future__ import annotations
@@ -31,8 +39,33 @@ class TipoValor(str, Enum):
 OPCION_NINGUNA = "ninguna"
 """El id con que el modelo dice que el mensaje rechaza todas las opciones."""
 
-CAMPOS_DEL_VALOR = ("fecha_iso", "opcion_id", "texto")
+CAMPOS_DEL_VALOR = ("fecha_iso", "opcion_id", "texto", "falta")
 """Las únicas claves de `valor`, el objeto cerrado que devuelve el ruteo."""
+
+FALTA_DIA = "dia"
+FALTA_CUAL = "cual"
+FALTA_DETALLE = "detalle"
+
+FALTAS_POR_TIPO = {
+    TipoValor.FECHA: (FALTA_DIA,),
+    TipoValor.OPCION: (FALTA_CUAL,),
+    TipoValor.TEXTO: (FALTA_DETALLE,),
+    TipoValor.ENTIDAD: (FALTA_DETALLE,),
+}
+"""Qué puede decir el modelo que falta, por tipo esperado: una fecha dada como
+período sin un día concreto, una opción que podría ser más de una, un texto o
+una referencia demasiado general para servir. Lista cerrada: la palabra que
+diga la persona nunca entra acá."""
+
+FALTA_POR_DEFECTO = {TipoValor.FECHA: FALTA_DIA, TipoValor.OPCION: FALTA_CUAL}
+"""Lo que falta cuando la persona confirmó que su mensaje es la respuesta y el
+modelo no pudo resolverlo a un valor del tipo: una respuesta que no se puede
+tomar tal cual es una respuesta incompleta, no una falla."""
+
+FALTAS_VALIDAS = tuple(dict.fromkeys(
+    f for faltas in FALTAS_POR_TIPO.values() for f in faltas))
+"""Todas las faltas que acepta el sobre del ruteo (la de cada tipo la valida
+`validar_valor`)."""
 
 
 @dataclass(frozen=True)
@@ -54,14 +87,18 @@ def opciones_numeradas(etiquetas) -> tuple[Opcion, ...]:
 class ValorEsperado:
     """Qué espera la pregunta pendiente: el tipo, las opciones ofrecidas (con
     `OPCION`) y el día de hoy en la zona del espacio (con `FECHA`: es lo que
-    deja resolver "mañana" y lo que separa una fecha pasada de una vigente)."""
+    deja resolver "mañana" y lo que separa una fecha pasada de una vigente).
+    `confirmado`: la persona ya confirmó con un botón que el mensaje es la
+    respuesta a esta pregunta (el modelo no vuelve a dudar de eso)."""
     tipo: TipoValor
     opciones: tuple[Opcion, ...] = ()
     hoy: date | None = None
+    confirmado: bool = False
 
 
 class MotivoRechazo(str, Enum):
     SIN_VALOR = "sin_valor"
+    VALOR_INCOMPLETO = "valor_incompleto"
     FECHA_INVALIDA = "fecha_invalida"
     FECHA_PASADA = "fecha_pasada"
     OPCION_DESCONOCIDA = "opcion_desconocida"
@@ -104,6 +141,28 @@ def _se_acepta_texto() -> str:
     return "Escribilo de nuevo."
 
 
+def _incompleto(falta: str | None, esperado: ValorEsperado) -> Rechazado | None:
+    """La respuesta incompleta o ambigua que dijo el modelo (`falta`), con lo
+    que falta y qué sirve en palabras propias; `None` si no hay `falta` o no es
+    una de las del tipo esperado (eso es un valor que falta, no una respuesta
+    parcial)."""
+    if falta not in FALTAS_POR_TIPO.get(esperado.tipo, ()):
+        return None
+    if falta == FALTA_DIA:
+        return Rechazado(
+            MotivoRechazo.VALOR_INCOMPLETO,
+            "Con eso no me alcanza para fijar un día.",
+            "Decime el día exacto, por ejemplo «el viernes» o «el 4 de octubre».")
+    if falta == FALTA_CUAL:
+        return Rechazado(
+            MotivoRechazo.VALOR_INCOMPLETO,
+            "Lo que dijiste puede ser más de una de las opciones.",
+            _se_acepta_opcion(esperado.opciones))
+    return Rechazado(
+        MotivoRechazo.VALOR_INCOMPLETO, "Eso es muy general para usarlo así.",
+        "Contame un poco más de detalle, con tus palabras.")
+
+
 def _cadena(valor, campo: str) -> str | None:
     """El campo del valor como texto recortado, o `None` si no hay o no es un
     texto: una forma inesperada es lo mismo que no traer valor."""
@@ -118,6 +177,9 @@ def _fecha(valor, esperado: ValorEsperado) -> Aceptado | Rechazado:
         raise ValueError("Validar una fecha necesita el día de hoy.")
     iso = _cadena(valor, "fecha_iso")
     if not iso:
+        incompleto = _incompleto(_cadena(valor, "falta"), esperado)
+        if incompleto:
+            return incompleto
         return Rechazado(MotivoRechazo.SIN_VALOR,
                          "No pude entender qué fecha querés.", _se_acepta_fecha())
     try:
@@ -139,6 +201,9 @@ def _opcion(valor, esperado: ValorEsperado) -> Aceptado | Rechazado:
     se_acepta = _se_acepta_opcion(esperado.opciones)
     opcion_id = _cadena(valor, "opcion_id")
     if not opcion_id:
+        incompleto = _incompleto(_cadena(valor, "falta"), esperado)
+        if incompleto:
+            return incompleto
         return Rechazado(MotivoRechazo.SIN_VALOR,
                          "No pude saber cuál elegiste.", se_acepta)
     if opcion_id == OPCION_NINGUNA or any(
@@ -152,6 +217,9 @@ def _texto(valor, esperado: ValorEsperado,
            limite_texto: int) -> Aceptado | Rechazado:
     texto = _cadena(valor, "texto")
     if texto is None:
+        incompleto = _incompleto(_cadena(valor, "falta"), esperado)
+        if incompleto:
+            return incompleto
         return Rechazado(MotivoRechazo.SIN_VALOR,
                          "No pude tomar ese texto.", _se_acepta_texto())
     if not texto:

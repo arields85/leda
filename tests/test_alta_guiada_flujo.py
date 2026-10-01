@@ -192,7 +192,8 @@ def test_una_fecha_que_no_sirve_dice_la_razon_y_la_pregunta_sigue_abierta(
     assert _incidentes(conn, I.ETAPA_VALOR_SIN_INTERPRETAR) == 0
 
 
-@pytest.mark.parametrize("valor", [None, {}, {"opcion_id": "1"}])
+@pytest.mark.parametrize("valor", [None, {}, {"opcion_id": "1"},
+                                   {"falta": "cual"}])   # la falta de otro tipo
 def test_sin_valor_la_pregunta_queda_abierta_con_incidente_y_aviso_neutro(
         valor, intake_world, conn):
     """El modelo no pudo interpretar: nunca se inventa el valor."""
@@ -206,6 +207,47 @@ def test_sin_valor_la_pregunta_queda_abierta_con_incidente_y_aviso_neutro(
         assert _campo(cur, rid, "due_date")["estado"] == "missing"
         assert _slot(cur, rid) == "due_date"
     assert _incidentes(conn, I.ETAPA_VALOR_SIN_INTERPRETAR) == 1
+
+
+@pytest.mark.parametrize("texto", [
+    "la semana que viene", "a fin de mes", "en octubre", "pronto", "después del feriado",
+])
+def test_una_fecha_incompleta_repregunta_el_dia_sin_incidente(
+        texto, intake_world, conn):
+    """F-B1: un período ("la semana que viene") es una respuesta parcial, no una
+    falla: la misma pregunta sigue abierta y se pide el día, sin incidente ni
+    aviso técnico."""
+    ws = intake_world["north-lab"]["id"]
+    with espacio(conn, ws) as cur:
+        actor, rid, ws = _en_la_fecha(cur, intake_world)
+        resultado = _decir_fecha(cur, intake_world, actor, rid, ws,
+                                 {"falta": "dia"}, texto)
+        assert resultado is not None and resultado.inert
+        assert "día exacto" in resultado.text
+        assert I.NOTICIA_NEUTRA_INCIDENTE not in resultado.text
+        assert _campo(cur, rid, "due_date")["estado"] == "missing"
+        assert _slot(cur, rid) == "due_date"                 # la misma pregunta
+        assert _cuerpos(cur, rid).count(resultado.text) == 1
+    assert _incidentes(conn, I.ETAPA_VALOR_SIN_INTERPRETAR) == 0
+
+
+@pytest.mark.parametrize("texto", ["algo que sirva", "lo que corresponda"])
+def test_un_texto_demasiado_general_pide_detalle_sin_incidente(
+        texto, intake_world, conn):
+    ws = intake_world["north-lab"]["id"]
+    with espacio(conn, ws) as cur:
+        actor, rid, ws = _en_la_fecha(cur, intake_world)
+        _decir_fecha(cur, intake_world, actor, rid, ws,
+                     {"fecha_iso": "2028-03-05"})
+        assert _slot(cur, rid) == "acceptance_criterion"
+        inbound = _entrante(cur, ws, actor, texto, n=820)
+        resultado = I.consume_pending_text(
+            cur, actor, chat_id=CHAT, source_inbound_id=inbound,
+            source_raw_text=texto, now=NOW, valor={"falta": "detalle"})
+        assert resultado is not None and resultado.inert
+        assert "detalle" in resultado.text
+        assert _slot(cur, rid) == "acceptance_criterion"
+    assert _incidentes(conn, I.ETAPA_VALOR_SIN_INTERPRETAR) == 0
 
 
 @pytest.mark.parametrize(("chat", "propuesta", "parte"), [
@@ -344,6 +386,25 @@ def test_una_eleccion_sin_valor_queda_abierta_con_incidente_y_aviso_neutro(
     (ultimo,) = _nuevas(conn, user, previas)
     assert I.NOTICIA_NEUTRA_INCIDENTE in ultimo["cuerpo"]
     assert ultimo["intake_choice_set_id"]
+
+
+def test_una_eleccion_que_podria_ser_mas_de_una_opcion_se_repregunta_sin_incidente(
+        intake_world, conn, monkeypatch):
+    """F-B1: una respuesta ambigua entre dos opciones no es una falla."""
+    user, rid = _alta_en_el_objetivo(conn, intake_world)
+    previas = _salidas(conn, user)
+    provider = _RoutingProvider([_ruta({"falta": "cual"})])
+
+    _escribir(conn, monkeypatch, intake_world, provider, "la de reducir o la de subir")
+
+    assert _incidentes(conn, I.ETAPA_VALOR_SIN_INTERPRETAR) == 0
+    assert _estado(conn, rid, "objective")["estado"] != "confirmed"
+    with admin(conn) as cur:
+        assert _conjunto_activo(cur, rid) == "objective"
+    (ultimo,) = _nuevas(conn, user, previas)
+    assert "más de una de las opciones" in ultimo["cuerpo"]
+    assert I.NOTICIA_NEUTRA_INCIDENTE not in ultimo["cuerpo"]
+    assert ultimo["intake_choice_set_id"]                  # con sus botones
 
 
 def test_un_valor_escrito_que_no_es_una_opcion_se_busca_entre_los_de_la_base(

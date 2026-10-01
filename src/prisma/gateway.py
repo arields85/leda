@@ -33,7 +33,8 @@ from .incidentes import (ETAPA_ENRUTAMIENTO, ETAPA_JEV_NO_CONFIGURADO,
 from .ingreso_tareas import (QUESTION_CHOICE, QUESTION_CONFIRMATION,
                              QUESTION_FREE_TEXT)
 from .respuesta_unica import controlar as controlar_una_respuesta
-from .valores import TipoValor, ValorEsperado, opciones_numeradas
+from .valores import (FALTA_POR_DEFECTO, TipoValor, ValorEsperado,
+                      opciones_numeradas)
 from .respuesta_unica import (dejar_nota, limpiar_nota, respuestas_del_mensaje,
                               sql_respondido)
 from .salida import TRUNCAR_ETIQUETA_BOTON as TRUNCAR_TITULO_BOTON
@@ -2016,13 +2017,11 @@ def _seguir_con_la_respuesta(cur, quien, texto: str, abierta, route, proveedor,
     if abierta.herramienta in (_SENTINEL_ALTA_TEXTO_LIBRE,
                                _SENTINEL_ALTA_ELECCION):
         # El valor lo interpreta el modelo (ADR 0014, M1): si todavía no se
-        # ruteó con la pregunta (el botón "Sí, es eso"), se rutea ahora.
+        # ruteó con la pregunta (el botón "Sí, es eso"), la persona ya
+        # confirmó que el mensaje es la respuesta (`_ruta_de_lo_confirmado`).
         if route is None:
-            pregunta = _pregunta_de(abierta)
-            route, error = _rutear(
-                proveedor, texto, pendiente=pregunta.para_ruteo,
-                valor_esperado=_valor_esperado_de(pregunta.valor_esperado, cal,
-                                                  ahora))
+            route, error = _ruta_de_lo_confirmado(
+                proveedor, texto, abierta, cal, ahora)
             if route is None:
                 _avisar_ruteo_caido(cur, quien, error, workspace_id, chat_id,
                                     ahora)
@@ -2070,6 +2069,35 @@ def _seguir_con_la_respuesta(cur, quien, texto: str, abierta, route, proveedor,
     # y Jev como cualquier turno, y llega al agente con la propuesta.
     _seguir_camino_normal(cur, quien, texto, route, proveedor, cal, chat_id,
                           workspace_id, ahora, entrante_id, modificacion=abierta)
+
+
+def _ruta_de_lo_confirmado(proveedor, texto: str, abierta, cal, ahora):
+    """La ruta del mensaje que la persona confirmó como respuesta con "Sí, es
+    eso" (F-B2, ADR 0014 M1): (ruta, None), o (None, error) si el ruteo cae.
+
+    - Texto libre o referencia: lo confirmado ES el valor. No hay una segunda
+      llamada al modelo (no puede volver a dudar ni a fallar) y el código lo
+      valida como cualquier valor.
+    - Fecha o elección: el modelo lo vuelve a interpretar sabiendo que la persona
+      confirmó que es la respuesta. Si aun así no lo resuelve, es una respuesta
+      incompleta (se repregunta), no una falla."""
+    from .llm import IntentAction, IntentRoute, RespectoPendiente
+
+    pregunta = _pregunta_de(abierta)
+    esperado = _valor_esperado_de(pregunta.valor_esperado, cal, ahora)
+    if esperado is not None and esperado.tipo in (TipoValor.TEXTO,
+                                                   TipoValor.ENTIDAD):
+        return IntentRoute(IntentAction.NORMAL_CONVERSATION,
+                           respecto_pendiente=RespectoPendiente.RESPONDE,
+                           valor={"texto": texto}), None
+    route, error = _rutear(
+        proveedor, texto, pendiente=pregunta.para_ruteo,
+        valor_esperado=(replace(esperado, confirmado=True)
+                        if esperado is not None else None))
+    falta = FALTA_POR_DEFECTO.get(esperado.tipo) if esperado else None
+    if route is not None and not route.valor and falta:
+        route = replace(route, valor={"falta": falta})
+    return route, error
 
 
 def _dejar_pregunta_pendiente(cur, quien, workspace_id: str, chat_id: int,

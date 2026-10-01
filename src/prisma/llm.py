@@ -16,7 +16,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Protocol
 
-from .valores import CAMPOS_DEL_VALOR, OPCION_NINGUNA, TipoValor, ValorEsperado
+from .valores import (CAMPOS_DEL_VALOR, FALTAS_POR_TIPO, FALTAS_VALIDAS,
+                      OPCION_NINGUNA, TipoValor, ValorEsperado)
 
 
 @dataclass
@@ -224,6 +225,14 @@ def _esquema_valor(esperado: ValorEsperado) -> dict:
             "opcion_id": opcion_id,
             "texto": {"type": "string",
                       "description": "Free text, as the person meant it."},
+            "falta": {
+                "type": "string",
+                "enum": list(FALTAS_POR_TIPO.get(esperado.tipo, ())),
+                "description": (
+                    "Instead of the value: the message does answer the "
+                    "question but is incomplete or ambiguous, and this says "
+                    "what is missing."),
+            },
         },
     }
 
@@ -256,6 +265,10 @@ def _bloque_valor(esperado: ValorEsperado) -> str:
     espera la pregunta pendiente (ADR 0014, M1)."""
     intro = ("\n\nAdemás, si el mensaje trae el dato que la pregunta pidió, "
              "completá \"valor\" ya normalizado. ")
+    if esperado.confirmado:
+        intro += ("La persona ya confirmó que este mensaje es la respuesta a la "
+                  "pregunta: no dudes de eso; devolvé el valor, o valor.falta si "
+                  "la respuesta está incompleta. ")
     if esperado.tipo is TipoValor.FECHA:
         if esperado.hoy is None:
             raise ValueError("Pedir una fecha necesita el día de hoy.")
@@ -267,7 +280,10 @@ def _bloque_valor(esperado: ValorEsperado) -> str:
             "AAAA-MM-DD, resolviendo las expresiones relativas y las formas "
             "informales a partir de hoy (\"mañana\", \"el viernes\", \"4 de "
             "octubre\", \"04 / 10\", \"4de octubre\"). Si no dice el año, es el "
-            "próximo que todavía no pasó." + _NO_INVENTAR)
+            "próximo que todavía no pasó. Si el mensaje responde pero no "
+            "alcanza para fijar un día (indica una semana, un mes o una época, "
+            "sin un día concreto), no inventes uno: devolvé valor.falta = "
+            "\"dia\" y ninguna fecha." + _NO_INVENTAR)
     if esperado.tipo is TipoValor.OPCION:
         listado = "; ".join(f"{o.id} = «{o.etiqueta}»" for o in esperado.opciones)
         return (
@@ -278,16 +294,22 @@ def _bloque_valor(esperado: ValorEsperado) -> str:
             "Nunca escribas una etiqueta en lugar del id. Si el mensaje nombra "
             "algo que no está entre las opciones (un objetivo, una persona, un "
             f"área), elegí \"{OPCION_NINGUNA}\" y completá también valor.texto "
-            "con lo que nombra." + _NO_INVENTAR)
+            "con lo que nombra. Si el mensaje podría ser más de una de las "
+            "opciones y no se puede saber cuál, no elijas vos: devolvé "
+            "valor.falta = \"cual\" y ningún id." + _NO_INVENTAR)
     if esperado.tipo is TipoValor.ENTIDAD:
         return (
             intro + "La pregunta espera la referencia a algo que ya existe "
             "(una tarea, una persona). Completá valor.texto con esa "
-            "referencia tal como el mensaje la escribe." + _NO_INVENTAR)
+            "referencia tal como el mensaje la escribe. Si responde pero es "
+            "tan general que no identifica nada, devolvé valor.falta = "
+            "\"detalle\" y ningún texto." + _NO_INVENTAR)
     return (
         intro + "La pregunta espera un texto libre. Completá valor.texto con "
         "lo que la persona quiso decir, tal como lo dijo, sin agregar, "
-        "resumir ni corregir nada." + _NO_INVENTAR)
+        "resumir ni corregir nada. Si responde pero es tan general que no "
+        "sirve como el dato, devolvé valor.falta = \"detalle\" y ningún "
+        "texto." + _NO_INVENTAR)
 
 
 def _sistema_del_ruteo(pendiente: str | None,
@@ -345,6 +367,8 @@ def _valor_o_vacio(valor: Any) -> dict[str, str]:
             return {}
         texto = dato.strip()
         if not texto or len(texto) > MAX_LONGITUD_VALOR:
+            return {}
+        if clave == "falta" and texto not in FALTAS_VALIDAS:
             return {}
         limpio[clave] = texto
     return limpio

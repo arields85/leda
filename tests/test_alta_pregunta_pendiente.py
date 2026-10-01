@@ -16,7 +16,7 @@ la red ni el modelo real.
 from __future__ import annotations
 
 import itertools
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from psycopg.types.json import Jsonb
@@ -236,9 +236,7 @@ def test_dudoso_pregunta_con_botones_y_si_es_eso_toma_el_campo(
         cliente, conn, corework, monkeypatch):
     ws = corework.workspace_id
     tg, rid = _abrir_alta(conn, ws)
-    _con_rutas(monkeypatch, [
-        _ruta(RespectoPendiente.DUDOSO),
-        _ruta_con_valor({"texto": "algo del tablero"})])
+    _con_rutas(monkeypatch, [_ruta(RespectoPendiente.DUDOSO)])
     antes = _salidas(conn, tg)
 
     _mensaje_privado(cliente, tg, "mmm, algo del tablero")
@@ -254,7 +252,7 @@ def test_dudoso_pregunta_con_botones_y_si_es_eso_toma_el_campo(
 
     campo = _campo(conn, rid, "title")
     assert campo["estado"] == "confirmed"
-    assert campo["valor"] == "algo del tablero"
+    assert campo["valor"] == "mmm, algo del tablero"     # lo que confirmó, tal cual
     assert _salidas(conn, tg) == antes + 1
 
     # Un segundo toque (fuera de la ventana del toque repetido, T9-R4), con el
@@ -262,9 +260,79 @@ def test_dudoso_pregunta_con_botones_y_si_es_eso_toma_el_campo(
     envejecer_toques(conn, FUERA_DE_LA_VENTANA)
     antes = _salidas(conn, tg)
     assert _tocar(cliente, token, tg).status_code == 200
-    assert _campo(conn, rid, "title")["valor"] == "algo del tablero"
+    assert _campo(conn, rid, "title")["valor"] == "mmm, algo del tablero"
     assert _salidas(conn, tg) == antes + 1
     assert _filas_del_chat(conn, tg)[-1]["cuerpo"] == AVISO_TOQUE_YA_USADO
+
+
+@pytest.mark.parametrize("texto", [
+    "porque enviare vide y foto", "con eso cierro", "mmm, lo de siempre"])
+def test_si_es_eso_con_un_texto_libre_el_texto_confirmado_es_el_valor(
+        texto, cliente, conn, corework, monkeypatch):
+    """F-B2: tras `dudoso`, "Sí, es eso" toma lo que la persona confirmó. Un
+    campo de texto libre no vuelve a pasar por el modelo: el texto es el valor y
+    el código lo valida. Sin una segunda ruta guionada, un segundo ruteo sería
+    un incidente."""
+    ws = corework.workspace_id
+    tg, rid = _abrir_alta(conn, ws)
+    proveedor = _con_rutas(monkeypatch, [_ruta(RespectoPendiente.DUDOSO)])
+    _mensaje_privado(cliente, tg, texto)
+    token = _boton(conn, "Sí, es eso")
+    incidentes = _incidentes(conn, ws)
+    antes = _salidas(conn, tg)
+
+    assert _tocar(cliente, token, tg).status_code == 200
+
+    campo = _campo(conn, rid, "title")
+    assert campo["estado"] == "confirmed" and campo["valor"] == texto
+    assert len(proveedor.esperados) == 1               # sin segundo ruteo
+    assert _incidentes(conn, ws) == incidentes          # sin incidente
+    assert _salidas(conn, tg) == antes + 1              # una respuesta
+
+
+@pytest.mark.parametrize("segunda", [
+    _ruta_con_valor({}), _ruta_con_valor({"falta": "dia"})],
+    ids=["sin-valor", "incompleta"])
+def test_si_es_eso_con_una_fecha_que_el_modelo_no_resuelve_repregunta_sin_incidente(
+        segunda, cliente, conn, corework, monkeypatch):
+    """F-B2 con un valor tipado: la persona ya confirmó que es la respuesta; si
+    el modelo no la resuelve a un día, es un valor incompleto y no una falla."""
+    ws = corework.workspace_id
+    tg, rid = _abrir_alta(conn, ws, campo="due_date")
+    proveedor = _con_rutas(monkeypatch, [_ruta(RespectoPendiente.DUDOSO), segunda])
+    _mensaje_privado(cliente, tg, "la semana que viene")
+    token = _boton(conn, "Sí, es eso")
+    incidentes = _incidentes(conn, ws)
+    antes = _salidas(conn, tg)
+
+    assert _tocar(cliente, token, tg).status_code == 200
+
+    assert proveedor.esperados[1].confirmado          # se le dijo que la confirmó
+    assert _campo(conn, rid, "due_date")["estado"] == "missing"
+    assert _campo_del_slot(conn) == "due_date"        # la misma pregunta
+    assert _incidentes(conn, ws) == incidentes
+    assert _salidas(conn, tg) == antes + 1
+    assert "día exacto" in _filas_del_chat(conn, tg)[-1]["cuerpo"]
+
+
+def test_si_es_eso_con_una_fecha_que_el_modelo_resuelve_la_toma(
+        cliente, conn, corework, monkeypatch):
+    ws = corework.workspace_id
+    tg, rid = _abrir_alta(conn, ws, campo="due_date")
+    futura = (datetime.now(timezone.utc) + timedelta(days=30)).date().isoformat()
+    _con_rutas(monkeypatch, [_ruta(RespectoPendiente.DUDOSO),
+                             _ruta_con_valor({"fecha_iso": futura})])
+    # El alta del fixture tiene entidades de mentira: lo que sigue después de
+    # tomar la fecha no es lo que se prueba acá.
+    monkeypatch.setattr(I, "_advance", lambda cur, request, *a, **k:
+                        I.IntakeOutcome(str(request["id"]), "listo", inert=True))
+    _mensaje_privado(cliente, tg, "para fin del mes que viene, creo")
+    token = _boton(conn, "Sí, es eso")
+
+    assert _tocar(cliente, token, tg).status_code == 200
+
+    campo = _campo(conn, rid, "due_date")
+    assert campo["estado"] == "confirmed" and campo["valor"] == futura
 
 
 def test_los_campos_de_texto_libre_tienen_nombre_y_limite_para_cada_uno():

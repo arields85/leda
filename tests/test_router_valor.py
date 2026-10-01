@@ -61,7 +61,7 @@ def test_con_valor_esperado_el_esquema_suma_un_valor_cerrado_y_opcional(
     esquema, _ = _esquema_y_sistema(adapter, capturas[0])
     valor = esquema["properties"]["valor"]
     assert valor["type"] == "object"
-    assert set(valor["properties"]) == {"fecha_iso", "opcion_id", "texto"}
+    assert set(valor["properties"]) == {"fecha_iso", "opcion_id", "texto", "falta"}
     assert all(p["type"] == "string" for p in valor["properties"].values())
     assert "valor" not in esquema["required"]       # opcional: sin dato, sin valor
     assert "respecto_pendiente" in esquema["required"]
@@ -180,6 +180,8 @@ MALFORMADOS = [
     pytest.param({"fecha_iso": "2026-10-04", "otro": "x"}, id="campo-de-mas"),
     pytest.param({"texto": "x" * (llm.MAX_LONGITUD_VALOR + 1)}, id="enorme"),
     pytest.param({"opcion_id": ["1"]}, id="opcion-lista"),
+    pytest.param({"falta": "no-existe"}, id="falta-desconocida"),
+    pytest.param({"falta": ["dia"]}, id="falta-lista"),
 ]
 
 
@@ -309,3 +311,35 @@ def test_el_grabador_sigue_llamando_como_antes_sin_valor_esperado():
 
     ProveedorGrabador(Viejo()).route_intent("hola", pendiente="p")
     assert visto["args"] == ("hola", "p")
+
+
+# --- el valor incompleto (F-B1) ---------------------------------------------
+
+@pytest.mark.parametrize("adapter", ADAPTADORES)
+@pytest.mark.parametrize(("esperado", "faltas"), [
+    (FECHA, ["dia"]), (OPCION, ["cual"]), (TEXTO, ["detalle"]),
+    (ENTIDAD, ["detalle"]),
+], ids=["fecha", "opcion", "texto", "entidad"])
+def test_la_falta_es_de_lista_cerrada_segun_el_tipo(adapter, esperado, faltas):
+    capturas: list = []
+    proveedor = _proveedor(adapter, _payload(), capturas)
+    proveedor.route_intent("x", pendiente=PENDIENTE, valor_esperado=esperado)
+
+    esquema, _ = _esquema_y_sistema(adapter, capturas[0])
+    assert esquema["properties"]["valor"]["properties"]["falta"]["enum"] == faltas
+
+
+@pytest.mark.parametrize(("esperado", "falta"), [
+    (FECHA, "dia"), (OPCION, "cual"), (TEXTO, "detalle")])
+def test_el_sistema_explica_cuando_usar_la_falta(esperado, falta):
+    sistema = llm._sistema_del_ruteo(PENDIENTE, esperado)
+    assert f'valor.falta = "{falta}"' in sistema
+
+
+@pytest.mark.parametrize("adapter", ADAPTADORES)
+@pytest.mark.parametrize("valor", [{"falta": "dia"}, {"falta": "cual"},
+                                   {"falta": "detalle"}])
+def test_una_falta_bien_formada_llega_en_la_ruta(adapter, valor):
+    proveedor = _proveedor(adapter, _payload(valor=valor), [])
+    route = proveedor.route_intent("x", pendiente=PENDIENTE, valor_esperado=FECHA)
+    assert route.valor == valor
