@@ -1742,7 +1742,7 @@ def test_los_rollbacks_devuelven_la_base_al_estado_anterior():
 
     tablas = ("task_state_event", "objective_state_event",
               "absence", "audit_log", "incident", "greeting_state",
-              "message_outbox", "inbound_message")
+              "message_outbox", "inbound_message", "task_intake_request")
     nombre = f"prisma_rollback_{uuid.uuid4().hex[:10]}"
     with psycopg.connect(maintenance, autocommit=True) as control:
         control.execute(SQL("create database {}").format(Identifier(nombre)))
@@ -1809,7 +1809,8 @@ def test_instalacion_limpia_y_base_migrada_convergen_en_el_aislamiento():
     # porque las bases de prueba se construyen desde el esquema limpio.
     tablas = ("task_state_event", "objective_state_event",
               "absence", "audit_log", "incident", "acceso_tablero",
-              "greeting_state", "message_outbox", "inbound_message")
+              "greeting_state", "message_outbox", "inbound_message",
+              "task_intake_request")
     con_politica = set(tablas) - {"acceso_tablero"}
     sufijo = uuid.uuid4().hex[:10]
     nombres = {"limpia": f"prisma_limpia_{sufijo}",

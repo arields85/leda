@@ -679,6 +679,118 @@ def test_despues_de_enviar_lo_que_escribe_quien_pide_sigue_el_camino_normal(
         "Un bloqueo frena una tarea."]
 
 
+# ------------------- F-B3: lo enviado a otra persona no es la rama abierta de quien pide
+
+def _pedir_otra_tarea(conn, monkeypatch, world, user):
+    """"quiero crear otra tarea" como lo rutea el modelo sin pregunta pendiente."""
+    from prisma.llm import IntentAction, IntentRoute
+
+    provider = _RoutingProvider([IntentRoute(IntentAction.START_TASK_INTAKE)])
+    _escribir(conn, monkeypatch, world, provider, "quiero crear otra tarea")
+    return provider
+
+
+def _entrante(cur, quien, user) -> str:
+    cur.execute(
+        """insert into inbound_message
+             (workspace_id, telegram_message_id, chat_id, app_user_id, texto)
+           values (%s, 99001, %s, %s, 'otra') returning id""",
+        (quien.workspace_id, user, quien.app_user_id))
+    return str(cur.fetchone()["id"])
+
+
+def _solicitudes(conn, user) -> list[dict]:
+    with admin(conn) as cur:
+        cur.execute("""select id, estado, enviada_en is not null enviada
+                         from task_intake_request where chat_id = %s
+                        order by creado_en, id""", (user,))
+        return cur.fetchall()
+
+
+def test_despues_de_enviar_pedir_otra_tarea_la_empieza_sin_tocar_la_enviada(
+        intake_world, conn, monkeypatch):
+    """F-B3 (ADR 0013, enmienda): el borrador que espera a otra persona no es la
+    rama abierta de quien lo pidió. Antes: "Ya hay un borrador en curso" y, con
+    Cancelar, quedaba cancelado el que esperaba aprobación."""
+    rid, pid = _alta_en_revision(conn, intake_world)
+    user = _usuario(intake_world)
+    client = _callback_client(conn, monkeypatch)
+    _tocar(client, conn, user, pid, "Enviar a aprobación")
+    (_, confirmacion) = _acciones(conn, rid)
+    antes = _salidas(conn, user)
+
+    _pedir_otra_tarea(conn, monkeypatch, intake_world, user)
+
+    (ultimo,) = _nuevas(conn, user, antes)
+    assert "Ya hay un borrador" not in ultimo["cuerpo"]
+    assert ultimo["cuerpo"] == "¿Qué hay que hacer?"        # empezó la nueva alta
+    enviada, nueva = _solicitudes(conn, user)
+    assert str(enviada["id"]) == rid and enviada["estado"] == "active"
+    assert enviada["enviada"] and not nueva["enviada"] and nueva["estado"] == "active"
+    # El borrador enviado sigue esperando a quien lo confirma.
+    assert [a["estado"] for a in _acciones(conn, rid)] == ["cancelada", "esperando"]
+    assert str(_acciones(conn, rid)[1]["id"]) == str(confirmacion["id"])
+
+
+def test_la_nueva_alta_y_la_enviada_conviven_y_quien_confirma_convierte_la_enviada(
+        intake_world, conn, monkeypatch, authority_conn):
+    rid, pid = _alta_en_revision(conn, intake_world)
+    user = _usuario(intake_world)
+    ws = intake_world["north-lab"]["id"]
+    client = _callback_client(conn, monkeypatch)
+    _tocar(client, conn, user, pid, "Enviar a aprobación")
+    (_, confirmacion) = _acciones(conn, rid)
+    _pedir_otra_tarea(conn, monkeypatch, intake_world, user)
+    tg_aprobador = _tg_aprobador(intake_world)
+
+    with autoridad(authority_conn) as cur:
+        resuelta = P.resolver_borrador(
+            cur, ws, _token(conn, confirmacion["id"], "Confirmar"),
+            tg_aprobador, tg_aprobador)
+
+    assert resuelta and resuelta.task_id and _tareas(conn) == 1
+    enviada, nueva = _solicitudes(conn, user)
+    assert enviada["estado"] == "converted" and nueva["estado"] == "active"
+    # La pregunta abierta de quien pide es la de la alta nueva.
+    assert _pregunta_abierta(conn, intake_world, user)["resumen"] == (
+        "¿Qué hay que hacer?")
+
+
+def test_la_pregunta_abierta_de_quien_pide_es_de_la_alta_nueva_no_de_la_enviada(
+        intake_world, conn, monkeypatch):
+    rid, pid = _alta_en_revision(conn, intake_world)
+    user = _usuario(intake_world)
+    client = _callback_client(conn, monkeypatch)
+    _tocar(client, conn, user, pid, "Enviar a aprobación")
+    _pedir_otra_tarea(conn, monkeypatch, intake_world, user)
+    antes = _salidas(conn, user)
+    from prisma.llm import IntentAction, IntentRoute
+
+    # Un mensaje con la nueva alta abierta es de ESA rama: el ruteo recibe su
+    # pregunta, no la de la enviada.
+    provider = _RoutingProvider([IntentRoute(
+        IntentAction.NORMAL_CONVERSATION,
+        respecto_pendiente=RespectoPendiente.CHARLA)])
+    _escribir(conn, monkeypatch, intake_world, provider, "gracias")
+
+    assert "¿Qué hay que hacer?" in provider.pending_calls[0]
+    assert [f["cuerpo"] for f in _nuevas(conn, user, antes)] == ["¿Qué hay que hacer?"]
+
+
+def test_con_la_revision_todavia_abierta_empezar_otra_sigue_siendo_el_conflicto(
+        intake_world, conn):
+    """Sin enviar, el borrador SÍ es su rama abierta: nada cambia."""
+    rid, pid = _alta_en_revision(conn, intake_world)
+    user = _usuario(intake_world)
+    with espacio(conn, intake_world["north-lab"]["id"]) as cur:
+        quien = identificar(cur, user, Canal.ESPACIO, intake_world["north-lab"]["id"])
+        outcome = I.start(cur, quien, chat_id=user,
+                          source_inbound_id=_entrante(cur, quien, user),
+                          source_raw_text="otra", proposals={}, now=NOW)
+    assert "Ya hay un borrador" in outcome.text
+    assert len(_solicitudes(conn, user)) == 1
+
+
 # ----------------------------------------- quien pide es quien confirma: no cambia
 
 def test_si_quien_pide_es_quien_confirma_nada_cambia(intake_world, conn):

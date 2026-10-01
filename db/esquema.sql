@@ -728,6 +728,10 @@ create table task_intake_request (
   terminal_result       jsonb,
   creado_en             timestamptz not null default now(),
   actualizado_en        timestamptz not null default now(),
+  -- Cuándo quien lo pidió lo envió a otra persona para que lo confirme: desde
+  -- entonces el borrador no es su rama abierta (ADR 0013, enmienda de la rama
+  -- abierta) y puede pedir otra tarea sin tocarlo.
+  enviada_en            timestamptz,
   constraint task_intake_request_workspace_id_unique unique (workspace_id, id),
   constraint task_intake_request_membership_workspace
     foreign key (workspace_id, membership_id)
@@ -742,7 +746,7 @@ create table task_intake_request (
 
 create unique index task_intake_one_active
   on task_intake_request (workspace_id, membership_id, chat_id)
-  where estado = 'active';
+  where estado = 'active' and enviada_en is null;
 
 create table task_intake_field (
   request_id          uuid not null,

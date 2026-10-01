@@ -254,6 +254,23 @@ def test_verificar_migraciones_sin_bloque_copiable_nombra_la_0020():
     assert saludo.verificar_migraciones(cur) == "0020_bloque_copiable.sql"
 
 
+def test_verificar_migraciones_sin_enviada_en_nombra_la_0026():
+    class _Cursor:
+        def __init__(self, respuestas):
+            self._respuestas = list(respuestas)
+            self._actual = None
+
+        def execute(self, *a, **k):
+            self._actual = self._respuestas.pop(0)
+
+        def fetchone(self):
+            return self._actual
+
+    cur = _Cursor([{"ok": True}] * 5 + [{"ok": False}])
+    assert saludo.verificar_migraciones(cur) == (
+        "0026_borrador_enviado_no_es_rama_abierta.sql")
+
+
 def test_verificar_migraciones_al_dia_devuelve_none(corework, conn):
     with admin(conn) as cur:
         assert saludo.verificar_migraciones(cur) is None

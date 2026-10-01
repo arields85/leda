@@ -187,7 +187,7 @@ def start(cur: psycopg.Cursor, who: Solicitante, *, chat_id: int,
     cur.execute(
         """select * from task_intake_request
             where workspace_id = %s and membership_id = %s and chat_id = %s
-              and estado = 'active' for update""",
+              and estado = 'active' and enviada_en is null for update""",
         (who.workspace_id, who.membership_id, chat_id),
     )
     existing = cur.fetchone()
@@ -471,6 +471,7 @@ def consume_pending_text(cur: psycopg.Cursor, who: Solicitante, *, chat_id: int,
              join task_intake_request r on r.id = s.request_id
             where s.workspace_id = %s and r.membership_id = %s
               and r.chat_id = %s and s.estado = 'active' and r.estado = 'active'
+              and r.enviada_en is null
               and (%s::uuid is null or s.id = %s::uuid)
             for update of s, r""",
         (who.workspace_id, who.membership_id, chat_id, slot_id, slot_id),
@@ -580,6 +581,7 @@ def handle_active_text(cur: psycopg.Cursor, who: Solicitante, *, chat_id: int,
                on s.request_id = r.id and s.estado = 'active'
             where r.workspace_id = %s and r.membership_id = %s
               and r.chat_id = %s and r.estado = 'active'
+              and r.enviada_en is null
             for update of r""",
         (who.workspace_id, who.membership_id, chat_id),
     )
@@ -605,7 +607,9 @@ def handle_active_text(cur: psycopg.Cursor, who: Solicitante, *, chat_id: int,
     waiting = cur.fetchone()
     if waiting and str(waiting["membership_id"]) != str(who.membership_id):
         # Espera la confirmación de otra persona (ya se la envió): no es una rama
-        # abierta de quien lo pidió y su mensaje sigue el camino normal.
+        # abierta de quien lo pidió y su mensaje sigue el camino normal. Desde la
+        # migración 0026 las enviadas ni llegan acá (`enviada_en`); queda para las
+        # enviadas antes de aplicarla.
         return None
     if waiting:
         prompt = _awaiting_prompt(waiting["herramienta"])
@@ -651,6 +655,7 @@ def open_free_text_slot(cur: psycopg.Cursor, who: Solicitante,
              join task_intake_request r on r.id = s.request_id
             where s.workspace_id = %s and r.membership_id = %s
               and r.chat_id = %s and s.estado = 'active' and r.estado = 'active'
+              and r.enviada_en is null
             order by s.creado_en desc limit 1""",
         (who.workspace_id, who.membership_id, chat_id),
     )
@@ -705,6 +710,7 @@ def open_intake_question(cur: psycopg.Cursor, who: Solicitante,
               join task_intake_request r on r.id = s.request_id
              where s.workspace_id = %s and r.membership_id = %s
                and r.chat_id = %s and s.estado = 'active' and r.estado = 'active'
+              and r.enviada_en is null
              order by s.creado_en desc limit 1""",
         (who.workspace_id, who.membership_id, chat_id),
     )
@@ -729,6 +735,7 @@ def open_intake_question(cur: psycopg.Cursor, who: Solicitante,
                                    and p.workspace_id = r.workspace_id
              where r.workspace_id = %s and r.membership_id = %s
                and r.chat_id = %s and r.estado = 'active'
+               and r.enviada_en is null
                and p.estado = 'esperando' and p.membership_id = %s
              order by p.creado_en desc limit 1""",
         (who.workspace_id, who.membership_id, chat_id, who.membership_id),
@@ -1044,6 +1051,12 @@ def send_to_approval(cur: psycopg.Cursor, who: Solicitante, *, token: str,
         # sus tres botones, es la respuesta a su toque.
         return IntakeOutcome(request_id, texto_para_confirmar, changed=True,
                              pending_action_id=pending.id)
+    # Desde que está en manos de otra persona deja de ser la rama abierta de quien
+    # lo pidió (ADR 0013, enmienda; F-B3): puede pedir otra tarea sin tocarlo. La
+    # solicitud sigue `active`: quien confirma la convierte o la cancela así.
+    cur.execute(
+        "update task_intake_request set enviada_en = %s where id = %s",
+        (now, request_id))
     text = draft_sent_text(authority["aprobador_nombre"])
     _enqueue(cur, request, text, now, f"intake:{request_id}:sent:v{version}")
     return IntakeOutcome(request_id, text, changed=True,
