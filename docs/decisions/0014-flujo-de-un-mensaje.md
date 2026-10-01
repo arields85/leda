@@ -113,6 +113,13 @@ todas las cuentas):
 - **Éxito:** de los siete hallazgos del alta guiada (R4c-H4 a H10), al menos cinco
   desaparecen sin código específico para ellos; ningún incidente nuevo; latencia
   mediana de cinco segundos o menos por respuesta.
+  **Corrección (2026-10-01, decisión del usuario):** el umbral de cinco segundos se fijó
+  sin línea base. Medida después (mensaje entrante → primera respuesta enviada, por la
+  base), la mediana de las respuestas a texto fue 8,7 s en la ronda 4 y 8,7 s con la
+  variante B; ninguna llegó a cinco segundos. A y B se comparan contra esa línea base
+  (no empeorar 8,7 s de mediana); los cinco segundos quedan como objetivo aparte, a
+  trabajar después del experimento. Se deja escrito para que el cambio de criterio sea
+  visible y no se confunda con mover el arco después de ver los datos.
 - **Corte:** si A y B quedan parecidas y ninguna mejora claramente sobre la ronda 4, el
   problema no estaba en la redacción: se busca la causa en otro lado en vez de insistir
   con el flujo.
