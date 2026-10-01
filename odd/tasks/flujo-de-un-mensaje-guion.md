@@ -75,3 +75,8 @@ Hallazgos (clasificados por etapa del ADR 0014; disparadores de "Cómo pensamos 
   marcador `{nombre}` sin reemplazar y "sin referencia al mensaje".
 - **F-B5 (observación).** "voy a enviar videos" volvió a mostrar la misma pregunta sin
   decir nada (22:05:44): sin incidente ni explicación.
+
+Nota de experiencia del usuario: "se sintió más fluido y humano este flujo"; los textos se
+sintieron muy estructurados. Explicación: en la variante B todos los textos visibles del alta
+son plantillas del código; el modelo sólo interpretó (etapa 2). La comprensión mejoró la
+experiencia aun con redacción plantillada; la variante A prueba la redacción.
