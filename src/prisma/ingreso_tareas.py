@@ -16,7 +16,8 @@ from .autoridad import Denegado, Solicitante
 from .db import entrante_atado, registrar_auditoria
 from .incidentes import (ETAPA_CONFIGURACION_ALTA, ETAPA_RESUMEN_VIGENTE_SIN_FILA,
                          ETAPA_VALOR_SIN_INTERPRETAR, NOTICIA_NEUTRA_INCIDENTE,
-                         REFERENCIA_PENDING_ACTION, registrar_incidente)
+                         REFERENCIA_INBOUND_MESSAGE, REFERENCIA_PENDING_ACTION,
+                         registrar_incidente)
 from .pendientes import HERRAMIENTA_REVISION_BORRADOR
 from .redaccion import nombre_legible, redactar, variante_redaccion
 from .resultado_turno import Falta, Rechazo, ResultadoTurno, Resumen
@@ -537,7 +538,10 @@ def _rechazar_valor(cur, request, who, field, rechazo: Rechazado, inbound_id,
             cur, who.workspace_id,
             "El modelo no pudo interpretar el valor de la respuesta a una "
             "pregunta del alta de tareas; la pregunta sigue abierta.",
-            etapa=ETAPA_VALOR_SIN_INTERPRETAR, app_user_id=who.app_user_id)
+            etapa=ETAPA_VALOR_SIN_INTERPRETAR, app_user_id=who.app_user_id,
+            chat_id=request["chat_id"],
+            referencia_tipo=REFERENCIA_INBOUND_MESSAGE if inbound_id else None,
+            referencia_id=inbound_id)
         aviso = f"{NOTICIA_NEUTRA_INCIDENTE}\n\n"
     elif rechazo.motivo is MotivoRechazo.TEXTO_LARGO:
         aviso = f"{_user_limit_prompt(field)}\n\n"

@@ -207,6 +207,16 @@ def test_sin_valor_la_pregunta_queda_abierta_con_incidente_y_aviso_neutro(
         assert _campo(cur, rid, "due_date")["estado"] == "missing"
         assert _slot(cur, rid) == "due_date"
     assert _incidentes(conn, I.ETAPA_VALOR_SIN_INTERPRETAR) == 1
+    # F-B4: el incidente apunta al mensaje que lo disparó (como los de otras
+    # etapas), así el aviso a la administración no dice "sin referencia".
+    with admin(conn) as cur:
+        cur.execute("""select referencia_tipo, referencia_id, chat_id, app_user_id
+                         from incident where etapa = %s""",
+                    (I.ETAPA_VALOR_SIN_INTERPRETAR,))
+        incidente = cur.fetchone()
+    assert incidente["referencia_tipo"] == "inbound_message"
+    assert incidente["referencia_id"] is not None
+    assert incidente["chat_id"] == CHAT and incidente["app_user_id"] is not None
 
 
 @pytest.mark.parametrize("texto", [
