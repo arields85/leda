@@ -152,3 +152,11 @@ cumplía tampoco antes: se fijó sin línea base.
   equipos…" es el estratégico, de todos. Causa en los datos: `objective` no tiene área y
   la semilla deja `referente_membership_id` vacío, así que hoy el sistema no puede saber
   qué objetivo es de qué área (la relación sólo se infiere de las tareas). Va con F-B10.
+  **Decisión del usuario (2026-10-01):** una persona no pide tareas de otro sector. Lo que
+  cruza áreas pasa por una dependencia de una tarea propia ("Depende de otra tarea" del
+  menú, `menu_tarea.py:135`; `nucleo/mecanica-pm.md` §4: una dependencia entre áreas se
+  notifica a los dos referentes). Por lo tanto el alta ofrece sólo los objetivos del área
+  de quien pide, no los de otras. Propuesta a confirmar en la implementación: si el área
+  tiene un solo objetivo operativo, se completa solo (misma regla que R4c-H10); el
+  estratégico sólo si el área no tiene objetivos propios. Requiere que el objetivo tenga
+  área en los datos (hoy no la tiene).
