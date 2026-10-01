@@ -26,7 +26,8 @@ from dataclasses import dataclass
 import psycopg
 
 from .db import registrar_auditoria
-from .incidentes import ETAPA_REDACCION_RECHAZADA, registrar_incidente
+from .incidentes import (ETAPA_CHARLA_SIN_RESPUESTA, ETAPA_REDACCION_RECHAZADA,
+                         registrar_incidente)
 from .resultado_turno import ResultadoTurno, Resumen
 from .valores import TipoValor  # noqa: F401 -- el tipo de `Falta.tipo`
 from .verificador_redaccion import verificar
@@ -290,6 +291,78 @@ def redactar_turno(cur, workspace_id: str, resultado: ResultadoTurno, variante: 
     _registrar_intento(cur, workspace_id, "aceptada", None, duracion_ms,
                        len(borrador))
     return TextoRedactado(borrador, base.cierre)
+
+
+# ---------------------------------------------------------------------------
+# La charla con una pregunta pendiente (ADR 0013 regla 1, F-B5)
+# ---------------------------------------------------------------------------
+
+SISTEMA_CHARLA = (
+    "Sos Prisma, una asistente que coordina el trabajo de un equipo por "
+    "Telegram. La persona escribió un saludo, un agradecimiento o una charla "
+    "suelta mientras Prisma esperaba la respuesta a una pregunta (te llega en "
+    "JSON como `mensaje` y `pregunta_pendiente`).\n"
+    "- Respondé en una sola oración corta, en español neutro con voseo, cálida "
+    "y sin vueltas.\n"
+    "- No hagas ninguna pregunta: la pregunta pendiente la vuelve a hacer el "
+    "sistema después de tu respuesta.\n"
+    "- No prometas, no afirmes cambios ni estados, y no inventes datos, fechas "
+    "ni nombres.\n"
+    "- Sin Markdown, sin emojis, sin jerga técnica y sin nombrar botones.\n"
+    "Devolvé únicamente el texto de la respuesta.")
+
+MAX_CARACTERES_CHARLA = 240
+
+
+def motivo_de_charla_invalida(texto: str) -> str | None:
+    """Por qué el texto no sirve como respuesta breve de una charla, o `None`
+    si sirve. Determinista: una respuesta vacía, de más de un párrafo, larga o
+    que abre otra pregunta (la pregunta pendiente es la única) no sale."""
+    texto = (texto or "").strip()
+    if not texto:
+        return "el modelo no devolvió texto"
+    if len(texto) > MAX_CARACTERES_CHARLA:
+        return f"la respuesta pasa de {MAX_CARACTERES_CHARLA} caracteres"
+    if "\n" in texto:
+        return "la respuesta tiene más de un párrafo"
+    if "?" in texto or "¿" in texto:
+        return "la respuesta abre otra pregunta"
+    return None
+
+
+def redactar_charla(cur, workspace_id: str, mensaje: str, pregunta: str, *,
+                    proveedor=None) -> str:
+    """La respuesta breve a una charla con una pregunta pendiente, en las dos
+    variantes (ADR 0014: el modelo redacta la charla y las preguntas). La
+    persona la lee delante de la pregunta, en la misma respuesta. `""` si el
+    modelo falla o su texto no sirve: sale sólo la pregunta y queda un incidente
+    de baja severidad que no avisa a la administración -- nunca en silencio."""
+    try:
+        modelo = proveedor or proveedor_de_redaccion(cur, workspace_id)
+        borrador = modelo.redactar(SISTEMA_CHARLA, json.dumps(
+            {"mensaje": mensaje, "pregunta_pendiente": pregunta},
+            ensure_ascii=False))
+    except psycopg.Error:
+        raise                       # la transacción no sigue: no es del modelo
+    except Exception as exc:        # un modelo que falla o se cuelga
+        _registrar_charla_sin_respuesta(
+            cur, workspace_id, f"{type(exc).__name__}: {exc}")
+        return ""
+    borrador = (borrador or "").strip()
+    motivo = motivo_de_charla_invalida(borrador)
+    if motivo:
+        _registrar_charla_sin_respuesta(cur, workspace_id, motivo)
+        return ""
+    return borrador
+
+
+def _registrar_charla_sin_respuesta(cur, workspace_id: str, motivo: str) -> None:
+    registrar_incidente(
+        cur, workspace_id,
+        "El modelo no pudo redactar la respuesta breve de una charla con una "
+        "pregunta pendiente: sale sólo la pregunta.",
+        severidad="baja", referencia_cruda=motivo[:2000],
+        etapa=ETAPA_CHARLA_SIN_RESPUESTA, avisar_admin=False)
 
 
 def estadistica_variante_a(cur, workspace_id: str) -> dict:

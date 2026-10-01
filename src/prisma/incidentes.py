@@ -104,6 +104,10 @@ ETAPA_VALOR_SIN_INTERPRETAR = "valor_sin_interpretar"
 # texto no pasó la verificación del código. Sale la plantilla de B, que lo
 # reemplaza; el incidente es el registro, no una falla de la persona.
 ETAPA_REDACCION_RECHAZADA = "redaccion_rechazada"
+# ADR 0013 regla 1 (F-B5): la respuesta breve de una `charla` con pregunta
+# pendiente no se pudo redactar (el modelo falló o su texto no sirvió): sale sólo
+# la pregunta.
+ETAPA_CHARLA_SIN_RESPUESTA = "charla_sin_respuesta"
 # T9-H19e: un recibo viejo sin respuesta que la reentrega no recuperó (`huerfanos`).
 ETAPA_MENSAJE_HUERFANO = "mensaje_huerfano_sin_respuesta"
 # T9-H19g: el aviso de UN huérfano falló y se lo saltea (el resto del barrido sigue).
@@ -336,6 +340,14 @@ EXPLICACION_POR_ETAPA: dict[str, ExplicacionDeEtapa] = {
                  "contenido y los mismos botones."),
         que_hacer=(f"{_BUSCAR_DETALLE} y mirá el motivo del rechazo: sirve para "
                    "decidir entre A y B. No hace falta que {nombre} haga nada.")),
+    ETAPA_CHARLA_SIN_RESPUESTA: ExplicacionDeEtapa(
+        que_paso=("{nombre} escribió una charla (un saludo, un agradecimiento) "
+                  "con una pregunta pendiente y el modelo no pudo redactar la "
+                  "respuesta breve, o su texto no pasó la verificación."),
+        que_vio=("Nada raro: la misma pregunta pendiente, sin la respuesta "
+                 "breve delante."),
+        que_hacer=(f"{_BUSCAR_DETALLE} y mirá el motivo. No hace falta que "
+                   "{nombre} haga nada.")),
     "indicador_actividad": ExplicacionDeEtapa(
         que_paso=("No se pudo retirar el borrador nativo del indicador de "
                   "actividad; puede haber quedado visible."),

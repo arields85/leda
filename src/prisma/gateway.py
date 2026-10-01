@@ -1949,8 +1949,15 @@ def _atender_pregunta_pendiente(cur, quien, texto: str, abierta, proveedor, cal,
                      entrante_id, prefijo=f"{AVISO_NO_PUEDO_DATO_PENDIENTE} ")
         return None
     if comando is RespectoPendiente.CHARLA:
+        # Respuesta breve y la pregunta de nuevo, en UNA respuesta (ADR 0013
+        # regla 1): la breve la redacta el modelo en las dos variantes; si no
+        # sirve, sale sólo la pregunta y queda un incidente.
+        from .redaccion import redactar_charla
+
+        breve = redactar_charla(cur, workspace_id, texto, pregunta.pregunta,
+                                proveedor=proveedor)
         _repreguntar(cur, quien, workspace_id, chat_id, abierta, pregunta, ahora,
-                     entrante_id)
+                     entrante_id, prefijo=f"{breve}\n\n" if breve else "")
         return None
     # `dudoso`, y también `corrige` donde corregir no es responder: lo decide
     # la persona con los botones.
