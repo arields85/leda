@@ -1410,7 +1410,13 @@ def _inicio_de_jornada(cur: psycopg.Cursor, workspace_id: str,
     próximo inicio de jornada (constitución §8). El despachador posterga igual
     ese mismo instante; encolarlo ya en él deja en la fila la hora real, la que
     se le dice a quien confirma (`linea_de_estado_de_avisos`)."""
-    return Calendario.desde_base(cur, workspace_id).dentro_de_jornada(now)
+    # Calcular la hora no puede costar el aviso: si el calendario falla, sale
+    # "ahora" y el despachador igual lo posterga al horario cuando lo manda.
+    try:
+        with cur.connection.transaction():
+            return Calendario.desde_base(cur, workspace_id).dentro_de_jornada(now)
+    except Exception:  # noqa: BLE001 - se degrada a la hora de siempre
+        return now
 
 
 def notify_requester_of_approval(cur: psycopg.Cursor, who: Solicitante, *,

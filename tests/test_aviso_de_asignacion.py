@@ -465,3 +465,27 @@ def test_si_el_aviso_falla_la_respuesta_no_agrega_nada_y_queda_el_incidente(
     _tocar(client, conn, pide, pid, "Confirmar")
 
     assert _respuesta_a(conn, pide, antes) == HECHO
+
+
+def test_si_el_calendario_falla_el_aviso_igual_se_encola_y_el_despachador_lo_posterga(
+        intake_world, conn, monkeypatch, authority_conn):
+    """Revisión RDD `review-16296c4f68eaa688` (R3): calcular "cuándo empieza el
+    horario" no puede costar el aviso. Si el calendario falla, se encola para
+    ahora (el despachador igual respeta el horario al mandarlo)."""
+    from prisma import ingreso_tareas as I
+    from prisma.calendario import Calendario
+
+    rid, pid = _alta_en_confirmacion(conn, intake_world, responsable="Sam North")
+    client = _cliente(conn, monkeypatch, authority_conn)
+    pide = _usuario(intake_world)
+    responsable = _chat(intake_world, "Sam North")
+    antes = _salidas(conn, responsable)
+
+    def _rompe(*_a, **_k):
+        raise RuntimeError("calendario roto")
+    monkeypatch.setattr(Calendario, "desde_base", staticmethod(_rompe))
+
+    _tocar(client, conn, pide, pid, "Confirmar")
+
+    assert _tareas(conn) == 1
+    assert len(_nuevas(conn, responsable, antes)) == 1

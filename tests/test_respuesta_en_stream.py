@@ -514,3 +514,28 @@ def test_una_falla_del_borrador_no_rompe_el_turno_ni_la_respuesta(
     assert _turno(c, tg) == ["¿Qué hay que hacer?"]
     assert len(tg.textos()) == 1                                # un intento y basta
     assert capsys.readouterr().out.count("indicador de actividad (stream)") == 1
+
+
+def test_un_telegram_lento_no_frena_la_lectura_del_modelo():
+    """Revisión RDD `review-16296c4f68eaa688` (R3/R4): actualizar el borrador no
+    puede esperar a Telegram en el hilo que lee lo que escribe el modelo; si hay un
+    envío en vuelo, la actualización siguiente se saltea (la próxima la alcanza) y
+    el cierre igual espera al envío antes de retirar."""
+    class Lento(Telegram):
+        def post(self, url, json=None):
+            if url.endswith("/sendMessageDraft") and (json or {}).get("text") != SEMILLA:
+                time.sleep(0.4)
+            return super().post(url, json)
+
+    tg = Lento()
+    with _activo(tg) as ind:
+        _esperar(lambda: ind.activado.is_set())
+        inicio = time.monotonic()
+        ind.actualizar_borrador("Hola")
+        ind.actualizar_borrador("Hola, ¿qué")
+        demora = time.monotonic() - inicio
+    assert demora < 0.2
+    assert tg.textos() == ["Hola"]                 # el segundo se salteó: había uno en vuelo
+    metodos = tg.metodos()
+    ultimo_borrador = max(i for i, m in enumerate(metodos) if m == "sendMessageDraft")
+    assert "deleteMessage" in metodos[ultimo_borrador:]   # el retiro, después del envío

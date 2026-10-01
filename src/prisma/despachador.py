@@ -265,7 +265,14 @@ class IndicadorDeActividad:
         if (not self.admite_borrador or not texto or self._fallo
                 or self.cerrado.is_set()):
             return
-        with self.candado:
+        # Nunca espera a Telegram en el hilo que lee lo que escribe el modelo: si
+        # hay un envío (o la semilla) en vuelo, esta actualización se saltea y la
+        # siguiente la alcanza. El envío corre aparte y suelta el candado al
+        # terminar; el cierre lo toma antes de retirar, así nunca se cruzan.
+        if not self.candado.acquire(blocking=False):
+            return
+        soltar = True
+        try:
             if self.cerrado.is_set() or self._fallo or texto == self._ultimo_texto:
                 return
             ahora = self._reloj()
@@ -275,15 +282,24 @@ class IndicadorDeActividad:
             self._ultimo_envio = ahora
             self.con_texto.set()
             self.activado.set()
-            try:
-                _enviar_borrador_texto(self._http, self._token, self._chat_id,
-                                       self.draft_id, texto)
-                self._ultimo_texto = texto
-            except Exception as e:  # noqa: BLE001 - no fatal, se reporta
-                self._fallo = True
-                _reportar_falla_indicador(self._impresos, "stream", e)
-            finally:
-                self.intentado.set()
+            threading.Thread(target=self._enviar_y_soltar, args=(texto,),
+                             name="prisma-stream", daemon=True).start()
+            soltar = False
+        finally:
+            if soltar:
+                self.candado.release()
+
+    def _enviar_y_soltar(self, texto: str) -> None:
+        try:
+            _enviar_borrador_texto(self._http, self._token, self._chat_id,
+                                   self.draft_id, texto)
+            self._ultimo_texto = texto
+        except Exception as e:  # noqa: BLE001 - no fatal, se reporta
+            self._fallo = True
+            _reportar_falla_indicador(self._impresos, "stream", e)
+        finally:
+            self.intentado.set()
+            self.candado.release()
 
 
 # El indicador del turno en curso: `mantener_chat_activo` lo deja aca mientras dura

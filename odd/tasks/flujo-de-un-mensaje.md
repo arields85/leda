@@ -1717,3 +1717,12 @@ Diseño B elegido por el usuario. Ruta declarada: un solo escritor (encargo expl
   un typing más y el refresco pasa a 3 s; causa deducida del código (el retiro manda y borra
   un mensaje, eso apaga el typing, y la respuesta sale después). RED 2 failed, GREEN 96
   passed. Pendiente (g) corregido, pendiente de verificar en real.
+- RDD `1ddf179..83743a2` (cuatro lentes), linaje `review-16296c4f68eaa688`: aprobada y
+  reconocida. Corregidas después dos WARNING: (1) actualizar el borrador esperaba a Telegram
+  en el hilo que lee el stream del modelo (la latencia de Telegram pasaba a ser latencia del
+  turno): ahora el envío corre en su propio hilo, una actualización con otra en vuelo se
+  saltea y el cierre toma el candado antes de retirar; (2) si el calendario fallaba, el aviso
+  de coordinación no se encolaba: ahora se encola para "ahora" (en su savepoint) y el
+  despachador lo posterga igual. RED 2 failed, GREEN 165 passed. Quedan como sugerencias: la
+  rama "la fila terminal ya salió" sin prueba, claves de aviso duplicadas, el ícono de
+  Empezar otro, ramas de `texto_parcial`, elección del índice de la herramienta en el stream.
