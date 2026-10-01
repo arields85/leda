@@ -728,6 +728,15 @@ def despachar(cur: psycopg.Cursor, workspace_id: str, transporte: Transporte,
     """Una pasada del despachador: examina a lo sumo `lote` filas, de a una,
     retenidas o no. Lo que queda por despachar sale en la pasada siguiente."""
     ahora = ahora or datetime.now(timezone.utc)
+    # Una pasada por espacio a la vez (F-A1). El orden por `programado_para` sólo
+    # vale dentro de una pasada: con dos a la vez (el despacho inmediato de
+    # después del webhook y el tick de fondo), mientras una envía la primera fila
+    # con su lock la otra la saltea (`skip locked`) y envía la segunda, y las
+    # partes de una misma respuesta salen invertidas. La que llega espera a que la
+    # otra termine y retoma desde el orden de la cola. El lock se suelta con la
+    # transacción de quien llama.
+    cur.execute("select pg_advisory_xact_lock(hashtextextended(%s, 0))",
+                (f"despachar:{workspace_id}",))
     tope = _tope_diario(cur, workspace_id)
     resumen = {"enviados": 0, "pospuestos": 0, "fallidos": 0, "descartados": 0,
                "retenidos": 0}
