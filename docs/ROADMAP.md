@@ -385,6 +385,12 @@ después de verificar es seguro pero no adelanta la respuesta.
 **Depende de:** el congelamiento levantado y la unidad de latencia (decisión del usuario:
 primero fluidez, después latencia).
 
+**Estado (2026-10-01, decisión del usuario):** se adelanta el **stream real** como
+experimento, detrás del ajuste `stream` del espacio, sólo en el alta conversada y en chat
+privado, para verlo en Telegram real; el mensaje final sigue siendo el verificado y sale
+por el outbox. **Pendiente:** probar la otra variante (mostrar progresivo después de
+verificar) cuando se trabaje la latencia, y elegir entre las dos viéndolas en real.
+
 ## Horizonte posterior
 
 No se abordan hasta que las unidades anteriores estén cerradas, y cada uno requiere

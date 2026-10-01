@@ -63,6 +63,7 @@ de `workspace_setting` (se cambia por SQL).
 | Objetivos y sus fechas (`objetivo_inicial`, frentes) | Pack | Hoy ningún objetivo tiene fecha: `horizonte_meses: 12` no se convierte al importar |
 | Margen máximo de la fecha de una tarea (`horizonte_tarea`, 2 meses, tope 120) | Pack → `workspace_setting` (rama `feat/flujo-de-un-mensaje`) | Regla de fondo decidida: la fecha de una tarea no pasa la de su objetivo; el margen es la red de seguridad |
 | Modo del alta (`alta`: `guiada` o `conversada`) | `workspace_setting` por SQL (rama `feat/flujo-de-un-mensaje`) | Experimento del ADR 0014; se retira cuando el alta conversada se adopte |
+| Respuesta en stream (`stream`: el texto se ve mientras el modelo lo escribe) | `workspace_setting` por SQL (rama `feat/flujo-de-un-mensaje`), apagado por omisión | Experimento del 2026-10-01: sólo alta conversada y chat privado; muestra texto todavía sin verificar. Pendiente comparar con la variante "progresivo después de verificar" |
 | Variante de redacción (`redaccion`: A o B) | `workspace_setting`, sembrado por el importador | Experimento del ADR 0014 |
 | Retención y visibilidad de las conversaciones | Fijado para el piloto por el ADR 0002 | Pasa a ser del cliente; requiere un ADR nuevo |
 | Revisión periódica del pack (cada N meses) | No existe | `nucleo/alta-de-equipo.md`, "Revisión periódica" |
