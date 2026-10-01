@@ -795,3 +795,15 @@ Chequeo de rumbo (escrito antes de escribir código).
   **2955 passed, 333 deselected, 0 failed** (18 min 37 s; línea previa 2852).
 - Próximo paso: reiniciar el listener del worktree (`PYTHONPATH=src`) y medir en la prueba
   real la tabla de `python -m prisma redaccion corework` (timeouts con 4 s, rechazos).
+
+## Revisión RDD, noche del 2026-10-01
+
+- Etapa 6 completa: `afa5718` (`review-ce7f8b8be7d5e437`), `39d29cb`
+  (`review-d1214d3160ab10c3`), `2c42650` (`review-59a22c8a9bcf050d`) aprobados; `485aa5c`,
+  `3ddee06` bajo presupuesto.
+- "Prisma propone": `712b9fe` (`review-34750754b99bf9da`), `c88ce03`
+  (`review-304fabe95eb22a6e`) aprobados; `0d75586`, `8717026`, `b102eec` bajo presupuesto.
+- Correcciones de la revisión: tramo `c88ce03..16cc7cf` (1343 líneas) revisado como un solo
+  candidato, aprobado y reconocido (`review-1c13a9b74afef99c`). Frontera de revisión de la
+  rama: `16cc7cf`. Notas no bloqueantes: `R3-incidente-campo-sin-sujeto`
+  (`ingreso_tareas.py:744-755`, WARNING) y `R3-rechazo-sin-campo` (`:1627-1629`).
