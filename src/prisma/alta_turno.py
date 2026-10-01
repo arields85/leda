@@ -586,8 +586,10 @@ def verificar_turno(salida: SalidaTurno, h: HechosTurno, a: Aplicacion) -> str |
     # muestra coincide con lo que se dice). Qué dato se pregunta, y si se vuelve a
     # preguntar uno ya confirmado (se corrige, o su valor nuevo se rechazó), lo
     # decide la conversación, no el verificador.
+    # Pedir es preguntar aunque no lleve signos ("decime la fecha"): se comprueba lo
+    # que el modelo declara en `pregunta`, no la puntuación del texto.
     faltan = a.faltan_tras(h)
-    if faltan and (not salida.pregunta or not _hay_pregunta(salida.texto)):
+    if faltan and not salida.pregunta:
         return f"falta_pregunta: {_SUJETOS[faltan[0]]}"
     if salida.botones and salida.botones not in salida.pregunta:
         return f"botones_sin_pregunta: {salida.botones}"

@@ -1366,3 +1366,25 @@ Tramo `f60c3ca..51fa9e6` (`81bb60a`, `9d1bee2`, `20cd9c8`, `51fa9e6`; 994 línea
   (c) cuando quien confirma aprueba el borrador, a quien lo pidió no le llega ningún aviso:
   no sabe que su tarea existe (mecánica §10, avisos de coordinación; el rechazo sí avisa);
   (d) el pedido de aprobación no dice quién lo manda: arranca en "Resumen para revisar".
+
+### Hallazgo: "?" no es una invariante (2026-10-01, prueba con Ismael)
+
+- Observado con la auditoría estructural nueva: el primer mensaje de Ismael se rechazó con
+  `falta_pregunta` declarando `pregunta: [due_date, acceptance_criterion]` y
+  `texto_tiene_pregunta: False` (pidió en imperativo). A Ismael, de Dirección, el código le
+  completó el objetivo (el único que tiene: el estratégico), así que le faltaban fecha y
+  criterio; a Marcos le faltaba el objetivo y el modelo preguntó con signos. Es la causa
+  probable de los primeros mensajes rechazados de toda la corrida.
+- Disparador del punto 4 (tercera corrección de `verificar_turno` en el día): no es un caso
+  nuevo sino un resto de la decisión "sólo invariantes" mal clasificado. La invariante es que
+  la respuesta pida algo cuando falta un dato, y eso lo declara `pregunta`; el "?" es forma.
+  Cambio: `falta_pregunta` comprueba sólo `pregunta` (se descartó exigir que cubra un dato
+  faltante: rompía la corrección de un dato confirmado mientras falta otro). RED 4 failed
+  (familia de pedidos en imperativo), GREEN 255 passed.
+- Repaso completo de los controles que quedan, uno por uno: botón inexistente (estado
+  real), texto vacío, llaves y claves internas (opacidad, §10), número, fecha, mes, título
+  o nombre que no está en los hechos (§4), botones sin pregunta (lo que se muestra coincide
+  con lo que se dice) y largo máximo de 700 caracteres (tope de seguridad, sin rechazos
+  observados). Ninguno es de estilo.
+- Pendiente (e): alguien de un área sin objetivos operativos (Dirección) recibe el objetivo
+  estratégico completado solo; revisar con el usuario si es lo que corresponde.

@@ -493,8 +493,19 @@ def test_se_puede_preguntar_por_un_dato_que_ya_esta_confirmado():
 
 def test_con_datos_pendientes_hay_que_preguntar_algo():
     assert verificar(texto="Dale.").startswith("falta_pregunta")
-    assert verificar(texto="Dale, sigamos.",
-                     pregunta=["title"]).startswith("falta_pregunta")
+
+
+@pytest.mark.parametrize("texto", [
+    "Decime para cuándo la necesitás y contame cómo se comprueba que quedó hecha.",
+    "Pasame la fecha objetivo.",
+    "Contame qué hay que hacer.",
+    "Necesito la fecha para seguir.",
+])
+def test_pedir_en_imperativo_sin_signo_de_pregunta_alcanza(texto):
+    """Pedir un dato es una pregunta aunque no lleve signos (prueba real del
+    2026-10-01: "decime otra fecha" se rechazaba por no tener "?"). Lo que el
+    código comprueba es lo que el modelo declara en `pregunta`, no la puntuación."""
+    assert verificar(texto=texto, pregunta=["title", "due_date"]) is None
 
 
 def test_preguntar_por_lo_que_se_acaba_de_completar_no_lo_rechaza_el_verificador():
