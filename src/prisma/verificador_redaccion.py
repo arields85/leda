@@ -245,7 +245,7 @@ def verificar(resultado: ResultadoTurno, borrador: Borrador,
 
     # Lo que los hechos exigen. Los datos del resumen los agrega el código: no se
     # exigen en el texto del modelo.
-    sin_resumen = replace(resultado, resumen=None)
+    sin_resumen = replace(resultado, resumen=None, charla=None)
     for hecho in _textos(sin_resumen):
         for citado in _CITADO.findall(hecho):
             if _norm(citado) not in t:

@@ -78,10 +78,13 @@ def test_con_a_la_repregunta_la_escribe_el_modelo_en_una_sola_respuesta(
         cliente, conn, corework, monkeypatch):
     ws = corework.workspace_id
     _variante(conn, ws, "A")
-    pregunta = f"Dale, la semana que viene. {REPREGUNTA_B}"
+    # El mensaje entero: la razón, qué sirve y la pregunta (ya no la plantilla).
+    pregunta = ("Con eso no me alcanza para fijar un día. ¿Para qué día la "
+                "necesitás? Decime el día exacto, por ejemplo «el viernes» o «el 4 "
+                "de octubre».")
 
     tg, proveedor, salidas, _ = _repreguntar_dia(
-        cliente, conn, ws, monkeypatch, [_json(pregunta)])
+        cliente, conn, ws, monkeypatch, [_json(pregunta, "due_date")])
 
     assert salidas == 1 and _campo_del_slot(conn) == "due_date"
     assert len(proveedor.redactados) == 1                 # el modelo redactó

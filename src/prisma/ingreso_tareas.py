@@ -21,7 +21,8 @@ from .incidentes import (ETAPA_CONFIGURACION_ALTA, ETAPA_RESUMEN_VIGENTE_SIN_FIL
 from .pendientes import HERRAMIENTA_REVISION_BORRADOR
 from .redaccion import (TextoRedactado, nombre_legible, redactar_partes,
                         redactar_turno, variante_redaccion)
-from .resultado_turno import Falta, Rechazo, ResultadoTurno, Resumen
+from .resultado_turno import (Cambio, Falta, OpcionDisponible, Rechazo,
+                              ResultadoTurno, Resumen, SinCambio, ValorAceptado)
 from .salida import (BUTTON_TEXT_LIMIT, ETIQUETA_CANCELAR, ETIQUETA_CONFIRMAR,
                      ETIQUETA_ENVIAR, ETIQUETA_MODIFICAR, ETIQUETA_RECHAZAR,
                      ICONO_CANCELAR, ICONO_OTRA_OPCION,
@@ -547,8 +548,12 @@ def _rechazar_valor(cur, request, who, field, rechazo: Rechazado, inbound_id,
     elif rechazo.motivo is MotivoRechazo.TEXTO_LARGO:
         aviso = f"{_user_limit_prompt(field)}\n\n"
     else:
-        aviso = _decir(cur, request, ResultadoTurno(
-            rechazo=Rechazo(rechazo.razon, rechazo.se_acepta))) + "\n\n"
+        hecho = Rechazo(rechazo.razon, rechazo.se_acepta)
+        aviso = redactar_partes(ResultadoTurno(rechazo=hecho), "B").texto + "\n\n"
+        if (field in _SUJETO_DEL_CAMPO and variante_redaccion(
+                cur, str(request["workspace_id"])) == "A"):
+            return _rechazo_entero(cur, request, who, field, hecho, aviso,
+                                   inbound_id, choice_set_id, now)
     if choice_set_id is not None:
         if resend_choice_prompt(cur, who, choice_set_id, now, prefix=aviso):
             return IntakeOutcome(str(request["id"]), aviso.strip(), inert=True,
@@ -561,12 +566,105 @@ def _rechazar_valor(cur, request, who, field, rechazo: Rechazado, inbound_id,
     return _reject_user_value(cur, request, field, texto, inbound_id, now)
 
 
-def _decir(cur, request, resultado: ResultadoTurno) -> str:
-    """El texto de un resultado con la variante de redacción del espacio (ADR
-    0014, etapa 6)."""
+def _rechazo_entero(cur, request, who, field, hecho: Rechazo, aviso: str,
+                    inbound_id, choice_set_id, now) -> IntakeOutcome:
+    """Un valor que no sirve con la variante A: UN mensaje del modelo con la razón
+    y la misma pregunta (antes eran dos llamadas, la razón y la pregunta
+    pegadas). Si el modelo no sirve, sale lo de B: la razón sola para un campo de
+    texto, o la razón delante de la pregunta guardada para una elección."""
+    if choice_set_id is not None:
+        cur.execute(
+            """select etiqueta from task_intake_choice
+                where choice_set_id = %s and activa order by orden""",
+            (choice_set_id,))
+        etiquetas = [f["etiqueta"] for f in cur.fetchall()]
+        guardada = _first_choice_prompt(cur, choice_set_id)
+        texto = _decir_pregunta(
+            cur, request, field, TipoValor.OPCION, aviso + guardada, now,
+            pregunta=guardada, opciones=etiquetas, rechazo=hecho)
+        if resend_choice_prompt(cur, who, choice_set_id, now, texto=texto):
+            return IntakeOutcome(str(request["id"]), texto.strip(), inert=True,
+                                 responded=True)
+        return IntakeOutcome(str(request["id"]), "", inert=True)
+    texto = _decir_pregunta(
+        cur, request, field, TIPO_DE_CAMPO.get(field, TipoValor.TEXTO),
+        aviso.strip(), now, pregunta=_free_text_prompt(field), rechazo=hecho)
+    return _reject_user_value(cur, request, field, texto, inbound_id, now)
+
+
+def _mostrar_valor(campo: str, valor) -> str:
+    """Un dato del alta como lo lee una persona."""
+    if campo == "due_date":
+        return format_due_date(valor)
+    if isinstance(valor, dict):
+        return str(valor.get("title") or valor.get("name") or "")
+    return str(valor or "")
+
+
+def _entendido_del_turno(cur, request_id: str, now: datetime
+                         ) -> tuple[ValorAceptado, ...]:
+    """Lo que la persona dio en ESTE turno, leído de la base: los datos que
+    quedaron confirmados con la hora del turno por lo que dijo o tocó (no los
+    que el código completa solo: la descripción vacía, la evidencia o un dato con
+    una sola opción). Es contexto para que el modelo lo diga en su mensaje."""
+    cur.execute(
+        """select campo, valor from task_intake_field
+            where request_id = %s and estado = 'confirmed' and actualizado_en = %s
+              and campo <> all(%s)
+              and not (proposed_by = 'server' and source_choice_id is null)
+            order by array_position(%s::text[], campo)""",
+        (request_id, now, ["description", "evidence"], list(FIELDS)))
+    dados = []
+    for fila in cur.fetchall():
+        mostrado = _mostrar_valor(fila["campo"], fila["valor"])
+        if mostrado:
+            dados.append(ValorAceptado(_SUJETO_DEL_CAMPO[fila["campo"]], mostrado))
+    return tuple(dados)
+
+
+def _decir_pregunta(cur, request, field: str, tipo: TipoValor, prompt: str,
+                    now: datetime, *, pregunta: str | None = None, opciones=(),
+                    rechazo: Rechazo | None = None,
+                    busqueda: str | None = None) -> str:
+    """El mensaje con que se pide un dato (ADR 0014, etapa 6 completa). Con B es
+    `prompt` tal cual. Con A, el modelo escribe el mensaje entero (lo que
+    entendió, el rechazo si lo hubo, la pregunta y para qué sirven las opciones)
+    y el código lo verifica; si no sirve, sale `prompt` como con B. `pregunta` es
+    la pregunta limpia cuando `prompt` es un aviso (una búsqueda sin
+    resultados)."""
     workspace_id = str(request["workspace_id"])
-    return redactar_turno(cur, workspace_id, resultado,
-                          variante_redaccion(cur, workspace_id)).texto
+    if variante_redaccion(cur, workspace_id) != "A":
+        return prompt
+    entendido = _entendido_del_turno(cur, str(request["id"]), now)
+    if busqueda:
+        entendido += (ValorAceptado("lo que buscaste", busqueda),)
+    resultado = ResultadoTurno(
+        falta=Falta(_SUJETO_DEL_CAMPO[field], tipo, pregunta=pregunta or prompt,
+                    campo=field),
+        opciones=tuple(OpcionDisponible(etiqueta_sin_icono(o), "elegir")
+                       for o in opciones),
+        entendido=entendido, rechazo=rechazo)
+    return redactar_turno(cur, workspace_id, resultado, "A",
+                          base=TextoRedactado(prompt)).texto
+
+
+def _decir_envio(cur, request, aprobador_nombre) -> str:
+    """A quién se le mandó el borrador. Con A lo cuenta el modelo como un efecto
+    del resultado (el único que hubo) y nada más; si no sirve, el aviso de
+    siempre."""
+    base = draft_sent_text(aprobador_nombre)
+    workspace_id = str(request["workspace_id"])
+    if variante_redaccion(cur, workspace_id) != "A":
+        return base
+    nombre = (normalize_text(aprobador_nombre)
+              if isinstance(aprobador_nombre, str) else "")
+    resultado = ResultadoTurno(
+        cambios=(Cambio("el borrador de la tarea",
+                        f"quedó enviado a {nombre or 'otra persona del equipo'} "
+                        "para que lo confirme", id="borrador_enviado"),),
+        sin_cambios=(SinCambio("la tarea", "se crea cuando lo confirme"),))
+    return redactar_turno(cur, workspace_id, resultado, "A",
+                          base=TextoRedactado(base)).texto
 
 
 def handle_active_text(cur: psycopg.Cursor, who: Solicitante, *, chat_id: int,
@@ -1065,7 +1163,7 @@ def send_to_approval(cur: psycopg.Cursor, who: Solicitante, *, token: str,
     cur.execute(
         "update task_intake_request set enviada_en = %s where id = %s",
         (now, request_id))
-    text = draft_sent_text(authority["aprobador_nombre"])
+    text = _decir_envio(cur, request, authority["aprobador_nombre"])
     _enqueue(cur, request, text, now, f"intake:{request_id}:sent:v{version}")
     return IntakeOutcome(request_id, text, changed=True,
                          pending_action_id=pending.id)
@@ -1289,7 +1387,8 @@ def _first_choice_prompt(cur: psycopg.Cursor, choice_set_id) -> str:
 
 def resend_choice_prompt(cur: psycopg.Cursor, who: Solicitante,
                          choice_set_id: str, now: datetime,
-                         ref: str | None = None, prefix: str = "") -> bool:
+                         ref: str | None = None, prefix: str = "",
+                         texto: str | None = None) -> bool:
     """Vuelve a mandar la pregunta de la elección abierta con sus botones
     (`prefix`, si viene, va delante en el mismo mensaje). `False` si la
     elección ya no estaba abierta: no manda nada. `ref` distingue este
@@ -1298,7 +1397,9 @@ def resend_choice_prompt(cur: psycopg.Cursor, who: Solicitante,
     toque), la referencia es ese evento (T9-R4): una entrega repetida del mismo
     evento no reenvía dos veces, y un evento nuevo sí. Sin ninguno de los dos, es
     el número de mensajes que la elección ya tiene (`n1`, `n2`, ...): cada
-    reenvío es un mensaje propio y ninguno depende del reloj."""
+    reenvío es un mensaje propio y ninguno depende del reloj. `texto`, si viene,
+    es el mensaje entero (lo redactó el modelo con A): reemplaza a `prefix` y a la
+    pregunta guardada."""
     request = _request_of_question(cur, who, QUESTION_CHOICE, choice_set_id,
                                    lock=False)
     if not request:
@@ -1310,7 +1411,7 @@ def resend_choice_prompt(cur: psycopg.Cursor, who: Solicitante,
             """select count(*) n from message_outbox
                 where intake_choice_set_id = %s""", (choice_set_id,))
         ref = f"n{cur.fetchone()['n']}"
-    _enqueue(cur, request, f"{prefix}{prompt}", now,
+    _enqueue(cur, request, f"{prefix}{prompt}" if texto is None else texto, now,
              f"intake:{request['id']}:reask:{ref}", choice_set_id=choice_set_id)
     return True
 
@@ -1626,14 +1727,19 @@ def _open_entity_page(cur, request, who, field, query, offset, now, *,
         }))
     if _hay_otra_opcion(cur, request, who, field, candidates, offset, has_more):
         options.append((OTHER, "other", None))
+    rechazo = busqueda = None
     if no_match:
         prompt = (f"No encontré nada parecido a «{buscado}». Estas son las "
                   "opciones que hay.")
+        rechazo = Rechazo(f"No encontré nada parecido a «{buscado}».",
+                          "Estas son las opciones que hay.")
     else:
         prompt = (_candidate_prompt(field) if not query else
                   f"Opciones que coinciden con «{query}».")
+        busqueda = str(query) if query else None
     return _open_choices(cur, request, field, prompt, options, now,
-                         prefijo=prefijo)
+                         prefijo=prefijo, pregunta=_candidate_prompt(field),
+                         rechazo=rechazo, busqueda=busqueda)
 
 
 def _hay_otra_opcion(cur, request, who, field, mostradas, offset, has_more) -> bool:
@@ -1663,15 +1769,20 @@ def _unica_opcion(cur, request, who, field):
 
 
 def _open_choices(cur, request, field, prompt, options, now, kind=None, *,
-                  prefijo: str = ""):
+                  prefijo: str = "", pregunta: str | None = None,
+                  rechazo: Rechazo | None = None, busqueda: str | None = None):
     request_id = str(request["id"])
     kind = kind or field or "choice"
-    if field is not None:
+    if field is not None and not kind.startswith("no_candidates"):
         # La pregunta de un dato sale por la redacción del espacio (ADR 0014,
-        # etapa 6); el aviso que va delante no es la pregunta.
-        prompt = prefijo + _decir(cur, request, ResultadoTurno(falta=Falta(
-            _SUJETO_DEL_CAMPO[field], TipoValor.OPCION, pregunta=prompt,
-            campo=field)))
+        # etapa 6); el aviso que va delante no es la pregunta. Sin opciones que
+        # ofrecer no hay nada que redactar: es un estado, no una pregunta.
+        prompt = prefijo + _decir_pregunta(
+            cur, request, field, TipoValor.OPCION, prompt, now, pregunta=pregunta,
+            opciones=[label for label, _, _ in options], rechazo=rechazo,
+            busqueda=busqueda)
+    elif field is not None:
+        prompt = prefijo + prompt
     else:
         prompt = prefijo + prompt
     prepare_payload(prompt, dedupe_key="intake-choice", has_buttons=True)
@@ -1703,9 +1814,11 @@ def _open_choices(cur, request, field, prompt, options, now, kind=None, *,
 def _open_free_text(cur, request, field, prompt, now, replace=False, block=None,
                     *, prefijo: str = ""):
     request_id = str(request["id"])
-    prompt = prefijo + _decir(cur, request, ResultadoTurno(falta=Falta(
-        _SUJETO_DEL_CAMPO[field], TIPO_DE_CAMPO.get(field, TipoValor.TEXTO),
-        pregunta=prompt, campo=field)))
+    # Con un bloque copiable (Modificar) el texto tiene que terminar en él: no se
+    # redacta.
+    prompt = prefijo + (prompt if block else _decir_pregunta(
+        cur, request, field, TIPO_DE_CAMPO.get(field, TipoValor.TEXTO), prompt,
+        now))
     prepare_payload(prompt, dedupe_key="intake-text", has_buttons=bool(block))
     cur.execute(
         """update task_intake_free_text_slot set estado = 'invalidated'

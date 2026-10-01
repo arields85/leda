@@ -28,7 +28,7 @@ import psycopg
 from .db import registrar_auditoria
 from .incidentes import (ETAPA_CHARLA_SIN_RESPUESTA, ETAPA_REDACCION_RECHAZADA,
                          registrar_incidente)
-from .resultado_turno import ResultadoTurno, Resumen, ids_de_cambios
+from .resultado_turno import Falta, ResultadoTurno, Resumen, ids_de_cambios
 from .valores import TipoValor  # noqa: F401 -- el tipo de `Falta.tipo`
 from .verificador_redaccion import leer_borrador, verificar
 
@@ -221,6 +221,8 @@ def serializar_hechos(r: ResultadoTurno) -> str:
     if r.entendido:
         datos["entendido"] = [{"dato": v.dato, "valor": v.mostrado}
                               for v in r.entendido]
+    if r.charla:
+        datos["charla"] = r.charla
     if r.estado:
         datos["estado"] = [{"sujeto": e.sujeto, "estado": e.estado}
                            for e in r.estado]
@@ -356,6 +358,21 @@ def motivo_de_charla_invalida(texto: str) -> str | None:
     if "?" in texto or "¿" in texto:
         return "la respuesta abre otra pregunta"
     return None
+
+
+def redactar_charla_con_pregunta(cur, workspace_id: str, mensaje: str,
+                                 pregunta: str, campo: str, dato: str, *,
+                                 proveedor=None) -> TextoRedactado:
+    """Con A, la charla y la pregunta pendiente son UN mensaje natural del modelo
+    (F-A2): contesta en pocas palabras y pide el dato, en vez de una frase suelta
+    delante de la plantilla. `campo` y `dato` identifican la pregunta (el campo
+    del alta, o `pendiente`). Si el modelo no sirve, sale sólo la pregunta (la
+    plantilla de B) y queda registrado."""
+    resultado = ResultadoTurno(
+        charla=mensaje,
+        falta=Falta(dato, TipoValor.TEXTO, pregunta=pregunta, campo=campo))
+    return redactar_turno(cur, workspace_id, resultado, "A", proveedor=proveedor,
+                          base=TextoRedactado(pregunta))
 
 
 def redactar_charla(cur, workspace_id: str, mensaje: str, pregunta: str, *,

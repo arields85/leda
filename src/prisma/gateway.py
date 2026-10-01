@@ -1952,8 +1952,22 @@ def _atender_pregunta_pendiente(cur, quien, texto: str, abierta, proveedor, cal,
         # Respuesta breve y la pregunta de nuevo, en UNA respuesta (ADR 0013
         # regla 1): la breve la redacta el modelo en las dos variantes; si no
         # sirve, sale sólo la pregunta y queda un incidente.
-        from .redaccion import redactar_charla
+        from .redaccion import (redactar_charla, redactar_charla_con_pregunta,
+                                variante_redaccion)
 
+        if (variante_redaccion(cur, workspace_id) == "A"
+                and abierta.herramienta in (_SENTINEL_ALTA_TEXTO_LIBRE,
+                                            _SENTINEL_ALTA_ELECCION)
+                and not abierta.args.get("bloque")):
+            # Con A, la charla y la pregunta son UN mensaje del modelo (F-A2);
+            # si no sirve, sale sólo la pregunta (el código la guarda como base).
+            completo = redactar_charla_con_pregunta(
+                cur, workspace_id, texto, pregunta.pregunta,
+                abierta.args.get("campo") or "pendiente", pregunta.nombre,
+                proveedor=proveedor).texto
+            _repreguntar(cur, quien, workspace_id, chat_id, abierta, pregunta,
+                         ahora, entrante_id, texto_completo=completo)
+            return None
         breve = redactar_charla(cur, workspace_id, texto, pregunta.pregunta,
                                 proveedor=proveedor)
         _repreguntar(cur, quien, workspace_id, chat_id, abierta, pregunta, ahora,
@@ -1981,7 +1995,7 @@ def _es_pregunta_de_evidencia(abierta) -> bool:
 
 def _repreguntar(cur, quien, workspace_id: str, chat_id: int, abierta,
                  pregunta: _Pregunta, ahora, entrante_id: str | None, *,
-                 prefijo: str = "") -> None:
+                 prefijo: str = "", texto_completo: str | None = None) -> None:
     """Vuelve a hacer la pregunta abierta (`charla`, `no_puedo`, un mensaje que
     no era la opción). Una elección del alta la vuelve a mandar con sus
     botones: sus opciones son las únicas respuestas. Las demás, como texto."""
@@ -1994,7 +2008,7 @@ def _repreguntar(cur, quien, workspace_id: str, chat_id: int, abierta,
         from .ingreso_tareas import resend_choice_prompt
 
         if resend_choice_prompt(cur, quien, abierta.pregunta_id, ahora,
-                                entrante_id, prefix=prefijo):
+                                entrante_id, prefix=prefijo, texto=texto_completo):
             return
         texto = AVISO_DATO_YA_NO_PENDIENTE
     elif abierta.args.get("bloque"):
@@ -2008,7 +2022,8 @@ def _repreguntar(cur, quien, workspace_id: str, chat_id: int, abierta,
                    ahora, bloque=bloque)
         return
     else:
-        texto = f"{prefijo}{pregunta.pregunta}"
+        texto = (texto_completo if texto_completo is not None
+                 else f"{prefijo}{pregunta.pregunta}")
     _responder(cur, workspace_id, chat_id, quien, texto, ahora)
 
 

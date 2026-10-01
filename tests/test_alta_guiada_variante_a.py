@@ -48,6 +48,9 @@ class _Eco:
         if "resumen" in datos:
             return _json(APERTURA)
         partes = []
+        if "entendido" in datos:
+            partes.append("Anoté " + ", ".join(e["valor"] for e in datos["entendido"])
+                          + ".")
         if "rechazo" in datos:
             partes.append(f"{datos['rechazo']['razon']} {datos['rechazo']['se_acepta']}")
         pregunta = None

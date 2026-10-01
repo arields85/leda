@@ -42,11 +42,7 @@ def _incidentes_de_charla(conn) -> list[dict]:
 
 # ---------------------------------------------- la respuesta, en una sola salida
 
-@pytest.mark.parametrize("variante", ["A", "B"])
-def test_la_charla_responde_breve_y_repregunta_en_una_sola_respuesta(
-        variante, cliente, conn, corework, monkeypatch):
-    ws = corework.workspace_id
-    tg, _ = _abrir_alta(conn, ws)
+def _variante(conn, ws, variante):
     with admin(conn) as cur:
         cur.execute("""insert into workspace_setting (workspace_id, clave, valor)
                        values (%s, 'redaccion', %s::jsonb)
@@ -54,6 +50,18 @@ def test_la_charla_responde_breve_y_repregunta_en_una_sola_respuesta(
                        do update set valor = excluded.valor""",
                     (ws, json.dumps({"variante": variante})))
     conn.commit()
+
+
+def _json(texto, pregunta=None):
+    return json.dumps({"texto": texto, "pregunta": pregunta, "afirma": []},
+                      ensure_ascii=False)
+
+
+def test_con_b_la_charla_responde_breve_y_repregunta_en_una_sola_respuesta(
+        cliente, conn, corework, monkeypatch):
+    ws = corework.workspace_id
+    tg, _ = _abrir_alta(conn, ws)
+    _variante(conn, ws, "B")
     proveedor = _con_charla(monkeypatch, [BREVE])
     antes = _salidas(conn, tg)
 
@@ -63,6 +71,54 @@ def test_la_charla_responde_breve_y_repregunta_en_una_sola_respuesta(
     assert _filas_del_chat(conn, tg)[-1]["cuerpo"] == f"{BREVE}\n\n{PREGUNTA_TITULO}"
     assert len(proveedor.redactados) == 1
     assert _incidentes_de_charla(conn) == []
+
+
+def test_con_a_la_charla_y_la_pregunta_son_un_solo_mensaje_natural_del_modelo(
+        cliente, conn, corework, monkeypatch):
+    """F-A2: no una frase suelta delante de la plantilla, sino un mensaje que
+    contesta y pide el dato."""
+    ws = corework.workspace_id
+    tg, _ = _abrir_alta(conn, ws)
+    _variante(conn, ws, "A")
+    mensaje = "Buen día. Cuando puedas, contame: ¿qué hay que hacer?"
+    proveedor = _con_charla(monkeypatch, [_json(mensaje, "title")])
+    antes = _salidas(conn, tg)
+
+    _mensaje_privado(cliente, tg, "hola")
+
+    assert _salidas(conn, tg) == antes + 1                     # una sola respuesta
+    assert _filas_del_chat(conn, tg)[-1]["cuerpo"] == mensaje
+    (sistema, hechos) = proveedor.redactados[0]
+    datos = json.loads(hechos)
+    assert datos["charla"] == "hola"
+    assert datos["falta"]["campo"] == "title"
+    assert PREGUNTA_TITULO in datos["falta"]["pregunta"]
+    assert _incidentes_de_charla(conn) == []                   # no es el viejo prefijo
+
+
+@pytest.mark.parametrize("borrador", [
+    TimeoutError("colgado"), RuntimeError("cayó"),
+    _json("Hola, qué bueno tenerte por acá.", "title"),     # no pide el dato
+    _json("Hola. ¿Qué hay que hacer?", None),               # no declara cuál pide
+    "Hola. ¿Qué hay que hacer?",                            # no es el JSON pedido
+])
+def test_con_a_si_el_mensaje_no_sirve_sale_la_pregunta_sola_y_queda_registrado(
+        borrador, cliente, conn, corework, monkeypatch):
+    ws = corework.workspace_id
+    tg, _ = _abrir_alta(conn, ws)
+    _variante(conn, ws, "A")
+    _con_charla(monkeypatch, [borrador])
+    antes = _salidas(conn, tg)
+
+    _mensaje_privado(cliente, tg, "hola")
+
+    assert _salidas(conn, tg) == antes + 1
+    assert _filas_del_chat(conn, tg)[-1]["cuerpo"] == PREGUNTA_TITULO
+    with admin(conn) as cur:
+        cur.execute("select detalle from audit_log where workspace_id = %s "
+                    "and accion = %s", (ws, redaccion.ACCION_REDACCION_A))
+        (intento,) = cur.fetchall()
+    assert intento["detalle"]["resultado"] in ("error", "rechazada")
 
 
 @pytest.mark.parametrize("error", [TimeoutError("colgado"), RuntimeError("cayó")])

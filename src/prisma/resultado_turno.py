@@ -107,6 +107,10 @@ class ResultadoTurno:
     # se va a ver). Es contexto para que el modelo lo diga en su mensaje: la
     # plantilla de B no lo dice, así que B no cambia.
     entendido: tuple[ValorAceptado, ...] = ()
+    # Lo que la persona dijo cuando era otra cosa que lo pedido (un saludo, un
+    # agradecimiento): contexto para que el modelo conteste en pocas palabras
+    # antes de pedir el dato. B no lo dice.
+    charla: str | None = None
 
     @property
     def vacio(self) -> bool:
