@@ -1476,3 +1476,66 @@ Tramo `f60c3ca..51fa9e6` (`81bb60a`, `9d1bee2`, `20cd9c8`, `51fa9e6`; 994 línea
   (asignación, aprobación, enviar a aprobación, incidentes legibles, rechazo, conducida).
 - Pendiente (h): si el responsable no activó su chat, el aviso no sale y sólo queda en la
   auditoría; a quien creó la tarea no se le dice que el otro no se enteró.
+
+
+### Chequeo de rumbo: el camino general ve el borrador pausado (2026-10-01)
+
+Hallazgo de la prueba real (pendiente (b)): tras pausar el borrador, "¿qué tarea dejaste para el lunes?" fue al
+camino general, que sólo conoce `task`, y abrió una aclaración con tareas ajenas que quedó como rama abierta.
+Diseño B elegido por el usuario. Ruta declarada: un solo escritor (encargo explícito); TDD estricto.
+
+- **¿Qué clase de problema es, y ya apareció?** Coexistencia entre el flujo nuevo y el camino viejo (punto 7): el
+  alta conducida creó un estado (el borrador pausado) que el camino general no conoce. Ya apareció con otra forma:
+  la rama falsa tras una pausa y el "Ya hay un borrador" que nunca se alcanzaba. En todas, un camino decide sin un
+  hecho que otro camino creó.
+- **¿Mecanismo general o caso?** Mecanismo: una sola función (`ingreso_tareas.borrador_pausado`) da el hecho a quien
+  interpreta (ruteo y modelo que responde), y el ruteo devuelve un comando de la lista cerrada (ADR 0013 regla 1)
+  que el código ejecuta con el menú que ya existe. Ninguna lista de frases.
+- **¿Qué haría innecesaria la próxima ronda?** Que cualquier camino que interprete un mensaje reciba los hechos de
+  la persona (borrador guardado) en vez de inferirlos de lo que ve. Si el hallazgo vuelve con otra forma (otra rama
+  que el camino general no ve), el mecanismo no alcanza y hay que revisar la precedencia de ramas, no el caso.
+- **¿Sigue valiendo la hipótesis?** Sí: la lección del día es que el modelo interpreta bien cuando tiene los
+  hechos; acá le faltaba uno. Se mide en la próxima prueba real, no se presume.
+
+### El camino general ve el borrador pausado (diseño B, 2026-10-01)
+
+- **Causa.** Pausar un borrador (`pause_request`) lo saca de las ramas abiertas, así que el mensaje siguiente va al
+  camino general (`_turno` → `_rutear` → Jev contra `task`). Ahí nada sabía que el borrador existía: "¿qué tarea
+  dejaste para el lunes?" abrió una aclaración con tareas ajenas (rama abierta falsa) y el menú "Ya hay un borrador
+  en curso" nunca se alcanzaba.
+- **Diseño (un solo mecanismo).**
+  1. `ingreso_tareas.borrador_pausado(cur, quien, chat_id=None)`: la única lectura del estado (id y título
+     confirmado, o `None`), con `_TITLE_OF_REQUEST`.
+  2. El hecho llega como dato al ruteo (`route_intent(..., borrador_pausado=hecho)`, en los tres proveedores y en
+     `ProveedorGuionado.borradores_pausados`) y al modelo que responde (bloque "Borrador de tarea guardado" en
+     `contexto.construir`). Línea exacta: `La persona tiene guardado, en pausa, el borrador de la tarea «<título>».`;
+     sin título: `La persona tiene guardado, en pausa, un borrador de tarea que estaba armando.`
+  3. Comando cerrado nuevo `IntentAction.PAUSED_DRAFT` (`paused_draft`): sólo está en el esquema del ruteo y en su
+     sistema cuando hay hecho. El código lo ejecuta en `_seguir_camino_normal`, antes de Jev: reutiliza
+     `_iniciar_alta_guiada` → `ingreso_tareas.start` y su menú (Continuar borrador / Cancelar borrador / Empezar
+     otro), con la pregunta redactada por el código en UNA respuesta: `Quedó guardado el borrador de la tarea
+     «<título>». Elegí cómo seguir.` (sin título: `Quedó guardado un borrador de tarea que estabas armando. Elegí
+     cómo seguir.`). Pedir crear una tarea sigue por `start_task_intake` y su texto de siempre.
+  4. Red de seguridad: un `paused_draft` sin borrador (o con Modificar de por medio) se atiende como
+     conversación normal.
+- **Deliberadamente no se hizo.** (A) Ampliar el conjunto de candidatas de Jev con el borrador (descartado por el
+  usuario). Ni se tocó la precedencia de las ramas abiertas: sin la aclaración falsa no hay rama que la discuta.
+  Tampoco listas de frases: el ruteo decide el comando y el código sólo lo ejecuta. El hecho sólo se le da al
+  ruteo del camino general (`_turno` sin pregunta abierta); el ruteo contra una pregunta pendiente no lo recibe.
+- **Límite conocido.** "Empezar otro" desde `paused_draft` abre el alta con el texto de la pregunta como mensaje
+  de origen (igual que con "quiero crear una tarea" abre con ese texto); el modelo conducido pregunta lo que falte.
+- **RED.** `tests/test_borrador_pausado_camino_general.py` (nuevo): 9 failed, 1 passed (el de "sin borrador
+  pausado", que protege que no cambie el camino general).
+- **GREEN.** El archivo nuevo, 11 passed. Tanda enfocada (`test_alta_conducida`, `test_alta_dejarlo_conserva_el_borrador`,
+  el nuevo, `test_rama_abierta`, `test_rama_eleccion`, `test_rama_abierta_guarda`, `test_aclaracion_botones`,
+  `test_resolucion_referencias`, `test_task_intake`, `test_alta_turno`, `test_una_respuesta` y todo archivo con
+  `_bloque_contexto_referencias`, `_resolver_referencias_del_turno` o `START_TASK_INTAKE`): primera corrida 897
+  passed, 2 failed (dobles de ruteo sin el parámetro nuevo); corregidos, los archivos afectados (dejarlo, el nuevo,
+  `banco/test_corrida`, `test_llm_protocol`, `test_task_intake`): 331 passed. No se corrió la suite completa ni el
+  banco real (`modelo_real`).
+- **Pruebas/dobles cambiados.** `tests/test_task_intake.py::_RoutingProvider.route_intent` y
+  `tests/banco/corrida.py::ProveedorGrabador.route_intent` aceptan `borrador_pausado` (el segundo lo reenvía y lo
+  anota en la grabación sólo si viene); ninguna aserción existente cambió. Los replays del banco no traen hecho, así
+  que no cambian.
+- Pendiente (b) de la corrida del 2026-10-01 ("la pausa que el camino general no conoce"): resuelto. Falta
+  confirmarlo en una prueba real por Telegram.

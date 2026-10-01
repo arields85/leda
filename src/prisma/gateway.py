@@ -1509,7 +1509,18 @@ def _turno(cur, quien, texto: str, workspace_id: str, chat_id: int,
             return
 
     if route is None:
-        route, last_error = _rutear(proveedor, texto, historial=conversacion)
+        # Un borrador de tarea guardado en pausa no es una rama abierta, pero el
+        # ruteo tiene que saber que existe (ADR 0013 regla 1, diseño B de
+        # 2026-10-01): es un hecho del servidor, y el comando `paused_draft` le
+        # permite decir que el mensaje trata de él.
+        from .ingreso_tareas import (borrador_pausado,
+                                     hecho_del_borrador_pausado)
+
+        pausado = borrador_pausado(cur, quien, chat_id)
+        route, last_error = _rutear(
+            proveedor, texto, historial=conversacion,
+            borrador_pausado=(hecho_del_borrador_pausado(pausado)
+                              if pausado else None))
         if route is None:
             _avisar_ruteo_caido(cur, quien, last_error, workspace_id, chat_id, now)
             return
@@ -1540,6 +1551,25 @@ def _seguir_camino_normal(cur, quien, texto: str, route, proveedor, cal,
         _responder_saludo_suelto(cur, quien, texto, cal, chat_id, ahora,
                                  entrante_id)
         return
+
+    # El mensaje trata del borrador que la persona dejó guardado (ADR 0013 regla
+    # 1, diseño B): el menú que ya existe, en una sola respuesta. Esa referencia
+    # no es una tarea del equipo, así que no pasa por Jev ni abre una aclaración.
+    # Si el borrador ya no está (o el comando no corresponde), es conversación
+    # normal.
+    if route.action is IntentAction.PAUSED_DRAFT:
+        from .ingreso_tareas import (borrador_pausado,
+                                     texto_del_borrador_pausado)
+
+        pausado = (borrador_pausado(cur, quien, chat_id)
+                   if modificacion is None else None)
+        if pausado is not None:
+            _iniciar_alta_guiada(
+                cur, quien, chat_id, entrante_id, texto, {}, workspace_id, ahora,
+                texto_del_conflicto=texto_del_borrador_pausado(pausado))
+            return
+        route = replace(route, action=IntentAction.NORMAL_CONVERSATION,
+                        task={})
 
     # Resolver antes de actuar (T3, ADR 0005 decisión 6 / ADR 0006): las
     # referencias a tarea que separó el enrutador se resuelven contra las
@@ -1596,11 +1626,14 @@ def _historial_del_turno(cur, chat_id: int, ahora,
 
 def _rutear(proveedor, texto: str, pendiente: str | None = None,
             valor_esperado: ValorEsperado | None = None,
-            historial: list[dict] | None = None):
+            historial: list[dict] | None = None,
+            borrador_pausado: str | None = None):
     """El ruteo tipado con dos intentos: (ruta, None), o (None, último
     error) si los dos fallan. `pendiente` es la descripción de la pregunta
     abierta, si la hay (T9-R1a); `valor_esperado` (ADR 0014, M1) es lo que esa
-    pregunta espera; `historial` (F-C6) es la conversación reciente. Cada uno
+    pregunta espera; `historial` (F-C6) es la conversación reciente;
+    `borrador_pausado` es el hecho de que la persona tiene un borrador guardado
+    (`ingreso_tareas.hecho_del_borrador_pausado`). Cada uno
     sólo se le pasa al proveedor cuando hay uno: un proveedor que no sabe de
     valores ni de conversación se llama como siempre."""
     from .llm import IntentRoute
@@ -1612,6 +1645,8 @@ def _rutear(proveedor, texto: str, pendiente: str | None = None,
             argumentos["valor_esperado"] = valor_esperado
     if historial:
         argumentos["historial"] = historial
+    if borrador_pausado:
+        argumentos["borrador_pausado"] = borrador_pausado
     last_error = None
     for _ in range(2):
         try:
@@ -2788,7 +2823,7 @@ def _atender_otro_tema_del_alta(cur, quien, solicitud, texto: str,
 
 def _iniciar_alta_guiada(cur, quien, chat_id: int, entrante_id: str | None,
                          texto: str, route_task: dict, workspace_id: str,
-                         now) -> None:
+                         now, *, texto_del_conflicto: str | None = None) -> None:
     """El alta guiada de tarea nueva, tal como la arrancaba `_turno` antes de
     T4 -- extraída para que también la use la opción "Es una tarea nueva"
     del caso mixto (decisión 2, ADR 0005) sin duplicar el camino."""
@@ -2803,6 +2838,7 @@ def _iniciar_alta_guiada(cur, quien, chat_id: int, entrante_id: str | None,
                 cur, quien, chat_id=chat_id, source_inbound_id=entrante_id,
                 source_raw_text=texto, proposals=route_task, now=now,
                 conducido=alta_conducida.alta_conducida(cur, workspace_id),
+                texto_del_conflicto=texto_del_conflicto,
             )
             if outcome.conducir:
                 # El primer turno del modelo, con el mensaje que abrió el alta:

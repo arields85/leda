@@ -1227,7 +1227,7 @@ class _RoutingProvider:
         self.main_calls = 0
 
     def route_intent(self, text, pendiente=None, valor_esperado=None,
-                     historial=None):
+                     historial=None, borrador_pausado=None):
         self.route_calls.append(text)
         self.pending_calls.append(pendiente)
         self.esperados.append(valor_esperado)

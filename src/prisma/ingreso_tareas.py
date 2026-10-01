@@ -187,12 +187,14 @@ def callback_data(token: str) -> str:
 def start(cur: psycopg.Cursor, who: Solicitante, *, chat_id: int,
           source_inbound_id: str, source_raw_text: str,
           proposals: dict[str, Any], now: datetime,
-          conducido: bool = False) -> IntakeOutcome:
+          conducido: bool = False,
+          texto_del_conflicto: str | None = None) -> IntakeOutcome:
     """Abre el alta. Con `conducido` (el alta conducida por el modelo) la solicitud
     se crea sin proponer ni preguntar nada: devuelve `conducir` y quien llama corre
     el primer turno del modelo con el mensaje que la abrió, así los datos que ese
     mensaje trae se toman todos. Con un borrador en curso, la elección de siempre
-    (continuar, cancelar, empezar otro)."""
+    (continuar, cancelar, empezar otro), con `texto_del_conflicto` como pregunta si
+    quien llama la redacta (el borrador pausado por el que la persona preguntó)."""
     if chat_id <= 0:
         return IntakeOutcome("", "Podemos armar el borrador sólo en un chat privado.",
                              inert=True)
@@ -216,7 +218,8 @@ def start(cur: psycopg.Cursor, who: Solicitante, *, chat_id: int,
         _invalidate_open_inputs(cur, str(existing["id"]))
         return _open_choices(
             cur, existing, None,
-            "Ya hay un borrador de tarea en curso. Elegí cómo seguir.",
+            texto_del_conflicto
+            or "Ya hay un borrador de tarea en curso. Elegí cómo seguir.",
             [
                 ("Continuar borrador", "continue", None),
                 (CANCELAR_BORRADOR, "cancel", None),
@@ -1164,6 +1167,59 @@ def pause_from_intake_question(cur: psycopg.Cursor, who: Solicitante, kind: str,
         return False
     pause_request(cur, who, request, now)
     return True
+
+
+@dataclass(frozen=True)
+class BorradorPausado:
+    """El borrador de tarea que la persona dejó guardado, en pausa. `titulo` es el
+    confirmado, o `None` si todavía no lo había."""
+    request_id: str
+    titulo: str | None
+
+
+# El hecho que el servidor le da al ruteo y al modelo que responde (ADR 0013 regla
+# 1, diseño B): un dato, no una instrucción sobre frases. Y lo que se le dice a la
+# persona cuando pregunta por ese borrador, junto con su menú.
+HECHO_BORRADOR_PAUSADO = (
+    "La persona tiene guardado, en pausa, el borrador de la tarea «{titulo}».")
+HECHO_BORRADOR_PAUSADO_SIN_TITULO = (
+    "La persona tiene guardado, en pausa, un borrador de tarea que estaba armando.")
+TEXTO_BORRADOR_PAUSADO = (
+    "Quedó guardado el borrador de la tarea «{titulo}». Elegí cómo seguir.")
+TEXTO_BORRADOR_PAUSADO_SIN_TITULO = (
+    "Quedó guardado un borrador de tarea que estabas armando. Elegí cómo seguir.")
+
+
+def borrador_pausado(cur, who, chat_id: int | None = None) -> BorradorPausado | None:
+    """El borrador pausado de esta persona (en `chat_id`, o en cualquiera si no se
+    dice) o `None`. Es la única lectura de ese estado: la usan el ruteo, el modelo
+    que responde y el menú. Sólo lee; la pausa la pone `pause_request`."""
+    cur.execute(
+        f"""select r.id, {_TITLE_OF_REQUEST} titulo
+              from task_intake_request r
+             where r.workspace_id = %s and r.membership_id = %s
+               and (%s::bigint is null or r.chat_id = %s)
+               and r.estado = 'active' and r.enviada_en is null
+               and r.terminal_result ->> %s = 'true'
+             order by r.actualizado_en desc limit 1""",
+        (who.workspace_id, who.membership_id, chat_id, chat_id, PAUSADO))
+    fila = cur.fetchone()
+    if not fila:
+        return None
+    titulo = fila["titulo"] if isinstance(fila["titulo"], str) else None
+    return BorradorPausado(str(fila["id"]), titulo or None)
+
+
+def hecho_del_borrador_pausado(borrador: BorradorPausado) -> str:
+    if borrador.titulo:
+        return HECHO_BORRADOR_PAUSADO.format(titulo=borrador.titulo)
+    return HECHO_BORRADOR_PAUSADO_SIN_TITULO
+
+
+def texto_del_borrador_pausado(borrador: BorradorPausado) -> str:
+    if borrador.titulo:
+        return TEXTO_BORRADOR_PAUSADO.format(titulo=borrador.titulo)
+    return TEXTO_BORRADOR_PAUSADO_SIN_TITULO
 
 
 def pause_request(cur, who: Solicitante, request, now: datetime) -> None:

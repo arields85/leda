@@ -282,6 +282,16 @@ def construir(cur: psycopg.Cursor, quien: Solicitante,
         quien_txt.append(f"\nTiene {debe} respuesta(s) pendiente(s) con vos.")
     bloques.append("\n".join(quien_txt))
 
+    # Un borrador de tarea guardado en pausa es un hecho de la persona (ADR 0013
+    # regla 1, diseño B): quien responde lo sabe aunque el ruteo no lo haya tomado
+    # como el tema del mensaje. Es un dato; la oferta de seguirlo la hace el código.
+    from .ingreso_tareas import borrador_pausado, hecho_del_borrador_pausado
+
+    pausado = borrador_pausado(cur, quien)
+    if pausado is not None:
+        bloques.append("# Borrador de tarea guardado\n\n"
+                       + hecho_del_borrador_pausado(pausado))
+
     return Contexto(sistema="\n\n---\n\n".join(bloques),
                     nucleo_hash=nucleo_hash, pack_hash=pack_hash,
                     variantes_prohibidas=variantes)
