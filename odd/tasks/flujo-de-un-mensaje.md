@@ -1300,3 +1300,15 @@ Ruta declarada: un solo escritor (encargo explícito). TDD estricto; runner
   - (a) y (b) de la entrada anterior (promesa a futuro con `dejar`; la pausa que el camino general no
     conoce) siguen sin arreglar.
 - **GREEN (toda la tanda).** `tests/test_alta_turno.py tests/test_alta_conducida.py tests/test_conducir_alta_proveedores.py tests/test_capacidades.py tests/test_redaccion_modelo_puro.py`: 214 passed. Alta guiada y caminos vecinos (`tests/test_task_intake.py`, `test_alta_guiada_variante_a`, `test_alta_modificar`, `test_alta_enviar_a_aprobacion`, `test_alta_eleccion_confirmacion`, `test_alta_estado_real`, `test_alta_guiada_mensaje_entero`, `test_aviso_incidente_legible`, `test_despacho_en_orden`, `test_pregunta_pendiente_otras`, `test_rama_vista_previa`, `test_respuesta_unica_caminos`, `test_rama_abierta_guarda`, `test_rama_abierta`, `test_rama_eleccion`, `test_router_historial`, `test_router_pendiente`, `test_una_respuesta`, `test_toque_idempotente`): 637 passed. No se corrió la suite completa.
+
+### Revisión RDD de las correcciones de la corrida (2026-10-01)
+
+Tramo `f60c3ca..51fa9e6` (`81bb60a`, `9d1bee2`, `20cd9c8`, `51fa9e6`; 994 líneas), linaje
+`review-8e3878791b775ddf`: aprobada y reconocida; la frontera de revisión pasa a `51fa9e6`.
+
+- WARNING `alta_turno.py:533-536`: el control `boton_inexistente` no detecta un botón
+  nombrado al empezar una oración ("Confirmar crea la tarea."). Real y chica; pendiente.
+- WARNING `respuesta_unica.py:190-191` (nota unida perdida sin respuesta): no se cumple.
+  Sin respuesta, `controlar` encola el aviso neutro, relee las respuestas y recién después
+  une las notas; la nota de la pausa sale igual.
+- SUGGESTION: falta una prueba del caso en que el primer mensaje ya no está `listo` al unir.
