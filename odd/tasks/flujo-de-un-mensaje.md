@@ -240,3 +240,37 @@ PR planificado: la integración a `main` la decide el usuario después del exper
 ## Próximo paso
 
 F6a (variante A del alta) y la prueba real F7/F8a.
+
+## Revisión RDD por commit (2026-10-01)
+
+La rama entera excede el contexto del revisor (`lens_context_budget_exceeded`); se revisó
+cada commit de trabajo por separado. Los cinco quedaron aprobados y reconocidos, sin
+hallazgos bloqueantes: `1d848ab` (`review-d25378527c903723`), `3ff59af`
+(`review-27d88ea41c9d51d2`), `9a8262f` (`review-8b857fb3b3ffd1fd`), `08f6281`
+(`review-a6314b41a447d7af`), `74e2918` (`review-afb810857a8849ed`). Frontera de revisión
+de la rama: `74e2918`.
+
+Advertencias no bloqueantes, a resolver después de la primera prueba real:
+
+- [ ] R1. `importador.py:617-618`: `conversacion` que no es un mapa rompe el import sin
+  aviso claro.
+- [ ] R2. `redaccion.py:59-63`: un string jsonb con un objeto escapado se acepta como
+  variante válida.
+- [ ] R3. `gateway.py:1904-1906`: el respaldo de `_rutear` para proveedores viejos quedó
+  sin efecto porque toda pregunta define `valor_esperado`.
+- [ ] R4. `ingreso_tareas.py:534-540`: `SIN_VALOR` registra incidente y aviso neutro
+  también cuando la respuesta fue vaga ("mmm"); una respuesta vaga es conversación, no
+  una falla. Observar en la prueba.
+- [ ] R5. `gateway.py:2020-2029`: "Sí, es eso" llama al ruteo con el cursor abierto; si el
+  proveedor está lento, el toque falla con el aviso de ruteo caído.
+- [ ] R6. `ingreso_tareas.py:1393-1404`: la rama de confirmación del título quedó sin uso
+  (`_CONFIRMA_EL_CAMPO` conserva `title`): retirarla.
+- [ ] R7. `ingreso_tareas.py:1194-1198` y `:456`: centinela `Rechazado` con campos vacíos y
+  `valor=None` por defecto en `consume_pending_text` (un llamador que no lo pase convierte
+  toda respuesta en `SIN_VALOR`).
+- [ ] R8. `ingreso_tareas.py:2074-2078`: `_con_cierre` corta el resumen en el último doble
+  salto de línea; con otra redacción (variante A) el cuerpo puede quedar vacío. Resolver
+  antes de F6a.
+- [ ] R9. `ingreso_tareas.py:1459-1471`: el dato de una sola opción pisa sin comparar un
+  valor que la persona propuso (por ejemplo, un responsable nombrado); debería decir que
+  esa opción no es posible.
