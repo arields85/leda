@@ -47,8 +47,6 @@ PROMESAS_SIN_CUMPLIR = {
         "Clasificación de intención persistida del mensaje entrante.",
     "bot_token_ref":
         "Referencia al secreto del bot de un espacio.",
-    "source_draft_id":
-        "Trazabilidad de la tarea hacia el borrador que la originó.",
     "converted_task_id":
         "Trazabilidad del borrador hacia la tarea que produjo.",
     "otorgado_por":
