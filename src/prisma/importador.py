@@ -569,6 +569,9 @@ def _importar_objetivo_inicial(cur, ws, pack) -> None:
         "select id from objective where workspace_id = %s and titulo = %s",
         (ws, obj["titulo"]))
     if cur.fetchone():
+        # Datos anteriores a la migración 0027: el objetivo no tenía área. Se
+        # completa la que falta; la que ya tiene no se toca.
+        _completar_area_de_los_frentes(cur, ws, obj)
         return
 
     cur.execute(
@@ -584,13 +587,28 @@ def _importar_objetivo_inicial(cur, ws, pack) -> None:
     # Cada frente del pack pasa a ser un objetivo operativo colgado de la raíz.
     for f in obj.get("frentes") or []:
         cur.execute(
-            """insert into objective (workspace_id, parent_id, tipo, titulo, estado)
-               values (%s, %s, 'operativo', %s, 'activo') returning id""",
-            (ws, raiz, f["titulo"]))
+            """insert into objective (workspace_id, parent_id, tipo, titulo, estado,
+                                      area_id)
+               values (%s, %s, 'operativo', %s, 'activo',
+                       (select id from area where workspace_id = %s and slug = %s))
+               returning id""",
+            (ws, raiz, f["titulo"], ws, f.get("area")))
         hijo = cur.fetchone()["id"]
         cur.execute(
             """insert into objective_state_event (objective_id, estado_nuevo, actor_kind)
                values (%s, 'activo', 'sistema')""", (hijo,))
+
+
+def _completar_area_de_los_frentes(cur, ws, obj) -> None:
+    """Da a cada frente del pack, si todavía no la tiene, el área que el pack le
+    asigna (F-B11). Nunca cambia un área ya puesta."""
+    for f in obj.get("frentes") or []:
+        cur.execute(
+            """update objective set area_id =
+                      (select id from area where workspace_id = %s and slug = %s)
+                where workspace_id = %s and tipo = 'operativo' and titulo = %s
+                  and area_id is null""",
+            (ws, f.get("area"), ws, f["titulo"]))
 
 
 def _importar_ajustes(cur, ws, pack) -> None:

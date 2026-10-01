@@ -108,7 +108,8 @@ create table area (
   workspace_id  uuid not null references workspace(id) on delete cascade,
   slug          text not null,
   nombre        text not null,
-  unique (workspace_id, slug)
+  unique (workspace_id, slug),
+  constraint area_workspace_id_unique unique (workspace_id, id)
 );
 
 create table rol (
@@ -340,11 +341,16 @@ create table objective (
   referente_membership_id uuid references membership(id),
   estado                  estado_objetivo not null default 'propuesto',
   fecha_objetivo          date,
+  -- F-B11 (0027): el área del objetivo; nula en el estratégico y en datos viejos.
+  area_id                 uuid,
   creado_en               timestamptz not null default now(),
-  actualizado_en          timestamptz not null default now()
+  actualizado_en          timestamptz not null default now(),
+  constraint objective_area_workspace
+    foreign key (workspace_id, area_id) references area (workspace_id, id)
 );
 
 create index objective_ws on objective (workspace_id, estado);
+create index objective_area on objective (workspace_id, area_id);
 create index objective_parent on objective (parent_id);
 
 create function telegram_utf16_units(p_text text) returns integer
