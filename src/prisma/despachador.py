@@ -298,7 +298,7 @@ _TIMEOUT_CLIENTE_INDICADOR = 5.0
 @contextmanager
 def mantener_chat_activo(token: str, chat_id: int, *, cliente=None,
                          chat_type: str | None = None,
-                         umbral: float = 1.5, intervalo: float = 4.0,
+                         umbral: float = 1.5, intervalo: float = 3.0,
                          nombre_hilo: str = "prisma-typing",
                          espera_cierre: float = 0.25,
                          timeout_borrador: float = _TIMEOUT_CLIENTE_INDICADOR,
@@ -422,11 +422,28 @@ def mantener_chat_activo(token: str, chat_id: int, *, cliente=None,
                     if owned_client:
                         with httpx.Client(timeout=_TIMEOUT_CLIENTE_INDICADOR) as http_retiro:
                             _retirar_borrador(http_retiro, token, chat_id)
+                            _escribiendo_tras_el_retiro(http_retiro, token, chat_id,
+                                                        impresos)
                     else:
                         _retirar_borrador(http, token, chat_id)
+                        _escribiendo_tras_el_retiro(http, token, chat_id, impresos)
                 except Exception as e:  # noqa: BLE001 - no fatal, pero pesa más
                     _reportar_falla_indicador(impresos, "retiro", e)
                     _reportar_falla_retiro(cur, workspace_id, e)
+
+
+def _escribiendo_tras_el_retiro(http, token: str, chat_id: int,
+                               impresos: set[str]) -> None:
+    """El retiro manda (y borra) un mensaje, y cualquier mensaje del bot apaga el
+    "escribiendo…" en Telegram; la respuesta real sale después (guardar,
+    controlar, despachar), y ese hueco se veía como "aparece y se va antes de la
+    respuesta" (prueba real del 2026-10-01). Un typing más lo cubre hasta que la
+    respuesta llega y lo reemplaza. Falla como cualquier typing: no fatal, se
+    reporta."""
+    try:
+        _enviar_chat_action(http, token, chat_id)
+    except Exception as e:  # noqa: BLE001 - no fatal, se reporta
+        _reportar_falla_indicador(impresos, "typing", e)
 
 
 def acusar_toque(token: str, callback_id: str, cliente=None) -> None:

@@ -563,3 +563,35 @@ def test_fallo_al_registrar_el_incidente_de_retiro_no_aborta_el_turno(
         cur.execute(
             "select count(*) n from incident where etapa = 'indicador_actividad'")
         assert cur.fetchone()["n"] == 0   # el registro rompió: no quedó fila
+
+
+def test_tras_retirar_el_borrador_se_vuelve_a_mandar_escribiendo():
+    """Retirar el borrador manda (y borra) un mensaje, y eso apaga el
+    "escribiendo…" en Telegram; la respuesta real sale después (guardar,
+    controlar, despachar). Sin un typing nuevo justo después del retiro quedaba
+    un hueco sin indicador (prueba real del 2026-10-01: "aparece y se va antes de
+    la respuesta")."""
+    from prisma.despachador import mantener_chat_activo
+
+    http = _ClienteIndicador()
+    with mantener_chat_activo(
+            "token-prueba", 123, cliente=http, chat_type="private",
+            umbral=0.01, intervalo=10.0):
+        assert http.esperar("/sendMessageDraft")
+        assert http.esperar("/sendChatAction")
+
+    urls = [url.rsplit("/", 1)[-1] for url, _ in http.llamadas]
+    i_borrado = len(urls) - 1 - urls[::-1].index("deleteMessage")
+    assert "sendChatAction" in urls[i_borrado + 1:]
+
+
+def test_el_refresco_por_omision_deja_margen_bajo_los_cinco_segundos_de_telegram():
+    """Telegram apaga "escribiendo…" a los ~5 s: con 4 s, una sola llamada lenta
+    lo dejaba caer."""
+    import inspect
+
+    from prisma.despachador import mantener_chat_activo
+
+    intervalo = inspect.signature(mantener_chat_activo.__wrapped__).parameters[
+        "intervalo"].default
+    assert intervalo <= 3.0
