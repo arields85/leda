@@ -124,6 +124,9 @@ ETAPA_ALTA_CONDUCIDA_FALLIDA = "alta_conducida_fallida"
 # El ajuste `alta` del espacio no tiene un valor que se entienda: sigue el alta
 # guiada de siempre.
 ETAPA_INTERRUPTOR_ALTA = "interruptor_alta"
+# El ajuste `stream` del espacio (la respuesta del alta conducida que se ve mientras
+# el modelo la escribe) no tiene un valor que se entienda: no hay stream.
+ETAPA_INTERRUPTOR_STREAM = "interruptor_stream"
 # El ajuste `horizonte_tarea` del espacio (el margen máximo de la fecha de una
 # tarea) no tiene un valor que se entienda: se usan los 2 meses por omisión.
 ETAPA_HORIZONTE_TAREA = "horizonte_tarea"
@@ -418,6 +421,13 @@ EXPLICACION_POR_ETAPA: dict[str, ExplicacionDeEtapa] = {
         que_vio="Nada raro: el alta guiada de siempre, un dato por vez.",
         que_hacer=("Corregí el ajuste `alta` del espacio (`conversada` o "
                    "`guiada`). No hace falta que {nombre} haga nada.")),
+    ETAPA_INTERRUPTOR_STREAM: ExplicacionDeEtapa(
+        que_paso=("El ajuste `stream` del espacio no vale `true` ni `false`: la "
+                  "respuesta del alta conducida no se muestra mientras el modelo "
+                  "la escribe."),
+        que_vio="Nada raro: la respuesta aparece entera, como siempre.",
+        que_hacer=("Corregí el ajuste `stream` del espacio (`true` o `false`). No "
+                   "hace falta que {nombre} haga nada.")),
     ETAPA_AVISO_COORDINACION: ExplicacionDeEtapa(
         que_paso=("Un aviso de coordinación de una tarea recién creada (a quien la "
                   "pidió o a su responsable) no se pudo encolar."),

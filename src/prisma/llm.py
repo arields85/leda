@@ -15,7 +15,7 @@ import json
 import math
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Protocol
+from typing import Any, Callable, Protocol
 
 from .alta_turno import (DESCRIPCION_HERRAMIENTA, ESQUEMA_SALIDA,
                          NOMBRE_HERRAMIENTA)
@@ -591,6 +591,7 @@ class Proveedor(Protocol):
 
     def conducir_alta(self, sistema: str, historial: list[dict[str, Any]],
                       hechos: str, *, plazo: float | None = None,
+                      al_avanzar: Callable[[str], None] | None = None,
                       ) -> dict[str, Any] | str: ...
 
 
@@ -620,6 +621,129 @@ def _argumentos_de_conduccion(argumentos, contenido: str | None):
     if contenido and contenido.strip():
         return contenido
     raise SalidaDeConduccionInvalida("El modelo no llamó a conducir_alta.")
+
+
+_BLANCOS = " \t\r\n"
+_ESCAPES_JSON = {'"': '"', "\\": "\\", "/": "/", "b": "\b", "f": "\f",
+                 "n": "\n", "r": "\r", "t": "\t"}
+
+
+def _leer_cadena_json(buf: str, i: int) -> tuple[str, int, bool]:
+    """Decodifica la cadena JSON que abre la comilla en `buf[i]`, aunque `buf`
+    termine a la mitad: devuelve (lo decodificado hasta ahí, dónde sigue, si cerró).
+    Un escape o un par sustituto incompleto no se emite: espera al próximo
+    fragmento, así un fragmento cortado dentro de un escape unicode nunca muestra basura."""
+    salida: list[str] = []
+    n, j = len(buf), i + 1
+    while j < n:
+        c = buf[j]
+        if c == '"':
+            return "".join(salida), j + 1, True
+        if c != "\\":
+            salida.append(c)
+            j += 1
+            continue
+        if j + 1 >= n:
+            break
+        e = buf[j + 1]
+        if e != "u":
+            salida.append(_ESCAPES_JSON.get(e, e))
+            j += 2
+            continue
+        if j + 6 > n:
+            break
+        try:
+            codigo = int(buf[j + 2:j + 6], 16)
+        except ValueError:
+            salida.append("\ufffd")
+            j += 6
+            continue
+        j += 6
+        if 0xD800 <= codigo < 0xDC00:             # primera mitad de un par sustituto
+            if j + 6 > n:
+                j -= 6
+                break
+            try:
+                bajo = int(buf[j + 2:j + 6], 16) if buf[j:j + 2] == "\\u" else -1
+            except ValueError:
+                bajo = -1
+            if 0xDC00 <= bajo < 0xE000:
+                codigo = 0x10000 + ((codigo - 0xD800) << 10) + (bajo - 0xDC00)
+                j += 6
+            else:
+                codigo = 0xFFFD
+        elif 0xDC00 <= codigo < 0xE000:
+            codigo = 0xFFFD
+        salida.append(chr(codigo))
+    return "".join(salida), n, False
+
+
+def texto_parcial(buf: str) -> str | None:
+    """El valor del campo `texto` de primer nivel del JSON que se va escribiendo en
+    `buf` (un prefijo de los argumentos de `conducir_alta`), decodificado hasta
+    donde llegó; `None` mientras `texto` no empezó. Sólo ese campo: nunca el resto
+    del JSON, y un `texto` anidado (`valores.title.texto`) no cuenta."""
+    n, i, profundidad, espera_clave = len(buf), 0, 0, False
+    while i < n:
+        c = buf[i]
+        if c in "{[":
+            profundidad += 1
+            espera_clave = c == "{" and profundidad == 1
+            i += 1
+        elif c in "}]":
+            profundidad -= 1
+            i += 1
+        elif c == ",":
+            espera_clave = profundidad == 1
+            i += 1
+        elif c == '"':
+            valor, i, cerro = _leer_cadena_json(buf, i)
+            if not (profundidad == 1 and espera_clave):
+                if not cerro:
+                    return None
+                continue
+            espera_clave = False
+            if not cerro or valor != "texto":
+                if not cerro:
+                    return None
+                continue
+            while i < n and buf[i] in _BLANCOS:
+                i += 1
+            if i >= n or buf[i] != ":":
+                return None
+            i += 1
+            while i < n and buf[i] in _BLANCOS:
+                i += 1
+            if i < n and buf[i] == '"':
+                return _leer_cadena_json(buf, i)[0]
+            return None
+        else:
+            i += 1
+    return None
+
+
+class LectorDeTexto:
+    """Alimentado con los fragmentos de los argumentos que escribe el modelo, avisa
+    el `texto` que lleva escrito cada vez que crece (el prefijo entero, nunca un
+    trozo suelto ni JSON): la salida estructurada llega como argumentos de una
+    llamada y esto es lo único que la persona puede ver mientras se escribe."""
+
+    def __init__(self, al_avanzar: Callable[[str], None]) -> None:
+        self._al_avanzar = al_avanzar
+        self._buf = ""
+        self._visto = ""
+
+    def alimentar(self, fragmento: str | None) -> None:
+        if not fragmento:
+            return
+        self._buf += fragmento
+        texto = texto_parcial(self._buf)
+        if texto and texto != self._visto:
+            self._visto = texto
+            try:
+                self._al_avanzar(texto)
+            except Exception:  # noqa: BLE001 -- ver al_avanzar: nunca rompe el turno
+                pass
 
 
 # Tope de la redacción de un turno (ADR 0014, variante A): un mensaje de pocas
@@ -721,13 +845,24 @@ class ProveedorGuionado:
     conducidos: list[tuple[str, list, str]] = field(default_factory=list)
     # El plazo con que se pidió cada conducción (`None` sin plazo).
     plazos_de_conduccion: list[float | None] = field(default_factory=list)
+    # Lo que "escribe" el modelo antes de cada salida, para probar la respuesta en
+    # stream: una lista de textos parciales por conducción (`[]` sin avance). Sólo se
+    # entrega si quien llama pidió `al_avanzar`.
+    avances: list[list[str]] = field(default_factory=list)
+    # Si cada conducción se pidió con `al_avanzar`, en orden.
+    pidieron_avance: list[bool] = field(default_factory=list)
 
     def conducir_alta(self, sistema: str, historial: list[dict[str, Any]],
                       hechos: str, *, plazo: float | None = None,
+                      al_avanzar: Callable[[str], None] | None = None,
                       ) -> dict[str, Any] | str:
         self.conducidos.append(
             (sistema, [dict(m) for m in (historial or [])], hechos))
         self.plazos_de_conduccion.append(plazo)
+        self.pidieron_avance.append(al_avanzar is not None)
+        for parcial in (self.avances.pop(0) if self.avances else []):
+            if al_avanzar is not None:
+                al_avanzar(parcial)
         if not self.conducciones:
             raise RuntimeError("El guion de conducir_alta se agotó.")
         salida = self.conducciones.pop(0)
@@ -879,6 +1014,7 @@ class ProveedorAnthropic:
 
     def conducir_alta(self, sistema: str, historial: list[dict[str, Any]],
                       hechos: str, *, plazo: float | None = None,
+                      al_avanzar: Callable[[str], None] | None = None,
                       ) -> dict[str, Any] | str:
         r = _con_plazo(self._c, plazo).messages.create(
             model=self._modelo,
@@ -1028,6 +1164,7 @@ class ProveedorGemini:
 
     def conducir_alta(self, sistema: str, historial: list[dict[str, Any]],
                       hechos: str, *, plazo: float | None = None,
+                      al_avanzar: Callable[[str], None] | None = None,
                       ) -> dict[str, Any] | str:
         cuerpo = {
             "system_instruction": {"parts": [{"text": sistema}]},
@@ -1237,8 +1374,9 @@ class ProveedorCompatible:
 
     def conducir_alta(self, sistema: str, historial: list[dict[str, Any]],
                       hechos: str, *, plazo: float | None = None,
+                      al_avanzar: Callable[[str], None] | None = None,
                       ) -> dict[str, Any] | str:
-        r = _con_plazo(self._c, plazo).chat.completions.create(
+        pedido = dict(
             model=self._modelo,
             max_tokens=min(self._param.get("max_tokens", 1024),
                            MAX_TOKENS_CONDUCCION),
@@ -1251,6 +1389,12 @@ class ProveedorCompatible:
                 "parameters": ESQUEMA_SALIDA}}],
             tool_choice={"type": "function",
                          "function": {"name": NOMBRE_HERRAMIENTA}})
+        cliente = _con_plazo(self._c, plazo)
+        if al_avanzar is not None:
+            # Respuesta en stream (ADR 0011, experimento del 2026-10-01): mismos
+            # argumentos finales, con el `texto` avisado a medida que se escribe.
+            return _conducir_en_stream(cliente, pedido, al_avanzar)
+        r = cliente.chat.completions.create(**pedido)
         mensaje = r.choices[0].message if r.choices else None
         llamada = next(iter((mensaje.tool_calls or []) if mensaje else []), None)
         return _argumentos_de_conduccion(
@@ -1268,6 +1412,41 @@ class ProveedorCompatible:
                       {"role": "user",
                        "content": _contenido_de_redaccion(hechos, historial)}])
         return (r.choices[0].message.content or "").strip()
+
+
+def _conducir_en_stream(cliente, pedido: dict, al_avanzar: Callable[[str], None],
+                        ) -> dict[str, Any] | str:
+    """`conducir_alta` con `stream=True` (chat completions compatible): junta los
+    fragmentos de los argumentos de la primera llamada a la herramienta y avisa el
+    `texto` que lleva escrito (`LectorDeTexto`). El resultado es el mismo que el de
+    la llamada sin stream: los argumentos completos, o el contenido si no hubo
+    llamada; el timeout es el del cliente (por lectura de cada fragmento). Del
+    contenido suelto, nunca se avisa nada: sólo el campo `texto`."""
+    lector = LectorDeTexto(al_avanzar)
+    argumentos: dict[int, str] = {}
+    contenido: list[str] = []
+    flujo = cliente.chat.completions.create(stream=True, **pedido)
+    try:
+        for trozo in flujo:
+            delta = trozo.choices[0].delta if trozo.choices else None
+            if delta is None:
+                continue
+            if delta.content:
+                contenido.append(delta.content)
+            for llamada in delta.tool_calls or []:
+                fragmento = (llamada.function.arguments
+                             if llamada.function is not None else None) or ""
+                indice = llamada.index or 0
+                argumentos[indice] = argumentos.get(indice, "") + fragmento
+                if indice == min(argumentos):
+                    lector.alimentar(fragmento)
+    finally:
+        cerrar = getattr(flujo, "close", None)
+        if cerrar is not None:
+            cerrar()
+    return _argumentos_de_conduccion(
+        argumentos[min(argumentos)] if argumentos else None,
+        "".join(contenido) or None)
 
 
 def _a_openai(mensajes: list[dict]) -> list[dict]:

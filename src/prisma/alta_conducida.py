@@ -37,11 +37,13 @@ import psycopg
 from psycopg.types.json import Jsonb
 
 from . import alta_turno as T
+from . import despachador
 from . import ingreso_tareas as I
 from . import redaccion
 from .db import entrante_atado, registrar_auditoria
 from .incidentes import (ETAPA_ALTA_CONDUCIDA_FALLIDA,
                          ETAPA_CRITERIO_SIN_PROPUESTA, ETAPA_INTERRUPTOR_ALTA,
+                         ETAPA_INTERRUPTOR_STREAM,
                          NOTICIA_NEUTRA_INCIDENTE, REFERENCIA_INBOUND_MESSAGE,
                          registrar_incidente)
 from .valores import sumar_meses
@@ -49,6 +51,10 @@ from .salida import (ICONO_RECOMENDADA, con_icono, etiqueta_sin_icono,
                      etiquetas_de_tarea, prepare_buttons, prepare_payload)
 
 CLAVE_ALTA = "alta"
+# Respuesta en stream (experimento del 2026-10-01): con `true` (o `{"activo": true}`),
+# en un chat privado la persona ve el texto del turno aparecer en el borrador nativo
+# mientras el modelo lo escribe. Sin el ajuste, apagado.
+CLAVE_STREAM = "stream"
 MODO_CONVERSADA = "conversada"
 MODO_GUIADA = "guiada"
 # `task_intake_choice_set.tipo` de los botones de un dato que pone este módulo: su
@@ -70,6 +76,7 @@ _reloj = time.monotonic
 _ultimo_aviso: dict[str, float] = {}
 # (espacio, valor) del ajuste ya registrado como anómalo por este proceso.
 _anomalias_reportadas: set[tuple[str, str]] = set()
+_anomalias_stream: set[tuple[str, str]] = set()
 # La elección clara de Jev por (solicitud, título): se pregunta una vez, no en cada
 # turno ni en cada intento.
 _SUGERIDO: dict[tuple[str, str], tuple[list[str], bool]] = {}
@@ -131,6 +138,49 @@ def _registrar_anomalia(cur, workspace_id: str, valor) -> None:
         referencia_cruda=f"workspace_setting[{CLAVE_ALTA}]={huella[1]}"[:2000],
         etapa=ETAPA_INTERRUPTOR_ALTA, avisar_admin=False)
     _anomalias_reportadas.add(huella)
+
+
+def stream_activo(cur, workspace_id: str) -> bool:
+    """Si el espacio muestra la respuesta del turno mientras el modelo la escribe.
+    Sin el ajuste, o con `false`, no. Un valor que no se entiende es "no" y queda un
+    incidente (una vez por proceso), igual que el interruptor `alta`."""
+    cur.execute(
+        "select valor from workspace_setting where workspace_id = %s and clave = %s",
+        (workspace_id, CLAVE_STREAM))
+    fila = cur.fetchone()
+    if not fila:
+        return False
+    valor = fila["valor"]
+    if isinstance(valor, str):
+        try:
+            valor = json.loads(valor)
+        except ValueError:
+            pass
+    activo = valor.get("activo") if isinstance(valor, dict) else valor
+    if isinstance(activo, bool):
+        return activo
+    huella = (workspace_id, json.dumps(valor, sort_keys=True, default=str))
+    if huella not in _anomalias_stream:
+        registrar_incidente(
+            cur, workspace_id,
+            "El ajuste `stream` del espacio no tiene un valor válido (true o "
+            "false): la respuesta no se muestra mientras el modelo la escribe.",
+            severidad="baja",
+            referencia_cruda=f"workspace_setting[{CLAVE_STREAM}]={huella[1]}"[:2000],
+            etapa=ETAPA_INTERRUPTOR_STREAM, avisar_admin=False)
+        _anomalias_stream.add(huella)
+    return False
+
+
+def _avance_en_vivo(cur, workspace_id: str):
+    """Quien recibe el texto del turno a medida que el modelo lo escribe: el borrador
+    del indicador de actividad, sólo en un chat privado (el único que admite
+    borradores) y con el ajuste `stream` del espacio. `None` si no corresponde."""
+    indicador = despachador.indicador_actual()
+    if (indicador is None or not indicador.admite_borrador
+            or not stream_activo(cur, workspace_id)):
+        return None
+    return indicador.actualizar_borrador
 
 
 def solicitud_conducida(cur, who, chat_id: int):
@@ -310,6 +360,11 @@ def _conducir(cur, who, request, evento: dict, now: datetime,
     proveedor = None
     rechazos: tuple[str, ...] = ()
     motivos: list[str] = []
+    # Respuesta en stream: cada intento avisa su texto desde cero, así un reintento
+    # tras un rechazo reemplaza en el borrador el texto del intento anterior. El
+    # mensaje real es siempre el verificado, por la cola.
+    avance = _avance_en_vivo(cur, workspace_id)
+    en_vivo = {"al_avanzar": avance} if avance is not None else {}
     for intento in range(1, redaccion.INTENTOS_MODELO_PURO + 1):
         h = _hechos(cur, request, who, evento, now, rechazos, historial)
         inicio = time.perf_counter()
@@ -317,7 +372,7 @@ def _conducir(cur, who, request, evento: dict, now: datetime,
             proveedor = proveedor or redaccion.proveedor_de_redaccion(
                 cur, workspace_id)
             crudo = proveedor.conducir_alta(T.SISTEMA_ALTA, historial,
-                                            T.hechos_a_json(h))
+                                            T.hechos_a_json(h), **en_vivo)
         except psycopg.Error:
             raise                    # la transacción no sigue: no es del modelo
         except Exception as exc:     # el modelo dio error: no se reintenta

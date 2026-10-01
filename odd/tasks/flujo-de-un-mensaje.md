@@ -1662,3 +1662,58 @@ Diseño B elegido por el usuario. Ruta declarada: un solo escritor (encargo expl
 - **Tanda enfocada** (10 archivos pedidos más los de `rg -l "explicacion|nombre_legible|Continuar
   borrador|Empezar otro"`, 32 archivos): 853 passed. No se corrió la suite completa.
 - Pendientes (h) e (i): resueltos, a verificar en la próxima corrida real.
+
+### Respuesta en stream real (experimento)
+
+- **Decisión del usuario (2026-10-01).** Probar stream real ya, para verlo en Telegram real: en un
+  chat privado, mientras el modelo escribe la respuesta de un turno del alta conducida, la persona ve
+  el texto aparecer en el borrador nativo (`sendMessageDraft`, el mismo que usa el indicador de
+  actividad).
+- **Riesgo aceptado.** El texto que se ve en el borrador todavía no pasó el verificador. Si el
+  verificador lo rechaza, la persona ve que el reintento lo reemplaza. La variante "mostrar de a poco
+  sólo después de verificar" queda PENDIENTE para el trabajo de latencia; no se construyó.
+- **Qué se ve y qué nunca.** Sólo el campo `texto` de primer nivel de la salida estructurada
+  (constitución §10): nunca JSON crudo, otros campos, nombres de herramienta ni razonamiento. Un
+  `texto` anidado (`valores.title.texto`) no cuenta. Hasta que `texto` empieza no se muestra nada
+  nuevo. El borrador es efímero: no es un mensaje, no pasa por la cola, no lleva botones. El mensaje
+  FINAL es el verificado, por la cola, como siempre.
+- **Mecanismo.** `llm.texto_parcial` / `LectorDeTexto` extraen el valor parcial de `texto` del JSON
+  que llega en fragmentos (escapes, `\n`, unicode, pares sustitutos, cortes dentro de un escape).
+  `ProveedorCompatible.conducir_alta(..., al_avanzar=cb)` (NaN y el resto de los compatibles) pide
+  `stream: true`, junta los argumentos de la llamada y devuelve exactamente los mismos argumentos que
+  sin stream; el timeout es el del cliente (con `plazo`, el mismo sin reintentos). Anthropic y Gemini
+  aceptan el argumento y lo ignoran (sin stream: mismo resultado, sin borrador progresivo).
+  Costura: `despachador.mantener_chat_activo` ahora entrega un `IndicadorDeActividad` (`draft_id`,
+  `actualizar_borrador(texto)`, con candado) y lo deja en un `ContextVar`; `alta_conducida._conducir`
+  lo toma con `despachador.indicador_actual()`, así el `gateway` no cambia. La actualización usa el
+  MISMO `draft_id` de la semilla (la semilla no tapa el texto) y el retiro es el de siempre (con el
+  typing posterior, 0d86349). Una a lo sumo cada 0,7 s; una falla se reporta una vez por turno
+  (`indicador de actividad (stream)`) y no se insiste en ese turno. Con un reintento, el texto nuevo
+  reemplaza al anterior en el borrador.
+- **Ajuste.** `workspace_setting` clave `stream`: `true` o `{"activo": true}` lo enciende; ausente o
+  `false`, apagado; un valor inválido es apagado más un incidente `interruptor_stream` (baja, una vez
+  por proceso). Sólo en chat privado y sólo para la llamada `conducir_alta`.
+
+  ```sql
+  -- Encender (prisma_flujo; PGCLIENTENCODING=UTF8)
+  insert into workspace_setting (workspace_id, clave, valor)
+  select id, 'stream', 'true'::jsonb from workspace where slug = 'corework'
+  on conflict (workspace_id, clave) do update set valor = excluded.valor;
+  -- Apagar
+  delete from workspace_setting
+   where clave = 'stream' and workspace_id = (select id from workspace where slug = 'corework');
+  ```
+- **Pendiente.** La variante "progresivo después de verificar" (con el trabajo de latencia); la
+  prueba real en Telegram para medir cuánto se ve y si los límites de `sendMessageDraft` alcanzan.
+- **RED.** `tests/test_respuesta_en_stream.py` (nuevo, 63 pruebas) contra el código de HEAD: no
+  colecciona (ImportError de `LectorDeTexto`); 0 de 63 corren. **GREEN.** El archivo: 63 passed; con
+  `test_smoke_runtime`, `test_conducir_alta_proveedores`, `test_alta_conducida`, `test_alta_turno`,
+  `test_llm_protocol` y `test_ciclo`: 473 passed. No se corrió la suite completa.
+- Nota del padre sobre el TDD de esta unidad: el código se escribió antes que las pruebas y
+  el RED se obtuvo después contra HEAD (no colectaba: `ImportError` de `LectorDeTexto`). Las
+  63 pruebas cubren lo pedido, pero no guiaron el diseño; queda registrado como desvío del
+  modo estricto.
+- Indicador "escribiendo…" (`0d86349`, inline del padre): tras retirar el borrador se manda
+  un typing más y el refresco pasa a 3 s; causa deducida del código (el retiro manda y borra
+  un mensaje, eso apaga el typing, y la respuesta sale después). RED 2 failed, GREEN 96
+  passed. Pendiente (g) corregido, pendiente de verificar en real.

@@ -14,9 +14,11 @@ sin tocar Telegram.
 
 from __future__ import annotations
 
+import contextvars
 import json
 import random
 import threading
+import time
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
@@ -211,6 +213,91 @@ def _enviar_borrador_semilla(http, token: str, chat_id: int, draft_id: int) -> N
         json={"chat_id": chat_id, "draft_id": draft_id, "text": SEMILLA_INDICADOR})
 
 
+def _enviar_borrador_texto(http, token: str, chat_id: int, draft_id: int,
+                           texto: str) -> None:
+    """El mismo borrador nativo de la semilla, con texto: Telegram lo reemplaza
+    (mismo `draft_id`) y lo muestra creciendo."""
+    pedido_telegram(
+        http.post, f"https://api.telegram.org/bot{token}/sendMessageDraft",
+        json={"chat_id": chat_id, "draft_id": draft_id,
+              "text": texto[:LIMITE_DE_BORRADOR]})
+
+
+# Un mensaje de Telegram admite hasta 4096 caracteres; el borrador, también.
+LIMITE_DE_BORRADOR = 4096
+# Cada cuánto se actualiza el borrador con el texto que llega (respuesta en stream):
+# más seguido toparía con los límites de Telegram y no se ve mejor.
+INTERVALO_DE_BORRADOR = 0.7
+
+
+class IndicadorDeActividad:
+    """Lo que `mantener_chat_activo` le da a quien atiende el turno: el borrador
+    nativo que abrió el indicador, para escribirle el texto que el modelo va
+    redactando (respuesta en stream, ADR 0011, experimento del 2026-10-01).
+
+    Efímero: es el borrador, nunca un mensaje; no pasa por la cola ni lleva
+    botones. El mensaje real sale por la cola cuando está verificado y el
+    indicador retira el borrador igual que siempre. Seguro entre hilos: lo llama
+    el hilo del turno (o el del cliente del modelo) mientras el hilo del indicador
+    manda la semilla y el typing; el `candado` los ordena."""
+
+    def __init__(self, http, token: str, chat_id: int, draft_id: int,
+                 admite_borrador: bool, impresos: set[str], reloj=time.monotonic,
+                 intervalo: float = INTERVALO_DE_BORRADOR) -> None:
+        self._http, self._token, self._chat_id = http, token, chat_id
+        self.draft_id = draft_id
+        self.admite_borrador = admite_borrador
+        self._impresos, self._reloj, self._intervalo = impresos, reloj, intervalo
+        self.candado = threading.Lock()
+        self.cerrado = threading.Event()
+        # Con texto en el borrador, la semilla ya no se manda: lo taparia.
+        self.con_texto = threading.Event()
+        self.intentado = threading.Event()
+        self.activado = threading.Event()
+        self._ultimo_texto: str | None = None
+        self._ultimo_envio: float | None = None
+        self._fallo = False
+
+    def actualizar_borrador(self, texto: str) -> None:
+        """Muestra `texto` en el borrador, a lo sumo una vez cada
+        `INTERVALO_DE_BORRADOR`. Nunca lanza: una falla se reporta una vez por turno
+        y no se insiste en el resto de ese turno (ni rompe la respuesta)."""
+        if (not self.admite_borrador or not texto or self._fallo
+                or self.cerrado.is_set()):
+            return
+        with self.candado:
+            if self.cerrado.is_set() or self._fallo or texto == self._ultimo_texto:
+                return
+            ahora = self._reloj()
+            if (self._ultimo_envio is not None
+                    and ahora - self._ultimo_envio < self._intervalo):
+                return
+            self._ultimo_envio = ahora
+            self.con_texto.set()
+            self.activado.set()
+            try:
+                _enviar_borrador_texto(self._http, self._token, self._chat_id,
+                                       self.draft_id, texto)
+                self._ultimo_texto = texto
+            except Exception as e:  # noqa: BLE001 - no fatal, se reporta
+                self._fallo = True
+                _reportar_falla_indicador(self._impresos, "stream", e)
+            finally:
+                self.intentado.set()
+
+
+# El indicador del turno en curso: `mantener_chat_activo` lo deja aca mientras dura
+# el bloque, asi quien conduce el turno lo encuentra sin que cada capa intermedia
+# lo pase (el turno corre en el mismo hilo que abrio el bloque).
+_INDICADOR_ACTUAL: contextvars.ContextVar[IndicadorDeActividad | None] = (
+    contextvars.ContextVar("indicador_de_actividad", default=None))
+
+
+def indicador_actual() -> IndicadorDeActividad | None:
+    """El indicador del turno en curso, o `None` fuera de `mantener_chat_activo`."""
+    return _INDICADOR_ACTUAL.get()
+
+
 def _retirar_borrador(http, token: str, chat_id: int) -> None:
     """Retira el borrador nativo materializando la semilla como mensaje
     normal -- silencioso, para no sonar ni vibrar por un mensaje que se
@@ -302,7 +389,9 @@ def mantener_chat_activo(token: str, chat_id: int, *, cliente=None,
                          nombre_hilo: str = "prisma-typing",
                          espera_cierre: float = 0.25,
                          timeout_borrador: float = _TIMEOUT_CLIENTE_INDICADOR,
-                         cur=None, workspace_id: str | None = None):
+                         cur=None, workspace_id: str | None = None,
+                         intervalo_borrador: float = INTERVALO_DE_BORRADOR,
+                         reloj=time.monotonic):
     """Indicador de actividad mientras se procesa un turno: "escribiendo…"
     y, en chat privado, un borrador nativo -- ninguno de los dos aparece si
     la respuesta está lista antes de `umbral` segundos (decisión del
@@ -348,15 +437,20 @@ def mantener_chat_activo(token: str, chat_id: int, *, cliente=None,
     try:
         http = cliente or httpx.Client(timeout=_TIMEOUT_CLIENTE_INDICADOR)
     except Exception:  # noqa: BLE001 - cosmetic
-        yield
+        yield None
         return
     owned_client = cliente is None
     detener = threading.Event()
-    activado = threading.Event()
-    borrador_intentado = threading.Event()
     intenta_borrador = (chat_type or "").lower() == "private"
     draft_id = random.randint(1, 2**31 - 1)
     impresos: set[str] = set()
+    indicador = IndicadorDeActividad(http, token, chat_id, draft_id,
+                                     intenta_borrador, impresos, reloj,
+                                     intervalo_borrador)
+    # Son los mismos eventos de siempre, ahora compartidos con el indicador: el
+    # texto en stream tambien "activa" el borrador y resuelve su intento.
+    activado = indicador.activado
+    borrador_intentado = indicador.intentado
 
     def ciclo() -> None:
         try:
@@ -365,7 +459,12 @@ def mantener_chat_activo(token: str, chat_id: int, *, cliente=None,
             activado.set()
             if intenta_borrador:
                 try:
-                    _enviar_borrador_semilla(http, token, chat_id, draft_id)
+                    with indicador.candado:
+                        # Con el texto de la respuesta ya en el borrador, la
+                        # semilla lo taparia: no se manda.
+                        if not indicador.con_texto.is_set():
+                            _enviar_borrador_semilla(http, token, chat_id,
+                                                     draft_id)
                 except Exception as e:  # noqa: BLE001 - no fatal, se reporta
                     _reportar_falla_indicador(impresos, "borrador", e)
                 finally:
@@ -382,7 +481,9 @@ def mantener_chat_activo(token: str, chat_id: int, *, cliente=None,
         finally:
             if owned_client:
                 try:
-                    http.close()
+                    indicador.cerrado.set()
+                    with indicador.candado:     # espera un texto en vuelo
+                        http.close()
                 except Exception:  # noqa: BLE001 - cosmetic cleanup is isolated
                     pass
 
@@ -392,11 +493,18 @@ def mantener_chat_activo(token: str, chat_id: int, *, cliente=None,
     except Exception:  # noqa: BLE001 - cosmetic
         if owned_client:
             _close_client_bounded(http, espera_cierre)
-        yield
+        yield None
         return
+    marca = _INDICADOR_ACTUAL.set(indicador)
     try:
-        yield
+        yield indicador
     finally:
+        _INDICADOR_ACTUAL.reset(marca)
+        # Ningun texto mas: el mensaje real ya esta (o no va a estar) y el retiro
+        # no puede cruzarse con una actualizacion del borrador.
+        indicador.cerrado.set()
+        if indicador.candado.acquire(timeout=timeout_borrador):
+            indicador.candado.release()
         detener.set()
         try:
             hilo.join(timeout=espera_cierre)
