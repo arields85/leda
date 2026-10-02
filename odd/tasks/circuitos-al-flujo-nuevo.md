@@ -21,14 +21,14 @@ Un circuito se tilda sólo cuando se cumplen sus cuatro pasos:
    2026-10-02): ¿es mecánico? ¿se puede hacer más fluido y conversacional? La persona
    escribe como habla y Leda pregunta sólo lo que falta; botones sólo para elegir
    (enmienda del ADR 0013 del 2026-10-02). La fluidez nunca saltea una garantía.
-2. **Construcción:** con el flujo C, con pruebas primero y revisión RDD, **al lado del
-   flujo actual del circuito y con un interruptor por circuito y por espacio**
-   (decisión del usuario, 2026-10-02): el flujo actual queda de respaldo y nunca se
-   mezclan en un mismo mensaje.
-3. **Retiro de lo viejo** (sólo cuando el flujo C aprobó la prueba real; el código viejo
-   queda guardado en Git con una etiqueta; si no aprueba, se vuelve al flujo actual con
-   el interruptor y se revisa el flujo C): "un camino pasa al flujo nuevo sólo cuando se retiró lo
-   viejo" (`AGENTS.md`, punto 7).
+2. **Construcción:** con el flujo C, con pruebas primero y revisión RDD. **Flujos
+   congelados** (decisión del usuario, 2026-10-02; `AGENTS.md`, "Nombres que usamos"):
+   antes de empezar hay una etiqueta de Git con la copia intacta de los flujos
+   anteriores; se trabaja sólo en el flujo C y los anteriores no se corrigen ni se
+   adaptan. Si un cambio los rompe, se retiran su código y sus pruebas (la versión buena
+   está en la etiqueta). Sin interruptores nuevos por circuito.
+3. **Retiro de lo viejo:** "un camino pasa al flujo nuevo sólo cuando se retiró lo
+   viejo" (`AGENTS.md`, punto 7); lo retirado queda en la etiqueta.
 4. **Prueba real:** por Telegram, con un guion numerado. Se leen la conversación, la base,
    la auditoría y los incidentes. Pasa con los criterios de adopción del ADR 0014: al
    menos nueve de cada diez turnos del modelo aceptados al primer intento, ningún
