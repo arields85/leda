@@ -107,7 +107,7 @@ fecha, propone una concreta en el texto y el "sí" se manda como `fecha_iso`.
 | Qué | Cómo |
 |---|---|
 | Listener del worktree (lo corre el usuario en su terminal) | `cd D:\Proyectos\Prisma-PM-worktrees\flujo-de-un-mensaje`, `$env:PYTHONPATH="src"`, `D:\Proyectos\Prisma-PM\.venv\Scripts\python.exe -m leda escuchar corework`. Reiniciar después de cada commit de código |
-| Base de la rama | `leda_flujo` (el `.env` del worktree apunta a ella). Ajustes activos: `alta = conversada`, `stream = true`; sin `horizonte_tarea` (vale 2 meses). La base `leda` es la de la ronda 4, no se toca |
+| Base de la rama | `leda_flujo` (el `.env` del worktree apunta a ella). Ajustes activos: `alta = conversada`, `stream = true`; sin `horizonte_tarea` (vale 2 meses). La base de la ronda 4 es `prisma` (anterior al renombre, queda como respaldo; ver `odd/tasks/renombre-a-leda.md`) |
 | Cambiar un ajuste | Script con `leda.db.conectar` + `admin`, comprobando `current_database() == 'leda_flujo'` antes de escribir; sólo imprimir valores fijos, nunca derivados del `.env` (memoria `env-sin-imprimir-derivados`) |
 | Horario de CoreWork | 09:00-17:00. Fuera de horario los avisos quedan para las 09:00 del día siguiente (no es una falla) |
 | Herramientas de lectura | Ver "Cómo leer una prueba" |

@@ -86,12 +86,19 @@ eran del arnés y se corrigieron en `ffe4e85`). Corridas anteriores y su detalle
 
 - Sin producción, sin trabajo real cargado, sin Docker ni staging. Telegram real sólo
   con datos ficticios (cuentas de prueba Ariel, Ismael y Marcos).
-- Base `leda` (local): ronda 4, rearmada dos veces el 2026-09-30, esquema completo
-  hasta `0025`, modelo `nan`/`deepseek-v4-flash`, Ariel administrador. **No se toca**
-  hasta terminar el circuito C. Respaldo previo al flujo:
+- Renombre a Leda ([ADR 0015](decisions/0015-renombre-del-producto-a-leda.md)): el
+  código renombrado usa bases nuevas, armadas desde el esquema renombrado. `leda` es para
+  el código de `main` y `leda_flujo` para la rama de flujo. Las bases anteriores,
+  `prisma` y `prisma_flujo`, y sus roles `prisma_*` quedan intactos como respaldo hasta
+  que Leda funcione correctamente. La condición y la limpieza están en
+  [`../odd/tasks/renombre-a-leda.md`](../odd/tasks/renombre-a-leda.md).
+- Base `prisma` (respaldo): ronda 4, rearmada dos veces el 2026-09-30, esquema hasta
+  `0025`, Ariel administrador. Tiene el estado del circuito C (hallazgos C-1 a C-3 en
+  "Próximo paso"). Respaldo previo al flujo:
   `db/respaldos/prisma-antes-flujo-20260930.dump`.
-- Base `leda_flujo`: nueva, para la primera prueba real de la variante B; el `.env`
-  del worktree `flujo-de-un-mensaje` apunta a ella.
+- Base `prisma_flujo` (respaldo): historial de las pruebas del alta conducida hasta el
+  2026-10-01. `leda_flujo` la reemplaza para la rama, con los mismos ajustes
+  (`alta = conversada`, `stream = true`).
 - El listener de `main` está detenido (el usuario lo cortó con Ctrl+C) para liberar el
   bot para el listener del worktree. El listener lo corre el usuario en su propia
   terminal (`python -m leda escuchar corework`); las tareas en segundo plano del
@@ -110,8 +117,8 @@ eran del arnés y se corrigieron en `ffe4e85`). Corridas anteriores y su detalle
   funcionalidad nueva). La latencia del banco es por escenario (mediana de flash 13 s),
   no por respuesta: el criterio de 5 s del ADR 0014 necesita la medición por respuesta de
   F6a.
-- Quedan bases residuales `leda_diag_*`/`leda_test_*` de corridas viejas en el
-  servidor local.
+- Quedan bases residuales `prisma_diag_*`/`prisma_test_*` de corridas viejas en el
+  servidor local (se pueden borrar: ver la limpieza del renombre).
 
 ## Riesgos prioritarios
 
@@ -173,7 +180,7 @@ desactualizan con cada cambio, así que conviene contrastar contra el símbolo.
 Orden vigente (2026-10-01). **Moratoria:** no se agregan reglas ni parches de
 conversación de caso; los hallazgos se registran y se clasifican por etapa del ADR 0014.
 
-1. **Circuito C (base `leda`, código de `main`), corrido el 01/10 a las 09:00: no se
+1. **Circuito C (base `prisma`, anterior al renombre; código de `main`), corrido el 01/10 a las 09:00: no se
    pudo hacer, y dejó tres hallazgos del código de `main`.**
    - **C-1 (falla silenciosa, alta).** La vista previa de aprobación del borrador de Marcos
      vence 8 h después de crearse (creada 30/09 18:19, venció 01/10 02:19), pero quedó

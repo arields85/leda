@@ -87,11 +87,31 @@ no un secreto. No hay `.env` ni volcados de base versionados.
 - [x] R3. ADR del renombre: [ADR 0015](../../docs/decisions/0015-renombre-del-producto-a-leda.md).
 - [x] R4. Script determinista (`tools/renombrar_a_leda.py`): primero `git mv` de las rutas,
       después contenido en bytes. Excluye este documento, binarios y archivos de bloqueo.
-- [ ] R5. Aplicarlo en `main`, verificar con la comparación byte a byte contra
-      `pre-renombre-leda` y listar cada aparición restante con su motivo.
-- [ ] R6. Variables de entorno: renombrar `PRISMA_*` a `LEDA_*` en los `.env`, sin mostrar
-      valores.
-- [ ] R7. Bases según R2; reimportar CoreWork; el usuario reactiva los enlaces de prueba.
+- [x] R5. Aplicado sobre `main` en la rama `refactor/renombre-a-leda` (worktree
+      `Prisma-PM-worktrees/renombre-a-leda`), commit mecánico `58d2bed` sobre `0bbc21b`.
+      Ruta inline: script determinista, sin escritor delegado.
+      - Comando: `python tools/renombrar_a_leda.py aplicar` y después
+        `verificar 0bbc21b 58d2bed`, el 2026-10-01.
+      - Resultado: 37 rutas movidas y 290 archivos reescritos. Verificación:
+        **373 de 373 archivos son pura sustitución** (differ 0, missing 0, added 0).
+      - Apariciones restantes, todas intencionales: los tres archivos excluidos (este
+        documento, el ADR 0015 y el script) y los tokens protegidos. Esos son las rutas a la
+        carpeta `D:\Proyectos\Prisma-PM` y a `Prisma-PM-worktrees` (16, en documentos y en
+        dos herramientas) y `db/respaldos/prisma-antes-flujo-20260930.dump` (1).
+      - Correcciones a mano, en un commit aparte: en `docs/STATUS.md` y en el traspaso, la
+        base de la ronda 4 y los residuales siguen siendo `prisma*`, porque son bases reales
+        que no cambian de nombre.
+- [ ] R6. Variables de entorno. Hecho: el `.env` y el `.env.test` del worktree del renombre
+      se copiaron del checkout principal y se les aplicó `renombrar_a_leda.py env`. Quedaron
+      con 0 claves `PRISMA` y sin ninguna aparición de "prisma", sin mostrar valores.
+      Pendiente: el `.env` del checkout principal, cuando `main` reciba el renombre, y el del
+      worktree de flujo (R9).
+- [ ] R7. Bases. Hecho: base `leda` creada el 2026-10-01 con `esquema`,
+      `importar corework --activar`, `feriados`, `sembrar` (12 tareas, 1 dependencia),
+      `modelo deepseek-v4-flash --proveedor nan` y `administrador corework Ariel`.
+      Pendiente: `leda_flujo` desde la rama de flujo renombrada (tiene las migraciones 0026 y
+      0027), con `alta = conversada` y `stream = true`. Después, el usuario reactiva los
+      enlaces de prueba.
 - [ ] R8. Suite completa y prueba real por Telegram desde el código renombrado.
 - [ ] R9. Aplicar el mismo script en `feat/flujo-de-un-mensaje` y repetir R5 y R8 ahí.
 - [ ] R10. Actualizar referencias externas: memoria del agente, Engram, `docs/STATUS.md`.
