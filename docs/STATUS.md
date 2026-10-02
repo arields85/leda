@@ -47,7 +47,7 @@ tales. Ver [`INDEX.md`](INDEX.md#documentos-superados).
   explícito del usuario: `main` publicada y siguiendo a `origin/main` (verificado con
   `git ls-remote --heads origin`). Antes del push se verificó que no se versiona ningún
   `.env`, respaldo ni credencial.
-- Rama auxiliar `auxiliar/alta-y-google` (worktree `D:\Proyectos\Prisma-PM-worktrees\alta-y-google`,
+- Rama auxiliar `auxiliar/alta-y-google` (worktree `D:\Proyectos\Leda-PM-worktrees\alta-y-google`,
   creada desde `main` en `dec6ae9`, 2026-09-27) para el alta con correo verificado y
   Google, agenda y reuniones: contrato en
   [`odd/tasks/alta-y-google.md`](../odd/tasks/alta-y-google.md), alcance en

@@ -34,7 +34,7 @@ definir el flujo y medirlo con pruebas reales.
   botones van en el mismo grupo de respuesta; con A, el verificador corre antes de
   encolar y el respaldo de B reemplaza al texto rechazado, no se suma.
 - `main` queda intacto para el circuito C de la ronda 4 (01/10 09:00).
-- Trabajo en el worktree `D:\Proyectos\Prisma-PM-worktrees\flujo-de-un-mensaje`, rama
+- Trabajo en el worktree `D:\Proyectos\Leda-PM-worktrees\flujo-de-un-mensaje`, rama
   `feat/flujo-de-un-mensaje`. El paquete `leda` está instalado en modo editable desde
   el checkout principal: pytest usa el `src/` del worktree (`pythonpath = ["src"]`), pero
   `python -m leda` necesita `PYTHONPATH=src` para correr el código del worktree.
@@ -42,7 +42,7 @@ definir el flujo y medirlo con pruebas reales.
 ## TDD
 
 - Modo: estricto (activado en la configuración del usuario, `CLAUDE.md` global).
-- Runner: `D:\Proyectos\Prisma-PM\.venv\Scripts\python.exe -m pytest` desde el worktree.
+- Runner: `D:\Proyectos\Leda-PM\.venv\Scripts\python.exe -m pytest` desde el worktree.
 - RED observado antes de cada implementación, después GREEN y REFACTOR.
 
 ## Mecanismos
@@ -869,7 +869,7 @@ del resumen, "Listo, dejé de lado…"), y F-C2 (descripción igual al título).
 Ruta declarada: un solo escritor (el encargo lo pidió así: "execute directly"); disparador
 de escritura de 2+ archivos no triviales cubierto por esa instrucción explícita.
 TDD: estricto (configuración global del usuario); runner
-`D:\Proyectos\Prisma-PM\.venv\Scripts\python.exe -m pytest` desde el worktree.
+`D:\Proyectos\Leda-PM\.venv\Scripts\python.exe -m pytest` desde el worktree.
 
 ### Qué quedó construido (conversación con memoria y modelo puro)
 
@@ -1131,7 +1131,7 @@ sin prueba) quedan como deuda menor de esta rama.
 Ruta declarada: un solo escritor (el encargo lo pidió así); disparador de escritura de 2+
 archivos no triviales cubierto por esa instrucción explícita.
 TDD: estricto (configuración global del usuario); runner
-`D:\Proyectos\Prisma-PM\.venv\Scripts\python.exe -m pytest` desde el worktree.
+`D:\Proyectos\Leda-PM\.venv\Scripts\python.exe -m pytest` desde el worktree.
 Delivery: ~400 líneas por commit como heurística; M1, M2 y M3 (posible M3a/M3b) son
 unidades de commit propias.
 

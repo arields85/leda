@@ -17,7 +17,7 @@
   repositorio (`docs/architecture/frontera.md`, `nucleo/`) deciden el *cómo*,
   dentro de la arquitectura multi-tenant vigente.
 - **Rama de trabajo:** `auxiliar/alta-y-google`, worktree
-  `D:\Proyectos\Prisma-PM-worktrees\alta-y-google`, sin efecto sobre `main`
+  `D:\Proyectos\Leda-PM-worktrees\alta-y-google`, sin efecto sobre `main`
   hasta integración. Ver `odd/tasks/alta-y-google.md`.
 
 ## Contexto
