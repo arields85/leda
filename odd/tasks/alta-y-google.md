@@ -11,7 +11,9 @@
 > renombrar la rama con el mismo script **antes** de traer `main`, verificar byte a byte,
 > renombrar el `.env`, crear una base nueva (la base a la que apunta el `.env` de este
 > worktree ya no existe), revisar roles y membresías, y correr suite, RDD y una prueba real.
-> No empezar ninguna rebanada nueva antes de eso.
+> No empezar ninguna rebanada nueva antes de eso. **Decisión del usuario (2026-10-02):**
+> una vez integrada, este trabajo continúa desde `main`; no se sigue en esta rama, que
+> se retira junto con su worktree.
 
 > **Para la sesión que trabaje esta rama:** este documento contiene todo lo que
 > se decidió con el usuario antes de crearla. Esa conversación ocurrió en otra
