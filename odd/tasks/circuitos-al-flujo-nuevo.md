@@ -243,7 +243,7 @@ suite completa de la rama.
       (constitución §8). Vale para todo botón vencido, no sólo para el resumen del alta;
       corrige también C-3 de `main`.
 
-**Hecho C0-5** (ruta delegada: un escritor).
+**Hecho C0-5** (commit `6b09cd4`, ruta delegada: un escritor).
 
 - Mecanismo único: `gateway._contestar_boton_vencido`. Todos los caminos que contestaban
   "Ese pedido ya no está vigente…" pasan por ahí: los toques del alta (guiada y
@@ -277,7 +277,7 @@ suite completa de la rama.
       enviada o vencida), sus botones se quitan del mensaje en Telegram, para que no se
       ofrezca lo que ya no se puede hacer (ADR 0013, regla 3).
 
-**Hecho C0-6** (ruta delegada: un escritor).
+**Hecho C0-6** (commit `50dc2f5`, ruta delegada: un escritor).
 
 - Mecanismo: `despachador._quitar_botones_resueltos`, al final de cada pasada de
   `despachar`, bajo el mismo espacio y el mismo candado. Busca los mensajes ya entregados
