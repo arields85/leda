@@ -187,7 +187,14 @@ Registro:
    passed (`1adcfd0`, 2026-10-02). Los dos son iguales a sus resultados previos.
 2. Cumplido. `main`: 373/373 pura sustitución (`0bbc21b`→`58d2bed`). Flujo: 408/408
    (`aeea562`→`3b75117`). Restos justificados en R5 y R9.
-3. `PENDIENTE`. Falta el alta de punta a punta; el proveedor estaba degradado (R9).
+3. Cumplido (2026-10-02, 09:12). Alta conversada de Marcos de punta a punta sobre
+   `leda_flujo`: cuatro turnos, "Enviar a aprobación" (09:02:35), aviso a Ismael (09:02:44),
+   confirmación de Ismael (09:12:30) y tarea «Revisar las alarmas del tablero de la línea 2»
+   creada desde su borrador, `asignada` a las 09:12:36, con el aviso a Marcos. La auditoría
+   (`enviar_ingreso_tarea_a_aprobacion`, `avisar_aprobacion_ingreso_tarea`,
+   `confirmar_borrador_tarea`) coincide con la conversación y la base. El único incidente
+   nuevo fue el permiso de `leda_gateway` (R9), un defecto del renombre que se corrigió
+   antes de la confirmación final; después de eso no hubo ninguno más.
 4. Parcial. El listener y los comandos corrieron con `.env` sin ninguna `PRISMA_*` y sin
    conexiones a bases `prisma*` (comprobado el 2026-10-02 en `pg_stat_activity`). Falta
    el `.env` del checkout principal (R6).
