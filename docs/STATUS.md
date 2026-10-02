@@ -200,7 +200,7 @@ conversación de caso; los hallazgos se registran y se clasifican por etapa del 
    botón real y la regla de fechas, margen de 2 meses por espacio (`horizonte_tarea`),
    aviso al aprobar un borrador y nombre de quien lo manda. Suite completa en `13c7ae5`:
    3285 passed.
-3. **Próxima prueba: la de adopción.** Por Telegram real, con alguien que no conozca el
+3. **Próxima prueba: la de adopción** (sin fecha: hoy no hay quien no conozca el guion; mientras tanto se avanza con los pendientes del traspaso). Por Telegram real, con alguien que no conozca el
    guion y al menos tres altas. Si cumple los criterios del ADR 0014, retirar el alta
    guiada (M4-M9) y pasar el patrón a entrega y aprobación. Pendientes de la rama antes o
    durante esa prueba: (a) y (f) el modelo promete lo que no existe ("la retomamos el
@@ -220,20 +220,15 @@ prueba real los criterios del ADR 0014. Alcance en [`ROADMAP.md`](ROADMAP.md), "
 entrega". Después, según el roadmap: aportes sobre tareas, aprendizaje de apodos y
 aclaraciones, conversación de bloqueos.
 
-**Punto exacto para retomar (2026-10-01, noche).** `main` sin push: sólo documentación y
-`tools/leer_conversacion.py` desde la ronda 4 (su código sigue siendo el de la ronda 4);
-inventario de la plataforma en [`product/plataforma-pendientes.md`](product/plataforma-pendientes.md).
-La rama `feat/flujo-de-un-mensaje` lleva el experimento, revisada con RDD hasta `83743a2`
-(`review-16296c4f68eaa688`; los linajes de cada tramo, en el documento de la unidad);
-`5cd32b6` (correcciones de esa revisión) queda por revisar. Suite completa en `5cd32b6`:
-3411 passed. Hecho en la tarde, todo verificado en Telegram real salvo lo marcado: avisos
-de aprobación y de asignación con el estado real para quien confirma (fuera de horario, sin
-chat); el camino general ve el borrador pausado; el modelo sólo ofrece lo que existe (fecha
-concreta hasta el límite, sin "dividir" ni "objetivo"); evidencia legible e íconos del
-menú; "escribiendo…" sin hueco al final (sin verificar en real); **respuesta en stream real**
-detrás del ajuste `stream`, prendido en `prisma_flujo` (sin verificar en real). Base
-`prisma_flujo`: `alta = conversada` y `stream` activados, sin `horizonte_tarea` (vale 2
-meses). Pendientes de la rama: (e) Dirección recibe el objetivo estratégico solo (decisión
-del usuario); calidad del criterio aceptado (medir con el banco); el detalle de "rango".
-Consentimiento permanente para commits y revisiones RDD; chequeo de rumbo escrito antes de
-cada unidad (`AGENTS.md`).
+**Punto exacto para retomar (cierre del 2026-10-01).** Leer primero el traspaso
+[`traspaso/2026-10-01-alta-conducida.md`](traspaso/2026-10-01-alta-conducida.md): el diseño
+que funciona, cómo se trabajó, cómo operar y leer una prueba, decisiones del usuario,
+pendientes en orden y lecciones. Primeros pasos: (1) suite completa en la rama
+`feat/flujo-de-un-mensaje` (última registrada: 3411 passed en `5cd32b6`; HEAD `96a139b`
+verificado con pruebas enfocadas); (2) RDD de `39bbf59..HEAD` con
+`tools/rdd_por_tramos.py`; (3) preguntarle al usuario la decisión (e), qué hace el alta
+cuando quien escribe es de Dirección y no tiene objetivos operativos. `main` sin push:
+sólo documentación y herramientas (`tools/leer_conversacion.py --completo`,
+`tools/leer_turnos_alta.py`, `tools/rdd_por_tramos.py`). Base `prisma_flujo`: `alta =
+conversada` y `stream` activados. Consentimiento permanente para commits y revisiones RDD;
+chequeo de rumbo escrito antes de cada unidad (`AGENTS.md`).

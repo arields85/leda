@@ -5,7 +5,10 @@ Herramienta de desarrollo para leer las pruebas por Telegram sin capturas. Usa l
 de `PRISMA_DB_URL` del checkout desde el que se corre (worktree con `PYTHONPATH=src`
 para `prisma_flujo`; checkout principal para `prisma`). Sólo lee.
 
-Uso: python tools/leer_conversacion.py [minutos] [desde HH:MM]
+Uso: python tools/leer_conversacion.py [minutos] [desde HH:MM] [--completo]
+
+Sin `--completo`, cada mensaje se corta en 400 caracteres (un resumen largo se ve
+cortado: no es un error de Prisma).
 """
 import sys
 
@@ -13,8 +16,12 @@ import psycopg
 
 from prisma import config
 
-MIN = int(sys.argv[1]) if len(sys.argv) > 1 else 40
-DESDE = sys.argv[2] if len(sys.argv) > 2 else None
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")   # la consola de Windows no es UTF-8
+COMPLETO = "--completo" in sys.argv
+ARGS = [a for a in sys.argv[1:] if a != "--completo"]
+MIN = int(ARGS[0]) if len(ARGS) > 0 else 40
+DESDE = ARGS[1] if len(ARGS) > 1 else None
 Q = """
 select cuando, quien, texto, botones from (
   select i.at cuando,
@@ -50,7 +57,7 @@ with psycopg.connect(config.config.db_url) as c:
         if DESDE and hora[:5] < DESDE:
             continue
         texto = (texto or "").replace("\n", " / ")
-        linea = f"{hora} {quien} | {texto[:400]}"
+        linea = f"{hora} {quien} | {texto if COMPLETO else texto[:400]}"
         if botones:
             linea += f"   [botones: {botones}]"
         print(linea)
