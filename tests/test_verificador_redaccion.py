@@ -20,7 +20,7 @@ from leda.resultado_turno import (
 )
 from leda.valores import TipoValor
 from leda.verificador_redaccion import (Borrador, LARGO_MAXIMO, leer_borrador,
-                                          verificar)
+                                          verificar, verificar_afirmaciones)
 
 TAREA = "la tarea «Revisar PLC»"
 
@@ -185,6 +185,33 @@ def test_el_nombre_de_quien_escribe_es_un_nombre_conocido_del_turno(texto):
 ])
 def test_el_nombre_del_propio_asistente_es_un_nombre_conocido(texto):
     _acepta(PREGUNTA, texto, pregunta="due_date")
+
+
+# Medición C3 (2026-10-02): «…ya está puesto 👍 Me falta el objetivo…» se rechazó
+# como `nombre_inventado: Me`. Un emoji (o cualquier símbolo pictográfico) o un
+# signo que cierra una oración termina la oración aunque no haya punto: la
+# mayúscula que sigue la empieza, no es un nombre propio.
+@pytest.mark.parametrize("cierre", [
+    "👍", " 👍", "👍🏻", "🙂", "✅", "❤️", "🙌", "👏🏽", "⭐", "🎯",
+    "!", "?", "…", "‼", "⁉", ".", "!!", "?!",
+])
+@pytest.mark.parametrize("espacio", [" ", "", "  "])
+def test_despues_de_un_emoji_o_un_cierre_la_mayuscula_empieza_una_oracion(
+        cierre, espacio):
+    for palabra in ("Me", "Ahora", "Falta", "Queda"):
+        texto = f"La fecha ya está puesta{cierre}{espacio}{palabra} falta el criterio."
+        assert verificar_afirmaciones(texto, ["la fecha"]) is None, texto
+
+
+@pytest.mark.parametrize("texto", [
+    "Ya está puesto 👍 se lo paso a Marcos.",
+    "Listo 🙂, Marcos lo ve.",
+    "Listo… se lo paso a Marcos.",
+    "Ya está ✅ y lo revisa Marcos.",
+])
+def test_un_emoji_no_tapa_un_nombre_inventado_en_medio_de_la_oracion(texto):
+    motivo = verificar_afirmaciones(texto, ["la fecha"])
+    assert motivo == "nombre_inventado: Marcos", (texto, motivo)
 
 
 @pytest.mark.parametrize("texto", [

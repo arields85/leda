@@ -61,8 +61,29 @@ _LETRAS = "A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9_"
 _PALABRA = re.compile(rf"[{_LETRAS}]+")
 _CAPITALIZADA = re.compile(rf"(?<![{_LETRAS}])[A-ZÁÉÍÓÚÜÑ][{_LETRAS}]*")
 # Lo que, antes de una palabra, la deja al principio de una oración: la
-# mayúscula inicial no es un nombre propio.
-_FIN_DE_ORACION = ".!?:;\n¿¡-–—•*(\"'"
+# mayúscula inicial no es un nombre propio. Además de estos signos, cualquier
+# emoji o símbolo pictográfico (`_empieza_oracion`).
+_FIN_DE_ORACION = ".!?:;\n¿¡-–—•*(\"'…‼⁉"
+# Categorías Unicode de los símbolos que cierran una oración aunque no haya
+# punto: emojis y pictogramas (So) y sus modificadores, como el tono de piel (Sk).
+_SIMBOLOS_DE_CIERRE = ("So", "Sk")
+# Lo que acompaña a un emoji sin ser parte de la oración: selectores de variante,
+# uniones (ZWJ) y marcas que se combinan (Mn, Me, Cf). Se saltean para ver el
+# símbolo que va antes.
+_ACOMPANANTES = ("Mn", "Me", "Cf")
+
+
+def _empieza_oracion(antes: str) -> bool:
+    """La palabra que sigue a `antes` empieza una oración: no hay nada antes, o lo
+    último es un signo de cierre o un símbolo (un emoji: «ya está 👍 Me falta…»)."""
+    antes = antes.rstrip()
+    while antes and unicodedata.category(antes[-1]) in _ACOMPANANTES:
+        antes = antes[:-1].rstrip()
+    if not antes:
+        return True
+    ultimo = antes[-1]
+    return (ultimo in _FIN_DE_ORACION
+            or unicodedata.category(ultimo) in _SIMBOLOS_DE_CIERRE)
 
 
 @dataclass(frozen=True)
@@ -174,11 +195,11 @@ def _aparece(valor: str, texto_norm: str, fechas_texto: set[tuple[int, int]]) ->
 def _nombre_propio_inventado(texto: str, palabras_hechos: set[str]) -> str | None:
     """La primera palabra con mayúscula inicial, en medio de una oración y fuera
     de las comillas «», que los hechos no tienen: un nombre que el texto no puede
-    sacar de ningún lado. La mayúscula al empezar una oración no cuenta."""
+    sacar de ningún lado. La mayúscula al empezar una oración (también después de
+    un emoji) no cuenta."""
     sin_citas = _CITADO.sub(" ", texto)
     for m in _CAPITALIZADA.finditer(sin_citas):
-        antes = sin_citas[:m.start()].rstrip()
-        if not antes or antes[-1] in _FIN_DE_ORACION:
+        if _empieza_oracion(sin_citas[:m.start()]):
             continue
         if _norm(m.group()) not in palabras_hechos:
             return m.group()
