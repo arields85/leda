@@ -29,6 +29,7 @@ from leda.llm import (IntentAction, IntentRoute, ProveedorAnthropic,
 from leda.salida import (BUTTON_LABEL_LIMIT, ICONO_TAREA, con_icono,
                            etiqueta_sin_icono, etiquetas_coinciden,
                            telegram_utf16_units)
+from tests.historia_previa_a_leda import a_nombres_actuales
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -38,6 +39,15 @@ NOW = datetime(2028, 2, 28, 15, 0, tzinfo=timezone.utc)
 # HEAD: desde que 0002 y el esquema que produce se versionaron en el mismo
 # commit, HEAD ya la incluye y la migración se rechaza a sí misma.
 BASELINE_REF = "efa8ee2"
+
+
+def esquema_base() -> str:
+    """`db/esquema.sql` en `BASELINE_REF`, con los nombres actuales (ADR 0015): ese
+    commit es anterior al renombre y las migraciones que se le aplican ya no lo son."""
+    texto = subprocess.run(
+        ["git", "show", f"{BASELINE_REF}:db/esquema.sql"], cwd=ROOT,
+        check=True, capture_output=True).stdout.decode("utf-8")
+    return a_nombres_actuales(texto)
 
 
 def _migraciones_posteriores_a(prefijo: str) -> list[Path]:
@@ -1755,9 +1765,7 @@ def test_los_rollbacks_devuelven_la_base_al_estado_anterior():
             db.execute(_sql_script(ROOT / "db" / carpeta / archivo))
 
     try:
-        base = subprocess.run(
-            ["git", "show", f"{BASELINE_REF}:db/esquema.sql"], cwd=ROOT,
-            check=True, capture_output=True).stdout.decode("utf-8")
+        base = esquema_base()
         with psycopg.connect(url, autocommit=True) as db:
             db.execute(base)
         correr("migrations", "0002_general_task_intake.sql")
@@ -1828,9 +1836,7 @@ def test_instalacion_limpia_y_base_migrada_convergen_en_el_aislamiento():
         with psycopg.connect(urls["limpia"], autocommit=True) as db:
             db.execute((ROOT / "db" / "esquema.sql").read_text("utf-8"))
 
-        base = subprocess.run(
-            ["git", "show", f"{BASELINE_REF}:db/esquema.sql"], cwd=ROOT,
-            check=True, capture_output=True).stdout.decode("utf-8")
+        base = esquema_base()
         with psycopg.connect(urls["migrada"], autocommit=True) as db:
             db.execute(base)
             for migracion in _migraciones_posteriores_a("0001"):
@@ -1929,9 +1935,7 @@ def test_0007_estado_previo_a_bloqueo_llega_por_migracion_con_dueno_correcto():
         control.execute(SQL("create database {}").format(Identifier(database)))
     url = make_conninfo(**{**conninfo_to_dict(maintenance), "dbname": database})
     try:
-        baseline = subprocess.run(
-            ["git", "show", f"{BASELINE_REF}:db/esquema.sql"], cwd=ROOT,
-            check=True, capture_output=True).stdout.decode("utf-8")
+        baseline = esquema_base()
         with psycopg.connect(url, autocommit=True, row_factory=dict_row) as db:
             db.execute(baseline)
             # Cadena completa desde el directorio, no a mano: nombrarlas dejó
@@ -1985,9 +1989,7 @@ def test_0008_motivo_no_arranca_tarea_llega_por_migracion():
         control.execute(SQL("create database {}").format(Identifier(database)))
     url = make_conninfo(**{**conninfo_to_dict(maintenance), "dbname": database})
     try:
-        baseline = subprocess.run(
-            ["git", "show", f"{BASELINE_REF}:db/esquema.sql"], cwd=ROOT,
-            check=True, capture_output=True).stdout.decode("utf-8")
+        baseline = esquema_base()
         with psycopg.connect(url, autocommit=True, row_factory=dict_row) as db:
             db.execute(baseline)
             for migracion in _migraciones_posteriores_a("0001"):
@@ -2027,10 +2029,7 @@ def test_migration_rejects_mojibake_then_accepts_zero_unit1a_rows():
         control.execute(SQL("create database {}").format(Identifier(database)))
     url = make_conninfo(**{**conninfo_to_dict(maintenance), "dbname": database})
     try:
-        baseline = subprocess.run(
-            ["git", "show", f"{BASELINE_REF}:db/esquema.sql"], cwd=ROOT,
-            check=True, capture_output=True,
-        ).stdout.decode("utf-8")
+        baseline = esquema_base()
         migration = _sql_script(
             ROOT / "db" / "migrations" / "0002_general_task_intake.sql")
         with psycopg.connect(url, autocommit=True, row_factory=dict_row) as db:
@@ -2072,10 +2071,7 @@ def test_migration_reconciles_legacy_and_guarded_rollback_restores_it(conn):
         control.execute(SQL("create database {}").format(Identifier(database)))
     url = make_conninfo(**{**conninfo_to_dict(maintenance), "dbname": database})
     try:
-        baseline = subprocess.run(
-            ["git", "show", f"{BASELINE_REF}:db/esquema.sql"], cwd=ROOT,
-            check=True, capture_output=True,
-        ).stdout.decode("utf-8")
+        baseline = esquema_base()
         migration = _sql_script(
             ROOT / "db" / "migrations" / "0002_general_task_intake.sql")
         rollback = _sql_script(
@@ -2478,10 +2474,7 @@ def test_migration_preflight_fails_before_ddl_for_incompatible_unit1a_rows(
         control.execute(SQL("create database {}").format(Identifier(database)))
     url = make_conninfo(**{**conninfo_to_dict(maintenance), "dbname": database})
     try:
-        baseline = subprocess.run(
-            ["git", "show", f"{BASELINE_REF}:db/esquema.sql"], cwd=ROOT,
-            check=True, capture_output=True,
-        ).stdout.decode("utf-8")
+        baseline = esquema_base()
         migration = _sql_script(
             ROOT / "db" / "migrations" / "0002_general_task_intake.sql")
         with psycopg.connect(url, autocommit=True, row_factory=dict_row) as db:
