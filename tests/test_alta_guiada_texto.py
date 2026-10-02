@@ -113,9 +113,11 @@ def test_con_mas_opciones_de_las_que_entran_hay_otra_y_ver_mas(intake_world, con
     ws = intake_world["north-lab"]["id"]
     with admin(conn) as cur:
         for n in range(12):
-            cur.execute("""insert into objective (workspace_id, tipo, titulo, estado)
-                           values (%s, 'operativo', %s, 'activo')""",
-                        (ws, f"Objetivo de relleno {n:02d}"))
+            cur.execute("""insert into objective (workspace_id, tipo, titulo, estado,
+                                                  area_id)
+                           values (%s, 'operativo', %s, 'activo', %s)""",
+                        (ws, f"Objetivo de relleno {n:02d}",
+                         intake_world["north-lab"]["areas"]["field"]))
     with espacio(conn, ws) as cur:
         _, outcome = _empezar(cur, intake_world, title=TITULO)
         opciones = _active_choices(cur, outcome.request_id)

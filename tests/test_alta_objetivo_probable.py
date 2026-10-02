@@ -39,6 +39,13 @@ def _alta(conn, world):
                 outcome.text)
 
 
+def _solo_field(cur, ws):
+    """La tarea de Taylor Quinn sólo puede ser de field (Sam Noble, de quality, no
+    está activo): los objetivos que se ofrecen son los operativos de field."""
+    cur.execute("update membership set activo = false where id = %s",
+                (ws["people"]["Sam Noble"]["membership_id"],))
+
+
 def _sin_icono(etiquetas):
     return [I.etiqueta_sin_icono(e) for e in etiquetas]
 
@@ -123,9 +130,10 @@ def test_con_un_solo_objetivo_no_se_llama_a_jev(intake_world, conn, monkeypatch)
     _con_jev(monkeypatch, cliente)
     ws = intake_world["north-lab"]
     with admin(conn) as cur:
+        _solo_field(cur, ws)
         cur.execute("update objective set area_id = %s where workspace_id = %s "
-                    "and titulo = 'Reduce service delay 1'",
-                    (ws["areas"]["field"], ws["id"]))
+                    "and titulo <> 'Reduce service delay 1'",
+                    (ws["areas"]["quality"], ws["id"]))
     conn.commit()
     with espacio(conn, ws["id"]) as cur:
         _, outcome = _empezar(cur, intake_world, title=TITULO)
@@ -144,6 +152,7 @@ def test_jev_solo_ve_los_objetivos_del_area(intake_world, conn, monkeypatch):
                              ("Raise delivery quality 1", "quality")):
             cur.execute("update objective set area_id = %s where workspace_id = %s "
                         "and titulo = %s", (ws["areas"][area], ws["id"], titulo))
+        _solo_field(cur, ws)
     conn.commit()
     _alta(conn, intake_world)
     assert set(cliente.pedidos[0][1]["objetivo"]["criteria"].values()) == {

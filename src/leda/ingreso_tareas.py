@@ -1017,6 +1017,10 @@ PAUSADO = "pausado"
 # persona (una sola propuesta por alta): vive en `terminal_result` junto a la pausa,
 # sin cambiar el esquema, y `resolve_choice` la conserva.
 CRITERIO_PROPUESTO = "criterio_propuesto"
+# La marca de que ya se avisó que el área de la tarea no tiene ningún objetivo
+# operativo (C0-2): el valor es el área. Vive en `terminal_result` como la pausa; el
+# aviso se da una vez por área y la conversación sigue abierta.
+SIN_OBJETIVO_AVISADO = "sin_objetivo_avisado"
 _TITLE_OF_REQUEST = """(select f.valor from task_intake_field f
                          where f.request_id = r.id and f.campo = 'title'
                            and f.estado = 'confirmed')"""
@@ -2171,44 +2175,182 @@ def _completar_evidencia(cur, request, who, now) -> IntakeOutcome | None:
     return None
 
 
-# Los objetivos que se ofrecen a quien pide (F-B11): los de su área. Una persona
-# no pide tareas de otro sector; lo que cruza áreas va por una dependencia de una
-# tarea propia. Sólo si el área no tiene ningún objetivo propio se ofrecen los que
-# no son de ningún área: el estratégico y los datos anteriores a la migración 0027.
-# Los de otra área no se ofrecen nunca. Los parámetros son (espacio, área, espacio,
-# área), en ese orden.
-_OBJETIVOS_DEL_AREA = """
+# Los objetivos que ofrece el alta (C0-1 y C0-2, decisión del usuario del 2026-10-02):
+# los objetivos OPERATIVOS del área de la tarea, que es la de quien es responsable
+# (igual que el área y el aprobador), nunca la de quien escribe. Una tarea cuelga
+# sólo de un objetivo operativo (mecánica §1): el estratégico y un objetivo sin área
+# no se ofrecen nunca, y si el área no tiene ninguno no se completa con otro
+# (constitución §4). Los parámetros son (espacio, áreas), en ese orden.
+_OBJETIVOS_DE_LA_TAREA = """
       o.workspace_id = %s and o.estado in ('activo', 'propuesto')
-      and (o.area_id = %s
-           or (o.area_id is null and not exists (
-                 select 1 from objective p
-                  where p.workspace_id = o.workspace_id and p.area_id = %s
-                    and p.estado in ('activo', 'propuesto'))))"""
+      and o.tipo = 'operativo' and o.area_id = any(%s::uuid[])"""
 
 
-def _objetivos_del_area(cur, who, *, filtro: str = "", params=(), offset=0):
+def _areas_de_la_tarea(cur, request, who) -> tuple[list[str], bool]:
+    """Las áreas de las que puede ser la tarea y si ya se sabe cuál es. Con el
+    responsable confirmado, la suya (`True`). Antes, las de todas las personas que
+    pueden ser responsables (quien escribe y quienes aprueba, las mismas que ofrece
+    el dato del responsable): el objetivo se puede elegir primero (el orden del alta,
+    decisión del usuario del 2026-09-30) sin ofrecer uno de un área a la que la
+    tarea no puede ir."""
+    cur.execute(
+        """select valor from task_intake_field
+            where request_id = %s and campo = 'responsible'
+              and estado = 'confirmed'""",
+        (request["id"],),
+    )
+    responsable = cur.fetchone()
+    if responsable:
+        cur.execute("select area_id from membership where id = %s",
+                    (responsable["valor"]["id"],))
+        fila = cur.fetchone()
+        return ([str(fila["area_id"])] if fila and fila["area_id"] else []), True
+    cur.execute(
+        """select distinct i.area_id from integrante i
+            where i.activo and i.area_id is not null
+              and (i.membership_id = %s or i.aprobador_membership_id = %s)""",
+        (who.membership_id, who.membership_id),
+    )
+    return sorted(str(f["area_id"]) for f in cur.fetchall()), False
+
+
+def _objetivos_de_la_tarea(cur, request, who, *, filtro: str = "", params=(),
+                           offset=0):
+    areas, _ = _areas_de_la_tarea(cur, request, who)
     cur.execute(
         f"""select o.id, o.titulo, o.estado from objective o
-             where {_OBJETIVOS_DEL_AREA}{filtro}
+             where {_OBJETIVOS_DE_LA_TAREA}{filtro}
              order by o.titulo, o.id limit %s offset %s""",
-        (who.workspace_id, who.area_id, who.area_id, *params,
-         CANDIDATE_PAGE_SIZE + 1, offset))
+        (who.workspace_id, areas, *params, CANDIDATE_PAGE_SIZE + 1, offset))
     return cur.fetchall()
+
+
+def objetivo_de_otra_area(cur, request, who) -> dict | None:
+    """El objetivo confirmado del borrador si no es un objetivo operativo del área
+    de la tarea (el responsable pasó a ser de otra área), o `None`. Un objetivo que
+    ya no existe no es de otra área: lo dice el resumen (`CONFIRMED_OPTION_STALE`)."""
+    cur.execute(
+        """select valor from task_intake_field
+            where request_id = %s and campo = 'objective'
+              and estado = 'confirmed'""",
+        (request["id"],),
+    )
+    fila = cur.fetchone()
+    if not fila:
+        return None
+    areas, conocida = _areas_de_la_tarea(cur, request, who)
+    if not conocida:
+        return None
+    cur.execute("select tipo, area_id from objective where id = %s",
+                (fila["valor"]["id"],))
+    objetivo = cur.fetchone()
+    if not objetivo:
+        return None
+    if objetivo["tipo"] == "operativo" and str(objetivo["area_id"]) in areas:
+        return None
+    return fila["valor"]
+
+
+def descartar_objetivo(cur, request_id: str, now) -> None:
+    """Saca el objetivo del borrador: vuelve a faltar."""
+    cur.execute(
+        """update task_intake_field
+              set estado = 'missing', valor = null, proposed_by = null,
+                  source_inbound_id = null, source_raw_text = null,
+                  source_choice_id = null, version = version + 1,
+                  actualizado_en = %s
+            where request_id = %s and campo = 'objective'""",
+        (now, request_id),
+    )
+
+
+def _area_y_responsable(cur, request) -> tuple[str, str]:
+    """El nombre del área de la tarea y el de quien es responsable (confirmado)."""
+    cur.execute(
+        """select a.nombre area, i.nombre responsable
+             from task_intake_field f
+             join membership m on m.id = (f.valor ->> 'id')::uuid
+             join area a on a.id = m.area_id
+             join integrante i on i.membership_id = m.id
+            where f.request_id = %s and f.campo = 'responsible'
+              and f.estado = 'confirmed'""",
+        (request["id"],),
+    )
+    fila = cur.fetchone()
+    return (fila["area"], fila["responsable"]) if fila else ("", "")
+
+
+def aviso_objetivo_descartado(cur, request, objetivo: dict) -> str:
+    """El estado real cuando un cambio de responsable deja afuera el objetivo que ya
+    estaba elegido: se dice, nunca se saca en silencio."""
+    area, responsable = _area_y_responsable(cur, request)
+    return (f"Saqué el objetivo «{objetivo.get('title', '')}» del borrador: es de "
+            f"otra área, y la tarea ahora es de {area}, el área de {responsable}.")
+
+
+def sin_objetivo_operativo(cur, request, who, *, conversada: bool
+                           ) -> tuple[str, str] | None:
+    """Si la tarea no tiene ningún objetivo operativo del que colgar: el estado real
+    para decirle a la persona y la clave del área (`""` si todavía no se sabe de qué
+    área es). `None` si hay alguno. En el alta conducida (`conversada`) el próximo
+    paso incluye escribir: elegir a alguien de otra área, si lo hay, o dejarla
+    guardada; la conversación sigue abierta."""
+    if _objetivos_de_la_tarea(cur, request, who):
+        return None
+    areas, conocida = _areas_de_la_tarea(cur, request, who)
+    if conocida and areas:
+        area, _ = _area_y_responsable(cur, request)
+        texto = (f"El área {area} no tiene ningún objetivo operativo activo, y una "
+                 "tarea siempre cuelga de uno.")
+        clave = areas[0]
+    else:
+        texto = ("No hay ningún objetivo operativo activo del que pueda colgar esta "
+                 "tarea.")
+        clave = ""
+    if not conversada:
+        return (f"{texto} Pedile a quien administra el espacio que lo cree, o "
+                "cancelá el borrador."), clave
+    falta = ("hace falta que quien administra el espacio cree uno; mientras tanto "
+             "podés dejarla guardada o cancelar el borrador.")
+    if conocida and _otra_area_con_objetivos(cur, who, areas):
+        return (f"{texto} Si es para alguien de otra área, decime quién; si no, "
+                f"{falta}"), clave
+    return f"{texto} Para seguir, {falta}", clave
+
+
+def _otra_area_con_objetivos(cur, who, areas: list[str]) -> bool:
+    """Si alguna persona que puede ser responsable es de otra área con un objetivo
+    operativo vigente (regla 3 del ADR 0013: ofrecer sólo lo posible)."""
+    cur.execute(
+        """select 1 from integrante i
+            where i.activo and i.area_id is not null
+              and not (i.area_id = any(%s::uuid[]))
+              and (i.membership_id = %s or i.aprobador_membership_id = %s)
+              and exists (
+                    select 1 from objective o
+                     where o.workspace_id = %s and o.area_id = i.area_id
+                       and o.tipo = 'operativo'
+                       and o.estado in ('activo', 'propuesto'))
+            limit 1""",
+        (areas, who.membership_id, who.membership_id, who.workspace_id),
+    )
+    return cur.fetchone() is not None
 
 
 def _entity_candidates(cur, request, who, field, query, offset=0):
     query_text = normalize_text(str(query or "")).casefold()
     if field == "objective":
         if query_text:
-            rows = _objetivos_del_area(
-                cur, who, filtro=" and lower(o.titulo) = lower(%s)",
+            rows = _objetivos_de_la_tarea(
+                cur, request, who, filtro=" and lower(o.titulo) = lower(%s)",
                 params=(normalize_text(str(query)),), offset=offset)
             if not rows:
-                rows = _objetivos_del_area(
-                    cur, who, filtro=" and position(lower(%s) in lower(o.titulo)) > 0",
+                rows = _objetivos_de_la_tarea(
+                    cur, request, who,
+                    filtro=" and position(lower(%s) in lower(o.titulo)) > 0",
                     params=(normalize_text(str(query)),), offset=offset)
         else:
-            rows = _objetivos_del_area(cur, who, offset=offset)
+            rows = _objetivos_de_la_tarea(cur, request, who, offset=offset)
         has_more = len(rows) > CANDIDATE_PAGE_SIZE
         chosen = rows[:CANDIDATE_PAGE_SIZE]
         return [(r["titulo"], str(r["id"]),
@@ -2286,8 +2428,13 @@ def _open_entity_page(cur, request, who, field, query, offset, now, *,
     if field == "objective" and not query and offset == 0 and len(candidates) > 1:
         candidates, recomendada = _ordenar_objetivos(cur, request, who, candidates)
     if not candidates:
+        # Sin objetivo operativo del que colgar la tarea: el estado real con el área,
+        # nunca otro objetivo en su lugar (C0-2).
+        sin_objetivo = (sin_objetivo_operativo(cur, request, who, conversada=False)
+                        if field == "objective" else None)
         return _open_choices(
-            cur, request, field, NO_CANDIDATES,
+            cur, request, field,
+            prefijo + (sin_objetivo[0] if sin_objetivo else NO_CANDIDATES),
             [(CANCELAR_BORRADOR, "cancel", None)], now,
             kind=f"no_candidates_{field}",
         )
@@ -2416,7 +2563,11 @@ def _unica_opcion(cur, request, who, field):
 def _open_choices(cur, request, field, prompt, options, now, kind=None, *,
                   prefijo: str = "", pregunta: str | None = None,
                   rechazo: Rechazo | None = None, busqueda: str | None = None,
-                  propuesto: str | None = None):
+                  propuesto: str | None = None, clave: str | None = None):
+    """Abre una elección con botones. `clave` reemplaza la clave de deduplicación de
+    siempre (por versión de la solicitud): el alta conducida la ata al mensaje o
+    toque que la dispara, para que un mismo estado dicho en dos turnos no se
+    descarte como repetido."""
     request_id = str(request["id"])
     kind = kind or field or "choice"
     if field is not None and not kind.startswith("no_candidates"):
@@ -2451,6 +2602,7 @@ def _open_choices(cur, request, field, prompt, options, now, kind=None, *,
         )
     _enqueue(
         cur, request, prompt, now,
+        clave or
         f"intake:{request_id}:v{request['version']}:choice:{kind}:{field or 'none'}",
         choice_set_id=choice_set_id,
     )
@@ -2615,6 +2767,15 @@ def _finalize(cur, request, who, now, apertura: str | None = None):
             (request_id,),
         )
         return _advance(cur, request, who, now)
+    descartado = objetivo_de_otra_area(cur, request, who)
+    if descartado is not None:
+        # El responsable pasó a ser de otra área: su objetivo no es de la tarea. Se
+        # saca y se dice (C0-2), y se vuelve a preguntar con botones, aunque haya
+        # una sola opción: el cambio se ve antes del resumen.
+        descartar_objetivo(cur, request_id, now)
+        aviso = aviso_objetivo_descartado(cur, request, descartado)
+        return _open_entity_page(cur, request, who, "objective", None, 0, now,
+                                 prefijo=f"{aviso}\n\n")
     cur.execute(
         """select evidencia_requerida, version from task_evidence_policy
             where workspace_id = %s and area_id = %s""",

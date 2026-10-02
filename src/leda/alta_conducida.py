@@ -30,7 +30,7 @@ from __future__ import annotations
 import json
 import secrets
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 
 import psycopg
@@ -602,8 +602,12 @@ def _guardar(cur, request, asignaciones: list, now: datetime, *,
 def _completar(cur, request, who, now: datetime):
     """Lo que el servidor completa solo, como el alta de siempre: un dato con una
     sola opción posible (no se pregunta), el área de quien es responsable, la
-    descripción vacía y la evidencia que exige la política del área. Devuelve el
-    estado real que lo impide (ya dicho a quien actuó), o `None`."""
+    descripción vacía y la evidencia que exige la política del área. El objetivo
+    tiene que ser un operativo del área de la tarea (C0-1, C0-2): si el responsable
+    pasó a ser de otra área, el objetivo elegido se saca y se dice; si el área no
+    tiene ningún objetivo operativo, se dice el estado real (una vez por área: la
+    conversación sigue abierta). Devuelve lo que se le dijo a quien actuó, o
+    `None`."""
     request_id = str(request["id"])
     cur.execute("select campo, estado from task_intake_field where request_id = %s",
                 (request_id,))
@@ -619,20 +623,80 @@ def _completar(cur, request, who, now: datetime):
             (Jsonb(valor), now, request_id, campo))
         estados[campo] = "confirmed"
 
-    for campo in T.CAMPOS_DE_OPCION:
-        if estados[campo] != "confirmed":
-            unica = I._unica_opcion(cur, request, who, campo)
-            if unica is not None:
-                confirmar(campo, unica)
+    # El responsable primero: de él sale el área de la tarea, y de ella el objetivo.
+    if estados["responsible"] != "confirmed":
+        unica = I._unica_opcion(cur, request, who, "responsible")
+        if unica is not None:
+            confirmar("responsible", unica)
+    descartado = I.objetivo_de_otra_area(cur, request, who)
+    if descartado is not None:
+        I.descartar_objetivo(cur, request_id, now)
+        estados["objective"] = "missing"
+    elif estados["objective"] != "confirmed":
+        unica = I._unica_opcion(cur, request, who, "objective")
+        if unica is not None:
+            confirmar("objective", unica)
     if estados["responsible"] == "confirmed" and estados["area"] != "confirmed":
         unica = I._unica_opcion(cur, request, who, "area")
         if unica is not None:
             confirmar("area", unica)
     if estados["description"] == "missing":
         confirmar("description", "")
+    if descartado is not None:
+        return _objetivo_descartado(cur, who, request, descartado, now)
     if estados["area"] == "confirmed" and estados["evidence"] != "confirmed":
-        return I._completar_evidencia(cur, request, who, now)
+        problema = I._completar_evidencia(cur, request, who, now)
+        if problema is not None:
+            return problema
+    if estados["objective"] != "confirmed" and estados["responsible"] == "confirmed":
+        sin_objetivo = I.sin_objetivo_operativo(cur, request, who, conversada=True)
+        if sin_objetivo is not None and _primer_aviso(cur, request_id,
+                                                      sin_objetivo[1]):
+            return _decir_con_cancelar(cur, request, sin_objetivo[0], now)
     return None
+
+
+def _primer_aviso(cur, request_id: str, area: str) -> bool:
+    """Si es la primera vez que se avisa que el área `area` no tiene objetivo
+    operativo en este borrador (la marca vive en `terminal_result`, como la pausa).
+    Después del aviso la conversación sigue: el modelo atiende lo que se escriba."""
+    cur.execute(
+        """select terminal_result ->> %s dado from task_intake_request
+            where id = %s""", (I.SIN_OBJETIVO_AVISADO, request_id))
+    if cur.fetchone()["dado"] == area:
+        return False
+    cur.execute(
+        """update task_intake_request
+              set terminal_result = coalesce(terminal_result, '{}'::jsonb) || %s
+            where id = %s""",
+        (Jsonb({I.SIN_OBJETIVO_AVISADO: area}), request_id))
+    return True
+
+
+def _decir_con_cancelar(cur, request, texto: str, now: datetime) -> I.IntakeOutcome:
+    """Un estado real del alta con el botón Cancelar borrador. No cierra la
+    conversación: el mensaje siguiente lo atiende el modelo, como siempre."""
+    outcome = I._open_choices(
+        cur, request, None, texto, [(I.CANCELAR_BORRADOR, "cancel", None)], now,
+        kind="no_candidates_objective",
+        clave=(f"intake:{request['id']}:v{request['version']}:conducida:"
+               f"{_evento_id(cur, now)}"))
+    return replace(outcome, responded=True)
+
+
+def _objetivo_descartado(cur, who, request, objetivo: dict, now: datetime
+                         ) -> I.IntakeOutcome:
+    """El objetivo elegido quedó de otra área (cambió el responsable): se dice que
+    se sacó y se vuelve a preguntar con los botones del área de la tarea, o con el
+    estado real si esa área no tiene ningún objetivo operativo."""
+    aviso = I.aviso_objetivo_descartado(cur, request, objetivo)
+    sin_objetivo = I.sin_objetivo_operativo(cur, request, who, conversada=True)
+    if sin_objetivo is not None:
+        _primer_aviso(cur, str(request["id"]), sin_objetivo[1])
+        return _decir_con_cancelar(cur, request, f"{aviso} {sin_objetivo[0]}", now)
+    return _botones(cur, request, "objective",
+                    _opciones_de_ahora(cur, request, who, "objective"),
+                    f"{aviso} ¿A qué objetivo de esa área pertenece?", now)
 
 
 # ---------------------------------------------------------------------------
@@ -680,6 +744,14 @@ def _responder(cur, who, request, salida: T.SalidaTurno, h: T.HechosTurno,
             referencia_id=entrante_atado(cur))
     faltan = aplicacion.faltan_tras(h)
     cambio = bool(aplicacion.asignaciones)
+    if "objective" in faltan and (salida.botones == "objective"
+                                  or "objective" in salida.pregunta):
+        # Pedir un objetivo que no tiene de dónde salir es prometer lo que no existe
+        # (constitución §4): la respuesta es el estado real (C0-2).
+        sin_objetivo = I.sin_objetivo_operativo(cur, request, who, conversada=True)
+        if sin_objetivo is not None:
+            return ResultadoConducido(_decir_con_cancelar(
+                cur, request, sin_objetivo[0], now))
     if not faltan:
         if cambio:
             return ResultadoConducido(_resumen(cur, who, request, salida.texto,

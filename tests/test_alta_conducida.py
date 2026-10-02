@@ -982,14 +982,15 @@ def test_tras_modificar_los_botones_de_un_dato_confirmado_se_arman_y_el_toque_lo
     nuevas = c.escribir("quiero cambiar el responsable")
 
     assert _cuerpos(nuevas) == ["Dale, ¿quién la hace?"]
-    assert any("Sam Noble" in e for e in c.etiquetas())        # las opciones del código
+    assert any("Sam North" in e for e in c.etiquetas())        # las opciones del código
     c.modelo.conducciones.append(salida("Listo, revisalo."))
 
-    nuevas = c.tocar("Sam Noble")
+    # Alguien de la misma área: el objetivo elegido sigue siendo de la tarea.
+    nuevas = c.tocar("Sam North")
 
-    assert c.campo("responsible")["valor"]["name"].startswith("Sam Noble")
+    assert c.campo("responsible")["valor"]["name"].startswith("Sam North")
     assert len(nuevas) == 1 and "Resumen para revisar" in nuevas[0]["cuerpo"]
-    assert "Responsable: Sam Noble" in nuevas[0]["cuerpo"]
+    assert "Responsable: Sam North" in nuevas[0]["cuerpo"]
     assert c.incidentes("alta_conducida_fallida") == []
 
 

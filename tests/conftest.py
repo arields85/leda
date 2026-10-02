@@ -369,13 +369,17 @@ def intake_world(conn):
                     (ws, area_id),
                 )
 
+            # Los operativos son del área field: una tarea cuelga sólo de un
+            # objetivo operativo del área de quien es responsable (C0-1, C0-2), y
+            # un objetivo sin área no se ofrece nunca.
             objectives = []
             for title in ("Reduce service delay", "Raise delivery quality",
                           "Expand regional coverage"):
                 cur.execute(
-                    """insert into objective (workspace_id, tipo, titulo, estado)
-                       values (%s, 'operativo', %s, 'activo') returning id""",
-                    (ws, f"{title} {index + 1}"),
+                    """insert into objective (workspace_id, tipo, titulo, estado,
+                                              area_id)
+                       values (%s, 'operativo', %s, 'activo', %s) returning id""",
+                    (ws, f"{title} {index + 1}", areas["field"]),
                 )
                 objectives.append(str(cur.fetchone()["id"]))
             _blindar_contra_saludo(cur, ws)

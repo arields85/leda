@@ -1810,7 +1810,10 @@ _TITULO_OBJETIVO_ALTA = "Objetivo simulado de Cablear tablero (simulado)"
 _TOQUES_HASTA_EL_BORRADOR = [
     {"indice": 0},                  # el objetivo (la única candidata; el título
                                     # que trae el mensaje ya está tomado)
-    {"indice": 0},                  # la persona responsable (el área se completa sola)
+    # La persona responsable es Marcos (OT), el área del objetivo; el área se
+    # completa sola. Ismael ("Para mí") es de Dirección, sin objetivos propios:
+    # su tarea no podría colgar de ese objetivo (C0-1, C0-2).
+    {"etiqueta": "Marcos Tarquini"},
     {"etiqueta": "Sí"},             # la fecha objetivo propuesta
     {"etiqueta": "Sí"},             # el criterio de aceptación propuesto
 ]
@@ -2577,10 +2580,11 @@ def test_el_borrador_sembrado_en_la_corrida_cambia_un_dato_con_opciones(
         corework, conn):
     ws = corework.workspace_id
     _con_dos_tareas(conn, ws)
-    # Ismael es de Dirección, que no tiene objetivos propios en el pack (F-B11):
-    # se le ofrecen el estratégico y los objetivos sin área, por título. "Objetivo
-    # simulado de Revisar tablero" es la 2.ª opción (Cablear, Revisar, Vincular).
-    interno = _responde((RespectoPendiente.RESPONDE, {"opcion_id": "2"}))
+    # Ismael (Dirección) pide para Marcos: se le ofrecen los objetivos operativos de
+    # OT, el área de la tarea (C0-1), nunca el estratégico. Elige el otro por su
+    # nombre (el código lo busca entre los del área), no por su lugar en la lista.
+    interno = _responde((RespectoPendiente.RESPONDE,
+                         {"opcion_id": "ninguna", "texto": _OBJETIVO_OTRO}))
 
     r = ejecutar_escenario(
         conn, ws, "corework", "Ismael Soschinski", [], interno,
@@ -2633,7 +2637,10 @@ def test_el_corredor_no_confirma_solo_la_vista_previa_de_un_borrador(corework, c
 
 @pytest.mark.parametrize("escenario_id, comandos", [
     ("b-0025", [(RespectoPendiente.RESPONDE, {"texto": "Cablear tablero sur"})]),
-    ("b-0025-b", [(RespectoPendiente.RESPONDE, {"opcion_id": "2"})]),  # "…de Revisar tablero"
+    # El nombre escrito del otro objetivo, que el código busca entre los del área
+    # de la tarea; no su posición en la lista.
+    ("b-0025-b", [(RespectoPendiente.RESPONDE,
+                   {"opcion_id": "ninguna", "texto": _OBJETIVO_OTRO})]),
     ("b-0025-c", [RespectoPendiente.CORRIGE,
                   (RespectoPendiente.RESPONDE, {"opcion_id": "5"})]),  # "Fecha objetivo"
     ("b-0025-d", []),                                   # sólo toques: nada que rutear

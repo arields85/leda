@@ -115,13 +115,59 @@ botón.
 
 **Decisión del usuario (2026-10-02): decidido, listo para hacer.**
 
-- [ ] **C0-1.** Los objetivos que ofrece el alta salen del **área de la tarea**, que es la
+- [x] **C0-1.** Los objetivos que ofrece el alta salen del **área de la tarea**, que es la
       del responsable, igual que el área y el aprobador. Ismael pidiendo para Marcos ve
       los objetivos de OT.
-- [ ] **C0-2.** Una tarea cuelga sólo de un **objetivo operativo**, nunca del estratégico
+- [x] **C0-2.** Una tarea cuelga sólo de un **objetivo operativo**, nunca del estratégico
       (mecánica §1: la tarea va bajo el objetivo operativo). Si el área de la tarea no
       tiene ningún objetivo operativo activo, Leda lo dice con el estado real y no
       completa con otro (constitución §4). Se retira la caída a los objetivos sin área.
+
+**Hecho C0-1 y C0-2** (commit `PENDIENTE`, ruta delegada: un escritor).
+
+- Mecanismo único: `_areas_de_la_tarea` y `_objetivos_de_la_tarea`
+  (`ingreso_tareas.py`) reemplazan el filtro por `who.area_id`. Todo lo que busca
+  objetivos pasa por `_entity_candidates`: el autocompletado de la opción única, la
+  página de botones, "Otra opción", el selector de Modificar, el orden de Jev y las
+  opciones que recibe el modelo. Filtro: `tipo = 'operativo'` y el área de la tarea;
+  el estratégico y los objetivos sin área no se ofrecen nunca.
+- Orden de los datos: sigue el de la decisión del 2026-09-30 (primero qué hay que
+  hacer, después el objetivo), así que el objetivo se puede pedir antes que el
+  responsable. Mientras no hay responsable, la tarea puede ser del área de cualquiera de
+  las personas que pueden serlo (quien escribe y quienes aprueba, las mismas que ofrece
+  el dato del responsable), y se ofrecen los operativos de esas áreas. Con el
+  responsable elegido, sólo los de su área. Se descartó pedir el responsable primero:
+  rompía esa decisión para quien aprueba gente de varias áreas. Si alguien puede asignar
+  sólo en su área, todo sigue igual que antes.
+- Si el responsable cambia a otra área, el objetivo ya elegido se saca y se dice
+  ("Saqué el objetivo «…» del borrador: es de otra área…") y se vuelve a preguntar con
+  los botones del área nueva (`alta_conducida._completar`; en el alta guiada,
+  `_finalize`).
+- Sin ningún operativo en el área de la tarea, Leda dice el estado real con el área y
+  ofrece Cancelar borrador; si alguien de otra área con objetivos puede ser responsable,
+  lo dice ("decime quién"). La conversación sigue abierta: el aviso se da una vez por
+  área (marca `sin_objetivo_avisado` en `terminal_result`) y después el modelo atiende
+  lo que se escriba (cambiar el responsable, cancelar, dejarla guardada). Si el modelo
+  pide el objetivo igual, la respuesta vuelve a ser el estado real.
+- La fixture `intake_world` (`tests/conftest.py`) da área a sus tres objetivos
+  operativos: sin área ya no se ofrecen. El banco también: el objetivo simulado de una
+  tarea sembrada (`tests/banco/corrida.py`) es operativo de su área, y las pruebas de
+  `tests/banco/test_corrida.py` que suponían la regla vieja (Ismael elige entre el
+  estratégico y los sin área) eligen al responsable y al objetivo por su nombre, no por
+  su lugar en la lista.
+- Pendiente conocido: `herramientas.crear_borrador_tarea` (camino general viejo) recibe un
+  `objetivo_id` sin este filtro. Se retira con el alta guiada (M4-M9); no se tocó.
+- RED (2026-10-02): `tests/test_alta_objetivo_del_area_de_la_tarea.py`, 8 de 8 en rojo.
+  La falla del caso real: pedida para Sam Noble (quality), los botones eran
+  `['Expand regional coverage 1', 'Vincular todo']`, el objetivo sin área y el
+  estratégico. GREEN: 8 de 8 en verde. Suite completa (2026-10-02, `python -m pytest
+  -q -p no:cacheprovider`): `1 failed, 3438 passed, 333 deselected, 1 warning in
+  879.63s`; la única falla es la previa de abajo.
+- Falla previa, para arreglar aparte:
+  `tests/test_alta_conducida.py::test_un_texto_con_un_dato_inventado_se_reintenta_con_el_motivo`
+  depende de la fecha de hoy ("15/03" ahora se rechaza como `fecha_distinta`, no como
+  `numero_inventado`). Falla igual sin este cambio. La prueba no tiene que depender del
+  día en que corre.
 - [ ] **C0-3.** Modificar muestra **un botón por dato modificable**, armado por el código
       desde el resumen vigente (objetivo incluido), no una lista escrita por el modelo.
 - [ ] **C0-4.** Repetir la ronda C0-A en real después de C0-1 a C0-3.
@@ -199,7 +245,7 @@ intento; sin incidentes.
 
 **Estado de C0 al 2026-10-02:** las cinco variantes ya se probaron en real (confirma quien
 pide, para otra persona, Modificar, Cancelar por texto y por botón, rechazo con motivo).
-Falta construir C0-1, C0-2, C0-3, C0-5, C0-6 y C0-8, retirar el alta guiada (M4-M9) y repetir
+C0-1 y C0-2 ya están construidos. Falta construir C0-3, C0-5, C0-6 y C0-8, retirar el alta guiada (M4-M9) y repetir
 la ronda C0-A (C0-4).
 
 ## Relación con otros pendientes

@@ -440,19 +440,38 @@ def test_elegir_otro_objetivo_cambia_solo_el_objetivo_y_vuelve_la_vista_previa(
 def test_elegir_un_responsable_de_otra_area_completa_el_area_y_vuelve_la_vista_previa(
         intake_world, conn, monkeypatch):
     rid, pid, client, user = _modificar(conn, monkeypatch, intake_world)
+    ws = intake_world["north-lab"]
+    with admin(conn) as cur:
+        cur.execute(
+            """insert into objective (workspace_id, tipo, titulo, estado, area_id)
+               values (%s, 'operativo', 'Calidad de entregas', 'activo', %s)""",
+            (ws["id"], ws["areas"]["quality"]))
+    conn.commit()
     _elegir_dato(conn, client, user, rid, "Responsable")
     noble = next(t for e, t in _opciones_activas(conn, rid).items()
                  if "Sam Noble" in e)
+    antes = _salidas(conn, user)
 
     _post_intake_callback(client, noble, user)
 
     # Su área es otra y es la única que tiene: se completa sola, sin preguntar.
-    assert _conjunto_activo(conn, rid) is None
     campos = _campos(conn, rid)
     assert campos["responsible"][1]["name"] == "Sam Noble 1"
     assert campos["area"][1]["name"] == "Quality Guild"
+    # El objetivo era de field: se saca, se dice y se vuelve a preguntar con los
+    # botones del área de la tarea (C0-2), aunque haya uno solo.
+    assert campos["objective"][0] == "missing"
+    aviso = _ultima_salida(conn, user, antes)["cuerpo"]
+    assert aviso.startswith("Saqué el objetivo «") and "Quality Guild" in aviso
+    assert list(_opciones_activas(conn, rid)) == ["Calidad de entregas"]
+
+    _post_intake_callback(client, _opciones_activas(conn, rid)["Calidad de entregas"],
+                          user)
+
+    assert _conjunto_activo(conn, rid) is None
     assert _previews(conn, rid)[-1]["estado"] == "esperando"
     assert "Sam Noble 1" in _previews(conn, rid)[-1]["resumen"]
+    assert "Calidad de entregas" in _previews(conn, rid)[-1]["resumen"]
 
 
 def test_el_area_no_se_ofrece_en_modificar_porque_no_tiene_otra_opcion(

@@ -611,9 +611,9 @@ def test_intake_candidate_label_near_the_limit_still_fits_with_its_icon(
     assert telegram_utf16_units(f"{ICONO_TAREA} {titulo_largo}") > BUTTON_LABEL_LIMIT
     with admin(conn) as cur:
         cur.execute(
-            """insert into objective (workspace_id, tipo, titulo, estado)
-               values (%s, 'operativo', %s, 'activo')""",
-            (ws, titulo_largo))
+            """insert into objective (workspace_id, tipo, titulo, estado, area_id)
+               values (%s, 'operativo', %s, 'activo', %s)""",
+            (ws, titulo_largo, intake_world["north-lab"]["areas"]["field"]))
     with espacio(conn, ws) as cur:
         actor, outcome = _start(cur, intake_world, objective=None)
         choices = _active_choices(cur, outcome.request_id)
@@ -634,14 +634,15 @@ def test_objective_exact_free_text_match_is_not_limited_to_first_page(
     with admin(conn) as cur:
         for index in range(15):
             cur.execute(
-                """insert into objective (workspace_id, tipo, titulo, estado)
-                   values (%s, 'operativo', %s, 'activo')""",
-                (ws, f"Paged objective {index:02d}"),
+                """insert into objective (workspace_id, tipo, titulo, estado, area_id)
+                   values (%s, 'operativo', %s, 'activo', %s)""",
+                (ws, f"Paged objective {index:02d}",
+                 intake_world["north-lab"]["areas"]["field"]),
             )
         cur.execute(
-            """insert into objective (workspace_id, tipo, titulo, estado)
-               values (%s, 'operativo', %s, 'activo')""",
-            (ws, target),
+            """insert into objective (workspace_id, tipo, titulo, estado, area_id)
+               values (%s, 'operativo', %s, 'activo', %s)""",
+            (ws, target, intake_world["north-lab"]["areas"]["field"]),
         )
     with espacio(conn, ws) as cur:
         actor, outcome = _start(cur, intake_world, objective=None)
@@ -676,9 +677,9 @@ def test_candidate_pages_are_bounded_and_reach_every_objective(
     with admin(conn) as cur:
         for title in sorted(inserted):
             cur.execute(
-                """insert into objective (workspace_id, tipo, titulo, estado)
-                   values (%s, 'operativo', %s, 'activo')""",
-                (ws, title),
+                """insert into objective (workspace_id, tipo, titulo, estado, area_id)
+                   values (%s, 'operativo', %s, 'activo', %s)""",
+                (ws, title, intake_world["north-lab"]["areas"]["field"]),
             )
     with espacio(conn, ws) as cur:
         actor, outcome = _start(cur, intake_world, objective=None)
@@ -702,9 +703,9 @@ def test_no_match_model_proposal_still_pages_known_objectives_before_free_text(
     with admin(conn) as cur:
         for title in sorted(inserted):
             cur.execute(
-                """insert into objective (workspace_id, tipo, titulo, estado)
-                   values (%s, 'operativo', %s, 'activo')""",
-                (ws, title),
+                """insert into objective (workspace_id, tipo, titulo, estado, area_id)
+                   values (%s, 'operativo', %s, 'activo', %s)""",
+                (ws, title, intake_world["north-lab"]["areas"]["field"]),
             )
     with espacio(conn, ws) as cur:
         _, outcome = _start(
@@ -738,7 +739,10 @@ def test_empty_entity_set_offers_simple_cancel_instead_of_free_text(
     with espacio(conn, ws) as cur:
         _, outcome = _start(
             cur, intake_world, objective="missing")
-        assert outcome.text == I.NO_CANDIDATES
+        # Sin objetivos, el estado real: la tarea no tiene de qué objetivo
+        # operativo colgar (C0-2), no un "no hay opciones" genérico.
+        assert outcome.text.startswith(
+            "No hay ningún objetivo operativo activo del que pueda colgar esta tarea.")
         assert set(_active_choices(cur, outcome.request_id)) == {
             I.CANCELAR_BORRADOR}
         assert not any(term in outcome.text.casefold()

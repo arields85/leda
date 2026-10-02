@@ -342,10 +342,13 @@ def _crear_tarea_semilla(cur, ws: str, *, titulo: str, area: str, responsable: s
     de mandar el dato de evidencia como un mensaje de texto aparte."""
     if evidencia_requerida is None:
         evidencia_requerida = ["explicacion"]
+    # El objetivo simulado es un operativo del área de la tarea: una tarea cuelga
+    # sólo de un objetivo operativo de su área (C0-1, C0-2).
+    area_id = _area_id(cur, ws, area)
     cur.execute(
-        """insert into objective (workspace_id, tipo, titulo, estado)
-           values (%s, 'operativo', %s, 'activo') returning id""",
-        (ws, f"Objetivo simulado de {titulo}"))
+        """insert into objective (workspace_id, tipo, titulo, estado, area_id)
+           values (%s, 'operativo', %s, 'activo', %s) returning id""",
+        (ws, f"Objetivo simulado de {titulo}", area_id))
     obj = cur.fetchone()["id"]
     cur.execute(
         """insert into task (workspace_id, objective_id, titulo, area_id,
@@ -353,7 +356,7 @@ def _crear_tarea_semilla(cur, ws: str, *, titulo: str, area: str, responsable: s
                              criterio_aceptacion, evidencia_requerida)
            values (%s, %s, %s, %s, %s, %s, %s, %s)
            returning id""",
-        (ws, obj, titulo, _area_id(cur, ws, area), _membership_id(cur, ws, responsable),
+        (ws, obj, titulo, area_id, _membership_id(cur, ws, responsable),
          fecha_objetivo, criterio_aceptacion, evidencia_requerida))
     tid = cur.fetchone()["id"]
     cur.execute(
