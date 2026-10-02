@@ -64,8 +64,10 @@ push deja una copia remota y un punto de retorno exacto.
 
 **Qué se subió:**
 
-- `main` y el tag **`pre-renombre-leda`**: el último commit con el nombre viejo. Es la base de
-  la verificación determinista (playbook §6.1) y el punto para volver atrás.
+- `main` y el tag **`pre-renombre-leda`**: el último commit subido con el nombre viejo, que es el
+  punto para volver atrás. La verificación determinista (playbook §6.1) no compara contra
+  el tag, sino contra el commit inmediatamente anterior al mecánico (`0bbc21b`, ver R5):
+  entre el tag y ese commit entraron el ADR y el script.
 - `feat/flujo-de-un-mensaje`, `feat/flujo-variante-a` y `auxiliar/alta-y-google`, como respaldo.
 
 **Qué quedó sólo local, a propósito:** `auxiliar/alta-y-google-pre-rebase-0929`,
