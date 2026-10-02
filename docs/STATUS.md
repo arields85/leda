@@ -59,8 +59,10 @@ Gobiernan: [`product/que-es-leda.md`](product/que-es-leda.md), [`architecture/fr
   `feat/flujo-de-un-mensaje`, `feat/flujo-variante-a` y `auxiliar/alta-y-google`, como
   respaldo antes del renombre a Leda. El porqué, lo que quedó local y la limpieza
   posterior están en [`../odd/tasks/renombre-a-leda.md`](../odd/tasks/renombre-a-leda.md).
-  Lo posterior al tag (el renombre en `main` y en la rama de flujo) todavía no se subió:
-  lo decide el usuario. Frontera de revisión RDD en `ec3109a` (rebanada de documentación aprobada y
+  Desde el 2026-10-02 el repositorio es **`arields85/leda`** (público): ahí se subieron
+  `main`, las ramas y el tag, y ahí van los push. `arields85/prisma` queda congelado como
+  respaldo (remoto local `respaldo-prisma`) hasta que se dé por obsoleto. Engram conserva su
+  proyecto `prisma-pm`, fijado en `.engram/config.json`. Frontera de revisión RDD en `ec3109a` (rebanada de documentación aprobada y
   reconocida, linaje `review-147d7327236bfea2`).
 - Rama `feat/flujo-de-un-mensaje`, worktree
   `D:\Proyectos\Prisma-PM-worktrees\flujo-de-un-mensaje`: documento
