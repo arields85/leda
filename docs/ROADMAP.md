@@ -405,6 +405,29 @@ Probado en real el 2026-10-01 (se ve el texto crecer y hasta el reintento del ve
 queda **encendido** en `leda_flujo` porque ayuda a ver cómo se comporta Leda (decisión
 del usuario); en la rama sigue apagado por omisión.
 
+### Mensajes de voz
+
+**Entrega:** la persona manda un audio con lo que quiere o necesita, Leda lo convierte a
+texto y lo procesa por el mismo flujo que un mensaje escrito (pedido del usuario del
+2026-10-02, anotado bajo el congelamiento). Hoy un audio recibe respuesta (regla 2 del
+ADR 0013), pero no se transcribe: sólo se procesa su epígrafe como texto.
+
+**Por qué la conversación por texto es la base:** un audio transcrito es texto libre,
+hablado como habla la persona, con varias cosas juntas y sin seguir los pasos del alta.
+Cuanto más humana y fluida sea Leda por texto (enmienda del ADR 0013 del 2026-10-02,
+"botones para elegir, texto para decir", y el paso de los circuitos al flujo del
+ADR 0014), más resuelto queda el camino para los audios: la transcripción entra como un
+mensaje más. Por eso los circuitos se pasan al flujo nuevo antes.
+
+**Decisiones pendientes antes de construir:** qué servicio transcribe y dónde vive su
+clave (ajuste de la plataforma); qué se guarda del audio y por cuánto tiempo (retención,
+hoy fijada por el ADR 0002); qué hace Leda cuando la transcripción sale dudosa o vacía
+(nunca fallar en silencio). Las confirmaciones de la constitución §7 siguen igual: un
+efecto se confirma con su vista previa, venga el pedido escrito o hablado.
+
+**Depende de:** el congelamiento levantado y los circuitos del alta, la entrega y la
+aprobación en el flujo nuevo (`odd/tasks/circuitos-al-flujo-nuevo.md`, rama de flujo).
+
 ## Horizonte posterior
 
 No se abordan hasta que las unidades anteriores estén cerradas, y cada uno requiere
