@@ -171,7 +171,7 @@ botón.
 - [x] **C0-3.** Modificar muestra **un botón por dato modificable**, armado por el código
       desde el resumen vigente (objetivo incluido), no una lista escrita por el modelo.
 
-**Hecho C0-3** (commit `PENDIENTE`, ruta delegada: un escritor).
+**Hecho C0-3** (commit `e138635`, ruta delegada: un escritor).
 
 - Causa: `modify_from_preview` (`ingreso_tareas.py`) mandaba el toque de Modificar del
   alta conducida a `alta_conducida.modificar`, un turno del modelo con
