@@ -771,6 +771,40 @@ a la IA entera ni aparte).
         se toma como nombre propio inventado; con emojis activados cuesta reintentos.
       - **Pendiente:** la prueba real por Telegram. 0-15 no se marca hasta entonces.
 
+      **Flujo C4 (ajustes después de la medición), 2026-10-02.** Decidido por el
+      usuario. Ruta: delegado (un escritor). Alcance: sólo el alta conversada.
+      - `MECANICA_ALTA`, reglas concretas nuevas: al pedir un dato, «por favor» o el
+        condicional (C3: 0 de 90 textos); si lo que se dio como título no dice qué hay
+        que hacer («lo del tablero»), no se toma y se propone uno más claro, sin «»,
+        antes de seguir (C3 lo aceptó 3 de 3); si el mensaje trae varios datos, no los
+        repasa uno por uno: confirma lo esencial y pide sólo lo que falta (9 de 9
+        primeros turnos repasaban todo); puede usar el `nombre_de_pila` de vez en
+        cuando, no en cada mensaje (C3: 0 de 30). Los hechos traen `nombre_de_pila`:
+        la primera palabra del nombre que da la base, nunca inventado; sin nombre, no
+        va. Commit `e6dff7b`.
+      - Verificador (`verificador_redaccion._empieza_oracion`): un emoji o símbolo
+        pictográfico (Unicode So/Sk, salteando selectores de variante y uniones) y los
+        cierres `…`, `‼`, `⁉` terminan una oración, así que la mayúscula que sigue no es
+        un nombre inventado («ya está puesto 👍 Me falta…»). Un nombre en medio de la
+        oración se sigue rechazando aunque haya un emoji antes. Commit `6632dce`.
+      - `nucleo/personalidad.md`: salió la primera línea "Quien lee estas
+        instrucciones responde como Leda" (aprobado por el usuario); una prueba la
+        mantiene afuera. Commit `e2297b1`.
+      - Tamaño (caracteres / 4): la mecánica pasó de 4.336 (~1.084) a 4.774 caracteres
+        (~1.193); armada con un tono de vos y emojis, 5.021 (~1.255); sin tono, 4.878
+        (~1.219). Tope: 1.300.
+      - Pruebas. RED: verificador 39 fallas (13 cierres × 3 espaciados), 19 pasan;
+        mecánica y hechos 7 fallas; personalidad 1 falla. GREEN: todas pasan
+        (`test_verificador_redaccion.py`, `test_alta_turno.py`,
+        `test_personalidad_en_mecanica.py`, `test_voz_y_instrucciones.py`). Suite
+        completa: `1 failed, 3607 passed, 333 deselected, 1 warning in 932.21s`
+        (2026-10-02; sólo la falla conocida
+        `test_un_texto_con_un_dato_inventado_se_reintenta_con_el_motivo`).
+      - **Sin hacer:** `MAX_PREGUNTAS = 1` (rechazar y reintentar un segundo dato en
+        `pregunta`). Rompe `tests/test_horizonte_tarea.py:182`, que usa
+        `pregunta=["title", "due_date"]` y quedaba fuera de lo autorizado para editar.
+      - **Pendiente:** medir C4 con el mismo banco y la prueba real por Telegram.
+
 - [ ] **0-14.** La redacción A (y la charla breve) leen la voz desde la misma fuente que el
       alta (`instrucciones`), para que haya una sola voz en todo lo que escribe la IA en el
       flujo C. Decidido por el principio de una sola fuente (0-13); pendiente de la
