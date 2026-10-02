@@ -198,6 +198,11 @@ de cada prueba real, el agente responde por escrito en el documento de la unidad
 - ¿Es un mecanismo general o un caso?
 - ¿Qué haría innecesaria la próxima ronda?
 - ¿Sigue valiendo la hipótesis que justificó este camino?
+- ¿Este diseño es mecánico? ¿Se puede hacer más fluido y conversacional? Siempre que se
+  pueda, se optimiza para fluidez y practicidad (decisión del usuario, 2026-10-02): la
+  persona escribe como habla, varias cosas juntas, y Leda pregunta sólo lo que falta. La
+  fluidez nunca saltea una garantía (punto 6): las confirmaciones de la constitución §7,
+  la validación del código y la auditoría se quedan.
 
 Si una respuesta no convence, se para y se discute con el usuario antes de seguir. No es
 un trámite: se razona antes de gastar una ronda, no después de varias.
