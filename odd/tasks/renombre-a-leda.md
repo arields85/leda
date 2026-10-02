@@ -106,14 +106,16 @@ no un secreto. No hay `.env` ni volcados de base versionados.
 - [ ] R6. Variables de entorno. Hecho: el `.env` y el `.env.test` del worktree del renombre
       se copiaron del checkout principal y se les aplicó `renombrar_a_leda.py env`. Quedaron
       con 0 claves `PRISMA` y sin ninguna aparición de "prisma", sin mostrar valores.
-      Pendiente: el `.env` del checkout principal, cuando `main` reciba el renombre, y el del
-      worktree de flujo (R9).
+      Worktree de flujo: hecho el 2026-10-02, con copias `.env.antes-leda`. Pendiente: el
+      `.env` del checkout principal, cuando `main` reciba el renombre.
 - [ ] R7. Bases. Hecho: base `leda` creada el 2026-10-01 con `esquema`,
       `importar corework --activar`, `feriados`, `sembrar` (12 tareas, 1 dependencia),
       `modelo deepseek-v4-flash --proveedor nan` y `administrador corework Ariel`.
-      Pendiente: `leda_flujo` desde la rama de flujo renombrada (tiene las migraciones 0026 y
-      0027), con `alta = conversada` y `stream = true`. Después, el usuario reactiva los
-      enlaces de prueba.
+      `leda_flujo`: creada el 2026-10-02 desde la rama de flujo renombrada (con las migraciones
+      0026 y 0027) con los mismos pasos, más `alta = conversada`, `stream = true` y
+      `redaccion = A`, igual que `prisma_flujo` (el pack de la rama trae B). El modelo es
+      idéntico en las dos bases (`nan/deepseek-v4-flash`, sin parámetros). **No hace falta
+      reactivar enlaces:** Ariel, Ismael y Marcos quedan vinculados desde el pack.
 - [ ] R8. Suite completa y prueba real por Telegram desde el código renombrado.
       - Primera suite sobre `460b413` (2026-10-01): **9 failed, 2277 passed**. Las 9 son pruebas
         de migración de `tests/test_task_intake.py` que arman una base vieja con
@@ -131,6 +133,17 @@ no un secreto. No hay `.env` ni volcados de base versionados.
         deselected, 15 min. Es toda la suite de `main`, sin fallas. Falta la parte real de
         R8, la prueba por Telegram, que se hace sobre la rama de flujo (R9).
 - [ ] R9. Aplicar el mismo script en `feat/flujo-de-un-mensaje` y repetir R5 y R8 ahí.
+      - Commit mecánico `3b75117` sobre `aeea562`: **408 de 408 archivos son pura
+        sustitución**. Los restos son rutas a `Prisma-PM`. Arreglo de las pruebas de
+        migración con cherry-pick (`1adcfd0`, RDD `review-7ea5dbadc4239272`).
+      - Suite completa sobre `1adcfd0` (2026-10-02): **3432 passed**, igual que antes del
+        renombre (3432 en `e506ddd`).
+      - Prueba real (2026-10-02 00:10): el listener arrancó con `python -m leda escuchar
+        corework` sobre `leda_flujo` y el saludo dijo "Soy Leda". El primer mensaje del alta
+        se colgó esperando al proveedor `nan`, que estaba degradado (11-30 s o sin respuesta
+        para un "ok"). No es del renombre; queda registrado como hallazgo en la rama de
+        flujo (llamada sin plazo total). `PENDIENTE`: repetir el alta cuando `nan` se
+        recupere.
 - [ ] R10. Actualizar referencias externas: memoria del agente, Engram, `docs/STATUS.md`.
 - [ ] R11. **Limpiar lo de Prisma cuando quede obsoleto**, según la tabla de abajo. Se hace
       recién cuando se cumpla "Leda funciona correctamente".
@@ -152,7 +165,16 @@ y resultado:
 4. **Nada lee los nombres viejos:** el listener y los comandos corren sin ninguna variable
    `PRISMA_*` en el `.env`, y no hay conexiones a las bases `prisma*`.
 
-Registro: `PENDIENTE`.
+Registro:
+
+1. Cumplido. `main` renombrado: 2286 passed (`481af9b`, 2026-10-01). Flujo renombrada: 3432
+   passed (`1adcfd0`, 2026-10-02). Los dos son iguales a sus resultados previos.
+2. Cumplido. `main`: 373/373 pura sustitución (`0bbc21b`→`58d2bed`). Flujo: 408/408
+   (`aeea562`→`3b75117`). Restos justificados en R5 y R9.
+3. `PENDIENTE`. Falta el alta de punta a punta; el proveedor estaba degradado (R9).
+4. Parcial. El listener y los comandos corrieron con `.env` sin ninguna `PRISMA_*` y sin
+   conexiones a bases `prisma*` (comprobado el 2026-10-02 en `pg_stat_activity`). Falta
+   el `.env` del checkout principal (R6).
 
 ## Limpieza posterior
 
