@@ -1801,3 +1801,16 @@ Diseño B elegido por el usuario. Ruta declarada: un solo escritor (encargo expl
   ahora deja un incidente `calendario_avisos` (etapa nueva con su explicación); (2) la prueba
   del último texto del borrador dependía del orden de los hilos: ahora afirma que todo lo
   enviado es algo escrito, en orden, y que lo último llega. RED 1 failed; GREEN 101 passed.
+- Verificado en real (Ariel, 22:07-22:10, tras `39bbf59`): las propuestas de criterio de
+  Prisma entraron al primer intento y sin incidente; Prisma propuso el criterio por su cuenta
+  en el primer turno (constitución §8) y "dale" lo confirmó.
+- Pendiente (j), stream: a veces se ve fluido y a veces queda en las primeras 3-5 letras con
+  la animación del borrador y después aparece el texto de golpe. Decisión del usuario:
+  dejarlo así y pulirlo después. Hipótesis sin verificar: el proveedor a veces entrega los
+  argumentos de la herramienta en pocos trozos grandes (no lo controla Prisma), o Telegram
+  aplica su propio ritmo al borrador. Para confirmar: registrar cuántos avances y con qué
+  separación llegan por turno.
+- Pendiente (k), latencia: el primer mensaje después de reiniciar el listener empieza a
+  procesarse 20-40 s después de llegar (21:40: 41 s; 22:07: 23 s), con el modelo tardando
+  7-10 s. Se repitió dos veces; sin investigar (candidatos: el arranque del sondeo de
+  Telegram, la primera conexión a la base o a Jev).
