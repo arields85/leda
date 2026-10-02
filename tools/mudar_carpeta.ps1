@@ -89,15 +89,27 @@ $freeze = Join-Path $env:TEMP 'leda-venv-freeze.txt'
 & (Join-Path $venv 'Scripts\python.exe') -m pip freeze --exclude-editable | Set-Content -Encoding ascii $freeze
 $base = (& (Join-Path $venv 'Scripts\python.exe') -c 'import sys; print(sys.base_prefix)').Trim()
 Rename-Item -LiteralPath $venv -NewName '.venv-viejo'
-& (Join-Path $base 'python.exe') -m venv $venv
 $py = Join-Path $venv 'Scripts\python.exe'
-& $py -m pip install -q --upgrade pip
-& $py -m pip install -q -r $freeze
-Push-Location $NewRoot
-& $py -m pip install -q --no-deps -e '.[dev]'
-Pop-Location
-$check = (& $py -c "import leda, importlib.util as u; print('ok' if leda.__file__.startswith(r'$NewRoot') and not u.find_spec('prisma') else 'bad')").Trim()
-if ($check -ne 'ok') { Fail "the new virtualenv does not import leda from $NewRoot (old one kept at $old)" }
+try {
+    & (Join-Path $base 'python.exe') -m venv $venv
+    if ($LASTEXITCODE) { throw 'venv creation failed' }
+    & $py -m pip install -q --upgrade pip
+    & $py -m pip install -q -r $freeze
+    if ($LASTEXITCODE) { throw 'installing the frozen packages failed' }
+    Push-Location $NewRoot
+    & $py -m pip install -q --no-deps -e '.[dev]'
+    $rc = $LASTEXITCODE
+    Pop-Location
+    if ($rc) { throw 'the editable install of leda failed' }
+    $check = (& $py -c "import leda, importlib.util as u; print('ok' if leda.__file__.lower().startswith(r'$NewRoot'.lower()) and not u.find_spec('prisma') else 'bad')").Trim()
+    if ($check -ne 'ok') { throw "the new virtualenv does not import leda from $NewRoot" }
+}
+catch {
+    # Put the old virtualenv back so the checkout is never left without one.
+    if (Test-Path $venv) { Remove-Item -Recurse -Force $venv }
+    Rename-Item -LiteralPath $old -NewName '.venv'
+    Fail "rebuilding .venv failed, the old one was restored: $($_.Exception.Message)"
+}
 Remove-Item -Recurse -Force $old
 Write-Host '  ok: leda imports from the new folder'
 
@@ -122,8 +134,13 @@ if (Get-Command gentle-ai -ErrorAction SilentlyContinue) {
 # --- 6. Verify -----------------------------------------------------------------------
 Step 'Verifying'
 git -C $NewRoot status --short --branch | Select-Object -First 1
+if ($LASTEXITCODE) { Fail 'git does not work in the new folder' }
+$listed = git -C $NewRoot worktree list
+if ($listed -match [regex]::Escape($OldRoot)) { Fail 'a worktree still points to the old folder' }
 Push-Location $NewRoot
 & $py -m leda estado corework | Select-Object -Last 1
+$rc = $LASTEXITCODE
 Pop-Location
+if ($rc) { Fail 'leda estado failed from the new folder (is PostgreSQL running?)' }
 Write-Host ''
 Write-Host "Done. Open Claude Code in $NewRoot to finish (paths in docs and tools)." -ForegroundColor Green
