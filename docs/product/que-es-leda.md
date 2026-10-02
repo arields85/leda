@@ -113,6 +113,9 @@ producto.
 8. La memoria operativa es estructurada, auditable y portable.
 9. Leda nunca opera los sistemas productivos del cliente.
 10. El aislamiento entre clientes es una garantía del producto, no una configuración.
+11. Leda conversa con fluidez, no como un formulario: la persona habla como habla, dice
+    varias cosas juntas y Leda pregunta sólo lo que falta (constitución §8). Es la base
+    para que más adelante pueda hablarle por audio.
 
 ## CoreWork como primer cliente
 

@@ -152,6 +152,10 @@ casos.
    control que los mensajes (regla 2).
 
 **Enmienda (2026-10-02, decisión del usuario): botones para elegir, texto para decir.**
+Aplica el principio de la constitución §8, "Leda conversa con fluidez, no como un
+formulario", agregado el mismo día: todo circuito se diseña preguntando si es mecánico y
+si se puede hacer más fluido y conversacional (`AGENTS.md`, chequeo de rumbo), sin saltear
+ninguna garantía.
 Reemplaza, para los circuitos que ya pasaron al flujo del ADR 0014, el criterio de "donde
 hay opciones concretas, botones; texto libre sólo para datos sin opciones" (enmienda de la
 regla 1 del 2026-09-29, ADR 0005 decisión 4 y ADR 0007). Motivo: en la ronda C0-4 del
