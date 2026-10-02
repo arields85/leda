@@ -515,6 +515,80 @@ def test_un_criterio_que_no_se_puede_comprobar_se_propone_otro_y_se_acepta(chat)
     assert "Resumen para revisar" in nuevas[0]["cuerpo"]       # ya está todo
 
 
+_PROPUESTA_DE_PRISMA = "Informe de la prueba de 24 h, firmado por calidad"
+
+
+def _ayuda_con_propuesta_registrada(c):
+    """Caso real (2026-10-01, 21:51 y 21:58): la persona pide ayuda con el criterio y
+    el modelo propone uno, registrándolo en `propuesta` y sin declarar `pregunta`."""
+    c.modelo.conducciones.append(salida(
+        f"Te propongo: {_PROPUESTA_DE_PRISMA}. Si te sirve, lo dejo así.",
+        intencion="ayuda",
+        valores={"acceptance_criterion": {"propuesta": _PROPUESTA_DE_PRISMA}}))
+    return c.escribir("¿qué me sugerís como criterio?")
+
+
+def test_una_propuesta_de_prisma_registrada_se_acepta_al_primer_intento_y_se_confirma_con_un_si(
+        chat):
+    c = _alta_completa_menos_criterio(chat)
+
+    nuevas = _ayuda_con_propuesta_registrada(c)
+
+    assert len(c.modelo.conducidos) == 2        # el alta previa + un único intento
+    assert _cuerpos(nuevas) == [
+        f"Te propongo: {_PROPUESTA_DE_PRISMA}. Si te sirve, lo dejo así."]
+    propuesto = c.campo("acceptance_criterion")
+    assert (propuesto["estado"], propuesto["proposed_by"]) == ("proposed", "model")
+    assert propuesto["valor"] == _PROPUESTA_DE_PRISMA
+    assert c.incidentes(incidentes.ETAPA_ALTA_CONDUCIDA_FALLIDA) == []
+
+    c.modelo.conducciones.append(salida(
+        "Listo, revisalo.",
+        valores={"acceptance_criterion": {"texto": _PROPUESTA_DE_PRISMA}}))
+    nuevas = c.escribir("sí")
+
+    assert c.hechos()["propuesta_vigente"] == _PROPUESTA_DE_PRISMA
+    criterio = c.campo("acceptance_criterion")
+    assert (criterio["estado"], criterio["valor"]) == ("confirmed",
+                                                       _PROPUESTA_DE_PRISMA)
+    assert "Resumen para revisar" in nuevas[0]["cuerpo"]
+    assert c.incidentes(incidentes.ETAPA_ALTA_CONDUCIDA_FALLIDA) == []
+
+
+def test_si_la_persona_rechaza_la_propuesta_de_prisma_y_da_la_suya_se_confirma_la_suya(
+        chat):
+    c = _alta_completa_menos_criterio(chat)
+    _ayuda_con_propuesta_registrada(c)
+    c.modelo.conducciones.append(salida(
+        "Listo, revisalo.",
+        valores={"acceptance_criterion": {
+            "texto": "Informe del cliente con su firma", "verificable": "si"}}))
+
+    nuevas = c.escribir("no, prefiero que lo firme el cliente")
+
+    criterio = c.campo("acceptance_criterion")
+    assert (criterio["estado"], criterio["valor"]) == (
+        "confirmed", "Informe del cliente con su firma")
+    assert "Resumen para revisar" in nuevas[0]["cuerpo"]
+    assert c.incidentes(incidentes.ETAPA_ALTA_CONDUCIDA_FALLIDA) == []
+
+
+def test_si_la_persona_rechaza_la_propuesta_y_pide_otra_prisma_puede_proponer_de_nuevo(
+        chat):
+    c = _alta_completa_menos_criterio(chat)
+    _ayuda_con_propuesta_registrada(c)
+    otra = "Registro de la prueba, con fotos y firma del responsable"
+    c.modelo.conducciones.append(salida(
+        f"Otra opción: {otra}. ¿Te sirve?", intencion="ayuda",
+        valores={"acceptance_criterion": {"propuesta": otra}}))
+
+    c.escribir("no me convence, ¿otra?")
+
+    criterio = c.campo("acceptance_criterion")
+    assert (criterio["estado"], criterio["valor"]) == ("proposed", otra)
+    assert c.incidentes(incidentes.ETAPA_ALTA_CONDUCIDA_FALLIDA) == []
+
+
 @pytest.mark.parametrize("dice", ["me va", "Informe firmado por calidad"])
 def test_una_propuesta_hecha_solo_en_la_conversacion_se_acepta_mandando_su_texto(
         chat, dice):

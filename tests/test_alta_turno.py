@@ -111,6 +111,11 @@ def test_tolera_un_json_en_texto_con_vallas():
     {"valores": {"due_date": {}}},
     {"valores": {"acceptance_criterion": {"verificable": "si"}}},
     {"valores": {"acceptance_criterion": {"texto": "x", "verificable": "tal vez"}}},
+    {"valores": {"acceptance_criterion": {"propuesta": ""}}},
+    {"valores": {"acceptance_criterion": {"propuesta": "   "}}},
+    {"valores": {"acceptance_criterion": {"propuesta": 3}}},
+    {"valores": {"acceptance_criterion": {"propuesta": "x", "otra": "y"}}},
+    {"valores": {"acceptance_criterion": {"verificable": "no", "propuesta": "x"}}},
     {"valores": {"acceptance_criterion": {"acepta_propuesta": False}}},
     {"valores": {"acceptance_criterion": {"acepta_propuesta": True, "texto": "x"}}},
     {"valores": {"acceptance_criterion": {"acepta_propuesta": True}}},
@@ -339,6 +344,43 @@ def test_un_criterio_propuesto_se_confirma_con_un_texto_sin_propuesta_previa_reg
         "texto": "Informe firmado por calidad"}})
     x = a.asignaciones[0]
     assert (x.estado, x.valor) == ("confirmed", "Informe firmado por calidad")
+
+
+PROPUESTA = "Prueba de 24 h sin fallas, con el registro adjunto"
+
+
+def test_una_propuesta_de_prisma_sin_texto_de_la_persona_se_lee():
+    s = leer(intencion="ayuda", texto="Te propongo una prueba de 24 h.",
+             valores={"acceptance_criterion": {"propuesta": PROPUESTA}})
+    assert s.valores["acceptance_criterion"] == {"propuesta": PROPUESTA}
+
+
+def test_una_propuesta_de_prisma_queda_propuesta_y_no_confirmada():
+    a = aplicar(hechos(), intencion="ayuda", valores={"acceptance_criterion": {
+        "propuesta": PROPUESTA}})
+    x = a.asignaciones[0]
+    assert (x.campo, x.estado, x.valor) == ("acceptance_criterion", "proposed",
+                                            PROPUESTA)
+    assert a.criterio_propuesto is True and a.criterio_sin_propuesta is False
+    assert "acceptance_criterion" in a.faltan_tras(hechos())      # no es dato completo
+
+
+def test_prisma_puede_proponer_de_nuevo_si_la_persona_rechazo_la_anterior():
+    # No hay texto de la persona que pisar: la regla de una sola propuesta cuida
+    # el texto propio de la persona, no una propuesta que ella no aceptó.
+    h = hechos(propuesta_hecha=True, propuesta_vigente="Otra",
+               borrador={"acceptance_criterion": CampoBorrador(
+                   "propuesto", "Otra", "Otra")})
+    a = aplicar(h, valores={"acceptance_criterion": {"propuesta": PROPUESTA}})
+    x = a.asignaciones[0]
+    assert (x.estado, x.valor) == ("proposed", PROPUESTA)
+
+
+def test_una_propuesta_no_pisa_un_criterio_ya_confirmado():
+    h = hechos(borrador={"acceptance_criterion": confirmado(
+        mostrado="Informe firmado", ref="Informe firmado")})
+    a = aplicar(h, valores={"acceptance_criterion": {"propuesta": PROPUESTA}})
+    assert a.asignaciones == () and "ya está confirmado" in a.rechazos[0]
 
 
 def test_un_criterio_propuesto_no_cuenta_como_dato_completo():
@@ -596,6 +638,37 @@ def test_ayuda_pide_ayuda_y_vuelve_a_preguntar():
                      pregunta=["acceptance_criterion"]) is None
 
 
+def test_proponer_un_dato_que_falta_cuenta_como_preguntar_por_el():
+    h = hechos(borrador={c: confirmado(mostrado=c, ref=c)
+                         for c in T.CAMPOS_REQUERIDOS if c != "acceptance_criterion"})
+    # Hallazgo real (2026-10-01): ayuda, `pregunta: []`, propuesta registrada.
+    assert verificar(h, intencion="ayuda", pregunta=[],
+                     texto=f"Te propongo: {PROPUESTA}. Si te sirve, lo dejo así.",
+                     valores={"acceptance_criterion": {"propuesta": PROPUESTA}}
+                     ) is None
+
+
+def test_sin_preguntar_ni_proponer_lo_que_falta_se_sigue_rechazando():
+    motivo = verificar(intencion="ayuda", pregunta=[],
+                       texto="Algo que se pueda comprobar, como un informe firmado.")
+    assert motivo.startswith("falta_pregunta")
+
+
+def test_la_propuesta_basta_como_proximo_paso_aunque_falten_otros_datos():
+    # La persona tiene qué contestar (la propuesta); lo demás se pide después.
+    assert verificar(intencion="ayuda", pregunta=[],
+                     texto=f"Te propongo: {PROPUESTA}. Si te sirve, lo dejo así.",
+                     valores={"acceptance_criterion": {"propuesta": PROPUESTA}}
+                     ) is None
+
+
+def test_el_texto_puede_repetir_la_propuesta_registrada():
+    assert verificar(intencion="ayuda", pregunta=[],
+                     texto=f"¿Te sirve «{PROPUESTA}»?",
+                     valores={"acceptance_criterion": {"propuesta": PROPUESTA}}
+                     ) is None
+
+
 # ------------------------------------------------------ lo que ve el modelo
 
 def test_los_hechos_para_el_modelo_nunca_llevan_un_id_real():
@@ -664,6 +737,14 @@ def test_la_guia_de_voz_dice_lo_esencial():
     for clave in ("dato", "nunca inventes", "boton_final", "conducir_alta"):
         assert clave.lower() in guia.lower()
     assert "Entendí que" in guia      # lo nombra para prohibirlo
+
+
+def test_la_guia_y_el_esquema_dan_un_lugar_a_la_propuesta_de_prisma():
+    assert "registralo en `propuesta`" in T.SISTEMA_ALTA
+    criterio = T.ESQUEMA_SALIDA["properties"]["valores"]["properties"][
+        "acceptance_criterion"]
+    assert "propuesta" in criterio["properties"]
+    assert "required" not in criterio       # `texto` ya no es obligatorio
 
 
 def test_la_guia_ya_no_menciona_la_clave_de_aceptar_la_propuesta():

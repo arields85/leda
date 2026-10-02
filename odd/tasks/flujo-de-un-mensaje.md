@@ -1746,3 +1746,53 @@ Diseño B elegido por el usuario. Ruta declarada: un solo escritor (encargo expl
   salida del modelo, `falta_pregunta` y `formato`, y la misma clase falló a la mañana sin
   stream). **Decisión del usuario: stream encendido** en `prisma_flujo` ("me ayudó mucho a
   ver cómo se comporta Prisma").
+
+### Propuestas de Prisma: un lugar en el contrato (tercera vez, punto 4) (2026-10-01)
+
+- **Evidencia de la auditoría (turnos reales de las 21:51 y 21:58).** La persona pidió ayuda con el
+  criterio ("¿qué me sugerís como criterio?") y el modelo lo propuso en su respuesta ("Te propongo: …
+  Si te sirve, lo dejo así."). Intento 1: `intencion: ayuda`, `pregunta: []`, `valores: []`, rechazado con
+  `falta_pregunta: el criterio de aceptación` (el modelo proponía, no "preguntaba", y no declaró
+  `pregunta`). Intento 2: el modelo intentó REGISTRAR su propuesta (`acceptance_criterion: {propuesta}`
+  sin `texto`), rechazado con `formato: acceptance_criterion es {texto, verificable?, propuesta?}` porque
+  `texto` era obligatorio. A las 21:58 fallaron los dos intentos: aviso neutro, incidente y aviso al
+  administrador. A las 21:45 el mismo rechazo de formato costó un reintento con Ismael.
+- **Razonamiento del disparador (AGENTS.md, punto 4).** Tercera aparición de la misma clase, las propuestas
+  de Prisma: `acepta_propuesta` (81bb60a, propuesta sin registro), el reintento de las 21:45 y ahora este
+  par de rechazos. Seguir con otro parche habría sido un tercer arreglo sobre el mismo camino
+  (`_criterio` / `verificar_turno`). La causa es de mecanismo: el contrato no tenía lugar para una
+  propuesta hecha por Prisma cuando la persona no dio texto, y el modelo busca de forma natural "registrar
+  mi propuesta". Dirección del usuario: no restringir al modelo; darle el lugar que busca. Regla ADR 0013
+  "estado real y sólo opciones posibles": el contrato debe ofrecer lo que el modelo necesita decir.
+- **Arreglo (mecanismo, sin esquema de base).**
+  1. `acceptance_criterion: {propuesta}` sin `texto` = "Prisma propone este criterio" (`leer_salida` lo acepta
+     sólo solo; vacía, no texto o con otras claves se rechaza). `aplicar_valores`/`_criterio` lo guardan
+     `proposed` (mismo almacenamiento que `verificable: "no"` + `propuesta`; se expone como
+     `propuesta_vigente`), nunca confirmado.
+  2. Una propuesta registrada de un dato que falta cuenta como preguntar por él: `verificar_turno` exige
+     `pregunta` O una propuesta registrada de un dato que sigue faltando. Sigue siendo la invariante "la
+     persona siempre tiene un próximo paso", no una regla de estilo.
+  3. Aceptar sigue siendo un solo camino: el "sí" y el modelo manda `{texto: <propuesta>}`, que pasa a
+     confirmado. `SISTEMA_ALTA` y el esquema dicen: "si proponés un criterio, registralo en `propuesta`
+     (sola, sin `texto`); si la persona lo acepta, mandá ese texto como `texto`".
+  4. El texto de la respuesta puede repetir la propuesta registrada (`_textos_permitidos` ya incluye lo que
+     asigna el turno); cubierto por prueba.
+- **Hallazgo `propuesta_hecha`.** La regla de una sola propuesta por alta sólo actúa en el camino
+  `{texto, verificable: "no", propuesta}` (la propuesta no pisa el texto propio de la persona). En la
+  propuesta sola no hay texto de la persona que pisar, así que no se aplica: si la persona rechaza la
+  propuesta, Prisma puede volver a proponer (reemplaza la propuesta `proposed`) y el criterio ya confirmado
+  sigue protegido por `_ya_confirmado`. No se tocó el comportamiento existente; no bloquea el flujo.
+- **RED.** `tests/test_alta_turno.py tests/test_alta_conducida.py tests/test_conducir_alta_proveedores.py
+  tests/test_horizonte_tarea.py tests/test_respuesta_en_stream.py`: 11 failed, 322 passed.
+- **GREEN.** Mismos archivos: 333 passed.
+- **Pruebas.** Nuevas en `test_alta_turno.py` (lectura, almacenamiento `proposed`, repetir propuesta,
+  no pisar confirmado, verificador con propuesta, sin preguntar ni proponer sigue rechazado, texto que repite
+  la propuesta, guía y esquema) y en `test_alta_conducida.py` (el caso real de punta a punta, la persona
+  rechaza y da la suya, la persona rechaza y Prisma propone otra). Sólo se agregaron casos de rechazo a la
+  lista de `test_una_salida_con_algo_fuera_del_contrato_se_rechaza_entera`; ninguna prueba existente
+  cambió de significado.
+- Stream más seguido (`fa7664c`, pedido del usuario: "bajar el refresco para ver más sus
+  pensamientos"): el borrador se actualiza cada 0,15 s. Se encontró que los errores HTTP de
+  Telegram en el borrador se ignoraban en silencio (no se miraba el código de respuesta):
+  ahora un 429 espera lo que pide Telegram (tope 2 s) y sigue con lo último, y otro error
+  corta el stream del turno y se reporta. RED 2 failed; GREEN 155 passed.

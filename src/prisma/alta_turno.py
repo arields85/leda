@@ -304,8 +304,14 @@ def _forma_del_valor(campo: str, valor: Any) -> str | None:
             return None
         return "`due_date` es {fecha_iso} o {falta: \"dia\"}"
     elif campo == "acceptance_criterion":
+        if claves == {"propuesta"}:
+            # Prisma propone un criterio sin texto de la persona: no se confirma.
+            if not _cadena(valor["propuesta"]) or not valor["propuesta"].strip():
+                return "`propuesta` no es un texto"
+            return None
         if not claves <= _CLAVES_DEL_CRITERIO or not _cadena(valor.get("texto")):
-            return "`acceptance_criterion` es {texto, verificable?, propuesta?}"
+            return ("`acceptance_criterion` es {texto, verificable?, propuesta?} "
+                    "o {propuesta}")
         if "verificable" in valor and valor["verificable"] not in _VERIFICABLES:
             return "`verificable` es si o no"
         if "propuesta" in valor and not _cadena(valor["propuesta"]):
@@ -449,6 +455,16 @@ def _criterio(valor: dict, h: HechosTurno, corrige: tuple[str, ...],
     (quedó propuesto), `sin_propuesta` (no verificable sin propuesta válida: se
     toma el texto) o `` (nada especial)."""
     campo = "acceptance_criterion"
+    if "texto" not in valor:
+        # Propuesta de Prisma sin texto de la persona: queda propuesta, no
+        # confirmada. Puede repetirse si la persona rechazó la anterior: la regla
+        # de una sola propuesta cuida el texto propio de la persona, no esto.
+        propuesta, motivo = _texto_de(campo, valor["propuesta"], h)
+        if motivo:
+            return motivo, ""
+        resultado = _asignar(campo, propuesta, propuesta, "proposed", propuesta,
+                             h, corrige)
+        return resultado, "propuesto" if isinstance(resultado, Asignacion) else ""
     texto, motivo = _texto_de(campo, valor["texto"], h)
     if motivo:
         return motivo, ""
@@ -608,8 +624,10 @@ def verificar_turno(salida: SalidaTurno, h: HechosTurno, a: Aplicacion) -> str |
     # decide la conversación, no el verificador.
     # Pedir es preguntar aunque no lleve signos ("decime la fecha"): se comprueba lo
     # que el modelo declara en `pregunta`, no la puntuación del texto.
+    # Proponer un dato que falta es pedirlo: la persona tiene qué contestar.
     faltan = a.faltan_tras(h)
-    if faltan and not salida.pregunta:
+    propuestos = {x.campo for x in a.asignaciones if x.estado == "proposed"}
+    if faltan and not salida.pregunta and not propuestos.intersection(faltan):
         return f"falta_pregunta: {_SUJETOS[faltan[0]]}"
     if salida.botones and salida.botones not in salida.pregunta:
         return f"botones_sin_pregunta: {salida.botones}"
@@ -645,9 +663,13 @@ ESQUEMA_SALIDA = _objeto({
                                          "relativos."},
             "falta": {"type": "string", "enum": ["dia"]}}),
         "acceptance_criterion": _objeto({
-            "texto": {"type": "string"},
+            "texto": {"type": "string",
+                      "description": "Lo que dijo la persona, o la propuesta que "
+                                     "acepta."},
             "verificable": {"type": "string", "enum": list(_VERIFICABLES)},
-            "propuesta": {"type": "string"}}),
+            "propuesta": {"type": "string",
+                          "description": "Un criterio que proponés vos: sola, sin "
+                                         "`texto`, queda propuesta y no confirmada."}}),
     }),
     "corrige": {"type": "array", "items": {"type": "string",
                                            "enum": list(CAMPOS)}},
@@ -690,8 +712,9 @@ SISTEMA_ALTA = (
     "viernes\" o \"la semana que viene\", no un límite; si el día no queda claro, "
     "`{\"falta\": \"dia\"}`); el criterio con `verificable` "
     "(si dice cómo se comprueba que está hecha) y, si no lo es, una `propuesta` "
-    "concreta. Si acepta una propuesta (la tuya en la charla o la "
-    "`propuesta_vigente`), mandá ese texto como `texto` del criterio, o esa fecha como `fecha_iso`. Nunca "
+    "concreta. Si proponés vos un criterio, registralo en `propuesta` (sola, sin "
+    "`texto`); si la persona lo acepta (la tuya o la `propuesta_vigente`), mandá ese "
+    "texto como `texto` del criterio, o esa fecha como `fecha_iso`. Nunca "
     "inventes opciones, datos ni hechos.\n"
     "- `corrige`: los datos ya confirmados que la persona cambia. Un valor para "
     "un dato confirmado sólo vale si va acá.\n"
