@@ -1,12 +1,12 @@
 id: b-0017
 objetivo: >
-  Prisma orienta, no charla (ADR 0007, T4): tocar una tarea de la lista abre
+  Leda orienta, no charla (ADR 0007, T4): tocar una tarea de la lista abre
   su menú de acciones (T2) y tocar una acción que cambia algo llega a la
   vista previa de siempre -- nada se aplica en PostgreSQL antes de tocar
   Confirmar (ADR 0005, decisión 1). Los dos toques ("indice: 0" -- la primera
   tarea de la lista -- y la etiqueta del menú) los simula el corredor
   (`corrida.ejecutar_escenario`, T4), no el modelo: representan a la persona
-  tocando los botones que Prisma ofreció.
+  tocando los botones que Leda ofreció.
 actor: Marcos Tarquini
 mensajes:
   - "pasame la lista completa de mis tareas"

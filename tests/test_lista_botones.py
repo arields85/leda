@@ -1,4 +1,4 @@
-"""Listas de tareas como botones (T3, `prisma-orienta`; ADR 0007 punto 3).
+"""Listas de tareas como botones (T3, `leda-orienta`; ADR 0007 punto 3).
 
 El servidor, no el modelo, garantiza que una lista de tareas salga como
 botones: cuando en un turno el modelo usa `consultar_tareas` y responde, el
@@ -24,14 +24,14 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from fastapi.testclient import TestClient
 
-from prisma import gateway
-from prisma import pendientes as P
-from prisma.agente import responder
-from prisma.autoridad import Canal, identificar
-from prisma.calendario import Calendario
-from prisma.db import admin, espacio
-from prisma.llm import Llamada, ProveedorGuionado, Respuesta
-from prisma.salida import (BUTTON_TEXT_LIMIT, ICONO_TAREA, con_icono,
+from leda import gateway
+from leda import pendientes as P
+from leda.agente import responder
+from leda.autoridad import Canal, identificar
+from leda.calendario import Calendario
+from leda.db import admin, espacio
+from leda.llm import Llamada, ProveedorGuionado, Respuesta
+from leda.salida import (BUTTON_TEXT_LIMIT, ICONO_TAREA, con_icono,
                            etiqueta_de_accion_menu, etiqueta_sin_icono,
                            etiquetas_boton_distinguibles, telegram_utf16_units)
 
@@ -96,7 +96,7 @@ def _tareas_en_orden(cur, ws, cantidad, *, persona="Marcos Tarquini"):
 
 def _con_proveedor(monkeypatch, guion):
     proveedor = ProveedorGuionado(guion=list(guion))
-    monkeypatch.setattr("prisma.llm.desde_base", lambda cur, ws, key: proveedor)
+    monkeypatch.setattr("leda.llm.desde_base", lambda cur, ws, key: proveedor)
     return proveedor
 
 
@@ -346,7 +346,7 @@ def test_ver_mas_tarea_que_se_cierra_mientras_tanto_se_queda_en_la_pagina(
     with admin(conn) as cur:
         cur.execute(
             "insert into task_state_event (task_id, estado_anterior, estado_nuevo, "
-            "actor_kind, motivo) values (%s, 'asignada', 'cancelada', 'prisma', "
+            "actor_kind, motivo) values (%s, 'asignada', 'cancelada', 'leda', "
             "'prueba')", (ids[4],))
     conn.commit()
 
@@ -515,7 +515,7 @@ def _tarea_admin(cur, ws, objetivo, area_id, membership_id, titulo):
         (ws, objetivo, titulo, area_id, membership_id))
     tid = str(cur.fetchone()["id"])
     cur.execute("insert into task_state_event (task_id, estado_nuevo, actor_kind) "
-                "values (%s, 'asignada', 'prisma')", (tid,))
+                "values (%s, 'asignada', 'leda')", (tid,))
     return tid
 
 

@@ -20,14 +20,14 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from prisma import gateway
-from prisma import ingreso_tareas as I
-from prisma import pendientes as P
-from prisma.calendario import Calendario
-from prisma.db import admin, autoridad, espacio
-from prisma.despachador import TransporteDePrueba, despachar
-from prisma.llm import RespectoPendiente
-from prisma.salida import (COPY_TEXT_LIMIT, ETIQUETA_COPIAR, ETIQUETA_MODIFICAR,
+from leda import gateway
+from leda import ingreso_tareas as I
+from leda import pendientes as P
+from leda.calendario import Calendario
+from leda.db import admin, autoridad, espacio
+from leda.despachador import TransporteDePrueba, despachar
+from leda.llm import RespectoPendiente
+from leda.salida import (COPY_TEXT_LIMIT, ETIQUETA_COPIAR, ETIQUETA_MODIFICAR,
                            etiqueta_sin_icono)
 
 from tests.test_alta_eleccion_confirmacion import (TITULO, _alta_en_confirmacion,
@@ -206,7 +206,7 @@ def test_el_selector_es_la_pregunta_abierta_de_la_rama(intake_world, conn,
     rid, pid, client, user = _modificar(conn, monkeypatch, intake_world)
 
     with espacio(conn, intake_world["north-lab"]["id"]) as cur:
-        from prisma.autoridad import Canal, identificar
+        from leda.autoridad import Canal, identificar
         quien = identificar(cur, user, Canal.ESPACIO,
                             intake_world["north-lab"]["id"])
         pregunta = I.open_intake_question(cur, quien, user)
@@ -282,7 +282,7 @@ def test_un_dato_de_texto_muestra_lo_que_tenia_en_un_bloque_copiable_y_abre_su_c
     assert fila["intake_choice_set_id"] is None and fila["pending_action_id"] is None
     # El campo queda abierto: el mensaje siguiente lo reemplaza.
     with espacio(conn, intake_world["north-lab"]["id"]) as cur:
-        from prisma.autoridad import Canal, identificar
+        from leda.autoridad import Canal, identificar
         quien = identificar(cur, user, Canal.ESPACIO,
                             intake_world["north-lab"]["id"])
         pregunta = I.open_intake_question(cur, quien, user)
@@ -622,7 +622,7 @@ def _es_respuesta(conn, pid) -> bool:
 
 
 def _calendario_cerrado(conn, ws) -> Calendario:
-    """Sin ningún día hábil: todo lo que inicia Prisma queda fuera de horario."""
+    """Sin ningún día hábil: todo lo que inicia Leda queda fuera de horario."""
     with espacio(conn, ws) as cur:
         zona = Calendario.desde_base(cur, ws).zona
     return Calendario(frozenset(), time(9), time(18), frozenset(), zona)
@@ -660,9 +660,9 @@ def test_la_vista_previa_del_alta_de_quien_la_confirma_es_una_respuesta(
     assert _es_respuesta(conn, pid) is True
 
 
-def test_si_confirma_otra_persona_su_vista_previa_la_inicia_prisma(
+def test_si_confirma_otra_persona_su_vista_previa_la_inicia_leda(
         intake_world, conn):
-    """Para el aprobador es un mensaje que Prisma le inicia: horario y tope."""
+    """Para el aprobador es un mensaje que Leda le inicia: horario y tope."""
     rid, pid = _alta_enviada(conn, intake_world)
 
     assert _es_respuesta(conn, pid) is False
@@ -751,7 +751,7 @@ def test_repreguntar_un_dato_de_modificar_tras_una_charla_vuelve_con_su_bloque(
     # espacio de texto libre sigue activo: el mensaje siguiente lo reemplaza.
     assert _campos(conn, rid)[campo] == ("confirmed", guardado)
     with espacio(conn, intake_world["north-lab"]["id"]) as cur:
-        from prisma.autoridad import Canal, identificar
+        from leda.autoridad import Canal, identificar
         quien = identificar(cur, user, Canal.ESPACIO,
                             intake_world["north-lab"]["id"])
         pregunta = I.open_intake_question(cur, quien, user)
@@ -880,7 +880,7 @@ def test_despues_de_volver_al_resumen_solo_confirmar_crea_la_tarea(
 
 @pytest.mark.parametrize("vacia", [None, "", "   "])
 def test_una_fecha_objetivo_vacia_no_se_muestra_como_la_palabra_none(vacia):
-    from prisma import ingreso_tareas as I
+    from leda import ingreso_tareas as I
 
     assert I.format_due_date(vacia) == ""
     vista = I.render_preview(
@@ -891,7 +891,7 @@ def test_una_fecha_objetivo_vacia_no_se_muestra_como_la_palabra_none(vacia):
 
 
 def test_una_fecha_iso_sigue_mostrandose_como_dia_mes_anio():
-    from prisma import ingreso_tareas as I
+    from leda import ingreso_tareas as I
 
     assert I.format_due_date("2028-02-29") == "29/02/2028"
     assert I.format_due_date("pasado mañana") == "pasado mañana"   # no ISO: tal cual

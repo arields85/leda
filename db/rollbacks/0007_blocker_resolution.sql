@@ -8,7 +8,7 @@
 -- to close -- which is the safe direction for a rollback: no half-applied
 -- function left behind with the wrong owner or privileges.
 begin;
-set search_path = prisma, public;
+set search_path = leda, public;
 
 drop function if exists estado_previo_a_bloqueo(uuid);
 

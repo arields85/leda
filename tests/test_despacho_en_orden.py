@@ -17,10 +17,10 @@ import threading
 import time
 from datetime import datetime, timedelta, timezone
 
-from prisma.calendario import Calendario
-from prisma.db import conectar, espacio
-from prisma.despachador import TransporteDePrueba, despachar
-from prisma.salida import enqueue_outbox
+from leda.calendario import Calendario
+from leda.db import conectar, espacio
+from leda.despachador import TransporteDePrueba, despachar
+from leda.salida import enqueue_outbox
 
 CHAT = 76001
 
@@ -131,7 +131,7 @@ def test_el_despacho_serializado_no_bloquea_a_otro_espacio(corework, conn, uri):
 
     ws = corework.workspace_id
     with conn.cursor() as cur:
-        cur.execute("set role prisma_admin")
+        cur.execute("set role leda_admin")
         otro = _espacio_activo(cur, "otro-orden")
     conn.commit()
     ahora = datetime.now(timezone.utc) - timedelta(seconds=5)

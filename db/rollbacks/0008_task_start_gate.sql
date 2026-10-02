@@ -19,7 +19,7 @@
 -- fixed incidentally while verifying 0012's own round-trip, unrelated to
 -- ADR 0009's behavior.
 begin;
-set search_path = prisma, public;
+set search_path = leda, public;
 
 drop trigger if exists trg_exigir_dependencias_resueltas on task_state_event;
 drop function if exists exigir_dependencias_resueltas();

@@ -10,7 +10,7 @@
 -- `area_id` es nula por omisión y no se rellena acá: un objetivo sin área es un
 -- dato viejo, y el alta lo trata con cautela (sólo lo ofrece si el área de quien
 -- pide no tiene objetivos propios). Para dar el área a los objetivos que ya
--- existen, reimportar el pack (`python -m prisma importar <espacio>`): el
+-- existen, reimportar el pack (`python -m leda importar <espacio>`): el
 -- importador completa `area_id` de los frentes que todavía no la tienen, sin
 -- tocar los que ya la tienen.
 --
@@ -19,7 +19,7 @@
 --
 -- Se deshace con `db/rollbacks/0027_objetivo_con_area.sql`.
 begin;
-set search_path = prisma, public;
+set search_path = leda, public;
 
 -- Fail closed if an invoking text pipeline decoded the UTF-8 file incorrectly.
 -- chr() builds the expected value independently from non-ASCII source bytes.
@@ -33,12 +33,12 @@ do $$ begin
 end $$;
 
 do $$ begin
-  if to_regclass('prisma.objective') is null then
+  if to_regclass('leda.objective') is null then
     raise exception '0027 requires objective (0001_task_commitment.sql)';
   end if;
   if exists (
       select 1 from information_schema.columns
-       where table_schema = 'prisma' and table_name = 'objective'
+       where table_schema = 'leda' and table_name = 'objective'
          and column_name = 'area_id') then
     raise exception '0027 ya está aplicada.';
   end if;

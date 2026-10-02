@@ -7,7 +7,7 @@
 -- quitar la columna se lleva el índice. Se pierde qué botón tocó cada persona
 -- (los toques siguen registrados como actividad, sin el botón).
 begin;
-set search_path = prisma, public;
+set search_path = leda, public;
 
 alter table inbound_message drop column if exists boton_callback;
 

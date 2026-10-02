@@ -13,10 +13,10 @@ import json
 
 import pytest
 
-from prisma import incidentes, llm, redaccion
-from prisma.db import admin
-from prisma.llm import ProveedorGuionado, RespectoPendiente
-from prisma.valores import TipoValor, ValorEsperado
+from leda import incidentes, llm, redaccion
+from leda.db import admin
+from leda.llm import ProveedorGuionado, RespectoPendiente
+from leda.valores import TipoValor, ValorEsperado
 
 from tests.test_alta_pregunta_pendiente import (PREGUNTA_TITULO, _abrir_alta,
                                                 _mensaje_privado)

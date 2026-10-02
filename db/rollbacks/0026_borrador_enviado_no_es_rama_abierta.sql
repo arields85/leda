@@ -8,7 +8,7 @@
 -- una solicitud enviada a aprobación y otra `active` a la vez: el índice no se
 -- podría crear y el rollback abortaría sin tocar nada.
 begin;
-set search_path = prisma, public;
+set search_path = leda, public;
 
 drop index if exists task_intake_one_active;
 alter table task_intake_request drop column if exists enviada_en;

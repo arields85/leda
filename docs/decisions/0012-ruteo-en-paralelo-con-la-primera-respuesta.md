@@ -2,12 +2,12 @@
 
 - **Estado:** revertida el 2026-09-29 (ver "Reversión" al final); aceptada el 2026-09-28
 - **Fecha:** 2026-09-28
-- **Alcance:** `src/prisma/agente.py` (`preparar`, `Especulacion`, `especular`,
-  `responder`); `src/prisma/gateway.py` (`_turno`, `_avanzar_aclaracion`);
-  `src/prisma/llm.py` (`admite_especulacion`); `tests/banco/corrida.py`
+- **Alcance:** `src/leda/agente.py` (`preparar`, `Especulacion`, `especular`,
+  `responder`); `src/leda/gateway.py` (`_turno`, `_avanzar_aclaracion`);
+  `src/leda/llm.py` (`admite_especulacion`); `tests/banco/corrida.py`
   (`ProveedorGrabador`); `tests/test_especulacion.py` (nuevo).
 - **Evidencia:** banco real con `nan/deepseek-v4-flash`, 2026-09-28 (T8b y
-  T8c-1 en `odd/tasks/prisma-orienta.md`): 29 de 36 escenarios rutean a
+  T8c-1 en `odd/tasks/leda-orienta.md`): 29 de 36 escenarios rutean a
   conversación normal; el ruteo tarda ~2,5 s de mediana y la primera llamada
   del responder ~3,6 s; NaN admite 7 pedidos concurrentes. Lectura del código
   de `gateway._turno` y `agente.responder`.
@@ -111,7 +111,7 @@ con esta evidencia del banco real (`nan/deepseek-v4-flash`):
   la ganancia.
 
 En su lugar se acota el tiempo de cada llamada al modelo con reintento (T8c-4 en
-`odd/tasks/prisma-orienta.md`), que ataca directamente los turnos de más de 90 s.
+`odd/tasks/leda-orienta.md`), que ataca directamente los turnos de más de 90 s.
 Esta decisión queda como registro: si en el futuro los turnos sin referencias
 dominaran o el proveedor no tuviera cuelgues, se puede reconsiderar con esta
 evidencia.

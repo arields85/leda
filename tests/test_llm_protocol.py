@@ -7,8 +7,8 @@ import anthropic
 import httpx
 import pytest
 
-import prisma.llm as llm
-from prisma.llm import (IntentAction, IntentRoute, Llamada, ProveedorAnthropic,
+import leda.llm as llm
+from leda.llm import (IntentAction, IntentRoute, Llamada, ProveedorAnthropic,
                          ProveedorCompatible, ProveedorGemini, ProveedorGuionado,
                          RouteEnvelope, RoutingError)
 
@@ -88,7 +88,7 @@ def test_router_system_keeps_the_measured_reference_wording():
     esa parte de la receta no cambió.
 
     Lo que sí cambió (decisión del usuario, 2026-09-27,
-    `odd/tasks/prisma-orienta.md`, b-0005-b): la FORMA de cada referencia ya
+    `odd/tasks/leda-orienta.md`, b-0005-b): la FORMA de cada referencia ya
     no es una copia literal del mensaje -- es el trabajo al que esa mención
     apunta (acción + objeto), para que Jev reciba una referencia más
     resoluble sin bajar `jev.CORTE_CLARA` ni darle más contexto. Guardas que
@@ -98,7 +98,7 @@ def test_router_system_keeps_the_measured_reference_wording():
     genuinamente ambigua siga ambigua), y no inventar un trabajo donde la
     mención no apunta a ninguno."""
     assert "Separás las referencias de un mensaje de trabajo." in llm.ROUTER_SYSTEM
-    assert "No incluyas a Prisma (el asistente) como persona." in llm.ROUTER_SYSTEM
+    assert "No incluyas a Leda (el asistente) como persona." in llm.ROUTER_SYSTEM
     assert ("el trabajo al que esa mención apunta: una frase corta "
             "con la acción y el objeto") in llm.ROUTER_SYSTEM
     assert ("por ejemplo \"que termine primero el plc\" -> \"terminar el "

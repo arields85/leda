@@ -17,8 +17,8 @@ from datetime import date
 
 import pytest
 
-from prisma import alta_turno as T
-from prisma.alta_turno import (CampoBorrador, HechosTurno, OpcionAlta,
+from leda import alta_turno as T
+from leda.alta_turno import (CampoBorrador, HechosTurno, OpcionAlta,
                                leer_salida)
 
 HOY = date(2028, 2, 28)     # lunes
@@ -349,13 +349,13 @@ def test_un_criterio_propuesto_se_confirma_con_un_texto_sin_propuesta_previa_reg
 PROPUESTA = "Prueba de 24 h sin fallas, con el registro adjunto"
 
 
-def test_una_propuesta_de_prisma_sin_texto_de_la_persona_se_lee():
+def test_una_propuesta_de_leda_sin_texto_de_la_persona_se_lee():
     s = leer(intencion="ayuda", texto="Te propongo una prueba de 24 h.",
              valores={"acceptance_criterion": {"propuesta": PROPUESTA}})
     assert s.valores["acceptance_criterion"] == {"propuesta": PROPUESTA}
 
 
-def test_una_propuesta_de_prisma_queda_propuesta_y_no_confirmada():
+def test_una_propuesta_de_leda_queda_propuesta_y_no_confirmada():
     a = aplicar(hechos(), intencion="ayuda", valores={"acceptance_criterion": {
         "propuesta": PROPUESTA}})
     x = a.asignaciones[0]
@@ -365,7 +365,7 @@ def test_una_propuesta_de_prisma_queda_propuesta_y_no_confirmada():
     assert "acceptance_criterion" in a.faltan_tras(hechos())      # no es dato completo
 
 
-def test_prisma_puede_proponer_de_nuevo_si_la_persona_rechazo_la_anterior():
+def test_leda_puede_proponer_de_nuevo_si_la_persona_rechazo_la_anterior():
     # No hay texto de la persona que pisar: la regla de una sola propuesta cuida
     # el texto propio de la persona, no una propuesta que ella no aceptó.
     h = hechos(propuesta_hecha=True, propuesta_vigente="Otra",
@@ -739,7 +739,7 @@ def test_la_guia_de_voz_dice_lo_esencial():
     assert "Entendí que" in guia      # lo nombra para prohibirlo
 
 
-def test_la_guia_y_el_esquema_dan_un_lugar_a_la_propuesta_de_prisma():
+def test_la_guia_y_el_esquema_dan_un_lugar_a_la_propuesta_de_leda():
     assert "registralo en `propuesta`" in T.SISTEMA_ALTA
     criterio = T.ESQUEMA_SALIDA["properties"]["valores"]["properties"][
         "acceptance_criterion"]
@@ -748,7 +748,7 @@ def test_la_guia_y_el_esquema_dan_un_lugar_a_la_propuesta_de_prisma():
 
 
 def test_la_guia_ya_no_menciona_la_clave_de_aceptar_la_propuesta():
-    from prisma.alta_turno import ESQUEMA_SALIDA, SISTEMA_ALTA
+    from leda.alta_turno import ESQUEMA_SALIDA, SISTEMA_ALTA
     assert "acepta_propuesta" not in SISTEMA_ALTA
     assert "acepta_propuesta" not in json.dumps(ESQUEMA_SALIDA)
 
@@ -856,7 +856,7 @@ def test_una_fecha_pasada_se_rechaza_y_el_texto_puede_nombrar_lo_que_dijo_la_per
 
 
 # ---------------------------------------------------------------------------
-# Lo que Prisma puede ofrecer, como hecho (constitución §4: no prometer lo que no
+# Lo que Leda puede ofrecer, como hecho (constitución §4: no prometer lo que no
 # existe; el modelo rellenaba con lo que haría una persona)
 # ---------------------------------------------------------------------------
 

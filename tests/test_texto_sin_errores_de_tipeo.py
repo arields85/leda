@@ -15,8 +15,8 @@ devuelve ya lo prueban `test_alta_guiada_flujo` y `test_router_valor`.
 
 from __future__ import annotations
 
-import prisma.llm as llm
-from prisma.valores import TipoValor, ValorEsperado
+import leda.llm as llm
+from leda.valores import TipoValor, ValorEsperado
 
 PENDIENTE = "el título de la tarea nueva"
 

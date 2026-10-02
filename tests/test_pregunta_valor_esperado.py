@@ -15,10 +15,10 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from prisma import gateway, pendientes as P
-from prisma.ingreso_tareas import FREE_TEXT_NAMES, MODIFY_PICKER_KIND
-from prisma.llm import IntentAction, IntentRoute, ProveedorGuionado
-from prisma.valores import Opcion, TipoValor, ValorEsperado
+from leda import gateway, pendientes as P
+from leda.ingreso_tareas import FREE_TEXT_NAMES, MODIFY_PICKER_KIND
+from leda.llm import IntentAction, IntentRoute, ProveedorGuionado
+from leda.valores import Opcion, TipoValor, ValorEsperado
 
 
 def _abierta(herramienta, args=None, resumen="¿Cuál?"):

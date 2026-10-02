@@ -3,11 +3,11 @@
 El hueco que cierran: `where nombre ilike '%Mar%' limit 1` se queda con el
 primero que devuelva el planificador —Marcos, Martín o Mariano, da igual— y si
 no coincide nadie inserta NULL sin decir nada. La tarea queda creada, sin
-responsable, y Prisma contesta que la asignó. No miente el modelo: le mintió
+responsable, y Leda contesta que la asignó. No miente el modelo: le mintió
 la base.
 
 Una persona se resuelve exacto o no se resuelve. Cuando hay más de una
-candidata, Prisma pregunta con botones, y lo que vuelve es un identificador,
+candidata, Leda pregunta con botones, y lo que vuelve es un identificador,
 no un nombre para volver a adivinar.
 """
 
@@ -20,15 +20,15 @@ from zoneinfo import ZoneInfo
 import pytest
 from fastapi.testclient import TestClient
 
-from prisma import gateway
-from prisma import herramientas as H
-from prisma import pendientes as P
-from prisma.agente import responder
-from prisma.autoridad import Canal, identificar
-from prisma.calendario import Calendario
-from prisma.db import admin, espacio
-from prisma.llm import Llamada, ProveedorGuionado, Respuesta
-from prisma.salida import NO_EFFECT_STATUS
+from leda import gateway
+from leda import herramientas as H
+from leda import pendientes as P
+from leda.agente import responder
+from leda.autoridad import Canal, identificar
+from leda.calendario import Calendario
+from leda.db import admin, espacio
+from leda.llm import Llamada, ProveedorGuionado, Respuesta
+from leda.salida import NO_EFFECT_STATUS
 
 BA = ZoneInfo("America/Argentina/Buenos_Aires")
 AHORA = datetime(2026, 7, 27, 10, 0, tzinfo=BA)
@@ -163,7 +163,7 @@ def test_el_contexto_avisa_que_un_nombre_del_mensaje_es_ambiguo(corework, conn):
     que decida nada: los candidatos se resuelven con un select y le llegan ya
     en el contexto del turno.
     """
-    from prisma.contexto import construir
+    from leda.contexto import construir
 
     ws = corework.workspace_id
     with espacio(conn, ws) as cur:
@@ -178,7 +178,7 @@ def test_el_contexto_avisa_que_un_nombre_del_mensaje_es_ambiguo(corework, conn):
 
 
 def test_un_nombre_sin_ambiguedad_no_agrega_ruido(corework, conn):
-    from prisma.contexto import construir
+    from leda.contexto import construir
 
     ws = corework.workspace_id
     with espacio(conn, ws) as cur:
@@ -189,7 +189,7 @@ def test_un_nombre_sin_ambiguedad_no_agrega_ruido(corework, conn):
 
 
 def test_un_mensaje_sin_nombres_no_agrega_nada(corework, conn):
-    from prisma.contexto import construir
+    from leda.contexto import construir
 
     ws = corework.workspace_id
     with espacio(conn, ws) as cur:
@@ -200,7 +200,7 @@ def test_un_mensaje_sin_nombres_no_agrega_nada(corework, conn):
 
 
 def test_contexto_expone_identidad_y_reloj_confiables(corework, conn):
-    from prisma.contexto import construir
+    from leda.contexto import construir
 
     ws = corework.workspace_id
     with espacio(conn, ws) as cur:

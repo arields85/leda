@@ -2,7 +2,7 @@
 \set ON_ERROR_STOP on
 
 -- Applied after 0014_evidencia_no_sobrevive_a_pedir_cambios.sql. Seguimiento
--- de review-c112506a (`odd/tasks/prisma-orienta.md` T6c): el disparador
+-- de review-c112506a (`odd/tasks/leda-orienta.md` T6c): el disparador
 -- `exigir_dependencias_resueltas` (0008) rechaza CUALQUIER llegada a
 -- `en_curso` con una dependencia bloqueante todavía abierta, salvo la
 -- restauración desde `bloqueada`. "Pedir cambios"
@@ -21,7 +21,7 @@
 -- `estado_previo_a_bloqueo`, 0007) y la rama que exime esa restauración en
 -- el disparador.
 begin;
-set search_path = prisma, public;
+set search_path = leda, public;
 
 -- Fail closed if an invoking text pipeline decoded the UTF-8 file incorrectly.
 -- chr() builds the expected value independently from non-ASCII source bytes.
@@ -35,21 +35,21 @@ do $$ begin
 end $$;
 
 do $$ begin
-  if to_regprocedure('prisma.exigir_dependencias_resueltas()') is null then
+  if to_regprocedure('leda.exigir_dependencias_resueltas()') is null then
     raise exception '0015 requires 0008_task_start_gate.sql';
   end if;
-  if to_regprocedure('prisma.estado_previo_a_revision(uuid)') is not null then
+  if to_regprocedure('leda.estado_previo_a_revision(uuid)') is not null then
     raise exception '0015 ya está aplicada.';
   end if;
 end $$;
 
 -- Misma puerta angosta que `estado_previo_a_bloqueo` (0007), para la
 -- ÚLTIMA entrada a `en_revision` en vez de a `bloqueada`. `task_state_event`
--- es append-only y `prisma_app` no lo lee directo; esta función security
+-- es append-only y `leda_app` no lo lee directo; esta función security
 -- definer es la única puerta.
 create or replace function estado_previo_a_revision(p_task uuid)
 returns estado_tarea
-language plpgsql security definer set search_path = prisma, public, pg_temp as $$
+language plpgsql security definer set search_path = leda, public, pg_temp as $$
 declare previo estado_tarea;
 begin
   select estado_anterior into previo
@@ -61,15 +61,15 @@ begin
 end $$;
 
 alter function estado_previo_a_revision(uuid)
-  owner to prisma_owner;
+  owner to leda_owner;
 
 revoke execute on function estado_previo_a_revision(uuid) from public;
-grant execute on function estado_previo_a_revision(uuid) to prisma_app;
+grant execute on function estado_previo_a_revision(uuid) to leda_app;
 
 -- No es security definer: mismo motivo que 0008 -- corre con los
 -- privilegios de quien inserta, y sólo necesita ejecutar
 -- `estado_previo_a_revision` (arriba), no leer `task_state_event` directo.
--- `prisma_app` -- el único rol que hoy hace pasar una tarea a `en_curso`,
+-- `leda_app` -- el único rol que hoy hace pasar una tarea a `en_curso`,
 -- vía `resolver_bloqueo`, `pedir_cambios_tarea` o `actualizar_estado` -- ya
 -- tiene `execute` concedido sobre ella desde la concesión de arriba.
 create or replace function exigir_dependencias_resueltas() returns trigger as $$

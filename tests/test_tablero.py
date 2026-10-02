@@ -13,9 +13,9 @@ from datetime import datetime, timedelta, timezone
 import psycopg
 import pytest
 
-from prisma import tablero
-from prisma.db import admin, espacio
-from prisma.lectura import tareas_por_estado
+from leda import tablero
+from leda.db import admin, espacio
+from leda.lectura import tareas_por_estado
 
 AHORA = datetime(2028, 3, 15, 12, 0, tzinfo=timezone.utc)
 
@@ -29,7 +29,7 @@ def sin_espacio(conn):
     """
     with conn.transaction():
         with conn.cursor() as cur:
-            cur.execute("set local role prisma_app")
+            cur.execute("set local role leda_app")
             yield cur
 
 
@@ -154,7 +154,7 @@ def test_la_aplicacion_no_puede_leer_la_tabla_ni_emitir_para_otro_espacio(
 def cliente_web(conn, monkeypatch):
     from fastapi.testclient import TestClient
 
-    from prisma import gateway
+    from leda import gateway
 
     monkeypatch.setattr(gateway, "_conn", lambda: conn)
     return TestClient(gateway.app)
@@ -258,7 +258,7 @@ def test_la_pantalla_dice_lo_que_todavia_no_puede_medir(
 
 
 def _solicitante(conn, mundo, slug, persona="Taylor Quinn"):
-    from prisma.autoridad import Canal, Solicitante
+    from leda.autoridad import Canal, Solicitante
 
     datos = mundo[slug]
     return Solicitante(
@@ -272,12 +272,12 @@ def test_pedir_el_enlace_desde_un_grupo_no_emite_nada(intake_world, conn,
     """Un enlace en el grupo es acceso para cualquiera que lea el historial."""
     import dataclasses
 
-    from prisma import herramientas as H
+    from leda import herramientas as H
 
     monkeypatch.setattr(
-        "prisma.config.config",
-        dataclasses.replace(__import__("prisma.config", fromlist=["config"]).config,
-                            base_url="https://prisma.example"))
+        "leda.config.config",
+        dataclasses.replace(__import__("leda.config", fromlist=["config"]).config,
+                            base_url="https://leda.example"))
 
     quien = _solicitante(conn, intake_world, "north-lab")
     with espacio(conn, intake_world["north-lab"]["id"]) as cur:
@@ -298,12 +298,12 @@ def test_pedir_el_enlace_por_privado_devuelve_uno_que_abre(
     """El circuito entero: pedir, recibir el enlace, abrirlo, ver."""
     import dataclasses
 
-    from prisma import config as config_mod
-    from prisma import herramientas as H
+    from leda import config as config_mod
+    from leda import herramientas as H
 
     monkeypatch.setattr(
         config_mod, "config",
-        dataclasses.replace(config_mod.config, base_url="https://prisma.example"))
+        dataclasses.replace(config_mod.config, base_url="https://leda.example"))
 
     _cargar_trabajo(conn, intake_world, "north-lab", "Tarea visible")
 
@@ -313,7 +313,7 @@ def test_pedir_el_enlace_por_privado_devuelve_uno_que_abre(
     conn.commit()
 
     assert resultado["emitido"] is True
-    assert resultado["enlace"].startswith("https://prisma.example/tablero/")
+    assert resultado["enlace"].startswith("https://leda.example/tablero/")
 
     token = resultado["enlace"].rsplit("/", 1)[1]
     r = cliente_web.get(f"/tablero/{token}")

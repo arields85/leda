@@ -15,10 +15,10 @@ from __future__ import annotations
 
 from datetime import timedelta
 
-from prisma import gateway
-from prisma.calendario import Calendario
-from prisma.db import admin, espacio
-from prisma.despachador import TransporteDePrueba, despachar
+from leda import gateway
+from leda.calendario import Calendario
+from leda.db import admin, espacio
+from leda.despachador import TransporteDePrueba, despachar
 
 from tests.test_alta_eleccion_confirmacion import (_alta_en_confirmacion,
                                                    _alta_enviada, _nuevas,

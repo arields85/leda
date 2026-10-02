@@ -8,10 +8,10 @@
 
 ## Objetivo
 
-Que Prisma haga visibles las dependencias: se registran, frenan a quien todavía
+Que Leda haga visibles las dependencias: se registran, frenan a quien todavía
 no puede arrancar y avisan en cadena antes de que un atraso se convierta en
 sorpresa. La misión §2 nombra "dependencias invisibles" como uno de los
-problemas que Prisma existe para reducir.
+problemas que Leda existe para reducir.
 
 ## Problema
 
@@ -28,17 +28,17 @@ El esquema está completo y el comportamiento no existe:
 
 - **bloqueante:** la tarea destino no puede pasar a `en_curso` hasta que la
   origen esté `terminada`.
-- **informativa:** no impide avanzar; Prisma avisa a ambas partes cuando la
+- **informativa:** no impide avanzar; Leda avisa a ambas partes cuando la
   origen cambia de fecha o de estado.
 - Los ciclos se rechazan al crear.
-- Cuando una bloqueante se atrasa, Prisma calcula el impacto en cadena y lo
+- Cuando una bloqueante se atrasa, Leda calcula el impacto en cadena y lo
   informa a los responsables afectados **antes** de que venzan sus fechas.
 - Una dependencia entre áreas distintas se notifica a los dos referentes.
 
 ## Decisión de producto (usuario, 2026-09-22)
 
 **Quién crea una dependencia:** el responsable de cualquiera de las dos tareas,
-o su referente. Prisma avisa a la otra parte. Motivo: una dependencia bloqueante
+o su referente. Leda avisa a la otra parte. Motivo: una dependencia bloqueante
 frena la tarea de otra persona, así que no puede declararla cualquiera; pero
 exigir confirmación de la otra parte agrega fricción sin necesidad, porque el
 aviso ya la hace visible.
@@ -82,7 +82,7 @@ pruebas conversacional con el modelo real, que es la unidad siguiente.
 ## Entrega
 
 Un solo commit sobre `master`, por pedido explícito del usuario: la creación de
-dependencias y los avisos comparten `src/prisma/herramientas.py` y partirlos
+dependencias y los avisos comparten `src/leda/herramientas.py` y partirlos
 exigía dividir el archivo a mano. Suite completa en ese contenido: 389 passed,
 verificado por el orquestador. Sin remoto con contenido, no hay pull requests.
 
@@ -93,7 +93,7 @@ verificado por el orquestador. Sin remoto con contenido, no hay pull requests.
   (`.venv/Scripts/python.exe -m pytest -q`), TDD estricto por cada bloque de
   comportamiento (rojo observado antes de implementar).
 
-  **T1** (`src/prisma/herramientas.py`, sección "Dependencias"): autoridad
+  **T1** (`src/leda/herramientas.py`, sección "Dependencias"): autoridad
   vía `_autorizado_para_dependencia` (responsable de cualquiera de las dos, o
   `puede_aprobar_tarea` de cualquiera de los dos — la misma noción de
   "referente" que ya usa `aprobar_tarea`), con `valida_en_handler=True` como
@@ -124,7 +124,7 @@ verificado por el orquestador. Sin remoto con contenido, no hay pull requests.
   aviso lo menciona explícitamente.
 
   **T2** (`db/esquema.sql`, `db/migrations/0008_task_start_gate.sql` +
-  rollback, `src/prisma/herramientas.py::_actualizar_estado`): función
+  rollback, `src/leda/herramientas.py::_actualizar_estado`): función
   `motivo_no_arranca_tarea` y disparador `trg_exigir_dependencias_resueltas`
   (antes de insertar en `task_state_event`, estilo idéntico a
   `exigir_bloqueo_abierto`/`exigir_condiciones_de_cierre`); `cancelada`
@@ -140,7 +140,7 @@ verificado por el orquestador. Sin remoto con contenido, no hay pull requests.
   `test_migration_clean_schema_parity_and_guarded_rollback`) pasan con la
   cadena completa.
 
-  **T3** (`src/prisma/escalera.py`, `src/prisma/reloj.py`): "en riesgo" =
+  **T3** (`src/leda/escalera.py`, `src/leda/reloj.py`): "en riesgo" =
   origen `bloqueante` no `terminada`/`cancelada` y (vencida, o con
   `fecha_objetivo` posterior a la de un dependiente directo que todavía la
   necesita). Cuando está en riesgo, `_cadena_de_dependientes` recorre
@@ -158,9 +158,9 @@ verificado por el orquestador. Sin remoto con contenido, no hay pull requests.
   `bloquear_estado_directo()` en `db/esquema.sql` vuelve `fecha_objetivo`
   inmutable apenas se compromete la tarea (lanza excepción si cambia), y no
   hay ninguna ruta de código que la modifique — se comprobó con grep sobre
-  `src/prisma/*.py`. Queda registrado como deuda, no como tarea pendiente de
+  `src/leda/*.py`. Queda registrado como deuda, no como tarea pendiente de
   esta unidad.
-  Decisión: `task_state_event` es append-only y `prisma_app` sólo tiene
+  Decisión: `task_state_event` es append-only y `leda_app` sólo tiene
   `insert` (no `select`); un `returning id` en ese insert falla con
   `InsufficientPrivilege` porque Postgres exige `select` para `returning`
   (se descubrió en rojo durante T3). La clave de deduplicación de la
@@ -279,15 +279,15 @@ verificado por el orquestador. Sin remoto con contenido, no hay pull requests.
   0009) como el chequeo proactivo de `_actualizar_estado` consultan ahora
   `estado_previo_a_bloqueo(new.task_id)` (0007) y sólo eximen cuando esa
   función devuelve `en_curso`. Se verificó que el preflight de 0008 ya exige
-  0007 (`to_regprocedure('prisma.estado_previo_a_bloqueo(uuid)')`, existente
-  desde la primera versión de la migración) y que `prisma_app` -- el único
+  0007 (`to_regprocedure('leda.estado_previo_a_bloqueo(uuid)')`, existente
+  desde la primera versión de la migración) y que `leda_app` -- el único
   rol que hoy hace pasar una tarea a `en_curso`, vía `resolver_bloqueo` o
   `actualizar_estado` -- ya tenía `execute` concedido sobre esa función desde
   0007; no hizo falta ninguna concesión nueva. Comentario SQL reescrito en
   ambos archivos documentando la corrección y por qué la primera versión no
   alcanzaba.
   Rojo observado (aislado, con `git stash` de sólo `db/esquema.sql` y
-  `src/prisma/herramientas.py` para reproducir la versión demasiado amplia
+  `src/leda/herramientas.py` para reproducir la versión demasiado amplia
   de la primera corrección, sin tocar el resto del árbol):
   `test_en_curso_desde_bloqueada_sigue_frenado_si_nunca_arranco` →
   `KeyError: 'iniciada'` (la herramienta devolvía `{"estado": "en_curso"}`,

@@ -1,7 +1,7 @@
 id: b-0012
 objetivo: >
   El actor tiene dos bloqueos abiertos a la vez, en tareas distintas, y el
-  mensaje no dice cuál se solucionó. Observar si Prisma pregunta cuál en vez
+  mensaje no dice cuál se solucionó. Observar si Leda pregunta cuál en vez
   de resolver el primero que encuentra o adivinar.
 actor: Marcos Tarquini
 mensajes:

@@ -5,11 +5,11 @@ real."""
 
 from __future__ import annotations
 
-from prisma import cli
+from leda import cli
 
 
 def test_escuchar_sin_cadencias_llega_a_local_escuchar(conn, corework, monkeypatch):
-    from prisma import local
+    from leda import local
 
     monkeypatch.setattr(cli, "conectar", lambda *a, **k: conn)
     llamadas = []
@@ -27,7 +27,7 @@ def test_escuchar_sin_cadencias_llega_a_local_escuchar(conn, corework, monkeypat
 
 
 def test_escuchar_sin_el_flag_deja_las_cadencias_activas(conn, corework, monkeypatch):
-    from prisma import local
+    from leda import local
 
     monkeypatch.setattr(cli, "conectar", lambda *a, **k: conn)
     llamadas = []
@@ -53,7 +53,7 @@ class _ConnFalsa:
 def test_servir_sin_cadencias_llega_a_reloj_montar(monkeypatch):
     import uvicorn
 
-    from prisma import reloj
+    from leda import reloj
 
     llamadas = []
 
@@ -73,7 +73,7 @@ def test_servir_sin_cadencias_llega_a_reloj_montar(monkeypatch):
 def test_servir_sin_el_flag_deja_las_cadencias_activas(monkeypatch):
     import uvicorn
 
-    from prisma import reloj
+    from leda import reloj
 
     llamadas = []
 
@@ -97,7 +97,7 @@ def test_servir_rechaza_arrancar_si_falta_una_migracion(monkeypatch):
     scheduler ni el servidor si falta una migración."""
     import uvicorn
 
-    from prisma import reloj
+    from leda import reloj
 
     llamadas_montar = []
     llamadas_uvicorn = []
@@ -115,7 +115,7 @@ def test_servir_rechaza_arrancar_si_falta_una_migracion(monkeypatch):
 
 def test_escuchar_rechaza_arrancar_si_falta_una_migracion(
         conn, corework, monkeypatch):
-    from prisma import local
+    from leda import local
 
     monkeypatch.setattr(cli, "conectar", lambda *a, **k: conn)
     monkeypatch.setattr(cli, "_verificar_esquema_o_salir", lambda conn: 1)
@@ -129,8 +129,8 @@ def test_escuchar_rechaza_arrancar_si_falta_una_migracion(
 def test_redaccion_imprime_la_latencia_y_los_rechazos_de_la_variante_a(
         conn, corework, monkeypatch, capsys):
     """F6a: cómo se lee la mediana de la prueba A/B, sin entrar a la base."""
-    from prisma import redaccion
-    from prisma.db import admin, registrar_auditoria
+    from leda import redaccion
+    from leda.db import admin, registrar_auditoria
 
     monkeypatch.setattr(cli, "conectar", lambda *a, **k: conn)
     with admin(conn) as cur:
@@ -139,7 +139,7 @@ def test_redaccion_imprime_la_latencia_y_los_rechazos_de_la_variante_a(
                               ("timeout", 3000)):
             registrar_auditoria(
                 cur, accion=redaccion.ACCION_REDACCION_A,
-                workspace_id=corework.workspace_id, actor_kind="prisma",
+                workspace_id=corework.workspace_id, actor_kind="leda",
                 detalle={"resultado": resultado, "duracion_ms": ms,
                          "caracteres": 10})
 

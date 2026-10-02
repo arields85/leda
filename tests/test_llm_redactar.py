@@ -14,7 +14,7 @@ import httpx
 import openai
 import pytest
 
-from prisma.llm import (ProveedorAnthropic, ProveedorCompatible, ProveedorGemini,
+from leda.llm import (ProveedorAnthropic, ProveedorCompatible, ProveedorGemini,
                         ProveedorGuionado)
 
 
@@ -220,7 +220,7 @@ def test_anthropic_con_plazo_pide_un_cliente_sin_reintentos():
 
 
 def test_el_tope_de_la_redaccion_es_corto():
-    from prisma.llm import MAX_TOKENS_REDACCION
+    from leda.llm import MAX_TOKENS_REDACCION
 
     # Un mensaje de pocas oraciones más el JSON cabe de sobra: un tope mayor sólo
     # alarga una redacción descontrolada.

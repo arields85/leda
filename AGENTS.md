@@ -1,6 +1,6 @@
-# Continuidad de trabajo en Prisma
+# Continuidad de trabajo en Leda
 
-Este archivo es el punto de entrada para futuras sesiones. Prisma se endurece y
+Este archivo es el punto de entrada para futuras sesiones. Leda se endurece y
 extiende sobre la arquitectura actual; no se reestructura ni reescribe sin una
 decisión explícita y documentada.
 
@@ -13,12 +13,12 @@ decisión explícita y documentada.
 
 ## Orden de lectura
 
-1. Leer `docs/product/que-es-prisma.md` para conocer qué es el producto y qué es
+1. Leer `docs/product/que-es-leda.md` para conocer qué es el producto y qué es
    configuración de cada cliente.
 2. Leer `docs/architecture/frontera.md` para conocer dónde termina el núcleo y qué
    reglas lo gobiernan.
 3. Leer `nucleo/`: `constitucion.md`, `mecanica-pm.md` y `alta-de-equipo.md`.
-   Son el comportamiento **obligatorio** de Prisma, no material de consulta.
+   Son el comportamiento **obligatorio** de Leda, no material de consulta.
    Una auditoría que no los lea no es una auditoría del proyecto.
 4. Leer `docs/capacidades.md` para saber qué está construido, qué está
    diseñado sin construir y qué es esquema sin implementación.
@@ -42,12 +42,12 @@ contenido sensible de conversaciones.
 
 Orden de autoridad para describir lo que existe hoy:
 
-1. `db/esquema.sql` y `src/prisma/`: comportamiento implementado.
+1. `db/esquema.sql` y `src/leda/`: comportamiento implementado.
 2. `tests/` y `db/pruebas.sql`: comportamiento comprobado por pruebas, sólo si la
    ejecución y su resultado están registrados.
 3. `docs/architecture/frontera.md`: gobierna la arquitectura. Ante una discrepancia
    entre documentos de arquitectura, prevalece esta frontera.
-4. `docs/product/que-es-prisma.md`: define el producto y qué es configuración de cada
+4. `docs/product/que-es-leda.md`: define el producto y qué es configuración de cada
    cliente frente a núcleo.
 5. `docs/decisions/`: decisiones aceptadas que gobiernan cambios futuros, salvo las
    marcadas como superadas.
@@ -112,30 +112,30 @@ documental. No reestructurar carpetas o módulos sin un ADR aceptado.
 ## Comandos verificados por inspección
 
 Estos comandos existen en `README.md`, `PRUEBA-LOCAL.md`, `pyproject.toml` o
-`src/prisma/cli.py`. Su disponibilidad fue inspeccionada; su resultado actual no
+`src/leda/cli.py`. Su disponibilidad fue inspeccionada; su resultado actual no
 se presume.
 
 ```bash
 docker compose up -d postgres
-python -m prisma esquema
-python -m prisma importar corework
-python -m prisma importar corework --activar
-python -m prisma feriados corework
-python -m prisma enlaces corework --solo <nombres>
-python -m prisma administrador corework <nombre>
-python -m prisma escuchar corework
-python -m prisma escuchar corework --sin-cadencias
-python -m prisma estado corework
-python -m prisma correr corework <cadencia>
-python -m prisma escalera corework
-python -m prisma despachar corework
-python -m prisma incidentes corework
-python -m prisma servir --puerto 8080
-python -m prisma servir --puerto 8080 --sin-cadencias
+python -m leda esquema
+python -m leda importar corework
+python -m leda importar corework --activar
+python -m leda feriados corework
+python -m leda enlaces corework --solo <nombres>
+python -m leda administrador corework <nombre>
+python -m leda escuchar corework
+python -m leda escuchar corework --sin-cadencias
+python -m leda estado corework
+python -m leda correr corework <cadencia>
+python -m leda escalera corework
+python -m leda despachar corework
+python -m leda incidentes corework
+python -m leda servir --puerto 8080
+python -m leda servir --puerto 8080 --sin-cadencias
 python -m pytest
 ```
 
-`python -m prisma esquema --recrear` borra los datos. No ejecutarlo sin una
+`python -m leda esquema --recrear` borra los datos. No ejecutarlo sin una
 autorización explícita y un entorno descartable confirmado.
 
 ## Reglas de seguridad
@@ -169,7 +169,7 @@ Antes de implementar una fase:
 ([`ADR 0013`](docs/decisions/0013-reglas-generales-de-la-conversacion.md), decisión del
 usuario del 2026-09-29). Las variantes de una conversación son infinitas; arreglar cada
 caso con listas de frases o palabras clave no termina nunca. Ante un hallazgo sobre cómo
-conversa Prisma:
+conversa Leda:
 
 - Clasificarlo primero en una de las reglas del ADR 0013: pregunta pendiente como
   contexto (comandos cerrados; una sola rama de conversación abierta a la vez, enmienda

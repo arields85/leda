@@ -12,10 +12,10 @@ import json
 
 import pytest
 
-from prisma import incidentes, redaccion
-from prisma import ingreso_tareas as I
-from prisma.db import admin, espacio
-from prisma.llm import ProveedorGuionado
+from leda import incidentes, redaccion
+from leda import ingreso_tareas as I
+from leda.db import admin, espacio
+from leda.llm import ProveedorGuionado
 
 from tests.test_alta_eleccion_confirmacion import _alta_en_confirmacion, _usuario
 from tests.test_alta_enviar_a_aprobacion import (_acciones, _alta_en_revision, _fila,

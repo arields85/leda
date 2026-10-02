@@ -3,7 +3,7 @@ variante_de: b-0025
 objetivo: >
   Variante de b-0025, la corrección escrita: con la vista previa esperando, la
   persona escribe que quiere cambiar la fecha. Un mensaje que corrige lleva al
-  mismo camino que Modificar: Prisma pregunta qué dato cambiar y, cuando la
+  mismo camino que Modificar: Leda pregunta qué dato cambiar y, cuando la
   persona escribe "Fecha objetivo", le muestra la fecha que tenía para copiarla
   y corregirla. Todo dentro de la misma rama; la tarea no se crea.
 actor: Ismael Soschinski

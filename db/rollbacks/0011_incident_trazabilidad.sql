@@ -8,7 +8,7 @@
 -- enough -- unlike 0010's rollback, there is no function body to restore
 -- first.
 begin;
-set search_path = prisma, public;
+set search_path = leda, public;
 
 alter table incident drop column if exists app_user_id;
 alter table incident drop column if exists chat_id;

@@ -13,7 +13,7 @@ COPY espacios ./espacios
 COPY plantillas ./plantillas
 COPY db ./db
 
-RUN useradd -m prisma && chown -R prisma /app
-USER prisma
+RUN useradd -m leda && chown -R leda /app
+USER leda
 
-CMD ["python", "-m", "prisma", "servir"]
+CMD ["python", "-m", "leda", "servir"]

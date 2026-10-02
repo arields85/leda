@@ -15,9 +15,9 @@ from datetime import datetime, timezone
 
 import pytest
 
-from prisma import gateway
-from prisma.db import admin, espacio
-from prisma.salida import (ICONO_TAREA, ICONOS_DE_ACCION_MENU, con_icono,
+from leda import gateway
+from leda.db import admin, espacio
+from leda.salida import (ICONO_TAREA, ICONOS_DE_ACCION_MENU, con_icono,
                            etiqueta_de_accion_menu, etiqueta_sin_icono,
                            etiquetas_coinciden)
 
@@ -107,7 +107,7 @@ def test_el_menu_del_borrador_en_curso_lleva_icono_en_sus_tres_botones(
     """(i) "Continuar borrador" y "Empezar otro" salían sin ícono mientras
     "Cancelar borrador" sí lo llevaba. Mismas constantes de `salida`, sin literales:
     ▶️ seguir (el de empezar/retomar) y ➕ uno nuevo (el de agregar)."""
-    from prisma.salida import ICONO_CANCELAR, ICONO_EMPEZAR, ICONO_VER_MAS
+    from leda.salida import ICONO_CANCELAR, ICONO_EMPEZAR, ICONO_VER_MAS
 
     from tests.test_task_intake import _active_choices, _start
 

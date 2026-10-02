@@ -14,10 +14,10 @@ from datetime import date
 
 import pytest
 
-import prisma.llm as llm
-from prisma.llm import (IntentAction, IntentRoute, Llamada, ProveedorGuionado,
+import leda.llm as llm
+from leda.llm import (IntentAction, IntentRoute, Llamada, ProveedorGuionado,
                          RespectoPendiente, RouteEnvelope, RoutingError)
-from prisma.valores import TipoValor, ValorEsperado, opciones_numeradas
+from leda.valores import TipoValor, ValorEsperado, opciones_numeradas
 from tests.test_router_pendiente import (ADAPTADORES, PENDIENTE, _esquema_y_sistema,
                                          _proveedor)
 
@@ -251,7 +251,7 @@ def test_el_guionado_pasa_por_la_validacion_un_sobre_con_valor_mal_formado():
 def test_un_proveedor_sin_valor_esperado_sigue_llamandose_como_antes():
     # Los que no saben de valores (`route_intent(text, pendiente)`) no se
     # rompen: el gateway sólo pasa `valor_esperado` cuando hay uno.
-    from prisma import gateway
+    from leda import gateway
 
     visto = {}
 
@@ -265,7 +265,7 @@ def test_un_proveedor_sin_valor_esperado_sigue_llamandose_como_antes():
 
 
 def test_el_gateway_pasa_el_valor_esperado_al_ruteo():
-    from prisma import gateway
+    from leda import gateway
 
     proveedor = ProveedorGuionado(guion=[], rutas=[IntentRoute(
         IntentAction.NORMAL_CONVERSATION, valor={"fecha_iso": "2026-10-04"})])

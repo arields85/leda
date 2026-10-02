@@ -7,7 +7,7 @@ from __future__ import annotations
 import psycopg
 import pytest
 
-from prisma.db import admin, espacio
+from leda.db import admin, espacio
 
 AREA_DE_CADA_FRENTE = {
     "Conectar y automatizar equipos para que produzcan y entreguen datos": "ot",
@@ -43,7 +43,7 @@ def test_el_objetivo_estrategico_no_tiene_area(corework, conn):
 def test_reimportar_completa_el_area_que_falta_y_no_pisa_la_que_hay(
         corework, conn, tmp_path):
     import yaml
-    from prisma.importador import importar
+    from leda.importador import importar
     from tests.conftest import RAIZ
 
     ws = corework.workspace_id
@@ -92,11 +92,11 @@ def test_el_objetivo_sigue_aislado_por_espacio(corework, conn):
     with conn.cursor() as cur:
         cur.execute(
             """select relrowsecurity, relforcerowsecurity from pg_class
-                where oid = to_regclass('prisma.objective')""")
+                where oid = to_regclass('leda.objective')""")
         fila = cur.fetchone()
     assert fila["relrowsecurity"] and fila["relforcerowsecurity"]
     with conn.cursor() as cur:
-        cur.execute("set role prisma_app")
+        cur.execute("set role leda_app")
         cur.execute("select count(*) n from objective")
         assert cur.fetchone()["n"] == 0
 
@@ -141,7 +141,7 @@ def _con_area(area, indice=2):
 
 @pytest.mark.parametrize("area", ["itt", "IT", "tecnologia", "", None])
 def test_validar_bloquea_un_frente_con_un_area_que_no_existe_o_sin_area(area):
-    from prisma.importador import validar
+    from leda.importador import validar
 
     pack, titulo = _con_area(area)
     bloqueantes, _ = validar(pack)
@@ -149,7 +149,7 @@ def test_validar_bloquea_un_frente_con_un_area_que_no_existe_o_sin_area(area):
 
 
 def test_validar_no_bloquea_los_frentes_del_pack_vigente():
-    from prisma.importador import validar
+    from leda.importador import validar
 
     bloqueantes, _ = validar(_pack())
     assert not any("frente" in b.lower() for b in bloqueantes)
@@ -158,7 +158,7 @@ def test_validar_no_bloquea_los_frentes_del_pack_vigente():
 @pytest.mark.parametrize("area", ["itt", None])
 def test_importar_un_espacio_nuevo_con_un_area_mala_falla_y_no_deja_nada(
         conn, tmp_path, area):
-    from prisma.importador import PackInvalido, importar
+    from leda.importador import PackInvalido, importar
 
     pack, titulo = _con_area(area)
     pack["espacio"]["slug"] = "nuevo-por-area"
@@ -172,7 +172,7 @@ def test_importar_un_espacio_nuevo_con_un_area_mala_falla_y_no_deja_nada(
 
 
 def test_reimportar_con_un_area_mala_falla_y_no_toca_nada(corework, conn, tmp_path):
-    from prisma.importador import PackInvalido, importar
+    from leda.importador import PackInvalido, importar
 
     ws = corework.workspace_id
     with admin(conn) as cur:
@@ -187,7 +187,7 @@ def test_reimportar_con_un_area_mala_falla_y_no_toca_nada(corework, conn, tmp_pa
 
 
 def test_completar_las_areas_informa_cuantas_actualizo(corework, conn, tmp_path):
-    from prisma.importador import importar
+    from leda.importador import importar
 
     with admin(conn) as cur:
         cur.execute("update objective set area_id = null where tipo = 'operativo' "
@@ -204,7 +204,7 @@ def test_completar_las_areas_informa_cuantas_actualizo(corework, conn, tmp_path)
 
 def test_completar_las_areas_avisa_del_frente_que_no_encuentra(
         corework, conn, tmp_path):
-    from prisma.importador import importar
+    from leda.importador import importar
 
     pack = _pack()
     pack["objetivo_inicial"]["frentes"][2]["titulo"] = "Un frente que se renombró"
@@ -215,7 +215,7 @@ def test_completar_las_areas_avisa_del_frente_que_no_encuentra(
 
 def test_reimportar_sin_nada_que_completar_no_agrega_avisos_de_area(
         corework, conn, tmp_path):
-    from prisma.importador import importar
+    from leda.importador import importar
 
     resultado = importar(conn, _escribir(tmp_path, _pack()))
     assert not [a for a in resultado.advertencias if "frente" in a.lower()]

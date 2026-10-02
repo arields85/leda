@@ -13,9 +13,9 @@ import json
 
 import pytest
 
-from prisma import incidentes, redaccion
-from prisma.db import admin
-from prisma.llm import RespectoPendiente
+from leda import incidentes, redaccion
+from leda.db import admin
+from leda.llm import RespectoPendiente
 
 from tests.test_alta_pregunta_pendiente import (_abrir_alta, _campo_del_slot,
                                                 _mensaje_privado, _ruta_con_valor)

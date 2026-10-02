@@ -11,8 +11,8 @@ import httpx
 import openai
 import pytest
 
-import prisma.llm as llm
-from prisma.llm import ProveedorAnthropic, ProveedorCompatible, ProveedorGemini
+import leda.llm as llm
+from leda.llm import ProveedorAnthropic, ProveedorCompatible, ProveedorGemini
 
 
 def _completion(texto: str) -> dict:

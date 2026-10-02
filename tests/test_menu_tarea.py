@@ -1,4 +1,4 @@
-"""Menú de acciones de una tarea (T2, `prisma-orienta`; ADR 0007, diseño
+"""Menú de acciones de una tarea (T2, `leda-orienta`; ADR 0007, diseño
 §4.6).
 
 Tocar una tarea ofrece sólo lo que la persona puede hacer con ella, según su
@@ -22,16 +22,16 @@ import pytest
 from fastapi.testclient import TestClient
 
 from tests.toques import id_de_mensaje
-from prisma import gateway
-from prisma import herramientas as H
-from prisma import jev as jev_modulo
-from prisma import pendientes as P
-from prisma.agente import responder
-from prisma.autoridad import Canal, identificar
-from prisma.calendario import Calendario
-from prisma.db import admin, espacio
-from prisma.llm import Llamada, ProveedorGuionado, Respuesta
-from prisma.salida import (ETIQUETA_CANCELAR, ETIQUETA_CONFIRMAR,
+from leda import gateway
+from leda import herramientas as H
+from leda import jev as jev_modulo
+from leda import pendientes as P
+from leda.agente import responder
+from leda.autoridad import Canal, identificar
+from leda.calendario import Calendario
+from leda.db import admin, espacio
+from leda.llm import Llamada, ProveedorGuionado, Respuesta
+from leda.salida import (ETIQUETA_CANCELAR, ETIQUETA_CONFIRMAR,
                            ETIQUETA_MODIFICAR, ICONO_TAREA,
                            con_icono, etiqueta_de_accion_menu, etiqueta_sin_icono,
                            etiquetas_boton_distinguibles, etiquetas_coinciden)
@@ -70,13 +70,13 @@ def _tarea(cur, ws, *, titulo="Programar HMI línea 2", area="ot",
         (ws, obj, titulo, ws, area, ws, persona))
     t = cur.fetchone()["id"]
     cur.execute("insert into task_state_event (task_id, estado_nuevo, actor_kind) "
-                "values (%s, %s, 'prisma')", (t, estado))
+                "values (%s, %s, 'leda')", (t, estado))
     return str(t)
 
 
 def _con_proveedor(monkeypatch, guion):
     proveedor = ProveedorGuionado(guion=list(guion))
-    monkeypatch.setattr("prisma.llm.desde_base", lambda cur, ws, key: proveedor)
+    monkeypatch.setattr("leda.llm.desde_base", lambda cur, ws, key: proveedor)
     return proveedor
 
 
@@ -89,7 +89,7 @@ def _jev_no_debe_llamarse(monkeypatch):
 def _modelo_no_debe_llamarse(monkeypatch):
     def _explota(cur, ws, key):
         raise AssertionError("No debería consultarse al modelo acá.")
-    monkeypatch.setattr("prisma.llm.desde_base", _explota)
+    monkeypatch.setattr("leda.llm.desde_base", _explota)
 
 
 @pytest.fixture
@@ -312,7 +312,7 @@ def test_menu_responsable_terminada(conn, corework):
     de entrada que existe hoy, antes de T3 -- así que esto prueba el cálculo
     determinístico (`menu_tarea.calcular_menu`) directo, no el toque de
     punta a punta como las demás variantes de este test."""
-    from prisma import menu_tarea as M
+    from leda import menu_tarea as M
 
     ws = corework.workspace_id
     with admin(conn) as cur:
@@ -329,7 +329,7 @@ def test_menu_responsable_terminada(conn, corework):
                        'aprobado')""",
             (ws, tid, ws))
         cur.execute("insert into task_state_event (task_id, estado_nuevo, actor_kind) "
-                    "values (%s, 'terminada', 'prisma')", (tid,))
+                    "values (%s, 'terminada', 'leda')", (tid,))
     conn.commit()
 
     with espacio(conn, ws) as cur:
@@ -344,7 +344,7 @@ def test_menu_responsable_en_revision_ofrece_cerrar_tarea_si_ya_alcanza(
     aprobación llegó antes de que se completara otra condición de cierre --
     acá, la evidencia -- y esa condición se resuelve después, el responsable
     tiene que poder cerrar tocando, no sólo escribiendo."""
-    from prisma import menu_tarea as M
+    from leda import menu_tarea as M
 
     ws = corework.workspace_id
     with admin(conn) as cur:
@@ -939,7 +939,7 @@ def test_retomar_una_opcion_entrega_respuesta_aunque_falle_el_proveedor(
     # `agente.responder`, que es quien atrapa la falla del modelo en sí.
     def _explota(cur, ws, key):
         raise RuntimeError("proveedor caído")
-    monkeypatch.setattr("prisma.llm.desde_base", _explota)
+    monkeypatch.setattr("leda.llm.desde_base", _explota)
 
     assert _tocar(cliente, token, tg).status_code == 200
 
@@ -1060,8 +1060,8 @@ def test_mensaje_resultado_menu_no_dice_no_se_aplico_para_algo_no_reconocido(
     ningún cambio."."""
     ws = corework.workspace_id
     with admin(conn) as cur:
-        # `prisma_app` sólo tiene `insert` sobre `incident` (`db/esquema.sql`,
-        # "grant insert on ... incident ... to prisma_app"), igual que
+        # `leda_app` sólo tiene `insert` sobre `incident` (`db/esquema.sql`,
+        # "grant insert on ... incident ... to leda_app"), igual que
         # `task_state_event`: se lee por la conexión administrativa.
         cur.execute("select count(*) n from incident where workspace_id = %s", (ws,))
         antes = cur.fetchone()["n"]
@@ -1092,7 +1092,7 @@ def test_mensaje_resultado_menu_no_dice_no_se_aplico_para_algo_no_reconocido(
 
 # ---------------------------------------------------------------------------
 # Decisión del usuario, 2026-09-25: un error nunca pasa en silencio. Evidencia
-# de la sesión real por Telegram: un `UndefinedColumn` hacía que Prisma
+# de la sesión real por Telegram: un `UndefinedColumn` hacía que Leda
 # saltara un mensaje sin ninguna respuesta ni incidente -- invisible hasta que
 # alguien lo notaba por otro lado.
 # ---------------------------------------------------------------------------

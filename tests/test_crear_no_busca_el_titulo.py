@@ -14,11 +14,11 @@ from __future__ import annotations
 
 import pytest
 
-import prisma.llm as llm
-from prisma import gateway
-from prisma import jev as jev_modulo
-from prisma.db import admin, espacio
-from prisma.llm import IntentAction, IntentRoute
+import leda.llm as llm
+from leda import gateway
+from leda import jev as jev_modulo
+from leda.db import admin, espacio
+from leda.llm import IntentAction, IntentRoute
 
 from tests.test_resolucion_referencias import _quien, _tarea
 

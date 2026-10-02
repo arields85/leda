@@ -9,8 +9,8 @@ cada uno en su renglón, sin " · ".
 
 from __future__ import annotations
 
-from prisma import menu_tarea as M
-from prisma.db import admin, espacio
+from leda import menu_tarea as M
+from leda.db import admin, espacio
 
 from tests.banco.corrida import sembrar_precondiciones
 from tests.test_menu_tarea import _quien

@@ -23,9 +23,9 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
-from prisma import despachador, gateway, incidentes
-from prisma.db import admin, espacio, registrar_auditoria
-from prisma.despachador import (BACKOFF_MINUTOS_AVISO_ADMIN, MAX_INTENTOS,
+from leda import despachador, gateway, incidentes
+from leda.db import admin, espacio, registrar_auditoria
+from leda.despachador import (BACKOFF_MINUTOS_AVISO_ADMIN, MAX_INTENTOS,
                                 TransporteDePrueba, despachar_avisos_admin)
 
 # Token de bot falso, sólo para probar que un error de Telegram no lo
@@ -201,7 +201,7 @@ def test_excepcion_no_manejada_en_un_turno_avisa_a_cada_administrador_vinculado(
             assert "arranco con esto" in cuerpo
             # El tipo de excepción también (viene en resumen_sanitizado,
             # nunca un secreto). El texto crudo de la excepción
-            # (`referencia_cruda`, sólo para `python -m prisma incidentes`)
+            # (`referencia_cruda`, sólo para `python -m leda incidentes`)
             # nunca sale acá -- por eso "falla inesperada de prueba" (el
             # `str(error)`) no aparece, aunque "RuntimeError" (el tipo) sí.
             assert "RuntimeError" in cuerpo
@@ -210,11 +210,11 @@ def test_excepcion_no_manejada_en_un_turno_avisa_a_cada_administrador_vinculado(
             assert "Nahuel Gimenez" in cuerpo
             # Formato llano (T10-2): abre con lo que le pasó a la persona y la
             # hora sale en la zona del espacio, no en UTC.
-            assert cuerpo.startswith("⚠️ Prisma no pudo responderle a Nahuel Gimenez")
+            assert cuerpo.startswith("⚠️ Leda no pudo responderle a Nahuel Gimenez")
             assert "UTC" not in cuerpo
             # Prefijo del incidente, espacio, etapa, severidad y hora -- lo
             # mínimo para encontrar el detalle con
-            # `python -m prisma incidentes corework`.
+            # `python -m leda incidentes corework`.
             assert str(incidente["id"])[:8] in cuerpo
             assert "corework" in cuerpo
             assert gateway.ETAPA_TURNO_TEXTO in cuerpo
@@ -234,7 +234,7 @@ def test_el_aviso_nunca_lleva_referencia_cruda_ni_algo_parecido_a_un_secreto(
         _administrador(cur, "Admin Secreto", 612001, chat_id=612001)
     conn.commit()
 
-    secreto = "postgresql://prisma_app:s3cr3t-p4ss@db.interno:5432/prisma"
+    secreto = "postgresql://leda_app:s3cr3t-p4ss@db.interno:5432/leda"
 
     def _explota(cur, quien, texto, workspace_id, chat_id, entrante_id=None, **_):
         raise RuntimeError(f"no se pudo conectar: {secreto}")
@@ -274,7 +274,7 @@ def test_el_aviso_nunca_lleva_referencia_cruda_ni_algo_parecido_a_un_secreto(
 # ---------------------------------------------------------------------------
 
 def test_redactar_secreto_telegram_oculta_la_url_completa():
-    from prisma.incidentes import redactar_secreto_telegram
+    from leda.incidentes import redactar_secreto_telegram
 
     texto = (f"Client error '401 Unauthorized' for url "
             f"'https://api.telegram.org/bot{TOKEN_FALSO}/sendMessage'")
@@ -286,7 +286,7 @@ def test_redactar_secreto_telegram_oculta_la_url_completa():
 
 
 def test_redactar_secreto_telegram_oculta_el_token_suelto():
-    from prisma.incidentes import redactar_secreto_telegram
+    from leda.incidentes import redactar_secreto_telegram
 
     texto = f"token filtrado en un log: bot{TOKEN_FALSO}"
     redactado = redactar_secreto_telegram(texto)
@@ -297,7 +297,7 @@ def test_redactar_secreto_telegram_oculta_el_token_suelto():
 
 
 def test_redactar_secreto_telegram_no_toca_texto_sin_token():
-    from prisma.incidentes import redactar_secreto_telegram
+    from leda.incidentes import redactar_secreto_telegram
 
     texto = "Un mensaje no se pudo entregar tras 5 intentos."
     assert redactar_secreto_telegram(texto) == texto
@@ -307,14 +307,14 @@ def test_redactar_secreto_telegram_no_toca_otros_secretos():
     """Sólo el patrón de Telegram -- la cadena de conexión de arriba sigue
     intacta en `referencia_cruda`: es el diseño del test anterior, no un
     olvido de esta redacción."""
-    from prisma.incidentes import redactar_secreto_telegram
+    from leda.incidentes import redactar_secreto_telegram
 
-    texto = "no se pudo conectar: postgresql://prisma_app:s3cr3t-p4ss@db.interno:5432/prisma"
+    texto = "no se pudo conectar: postgresql://leda_app:s3cr3t-p4ss@db.interno:5432/leda"
     assert redactar_secreto_telegram(texto) == texto
 
 
 def test_redactar_secreto_telegram_pasa_none_y_vacio_sin_cambios():
-    from prisma.incidentes import redactar_secreto_telegram
+    from leda.incidentes import redactar_secreto_telegram
 
     assert redactar_secreto_telegram(None) is None
     assert redactar_secreto_telegram("") == ""
@@ -386,7 +386,7 @@ def test_cada_aviso_admin_deja_un_acceso_a_conversacion_en_audit_log(
         ids_esperados = {str(f["id"]) for f in cur.fetchall()}
     assert admins_auditados == ids_esperados
     for f in filas:
-        assert f["actor_kind"] == "prisma"   # Prisma lo mandó, no un click del admin
+        assert f["actor_kind"] == "leda"   # Leda lo mandó, no un click del admin
         assert f["sujeto_tipo"] == incidente["referencia_tipo"]
         assert f["sujeto_id"] == incidente["referencia_id"]
         assert f["detalle"]["incident_id"] == str(incidente["id"])
@@ -784,8 +784,8 @@ def test_tareas_de_fondo_despacha_los_avisos_admin_en_el_modo_local(conn, corewo
     """El mismo ciclo que hoy corre la escalera y despacha la cola de un
     espacio (`local.Escucha.tareas_de_fondo`) también despacha los avisos de
     administración -- no están acotados a ningún espacio en particular, así
-    que se despachan aparte, bajo rol `prisma_admin`."""
-    from prisma.local import _AdminBot, Escucha
+    que se despachan aparte, bajo rol `leda_admin`."""
+    from leda.local import _AdminBot, Escucha
 
     ws = corework.workspace_id
     with admin(conn) as cur:
@@ -808,12 +808,12 @@ def test_tareas_de_fondo_despacha_los_avisos_admin_en_el_modo_local(conn, corewo
 
 
 def test_tareas_de_fondo_sin_token_de_administracion_no_rompe(conn, corework, monkeypatch):
-    """Sin `PRISMA_BOT_TOKEN_ADMIN` configurado (desarrollo local sin el bot
+    """Sin `LEDA_BOT_TOKEN_ADMIN` configurado (desarrollo local sin el bot
     de administración levantado), los avisos quedan encolados en
     `admin_notice` sin que nada se caiga -- se entregan solos en cuanto se
     configure el token."""
-    from prisma import config as config_modulo
-    from prisma.local import Escucha
+    from leda import config as config_modulo
+    from leda.local import Escucha
 
     ws = corework.workspace_id
     with admin(conn) as cur:
@@ -822,7 +822,7 @@ def test_tareas_de_fondo_sin_token_de_administracion_no_rompe(conn, corework, mo
     conn.commit()
 
     def _sin_token(self, slug):
-        raise LookupError(f"Falta PRISMA_BOT_TOKEN_{slug.upper()} en el entorno")
+        raise LookupError(f"Falta LEDA_BOT_TOKEN_{slug.upper()} en el entorno")
 
     monkeypatch.setattr(config_modulo.Config, "token_bot", _sin_token)
 
@@ -837,13 +837,13 @@ def test_tareas_de_fondo_sin_token_de_administracion_no_rompe(conn, corework, mo
 def test_tareas_de_fondo_entrega_avisos_admin_apenas_el_token_aparece(
         conn, corework, monkeypatch):
     """C: `_obtener_transporte_admin` no cachea la AUSENCIA del token -- si
-    en la primera pasada `PRISMA_BOT_TOKEN_ADMIN` todavía no está
+    en la primera pasada `LEDA_BOT_TOKEN_ADMIN` todavía no está
     configurado, no rompe nada (mismo caso que la prueba anterior) y, apenas
     el token aparece en una pasada posterior (sin reiniciar el proceso), el
     aviso que había quedado encolado se entrega."""
-    from prisma import config as config_modulo
-    from prisma import local as local_modulo
-    from prisma.local import Escucha
+    from leda import config as config_modulo
+    from leda import local as local_modulo
+    from leda.local import Escucha
 
     ws = corework.workspace_id
     with admin(conn) as cur:
@@ -863,12 +863,12 @@ def test_tareas_de_fondo_entrega_avisos_admin_apenas_el_token_aparece(
             return original(self, slug)
         intentos_admin["n"] += 1
         if intentos_admin["n"] == 1:
-            raise LookupError("Falta PRISMA_BOT_TOKEN_ADMIN en el entorno")
+            raise LookupError("Falta LEDA_BOT_TOKEN_ADMIN en el entorno")
         return original(self, slug)
 
     monkeypatch.setattr(config_modulo.Config, "token_bot",
                         _token_admin_recien_en_la_segunda_pasada)
-    monkeypatch.setenv("PRISMA_BOT_TOKEN_ADMIN", "tok-admin-prueba")
+    monkeypatch.setenv("LEDA_BOT_TOKEN_ADMIN", "tok-admin-prueba")
 
     # `_obtener_transporte_admin` arma un `TransporteTelegram` real con el
     # token apenas aparece -- acá se reemplaza por un doble (mismo motivo
@@ -911,7 +911,7 @@ def test_obtener_transporte_admin_relee_env_cuando_el_token_llega_despues(
     cubrir ese caso.
 
     R3-001 (revisión de confiabilidad, 2026-09-28): si esta máquina tiene un
-    `.env` real con `PRISMA_BOT_TOKEN_ADMIN` (`config._cargar_dotenv` ya lo
+    `.env` real con `LEDA_BOT_TOKEN_ADMIN` (`config._cargar_dotenv` ya lo
     puso en `os.environ` al importar el módulo, una sola vez), la variable
     llega puesta y `monkeypatch.delenv(..., raising=False)` sí anota un
     undo -- el caso que rompía es el contrario, variable ausente al entrar.
@@ -922,18 +922,18 @@ def test_obtener_transporte_admin_relee_env_cuando_el_token_llega_despues(
     compara el valor real en un `assert` (`AssertionError` expone el valor
     de cada operando: repetir la cadena real ahí la dejaría en la salida de
     la prueba)."""
-    from prisma import config as config_modulo
-    from prisma import local as local_modulo
-    from prisma.local import Escucha
+    from leda import config as config_modulo
+    from leda import local as local_modulo
+    from leda.local import Escucha
 
-    valor_real = os.environ.pop("PRISMA_BOT_TOKEN_ADMIN", None)
+    valor_real = os.environ.pop("LEDA_BOT_TOKEN_ADMIN", None)
     try:
         # `setenv` antes de `delenv` fuerza que monkeypatch anote un undo
         # SIEMPRE, esté o no la variable puesta al entrar (R3-001): un
         # `delenv(..., raising=False)` solo, con la variable ya ausente, no
         # anota nada para deshacer.
-        monkeypatch.setenv("PRISMA_BOT_TOKEN_ADMIN", "placeholder-antes-de-recargar")
-        monkeypatch.delenv("PRISMA_BOT_TOKEN_ADMIN")
+        monkeypatch.setenv("LEDA_BOT_TOKEN_ADMIN", "placeholder-antes-de-recargar")
+        monkeypatch.delenv("LEDA_BOT_TOKEN_ADMIN")
         # T11: apenas el token aparece, `_obtener_transporte_admin` consulta
         # si hay un webhook puesto sobre el bot de administración -- nunca
         # la API real de Telegram desde una prueba.
@@ -949,7 +949,7 @@ def test_obtener_transporte_admin_relee_env_cuando_el_token_llega_despues(
         assert e._admin_bot is None
 
         # El token se agrega al archivo mientras el proceso sigue corriendo.
-        dotenv.write_text("PRISMA_BOT_TOKEN_ADMIN=tok-admin-nuevo\n", encoding="utf-8")
+        dotenv.write_text("LEDA_BOT_TOKEN_ADMIN=tok-admin-nuevo\n", encoding="utf-8")
         e._ultimo_reintento_dotenv = None  # sin esperar el throttle real en la prueba
 
         transporte = e._obtener_transporte_admin()
@@ -969,16 +969,16 @@ def test_obtener_transporte_admin_relee_env_cuando_el_token_llega_despues(
         # imprimiría `os.environ` completo en el diff -- y esta máquina
         # puede tener un token real puesto (regla del proyecto: nunca
         # imprimir un secreto en un diagnóstico).
-        quedo_filtrado = "PRISMA_BOT_TOKEN_ADMIN" in os.environ
+        quedo_filtrado = "LEDA_BOT_TOKEN_ADMIN" in os.environ
         assert not quedo_filtrado, (
-            "PRISMA_BOT_TOKEN_ADMIN quedó puesto en os.environ tras la "
+            "LEDA_BOT_TOKEN_ADMIN quedó puesto en os.environ tras la "
             "prueba -- se filtraría a cualquier prueba posterior del mismo "
             "proceso")
     finally:
         if valor_real is not None:
-            os.environ["PRISMA_BOT_TOKEN_ADMIN"] = valor_real
+            os.environ["LEDA_BOT_TOKEN_ADMIN"] = valor_real
         else:
-            os.environ.pop("PRISMA_BOT_TOKEN_ADMIN", None)
+            os.environ.pop("LEDA_BOT_TOKEN_ADMIN", None)
 
 
 # ---------------------------------------------------------------------------
@@ -996,7 +996,7 @@ def test_obtener_transporte_admin_relee_env_cuando_el_token_llega_despues(
 def _fijar_token_admin(monkeypatch, config_modulo, token: str = "tok-admin-prueba"):
     """Parcha `Config.token_bot` en vez de tocar variables de entorno, para
     no depender de si esta máquina tiene un `.env` real con
-    `PRISMA_BOT_TOKEN_ADMIN` puesto."""
+    `LEDA_BOT_TOKEN_ADMIN` puesto."""
     original = config_modulo.Config.token_bot
 
     def _con_token_admin(self, slug):
@@ -1047,9 +1047,9 @@ def _parchar_webhook_admin(monkeypatch, local_modulo, *,
 
 def test_recibir_admin_sondea_con_timeout_0_y_offset_propio(
         conn, corework, monkeypatch, capsys):
-    from prisma import config as config_modulo
-    from prisma import local as local_modulo
-    from prisma.local import Escucha
+    from leda import config as config_modulo
+    from leda import local as local_modulo
+    from leda.local import Escucha
 
     ws = corework.workspace_id
     with admin(conn) as cur:
@@ -1103,11 +1103,11 @@ def test_recibir_admin_sondea_con_timeout_0_y_offset_propio(
 
 
 def test_recibir_admin_sin_token_no_sondea_y_no_rompe(conn, corework, monkeypatch):
-    from prisma import config as config_modulo
-    from prisma.local import Escucha
+    from leda import config as config_modulo
+    from leda.local import Escucha
 
     def _sin_token(self, slug):
-        raise LookupError(f"Falta PRISMA_BOT_TOKEN_{slug.upper()} en el entorno")
+        raise LookupError(f"Falta LEDA_BOT_TOKEN_{slug.upper()} en el entorno")
 
     monkeypatch.setattr(config_modulo.Config, "token_bot", _sin_token)
 
@@ -1131,9 +1131,9 @@ def test_obtener_transporte_admin_consulta_getwebhookinfo_una_sola_vez_cuando_es
     consulta corre una sola vez por proceso -- una vez que `_admin_bot`
     queda cacheado (webhook vacío), las vueltas siguientes no vuelven a
     pegarle a la API de Telegram para esto."""
-    from prisma import config as config_modulo
-    from prisma import local as local_modulo
-    from prisma.local import Escucha
+    from leda import config as config_modulo
+    from leda import local as local_modulo
+    from leda.local import Escucha
 
     ws = corework.workspace_id
     _fijar_token_admin(monkeypatch, config_modulo, token="tok-admin-sin-webhook")
@@ -1172,9 +1172,9 @@ def test_obtener_transporte_admin_throttlea_la_reconsulta_de_getwebhookinfo(
     que el throttle sea lo único que decida si hay una llamada nueva o no --
     con éxito, `_admin_bot` quedaría cacheado y el primer `if self._admin_bot
     is not None` de la función taparía lo que se está probando acá."""
-    from prisma import config as config_modulo
-    from prisma import local as local_modulo
-    from prisma.local import Escucha
+    from leda import config as config_modulo
+    from leda import local as local_modulo
+    from leda.local import Escucha
 
     ws = corework.workspace_id
     _fijar_token_admin(monkeypatch, config_modulo, token="tok-admin-throttle")
@@ -1208,14 +1208,14 @@ def test_obtener_transporte_admin_throttlea_la_reconsulta_de_getwebhookinfo(
 def test_recibir_admin_no_sondea_si_el_bot_de_administracion_ya_tiene_webhook(
         conn, corework, monkeypatch, capsys):
     """R1-001/R4-001/R3-002 (revisión de riesgo y confiabilidad,
-    2026-09-28): si el token puesto en `PRISMA_BOT_TOKEN_ADMIN` es el de un
+    2026-09-28): si el token puesto en `LEDA_BOT_TOKEN_ADMIN` es el de un
     bot que YA está servido por un webhook en otro lado (p. ej. el de
     producción reusado por error acá), `escuchar` nunca puede tocarlo ni
     sondearlo -- le robaría los updates a quien lo está sirviendo. Sólo
     avisa por consola, una sola vez aunque pasen varias vueltas."""
-    from prisma import config as config_modulo
-    from prisma import local as local_modulo
-    from prisma.local import Escucha
+    from leda import config as config_modulo
+    from leda import local as local_modulo
+    from leda.local import Escucha
 
     ws = corework.workspace_id
     _fijar_token_admin(monkeypatch, config_modulo, token="tok-admin-prod-reusado")
@@ -1225,7 +1225,7 @@ def test_recibir_admin_no_sondea_si_el_bot_de_administracion_ya_tiene_webhook(
         lambda url, timeout=None: llamadas_post.append(url))
     _parchar_webhook_admin(
         monkeypatch, local_modulo,
-        url_webhook="https://prisma-vps.example.com/telegram/admin")
+        url_webhook="https://leda-vps.example.com/telegram/admin")
 
     http_admin = _HttpAdminFalso()
     e = Escucha(conn, "corework", ws, "tok", cliente=http_admin)
@@ -1239,7 +1239,7 @@ def test_recibir_admin_no_sondea_si_el_bot_de_administracion_ya_tiene_webhook(
 
     salida = capsys.readouterr().out
     assert salida.count("ya tiene un webhook puesto") == 1
-    assert "prisma-vps.example.com" in salida  # el host es útil
+    assert "leda-vps.example.com" in salida  # el host es útil
     assert "tok-admin-prod-reusado" not in salida  # el token nunca
 
     e.recibir_admin()  # segunda vuelta: sigue sin sondear y no repite el aviso
@@ -1255,9 +1255,9 @@ def test_obtener_transporte_admin_si_falla_getwebhookinfo_avisa_y_reintenta_desp
     (regla del proyecto: nunca en silencio) y NO se cachea la falla: una
     vuelta posterior, una vez que la consulta responde bien, resuelve el
     transporte sin reiniciar el proceso."""
-    from prisma import config as config_modulo
-    from prisma import local as local_modulo
-    from prisma.local import Escucha
+    from leda import config as config_modulo
+    from leda import local as local_modulo
+    from leda.local import Escucha
 
     ws = corework.workspace_id
     _fijar_token_admin(monkeypatch, config_modulo)
@@ -1287,9 +1287,9 @@ def test_obtener_transporte_admin_si_getwebhookinfo_responde_ok_false_avisa_y_re
         conn, corework, monkeypatch, capsys):
     """Mismo caso que una falla de red: Telegram puede responder 200 con
     `ok: false` -- tampoco ahí se asume que no hay webhook puesto."""
-    from prisma import config as config_modulo
-    from prisma import local as local_modulo
-    from prisma.local import Escucha
+    from leda import config as config_modulo
+    from leda import local as local_modulo
+    from leda.local import Escucha
 
     ws = corework.workspace_id
     _fijar_token_admin(monkeypatch, config_modulo)
@@ -1316,9 +1316,9 @@ def test_recibir_admin_error_de_procesamiento_registra_incidente_global_y_sigue(
     (`gateway.reportar_incidente_no_manejado` haría `if workspace_id is
     None: return` y perdería el incidente), así que
     `_reportar_incidente_admin_no_manejado` registra uno global."""
-    from prisma import config as config_modulo
-    from prisma import local as local_modulo
-    from prisma.local import Escucha
+    from leda import config as config_modulo
+    from leda import local as local_modulo
+    from leda.local import Escucha
 
     ws = corework.workspace_id
     _fijar_token_admin(monkeypatch, config_modulo)
@@ -1361,7 +1361,7 @@ def test_error_de_red_se_describe_sin_la_url_que_lleva_el_token():
     Telegram lleva el token del bot: la consola del listener no lo muestra."""
     import httpx
 
-    from prisma.local import _error_sin_url
+    from leda.local import _error_sin_url
 
     pedido = httpx.Request("GET", "https://api.telegram.org/bot123:SECRETO/getUpdates")
     respuesta = httpx.Response(401, request=pedido)
@@ -1386,7 +1386,7 @@ def test_error_de_red_se_describe_sin_la_url_que_lleva_el_token():
 # ---------------------------------------------------------------------------
 
 def test_recibir_no_imprime_el_token_si_telegram_devuelve_401(conn, corework, capsys):
-    from prisma.local import Escucha
+    from leda.local import Escucha
 
     class _HttpQueFalla:
         def get(self, url, params=None):
@@ -1411,9 +1411,9 @@ def test_recibir_no_imprime_el_token_si_telegram_devuelve_401(conn, corework, ca
 
 def test_obtener_transporte_admin_no_imprime_el_token_si_getwebhookinfo_falla(
         conn, corework, monkeypatch, capsys):
-    from prisma import config as config_modulo
-    from prisma import local as local_modulo
-    from prisma.local import Escucha
+    from leda import config as config_modulo
+    from leda import local as local_modulo
+    from leda.local import Escucha
 
     ws = corework.workspace_id
     _fijar_token_admin(monkeypatch, config_modulo, token=TOKEN_FALSO)
@@ -1438,7 +1438,7 @@ def test_obtener_transporte_admin_no_imprime_el_token_si_getwebhookinfo_falla(
 
 
 def test_registrar_webhooks_no_filtra_el_token_si_setwebhook_falla(monkeypatch):
-    from prisma import config as config_modulo
+    from leda import config as config_modulo
 
     monkeypatch.setattr(
         config_modulo.Config, "espacios_con_token",

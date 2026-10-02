@@ -2,7 +2,7 @@
 \set ON_ERROR_STOP on
 
 -- Applied after 0012_evidencia_pendiente.sql. Revisión review-c112506a
--- (seguimiento, `odd/tasks/prisma-orienta.md` T6a): `motivo_no_cierra_tarea`
+-- (seguimiento, `odd/tasks/leda-orienta.md` T6a): `motivo_no_cierra_tarea`
 -- contaba cualquier `approval` 'aprobado' del aprobador, de cualquier
 -- momento. ADR 0009 agregó "Pedir cambios" (`herramientas._pedir_cambios_
 -- tarea`), que inserta un `approval` 'rechazado' y devuelve la tarea a
@@ -16,7 +16,7 @@
 -- ÚLTIMA decisión del aprobador sobre la tarea); la forma de salida no
 -- cambia.
 begin;
-set search_path = prisma, public;
+set search_path = leda, public;
 
 -- Fail closed if an invoking text pipeline decoded the UTF-8 file incorrectly.
 -- chr() builds the expected value independently from non-ASCII source bytes.
@@ -30,10 +30,10 @@ do $$ begin
 end $$;
 
 do $$ begin
-  if to_regprocedure('prisma.evidencia_pendiente(uuid)') is null then
+  if to_regprocedure('leda.evidencia_pendiente(uuid)') is null then
     raise exception '0013 requires 0012_evidencia_pendiente.sql';
   end if;
-  if pg_get_functiondef('prisma.motivo_no_cierra_tarea(uuid)'::regprocedure)
+  if pg_get_functiondef('leda.motivo_no_cierra_tarea(uuid)'::regprocedure)
      like '%r.decision = ''rechazado''%' then
     raise exception '0013 ya está aplicada.';
   end if;
@@ -41,7 +41,7 @@ end $$;
 
 -- No es security definer: corre con los privilegios de quien llama, igual
 -- que antes de esta migración -- `approval` ya tiene `select` concedido a
--- `prisma_app` desde el esquema base, así que no hace falta ninguna
+-- `leda_app` desde el esquema base, así que no hace falta ninguna
 -- concesión nueva.
 create or replace function motivo_no_cierra_tarea(p_task uuid)
 returns text as $$

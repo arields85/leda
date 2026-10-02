@@ -14,10 +14,10 @@ from __future__ import annotations
 
 import pytest
 
-from prisma import gateway
-from prisma import ingreso_tareas as I
-from prisma.db import admin, espacio
-from prisma.llm import IntentAction, IntentRoute, RespectoPendiente
+from leda import gateway
+from leda import ingreso_tareas as I
+from leda.db import admin, espacio
+from leda.llm import IntentAction, IntentRoute, RespectoPendiente
 
 from tests.test_alta_eleccion_confirmacion import (
     TITULO, _alta_con_eleccion, _alta_en_confirmacion, _callback_client,

@@ -3,7 +3,7 @@ historial reciente de lo que efectivamente se dijo", F-C6).
 
 Antes sólo `agente.responder` veía la conversación: el ruteo recibía el mensaje
 suelto y una descripción corta de la pregunta pendiente, así que "ayudame, que
-puedo poner?" se clasificaba como otro tema sin saber que Prisma acababa de
+puedo poner?" se clasificaba como otro tema sin saber que Leda acababa de
 pedir el criterio de aceptación. Ahora el historial reciente (la misma fuente y
 los mismos límites que `contexto.historial`: sólo lo enviado, en orden, sin el
 mensaje que se rutea) entra como mensajes previos a los proveedores.
@@ -18,10 +18,10 @@ from types import SimpleNamespace
 
 import pytest
 
-import prisma.llm as llm
-from prisma import gateway
-from prisma.db import admin
-from prisma.llm import (IntentAction, IntentRoute, ProveedorAnthropic,
+import leda.llm as llm
+from leda import gateway
+from leda.db import admin
+from leda.llm import (IntentAction, IntentRoute, ProveedorAnthropic,
                         ProveedorCompatible, ProveedorGemini, ProveedorGuionado,
                         RespectoPendiente)
 
@@ -217,7 +217,7 @@ def _marcar_enviado(conn, tg: int) -> None:
     conn.commit()
 
 
-def test_con_una_pregunta_abierta_el_ruteo_ve_lo_que_prisma_pregunto(
+def test_con_una_pregunta_abierta_el_ruteo_ve_lo_que_leda_pregunto(
         cliente, conn, corework, monkeypatch):  # noqa: F811
     """F-C6: el ruteo clasificaba "ayudame, que puedo poner?" sin saber qué se
     había preguntado. Ahora recibe la pregunta que salió, sin el mensaje actual."""

@@ -3,7 +3,7 @@ del 2026-09-29).
 
 Con una pregunta pendiente (el dato de una acción del menú, Modificar, "Ninguna,
 lo escribo", un campo de texto libre del alta), un mensaje de otro tema ya no se
-atiende: Prisma pregunta con dos botones si se sigue con lo pendiente o se lo
+atiende: Leda pregunta con dos botones si se sigue con lo pendiente o se lo
 deja para ver lo otro. Seguir repite la pregunta; Dejar cierra lo pendiente como
 `cancela` y atiende, en la misma respuesta, el mensaje que quedó guardado.
 
@@ -20,11 +20,11 @@ from datetime import datetime, timezone
 
 import pytest
 
-from prisma import gateway
-from prisma import ingreso_tareas as I
-from prisma import pendientes as P
-from prisma.db import admin, espacio
-from prisma.llm import RespectoPendiente, Respuesta, RouteEnvelope
+from leda import gateway
+from leda import ingreso_tareas as I
+from leda import pendientes as P
+from leda.db import admin, espacio
+from leda.llm import RespectoPendiente, Respuesta, RouteEnvelope
 
 from tests.test_alta_pregunta_pendiente import (_abrir_alta, _campo_del_slot,
                                                 _mensaje_privado, _request)
@@ -68,7 +68,7 @@ DEJADAS = {
 
 
 class _Mundo:
-    """La pregunta abierta de un `kind` y cómo escribirle a Prisma en ese chat."""
+    """La pregunta abierta de un `kind` y cómo escribirle a Leda en ese chat."""
 
     def __init__(self, kind, cliente, conn, ws, monkeypatch):
         self.kind, self.cliente, self.conn, self.ws = kind, cliente, conn, ws
@@ -348,7 +348,7 @@ def test_un_toque_en_un_boton_del_retome_de_antes_se_contesta_como_no_vigente(
     # mensaje guardado): una sola respuesta y lo pendiente no se toca.
     proveedor = _con_rutas(monkeypatch, [])
     from datetime import timedelta
-    from prisma.agente import VIGENCIA_PENDIENTE
+    from leda.agente import VIGENCIA_PENDIENTE
     ahora = datetime.now(timezone.utc)
     with espacio(conn, mundo.ws) as cur:
         quien = _quien(cur, "Marcos Tarquini" if mundo.kind != "dato_menu"
@@ -406,7 +406,7 @@ def test_una_eleccion_inesperada_se_contesta_como_no_vigente_y_no_cierra_nada(
         mundo, conn, monkeypatch):
     proveedor = _con_rutas(monkeypatch, [])
     from datetime import timedelta
-    from prisma.agente import VIGENCIA_PENDIENTE
+    from leda.agente import VIGENCIA_PENDIENTE
     ahora = datetime.now(timezone.utc)
     with espacio(conn, mundo.ws) as cur:
         quien = _quien(cur, "Marcos Tarquini" if mundo.kind != "dato_menu"

@@ -23,14 +23,14 @@ import time
 
 import pytest
 
-from prisma import incidentes, redaccion
-from prisma import ingreso_tareas as I
-from prisma.db import admin, espacio
-from prisma.incidentes import NOTICIA_NEUTRA_INCIDENTE
-from prisma.llm import ProveedorGuionado
-from prisma.resultado_turno import (Cambio, Falta, OpcionDisponible, Resumen,
+from leda import incidentes, redaccion
+from leda import ingreso_tareas as I
+from leda.db import admin, espacio
+from leda.incidentes import NOTICIA_NEUTRA_INCIDENTE
+from leda.llm import ProveedorGuionado
+from leda.resultado_turno import (Cambio, Falta, OpcionDisponible, Resumen,
                                     ResultadoTurno, ValorAceptado)
-from prisma.valores import TipoValor
+from leda.valores import TipoValor
 
 from tests.test_alta_guiada_flujo import _cuerpos, _empezar
 from tests.test_alta_guiada_mensaje_entero import _a

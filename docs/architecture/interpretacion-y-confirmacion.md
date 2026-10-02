@@ -6,7 +6,7 @@ resolución (secciones 4 y 5) sigue en validación y se ajusta acá sin reabrirl
 **Creado:** 2026-09-23
 **Origen:** primera corrida del banco conversacional (`docs/STATUS.md`), pedido
 del usuario de frenar la ambigüedad con botones, investigación con fuentes y el
-paquete de trabajo previo `PRISMA-PACK-VERACIDAD-Y-AMBIGUEDAD-20260923` (externo
+paquete de trabajo previo `LEDA-PACK-VERACIDAD-Y-AMBIGUEDAD-20260923` (externo
 al repositorio; usado como experiencia, no como norma).
 
 Este documento se actualiza con cada prueba. Lo que está en "Decidido" lo decidió
@@ -17,7 +17,7 @@ el usuario; lo que está en "Diseño propuesto" espera evidencia.
 ## 1. Problema
 
 Las personas escriben como escriben: con faltas, sin tildes, con abreviaturas,
-nombrando a medias ("lo del tablero", "marco") o contradiciéndose. Prisma tiene que
+nombrando a medias ("lo del tablero", "marco") o contradiciéndose. Leda tiene que
 entender ese lenguaje sin convertir una interpretación probable en un cambio real.
 
 Hoy falla de dos maneras, las dos verificadas:
@@ -38,7 +38,7 @@ señalar la duda. Corregirlo ajustando el prompt es parchear frase por frase.
 
 Tomados del paquete previo y de la investigación; se aplican a todo lo que sigue.
 
-1. **Tolerante con la forma, estricto con las consecuencias.** Prisma entiende
+1. **Tolerante con la forma, estricto con las consecuencias.** Leda entiende
    lenguaje imperfecto; no adivina una decisión que cambia algo.
 2. **Sólo la ambigüedad material frena.** Es material si cambia la entidad, el
    estado, la fecha, el responsable, el alcance o el efecto. Una diferencia de
@@ -48,7 +48,7 @@ Tomados del paquete previo y de la investigación; se aplican a todo lo que sigu
    contra PostgreSQL.
 4. **La similitud propone, nunca elige.** Un candidato encontrado por parecido se
    ofrece; no se selecciona solo.
-5. **Sin candidatos reales no hay botones.** Si no hay a qué referirse, Prisma pide
+5. **Sin candidatos reales no hay botones.** Si no hay a qué referirse, Leda pide
    la referencia en texto; no inventa opciones.
 6. **Un toque vale sólo para su propuesta exacta.** Mismo actor, misma
    conversación, misma propuesta, sin vencer. Un "dale" suelto no autoriza nada.
@@ -79,14 +79,14 @@ aclara con botones que muestran cada lectura escrita con su puntuación.
   tras la prueba 5.2). La detección de ambigüedad reduce preguntas y errores,
   pero no se confía en ella para evitar un efecto equivocado: ningún cambio se
   aplica sin que la persona vea exactamente qué va a pasar y lo confirme.
-- **Cuando Prisma pregunta, pregunta con botones** (2026-09-24). Las respuestas
+- **Cuando Leda pregunta, pregunta con botones** (2026-09-24). Las respuestas
   posibles se ofrecen como botones ("¿Terminaste la tarea?" → [Sí] [No] [Todavía
   no sé]) para que la ambigüedad de una respuesta libre no llegue a existir. El
   texto libre queda para lo que no tiene opciones concretas y para "Ninguna, lo
   escribo".
 - **Los apodos se aprenden preguntando, no se cargan de antemano** (2026-09-24).
   Una lista fija envejece: la gente cambia de apodo. Cuando una referencia a una
-  persona no coincide con nadie ("tincho"), Prisma pregunta quién es con botones
+  persona no coincide con nadie ("tincho"), Leda pregunta quién es con botones
   —las personas del equipo, ordenadas por el contexto del mensaje, más "Ninguno,
   lo escribo"— y, con la respuesta, registra ese apodo para esa persona ("tincho",
   "luquitas", "luki", "nahue").
@@ -136,7 +136,7 @@ Marcos tiene dos tareas de tablero abiertas y escribe "ya termine lo del tablero
 pasala a revision".
 
 ```text
-Prisma: Tenés dos tareas de tablero abiertas. ¿Cuál pasamos a revisión?
+Leda: Tenés dos tareas de tablero abiertas. ¿Cuál pasamos a revisión?
   [Pasar «Cablear tablero máq. 3» a revisión]
   [Pasar «Revisar tablero máq. 4» a revisión]
   [Ninguna, lo escribo]
@@ -145,7 +145,7 @@ Prisma: Tenés dos tareas de tablero abiertas. ¿Cuál pasamos a revisión?
 Toca la primera:
 
 ```text
-Prisma: Tarea: Cablear tablero máq. 3
+Leda: Tarea: Cablear tablero máq. 3
         Estado actual: En curso
         Nuevo estado: En revisión
         Todavía no se aplicó ningún cambio.
@@ -155,7 +155,7 @@ Prisma: Tarea: Cablear tablero máq. 3
 Confirma:
 
 ```text
-Prisma: Listo: «Cablear tablero máq. 3» pasó de En curso a En revisión.
+Leda: Listo: «Cablear tablero máq. 3» pasó de En curso a En revisión.
 ```
 
 Un mensaje claro empieza directamente en la vista previa.
@@ -179,9 +179,9 @@ Un mensaje claro empieza directamente en la vista previa.
 
 - `pending_action` y `pending_action_option` (`db/esquema.sql`): dueño, vencimiento
   obligatorio, opciones con token de un solo uso y estados `inexistente`, `usada`,
-  `vencida`, `obsoleta` (`src/prisma/pendientes.py`).
-- `NecesitaElegir` (`src/prisma/herramientas.py`) y `_ambiguos`
-  (`src/prisma/contexto.py`): hoy resuelven sólo el caso de una persona con nombre
+  `vencida`, `obsoleta` (`src/leda/pendientes.py`).
+- `NecesitaElegir` (`src/leda/herramientas.py`) y `_ambiguos`
+  (`src/leda/contexto.py`): hoy resuelven sólo el caso de una persona con nombre
   repetido; son el antecedente a generalizar.
 - Botones y salida (`despachador._botones`, `salida.enqueue_outbox`).
 - El banco (`tests/banco/`) con la comprobación `debe_preguntar` para medir.
@@ -207,10 +207,10 @@ Un mensaje claro empieza directamente en la vista previa.
 - ~~Botón "Ninguna, lo escribo"~~: construido; espera la aclaración 30 minutos,
   como Modificar. La propuesta vence a las 8 h heredadas de `pending_action`; el
   plazo por defecto sigue abierto (§7).
-- ~~Prisma orienta (ADR 0007): opciones del modelo, menú de tarea, listas de tareas
+- ~~Leda orienta (ADR 0007): opciones del modelo, menú de tarea, listas de tareas
   como botones y cierre genérico sin opciones concretas~~: construido, T1 a T4b
   (`main`, commits `c253d27`..`9681973`; detalle y evidencia en
-  `odd/tasks/prisma-orienta.md`). El menú de tarea por estado y relación es §4.6, más
+  `odd/tasks/leda-orienta.md`). El menú de tarea por estado y relación es §4.6, más
   abajo. Pendiente: autoridad de una autoridad superior sobre `cancelada` (T2b);
   "Adjuntar evidencia" del aprobador todavía no aparece como botón en el menú aunque
   la herramienta ya lo permite; y la segunda sesión real por Telegram que mide ADR
@@ -218,7 +218,7 @@ Un mensaje claro empieza directamente en la vista previa.
 
 ### 4.6 Acciones por tarea (ADR 0007, decidido con el usuario el 2026-09-25)
 
-Al tocar una tarea, Prisma ofrece sólo lo que quien toca puede hacer, según el estado
+Al tocar una tarea, Leda ofrece sólo lo que quien toca puede hacer, según el estado
 de la tarea y su relación con ella (`nucleo/mecanica-pm.md` §3, §4, §7 y §8). Siempre
 se suma "Quiero consultar otra cosa". Todo lo que cambia algo termina en la vista
 previa, y al confirmar se vuelve a verificar la autoridad: ofrecer no autoriza.
@@ -251,13 +251,13 @@ exige razón y autoridad y no se ofrece como opción común.
 persona suma a una tarea con un motivo (avance, información de un bloqueo,
 observaciones al devolver una revisión, respuesta a un pedido de estado). Un aporte no
 es evidencia (actualización, evidencia, aprobación y cierre son hechos distintos); los
-archivos se guardan por referencia con verificación de integridad y Prisma no los
+archivos se guardan por referencia con verificación de integridad y Leda no los
 interpreta. Hasta que exista, esas opciones no se muestran.
 
 ## 5. Pruebas de concepto
 
 Cada una se corre antes de construir el paso que la necesita, fuera del código de
-Prisma, y su resultado se registra acá.
+Leda, y su resultado se registra acá.
 
 ### 5.1 ¿Los embeddings separan lo claro de lo ambiguo?
 
@@ -322,7 +322,7 @@ Lectura:
 3. **Rerank, sobreconfiado.** Ordena bien cuando hay una sola respuesta, pero ante
    referencias ambiguas elige una con fuerza: "los planos" dio un cociente de 0,09
    y "lo del tablero" puso primero la tarea de la estufa. Usarlo como señal haría
-   que Prisma actúe sin preguntar. Sirve, a lo sumo, para ordenar las opciones.
+   que Leda actúe sin preguntar. Sirve, a lo sumo, para ordenar las opciones.
 4. **Personas, coincidencia aproximada.** Separa limpio: las claras dan 0,90, los
    nombres ajenos 0,39–0,43, y "mar" empata exactamente entre los tres nombres que
    empiezan así, que es la señal de duda correcta. Los embeddings no sirven para
@@ -419,7 +419,7 @@ Lectura:
    ("eppi"), y una referencia cuyas palabras distintivas no aparecen en ninguna es
    señal de "sin referente" ("horno").
 4. **"tincho" quedó sin resolver**, que con la decisión de la sección 3 es lo
-   correcto: Prisma pregunta quién es.
+   correcto: Leda pregunta quién es.
 
 Límites: la extracción se corrió una vez; falta medir si es estable entre
 corridas. El corte 0,85 se propuso después de ver la segunda corrida.
@@ -440,7 +440,7 @@ general, aplicada a cada referencia antes de los embeddings:
 | Conjunto | Correctos | Inseguros | Resto |
 |---|---|---|---|
 | Mensajes del usuario (15) | **15** | **0** | — |
-| Referencias de la corrida 1 (23) | 21 | **0** | "el tablro de la maq 3" pregunta de más; "lo de los aps" queda sin referente (Prisma pregunta a qué se refiere) |
+| Referencias de la corrida 1 (23) | 21 | **0** | "el tablro de la maq 3" pregunta de más; "lo de los aps" queda sin referente (Leda pregunta a qué se refiere) |
 
 La extracción del paso 1 resultó estable: 0 de 15 mensajes cambiaron en 3
 repeticiones, y una segunda tanda de 3 dio lo mismo.
@@ -473,7 +473,7 @@ cuarta corrida sin ningún cambio.
 |---|---|
 | Correcto | 7 de 15 |
 | **Inseguro** (elige sin preguntar) | **3**: "lo de los planos" → T6 (eran T5 o T6); "lo de dashboar" → T9 (eran T9 o T10); "las cosas de IT" → sin referente (eran cuatro tareas de IT) |
-| Incompleto (no encuentra la tarea; Prisma preguntaría) | 3: "lo del wifi", "la migración", "la red que había quedado pendiente" |
+| Incompleto (no encuentra la tarea; Leda preguntaría) | 3: "lo del wifi", "la migración", "la red que había quedado pendiente" |
 | Pregunta de más | 2: "el tablero de la 3"; una referencia del mensaje largo |
 
 Personas: "mariano" bien; "marquitos" y "Luquitas" sin coincidencia, que es lo
@@ -522,7 +522,7 @@ medir el acuerdo por mensaje y la latencia agregada.
 intención de forma confiable con `deepseek-v4-flash`. La protección real es la
 vista previa con confirmación.
 
-Datos: 18 mensajes (10 claros, 8 ambiguos), con la última pregunta de Prisma como
+Datos: 18 mensajes (10 claros, 8 ambiguos), con la última pregunta de Leda como
 contexto cuando la hubo; incluye el ejemplo del usuario sin coma ("no se iso lo que
 se pidió martin") y su versión con coma como control. Etiquetas del diseñador,
 discutibles en tres casos (8, 17 y 18). Dos métodos:
@@ -556,11 +556,11 @@ Lectura:
 Consecuencias de diseño:
 
 - **La vista previa con confirmación es la protección, no la detección.** Si
-  Prisma entendió mal la intención, la vista previa lo muestra ("Nuevo estado: En
+  Leda entendió mal la intención, la vista previa lo muestra ("Nuevo estado: En
   revisión") y la persona cancela o modifica antes de que se aplique nada. Por eso
   la decisión de confirmar todo cambio relevante es la pieza que sostiene el
   diseño.
-- **Evitar el texto libre cuando Prisma pregunta.** El ejemplo de la coma nace de
+- **Evitar el texto libre cuando Leda pregunta.** El ejemplo de la coma nace de
   una respuesta libre a "¿Terminaste la tarea?". Si esa pregunta llega con botones
   ([Sí] [No] [Todavía no sé]), la ambigüedad no llega a existir.
 - **La detección de intención queda como mejora, no como garantía.** Se puede
@@ -883,7 +883,7 @@ El error es siempre el mismo mensaje del lote 1: "ya esta listo lo del horno de 
 línea 2? falta mucho?". No existe una tarea del horno; Jev eligió "Relevar planos
 del tablero de la estufa" con confianza. El cero de corridas anteriores fue suerte.
 Además del riesgo en un cambio, que la vista previa frena, el riesgo mayor está en
-una consulta: sin vista previa, Prisma respondería sobre la estufa como si fuera el
+una consulta: sin vista previa, Leda respondería sobre la estufa como si fuera el
 horno.
 
 **Arreglo probado:** cuando la receta decide clara, una segunda llamada con un Noul
@@ -905,10 +905,10 @@ Lectura:
 2. **El margen es fino:** la correcta más baja dio 0,51, al lado del corte.
 3. **Se midió sobre mensajes ya vistos y con un solo caso fallido.** Se confirma con
    un lote nuevo, no con esta prueba.
-4. **Cuesta una llamada más, de unos 0,4 s,** sólo cuando Prisma está por decidir
+4. **Cuesta una llamada más, de unos 0,4 s,** sólo cuando Leda está por decidir
    solo: la tarea a verificar no se conoce hasta que Jev la elige.
 5. **Toda respuesta a una consulta nombra la tarea por su título,** para que la
-   persona note si Prisma entendió otra cosa; es la protección de las lecturas, que
+   persona note si Leda entendió otra cosa; es la protección de las lecturas, que
    no pasan por vista previa.
 
 ### 5.9 Lote 4, no visto: confirmación de la verificación
@@ -955,7 +955,7 @@ Lectura:
 
 ### 5.10 ¿Saber quién escribe ayuda a Jev?
 
-**Pregunta (planteada por el usuario):** Prisma sabe quién escribe por su cuenta de
+**Pregunta (planteada por el usuario):** Leda sabe quién escribe por su cuenta de
 Telegram, pero Jev no lo recibía. Se asignó un autor verosímil a los 60 mensajes de
 los lotes 1 a 4 (quien cuenta avances de su trabajo, un referente que pregunta por
 tareas de otros, y casos adversariales: alguien que nombra algo inexistente parecido
@@ -1048,17 +1048,17 @@ local no tenía las migraciones 0009 y 0010: las pruebas crean una base nueva de
 
 Hallazgos:
 
-1. **Prisma pregunta con texto abierto.** "¿Querés que vea si alguna depende de
+1. **Leda pregunta con texto abierto.** "¿Querés que vea si alguna depende de
    otra?", "¿Cuál querés ver?", "decime y la paso a revisión", "¿Qué querés
    cambiar?": cada pregunta abierta invitó una respuesta vaga ("si, revisa", "la
    tarea") que después hubo que interpretar. ADR 0005 punto 4 (las preguntas de
-   Prisma van con botones) sólo está construido para la duda de referencia.
+   Leda van con botones) sólo está construido para la duda de referencia.
 2. **Suposición presentada como hecho:** ante "si, revisa", el modelo afirmó que una
    tarea "claramente va detrás" de otra, sin ningún dato que lo diga.
 3. **Botones con tareas que la persona no puede reportar:** para "ya terminé la
    comprimidora", escrito por Ariel, se ofreció el PLC de Marcos, que después se
    rechazó al prepararse el cambio.
-4. **Jev no sigue el hilo:** Prisma acababa de listar las tareas de Ariel y "ya
+4. **Jev no sigue el hilo:** Leda acababa de listar las tareas de Ariel y "ya
    terminé la comprimidora" igual abrió botones; el modelo de conversación ve el
    historial, Jev no.
 5. **Una referencia genérica llega a Jev:** "la tarea", respuesta a "¿Qué querés
@@ -1067,8 +1067,8 @@ Hallazgos:
    Confirmar, Modificar y Cancelar, y una respuesta que entendió una dependencia
    implícita ("cuando él termine yo puedo hacer mi trabajo") y propuso declararla.
 
-**Principio propuesto por el usuario: Prisma orienta, no charla.** Cada respuesta
-cierra con opciones concretas para tocar, no con una pregunta abierta; si Prisma
+**Principio propuesto por el usuario: Leda orienta, no charla.** Cada respuesta
+cierra con opciones concretas para tocar, no con una pregunta abierta; si Leda
 nombra opciones, esas opciones van como botones, más una salida del tipo "Quiero
 consultar otra cosa". Una lista de tareas se ofrece como botones; tocar una abre lo
 que se puede hacer con ella. Responde a la vez a los hallazgos 1, 2, 4 y 5. Se fija en
@@ -1081,7 +1081,7 @@ hilo reciente (4); resolver las referencias genéricas con el hilo y no con Jev 
 Con el banco (`docs/validation/README.md`, "Banco conversacional") y, después, por
 Telegram real:
 
-- **Aclaración:** en los escenarios ambiguos, Prisma no aplica nada y ofrece
+- **Aclaración:** en los escenarios ambiguos, Leda no aplica nada y ofrece
   botones o pregunta.
 - **Preguntas de más:** en los escenarios claros, no pregunta; va a la vista previa.
 - **Ningún efecto sin confirmación:** ningún escenario cambia la base sin un
@@ -1097,7 +1097,7 @@ comparar, no antes.
   (`registrar_bloqueo`, `resolver_bloqueo`, `actualizar_estado`,
   `crear_dependencia`, `quitar_dependencia`, `adjuntar_evidencia`,
   `aprobar_tarea`, `crear_objetivo`). `PENDIENTE`.
-- **pgvector.** Prisma va a correr en un servidor, así que el destino natural es
+- **pgvector.** Leda va a correr en un servidor, así que el destino natural es
   guardar un vector por tarea en PostgreSQL con pgvector, sin un servicio aparte.
   Las pruebas hasta ahora no usan pgvector: calculan los parecidos en memoria. Datos
   verificados (2026-09-24): pgvector soporta PostgreSQL 13 a 18 y busca exacto sin
@@ -1132,8 +1132,8 @@ comparar, no antes.
 | 2026-09-24 | Decisión del usuario: los apodos se aprenden preguntando, con alcance acotado (excepción explícita al aprendizaje persistente) |
 | 2026-09-24 | Tercera corrida con referencias extraídas por el modelo: 11 de 15 correctos, 0 inseguros; el borde "sin referente" queda como lo pendiente |
 | 2026-09-24 | Cuarta corrida con palabras distintivas: 15 de 15 en mensajes del usuario y 21 de 23 en la corrida 1, 0 inseguros; extracción estable; falta un conjunto nuevo no visto |
-| 2026-09-24 | Prueba 5.2: ni clasificar 5 veces (0 de 8) ni pedir lecturas (4 de 8, hasta 73 s) detectan la duda de intención con fiabilidad; la vista previa con confirmación queda como la protección y se evita el texto libre en las preguntas de Prisma |
-| 2026-09-24 | El usuario confirma: la vista previa con confirmación es la protección principal y las preguntas de Prisma van con botones |
+| 2026-09-24 | Prueba 5.2: ni clasificar 5 veces (0 de 8) ni pedir lecturas (4 de 8, hasta 73 s) detectan la duda de intención con fiabilidad; la vista previa con confirmación queda como la protección y se evita el texto libre en las preguntas de Leda |
+| 2026-09-24 | El usuario confirma: la vista previa con confirmación es la protección principal y las preguntas de Leda van con botones |
 | 2026-09-24 | Quinta corrida con un lote no visto: 7 de 15, 3 inseguros; las reglas por palabras sobreajustaron; hacen falta vocabulario del equipo aprendido y referencias por área o persona |
 | 2026-09-24 | Prueba 5.3 con Jev: 9 de 9 claras en el lote no visto y duda correcta en "los planos"; falla vocabulario del equipo y áreas; para intención, 4 de 8 al corte 0,8 frente a 0 de 8 de DeepSeek |
 | 2026-09-24 | Pruebas 5.4 a 5.7: combinaciones de modalidades de Jev, validación con el lote 3 (11 de 15, 0 inseguros) y escala a 200 tareas |

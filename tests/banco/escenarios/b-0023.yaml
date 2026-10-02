@@ -3,7 +3,7 @@ objetivo: >
   La vista previa de un cambio que la persona pidió es una rama abierta (ADR
   0013 regla 1, enmienda "una sola rama de conversación abierta", T9-R1d-1b):
   con la vista previa de un bloqueo esperando su Confirmar, la persona pide otra
-  cosa (una consulta sobre sus tareas). Prisma no la atiende todavía: hace una
+  cosa (una consulta sobre sus tareas). Leda no la atiende todavía: hace una
   sola pregunta con dos botones sobre lo pendiente ("Estábamos con el cambio que
   te mostré. ¿Seguimos con eso?"). La consulta no se contesta y no se aplica
   nada antes del Confirmar; ese toque lo simula el corredor al final, sobre la

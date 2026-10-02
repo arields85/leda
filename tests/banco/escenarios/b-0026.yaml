@@ -1,7 +1,7 @@
 id: b-0026
 objetivo: >
   Una foto con epígrafe (ADR 0013 regla 2, H15): el epígrafe se procesa como el
-  texto del mensaje y Prisma responde a eso (las tareas propias, sin inventar
+  texto del mensaje y Leda responde a eso (las tareas propias, sin inventar
   nada), y en la misma respuesta avisa que el adjunto todavía no se guarda. Una
   sola respuesta visible: el aviso es una parte de ella, no otra respuesta. No se
   ejecuta ninguna herramienta que escriba por haber mandado una imagen.

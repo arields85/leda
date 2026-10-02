@@ -14,12 +14,12 @@ from datetime import timedelta
 
 import pytest
 
-from prisma import incidentes, redaccion
-from prisma import ingreso_tareas as I
-from prisma.db import admin, atar_al_entrante, espacio
-from prisma.llm import ProveedorGuionado
-from prisma.resultado_turno import Rechazo
-from prisma.valores import TipoValor
+from leda import incidentes, redaccion
+from leda import ingreso_tareas as I
+from leda.db import admin, atar_al_entrante, espacio
+from leda.llm import ProveedorGuionado
+from leda.resultado_turno import Rechazo
+from leda.valores import TipoValor
 
 from tests.test_alta_enviar_a_aprobacion import _alta_en_revision, _tocar, _fila, _acciones
 from tests.test_alta_eleccion_confirmacion import _usuario
@@ -120,7 +120,7 @@ def test_la_pregunta_sale_entera_del_modelo_con_lo_que_se_entendio(
     assert [i["resultado"] for i in _intentos(conn, ws)] == ["aceptada"]
 
 
-def test_el_modelo_puede_nombrar_a_quien_escribe_y_a_prisma(
+def test_el_modelo_puede_nombrar_a_quien_escribe_y_a_leda(
         intake_world, conn, monkeypatch):
     """Los nombres que el turno ya conoce (la persona, el asistente) no son
     "nombres inventados": el verificador los deja pasar sin que estén en los
@@ -128,7 +128,7 @@ def test_el_modelo_puede_nombrar_a_quien_escribe_y_a_prisma(
     ws = intake_world["north-lab"]["id"]
     with espacio(conn, ws) as cur:
         nombre = _actor(cur, intake_world).nombre
-    mensaje = (f"Dale, {nombre}: tomé «{TITULO}» como título y Prisma sigue con "
+    mensaje = (f"Dale, {nombre}: tomé «{TITULO}» como título y Leda sigue con "
                "vos. ¿De cuál de estos objetivos es?")
     modelo = _Modelo(_json(mensaje, "objective"))
     _a(conn, ws, monkeypatch, modelo)

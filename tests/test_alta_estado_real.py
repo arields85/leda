@@ -18,10 +18,10 @@ from datetime import datetime, timezone
 
 import pytest
 
-from prisma import gateway
-from prisma import ingreso_tareas as I
-from prisma.db import admin, espacio
-from prisma.llm import RespectoPendiente
+from leda import gateway
+from leda import ingreso_tareas as I
+from leda.db import admin, espacio
+from leda.llm import RespectoPendiente
 
 from tests.test_alta_eleccion_confirmacion import (_escribir, _nuevas, _ruta,
                                                    _salidas, _tocar_boton,
@@ -272,7 +272,7 @@ def test_un_reintento_con_el_mismo_estado_trabado_tambien_recibe_su_respuesta(
     recibía nada. La clave incluye el mensaje o toque que lo dispara: cada
     intento tiene su respuesta, y una entrega repetida del mismo evento no la
     duplica."""
-    from prisma.db import atar_al_entrante
+    from leda.db import atar_al_entrante
 
     from tests.test_alta_eleccion_confirmacion import _fila_de_evento
 

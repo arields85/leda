@@ -7,7 +7,7 @@ acceso (`5b1be50`). Lo difícil ya está.
 
 ## Objetivo
 
-Que alguien de CoreWork le pida el tablero a Prisma por Telegram, reciba su
+Que alguien de CoreWork le pida el tablero a Leda por Telegram, reciba su
 enlace, lo abra, y vea el estado de su espacio. Punta a punta.
 
 Feo está permitido. Incompleto, no: lo que muestre tiene que ser cierto.

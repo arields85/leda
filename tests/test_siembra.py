@@ -1,6 +1,6 @@
-"""Siembra reproducible de datos ficticios (T7, `odd/tasks/prisma-orienta.md`).
+"""Siembra reproducible de datos ficticios (T7, `odd/tasks/leda-orienta.md`).
 
-`prisma.siembra.sembrar` carga un archivo YAML de semilla en un espacio recién
+`leda.siembra.sembrar` carga un archivo YAML de semilla en un espacio recién
 importado, para que la próxima base de prueba no dependa de tareas cargadas a
 mano -- eso fue lo que dejó las 12 tareas ficticias de las sesiones 1 y 2 con
 " (simulado)" en el título, un campo de compromiso inmutable que después no se
@@ -15,7 +15,7 @@ Cubre:
   3. La semilla es idempotente por rechazo: una segunda corrida no agrega ni
      modifica nada.
   4. Invariantes del comprobador diario del experimento (Experimento 1,
-     `odd/tasks/prisma-orienta.md`): `task.estado` es el último evento;
+     `odd/tasks/leda-orienta.md`): `task.estado` es el último evento;
      ninguna tarea `en_curso` tiene una dependencia bloqueante abierta salvo
      la diseñada a propósito, y esa dependencia se cargó en un orden legal
      (la tarea ya estaba en curso antes de que la dependencia existiera).
@@ -25,7 +25,7 @@ Cubre:
   6. `evidencia_policy_version` queda igual que si la tarea hubiera pasado
      por `confirmar_borrador_tarea`: la versión vigente de
      `task_evidence_policy` para el área de esa tarea, nunca `null`.
-  7. Seguimientos T7b (`odd/tasks/prisma-orienta.md`): toda la validación
+  7. Seguimientos T7b (`odd/tasks/leda-orienta.md`): toda la validación
      corre antes del primer insert -- título repetido, `estado_inicial`
      fuera del allow-list `asignada`/`en_curso`, clave requerida faltante,
      objetivo ambiguo, archivo de semilla inexistente o YAML roto o vacío --
@@ -52,8 +52,8 @@ import psycopg
 import pytest
 import yaml
 
-from prisma.db import admin
-from prisma.siembra import ResultadoSiembra, SiembraInvalida, sembrar
+from leda.db import admin
+from leda.siembra import ResultadoSiembra, SiembraInvalida, sembrar
 
 RAIZ = Path(__file__).resolve().parents[1]
 SEMILLA_COREWORK = RAIZ / "espacios" / "corework.semilla-ficticia.yaml"
@@ -105,7 +105,7 @@ def test_sembrar_corework_crea_las_12_tareas_sin_simulado(corework, conn):
 
 def test_sembrar_corework_seis_en_curso_y_seis_asignada(corework, conn):
     """Estados iniciales documentados en el YAML y en T7
-    (`odd/tasks/prisma-orienta.md`): seis `en_curso` -- una por responsable
+    (`odd/tasks/leda-orienta.md`): seis `en_curso` -- una por responsable
     con aprobador -- y seis `asignada`, ninguna en otro estado."""
     ws = corework.workspace_id
     with admin(conn) as cur:
@@ -157,7 +157,7 @@ def test_sembrar_corework_estado_es_siempre_el_ultimo_evento(corework, conn):
 
 
 def test_sembrar_corework_una_sola_dependencia_bloqueante_abierta_en_orden_legal(corework, conn):
-    """Sólo la tarea diseñada a propósito (T6c, `odd/tasks/prisma-orienta.md`)
+    """Sólo la tarea diseñada a propósito (T6c, `odd/tasks/leda-orienta.md`)
     tiene una dependencia bloqueante abierta mientras está `en_curso`, y la
     dependencia se cargó después de que la tarea ya estuviera en curso -- no
     la movió retroactivamente, igual que
@@ -615,11 +615,11 @@ def test_sembrar_es_idempotente_por_rechazo(corework, conn, tmp_path):
 
 # ---------------------------------------------------------------------------
 # 7. La CLI (`cli.py`, rama `sembrar`): nunca una traza cruda ni el DETAIL de
-#    la base, siempre rollback en el rechazo (T7b, `odd/tasks/prisma-orienta.md`)
+#    la base, siempre rollback en el rechazo (T7b, `odd/tasks/leda-orienta.md`)
 # ---------------------------------------------------------------------------
 
 def test_cli_sembrar_ok_imprime_solo_conteos_y_commitea(corework, conn, monkeypatch, capsys):
-    import prisma.cli as cli
+    import leda.cli as cli
 
     monkeypatch.setattr(cli, "conectar", lambda: conn)
     codigo = cli.main(["sembrar", "corework", "--semilla", str(SEMILLA_COREWORK)])
@@ -641,7 +641,7 @@ def test_cli_sembrar_ok_imprime_solo_conteos_y_commitea(corework, conn, monkeypa
 
 def test_cli_sembrar_rechazo_de_validacion_sin_traza_y_sin_escribir_nada(
         corework, conn, tmp_path, monkeypatch, capsys):
-    import prisma.cli as cli
+    import leda.cli as cli
 
     monkeypatch.setattr(cli, "conectar", lambda: conn)
     ruta_inexistente = tmp_path / "no-existe.yaml"
@@ -662,7 +662,7 @@ def test_cli_sembrar_rechazo_de_validacion_sin_traza_y_sin_escribir_nada(
 
 def test_cli_sembrar_rechazo_de_la_base_no_muestra_detalle_ni_escribe_nada(
         corework, conn, tmp_path, monkeypatch, capsys):
-    import prisma.cli as cli
+    import leda.cli as cli
 
     monkeypatch.setattr(cli, "conectar", lambda: conn)
     ruta = _semilla_minima(tmp_path, dependencias=[
@@ -697,7 +697,7 @@ def test_cli_sembrar_rollback_roto_no_impide_el_mensaje_limpio(
     """Si la conexión ya está cortada, `conn.rollback()` puede volver a
     fallar -- eso no puede tapar el mensaje limpio que la rama ya decidió
     mostrar ni terminar en una traza cruda de esta segunda falla."""
-    import prisma.cli as cli
+    import leda.cli as cli
 
     def _rollback_roto():
         raise psycopg.OperationalError("conexión cortada")

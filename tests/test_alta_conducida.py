@@ -19,13 +19,13 @@ from zoneinfo import ZoneInfo
 import pytest
 from psycopg.types.json import Jsonb
 
-from prisma import alta_conducida as AC
-from prisma import gateway, incidentes
-from prisma import ingreso_tareas as I
-from prisma.db import admin, espacio
-from prisma.incidentes import NOTICIA_NEUTRA_INCIDENTE
-from prisma.valores import sumar_meses
-from prisma.llm import (IntentAction, IntentRoute, ProveedorGuionado,
+from leda import alta_conducida as AC
+from leda import gateway, incidentes
+from leda import ingreso_tareas as I
+from leda.db import admin, espacio
+from leda.incidentes import NOTICIA_NEUTRA_INCIDENTE
+from leda.valores import sumar_meses
+from leda.llm import (IntentAction, IntentRoute, ProveedorGuionado,
                         Respuesta)
 
 from tests.test_alta_eleccion_confirmacion import (
@@ -74,7 +74,7 @@ def conversada(intake_world, conn, monkeypatch):
 
 
 class Chat:
-    """Una persona (Taylor Quinn) conversando con Prisma por el webhook."""
+    """Una persona (Taylor Quinn) conversando con Leda por el webhook."""
 
     def __init__(self, conn, monkeypatch, world, modelo):
         self.conn, self.monkeypatch, self.world, self.modelo = (
@@ -91,7 +91,7 @@ class Chat:
     def tocar(self, parte: str) -> list[dict]:
         antes = _salidas(self.conn, self.usuario)
         self.cliente = self.cliente or _callback_client(self.conn, self.monkeypatch)
-        self.monkeypatch.setattr("prisma.llm.desde_base", lambda *a: self.modelo)
+        self.monkeypatch.setattr("leda.llm.desde_base", lambda *a: self.modelo)
         respuesta = _post_intake_callback(
             self.cliente, self.token(parte), self.usuario,
             callback_id=f"cb-{next(_toques)}")
@@ -515,20 +515,20 @@ def test_un_criterio_que_no_se_puede_comprobar_se_propone_otro_y_se_acepta(chat)
     assert "Resumen para revisar" in nuevas[0]["cuerpo"]       # ya está todo
 
 
-_PROPUESTA_DE_PRISMA = "Informe de la prueba de 24 h, firmado por calidad"
+_PROPUESTA_DE_LEDA = "Informe de la prueba de 24 h, firmado por calidad"
 
 
 def _ayuda_con_propuesta_registrada(c):
     """Caso real (2026-10-01, 21:51 y 21:58): la persona pide ayuda con el criterio y
     el modelo propone uno, registrándolo en `propuesta` y sin declarar `pregunta`."""
     c.modelo.conducciones.append(salida(
-        f"Te propongo: {_PROPUESTA_DE_PRISMA}. Si te sirve, lo dejo así.",
+        f"Te propongo: {_PROPUESTA_DE_LEDA}. Si te sirve, lo dejo así.",
         intencion="ayuda",
-        valores={"acceptance_criterion": {"propuesta": _PROPUESTA_DE_PRISMA}}))
+        valores={"acceptance_criterion": {"propuesta": _PROPUESTA_DE_LEDA}}))
     return c.escribir("¿qué me sugerís como criterio?")
 
 
-def test_una_propuesta_de_prisma_registrada_se_acepta_al_primer_intento_y_se_confirma_con_un_si(
+def test_una_propuesta_de_leda_registrada_se_acepta_al_primer_intento_y_se_confirma_con_un_si(
         chat):
     c = _alta_completa_menos_criterio(chat)
 
@@ -536,26 +536,26 @@ def test_una_propuesta_de_prisma_registrada_se_acepta_al_primer_intento_y_se_con
 
     assert len(c.modelo.conducidos) == 2        # el alta previa + un único intento
     assert _cuerpos(nuevas) == [
-        f"Te propongo: {_PROPUESTA_DE_PRISMA}. Si te sirve, lo dejo así."]
+        f"Te propongo: {_PROPUESTA_DE_LEDA}. Si te sirve, lo dejo así."]
     propuesto = c.campo("acceptance_criterion")
     assert (propuesto["estado"], propuesto["proposed_by"]) == ("proposed", "model")
-    assert propuesto["valor"] == _PROPUESTA_DE_PRISMA
+    assert propuesto["valor"] == _PROPUESTA_DE_LEDA
     assert c.incidentes(incidentes.ETAPA_ALTA_CONDUCIDA_FALLIDA) == []
 
     c.modelo.conducciones.append(salida(
         "Listo, revisalo.",
-        valores={"acceptance_criterion": {"texto": _PROPUESTA_DE_PRISMA}}))
+        valores={"acceptance_criterion": {"texto": _PROPUESTA_DE_LEDA}}))
     nuevas = c.escribir("sí")
 
-    assert c.hechos()["propuesta_vigente"] == _PROPUESTA_DE_PRISMA
+    assert c.hechos()["propuesta_vigente"] == _PROPUESTA_DE_LEDA
     criterio = c.campo("acceptance_criterion")
     assert (criterio["estado"], criterio["valor"]) == ("confirmed",
-                                                       _PROPUESTA_DE_PRISMA)
+                                                       _PROPUESTA_DE_LEDA)
     assert "Resumen para revisar" in nuevas[0]["cuerpo"]
     assert c.incidentes(incidentes.ETAPA_ALTA_CONDUCIDA_FALLIDA) == []
 
 
-def test_si_la_persona_rechaza_la_propuesta_de_prisma_y_da_la_suya_se_confirma_la_suya(
+def test_si_la_persona_rechaza_la_propuesta_de_leda_y_da_la_suya_se_confirma_la_suya(
         chat):
     c = _alta_completa_menos_criterio(chat)
     _ayuda_con_propuesta_registrada(c)
@@ -573,7 +573,7 @@ def test_si_la_persona_rechaza_la_propuesta_de_prisma_y_da_la_suya_se_confirma_l
     assert c.incidentes(incidentes.ETAPA_ALTA_CONDUCIDA_FALLIDA) == []
 
 
-def test_si_la_persona_rechaza_la_propuesta_y_pide_otra_prisma_puede_proponer_de_nuevo(
+def test_si_la_persona_rechaza_la_propuesta_y_pide_otra_leda_puede_proponer_de_nuevo(
         chat):
     c = _alta_completa_menos_criterio(chat)
     _ayuda_con_propuesta_registrada(c)
@@ -592,7 +592,7 @@ def test_si_la_persona_rechaza_la_propuesta_y_pide_otra_prisma_puede_proponer_de
 @pytest.mark.parametrize("dice", ["me va", "Informe firmado por calidad"])
 def test_una_propuesta_hecha_solo_en_la_conversacion_se_acepta_mandando_su_texto(
         chat, dice):
-    # Hallazgo de la corrida conversada: Prisma propuso en su respuesta, sin registrar
+    # Hallazgo de la corrida conversada: Leda propuso en su respuesta, sin registrar
     # propuesta; aceptar es mandar el texto como criterio, un solo camino.
     c = _alta_completa_menos_criterio(chat)
     c.modelo.conducciones.append(salida(
@@ -905,7 +905,7 @@ def _tocar_modificar(c) -> list[dict]:
     """Toca el botón Modificar del resumen vigente (una acción pendiente, no un
     botón de elección del alta conducida)."""
     cliente = _callback_client(c.conn, c.monkeypatch)
-    c.monkeypatch.setattr("prisma.llm.desde_base", lambda *a: c.modelo)
+    c.monkeypatch.setattr("leda.llm.desde_base", lambda *a: c.modelo)
     with admin(c.conn) as cur:
         cur.execute(
             """select o.token from pending_action_option o
@@ -1092,7 +1092,7 @@ def test_cada_mensaje_y_cada_toque_tienen_una_sola_respuesta_visible(chat, conn)
 def _enviar_a_aprobacion(c):
     """Toca el botón Enviar a aprobación del resumen vigente (una acción pendiente)."""
     cliente = _callback_client(c.conn, c.monkeypatch)
-    c.monkeypatch.setattr("prisma.llm.desde_base", lambda *a: c.modelo)
+    c.monkeypatch.setattr("leda.llm.desde_base", lambda *a: c.modelo)
     with admin(c.conn) as cur:
         cur.execute(
             """select o.token from pending_action_option o
@@ -1164,7 +1164,7 @@ def test_cambiar_de_tema_en_medio_del_alta_es_un_solo_mensaje_visible(
 
 def test_si_el_aviso_de_la_pausa_no_entra_con_la_respuesta_sale_como_primera_parte_del_mismo_grupo(
         chat):
-    from prisma.respuesta_unica import grupo_de
+    from leda.respuesta_unica import grupo_de
 
     c = _alta_hasta_objetivo(chat)
     c.modelo.conducciones.append(salida("Eso lo veo aparte.", intencion="otro_tema"))

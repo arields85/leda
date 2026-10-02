@@ -56,7 +56,7 @@
 - Latencia de 0,35 a 0,51 s y una fracción de centavo por llamada. El agregado
   real por mensaje es de unos 0,4 s: la consulta de tareas va después de que el
   modelo de conversación separa las referencias; la de intención puede ir en
-  paralelo con ese paso. La verificación suma otros 0,4 s sólo cuando Prisma está
+  paralelo con ese paso. La verificación suma otros 0,4 s sólo cuando Leda está
   por decidir solo.
 
 ## Alternativas consideradas
@@ -71,7 +71,7 @@
 ## Consecuencias
 
 - **Dos proveedores:** NaN para conversación y embeddings, OpenRouter para Jev.
-  Clave en `PRISMA_OPENROUTER_API_KEY`. Si Jev no responde, Prisma no adivina:
+  Clave en `LEDA_OPENROUTER_API_KEY`. Si Jev no responde, Leda no adivina:
   pregunta con botones o pide la referencia; la vista previa sigue protegiendo.
 - **Datos que salen:** títulos de tareas, áreas, responsables, vocabulario del
   equipo y el texto del mensaje viajan a TypeSafe vía OpenRouter. El usuario
@@ -86,6 +86,6 @@
   marcada por el usuario se detectó en 3 de 5 repeticiones. Con la verificación,
   ambos terminan en una pregunta, no en un efecto.
 - **Las consultas no pasan por vista previa:** toda respuesta nombra la tarea por
-  su título, para que la persona note si Prisma entendió otra cosa.
+  su título, para que la persona note si Leda entendió otra cosa.
 - **El vocabulario y los apodos del equipo** se pasan como contexto; su
   aprendizaje sigue la decisión 5 de ADR 0005.

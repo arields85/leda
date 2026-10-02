@@ -18,7 +18,7 @@
 --
 -- Se deshace con `db/rollbacks/0026_borrador_enviado_no_es_rama_abierta.sql`.
 begin;
-set search_path = prisma, public;
+set search_path = leda, public;
 
 -- Fail closed if an invoking text pipeline decoded the UTF-8 file incorrectly.
 -- chr() builds the expected value independently from non-ASCII source bytes.
@@ -32,12 +32,12 @@ do $$ begin
 end $$;
 
 do $$ begin
-  if to_regclass('prisma.task_intake_request') is null then
+  if to_regclass('leda.task_intake_request') is null then
     raise exception '0026 requires task_intake_request (0002_general_task_intake.sql)';
   end if;
   if exists (
       select 1 from information_schema.columns
-       where table_schema = 'prisma' and table_name = 'task_intake_request'
+       where table_schema = 'leda' and table_name = 'task_intake_request'
          and column_name = 'enviada_en') then
     raise exception '0026 ya está aplicada.';
   end if;

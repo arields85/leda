@@ -11,7 +11,7 @@ from datetime import date
 
 import pytest
 
-from prisma.valores import (
+from leda.valores import (
     OPCION_NINGUNA, Aceptado, MotivoRechazo, Opcion, Rechazado, TipoValor,
     ValorEsperado, opciones_numeradas, validar_valor,
 )

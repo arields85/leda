@@ -6,12 +6,12 @@
   `agente`, `contexto`, `ingreso_tareas`, `pendientes`, `herramientas`). Amplía el
   ADR 0013; no lo reemplaza.
 - **Evidencia:** cuarta ronda por Telegram (R4b-H1 a H7, R4c-H1 a H10 en
-  `odd/tasks/prisma-orienta.md`); observación del usuario del 2026-09-30 ("todo es muy
+  `odd/tasks/leda-orienta.md`); observación del usuario del 2026-09-30 ("todo es muy
   robótico"); mapa del flujo por lectura de código del 2026-09-30.
 
 ## Contexto
 
-La capa de datos funciona: Prisma sabe con quién habla, lee bien el estado y no mezcla
+La capa de datos funciona: Leda sabe con quién habla, lee bien el estado y no mezcla
 clientes. Pero la conversación se siente robótica, y cada ronda deja hallazgos nuevos
 que se corrigen uno por uno. El usuario lo resumió así: estamos parchando, y así se
 puede seguir al infinito.
@@ -50,7 +50,7 @@ pieza decide lo que le toca a ese dueño.
    sus estados, quién aprueba, la evidencia), el estado de la conversación (la rama
    abierta, la pregunta pendiente, las opciones ofrecidas, los borradores y las vistas
    previas) y el historial reciente de lo que efectivamente se dijo (lo que la persona
-   escribió y lo que Prisma envió, no lo que quedó en la cola). PostgreSQL guarda y
+   escribió y lo que Leda envió, no lo que quedó en la cola). PostgreSQL guarda y
    entrega; quien comprende la conversación es el modelo (etapa 2). Nadie supone nada
    que no se leyó, ni siquiera qué se le preguntó recién a la persona.
 2. **Interpretar (modelo).** El modelo devuelve el comando, de la lista cerrada del

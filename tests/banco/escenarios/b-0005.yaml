@@ -1,6 +1,6 @@
 id: b-0005
 objetivo: >
-  Observar si Prisma declara la dependencia en el sentido correcto -- quién
+  Observar si Leda declara la dependencia en el sentido correcto -- quién
   frena a quién -- a partir de una descripción natural, sin invertirla.
 actor: Nahuel Gimenez
 mensajes:

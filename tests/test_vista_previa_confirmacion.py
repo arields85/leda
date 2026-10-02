@@ -16,13 +16,13 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from prisma import herramientas as H
-from prisma import pendientes as P
-from prisma.agente import responder
-from prisma.autoridad import Canal, identificar
-from prisma.calendario import Calendario
-from prisma.db import admin, espacio
-from prisma.llm import Llamada, ProveedorGuionado, Respuesta
+from leda import herramientas as H
+from leda import pendientes as P
+from leda.agente import responder
+from leda.autoridad import Canal, identificar
+from leda.calendario import Calendario
+from leda.db import admin, espacio
+from leda.llm import Llamada, ProveedorGuionado, Respuesta
 
 BA = ZoneInfo("America/Argentina/Buenos_Aires")
 AHORA = datetime(2026, 7, 27, 10, 0, tzinfo=BA)
@@ -55,7 +55,7 @@ def _tarea(cur, ws, *, titulo="Programar PLC", area="ot",
     t = cur.fetchone()["id"]
     cur.execute(
         "insert into task_state_event (task_id, estado_nuevo, actor_kind, at) "
-        "values (%s, %s, 'prisma', clock_timestamp())", (t, estado_inicial))
+        "values (%s, %s, 'leda', clock_timestamp())", (t, estado_inicial))
     return str(t)
 
 

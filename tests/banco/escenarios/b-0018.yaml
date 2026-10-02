@@ -1,6 +1,6 @@
 id: b-0018
 objetivo: >
-  Prisma orienta, no charla (ADR 0007, T4): frente a una referencia ambigua
+  Leda orienta, no charla (ADR 0007, T4): frente a una referencia ambigua
   entre dos tareas propias, la elección que necesita se ofrece con botones
   (ofrecer_opciones, T1) en vez de una pregunta en texto abierto -- y no
   mueve ninguna de las dos hasta que la persona elija.

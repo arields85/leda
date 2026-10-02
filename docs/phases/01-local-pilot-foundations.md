@@ -3,10 +3,10 @@
 > **Superada por cambio de alcance — 2026-09-22.**
 >
 > Este plan organiza el trabajo por unidades de un piloto local para un único equipo.
-> Prisma pasó a ser un producto de gestión de proyectos multi-tenant, y el orden de
+> Leda pasó a ser un producto de gestión de proyectos multi-tenant, y el orden de
 > trabajo vigente son unidades con precondición y criterio de cierre, no fases. Se
 > conserva como registro histórico y **no debe usarse para decidir**. Para el alcance
-> vigente: [`../product/que-es-prisma.md`](../product/que-es-prisma.md),
+> vigente: [`../product/que-es-leda.md`](../product/que-es-leda.md),
 > [`../architecture/frontera.md`](../architecture/frontera.md) y
 > [`../ROADMAP.md`](../ROADMAP.md).
 >
@@ -22,7 +22,7 @@ se posponen hasta completar todas las unidades o fases.
 ## Estrategia de entrega
 
 La prioridad es el menor circuito útil de extremo a extremo que permita observar si
-Prisma comprende, responde, coordina y reduce carga humana. Cada circuito incluye sólo
+Leda comprende, responde, coordina y reduce carga humana. Cada circuito incluye sólo
 el comportamiento, migración o reconciliación necesaria, verificación focalizada y
 actualización de estado. Antes de cerrarlo se registra:
 
@@ -108,8 +108,8 @@ confirmación → tarea; comando, resultado exacto y evidencia PostgreSQL regist
   cuando constituye la autoridad final.
 - [x] La conversión revalida versión, actor y autoridad, y es bloqueante, atómica e
   idempotente.
-- [x] Borrador, tarea, actor, autoridad y confirmación quedan enlazados; `prisma_app`
-  no conserva `INSERT` directo sobre `task` y el acceso residual de `prisma_admin`
+- [x] Borrador, tarea, actor, autoridad y confirmación quedan enlazados; `leda_app`
+  no conserva `INSERT` directo sobre `task` y el acceso residual de `leda_admin`
   está documentado.
 - [x] Suite post-integración completa: 141 passed, 0 failed, 0 errors, 0 skipped; 1
   `StarletteDeprecationWarning`; 78.36 s.
@@ -122,7 +122,7 @@ confirmación → tarea; comando, resultado exacto y evidencia PostgreSQL regist
   `pg_dump`/`pg_restore`, fuente intacta, 0 tasks y 8 registros de outbox preservados;
   grants, función, RLS, constraints y rollback de borrador comprobados.
 - [x] Ventana operativa autorizada; backup sanitizado
-  `prisma-unit1a-20260812T230031Z-83016718.dump` comprobado; 0 escritores; migración
+  `leda-unit1a-20260812T230031Z-83016718.dump` comprobado; 0 escritores; migración
   aplicada bajo advisory lock.
 - [x] Login de autoridad separado configurado; pack aprobado reimportado como versión
   2 con 6 políticas de evidencia.
@@ -280,7 +280,7 @@ sobre PostgreSQL 18 limpio antes de habilitar el Corte 1.
 todavía hechos de tarea.
 
 **Punto de entrada al retomar este horizonte:** la inspección estática ya identificó 26
-tablas directamente mutables por `prisma_app`, mutación indirecta de tarea mediante
+tablas directamente mutables por `leda_app`, mutación indirecta de tarea mediante
 eventos, ACL potencial de funciones por `PUBLIC` y riesgo de credencial superusuario
 compartida en Docker. Esto no prueba el catálogo efectivo de producción. Antes de
 implementar ingress, el Corte 0 debe convertir el inventario en catálogo ejecutable y
@@ -292,10 +292,10 @@ inmutable `(bot_scope, update_id)` e identificador estable de despacho exclusivo
 ingreso; ledger `pending`/`interpreting`/terminal; T2 recuperable con generación
 monotónica y capacidad opaca por claim, almacenada sólo mediante su hash y rotada al
 reclamar; identidad y espacio derivados dentro de la frontera; logins y membresías
-disjuntos para `prisma_ingress`, `prisma_app`, `prisma_gateway`,
-`prisma_dispatcher` y `prisma_admin`; serving y polling sin credencial administrativa;
+disjuntos para `leda_ingress`, `leda_app`, `leda_gateway`,
+`leda_dispatcher` y `leda_admin`; serving y polling sin credencial administrativa;
 dispatcher limitado a outbox e incidentes técnicos; Unidad 1A adaptada para que
-`prisma_gateway` consuma el recibo autenticado. El monolito se conserva y no se agrega
+`leda_gateway` consuma el recibo autenticado. El monolito se conserva y no se agrega
 otro proceso antes del piloto.
 
 #### Experiencia temporal y registros
@@ -309,7 +309,7 @@ aceptación del onboarding autenticado del Corte 4; los usuarios ya activados co
 Inbound y outbox registran conversación, no autoridad humana. Sólo T2b cercada, el
 gateway de Unidad 1A y acciones administrativas identificadas originan auditoría
 autoritativa. Los incidentes técnicos son otro registro y no prueban hechos de dominio.
-`prisma_app` no puede fabricar auditoría humana. El inbound histórico permanece como
+`leda_app` no puede fabricar auditoría humana. El inbound histórico permanece como
 legacy de sólo lectura y no autoritativo: no se elimina, promueve, reintenta ni produce
 efectos.
 
@@ -338,7 +338,7 @@ temporales. Debe distinguir la provisión canónica de roles de cualquier residu
 del clúster. Hasta su aceptación no se habilita el Corte 1 ni se declara una mejora de
 seguridad.
 
-**Políticas:** `prisma_app` no crea, modifica ni enumera recibos. T2a reclama en una
+**Políticas:** `leda_app` no crea, modifica ni enumera recibos. T2a reclama en una
 transacción corta con `READ COMMITTED`, row lock y `SKIP LOCKED`; confirma el incremento
 de generación y la rotación de capacidad antes de interpretar fuera de transacción. El
 heartbeat opcional usa otra conexión, no revive leases vencidos y no es un control de
@@ -347,7 +347,7 @@ revocación. `edited_message` puede conservarse como historia, pero no produce e
 un cambio operativo exige un mensaje nuevo.
 
 Cada frontera ofrece una sola función superior `SECURITY DEFINER` en T2b:
-`prisma_app` presenta el plan a su función de aplicación y `prisma_gateway` ejecuta el
+`leda_app` presenta el plan a su función de aplicación y `leda_gateway` ejecuta el
 callback de Unidad 1A. La función bloquea el procesamiento, comprueba hash de capacidad,
 generación, estado y lease, deriva identidad, revalida autoridad y confirma de forma
 atómica inbound, efectos, ledger de operación, auditoría, outbox, resultado y
@@ -366,7 +366,7 @@ de reinterpretar.
 **Criterios de aceptación:**
 
 - T1 sobrevive a la caída posterior y una reentrega converge al recibo inmutable sin
-  exponer el identificador privado de despacho fuera de `prisma_ingress`;
+  exponer el identificador privado de despacho fuera de `leda_ingress`;
 - cada claim incrementa la generación y rota la capacidad; sólo se almacena su hash y
   un heartbeat no revive un lease vencido ni una generación ya reclamada;
 - en la carrera crítica, si el reclaimer bloquea primero el worker obsoleto falla antes
@@ -378,13 +378,13 @@ de reinterpretar.
   recibo/operación y no duplica ni reinterpreta un efecto terminal;
 - no existe una conexión `idle in transaction` durante el LLM y claim, heartbeat,
   aplicación y recuperación no comparten conexión;
-- la única T2b de `prisma_gateway` conserva la semántica de Unidad 1A y confirma tarea,
+- la única T2b de `leda_gateway` conserva la semántica de Unidad 1A y confirma tarea,
   auditoría, resultado, outbox y finalización como una unidad;
 - los fallos de recuperación quedan aislados por recibo;
 - los logins `NOINHERIT` tienen membresías disjuntas, los owners no son asumibles,
   los revokes impiden DML o funciones internas de bypass y serving/polling no cargan
   administración;
-- `prisma_dispatcher` sólo reclama outbox listo, marca envío, reintento o fallo y abre
+- `leda_dispatcher` sólo reclama outbox listo, marca envío, reintento o fallo y abre
   incidentes técnicos de transporte; no crea contenido, cambia destinatarios ni toca
   dominio o auditoría humana;
 - instalación limpia y migración producen privilegios equivalentes; avance, rollback,
@@ -415,7 +415,7 @@ qué regla produjo la transición y con qué estado vigente.
 #### Invariante de producto
 
 Las personas realizan el trabajo, informan hechos concretos y aportan evidencia; las
-decisiones que requieren autoridad o juicio siguen siendo humanas. Prisma absorbe el
+decisiones que requieren autoridad o juicio siguen siendo humanas. Leda absorbe el
 seguimiento y la coordinación operativa, convierte hechos autorizados en transiciones
 deterministas y dirige las decisiones al actor vigente. Un referente acepta tareas
 vinculadas a su área y, cuando corresponda, aprueba o rechaza lo entregado: no persigue
@@ -432,7 +432,7 @@ explícita. La propuesta, la vista previa y la aceptación permanecen en `task_d
 - `actualizar_estado` admite una selección de estado y está permitida por defecto a
   cualquier integrante, sin limitar la tarea al responsable ni reservar cancelación a
   Dirección;
-- la herramienta inserta `task_state_event` y `prisma_app` conserva permiso de
+- la herramienta inserta `task_state_event` y `leda_app` conserva permiso de
   inserción directa sobre esa tabla;
 - el esquema proyecta cada evento sobre `task.estado`, pero no valida el grafo completo,
   el estado anterior vigente, los no-op ni la irreversibilidad de estados terminales;
@@ -486,13 +486,13 @@ al mismo estado son inválidos.
 |---|---|---|
 | Trabajo iniciado | Responsable vigente | `asignada -> en_curso` |
 | Bloqueo informado | Responsable vigente | Estado operativo vigente `-> bloqueada`, con causa factual |
-| Último bloqueo resuelto | Responsable vigente; Prisma verifica los bloqueos persistidos | `bloqueada -> estado operativo previo` |
+| Último bloqueo resuelto | Responsable vigente; Leda verifica los bloqueos persistidos | `bloqueada -> estado operativo previo` |
 | Trabajo entregado | Responsable vigente | `en_curso -> en_revision`; no implica aprobación ni cierre |
 | Trabajo rechazado | Aprobador vigente | `en_revision -> en_curso`; la decisión y su mecánica completa pertenecen a Unidad 4 |
 | Trabajo aprobado y cierre válido | Aprobador vigente y mecanismo de cierre autorizado | `en_revision -> terminada`; evidencia, aprobación y cierre completos pertenecen a Unidad 4 |
 | Cancelación | Sólo Dirección | Cualquier estado no terminal `-> cancelada`, con motivo obligatorio y auditado |
 
-Prisma puede interpretar la expresión natural y coordinar el próximo paso, pero no
+Leda puede interpretar la expresión natural y coordinar el próximo paso, pero no
 inventa el hecho, la decisión ni la autoridad. Un integrante ajeno, el referente como
 seguidor, el modelo o un caller técnico no pueden declarar inicio, entrega, rechazo,
 aprobación o cancelación en nombre del actor correspondiente.
@@ -513,7 +513,7 @@ aprobación o cancelación en nombre del actor correspondiente.
   solicitud de cancelación de otro actor no cambia la tarea;
 - `en_revision` no equivale a evidencia suficiente, aprobación ni cierre, y el límite
   no ofrece un atajo genérico hacia `terminada`;
-- todas las rutas de aplicación atraviesan el mismo límite y `prisma_app` no puede
+- todas las rutas de aplicación atraviesan el mismo límite y `leda_app` no puede
   insertar `task_state_event` ni mutar `task.estado` directamente;
 - reintentos y carreras no aplican dos veces el mismo hecho ni aceptan una transición
   calculada sobre un estado obsoleto;
@@ -553,7 +553,7 @@ En PostgreSQL descartable confirmado, comprometer una tarea por el flujo vigente
 Unidad 1A y comprobar que nace `asignada`. Como responsable, informar en lenguaje
 natural que se inició, que apareció un bloqueo, que el bloqueo se resolvió y que el
 trabajo fue entregado; comprobar después de cada mensaje el hecho persistido, el evento,
-la proyección y la auditoría, hasta `en_revision`. Verificar que Prisma no la presenta
+la proyección y la auditoría, hasta `en_revision`. Verificar que Leda no la presenta
 como aprobada ni terminada. En una segunda tarea, comprobar que una solicitud de
 cancelación de un actor sin autoridad no cambia el estado y que Dirección puede
 cancelarla una sola vez únicamente con motivo. Registrar comando, resultado exacto y
@@ -587,7 +587,7 @@ impidiendo crear tareas incompletas o por inserción directa. Conservar eventos 
 auditoría producidos por 1B.1 para diagnóstico; no reescribirlos ni restaurar una base
 sobre escrituras posteriores. Si la migración cambió estados o privilegios, definir y
 ensayar la reconciliación inversa en un clon con inventario previo. Un rollback no
-puede reabrir `INSERT task` a `prisma_app` ni debilitar la conversión autorizada de
+puede reabrir `INSERT task` a `leda_app` ni debilitar la conversión autorizada de
 `task_draft`.
 
 **Condición de cierre:** 1B.1-A está implementado y verificado; código, esquema,
@@ -621,7 +621,7 @@ compromiso establecido por Unidad 1A ni el contrato acordado para 1B.1.
 `(bot_scope, update_id)`.
 
 **Dependencia conservada:** extender el recibo autenticado de ADR 0003 sin reemplazar
-su raíz de confianza ni conceder a `prisma_app` acceso general a recibos.
+su raíz de confianza ni conceder a `leda_app` acceso general a recibos.
 
 **Alcance:** completar para todos los tipos de update la restricción persistente,
 clasificación, resultado repetible y auditoría sin duplicar turnos ni efectos. El tipo,

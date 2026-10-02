@@ -1,6 +1,6 @@
 # Guion de la prueba real, corte 1 (alta guiada)
 
-Base `prisma_flujo` (esquema completo, paquete, feriados, semilla ficticia, modelo
+Base `leda_flujo` (esquema completo, paquete, feriados, semilla ficticia, modelo
 `nan`/`deepseek-v4-flash`, variante `redaccion` = B). Cuentas vinculadas: Ariel, Ismael,
 Marcos. Listener del worktree (`PYTHONPATH=src`).
 
@@ -29,11 +29,11 @@ la persona, desprolijos.
 - Una fecha relativa en el primer mensaje ("…para el viernes") no se toma todavía: se
   pregunta después.
 - Los tipos de evidencia salen sin tilde ("explicacion").
-- Fuera del horario laboral, lo que inicia Prisma (el borrador que le llega a Ismael)
+- Fuera del horario laboral, lo que inicia Leda (el borrador que le llega a Ismael)
   queda en la cola hasta las 09:00 (R4b-H6). Las respuestas a lo que uno escribe salen
   en el momento.
 
-**Además registrar:** incidentes nuevos (`python -m prisma incidentes corework`), y
+**Además registrar:** incidentes nuevos (`python -m leda incidentes corework`), y
 cualquier respuesta que se sienta robótica aunque no esté en la lista: se anota y se
 clasifica por etapa del ADR 0014, sin corregir durante la prueba (moratoria).
 
@@ -99,10 +99,10 @@ Observaciones (no son fallas del mecanismo):
   "Estábamos con el título de la tarea nueva. ¿Seguimos con eso?": la persona repite la
   misma intención y la rama le pide confirmar. Fricción menor (regla de una rama).
 - **F-B7 (producto).** "no lo se, voy a ver" quedó como criterio de aceptación porque la
-  persona lo confirmó. El invariante exige un criterio, y Prisma lo aceptó vacío de
-  contenido. **Respuesta del usuario (2026-09-30): sí; Prisma ayuda y facilita, no sólo
+  persona lo confirmó. El invariante exige un criterio, y Leda lo aceptó vacío de
+  contenido. **Respuesta del usuario (2026-09-30): sí; Leda ayuda y facilita, no sólo
   dirige, y sin burocracia.** Ya está mandado en `nucleo/mecanica-pm.md` §13.2 ("¿El
-  resultado esperado es concreto y verificable?… Si alguna respuesta falta, Prisma
+  resultado esperado es concreto y verificable?… Si alguna respuesta falta, Leda
   pregunta antes de crear"): es una brecha entre núcleo y código, no una decisión nueva.
   Mecanismo (etapa 2): el modelo evalúa si el criterio es verificable y, si no lo es,
   propone uno a partir del título y de lo que la persona dijo, con botones para usarlo o
@@ -113,7 +113,7 @@ Observaciones (no son fallas del mecanismo):
 | # | Resultado | Nota |
 |---|---|---|
 | 9 | Mejoró | Resumen sin "Sin descripción"; el cierre coincide con el botón. |
-| 10 | No probado | El mensaje llegó como respuesta a un "¿Qué hay que hacer?" que Prisma ya había preguntado (al atender el mensaje dejado de lado), así que no probó el salto de esa pregunta. El título sí quedó bien extraído ("calibrar los sensores de la linea 2", sin "necesito crear una tarea:"). El responsable salió contaminado por el mensaje dejado de lado (F-B8). Observación del usuario: el objetivo se pregunta siempre igual, sin importar el título (hueco ⭐, ver F-B10). Repetir en la corrida A como primer mensaje. |
+| 10 | No probado | El mensaje llegó como respuesta a un "¿Qué hay que hacer?" que Leda ya había preguntado (al atender el mensaje dejado de lado), así que no probó el salto de esa pregunta. El título sí quedó bien extraído ("calibrar los sensores de la linea 2", sin "necesito crear una tarea:"). El responsable salió contaminado por el mensaje dejado de lado (F-B8). Observación del usuario: el objetivo se pregunta siempre igual, sin importar el título (hueco ⭐, ver F-B10). Repetir en la corrida A como primer mensaje. |
 | 11 | Mejoró | Ariel: área y responsable completados solos (una sola opción), "manana" → 01/10/2026, resumen y "Enviar a aprobación" a Ismael. El guion esperaba "Confirmar": era un error del guion; quien crea una tarea para sí necesita la aprobación de su aprobador (Marcos creando para Nahuel sí confirmó directo). |
 
 Observaciones:
@@ -129,13 +129,13 @@ Observaciones:
   lector ahora resuelve cada toque a su etiqueta y muestra los botones de cada mensaje.
 - **F-B9.** El valor se normaliza distinto según el campo: el criterio corrigió un error de
   tipeo ("andadndo" → "andando") y el título quedó tal cual ("la ainterfaz"). Pregunta de
-  producto: ¿Prisma corrige errores de tipeo obvios en los textos (visible en el resumen,
+  producto: ¿Leda corrige errores de tipeo obvios en los textos (visible en el resumen,
   cambiable con Modificar) o respeta lo escrito?
 - No se probó el caso exacto "4de octubre" (R4c-H6): queda para la corrida A.
 
 **Latencia por respuesta** (mensaje entrante → primera respuesta enviada, de la base):
 textos n=34, mediana 8,7 s, p90 13,7 s, ninguno ≤ 5 s; toques n=23, mediana 0,9 s. En la
-ronda 4 (base `prisma`, 2026-09-30) la mediana de textos fue la misma, 8,7 s (p90 18,6 s,
+ronda 4 (base `leda`, 2026-09-30) la mediana de textos fue la misma, 8,7 s (p90 18,6 s,
 ninguno ≤ 5 s). B no agregó latencia, pero el criterio "mediana ≤ 5 s" del ADR 0014 no se
 cumplía tampoco antes: se fijó sin línea base.
 
@@ -143,7 +143,7 @@ cumplía tampoco antes: se fijó sin línea base.
   aparece la misma lista, en el mismo orden, diga lo que diga la tarea. Es el hueco del
   objetivo más probable primero (⭐, decisión del usuario para R4c-H4), y con el principio
   constitucional "ayuda y facilita" pasa a ser el hueco más visible del alta: con un título
-  claro, Prisma tendría que proponer el objetivo (Jev elige entre los candidatos de la base).
+  claro, Leda tendría que proponer el objetivo (Jev elige entre los candidatos de la base).
 - **F-B11 (usuario, 2026-10-01; etapas 1 y 3).** A Ariel (área Software e interfaz HMI)
   el alta le ofreció los seis objetivos del espacio, de todas las áreas. Por las tareas
   sembradas: "Conectar y automatizar equipos…" y "Planos eléctricos…" son de OT,
@@ -197,9 +197,9 @@ final: humano → modelo → lógica lo más determinista posible (Jev, SQL, reg
 6 sea completa: que el modelo redacte el mensaje entero a partir del resultado del turno,
 no una frase delante de una plantilla.
 
-## Corrida siguiente: "Prisma propone" (F-B7, F-B8, F-B10, F-B11) y lo que falta probar
+## Corrida siguiente: "Leda propone" (F-B7, F-B8, F-B10, F-B11) y lo que falta probar
 
-Antes: aplicar la migración `0027` a `prisma_flujo` y dar su área a los objetivos
+Antes: aplicar la migración `0027` a `leda_flujo` y dar su área a los objetivos
 existentes (el orquestador lo hace; ver el reporte del commit). Con `variante`
 A o B, a elección. Anotar por paso: mejoró / empeoró / igual, y si tardó.
 
@@ -215,12 +215,12 @@ A o B, a elección. Anotar por paso: mejoró / empeoró / igual, y si tardó.
 | 8 | Marcos | En otra alta, tocar "Otra opción" y volver a escribir "no lo sé" | Lo acepta tal cual (una sola propuesta, sin bucle) | F-B7 |
 | 9 | Marcos | A mitad de un alta: "ah, y necesito otra tarea para Nahuel" -> "Dejarlo y ver lo otro" -> a "¿Qué hay que hacer?" contestar "necesito crear una tarea: calibrar los sensores" | El responsable NO viene precargado con Nahuel (es otra tarea); se pregunta normal. Variante: contestar sólo "calibrar los sensores" (sin "necesito crear una tarea") -> el responsable sí sigue siendo Nahuel | F-B8 |
 
-**Además registrar:** incidentes nuevos (`python -m prisma incidentes corework`),
+**Además registrar:** incidentes nuevos (`python -m leda incidentes corework`),
 en particular `objetivo_sin_ordenar` (Jev sin credencial o caído: los objetivos
 salen en el orden de siempre, sin ⭐) y `criterio_sin_propuesta`; y cualquier
 respuesta que se sienta robótica aunque no esté en la lista.
 
-**Decisión del usuario sobre F-B9 (2026-10-01):** Prisma corrige los errores de tipeo
+**Decisión del usuario sobre F-B9 (2026-10-01):** Leda corrige los errores de tipeo
 obvios en los textos que la persona dicta (título, criterio, motivo): el modelo normaliza
 el valor en la etapa 2 y la corrección queda a la vista en el resumen, cambiable con
 Modificar. Pendiente de implementar después de esta corrida (hoy el título queda tal cual
@@ -256,7 +256,7 @@ Hallazgos:
 - **F-C5.** El resumen de las 08:18:47 salió sin el cierre que nombra el botón (termina
   en una línea vacía); coincide con un vencimiento del plazo de redacción a las 08:18.
 - **Latencia en vivo.** 4 vencimientos del plazo de 4 s esta mañana (08:15, 08:16, 08:18 y
-  uno más); la medición en banco (p50 0,9 s) no se reprodujo en vivo. `prisma redaccion`
+  uno más); la medición en banco (p50 0,9 s) no se reprodujo en vivo. `leda redaccion`
   acumulado: 25 llamadas, 18 aceptadas, 3 rechazadas (anoche), 4 vencidas; mediana 4,0 s.
 - No hubo saludo del día: Marcos ya lo había recibido a las 00:23 (regla vigente, un
   saludo por día local).
@@ -267,7 +267,7 @@ Hallazgos:
   propuso un criterio (F-B7 sigue sin aparecer en vivo).
 - **"ayudame, que puedo poner?"** (pedido de ayuda SOBRE la pregunta abierta) → el ruteo lo
   tomó como otro tema → "Estábamos con el criterio… ¿Seguimos con eso?"; con "Dejarlo y ver
-  lo otro" **se perdió el borrador entero** y recién ahí Prisma ayudó con ejemplos de
+  lo otro" **se perdió el borrador entero** y recién ahí Leda ayudó con ejemplos de
   criterio, ya sin tarea.
 - **"por que anda"** (respuesta al criterio) → otra vez otro tema → "¿Seguimos?" → Dejarlo
   → **se perdió el borrador** "calibrar los sensores" y salió "No te sigo. ¿Qué querés
@@ -294,9 +294,9 @@ mejoró / empeoró / igual, y cuánto tardó.
 | # | Quién | Mensaje | Qué se espera | Hallazgo |
 |---|---|---|---|---|
 | 1 | Marcos | PRIMER mensaje de la sesión: "necesito crear una tarea: calibrar los sensres de la linea 2" (con los dos errores de tipeo) | Sigue directo al objetivo, sin aclaración de Jev por «calibrar los sensores…» ni "¿A cuál te referís?"; el título ya viene corregido (F-B9) | F-C1, F-B9 |
-| 2 | Marcos | Elegir el objetivo, el responsable y la fecha | Cada mensaje de Prisma continúa el anterior: no repite "Entendí que…" ni "Me falta…" en cada turno | F-C4 |
-| 3 | Marcos | En el criterio: "no lo sé" | Prisma no lo toma como criterio (hoy: lo dice y vuelve a preguntar; la propuesta de criterio de F-B7 sigue sin aparecer en vivo y se rediseña aparte) | F-B7 (pendiente) |
-| 4 | Marcos | "ayudame, que puedo poner?" | NO sale "Estábamos con el criterio… ¿Seguimos con eso?": el ruteo ve que Prisma acaba de pedir el criterio y esto es sobre esa pregunta (`dudoso`/`responde`, nunca `otro_tema`). Con `dudoso`, "¿Esto es el criterio…?" con Sí / No, es otra cosa: no se pierde nada | F-C6 |
+| 2 | Marcos | Elegir el objetivo, el responsable y la fecha | Cada mensaje de Leda continúa el anterior: no repite "Entendí que…" ni "Me falta…" en cada turno | F-C4 |
+| 3 | Marcos | En el criterio: "no lo sé" | Leda no lo toma como criterio (hoy: lo dice y vuelve a preguntar; la propuesta de criterio de F-B7 sigue sin aparecer en vivo y se rediseña aparte) | F-B7 (pendiente) |
+| 4 | Marcos | "ayudame, que puedo poner?" | NO sale "Estábamos con el criterio… ¿Seguimos con eso?": el ruteo ve que Leda acaba de pedir el criterio y esto es sobre esa pregunta (`dudoso`/`responde`, nunca `otro_tema`). Con `dudoso`, "¿Esto es el criterio…?" con Sí / No, es otra cosa: no se pierde nada | F-C6 |
 | 5 | Marcos | "por que anda" | Lo mismo que el paso 4 | F-C6 |
 | 6 | Marcos | Un tema de verdad distinto, con el criterio todavía abierto: "¿qué tareas tengo abiertas?" | "Estábamos con el criterio de aceptación de la tarea nueva. ¿Seguimos con eso?" con Seguir / Dejarlo y ver lo otro | ADR 0013 regla 1 |
 | 7 | Marcos | Tocar "Dejarlo y ver lo otro" | UNA respuesta de dos partes, en este orden: "Listo, dejé guardado el borrador de la tarea «Calibrar los sensores de la línea 2». Cuando quieras, lo retomamos." y después la lista de tareas. NO "dejé de lado" y el borrador NO se cancela | F-C6, F-A1 |
@@ -308,10 +308,10 @@ mejoró / empeoró / igual, y cuánto tardó.
 
 **Además registrar:** el orden de los mensajes de una misma respuesta (si una parte llega
 detrás de otra, anotar la hora y mirar en la base `intentos` y `ultimo_error` de las dos
-filas de `message_outbox`); los incidentes (`python -m prisma incidentes corework`), en
+filas de `message_outbox`); los incidentes (`python -m leda incidentes corework`), en
 particular `redaccion_fallida` (el modelo dio error o no pasó la verificación ni después
-de corregirse: Prisma dijo el aviso neutro) y `resumen_sin_cierre`; la latencia de cada
-respuesta (sin plazo propio, es la del modelo) con `python -m prisma redaccion corework`;
+de corregirse: Leda dijo el aviso neutro) y `resumen_sin_cierre`; la latencia de cada
+respuesta (sin plazo propio, es la del modelo) con `python -m leda redaccion corework`;
 y cualquier mensaje que se sienta robótico o repetido aunque no esté en la lista.
 
 ## Corrida conversada: el alta conducida por el modelo (M1-M3)
@@ -322,8 +322,8 @@ toque, es UNA llamada al modelo con la conversación y el borrador. Lo que el c�
 garantizando: nada se compromete sin Confirmar, las opciones de objetivo y de responsable
 salen de la base según la autoridad de quien escribe, y un valor que no sirve se dice.
 
-**Cómo prender la prueba** (sólo `prisma_flujo`, con el listener del worktree y
-`PYTHONPATH=src`; **no hay migración**). Con la base a mano (`psql` contra `prisma_flujo`,
+**Cómo prender la prueba** (sólo `leda_flujo`, con el listener del worktree y
+`PYTHONPATH=src`; **no hay migración**). Con la base a mano (`psql` contra `leda_flujo`,
 nunca la de producción), el espacio de la prueba:
 
 ```sql
@@ -347,7 +347,7 @@ Anotar por paso: mejoró / empeoró / igual respecto de "Corrida siguiente 2", y
 | 2 | Marcos | Tocar un objetivo | El modelo contesta el toque (sigue con lo que falta, sin repetir lo dicho) | toque respondido por el modelo |
 | 3 | Marcos | En el criterio: "ayudame, ¿qué puedo poner?" | Ayuda con un ejemplo de la forma y vuelve a preguntar; NO "¿Seguimos?" ni nada se pierde | F-C6 |
 | 4 | Marcos | "no lo sé" | Propone un criterio concreto (con el título) y pregunta si le sirve | propuesta de criterio (F-B7) |
-| 5 | Marcos | "sí, dale" | El criterio propuesto queda y sale el resumen: la frase de Prisma, la lista exacta de datos y el cierre que nombra el botón ("Con Confirmar…" o "Con Enviar a aprobación…") | resumen del código |
+| 5 | Marcos | "sí, dale" | El criterio propuesto queda y sale el resumen: la frase de Leda, la lista exacta de datos y el cierre que nombra el botón ("Con Confirmar…" o "Con Enviar a aprobación…") | resumen del código |
 | 6 | Marcos | "no, el responsable es Nahuel" | Cambia el responsable (si Nahuel está entre los que puede asignar), recalcula el área y vuelve a mostrar UN resumen nuevo; el anterior ya no vale. Si Nahuel no es una opción, lo dice y ofrece las que hay | corrección y frontera de autoridad |
 | 7 | Marcos | "para el 15 de agosto" (una fecha ya pasada) | Lo dice con sus palabras ("esa fecha ya pasó…") y vuelve a preguntar; la fecha anterior no se pierde | fecha inválida, reintento |
 | 8 | Marcos | Con el resumen a la vista: "¿y si confirmo, qué pasa?" | Contesta sin armar otro resumen | ayuda con el resumen a la vista |
@@ -355,11 +355,11 @@ Anotar por paso: mejoró / empeoró / igual respecto de "Corrida siguiente 2", y
 | 10 | Marcos | "quiero crear una tarea" | "Ya hay un borrador de tarea en curso. Elegí cómo seguir." (Continuar borrador / Cancelar borrador / Empezar otro), una sola vez | retomar sin insistir |
 | 11 | Marcos | Tocar "Continuar borrador" | El modelo retoma donde estaban, sin repreguntar lo ya tomado | retomar |
 | 12 | Marcos | Con un resumen a la vista, tocar "Modificar" | El modelo pregunta qué quiere cambiar (no hay un selector) y el cambio genera un resumen nuevo | Modificar conversado |
-| 13 | Marcos | "cancelá" a mitad de otra alta | El borrador se cancela y Prisma lo confirma | cancelar explícito |
+| 13 | Marcos | "cancelá" a mitad de otra alta | El borrador se cancela y Leda lo confirma | cancelar explícito |
 | 14 | Ariel | Alta con un solo responsable posible o un solo objetivo propio | Ese dato se completa solo y se ve en el resumen; no se pregunta | un dato con una sola opción |
 | 15 | Marcos | Tocar Confirmar / Enviar a aprobación | La tarea se crea (o se manda) como siempre; ningún mensaje la confirma | el botón sigue siendo el único que compromete |
 
-**Además registrar:** los incidentes (`python -m prisma incidentes corework`), en particular
+**Además registrar:** los incidentes (`python -m leda incidentes corework`), en particular
 `alta_conducida_fallida` (el modelo dio error o su salida no cumplió el contrato ni después
 de reintentar: salió el aviso neutro con "Pendiente: …") y `interruptor_alta`; la latencia de
 cada turno (las filas `alta_conducida_turno` de `audit_log`: resultado, intento y duración);

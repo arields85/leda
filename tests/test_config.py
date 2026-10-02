@@ -1,4 +1,4 @@
-"""`Config` guarda credenciales (`src/prisma/config.py`). Su repr por
+"""`Config` guarda credenciales (`src/leda/config.py`). Su repr por
 defecto las mostraba en texto plano -- mismo problema que `ClienteJev`
 (`tests/test_jev.py::test_cliente_jev_repr_no_incluye_la_clave`), y con el
 mismo riesgo: una excepción sin capturar que traiga esta instancia en la
@@ -6,7 +6,7 @@ traza las imprime enteras."""
 
 from __future__ import annotations
 
-from prisma.config import Config
+from leda.config import Config
 
 
 def test_config_repr_no_incluye_credenciales():

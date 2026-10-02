@@ -1,8 +1,8 @@
-"""Cierre genérico de una pregunta sin opciones (T4b, `prisma-orienta`; ADR
-0007 "Prisma orienta, no charla").
+"""Cierre genérico de una pregunta sin opciones (T4b, `leda-orienta`; ADR
+0007 "Leda orienta, no charla").
 
 Decisión del usuario (2026-09-26, evidencia
-`tests/banco/reportes/replay-candidato-b-0007-*.json`): cuando Prisma
+`tests/banco/reportes/replay-candidato-b-0007-*.json`): cuando Leda
 necesita algo de la persona pero termina el turno preguntando en texto
 abierto sin ofrecer ningún botón propio, el servidor agrega un juego FIJO de
 tres botones -- "Es una tarea nueva", "Es sobre una tarea existente",
@@ -24,14 +24,14 @@ import uuid
 import pytest
 from fastapi.testclient import TestClient
 
-from prisma import gateway
-from prisma import pendientes as P
-from prisma.agente import responder
-from prisma.autoridad import Canal, identificar
-from prisma.calendario import Calendario
-from prisma.db import admin, espacio
-from prisma.llm import Llamada, ProveedorGuionado, Respuesta
-from prisma.salida import (BUTTON_TEXT_LIMIT, ICONO_TAREA, ICONO_VER_MAS,
+from leda import gateway
+from leda import pendientes as P
+from leda.agente import responder
+from leda.autoridad import Canal, identificar
+from leda.calendario import Calendario
+from leda.db import admin, espacio
+from leda.llm import Llamada, ProveedorGuionado, Respuesta
+from leda.salida import (BUTTON_TEXT_LIMIT, ICONO_TAREA, ICONO_VER_MAS,
                            con_icono, telegram_utf16_units)
 
 ETIQUETAS_CIERRE_GENERICO = ["Es una tarea nueva", "Es sobre una tarea existente",
@@ -92,7 +92,7 @@ def _tarea(cur, ws, *, titulo="Cablear tablero máq. 3", area="electricidad",
             (ws, obj, titulo, ws, area, ws, persona, vence))
     t = cur.fetchone()["id"]
     cur.execute("insert into task_state_event (task_id, estado_nuevo, actor_kind) "
-                "values (%s, %s, 'prisma')", (t, estado))
+                "values (%s, %s, 'leda')", (t, estado))
     return str(t)
 
 
@@ -110,7 +110,7 @@ def _entrante(cur, ws, quien, chat_id, texto) -> str:
 
 def _con_proveedor(monkeypatch, guion):
     proveedor = ProveedorGuionado(guion=list(guion))
-    monkeypatch.setattr("prisma.llm.desde_base", lambda cur, ws, key: proveedor)
+    monkeypatch.setattr("leda.llm.desde_base", lambda cur, ws, key: proveedor)
     return proveedor
 
 

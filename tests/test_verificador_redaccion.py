@@ -14,12 +14,12 @@ from __future__ import annotations
 
 import pytest
 
-from prisma.resultado_turno import (
+from leda.resultado_turno import (
     Cambio, Estado, Falta, OpcionDisponible, Rechazo, ResultadoTurno, Resumen,
     SinCambio, ValorAceptado, ids_de_cambios,
 )
-from prisma.valores import TipoValor
-from prisma.verificador_redaccion import (Borrador, LARGO_MAXIMO, leer_borrador,
+from leda.valores import TipoValor
+from leda.verificador_redaccion import (Borrador, LARGO_MAXIMO, leer_borrador,
                                           verificar)
 
 TAREA = "la tarea «Revisar PLC»"
@@ -180,8 +180,8 @@ def test_el_nombre_de_quien_escribe_es_un_nombre_conocido_del_turno(texto):
 
 
 @pytest.mark.parametrize("texto", [
-    "Soy Prisma y te ayudo con esto. ¿Para cuándo debería estar?",
-    "Dale, con Prisma queda anotado. ¿Para cuándo debería estar?",
+    "Soy Leda y te ayudo con esto. ¿Para cuándo debería estar?",
+    "Dale, con Leda queda anotado. ¿Para cuándo debería estar?",
 ])
 def test_el_nombre_del_propio_asistente_es_un_nombre_conocido(texto):
     _acepta(PREGUNTA, texto, pregunta="due_date")
@@ -207,7 +207,7 @@ def test_un_nombre_de_persona_conocido_no_deja_pasar_un_titulo_inventado():
 
 
 def test_los_nombres_conocidos_no_se_le_cuentan_al_modelo():
-    from prisma.redaccion import serializar_hechos
+    from leda.redaccion import serializar_hechos
     conocido = ResultadoTurno(falta=PREGUNTA.falta, nombres_conocidos=("Ismael",))
     assert "Ismael" not in serializar_hechos(conocido)
 

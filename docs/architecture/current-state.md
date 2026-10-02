@@ -1,6 +1,6 @@
 # Estado arquitectónico actual
 
-Prisma es hoy un monolito modular en Python, con PostgreSQL como fuente operativa y
+Leda es hoy un monolito modular en Python, con PostgreSQL como fuente operativa y
 Telegram como interfaz principal. Esta descripción contrasta inspección estática con
 la evidencia operativa y la baseline registradas en `docs/STATUS.md`.
 
@@ -42,10 +42,10 @@ Telegram webhook o polling local
 | Memoria | El turno carga una ventana reciente del chat; sólo considera salidas efectivamente enviadas. |
 | Automatización | APScheduler monta cadencias y escalera en modo servidor; el polling local ejecuta escalera y despacho. |
 | Configuración | Packs YAML importan equipo, autoridad, cadencias, rutas, glosario y ajustes; se registra versión y hash. |
-| Aislamiento | `prisma_app` usa RLS por `workspace_id`; `prisma_admin` se reserva para importación y consola. |
+| Aislamiento | `leda_app` usa RLS por `workspace_id`; `leda_admin` se reserva para importación y consola. |
 
 La separación objetivo en cinco credenciales técnicas todavía no existe. En
-particular, no existe el rol dedicado `prisma_dispatcher`; el gateway actual no debe
+particular, no existe el rol dedicado `leda_dispatcher`; el gateway actual no debe
 interpretarse como autoridad general más allá del límite ya implementado de Unidad 1A.
 
 ## Reglas comprobadas por lectura
@@ -55,7 +55,7 @@ interpretarse como autoridad general más allá del límite ya implementado de U
   anulabilidad física. Eso no define el contrato operativo: Unidad 1A obliga a que una
   tarea comprometida tenga objetivo, responsable, fecha, criterio de aceptación y
   política de evidencia, y la conversión desde `task_draft` revalida esos datos.
-- Unidad 1A materializa la política de evidencia como snapshot y `prisma_app` no tiene
+- Unidad 1A materializa la política de evidencia como snapshot y `leda_app` no tiene
   `INSERT` directo sobre `task`; el acceso administrativo residual no equivale a una
   ruta operativa autorizada.
 - El cierre consulta criterio, evidencia configurada, bloqueos, dependencias y
@@ -83,7 +83,7 @@ Estos huecos se observan directamente en el código o esquema actual:
 | RLS incompleto | La lista de tablas protegidas no incluye todas las tablas con alcance de espacio, eventos o auditoría. |
 | Webhook opcionalmente inseguro | El secreto sólo se valida cuando está configurado; vacío deja la ruta sin esa verificación. |
 | Conexión no preparada para carga | El gateway conserva una única conexión, sin pool ni worker de entrada separado. |
-| Superficie DML legacy amplia | El análisis estático identifica 26 tablas directamente mutables por `prisma_app`; además, insertar eventos puede mutar indirectamente la proyección de tarea. El número no incluye funciones, secuencias, owners ni herencia. |
+| Superficie DML legacy amplia | El análisis estático identifica 26 tablas directamente mutables por `leda_app`; además, insertar eventos puede mutar indirectamente la proyección de tarea. El número no incluye funciones, secuencias, owners ni herencia. |
 | ACL implícita de funciones | La disponibilidad potencial de `EXECUTE` mediante `PUBLIC` impide tratar los revokes nominales de tablas como cierre exhaustivo. |
 | Riesgo de superusuario compartido | La topología Docker declarada puede compartir una credencial con capacidad de superusuario entre caminos; los roles lógicos no aíslan una sesión que pueda asumirlos o eludirlos. |
 | Registros con autoridad mezclable | La aplicación actual puede escribir conversación, auditoría e incidentes sin la separación objetivo que reserva auditoría autoritativa a T2b, gateway o administración identificada. |

@@ -3,7 +3,7 @@ variante_de: b-0021
 objetivo: >
   Variante de b-0021, dejar el alta para ver lo otro (ADR 0013 regla 1,
   enmienda "una sola rama de conversación abierta", T9-R1d): con la pregunta
-  del título abierta, la persona consulta sus tareas y Prisma pregunta si
+  del título abierta, la persona consulta sus tareas y Leda pregunta si
   sigue con lo pendiente; la persona toca "Dejarlo y ver lo otro". El borrador
   se guarda (no se cancela, F-C6), se dice y, en la misma respuesta, se atiende
   la consulta guardada (aparece la tarea) sin pedir el título de nuevo.

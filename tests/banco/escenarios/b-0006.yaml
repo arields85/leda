@@ -17,7 +17,7 @@ herramientas_prohibidas:
   - adjuntar_evidencia
 # El alta guiada (ingreso_tareas.start) no compromete ninguna 'task' en el
 # primer turno; abre exactamente un 'task_draft' (verificado contra
-# src/prisma/ingreso_tareas.py: inserta uno cuando no hay un pedido activo).
+# src/leda/ingreso_tareas.py: inserta uno cuando no hay un pedido activo).
 efectos:
   conteos_delta:
     task: 0

@@ -11,14 +11,14 @@ from datetime import datetime, timedelta, timezone
 import psycopg
 import pytest
 
-import prisma.jev as jev
-from prisma import agente, herramientas
-from prisma import pendientes as P
-from prisma.salida import etiqueta_sin_icono
-from prisma.autoridad import Canal, identificar
-from prisma.db import admin, espacio
-from prisma.jev import ClienteJevGuionado
-from prisma.llm import (IntentAction, IntentRoute, Llamada, ProveedorGuionado,
+import leda.jev as jev
+from leda import agente, herramientas
+from leda import pendientes as P
+from leda.salida import etiqueta_sin_icono
+from leda.autoridad import Canal, identificar
+from leda.db import admin, espacio
+from leda.jev import ClienteJevGuionado
+from leda.llm import (IntentAction, IntentRoute, Llamada, ProveedorGuionado,
                          RespectoPendiente, Respuesta)
 
 from tests.banco.comprobadores import comprobar_aclaracion
@@ -97,7 +97,7 @@ def test_grabador_conserva_la_ruta_que_fallo_y_su_error():
     """El ruteo que falla también queda en la grabación (banco b-0022: un
     `RoutingError` 3/3 sin ninguna huella de qué ruta lo causó): la entrada,
     la pregunta pendiente y el error, y la excepción sigue su camino."""
-    from prisma.llm import RouteEnvelope, RoutingError
+    from leda.llm import RouteEnvelope, RoutingError
 
     sobre_malo = RouteEnvelope(calls=(Llamada("c", "route_intent", {
         "action": "normal_conversation"}),))   # falta `respecto_pendiente`
@@ -121,7 +121,7 @@ def test_replay_de_una_ruta_fallida_vuelve_a_fallar_en_su_lugar():
     reproduce en el mismo orden: falla y después responde."""
     import json
 
-    from prisma.llm import RoutingError
+    from leda.llm import RoutingError
 
     grabacion = json.loads(json.dumps({"rutas": [
         {"entrada": "x", "error": "RoutingError: Malformed router payload.",
@@ -320,8 +320,8 @@ def test_resolver_en_paralelo_con_guionado_por_referencia_no_cruza_las_dos_refer
     del mismo mensaje, resueltas por `gateway._resolver_en_paralelo` (el
     mismo `ThreadPoolExecutor` de producción), cada una tiene que recibir su
     propia probabilidad grabada -- nunca la de la otra."""
-    from prisma.gateway import _resolver_en_paralelo
-    from prisma.jev import TareaCandidata
+    from leda.gateway import _resolver_en_paralelo
+    from leda.jev import TareaCandidata
 
     pedidos_grabados = [
         {"state": {"referencia": "el plc"},
@@ -609,8 +609,8 @@ def test_recolectar_efectos_bloqueos_abiertos_baja_al_resolver(corework, conn):
                        "area": "ot", "responsable": "Marcos Tarquini"}],
             "bloqueos": [{"tarea": "t1", "causa": "falta un repuesto (simulado)"}],
         })
-    from prisma import herramientas as H
-    from prisma.db import espacio
+    from leda import herramientas as H
+    from leda.db import espacio
     with espacio(conn, ws) as cur:
         cur.execute("select bloqueo_id from (select id as bloqueo_id from blocker "
                     "where task_id = %s) x", (ids["t1"],))
@@ -703,9 +703,9 @@ def test_filas_respuesta_trae_pending_action_id_e_intake_choice_set_id(corework,
     -- es una prueba de la consulta de `corrida.py`, no del circuito."""
     from datetime import datetime, timedelta, timezone
 
-    from prisma.autoridad import Canal, identificar
-    from prisma.pendientes import registrar
-    from prisma.salida import enqueue_outbox
+    from leda.autoridad import Canal, identificar
+    from leda.pendientes import registrar
+    from leda.salida import enqueue_outbox
 
     from tests.banco.corrida import _telegram_id
 
@@ -992,7 +992,7 @@ def test_b_0013_con_dos_referencias_a_las_mismas_candidatas_llega_a_su_efecto(
         corework, conn):
     """T9-R5 (banco b-0013): "ya arregle lo del dashboard, pasalo a revision" trae dos
     referencias con las mismas dos candidatas. La persona elige una vez y esa
-    elección vale para todo el mensaje: Prisma no vuelve a preguntar, retoma el
+    elección vale para todo el mensaje: Leda no vuelve a preguntar, retoma el
     pedido y la tarea elegida llega a `en_revision`."""
     ws = corework.workspace_id
     with admin(conn) as cur:
@@ -1040,7 +1040,7 @@ def test_b_0013_con_dos_referencias_a_las_mismas_candidatas_llega_a_su_efecto(
 
 
 def gateway_sentinel() -> str:
-    from prisma import gateway
+    from leda import gateway
 
     return gateway._SENTINEL_ACLARACION
 
@@ -1050,7 +1050,7 @@ def test_ejecutar_escenario_aclaracion_elige_por_el_titulo_entero_aunque_el_boto
     """T10-2b (b-0013): el escenario nombra la candidata por su título entero, pero el
     botón real lo lleva acortado ("Cablear tablero máq. 3…"). Sin reconocer la forma
     ofrecida del título el corredor no encontraba el botón, no tocaba nada y la corrida
-    parecía un pedido que Prisma no retomó."""
+    parecía un pedido que Leda no retomó."""
     ws = corework.workspace_id
     with admin(conn) as cur:
         ids = sembrar_precondiciones(cur, ws, {
@@ -1096,7 +1096,7 @@ def test_ejecutar_escenario_aclaracion_con_dos_botones_que_cumplen_no_adivina_cu
     """T10-2c: si dos botones de la misma pregunta cumplen la etiqueta a elegir, el
     corredor no toca ninguno: la corrida queda bloqueada con el motivo "ambiguo" y
     no se aplica nada (antes tomaba el primero, y un toque equivocado pasaba por
-    conducta de Prisma). Los botones reales llevan etiquetas distinguibles entre sí,
+    conducta de Leda). Los botones reales llevan etiquetas distinguibles entre sí,
     así que la ambigüedad se fuerza repitiendo la primera opción de la pregunta."""
     original = corrida_modulo._opciones_pendiente
 
@@ -1281,7 +1281,7 @@ def test_ejecutar_escenario_opcion_de_texto_no_cuenta_como_tarea_ofrecida(
 
 
 # ---------------------------------------------------------------------------
-# _resolver_opcion_toque (T4, `prisma-orienta`): resuelve un toque genérico
+# _resolver_opcion_toque (T4, `leda-orienta`): resuelve un toque genérico
 # de escenario contra las opciones REALES de la propuesta vigente -- nunca
 # inventa un token.
 # ---------------------------------------------------------------------------
@@ -1487,7 +1487,7 @@ def test_candidatas_tarea_por_titulo_ignora_una_opcion_sin_titulo():
 
 
 # ---------------------------------------------------------------------------
-# ejecutar_escenario con `toques` (T4, `prisma-orienta`): simula, en orden,
+# ejecutar_escenario con `toques` (T4, `leda-orienta`): simula, en orden,
 # tocar una tarea de la lista (T3) y después una acción de su menú (T2) --
 # extremo a extremo, hasta la vista previa y su Confirmar automático de
 # siempre -- sin que nada de lo que las 8 herramientas escriben cambie antes
@@ -1750,7 +1750,7 @@ def _sembrar_objetivo_para_el_alta(conn, ws):
 
 
 def test_resolver_toque_generico_alcanza_las_opciones_del_alta(corework, conn):
-    from prisma import ingreso_tareas as I
+    from leda import ingreso_tareas as I
 
     ws = corework.workspace_id
     _sembrar_objetivo_para_el_alta(conn, ws)
@@ -1920,7 +1920,7 @@ def _sembrar_borrador_de_alta(conn, ws, **cambios):
 
 
 def test_sembrar_borrador_de_alta_deja_la_vista_previa_esperando(corework, conn):
-    from prisma import ingreso_tareas as I
+    from leda import ingreso_tareas as I
 
     ws = corework.workspace_id
     _sembrar_borrador_de_alta(conn, ws)
@@ -1965,8 +1965,8 @@ def _acciones_del_borrador(conn) -> list[dict]:
 
 def test_sembrar_borrador_de_otro_aprobador_deja_el_resumen_de_quien_pide_esperando(
         corework, conn):
-    from prisma import ingreso_tareas as I
-    from prisma.salida import etiqueta_sin_icono
+    from leda import ingreso_tareas as I
+    from leda.salida import etiqueta_sin_icono
 
     ws = corework.workspace_id
     _sembrar_borrador_de_alta(conn, ws, **_BORRADOR_DE_OTRO_APROBADOR)
@@ -1988,8 +1988,8 @@ def test_sembrar_borrador_de_otro_aprobador_deja_el_resumen_de_quien_pide_espera
 
 def test_sembrar_borrador_enviado_a_aprobacion_lo_deja_esperando_a_quien_confirma(
         corework, conn):
-    from prisma import ingreso_tareas as I
-    from prisma.salida import etiqueta_sin_icono
+    from leda import ingreso_tareas as I
+    from leda.salida import etiqueta_sin_icono
 
     ws = corework.workspace_id
     _sembrar_borrador_de_alta(conn, ws, **_BORRADOR_DE_OTRO_APROBADOR,
@@ -2398,7 +2398,7 @@ def test_la_aclaracion_sembrada_es_la_misma_fila_que_crea_el_flujo_real(
     esperando -- herramienta, pregunta, `campo`, `args`, botones con su orden,
     etiqueta y valor -- es la que crea el flujo real de un turno con una
     referencia ambigua, con tareas propias y ajenas."""
-    from prisma import gateway
+    from leda import gateway
     from tests.banco.corrida import _sembrar_aclaracion
     from tests.test_aclaracion_botones import (_alcance, _con_jev, _con_proveedor,
                                                _quien, _tarea, _tarea_resp)
@@ -2763,7 +2763,7 @@ def test_la_corrida_ve_un_camino_que_encola_dos_respuestas_aunque_el_control_lo_
         corework, conn, monkeypatch):
     from datetime import timedelta as _td
 
-    from prisma import gateway
+    from leda import gateway
 
     def turno_doble(cur, quien, texto, workspace_id, chat_id, entrante_id=None, **k):
         ahora = datetime.now(timezone.utc)
@@ -2846,7 +2846,7 @@ _ALTA_DE_OTRO_APROBADOR = {
 
 
 def test_sembrar_criterio_por_confirmar_deja_esperando_el_ultimo_dato(corework, conn):
-    from prisma import ingreso_tareas as I
+    from leda import ingreso_tareas as I
 
     ws = corework.workspace_id
     _sembrar_objetivo_para_el_alta(conn, ws)
@@ -2883,7 +2883,7 @@ def test_ejecutar_escenario_termina_el_alta_por_toque_y_dice_quien_confirma(
 
 
 def test_sembrar_cambios_pedidos_deja_la_tarea_por_hacer_con_su_motivo(corework, conn):
-    from prisma import menu_tarea as M
+    from leda import menu_tarea as M
 
     ws = corework.workspace_id
     with admin(conn) as cur:

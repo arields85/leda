@@ -19,12 +19,12 @@ from types import SimpleNamespace
 
 from fastapi.testclient import TestClient
 
-from prisma import gateway
-from prisma import pendientes as P
-from prisma.calendario import Calendario
-from prisma.db import admin, autoridad, espacio
-from prisma.despachador import TransporteDePrueba, despachar
-from prisma.llm import RespectoPendiente
+from leda import gateway
+from leda import pendientes as P
+from leda.calendario import Calendario
+from leda.db import admin, autoridad, espacio
+from leda.despachador import TransporteDePrueba, despachar
+from leda.llm import RespectoPendiente
 
 from tests.test_alta_eleccion_confirmacion import (_alta_en_confirmacion,
                                                    _alta_enviada, _nuevas, _ruta,
@@ -64,7 +64,7 @@ def _escribir_como(conn, monkeypatch, provider, user, texto, message_id):
     monkeypatch.setattr(gateway, "config", SimpleNamespace(
         webhook_secret="test-secret", llm_api_key="unused",
         token_bot=lambda slug: "unused-token"))
-    monkeypatch.setattr("prisma.llm.desde_base", lambda *args: provider)
+    monkeypatch.setattr("leda.llm.desde_base", lambda *args: provider)
     response = TestClient(gateway.app).post(
         "/telegram/north-lab",
         json={"message": {"message_id": message_id, "text": texto,

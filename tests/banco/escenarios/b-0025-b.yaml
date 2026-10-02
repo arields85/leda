@@ -2,7 +2,7 @@ id: b-0025-b
 variante_de: b-0025
 objetivo: >
   Variante de b-0025, un dato que se elige con botones: con la vista previa
-  esperando, la persona toca Modificar y elige el objetivo; Prisma vuelve a
+  esperando, la persona toca Modificar y elige el objetivo; Leda vuelve a
   mostrar las opciones del objetivo y la persona escribe el nombre exacto de
   otro. Cambia sólo el objetivo y vuelve la vista previa. La tarea no se crea.
 actor: Ismael Soschinski

@@ -3,13 +3,13 @@
 
 -- Applied after 0004_function_ownership.sql. Closes the last isolation gap in
 -- the auxiliary records: audit_log, incident and absence all granted insert to
--- prisma_app with no isolation policy, so a connection bound to one workspace
+-- leda_app with no isolation policy, so a connection bound to one workspace
 -- could attribute an audit entry, an incident or an absence to another.
 --
 -- The audit log is the record a client is shown as evidence. If another client
 -- can write into it, it stops being evidence.
 begin;
-set search_path = prisma, public;
+set search_path = leda, public;
 
 -- Fail closed if an invoking text pipeline decoded the UTF-8 file incorrectly.
 -- chr() builds the expected value independently from non-ASCII source bytes.
@@ -23,7 +23,7 @@ do $$ begin
 end $$;
 
 do $$ begin
-  if not exists (select 1 from pg_roles where rolname = 'prisma_owner') then
+  if not exists (select 1 from pg_roles where rolname = 'leda_owner') then
     raise exception '0005 requires 0004_function_ownership.sql';
   end if;
 end $$;
@@ -70,7 +70,7 @@ create trigger trg_derivar_espacio_ausencia
 -- --- audit_log e incident: el espacio lo fija la sesión, no quien escribe --
 
 create or replace function derivar_espacio_registro() returns trigger as $$
-declare actual text := nullif(current_setting('prisma.workspace_id', true), '');
+declare actual text := nullif(current_setting('leda.workspace_id', true), '');
 begin
   -- Cuando la sesión declara un espacio, ése manda: no se acepta el que
   -- aporte quien escribe. Cuando no lo declara --la conexión administrativa--
@@ -95,7 +95,7 @@ create trigger trg_derivar_espacio_incidente
 alter table absence enable row level security;
 alter table absence force row level security;
 create policy aislamiento_espacio on absence
-  using (workspace_id = nullif(current_setting('prisma.workspace_id', true), '')::uuid);
+  using (workspace_id = nullif(current_setting('leda.workspace_id', true), '')::uuid);
 
 -- `audit_log` e `incident` admiten espacio nulo para los hechos de alcance
 -- global, que sólo origina la conexión administrativa. Una fila sin espacio no
@@ -104,12 +104,12 @@ alter table audit_log enable row level security;
 alter table audit_log force row level security;
 create policy aislamiento_espacio on audit_log
   using (workspace_id is null
-         or workspace_id = nullif(current_setting('prisma.workspace_id', true), '')::uuid);
+         or workspace_id = nullif(current_setting('leda.workspace_id', true), '')::uuid);
 
 alter table incident enable row level security;
 alter table incident force row level security;
 create policy aislamiento_espacio on incident
   using (workspace_id is null
-         or workspace_id = nullif(current_setting('prisma.workspace_id', true), '')::uuid);
+         or workspace_id = nullif(current_setting('leda.workspace_id', true), '')::uuid);
 
 commit;

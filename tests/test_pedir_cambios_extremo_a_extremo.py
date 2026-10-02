@@ -1,4 +1,4 @@
-"""Prueba de punta a punta de "Pedir cambios" (T6e, `odd/tasks/prisma-orienta.md`;
+"""Prueba de punta a punta de "Pedir cambios" (T6e, `odd/tasks/leda-orienta.md`;
 seguimiento de review-c112506a).
 
 ADR 0009 y su enmienda del 2026-09-27 (T6a-T6d) ya tienen cobertura a nivel de
@@ -28,14 +28,14 @@ import pytest
 from fastapi.testclient import TestClient
 
 from tests.toques import id_de_mensaje
-from prisma import gateway
-from prisma import pendientes as P
-from prisma.salida import etiquetas_coinciden
-from prisma.agente import responder
-from prisma.autoridad import Canal, identificar
-from prisma.calendario import Calendario
-from prisma.db import admin, espacio
-from prisma.llm import Llamada, ProveedorGuionado, Respuesta
+from leda import gateway
+from leda import pendientes as P
+from leda.salida import etiquetas_coinciden
+from leda.agente import responder
+from leda.autoridad import Canal, identificar
+from leda.calendario import Calendario
+from leda.db import admin, espacio
+from leda.llm import Llamada, ProveedorGuionado, Respuesta
 
 # ---------------------------------------------------------------------------
 # Helpers -- mismo patrón que tests/test_menu_tarea.py y tests/test_gateway.py
@@ -48,7 +48,7 @@ def _quien(cur, nombre, ws):
 
 
 def _tg(cur, nombre) -> int:
-    # `integrante` es una vista filtrada por `prisma.workspace_id`
+    # `integrante` es una vista filtrada por `leda.workspace_id`
     # (documentado en `tests/test_entrega_con_evidencia.py::_tg`); `app_user`
     # es la tabla real, sin ese filtro -- se usa siempre bajo `admin(conn)`.
     cur.execute("select telegram_user_id t from app_user where nombre = %s", (nombre,))
@@ -76,7 +76,7 @@ def _tarea(cur, ws, *, titulo="Programar HMI línea 2", area="ot",
          list(evidencia_requerida) if evidencia_requerida else []))
     t = cur.fetchone()["id"]
     cur.execute("insert into task_state_event (task_id, estado_nuevo, actor_kind) "
-                "values (%s, %s, 'prisma')", (t, estado))
+                "values (%s, %s, 'leda')", (t, estado))
     return str(t)
 
 
@@ -93,7 +93,7 @@ def _dependencia_bloqueante(cur, ws, destino):
 
 
 def _outbox_ultimo(cur, ws, chat_id) -> str:
-    # T6g (`odd/tasks/prisma-orienta.md`; review-8b7dde28): `programado_para`
+    # T6g (`odd/tasks/leda-orienta.md`; review-8b7dde28): `programado_para`
     # no tiene desempate -- dos filas pueden compartir la misma hora dentro
     # de la misma transacción --, y `message_outbox.id` (`db/esquema.sql`) es
     # un `uuid` al azar (`gen_random_uuid()`, sin ningún orden temporal), así
@@ -193,7 +193,7 @@ def _abrir_menu(cliente, conn, ws, monkeypatch, tarea_id, quien_nombre, tg, *,
         "pregunta": "¿De qué tarea hablamos?",
         "opciones": [{"tarea_id": tarea_id, "accion": "menu"}]})])]
     proveedor = ProveedorGuionado(guion=list(guion))
-    monkeypatch.setattr("prisma.llm.desde_base", lambda cur, ws, key: proveedor)
+    monkeypatch.setattr("leda.llm.desde_base", lambda cur, ws, key: proveedor)
 
     with espacio(conn, ws) as cur:
         quien = _quien(cur, quien_nombre, ws)
@@ -229,14 +229,14 @@ def test_pedir_cambios_punta_a_punta_por_telegram(cliente, conn, corework, monke
     Marcos Tarquini como su aprobador (`aprobado_por` de OT, mismo elenco que
     `tests/test_menu_tarea.py`):
 
-    1. Nahuel entrega ("Ya la terminé"), Prisma pide la evidencia, la
+    1. Nahuel entrega ("Ya la terminé"), Leda pide la evidencia, la
        escribe, Confirmar -> `en_revision`, evidencia registrada, Marcos
        recibe la notificación con "Aprobar"/"Pedir cambios" (decisión 3).
     2. Marcos toca "Pedir cambios", escribe el comentario, la vista previa
        nombra el destino ("en curso"), Confirmar -> `approval` 'rechazado',
        la tarea vuelve a `en_curso`, Nahuel recibe el aviso con el
        comentario (decisión 4).
-    3. Nahuel entrega de nuevo -- Prisma pide evidencia NUEVA, la vieja ya no
+    3. Nahuel entrega de nuevo -- Leda pide evidencia NUEVA, la vieja ya no
        cuenta (T6b) -- Confirmar -> `en_revision` otra vez, una segunda fila
        de evidencia, una segunda notificación a Marcos con una `pending_
        action` y una clave de dedupe distintas de la primera (T6d).
@@ -438,7 +438,7 @@ def test_pedir_cambios_con_dependencia_bloqueante_sigue_por_telegram(
 
 
 # ---------------------------------------------------------------------------
-# T6i (`odd/tasks/prisma-orienta.md`; ADR 0009, enmienda 2026-09-27):
+# T6i (`odd/tasks/leda-orienta.md`; ADR 0009, enmienda 2026-09-27):
 # evidencia nueva sobre una tarea en_revision, de alguien que no es el
 # aprobador, retira el aviso de entrega que tiene esperando y manda uno
 # nuevo con toda la evidencia -- acá por "Adjuntar evidencia", de punta a

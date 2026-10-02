@@ -28,9 +28,9 @@ from datetime import datetime, timezone
 import psycopg
 import pytest
 
-from prisma import herramientas as H
-from prisma.autoridad import Canal, Denegado, identificar
-from prisma.db import admin, conectar, espacio
+from leda import herramientas as H
+from leda.autoridad import Canal, Denegado, identificar
+from leda.db import admin, conectar, espacio
 
 
 def _quien(cur, nombre, ws):
@@ -59,7 +59,7 @@ def _tarea(cur, ws, *, titulo="Programar HMI línea 2", persona="Nahuel Gimenez"
          list(evidencia_requerida) if evidencia_requerida else []))
     t = cur.fetchone()["id"]
     if estado == "en_revision":
-        # T6c (`odd/tasks/prisma-orienta.md`): `_pedir_cambios_tarea` ahora
+        # T6c (`odd/tasks/leda-orienta.md`): `_pedir_cambios_tarea` ahora
         # consulta `estado_previo_a_revision` -- el `estado_anterior` de la
         # ÚLTIMA entrada a `en_revision` -- para decidir a qué estado
         # vuelve la tarea. Sin un `en_curso` real antes, ese valor sería
@@ -68,14 +68,14 @@ def _tarea(cur, ws, *, titulo="Programar HMI línea 2", persona="Nahuel Gimenez"
         # `en_curso`). Una entrega sin haber arrancado nunca tiene su propio
         # helper (sección 8, más abajo).
         cur.execute("insert into task_state_event (task_id, estado_nuevo, "
-                   "actor_kind) values (%s, 'en_curso', 'prisma')", (t,))
+                   "actor_kind) values (%s, 'en_curso', 'leda')", (t,))
         cur.execute(
             "insert into task_state_event (task_id, estado_anterior, "
             "estado_nuevo, actor_kind) values (%s, 'en_curso', 'en_revision', "
-            "'prisma')", (t,))
+            "'leda')", (t,))
     else:
         cur.execute("insert into task_state_event (task_id, estado_nuevo, actor_kind) "
-                    "values (%s, %s, 'prisma')", (t, estado))
+                    "values (%s, %s, 'leda')", (t, estado))
     return str(t)
 
 
@@ -94,7 +94,7 @@ def _outbox_ultimo(cur, ws, tg) -> str:
 
 
 def _tg(cur, nombre) -> int:
-    # `integrante` es una vista filtrada por `prisma.workspace_id`
+    # `integrante` es una vista filtrada por `leda.workspace_id`
     # (`db/esquema.sql`), que sólo fija `espacio()` -- bajo `admin()` queda
     # sin definir y no devuelve filas (mismo gotcha que documentó la sesión
     # de T2b sobre `test_veracidad.py`). `app_user` es la tabla real, sin
@@ -222,7 +222,7 @@ def test_tocar_aprobar_de_la_notificacion_de_entrega_llega_a_la_vista_previa(
 
     from fastapi.testclient import TestClient
 
-    from prisma import gateway
+    from leda import gateway
 
     ws = corework.workspace_id
     with admin(conn) as cur:
@@ -696,8 +696,8 @@ def test_ya_la_termine_pide_evidencia_de_nuevo_tras_pedir_cambios(corework, conn
     pasar por HTTP ni por el token del menú (que T2 ya prueba de punta a
     punta): lo que importa acá es que la acción "terminar" recalcule
     `evidencia_pendiente` y no la vieja lectura descartada."""
-    from prisma import gateway
-    from prisma import pendientes as P
+    from leda import gateway
+    from leda import pendientes as P
 
     ws = corework.workspace_id
     with admin(conn) as cur:
@@ -818,7 +818,7 @@ def test_evidencia_texto_se_registra_aunque_ya_exista_evidencia_sin_pedir_cambio
 
 
 # ---------------------------------------------------------------------------
-# 7. Dedupe estable del aviso de entrega (T6d, `odd/tasks/prisma-orienta.md`)
+# 7. Dedupe estable del aviso de entrega (T6d, `odd/tasks/leda-orienta.md`)
 # ---------------------------------------------------------------------------
 
 def _dedupe_keys_entrega(cur, ws, tg) -> list[str]:
@@ -967,7 +967,7 @@ def test_dos_entregas_distintas_con_evidencia_notifican_dos_veces_con_claves_dis
 
 # ---------------------------------------------------------------------------
 # 8. "Pedir cambios" con una dependencia bloqueante abierta (T6c,
-#    `odd/tasks/prisma-orienta.md`; enmienda a la decisión 4 de ADR 0009).
+#    `odd/tasks/leda-orienta.md`; enmienda a la decisión 4 de ADR 0009).
 #    Antes de esta corrección, el disparador `exigir_dependencias_resueltas`
 #    (`db/esquema.sql`) rechazaba CUALQUIER llegada a `en_curso` con una
 #    dependencia bloqueante todavía abierta, incluida la restauración que
@@ -998,7 +998,7 @@ def test_pedir_cambios_con_dependencia_bloqueante_abierta_vuelve_a_en_curso(
     `psycopg.errors.RaiseException` ("No se puede pasar la tarea a en
     curso...") porque el insert a `en_curso` chocaba con el disparador:
     exactamente el hallazgo anotado al cerrar T6a (`odd/tasks/
-    prisma-orienta.md`)."""
+    leda-orienta.md`)."""
     ws = corework.workspace_id
     with admin(conn) as cur:
         tid = _tarea(cur, ws, estado="en_revision")
@@ -1038,7 +1038,7 @@ def test_pedir_cambios_entregada_sin_arrancar_con_dependencia_abierta_vuelve_a_a
         cur.execute(
             """insert into task_state_event (task_id, estado_anterior,
                                              estado_nuevo, actor_kind)
-               values (%s, 'asignada', 'en_revision', 'prisma')""", (tid,))
+               values (%s, 'asignada', 'en_revision', 'leda')""", (tid,))
         _evidencia(cur, ws, tid)
         _dependencia_bloqueante(cur, ws, tid)
     conn.commit()
@@ -1076,7 +1076,7 @@ def test_pedir_cambios_sin_dependencia_sigue_volviendo_a_en_curso(corework, conn
 
     with espacio(conn, ws) as cur:
         # `estado_previo_a_revision` sólo tiene `execute` concedido a
-        # `prisma_app` (`db/esquema.sql`) -- bajo `prisma_admin` (helper
+        # `leda_app` (`db/esquema.sql`) -- bajo `leda_admin` (helper
         # `admin(conn)`) el permiso está revocado, igual que
         # `estado_previo_a_bloqueo`. Se comprueba bajo el mismo rol que usa
         # `_pedir_cambios_tarea`.
@@ -1107,7 +1107,7 @@ def test_pedir_cambios_vista_previa_nombra_el_destino_real(corework, conn):
         cur.execute(
             """insert into task_state_event (task_id, estado_anterior,
                                              estado_nuevo, actor_kind)
-               values (%s, 'asignada', 'en_revision', 'prisma')""", (tid_asignada,))
+               values (%s, 'asignada', 'en_revision', 'leda')""", (tid_asignada,))
         _evidencia(cur, ws, tid_asignada)
     conn.commit()
 
@@ -1161,19 +1161,19 @@ def test_estado_previo_a_revision_no_es_ejecutable_por_public(corework, conn):
     """Catálogo efectivo, no el texto del SQL (mismo criterio que
     `test_task_intake.py::test_0007_estado_previo_a_bloqueo_llega_por_
     migracion_con_dueno_correcto`): `security definer`, dueño
-    `prisma_owner`, sin `execute` para `public`, con `execute` para
-    `prisma_app`."""
+    `leda_owner`, sin `execute` para `public`, con `execute` para
+    `leda_app`."""
     with admin(conn) as cur:
         cur.execute(
             """select r.rolname dueno, p.prosecdef definer,
                       has_function_privilege('public',
-                        'prisma.estado_previo_a_revision(uuid)', 'execute') publico,
-                      has_function_privilege('prisma_app',
-                        'prisma.estado_previo_a_revision(uuid)', 'execute') app
+                        'leda.estado_previo_a_revision(uuid)', 'execute') publico,
+                      has_function_privilege('leda_app',
+                        'leda.estado_previo_a_revision(uuid)', 'execute') app
                  from pg_proc p join pg_roles r on r.oid = p.proowner
-                where p.oid = 'prisma.estado_previo_a_revision(uuid)'::regprocedure""")
+                where p.oid = 'leda.estado_previo_a_revision(uuid)'::regprocedure""")
         fila = cur.fetchone()
-    assert fila["dueno"] == "prisma_owner"
+    assert fila["dueno"] == "leda_owner"
     assert fila["definer"] is True
     assert fila["publico"] is False
     assert fila["app"] is True
@@ -1181,7 +1181,7 @@ def test_estado_previo_a_revision_no_es_ejecutable_por_public(corework, conn):
 
 # ---------------------------------------------------------------------------
 # 9. Entrega repetida en_revision y empate de evidencia (T6g,
-#    `odd/tasks/prisma-orienta.md`; review-e719d807, review-09452c69).
+#    `odd/tasks/leda-orienta.md`; review-e719d807, review-09452c69).
 #    Decisión del usuario (2026-09-27): "ya la terminé" sobre una tarea que
 #    YA está en_revision no registra ningún evento de estado -- antes, ese
 #    evento `en_revision -> en_revision` hacía que `estado_previo_a_revision`
@@ -1332,13 +1332,13 @@ def test_pedir_cambios_con_previo_en_revision_nulo_vuelve_a_asignada(corework, c
         cur.execute("delete from task_state_event where task_id = %s", (tid,))
         cur.execute(
             "insert into task_state_event (task_id, estado_nuevo, actor_kind) "
-            "values (%s, 'en_revision', 'prisma')", (tid,))
+            "values (%s, 'en_revision', 'leda')", (tid,))
         _evidencia(cur, ws, tid)
     conn.commit()
 
     with espacio(conn, ws) as cur:
         # `estado_previo_a_revision` sólo tiene `execute` concedido a
-        # `prisma_app` -- bajo `prisma_admin` el permiso está revocado
+        # `leda_app` -- bajo `leda_admin` el permiso está revocado
         # (mismo gotcha documentado en la sección 8), así que la premisa se
         # comprueba bajo el mismo rol que usa `_pedir_cambios_tarea`.
         cur.execute("select estado_previo_a_revision(%s) as previo", (tid,))
@@ -1386,7 +1386,7 @@ def test_evidencia_pendiente_empate_de_at_en_la_misma_transaccion_falla_cerrado(
     tiene que fallar cerrado: sigue pendiente, para que un cambio futuro de
     `>` a `>=` no pase inadvertido.
 
-    T6j (`odd/tasks/prisma-orienta.md`, migración 0016) cambió el `default`
+    T6j (`odd/tasks/leda-orienta.md`, migración 0016) cambió el `default`
     de estas columnas a `clock_timestamp()`, que ya NO repite el mismo valor
     entre dos inserts de una misma transacción como hacía `now()` -- el
     empate ya no sale solo por compartir transacción. Se fija `at` a mano,
@@ -1426,7 +1426,7 @@ def test_evidencia_pendiente_empate_de_at_en_la_misma_transaccion_falla_cerrado(
 
 # ---------------------------------------------------------------------------
 # 10. Evidencia nueva en revisión reemplaza el aviso del aprobador (T6i,
-#     `odd/tasks/prisma-orienta.md`; ADR 0009, enmienda 2026-09-27).
+#     `odd/tasks/leda-orienta.md`; ADR 0009, enmienda 2026-09-27).
 #     Decisión del usuario: cuando llega evidencia nueva a una tarea que ya
 #     está `en_revision` -- entrega repetida (T6g) o "Adjuntar evidencia" --
 #     de alguien que no es el aprobador, el aviso que el aprobador tiene
@@ -1455,7 +1455,7 @@ def test_adjuntar_evidencia_en_revision_retira_el_aviso_viejo_y_manda_uno_nuevo(
     ya en_revision: el aviso que Marcos tiene esperando queda retirado --
     tocar su "Aprobar" ya no está vigente y no aplica nada -- y sale uno
     nuevo con las dos evidencias y una clave de dedupe distinta."""
-    from prisma import pendientes as P
+    from leda import pendientes as P
 
     ws = corework.workspace_id
     with admin(conn) as cur:
@@ -1659,11 +1659,11 @@ def test_aviso_de_entrega_lista_toda_la_evidencia_del_ciclo_actual(corework, con
 
 # ---------------------------------------------------------------------------
 # 11. Serializar decisiones y avisos concurrentes sobre una misma tarea (T6f,
-#     `odd/tasks/prisma-orienta.md`; review-3cf89bef, review-ae0ab510).
+#     `odd/tasks/leda-orienta.md`; review-3cf89bef, review-ae0ab510).
 #     "Aprobar" y "Pedir cambios" simultáneos, y dos evidencias simultáneas
 #     sobre una tarea `en_revision`, en conexiones/transacciones reales --
 #     `_bloquear_tarea` (`herramientas.py`) sirializa con un advisory lock de
-#     transacción (`prisma_app` no tiene privilegio `update`/`delete` sobre
+#     transacción (`leda_app` no tiene privilegio `update`/`delete` sobre
 #     `task`, así que `for update` no es una opción -- verificado contra el
 #     esquema real).
 # ---------------------------------------------------------------------------
@@ -1765,7 +1765,7 @@ def test_dos_evidencias_simultaneas_en_en_revision_dejan_un_solo_aviso_con_las_d
     primera (nunca los dos a la vez) y manda el suyo con las dos evidencias
     ya visibles -- `_evidencia_vigente` corre después de tomar el lock, así
     que ve lo que la primera ya confirmó."""
-    from prisma import pendientes as P
+    from leda import pendientes as P
 
     ws = corework.workspace_id
     with admin(conn) as cur:
@@ -1822,7 +1822,7 @@ def test_dos_evidencias_simultaneas_en_en_revision_dejan_un_solo_aviso_con_las_d
 
 # ---------------------------------------------------------------------------
 # 12. Seguimientos de review-6b1efba1 sobre el aviso de entrega (T6h,
-#     `odd/tasks/prisma-orienta.md`).
+#     `odd/tasks/leda-orienta.md`).
 # ---------------------------------------------------------------------------
 
 def test_dedupe_key_shape_tarea_id_y_transaccion_no_colisiona_entre_tareas(
@@ -1873,7 +1873,7 @@ def test_notificar_entrega_repetido_en_la_misma_transaccion_no_deja_pending_acti
     que queda ni que fuera la misma que espera el único mensaje. Ahora
     comprueba que la `pending_action` que sobrevive está `esperando` y que
     su id es el `pending_action_id` de la única fila de `message_outbox`."""
-    from prisma import pendientes as P
+    from leda import pendientes as P
 
     ws = corework.workspace_id
     with admin(conn) as cur:
@@ -1922,8 +1922,8 @@ def test_evidencia_nueva_en_revision_no_retira_el_menu_general_del_aprobador(
     (`menu_tarea.calcular_menu`), pero su `pending_action` no lleva esa
     marca (`SENTINEL_MENU_TAREA` sin `aviso` en `args`) y tiene que
     sobrevivir cuando llega evidencia nueva."""
-    from prisma import gateway as G
-    from prisma import pendientes as P
+    from leda import gateway as G
+    from leda import pendientes as P
 
     ws = corework.workspace_id
     with admin(conn) as cur:
@@ -2179,7 +2179,7 @@ def test_at_de_clock_timestamp_ordena_evidencia_despues_de_rechazado_aunque_b_ar
 
 # ---------------------------------------------------------------------------
 # 14. El `default` de la columna también ordena por escritura (T6j,
-#     `odd/tasks/prisma-orienta.md`, review-5085907d): la sección 13 sólo
+#     `odd/tasks/leda-orienta.md`, review-5085907d): la sección 13 sólo
 #     prueba los cuatro handlers que `_bloquear_tarea` bloquea y que fijan
 #     `at = clock_timestamp()` a mano. Cualquier otro escritor -- una
 #     transición del sistema, una carga administrativa -- pasaba por el

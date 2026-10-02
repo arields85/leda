@@ -22,16 +22,16 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from fastapi.testclient import TestClient
 
-from prisma import gateway
-from prisma import herramientas as H
-from prisma import jev as jev_modulo
-from prisma import pendientes as P
-from prisma.autoridad import Canal, identificar
-from prisma.db import admin, espacio
-from prisma.jev import ClienteJevGuionado
-from prisma.llm import (IntentAction, IntentRoute, Llamada, ProveedorGuionado,
+from leda import gateway
+from leda import herramientas as H
+from leda import jev as jev_modulo
+from leda import pendientes as P
+from leda.autoridad import Canal, identificar
+from leda.db import admin, espacio
+from leda.jev import ClienteJevGuionado
+from leda.llm import (IntentAction, IntentRoute, Llamada, ProveedorGuionado,
                         Respuesta)
-from prisma.salida import ICONO_TAREA, acortar_etiqueta_boton, con_icono
+from leda.salida import ICONO_TAREA, acortar_etiqueta_boton, con_icono
 
 
 def _quien(cur, nombre, ws):
@@ -63,7 +63,7 @@ def _tarea(cur, ws, *, titulo="Cablear tablero máq. 3", area="electricidad",
         (ws, obj, titulo, ws, area, ws, persona))
     t = cur.fetchone()["id"]
     cur.execute("insert into task_state_event (task_id, estado_nuevo, actor_kind) "
-                "values (%s, %s, 'prisma')", (t, estado))
+                "values (%s, %s, 'leda')", (t, estado))
     return str(t)
 
 
@@ -100,7 +100,7 @@ def _con_jev(monkeypatch, doble):
 def _con_proveedor(monkeypatch, *, rutas, guion=None):
     proveedor = ProveedorGuionado(guion=list(guion or [Respuesta(texto="Anotado.")]),
                                   rutas=list(rutas))
-    monkeypatch.setattr("prisma.llm.desde_base", lambda cur, ws, key: proveedor)
+    monkeypatch.setattr("leda.llm.desde_base", lambda cur, ws, key: proveedor)
     return proveedor
 
 
@@ -298,7 +298,7 @@ def test_dos_referencias_con_las_mismas_candidatas_se_preguntan_una_sola_vez(
         cliente, conn, corework, monkeypatch, con_credencial):
     """Una elección ya hecha vale para todo el mensaje (T9-R5, decisión del usuario,
     2026-09-30): si la segunda referencia tiene las mismas candidatas que la que la
-    persona ya resolvió, Prisma no vuelve a preguntar "¿A cuál te referís?"."""
+    persona ya resolvió, Leda no vuelve a preguntar "¿A cuál te referís?"."""
     ws = corework.workspace_id
     with admin(conn) as cur:
         tid_tablero = _tarea(cur, ws, titulo="Cablear tablero máq. 3",
@@ -702,8 +702,8 @@ def test_alta_de_tarea_con_referencia_varias_pregunta_en_vez_de_arrancar_sola(
 
 def test_correccion_de_modificar_pasa_por_route_intent_y_jev(
         corework, conn, monkeypatch, con_credencial):
-    from prisma.agente import responder
-    from prisma.calendario import Calendario
+    from leda.agente import responder
+    from leda.calendario import Calendario
 
     ws = corework.workspace_id
     with admin(conn) as cur:

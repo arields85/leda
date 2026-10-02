@@ -2,7 +2,7 @@
 (ADR 0008).
 
 Sesión 2 por Telegram real, 2026-09-27 (hallazgo 5): Ismael aprobó por el
-menú de una tarea y Prisma contestó "se aprueba el trabajo", pero la tarea
+menú de una tarea y Leda contestó "se aprueba el trabajo", pero la tarea
 quedó en `en_revision` -- `herramientas._aprobar_tarea` sólo insertaba en
 `approval`, nunca corría `motivo_no_cierra_tarea` ni escribía en
 `task_state_event`. El responsable de la tarea (Ariel) nunca se enteró, y su
@@ -26,12 +26,12 @@ from zoneinfo import ZoneInfo
 
 from fastapi.testclient import TestClient
 
-from prisma import gateway
-from prisma import herramientas as H
-from prisma import pendientes as P
-from prisma.autoridad import Canal, identificar
-from prisma.db import admin, espacio
-from prisma.llm import ProveedorGuionado, Respuesta
+from leda import gateway
+from leda import herramientas as H
+from leda import pendientes as P
+from leda.autoridad import Canal, identificar
+from leda.db import admin, espacio
+from leda.llm import ProveedorGuionado, Respuesta
 
 BA = ZoneInfo("America/Argentina/Buenos_Aires")
 # Relativo al reloj real: el webhook (`_tocar`) resuelve el pendiente contra
@@ -72,7 +72,7 @@ def _tarea(cur, ws, *, titulo="Programar HMI línea 2", persona="Nahuel Gimenez"
          list(evidencia_requerida) if evidencia_requerida else []))
     t = cur.fetchone()["id"]
     cur.execute("insert into task_state_event (task_id, estado_nuevo, actor_kind) "
-                "values (%s, %s, 'prisma')", (t, estado))
+                "values (%s, %s, 'leda')", (t, estado))
     return str(t)
 
 
@@ -129,7 +129,7 @@ def test_aprobar_tarea_rechaza_si_falta_la_evidencia_que_exige(corework, conn):
     tarea de Ariel (hallazgo 5). Ahora ni siquiera se registra: se rechaza
     antes de escribir nada. Cobertura más completa (el gate, "Pedir
     cambios", la notificación de entrega) en `test_entrega_con_evidencia.py`."""
-    from prisma.autoridad import Denegado
+    from leda.autoridad import Denegado
 
     ws = corework.workspace_id
     with admin(conn) as cur:
@@ -204,7 +204,7 @@ def _cliente(conn, monkeypatch):
         gateway, "config",
         dataclasses.replace(gateway.config, webhook_secret="s3cr3t"))
     monkeypatch.setattr(
-        "prisma.llm.desde_base",
+        "leda.llm.desde_base",
         lambda cur, ws, key: ProveedorGuionado([Respuesta(texto="Anotado.")]))
     return TestClient(gateway.app)
 

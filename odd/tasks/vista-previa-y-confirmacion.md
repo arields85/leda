@@ -41,7 +41,7 @@ obligatoria, control de cambio entre vista previa y confirmación, botón
 Modificar, corrección de `crear_objetivo`, banco adaptado, continuidad.
 
 **Excluido:** aclaración con botones-propuesta ante ambigüedad (ADR 0005 punto 3,
-unidad siguiente), preguntas de Prisma con botones (punto 4), apodos (punto 5),
+unidad siguiente), preguntas de Leda con botones (punto 4), apodos (punto 5),
 resolución de referencias (receta 5.1).
 
 ## Tareas
@@ -143,7 +143,7 @@ Commits sobre `master` por unidad, con pedido explícito del usuario
   `crear_tarea` alcanzaría también a `crear_objetivo` sin que nadie lo
   hubiera decidido así, y viceversa. Se corrigió a `accion="crear_objetivo"`
   y se agregó `"crear_objetivo"` a la lista de acciones permitidas por
-  defecto en `autoridad.verificar` (`src/prisma/autoridad.py`), preservando
+  defecto en `autoridad.verificar` (`src/leda/autoridad.py`), preservando
   el comportamiento actual (cualquier integrante puede proponer un
   objetivo) mientras separa el permiso para el futuro. Ningún test unitario
   dependía del valor viejo; los escenarios del banco
@@ -224,8 +224,8 @@ Commits sobre `master` por unidad, con pedido explícito del usuario
   Siguen T3 (Modificar), T4 (banco) y T5 (continuidad).
 - 2026-09-24: **T3 implementado.** Ruta: delegada, un escritor (`db/esquema.sql`,
   `db/migrations/0010_modificar_propuesta.sql`,
-  `db/rollbacks/0010_modificar_propuesta.sql`, `src/prisma/pendientes.py`,
-  `src/prisma/agente.py`, `src/prisma/gateway.py`, `tests/test_modificar.py`).
+  `db/rollbacks/0010_modificar_propuesta.sql`, `src/leda/pendientes.py`,
+  `src/leda/agente.py`, `src/leda/gateway.py`, `tests/test_modificar.py`).
 
   **Mecanismo elegido para el contexto de Modificar.** Se evaluaron las dos
   alternativas que sugería la tarea y se descartó inventar una tercera:
@@ -233,7 +233,7 @@ Commits sobre `master` por unidad, con pedido explícito del usuario
     recordatorios (`tipo`, `recordatorios`, `escalado_en`, ligada a
     `task_id`), no tiene `chat_id` ni referencia a `pending_action`, y
     reusarla habría mezclado dos dominios distintos —una fila de esa tabla
-    hoy significa "Prisma le debe una pregunta sobre una tarea a esta
+    hoy significa "Leda le debe una pregunta sobre una tarea a esta
     persona", no "esta persona pidió corregir una propuesta"— además de
     arriesgar que `escalera.py` la contara para la escalada.
   - `pending_action` (elegida): la fila que ya representa la propuesta

@@ -299,7 +299,7 @@ def test_saludo_seguido_de_persona_desconocida_sigue_marcando():
     assert "Rodrigo" in r.diferencia
 
 
-# --- Defecto de revisión (Experimento 3, `odd/tasks/prisma-orienta.md`,
+# --- Defecto de revisión (Experimento 3, `odd/tasks/leda-orienta.md`,
 # hallazgo lateral de b-0002/b-0003): "Bloqueada Todavía" y "Asignada
 # Todavía" marcaban no_concluyente -- una palabra de estado
 # (`herramientas.ESTADOS_LEGIBLES`) seguida de "Todavía" al empezar la
@@ -819,11 +819,11 @@ def test_pregunta_imperativo_porque_no_es_un_falso_positivo_de_que():
 
 
 # ---------------------------------------------------------------------------
-# comprobar_pregunta_con_opciones (T4, `prisma-orienta`, ADR 0007 puntos 1 y
+# comprobar_pregunta_con_opciones (T4, `leda-orienta`, ADR 0007 puntos 1 y
 # 5): a diferencia de `comprobar_pregunta` -- que sólo corre si el escenario
 # declaró `debe_preguntar: true`, y aprueba tanto una pregunta con botones
 # como una en texto abierto -- ésta corre por defecto en todo escenario y es
-# estricta sobre la FORMA: si Prisma pregunta, tiene que ofrecer botones.
+# estricta sobre la FORMA: si Leda pregunta, tiene que ofrecer botones.
 # Reusa `_hace_pregunta` (misma detección que `comprobar_pregunta`): "?" o el
 # pedido de elección en imperativo (T7).
 # ---------------------------------------------------------------------------
@@ -896,7 +896,7 @@ def test_pregunta_con_opciones_no_le_importa_si_actuo():
 
 
 # ---------------------------------------------------------------------------
-# comprobaciones_pregunta_con_opciones (T4, `prisma-orienta`, ADR 0007): la
+# comprobaciones_pregunta_con_opciones (T4, `leda-orienta`, ADR 0007): la
 # puerta de opt-out en un sólo lugar, revisión del orquestador 2026-09-26 --
 # `test_banco.py` y `test_replays.py` la llaman igual; acá se prueba la
 # puerta sola, de punta a punta contra los dos valores del campo se prueba
@@ -961,7 +961,7 @@ def test_aclaracion_con_candidatas_de_mas_no_le_importa():
     assert r.resultado == "aprobado"
 
 
-# --- Defecto de revisión (Experimento 3, `odd/tasks/prisma-orienta.md`,
+# --- Defecto de revisión (Experimento 3, `odd/tasks/leda-orienta.md`,
 # hallazgo lateral de b-0013): el comprobador comparaba la etiqueta entera
 # contra el título entero, y `e7071eb`/`2bee9a9` empezaron a acortar las
 # etiquetas de botón con "…" (`salida.acortar_etiqueta_boton`) -- toda
@@ -970,7 +970,7 @@ def test_aclaracion_con_candidatas_de_mas_no_le_importa():
 
 
 def test_aclaracion_acepta_la_etiqueta_acortada_del_titulo_largo():
-    from prisma.salida import acortar_etiqueta_boton
+    from leda.salida import acortar_etiqueta_boton
 
     titulo = "Actualizar el dashboard de HMI (simulado)"
     etiqueta = acortar_etiqueta_boton(titulo)
@@ -982,7 +982,7 @@ def test_aclaracion_acepta_la_etiqueta_acortada_del_titulo_largo():
 def test_aclaracion_acepta_la_etiqueta_acortada_con_sufijo_de_responsable():
     """`gateway._etiqueta_boton` agrega " — <nombre>" después de acortar,
     para una tarea ajena -- el sufijo nunca se recorta."""
-    from prisma.salida import acortar_etiqueta_boton
+    from leda.salida import acortar_etiqueta_boton
 
     titulo = "Actualizar el dashboard de HMI (simulado)"
     etiqueta = f"{acortar_etiqueta_boton(titulo)} — Marcos"
@@ -1020,7 +1020,7 @@ def test_aclaracion_no_acepta_un_corte_a_mitad_de_palabra():
 def test_aclaracion_no_acepta_la_etiqueta_de_una_tarea_distinta():
     """La forma acortada de la tarea EQUIVOCADA sigue sin contar para la
     esperada, aunque las dos empiecen distinto."""
-    from prisma.salida import acortar_etiqueta_boton
+    from leda.salida import acortar_etiqueta_boton
 
     esperada = "Actualizar el dashboard de HMI (simulado)"
     otra = "Revisar gráficos del dashboard HMI (simulado)"
@@ -1128,7 +1128,7 @@ def test_una_respuesta_por_toque_aprueba_con_un_grupo_por_toque():
 
 
 def test_aclaracion_acepta_la_etiqueta_con_icono_del_titulo_entero():
-    from prisma.salida import ICONO_TAREA, con_icono
+    from leda.salida import ICONO_TAREA, con_icono
 
     titulo = "Dashboard de lotes en CoreLabs"
     r = comprobar_aclaracion(
@@ -1137,7 +1137,7 @@ def test_aclaracion_acepta_la_etiqueta_con_icono_del_titulo_entero():
 
 
 def test_aclaracion_acepta_la_etiqueta_con_icono_acortada_y_con_sufijo():
-    from prisma.salida import ICONO_TAREA, acortar_etiqueta_boton, con_icono
+    from leda.salida import ICONO_TAREA, acortar_etiqueta_boton, con_icono
 
     titulo = "Actualizar el dashboard de HMI (simulado)"
     acortada = acortar_etiqueta_boton(titulo)
@@ -1148,7 +1148,7 @@ def test_aclaracion_acepta_la_etiqueta_con_icono_acortada_y_con_sufijo():
 
 
 def test_aclaracion_con_icono_sigue_fallando_si_el_titulo_es_otro():
-    from prisma.salida import ICONO_TAREA, con_icono
+    from leda.salida import ICONO_TAREA, con_icono
 
     r = comprobar_aclaracion(
         (con_icono("Revisar tablero máq. 4", ICONO_TAREA),),

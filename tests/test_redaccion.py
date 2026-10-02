@@ -13,13 +13,13 @@ import dataclasses
 import pytest
 import yaml
 
-from prisma import redaccion
-from prisma.db import admin, espacio
-from prisma.resultado_turno import (
+from leda import redaccion
+from leda.db import admin, espacio
+from leda.resultado_turno import (
     Cambio, Falta, OpcionDisponible, Rechazo, ResultadoTurno, Resumen, SinCambio,
     Estado, ValorAceptado,
 )
-from prisma.valores import TipoValor
+from leda.valores import TipoValor
 from tests.conftest import RAIZ
 
 
@@ -65,7 +65,7 @@ def test_el_pack_de_corework_siembra_la_variante_b(corework, conn):
 @pytest.mark.parametrize("variante", ["A", "B"])
 def test_el_importador_siembra_la_variante_que_declara_el_pack(
         conn, tmp_path, variante):
-    from prisma.importador import importar
+    from leda.importador import importar
 
     pack = yaml.safe_load(
         (RAIZ / "espacios" / "corework.yaml").read_text("utf-8"))
@@ -79,7 +79,7 @@ def test_el_importador_siembra_la_variante_que_declara_el_pack(
 
 
 def test_un_pack_sin_seccion_de_conversacion_no_siembra_nada(conn, tmp_path):
-    from prisma.importador import importar
+    from leda.importador import importar
 
     pack = yaml.safe_load(
         (RAIZ / "espacios" / "corework.yaml").read_text("utf-8"))
@@ -97,7 +97,7 @@ def test_un_pack_sin_seccion_de_conversacion_no_siembra_nada(conn, tmp_path):
 
 
 def test_un_pack_con_una_variante_desconocida_advierte(conn, tmp_path):
-    from prisma.importador import importar
+    from leda.importador import importar
 
     pack = yaml.safe_load(
         (RAIZ / "espacios" / "corework.yaml").read_text("utf-8"))
@@ -213,7 +213,7 @@ class _CursorQueAnota:
 
 def _ajustes_sembrados(pack: dict) -> dict:
     import json
-    from prisma.importador import _importar_ajustes
+    from leda.importador import _importar_ajustes
 
     cur = _CursorQueAnota()
     _importar_ajustes(cur, "ws-1", pack)
@@ -237,7 +237,7 @@ def test_el_pack_de_corework_declara_la_variante_b():
 
 
 def test_el_pack_no_rechaza_la_seccion_conversacion():
-    from prisma.importador import validar
+    from leda.importador import validar
 
     pack = yaml.safe_load(
         (RAIZ / "espacios" / "corework.yaml").read_text("utf-8"))
@@ -246,7 +246,7 @@ def test_el_pack_no_rechaza_la_seccion_conversacion():
 
 
 def test_validar_advierte_de_una_variante_desconocida():
-    from prisma.importador import validar
+    from leda.importador import validar
 
     pack = yaml.safe_load(
         (RAIZ / "espacios" / "corework.yaml").read_text("utf-8"))

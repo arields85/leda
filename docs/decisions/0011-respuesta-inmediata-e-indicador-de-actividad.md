@@ -2,12 +2,12 @@
 
 - **Estado:** aceptada (usuario, 2026-09-27; implementación 2026-09-28)
 - **Fecha:** 2026-09-28
-- **Alcance:** `src/prisma/despachador.py` (`mantener_chat_activo`, borrador
-  nativo); `src/prisma/gateway.py` (`_despachar_ahora`, `_transporte_de`, el
-  llamado a `mantener_chat_activo`); `src/prisma/local.py`
+- **Alcance:** `src/leda/despachador.py` (`mantener_chat_activo`, borrador
+  nativo); `src/leda/gateway.py` (`_despachar_ahora`, `_transporte_de`, el
+  llamado a `mantener_chat_activo`); `src/leda/local.py`
   (`Escucha._despachar_ahora`); `tests/test_smoke_runtime.py`,
   `tests/test_gateway.py`, `tests/test_local.py` (nuevo).
-- **Evidencia:** `D:\Proyectos\PRISMA-PACK-RECONSTRUCCION-20260925\05-TELEGRAM-INDICADOR-Y-ESCRIBIENDO.md`
+- **Evidencia:** `D:\Proyectos\LEDA-PACK-RECONSTRUCCION-20260925\05-TELEGRAM-INDICADOR-Y-ESCRIBIENDO.md`
   (mecanismo recuperado: semilla U+2063, `initial_status_delay_seconds: 1.5`,
   retiro por mensaje transitorio); decisión del usuario, 2026-09-27 (el
   indicador nunca aparece si la respuesta ya está lista); mapa de código de
@@ -29,10 +29,10 @@ Dos problemas separados, encontrados juntos por el mismo mapeo:
    para una respuesta que ya estaba lista en milisegundos -- y se apagaba
    cuando `_turno` terminaba de CALCULAR, no cuando la respuesta
    efectivamente salía. No existía ningún borrador nativo (`sendMessageDraft`):
-   el pack recuperado documenta que Prisma ya lo tuvo, con una semilla
+   el pack recuperado documenta que Leda ya lo tuvo, con una semilla
    invisible (U+2063) y un umbral de 1.5 s antes de mostrar nada.
 
-Constitución §10 ya fija el límite: "Mientras procesa, Prisma muestra a lo
+Constitución §10 ya fija el límite: "Mientras procesa, Leda muestra a lo
 sumo el indicador de escritura y un estado temporal breve. No muestra pasos
 intermedios." Esta unidad no cambia ese límite: lo hace cumplir con un
 umbral (nunca destella en una respuesta rápida) y agrega la segunda señal
@@ -69,7 +69,7 @@ del módulo), pero también es el punto que ejercitan directamente unas 35
 suites de prueba de comportamiento (`test_botones.py`, `test_menu_tarea.py`,
 etc., casi todas contra `_turno`) más el corredor de escenarios
 `tests/banco/corrida.py` (usado por `test_task_intake.py` y otros), que
-corren con un token de bot ficticio (`PRISMA_BOT_TOKEN_COREWORK`) y esperan
+corren con un token de bot ficticio (`LEDA_BOT_TOKEN_COREWORK`) y esperan
 que `message_outbox` quede en `'listo'`, sin que nada intente hablarle a
 Telegram. Despachar ahí adentro habría exigido auditar y potencialmente
 tocar cada una de esas suites para evitar una llamada de red real o un
@@ -145,7 +145,7 @@ sin depender de que el despacho ocurra rápido.
 
 ### 4. Excepción acotada a "todo lo visible sale por la cola"
 
-`nucleo/mecanica-pm.md` §12 y la regla del proyecto dicen que Prisma nunca
+`nucleo/mecanica-pm.md` §12 y la regla del proyecto dicen que Leda nunca
 le habla a Telegram directamente; todo pasa por `message_outbox`. El typing
 y `acusar_toque` ya eran la excepción documentada (comentario de
 `acusar_toque`, arriba en este archivo); el borrador se suma a esa MISMA
@@ -209,7 +209,7 @@ proyecto sin necesidad: no cuesta nada hacerlas visibles sin inundar.
   punto como no verificado ("si el adaptador interpreta notificaciones de
   otro modo puede haber efectos visuales/sonoros"). Un mensaje que se borra
   al instante no tiene por qué sonar o vibrar en el teléfono de nadie;
-  silencioso es el default más seguro para Prisma, que ya evita interrumpir
+  silencioso es el default más seguro para Leda, que ya evita interrumpir
   fuera de horario.
 
 ## Consecuencias
@@ -226,7 +226,7 @@ proyecto sin necesidad: no cuesta nada hacerlas visibles sin inundar.
 - `mantener_chat_activo` gana `cur`/`workspace_id` (opcionales, sólo para el
   incidente de una falla al retirar); `gateway.procesar_update` le pasa el
   mismo `cur`/`workspace_id` que ya usa para el turno. Un incidente nuevo,
-  `etapa='indicador_actividad'`, puede aparecer en `python -m prisma
+  `etapa='indicador_actividad'`, puede aparecer en `python -m leda
   incidentes <espacio>` -- sólo por una falla al RETIRAR el borrador, nunca
   por typing ni por mandarlo, y deduplicado por proceso.
 - **Pendiente, fuera de esta unidad:** renovar el borrador más allá de sus

@@ -20,7 +20,7 @@
 -- `resolver_ingreso_borrador` trata ese token como inexistente. Un
 -- `create or replace` conserva dueño y privilegios.
 begin;
-set search_path = prisma, public;
+set search_path = leda, public;
 
 -- Fail closed if an invoking text pipeline decoded the UTF-8 file incorrectly.
 -- chr() builds the expected value independently from non-ASCII source bytes.
@@ -36,23 +36,23 @@ end $$;
 do $$ begin
   if not exists (
       select 1 from information_schema.columns
-       where table_schema = 'prisma' and table_name = 'message_outbox'
+       where table_schema = 'leda' and table_name = 'message_outbox'
          and column_name = 'es_bienvenida') then
     raise exception '0020 requires 0019_marca_de_bienvenida.sql';
   end if;
   if exists (
       select 1 from information_schema.columns
-       where table_schema = 'prisma' and table_name = 'message_outbox'
+       where table_schema = 'leda' and table_name = 'message_outbox'
          and column_name = 'bloque_copiable') then
     raise exception '0020 ya está aplicada.';
   end if;
-  if to_regprocedure('prisma.resolver_ingreso_borrador(uuid,text,bigint,bigint)') is null then
+  if to_regprocedure('leda.resolver_ingreso_borrador(uuid,text,bigint,bigint)') is null then
     raise exception '0020 requires resolver_ingreso_borrador(uuid,text,bigint,bigint)';
   end if;
 end $$;
 
 -- Una columna nueva, nula por omisión, no toca privilegios ni dueño de la
--- tabla: prisma_app ya tiene el juego completo sobre message_outbox (bucle
+-- tabla: leda_app ya tiene el juego completo sobre message_outbox (bucle
 -- genérico de `db/esquema.sql`). Sin concesión que agregar.
 alter table message_outbox add column bloque_copiable text;
 
@@ -64,9 +64,9 @@ create or replace function resolver_ingreso_borrador(p_workspace_id uuid, p_toke
                                                      p_chat_id bigint)
 returns table (resultado text, task_id uuid, pending_action_id uuid, replay boolean)
 language plpgsql security definer
-set search_path = prisma, public, pg_temp as $$
+set search_path = leda, public, pg_temp as $$
 begin
-  perform set_config('prisma.workspace_id', p_workspace_id::text, true);
+  perform set_config('leda.workspace_id', p_workspace_id::text, true);
   -- Modificar no confirma (T9-R1c-3): su token nunca llega a la conversión.
   if exists (select 1 from pending_action_option o
               where o.token = p_token and o.workspace_id = p_workspace_id

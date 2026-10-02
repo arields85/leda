@@ -8,16 +8,16 @@
 -- esperen la revisión de quien los pidió (sus tokens de "enviar" llegarían a la
 -- conversión). `create or replace` conserva dueño y privilegios.
 begin;
-set search_path = prisma, public;
+set search_path = leda, public;
 
 create or replace function resolver_ingreso_borrador(p_workspace_id uuid, p_token text,
                                           p_telegram_user_id bigint,
                                           p_chat_id bigint)
 returns table (resultado text, task_id uuid, pending_action_id uuid, replay boolean)
 language plpgsql security definer
-set search_path = prisma, public, pg_temp as $$
+set search_path = leda, public, pg_temp as $$
 begin
-  perform set_config('prisma.workspace_id', p_workspace_id::text, true);
+  perform set_config('leda.workspace_id', p_workspace_id::text, true);
   -- Modificar no confirma (T9-R1c-3): su token nunca llega a la conversión.
   if exists (select 1 from pending_action_option o
               where o.token = p_token and o.workspace_id = p_workspace_id

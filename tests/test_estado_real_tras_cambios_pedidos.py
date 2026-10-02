@@ -1,7 +1,7 @@
 """El estado real de una tarea tras "Pedir cambios" (R4-H8, ADR 0013 regla 3).
 
 En la cuarta ronda por Telegram, después de que Ismael pidió cambios (con su
-motivo), Ariel preguntó por su tarea y Prisma contestó "sigue en curso… No tuvo
+motivo), Ariel preguntó por su tarea y Leda contestó "sigue en curso… No tuvo
 cambios de estado." -- falso, y sin el motivo que el menú de la misma tarea sí
 muestra ("Cambios pedidos por …: …"). El servidor tiene que decir el estado real
 sin depender de cómo lo redacte el modelo:
@@ -18,11 +18,11 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from prisma import herramientas as H
-from prisma.agente import responder
-from prisma.calendario import Calendario
-from prisma.db import admin, espacio
-from prisma.llm import Llamada, ProveedorGuionado, Respuesta
+from leda import herramientas as H
+from leda.agente import responder
+from leda.calendario import Calendario
+from leda.db import admin, espacio
+from leda.llm import Llamada, ProveedorGuionado, Respuesta
 
 from tests.banco.corrida import sembrar_precondiciones
 from tests.test_menu_tarea import _quien
@@ -274,7 +274,7 @@ def test_un_motivo_largo_dicho_entero_no_se_repite(corework, conn):
 # ---------------------------------------------------------------------------
 
 def _guarda(conn, ws, claras, texto):
-    from prisma.agente import _cambios_pedidos_sin_mencionar
+    from leda.agente import _cambios_pedidos_sin_mencionar
 
     with espacio(conn, ws) as cur:
         return _cambios_pedidos_sin_mencionar(cur, texto, claras)
@@ -283,7 +283,7 @@ def _guarda(conn, ws, claras, texto):
 def test_aplicar_la_guarda_dos_veces_con_un_motivo_largo_da_lo_mismo(corework, conn):
     """La línea que agrega lleva el motivo acotado con puntos suspensivos: la
     segunda aplicación tiene que reconocerla, no agregarla otra vez."""
-    from prisma.menu_tarea import LIMITE_MOTIVO_CAMBIOS
+    from leda.menu_tarea import LIMITE_MOTIVO_CAMBIOS
 
     ws = corework.workspace_id
     motivo = "falta el detalle de la captura " * 20
@@ -314,8 +314,8 @@ def test_aplicar_la_guarda_dos_veces_con_el_titulo_dentro_del_motivo_da_lo_mismo
 
 def test_quien_pidio_los_cambios_con_un_nombre_en_blanco_no_rompe_la_guarda(
         monkeypatch):
-    from prisma import menu_tarea
-    from prisma.agente import _cambios_pedidos_sin_mencionar
+    from leda import menu_tarea
+    from leda.agente import _cambios_pedidos_sin_mencionar
 
     pedido = menu_tarea.CambiosPedidos(
         motivo=MOTIVO, linea=f"Cambios pedidos por    : {MOTIVO}", por="   ",

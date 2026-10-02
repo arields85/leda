@@ -6,10 +6,10 @@ nunca en silencio."""
 
 from __future__ import annotations
 
-from prisma import ingreso_tareas as I
-from prisma import jev
-from prisma.db import admin, espacio
-from prisma.jev import ClienteJevGuionado
+from leda import ingreso_tareas as I
+from leda import jev
+from leda.db import admin, espacio
+from leda.jev import ClienteJevGuionado
 
 from tests.test_alta_guiada_flujo import TITULO, _campo, _conjunto_activo, _empezar
 from tests.test_task_intake import NOW, _active_choices

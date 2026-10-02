@@ -3,7 +3,7 @@ objetivo: >
   Quien confirma el borrador de otra persona lo rechaza con un motivo (T9-R1c-5,
   decisión del usuario, 2026-09-30; ADR 0013 reglas 1, 2 y 4). Marcos pidió el alta
   de una tarea suya y ya la envió a su aprobador, Ismael. Ismael toca Rechazar
-  (no Cancelar): Prisma le pregunta el motivo -- la misma pregunta de texto libre
+  (no Cancelar): Leda le pregunta el motivo -- la misma pregunta de texto libre
   que "Pedir cambios" --, y con el motivo cancela el borrador y le dice a Ismael, en
   una sola respuesta, que lo rechazó y le avisó a Marcos. No se crea ninguna tarea.
 actor: Ismael Soschinski

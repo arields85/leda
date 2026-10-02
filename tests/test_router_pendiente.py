@@ -13,8 +13,8 @@ from types import SimpleNamespace
 
 import pytest
 
-import prisma.llm as llm
-from prisma.llm import (IntentAction, IntentRoute, Llamada, ProveedorAnthropic,
+import leda.llm as llm
+from leda.llm import (IntentAction, IntentRoute, Llamada, ProveedorAnthropic,
                          ProveedorCompatible, ProveedorGemini, ProveedorGuionado,
                          RespectoPendiente, RouteEnvelope, RoutingError)
 

@@ -3,7 +3,7 @@ variante_de: b-0020
 objetivo: >
   Variante de b-0020: con Modificar tocado, la persona deja de lado lo que
   iba a corregir. Se cierra sin efectos, se dice que la propuesta quedó sin
-  aplicar y Prisma no vuelve a preguntar qué cambiar.
+  aplicar y Leda no vuelve a preguntar qué cambiar.
 actor: Nahuel Gimenez
 mensajes:
   - "quedé trabado con el cableado, todavía no me pasaron el plano que prometieron"

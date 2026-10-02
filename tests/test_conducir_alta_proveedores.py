@@ -18,9 +18,9 @@ import httpx
 import openai
 import pytest
 
-from prisma import llm
-from prisma.alta_turno import ESQUEMA_SALIDA, NOMBRE_HERRAMIENTA
-from prisma.llm import (ProveedorAnthropic, ProveedorCompatible, ProveedorGemini,
+from leda import llm
+from leda.alta_turno import ESQUEMA_SALIDA, NOMBRE_HERRAMIENTA
+from leda.llm import (ProveedorAnthropic, ProveedorCompatible, ProveedorGemini,
                         ProveedorGuionado, SalidaDeConduccionInvalida)
 
 SALIDA = {"intencion": "continuar", "texto": "Dale. ¿Para cuándo?",
@@ -32,7 +32,7 @@ HECHOS = '{"faltan": ["title"]}'
 
 # --------------------------------------------------------- el historial
 
-def test_el_historial_se_alterna_sin_empezar_por_prisma():
+def test_el_historial_se_alterna_sin_empezar_por_leda():
     mensajes = llm._alternados([
         {"role": "assistant", "content": "arranque"},
         {"role": "user", "content": "uno"},

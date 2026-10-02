@@ -10,7 +10,7 @@
 -- workspace would repeat the mistake the boundary already rejects -- trusting
 -- the caller for the space it operates on.
 begin;
-set search_path = prisma, public;
+set search_path = leda, public;
 
 -- Fail closed if an invoking text pipeline decoded the UTF-8 file incorrectly.
 -- chr() builds the expected value independently from non-ASCII source bytes.
@@ -24,7 +24,7 @@ do $$ begin
 end $$;
 
 do $$ begin
-  if not exists (select 1 from pg_roles where rolname = 'prisma_owner') then
+  if not exists (select 1 from pg_roles where rolname = 'leda_owner') then
     raise exception '0006 requires 0004_function_ownership.sql';
   end if;
 end $$;
@@ -45,21 +45,21 @@ create index acceso_tablero_vencimiento on acceso_tablero (vence_en);
 -- Sin política de aislamiento, a propósito y a diferencia del resto del
 -- esquema: la búsqueda del token ocurre ANTES de saber a qué espacio
 -- pertenece, así que una política por espacio no tendría contra qué comparar.
--- Lo que protege esta tabla es que nadie la consulta: `prisma_app` no recibe
+-- Lo que protege esta tabla es que nadie la consulta: `leda_app` no recibe
 -- ningún privilegio sobre ella, sólo `execute` sobre las dos funciones de
 -- abajo, que son la única puerta.
 revoke all on acceso_tablero from public;
 
 -- --- Emisión --------------------------------------------------------------
 
--- El espacio no se recibe: sale de la membresía. Como `prisma_owner` no
+-- El espacio no se recibe: sale de la membresía. Como `leda_owner` no
 -- saltea la RLS, esa búsqueda queda filtrada al espacio de la sesión, así que
 -- una membresía de otro cliente no se encuentra y falla idéntico a una
 -- inexistente. Decir "no tenés permiso" confirmaría que existe.
 create or replace function emitir_acceso_tablero(
     p_membership_id uuid, p_token_hash text, p_vence_en timestamptz)
 returns uuid
-language plpgsql security definer set search_path = prisma, public, pg_temp as $$
+language plpgsql security definer set search_path = leda, public, pg_temp as $$
 declare espacio uuid;
         nuevo uuid;
 begin
@@ -87,7 +87,7 @@ end $$;
 -- ya corre acotada al espacio correcto.
 create or replace function resolver_acceso_tablero(p_token_hash text)
 returns table (workspace_id uuid, membership_id uuid)
-language plpgsql security definer set search_path = prisma, public, pg_temp as $$
+language plpgsql security definer set search_path = leda, public, pg_temp as $$
 declare acceso acceso_tablero%rowtype;
 begin
   select * into acceso from acceso_tablero a
@@ -96,7 +96,7 @@ begin
     return;
   end if;
 
-  perform set_config('prisma.workspace_id', acceso.workspace_id::text, true);
+  perform set_config('leda.workspace_id', acceso.workspace_id::text, true);
 
   if not exists (select 1 from membership m
                   where m.id = acceso.membership_id and m.activo) then
@@ -110,22 +110,22 @@ end $$;
 
 -- Las concesiones generales del esquema alcanzaron a las tablas que existían
 -- cuando se ejecutaron; esta es nueva y necesita las suyas explícitas. Sin la
--- de `prisma_owner` fallan las funciones, y sin la de `prisma_admin` una base
+-- de `leda_owner` fallan las funciones, y sin la de `leda_admin` una base
 -- migrada diverge de una instalación limpia, donde el `grant all on all
 -- tables` del final del esquema sí la alcanza.
-grant select, insert on acceso_tablero to prisma_owner;
-grant all on acceso_tablero to prisma_admin;
+grant select, insert on acceso_tablero to leda_owner;
+grant all on acceso_tablero to leda_admin;
 
 alter function emitir_acceso_tablero(uuid, text, timestamptz)
-  owner to prisma_owner;
+  owner to leda_owner;
 alter function resolver_acceso_tablero(text)
-  owner to prisma_owner;
+  owner to leda_owner;
 
 revoke execute on function emitir_acceso_tablero(uuid, text, timestamptz)
   from public;
 revoke execute on function resolver_acceso_tablero(text) from public;
 grant execute on function emitir_acceso_tablero(uuid, text, timestamptz)
-  to prisma_app;
-grant execute on function resolver_acceso_tablero(text) to prisma_app;
+  to leda_app;
+grant execute on function resolver_acceso_tablero(text) to leda_app;
 
 commit;

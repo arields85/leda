@@ -7,7 +7,7 @@ from datetime import date
 
 import pytest
 
-from prisma.valores import (Aceptado, MotivoRechazo, Rechazado, TipoValor,
+from leda.valores import (Aceptado, MotivoRechazo, Rechazado, TipoValor,
                             ValorEsperado, sumar_meses, validar_valor)
 
 HOY = date(2026, 10, 1)
@@ -58,7 +58,7 @@ def test_sin_margen_no_hay_limite_superior():
 
 def test_el_rechazo_por_fecha_lejana_no_ofrece_tomarla_como_objetivo():
     # Crear un objetivo desde el alta no existe (roadmap): no se ofrece.
-    from prisma.valores import MotivoRechazo
+    from leda.valores import MotivoRechazo
     r = _validar("2027-08-15")
     assert r.motivo is MotivoRechazo.FECHA_LEJANA
     assert "objetivo" not in r.se_acepta.lower()

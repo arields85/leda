@@ -2,15 +2,15 @@
 
 - **Estado:** aceptada (usuario, 2026-09-27)
 - **Fecha:** 2026-09-27
-- **Alcance:** `aprobar_tarea` (`src/prisma/herramientas.py`), el menú de tarea en
-  `en_revision` (`src/prisma/menu_tarea.py`) y los mensajes posteriores a confirmar por
-  botón (`src/prisma/gateway.py`)
-- **Evidencia:** sesión 2 por Telegram real, 2026-09-27, hallazgo 5 (`odd/tasks/prisma-orienta.md`)
+- **Alcance:** `aprobar_tarea` (`src/leda/herramientas.py`), el menú de tarea en
+  `en_revision` (`src/leda/menu_tarea.py`) y los mensajes posteriores a confirmar por
+  botón (`src/leda/gateway.py`)
+- **Evidencia:** sesión 2 por Telegram real, 2026-09-27, hallazgo 5 (`odd/tasks/leda-orienta.md`)
 
 ## Contexto
 
 Ismael, el aprobador, tocó el menú de una tarea → "Aprobar" → vista previa → Confirmar.
-Prisma contestó "Hecho. Tarea: Dashboard de lotes en CoreLabs (simulado) · Estado
+Leda contestó "Hecho. Tarea: Dashboard de lotes en CoreLabs (simulado) · Estado
 actual: En revisión · se aprueba el trabajo". La base quedó así:
 
 - `audit_log` registró `herramienta:aprobar_tarea`;
@@ -44,7 +44,7 @@ el resultado -- "Estado actual: En revisión" después de que la aprobación (o 
    negocio para "cerrar por aprobación": es la regla de cierre de siempre, ejecutada
    una vez más, después de insertar la aprobación.
 4. **Si falta algo más, la tarea queda en `en_revision`, con la aprobación igual
-   registrada, y Prisma dice exactamente qué falta.** No es una pregunta abierta: es
+   registrada, y Leda dice exactamente qué falta.** No es una pregunta abierta: es
    el mismo texto que devuelve `motivo_no_cierra_tarea` (evidencia, un bloqueo, una
    dependencia bloqueante).
 5. **El responsable se entera.** Un aviso por outbox, con el mismo mecanismo que el
@@ -70,7 +70,7 @@ la tarea `en_revision`, y el responsable (o el aprobador) tiene que volver a toc
 comprobación determinista sobre condiciones que **ya están cumplidas o no** en el
 momento de aprobar -- no depende de ningún juicio adicional que el segundo toque
 fuera a aportar. Pedirlo igual es la burocracia que el principio del usuario
-("Prisma ayuda y orienta, nunca agrega burocracia") rechaza explícitamente: un paso
+("Leda ayuda y orienta, nunca agrega burocracia") rechaza explícitamente: un paso
 mecánico, sin criterio propio, que sólo repite lo que la base ya puede decidir sola.
 
 Lo que la constitución protege -- que aprobar y cerrar queden como hechos auditables
@@ -87,10 +87,10 @@ este caso son el mismo instante porque no había ninguna otra condición pendien
   condición ya se evaluó al aprobar -- y deja una ventana en la que la tarea aparenta
   seguir "en revisión" cuando en los hechos ya no falta nada. Rechazada por el
   principio de no agregar burocracia.
-- **Actos separados, con Prisma preguntando "¿la cierro también?"** Vuelve a
-  `nucleo/mecanica-pm.md`: "Prisma nunca cambia un estado por inferencia" no aplica
+- **Actos separados, con Leda preguntando "¿la cierro también?"** Vuelve a
+  `nucleo/mecanica-pm.md`: "Leda nunca cambia un estado por inferencia" no aplica
   acá (el cierre sigue siendo la comprobación determinista, no una inferencia), pero
-  la pregunta abierta contradice ADR 0007 ("Prisma orienta, no charla"): si la
+  la pregunta abierta contradice ADR 0007 ("Leda orienta, no charla"): si la
   condición ya se puede evaluar, no hace falta preguntar para saber la respuesta.
   Rechazada.
 

@@ -9,8 +9,8 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-from prisma.db import admin, espacio
-from prisma.lectura import (avance_de_objetivos, bloqueos_abiertos,
+from leda.db import admin, espacio
+from leda.lectura import (avance_de_objetivos, bloqueos_abiertos,
                             carga_por_persona, tareas_por_estado,
                             tareas_vencidas, trabajo_esperando_aprobacion)
 

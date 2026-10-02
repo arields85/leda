@@ -37,11 +37,11 @@ from __future__ import annotations
 
 import pytest
 
-from prisma import gateway
-from prisma.agente import _TEXTO_BOTONES_GENERICO
-from prisma.db import admin
-from prisma.llm import Llamada, RespectoPendiente, Respuesta
-from prisma.respuesta_unica import (ETAPA_RESPUESTA_DUPLICADA,
+from leda import gateway
+from leda.agente import _TEXTO_BOTONES_GENERICO
+from leda.db import admin
+from leda.llm import Llamada, RespectoPendiente, Respuesta
+from leda.respuesta_unica import (ETAPA_RESPUESTA_DUPLICADA,
                                     ETAPA_SIN_RESPUESTA, grupo_de)
 
 from tests.test_menu_tarea import _mensaje, cliente  # noqa: F401

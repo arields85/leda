@@ -14,10 +14,10 @@ from zoneinfo import ZoneInfo
 import httpx
 import pytest
 
-from prisma import ciclo, reloj
-from prisma.calendario import Calendario
-from prisma.db import admin, espacio
-from prisma.despachador import TransporteDePrueba
+from leda import ciclo, reloj
+from leda.calendario import Calendario
+from leda.db import admin, espacio
+from leda.despachador import TransporteDePrueba
 
 BA = ZoneInfo("America/Argentina/Buenos_Aires")
 
@@ -51,7 +51,7 @@ def _tarea(cur, ws, *, area="ot", persona="Marcos Tarquini", vence=None,
     t = cur.fetchone()["id"]
     cur.execute(
         "insert into task_state_event (task_id, estado_nuevo, actor_kind) "
-        "values (%s, %s, 'prisma')", (t, estado))
+        "values (%s, %s, 'leda')", (t, estado))
     return t
 
 
@@ -77,7 +77,7 @@ def _esperar_bloqueada_por_lock(uri: str, pid: int, *, timeout: float = 5.0) -> 
     """Espera hasta que el proceso `pid` quede bloqueado esperando un lock,
     sondeando `pg_stat_activity` -- reemplaza un `sleep` fijo, que es lento
     en el caso normal y flaco bajo carga (R3-003, revisión 2026-09-28)."""
-    from prisma.db import conectar
+    from leda.db import conectar
 
     polling = conectar(uri)
     try:
@@ -461,8 +461,8 @@ def test_ejecutar_ciclo_espacio_sin_cadencias_no_encola_pero_despacha_igual(
 
 def test_ciclo_tick_despacha_admin_una_sola_vez_con_dos_espacios(
         conn, corework, monkeypatch):
-    from prisma import incidentes
-    from prisma.db import registrar_auditoria
+    from leda import incidentes
+    from leda.db import registrar_auditoria
 
     with admin(conn) as cur:
         ws2 = _espacio_activo(cur, "segundo-equipo")
@@ -481,8 +481,8 @@ def test_ciclo_tick_despacha_admin_una_sola_vez_con_dos_espacios(
             etapa="prueba_directa")
     conn.commit()
 
-    monkeypatch.setenv("PRISMA_BOT_TOKEN_SEGUNDO-EQUIPO", "tok-segundo")
-    monkeypatch.setenv("PRISMA_BOT_TOKEN_ADMIN", "tok-admin-ciclo")
+    monkeypatch.setenv("LEDA_BOT_TOKEN_SEGUNDO-EQUIPO", "tok-segundo")
+    monkeypatch.setenv("LEDA_BOT_TOKEN_ADMIN", "tok-admin-ciclo")
     transportes = _fake_transportes(monkeypatch)
 
     # `admin_notice.programado_para` sale de `now()` al registrar el
@@ -540,7 +540,7 @@ def test_ciclo_tick_excepcion_en_un_espacio_no_frena_los_demas(
         _espacio_activo(cur, "sin-calendario", con_calendario=False)
     conn.commit()
 
-    monkeypatch.setenv("PRISMA_BOT_TOKEN_SIN-CALENDARIO", "tok-roto")
+    monkeypatch.setenv("LEDA_BOT_TOKEN_SIN-CALENDARIO", "tok-roto")
     transportes = _fake_transportes(monkeypatch)
 
     c = ciclo.Ciclo(lambda: conn, arranque=datetime(2026, 1, 1, tzinfo=timezone.utc))
@@ -580,12 +580,12 @@ def test_ciclo_tick_corre_escalera_en_espacio_activo_sin_cadence_job(
         tid = cur.fetchone()["id"]
         cur.execute(
             "insert into task_state_event (task_id, estado_nuevo, actor_kind) "
-            "values (%s, 'asignada', 'prisma')", (tid,))
+            "values (%s, 'asignada', 'leda')", (tid,))
         cur.execute("select count(*) n from cadence_job where workspace_id = %s", (ws,))
         assert cur.fetchone()["n"] == 0   # sin cadencias configuradas
     conn.commit()
 
-    monkeypatch.setenv("PRISMA_BOT_TOKEN_NORTH-LAB", "tok-north-lab")
+    monkeypatch.setenv("LEDA_BOT_TOKEN_NORTH-LAB", "tok-north-lab")
     _fake_transportes(monkeypatch)
 
     c = ciclo.Ciclo(lambda: conn, arranque=datetime(2026, 7, 1, tzinfo=BA))
@@ -608,7 +608,7 @@ def test_despachar_no_reenvia_el_primero_si_el_segundo_falla_al_marcarse(
     contenerse y el `rollback` de la transacción entera -- compartida con la
     escalera -- devolvía a 'listo' TAMBIÉN los mensajes anteriores del mismo
     lote, que se reenviaban en la próxima pasada."""
-    from prisma import despachador as desp
+    from leda import despachador as desp
 
     ws = corework.workspace_id
     ahora = datetime(2026, 7, 27, 10, 0, tzinfo=BA)  # lunes, en horario
@@ -667,7 +667,7 @@ def test_intentar_envio_no_envia_si_falla_la_marca_de_enviado(
     """Si el UPDATE que marca 'enviado' falla, el mensaje NUNCA se manda:
     la marca -- el cambio de estado durable -- va antes del envío, no
     después."""
-    from prisma import despachador as desp
+    from leda import despachador as desp
 
     ws = corework.workspace_id
     ahora = datetime(2026, 7, 27, 10, 0, tzinfo=BA)  # lunes, en horario
@@ -709,7 +709,7 @@ def test_intentar_envio_conserva_la_marca_si_falla_guardar_el_id_de_telegram(
     Telegram: si ese UPDATE falla, la marca 'enviado' tiene que quedar en
     pie -- no se reenvía en la próxima pasada -- y el fallo se reporta sin
     el texto crudo de la excepción."""
-    from prisma import despachador as desp
+    from leda import despachador as desp
 
     ws = corework.workspace_id
     ahora = datetime(2026, 7, 27, 10, 0, tzinfo=BA)
@@ -778,7 +778,7 @@ def test_ejecutar_cadencia_evaluada_a_la_vez_por_dos_conexiones_no_duplica(
     `message_outbox` -- no una coordinación en Python -- así que tiene que
     seguir siéndolo bajo concurrencia real, no sólo en llamadas
     secuenciales."""
-    from prisma.db import conectar
+    from leda.db import conectar
 
     ws = corework.workspace_id
     with admin(conn) as cur:
@@ -840,8 +840,8 @@ def test_despachar_con_fila_tomada_por_otra_conexion_no_la_duplica(
     `escuchar` sobre el mismo espacio sin que ambos entreguen el mismo
     mensaje: mientras otra conexión sostiene el lock (transacción sin
     `commit` todavía), esta lo saltea en vez de bloquearse o reprocesarlo."""
-    from prisma.db import conectar
-    from prisma.despachador import despachar
+    from leda.db import conectar
+    from leda.despachador import despachar
 
     ws = corework.workspace_id
     with admin(conn) as cur:
@@ -857,9 +857,9 @@ def test_despachar_con_fila_tomada_por_otra_conexion_no_la_duplica(
     try:
         with otra.transaction():
             with otra.cursor() as cur_otra:
-                cur_otra.execute("set local role prisma_app")
+                cur_otra.execute("set local role leda_app")
                 cur_otra.execute(
-                    "select set_config('prisma.workspace_id', %s, true)", (ws,))
+                    "select set_config('leda.workspace_id', %s, true)", (ws,))
                 cur_otra.execute(
                     """select id from message_outbox
                         where workspace_id = %s and estado = 'listo'
@@ -933,9 +933,9 @@ def test_montar_default_es_con_cadencias_activas(conn):
 def test_escucha_tareas_de_fondo_dispara_cadencia_vencida_automaticamente(
         corework, conn):
     """Hasta ahora una cadencia sólo se disparaba a mano
-    (`python -m prisma correr`); `tareas_de_fondo` ahora la dispara sola
+    (`python -m leda correr`); `tareas_de_fondo` ahora la dispara sola
     cuando su cron ya venció."""
-    from prisma.local import Escucha
+    from leda.local import Escucha
 
     ws = corework.workspace_id
     with admin(conn) as cur:
@@ -955,7 +955,7 @@ def test_escucha_tareas_de_fondo_dispara_cadencia_vencida_automaticamente(
 
 def test_escucha_tareas_de_fondo_con_sin_cadencias_no_dispara_cadencia(
         corework, conn):
-    from prisma.local import Escucha
+    from leda.local import Escucha
 
     ws = corework.workspace_id
     with admin(conn) as cur:
@@ -981,7 +981,7 @@ def test_ciclo_no_repite_incidente_mientras_la_falla_persiste(
         _espacio_activo(cur, "persistente", con_calendario=False)
     conn.commit()
 
-    monkeypatch.setenv("PRISMA_BOT_TOKEN_PERSISTENTE", "tok-persistente")
+    monkeypatch.setenv("LEDA_BOT_TOKEN_PERSISTENTE", "tok-persistente")
     _fake_transportes(monkeypatch)
 
     c = ciclo.Ciclo(lambda: conn, arranque=datetime(2026, 1, 1, tzinfo=timezone.utc))
@@ -1005,7 +1005,7 @@ def test_ciclo_reporta_de_nuevo_tras_recuperarse_y_fallar_de_nuevo(
         ws = _espacio_activo(cur, "intermitente", con_calendario=False)
     conn.commit()
 
-    monkeypatch.setenv("PRISMA_BOT_TOKEN_INTERMITENTE", "tok-intermitente")
+    monkeypatch.setenv("LEDA_BOT_TOKEN_INTERMITENTE", "tok-intermitente")
     _fake_transportes(monkeypatch)
 
     c = ciclo.Ciclo(lambda: conn, arranque=datetime(2026, 1, 1, tzinfo=timezone.utc))
@@ -1044,7 +1044,7 @@ def test_ciclo_reporta_de_nuevo_tras_recuperarse_y_fallar_de_nuevo(
 
 def test_tareas_de_fondo_con_excepcion_no_rompe_y_reporta_una_vez(
         conn, corework, monkeypatch):
-    from prisma.local import Escucha
+    from leda.local import Escucha
 
     ws = corework.workspace_id
     e = Escucha(conn, "corework", ws, "tok")
@@ -1072,13 +1072,13 @@ def test_tareas_de_fondo_con_excepcion_no_rompe_y_reporta_una_vez(
 
 def test_tareas_de_fondo_la_consola_no_filtra_el_texto_crudo_del_error(
         conn, corework, monkeypatch, capsys):
-    from prisma.local import Escucha
+    from leda.local import Escucha
 
     ws = corework.workspace_id
     e = Escucha(conn, "corework", ws, "tok")
     e.transporte = TransporteDePrueba()
 
-    secreto = "postgresql://prisma_app:s3cr3t-p4ss@db.interno:5432/prisma"
+    secreto = "postgresql://leda_app:s3cr3t-p4ss@db.interno:5432/leda"
 
     def _revienta(*a, **k):
         raise RuntimeError(f"no se pudo conectar: {secreto}")
@@ -1095,7 +1095,7 @@ def test_tareas_de_fondo_la_consola_no_filtra_el_texto_crudo_del_error(
 
 def test_tareas_de_fondo_reporta_cadencia_rota_sin_frenar_escalera_ni_despacho(
         conn, corework, monkeypatch):
-    from prisma.local import Escucha
+    from leda.local import Escucha
 
     ws = corework.workspace_id
     with admin(conn) as cur:
@@ -1124,9 +1124,9 @@ def test_tareas_de_fondo_reporta_cadencia_rota_sin_frenar_escalera_ni_despacho(
 
 def test_tareas_de_fondo_avisa_admin_aunque_la_pasada_del_espacio_falle(
         conn, corework, monkeypatch):
-    from prisma import incidentes
-    from prisma.db import registrar_auditoria
-    from prisma.local import Escucha, _AdminBot
+    from leda import incidentes
+    from leda.db import registrar_auditoria
+    from leda.local import Escucha, _AdminBot
 
     ws = corework.workspace_id
     with admin(conn) as cur:
@@ -1165,7 +1165,7 @@ def test_tareas_de_fondo_avisa_admin_aunque_la_pasada_del_espacio_falle(
 # ---------------------------------------------------------------------------
 
 def test_transporte_telegram_cerrar_cierra_el_cliente_http():
-    from prisma.despachador import TransporteTelegram
+    from leda.despachador import TransporteTelegram
 
     class _ClienteFalso:
         def __init__(self) -> None:
@@ -1206,7 +1206,7 @@ def test_ciclo_reusa_el_transporte_admin_entre_pasadas(conn, corework, monkeypat
         return TransporteDePrueba()
 
     monkeypatch.setattr(ciclo, "TransporteTelegram", _fabrica)
-    monkeypatch.setenv("PRISMA_BOT_TOKEN_ADMIN", "tok-admin-reuso")
+    monkeypatch.setenv("LEDA_BOT_TOKEN_ADMIN", "tok-admin-reuso")
 
     c = ciclo.Ciclo(lambda: conn, arranque=datetime(2026, 1, 1, tzinfo=timezone.utc))
     ahora = datetime(2026, 1, 2, tzinfo=timezone.utc)
@@ -1231,12 +1231,12 @@ def test_ciclo_cierra_el_transporte_viejo_si_el_token_cambia(
             self.cerrado = True
 
     monkeypatch.setattr(ciclo, "TransporteTelegram", _TransporteFalso)
-    monkeypatch.setenv("PRISMA_BOT_TOKEN_COREWORK", "tok-v1")
-    # Esta máquina puede tener un PRISMA_BOT_TOKEN_ADMIN real en `.env`: sin
+    monkeypatch.setenv("LEDA_BOT_TOKEN_COREWORK", "tok-v1")
+    # Esta máquina puede tener un LEDA_BOT_TOKEN_ADMIN real en `.env`: sin
     # sacarlo, el ciclo construiría un segundo transporte (el de admin) y el
     # conteo de abajo, que es sobre el total, no sobre "corework" en
     # particular, no sería determinístico.
-    monkeypatch.delenv("PRISMA_BOT_TOKEN_ADMIN", raising=False)
+    monkeypatch.delenv("LEDA_BOT_TOKEN_ADMIN", raising=False)
 
     c = ciclo.Ciclo(lambda: conn, arranque=datetime(2026, 1, 1, tzinfo=timezone.utc))
     ahora = datetime(2026, 1, 2, tzinfo=timezone.utc)
@@ -1246,7 +1246,7 @@ def test_ciclo_cierra_el_transporte_viejo_si_el_token_cambia(
     primero = creados[0]
     assert not primero.cerrado
 
-    monkeypatch.setenv("PRISMA_BOT_TOKEN_COREWORK", "tok-v2")
+    monkeypatch.setenv("LEDA_BOT_TOKEN_COREWORK", "tok-v2")
     c.tick(ahora=ahora)
 
     assert len(creados) == 2       # se construyó uno nuevo
@@ -1407,10 +1407,10 @@ def test_ciclo_tick_reconecta_en_la_proxima_pasada_tras_una_conexion_muerta_a_mi
     falla fatal, no un simple error de aplicación -- `_conectar` tiene que
     reemplazarla en la próxima pasada en vez de reintentar para siempre con
     una conexión muerta."""
-    from prisma.db import conectar
+    from leda.db import conectar
 
-    monkeypatch.setenv("PRISMA_BOT_TOKEN_COREWORK", "tok-reconexion")
-    monkeypatch.delenv("PRISMA_BOT_TOKEN_ADMIN", raising=False)
+    monkeypatch.setenv("LEDA_BOT_TOKEN_COREWORK", "tok-reconexion")
+    monkeypatch.delenv("LEDA_BOT_TOKEN_ADMIN", raising=False)
     _fake_transportes(monkeypatch)
 
     conexiones: list = []
@@ -1567,7 +1567,7 @@ def test_reportar_fallo_no_suprime_si_la_escritura_del_incidente_falla(
 # ---------------------------------------------------------------------------
 
 def test_pedido_telegram_traduce_un_401_con_descripcion_sin_token():
-    from prisma import despachador as desp
+    from leda import despachador as desp
 
     pedido = httpx.Request(
         "POST", f"https://api.telegram.org/bot{TOKEN_FALSO}/sendMessage")
@@ -1585,7 +1585,7 @@ def test_pedido_telegram_traduce_un_401_con_descripcion_sin_token():
 
 
 def test_pedido_telegram_traduce_un_500_sin_descripcion_sin_token():
-    from prisma import despachador as desp
+    from leda import despachador as desp
 
     pedido = httpx.Request(
         "POST", f"https://api.telegram.org/bot{TOKEN_FALSO}/sendMessage")
@@ -1603,7 +1603,7 @@ def test_pedido_telegram_traduce_un_500_sin_descripcion_sin_token():
 def test_pedido_telegram_traduce_un_error_de_conexion_que_lleva_la_url():
     """Un error de red puede traer la URL en su propio mensaje -- no sólo un
     `HTTPStatusError` -- y se traduce igual, sin mirar `str(e)` del original."""
-    from prisma import despachador as desp
+    from leda import despachador as desp
 
     url = f"https://api.telegram.org/bot{TOKEN_FALSO}/getUpdates"
     pedido = httpx.Request("GET", url)
@@ -1624,7 +1624,7 @@ def test_pedido_telegram_traduce_un_error_de_conexion_que_lleva_la_url():
 def test_pedido_telegram_corta_la_cadena_de_excepciones():
     """`from None`: ni `__cause__` ni el traceback del error ya traducido
     arrastran el original -- que sí llevaba el token."""
-    from prisma import despachador as desp
+    from leda import despachador as desp
 
     def _falla():
         raise RuntimeError(f"secreto en bot{TOKEN_FALSO}")
@@ -1638,14 +1638,14 @@ def test_pedido_telegram_corta_la_cadena_de_excepciones():
 
 
 def test_texto_error_seguro_no_retraduce_un_error_ya_traducido():
-    from prisma import despachador as desp
+    from leda import despachador as desp
 
     ya_traducido = desp.ErrorTelegram("HTTPStatusError HTTP 401: Unauthorized")
     assert desp.texto_error_seguro(ya_traducido) == str(ya_traducido)
 
 
 def test_acusar_toque_traduce_el_error_sin_filtrar_el_token():
-    from prisma import despachador as desp
+    from leda import despachador as desp
 
     class _ClienteQueFalla:
         def post(self, url, json=None):
@@ -1670,7 +1670,7 @@ def test_mantener_chat_activo_traduce_el_error_del_ping_de_typing(monkeypatch):
     cosmético) -- pero pasa por el mismo traductor que el resto de las
     llamadas a Telegram, así que si algún día deja de descartarse, ya no
     puede filtrar el token."""
-    from prisma import despachador as desp
+    from leda import despachador as desp
 
     capturados: list[Exception] = []
     original = desp.pedido_telegram
@@ -1708,7 +1708,7 @@ def test_despachar_no_guarda_el_token_en_ultimo_error_si_telegram_falla(
     Telegram es el que fallò (R1-001, revisión 2026-09-28): antes,
     `TransporteTelegram.enviar` dejaba escapar el `HTTPStatusError` de
     httpx tal cual, y su `str()` lleva la URL completa con el token."""
-    from prisma import despachador as desp
+    from leda import despachador as desp
 
     class _ClienteQueFalla:
         def post(self, url, json=None):

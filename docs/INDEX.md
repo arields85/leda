@@ -1,14 +1,14 @@
-# Documentación de Prisma
+# Documentación de Leda
 
 Esta base documental permite retomar el proyecto desde el estado vigente sin
 reconstruir decisiones desde conversaciones anteriores.
 
-Prisma es un producto de gestión de proyectos multi-tenant. CoreWork es su primer
+Leda es un producto de gestión de proyectos multi-tenant. CoreWork es su primer
 cliente, no su definición.
 
 ## Camino rápido
 
-1. Leer [`product/que-es-prisma.md`](product/que-es-prisma.md) para entender qué es
+1. Leer [`product/que-es-leda.md`](product/que-es-leda.md) para entender qué es
    el producto.
 2. Leer [`architecture/frontera.md`](architecture/frontera.md) para entender dónde
    termina el núcleo y qué reglas lo gobiernan.
@@ -21,7 +21,7 @@ cliente, no su definición.
 
 | Necesidad | Documento |
 |---|---|
-| Definición del producto y alcance | [`product/que-es-prisma.md`](product/que-es-prisma.md) |
+| Definición del producto y alcance | [`product/que-es-leda.md`](product/que-es-leda.md) |
 | Frontera entre núcleo y adaptadores | [`architecture/frontera.md`](architecture/frontera.md) |
 | Qué se aprovecha, corrige y descarta, y en qué orden | [`ROADMAP.md`](ROADMAP.md) |
 | Estado, riesgos y próximo paso | [`STATUS.md`](STATUS.md) |
@@ -33,7 +33,7 @@ cliente, no su definición.
 | Decisión sobre las dos superficies web separadas | [`decisions/0004-dos-superficies-separadas.md`](decisions/0004-dos-superficies-separadas.md) |
 | Decisión sobre interpretación, confirmación y aclaración con botones | [`decisions/0005-interpretacion-y-confirmacion.md`](decisions/0005-interpretacion-y-confirmacion.md) |
 | Decisión sobre Jev para resolver referencias y detectar la duda de intención | [`decisions/0006-jev-para-resolver-referencias-e-intencion.md`](decisions/0006-jev-para-resolver-referencias-e-intencion.md) |
-| Decisión sobre Prisma que orienta con opciones concretas, no charla | [`decisions/0007-prisma-orienta-no-charla.md`](decisions/0007-prisma-orienta-no-charla.md) |
+| Decisión sobre Leda que orienta con opciones concretas, no charla | [`decisions/0007-leda-orienta-no-charla.md`](decisions/0007-leda-orienta-no-charla.md) |
 | Decisión sobre que aprobar cierra la tarea, en el mismo acto, si se puede | [`decisions/0008-la-aprobacion-cierra-la-tarea.md`](decisions/0008-la-aprobacion-cierra-la-tarea.md) |
 | Decisión sobre entrega con evidencia y revisión | [`decisions/0009-entrega-con-evidencia-y-revision.md`](decisions/0009-entrega-con-evidencia-y-revision.md) |
 | Reglas para futuras sesiones | [`../AGENTS.md`](../AGENTS.md) |

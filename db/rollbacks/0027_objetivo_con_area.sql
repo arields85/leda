@@ -7,7 +7,7 @@
 -- volver a darla al reaplicar la migración) y la restricción única de `area` que
 -- sostenía la clave foránea.
 begin;
-set search_path = prisma, public;
+set search_path = leda, public;
 
 drop index if exists objective_area;
 alter table objective drop constraint if exists objective_area_workspace;

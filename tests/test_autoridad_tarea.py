@@ -1,4 +1,4 @@
-"""T2b (`prisma-orienta`): autoridad sobre tareas ajenas.
+"""T2b (`leda-orienta`): autoridad sobre tareas ajenas.
 
 Hallazgo del orquestador, evidencia de la sesión real por Telegram del
 2026-09-25: sin un chequeo explícito, `actualizar_estado`, `registrar_bloqueo`
@@ -26,7 +26,7 @@ Decisiones (citas de `nucleo/`):
   (`test_menu_aprobador_en_revision`, `test_menu_aprobador_otro_estado`):
   el aprobador nunca ve un botón que cambie el estado, sólo "Aprobar".
 - `adjuntar_evidencia`: responsable O aprobador. `nucleo/mecanica-pm.md` §6
-  lista "confirmación del referente" entre la evidencia que Prisma
+  lista "confirmación del referente" entre la evidencia que Leda
   solicita -- el aprobador de la tarea (`puede_aprobar_tarea`, un solo
   nivel: a un integrante lo aprueba su referente) también puede adjuntarla.
 """
@@ -37,13 +37,13 @@ from datetime import datetime, timezone
 
 import pytest
 
-from prisma import herramientas as H
-from prisma import menu_tarea as M
-from prisma.agente import responder
-from prisma.autoridad import Canal, Denegado, identificar
-from prisma.calendario import Calendario
-from prisma.db import admin, espacio
-from prisma.llm import Llamada, ProveedorGuionado, Respuesta
+from leda import herramientas as H
+from leda import menu_tarea as M
+from leda.agente import responder
+from leda.autoridad import Canal, Denegado, identificar
+from leda.calendario import Calendario
+from leda.db import admin, espacio
+from leda.llm import Llamada, ProveedorGuionado, Respuesta
 
 
 def _quien(cur, nombre, ws):
@@ -70,7 +70,7 @@ def _tarea(cur, ws, *, titulo="Programar HMI línea 2", area="ot",
         (ws, obj, titulo, ws, area, ws, persona))
     t = cur.fetchone()["id"]
     cur.execute("insert into task_state_event (task_id, estado_nuevo, actor_kind) "
-                "values (%s, %s, 'prisma')", (t, estado))
+                "values (%s, %s, 'leda')", (t, estado))
     return str(t)
 
 

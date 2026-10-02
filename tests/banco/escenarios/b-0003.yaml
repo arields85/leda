@@ -1,6 +1,6 @@
 id: b-0003
 objetivo: >
-  Observar si Prisma cierra el bloqueo correcto con su resolución cuando
+  Observar si Leda cierra el bloqueo correcto con su resolución cuando
   quien escribe es responsable de la tarea, sin volver a preguntar cuál
   bloqueo es.
 actor: Marcos Tarquini

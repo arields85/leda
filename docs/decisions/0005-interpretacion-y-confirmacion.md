@@ -2,13 +2,13 @@
 
 - **Estado:** aceptada
 - **Fecha:** 2026-09-24
-- **Alcance:** toda conversación en la que Prisma interpreta un mensaje y puede
+- **Alcance:** toda conversación en la que Leda interpreta un mensaje y puede
   producir un cambio
 - **Diseño y evidencia:** [`architecture/interpretacion-y-confirmacion.md`](../architecture/interpretacion-y-confirmacion.md)
 
 ## Decisión
 
-1. **Todo cambio relevante lleva vista previa y confirmación.** Prisma muestra qué
+1. **Todo cambio relevante lleva vista previa y confirmación.** Leda muestra qué
    va a cambiar —recurso, estado actual, estado nuevo— y que todavía no se aplicó
    nada, con **Confirmar**, **Modificar** y **Cancelar**. Sin Confirmar no hay
    efecto. Vale para mensajes claros y ambiguos.
@@ -41,7 +41,7 @@
    **Ninguna, lo escribo**. Elegir un botón lleva a la vista previa; no aplica nada.
    Sólo la ambigüedad que cambia el efecto frena; si no hay candidatos reales, se
    pide la referencia en texto, sin botones inventados.
-4. **Cuando Prisma pregunta, pregunta con botones.** Las respuestas posibles se
+4. **Cuando Leda pregunta, pregunta con botones.** Las respuestas posibles se
    ofrecen como opciones ("¿Terminaste la tarea?" → Sí / No / Todavía no sé). El
    texto libre queda para lo que no tiene opciones concretas.
 5. **Los apodos se aprenden preguntando.** Una referencia a una persona que no
@@ -54,7 +54,7 @@
 
 ## Por qué
 
-**Prisma adivinaba.** En el banco conversacional, una dependencia entre dos tareas
+**Leda adivinaba.** En el banco conversacional, una dependencia entre dos tareas
 existentes se tomó como pedido de tarea nueva en 10 de 10 corridas: el router veía
 sólo el texto.
 

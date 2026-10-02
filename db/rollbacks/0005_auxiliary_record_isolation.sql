@@ -7,7 +7,7 @@
 -- state 0005 found them in. Run this only to recover from a failed migration,
 -- never as a resting state: it restores cross-tenant audit forgery.
 begin;
-set search_path = prisma, public;
+set search_path = leda, public;
 
 drop policy if exists aislamiento_espacio on incident;
 alter table incident no force row level security;

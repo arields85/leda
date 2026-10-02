@@ -1,7 +1,7 @@
 """Dejar de lado una pregunta que no es un tema (R4-H2; ADR 0013).
 
 Cuarta ronda por Telegram: después de tocar "Quiero consultar otra cosa" sobre los
-botones del saludo, Prisma dijo "Dale, dejamos de lado «Hola Ariel, ¿en qué te
+botones del saludo, Leda dijo "Dale, dejamos de lado «Hola Ariel, ¿en qué te
 ayudo?». Escribime qué necesitás." Regla del usuario (2026-09-30): "Dale, escribime
 qué necesitás." Lo que se deja de lado se nombra sólo cuando es un tema real (una
 tarea, una propuesta, un alta); el saludo no lo es. Se decide por la marca
@@ -10,9 +10,9 @@ estructural que guarda la pregunta (`args.saludo`), nunca por su texto.
 
 from __future__ import annotations
 
-from prisma import pendientes as P
-from prisma.db import admin
-from prisma.llm import IntentAction, IntentRoute, ProveedorGuionado
+from leda import pendientes as P
+from leda.db import admin
+from leda.llm import IntentAction, IntentRoute, ProveedorGuionado
 
 from tests.test_pedir_cambios_extremo_a_extremo import (  # noqa: F401
     _mensaje, _opciones, _pendiente, _tg, _tocar, cliente)
@@ -22,7 +22,7 @@ CIERRE_SIN_TEMA = "Dale, escribime qué necesitás."
 
 def _guion(monkeypatch, *rutas):
     proveedor = ProveedorGuionado(guion=[], rutas=list(rutas))
-    monkeypatch.setattr("prisma.llm.desde_base", lambda cur, ws, key: proveedor)
+    monkeypatch.setattr("leda.llm.desde_base", lambda cur, ws, key: proveedor)
     return proveedor
 
 
@@ -45,7 +45,7 @@ def _ultimo_cuerpo(conn, ws, tg: int) -> str:
 def _abrir_generica(conn, ws, tg: int, pregunta: str, **marcas) -> None:
     from datetime import datetime, timedelta, timezone
 
-    from prisma.db import espacio
+    from leda.db import espacio
 
     from tests.test_pedir_cambios_extremo_a_extremo import _quien
 

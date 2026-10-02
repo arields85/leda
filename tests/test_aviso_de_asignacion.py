@@ -20,8 +20,8 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from prisma import gateway
-from prisma.db import admin
+from leda import gateway
+from leda.db import admin
 
 from tests.test_alta_conducida import (Chat, _en, _modelo,  # noqa: F401
                                        conversada, salida)
@@ -118,9 +118,9 @@ def test_el_aviso_de_asignacion_sale_por_el_despachador_fuera_del_tope(
         intake_world, conn, monkeypatch, authority_conn):
     from datetime import timedelta
 
-    from prisma.calendario import Calendario
-    from prisma.db import espacio
-    from prisma.despachador import TransporteDePrueba, despachar
+    from leda.calendario import Calendario
+    from leda.db import espacio
+    from leda.despachador import TransporteDePrueba, despachar
     from tests.test_task_intake import NOW
 
     rid, pid = _alta_en_confirmacion(conn, intake_world, responsable="Sam North")
@@ -148,10 +148,10 @@ def test_confirmando_una_tercera_persona_el_responsable_recibe_la_asignacion_y_q
     pide). La regla igual se prueba a nivel de la función, con Morgan como tercera
     persona que convierte el borrador de Taylor para Sam North; el aviso de
     aprobación a quien pidió es el de siempre y no lo cubre esta función."""
-    from prisma import ingreso_tareas as I
-    from prisma.autoridad import Canal, identificar
-    from prisma.db import autoridad, espacio
-    from prisma.pendientes import resolver_borrador
+    from leda import ingreso_tareas as I
+    from leda.autoridad import Canal, identificar
+    from leda.db import autoridad, espacio
+    from leda.pendientes import resolver_borrador
 
     rid, pid = _alta_en_confirmacion(conn, intake_world, responsable="Sam North")
     ws = intake_world["north-lab"]["id"]
@@ -299,7 +299,7 @@ def test_en_el_alta_conversacional_el_responsable_tambien_recibe_el_aviso(
 def test_el_aviso_sin_fecha_no_la_nombra_y_no_duplica_el_punto():
     from datetime import date
 
-    from prisma import ingreso_tareas as I
+    from leda import ingreso_tareas as I
 
     con = I.assignment_notice_text("Morgan", "Medir", date(2026, 10, 15), "Anda.")
     assert con == ("Morgan te asignó la tarea «Medir», para el 15/10/2026. "
@@ -312,7 +312,7 @@ def test_el_aviso_sin_fecha_no_la_nombra_y_no_duplica_el_punto():
 
 def test_si_un_aviso_falla_quien_confirma_igual_recibe_su_respuesta_y_queda_un_incidente(
         intake_world, conn, monkeypatch, authority_conn):
-    from prisma import ingreso_tareas as I
+    from leda import ingreso_tareas as I
 
     rid, pid = _alta_en_confirmacion(conn, intake_world, responsable="Sam North")
     client = _cliente(conn, monkeypatch, authority_conn)
@@ -412,7 +412,7 @@ def test_sin_chat_activado_quien_confirma_sabe_que_no_se_le_pudo_avisar(
     _tocar(client, conn, pide, pid, "Confirmar")
 
     assert _respuesta_a(conn, pide, antes) == (
-        f"{HECHO}\n{nombre} todavía no activó su chat con Prisma, así que no le "
+        f"{HECHO}\n{nombre} todavía no activó su chat con Leda, así que no le "
         "pude avisar.")
 
 
@@ -450,7 +450,7 @@ def test_si_el_aviso_falla_la_respuesta_no_agrega_nada_y_queda_el_incidente(
         intake_world, conn, monkeypatch, authority_conn):
     """El aislamiento sigue: un aviso que no se pudo encolar no deja una línea de
     estado inventada; su incidente ya lo cubre."""
-    from prisma import ingreso_tareas as I
+    from leda import ingreso_tareas as I
 
     def _rompe(*args, **kwargs):
         raise RuntimeError("falla del aviso")
@@ -472,8 +472,8 @@ def test_si_el_calendario_falla_el_aviso_igual_se_encola_y_el_despachador_lo_pos
     """Revisión RDD `review-16296c4f68eaa688` (R3): calcular "cuándo empieza el
     horario" no puede costar el aviso. Si el calendario falla, se encola para
     ahora (el despachador igual respeta el horario al mandarlo)."""
-    from prisma import ingreso_tareas as I
-    from prisma.calendario import Calendario
+    from leda import ingreso_tareas as I
+    from leda.calendario import Calendario
 
     rid, pid = _alta_en_confirmacion(conn, intake_world, responsable="Sam North")
     client = _cliente(conn, monkeypatch, authority_conn)

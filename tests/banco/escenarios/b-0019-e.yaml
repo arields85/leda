@@ -3,7 +3,7 @@ variante_de: b-0019
 objetivo: >
   Variante de b-0019: con la pregunta de la evidencia abierta, la persona
   la deja de lado ("dejalo, después lo veo"). Se cierra sin efectos: no hay
-  evidencia ni vista previa, la tarea sigue como estaba y Prisma no vuelve
+  evidencia ni vista previa, la tarea sigue como estaba y Leda no vuelve
   a pedir el dato.
 actor: Marcos Tarquini
 mensajes:

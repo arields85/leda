@@ -7,9 +7,9 @@ también."""
 
 from __future__ import annotations
 
-from prisma import ingreso_tareas as I
-from prisma.db import admin, espacio
-from prisma.llm import IntentAction, IntentRoute, RespectoPendiente
+from leda import ingreso_tareas as I
+from leda.db import admin, espacio
+from leda.llm import IntentAction, IntentRoute, RespectoPendiente
 
 from tests.test_alta_guiada_flujo import (_empezar, _escribir, _estado, _salidas,
                                           _slot, _usuario)

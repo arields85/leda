@@ -1,6 +1,6 @@
 # La base de datos
 
-PostgreSQL 18 o posterior, esquema `prisma`. Es la fuente de verdad del estado operativo:
+PostgreSQL 18 o posterior, esquema `leda`. Es la fuente de verdad del estado operativo:
 qué se está haciendo, quién lo tiene, en qué estado está y qué se decidió.
 
 > **Actualización mayor:** cambiar la imagen a PostgreSQL 18 no actualiza un volumen
@@ -11,12 +11,12 @@ qué se está haciendo, quién lo tiene, en qué estado está y qué se decidió
 > Desde PostgreSQL 18, la imagen oficial monta el volumen en `/var/lib/postgresql` y
 > usa un `PGDATA` versionado dentro de ese directorio.
 
-Lo que **no** vive acá: la identidad y las reglas de Prisma (viven en `nucleo/`,
+Lo que **no** vive acá: la identidad y las reglas de Leda (viven en `nucleo/`,
 versionadas en git) y los secretos (tokens y claves, en el archivo de secretos
 de la VPS).
 
 ```
-git          →  quién es Prisma y cómo está configurado cada equipo
+git          →  quién es Leda y cómo está configurado cada equipo
 PostgreSQL   →  qué está pasando ahora
 secretos     →  tokens y claves, nunca en git ni en la base
 ```
@@ -53,39 +53,39 @@ algo que la base puede verificar.
 `objective_state_event`, `dependency`, `blocker`, `evidence`, `approval`,
 `pending_reply`.
 
-`prisma_app` puede insertar borradores, pero no tareas. Una tarea nueva se crea
+`leda_app` puede insertar borradores, pero no tareas. Una tarea nueva se crea
 únicamente mediante `confirmar_borrador_tarea`, que revalida la vista previa y
-deja `task.source_draft_id`. `prisma_admin` conserva escritura directa para
+deja `task.source_draft_id`. `leda_admin` conserva escritura directa para
 mantenimiento controlado y carga de fixtures; ese privilegio residual no es una
 ruta de aplicación.
 
 La confirmación usa una conexión separada configurada con
-`PRISMA_AUTHORITY_DB_URL`, cuyo login sólo puede asumir `prisma_gateway`.
-`prisma_app` no puede ejecutar la función sensible. La función recibe el
+`LEDA_AUTHORITY_DB_URL`, cuyo login sólo puede asumir `leda_gateway`.
+`leda_app` no puede ejecutar la función sensible. La función recibe el
 `telegram_user_id` autenticado por el webhook, resuelve la identidad humana en
 PostgreSQL y usa `clock_timestamp()`; no acepta `app_user_id` ni reloj del
-caller. No hay fallback a `PRISMA_DB_URL` porque compartir credencial destruiría
+caller. No hay fallback a `LEDA_DB_URL` porque compartir credencial destruiría
 la frontera de autoridad.
 
 La función corre como `SECURITY DEFINER` con search path fijo y sólo
-`prisma_gateway` recibe `EXECUTE`. El login de la URL debe ser `NOINHERIT`: no
+`leda_gateway` recibe `EXECUTE`. El login de la URL debe ser `NOINHERIT`: no
 obtiene privilegios de tablas ni puede administrar datos directamente; el
-contexto transaccional asume `prisma_gateway` únicamente durante la llamada.
+contexto transaccional asume `leda_gateway` únicamente durante la llamada.
 El rol no tiene `BYPASSRLS`, membresía administrativa ni privilegios generales
 de aplicación.
 
-El login de esa URL debe tener únicamente `SET ROLE prisma_gateway`; no debe ser
-miembro de `prisma_app` ni `prisma_admin`. La migración crea el rol sin login y
+El login de esa URL debe tener únicamente `SET ROLE leda_gateway`; no debe ser
+miembro de `leda_app` ni `leda_admin`. La migración crea el rol sin login y
 retira el overload anterior que aceptaba actor/reloj. `0002` reemplaza además la firma
 de Unidad 1A por `confirmar_borrador_tarea(uuid, text, bigint, bigint)`, que valida el
 chat originario y ejecuta el cierre terminal integral; no queda ejecutable la firma de
 tres argumentos. Sólo esa firma y
 `resolver_ingreso_borrador(uuid, text, bigint, bigint)` se conceden a
-`prisma_gateway`.
+`leda_gateway`.
 
 El owner del proceso debe crear ese login y concederle membresía exclusiva en
-`prisma_gateway`; la migración no crea ni guarda credenciales. El login usado
-por `PRISMA_DB_URL` no debe ser miembro de `prisma_gateway`.
+`leda_gateway`; la migración no crea ni guarda credenciales. El login usado
+por `LEDA_DB_URL` no debe ser miembro de `leda_gateway`.
 
 La resolución terminal vive en esa función; `resolver_ingreso_borrador` es sólo su
 entrada nominada. Conversión o cancelación, cierre de request/draft/pending/opciones,
@@ -116,7 +116,7 @@ acordó de registrar, sino porque es el único camino posible.
 antes de aceptar el evento de cierre.
 
 Esto es lo que impide que el modelo de lenguaje dé por terminada una tarea
-porque alguien le escribió "ya está". Prisma puede proponer el cierre; quien lo
+porque alguien le escribió "ya está". Leda puede proponer el cierre; quien lo
 autoriza es la comprobación más la persona que corresponda.
 
 Un objetivo sólo cierra si todas sus tareas terminaron, todos sus objetivos
@@ -127,22 +127,22 @@ original pedía en prosa.
 ### El aislamiento está en la base
 
 Todas las tablas por espacio tienen RLS activo y forzado. El agente se conecta
-con el rol `prisma_app` y declara en qué espacio trabaja:
+con el rol `leda_app` y declara en qué espacio trabaja:
 
 ```sql
-set role prisma_app;
-set "prisma.workspace_id" = '<uuid del espacio>';
+set role leda_app;
+set "leda.workspace_id" = '<uuid del espacio>';
 ```
 
 A partir de ahí no ve nada de otro equipo, ni por error ni a propósito. No
 depende de que el modelo se acuerde de filtrar.
 
-El rol `prisma_admin` tiene `bypassrls` y es el que usa la consola de
+El rol `leda_admin` tiene `bypassrls` y es el que usa la consola de
 administración.
 
 ### Nada sale sin pasar por la cola
 
-Prisma nunca llama a Telegram. Escribe en `message_outbox` con una
+Leda nunca llama a Telegram. Escribe en `message_outbox` con una
 `dedupe_key` única y un worker despacha. Si la VPS se reinicia y el proceso
 vuelve a generar el mismo mensaje, la clave lo rechaza.
 
@@ -204,7 +204,7 @@ Las previews cuya descripción completó llevan una marca de migración; sólo s
 esa clave y sólo si pending, draft y preview siguen exactamente como quedaron.
 
 Respaldo: `pg_dump` diario más archivado de WAL. La restauración se prueba cada
-tres meses — conviene que sea una tarea programada de Prisma, no un recordatorio
+tres meses — conviene que sea una tarea programada de Leda, no un recordatorio
 en la cabeza de alguien.
 
 ## Pendiente

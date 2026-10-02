@@ -14,11 +14,11 @@ nunca por lo que el modelo escriba.
 
 from __future__ import annotations
 
-from prisma import gateway
-from prisma import herramientas as H
-from prisma import pendientes as P
-from prisma.db import admin
-from prisma.llm import Llamada, ProveedorGuionado, Respuesta
+from leda import gateway
+from leda import herramientas as H
+from leda import pendientes as P
+from leda.db import admin
+from leda.llm import Llamada, ProveedorGuionado, Respuesta
 
 from tests.test_pedir_cambios_extremo_a_extremo import (  # noqa: F401
     _mensaje, _pendiente, _tarea, _tg, cliente)
@@ -26,7 +26,7 @@ from tests.test_pedir_cambios_extremo_a_extremo import (  # noqa: F401
 
 def _guion(monkeypatch, *respuestas) -> ProveedorGuionado:
     proveedor = ProveedorGuionado(guion=list(respuestas))
-    monkeypatch.setattr("prisma.llm.desde_base", lambda cur, ws, key: proveedor)
+    monkeypatch.setattr("leda.llm.desde_base", lambda cur, ws, key: proveedor)
     return proveedor
 
 
@@ -52,8 +52,8 @@ def _escenario(conn, ws):
 
 
 def test_el_rechazo_por_falta_de_evidencia_lleva_un_motivo_tipado(corework, conn):
-    from prisma.autoridad import Canal, identificar
-    from prisma.db import espacio
+    from leda.autoridad import Canal, identificar
+    from leda.db import espacio
 
     ws = corework.workspace_id
     with admin(conn) as cur:

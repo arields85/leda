@@ -1,4 +1,4 @@
-"""Seguimientos de `review-3ebe127d376a4d18` sobre la retención de lo que Prisma
+"""Seguimientos de `review-3ebe127d376a4d18` sobre la retención de lo que Leda
 inicia (T9-R1d-2 y T9-R1d-2b, cerrados en T9-R1c-3).
 
 - Lo que MUESTRA la propia pregunta abierta del alta nunca se retiene contra su
@@ -17,13 +17,13 @@ from datetime import timedelta
 
 import pytest
 
-from prisma import ingreso_tareas as I
-from prisma import pendientes as P
-from prisma.autoridad import Canal, identificar
-from prisma.calendario import Calendario
-from prisma.db import admin, conectar, espacio
-from prisma.despachador import TransporteDePrueba, despachar
-from prisma.salida import enqueue_outbox
+from leda import ingreso_tareas as I
+from leda import pendientes as P
+from leda.autoridad import Canal, identificar
+from leda.calendario import Calendario
+from leda.db import admin, conectar, espacio
+from leda.despachador import TransporteDePrueba, despachar
+from leda.salida import enqueue_outbox
 
 from tests.test_alta_eleccion_confirmacion import (_alta_con_eleccion,
                                                    _alta_en_confirmacion,
@@ -51,7 +51,7 @@ def _activa(cur, quien, tg, cuando) -> None:
 
 
 def _control(cur, ws, quien, tg, ahora=DESPUES) -> None:
-    """Un aviso de Prisma a la misma persona que no es lo que muestra su rama: sí
+    """Un aviso de Leda a la misma persona que no es lo que muestra su rama: sí
     se retiene, y prueba que la retención está en marcha."""
     enqueue_outbox(
         cur, workspace_id=ws, chat_id=tg, text=f"{AVISO} de control",

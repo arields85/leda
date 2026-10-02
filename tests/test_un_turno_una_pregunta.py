@@ -18,13 +18,13 @@ from datetime import datetime, timezone
 
 import pytest
 
-from prisma import agente
-from prisma import pendientes as P
-from prisma.agente import responder
-from prisma.autoridad import Canal, identificar
-from prisma.calendario import Calendario
-from prisma.db import admin, espacio
-from prisma.llm import Llamada, ProveedorGuionado, Respuesta
+from leda import agente
+from leda import pendientes as P
+from leda.agente import responder
+from leda.autoridad import Canal, identificar
+from leda.calendario import Calendario
+from leda.db import admin, espacio
+from leda.llm import Llamada, ProveedorGuionado, Respuesta
 
 from tests.test_modificar import _tarea
 
@@ -209,7 +209,7 @@ def test_una_escritura_despues_de_una_eleccion_de_herramienta_se_rechaza(
     """La elección que pide una herramienta (`NecesitaElegir`) también termina
     el turno: una escritura que la sigue en la misma vuelta se rechaza antes de
     ejecutarse (review-faccc0e9d83561b3)."""
-    from prisma import herramientas as H
+    from leda import herramientas as H
 
     ws = corework.workspace_id
     a, _b = _dos_tareas(conn, ws)

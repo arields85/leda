@@ -6,24 +6,24 @@ services:
   postgres:
     image: postgres:18-alpine
     environment:
-      POSTGRES_DB: prisma
-      POSTGRES_USER: prisma
+      POSTGRES_DB: leda
+      POSTGRES_USER: leda
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?falta en .env}
     volumes:
       - datos:/var/lib/postgresql
       - ./db/respaldos:/respaldos
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U prisma"]
+      test: ["CMD-SHELL", "pg_isready -U leda"]
       interval: 10s
       retries: 5
     restart: unless-stopped
 
   app:
     build: .
-    command: python -m prisma servir --puerto 8080
+    command: python -m leda servir --puerto 8080
     env_file: .env
     environment:
-      PRISMA_DB_URL: postgresql://prisma:${POSTGRES_PASSWORD}@postgres:5432/prisma
+      LEDA_DB_URL: postgresql://leda:${POSTGRES_PASSWORD}@postgres:5432/leda
     depends_on:
       postgres:
         condition: service_healthy
@@ -37,12 +37,12 @@ services:
     build: .
     command: >
       sh -c "while true; do
-               python -m prisma despachar corework || true;
+               python -m leda despachar corework || true;
                sleep 30;
              done"
     env_file: .env
     environment:
-      PRISMA_DB_URL: postgresql://prisma:${POSTGRES_PASSWORD}@postgres:5432/prisma
+      LEDA_DB_URL: postgresql://leda:${POSTGRES_PASSWORD}@postgres:5432/leda
     depends_on:
       postgres:
         condition: service_healthy
@@ -52,8 +52,8 @@ services:
     image: postgres:18-alpine
     entrypoint: >
       sh -c "while true; do
-               pg_dump -h postgres -U prisma prisma
-                 | gzip > /respaldos/prisma-$$(date +%%Y%%m%%d).sql.gz;
+               pg_dump -h postgres -U leda leda
+                 | gzip > /respaldos/leda-$$(date +%%Y%%m%%d).sql.gz;
                find /respaldos -name '*.sql.gz' -mtime +30 -delete;
                sleep 86400;
              done"

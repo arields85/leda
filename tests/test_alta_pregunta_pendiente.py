@@ -21,10 +21,10 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from psycopg.types.json import Jsonb
 
-from prisma import gateway
-from prisma import ingreso_tareas as I
-from prisma.db import admin, espacio
-from prisma.llm import (IntentAction, IntentRoute, RespectoPendiente, Respuesta,
+from leda import gateway
+from leda import ingreso_tareas as I
+from leda.db import admin, espacio
+from leda.llm import (IntentAction, IntentRoute, RespectoPendiente, Respuesta,
                         RouteEnvelope)
 
 from tests.toques import FUERA_DE_LA_VENTANA, envejecer_toques

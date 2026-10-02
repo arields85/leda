@@ -11,10 +11,10 @@ from __future__ import annotations
 
 import pytest
 
-from prisma import ingreso_tareas as I
-from prisma import redaccion
-from prisma.pendientes import HERRAMIENTA_REVISION_BORRADOR
-from prisma.db import admin, espacio
+from leda import ingreso_tareas as I
+from leda import redaccion
+from leda.pendientes import HERRAMIENTA_REVISION_BORRADOR
+from leda.db import admin, espacio
 
 from tests.test_alta_eleccion_confirmacion import (_alta_en_confirmacion,
                                                    _alta_enviada, _usuario)

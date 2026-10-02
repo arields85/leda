@@ -1,6 +1,6 @@
 id: b-0004
 objetivo: >
-  Observar si Prisma mueve la tarea al estado que corresponde a lo que la
+  Observar si Leda mueve la tarea al estado que corresponde a lo que la
   persona cuenta, sin adelantarla a un cierre que todavía no pidió.
 actor: Marcos Tarquini
 mensajes:

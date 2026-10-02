@@ -6,7 +6,7 @@
 
 ## Contexto
 
-Prisma necesita validar si sus respuestas son útiles, completas y operativamente
+Leda necesita validar si sus respuestas son útiles, completas y operativamente
 correctas. Aplicar minimización funcional del contexto antes de contar con evidencia
 real podría degradar esas respuestas y agregar otra variable al diagnóstico.
 
@@ -18,7 +18,7 @@ proveedor estén implementados.
 
 ## Decisión
 
-Durante la validación local simulada y el piloto controlado real, Prisma usará
+Durante la validación local simulada y el piloto controlado real, Leda usará
 **contexto operativo amplio** y no aplicará minimización funcional prematura. Podrá
 enviar al modelo los datos operativos autorizados que sean necesarios para priorizar
 calidad y completitud de las respuestas.
@@ -29,7 +29,7 @@ La política se completa con estas decisiones:
 - Una futura interfaz permitirá seleccionar proveedor y modelo. Cada proveedor se
   autenticará sólo mediante los métodos oficiales que soporte. Esta capacidad
   futura no queda aprobada como implementada por esta ADR.
-- Las conversaciones almacenadas por Prisma en local o en la VPS tienen retención
+- Las conversaciones almacenadas por Leda en local o en la VPS tienen retención
   indefinida hasta que un administrador autorizado las elimine.
 - Los participantes no pueden solicitar el borrado de conversaciones.
 - El acceso y la eliminación administrativos deben estar restringidos y auditados.
@@ -38,7 +38,7 @@ La política se completa con estas decisiones:
 
 ## Fronteras obligatorias
 
-Contexto amplio no significa contexto sin fronteras. Prisma nunca debe enviar al
+Contexto amplio no significa contexto sin fronteras. Leda nunca debe enviar al
 proveedor:
 
 - secretos, credenciales o material equivalente;
@@ -57,7 +57,7 @@ memoria no amplían permisos ni reemplazan las reglas de autoridad del sistema.
 - La retención local o en VPS no determina ni modifica la retención externa del
   proveedor.
 - Antes de incorporar participantes deben informarse la retención administrada por
-  Prisma y las condiciones vigentes del proveedor.
+  Leda y las condiciones vigentes del proveedor.
 - Restringir y auditar acceso y eliminación requiere implementación y verificación
   separadas; aceptar esta política no demuestra que esos controles existan.
 - Cambiar de proveedor, modelo o método de autenticación exigirá respetar las
@@ -117,4 +117,4 @@ aprobado por esta ADR.
 - **Contexto sin fronteras de seguridad:** rechazado; autorización, aislamiento,
   exclusión de secretos y límites del proveedor son obligatorios.
 - **Vencimiento fijo o borrado solicitado por participantes:** no elegidos para el
-  almacenamiento administrado por Prisma durante esta etapa.
+  almacenamiento administrado por Leda durante esta etapa.

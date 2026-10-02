@@ -15,18 +15,18 @@ import psycopg
 from fastapi.testclient import TestClient
 from psycopg.types.json import Jsonb
 
-from prisma import gateway
-from prisma import herramientas as H
-from prisma import ingreso_tareas as I
-from prisma import pendientes as P
-from prisma.agente import responder
-from prisma.autoridad import Canal, Denegado, identificar
-from prisma.calendario import Calendario
-from prisma.db import admin, autoridad, conectar, espacio
-from prisma.despachador import TransporteDePrueba, despachar
-from prisma.llm import (IntentAction, IntentRoute, ProveedorAnthropic,
+from leda import gateway
+from leda import herramientas as H
+from leda import ingreso_tareas as I
+from leda import pendientes as P
+from leda.agente import responder
+from leda.autoridad import Canal, Denegado, identificar
+from leda.calendario import Calendario
+from leda.db import admin, autoridad, conectar, espacio
+from leda.despachador import TransporteDePrueba, despachar
+from leda.llm import (IntentAction, IntentRoute, ProveedorAnthropic,
                         RespectoPendiente, Respuesta, RoutingError)
-from prisma.salida import (BUTTON_LABEL_LIMIT, ICONO_TAREA, con_icono,
+from leda.salida import (BUTTON_LABEL_LIMIT, ICONO_TAREA, con_icono,
                            etiqueta_sin_icono, etiquetas_coinciden,
                            telegram_utf16_units)
 
@@ -1116,7 +1116,7 @@ def test_no_mutating_tool_output_is_truth_marked_and_has_no_buttons(
         cur.execute("select pending_action_id, intake_choice_set_id from message_outbox")
         filas = cur.fetchall()
         assert all(f["intake_choice_set_id"] is None for f in filas)
-        # Desde T4b (`prisma-orienta`, ADR 0007) un texto que pregunta sin
+        # Desde T4b (`leda-orienta`, ADR 0007) un texto que pregunta sin
         # botones propios recibe el cierre genérico del servidor. Lo que este
         # caso protege sigue intacto: el "Confirm?" del modelo, sin ninguna
         # herramienta de por medio, nunca termina en una confirmación -- los
@@ -1187,7 +1187,7 @@ def test_real_testclient_gateway_with_mocked_anthropic_protocol(
     monkeypatch.setattr(gateway, "config", SimpleNamespace(
         webhook_secret="test-secret", llm_api_key="unused",
         token_bot=lambda slug: "unused-token"))
-    monkeypatch.setattr("prisma.llm.desde_base", lambda *args: provider)
+    monkeypatch.setattr("leda.llm.desde_base", lambda *args: provider)
     client = TestClient(gateway.app)
     user = ws["people"]["Taylor Quinn"]["telegram"]
     response = client.post(
@@ -1250,7 +1250,7 @@ def _post_message(conn, monkeypatch, world, provider, raw, *, slug="north-lab",
     monkeypatch.setattr(gateway, "config", SimpleNamespace(
         webhook_secret="test-secret", llm_api_key="unused",
         token_bot=lambda selected_slug: "unused-token"))
-    monkeypatch.setattr("prisma.llm.desde_base", lambda *args: provider)
+    monkeypatch.setattr("leda.llm.desde_base", lambda *args: provider)
     user = ws["people"]["Taylor Quinn"]["telegram"]
     response = TestClient(gateway.app).post(
         f"/telegram/{slug}",
@@ -1301,7 +1301,7 @@ def test_varied_task_creation_routes_open_server_choices_first(
         )
         message = cur.fetchone()
         assert message
-        from prisma.despachador import _botones
+        from leda.despachador import _botones
         buttons = _botones(cur, message)
         assert buttons and all(button.callback_data.startswith("i:")
                                for button in buttons)
@@ -1534,7 +1534,7 @@ def test_un_espacio_no_puede_fabricar_auditoria_en_otro(intake_world, conn):
     """La auditoría autoritativa es la prueba que se le muestra a un cliente.
 
     Si otro cliente puede escribir en ella, deja de ser evidencia. `audit_log`
-    tiene `workspace_id` pero ninguna política, y `prisma_app` tiene `insert`:
+    tiene `workspace_id` pero ninguna política, y `leda_app` tiene `insert`:
     nada impide declarar el espacio ajeno.
     """
     north = intake_world["north-lab"]
@@ -1572,7 +1572,7 @@ def test_ninguna_funcion_elevada_pertenece_a_un_rol_que_ignora_la_rls(conn):
                  from pg_proc p
                  join pg_roles r on r.oid = p.proowner
                  join pg_namespace n on n.oid = p.pronamespace
-                where n.nspname = 'prisma' and p.prosecdef
+                where n.nspname = 'leda' and p.prosecdef
                 order by p.proname""")
         elevadas = cur.fetchall()
 
@@ -1670,23 +1670,23 @@ def _retrato_de_aislamiento(url, tablas):
             columnas = db.execute(
                 """select column_name, data_type, is_nullable, column_default
                      from information_schema.columns
-                    where table_schema = 'prisma' and table_name = %s
+                    where table_schema = 'leda' and table_name = %s
                     order by column_name""", (tabla,)).fetchall()
             seguridad = db.execute(
                 """select relrowsecurity, relforcerowsecurity
                      from pg_class where oid = to_regclass(%s)""",
-                (f"prisma.{tabla}",)).fetchone()
+                (f"leda.{tabla}",)).fetchone()
             politicas = db.execute(
                 """select polname, pg_get_expr(polqual, polrelid) as expresion
                      from pg_policy where polrelid = to_regclass(%s)
-                    order by polname""", (f"prisma.{tabla}",)).fetchall()
+                    order by polname""", (f"leda.{tabla}",)).fetchall()
             disparadores = db.execute(
                 """select tgname from pg_trigger
                     where tgrelid = to_regclass(%s) and not tgisinternal
-                    order by tgname""", (f"prisma.{tabla}",)).fetchall()
+                    order by tgname""", (f"leda.{tabla}",)).fetchall()
             permisos = db.execute(
                 """select privilege_type from information_schema.role_table_grants
-                    where grantee = 'prisma_app' and table_schema = 'prisma'
+                    where grantee = 'leda_app' and table_schema = 'leda'
                       and table_name = %s
                     order by privilege_type""", (tabla,)).fetchall()
             retrato[tabla] = {
@@ -1717,7 +1717,7 @@ def _retrato_de_funciones(url):
                  from pg_proc p
                  join pg_roles r on r.oid = p.proowner
                  join pg_namespace n on n.oid = p.pronamespace
-                where n.nspname = 'prisma'
+                where n.nspname = 'leda'
                 order by p.proname""").fetchall()
 
 
@@ -1733,7 +1733,7 @@ def test_los_rollbacks_devuelven_la_base_al_estado_anterior():
     migración/rollback. Se exige además que la migración haya cambiado algo:
     sin eso, la comparación pasaría igual con dos rollbacks vacíos.
     """
-    maintenance = os.environ.get("PRISMA_TEST_DB_URL")
+    maintenance = os.environ.get("LEDA_TEST_DB_URL")
     if not maintenance:
         pytest.skip("Migration rehearsal requires the pytest-authorized test server.")
 
@@ -1745,7 +1745,7 @@ def test_los_rollbacks_devuelven_la_base_al_estado_anterior():
               "absence", "audit_log", "incident", "greeting_state",
               "message_outbox", "inbound_message", "task_intake_request",
               "objective")
-    nombre = f"prisma_rollback_{uuid.uuid4().hex[:10]}"
+    nombre = f"leda_rollback_{uuid.uuid4().hex[:10]}"
     with psycopg.connect(maintenance, autocommit=True) as control:
         control.execute(SQL("create database {}").format(Identifier(nombre)))
     url = make_conninfo(**{**conninfo_to_dict(maintenance), "dbname": nombre})
@@ -1797,7 +1797,7 @@ def test_instalacion_limpia_y_base_migrada_convergen_en_el_aislamiento():
     políticas, disparadores y privilegios. Si divergen, una instalación nueva y
     una migrada no quedan igual de aisladas.
     """
-    maintenance = os.environ.get("PRISMA_TEST_DB_URL")
+    maintenance = os.environ.get("LEDA_TEST_DB_URL")
     if not maintenance:
         pytest.skip("Migration rehearsal requires the pytest-authorized test server.")
 
@@ -1815,8 +1815,8 @@ def test_instalacion_limpia_y_base_migrada_convergen_en_el_aislamiento():
               "task_intake_request", "objective")
     con_politica = set(tablas) - {"acceso_tablero"}
     sufijo = uuid.uuid4().hex[:10]
-    nombres = {"limpia": f"prisma_limpia_{sufijo}",
-               "migrada": f"prisma_migrada_{sufijo}"}
+    nombres = {"limpia": f"leda_limpia_{sufijo}",
+               "migrada": f"leda_migrada_{sufijo}"}
     urls = {}
     try:
         for clave, nombre in nombres.items():
@@ -1916,7 +1916,7 @@ def test_0007_estado_previo_a_bloqueo_llega_por_migracion_con_dueno_correcto():
     scripts de `db/migrations/`. Sin uno para `estado_previo_a_bloqueo`,
     `resolver_bloqueo` fallaría contra ella con "function does not exist".
     """
-    maintenance = os.environ.get("PRISMA_TEST_DB_URL")
+    maintenance = os.environ.get("LEDA_TEST_DB_URL")
     if not maintenance:
         pytest.skip("Migration rehearsal requires the pytest-authorized test server.")
 
@@ -1924,7 +1924,7 @@ def test_0007_estado_previo_a_bloqueo_llega_por_migracion_con_dueno_correcto():
     from psycopg.rows import dict_row
     from psycopg.sql import SQL, Identifier
 
-    database = f"prisma_0007_migration_{uuid.uuid4().hex[:12]}"
+    database = f"leda_0007_migration_{uuid.uuid4().hex[:12]}"
     with psycopg.connect(maintenance, autocommit=True) as control:
         control.execute(SQL("create database {}").format(Identifier(database)))
     url = make_conninfo(**{**conninfo_to_dict(maintenance), "dbname": database})
@@ -1941,7 +1941,7 @@ def test_0007_estado_previo_a_bloqueo_llega_por_migracion_con_dueno_correcto():
 
             existe = db.execute(
                 "select to_regprocedure("
-                "'prisma.estado_previo_a_bloqueo(uuid)') as f"
+                "'leda.estado_previo_a_bloqueo(uuid)') as f"
             ).fetchone()["f"]
             assert existe is not None, (
                 "estado_previo_a_bloqueo no llegó por la cadena de migraciones")
@@ -1949,13 +1949,13 @@ def test_0007_estado_previo_a_bloqueo_llega_por_migracion_con_dueno_correcto():
             fila = db.execute(
                 """select r.rolname dueno,
                           has_function_privilege('public',
-                            'prisma.estado_previo_a_bloqueo(uuid)', 'execute') publico,
-                          has_function_privilege('prisma_app',
-                            'prisma.estado_previo_a_bloqueo(uuid)', 'execute') app
+                            'leda.estado_previo_a_bloqueo(uuid)', 'execute') publico,
+                          has_function_privilege('leda_app',
+                            'leda.estado_previo_a_bloqueo(uuid)', 'execute') app
                      from pg_proc p join pg_roles r on r.oid = p.proowner
-                    where p.oid = 'prisma.estado_previo_a_bloqueo(uuid)'::regprocedure"""
+                    where p.oid = 'leda.estado_previo_a_bloqueo(uuid)'::regprocedure"""
             ).fetchone()
-            assert fila["dueno"] == "prisma_owner"
+            assert fila["dueno"] == "leda_owner"
             assert fila["publico"] is False
             assert fila["app"] is True
     finally:
@@ -1972,7 +1972,7 @@ def test_0008_motivo_no_arranca_tarea_llega_por_migracion():
     prueba -- y `actualizar_estado` podría mover una tarea a `en_curso` con
     su bloqueante sin terminar.
     """
-    maintenance = os.environ.get("PRISMA_TEST_DB_URL")
+    maintenance = os.environ.get("LEDA_TEST_DB_URL")
     if not maintenance:
         pytest.skip("Migration rehearsal requires the pytest-authorized test server.")
 
@@ -1980,7 +1980,7 @@ def test_0008_motivo_no_arranca_tarea_llega_por_migracion():
     from psycopg.rows import dict_row
     from psycopg.sql import SQL, Identifier
 
-    database = f"prisma_0008_migration_{uuid.uuid4().hex[:12]}"
+    database = f"leda_0008_migration_{uuid.uuid4().hex[:12]}"
     with psycopg.connect(maintenance, autocommit=True) as control:
         control.execute(SQL("create database {}").format(Identifier(database)))
     url = make_conninfo(**{**conninfo_to_dict(maintenance), "dbname": database})
@@ -1995,7 +1995,7 @@ def test_0008_motivo_no_arranca_tarea_llega_por_migracion():
 
             existe = db.execute(
                 "select to_regprocedure("
-                "'prisma.motivo_no_arranca_tarea(uuid)') as f"
+                "'leda.motivo_no_arranca_tarea(uuid)') as f"
             ).fetchone()["f"]
             assert existe is not None, (
                 "motivo_no_arranca_tarea no llegó por la cadena de migraciones")
@@ -2003,7 +2003,7 @@ def test_0008_motivo_no_arranca_tarea_llega_por_migracion():
             disparador = db.execute(
                 """select tgenabled from pg_trigger
                     where tgname = 'trg_exigir_dependencias_resueltas'
-                      and tgrelid = 'prisma.task_state_event'::regclass"""
+                      and tgrelid = 'leda.task_state_event'::regclass"""
             ).fetchone()
             assert disparador is not None, (
                 "trg_exigir_dependencias_resueltas no llegó por la cadena de migraciones")
@@ -2014,7 +2014,7 @@ def test_0008_motivo_no_arranca_tarea_llega_por_migracion():
 
 
 def test_migration_rejects_mojibake_then_accepts_zero_unit1a_rows():
-    maintenance = os.environ.get("PRISMA_TEST_DB_URL")
+    maintenance = os.environ.get("LEDA_TEST_DB_URL")
     if not maintenance:
         pytest.skip("Migration rehearsal requires the pytest-authorized test server.")
 
@@ -2022,7 +2022,7 @@ def test_migration_rejects_mojibake_then_accepts_zero_unit1a_rows():
     from psycopg.rows import dict_row
     from psycopg.sql import SQL, Identifier
 
-    database = f"prisma_empty_migration_{uuid.uuid4().hex[:12]}"
+    database = f"leda_empty_migration_{uuid.uuid4().hex[:12]}"
     with psycopg.connect(maintenance, autocommit=True) as control:
         control.execute(SQL("create database {}").format(Identifier(database)))
     url = make_conninfo(**{**conninfo_to_dict(maintenance), "dbname": database})
@@ -2041,15 +2041,15 @@ def test_migration_rejects_mojibake_then_accepts_zero_unit1a_rows():
                 db.execute(mojibake)
             db.execute("rollback")
             assert db.execute(
-                "select to_regclass('prisma.task_intake_request') table_name"
+                "select to_regclass('leda.task_intake_request') table_name"
             ).fetchone()["table_name"] is None
             db.execute(migration)
             assert db.execute(
-                "select to_regclass('prisma.task_intake_request') table_name"
+                "select to_regclass('leda.task_intake_request') table_name"
             ).fetchone()["table_name"] in {
-                "task_intake_request", "prisma.task_intake_request"}
+                "task_intake_request", "leda.task_intake_request"}
             assert db.execute(
-                "select count(*) n from prisma.task_draft"
+                "select count(*) n from leda.task_draft"
             ).fetchone()["n"] == 0
     finally:
         with psycopg.connect(maintenance, autocommit=True) as control:
@@ -2058,7 +2058,7 @@ def test_migration_rejects_mojibake_then_accepts_zero_unit1a_rows():
 
 
 def test_migration_reconciles_legacy_and_guarded_rollback_restores_it(conn):
-    maintenance = os.environ.get("PRISMA_TEST_DB_URL")
+    maintenance = os.environ.get("LEDA_TEST_DB_URL")
     if not maintenance:
         pytest.skip("Migration rehearsal requires the pytest-authorized test server.")
 
@@ -2067,7 +2067,7 @@ def test_migration_reconciles_legacy_and_guarded_rollback_restores_it(conn):
     from psycopg.rows import dict_row
     from psycopg.sql import SQL, Identifier
 
-    database = f"prisma_migration_{uuid.uuid4().hex[:12]}"
+    database = f"leda_migration_{uuid.uuid4().hex[:12]}"
     with psycopg.connect(maintenance, autocommit=True) as control:
         control.execute(SQL("create database {}").format(Identifier(database)))
     url = make_conninfo(**{**conninfo_to_dict(maintenance), "dbname": database})
@@ -2083,7 +2083,7 @@ def test_migration_reconciles_legacy_and_guarded_rollback_restores_it(conn):
 
         with psycopg.connect(url, autocommit=True, row_factory=dict_row) as db:
             db.execute(baseline)
-            db.execute("set search_path = prisma, public")
+            db.execute("set search_path = leda, public")
             ws = db.execute(
                 """insert into workspace (slug, nombre, activo)
                    values ('migration-lab', 'Migration Lab', true) returning id"""
@@ -2257,7 +2257,7 @@ def test_migration_reconciles_legacy_and_guarded_rollback_restores_it(conn):
             signatures = db.execute(
                 """select p.proname, pg_get_function_identity_arguments(p.oid) args
                      from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-                    where n.nspname = 'prisma'
+                    where n.nspname = 'leda'
                       and p.proname in ('confirmar_borrador_tarea',
                                         'resolver_ingreso_borrador')
                     order by p.proname, args"""
@@ -2269,13 +2269,13 @@ def test_migration_reconciles_legacy_and_guarded_rollback_restores_it(conn):
                  "args": "p_workspace_id uuid, p_token text, p_telegram_user_id bigint, p_chat_id bigint"},
             ]
             for function in ("confirmar_borrador_tarea", "resolver_ingreso_borrador"):
-                signature = f"prisma.{function}(uuid,text,bigint,bigint)"
+                signature = f"leda.{function}(uuid,text,bigint,bigint)"
                 assert db.execute(
-                    "select has_function_privilege('prisma_gateway', %s, 'execute') ok",
+                    "select has_function_privilege('leda_gateway', %s, 'execute') ok",
                     (signature,),
                 ).fetchone()["ok"]
                 assert not db.execute(
-                    "select has_function_privilege('prisma_app', %s, 'execute') ok",
+                    "select has_function_privilege('leda_app', %s, 'execute') ok",
                     (signature,),
                 ).fetchone()["ok"]
                 assert not db.execute(
@@ -2350,8 +2350,8 @@ def test_migration_reconciles_legacy_and_guarded_rollback_restores_it(conn):
                                   p.proacl, r.rolname owner
                              from pg_proc p join pg_roles r on r.oid = p.proowner
                             where p.oid = %s::regprocedure""",
-                        (f"prisma.{function}(uuid,text,bigint,bigint)",
-                         f"prisma.{function}(uuid,text,bigint,bigint)"),
+                        (f"leda.{function}(uuid,text,bigint,bigint)",
+                         f"leda.{function}(uuid,text,bigint,bigint)"),
                     )
                     clean_functions[function] = clean.fetchone()
             for function in ("confirmar_borrador_tarea", "resolver_ingreso_borrador"):
@@ -2360,19 +2360,19 @@ def test_migration_reconciles_legacy_and_guarded_rollback_restores_it(conn):
                               p.proacl, r.rolname owner
                          from pg_proc p join pg_roles r on r.oid = p.proowner
                         where p.oid = %s::regprocedure""",
-                    (f"prisma.{function}(uuid,text,bigint,bigint)",
-                     f"prisma.{function}(uuid,text,bigint,bigint)"),
+                    (f"leda.{function}(uuid,text,bigint,bigint)",
+                     f"leda.{function}(uuid,text,bigint,bigint)"),
                 ).fetchone()
                 assert migrated_function == clean_functions[function]
             with admin(conn) as clean:
                 clean.execute(
-                    """select pg_get_functiondef('prisma.telegram_utf16_units(text)'::regprocedure)
+                    """select pg_get_functiondef('leda.telegram_utf16_units(text)'::regprocedure)
                        definition"""
                 )
                 clean_utf16 = clean.fetchone()["definition"]
             migrated_utf16 = db.execute(
                 """select pg_get_functiondef(
-                     'prisma.telegram_utf16_units(text)'::regprocedure) definition"""
+                     'leda.telegram_utf16_units(text)'::regprocedure) definition"""
             ).fetchone()["definition"]
             assert migrated_utf16 == clean_utf16
 
@@ -2392,7 +2392,7 @@ def test_migration_reconciles_legacy_and_guarded_rollback_restores_it(conn):
                        (legacy_drafts["resuelta"],))
 
         writer = psycopg.connect(url, row_factory=dict_row)
-        writer.execute("set search_path = prisma, public")
+        writer.execute("set search_path = leda, public")
         draft = writer.execute(
             """insert into task_draft (workspace_id, creado_por_membership_id)
                values (%s, %s) returning id""",
@@ -2431,9 +2431,9 @@ def test_migration_reconciles_legacy_and_guarded_rollback_restores_it(conn):
 
         with psycopg.connect(url, autocommit=True, row_factory=dict_row) as db:
             assert db.execute(
-                "select to_regclass('prisma.task_intake_request') table_name"
-            ).fetchone()["table_name"] == "prisma.task_intake_request"
-            db.execute("set search_path = prisma, public")
+                "select to_regclass('leda.task_intake_request') table_name"
+            ).fetchone()["table_name"] == "leda.task_intake_request"
+            db.execute("set search_path = leda, public")
             db.execute("delete from task_intake_request")
             db.execute("delete from task_draft where id = %s", (draft,))
             db.execute("delete from inbound_message where id = %s", (inbound,))
@@ -2446,7 +2446,7 @@ def test_migration_reconciles_legacy_and_guarded_rollback_restores_it(conn):
                 "select estado from message_outbox where id = %s", (outbox,),
             ).fetchone()["estado"] == "listo"
             assert db.execute(
-                "select to_regclass('prisma.task_intake_request') as table_name"
+                "select to_regclass('leda.task_intake_request') as table_name"
             ).fetchone()["table_name"] is None
             for state in ("esperando", "cancelada"):
                 restored = db.execute(
@@ -2465,7 +2465,7 @@ def test_migration_reconciles_legacy_and_guarded_rollback_restores_it(conn):
                                    "resolved_without_conversion"))
 def test_migration_preflight_fails_before_ddl_for_incompatible_unit1a_rows(
         shape):
-    maintenance = os.environ.get("PRISMA_TEST_DB_URL")
+    maintenance = os.environ.get("LEDA_TEST_DB_URL")
     if not maintenance:
         pytest.skip("Migration rehearsal requires the pytest-authorized test server.")
 
@@ -2473,7 +2473,7 @@ def test_migration_preflight_fails_before_ddl_for_incompatible_unit1a_rows(
     from psycopg.rows import dict_row
     from psycopg.sql import SQL, Identifier
 
-    database = f"prisma_preflight_{uuid.uuid4().hex[:12]}"
+    database = f"leda_preflight_{uuid.uuid4().hex[:12]}"
     with psycopg.connect(maintenance, autocommit=True) as control:
         control.execute(SQL("create database {}").format(Identifier(database)))
     url = make_conninfo(**{**conninfo_to_dict(maintenance), "dbname": database})
@@ -2486,7 +2486,7 @@ def test_migration_preflight_fails_before_ddl_for_incompatible_unit1a_rows(
             ROOT / "db" / "migrations" / "0002_general_task_intake.sql")
         with psycopg.connect(url, autocommit=True, row_factory=dict_row) as db:
             db.execute(baseline)
-            db.execute("set search_path = prisma, public")
+            db.execute("set search_path = leda, public")
             ws = db.execute(
                 "insert into workspace (slug, nombre) values ('preflight', 'Preflight') returning id"
             ).fetchone()["id"]
@@ -2572,11 +2572,11 @@ def test_migration_preflight_fails_before_ddl_for_incompatible_unit1a_rows(
             db.execute("rollback")
             assert db.execute(
                 """select count(*) n from information_schema.columns
-                    where table_schema = 'prisma' and table_name = 'task_draft'
+                    where table_schema = 'leda' and table_name = 'task_draft'
                       and column_name = 'estado'"""
             ).fetchone()["n"] == 0
             assert db.execute(
-                "select to_regclass('prisma.task_intake_request') table_name"
+                "select to_regclass('leda.task_intake_request') table_name"
             ).fetchone()["table_name"] is None
     finally:
         with psycopg.connect(maintenance, autocommit=True) as control:

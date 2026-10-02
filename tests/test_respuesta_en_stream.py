@@ -20,12 +20,12 @@ import pytest
 from fastapi.testclient import TestClient
 from psycopg.types.json import Jsonb
 
-from prisma import alta_conducida as AC
-from prisma import despachador as desp
-from prisma import gateway, incidentes, llm
-from prisma.alta_turno import NOMBRE_HERRAMIENTA
-from prisma.db import admin, espacio
-from prisma.llm import (LectorDeTexto, ProveedorCompatible, ProveedorGemini,
+from leda import alta_conducida as AC
+from leda import despachador as desp
+from leda import gateway, incidentes, llm
+from leda.alta_turno import NOMBRE_HERRAMIENTA
+from leda.db import admin, espacio
+from leda.llm import (LectorDeTexto, ProveedorCompatible, ProveedorGemini,
                         ProveedorGuionado, SalidaDeConduccionInvalida,
                         texto_parcial)
 
@@ -431,7 +431,7 @@ def _escribir_en_vivo(c, texto: str, tg: Telegram, tipo="private"):
     mp.setattr(gateway, "config", SimpleNamespace(
         webhook_secret="test-secret", llm_api_key="unused",
         token_bot=lambda slug: "unused-token"))
-    mp.setattr("prisma.llm.desde_base", lambda *a: c.modelo)
+    mp.setattr("leda.llm.desde_base", lambda *a: c.modelo)
     usuario = ws["people"]["Taylor Quinn"]["telegram"]
     respuesta = TestClient(gateway.app).post(
         "/telegram/north-lab",

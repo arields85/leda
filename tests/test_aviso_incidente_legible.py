@@ -14,8 +14,8 @@ import re
 from datetime import datetime, timezone
 from pathlib import Path
 
-from prisma import gateway, incidentes, local, respuesta_unica
-from prisma.incidentes import (EXPLICACION_POR_ETAPA, NOTICIA_NEUTRA_INCIDENTE,
+from leda import gateway, incidentes, local, respuesta_unica
+from leda.incidentes import (EXPLICACION_POR_ETAPA, NOTICIA_NEUTRA_INCIDENTE,
                                armar_aviso_admin)
 
 ZONA_AR = "America/Argentina/Buenos_Aires"
@@ -107,7 +107,7 @@ def test_la_prueba_de_etapas_rechaza_las_formas_que_no_nombran_una():
 def test_el_aviso_sigue_el_formato_aprobado_en_orden():
     texto = _aviso()
     lineas = texto.split("\n")
-    assert lineas[0] == "⚠️ Prisma no pudo responderle a Nahuel Gimenez"
+    assert lineas[0] == "⚠️ Leda no pudo responderle a Nahuel Gimenez"
     encabezados = ["Qué pasó", "Qué vio Nahuel Gimenez", "Qué hacer", "Mensaje",
                    "Detalle técnico"]
     posiciones = [lineas.index(h) for h in encabezados]
@@ -176,12 +176,12 @@ def test_una_etapa_desconocida_o_ausente_usa_el_texto_generico():
     for etapa in ("etapa_que_no_existe", None):
         texto = _aviso(etapa=etapa)
         assert "Qué pasó" in texto and "Qué hacer" in texto
-        assert "python -m prisma incidentes" in texto
+        assert "python -m leda incidentes" in texto
         # Nunca se afirma qué vio la persona cuando no se sabe.
         assert NOTICIA_NEUTRA_INCIDENTE not in texto
 
 
 def test_sin_persona_identificada_no_se_inventa_un_nombre():
     texto = _aviso(nombre=None)
-    assert texto.split("\n")[0] == "⚠️ Prisma tuvo un problema"
+    assert texto.split("\n")[0] == "⚠️ Leda tuvo un problema"
     assert "Qué vio la persona" in texto

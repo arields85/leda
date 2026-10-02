@@ -18,9 +18,9 @@ from __future__ import annotations
 import threading
 import time
 
-from prisma import gateway
-from prisma.db import admin, conectar
-from prisma.incidentes import EXPLICACION_POR_ETAPA
+from leda import gateway
+from leda.db import admin, conectar
+from leda.incidentes import EXPLICACION_POR_ETAPA
 
 from tests.test_una_respuesta import (_con_respuesta_del_modelo, _filas_de_salida,
                                       _tg)
@@ -137,7 +137,7 @@ def test_un_mensaje_editado_se_ignora(cliente, conn, corework, monkeypatch):
 def test_un_mensaje_editado_sin_original_tampoco_recibe_turno(
         cliente, conn, corework, monkeypatch):
     """Ignorarlo no depende de haber visto el original: una edición sola (el original
-    llegó antes de que Prisma estuviera atendiendo) tampoco se atiende."""
+    llegó antes de que Leda estuviera atendiendo) tampoco se atiende."""
     _con_respuesta_del_modelo(monkeypatch)
     tg = _tg(conn)
 

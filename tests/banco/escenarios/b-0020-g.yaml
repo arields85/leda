@@ -3,8 +3,8 @@ variante_de: b-0020
 objetivo: >
   Variante de b-0020, seguir con lo pendiente (ADR 0013 regla 1, enmienda "una
   sola rama de conversación abierta", T9-R1d): con Modificar tocado, la
-  persona pide otra cosa y Prisma pregunta si sigue con lo pendiente; la
-  persona toca "Seguir con eso". Prisma vuelve a preguntar qué cambiar, la
+  persona pide otra cosa y Leda pregunta si sigue con lo pendiente; la
+  persona toca "Seguir con eso". Leda vuelve a preguntar qué cambiar, la
   consulta no se contesta y no hay ningún efecto.
 actor: Nahuel Gimenez
 mensajes:

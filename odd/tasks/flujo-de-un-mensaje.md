@@ -35,9 +35,9 @@ definir el flujo y medirlo con pruebas reales.
   encolar y el respaldo de B reemplaza al texto rechazado, no se suma.
 - `main` queda intacto para el circuito C de la ronda 4 (01/10 09:00).
 - Trabajo en el worktree `D:\Proyectos\Prisma-PM-worktrees\flujo-de-un-mensaje`, rama
-  `feat/flujo-de-un-mensaje`. El paquete `prisma` está instalado en modo editable desde
+  `feat/flujo-de-un-mensaje`. El paquete `leda` está instalado en modo editable desde
   el checkout principal: pytest usa el `src/` del worktree (`pythonpath = ["src"]`), pero
-  `python -m prisma` necesita `PYTHONPATH=src` para correr el código del worktree.
+  `python -m leda` necesita `PYTHONPATH=src` para correr el código del worktree.
 
 ## TDD
 
@@ -136,7 +136,7 @@ PR planificado: la integración a `main` la decide el usuario después del exper
 
 - 2026-09-30, F1 (ruta: delegada, 2+ archivos no triviales). Verificado: el importador
   no rechaza claves de pack desconocidas (sólo `CLAVES_PROHIBIDAS`), no hace falta
-  migración; `prisma.__file__` resuelve dentro del worktree durante pytest.
+  migración; `leda.__file__` resuelve dentro del worktree durante pytest.
   Hecho: sección `conversacion.redaccion` en `espacios/corework.yaml` (B), siembra en
   `importador._importar_ajustes` y advertencia en `validar` ante una variante
   desconocida; `redaccion.py` (`variante_redaccion(cur, workspace_id)`,
@@ -150,7 +150,7 @@ PR planificado: la integración a `main` la decide el usuario después del exper
   **Límite de la verificación:** las 17 pruebas con base (`corework`, `conn`) quedaron
   SALTADAS: el worktree no tiene `.env.test` (no versionado) y el agente no puede leer
   ni copiar el de `main` (regla de denegación). Esas pruebas no se ejecutaron: F1 queda
-  sin tildar hasta correrlas con `PRISMA_TEST_DB_URL`.
+  sin tildar hasta correrlas con `LEDA_TEST_DB_URL`.
 
 - 2026-09-30, F2 (ruta: delegada, 2+ archivos no triviales). Hecho: `valores.py`
   (`TipoValor`, `Opcion`, `opciones_numeradas`, `ValorEsperado`, `validar_valor` ->
@@ -169,7 +169,7 @@ PR planificado: la integración a `main` la decide el usuario después del exper
   tests/test_router_valor.py tests/test_pregunta_valor_esperado.py` -> 199 passed
   ; suite completa sin base: 1001 passed, 1531 skipped.
   **Sin base no se pudo correr la suite completa** (ver F1): tareas F1 y F2 sin tildar
-  hasta correr `pytest -q` con `PRISMA_TEST_DB_URL` (línea base de `main`: 2279 passed).
+  hasta correr `pytest -q` con `LEDA_TEST_DB_URL` (línea base de `main`: 2279 passed).
 
 - 2026-09-30, verificación de F1 y F2 con base (`.env.test` ya en el worktree). Suite
   completa desde el worktree: 58 fallas, todas por el mismo defecto de prueba, no de código:
@@ -277,7 +277,7 @@ PR planificado: la integración a `main` la decide el usuario después del exper
   aceptados además en un incidente de baja severidad, etapa `redaccion_rechazada`, sin aviso a
   la administración. El cierre del resumen es siempre del código; el resumen se redacta una vez
   para los dos cierres. B queda idéntica: `redactar`/`redactar_partes` no llaman al modelo.
-  CLI nueva `python -m prisma redaccion <slug>`.
+  CLI nueva `python -m leda redaccion <slug>`.
   RED: `test_verificador_redaccion.py` (`ModuleNotFoundError`), `test_llm_redactar.py` (9
   failed), `test_redaccion_a.py` (13 failed, 1 passed), `test_alta_guiada_variante_a.py` (7
   failed, 1 passed: el caso de B), `test_cli.py` (2 failed, `invalid choice: 'redaccion'`).
@@ -286,13 +286,13 @@ PR planificado: la integración a `main` la decide el usuario después del exper
   (`python -m pytest -q`): 2644 passed, 333 deselected, 0 failed (línea base 2573).
   Pruebas viejas actualizadas: `test_alta_guiada_texto` (el espía sigue la función nueva),
   `test_alta_enviar_a_aprobacion` (cuerpo desde `args`), `test_redaccion` (renombrada).
-  **Cómo leer la latencia.** `python -m prisma redaccion corework` (con `PYTHONPATH=src` desde
+  **Cómo leer la latencia.** `python -m leda redaccion corework` (con `PYTHONPATH=src` desde
   el worktree): llamadas, aceptadas/rechazadas/errores, mediana (criterio ADR 0014: ≤ 5 s),
   mediana de las aceptadas, p90 y máximo de la llamada de redacción. Los motivos:
-  `python -m prisma incidentes corework` (etapa `redaccion_rechazada`). Cada intento es una
+  `python -m leda incidentes corework` (etapa `redaccion_rechazada`). Cada intento es una
   fila de `audit_log` con `accion = 'redaccion_variante_a'` y `detalle->>'duracion_ms'`.
   **Pasar la prueba real a A:** editar `conversacion.redaccion: A` en `espacios/corework.yaml`
-  y `python -m prisma importar corework --activar` (reaplica todo el pack, idempotente), o el
+  y `python -m leda importar corework --activar` (reaplica todo el pack, idempotente), o el
   `update` directo de `workspace_setting` (clave `redaccion`, valor `{"variante": "A"}`),
   más acotado. No hace falta reiniciar: la variante se lee de la base en cada turno. El
   listener tiene que correr el código de este worktree (`PYTHONPATH=src`); el del worktree
@@ -392,15 +392,15 @@ Verificación (desde el worktree, runner del checkout principal): `pytest -q` co
 cortó por el límite de tiempo de la herramienta, no por una falla; se repitió en segundo plano.
 No se vio `tuple concurrently updated`.
 Para reanudar la prueba real: aplicar `db/migrations/0026_borrador_enviado_no_es_rama_abierta.sql`
-a `prisma_flujo` (con `psql -f`, `PGCLIENTENCODING=UTF8`, ver `db/migrations/README.md`) y reiniciar
+a `leda_flujo` (con `psql -f`, `PGCLIENTENCODING=UTF8`, ver `db/migrations/README.md`) y reiniciar
 el listener; sin la `0026` el listener no arranca (`verificar_migraciones`).
 
 ## Próximo paso
 
 F7/F8a: la segunda vuelta de la prueba real con A (etapa 6 completa): reiniciar el
 listener del worktree (`PYTHONPATH=src`), repetir el guion y leer
-`python -m prisma redaccion corework` (llamadas, aceptadas, rechazadas, errores,
-timeouts, mediana) y `python -m prisma incidentes corework` (motivos de
+`python -m leda redaccion corework` (llamadas, aceptadas, rechazadas, errores,
+timeouts, mediana) y `python -m leda incidentes corework` (motivos de
 `redaccion_rechazada`); comparar contra la línea base de 8,7 s.
 
 ## Revisión RDD por commit (2026-10-01)
@@ -461,7 +461,7 @@ aprobados y reconocidos, sin correcciones. Advertencias no bloqueantes:
 - [x] R12 (`2c42650`; segunda revisión: el plazo era un timeout por fase de httpx y la llamada podía tardar 6-9 s; `fa86a53` lo acota en total, con un hilo, y lo sube a 4 s tras la medición en vivo; antes: plazo propio de 3 s sin reintentos y caída inmediata a B; la llamada sigue dentro de la transacción del turno, acotada a 3 s: ver "Etapa 6 completa"). `redaccion.py:272-282`: con A, la llamada al modelo corre dentro de la
   transacción del turno con los reintentos completos del proveedor; ante una caída, cada
   turno espera todo antes de caer a B. Plazo propio corto o cortar A tras N errores.
-- [x] R13 (`afa5718`: el verificador se rehízo sobre salida estructurada, sin morfología ni listas, y corre dentro del `try` que cae a B). Segunda revisión: rechazaba «Prisma» y el nombre de la persona; `f9f574e` los incorpora como nombres conocidos del turno (`ResultadoTurno.nombres_conocidos`, `NOMBRE_ASISTENTE`). `verificador_redaccion.py:202-203`: "hace la pregunta" se cumple con cualquier
+- [x] R13 (`afa5718`: el verificador se rehízo sobre salida estructurada, sin morfología ni listas, y corre dentro del `try` que cae a B). Segunda revisión: rechazaba «Leda» y el nombre de la persona; `f9f574e` los incorpora como nombres conocidos del turno (`ResultadoTurno.nombres_conocidos`, `NOMBRE_ASISTENTE`). `verificador_redaccion.py:202-203`: "hace la pregunta" se cumple con cualquier
   "?" ("Gracias. ¿Todo bien?" pasa sin la fecha). `:149-152`: la detección de acciones en
   primera persona no descuenta nombres de los hechos ("José"). `redaccion.py:285`:
   `verificar` fuera del try que cae a B.
@@ -487,7 +487,7 @@ Chequeo de rumbo (escrito antes de empezar; ADR 0014, "Resultado de la primera v
    (d) F-A1: el despacho se serializa por espacio (dos pasadas concurrentes y
    `skip locked` saltaban la fila que la otra estaba enviando).
 3. Qué haría innecesaria la próxima ronda: la tabla de motivos de rechazo y la mediana de
-   la llamada de redacción (`python -m prisma redaccion corework`); ningún rechazo por
+   la llamada de redacción (`python -m leda redaccion corework`); ningún rechazo por
    una forma verbal; ningún par de mensajes del turno en orden inverso.
 4. Hipótesis vigente: un modelo flash redacta el mensaje entero sobre hechos dentro de
    un plazo de 3 s con pocas caídas a B, y un pedido corto baja la mediana. Se mide, no
@@ -526,7 +526,7 @@ Chequeo de rumbo (escrito antes de empezar; ADR 0014, "Resultado de la primera v
 - **Latencia**: `redaccion.PLAZO_REDACCION_S = 3.0` (parámetro `plazo` de `redactar_turno`),
   `llm._con_plazo` (cliente por llamada con ese tiempo y sin reintentos; Gemini, un solo
   intento), tope de salida 256 tokens (antes 400), un timeout se registra con resultado
-  `timeout` y se cuenta aparte en `python -m prisma redaccion corework`.
+  `timeout` y se cuenta aparte en `python -m leda redaccion corework`.
 - **F-A1**: causa en el código, reproducida con dos conexiones y dos hilos
   (`tests/test_despacho_en_orden.py`: sin el lock salió `['PREGUNTA', 'NOTA']`). Dos
   pasadas concurrentes del despachador (el despacho inmediato de después del webhook y
@@ -581,16 +581,16 @@ Chequeo de rumbo (escrito antes de empezar; ADR 0014, "Resultado de la primera v
 - Sin cambios: `pendientes`/menú de una tarea, evidencia, reentrega y Aprobar (F4/F5), el
   texto "Hecho. La tarea quedó comprometida." (lo escribe una función de la base).
 
-## Prisma propone (2026-10-01): F-B7, F-B8, F-B10, F-B11
+## Leda propone (2026-10-01): F-B7, F-B8, F-B10, F-B11
 
 Chequeo de rumbo (registrado en el documento al cerrar la unidad; la clasificación se
 hizo al leer el encargo, antes de escribir código).
 
-1. Clase de problema: Prisma sólo dirige. Pregunta lo que falta y no propone ni acota
+1. Clase de problema: Leda sólo dirige. Pregunta lo que falta y no propone ni acota
    lo que sabe: ofrece los objetivos de todos los sectores en el mismo orden diga lo que
    diga la tarea (F-B10, F-B11), acepta un criterio de aceptación vacío de contenido
    (F-B7) y arrastra una propuesta de otro mensaje a otra tarea (F-B8). Principio
-   constitucional "Prisma ayuda y facilita, no sólo dirige" (`nucleo/constitucion.md`
+   constitucional "Leda ayuda y facilita, no sólo dirige" (`nucleo/constitucion.md`
    §8); `nucleo/mecanica-pm.md` §4 (lo que cruza áreas va por dependencias) y §13.2
    ("¿El resultado esperado es concreto y verificable?").
 2. Mecanismo, no caso: (a) el objetivo tiene área como DATO (migración `0027`), y la
@@ -673,7 +673,7 @@ hizo al leer el encargo, antes de escribir código).
 ### Resultado final
 
 - Suite completa (`python -m pytest -q` desde el worktree, runner del checkout principal): **2852 passed, 333 deselected, 0 failed** (17 min 48 s; línea previa 2793).
-- PENDIENTE (orquestador): aplicar `0027` a `prisma_flujo` y dar el área a los objetivos existentes; la prueba real de "Corrida siguiente".
+- PENDIENTE (orquestador): aplicar `0027` a `leda_flujo` y dar el área a los objetivos existentes; la prueba real de "Corrida siguiente".
 
 ## Correcciones de la revisión RDD de la etapa 6 completa (2026-10-01)
 
@@ -697,7 +697,7 @@ vuelta A/B").
    igualdad de marcas de tiempo, y un campo sin mapeo cae a B; (g) comprobar que la elección
    sigue abierta antes de llamar al modelo. Ninguna lista de frases.
 3. Qué haría innecesaria la próxima ronda: la tabla de rechazos de
-   `python -m prisma redaccion corework` sin rechazos por "Prisma" ni por el nombre de la
+   `python -m leda redaccion corework` sin rechazos por "Leda" ni por el nombre de la
    persona; la mediana y el porcentaje de `timeout` con el plazo de 4 s; ninguna redacción
    de más de ~4 s a la vista de la persona.
 4. Hipótesis vigente: un modelo flash redacta el mensaje entero dentro de un plazo. Medido
@@ -794,14 +794,14 @@ Chequeo de rumbo (escrito antes de escribir código).
 - Suite completa (`python -m pytest -q` desde el worktree, runner del checkout principal):
   **2955 passed, 333 deselected, 0 failed** (18 min 37 s; línea previa 2852).
 - Próximo paso: reiniciar el listener del worktree (`PYTHONPATH=src`) y medir en la prueba
-  real la tabla de `python -m prisma redaccion corework` (timeouts con 4 s, rechazos).
+  real la tabla de `python -m leda redaccion corework` (timeouts con 4 s, rechazos).
 
 ## Revisión RDD, noche del 2026-10-01
 
 - Etapa 6 completa: `afa5718` (`review-ce7f8b8be7d5e437`), `39d29cb`
   (`review-d1214d3160ab10c3`), `2c42650` (`review-59a22c8a9bcf050d`) aprobados; `485aa5c`,
   `3ddee06` bajo presupuesto.
-- "Prisma propone": `712b9fe` (`review-34750754b99bf9da`), `c88ce03`
+- "Leda propone": `712b9fe` (`review-34750754b99bf9da`), `c88ce03`
   (`review-304fabe95eb22a6e`) aprobados; `0d75586`, `8717026`, `b102eec` bajo presupuesto.
 - Correcciones de la revisión: tramo `c88ce03..16cc7cf` (1343 líneas) revisado como un solo
   candidato, aprobado y reconocido (`review-1c13a9b74afef99c`). Frontera de revisión de la
@@ -876,14 +876,14 @@ TDD: estricto (configuración global del usuario); runner
 - **T1, historial al ruteo.** `route_intent(..., historial=)` en los cuatro proveedores
   (`llm.py`): la conversación reciente (misma fuente y límites que `contexto.historial`:
   sólo lo enviado, en orden, sin el mensaje entrante) como mensajes previos antes del
-  texto actual (un arranque de Prisma se descarta; si la persona tenía un mensaje sin
+  texto actual (un arranque de Leda se descarta; si la persona tenía un mensaje sin
   responder, el actual se le suma). `ROUTER_SYSTEM_CONVERSACION` (sólo con historial) y
   una regla general en `otro_tema`: pedir ayuda con la pregunta, comentarla o decir que no
   se sabe responderla pertenece a ella, nunca es otro tema. `gateway._rutear` pasa
   `historial` sólo si hay; `_historial_del_turno` en `_turno`, el toque de `dudoso` y
   "Dejarlo". El grabador del banco y los dobles de prueba aceptan `historial`.
 - **T2, historial a la redacción.** `redactar(..., historial=)`: transcripción
-  ("Persona:" / "Prisma:") delante de los hechos, dentro del único mensaje (no turnos
+  ("Persona:" / "Leda:") delante de los hechos, dentro del único mensaje (no turnos
   previos: el modelo contesta un JSON y turnos en prosa le enseñarían a contestar en
   prosa). La guía: seguir la conversación, no repetir aperturas ni fórmulas, decir sólo lo
   nuevo; la conversación es contexto, nunca una fuente de hechos (el verificador no
@@ -978,7 +978,7 @@ TDD: estricto (configuración global del usuario); runner
 - **Historial en la redacción** como transcripción dentro del mensaje, no como turnos.
 - **F-A1: causa sin confirmar.** El bloqueo por espacio ya estaba (`485aa5c`) y no cubre
   un listener de un solo hilo; se corrigió el mecanismo que sí se encontró (envío fallido).
-  Hay que mirar en `prisma_flujo`, de sólo lectura, `intentos` y `ultimo_error` de las dos
+  Hay que mirar en `leda_flujo`, de sólo lectura, `intentos` y `ultimo_error` de las dos
   filas de `message_outbox` del turno de las 08:32:34: si la nota de "Dejarlo" tiene
   `intentos > 0`, es esta causa.
 - **F-C5: causa sin aislar** (ver arriba): garantía estructural más incidente.
@@ -1019,11 +1019,11 @@ decisión del usuario "que se comporte como vos").
    comprobar de un texto libre (fechas, nombres y números fuera de los hechos; no el
    sentido).
 
-Prueba real más temprana: M3 (esqueleto andante) en `prisma_flujo` con `alta = conversada`.
+Prueba real más temprana: M3 (esqueleto andante) en `leda_flujo` con `alta = conversada`.
 
 ### Tareas
 
-- [x] **M1.** (`16fa0ff`) Contrato del turno (`src/prisma/alta_turno.py`, puro): hechos, salida
+- [x] **M1.** (`16fa0ff`) Contrato del turno (`src/leda/alta_turno.py`, puro): hechos, salida
   estructurada cerrada, validación y aplicación de valores (fechas, ids cortos, límites,
   correcciones, criterio con propuesta).
 - [x] **M2.** (`03263de`) `conducir_alta(sistema, historial, hechos)` en los cuatro proveedores (salida
@@ -1116,7 +1116,7 @@ sin prueba) quedan como deuda menor de esta rama.
   incidente (`interruptor_alta`).
 - **Sin plazo propio, siempre:** `MODELO_PURO=False` no restaura nada en el alta conducida.
 - **La propuesta de criterio ya hecha** vive en `terminal_result` de la solicitud
-  (`criterio_propuesto`), junto a la pausa, sin cambiar el esquema; `prisma_app` no puede leer
+  (`criterio_propuesto`), junto a la pausa, sin cambiar el esquema; `leda_app` no puede leer
   `audit_log`.
 - **Botones:** hasta 7 por dato; el modelo conoce todas las opciones (hasta 40).
 - **Modificar** del resumen no abre el selector: lo conversa el modelo.
@@ -1212,7 +1212,7 @@ unidades de commit propias.
   afirmaban reglas retiradas.
 - **Hallazgos pendientes de la misma corrida (no se arreglan ahora).**
   - (a) Con `intencion: dejar`, la respuesta prometió "la retomamos el lunes": un compromiso a futuro para el
-    que Prisma no tiene mecanismo (constitución §4).
+    que Leda no tiene mecanismo (constitución §4).
   - (b) Tras pausar, "¿qué tarea dejaste para el lunes?" fue al camino general, que no conoce el borrador
     pausado y ofreció tareas que no tenían que ver.
 
@@ -1321,7 +1321,7 @@ Tramo `f60c3ca..51fa9e6` (`81bb60a`, `9d1bee2`, `20cd9c8`, `51fa9e6`; 994 línea
 - **Por qué.** Saca la ambigüedad del año. Una fecha sin año tiene a lo sumo UNA lectura válida: la
   próxima que llega dentro del margen. Caso de la prueba real: "para el 15 de agosto" lo resolvió el
   modelo a 2027 (hoy 2026-10-01) y la tarea quedó a casi un año. Ahora eso queda fuera del margen:
-  Prisma dice hasta dónde llega una tarea, sugiere dividirla o tomarla como objetivo, y pide una fecha
+  Leda dice hasta dónde llega una tarea, sugiere dividirla o tomarla como objetivo, y pide una fecha
   dentro del rango. En diciembre, "10 de enero" es el próximo enero sin preguntar nada.
 - **Definición.** N meses de calendario: hoy + N meses, recortado al último día del mes
   (2026-12-31 + 2 = 2027-02-28); el límite se incluye (`valores.sumar_meses`).
@@ -1390,7 +1390,7 @@ Tramo `f60c3ca..51fa9e6` (`81bb60a`, `9d1bee2`, `20cd9c8`, `51fa9e6`; 994 línea
   estratégico completado solo; revisar con el usuario si es lo que corresponde.
 - Verificado en real (16:44): el primer mensaje de Ismael entró al primer intento tras
   `bdc2905` (pidió el criterio en la misma respuesta).
-- Pendiente (f): el modelo ofrece capacidades que Prisma no tiene: "si necesitás más tiempo,
+- Pendiente (f): el modelo ofrece capacidades que Leda no tiene: "si necesitás más tiempo,
   lo tomamos como objetivo" (no existe; roadmap "Objetivo propuesto desde el alta") y "la
   retomamos el lunes" (pendiente a). Misma clase: prometer algo sin mecanismo (§4).
 - Pendiente (g), observado por el usuario: el indicador "escribiendo…" aparece y se va antes
@@ -1557,9 +1557,9 @@ Diseño B elegido por el usuario. Ruta declarada: un solo escritor (encargo expl
 - Pendiente (i), visual (RESUELTO, ver la misma entrada): en ese menú "Continuar borrador" y "Empezar otro" salen sin ícono
   (Cancelar sí lo tiene).
 
-### Lo que Prisma puede ofrecer, como hecho (2026-10-01)
+### Lo que Leda puede ofrecer, como hecho (2026-10-01)
 
-- **Causa.** En el alta conducida el modelo no sabía qué puede ofrecer Prisma en ese punto y rellenaba con lo que
+- **Causa.** En el alta conducida el modelo no sabía qué puede ofrecer Leda en ese punto y rellenaba con lo que
   haría una persona: con `dejar`, "la retomamos el lunes"; tras una fecha fuera del margen, "lo tomamos como
   objetivo". Ninguna de las dos existe (constitución §4). Además tres textos escritos por el código lo sugerían
   ellos mismos: `regla_de_fechas`, la guía `SISTEMA_ALTA` y el rechazo `FECHA_LEJANA` de `valores.py`.
@@ -1633,7 +1633,7 @@ Diseño B elegido por el usuario. Ruta declarada: un solo escritor (encargo expl
     terminal con `_sumar_a_la_respuesta_terminal`: sigue siendo UN mensaje visible (ADR 0013 regla 2),
     con estado real (regla 3). Textos: "<Nombre> lo va a ver mañana a las 08:00, cuando empiece el
     horario." (también "el lunes a las 08:00", "el 15/10 a las 08:00"; `calendario.cuando_legible`) y
-    "<Nombre> todavía no activó su chat con Prisma, así que no le pude avisar." Si el aviso sale ya,
+    "<Nombre> todavía no activó su chat con Leda, así que no le pude avisar." Si el aviso sale ya,
     no se agrega nada; si un aviso falló, tampoco (su incidente ya lo cubre; `_aviso_aislado` intacto).
     El aviso de aprobación a quien pidió usa la misma línea (era igual de simple).
   - **Límite.** Si la fila terminal ya salió antes de sumarle la línea (ventana de milisegundos con
@@ -1695,7 +1695,7 @@ Diseño B elegido por el usuario. Ruta declarada: un solo escritor (encargo expl
   por proceso). Sólo en chat privado y sólo para la llamada `conducir_alta`.
 
   ```sql
-  -- Encender (prisma_flujo; PGCLIENTENCODING=UTF8)
+  -- Encender (leda_flujo; PGCLIENTENCODING=UTF8)
   insert into workspace_setting (workspace_id, clave, valor)
   select id, 'stream', 'true'::jsonb from workspace where slug = 'corework'
   on conflict (workspace_id, clave) do update set valor = excluded.valor;
@@ -1738,16 +1738,16 @@ Diseño B elegido por el usuario. Ruta declarada: un solo escritor (encargo expl
 - Segunda prueba real del stream (Ariel, 21:58, intervalo 0,3 s): se vio mejor, con los
   textos intermedios y hasta el reintento del verificador reemplazando el primer texto.
   **Decisión del usuario (2026-10-01): stream apagado por ahora** (`delete` del ajuste
-  `stream` en `prisma_flujo`); queda sólo el "escribiendo…", que funciona. El código queda en
+  `stream` en `leda_flujo`); queda sólo el "escribiendo…", que funciona. El código queda en
   la rama, apagado por omisión. Pendiente visual para después: retomar el stream y comparar
-  sus dos modos. Prioridad: que Prisma se comporte y responda bien.
+  sus dos modos. Prioridad: que Leda se comporte y responda bien.
 - Corrección (2026-10-01, minutos después): el usuario apagó el stream creyendo que había
   causado el incidente de las 21:58; no fue así (los dos rechazos son del contenido de la
   salida del modelo, `falta_pregunta` y `formato`, y la misma clase falló a la mañana sin
-  stream). **Decisión del usuario: stream encendido** en `prisma_flujo` ("me ayudó mucho a
-  ver cómo se comporta Prisma").
+  stream). **Decisión del usuario: stream encendido** en `leda_flujo` ("me ayudó mucho a
+  ver cómo se comporta Leda").
 
-### Propuestas de Prisma: un lugar en el contrato (tercera vez, punto 4) (2026-10-01)
+### Propuestas de Leda: un lugar en el contrato (tercera vez, punto 4) (2026-10-01)
 
 - **Evidencia de la auditoría (turnos reales de las 21:51 y 21:58).** La persona pidió ayuda con el
   criterio ("¿qué me sugerís como criterio?") y el modelo lo propuso en su respuesta ("Te propongo: …
@@ -1758,14 +1758,14 @@ Diseño B elegido por el usuario. Ruta declarada: un solo escritor (encargo expl
   `texto` era obligatorio. A las 21:58 fallaron los dos intentos: aviso neutro, incidente y aviso al
   administrador. A las 21:45 el mismo rechazo de formato costó un reintento con Ismael.
 - **Razonamiento del disparador (AGENTS.md, punto 4).** Tercera aparición de la misma clase, las propuestas
-  de Prisma: `acepta_propuesta` (81bb60a, propuesta sin registro), el reintento de las 21:45 y ahora este
+  de Leda: `acepta_propuesta` (81bb60a, propuesta sin registro), el reintento de las 21:45 y ahora este
   par de rechazos. Seguir con otro parche habría sido un tercer arreglo sobre el mismo camino
   (`_criterio` / `verificar_turno`). La causa es de mecanismo: el contrato no tenía lugar para una
-  propuesta hecha por Prisma cuando la persona no dio texto, y el modelo busca de forma natural "registrar
+  propuesta hecha por Leda cuando la persona no dio texto, y el modelo busca de forma natural "registrar
   mi propuesta". Dirección del usuario: no restringir al modelo; darle el lugar que busca. Regla ADR 0013
   "estado real y sólo opciones posibles": el contrato debe ofrecer lo que el modelo necesita decir.
 - **Arreglo (mecanismo, sin esquema de base).**
-  1. `acceptance_criterion: {propuesta}` sin `texto` = "Prisma propone este criterio" (`leer_salida` lo acepta
+  1. `acceptance_criterion: {propuesta}` sin `texto` = "Leda propone este criterio" (`leer_salida` lo acepta
      sólo solo; vacía, no texto o con otras claves se rechaza). `aplicar_valores`/`_criterio` lo guardan
      `proposed` (mismo almacenamiento que `verificable: "no"` + `propuesta`; se expone como
      `propuesta_vigente`), nunca confirmado.
@@ -1780,7 +1780,7 @@ Diseño B elegido por el usuario. Ruta declarada: un solo escritor (encargo expl
 - **Hallazgo `propuesta_hecha`.** La regla de una sola propuesta por alta sólo actúa en el camino
   `{texto, verificable: "no", propuesta}` (la propuesta no pisa el texto propio de la persona). En la
   propuesta sola no hay texto de la persona que pisar, así que no se aplica: si la persona rechaza la
-  propuesta, Prisma puede volver a proponer (reemplaza la propuesta `proposed`) y el criterio ya confirmado
+  propuesta, Leda puede volver a proponer (reemplaza la propuesta `proposed`) y el criterio ya confirmado
   sigue protegido por `_ya_confirmado`. No se tocó el comportamiento existente; no bloquea el flujo.
 - **RED.** `tests/test_alta_turno.py tests/test_alta_conducida.py tests/test_conducir_alta_proveedores.py
   tests/test_horizonte_tarea.py tests/test_respuesta_en_stream.py`: 11 failed, 322 passed.
@@ -1788,7 +1788,7 @@ Diseño B elegido por el usuario. Ruta declarada: un solo escritor (encargo expl
 - **Pruebas.** Nuevas en `test_alta_turno.py` (lectura, almacenamiento `proposed`, repetir propuesta,
   no pisar confirmado, verificador con propuesta, sin preguntar ni proponer sigue rechazado, texto que repite
   la propuesta, guía y esquema) y en `test_alta_conducida.py` (el caso real de punta a punta, la persona
-  rechaza y da la suya, la persona rechaza y Prisma propone otra). Sólo se agregaron casos de rechazo a la
+  rechaza y da la suya, la persona rechaza y Leda propone otra). Sólo se agregaron casos de rechazo a la
   lista de `test_una_salida_con_algo_fuera_del_contrato_se_rechaza_entera`; ninguna prueba existente
   cambió de significado.
 - Stream más seguido (`fa7664c`, pedido del usuario: "bajar el refresco para ver más sus
@@ -1802,12 +1802,12 @@ Diseño B elegido por el usuario. Ruta declarada: un solo escritor (encargo expl
   del último texto del borrador dependía del orden de los hilos: ahora afirma que todo lo
   enviado es algo escrito, en orden, y que lo último llega. RED 1 failed; GREEN 101 passed.
 - Verificado en real (Ariel, 22:07-22:10, tras `39bbf59`): las propuestas de criterio de
-  Prisma entraron al primer intento y sin incidente; Prisma propuso el criterio por su cuenta
+  Leda entraron al primer intento y sin incidente; Leda propuso el criterio por su cuenta
   en el primer turno (constitución §8) y "dale" lo confirmó.
 - Pendiente (j), stream: a veces se ve fluido y a veces queda en las primeras 3-5 letras con
   la animación del borrador y después aparece el texto de golpe. Decisión del usuario:
   dejarlo así y pulirlo después. Hipótesis sin verificar: el proveedor a veces entrega los
-  argumentos de la herramienta en pocos trozos grandes (no lo controla Prisma), o Telegram
+  argumentos de la herramienta en pocos trozos grandes (no lo controla Leda), o Telegram
   aplica su propio ritmo al borrador. Para confirmar: registrar cuántos avances y con qué
   separación llegan por turno.
 - Pendiente (k), latencia: el primer mensaje después de reiniciar el listener empieza a
@@ -1822,7 +1822,7 @@ funciona, ritmo de trabajo, cómo operar y leer una prueba, decisiones, pendient
 orden, lecciones). Punto de retorno: (1) suite completa en HEAD (`96a139b`; última
 completa registrada 3411 passed en `5cd32b6`); (2) RDD de `39bbf59..HEAD` con
 `tools/rdd_por_tramos.py` del checkout principal; (3) decisión (e) del usuario sobre
-Dirección y el objetivo estratégico. `prisma_flujo`: `alta = conversada` y `stream`
+Dirección y el objetivo estratégico. `leda_flujo`: `alta = conversada` y `stream`
 activados.
 
 ### Retorno (2026-10-01, noche): suite, RDD y renombre a Leda
@@ -1840,6 +1840,6 @@ activados.
     débil.
 - Renombre del producto a Leda (ADR 0015 en `main`, unidad `odd/tasks/renombre-a-leda.md`).
   Esta rama recibe el mismo script determinista en el commit siguiente a éste. Su base pasa
-  de `prisma_flujo` a `leda_flujo` (nueva, armada desde el esquema renombrado, con
-  `alta = conversada` y `stream = true`). `prisma_flujo` queda como respaldo del historial
+  de `leda_flujo` a `leda_flujo` (nueva, armada desde el esquema renombrado, con
+  `alta = conversada` y `stream = true`). `leda_flujo` queda como respaldo del historial
   de pruebas.

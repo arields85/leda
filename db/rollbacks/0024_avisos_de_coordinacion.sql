@@ -7,7 +7,7 @@
 -- ni dueño. Se pierde qué filas eran avisos de coordinación: al deshacer, todas
 -- vuelven a contar contra el tope diario (y a ser pospuestas por él).
 begin;
-set search_path = prisma, public;
+set search_path = leda, public;
 
 alter table message_outbox drop column if exists es_coordinacion;
 

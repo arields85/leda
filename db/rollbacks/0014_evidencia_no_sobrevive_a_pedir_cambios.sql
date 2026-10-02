@@ -9,7 +9,7 @@
 -- function, since `motivo_no_cierra_tarea` and other functions still call
 -- it.
 begin;
-set search_path = prisma, public;
+set search_path = leda, public;
 
 create or replace function evidencia_pendiente(p_task uuid)
 returns boolean as $$

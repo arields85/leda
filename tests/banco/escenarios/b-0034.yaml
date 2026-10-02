@@ -2,7 +2,7 @@ id: b-0034
 objetivo: >
   Con la pregunta de evidencia abierta, un enlace es la respuesta (R4-H9; ADR 0005,
   ADR 0013 regla 1): la persona toca "Ya la terminé" y manda "google.com". Telegram
-  lo marca como enlace y Prisma va directo a la vista previa de la entrega -- una
+  lo marca como enlace y Leda va directo a la vista previa de la entrega -- una
   sola confirmación --, sin la pregunta intermedia "¿Esto es la evidencia…?".
 actor: Marcos Tarquini
 mensajes:

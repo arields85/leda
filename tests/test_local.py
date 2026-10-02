@@ -12,10 +12,10 @@ import contextlib
 
 import pytest
 
-from prisma import gateway
-from prisma.db import admin
-from prisma.despachador import TransporteDePrueba
-from prisma.llm import ProveedorGuionado, Respuesta
+from leda import gateway
+from leda.db import admin
+from leda.despachador import TransporteDePrueba
+from leda.llm import ProveedorGuionado, Respuesta
 
 
 class _Updates:
@@ -38,12 +38,12 @@ class _Updates:
 
 @pytest.fixture
 def escucha(corework, conn, monkeypatch):
-    from prisma.local import Escucha
+    from leda.local import Escucha
 
     monkeypatch.setattr(gateway, "mantener_chat_activo",
                         lambda *a, **k: contextlib.nullcontext())
     monkeypatch.setattr(
-        "prisma.llm.desde_base",
+        "leda.llm.desde_base",
         lambda cur, ws, key: ProveedorGuionado([Respuesta(texto="Anotado.")]))
 
     with admin(conn) as cur:
@@ -84,7 +84,7 @@ def test_despacho_inmediato_no_frena_la_escucha_si_falla(escucha, conn, monkeypa
     def _revienta(*a, **k):
         raise RuntimeError("falla simulada del despacho inmediato")
 
-    monkeypatch.setattr("prisma.local.despachar", _revienta)
+    monkeypatch.setattr("leda.local.despachar", _revienta)
 
     n = escucha.recibir(espera=0)
 

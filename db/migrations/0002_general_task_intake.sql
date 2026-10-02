@@ -4,7 +4,7 @@
 -- Applied after 0001_task_commitment.sql. This migration adds only the
 -- bounded, server-owned general task-intake path; Unit 1A remains authoritative.
 begin;
-set search_path = prisma, public;
+set search_path = leda, public;
 
 -- Fail closed if an invoking text pipeline decoded the UTF-8 file incorrectly.
 -- chr() builds the expected value independently from non-ASCII source bytes.
@@ -18,13 +18,13 @@ do $$ begin
 end $$;
 
 do $$ begin
-  if to_regclass('prisma.task_draft') is null
-     or to_regprocedure('prisma.confirmar_borrador_tarea(uuid,text,bigint)') is null then
+  if to_regclass('leda.task_draft') is null
+     or to_regprocedure('leda.confirmar_borrador_tarea(uuid,text,bigint)') is null then
     raise exception '0002 requires 0001_task_commitment.sql';
   end if;
 end $$;
 
-select pg_advisory_xact_lock(hashtextextended('prisma:0002_general_task_intake', 0));
+select pg_advisory_xact_lock(hashtextextended('leda:0002_general_task_intake', 0));
 lock table task_draft, pending_action, pending_action_option, message_outbox
   in share row exclusive mode;
 
@@ -398,11 +398,11 @@ begin
     execute format('alter table %I force row level security', table_name);
     execute format(
       'create policy aislamiento_espacio on %I using '
-      '(workspace_id = nullif(current_setting(''prisma.workspace_id'', true), '''')::uuid)',
+      '(workspace_id = nullif(current_setting(''leda.workspace_id'', true), '''')::uuid)',
       table_name);
-    execute format('grant select, insert, update, delete on %I to prisma_app',
+    execute format('grant select, insert, update, delete on %I to leda_app',
                    table_name);
-    execute format('grant all on %I to prisma_admin', table_name);
+    execute format('grant all on %I to leda_admin', table_name);
   end loop;
 end $$;
 
@@ -410,7 +410,7 @@ grant update (objective_id, objective_snapshot, titulo, descripcion, area_id,
               responsable_membership_id, fecha_objetivo,
               criterio_aceptacion, evidencia_requerida,
               evidencia_policy_version, version, estado, actualizado_en)
-  on task_draft to prisma_app;
+  on task_draft to leda_app;
 
 -- Reconcile any waiting legacy crear_tarea callback. It is cancelled rather
 -- than reinterpreted because its model-selected arguments lack intake lineage.
@@ -438,7 +438,7 @@ create function confirmar_borrador_tarea(p_workspace_id uuid, p_token text,
                                          p_chat_id bigint)
 returns table (resultado text, task_id uuid, pending_action_id uuid, replay boolean)
 language plpgsql security definer
-set search_path = prisma, public, pg_temp as $$
+set search_path = leda, public, pg_temp as $$
 declare
   o pending_action_option%rowtype;
   a pending_action%rowtype;
@@ -453,7 +453,7 @@ declare
   ahora timestamptz := clock_timestamp();
   preview_actual jsonb;
 begin
-  perform set_config('prisma.workspace_id', p_workspace_id::text, true);
+  perform set_config('leda.workspace_id', p_workspace_id::text, true);
   select * into o from pending_action_option
    where token = p_token and workspace_id = p_workspace_id;
   if not found then
@@ -679,9 +679,9 @@ end $$;
 revoke all on function confirmar_borrador_tarea(uuid, text, bigint, bigint)
   from public;
 revoke execute on function confirmar_borrador_tarea(uuid, text, bigint, bigint)
-  from prisma_app;
+  from leda_app;
 grant execute on function confirmar_borrador_tarea(uuid, text, bigint, bigint)
-  to prisma_gateway;
+  to leda_gateway;
 drop function confirmar_borrador_tarea(uuid, text, bigint);
 
 create function resolver_ingreso_borrador(p_workspace_id uuid, p_token text,
@@ -689,7 +689,7 @@ create function resolver_ingreso_borrador(p_workspace_id uuid, p_token text,
                                           p_chat_id bigint)
 returns table (resultado text, task_id uuid, pending_action_id uuid, replay boolean)
 language plpgsql security definer
-set search_path = prisma, public, pg_temp as $$
+set search_path = leda, public, pg_temp as $$
 begin
   return query
     select c.resultado, c.task_id, c.pending_action_id, c.replay
@@ -700,8 +700,8 @@ end $$;
 revoke all on function resolver_ingreso_borrador(uuid, text, bigint, bigint)
   from public;
 revoke execute on function resolver_ingreso_borrador(uuid, text, bigint, bigint)
-  from prisma_app;
+  from leda_app;
 grant execute on function resolver_ingreso_borrador(uuid, text, bigint, bigint)
-  to prisma_gateway;
+  to leda_gateway;
 
 commit;

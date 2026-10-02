@@ -14,9 +14,9 @@ from pathlib import Path
 
 import pytest
 
-from prisma import herramientas as H
-from prisma import pendientes as P
-from prisma.db import admin, espacio
+from leda import herramientas as H
+from leda import pendientes as P
+from leda.db import admin, espacio
 from tests.test_botones import _quien, _tarea, _telegram_id, _tocar, cliente  # noqa: F401
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -38,7 +38,7 @@ def test_ninguna_preparacion_junta_datos_con_puntos_medios():
     lineas = [
         f"{n}: {linea.strip()}"
         for n, linea in enumerate(
-            (ROOT / "src" / "prisma" / "herramientas.py").read_text(encoding="utf-8").splitlines(), 1)
+            (ROOT / "src" / "leda" / "herramientas.py").read_text(encoding="utf-8").splitlines(), 1)
         if "·" in linea and not linea.lstrip().startswith("#")]
     assert lineas == []
 

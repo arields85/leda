@@ -40,7 +40,7 @@ fina encima.
 
 ## Consultas de este primer corte
 
-Tomadas de lo que `product/que-es-prisma.md` promete de la superficie de
+Tomadas de lo que `product/que-es-leda.md` promete de la superficie de
 lectura y del §16 del documento del primer cliente.
 
 1. Objetivos con su avance, medido en tareas terminadas sobre el total.
@@ -58,7 +58,7 @@ decisiones y actividad semanal o mensual.
 - [x] **T1/T3** — `tests/test_lectura.py`: una prueba de aislamiento sobre las
       seis consultas y una de corrección por consulta, con datos distintos
       cargados en los dos espacios. *Ruta: delegada.*
-- [x] **T2** — `src/prisma/lectura.py`. *Ruta: delegada.*
+- [x] **T2** — `src/leda/lectura.py`. *Ruta: delegada.*
 - [x] **T4** — `frontera.md`: el puerto de lectura pasa a implementado; el
       adaptador HTTP sigue marcado como inexistente, que es lo correcto.
 - [x] **T5** — `intake_world` movida a `tests/conftest.py` para que la usen
@@ -87,7 +87,7 @@ consulta.
 Ninguna consulta lleva filtro de espacio en su SQL. El aislamiento es
 enteramente de la RLS, lo que hace que la prueba de aislamiento signifique
 algo: si la política fallara, las consultas devolverían los dos espacios y la
-prueba lo vería. Diverge del estilo de `src/prisma/herramientas.py:177`, que sí
+prueba lo vería. Diverge del estilo de `src/leda/herramientas.py:177`, que sí
 filtra explícitamente, y coincide con lo que declara el propio esquema: *el
 aislamiento no depende de que el modelo se acuerde*.
 
@@ -103,7 +103,7 @@ aislamiento no depende de que el modelo se acuerde*.
 ## Verificación aplicable
 
 TDD habilitado. Runner: `.venv/Scripts/python.exe -m pytest -q`.
-PostgreSQL 18.6 en `localhost:5432`, `PRISMA_TEST_DB_URL` en `.env.test`.
+PostgreSQL 18.6 en `localhost:5432`, `LEDA_TEST_DB_URL` en `.env.test`.
 
 El criterio 3 importa: una prueba que sólo comprueba aislamiento pasaría con
 seis funciones que devuelven siempre vacío.

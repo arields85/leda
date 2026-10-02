@@ -1,6 +1,6 @@
 """Respuestas que nombran la tarea por su título (T5, `aclaracion-con-
 botones`; ADR 0006, "las consultas no pasan por vista previa: toda respuesta
-nombra la tarea por su título, para que la persona note si Prisma entendió
+nombra la tarea por su título, para que la persona note si Leda entendió
 otra cosa").
 
 La instrucción vive en el sistema (`contexto.py`, `gateway.
@@ -26,11 +26,11 @@ from __future__ import annotations
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from prisma.agente import responder
-from prisma.autoridad import Canal, identificar
-from prisma.calendario import Calendario
-from prisma.db import admin, espacio
-from prisma.llm import Llamada, ProveedorGuionado, Respuesta
+from leda.agente import responder
+from leda.autoridad import Canal, identificar
+from leda.calendario import Calendario
+from leda.db import admin, espacio
+from leda.llm import Llamada, ProveedorGuionado, Respuesta
 
 BA = ZoneInfo("America/Argentina/Buenos_Aires")
 AHORA = datetime(2026, 7, 27, 10, 0, tzinfo=BA)
@@ -60,7 +60,7 @@ def _tarea(cur, ws, titulo="Cablear tablero máq. 3", area="ot",
         (ws, obj, titulo, ws, area, ws, persona))
     t = cur.fetchone()["id"]
     cur.execute("insert into task_state_event (task_id, estado_nuevo, actor_kind) "
-                "values (%s, 'asignada', 'prisma')", (t,))
+                "values (%s, 'asignada', 'leda')", (t,))
     return str(t)
 
 
@@ -204,7 +204,7 @@ def test_dos_tareas_resueltas_una_ausente_nombra_sólo_esa(corework, conn):
 import subprocess
 import sys
 
-from prisma.agente import (_nombrar_tareas_listadas, _nombrar_tareas_sin_mencionar,
+from leda.agente import (_nombrar_tareas_listadas, _nombrar_tareas_sin_mencionar,
                            _titulos_nombrados)
 
 
@@ -240,7 +240,7 @@ def test_titulos_de_igual_largo_que_se_pisan_se_resuelven_en_orden_estable():
     conjunto: se desempata por el título. "aaa bbb" y "bbb ccc" se pisan en "bbb":
     el primero por orden alfabético consume la aparición."""
     assert _titulos_nombrados("aaa bbb ccc", ["bbb ccc", "aaa bbb"]) == {"aaa bbb"}
-    codigo = ("from prisma.agente import _titulos_nombrados as f\n"
+    codigo = ("from leda.agente import _titulos_nombrados as f\n"
               "print(sorted(f('aaa bbb ccc', ['bbb ccc', 'aaa bbb', 'ccc ddd'])))")
     salidas = set()
     for semilla in range(8):

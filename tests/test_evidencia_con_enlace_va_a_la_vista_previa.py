@@ -15,9 +15,9 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-from prisma import pendientes as P
-from prisma.db import admin, espacio
-from prisma.llm import (IntentAction, IntentRoute, Llamada, ProveedorGuionado,
+from leda import pendientes as P
+from leda.db import admin, espacio
+from leda.llm import (IntentAction, IntentRoute, Llamada, ProveedorGuionado,
                         RespectoPendiente, Respuesta)
 
 from tests.toques import id_de_mensaje
@@ -32,7 +32,7 @@ def _ruta(respecto: RespectoPendiente) -> IntentRoute:
 
 def _guion(monkeypatch, *respuestas, rutas=()) -> ProveedorGuionado:
     proveedor = ProveedorGuionado(guion=list(respuestas), rutas=list(rutas))
-    monkeypatch.setattr("prisma.llm.desde_base", lambda cur, ws, key: proveedor)
+    monkeypatch.setattr("leda.llm.desde_base", lambda cur, ws, key: proveedor)
     return proveedor
 
 

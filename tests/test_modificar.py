@@ -19,16 +19,16 @@ import pytest
 from fastapi.testclient import TestClient
 
 from tests.toques import id_de_mensaje
-from prisma import gateway
-from prisma import herramientas as H
-from prisma import pendientes as P
-from prisma.salida import (ETIQUETA_CANCELAR, ETIQUETA_CONFIRMAR,
+from leda import gateway
+from leda import herramientas as H
+from leda import pendientes as P
+from leda.salida import (ETIQUETA_CANCELAR, ETIQUETA_CONFIRMAR,
                            ETIQUETA_MODIFICAR)
-from prisma.agente import responder
-from prisma.autoridad import Canal, Denegado, identificar
-from prisma.calendario import Calendario
-from prisma.db import admin, espacio
-from prisma.llm import Llamada, ProveedorGuionado, Respuesta
+from leda.agente import responder
+from leda.autoridad import Canal, Denegado, identificar
+from leda.calendario import Calendario
+from leda.db import admin, espacio
+from leda.llm import Llamada, ProveedorGuionado, Respuesta
 
 BA = ZoneInfo("America/Argentina/Buenos_Aires")
 AHORA = datetime(2026, 7, 27, 10, 0, tzinfo=BA)
@@ -67,7 +67,7 @@ def _tarea(cur, ws, *, titulo="Programar PLC", area="ot",
     t = cur.fetchone()["id"]
     cur.execute(
         "insert into task_state_event (task_id, estado_nuevo, actor_kind, at) "
-        "values (%s, %s, 'prisma', clock_timestamp())", (t, estado_inicial))
+        "values (%s, %s, 'leda', clock_timestamp())", (t, estado_inicial))
     return str(t)
 
 
@@ -113,7 +113,7 @@ def test_la_confirmacion_vieja_sin_preparar_sigue_con_dos_botones(
     """Una NecesitaConfirmacion sin huella (herramienta sin `preparar`, la
     lista `REQUIEREN_CONFIRMACION` que hoy no usa ninguna de las 8) no gana
     el botón Modificar: sigue siendo Confirmar/Cancelar, como antes de T3."""
-    from prisma.agente import _encolar_confirmacion
+    from leda.agente import _encolar_confirmacion
 
     ws = corework.workspace_id
     with espacio(conn, ws) as cur:
@@ -493,7 +493,7 @@ def test_de_punta_a_punta_tocar_modificar_pregunta_y_la_correccion_arma_vista_pr
                  {"tarea_id": tarea, "causa": "falta el cable"})]),
              Respuesta(texto="listo")]
     monkeypatch.setattr(
-        "prisma.llm.desde_base",
+        "leda.llm.desde_base",
         lambda cur, ws, key: ProveedorGuionado(guion))
 
     assert _mensaje(cliente, tg, "en realidad es el cable").status_code == 200

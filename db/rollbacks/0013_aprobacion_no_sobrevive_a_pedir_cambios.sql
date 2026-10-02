@@ -9,7 +9,7 @@
 -- 'rechazado') -- never dropping the function, since `evidencia_pendiente`
 -- and other functions still call it.
 begin;
-set search_path = prisma, public;
+set search_path = leda, public;
 
 create or replace function motivo_no_cierra_tarea(p_task uuid)
 returns text as $$

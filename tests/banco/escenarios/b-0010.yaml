@@ -1,7 +1,7 @@
 id: b-0010
 objetivo: >
   "Está parado" puede ser un bloqueo nuevo (registrar_bloqueo) o sólo una
-  descripción del estado sin pedir ninguna acción. Observar si Prisma
+  descripción del estado sin pedir ninguna acción. Observar si Leda
   pregunta qué necesita en vez de registrar un bloqueo que capaz no
   corresponde, o de dejarlo pasar sin más cuando sí hacía falta actuar.
 actor: Marcos Tarquini

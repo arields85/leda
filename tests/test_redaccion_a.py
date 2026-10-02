@@ -14,14 +14,14 @@ import json
 
 import pytest
 
-from prisma import incidentes, redaccion
-from prisma.db import admin, espacio
-from prisma.llm import ProveedorGuionado
-from prisma.resultado_turno import (
+from leda import incidentes, redaccion
+from leda.db import admin, espacio
+from leda.llm import ProveedorGuionado
+from leda.resultado_turno import (
     Cambio, Estado, Falta, OpcionDisponible, ResultadoTurno, Resumen,
     ValorAceptado,
 )
-from prisma.valores import TipoValor
+from leda.valores import TipoValor
 
 # Estas pruebas son de la variante A con el plazo propio y el respaldo de plantilla de B
 # (el comportamiento anterior al modelo puro, `redaccion.MODELO_PURO = False`); el modelo
@@ -80,7 +80,7 @@ def test_a_usa_el_texto_del_modelo_si_el_verificador_lo_acepta(corework, conn):
 
     assert texto.texto == "Listo, la tarea «Revisar PLC» quedó en curso."
     (sistema, hechos) = proveedor.redactados[0]
-    assert "Prisma" in sistema and "JSON" in sistema
+    assert "Leda" in sistema and "JSON" in sistema
     datos = json.loads(hechos)
     assert datos["cambios"] == [{"id": "c1", "sujeto": "la tarea «Revisar PLC»",
                                  "que": "quedó en curso"}]
@@ -125,7 +125,7 @@ def test_con_un_resumen_el_modelo_escribe_la_apertura_y_los_datos_y_el_cierre_so
 def test_una_plantilla_propia_de_b_es_el_respaldo_cuando_hay(corework, conn):
     """Un texto que B ya tenía antes del resultado (no la plantilla genérica)
     sale tal cual si A no sirve."""
-    from prisma.redaccion import TextoRedactado
+    from leda.redaccion import TextoRedactado
 
     propia = TextoRedactado("Le mandé el borrador a Morgan.")
     resultado = ResultadoTurno(cambios=(Cambio("el borrador", "quedó enviado",

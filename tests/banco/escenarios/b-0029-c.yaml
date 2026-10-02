@@ -4,7 +4,7 @@ objetivo: >
   Variante de b-0029, otro tema con el resumen esperando (ADR 0013 regla 1,
   enmienda "una sola rama de conversación abierta"; T9-R1c-4): hasta que lo
   envía, el borrador es una rama abierta de quien pide. Si consulta sus tareas,
-  Prisma no la atiende todavía: hace una sola pregunta con dos botones sobre la
+  Leda no la atiende todavía: hace una sola pregunta con dos botones sobre la
   revisión ("Estábamos con la revisión del borrador de la tarea nueva.
   ¿Seguimos con eso?"). El borrador sigue esperando y la consulta no se contesta.
 actor: Nahuel Gimenez

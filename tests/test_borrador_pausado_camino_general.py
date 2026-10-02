@@ -20,13 +20,13 @@ import dataclasses
 
 import pytest
 
-from prisma import gateway
-from prisma import ingreso_tareas as I
-from prisma import jev as jev_modulo
-from prisma.db import admin, espacio
-from prisma.jev import ClienteJevGuionado
-from prisma.salida import etiqueta_sin_icono
-from prisma.llm import (IntentAction, IntentRoute, ProveedorGuionado,
+from leda import gateway
+from leda import ingreso_tareas as I
+from leda import jev as jev_modulo
+from leda.db import admin, espacio
+from leda.jev import ClienteJevGuionado
+from leda.salida import etiqueta_sin_icono
+from leda.llm import (IntentAction, IntentRoute, ProveedorGuionado,
                         Respuesta)
 
 from tests.test_alta_eleccion_confirmacion import (
@@ -242,7 +242,7 @@ def test_una_tarea_existente_se_resuelve_aunque_haya_un_borrador_pausado(
                returning id""", (ws, objetivo, ws, ws))
         tarea_id = str(cur.fetchone()["id"])
         cur.execute("insert into task_state_event (task_id, estado_nuevo, "
-                    "actor_kind) values (%s, 'asignada', 'prisma')", (tarea_id,))
+                    "actor_kind) values (%s, 'asignada', 'leda')", (tarea_id,))
     conn.commit()
     monkeypatch.setattr(
         gateway, "config",
@@ -257,7 +257,7 @@ def test_una_tarea_existente_se_resuelve_aunque_haya_un_borrador_pausado(
         guion=[Respuesta(texto="Va bien.")],
         rutas=[IntentRoute(IntentAction.NORMAL_CONVERSATION,
                            trabajos=("lo del tablero",))])
-    monkeypatch.setattr("prisma.llm.desde_base", lambda cur, ws, key: proveedor)
+    monkeypatch.setattr("leda.llm.desde_base", lambda cur, ws, key: proveedor)
 
     with espacio(conn, ws) as cur:
         gateway._turno(cur, _actor(cur, intake_world), "¿cómo va lo del tablero?",
@@ -270,7 +270,7 @@ def test_una_tarea_existente_se_resuelve_aunque_haya_un_borrador_pausado(
 
 
 def test_el_ruteo_ofrece_paused_draft_y_el_hecho_sólo_con_un_borrador_guardado():
-    from prisma import llm
+    from leda import llm
 
     def acciones(con):
         return llm._herramienta_del_ruteo(None, None, con)[
@@ -289,7 +289,7 @@ def test_el_contexto_de_la_respuesta_mira_el_mismo_chat_que_el_ruteo(
     """Quien responde no puede saber de un borrador sobre el que el código de este
     turno no va a actuar: el hecho sale sólo en el chat del borrador (revisión RDD
     `review-9b9e456cc4c197c1`, R2/R3)."""
-    from prisma.contexto import construir
+    from leda.contexto import construir
 
     rid = _alta_con_eleccion(conn, intake_world)
     _pausar(conn, intake_world, rid)

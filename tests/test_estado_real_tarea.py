@@ -17,13 +17,13 @@ from datetime import datetime, timezone
 
 import pytest
 
-from prisma import agente
-from prisma import herramientas as H
-from prisma import menu_tarea as M
-from prisma import pendientes as P
-from prisma.calendario import Calendario
-from prisma.db import admin, espacio
-from prisma.salida import etiquetas_coinciden
+from leda import agente
+from leda import herramientas as H
+from leda import menu_tarea as M
+from leda import pendientes as P
+from leda.calendario import Calendario
+from leda.db import admin, espacio
+from leda.salida import etiquetas_coinciden
 
 from tests.test_menu_tarea import (_abrir_menu, _opciones, _pendiente, _quien,
                                    _resumen_menu, _tarea, _telegram_id, _tocar,

@@ -15,10 +15,10 @@ from datetime import date, datetime, timedelta, timezone
 import pytest
 from psycopg.types.json import Jsonb
 
-from prisma import gateway
-from prisma import ingreso_tareas as I
-from prisma.db import admin, espacio
-from prisma.llm import IntentAction, IntentRoute, RespectoPendiente
+from leda import gateway
+from leda import ingreso_tareas as I
+from leda.db import admin, espacio
+from leda.llm import IntentAction, IntentRoute, RespectoPendiente
 
 from tests.test_task_intake import (NOW, _RoutingProvider, _actor,  # noqa: F401
                                     _active_choices, _choose, _post_message)

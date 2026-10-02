@@ -8,26 +8,26 @@ límites operativos antes de aumentar infraestructura, no distribuir el sistema.
 ```text
 Telegram webhook/polling autenticado por bot
                     |
-          prisma_ingress + T1 durable
+          leda_ingress + T1 durable
                     |
  recibo inmutable (bot_scope, update_id) + capacidad opaca
                     |
-       prisma_app + T2 recuperable + LLM/herramientas
+       leda_app + T2 recuperable + LLM/herramientas
                     |
    capacidad -> actor/espacio derivados -> autoridad vigente
                     |
- prisma_gateway Unidad 1A + demás límites de dominio
+ leda_gateway Unidad 1A + demás límites de dominio
                     |
  PostgreSQL + auditoría autoritativa + outbox
                     |
- prisma_dispatcher mínimo -> Telegram/incidentes técnicos
+ leda_dispatcher mínimo -> Telegram/incidentes técnicos
 ```
 
 Este flujo es el objetivo de
 [`ADR 0003`](../decisions/0003-authenticated-inbound-boundary.md), no una descripción
 del estado implementado. Antes del piloto puede ejecutarse dentro del mismo monolito,
-pero con conexiones y membresías PostgreSQL disjuntas para `prisma_ingress`,
-`prisma_app`, `prisma_gateway`, `prisma_dispatcher` y `prisma_admin`. Ningún login
+pero con conexiones y membresías PostgreSQL disjuntas para `leda_ingress`,
+`leda_app`, `leda_gateway`, `leda_dispatcher` y `leda_admin`. Ningún login
 puede asumir varias de esas fronteras. El proceso de serving o polling no carga la
 credencial administrativa.
 
@@ -39,7 +39,7 @@ como historia, pero no produce efectos operativos.
 El dispatcher sólo reclama mensajes de outbox ya listos y puede marcar envío,
 reintento o fallo y abrir incidentes técnicos de transporte. No redacta contenido,
 cambia destinatarios ni escribe dominio. Conversación, auditoría autoritativa e
-incidentes técnicos permanecen separados: `prisma_app` no puede atribuir acciones
+incidentes técnicos permanecen separados: `leda_app` no puede atribuir acciones
 humanas; esa auditoría nace sólo en T2b cercada, gateway de Unidad 1A o una acción
 administrativa identificada.
 
@@ -52,7 +52,7 @@ Antes del piloto real, la validación simulada debe alcanzar:
 - un alcance pequeño y explícito, con autoridad, privacidad y escalamiento
   acordados;
 - borradores sin efectos y conversión explícita a tareas completas;
-- recibos Telegram autenticados, inmutables y aislados de `prisma_app`, con secreto
+- recibos Telegram autenticados, inmutables y aislados de `leda_app`, con secreto
   webhook obligatorio y específico del bot;
 - idempotencia de updates entrantes y efectos salientes;
 - máquina de estados y cierre coherentes para tareas y objetivos;
@@ -101,7 +101,7 @@ Antes de exponerlo en una VPS se requiere:
 | Datos | PostgreSQL continúa como fuente de verdad y límite transaccional. |
 | Mensajería | Recibo autenticado e idempotente en T1, procesamiento recuperable en T2 y outbox en salida. |
 | Confianza | Capacidades opacas, identidad derivada y cinco logins disjuntos; no protege frente al compromiso total del proceso Python. |
-| Autoridad de salida | `prisma_dispatcher` transporta outbox listo y registra resultado/incidente técnico; no decide contenido, destinatario ni hechos de dominio. |
+| Autoridad de salida | `leda_dispatcher` transporta outbox listo y registra resultado/incidente técnico; no decide contenido, destinatario ni hechos de dominio. |
 | Registros | Conversación, auditoría autoritativa e incidentes técnicos tienen escritores y significado separados. |
 | LLM | Interpreta y redacta; contratos y políticas controlan hechos y completitud. |
 | Configuración | Packs gobernados, versionados, reconciliables y auditables. |

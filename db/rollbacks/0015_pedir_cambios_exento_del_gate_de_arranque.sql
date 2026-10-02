@@ -13,7 +13,7 @@
 -- deja el disparador apuntando a una función eliminada, ni una función a
 -- medio aplicar.
 begin;
-set search_path = prisma, public;
+set search_path = leda, public;
 
 create or replace function exigir_dependencias_resueltas() returns trigger as $$
 declare

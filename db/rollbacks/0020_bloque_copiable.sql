@@ -8,7 +8,7 @@
 -- despachar: la columna se pierde con sus datos. `create or replace` conserva
 -- dueño y privilegios.
 begin;
-set search_path = prisma, public;
+set search_path = leda, public;
 
 alter table message_outbox drop column if exists bloque_copiable;
 
@@ -17,7 +17,7 @@ create or replace function resolver_ingreso_borrador(p_workspace_id uuid, p_toke
                                                      p_chat_id bigint)
 returns table (resultado text, task_id uuid, pending_action_id uuid, replay boolean)
 language plpgsql security definer
-set search_path = prisma, public, pg_temp as $$
+set search_path = leda, public, pg_temp as $$
 begin
   return query
     select c.resultado, c.task_id, c.pending_action_id, c.replay

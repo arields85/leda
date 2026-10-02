@@ -18,4 +18,4 @@ Before applying a migration:
 Migration `0002_general_task_intake.sql` also pins the `psql` encoding and
 aborts transactionally before DDL if its UTF-8 sentinel was decoded incorrectly.
 
-Never use `python -m prisma esquema --recrear` on an operational database.
+Never use `python -m leda esquema --recrear` on an operational database.

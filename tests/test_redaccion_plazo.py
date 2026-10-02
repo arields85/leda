@@ -16,12 +16,12 @@ import time
 import httpx
 import pytest
 
-from prisma import incidentes, llm, redaccion
-from prisma.db import admin, espacio
-from prisma.llm import ProveedorGuionado
-from prisma.resultado_turno import (Cambio, Falta, OpcionDisponible, Rechazo,
+from leda import incidentes, llm, redaccion
+from leda.db import admin, espacio
+from leda.llm import ProveedorGuionado
+from leda.resultado_turno import (Cambio, Falta, OpcionDisponible, Rechazo,
                                     ResultadoTurno, ValorAceptado)
-from prisma.valores import TipoValor
+from leda.valores import TipoValor
 
 # Estas pruebas son de la variante A con el plazo propio y el respaldo de plantilla de B
 # (el comportamiento anterior al modelo puro, `redaccion.MODELO_PURO = False`); el modelo

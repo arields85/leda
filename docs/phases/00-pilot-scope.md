@@ -2,11 +2,11 @@
 
 > **Superada por cambio de alcance — 2026-09-22.**
 >
-> Este documento define el alcance de un piloto local para un único equipo. Prisma
+> Este documento define el alcance de un piloto local para un único equipo. Leda
 > pasó a ser un producto de gestión de proyectos multi-tenant, y el trabajo ya no se
 > organiza por fases de piloto. Se conserva como registro histórico y **no debe usarse
 > para decidir**. Para el alcance vigente:
-> [`../product/que-es-prisma.md`](../product/que-es-prisma.md),
+> [`../product/que-es-leda.md`](../product/que-es-leda.md),
 > [`../architecture/frontera.md`](../architecture/frontera.md) y
 > [`../ROADMAP.md`](../ROADMAP.md).
 
@@ -76,7 +76,7 @@ La conversación no amplía autoridad. Toda excepción debe ser explícita y aud
 
 ### 3. Escalamiento público
 
-**RESUELTA COMO POLÍTICA; PENDIENTE DE IMPLEMENTACIÓN Y VALIDACIÓN.** Prisma
+**RESUELTA COMO POLÍTICA; PENDIENTE DE IMPLEMENTACIÓN Y VALIDACIÓN.** Leda
 contacta primero en privado:
 
 - [x] los problemas técnicos pueden elevarse en privado al referente;

@@ -14,10 +14,10 @@ import pytest
 import yaml
 from psycopg.types.json import Jsonb
 
-from prisma import incidentes
-from prisma import ingreso_tareas as I
-from prisma.db import admin, espacio
-from prisma.valores import sumar_meses
+from leda import incidentes
+from leda import ingreso_tareas as I
+from leda.db import admin, espacio
+from leda.valores import sumar_meses
 
 from tests.conftest import RAIZ
 from tests.test_alta_conducida import (_cuerpos, _en, _hoy, chat,  # noqa: F401
@@ -83,7 +83,7 @@ def test_un_valor_invalido_usa_dos_meses_y_deja_un_incidente(
 # ---------------------------------------------------------------- el importador
 
 def _importar(conn, tmp_path, **cambios):
-    from prisma.importador import importar
+    from leda.importador import importar
 
     pack = yaml.safe_load((RAIZ / "espacios" / "corework.yaml").read_text("utf-8"))
     pack.pop("horizonte_tarea", None)

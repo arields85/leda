@@ -2,7 +2,7 @@
 (`nucleo/mecanica-pm.md` §13.2). El modelo, al interpretar la respuesta, también
 juzga si lo es (`valor.verificable`, un campo cerrado) y, si no lo es, propone uno
 armado con el título y lo que la persona dijo (`valor.propuesta`). El código
-valida la propuesta y Prisma nunca compromete un criterio que la persona no
+valida la propuesta y Leda nunca compromete un criterio que la persona no
 eligió: la propuesta sale con botones para usarla o escribir otro. Una sola
 propuesta: si la persona insiste con su texto, se acepta."""
 
@@ -13,12 +13,12 @@ from datetime import timedelta
 
 import pytest
 
-from prisma import gateway, incidentes, llm
-from prisma import pendientes as P
-from prisma import ingreso_tareas as I
-from prisma.db import admin, espacio
-from prisma.llm import IntentAction, IntentRoute, RespectoPendiente
-from prisma.valores import TipoValor, ValorEsperado
+from leda import gateway, incidentes, llm
+from leda import pendientes as P
+from leda import ingreso_tareas as I
+from leda.db import admin, espacio
+from leda.llm import IntentAction, IntentRoute, RespectoPendiente
+from leda.valores import TipoValor, ValorEsperado
 
 from tests.test_alta_guiada_flujo import (CHAT, TITULO, _campo, _conjunto_activo,
                                           _elegir, _empezar, _entrante, _slot)

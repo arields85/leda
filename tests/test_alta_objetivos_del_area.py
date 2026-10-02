@@ -8,8 +8,8 @@ from __future__ import annotations
 
 import pytest
 
-from prisma import ingreso_tareas as I
-from prisma.db import admin, espacio
+from leda import ingreso_tareas as I
+from leda.db import admin, espacio
 
 from tests.test_alta_guiada_flujo import (TITULO, _campo, _conjunto_activo,
                                           _empezar)

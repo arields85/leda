@@ -3,12 +3,12 @@
 
 -- Applied after 0002_general_task_intake.sql. Closes cross-tenant writes on the
 -- two append-only state-event tables. They carried no workspace_id and no
--- isolation policy while still granting insert to prisma_app, so a connection
+-- isolation policy while still granting insert to leda_app, so a connection
 -- bound to one workspace could insert an event against another workspace's task
 -- and move its state. The foreign key confirmed the identifier existed, which
 -- also made the tables an enumeration oracle.
 begin;
-set search_path = prisma, public;
+set search_path = leda, public;
 
 -- Fail closed if an invoking text pipeline decoded the UTF-8 file incorrectly.
 -- chr() builds the expected value independently from non-ASCII source bytes.
@@ -22,7 +22,7 @@ do $$ begin
 end $$;
 
 do $$ begin
-  if to_regclass('prisma.task_intake_request') is null then
+  if to_regclass('leda.task_intake_request') is null then
     raise exception '0003 requires 0002_general_task_intake.sql';
   end if;
 end $$;
@@ -122,14 +122,14 @@ create trigger trg_derivar_espacio_evento_objetivo
 alter table task_state_event enable row level security;
 alter table task_state_event force row level security;
 create policy aislamiento_espacio on task_state_event
-  using (workspace_id = nullif(current_setting('prisma.workspace_id', true), '')::uuid);
+  using (workspace_id = nullif(current_setting('leda.workspace_id', true), '')::uuid);
 
 alter table objective_state_event enable row level security;
 alter table objective_state_event force row level security;
 create policy aislamiento_espacio on objective_state_event
-  using (workspace_id = nullif(current_setting('prisma.workspace_id', true), '')::uuid);
+  using (workspace_id = nullif(current_setting('leda.workspace_id', true), '')::uuid);
 
--- Los privilegios de prisma_app no cambian: estas tablas son append-only y ya
+-- Los privilegios de leda_app no cambian: estas tablas son append-only y ya
 -- tenía insert y nada más. La política es lo único que se agrega.
 
 commit;

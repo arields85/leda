@@ -1,7 +1,7 @@
 """Pruebas de la memoria conversacional.
 
 Hasta acá cada turno empezaba con un solo mensaje: el que la persona acababa
-de escribir. Prisma preguntaba algo y, cuando le contestaban, ya no sabía qué
+de escribir. Leda preguntaba algo y, cuando le contestaban, ya no sabía qué
 había preguntado. Ningún intercambio de dos turnos podía funcionar.
 
 Lo que se prueba: que el turno traiga lo que se dijeron hace un rato, que no
@@ -16,13 +16,13 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from prisma import gateway
-from prisma.agente import responder
-from prisma.autoridad import Canal, identificar
-from prisma.calendario import Calendario
-from prisma.contexto import historial
-from prisma.db import espacio
-from prisma.llm import ProveedorGuionado, Respuesta
+from leda import gateway
+from leda.agente import responder
+from leda.autoridad import Canal, identificar
+from leda.calendario import Calendario
+from leda.contexto import historial
+from leda.db import espacio
+from leda.llm import ProveedorGuionado, Respuesta
 
 BA = ZoneInfo("America/Argentina/Buenos_Aires")
 AHORA = datetime(2026, 7, 27, 10, 0, tzinfo=BA)
@@ -130,7 +130,7 @@ def test_no_trae_lo_de_ayer(corework, conn):
 def test_no_se_atribuye_lo_que_nunca_salio(corework, conn):
     """Un mensaje que quedó en la cola, la persona no lo leyó.
 
-    Si Prisma lo diera por dicho, seguiría una conversación que del otro lado
+    Si Leda lo diera por dicho, seguiría una conversación que del otro lado
     no ocurrió.
     """
     ws = corework.workspace_id
@@ -151,7 +151,7 @@ def test_no_se_atribuye_lo_que_nunca_salio(corework, conn):
 def test_el_historial_arranca_con_la_persona_y_alterna(corework, conn):
     """Los proveedores rechazan dos mensajes seguidos del mismo lado.
 
-    Si Prisma escribió primero —un recordatorio de la cadencia— el historial
+    Si Leda escribió primero —un recordatorio de la cadencia— el historial
     empezaría por ella, y la llamada fallaría entera.
     """
     ws = corework.workspace_id
@@ -174,10 +174,10 @@ def test_el_historial_arranca_con_la_persona_y_alterna(corework, conn):
 def test_el_historial_deja_ver_que_una_pregunta_quedo_cerrada(corework, conn):
     """Hallazgo 10 (sesión 2 por Telegram, 2026-09-27): Marcos tocó "Quiero
     consultar otra cosa" sobre "¿Sobre cuál de tus tareas avanzaste?",
-    escribió "hols" (un saludo) y Prisma volvió a hacer la misma pregunta.
+    escribió "hols" (un saludo) y Leda volvió a hacer la misma pregunta.
     El cierre salía con un texto fijo ("Dale, escribime qué necesitás.") que
     no nombraba qué se había cerrado -- el historial mostraba la pregunta y
-    el cierre como dos mensajes de Prisma seguidos, sin ninguna marca de que
+    el cierre como dos mensajes de Leda seguidos, sin ninguna marca de que
     la persona la había descartado.
 
     `gateway._texto_cierre_opciones` (hallazgo 10) nombra la pregunta cerrada

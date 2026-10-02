@@ -1,6 +1,6 @@
 """Pruebas de las acciones pendientes.
 
-Una acción pendiente es trabajo que Prisma entendió pero todavía no ejecutó,
+Una acción pendiente es trabajo que Leda entendió pero todavía no ejecutó,
 porque falta un acto de una persona: confirmarlo, o elegir entre opciones.
 
 Es la pieza que faltaba para que la confirmación humana sea algo más que un
@@ -19,9 +19,9 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from prisma import pendientes as P
-from prisma.autoridad import Canal, Denegado, identificar
-from prisma.db import espacio
+from leda import pendientes as P
+from leda.autoridad import Canal, Denegado, identificar
+from leda.db import espacio
 
 BA = ZoneInfo("America/Argentina/Buenos_Aires")
 AHORA = datetime(2026, 7, 27, 10, 0, tzinfo=BA)

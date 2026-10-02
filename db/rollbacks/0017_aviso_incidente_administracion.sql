@@ -8,7 +8,7 @@
 -- these -- no view, no other function, no trigger -- so plain drops are
 -- enough, same as 0011's rollback.
 begin;
-set search_path = prisma, public;
+set search_path = leda, public;
 
 drop function if exists avisar_incidente_admin(uuid, uuid, text);
 drop table if exists admin_notice;

@@ -8,12 +8,12 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from prisma import escalera, reloj
-from prisma.autoridad import Canal, Denegado, identificar, verificar
-from prisma.calendario import Calendario, cargar_feriados_ar
-from prisma.db import admin, espacio
-from prisma.despachador import TransporteDePrueba, despachar
-from prisma.importador import PackInvalido, importar
+from leda import escalera, reloj
+from leda.autoridad import Canal, Denegado, identificar, verificar
+from leda.calendario import Calendario, cargar_feriados_ar
+from leda.db import admin, espacio
+from leda.despachador import TransporteDePrueba, despachar
+from leda.importador import PackInvalido, importar
 
 BA = ZoneInfo("America/Argentina/Buenos_Aires")
 
@@ -26,7 +26,7 @@ def test_importa_corework(corework, conn):
     assert corework.slug == "corework"
     assert corework.activo
     with conn.cursor() as cur:
-        cur.execute("set role prisma_admin")
+        cur.execute("set role leda_admin")
         cur.execute("select count(*) n from membership")
         assert cur.fetchone()["n"] == 7
         cur.execute("select count(*) n from cadence_job")
@@ -40,7 +40,7 @@ def test_no_activa_con_pendientes(conn, tmp_path):
     from tests.conftest import RAIZ
 
     pack = yaml.safe_load((RAIZ / "espacios" / "corework.yaml").read_text("utf-8"))
-    # Sin grupo Prisma no tiene dónde publicar: eso sí bloquea.
+    # Sin grupo Leda no tiene dónde publicar: eso sí bloquea.
     pack["telegram"]["grupo_gestion_id"] = "PENDIENTE"
     # Los identificadores de Telegram, en cambio, llegan por activación.
     for p in pack["personas"]:
@@ -125,7 +125,7 @@ def _tarea(cur, ws, *, area="ot", persona="Marcos Tarquini", vence=None):
     t = cur.fetchone()["id"]
     cur.execute(
         "insert into task_state_event (task_id, estado_nuevo, actor_kind) "
-        "values (%s, 'asignada', 'prisma')", (t,))
+        "values (%s, 'asignada', 'leda')", (t,))
     return t
 
 
@@ -315,7 +315,7 @@ def test_ariel_en_el_bot_del_equipo_no_es_administrador(corework, conn):
         verificar(cur, quien, "cambiar_modelo")
 
 
-def test_ismael_no_puede_configurar_prisma(corework, conn):
+def test_ismael_no_puede_configurar_leda(corework, conn):
     ws = corework.workspace_id
     with admin(conn) as cur:
         cur.execute("select telegram_user_id t from app_user where nombre = 'Ismael Soschinski'")
@@ -356,7 +356,7 @@ def test_prohibiciones_absolutas(corework, conn):
 def test_una_respuesta_sale_fuera_de_horario(corework, conn):
     """Contestarle a quien escribió no es "escribir fuera de horario".
 
-    La regla de no molestar fuera de hora es para lo que Prisma inicia; dejar
+    La regla de no molestar fuera de hora es para lo que Leda inicia; dejar
     a alguien esperando hasta mañana porque son las 17:05 es peor.
     """
     ws = corework.workspace_id

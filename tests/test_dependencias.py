@@ -15,10 +15,10 @@ from zoneinfo import ZoneInfo
 import psycopg
 import pytest
 
-from prisma import escalera, herramientas as H, reloj
-from prisma.autoridad import Canal, Denegado, identificar
-from prisma.calendario import Calendario
-from prisma.db import admin, espacio
+from leda import escalera, herramientas as H, reloj
+from leda.autoridad import Canal, Denegado, identificar
+from leda.calendario import Calendario
+from leda.db import admin, espacio
 
 BA = ZoneInfo("America/Argentina/Buenos_Aires")
 
@@ -62,7 +62,7 @@ def _tarea(cur, ws, *, titulo, area, persona, estado_inicial="asignada",
     t = cur.fetchone()["id"]
     cur.execute(
         "insert into task_state_event (task_id, estado_nuevo, actor_kind, at) "
-        "values (%s, %s, 'prisma', clock_timestamp())", (t, estado_inicial))
+        "values (%s, %s, 'leda', clock_timestamp())", (t, estado_inicial))
     return str(t)
 
 
@@ -365,10 +365,10 @@ def test_quitar_dependencia_queda_auditada(corework, conn):
     accion `herramienta:<nombre>` se escribe recién al confirmar por botón
     (`gateway._toque`), no dentro del turno del agente.
     """
-    from prisma import pendientes as P
-    from prisma.agente import responder
-    from prisma.db import registrar_auditoria
-    from prisma.llm import Llamada, ProveedorGuionado, Respuesta
+    from leda import pendientes as P
+    from leda.agente import responder
+    from leda.db import registrar_auditoria
+    from leda.llm import Llamada, ProveedorGuionado, Respuesta
 
     ws = corework.workspace_id
     with admin(conn) as cur:

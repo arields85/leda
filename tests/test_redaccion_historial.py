@@ -17,14 +17,14 @@ from types import SimpleNamespace
 
 import pytest
 
-import prisma.llm as llm
-from prisma import redaccion
-from prisma import ingreso_tareas as I
-from prisma.db import admin, atar_al_entrante, espacio
-from prisma.llm import (ProveedorAnthropic, ProveedorCompatible, ProveedorGemini,
+import leda.llm as llm
+from leda import redaccion
+from leda import ingreso_tareas as I
+from leda.db import admin, atar_al_entrante, espacio
+from leda.llm import (ProveedorAnthropic, ProveedorCompatible, ProveedorGemini,
                         ProveedorGuionado)
-from prisma.resultado_turno import Falta, ResultadoTurno
-from prisma.valores import TipoValor
+from leda.resultado_turno import Falta, ResultadoTurno
+from leda.valores import TipoValor
 
 from tests.test_alta_guiada_flujo import CHAT, _empezar, _entrante
 from tests.test_alta_guiada_mensaje_entero import _Eco as _EcoBase, _a
@@ -81,7 +81,7 @@ def test_el_proveedor_manda_la_conversacion_y_los_hechos(adaptador):
 
     (contenido,) = cuerpos
     assert "Persona: necesito crear una tarea" in contenido
-    assert "Prisma: Entendí que querés una tarea nueva." in contenido
+    assert "Leda: Entendí que querés una tarea nueva." in contenido
     assert contenido.endswith(HECHOS)           # los hechos, lo último y tal cual
     assert contenido.index("Persona:") < contenido.index(HECHOS)
 

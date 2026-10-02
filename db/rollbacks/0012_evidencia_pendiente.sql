@@ -8,7 +8,7 @@
 -- the function, so no function is ever left calling one that does not
 -- exist.
 begin;
-set search_path = prisma, public;
+set search_path = leda, public;
 
 create or replace function motivo_no_cierra_tarea(p_task uuid)
 returns text as $$

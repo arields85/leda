@@ -24,12 +24,12 @@ import json
 
 import pytest
 
-from prisma import agente
-from prisma.agente import NoProponer, responder
-from prisma.calendario import Calendario
-from prisma.db import admin, espacio
-from prisma.llm import Llamada, ProveedorGuionado, Respuesta
-from prisma.salida import NO_EFFECT_STATUS
+from leda import agente
+from leda.agente import NoProponer, responder
+from leda.calendario import Calendario
+from leda.db import admin, espacio
+from leda.llm import Llamada, ProveedorGuionado, Respuesta
+from leda.salida import NO_EFFECT_STATUS
 
 from tests.test_veracidad import AHORA, _quien, _tarea
 
