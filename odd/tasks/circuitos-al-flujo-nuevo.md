@@ -123,7 +123,7 @@ botón.
       tiene ningún objetivo operativo activo, Leda lo dice con el estado real y no
       completa con otro (constitución §4). Se retira la caída a los objetivos sin área.
 
-**Hecho C0-1 y C0-2** (commit `PENDIENTE`, ruta delegada: un escritor).
+**Hecho C0-1 y C0-2** (commit `616f863`, ruta delegada: un escritor).
 
 - Mecanismo único: `_areas_de_la_tarea` y `_objetivos_de_la_tarea`
   (`ingreso_tareas.py`) reemplazan el filtro por `who.area_id`. Todo lo que busca
