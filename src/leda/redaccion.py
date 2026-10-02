@@ -37,6 +37,7 @@ from .incidentes import (ETAPA_CHARLA_SIN_RESPUESTA, ETAPA_REDACCION_FALLIDA,
 from .llm import PlazoAgotado, llamar_con_plazo
 from .resultado_turno import Falta, ResultadoTurno, Resumen, ids_de_cambios
 from .valores import TipoValor  # noqa: F401 -- el tipo de `Falta.tipo`
+from .instrucciones import emojis_del_espacio, regla_de_emojis
 from .verificador_redaccion import leer_borrador, verificar
 
 CLAVE_REDACCION = "redaccion"
@@ -216,11 +217,17 @@ def redactar(resultado: ResultadoTurno, variante: str) -> str:
 # Variante A: el modelo redacta, el código verifica
 # ---------------------------------------------------------------------------
 
-SISTEMA_REDACCION = (
+def sistema_redaccion(*, emojis: bool) -> str:
+    """La guía de la redacción de A. Los emojis salen del pack del espacio
+    (`persona_config.emojis`, C0-13), nunca fijos en el código."""
+    return _SISTEMA_REDACCION.replace("{emojis}", regla_de_emojis(emojis))
+
+
+_SISTEMA_REDACCION = (
     "Sos Leda, asistente de un equipo de trabajo por Telegram. Escribí el "
     "mensaje que la persona va a leer, a partir de los hechos en JSON.\n"
     "Voz: cordial, clara y breve (una a tres oraciones), con voseo, sin jerga, "
-    "claves internas, Markdown ni emojis. Ayudá: decí lo que entendiste y qué "
+    "claves internas ni Markdown; {emojis}. Ayudá: decí lo que entendiste y qué "
     "falta, con tus palabras.\n"
     "Usá SOLO los hechos: ninguna fecha, nombre, estado, número ni cambio que "
     "no esté. Los títulos y nombres, copiados tal cual y entre «». No nombres "
@@ -238,6 +245,8 @@ SISTEMA_REDACCION = (
     "Respondé SOLO este JSON, sin nada más: "
     "{\"texto\": \"...\", \"pregunta\": <el `campo` de `falta`, o null>, "
     "\"afirma\": [<los `id` de `cambios` que el texto cuenta como hechos>]}")
+# La guía sin emojis: la de un espacio que no los permite.
+SISTEMA_REDACCION = sistema_redaccion(emojis=False)
 
 
 def serializar_hechos(r: ResultadoTurno, correccion: dict | None = None) -> str:
@@ -398,10 +407,11 @@ def redactar_turno(cur, workspace_id: str, resultado: ResultadoTurno, variante: 
     caracteres = 0
     try:
         modelo = proveedor or proveedor_de_redaccion(cur, workspace_id)
+        sistema = sistema_redaccion(emojis=emojis_del_espacio(cur, workspace_id))
         hechos = serializar_hechos(resultado)
         conversacion = {"historial": historial} if historial else {}
         crudo = llamar_con_plazo(
-            lambda: modelo.redactar(SISTEMA_REDACCION, hechos, plazo=plazo,
+            lambda: modelo.redactar(sistema, hechos, plazo=plazo,
                                     **conversacion), plazo)
         duracion_ms = round((_reloj() - inicio) * 1000)
         caracteres = len((crudo or "").strip())
@@ -457,6 +467,7 @@ def _redactar_modelo_puro(cur, workspace_id: str, resultado: ResultadoTurno,
     el motivo); un error del modelo no se reintenta (el proveedor ya reintentó). Si
     no sale un texto, un incidente con los motivos y el aviso neutro."""
     conversacion = {"historial": historial} if historial else {}
+    sistema = sistema_redaccion(emojis=emojis_del_espacio(cur, workspace_id))
     correccion: dict | None = None
     motivos: list[str] = []
     for _ in range(INTENTOS_MODELO_PURO):
@@ -465,7 +476,7 @@ def _redactar_modelo_puro(cur, workspace_id: str, resultado: ResultadoTurno,
         try:
             modelo = proveedor or proveedor_de_redaccion(cur, workspace_id)
             crudo = modelo.redactar(
-                SISTEMA_REDACCION, serializar_hechos(resultado, correccion),
+                sistema, serializar_hechos(resultado, correccion),
                 **conversacion)
             duracion_ms = round((_reloj() - inicio) * 1000)
             caracteres = len((crudo or "").strip())
@@ -512,7 +523,13 @@ def _redactar_modelo_puro(cur, workspace_id: str, resultado: ResultadoTurno,
 # La charla con una pregunta pendiente (ADR 0013 regla 1, F-B5)
 # ---------------------------------------------------------------------------
 
-SISTEMA_CHARLA = (
+def sistema_charla(*, emojis: bool) -> str:
+    """La guía de la charla breve. Los emojis salen del pack del espacio (C0-13)."""
+    regla = regla_de_emojis(emojis)
+    return _SISTEMA_CHARLA.replace("{emojis}", f"{regla[0].upper()}{regla[1:]}")
+
+
+_SISTEMA_CHARLA = (
     "Sos Leda, una asistente que coordina el trabajo de un equipo por "
     "Telegram. La persona escribió un saludo, un agradecimiento o una charla "
     "suelta mientras Leda esperaba la respuesta a una pregunta (te llega en "
@@ -523,8 +540,11 @@ SISTEMA_CHARLA = (
     "sistema después de tu respuesta.\n"
     "- No prometas, no afirmes cambios ni estados, y no inventes datos, fechas "
     "ni nombres.\n"
-    "- Sin Markdown, sin emojis, sin jerga técnica y sin nombrar botones.\n"
+    "- Sin Markdown, sin jerga técnica y sin nombrar botones.\n"
+    "- {emojis}.\n"
     "Devolvé únicamente el texto de la respuesta.")
+# La guía sin emojis: la de un espacio que no los permite.
+SISTEMA_CHARLA = sistema_charla(emojis=False)
 
 MAX_CARACTERES_CHARLA = 240
 
@@ -573,11 +593,12 @@ def redactar_charla(cur, workspace_id: str, mensaje: str, pregunta: str, *,
     de baja severidad que no avisa a la administración -- nunca en silencio."""
     try:
         modelo = proveedor or proveedor_de_redaccion(cur, workspace_id)
+        sistema = sistema_charla(emojis=emojis_del_espacio(cur, workspace_id))
         pedido = json.dumps({"mensaje": mensaje, "pregunta_pendiente": pregunta},
                             ensure_ascii=False)
         conversacion = {"historial": historial} if historial else {}
         borrador = llamar_con_plazo(
-            lambda: modelo.redactar(SISTEMA_CHARLA, pedido,
+            lambda: modelo.redactar(sistema, pedido,
                                     plazo=PLAZO_REDACCION_S, **conversacion),
             PLAZO_REDACCION_S)
     except psycopg.Error:

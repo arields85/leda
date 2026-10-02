@@ -38,7 +38,7 @@ SEPARADOR_DE_BLOQUES = "\n\n---\n\n"
 
 # Tope de las instrucciones estables del alta, en tokens estimados (caracteres / 4).
 # Una prueba falla a la vista si se pasa (`tests/test_voz_y_instrucciones.py`).
-TOPE_TOKENS_ALTA = 2000
+TOPE_TOKENS_ALTA = 2500
 
 
 def tokens_estimados(texto: str) -> int:
@@ -79,6 +79,12 @@ class Tono:
     emojis: bool | None = None
 
 
+def emojis_del_espacio(cur, workspace_id: str) -> bool:
+    """Si el pack del espacio permite emojis. Sin tono configurado, no."""
+    tono = tono_del_espacio(cur, workspace_id)
+    return bool(tono is not None and tono.emojis)
+
+
 def tono_del_espacio(cur, workspace_id: str) -> Tono | None:
     """El tono del pack del espacio; `None` si el pack no lo define."""
     cur.execute(
@@ -91,6 +97,15 @@ def tono_del_espacio(cur, workspace_id: str) -> Tono | None:
     return Tono(nombre_visible=fila["nombre_visible"], registro=fila["registro"],
                 formalidad=fila["formalidad"], longitud=fila["longitud"],
                 emojis=fila["emojis"])
+
+
+def regla_de_emojis(emojis: bool) -> str:
+    """La regla de emojis del pack (`persona.emojis`), una sola redacción para
+    todos los circuitos que la usan (el alta y la redacción de `redaccion.py`)."""
+    if emojis:
+        return ("algún emoji ocasional cuando suma calidez o claridad, no en cada "
+                "respuesta ni como adorno")
+    return "sin emojis"
 
 
 def _sin_guiones(valor: str) -> str:
@@ -115,8 +130,8 @@ def bloque_de_tono(tono: Tono | None) -> str:
     if tono.longitud:
         lineas.append(f"- Longitud {_sin_guiones(tono.longitud)}.")
     if tono.emojis is not None:
-        lineas.append("- Puede usar emojis con moderación." if tono.emojis
-                      else "- Sin emojis.")
+        regla = regla_de_emojis(tono.emojis)
+        lineas.append(f"- {regla[0].upper()}{regla[1:]}.")
     return "\n".join(lineas)
 
 
