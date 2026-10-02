@@ -1735,3 +1735,9 @@ Diseño B elegido por el usuario. Ruta declarada: un solo escritor (encargo expl
   manda, lo último sí. El usuario quiere ver los textos intermedios ("lo hace más dinámico,
   se ve algo mientras piensa"): se conservan. RED 1 failed; GREEN 143 passed; se reescribió
   `test_el_texto_se_acota_a_una_actualizacion_por_intervalo`, que afirmaba el descarte.
+- Segunda prueba real del stream (Ariel, 21:58, intervalo 0,3 s): se vio mejor, con los
+  textos intermedios y hasta el reintento del verificador reemplazando el primer texto.
+  **Decisión del usuario (2026-10-01): stream apagado por ahora** (`delete` del ajuste
+  `stream` en `prisma_flujo`); queda sólo el "escribiendo…", que funciona. El código queda en
+  la rama, apagado por omisión. Pendiente visual para después: retomar el stream y comparar
+  sus dos modos. Prioridad: que Prisma se comporte y responda bien.
