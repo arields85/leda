@@ -83,8 +83,11 @@ si Ismael pide una tarea para Marcos, la confirma él mismo (es el aprobador de 
 Ismael pidió una tarea para Marcos ("revisar el cableado del tablero de la línea 2"). Los
 cinco turnos del modelo fueron aceptados al primer intento y no hubo incidentes. El modelo
 entendió todo, incluido "el objetivo" escrito a mano; **las tres fallas están en el código
-que rodea al modelo** ("Cómo pensamos juntos", punto 8). La tarea no se creó: Ismael
-canceló para no dejarla con el objetivo equivocado.
+que rodea al modelo** ("Cómo pensamos juntos", punto 8). La tarea no se creó: a las
+12:45:38 Ismael escribió "nada, cancela" y la solicitud quedó `cancelled` en el mismo
+segundo, con "Listo, cancelo la tarea y no queda nada guardado. Si más adelante querés
+armarla de nuevo, la empezamos cuando digas." Cancelar por texto funciona; C0-B prueba el
+botón.
 
 - **H1. Objetivos del área de quien pide, no de la tarea.** `_objetivos_del_area`
   (`ingreso_tareas.py:2189`) filtra por `who.area_id`, el área de quien escribe. Ismael es
