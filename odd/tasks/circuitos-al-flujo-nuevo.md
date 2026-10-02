@@ -248,6 +248,18 @@ pide, para otra persona, Modificar, Cancelar por texto y por botón, rechazo con
 C0-1 y C0-2 ya están construidos. Falta construir C0-3, C0-5, C0-6 y C0-8, retirar el alta guiada (M4-M9) y repetir
 la ronda C0-A (C0-4).
 
+### RDD de C0-1 y C0-2 (2026-10-02)
+
+`616f863` y `cb3befb`, desde `bda7e5b`: riesgo medio, revisión debida por presupuesto
+(`slice_budget_reached`), consentimiento permanente del usuario. Linaje
+`review-f5b5e084057d2e82`, una lente (confiabilidad): **aprobada y reconocida**. Frontera
+de revisión de la rama: `cb3befb`. Cinco observaciones no bloqueantes, para después:
+R3-001 (`alta_conducida.py:747-754`, advertencia), R3-002
+(`tests/test_alta_objetivo_del_area_de_la_tarea.py:152-157`, advertencia), R3-003
+(`ingreso_tareas.py:2208-2214`, advertencia), R3-004 (`ingreso_tareas.py:2269-2280`,
+sugerencia) y R3-005 (`ingreso_tareas.py:2770-2778`, sugerencia). La revisión entregó sólo
+la ubicación y la severidad: se miran al retomar C0.
+
 ## Relación con otros pendientes
 
 - **P1-P7** (falla del proveedor, `odd/tasks/flujo-de-un-mensaje.md`): decidido y listo
