@@ -42,6 +42,7 @@ agrega acá con dónde vive hoy.
 | Proveedor y modelo de lenguaje, con el cambio atribuido | `python -m leda modelo <id> --proveedor <p>` (escribe `model_config`) | ROADMAP, "Panel de plataforma" |
 | Dónde vive la clave de cada proveedor | Una sola `LEDA_LLM_API_KEY` en `.env`, leída al arrancar | `PENDIENTE` |
 | Modelo por espacio (`model_config` ya lo admite) | Sin superficie | `PENDIENTE` |
+| Plazo total de un turno del modelo: cuánto se espera al proveedor antes de dar el turno por fallido (aviso a la persona e incidente) | Por construir en la rama `feat/flujo-de-un-mensaje`: valor fijo de 2 minutos | Decisión del usuario (2026-10-02), a partir del turno del alta que quedó colgado sin fin. Tiene que poder ajustarse desde la plataforma |
 
 ## Configuración de cada espacio
 
