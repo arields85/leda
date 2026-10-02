@@ -233,8 +233,8 @@ respaldo del renombre.
 | Bases residuales `prisma_test_*` y `prisma_diag_*` | **Hecho** (2026-10-02) | Se borraron 15 (8 `prisma_diag_*` y 7 `prisma_test_*`), todas sin conexiones; `prisma` y `prisma_flujo` siguen como respaldo |
 | Membresía del login de autoridad en `prisma_gateway` | **Hecho** (2026-10-02) | Se fue con el rol |
 | Roles `prisma_*` del servidor | **Hecho** (2026-10-02) | Primero los 5 `prisma_gateway_test_*`. Después se volcó el esquema `prisma` viejo de la base `postgres` (sesiones 1 y 2; `db/respaldos/postgres-esquema-prisma-final-antes-de-borrar-20261002.dump`, 508 entradas, 46 tablas con datos, verificado), se hizo `drop schema prisma cascade` en `postgres` y se borraron `prisma_app`, `prisma_admin`, `prisma_gateway` y `prisma_owner`. No queda ningún rol `prisma*`. Verificado después: la autoridad asume `leda_gateway` y `leda estado` corre en las dos bases |
-| Variables `PRISMA_*` que queden en algún `.env` | Cuando todos los checkouts en uso estén renombrados | Borrar la línea |
-| Copias `.env.antes-leda` (las deja `renombrar_a_leda.py env`, ignoradas por Git) | Cuando se cumpla "Leda funciona correctamente" | Borrar el archivo |
+| Variables `PRISMA_*` que queden en algún `.env` | **Hecho** en los checkouts en uso (`main`, flujo). El worktree congelado `alta-y-google` las conserva hasta que se retome; ahí se le aplica el script | — |
+| Copias `.env.antes-leda` (las deja `renombrar_a_leda.py env`, ignoradas por Git) | **Hecho** (2026-10-02) | Borradas en `main` y en flujo (`.env.antes-leda` y `.env.test.antes-leda`) |
 | Tag `pre-renombre-leda` | Nunca hace falta borrarlo: es el registro de dónde estaba todo antes | — |
 | Ramas `auxiliar/alta-y-google-pre-*` y `-unificada-un-commit` (locales) | Ya mismo, si el usuario confirma que no las necesita (no tienen trabajo propio) | `git branch -D` |
 | `feat/flujo-variante-a` (local, remota y su worktree) | Cuando el usuario dé por cerrado el experimento A/B del ADR 0014 | Borrar el worktree, la rama local y la remota |
