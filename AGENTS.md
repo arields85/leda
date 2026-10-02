@@ -11,6 +11,20 @@ actual; no se reestructura ni reescribe sin una decisión explícita y documenta
 > posterior a una instalación o actualización; la importación funciona siempre.
 > Editar siempre este archivo, nunca `CLAUDE.md`.
 
+## Lectura obligatoria al iniciar cada sesión
+
+Pedido del usuario (2026-10-02): toda sesión nueva arranca conociendo el estado y el
+núcleo, sin que haya que pedírselo. Que figuraran en el orden de lectura no alcanzaba;
+por eso se importan, y Claude Code los carga al iniciar la sesión:
+
+@docs/STATUS.md
+@nucleo/constitucion.md
+@nucleo/mecanica-pm.md
+@nucleo/alta-de-equipo.md
+
+Un agente que no expanda estas importaciones (otra herramienta que lea `AGENTS.md`)
+tiene que leer esos cuatro archivos enteros antes de su primera respuesta.
+
 ## Orden de lectura
 
 1. `docs/product/que-es-leda.md`: qué es el producto y qué es configuración de cada cliente.
