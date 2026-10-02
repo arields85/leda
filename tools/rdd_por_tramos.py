@@ -19,6 +19,7 @@ import json
 import shlex
 import subprocess
 import sys
+import threading
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -26,14 +27,19 @@ REPO, BASE, TAG = sys.argv[1], sys.argv[2], sys.argv[3]
 OUT = Path(__file__).parent / "_rdd" / TAG
 OUT.mkdir(parents=True, exist_ok=True)
 step = 0
+_paso = threading.Lock()
 
 
 def run(argv, name):
+    # El número de paso se toma bajo candado ANTES de llamar: con los lentes en
+    # paralelo, cada uno escribe su propio archivo (antes se pisaban).
     global step
-    step += 1
+    with _paso:
+        step += 1
+        n = step
     p = subprocess.run(argv, cwd=REPO, capture_output=True, text=True, encoding="utf-8")
-    (OUT / f"{step:02d}-{name}.json").write_text(p.stdout + "\n--stderr--\n" + p.stderr,
-                                                 encoding="utf-8")
+    (OUT / f"{n:02d}-{name}.json").write_text(p.stdout + "\n--stderr--\n" + p.stderr,
+                                              encoding="utf-8")
     try:
         return json.JSONDecoder().raw_decode(p.stdout.lstrip())[0]
     except Exception:
@@ -97,11 +103,20 @@ for _ in range(20):
             sys.exit(1)
         print(f"capturing {len(inputs)} lens(es):", [
             next(a["value"] for a in i["arguments"] if a["name"] == "lens") for i in inputs])
+        def _lente(i):
+            nombre = next(a["value"] for a in i["arguments"] if a["name"] == "lens")
+            return run(op_argv(i["capture_operation"], i["arguments"]),
+                       f"capture-{nombre}")
         with ThreadPoolExecutor(len(inputs)) as ex:
-            results = list(ex.map(
-                lambda i: run(op_argv(i["capture_operation"], i["arguments"]), "capture"),
-                inputs))
-        d = results[-1]
+            results = list(ex.map(_lente, inputs))
+        # Ningún resultado se descarta: una falla o una corrección pedida en
+        # cualquier lente detiene, no sólo en el último.
+        for r in results:
+            if "failure" in r.get("schema", "") or r.get("state") == "correction_required":
+                print("STOP", json.dumps(r, indent=1, ensure_ascii=False)[:3000])
+                sys.exit(1)
+        cierres = [r for r in results if "last-event-closure" in r.get("schema", "")]
+        d = cierres[-1] if cierres else results[-1]
         # Reconcile through the bound status of the final capture, or the bound one.
         if "last-event-closure" not in d.get("schema", ""):
             print("capture result schema:", d.get("schema"), d.get("action"))
