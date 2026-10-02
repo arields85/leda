@@ -205,6 +205,16 @@ Registro:
    y no hay conexiones a bases `prisma*`. El worktree congelado `alta-y-google` conserva su
    `.env` viejo hasta que se retome (no está en uso).
 
+**RDD sobre el renombre en `main`.** El tramo `647fcc7..074d044` no se puede revisar con
+RDD: el commit mecánico `58d2bed` (290 archivos) supera el presupuesto del revisor
+(`lens_context_budget_exceeded`, linaje `review-c9f2673498baa540`, sin autoridad creada).
+Tampoco se puede partir, porque es una sustitución atómica y cualquier corte intermedio
+deja el código roto. Su prueba es la verificación determinista (373/373, playbook §6.1).
+Todo lo escrito a mano sí pasó por RDD y quedó aprobado: script y ADR
+(`review-ea0a694a9f86e303`, `review-f74eddb63ce99ff0`, `review-5be02e0e1d31830a`,
+`review-72ee922c2dfa1f26`) y arreglo de las pruebas (`review-ff793423fcb4995a`, y en la
+rama de flujo `review-7ea5dbadc4239272`).
+
 **Conclusión: Leda funciona correctamente (2026-10-02).** Ya se puede hacer la limpieza
 (R11) siguiendo la tabla. Los borrados destructivos (bases, roles) se confirman con el
 usuario antes de ejecutarse.
