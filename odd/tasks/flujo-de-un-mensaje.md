@@ -1889,10 +1889,13 @@ activados.
   botones. Turno: modelo 4,8 s, mensaje final a los 7 s. Causa: el modelo escribe `texto`
   primero y sigue generando el resto de su salida sin que se vea; después el código
   verifica y arma el resumen.
-  - Propuesta del usuario: enviar el primer párrafo como mensaje aparte. Se descarta
-    porque contradice el ADR 0013 (una respuesta visible por mensaje) y porque ese texto
-    todavía no está verificado. A las 08:55:56 el verificador rechazó un primer intento, y
-    un párrafo ya enviado no se puede retirar.
+  - Propuesta del usuario: enviar el primer párrafo como primera parte. **No contradice el
+    ADR 0013**: la regla 2 permite que una respuesta tenga varias partes. La primera
+    versión de esta nota decía lo contrario y estaba mal; el usuario lo señaló. El límite
+    real es la verificación, que revisa la salida entera. Antes de que el modelo termine,
+    el párrafo no está verificado: a las 08:55:56 el verificador rechazó un primer intento,
+    y una parte ya enviada no se puede retirar. Enviarlo después de verificar no ahorra
+    tiempo, porque el hueco es el modelo terminando su salida.
   - Solución recomendada: no dejar espacio muerto, mantener el borrador con el último texto
     (o volver a "escribiendo…") hasta que el mensaje final lo reemplace. Misma familia que
     (j). `PENDIENTE`.
