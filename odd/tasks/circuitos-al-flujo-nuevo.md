@@ -722,6 +722,43 @@ a la IA entera ni aparte).
       Lo mismo se aplica a la redacción A y a la charla breve (0-14) y a cada circuito que
       pase al flujo C.
 
+      **Construido (flujo C3 en el alta), 2026-10-02.** Commit `7191e99`. Ruta:
+      delegado (un escritor; más de dos archivos no triviales). Alcance: sólo el alta
+      conversada.
+      - `nucleo/voz.md` pasó a `nucleo/personalidad.md` (`git mv`). Cambió sólo el
+        encabezado y el título: referencia de cómo es y cómo se comporta Leda, para
+        escribir la mecánica de cada circuito, **no se le manda a la IA**; la
+        constitución sigue siendo la autoridad; cambios con aprobación del administrador;
+        "voz" queda para las respuestas con audio. El cuerpo aprobado (1.0) no cambió,
+        salvo su título; su primera línea ("Quien lee estas instrucciones responde como
+        Leda") quedó como estaba aunque ya no la lee la IA.
+      - `instrucciones.instrucciones_alta` arma la mecánica del alta y el tono del pack;
+        salieron la personalidad, `voz()`, `cuerpo_de_la_voz` y `voz_hash`. La auditoría
+        de cada turno lleva sólo `instrucciones_hash`.
+      - `MECANICA_ALTA` reescrita: personalidad general en tres líneas al comienzo
+        (cálida, cordial, breve, orientada a soluciones, sin elogios exagerados ni la
+        misma fórmula, nada interno); `pregunta` pide **un solo dato** (salió "hasta dos
+        datos"); el `texto` tiene **una o dos oraciones** (igual en el esquema, que antes
+        decía "una a tres"), en texto plano y sin saludo; primero reconoce lo que dijo la
+        persona y después pregunta; pide con una pregunta, nunca con una orden seca
+        («Decime…»); dice para qué hace falta un dato; ante «no sé» propone algo concreto
+        (regla unida a la de `ayuda`); ante «ya te lo dije» lo reconoce y sigue; nunca da
+        un efecto por hecho («anoté», «quedó registrado», «guardado», «creada»). Las
+        reglas operativas no cambiaron. El esquema de `pregunta` dice "Un solo dato".
+      - Tamaño de las instrucciones armadas con el tono de CoreWork (caracteres / 4):
+        antes (C2) 9.315 caracteres (~2.328 tokens); después (C3) 4.583 (~1.145), de los
+        que la mecánica es 4.336 (~1.084). Tope: 1.300.
+      - Pruebas: `tests/test_personalidad_en_mecanica.py` (nuevo). RED: 27 fallas, 7
+        pasan; GREEN: 34 pasan. `tests/test_voz_y_instrucciones.py` se adaptó (ya no
+        busca la voz en las instrucciones; la huella es sólo la del texto armado). Las dos
+        juntas: 63 pasan. Suite completa: `1 failed, 3538 passed, 333 deselected, 1 warning in 944.26s` (2026-10-02; sólo la falla conocida `test_un_texto_con_un_dato_inventado_se_reintenta_con_el_motivo`).
+      - **Sin decidir:** el lector de la salida sigue aceptando hasta dos datos en
+        `pregunta` (`alta_turno.MAX_PREGUNTAS = 2`): la mecánica pide uno, pero un
+        segundo no se rechaza. Bajarlo a 1 convertiría el pedido en un control (con un
+        reintento cuando la IA pide dos); queda para decidir con el usuario.
+      - **Pendiente:** medir de nuevo con el banco (`medicion-voz/test_medir_voz.py`),
+        C3 contra C1 y C2, y la prueba real. 0-15 no se marca hasta entonces.
+
 - [ ] **0-14.** La redacción A (y la charla breve) leen la voz desde la misma fuente que el
       alta (`instrucciones`), para que haya una sola voz en todo lo que escribe la IA en el
       flujo C. Decidido por el principio de una sola fuente (0-13); pendiente de la
