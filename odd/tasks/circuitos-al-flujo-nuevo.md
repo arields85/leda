@@ -368,12 +368,31 @@ escrito en el núcleo no llega al alta. Además, la rama tenía la constitución
 **Decisión del usuario (2026-10-02): hay que hacerlo**, para que lo que se decida sobre
 cómo conversa Leda se aplique en todos los circuitos.
 
-- [ ] **C0-13.** Las instrucciones del modelo de cada circuito del flujo nuevo (hoy el
-      alta conducida) toman las reglas de conversación del núcleo, de una sola fuente, en
-      lugar de repetirlas o ignorarlas. `PENDIENTE` de diseño con el usuario: qué parte
-      del núcleo va (la constitución entera, o las secciones de trato y honestidad, §4, §8
-      y §10) frente al costo de un contexto más largo en latencia, y cómo se nota un
-      cambio del núcleo sin reiniciar (hoy hace falta reiniciar el listener).
+- [ ] **C0-13. Decidido, listo para hacer** (diseño del usuario, 2026-10-02, a partir
+      del relevamiento de Hermes en `docs/research/hermes-agent.md`, "Cómo arma las
+      instrucciones del agente"):
+      1. **La voz de Leda en `nucleo/voz.md`**, al estilo de `SOUL.md` de Hermes: quién es,
+         cómo conversa (fluida, no como un formulario), honestidad y lo que nunca hace,
+         escrita como conducta con ejemplos concretos, no como lista de rasgos. Corta
+         (unos 600 a 1.000 tokens) y siempre presente en todos los circuitos. La
+         constitución sigue siendo la autoridad y la referencia; la voz dice cómo se
+         habla, la constitución qué nunca se hace.
+      2. **La constitución entera no se le manda al modelo:** lo que nunca puede pasar lo
+         garantizan el código y la base.
+      3. **El código elige qué sección del núcleo lleva cada circuito** (el alta, la
+         mecánica del alta; la entrega, la de la entrega), desde los mismos archivos: una
+         sola fuente. No la elige el modelo, porque Leda ya decide por código en qué
+         circuito está y usa un modelo chico.
+      4. **Lo fijo primero y lo que cambia al final** (voz, después la sección del
+         circuito, después los datos del espacio, y los del turno al final), por si el
+         proveedor reutiliza el comienzo idéntico. `PENDIENTE` verificar si lo hace.
+      5. **Un tope de tamaño por circuito** con una prueba que falla a la vista.
+      6. **Medir antes y después con el banco**: el mismo conjunto de turnos con el núcleo
+         entero y con la voz más la sección del circuito; latencia y cumplimiento de reglas
+         ("Cómo pensamos juntos", punto 8). Mejoras seguras: una sola fuente, la misma voz en
+         todos los circuitos, cambios en un archivo, menos costo por turno. Probables, a
+         medir: menos latencia (seguramente modesta) y mejor cumplimiento de reglas.
+      Un cambio en `voz.md` vale al reiniciar el listener (como hoy el núcleo).
 
 ## Relación con otros pendientes
 
