@@ -97,6 +97,19 @@ esperar: el 2026-10-02 un turno quedó colgado porque el proveedor `nan` estaba 
 | C-1…C-3 | Hallazgos del circuito C en `main` | `docs/STATUS.md` |
 | — | Borrar `arields85/prisma` y el remoto `respaldo-prisma` cuando el usuario lo dé por obsoleto (la carpeta de memoria vieja `D--Proyectos-Prisma-PM` ya se borró) | tabla de limpieza de R11 |
 
+## Congelado hasta cumplir el ADR 0014
+
+No se construye hasta que el alta, la entrega y la aprobación cumplan en una prueba real los
+criterios del [ADR 0014](../decisions/0014-flujo-de-un-mensaje.md) (congelamiento decidido
+por el usuario el 2026-09-30; `docs/ROADMAP.md`, "Orden de entrega"). Figura acá para que
+la lista de pendientes esté completa. Descongelar una unidad lo decide el usuario.
+
+| Unidad | Qué le falta además del descongelamiento | Dónde está el detalle |
+|---|---|---|
+| Panel de plataforma | Decidir cómo se autentica quien opera Leda; en el código no depende de nada | `docs/ROADMAP.md`, "Panel de plataforma"; inventario en `docs/product/plataforma-pendientes.md` |
+| Tablero de cliente | El puerto de lectura y el desacople del transporte | `docs/ROADMAP.md`, "Tablero de cliente" |
+| Alta con correo verificado y Google (ADR 0010) | Integrar la rama a `main` (R12) | `odd/tasks/renombre-a-leda.md`, R12 |
+
 ## Cómo operar ahora
 
 | Qué | Cómo |
