@@ -48,10 +48,16 @@ nombres con el usuario; "conducida", "guiada" o "método nuevo" confunden.
 - **Circuito:** cada cosa que Leda sabe hacer (alta, entrega, aprobación…), numerada en
   `odd/tasks/circuitos-al-flujo-nuevo.md` de la rama de flujo: circuito 0, circuito 1…;
   sus tareas, 0-1, 0-2…
-- **Pasar un circuito de flujo:** construir el flujo nuevo al lado del actual, con un
-  interruptor por circuito y por espacio (el actual queda de respaldo y nunca se mezclan
-  en un mismo mensaje), probarlo en real y, si aprueba, retirar el viejo dejándolo
-  guardado en Git con una etiqueta.
+- **Flujos congelados** (decisión del usuario, 2026-10-02, "como copiar un archivo de
+  Paint y trabajar sólo en la copia"): al empezar un flujo nuevo se pone una **etiqueta
+  de Git** a todo el código tal como está (por ejemplo `respaldo-flujos-antes-de-c2`).
+  Esa etiqueta es la copia intacta de los flujos anteriores. Desde ahí se trabaja **sólo
+  en el flujo actual**: los anteriores no se mejoran ni se corrigen, y si un cambio del
+  flujo actual los rompe, no se arreglan (la versión buena está en la etiqueta; sus
+  pruebas rotas se retiran junto con su código). No se mantienen dos flujos andando a la
+  vez ni interruptores nuevos por circuito; el interruptor `alta` que ya existe queda
+  como está. Única excepción: un error que rompa una garantía del núcleo (aislamiento
+  entre clientes, confirmación, auditoría) se corrige donde esté.
 
 ## Orden de lectura
 
