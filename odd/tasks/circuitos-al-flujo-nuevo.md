@@ -9,6 +9,8 @@ se prueba por Telegram real, con datos ficticios, y las cuentas las opera el usu
 
 **Rama:** `feat/flujo-de-un-mensaje`, base `leda_flujo`.
 
+**Nombres (2026-10-02):** los circuitos se llaman por número (circuito 0, circuito 1…) y sus tareas 0-1, 0-2…; hasta el 2026-10-02 se llamaban C0, C1… y C0-1, C0-2…, nombres que ahora se usan para las versiones del flujo C (glosario en `AGENTS.md`, "Nombres que usamos").
+
 ## Regla para cada circuito
 
 Un circuito se tilda sólo cuando se cumplen sus cuatro pasos:
@@ -19,8 +21,13 @@ Un circuito se tilda sólo cuando se cumplen sus cuatro pasos:
    2026-10-02): ¿es mecánico? ¿se puede hacer más fluido y conversacional? La persona
    escribe como habla y Leda pregunta sólo lo que falta; botones sólo para elegir
    (enmienda del ADR 0013 del 2026-10-02). La fluidez nunca saltea una garantía.
-2. **Construcción:** con el flujo nuevo, con pruebas primero y revisión RDD.
-3. **Retiro de lo viejo:** "un camino pasa al flujo nuevo sólo cuando se retiró lo
+2. **Construcción:** con el flujo C, con pruebas primero y revisión RDD, **al lado del
+   flujo actual del circuito y con un interruptor por circuito y por espacio**
+   (decisión del usuario, 2026-10-02): el flujo actual queda de respaldo y nunca se
+   mezclan en un mismo mensaje.
+3. **Retiro de lo viejo** (sólo cuando el flujo C aprobó la prueba real; el código viejo
+   queda guardado en Git con una etiqueta; si no aprueba, se vuelve al flujo actual con
+   el interruptor y se revisa el flujo C): "un camino pasa al flujo nuevo sólo cuando se retiró lo
    viejo" (`AGENTS.md`, punto 7).
 4. **Prueba real:** por Telegram, con un guion numerado. Se leen la conversación, la base,
    la auditoría y los incidentes. Pasa con los criterios de adopción del ADR 0014: al
@@ -31,29 +38,29 @@ Un circuito se tilda sólo cuando se cumplen sus cuatro pasos:
 
 Estado actual de cada uno: *por diseñar*, salvo el alta, que ya está construida.
 
-- [ ] **C0. Alta de tarea: variantes que faltan probar.** El alta conducida está
+- [ ] **Circuito 0. Alta de tarea: variantes que faltan probar.** El alta conducida está
       construida y su camino principal pasó la prueba real (2026-10-02, 11:07; quien
       confirma es otra persona). Faltan, en real: quien pide confirma su propia tarea;
       pedir una tarea para otra persona; Modificar un dato del resumen; Cancelar; y el
       aprobador rechaza con motivo. Falta también retirar el alta guiada vieja (M4-M9).
-- [ ] **C1. Entrega con evidencia.** El responsable avisa que terminó y entrega evidencia
+- [ ] **Circuito 1. Entrega con evidencia.** El responsable avisa que terminó y entrega evidencia
       (explicación, foto, archivo, resultado de prueba). La tarea pasa a `en_revision` y
       se avisa al aprobador. Mecánica §3 y §6; ADR 0009.
-- [ ] **C2. Aprobación de la entrega.** El aprobador aprueba (la tarea queda
+- [ ] **Circuito 2. Aprobación de la entrega.** El aprobador aprueba (la tarea queda
       `terminada`) o pide cambios con un motivo que el responsable ve. Mecánica §5 y §7;
       ADR 0008.
-- [ ] **C3. Estados y bloqueos.** "Ya empecé" (`en_curso`), declarar un bloqueo con su
+- [ ] **Circuito 3. Estados y bloqueos.** "Ya empecé" (`en_curso`), declarar un bloqueo con su
       causa, resolverlo, y que la tarea vuelva a su estado anterior. Mecánica §3 y §8.
-- [ ] **C4. Consultas y menú de tarea.** "¿Qué tengo pendiente?", la lista con un botón
+- [ ] **Circuito 4. Consultas y menú de tarea.** "¿Qué tengo pendiente?", la lista con un botón
       por tarea, "Ver más" y el menú de cada tarea según quién la mira. ADR 0007.
-- [ ] **C5. Dependencias.** "Esta no puede arrancar hasta que termine aquella", y el
+- [ ] **Circuito 5. Dependencias.** "Esta no puede arrancar hasta que termine aquella", y el
       aviso en cadena cuando la primera se atrasa. Mecánica §4.
-- [ ] **C6. Aclaración de referencias.** Una referencia ambigua a una tarea, una persona
+- [ ] **Circuito 6. Aclaración de referencias.** Una referencia ambigua a una tarea, una persona
       o un objetivo, y Leda pregunta cuál, con botones. Etapa 3 del ADR 0014 (Jev);
       ADR 0006.
-- [ ] **C7. Cambio de tema con una pregunta abierta.** Escribir otra cosa a mitad de
+- [ ] **Circuito 7. Cambio de tema con una pregunta abierta.** Escribir otra cosa a mitad de
       algo: "¿Seguimos con eso?", seguir o dejarlo. ADR 0013, regla 1.
-- [ ] **C8. Seguimiento automático.** Recordatorios por vencimiento, pedido de estado y
+- [ ] **Circuito 8. Seguimiento automático.** Recordatorios por vencimiento, pedido de estado y
       resumen del equipo, y cómo Leda conversa la respuesta de la persona. Para probarlo
       en real hay que forzar fechas y cadencias por consola (`leda escalera`,
       `leda correr`). Mecánica §9 a §11.
@@ -68,7 +75,7 @@ Estado actual de cada uno: *por diseñar*, salvo el alta, que ya está construid
       respuesta**, que hoy no se sigue (`pending_reply` no es operativo, riesgo 4 de
       `docs/STATUS.md`); (b) que los textos de los recordatorios salgan con la voz y el tono
       del cliente, no escritos fijos en `escalera.py` con voseo.
-- [ ] **C10. Presentación visual de las respuestas.** Decidido (usuario, 2026-10-02, tomado
+- [ ] **Circuito 10. Presentación visual de las respuestas.** Decidido (usuario, 2026-10-02, tomado
       de su contexto de Prisma en Hermes). Se aplica en el **código** que arma los
       resultados estructurados (resumen del borrador, listas, menú de tarea, avisos), no en
       el modelo, cuyo texto sigue plano (voz):
@@ -90,15 +97,15 @@ Estado actual de cada uno: *por diseñar*, salvo el alta, que ya está construid
       **Requisito técnico:** hoy Leda manda todo a Telegram como texto plano (no usa
       `parse_mode`), así que la negrita no es posible; hay que activar el formato de
       Telegram en el despachador escapando lo que escriben las personas.
-- [ ] **C9. Cambios sobre una tarea creada.** Cambiar el responsable, la fecha o el
+- [ ] **Circuito 9. Cambios sobre una tarea creada.** Cambiar el responsable, la fecha o el
       criterio de una tarea ya comprometida, con vista previa, confirmación y la
       re-aprobación cuando el cambio cruza el umbral (cambio de responsable, corrimiento
       de fecha, cambio de criterio). Hoy no existe: no hay herramienta para hacerlo.
       Constitución §7 (cambios de asignación y de fecha con confirmación humana);
-      mecánica §7 (umbral de re-aprobación). Agregado el 2026-10-02 por la ronda C0-C
+      mecánica §7 (umbral de re-aprobación). Agregado el 2026-10-02 por la ronda 0-C
       (hallazgo H5): no es funcionalidad nueva, es comportamiento obligatorio del núcleo.
 
-## C0: chequeo de rumbo y rondas (2026-10-02)
+## circuito 0: chequeo de rumbo y rondas (2026-10-02)
 
 1. Clase de problema: comprobar que el alta conducida cubre todas sus ramas reales, no
    sólo el camino que ya pasó. Ya apareció: los peores hallazgos de la primera corrida
@@ -115,13 +122,13 @@ Estado actual de cada uno: *por diseñar*, salvo el alta, que ya está construid
 Quién confirma: el aprobador del **responsable** de la tarea (`_find_confirmer`). Por eso,
 si Ismael pide una tarea para Marcos, la confirma él mismo (es el aprobador de Marcos).
 
-- **Ronda C0-A:** Ismael pide una tarea para Marcos, toca Modificar y cambia un dato, y
+- **Ronda 0-A:** Ismael pide una tarea para Marcos, toca Modificar y cambia un dato, y
   confirma él mismo. Cubre "quien pide confirma", "para otra persona" y Modificar.
-- **Ronda C0-B:** Marcos pide una tarea y la cancela desde el resumen. Cubre Cancelar.
-- **Ronda C0-C:** Marcos pide una tarea y la envía a aprobación; Ismael la rechaza y
+- **Ronda 0-B:** Marcos pide una tarea y la cancela desde el resumen. Cubre Cancelar.
+- **Ronda 0-C:** Marcos pide una tarea y la envía a aprobación; Ismael la rechaza y
   escribe el motivo. Cubre el rechazo con motivo.
 
-### Ronda C0-A (2026-10-02, 12:35-12:41): hallazgos y decisión
+### Ronda 0-A (2026-10-02, 12:35-12:41): hallazgos y decisión
 
 Ismael pidió una tarea para Marcos ("revisar el cableado del tablero de la línea 2"). Los
 cinco turnos del modelo fueron aceptados al primer intento y no hubo incidentes. El modelo
@@ -129,7 +136,7 @@ entendió todo, incluido "el objetivo" escrito a mano; **las tres fallas están 
 que rodea al modelo** ("Cómo pensamos juntos", punto 8). La tarea no se creó: a las
 12:45:38 Ismael escribió "nada, cancela" y la solicitud quedó `cancelled` en el mismo
 segundo, con "Listo, cancelo la tarea y no queda nada guardado. Si más adelante querés
-armarla de nuevo, la empezamos cuando digas." Cancelar por texto funciona; C0-B prueba el
+armarla de nuevo, la empezamos cuando digas." Cancelar por texto funciona; 0-B prueba el
 botón.
 
 - **H1. Objetivos del área de quien pide, no de la tarea.** `_objetivos_del_area`
@@ -151,15 +158,15 @@ botón.
 
 **Decisión del usuario (2026-10-02): decidido, listo para hacer.**
 
-- [x] **C0-1.** Los objetivos que ofrece el alta salen del **área de la tarea**, que es la
+- [x] **0-1.** Los objetivos que ofrece el alta salen del **área de la tarea**, que es la
       del responsable, igual que el área y el aprobador. Ismael pidiendo para Marcos ve
       los objetivos de OT.
-- [x] **C0-2.** Una tarea cuelga sólo de un **objetivo operativo**, nunca del estratégico
+- [x] **0-2.** Una tarea cuelga sólo de un **objetivo operativo**, nunca del estratégico
       (mecánica §1: la tarea va bajo el objetivo operativo). Si el área de la tarea no
       tiene ningún objetivo operativo activo, Leda lo dice con el estado real y no
       completa con otro (constitución §4). Se retira la caída a los objetivos sin área.
 
-**Hecho C0-1 y C0-2** (commit `616f863`, ruta delegada: un escritor).
+**Hecho 0-1 y 0-2** (commit `616f863`, ruta delegada: un escritor).
 
 - Mecanismo único: `_areas_de_la_tarea` y `_objetivos_de_la_tarea`
   (`ingreso_tareas.py`) reemplazan el filtro por `who.area_id`. Todo lo que busca
@@ -204,10 +211,10 @@ botón.
   depende de la fecha de hoy ("15/03" ahora se rechaza como `fecha_distinta`, no como
   `numero_inventado`). Falla igual sin este cambio. La prueba no tiene que depender del
   día en que corre.
-- [x] **C0-3.** Modificar muestra **un botón por dato modificable**, armado por el código
+- [x] **0-3.** Modificar muestra **un botón por dato modificable**, armado por el código
       desde el resumen vigente (objetivo incluido), no una lista escrita por el modelo.
 
-**Hecho C0-3** (commit `e138635`, ruta delegada: un escritor).
+**Hecho 0-3** (commit `e138635`, ruta delegada: un escritor).
 
 - Causa: `modify_from_preview` (`ingreso_tareas.py`) mandaba el toque de Modificar del
   alta conducida a `alta_conducida.modificar`, un turno del modelo con
@@ -231,22 +238,22 @@ botón.
 - Suite completa (2026-10-02, `python -m pytest -q -p no:cacheprovider`): `1 failed,
   3444 passed, 333 deselected, 1 warning in 963.07s`; la única falla es la previa que
   depende de la fecha (`test_un_texto_con_un_dato_inventado_se_reintenta_con_el_motivo`).
-- [x] **C0-4.** Repetir la ronda C0-A en real después de C0-1 a C0-3. Pasa el
-      2026-10-02 a las 14:58-15:02: ver "Ronda C0-4".
+- [x] **0-4.** Repetir la ronda 0-A en real después de 0-1 a 0-3. Pasa el
+      2026-10-02 a las 14:58-15:02: ver "Ronda 0-4".
 
 Comprobaciones: RED primero con un alta pedida por alguien de otra área (Dirección para OT)
 que hoy ofrece el estratégico; prueba de que Modificar arma sus botones desde el resumen;
 suite completa de la rama.
 
-### Rondas C0-B y C0-C (2026-10-02, 12:46-12:53): resultado y hallazgos
+### Rondas 0-B y 0-C (2026-10-02, 12:46-12:53): resultado y hallazgos
 
-- **C0-B, Cancelar con el botón: pasa.** Marcos tocó Cancelar en el resumen (12:48:16) y
+- **0-B, Cancelar con el botón: pasa.** Marcos tocó Cancelar en el resumen (12:48:16) y
   a las 12:48:17 Leda contestó "Listo, cancelé el borrador de la tarea."
-- **C0-C se desvió y quedó sin probar el rechazo con motivo.** Marcos eligió a Nahuel como
+- **0-C se desvió y quedó sin probar el rechazo con motivo.** Marcos eligió a Nahuel como
   responsable; como Marcos es el aprobador de Nahuel, tuvo Confirmar y la tarea se creó
   (12:50:25, "Calibrar los sensores de temperatura de la línea 1", a cargo de Nahuel).
   Bien: "Nahuel Gimenez todavía no activó su chat con Leda, así que no le pude avisar"
-  (auditoría `omitir_aviso_asignacion_ingreso_tarea`). Hay que repetir C0-C.
+  (auditoría `omitir_aviso_asignacion_ingreso_tarea`). Hay que repetir 0-C.
 - Los 14 turnos del alta de las tres rondas, aceptados al primer intento; sin incidentes.
 
 - **H4. Botón viejo, callejón sin salida.** El resumen ya confirmado siguió mostrando sus
@@ -264,19 +271,19 @@ suite completa de la rama.
   Constitución §4 (nunca inventa) y ADR 0013, regla 3 (estado real). Tercera aparición de
   la clase "el modelo promete lo que no existe" ((a) y (f) de `docs/STATUS.md`): el
   mecanismo es que en el camino general el texto lo escribe el modelo y no sale de los
-  hechos. Lo corrige pasar ese camino al flujo nuevo (C3, C4, C9), no un parche.
+  hechos. Lo corrige pasar ese camino al flujo nuevo (circuito 3, circuito 4, circuito 9), no un parche.
 - **H6. El menú de la tarea no ofrece cambios.** Marcos, aprobador de Nahuel y quien la
-  creó, ve sólo "Ver detalle". Consecuencia de que no exista la capacidad (C9).
+  creó, ve sólo "Ver detalle". Consecuencia de que no exista la capacidad (circuito 9).
 
 **Decisión del usuario (2026-10-02): decidido, listo para hacer.**
 
-- [x] **C0-5.** Un toque sobre un botón que ya no está vigente contesta con el **estado
+- [x] **0-5.** Un toque sobre un botón que ya no está vigente contesta con el **estado
       real** de lo que ese botón tocaba (por ejemplo, "la tarea ya quedó creada") y
       ofrece lo que se puede hacer ahora con eso, nunca un mensaje sin próximo paso
       (constitución §8). Vale para todo botón vencido, no sólo para el resumen del alta;
       corrige también C-3 de `main`.
 
-**Hecho C0-5** (commit `6b09cd4`, ruta delegada: un escritor).
+**Hecho 0-5** (commit `6b09cd4`, ruta delegada: un escritor).
 
 - Mecanismo único: `gateway._contestar_boton_vencido`. Todos los caminos que contestaban
   "Ese pedido ya no está vigente…" pasan por ahí: los toques del alta (guiada y
@@ -306,11 +313,11 @@ suite completa de la rama.
   texto anterior (alta, toques, ramas, borradores, alta guiada) ahora comprueban el
   estado real.
 - C-3 de `main` queda corregido en esta rama; llega a `main` recién cuando se integre.
-- [x] **C0-6.** Cuando una vista previa o una elección se resuelve (confirmada, cancelada,
+- [x] **0-6.** Cuando una vista previa o una elección se resuelve (confirmada, cancelada,
       enviada o vencida), sus botones se quitan del mensaje en Telegram, para que no se
       ofrezca lo que ya no se puede hacer (ADR 0013, regla 3).
 
-**Hecho C0-6** (commit `50dc2f5`, ruta delegada: un escritor).
+**Hecho 0-6** (commit `50dc2f5`, ruta delegada: un escritor).
 
 - Mecanismo: `despachador._quitar_botones_resueltos`, al final de cada pasada de
   `despachar`, bajo el mismo espacio y el mismo candado. Busca los mensajes ya entregados
@@ -322,11 +329,11 @@ suite completa de la rama.
   (nada que quitar) y también ante cualquier otra falla, que deja un incidente
   `quitar_botones` con la referencia al mensaje (nunca un silencio; reintentar sin fin
   sólo repetiría el incidente). Un toque que llegue antes o a pesar de esto lo contesta
-  C0-5.
+  0-5.
 - Migración `0028_quitar_botones.sql` (con su rollback): la columna, un índice parcial
   y su comentario, igual que en `db/esquema.sql`. No toca privilegios, dueño ni la RLS
   forzada de `message_outbox`. Lo ya entregado cuya acción ya no valía al aplicarla
-  queda marcado sin tocar Telegram (historia anterior; un toque lo contesta C0-5). El
+  queda marcado sin tocar Telegram (historia anterior; un toque lo contesta 0-5). El
   ensayo de migración y rollback de la suite y la paridad entre instalación limpia y
   base migrada pasan.
 - PENDIENTE (orquestador): aplicar `0028` a `leda_flujo` con el listener detenido, como
@@ -338,14 +345,14 @@ suite completa de la rama.
   del alta usada, idempotencia, una que sigue esperando no se toca, otro espacio no se
   toca, "no hay nada que quitar" sin incidente, otra falla con un incidente y sin
   reintento.
-- Suite completa con C0-5 y C0-6 (2026-10-02, `python -m pytest -q -p no:cacheprovider`):
+- Suite completa con 0-5 y 0-6 (2026-10-02, `python -m pytest -q -p no:cacheprovider`):
   `1 failed, 3457 passed, 333 deselected, 1 warning in 1008.24s`; la única falla es la
   previa que depende de la fecha
   (`test_un_texto_con_un_dato_inventado_se_reintenta_con_el_motivo`).
-- [x] **C0-7.** Repetir la ronda C0-C (rechazo con motivo) con Marcos como responsable.
+- [x] **0-7.** Repetir la ronda 0-C (rechazo con motivo) con Marcos como responsable.
       Hecho el 2026-10-02, 13:06-13:10: ver abajo.
 
-### Ronda C0-C repetida (2026-10-02, 13:06-13:10): pasa
+### Ronda 0-C repetida (2026-10-02, 13:06-13:10): pasa
 
 Marcos pidió "calibrar los sensores de presión de la línea 1", eligió el objetivo y "Para
 mí", escribió el criterio y tocó Enviar a aprobación (13:09:33). A Ismael le llegó el
@@ -363,18 +370,18 @@ intento; sin incidentes.
 
 **Decisión del usuario (2026-10-02): decidido, listo para hacer.**
 
-- [ ] **C0-8.** El aviso de rechazo a quien pidió cierra con dos botones: **"Volver a
+- [ ] **0-8.** El aviso de rechazo a quien pidió cierra con dos botones: **"Volver a
       armarla"** reabre el borrador con los mismos datos, para corregir lo que hizo falta
       y volver a enviarlo (con su resumen, Modificar y Enviar a aprobación); **"Dejarla
       así"** cierra el tema sin efectos. Toque idempotente y con estado real si el
-      borrador ya no se puede reabrir (C0-5).
+      borrador ya no se puede reabrir (0-5).
 
-**Estado de C0 al 2026-10-02:** las cinco variantes ya se probaron en real (confirma quien
+**Estado de circuito 0 al 2026-10-02:** las cinco variantes ya se probaron en real (confirma quien
 pide, para otra persona, Modificar, Cancelar por texto y por botón, rechazo con motivo).
-C0-1, C0-2, C0-3, C0-5 y C0-6 ya están construidos. Falta construir C0-8, retirar el alta guiada (M4-M9) y repetir
-la ronda C0-A (C0-4).
+0-1, 0-2, 0-3, 0-5 y 0-6 ya están construidos. Falta construir 0-8, retirar el alta guiada (M4-M9) y repetir
+la ronda 0-A (0-4).
 
-### RDD de C0-1 y C0-2 (2026-10-02)
+### RDD de 0-1 y 0-2 (2026-10-02)
 
 `616f863` y `cb3befb`, desde `bda7e5b`: riesgo medio, revisión debida por presupuesto
 (`slice_budget_reached`), consentimiento permanente del usuario. Linaje
@@ -384,11 +391,11 @@ R3-001 (`alta_conducida.py:747-754`, advertencia), R3-002
 (`tests/test_alta_objetivo_del_area_de_la_tarea.py:152-157`, advertencia), R3-003
 (`ingreso_tareas.py:2208-2214`, advertencia), R3-004 (`ingreso_tareas.py:2269-2280`,
 sugerencia) y R3-005 (`ingreso_tareas.py:2770-2778`, sugerencia). La revisión entregó sólo
-la ubicación y la severidad: se miran al retomar C0.
+la ubicación y la severidad: se miran al retomar circuito 0.
 
-### Ronda C0-4 (2026-10-02, 14:58-15:02): pasa
+### Ronda 0-4 (2026-10-02, 14:58-15:02): pasa
 
-Con `e138635` (C0-1 a C0-3) y el listener reiniciado. Ismael pidió "necesito que Marcos
+Con `e138635` (0-1 a 0-3) y el listener reiniciado. Ismael pidió "necesito que Marcos
 revise el cableado del tablero de la línea 2 para el martes que viene":
 
 - Objetivo con **dos botones de OT** ("Planos eléctricos correctos…" y "Conectar y
@@ -412,7 +419,7 @@ revise el cableado del tablero de la línea 2 para el martes que viene":
 
 **Decisión del usuario (2026-10-02): decidido, listo para hacer.**
 
-- [ ] **C0-9.** Cuando una fecha dicha por la persona admite dos lecturas ("el martes que
+- [ ] **0-9.** Cuando una fecha dicha por la persona admite dos lecturas ("el martes que
       viene" un viernes: 6/10 o 13/10), Leda no elige: pregunta "¿Para qué martes?" con
       un botón por fecha posible. Cuando la fecha tiene una sola lectura ("el 15/10",
       "mañana", "el martes 13", "dentro de dos semanas"), sigue como hoy, sin preguntar.
@@ -422,35 +429,35 @@ revise el cableado del tablero de la línea 2 para el martes que viene":
       Modificar. Constitución §4 (no completa con lo más probable); "botones donde hay
       opciones".
 
-### Botones para elegir, texto para decir (2026-10-02, después de C0-4)
+### Botones para elegir, texto para decir (2026-10-02, después de 0-4)
 
-Observación del usuario sobre la ronda C0-4: funcionó, pero modificar dato por dato con
+Observación del usuario sobre la ronda 0-4: funcionó, pero modificar dato por dato con
 botones se sintió mecánico. Quiere poder escribir varias cosas juntas ("quiero modificar
 la fecha por tal día y la tarea por tal otra, ¿qué objetivos hay?"), como ya pasa en el
 primer mensaje del alta ("creá una tarea para tal día, es tal cosa y la hago yo"), y que
 Leda pregunte sólo lo que falta. **Decisión del usuario: enmienda del ADR 0013 del
 2026-10-02, en `main`.** Botones sólo para elegir entre opciones que la persona no conoce
-(objetivos, responsables), por ambigüedad (C0-9), para las confirmaciones de la
+(objetivos, responsables), por ambigüedad (0-9), para las confirmaciones de la
 constitución §7, y cuando la persona pide ayuda. Todo lo demás, por texto.
 
-**Decidido, listo para hacer** (después de que terminen C0-5 y C0-6, que tocan código
+**Decidido, listo para hacer** (después de que terminen 0-5 y 0-6, que tocan código
 vecino):
 
-- [ ] **C0-10.** En el alta conducida, tocar Modificar ya no abre la lista de botones por
-      dato (C0-3): Leda contesta con un texto armado por el código, no por el modelo
+- [ ] **0-10.** En el alta conducida, tocar Modificar ya no abre la lista de botones por
+      dato (0-3): Leda contesta con un texto armado por el código, no por el modelo
       (para que no se repita H2), del estilo "Decime qué querés cambiar, podés decirme
       varias cosas juntas". La persona puede además escribir el cambio sin tocar
       Modificar. Un mensaje con varios cambios aplica todos en un turno y pregunta sólo lo
       que falta o lo ambiguo. El selector por dato queda para el alta guiada, que se
       retira igual.
-- [ ] **C0-11.** Pedido de ayuda: cuando la persona pide opciones ("¿qué objetivos hay?",
+- [ ] **0-11.** Pedido de ayuda: cuando la persona pide opciones ("¿qué objetivos hay?",
       "¿qué opciones tengo?") o no entiende lo que se le pide ("no entiendo"), el modelo lo
       devuelve como un comando de la lista cerrada y el código responde: si el dato tiene
       opciones, una explicación simple con sus botones; si es libre (criterio de
       aceptación), qué se necesita y un ejemplo concreto que se acepta con un toque. Sin
       listas de frases.
-- [ ] **C0-12.** Repetir en real una ronda con cambios escritos juntos y un pedido de
-      ayuda, después de C0-10 y C0-11.
+- [ ] **0-12.** Repetir en real una ronda con cambios escritos juntos y un pedido de
+      ayuda, después de 0-10 y 0-11.
 
 ### Una sola fuente para las reglas de conversación (2026-10-02)
 
@@ -465,7 +472,7 @@ escrito en el núcleo no llega al alta. Además, la rama tenía la constitución
 **Decisión del usuario (2026-10-02): hay que hacerlo**, para que lo que se decida sobre
 cómo conversa Leda se aplique en todos los circuitos.
 
-- [ ] **C0-13. Decidido, listo para hacer** (diseño del usuario, 2026-10-02, a partir
+- [ ] **0-13. Decidido, listo para hacer** (diseño del usuario, 2026-10-02, a partir
       del relevamiento de Hermes en `docs/research/hermes-agent.md`, "Cómo arma las
       instrucciones del agente"):
       1. **La voz de Leda en `nucleo/voz.md`**, al estilo de `SOUL.md` de Hermes: quién es,
@@ -548,7 +555,7 @@ cómo conversa Leda se aplique en todos los circuitos.
         `nucleo/mecanica-pm.md` (§2 y §13 nombran datos que el alta no pide, como
         prioridad o dependencias, y empujarían al modelo a preguntarlos); queda para
         decidir con el usuario. La medición con el banco (punto 6) queda pendiente.
-      **C0-13 no se marca** hasta que el usuario apruebe el texto de la voz y pase la
+      **0-13 no se marca** hasta que el usuario apruebe el texto de la voz y pase la
       prueba real.
 
       **Segunda unidad (revisión del usuario del borrador), 2026-10-02.** Commits
@@ -588,17 +595,17 @@ cómo conversa Leda se aplique en todos los circuitos.
         compare con la guía de emojis que corresponde al pack. Después, importar el pack
         a la base (lo hace el coordinador).
 
-### RDD de C0-3, C0-5 y C0-6 (2026-10-02)
+### RDD de 0-3, 0-5 y 0-6 (2026-10-02)
 
-Tramo desde la frontera `cb3befb` hasta `e8e6499` (C0-3, C0-5, C0-6 y documentos): riesgo
+Tramo desde la frontera `cb3befb` hasta `e8e6499` (0-3, 0-5, 0-6 y documentos): riesgo
 medio, revisión debida por presupuesto, consentimiento permanente del usuario. Linaje
 `review-a8f31237eafb9491`, una lente (confiabilidad): **aprobada y reconocida**. Nueva
 frontera de revisión de la rama: `e8e6499`. Cuatro observaciones no bloqueantes, todas
-en `despachador.py`, para mirar antes de la prueba real de C0-6: R3-001 (`:1002`,
+en `despachador.py`, para mirar antes de la prueba real de 0-6: R3-001 (`:1002`,
 advertencia), R3-002 (`:1043-1059`, advertencia), R3-003 (`:1006-1008`, sugerencia) y
 R3-004 (`:185-191`, sugerencia).
 
-**Pendiente antes de la prueba real de C0-5 y C0-6:** aplicar la migración `0028` a
+**Pendiente antes de la prueba real de 0-5 y 0-6:** aplicar la migración `0028` a
 `leda_flujo` con el listener detenido (autorización del usuario pedida, no dada todavía).
 
 ## Relación con otros pendientes
