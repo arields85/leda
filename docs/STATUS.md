@@ -68,8 +68,10 @@ Gobiernan: [`product/que-es-leda.md`](product/que-es-leda.md), [`architecture/fr
   F3 en curso.
 - Rama auxiliar `auxiliar/alta-y-google` (worktree `alta-y-google`, alta con correo
   verificado y Google; [`ADR 0010`](decisions/0010-correo-verificado-y-google-en-el-producto.md),
-  propuesta). Congelada junto con la funcionalidad nueva; le toca traer los cambios de
-  `main` antes de su próxima rebanada.
+  propuesta). Congelada junto con la funcionalidad nueva; tiene trabajo avanzado que se
+  integra a `main`. Antes de su próxima rebanada le toca el renombre a Leda y traer `main`,
+  con el procedimiento de R12 en [`../odd/tasks/renombre-a-leda.md`](../odd/tasks/renombre-a-leda.md)
+  (su `.env` apunta a la base `prisma`, que ya no existe).
 
 ## Baseline de pruebas
 

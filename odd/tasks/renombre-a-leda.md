@@ -1,6 +1,6 @@
 # Renombre del producto: Prisma pasa a llamarse Leda
 
-**Estado:** Leda funciona correctamente (2026-10-02); falta la limpieza (R11). **Decisión del usuario:** renombrar "todo lo que es
+**Estado:** Leda funciona correctamente (2026-10-02). Limpieza (R11) hecha salvo lo que depende de alta y Google; integración de `auxiliar/alta-y-google` pendiente (R12). **Decisión del usuario:** renombrar "todo lo que es
 Prisma" a Leda. Guía de referencia: `D:\Proyectos\RENAME_PLAYBOOK_prisma_to_leda.md` (renombre
 equivalente hecho en otra aplicación del usuario).
 
@@ -168,6 +168,67 @@ no un secreto. No hay `.env` ni volcados de base versionados.
 - [ ] R11. **Limpiar lo de Prisma cuando quede obsoleto**, según la tabla de abajo. Se hace
       recién cuando se cumpla "Leda funciona correctamente".
 
+- [ ] R12. **Integrar `auxiliar/alta-y-google` con el renombre** (pedido del usuario,
+      2026-10-02). La rama tiene trabajo avanzado sin terminar (alta con correo verificado y
+      credencial de Google, migraciones `0100` y `0101`, ADR 0010) que se retoma y se integra
+      a `main`. Se hace con el procedimiento de abajo, cuando el usuario la retome (la
+      funcionalidad nueva sigue congelada).
+
+## Procedimiento para integrar `auxiliar/alta-y-google` (R12)
+
+Estado de la rama al 2026-10-02: 30 commits sobre `main` (el último, `9b4d8eb`, G2c del
+2026-09-29), worktree `Prisma-PM-worktrees/alta-y-google` limpio, código todavía con el
+nombre Prisma, y su `.env` todavía con `PRISMA_*`, apuntando a la base `prisma`. **Esa base
+ya no existe**: se borró el 2026-10-02 con volcado final, y no tenía las tablas de `0100` ni
+`0101` (la rama se probó con bases efímeras), así que no se perdió nada propio de la rama.
+Sus tres copias locales (`-pre-rebase-0929`, `-pre-unificacion`, `-unificada-un-commit`) se
+conservan.
+
+Orden, aplicado igual que en `feat/flujo-de-un-mensaje`:
+
+1. **Preparar.** Detener cualquier proceso que corra desde ese worktree. Árbol limpio.
+   Correr la suite completa de la rama **antes** del renombre y registrar el resultado, que
+   es la línea de base contra la que se compara.
+2. **Las copias locales.** Compararlas con `auxiliar/alta-y-google` (`git range-diff` o
+   `git cherry`). Borrar una copia sólo si todo su contenido está en la rama; si no, se
+   conserva o se rescata lo que falte.
+3. **Renombrar la rama antes de traer `main`.** Desde el worktree:
+   `D:/Proyectos/Prisma-PM/.venv/Scripts/python.exe D:/Proyectos/Prisma-PM/tools/renombrar_a_leda.py aplicar`.
+   Commit `refactor: rename the product from Prisma to Leda across the repository`.
+   Después, `renombrar_a_leda.py verificar <commit previo> HEAD` tiene que dar differ,
+   missing y added en 0, y `restos` sólo tiene que mostrar tokens protegidos. **Por qué
+   antes:** así `main` y la rama tienen el mismo renombre, y el merge sólo muestra
+   conflictos reales. Al revés, cada archivo que la rama tocó chocaría con su versión
+   renombrada.
+4. **Traer `main`** (`git merge main`) y resolver sólo conflictos reales:
+   - Con `main` llega `tests/historia_previa_a_leda.py`. La rama tiene en
+     `tests/test_task_intake.py` lecturas `git show {BASELINE_REF}:db/esquema.sql`: tienen
+     que pasar por `esquema_base()`, como en `main`. Es un conflicto esperable en ese
+     archivo.
+   - Las migraciones `0100` y `0101` no chocan en número con `0026` y `0027` (rama de
+     flujo), pero `db/esquema.sql` tiene que converger: lo comprueba el ensayo de paridad
+     de la suite.
+5. **`.env` y `.env.test`.** `renombrar_a_leda.py env .env .env.test`, que deja la copia
+   `.env.antes-leda`. Esta rama además lee `PRISMA_CLAVE_CREDENCIALES`,
+   `PRISMA_GOOGLE_CLIENT_ID` y `PRISMA_GOOGLE_CLIENT_SECRET`: quedan como `LEDA_…`.
+   Comprobar que el código renombrado las lee (al 2026-10-02 no figuraban en el `.env` del
+   worktree).
+6. **Base nueva.** Crear una base propia para la rama (por ejemplo `leda_google`) con
+   `python -m leda esquema`, más `importar`, `feriados`, `sembrar`, `modelo` y
+   `administrador`, como `leda_flujo`. Poner su nombre en `dbname` de `LEDA_DB_URL` y de
+   `LEDA_AUTHORITY_DB_URL`. La credencial de Google se guarda cifrada en la base: en una
+   base nueva hay que cargarla de nuevo.
+7. **Roles y membresías.** Los roles `leda_*` ya existen y el login de autoridad ya tiene
+   `SET ROLE leda_gateway`. Si `0100` o `0101` crean roles nuevos o necesitan que un login
+   pueda asumirlos, replicar la membresía con las mismas opciones. Es la lección del
+   renombre: revisar `pg_auth_members`, no sólo roles y bases.
+8. **Verificar.** La suite completa tiene que dar el mismo resultado que la línea de base
+   del paso 1. RDD por tramos de todo lo escrito a mano (el commit mecánico se prueba con
+   el paso 3). Prueba real por Telegram de un alta con correo sobre la base nueva.
+9. **Integrar y limpiar.** Integrar a `main` según lo que decida el usuario. Después,
+   borrar las copias `.env.antes-leda` y, si ninguna rama viva conserva el nombre viejo,
+   el script (tabla de limpieza).
+
 ## Leda funciona correctamente: la condición para limpiar
 
 Pedido del usuario: dejar asentado que Leda funciona antes de borrar nada de Prisma. Se
@@ -240,6 +301,6 @@ respaldo del renombre.
 | Tag `pre-renombre-leda` | Nunca hace falta borrarlo: es el registro de dónde estaba todo antes | — |
 | Ramas `auxiliar/alta-y-google-pre-*` y `-unificada-un-commit` (locales) | **No se borran por la limpieza del renombre.** Son parte del trabajo de alta y Google (rama aparte, `odd/tasks/alta-y-google.md`, ADR 0010), que se retoma para integrarlo. Se decide sobre ellas al retomar esa rama, después de comparar su contenido | — |
 | `feat/flujo-variante-a` (local, remota y su worktree) | Cuando el usuario dé por cerrado el experimento A/B del ADR 0014 | Borrar el worktree, la rama local y la remota |
-| Script `tools/renombrar_a_leda.py` | Cuando ninguna rama viva tenga el nombre viejo (incluida `auxiliar/alta-y-google`, si se retoma) | Borrar el archivo |
+| Script `tools/renombrar_a_leda.py` | Cuando `auxiliar/alta-y-google` esté renombrada (R12, pasos 3 y 5) y ninguna otra rama viva conserve el nombre viejo | Borrar el archivo |
 | `tests/historia_previa_a_leda.py` | **Nunca**: las pruebas de migración leen commits anteriores al renombre y lo necesitan siempre. No es un resto de Prisma | — |
 | Carpeta, worktrees y repositorio de GitHub con el nombre viejo | Cuando el usuario decida renombrarlos (fuera de alcance) | Lo hace el usuario; el agente actualiza después `.venv`, rutas y memoria |
