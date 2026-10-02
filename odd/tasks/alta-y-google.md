@@ -5,6 +5,14 @@
 **Origen:** decisión del usuario, 2026-09-27; [`ADR 0010`](../../docs/decisions/0010-correo-verificado-y-google-en-el-producto.md).
 **Rama/worktree:** `auxiliar/alta-y-google`, `D:\Proyectos\Prisma-PM-worktrees\alta-y-google`.
 
+> **ANTES DE RETOMAR ESTA RAMA (2026-10-02).** El producto cambió de nombre a Leda en
+> `main` (ADR 0015). Esta rama tiene que integrarse a `main`, y primero le toca el renombre
+> con el procedimiento de la tarea R12 de `odd/tasks/renombre-a-leda.md` en `main`:
+> renombrar la rama con el mismo script **antes** de traer `main`, verificar byte a byte,
+> renombrar el `.env`, crear una base nueva (la base a la que apunta el `.env` de este
+> worktree ya no existe), revisar roles y membresías, y correr suite, RDD y una prueba real.
+> No empezar ninguna rebanada nueva antes de eso.
+
 > **Para la sesión que trabaje esta rama:** este documento contiene todo lo que
 > se decidió con el usuario antes de crearla. Esa conversación ocurrió en otra
 > sesión, cuya memoria automática no está disponible acá (la memoria está atada
