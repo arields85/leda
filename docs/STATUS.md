@@ -243,15 +243,11 @@ prueba real los criterios del ADR 0014. Alcance en [`ROADMAP.md`](ROADMAP.md), "
 entrega". Después, según el roadmap: aportes sobre tareas, aprendizaje de apodos y
 aclaraciones, conversación de bloqueos.
 
-**Punto exacto para retomar (cierre del 2026-10-01).** Leer primero el traspaso
-[`traspaso/2026-10-01-alta-conducida.md`](traspaso/2026-10-01-alta-conducida.md): el diseño
-que funciona, cómo se trabajó, cómo operar y leer una prueba, decisiones del usuario,
-pendientes en orden y lecciones. Primeros pasos: (1) suite completa en la rama
-`feat/flujo-de-un-mensaje` (última registrada: 3411 passed en `5cd32b6`; HEAD `96a139b`
-verificado con pruebas enfocadas); (2) RDD de `39bbf59..HEAD` con
-`tools/rdd_por_tramos.py`; (3) preguntarle al usuario la decisión (e), qué hace el alta
-cuando quien escribe es de Dirección y no tiene objetivos operativos. `main` sin push:
-sólo documentación y herramientas (`tools/leer_conversacion.py --completo`,
-`tools/leer_turnos_alta.py`, `tools/rdd_por_tramos.py`). Base `leda_flujo`: `alta =
-conversada` y `stream` activados. Consentimiento permanente para commits y revisiones RDD;
-chequeo de rumbo escrito antes de cada unidad (`AGENTS.md`).
+**Punto exacto para retomar (cierre del 2026-10-02).** Leer primero el traspaso
+[`traspaso/2026-10-02-renombre-a-leda.md`](traspaso/2026-10-02-renombre-a-leda.md): qué se
+hizo en el renombre, el punto exacto de retorno (terminar la mudanza de la carpeta local a
+`D:\Proyectos\Leda-PM`, R13), los pendientes en orden, cómo operar ahora y las lecciones. El
+traspaso del 2026-10-01 sigue valiendo para el diseño del alta conducida y la forma de
+trabajar. Push sólo a `arields85/leda` y cuando lo decida el usuario. Consentimiento
+permanente para commits y revisiones RDD; chequeo de rumbo escrito antes de cada unidad
+(`AGENTS.md`).
