@@ -651,6 +651,21 @@ cambió por su versión y envió a aprobación; Ismael confirmó.
   puede leerse como tarea creada: ajuste fino de la voz. (3) El primer turno duró 15 s
   contra 7-11 s en las pruebas anteriores del día; con un caso no se sabe si es por las
   instrucciones más largas: juntar más casos antes de concluir.
+- **El usuario no notó diferencia en la voz** ("habla exactamente igual que el flujo
+  anterior"): disparador 4 de "Cómo pensamos juntos". Causas vistas: la mitad de los
+  mensajes visibles son textos fijos del código (resumen, avisos, "Hecho. La tarea quedó
+  comprometida.", el botón vencido), que ninguna voz cambia; la IA escribe una o dos
+  oraciones por turno; y las instrucciones viejas ya pedían "colega atenta, cordial, clara
+  y breve". En curso: medición con el banco, instrucciones de C1 contra C2 en seis
+  escenarios (feliz, duda, frustración, algo imposible, varios cambios con pedido de ayuda
+  y mensaje vago), tres veces cada uno.
+
+**RDD de la voz y el trato desde el pack (2026-10-02):** tramo `e8e6499`…`1fc8db0`, riesgo
+medio, revisión debida por presupuesto; linaje `review-1a8be8746c694446`, una lente
+(confiabilidad): **aprobada y reconocida**. Nueva frontera: `c381d4d`. Cuatro
+observaciones no bloqueantes: R3-001 (`espacios/corework.yaml:353`), R3-002
+(`src/leda/alta_conducida.py:400-402`), R3-003 (`tests/test_voz_y_instrucciones.py:110-126`)
+y R3-004 (`tests/test_redaccion_trato.py:68-71`).
 
 ## Relación con otros pendientes
 
