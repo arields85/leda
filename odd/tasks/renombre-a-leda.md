@@ -177,6 +177,28 @@ no un secreto. No hay `.env` ni volcados de base versionados.
       funcionalidad nueva sigue congelada (ROADMAP, "Orden de entrega"), así que la fecha
       la decide el usuario.
 
+- [ ] R13. **Mudar la carpeta local** `D:\Proyectos\Prisma-PM` → `D:\Proyectos\Leda-PM`, y
+      `Prisma-PM-worktrees` → `Leda-PM-worktrees` (pedido del usuario, 2026-10-02).
+      - Windows no deja renombrar una carpeta en uso, y la sesión de Claude Code corre
+        adentro. Por eso la mudanza la corre el usuario con
+        `tools/mudar_carpeta.ps1` (primero `-DryRun`), con Claude Code, los editores, el
+        listener y las pruebas cerrados, desde una PowerShell fuera de las dos carpetas.
+        La simulación del 2026-10-02 detectó los procesos en uso y se negó a seguir, como
+        corresponde.
+      - El script: renombra (y deshace el primer renombre si falla el segundo), hace
+        `git worktree repair`, recrea el `.venv` con los mismos paquetes (conserva el viejo
+        hasta que el nuevo importa `leda`), copia la memoria del agente a
+        `D--Proyectos-Leda-PM`, borra los índices viejos de CodeGraph y crea el nuevo, y
+        verifica.
+      - No dependen de la ruta: Engram (fijado en `.engram/config.json`), PostgreSQL (datos
+        en scoop) y los `.env`.
+      - Después de la mudanza, en una sesión nueva abierta en `D:\Proyectos\Leda-PM`:
+        cambiar `Prisma-PM` por `Leda-PM` en los documentos vivos, las herramientas y la
+        memoria del agente (también en las ramas de flujo y de alta y Google); sacar
+        `Prisma-PM` de los tokens protegidos de `tools/renombrar_a_leda.py`, porque desde ahí
+        renombrar esas rutas pasa a ser lo correcto; y comprobar el listener desde la ruta
+        nueva. Claude Code va a pedir confiar en la carpeta nueva.
+
 ## Procedimiento para integrar `auxiliar/alta-y-google` (R12)
 
 Estado de la rama al 2026-10-02: 30 commits sobre `main` (el último, `9b4d8eb`, G2c del
@@ -331,5 +353,6 @@ respaldo del renombre.
 | `feat/flujo-variante-a` (local, remota y su worktree) | **Hecho en local** (2026-10-02, decisión del usuario) | Worktree y rama local borrados. Sus 20 commits ya estaban todos en `feat/flujo-de-un-mensaje` (0 fuera), y el experimento A/B se cerró el 2026-10-01 (ADR 0014). Queda la rama remota `origin/feat/flujo-variante-a`, que se borra cuando el usuario decida el push |
 | Script `tools/renombrar_a_leda.py` | Cuando `auxiliar/alta-y-google` esté renombrada (R12, pasos 3 y 5) y ninguna otra rama viva conserve el nombre viejo | Borrar el archivo |
 | `tests/historia_previa_a_leda.py` | **Nunca**: las pruebas de migración leen commits anteriores al renombre y lo necesitan siempre. No es un resto de Prisma | — |
+| Carpeta de memoria vieja `~/.claude/projects/D--Proyectos-Prisma-PM` (después de R13) | Cuando la sesión en `Leda-PM` lea bien su memoria | Borrar la carpeta (las transcripciones viejas se pierden; copiarlas antes si interesan) |
 | Repositorio `arields85/prisma` (respaldo congelado) y el remoto local `respaldo-prisma` | Cuando el usuario lo dé por obsoleto | Borrar el repositorio en GitHub (lo hace o lo autoriza el usuario) y `git remote remove respaldo-prisma` |
 | Carpeta, worktrees y repositorio de GitHub con el nombre viejo | Cuando el usuario decida renombrarlos (fuera de alcance) | Lo hace el usuario; el agente actualiza después `.venv`, rutas y memoria |
