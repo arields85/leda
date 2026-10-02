@@ -151,6 +151,37 @@ casos.
    ventana. Cada toque procesado recibe exactamente una respuesta visible, con el mismo
    control que los mensajes (regla 2).
 
+**Enmienda (2026-10-02, decisión del usuario): botones para elegir, texto para decir.**
+Reemplaza, para los circuitos que ya pasaron al flujo del ADR 0014, el criterio de "donde
+hay opciones concretas, botones; texto libre sólo para datos sin opciones" (enmienda de la
+regla 1 del 2026-09-29, ADR 0005 decisión 4 y ADR 0007). Motivo: en la ronda C0-4 del
+alta conducida, modificar dato por dato con botones se sintió mecánico y poco fluido,
+aunque funcionó; y el motivo de aquel criterio (las fallas venían de interpretar texto
+libre con expresiones regulares y el ruteo viejo) ya no vale donde interpreta el modelo:
+en las rondas del 2026-10-02 el modelo entendió todo el texto libre, con todos sus turnos
+aceptados al primer intento.
+
+- **Texto, lo normal:** la persona da datos y pide cambios escribiendo, varios juntos
+  ("cambiá la fecha al jueves, el título que sea tal cosa y decime qué objetivos hay").
+  Leda aplica todo de una vez y pregunta sólo lo que falta.
+- **Botones, sólo en cuatro casos:**
+  1. elegir entre opciones que la persona no conoce de memoria (objetivos, responsables),
+     para que se adopten;
+  2. ambigüedad (una fecha con dos lecturas posibles);
+  3. las confirmaciones que exige la constitución §7 (Confirmar, Enviar a aprobación,
+     Cancelar);
+  4. cuando la persona pide ayuda ("¿qué opciones tengo?", "no entiendo"): si el dato
+     tiene opciones, Leda lo explica en simple y muestra sus botones; si es libre (el
+     criterio de aceptación), explica qué necesita y propone un ejemplo concreto que se
+     acepta con un toque (constitución §8, proponer en lugar de sólo pedir).
+- **Mecanismo, no frases:** el modelo reconoce la intención (dar datos, pedir opciones, no
+  entender) y devuelve un comando de la lista cerrada; el código arma la respuesta y sus
+  botones. Ninguna lista de frases.
+- **Alcance:** cada circuito adopta esta regla al pasar al flujo nuevo
+  (`odd/tasks/circuitos-al-flujo-nuevo.md`, rama de flujo). Los que siguen con el método
+  viejo conservan el criterio anterior, porque ahí el texto libre todavía falla (hallazgo
+  H5 de la ronda C0-C).
+
 **Cómo se prueba.** Cada regla con su mecanismo, el caso de la ronda 3 y familias de
 variantes (distintas formas de saludar, cambiar de tema, responder a medias, mandar un
 audio o una foto, tocar dos veces) en pruebas deterministas y en el banco. La regla 2 se
