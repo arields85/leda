@@ -667,6 +667,17 @@ cambió por su versión y envió a aprobación; Ismael confirmó.
   (18:24) lo escribió la **redacción A** (`redaccion.py`, auditoría
   `redaccion_variante_a`), que no lee la voz.
 
+- **Charla con Ariel por el flujo B (2026-10-02, 18:45-18:47), insumo para los circuitos 4
+  y 7** (flujo congelado: se anota, no se corrige). "como te llamas?" → "Soy Leda 👋, la
+  project manager del equipo CoreWork. ¿En qué te doy una mano?" con tres botones
+  genéricos sin nada que elegir (cierre genérico del ADR 0007), a los 30 s. "para qué te
+  puedo usar?" → seis puntos con guiones más "lo que no hago": largo para una pregunta
+  general (regla de Hermes: hasta tres puntos y ofrecer más), lista que la voz evita, y
+  promete "asignarlos y ponerles fecha", que se lee como cambiar el responsable de una
+  tarea creada, capacidad que no existe (circuito 9; clase de (a), (f) y H5). "no quiero
+  hacer nada ahora" → "Dale, Ariel. Quedo por acá. 👋": bien. Los emojis del pack ya se
+  usan (👋 en dos de tres mensajes, algo repetido para "ocasional").
+
 - [ ] **0-14.** La redacción A (y la charla breve) leen la voz desde la misma fuente que el
       alta (`instrucciones`), para que haya una sola voz en todo lo que escribe la IA en el
       flujo C. Decidido por el principio de una sola fuente (0-13); pendiente de la
