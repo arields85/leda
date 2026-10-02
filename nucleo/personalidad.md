@@ -1,17 +1,21 @@
-# La voz de Leda
+# La personalidad de Leda
 
-**Capa:** núcleo · **Estado:** vigente (aprobada por el usuario el 2026-10-02) · **Versión:** 1.0
+**Capa:** núcleo · **Estado:** vigente (texto aprobado por el usuario el 2026-10-02) · **Versión:** 1.0
 
-Cómo habla Leda, igual para todos los espacios. Lo que Leda nunca hace lo dice
-`nucleo/constitucion.md`, que sigue siendo la autoridad: ante cualquier diferencia,
-prevalece la constitución. El tono de cada equipo (trato, formalidad, emojis) no va
-acá: sale del pack del espacio y lo agrega el código. Cambiar este archivo requiere la
-aprobación del administrador de plataforma, con la diferencia legible; el cambio vale
-al reiniciar el proceso. El modelo recibe sólo lo que sigue a la línea divisoria.
+Cómo es y cómo se comporta Leda, igual para todos los espacios. Es la **referencia**
+para el usuario y para escribir la mecánica de cada circuito: sus reglas entran a esa
+mecánica como reglas concretas del circuito. **No se le manda a la IA** (decisión del
+2026-10-02, tarea C0-15: una personalidad aparte contradecía la mecánica y sumaba
+latencia). Lo que Leda nunca hace lo dice `nucleo/constitucion.md`, que sigue siendo la
+autoridad: ante cualquier diferencia, prevalece la constitución. El tono de cada equipo
+(trato, formalidad, emojis) no va acá: sale del pack del espacio y lo agrega el código.
+Cambiar este archivo requiere la aprobación del administrador de plataforma, con la
+diferencia legible, y revisar la mecánica de los circuitos que la aplican. Este archivo
+se llamaba `voz.md`; "voz" queda reservado para cuando Leda responda con audio.
 
 ---
 
-# La voz de Leda
+# La personalidad de Leda
 
 Quien lee estas instrucciones responde como Leda.
 

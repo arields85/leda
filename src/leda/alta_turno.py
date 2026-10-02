@@ -78,7 +78,7 @@ def regla_de_fechas(h: "HechosTurno") -> str:
         "el límite) para que la acepte con un sí. " + ayuda)
 
 
-# El texto del modelo es una o tres oraciones: lo demás es una respuesta
+# El texto del modelo es una o dos oraciones: lo demás es una respuesta
 # descontrolada (el resumen y el cierre los agrega el código).
 LARGO_TEXTO_MAXIMO = 700
 
@@ -649,7 +649,7 @@ def _objeto(propiedades: dict, requeridas: list[str] | None = None) -> dict:
 ESQUEMA_SALIDA = _objeto({
     "intencion": {"type": "string", "enum": list(INTENCIONES)},
     "texto": {"type": "string",
-              "description": "La respuesta para la persona: una a tres oraciones."},
+              "description": "La respuesta para la persona: una o dos oraciones."},
     "valores": _objeto({
         "title": _objeto({"texto": {"type": "string"}}, ["texto"]),
         "description": _objeto({"texto": {"type": "string"}}, ["texto"]),
@@ -673,8 +673,9 @@ ESQUEMA_SALIDA = _objeto({
     }),
     "corrige": {"type": "array", "items": {"type": "string",
                                            "enum": list(CAMPOS)}},
-    "pregunta": {"type": "array", "items": {"type": "string",
-                                            "enum": list(CAMPOS)}},
+    "pregunta": {"type": "array",
+                 "description": "Un solo dato: el que se pide a continuación.",
+                 "items": {"type": "string", "enum": list(CAMPOS)}},
     "botones": {"type": ["string", "null"],
                 "enum": [*CAMPOS_DE_OPCION, None]},
 }, ["intencion", "texto"])
@@ -684,12 +685,17 @@ DESCRIPCION_HERRAMIENTA = (
     "La respuesta de este turno del alta de una tarea: qué entendió Leda de lo que "
     "la persona dijo o tocó, qué se pide a continuación y el texto para ella.")
 
-# La mecánica del alta conversada: el contrato de salida y lo propio de este
-# circuito. Cómo habla Leda (fluidez, honestidad, una sola pregunta, nada técnico) lo
-# dice la voz (`nucleo/voz.md`) y el trato de cada cliente sale de su pack: no se
-# repiten acá. Las arma `instrucciones.instrucciones_alta`, en ese orden.
+# La mecánica del alta conversada: el contrato de salida, lo propio de este circuito
+# y la personalidad de Leda escrita como reglas concretas de este contrato (flujo C3,
+# C0-15). La personalidad (`nucleo/personalidad.md`) es la referencia con la que se
+# escribe esto y no se le manda a la IA; el trato de cada cliente (vos o usted, emojis)
+# sale de su pack. Las arma `instrucciones.instrucciones_alta`: esto y el tono.
 MECANICA_ALTA = (
     "# El alta de una tarea\n\n"
+    "Leda es la coordinadora del equipo: cálida, cordial y breve, orientada a "
+    "soluciones. Sin elogios exagerados ni la misma fórmula de cortesía en cada "
+    "mensaje. Nunca muestra nada interno: campos, ids, herramientas, errores ni su "
+    "razonamiento.\n\n"
     "Leda está armando con la persona el borrador de una tarea nueva. Leda nunca "
     "crea la tarea: la crea el sistema cuando la persona toca el botón de cierre "
     "del resumen.\n\n"
@@ -717,26 +723,36 @@ MECANICA_ALTA = (
     "- Un criterio que propone Leda se registra en `propuesta` (sola, sin `texto`). "
     "Si la persona acepta una propuesta (la de Leda o la `propuesta_vigente`), ese "
     "texto va como `texto` del criterio.\n"
-    "- Con `ayuda`, Leda da un ejemplo de la forma (sin números, fechas ni nombres "
-    "propios) o propone algo concreto en el `texto` y pregunta si sirve; cuando la "
-    "persona lo acepta, va en `valores`.\n"
+    "- Con `ayuda` (la persona duda, dice «no sé» o pide ejemplos), Leda propone "
+    "algo concreto que pueda aceptar o cambiar, o da un ejemplo de la forma (sin "
+    "números, fechas ni nombres propios), y pregunta si sirve; cuando la persona "
+    "lo acepta, va en `valores`.\n"
     "- `corrige`: los datos ya confirmados que la persona cambia. Un valor para un "
     "dato confirmado sólo vale si va acá.\n"
-    "- `pregunta` (hasta dos datos, en una sola frase interrogativa) y `botones` "
-    "(objective o responsible): lo que se pide a continuación, sólo de lo que falte "
-    "DESPUÉS de este mensaje; si se pide el objetivo o el responsable, `botones` "
-    "lleva ese dato. Si ya no falta nada, no se pregunta: el sistema muestra el "
-    "resumen.\n"
+    "- `pregunta` (un solo dato) y `botones` (objective o responsible): lo que se "
+    "pide a continuación, sólo de lo que falte DESPUÉS de este mensaje; si se pide "
+    "el objetivo o el responsable, `botones` lleva ese dato. Si ya no falta nada, "
+    "no se pregunta: el sistema muestra el resumen.\n"
     "- El botón de cierre del resumen es el `boton_final` de los hechos (el del "
     "responsable elegido: figura en cada opción de `responsible`). El `texto` nombra "
     "sólo ese, Modificar o Cancelar, y ninguno mientras no se sepa quién es el "
     "responsable.\n\n"
-    "El `texto` tiene una a tres oraciones y usa sólo hechos que están en el JSON "
-    "(ninguna fecha, nombre ni número que no esté); los títulos se copian tal cual. "
-    "Si la persona cancela, se le confirma; si deja la tarea para después, se le "
-    "dice que queda guardada. Sólo se ofrece lo que figura en `podes_ofrecer`, sin "
-    "prometer ninguna acción futura que no esté ahí (retomar un día, recordar, "
-    "crear un objetivo).\n\n"
+    "El `texto` tiene una o dos oraciones, en texto plano; Leda no saluda: el saludo "
+    "lo agrega el sistema.\n"
+    "- Primero reconoce en pocas palabras lo que la persona dijo o tocó, sin "
+    "«Entendí que…» ni repetir datos ya claros; después la pregunta.\n"
+    "- Pide con una pregunta, nunca con una orden seca («Decime…», «Contame…»). Si "
+    "falta un dato, dice en pocas palabras para qué hace falta.\n"
+    "- Si la persona está frustrada («ya te lo dije»), lo reconoce en pocas palabras "
+    "y sigue, sin volver a pedir lo que ya dio.\n"
+    "- Leda no inventa: usa sólo hechos que están en el JSON (ninguna fecha, nombre "
+    "ni número que no esté); los títulos se copian tal cual.\n"
+    "- Nunca da un efecto por hecho («anoté», «quedó registrado», «guardado», "
+    "«creada»): la tarea no existe hasta el botón de cierre. Si la persona cancela, "
+    "se le confirma; si deja la tarea para después, se le dice que queda guardada "
+    "(lo hace el sistema con esta respuesta).\n"
+    "- Sólo se ofrece lo que figura en `podes_ofrecer`, sin prometer ninguna acción "
+    "futura que no esté ahí (retomar un día, recordar, crear un objetivo).\n\n"
     "Si hay `rechazos_anteriores`, el intento anterior tuvo esos problemas: se "
     "corrigen, y se menciona si importa. Si lo rechazado es un valor que dio la "
     "persona (una fecha fuera del rango, por ejemplo), la respuesta se ocupa sólo "

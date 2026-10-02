@@ -1,5 +1,5 @@
 """Las instrucciones de cada circuito, armadas por el código desde una sola fuente
-(C0-13, `odd/tasks/circuitos-al-flujo-nuevo.md`).
+(C0-13 y C0-15, `odd/tasks/circuitos-al-flujo-nuevo.md`).
 
 El código, no el modelo, decide qué lleva cada circuito. Hoy lo usa sólo el alta
 conversada; el camino general sigue con su contexto (`contexto.construir`) hasta que
@@ -8,18 +8,18 @@ sus circuitos pasen al flujo nuevo.
 Orden estable, de lo fijo a lo que cambia, por si el proveedor reutiliza el comienzo
 idéntico del texto:
 
-  1. La voz de Leda (`nucleo/voz.md`): igual para todos los espacios y circuitos.
-  2. La mecánica del circuito (para el alta, `alta_turno.MECANICA_ALTA`): el
-     contrato de salida y lo propio del circuito, sin repetir lo que dice la voz.
-  3. El tono del espacio, desde su pack (`persona_config`): trato, formalidad,
+  1. La mecánica del circuito (para el alta, `alta_turno.MECANICA_ALTA`): el
+     contrato de salida, lo propio del circuito y las reglas de la personalidad de
+     Leda escritas como reglas concretas de ese contrato.
+  2. El tono del espacio, desde su pack (`persona_config`): trato, formalidad,
      longitud, emojis. El trato de cada cliente nunca se escribe en el código.
 
-Lo que cambia en cada turno (los hechos, la conversación) no va acá: viaja aparte.
+La personalidad (`nucleo/personalidad.md`) no se le manda a la IA: es la referencia
+con la que se escribe la mecánica de cada circuito (flujo C3, C0-15). Lo que cambia en
+cada turno (los hechos, la conversación) no va acá: viaja aparte.
 
-Cada armado lleva la huella de la voz cargada y la del texto entero, para registrar
-en la auditoría qué voz y qué instrucciones recibió el modelo. Los archivos se leen
-una vez por proceso, como el núcleo del camino general: un cambio en `voz.md` vale
-al reiniciar.
+Cada armado lleva la huella del texto entero, para registrar en la auditoría qué
+instrucciones recibió el modelo.
 """
 
 from __future__ import annotations
@@ -29,16 +29,12 @@ from dataclasses import dataclass
 from functools import lru_cache
 
 from . import alta_turno as T
-from .config import config
 
-# La línea que separa el encabezado de `voz.md` (para quien lo mantiene) del cuerpo
-# que lee el modelo.
-SEPARADOR_DE_LA_VOZ = "\n---\n"
 SEPARADOR_DE_BLOQUES = "\n\n---\n\n"
 
 # Tope de las instrucciones estables del alta, en tokens estimados (caracteres / 4).
-# Una prueba falla a la vista si se pasa (`tests/test_voz_y_instrucciones.py`).
-TOPE_TOKENS_ALTA = 2500
+# Una prueba falla a la vista si se pasa (`tests/test_personalidad_en_mecanica.py`).
+TOPE_TOKENS_ALTA = 1300
 
 
 def tokens_estimados(texto: str) -> int:
@@ -48,25 +44,6 @@ def tokens_estimados(texto: str) -> int:
 
 def _huella(texto: str) -> str:
     return hashlib.sha256(texto.encode("utf-8")).hexdigest()
-
-
-def cuerpo_de_la_voz(texto: str) -> str:
-    """Lo que lee el modelo de `voz.md`: lo que sigue a la primera línea divisoria.
-    Un archivo sin divisoria es un defecto del núcleo y falla fuerte: nunca se le
-    manda al modelo el encabezado como si fuera la voz."""
-    encabezado, separador, cuerpo = texto.partition(SEPARADOR_DE_LA_VOZ)
-    if not separador or not cuerpo.strip():
-        raise ValueError("nucleo/voz.md no tiene la línea divisoria entre su "
-                         "encabezado y la voz.")
-    return cuerpo.strip()
-
-
-@lru_cache(maxsize=1)
-def voz() -> tuple[str, str]:
-    """El cuerpo de la voz y la huella del archivo tal como se leyó. Sin el archivo,
-    falla fuerte: el alta no conversa sin voz."""
-    texto = (config.nucleo / "voz.md").read_text(encoding="utf-8")
-    return cuerpo_de_la_voz(texto), _huella(texto)
 
 
 @dataclass(frozen=True)
@@ -133,20 +110,18 @@ def bloque_de_tono(tono: Tono | None) -> str:
 class Instrucciones:
     texto: str
     hash: str          # del texto entero que recibe el modelo
-    voz_hash: str      # del archivo `nucleo/voz.md` cargado
 
     def auditoria(self) -> dict:
         """Lo que se registra en la auditoría del turno."""
-        return {"voz_hash": self.voz_hash, "instrucciones_hash": self.hash}
+        return {"instrucciones_hash": self.hash}
 
 
 @lru_cache(maxsize=32)
 def instrucciones_alta(tono: Tono | None) -> Instrucciones:
-    """Las instrucciones del alta conversada: voz, mecánica del alta y tono."""
-    cuerpo, voz_hash = voz()
-    texto = SEPARADOR_DE_BLOQUES.join(
-        [cuerpo, T.MECANICA_ALTA, bloque_de_tono(tono)])
-    return Instrucciones(texto=texto, hash=_huella(texto), voz_hash=voz_hash)
+    """Las instrucciones del alta conversada: la mecánica del alta (con las reglas de
+    la personalidad adentro) y el tono del pack."""
+    texto = SEPARADOR_DE_BLOQUES.join([T.MECANICA_ALTA, bloque_de_tono(tono)])
+    return Instrucciones(texto=texto, hash=_huella(texto))
 
 
 def instrucciones_alta_del_espacio(cur, workspace_id: str) -> Instrucciones:

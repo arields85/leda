@@ -1,15 +1,18 @@
-"""La voz de Leda y las instrucciones del alta conversada, armadas por el código
-desde una sola fuente (C0-13, `odd/tasks/circuitos-al-flujo-nuevo.md`).
+"""La personalidad de Leda y las instrucciones del alta conversada, armadas por el
+código desde una sola fuente (C0-13 y C0-15, `odd/tasks/circuitos-al-flujo-nuevo.md`).
 
-- `nucleo/voz.md` es la voz del producto, igual para todos los clientes; el tono de
-  cada cliente (trato, formalidad, emojis) sale de su pack (`persona_config`) y lo
-  agrega el código según el espacio. Nada de "voseo" escrito en el código del alta.
-- Orden estable: voz, mecánica del alta, tono del espacio; lo que cambia por turno
+- `nucleo/personalidad.md` es la personalidad del producto, igual para todos los
+  clientes: la referencia con la que se escribe la mecánica de cada circuito. No se le
+  manda a la IA (flujo C3, C0-15); el cumplimiento de la mecánica lo comprueba
+  `tests/test_personalidad_en_mecanica.py`. El nombre del archivo de pruebas conserva
+  "voz" por historia; "voz" queda para las respuestas con audio.
+- El tono de cada cliente (trato, formalidad, emojis) sale de su pack
+  (`persona_config`) y lo agrega el código según el espacio. Nada de "voseo" escrito
+  en el código del alta.
+- Orden estable: mecánica del alta, tono del espacio; lo que cambia por turno
   (hechos, historial) viaja aparte.
-- La huella de la voz y la de las instrucciones armadas quedan en la auditoría de
-  cada turno del alta: se puede probar qué voz se cargó.
+- La huella de las instrucciones armadas queda en la auditoría de cada turno del alta.
 - Un tope de tamaño que falla a la vista.
-- Lo que cubre la voz no se repite en la mecánica del alta.
 """
 
 from __future__ import annotations
@@ -33,40 +36,43 @@ USTED = INS.Tono(nombre_visible="Leda", registro="usted",
                  formalidad="formal", longitud="breve", emojis=False)
 
 
-def _cuerpo_de_la_voz() -> str:
-    texto = (config.nucleo / "voz.md").read_text(encoding="utf-8")
-    return INS.cuerpo_de_la_voz(texto)
+def _texto_de_la_personalidad() -> str:
+    return (config.nucleo / "personalidad.md").read_text(encoding="utf-8")
 
 
-# ------------------------------------------------------------------ la voz
+def _cuerpo_de_la_personalidad() -> str:
+    """Lo que sigue a la línea divisoria: la personalidad, sin el encabezado de
+    núcleo para quien la mantiene."""
+    encabezado, separador, cuerpo = _texto_de_la_personalidad().partition("\n---\n")
+    assert separador and cuerpo.strip()
+    return cuerpo.strip()
 
-def test_la_voz_existe_con_su_encabezado_de_nucleo_y_cuerpo_para_el_modelo():
-    texto = (config.nucleo / "voz.md").read_text(encoding="utf-8")
-    encabezado, _, cuerpo = texto.partition("\n---\n")
+
+# ---------------------------------------------------------- la personalidad
+
+def test_la_personalidad_existe_con_su_encabezado_de_nucleo():
+    encabezado = _texto_de_la_personalidad().partition("\n---\n")[0]
     assert "constitucion.md" in encabezado and "administrador" in encabezado
-    assert cuerpo.strip()
-    # El encabezado es para las personas que la mantienen; el modelo lee el cuerpo.
-    assert "administrador" not in INS.cuerpo_de_la_voz(texto).split("\n")[0]
+    assert "administrador" not in _cuerpo_de_la_personalidad().split("\n")[0]
 
 
-def test_la_voz_es_del_producto_sin_tono_ni_vocabulario_de_un_cliente():
-    cuerpo = _cuerpo_de_la_voz().lower()
+def test_la_personalidad_es_del_producto_sin_tono_ni_vocabulario_de_un_cliente():
+    cuerpo = _cuerpo_de_la_personalidad().lower()
     for marca in ("voseo", "corework", "usted"):
         assert marca not in cuerpo, marca
 
 
-def test_las_instrucciones_del_alta_empiezan_por_la_voz():
+def test_las_instrucciones_del_alta_empiezan_por_la_mecanica():
     texto = INS.instrucciones_alta(VOS).texto
-    assert texto.startswith(_cuerpo_de_la_voz())
-    assert T.MECANICA_ALTA in texto
+    assert texto.startswith(T.MECANICA_ALTA)
+    assert _cuerpo_de_la_personalidad() not in texto
 
 
-def test_el_orden_es_voz_mecanica_y_tono():
+def test_el_orden_es_mecanica_y_tono():
     texto = INS.instrucciones_alta(USTED).texto
-    voz = texto.index(_cuerpo_de_la_voz())
     mecanica = texto.index(T.MECANICA_ALTA)
     tono = texto.index(INS.bloque_de_tono(USTED))
-    assert voz < mecanica < tono
+    assert mecanica < tono
 
 
 # ------------------------------------------------------------- el tono del pack
@@ -97,18 +103,15 @@ def test_las_instrucciones_se_arman_una_vez_por_tono():
     assert INS.instrucciones_alta(VOS) is INS.instrucciones_alta(VOS)
 
 
-# ------------------------------------------------------------------ las huellas
+# ------------------------------------------------------------------ la huella
 
-def test_las_huellas_son_de_la_voz_y_del_texto_armado():
+def test_la_huella_es_del_texto_armado():
     instr = INS.instrucciones_alta(VOS)
-    voz = (config.nucleo / "voz.md").read_text(encoding="utf-8")
-    assert instr.voz_hash == hashlib.sha256(voz.encode("utf-8")).hexdigest()
     assert instr.hash == hashlib.sha256(instr.texto.encode("utf-8")).hexdigest()
     assert INS.instrucciones_alta(USTED).hash != instr.hash
-    assert INS.instrucciones_alta(USTED).voz_hash == instr.voz_hash
 
 
-def test_el_turno_del_alta_usa_las_instrucciones_y_audita_sus_huellas(chat):
+def test_el_turno_del_alta_usa_las_instrucciones_y_audita_su_huella(chat):
     c = chat(salida("Anotado. ¿A qué objetivo pertenece?",
                     valores={"title": {"texto": "Calibrar sensores del laboratorio"}},
                     pregunta=["objective"], botones="objective"))
@@ -120,9 +123,9 @@ def test_el_turno_del_alta_usa_las_instrucciones_y_audita_sus_huellas(chat):
         cur.execute("select detalle from audit_log "
                     "where accion = 'alta_conducida_turno'")
         (detalle,) = [f["detalle"] for f in cur.fetchall()]
-    assert sistema.startswith(_cuerpo_de_la_voz())
-    voz = (config.nucleo / "voz.md").read_text(encoding="utf-8")
-    assert detalle["voz_hash"] == hashlib.sha256(voz.encode("utf-8")).hexdigest()
+    assert sistema.startswith(T.MECANICA_ALTA)
+    assert _cuerpo_de_la_personalidad() not in sistema
+    assert "voz_hash" not in detalle
     assert detalle["instrucciones_hash"] == hashlib.sha256(
         sistema.encode("utf-8")).hexdigest()
 
@@ -138,46 +141,44 @@ def test_las_instrucciones_del_alta_entran_en_su_tope(tono):
         f"({len(texto)} caracteres); el tope es {INS.TOPE_TOKENS_ALTA}.")
 
 
-# ------------------------------------------------- lo que dice la voz, una vez
+# ---------------------------- lo que la personalidad pone en la mecánica, una vez
 
-# Reglas que ahora cubre la voz: no se repiten en la mecánica del alta.
-_REGLAS_DE_LA_VOZ = (
-    "una sola pregunta",       # ante un dato faltante, una sola pregunta clara
-    "no inventa",              # honestidad
+# Reglas de la personalidad escritas como reglas de la mecánica del alta: cada una
+# aparece una sola vez en las instrucciones que recibe la IA.
+_REGLAS_EN_LA_MECANICA = (
+    "un solo dato",            # una sola pregunta, de un dato
+    "no inventa",              # honestidad: sólo hechos del JSON
     "anoté",                   # nunca un efecto sin comprobante (H5)
-    "voy a consultar",         # no anunciar: responder con el resultado
-    "no sé todavía",           # es seguro no saber
+    "orden seca",              # pide, no ordena
+    "para qué hace falta",     # ante un dato faltante
     "entendí que",             # sin fórmulas de formulario
-    "jerga",                   # sin detalles técnicos
-    "markdown",                # texto plano de chat
+    "texto plano",             # sin Markdown
 )
 
 
-@pytest.mark.parametrize("regla", _REGLAS_DE_LA_VOZ)
-def test_cada_regla_de_la_voz_aparece_una_sola_vez(regla):
-    def plano(texto: str) -> str:          # el Markdown corta líneas en cualquier lado
+@pytest.mark.parametrize("regla", _REGLAS_EN_LA_MECANICA)
+def test_cada_regla_de_la_personalidad_aparece_una_sola_vez(regla):
+    def plano(texto: str) -> str:
         return " ".join(texto.lower().split())
 
-    assert regla in plano(_cuerpo_de_la_voz()), regla
-    assert regla not in plano(T.MECANICA_ALTA), regla
     assert plano(INS.instrucciones_alta(VOS).texto).count(regla) == 1, regla
 
 
-def test_la_mecanica_del_alta_no_repite_el_trato_de_la_voz():
+def test_la_mecanica_del_alta_no_le_habla_a_la_ia_de_vos():
     mecanica = T.MECANICA_ALTA.lower()
-    for adjetivo in ("cordial", "colega", "con naturalidad y decí", "ayudá y facilitá"):
+    for adjetivo in ("colega", "con naturalidad y decí", "ayudá y facilitá"):
         assert adjetivo not in mecanica, adjetivo
 
 
-# ------------------------------------------- personalidad y trato (C0-13, 2.ª unidad)
+# ------------------------------- personalidad y trato (C0-13, 2.ª unidad)
 
 def _seccion(titulo: str) -> str:
-    cuerpo = _cuerpo_de_la_voz()
+    cuerpo = _cuerpo_de_la_personalidad()
     assert f"## {titulo}" in cuerpo, titulo
     return cuerpo.split(f"## {titulo}", 1)[1].split("\n## ", 1)[0]
 
 
-def test_la_voz_tiene_personalidad_y_trato_como_rasgo_conducta_y_limite():
+def test_la_personalidad_tiene_rasgos_como_rasgo_conducta_y_limite():
     seccion = _seccion("Personalidad y trato")
     rasgos = [l for l in seccion.splitlines() if l.startswith("- **")]
     assert len(rasgos) >= 10, rasgos
@@ -191,15 +192,15 @@ def test_la_voz_tiene_personalidad_y_trato_como_rasgo_conducta_y_limite():
     assert "falta personal" in plano     # un bloqueo a tiempo no es una falta
 
 
-def test_la_voz_no_nombra_botones_ajenos_ni_saluda_por_su_cuenta():
-    plano = " ".join(_cuerpo_de_la_voz().split())
+def test_la_personalidad_no_nombra_botones_ajenos_ni_saluda_por_su_cuenta():
+    plano = " ".join(_cuerpo_de_la_personalidad().split())
     assert ("Leda nunca nombra un botón que no esté entre las opciones que "
             "recibe") in plano
     assert "Leda no saluda por su cuenta: el saludo del día lo agrega el sistema" in plano
 
 
-def test_los_emojis_no_van_en_la_voz():
-    assert "emoji" not in _cuerpo_de_la_voz().lower()
+def test_los_emojis_no_van_en_la_personalidad():
+    assert "emoji" not in _cuerpo_de_la_personalidad().lower()
 
 
 # ------------------------------------------------------- emojis desde el pack
@@ -220,5 +221,5 @@ def test_el_pack_de_corework_permite_emojis():
     assert pack["persona"]["emojis"] is True
 
 
-def test_el_tope_del_alta_es_de_2500_tokens():
-    assert INS.TOPE_TOKENS_ALTA == 2500
+def test_el_tope_del_alta_es_de_1300_tokens():
+    assert INS.TOPE_TOKENS_ALTA == 1300

@@ -733,12 +733,12 @@ def test_el_esquema_de_la_salida_es_cerrado_y_describe_el_contrato():
 
 
 def _guia() -> str:
-    """Lo que recibe el modelo del alta: la voz, la mecánica y el tono (C0-13)."""
+    """Lo que recibe el modelo del alta: la mecánica y el tono (C0-13, C0-15)."""
     from leda import instrucciones
     return instrucciones.instrucciones_alta(None).texto
 
 
-def test_la_guia_de_voz_dice_lo_esencial():
+def test_la_guia_del_alta_dice_lo_esencial():
     guia = " ".join(_guia().split())
     for clave in ("dato", "no inventa", "boton_final", "conducir_alta"):
         assert clave.lower() in guia.lower()

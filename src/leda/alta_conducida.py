@@ -397,8 +397,9 @@ def _conducir(cur, who, request, evento: dict, now: datetime,
               permite_otro_tema: bool) -> ResultadoConducido:
     workspace_id = str(request["workspace_id"])
     historial = I._conversacion_de(cur, request, now)
-    # La voz, la mecánica del alta y el tono del pack, armados por el código (C0-13).
-    # Fuera del `try` del modelo: una voz que falta no es un error del modelo.
+    # La mecánica del alta (con la personalidad adentro) y el tono del pack, armados
+    # por el código (C0-13, C0-15). Fuera del `try` del modelo: un tono que no se
+    # puede leer no es un error del modelo.
     instr = INS.instrucciones_alta_del_espacio(cur, workspace_id)
     proveedor = None
     rechazos: tuple[str, ...] = ()
@@ -477,8 +478,8 @@ def _forma_de(salida: T.SalidaTurno, h: T.HechosTurno,
 def _auditar(cur, workspace_id: str, intento: int, resultado: str,
              motivo: str | None, inicio: float, instr: INS.Instrucciones,
              forma: dict | None = None) -> None:
-    """Cada intento queda con las huellas de la voz y de las instrucciones que
-    recibió el modelo: así se prueba qué versión se cargó (C0-13)."""
+    """Cada intento queda con la huella de las instrucciones que recibió el
+    modelo: así se prueba qué versión se cargó (C0-13, C0-15)."""
     detalle = {"resultado": resultado, "intento": intento,
                "duracion_ms": round((time.perf_counter() - inicio) * 1000),
                **instr.auditoria()}
