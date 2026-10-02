@@ -60,7 +60,6 @@ Estado actual de cada uno: *por diseñar*, salvo el alta, que ya está construid
 - **P1-P7** (falla del proveedor, `odd/tasks/flujo-de-un-mensaje.md`): decidido y listo
   para hacer. Afecta a todos los circuitos, porque cualquier turno del modelo puede
   colgarse en medio de una prueba real.
-- **Orden respecto de la prueba de adopción del alta:** el ADR 0014 dice que el patrón
-  pasa a entrega y aprobación *después* de que el alta apruebe su prueba de adopción, con
-  alguien que no conozca el guion. Esa prueba hoy no tiene fecha. `PENDIENTE` de decisión
-  del usuario: esperarla o avanzar con los circuitos antes.
+- **Prueba con alguien que no conozca el guion:** una sola vez, al final, cuando
+  aprobaron todos los circuitos (enmienda del ADR 0014, decisión del usuario del
+  2026-10-02). Ningún circuito la espera para empezar.

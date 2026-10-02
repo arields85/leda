@@ -1908,7 +1908,7 @@ activados.
 **Estado: decidido por el usuario el 2026-10-02, no empezado.** Responde el hallazgo
 "turno del alta colgado sin fin y sin aviso" (00:11). Se retoma como tarea pendiente,
 P1 a P7 abajo. No es funcionalidad nueva: corrige una falla silenciosa del flujo existente
-("nunca fallar en silencio") y es condición para la prueba de adopción del ADR 0014.
+("nunca fallar en silencio") y es condición para las pruebas reales de los circuitos (`odd/tasks/circuitos-al-flujo-nuevo.md`).
 
 **Decisiones del usuario (no se vuelven a discutir, salvo que la evidencia las contradiga):**
 
