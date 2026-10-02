@@ -54,6 +54,13 @@ Estado actual de cada uno: *por diseñar*, salvo el alta, que ya está construid
       resumen del equipo, y cómo Leda conversa la respuesta de la persona. Para probarlo
       en real hay que forzar fechas y cadencias por consola (`leda escalera`,
       `leda correr`). Mecánica §9 a §11.
+- [ ] **C9. Cambios sobre una tarea creada.** Cambiar el responsable, la fecha o el
+      criterio de una tarea ya comprometida, con vista previa, confirmación y la
+      re-aprobación cuando el cambio cruza el umbral (cambio de responsable, corrimiento
+      de fecha, cambio de criterio). Hoy no existe: no hay herramienta para hacerlo.
+      Constitución §7 (cambios de asignación y de fecha con confirmación humana);
+      mecánica §7 (umbral de re-aprobación). Agregado el 2026-10-02 por la ronda C0-C
+      (hallazgo H5): no es funcionalidad nueva, es comportamiento obligatorio del núcleo.
 
 ## C0: chequeo de rumbo y rondas (2026-10-02)
 
@@ -122,6 +129,48 @@ botón.
 Comprobaciones: RED primero con un alta pedida por alguien de otra área (Dirección para OT)
 que hoy ofrece el estratégico; prueba de que Modificar arma sus botones desde el resumen;
 suite completa de la rama.
+
+### Rondas C0-B y C0-C (2026-10-02, 12:46-12:53): resultado y hallazgos
+
+- **C0-B, Cancelar con el botón: pasa.** Marcos tocó Cancelar en el resumen (12:48:16) y
+  a las 12:48:17 Leda contestó "Listo, cancelé el borrador de la tarea."
+- **C0-C se desvió y quedó sin probar el rechazo con motivo.** Marcos eligió a Nahuel como
+  responsable; como Marcos es el aprobador de Nahuel, tuvo Confirmar y la tarea se creó
+  (12:50:25, "Calibrar los sensores de temperatura de la línea 1", a cargo de Nahuel).
+  Bien: "Nahuel Gimenez todavía no activó su chat con Leda, así que no le pude avisar"
+  (auditoría `omitir_aviso_asignacion_ingreso_tarea`). Hay que repetir C0-C.
+- Los 14 turnos del alta de las tres rondas, aceptados al primer intento; sin incidentes.
+
+- **H4. Botón viejo, callejón sin salida.** El resumen ya confirmado siguió mostrando sus
+  botones. Marcos tocó Modificar (12:50:48) y Leda contestó "Ese pedido ya no está
+  vigente. Si sigue haciendo falta, escribime y lo vemos de nuevo.": no dice el estado
+  real (la tarea ya existe) ni qué se puede hacer. Misma clase que C-3 de `main`: segunda
+  aparición, se corrige el mecanismo.
+- **H5 (grave). Leda inventó un cambio.** "quiero modificar la tarea, la hago yo, no
+  nahuel" (12:51:06) fue por el camino general, todavía con el método viejo, y tardó
+  87 s. Leda contestó "Anoté el cambio: la tarea pasa a tu nombre… Con Confirmar el cambio
+  queda aplicado… va con la confirmación de Ismael Soschinski", pero no se preparó ningún
+  cambio: la auditoría muestra sólo `herramienta:consultar_tareas`, no hubo vista previa
+  (`pending_action`) y los botones eran los de la lista de tareas, sin Confirmar. No
+  existe herramienta para cambiar el responsable. La tarea sigue a cargo de Nahuel.
+  Constitución §4 (nunca inventa) y ADR 0013, regla 3 (estado real). Tercera aparición de
+  la clase "el modelo promete lo que no existe" ((a) y (f) de `docs/STATUS.md`): el
+  mecanismo es que en el camino general el texto lo escribe el modelo y no sale de los
+  hechos. Lo corrige pasar ese camino al flujo nuevo (C3, C4, C9), no un parche.
+- **H6. El menú de la tarea no ofrece cambios.** Marcos, aprobador de Nahuel y quien la
+  creó, ve sólo "Ver detalle". Consecuencia de que no exista la capacidad (C9).
+
+**Decisión del usuario (2026-10-02): decidido, listo para hacer.**
+
+- [ ] **C0-5.** Un toque sobre un botón que ya no está vigente contesta con el **estado
+      real** de lo que ese botón tocaba (por ejemplo, "la tarea ya quedó creada") y
+      ofrece lo que se puede hacer ahora con eso, nunca un mensaje sin próximo paso
+      (constitución §8). Vale para todo botón vencido, no sólo para el resumen del alta;
+      corrige también C-3 de `main`.
+- [ ] **C0-6.** Cuando una vista previa o una elección se resuelve (confirmada, cancelada,
+      enviada o vencida), sus botones se quitan del mensaje en Telegram, para que no se
+      ofrezca lo que ya no se puede hacer (ADR 0013, regla 3).
+- [ ] **C0-7.** Repetir la ronda C0-C (rechazo con motivo) con Marcos como responsable.
 
 ## Relación con otros pendientes
 
