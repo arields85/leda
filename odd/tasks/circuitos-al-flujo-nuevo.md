@@ -458,6 +458,19 @@ cómo conversa Leda se aplique en todos los circuitos.
          medir: menos latencia (seguramente modesta) y mejor cumplimiento de reglas.
       Un cambio en `voz.md` vale al reiniciar el listener (como hoy el núcleo).
 
+### RDD de C0-3, C0-5 y C0-6 (2026-10-02)
+
+Tramo desde la frontera `cb3befb` hasta `e8e6499` (C0-3, C0-5, C0-6 y documentos): riesgo
+medio, revisión debida por presupuesto, consentimiento permanente del usuario. Linaje
+`review-a8f31237eafb9491`, una lente (confiabilidad): **aprobada y reconocida**. Nueva
+frontera de revisión de la rama: `e8e6499`. Cuatro observaciones no bloqueantes, todas
+en `despachador.py`, para mirar antes de la prueba real de C0-6: R3-001 (`:1002`,
+advertencia), R3-002 (`:1043-1059`, advertencia), R3-003 (`:1006-1008`, sugerencia) y
+R3-004 (`:185-191`, sugerencia).
+
+**Pendiente antes de la prueba real de C0-5 y C0-6:** aplicar la migración `0028` a
+`leda_flujo` con el listener detenido (autorización del usuario pedida, no dada todavía).
+
 ## Relación con otros pendientes
 
 - **P1-P7** (falla del proveedor, `odd/tasks/flujo-de-un-mensaje.md`): decidido y listo
