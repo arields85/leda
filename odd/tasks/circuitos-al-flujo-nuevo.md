@@ -595,6 +595,20 @@ cómo conversa Leda se aplique en todos los circuitos.
         compare con la guía de emojis que corresponde al pack. Después, importar el pack
         a la base (lo hace el coordinador).
 
+      **Tercera unidad: trato y emojis desde el pack en la redacción, 2026-10-02.**
+      Commit `a251984`. El usuario autorizó `tests/test_charla_breve.py`.
+      - `redaccion.py` ya no tiene voseo fijo: `sistema_redaccion` y `sistema_charla`
+        reciben `registro` y `emojis` del pack (`persona_config`, por
+        `instrucciones.tono_del_espacio`, la misma fuente del alta). Sin tono
+        configurado no se inventa un trato. El resto de esas guías no cambió (siguen
+        hablándole al modelo en voseo, en segunda persona).
+      - `persona.emojis: true` en `espacios/corework.yaml`; la prueba de la charla
+        compara con la guía de CoreWork (trato de vos, emojis permitidos).
+      - Pruebas: RED, 8 fallas en `tests/test_redaccion_trato.py`; GREEN, 18 pasan.
+        Suite completa: `1 failed, 3505 passed, 333 deselected, 1 warning in
+        950.13s` (2026-10-02; sólo la falla conocida).
+      - Pendiente: importar el pack a la base (coordinador).
+
 ### RDD de 0-3, 0-5 y 0-6 (2026-10-02)
 
 Tramo desde la frontera `cb3befb` hasta `e8e6499` (0-3, 0-5, 0-6 y documentos): riesgo
