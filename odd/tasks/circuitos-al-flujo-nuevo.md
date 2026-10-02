@@ -78,6 +78,48 @@ si Ismael pide una tarea para Marcos, la confirma él mismo (es el aprobador de 
 - **Ronda C0-C:** Marcos pide una tarea y la envía a aprobación; Ismael la rechaza y
   escribe el motivo. Cubre el rechazo con motivo.
 
+### Ronda C0-A (2026-10-02, 12:35-12:41): hallazgos y decisión
+
+Ismael pidió una tarea para Marcos ("revisar el cableado del tablero de la línea 2"). Los
+cinco turnos del modelo fueron aceptados al primer intento y no hubo incidentes. El modelo
+entendió todo, incluido "el objetivo" escrito a mano; **las tres fallas están en el código
+que rodea al modelo** ("Cómo pensamos juntos", punto 8). La tarea no se creó: Ismael
+canceló para no dejarla con el objetivo equivocado.
+
+- **H1. Objetivos del área de quien pide, no de la tarea.** `_objetivos_del_area`
+  (`ingreso_tareas.py:2189`) filtra por `who.area_id`, el área de quien escribe. Ismael es
+  de Dirección, que no tiene objetivos propios, así que cae en los objetivos sin área: el
+  estratégico. Con una sola opción, la regla "un dato con una sola opción no se pregunta"
+  (`ingreso_tareas.py:2118`) lo completa sin preguntar. El resumen era incoherente: "Área:
+  OT y automatización" (sale del responsable) con el objetivo estratégico (sale de quien
+  pide). Es la misma clase que el pendiente (e) de la primera prueba: segunda aparición,
+  disparador del punto 4. Se corrige el mecanismo.
+- **H2. Modificar sin botones y sin el objetivo.** Al tocar Modificar, Leda contestó en
+  texto "puede ser el título, el responsable, la fecha o el criterio": sin botones y sin
+  el objetivo, que sí se podía cambiar. La lista la escribió el modelo, no salió de los
+  datos. ADR 0013, regla 3 (sólo opciones posibles) y "botones donde hay opciones".
+- **H3. Latencia.** El toque de Modificar tardó 48 s en tener respuesta (turno de 40 s),
+  "el objetivo" 27 s, y el primer mensaje 54 s, con el turno arrancando 33 s después de
+  que llegó el mensaje. Se registra; la latencia va después de la fluidez (decisión del
+  2026-10-01).
+
+**Decisión del usuario (2026-10-02): decidido, listo para hacer.**
+
+- [ ] **C0-1.** Los objetivos que ofrece el alta salen del **área de la tarea**, que es la
+      del responsable, igual que el área y el aprobador. Ismael pidiendo para Marcos ve
+      los objetivos de OT.
+- [ ] **C0-2.** Una tarea cuelga sólo de un **objetivo operativo**, nunca del estratégico
+      (mecánica §1: la tarea va bajo el objetivo operativo). Si el área de la tarea no
+      tiene ningún objetivo operativo activo, Leda lo dice con el estado real y no
+      completa con otro (constitución §4). Se retira la caída a los objetivos sin área.
+- [ ] **C0-3.** Modificar muestra **un botón por dato modificable**, armado por el código
+      desde el resumen vigente (objetivo incluido), no una lista escrita por el modelo.
+- [ ] **C0-4.** Repetir la ronda C0-A en real después de C0-1 a C0-3.
+
+Comprobaciones: RED primero con un alta pedida por alguien de otra área (Dirección para OT)
+que hoy ofrece el estratégico; prueba de que Modificar arma sus botones desde el resumen;
+suite completa de la rama.
+
 ## Relación con otros pendientes
 
 - **P1-P7** (falla del proveedor, `odd/tasks/flujo-de-un-mensaje.md`): decidido y listo
