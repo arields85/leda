@@ -390,6 +390,9 @@ experimento, detrás del ajuste `stream` del espacio, sólo en el alta conversad
 privado, para verlo en Telegram real; el mensaje final sigue siendo el verificado y sale
 por el outbox. **Pendiente:** probar la otra variante (mostrar progresivo después de
 verificar) cuando se trabaje la latencia, y elegir entre las dos viéndolas en real.
+Probado en real el 2026-10-01 (se ve el texto crecer y hasta el reintento del verificador);
+el usuario lo **apagó** por ahora para priorizar el comportamiento: queda en la rama,
+apagado por omisión, como pendiente visual.
 
 ## Horizonte posterior
 
