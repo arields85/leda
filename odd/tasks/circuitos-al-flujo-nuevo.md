@@ -695,6 +695,33 @@ cambió por su versión y envió a aprobación; Ismael confirmó.
   latencia por turno de 10 s a 17 s (p90 de 19 s a 40 s); los tokens de salida se duplican
   (razonamiento oculto del proveedor).
 
+**Decisión del usuario (2026-10-02, después de la medición): la personalidad va adentro de
+la mecánica, no aparte.** La idea de `SOUL.md` sirve en Hermes porque allá la IA hace
+todo; en Leda la mecánica de cada circuito ya le dice a la IA qué escribir, y una
+personalidad aparte la contradice y suma latencia. Además cambia el nombre: lo que era
+"voz" pasa a ser **personalidad** (`nucleo/personalidad.md`); "voz" queda para cuando Leda
+responda con audio. Reemplaza los puntos 1 y 2 de 0-13 (la personalidad ya no se le manda
+a la IA entera ni aparte).
+
+- [ ] **0-15. Personalidad adentro de la mecánica (flujo C3). Decidido, listo para hacer.**
+      1. `nucleo/voz.md` pasa a `nucleo/personalidad.md`: referencia de cómo es y cómo se
+         comporta Leda, para el usuario y para escribir la mecánica de cada circuito. **No
+         se le manda a la IA.**
+      2. La mecánica del alta (`MECANICA_ALTA`) se reescribe con las reglas de la
+         personalidad como reglas concretas de su contrato, sin contradicciones: `pregunta`
+         pide **un solo dato**; `texto` reconoce en pocas palabras lo que dijo la persona y
+         hace la pregunta; nunca "anoté", "quedó registrado" ni nada que dé un efecto por
+         hecho sin que el sistema lo haya hecho; pide en forma de pregunta, nunca como orden
+         seca; ante una duda propone algo concreto; ante la frustración lo reconoce. La
+         personalidad general, en dos o tres líneas.
+      3. El tono de cada cliente (trato, emojis) sigue saliendo del pack.
+      4. Una prueba automática comprueba que la mecánica del circuito cumple la
+         personalidad (por ejemplo, que no permita dos datos en una pregunta).
+      5. Medir de nuevo con el mismo banco (`medicion-voz/test_medir_voz.py`): latencia y
+         reglas cumplidas, contra C1 y C2.
+      Lo mismo se aplica a la redacción A y a la charla breve (0-14) y a cada circuito que
+      pase al flujo C.
+
 - [ ] **0-14.** La redacción A (y la charla breve) leen la voz desde la misma fuente que el
       alta (`instrucciones`), para que haya una sola voz en todo lo que escribe la IA en el
       flujo C. Decidido por el principio de una sola fuente (0-13); pendiente de la
