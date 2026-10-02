@@ -126,7 +126,10 @@ no un secreto. No hay `.env` ni volcados de base versionados.
         y excluido del script en `a3c5ce8`). RED: las 9 observadas. GREEN: 9 passed. RDD
         `review-ff793423fcb4995a` aprobada. Su WARNING sobre la ruta del import se descarta:
         es el estilo existente (`from tests.toques …`) y las 9 pasan.
-      - Suite completa repetida sobre `481af9b`: `PENDIENTE` (en curso).
+      - Suite completa repetida sobre `481af9b` (2026-10-01):
+        `PYTHONPATH=src python -m pytest -q -p no:cacheprovider` → **2286 passed**, 333
+        deselected, 15 min. Es toda la suite de `main`, sin fallas. Falta la parte real de
+        R8, la prueba por Telegram, que se hace sobre la rama de flujo (R9).
 - [ ] R9. Aplicar el mismo script en `feat/flujo-de-un-mensaje` y repetir R5 y R8 ahí.
 - [ ] R10. Actualizar referencias externas: memoria del agente, Engram, `docs/STATUS.md`.
 - [ ] R11. **Limpiar lo de Prisma cuando quede obsoleto**, según la tabla de abajo. Se hace
