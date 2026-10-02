@@ -133,14 +133,19 @@ if (Get-Command gentle-ai -ErrorAction SilentlyContinue) {
 
 # --- 6. Verify -----------------------------------------------------------------------
 Step 'Verifying'
-git -C $NewRoot status --short --branch | Select-Object -First 1
+# Capture output and exit code before piping: piping a native command into
+# Select-Object can stop it early and leave $LASTEXITCODE unreliable.
+$status = git -C $NewRoot status --short --branch
 if ($LASTEXITCODE) { Fail 'git does not work in the new folder' }
-$listed = git -C $NewRoot worktree list
+$status | Select-Object -First 1
+# git prints worktree paths with forward slashes: normalize before comparing.
+$listed = (git -C $NewRoot worktree list) -join "`n" -replace '/', '\'
 if ($listed -match [regex]::Escape($OldRoot)) { Fail 'a worktree still points to the old folder' }
 Push-Location $NewRoot
-& $py -m leda estado corework | Select-Object -Last 1
+$estado = & $py -m leda estado corework
 $rc = $LASTEXITCODE
 Pop-Location
+$estado | Select-Object -Last 1
 if ($rc) { Fail 'leda estado failed from the new folder (is PostgreSQL running?)' }
 Write-Host ''
 Write-Host "Done. Open Claude Code in $NewRoot to finish (paths in docs and tools)." -ForegroundColor Green
