@@ -241,18 +241,57 @@ def continuar(cur, who, request, now: datetime) -> I.IntakeOutcome:
                   permite_otro_tema=False).outcome
 
 
-def modificar(cur, who, request, now: datetime) -> I.IntakeOutcome:
-    """El botón Modificar del resumen: no hay un selector de datos, lo conversa el
-    modelo. El resumen deja de valer (nada se aplica sin Confirmar)."""
-    I._invalidate_open_inputs(cur, str(request["id"]))
-    request = _subir_version(cur, request, now)
-    registrar_auditoria(
-        cur, accion="modificar_ingreso_tarea", workspace_id=who.workspace_id,
-        actor_app_user_id=who.app_user_id, actor_kind="persona",
-        sujeto_tipo="task_draft", sujeto_id=str(request["task_draft_id"]),
-        detalle={"request_id": str(request["id"]), "via": "boton"})
-    return _turno(cur, who, request, {"toque": "modificar"}, now,
-                  permite_otro_tema=False).outcome
+# La pregunta de un dato con opciones elegido en el selector de Modificar (C0-3).
+PREGUNTA_AL_MODIFICAR = {
+    "objective": "¿A qué objetivo pertenece la tarea?",
+    "responsible": "¿Quién es responsable de la tarea?",
+}
+
+
+def campos_modificables(cur, request, who) -> list[str]:
+    """Los datos del resumen que la persona puede cambiar con Modificar (C0-3), en
+    el orden del resumen: la lista es del código, nunca del modelo. Son los que
+    llena el alta (`alta_turno.CAMPOS`; el área y la evidencia salen del
+    responsable), sin la descripción vacía (el resumen no la muestra) ni un dato
+    con una sola opción posible (ADR 0013, regla 3)."""
+    cur.execute(
+        "select campo, valor from task_intake_field where request_id = %s",
+        (str(request["id"]),))
+    valores = {f["campo"]: f["valor"] for f in cur.fetchall()}
+    campos = []
+    for campo in T.CAMPOS:
+        if campo == "description" and not I.normalize_text(
+                str(valores.get(campo) or "")):
+            continue
+        if (campo in T.CAMPOS_DE_OPCION
+                and I._unica_opcion(cur, request, who, campo) is not None):
+            continue
+        campos.append(campo)
+    return campos
+
+
+def pedir_dato(cur, who, request, campo: str, now: datetime) -> I.IntakeOutcome:
+    """Lo que sigue a elegir un dato en el selector de Modificar (C0-3). Uno con
+    opciones se pregunta con los botones del turno (las mismas opciones que usa el
+    alta; el toque lo guarda `conducir_toque`); uno de texto se pide por escrito,
+    con lo que tenía para copiar, y la respuesta la atiende el turno del modelo como
+    cualquier corrección. Sin llamar al modelo: la pregunta es del código."""
+    request_id = str(request["id"])
+    clave = (f"intake:{request_id}:v{request['version']}:conducida:"
+             f"{_evento_id(cur, now)}")
+    if campo in T.CAMPOS_DE_OPCION:
+        try:
+            opciones = _opciones_de_ahora(cur, request, who, campo)
+        except _ConfiguracionInvalida as exc:
+            return I._configuration_error(cur, request, who, exc.campo, now)
+        return _botones(cur, request, campo, opciones,
+                        PREGUNTA_AL_MODIFICAR[campo], now)
+    actual = I.text_to_copy(cur, request_id, campo)
+    texto = I.modify_text_prompt(campo, actual)
+    prepare_payload(texto, dedupe_key="intake-text", has_buttons=bool(actual))
+    I._invalidate_open_inputs(cur, request_id)
+    I._enqueue(cur, request, texto, now, clave, block=actual or None)
+    return I.IntakeOutcome(request_id, texto, changed=True, responded=True)
 
 
 def conducir_toque(cur, who, *, token: str, chat_id: int, now: datetime,
@@ -763,8 +802,7 @@ def _responder(cur, who, request, salida: T.SalidaTurno, h: T.HechosTurno,
                 cur, request, salida.botones,
                 _opciones_de_ahora(cur, request, who, salida.botones),
                 salida.texto, now))
-        if (evento.get("toque") != "modificar" and not salida.pregunta
-                and not _resumen_abierto(cur, request)):
+        if not salida.pregunta and not _resumen_abierto(cur, request):
             return ResultadoConducido(_resumen(cur, who, request, salida.texto,
                                                now))
         return ResultadoConducido(_decir(cur, request, salida.texto, now))

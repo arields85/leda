@@ -925,15 +925,9 @@ def _tocar_modificar(c) -> list[dict]:
     return _nuevas(c.conn, c.usuario, antes)
 
 
-def test_el_boton_modificar_del_resumen_se_lo_deja_al_modelo(chat, conn):
-    c, _ = _hasta_el_resumen(chat)
-    c.modelo.conducciones.append(salida(
-        "Claro, ¿qué querés cambiar?", intencion="ayuda"))
-
-    nuevas = _tocar_modificar(c)
-
-    assert _cuerpos(nuevas) == ["Claro, ¿qué querés cambiar?"]
-    assert c.hechos()["evento"] == {"toque": "modificar"}
+# El botón Modificar abre el selector del código, un botón por dato (C0-3):
+# `tests/test_alta_conducida_modificar_botones.py`. Escribir el cambio con el
+# selector abierto sigue yendo al modelo (las dos pruebas siguientes).
 
 
 def test_tras_modificar_una_fecha_rechazada_se_vuelve_a_pedir_sin_incidente(chat):
@@ -941,8 +935,6 @@ def test_tras_modificar_una_fecha_rechazada_se_vuelve_a_pedir_sin_incidente(chat
     vieja sigue guardada) el valor nuevo es una fecha pasada, el código lo rechaza
     y el modelo, con razón, vuelve a pedir la fecha. Esa pregunta llega tal cual."""
     c, _ = _hasta_el_resumen(chat)
-    c.modelo.conducciones.append(salida("Claro, ¿qué querés cambiar?",
-                                        intencion="ayuda"))
     _tocar_modificar(c)
     fecha_guardada = c.campo("due_date")["valor"]
     c.modelo.conducciones.append(salida(
@@ -972,8 +964,6 @@ def test_tras_modificar_una_fecha_rechazada_se_vuelve_a_pedir_sin_incidente(chat
 def test_tras_modificar_los_botones_de_un_dato_confirmado_se_arman_y_el_toque_lo_cambia(
         chat):
     c, _ = _hasta_el_resumen(chat)
-    c.modelo.conducciones.append(salida("Claro, ¿qué querés cambiar?",
-                                        intencion="ayuda"))
     _tocar_modificar(c)
     c.modelo.conducciones.append(salida(
         "Dale, ¿quién la hace?", intencion="corrige", corrige=["responsible"],

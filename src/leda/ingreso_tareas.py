@@ -1269,12 +1269,20 @@ def open_modify_picker(cur: psycopg.Cursor, who: Solicitante, question_id: str,
         actor_app_user_id=who.app_user_id, actor_kind="persona",
         sujeto_tipo="task_draft", sujeto_id=str(request["task_draft_id"]),
         detalle={"request_id": str(request["id"]), "via": via})
-    # Sólo lo que se puede cambiar (regla 3 del ADR 0013): un dato con una sola
-    # opción posible, como el área de quien tiene un solo lugar, no se ofrece.
+    from . import alta_conducida
+
+    if alta_conducida.alta_conducida(cur, who.workspace_id):
+        # El alta conducida (C0-3): los datos que muestra su resumen y la persona
+        # puede cambiar. La lista es del código, nunca del modelo.
+        fields = alta_conducida.campos_modificables(cur, request, who)
+    else:
+        # Sólo lo que se puede cambiar (regla 3 del ADR 0013): un dato con una sola
+        # opción posible, como el área de quien tiene un solo lugar, no se ofrece.
+        fields = [field for field in MODIFY_FIELD_LABELS
+                  if field not in CHOICE_FIELDS
+                  or _unica_opcion(cur, request, who, field) is None]
     options = [(MODIFY_FIELD_LABELS[field], "modify_field", {"field": field})
-               for field in MODIFY_FIELD_LABELS
-               if field not in CHOICE_FIELDS
-               or _unica_opcion(cur, request, who, field) is None]
+               for field in fields]
     options.append((BACK_TO_SUMMARY, "back_to_summary", None))
     return _open_choices(cur, request, None, MODIFY_PICKER_PROMPT, options, now,
                          kind=MODIFY_PICKER_KIND)
@@ -1622,15 +1630,8 @@ def modify_from_preview(cur: psycopg.Cursor, who: Solicitante, *, token: str,
         raise Denegado(NOT_YOURS)
     if preview["estado"] != "esperando" or not preview["vigente"]:
         return None
-    from . import alta_conducida
-
-    if alta_conducida.alta_conducida(cur, who.workspace_id):
-        # El alta conducida no tiene un selector de datos: lo conversa el modelo.
-        request = _request_of_question(cur, who, QUESTION_CONFIRMATION,
-                                       str(preview["id"]), lock=True)
-        if not request:
-            return None
-        return alta_conducida.modificar(cur, who, request, now)
+    # El mismo selector en las dos altas: en la conducida también es el código el
+    # que arma un botón por dato (C0-3), sin llamar al modelo.
     return open_modify_picker(cur, who, str(preview["id"]), now, via="boton")
 
 
@@ -1817,7 +1818,13 @@ def _ask_field_change(cur, request, who, field, now):
     """Lo que sigue a elegir un dato en el selector de Modificar. Uno de texto
     abre su campo para que el mensaje siguiente lo reemplace (con su validación de
     siempre), mostrando lo que tenía; uno que se elige con botones vuelve a
-    mostrar sus opciones. Cambia sólo ese dato: lo demás queda como estaba."""
+    mostrar sus opciones. Cambia sólo ese dato: lo demás queda como estaba. En el
+    alta conducida, la pregunta del dato es suya (`alta_conducida.pedir_dato`): sus
+    botones y la respuesta escrita los atiende el turno del modelo."""
+    from . import alta_conducida
+
+    if alta_conducida.alta_conducida(cur, who.workspace_id):
+        return alta_conducida.pedir_dato(cur, who, request, field, now)
     if field in CHOICE_FIELDS:
         return _open_entity_page(cur, request, who, field, None, 0, now)
     current = text_to_copy(cur, str(request["id"]), field)

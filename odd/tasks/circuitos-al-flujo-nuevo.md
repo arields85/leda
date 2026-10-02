@@ -168,8 +168,33 @@ botón.
   depende de la fecha de hoy ("15/03" ahora se rechaza como `fecha_distinta`, no como
   `numero_inventado`). Falla igual sin este cambio. La prueba no tiene que depender del
   día en que corre.
-- [ ] **C0-3.** Modificar muestra **un botón por dato modificable**, armado por el código
+- [x] **C0-3.** Modificar muestra **un botón por dato modificable**, armado por el código
       desde el resumen vigente (objetivo incluido), no una lista escrita por el modelo.
+
+**Hecho C0-3** (commit `PENDIENTE`, ruta delegada: un escritor).
+
+- Causa: `modify_from_preview` (`ingreso_tareas.py`) mandaba el toque de Modificar del
+  alta conducida a `alta_conducida.modificar`, un turno del modelo con
+  `{"toque": "modificar"}`: la lista de datos la escribía el modelo.
+- Mecanismo: un solo selector para las dos altas. El toque abre `open_modify_picker`
+  (`MODIFY_PICKER_KIND`, con "Volver al resumen") sin llamar al modelo. En el alta
+  conducida, los botones salen de `alta_conducida.campos_modificables`: los datos que
+  llena el alta, en el orden del resumen, sin la descripción vacía (el resumen no la
+  muestra) ni un dato con una sola opción; el área y la evidencia salen del
+  responsable. Elegir un dato pasa por `alta_conducida.pedir_dato`: objetivo y
+  responsable, con los botones del turno (`_opciones_de_ahora`, la misma búsqueda de
+  `_entity_candidates`; el toque lo guarda `conducir_toque`); título, fecha y criterio,
+  por escrito con lo que tenía para copiar, y la respuesta la atiende el turno del
+  modelo. Después vuelve el resumen con sus botones. Escribir el cambio en vez de tocar
+  sigue yendo al modelo. Se retiró `alta_conducida.modificar`.
+- RED (2026-10-02): `tests/test_alta_conducida_modificar_botones.py`, 6 de 7 en rojo
+  (el toque de Modificar llamaba al modelo con `{"toque": "modificar"}` y no dejaba
+  botones). GREEN: 7 de 7. Las dos pruebas de `tests/test_alta_conducida.py` que
+  escriben el cambio con el selector abierto ya no guionan un turno para el toque; la
+  que esperaba que Modificar fuera al modelo se retiró.
+- Suite completa (2026-10-02, `python -m pytest -q -p no:cacheprovider`): `1 failed,
+  3444 passed, 333 deselected, 1 warning in 963.07s`; la única falla es la previa que
+  depende de la fecha (`test_un_texto_con_un_dato_inventado_se_reintenta_con_el_motivo`).
 - [ ] **C0-4.** Repetir la ronda C0-A en real después de C0-1 a C0-3.
 
 Comprobaciones: RED primero con un alta pedida por alguien de otra área (Dirección para OT)
@@ -245,7 +270,7 @@ intento; sin incidentes.
 
 **Estado de C0 al 2026-10-02:** las cinco variantes ya se probaron en real (confirma quien
 pide, para otra persona, Modificar, Cancelar por texto y por botón, rechazo con motivo).
-C0-1 y C0-2 ya están construidos. Falta construir C0-3, C0-5, C0-6 y C0-8, retirar el alta guiada (M4-M9) y repetir
+C0-1, C0-2 y C0-3 ya están construidos. Falta construir C0-5, C0-6 y C0-8, retirar el alta guiada (M4-M9) y repetir
 la ronda C0-A (C0-4).
 
 ### RDD de C0-1 y C0-2 (2026-10-02)
