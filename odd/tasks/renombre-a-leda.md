@@ -144,6 +144,22 @@ no un secreto. No hay `.env` ni volcados de base versionados.
         para un "ok"). No es del renombre; queda registrado como hallazgo en la rama de
         flujo (llamada sin plazo total). `PENDIENTE`: repetir el alta cuando `nan` se
         recupere.
+      - Segunda prueba real (2026-10-02, 08:48-09:07, con `nan` recuperado): el alta de
+        Marcos anduvo de punta a punta hasta "Enviar a aprobación" y el aviso a Ismael salió
+        al instante. Al confirmar, Ismael recibió el aviso neutro y quedó el incidente
+        `toque_boton` (alta, avisado a la administración): `permission denied to set role
+        "leda_gateway"`.
+        - Causa, **del renombre**: el login de `LEDA_AUTHORITY_DB_URL` era miembro sólo de
+          `prisma_gateway` (`SET` sí, `INHERIT` y `ADMIN` no; `db/README.md`). Es una
+          membresía del servidor que se otorgó a mano, y `esquema.sql` no la crea para el
+          rol nuevo. La suite no podía verla porque arma su propio login de autoridad
+          (`tests/conftest.py`, `authority_uri`).
+        - Arreglo (2026-10-02 09:1x): `grant leda_gateway to <login de autoridad> with
+          inherit false, set true, admin false`, con las mismas opciones. Verificado: puede
+          hacer `set role leda_gateway` y no puede asumir `leda_app`. La membresía vieja
+          queda hasta la limpieza.
+        - Lección para el inventario de cualquier renombre: además de roles, variables y
+          bases, revisar **las membresías de los logins** en `pg_auth_members`.
 - [ ] R10. Actualizar referencias externas: memoria del agente, Engram, `docs/STATUS.md`.
 - [ ] R11. **Limpiar lo de Prisma cuando quede obsoleto**, según la tabla de abajo. Se hace
       recién cuando se cumpla "Leda funciona correctamente".
@@ -187,6 +203,7 @@ respaldo del renombre.
 | Bases `prisma` y `prisma_flujo` | Cuando se cumpla "Leda funciona correctamente" | Volcado final a `db/respaldos/` y después `drop database` |
 | Respaldo `db/respaldos/prisma-antes-flujo-20260930.dump` | Junto con las bases de arriba | Borrar el archivo |
 | Bases residuales `prisma_test_*` y `prisma_diag_*` | Ya mismo: son de corridas viejas, no son respaldo de nada | `drop database` |
+| Membresía del login de autoridad en `prisma_gateway` | Se va sola al borrar el rol `prisma_gateway` | — |
 | Roles `prisma_*` del servidor | Después de borrar todas las bases `prisma*` (un rol con objetos no se puede borrar) | `drop role` |
 | Variables `PRISMA_*` que queden en algún `.env` | Cuando todos los checkouts en uso estén renombrados | Borrar la línea |
 | Copias `.env.antes-leda` (las deja `renombrar_a_leda.py env`, ignoradas por Git) | Cuando se cumpla "Leda funciona correctamente" | Borrar el archivo |
