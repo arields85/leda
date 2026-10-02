@@ -18,8 +18,9 @@ La mudanza de la carpeta (R13) quedó hecha y verificada el 2026-10-02: el paso 
 script, rutas actualizadas en `main`, en la rama de flujo y en la memoria del agente, y una
 prueba real del alta que pasa desde `D:\Proyectos\Leda-PM` (detalle en R13). Lo que sigue:
 
-1. Seguir con los pendientes en el orden de abajo. El primero, el turno colgado sin plazo
-   total, se **discute con el usuario** antes de tocar código.
+1. Cuando el usuario pregunte qué queda pendiente, nombrarle los pendientes de la tabla
+   de abajo y dejar que elija. Los marcados como **decididos** se empiezan sin volver a
+   discutir su diseño: todo lo resuelto está en el documento que señala la tabla.
 2. Si la PC se reinició, levantar PostgreSQL antes de cualquier cosa
    (`levantar-postgres.bat`). Sin eso `leda estado` agota el tiempo contra
    `localhost:5432`, y así fue como frenó la mudanza.
@@ -87,7 +88,7 @@ esperar: el 2026-10-02 un turno quedó colgado porque el proveedor `nan` estaba 
 
 | # | Pendiente | Dónde está el detalle |
 |---|---|---|
-| — | Turno del alta colgado sin fin cuando el proveedor se degrada: `conducir_alta` no tiene plazo total y Ctrl+C no corta el listener. Choca con la decisión de "sin plazo por turno": **discutir con el usuario** | rama de flujo, `odd/tasks/flujo-de-un-mensaje.md` |
+| P1-P7 | **Decidido, listo para hacer** (2026-10-02). Falla del proveedor del modelo: plazo total de 2 min por turno, aviso certero (promete "te respondo" sólo si la falla es del proveedor; constitución §10), cola que se reprocesa contra el estado actual, respuesta dentro del horario, límite de 4 h hábiles, alcance a todo turno del modelo. Todo está decidido: se empieza directamente por P1 | rama de flujo, `odd/tasks/flujo-de-un-mensaje.md`, "Decisión: plazo total, aviso certero y cola cuando falla el proveedor" |
 | (l) | Espacio muerto entre el stream y el mensaje final. Recomendado: mantener el borrador o "escribiendo…" hasta el final (el ADR 0013 permite varias partes; el límite es la verificación) | rama de flujo |
 | (e) | Decisión del usuario: qué hace el alta cuando escribe alguien de Dirección sin objetivos operativos | traspaso del 2026-10-01 |
 | — | Advertencia de RDD: doble falla calendario + incidente en `_inicio_de_jornada` (`ingreso_tareas.py`) | rama de flujo |
