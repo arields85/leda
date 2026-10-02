@@ -235,6 +235,28 @@ Orden, aplicado igual que en `feat/flujo-de-un-mensaje`:
    copias locales (si el paso 2 confirmó que no tienen nada propio), las copias
    `.env.antes-leda` y, si ninguna rama viva conserva el nombre viejo, el script.
 
+## Repositorio en GitHub: `arields85/leda` (2026-10-02)
+
+Decisión del usuario: no renombrar `arields85/prisma`. Queda **congelado como respaldo**
+(sin más push) y se crea **`arields85/leda`, público**, con toda la historia. Desde ahora los
+push van ahí. Cuando `arields85/prisma` quede realmente obsoleto, se borra.
+
+- Remotos locales: `origin` pasa a apuntar a `arields85/leda`. El remoto viejo queda como
+  `respaldo-prisma`, sólo de lectura por convención.
+- Se suben `main`, `feat/flujo-de-un-mensaje`, `auxiliar/alta-y-google`, sus tres copias
+  locales (como respaldo, porque tienen commits sin equivalente verificado) y el tag
+  `pre-renombre-leda`.
+- Control previo (el repo es público): se escaneó la historia sin publicar. Las
+  coincidencias son ejemplos (plantilla `.env.ejemplo`, contraseñas de muestra en las
+  guías, datos de prueba y un token falso), y la verificación byte a byte prueba que son el
+  mismo contenido ya público en `arields85/prisma`, renombrado.
+- **Engram no se pierde.** Según su documentación (`DOCS.md`, "Detection algorithm"),
+  la identidad del proyecto es una etiqueta privada guardada en `.git` que se conserva a
+  través de cambios de remoto y mudanzas del repositorio. Como seguro se fijó con
+  `engram init prisma-pm` (`.engram/config.json`, la máxima prioridad). El nombre interno
+  queda `prisma-pm`, porque Engram no permite renombrar proyectos (`projects merge` sólo une
+  variantes de separador) y forzar `leda` partiría las memorias.
+
 ## Leda funciona correctamente: la condición para limpiar
 
 Pedido del usuario: dejar asentado que Leda funciona antes de borrar nada de Prisma. Se
@@ -309,4 +331,5 @@ respaldo del renombre.
 | `feat/flujo-variante-a` (local, remota y su worktree) | **Hecho en local** (2026-10-02, decisión del usuario) | Worktree y rama local borrados. Sus 20 commits ya estaban todos en `feat/flujo-de-un-mensaje` (0 fuera), y el experimento A/B se cerró el 2026-10-01 (ADR 0014). Queda la rama remota `origin/feat/flujo-variante-a`, que se borra cuando el usuario decida el push |
 | Script `tools/renombrar_a_leda.py` | Cuando `auxiliar/alta-y-google` esté renombrada (R12, pasos 3 y 5) y ninguna otra rama viva conserve el nombre viejo | Borrar el archivo |
 | `tests/historia_previa_a_leda.py` | **Nunca**: las pruebas de migración leen commits anteriores al renombre y lo necesitan siempre. No es un resto de Prisma | — |
+| Repositorio `arields85/prisma` (respaldo congelado) y el remoto local `respaldo-prisma` | Cuando el usuario lo dé por obsoleto | Borrar el repositorio en GitHub (lo hace o lo autoriza el usuario) y `git remote remove respaldo-prisma` |
 | Carpeta, worktrees y repositorio de GitHub con el nombre viejo | Cuando el usuario decida renombrarlos (fuera de alcance) | Lo hace el usuario; el agente actualiza después `.venv`, rutas y memoria |
