@@ -109,6 +109,10 @@ eran del arnés y se corrigieron en `ffe4e85`). Corridas anteriores y su detalle
 - `leda_flujo` (2026-10-02): migraciones hasta `0028` (quitar botones resueltos), con
   respaldo previo en `db/respaldos/leda_flujo-antes-de-0028-20261002.dump`; CoreWork con
   `emojis = true` (decisión del usuario; el pack se actualiza en la rama de flujo).
+  **Restricción de horario apagada** en `leda_flujo` desde el 2026-10-02 (horario de
+  CoreWork: todos los días, 00:00-23:59) para probar a cualquier hora; el original
+  (lunes a viernes, 09:00-17:00) se restaura con `tools/restriccion_horario.py prender
+  corework`.
 - Base `prisma` (respaldo): ronda 4, rearmada dos veces el 2026-09-30, esquema hasta
   `0025`, Ariel administrador. Tiene el estado del circuito C (hallazgos C-1 a C-3 en
   "Próximo paso"). Respaldo previo al flujo:

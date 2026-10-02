@@ -58,6 +58,15 @@ nombres con el usuario; "conducida", "guiada" o "método nuevo" confunden.
   vez ni interruptores nuevos por circuito; el interruptor `alta` que ya existe queda
   como está. Los flujos anteriores no llegan al producto: el producto final se queda
   con el flujo definitivo y los demás se descartan.
+- **"Apagá / prendé la restricción de horario":** para probar por Telegram a cualquier
+  hora. Leda no escribe fuera del horario del espacio (constitución §8), y ese horario
+  es un dato de cada cliente (`work_calendar`, cargado del `calendario` del pack), no una
+  regla del código. Apagarla pone el horario del espacio en todos los días, 00:00-23:59;
+  prenderla lo restaura desde el pack. Se hace con
+  `tools/restriccion_horario.py apagar|prender|estado <espacio>`, desde el worktree de la
+  base que se quiere tocar y con `PYTHONPATH=src`; sólo funciona en `leda` y `leda_flujo`.
+  Mientras está apagada, todos los días cuentan como hábiles y los plazos de los
+  recordatorios se acortan.
 
 ## Orden de lectura
 
