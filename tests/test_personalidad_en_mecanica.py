@@ -54,6 +54,12 @@ def test_el_encabezado_dice_que_es_referencia_y_no_se_le_manda_a_la_ia():
     assert "audio" in encabezado        # "voz" queda para las respuestas con audio
 
 
+def test_la_referencia_no_le_habla_a_la_ia():
+    # Era instrucciones para la IA; ahora es referencia (flujo C4, aprobado por el
+    # usuario el 2026-10-02).
+    assert "quien lee estas instrucciones" not in _plano(_cuerpo_de_la_personalidad())
+
+
 @pytest.mark.parametrize("tono", [VOS, USTED, None])
 def test_las_instrucciones_del_alta_no_llevan_la_personalidad(tono):
     texto = INS.instrucciones_alta(tono).texto
