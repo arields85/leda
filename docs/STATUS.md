@@ -55,7 +55,10 @@ Gobiernan: [`product/que-es-prisma.md`](product/que-es-prisma.md), [`architectur
 - Feature previa "Prisma orienta" (T1-T4b) cerrada; ver
   [`../odd/tasks/prisma-orienta.md`](../odd/tasks/prisma-orienta.md) y su diario en
   [`historial/`](historial/prisma-orienta-diario-hasta-2026-09-30.md).
-- Git: trabajo en `main`, por delante de `origin/main` sin push (lo decide el usuario).
+- Git: el 2026-10-01 se subieron `main`, el tag `pre-renombre-leda` y las ramas
+  `feat/flujo-de-un-mensaje`, `feat/flujo-variante-a` y `auxiliar/alta-y-google`, como
+  respaldo antes del renombre a Leda. El porqué, lo que quedó local y la limpieza
+  posterior están en [`../odd/tasks/renombre-a-leda.md`](../odd/tasks/renombre-a-leda.md).
   Frontera de revisión RDD en `ec3109a` (rebanada de documentación aprobada y
   reconocida, linaje `review-147d7327236bfea2`).
 - Rama `feat/flujo-de-un-mensaje`, worktree
