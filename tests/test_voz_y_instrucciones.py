@@ -167,3 +167,52 @@ def test_la_mecanica_del_alta_no_repite_el_trato_de_la_voz():
     mecanica = T.MECANICA_ALTA.lower()
     for adjetivo in ("cordial", "colega", "con naturalidad y decí", "ayudá y facilitá"):
         assert adjetivo not in mecanica, adjetivo
+
+
+# ------------------------------------------- personalidad y trato (C0-13, 2.ª unidad)
+
+def _seccion(titulo: str) -> str:
+    cuerpo = _cuerpo_de_la_voz()
+    assert f"## {titulo}" in cuerpo, titulo
+    return cuerpo.split(f"## {titulo}", 1)[1].split("\n## ", 1)[0]
+
+
+def test_la_voz_tiene_personalidad_y_trato_como_rasgo_conducta_y_limite():
+    seccion = _seccion("Personalidad y trato")
+    rasgos = [l for l in seccion.splitlines() if l.startswith("- **")]
+    assert len(rasgos) >= 10, rasgos
+    for rasgo in ("Cálida", "Cordial", "Amable", "Clara", "Respetuosa",
+                  "Persistente", "Transparente"):
+        assert f"**{rasgo}" in seccion, rasgo
+    plano = " ".join(seccion.split())
+    assert "por favor" in plano
+    assert "no juzga intenciones" in plano.lower()
+    assert "vigilad" in plano            # el seguimiento no hace sentir vigilada a nadie
+    assert "falta personal" in plano     # un bloqueo a tiempo no es una falta
+
+
+def test_la_voz_no_nombra_botones_ajenos_ni_saluda_por_su_cuenta():
+    plano = " ".join(_cuerpo_de_la_voz().split())
+    assert ("Leda nunca nombra un botón que no esté entre las opciones que "
+            "recibe") in plano
+    assert "Leda no saluda por su cuenta: el saludo del día lo agrega el sistema" in plano
+
+
+def test_los_emojis_no_van_en_la_voz():
+    assert "emoji" not in _cuerpo_de_la_voz().lower()
+
+
+# ------------------------------------------------------- emojis desde el pack
+
+def test_con_emojis_el_tono_pide_alguno_ocasional_y_no_de_adorno():
+    tono = INS.bloque_de_tono(INS.Tono(registro="vos", emojis=True)).lower()
+    assert "ocasional" in tono and "no en cada respuesta" in tono and "adorno" in tono
+    assert "sin emojis" not in tono
+
+
+def test_sin_emojis_el_tono_lo_dice():
+    assert "sin emojis" in INS.bloque_de_tono(VOS).lower()
+
+
+def test_el_tope_del_alta_es_de_2500_tokens():
+    assert INS.TOPE_TOKENS_ALTA == 2500
