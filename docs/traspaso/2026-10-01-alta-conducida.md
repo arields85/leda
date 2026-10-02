@@ -17,9 +17,9 @@ corrección y cada revisión está en `odd/tasks/flujo-de-un-mensaje.md` de la r
 2. **Verificar el estado de la rama** (el worktree no tiene `.venv`: se usa el del checkout
    principal):
    ```bash
-   cd D:/Proyectos/Prisma-PM-worktrees/flujo-de-un-mensaje
+   cd D:/Proyectos/Leda-PM-worktrees/flujo-de-un-mensaje
    git log --oneline -1          # esperado: 96a139b o posterior
-   PYTHONPATH=src "D:/Proyectos/Prisma-PM/.venv/Scripts/python.exe" -m pytest -q -p no:cacheprovider
+   PYTHONPATH=src "D:/Proyectos/Leda-PM/.venv/Scripts/python.exe" -m pytest -q -p no:cacheprovider
    ```
    La última suite completa registrada es la de `5cd32b6`, con 3411 passed. Los commits
    posteriores (`dfbb01d` … `96a139b`) se verificaron con pruebas enfocadas. **Lo primero
@@ -27,8 +27,8 @@ corrección y cada revisión está en `odd/tasks/flujo-de-un-mensaje.md` de la r
 3. **Revisar con RDD lo que falta:** la frontera revisada es `39bbf59`, y las correcciones
    de esa revisión llegaron en `76721cd`.
    ```bash
-   "D:/Proyectos/Prisma-PM/.venv/Scripts/python.exe" tools/rdd_por_tramos.py \
-     "D:/Proyectos/Prisma-PM-worktrees/flujo-de-un-mensaje" 39bbf59 tramo-siguiente
+   "D:/Proyectos/Leda-PM/.venv/Scripts/python.exe" tools/rdd_por_tramos.py \
+     "D:/Proyectos/Leda-PM-worktrees/flujo-de-un-mensaje" 39bbf59 tramo-siguiente
    ```
 4. **Preguntarle al usuario la decisión (e)**, la de Dirección (ver "Pendientes"). Es lo
    que quedó recomendado como siguiente unidad.
@@ -106,7 +106,7 @@ fecha, propone una concreta en el texto y el "sí" se manda como `fecha_iso`.
 
 | Qué | Cómo |
 |---|---|
-| Listener del worktree (lo corre el usuario en su terminal) | `cd D:\Proyectos\Prisma-PM-worktrees\flujo-de-un-mensaje`, `$env:PYTHONPATH="src"`, `D:\Proyectos\Prisma-PM\.venv\Scripts\python.exe -m leda escuchar corework`. Reiniciar después de cada commit de código |
+| Listener del worktree (lo corre el usuario en su terminal) | `cd D:\Proyectos\Leda-PM-worktrees\flujo-de-un-mensaje`, `$env:PYTHONPATH="src"`, `D:\Proyectos\Leda-PM\.venv\Scripts\python.exe -m leda escuchar corework`. Reiniciar después de cada commit de código |
 | Base de la rama | `leda_flujo` (el `.env` del worktree apunta a ella). Ajustes activos: `alta = conversada`, `stream = true`; sin `horizonte_tarea` (vale 2 meses). La base de la ronda 4 es `prisma` (anterior al renombre, queda como respaldo; ver `odd/tasks/renombre-a-leda.md`) |
 | Cambiar un ajuste | Script con `leda.db.conectar` + `admin`, comprobando `current_database() == 'leda_flujo'` antes de escribir; sólo imprimir valores fijos, nunca derivados del `.env` (memoria `env-sin-imprimir-derivados`) |
 | Horario de CoreWork | 09:00-17:00. Fuera de horario los avisos quedan para las 09:00 del día siguiente (no es una falla) |
@@ -120,9 +120,9 @@ Desde el worktree, con `PYTHONPATH=src`:
 
 ```bash
 # conversación con botones (--completo: sin cortar en 400 caracteres)
-"D:/Proyectos/Prisma-PM/.venv/Scripts/python.exe" "D:/Proyectos/Prisma-PM/tools/leer_conversacion.py" 30 --completo
+"D:/Proyectos/Leda-PM/.venv/Scripts/python.exe" "D:/Proyectos/Leda-PM/tools/leer_conversacion.py" 30 --completo
 # por qué falló un turno: intentos del modelo, motivo, forma de la salida, incidentes
-"D:/Proyectos/Prisma-PM/.venv/Scripts/python.exe" "D:/Proyectos/Prisma-PM/tools/leer_turnos_alta.py" 30
+"D:/Proyectos/Leda-PM/.venv/Scripts/python.exe" "D:/Proyectos/Leda-PM/tools/leer_turnos_alta.py" 30
 ```
 
 - Un turno con dos intentos rechazados = el aviso "Tuve un problema…". El `motivo` y la

@@ -19,7 +19,8 @@ Usage, from the root of the checkout to rename:
 
 The substitution preserves case (PRISMA -> LEDA, Prisma -> Leda, prisma -> leda) and
 never touches the protected tokens: names of things outside the rename's scope that
-keep their old name (the repository folder, the GitHub repository, a real backup file).
+keep their old name (the GitHub repository, a real backup file). The local folder
+`Prisma-PM` was protected until it moved to `Leda-PM` (R13); since then it is renamed.
 """
 import pathlib
 import subprocess
@@ -29,7 +30,6 @@ RULES = [("PRISMA", "LEDA"), ("Prisma", "Leda"), ("prisma", "leda")]
 
 # Outside the rename's scope (decided by the user): they keep their real names.
 PROTECTED = [
-    "Prisma-PM",            # D:\Proyectos\Prisma-PM and Prisma-PM-worktrees
     "arields85/prisma",     # GitHub repository
     "prisma-antes-flujo",   # db/respaldos/prisma-antes-flujo-20260930.dump (real file)
 ]
@@ -177,8 +177,8 @@ SELF_TEST = {
     "current_setting('prisma.workspace_id')": "current_setting('leda.workspace_id')",
     "src/prisma/cli.py": "src/leda/cli.py",
     "prisma_flujo": "leda_flujo",
-    "D:/Proyectos/Prisma-PM/.venv": "D:/Proyectos/Prisma-PM/.venv",
-    "D:\\Proyectos\\Prisma-PM-worktrees\\x": "D:\\Proyectos\\Prisma-PM-worktrees\\x",
+    "D:/Proyectos/Prisma-PM/.venv": "D:/Proyectos/Leda-PM/.venv",
+    "D:\\Proyectos\\Prisma-PM-worktrees\\x": "D:\\Proyectos\\Leda-PM-worktrees\\x",
     "arields85/prisma": "arields85/prisma",
     "db/respaldos/prisma-antes-flujo-20260930.dump":
         "db/respaldos/prisma-antes-flujo-20260930.dump",

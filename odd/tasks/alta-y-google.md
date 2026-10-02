@@ -3,7 +3,7 @@
 **Estado:** propuesto (no iniciado — pendiente de G0: matriz aprobada y ADR 0010 aceptado)
 **Creado:** 2026-09-27
 **Origen:** decisión del usuario, 2026-09-27; [`ADR 0010`](../../docs/decisions/0010-correo-verificado-y-google-en-el-producto.md).
-**Rama/worktree:** `auxiliar/alta-y-google`, `D:\Proyectos\Prisma-PM-worktrees\alta-y-google`.
+**Rama/worktree:** `auxiliar/alta-y-google`, `D:\Proyectos\Leda-PM-worktrees\alta-y-google`.
 
 > **Para la sesión que trabaje esta rama:** este documento contiene todo lo que
 > se decidió con el usuario antes de crearla. Esa conversación ocurrió en otra
@@ -360,7 +360,7 @@ por commit, igual que en `main`. Nunca push sin pedido explícito del usuario.
 
 ## Cómo arrancar la sesión auxiliar
 
-En el worktree `D:\Proyectos\Prisma-PM-worktrees\alta-y-google`, rama
+En el worktree `D:\Proyectos\Leda-PM-worktrees\alta-y-google`, rama
 `auxiliar/alta-y-google`:
 
 1. Leer `AGENTS.md` en su orden de lectura declarado (producto, frontera,

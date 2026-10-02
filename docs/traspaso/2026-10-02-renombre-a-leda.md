@@ -1,8 +1,8 @@
-# Traspaso: el producto se llama Leda y la carpeta local se muda
+# Traspaso: el producto se llama Leda y la carpeta local se mudó
 
 Cierre del 2026-10-02. El producto pasó a llamarse **Leda** en todo el repositorio
 ([ADR 0015](../decisions/0015-renombre-del-producto-a-leda.md)), funciona (alta real de
-punta a punta) y lo viejo ya se limpió. Queda una sola mudanza pendiente: la carpeta local.
+punta a punta) y lo viejo ya se limpió. La carpeta local también se mudó (R13).
 Este documento permite retomar sin reconstruir nada de memoria. El detalle completo, con
 cada comando, verificación y revisión, está en
 [`../../odd/tasks/renombre-a-leda.md`](../../odd/tasks/renombre-a-leda.md).
@@ -14,30 +14,19 @@ punto de retorno los reemplaza este documento.
 
 ## Punto exacto de retorno
 
-1. **¿Se hizo la mudanza de la carpeta (R13)?** Si existe `D:\Proyectos\Leda-PM` y no
-   existe `D:\Proyectos\Prisma-PM`, sí. La corre el usuario (o una IA que controla su PC)
-   con `tools/mudar_carpeta.ps1`, con Claude Code cerrado, porque Windows no deja renombrar
-   una carpeta en uso.
-   - **Si no se hizo:** ayudar a correrla. Primero `-DryRun` desde una PowerShell fuera de
-     la carpeta y con todo cerrado. Instrucciones en R13.
-   - **Si se hizo**, en la sesión nueva abierta en `D:\Proyectos\Leda-PM`:
-     1. verificar que `git worktree list` muestre sólo rutas con `Leda-PM`, que
-        `.venv\Scripts\python.exe -c "import leda"` funcione y que la memoria del agente se
-        haya leído;
-     2. cambiar `Prisma-PM` por `Leda-PM` en los documentos vivos, las herramientas y la
-        memoria del agente, también en las ramas `feat/flujo-de-un-mensaje` y
-        `auxiliar/alta-y-google`;
-     3. sacar `Prisma-PM` de los tokens protegidos de `tools/renombrar_a_leda.py`, porque
-        desde ahí renombrar esas rutas pasa a ser lo correcto;
-     4. hacer con el usuario la **prueba real del alta de tareas** (guion de abajo), para
-        comprobar que todo funciona desde la carpeta nueva como funcionaba antes;
-     5. recordarle al usuario que borre `D:\Respaldo-mudanza-leda`, el respaldo de los
-        `.env` y los volcados que hizo antes de la mudanza, porque tiene secretos;
-     6. registrar el resultado en R13, cerrar R13, borrar el "AVISO DE RETORNO" de
-        `AGENTS.md`, y hacer commit y push a `arields85/leda`.
-2. Después, seguir con los pendientes en el orden de abajo.
+La mudanza de la carpeta (R13) quedó hecha y verificada el 2026-10-02: el paso 6 del
+script, rutas actualizadas en `main`, en la rama de flujo y en la memoria del agente, y una
+prueba real del alta que pasa desde `D:\Proyectos\Leda-PM` (detalle en R13). Lo que sigue:
 
-## Guion de la prueba real después de la mudanza
+1. Seguir con los pendientes en el orden de abajo. El primero, el turno colgado sin plazo
+   total, se **discute con el usuario** antes de tocar código.
+2. Si la PC se reinició, levantar PostgreSQL antes de cualquier cosa
+   (`levantar-postgres.bat`). Sin eso `leda estado` agota el tiempo contra
+   `localhost:5432`, y así fue como frenó la mudanza.
+3. El guion de abajo sirve como prueba de humo del alta cada vez que haga falta comprobar
+   que todo sigue funcionando.
+
+## Guion de la prueba real del alta
 
 Es la misma prueba que pasó el 2026-10-02 (09:12, tarea creada sin incidentes). Antes de
 empezar, PostgreSQL tiene que estar corriendo (`levantar-postgres.bat`, si se reinició la
@@ -98,7 +87,6 @@ esperar: el 2026-10-02 un turno quedó colgado porque el proveedor `nan` estaba 
 
 | # | Pendiente | Dónde está el detalle |
 |---|---|---|
-| R13 | Terminar la mudanza de la carpeta (pasos de arriba) | `odd/tasks/renombre-a-leda.md` |
 | — | Turno del alta colgado sin fin cuando el proveedor se degrada: `conducir_alta` no tiene plazo total y Ctrl+C no corta el listener. Choca con la decisión de "sin plazo por turno": **discutir con el usuario** | rama de flujo, `odd/tasks/flujo-de-un-mensaje.md` |
 | (l) | Espacio muerto entre el stream y el mensaje final. Recomendado: mantener el borrador o "escribiendo…" hasta el final (el ADR 0013 permite varias partes; el límite es la verificación) | rama de flujo |
 | (e) | Decisión del usuario: qué hace el alta cuando escribe alguien de Dirección sin objetivos operativos | traspaso del 2026-10-01 |
@@ -113,7 +101,7 @@ esperar: el 2026-10-02 un turno quedó colgado porque el proveedor `nan` estaba 
 | Qué | Cómo |
 |---|---|
 | Arrancar PostgreSQL después de reiniciar la PC | `levantar-postgres.bat` desde la carpeta del repositorio (no es un servicio) |
-| Listener de la rama de flujo | Desde su worktree (`…\Leda-PM-worktrees\flujo-de-un-mensaje` después de la mudanza): `$env:PYTHONPATH="src"` y `<repo>\.venv\Scripts\python.exe -m leda escuchar corework` |
+| Listener de la rama de flujo | Desde su worktree (`…\Leda-PM-worktrees\flujo-de-un-mensaje`): `$env:PYTHONPATH="src"` y `<repo>\.venv\Scripts\python.exe -m leda escuchar corework` |
 | Bases | `leda` (código de `main`) y `leda_flujo` (rama de flujo: `alta = conversada`, `stream = true`, `redaccion = A`). Ariel, Ismael y Marcos quedan vinculados desde el pack |
 | Leer una prueba | `tools/leer_conversacion.py [minutos] --completo` y `tools/leer_turnos_alta.py [minutos]`, con `PYTHONPATH=src` desde el worktree de la rama |
 | RDD de `main` | El tramo desde `647fcc7` incluye el commit mecánico del renombre y siempre corta por presupuesto (`lens_context_budget_exceeded`). Está documentado: el commit se prueba con la verificación byte a byte. Revisar lo escrito a mano por tramos que no lo incluyan |

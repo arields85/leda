@@ -65,7 +65,7 @@ Gobiernan: [`product/que-es-leda.md`](product/que-es-leda.md), [`architecture/fr
   proyecto `prisma-pm`, fijado en `.engram/config.json`. Frontera de revisión RDD en `ec3109a` (rebanada de documentación aprobada y
   reconocida, linaje `review-147d7327236bfea2`).
 - Rama `feat/flujo-de-un-mensaje`, worktree
-  `D:\Proyectos\Prisma-PM-worktrees\flujo-de-un-mensaje`: documento
+  `D:\Proyectos\Leda-PM-worktrees\flujo-de-un-mensaje`: documento
   `odd/tasks/flujo-de-un-mensaje.md` (vive en esa rama). F1 y F2 confirmadas con commit,
   F3 en curso.
 - Rama auxiliar `auxiliar/alta-y-google` (worktree `alta-y-google`, alta con correo
@@ -245,8 +245,10 @@ aclaraciones, conversación de bloqueos.
 
 **Punto exacto para retomar (cierre del 2026-10-02).** Leer primero el traspaso
 [`traspaso/2026-10-02-renombre-a-leda.md`](traspaso/2026-10-02-renombre-a-leda.md): qué se
-hizo en el renombre, el punto exacto de retorno (terminar la mudanza de la carpeta local a
-`D:\Proyectos\Leda-PM`, R13), los pendientes en orden, cómo operar ahora y las lecciones. El
+hizo en el renombre, los pendientes en orden, cómo operar ahora y las lecciones. La mudanza
+de la carpeta local a `D:\Proyectos\Leda-PM` (R13) quedó hecha el 2026-10-02 y se verificó
+con una prueba real del alta. PostgreSQL no arranca solo: después de reiniciar la PC hay que
+correr `levantar-postgres.bat`. El
 traspaso del 2026-10-01 sigue valiendo para el diseño del alta conducida y la forma de
 trabajar. Push sólo a `arields85/leda` y cuando lo decida el usuario. Consentimiento
 permanente para commits y revisiones RDD; chequeo de rumbo escrito antes de cada unidad

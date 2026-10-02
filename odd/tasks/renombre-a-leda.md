@@ -177,7 +177,7 @@ no un secreto. No hay `.env` ni volcados de base versionados.
       funcionalidad nueva sigue congelada (ROADMAP, "Orden de entrega"), así que la fecha
       la decide el usuario.
 
-- [ ] R13. **Mudar la carpeta local** `D:\Proyectos\Prisma-PM` → `D:\Proyectos\Leda-PM`, y
+- [x] R13. **Mudar la carpeta local** `D:\Proyectos\Prisma-PM` → `D:\Proyectos\Leda-PM`, y
       `Prisma-PM-worktrees` → `Leda-PM-worktrees` (pedido del usuario, 2026-10-02).
       - Windows no deja renombrar una carpeta en uso, y la sesión de Claude Code corre
         adentro. Por eso la mudanza la corre el usuario con
@@ -206,11 +206,33 @@ no un secreto. No hay `.env` ni volcados de base versionados.
         mudanza ninguna ruta debe contener `Prisma-PM`, tampoco `Prisma-PM-worktrees`.
         Sintaxis verificada con el analizador de PowerShell; `-DryRun` frena por los procesos
         en uso, como corresponde.
+      - **Hecho (2026-10-02).** El usuario corrió el script después de reiniciar la PC.
+        Hizo los pasos 1 a 5 y frenó en la verificación: `leda estado` agotó el tiempo
+        contra `localhost:5432`. La causa fue que PostgreSQL no estaba corriendo, porque no
+        es un servicio de Windows y no arranca después de reiniciar. El script frenó como
+        debía. Con PostgreSQL levantado, el paso 6 pasó entero desde `D:\Proyectos\Leda-PM`:
+        `git worktree list` muestra sólo rutas `Leda-PM`, `import leda` funciona y
+        `leda estado corework` termina con código 0.
+      - Prueba real del alta desde la carpeta nueva, el 2026-10-02 de 11:07 a 11:09, con el
+        listener de la rama de flujo y la base `leda_flujo`: **pasa**. Marcos creó el
+        borrador, eligió el objetivo y "Para mí", escribió el criterio y lo envió a
+        aprobación. Ismael lo confirmó. La tarea `02168c89` quedó `asignada`, y su borrador y
+        su solicitud de alta quedaron `converted` y apuntan a ella. La auditoría registra
+        enviar → avisar → confirmar, más el evento `→ asignada`. Los cuatro turnos salieron
+        "aceptada" al primer intento (de 4,9 a 8,2 segundos), sin incidentes nuevos y sin
+        "Prisma" en ningún mensaje.
+      - Rutas: `Prisma-PM` → `Leda-PM` en los documentos vivos de `main` (`docs/STATUS.md`,
+        ADR 0010, traspaso del 2026-10-01, `odd/tasks/alta-y-google.md` y el procedimiento
+        de R12), en la rama de flujo (`5ce55e0`) y en la memoria del agente. Se conservan
+        como registro histórico: `docs/historial/`, el ADR 0015, el relato de R5 a R13, el
+        diario `leda-orienta.md` de la rama de flujo y `tools/mudar_carpeta.ps1`.
+        `auxiliar/alta-y-google` no se tocó a mano: la cubre R12, porque
+        `renombrar_a_leda.py` ya no protege `Prisma-PM` (autoprueba 11/11).
 
 ## Procedimiento para integrar `auxiliar/alta-y-google` (R12)
 
 Estado de la rama al 2026-10-02: 30 commits sobre `main` (el último, `9b4d8eb`, G2c del
-2026-09-29), worktree `Prisma-PM-worktrees/alta-y-google` limpio, código todavía con el
+2026-09-29), worktree `Leda-PM-worktrees/alta-y-google` limpio, código todavía con el
 nombre Prisma, y su `.env` todavía con `PRISMA_*`, apuntando a la base `prisma`. **Esa base
 ya no existe**: se borró el 2026-10-02 con volcado final, y no tenía las tablas de `0100` ni
 `0101` (la rama se probó con bases efímeras), así que no se perdió nada propio de la rama.
@@ -226,7 +248,7 @@ Orden, aplicado igual que en `feat/flujo-de-un-mensaje`:
    `git cherry`). Borrar una copia sólo si todo su contenido está en la rama; si no, se
    conserva o se rescata lo que falte.
 3. **Renombrar la rama antes de traer `main`.** Desde el worktree:
-   `D:/Proyectos/Prisma-PM/.venv/Scripts/python.exe D:/Proyectos/Prisma-PM/tools/renombrar_a_leda.py aplicar`.
+   `D:/Proyectos/Leda-PM/.venv/Scripts/python.exe D:/Proyectos/Leda-PM/tools/renombrar_a_leda.py aplicar`.
    Commit `refactor: rename the product from Prisma to Leda across the repository`.
    Después, `renombrar_a_leda.py verificar <commit previo> HEAD` tiene que dar differ,
    missing y added en 0, y `restos` sólo tiene que mostrar tokens protegidos. **Por qué
