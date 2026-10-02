@@ -187,11 +187,19 @@ intento; sin incidentes.
 
 - **H7 (menor). El aviso de rechazo no deja un próximo paso a quien pidió.** Marcos
   recibe el rechazo con el motivo y nada más. Constitución §8: ningún mensaje deja a la
-  persona sin un próximo paso. `PENDIENTE` de decisión del usuario.
+  persona sin un próximo paso; sin uno, el tema queda abierto en el aire.
+
+**Decisión del usuario (2026-10-02): decidido, listo para hacer.**
+
+- [ ] **C0-8.** El aviso de rechazo a quien pidió cierra con dos botones: **"Volver a
+      armarla"** reabre el borrador con los mismos datos, para corregir lo que hizo falta
+      y volver a enviarlo (con su resumen, Modificar y Enviar a aprobación); **"Dejarla
+      así"** cierra el tema sin efectos. Toque idempotente y con estado real si el
+      borrador ya no se puede reabrir (C0-5).
 
 **Estado de C0 al 2026-10-02:** las cinco variantes ya se probaron en real (confirma quien
 pide, para otra persona, Modificar, Cancelar por texto y por botón, rechazo con motivo).
-Falta construir C0-1, C0-2, C0-3, C0-5 y C0-6, retirar el alta guiada (M4-M9) y repetir
+Falta construir C0-1, C0-2, C0-3, C0-5, C0-6 y C0-8, retirar el alta guiada (M4-M9) y repetir
 la ronda C0-A (C0-4).
 
 ## Relación con otros pendientes
