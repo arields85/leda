@@ -22,7 +22,9 @@ sobre las que se apoyan las políticas de aislamiento.
 1. Una sola sustitución que respeta mayúsculas (`PRISMA` → `LEDA`, `Prisma` → `Leda`,
    `prisma` → `leda`), aplicada a rutas y contenido de todos los archivos versionados.
    No toca binarios, archivos de bloqueo, los archivos que describen el renombre (el
-   documento de la unidad, este ADR y el script `tools/renombrar_a_leda.py`) ni los
+   documento de la unidad, este ADR y el script `tools/renombrar_a_leda.py`), el ayudante
+   `tests/historia_previa_a_leda.py` (traduce a los nombres actuales los esquemas que las
+   pruebas leen de commits anteriores al renombre; es permanente) ni los
    nombres protegidos que quedan fuera de alcance: la carpeta `Prisma-PM`, el repositorio
    `arields85/prisma` y el archivo de respaldo `prisma-antes-flujo-*`.
 2. Corte limpio: el código no lee nombres viejos de variables, roles ni bases.
