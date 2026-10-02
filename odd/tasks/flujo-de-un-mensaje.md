@@ -1726,3 +1726,12 @@ Diseño B elegido por el usuario. Ruta declarada: un solo escritor (encargo expl
   despachador lo posterga igual. RED 2 failed, GREEN 165 passed. Quedan como sugerencias: la
   rama "la fila terminal ya salió" sin prueba, claves de aviso duplicadas, el ícono de
   Empezar otro, ramas de `texto_parcial`, elección del índice de la herramienta en el stream.
+- Prueba real del stream con Ariel (celular, 21:51): se veían sólo las primeras letras
+  ("List…") y después el mensaje final; la animación "…" del borrador y el "escribiendo…"
+  sí funcionaron y se mantuvieron hasta la respuesta (pendiente (g) verificado en real).
+  Causa: la regulación de envíos descartaba lo que llegaba con un envío en vuelo o antes
+  del intervalo, sin guardar el último texto. Corregido: un solo trabajador en segundo plano
+  manda siempre el texto más reciente, a lo sumo cada 0,7 s; lo intermedio ya superado no se
+  manda, lo último sí. El usuario quiere ver los textos intermedios ("lo hace más dinámico,
+  se ve algo mientras piensa"): se conservan. RED 1 failed; GREEN 143 passed; se reescribió
+  `test_el_texto_se_acota_a_una_actualizacion_por_intervalo`, que afirmaba el descarte.

@@ -329,17 +329,18 @@ def test_con_texto_antes_del_umbral_la_semilla_no_lo_tapa_y_igual_se_retira():
 
 
 def test_el_texto_se_acota_a_una_actualizacion_por_intervalo():
-    tg, hora = Telegram(), [0.0]
-    with _activo(tg, umbral=10, intervalo_borrador=0.7,
-                 reloj=lambda: hora[0]) as ind:
+    """Lo intermedio que quedó viejo antes de poder salir no se manda; lo último
+    sí, cuando pasa el intervalo; el mismo texto o uno vacío no se repiten."""
+    tg = Telegram()
+    with _activo(tg, umbral=10, intervalo_borrador=0.2) as ind:
         ind.actualizar_borrador("a")             # la primera sale enseguida
-        hora[0] = 0.3
-        ind.actualizar_borrador("ab")            # muy pronto: no sale
-        hora[0] = 0.8
-        ind.actualizar_borrador("abc")           # pasó el intervalo: sale
-        hora[0] = 2.0
+        _esperar(lambda: tg.textos() == ["a"])
+        ind.actualizar_borrador("ab")            # muy pronto: queda pendiente...
+        ind.actualizar_borrador("abc")           # ...y la reemplaza la más nueva
+        _esperar(lambda: tg.textos()[-1:] == ["abc"])
         ind.actualizar_borrador("abc")           # el mismo texto: no sale
         ind.actualizar_borrador("")              # vacío: no sale
+        time.sleep(0.3)
     assert tg.textos() == ["a", "abc"]
 
 
@@ -539,3 +540,19 @@ def test_un_telegram_lento_no_frena_la_lectura_del_modelo():
     metodos = tg.metodos()
     ultimo_borrador = max(i for i, m in enumerate(metodos) if m == "sendMessageDraft")
     assert "deleteMessage" in metodos[ultimo_borrador:]   # el retiro, después del envío
+
+
+def test_el_ultimo_texto_siempre_llega_al_borrador_aunque_haya_llegado_rapido():
+    """Prueba real del 2026-10-01 (Ariel): se veían sólo las primeras letras
+    ("List…") y después el mensaje final. Lo que llega mientras hay un envío en
+    vuelo, o antes del intervalo, no se descarta: queda pendiente y sale apenas se
+    puede, así el borrador termina mostrando lo último que escribió el modelo."""
+    tg = Telegram()
+    with _activo(tg, intervalo_borrador=0.15) as ind:
+        _esperar(lambda: ind.activado.is_set())
+        for parcial in ("Li", "Listo", "Listo, anoté", "Listo, anoté la tarea"):
+            ind.actualizar_borrador(parcial)
+        _esperar(lambda: tg.textos() and tg.textos()[-1] == "Listo, anoté la tarea")
+    assert tg.textos()[0] == "Li"
+    assert tg.textos()[-1] == "Listo, anoté la tarea"
+    assert len(tg.textos()) <= 3                      # sigue acotado por el intervalo
