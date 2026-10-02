@@ -70,6 +70,13 @@ def _pasos_a_en_curso(conn, tarea) -> int:
         return cur.fetchone()["n"]
 
 
+def _estado_real_de_la_tarea(cuerpo: str) -> bool:
+    """La respuesta a un botón vencido sobre una tarea (C0-5): que el cambio ya se
+    aplicó y la tarea como está ahora, con su menú."""
+    return cuerpo.startswith(gateway.ESTADO_CAMBIO["resuelta"]) and (
+        gateway.ESTADO_TAREA in cuerpo)
+
+
 def _respuestas(conn, tg) -> list[dict]:
     return [f for f in _filas_de_salida(conn, tg)
             if f["es_respuesta"] and f["estado"] != "descartado"]
@@ -130,7 +137,7 @@ def test_fuera_de_la_ventana_el_segundo_toque_se_contesta_como_siempre(
 
     assert _pasos_a_en_curso(conn, tarea) == 1
     cuerpos = [f["cuerpo"] for f in _respuestas(conn, tg)]
-    assert len(cuerpos) == 2 and gateway.AVISO_PEDIDO_NO_VIGENTE in cuerpos[-1]
+    assert len(cuerpos) == 2 and _estado_real_de_la_tarea(cuerpos[-1])
 
 
 def test_un_toque_absorbido_no_prolonga_la_ventana(cliente, conn, corework):
@@ -143,7 +150,7 @@ def test_un_toque_absorbido_no_prolonga_la_ventana(cliente, conn, corework):
 
     _tocar_boton(cliente, token, tg, callback_id="c")
 
-    assert gateway.AVISO_PEDIDO_NO_VIGENTE in _respuestas(conn, tg)[-1]["cuerpo"]
+    assert _estado_real_de_la_tarea(_respuestas(conn, tg)[-1]["cuerpo"])
 
 
 def test_el_toque_de_otra_persona_no_se_absorbe(cliente, conn, corework):
@@ -401,4 +408,4 @@ def test_el_toque_repetido_se_mide_con_el_reloj_de_la_base_con_la_app_atrasada(
     _tocar_boton(cliente, token, tg, callback_id="b")
 
     cuerpos = [f["cuerpo"] for f in _respuestas(conn, tg)]      # el orden sigue a la app
-    assert len(cuerpos) == 2 and any(gateway.AVISO_PEDIDO_NO_VIGENTE in c for c in cuerpos)
+    assert len(cuerpos) == 2 and any(_estado_real_de_la_tarea(c) for c in cuerpos)

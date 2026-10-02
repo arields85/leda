@@ -44,6 +44,13 @@ OTRO_MENSAJE = "¿qué tareas tengo abiertas?"
 RESPUESTA = "Tenés dos tareas abiertas."
 
 
+def _dice_el_estado_real(cuerpo: str) -> bool:
+    """La respuesta a un botón vencido (C0-5): que ya no vale y el estado real de lo
+    que tocaba, con un próximo paso; nunca el aviso de que no se sabe qué era."""
+    return (cuerpo.startswith(gateway.AVISO_BOTON_VENCIDO)
+            and cuerpo != gateway.AVISO_PEDIDO_NO_VIGENTE)
+
+
 def _abrir_vista_previa(conn, ws, *, causa: str = CAUSA):
     """La vista previa de un bloqueo que la persona pidió, esperando su
     Confirmar, en su chat. Devuelve (chat, tarea, pending_action)."""
@@ -172,7 +179,7 @@ def test_cancela_cierra_la_vista_previa_y_dice_que_se_dejo_de_lado(
     assert proveedor.recibidos == []
     _confirmar(cliente, conn, tg, pid)                        # el botón ya no aplica
     assert _bloqueos(conn, tid) == 0
-    assert gateway.AVISO_PEDIDO_NO_VIGENTE in _ultimo_cuerpo(conn, tg)
+    assert _dice_el_estado_real(_ultimo_cuerpo(conn, tg))
 
 
 @pytest.mark.parametrize("comando", [RespectoPendiente.CHARLA,

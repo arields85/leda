@@ -37,9 +37,8 @@ PERSONA = "Marcos Tarquini"
 TITULO_ALTA = "Cablear tablero norte"
 PREGUNTA_TITULO = "¿Qué hay que hacer?"
 PREGUNTA_FECHA = "¿Para cuándo la necesitás?"
-# La respuesta a un botón que ya se usó (`gateway._toque`, sin constante propia).
-AVISO_TOQUE_YA_USADO = ("Ese pedido ya no está vigente. Si sigue haciendo falta, "
-                        "escribime y lo vemos de nuevo.")
+# La respuesta a un botón que ya se usó: el estado real de su pregunta (C0-5).
+AVISO_TOQUE_YA_USADO = gateway.ESTADO_PREGUNTA["resuelta"]
 
 _ids_de_mensaje = itertools.count(700)
 
@@ -262,7 +261,7 @@ def test_dudoso_pregunta_con_botones_y_si_es_eso_toma_el_campo(
     assert _tocar(cliente, token, tg).status_code == 200
     assert _campo(conn, rid, "title")["valor"] == "mmm, algo del tablero"
     assert _salidas(conn, tg) == antes + 1
-    assert _filas_del_chat(conn, tg)[-1]["cuerpo"] == AVISO_TOQUE_YA_USADO
+    assert _filas_del_chat(conn, tg)[-1]["cuerpo"].startswith(AVISO_TOQUE_YA_USADO)
 
 
 @pytest.mark.parametrize("texto", [

@@ -348,7 +348,7 @@ def test_el_toque_repetido_de_enviar_no_lo_manda_dos_veces(intake_world, conn,
     assert len(_acciones(conn, rid)) == 2
 
 
-def test_un_toque_tardio_de_enviar_no_lo_manda_de_nuevo_y_dice_que_ya_no_esta_vigente(
+def test_un_toque_tardio_de_enviar_no_lo_manda_de_nuevo_y_dice_a_quien_le_llego(
         intake_world, conn, monkeypatch):
     rid, pid = _alta_en_revision(conn, intake_world)
     user = _usuario(intake_world)
@@ -360,7 +360,11 @@ def test_un_toque_tardio_de_enviar_no_lo_manda_de_nuevo_y_dice_que_ya_no_esta_vi
 
     _tocar(client, conn, user, pid, "Enviar a aprobación")
 
-    assert [f["cuerpo"] for f in _nuevas(conn, user, antes)] == [AVISO_TOQUE_YA_USADO]
+    # El estado real (C0-5): a quién le llegó para confirmarlo.
+    (fila,) = _nuevas(conn, user, antes)
+    assert fila["cuerpo"].startswith(AVISO_TOQUE_YA_USADO)
+    assert (f"esperando la confirmación de {_nombre_del_aprobador(conn, intake_world)}"
+            in fila["cuerpo"])
     assert _salidas(conn, _tg_aprobador(intake_world)) == del_aprobador
     assert len(_acciones(conn, rid)) == 2
 

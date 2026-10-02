@@ -45,8 +45,17 @@ from tests.test_task_intake import (_RoutingProvider, _active_choices,
 ETIQUETAS_DE_LOS_DATOS = ["Título", "Descripción", "Objetivo", "Responsable",
                           "Fecha objetivo", "Criterio de aceptación"]
 ETIQUETAS_DEL_SELECTOR = ETIQUETAS_DE_LOS_DATOS + ["Volver al resumen"]
-AVISO_TOQUE_YA_USADO = ("Ese pedido ya no está vigente. Si sigue haciendo falta, "
-                        "escribime y lo vemos de nuevo.")
+# Un botón que ya no vale contesta con el estado real de lo que tocaba y un próximo
+# paso (C0-5, `gateway._contestar_boton_vencido`): siempre empieza así.
+AVISO_TOQUE_YA_USADO = "Ese botón ya no está vigente"
+
+
+def _dice_que_el_borrador_sigue_abierto(salidas: list[dict]) -> None:
+    """Una sola respuesta: el botón ya no vale y el borrador sigue abierto, con un
+    próximo paso (en un chat privado, la pregunta abierta de nuevo)."""
+    (fila,) = salidas
+    assert fila["cuerpo"].startswith(AVISO_TOQUE_YA_USADO)
+    assert "sigue abierto" in fila["cuerpo"]
 
 
 # ----------------------------------------------------------------- ayudas
@@ -223,7 +232,7 @@ def test_modificar_dos_veces_la_segunda_dice_que_ya_no_esta_vigente(
 
     assert _toque_de_modificar(client, conn, user, pid).status_code == 200
 
-    assert [f["cuerpo"] for f in _nuevas(conn, user, antes)] == [AVISO_TOQUE_YA_USADO]
+    _dice_que_el_borrador_sigue_abierto(_nuevas(conn, user, antes))
     assert list(_opciones_activas(conn, rid)) == ETIQUETAS_DEL_SELECTOR
 
 
@@ -239,7 +248,7 @@ def test_modificar_de_una_vista_previa_vencida_dice_que_ya_no_esta_vigente(
 
     _toque_de_modificar(client, conn, user, pid)
 
-    assert [f["cuerpo"] for f in _nuevas(conn, user, antes)] == [AVISO_TOQUE_YA_USADO]
+    _dice_que_el_borrador_sigue_abierto(_nuevas(conn, user, antes))
     assert _conjunto_activo(conn, rid) is None
     assert _tareas(conn) == 0
 
@@ -561,7 +570,7 @@ def test_tocar_dos_veces_el_mismo_dato_del_selector_dice_que_ya_no_esta_vigente(
 
     assert _post_intake_callback(client, token, user).status_code == 200
 
-    assert [f["cuerpo"] for f in _nuevas(conn, user, antes)] == [AVISO_TOQUE_YA_USADO]
+    _dice_que_el_borrador_sigue_abierto(_nuevas(conn, user, antes))
 
 
 def test_un_boton_del_selector_de_antes_ya_no_vale_despues_de_cerrarlo(
@@ -574,7 +583,7 @@ def test_un_boton_del_selector_de_antes_ya_no_vale_despues_de_cerrarlo(
 
     _post_intake_callback(client, viejo, user)
 
-    assert [f["cuerpo"] for f in _nuevas(conn, user, antes)] == [AVISO_TOQUE_YA_USADO]
+    _dice_que_el_borrador_sigue_abierto(_nuevas(conn, user, antes))
     assert _conjunto_activo(conn, rid) is None
     assert _tareas(conn) == 0
 
@@ -859,7 +868,7 @@ def test_volver_al_resumen_dos_veces_dice_que_ya_no_esta_vigente(
 
     assert _post_intake_callback(client, token, user).status_code == 200
 
-    assert [f["cuerpo"] for f in _nuevas(conn, user, antes)] == [AVISO_TOQUE_YA_USADO]
+    _dice_que_el_borrador_sigue_abierto(_nuevas(conn, user, antes))
     assert [p["estado"] for p in _previews(conn, rid)] == ["cancelada", "esperando"]
 
 
@@ -872,7 +881,7 @@ def test_un_boton_del_selector_de_antes_no_vale_despues_de_volver_al_resumen(
 
     _post_intake_callback(client, viejo, user)
 
-    assert [f["cuerpo"] for f in _nuevas(conn, user, antes)] == [AVISO_TOQUE_YA_USADO]
+    _dice_que_el_borrador_sigue_abierto(_nuevas(conn, user, antes))
     assert _conjunto_activo(conn, rid) is None
 
 

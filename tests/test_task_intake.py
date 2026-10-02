@@ -306,15 +306,17 @@ def test_objective_callback_rejects_wrong_actor_chat_request_or_version(
             (ws["id"],),
         )
         # Un toque que no se atiende (otra persona, otro chat, ya usado o
-        # reemplazado) recibe su única respuesta: que ya no está vigente (T9-R4).
+        # reemplazado) recibe su única respuesta (T9-R4): que ya no está vigente,
+        # con el estado real de lo que tocaba (C0-5).
         assert cur.fetchone()["n"] == choice["outbox_count"] + 1
         cur.execute(
             "select cuerpo from message_outbox where workspace_id = %s "
             "and es_respuesta and entrante_id is not null",
             (ws["id"],),
         )
-        assert [f["cuerpo"] for f in cur.fetchall()] == [
-            gateway.AVISO_PEDIDO_NO_VIGENTE]
+        (respuesta,) = [f["cuerpo"] for f in cur.fetchall()]
+        assert respuesta.startswith(gateway.AVISO_BOTON_VENCIDO)
+        assert respuesta != gateway.AVISO_PEDIDO_NO_VIGENTE
 
 
 def test_objective_callback_failure_rolls_back_before_outer_commit(

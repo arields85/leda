@@ -67,6 +67,13 @@ DEJADAS = {
 }
 
 
+def _dice_el_estado_real(cuerpo: str) -> bool:
+    """La respuesta a un botón vencido (C0-5): que ya no vale y el estado real de lo
+    que tocaba, con un próximo paso; nunca el aviso de que no se sabe qué era."""
+    return (cuerpo.startswith(gateway.AVISO_BOTON_VENCIDO)
+            and cuerpo != gateway.AVISO_PEDIDO_NO_VIGENTE)
+
+
 class _Mundo:
     """La pregunta abierta de un `kind` y cómo escribirle a Leda en ese chat."""
 
@@ -283,7 +290,7 @@ def test_dejar_tocado_dos_veces_no_repite_el_efecto(mundo, conn, monkeypatch):
     assert _tocar(mundo.cliente, token, mundo.tg).status_code == 200
 
     assert _salidas(conn, mundo.tg) == antes + 1              # sólo un aviso
-    assert _ultimo_cuerpo(conn, mundo.tg) == gateway.AVISO_PEDIDO_NO_VIGENTE
+    assert _dice_el_estado_real(_ultimo_cuerpo(conn, mundo.tg))
     assert len(proveedor.recibidos) == 1                      # no se atendió dos veces
 
 
@@ -330,7 +337,7 @@ def test_una_pregunta_nueva_de_la_rama_deja_sin_vigencia_los_botones_de_la_anter
     assert _tocar(mundo.cliente, vieja["token"], mundo.tg).status_code == 200
 
     assert _salidas(conn, mundo.tg) == antes + 1
-    assert _ultimo_cuerpo(conn, mundo.tg) == gateway.AVISO_PEDIDO_NO_VIGENTE
+    assert _dice_el_estado_real(_ultimo_cuerpo(conn, mundo.tg))
     assert mundo.sigue_abierta()
     assert proveedor.recibidos == []
 
@@ -368,7 +375,7 @@ def test_un_toque_en_un_boton_del_retome_de_antes_se_contesta_como_no_vigente(
     assert _tocar(mundo.cliente, token, mundo.tg).status_code == 200
 
     assert _salidas(conn, mundo.tg) == antes + 1
-    assert _ultimo_cuerpo(conn, mundo.tg) == gateway.AVISO_PEDIDO_NO_VIGENTE
+    assert _dice_el_estado_real(_ultimo_cuerpo(conn, mundo.tg))
     assert mundo.sigue_abierta()                              # no se cerró
     assert proveedor.recibidos == []
 
@@ -427,6 +434,6 @@ def test_una_eleccion_inesperada_se_contesta_como_no_vigente_y_no_cierra_nada(
     assert _tocar(mundo.cliente, token, mundo.tg).status_code == 200
 
     assert _salidas(conn, mundo.tg) == antes + 1              # exactamente una
-    assert _ultimo_cuerpo(conn, mundo.tg) == gateway.AVISO_PEDIDO_NO_VIGENTE
+    assert _dice_el_estado_real(_ultimo_cuerpo(conn, mundo.tg))
     assert mundo.sigue_abierta()                              # no se cerró
     assert proveedor.recibidos == []

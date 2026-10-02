@@ -147,9 +147,44 @@ AVISO_RAMA_YA_CERRADA = (
 # o lo cancelaron): no se rechaza ni se avisa nada.
 AVISO_BORRADOR_YA_NO_ESPERA = (
     "Ese borrador ya no estaba esperando tu decisión, así que no rechacé nada.")
+# Un botón vencido contesta con el estado real de lo que tocaba y un próximo paso
+# (C0-5, constitución §8, ADR 0013 regla 3): `_contestar_boton_vencido`. Estas son
+# sus piezas; cada respuesta empieza diciendo que el botón ya no vale.
+AVISO_BOTON_VENCIDO = "Ese botón ya no está vigente"
 AVISO_PEDIDO_NO_VIGENTE = (
-    "Ese pedido ya no está vigente. Si sigue haciendo falta, escribime y lo "
-    "vemos de nuevo.")
+    "Ese botón ya no está vigente y no puedo ver a qué correspondía. Contame qué "
+    "necesitás y lo vemos.")
+AVISO_BOTON_VENCIDO_AJENO = (
+    "Ese botón ya no está vigente y era de otra persona. Si necesitás algo, "
+    "escribime y lo vemos.")
+SIGUIENTE_PASO_GENERAL = "Si sigue haciendo falta, escribime y lo vemos de nuevo."
+ESTADO_TAREA_CREADA = "Ese botón ya no está vigente: la tarea ya quedó creada."
+ESTADO_TAREA = "Así está la tarea ahora:"
+ESTADO_TAREA_NO_DISPONIBLE = (
+    "Ese botón ya no está vigente y esa tarea ya no está disponible. Contame qué "
+    "necesitás y lo vemos.")
+ESTADO_BORRADOR_CANCELADO = (
+    "Ese botón ya no está vigente: el borrador{titulo} se canceló y la tarea no se "
+    "creó. Si sigue haciendo falta, contame qué hay que hacer y la armamos de nuevo.")
+ESTADO_BORRADOR_ENVIADO = (
+    "Ese botón ya no está vigente: el borrador{titulo} está esperando la "
+    "confirmación de {nombre}. Te aviso cuando lo confirme o lo rechace.")
+ESTADO_BORRADOR_ABIERTO = (
+    "Ese botón ya no está vigente; el borrador{titulo} sigue abierto.")
+ESTADO_BORRADOR_ABIERTO_SIN_PREGUNTA = "Escribime cómo seguimos con él y lo retomamos."
+# Lo que pasó con una acción que no es de un borrador ni de una tarea, según su
+# estado: la vista previa de un cambio y una pregunta con botones (una elección,
+# las opciones del modelo, la pregunta sobre la rama abierta).
+ESTADO_CAMBIO = {
+    "resuelta": "Ese botón ya no está vigente: ese cambio ya se aplicó.",
+    "cancelada": "Ese botón ya no está vigente: ese cambio no se aplicó.",
+    "vencida": "Ese botón ya no está vigente: ese cambio venció sin aplicarse.",
+}
+ESTADO_PREGUNTA = {
+    "resuelta": "Ese botón ya no está vigente: esa pregunta ya se respondió.",
+    "cancelada": "Ese botón ya no está vigente: esa pregunta ya se cerró.",
+    "vencida": "Ese botón ya no está vigente: esa pregunta venció.",
+}
 # ADR 0013 regla 4 (T9-R4): el segundo toque del MISMO botón de la misma persona
 # dentro de esta ventana se absorbe (sólo el acuse; ni efecto ni error ni aviso).
 # "El mismo botón" es el mismo `callback_data` en el mismo chat: lleva el token de
@@ -881,6 +916,7 @@ def _toque(conn, workspace_id: str, slug: str, toque: dict,
     chat = (toque.get("message") or {}).get("chat", {})
     chat_id = chat.get("id")
     chat_type = chat.get("type")
+    privado = chat_type == "private"
 
     # Antes de trabajar, y para TODO toque (también uno que no es de un botón de
     # Leda o que se va a absorber por repetido; ADR 0013 regla 4, H5): Telegram
@@ -956,8 +992,8 @@ def _toque(conn, workspace_id: str, slug: str, toque: dict,
                     # que no se atiende (de otra persona o chat, ya usado, de un
                     # borrador que terminó) y no dijo nada: se contesta como
                     # cualquier otro toque que no está vigente (T9-R4).
-                    _responder(cur, workspace_id, chat_id, quien,
-                               AVISO_PEDIDO_NO_VIGENTE, ahora)
+                    _contestar_boton_vencido(cur, quien, workspace_id, chat_id,
+                                             callback, ahora, privado=privado)
                 return cerrar()
 
             try:
@@ -969,8 +1005,8 @@ def _toque(conn, workspace_id: str, slug: str, toque: dict,
                     # y nunca llega a la autoridad del borrador.
                     if I.modify_from_preview(cur, quien, token=token,
                                              chat_id=chat_id, now=ahora) is None:
-                        _responder(cur, workspace_id, chat_id, quien,
-                                   AVISO_PEDIDO_NO_VIGENTE, ahora)
+                        _contestar_boton_vencido(cur, quien, workspace_id, chat_id,
+                                                 callback, ahora, privado=privado)
                     return cerrar()
                 if draft_token and I.es_rechazar_de_borrador(cur, quien, token,
                                                              ahora):
@@ -982,8 +1018,8 @@ def _toque(conn, workspace_id: str, slug: str, toque: dict,
                     rechazo = I.reject_from_preview(cur, quien, token=token,
                                                     chat_id=chat_id, now=ahora)
                     if rechazo is None:
-                        _responder(cur, workspace_id, chat_id, quien,
-                                   AVISO_PEDIDO_NO_VIGENTE, ahora)
+                        _contestar_boton_vencido(cur, quien, workspace_id, chat_id,
+                                                 callback, ahora, privado=privado)
                     else:
                         _pedir_dato_menu_tarea(
                             cur, quien, workspace_id, chat_id,
@@ -1000,8 +1036,8 @@ def _toque(conn, workspace_id: str, slug: str, toque: dict,
                     # contesta como cualquier botón que no está vigente.
                     if I.send_to_approval(cur, quien, token=token,
                                           chat_id=chat_id, now=ahora) is None:
-                        _responder(cur, workspace_id, chat_id, quien,
-                                   AVISO_PEDIDO_NO_VIGENTE, ahora)
+                        _contestar_boton_vencido(cur, quien, workspace_id, chat_id,
+                                                 callback, ahora, privado=privado)
                     return cerrar()
                 if not draft_token:
                     resuelta = P.resolver(cur, token,
@@ -1023,8 +1059,8 @@ def _toque(conn, workspace_id: str, slug: str, toque: dict,
             if not draft_token and resuelta is None:
                 # Vencida, ya usada, o de otro espacio. Para la persona es lo
                 # mismo: ese pedido ya no está en pie.
-                _responder(cur, workspace_id, chat_id, quien,
-                           AVISO_PEDIDO_NO_VIGENTE, ahora)
+                _contestar_boton_vencido(cur, quien, workspace_id, chat_id,
+                                         callback, ahora, privado=privado)
             elif not draft_token and resuelta.cancelada:
                 _responder(cur, workspace_id, chat_id, quien,
                            "Listo, no lo hago.", ahora)
@@ -1067,9 +1103,157 @@ def _toque(conn, workspace_id: str, slug: str, toque: dict,
                                   chat_type=chat_type, workspace_id=workspace_id):
             return _resolver_toque_borrador(
                 conn, authority_conn or _authority_conn(), workspace_id, token,
-                tg_user, chat_id, quien, ahora, toque_id)
+                tg_user, chat_id, quien, ahora, toque_id, privado=privado)
 
     return {"ok": True}
+
+
+# El título del borrador: el de la tabla cuando ya se armó el resumen, si no el
+# dato que se viene confirmando en el alta.
+# La tarea en que se convirtió el borrador: la que lo tiene como origen.
+_TAREA_DEL_BORRADOR = "(select t.id from task t where t.source_draft_id = d.id)"
+_TITULO_DEL_BORRADOR = """coalesce(d.titulo,
+    (select f.valor #>> '{}' from task_intake_field f
+      where f.request_id = r.id and f.campo = 'title' and f.valor is not null))"""
+
+
+def _sujeto_del_boton(cur, callback: str, ahora) -> dict | None:
+    """Lo que tocaba un botón, leído desde su token, esté vigente o no: el
+    borrador del alta (su estado, la tarea en que se convirtió, si se envió a
+    aprobación), la acción pendiente (su herramienta, sus `args` y su estado) y
+    quiénes son sus dueños (`dueno` y, en un borrador, `pidio`). `None` si el
+    token no es de un botón de Leda o ya no se puede leer en este espacio."""
+    from . import ingreso_tareas as I
+    from . import pendientes as P
+
+    intake_token = I.token_de(callback)
+    if intake_token:
+        cur.execute(
+            f"""select r.membership_id dueno, r.membership_id pidio,
+                       r.estado request_estado, r.enviada_en, d.id draft_id,
+                       d.estado draft_estado, {_TAREA_DEL_BORRADOR} tarea_creada,
+                       {_TITULO_DEL_BORRADOR} titulo, null::text herramienta,
+                       null::jsonb args, null::text estado
+                  from task_intake_choice c
+                  join task_intake_choice_set s on s.id = c.choice_set_id
+                  join task_intake_request r on r.id = s.request_id
+                  join task_draft d on d.id = r.task_draft_id
+                 where c.token = %s""", (intake_token,))
+        return cur.fetchone()
+    token = P.token_de(callback)
+    if not token:
+        return None
+    cur.execute(
+        f"""select p.membership_id dueno, r.membership_id pidio,
+                   r.estado request_estado, r.enviada_en, d.id draft_id,
+                   d.estado draft_estado, {_TAREA_DEL_BORRADOR} tarea_creada,
+                   {_TITULO_DEL_BORRADOR} titulo, p.herramienta, p.args,
+                   case when p.estado = 'esperando' and p.vence_en <= %s
+                        then 'vencida' else p.estado::text end estado
+              from pending_action_option o
+              join pending_action p on p.id = o.pending_action_id
+              left join task_draft d on d.id = p.draft_id
+              left join task_intake_request r on r.task_draft_id = d.id
+                                             and r.workspace_id = d.workspace_id
+             where o.token = %s""", (ahora, token))
+    return cur.fetchone()
+
+
+def _contestar_boton_vencido(cur, quien, workspace_id: str, chat_id: int,
+                             callback: str, ahora, *, privado: bool) -> None:
+    """Un toque sobre un botón que ya no vale (C0-5; constitución §8, ADR 0013
+    regla 3): una sola respuesta con el estado real de lo que el botón tocaba y
+    lo que se puede hacer ahora con eso, nunca un mensaje sin próximo paso. Es el
+    único camino de todo botón vencido: una vista previa ya confirmada, cancelada,
+    enviada o vencida, una elección ya usada, un menú, un aviso de coordinación.
+
+    - Un borrador ya convertido, o una acción sobre una tarea (`args.tarea_id`):
+      qué pasó con el botón y la tarea como está ahora, con su menú (`_encolar_menu_tarea`: sólo lo que
+      esta persona puede hacer con ella según su estado).
+    - Un borrador cancelado: que se canceló y que la tarea no se creó; armarla de
+      nuevo por escrito.
+    - Un borrador ya enviado a aprobación, a quien lo pidió: quién lo tiene que
+      confirmar y que se le avisa.
+    - Un borrador abierto, o cualquier otra pregunta o vista previa: su estado y,
+      si la persona tiene una pregunta abierta (una sola rama, ADR 0013 regla 1),
+      esa pregunta de nuevo; si no, un paso general.
+    - De otra persona, o de algo que ya no se puede leer: se dice así, sin
+      inventar, con un paso general."""
+    sujeto = _sujeto_del_boton(cur, callback, ahora)
+    if sujeto is None:
+        _responder(cur, workspace_id, chat_id, quien, AVISO_PEDIDO_NO_VIGENTE, ahora)
+        return
+    duenos = {str(sujeto["dueno"]), str(sujeto["pidio"])}
+    if str(quien.membership_id) not in duenos:
+        _responder(cur, workspace_id, chat_id, quien, AVISO_BOTON_VENCIDO_AJENO,
+                   ahora)
+        return
+    titulo = f" «{sujeto['titulo']}»" if sujeto["titulo"] else ""
+    if sujeto["draft_id"] is not None:
+        if sujeto["draft_estado"] == "converted" and sujeto["tarea_creada"]:
+            _encolar_menu_tarea(cur, quien, workspace_id, chat_id,
+                                str(sujeto["tarea_creada"]), ahora,
+                                encabezado=ESTADO_TAREA_CREADA,
+                                si_no_existe=ESTADO_TAREA_NO_DISPONIBLE)
+            return
+        if "cancelled" in (sujeto["draft_estado"], sujeto["request_estado"]):
+            _responder(cur, workspace_id, chat_id, quien,
+                       ESTADO_BORRADOR_CANCELADO.format(titulo=titulo), ahora)
+            return
+        confirma = (_quien_confirma_el_borrador(cur, sujeto["draft_id"],
+                                                sujeto["pidio"])
+                    if sujeto["enviada_en"] is not None
+                    and str(quien.membership_id) == str(sujeto["pidio"]) else None)
+        if confirma:
+            _responder(cur, workspace_id, chat_id, quien,
+                       ESTADO_BORRADOR_ENVIADO.format(titulo=titulo, nombre=confirma),
+                       ahora)
+            return
+        _reofrecer_lo_abierto(cur, quien, workspace_id, chat_id, ahora,
+                              ESTADO_BORRADOR_ABIERTO.format(titulo=titulo),
+                              privado=privado,
+                              sin_pregunta=ESTADO_BORRADOR_ABIERTO_SIN_PREGUNTA)
+        return
+    # Una herramienta que empieza con "_" es una pregunta con botones (un
+    # centinela); cualquier otra, la vista previa de un cambio.
+    estados = (ESTADO_PREGUNTA if (sujeto["herramienta"] or "_").startswith("_")
+               else ESTADO_CAMBIO)
+    estado = estados.get(sujeto["estado"], estados["cancelada"])
+    tarea_id = (sujeto["args"] or {}).get("tarea_id")
+    if tarea_id:
+        _encolar_menu_tarea(cur, quien, workspace_id, chat_id, str(tarea_id), ahora,
+                            encabezado=f"{estado} {ESTADO_TAREA}",
+                            si_no_existe=ESTADO_TAREA_NO_DISPONIBLE)
+        return
+    _reofrecer_lo_abierto(cur, quien, workspace_id, chat_id, ahora, estado,
+                          privado=privado, sin_pregunta=SIGUIENTE_PASO_GENERAL)
+
+
+def _quien_confirma_el_borrador(cur, draft_id, pidio) -> str | None:
+    """El nombre de quien tiene que confirmar el borrador ya enviado: el dueño de
+    su vista previa que sigue esperando y no es quien lo pidió."""
+    cur.execute(
+        """select i.nombre from pending_action p
+             join integrante i on i.membership_id = p.membership_id
+            where p.draft_id = %s and p.estado = 'esperando'
+              and p.membership_id <> %s
+            order by p.creado_en desc limit 1""", (draft_id, pidio))
+    fila = cur.fetchone()
+    return fila["nombre"] if fila else None
+
+
+def _reofrecer_lo_abierto(cur, quien, workspace_id: str, chat_id: int, ahora,
+                          estado: str, *, privado: bool, sin_pregunta: str) -> None:
+    """El estado real y, como próximo paso, la pregunta que la persona tiene
+    abierta (la misma que vuelve a hacer un adjunto o un "no puedo", con sus
+    botones si los tiene); sin ninguna, `sin_pregunta`."""
+    abierta = _ver_pregunta_abierta(cur, quien, chat_id, ahora, alta=privado)
+    if abierta is None:
+        _responder(cur, workspace_id, chat_id, quien, f"{estado} {sin_pregunta}",
+                   ahora)
+        return
+    _repreguntar(cur, quien, workspace_id, chat_id, abierta, _pregunta_de(abierta),
+                 ahora, None, prefijo=f"{estado}\n\n")
 
 
 def _seguir_resuelta(cur, quien, workspace_id: str, chat_id: int, token: str,
@@ -1394,7 +1578,8 @@ def _sumar_a_la_respuesta_terminal(cur, workspace_id: str,
 
 def _resolver_toque_borrador(conn, authority_conn, workspace_id, token,
                              tg_user, chat_id, quien, ahora,
-                             toque_id: str | None = None) -> dict:
+                             toque_id: str | None = None, *,
+                             privado: bool = False) -> dict:
     """Resolve outside the app transaction, then enqueue its response."""
     from . import pendientes as P
     from . import ingreso_tareas as I
@@ -1462,9 +1647,13 @@ def _resolver_toque_borrador(conn, authority_conn, workspace_id, token,
             if texto is None:
                 # Replays reuse the terminal row, which already went out for the
                 # first toque: outside the window, this toque is answered like
-                # any other button that is no longer current.
-                texto = AVISO_PEDIDO_NO_VIGENTE
-            _responder(cur, workspace_id, chat_id, quien, texto, ahora)
+                # any other button that is no longer current, with the real
+                # state of its draft (C0-5).
+                _contestar_boton_vencido(cur, quien, workspace_id, chat_id,
+                                         f"{P.CALLBACK_PREFIJO}{token}", ahora,
+                                         privado=privado)
+            else:
+                _responder(cur, workspace_id, chat_id, quien, texto, ahora)
         _controlar_una_respuesta(cur, quien, workspace_id, chat_id, toque_id, ahora)
     return {"ok": True}
 
@@ -2722,10 +2911,12 @@ def _resolver_toque_respuesta_dato_menu(cur, quien, workspace_id: str,
 
     if texto is None:
         # El botón "Dejarlo" del retome de antes de T9-R1d: ya no hay retome ni
-        # mensaje guardado que atender. Se contesta como un pedido que ya no
-        # está vigente, sin cerrar la pregunta.
-        _responder(cur, workspace_id, chat_id, quien, AVISO_PEDIDO_NO_VIGENTE,
-                   ahora)
+        # mensaje guardado que atender. Se contesta como cualquier botón que ya
+        # no está vigente (C0-5), sin cerrar la pregunta: ésa es el próximo paso.
+        # Un chat privado tiene id positivo en Telegram.
+        _reofrecer_lo_abierto(cur, quien, workspace_id, chat_id, ahora,
+                              ESTADO_PREGUNTA["cancelada"], privado=chat_id > 0,
+                              sin_pregunta=SIGUIENTE_PASO_GENERAL)
         return
 
     # Auditoría: la elección y la tarea, nunca el texto de la persona.
@@ -2770,9 +2961,11 @@ def _resolver_toque_respuesta_dato_menu(cur, quien, workspace_id: str,
 
     if eleccion not in _ELECCIONES_DE_DEJAR:
         # Un valor que ningún botón de hoy deja: no es "dejar" (review R3). Se
-        # contesta como un pedido que ya no está vigente, sin cerrar nada.
-        _responder(cur, workspace_id, chat_id, quien, AVISO_PEDIDO_NO_VIGENTE,
-                   ahora)
+        # contesta como cualquier botón que ya no está vigente (C0-5), sin cerrar
+        # nada.
+        _reofrecer_lo_abierto(cur, quien, workspace_id, chat_id, ahora,
+                              ESTADO_PREGUNTA["cancelada"], privado=chat_id > 0,
+                              sin_pregunta=SIGUIENTE_PASO_GENERAL)
         return
 
     _dejar_y_ver_lo_otro(cur, quien, workspace_id, chat_id, abierta, texto,
@@ -3533,18 +3726,21 @@ def _mostrar_tareas_propias(cur, quien, workspace_id: str, chat_id: int,
 
 
 def _encolar_menu_tarea(cur, quien, workspace_id: str, chat_id: int,
-                        tarea_id: str, ahora, *, encabezado: str | None) -> None:
+                        tarea_id: str, ahora, *, encabezado: str | None,
+                        si_no_existe: str = "Esa tarea ya no está disponible."
+                        ) -> None:
     """Arma (o rearma) el menú de una tarea y lo encola con sus botones.
     `encabezado`, si viene, se antepone al mensaje -- es cómo "Ver detalle"
-    cierra con el menú de nuevo en el mismo mensaje (T2, punto 3)."""
+    cierra con el menú de nuevo en el mismo mensaje (T2, punto 3), y cómo un
+    botón vencido dice qué pasó antes de la tarea como está ahora (C0-5).
+    `si_no_existe` es la respuesta si la tarea ya no se puede leer."""
     from . import menu_tarea as M
     from . import pendientes as P
     from .agente import VIGENCIA_PENDIENTE
 
     menu = M.calcular_menu(cur, quien, tarea_id)
     if menu is None:
-        _responder(cur, workspace_id, chat_id, quien,
-                  "Esa tarea ya no está disponible.", ahora)
+        _responder(cur, workspace_id, chat_id, quien, si_no_existe, ahora)
         return
 
     # Cada acción del menú lleva el ícono de SU acción (R4-H6, decisión del

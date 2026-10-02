@@ -560,8 +560,9 @@ def test_el_toque_del_borrador_fuera_de_la_ventana_dice_que_ya_no_esta_vigente(
     assert _tocar(cliente_drafts, token, telegram).status_code == 200
 
     cuerpos = [f["cuerpo"] for f in _salidas_del_chat(conn, telegram)]
-    assert cuerpos[-2:] == ["Hecho. La tarea quedó comprometida.",
-                            gateway.AVISO_PEDIDO_NO_VIGENTE]
+    assert cuerpos[-2] == "Hecho. La tarea quedó comprometida."
+    # El estado real (C0-5): la tarea ya existe, con su menú.
+    assert cuerpos[-1].startswith(gateway.ESTADO_TAREA_CREADA)
     with admin(conn) as cur:
         cur.execute("select count(*) n from task where source_draft_id = %s",
                     (resultado["draft_id"],))
@@ -860,7 +861,7 @@ def test_si_falla_la_respuesta_tras_la_autoridad_el_reintento_no_queda_en_silenc
 
     cuerpos = _cuerpos(conn, telegram, antes)
     assert cuerpos.count("Hecho. La tarea quedó comprometida.") == 1
-    assert gateway.AVISO_PEDIDO_NO_VIGENTE not in cuerpos
+    assert not any(c.startswith(gateway.AVISO_BOTON_VENCIDO) for c in cuerpos)
     assert _incidentes_de(conn, "sin_respuesta") == []
     assert _incidentes_de(conn, "respuesta_duplicada") == []
 

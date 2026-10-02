@@ -237,11 +237,42 @@ suite completa de la rama.
 
 **Decisión del usuario (2026-10-02): decidido, listo para hacer.**
 
-- [ ] **C0-5.** Un toque sobre un botón que ya no está vigente contesta con el **estado
+- [x] **C0-5.** Un toque sobre un botón que ya no está vigente contesta con el **estado
       real** de lo que ese botón tocaba (por ejemplo, "la tarea ya quedó creada") y
       ofrece lo que se puede hacer ahora con eso, nunca un mensaje sin próximo paso
       (constitución §8). Vale para todo botón vencido, no sólo para el resumen del alta;
       corrige también C-3 de `main`.
+
+**Hecho C0-5** (ruta delegada: un escritor).
+
+- Mecanismo único: `gateway._contestar_boton_vencido`. Todos los caminos que contestaban
+  "Ese pedido ya no está vigente…" pasan por ahí: los toques del alta (guiada y
+  conducida), Modificar, Rechazar y Enviar a aprobación vencidos, `resuelta is None` de
+  `pendientes.resolver`, la repetición tardía de Confirmar o Cancelar de un borrador
+  (`_resolver_toque_borrador`) y los dos casos viejos de la pregunta sobre la rama. El
+  estado sale de lo que el botón tocaba, leído desde su token (`_sujeto_del_boton`):
+  - borrador convertido: "la tarea ya quedó creada" y el menú de la tarea
+    (`_encolar_menu_tarea`, sólo lo que esa persona puede hacer según el estado). La
+    tarea se encuentra por `task.source_draft_id`;
+  - acción sobre una tarea (`args.tarea_id`: aviso de coordinación, menú, vista previa
+    de un cambio): qué pasó con el botón ("ese cambio ya se aplicó", "esa pregunta
+    venció") y "Así está la tarea ahora:" con su menú. Es C-3 de `main` (Aprobar en un
+    aviso viejo de una tarea terminada);
+  - borrador cancelado (también rechazado): que se canceló y la tarea no se creó, y que
+    se puede volver a armar contándolo;
+  - borrador enviado a aprobación, a quien lo pidió: quién lo tiene que confirmar y que
+    se le avisa;
+  - borrador abierto o cualquier otra pregunta o vista previa: su estado y la pregunta
+    abierta de esa persona otra vez, con sus botones (`_reofrecer_lo_abierto`, el mismo
+    repreguntar de un adjunto o un "no puedo"); sin pregunta abierta, un paso general;
+  - botón de otra persona, o uno que ya no se puede leer: se dice así, con un paso
+    general.
+- RED (2026-10-02): `tests/test_botones_vencidos_estado_real.py`, 5 de 5 en rojo, todas
+  con el texto del callejón sin salida. GREEN: 6 de 6 (se sumó el caso en chat privado
+  que vuelve a hacer la pregunta abierta). Las 49 aserciones viejas que esperaban el
+  texto anterior (alta, toques, ramas, borradores, alta guiada) ahora comprueban el
+  estado real.
+- C-3 de `main` queda corregido en esta rama; llega a `main` recién cuando se integre.
 - [ ] **C0-6.** Cuando una vista previa o una elección se resuelve (confirmada, cancelada,
       enviada o vencida), sus botones se quitan del mensaje en Telegram, para que no se
       ofrezca lo que ya no se puede hacer (ADR 0013, regla 3).

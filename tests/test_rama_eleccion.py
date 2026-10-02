@@ -54,6 +54,13 @@ TITULO_2 = "Revisar variador línea 2"
 KINDS = ["aclaracion", "dependencia", "herramienta"]
 
 
+def _dice_el_estado_real(cuerpo: str) -> bool:
+    """La respuesta a un botón vencido (C0-5): que ya no vale y el estado real de lo
+    que tocaba, con un próximo paso; nunca el aviso de que no se sabe qué era."""
+    return (cuerpo.startswith(gateway.AVISO_BOTON_VENCIDO)
+            and cuerpo != gateway.AVISO_PEDIDO_NO_VIGENTE)
+
+
 @dataclass
 class _Eleccion:
     tg: int
@@ -225,7 +232,7 @@ def test_responde_con_exactamente_una_opcion_se_toma_como_el_toque(
     # El botón de la otra opción ya no vale: la elección está resuelta.
     assert _tocar_opcion(cliente, conn, e.pid, "Revisar variador",
                          e.tg).status_code == 200
-    assert gateway.AVISO_PEDIDO_NO_VIGENTE in _ultimo_cuerpo(conn, e.tg)
+    assert _dice_el_estado_real(_ultimo_cuerpo(conn, e.tg))
 
 
 def test_responde_con_el_titulo_completo_toma_la_opcion_de_la_aclaracion(
@@ -316,7 +323,7 @@ def test_cancela_cierra_la_eleccion_y_dice_que_se_dejo_de_lado(
     assert proveedor.recibidos == []
     assert _bloqueos(conn) == 0
     _tocar_opcion(cliente, conn, e.pid, "Programar PLC", e.tg)   # el botón ya no vale
-    assert gateway.AVISO_PEDIDO_NO_VIGENTE in _ultimo_cuerpo(conn, e.tg)
+    assert _dice_el_estado_real(_ultimo_cuerpo(conn, e.tg))
     assert _bloqueos(conn) == 0 and _dependencias_esperando(conn) == []
 
 
