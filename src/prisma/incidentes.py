@@ -131,6 +131,9 @@ ETAPA_INTERRUPTOR_STREAM = "interruptor_stream"
 # tarea) no tiene un valor que se entienda: se usan los 2 meses por omisión.
 ETAPA_HORIZONTE_TAREA = "horizonte_tarea"
 ETAPA_AVISO_COORDINACION = "aviso_coordinacion"
+# El calendario del espacio falló al calcular cuándo sale un aviso de coordinación:
+# el aviso se encola igual y el despachador lo posterga al horario.
+ETAPA_CALENDARIO_AVISOS = "calendario_avisos"
 # T9-H19e: un recibo viejo sin respuesta que la reentrega no recuperó (`huerfanos`).
 ETAPA_MENSAJE_HUERFANO = "mensaje_huerfano_sin_respuesta"
 # T9-H19g: el aviso de UN huérfano falló y se lo saltea (el resto del barrido sigue).
@@ -435,6 +438,14 @@ EXPLICACION_POR_ETAPA: dict[str, ExplicacionDeEtapa] = {
                  "el aviso."),
         que_hacer=("Avisale a mano a la persona que no se enteró y pasale el detalle "
                    "técnico a quien desarrolla.")),
+    ETAPA_CALENDARIO_AVISOS: ExplicacionDeEtapa(
+        que_paso=("No se pudo leer el calendario del espacio para calcular cuándo "
+                  "sale un aviso de coordinación."),
+        que_vio=("{nombre} recibió su respuesta; el aviso igual quedó en la cola y "
+                 "sale en horario, pero la hora que se le informó puede no ser la "
+                 "real."),
+        que_hacer=("Revisá el calendario del espacio (horario y feriados del pack) y "
+                   "pasale el detalle técnico a quien desarrolla.")),
     ETAPA_HORIZONTE_TAREA: ExplicacionDeEtapa(
         que_paso=("El ajuste `horizonte_tarea` del espacio no tiene un valor "
                   "válido (`meses` debe ser un entero de 1 o más): se usan los "

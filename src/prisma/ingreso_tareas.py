@@ -1415,7 +1415,18 @@ def _inicio_de_jornada(cur: psycopg.Cursor, workspace_id: str,
     try:
         with cur.connection.transaction():
             return Calendario.desde_base(cur, workspace_id).dentro_de_jornada(now)
-    except Exception:  # noqa: BLE001 - se degrada a la hora de siempre
+    except Exception as exc:  # noqa: BLE001 - se degrada a la hora de siempre
+        # Nunca en silencio: el calendario roto queda como incidente.
+        from .despachador import texto_error_seguro
+        from .incidentes import ETAPA_CALENDARIO_AVISOS
+        with cur.connection.transaction():
+            registrar_incidente(
+                cur, workspace_id,
+                "No se pudo leer el calendario del espacio para calcular cuándo sale "
+                "un aviso de coordinación: se encoló para ahora y el despachador lo "
+                "posterga al horario.",
+                severidad="media", etapa=ETAPA_CALENDARIO_AVISOS,
+                referencia_cruda=texto_error_seguro(exc)[:2000])
         return now
 
 

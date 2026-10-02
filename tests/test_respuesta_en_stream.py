@@ -553,8 +553,14 @@ def test_el_ultimo_texto_siempre_llega_al_borrador_aunque_haya_llegado_rapido():
         for parcial in ("Li", "Listo", "Listo, anoté", "Listo, anoté la tarea"):
             ind.actualizar_borrador(parcial)
         _esperar(lambda: tg.textos() and tg.textos()[-1] == "Listo, anoté la tarea")
-    assert tg.textos()[0] == "Li"
-    assert tg.textos()[-1] == "Listo, anoté la tarea"
+    # El primero que sale depende de cuándo arranca el trabajador; lo que se
+    # garantiza es que todo lo enviado es algo que escribió el modelo, en orden,
+    # y que lo último siempre llega.
+    enviados = tg.textos()
+    escritos = ["Li", "Listo", "Listo, anoté", "Listo, anoté la tarea"]
+    assert all(t in escritos for t in enviados)
+    assert enviados == sorted(enviados, key=escritos.index)
+    assert enviados[-1] == "Listo, anoté la tarea"
     assert len(tg.textos()) <= 3                      # sigue acotado por el intervalo
 
 

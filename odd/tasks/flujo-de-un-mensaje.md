@@ -1796,3 +1796,8 @@ Diseño B elegido por el usuario. Ruta declarada: un solo escritor (encargo expl
   Telegram en el borrador se ignoraban en silencio (no se miraba el código de respuesta):
   ahora un 429 espera lo que pide Telegram (tope 2 s) y sigue con lo último, y otro error
   corta el stream del turno y se reporta. RED 2 failed; GREEN 155 passed.
+- RDD `83743a2..39bbf59`, linaje `review-b2477323152356eb`: aprobada y reconocida. Corregidas
+  sus dos WARNING: (1) la caída a "ahora" cuando falla el calendario quedaba en silencio:
+  ahora deja un incidente `calendario_avisos` (etapa nueva con su explicación); (2) la prueba
+  del último texto del borrador dependía del orden de los hilos: ahora afirma que todo lo
+  enviado es algo escrito, en orden, y que lo último llega. RED 1 failed; GREEN 101 passed.

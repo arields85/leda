@@ -489,3 +489,7 @@ def test_si_el_calendario_falla_el_aviso_igual_se_encola_y_el_despachador_lo_pos
 
     assert _tareas(conn) == 1
     assert len(_nuevas(conn, responsable, antes)) == 1
+    # Nunca en silencio: el calendario roto queda como incidente.
+    with admin(conn) as cur:
+        cur.execute("select count(*) n from incident where etapa = 'calendario_avisos'")
+        assert cur.fetchone()["n"] >= 1
