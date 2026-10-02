@@ -15,7 +15,10 @@ Un circuito se tilda sólo cuando se cumplen sus cuatro pasos:
 
 1. **Diseño:** acordado con el usuario y escrito en este documento, con su chequeo de
    rumbo ("Cómo pensamos juntos", punto 3, en `AGENTS.md`). Desde ahí queda "decidido,
-   listo para hacer".
+   listo para hacer". **Todo diseño se piensa para la fluidez** (decisión del usuario,
+   2026-10-02): ¿es mecánico? ¿se puede hacer más fluido y conversacional? La persona
+   escribe como habla y Leda pregunta sólo lo que falta; botones sólo para elegir
+   (enmienda del ADR 0013 del 2026-10-02). La fluidez nunca saltea una garantía.
 2. **Construcción:** con el flujo nuevo, con pruebas primero y revisión RDD.
 3. **Retiro de lo viejo:** "un camino pasa al flujo nuevo sólo cuando se retiró lo
    viejo" (`AGENTS.md`, punto 7).
