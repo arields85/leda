@@ -556,3 +556,9 @@ def test_el_ultimo_texto_siempre_llega_al_borrador_aunque_haya_llegado_rapido():
     assert tg.textos()[0] == "Li"
     assert tg.textos()[-1] == "Listo, anoté la tarea"
     assert len(tg.textos()) <= 3                      # sigue acotado por el intervalo
+
+
+def test_el_borrador_se_actualiza_seguido_para_que_se_vea_mientras_escribe():
+    """Pedido del usuario (2026-10-01): "que apenas tenga algo para mostrar lo
+    muestre". El primer texto sale enseguida y después, a lo sumo cada 0,3 s."""
+    assert desp.INTERVALO_DE_BORRADOR <= 0.3

@@ -225,9 +225,12 @@ def _enviar_borrador_texto(http, token: str, chat_id: int, draft_id: int,
 
 # Un mensaje de Telegram admite hasta 4096 caracteres; el borrador, también.
 LIMITE_DE_BORRADOR = 4096
-# Cada cuánto se actualiza el borrador con el texto que llega (respuesta en stream):
-# más seguido toparía con los límites de Telegram y no se ve mejor.
-INTERVALO_DE_BORRADOR = 0.7
+# Cada cuánto se actualiza el borrador con el texto que llega (respuesta en stream).
+# El primero sale enseguida; después, a lo sumo cada 0,3 s (pedido del usuario,
+# 2026-10-01: "que apenas tenga algo para mostrar lo muestre"). Si Telegram rechaza
+# por ritmo, el stream se corta en ese turno y se reporta; el mensaje final sale
+# igual. Valor a configurar desde la plataforma.
+INTERVALO_DE_BORRADOR = 0.3
 
 
 class IndicadorDeActividad:
