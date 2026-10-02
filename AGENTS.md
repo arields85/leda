@@ -11,6 +11,17 @@ actual; no se reestructura ni reescribe sin una decisión explícita y documenta
 > posterior a una instalación o actualización; la importación funciona siempre.
 > Editar siempre este archivo, nunca `CLAUDE.md`.
 
+> **AVISO DE RETORNO (2026-10-02), temporal.** El producto se llamaba Prisma y pasó a
+> llamarse Leda (ADR 0015). La carpeta local se muda de `D:\Proyectos\Prisma-PM` a
+> `D:\Proyectos\Leda-PM` con `tools/mudar_carpeta.ps1`. **Si esta sesión se abrió en
+> `D:\Proyectos\Leda-PM`, es la primera después de esa mudanza:** antes de cualquier otra
+> cosa, leer [`docs/traspaso/2026-10-02-renombre-a-leda.md`](docs/traspaso/2026-10-02-renombre-a-leda.md)
+> y seguir su "Punto exacto de retorno": verificar la mudanza, actualizar las rutas viejas
+> y hacer con el usuario la **prueba real del alta de tareas** del guion de ese documento,
+> para comprobar que todo funciona como antes. Engram sigue en el proyecto `prisma-pm`, y
+> está bien así. Borrar este aviso cuando R13 quede cerrada
+> (`odd/tasks/renombre-a-leda.md`).
+
 ## Orden de lectura
 
 1. `docs/product/que-es-leda.md`: qué es el producto y qué es configuración de cada cliente.

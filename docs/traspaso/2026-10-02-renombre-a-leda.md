@@ -29,11 +29,50 @@ punto de retorno los reemplaza este documento.
         `auxiliar/alta-y-google`;
      3. sacar `Prisma-PM` de los tokens protegidos de `tools/renombrar_a_leda.py`, porque
         desde ahí renombrar esas rutas pasa a ser lo correcto;
-     4. probar el listener desde la ruta nueva (comando abajo);
+     4. hacer con el usuario la **prueba real del alta de tareas** (guion de abajo), para
+        comprobar que todo funciona desde la carpeta nueva como funcionaba antes;
      5. recordarle al usuario que borre `D:\Respaldo-mudanza-leda`, el respaldo de los
         `.env` y los volcados que hizo antes de la mudanza, porque tiene secretos;
-     6. commit y push a `arields85/leda`.
+     6. registrar el resultado en R13, cerrar R13, borrar el "AVISO DE RETORNO" de
+        `AGENTS.md`, y hacer commit y push a `arields85/leda`.
 2. Después, seguir con los pendientes en el orden de abajo.
+
+## Guion de la prueba real después de la mudanza
+
+Es la misma prueba que pasó el 2026-10-02 (09:12, tarea creada sin incidentes). Antes de
+empezar, PostgreSQL tiene que estar corriendo (`levantar-postgres.bat`, si se reinició la
+PC). Hacerla dentro del horario de CoreWork (09:00 a 17:00), así el aviso a Ismael llega
+al instante. Las cuentas de prueba las opera el usuario. Se arranca desde el chat de Marcos
+sin nada pendiente.
+
+0. **El usuario, en una PowerShell:**
+   `cd D:\Proyectos\Leda-PM-worktrees\flujo-de-un-mensaje`, después
+   `$env:PYTHONPATH="src"`, después
+   `D:\Proyectos\Leda-PM\.venv\Scripts\python.exe -m leda escuchar corework`
+   → "Escuchando como @PM_prisma_agent_bot — espacio 'corework'". El nombre del bot sigue
+   siendo el viejo hasta que el usuario lo cambie en BotFather.
+1. **Marcos escribe** `necesito preparar el informe de paradas de la línea 1 para el viernes que viene`
+   → en pocos segundos, Leda anota el borrador con título y fecha y pregunta el objetivo
+   con botones. En ningún lado dice "Prisma".
+2. **Marcos toca un botón de objetivo** → Leda sigue con lo que falta: responsable y
+   criterio de aceptación.
+3. **Marcos toca "Para mí"** → Leda pregunta el criterio o propone uno.
+4. **Marcos acepta la propuesta con `sí`, o escribe** `el informe tiene las paradas de la semana con su causa`
+   → aparece el resumen completo con "Enviar a aprobación", "Modificar" y "Cancelar".
+5. **Marcos toca "Enviar a aprobación"** → Leda le confirma que se lo mandó a Ismael, y a
+   Ismael le llega el borrador con "Confirmar".
+6. **Ismael toca "Confirmar"** → la tarea queda creada; a Marcos le llega "Ismael
+   Soschinski confirmó el borrador de la tarea «…»: la tarea quedó creada" y a Ismael
+   "Hecho. La tarea quedó comprometida."
+7. **El usuario para y avisa.** El agente lee la evidencia antes de opinar:
+   `tools/leer_conversacion.py 20 --completo` y `tools/leer_turnos_alta.py 20` (con
+   `PYTHONPATH=src` desde el worktree de flujo), la tarea en `leda_flujo` (que venga de su
+   borrador y esté `asignada`), la auditoría y los incidentes.
+
+**Pasa** si la tarea queda creada, la conversación, la base y la auditoría coinciden y no
+hay incidentes nuevos. Si los "…" duran más de 30 segundos, mirar en vivo antes de
+esperar: el 2026-10-02 un turno quedó colgado porque el proveedor `nan` estaba degradado
+(pendiente del plazo total, más abajo).
 
 ## Qué se hizo (2026-10-01 y 2026-10-02)
 
