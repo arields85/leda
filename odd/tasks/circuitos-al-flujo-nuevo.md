@@ -195,7 +195,8 @@ botón.
 - Suite completa (2026-10-02, `python -m pytest -q -p no:cacheprovider`): `1 failed,
   3444 passed, 333 deselected, 1 warning in 963.07s`; la única falla es la previa que
   depende de la fecha (`test_un_texto_con_un_dato_inventado_se_reintenta_con_el_motivo`).
-- [ ] **C0-4.** Repetir la ronda C0-A en real después de C0-1 a C0-3.
+- [x] **C0-4.** Repetir la ronda C0-A en real después de C0-1 a C0-3. Pasa el
+      2026-10-02 a las 14:58-15:02: ver "Ronda C0-4".
 
 Comprobaciones: RED primero con un alta pedida por alguien de otra área (Dirección para OT)
 que hoy ofrece el estratégico; prueba de que Modificar arma sus botones desde el resumen;
@@ -284,6 +285,31 @@ R3-001 (`alta_conducida.py:747-754`, advertencia), R3-002
 (`ingreso_tareas.py:2208-2214`, advertencia), R3-004 (`ingreso_tareas.py:2269-2280`,
 sugerencia) y R3-005 (`ingreso_tareas.py:2770-2778`, sugerencia). La revisión entregó sólo
 la ubicación y la severidad: se miran al retomar C0.
+
+### Ronda C0-4 (2026-10-02, 14:58-15:02): pasa
+
+Con `e138635` (C0-1 a C0-3) y el listener reiniciado. Ismael pidió "necesito que Marcos
+revise el cableado del tablero de la línea 2 para el martes que viene":
+
+- Objetivo con **dos botones de OT** ("Planos eléctricos correctos…" y "Conectar y
+  automatizar equipos…"); el estratégico no apareció. H1 corregido.
+- Modificar (15:00:11) contestó en 1 s, sin el modelo, con **un botón por dato** (Título,
+  Objetivo, Responsable, Fecha objetivo, Criterio de aceptación) y "Volver al resumen".
+  Objetivo ofreció los dos de OT; el cambio volvió al resumen con el objetivo nuevo.
+  Fecha objetivo mostró el valor para copiar; "el jueves que viene" quedó 08/10/2026. H2
+  corregido.
+- Confirmar (15:02:20): la tarea quedó `asignada`, para el 08/10, bajo "Conectar y
+  automatizar equipos…" (`operativo`), a cargo de Marcos; a Marcos le llegó el aviso de
+  asignación con la fecha y el criterio. Auditoría: dos `modificar_ingreso_tarea`,
+  `avisar_asignacion_ingreso_tarea` y `confirmar_borrador_tarea`.
+- Cinco turnos del modelo, aceptados al primer intento (4,5 a 11,5 s); sin incidentes.
+
+- **H8 (observación). La misma frase, dos fechas distintas.** "el martes que viene",
+  escrita un viernes (2026-10-02), quedó 13/10 a las 12:36 y 06/10 a las 14:58. Leda
+  muestra la fecha con el día en el mensaje y en el resumen, así que la persona puede
+  corregirla, pero la interpretación del modelo no es estable. Etapa 2 del ADR 0014 (el
+  modelo normaliza valores). No se corrige con reglas de frases: `PENDIENTE` de decisión
+  del usuario sobre qué hacer con las fechas relativas ambiguas, y de medir su frecuencia.
 
 ## Relación con otros pendientes
 
