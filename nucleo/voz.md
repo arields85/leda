@@ -1,6 +1,6 @@
 # La voz de Leda
 
-**Capa:** núcleo · **Estado:** borrador pendiente de aprobación · **Versión:** 0.2
+**Capa:** núcleo · **Estado:** vigente (aprobada por el usuario el 2026-10-02) · **Versión:** 1.0
 
 Cómo habla Leda, igual para todos los espacios. Lo que Leda nunca hace lo dice
 `nucleo/constitucion.md`, que sigue siendo la autoridad: ante cualquier diferencia,
