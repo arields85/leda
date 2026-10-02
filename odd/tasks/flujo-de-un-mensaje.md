@@ -1873,3 +1873,6 @@ activados.
   usuario de no poner plazo por turno, así que se discute antes de tocarla. Propuesta: un
   plazo total que termine en el aviso neutro y el incidente que ya existen
   (`alta_conducida_fallida`), sin plantillas que tapen al modelo. `PENDIENTE`.
+- Agravante: con la llamada colgada, Ctrl+C deja el listener en "Cortando…" para siempre,
+  porque espera al hilo bloqueado en la llamada. Hubo que forzar el cierre del proceso
+  (00:20). Misma causa: una llamada al modelo sin plazo total.
