@@ -214,5 +214,11 @@ def test_sin_emojis_el_tono_lo_dice():
     assert "sin emojis" in INS.bloque_de_tono(VOS).lower()
 
 
+def test_el_pack_de_corework_permite_emojis():
+    import yaml
+    pack = yaml.safe_load((RAIZ / "espacios" / "corework.yaml").read_text("utf-8"))
+    assert pack["persona"]["emojis"] is True
+
+
 def test_el_tope_del_alta_es_de_2500_tokens():
     assert INS.TOPE_TOKENS_ALTA == 2500

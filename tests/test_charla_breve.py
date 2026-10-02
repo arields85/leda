@@ -169,7 +169,8 @@ def test_el_modelo_recibe_el_mensaje_y_la_pregunta_pendiente_como_datos(
     _mensaje_privado(cliente, tg, "buen día")
 
     sistema, hechos = proveedor.redactados[0]
-    assert sistema == redaccion.SISTEMA_CHARLA
+    # La guía con el tono del pack de CoreWork: trato de vos y emojis permitidos.
+    assert sistema == redaccion.sistema_charla(emojis=True, registro="vos")
     assert json.loads(hechos) == {"mensaje": "buen día",
                                   "pregunta_pendiente": PREGUNTA_TITULO}
 

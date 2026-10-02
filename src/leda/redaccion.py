@@ -37,7 +37,7 @@ from .incidentes import (ETAPA_CHARLA_SIN_RESPUESTA, ETAPA_REDACCION_FALLIDA,
 from .llm import PlazoAgotado, llamar_con_plazo
 from .resultado_turno import Falta, ResultadoTurno, Resumen, ids_de_cambios
 from .valores import TipoValor  # noqa: F401 -- el tipo de `Falta.tipo`
-from .instrucciones import emojis_del_espacio, regla_de_emojis
+from .instrucciones import regla_de_emojis, tono_del_espacio
 from .verificador_redaccion import leer_borrador, verificar
 
 CLAVE_REDACCION = "redaccion"
@@ -217,16 +217,25 @@ def redactar(resultado: ResultadoTurno, variante: str) -> str:
 # Variante A: el modelo redacta, el código verifica
 # ---------------------------------------------------------------------------
 
-def sistema_redaccion(*, emojis: bool) -> str:
-    """La guía de la redacción de A. Los emojis salen del pack del espacio
-    (`persona_config.emojis`, C0-13), nunca fijos en el código."""
-    return _SISTEMA_REDACCION.replace("{emojis}", regla_de_emojis(emojis))
+def _trato(registro: str | None) -> str:
+    """El trato del pack (`persona_config.registro`, 0-13). Sin registro
+    configurado, nada: no se inventa un trato."""
+    return f"tratando a la persona de {registro}" if registro else ""
+
+
+def sistema_redaccion(*, emojis: bool, registro: str | None = None) -> str:
+    """La guía de la redacción de A. El trato y los emojis salen del pack del
+    espacio (`persona_config`, 0-13), nunca fijos en el código."""
+    trato = _trato(registro)
+    return (_SISTEMA_REDACCION
+            .replace("{trato}", f", {trato}" if trato else "")
+            .replace("{emojis}", regla_de_emojis(emojis)))
 
 
 _SISTEMA_REDACCION = (
     "Sos Leda, asistente de un equipo de trabajo por Telegram. Escribí el "
     "mensaje que la persona va a leer, a partir de los hechos en JSON.\n"
-    "Voz: cordial, clara y breve (una a tres oraciones), con voseo, sin jerga, "
+    "Voz: cordial, clara y breve (una a tres oraciones){trato}, sin jerga, "
     "claves internas ni Markdown; {emojis}. Ayudá: decí lo que entendiste y qué "
     "falta, con tus palabras.\n"
     "Usá SOLO los hechos: ninguna fecha, nombre, estado, número ni cambio que "
@@ -407,7 +416,7 @@ def redactar_turno(cur, workspace_id: str, resultado: ResultadoTurno, variante: 
     caracteres = 0
     try:
         modelo = proveedor or proveedor_de_redaccion(cur, workspace_id)
-        sistema = sistema_redaccion(emojis=emojis_del_espacio(cur, workspace_id))
+        sistema = sistema_redaccion(**_guias_del_espacio(cur, workspace_id))
         hechos = serializar_hechos(resultado)
         conversacion = {"historial": historial} if historial else {}
         crudo = llamar_con_plazo(
@@ -467,7 +476,7 @@ def _redactar_modelo_puro(cur, workspace_id: str, resultado: ResultadoTurno,
     el motivo); un error del modelo no se reintenta (el proveedor ya reintentó). Si
     no sale un texto, un incidente con los motivos y el aviso neutro."""
     conversacion = {"historial": historial} if historial else {}
-    sistema = sistema_redaccion(emojis=emojis_del_espacio(cur, workspace_id))
+    sistema = sistema_redaccion(**_guias_del_espacio(cur, workspace_id))
     correccion: dict | None = None
     motivos: list[str] = []
     for _ in range(INTENTOS_MODELO_PURO):
@@ -523,10 +532,22 @@ def _redactar_modelo_puro(cur, workspace_id: str, resultado: ResultadoTurno,
 # La charla con una pregunta pendiente (ADR 0013 regla 1, F-B5)
 # ---------------------------------------------------------------------------
 
-def sistema_charla(*, emojis: bool) -> str:
-    """La guía de la charla breve. Los emojis salen del pack del espacio (C0-13)."""
+def sistema_charla(*, emojis: bool, registro: str | None = None) -> str:
+    """La guía de la charla breve. El trato y los emojis salen del pack del
+    espacio (`persona_config`, 0-13)."""
     regla = regla_de_emojis(emojis)
-    return _SISTEMA_CHARLA.replace("{emojis}", f"{regla[0].upper()}{regla[1:]}")
+    trato = _trato(registro)
+    return (_SISTEMA_CHARLA
+            .replace("{trato}", f" y {trato}" if trato else "")
+            .replace("{emojis}", f"{regla[0].upper()}{regla[1:]}"))
+
+
+def _guias_del_espacio(cur, workspace_id: str) -> dict:
+    """El trato y los emojis del pack del espacio, para armar las guías."""
+    tono = tono_del_espacio(cur, workspace_id)
+    if tono is None:
+        return {"emojis": False}
+    return {"emojis": bool(tono.emojis), "registro": tono.registro}
 
 
 _SISTEMA_CHARLA = (
@@ -534,7 +555,7 @@ _SISTEMA_CHARLA = (
     "Telegram. La persona escribió un saludo, un agradecimiento o una charla "
     "suelta mientras Leda esperaba la respuesta a una pregunta (te llega en "
     "JSON como `mensaje` y `pregunta_pendiente`).\n"
-    "- Respondé en una sola oración corta, en español neutro con voseo, cálida "
+    "- Respondé en una sola oración corta, en español neutro{trato}, cálida "
     "y sin vueltas.\n"
     "- No hagas ninguna pregunta: la pregunta pendiente la vuelve a hacer el "
     "sistema después de tu respuesta.\n"
@@ -593,7 +614,7 @@ def redactar_charla(cur, workspace_id: str, mensaje: str, pregunta: str, *,
     de baja severidad que no avisa a la administración -- nunca en silencio."""
     try:
         modelo = proveedor or proveedor_de_redaccion(cur, workspace_id)
-        sistema = sistema_charla(emojis=emojis_del_espacio(cur, workspace_id))
+        sistema = sistema_charla(**_guias_del_espacio(cur, workspace_id))
         pedido = json.dumps({"mensaje": mensaje, "pregunta_pendiente": pregunta},
                             ensure_ascii=False)
         conversacion = {"historial": historial} if historial else {}

@@ -54,7 +54,8 @@ class _Captura:
 
 def _emojis(conn, ws, valor: bool) -> None:
     with admin(conn) as cur:
-        cur.execute("update persona_config set emojis = %s where workspace_id = %s",
+        cur.execute("update persona_config set emojis = %s, registro = 'vos' "
+                    "where workspace_id = %s",
                     (valor, ws))
     conn.commit()
 
@@ -74,5 +75,7 @@ def test_la_redaccion_y_la_charla_leen_los_emojis_del_espacio(valor, intake_worl
         redaccion.redactar_turno(cur, ws, resultado, "A", proveedor=turno)
         redaccion.redactar_charla(cur, ws, "hola", "¿Qué hay que hacer?",
                                   proveedor=charla)
-    assert turno.sistemas[0] == redaccion.sistema_redaccion(emojis=valor)
-    assert charla.sistemas[0] == redaccion.sistema_charla(emojis=valor)
+    assert turno.sistemas[0] == redaccion.sistema_redaccion(
+        emojis=valor, registro="vos")
+    assert charla.sistemas[0] == redaccion.sistema_charla(
+        emojis=valor, registro="vos")

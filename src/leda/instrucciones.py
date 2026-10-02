@@ -79,12 +79,6 @@ class Tono:
     emojis: bool | None = None
 
 
-def emojis_del_espacio(cur, workspace_id: str) -> bool:
-    """Si el pack del espacio permite emojis. Sin tono configurado, no."""
-    tono = tono_del_espacio(cur, workspace_id)
-    return bool(tono is not None and tono.emojis)
-
-
 def tono_del_espacio(cur, workspace_id: str) -> Tono | None:
     """El tono del pack del espacio; `None` si el pack no lo define."""
     cur.execute(
