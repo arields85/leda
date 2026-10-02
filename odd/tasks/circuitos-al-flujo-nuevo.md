@@ -457,6 +457,30 @@ cómo conversa Leda se aplique en todos los circuitos.
          todos los circuitos, cambios en un archivo, menos costo por turno. Probables, a
          medir: menos latencia (seguramente modesta) y mejor cumplimiento de reglas.
       Un cambio en `voz.md` vale al reiniciar el listener (como hoy el núcleo).
+      **Ajustes del usuario (2026-10-02), a partir de su experiencia con Prisma en Hermes**
+      (`docs/research/soul-y-contexto-de-prisma-en-hermes.md`):
+      7. **Dos capas de voz:** `nucleo/voz.md` es la voz del producto, igual para todos los
+         clientes (honestidad, fluidez, una sola pregunta clara, reconocer primero, firme
+         sin hostilidad); el tono de cada cliente sale de su pack (`persona.registro`,
+         glosario, equipo) y lo agrega el código según el espacio. Hallazgo: el alta tiene
+         "con voseo" escrito en el código (`alta_turno.py:690`) aunque el pack ya lo define
+         (`persona.registro: vos`); con un cliente que trate de usted, Leda le hablaría de
+         vos. Se corrige acá.
+      8. **Cada regla como conducta:** cuándo aplica, qué hace Leda, qué no hace y cómo se
+         comprueba. Sin adjetivos sueltos ni ejemplos que se puedan copiar como respuesta.
+      9. **Reglas que entran a la voz:** las cuatro frases distintas (acuse, efecto con
+         comprobante real, propuesta, "no pude verificarlo"; nunca "quedó registrado" o
+         "anoté" sin efecto real, la falla de H5); no encontrar no es que no exista; no
+         anunciar "voy a consultar"; ante un dato faltante, para qué hace falta y una sola
+         pregunta.
+      10. **Antes de escribir cada frase, dónde va:** voz, contexto del cliente, dato de la
+          base o control del código. Una prohibición escrita no reemplaza un bloqueo.
+      11. **Cuatro evidencias para validar un cambio de voz:** el texto bien escrito, la
+          versión cargada (huella de `voz.md` registrada como la del núcleo), los controles
+          que funcionan aunque el modelo se equivoque, y la respuesta clara y con próximo
+          paso en una prueba real.
+      **Aprobación del texto:** `voz.md` es parte del núcleo; su texto lo aprueba el
+      usuario, con la diferencia legible, antes de la prueba real.
 
 ### RDD de C0-3, C0-5 y C0-6 (2026-10-02)
 
