@@ -1741,3 +1741,8 @@ Diseño B elegido por el usuario. Ruta declarada: un solo escritor (encargo expl
   `stream` en `prisma_flujo`); queda sólo el "escribiendo…", que funciona. El código queda en
   la rama, apagado por omisión. Pendiente visual para después: retomar el stream y comparar
   sus dos modos. Prioridad: que Prisma se comporte y responda bien.
+- Corrección (2026-10-01, minutos después): el usuario apagó el stream creyendo que había
+  causado el incidente de las 21:58; no fue así (los dos rechazos son del contenido de la
+  salida del modelo, `falta_pregunta` y `formato`, y la misma clase falló a la mañana sin
+  stream). **Decisión del usuario: stream encendido** en `prisma_flujo` ("me ayudó mucho a
+  ver cómo se comporta Prisma").
