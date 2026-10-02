@@ -322,6 +322,36 @@ revise el cableado del tablero de la línea 2 para el martes que viene":
       Modificar. Constitución §4 (no completa con lo más probable); "botones donde hay
       opciones".
 
+### Botones para elegir, texto para decir (2026-10-02, después de C0-4)
+
+Observación del usuario sobre la ronda C0-4: funcionó, pero modificar dato por dato con
+botones se sintió mecánico. Quiere poder escribir varias cosas juntas ("quiero modificar
+la fecha por tal día y la tarea por tal otra, ¿qué objetivos hay?"), como ya pasa en el
+primer mensaje del alta ("creá una tarea para tal día, es tal cosa y la hago yo"), y que
+Leda pregunte sólo lo que falta. **Decisión del usuario: enmienda del ADR 0013 del
+2026-10-02, en `main`.** Botones sólo para elegir entre opciones que la persona no conoce
+(objetivos, responsables), por ambigüedad (C0-9), para las confirmaciones de la
+constitución §7, y cuando la persona pide ayuda. Todo lo demás, por texto.
+
+**Decidido, listo para hacer** (después de que terminen C0-5 y C0-6, que tocan código
+vecino):
+
+- [ ] **C0-10.** En el alta conducida, tocar Modificar ya no abre la lista de botones por
+      dato (C0-3): Leda contesta con un texto armado por el código, no por el modelo
+      (para que no se repita H2), del estilo "Decime qué querés cambiar, podés decirme
+      varias cosas juntas". La persona puede además escribir el cambio sin tocar
+      Modificar. Un mensaje con varios cambios aplica todos en un turno y pregunta sólo lo
+      que falta o lo ambiguo. El selector por dato queda para el alta guiada, que se
+      retira igual.
+- [ ] **C0-11.** Pedido de ayuda: cuando la persona pide opciones ("¿qué objetivos hay?",
+      "¿qué opciones tengo?") o no entiende lo que se le pide ("no entiendo"), el modelo lo
+      devuelve como un comando de la lista cerrada y el código responde: si el dato tiene
+      opciones, una explicación simple con sus botones; si es libre (criterio de
+      aceptación), qué se necesita y un ejemplo concreto que se acepta con un toque. Sin
+      listas de frases.
+- [ ] **C0-12.** Repetir en real una ronda con cambios escritos juntos y un pedido de
+      ayuda, después de C0-10 y C0-11.
+
 ## Relación con otros pendientes
 
 - **P1-P7** (falla del proveedor, `odd/tasks/flujo-de-un-mensaje.md`): decidido y listo
