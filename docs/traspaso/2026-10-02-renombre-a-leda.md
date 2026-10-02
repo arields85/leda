@@ -107,7 +107,7 @@ la lista de pendientes esté completa. Descongelar una unidad lo decide el usuar
 | Unidad | Qué le falta además del descongelamiento | Dónde está el detalle |
 |---|---|---|
 | Panel de plataforma | Decidir cómo se autentica quien opera Leda; en el código no depende de nada | `docs/ROADMAP.md`, "Panel de plataforma"; inventario en `docs/product/plataforma-pendientes.md` |
-| Tablero de cliente | El puerto de lectura y el desacople del transporte | `docs/ROADMAP.md`, "Tablero de cliente" |
+| Tablero de cliente | La credencial de acceso del puerto de lectura (el puerto está hecho; la credencial quedó en pausa sin commitear) | `docs/ROADMAP.md`, "Tablero de cliente" |
 | Alta con correo verificado y Google (ADR 0010) | Integrar la rama a `main` (R12) | `odd/tasks/renombre-a-leda.md`, R12 |
 
 ## Cómo operar ahora
