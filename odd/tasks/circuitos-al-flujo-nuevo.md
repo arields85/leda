@@ -678,6 +678,23 @@ cambió por su versión y envió a aprobación; Ismael confirmó.
   hacer nada ahora" → "Dale, Ariel. Quedo por acá. 👋": bien. Los emojis del pack ya se
   usan (👋 en dos de tres mensajes, algo repetido para "ocasional").
 
+- **Medición C1 contra C2 (2026-10-02):** webhook real contra la base de pruebas, IA real
+  (`nan`/`deepseek-v4-flash`) sólo en `conducir_alta`, mismas entradas, seis escenarios ×
+  tres repeticiones × dos variantes (63 llamadas). Archivos en el scratchpad de la sesión
+  (`medicion-voz/lado_a_lado.md`, `corridas.jsonl`, `test_medir_voz.py`). **La voz cambia
+  lo que escribe la IA, pero poco:** órdenes secas ("Decime") de 12 a 1 de 30; "anoté" de
+  7 a 1; reconoce la frustración ("Tenés razón"); cuestiona un título vago; usa el nombre de
+  la persona. **No cambia** el esqueleto (acuse, repaso de datos y pregunta, en unas dos
+  oraciones de 150-180 caracteres); sigue pidiendo dos datos juntos (9 → 6 de 30); cero
+  "por favor" y cero emojis en 59 textos. **Causas verificadas:** la mecánica del alta
+  permite "hasta dos datos" en la pregunta (`alta_turno.py:725`) y contradice la voz ("una
+  sola pregunta", `voz.md:71`); el contrato fija "una a tres oraciones"
+  (`alta_turno.py:652`, `:734`); la regla de emojis va al final y blanda; en "avisale a mi
+  jefe por mail" la IA clasifica `otro_tema` y su texto se descarta (`alta_conducida.py:771`).
+  **Costo:** con la voz, la mediana de tokens de entrada pasa de ~2,9k a ~4,4k y la
+  latencia por turno de 10 s a 17 s (p90 de 19 s a 40 s); los tokens de salida se duplican
+  (razonamiento oculto del proveedor).
+
 - [ ] **0-14.** La redacción A (y la charla breve) leen la voz desde la misma fuente que el
       alta (`instrucciones`), para que haya una sola voz en todo lo que escribe la IA en el
       flujo C. Decidido por el principio de una sola fuente (0-13); pendiente de la
