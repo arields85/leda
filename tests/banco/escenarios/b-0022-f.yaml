@@ -3,7 +3,7 @@ variante_de: b-0022
 objetivo: >
   Variante de b-0022, corregir el borrador: con la vista previa esperando, la
   persona pide cambiar la fecha. Un mensaje que corrige lleva al mismo camino
-  que el botón Modificar (T9-R1c-3): Prisma pregunta qué dato cambiar, con un
+  que el botón Modificar (T9-R1c-3): Leda pregunta qué dato cambiar, con un
   botón por dato, y no aplica nada.
 actor: Ismael Soschinski
 mensajes: []

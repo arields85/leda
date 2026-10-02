@@ -16,7 +16,7 @@
 --
 -- Se deshace con `db/rollbacks/0024_avisos_de_coordinacion.sql`.
 begin;
-set search_path = prisma, public;
+set search_path = leda, public;
 
 -- Fail closed if an invoking text pipeline decoded the UTF-8 file incorrectly.
 -- chr() builds the expected value independently from non-ASCII source bytes.
@@ -32,13 +32,13 @@ end $$;
 do $$ begin
   if not exists (
       select 1 from information_schema.columns
-       where table_schema = 'prisma' and table_name = 'inbound_message'
+       where table_schema = 'leda' and table_name = 'inbound_message'
          and column_name = 'boton_callback') then
     raise exception '0024 requires 0022_toque_con_boton.sql';
   end if;
   if exists (
       select 1 from information_schema.columns
-       where table_schema = 'prisma' and table_name = 'message_outbox'
+       where table_schema = 'leda' and table_name = 'message_outbox'
          and column_name = 'es_coordinacion') then
     raise exception '0024 ya está aplicada.';
   end if;

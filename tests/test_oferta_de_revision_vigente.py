@@ -9,10 +9,10 @@ encabezado de "el borrador cambió" no entra en el mensaje, sale sólo el resume
 
 from __future__ import annotations
 
-from prisma import gateway
-from prisma import ingreso_tareas as I
-from prisma.db import admin
-from prisma.incidentes import NOTICIA_NEUTRA_INCIDENTE
+from leda import gateway
+from leda import ingreso_tareas as I
+from leda.db import admin
+from leda.incidentes import NOTICIA_NEUTRA_INCIDENTE
 
 from tests.test_alta_enviar_a_aprobacion import (_acciones, _alta_en_revision,
                                                  _dejar_atras_el_resumen, _tocar,

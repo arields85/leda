@@ -1,8 +1,8 @@
-# ADR 0007: Prisma orienta, no charla
+# ADR 0007: Leda orienta, no charla
 
 - **Estado:** aceptada (usuario, 2026-09-25)
 - **Fecha:** 2026-09-25
-- **Alcance:** toda respuesta de Prisma que espera algo de la persona, en chat privado
+- **Alcance:** toda respuesta de Leda que espera algo de la persona, en chat privado
 - **Amplía:** [`ADR 0005`](0005-interpretacion-y-confirmacion.md), punto 4
 - **Evidencia:** [`architecture/interpretacion-y-confirmacion.md`](../architecture/interpretacion-y-confirmacion.md), §5.13 (primera sesión por Telegram real)
 
@@ -11,7 +11,7 @@
 1. **Cada respuesta que espera algo de la persona cierra con opciones concretas como
    botones,** no con una pregunta abierta. Siempre hay una salida, "Quiero consultar
    otra cosa", y escribir libremente sigue siendo posible en cualquier momento.
-2. **Si Prisma nombra opciones, esas opciones son botones.** El texto da el contexto;
+2. **Si Leda nombra opciones, esas opciones son botones.** El texto da el contexto;
    la elección se hace tocando. "¿Cuál querés ver, el Dashboard de lotes o la
    Integración de datos?" se escribe como "Tenés dos tareas abiertas:" y dos botones.
 3. **Una lista de tareas se ofrece como botones.** Tocar una tarea abre lo que se
@@ -31,15 +31,15 @@
 
 ## Por qué
 
-En la primera sesión por Telegram real, las preguntas abiertas de Prisma fueron el
+En la primera sesión por Telegram real, las preguntas abiertas de Leda fueron el
 origen de casi todos los problemas: "¿Querés que vea si alguna depende de otra?"
 recibió "si, revisa", que el modelo completó con una dependencia inventada ("claramente
 va detrás"); "decime y la paso a revisión" obligó a escribir y abrió otra aclaración;
 "¿Qué querés cambiar?" recibió "la tarea", que se interpretó como el nombre de una
-tarea y ofreció tres al azar. En los tres casos Prisma ya conocía las opciones.
+tarea y ofreció tres al azar. En los tres casos Leda ya conocía las opciones.
 
 Las 3 aclaraciones con botones de la sesión fueron innecesarias: la persona hablaba de
-una tarea que Prisma acababa de listar. Con la lista como botones, la referencia no
+una tarea que Leda acababa de listar. Con la lista como botones, la referencia no
 existe: el toque ya dice cuál es.
 
 ## Alternativas consideradas
@@ -49,7 +49,7 @@ existe: el toque ya dice cuál es.
   sigue interpretando algo que podía no hacer falta interpretar. Se mide igual, como
   complemento, para los mensajes que la persona escribe por su cuenta.
 - **Un menú fijo, sin conversación:** más predecible, pero rígido; la persona tiene
-  que poder escribir lo que quiera, y Prisma interpretarlo.
+  que poder escribir lo que quiera, y Leda interpretarlo.
 
 ## Consecuencias
 
@@ -67,7 +67,7 @@ existe: el toque ya dice cuál es.
 
 - ~~Qué acciones ofrece cada estado de tarea y para qué roles~~: resuelto con el
   usuario el 2026-09-25, en el diseño §4.6.
-- ~~Si Prisma pregunta sin tener opciones concretas que ofrecer~~: decisión del usuario,
+- ~~Si Leda pregunta sin tener opciones concretas que ofrecer~~: decisión del usuario,
   2026-09-26 (evidencia real `b-0007`, T4b): una respuesta que pregunta lleva opciones
   siempre. Sin ninguna concreta, el servidor agrega un juego genérico fijo — "Es una
   tarea nueva", "Es sobre una tarea existente", "Quiero consultar otra cosa" — cuando el

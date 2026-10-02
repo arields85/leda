@@ -3,7 +3,7 @@ variante_de: b-0020
 objetivo: >
   Variante de b-0020, dejar lo pendiente para ver lo otro (ADR 0013 regla 1,
   enmienda "una sola rama de conversación abierta", T9-R1d): con Modificar
-  tocado, la persona pide otra cosa y Prisma pregunta si sigue con lo
+  tocado, la persona pide otra cosa y Leda pregunta si sigue con lo
   pendiente; la persona toca "Dejarlo y ver lo otro". Se cierra la corrección
   sin aplicar nada, se dice qué se dejó de lado y, en la misma respuesta, se
   atiende la consulta guardada (aparece la tarea) sin pedir que la repita.

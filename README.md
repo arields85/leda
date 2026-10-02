@@ -1,4 +1,4 @@
-# Prisma
+# Leda
 
 Project manager digital que se asigna a un equipo de personas y se encarga de que
 el trabajo tenga objetivos, responsables, fechas, dependencias y criterios claros.
@@ -6,7 +6,7 @@ el trabajo tenga objetivos, responsables, fechas, dependencias y criterios claro
 La navegación documental comienza en [`docs/INDEX.md`](docs/INDEX.md). El estado
 activo y el roadmap vigente se mantienen en `docs/STATUS.md` y `docs/ROADMAP.md`.
 
-Prisma no es específica de ninguna disciplina. El mismo núcleo sirve para un
+Leda no es específica de ninguna disciplina. El mismo núcleo sirve para un
 equipo de ingeniería, de mantenimiento o de administración. Lo que cambia entre
 un equipo y otro son los datos del espacio de trabajo.
 
@@ -30,7 +30,7 @@ db/
   esquema.sql          Estado completo de la base
   pruebas.sql          15 comprobaciones de las reglas del núcleo
 
-src/prisma/
+src/leda/
   config.py            Credenciales y rutas. Nada de política.
   db.py                Conexión, rol y espacio activo
   importador.py        Pack YAML → base, con las validaciones del alta
@@ -40,12 +40,12 @@ src/prisma/
   despachador.py       Cola de salida hacia Telegram
   autoridad.py         Permisos, verificados del lado del servidor
   onboarding.py        Enlaces de activación individuales
-  herramientas.py      Lo único que Prisma puede hacer en el mundo
+  herramientas.py      Lo único que Leda puede hacer en el mundo
   contexto.py          Núcleo, espacio y momento, en ese orden
   llm.py               Proveedor de modelo detrás de una interfaz
   agente.py            El turno: mensaje entra, respuesta a la cola
   gateway.py           Webhook, un bot por espacio
-  cli.py               python -m prisma …
+  cli.py               python -m leda …
 ```
 
 ## El turno del agente
@@ -76,18 +76,18 @@ Tres cosas que se cumplen pase lo que pase con el modelo:
 ```bash
 cp .env.ejemplo .env          # completar tokens y credenciales
 docker compose up -d postgres
-python -m prisma esquema
-python -m prisma importar corework            # revisar advertencias
-python -m prisma feriados corework
-python -m prisma importar corework --activar
-python -m prisma servir
+python -m leda esquema
+python -m leda importar corework            # revisar advertencias
+python -m leda feriados corework
+python -m leda importar corework --activar
+python -m leda servir
 ```
 
 Después, el alta de cada persona:
 
 ```bash
-python -m prisma enlaces corework --solo Marcos Nahuel
-python -m prisma presentar corework
+python -m leda enlaces corework --solo Marcos Nahuel
+python -m leda presentar corework
 ```
 
 ```bash
@@ -99,7 +99,7 @@ tiene ruedas para Windows. Ahí, y en cualquier máquina donde se prefiera un
 servidor propio, alcanza con dejar en `.env.test`:
 
 ```
-PRISMA_TEST_DB_URL=postgresql://postgres:CONTRASENA@localhost:5432/postgres
+LEDA_TEST_DB_URL=postgresql://postgres:CONTRASENA@localhost:5432/postgres
 ```
 
 Cada corrida crea su propia base, le aplica el esquema y la borra al terminar.
@@ -109,7 +109,7 @@ apuntar a la base de mantenimiento: las pruebas truncan todas las tablas.
 ## Alta de integrantes
 
 Telegram no deja que un bot escriba primero a alguien que nunca interactuó con
-él. Cada persona abre su enlace y aprieta Iniciar una vez; recién ahí Prisma
+él. Cada persona abre su enlace y aprieta Iniciar una vez; recién ahí Leda
 puede hacerle seguimiento privado.
 
 **Los enlaces se entregan uno a uno.** Publicarlos en el grupo permitiría que
@@ -138,7 +138,7 @@ Un pack no puede contradecir el núcleo. Si lo intenta, se rechaza al importarse
 
 ### Plantillas
 
-Packs de arranque por tipo de equipo. En el alta, Prisma parte de una plantilla y
+Packs de arranque por tipo de equipo. En el alta, Leda parte de una plantilla y
 entrevista sólo sobre lo que difiere.
 
 ---
@@ -149,14 +149,14 @@ Son independientes. Tener uno no otorga nada del otro.
 
 | | Rol de plataforma | Rol de espacio |
 |---|---|---|
-| Alcance | Prisma entera | un equipo |
+| Alcance | Leda entera | un equipo |
 | Habilita | crear y configurar espacios, modelos, incidentes, respaldos, acceso a conversaciones | tener tareas, aprobar, escalar |
 | Dónde se ejerce | bot de administración | bot del espacio |
 
-El sombrero lo define el canal. En el bot de un espacio, Prisma trata a quien le
+El sombrero lo define el canal. En el bot de un espacio, Leda trata a quien le
 escribe según su rol en ese espacio, aunque sea administrador de plataforma.
 
-Ampliar la autoridad de Prisma dentro de un equipo requiere dos actos de dos
+Ampliar la autoridad de Leda dentro de un equipo requiere dos actos de dos
 personas: la autoridad del espacio **autoriza**, el administrador de plataforma
 **aplica**. El registro guarda ambas firmas.
 
@@ -190,5 +190,5 @@ personas: la autoridad del espacio **autoriza**, el administrador de plataforma
 - Migraciones con Alembic a partir del primer despliegue real.
 - Grafo de transiciones de estado permitidas.
 
-`PRISMA_DOCUMENTO_MAESTRO.md` (v1.5) es el borrador original del que salió todo
+`LEDA_DOCUMENTO_MAESTRO.md` (v1.5) es el borrador original del que salió todo
 esto. Queda como referencia histórica; la fuente de verdad es este árbol.

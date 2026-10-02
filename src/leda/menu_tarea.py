@@ -1,4 +1,4 @@
-"""Menú de acciones de una tarea (T2, `prisma-orienta`; ADR 0007, diseño
+"""Menú de acciones de una tarea (T2, `leda-orienta`; ADR 0007, diseño
 §4.6, `docs/architecture/interpretacion-y-confirmacion.md`).
 
 Tocar una tarea ofrece sólo lo que la persona puede hacer con ella, según su

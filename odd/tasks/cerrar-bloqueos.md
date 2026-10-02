@@ -81,7 +81,7 @@ la historia:
   comportamiento, luego verde). Suite completa: 353 passed (17 pruebas nuevas
   en `tests/test_bloqueos.py`, cero regresiones).
 
-  **T1.** `resolver_bloqueo(bloqueo_id, resolucion)` en `src/prisma/herramientas.py`,
+  **T1.** `resolver_bloqueo(bloqueo_id, resolucion)` en `src/leda/herramientas.py`,
   `valida_en_handler=True`: autoriza al responsable de la tarea, a quien abrió el
   bloqueo o a quien se escaló; cualquier otra persona del equipo recibe `Denegado`.
   Bloqueo de otro espacio o inexistente devuelve `"no existe"` (RLS ya lo deja
@@ -94,13 +94,13 @@ la historia:
   tarea ya `bloqueada` el bloqueo se suma sin duplicar el evento
   `bloqueada -> bloqueada`; se sacó el `select estado` suelto que no se usaba.
 
-  **Decisión de esquema:** `prisma_app` tiene el `select` revocado sobre
+  **Decisión de esquema:** `leda_app` tiene el `select` revocado sobre
   `task_state_event` (append-only, por diseño — comentario en
   `db/esquema.sql:1687-1691`), así que no hay forma de leer "el estado antes del
   último evento" desde la herramienta sin una puerta nueva. Se agregó
   `estado_previo_a_bloqueo(p_task uuid)`, función `security definer` con el mismo
   patrón que `emitir_acceso_tablero`/`resolver_acceso_tablero` (dueño
-  `prisma_owner`, `execute` revocado de `public` y concedido sólo a `prisma_app`).
+  `leda_owner`, `execute` revocado de `public` y concedido sólo a `leda_app`).
   Es el mínimo necesario para que "volver al estado previo" no dependa de leer la
   tabla append-only directamente.
 
@@ -180,9 +180,9 @@ la historia:
     la convención real del repo, confirmada en `db/README.md` y en el propio
     directorio, es `db/rollbacks/<mismo nombre>`. Misma estructura que
     0004/0006: `\encoding UTF8`, `\set ON_ERROR_STOP on`, chequeo de
-    codificación, `begin`/`commit`, preflight (`prisma_owner` existe, si no
-    exige 0004), `alter function ... owner to prisma_owner`, `revoke execute
-    ... from public`, `grant execute ... to prisma_app`.
+    codificación, `begin`/`commit`, preflight (`leda_owner` existe, si no
+    exige 0004), `alter function ... owner to leda_owner`, `revoke execute
+    ... from public`, `grant execute ... to leda_app`.
   - Las migraciones se descubren del directorio, no a mano — el trap que
     avisaba el mensaje de revisión (cuatro veces nombradas y desactualizadas):
     usé el mismo mecanismo ya existente, `_migraciones_posteriores_a()` en
@@ -199,10 +199,10 @@ la historia:
   - Agregada además una prueba específica,
     `test_0007_estado_previo_a_bloqueo_llega_por_migracion_con_dueno_correcto`
     en `tests/test_task_intake.py` (mismo estilo que las otras pruebas de
-    migración: base descartable vía `PRISMA_TEST_DB_URL`, `git show` del
+    migración: base descartable vía `LEDA_TEST_DB_URL`, `git show` del
     esquema pre-0002, cadena de migraciones aplicada, base borrada al
     terminar): confirma `to_regprocedure` no nulo (la falla original) y que
-    el dueño efectivo es `prisma_owner`, `public` sin `execute` y `prisma_app`
+    el dueño efectivo es `leda_owner`, `public` sin `execute` y `leda_app`
     con `execute`, leído del catálogo real, no del texto del archivo.
   - Rojo observado: `AssertionError: estado_previo_a_bloqueo no llegó por la
     cadena de migraciones` (`to_regprocedure(...) is None`) antes de crear
@@ -230,8 +230,8 @@ la historia:
     estado_nuevo = 'bloqueada'` a la búsqueda: devuelve el `estado_anterior`
     de la última vez que la tarea entró a `bloqueada`, no de cualquier evento
     posterior.
-  - `_resolver_bloqueo` en `src/prisma/herramientas.py` ahora lee
-    `task.estado` (columna que `prisma_app` sí puede leer) antes de emitir el
+  - `_resolver_bloqueo` en `src/leda/herramientas.py` ahora lee
+    `task.estado` (columna que `leda_app` sí puede leer) antes de emitir el
     evento de retorno, y sólo lo emite si la tarea sigue `bloqueada` en este
     momento. Si ya salió por otro camino, resolver el último bloqueo no la
     mueve — se devuelve `{"resuelto": True, "tarea_desbloqueada": False}` sin
@@ -259,7 +259,7 @@ la historia:
   una sesión acotada al espacio A y confirma que devuelve `null`. A diferencia
   de los otros dos defectos, esta prueba **pasó en verde ya en su primera
   corrida**, sin cambiar código de producción: la RLS forzada sobre
-  `task_state_event` y `prisma_owner nobypassrls` ya contenían el caso. No fue
+  `task_state_event` y `leda_owner nobypassrls` ya contenían el caso. No fue
   un defecto en sí — era un chequeo que faltaba para dejarlo demostrado en vez
   de asumido, que es exactamente lo que pedía el pedido de revisión. Se
   registra igual como evidencia honesta: no todo lo señalado por la revisión

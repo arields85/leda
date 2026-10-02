@@ -18,7 +18,7 @@
 -- `es_respuesta`, ya en esta tabla, para una distinción de despacho que no
 -- es una categoría de mensaje.
 begin;
-set search_path = prisma, public;
+set search_path = leda, public;
 
 -- Fail closed if an invoking text pipeline decoded the UTF-8 file incorrectly.
 -- chr() builds the expected value independently from non-ASCII source bytes.
@@ -32,19 +32,19 @@ do $$ begin
 end $$;
 
 do $$ begin
-  if to_regclass('prisma.greeting_state') is null then
+  if to_regclass('leda.greeting_state') is null then
     raise exception '0019 requires 0018_saludo_diario.sql';
   end if;
   if exists (
       select 1 from information_schema.columns
-       where table_schema = 'prisma' and table_name = 'message_outbox'
+       where table_schema = 'leda' and table_name = 'message_outbox'
          and column_name = 'es_bienvenida') then
     raise exception '0019 ya está aplicada.';
   end if;
 end $$;
 
 -- Una columna nueva con default no toca privilegios ni dueño de la tabla --
--- prisma_app ya tiene el juego completo sobre message_outbox (bucle genérico
+-- leda_app ya tiene el juego completo sobre message_outbox (bucle genérico
 -- de `db/esquema.sql`). Sin concesión que agregar.
 alter table message_outbox add column es_bienvenida boolean not null default false;
 

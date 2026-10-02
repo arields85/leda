@@ -310,7 +310,7 @@ def test_aclaracion_esperada_elegir_fuera_de_candidatas_es_invalido(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# toques / permite_pregunta_sin_opciones (T4, `prisma-orienta`, ADR 0007): una
+# toques / permite_pregunta_sin_opciones (T4, `leda-orienta`, ADR 0007): una
 # secuencia de botones genéricos a tocar en orden (lista de tareas -> menú ->
 # acción -> vista previa), y el opt-out explícito de
 # `comprobadores.comprobar_pregunta_con_opciones` para un escenario legado.

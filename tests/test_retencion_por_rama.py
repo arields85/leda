@@ -1,4 +1,4 @@
-"""Lo que Prisma inicia por su cuenta espera mientras la persona tiene una rama
+"""Lo que Leda inicia por su cuenta espera mientras la persona tiene una rama
 abierta (T9-R1d-2, ADR 0013 regla 1, enmienda "una sola rama de conversación
 abierta", decisión del usuario del 2026-09-29, opción A).
 
@@ -11,7 +11,7 @@ lo dirigido a esa persona en ese chat, nunca una respuesta, y se reporta:
 
 "Rama abierta" es la misma definición que usa la conversación
 (`pendientes.ver_rama_abierta`): el dato que se pidió por escrito (Modificar), la
-elección con botones que Prisma pidió y la vista previa del cambio que la persona
+elección con botones que Leda pidió y la vista previa del cambio que la persona
 pidió, más las preguntas del alta guiada. Se retiene sólo mientras la persona
 está activa (`despachador.VENTANA_DE_ACTIVIDAD`): la ventana y las preguntas del
 alta se prueban en `test_retencion_por_actividad.py`.
@@ -22,11 +22,11 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from prisma import pendientes as P
-from prisma.calendario import Calendario
-from prisma.db import admin, espacio
-from prisma.despachador import TransporteDePrueba, despachar
-from prisma.salida import enqueue_outbox
+from leda import pendientes as P
+from leda.calendario import Calendario
+from leda.db import admin, espacio
+from leda.despachador import TransporteDePrueba, despachar
+from leda.salida import enqueue_outbox
 
 from tests.test_menu_tarea import _quien
 
@@ -34,7 +34,7 @@ BA = ZoneInfo("America/Argentina/Buenos_Aires")
 AHORA = datetime(2026, 7, 27, 10, 0, tzinfo=BA)   # lunes, en horario
 PERSONA = "Marcos Tarquini"
 OTRA = "Nahuel Gimenez"
-AVISO = "Recordatorio de Prisma"
+AVISO = "Recordatorio de Leda"
 
 
 def _telegram_id(cur, nombre: str) -> int:
@@ -102,7 +102,7 @@ def _estados(conn, prefijo: str = "retencion:") -> dict[str, str]:
 
 
 def _preparar(conn, ws, abrir, **kw):
-    """La persona con una rama abierta y un aviso de Prisma esperando."""
+    """La persona con una rama abierta y un aviso de Leda esperando."""
     with espacio(conn, ws) as cur:
         quien = _quien(cur, PERSONA, ws)
         tg = _telegram_id(cur, PERSONA)
@@ -285,7 +285,7 @@ def test_una_respuesta_nunca_se_retiene(corework, conn):
 def test_lo_que_le_llega_para_decidir_no_es_una_rama_y_no_se_retiene_a_si_mismo(
         corework, conn):
     """El aviso de entrega (`SENTINEL_MENU_TAREA`, con botones) es un mensaje que
-    inicia Prisma: no cuenta como rama de quien lo recibe, así que no se retiene
+    inicia Leda: no cuenta como rama de quien lo recibe, así que no se retiene
     a sí mismo ni retiene a los demás."""
     ws = corework.workspace_id
     with espacio(conn, ws) as cur:

@@ -21,10 +21,10 @@ from datetime import datetime, timezone
 import pytest
 from psycopg.types.json import Jsonb
 
-from prisma import gateway
-from prisma import ingreso_tareas as I
-from prisma.db import admin, espacio
-from prisma.llm import RespectoPendiente, Respuesta, RouteEnvelope
+from leda import gateway
+from leda import ingreso_tareas as I
+from leda.db import admin, espacio
+from leda.llm import RespectoPendiente, Respuesta, RouteEnvelope
 
 from tests.toques import FUERA_DE_LA_VENTANA, envejecer_toques
 from tests.test_menu_tarea import (_quien, _tarea as _tarea_menu,  # noqa: F401

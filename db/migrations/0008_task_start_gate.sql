@@ -9,7 +9,7 @@
 -- check for the same rule) already existed; this adds the matching
 -- starting-time check.
 begin;
-set search_path = prisma, public;
+set search_path = leda, public;
 
 -- Fail closed if an invoking text pipeline decoded the UTF-8 file incorrectly.
 -- chr() builds the expected value independently from non-ASCII source bytes.
@@ -23,14 +23,14 @@ do $$ begin
 end $$;
 
 do $$ begin
-  if to_regprocedure('prisma.estado_previo_a_bloqueo(uuid)') is null then
+  if to_regprocedure('leda.estado_previo_a_bloqueo(uuid)') is null then
     raise exception '0008 requires 0007_blocker_resolution.sql';
   end if;
 end $$;
 
 -- No es security definer: corre con los privilegios de quien llama, igual
 -- que `motivo_no_cierra_tarea`. `task` y `dependency` ya tienen select
--- concedido a `prisma_app` desde el bucle de aislamiento del esquema base,
+-- concedido a `leda_app` desde el bucle de aislamiento del esquema base,
 -- así que no hace falta ninguna concesión nueva.
 --
 -- `cancelada` libera el freno igual que `terminada`, con el mismo criterio
@@ -82,7 +82,7 @@ end $$ language plpgsql;
 
 -- No es security definer: corre con los privilegios de quien inserta. Sólo
 -- necesita ejecutar `estado_previo_a_bloqueo` cuando la transición realmente
--- sale de `bloqueada`; `prisma_app` -- el único rol que hoy hace pasar una
+-- sale de `bloqueada`; `leda_app` -- el único rol que hoy hace pasar una
 -- tarea a `en_curso`, vía `resolver_bloqueo` o `actualizar_estado` -- ya
 -- tiene `execute` concedido sobre ella desde 0007.
 create or replace function exigir_dependencias_resueltas() returns trigger as $$

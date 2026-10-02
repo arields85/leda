@@ -2,7 +2,7 @@
 \set ON_ERROR_STOP on
 
 -- Applied after 0013_aprobacion_no_sobrevive_a_pedir_cambios.sql. Seguimiento
--- de review-c112506a (`odd/tasks/prisma-orienta.md` T6b): al volver a
+-- de review-c112506a (`odd/tasks/leda-orienta.md` T6b): al volver a
 -- entregar después de "Pedir cambios" (`herramientas._pedir_cambios_tarea`,
 -- inserta un `approval` 'rechazado' y devuelve la tarea a `en_curso`),
 -- `evidencia_pendiente(p_task)` seguía devolviendo `false` porque la
@@ -19,7 +19,7 @@
 -- evidencia con `at` posterior al último `approval` 'rechazado' de la
 -- tarea); la forma de salida no cambia.
 begin;
-set search_path = prisma, public;
+set search_path = leda, public;
 
 -- Fail closed if an invoking text pipeline decoded the UTF-8 file incorrectly.
 -- chr() builds the expected value independently from non-ASCII source bytes.
@@ -33,12 +33,12 @@ do $$ begin
 end $$;
 
 do $$ begin
-  if to_regprocedure('prisma.motivo_no_cierra_tarea(uuid)') is null
-     or pg_get_functiondef('prisma.motivo_no_cierra_tarea(uuid)'::regprocedure)
+  if to_regprocedure('leda.motivo_no_cierra_tarea(uuid)') is null
+     or pg_get_functiondef('leda.motivo_no_cierra_tarea(uuid)'::regprocedure)
         not like '%r.decision = ''rechazado''%' then
     raise exception '0014 requires 0013_aprobacion_no_sobrevive_a_pedir_cambios.sql';
   end if;
-  if pg_get_functiondef('prisma.evidencia_pendiente(uuid)'::regprocedure)
+  if pg_get_functiondef('leda.evidencia_pendiente(uuid)'::regprocedure)
      like '%decision = ''rechazado''%' then
     raise exception '0014 ya está aplicada.';
   end if;
@@ -46,7 +46,7 @@ end $$;
 
 -- No es security definer: corre con los privilegios de quien llama, igual
 -- que antes de esta migración -- `evidence` y `approval` ya tienen `select`
--- concedido a `prisma_app` desde el esquema base, así que no hace falta
+-- concedido a `leda_app` desde el esquema base, así que no hace falta
 -- ninguna concesión nueva.
 create or replace function evidencia_pendiente(p_task uuid)
 returns boolean as $$

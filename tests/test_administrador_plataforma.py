@@ -3,7 +3,7 @@
 Hasta esta unidad, nadie podía llegar a ser "alcanzable"
 (`db/esquema.sql`, `avisar_incidente_admin`) en desarrollo local: ningún
 comando otorgaba `platform_role`, sólo lo insertaban las pruebas a mano.
-`python -m prisma administrador <slug> <nombre>` resuelve a la persona por
+`python -m leda administrador <slug> <nombre>` resuelve a la persona por
 nombre entre los integrantes del espacio -- mismo punto de partida que
 `enlaces --solo` (emparejar por subcadena, `cli._resolver_integrante`), pero
 además prefiere una coincidencia exacta sobre cualquier coincidencia
@@ -20,8 +20,8 @@ que los avisos no le van a llegar todavía.
 
 from __future__ import annotations
 
-import prisma.cli as cli
-from prisma.db import admin
+import leda.cli as cli
+from leda.db import admin
 
 
 def test_cli_administrador_otorga_y_audita_con_coincidencia_unica(

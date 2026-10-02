@@ -2,7 +2,7 @@ id: b-0025-e
 variante_de: b-0025
 objetivo: >
   Variante de b-0025, la fecha objetivo: con la vista previa esperando, la
-  persona toca Modificar, elige la fecha objetivo (Prisma se la muestra como la
+  persona toca Modificar, elige la fecha objetivo (Leda se la muestra como la
   lee una persona, DD/MM/AAAA, para copiarla) y manda la fecha corregida. Cambia
   sólo la fecha: la vista previa vuelve con la fecha nueva en el mismo formato y
   lo demás como estaba. La tarea no se crea.

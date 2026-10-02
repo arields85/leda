@@ -1,5 +1,5 @@
 [project]
-name = "prisma"
+name = "leda"
 version = "0.1.0"
 description = "Project manager digital multi-equipo"
 requires-python = ">=3.11"
@@ -17,7 +17,7 @@ dependencies = [
 
 [project.optional-dependencies]
 # pgserver no publica ruedas para Windows. Ahí las pruebas usan un servidor
-# propio vía PRISMA_TEST_DB_URL; ver tests/conftest.py.
+# propio vía LEDA_TEST_DB_URL; ver tests/conftest.py.
 dev = ["pytest>=8.0", "pgserver>=0.1; sys_platform != 'win32'"]
 
 [build-system]

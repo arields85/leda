@@ -1,4 +1,4 @@
-"""Siembra reproducible de datos ficticios (T7, `odd/tasks/prisma-orienta.md`).
+"""Siembra reproducible de datos ficticios (T7, `odd/tasks/leda-orienta.md`).
 
 Carga un archivo de semilla versionado (por ejemplo
 `espacios/corework.semilla-ficticia.yaml`) en un espacio recién importado y
@@ -7,19 +7,19 @@ lo que dejó las 12 tareas ficticias de las sesiones 1 y 2 con el título
 terminado en " (simulado)", un campo de compromiso que después no se pudo
 renombrar (`bloquear_estado_directo`, `db/esquema.sql`).
 
-Corre bajo `admin(conn)`, igual que `importador.importar`: `prisma_admin`
+Corre bajo `admin(conn)`, igual que `importador.importar`: `leda_admin`
 tiene `bypassrls` y `grant all` sobre `task`/`task_state_event`/`dependency`,
 así que puede escribir directo sin pasar por `confirmar_borrador_tarea` --
 esa función es la ruta de compromiso para un borrador real que llegó por
 Telegram (revalida la vista previa, resuelve la identidad autenticada por el
-webhook, corre con `prisma_gateway` sobre una conexión de autoridad separada)
+webhook, corre con `leda_gateway` sobre una conexión de autoridad separada)
 y no tiene sentido para cargar un lote de fixtures administrativos; el
 importador del pack ya crea `objective`/`objective_state_event` del mismo
 modo, directo, bajo `admin(conn)`.
 
 Ninguna escritura salta los disparadores: el estado de una tarea sigue sin
 poder fijarse directo (`bloquear_estado_directo` lo rechaza incluso para
-`prisma_admin`, que no es dueño de esa regla) y se alcanza insertando
+`leda_admin`, que no es dueño de esa regla) y se alcanza insertando
 `task_state_event`, como el resto del producto. El orden importa para que
 ningún disparador tenga que saltearse:
 
@@ -47,7 +47,7 @@ al confirmar. La siembra no pasa por ningún borrador, así que lee la misma
 fila (`task_evidence_policy` de esa área, en este mismo espacio) al momento de
 sembrar y la fija en el `insert` -- nunca queda en `null` como quedaron las 12
 tareas cargadas a mano en las sesiones 1 y 2 (el hallazgo lateral del
-Experimento 1 de invariantes, `odd/tasks/prisma-orienta.md`, que no es cómo el
+Experimento 1 de invariantes, `odd/tasks/leda-orienta.md`, que no es cómo el
 producto crea una tarea real).
 
 Cada siembra exitosa se audita con una sola fila en `audit_log`
@@ -59,7 +59,7 @@ nombres de personas. Una siembra rechazada (guardas de arriba) no escribe
 nada, tampoco esa fila: no hubo ningún efecto que auditar.
 
 Seguimientos de la revisión review-943484ef642de774 (T7b,
-`odd/tasks/prisma-orienta.md`): `sembrar` valida toda la semilla contra el
+`odd/tasks/leda-orienta.md`): `sembrar` valida toda la semilla contra el
 espacio -- archivo legible y YAML válido, claves requeridas de cada tarea,
 títulos repetidos, referencias de `dependencias` a títulos que no están en
 la misma semilla, y un `estado_inicial` dentro de `asignada`/`en_curso`
@@ -127,7 +127,7 @@ class _TareaPreparada:
 # forma de resolver área, objetivo ni responsable contra el espacio.
 CLAVES_TAREA_REQUERIDAS = ("titulo", "area", "objetivo", "responsable")
 
-# T7b (`odd/tasks/prisma-orienta.md`): el único allow-list posible para
+# T7b (`odd/tasks/leda-orienta.md`): el único allow-list posible para
 # `estado_inicial` de una siembra -- "nada preaprobado, nada en revisión"
 # (ADR 0009) queda en código, no sólo en la semilla. Ni `pendiente_aprobacion`
 # ni `en_revision`, tampoco `terminada`, `bloqueada`, `cancelada` o
@@ -160,7 +160,7 @@ def sembrar(
     cálculo de abajo. Sin él, el día sale de `ahora` (aware; por defecto el
     instante real, `datetime.now(timezone.utc)`) convertido a la zona
     horaria del espacio -- nunca la fecha local del host que corre el
-    comando (T7b, `odd/tasks/prisma-orienta.md`). `ahora` es el instante
+    comando (T7b, `odd/tasks/leda-orienta.md`). `ahora` es el instante
     inyectable que hace ESE cálculo comprobable (T7c, seguimiento a
     review-05906dd3): antes no había forma de fijarlo, así que un defecto
     ahí (usar UTC o la zona del host en vez de la del espacio) sólo se
@@ -287,7 +287,7 @@ def sembrar(
 
 def _cargar_semilla(ruta: Path) -> dict[str, Any]:
     """Lee y parsea el YAML de la semilla, sin dejar pasar una traza cruda
-    (T7b, `odd/tasks/prisma-orienta.md`): archivo faltante o YAML roto o
+    (T7b, `odd/tasks/leda-orienta.md`): archivo faltante o YAML roto o
     vacío terminan en `SiembraInvalida`, nunca en una excepción de
     `pathlib`/`yaml` sin traducir."""
     try:
@@ -356,7 +356,7 @@ def _objetivo_id(cur: psycopg.Cursor, ws: str, titulo: str) -> str:
     el mismo título en el mismo espacio. Buscar por título y quedarse con
     `fetchone()` sería arbitrario -- el orden sin `order by` no está
     garantizado -- así que una siembra que lo haga rechaza en vez de adivinar
-    cuál de los dos es (T7b, `odd/tasks/prisma-orienta.md`)."""
+    cuál de los dos es (T7b, `odd/tasks/leda-orienta.md`)."""
     cur.execute(
         "select id from objective where workspace_id = %s and titulo = %s", (ws, titulo))
     filas = cur.fetchall()

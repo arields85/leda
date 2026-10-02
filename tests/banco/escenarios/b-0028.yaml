@@ -1,7 +1,7 @@
 id: b-0028
 objetivo: >
   Tocar dos veces Confirmar (ADR 0013 regla 4, T9-R4): la persona pide poner una
-  tarea en curso, Prisma muestra la vista previa y ella toca Confirmar dos veces
+  tarea en curso, Leda muestra la vista previa y ella toca Confirmar dos veces
   seguidas (a los 3 segundos). El segundo toque de la misma persona sobre el mismo
   botón, dentro de los 10 segundos, se absorbe: el cambio se aplica una sola vez
   (un solo evento de estado), hay una sola respuesta visible y nunca sale "ya no

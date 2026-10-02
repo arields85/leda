@@ -1,10 +1,10 @@
 """El turno del agente.
 
-Un mensaje entra, Prisma piensa, y la respuesta sale por la cola. Nunca
+Un mensaje entra, Leda piensa, y la respuesta sale por la cola. Nunca
 directo a Telegram: eso mantiene la idempotencia, la confirmación humana y la
 auditoría en un solo lugar.
 
-El bucle es corto porque el trabajo de Prisma es acotado. Entiende el mensaje,
+El bucle es corto porque el trabajo de Leda es acotado. Entiende el mensaje,
 llama a herramientas validadas, y contesta. No navega, no programa, no decide
 sola.
 
@@ -103,7 +103,7 @@ def responder(cur: psycopg.Cursor, quien: Solicitante, texto_entrante: str,
     de la instrucción en el sistema, al cerrar el turno con una respuesta
     visible se comprueba que esa respuesta nombre por su título exacto cada
     una de estas tareas -- si no la nombra, se antepone una línea neutra con
-    el título, para que la persona note si Prisma entendió otra tarea.
+    el título, para que la persona note si Leda entendió otra tarea.
 
     Revisión del orquestador sobre la primera versión de esta unidad: la
     condición original exigía además que `consultar_tareas` hubiera devuelto
@@ -558,7 +558,7 @@ def _resultado_rechazado(cur, quien: Solicitante, c: Llamada, ctx,
     registrar_auditoria(
         cur, accion=f"herramienta_rechazada:{c.nombre}",
         workspace_id=quien.workspace_id, actor_app_user_id=quien.app_user_id,
-        actor_kind="prisma",
+        actor_kind="leda",
         detalle={"args": c.args, "rechazo": {"error": rechazo}},
         pack_hash=ctx.pack_hash, nucleo_hash=ctx.nucleo_hash)
     return {"type": "tool_result", "tool_use_id": c.id,
@@ -608,7 +608,7 @@ def _nombrar_tareas_sin_mencionar(
     prompt no es garantía. Acá se comprueba de verdad: por cada tarea que
     este turno resolvió CLARA (`tareas_resueltas_claras`, id → título, T3/T4),
     si su título exacto no aparece en la respuesta visible, se antepone una
-    línea neutra que lo nombra -- así la persona nota si Prisma entendió otra
+    línea neutra que lo nombra -- así la persona nota si Leda entendió otra
     tarea. No importa qué herramienta corrió, ni si corrió alguna: una
     respuesta armada con otro contexto (p. ej. "tareas abiertas" de
     `contexto.construir`) protege igual. No toca el resto del texto del
@@ -819,7 +819,7 @@ def _ejecutar_una(cur, quien: Solicitante, c: Llamada, ctx, acciones,
     """Ejecuta una herramienta y devuelve el bloque de resultado para el modelo.
 
     Los rechazos no son excepciones que cortan el turno: son información que
-    Prisma tiene que saber transmitir.
+    Leda tiene que saber transmitir.
     """
     def bloque(contenido, error=False):
         return {"type": "tool_result", "tool_use_id": c.id,
@@ -903,7 +903,7 @@ def _ejecutar_una(cur, quien: Solicitante, c: Llamada, ctx, acciones,
         registrar_auditoria(
             cur, accion=f"herramienta_rechazada:{c.nombre}",
             workspace_id=quien.workspace_id,
-            actor_app_user_id=quien.app_user_id, actor_kind="prisma",
+            actor_app_user_id=quien.app_user_id, actor_kind="leda",
             detalle={"args": c.args, "rechazo": resultado},
             pack_hash=ctx.pack_hash, nucleo_hash=ctx.nucleo_hash)
         if (evidencia_faltante is not None and c.nombre == "actualizar_estado"
@@ -940,7 +940,7 @@ def _ejecutar_una(cur, quien: Solicitante, c: Llamada, ctx, acciones,
     acciones.append(c.nombre)
     registrar_auditoria(
         cur, accion=f"herramienta:{c.nombre}", workspace_id=quien.workspace_id,
-        actor_app_user_id=quien.app_user_id, actor_kind="prisma",
+        actor_app_user_id=quien.app_user_id, actor_kind="leda",
         detalle={"args": c.args}, pack_hash=ctx.pack_hash,
         nucleo_hash=ctx.nucleo_hash)
     return bloque(resultado)
@@ -992,7 +992,7 @@ def _encolar_confirmacion(cur, quien: Solicitante, chat_id: int,
 
 def _encolar_eleccion(cur, quien: Solicitante, chat_id: int,
                       e: H.NecesitaElegir, ahora: datetime) -> None:
-    """Prisma pregunta con opciones y la acción espera la elección.
+    """Leda pregunta con opciones y la acción espera la elección.
 
     La pregunta sale con botones porque lo que vuelve tiene que ser un
     identificador. Si la persona contestara escribiendo, habría que resolver
@@ -1242,7 +1242,7 @@ def _encolar_respuesta_con_tareas(cur, quien: Solicitante, chat_id: int,
 
 
 # T4b (ADR 0007, corrida real b-0007 del 2026-09-26): el cierre genérico
-# cuando Prisma necesita algo de la persona pero termina el turno
+# cuando Leda necesita algo de la persona pero termina el turno
 # preguntando en texto abierto, sin ningún botón propio. Mismas etiquetas que
 # ya usa "Es una tarea nueva" de la aclaración con botones (T4,
 # `aclaracion-con-botones`) para la primera -- coincide a propósito, aunque
@@ -1271,13 +1271,13 @@ def _encolar_opciones_genericas(cur, quien: Solicitante, chat_id: int,
                                 lleva_su_saludo: bool = False,
                                 es_saludo: bool = False) -> None:
     """Decisión del usuario (2026-09-26, evidencia
-    `tests/banco/reportes/replay-candidato-b-0007-*.json`): cuando Prisma
+    `tests/banco/reportes/replay-candidato-b-0007-*.json`): cuando Leda
     necesita algo de la persona pero no tiene opciones concretas para
     ofrecer, el modelo debería llamar a `ofrecer_opciones` igual (regla
     reforzada en `contexto.PREAMBULO`) -- esto es la red de seguridad del
     servidor para cuando, aun así, el turno cierra preguntando en texto
     abierto: agrega un juego FIJO de tres botones en vez de dejar pasar la
-    pregunta sin opciones (ADR 0007, "Prisma orienta, no charla", sin
+    pregunta sin opciones (ADR 0007, "Leda orienta, no charla", sin
     excepción). Reusa el mecanismo de T1
     (`pendientes.SENTINEL_OPCIONES_MODELO`): las tres opciones se resuelven
     en `gateway._resolver_toque_opcion_modelo` por su `tipo`

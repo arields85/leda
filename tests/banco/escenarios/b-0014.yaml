@@ -1,6 +1,6 @@
 id: b-0014
 objetivo: >
-  Observar si Prisma pregunta en vez de inventar cuando la persona nombra
+  Observar si Leda pregunta en vez de inventar cuando la persona nombra
   una tarea parecida a las que existen pero de otra máquina, que no está en
   el equipo, sin aplicar ningún cambio (Jev tiene que resolver esto como
   'ninguna', no como una candidata de las que sí existen).

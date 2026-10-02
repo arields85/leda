@@ -13,10 +13,10 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-from prisma import herramientas as H
-from prisma import pendientes as P
-from prisma.db import admin, espacio
-from prisma.salida import enqueue_outbox
+from leda import herramientas as H
+from leda import pendientes as P
+from leda.db import admin, espacio
+from leda.salida import enqueue_outbox
 
 from tests.test_ramas_cerradas_al_terminar_el_flujo import (  # noqa: F401
     _activa, _enviados_a, _pasada, _quien, reloj)
@@ -96,7 +96,7 @@ def test_un_aviso_de_coordinacion_no_consume_la_cuota_de_los_seguimientos(
 
 
 def test_la_retencion_por_rama_abierta_alcanza_a_los_dos_tipos(corework, conn, reloj):
-    """T9-R1d-2: mientras la persona está activa en una rama abierta, lo que Prisma
+    """T9-R1d-2: mientras la persona está activa en una rama abierta, lo que Leda
     le inicia espera, sea seguimiento o aviso de coordinación."""
     ws = corework.workspace_id
     nahuel, tg = _nahuel(conn, ws)

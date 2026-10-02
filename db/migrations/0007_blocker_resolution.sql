@@ -5,13 +5,13 @@
 -- `resolver_bloqueo` needs: what state a task had right before it last
 -- entered `bloqueada`.
 --
--- `task_state_event` is append-only and `prisma_app` has no `select` on it
+-- `task_state_event` is append-only and `leda_app` has no `select` on it
 -- (see 0003/the base schema, "los eventos de estado son append-only y
--- prisma_app no los lee"). Without this function, closing the last open
+-- leda_app no los lee"). Without this function, closing the last open
 -- blocker of a task has no way to know which state to return it to without
 -- guessing `asignada`, which mecánica §3 explicitly forbids.
 begin;
-set search_path = prisma, public;
+set search_path = leda, public;
 
 -- Fail closed if an invoking text pipeline decoded the UTF-8 file incorrectly.
 -- chr() builds the expected value independently from non-ASCII source bytes.
@@ -25,7 +25,7 @@ do $$ begin
 end $$;
 
 do $$ begin
-  if not exists (select 1 from pg_roles where rolname = 'prisma_owner') then
+  if not exists (select 1 from pg_roles where rolname = 'leda_owner') then
     raise exception '0007 requires 0004_function_ownership.sql';
   end if;
 end $$;
@@ -40,7 +40,7 @@ end $$;
 -- que la tarea esté bloqueada *ahora* antes de usar este valor.
 create or replace function estado_previo_a_bloqueo(p_task uuid)
 returns estado_tarea
-language plpgsql security definer set search_path = prisma, public, pg_temp as $$
+language plpgsql security definer set search_path = leda, public, pg_temp as $$
 declare previo estado_tarea;
 begin
   select estado_anterior into previo
@@ -52,9 +52,9 @@ begin
 end $$;
 
 alter function estado_previo_a_bloqueo(uuid)
-  owner to prisma_owner;
+  owner to leda_owner;
 
 revoke execute on function estado_previo_a_bloqueo(uuid) from public;
-grant execute on function estado_previo_a_bloqueo(uuid) to prisma_app;
+grant execute on function estado_previo_a_bloqueo(uuid) to leda_app;
 
 commit;

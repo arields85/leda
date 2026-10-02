@@ -9,8 +9,8 @@ from __future__ import annotations
 
 import json
 
-from prisma.db import admin
-from prisma.llm import IntentAction, IntentRoute, ProveedorGuionado, Respuesta
+from leda.db import admin
+from leda.llm import IntentAction, IntentRoute, ProveedorGuionado, Respuesta
 
 from tests.banco.comprobadores import (
     Evidencia,
@@ -105,7 +105,7 @@ def test_replay_reproduce_el_resultado_esperado(archivo_replay, corework, conn):
             incidentes=resultado.incidentes_de_respuesta,
             respuestas_por_toque=resultado.respuestas_por_toque),
     ]
-    # ADR 0007 ("Prisma orienta, no charla"), T4: mismo criterio que
+    # ADR 0007 ("Leda orienta, no charla"), T4: mismo criterio que
     # `test_banco.py` -- activa por defecto, opt-out explícito por escenario
     # (`comprobaciones_pregunta_con_opciones`, una sola implementación de la
     # puerta para los dos llamadores reales).
@@ -145,11 +145,11 @@ def _corrida_pregunta_en_texto_abierto(conn, ws: str, escenario_id: str):
     """Un guión que hace que el modelo cierre el turno preguntando en texto
     abierto, sin llamar a `ofrecer_opciones` ni a ninguna otra herramienta.
 
-    Hasta T4b (`prisma-orienta`), este era el caso que
+    Hasta T4b (`leda-orienta`), este era el caso que
     `comprobar_pregunta_con_opciones` marcaba `falla` cuando la puerta está
     activa -- nada del lado del servidor evitaba que esa pregunta abierta
     llegara tal cual. Desde T4b, `agente.responder` agrega un cierre
-    genérico de botones cada vez que el turno termina así (ADR 0007, "Prisma
+    genérico de botones cada vez que el turno termina así (ADR 0007, "Leda
     orienta, no charla", sin excepción), así que esta misma corrida ya
     ofrece opciones -- ver `test_pregunta_con_opciones_activa_ahora_aprueba_
     porque_el_servidor_ya_cierra_con_botones`, más abajo."""
@@ -181,7 +181,7 @@ def test_permite_pregunta_sin_opciones_deja_pasar_una_pregunta_en_texto_abierto(
 
 def test_pregunta_con_opciones_activa_ahora_aprueba_porque_el_servidor_ya_cierra_con_botones(
         corework, conn):
-    """Regresión detectada al implementar T4b (`prisma-orienta`): antes de
+    """Regresión detectada al implementar T4b (`leda-orienta`): antes de
     esa unidad, esta misma corrida (una pregunta en texto abierto, sin
     `ofrecer_opciones`) daba `falla` con la puerta activa -- era el caso que
     `comprobar_pregunta_con_opciones` existía para atrapar. Desde T4b,

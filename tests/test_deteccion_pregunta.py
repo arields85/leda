@@ -1,6 +1,6 @@
-"""Detección de pregunta compartida (T4b, `prisma-orienta`).
+"""Detección de pregunta compartida (T4b, `leda-orienta`).
 
-`prisma.deteccion_pregunta` es la única implementación de "esto le pregunta
+`leda.deteccion_pregunta` es la única implementación de "esto le pregunta
 algo a la persona": antes de esta unidad vivía sólo en
 `tests/banco/comprobadores.py` (T7); ahora el servidor
 (`agente.responder`) la necesita también para el cierre genérico de una
@@ -11,7 +11,7 @@ mover el código, tiene que fallar acá primero.
 
 from __future__ import annotations
 
-from prisma.deteccion_pregunta import hace_pregunta, pide_elegir_en_imperativo
+from leda.deteccion_pregunta import hace_pregunta, pide_elegir_en_imperativo
 
 
 def test_signo_de_pregunta_alcanza():
@@ -52,7 +52,7 @@ def test_negacion_no_es_relevante_para_esta_deteccion():
 # ---------------------------------------------------------------------------
 
 def test_signo_de_pregunta_dentro_de_una_url_no_cuenta():
-    # Un "?" de query string no es Prisma preguntando algo.
+    # Un "?" de query string no es Leda preguntando algo.
     assert not hace_pregunta(
         "Mirá el detalle acá: https://ejemplo.com/tarea?id=5&modo=ver")
     assert not hace_pregunta("Lo subí a www.ejemplo.com/reporte?mes=9")

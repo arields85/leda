@@ -7,17 +7,17 @@ Hay dos formas de conseguir ese PostgreSQL:
 
 - Por defecto, `pgserver` levanta un servidor descartable dentro de un
   directorio temporal. No hay wheels para Windows.
-- Si `PRISMA_TEST_DB_URL` está definida, se usa ese servidor: la sesión crea
+- Si `LEDA_TEST_DB_URL` está definida, se usa ese servidor: la sesión crea
   una base con nombre irrepetible, la usa y la borra al terminar. Es una base
   aparte a propósito — las pruebas truncan todo entre casos, y apuntar esto a
   una base con datos reales los perdería.
 
 La variable se puede dejar en `.env.test`, que no se versiona:
 
-    PRISMA_TEST_DB_URL=postgresql://postgres:CONTRASENA@localhost:5432/postgres
+    LEDA_TEST_DB_URL=postgresql://postgres:CONTRASENA@localhost:5432/postgres
 
 Tiene que ser un usuario con permiso para CREATE DATABASE y CREATE ROLE — el
-esquema crea `prisma_app` y `prisma_admin`, que son del cluster — y apuntar a
+esquema crea `leda_app` y `leda_admin`, que son del cluster — y apuntar a
 la base de mantenimiento, no a la de la aplicación.
 """
 
@@ -31,12 +31,12 @@ from collections.abc import Iterator
 
 import pytest
 
-from prisma.config import _cargar_dotenv
+from leda.config import _cargar_dotenv
 
 RAIZ = pathlib.Path(__file__).resolve().parents[1]
 ESQUEMA = RAIZ / "db" / "esquema.sql"
 
-if os.environ.get("PRISMA_TEST_LOAD_DOTENV", "1") != "0":
+if os.environ.get("LEDA_TEST_LOAD_DOTENV", "1") != "0":
     _cargar_dotenv(RAIZ / ".env.test")
 
 
@@ -80,7 +80,7 @@ def _con_base_efimera(mantenimiento: str) -> Iterator[str]:
     from psycopg.conninfo import conninfo_to_dict, make_conninfo
     from psycopg.sql import SQL, Identifier, Literal
 
-    nombre = f"prisma_test_{uuid.uuid4().hex[:12]}"
+    nombre = f"leda_test_{uuid.uuid4().hex[:12]}"
 
     with psycopg.connect(mantenimiento, autocommit=True) as conn:
         conn.execute(SQL("create database {}").format(Identifier(nombre)))
@@ -108,7 +108,7 @@ def _servidor_efimero(datos: pathlib.Path) -> str:
 
 @pytest.fixture(scope="session")
 def uri(tmp_path_factory) -> Iterator[str]:
-    mantenimiento = os.environ.get("PRISMA_TEST_DB_URL")
+    mantenimiento = os.environ.get("LEDA_TEST_DB_URL")
     if mantenimiento:
         yield from _con_base_efimera(mantenimiento)
         return
@@ -118,7 +118,7 @@ def uri(tmp_path_factory) -> Iterator[str]:
     except ImportError:
         pytest.skip(
             "Hace falta un PostgreSQL para las pruebas: instalá el extra dev "
-            "(trae pgserver, que no corre en Windows) o poné PRISMA_TEST_DB_URL "
+            "(trae pgserver, que no corre en Windows) o poné LEDA_TEST_DB_URL "
             "en .env.test apuntando a un servidor propio.",
             allow_module_level=True)
 
@@ -156,7 +156,7 @@ def _sin_despacho_inmediato_por_defecto(monkeypatch):
     y/o `gateway.conectar` de nuevo, con su propio doble o con una conexión
     real a la base efímera (`uri`) -- corren después de esta fixture
     (autouse), así que ganan."""
-    from prisma import gateway
+    from leda import gateway
 
     def _sin_transporte(slug, token):
         raise LookupError("despacho inmediato deshabilitado en esta prueba")
@@ -172,7 +172,7 @@ def _sin_despacho_inmediato_por_defecto(monkeypatch):
 def _sin_fallidos_de_huerfanos_de_otra_prueba():
     """`huerfanos._FALLIDOS` (la deduplicación en memoria del reporte de un aviso
     fallido) vive por proceso: una prueba no hereda las marcas de otra (T9-H19h)."""
-    from prisma import huerfanos
+    from leda import huerfanos
 
     huerfanos._FALLIDOS.clear()
     yield
@@ -181,12 +181,12 @@ def _sin_fallidos_de_huerfanos_de_otra_prueba():
 
 @pytest.fixture
 def conn(uri):
-    from prisma.db import conectar
+    from leda.db import conectar
 
     c = conectar(uri)
     yield c
     with c.cursor() as cur:
-        cur.execute("set role prisma_admin")
+        cur.execute("set role leda_admin")
         cur.execute("""
             truncate task_intake_free_text_slot, task_intake_field,
                      task_intake_choice, task_intake_choice_set,
@@ -212,13 +212,13 @@ def authority_uri(uri) -> Iterator[str]:
     from psycopg.conninfo import conninfo_to_dict, make_conninfo
     from psycopg.sql import SQL, Identifier, Literal
 
-    role = f"prisma_gateway_test_{uuid.uuid4().hex[:12]}"
+    role = f"leda_gateway_test_{uuid.uuid4().hex[:12]}"
     password = secrets.token_urlsafe(32)
     with psycopg.connect(uri, autocommit=True) as c:
         c.execute(SQL("create role {} login noinherit password {}").format(
             Identifier(role), Literal(password)))
         c.execute(
-            SQL("grant prisma_gateway to {}").format(Identifier(role)))
+            SQL("grant leda_gateway to {}").format(Identifier(role)))
 
     authority_url = make_conninfo(
         **{**conninfo_to_dict(uri), "user": role, "password": password})
@@ -232,7 +232,7 @@ def authority_uri(uri) -> Iterator[str]:
 
 @pytest.fixture
 def authority_conn(authority_uri):
-    from prisma.db import conectar_autoridad
+    from leda.db import conectar_autoridad
 
     c = conectar_autoridad(authority_uri)
     yield c
@@ -243,11 +243,11 @@ def authority_conn(authority_uri):
 def corework(conn, tmp_path):
     """CoreWork importado y activo, con los pendientes completados."""
     import yaml
-    from prisma.importador import importar
+    from leda.importador import importar
 
     import os
 
-    os.environ["PRISMA_BOT_TOKEN_COREWORK"] = "prueba:token"
+    os.environ["LEDA_BOT_TOKEN_COREWORK"] = "prueba:token"
 
     pack = yaml.safe_load((RAIZ / "espacios" / "corework.yaml").read_text("utf-8"))
     pack["telegram"]["grupo_gestion_id"] = -1001
@@ -258,7 +258,7 @@ def corework(conn, tmp_path):
     tmp = tmp_path / "corework.yaml"
     tmp.write_text(yaml.safe_dump(pack, allow_unicode=True), "utf-8")
     r = importar(conn, tmp, activar=True)
-    from prisma.db import admin
+    from leda.db import admin
 
     with admin(conn) as cur:
         _blindar_contra_saludo(cur, r.workspace_id)
@@ -273,7 +273,7 @@ def intake_world(conn):
     Vive acá y no en un archivo de pruebas porque la usan varios: mover
     una fixture compartida a conftest es cómo pytest la resuelve sola.
     """
-    from prisma.db import admin
+    from leda.db import admin
 
     workspaces: dict[str, dict] = {}
     with admin(conn) as cur:

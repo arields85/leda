@@ -3,7 +3,7 @@ variante_de: b-0023
 objetivo: >
   Variante de b-0023, confirmar escribiendo: con la vista previa de un bloqueo
   esperando su Confirmar, la persona escribe "sí, dale". Un mensaje no aplica el
-  cambio (AGENTS.md: sólo el botón Confirmar): Prisma lo dice, vuelve a mostrar
+  cambio (AGENTS.md: sólo el botón Confirmar): Leda lo dice, vuelve a mostrar
   la vista previa con sus botones y no se aplica nada antes del Confirmar que
   toca el corredor al final.
 actor: Nahuel Gimenez

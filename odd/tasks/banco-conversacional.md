@@ -7,7 +7,7 @@
 
 ## Objetivo
 
-Medir cómo se comporta Prisma con un modelo de lenguaje real, no guionado:
+Medir cómo se comporta Leda con un modelo de lenguaje real, no guionado:
 escenarios ficticios fijos, corridos N veces cada uno, con comprobaciones de
 propiedad sobre lo que el modelo hizo y dijo. Cada falla se conserva y se vuelve
 una regresión determinista con `ProveedorGuionado`.
@@ -27,7 +27,7 @@ pruebas opcionales (`pyproject.toml` no define `markers`).
   real de Telegram, con el proveedor real inyectado en lugar de
   `llm.desde_base`. No `agente.responder`: se saltearía `route_intent` y el alta
   guiada de tareas (`ingreso_tareas`), que entra por ahí.
-- **Base:** la descartable de las pruebas (`PRISMA_TEST_DB_URL`, fixture `uri`),
+- **Base:** la descartable de las pruebas (`LEDA_TEST_DB_URL`, fixture `uri`),
   con el fixture `corework`. Nunca la base de la aplicación.
 - **Comprobaciones por corrida:**
   1. *Herramienta correcta:* herramientas esperadas y prohibidas por escenario,
@@ -52,7 +52,7 @@ escenario y primer lote (6-8), reporte, replay, primera corrida real con NaN
 (`deepseek-v4-flash`), continuidad.
 
 **Excluido:** corpus holdout (custodia del usuario, fuera del repo), validación
-manual E, corregir comportamiento de Prisma que el banco revele (cada falla
+manual E, corregir comportamiento de Leda que el banco revele (cada falla
 real se registra y se trata como unidad propia salvo que sea trivial), juez LLM.
 
 ## Tareas
@@ -121,7 +121,7 @@ Commits sobre `master` por unidad, sólo con pedido explícito del usuario
   100% aprobado, latencia ~15.9s; reporte JSON en
   `tests/banco/reportes/banco-20260923T163341Z.json` (no versionado). No se
   corrió el lote completo: queda para T5 (orquestador). Ningún indicio de
-  defecto real de Prisma en esta única corrida de humo.
+  defecto real de Leda en esta única corrida de humo.
   Decisiones de diseño no resueltas por el documento (registradas acá por no
   estar explícitas): (1) el banco desactiva `gateway.mantener_chat_activo`
   durante la corrida (igual que `tests/test_gateway.py`, fixture `cliente`)
@@ -187,10 +187,10 @@ Commits sobre `master` por unidad, sólo con pedido explícito del usuario
      devuelve el `estado_anterior` del último evento a `bloqueada`, así que
      una tarea sembrada en `asignada` vuelve a `asignada` al resolver su
      único bloqueo, no a `en_curso`. `task_draft` en el alta guiada
-     verificado contra `src/prisma/ingreso_tareas.py:190-194` (`start`
+     verificado contra `src/leda/ingreso_tareas.py:190-194` (`start`
      inserta exactamente una fila cuando no hay un pedido activo).
   4. **b-0001 y b-0007 exigían herramientas que el modelo no necesita.**
-     `src/prisma/contexto.py:96-212` ya pone el roster completo y las tareas
+     `src/leda/contexto.py:96-212` ya pone el roster completo y las tareas
      propias del actor en el contexto del turno, así que responder desde
      contexto es comportamiento correcto; exigir `consultar_tareas` o
      `consultar_personas` era una expectativa inventada. Se sacaron de
@@ -261,7 +261,7 @@ Commits sobre `master` por unidad, sólo con pedido explícito del usuario
     Rojo observado de las dos (`test_registre_respaldado_por_resolver_el_bloqueo_aprueba`
     y `test_nombre_con_mayuscula_interna_no_se_corta_en_un_candidato`, falla
     real de aserción), luego verde: `tests/banco` 84 passed.
-  - b-0005, 10/10, **defecto real de Prisma, abierto**: `route_intent` clasifica
+  - b-0005, 10/10, **defecto real de Leda, abierto**: `route_intent` clasifica
     la declaración de una dependencia entre dos tareas existentes como
     `start_task_intake`; abre el alta guiada y la dependencia nunca se crea.
     Causa: el router recibe sólo el texto, no las tareas del espacio. Se trata

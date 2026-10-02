@@ -1,14 +1,14 @@
-# Prisma orienta
+# Leda orienta
 
 **Estado:** en curso
 **Creado:** 2026-09-25
-**Origen:** [`ADR 0007`](../../docs/decisions/0007-prisma-orienta-no-charla.md);
+**Origen:** [`ADR 0007`](../../docs/decisions/0007-leda-orienta-no-charla.md);
 acciones por tarea en `docs/architecture/interpretacion-y-confirmacion.md` §4.6;
 evidencia en §5.13 (primera sesión por Telegram real).
 
 ## Objetivo
 
-Que Prisma oriente a las personas con opciones concretas en lugar de preguntas
+Que Leda oriente a las personas con opciones concretas en lugar de preguntas
 abiertas: cada respuesta que espera algo cierra con botones y una salida, las listas
 de tareas son botones y tocar una tarea ofrece lo que se puede hacer con ella.
 
@@ -19,7 +19,7 @@ de tareas son botones y tocar una tarea ofrece lo que se puede hacer con ella.
   interpretan mal ("la tarea" tomada como nombre de una tarea).
 - Presentó una suposición como hecho ("claramente va detrás").
 - Las aclaraciones con botones fueron innecesarias porque la persona hablaba de una
-  tarea que Prisma acababa de listar como texto.
+  tarea que Leda acababa de listar como texto.
 - Hoy sólo existen botones para confirmar, para la duda de referencia y para el alta
   guiada de tareas.
 
@@ -62,7 +62,7 @@ gestión.
 - [x] **T3 — Listas como botones.** Una respuesta que presenta tareas para elegir las
   ofrece como botones (por la herramienta de T1 o por la consulta misma).
 - [x] **T4 — Banco.** Escenarios: lista de tareas con botones, tocar una tarea y
-  llegar a la vista previa, pregunta de Prisma siempre con opciones; comprobador que
+  llegar a la vista previa, pregunta de Leda siempre con opciones; comprobador que
   falla ante una pregunta abierta sin opciones.
 - [x] **T4b — Cierre genérico de una pregunta sin opciones.** Decisión del usuario
   (2026-09-26, evidencia real b-0007): si el turno cierra preguntando en texto
@@ -75,7 +75,7 @@ gestión.
   - [x] Documentación (2026-09-26, ver Progreso).
   - [ ] Segunda sesión real por Telegram, datos ficticios (necesita al usuario).
 - [x] **T7 — Base nueva y siembra reproducible para la tercera ronda por Telegram.**
-  Decisión del usuario (2026-09-27): base dedicada nueva (`prisma`) creada desde
+  Decisión del usuario (2026-09-27): base dedicada nueva (`leda`) creada desde
   `db/esquema.sql` completo (ya con 0013-0016), sembrada con un comando reproducible
   (mismas personas del pack y mismas tareas ficticias, títulos sin "(simulado)",
   `evidencia_requerida` coherente con la política del pack, estados iniciales que
@@ -128,7 +128,7 @@ gestión.
     transacción queda sin desempate). Decisión del usuario (2026-09-27): sobre una
     tarea que ya está `en_revision`, "ya la terminé" no registra ningún cambio de
     estado; la evidencia que llegue se suma como un adjunto más (igual que "Adjuntar
-    evidencia") y Prisma avisa que ya está en revisión y que sumó la evidencia para
+    evidencia") y Leda avisa que ya está en revisión y que sumó la evidencia para
     quien la revisa.
     Sumar pruebas: previo nulo -> `asignada`; rama `en_revision` de
     `_preparar_actualizar_estado` sin confirmar.
@@ -156,14 +156,14 @@ gestión.
   2026-09-28: después de leer el manual de personalidad (hecho el 2026-09-28, ver
   Progreso).
   - [x] **T8a — Clave del proveedor conversacional según el proveedor.** Hoy
-    `llm.desde_base` recibe siempre `PRISMA_LLM_API_KEY` (`gateway.py`, banco,
+    `llm.desde_base` recibe siempre `LEDA_LLM_API_KEY` (`gateway.py`, banco,
     `modelos`): con `openrouter` le mandaría a OpenRouter la clave de otro proveedor.
-    OpenRouter usa `PRISMA_OPENROUTER_API_KEY` (la misma de Jev); si falta la clave del
+    OpenRouter usa `LEDA_OPENROUTER_API_KEY` (la misma de Jev); si falta la clave del
     proveedor configurado, error claro, nunca la otra clave.
   - [x] **T8b — Medir y elegir el modelo.** Con el banco real, `google/gemini-3.8-flash`
     y `openai/gpt-6-luna` contra `nan/deepseek-v4-flash`: latencia por llamada (ruteo y
     respuesta) y escenarios. Objetivo: menos de 4 s por turno sin empeorar ningún
-    escenario. Elige el usuario; se configura con `python -m prisma modelo`.
+    escenario. Elige el usuario; se configura con `python -m leda modelo`.
     Resultado (ver Progreso): ningún modelo llega a 4 s porque cada turno hace unas tres
     llamadas seguidas. Decisión del usuario (2026-09-28): se mantiene
     `nan/deepseek-v4-flash` y se ataca la cantidad de llamadas (T8c).
@@ -194,7 +194,7 @@ gestión.
       Acotar cada intento (~20 s, configurable en `model_config.parametros`) con
       reintento, para que un cuelgue cueste ~20 s y no más de 90.
 - [ ] **T8d — Responder en un solo viaje (postergada).** Decisión del usuario
-  (2026-09-29): es una optimización; va después de T11 (la prioridad es que Prisma
+  (2026-09-29): es una optimización; va después de T11 (la prioridad es que Leda
   responda y se comporte como se espera: T9, T10 y la cuarta ronda). Evitar la vuelta de datos del responder
   (`consultar_tareas` y similares) cuando el dato ya viaja en el contexto, reconstruyendo
   los botones de lista desde el contexto (ADR 0007 §3). Es la palanca que puede acercar
@@ -267,7 +267,7 @@ gestión.
     retome posterior (`_retomar_dato_pendiente`, `retomar` en `_turno`) y la guarda
     `agente.NoProponer` de R1b-3. Actualizar `b-0020`, `b-0021-c` y `b-0022-b` a la
     regla nueva. Va después de T9-R1c-2b (mismos archivos). Los mensajes que inicia
-    Prisma (cadencias, avisos, escalera) dirigidos a quien tiene una rama abierta quedan
+    Leda (cadencias, avisos, escalera) dirigidos a quien tiene una rama abierta quedan
     retenidos hasta que se cierra (decisión del usuario, opción A); la retención termina
     al vencer la pregunta pendiente (a definir un vencimiento donde no lo haya). Puede
     partirse en R1d-1 (la pregunta de la rama) y R1d-2 (retención en el despacho).
@@ -299,7 +299,7 @@ gestión.
       (2026-09-29): retener sólo si la persona escribió o tocó algo en ese chat en los
       últimos 30 minutos; así también retienen las preguntas del alta (sin vencimiento) y
       un urgente no espera horas por una rama abandonada.
-    - [x] **T9-R1d-2** — retención de los mensajes que inicia Prisma mientras la persona
+    - [x] **T9-R1d-2** — retención de los mensajes que inicia Leda mientras la persona
       tiene una rama abierta, hasta que vence la pregunta. Más los seguimientos de
       `review-faccc0e9d83561b3`: controlar que una elección sin prefijo entre con sus
       botones al volver a mostrarla; probar la guarda de un turno con una elección
@@ -319,7 +319,7 @@ gestión.
     un reloj único en la prueba del toque; y la prueba del aprobador sin nombre legible.
   - [x] **T9-R1c-3b — Ajustes de Modificar en el alta.** La vista previa que sigue a
     Modificar, cuando quien pide es quien confirma, sale como respuesta (hoy es un mensaje
-    que inicia Prisma y queda sujeto a horario, tope diario y retención: fuera de horario la
+    que inicia Leda y queda sujeto a horario, tope diario y retención: fuera de horario la
     persona no recibiría el resumen corregido); botón [Volver al resumen] en el selector
     (hoy salir sólo se puede cancelando el borrador); la fecha objetivo se muestra en
     formato de la persona, no ISO; al repreguntar un campo tras una charla vuelve el bloque
@@ -387,7 +387,7 @@ gestión.
     botones (el pedido sigue activo sin pregunta abierta): ofrecer la revisión vigente en
     vez de un callejón sin salida; (2) probar la rama en la que quien confirma pasó a ser
     quien pide al momento de enviar (una sola respuesta atada al toque, sin aviso neutro);
-    (3) `test_la_revision_retiene_lo_que_prisma_inicia_como_cualquier_rama` usa el reloj
+    (3) `test_la_revision_retiene_lo_que_leda_inicia_como_cualquier_rama` usa el reloj
     real: derivar de `NOW`.
   - [ ] **T9-R1c-5 — Consulta al usuario abierta:** si quien confirma cancela el borrador
     que le mandó quien pidió, ¿se le avisa a quien pidió? (hoy el "Listo, cancelé…" sólo
@@ -426,7 +426,7 @@ gestión.
     hilo de la reentrega que no espera al ciclo tiene que capturar sus errores; la marca de
     falla probada contra un commit que falla de verdad; cerrar la transacción al cortar por
     el candado del espacio; la prueba del entrante atado no debe pasar por construcción.
-  - [ ] **T9-H19c — Consulta al usuario:** ¿qué hace Prisma cuando alguien edita un mensaje
+  - [ ] **T9-H19c — Consulta al usuario:** ¿qué hace Leda cuando alguien edita un mensaje
     ya enviado (`edited_message`)? Hoy lo trata como un mensaje nuevo.
   - [x] **T10-5c** — Seguimientos de `review-eca94d14a705c5c4`: comparar títulos contra el
     texto normalizado (énfasis con guiones bajos); probar la rama de opciones con tarea
@@ -439,7 +439,7 @@ gestión.
   textos fijos y botones en un solo lugar; D: una negativa sin intento dice el estado real).
   Unidades, de la más chica a la más grande:
   - [x] **T10-1** — Arnés: `comprobadores._es_forma_ofrecida_del_titulo` no saca el ícono
-    de la etiqueta (`b-0013` falla por el arnés, no por Prisma).
+    de la etiqueta (`b-0013` falla por el arnés, no por Leda).
   - [x] **T10-2** — H2 (texto aprobado del aviso neutro) y H1 (aviso de incidente al
     administrador en lenguaje llano y hora local).
   - [x] **T10-3** — H10: ícono en Modificar y una sola definición de la etiqueta.
@@ -516,35 +516,35 @@ cada commit con código pasa por la evaluación de RDD.
   archivos de código + pruebas).
 
   Archivos:
-  - `src/prisma/herramientas.py`: herramienta `ofrecer_opciones` (`accion="consultar"`,
+  - `src/leda/herramientas.py`: herramienta `ofrecer_opciones` (`accion="consultar"`,
     sin `preparar`: no escribe nada), `MAX_OPCIONES_MODELO = 4`, `OpcionOfrecida`,
     excepción `NecesitaOpciones`, `_tareas_activas_por_id` (valida cada `tarea_id`
     contra PostgreSQL bajo el cursor con RLS del turno; activas del espacio, id de
     otro espacio o cerrado queda simplemente afuera).
-  - `src/prisma/agente.py`: `_ejecutar_una` atrapa `NecesitaOpciones` y la reusa como
+  - `src/leda/agente.py`: `_ejecutar_una` atrapa `NecesitaOpciones` y la reusa como
     `elecciones` (mismo cierre de turno sin texto que `NecesitaElegir`/
     `NecesitaConfirmacion`); `_encolar_opciones_modelo` arma la `pending_action` con
     el sentinel `pendientes.SENTINEL_OPCIONES_MODELO`, agrega siempre "Quiero
     consultar otra cosa" y la encola por outbox.
-  - `src/prisma/gateway.py`: `_toque` intercepta el sentinel antes de `H.ejecutar`
+  - `src/leda/gateway.py`: `_toque` intercepta el sentinel antes de `H.ejecutar`
     (mismo patrón que `_SENTINEL_ACLARACION`); `_resolver_toque_opcion_modelo` audita
     (tipo + id de tarea, nunca texto), cierra sin efecto en "Quiero consultar otra
     cosa" invitando a escribir, y para tarea/texto retoma llamando a
     `agente.responder` directo -- nunca a `_turno`/`route_intent`/Jev -- con la
     elección como contexto de confianza del servidor (`contexto_referencias`) y,
     para una tarea, `tareas_resueltas_claras` (protección T5 existente).
-  - `src/prisma/pendientes.py`: `SENTINEL_OPCIONES_MODELO`, constante compartida
+  - `src/leda/pendientes.py`: `SENTINEL_OPCIONES_MODELO`, constante compartida
     entre `agente.py` (arma) y `gateway.py` (intercepta) -- vive acá porque ninguno
     de los dos módulos puede importar del otro sin ciclo.
-  - `src/prisma/salida.py`: `TRUNCAR_ETIQUETA_BOTON` + `truncar_etiqueta_boton()`,
+  - `src/leda/salida.py`: `TRUNCAR_ETIQUETA_BOTON` + `truncar_etiqueta_boton()`,
     extraídos de la regla de truncado que ya tenía `gateway._etiqueta_boton`, para
     reusarla en `ofrecer_opciones` en vez de duplicarla.
-  - `src/prisma/gateway.py`: `TRUNCAR_TITULO_BOTON` pasa a ser alias de
+  - `src/leda/gateway.py`: `TRUNCAR_TITULO_BOTON` pasa a ser alias de
     `salida.TRUNCAR_ETIQUETA_BOTON` (mismo valor, 48) y `_etiqueta_boton` llama a
     `truncar_etiqueta_boton` -- refactor de compatibilidad, las pruebas existentes
     de `test_aclaracion_botones.py` siguen referenciando `gateway.TRUNCAR_TITULO_BOTON`
     sin cambios.
-  - `src/prisma/contexto.py`: tres reglas nuevas en `PREAMBULO` (usar
+  - `src/leda/contexto.py`: tres reglas nuevas en `PREAMBULO` (usar
     `ofrecer_opciones` en vez de preguntar en texto abierto; ofrecer listas de tareas
     como opciones; no presentar una suposición como un hecho, ofrecerla para
     confirmar).
@@ -622,12 +622,12 @@ cada commit con código pasa por la evaluación de RDD.
   de código + pruebas, igual que T1).
 
   Archivos:
-  - `src/prisma/menu_tarea.py` (nuevo): `calcular_menu` (el menú determinístico de §4.6
+  - `src/leda/menu_tarea.py` (nuevo): `calcular_menu` (el menú determinístico de §4.6
     según estado y relación -- responsable/aprobador/otra persona --, calculada por
     código, nunca por el modelo), `detalle_tarea` (la lectura de "Ver detalle"/"Ver
     detalle y evidencia"), `bloqueos_abiertos`, `tareas_activas_de` (candidatas para
     una dependencia, tope `MAX_CANDIDATAS_DEPENDENCIA = 4`, mismo tope que T1).
-  - `src/prisma/gateway.py`: sección nueva "Menú de acciones de una tarea" --
+  - `src/leda/gateway.py`: sección nueva "Menú de acciones de una tarea" --
     `_encolar_menu_tarea`/`_abrir_menu_tarea` (arma o rearma el menú con sus botones),
     `_encolar_vista_previa_menu` (la vista previa de una acción del menú, mismos tres
     botones que `agente._encolar_confirmacion`), `_ejecutar_accion_menu` (corre una
@@ -638,12 +638,12 @@ cada commit con código pasa por la evaluación de RDD.
     el cableado nuevo en `_toque` (dos `elif` más, por `P.SENTINEL_MENU_TAREA` y
     `P.SENTINEL_DATO_MENU_TAREA`) y en `_turno` (reclama `SENTINEL_DATO_MENU_TAREA`
     antes de rutear, igual que "Ninguna, lo escribo").
-  - `src/prisma/pendientes.py`: `SENTINEL_MENU_TAREA`, `SENTINEL_DATO_MENU_TAREA`,
+  - `src/leda/pendientes.py`: `SENTINEL_MENU_TAREA`, `SENTINEL_DATO_MENU_TAREA`,
     `ETIQUETA_SALIR_OPCIONES` (la etiqueta de salida de T1, movida acá para que el
     menú de T2 la reuse sin duplicarla).
-  - `src/prisma/agente.py`: `_encolar_opciones_modelo` usa `P.ETIQUETA_SALIR_OPCIONES`
+  - `src/leda/agente.py`: `_encolar_opciones_modelo` usa `P.ETIQUETA_SALIR_OPCIONES`
     en vez de su propia constante privada (refactor de compatibilidad, mismo valor).
-  - `src/prisma/herramientas.py`: `ofrecer_opciones` gana un campo opcional `accion`
+  - `src/leda/herramientas.py`: `ofrecer_opciones` gana un campo opcional `accion`
     por opción de tarea (`"responder"`, el de siempre, o `"menu"`, que abre el menú en
     vez de retomar la conversación); `_uuid_normalizado` (nuevo) + corrección de
     revisión de T1 sobre `_tareas_activas_por_id`/`_ofrecer_opciones` (abajo).
@@ -771,7 +771,7 @@ cada commit con código pasa por la evaluación de RDD.
   existentes con datos que dependían del hueco -- más dos archivos de prueba nuevos).
 
   Archivos:
-  - `src/prisma/herramientas.py`: chequeo de autoridad por tarea en `_preparar_
+  - `src/leda/herramientas.py`: chequeo de autoridad por tarea en `_preparar_
     actualizar_estado`/`_actualizar_estado`, `_preparar_registrar_bloqueo`/
     `_registrar_bloqueo` y `_preparar_adjuntar_evidencia`/`_adjuntar_evidencia` --
     duplicado en `preparar` y en el handler, mismo patrón que `_resolver_bloqueo`/
@@ -782,7 +782,7 @@ cada commit con código pasa por la evaluación de RDD.
     -- el chequeo nuevo es una autoridad adicional, por tarea, no un reemplazo; una
     regla explícita de permiso del pack (`permission`) sigue pudiendo ampliar el nivel
     de rol como hasta ahora.
-  - `src/prisma/gateway.py`: `_ejecutar_accion_menu` corre `H.ejecutar` dentro de un
+  - `src/leda/gateway.py`: `_ejecutar_accion_menu` corre `H.ejecutar` dentro de un
     punto de retorno (`cur.connection.transaction(force_rollback=False)`, mismo
     patrón que `agente._ejecutar_una`) y atrapa `Denegado` respondiendo con el texto
     humano de la excepción; `_mensaje_resultado_menu` deja de colapsar cualquier
@@ -822,7 +822,7 @@ cada commit con código pasa por la evaluación de RDD.
     "Informar un bloqueo" al aprobador.
   - **`adjuntar_evidencia`: responsable O aprobador.** A diferencia de las otras dos,
     `nucleo/mecanica-pm.md` §6 lista explícitamente "confirmación del referente"
-    entre la evidencia que Prisma solicita -- el aprobador de la tarea
+    entre la evidencia que Leda solicita -- el aprobador de la tarea
     (`autoridad.puede_aprobar_tarea`, un solo nivel: a un integrante lo aprueba su
     referente) también puede adjuntarla, no sólo el responsable. El menú (T2) todavía
     no le ofrece un botón de "Adjuntar evidencia" al aprobador (sólo "Ver detalle y
@@ -878,7 +878,7 @@ cada commit con código pasa por la evaluación de RDD.
   - `tests/test_veracidad.py::_tarea`: creaba la tarea bajo `admin(conn)` resolviendo
     el responsable por la vista `integrante` (`select membership_id from integrante
     where nombre = 'Marcos Tarquini'`). Esa vista filtra por
-    `current_setting('prisma.workspace_id', true)` (`db/esquema.sql`), que sólo fija
+    `current_setting('leda.workspace_id', true)` (`db/esquema.sql`), que sólo fija
     `db.espacio` -- bajo `admin` queda sin definir y la vista no devuelve filas, así
     que la subconsulta resolvía en `null` y la tarea quedaba **sin responsable real**,
     invisible porque nada lo verificaba antes. Con el chequeo nuevo,
@@ -888,8 +888,8 @@ cada commit con código pasa por la evaluación de RDD.
     prueba) y el resultado visible pasó a construirse por el camino de
     `with_no_effect_status` en vez de descartarse entero. Corregido resolviendo el
     `membership_id` por `membership`/`app_user` directo (mismo patrón que
-    `test_bloqueos.py`/`test_dependencias.py`), sin depender de `prisma.workspace_id`.
-  - `tests/test_task_drafts.py::test_prisma_app_no_puede_borrar_task_y_evento_
+    `test_bloqueos.py`/`test_dependencias.py`), sin depender de `leda.workspace_id`.
+  - `tests/test_task_drafts.py::test_leda_app_no_puede_borrar_task_y_evento_
     autorizado_sigue_operando`: la tarea la crea `_crear_preview` con responsable
     "Nahuel Gimenez" (default de `_args`); el test usaba a "Marcos Tarquini" (quien
     sólo confirmó el borrador) para el `actualizar_estado` final, que no prueba
@@ -898,7 +898,7 @@ cada commit con código pasa por la evaluación de RDD.
     real); la aserción no cambió.
 
   RED (antes de implementar, con el código de `herramientas.py`/`gateway.py`
-  apartado temporalmente por `git stash push -- src/prisma/gateway.py src/prisma/
+  apartado temporalmente por `git stash push -- src/leda/gateway.py src/leda/
   herramientas.py`, los archivos de prueba ya escritos):
   `.venv/Scripts/python.exe -m pytest -q tests/test_autoridad_tarea.py
   tests/test_menu_tarea.py` -> `12 failed, 26 passed` -- las 12 fallas son
@@ -941,7 +941,7 @@ cada commit con código pasa por la evaluación de RDD.
   (sanitizado, sin texto de mensajes, acotado al espacio), (c) avisar con un texto
   neutro cuando se puede identificar a quien escribió (chat y membresía), sin
   filtrar detalle técnico. Evidencia citada: en la sesión real por Telegram un
-  `UndefinedColumn` hacía que Prisma saltara mensajes sin respuesta ni incidente.
+  `UndefinedColumn` hacía que Leda saltara mensajes sin respuesta ni incidente.
 
   **Decisión del usuario (2, corrección sobre la anterior): el incidente tiene que
   hacer encontrable la causa.** No alcanza con un resumen sanitizado: cada
@@ -953,7 +953,7 @@ cada commit con código pasa por la evaluación de RDD.
   apunta a `inbound_message`, que ya tiene su propia retención por cliente
   (`docs/ROADMAP.md`). Se pidió una migración + rollback en `db/migrations/` +
   (la ubicación exacta se verificó contra el repo, ver más abajo), actualizar
-  `db/esquema.sql`, y `python -m prisma incidentes` (`cli.py`).
+  `db/esquema.sql`, y `python -m leda incidentes` (`cli.py`).
 
   **Verificación contra el repo antes de escribir la migración (el usuario dijo
   `db/migrations/rollback/`; no existe esa carpeta).** Los rollbacks ya
@@ -974,9 +974,9 @@ cada commit con código pasa por la evaluación de RDD.
     llena.
   - `db/migrations/0011_incident_trazabilidad.sql` / `db/rollbacks/
     0011_incident_trazabilidad.sql` (nuevos): agregan/revierten las cinco columnas.
-    Sin cambio de `grant`: `prisma_app` ya tenía `insert` sobre toda la fila desde
+    Sin cambio de `grant`: `leda_app` ya tenía `insert` sobre toda la fila desde
     el esquema base.
-  - `src/prisma/gateway.py`:
+  - `src/leda/gateway.py`:
     - Constantes nuevas: `ETAPA_TURNO_TEXTO`, `ETAPA_TOQUE_BOTON`,
       `ETAPA_ACTIVACION`, `ETAPA_ACCION_MENU` (puntos de entrada de la red general,
       no cada paso interno -- los incidentes puntuales que ya existían
@@ -1003,9 +1003,9 @@ cada commit con código pasa por la evaluación de RDD.
       parámetro `pending_action_id`/`referencia_id` opcional, hilado desde `_toque`
       (toque) o `modificacion.pending_action_id` (texto libre tras "Ninguna, lo
       escribo" del menú).
-  - `src/prisma/local.py`: `Escucha.recibir` importa las constantes de etapa y las
+  - `src/leda/local.py`: `Escucha.recibir` importa las constantes de etapa y las
     pasa a `reportar_incidente_no_manejado` (toque vs. turno, según el update).
-  - `src/prisma/cli.py`: `python -m prisma incidentes` imprime `etapa`,
+  - `src/leda/cli.py`: `python -m leda incidentes` imprime `etapa`,
     `referencia_tipo=referencia_id`, `chat_id` y si se avisó -- nunca un secreto.
   - `tests/test_capacidades.py`: se saca `"notificado_en"` de `PROMESAS_SIN_CUMPLIR`
     (ya se implementa); las cinco columnas nuevas quedan referenciadas en
@@ -1021,8 +1021,8 @@ cada commit con código pasa por la evaluación de RDD.
 
   Decisiones de diseño:
   - **Notificar antes de registrar, no una fila y después una actualización.**
-    `prisma_app` sólo tiene `insert` sobre `incident` (`grant insert on ... incident
-    ... to prisma_app`, sin `update`) -- mismo espíritu que `task_state_event`
+    `leda_app` sólo tiene `insert` sobre `incident` (`grant insert on ... incident
+    ... to leda_app`, sin `update`) -- mismo espíritu que `task_state_event`
     append-only. Grabar el incidente primero y actualizar `notificado_en` después
     habría necesitado ese `update`, ampliando un privilegio que el esquema niega a
     propósito. Se intenta avisar primero (transacción propia, con su propio
@@ -1067,14 +1067,14 @@ cada commit con código pasa por la evaluación de RDD.
     `agente._incidente`) -- seguirían sin `etapa` ni referencia estructurada; ese
     trabajo queda fuera del alcance de esta corrección y no se inventó.
 
-  RED (`git stash push -- src/prisma/gateway.py src/prisma/local.py`, primer envío
+  RED (`git stash push -- src/leda/gateway.py src/leda/local.py`, primer envío
   del punto 1 -- el mecanismo de incidente en sí):
   `.venv/Scripts/python.exe -m pytest -q tests/test_autoridad_tarea.py
   tests/test_menu_tarea.py` -> `12 failed, 26 passed` (incluye una reproducción real
   de `psycopg.errors.InFailedSqlTransaction`, no simulada).
 
-  RED (extensión de trazabilidad, `git stash push -- src/prisma/gateway.py
-  src/prisma/local.py src/prisma/cli.py`, con `db/esquema.sql` ya con las columnas
+  RED (extensión de trazabilidad, `git stash push -- src/leda/gateway.py
+  src/leda/local.py src/leda/cli.py`, con `db/esquema.sql` ya con las columnas
   nuevas):
   `.venv/Scripts/python.exe -m pytest -q tests/test_menu_tarea.py
   tests/test_task_intake.py::test_objective_callback_failure_rolls_back_before_
@@ -1101,7 +1101,7 @@ cada commit con código pasa por la evaluación de RDD.
   - `.venv/Scripts/python.exe -m pytest -q` (suite completa) -> `775 passed,
     99 deselected`.
 
-  Abierto: los pares `0001`..`0002` gated por `PRISMA_TEST_DB_URL` (`test_los_
+  Abierto: los pares `0001`..`0002` gated por `LEDA_TEST_DB_URL` (`test_los_
   rollbacks_devuelven_la_base_al_estado_anterior`,
   `test_migration_reconciles_legacy_and_guarded_rollback_restores_it`, y afines) no
   corrieron -- esa variable no está configurada en este entorno; se verificó en su
@@ -1111,7 +1111,7 @@ cada commit con código pasa por la evaluación de RDD.
   `begin`/`commit`) y que su rollback sólo suelta columnas que nada más referencia
   (sin función que reconstruir, a diferencia de `0010`). No se ejercitó
   migración-arriba/rollback-abajo contra una base real: queda como
-  **PENDIENTE** de una sesión con `PRISMA_TEST_DB_URL` configurado, igual que ya
+  **PENDIENTE** de una sesión con `LEDA_TEST_DB_URL` configurado, igual que ya
   está pendiente para `0001`..`0010`. `docs/capacidades.md` no se actualizó (fuera
   del alcance autorizado para esta unidad, "no tocar docs/"): sigue mencionando
   `notificado_en` como promesa sin cumplir aunque `tests/test_capacidades.py` ya no
@@ -1126,7 +1126,7 @@ cada commit con código pasa por la evaluación de RDD.
   registro del incidente); `gateway.py:1826-1832` (incidente de enrutamiento duplicado);
   `gateway.py:1117-1148` (efecto lateral en `_mensaje_resultado_menu`); `gateway.py:156-161`
   (cobertura de las redes nuevas); migración `0011` no ejercitada contra una base de ensayo
-  (`PRISMA_TEST_DB_URL` sin configurar); `cli.py:367-369` y `tests/test_menu_tarea.py:959-960`
+  (`LEDA_TEST_DB_URL` sin configurar); `cli.py:367-369` y `tests/test_menu_tarea.py:959-960`
   (código muerto). Pendiente de T2b: autoridad para `cancelada`.
 - 2026-09-25 (orquestador): **`notificado_en` falso corregido** (`b4e5973`). Cambio encontrado
   sin commitear tras el cierre de sesión, de origen desconocido; verificado antes de aceptarlo.
@@ -1154,7 +1154,7 @@ cada commit con código pasa por la evaluación de RDD.
   archivos de código + pruebas).
 
   Archivos:
-  - `src/prisma/agente.py`: `_ejecutar_una` gana un acumulador más,
+  - `src/leda/agente.py`: `_ejecutar_una` gana un acumulador más,
     `ultima_lista_tareas` (mismo patrón mutable que `acciones`/`confirmaciones`/
     `elecciones`) -- se sobrescribe sólo cuando una llamada a `consultar_tareas`
     devuelve filas, así que si hay varias en el turno gana la ÚLTIMA que trajo
@@ -1168,7 +1168,7 @@ cada commit con código pasa por la evaluación de RDD.
     "Ver más" con los ids restantes cuando sobran; `_encolar_respuesta_con_tareas`
     arma la `pending_action` (sentinel compartido `SENTINEL_OPCIONES_MODELO`) y
     la encola con el MISMO texto que ya iba a mandar el modelo.
-  - `src/prisma/gateway.py`: `_resolver_toque_opcion_modelo` gana un tercer tipo
+  - `src/leda/gateway.py`: `_resolver_toque_opcion_modelo` gana un tercer tipo
     de elección, `"ver_mas"`, que despacha a la función nueva
     `_mostrar_mas_tareas` sin retomar la conversación (ni con el modelo, ni con
     Jev, ni con `route_intent`). `_mostrar_mas_tareas` revalida los ids
@@ -1176,11 +1176,11 @@ cada commit con código pasa por la evaluación de RDD.
     `herramientas._tareas_activas_por_id` (T1) -- la misma función que ya valida
     las tareas que ofrece el modelo --, arma la página siguiente (hasta 4 +
     "Ver más" si sobra más + la salida) y la encola con el mismo sentinel.
-  - `src/prisma/pendientes.py`: `ETIQUETA_VER_MAS = "Ver más"`, al lado de
+  - `src/leda/pendientes.py`: `ETIQUETA_VER_MAS = "Ver más"`, al lado de
     `ETIQUETA_SALIR_OPCIONES`, por el mismo motivo (que `agente.py`, que arma la
     primera página, y `gateway.py`, que arma las siguientes, muestren la misma
     etiqueta).
-  - `src/prisma/contexto.py`: la regla del `PREAMBULO` sobre listar tareas se
+  - `src/leda/contexto.py`: la regla del `PREAMBULO` sobre listar tareas se
     reescribe -- ya no le pide al modelo llamar a `ofrecer_opciones` para que
     una lista de `consultar_tareas` salga como botones (eso ahora lo garantiza
     el servidor); sigue pidiéndole usar `ofrecer_opciones` para el resto de las
@@ -1273,8 +1273,8 @@ cada commit con código pasa por la evaluación de RDD.
     ese caso ahora lo garantiza el servidor sin depender de que el modelo
     obedezca.
 
-  RED (antes de implementar -- `git stash push -- src/prisma/agente.py
-  src/prisma/gateway.py src/prisma/pendientes.py src/prisma/contexto.py`, con
+  RED (antes de implementar -- `git stash push -- src/leda/agente.py
+  src/leda/gateway.py src/leda/pendientes.py src/leda/contexto.py`, con
   `tests/test_lista_botones.py` ya escrito):
   `.venv/Scripts/python.exe -m pytest -q tests/test_lista_botones.py` ->
   `5 failed, 2 passed` -- los 2 que ya pasaban en rojo son "lista vacía no arma
@@ -1303,9 +1303,9 @@ cada commit con código pasa por la evaluación de RDD.
   Corrección tras revisión del orquestador (mismo día, misma unidad -- ver
   arriba, "«Ver más» revalida existencia, no estado"):
 
-  Archivos: `src/prisma/herramientas.py` (función nueva
+  Archivos: `src/leda/herramientas.py` (función nueva
   `_tareas_existentes_por_id`, al lado de `_tareas_activas_por_id`),
-  `src/prisma/gateway.py` (`_mostrar_mas_tareas` llama a la función nueva),
+  `src/leda/gateway.py` (`_mostrar_mas_tareas` llama a la función nueva),
   `tests/test_lista_botones.py` (test nuevo
   `test_ver_mas_de_tareas_terminadas_no_dice_que_ya_no_estan_disponibles`;
   `test_ver_mas_descarta_una_tarea_que_se_cerro_mientras_tanto` reescrito como
@@ -1357,7 +1357,7 @@ cada commit con código pasa por la evaluación de RDD.
   orquestador contra `salida.prepare_payload`, más las dos pruebas de cobertura
   sugeridas en la misma revisión).
 
-  Archivos: `src/prisma/agente.py` (`_encolar_respuesta_con_tareas` reescrita;
+  Archivos: `src/leda/agente.py` (`_encolar_respuesta_con_tareas` reescrita;
   constante nueva `_TEXTO_BOTONES_LISTA_TAREAS`; import de `BUTTON_TEXT_LIMIT` y
   `telegram_utf16_units` desde `.salida`), `tests/test_lista_botones.py` (cuatro
   pruebas nuevas: `test_lista_con_respuesta_larga_se_parte_y_los_botones_van_aparte`,
@@ -1405,7 +1405,7 @@ cada commit con código pasa por la evaluación de RDD.
   dos ramas, señaladas sin prueba en la revisión, ya funcionan como corresponde; no eran
   un defecto, sólo huecos de cobertura.
 
-  RED (defecto 1 -- reversión quirúrgica de `src/prisma/agente.py` a `5e47038`, con las
+  RED (defecto 1 -- reversión quirúrgica de `src/leda/agente.py` a `5e47038`, con las
   cuatro pruebas nuevas ya escritas):
   `.venv/Scripts/python.exe -m pytest -q
   tests/test_lista_botones.py::test_lista_con_respuesta_larga_se_parte_y_los_botones_van_aparte
@@ -1413,7 +1413,7 @@ cada commit con código pasa por la evaluación de RDD.
   tests/test_lista_botones.py::test_mostrar_mas_tareas_sin_sobrevivientes_dice_que_ya_no_estan_disponibles
   tests/test_lista_botones.py::test_ver_mas_de_mas_de_ocho_tareas_arma_una_tercera_pagina`
   -> `1 failed, 3 passed`: la de respuesta larga falló con
-  `prisma.salida.PayloadValidationError: Un mensaje con botones no puede exceder 3900
+  `leda.salida.PayloadValidationError: Un mensaje con botones no puede exceder 3900
   unidades UTF-16` (`pendientes.py:166`, dentro de `P.registrar`) -- exactamente el
   defecto reportado; las otras tres ya pasaban contra el código sin tocar, confirmando que
   sólo eran cobertura.
@@ -1500,8 +1500,8 @@ cada commit con código pasa por la evaluación de RDD.
   entera.
 
   Archivos:
-  - `src/prisma/jev.py`: `ClienteJev.api_key` pasa a `field(repr=False)`.
-  - `src/prisma/config.py`: mismo repaso sobre `Config` (dataclass, singleton de
+  - `src/leda/jev.py`: `ClienteJev.api_key` pasa a `field(repr=False)`.
+  - `src/leda/config.py`: mismo repaso sobre `Config` (dataclass, singleton de
     módulo que circula por todo el proceso): `db_url`, `authority_db_url`,
     `llm_api_key`, `openrouter_api_key` y `webhook_secret` pasan a
     `field(repr=False, default=...)`. `base_url` queda igual (no es secreto).
@@ -1516,7 +1516,7 @@ cada commit con código pasa por la evaluación de RDD.
   `Enlace.token` (`onboarding.py`) quedaron afuera a propósito: el primero es un
   identificador de botón que Telegram ya devuelve tal cual al servidor (no es un
   secreto adicional); el segundo es el enlace de activación que el comando
-  `python -m prisma enlaces` imprime a propósito para distribuirlo -- ocultarlo del
+  `python -m leda enlaces` imprime a propósito para distribuirlo -- ocultarlo del
   repr rompería el único uso que tiene.
 
   RED: `.venv/Scripts/python.exe -m pytest -q tests/test_jev.py::test_cliente_jev_repr_no_incluye_la_clave`
@@ -1563,12 +1563,12 @@ cada commit con código pasa por la evaluación de RDD.
   incluso empatar con partes siguientes o llegar antes que ellas.
 
   Archivos:
-  - `src/prisma/salida.py` (`enqueue_outbox`): cada parte se programa ahora en
+  - `src/leda/salida.py` (`enqueue_outbox`): cada parte se programa ahora en
     `base + microsegundos(índice)`, con `base` fijada una sola vez en Python
     (`scheduled_for` o, si no vino, `datetime.now(timezone.utc)`) -- no con
     `coalesce(%s, now())` en SQL, porque `now()` devuelve la hora de inicio de la
     transacción, la misma para todas las filas del bucle, y no serviría para desempatar.
-  - `src/prisma/agente.py` (`_encolar_respuesta_con_tareas`): el mensaje de botones ahora
+  - `src/leda/agente.py` (`_encolar_respuesta_con_tareas`): el mensaje de botones ahora
     se programa `len(partes)` microsegundos después de `ahora` -- después de la ÚLTIMA
     parte del texto (índices `0..len(partes)-1`), no de la primera. `partes` se recalcula
     con `salida.prepare_payload` (la misma función determinística que usa `enqueue_outbox`
@@ -1838,7 +1838,7 @@ cada commit con código pasa por la evaluación de RDD.
   - `tests/banco/test_replays.py:97-100` (sugerencia): sin prueba de punta a punta de la
     exclusión `permite_pregunta_sin_opciones` ni de que el comprobador activo cambie el
     veredicto. Pendiente.
-  - `src/prisma/salida.py:199` (sugerencia, verificada sin cambio): el desplazamiento por
+  - `src/leda/salida.py:199` (sugerencia, verificada sin cambio): el desplazamiento por
     parte aplica a todos los llamadores; el único que encola un mensaje detrás de un texto
     partido es `agente._encolar_respuesta_con_tareas` (`agente.py:565`), que ya se programa
     después de la última parte. Los demás llamadores con `allow_split=True`
@@ -2029,12 +2029,12 @@ cada commit con código pasa por la evaluación de RDD.
   agrega el cierre si aun así pregunta en texto abierto.
 
   Archivos:
-  - `src/prisma/deteccion_pregunta.py` (nuevo): `hace_pregunta`/
+  - `src/leda/deteccion_pregunta.py` (nuevo): `hace_pregunta`/
     `pide_elegir_en_imperativo`, movidas de `tests/banco/comprobadores.py` (T7) --
-    una sola implementación en `src/prisma/`, porque el servidor la necesita en
-    tiempo de ejecución y `tests/banco` puede importar de `src/prisma/`, nunca al
+    una sola implementación en `src/leda/`, porque el servidor la necesita en
+    tiempo de ejecución y `tests/banco` puede importar de `src/leda/`, nunca al
     revés (`AGENTS.md`).
-  - `src/prisma/agente.py`: `responder` gana una rama `elif hace_pregunta(salida)`
+  - `src/leda/agente.py`: `responder` gana una rama `elif hace_pregunta(salida)`
     después de la de T3 (lista de tareas) y antes de `_encolar_respuesta` -- nunca
     compite con confirmaciones/elecciones (ya cerraron el turno antes) ni con la
     lista de T3 (mismo `if`/`elif`). `_encolar_texto_con_opciones` (nuevo): el
@@ -2045,18 +2045,18 @@ cada commit con código pasa por la evaluación de RDD.
     tres opciones (`tipo`: `tarea_nueva`/`tarea_existente`/`salida`) y guarda
     `entrante_id`/`mensaje_original` en `args` (iguales para las tres, no por
     opción) para que "Es una tarea nueva" pueda arrancar el alta guiada.
-  - `src/prisma/gateway.py`: `_resolver_toque_opcion_modelo` gana dos `tipo` más --
+  - `src/leda/gateway.py`: `_resolver_toque_opcion_modelo` gana dos `tipo` más --
     `tarea_nueva` llama a `_iniciar_alta_guiada` (la misma que ya usa "Es una tarea
     nueva" de la aclaración con botones, T4) con `route_task={}` (sin propuestas:
     el alta guiada las pide todas); `tarea_existente` llama a
     `_mostrar_tareas_propias` (nueva), que lista las tareas ACTIVAS de la propia
     persona bajo RLS y reusa `agente._opciones_lista_tareas` (el armador de página
     + "Ver más" de T3) en vez de duplicarlo. Sin tareas activas, sólo la salida.
-  - `src/prisma/contexto.py`: nueva regla en `PREAMBULO` -- sin opciones concretas,
+  - `src/leda/contexto.py`: nueva regla en `PREAMBULO` -- sin opciones concretas,
     llamar a `ofrecer_opciones` igual con las más razonables; nunca cerrar en texto
     abierto.
   - `tests/banco/comprobadores.py`: `_hace_pregunta`/`_pide_elegir_en_imperativo`
-    pasan a importarse de `prisma.deteccion_pregunta` (con esos mismos nombres,
+    pasan a importarse de `leda.deteccion_pregunta` (con esos mismos nombres,
     para no tocar el resto del archivo) en vez de definirse acá.
   - `tests/test_deteccion_pregunta.py` (nuevo, 5 pruebas): la detección movida,
     contra los mismos casos que ya la validaban en el banco.
@@ -2086,7 +2086,7 @@ cada commit con código pasa por la evaluación de RDD.
     constancia del cambio de sentido.
 
   Decisiones de diseño:
-  - **Detección de pregunta: una sola implementación, movida a `src/prisma/`.**
+  - **Detección de pregunta: una sola implementación, movida a `src/leda/`.**
     `_hace_pregunta`/`_pide_elegir_en_imperativo` vivían sólo en
     `tests/banco/comprobadores.py` (T7); el servidor las necesita ahora en tiempo
     de ejecución. Se mueven a `deteccion_pregunta.py` (nunca al revés: `src/`
@@ -2116,8 +2116,8 @@ cada commit con código pasa por la evaluación de RDD.
     el turno antes (`if confirmaciones or elecciones: return ...`), así que nunca
     llegan a `hace_pregunta`.
 
-  RED (antes de implementar, `git stash push -- src/prisma/agente.py
-  src/prisma/gateway.py src/prisma/contexto.py`, con las pruebas nuevas ya
+  RED (antes de implementar, `git stash push -- src/leda/agente.py
+  src/leda/gateway.py src/leda/contexto.py`, con las pruebas nuevas ya
   escritas y `deteccion_pregunta.py` ya creado):
   `.venv/Scripts/python.exe -m pytest -q tests/test_pregunta_sin_opciones.py
   tests/test_deteccion_pregunta.py` -> `11 failed, 8 passed` -- las 11 fallas son
@@ -2165,7 +2165,7 @@ cada commit con código pasa por la evaluación de RDD.
   `acciones` ya no estaba vacía, `with_no_effect_status` ("Estado: sin
   cambios") no se aplicaba: el modelo podía decir "Anoté…" sin la advertencia.
 
-  Archivos: `src/prisma/agente.py` (`_ejecutar_una`, un bloque nuevo antes
+  Archivos: `src/leda/agente.py` (`_ejecutar_una`, un bloque nuevo antes
   del chequeo de `consultar_tareas`); `tests/test_agente.py` (dos pruebas
   nuevas).
 
@@ -2189,7 +2189,7 @@ cada commit con código pasa por la evaluación de RDD.
   solo con la condición que ya tenía: hubo un intento de mutación y ninguna
   acción no-consultar se ejecutó.
 
-  RED (`git stash push -- src/prisma/agente.py`, con las pruebas ya
+  RED (`git stash push -- src/leda/agente.py`, con las pruebas ya
   escritas): `tests/test_agente.py -k rechazo_de_preparacion_no_se_audita`
   -> `1 failed` (`r.acciones == ['crear_dependencia']`, no `[]`). `git stash
   pop` restauró la implementación.
@@ -2225,7 +2225,7 @@ cada commit con código pasa por la evaluación de RDD.
   información (ADR 0007 punto 2: "el texto da el contexto; la elección se
   hace tocando").
 
-  Archivos: `src/prisma/agente.py` (`responder`: nuevas variables de
+  Archivos: `src/leda/agente.py` (`responder`: nuevas variables de
   seguimiento del turno, `elegir_pendiente`/`opciones_pendientes`/
   `texto_al_ofrecer`, y el bloque que decide `confirmaciones or elecciones`
   reescrito; `_ejecutar_una`: dos parámetros nuevos, las ramas `except
@@ -2277,7 +2277,7 @@ cada commit con código pasa por la evaluación de RDD.
     `{"pregunta": e.pregunta}`: es lo único que lee `gateway._resolver_
     toque_opcion_modelo` al retomar, sin cambios ahí.
 
-  RED (`git stash push -- src/prisma/agente.py`, con las pruebas ya
+  RED (`git stash push -- src/leda/agente.py`, con las pruebas ya
   escritas): `tests/test_opciones_modelo.py -k
   "texto_del_modelo_acompana or texto_largo_con_opciones"` -> `2 failed`
   (`r.texto == ''` en vez del texto del modelo; 0 partes de texto en vez de
@@ -2413,7 +2413,7 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   `is_error: true` ("ya ofreciste opciones en este turno; no se mostraron
   estas") y no se suma ni a `elecciones` ni a `opciones_pendientes` (ADR
   0007, ninguna herramienta nueva, ningún marcador nuevo). Archivo:
-  `src/prisma/agente.py`. Prueba:
+  `src/leda/agente.py`. Prueba:
   `tests/test_opciones_modelo.py::test_segunda_llamada_a_ofrecer_opciones_en_el_mismo_turno_no_se_muestra`
   (dos llamadas en la misma vuelta; verifica `r.elecciones == ["ofrecer_opciones"]`,
   una sola `pending_action`, y que el segundo `tool_result` sea
@@ -2439,7 +2439,7 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   específico (`falta`/`error`, mismo criterio que
   `_mensaje_resultado_menu`) en vez del genérico "No se aplicó el cambio.";
   si no, sigue el camino de siempre (`herramienta:<nombre>`, "Hecho."/borrador).
-  Archivo: `src/prisma/gateway.py`. Prueba nueva en `tests/test_botones.py`
+  Archivo: `src/leda/gateway.py`. Prueba nueva en `tests/test_botones.py`
   (`test_confirmar_una_preparacion_que_rechaza_no_se_audita_como_ejecutada`):
   crea una dependencia bloqueante DESPUÉS de armar la vista previa de
   `actualizar_estado` (mismo `tarea_id`/`estado`, huella sin cambiar) y
@@ -2460,7 +2460,7 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   de buscar "?"); "elegi"/"cual" pasan a buscarse con borde de palabra
   (`\belegi\b`, `\bcual\b`) en vez de subcadena, así que "elegido"/"elegida"/
   "elegimos"/"elegible" y "cualquier"/"cualquiera" dejan de disparar un
-  pedido de elección falso. Archivo: `src/prisma/deteccion_pregunta.py`.
+  pedido de elección falso. Archivo: `src/leda/deteccion_pregunta.py`.
   Pruebas nuevas en `tests/test_deteccion_pregunta.py` (URL con "?", pregunta
   real junto a una URL sigue contando, las cuatro formas de "elegi" como
   subcadena, dos formas de "cualquier"). RED: `3 failed` (las tres exactas).
@@ -2488,8 +2488,8 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   `entrante_id`) -- ese botón tiene garantizado fallar
   (`_iniciar_alta_guiada` exige un `inbound_message` persistido y levanta
   antes de intentar nada sin uno); sólo quedan las otras dos opciones.
-  Archivos: `src/prisma/menu_tarea.py`, `src/prisma/gateway.py`,
-  `src/prisma/agente.py`. Pruebas nuevas/adaptadas en
+  Archivos: `src/leda/menu_tarea.py`, `src/leda/gateway.py`,
+  `src/leda/agente.py`. Pruebas nuevas/adaptadas en
   `tests/test_pregunta_sin_opciones.py`: `test_sin_entrante_id_no_ofrece_es_una_tarea_nueva`
   (reemplaza la prueba anterior, que esperaba el botón ofrecido y fallando
   recién al tocarlo);
@@ -2600,7 +2600,7 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   exactamente el `falla` que reporta cada corrida real.
 
   **Esto es comportamiento de Jev (el modelo), evaluado contra un umbral ya
-  codificado a propósito (`CORTE_CLARA`), no un defecto de Prisma ni del
+  codificado a propósito (`CORTE_CLARA`), no un defecto de Leda ni del
   router** -- "el plc" es una referencia genuinamente informal para
   "Programar PLC de la comprimidora (simulado)" y Jev no llegó al 85% que
   exige el diseño para no preguntar. **No se cambiaron las expectativas del
@@ -2628,7 +2628,7 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   scheduling de los hilos -- afecta a cualquier escenario guionado con 2+
   `trabajos` en el mismo mensaje, no sólo a `b-0005-b`. Corrección: nueva
   `ClienteJevGuionadoPorReferencia` (`tests/banco/corrida.py`, sólo el
-  arnés de pruebas -- `ClienteJevGuionado` en `src/prisma/jev.py` sigue
+  arnés de pruebas -- `ClienteJevGuionado` en `src/leda/jev.py` sigue
   igual, la usan decenas de pruebas unitarias de una sola referencia que no
   tienen este problema) que agrupa las respuestas grabadas por
   `state["referencia"]` en colas propias, con lock; `jev_guionado_desde_grabacion`
@@ -2677,14 +2677,14 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   - `docs/STATUS.md`: fecha de actualización, hecho de commits/rama corregido (67
     commits en `main`, renombrada desde `master` el 2026-09-25, sin push — no "un
     único commit `efa8ee2`"), tabla de línea base de pruebas actualizada (876 passed,
-    108 deselected, 2026-09-26), sección nueva "Cerrado: Prisma orienta (T1-T4b)" con
+    108 deselected, 2026-09-26), sección nueva "Cerrado: Leda orienta (T1-T4b)" con
     la evidencia de suite y banco real, y "Próximo paso" reescrito.
-  - `docs/capacidades.md`: la fila "Prisma orienta con opciones (parcial)" pasa a
+  - `docs/capacidades.md`: la fila "Leda orienta con opciones (parcial)" pasa a
     fila completa con lo construido en T2/T3/T4b (menú, listas con "Ver más", cierre
     genérico); autoridad sobre la propia tarea anota el hueco de `cancelada`; fallas
     con aviso y trazabilidad describe `notificado_en` correcto y
     `herramienta_rechazada:<nombre>`.
-  - `docs/decisions/0007-prisma-orienta-no-charla.md`: "Pendiente" registra la
+  - `docs/decisions/0007-leda-orienta-no-charla.md`: "Pendiente" registra la
     decisión del usuario del 2026-09-26 (cierre genérico con tres opciones) como
     resuelta, y dejó explícito que "cerrar sin preguntar nada, sin botones" es el
     comportamiento implementado hoy, no una confirmación explícita del usuario —
@@ -2697,14 +2697,14 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
     `permite_pregunta_sin_opciones`, el comprobador `comprobar_pregunta_con_opciones`,
     `bloqueado` por fallo del proveedor, y que la aclaración acepta una opción de
     tarea ofrecida por el modelo.
-  - `odd/tasks/prisma-orienta.md` (este archivo): T5 dividida en su parte documental
+  - `odd/tasks/leda-orienta.md` (este archivo): T5 dividida en su parte documental
     (hecha) y la sesión por Telegram (pendiente); esta entrada de Progreso; "Próximo
     paso al retomar" reescrito.
 
   Verificación:
   - `.venv/Scripts/python.exe -m pytest -q tests/test_capacidades.py` (`pg_isready`
     antes) -> `3 passed` (cruza `docs/capacidades.md`/`PROMESAS_SIN_CUMPLIR` contra el
-    esquema; no falla con la reescritura de la fila de Prisma orienta).
+    esquema; no falla con la reescritura de la fila de Leda orienta).
   - `.venv/Scripts/python.exe -m pytest -q` (suite completa, reejecutada para esta
     unidad) -> `876 passed, 108 deselected` (206 s) — confirma el número que ya
     figuraba como hecho de la sesión.
@@ -2721,7 +2721,7 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   No verificable / no verificado en esta unidad (queda `PENDIENTE`, no se inventó):
   - Los 7 ids de revisión RDD que el orquestador entregó como hecho de la sesión
     (`review-4a429367dd7cfdc8`, `review-231a98f5d94099c9`, `review-d81552b4b65f4be5`,
-    `review-42b7c7c32af6e755`) no aparecen en `odd/tasks/prisma-orienta.md` ni en
+    `review-42b7c7c32af6e755`) no aparecen en `odd/tasks/leda-orienta.md` ni en
     ningún mensaje de commit de este repositorio (`git log --all`, buscado); sólo hay
     evidencia escrita de cinco (`review-995bc30d2d0df7e8`, `review-9ac0b4b8afec17ee`,
     `review-112e1420d47dd637`, `review-0ea0c4be83f8e6d9`, `review-356a9a31c3d84353`,
@@ -2807,7 +2807,7 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
     `commit` podían chocar si la prueba se repetía sobre la misma base -> corregido en
     `9896ba7` con cuatro `uuid4` al azar, ordenados (el orden de texto en minúsculas
     coincide con el orden de `uuid` en PostgreSQL); la prueba pasó tres veces seguidas.
-  - `src/prisma/deteccion_pregunta.py:49` (sugerencia, aceptada sin cambio): una URL cuyo
+  - `src/leda/deteccion_pregunta.py:49` (sugerencia, aceptada sin cambio): una URL cuyo
     último carácter sea su propio "?" (query vacía) seguida de más texto deja ese "?"
     afuera y cuenta como pregunta. Caso raro; el costo es un cierre genérico de más, no
     una respuesta perdida.
@@ -2840,13 +2840,13 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
 
   Se renombró el acumulador `ultima_lista_tareas` a `tareas_listadas` (ya no
   describe "la última", sino la unión) y se actualizaron los comentarios que
-  explicaban la regla vieja en `src/prisma/agente.py` (declaración cerca de
+  explicaban la regla vieja en `src/leda/agente.py` (declaración cerca de
   `responder`, `_ejecutar_una`, y los docstrings de `_opciones_lista_tareas`;
   `_encolar_respuesta_con_tareas` no mencionaba la regla vieja, no hizo falta
   tocarlo).
 
   Archivos:
-  - `src/prisma/agente.py`: acumulación por unión deduplicada (ver arriba) y
+  - `src/leda/agente.py`: acumulación por unión deduplicada (ver arriba) y
     renombre `ultima_lista_tareas` -> `tareas_listadas`.
   - `tests/test_lista_botones.py`: `test_ultima_llamada_con_filas_gana` (afirmaba
     la regla vieja a propósito) se reemplazó por
@@ -2872,7 +2872,7 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   mano? ¿Qué necesitás?". Regla nueva en `contexto.PREAMBULO`: una respuesta
   nunca hace más de una pregunta en el mismo turno -- si va a llamar a
   `ofrecer_opciones`, esa pregunta (con sus botones) es la única, sin otra en
-  el texto que la acompaña. Archivo: `src/prisma/contexto.py`. Prueba:
+  el texto que la acompaña. Archivo: `src/leda/contexto.py`. Prueba:
   `tests/test_opciones_modelo.py::test_reglas_del_contexto_piden_ofrecer_opciones`,
   assertion nueva sobre `"más de una pregunta" in PREAMBULO.lower()`. RED
   verificado a mano contra el `PREAMBULO` de `HEAD` (sin la frase, `False`);
@@ -2928,8 +2928,8 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   sigue con el corte duro de siempre, sin cambios (T1: "cuando el modelo
   elige su propia etiqueta, está bien").
 
-  Archivos: `src/prisma/salida.py` (funciones nuevas),
-  `src/prisma/agente.py`, `src/prisma/gateway.py`, `src/prisma/herramientas.py`
+  Archivos: `src/leda/salida.py` (funciones nuevas),
+  `src/leda/agente.py`, `src/leda/gateway.py`, `src/leda/herramientas.py`
   (los seis sitios de arriba).
 
   Adaptaciones deliberadas de pruebas existentes (título afectado por el
@@ -3000,8 +3000,8 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
     `menu_tarea._tarea_para_menu` (antes sólo traía el `membership_id`).
     Sigue siendo una sola pregunta por mensaje (regla del hallazgo 2).
 
-  Archivos: `src/prisma/contexto.py` (regla nueva), `src/prisma/menu_tarea.py`
-  (`responsable_nombre`, `encabezado_menu`), `src/prisma/gateway.py`
+  Archivos: `src/leda/contexto.py` (regla nueva), `src/leda/menu_tarea.py`
+  (`responsable_nombre`, `encabezado_menu`), `src/leda/gateway.py`
   (`_encolar_menu_tarea` arma la pregunta con el encabezado nuevo).
 
   Bench (`tests/banco`, sólo corre contra un modelo real, fuera de la suite
@@ -3059,11 +3059,11 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   gobierna el cierre por `actualizar_estado`), registra la transición
   `en_revision -> terminada` en el mismo acto: dos registros distintos
   (`approval` y `task_state_event`), un solo toque. Si falta algo, la tarea
-  queda `en_revision` con la aprobación igual registrada, y Prisma dice
+  queda `en_revision` con la aprobación igual registrada, y Leda dice
   exactamente qué falta -- nunca una pregunta abierta. Se avisa al responsable
   por outbox en cualquiera de los dos casos (dedupe por el id de la
   aprobación, nunca por la hora; se omite en silencio sólo si no tiene chat
-  vinculado). Principio del usuario: Prisma ayuda y orienta, nunca agrega
+  vinculado). Principio del usuario: Leda ayuda y orienta, nunca agrega
   burocracia -- pero "aprobación y cierre son hechos distintos"
   (`AGENTS.md`/constitución §3) sigue valiendo como dos REGISTROS distintos,
   no dos actos separados que exigirían un segundo toque para algo que la base
@@ -3071,7 +3071,7 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   consideradas en el ADR.
 
   Archivos:
-  - `src/prisma/herramientas.py`: constante `_MOTIVO_FALTA_APROBACION` (el
+  - `src/leda/herramientas.py`: constante `_MOTIVO_FALTA_APROBACION` (el
     texto exacto que devuelve `motivo_no_cierra_tarea` cuando lo único que
     falta es esta aprobación); `_preparar_aprobar_tarea` predice el resultado
     corriendo esa misma función SQL antes de escribir nada (preview: "Se
@@ -3082,7 +3082,7 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
     dependencia informativa si corresponde, y notifica al responsable por
     `_avisar`. Devuelve `{"aprobada": True, "cerrada": bool, "falta": motivo o
     None, "titulo": ...}` en vez de `{"aprobada": True}`.
-  - `src/prisma/gateway.py`: el camino de confirmación por botón distingue
+  - `src/leda/gateway.py`: el camino de confirmación por botón distingue
     `aprobar_tarea` (donde `cerrada: False` significa "se escribió la
     aprobación, pero no alcanzó para cerrar", no "no se escribió nada") del
     resto de las herramientas con `preparar`, para no auditarla como
@@ -3093,7 +3093,7 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
     devuelve (otros tests comparan su resultado con `{"estado": ...}` exacto).
     También se agregó el mapeo de la acción de menú `cerrar_tarea` a
     `actualizar_estado(estado="terminada")` en `_resolver_toque_menu_tarea`.
-  - `src/prisma/menu_tarea.py`: `_puede_cerrar` (reusa `motivo_no_cierra_tarea`,
+  - `src/leda/menu_tarea.py`: `_puede_cerrar` (reusa `motivo_no_cierra_tarea`,
     igual que `_puede_empezar` reusa `motivo_no_arranca_tarea`) y el botón
     "Cerrar tarea" en el menú del responsable cuando la tarea está
     `en_revision` y ya no falta ninguna condición.
@@ -3101,7 +3101,7 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
     `docs/INDEX.md` (fila agregada a la tabla de decisiones).
 
   Pruebas nuevas (RED verificado antes de implementar, revirtiendo sólo los
-  tres archivos de `src/prisma/` con `git stash` y corriendo las pruebas
+  tres archivos de `src/leda/` con `git stash` y corriendo las pruebas
   nuevas contra el código viejo):
   - `tests/test_aprobacion_cierra_tarea.py` (nuevo):
     `test_aprobar_tarea_cierra_cuando_las_condiciones_estan`,
@@ -3114,7 +3114,7 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
     `test_menu_responsable_en_revision_ofrece_cerrar_tarea_si_ya_alcanza`,
     `test_menu_responsable_en_revision_sin_aprobacion_no_ofrece_cerrar_tarea`,
     `test_cerrar_tarea_desde_el_menu_termina_en_vista_previa`.
-  - RED (código de `src/prisma/` en el estado anterior a esta unidad): `8
+  - RED (código de `src/leda/` en el estado anterior a esta unidad): `8
     failed, 1 passed` -- las 6 de `test_aprobacion_cierra_tarea.py` (tarea
     seguía `en_revision`/mensaje seguía siendo la vista previa) y 2 de las 3
     nuevas de `test_menu_tarea.py` (`Cerrar tarea` no aparecía en el menú ni
@@ -3187,8 +3187,8 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
     candidatas de una dependencia (`gateway._pedir_eleccion_dependencia`).
 
   Archivos:
-  - `src/prisma/agente.py`: `_encolar_opciones_modelo` (hallazgo 6).
-  - `src/prisma/salida.py`: `truncar_etiqueta_boton` (seguimiento a);
+  - `src/leda/agente.py`: `_encolar_opciones_modelo` (hallazgo 6).
+  - `src/leda/salida.py`: `truncar_etiqueta_boton` (seguimiento a);
     `_PALABRAS_FUNCION_FINALES` + `_sin_palabras_funcion_finales` +
     `acortar_etiqueta_boton` (hallazgo 7); `etiquetas_boton_distinguibles`
     (seguimientos b y c).
@@ -3224,7 +3224,7 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   texto_del_modelo_ya_pregunta` y `tests/test_salida.py::test_acortar_
   etiqueta_boton_no_termina_en_palabra_de_funcion` contra el código sin
   estas correcciones, con `agente.py`/`salida.py` apartados temporalmente
-  por `git stash push -- src/prisma/agente.py src/prisma/salida.py`, los
+  por `git stash push -- src/leda/agente.py src/leda/salida.py`, los
   archivos de prueba ya escritos):
   `.venv/Scripts/python.exe -m pytest -q tests/test_opciones_modelo.py::
   test_no_duplica_la_pregunta_si_el_texto_del_modelo_ya_pregunta
@@ -3268,9 +3268,9 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   ocho archivos de prueba existentes adaptados + un archivo nuevo).
 
   **Evidencia real:** Ariel tocó "Ya la terminé" sobre una tarea que exige
-  evidencia (`evidencia_requerida = ['explicacion']`); Prisma la pasó a
+  evidencia (`evidencia_requerida = ['explicacion']`); Leda la pasó a
   `en_revision` sin pedir ni registrar ninguna. Ismael, el aprobador, tocó
-  "Aprobar" → vista previa → Confirmar y Prisma lo dejó aprobar a ciegas,
+  "Aprobar" → vista previa → Confirmar y Leda lo dejó aprobar a ciegas,
   contestando "Se aprueba «…»; para cerrarla todavía falta: Falta la evidencia
   requerida." -- con "falta" repetida. Una revisión de código aparte encontró el
   defecto de fondo: `_aprobar_tarea`/`_preparar_aprobar_tarea` no exigían que la
@@ -3302,7 +3302,7 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
     para llamarla en vez de repetir el chequeo inline (mismo criterio que
     `motivo_no_arranca_tarea`/`estado_previo_a_bloqueo`: una función, no una
     regla duplicada en Python).
-  - `src/prisma/herramientas.py`: `_MOTIVO_FALTA_EVIDENCIA_ENTREGA`;
+  - `src/leda/herramientas.py`: `_MOTIVO_FALTA_EVIDENCIA_ENTREGA`;
     `actualizar_estado` gana el parámetro opcional `evidencia_texto`;
     `_preparar_actualizar_estado`/`_actualizar_estado` piden/registran la
     evidencia junto con el cambio a `en_revision` (dos filas, un acto, mismo
@@ -3317,11 +3317,11 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
     "falta" corregido en `_preparar_aprobar_tarea` y el aviso de `_aprobar_tarea`;
     `_avisar_dependencia_informativa` en `_aprobar_tarea` usa `aprobacion_id` en
     vez de `uuid.uuid4()` (revisión review-ec6f7d80, decisión 6 del enunciado).
-  - `src/prisma/menu_tarea.py`: `evidencia_pendiente` (envoltorio de la función
+  - `src/leda/menu_tarea.py`: `evidencia_pendiente` (envoltorio de la función
     SQL, mismo patrón que `_puede_cerrar`/`_puede_empezar`); el menú del
     aprobador en `en_revision` sólo ofrece "Aprobar" sin evidencia pendiente, y
     siempre ofrece "Pedir cambios".
-  - `src/prisma/gateway.py`: `_resolver_toque_menu_tarea` -- "terminar" pide la
+  - `src/leda/gateway.py`: `_resolver_toque_menu_tarea` -- "terminar" pide la
     evidencia primero si falta (`_pedir_dato_menu_tarea`) y agrega la acción
     "pedir_cambios"; `_resumir_dato_menu_tarea` mapea esos dos datos a
     `actualizar_estado(evidencia_texto=...)`/`pedir_cambios_tarea`; wording de
@@ -3397,8 +3397,8 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   `0012`, el mismo guión encontró dos comentarios que se habían perdido al
   transcribir el rollback de `0012`, ya corregidos ahí mismo).
 
-  RED (`git stash push -- src/prisma/herramientas.py src/prisma/menu_tarea.py
-  src/prisma/gateway.py`, con `db/esquema.sql` ya con `evidencia_pendiente` y
+  RED (`git stash push -- src/leda/herramientas.py src/leda/menu_tarea.py
+  src/leda/gateway.py`, con `db/esquema.sql` ya con `evidencia_pendiente` y
   los archivos de prueba ya escritos):
   `.venv/Scripts/python.exe -m pytest -q tests/test_entrega_con_evidencia.py` ->
   `7 failed, 5 passed` (los 5 que ya pasaban son los que no dependen del cambio
@@ -3426,8 +3426,8 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   libre intercalado entre dos toques.
 
 - 2026-09-27 (orquestador): **cierre de la segunda sesión real por Telegram.** Datos
-  ficticios en la base local (copias `db/respaldos/prisma-antes-sesion2-20260927.dump` y
-  `prisma-antes-0012-20260927.dump`); cero incidentes en toda la sesión. Diez hallazgos:
+  ficticios en la base local (copias `db/respaldos/leda-antes-sesion2-20260927.dump` y
+  `leda-antes-0012-20260927.dump`); cero incidentes en toda la sesión. Diez hallazgos:
   1 (botones de lista sólo con la última consulta, `efb4feb`), 2 y 6 (dos preguntas: regla
   del contexto `dafe87e` y la causa real, el servidor pegaba texto y pregunta, `2bee9a9`),
   3 y 7 (etiquetas cortas por palabra sin palabra de enlace final, `e7071eb`, `2bee9a9`),
@@ -3444,7 +3444,7 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   aprobador que ve la evidencia antes de aprobar, "Pedir cambios" (ADR 0009); referencias
   reformuladas por el modelo como el trabajo al que apuntan, sin bajar el umbral de Jev ni
   pasarle más contexto, adoptable sólo si el banco real completo no empeora ningún
-  escenario; principio "Prisma ayuda y dirige, firme donde importa, sin burocracia".
+  escenario; principio "Leda ayuda y dirige, firme donde importa, sin burocracia".
   Los títulos de las tareas ficticias conservan "(simulado)": el esquema protege los campos
   de compromiso como inmutables y no se forzó; sembrarlas sin sufijo en la próxima base de
   prueba.
@@ -3574,8 +3574,8 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
 
 - 2026-09-27: **T6c cerrada — "Pedir cambios" vuelve al estado previo a la entrega.**
   Ruta: delegada, un escritor. Función nueva `estado_previo_a_revision` (misma puerta
-  angosta que `estado_previo_a_bloqueo`: `security definer`, dueña `prisma_owner`,
-  `execute` sólo para `prisma_app`); `exigir_dependencias_resueltas` exime
+  angosta que `estado_previo_a_bloqueo`: `security definer`, dueña `leda_owner`,
+  `execute` sólo para `leda_app`); `exigir_dependencias_resueltas` exime
   `en_revision -> en_curso` cuando el estado previo a la revisión era `en_curso`;
   `_pedir_cambios_tarea` devuelve a `en_curso` o a `asignada` (cualquier otro previo
   -> `asignada`, que nunca saltea el gate), con vista previa, huella y aviso que
@@ -3686,9 +3686,9 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   reconstruido por hora, cadena de aprobación, pendientes, cola de salida, personas
   sin respuesta, incidentes sin aviso, `workspace_id` cruzado). Dos datos laterales:
   (1) la base local con los datos de las sesiones es la base de mantenimiento
-  `postgres` del servidor, la misma a la que apunta `PRISMA_TEST_DB_URL` (las
+  `postgres` del servidor, la misma a la que apunta `LEDA_TEST_DB_URL` (las
   pruebas crean bases propias y no escriben ahí, pero conviven en el mismo lugar);
-  (2) quedan bases residuales `prisma_diag_*`/`prisma_test_*` de corridas viejas.
+  (2) quedan bases residuales `leda_diag_*`/`leda_test_*` de corridas viejas.
   Chequeos que valen para un validador diario: evidencia faltante en revisión,
   gate de arranque por hora, `workspace_id` cruzado (hoy sin constraint en esas
   tablas), proyección del estado, personas sin respuesta.
@@ -3706,7 +3706,7 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   opinión. La idea, en su forma original, no se adopta. Hallazgos laterales del
   banco: (1) `b-0013` falla porque el comprobador compara la etiqueta del botón
   entera y ahora las etiquetas se acortan con "…" (efecto de `e7071eb`/`2bee9a9`
-  sobre el comprobador, no sobre Prisma); (2) `b-0002`/`b-0003` quedan no
+  sobre el comprobador, no sobre Leda); (2) `b-0002`/`b-0003` quedan no
   concluyentes porque el comprobador de nombres toma "Bloqueada Todavía" y
   "Asignada Todavía" como nombres propios (falso positivo); (3) `b-0005-b`, ya
   conocido. `audit_log` ya guarda la resolución de Jev y cada llamada del modelo,
@@ -3716,7 +3716,7 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   aviso de entrega.** Ruta: delegada, un escritor; una corrección pedida por el
   orquestador antes del commit. `_bloquear_tarea` toma `pg_advisory_xact_lock` por
   tarea al empezar `_actualizar_estado`, `_adjuntar_evidencia`, `_aprobar_tarea` y
-  `_pedir_cambios_tarea` (`prisma_app` no tiene `update` sobre `task`, así que `for
+  `_pedir_cambios_tarea` (`leda_app` no tiene `update` sobre `task`, así que `for
   update` falla por permisos; el bloqueo consultivo es el mismo recurso que ya usa
   `ingreso_tareas.start`). Corrección del orquestador: el bloqueo ordena los actos,
   pero `approval.at`, `evidence.at` y `task_state_event.at` tomaban `now()`, la hora
@@ -3784,8 +3784,8 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   escritor; dos agregados pedidos por el orquestador. `espacios/corework.semilla-ficticia.yaml`
   (12 tareas extraídas en sólo lectura de la base de las sesiones, títulos sin
   "(simulado)", cada una colgada de un frente real del pack, fecha objetivo relativa
-  al día de siembra, `evidencia_requerida: [explicacion]`), `src/prisma/siembra.py` y
-  el comando `python -m prisma sembrar corework --semilla <archivo>`. Estados
+  al día de siembra, `evidencia_requerida: [explicacion]`), `src/leda/siembra.py` y
+  el comando `python -m leda sembrar corework --semilla <archivo>`. Estados
   iniciales: seis `en_curso` (una por responsable; una con dependencia bloqueante
   abierta, creada después de arrancar, sin saltear el gate) y seis `asignada`; ninguna
   aprobada ni en revisión. Todo por eventos (`bloquear_estado_directo` rechaza la
@@ -3797,15 +3797,15 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   cantidades y el nombre del archivo) y `evidencia_policy_version` tomada de
   `task_evidence_policy` del área, igual que el alta real (el vacío que encontró el
   experimento 1 era de la carga a mano). Pasos para el usuario en `PRUEBA-LOCAL.md`
-  §5 (respaldo, `create database prisma`, cambiar sólo el nombre de la base en
-  `PRISMA_DB_URL` y, si apunta a la misma base, en `PRISMA_AUTHORITY_DB_URL`,
+  §5 (respaldo, `create database leda`, cambiar sólo el nombre de la base en
+  `LEDA_DB_URL` y, si apunta a la misma base, en `LEDA_AUTHORITY_DB_URL`,
   `esquema`, `importar`, `feriados`, `sembrar`, `enlaces`, `escuchar`).
   RED: sin `siembra.py` no se recolectan las pruebas; para los agregados, `3 failed`.
   GREEN (reejecutado por el orquestador): `tests/test_siembra.py tests/test_esqueleto.py
   tests/test_onboarding.py` -> `51 passed`. Suite completa (escritor): `988 passed,
   108 deselected`.
   Commit `e71cfa0`. RDD sobre `86a55d9..e71cfa0`: **alto** (`process_boundary` en
-  `src/prisma/cli.py`), `review_due`; consentimiento del usuario: revisar.
+  `src/leda/cli.py`), `review_due`; consentimiento del usuario: revisar.
   review-943484ef642de774, cuatro lentes, aprobada y reconocida; frontera en
   `e71cfa0`. Seguimientos atendidos en T7b antes de que el usuario corra los pasos:
   errores del comando sin traza cruda (podía mostrar títulos en el DETAIL de la
@@ -3827,7 +3827,7 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   único en el esquema, así que un objetivo ambiguo se rechaza en vez de elegir uno.
   Pruebas: la de orden legal ahora compara el orden de escritura (`dependency` no
   tiene columna de hora; se usa `cmin` dentro de la misma transacción), seis
-  `en_curso` y seis `asignada`, y tres pruebas del comando por `prisma.cli.main`.
+  `en_curso` y seis `asignada`, y tres pruebas del comando por `leda.cli.main`.
   `PRUEBA-LOCAL.md` §5 aclara que el respaldo real es el `pg_dump` del paso 1.
   RED: `18 failed, 16 passed`. GREEN (reejecutado por el orquestador):
   `tests/test_siembra.py tests/test_esqueleto.py tests/test_onboarding.py` ->
@@ -3844,16 +3844,16 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   tareas validadas. Ninguno afecta una siembra con el archivo versionado.
 
 - 2026-09-28 (orquestador): **pasos 1 y 2 de `PRUEBA-LOCAL.md` §5 hechos.** Respaldo
-  `db/respaldos/prisma-antes-base-nueva-20260928.dump` (263.842 bytes, formato
+  `db/respaldos/leda-antes-base-nueva-20260928.dump` (263.842 bytes, formato
   personalizado de `pg_dump` sobre la base `postgres`; `pg_restore -l` lo lee: 46
   entradas de datos, entre ellas `task`, `task_state_event`, `approval`, `evidence`;
-  no se ensayó una restauración completa de este archivo). Base vacía `prisma`
+  no se ensayó una restauración completa de este archivo). Base vacía `leda`
   creada en el mismo servidor. La base `postgres` sigue intacta (12 tareas). Sin
   imprimir la URL ni credenciales (cargadas como las carga la suite). Quedan para el
   usuario los pasos 3 a 7.
 
 - 2026-09-28 (usuario): **base nueva lista y listener corriendo.** El usuario cambió
-  `PRISMA_DB_URL` y `PRISMA_AUTHORITY_DB_URL` a la base `prisma` y corrió `esquema`
+  `LEDA_DB_URL` y `LEDA_AUTHORITY_DB_URL` a la base `leda` y corrió `esquema`
   ("Esquema aplicado."), `importar corework --activar` (v1, activo; 4 personas sin
   Telegram), `feriados corework`, `sembrar` ("12 tareas y 1 dependencias sembradas.
   asignada: 6, en_curso: 6") y `escuchar corework`. `enlaces --solo Ismael Ariel Marcos`
@@ -3924,7 +3924,7 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   b-0002-c, b-0005-b, b-0013, b-0016); después `banco-20260928T113448Z.json` -> 32
   aprobado, 4 falla (b-0001, b-0001-a, b-0002-c, b-0013, las cuatro ya fallaban antes).
   Ningún escenario empeoró; mejoraron b-0001-b, b-0005-b y b-0016. Los de guarda
-  (b-0008, b-0009, b-0010, b-0014) siguieron aprobados: Prisma sigue preguntando en vez
+  (b-0008, b-0009, b-0010, b-0014) siguieron aprobados: Leda sigue preguntando en vez
   de adivinar. Límite honesto: una sola corrida por escenario (n=1), así que las
   mejoras de b-0001-b y b-0016 pueden ser ruido; no se corrió n=3. **Abierto**: b-0001,
   b-0001-a, b-0002-c y b-0013 fallan en las dos corridas, sin relación con las
@@ -3934,7 +3934,7 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   orquestador); suite completa (escritor): `1027 passed, 108 deselected`.
 
 - 2026-09-28 (usuario): **la tercera ronda por Telegram queda pendiente para la próxima
-  sesión.** No se llegó a probar ningún circuito. La base `prisma` queda lista y
+  sesión.** No se llegó a probar ningún circuito. La base `leda` queda lista y
   sembrada (12 tareas: seis `en_curso`, seis `asignada`, una dependencia bloqueante),
   con Ismael, Ariel y Marcos ya vinculados. Guion de la ronda: circuito A (Ariel
   entrega "Dashboard de lotes en CoreLabs" con evidencia -> Ismael pide cambios -> Ariel
@@ -3955,21 +3955,21 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   `admin_notice` y función `security definer` `avisar_incidente_admin` (mismo patrón
   que `emitir_acceso_tablero`), columna `incident.notificado_admin_en`, migración
   `db/migrations/0017_aviso_incidente_administracion.sql` y su rollback. Un único punto
-  de entrada, `src/prisma/incidentes.registrar_incidente()`, reemplaza los `insert into
+  de entrada, `src/leda/incidentes.registrar_incidente()`, reemplaza los `insert into
   incident` repartidos. El aviso lleva el texto de la persona (o el resumen de la acción
   tocada) hasta 1000 caracteres, quién, etapa, severidad, resumen saneado, id,
   espacio y hora; nunca `referencia_cruda` (puede traer secretos). Cada aviso deja una
   fila de `audit_log` (`aviso_incidente_admin`, sólo ids). Alcanzable = el
   administrador ya le escribió alguna vez al bot de administración (Telegram no deja
   que un bot inicie la conversación). `local.tareas_de_fondo` despacha los avisos
-  con `despachador.despachar_avisos_admin`; sin `PRISMA_BOT_TOKEN_ADMIN` quedan en cola.
+  con `despachador.despachar_avisos_admin`; sin `LEDA_BOT_TOKEN_ADMIN` quedan en cola.
   Hallazgo lateral: en modo `servir` nadie despacha `message_outbox` ni
   `admin_notice` (`reloj.py` sólo encola) -- entra en #29. RED/GREEN observado (el RED
   encontró que la auditoría no recibía la referencia). Enfocada (reejecutada por el
   orquestador): `tests/test_avisos_admin.py tests/test_gateway.py
   tests/test_capacidades.py tests/test_task_intake.py` -> `102 passed`. Suite completa
   (escritor, dos veces): `1037 passed, 108 deselected`. **Migración 0017 no aplicada a
-  la base `prisma`**: aplicarla antes de reiniciar el listener.
+  la base `leda`**: aplicarla antes de reiniciar el listener.
   Revisión del tramo `cb9cd2d..dd6ab0a` (hallazgo 10, `b-0005-b`, #28): medio,
   `review_due`; consentimiento del usuario: revisar. review-1b0a5a4777341c90
   (confiabilidad) aprobada y reconocida; frontera en `dd6ab0a`. Dos WARNING reales
@@ -3999,9 +3999,9 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   (Buenos Aires), ajenas a este cambio -> tarea nueva. Confirmado sin tocar:
   `despachador._fallo` (`message_outbox`) también reintenta sin espera en horario
   laboral, porque `cal.dentro_de_jornada(ahora)` devuelve `ahora`.
-  Migración `0017` aplicada a la base `prisma` con respaldo previo
-  (`db/respaldos/prisma-antes-0017-20260928.dump`). Hallazgo al preparar la ronda: en
-  modo local el administrador no es alcanzable. La base `prisma` no tiene ningún
+  Migración `0017` aplicada a la base `leda` con respaldo previo
+  (`db/respaldos/leda-antes-0017-20260928.dump`). Hallazgo al preparar la ronda: en
+  modo local el administrador no es alcanzable. La base `leda` no tiene ningún
   `platform_role` 'administrador' y ningún comando lo asigna, y `escuchar` no lee el bot
   de administración (`mensaje_admin` sólo se registra por el webhook de `servir`) ->
   tarea nueva, antes de la ronda.
@@ -4023,7 +4023,7 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   líneas), queda pendiente en la rebanada.
 
 - 2026-09-28: **#28c cerrada — seguimientos de review-cc9552ab.** Ruta: delegada, un
-  escritor. R3-001: la prueba del `.env` releído dejaba `PRISMA_BOT_TOKEN_ADMIN` en el
+  escritor. R3-001: la prueba del `.env` releído dejaba `LEDA_BOT_TOKEN_ADMIN` en el
   entorno (`delenv(raising=False)` sin nada que restaurar y `recargar_dotenv` escribe
   con `setdefault`); ahora `setenv` + `delenv` registran siempre el deshacer. R3-002:
   el incidente de un aviso agotado se escribe dentro de un savepoint; si falla, el lote
@@ -4038,7 +4038,7 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
 
 - 2026-09-28: **Administrador alcanzable en modo local (T11 de la sesión).** Ruta:
   delegada, un escritor (el primer intento se cortó por el límite de uso, sin dejar
-  cambios; se relanzó igual). `python -m prisma administrador <espacio> <nombre>`:
+  cambios; se relanzó igual). `python -m leda administrador <espacio> <nombre>`:
   busca entre los integrantes activos por fragmento del nombre, prefiere la
   coincidencia exacta (ajuste del orquestador: es un rol privilegiado), frena si hay
   cero o varias, otorga `platform_role` de forma idempotente y audita
@@ -4089,7 +4089,7 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
 
 - 2026-09-28: **#29 cerrada — una sola rutina de fondo para `escuchar` y `servir`.**
   Ruta: mapeo delegado (sólo lectura) y un escritor; dos pasadas. Módulo nuevo
-  `src/prisma/ciclo.py` (`reloj.py` sigue sin enviar nada): por espacio, cadencias
+  `src/leda/ciclo.py` (`reloj.py` sigue sin enviar nada): por espacio, cadencias
   vencidas + escalera + `despachar`; una vez por pasada, `despachar_avisos_admin`.
   `Escucha.tareas_de_fondo` y `servir` (un único job de APScheduler cada 20 s, vía
   `reloj.montar`) usan el mismo código. Las cadencias se releen de `cadence_job` en cada
@@ -4158,12 +4158,12 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   (desde antes de hoy), `admin_notice.ultimo_error` e `incident.referencia_cruda`
   (hallazgo R1-001 de review-6d62b73c). Corregido en el origen: `pedido_telegram`
   convierte cualquier falla de una llamada a Telegram en `ErrorTelegram` (tipo, código
-  HTTP y `description`, `from None`), en los 12 llamados de `src/prisma/`
+  HTTP y `description`, `from None`), en los 12 llamados de `src/leda/`
   (despachador, local, gateway, cli). Defensa en profundidad:
   `incidentes.redactar_secreto_telegram` tapa `api.telegram.org/bot...` y
   `bot<dígitos>:<token>` en `referencia_cruda` y `ultimo_error`. ROJO de las 18 pruebas
   nuevas con los archivos de `HEAD`, VERDE con el cambio. Suite completa del escritor:
-  `1136 passed, 108 deselected`. Las bases locales `prisma` y `postgres` no tenían filas
+  `1136 passed, 108 deselected`. Las bases locales `leda` y `postgres` no tenían filas
   con el token (consulta de conteo del orquestador).
   Revisión de `c4e877e..5a6c82a` (#29c y el token): alto (`high_risk`, 967 líneas);
   consentimiento del usuario: revisar. review-709174f82057e0c2 (4 lentes) aprobada y
@@ -4248,7 +4248,7 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   commit explícito en /start sin token (tarea nueva). ROJO/VERDE observados. Suite
   completa del escritor: `1199 passed, 108 deselected`. Pendiente: verificación visual
   en Telegram real, en la ronda.
-  Base `prisma`: respaldo `db/respaldos/prisma-antes-0018-0019-20260928.dump` y
+  Base `leda`: respaldo `db/respaldos/leda-antes-0018-0019-20260928.dump` y
   migraciones `0018` y `0019` aplicadas; `saludo.verificar_migraciones` -> `None`.
   Revisión de `d1e3e1e..e2a094e`: medio (`slice_budget_reached`, 1025 líneas);
   consentimiento del usuario: revisar. review-2758883d40d83428 (confiabilidad)
@@ -4276,7 +4276,7 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   horario los avisos que no son respuesta se postergan.
 
 - 2026-09-28 (noche): **Tercera ronda por Telegram — cortada por el usuario, con
-  hallazgos.** Base local `prisma`, `escuchar corework --sin-cadencias`, 21:00-21:46
+  hallazgos.** Base local `leda`, `escuchar corework --sin-cadencias`, 21:00-21:46
   (fuera del horario laboral 09:00-17:00: los avisos que no son respuesta quedaron
   postergados). Participaron Ariel e Ismael; el circuito B no se llegó a correr.
   Evaluación del usuario: "tarda mucho en responder, se pierde en la conversación, no es
@@ -4296,7 +4296,7 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
 
   **Hallazgos (R3-H):**
   - H1. El aviso de incidente al administrador necesita explicación humana. Formato
-    aprobado por el usuario: "⚠️ Prisma no pudo responderle a X" / Qué pasó / Qué vio X /
+    aprobado por el usuario: "⚠️ Leda no pudo responderle a X" / Qué pasó / Qué vio X /
     Qué hacer / Mensaje / Detalle técnico (hora local del espacio, no UTC). Qué pasó y
     Qué hacer salen de una tabla determinista de causas conocidas, no del modelo.
   - H2. El mensaje neutro a la persona es poco claro. Texto nuevo aprobado: "Tuve un
@@ -4308,7 +4308,7 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   - H5. El indicador sólo cubre turnos de texto (único punto: `gateway.py:333`); al tocar
     un botón no hay ninguna señal y la persona toca dos veces.
   - H6. Preparación: la base nueva no tenía `model_config` (cada texto terminaba en
-    incidente `LookupError`). Resuelto en vivo con `python -m prisma modelo
+    incidente `LookupError`). Resuelto en vivo con `python -m leda modelo
     deepseek-v4-flash --proveedor nan` (el de la base vieja) y `PRUEBA-LOCAL.md` §5 paso 5b.
   - H7. Regla del usuario: con hasta 3 tareas el texto las nombra enteras; con más,
     resume y los nombres quedan en los botones. Siempre igual (hoy el modelo alterna).
@@ -4348,11 +4348,11 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   texto ignorados); (3) ninguna señal al tocar botones.
 
   **Decisiones del usuario para retomar:** cambiar el modelo a uno rápido por OpenRouter
-  (ya hay clave, `PRISMA_OPENROUTER_API_KEY`; el usuario propone Gemini 3.8 o GPT Luna
-  6: verificar los identificadores reales con `python -m prisma modelos --proveedor
+  (ya hay clave, `LEDA_OPENROUTER_API_KEY`; el usuario propone Gemini 3.8 o GPT Luna
+  6: verificar los identificadores reales con `python -m leda modelos --proveedor
   openrouter`, medir y elegir); leer como insumo el manual de personalidad, voz y
   comportamiento del trabajo anterior del usuario con otra IA
-  (`D:\Proyectos\PRISMA-PACK-VERACIDAD-Y-AMBIGUEDAD-20260923\PRISMA-MANUAL-PERSONALIDAD-VOZ-Y-COMPORTAMIENTO-20260928.md`),
+  (`D:\Proyectos\LEDA-PACK-VERACIDAD-Y-AMBIGUEDAD-20260923\LEDA-MANUAL-PERSONALIDAD-VOZ-Y-COMPORTAMIENTO-20260928.md`),
   medido contra el corpus del repo como pide `AGENTS.md`.
 
   **Operación:** listener detenido. Los dos avisos postergados a las 09:00 ("Ariel
@@ -4379,7 +4379,7 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   -> 112 passed (escritor y repetida por el orquestador); suite completa `pytest -q`
   -> 1208 passed, 108 deselected. Pendiente: `.env.ejemplo` no se pudo revisar (el
   sistema de permisos niega su lectura); el usuario confirma si su comentario dice que
-  `PRISMA_OPENROUTER_API_KEY` es sólo para Jev.
+  `LEDA_OPENROUTER_API_KEY` es sólo para Jev.
   Candidatos en OpenRouter verificados en el catálogo público:
   `google/gemini-3.8-flash` y `openai/gpt-6-luna` (ambos con herramientas).
   PostgreSQL local estaba colgado desde las 22:02 (autovacuum terminó con 0xC0000142 y
@@ -4535,7 +4535,7 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   `review-e95b2d47b01f0161` (medio) aprobada y reconocida; frontera en `5371921`. Banco real
   (n=3): 12/18. El ruteo acertó siempre (`corrige`, `otro_tema`); las fallas son después: (1)
   la corrección "se rompió el variador" sacó "el variador roto" como referencia a tarea, Jev
-  no la resolvió y Prisma preguntó "¿A cuál te referís?" en vez de corregir (mismo mecanismo
+  no la resolvió y Leda preguntó "¿A cuál te referís?" en vez de corregir (mismo mecanismo
   probable de H19); (2) con `otro_tema`, el modelo volvió a proponer el bloqueo por su cuenta
   (el banco confirma al final y quedó el efecto). Precisión del ADR 0013 regla 1 y T9-R1b-2.
 
@@ -4720,7 +4720,7 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   aclaración no era rama. `4ab92a8`: un turno termina en la primera pregunta que abre (una
   llamada posterior que escribe o pregunta se rechaza antes de ejecutarse; las lecturas
   siguen). `d398e4d`: si el aviso y la vista previa no entran juntos, salen en dos partes.
-  `9e0d82a`: la elección con botones que pidió Prisma (aclaración, elección de la otra
+  `9e0d82a`: la elección con botones que pidió Leda (aclaración, elección de la otra
   tarea de una dependencia, elección de herramienta) es rama; las ofertas de navegación
   (listas, menú de una tarea, `ofrecer_opciones`) no. `21884dd`: siembra de la pregunta
   abierta en el banco y familia `b-0024`. Suite del escritor 1680 passed, 234 deselected;
@@ -4731,7 +4731,7 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   texto; R3-H7, T10).
 
 - 2026-09-29: **T9-R1d-2.** Ruta: delegada, un escritor. `6d78229`: `despachar` retiene
-  lo que inicia Prisma (no las respuestas) mientras el destinatario tiene una rama abierta
+  lo que inicia Leda (no las respuestas) mientras el destinatario tiene una rama abierta
   en ese chat; una sola definición de rama (`pendientes.ver_rama_abierta`, usada también por
   `gateway._ver_pregunta_abierta`); la fila retenida queda `listo` y sale en orden al
   cerrarse o vencer la pregunta; `despachar` informa `retenidos`. Vencimientos: dato
@@ -4857,7 +4857,7 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
 
 - 2026-09-29: **Decisión del usuario — quien pide revisa antes de enviar (opción A).**
   Precisión del ADR 0005; tarea T9-R1c-4. Además autorizó aplicar `0020`, `0021` y `0022` en
-  la base local: respaldo `db/respaldos/prisma-antes-0020-0022-20260929.dump` (525 entradas
+  la base local: respaldo `db/respaldos/leda-antes-0020-0022-20260929.dump` (525 entradas
   legibles con `pg_restore -l`).
 
 - 2026-09-29: **T9-R4b.** Ruta: delegada, un escritor. `6486a26` (una `ref` explícita gana
@@ -4873,13 +4873,13 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   `review-c264ebc81ffa5f14` **aprobada y reconocida**; frontera en `d5a89da`. Seguimientos a
   T9-R4c.
 
-- 2026-09-29: **Migraciones `0020`, `0021`, `0022` aplicadas en la base local `prisma`**
-  (autorización del usuario). Respaldo `db/respaldos/prisma-antes-0020-0022-20260929.dump`
+- 2026-09-29: **Migraciones `0020`, `0021`, `0022` aplicadas en la base local `leda`**
+  (autorización del usuario). Respaldo `db/respaldos/leda-antes-0020-0022-20260929.dump`
   (525 entradas); ensayo en una copia descartable restaurada del respaldo: las tres
   aplicaron y `saludo.verificar_migraciones` pasó de `0020_bloque_copiable.sql` a `None`;
   copia borrada. Luego en la base real, con el mismo resultado (`None`). Con `psql -f`,
   `ON_ERROR_STOP=1`, `PGCLIENTENCODING=UTF8`, como dueño del esquema; ningún proceso de
-  Prisma escribía en la base.
+  Leda escribía en la base.
 
 - 2026-09-29: **Cierre de sesión — punto exacto para retomar.** `main` publicado en
   `origin` (push pedido por el usuario). Frontera de revisión RDD en `d5a89da`
@@ -4887,16 +4887,16 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   T9-R1c (0, 1, 2, 2b, 3, 3b), T9-R1d (1a, 1a-fix, 1b, 1c, 2, 2b), T9-R2, T9-R2b, T9-R3,
   T9-R4, T9-R4b: las cuatro reglas del ADR 0013 implementadas, con su banco real en verde
   salvo redacción. Decisiones del usuario de la sesión: una sola rama abierta (enmienda ADR
-  0013), los mensajes de Prisma esperan sólo mientras la persona está activa en la rama (30
+  0013), los mensajes de Leda esperan sólo mientras la persona está activa en la rama (30
   min), [Modificar] con selector y bloque copiable en el borrador del alta (ADR 0005), quien
   pide revisa antes de enviar a aprobación (opción A, ADR 0005), consentimiento permanente
-  para las revisiones RDD y parar sólo por decisiones sobre cómo funciona Prisma.
+  para las revisiones RDD y parar sólo por decisiones sobre cómo funciona Leda.
   **Próximo, en orden:** T9-R4c (seguimientos chicos de la última revisión), T9-R1c-4 (quien
   pide revisa antes de enviar), T9-H19 (reproducir las dos respuestas a un mensaje), T10
   (forma de las respuestas: redacción, voz, listas que nombren las tareas; junta las fallas
   de redacción del banco: `b-0001`, `b-0001-a`, `b-0013`, `b-0024-b`, `b-0021-c`), T11
   (cuarta ronda por Telegram con las cuentas del usuario). Consulta anotada para más
-  adelante: en grupos, Prisma responde todo, ahora también las fotos. Método: un escritor
+  adelante: en grupos, Leda responde todo, ahora también las fotos. Método: un escritor
   por unidad con TDD, commit, evaluación y revisión RDD (consentimiento permanente), banco
   real de la familia (n=3); nunca dos sesiones de pytest a la vez sobre el servidor local.
 
@@ -4931,7 +4931,7 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   aprobación] [Modificar] [Cancelar] (`pending_action` propia,
   `pendientes.HERRAMIENTA_REVISION_BORRADOR`); Modificar reusa el selector de T9-R1c-3 y
   vuelve a la revisión de quien pide; Enviar se intercepta en el gateway, cierra la revisión
-  una sola vez y registra la vista previa de quien confirma (iniciada por Prisma) más "Le
+  una sola vez y registra la vista previa de quien confirma (iniciada por Leda) más "Le
   mandé el borrador…" como única respuesta al toque; un toque tardío recibe "ya no está
   vigente"; `NO_ACTIVE_AUTHORITY` se detecta antes de mostrar la revisión; claves
   `review:v{n}` y `preview:v{n}`; `despachador._preview_vigente` reconoce la revisión.
@@ -4946,7 +4946,7 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   afirmar nada, pero sin "Estado: sin cambios" (esa línea sólo se agrega cuando un intento
   fue rechazado); no lo toca esta unidad: a T10 (forma de la negativa sin intento).
   Latencia del responder en esas corridas: ~32 s (a vigilar). Migración `0023` **pendiente
-  de aplicar en la base local `prisma`** (sólo reemplaza una función; sin ella el gateway
+  de aplicar en la base local `leda`** (sólo reemplaza una función; sin ella el gateway
   igual nunca manda "enviar" a la autoridad).
 
 - 2026-09-30: **T9-R1c-4b.** Ruta: delegada, un escritor (`ingreso_tareas.py` y pruebas).
@@ -4965,7 +4965,7 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   `gateway.py`, `agente.py`, `salida.py`, `herramientas.py`, pruebas). `31caed3`: el
   comprobador del banco compara etiquetas sin el ícono (T10-1). `e1bc84d`: aviso neutro con
   el texto aprobado (H2, ahora en `incidentes.NOTICIA_NEUTRA_INCIDENTE`) y aviso de incidente
-  al administrador con el formato aprobado (H1): "⚠️ Prisma no pudo responderle a
+  al administrador con el formato aprobado (H1): "⚠️ Leda no pudo responderle a
   {nombre}", Qué pasó / Qué vio / Qué hacer / Mensaje / Detalle técnico, hora local del
   espacio, tabla determinista `EXPLICACION_POR_ETAPA` con prueba que exige una entrada por
   etapa. `4597de9`: Modificar con ✏️ desde una sola definición (H10); Enviar a aprobación
@@ -4996,7 +4996,7 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   tienen, con explicación en la tabla; prueba AST que exige `etapa=`. `16747b1`: el
   corredor del banco toca un botón de aclaración nombrado por su título completo cuando el
   botón lo muestra acortado. Diagnóstico de `b-0013` (repetición determinista): el ruteo
-  saca dos referencias del mismo mensaje y Prisma pregunta dos veces "¿A cuál te referís?"
+  saca dos referencias del mismo mensaje y Leda pregunta dos veces "¿A cuál te referís?"
   con las mismas candidatas; nada se ejecuta hasta responder la segunda: a T9-R5 (consulta).
   Suite del escritor 2068 passed, 300 deselected; banco determinista 346 passed; padre:
   enfocadas 8 passed; banco real `b-0008` pasa, `b-0013` falla como se diagnosticó. RDD:
@@ -5113,24 +5113,24 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   cambiar las prioridades. Antes de la ronda: aplicar `0023` en la base local (con
   autorización), cerrar la revisión de T9-H19h y el gate de sesión progresiva de `AGENTS.md`.
 
-- 2026-09-30: **Migración `0023` aplicada en la base local `prisma`** (autorización del
-  usuario). Respaldo `db/respaldos/prisma-antes-0023-20260930.dump` (532 entradas legibles
+- 2026-09-30: **Migración `0023` aplicada en la base local `leda`** (autorización del
+  usuario). Respaldo `db/respaldos/leda-antes-0023-20260930.dump` (532 entradas legibles
   con `pg_restore -l`); ensayo en una copia descartable restaurada del respaldo: antes
-  `resolver_ingreso_borrador` no rechazaba "enviar", después sí, dueño `prisma_owner`; copia
+  `resolver_ingreso_borrador` no rechazaba "enviar", después sí, dueño `leda_owner`; copia
   borrada. Luego en la base real con el mismo resultado; `saludo.verificar_migraciones` ->
-  `None`. `psql -f` con `ON_ERROR_STOP=1`, `PGCLIENTENCODING=UTF8`; ningún proceso de Prisma
+  `None`. `psql -f` con `ON_ERROR_STOP=1`, `PGCLIENTENCODING=UTF8`; ningún proceso de Leda
   escribía en la base.
 
 - 2026-09-30: **Base nueva para la cuarta ronda** (autorización del usuario: "rearmamos la
-  base con datos ficticios nuevos"). Respaldo `db/respaldos/prisma-antes-ronda4-20260930.dump`
-  (532 entradas legibles, 12 tareas); con cero conexiones abiertas y `PRISMA_DB_URL`
-  verificada contra la base esperada, `drop database prisma` / `create database prisma`;
-  luego `python -m prisma esquema`, `importar corework --activar`, `feriados corework`,
+  base con datos ficticios nuevos"). Respaldo `db/respaldos/leda-antes-ronda4-20260930.dump`
+  (532 entradas legibles, 12 tareas); con cero conexiones abiertas y `LEDA_DB_URL`
+  verificada contra la base esperada, `drop database leda` / `create database leda`;
+  luego `python -m leda esquema`, `importar corework --activar`, `feriados corework`,
   `sembrar corework --semilla espacios/corework.semilla-ficticia.yaml` (12 tareas: 6
   asignadas, 6 en curso, 1 dependencia), `modelo deepseek-v4-flash --proveedor nan`,
   `administrador corework "Ariel De Simone"`. Ariel, Ismael y Marcos quedan activos (el
   pack trae sus Telegram); `verificar_migraciones` -> `None`; la base rechaza "enviar" y la
-  función sigue siendo de `prisma_owner`. El usuario maneja todas las cuentas de prueba.
+  función sigue siendo de `leda_owner`. El usuario maneja todas las cuentas de prueba.
 
   **Guion de T11** (horario laboral; datos ficticios): circuito A — Ariel entrega "Dashboard
   de lotes en CoreLabs" con evidencia, Ismael pide cambios, Ariel vuelve a entregar con
@@ -5154,7 +5154,7 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   passed, 309 deselected; banco real completo 98/100. Base local rearmada para T11 con datos
   ficticios nuevos. **Próximo:** T11 cuando el usuario vuelva: `pg_isready` (o `pg_ctl`
   tras reiniciar Windows), Ariel le escribe una vez al bot de administración, arrancar
-  `python -m prisma escuchar corework`, guion A/B/C de arriba. Después de la ronda: las
+  `python -m leda escuchar corework`, guion A/B/C de arriba. Después de la ronda: las
   consultas abiertas (T9-R1c-5, T9-R5, T9-H19c, T10-6, T10-7), T9-H19i y los pendientes
   menores (índice de `inbound_message`, relojes de `despachador` y `contexto`). `main` sin
   push (lo decide el usuario).
@@ -5177,13 +5177,13 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   - R4-H5. Encabezado del menú de tarea con puntos medios y "En revisión"/"En curso" con
     mayúscula ("«X» · Ariel De Simone · En revisión").
   - R4-H6. Ver detalle, Aprobar, Pedir cambios, Ya la terminé: todos con el mismo 📋.
-  - R4-H7. **Alto.** Los avisos que inicia Prisma no salen: "Ariel entregó…" a Ismael (dos
+  - R4-H7. **Alto.** Los avisos que inicia Leda no salen: "Ariel entregó…" a Ismael (dos
     veces) y "Ismael pidió cambios…" a Ariel quedaron `listo` sin enviar. Causa verificada
     en la base: los flujos terminados dejan su pregunta en `esperando` (`_opciones_modelo`
     de R4-H3 tras contestar con el link; `_dato_menu_tarea` de pedir cambios y de terminar
     después de confirmar; `_menu_tarea` del aviso), así que la persona figura con una rama
     abierta y, como estuvo activa hace menos de 30 minutos, `despachador._rama_activa_de`
-    retiene todo lo que Prisma le inicia. Corta los pasos 4 y 5 del circuito A y bloquearía
+    retiene todo lo que Leda le inicia. Corta los pasos 4 y 5 del circuito A y bloquearía
     el B y el C. Regla 1 del ADR 0013: una rama se cierra cuando su flujo termina.
   - R4-H8. **Alto.** "¿Qué pasó con mi tarea?" después de que pidieron cambios: "sigue en
     curso… No tuvo cambios de estado." Es falso (pasó a revisión y volvió con cambios
@@ -5256,7 +5256,7 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
      3 en corework) sigue para seguimientos, recordatorios de la escalera y cadencias.
   2. **T9-R1c-5:** el botón de quien confirma el borrador de otra persona no se llama
      "Cancelar" sino **"Rechazar"**, y a quien lo pidió se le avisa. Rechazar **pide el motivo** (como "Pedir cambios") y se lo pasa a quien pidió.
-  3. **T9-R5:** una elección ya hecha vale para todo el mensaje; Prisma no pregunta dos
+  3. **T9-R5:** una elección ya hecha vale para todo el mensaje; Leda no pregunta dos
      veces "¿A cuál te referís?" con las mismas candidatas ("no tiene utilidad, y molesta").
   4. **T9-H19c:** un mensaje editado se ignora; para otra cosa se escribe un mensaje nuevo.
   5. **T10-6:** el saludo en una línea lleva los tres botones genéricos (como quedó en
@@ -5324,8 +5324,8 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   `under_budget`: pendiente en el tramo.
 
 - 2026-09-30: **Base rearmada para retomar T11** (autorización del usuario). Respaldo
-  `db/respaldos/prisma-antes-ronda4b-20260930.dump` (526 entradas legibles); misma secuencia
-  que en el primer rearmado (`drop`/`create` con cero conexiones y `PRISMA_DB_URL`
+  `db/respaldos/leda-antes-ronda4b-20260930.dump` (526 entradas legibles); misma secuencia
+  que en el primer rearmado (`drop`/`create` con cero conexiones y `LEDA_DB_URL`
   verificada, `esquema`, `importar --activar`, `feriados`, `sembrar`, `modelo`,
   `administrador`): 12 tareas; `verificar_migraciones` -> `None`; columna
   `message_outbox.es_coordinacion` presente. `escuchar corework` arrancado. Ariel tiene que
@@ -5345,11 +5345,11 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   - R4b-H4. Evidencia mostrada como "- (texto) https://…".
   - R4b-H5. **Medio-alto.** A "¿Qué falta corregir en «X»?", la respuesta "necesito
     capturas de pantalla" recibió "Eso todavía no lo puedo hacer." y la misma pregunta: el
-    ruteo tomó el motivo como un pedido que Prisma no puede cumplir (capturas). Regla 1 del
+    ruteo tomó el motivo como un pedido que Leda no puede cumplir (capturas). Regla 1 del
     ADR 0013: con una pregunta de texto libre abierta, el mensaje es la respuesta. Hubo que
     reformular ("tiene que enviar capturas…").
   - R4b-H6. El aviso "Ismael pidió cambios…" a Ariel (17:35) quedó programado para el
-    01/10 09:00: fuera del horario laboral del espacio, lo que inicia Prisma espera al día
+    01/10 09:00: fuera del horario laboral del espacio, lo que inicia Leda espera al día
     siguiente (regla vigente; el tope ya no interviene). Afecta la ronda de hoy.
   - R4b-H7. Incidente `entrega_mensaje`: el resumen "Estado del equipo" al chat del grupo
     falló 5 veces con "chat not found" (el bot no está en ese grupo); no se avisó al
@@ -5410,7 +5410,7 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   Frontera RDD `4fc1365`; `ffe4e85` sin revisar (arnés). Listener en la terminal del usuario.
 
 - 2026-09-30: **Observación del usuario sobre la ronda 4 (para abrir la próxima sesión).**
-  Funciona bien la capa de datos: Prisma sabe con quién habla, da datos correctos de sus
+  Funciona bien la capa de datos: Leda sabe con quién habla, da datos correctos de sus
   tareas y no mezcla las de otras personas; los flujos avanzan y se van corrigiendo. Pero
   "todo es muy robótico": "estamos combinando Jev, PostgreSQL y un modelo de razonamiento
   y sólo siento que estamos usando Jev y SQL; la parte más humana, la de comprensión, que
@@ -5430,9 +5430,9 @@ generico`/`_candidatas_tarea_por_titulo` menos 3 quitadas de
   la acepta, va como ADR y gobierna la unidad del alta guiada del orden de trabajo.
 
 - 2026-09-30: **R4c-H10 (observación del usuario, alta guiada).** Con Marcos creando una
-  tarea para él o para Nahuel, Prisma preguntó "Elegí el área." con una sola opción real
+  tarea para él o para Nahuel, Leda preguntó "Elegí el área." con una sola opción real
   ("OT y automatización") más ✏️ Otra opción: una pregunta cuya respuesta ya está
   determinada. Regla propuesta, general: si un dato tiene una sola opción posible, no se
   pregunta; se completa solo y se muestra en el resumen (se puede cambiar con Modificar); y
   "Otra opción" sólo aparece si de verdad hay otra posible (regla 3 del ADR 0013, "sólo
-  opciones posibles"; "Prisma ayuda, no fastidia"). Va con la unidad del alta guiada.
+  opciones posibles"; "Leda ayuda, no fastidia"). Va con la unidad del alta guiada.

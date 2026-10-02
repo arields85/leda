@@ -7,12 +7,12 @@ clientes (`675184a`).
 
 ## Decisión de producto tomada
 
-Una persona le pide el tablero a Prisma por Telegram y recibe un enlace
+Una persona le pide el tablero a Leda por Telegram y recibe un enlace
 personal que vence. Sin usuarios, sin contraseñas.
 
 Se eligió sobre las alternativas —clave compartida por empresa, o registro con
 usuario y contraseña por persona— porque **reusa la identidad que ya funciona**.
-Telegram ya dice quién escribe, y Prisma ya vincula esa persona con su
+Telegram ya dice quién escribe, y Leda ya vincula esa persona con su
 membresía, su área y su autoridad. No hay que construir un sistema de usuarios
 nuevo ni que nadie recuerde otra contraseña.
 
@@ -54,13 +54,13 @@ alcanza: la membresía tiene que seguir activa. Es la regla 6 de la frontera.
 **D5 — Resolver el token necesita una frontera propia.** La búsqueda ocurre
 *antes* de conocer el espacio, así que no puede correr bajo `espacio()`. Va por
 una función acotada, al estilo de la frontera dedicada que ya existe para la
-conversión de Unidad 1A (`src/prisma/db.py:68`). No se le da a la aplicación
+conversión de Unidad 1A (`src/leda/db.py:68`). No se le da a la aplicación
 una consulta general de tokens.
 
 **D6 — CORREGIDA. Lectura y configuración propia.** Decía "sólo lectura: el
 adaptador expone el puerto de lectura y nada más". Quedó incorrecta el mismo
 día: el usuario aclaró que el tablero no es un visualizador, sino la superficie
-desde la que un cliente configura Prisma. Telegram es el intercomunicador; la
+desde la que un cliente configura Leda. Telegram es el intercomunicador; la
 configuración viene del tablero.
 
 Lo que sí se conserva del espíritu original: el tablero alcanza **un solo
@@ -71,14 +71,14 @@ igual que cualquier otro efecto. Ver
 
 **D7 — La duración es configuración del cliente, no una constante.** El
 usuario confirmó que un administrador va a poder cambiarla desde el tablero
-cuando exista esa pantalla. Según la tabla de `docs/product/que-es-prisma.md`,
+cuando exista esa pantalla. Según la tabla de `docs/product/que-es-leda.md`,
 eso la ubica del lado de la configuración por cliente, no del núcleo: vive en
 `workspace_setting`, con 30 minutos por defecto cuando no hay fila. Mismo
-patrón que el tope diario de mensajes (`src/prisma/despachador.py:271`).
+patrón que el tope diario de mensajes (`src/leda/despachador.py:271`).
 
 Decidirlo ahora cuesta nada; hacerlo después exigiría una migración y tocar el
 núcleo. La pantalla de administración, cuando llegue, sólo escribe ese valor.
-`src/prisma/autoridad.py:89` ya distingue a un administrador, así que esa
+`src/leda/autoridad.py:89` ya distingue a un administrador, así que esa
 pantalla tendrá contra qué autorizar.
 
 ## Alcance: el menor circuito útil
@@ -95,8 +95,8 @@ visible serían la deriva que este proyecto ya conoce.
       sale por el grupo.
 - [ ] **T2** — Migración `0006`: tabla de accesos con RLS, función acotada de
       resolución, y la frontera de conexión que la ejecuta.
-- [ ] **T3** — `src/prisma/tablero.py`: emitir y resolver.
-- [ ] **T4** — Entrega por Telegram: la persona pide, Prisma responde con el
+- [ ] **T3** — `src/leda/tablero.py`: emitir y resolver.
+- [ ] **T4** — Entrega por Telegram: la persona pide, Leda responde con el
       enlace por privado.
 - [ ] **T5** — Adaptador HTTP en `gateway.py` sirviendo el puerto de lectura.
 - [ ] **T6 (VERDE)** — T1 pasa y el circuito completo funciona.
@@ -145,7 +145,7 @@ La credencial se implementó parcialmente y **quedó sin comitear**. Hay archivo
 nuevos en el árbol de trabajo:
 
 - `db/migrations/0006_dashboard_access.sql` y su rollback
-- `src/prisma/tablero.py`
+- `src/leda/tablero.py`
 - `tests/test_tablero.py`
 - cambios en `db/esquema.sql` y `tests/test_task_intake.py`
 

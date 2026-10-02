@@ -1,15 +1,15 @@
 """Línea de comandos.
 
-    python -m prisma esquema                  aplica db/esquema.sql
-    python -m prisma importar corework        importa el pack (sin activar)
-    python -m prisma importar corework --activar
-    python -m prisma feriados corework        carga los feriados nacionales
-    python -m prisma sembrar corework --semilla espacios/corework.semilla-ficticia.yaml
-    python -m prisma cadencia corework objetivos_semanales
-    python -m prisma despachar corework       vacía la cola una vez
-    python -m prisma escuchar corework         long polling + cadencias + escalera + despacho
-    python -m prisma servir                   webhook + cadencias + escalera + despacho
-    python -m prisma servir --sin-cadencias    igual, sin disparar cadencias automáticas
+    python -m leda esquema                  aplica db/esquema.sql
+    python -m leda importar corework        importa el pack (sin activar)
+    python -m leda importar corework --activar
+    python -m leda feriados corework        carga los feriados nacionales
+    python -m leda sembrar corework --semilla espacios/corework.semilla-ficticia.yaml
+    python -m leda cadencia corework objetivos_semanales
+    python -m leda despachar corework       vacía la cola una vez
+    python -m leda escuchar corework         long polling + cadencias + escalera + despacho
+    python -m leda servir                   webhook + cadencias + escalera + despacho
+    python -m leda servir --sin-cadencias    igual, sin disparar cadencias automáticas
 """
 
 from __future__ import annotations
@@ -40,7 +40,7 @@ def _revertir_sin_traza(conn) -> None:
 
 def _id_de(conn, slug: str) -> str:
     with conn.cursor() as cur:
-        cur.execute("set role prisma_admin")
+        cur.execute("set role leda_admin")
         cur.execute("select id from workspace where slug = %s", (slug,))
         fila = cur.fetchone()
     if not fila:
@@ -61,14 +61,14 @@ def _verificar_esquema_o_salir(conn) -> int | None:
     if falta is None:
         return None
     print(f"Falta aplicar la migración '{falta}'. Ejecutá "
-          f"'python -m prisma esquema' antes de arrancar.")
+          f"'python -m leda esquema' antes de arrancar.")
     return 1
 
 
 def _resolver_integrante(cur, ws: str, nombre: str) -> list[dict]:
     """Empareja por subcadena, sin importar mayúsculas -- mismo punto de
     partida que `onboarding.generar_enlaces` con `--solo` (T7,
-    `odd/tasks/prisma-orienta.md`), pero además prefiere una coincidencia
+    `odd/tasks/leda-orienta.md`), pero además prefiere una coincidencia
     EXACTA sobre cualquier coincidencia parcial, cosa que `--solo` no hace:
     otorgar un rol privilegiado no puede quedar ambiguo sólo porque el
     nombre completo de alguien es substring del de otra persona. Busca
@@ -157,12 +157,12 @@ def _estado(conn, ws: str, slug: str) -> int:
             "select count(*) n from incident where workspace_id = %s", (ws,))
         inc = cur.fetchone()["n"]
         if inc:
-            print(f"Incidentes registrados: {inc}  (python -m prisma incidentes {slug})")
+            print(f"Incidentes registrados: {inc}  (python -m leda incidentes {slug})")
     return 0
 
 
 def main(argv: list[str] | None = None) -> int:
-    p = argparse.ArgumentParser(prog="prisma")
+    p = argparse.ArgumentParser(prog="leda")
     sub = p.add_subparsers(dest="cmd", required=True)
 
     esq = sub.add_parser("esquema")
@@ -178,7 +178,7 @@ def main(argv: list[str] | None = None) -> int:
     sem = sub.add_parser("sembrar")
     sem.add_argument("slug")
     sem.add_argument("--semilla", required=True,
-                     help="ruta al YAML de datos ficticios (T7, odd/tasks/prisma-orienta.md)")
+                     help="ruta al YAML de datos ficticios (T7, odd/tasks/leda-orienta.md)")
 
     cad = sub.add_parser("cadencia")
     cad.add_argument("slug"); cad.add_argument("nombre")
@@ -229,14 +229,14 @@ def main(argv: list[str] | None = None) -> int:
 
         sql = (config.raiz / "db" / "esquema.sql").read_text(encoding="utf-8")
         if a.recrear:
-            sql = "drop schema if exists prisma cascade;\n" + sql
+            sql = "drop schema if exists leda cascade;\n" + sql
         try:
             with psycopg.connect(config.db_url, autocommit=False) as c:
                 c.execute(sql)
         except psycopg.OperationalError as e:
             print("No se pudo conectar a la base.")
             print(f"  {str(e).strip().splitlines()[0]}")
-            print("\nRevisá PRISMA_DB_URL en .env y que PostgreSQL esté corriendo.")
+            print("\nRevisá LEDA_DB_URL en .env y que PostgreSQL esté corriendo.")
             return 1
         except psycopg.Error as e:
             print("La base rechazó el esquema:")
@@ -257,7 +257,7 @@ def main(argv: list[str] | None = None) -> int:
         if codigo is not None:
             return codigo
         montar(lambda: conectar(), con_cadencias=not a.sin_cadencias).start()
-        uvicorn.run("prisma.gateway:app", host="0.0.0.0", port=a.puerto)
+        uvicorn.run("leda.gateway:app", host="0.0.0.0", port=a.puerto)
         return 0
 
     if a.cmd == "grupo":
@@ -337,7 +337,7 @@ def main(argv: list[str] | None = None) -> int:
         for n in sorted(nombres):
             print(f"  {n}")
         print(f"\nElegí uno y corré:")
-        print(f"  python -m prisma modelo <identificador> --proveedor {a.proveedor}")
+        print(f"  python -m leda modelo <identificador> --proveedor {a.proveedor}")
         return 0
 
     conn = conectar()
@@ -351,7 +351,7 @@ def main(argv: list[str] | None = None) -> int:
                 filas = cur.fetchall()
                 if not filas:
                     print("No hay modelo configurado.")
-                    print("Ejemplo:  python -m prisma modelo <identificador>")
+                    print("Ejemplo:  python -m leda modelo <identificador>")
                     return 1
                 for f in filas:
                     marca = "activo" if f["activo"] else "inactivo"
@@ -460,7 +460,7 @@ def main(argv: list[str] | None = None) -> int:
                   "su cuenta y le escriba una vez al bot de administración.")
         else:
             print("Próximo paso: que le escriba una vez al bot de "
-                  "administración (PRISMA_BOT_TOKEN_ADMIN) -- Telegram no "
+                  "administración (LEDA_BOT_TOKEN_ADMIN) -- Telegram no "
                   "deja que un bot le escriba primero a quien nunca le "
                   "escribió, así que sin eso no hay a qué chat avisarle.")
         return 0
@@ -546,7 +546,7 @@ def main(argv: list[str] | None = None) -> int:
         except psycopg.Error as e:
             # Nunca el DETAIL crudo de la base acá: puede traer la fila
             # entera que la violó (títulos de tarea incluidos). Sólo el tipo
-            # de error, nunca su mensaje (T7b, `odd/tasks/prisma-orienta.md`).
+            # de error, nunca su mensaje (T7b, `odd/tasks/leda-orienta.md`).
             _revertir_sin_traza(conn)
             print(f"La base rechazó la siembra ({type(e).__name__}). No se guardó nada.")
             return 1

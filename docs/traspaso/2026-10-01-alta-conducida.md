@@ -42,9 +42,9 @@ Nada se compromete sin el botón.
 
 | Pieza | Dónde | Qué hace |
 |---|---|---|
-| Contrato del turno | `src/prisma/alta_turno.py` | Hechos (`hechos_a_json`), esquema de salida, guía `SISTEMA_ALTA`, `leer_salida`, `aplicar_valores`, `verificar_turno` |
-| Conducción | `src/prisma/alta_conducida.py` | `_conducir`: hasta 2 intentos; si los dos fallan, aviso neutro + incidente `alta_conducida_fallida` + aviso a la administración |
-| Proveedores | `src/prisma/llm.py` | `conducir_alta` en cada proveedor; NaN/compatible con stream |
+| Contrato del turno | `src/leda/alta_turno.py` | Hechos (`hechos_a_json`), esquema de salida, guía `SISTEMA_ALTA`, `leer_salida`, `aplicar_valores`, `verificar_turno` |
+| Conducción | `src/leda/alta_conducida.py` | `_conducir`: hasta 2 intentos; si los dos fallan, aviso neutro + incidente `alta_conducida_fallida` + aviso a la administración |
+| Proveedores | `src/leda/llm.py` | `conducir_alta` en cada proveedor; NaN/compatible con stream |
 | Encendido | `workspace_setting` `alta = conversada` | Ausente o `guiada`: el alta guiada de siempre (todavía convive) |
 
 **Lo que el código garantiza** (el verificador cuida **solo invariantes**, decisión del
@@ -63,12 +63,12 @@ usuario):
   ayuda (`proximos_dias`, no es un límite);
 - la regla real de fechas: desde hoy hasta el límite del margen (`horizonte_tarea`, 2 meses);
 - `boton_final`, el botón real del resumen;
-- `podes_ofrecer`: la lista cerrada de lo que Prisma puede ofrecer **en ese turno**
+- `podes_ofrecer`: la lista cerrada de lo que Leda puede ofrecer **en ese turno**
   (guardar y retomar cuando la persona quiera, cambiar un dato, cancelar, el botón final,
   una fecha concreta hasta el límite). Nunca dividir tareas, crear objetivos ni retomar en
   un día dado: no existen.
 
-**Propuestas de Prisma** (tres correcciones hasta encontrar la forma): Prisma registra su
+**Propuestas de Leda** (tres correcciones hasta encontrar la forma): Leda registra su
 propia propuesta de criterio con `{propuesta}` sola (queda `proposed`) y eso cuenta como
 preguntar. La persona acepta con un "sí" y el modelo manda `{texto: <propuesta>}`. Para la
 fecha, propone una concreta en el texto y el "sí" se manda como `fecha_iso`.
@@ -106,9 +106,9 @@ fecha, propone una concreta en el texto y el "sí" se manda como `fecha_iso`.
 
 | Qué | Cómo |
 |---|---|
-| Listener del worktree (lo corre el usuario en su terminal) | `cd D:\Proyectos\Prisma-PM-worktrees\flujo-de-un-mensaje`, `$env:PYTHONPATH="src"`, `D:\Proyectos\Prisma-PM\.venv\Scripts\python.exe -m prisma escuchar corework`. Reiniciar después de cada commit de código |
-| Base de la rama | `prisma_flujo` (el `.env` del worktree apunta a ella). Ajustes activos: `alta = conversada`, `stream = true`; sin `horizonte_tarea` (vale 2 meses). La base `prisma` es la de la ronda 4, no se toca |
-| Cambiar un ajuste | Script con `prisma.db.conectar` + `admin`, comprobando `current_database() == 'prisma_flujo'` antes de escribir; sólo imprimir valores fijos, nunca derivados del `.env` (memoria `env-sin-imprimir-derivados`) |
+| Listener del worktree (lo corre el usuario en su terminal) | `cd D:\Proyectos\Prisma-PM-worktrees\flujo-de-un-mensaje`, `$env:PYTHONPATH="src"`, `D:\Proyectos\Prisma-PM\.venv\Scripts\python.exe -m leda escuchar corework`. Reiniciar después de cada commit de código |
+| Base de la rama | `leda_flujo` (el `.env` del worktree apunta a ella). Ajustes activos: `alta = conversada`, `stream = true`; sin `horizonte_tarea` (vale 2 meses). La base `leda` es la de la ronda 4, no se toca |
+| Cambiar un ajuste | Script con `leda.db.conectar` + `admin`, comprobando `current_database() == 'leda_flujo'` antes de escribir; sólo imprimir valores fijos, nunca derivados del `.env` (memoria `env-sin-imprimir-derivados`) |
 | Horario de CoreWork | 09:00-17:00. Fuera de horario los avisos quedan para las 09:00 del día siguiente (no es una falla) |
 | Herramientas de lectura | Ver "Cómo leer una prueba" |
 | Revisión RDD por tramos | `tools/rdd_por_tramos.py <repo> <base> <etiqueta>` (consentimiento permanente del usuario). Si el tramo excede el presupuesto, commit por commit, con el listener detenido |
@@ -140,10 +140,10 @@ Desde el worktree, con `PYTHONPATH=src`:
 - El verificador cuida sólo invariantes.
 - Margen de fecha de una tarea por espacio, 2 meses por omisión. La regla de fondo es que la
   fecha de una tarea no pasa la de su objetivo y el margen queda como red de seguridad.
-  **Topes y fechas son configuración: no se ajusta Prisma a sus valores actuales.**
+  **Topes y fechas son configuración: no se ajusta Leda a sus valores actuales.**
 - Avisos: a quien pidió, cuando se aprueba su borrador; al responsable, cuando otro le
   asigna una tarea; a quien confirma, si el otro se entera y cuándo.
-- Stream real encendido en `prisma_flujo` ("me ayuda a ver cómo se comporta Prisma"), con
+- Stream real encendido en `leda_flujo` ("me ayuda a ver cómo se comporta Leda"), con
   los textos intermedios a la vista, cada 0,15 s.
 - Criterios de adopción del alta conducida en la enmienda del ADR 0014. La prueba de
   adopción necesita a alguien que no conozca el guion, y **hoy no lo hay**: mientras tanto

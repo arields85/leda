@@ -2,7 +2,7 @@
 
 Telegram no deja que un bot escriba primero a alguien que nunca interactuó con
 él. Por eso cada persona tiene que abrir un enlace y apretar Iniciar una vez.
-Recién ahí Prisma puede hacerle seguimiento privado.
+Recién ahí Leda puede hacerle seguimiento privado.
 
 El punto delicado es la entrega de esos enlaces. Un enlace contiene un token
 que vincula un identificador de Telegram con una persona del equipo: **si se
@@ -140,7 +140,7 @@ def bienvenida(cur: psycopg.Cursor, workspace_id: str, nombre: str) -> str:
             where p.workspace_id = %s""",
         (workspace_id,))
     c = cur.fetchone() or {}
-    visible = c.get("nombre_visible", "Prisma")
+    visible = c.get("nombre_visible", "Leda")
     equipo = c.get("equipo", "el equipo")
 
     cur.execute(

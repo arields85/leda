@@ -1,7 +1,7 @@
 """La retención acotada por la actividad de la persona y por una pasada acotada
 (T9-R1d-2b, ADR 0013 regla 1, "Precisión (2026-09-29, decisión del usuario)").
 
-Lo que inicia Prisma se retiene sólo mientras la persona está ACTIVA en la rama:
+Lo que inicia Leda se retiene sólo mientras la persona está ACTIVA en la rama:
 escribió o tocó algo en ese chat en los últimos `VENTANA_DE_ACTIVIDAD` (30
 minutos). Una rama abierta pero abandonada no retiene nada, ni siquiera un aviso
 urgente: sale en el momento y la rama sigue abierta. Con esa ventana también
@@ -16,9 +16,9 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from prisma import pendientes as P
-from prisma.db import admin, espacio
-from prisma.despachador import (VENTANA_DE_ACTIVIDAD, _rama_que_retiene,
+from leda import pendientes as P
+from leda.db import admin, espacio
+from leda.despachador import (VENTANA_DE_ACTIVIDAD, _rama_que_retiene,
                                 despachar)
 
 from tests.test_alta_eleccion_confirmacion import (_alta_con_eleccion,
@@ -207,7 +207,7 @@ def test_un_toque_cuenta_como_actividad_en_ese_chat(corework, conn, cliente):
 
 def _aviso_para(conn, ws, membership_id: str, tg: int, clave="alta"):
     with espacio(conn, ws) as cur:
-        from prisma.salida import enqueue_outbox
+        from leda.salida import enqueue_outbox
         enqueue_outbox(
             cur, workspace_id=ws, chat_id=tg, text=f"{AVISO} {clave}",
             recipient_membership_id=membership_id,

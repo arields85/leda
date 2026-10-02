@@ -24,7 +24,7 @@ def _cargar_dotenv(ruta: Path) -> None:
 
 
 RAIZ = Path(__file__).resolve().parents[2]
-if os.environ.get("PRISMA_LOAD_DOTENV", "1") != "0":
+if os.environ.get("LEDA_LOAD_DOTENV", "1") != "0":
     _cargar_dotenv(RAIZ / ".env")
 
 
@@ -33,9 +33,9 @@ def recargar_dotenv() -> None:
     (`_cargar_dotenv` usa `setdefault`). Hace falta porque la carga de
     arriba sólo corre una vez, al importar este módulo: un proceso de larga
     vida -- el listener local (`local.Escucha`) -- puede arrancar antes de
-    que `.env` tenga, por ejemplo, `PRISMA_BOT_TOKEN_ADMIN`, y sin releer el
+    que `.env` tenga, por ejemplo, `LEDA_BOT_TOKEN_ADMIN`, y sin releer el
     archivo ese token nunca se vería hasta reiniciar el proceso."""
-    if os.environ.get("PRISMA_LOAD_DOTENV", "1") != "0":
+    if os.environ.get("LEDA_LOAD_DOTENV", "1") != "0":
         _cargar_dotenv(RAIZ / ".env")
 
 
@@ -45,16 +45,16 @@ def recargar_dotenv() -> None:
 # `ClienteJev.api_key` (fallo real de pytest que imprimió la clave entera).
 @dataclass(frozen=True)
 class Config:
-    db_url: str = field(repr=False, default=os.environ.get("PRISMA_DB_URL", ""))
+    db_url: str = field(repr=False, default=os.environ.get("LEDA_DB_URL", ""))
     authority_db_url: str = field(
-        repr=False, default=os.environ.get("PRISMA_AUTHORITY_DB_URL", ""))
+        repr=False, default=os.environ.get("LEDA_AUTHORITY_DB_URL", ""))
     llm_api_key: str = field(
-        repr=False, default=os.environ.get("PRISMA_LLM_API_KEY", ""))
+        repr=False, default=os.environ.get("LEDA_LLM_API_KEY", ""))
     openrouter_api_key: str = field(
-        repr=False, default=os.environ.get("PRISMA_OPENROUTER_API_KEY", ""))
+        repr=False, default=os.environ.get("LEDA_OPENROUTER_API_KEY", ""))
     webhook_secret: str = field(
-        repr=False, default=os.environ.get("PRISMA_WEBHOOK_SECRET", ""))
-    base_url: str = os.environ.get("PRISMA_BASE_URL", "")
+        repr=False, default=os.environ.get("LEDA_WEBHOOK_SECRET", ""))
+    base_url: str = os.environ.get("LEDA_BASE_URL", "")
     raiz: Path = RAIZ
     nucleo: Path = RAIZ / "nucleo"
     espacios: Path = RAIZ / "espacios"
@@ -62,7 +62,7 @@ class Config:
 
     def clave_llm(self, proveedor: str) -> str:
         """Credencial del modelo conversacional según el proveedor: OpenRouter
-        usa la suya (la misma de Jev) y el resto `PRISMA_LLM_API_KEY`. Nunca
+        usa la suya (la misma de Jev) y el resto `LEDA_LLM_API_KEY`. Nunca
         se manda la clave de un proveedor a otro."""
         if proveedor == "openrouter":
             return self.openrouter_api_key
@@ -71,20 +71,20 @@ class Config:
     def variable_clave_llm(self, proveedor: str) -> str:
         """Nombre de la variable de entorno que `clave_llm` lee."""
         if proveedor == "openrouter":
-            return "PRISMA_OPENROUTER_API_KEY"
-        return "PRISMA_LLM_API_KEY"
+            return "LEDA_OPENROUTER_API_KEY"
+        return "LEDA_LLM_API_KEY"
 
     def token_bot(self, slug_espacio: str) -> str:
         """Token del bot de un espacio. Un bot por equipo: si dos espacios
         compartieran token, un integrante podría recibir mensajes del otro."""
-        clave = f"PRISMA_BOT_TOKEN_{slug_espacio.upper()}"
+        clave = f"LEDA_BOT_TOKEN_{slug_espacio.upper()}"
         token = os.environ.get(clave, "")
         if not token:
             raise LookupError(f"Falta {clave} en el entorno")
         return token
 
     def espacios_con_token(self) -> dict[str, str]:
-        prefijo = "PRISMA_BOT_TOKEN_"
+        prefijo = "LEDA_BOT_TOKEN_"
         return {
             k[len(prefijo):].lower(): v
             for k, v in os.environ.items()

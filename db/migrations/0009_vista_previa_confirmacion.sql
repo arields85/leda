@@ -8,7 +8,7 @@
 -- herramienta and its arguments: two different reads of the same resource,
 -- one at preview time and one at confirm time, were indistinguishable.
 begin;
-set search_path = prisma, public;
+set search_path = leda, public;
 
 -- Fail closed if an invoking text pipeline decoded the UTF-8 file incorrectly.
 -- chr() builds the expected value independently from non-ASCII source bytes.
@@ -22,10 +22,10 @@ do $$ begin
 end $$;
 
 do $$ begin
-  if not exists (select 1 from pg_roles where rolname = 'prisma_owner') then
+  if not exists (select 1 from pg_roles where rolname = 'leda_owner') then
     raise exception '0009 requires 0004_function_ownership.sql';
   end if;
-  if to_regprocedure('prisma.resolver_pendiente(text,uuid,timestamptz)') is null then
+  if to_regprocedure('leda.resolver_pendiente(text,uuid,timestamptz)') is null then
     raise exception '0009 requires the base schema pending_action machinery';
   end if;
 end $$;
@@ -46,7 +46,7 @@ language plpgsql security definer as $$
 declare
   o record;
   a record;
-  ws uuid := nullif(current_setting('prisma.workspace_id', true), '')::uuid;
+  ws uuid := nullif(current_setting('leda.workspace_id', true), '')::uuid;
 begin
   select * into o from pending_action_option
    where token = p_token and (ws is null or workspace_id = ws);
@@ -113,6 +113,6 @@ comment on function resolver_pendiente is
   'Resuelve una acción pendiente por el token de una de sus opciones. Atómica: el doble toque de un botón ejecuta una sola vez. Devuelve la huella guardada para que quien llama detecte si el estado cambió desde la vista previa.';
 
 alter function resolver_pendiente(text, uuid, timestamptz)
-  owner to prisma_owner;
+  owner to leda_owner;
 
 commit;

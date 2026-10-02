@@ -1,5 +1,5 @@
 -- =========================================================================
--- Prisma — esquema de base de datos
+-- Leda — esquema de base de datos
 -- PostgreSQL 18 o posterior
 --
 -- Principios que el esquema hace cumplir, no sólo documenta:
@@ -15,8 +15,8 @@
 
 -- gen_random_uuid() es nativo desde PostgreSQL 13; no hace falta pgcrypto.
 
-create schema if not exists prisma;
-set search_path = prisma, public;
+create schema if not exists leda;
+set search_path = leda, public;
 
 -- =========================================================================
 -- Tipos
@@ -36,7 +36,7 @@ create type estado_tarea as enum (
 
 create type tipo_dependencia as enum ('bloqueante', 'informativa');
 
-create type tipo_actor as enum ('persona', 'prisma', 'sistema');
+create type tipo_actor as enum ('persona', 'leda', 'sistema');
 
 create type tipo_mensaje as enum (
   'informativo', 'normal', 'seguimiento', 'prioritario', 'urgente');
@@ -282,7 +282,7 @@ create table message_template (
 
 create table persona_config (
   workspace_id    uuid primary key references workspace(id) on delete cascade,
-  nombre_visible  text not null default 'Prisma',
+  nombre_visible  text not null default 'Leda',
   registro        text not null default 'vos',
   formalidad      text not null default 'profesional_cordial',
   longitud        text not null default 'breve',
@@ -442,7 +442,7 @@ create table task_state_event (
   actor_kind       tipo_actor not null,
   actor_app_user_id uuid references app_user(id),
   motivo           text,
-  -- T6j (`odd/tasks/prisma-orienta.md`): `clock_timestamp()`, no `now()` --
+  -- T6j (`odd/tasks/leda-orienta.md`): `clock_timestamp()`, no `now()` --
   -- `now()` es la hora de INICIO de la transacción, y `motivo_no_cierra_tarea`,
   -- `evidencia_pendiente` y `estado_previo_a_bloqueo`/`estado_previo_a_revision`
   -- ordenan o comparan por `at` entre esta tabla, `evidence` y `approval`.
@@ -523,7 +523,7 @@ create table approval (
 
 create index approval_sujeto on approval (sujeto_tipo, sujeto_id);
 
--- Quién le debe una respuesta a Prisma. Sin esta tabla la escalera de
+-- Quién le debe una respuesta a Leda. Sin esta tabla la escalera de
 -- recordatorios sería una adivinanza del modelo.
 create table pending_reply (
   id             uuid primary key default gen_random_uuid(),
@@ -564,7 +564,7 @@ create table inbound_message (
     unique (workspace_id, id, chat_id)
 );
 
--- Prisma nunca llama a Telegram directamente: escribe acá y un worker despacha.
+-- Leda nunca llama a Telegram directamente: escribe acá y un worker despacha.
 -- dedupe_key es lo que hace que un reinicio no duplique mensajes.
 create table message_outbox (
   id                      uuid primary key default gen_random_uuid(),
@@ -574,7 +574,7 @@ create table message_outbox (
   tipo                    tipo_mensaje not null default 'normal',
   cuerpo                  text not null,
   -- Una respuesta a alguien que acaba de escribir sale siempre. La regla de
-  -- no escribir fuera de horario es para lo que Prisma inicia; dejar a una
+  -- no escribir fuera de horario es para lo que Leda inicia; dejar a una
   -- persona esperando hasta mañana porque son las 17:05 es peor.
   es_respuesta            boolean not null default false,
   -- Saludo diario (pack 06 §3, T28; revisión 2026-09-28+2): esta fila ES la
@@ -593,11 +593,11 @@ create table message_outbox (
   -- si entra en 256 unidades UTF-16, agrega el botón de copiar.
   bloque_copiable         text,
   -- T9-R2 (migración 0021): el mensaje entrante al que responde esta salida. Se
-  -- llena sola con la configuración local `prisma.entrante_id` que deja el gateway
+  -- llena sola con la configuración local `leda.entrante_id` que deja el gateway
   -- al procesar un mensaje; nula fuera de uno (toque, cadencia, escalera). La
   -- clave foránea se declara más abajo, con las demás de la tabla.
   entrante_id             uuid
-    default nullif(current_setting('prisma.entrante_id', true), '')::uuid,
+    default nullif(current_setting('leda.entrante_id', true), '')::uuid,
   -- T9-R2: la respuesta a la que pertenece la fila cuando una respuesta se
   -- encola en varias llamadas (texto en partes y mensaje con botones). Nula: la
   -- fila es su propia respuesta.
@@ -625,7 +625,7 @@ create index outbox_despacho on message_outbox (estado, programado_para)
 -- Acciones pendientes
 -- =========================================================================
 
--- Trabajo que Prisma entendió y todavía no ejecutó, porque falta un acto de
+-- Trabajo que Leda entendió y todavía no ejecutó, porque falta un acto de
 -- una persona: confirmarlo, o elegir entre opciones.
 --
 -- Sin esta tabla la confirmación humana sólo sabía frenar. El pedido salía a
@@ -906,7 +906,7 @@ language plpgsql security definer as $$
 declare
   o record;
   a record;
-  ws uuid := nullif(current_setting('prisma.workspace_id', true), '')::uuid;
+  ws uuid := nullif(current_setting('leda.workspace_id', true), '')::uuid;
 begin
   select * into o from pending_action_option
    where token = p_token and (ws is null or workspace_id = ws);
@@ -1007,7 +1007,7 @@ create function confirmar_borrador_tarea(p_workspace_id uuid, p_token text,
                                          p_chat_id bigint)
 returns table (resultado text, task_id uuid, pending_action_id uuid, replay boolean)
 language plpgsql security definer
-set search_path = prisma, public, pg_temp as $$
+set search_path = leda, public, pg_temp as $$
 declare
   o pending_action_option%rowtype;
   a pending_action%rowtype;
@@ -1022,7 +1022,7 @@ declare
   ahora timestamptz := clock_timestamp();
   preview_actual jsonb;
 begin
-  perform set_config('prisma.workspace_id', p_workspace_id::text, true);
+  perform set_config('leda.workspace_id', p_workspace_id::text, true);
   select * into o from pending_action_option
    where token = p_token and workspace_id = p_workspace_id;
   if not found then
@@ -1255,9 +1255,9 @@ create function resolver_ingreso_borrador(p_workspace_id uuid, p_token text,
                                           p_chat_id bigint)
 returns table (resultado text, task_id uuid, pending_action_id uuid, replay boolean)
 language plpgsql security definer
-set search_path = prisma, public, pg_temp as $$
+set search_path = leda, public, pg_temp as $$
 begin
-  perform set_config('prisma.workspace_id', p_workspace_id::text, true);
+  perform set_config('leda.workspace_id', p_workspace_id::text, true);
   -- Modificar (T9-R1c-3), Enviar a aprobación (T9-R1c-4) y Rechazar (2026-09-30)
   -- no confirman: sus tokens nunca llegan a la conversión.
   if exists (select 1 from pending_action_option o
@@ -1311,7 +1311,7 @@ create table learning (
 );
 
 comment on table learning is
-  'El aprendizaje ajusta cómo Prisma comunica y estima. Nunca modifica autoridad ni reglas.';
+  'El aprendizaje ajusta cómo Leda comunica y estima. Nunca modifica autoridad ni reglas.';
 
 create table incident (
   id                   uuid primary key default gen_random_uuid(),
@@ -1349,7 +1349,7 @@ create table incident (
 -- Sin política de aislamiento, a propósito y a diferencia del resto del
 -- esquema: la búsqueda del token ocurre ANTES de saber a qué espacio
 -- pertenece, así que una política por espacio no tendría contra qué comparar.
--- Lo que protege esta tabla es que nadie la consulta: `prisma_app` no recibe
+-- Lo que protege esta tabla es que nadie la consulta: `leda_app` no recibe
 -- ningún privilegio sobre ella, sólo `execute` sobre las dos funciones que son
 -- su única puerta.
 create table acceso_tablero (
@@ -1365,14 +1365,14 @@ create index acceso_tablero_vencimiento on acceso_tablero (vence_en);
 
 revoke all on acceso_tablero from public;
 
--- El espacio no se recibe: sale de la membresía. Como `prisma_owner` no
+-- El espacio no se recibe: sale de la membresía. Como `leda_owner` no
 -- saltea la RLS, esa búsqueda queda filtrada al espacio de la sesión, así que
 -- una membresía de otro cliente no se encuentra y falla idéntico a una
 -- inexistente. Decir "no tenés permiso" confirmaría que existe.
 create or replace function emitir_acceso_tablero(
     p_membership_id uuid, p_token_hash text, p_vence_en timestamptz)
 returns uuid
-language plpgsql security definer set search_path = prisma, public, pg_temp as $$
+language plpgsql security definer set search_path = leda, public, pg_temp as $$
 declare espacio uuid;
         nuevo uuid;
 begin
@@ -1398,7 +1398,7 @@ end $$;
 -- ya corre acotada al espacio correcto.
 create or replace function resolver_acceso_tablero(p_token_hash text)
 returns table (workspace_id uuid, membership_id uuid)
-language plpgsql security definer set search_path = prisma, public, pg_temp as $$
+language plpgsql security definer set search_path = leda, public, pg_temp as $$
 declare acceso acceso_tablero%rowtype;
 begin
   select * into acceso from acceso_tablero a
@@ -1407,7 +1407,7 @@ begin
     return;
   end if;
 
-  perform set_config('prisma.workspace_id', acceso.workspace_id::text, true);
+  perform set_config('leda.workspace_id', acceso.workspace_id::text, true);
 
   if not exists (select 1 from membership m
                   where m.id = acceso.membership_id and m.activo) then
@@ -1450,7 +1450,7 @@ create table conversation_access_log (
 -- administrador de plataforma por su canal." T28 (decisión del usuario,
 -- 2026-09-28) es la primera unidad que lo cumple: hasta acá sólo se avisaba
 -- a la persona afectada (`gateway.NOTICIA_NEUTRA_INCIDENTE`) y quien
--- administra la plataforma tenía que correr `python -m prisma incidentes
+-- administra la plataforma tenía que correr `python -m leda incidentes
 -- <slug>` para enterarse.
 -- =========================================================================
 
@@ -1482,12 +1482,12 @@ create table admin_notice (
 );
 
 comment on table admin_notice is
-  'Cola de salida del bot de administración: un aviso por incidente y por administrador de plataforma alcanzable. Sin política de aislamiento por espacio -- no tiene un único espacio dueño -- y sin concesión a prisma_app: sólo la escribe avisar_incidente_admin() (security definer) y sólo la despacha prisma_admin (despachador.despachar_avisos_admin).';
+  'Cola de salida del bot de administración: un aviso por incidente y por administrador de plataforma alcanzable. Sin política de aislamiento por espacio -- no tiene un único espacio dueño -- y sin concesión a leda_app: sólo la escribe avisar_incidente_admin() (security definer) y sólo la despacha leda_admin (despachador.despachar_avisos_admin).';
 
 -- Fan-out del aviso de un incidente a cada administrador de plataforma
 -- alcanzable. `security definer`, mismo motivo que `emitir_acceso_tablero`/
 -- `resolver_acceso_tablero`: necesita leer `platform_role` y `audit_log`
--- (tablas globales, o sin concesión de lectura a prisma_app, que prisma_app
+-- (tablas globales, o sin concesión de lectura a leda_app, que leda_app
 -- no puede consultar directamente -- mismo motivo por el que existe la
 -- vista `integrante`) desde una sesión que puede estar acotada a un espacio,
 -- o a ninguno (un incidente global, sin cliente en particular).
@@ -1496,9 +1496,9 @@ comment on table admin_notice is
 -- llamar acá -- decisión del usuario, 2026-09-28, corrigiendo el alcance
 -- original de esta unidad: el aviso SÍ tiene que incluir qué lo disparó
 -- (Constitución §2, el administrador "accede a las conversaciones privadas
--- entre Prisma y los integrantes"; §10 exige avisarle sanitizado, no
+-- entre Leda y los integrantes"; §10 exige avisarle sanitizado, no
 -- ocultarle el disparador). Armarlo en Python, no acá, es porque necesita
--- leer `inbound_message`/`pending_action` (ya concedidas a `prisma_app`,
+-- leer `inbound_message`/`pending_action` (ya concedidas a `leda_app`,
 -- sin falta de elevación) y la vista `integrante` -- nada que justifique
 -- `security definer` para esa parte.
 --
@@ -1523,7 +1523,7 @@ comment on table admin_notice is
 create function avisar_incidente_admin(
     p_incident_id uuid, p_workspace_id uuid, p_cuerpo text)
 returns table(app_user_id uuid)
-language plpgsql security definer set search_path = prisma, public, pg_temp as $$
+language plpgsql security definer set search_path = leda, public, pg_temp as $$
 declare v_admin record;
 begin
   for v_admin in
@@ -1617,7 +1617,7 @@ create trigger trg_derivar_espacio_ausencia
 -- la sesión --la conexión administrativa-- se conserva lo suministrado, que es
 -- como se registran los hechos de alcance global.
 create or replace function derivar_espacio_registro() returns trigger as $$
-declare actual text := nullif(current_setting('prisma.workspace_id', true), '');
+declare actual text := nullif(current_setting('leda.workspace_id', true), '');
 begin
   if actual is not null then
     new.workspace_id := actual::uuid;
@@ -1636,8 +1636,8 @@ create trigger trg_derivar_espacio_incidente
 -- --- El estado es una proyección, no un campo editable -------------------
 
 create or replace function aplicar_evento_tarea() returns trigger
-security definer set search_path = prisma, public as $$
-declare espacio_anterior text := current_setting('prisma.workspace_id', true);
+security definer set search_path = leda, public as $$
+declare espacio_anterior text := current_setting('leda.workspace_id', true);
 begin
   -- El dueño de esta función no saltea la RLS, así que este `update` queda
   -- sujeto a la política de aislamiento. Se acota al espacio del propio
@@ -1646,14 +1646,14 @@ begin
   -- conexión administrativa no define espacio alguno, y sin esto la proyección
   -- no encontraría la fila y fallaría en silencio. El valor previo se
   -- restaura para no angostar el resto de la transacción.
-  perform set_config('prisma.workspace_id', new.workspace_id::text, true);
-  perform set_config('prisma.aplicando_evento', '1', true);
+  perform set_config('leda.workspace_id', new.workspace_id::text, true);
+  perform set_config('leda.aplicando_evento', '1', true);
   update task
      set estado = new.estado_nuevo,
          actualizado_en = new.at
    where id = new.task_id;
-  perform set_config('prisma.aplicando_evento', '0', true);
-  perform set_config('prisma.workspace_id', coalesce(espacio_anterior, ''), true);
+  perform set_config('leda.aplicando_evento', '0', true);
+  perform set_config('leda.workspace_id', coalesce(espacio_anterior, ''), true);
   return new;
 end $$ language plpgsql;
 
@@ -1676,7 +1676,7 @@ begin
     raise exception 'Los campos de compromiso de una tarea son inmutables.';
   end if;
   if new.estado is distinct from old.estado
-     and coalesce(current_setting('prisma.aplicando_evento', true), '0') <> '1' then
+     and coalesce(current_setting('leda.aplicando_evento', true), '0') <> '1' then
     raise exception
       'El estado de una tarea no se escribe directamente. Insertá una fila en task_state_event.';
   end if;
@@ -1689,11 +1689,11 @@ create trigger trg_bloquear_estado_directo
 
 create or replace function aplicar_evento_objetivo() returns trigger as $$
 begin
-  perform set_config('prisma.aplicando_evento', '1', true);
+  perform set_config('leda.aplicando_evento', '1', true);
   update objective
      set estado = new.estado_nuevo, actualizado_en = new.at
    where id = new.objective_id;
-  perform set_config('prisma.aplicando_evento', '0', true);
+  perform set_config('leda.aplicando_evento', '0', true);
   return new;
 end $$ language plpgsql;
 
@@ -1769,7 +1769,7 @@ create trigger trg_exigir_bloqueo_abierto
 -- antes de bloquearse -- era `en_curso`. Por eso se consulta
 -- `estado_previo_a_bloqueo` (0007), no `new.estado_anterior` a secas.
 --
--- T6c (`odd/tasks/prisma-orienta.md`): mismo criterio para la vuelta desde
+-- T6c (`odd/tasks/leda-orienta.md`): mismo criterio para la vuelta desde
 -- `en_revision`. Decisión del usuario (2026-09-27): "Pedir cambios"
 -- (`herramientas._pedir_cambios_tarea`) devuelve la tarea al estado que
 -- tenía antes de la ÚLTIMA entrada a `en_revision` -- `en_curso` si estaba
@@ -1803,7 +1803,7 @@ end $$ language plpgsql;
 -- necesita ejecutar `estado_previo_a_bloqueo` y `estado_previo_a_revision`
 -- (tampoco security definer para quien las llama desde acá, sólo para lo
 -- que leen adentro) cuando la transición realmente sale de `bloqueada` o de
--- `en_revision`; `prisma_app` -- el único rol que hoy hace pasar una tarea a
+-- `en_revision`; `leda_app` -- el único rol que hoy hace pasar una tarea a
 -- `en_curso`, vía `resolver_bloqueo`, `pedir_cambios_tarea` o
 -- `actualizar_estado` -- ya tiene `execute` concedido sobre las dos (0007 y
 -- T6c más abajo).
@@ -1842,7 +1842,7 @@ create trigger trg_exigir_dependencias_resueltas
 -- (entrega a `en_revision` y el gate de "Aprobar"), que antes no tenían
 -- ninguna forma de hacer la misma pregunta sin reimplementar el criterio.
 --
--- Migración 0014 (T6b, `odd/tasks/prisma-orienta.md`): decisión del usuario
+-- Migración 0014 (T6b, `odd/tasks/leda-orienta.md`): decisión del usuario
 -- (2026-09-27) -- si el aprobador pidió cambios, la evidencia vieja deja de
 -- contar; hay que volver a mandar evidencia (ejemplo: pintar una pared, al
 -- aprobador le faltó una parte, la evidencia nueva muestra esa parte
@@ -1937,7 +1937,7 @@ begin
   return null;
 end $$ language plpgsql;
 
--- El estado de una tarea es la proyección del último evento, y `prisma_app`
+-- El estado de una tarea es la proyección del último evento, y `leda_app`
 -- no puede leer `task_state_event` directamente: es un registro append-only,
 -- con el `select` revocado más abajo. Sin esta puerta angosta, salir de
 -- `bloqueada` no tendría forma de saber a qué estado volver sin adivinar
@@ -1953,7 +1953,7 @@ end $$ language plpgsql;
 -- que la tarea esté bloqueada *ahora* antes de usar este valor.
 create or replace function estado_previo_a_bloqueo(p_task uuid)
 returns estado_tarea
-language plpgsql security definer set search_path = prisma, public, pg_temp as $$
+language plpgsql security definer set search_path = leda, public, pg_temp as $$
 declare previo estado_tarea;
 begin
   select estado_anterior into previo
@@ -1964,7 +1964,7 @@ begin
   return previo;
 end $$;
 
--- T6c (`odd/tasks/prisma-orienta.md`): la misma puerta angosta que
+-- T6c (`odd/tasks/leda-orienta.md`): la misma puerta angosta que
 -- `estado_previo_a_bloqueo`, pero para la ÚLTIMA entrada a `en_revision` en
 -- vez de a `bloqueada` -- la necesita `herramientas._pedir_cambios_tarea`
 -- para saber a qué estado devolver la tarea al pedirle cambios, y
@@ -1978,7 +1978,7 @@ end $$;
 -- esté en revisión *ahora* antes de usar este valor.
 create or replace function estado_previo_a_revision(p_task uuid)
 returns estado_tarea
-language plpgsql security definer set search_path = prisma, public, pg_temp as $$
+language plpgsql security definer set search_path = leda, public, pg_temp as $$
 declare previo estado_tarea;
 begin
   select estado_anterior into previo
@@ -2074,29 +2074,29 @@ create trigger trg_exigir_condiciones_de_cierre_obj
 -- =========================================================================
 -- Aislamiento entre espacios
 --
--- El agente se conecta con prisma_app y sólo ve el espacio que declara en
--- prisma.workspace_id. El aislamiento no depende de que el modelo se acuerde.
+-- El agente se conecta con leda_app y sólo ve el espacio que declara en
+-- leda.workspace_id. El aislamiento no depende de que el modelo se acuerde.
 -- =========================================================================
 
 do $$ begin
-  if not exists (select 1 from pg_roles where rolname = 'prisma_app') then
-    create role prisma_app nologin;
+  if not exists (select 1 from pg_roles where rolname = 'leda_app') then
+    create role leda_app nologin;
   end if;
-  if not exists (select 1 from pg_roles where rolname = 'prisma_admin') then
-    create role prisma_admin nologin bypassrls;
+  if not exists (select 1 from pg_roles where rolname = 'leda_admin') then
+    create role leda_admin nologin bypassrls;
   end if;
-  if not exists (select 1 from pg_roles where rolname = 'prisma_gateway') then
-    create role prisma_gateway nologin noinherit;
+  if not exists (select 1 from pg_roles where rolname = 'leda_gateway') then
+    create role leda_gateway nologin noinherit;
   end if;
   -- Dueño de las funciones `security definer`. Sin él, esas funciones quedan a
   -- nombre de quien corra este script -- en la práctica un superusuario, que
   -- ignora la RLS: adentro de sus cuerpos el aislamiento no existiría.
-  if not exists (select 1 from pg_roles where rolname = 'prisma_owner') then
-    create role prisma_owner nologin noinherit;
+  if not exists (select 1 from pg_roles where rolname = 'leda_owner') then
+    create role leda_owner nologin noinherit;
   end if;
 end $$;
-alter role prisma_gateway noinherit nobypassrls;
-alter role prisma_owner nologin noinherit nobypassrls nosuperuser;
+alter role leda_gateway noinherit nobypassrls;
+alter role leda_owner nologin noinherit nobypassrls nosuperuser;
 
 do $$
 declare t text;
@@ -2116,30 +2116,30 @@ begin
     execute format('alter table %I force row level security', t);
     execute format($f$
       create policy aislamiento_espacio on %I
-        using (workspace_id = nullif(current_setting('prisma.workspace_id', true), '')::uuid)
+        using (workspace_id = nullif(current_setting('leda.workspace_id', true), '')::uuid)
     $f$, t);
-    execute format('grant select, insert, update, delete on %I to prisma_app', t);
+    execute format('grant select, insert, update, delete on %I to leda_app', t);
   end loop;
 end $$;
 
 -- Committed tasks are created only by confirmar_borrador_tarea(). The admin
 -- role keeps direct access for controlled maintenance and legacy test data.
-revoke insert on task from prisma_app;
-revoke update, delete on task from prisma_app;
-grant select on task to prisma_app;
-revoke update, delete on task_draft from prisma_app;
+revoke insert on task from leda_app;
+revoke update, delete on task from leda_app;
+grant select on task to leda_app;
+revoke update, delete on task_draft from leda_app;
 grant update (objective_id, objective_snapshot, titulo, descripcion, area_id,
               responsable_membership_id, fecha_objetivo,
               criterio_aceptacion, evidencia_requerida,
               evidencia_policy_version, version, estado, actualizado_en)
-  on task_draft to prisma_app;
-revoke insert, update, delete on task_evidence_policy from prisma_app;
--- Los eventos de estado son append-only y prisma_app no los lee: sólo escribe
+  on task_draft to leda_app;
+revoke insert, update, delete on task_evidence_policy from leda_app;
+-- Los eventos de estado son append-only y leda_app no los lee: sólo escribe
 -- hechos. Están en el arreglo de arriba por su política de aislamiento, que es
 -- lo que impide escribir contra una tarea de otro espacio; el bucle concede el
 -- juego completo, así que acá se recorta al insert que es lo único legítimo.
-revoke select, update, delete on task_state_event from prisma_app;
-revoke select, update, delete on objective_state_event from prisma_app;
+revoke select, update, delete on task_state_event from leda_app;
+revoke select, update, delete on objective_state_event from leda_app;
 
 -- Registros auxiliares. Quedan fuera del bucle de arriba porque `audit_log` e
 -- `incident` admiten espacio nulo para los hechos de alcance global, que sólo
@@ -2148,88 +2148,88 @@ revoke select, update, delete on objective_state_event from prisma_app;
 alter table absence enable row level security;
 alter table absence force row level security;
 create policy aislamiento_espacio on absence
-  using (workspace_id = nullif(current_setting('prisma.workspace_id', true), '')::uuid);
+  using (workspace_id = nullif(current_setting('leda.workspace_id', true), '')::uuid);
 
 alter table audit_log enable row level security;
 alter table audit_log force row level security;
 create policy aislamiento_espacio on audit_log
   using (workspace_id is null
-         or workspace_id = nullif(current_setting('prisma.workspace_id', true), '')::uuid);
+         or workspace_id = nullif(current_setting('leda.workspace_id', true), '')::uuid);
 
 alter table incident enable row level security;
 alter table incident force row level security;
 create policy aislamiento_espacio on incident
   using (workspace_id is null
-         or workspace_id = nullif(current_setting('prisma.workspace_id', true), '')::uuid);
+         or workspace_id = nullif(current_setting('leda.workspace_id', true), '')::uuid);
 
 grant execute on function confirmar_borrador_tarea(uuid, text, bigint, bigint)
-  to prisma_gateway;
+  to leda_gateway;
 grant execute on function resolver_ingreso_borrador(uuid, text, bigint, bigint)
-  to prisma_gateway;
+  to leda_gateway;
 revoke execute on function confirmar_borrador_tarea(uuid, text, bigint, bigint)
-  from prisma_app;
+  from leda_app;
 revoke execute on function resolver_ingreso_borrador(uuid, text, bigint, bigint)
-  from prisma_app;
+  from leda_app;
 
 -- Una función `security definer` corre con los privilegios de su dueño. Si ese
 -- dueño fuera superusuario, la RLS no aplicaría dentro de ella y el
 -- aislamiento entre clientes se caería por adentro. Lo que contiene a
--- `prisma_owner` es la RLS, no la lista de privilegios: por eso no inicia
+-- `leda_owner` es la RLS, no la lista de privilegios: por eso no inicia
 -- sesión, nadie es miembro suyo y no puede saltear la política. Una lista
 -- exacta de lo que toca cada cuerpo se desactualizaría en el próximo cambio.
-grant usage on schema prisma to prisma_owner;
-grant all privileges on all tables in schema prisma to prisma_owner;
-grant all privileges on all sequences in schema prisma to prisma_owner;
+grant usage on schema leda to leda_owner;
+grant all privileges on all tables in schema leda to leda_owner;
+grant all privileges on all sequences in schema leda to leda_owner;
 
 alter function resolver_pendiente(text, uuid, timestamptz)
-  owner to prisma_owner;
+  owner to leda_owner;
 alter function confirmar_borrador_tarea(uuid, text, bigint, bigint)
-  owner to prisma_owner;
+  owner to leda_owner;
 alter function resolver_ingreso_borrador(uuid, text, bigint, bigint)
-  owner to prisma_owner;
+  owner to leda_owner;
 alter function aplicar_evento_tarea()
-  owner to prisma_owner;
+  owner to leda_owner;
 alter function estado_previo_a_bloqueo(uuid)
-  owner to prisma_owner;
+  owner to leda_owner;
 alter function estado_previo_a_revision(uuid)
-  owner to prisma_owner;
+  owner to leda_owner;
 
 revoke execute on function estado_previo_a_bloqueo(uuid) from public;
-grant execute on function estado_previo_a_bloqueo(uuid) to prisma_app;
+grant execute on function estado_previo_a_bloqueo(uuid) to leda_app;
 revoke execute on function estado_previo_a_revision(uuid) from public;
-grant execute on function estado_previo_a_revision(uuid) to prisma_app;
+grant execute on function estado_previo_a_revision(uuid) to leda_app;
 
 -- La concesión general de arriba alcanzó a `acceso_tablero` por haberse
 -- definido antes. Se la acota a lo que sus dos funciones necesitan, que es lo
 -- mismo que concede la migración `0006`: sin esto, instalación limpia y base
 -- migrada divergirían en los privilegios de esta tabla.
-revoke all on acceso_tablero from prisma_owner;
-grant select, insert on acceso_tablero to prisma_owner;
+revoke all on acceso_tablero from leda_owner;
+grant select, insert on acceso_tablero to leda_owner;
 
 alter function emitir_acceso_tablero(uuid, text, timestamptz)
-  owner to prisma_owner;
+  owner to leda_owner;
 alter function resolver_acceso_tablero(text)
-  owner to prisma_owner;
+  owner to leda_owner;
 
 revoke execute on function emitir_acceso_tablero(uuid, text, timestamptz)
   from public;
 revoke execute on function resolver_acceso_tablero(text) from public;
 grant execute on function emitir_acceso_tablero(uuid, text, timestamptz)
-  to prisma_app;
-grant execute on function resolver_acceso_tablero(text) to prisma_app;
+  to leda_app;
+grant execute on function resolver_acceso_tablero(text) to leda_app;
 
 -- Aviso de incidentes a la administración de plataforma (T28). Mismo motivo
--- que las dos funciones de arriba: `security definer`, dueño `prisma_owner`,
--- ejecutable por `prisma_app` (la mayoría de los incidentes se registran
--- desde una sesión acotada a un espacio) y por `prisma_admin` (la consola y
+-- que las dos funciones de arriba: `security definer`, dueño `leda_owner`,
+-- ejecutable por `leda_app` (la mayoría de los incidentes se registran
+-- desde una sesión acotada a un espacio) y por `leda_admin` (la consola y
 -- el validador de invariantes, que corren sin espacio fijado).
 alter function avisar_incidente_admin(uuid, uuid, text)
-  owner to prisma_owner;
+  owner to leda_owner;
 
 revoke execute on function avisar_incidente_admin(uuid, uuid, text)
   from public;
 grant execute on function avisar_incidente_admin(uuid, uuid, text)
-  to prisma_app, prisma_admin;
+  to leda_app, leda_admin;
 
 -- El agente no consulta app_user directamente: lo haría por encima del
 -- aislamiento, porque esa tabla es global. Usa esta vista, que pasa por
@@ -2246,20 +2246,20 @@ create view integrante with (security_barrier = true) as
          u.nombre
     from membership m
     join app_user u on u.id = m.app_user_id
-   where m.workspace_id = nullif(current_setting('prisma.workspace_id', true), '')::uuid;
+   where m.workspace_id = nullif(current_setting('leda.workspace_id', true), '')::uuid;
 
 comment on view integrante is
-  'Personas del espacio activo. La vista corre con permisos de su dueño, así que app_user nunca se expone a prisma_app; el filtro explícito es lo que acota al espacio. Sin prisma.workspace_id definido no devuelve nada.';
+  'Personas del espacio activo. La vista corre con permisos de su dueño, así que app_user nunca se expone a leda_app; el filtro explícito es lo que acota al espacio. Sin leda.workspace_id definido no devuelve nada.';
 
-grant usage on schema prisma to prisma_app, prisma_admin;
-grant usage on schema prisma to prisma_gateway;
+grant usage on schema leda to leda_app, leda_admin;
+grant usage on schema leda to leda_gateway;
 -- approval_requirement no lleva workspace_id: sólo se llega a ella por
 -- approval_policy, que sí tiene RLS.
 grant select on workspace, work_calendar, holiday, persona_config,
                 integrante, absence, model_config, workspace_version,
-                approval_requirement to prisma_app;
+                approval_requirement to leda_app;
 -- task_state_event y objective_state_event ya reciben su insert por el bucle de
 -- aislamiento, que además les instala la política.
-grant insert on audit_log, incident, absence to prisma_app;
-grant all on all tables in schema prisma to prisma_admin;
-grant all on integrante to prisma_admin;
+grant insert on audit_log, incident, absence to leda_app;
+grant all on all tables in schema leda to leda_admin;
+grant all on integrante to leda_admin;

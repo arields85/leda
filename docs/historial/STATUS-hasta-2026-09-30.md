@@ -1,19 +1,19 @@
 # Estado actual
 
-**Alcance:** Prisma es un producto de gestión de proyectos multi-tenant. CoreWork es
+**Alcance:** Leda es un producto de gestión de proyectos multi-tenant. CoreWork es
 su primer cliente, no su definición.
 
 **Última actualización documental:** 2026-09-29.
 
 ## Resumen
 
-El alcance del proyecto cambió: Prisma dejó de tratarse como asistente interno de un
+El alcance del proyecto cambió: Leda dejó de tratarse como asistente interno de un
 equipo y pasó a definirse como producto ofrecible a varios clientes, con superficie
 conversacional, superficie de lectura y eventual aplicación móvil.
 
 La base documental se reescribió en consecuencia:
 
-- [`product/que-es-prisma.md`](product/que-es-prisma.md) define el producto y separa
+- [`product/que-es-leda.md`](product/que-es-leda.md) define el producto y separa
   configuración de cliente de núcleo del producto.
 - [`architecture/frontera.md`](architecture/frontera.md) define dónde termina el
   núcleo y qué reglas lo gobiernan. Gobierna a los demás documentos de arquitectura.
@@ -34,7 +34,7 @@ tales. Ver [`INDEX.md`](INDEX.md#documentos-superados).
 - El estado de tarea es proyección de eventos, no campo editable
   (`db/esquema.sql:1231`).
 - La superficie HTTP se limita a `POST /telegram/{slug}` y `GET /salud`
-  (`src/prisma/gateway.py:47,434`). No existe API de lectura.
+  (`src/leda/gateway.py:47,434`). No existe API de lectura.
 - La Unidad 1A (borrador y compromiso de tarea) está implementada, verificada de forma
   independiente y fue activada en su momento sobre la base local. Su evidencia
   detallada se conserva en
@@ -68,14 +68,14 @@ tales. Ver [`INDEX.md`](INDEX.md#documentos-superados).
 | Resultado exacto | 1396 passed, 147 deselected (corrida del escritor de T9-R1b-3, commit `3bcaa99`; los 147 deselected son los escenarios del banco real `modelo_real`, incluidas las familias `b-0019` y `b-0020`). |
 
 Seguimientos de la entrega con evidencia (T6a-T6j), siembra reproducible (T7, T7b) y
-comprobadores del banco, `odd/tasks/prisma-orienta.md`: `1008 passed, 108
+comprobadores del banco, `odd/tasks/leda-orienta.md`: `1008 passed, 108
 deselected` (corrida aislada del escritor de T7b; cada unidad reejecutó además su
 suite enfocada en el orquestador). Una falla intermitente `tuple concurrently updated`
 en `tests/test_task_intake.py` apareció dos veces sólo cuando otra corrida aplicaba
 el esquema en el mismo servidor a la vez (los roles son del clúster); aislada pasa.
 
 Sesión 2 por Telegram, hallazgos 8 y 9 (entrega con evidencia y revisión, ADR
-0009, `odd/tasks/prisma-orienta.md`): `927 passed, 108 deselected` (216 s) --
+0009, `odd/tasks/leda-orienta.md`): `927 passed, 108 deselected` (216 s) --
 línea base 912 (hallazgos 1-7 de la misma sesión) + 15 pruebas nuevas. Antes,
 reejecutada como parte del cierre documental (T5): mismo resultado, `876
 passed, 108 deselected` (206 s). La corrida de 2026-08-15
@@ -105,9 +105,9 @@ para que la próxima corrección tenga un lugar declarado al que pertenecer.
 - No hay Telegram real, base operativa, Docker ni staging en uso.
 - No hay datos ni trabajo real cargados.
 - Los datos ficticios de las sesiones 1 y 2 viven en la base de mantenimiento
-  `postgres` del servidor local (no hay una base llamada `prisma`), la misma a la que
-  apunta `PRISMA_TEST_DB_URL`: las pruebas se conectan ahí sólo para crear y borrar sus
-  bases descartables. Quedan bases residuales `prisma_diag_*`/`prisma_test_*` de
+  `postgres` del servidor local (no hay una base llamada `leda`), la misma a la que
+  apunta `LEDA_TEST_DB_URL`: las pruebas se conectan ahí sólo para crear y borrar sus
+  bases descartables. Quedan bases residuales `leda_diag_*`/`leda_test_*` de
   corridas viejas. La tercera ronda pasa a una base dedicada nueva.
 
 ## Riesgos prioritarios
@@ -116,16 +116,16 @@ para que la próxima corrección tenga un lugar declarado al que pertenecer.
    `telegram_message_id` y no tiene columna de canal (`db/esquema.sql:533,548`).
    Bloquea toda superficie que no sea la conversacional.
 2. **Un límite de transporte decide validez de negocio.** `telegram_utf16_units`
-   (`src/prisma/salida.py:39`) se usa para aceptar o rechazar datos de negocio en
-   `src/prisma/ingreso_tareas.py:532,547,554,1118`.
+   (`src/leda/salida.py:39`) se usa para aceptar o rechazar datos de negocio en
+   `src/leda/ingreso_tareas.py:532,547,554,1118`.
 3. **No existe grafo de transiciones de estado.** `actualizar_estado` acepta cualquier
    destino del tipo enumerado sin validar que la transición sea legítima
-   (`src/prisma/herramientas.py:464-491`).
+   (`src/leda/herramientas.py:464-491`).
 4. **`pending_reply` no es operativo.** La tabla y la escalera existen, pero el ingreso
    no crea ni satisface el ciclo de respuesta, de modo que el seguimiento no puede
    afirmar silencio sobre evidencia real.
 5. **`confirmar_borrador_tarea` fija el espacio con el valor que recibe.** Está
-   acotada a `prisma_gateway` y fuera del alcance de `prisma_app`, pero confiar el
+   acotada a `leda_gateway` y fuera del alcance de `leda_app`, pero confiar el
    espacio a quien llama es el patrón que la frontera rechaza. Pertenece al ingreso
    autenticado.
 
@@ -141,7 +141,7 @@ La migración `0005` cerró el resto: `audit_log`, `incident` y `absence` recib�
 `insert` sin política. Figuraba como riesgo menor, pero lo comprobado fue que un
 espacio podía **fabricar auditoría atribuida a otro**. La auditoría autoritativa es
 la evidencia que se le muestra a un cliente; si otro puede escribir en ella, deja
-de serlo. Su posición en la lista venía de cuando Prisma era un bot de un solo
+de serlo. Su posición en la lista venía de cuando Leda era un bot de un solo
 equipo y nadie más podía escribir.
 
 `audit_log` e `incident` conservan a propósito la posibilidad de espacio nulo, para
@@ -165,9 +165,9 @@ se verifica sobre una base nueva dentro de un clúster existente.
 ## Próximo paso
 
 **Segunda sesión real por Telegram hecha** (2026-09-27, datos ficticios, base local con
-copias `db/respaldos/prisma-antes-sesion2-20260927.dump` y
-`prisma-antes-0012-20260927.dump`; cero incidentes). Diez hallazgos, registrados en
-`odd/tasks/prisma-orienta.md`: los hallazgos 1 a 7 quedaron corregidos y probados en vivo
+copias `db/respaldos/leda-antes-sesion2-20260927.dump` y
+`leda-antes-0012-20260927.dump`; cero incidentes). Diez hallazgos, registrados en
+`odd/tasks/leda-orienta.md`: los hallazgos 1 a 7 quedaron corregidos y probados en vivo
 (lista de botones por unión de consultas, una sola pregunta, etiquetas cortas por palabra
 sin palabra de enlace final, resumen en vez de enumerar, encabezado del menú con
 responsable y estado, aprobar cierra la tarea cuando se cumplen las condiciones —
@@ -177,7 +177,7 @@ construyeron como entrega con evidencia y revisión
 aplicada también en la base local) y **todavía no se probaron en vivo**.
 
 **Después de la sesión 2 (2026-09-27/28):** los seguimientos de la entrega con evidencia
-quedaron cerrados y revisados (T6a-T6j, `odd/tasks/prisma-orienta.md`): una aprobación
+quedaron cerrados y revisados (T6a-T6j, `odd/tasks/leda-orienta.md`): una aprobación
 anterior no sobrevive a "Pedir cambios" (`0013`); después de "Pedir cambios" la entrega
 pide evidencia nueva y la evidencia enviada se registra siempre (`0014`); "Pedir
 cambios" devuelve la tarea al estado previo a la entrega aunque haya una dependencia
@@ -196,7 +196,7 @@ persona respalda un "le avisé" (debería ser un aviso de coordinación a la per
 nombrada) y en `b-0027-d` hay que verificar que un intento rechazado de `aprobar_tarea` no
 cuente como herramienta ejecutada.
 Consentimiento permanente del usuario para las revisiones; parar sólo por decisiones sobre
-cómo funciona Prisma. Detalle y evidencia de todo en `odd/tasks/prisma-orienta.md`.
+cómo funciona Leda. Detalle y evidencia de todo en `odd/tasks/leda-orienta.md`.
 
 **Cuarta ronda por Telegram (T11) en curso.** Circuito A completo de punta a punta (entrega,
 cambios pedidos, reentrega, aprobación) y circuito B completo; circuito C hasta "Enviar a
@@ -206,7 +206,7 @@ tiene que llegar "Ismael rechazó el borrador…: motivo". A las 09:00 salen ade
 avisos encolados fuera de horario; tres son de «Dashboard de lotes», que ya está
 `terminada`: observar si el despachador descarta los que dejaron de corresponder. El
 listener lo corre el usuario en su propia terminal (`.\.venv\Scripts\python.exe -m
-prisma escuchar corework`): las tareas en segundo plano del agente se cortan por tiempo.
+leda escuchar corework`): las tareas en segundo plano del agente se cortan por tiempo.
 
 **Cambio de rumbo (decisión del usuario, 2026-09-30, noche): se deja de corregir hallazgo
 por hallazgo.** La capa de datos funciona, pero la conversación se siente "robótica" y
@@ -260,9 +260,9 @@ completa: 2279 passed, 333 deselected. Banco real completo (n=1): 108/111 (las t
 explicadas; dos eran del arnés y se corrigieron en `ffe4e85`).
 
 Cerradas en la sesión del 2026-09-28 (noche) (detalle y evidencia en
-`odd/tasks/prisma-orienta.md`): avisos
+`odd/tasks/leda-orienta.md`): avisos
 al administrador con espera entre reintentos y sin fallar en silencio (#28b, #28c);
-administrador alcanzable en modo local (`python -m prisma administrador`, `escuchar`
+administrador alcanzable en modo local (`python -m leda administrador`, `escuchar`
 lee el bot de administración sin robarle un webhook ajeno; #11, #11b, #11c); una sola
 rutina de fondo para `escuchar` y `servir` con cadencias releídas de la base y
 `--sin-cadencias` (#29, #29b, #29c; arregló que la cadencia del lunes salía el martes);
@@ -272,23 +272,23 @@ botones y saludo diario al primer mensaje del día a cada persona, decidido al d
 falta una migración; respuesta inmediata e indicador "escribiendo…" con borrador
 nativo sólo si el turno pasa de 1,5 s (#9, #9b, ADR 0011).
 
-Base local `prisma` **rearmada dos veces el 2026-09-30 para la cuarta ronda** (la segunda con respaldo `db/respaldos/prisma-antes-ronda4b-20260930.dump`; migraciones hasta `0025`) con datos ficticios nuevos (respaldo previo `db/respaldos/prisma-antes-ronda4-20260930.dump`; esquema completo, pack, feriados, semilla ficticia, modelo `nan`/`deepseek-v4-flash`, Ariel administrador; Ariel, Ismael y Marcos activos). Antes: migraciones hasta `0023` aplicadas (`0023` el 2026-09-30, con respaldo `db/respaldos/prisma-antes-0023-20260930.dump`, 532 entradas, y ensayo previo en una copia descartable; `verificar_migraciones` -> `None`) (`0020` a `0022` el 2026-09-29, con
-respaldo `db/respaldos/prisma-antes-0020-0022-20260929.dump` y ensayo previo en una copia
+Base local `leda` **rearmada dos veces el 2026-09-30 para la cuarta ronda** (la segunda con respaldo `db/respaldos/leda-antes-ronda4b-20260930.dump`; migraciones hasta `0025`) con datos ficticios nuevos (respaldo previo `db/respaldos/leda-antes-ronda4-20260930.dump`; esquema completo, pack, feriados, semilla ficticia, modelo `nan`/`deepseek-v4-flash`, Ariel administrador; Ariel, Ismael y Marcos activos). Antes: migraciones hasta `0023` aplicadas (`0023` el 2026-09-30, con respaldo `db/respaldos/leda-antes-0023-20260930.dump`, 532 entradas, y ensayo previo en una copia descartable; `verificar_migraciones` -> `None`) (`0020` a `0022` el 2026-09-29, con
+respaldo `db/respaldos/leda-antes-0020-0022-20260929.dump` y ensayo previo en una copia
 descartable; `saludo.verificar_migraciones` -> `None`); modelo `nan`/`deepseek-v4-flash`
 configurado en la ronda (respaldos
-`db/respaldos/prisma-antes-0017-20260928.dump` y
-`prisma-antes-0018-0019-20260928.dump`); Ariel De Simone designado administrador de
-plataforma; `PRISMA_BOT_TOKEN_ADMIN` configurado y rotado por el usuario.
+`db/respaldos/leda-antes-0017-20260928.dump` y
+`leda-antes-0018-0019-20260928.dump`); Ariel De Simone designado administrador de
+plataforma; `LEDA_BOT_TOKEN_ADMIN` configurado y rotado por el usuario.
 
 **Tercera ronda por Telegram hecha y cortada (2026-09-28, 21:00-21:46).** Registro
-completo en `odd/tasks/prisma-orienta.md` (hallazgos R3-H1 a R3-H21). Evaluación del
+completo en `odd/tasks/leda-orienta.md` (hallazgos R3-H1 a R3-H21). Evaluación del
 usuario: "tarda mucho en responder, se pierde en la conversación, no es para nada
 fluido". Tres causas de fondo: la latencia del modelo (10-17 s por turno con
 `nan`/`deepseek-v4-flash`; 0 s cuando decide el código), el manejo del estado de la
 conversación y ninguna señal al tocar botones. El circuito A quedó cortado: la nueva
 entrega después de "Pedir cambios" no volvió a revisión (R3-H20); el B no se corrió.
 
-**Hecho el 2026-09-28/29 (detalle y evidencia en `odd/tasks/prisma-orienta.md`, T8):**
+**Hecho el 2026-09-28/29 (detalle y evidencia en `odd/tasks/leda-orienta.md`, T8):**
 
 - Manual de personalidad leído y contrastado con el corpus: da criterio, no mecanismo,
   para los críticos de estado; sus preguntas de cierre en texto abierto contradicen ADR
@@ -330,7 +330,7 @@ entrega después de "Pedir cambios" no volvió a revisión (R3-H20); el B no se 
    R3-H10, R3-H11, R3-H12, R3-H14, R3-H4.
 3. **Cuarta ronda por Telegram** (T11), en horario laboral, con los circuitos A y B.
 4. **Después de T11, mejoras y optimizaciones**: T8d y lo que sigue abajo. La prioridad
-   es que Prisma responda y se comporte como se espera (decisión del usuario, 2026-09-29).
+   es que Leda responda y se comporte como se espera (decisión del usuario, 2026-09-29).
 
 Después, sin bloquear: #23 validador de invariantes
 (`odd/tasks/validador-invariantes.md`); escenarios del banco que fallan desde antes de
@@ -350,32 +350,32 @@ Abierto, sin bloquear:
 - El menú de tarea (T2) todavía no ofrece "Adjuntar evidencia" al aprobador, aunque
   `herramientas.py` ya se lo permite desde T2b — ajuste de UX pendiente.
 - `b-0005-b` (banco real, 2026-09-26): Jev resuelve "el plc" a 0,76/0,53 de
-  probabilidad/confianza, debajo de `jev.CORTE_CLARA = 0,85`, y Prisma abre una
+  probabilidad/confianza, debajo de `jev.CORTE_CLARA = 0,85`, y Leda abre una
   aclaración que el escenario no contesta — comportamiento del modelo contra un umbral
-  ya codificado, no un defecto de Prisma. `PENDIENTE` de decisión de producto: ajustar
+  ya codificado, no un defecto de Leda. `PENDIENTE` de decisión de producto: ajustar
   el umbral o enriquecer el contexto que recibe Jev para referencias informales de una
   sola palabra clave.
 - El reintento del despachador puede reordenar las partes de una respuesta partida:
   el orden estrictamente creciente que garantiza `salida.enqueue_outbox` vale para la
   primera pasada, no para una parte reprogramada tras un fallo — límite documentado en
-  `odd/tasks/prisma-orienta.md`, no corregido.
+  `odd/tasks/leda-orienta.md`, no corregido.
 - ADR 0007 sigue con dos puntos abiertos en "Pendiente": si una respuesta puede cerrar
   sin ninguna opción, y cómo se ven las opciones en el grupo de gestión.
 
 Después de T5, según [`ROADMAP.md`](ROADMAP.md): **Aportes sobre tareas** (depende de
-Prisma orienta), después aprendizaje de apodos y aclaraciones, y la conversación de
+Leda orienta), después aprendizaje de apodos y aclaraciones, y la conversación de
 bloqueos (mecánica §8, pasos 2 a 7).
 
 El resto del orden de trabajo está en [`ROADMAP.md`](ROADMAP.md).
 
-## Cerrado: Prisma orienta (T1-T4b)
+## Cerrado: Leda orienta (T1-T4b)
 
-Feature `odd/tasks/prisma-orienta.md`, origen [`ADR 0007`](decisions/0007-prisma-orienta-no-charla.md);
+Feature `odd/tasks/leda-orienta.md`, origen [`ADR 0007`](decisions/0007-leda-orienta-no-charla.md);
 acciones por tarea en
 [`architecture/interpretacion-y-confirmacion.md`](architecture/interpretacion-y-confirmacion.md)
 §4.6. Construido sobre `main` (commits `c253d27` a `9681973`), cada unidad con su
 revisión RDD; detalle completo, decisiones y evidencia de cada corrección en
-`odd/tasks/prisma-orienta.md`.
+`odd/tasks/leda-orienta.md`.
 
 - **T1 — Opciones del modelo.** `ofrecer_opciones` (`herramientas.py`): el modelo pide
   una elección con hasta `MAX_OPCIONES_MODELO = 4` opciones (texto o tarea), el
@@ -392,7 +392,7 @@ revisión RDD; detalle completo, decisiones y evidencia de cada corrección en
   respuesta que liste tareas (`consultar_tareas`), con páginas de 4 y "Ver más"; no
   depende de que el modelo llame a ninguna herramienta.
 - **T4 — Banco.** `tests/banco/` gana `toques` genéricos (tocar por etiqueta o índice),
-  el comprobador `comprobar_pregunta_con_opciones` (activo por defecto: si Prisma
+  el comprobador `comprobar_pregunta_con_opciones` (activo por defecto: si Leda
   pregunta, tiene que ofrecer botones) y tres escenarios nuevos (`b-0016` a `b-0018`).
   Corridas guionadas ejercitan el circuito lista → menú → acción → vista previa de
   punta a punta sin modelo real.
@@ -439,11 +439,11 @@ a §5.12).
 Banco con modelo real y Jev real (NaN `deepseek-v4-flash`, 33 escenarios x 3, base
 descartable de pruebas), 2026-09-24, cinco corridas mientras se corregía lo que
 mostraba cada una: 58, 77, 84, 81 y **96 de 99** aprobadas. Las 3 que fallan son
-`b-0005-b`: Jev da 0,79 a 0,84 a "el plc" (corte 0,85) y Prisma pregunta; es una
+`b-0005-b`: Jev da 0,79 a 0,84 a "el plc" (corte 0,85) y Leda pregunta; es una
 pregunta de más, segura. Límites conocidos: "lo del tablero" (`b-0008`) puede elegirse
-solo, lo frena la vista previa; ante algo que no existe, Prisma ofrece la tarea
+solo, lo frena la vista previa; ante algo que no existe, Leda ofrece la tarea
 parecida en lugar de decir que no la encuentra. Con los 60 mensajes de los lotes,
-Prisma pregunta en uno de cada tres; los lotes son difíciles a propósito y la
+Leda pregunta en uno de cada tres; los lotes son difíciles a propósito y la
 proporción real se mide en la sesión por Telegram.
 
 Suite por defecto, 2026-09-24: `.venv/Scripts/python.exe -m pytest -q` → 721 passed,
@@ -489,7 +489,7 @@ con `levantar-postgres.bat`. Modelo activo `nan / deepseek-v4-flash`.
 ## Cerrado: dependencias entre tareas
 
 Era el próximo paso anterior. `crear_dependencia`/`quitar_dependencia`
-(`src/prisma/herramientas.py`) crean y quitan con la autoridad decidida —responsable de
+(`src/leda/herramientas.py`) crean y quitan con la autoridad decidida —responsable de
 cualquiera de las dos tareas, o su referente— y avisan a la otra parte y, entre áreas
 distintas, a los dos referentes; un ciclo lo rechaza `trg_evitar_ciclo_dependencia` con
 un mensaje legible. El freno de `en_curso` vive en la base

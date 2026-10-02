@@ -1,6 +1,6 @@
-# Protocolo de validación de Prisma
+# Protocolo de validación de Leda
 
-Este documento define la validación que Prisma debe superar antes de trabajar con
+Este documento define la validación que Leda debe superar antes de trabajar con
 objetivos o tareas reales. Las pruebas automatizadas y las evaluaciones ejecutadas
 por el asistente aportan evidencia, pero no constituyen validación definitiva ni
 pueden aprobar el pase al piloto real.
@@ -22,7 +22,7 @@ decisión separada.
 
 ## Política de desarrollo MVP
 
-El objetivo inmediato es probar que Prisma comprende, responde, coordina y reduce
+El objetivo inmediato es probar que Leda comprende, responde, coordina y reduce
 carga humana. No se construye seguridad de grado productivo antes de observar el
 comportamiento, salvo cuando el riesgo alcance al circuito que se quiere ejercitar.
 
@@ -81,7 +81,7 @@ observable y el estado persistido o efecto correspondiente.
 
 ### B. Evaluación de extremo a extremo
 
-Usar el circuito real de Prisma y lenguaje humano natural: vago, incompleto, con
+Usar el circuito real de Leda y lenguaje humano natural: vago, incompleto, con
 errores, cambios de opinión, referencias contextuales, contradicciones,
 irrelevancias, silencios y sin identificadores, taxonomías ni pistas internas.
 
@@ -108,13 +108,13 @@ habilitar el piloto controlado real. La guía operativa está en
 ## Reglas de naturalidad
 
 - No revelar IDs internos, taxonomías, nombres de herramientas, estado esperado ni
-  formulaciones que ayuden a Prisma a elegir la respuesta correcta.
+  formulaciones que ayuden a Leda a elegir la respuesta correcta.
 - No convertir los escenarios en prompts exactos. El evaluador conoce el objetivo,
   pero formula y continúa la conversación como lo haría en uso normal.
 - No corregir gramática, completar datos ni eliminar contradicciones para facilitar
   la interpretación.
 - No forzar un guion completo: el escenario puede definir un mensaje inicial humano
-  y dejar que el resto dependa de lo que Prisma pregunte o haga.
+  y dejar que el resto dependa de lo que Leda pregunte o haga.
 - No premiar una respuesta convincente si el estado, los efectos o la auditoría son
   incorrectos.
 
@@ -125,7 +125,7 @@ habilitar el piloto controlado real. La guía operativa está en
 | Desarrollo | Versionado en este repositorio, sin secretos ni trabajo real. | Diagnóstico, correcciones y regresiones conocidas en A, B y D. Puede crecer con fallos y variantes, siempre con trazabilidad. |
 | Holdout | Fuera del repositorio y de Engram, bajo custodia exclusiva del usuario. | Medición reservada de generalización en C. Se revela sólo al ejecutarlo y no se usa para diseñar prompts, reglas, contratos ni correcciones. |
 
-El holdout usa IDs opacos. Los agentes que escriben o corrigen Prisma no acceden a
+El holdout usa IDs opacos. Los agentes que escriben o corrigen Leda no acceden a
 su contenido ni a los resultados esperados. Sólo se registra su versión, cobertura,
 fecha y resultado agregado; nunca escenarios, prompts, respuestas esperadas ni otro
 contenido secreto.
@@ -147,7 +147,7 @@ esperado con lo observado.
 | Campo | Contenido mínimo |
 |---|---|
 | ID opaco | Identificador sin pistas sobre intención, regla o resultado. |
-| Objetivo del evaluador | Capacidad o riesgo que se quiere observar; no se muestra a Prisma. |
+| Objetivo del evaluador | Capacidad o riesgo que se quiere observar; no se muestra a Leda. |
 | Precondiciones simuladas | Estado ficticio necesario, marcado como simulado y aislado de trabajo real. |
 | Actor y canal | Identidad/rol real autorizado y canal efectivo de interacción. |
 | Mensaje inicial | Formulación humana natural; no exige definir un guion completo. |
@@ -299,7 +299,7 @@ Un escenario (`Escenario`, `tests/banco/escenario.py`) admite además:
   Si un toque no resuelve, o resuelve contra más de una acción pendiente distinta de
   esta corrida, la corrida queda `bloqueado` con el motivo exacto — nunca adivina.
 - `permite_pregunta_sin_opciones` (por defecto `false`): habilita, sólo para ese
-  escenario, que Prisma cierre preguntando en texto abierto sin ofrecer botones. Por
+  escenario, que Leda cierre preguntando en texto abierto sin ofrecer botones. Por
   defecto, todo escenario pasa por el comprobador nuevo `comprobar_pregunta_con_
   opciones` (`tests/banco/comprobadores.py`), que aprueba una pregunta con botones o
   una respuesta que no pregunta nada, y falla una pregunta en texto abierto sin
@@ -320,7 +320,7 @@ es el escenario y sus variantes contra el modelo real.
 
 ## Qué no hacer
 
-- Dar a Prisma el prompt exacto que conduce a la respuesta esperada.
+- Dar a Leda el prompt exacto que conduce a la respuesta esperada.
 - Evaluar sólo el texto visible y omitir PostgreSQL, herramientas, efectos o
   auditoría.
 - Entrenar, ajustar o diseñar contra el holdout.

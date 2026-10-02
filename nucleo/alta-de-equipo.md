@@ -2,7 +2,7 @@
 
 **Capa:** núcleo · **Versión:** 1.0
 
-Cómo Prisma da de alta un equipo nuevo. La entrevista la conduce Prisma desde el
+Cómo Leda da de alta un equipo nuevo. La entrevista la conduce Leda desde el
 **bot de administración**, con un administrador de plataforma. Su salida es un
 pack de espacio que alguien tiene que leer y aprobar antes de que el espacio se
 active.
@@ -15,12 +15,12 @@ averiguar y qué no se puede dejar sin definir.
 ## Principios de la entrevista
 
 - **Una pregunta por vez.** No se envían cuestionarios.
-- **Prisma no completa por su cuenta.** Si algo no se contestó, queda como
+- **Leda no completa por su cuenta.** Si algo no se contestó, queda como
   faltante, no como valor por defecto silencioso.
-- Cuando existe un valor habitual, Prisma lo propone explícitamente y pide
+- Cuando existe un valor habitual, Leda lo propone explícitamente y pide
   confirmación: "por defecto uso X, ¿te sirve?".
-- Prisma puede partir de una plantilla y entrevistar sólo para lo que difiere.
-- Al terminar, Prisma **muestra el pack completo en lenguaje natural**, no en
+- Leda puede partir de una plantilla y entrevistar sólo para lo que difiere.
+- Al terminar, Leda **muestra el pack completo en lenguaje natural**, no en
   YAML. La persona lo lee, corrige lo que haga falta y recién ahí aprueba.
 - Un espacio no se activa sin aprobación explícita.
 
@@ -31,10 +31,10 @@ averiguar y qué no se puede dejar sin definir.
 1. ¿Cómo se llama el equipo?
 2. ¿A qué se dedica, en una o dos frases?
 3. ¿Hay un objetivo grande que ordene el trabajo de los próximos meses? ¿Cuál?
-4. ¿Hay nombres propios que Prisma tenga que usar con precisión — productos,
+4. ¿Hay nombres propios que Leda tenga que usar con precisión — productos,
    sistemas, plantas, clientes? ¿Alguno se confunde fácil con otro?
 
-El punto 4 alimenta el glosario. Es el que evita que Prisma escriba mal el nombre
+El punto 4 alimenta el glosario. Es el que evita que Leda escriba mal el nombre
 de un producto o confunda el nombre del equipo con el de una de sus partes.
 
 ---
@@ -49,16 +49,16 @@ Por cada integrante:
 4. ¿Aprueba el trabajo de alguien más? ¿De quién?
 5. ¿Su trabajo lo aprueba alguien? ¿Quién?
 6. ¿Qué días y horarios trabaja, si difiere del equipo?
-7. ¿Algo que Prisma deba tener en cuenta al escribirle?
+7. ¿Algo que Leda deba tener en cuenta al escribirle?
 
 Y sobre el conjunto:
 
 8. ¿Quién tiene la última palabra cuando hay un desacuerdo?
 9. ¿Esa persona debería recibir el seguimiento diario del equipo, o eso lo hace
-   Prisma y a ella le llega sólo lo relevante?
+   Leda y a ella le llega sólo lo relevante?
 
 La pregunta 9 importa: sin ella, la autoridad del espacio termina recibiendo todo
-y Prisma pierde su función.
+y Leda pierde su función.
 
 ---
 
@@ -68,7 +68,7 @@ y Prisma pierde su función.
 2. ¿Cómo le dicen ustedes a una unidad de trabajo asignable? ¿Tarea, orden de
    trabajo, ticket, pedido?
 3. ¿Y al conjunto de trabajos que persiguen un mismo resultado?
-4. ¿Hay palabras que Prisma debería evitar, o formas que el equipo no usa?
+4. ¿Hay palabras que Leda debería evitar, o formas que el equipo no usa?
 
 ---
 
@@ -87,9 +87,9 @@ y Prisma pierde su función.
 
 1. ¿Qué días y en qué horario trabaja el equipo?
 2. ¿Qué feriados siguen?
-3. ¿Cada cuánto querés que Prisma pida estado? ¿Qué días y a qué hora?
+3. ¿Cada cuánto querés que Leda pida estado? ¿Qué días y a qué hora?
 4. ¿Querés un resumen para todo el equipo? ¿Cuándo?
-5. ¿Hay una reunión periódica que Prisma tenga que preparar? ¿Con cuánta
+5. ¿Hay una reunión periódica que Leda tenga que preparar? ¿Con cuánta
    anticipación?
 6. ¿Cuántos mensajes automáticos por día te parece razonable que reciba una
    persona?
@@ -101,7 +101,7 @@ y Prisma pierde su función.
 1. ¿Qué hace que algo sea urgente en este equipo? Una condición concreta, no una
    sensación.
 2. ¿Quién puede declarar una urgencia?
-3. Cuando alguien se atrasa, ¿a quién avisa Prisma primero?
+3. Cuando alguien se atrasa, ¿a quién avisa Leda primero?
 4. ¿Y si el atraso persiste?
 5. ¿Cuánto tiempo puede quedar un bloqueo abierto antes de que escale solo?
 
@@ -112,7 +112,7 @@ y Prisma pierde su función.
 1. ¿Cómo se hablan en este equipo? ¿De vos, de usted?
 2. ¿Formal o distendido?
 3. ¿Mensajes cortos o con contexto?
-4. ¿Hay algo que te resultaría molesto que Prisma haga al escribir?
+4. ¿Hay algo que te resultaría molesto que Leda haga al escribir?
 
 ---
 
@@ -130,7 +130,7 @@ grupo. Un enlace publicado permite que cualquiera reclame la identidad de otro.
 
 ## Validaciones
 
-Prisma corre estas comprobaciones sobre el pack armado.
+Leda corre estas comprobaciones sobre el pack armado.
 
 ### Impiden activar el espacio
 
@@ -140,13 +140,13 @@ Prisma corre estas comprobaciones sobre el pack armado.
 | Un integrante sin área asignada | Rompe la política de aprobación |
 | Un área sin aprobador y sin declaración explícita de autoaprobación | La omisión no puede pasar por decisión |
 | Ciclo en la política de aprobación | A aprueba a B que aprueba a A |
-| Falta el token del bot o el grupo | Prisma no puede operar |
+| Falta el token del bot o el grupo | Leda no puede operar |
 | No hay calendario laboral | Toda la escalera de recordatorios se calcula sobre él |
 | El pack intenta modificar una regla del núcleo | Rechazo automático |
 
 ### Advierten, pero no impiden
 
-| Comprobación | Qué dice Prisma |
+| Comprobación | Qué dice Leda |
 |---|---|
 | Un área se autoaprueba | "El trabajo de esta área no lo revisa nadie más. ¿Es a propósito?" |
 | Un solo aprobador para todo el equipo | "Todo pasa por una persona. Si no está, se frena el equipo." |
@@ -164,24 +164,24 @@ mostrarse en la próxima revisión.
 
 ## Cierre
 
-1. Prisma arma el pack.
+1. Leda arma el pack.
 2. Lo presenta en lenguaje natural, sección por sección.
 3. Lista las advertencias abiertas.
 4. El administrador corrige lo que haga falta.
 5. El administrador aprueba.
 6. El espacio se activa, se genera el pack versionado y se registra quién lo
    aprobó y cuándo.
-7. Prisma publica su presentación en el grupo y quedan pendientes las
+7. Leda publica su presentación en el grupo y quedan pendientes las
    activaciones individuales.
 
-Hasta que un integrante no active su enlace, Prisma no puede escribirle en
+Hasta que un integrante no active su enlace, Leda no puede escribirle en
 privado. Sus tareas existen igual; el seguimiento privado empieza cuando activa.
 
 ---
 
 ## Revisión periódica
 
-Un pack no se escribe una vez. Cada **[pack]** meses Prisma propone una
+Un pack no se escribe una vez. Cada **[pack]** meses Leda propone una
 revisión al administrador con:
 
 - advertencias que siguen abiertas;
@@ -191,5 +191,5 @@ revisión al administrador con:
 - estimaciones que fallan sistemáticamente;
 - aprendizajes acumulados que sugieren cambiar la configuración.
 
-Prisma propone. El cambio lo aprueba quien corresponda y lo aplica el
+Leda propone. El cambio lo aprueba quien corresponda y lo aplica el
 administrador.

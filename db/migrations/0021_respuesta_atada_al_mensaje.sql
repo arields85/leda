@@ -10,7 +10,7 @@
 -- a su entrante por horario o por clave de deduplicación.
 --
 -- `entrante_id` se llena sola: el gateway deja el id del mensaje en la
--- configuración de la transacción (`prisma.entrante_id`, local) y el valor por
+-- configuración de la transacción (`leda.entrante_id`, local) y el valor por
 -- omisión de la columna la lee, así que cualquier `insert` de esa transacción
 -- (Python o una función de la base) queda atado sin pasar el dato por cada
 -- llamada. Fuera de un mensaje (un toque, una cadencia, la escalera) la
@@ -24,7 +24,7 @@
 --
 -- Se deshace con `db/rollbacks/0021_respuesta_atada_al_mensaje.sql`.
 begin;
-set search_path = prisma, public;
+set search_path = leda, public;
 
 -- Fail closed if an invoking text pipeline decoded the UTF-8 file incorrectly.
 -- chr() builds the expected value independently from non-ASCII source bytes.
@@ -40,20 +40,20 @@ end $$;
 do $$ begin
   if not exists (
       select 1 from information_schema.columns
-       where table_schema = 'prisma' and table_name = 'message_outbox'
+       where table_schema = 'leda' and table_name = 'message_outbox'
          and column_name = 'bloque_copiable') then
     raise exception '0021 requires 0020_bloque_copiable.sql';
   end if;
   if exists (
       select 1 from information_schema.columns
-       where table_schema = 'prisma' and table_name = 'message_outbox'
+       where table_schema = 'leda' and table_name = 'message_outbox'
          and column_name = 'entrante_id') then
     raise exception '0021 ya está aplicada.';
   end if;
 end $$;
 
 -- Columnas nuevas, nulas por omisión: no tocan privilegios ni dueño de la tabla
--- (prisma_app ya tiene el juego completo sobre message_outbox, bucle genérico de
+-- (leda_app ya tiene el juego completo sobre message_outbox, bucle genérico de
 -- `db/esquema.sql`). La clave foránea es sobre la clave primaria de `inbound_message`
 -- (no compuesta con el espacio, como las demás de la tabla): la compuesta
 -- dependería de `inbound_message_workspace_id_unique`, que es de la 0002, y
@@ -62,7 +62,7 @@ end $$;
 -- retención borra el mensaje entrante, la salida queda.
 alter table message_outbox
   add column entrante_id uuid
-    default nullif(current_setting('prisma.entrante_id', true), '')::uuid,
+    default nullif(current_setting('leda.entrante_id', true), '')::uuid,
   add column respuesta_grupo text;
 
 alter table message_outbox
@@ -74,7 +74,7 @@ create index outbox_por_entrante on message_outbox (entrante_id)
   where entrante_id is not null;
 
 comment on column message_outbox.entrante_id is
-  'T9-R2: el mensaje entrante (inbound_message) al que responde esta salida. Se llena sola con la configuración local prisma.entrante_id que deja el gateway al procesar un mensaje; nula fuera de un mensaje (toque, cadencia, escalera).';
+  'T9-R2: el mensaje entrante (inbound_message) al que responde esta salida. Se llena sola con la configuración local leda.entrante_id que deja el gateway al procesar un mensaje; nula fuera de un mensaje (toque, cadencia, escalera).';
 comment on column message_outbox.respuesta_grupo is
   'T9-R2: nombre de la respuesta a la que pertenece la fila cuando una respuesta se encola en varias llamadas (texto en partes y mensaje con botones). Nula: la fila es su propia respuesta.';
 

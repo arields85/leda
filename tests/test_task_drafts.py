@@ -9,16 +9,16 @@ import psycopg
 import pytest
 from fastapi.testclient import TestClient
 
-from prisma import gateway
-from prisma import herramientas as H
-from prisma import pendientes as P
-from prisma.agente import responder
-from prisma.autoridad import Canal, Denegado, identificar
-from prisma.calendario import Calendario
-from prisma.db import admin, autoridad, conectar, espacio
-from prisma.despachador import TransporteDePrueba, despachar
-from prisma.llm import Llamada, ProveedorGuionado, Respuesta
-from prisma.salida import NO_EFFECT_STATUS
+from leda import gateway
+from leda import herramientas as H
+from leda import pendientes as P
+from leda.agente import responder
+from leda.autoridad import Canal, Denegado, identificar
+from leda.calendario import Calendario
+from leda.db import admin, autoridad, conectar, espacio
+from leda.despachador import TransporteDePrueba, despachar
+from leda.llm import Llamada, ProveedorGuionado, Respuesta
+from leda.salida import NO_EFFECT_STATUS
 
 from tests.toques import FUERA_DE_LA_VENTANA, envejecer_toques
 
@@ -143,7 +143,7 @@ def test_borradores_tienen_rls_forzado(corework, conn):
     with admin(conn) as cur:
         cur.execute(
             """select relrowsecurity, relforcerowsecurity
-                 from pg_class where oid = 'prisma.task_draft'::regclass""")
+                 from pg_class where oid = 'leda.task_draft'::regclass""")
         assert tuple(cur.fetchone().values()) == (True, True)
 
 
@@ -241,7 +241,7 @@ def test_preview_obsoleta_no_crea_tarea(corework, conn, authority_conn,
                     where id = (select objective_id from task_draft
                                   where id = %s)""", (resultado["draft_id"],))
         elif obsolescencia == "politica":
-            cur.execute("set local role prisma_admin")
+            cur.execute("set local role leda_admin")
             cur.execute(
                 """update task_evidence_policy
                       set evidencia_requerida = array['explicacion'],
@@ -249,12 +249,12 @@ def test_preview_obsoleta_no_crea_tarea(corework, conn, authority_conn,
                     where workspace_id = %s and area_id =
                           (select area_id from task_draft where id = %s)""",
                 (ws, resultado["draft_id"]))
-            cur.execute("set local role prisma_app")
+            cur.execute("set local role leda_app")
         elif obsolescencia == "version":
-            cur.execute("set local role prisma_admin")
+            cur.execute("set local role leda_admin")
             cur.execute("update task_draft set version = version + 1 where id = %s",
                         (resultado["draft_id"],))
-            cur.execute("set local role prisma_app")
+            cur.execute("set local role leda_app")
         else:
             cur.execute(
                 """update membership
@@ -341,7 +341,7 @@ def test_doble_confirmacion_concurrente_crea_una_sola_tarea(
     resultados = []
 
     def confirmar():
-        from prisma.db import conectar_autoridad
+        from leda.db import conectar_autoridad
 
         otra = conectar_autoridad(authority_uri)
         try:
@@ -379,7 +379,7 @@ def test_fallo_posterior_al_insert_revierte_toda_la_conversion(
     with conn.transaction():
         with conn.cursor() as cur:
             cur.execute("reset role")
-            cur.execute("set search_path = prisma, public")
+            cur.execute("set search_path = leda, public")
             cur.execute(
                 """create function fallar_auditoria_borrador() returns trigger
                    language plpgsql as $$ begin
@@ -402,7 +402,7 @@ def test_fallo_posterior_al_insert_revierte_toda_la_conversion(
         with conn.transaction():
             with conn.cursor() as cur:
                 cur.execute("reset role")
-                cur.execute("set search_path = prisma, public")
+                cur.execute("set search_path = leda, public")
                 cur.execute("drop trigger if exists trg_fallar_auditoria_borrador on audit_log")
                 cur.execute("drop function if exists fallar_auditoria_borrador()")
         conn.commit()
@@ -572,7 +572,7 @@ def test_el_toque_del_borrador_fuera_de_la_ventana_dice_que_ya_no_esta_vigente(
     "responsable_membership_id", "fecha_objetivo", "criterio_aceptacion",
     "evidencia_requerida", "source_draft_id",
 ])
-def test_prisma_app_no_puede_mutar_campos_de_compromiso(
+def test_leda_app_no_puede_mutar_campos_de_compromiso(
         corework, conn, authority_conn, campo):
     from psycopg.sql import SQL, Identifier
 
@@ -592,7 +592,7 @@ def test_prisma_app_no_puede_mutar_campos_de_compromiso(
                 (resuelta.task_id,))
 
 
-def test_prisma_app_no_puede_borrar_task_y_evento_autorizado_sigue_operando(
+def test_leda_app_no_puede_borrar_task_y_evento_autorizado_sigue_operando(
         corework, conn, authority_conn):
     ws = corework.workspace_id
     with espacio(conn, ws) as cur:
@@ -638,7 +638,7 @@ def test_trigger_defensivo_bloquea_mutacion_administrativa(
                         (resuelta.task_id,))
 
 
-def test_prisma_app_no_puede_ejecutar_compromiso_ni_usar_overload_anterior(
+def test_leda_app_no_puede_ejecutar_compromiso_ni_usar_overload_anterior(
         corework, conn):
     ws = corework.workspace_id
     with espacio(conn, ws) as cur:
@@ -648,7 +648,7 @@ def test_prisma_app_no_puede_ejecutar_compromiso_ni_usar_overload_anterior(
         cur.execute(
             """select has_function_privilege(
                  current_user,
-                 'prisma.confirmar_borrador_tarea(uuid,text,bigint,bigint)',
+                 'leda.confirmar_borrador_tarea(uuid,text,bigint,bigint)',
                  'EXECUTE') as puede""")
         assert cur.fetchone()["puede"] is False
 
@@ -660,7 +660,7 @@ def test_prisma_app_no_puede_ejecutar_compromiso_ni_usar_overload_anterior(
     with espacio(conn, ws) as cur:
         cur.execute(
             """select to_regprocedure(
-                 'prisma.confirmar_borrador_tarea(text,uuid,timestamptz)') as fn""")
+                 'leda.confirmar_borrador_tarea(text,uuid,timestamptz)') as fn""")
         assert cur.fetchone()["fn"] is None
 
 
@@ -677,19 +677,19 @@ def test_login_autoridad_es_exclusivo_y_no_administra_tablas(
                  join pg_roles parent on parent.oid = am.roleid
                  join pg_roles member on member.oid = am.member
                 where member.rolname = %s""", (login,))
-        assert cur.fetchone()["roles"] == ["prisma_gateway"]
+        assert cur.fetchone()["roles"] == ["leda_gateway"]
 
     with pytest.raises(psycopg.errors.InsufficientPrivilege):
         with authority_conn.transaction():
-            authority_conn.execute("select count(*) from prisma.task")
+            authority_conn.execute("select count(*) from leda.task")
 
     with autoridad(authority_conn) as cur:
         cur.execute(
             """select has_function_privilege(
                  current_user,
-                 'prisma.confirmar_borrador_tarea(uuid,text,bigint,bigint)',
+                 'leda.confirmar_borrador_tarea(uuid,text,bigint,bigint)',
                  'EXECUTE') as puede,
-               has_table_privilege(current_user, 'prisma.task', 'SELECT')
+               has_table_privilege(current_user, 'leda.task', 'SELECT')
                  as lee_task""")
         permisos = cur.fetchone()
         assert permisos == {"puede": True, "lee_task": False}

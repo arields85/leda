@@ -2,7 +2,7 @@
 \set ON_ERROR_STOP on
 
 -- Applied after 0015_pedir_cambios_exento_del_gate_de_arranque.sql. T6j
--- (`odd/tasks/prisma-orienta.md`, review-5085907d): sólo los cuatro
+-- (`odd/tasks/leda-orienta.md`, review-5085907d): sólo los cuatro
 -- handlers que bloquea `_bloquear_tarea` (`_actualizar_estado`,
 -- `_adjuntar_evidencia`, `_aprobar_tarea`, `_pedir_cambios_tarea`,
 -- `herramientas.py`) fijan `at = clock_timestamp()` al escribir en
@@ -31,7 +31,7 @@
 -- qué ese orden importa, y no deja esa garantía dependiendo únicamente de
 -- que nadie borre este default más adelante.
 begin;
-set search_path = prisma, public;
+set search_path = leda, public;
 
 -- Fail closed if an invoking text pipeline decoded the UTF-8 file incorrectly.
 -- chr() builds the expected value independently from non-ASCII source bytes.
@@ -45,11 +45,11 @@ do $$ begin
 end $$;
 
 do $$ begin
-  if to_regprocedure('prisma.estado_previo_a_revision(uuid)') is null then
+  if to_regprocedure('leda.estado_previo_a_revision(uuid)') is null then
     raise exception '0016 requires 0015_pedir_cambios_exento_del_gate_de_arranque.sql';
   end if;
   if (select column_default from information_schema.columns
-       where table_schema = 'prisma' and table_name = 'task_state_event'
+       where table_schema = 'leda' and table_name = 'task_state_event'
          and column_name = 'at') = 'clock_timestamp()' then
     raise exception '0016 ya está aplicada.';
   end if;

@@ -1,7 +1,7 @@
 """Un cambio rechazado cierra con el estado real de la tarea (T10-7, decisión del
 usuario, 2026-09-30).
 
-Cuando Prisma no hace algo sobre una tarea porque el cambio se rechazó, el mensaje
+Cuando Leda no hace algo sobre una tarea porque el cambio se rechazó, el mensaje
 no cierra con "Estado: sin cambios." -- que no dice de qué tarea ni cómo está --,
 sino con lo que es cierto de ella ahora: "«Programar PLC» sigue en revisión.". Es
 una garantía del servidor, con la misma técnica que las demás guardas de
@@ -16,11 +16,11 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from prisma.agente import responder
-from prisma.calendario import Calendario
-from prisma.db import admin, espacio
-from prisma.llm import Llamada, ProveedorGuionado, Respuesta
-from prisma.salida import NO_EFFECT_STATUS
+from leda.agente import responder
+from leda.calendario import Calendario
+from leda.db import admin, espacio
+from leda.llm import Llamada, ProveedorGuionado, Respuesta
+from leda.salida import NO_EFFECT_STATUS
 
 from tests.banco.corrida import sembrar_precondiciones
 from tests.test_menu_tarea import _quien

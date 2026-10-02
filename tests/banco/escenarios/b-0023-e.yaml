@@ -3,7 +3,7 @@ variante_de: b-0023
 objetivo: >
   Variante de b-0023, dejar la vista previa para ver lo otro: con la vista
   previa de un bloqueo esperando su Confirmar, la persona pide otra cosa y
-  Prisma pregunta si sigue con lo pendiente; la persona toca "Dejarlo y ver lo
+  Leda pregunta si sigue con lo pendiente; la persona toca "Dejarlo y ver lo
   otro". Se cancela la vista previa sin aplicar nada, se dice qué se dejó de
   lado y, en la misma respuesta, se atiende la consulta guardada (aparece la
   otra tarea) sin volver a proponer el bloqueo que se acaba de dejar. La vista

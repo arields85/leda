@@ -1,7 +1,7 @@
 # Prueba local con Ismael, Ariel y Marcos
 
 Todo corre en tu máquina. Telegram no necesita que seas alcanzable desde
-internet: en vez de webhook, Prisma pregunta cada tanto si hay algo nuevo. Al
+internet: en vez de webhook, Leda pregunta cada tanto si hay algo nuevo. Al
 pasar a la VPS se cambia por webhook y no se toca nada más — los dos caminos
 llaman a la misma función.
 
@@ -16,46 +16,46 @@ cp .env.ejemplo .env
 En `.env`:
 
 ```
-PRISMA_DB_URL=postgresql://prisma:loquesea@localhost:5432/prisma
-PRISMA_BOT_TOKEN_COREWORK=<el token de BotFather>
-PRISMA_LLM_API_KEY=<tu credencial>
+LEDA_DB_URL=postgresql://leda:loquesea@localhost:5432/leda
+LEDA_BOT_TOKEN_COREWORK=<el token de BotFather>
+LEDA_LLM_API_KEY=<tu credencial>
 ```
 
-`PRISMA_WEBHOOK_SECRET` y `PRISMA_BASE_URL` quedan vacíos: son para la VPS.
+`LEDA_WEBHOOK_SECRET` y `LEDA_BASE_URL` quedan vacíos: son para la VPS.
 
 Base de datos:
 
 ```bash
 docker compose up -d postgres
-python -m prisma esquema
+python -m leda esquema
 ```
 
 ## 2. Cargar el equipo
 
 El token del bot **no** va en `espacios/corework.yaml`: ese archivo se versiona
-en git. Vive en `.env`, como `PRISMA_BOT_TOKEN_COREWORK`.
+en git. Vive en `.env`, como `LEDA_BOT_TOKEN_COREWORK`.
 
 Lo único que el pack necesita es el `grupo_gestion_id`, que ya está cargado. Si
-alguna vez cambia el grupo, Prisma lo averigua sola:
+alguna vez cambia el grupo, Leda lo averigua sola:
 
 ```bash
-python -m prisma grupo corework
+python -m leda grupo corework
 ```
 
 Después, tres comandos:
 
 ```bash
-python -m prisma importar corework --activar
-python -m prisma feriados corework
-python -m prisma modelo <identificador> --proveedor anthropic
+python -m leda importar corework --activar
+python -m leda feriados corework
+python -m leda modelo <identificador> --proveedor anthropic
 ```
 
 El modelo no va en el pack ni en el núcleo: es configuración, y se cambia sin
-tocar un archivo. Para ver cuáles ofrece un proveedor, `python -m prisma
-modelos --proveedor anthropic`; sin argumentos, `python -m prisma modelo`
+tocar un archivo. Para ver cuáles ofrece un proveedor, `python -m leda
+modelos --proveedor anthropic`; sin argumentos, `python -m leda modelo`
 muestra el que está activo. La credencial depende del proveedor: `openrouter`
-usa `PRISMA_OPENROUTER_API_KEY` (la misma de Jev) y los demás
-`PRISMA_LLM_API_KEY`; si falta la que corresponde, Prisma lo registra como
+usa `LEDA_OPENROUTER_API_KEY` (la misma de Jev) y los demás
+`LEDA_LLM_API_KEY`; si falta la que corresponde, Leda lo registra como
 incidente en vez de usar la otra.
 
 Cada llamada al modelo tiene un tiempo máximo por intento y reintentos acotados,
@@ -67,7 +67,7 @@ reintentos se trata como cualquier otro error del proveedor: incidente y disculp
 ## 3. Dar de alta a los tres
 
 ```bash
-python -m prisma enlaces corework --solo Ismael Ariel Marcos
+python -m leda enlaces corework --solo Ismael Ariel Marcos
 ```
 
 Mandale a cada uno **su** enlace, por privado. No los pegues en el grupo: un
@@ -80,7 +80,7 @@ existen, tienen tareas y cuentan para cerrar objetivos, pero no reciben nada.
 ## 4. Escuchar
 
 ```bash
-python -m prisma escuchar corework
+python -m leda escuchar corework
 ```
 
 Ese proceso hace todo: recibe mensajes, contesta, dispara las cadencias que
@@ -90,13 +90,13 @@ para no mezclar los mensajes de una cadencia con lo que se está probando a
 mano), agregá `--sin-cadencias`; la escalera y el despacho siguen igual:
 
 ```bash
-python -m prisma escuchar corework --sin-cadencias
+python -m leda escuchar corework --sin-cadencias
 ```
 
 En otra terminal, para ver cómo va:
 
 ```bash
-python -m prisma estado corework
+python -m leda estado corework
 ```
 
 ---
@@ -132,7 +132,7 @@ a recibir es el seguimiento privado.
 
    > *terminé el panel de lote*
 
-   Prisma la mueve a **en revisión**, no a terminada. Si intenta cerrarla, la
+   Leda la mueve a **en revisión**, no a terminada. Si intenta cerrarla, la
    base responde qué falta.
 
 3. Ariel adjunta la evidencia:
@@ -143,7 +143,7 @@ a recibir es el seguimiento privado.
 
    > *apruebo la tarea del panel de lote*
 
-5. Ahora sí cierra. Verificá con `python -m prisma estado corework`.
+5. Ahora sí cierra. Verificá con `python -m leda estado corework`.
 
 ### Los dos escalones
 
@@ -161,9 +161,9 @@ Ese contraste es lo que muestra que la cadena es por persona y no por área.
 - **Que Ismael apruebe una tarea de Nahuel.** Tiene la decisión final del
   equipo, pero eso no lo habilita a firmar en lugar de Marcos.
 - **Que Marcos apruebe una de CoreLabs.** No es su cadena.
-- **Que alguien diga "esto es urgente".** Prisma no debería marcarlo como
+- **Que alguien diga "esto es urgente".** Leda no debería marcarlo como
   urgente: sólo Ismael puede declararlo.
-- **Que Ismael pida cambiar la configuración de Prisma.** Tiene que derivarlo
+- **Que Ismael pida cambiar la configuración de Leda.** Tiene que derivarlo
   a la administración, cordialmente.
 - **Un bloqueo.** Que Marcos diga que está trabado por algo. La tarea sale de
   la escalera de recordatorios y deja de recibir avisos.
@@ -175,8 +175,8 @@ vence su horario -- no hace falta reiniciar el proceso ni volver a importar
 el pack para que un horario editado tome efecto. Para no esperar ni eso:
 
 ```bash
-python -m prisma correr corework objetivos_semanales
-python -m prisma correr corework resumen_grupal
+python -m leda correr corework objetivos_semanales
+python -m leda correr corework resumen_grupal
 ```
 
 ### Escalera de recordatorios
@@ -185,11 +185,11 @@ Se calcula desde el vencimiento en días hábiles. Para verla sin esperar,
 poné una tarea con fecha pasada:
 
 ```sql
-update prisma.task set fecha_objetivo = now() - interval '2 days'
+update leda.task set fecha_objetivo = now() - interval '2 days'
  where titulo like 'Relevar%';
 ```
 
-Y esperá una vuelta del proceso, o corré `python -m prisma escalera corework`.
+Y esperá una vuelta del proceso, o corré `python -m leda escalera corework`.
 
 ---
 
@@ -199,7 +199,7 @@ Al integrante nunca le llega un error técnico, sólo un mensaje genérico. Lo
 que pasó queda acá:
 
 ```bash
-python -m prisma incidentes corework
+python -m leda incidentes corework
 ```
 
 ---
@@ -229,8 +229,8 @@ pasos no tocan la base actual (`postgres`, con los datos de las sesiones 1 y
 2), pero que quede sin tocar no es lo mismo que tener un respaldo: mientras
 no se corra el paso 1, sigue siendo la única copia. Esa misma base
 `postgres` es además la base de mantenimiento a la que se conecta la suite
-de pruebas (`PRISMA_TEST_DB_URL`, `tests/conftest.py`) para crear y borrar
-sus propias bases descartables (`prisma_test_<id>`, una por sesión de
+de pruebas (`LEDA_TEST_DB_URL`, `tests/conftest.py`) para crear y borrar
+sus propias bases descartables (`leda_test_<id>`, una por sesión de
 pruebas); las pruebas nunca escriben datos de sesión ahí, sólo la usan para
 crear y borrar las suyas, pero nadie debería confiar en dejarla intacta como
 si fuera la copia de respaldo.
@@ -241,25 +241,25 @@ no "no tocar `postgres`":
 
 ```bash
 mkdir -p db/respaldos
-pg_dump "$PRISMA_DB_URL" -Fc -f db/respaldos/prisma-antes-base-nueva-<fecha>.dump
+pg_dump "$LEDA_DB_URL" -Fc -f db/respaldos/leda-antes-base-nueva-<fecha>.dump
 ```
 
 (`<fecha>` en `AAAAMMDD`, igual que los respaldos anteriores en esa carpeta.)
 
-**2. Crear la base vacía `prisma`**, en el mismo servidor:
+**2. Crear la base vacía `leda`**, en el mismo servidor:
 
 ```sql
-create database prisma;
+create database leda;
 ```
 
-o, equivalente, `createdb prisma` con el mismo usuario y host que usa
-`PRISMA_DB_URL` hoy.
+o, equivalente, `createdb leda` con el mismo usuario y host que usa
+`LEDA_DB_URL` hoy.
 
-**3. Cambiar el nombre de la base en `.env`.** La variable es `PRISMA_DB_URL`:
+**3. Cambiar el nombre de la base en `.env`.** La variable es `LEDA_DB_URL`:
 es una URL completa (`postgresql://usuario:contraseña@host:puerto/basededatos`)
 y el nombre de la base es sólo el último segmento, después de la última `/` --
-cambiá únicamente ese segmento, a `prisma`; dejá usuario, contraseña, host y
-puerto como están. Si `PRISMA_AUTHORITY_DB_URL` también apunta a esta base
+cambiá únicamente ese segmento, a `leda`; dejá usuario, contraseña, host y
+puerto como están. Si `LEDA_AUTHORITY_DB_URL` también apunta a esta base
 (no hay fallback entre las dos: `db/README.md`), cambiale el mismo segmento --
 si sólo se cambia una de las dos, la sesión real terminaría escribiendo tareas
 en una base y confirmándolas en otra.
@@ -269,26 +269,26 @@ incluidas: `esquema.sql` es el estado actual, no hace falta aplicar
 migraciones sueltas sobre una base nueva):
 
 ```bash
-python -m prisma esquema
+python -m leda esquema
 ```
 
 Es una base recién creada: `esquema.sql` crea los roles del clúster
-(`prisma_app`, `prisma_admin`, `prisma_gateway`, `prisma_owner`) si todavía no
+(`leda_app`, `leda_admin`, `leda_gateway`, `leda_owner`) si todavía no
 existen -- como suelen ya existir en el mismo servidor por la base anterior,
 esa parte no hace nada la segunda vez -- así que sólo hace falta que el
-usuario de `PRISMA_DB_URL` pueda crear roles y el esquema `prisma` en esta
+usuario de `LEDA_DB_URL` pueda crear roles y el esquema `leda` en esta
 base nueva, ni más ni menos que lo que ya hacía falta para la base actual.
 
-> **Nunca correr `python -m prisma esquema --recrear` contra la base
+> **Nunca correr `python -m leda esquema --recrear` contra la base
 > anterior.** Borra todos los datos. La base nueva se crea recién, así que
 > acá no hace falta -- y contra la anterior jamás, es el respaldo.
 
 **5. Importar el pack, feriados y sembrar:**
 
 ```bash
-python -m prisma importar corework --activar
-python -m prisma feriados corework
-python -m prisma sembrar corework --semilla espacios/corework.semilla-ficticia.yaml
+python -m leda importar corework --activar
+python -m leda feriados corework
+python -m leda sembrar corework --semilla espacios/corework.semilla-ficticia.yaml
 ```
 
 `sembrar` rechaza con un mensaje claro si el espacio ya tiene alguna tarea
@@ -299,11 +299,11 @@ los nombres de las personas.
 
 **5b. Configurar el modelo de lenguaje.** Una base nueva no hereda el modelo de
 la anterior: sin este paso, cada mensaje de texto termina en un incidente
-("No hay modelo configurado"). Ver el activo con `python -m prisma modelo` y
+("No hay modelo configurado"). Ver el activo con `python -m leda modelo` y
 configurarlo, por ejemplo:
 
 ```bash
-python -m prisma modelo <identificador> --proveedor openrouter
+python -m leda modelo <identificador> --proveedor openrouter
 ```
 
 **6. Volver a vincular las cuentas de Telegram** (son las mismas personas del
@@ -312,14 +312,14 @@ nombres de quienes participan de esta ronda, igual que en el punto 3 más
 arriba; sin `--solo`, genera el enlace de las siete:
 
 ```bash
-python -m prisma enlaces corework --solo <nombres>
+python -m leda enlaces corework --solo <nombres>
 ```
 
 **7. Arrancar el proceso** que escucha Telegram, igual que en las sesiones
 anteriores:
 
 ```bash
-python -m prisma escuchar corework
+python -m leda escuchar corework
 ```
 
 La semilla deja, para probar entrega con evidencia y "Pedir cambios" (ADR
@@ -338,17 +338,17 @@ primero a quien nunca le escribió. Ninguna de las dos cosas pasa sola en un
 entorno local nuevo.
 
 Agregá a `.env` el token de un bot de administración **aparte** -- nunca el
-mismo que `PRISMA_BOT_TOKEN_COREWORK`: un integrante no puede terminar
+mismo que `LEDA_BOT_TOKEN_COREWORK`: un integrante no puede terminar
 recibiendo avisos de administración por el bot de su propio equipo:
 
 ```
-PRISMA_BOT_TOKEN_ADMIN=<el token de BotFather del bot de administración>
+LEDA_BOT_TOKEN_ADMIN=<el token de BotFather del bot de administración>
 ```
 
 Elegí a alguien del equipo ya vinculado (punto 6) y otorgale el rol:
 
 ```bash
-python -m prisma administrador corework Ismael
+python -m leda administrador corework Ismael
 ```
 
 Es idempotente: correrlo de nuevo no duplica el rol, y avisa si la persona
@@ -356,15 +356,15 @@ ya lo tenía. Si todavía no activó su cuenta de Telegram, igual se lo otorga
 -- pero avisa que los incidentes no le van a llegar hasta que la active y
 escriba una vez al bot de administración.
 
-Con `python -m prisma escuchar corework` corriendo (punto 7 -- ahora también
-sondea el bot de administración, sin bloquear, si `PRISMA_BOT_TOKEN_ADMIN`
+Con `python -m leda escuchar corework` corriendo (punto 7 -- ahora también
+sondea el bot de administración, sin bloquear, si `LEDA_BOT_TOKEN_ADMIN`
 está puesto), esa persona le escribe **una vez** cualquier cosa al bot de
 administración. Sin ese mensaje no hay a qué `chat_id` mandarle nada.
 Hacelo mientras el listener está corriendo: Telegram descarta las
 actualizaciones no leídas después de 24 horas, así que un mensaje mandado
 con el listener apagado se puede perder.
 
-**Nunca pongas en `PRISMA_BOT_TOKEN_ADMIN` el token de un bot de
+**Nunca pongas en `LEDA_BOT_TOKEN_ADMIN` el token de un bot de
 administración que ya está servido por webhook en otro lado** (p. ej. el
 de producción, el que atiende `servir`): antes de sondear, `escuchar`
 CONSULTA si el bot ya tiene un webhook puesto -- si lo tiene, nunca lo toca

@@ -7,12 +7,12 @@
 ## Objetivo
 
 Reemplazar la base documental escrita para "bot interno de CoreWork" por la base
-documental de "Prisma, producto PM multi-tenant", y dejar registrado con evidencia
+documental de "Leda, producto PM multi-tenant", y dejar registrado con evidencia
 qué se aprovecha, qué se corrige y qué queda superado.
 
 ## Problema
 
-La documentación vigente define a Prisma como un asistente interno para un único
+La documentación vigente define a Leda como un asistente interno para un único
 equipo. El alcance real declarado es un producto ofrecible a varios clientes, cada
 uno con su propia configuración de integrantes, áreas, tareas y políticas, con
 dashboard web y eventualmente aplicación móvil.
@@ -33,15 +33,15 @@ Verificados en esta sesión sobre el árbol de trabajo actual.
 
 | Hallazgo | Evidencia |
 |---|---|
-| Aislamiento multi-tenant real: 28 tablas con `force row level security` y policy contra el GUC `prisma.workspace_id` | `db/esquema.sql:1474-1492` |
+| Aislamiento multi-tenant real: 28 tablas con `force row level security` y policy contra el GUC `leda.workspace_id` | `db/esquema.sql:1474-1492` |
 | Cero vocabulario de cliente congelado en esquema: `area` y `rol` son tablas con `workspace_id`, no enums | `db/esquema.sql:106,114` |
 | Estado de tarea es proyección de eventos, no campo editable | `db/esquema.sql:1231` |
 | Escritura cross-tenant: las tablas de eventos no tienen `workspace_id` ni RLS, pero sí `grant insert` | `db/esquema.sql:413-422,426-435,1474-1482,1542` |
 | El trigger que proyecta el estado es `security definer` y no valida workspace | `db/esquema.sql:1215-1225` |
 | No existe ningún `alter ... owner to` en el esquema versionado | `db/esquema.sql` (grep sin resultados) |
 | Telegram filtrado al núcleo: `message_outbox` sin columna de canal | `db/esquema.sql:533,548` |
-| Un límite de transporte decide validez de negocio | `src/prisma/ingreso_tareas.py:532,547,554,1118` |
-| No existe API de lectura: la superficie HTTP es webhook + salud | `src/prisma/gateway.py:47,434` |
+| Un límite de transporte decide validez de negocio | `src/leda/ingreso_tareas.py:532,547,554,1118` |
+| No existe API de lectura: la superficie HTTP es webhook + salud | `src/leda/gateway.py:47,434` |
 
 ## Alcance autorizado
 
@@ -64,7 +64,7 @@ de lectura y el commit de línea base. Quedan para unidades siguientes, en ese o
 
 ## Checklist
 
-- [x] **T1** — `docs/product/que-es-prisma.md`: definición de producto, superficies,
+- [x] **T1** — `docs/product/que-es-leda.md`: definición de producto, superficies,
       qué hace y qué no, qué es configuración por cliente vs núcleo, CoreWork como
       primer cliente. *Ruta: delegada (writer trigger: 3+ archivos no triviales).*
       **111 líneas.**
@@ -97,7 +97,7 @@ de lectura y el commit de línea base. Quedan para unidades siguientes, en ese o
 
 ## Criterios de aceptación
 
-1. Un lector nuevo entiende, leyendo sólo T1 y T2, qué es Prisma como producto y
+1. Un lector nuevo entiende, leyendo sólo T1 y T2, qué es Leda como producto y
    dónde termina el núcleo.
 2. T2 nombra el aislamiento entre clientes como invariante número uno y documenta la
    violación conocida con su evidencia.
@@ -136,10 +136,10 @@ orquestador, no por el writer.
 
 | Criterio | Resultado | Evidencia observada |
 |---|---|---|
-| 1. Un lector nuevo entiende producto y frontera con T1 y T2 | Cumplido | `que-es-prisma.md` define espacio como cliente y la tabla configuración/núcleo; `frontera.md` mapea núcleo, puertos y adaptadores. |
+| 1. Un lector nuevo entiende producto y frontera con T1 y T2 | Cumplido | `que-es-leda.md` define espacio como cliente y la tabla configuración/núcleo; `frontera.md` mapea núcleo, puertos y adaptadores. |
 | 2. T2 nombra el aislamiento como invariante 1 y documenta la violación | Cumplido | `frontera.md:97-100` regla 1; `frontera.md:119` fila de incumplimiento con las cuatro citas de esquema; `frontera.md:126-136` consecuencia. |
 | 3. T3 ordena sin fases numeradas | Cumplido | `ROADMAP.md:54-127`, siete unidades con entrega, dependencia y cierre. |
-| 4. Ningún documento afirma implementado lo que no está | Cumplido | `que-es-prisma.md:28-29,31-33` marcan las superficies inexistentes; `frontera.md:88-89` marca los adaptadores ausentes. |
+| 4. Ningún documento afirma implementado lo que no está | Cumplido | `que-es-leda.md:28-29,31-33` marcan las superficies inexistentes; `frontera.md:88-89` marca los adaptadores ausentes. |
 | 5. Ningún documento existente se borra | Cumplido | `git status --short docs/` no muestra ninguna eliminación; sólo dos archivos nuevos y dos modificados. |
 
 Alcance respetado: el writer tocó exactamente los cuatro archivos indicados. El resto
@@ -156,7 +156,7 @@ La directiva que se le pasó al writer de T5 contenía una afirmación falsa: de
 writer se apartó de la directiva antes que escribir algo falso y lo reportó.
 
 Verificado: ese documento se titula "Especificación funcional **genérica**" y declara
-su ámbito como "Prisma como Project Manager digital configurable para cualquier
+su ámbito como "Leda como Project Manager digital configurable para cualquier
 equipo" (`docs/product/functional-specification.md:1,19`). El motivo correcto es otro:
 precede al modelo multi-tenant, no separa configuración de cliente de núcleo del
 producto y no trata el aislamiento como garantía.
@@ -170,7 +170,7 @@ Encontrados al intentar reejecutar la suite, fuera del alcance documental de est
 unidad pero relevantes para la línea base:
 
 - **El entorno virtual está roto.** `.venv/pyvenv.cfg` declara `home = C:\Python314`
-  y fue creado en `D:\Laboratorios\Prisma\Prisma\.venv`. Ninguna de las dos rutas
+  y fue creado en `D:\Laboratorios\Leda\Leda\.venv`. Ninguna de las dos rutas
   existe. Todo comando de la sección "Comandos verificados" que use
   `.venv\Scripts\python.exe` falla hoy. No se modificó.
 - **`.codegraph/` no figura en `.gitignore`** y aparece sin seguimiento. Es un índice

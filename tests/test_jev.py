@@ -14,8 +14,8 @@ import json
 import httpx
 import pytest
 
-from prisma import jev
-from prisma.jev import (URL, ClienteJev, ClienteJevGuionado, JevError,
+from leda import jev
+from leda.jev import (URL, ClienteJev, ClienteJevGuionado, JevError,
                          ResolucionReferencia, TareaCandidata, TipoResolucion,
                          resolver_referencia_tarea)
 

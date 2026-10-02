@@ -12,7 +12,7 @@
 -- una sola fuente de verdad, igual que ya son `motivo_no_arranca_tarea` y
 -- `estado_previo_a_bloqueo` para sus propias preguntas.
 begin;
-set search_path = prisma, public;
+set search_path = leda, public;
 
 -- Fail closed if an invoking text pipeline decoded the UTF-8 file incorrectly.
 -- chr() builds the expected value independently from non-ASCII source bytes.
@@ -28,12 +28,12 @@ end $$;
 do $$ begin
   if not exists (
       select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-       where n.nspname = 'prisma' and p.proname = 'motivo_no_cierra_tarea') then
+       where n.nspname = 'leda' and p.proname = 'motivo_no_cierra_tarea') then
     raise exception '0012 requires the base schema (motivo_no_cierra_tarea missing).';
   end if;
   if exists (
       select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-       where n.nspname = 'prisma' and p.proname = 'evidencia_pendiente') then
+       where n.nspname = 'leda' and p.proname = 'evidencia_pendiente') then
     raise exception '0012 ya está aplicada.';
   end if;
 end $$;

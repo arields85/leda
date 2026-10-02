@@ -3,7 +3,7 @@ objetivo: >
   La aclaración con botones ("¿A cuál te referís?") es una rama abierta (ADR
   0013 regla 1, enmienda "una sola rama de conversación abierta", T9-R1d-1c):
   con la aclaración de una referencia ambigua esperando (dos tareas candidatas),
-  la persona pide otra cosa (una consulta sobre sus tareas). Prisma no la
+  la persona pide otra cosa (una consulta sobre sus tareas). Leda no la
   atiende todavía: hace una sola pregunta con dos botones sobre lo pendiente
   ("Estábamos con la tarea a la que te referías con «el cableado». ¿Seguimos con
   eso?"). La consulta no se contesta y no se aplica nada. La aclaración se

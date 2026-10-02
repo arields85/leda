@@ -2,7 +2,7 @@
 
 **Estado:** propuesto, no iniciado. **Creado:** 2026-09-27.
 **Origen:** decisión del usuario (2026-09-27) tras el experimento 1 registrado en
-`odd/tasks/prisma-orienta.md` ("Experimento 1 — validador de invariantes").
+`odd/tasks/leda-orienta.md` ("Experimento 1 — validador de invariantes").
 
 ## Objetivo
 
@@ -36,7 +36,7 @@ garantía) e `i3` dio un falso positivo por textos cortos genéricos.
 ## Decisiones del usuario (2026-09-28)
 
 1. **Cuándo corre:** automáticamente todos los días y además a mano. A mano, hoy con
-   un comando (`python -m prisma validar <slug>`); cuando exista el panel de
+   un comando (`python -m leda validar <slug>`); cuando exista el panel de
    plataforma, desde un botón del panel que llame a la misma función. Automático: en
    modo servidor (`servir`), como un trabajo diario más del planificador que ya
    programa las cadencias (`reloj.montar`); en modo local (`escuchar`), una vez por día
@@ -49,7 +49,7 @@ garantía) e `i3` dio un falso positivo por textos cortos genéricos.
 Hechos que condicionan el diseño (verificados en el código el 2026-09-28): hoy un
 incidente avisa a la **persona afectada** con un texto neutral
 (`gateway.reportar_incidente_no_manejado`), no al administrador; el administrador los
-ve con `python -m prisma incidentes <slug>`. El bot de administración es un cascarón
+ve con `python -m leda incidentes <slug>`. El bot de administración es un cascarón
 (identifica, audita y responde `ok`, `docs/capacidades.md`) y no manda avisos; el
 panel de plataforma no existe. Por eso el aviso por el bot de administración es parte
 de esta unidad, y el del panel queda para cuando el panel exista.
@@ -74,7 +74,7 @@ Escritas contra `db/esquema.sql` con las migraciones hasta `0015`; se corrieron
 dentro de una sesión `default_transaction_read_only = on`.
 
 ```sql
--- Invariantes de Prisma para chequeo diario de solo lectura.
+-- Invariantes de Leda para chequeo diario de solo lectura.
 -- Derivados de: nucleo/constitucion.md, nucleo/mecanica-pm.md,
 -- AGENTS.md "Invariantes vigentes", docs/decisions/0008 y 0009 (con su
 -- enmienda T6a/T6b/T6c), y db/esquema.sql (tablas y funciones deterministas
@@ -214,7 +214,7 @@ select e.evento_id, e.task_id, e.workspace_id, e.at
 -- Mecánica §7 / esquema: la aprobación de una tarea la da
 -- membership.aprobador_membership_id del responsable (o, si es null, quien
 -- tenga autoridad_final del espacio -- misma resolución que
--- confirmar_borrador_tarea). Prisma nunca se cuenta a sí misma como
+-- confirmar_borrador_tarea). Leda nunca se cuenta a sí misma como
 -- aprobador (constitución §7) y el responsable no se autoaprueba.
 with aprobador_esperado as (
   select t.id as task_id, t.workspace_id, t.responsable_membership_id,
@@ -292,7 +292,7 @@ select a.id as id_a, b.id as id_b, a.workspace_id, a.chat_id, a.tipo,
 -- @endcheck
 
 -- @check:j
--- "Nunca fallar en silencio": alguien que le escribió a Prisma y no recibió
+-- "Nunca fallar en silencio": alguien que le escribió a Leda y no recibió
 -- ninguna salida por ese chat después. Se mira sólo el último inbound de
 -- cada chat -- uno anterior ya resuelto por un outbox intermedio no cuenta.
 with ultimo_inbound as (

@@ -6,7 +6,7 @@
   `_turno`, `_toque`, los retomes de preguntas pendientes), `pendientes`,
   `ingreso_tareas`, `agente`, `contexto` y las herramientas que informan efectos.
 - **Evidencia:** tercera ronda por Telegram (hallazgos R3-H5, H13, H15, H16, H17, H18,
-  H19 y H20 en `odd/tasks/prisma-orienta.md`); mapeo de causas del 2026-09-29 por
+  H19 y H20 en `odd/tasks/leda-orienta.md`); mapeo de causas del 2026-09-29 por
   lectura de código; manual de personalidad, voz y comportamiento del usuario (§13-§16,
   §20, §27), contrastado con el corpus del repo.
 
@@ -15,12 +15,12 @@
 Los hallazgos de la ronda 3 parecen distintos, pero son pocas clases de falla que se
 repiten en caminos distintos:
 
-- Cuando Prisma espera un dato, el mensaje siguiente se toma como ese dato sin
+- Cuando Leda espera un dato, el mensaje siguiente se toma como ese dato sin
   interpretarlo: un "hola" quedó como evidencia (H17), y probablemente de ahí salieron
   dos respuestas para un mismo mensaje (H19).
 - Hay caminos donde un mensaje no produce ninguna respuesta (H15: foto, archivo o audio)
   o produce dos (H19).
-- Prisma deja la situación sin decir cómo quedó: evidencia registrada sobre una tarea
+- Leda deja la situación sin decir cómo quedó: evidencia registrada sobre una tarea
   que sigue en curso sin avisarlo (H20), el motivo de "Pedir cambios" invisible fuera de
   un aviso efímero (H16), opciones que el sistema no puede cumplir (H18).
 - Un toque de botón no da ninguna señal mientras se procesa (H5) y el segundo toque
@@ -31,7 +31,7 @@ como dato) no termina nunca: las variantes de una conversación son infinitas. E
 del usuario lo dice en §27: corregir el mecanismo general, no agregar frases especiales
 ni palabras clave para que pase el caso conocido.
 
-El reparto que sigue es el de siempre en Prisma: el modelo interpreta las variantes del
+El reparto que sigue es el de siempre en Leda: el modelo interpreta las variantes del
 lenguaje; el código garantiza las invariantes.
 
 ## Decisión
@@ -39,7 +39,7 @@ lenguaje; el código garantiza las invariantes.
 Cuatro reglas generales. Cada una se implementa con un mecanismo en el código, no con
 casos.
 
-1. **Una pregunta pendiente es contexto, no una trampa.** Cuando Prisma espera un dato
+1. **Una pregunta pendiente es contexto, no una trampa.** Cuando Leda espera un dato
    (la evidencia de una entrega, la causa de un bloqueo, su resolución, el motivo de
    "Pedir cambios", una corrección, un campo del alta de una tarea), el mensaje
    siguiente se interpreta. Se adopta el patrón probado de los asistentes de tareas
@@ -54,13 +54,13 @@ casos.
    - **cancela**: la persona deja lo pendiente; se cierra y se dice qué se dejó de lado.
    - **otro tema** (reemplazado por la enmienda del 2026-09-29, abajo): se atiende el
      mensaje por el camino normal y la pregunta queda abierta; al terminar, si la
-     respuesta no dejó otra interacción pendiente, Prisma retoma dentro de la misma
+     respuesta no dejó otra interacción pendiente, Leda retoma dentro de la misma
      respuesta ("¿seguimos con …?") con botones.
    - **charla** (saludo, agradecimiento, algo fuera de tema): respuesta breve y la
      pregunta pendiente se vuelve a hacer; no se consume.
    - **dudoso**: una sola pregunta con botones para saber si el mensaje es el dato o es
      otra cosa.
-   - **no puedo**: el mensaje pide algo que Prisma no puede hacer; lo dice una vez,
+   - **no puedo**: el mensaje pide algo que Leda no puede hacer; lo dice una vez,
      ofrece la alternativa real si existe y la pregunta queda abierta.
    **Precisión (2026-09-29, banco real `b-0020`).** Al responder o corregir una
    pregunta pendiente, la tarea de esa pregunta es el sujeto por defecto. Jev sigue
@@ -78,12 +78,12 @@ casos.
    **Enmienda (2026-09-29, decisión del usuario): una sola rama de conversación
    abierta.** No se abre una rama nueva de conversación hasta cerrar la que empezó.
    Una rama se cierra de tres maneras: se continúa (la persona da el dato), se cancela,
-   o se deja para hacer otra cosa. Prisma dirige (ADR 0007): no atiende otro tema con
+   o se deja para hacer otra cosa. Leda dirige (ADR 0007): no atiende otro tema con
    una pregunta abierta. Evidencia: banco real `b-0021-c` y `b-0020`, donde la respuesta
    al otro tema traía sus propios botones, el retome no podía salir (un solo juego de
    botones por respuesta, regla 2) y la pregunta quedaba abierta sin que la persona lo
    supiera. Con esta enmienda, **otro tema** pasa a ser:
-   - Prisma no atiende el mensaje todavía. Responde una sola pregunta con botones sobre
+   - Leda no atiende el mensaje todavía. Responde una sola pregunta con botones sobre
      lo pendiente, por ejemplo "Estábamos armando una tarea nueva y me falta el título.
      ¿Seguimos con eso?" con **[Seguir con la tarea]** y **[Dejarla y ver lo otro]** (la
      redacción final es de T10).
@@ -97,20 +97,20 @@ casos.
    - `charla` y `no puedo` no cambian: vuelven a hacer la pregunta pendiente.
    - Una rama está abierta para quien tiene que responderla: un borrador que espera la
      confirmación de otra persona no es una rama abierta de quien lo pidió.
-   - Qué es una rama: algo que la persona empezó en ese chat y que Prisma espera de ella
+   - Qué es una rama: algo que la persona empezó en ese chat y que Leda espera de ella
      para terminarlo. Lo son un dato pedido (el del menú, Modificar, "Ninguna, lo
      escribo", un campo o una elección del alta), la vista previa de un cambio que ella
      pidió y espera su Confirmar, y la propia pregunta de la rama. No lo son los botones
      que sólo ofrecen caminos (una lista de tareas, el menú de una tarea), ni lo que
      empezó otra persona y le llega para decidir (una aprobación que le piden): eso es
-     un mensaje que inicia Prisma, se retiene mientras ella tenga una rama abierta y
+     un mensaje que inicia Leda, se retiene mientras ella tenga una rama abierta y
      sigue la escalera si queda sin respuesta, pero no le impide hablar de otra cosa.
    - El retome posterior ("¿seguimos con …?") y la guarda que impedía volver a proponer
      lo pendiente durante otro tema quedan sin uso, porque el responder ya no corre con
      una pregunta abierta.
-   - Los mensajes que Prisma inicia por su cuenta (cadencias, avisos, escalera) también
+   - Los mensajes que Leda inicia por su cuenta (cadencias, avisos, escalera) también
      esperan (decisión del usuario, 2026-09-29): mientras una persona tiene una rama
-     abierta, lo que Prisma le iba a mandar queda retenido y sale apenas la rama se
+     abierta, lo que Leda le iba a mandar queda retenido y sale apenas la rama se
      cierra. Sólo se retiene lo dirigido a esa persona; a las demás les sigue saliendo.
      Para que una rama abandonada no silencie el seguimiento, la retención termina
      cuando la pregunta pendiente vence (su vencimiento de siempre); si un tipo de
@@ -118,7 +118,7 @@ casos.
      **Precisión (2026-09-29, decisión del usuario):** se retiene sólo mientras la
      persona está activa en la rama, es decir, si escribió o tocó algo en ese chat en
      los últimos 30 minutos. Una rama abierta pero abandonada no retiene nada: lo que
-     Prisma inicia sale en el momento (un aviso urgente no espera horas) y la rama sigue
+     Leda inicia sale en el momento (un aviso urgente no espera horas) y la rama sigue
      abierta para cuando la persona vuelva. Con esto las preguntas del alta, que no
      vencen, también retienen, acotadas por la actividad.
 2. **Cada mensaje recibe exactamente una respuesta visible.** Al terminar de procesar un
@@ -127,8 +127,8 @@ casos.
    respuesta (una respuesta puede tener varias partes y un juego de botones). El saludo
    del día va dentro de la respuesta y el indicador de actividad (ADR 0011) no es una
    respuesta. Los mensajes sin texto entran en la regla: el epígrafe de una foto o un
-   archivo se procesa como texto y Prisma avisa que el adjunto todavía no se guarda; sin
-   epígrafe, Prisma dice que todavía no puede recibir fotos, archivos ni audios y pide el
+   archivo se procesa como texto y Leda avisa que el adjunto todavía no se guarda; sin
+   epígrafe, Leda dice que todavía no puede recibir fotos, archivos ni audios y pide el
    texto o un link.
 3. **Decir el estado real y ofrecer sólo lo posible.** Después de cualquier acción, o de
    una acción que no se hizo, la respuesta dice cómo quedó la tarea (estado vigente

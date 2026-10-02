@@ -1289,7 +1289,7 @@ def _configuration_error(cur, request, who, field, now):
     registrar_auditoria(
         cur, accion="configuracion_intake_invalida",
         workspace_id=who.workspace_id,
-        actor_app_user_id=who.app_user_id, actor_kind="prisma",
+        actor_app_user_id=who.app_user_id, actor_kind="leda",
         sujeto_tipo="task_draft", sujeto_id=str(request["task_draft_id"]),
         detalle={"request_id": request_id, "field": field},
     )
@@ -1867,7 +1867,7 @@ def _send_to_confirmer(cur, request, now, preview_text, preview, version,
         pending_action_id=pending.id,
         # Quien actúa (un toque o un mensaje) es quien confirma: el resumen le
         # contesta a ese acto y no queda sujeto a horario, tope ni retención
-        # (ADR 0013 regla 2). Si confirma otra persona, es un mensaje que Prisma
+        # (ADR 0013 regla 2). Si confirma otra persona, es un mensaje que Leda
         # le inicia a ella.
         is_response=requester_confirms, es_coordinacion=not requester_confirms,
     )

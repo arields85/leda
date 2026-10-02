@@ -34,10 +34,10 @@ def test_app_cannot_mutate_tasks_or_execute_commit_function():
     migration_2 = (ROOT / "db" / "migrations" /
                    "0002_general_task_intake.sql").read_text("utf-8")
     for sql in (schema, migration_1):
-        assert "revoke update, delete on task from prisma_app" in sql
-        assert "to prisma_gateway" in sql
+        assert "revoke update, delete on task from leda_app" in sql
+        assert "to leda_gateway" in sql
         assert ("grant execute on function "
-                 "confirmar_borrador_tarea(uuid, text, bigint)\n  to prisma_app") \
+                 "confirmar_borrador_tarea(uuid, text, bigint)\n  to leda_app") \
             not in sql
     assert "revoke execute on function confirmar_borrador_tarea" in migration_2
 
@@ -48,13 +48,13 @@ def test_commit_function_uses_database_time_and_frozen_preview():
     assert "a.preview is distinct from preview_actual" in schema
     assert "p_telegram_user_id bigint" in schema
     assert "language plpgsql security definer" in schema
-    assert "create role prisma_gateway nologin noinherit;" in schema
-    assert "alter role prisma_gateway noinherit nobypassrls" in schema
+    assert "create role leda_gateway nologin noinherit;" in schema
+    assert "alter role leda_gateway noinherit nobypassrls" in schema
 
 
 def test_dispatch_and_gateway_contain_stale_preview_and_callback_guards():
-    dispatch = (ROOT / "src" / "prisma" / "despachador.py").read_text("utf-8")
-    gateway = (ROOT / "src" / "prisma" / "gateway.py").read_text("utf-8")
+    dispatch = (ROOT / "src" / "leda" / "despachador.py").read_text("utf-8")
+    gateway = (ROOT / "src" / "leda" / "gateway.py").read_text("utf-8")
     assert "def _preview_vigente" in dispatch
     # Un solo reloj: la vigencia de la vista previa usa el `ahora` de la pasada.
     assert "p.vence_en > %s as no_vencida" in dispatch

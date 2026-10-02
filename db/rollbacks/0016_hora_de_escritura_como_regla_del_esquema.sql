@@ -7,7 +7,7 @@
 -- carried before this migration. No function, trigger, or privilege to
 -- undo: the migration touched no ACL or ownership, only the three defaults.
 begin;
-set search_path = prisma, public;
+set search_path = leda, public;
 
 alter table task_state_event alter column at set default now();
 alter table evidence alter column at set default now();

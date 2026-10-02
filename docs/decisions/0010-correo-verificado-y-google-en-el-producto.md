@@ -3,12 +3,12 @@
 - **Estado:** propuesta (pendiente de aceptación del usuario)
 - **Fecha:** 2026-09-27
 - **Alcance:** `AGENTS.md` (lista de "fuera de alcance"), alta de integrantes
-  (`src/prisma/onboarding.py`, `db/esquema.sql: activation_token`), un módulo
-  nuevo de acceso a Google (`src/prisma/google/`, a crear), herramientas nuevas
-  en el registro de `src/prisma/herramientas.py`, `src/prisma/autoridad.py`
+  (`src/leda/onboarding.py`, `db/esquema.sql: activation_token`), un módulo
+  nuevo de acceso a Google (`src/leda/google/`, a crear), herramientas nuevas
+  en el registro de `src/leda/herramientas.py`, `src/leda/autoridad.py`
   (`REQUIEREN_CONFIRMACION` ya reserva `enviar_correo` y `crear_evento`).
 - **Origen:** decisión del usuario, 2026-09-27. Fuente funcional (el *qué* a
-  reproducir): `PRISMA-PACK-RECONSTRUCCION-20260925/00-LEER-PRIMERO.md`,
+  reproducir): `LEDA-PACK-RECONSTRUCCION-20260925/00-LEER-PRIMERO.md`,
   `01-INCORPORACION-E-IDENTIDAD.md`, `02-GOOGLE-ACCESO-Y-OPERACIONES.md`,
   `03-REUNIONES-EVENTOS-Y-AGENDA.md` y
   `VALIDACION-PARA-LA-NUEVA-IMPLEMENTACION.md` describen el comportamiento
@@ -27,14 +27,14 @@ producto por ahora" y exige "una decisión explícita y documentada" antes de
 construirlo. Hoy:
 
 - El alta de integrantes es sólo enlace de activación de Telegram
-  (`src/prisma/onboarding.py`): ningún correo, ninguna verificación adicional.
+  (`src/leda/onboarding.py`): ningún correo, ninguna verificación adicional.
 - `docs/capacidades.md` ("Diseñado y sin construir") lista sin una sola línea
   de código: Integración de calendario, Correo, Almacenamiento documental,
   Reuniones e informes.
 - El esquema ya tiene lugares reservados que nadie llena: `evidence.drive_file_id`
   (`db/esquema.sql`, tabla `evidence`) y `corework.yaml` declara
   `reunion_periodica`, que el importador no consume.
-- `src/prisma/autoridad.py` ya reserva `enviar_correo` y `crear_evento` en
+- `src/leda/autoridad.py` ya reserva `enviar_correo` y `crear_evento` en
   `REQUIEREN_CONFIRMACION` — nadie los implementó, pero el núcleo ya los
   anticipó: `nucleo/constitucion.md` §7 lista explícitamente "correos" y
   "creación o modificación de eventos de calendario" entre las acciones que
@@ -45,7 +45,7 @@ construirlo. Hoy:
 
 El usuario decidió (2026-09-27) traer dos capacidades al alcance del
 producto, tomando como especificación de comportamiento el pack
-`PRISMA-PACK-RECONSTRUCCION-20260925/` (el detalle completo por sección y por
+`LEDA-PACK-RECONSTRUCCION-20260925/` (el detalle completo por sección y por
 rebanada vive en "Fuentes funcionales obligatorias" de
 `odd/tasks/alta-y-google.md`):
 
@@ -85,15 +85,15 @@ rebanada vive en "Fuentes funcionales obligatorias" de
    credencial de cada espacio, con el mismo patrón de aislamiento de la regla
    1 de `frontera.md` (`workspace_id`, RLS forzada, política
    `aislamiento_espacio`) **y además** sin ningún privilegio directo de
-   `prisma_app`, siguiendo el precedente ya existente de `acceso_tablero`:
+   `leda_app`, siguiendo el precedente ya existente de `acceso_tablero`:
    `revoke all ... from public`, acceso únicamente a través de funciones
-   `security definer` propiedad de `prisma_owner` (nunca de un superusuario —
+   `security definer` propiedad de `leda_owner` (nunca de un superusuario —
    regla 6 y la sección "Cómo se cerró la regla 1" de `frontera.md`) que
    devuelven un token ya vigente, nunca la fila cruda. **Se descarta
    explícitamente `workspace_setting` para este dato**: esa tabla recibe
-   `grant select, insert, update, delete ... to prisma_app` dentro del bucle
+   `grant select, insert, update, delete ... to leda_app` dentro del bucle
    genérico de RLS de `db/esquema.sql`, así que cualquier proceso del agente
-   con `prisma_app` podría leer un token guardado ahí en texto plano. El valor
+   con `leda_app` podría leer un token guardado ahí en texto plano. El valor
    se cifra en reposo con una clave que vive fuera de la base y fuera de git,
    mismo espíritu que `workspace.bot_token_ref` ("referencia al secreto, nunca
    el token"); el mecanismo exacto de cifrado y custodia de esa clave queda
@@ -103,7 +103,7 @@ rebanada vive en "Fuentes funcionales obligatorias" de
    (`herramientas.Preparacion`/`NecesitaConfirmacion`/`pending_action`, huella
    de estado, ADR 0005) — nunca un camino paralelo. Cada acción nueva
    (`crear_evento`, `consultar_agenda`, `enviar_correo`, etc.) es una
-   herramienta más del `REGISTRO` de `src/prisma/herramientas.py`, con su
+   herramienta más del `REGISTRO` de `src/leda/herramientas.py`, con su
    propia entrada en `autoridad.verificar`; `enviar_correo` y `crear_evento`
    ya están en `REQUIEREN_CONFIRMACION`.
 6. **Las notificaciones a personas del equipo siguen saliendo por
@@ -116,7 +116,7 @@ rebanada vive en "Fuentes funcionales obligatorias" de
    `frontera.md`, con el mismo contrato que hoy tienen Notificación y
    Lectura: el núcleo expresa "crear un evento con estas personas en este
    horario", nunca una llamada a la API de Calendar. El adaptador concreto
-   vive en un módulo nuevo (`src/prisma/google/`).
+   vive en un módulo nuevo (`src/leda/google/`).
 8. **Ningún límite de la API de Google decide la validez de un dato de
    negocio** (regla 3 de `frontera.md`): el máximo de asistentes de un evento
    o el tamaño de un adjunto de Gmail son límites del adaptador de salida,
@@ -157,8 +157,8 @@ rebanada vive en "Fuentes funcionales obligatorias" de
 - **Aislamiento multi-tenant (regla 1 de `frontera.md`):** toda tabla nueva
   lleva `workspace_id`, RLS forzada y política `aislamiento_espacio`; ninguna
   credencial de Google de un espacio es alcanzable desde otro.
-- **Secretos fuera del alcance de `prisma_app`:** ninguna credencial (token de
-  acceso, refresh token, client secret) se guarda en una fila que `prisma_app`
+- **Secretos fuera del alcance de `leda_app`:** ninguna credencial (token de
+  acceso, refresh token, client secret) se guarda en una fila que `leda_app`
   pueda leer de forma directa. El patrón es `acceso_tablero`.
 - **El núcleo no conoce el transporte de Google** (regla 2).
 - **Ningún límite de Google decide validez de negocio** (regla 3).
@@ -180,7 +180,7 @@ rebanada vive en "Fuentes funcionales obligatorias" de
 ## Alternativas consideradas
 
 - **Guardar el token de Google en `workspace_setting`.** Rechazada: esa tabla
-  ya tiene `select` para `prisma_app`; cualquier herramienta del agente podría
+  ya tiene `select` para `leda_app`; cualquier herramienta del agente podría
   leer el token.
 - **Una operación genérica `workspace_mutate` discriminada por
   recurso/acción**, como describe `02-GOOGLE-ACCESO-Y-OPERACIONES.md` §5 sobre
@@ -204,7 +204,7 @@ rebanada vive en "Fuentes funcionales obligatorias" de
   alcance. La rama auxiliar no toca `AGENTS.md`.
 - Se agregan tablas nuevas al esquema (eventos de verificación de correo,
   credencial de Google por espacio) y un módulo de adaptador
-  (`src/prisma/google/`); nada llega a `main` hasta que la rama auxiliar se
+  (`src/leda/google/`); nada llega a `main` hasta que la rama auxiliar se
   integre.
 - `docs/capacidades.md` sigue describiendo el estado de `main`; se actualiza
   al integrar.

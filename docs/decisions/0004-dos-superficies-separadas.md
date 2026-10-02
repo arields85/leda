@@ -6,11 +6,11 @@
 
 ## Decisión
 
-Prisma tiene dos superficies web separadas, no una con niveles de permiso.
+Leda tiene dos superficies web separadas, no una con niveles de permiso.
 
 | | Panel de plataforma | Tablero de cliente |
 |---|---|---|
-| Quién entra | Quien opera Prisma | Integrantes de un espacio |
+| Quién entra | Quien opera Leda | Integrantes de un espacio |
 | Qué alcanza | Todos los espacios | Sólo el suyo |
 | Qué hace | Da de alta clientes, conduce la entrevista de alta | Consulta su estado y ajusta su configuración |
 | Cómo se autentica | Credencial propia de plataforma | Enlace personal entregado por Telegram |
@@ -26,7 +26,7 @@ Para un producto multi-tenant, que un cliente vea a otro no es un defecto más.
 Es el que termina la relación comercial.
 
 **Y la autenticación no puede ser la misma.** El enlace por Telegram funciona
-porque Prisma ya conoce a la persona: tiene membresía en un espacio. Un cliente
+porque Leda ya conoce a la persona: tiene membresía en un espacio. Un cliente
 que todavía no existe no tiene nada de eso, así que la entrevista de alta —que
 por definición ocurre antes del espacio— no puede autenticarse así. Es anterior
 a la identidad que ese mecanismo necesita.

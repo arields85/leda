@@ -6,7 +6,7 @@
 -- registran sanitizados y se avisan al administrador de plataforma por su
 -- canal." Hasta acá sólo se avisaba a la persona afectada
 -- (`gateway.NOTICIA_NEUTRA_INCIDENTE`); quien administra la plataforma tenía
--- que correr `python -m prisma incidentes <slug>` para enterarse.
+-- que correr `python -m leda incidentes <slug>` para enterarse.
 --
 -- Corrección del usuario sobre el alcance original de esta unidad (mismo
 -- día): el aviso SÍ tiene que incluir qué lo disparó -- el texto del
@@ -25,16 +25,16 @@
 --     `emitir_acceso_tablero`/`resolver_acceso_tablero`: hace el fan-out a
 --     cada administrador alcanzable (que ya le escribió al bot de
 --     administración alguna vez) porque necesita leer `platform_role` y
---     `audit_log`, sin concesión de lectura a `prisma_app`. El texto del
+--     `audit_log`, sin concesión de lectura a `leda_app`. El texto del
 --     aviso (con el disparador) lo arma Python antes de llamar -- eso no
---     necesita elevación, `prisma_app` ya puede leer `inbound_message`,
+--     necesita elevación, `leda_app` ya puede leer `inbound_message`,
 --     `pending_action` y la vista `integrante`.
 --
 -- Todas las piezas nuevas están documentadas en detalle en `db/esquema.sql`
 -- (misma sección, mismos comentarios) -- esta migración es su aplicación
 -- incremental sobre una base existente.
 begin;
-set search_path = prisma, public;
+set search_path = leda, public;
 
 -- Fail closed if an invoking text pipeline decoded the UTF-8 file incorrectly.
 -- chr() builds the expected value independently from non-ASCII source bytes.
@@ -49,13 +49,13 @@ end $$;
 
 do $$ begin
   if (select column_default from information_schema.columns
-       where table_schema = 'prisma' and table_name = 'task_state_event'
+       where table_schema = 'leda' and table_name = 'task_state_event'
          and column_name = 'at') is distinct from 'clock_timestamp()' then
     raise exception '0017 requires 0016_hora_de_escritura_como_regla_del_esquema.sql';
   end if;
   if exists (
       select 1 from information_schema.columns
-       where table_schema = 'prisma' and table_name = 'incident'
+       where table_schema = 'leda' and table_name = 'incident'
          and column_name = 'notificado_admin_en') then
     raise exception '0017 ya está aplicada.';
   end if;
@@ -83,20 +83,20 @@ create table admin_notice (
 );
 
 comment on table admin_notice is
-  'Cola de salida del bot de administración: un aviso por incidente y por administrador de plataforma alcanzable. Sin política de aislamiento por espacio -- no tiene un único espacio dueño -- y sin concesión a prisma_app: sólo la escribe avisar_incidente_admin() (security definer) y sólo la despacha prisma_admin (despachador.despachar_avisos_admin).';
+  'Cola de salida del bot de administración: un aviso por incidente y por administrador de plataforma alcanzable. Sin política de aislamiento por espacio -- no tiene un único espacio dueño -- y sin concesión a leda_app: sólo la escribe avisar_incidente_admin() (security definer) y sólo la despacha leda_admin (despachador.despachar_avisos_admin).';
 
 -- `db/esquema.sql` cubre esto con la concesión general sobre "all tables in
--- schema prisma" porque esa sentencia corre DESPUÉS de crear esta tabla, en
+-- schema leda" porque esa sentencia corre DESPUÉS de crear esta tabla, en
 -- una instalación limpia. Acá, sobre una base existente, esa concesión ya
 -- corrió hace tiempo y no alcanza a una tabla nueva -- hay que repetirla
 -- para esta tabla sola.
-grant all privileges on admin_notice to prisma_owner;
-grant all on admin_notice to prisma_admin;
+grant all privileges on admin_notice to leda_owner;
+grant all on admin_notice to leda_admin;
 
 create function avisar_incidente_admin(
     p_incident_id uuid, p_workspace_id uuid, p_cuerpo text)
 returns table(app_user_id uuid)
-language plpgsql security definer set search_path = prisma, public, pg_temp as $$
+language plpgsql security definer set search_path = leda, public, pg_temp as $$
 declare v_admin record;
 begin
   for v_admin in
@@ -126,11 +126,11 @@ begin
 end $$;
 
 alter function avisar_incidente_admin(uuid, uuid, text)
-  owner to prisma_owner;
+  owner to leda_owner;
 
 revoke execute on function avisar_incidente_admin(uuid, uuid, text)
   from public;
 grant execute on function avisar_incidente_admin(uuid, uuid, text)
-  to prisma_app, prisma_admin;
+  to leda_app, leda_admin;
 
 commit;

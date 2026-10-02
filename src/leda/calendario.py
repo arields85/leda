@@ -83,7 +83,7 @@ class Calendario:
     def dentro_de_jornada(self, momento: datetime) -> datetime:
         """Corre un momento al próximo instante hábil.
 
-        Prisma no escribe fuera de horario salvo urgencia autorizada; el
+        Leda no escribe fuera de horario salvo urgencia autorizada; el
         despachador usa esto para postergar en vez de descartar.
         """
         local = momento.astimezone(self.zona)

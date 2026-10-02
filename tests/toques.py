@@ -5,8 +5,8 @@ from __future__ import annotations
 
 import itertools
 
-from prisma.db import admin
-from prisma.gateway import VENTANA_TOQUE_REPETIDO
+from leda.db import admin
+from leda.gateway import VENTANA_TOQUE_REPETIDO
 
 # Segundos que dejan un toque ya registrado fuera de la ventana, derivados de ella
 # (T9-R4b): si la ventana cambia, las pruebas la siguen.

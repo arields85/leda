@@ -1,6 +1,6 @@
 """Capa de autoridad.
 
-Todo lo que la constitución dice que Prisma no puede hacer se verifica acá,
+Todo lo que la constitución dice que Leda no puede hacer se verifica acá,
 del lado del servidor, antes de tocar la base. No es una instrucción en el
 prompt: es una función que se ejecuta sí o sí.
 
@@ -88,7 +88,7 @@ def identificar_en_espacio(cur: psycopg.Cursor, telegram_user_id: int,
 
 def identificar_administrador(cur: psycopg.Cursor,
                               telegram_user_id: int) -> Solicitante:
-    """Identifica en el canal de administración. Requiere rol prisma_admin,
+    """Identifica en el canal de administración. Requiere rol leda_admin,
     porque tiene que leer tablas globales."""
     cur.execute(
         """select u.id from app_user u

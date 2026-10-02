@@ -3,7 +3,7 @@ variante_de: b-0022
 objetivo: >
   Variante de b-0022, otro tema (ADR 0013 regla 1, enmienda "una sola rama de
   conversación abierta", T9-R1d): con la elección del objetivo abierta, la
-  persona consulta sus tareas. Prisma no la atiende todavía: hace una sola
+  persona consulta sus tareas. Leda no la atiende todavía: hace una sola
   pregunta con dos botones sobre lo pendiente ("Estábamos con la elección
   sobre el objetivo de la tarea nueva. ¿Seguimos con eso?"). No se elige
   ningún objetivo por ella y la consulta no se contesta.

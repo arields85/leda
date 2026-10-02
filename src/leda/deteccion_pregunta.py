@@ -3,16 +3,16 @@
 Una sola implementación, compartida por dos lados que antes la tenían cada
 uno por su cuenta:
 
-  - el servidor (`agente.responder`, T4b, ADR 0007 "Prisma orienta, no
+  - el servidor (`agente.responder`, T4b, ADR 0007 "Leda orienta, no
     charla"): si el turno cierra con una pregunta en texto abierto y sin
     ningún juego de botones propio, agrega el cierre genérico de tres
     botones;
   - el banco conversacional (`tests/banco/comprobadores.py::
-    comprobar_pregunta_con_opciones`, T4): falla un escenario si Prisma
+    comprobar_pregunta_con_opciones`, T4): falla un escenario si Leda
     pregunta sin ofrecer botones.
 
-Vive en `src/prisma/` porque el servidor la necesita en tiempo de ejecución
--- `tests/banco` puede importar de `src/prisma/`, nunca al revés
+Vive en `src/leda/` porque el servidor la necesita en tiempo de ejecución
+-- `tests/banco` puede importar de `src/leda/`, nunca al revés
 (`AGENTS.md`).
 """
 
@@ -41,7 +41,7 @@ _MARCADOR_ELEGI = re.compile(r"\belegi\b")
 _MARCADOR_CUAL = re.compile(r"\bcual\b")
 _MARCADOR_QUE = re.compile(r"\bque\b")
 # Una URL puede traer su propio "?" (query string) o palabras en su camino
-# sin que eso sea Prisma preguntando algo -- se descarta antes de buscar
+# sin que eso sea Leda preguntando algo -- se descarta antes de buscar
 # cualquiera de las dos señales. La URL nunca termina en puntuación: el "?"
 # (o el punto, la coma) pegado al final es el de la frase, no parte de la
 # URL. No hace falta reconocer cualquier URL válida: alcanza con las dos

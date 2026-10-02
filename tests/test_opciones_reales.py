@@ -15,11 +15,11 @@ from __future__ import annotations
 
 import pytest
 
-from prisma.agente import NoProponer, responder
-from prisma.calendario import Calendario
-from prisma.contexto import PREAMBULO
-from prisma.db import admin, espacio
-from prisma.llm import ProveedorGuionado, Respuesta
+from leda.agente import NoProponer, responder
+from leda.calendario import Calendario
+from leda.contexto import PREAMBULO
+from leda.db import admin, espacio
+from leda.llm import ProveedorGuionado, Respuesta
 
 from tests.test_veracidad import AHORA, _quien
 

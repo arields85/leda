@@ -3,18 +3,18 @@
 - **Estado:** aceptada (usuario, 2026-09-27)
 - **Fecha:** 2026-09-27
 - **Alcance:** `actualizar_estado`, `aprobar_tarea`, `pedir_cambios_tarea`
-  (nueva) en `src/prisma/herramientas.py`; el menú de tarea en
-  `src/prisma/menu_tarea.py`; el camino del menú en `src/prisma/gateway.py`;
+  (nueva) en `src/leda/herramientas.py`; el menú de tarea en
+  `src/leda/menu_tarea.py`; el camino del menú en `src/leda/gateway.py`;
   `evidencia_pendiente` en `db/esquema.sql`.
 - **Evidencia:** sesión 2 por Telegram real, 2026-09-27, hallazgos 8 y 9
-  (`odd/tasks/prisma-orienta.md`).
+  (`odd/tasks/leda-orienta.md`).
 
 ## Contexto
 
 Ariel, el responsable, tocó "Ya la terminé" sobre una tarea cuya política
-exige evidencia (`evidencia_requerida = ['explicacion']`). Prisma la pasó a
+exige evidencia (`evidencia_requerida = ['explicacion']`). Leda la pasó a
 `en_revision` sin pedir ni registrar ninguna evidencia. Ismael, el aprobador,
-tocó "Aprobar" → vista previa → Confirmar; Prisma contestó "Se aprueba «…»;
+tocó "Aprobar" → vista previa → Confirmar; Leda contestó "Se aprueba «…»;
 para cerrarla todavía falta: Falta la evidencia requerida." -- con la palabra
 "falta" repetida -- y confirmó igual: aprobó a ciegas un trabajo sin ninguna
 evidencia que revisar.
@@ -104,11 +104,11 @@ sincronizados. Mismo criterio que ya usan `motivo_no_arranca_tarea` y
   el mismo paso que "Ya la terminé".** Un paso más sin necesidad: el menú ya
   sabe que falta (`evidencia_pendiente`) en el momento de tocar la acción;
   pedirla ahí mismo evita una vuelta extra. Rechazada por el mismo principio
-  que ADR 0008 ("Prisma ayuda y orienta, nunca agrega burocracia").
+  que ADR 0008 ("Leda ayuda y orienta, nunca agrega burocracia").
 - **Aprobar con evidencia faltante, pero marcando la aprobación como
   "condicional".** Habría exigido un tercer valor de `decision_aprobacion`
   o un campo nuevo, para un caso que la constitución ya resuelve más
-  simple: "Prisma no acepta como evidencia una afirmación cuando la política
+  simple: "Leda no acepta como evidencia una afirmación cuando la política
   pide un artefacto" (mecánica §6) -- no hay aprobación posible sin la
   evidencia que la política exige. Rechazada.
 - **"Pedir cambios" como un tercer valor de `decision_aprobacion` en vez de
@@ -149,7 +149,7 @@ sincronizados. Mismo criterio que ya usan `motivo_no_arranca_tarea` y
 
 ## Enmienda (2026-09-27): "Pedir cambios" no deja sobrevivir lo anterior
 
-Seguimiento de review-c112506a (`odd/tasks/prisma-orienta.md` T6). "Pedir
+Seguimiento de review-c112506a (`odd/tasks/leda-orienta.md` T6). "Pedir
 cambios" (decisión 4, arriba) devuelve la tarea a `en_curso` para que se
 corrija, pero dos cosas de la entrega original seguían contando para
 siempre, como si nunca se hubiera pedido cambios:
@@ -182,7 +182,7 @@ siempre, como si nunca se hubiera pedido cambios:
 
 Las dos migraciones tocan sólo el cuerpo de su función (no son `security
 definer`; corren con los privilegios de quien llama, y `evidence`/
-`approval` ya tienen `select` concedido a `prisma_app`); el menú de tarea
+`approval` ya tienen `select` concedido a `leda_app`); el menú de tarea
 (`menu_tarea.evidencia_pendiente`) y el gate de "Aprobar"
 (`_exigir_puede_aprobarse`) heredan la corrección sin cambiar, porque las
 dos llaman a la misma función SQL.
@@ -201,7 +201,7 @@ dos llaman a la misma función SQL.
    o no hay un evento anterior registrado -- "Ya la terminé" se ofrece
    desde `asignada`). Función nueva `estado_previo_a_revision` (misma
    puerta angosta que `estado_previo_a_bloqueo`, 0007: `security definer`,
-   dueño `prisma_owner`, sin `execute` para `public`), y la misma rama de
+   dueño `leda_owner`, sin `execute` para `public`), y la misma rama de
    excepción en el disparador. El chequeo proactivo de
    `_actualizar_estado`/`_preparar_actualizar_estado` para `en_curso` gana
    la misma rama, por consistencia con el disparador. Migración
@@ -228,9 +228,9 @@ dos llaman a la misma función SQL.
    el menú general de la tarea (`_encolar_menu_tarea`, mismo
    `SENTINEL_MENU_TAREA`): se distingue porque ese menú siempre ofrece
    "Quiero consultar otra cosa" y el aviso de entrega nunca. Sin migración
-   -- sólo `src/prisma/herramientas.py` (`_notificar_entrega_al_aprobador`,
+   -- sólo `src/leda/herramientas.py` (`_notificar_entrega_al_aprobador`,
    `_evidencia_vigente`, `_avisar_evidencia_nueva_en_revision`) y
-   `src/prisma/pendientes.py` (`retirar_avisos_de_entrega`). Hoy no existe
+   `src/leda/pendientes.py` (`retirar_avisos_de_entrega`). Hoy no existe
    edición del lado de Telegram para borrar los botones del mensaje viejo ya
    entregado (el transporte sólo manda, `despachador.Transporte.enviar`) --
    el mensaje viejo puede seguir visible en el chat, pero tocar sus botones

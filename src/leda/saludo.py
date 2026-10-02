@@ -9,7 +9,7 @@ Un saludo por hora local del espacio (`workspace.zona_horaria`), como mucho
 una vez por persona y por fecha local -- nunca de nuevo por una conversación
 nueva, `/new`, `/reset` ni un período de inactividad dentro del mismo día. El
 mecanismo de referencia
-(`PRISMA-PACK-RECONSTRUCCION-20260925/06-SALUDOS-TONO-E-ICONOGRAFIA.md` y sus
+(`LEDA-PACK-RECONSTRUCCION-20260925/06-SALUDOS-TONO-E-ICONOGRAFIA.md` y sus
 anexos `incorporacion-greeting_for.py.txt`/`incorporacion-claim_greeting.py.
 txt`/`incorporacion-complete_greeting_claim.py.txt`/`incorporacion-
 make_daily_greeting_hooks.py.txt`, la implementación anterior del propio
@@ -20,7 +20,7 @@ nueva. Acá "no saludar de nuevo" nunca depende del modelo: el servidor decide
 de forma determinística.
 
 Decisión del usuario, 2026-09-28+2 (revisión de e83a280, T7b/T7b-follow-up):
-**el primer mensaje que Prisma le manda a una persona en su fecha local lleva
+**el primer mensaje que Leda le manda a una persona en su fecha local lleva
 el saludo, sea cual sea** -- una respuesta, una cadencia (el objetivo del
 lunes 09:15), un recordatorio de la escalera, o un aviso que disparó otra
 persona (una entrega para el aprobador, por ejemplo). Nunca se repite ese
@@ -173,13 +173,13 @@ def verificar_migraciones(cur: psycopg.Cursor) -> str | None:
     necesita). Se llama una sola vez, al arrancar `escuchar`/`servir`
     (`cli.py`) -- nunca en cada `despachar`: no hay fallback en tiempo de
     ejecución para una columna faltante, el proceso no arranca."""
-    cur.execute("select to_regclass('prisma.greeting_state') is not null as ok")
+    cur.execute("select to_regclass('leda.greeting_state') is not null as ok")
     if not cur.fetchone()["ok"]:
         return "0018_saludo_diario.sql"
     cur.execute(
         """select exists (
              select 1 from information_schema.columns
-              where table_schema = 'prisma' and table_name = 'message_outbox'
+              where table_schema = 'leda' and table_name = 'message_outbox'
                 and column_name = 'es_bienvenida') as ok""")
     if not cur.fetchone()["ok"]:
         return "0019_marca_de_bienvenida.sql"
@@ -188,7 +188,7 @@ def verificar_migraciones(cur: psycopg.Cursor) -> str | None:
     cur.execute(
         """select exists (
              select 1 from information_schema.columns
-              where table_schema = 'prisma' and table_name = 'message_outbox'
+              where table_schema = 'leda' and table_name = 'message_outbox'
                 and column_name = 'bloque_copiable') as ok""")
     if not cur.fetchone()["ok"]:
         return "0020_bloque_copiable.sql"
@@ -198,7 +198,7 @@ def verificar_migraciones(cur: psycopg.Cursor) -> str | None:
     cur.execute(
         """select exists (
              select 1 from information_schema.columns
-              where table_schema = 'prisma' and table_name = 'message_outbox'
+              where table_schema = 'leda' and table_name = 'message_outbox'
                 and column_name = 'entrante_id') as ok""")
     if not cur.fetchone()["ok"]:
         return "0021_respuesta_atada_al_mensaje.sql"
@@ -207,7 +207,7 @@ def verificar_migraciones(cur: psycopg.Cursor) -> str | None:
     cur.execute(
         """select exists (
              select 1 from information_schema.columns
-              where table_schema = 'prisma' and table_name = 'inbound_message'
+              where table_schema = 'leda' and table_name = 'inbound_message'
                 and column_name = 'boton_callback') as ok""")
     if not cur.fetchone()["ok"]:
         return "0022_toque_con_boton.sql"

@@ -16,11 +16,11 @@ from datetime import datetime, timedelta, timezone
 
 from psycopg import Rollback
 
-from prisma import ciclo, gateway, huerfanos
-from prisma.db import admin, conectar, espacio
-from prisma.despachador import TransporteDePrueba
-from prisma.incidentes import (EXPLICACION_POR_ETAPA, NOTICIA_NEUTRA_INCIDENTE)
-from prisma.salida import enqueue_outbox
+from leda import ciclo, gateway, huerfanos
+from leda.db import admin, conectar, espacio
+from leda.despachador import TransporteDePrueba
+from leda.incidentes import (EXPLICACION_POR_ETAPA, NOTICIA_NEUTRA_INCIDENTE)
+from leda.salida import enqueue_outbox
 
 from tests.test_una_respuesta import (_ADJUNTOS, _con_adjunto,
                                       _con_respuesta_del_modelo, _tg)
@@ -137,7 +137,7 @@ def test_el_aviso_no_deja_el_entrante_atado_a_lo_que_sigue_en_la_transaccion(
 
     huerfanos.barrer(conn, ws, _ahora())
     with espacio(conn, ws) as cur:
-        cur.execute("select nullif(current_setting('prisma.entrante_id', true), '') e")
+        cur.execute("select nullif(current_setting('leda.entrante_id', true), '') e")
         assert cur.fetchone()["e"] is None
 
 
@@ -289,7 +289,7 @@ def test_el_lote_acota_cuantos_se_avisan_por_pasada(corework, conn):
 
 def test_sin_membresia_activa_no_sale_ningun_mensaje_y_queda_un_incidente(
         corework, conn):
-    """Quien ya no es integrante no recibe mensajes de Prisma: queda el incidente
+    """Quien ya no es integrante no recibe mensajes de Leda: queda el incidente
     (sin contenido) y una marca descartada atada al recibo, que hace idempotente el
     barrido."""
     ws = corework.workspace_id

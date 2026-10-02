@@ -5,7 +5,7 @@ reglas viven en disparadores y funciones; duplicar las tablas en clases de
 Python sólo agregaría una copia que se desincroniza.
 
 Lo importante de este módulo es `espacio()`: abre una transacción con el rol
-`prisma_app` y el espacio activo declarado, y a partir de ahí el aislamiento
+`leda_app` y el espacio activo declarado, y a partir de ahí el aislamiento
 entre equipos lo garantiza PostgreSQL, no el cuidado de quien escribe la
 consulta.
 """
@@ -24,14 +24,14 @@ from .config import config
 
 def conectar(url: str | None = None) -> psycopg.Connection:
     conn = psycopg.connect(url or config.db_url, row_factory=dict_row)
-    conn.execute("set search_path = prisma, public")
+    conn.execute("set search_path = leda, public")
     return conn
 
 
 def conectar_autoridad(url: str) -> psycopg.Connection:
     """Dedicated connection whose transactions are bounded by autoridad()."""
     conn = psycopg.connect(url, row_factory=dict_row)
-    conn.execute("set search_path = prisma, public")
+    conn.execute("set search_path = leda, public")
     conn.commit()
     return conn
 
@@ -46,8 +46,8 @@ def espacio(conn: psycopg.Connection, workspace_id: str) -> Iterator[psycopg.Cur
     """
     with conn.transaction():
         with conn.cursor() as cur:
-            cur.execute("set local role prisma_app")
-            cur.execute("select set_config('prisma.workspace_id', %s, true)",
+            cur.execute("set local role leda_app")
+            cur.execute("select set_config('leda.workspace_id', %s, true)",
                         (workspace_id,))
             yield cur
 
@@ -60,7 +60,7 @@ def atar_al_entrante(cur: psycopg.Cursor, entrante_id: str | None) -> None:
     `insert` lo pase, incluso los de las funciones de la base. Local a la
     transacción: se va con el commit o el rollback."""
     if entrante_id:
-        cur.execute("select set_config('prisma.entrante_id', %s, true)",
+        cur.execute("select set_config('leda.entrante_id', %s, true)",
                     (str(entrante_id),))
 
 
@@ -70,7 +70,7 @@ def entrante_atado(cur: psycopg.Cursor) -> str | None:
     se encole: sirve para derivar de él una clave de deduplicación, de modo que
     una entrega repetida del mismo evento no repita lo encolado y cada evento
     nuevo tenga su propia respuesta (T9-R4)."""
-    cur.execute("select nullif(current_setting('prisma.entrante_id', true), '') as e")
+    cur.execute("select nullif(current_setting('leda.entrante_id', true), '') as e")
     return cur.fetchone()["e"]
 
 
@@ -83,7 +83,7 @@ def admin(conn: psycopg.Connection) -> Iterator[psycopg.Cursor]:
     """
     with conn.transaction():
         with conn.cursor() as cur:
-            cur.execute("set local role prisma_admin")
+            cur.execute("set local role leda_admin")
             yield cur
 
 
@@ -91,12 +91,12 @@ def admin(conn: psycopg.Connection) -> Iterator[psycopg.Cursor]:
 def autoridad(conn: psycopg.Connection) -> Iterator[psycopg.Cursor]:
     """Dedicated boundary for task commitment authority.
 
-    This connection must use PRISMA_AUTHORITY_DB_URL. The application role has
+    This connection must use LEDA_AUTHORITY_DB_URL. The application role has
     no EXECUTE privilege on the commitment function.
     """
     with conn.transaction():
         with conn.cursor() as cur:
-            cur.execute("set local role prisma_gateway")
+            cur.execute("set local role leda_gateway")
             yield cur
 
 
@@ -115,7 +115,7 @@ def sin_espacio(conn: psycopg.Connection) -> Iterator[psycopg.Cursor]:
     """
     with conn.transaction():
         with conn.cursor() as cur:
-            cur.execute("set local role prisma_app")
+            cur.execute("set local role leda_app")
             yield cur
 
 
@@ -125,7 +125,7 @@ def registrar_auditoria(
     accion: str,
     workspace_id: str | None = None,
     actor_app_user_id: str | None = None,
-    actor_kind: str = "prisma",
+    actor_kind: str = "leda",
     sujeto_tipo: str | None = None,
     sujeto_id: str | None = None,
     detalle: dict[str, Any] | None = None,

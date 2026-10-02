@@ -36,7 +36,7 @@ efectos:
     task_state_event: 0
     evidence: 0
     approval: 0
-# Prisma vuelve a preguntar qué cambiar (fragmento de
+# Leda vuelve a preguntar qué cambiar (fragmento de
 # `gateway.PREGUNTA_MODIFICAR`; si T10 cambia su redacción, actualizar acá).
 respuesta_menciona:
   - "cambiar"

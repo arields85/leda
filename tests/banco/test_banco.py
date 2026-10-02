@@ -29,7 +29,7 @@ import warnings
 
 import pytest
 
-from prisma.db import admin
+from leda.db import admin
 
 from tests.banco.comprobadores import (
     Evidencia,
@@ -140,7 +140,7 @@ def test_escenario_contra_modelo_real(
             incidentes=resultado.incidentes_de_respuesta,
             respuestas_por_toque=resultado.respuestas_por_toque),
     ]
-    # ADR 0007 ("Prisma orienta, no charla"), T4: activa por defecto para
+    # ADR 0007 ("Leda orienta, no charla"), T4: activa por defecto para
     # todo escenario -- `permite_pregunta_sin_opciones` es el opt-out
     # explícito de un escenario legado que necesite seguir pasando con una
     # pregunta en texto abierto sin botones

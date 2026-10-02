@@ -1,12 +1,12 @@
 # Relevamiento: Hermes Agent (Nous Research)
 
 - **Fecha:** 2026-09-30
-- **Pedido:** del usuario, para ver si resuelve algo en lo que Prisma está trabado.
+- **Pedido:** del usuario, para ver si resuelve algo en lo que Leda está trabado.
 - **Fuentes:** sitio y documentación oficial (https://hermes-agent.nousresearch.com/),
   repositorio https://github.com/NousResearch/hermes-agent (clon superficial de `main`,
   último commit del 2026-09-30 22:42Z, alrededor de 400 contribuidores, versión
   v0.21.5 del 2026-09-24, licencia MIT). Las rutas citadas son del repositorio.
-- **Veredicto:** no sirve como base de Prisma. Tiene tres ideas que conviene tomar,
+- **Veredicto:** no sirve como base de Leda. Tiene tres ideas que conviene tomar,
   dentro del monolito y sin la dependencia.
 
 ## Qué es
@@ -40,7 +40,7 @@ Verificado en el código:
   `tools/approval.py:1104-1116`), pero no hay vista previa guardada, ejecución única,
   verificación ni auditoría como hechos del dominio. Por defecto, la aprobación de
   comandos peligrosos la decide otro modelo: lo opuesto a "el código garantiza".
-- **No toca los problemas de conversación de Prisma.** No hay nada sobre interpretar
+- **No toca los problemas de conversación de Leda.** No hay nada sobre interpretar
   valores dichos de forma desprolija, responder a partir de hechos, impedir que se
   afirme una acción que no ocurrió ni conversar con una sola rama abierta. Eso lo
   resuelve el [`ADR 0014`](../decisions/0014-flujo-de-un-mensaje.md), no Hermes.
@@ -51,16 +51,16 @@ Verificado en el código:
    un paso aparte revisa la conversación y propone memorias a partir de las
    correcciones de la persona (`agent/background_review.py`). Con `write_approval`, lo
    propuesto queda pendiente hasta que alguien lo aprueba (`tools/write_approval.py`).
-   Para Prisma, el mecanismo se adapta a las reglas ya fijadas: se aprende sólo de lo
+   Para Leda, el mecanismo se adapta a las reglas ya fijadas: se aprende sólo de lo
    confirmado, por espacio, a la vista, borrable, auditado y como pista para Jev, no
    como decisión ([`ADR 0005`](../decisions/0005-interpretacion-y-confirmacion.md)
    punto 5; [`ROADMAP.md`](../ROADMAP.md), "Aprendizaje de apodos y de aclaraciones").
 2. **Registro durable de entregas.** El gateway detecta un envío que quedó a medias
    (el proceso cayó mientras enviaba) y lo reenvía, marcando la recuperación. Comparar
-   con el outbox de Prisma antes de decidir si hace falta.
+   con el outbox de Leda antes de decidir si hace falta.
 3. **Emparejamiento por mensaje directo con código de un solo uso**, con vencimiento de
    una hora y bloqueo tras cinco intentos fallidos (`gateway/pairing.py`). Comparar con
-   los enlaces de activación de Prisma (`python -m prisma enlaces`).
+   los enlaces de activación de Leda (`python -m leda enlaces`).
 
 Ninguna de las tres es urgente. La primera entra en la unidad de aprendizaje del
 roadmap; las otras dos, en el endurecimiento del transporte.
@@ -69,4 +69,4 @@ roadmap; las otras dos, en el endurecimiento del transporte.
 
 - El detalle de `run_agent.py:295` (`skip_background_review`) y qué omite exactamente.
 - `gateway/delivery.py`, y los complementos ByteRover, Supermemory y OpenViking.
-- El rendimiento con modelos chicos como el que usa Prisma.
+- El rendimiento con modelos chicos como el que usa Leda.

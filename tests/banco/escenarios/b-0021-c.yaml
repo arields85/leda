@@ -3,7 +3,7 @@ variante_de: b-0021
 objetivo: >
   Variante de b-0021, otro tema (ADR 0013 regla 1, enmienda "una sola rama de
   conversación abierta", T9-R1d): con la pregunta del título abierta, la
-  persona consulta sus tareas. Prisma no la atiende todavía: hace una sola
+  persona consulta sus tareas. Leda no la atiende todavía: hace una sola
   pregunta con dos botones sobre lo pendiente ("Estábamos con el título de la
   tarea nueva. ¿Seguimos con eso?"). La consulta no se contesta, no se toma
   como título y no se vuelve a proponer el alta.

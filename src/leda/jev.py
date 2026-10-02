@@ -3,7 +3,7 @@
 Jev (TypeSafe AI, `typesafe/jev-1.13` vía OpenRouter) no es un proveedor de
 conversación: elige entre opciones con una probabilidad por opción, no
 genera texto. No vive en `model_config` ni pasa por `llm.Proveedor` — es un
-colaborador aparte, con su propia credencial (`PRISMA_OPENROUTER_API_KEY`).
+colaborador aparte, con su propia credencial (`LEDA_OPENROUTER_API_KEY`).
 
 Receta congelada, de `docs/architecture/interpretacion-y-confirmacion.md`
 §5.6, §5.8 y §5.9 (ADR 0006): por referencia a tarea, una llamada con dos
@@ -134,7 +134,7 @@ class ClienteJev:
 
 def desde_base(api_key: str) -> Jev | None:
     """Arma el cliente de Jev desde la credencial, o `None` si no hay
-    (`PRISMA_OPENROUTER_API_KEY` vacía).
+    (`LEDA_OPENROUTER_API_KEY` vacía).
 
     Sin cliente, `gateway._turno` no resuelve ninguna referencia y el turno
     sigue exactamente como antes de esta unidad (T3, `aclaracion-con-

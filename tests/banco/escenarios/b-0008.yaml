@@ -1,7 +1,7 @@
 id: b-0008
 objetivo: >
   Hay dos tareas de "tablero" abiertas a la vez para el mismo actor y el
-  mensaje no dice cuál. Observar si Prisma frena y pregunta cuál en vez de
+  mensaje no dice cuál. Observar si Leda frena y pregunta cuál en vez de
   adivinar o mover la que no corresponde.
 actor: Marcos Tarquini
 mensajes:

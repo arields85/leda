@@ -3,7 +3,7 @@
 Mecanismo, en el orden en que corre `gateway._toque`:
 
 - El acuse del toque (`acusar_toque`) sale antes de cualquier trabajo y para
-  TODO toque, aunque no sea de un botón de Prisma o vaya a absorberse.
+  TODO toque, aunque no sea de un botón de Leda o vaya a absorberse.
 - El procesamiento del toque va envuelto en el indicador de actividad (ADR 0011):
   no aparece nada si termina antes del umbral.
 - "El mismo botón" es el mismo `callback_data` (lleva el token de la opción, único
@@ -21,10 +21,10 @@ from __future__ import annotations
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 
-from prisma import gateway
-from prisma import pendientes as P
-from prisma.db import admin, espacio
-from prisma.respuesta_unica import (ETAPA_RESPUESTA_DUPLICADA,
+from leda import gateway
+from leda import pendientes as P
+from leda.db import admin, espacio
+from leda.respuesta_unica import (ETAPA_RESPUESTA_DUPLICADA,
                                     ETAPA_SIN_RESPUESTA)
 
 from tests.test_botones import _quien, _tarea, _telegram_id, cliente  # noqa: F401
@@ -184,7 +184,7 @@ def test_otro_boton_de_la_misma_persona_no_se_absorbe(cliente, conn, corework):
 # ---------------------------------------------------------------------------
 
 
-def test_todo_toque_se_acusa_aunque_no_sea_de_un_boton_de_prisma(
+def test_todo_toque_se_acusa_aunque_no_sea_de_un_boton_de_leda(
         cliente, conn, corework, monkeypatch):
     acusados = []
     monkeypatch.setattr(
@@ -287,8 +287,8 @@ def test_la_respuesta_del_toque_queda_atada_a_la_fila_del_toque(
 
 def test_dejarlo_y_ver_lo_otro_es_una_sola_respuesta(
         cliente, conn, corework, monkeypatch):
-    from prisma.llm import Respuesta
-    from prisma.respuesta_unica import grupo_de
+    from leda.llm import Respuesta
+    from leda.respuesta_unica import grupo_de
 
     from tests.test_rama_abierta_guarda import (_abrir_modificar,
                                                 _dejar_y_ver_lo_otro)
@@ -319,8 +319,8 @@ def test_una_nota_de_otra_entrada_no_se_filtra_a_una_respuesta_ajena(
         conn, corework):
     """T9-R4b (R2-003): una entrada cuyo turno se revirtió deja su nota sin
     consumir; la siguiente, aunque su camino de entrada no la limpie, no la dice."""
-    from prisma.db import atar_al_entrante
-    from prisma.respuesta_unica import controlar, dejar_nota
+    from leda.db import atar_al_entrante
+    from leda.respuesta_unica import controlar, dejar_nota
 
     ws = corework.workspace_id
     ahora = datetime.now(timezone.utc)

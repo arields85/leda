@@ -19,7 +19,7 @@ Es el riesgo número uno de `docs/STATUS.md` y la regla número uno de
 |---|---|
 | `task_state_event` y `objective_state_event` no tienen `workspace_id` | `db/esquema.sql:413-422,426-435` |
 | No figuran en el arreglo de tablas con RLS | `db/esquema.sql:1474-1482` |
-| Sí reciben `grant insert` para `prisma_app` | `db/esquema.sql:1542` |
+| Sí reciben `grant insert` para `leda_app` | `db/esquema.sql:1542` |
 | El disparador que proyecta el estado es `security definer` y no valida espacio | `db/esquema.sql:1215-1225` |
 | El esquema versionado no fija propietario de ninguna función | `db/esquema.sql`, sin ninguna sentencia `alter ... owner to` |
 
@@ -29,7 +29,7 @@ ese identificador existe, lo que habilita enumeración.
 
 ## La trampa de diseño
 
-`prisma_admin` es **`bypassrls`** (`db/esquema.sql:1463`). Darle a ese rol la
+`leda_admin` es **`bypassrls`** (`db/esquema.sql:1463`). Darle a ese rol la
 propiedad de las funciones `security definer` anularía la política de
 aislamiento que esta unidad agrega: las funciones la saltearían por completo.
 
@@ -54,7 +54,7 @@ la política compara contra el GUC de sesión y rechaza lo que no corresponda.
 noinherit` que posea las funciones y tenga exactamente los privilegios de tabla
 que necesitan, ni uno más.
 
-**D3 — El disparador conserva `security definer`.** `prisma_app` no tiene
+**D3 — El disparador conserva `security definer`.** `leda_app` no tiene
 `update` sobre `task` (`db/esquema.sql:1497`), por eso existe. Con un
 propietario sin `bypassrls`, su `update` queda sujeto a la RLS de `task`. La
 puerta real es el `insert` del evento; la RLS de `task` es la segunda barrera.
@@ -78,7 +78,7 @@ problema y menor impacto. No se incluye sin autorización explícita.
       en `db/esquema.sql`. *Ruta: delegada; el writer murió por límite de
       sesión durante su verificación, el trabajo estaba completo y lo verifiqué
       yo.*
-- [x] **T3** — `prisma_owner` (`nologin noinherit nobypassrls nosuperuser`) es
+- [x] **T3** — `leda_owner` (`nologin noinherit nobypassrls nosuperuser`) es
       dueño de las cuatro funciones elevadas. Migración `0004` y su rollback.
       **Desvío deliberado de la especificación:** no se le dieron privilegios
       mínimos sino acceso amplio a las tablas del esquema. Lo que contiene a
@@ -113,7 +113,7 @@ problema y menor impacto. No se incluye sin autorización explícita.
 5. Instalación limpia y base migrada convergen a la misma matriz de
    privilegios.
 6. El rollback restaura el estado anterior sin conceder acceso directo a
-   `prisma_app`.
+   `leda_app`.
 
 ## Verificación aplicable
 
@@ -121,7 +121,7 @@ TDD habilitado. Fuente: `CLAUDE.md`. Runner verificado en esta máquina:
 
     .venv/Scripts/python.exe -m pytest -q
 
-Entorno: PostgreSQL 18.6 nativo en `localhost:5432`, con `PRISMA_TEST_DB_URL`
+Entorno: PostgreSQL 18.6 nativo en `localhost:5432`, con `LEDA_TEST_DB_URL`
 en `.env.test`. No arranca solo tras reiniciar Windows.
 
 Secuencia obligatoria: ROJO observado en T1 antes de implementar T2 y T3;
@@ -143,7 +143,7 @@ Se agregó `test_instalacion_limpia_y_base_migrada_convergen_en_el_aislamiento`,
 que instala el esquema limpio en una base descartable, migra otra desde el
 esquema anterior a `0002`, y compara los catálogos efectivos de PostgreSQL:
 columnas, banderas de RLS, políticas, disparadores y privilegios de
-`prisma_app`. Además afirma explícitamente que la RLS está encendida y forzada,
+`leda_app`. Además afirma explícitamente que la RLS está encendida y forzada,
 que la política se llama `aislamiento_espacio` y que `workspace_id` es
 `not null`, de modo que dos bases igualmente desprotegidas no pasarían.
 
@@ -166,7 +166,7 @@ Revisión del SQL hecha por el orquestador, no por el writer:
 | Las funciones de derivación **no** son `security definer` | Correcto: privilegios del llamador, que es lo que cierra el oráculo |
 | Privilegios concedidos por la migración | Ninguno: `0003` no contiene `grant` ni `revoke` |
 | Expresión de la política | Idéntica a la del resto del esquema |
-| `esquema.sql`: tablas en el bucle de RLS y `update`/`delete` revocados | Correcto (`:1523`, `:1557-1558`); `prisma_app` conserva sólo `insert` |
+| `esquema.sql`: tablas en el bucle de RLS y `update`/`delete` revocados | Correcto (`:1523`, `:1557-1558`); `leda_app` conserva sólo `insert` |
 
 ## Lo que T3 destapó
 
@@ -175,9 +175,9 @@ Medido, no supuesto. Eso cierra el `PENDIENTE` que arrastraba
 `docs/architecture/frontera.md`.
 
 Al quitarles el privilegio cayeron **diez** pruebas. Causa raíz: el disparador
-que proyecta `task.estado` se apoyaba en saltear la RLS. `src/prisma/db.py:56`
-muestra por qué — la conexión administrativa fija `role prisma_admin` pero
-**nunca define `prisma.workspace_id`**: ve todos los espacios por `bypassrls`,
+que proyecta `task.estado` se apoyaba en saltear la RLS. `src/leda/db.py:56`
+muestra por qué — la conexión administrativa fija `role leda_admin` pero
+**nunca define `leda.workspace_id`**: ve todos los espacios por `bypassrls`,
 no por el GUC. Sin ese privilegio, el `update` de la proyección se filtraba
 contra un espacio vacío, no encontraba ninguna fila y **fallaba en silencio**:
 el evento quedaba registrado y el estado nunca se proyectaba.
@@ -206,7 +206,7 @@ Estaba fuera de alcance y se incorporó al continuar. Lo comprobado justificó e
 cambio de prioridad: el rojo fue `assert 1 == 0` — un espacio escribió una
 entrada de `audit_log` **atribuida a otro**. La auditoría autoritativa es la
 evidencia que se le muestra a un cliente; si otro puede escribir en ella, deja
-de serlo. Figuraba quinto porque esa lista se escribió cuando Prisma era un bot
+de serlo. Figuraba quinto porque esa lista se escribió cuando Leda era un bot
 de un solo equipo y nadie más podía escribir.
 
 Dos problemas distintos en tres tablas. `audit_log` e `incident` ya tenían
@@ -239,7 +239,7 @@ Queda abierto, todo registrado en `docs/STATUS.md`:
   nueva dentro de un clúster existente. Un ensayo sobre un clúster enteramente
   limpio sigue siendo más fuerte y está `PENDIENTE`.
 - `confirmar_borrador_tarea` fija el espacio con el valor que recibe de quien
-  la llama. Contenida a `prisma_gateway` y fuera del alcance de `prisma_app`,
+  la llama. Contenida a `leda_gateway` y fuera del alcance de `leda_app`,
   pero es el patrón que la regla 6 rechaza. Pertenece al ingreso autenticado.
 - Riesgo 5 de `STATUS.md`: `absence`, `incident` y `audit_log` reciben `insert`
   sin política. Misma clase que lo ya cerrado, menor impacto. No se incluyó sin

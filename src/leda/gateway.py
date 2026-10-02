@@ -45,7 +45,7 @@ from .salida import (ETIQUETA_CANCELAR, ETIQUETA_CONFIRMAR, ETIQUETA_MODIFICAR,
                      normalize_visible_text, truncar_etiqueta_boton,
                      with_no_effect_status)
 
-app = FastAPI(title="Prisma", docs_url=None, redoc_url=None)
+app = FastAPI(title="Leda", docs_url=None, redoc_url=None)
 router = APIRouter()
 
 # Aclaración con botones (T4, `aclaracion-con-botones`; ADR 0005 decisión 3).
@@ -79,7 +79,7 @@ _SENTINEL_DE_ALTA = {tipo: centinela for centinela, tipo in _TIPO_DE_ALTA.items(
 # (T9-R1d-1b): tampoco es una pregunta de `pending_action` que se consuma como
 # Modificar. Su `args` lleva la herramienta real y sus argumentos.
 _SENTINEL_VISTA_PREVIA = "_vista_previa_cambio"
-# La elección con botones que Prisma le pidió a la persona y espera su respuesta
+# La elección con botones que Leda le pidió a la persona y espera su respuesta
 # (T9-R1d-1c): la aclaración "¿A cuál te referís?", la de la otra tarea de una
 # dependencia, la de una herramienta con un argumento ambiguo. Su `args` lleva la
 # `herramienta` real de la fila (o su centinela) y sus `argumentos`.
@@ -128,7 +128,7 @@ PREGUNTA_ES_EL_DATO = "¿Esto es {descripcion}?"
 ETIQUETA_ES_EL_DATO = con_icono("Sí, es eso", ICONO_CONFIRMAR)
 ETIQUETA_NO_ES_EL_DATO = con_icono("No, es otra cosa", ICONO_OTRA_OPCION)
 # Comando `otro_tema` con una pregunta abierta (T9-R1d-1a, ADR 0013 regla 1,
-# enmienda "una sola rama de conversación abierta"): Prisma no atiende el
+# enmienda "una sola rama de conversación abierta"): Leda no atiende el
 # mensaje; pregunta una vez, con dos botones, si se sigue con lo pendiente o se
 # lo deja para ver lo otro. Redacción pendiente de revisión de voz en T10.
 PREGUNTA_RAMA_ABIERTA = "Estábamos con {nombre}. ¿Seguimos con eso?"
@@ -227,7 +227,7 @@ def _conn():
 
 def _authority_conn():
     if not config.authority_db_url:
-        raise RuntimeError("Falta PRISMA_AUTHORITY_DB_URL.")
+        raise RuntimeError("Falta LEDA_AUTHORITY_DB_URL.")
     if not hasattr(_authority_conn, "_c") or _authority_conn._c.closed:
         _authority_conn._c = conectar_autoridad(config.authority_db_url)
     return _authority_conn._c
@@ -291,7 +291,7 @@ def _despachar_ahora(conn, slug: str) -> None:
     fondo si el envío de verdad se agota."""
     try:
         with conn.cursor() as cur:
-            cur.execute("set role prisma_admin")
+            cur.execute("set role leda_admin")
             ws = _espacio_por_slug(cur, slug)
         if ws is not None and ws["activo"]:
             workspace_id = str(ws["id"])
@@ -401,7 +401,7 @@ def procesar_update(conn, slug: str, update: dict,
         if not mensaje:
             return {"ok": True}
         with conn.cursor() as cur:
-            cur.execute("set role prisma_admin")
+            cur.execute("set role leda_admin")
             try:
                 quien = identificar(cur, tg_user, canal, None)
             except Denegado:
@@ -413,7 +413,7 @@ def procesar_update(conn, slug: str, update: dict,
         return {"ok": True}
 
     with conn.cursor() as cur:
-        cur.execute("set role prisma_admin")
+        cur.execute("set role leda_admin")
         ws = _espacio_por_slug(cur, slug)
     if ws is None or not ws["activo"]:
         raise HTTPException(status_code=404, detail="espacio no disponible")
@@ -596,7 +596,7 @@ def procesar_update(conn, slug: str, update: dict,
         conn.commit()
     except Exception as e:  # noqa: BLE001
         # Red de contención final (decisión del usuario, 2026-09-25):
-        # evidencia de la sesión real, un `UndefinedColumn` hacía que Prisma
+        # evidencia de la sesión real, un `UndefinedColumn` hacía que Leda
         # saltara el mensaje entero sin ninguna respuesta ni incidente. Lo
         # que ya atajan `_turno`/`agente.responder` por su cuenta (con su
         # propio incidente y disculpa) nunca llega hasta acá; esto es sólo
@@ -756,7 +756,7 @@ def _registrar_toque(cur, workspace_id: str, chat_id: int, quien,
                      boton: str | None) -> str:
     """Deja constancia de que esta persona tocó un botón en este chat (T9-R1d-2b):
     es actividad, igual que un mensaje escrito, para la ventana que acota la
-    retención de lo que Prisma inicia (`despachador.VENTANA_DE_ACTIVIDAD`). Es una
+    retención de lo que Leda inicia (`despachador.VENTANA_DE_ACTIVIDAD`). Es una
     fila de `inbound_message` sin texto ni id de mensaje de Telegram (no se le
     inventa una clasificación): el historial de la conversación sólo
     lee las que tienen texto. Se fecha con el reloj de la base (el valor por omisión
@@ -861,7 +861,7 @@ def _toque(conn, workspace_id: str, slug: str, toque: dict,
     chat_type = chat.get("type")
 
     # Antes de trabajar, y para TODO toque (también uno que no es de un botón de
-    # Prisma o que se va a absorber por repetido; ADR 0013 regla 4, H5): Telegram
+    # Leda o que se va a absorber por repetido; ADR 0013 regla 4, H5): Telegram
     # quiere el acuse en un par de segundos y lo que sigue puede tardar más. Si
     # falla, es sólo el reloj girando en el teléfono de alguien; el trabajo se
     # hace igual.
@@ -1484,7 +1484,7 @@ def _seguir_camino_normal(cur, quien, texto: str, route, proveedor, cal,
     # referencias a tarea que separó el enrutador se resuelven contra las
     # tareas activas del espacio, bajo el mismo cursor con RLS que ya tiene
     # `cur`. Sin referencias no hay nada que resolver. Sin credencial de Jev
-    # (`PRISMA_OPENROUTER_API_KEY` vacía) Prisma no adivina igual: se pide
+    # (`LEDA_OPENROUTER_API_KEY` vacía) Leda no adivina igual: se pide
     # aclaración como si Jev hubiera fallado (decisión del usuario,
     # 2026-09-24; ver `_resolver_referencias_del_turno`).
     #
@@ -2113,7 +2113,7 @@ def _ver_pregunta_abierta(cur, quien, chat_id: int, ahora, *, alta: bool):
     de que `_turno` mirara nada); la otra queda abierta y se retoma cuando el
     alta termina o se deja. Sin `alta`, sólo las de `pending_action`.
 
-    Después, la elección con botones que Prisma le pidió y ella no respondió
+    Después, la elección con botones que Leda le pidió y ella no respondió
     (T9-R1d-1c, `pendientes.ver_eleccion_abierta`: la aclaración "¿A cuál te
     referís?", la de la otra tarea de una dependencia, la de una herramienta) y,
     última, la vista previa de un cambio que la persona pidió y espera su
@@ -2127,7 +2127,7 @@ def _ver_pregunta_abierta(cur, quien, chat_id: int, ahora, *, alta: bool):
     una rama las ofertas de camino (listas de tareas, el menú de una tarea,
     "Quiero consultar otra cosa"), la vista previa o la elección de otra persona
     ni lo que le llega a alguien para decidir (el aviso de entrega, el borrador
-    que espera a otro aprobador): ese es un mensaje que inicia Prisma."""
+    que espera a otro aprobador): ese es un mensaje que inicia Leda."""
     from . import herramientas as H
     from . import pendientes as P
 
@@ -2878,11 +2878,11 @@ LIMITE_PREGUNTA_CERRADA = 160
 def _texto_cierre_opciones(pregunta: str, *, es_tema: bool = True) -> str:
     """Texto de "Quiero consultar otra cosa" (hallazgo 10, sesión 2 por
     Telegram, 2026-09-27, evidencia real: Marcos tocó la salida sobre "¿Sobre
-    cuál de tus tareas avanzaste?", escribió "hols" y Prisma volvió a
+    cuál de tus tareas avanzaste?", escribió "hols" y Leda volvió a
     preguntar lo mismo). Causa real: el cierre salía con un texto fijo que no
     nombraba qué se cerró ("Dale, escribime qué necesitás.") -- el historial
     que arma `contexto.historial` guarda literalmente lo que salió por
-    `message_outbox`, así que el turno siguiente veía dos mensajes de Prisma
+    `message_outbox`, así que el turno siguiente veía dos mensajes de Leda
     seguidos (la pregunta y el cierre) sin ninguna marca de que la persona la
     descartó, y un saludo alcanzaba para que el modelo la retomara.
 
@@ -2978,7 +2978,7 @@ def _resolver_toque_opcion_modelo(cur, quien, workspace_id: str, chat_id: int,
         texto_entrante = eleccion.get("etiqueta") or titulo
         contexto = (
             "# Elección de una opción\n\n"
-            f"Prisma había preguntado: «{pregunta}»\n\n"
+            f"Leda había preguntado: «{pregunta}»\n\n"
             f"La persona tocó la tarea «{titulo}» ({tarea_id}): es su "
             "respuesta a esa pregunta. Usá esa tarea directamente; no la "
             "vuelvas a resolver ni preguntes de nuevo cuál es.")
@@ -2987,7 +2987,7 @@ def _resolver_toque_opcion_modelo(cur, quien, workspace_id: str, chat_id: int,
         texto_entrante = eleccion.get("texto", "")
         contexto = (
             "# Elección de una opción\n\n"
-            f"Prisma había preguntado: «{pregunta}»\n\n"
+            f"Leda había preguntado: «{pregunta}»\n\n"
             f"La persona tocó «{texto_entrante}»: es su respuesta a esa "
             "pregunta, tratala como tal.")
         tareas_resueltas = None
@@ -3130,7 +3130,7 @@ def _mostrar_tareas_propias(cur, quien, workspace_id: str, chat_id: int,
 
 
 # ---------------------------------------------------------------------------
-# Menú de acciones de una tarea (T2, `prisma-orienta`; ADR 0007 §4.6)
+# Menú de acciones de una tarea (T2, `leda-orienta`; ADR 0007 §4.6)
 # ---------------------------------------------------------------------------
 #
 # Se llega al menú tocando una tarea que se ofreció con `accion: "menu"`
@@ -3666,7 +3666,7 @@ def _resolver_referencias_del_turno(cur, quien, texto: str, route,
     resolver y el turno sigue exactamente igual que sin resolución de
     referencias (T3), sin tocar la base ni la red.
 
-    Sin credencial de Jev (`Config.openrouter_api_key` vacía) Prisma **no
+    Sin credencial de Jev (`Config.openrouter_api_key` vacía) Leda **no
     adivina** (decisión del usuario, 2026-09-24): con referencias en el
     mensaje, se trata igual que si Jev hubiera respondido `JevError` en cada
     una -- se le pide al modelo que pregunte, nunca que elija por su cuenta
@@ -4018,14 +4018,14 @@ def _auditar_resolucion(cur, quien, workspace_id: str, resultados: dict) -> None
     ]}
     registrar_auditoria(
         cur, accion="resolucion_referencias", workspace_id=workspace_id,
-        actor_app_user_id=quien.app_user_id, actor_kind="prisma",
+        actor_app_user_id=quien.app_user_id, actor_kind="leda",
         detalle=detalle)
 
 
 def _incidente_jev_no_configurado(cur, workspace_id: str,
                                   app_user_id: str | None) -> None:
     """El mensaje traía referencias a tarea pero no hay credencial de Jev
-    (`PRISMA_OPENROUTER_API_KEY`): Prisma le pide al modelo que pregunte en
+    (`LEDA_OPENROUTER_API_KEY`): Leda le pide al modelo que pregunte en
     vez de adivinar (decisión del usuario, 2026-09-24), y esto queda
     registrado para que la falta de configuración no pase inadvertida. Sin
     secretos, igual que `_routing_incident` -- el aviso a la administración
@@ -4034,7 +4034,7 @@ def _incidente_jev_no_configurado(cur, workspace_id: str,
     registrar_incidente(
         cur, workspace_id,
         "El mensaje tenía referencias a tarea, pero no hay credencial de "
-        "Jev configurada (PRISMA_OPENROUTER_API_KEY).",
+        "Jev configurada (LEDA_OPENROUTER_API_KEY).",
         etapa=ETAPA_JEV_NO_CONFIGURADO, app_user_id=app_user_id)
 
 
@@ -4070,7 +4070,7 @@ def reportar_incidente_no_manejado(conn, *, workspace_id: str | None,
     """Red de contención final para un update de Telegram (mensaje o toque)
     que levantó algo que ningún camino específico atajó -- decisión del
     usuario, 2026-09-25: un error nunca pasa en silencio. Evidencia de la
-    sesión real: un `UndefinedColumn` hacía que Prisma saltara el mensaje
+    sesión real: un `UndefinedColumn` hacía que Leda saltara el mensaje
     sin ninguna respuesta ni incidente, invisible hasta que alguien lo
     notaba por otro lado.
 
@@ -4083,9 +4083,9 @@ def reportar_incidente_no_manejado(conn, *, workspace_id: str | None,
 
     Corrección del usuario sobre trazabilidad (2026-09-25): el incidente
     tiene que poder encontrarse. Se intenta avisar a la persona PRIMERO --
-    sin tocar `incident` todavía -- porque `prisma_app` sólo tiene `insert`
+    sin tocar `incident` todavía -- porque `leda_app` sólo tiene `insert`
     sobre esa tabla (`db/esquema.sql`, "grant insert on ... incident ... to
-    prisma_app"): no hay una segunda pasada que la actualice con si el
+    leda_app"): no hay una segunda pasada que la actualice con si el
     aviso funcionó. El incidente se registra una sola vez, al final, ya con
     el resultado del aviso resuelto (`notificado_en`, y una nota en el
     resumen si no se pudo avisar) -- nunca dos filas para un mismo fallo."""

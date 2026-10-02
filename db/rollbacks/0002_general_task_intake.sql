@@ -1,8 +1,8 @@
 \set ON_ERROR_STOP on
 
 begin;
-set search_path = prisma, public;
-select pg_advisory_xact_lock(hashtextextended('prisma:0002_general_task_intake', 0));
+set search_path = leda, public;
+select pg_advisory_xact_lock(hashtextextended('leda:0002_general_task_intake', 0));
 
 lock table task_intake_request, task_intake_field, task_intake_choice_set,
            task_intake_choice, task_intake_free_text_slot
@@ -112,8 +112,8 @@ alter table inbound_message
 alter table membership
   drop constraint if exists membership_workspace_id_unique;
 
-revoke update on task_draft from prisma_app;
-grant select, insert on task_draft to prisma_app;
+revoke update on task_draft from leda_app;
+grant select, insert on task_draft to leda_app;
 alter table pending_action_option
   drop column if exists resultado,
   drop column if exists activa;
@@ -126,7 +126,7 @@ create function confirmar_borrador_tarea(
 )
 returns table (resultado text, task_id uuid)
 language plpgsql security definer
-set search_path = prisma, public, pg_temp as $$
+set search_path = leda, public, pg_temp as $$
 declare
   o pending_action_option%rowtype;
   a pending_action%rowtype;
@@ -141,7 +141,7 @@ declare
   ahora timestamptz := clock_timestamp();
   preview_actual jsonb;
 begin
-  perform set_config('prisma.workspace_id', p_workspace_id::text, true);
+  perform set_config('leda.workspace_id', p_workspace_id::text, true);
   select * into o from pending_action_option
    where token = p_token and workspace_id = p_workspace_id;
   if not found then
@@ -286,8 +286,8 @@ end $$;
 revoke all on function confirmar_borrador_tarea(uuid, text, bigint)
   from public;
 revoke execute on function confirmar_borrador_tarea(uuid, text, bigint)
-  from prisma_app;
+  from leda_app;
 grant execute on function confirmar_borrador_tarea(uuid, text, bigint)
-  to prisma_gateway;
+  to leda_gateway;
 
 commit;

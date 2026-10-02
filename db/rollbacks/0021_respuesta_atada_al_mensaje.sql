@@ -7,7 +7,7 @@
 -- privilegios ni dueño: quitar las columnas se lleva la clave y el índice. Se
 -- pierde el vínculo de cada salida con el mensaje al que respondía.
 begin;
-set search_path = prisma, public;
+set search_path = leda, public;
 
 alter table message_outbox
   drop column if exists entrante_id,

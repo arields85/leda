@@ -8,7 +8,7 @@
 -- privilegios y su índice implícito (la primary key) con él -- mismo
 -- criterio que el rollback de 0011.
 begin;
-set search_path = prisma, public;
+set search_path = leda, public;
 
 drop table if exists greeting_state;
 

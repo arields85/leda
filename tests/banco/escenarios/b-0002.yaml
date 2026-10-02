@@ -1,6 +1,6 @@
 id: b-0002
 objetivo: >
-  Observar si Prisma registra un bloqueo con su causa a partir de un relato
+  Observar si Leda registra un bloqueo con su causa a partir de un relato
   vago, sobre la tarea correcta, sin pedir datos que ya puede inferir del
   contexto de quién escribe.
 actor: Nahuel Gimenez

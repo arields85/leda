@@ -2,7 +2,7 @@ id: b-0025-d
 variante_de: b-0025
 objetivo: >
   Variante de b-0025, salir del selector sin cambiar nada: con la vista previa
-  esperando, la persona toca Modificar y después Volver al resumen. Prisma
+  esperando, la persona toca Modificar y después Volver al resumen. Leda
   vuelve a mostrar la vista previa actual con Confirmar, Modificar y Cancelar,
   con todos los datos como estaban. La tarea no se crea.
 actor: Ismael Soschinski

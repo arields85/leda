@@ -15,9 +15,9 @@ from datetime import datetime, timezone
 
 import pytest
 
-from prisma import gateway
-from prisma.db import admin, espacio
-from prisma.salida import (ICONO_TAREA, ICONOS_DE_ACCION_MENU, con_icono,
+from leda import gateway
+from leda.db import admin, espacio
+from leda.salida import (ICONO_TAREA, ICONOS_DE_ACCION_MENU, con_icono,
                            etiqueta_de_accion_menu, etiqueta_sin_icono,
                            etiquetas_coinciden)
 

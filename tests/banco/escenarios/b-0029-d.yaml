@@ -3,7 +3,7 @@ variante_de: b-0029
 objetivo: >
   Variante de b-0029, un mensaje no envía: con su resumen esperando, quien pide
   escribe "sí, dale, mandalo". Un mensaje no envía el borrador a aprobación (es
-  sólo el botón Enviar a aprobación): Prisma nombra los botones que de verdad
+  sólo el botón Enviar a aprobación): Leda nombra los botones que de verdad
   tiene (no los de quien confirma), no le manda nada a su aprobador y el
   borrador sigue esperando su revisión.
 actor: Nahuel Gimenez

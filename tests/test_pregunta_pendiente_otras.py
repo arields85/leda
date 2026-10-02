@@ -18,12 +18,12 @@ from datetime import datetime, timezone
 
 import pytest
 
-from prisma import gateway
-from prisma import jev as jev_modulo
-from prisma import pendientes as P
-from prisma.db import admin, espacio
-from prisma.jev import ClienteJevGuionado
-from prisma.llm import (IntentAction, IntentRoute, Llamada, ProveedorGuionado,
+from leda import gateway
+from leda import jev as jev_modulo
+from leda import pendientes as P
+from leda.db import admin, espacio
+from leda.jev import ClienteJevGuionado
+from leda.llm import (IntentAction, IntentRoute, Llamada, ProveedorGuionado,
                         RespectoPendiente, Respuesta, RouteEnvelope)
 
 from tests.test_menu_tarea import (_mensaje, _opciones, _pendiente, _quien,  # noqa: F401
@@ -35,7 +35,7 @@ CAUSA = "falta el switch"
 REFERENCIA = "lo del tablero"
 PEDIDO_ORIGINAL = "avisame de lo del tablero"
 
-# Lo que Prisma le pide a la persona, según lo que abrió la pregunta.
+# Lo que Leda le pide a la persona, según lo que abrió la pregunta.
 PREGUNTAS = {"modificar": gateway.PREGUNTA_MODIFICAR,
              "ninguna": gateway.PREGUNTA_ACLARACION_NINGUNA}
 DEJADAS = {"modificar": gateway.AVISO_MODIFICACION_DEJADA,
@@ -54,7 +54,7 @@ def _ruta(comando: RespectoPendiente | None) -> IntentRoute:
 
 def _con_rutas(monkeypatch, rutas, guion=()) -> ProveedorGuionado:
     proveedor = ProveedorGuionado(guion=list(guion), rutas=list(rutas))
-    monkeypatch.setattr("prisma.llm.desde_base", lambda cur, ws, key: proveedor)
+    monkeypatch.setattr("leda.llm.desde_base", lambda cur, ws, key: proveedor)
     return proveedor
 
 

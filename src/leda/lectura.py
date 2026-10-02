@@ -7,7 +7,7 @@ que usa el agente.
 
 **El espacio sale de la sesión, nunca de quien llama.** Ninguna función de este
 módulo recibe `workspace_id`: todas toman un cursor ya acotado por
-`prisma.db.espacio()`, y el aislamiento lo garantiza la política de la base. Si
+`leda.db.espacio()`, y el aislamiento lo garantiza la política de la base. Si
 alguna aceptara el espacio por parámetro, quien la invoque podría pedir el
 ajeno, que es exactamente lo que la regla 1 de la frontera prohíbe.
 

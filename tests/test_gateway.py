@@ -15,17 +15,17 @@ from fastapi import BackgroundTasks
 from fastapi.testclient import TestClient
 from starlette.requests import Request
 
-from prisma import gateway
-from prisma.db import admin
-from prisma.despachador import TransporteDePrueba
-from prisma.llm import ProveedorGuionado, Respuesta
+from leda import gateway
+from leda.db import admin
+from leda.despachador import TransporteDePrueba
+from leda.llm import ProveedorGuionado, Respuesta
 
 
 @pytest.fixture
 def cliente(corework, conn, uri, monkeypatch):
     import dataclasses
 
-    from prisma.db import conectar as conectar_de_verdad
+    from leda.db import conectar as conectar_de_verdad
 
     monkeypatch.setattr(gateway, "_conn", lambda: conn)
     monkeypatch.setattr(gateway, "mantener_chat_activo",
@@ -46,7 +46,7 @@ def cliente(corework, conn, uri, monkeypatch):
         gateway, "config",
         dataclasses.replace(gateway.config, webhook_secret="s3cr3t"))
     monkeypatch.setattr(
-        "prisma.llm.desde_base",
+        "leda.llm.desde_base",
         lambda cur, ws, key: ProveedorGuionado([Respuesta(texto="Anotado.")]))
     tc = TestClient(gateway.app)
     tc.transporte = transporte_falso

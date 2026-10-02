@@ -1,10 +1,10 @@
-"""La elección con botones que Prisma le pidió a la persona es una rama abierta
+"""La elección con botones que Leda le pidió a la persona es una rama abierta
 (T9-R1d-1c, ADR 0013 regla 1, enmienda "una sola rama de conversación abierta";
 ADR 0005 decisión 3).
 
 Una elección con botones -- la aclaración "¿A cuál te referís?", la de con cuál
 otra tarea se declara una dependencia, la que pide una herramienta (`campo`) --
-es algo que la persona empezó y que Prisma espera de ella para terminarlo. El
+es algo que la persona empezó y que Leda espera de ella para terminarlo. El
 mensaje siguiente se interpreta contra esa elección con el ruteo tipado, igual
 que con las demás preguntas abiertas:
 
@@ -31,11 +31,11 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from prisma import gateway
-from prisma import pendientes as P
-from prisma.db import admin, espacio
-from prisma.llm import Llamada, RespectoPendiente, Respuesta
-from prisma.salida import ICONO_TAREA, con_icono, enqueue_outbox
+from leda import gateway
+from leda import pendientes as P
+from leda.db import admin, espacio
+from leda.llm import Llamada, RespectoPendiente, Respuesta
+from leda.salida import ICONO_TAREA, con_icono, enqueue_outbox
 
 from tests.test_menu_tarea import (_mensaje, _opciones, _pendiente, _quien,  # noqa: F401
                                    _telegram_id, _tocar, cliente)
@@ -395,7 +395,7 @@ def test_ruteo_caido_deja_la_eleccion_abierta_y_avisa(
         def route_intent(self, texto, pendiente=None):
             raise RuntimeError("caído")
 
-    monkeypatch.setattr("prisma.llm.desde_base", lambda cur, w, key: _Caido())
+    monkeypatch.setattr("leda.llm.desde_base", lambda cur, w, key: _Caido())
     antes = _salidas(conn, e.tg)
 
     _mensaje(cliente, e.tg, "programar plc")
@@ -594,7 +594,7 @@ def test_las_ofertas_de_camino_no_son_una_rama(conn, corework):
 def test_una_eleccion_que_le_llega_a_otro_para_decidir_no_es_una_rama_suya(
         conn, corework):
     # El aviso de entrega comparte `SENTINEL_MENU_TAREA` y `campo` con el
-    # menú: es un mensaje que inicia Prisma (ADR 0013, enmienda).
+    # menú: es un mensaje que inicia Leda (ADR 0013, enmienda).
     ws = corework.workspace_id
     with admin(conn) as cur:
         tid = _tarea(cur, ws)
@@ -682,7 +682,7 @@ def test_una_eleccion_larga_vuelve_a_mostrarse_con_sus_botones_sin_fallar(
     (review-faccc0e9d83561b3): el texto entero sale primero, en partes, y la
     elección después, con un texto corto y sus botones. Nunca un aviso solo ni
     una respuesta vacía, ni un incidente."""
-    from prisma.salida import BUTTON_TEXT_LIMIT, telegram_utf16_units
+    from leda.salida import BUTTON_TEXT_LIMIT, telegram_utf16_units
 
     ws = corework.workspace_id
     e = _abrir_herramienta(conn, ws)

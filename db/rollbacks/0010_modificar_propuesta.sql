@@ -8,7 +8,7 @@
 -- `modificar_pedido_en` and `modificacion_consumida_en`, so no function is
 -- ever left pointing at a column that does not exist.
 begin;
-set search_path = prisma, public;
+set search_path = leda, public;
 
 create or replace function resolver_pendiente(p_token text, p_app_user_id uuid,
                                               p_ahora timestamptz)
@@ -18,7 +18,7 @@ language plpgsql security definer as $$
 declare
   o record;
   a record;
-  ws uuid := nullif(current_setting('prisma.workspace_id', true), '')::uuid;
+  ws uuid := nullif(current_setting('leda.workspace_id', true), '')::uuid;
 begin
   select * into o from pending_action_option
    where token = p_token and (ws is null or workspace_id = ws);
@@ -85,7 +85,7 @@ comment on function resolver_pendiente is
   'Resuelve una acción pendiente por el token de una de sus opciones. Atómica: el doble toque de un botón ejecuta una sola vez. Devuelve la huella guardada para que quien llama detecte si el estado cambió desde la vista previa.';
 
 alter function resolver_pendiente(text, uuid, timestamptz)
-  owner to prisma_owner;
+  owner to leda_owner;
 
 alter table pending_action drop column if exists modificacion_consumida_en;
 alter table pending_action drop column if exists modificar_pedido_en;

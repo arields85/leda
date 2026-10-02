@@ -15,12 +15,12 @@ import dataclasses
 
 import pytest
 
-from prisma import gateway
-from prisma import jev as jev_modulo
-from prisma.autoridad import Canal, identificar
-from prisma.db import admin, espacio
-from prisma.jev import ClienteJevGuionado
-from prisma.llm import (IntentAction, IntentRoute, Llamada, ProveedorGuionado,
+from leda import gateway
+from leda import jev as jev_modulo
+from leda.autoridad import Canal, identificar
+from leda.db import admin, espacio
+from leda.jev import ClienteJevGuionado
+from leda.llm import (IntentAction, IntentRoute, Llamada, ProveedorGuionado,
                         Respuesta)
 
 
@@ -48,7 +48,7 @@ def _tarea(cur, ws, *, titulo="Cablear tablero máq. 3", area="electricidad",
         (ws, obj, titulo, ws, area, ws, persona))
     t = cur.fetchone()["id"]
     cur.execute("insert into task_state_event (task_id, estado_nuevo, actor_kind) "
-                "values (%s, %s, 'prisma')", (t, estado))
+                "values (%s, %s, 'leda')", (t, estado))
     return str(t)
 
 
@@ -97,16 +97,16 @@ def _con_jev(monkeypatch, doble):
 def _con_proveedor(monkeypatch, *, rutas, guion=None):
     proveedor = ProveedorGuionado(guion=list(guion or [Respuesta(texto="Anotado.")]),
                                   rutas=list(rutas))
-    monkeypatch.setattr("prisma.llm.desde_base", lambda cur, ws, key: proveedor)
+    monkeypatch.setattr("leda.llm.desde_base", lambda cur, ws, key: proveedor)
     return proveedor
 
 
 # ---------------------------------------------------------------------------
-# Sin credencial: Prisma no adivina (decisión del usuario, 2026-09-24)
+# Sin credencial: Leda no adivina (decisión del usuario, 2026-09-24)
 # ---------------------------------------------------------------------------
 
 def test_sin_credencial_pregunta_y_registra_incidente(corework, conn, monkeypatch):
-    """Sin `PRISMA_OPENROUTER_API_KEY`, un mensaje con referencias se trata
+    """Sin `LEDA_OPENROUTER_API_KEY`, un mensaje con referencias se trata
     igual que si Jev hubiera fallado en cada una: se le pide al modelo que
     pregunte, nunca que elija solo, y queda un incidente sin secretos ni
     texto del mensaje para que la falta de configuración no pase
@@ -646,11 +646,11 @@ def test_solo_viajan_tareas_del_espacio_actual(intake_world, conn, monkeypatch):
             (ws, objetivo, titulo, area, membership))
         tid = cur.fetchone()["id"]
         cur.execute("insert into task_state_event (task_id, estado_nuevo, actor_kind) "
-                    "values (%s, 'asignada', 'prisma')", (tid,))
+                    "values (%s, 'asignada', 'leda')", (tid,))
         return str(tid)
 
     with admin(conn) as cur:
-        cur.execute("set role prisma_admin")
+        cur.execute("set role leda_admin")
         _tarea_en(cur, a["id"], a["objectives"][0], a["areas"]["field"],
                  a["people"]["Sam North"]["membership_id"], "Reparar bomba del norte")
         _tarea_en(cur, b["id"], b["objectives"][0], b["areas"]["field"],
@@ -667,7 +667,7 @@ def test_solo_viajan_tareas_del_espacio_actual(intake_world, conn, monkeypatch):
     proveedor = ProveedorGuionado(
         guion=[Respuesta(texto="ok")],
         rutas=[IntentRoute(IntentAction.NORMAL_CONVERSATION, trabajos=("la bomba",))])
-    monkeypatch.setattr("prisma.llm.desde_base", lambda cur, ws, key: proveedor)
+    monkeypatch.setattr("leda.llm.desde_base", lambda cur, ws, key: proveedor)
 
     with espacio(conn, a["id"]) as cur:
         quien = identificar(cur, a["people"]["Morgan Hale"]["telegram"],

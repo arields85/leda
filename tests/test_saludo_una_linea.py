@@ -1,6 +1,6 @@
 """Un saludo suelto se contesta en UNA línea (R4-H1, R3-H8; ADR 0013).
 
-Cuarta ronda por Telegram: a "hola", primer mensaje del día, Prisma mandó "👋 Buen
+Cuarta ronda por Telegram: a "hola", primer mensaje del día, Leda mandó "👋 Buen
 día", una línea en blanco y "Hola Ariel, ¿en qué te ayudo?", con los tres botones
 genéricos. Regla del usuario (2026-09-30): una sola línea, "👋 Buen día Ariel, ¿en
 qué te ayudo?"; y (R3-H8) un saludo sin rama abierta se contesta con un saludo y una
@@ -19,12 +19,12 @@ from datetime import datetime, timezone
 
 import pytest
 
-from prisma import pendientes as P
-from prisma import saludo as S
-from prisma.calendario import Calendario
-from prisma.db import admin, espacio
-from prisma.despachador import TransporteDePrueba, despachar
-from prisma.llm import (IntentAction, IntentRoute, Llamada, ProveedorGuionado,
+from leda import pendientes as P
+from leda import saludo as S
+from leda.calendario import Calendario
+from leda.db import admin, espacio
+from leda.despachador import TransporteDePrueba, despachar
+from leda.llm import (IntentAction, IntentRoute, Llamada, ProveedorGuionado,
                         Respuesta, RouteEnvelope, RoutingError, ROUTER_TOOL,
                         ROUTER_SYSTEM)
 
@@ -38,7 +38,7 @@ UNA_LINEA_SIN_SALUDO_DEL_DIA = "Hola Nahuel, ¿en qué te ayudo?"
 
 def _guion(monkeypatch, *rutas, respuestas=()):
     proveedor = ProveedorGuionado(guion=list(respuestas), rutas=list(rutas))
-    monkeypatch.setattr("prisma.llm.desde_base", lambda cur, ws, key: proveedor)
+    monkeypatch.setattr("leda.llm.desde_base", lambda cur, ws, key: proveedor)
     return proveedor
 
 

@@ -1,7 +1,7 @@
 """Saludo diario (pack 06).
 
 Decisión del usuario, 2026-09-28+2 (revisión de e83a280, T7b/T7b-follow-up):
-el primer mensaje que Prisma le manda a una persona en su fecha local lleva
+el primer mensaje que Leda le manda a una persona en su fecha local lleva
 el saludo, sea cual sea -- una respuesta, una cadencia, un recordatorio de la
 escalera, o un aviso que disparó otra persona. Nunca se repite ese día. La
 decisión y la reserva corren en `despachador._intentar_envio`, el único
@@ -23,11 +23,11 @@ from zoneinfo import ZoneInfo
 import psycopg
 import pytest
 
-from prisma import saludo as S
-from prisma.calendario import Calendario
-from prisma.db import admin, conectar, espacio
-from prisma.despachador import TransporteDePrueba, despachar
-from prisma.salida import BUTTON_TEXT_LIMIT, TELEGRAM_TEXT_LIMIT, enqueue_outbox
+from leda import saludo as S
+from leda.calendario import Calendario
+from leda.db import admin, conectar, espacio
+from leda.despachador import TransporteDePrueba, despachar
+from leda.salida import BUTTON_TEXT_LIMIT, TELEGRAM_TEXT_LIMIT, enqueue_outbox
 
 BA = ZoneInfo("America/Argentina/Buenos_Aires")
 
@@ -47,7 +47,7 @@ def _limpiar_supresor_de_fallas():
 
 def _membership_id(cur, ws: str, nombre: str) -> str:
     # Consulta directa, no la vista `integrante`: corre bajo `admin()`, sin
-    # `prisma.workspace_id` en la sesión -- la vista no devolvería nada.
+    # `leda.workspace_id` en la sesión -- la vista no devolvería nada.
     cur.execute(
         """select m.id from membership m join app_user u on u.id = m.app_user_id
             where m.workspace_id = %s and u.nombre = %s""",
@@ -165,7 +165,7 @@ def test_dos_reclamos_concurrentes_de_la_misma_persona_gana_uno_solo(
         otra = conectar(uri)
         try:
             with otra.cursor() as cur:
-                cur.execute("set role prisma_admin")
+                cur.execute("set role leda_admin")
                 barrier.wait()
                 resultados.append(S.reclamar_saludo(
                     cur, workspace_id=ws, membership_id=mid,
@@ -216,8 +216,8 @@ def test_bienvenida_reclama_sin_anteponer_nada(corework, conn):
 
         resultado, falla = S.reclamar_y_anteponer(
             cur, workspace_id=ws, membership_id=mid, zona=BA, ahora=ahora,
-            texto="Listo, Marcos. Soy Prisma.", es_bienvenida=True)
-        assert resultado == "Listo, Marcos. Soy Prisma."   # sin "👋" antepuesto
+            texto="Listo, Marcos. Soy Leda.", es_bienvenida=True)
+        assert resultado == "Listo, Marcos. Soy Leda."   # sin "👋" antepuesto
         assert falla is None
 
         # Pero SÍ quedó reclamada: un mensaje normal después, mismo día, no
@@ -385,7 +385,7 @@ def test_verificar_migraciones_sin_es_bienvenida_nombra_la_0019():
 # ---------------------------------------------------------------------------
 
 def test_margen_saludo_es_el_peor_caso_de_los_tres_saludos_mas_el_separador():
-    from prisma.salida import telegram_utf16_units
+    from leda.salida import telegram_utf16_units
 
     esperado = max(telegram_utf16_units(s) for s in
                    (S.SALUDO_MANANA, S.SALUDO_TARDE, S.SALUDO_NOCHE)) + 2
@@ -425,7 +425,7 @@ def test_enqueue_outbox_con_botones_reserva_el_margen(corework, conn):
     """Un mensaje con botones dirigido a una persona, justo en
     `BUTTON_TEXT_LIMIT`, tiene que quedar afuera del límite reducido y
     rechazarse -- nunca aceptarse para que el saludo lo rompa después."""
-    from prisma.salida import PayloadValidationError
+    from leda.salida import PayloadValidationError
 
     ws = corework.workspace_id
     with admin(conn) as cur:
@@ -756,7 +756,7 @@ def test_falla_del_saludo_con_envio_fallido_se_reporta_una_sola_vez(
 
     with espacio(conn, ws) as cur:
         _limpiar_saludo(cur, mid)
-    # `prisma_app` sólo tiene `insert` sobre `incident` (`db/esquema.sql`);
+    # `leda_app` sólo tiene `insert` sobre `incident` (`db/esquema.sql`);
     # los conteos se leen por la conexión administrativa, como en el resto
     # de la suite (`tests/test_menu_tarea.py`, por ejemplo).
     with admin(conn) as cur:
@@ -805,7 +805,7 @@ def test_bienvenida_por_activacion_reclama_y_la_respuesta_del_dia_no_repite(
     `programado_para` ya confirmado y el segundo despacho avanza sólo un
     segundo desde él, nunca una hora entera: no puede cruzar una
     medianoche local."""
-    from prisma import gateway
+    from leda import gateway
 
     ws = intake_world["north-lab"]["id"]
     persona = intake_world["north-lab"]["people"]["Taylor Quinn"]

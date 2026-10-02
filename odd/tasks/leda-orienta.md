@@ -1,18 +1,18 @@
-# Prisma orienta
+# Leda orienta
 
 **Estado:** cerrado como feature; los hallazgos abiertos de la ronda 4 pasan a ser el
 guion de prueba del ADR 0014.
 **Creado:** 2026-09-25 · **Condensado:** 2026-09-30
-**Origen:** [`ADR 0007`](../../docs/decisions/0007-prisma-orienta-no-charla.md);
+**Origen:** [`ADR 0007`](../../docs/decisions/0007-leda-orienta-no-charla.md);
 acciones por tarea en `docs/architecture/interpretacion-y-confirmacion.md` §4.6.
 
 **Diario completo** (cuatro rondas por Telegram, decisiones, evidencia, revisiones y rutas
 por tarea, 5438 líneas, copia literal de este documento antes de condensarlo):
-[`docs/historial/prisma-orienta-diario-hasta-2026-09-30.md`](../../docs/historial/prisma-orienta-diario-hasta-2026-09-30.md).
+[`docs/historial/leda-orienta-diario-hasta-2026-09-30.md`](../../docs/historial/leda-orienta-diario-hasta-2026-09-30.md).
 
 ## Objetivo
 
-Que Prisma oriente a las personas con opciones concretas en lugar de preguntas abiertas:
+Que Leda oriente a las personas con opciones concretas en lugar de preguntas abiertas:
 cada respuesta que espera algo cierra con botones y una salida, las listas de tareas son
 botones y tocar una tarea ofrece lo que se puede hacer con ella.
 

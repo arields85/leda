@@ -16,10 +16,10 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from prisma import gateway
-from prisma.db import admin
-from prisma.llm import ProveedorGuionado, Respuesta
-from prisma.respuesta_unica import grupo_de
+from leda import gateway
+from leda.db import admin
+from leda.llm import ProveedorGuionado, Respuesta
+from leda.respuesta_unica import grupo_de
 
 from tests.test_menu_tarea import _mensaje, cliente  # noqa: F401
 
@@ -33,7 +33,7 @@ def _tg(conn, nombre="Nahuel Gimenez") -> int:
 
 def _con_respuesta_del_modelo(monkeypatch, texto="Anotado.") -> ProveedorGuionado:
     proveedor = ProveedorGuionado([Respuesta(texto=texto)] * 4)
-    monkeypatch.setattr("prisma.llm.desde_base", lambda cur, ws, key: proveedor)
+    monkeypatch.setattr("leda.llm.desde_base", lambda cur, ws, key: proveedor)
     return proveedor
 
 
@@ -137,7 +137,7 @@ def test_dos_respuestas_independientes_dejan_una_y_el_incidente_dice_cual_se_sup
 
 def test_la_respuesta_con_botones_se_conserva_aunque_no_sea_la_primera(
         cliente, conn, corework, monkeypatch):
-    from prisma import pendientes as P
+    from leda import pendientes as P
 
     def con_botones(cur, ws, chat, quien, ahora):
         p = P.registrar(cur, quien, herramienta="actualizar_estado", args={},
@@ -337,7 +337,7 @@ def test_un_toque_no_es_un_mensaje_ni_queda_como_mensaje_sin_respuesta(
 
 
 def test_el_arranque_avisa_que_falta_la_migracion_0021():
-    from prisma import saludo
+    from leda import saludo
 
     class _Cursor:
         def __init__(self, respuestas):
@@ -355,7 +355,7 @@ def test_el_arranque_avisa_que_falta_la_migracion_0021():
 
 
 def test_con_el_esquema_al_dia_el_arranque_no_pide_migraciones(corework, conn):
-    from prisma import saludo
+    from leda import saludo
 
     with admin(conn) as cur:
         assert saludo.verificar_migraciones(cur) is None

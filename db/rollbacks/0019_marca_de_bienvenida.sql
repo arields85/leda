@@ -6,7 +6,7 @@
 -- Sólo agregó una columna con default, sin tocar privilegios ni dueño: un
 -- `drop column` alcanza.
 begin;
-set search_path = prisma, public;
+set search_path = leda, public;
 
 alter table message_outbox drop column if exists es_bienvenida;
 

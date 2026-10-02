@@ -18,7 +18,7 @@
 --
 -- Se deshace con `db/rollbacks/0025_rechazar_borrador.sql`.
 begin;
-set search_path = prisma, public;
+set search_path = leda, public;
 
 -- Fail closed if an invoking text pipeline decoded the UTF-8 file incorrectly.
 -- chr() builds the expected value independently from non-ASCII source bytes.
@@ -34,11 +34,11 @@ end $$;
 do $$ begin
   if not exists (
       select 1 from information_schema.columns
-       where table_schema = 'prisma' and table_name = 'message_outbox'
+       where table_schema = 'leda' and table_name = 'message_outbox'
          and column_name = 'es_coordinacion') then
     raise exception '0025 requires 0024_avisos_de_coordinacion.sql';
   end if;
-  if to_regprocedure('prisma.resolver_ingreso_borrador(uuid,text,bigint,bigint)') is null then
+  if to_regprocedure('leda.resolver_ingreso_borrador(uuid,text,bigint,bigint)') is null then
     raise exception '0025 requires resolver_ingreso_borrador(uuid,text,bigint,bigint)';
   end if;
 end $$;
@@ -48,9 +48,9 @@ create or replace function resolver_ingreso_borrador(p_workspace_id uuid, p_toke
                                           p_chat_id bigint)
 returns table (resultado text, task_id uuid, pending_action_id uuid, replay boolean)
 language plpgsql security definer
-set search_path = prisma, public, pg_temp as $$
+set search_path = leda, public, pg_temp as $$
 begin
-  perform set_config('prisma.workspace_id', p_workspace_id::text, true);
+  perform set_config('leda.workspace_id', p_workspace_id::text, true);
   -- Modificar (T9-R1c-3), Enviar a aprobación (T9-R1c-4) y Rechazar (2026-09-30)
   -- no confirman: sus tokens nunca llegan a la conversión.
   if exists (select 1 from pending_action_option o

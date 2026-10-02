@@ -1,6 +1,6 @@
 """Herramientas del agente.
 
-Todo lo que Prisma puede hacer en el mundo pasa por acá. El modelo de lenguaje
+Todo lo que Leda puede hacer en el mundo pasa por acá. El modelo de lenguaje
 no escribe en la base: pide una herramienta, y la herramienta valida la
 autoridad del solicitante antes de tocar nada.
 
@@ -240,7 +240,7 @@ class OpcionOfrecida:
 
 class NecesitaOpciones(Exception):
     """El modelo le ofrece una elección concreta a la persona en vez de
-    preguntar en texto abierto (T1, ADR 0007 "Prisma orienta, no charla").
+    preguntar en texto abierto (T1, ADR 0007 "Leda orienta, no charla").
 
     No es un argumento que falta para volver a llamar a esta misma
     herramienta -- a diferencia de `NecesitaElegir` --: es una pregunta del
@@ -326,7 +326,7 @@ def _tareas_existentes_por_id(cur: psycopg.Cursor, workspace_id: str,
 @herramienta(
     "ofrecer_opciones", "consultar",
     "Ofrece a la persona una elección concreta, con botones, en vez de "
-    "preguntar en texto abierto (Prisma orienta, no charla). Cada opción es "
+    "preguntar en texto abierto (Leda orienta, no charla). Cada opción es "
     "un texto corto (campo 'texto') o una tarea existente por su id (campo "
     "'tarea_id', con 'etiqueta' opcional para el botón). El servidor valida "
     "cada tarea contra el equipo, arma los botones, agrega la salida "
@@ -337,7 +337,7 @@ def _tareas_existentes_por_id(cur: psycopg.Cursor, workspace_id: str,
     "preguntarte nada. No escribas nada más ni llames a otra herramienta "
     "después de usar ésta: el turno termina acá.",
     {"pregunta": {"type": "string", "requerido": True,
-                 "description": "lo que Prisma pregunta, en una frase corta"},
+                 "description": "lo que Leda pregunta, en una frase corta"},
      "opciones": {
          "type": "array", "requerido": True,
          "description": f"hasta {MAX_OPCIONES_MODELO} opciones",
@@ -800,7 +800,7 @@ def crear_borrador_tarea(cur, quien: Solicitante, titulo, objetivo_id=None,
         posibles = candidatos(cur, responsable)
         if not posibles:
             # Antes esto insertaba NULL y devolvía la tarea como creada, así
-            # que Prisma anunciaba una asignación que no existía.
+            # que Leda anunciaba una asignación que no existía.
             return {"creada": False,
                     "error": f"No encuentro a nadie que se llame "
                              f"«{responsable}» en el equipo."}
@@ -975,7 +975,7 @@ def _falta_evidencia_de_entrega() -> dict:
             "falta_tipo": FALTA_EVIDENCIA_DE_ENTREGA}
 
 
-# T6g (`odd/tasks/prisma-orienta.md`; review-e719d807, review-09452c69):
+# T6g (`odd/tasks/leda-orienta.md`; review-e719d807, review-09452c69):
 # decisión del usuario (2026-09-27) -- "ya la terminé" sobre una tarea que YA
 # está en_revision no es una segunda entrega, así que no hay un segundo
 # `falta` que devolver: la tarea ya tiene lo que este pedido pretendía lograr.
@@ -986,7 +986,7 @@ _AVISO_EVIDENCIA_SUMADA_EN_REVISION = (
 
 
 def _bloquear_tarea(cur, tarea_id) -> None:
-    """T6f (`odd/tasks/prisma-orienta.md`; review-3cf89bef, review-ae0ab510):
+    """T6f (`odd/tasks/leda-orienta.md`; review-3cf89bef, review-ae0ab510):
     serializa los actos que deciden o avisan sobre una misma tarea --
     "Aprobar" y "Pedir cambios" simultáneos, o dos evidencias simultáneas
     sobre una tarea `en_revision` -- para que el segundo espere a que el
@@ -996,10 +996,10 @@ def _bloquear_tarea(cur, tarea_id) -> None:
     "aprobado" contado después de un "rechazado" posterior).
 
     `select ... for update`/`for no key update` sobre `task` exige el
-    privilegio `update` (o `delete`/`truncate`) en PostgreSQL, y `prisma_app`
+    privilegio `update` (o `delete`/`truncate`) en PostgreSQL, y `leda_app`
     sólo tiene `select` ahí (`db/esquema.sql`: "Committed tasks are created
     only by confirmar_borrador_tarea()", `revoke update, delete on task from
-    prisma_app`) -- verificado contra el esquema real:
+    leda_app`) -- verificado contra el esquema real:
     `psycopg.errors.InsufficientPrivilege: permission denied for table task`
     con las dos formas. Un advisory lock no depende de ningún privilegio
     sobre la tabla -- mismo mecanismo y misma forma de clave
@@ -1017,7 +1017,7 @@ def _bloquear_tarea(cur, tarea_id) -> None:
 
     El lock por sí solo NO alcanza (corrección del orquestador tras revisar
     T6f): serializa el ORDEN DE EJECUCIÓN, pero -- hasta T6j
-    (`odd/tasks/prisma-orienta.md`) -- `approval.at`, `evidence.at` y
+    (`odd/tasks/leda-orienta.md`) -- `approval.at`, `evidence.at` y
     `task_state_event.at` (`db/esquema.sql`) tenían `default now()`, que en
     PostgreSQL es la hora de INICIO de la transacción, no la del `insert`. En
     el gateway la transacción arranca mucho antes de llegar acá -- ruteo,
@@ -1076,7 +1076,7 @@ def _preparar_actualizar_estado(cur, quien: Solicitante, tarea_id, estado,
 
     if estado == "en_revision":
         if fila["estado"] == "en_revision":
-            # T6g (`odd/tasks/prisma-orienta.md`; review-e719d807,
+            # T6g (`odd/tasks/leda-orienta.md`; review-e719d807,
             # review-09452c69): decisión del usuario (2026-09-27) -- una
             # entrega repetida sobre una tarea que YA está en_revision no
             # registra ningún evento de estado (nunca un
@@ -1120,7 +1120,7 @@ def _preparar_actualizar_estado(cur, quien: Solicitante, tarea_id, estado,
             cur.execute("select estado_previo_a_bloqueo(%s) as previo", (tarea_id,))
             restaura_en_curso = cur.fetchone()["previo"] == "en_curso"
         elif fila["estado"] == "en_revision":
-            # T6c (`odd/tasks/prisma-orienta.md`): mismo criterio que la
+            # T6c (`odd/tasks/leda-orienta.md`): mismo criterio que la
             # rama de `bloqueada`, ahora también para la restauración que
             # hace `pedir_cambios_tarea` -- consistente con el disparador
             # `exigir_dependencias_resueltas` (`db/esquema.sql`). Sin esta
@@ -1183,7 +1183,7 @@ def _actualizar_estado(cur, quien: Solicitante, tarea_id, estado, motivo=None,
         cur.execute("select motivo_no_cierra_tarea(%s) as m", (tarea_id,))
         impedimento = cur.fetchone()["m"]
         if impedimento:
-            # No es un error: es información que Prisma tiene que transmitir.
+            # No es un error: es información que Leda tiene que transmitir.
             return {"cerrada": False, "falta": impedimento}
 
     evidencia_id = None
@@ -1226,7 +1226,7 @@ def _actualizar_estado(cur, quien: Solicitante, tarea_id, estado, motivo=None,
         if pendiente and not evidencia_texto:
             return _falta_evidencia_de_entrega()
         if evidencia_texto:
-            # T6b (`odd/tasks/prisma-orienta.md`, decisión del usuario
+            # T6b (`odd/tasks/leda-orienta.md`, decisión del usuario
             # 2026-09-27): antes, este insert corría sólo cuando
             # `evidencia_pendiente` era verdadero -- si la tarea ya tenía
             # alguna fila de `evidence` (por ejemplo de una entrega
@@ -1268,7 +1268,7 @@ def _actualizar_estado(cur, quien: Solicitante, tarea_id, estado, motivo=None,
         # legítima exige además que el estado previo a la ÚLTIMA entrada a
         # `bloqueada` haya sido `en_curso`, igual que el disparador.
         #
-        # T6c (`odd/tasks/prisma-orienta.md`): mismo criterio para la rama
+        # T6c (`odd/tasks/leda-orienta.md`): mismo criterio para la rama
         # `en_revision` -- repetido acá por el mismo motivo que el resto de
         # este chequeo proactivo (el handler es la puerta real a la base,
         # no depende de que `_preparar_actualizar_estado` haya corrido
@@ -1286,7 +1286,7 @@ def _actualizar_estado(cur, quien: Solicitante, tarea_id, estado, motivo=None,
             if impedimento:
                 return {"iniciada": False, "falta": impedimento}
 
-    # Sin `returning`: `prisma_app` sólo tiene `insert` sobre
+    # Sin `returning`: `leda_app` sólo tiene `insert` sobre
     # `task_state_event` (es append-only, ver el `revoke` en
     # `db/esquema.sql`), y `returning` exige además `select`. El token de
     # deduplicación se genera acá, no se lee de la fila insertada.
@@ -1310,13 +1310,13 @@ def _actualizar_estado(cur, quien: Solicitante, tarea_id, estado, motivo=None,
         aprob = cur.fetchone()
         aprobador_membership_id = aprob["aprobador_membership_id"] if aprob else None
         if aprobador_membership_id:
-            # T6d (`odd/tasks/prisma-orienta.md`): antes, sin evidencia nueva
+            # T6d (`odd/tasks/leda-orienta.md`): antes, sin evidencia nueva
             # (política sin evidencia requerida, o entrega sin texto nuevo),
             # esto era `uuid.uuid4()` -- una clave al azar en cada ejecución.
             # Con evidencia nueva, `evidencia_id` ya es un id real de la fila
             # que se acaba de insertar y sigue siendo la ancla (mismo patrón
             # que `aprobacion_id` en `_aprobar_tarea`, revisión ec6f7d80). Sin
-            # ella no hay ninguna fila nueva para anclar -- `prisma_app`
+            # ella no hay ninguna fila nueva para anclar -- `leda_app`
             # tampoco puede leer el id de `task_state_event` recién insertado
             # (ver el comentario de arriba).
             #
@@ -1331,7 +1331,7 @@ def _actualizar_estado(cur, quien: Solicitante, tarea_id, estado, motivo=None,
             # La identidad estable de un acto -- sin depender de una fila que
             # esta vez no existe -- es la transacción que lo ejecuta:
             # `pg_current_xact_id()` (PostgreSQL 13+; verificado como
-            # `prisma_app`, sin grants extra, contra el Postgres 18 de
+            # `leda_app`, sin grants extra, contra el Postgres 18 de
             # `docker-compose.yml`/desarrollo) es la misma para cualquier
             # llamada dentro de esta misma transacción y distinta de la de
             # cualquier otra transacción, sin repetirse nunca en el clúster.
@@ -1551,7 +1551,7 @@ def _resolver_bloqueo(cur, quien: Solicitante, bloqueo_id, resolucion):
         if estado_actual == "bloqueada":
             # `bloqueada` es una proyección: el estado al que se vuelve es el
             # que tenía el último evento que entró a `bloqueada`, nunca un
-            # valor fijo. `task_state_event` es append-only y prisma_app no
+            # valor fijo. `task_state_event` es append-only y leda_app no
             # lo lee directo; esta función security definer es la única
             # puerta.
             cur.execute("select estado_previo_a_bloqueo(%s) as previo",
@@ -1590,7 +1590,7 @@ def _preparar_adjuntar_evidencia(cur, quien: Solicitante, tarea_id, tipo,
             and not puede_aprobar_tarea(cur, quien, fila["responsable_membership_id"])):
         # T2b: a diferencia de actualizar_estado/registrar_bloqueo, mecánica
         # §6 lista "confirmación del referente" entre la evidencia que
-        # Prisma solicita -- el aprobador de la tarea (`puede_aprobar_tarea`,
+        # Leda solicita -- el aprobador de la tarea (`puede_aprobar_tarea`,
         # un solo nivel) también puede adjuntarla, no sólo el responsable.
         raise Denegado(
             "No podés adjuntar evidencia a una tarea que no es tuya ni que revisás.")
@@ -1654,7 +1654,7 @@ def _exigir_puede_aprobarse(cur, tarea_id, fila) -> None:
     `en_revision` y con la evidencia que exige su política ya registrada.
 
     Sesión 2 por Telegram, 2026-09-27 (hallazgo 5): Ismael tocó "Aprobar" y
-    Prisma lo dejó aprobar a ciegas una tarea sin evidencia -- este chequeo
+    Leda lo dejó aprobar a ciegas una tarea sin evidencia -- este chequeo
     es el que faltaba, y cierra también el defecto de revisión encontrado
     aparte: sin él, cualquiera con autoridad de aprobador podía aprobar (y
     de paso cerrar) una tarea `asignada`, o volver a aprobar una ya
@@ -1805,7 +1805,7 @@ def _exigir_puede_pedirse_cambios(cur, fila) -> None:
 
 
 def _destino_pedir_cambios(cur, tarea_id) -> str:
-    """T6c (`odd/tasks/prisma-orienta.md`), enmienda a la decisión 4 de ADR
+    """T6c (`odd/tasks/leda-orienta.md`), enmienda a la decisión 4 de ADR
     0009: a qué estado vuelve la tarea al pedirle cambios -- el que tenía
     antes de la ÚLTIMA entrada a `en_revision` (`estado_previo_a_revision`,
     `db/esquema.sql`). `en_curso` si estaba en curso: es una restauración,
@@ -1882,7 +1882,7 @@ def _pedir_cambios_tarea(cur, quien: Solicitante, tarea_id, comentario=None):
     if not comentario:
         raise Denegado("Hace falta contar qué falta corregir.")
 
-    # T6c (`odd/tasks/prisma-orienta.md`), enmienda a la decisión 4 de ADR
+    # T6c (`odd/tasks/leda-orienta.md`), enmienda a la decisión 4 de ADR
     # 0009: el destino ya no es siempre `en_curso` -- una tarea que se
     # entregó sin haber arrancado nunca ("Ya la terminé" se ofrece desde
     # `asignada`) vuelve a `asignada`, no a un `en_curso` que nunca tuvo. El
@@ -1963,7 +1963,7 @@ def _enlace_portal_tarea(tarea_id) -> str | None:
 
 
 def _evidencia_vigente(cur, tarea_id) -> list[dict]:
-    """T6i (`odd/tasks/prisma-orienta.md`): toda la evidencia del ciclo de
+    """T6i (`odd/tasks/leda-orienta.md`): toda la evidencia del ciclo de
     entrega actual, para el aviso al aprobador -- mismo corte que
     `evidencia_pendiente` (`db/esquema.sql`): sólo cuenta la que tiene `at`
     posterior al último `approval` 'rechazado' de la tarea; sin ningún
@@ -2060,7 +2060,7 @@ def _notificar_entrega_al_aprobador(cur, quien: Solicitante, tarea_id, titulo,
 def _avisar_evidencia_nueva_en_revision(cur, quien: Solicitante, tarea_id, titulo,
                                         responsable_membership_id, evidencia_id,
                                         ahora) -> None:
-    """T6i (`odd/tasks/prisma-orienta.md`; ADR 0009, enmienda 2026-09-27):
+    """T6i (`odd/tasks/leda-orienta.md`; ADR 0009, enmienda 2026-09-27):
     evidencia nueva sobre una tarea que YA está `en_revision` -- entrega
     repetida (T6g) o "Adjuntar evidencia" -- de alguien que no es el
     aprobador retira el aviso de entrega que el aprobador tiene esperando

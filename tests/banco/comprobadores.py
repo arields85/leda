@@ -15,17 +15,17 @@ import unicodedata
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 
-from prisma.deteccion_pregunta import hace_pregunta as _hace_pregunta
-from prisma.deteccion_pregunta import pide_elegir_en_imperativo as _pide_elegir_en_imperativo
-from prisma.herramientas import ESTADOS_LEGIBLES
-from prisma.salida import TRUNCAR_ETIQUETA_BOTON, etiqueta_sin_icono
+from leda.deteccion_pregunta import hace_pregunta as _hace_pregunta
+from leda.deteccion_pregunta import pide_elegir_en_imperativo as _pide_elegir_en_imperativo
+from leda.herramientas import ESTADOS_LEGIBLES
+from leda.salida import TRUNCAR_ETIQUETA_BOTON, etiqueta_sin_icono
 
 RESULTADOS = ("aprobado", "falla", "no_concluyente", "bloqueado")
 
 
 @dataclass(frozen=True)
 class AvisoEncolado:
-    """Un mensaje que Prisma inició durante la corrida para otra persona (una
+    """Un mensaje que Leda inició durante la corrida para otra persona (una
     fila de `message_outbox` que no es respuesta al actor): el efecto real
     detrás de un "le avisé" que escribe el servidor y no una herramienta."""
 
@@ -44,7 +44,7 @@ class Evidencia:
     # o `intake_choice_set_id` no nulo en la fila de `message_outbox`
     # (`corrida.py::respuesta_ofrecio_opciones`, `despachador.py::_botones`).
     ofrecio_opciones: bool = False
-    # Avisos que Prisma encoló durante la corrida para personas DISTINTAS del
+    # Avisos que Leda encoló durante la corrida para personas DISTINTAS del
     # actor (`corrida.py::avisos_a_otros`, `message_outbox` sin `es_respuesta`).
     # Respaldan las afirmaciones de "avisé" que no salen de una herramienta del
     # modelo sino del servidor (p. ej. el rechazo de un borrador ajeno).
@@ -203,13 +203,13 @@ _DIAS = ("lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domin
          "próximo", "próxima", "pasado", "pasada")
 _MESES = ("enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto",
          "septiembre", "setiembre", "octubre", "noviembre", "diciembre")
-_GENERICAS = ("CoreWork", "Prisma", "Dirección", "Referente técnico de área",
+_GENERICAS = ("CoreWork", "Leda", "Dirección", "Referente técnico de área",
              "Integrante", "OT y automatización", "Infraestructura IT",
              "Sistemas eléctricos y tableros", "Software e interfaz HMI",
              "Gestión", "Google Drive")
 
 # Hallazgo lateral del Experimento 3 (opinión sombra, `odd/tasks/
-# prisma-orienta.md`): "Bloqueada Todavía"/"Asignada Todavía" marcaban
+# leda-orienta.md`): "Bloqueada Todavía"/"Asignada Todavía" marcaban
 # no_concluyente en b-0002/b-0003 -- una palabra de estado
 # (`herramientas.ESTADOS_LEGIBLES`, la misma que
 # renderiza "Estado actual: Bloqueada" o el menú de tarea) seguida de
@@ -472,13 +472,13 @@ def comprobar_contenido(
 
 # La detección de "esto es una pregunta" (signo de interrogación, o un
 # pedido de elección en imperativo como "Decime cuál de las dos y lo hago")
-# vive en `prisma.deteccion_pregunta` (T4b, `prisma-orienta`): antes T7 la
+# vive en `leda.deteccion_pregunta` (T4b, `leda-orienta`): antes T7 la
 # tenía sólo acá, pero el servidor (`agente.responder`) la necesita también
 # para el cierre genérico de una pregunta sin opciones -- una sola
-# implementación en `src/prisma/`, importada acá como `_hace_pregunta`/
+# implementación en `src/leda/`, importada acá como `_hace_pregunta`/
 # `_pide_elegir_en_imperativo` para no tocar el resto de este archivo.
 # Compartida entre `comprobar_pregunta` (T7, "ante la duda, preguntó en vez
-# de actuar") y `comprobar_pregunta_con_opciones` (T4, ADR 0007 "Prisma
+# de actuar") y `comprobar_pregunta_con_opciones` (T4, ADR 0007 "Leda
 # orienta, no charla") -- una sola detección, dos comprobaciones distintas.
 
 
@@ -520,11 +520,11 @@ def comprobar_pregunta(
 
 
 # ---------------------------------------------------------------------------
-# 6bis. Pregunta con opciones (T4, `prisma-orienta`, ADR 0007 puntos 1 y 5):
+# 6bis. Pregunta con opciones (T4, `leda-orienta`, ADR 0007 puntos 1 y 5):
 # a diferencia de `comprobar_pregunta` (que sólo corre para un escenario que
 # declaró `debe_preguntar: true`, y aprueba una pregunta en texto abierto
 # tanto como una con botones), esta comprobación corre por defecto en TODO
-# escenario y es estricta sobre la forma: si Prisma le pregunta algo a la
+# escenario y es estricta sobre la forma: si Leda le pregunta algo a la
 # persona, esa pregunta tiene que venir con opciones como botones
 # (`evidencia.ofrecio_opciones`), nunca en texto abierto solo. Reusa
 # `_hace_pregunta` -- la misma detección de "esto es una pregunta" que ya
@@ -550,7 +550,7 @@ def comprobar_pregunta_con_opciones(evidencia: Evidencia) -> ResultadoComprobaci
     return ResultadoComprobacion(
         "pregunta_con_opciones", "falla",
         "preguntó en texto abierto sin ofrecer opciones con botones (ADR "
-        f"0007, prisma-orienta): {evidencia.respuesta_texto!r}")
+        f"0007, leda-orienta): {evidencia.respuesta_texto!r}")
 
 
 def comprobaciones_pregunta_con_opciones(
@@ -594,7 +594,7 @@ _LARGO_MAXIMO_PREFIJO_CORTE_DURO = TRUNCAR_ETIQUETA_BOTON - 1
 def _es_forma_ofrecida_del_titulo(etiqueta: str, titulo: str) -> bool:
     """True si `etiqueta` es el título entero, o su forma acortada real de
     botón (`salida.acortar_etiqueta_boton`/`etiquetas_boton_distinguibles`;
-    Experimento 3, `odd/tasks/prisma-orienta.md`: comprobador desactualizado
+    Experimento 3, `odd/tasks/leda-orienta.md`: comprobador desactualizado
     por `e7071eb`/`2bee9a9`, hallazgo lateral del experimento de opinión
     sombra sobre b-0013). El corte real de esas funciones
     siempre cae en un límite de PALABRA -- nunca a mitad de una, salvo el

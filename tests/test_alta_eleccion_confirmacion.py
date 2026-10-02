@@ -22,11 +22,11 @@ from __future__ import annotations
 
 import pytest
 
-from prisma import gateway
-from prisma import ingreso_tareas as I
-from prisma import pendientes as P
-from prisma.db import admin, espacio
-from prisma.llm import IntentAction, IntentRoute, RespectoPendiente
+from leda import gateway
+from leda import ingreso_tareas as I
+from leda import pendientes as P
+from leda.db import admin, espacio
+from leda.llm import IntentAction, IntentRoute, RespectoPendiente
 
 from tests.test_task_intake import (NOW, _RoutingProvider, _actor,  # noqa: F401
                                     _active_choices, _callback_client,
@@ -210,7 +210,7 @@ def test_una_opcion_que_parece_un_titulo_no_tira_abajo_el_ruteo(
     modelo la rutea como conversación con propuestas de tarea. Con la elección
     abierta la decisión es `respecto_pendiente`: la opción se toma y no hay
     RoutingError ni incidente."""
-    from prisma.llm import Llamada, ProveedorGuionado, RouteEnvelope
+    from leda.llm import Llamada, ProveedorGuionado, RouteEnvelope
 
     rid = _alta_con_eleccion(conn, intake_world)
     sobre = RouteEnvelope(calls=(Llamada("c", "route_intent", {
@@ -264,7 +264,7 @@ def test_reenviar_la_eleccion_sale_del_evento_que_lo_dispara_y_es_idempotente(
     reenvío sale del evento que lo dispara (el mensaje o el toque al que está
     atado el turno), no de un conteo: un callback que se entrega dos veces
     reenvía UNA vez, y otro evento reenvía de nuevo."""
-    from prisma.db import atar_al_entrante
+    from leda.db import atar_al_entrante
 
     rid = _alta_con_eleccion(conn, intake_world)
     conjunto = _conjunto_activo(conn, rid)
@@ -780,7 +780,7 @@ def test_un_mensaje_no_impide_confirmar_con_el_boton(
         aprobador = cur.fetchone()["telegram_user_id"]
     conn.commit()
 
-    from prisma.db import autoridad
+    from leda.db import autoridad
     with autoridad(authority_conn) as cur:
         resuelta = P.resolver_borrador(cur, ws, confirmar, aprobador, aprobador)
 
@@ -792,7 +792,7 @@ def test_una_referencia_explicita_le_gana_al_evento_atado(intake_world, conn):
     # T9-R4b (R2-002): dos reenvíos con referencias explícitas distintas dentro de
     # un mismo turno atado salen los dos; la referencia del evento es sólo el
     # valor por omisión.
-    from prisma.db import atar_al_entrante
+    from leda.db import atar_al_entrante
 
     rid = _alta_con_eleccion(conn, intake_world)
     conjunto = _conjunto_activo(conn, rid)

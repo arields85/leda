@@ -1,6 +1,6 @@
 """Una rama se cierra cuando su flujo termina (R4-H7, ADR 0013 regla 1).
 
-En la cuarta ronda por Telegram los avisos que inicia Prisma ("X entregó…", "X
+En la cuarta ronda por Telegram los avisos que inicia Leda ("X entregó…", "X
 pidió cambios…") quedaron `listo` sin enviarse y los flujos ya terminados dejaban
 su pregunta en `esperando` (`_opciones_modelo` de una respuesta con pregunta
 abierta, `_dato_menu_tarea` de "Pedir cambios" y de "Ya la terminé"). Estas
@@ -21,12 +21,12 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from prisma import pendientes as P
-from prisma.calendario import Calendario
-from prisma.db import admin, espacio
-from prisma.despachador import TransporteDePrueba, despachar
-from prisma.llm import Llamada, ProveedorGuionado, Respuesta
-from prisma.salida import enqueue_outbox
+from leda import pendientes as P
+from leda.calendario import Calendario
+from leda.db import admin, espacio
+from leda.despachador import TransporteDePrueba, despachar
+from leda.llm import Llamada, ProveedorGuionado, Respuesta
+from leda.salida import enqueue_outbox
 
 from tests.test_pedir_cambios_extremo_a_extremo import (  # noqa: F401
     _abrir_menu, _confirmar, _mensaje, _opciones, _pendiente, _quien, _tarea,
@@ -39,7 +39,7 @@ from tests.test_pedir_cambios_extremo_a_extremo import (  # noqa: F401
 
 def _guion(monkeypatch, *respuestas) -> ProveedorGuionado:
     proveedor = ProveedorGuionado(guion=list(respuestas))
-    monkeypatch.setattr("prisma.llm.desde_base", lambda cur, ws, key: proveedor)
+    monkeypatch.setattr("leda.llm.desde_base", lambda cur, ws, key: proveedor)
     return proveedor
 
 
@@ -341,7 +341,7 @@ def test_la_pregunta_con_botones_de_la_rama_se_retira_al_cerrarse_la_rama(
         corework, conn):
     """`_respuesta_dato_menu` ("¿Esto es la evidencia?") acompaña a la pregunta
     abierta: si esa pregunta se consume o se deja, sus botones ya no valen."""
-    from prisma import gateway
+    from leda import gateway
 
     ws = corework.workspace_id
     ahora = datetime.now(timezone.utc)
@@ -404,8 +404,8 @@ def test_el_aviso_con_sus_botones_no_es_una_rama_ni_retiene_a_otros_ni_a_si_mism
     """Un aviso todavía sin responder (ni siquiera enviado) no es una conversación
     en la que la persona esté: no la retiene a ella ni a otros avisos, ni se
     retiene a sí mismo (ADR 0013: "lo que empezó otra persona y le llega para
-    decidir" es un mensaje que inicia Prisma, no una rama)."""
-    from prisma import herramientas as H
+    decidir" es un mensaje que inicia Leda, no una rama)."""
+    from leda import herramientas as H
 
     ws = corework.workspace_id
     ahora = datetime.now(timezone.utc)
@@ -447,7 +447,7 @@ def test_las_respuestas_no_cuentan_contra_el_tope_diario_de_avisos(corework, con
     """`despachar` dice que contestarle a quien escribió "no cuenta contra el tope
     de mensajes automáticos: no es automático" (ADR 0011), y el tope de corework es
     de 3 por día. Una persona que ya recibió más de tres respuestas hoy sigue
-    recibiendo el aviso que Prisma le inicia."""
+    recibiendo el aviso que Leda le inicia."""
     ws = corework.workspace_id
     with espacio(conn, ws) as cur:
         nahuel = _quien(cur, "Nahuel Gimenez", ws)
@@ -458,7 +458,7 @@ def test_las_respuestas_no_cuentan_contra_el_tope_diario_de_avisos(corework, con
                            scheduled_for=datetime.now(timezone.utc)
                            - timedelta(minutes=2), dedupe_key=f"tope:r{i}",
                            is_response=True)
-        enqueue_outbox(cur, workspace_id=ws, chat_id=tg, text="Aviso de Prisma",
+        enqueue_outbox(cur, workspace_id=ws, chat_id=tg, text="Aviso de Leda",
                        recipient_membership_id=nahuel.membership_id,
                        scheduled_for=datetime.now(timezone.utc)
                        - timedelta(minutes=1), dedupe_key="tope:aviso")
@@ -466,13 +466,13 @@ def test_las_respuestas_no_cuentan_contra_el_tope_diario_de_avisos(corework, con
 
     resumen, transporte = _pasada(conn, ws, reloj.en_horario())
 
-    assert "Aviso de Prisma" in _enviados_a(transporte, 9005)
+    assert "Aviso de Leda" in _enviados_a(transporte, 9005)
     assert resumen["pospuestos"] == 0
 
 
 def test_los_avisos_ya_enviados_hoy_si_cuentan_contra_el_tope_diario(
         corework, conn, reloj):
-    """El otro borde del tope: lo que Prisma inicia sí cuenta. Con tres avisos ya
+    """El otro borde del tope: lo que Leda inicia sí cuenta. Con tres avisos ya
     enviados hoy (el tope de corework), el siguiente se posterga al día hábil
     siguiente aunque la persona haya recibido además respuestas."""
     ws = corework.workspace_id

@@ -5,20 +5,20 @@ administrador de plataforma por su canal." Hasta esta unidad (T28, decisión
 del usuario, 2026-09-28) eso último no pasaba: cada módulo armaba su propio
 `insert into incident` a mano y sólo la persona afectada se enteraba
 (`gateway.NOTICIA_NEUTRA_INCIDENTE`) -- quien administra la plataforma recién
-se enteraba corriendo `python -m prisma incidentes <slug>`.
+se enteraba corriendo `python -m leda incidentes <slug>`.
 
 `registrar_incidente` es el punto único de escritura en `incident`: inserta
 la fila y, en la misma llamada, encola un aviso para cada administrador de
 plataforma que tenga el bot de administración vinculado. El fan-out corre del
 lado de la base (`avisar_incidente_admin`, `security definer`, migración
 0017): necesita leer `platform_role` y `audit_log`, sin concesión de lectura
-a `prisma_app`.
+a `leda_app`.
 
 El texto del aviso SÍ incluye qué lo disparó -- el mensaje de la persona, o
 la acción que tocó -- corrección del usuario sobre el alcance original de
 esta unidad (2026-09-28, mismo día): la Constitución §2 ya le da al
 administrador de plataforma acceso a las conversaciones privadas entre
-Prisma y los integrantes, y §12 dice que ESE acceso se audita, no que haya
+Leda y los integrantes, y §12 dice que ESE acceso se audita, no que haya
 que ocultárselo. Lo que §10 exige es que el incidente quede sanitizado --
 sin secretos -- no que el aviso salga sin disparador. Por eso este módulo
 nunca manda `referencia_cruda` (la traza técnica cruda, que puede traer algo
@@ -153,7 +153,7 @@ class ExplicacionDeEtapa:
     que_hacer: str
 
 
-_BUSCAR_DETALLE = "Buscá el detalle con `python -m prisma incidentes <espacio>`"
+_BUSCAR_DETALLE = "Buscá el detalle con `python -m leda incidentes <espacio>`"
 
 # Tabla determinista, nunca el modelo: una entrada por etapa con la que el código
 # registra un incidente (las constantes `ETAPA_*` de `gateway`, `respuesta_unica`
@@ -163,13 +163,13 @@ _BUSCAR_DETALLE = "Buscá el detalle con `python -m prisma incidentes <espacio>`
 # entrada.
 EXPLICACION_POR_ETAPA: dict[str, ExplicacionDeEtapa] = {
     "turno_texto": ExplicacionDeEtapa(
-        que_paso=("Falló algo dentro de Prisma mientras procesaba un mensaje de "
+        que_paso=("Falló algo dentro de Leda mientras procesaba un mensaje de "
                   "texto, y ningún control más específico lo atajó."),
         que_vio=NOTICIA_NEUTRA_INCIDENTE,
         que_hacer=(f"{_BUSCAR_DETALLE} y corregí la causa. Después podés "
                    "pedirle a {nombre} que reenvíe el mensaje.")),
     "toque_boton": ExplicacionDeEtapa(
-        que_paso=("Falló algo dentro de Prisma mientras procesaba el toque de "
+        que_paso=("Falló algo dentro de Leda mientras procesaba el toque de "
                   "un botón, y ningún control más específico lo atajó."),
         que_vio=NOTICIA_NEUTRA_INCIDENTE,
         que_hacer=(f"{_BUSCAR_DETALLE} y corregí la causa. Revisá que lo que "
@@ -181,7 +181,7 @@ EXPLICACION_POR_ETAPA: dict[str, ExplicacionDeEtapa] = {
                    "activada; si no, repetí la activación.")),
     "accion_menu": ExplicacionDeEtapa(
         que_paso=("Un botón del menú de una tarea llegó a una acción que "
-                  "terminó sin un resultado que Prisma pueda confirmar."),
+                  "terminó sin un resultado que Leda pueda confirmar."),
         que_vio=NOTICIA_NEUTRA_INCIDENTE,
         que_hacer=("Revisá el estado de la tarea antes de repetir la acción, "
                    "porque no se sabe si algo cambió, y pasale el detalle "
@@ -196,7 +196,7 @@ EXPLICACION_POR_ETAPA: dict[str, ExplicacionDeEtapa] = {
     "mensaje_recuperado_sin_respuesta": ExplicacionDeEtapa(
         que_paso=("Un mensaje de {nombre} se recibió pero su turno murió antes de "
                   "responderlo (un reinicio o un corte del proceso); Telegram lo "
-                  "reentregó y Prisma lo atendió de nuevo."),
+                  "reentregó y Leda lo atendió de nuevo."),
         que_vio="La respuesta a su mensaje, con demora.",
         que_hacer=(f"{_BUSCAR_DETALLE} y mirá si hubo un reinicio o un corte del "
                    "servicio a esa hora. No hace falta avisarle a {nombre}.")),
@@ -207,7 +207,7 @@ EXPLICACION_POR_ETAPA: dict[str, ExplicacionDeEtapa] = {
         que_vio=NOTICIA_NEUTRA_INCIDENTE,
         que_hacer=(f"{_BUSCAR_DETALLE} y mirá si hubo un reinicio o un corte del "
                    "servicio a esa hora. {nombre} puede reenviar el mensaje: "
-                   "Prisma no lo vuelve a procesar solo.")),
+                   "Leda no lo vuelve a procesar solo.")),
     "mensaje_huerfano_fallo_al_avisar": ExplicacionDeEtapa(
         que_paso=("Un mensaje de {nombre} se recibió y quedó sin respuesta, pero "
                   "la red de fondo no pudo avisarle: falló al escribir el aviso "
@@ -218,7 +218,7 @@ EXPLICACION_POR_ETAPA: dict[str, ExplicacionDeEtapa] = {
                    "técnica del incidente); el aviso sale solo en la pasada "
                    "siguiente. Mientras tanto {nombre} puede reenviar el mensaje.")),
     "sin_respuesta": ExplicacionDeEtapa(
-        que_paso=("Un mensaje quedó sin ninguna respuesta de Prisma; el control "
+        que_paso=("Un mensaje quedó sin ninguna respuesta de Leda; el control "
                   "de respuesta única mandó el aviso de problema."),
         que_vio=NOTICIA_NEUTRA_INCIDENTE,
         que_hacer=(f"{_BUSCAR_DETALLE} para ver qué camino no contestó y "
@@ -269,7 +269,7 @@ EXPLICACION_POR_ETAPA: dict[str, ExplicacionDeEtapa] = {
                    "reenviar el mensaje.")),
     ETAPA_ENRUTAMIENTO: ExplicacionDeEtapa(
         que_paso=("Falló el enrutamiento de un mensaje o de un toque de "
-                  "{nombre}: Prisma no pudo decidir a qué paso de la "
+                  "{nombre}: Leda no pudo decidir a qué paso de la "
                   "conversación correspondía."),
         que_vio=NOTICIA_NEUTRA_INCIDENTE,
         que_hacer=(_BUSCAR_DETALLE + " y revisá que lo que {nombre} quería "
@@ -277,11 +277,11 @@ EXPLICACION_POR_ETAPA: dict[str, ExplicacionDeEtapa] = {
     ETAPA_JEV_NO_CONFIGURADO: ExplicacionDeEtapa(
         que_paso=("El mensaje de {nombre} nombraba una tarea, pero falta la "
                   "credencial del modelo que la identifica "
-                  "(PRISMA_OPENROUTER_API_KEY)."),
+                  "(LEDA_OPENROUTER_API_KEY)."),
         que_vio=("Una pregunta para aclarar de qué tarea habla, en vez de una "
                  "respuesta adivinada."),
         que_hacer=("Configurá la credencial y reiniciá el servicio. Hasta "
-                   "entonces Prisma pregunta en vez de resolver la tarea.")),
+                   "entonces Leda pregunta en vez de resolver la tarea.")),
     ETAPA_ENTREGA_MENSAJE: ExplicacionDeEtapa(
         que_paso=("Un mensaje para {nombre} no se pudo entregar por Telegram "
                   "después de varios intentos."),
@@ -321,7 +321,7 @@ EXPLICACION_POR_ETAPA: dict[str, ExplicacionDeEtapa] = {
 }
 
 _EXPLICACION_GENERICA = ExplicacionDeEtapa(
-    que_paso=("Prisma registró un problema en una parte que todavía no tiene "
+    que_paso=("Leda registró un problema en una parte que todavía no tiene "
               "una explicación propia; el resumen técnico dice dónde."),
     que_vio=("No se puede saber con este registro qué vio {nombre}; "
              "revisá su chat."),
@@ -353,8 +353,8 @@ def armar_aviso_admin(*, incident_id: str, slug: str | None,
     `mensaje` es el disparador que el aviso ya mostraba, sin nada nuevo."""
     explicacion = EXPLICACION_POR_ETAPA.get(etapa or "", _EXPLICACION_GENERICA)
     quien = nombre or "la persona"
-    titulo = (f"⚠️ Prisma no pudo responderle a {nombre}" if nombre
-              else "⚠️ Prisma tuvo un problema")
+    titulo = (f"⚠️ Leda no pudo responderle a {nombre}" if nombre
+              else "⚠️ Leda tuvo un problema")
     return "\n".join((
         titulo,
         "",
@@ -429,7 +429,7 @@ def avisar_incidente_admin(cur, incident_id: str, *, workspace_id: str | None,
     for admin_app_user_id in avisados:
         registrar_auditoria(
             cur, accion="aviso_incidente_admin", workspace_id=workspace_id,
-            actor_app_user_id=admin_app_user_id, actor_kind="prisma",
+            actor_app_user_id=admin_app_user_id, actor_kind="leda",
             sujeto_tipo=referencia_tipo, sujeto_id=referencia_id,
             detalle={"incident_id": incident_id})
     return avisados
@@ -500,7 +500,7 @@ def registrar_incidente(cur, workspace_id: str | None, resumen: str, *,
     else:
         resumen_final += (" No se avisó a la administración: el canal de "
                           "administración es justamente el que falló -- "
-                          "revisar con `python -m prisma incidentes <espacio>`.")
+                          "revisar con `python -m leda incidentes <espacio>`.")
 
     cur.execute(
         """insert into incident (id, workspace_id, severidad, resumen_sanitizado,

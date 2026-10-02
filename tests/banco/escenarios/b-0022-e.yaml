@@ -3,7 +3,7 @@ variante_de: b-0022
 objetivo: >
   Variante de b-0022, el borrador esperando confirmación: la persona escribe
   "sí, dale". Un mensaje no confirma el borrador (la conversión es explícita,
-  con el botón Confirmar): Prisma lo dice y el borrador sigue esperando.
+  con el botón Confirmar): Leda lo dice y el borrador sigue esperando.
 actor: Ismael Soschinski
 mensajes: []
 precondiciones:

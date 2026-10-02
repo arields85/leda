@@ -19,14 +19,14 @@ from datetime import timedelta
 import pytest
 from psycopg.types.json import Jsonb
 
-from prisma import ingreso_tareas as I
-from prisma import pendientes as P
-from prisma.autoridad import Canal, identificar
-from prisma.db import admin, autoridad, espacio
-from prisma.calendario import Calendario
-from prisma.despachador import TransporteDePrueba, despachar
-from prisma.llm import RespectoPendiente
-from prisma.salida import etiqueta_sin_icono
+from leda import ingreso_tareas as I
+from leda import pendientes as P
+from leda.autoridad import Canal, identificar
+from leda.db import admin, autoridad, espacio
+from leda.calendario import Calendario
+from leda.despachador import TransporteDePrueba, despachar
+from leda.llm import RespectoPendiente
+from leda.salida import etiqueta_sin_icono
 
 from tests.test_alta_eleccion_confirmacion import (_alta_en_confirmacion, _escribir,
                                                    _nuevas, _ruta, _salidas,
@@ -166,9 +166,9 @@ def test_la_revision_es_la_rama_abierta_de_quien_pide(intake_world, conn):
     assert "Confirmar" not in I.DRAFT_AWAITING_SEND
 
 
-def test_la_revision_retiene_lo_que_prisma_inicia_como_cualquier_rama(
+def test_la_revision_retiene_lo_que_leda_inicia_como_cualquier_rama(
         intake_world, conn):
-    from prisma import herramientas as H
+    from leda import herramientas as H
 
     rid, pid = _alta_en_revision(conn, intake_world)
     user = _usuario(intake_world)
@@ -225,7 +225,7 @@ def test_enviar_le_manda_el_borrador_a_quien_confirma_y_le_dice_a_quien_pide(
         cur.execute("select es_respuesta from message_outbox where id = %s",
                     (nuevas[0]["id"],))
         assert cur.fetchone()["es_respuesta"] is True
-    # A quien confirma, el mismo resumen con Confirmar y Rechazar, iniciado por Prisma.
+    # A quien confirma, el mismo resumen con Confirmar y Rechazar, iniciado por Leda.
     (revision, confirmacion) = _acciones(conn, rid)
     assert revision["estado"] == "cancelada" and confirmacion["estado"] == "esperando"
     assert confirmacion["chat_id"] == tg_aprobador
@@ -665,7 +665,7 @@ def test_despues_de_enviar_lo_que_escribe_quien_pide_sigue_el_camino_normal(
     client = _callback_client(conn, monkeypatch)
     _tocar(client, conn, user, pid, "Enviar a aprobación")
     antes = _salidas(conn, user)
-    from prisma.llm import IntentAction, IntentRoute
+    from leda.llm import IntentAction, IntentRoute
 
     provider = _RoutingProvider([IntentRoute(IntentAction.NORMAL_CONVERSATION)],
                                 answer="Un bloqueo frena una tarea.")

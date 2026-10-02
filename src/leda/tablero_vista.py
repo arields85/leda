@@ -1,7 +1,7 @@
 """La pantalla del tablero.
 
 Adaptador de presentación sobre el puerto de lectura. No consulta la base:
-recibe lo que `prisma.lectura` devolvió y lo convierte en HTML.
+recibe lo que `leda.lectura` devolvió y lo convierte en HTML.
 
 Dos reglas gobiernan este módulo.
 

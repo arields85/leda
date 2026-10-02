@@ -4,7 +4,7 @@
 # la taxonomía de áreas, la política de aprobación, la cadencia y el tono.
 # No cambia ni una línea del núcleo.
 #
-# Se usa como punto de partida en el alta: Prisma entrevista sólo sobre lo que
+# Se usa como punto de partida en el alta: Leda entrevista sólo sobre lo que
 # difiere de esta base.
 
 version: 1
@@ -131,13 +131,13 @@ bloqueos:
   ausencia_sin_fecha_de_fin_alerta_a_los_dias: 1
 
 persona:
-  nombre_visible: Prisma
+  nombre_visible: Leda
   registro: vos
   formalidad: directo
   longitud: muy_breve              # se lee de pie, con guantes puestos
   emojis: false
   presentacion: >
-    Hola, soy Prisma. Llevo el registro de las órdenes de trabajo del equipo.
+    Hola, soy Leda. Llevo el registro de las órdenes de trabajo del equipo.
     Cada mañana te paso lo que tenés asignado y al final del turno te pido el
     cierre. Si algo te traba, avisame y lo escalo.
 

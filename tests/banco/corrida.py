@@ -21,24 +21,24 @@ from typing import Any
 
 from psycopg.types.json import Jsonb
 
-import prisma.jev as jev_modulo
-import prisma.llm as llm_modulo
-from prisma import agente
-from prisma import gateway
-from prisma import herramientas as H
-from prisma import ingreso_tareas as I
-from prisma import pendientes as P
-from prisma.agente import DISCULPA
-from prisma.autoridad import Canal, Solicitante, identificar_en_espacio
-from prisma.calendario import Calendario
-from prisma.db import admin, espacio
-from prisma.jev import ClienteJevGuionado
-from prisma.llm import (IntentAction, IntentRoute, Llamada, Proveedor,
+import leda.jev as jev_modulo
+import leda.llm as llm_modulo
+from leda import agente
+from leda import gateway
+from leda import herramientas as H
+from leda import ingreso_tareas as I
+from leda import pendientes as P
+from leda.agente import DISCULPA
+from leda.autoridad import Canal, Solicitante, identificar_en_espacio
+from leda.calendario import Calendario
+from leda.db import admin, espacio
+from leda.jev import ClienteJevGuionado
+from leda.llm import (IntentAction, IntentRoute, Llamada, Proveedor,
                         ProveedorGuionado, RespectoPendiente, Respuesta,
                         RouteEnvelope)
-from prisma.respuesta_unica import (ETAPA_RESPUESTA_DUPLICADA, ETAPA_SIN_RESPUESTA,
+from leda.respuesta_unica import (ETAPA_RESPUESTA_DUPLICADA, ETAPA_SIN_RESPUESTA,
                                     grupo_de)
-from prisma.salida import (etiquetas_coinciden, etiquetas_de_tarea,
+from leda.salida import (etiquetas_coinciden, etiquetas_de_tarea,
                            telegram_utf16_units)
 
 from tests.banco.comprobadores import AvisoEncolado, es_forma_ofrecida_del_titulo
@@ -439,7 +439,7 @@ def filas_respuesta(cur, workspace_id: str, chat_id: int,
     Cuenta también la vista previa de un borrador (`pending_action.draft_id`)
     que llega a este chat: `ingreso_tareas._finalize` la encola como respuesta
     cuando quien confirma es quien escribe (T9-R1c-3b), y como un mensaje que
-    inicia Prisma cuando confirma otra persona, que es lo que ve ese chat."""
+    inicia Leda cuando confirma otra persona, que es lo que ve ese chat."""
     cur.execute(
         """select id, cuerpo, pending_action_id, intake_choice_set_id
             from message_outbox
@@ -453,7 +453,7 @@ def filas_respuesta(cur, workspace_id: str, chat_id: int,
 
 def avisos_a_otros(cur, workspace_id: str, chat_id: int,
                    ids_previos: set) -> tuple[AvisoEncolado, ...]:
-    """Mensajes que Prisma inició durante la corrida para personas DISTINTAS
+    """Mensajes que Leda inició durante la corrida para personas DISTINTAS
     del actor: filas nuevas de `message_outbox` que no son respuesta
     (`es_respuesta` falso) y cuyo chat no es el del actor. Es el efecto real
     detrás de un "le avisé" que escribe el servidor -- p. ej. el rechazo de un
@@ -524,7 +524,7 @@ def _sembrar_borrador_de_alta(cur, ws: str, borrador: dict) -> str:
         raise LookupError(f"'borrador_de_alta' no trae {faltan}.")
     # `ingreso_tareas` lee al integrante por la vista `integrante`, acotada al
     # espacio activo: sin esto, bajo administración no ve a nadie.
-    cur.execute("select set_config('prisma.workspace_id', %s, true)", (ws,))
+    cur.execute("select set_config('leda.workspace_id', %s, true)", (ws,))
     cur.execute(
         """select u.id app_user_id, u.telegram_user_id, m.id membership_id
              from membership m join app_user u on u.id = m.app_user_id
@@ -756,7 +756,7 @@ class ResultadoCorrida:
     bloqueado: bool = False
     motivo_bloqueo: str = ""
     ofrecio_opciones: bool = False
-    # Avisos que Prisma encoló durante la corrida para otras personas
+    # Avisos que Leda encoló durante la corrida para otras personas
     # (`avisos_a_otros`): respaldan un "le avisé" que no sale de una herramienta.
     avisos_a_otros: tuple[AvisoEncolado, ...] = ()
     # Conteos por tabla justo antes de simular el toque en Confirmar (T4,
@@ -863,7 +863,7 @@ def _aclaraciones_para_elegir(cur, workspace_id: str, chat_id: int,
     """TODAS las acciones pendientes 'esperando' de este chat, creadas
     durante ESTA corrida (`creado_en >= desde`), que dejaron una referencia
     ambigua lista para elegir con botones, por cualquiera de las dos formas
-    en que Prisma la ofrece (T4, 2026-09-26): la aclaración con botones de
+    en que Leda la ofrece (T4, 2026-09-26): la aclaración con botones de
     siempre (T6, `aclaracion-con-botones`,
     `gateway._SENTINEL_ACLARACION`) o una elección del modelo por
     `ofrecer_opciones` (T1, ADR 0007, `pendientes.SENTINEL_OPCIONES_MODELO`)
@@ -1205,7 +1205,7 @@ def ejecutar_escenario(
     igual que `proveedor_real` en `ProveedorGrabador`, así que lo que se le
     pidió a Jev también queda en `grabacion["jev"]` (T6). Por defecto es un
     `ClienteJevGuionado` con guion vacío: explícito -- nunca `None`, que
-    desde T3 hace que Prisma pida en vez de adivinar (decisión del usuario
+    desde T3 hace que Leda pida en vez de adivinar (decisión del usuario
     2026-09-24) -- pero sin ninguna respuesta preparada, así que el banco no
     llama a la red por defecto; un escenario contra el modelo real pasa acá
     el Jev real (`jev.desde_base`, T6, `conftest.cliente_jev_real`).
@@ -1216,7 +1216,7 @@ def ejecutar_escenario(
     tapea -- por el mismo camino que un toque real de Telegram, igual que ya
     hace con Confirmar -- para retomar el pedido original hasta la vista
     previa de siempre, en vez de quedarse preguntando. Reconoce las DOS
-    formas en que Prisma puede dejarla esperando (T4, 2026-09-26): la
+    formas en que Leda puede dejarla esperando (T4, 2026-09-26): la
     aclaración con botones de siempre (T6) o una
     elección del modelo por `ofrecer_opciones` (T1, ADR 0007) que ofreció
     las mismas tareas como botones -- `_aclaracion_para_elegir`. Para la
@@ -1230,7 +1230,7 @@ def ejecutar_escenario(
     corrida sigue igual, sin adivinar cuál tocar, y la falta queda visible
     en las etiquetas ofrecidas.
 
-    `toques` (T4, `prisma-orienta`): una secuencia de botones genéricos a
+    `toques` (T4, `leda-orienta`): una secuencia de botones genéricos a
     tocar, EN ORDEN, después de la aclaración con botones (si la hubo) y
     antes del toque automático en Confirmar de siempre, más abajo. Cada uno
     (`Escenario.toques`, `{"etiqueta": ...}` o `{"indice": ...}`) resuelve
@@ -1404,7 +1404,7 @@ def ejecutar_escenario(
                     "message": {"message_id": 2, "chat": {"id": chat}}}}
                 gateway.procesar_update(conn, slug, toque_aclaracion)
 
-        # Toques genéricos de escenario (T4, `prisma-orienta`): en orden,
+        # Toques genéricos de escenario (T4, `leda-orienta`): en orden,
         # después de la aclaración con botones de arriba y antes de capturar
         # `herramientas_antes_del_toque`/`conteos_antes_del_toque` -- la
         # propiedad central de T4 (nada se aplica antes de Confirmar) tiene

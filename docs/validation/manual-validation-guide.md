@@ -1,6 +1,6 @@
 # Guía de validación manual por Telegram
 
-Esta guía permite al usuario validar Prisma mediante Telegram real sin recibir frases
+Esta guía permite al usuario validar Leda mediante Telegram real sin recibir frases
 guionadas. Toda sesión usa exclusivamente situaciones ficticias, simuladas,
 inequívocamente identificadas y aisladas del trabajo real.
 
@@ -45,16 +45,16 @@ herramientas ni la respuesta correcta.
 El usuario decide cómo iniciar y continuar la conversación. Puede escribir con su
 estilo habitual, omitir información, corregirse, cambiar de opinión, hacer
 referencias contextuales o guardar silencio. No debe forzar artificialmente una
-formulación si Prisma toma un camino inesperado.
+formulación si Leda toma un camino inesperado.
 
 ## Ejecución de una sesión
 
 1. Verificar el actor, rol, canal y precondiciones simuladas.
 2. Registrar la hora de inicio y el ID opaco, sin copiar el objetivo en el chat.
 3. Iniciar la conversación con palabras propias.
-4. Responder como en uso normal; no ayudar a Prisma con nombres internos ni con el
+4. Responder como en uso normal; no ayudar a Leda con nombres internos ni con el
    siguiente paso esperado.
-5. Observar qué pregunta, afirma, propone, confirma y ejecuta Prisma.
+5. Observar qué pregunta, afirma, propone, confirma y ejecuta Leda.
 6. Antes de aceptar una acción sensible, comprobar que la vista previa y la autoridad
    sean correctas; no confirmar sólo para completar el caso.
 7. Al terminar, capturar respuesta visible, estado PostgreSQL, herramientas/efectos y

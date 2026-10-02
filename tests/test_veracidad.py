@@ -1,4 +1,4 @@
-"""Pruebas de que Prisma no diga que hizo algo que no hizo.
+"""Pruebas de que Leda no diga que hizo algo que no hizo.
 
 El resto del sistema ya impide que el modelo *haga* lo que no debe: la
 autoridad se verifica en el servidor y las reglas de cierre viven en la base.
@@ -17,12 +17,12 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from prisma.agente import responder
-from prisma.autoridad import Canal, identificar
-from prisma.calendario import Calendario
-from prisma.db import admin, espacio
-from prisma.llm import Llamada, ProveedorGuionado, Respuesta
-from prisma.salida import NO_EFFECT_STATUS
+from leda.agente import responder
+from leda.autoridad import Canal, identificar
+from leda.calendario import Calendario
+from leda.db import admin, espacio
+from leda.llm import Llamada, ProveedorGuionado, Respuesta
+from leda.salida import NO_EFFECT_STATUS
 
 BA = ZoneInfo("America/Argentina/Buenos_Aires")
 AHORA = datetime(2026, 7, 27, 10, 0, tzinfo=BA)
@@ -40,9 +40,9 @@ def _tarea(cur, ws):
            values (%s, 'operativo', 'Integrar comprimidora 3') returning id""",
         (ws,))
     obj = cur.fetchone()["id"]
-    cur.execute("set local role prisma_admin")
+    cur.execute("set local role leda_admin")
     # Por `membership`/`app_user` directo y no por la vista `integrante`: esa
-    # vista filtra por `prisma.workspace_id` (`db/esquema.sql`), que sólo
+    # vista filtra por `leda.workspace_id` (`db/esquema.sql`), que sólo
     # pone `db.espacio` -- bajo `admin` queda sin definir, la vista no
     # devuelve nada y la subconsulta original resolvía en null. Con el
     # chequeo de autoridad de T2b (`herramientas._preparar_actualizar_estado`)
@@ -62,8 +62,8 @@ def _tarea(cur, ws):
            returning id""", (ws, obj, ws, ws))
     t = cur.fetchone()["id"]
     cur.execute("insert into task_state_event (task_id, estado_nuevo, actor_kind) "
-                "values (%s, 'asignada', 'prisma')", (t,))
-    cur.execute("set local role prisma_app")
+                "values (%s, 'asignada', 'leda')", (t,))
+    cur.execute("set local role leda_app")
     return str(t)
 
 

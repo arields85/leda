@@ -19,14 +19,14 @@ from zoneinfo import ZoneInfo
 import pytest
 from fastapi.testclient import TestClient
 
-from prisma import gateway
-from prisma import pendientes as P
-from prisma.autoridad import Canal, identificar
-from prisma.calendario import Calendario
-from prisma.db import admin, espacio
-from prisma.despachador import TransporteDePrueba, despachar
-from prisma.llm import ProveedorGuionado, Respuesta
-from prisma.salida import ETIQUETA_CANCELAR, ETIQUETA_CONFIRMAR
+from leda import gateway
+from leda import pendientes as P
+from leda.autoridad import Canal, identificar
+from leda.calendario import Calendario
+from leda.db import admin, espacio
+from leda.despachador import TransporteDePrueba, despachar
+from leda.llm import ProveedorGuionado, Respuesta
+from leda.salida import ETIQUETA_CANCELAR, ETIQUETA_CONFIRMAR
 
 BA = ZoneInfo("America/Argentina/Buenos_Aires")
 AHORA = datetime(2026, 7, 27, 10, 0, tzinfo=BA)
@@ -50,7 +50,7 @@ def _tarea(cur, ws, persona="Marcos Tarquini"):
            values (%s, 'operativo', 'Integrar comprimidora 3') returning id""",
         (ws,))
     obj = cur.fetchone()["id"]
-    cur.execute("set local role prisma_admin")
+    cur.execute("set local role leda_admin")
     # Por la vista y no por app_user: bajo el rol del agente esa tabla no se
     # toca, que es exactamente lo que el esquema quiere.
     cur.execute(
@@ -65,8 +65,8 @@ def _tarea(cur, ws, persona="Marcos Tarquini"):
         (ws, obj, ws, persona))
     t = cur.fetchone()["id"]
     cur.execute("insert into task_state_event (task_id, estado_nuevo, actor_kind) "
-                "values (%s, 'asignada', 'prisma')", (t,))
-    cur.execute("set local role prisma_app")
+                "values (%s, 'asignada', 'leda')", (t,))
+    cur.execute("set local role leda_app")
     return str(t)
 
 
@@ -135,7 +135,7 @@ def cliente(corework, conn, monkeypatch):
         gateway, "config",
         dataclasses.replace(gateway.config, webhook_secret="s3cr3t"))
     monkeypatch.setattr(
-        "prisma.llm.desde_base",
+        "leda.llm.desde_base",
         lambda cur, ws, key: ProveedorGuionado([Respuesta(texto="Anotado.")]))
     return TestClient(gateway.app)
 
@@ -222,12 +222,12 @@ def test_confirmar_una_preparacion_que_rechaza_no_se_audita_como_ejecutada(
             chat_id=500)
         token = P.opcion_por_etiqueta(cur, p.id, "Confirmar").token
         tg = _telegram_id(cur, "Marcos Tarquini")
-        cur.execute("set local role prisma_admin")
+        cur.execute("set local role leda_admin")
         cur.execute(
             """insert into dependency (workspace_id, origen_task_id,
                                        destino_task_id, tipo)
                values (%s, %s, %s, 'bloqueante')""", (ws, origen, destino))
-        cur.execute("set local role prisma_app")
+        cur.execute("set local role leda_app")
     conn.commit()
 
     assert _tocar(cliente, token, tg).status_code == 200
@@ -298,7 +298,7 @@ def test_el_toque_de_un_desconocido_no_hace_nada(cliente, conn, corework):
 
 def test_el_toque_se_acusa_para_que_no_quede_el_reloj_girando(
         cliente, conn, corework, monkeypatch):
-    """El único lugar donde Prisma le habla a Telegram sin pasar por la cola."""
+    """El único lugar donde Leda le habla a Telegram sin pasar por la cola."""
     acusados = []
     monkeypatch.setattr(
         gateway, "acusar_toque",
@@ -375,7 +375,7 @@ def test_el_modo_local_pide_los_toques_de_boton(corework, conn):
     botones se dibujan y al tocarlos no pasa nada — y el problema no se ve por
     ningún lado, porque no hay error: el toque nunca llega.
     """
-    from prisma.local import Escucha
+    from leda.local import Escucha
 
     http = _HttpFalso()
     e = Escucha(conn, "corework", corework.workspace_id, "tok", cliente=http,

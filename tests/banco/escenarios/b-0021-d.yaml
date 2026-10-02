@@ -2,7 +2,7 @@ id: b-0021-d
 variante_de: b-0021
 objetivo: >
   Variante de b-0021: la persona deja el alta. Se cancela el borrador, se
-  dice que quedó de lado y Prisma no vuelve a pedir el título.
+  dice que quedó de lado y Leda no vuelve a pedir el título.
 actor: Marcos Tarquini
 mensajes:
   - "armame una tarea nueva"

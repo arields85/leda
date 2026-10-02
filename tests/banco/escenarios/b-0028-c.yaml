@@ -3,7 +3,7 @@ variante_de: b-0028
 objetivo: >
   Variante de b-0028, "Dejarlo y ver lo otro" es una sola respuesta (ADR 0013
   regla 2 extendida a los toques): con la aclaración de una referencia ambigua
-  esperando, la persona pide otra cosa y Prisma pregunta si sigue con lo pendiente;
+  esperando, la persona pide otra cosa y Leda pregunta si sigue con lo pendiente;
   toca "Dejarlo y ver lo otro". Lo que se dejó de lado y la atención del mensaje
   guardado salen como UNA respuesta del toque, sin incidente del control de una
   respuesta por toque.

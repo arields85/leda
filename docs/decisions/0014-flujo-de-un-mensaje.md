@@ -6,12 +6,12 @@
   `agente`, `contexto`, `ingreso_tareas`, `pendientes`, `herramientas`). Amplía el
   ADR 0013; no lo reemplaza.
 - **Evidencia:** cuarta ronda por Telegram (R4b-H1 a H7, R4c-H1 a H10 en
-  `odd/tasks/prisma-orienta.md`); observación del usuario del 2026-09-30 ("todo es muy
+  `odd/tasks/leda-orienta.md`); observación del usuario del 2026-09-30 ("todo es muy
   robótico"); mapa del flujo por lectura de código del 2026-09-30.
 
 ## Contexto
 
-La capa de datos funciona: Prisma sabe con quién habla, lee bien el estado y no mezcla
+La capa de datos funciona: Leda sabe con quién habla, lee bien el estado y no mezcla
 clientes. Pero la conversación se siente robótica, y cada ronda deja hallazgos nuevos
 que se corrigen uno por uno. El usuario lo resumió así: estamos parchando, y así se
 puede seguir al infinito.
@@ -50,7 +50,7 @@ pieza decide lo que le toca a ese dueño.
    sus estados, quién aprueba, la evidencia), el estado de la conversación (la rama
    abierta, la pregunta pendiente, las opciones ofrecidas, los borradores y las vistas
    previas) y el historial reciente de lo que efectivamente se dijo (lo que la persona
-   escribió y lo que Prisma envió, no lo que quedó en la cola). PostgreSQL guarda y
+   escribió y lo que Leda envió, no lo que quedó en la cola). PostgreSQL guarda y
    entrega; quien comprende la conversación es el modelo (etapa 2). Nadie supone nada
    que no se leyó, ni siquiera qué se le preguntó recién a la persona.
 2. **Interpretar (modelo).** El modelo devuelve el comando, de la lista cerrada del
@@ -130,7 +130,7 @@ todas las cuentas):
   superficie nueva. Lo que se espera es que dejen de repetirse las mismas clases de
   falla.
 
-**Prueba posterior: flujo frente a modelo** (decisión del usuario, 2026-09-30). Prisma
+**Prueba posterior: flujo frente a modelo** (decisión del usuario, 2026-09-30). Leda
 usa NaN `deepseek-v4-flash`, elegido por velocidad (`docs/STATUS.md`). Que la
 conversación se sienta robótica puede venir del flujo (el modelo encerrado donde tendría
 que comprender) o del modelo (uno chico entiende peor el lenguaje desprolijo). Para no
@@ -181,7 +181,7 @@ es una base de datos que consulta para dar respuestas concretas, no inventadas".
   corrige, cancela, otro tema, charla, dudoso, no puedo) deja de usarse: la reemplaza
   ese contrato. Sigue vigente fuera del alta.
 - Decisiones del usuario: "cancelá" cancela; cambiar de tema **pausa** el borrador, nunca
-  lo borra, y Prisma atiende lo otro directamente avisando que la tarea quedó guardada
+  lo borra, y Leda atiende lo otro directamente avisando que la tarea quedó guardada
   (ajuste de la enmienda "una sola rama abierta" del ADR 0013 para el alta: nada se
   pierde, así que no hace falta preguntar "¿Seguimos?"); un borrador pausado se ofrece
   retomar una sola vez, sin insistir; los toques de botón también los responde el
@@ -198,7 +198,7 @@ El resultado del experimento se registra como enmienda de este ADR, con la varia
 elegida (o la combinación) y su evidencia.
 
 **Resultado de la primera prueba del alta conducida (2026-10-01).** Corrida por Telegram
-real con datos ficticios, base `prisma_flujo`, rama `feat/flujo-de-un-mensaje`, ajuste
+real con datos ficticios, base `leda_flujo`, rama `feat/flujo-de-un-mensaje`, ajuste
 `alta = conversada`, modelo `deepseek-v4-flash`, cuentas Marcos, Ariel e Ismael operadas
 por el usuario. Detalle de cada hallazgo, su causa, corrección, pruebas y revisión en
 `odd/tasks/flujo-de-un-mensaje.md` de esa rama.
@@ -273,7 +273,7 @@ antes de la próxima prueba):
   se ve en conversaciones reales.
 - **Un modelo capaz con acceso libre a SQL haciendo de PM, gobernado sólo por
   instrucciones** (planteo del usuario, 2026-09-30: "si te uso como PM con acceso a
-  SQL, ¿podrías hacer de Prisma?"). La comprensión no es el límite. Rechazada por lo
+  SQL, ¿podrías hacer de Leda?"). La comprensión no es el límite. Rechazada por lo
   que un modelo no garantiza solo: (1) acierta casi siempre, no siempre, y con decenas
   de acciones por día un error en un efecto (asignar mal, decir "le avisé" sin avisar)
   rompe la confianza del equipo; (2) no existe entre mensajes, y el seguimiento

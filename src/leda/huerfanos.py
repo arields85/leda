@@ -190,7 +190,7 @@ def _avisar(cur, workspace_id: str, entrante_id: str, ahora: datetime) -> bool:
         recipient_membership_id=str(h["membership_id"]) if activo else None,
         scheduled_for=ahora, dedupe_key=f"{workspace_id}:huerfano:{entrante_id}",
         is_response=True, state="listo" if activo else "descartado")
-    cur.execute("select set_config('prisma.entrante_id', '', true)")
+    cur.execute("select set_config('leda.entrante_id', '', true)")
     registrar_incidente(
         cur, workspace_id,
         "Un mensaje recibido no llegó a responderse (su turno murió y Telegram "

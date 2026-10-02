@@ -102,7 +102,7 @@ def _reportar_incidente_admin_no_manejado(conn, *, chat_id: int | None,
 
     El incidente queda registrado global (`workspace_id=None`), mismo camino
     que ya cubre `incidentes.registrar_incidente` para el validador de
-    invariantes -- y bajo rol `prisma_admin`, como el resto de lo que toca el
+    invariantes -- y bajo rol `leda_admin`, como el resto de lo que toca el
     canal de administración. Nunca deja escapar una excepción propia: si ni
     siquiera esto funciona, el aviso se pierde pero el ciclo que sigue
     escuchando no se cuelga."""
@@ -296,7 +296,7 @@ class Escucha:
 
     def _obtener_transporte_admin(self, ahora: datetime | None = None) -> Transporte | None:
         """El bot de administración es opcional en desarrollo local: si
-        `PRISMA_BOT_TOKEN_ADMIN` no está configurado, los avisos de
+        `LEDA_BOT_TOKEN_ADMIN` no está configurado, los avisos de
         incidente quedan encolados en `admin_notice` igual (los arma
         `incidentes.registrar_incidente`) y se entregan solos en cuanto se
         configure el token, sin perder nada mientras tanto.
@@ -336,7 +336,7 @@ class Escucha:
         except LookupError:
             if not self._avisado_falta_token_admin:
                 self._avisado_falta_token_admin = True
-                _imprimir("  (sin PRISMA_BOT_TOKEN_ADMIN: los avisos de "
+                _imprimir("  (sin LEDA_BOT_TOKEN_ADMIN: los avisos de "
                           "administración quedan encolados hasta que se "
                           "configure)")
             return None
@@ -418,7 +418,7 @@ class Escucha:
 
         # El aviso a la administración (T28, Constitución §10) no está
         # acotado a este espacio -- puede venir de cualquiera, o de ninguno
-        # -- así que se despacha aparte, bajo rol `prisma_admin`, y corre
+        # -- así que se despacha aparte, bajo rol `leda_admin`, y corre
         # igual aunque la pasada de este espacio haya fallado arriba.
         transporte_admin = self._obtener_transporte_admin()
         if transporte_admin is not None:
@@ -444,7 +444,7 @@ class Escucha:
                 # Nunca en silencio: agotó MAX_INTENTOS y quedó un incidente
                 # (despachador.despachar_avisos_admin) -- visible acá también.
                 _imprimir("  ! aviso admin agotado tras reintentos -- ver "
-                          f"`python -m prisma incidentes {self.slug}`")
+                          f"`python -m leda incidentes {self.slug}`")
             for _ in range(resumen_admin["incidentes_sin_registrar"]):
                 # Nunca en silencio (regla del proyecto): además de agotar
                 # reintentos, el propio incidente no se pudo registrar
@@ -473,7 +473,7 @@ def escuchar(conn, slug: str, workspace_id: str, *,
 
     token = config.token_bot(slug)
     if not config.authority_db_url:
-        raise RuntimeError("Falta PRISMA_AUTHORITY_DB_URL.")
+        raise RuntimeError("Falta LEDA_AUTHORITY_DB_URL.")
     authority_conn = conectar_autoridad(config.authority_db_url)
     e = Escucha(conn, slug, workspace_id, token,
                 authority_conn=authority_conn, con_cadencias=con_cadencias)

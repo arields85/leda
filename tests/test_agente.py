@@ -1,7 +1,7 @@
 """Pruebas del turno del agente.
 
 El proveedor está guionado: lo que se prueba no es qué escribe el modelo, sino
-que Prisma haga cumplir sus reglas pase lo que pase con el modelo.
+que Leda haga cumplir sus reglas pase lo que pase con el modelo.
 """
 
 from __future__ import annotations
@@ -11,14 +11,14 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from prisma import herramientas as H
-from prisma.agente import responder
-from prisma.autoridad import Canal, identificar
-from prisma.calendario import Calendario
-from prisma.contexto import construir, revisar_salida
-from prisma.db import admin, espacio
-from prisma.incidentes import NOTICIA_NEUTRA_INCIDENTE
-from prisma.llm import Llamada, ProveedorGuionado, Respuesta
+from leda import herramientas as H
+from leda.agente import responder
+from leda.autoridad import Canal, identificar
+from leda.calendario import Calendario
+from leda.contexto import construir, revisar_salida
+from leda.db import admin, espacio
+from leda.incidentes import NOTICIA_NEUTRA_INCIDENTE
+from leda.llm import Llamada, ProveedorGuionado, Respuesta
 
 BA = ZoneInfo("America/Argentina/Buenos_Aires")
 AHORA = datetime(2026, 7, 27, 10, 0, tzinfo=BA)
@@ -37,9 +37,9 @@ def test_encolar_texto_con_opciones_no_rompe_en_la_ventana_del_margen_del_saludo
     personal (`saludo.MARGEN_SALUDO`) -- un texto en esa ventana exacta
     pasaba la decisión de acá y `enqueue_outbox` lo rechazaba después, en
     todos los reintentos."""
-    from prisma.agente import _encolar_texto_con_opciones
-    from prisma.saludo import MARGEN_SALUDO
-    from prisma.salida import BUTTON_TEXT_LIMIT
+    from leda.agente import _encolar_texto_con_opciones
+    from leda.saludo import MARGEN_SALUDO
+    from leda.salida import BUTTON_TEXT_LIMIT
 
     ws = corework.workspace_id
     # Justo en la ventana: entra en BUTTON_TEXT_LIMIT pero no en
@@ -77,7 +77,7 @@ def _tarea(cur, ws, titulo="Programar PLC", area="ot", persona="Marcos Tarquini"
         (ws, obj, titulo, ws, area, ws, persona))
     t = cur.fetchone()["id"]
     cur.execute("insert into task_state_event (task_id, estado_nuevo, actor_kind) "
-                "values (%s, 'asignada', 'prisma')", (t,))
+                "values (%s, 'asignada', 'leda')", (t,))
     return str(t)
 
 
@@ -277,9 +277,9 @@ def test_bloqueo_registrado_saca_la_tarea_de_la_escalera(corework, conn):
     el turno; se confirma por botón (simulado acá con `pendientes.resolver` +
     `H.ejecutar(ya_confirmada=True)`, el mismo camino que usa el gateway) y
     recién ahí saca a la tarea de la escalera."""
-    from prisma import escalera
-    from prisma import herramientas as H
-    from prisma import pendientes as P
+    from leda import escalera
+    from leda import herramientas as H
+    from leda import pendientes as P
 
     ws = corework.workspace_id
     with admin(conn) as cur:
@@ -359,7 +359,7 @@ def _en_revision_con_evidencia(cur, ws, tarea_id):
     sobre la CADENA de autoridad, no sobre ese gate, así que se lo deja
     satisfecho de antemano en vez de mezclar las dos cosas."""
     cur.execute("insert into task_state_event (task_id, estado_nuevo, actor_kind) "
-                "values (%s, 'en_revision', 'prisma')", (tarea_id,))
+                "values (%s, 'en_revision', 'leda')", (tarea_id,))
     cur.execute(
         """insert into evidence (workspace_id, task_id, tipo, uri)
            values (%s, %s, 'resultado_de_prueba', 'ok')""", (ws, tarea_id))
@@ -564,8 +564,8 @@ def test_rechazo_de_preparacion_no_bloquea_una_ejecucion_real_despues(
 
     from fastapi.testclient import TestClient
 
-    from prisma import gateway
-    from prisma import pendientes as P
+    from leda import gateway
+    from leda import pendientes as P
 
     ws = corework.workspace_id
     with admin(conn) as cur:

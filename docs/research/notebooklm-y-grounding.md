@@ -1,9 +1,9 @@
 # Relevamiento: NotebookLM y respuestas ancladas en fuentes
 
 - **Fecha:** 2026-10-01
-- **Pedido:** del usuario, que comparó lo que quiere de Prisma con NotebookLM: un modelo
+- **Pedido:** del usuario, que comparó lo que quiere de Leda con NotebookLM: un modelo
   que conversa con fluidez y responde sólo con hechos de una base, sin inventar.
-- **Veredicto:** la analogía sirve para la lectura; Prisma suma efectos con confirmación.
+- **Veredicto:** la analogía sirve para la lectura; Leda suma efectos con confirmación.
   Tres ideas para adoptar dentro del flujo del
   [`ADR 0014`](../decisions/0014-flujo-de-un-mensaje.md).
 
@@ -29,12 +29,12 @@ verifica las citas.
   afirmación entera (https://docs.cloud.google.com/generative-ai-app-builder/docs/check-grounding).
   Es un modelo de inferencia, no un control determinista.
 
-## Diferencias con Prisma
+## Diferencias con Leda
 
-- NotebookLM sólo lee documentos. Prisma además escribe: crea tareas, aprueba, avisa.
+- NotebookLM sólo lee documentos. Leda además escribe: crea tareas, aprueba, avisa.
   Eso sigue pasando por herramientas con autoridad, validación del código y botón de
   confirmar.
-- Los datos de Prisma son estructurados: la "recuperación" son consultas y herramientas,
+- Los datos de Leda son estructurados: la "recuperación" son consultas y herramientas,
   deterministas y auditables, y el aislamiento entre clientes lo da RLS, no el prompt.
 
 ## Ideas para adoptar

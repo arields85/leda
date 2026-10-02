@@ -1,6 +1,6 @@
 # Roadmap
 
-Prisma es un producto multi-tenant (ver [`product/que-es-prisma.md`](product/que-es-prisma.md))
+Leda es un producto multi-tenant (ver [`product/que-es-leda.md`](product/que-es-leda.md))
 y este roadmap ordena el trabajo que falta para que el código lo sostenga.
 
 El orden no son fases del proyecto: son unidades de trabajo con precondición y
@@ -9,7 +9,7 @@ completadas.
 
 **La entrevista de alta se antepuso al tablero de cliente.** Dos razones. Sin ella,
 cada cliente nuevo exige que alguien que conozca al equipo escriba un paquete a mano,
-y eso no es un producto: es una instalación a medida. **Prisma no se puede vender dos
+y eso no es un producto: es una instalación a medida. **Leda no se puede vender dos
 veces sin la entrevista.** Y además es la que define qué configuración existe —sus
 ocho bloques son exactamente lo que el tablero debería dejar editar—, así que
 construir el tablero antes sería adivinar esa lista.
@@ -25,10 +25,10 @@ se rehace.
 | Modelo de roles y membresías | Separa persona, membresía y autoridad; funciona igual para cualquier cliente. |
 | Tablas de configuración por cliente | `area` y `rol` son datos con alcance de espacio (`db/esquema.sql:106,114`), no tipos enumerados. |
 | Estado como proyección de eventos | `bloquear_estado_directo()` impide la escritura directa (`db/esquema.sql:1231`). Es exactamente lo que necesita una superficie de lectura. |
-| Paquetes de configuración versionados | El importador es genérico por diseño (`src/prisma/importador.py:211`) y registra versión y hash. |
-| `TransporteTelegram` como adaptador | Aislado detrás de una interfaz de envío (`src/prisma/despachador.py:66`), con doble de prueba equivalente. |
-| Router tipado multiproveedor | Un validador cerrado compartido por todos los proveedores (`src/prisma/llm.py`). |
-| Renderer único de salida | Normalización y medición centralizadas (`src/prisma/salida.py`). Se conserva; cambia dónde se aplica. |
+| Paquetes de configuración versionados | El importador es genérico por diseño (`src/leda/importador.py:211`) y registra versión y hash. |
+| `TransporteTelegram` como adaptador | Aislado detrás de una interfaz de envío (`src/leda/despachador.py:66`), con doble de prueba equivalente. |
+| Router tipado multiproveedor | Un validador cerrado compartido por todos los proveedores (`src/leda/llm.py`). |
+| Renderer único de salida | Normalización y medición centralizadas (`src/leda/salida.py`). Se conserva; cambia dónde se aplica. |
 | Escalera y cadencias como datos | Configurables por cliente, no codificadas. |
 
 ## Qué se corrige
@@ -53,7 +53,7 @@ vigente y no deben usarse para decidir.
 | [`decisions/0003-authenticated-inbound-boundary.md`](decisions/0003-authenticated-inbound-boundary.md) | El modelo de amenaza cambió. Fue escrito para un asistente interno de un solo equipo, donde la amenaza principal era el compromiso de la credencial de aplicación. En un producto multi-tenant la amenaza principal es el cruce entre clientes. Su análisis de capacidades y credenciales conserva valor; su secuencia y su prioridad no. |
 | [`phases/00-pilot-scope.md`](phases/00-pilot-scope.md) | Alcance de piloto local para un único equipo. |
 | [`phases/01-local-pilot-foundations.md`](phases/01-local-pilot-foundations.md) | Fundaciones organizadas por unidades de piloto local, superadas por este orden de entrega. |
-| [`product/functional-specification.md`](product/functional-specification.md) | Ya se proponía describir a Prisma con independencia de una empresa concreta, y esa intención sigue siendo correcta. Lo superado es su modelo: precede a la definición como producto multi-tenant, no distingue configuración de cliente frente a núcleo del producto y no trata el aislamiento entre clientes como garantía. Su descripción de comportamiento conserva valor como insumo, contrastada contra la frontera. |
+| [`product/functional-specification.md`](product/functional-specification.md) | Ya se proponía describir a Leda con independencia de una empresa concreta, y esa intención sigue siendo correcta. Lo superado es su modelo: precede a la definición como producto multi-tenant, no distingue configuración de cliente frente a núcleo del producto y no trata el aislamiento entre clientes como garantía. Su descripción de comportamiento conserva valor como insumo, contrastada contra la frontera. |
 
 Nada de esto se borra. La parte del inventario de autoridad de la decisión 0003 se
 reutiliza al cerrar el aislamiento entre clientes.
@@ -99,7 +99,7 @@ lateral que ese identificador existe.
 
 **Depende de:** nada.
 
-**Cierre:** un lector nuevo entiende qué es Prisma y dónde termina el núcleo sin
+**Cierre:** un lector nuevo entiende qué es Leda y dónde termina el núcleo sin
 recurrir a documentación superada. *Unidad en curso.*
 
 ### Desacople del transporte
@@ -116,7 +116,7 @@ transporte. Es la precondición de toda superficie que no sea conversacional.
 
 ### Puerto de lectura — entregado
 
-**Entregado** en `70685f3`: seis consultas agregadas en `src/prisma/lectura.py`
+**Entregado** en `70685f3`: seis consultas agregadas en `src/leda/lectura.py`
 —avance de objetivos, tareas por estado, carga por persona, vencidas, bloqueos
 abiertos y trabajo esperando aprobación—. Ninguna recibe el espacio: lo toman de la
 sesión, y el aislamiento queda a cargo de la política.
@@ -145,14 +145,14 @@ advierte.
 
 **Entrega:** la superficie que aloja la entrevista de alta y el alta de clientes, y
 su autenticación. También la elección de proveedor y modelo de lenguaje: hoy se
-fija por consola (`python -m prisma modelo <id> --proveedor <p>`, que escribe
+fija por consola (`python -m leda modelo <id> --proveedor <p>`, que escribe
 `model_config`), y tiene que poder cambiarse desde el panel, con el cambio atribuido
 en la auditoría. Va en el panel y no en el tablero de cliente porque el modelo
 global alcanza a todos los espacios.
 
 También la vista de incidentes (pedido del usuario, 2026-09-24): hoy cada falla
 queda en la tabla `incident` (espacio, severidad, resumen sin datos sensibles, fecha)
-y sólo se consulta por consola (`python -m prisma incidentes <espacio>`). El
+y sólo se consulta por consola (`python -m leda incidentes <espacio>`). El
 administrador tiene que poder ver desde el panel dónde está fallando el sistema y qué
 lo hizo fallar: enrutamiento, Jev caído o sin clave, errores del modelo, despacho.
 Cada incidente apunta al mensaje que lo causó en lugar de copiar su texto: quien
@@ -162,7 +162,7 @@ en un solo lugar, con un solo control de acceso y de borrado.
 
 La retención y la visibilidad de las conversaciones pasan a ser configuración de
 cada cliente (pedido del usuario, 2026-09-24): cuánto tiempo se guardan y quién puede
-verlas lo decide quien contrata Prisma o administra el equipo. Hoy lo fija para el
+verlas lo decide quien contrata Leda o administra el equipo. Hoy lo fija para el
 piloto [`ADR 0002`](decisions/0002-pilot-llm-context-and-retention.md) (retención
 indefinida hasta que un administrador autorizado borre; acceso y borrado restringidos
 y auditados); el cambio requiere un ADR nuevo que la reemplace en ese punto.
@@ -171,26 +171,26 @@ y auditados); el cambio requiere un ADR nuevo que la reemplace en ese punto.
 
 - si el tablero de cada cliente muestra también sus propios incidentes, o sólo el
   panel de plataforma;
-- dónde vive la clave de cada proveedor, hoy una única `PRISMA_LLM_API_KEY` en
+- dónde vive la clave de cada proveedor, hoy una única `LEDA_LLM_API_KEY` en
   `.env` que se lee al arrancar el proceso;
 - si el ajuste por espacio que `model_config` ya admite se expone, y en qué
   superficie.
 
 **Depende de:** nada en el código; sí de una decisión abierta sobre cómo se autentica
-quien opera Prisma. El enlace por Telegram no sirve acá: autentica contra una
+quien opera Leda. El enlace por Telegram no sirve acá: autentica contra una
 membresía, y en el alta el espacio todavía no existe.
 
 Inventario completo de lo que tiene que poder configurarse, con dónde vive hoy cada
 cosa: [`product/plataforma-pendientes.md`](product/plataforma-pendientes.md).
 
-**Cierre:** quien opera Prisma entra, da de alta un espacio y lo activa.
+**Cierre:** quien opera Leda entra, da de alta un espacio y lo activa.
 
 ### Tablero de cliente
 
 **Entrega:** la superficie que consume el puerto de lectura y permite al cliente
 ajustar su propia configuración, con cada cambio atribuido en la auditoría. Incluye
 las cadencias del bloque 5 de la entrevista de alta (`nucleo/alta-de-equipo.md`):
-qué días y a qué hora Prisma pide estado, el resumen grupal y el tope de mensajes
+qué días y a qué hora Leda pide estado, el resumen grupal y el tope de mensajes
 automáticos por persona. Un cambio de cadencia toma efecto sin reiniciar el proceso.
 
 **Depende de:** puerto de lectura (hecho) y su credencial de acceso, cuya
@@ -219,16 +219,16 @@ que la escalera afirme silencio sobre evidencia real.
 **Cierre:** un escenario con tiempo simulado demuestra envío, silencio, respuesta,
 ausencia y escalamiento sobre solicitudes reales.
 
-### Prisma orienta
+### Leda orienta
 
-**Entrega:** [`ADR 0007`](decisions/0007-prisma-orienta-no-charla.md): cada respuesta que
+**Entrega:** [`ADR 0007`](decisions/0007-leda-orienta-no-charla.md): cada respuesta que
 espera algo cierra con botones concretos y una salida; las listas de tareas son botones
 y tocar una ofrece las acciones del diseño §4.6 que ya tienen herramienta. Tras la
 tercera ronda por Telegram (2026-09-28), las cuatro reglas generales de la conversación
 del [`ADR 0013`](decisions/0013-reglas-generales-de-la-conversacion.md) (pregunta pendiente
 como contexto con una sola rama abierta, una respuesta visible por mensaje y toque, estado
 real, toques con señal e idempotentes), implementadas el 2026-09-29, y la forma de las
-respuestas (T10 de `odd/tasks/prisma-orienta.md`).
+respuestas (T10 de `odd/tasks/leda-orienta.md`).
 
 **Cierre:** la segunda sesión por Telegram real se hizo (2026-09-27) y la tercera
 (2026-09-28) mostró que la conversación seguía perdiéndose; el cierre pasa a ser la
@@ -242,14 +242,14 @@ avisar un avance, sumar información a un bloqueo, devolver una revisión con
 observaciones, responder un pedido de estado (diseño §4.6). Recibir archivos de
 Telegram y guardarlos por referencia con verificación de integridad, sin interpretarlos;
 un aporte no es evidencia. Incluye la transición de revisión a en curso al devolver y el
-pedido de estado de Prisma al responsable, respetando el volumen de contacto (mecánica
+pedido de estado de Leda al responsable, respetando el volumen de contacto (mecánica
 §10).
 
-**Depende de:** Prisma orienta.
+**Depende de:** Leda orienta.
 
 ### Aprendizaje de apodos y de aclaraciones
 
-**Entrega:** Prisma aprende de lo que ya preguntó, para preguntar menos (pedido del
+**Entrega:** Leda aprende de lo que ya preguntó, para preguntar menos (pedido del
 usuario, 2026-09-24). Dos partes: los apodos y el vocabulario del equipo ("tincho" es
 Martín; "dashboard", "interfaz HMI" y "CoreLabs" son lo mismo), que ADR 0005 ya
 decide aprender preguntando; y las aclaraciones de tareas: si una persona eligió
@@ -287,7 +287,7 @@ componente, como servicio aparte o sólo como referencia de diseño.
 [`research/hermes-agent.md`](research/hermes-agent.md)). No sirve como base: agente
 personal, memoria en archivos y SQLite, aislamiento por perfil y no por espacio, y
 aprende solo por defecto. Sí aporta el mecanismo de esta unidad: después de un turno en
-el que la persona corrigió a Prisma, un paso aparte detecta qué se podría aprender (un
+el que la persona corrigió a Leda, un paso aparte detecta qué se podría aprender (un
 apodo, un sinónimo del equipo, la tarea a la que apuntaba una referencia) y lo
 **propone**; se guarda sólo cuando alguien lo confirma, con las reglas de arriba. En el
 flujo del [`ADR 0014`](decisions/0014-flujo-de-un-mensaje.md), lo aprendido vive en
@@ -295,12 +295,12 @@ PostgreSQL (etapa 1) y le llega a Jev como pista (etapa 3).
 
 **Idea a investigar, no decidida: memoria por integrante** (propuesta del usuario,
 2026-09-24, inspirada en los proyectos de Engram). Tratar la conversación de cada
-integrante como un espacio de memoria propio, para que Prisma recuerde lo que habló
+integrante como un espacio de memoria propio, para que Leda recuerde lo que habló
 con esa persona. Es una hipótesis a evaluar, no una decisión de usar Engram ni de
 construirla. Condiciones que la investigación tiene que respetar:
 
 - memoria por persona dentro de su espacio, con RLS; lo que una persona le dijo a
-  Prisma nunca aparece en la respuesta a otra;
+  Leda nunca aparece en la respuesta a otra;
 - guarda lo que la base no tiene (lo conversado, preferencias, compromisos dichos al
   pasar, apodos y aclaraciones), nunca el estado de las tareas, que se lee en el
   momento: la memoria no reemplaza una lectura vigente;
@@ -321,7 +321,7 @@ memoria a un agente se hace con la extensión comunitaria Local REST API, que co
 dentro de la aplicación abierta, una carpeta por instancia. Lectura inicial: como
 memoria del núcleo choca igual que Engram (segundo almacén, aislamiento por carpeta
 y no por RLS, aplicación de escritorio en un servidor). Único uso con sentido: como
-formato en el que un cliente redacte documentación de su proyecto y Prisma la lea
+formato en el que un cliente redacte documentación de su proyecto y Leda la lea
 como archivos Markdown, sin la aplicación en el servidor. `PENDIENTE`: si existen
 bóvedas compartidas con permisos, los términos de Sync y Publish para un servicio
 con varios clientes, y si la extensión funciona sin entorno gráfico.
@@ -336,7 +336,7 @@ elección equivocada sin preguntar.
 
 **Entrega:** cuando el trabajo que alguien pide no entra en el margen máximo de una
 tarea (ajuste del espacio `horizonte_tarea`, 2 meses por omisión; decisión del usuario del
-2026-10-01), Prisma ofrece salidas reales y la persona elige. Tres candidatas, pedidas
+2026-10-01), Leda ofrece salidas reales y la persona elige. Tres candidatas, pedidas
 por el usuario el 2026-10-01 y anotadas bajo el congelamiento:
 
 - **Pedir una extensión:** la fecha fuera del margen se acepta como excepción con
@@ -344,15 +344,15 @@ por el usuario el 2026-10-01 y anotadas bajo el congelamiento:
   corrimiento de fecha mayor al umbral del pack requiere aprobación). Decisión pendiente:
   quién aprueba la excepción cuando quien pide ya es el aprobador del responsable (él
   mismo, el nivel siguiente o la autoridad del espacio).
-- **Dividirlo en tareas** dentro del objetivo que ya existe: Prisma propone las partes y
+- **Dividirlo en tareas** dentro del objetivo que ya existe: Leda propone las partes y
   la persona confirma cada una. Hoy no existe; en la prueba real del 2026-10-01 ofrecerlo
   sin mecanismo confundió al usuario ("¿dónde apruebo eso?") y se retiró.
 - **Proponer un objetivo nuevo:** se crea en estado `propuesto` y va a aprobación según
   la política del espacio (mecánica §3 y §7) hasta quedar `activo`. Corrige de paso una
   diferencia con el núcleo: hoy `crear_objetivo` crea el objetivo directamente `activo`,
-  sin aprobación (`src/prisma/herramientas.py`, `_crear_objetivo`).
+  sin aprobación (`src/leda/herramientas.py`, `_crear_objetivo`).
 
-Mientras tanto, la única salida es una fecha dentro del margen, que Prisma propone
+Mientras tanto, la única salida es una fecha dentro del margen, que Leda propone
 concreta para aceptarla con un sí.
 
 **Regla de fondo decidida (usuario, 2026-10-01), a construir con esta unidad:** la fecha
@@ -363,7 +363,7 @@ los objetivos tengan fecha (hoy ninguno de CoreWork la tiene: el pack declara
 `horizonte_meses: 12` en el estratégico y el importador no la convierte) y validar la
 fecha cuando se conocen fecha y objetivo, sin importar el orden en que la persona los dé.
 Topes, márgenes y fechas de objetivos son configuración del espacio, a cambiar desde la
-plataforma cuando exista: no se ajusta el comportamiento de Prisma a sus valores actuales.
+plataforma cuando exista: no se ajusta el comportamiento de Leda a sus valores actuales.
 
 **Depende de:** el congelamiento levantado (alta, entrega y aprobación cumpliendo el ADR
 0014) y el margen máximo de la fecha de una tarea (rama `feat/flujo-de-un-mensaje`).
@@ -374,7 +374,7 @@ excepción queda vigente sin la aprobación que corresponde.
 
 ### Respuesta que se va escribiendo
 
-**Entrega:** en chat privado, la respuesta de Prisma aparece de a poco, como si la fuera
+**Entrega:** en chat privado, la respuesta de Leda aparece de a poco, como si la fuera
 escribiendo, en vez de llegar de golpe (pedido del usuario del 2026-10-01, anotado bajo el
 congelamiento). La base existe: el borrador nativo de Telegram (`sendMessageDraft`) que ya
 usa el indicador de actividad del ADR 0011. Decisión pendiente antes de construir: hoy el
@@ -391,7 +391,7 @@ privado, para verlo en Telegram real; el mensaje final sigue siendo el verificad
 por el outbox. **Pendiente:** probar la otra variante (mostrar progresivo después de
 verificar) cuando se trabaje la latencia, y elegir entre las dos viéndolas en real.
 Probado en real el 2026-10-01 (se ve el texto crecer y hasta el reintento del verificador);
-queda **encendido** en `prisma_flujo` porque ayuda a ver cómo se comporta Prisma (decisión
+queda **encendido** en `leda_flujo` porque ayuda a ver cómo se comporta Leda (decisión
 del usuario); en la rama sigue apagado por omisión.
 
 ## Horizonte posterior

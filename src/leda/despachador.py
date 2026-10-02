@@ -1,6 +1,6 @@
 """Despachador de la cola de salida.
 
-Prisma nunca llama a Telegram: escribe en `message_outbox` y este worker
+Leda nunca llama a Telegram: escribe en `message_outbox` y este worker
 entrega. Eso da tres cosas de una sola vez:
 
   - idempotencia, porque la clave de deduplicación sobrevive a un reinicio;
@@ -183,7 +183,7 @@ def _close_client_bounded(client, timeout: float) -> None:
 
     try:
         thread = threading.Thread(
-            target=close, name="prisma-typing-client-close", daemon=True)
+            target=close, name="leda-typing-client-close", daemon=True)
         thread.start()
         thread.join(timeout=timeout)
     except Exception:  # noqa: BLE001 - cosmetic cleanup remains best effort
@@ -195,7 +195,7 @@ def _close_client_bounded(client, timeout: float) -> None:
 # (`sendMessageDraft`), sembrado con el carácter invisible U+2063. Nunca
 # texto vacío, aunque la API admita un placeholder vacío desde Bot API
 # 10.0 -- cambiar la semilla es una decisión visual aparte, no un reemplazo
-# silencioso (pack recuperado PRISMA-PACK-RECONSTRUCCION-20260925/05).
+# silencioso (pack recuperado LEDA-PACK-RECONSTRUCCION-20260925/05).
 SEMILLA_INDICADOR = "⁣"
 
 
@@ -299,7 +299,7 @@ _TIMEOUT_CLIENTE_INDICADOR = 5.0
 def mantener_chat_activo(token: str, chat_id: int, *, cliente=None,
                          chat_type: str | None = None,
                          umbral: float = 1.5, intervalo: float = 4.0,
-                         nombre_hilo: str = "prisma-typing",
+                         nombre_hilo: str = "leda-typing",
                          espera_cierre: float = 0.25,
                          timeout_borrador: float = _TIMEOUT_CLIENTE_INDICADOR,
                          cur=None, workspace_id: str | None = None):
@@ -435,9 +435,9 @@ def acusar_toque(token: str, callback_id: str, cliente=None) -> None:
     **Es la única llamada a Telegram que no pasa por la cola, y tiene que
     seguir siéndolo.**
 
-    La regla del proyecto es que Prisma escribe en `message_outbox` y un
+    La regla del proyecto es que Leda escribe en `message_outbox` y un
     worker entrega. Eso da reintentos, auditoría e idempotencia, y vale para
-    todo lo que Prisma le dice a una persona.
+    todo lo que Leda le dice a una persona.
 
     Esto no es eso. Es un acuse del protocolo, entre máquinas: no aparece en
     el chat, nadie lo lee, y Telegram lo exige en un par de segundos o le deja
@@ -482,7 +482,7 @@ def _proximo_intento_admin(intentos: int, ahora: datetime) -> datetime:
 def _botones(cur, m) -> list[Boton]:
     """Las opciones de la acción pendiente que el mensaje está preguntando.
 
-    Se leen al despachar, no al encolar: entre que Prisma pregunta y el
+    Se leen al despachar, no al encolar: entre que Leda pregunta y el
     mensaje sale puede pasar tiempo, y lo que vale es lo vigente al entregar.
     """
     if m.get("bloque_copiable"):
@@ -603,7 +603,7 @@ def _tope_diario(cur, workspace_id: str) -> int | None:
 VENTANA_DE_ACTIVIDAD = timedelta(minutes=30)
 """Cuánto cuenta como "activa en la rama" una persona que escribió o tocó algo en
 ese chat (T9-R1d-2b, ADR 0013 regla 1, "Precisión (2026-09-29, decisión del
-usuario)"): lo que Prisma inicia se retiene sólo mientras haya pasado menos que
+usuario)"): lo que Leda inicia se retiene sólo mientras haya pasado menos que
 esto desde su última actividad. Una rama abandonada no retiene nada, ni un aviso
 urgente: sale en el momento y la rama sigue abierta para cuando vuelva."""
 
@@ -656,7 +656,7 @@ def _rama_activa_de(cur, m, ahora: datetime):
 def _rama_que_retiene(cur, m, ahora: datetime, cache: dict):
     """La rama abierta que retiene a `m`, o `None` si `m` sale (T9-R1d-2 y
     T9-R1d-2b, ADR 0013 regla 1, enmienda "una sola rama abierta"). Sólo un
-    mensaje que inicia Prisma a una persona se retiene, y mientras ella esté
+    mensaje que inicia Leda a una persona se retiene, y mientras ella esté
     activa en la rama (`VENTANA_DE_ACTIVIDAD`): una respuesta nunca. El mensaje
     que muestra la propia rama (`pending_action_id` o `intake_choice_set_id` igual
     al de la pregunta abierta) no espera a su propio cierre. Se consulta una vez
@@ -681,7 +681,7 @@ def _rama_que_retiene(cur, m, ahora: datetime, cache: dict):
 class _Pasada:
     """Lo que una pasada de `despachar` va aprendiendo: las filas ya examinadas,
     la rama de cada persona y chat, y a quién dejó de pedirle filas porque lo que
-    Prisma le inicia se retiene."""
+    Leda le inicia se retiene."""
     vistos: list[str] = field(default_factory=list)
     ramas: dict = field(default_factory=dict)
     retenidos: list[dict] = field(default_factory=list)
@@ -813,7 +813,7 @@ def _despachar_fila(cur, workspace_id: str, transporte: Transporte,
         resumen["descartados"] += 1
         return
 
-    # Lo que inicia Prisma espera mientras su destinatario esté activo en una rama
+    # Lo que inicia Leda espera mientras su destinatario esté activo en una rama
     # abierta en ese chat (T9-R1d-2, T9-R1d-2b): no se envía ni se descarta, sigue
     # `listo` en su lugar de la cola y se cuenta en `retenidos`.
     rama = _rama_que_retiene(cur, m, ahora, pasada.ramas)
@@ -953,7 +953,7 @@ def despachar_avisos_admin(cur: psycopg.Cursor, transporte: Transporte,
     """Entrega los avisos de incidente encolados para la administración de
     plataforma (`admin_notice`, T28, Constitución §10).
 
-    Corre bajo rol `prisma_admin`: un aviso no tiene un único espacio dueño
+    Corre bajo rol `leda_admin`: un aviso no tiene un único espacio dueño
     -- puede venir de cualquiera, o de ninguno (incidente global) -- así que
     no hay un `espacio()` que lo acote, a diferencia de `despachar`.
 
@@ -1080,10 +1080,10 @@ def _ya_recibio(cur, membership_id: str, ahora: datetime) -> int:
     El tope es por persona, no por espacio: alguien en tres equipos no debería
     recibir tres seguimientos el mismo día.
 
-    Sólo cuenta lo que Prisma inicia: una respuesta a lo que la persona escribió o
+    Sólo cuenta lo que Leda inicia: una respuesta a lo que la persona escribió o
     tocó (`es_respuesta`) "no es automática" y nunca cuenta contra el tope
     (`_despachar_fila`, ADR 0011). Contarlas dejaba sin su aviso a quien
-    conversaba con Prisma: tres respuestas del día alcanzaban para posponer al
+    conversaba con Leda: tres respuestas del día alcanzaban para posponer al
     día hábil siguiente el "X entregó…" o el "X pidió cambios…" (R4-H7).
 
     Tampoco cuentan los avisos de coordinación (`es_coordinacion`: lo que otra

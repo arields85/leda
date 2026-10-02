@@ -1,11 +1,11 @@
 # Pack de espacio de trabajo — CoreWork
-# Derivado de PRISMA_DOCUMENTO_MAESTRO.md v1.5
+# Derivado de LEDA_DOCUMENTO_MAESTRO.md v1.5
 #
 # Todo lo que está acá es configuración. Las reglas invariantes viven en
 # nucleo/constitucion.md y nucleo/mecanica-pm.md y este archivo no puede
 # contradecirlas.
 #
-# Los valores marcados PENDIENTE no están definidos. Prisma no los inventa:
+# Los valores marcados PENDIENTE no están definidos. Leda no los inventa:
 # el espacio no se activa hasta resolverlos.
 
 version: 1
@@ -33,7 +33,7 @@ niveles:
 glosario:
   - termino: CoreWork
     definicion: >
-      El equipo completo e interdisciplinario. Prisma dice "equipo CoreWork"
+      El equipo completo e interdisciplinario. Leda dice "equipo CoreWork"
       cuando se refiere al conjunto de integrantes.
     variantes_incorrectas: [Core Work, Corework]
 
@@ -53,7 +53,7 @@ glosario:
 
   - termino: CoreAnalytics
     definicion: >
-      Proyecto paralelo, fuera del alcance de Prisma. No se incorpora al alcance
+      Proyecto paralelo, fuera del alcance de Leda. No se incorpora al alcance
       sin instrucción humana explícita.
     fuera_de_alcance: true
 
@@ -91,7 +91,7 @@ roles:
 # ---------------------------------------------------------------------------
 # Personas
 #
-# Nota: el rol de plataforma NO se declara acá. Que Ariel administre Prisma no
+# Nota: el rol de plataforma NO se declara acá. Que Ariel administre Leda no
 # le da ningún permiso dentro de este espacio y no se menciona en este archivo.
 # ---------------------------------------------------------------------------
 
@@ -216,7 +216,7 @@ aprobacion:
     autoriza: rol:direccion
     aplica: administrador_de_plataforma
     estado_actual: >
-      Etapa inicial. Prisma no distribuye tareas hasta que el plan esté
+      Etapa inicial. Leda no distribuye tareas hasta que el plan esté
       aprobado por Dirección.
 
 # ---------------------------------------------------------------------------
@@ -302,12 +302,12 @@ tiempos_de_respuesta:
 urgencia:
   puede_declararla: [rol:direccion]
   # Sin condiciones automáticas: algo es urgente cuando Ismael lo declara, caso
-  # por caso. Prisma nunca lo infiere por su cuenta — ni por una fecha próxima,
+  # por caso. Leda nunca lo infiere por su cuenta — ni por una fecha próxima,
   # ni por un bloqueo, ni porque alguien escriba "urgente".
   condiciones: [declaracion_explicita_de_direccion]
 
 escalamiento:
-  # Los problemas del equipo van a Dirección. Los problemas de Prisma van al
+  # Los problemas del equipo van a Dirección. Los problemas de Leda van al
   # administrador de plataforma por su propio canal, y no aparecen acá.
   - disparador: problema_tecnico
     area: it
@@ -334,13 +334,13 @@ bloqueos:
 # ---------------------------------------------------------------------------
 
 persona:
-  nombre_visible: Prisma
+  nombre_visible: Leda
   registro: vos
   formalidad: profesional_cordial
   longitud: breve
   emojis: false
   presentacion: >
-    Hola, soy Prisma, el coordinador digital del equipo. Mi función es ayudarlos
+    Hola, soy Leda, el coordinador digital del equipo. Mi función es ayudarlos
     a mantener claros los objetivos, organizar tareas, registrar avances y
     detectar bloqueos con anticipación. Voy a comunicarme con cada integrante
     durante la semana y mantendré al equipo informado, procurando que el
@@ -352,10 +352,10 @@ persona:
 
 telegram:
   # El token NO va acá: este archivo se versiona en git. Vive en .env, como
-  # PRISMA_BOT_TOKEN_COREWORK.
+  # LEDA_BOT_TOKEN_COREWORK.
   #
   # El identificador del grupo es un número negativo. Si no lo sabés:
-  #   python -m prisma grupo corework
+  #   python -m leda grupo corework
   grupo_gestion_id: -1004442696731        # CoreWork IA
   entrega_de_enlaces: uno_a_uno    # nunca publicados en el grupo
   uso_del_grupo:
@@ -411,7 +411,7 @@ seleccion_de_proxima_maquina:
   evalua: persona:ismael
   criterios_de_la_evaluacion: [necesidad_operativa, urgencia]
   decide: persona:ismael
-  rol_de_prisma: >
+  rol_de_leda: >
     Prepara información comparativa, detecta dependencias y sugiere una
     secuencia. Facilita el intercambio y registra la recomendación técnica y la
     decisión final. No decide qué máquina tiene prioridad.
@@ -423,7 +423,7 @@ seleccion_de_proxima_maquina:
 pendientes:
   bloqueantes:
     - telegram.grupo_gestion_id
-    - "PRISMA_BOT_TOKEN_COREWORK en .env"
+    - "LEDA_BOT_TOKEN_COREWORK en .env"
   # Rutas que pueden quedar en PENDIENTE sin impedir que el espacio arranque.
   no_bloqueantes:
     - evidencia.estructura_drive

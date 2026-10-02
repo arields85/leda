@@ -15,7 +15,7 @@
 -- `resumen`, already on the row from when the preview was built, instead of
 -- a parallel table.
 begin;
-set search_path = prisma, public;
+set search_path = leda, public;
 
 -- Fail closed if an invoking text pipeline decoded the UTF-8 file incorrectly.
 -- chr() builds the expected value independently from non-ASCII source bytes.
@@ -29,12 +29,12 @@ do $$ begin
 end $$;
 
 do $$ begin
-  if not exists (select 1 from pg_roles where rolname = 'prisma_owner') then
+  if not exists (select 1 from pg_roles where rolname = 'leda_owner') then
     raise exception '0010 requires 0004_function_ownership.sql';
   end if;
   if not exists (
       select 1 from information_schema.columns
-       where table_schema = 'prisma' and table_name = 'pending_action'
+       where table_schema = 'leda' and table_name = 'pending_action'
          and column_name = 'huella') then
     raise exception '0010 requires 0009_vista_previa_confirmacion.sql';
   end if;
@@ -53,7 +53,7 @@ language plpgsql security definer as $$
 declare
   o record;
   a record;
-  ws uuid := nullif(current_setting('prisma.workspace_id', true), '')::uuid;
+  ws uuid := nullif(current_setting('leda.workspace_id', true), '')::uuid;
 begin
   select * into o from pending_action_option
    where token = p_token and (ws is null or workspace_id = ws);
@@ -147,6 +147,6 @@ comment on function resolver_pendiente is
   'Resuelve una acción pendiente por el token de una de sus opciones. Atómica: el doble toque de un botón ejecuta una sola vez. Devuelve la huella guardada para que quien llama detecte si el estado cambió desde la vista previa. "modificada" cierra sin aplicar nada y marca `modificar_pedido_en`, que deja la fila como contexto para el próximo turno de esa persona en ese chat (ADR 0005, decisión 1).';
 
 alter function resolver_pendiente(text, uuid, timestamptz)
-  owner to prisma_owner;
+  owner to leda_owner;
 
 commit;

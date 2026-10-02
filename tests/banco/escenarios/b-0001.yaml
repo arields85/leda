@@ -1,6 +1,6 @@
 id: b-0001
 objetivo: >
-  Observar si Prisma responde con las tareas propias del solicitante, sin
+  Observar si Leda responde con las tareas propias del solicitante, sin
   inventar datos ni ejecutar ninguna mutación sólo por consultar. El
   contexto del turno ya trae las tareas propias del actor (`contexto.py`),
   así que no hace falta ninguna herramienta para responder bien: exigirla

@@ -1,6 +1,6 @@
-# Continuidad de trabajo en Prisma
+# Continuidad de trabajo en Leda
 
-Este archivo es el punto de entrada para futuras sesiones. Prisma se endurece y extiende sobre la arquitectura
+Este archivo es el punto de entrada para futuras sesiones. Leda se endurece y extiende sobre la arquitectura
 actual; no se reestructura ni reescribe sin una decisión explícita y documentada. Versión previa, sin condensar:
 [`docs/historial/AGENTS-hasta-2026-09-30.md`](docs/historial/AGENTS-hasta-2026-09-30.md).
 
@@ -13,9 +13,9 @@ actual; no se reestructura ni reescribe sin una decisión explícita y documenta
 
 ## Orden de lectura
 
-1. `docs/product/que-es-prisma.md`: qué es el producto y qué es configuración de cada cliente.
+1. `docs/product/que-es-leda.md`: qué es el producto y qué es configuración de cada cliente.
 2. `docs/architecture/frontera.md`: dónde termina el núcleo y qué reglas lo gobiernan.
-3. `nucleo/` (`constitucion.md`, `mecanica-pm.md`, `alta-de-equipo.md`): comportamiento **obligatorio** de Prisma,
+3. `nucleo/` (`constitucion.md`, `mecanica-pm.md`, `alta-de-equipo.md`): comportamiento **obligatorio** de Leda,
    no material de consulta. Una auditoría que no lo haya leído entero no está terminada.
 4. `docs/capacidades.md`: qué está construido, qué está diseñado sin construir y qué es esquema sin implementación.
 5. `docs/STATUS.md`: estado, riesgos y próximo paso.
@@ -38,11 +38,11 @@ secretos, tokens, credenciales, URLs privadas ni contenido sensible de conversac
 
 Orden de autoridad para describir lo que existe hoy:
 
-1. `db/esquema.sql` y `src/prisma/`: comportamiento implementado.
+1. `db/esquema.sql` y `src/leda/`: comportamiento implementado.
 2. `tests/` y `db/pruebas.sql`: comportamiento comprobado, sólo si la ejecución y su resultado están registrados.
 3. `docs/architecture/frontera.md`: gobierna la arquitectura; ante una discrepancia entre documentos de
    arquitectura, prevalece.
-4. `docs/product/que-es-prisma.md`: define el producto y qué es configuración de cada cliente frente a núcleo.
+4. `docs/product/que-es-leda.md`: define el producto y qué es configuración de cada cliente frente a núcleo.
 5. `docs/decisions/`: decisiones aceptadas que gobiernan cambios futuros, salvo las marcadas como superadas.
 6. `docs/STATUS.md` y `docs/ROADMAP.md`: estado y orden de trabajo vigentes.
 7. `README.md` y `PRUEBA-LOCAL.md`: guía operativa; contrastar con la implementación si hay discrepancias.
@@ -85,27 +85,27 @@ carpetas o módulos sin un ADR aceptado.
 
 ## Comandos verificados por inspección
 
-Existen en `README.md`, `PRUEBA-LOCAL.md`, `pyproject.toml` o `src/prisma/cli.py`. Su disponibilidad fue
+Existen en `README.md`, `PRUEBA-LOCAL.md`, `pyproject.toml` o `src/leda/cli.py`. Su disponibilidad fue
 inspeccionada; su resultado actual no se presume.
 
 ```bash
 docker compose up -d postgres
-python -m prisma esquema
-python -m prisma importar corework [--activar]
-python -m prisma feriados corework
-python -m prisma enlaces corework --solo <nombres>
-python -m prisma administrador corework <nombre>
-python -m prisma escuchar corework [--sin-cadencias]
-python -m prisma estado corework
-python -m prisma correr corework <cadencia>
-python -m prisma escalera corework
-python -m prisma despachar corework
-python -m prisma incidentes corework
-python -m prisma servir --puerto 8080 [--sin-cadencias]
+python -m leda esquema
+python -m leda importar corework [--activar]
+python -m leda feriados corework
+python -m leda enlaces corework --solo <nombres>
+python -m leda administrador corework <nombre>
+python -m leda escuchar corework [--sin-cadencias]
+python -m leda estado corework
+python -m leda correr corework <cadencia>
+python -m leda escalera corework
+python -m leda despachar corework
+python -m leda incidentes corework
+python -m leda servir --puerto 8080 [--sin-cadencias]
 python -m pytest
 ```
 
-`python -m prisma esquema --recrear` borra los datos. No ejecutarlo sin una autorización explícita y un entorno
+`python -m leda esquema --recrear` borra los datos. No ejecutarlo sin una autorización explícita y un entorno
 descartable confirmado.
 
 ## Reglas de seguridad
@@ -135,7 +135,7 @@ Antes de implementar una fase:
 ([`ADR 0013`](docs/decisions/0013-reglas-generales-de-la-conversacion.md), decisión del
 usuario del 2026-09-29). Las variantes de una conversación son infinitas; arreglar cada
 caso con listas de frases o palabras clave no termina nunca. Ante un hallazgo sobre cómo
-conversa Prisma:
+conversa Leda:
 
 - Clasificarlo primero en una de las reglas del ADR 0013: pregunta pendiente como
   contexto (comandos cerrados; una sola rama de conversación abierta a la vez, enmienda
@@ -217,7 +217,7 @@ conversación es dónde participa el modelo, no la falta de reglas. Si los mecan
 viejos conviven con los nuevos, el camino no está terminado y el sistema queda peor.
 
 **8. Separar modelo de flujo.** Antes de atribuir una falla de comprensión al flujo,
-medir cuánto aporta el modelo: Prisma usa un modelo "flash" chico, elegido por
+medir cuánto aporta el modelo: Leda usa un modelo "flash" chico, elegido por
 velocidad, y medirlo con el banco es barato.
 
 **9. Funcionalidad nueva congelada** (decisión del usuario) hasta que alta, entrega y

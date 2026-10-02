@@ -7,14 +7,14 @@ from types import SimpleNamespace
 
 import pytest
 
-from prisma import escalera, gateway, onboarding, reloj
-from prisma.agente import responder
-from prisma.autoridad import Canal, identificar
-from prisma.calendario import Calendario
-from prisma.db import admin, espacio
-from prisma.despachador import Boton, TransporteTelegram
-from prisma.llm import ProveedorGuionado, Respuesta
-from prisma.salida import (BUTTON_LABEL_LIMIT, BUTTON_TEXT_LIMIT,
+from leda import escalera, gateway, onboarding, reloj
+from leda.agente import responder
+from leda.autoridad import Canal, identificar
+from leda.calendario import Calendario
+from leda.db import admin, espacio
+from leda.despachador import Boton, TransporteTelegram
+from leda.llm import ProveedorGuionado, Respuesta
+from leda.salida import (BUTTON_LABEL_LIMIT, BUTTON_TEXT_LIMIT,
                              ETIQUETA_CANCELAR, ETIQUETA_CONFIRMAR,
                              ICONO_CANCELAR, ICONO_CONFIRMAR,
                              ICONO_OTRA_OPCION, ICONO_SALIR_OPCIONES,
@@ -77,7 +77,7 @@ def test_telegram_transport_revalidates_before_http():
 
 def test_all_python_outbox_producers_use_the_central_contract():
     offenders = []
-    for path in (ROOT / "src" / "prisma").glob("*.py"):
+    for path in (ROOT / "src" / "leda").glob("*.py"):
         if path.name == "salida.py":
             continue
         if "insert into message_outbox" in path.read_text("utf-8").lower():
@@ -562,7 +562,7 @@ def test_etiquetas_de_tarea_que_colisionan_siguen_distinguibles_con_icono():
 
 
 def test_modificar_lleva_el_icono_de_alternativa_junto_a_confirmar_y_cancelar():
-    from prisma.salida import ETIQUETA_MODIFICAR
+    from leda.salida import ETIQUETA_MODIFICAR
 
     assert ETIQUETA_MODIFICAR == con_icono("Modificar", ICONO_OTRA_OPCION)
     assert ETIQUETA_MODIFICAR.startswith("✏️ ")
@@ -576,7 +576,7 @@ def test_ningun_modulo_arma_el_boton_modificar_con_un_literal():
     "Modificar" suelto en una lista de opciones vuelve a dejar el botón sin
     ícono en ese camino."""
     literales = []
-    for archivo in (ROOT / "src" / "prisma").glob("*.py"):
+    for archivo in (ROOT / "src" / "leda").glob("*.py"):
         if archivo.name == "salida.py":
             continue
         for numero, linea in enumerate(archivo.read_text(encoding="utf-8").splitlines(), 1):

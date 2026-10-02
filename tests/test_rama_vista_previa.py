@@ -1,7 +1,7 @@
 """La vista previa de un cambio que la persona pidió es una rama abierta
 (T9-R1d-1b, ADR 0013 regla 1, enmienda "una sola rama de conversación abierta").
 
-Cuando Prisma le mostró a la persona la vista previa de un cambio que ella pidió
+Cuando Leda le mostró a la persona la vista previa de un cambio que ella pidió
 en ese chat (una `pending_action` de una herramienta que escribe, con Confirmar,
 Modificar y Cancelar) y ella escribe algo, el mensaje se interpreta contra esa
 vista previa con el ruteo tipado, igual que con las demás preguntas abiertas:
@@ -26,10 +26,10 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from prisma import gateway
-from prisma import pendientes as P
-from prisma.db import admin, espacio
-from prisma.llm import Llamada, RespectoPendiente, Respuesta
+from leda import gateway
+from leda import pendientes as P
+from leda.db import admin, espacio
+from leda.llm import Llamada, RespectoPendiente, Respuesta
 
 from tests.test_menu_tarea import _mensaje, _quien, _tocar, cliente  # noqa: F401
 from tests.test_modificar import _proponer, _tarea
@@ -220,7 +220,7 @@ def test_ruteo_caido_deja_la_vista_previa_abierta_y_avisa(
         def route_intent(self, texto, pendiente=None):
             raise RuntimeError("caído")
 
-    monkeypatch.setattr("prisma.llm.desde_base", lambda cur, w, key: _Caido())
+    monkeypatch.setattr("leda.llm.desde_base", lambda cur, w, key: _Caido())
     antes = _salidas(conn, tg)
 
     _mensaje(cliente, tg, "sí, dale")
@@ -402,7 +402,7 @@ def test_la_vista_previa_de_otra_persona_no_es_una_rama_de_quien_escribe(
 def test_una_aprobacion_que_le_piden_a_la_persona_no_es_una_rama_suya(
         cliente, conn, corework, monkeypatch):
     # El aviso de entrega que le llega al aprobador es un mensaje que inicia
-    # Prisma (ADR 0013, enmienda): no le impide hablar de otra cosa.
+    # Leda (ADR 0013, enmienda): no le impide hablar de otra cosa.
     ws = corework.workspace_id
     with admin(conn) as cur:
         tid = _tarea(cur, ws)
@@ -434,7 +434,7 @@ def test_una_eleccion_de_una_herramienta_no_es_una_vista_previa(conn, corework):
     # `NecesitaElegir` guarda la herramienta real pero con `campo`: pregunta
     # "¿cuál de estas?", no espera un Confirmar. Es otra rama, la de la elección
     # (`test_rama_eleccion`, T9-R1d-1c), no una vista previa.
-    from prisma import herramientas as H
+    from leda import herramientas as H
 
     ws = corework.workspace_id
     with admin(conn) as cur:
@@ -560,7 +560,7 @@ def _causa_que_llena_la_vista_previa() -> str:
     """Una causa tan larga que la vista previa entra sola con sus botones (así
     salió la primera vez) pero no con un aviso delante. Se calcula sobre la
     vista previa real de un bloqueo, no sobre un largo fijo."""
-    from prisma.salida import (BUTTON_TEXT_LIMIT, margen_saludo,
+    from leda.salida import (BUTTON_TEXT_LIMIT, margen_saludo,
                                telegram_utf16_units)
 
     base = ("Tarea: Programar PLC\nCausa del bloqueo: \nEstado actual: Asignada\n"
@@ -571,7 +571,7 @@ def _causa_que_llena_la_vista_previa() -> str:
 
 def test_con_el_aviso_delante_la_vista_previa_larga_sale_aparte_con_sus_botones(
         cliente, conn, corework, monkeypatch):
-    from prisma.salida import cabe_en_mensaje
+    from leda.salida import cabe_en_mensaje
 
     ws = corework.workspace_id
     tg, tid, pid = _abrir_vista_previa(conn, ws, causa=_causa_que_llena_la_vista_previa())

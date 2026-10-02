@@ -1,5 +1,5 @@
 """El modelo ofrece opciones en vez de preguntar en texto abierto (T1,
-`prisma-orienta`; ADR 0007 "Prisma orienta, no charla").
+`leda-orienta`; ADR 0007 "Leda orienta, no charla").
 
 `ofrecer_opciones` es una herramienta más: el modelo la llama con una
 pregunta y sus opciones (texto corto o tarea existente por id), el servidor
@@ -23,18 +23,18 @@ from datetime import datetime, timezone
 import pytest
 from fastapi.testclient import TestClient
 
-from prisma import agente
-from prisma import gateway
-from prisma import herramientas as H
-from prisma import jev as jev_modulo
-from prisma import pendientes as P
-from prisma.agente import responder
-from prisma.autoridad import Canal, identificar
-from prisma.calendario import Calendario
-from prisma.contexto import PREAMBULO, construir
-from prisma.db import admin, espacio
-from prisma.llm import Llamada, ProveedorGuionado, Respuesta
-from prisma.salida import (BUTTON_TEXT_LIMIT, ICONO_TAREA,
+from leda import agente
+from leda import gateway
+from leda import herramientas as H
+from leda import jev as jev_modulo
+from leda import pendientes as P
+from leda.agente import responder
+from leda.autoridad import Canal, identificar
+from leda.calendario import Calendario
+from leda.contexto import PREAMBULO, construir
+from leda.db import admin, espacio
+from leda.llm import Llamada, ProveedorGuionado, Respuesta
+from leda.salida import (BUTTON_TEXT_LIMIT, ICONO_TAREA,
                              OBJETIVO_ETIQUETA_BOTON, etiqueta_sin_icono,
                              normalize_visible_text, telegram_utf16_units)
 
@@ -68,13 +68,13 @@ def _tarea(cur, ws, *, titulo="Cablear tablero máq. 3", area="electricidad",
         (ws, obj, titulo, ws, area, ws, persona))
     t = cur.fetchone()["id"]
     cur.execute("insert into task_state_event (task_id, estado_nuevo, actor_kind) "
-                "values (%s, %s, 'prisma')", (t, estado))
+                "values (%s, %s, 'leda')", (t, estado))
     return str(t)
 
 
 def _con_proveedor(monkeypatch, guion):
     proveedor = ProveedorGuionado(guion=list(guion))
-    monkeypatch.setattr("prisma.llm.desde_base", lambda cur, ws, key: proveedor)
+    monkeypatch.setattr("leda.llm.desde_base", lambda cur, ws, key: proveedor)
     return proveedor
 
 
@@ -560,7 +560,7 @@ def test_tarea_de_otro_espacio_se_rechaza_al_modelo(intake_world, conn, monkeypa
              oeste["people"]["Taylor Quinn"]["membership_id"]))
         tarea_ajena = str(cur.fetchone()["id"])
         cur.execute("insert into task_state_event (task_id, estado_nuevo, actor_kind) "
-                    "values (%s, 'asignada', 'prisma')", (tarea_ajena,))
+                    "values (%s, 'asignada', 'leda')", (tarea_ajena,))
     conn.commit()
 
     guion = [
@@ -783,14 +783,14 @@ def test_salida_cierra_sin_efecto_y_no_llama_al_modelo(
 
 
 # ---------------------------------------------------------------------------
-# Hallazgo 10 (sesión 2 por Telegram, 2026-09-27): Prisma no puede volver a
+# Hallazgo 10 (sesión 2 por Telegram, 2026-09-27): Leda no puede volver a
 # preguntar sola lo que la persona ya descartó con "Quiero consultar otra
 # cosa". Evidencia real: Marcos tocó la salida sobre "¿Sobre cuál de tus
-# tareas avanzaste?", escribió "hols" (un saludo) y Prisma repitió la misma
+# tareas avanzaste?", escribió "hols" (un saludo) y Leda repitió la misma
 # pregunta -- el cierre salía con un texto fijo ("Dale, escribime qué
 # necesitás.") que no nombraba qué se había cerrado; `contexto.historial`
 # guarda literalmente lo que salió por `message_outbox`, así que el turno
-# siguiente veía la pregunta y el cierre como dos mensajes de Prisma
+# siguiente veía la pregunta y el cierre como dos mensajes de Leda
 # seguidos, sin ninguna marca de que la persona la había descartado.
 # ---------------------------------------------------------------------------
 

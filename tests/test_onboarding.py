@@ -12,10 +12,10 @@ import pytest
 from fastapi.testclient import TestClient
 
 from tests.toques import id_de_mensaje
-from prisma import gateway
-from prisma.db import admin, espacio
-from prisma.llm import ProveedorGuionado, Respuesta
-from prisma.onboarding import (ActivacionInvalida, activar, encolar_presentacion,
+from leda import gateway
+from leda.db import admin, espacio
+from leda.llm import ProveedorGuionado, Respuesta
+from leda.onboarding import (ActivacionInvalida, activar, encolar_presentacion,
                                generar_enlaces, pendientes_de_activar)
 
 AHORA = datetime(2026, 7, 27, 10, 0, tzinfo=timezone.utc)
@@ -26,12 +26,12 @@ def sin_activar(conn, tmp_path):
     """CoreWork activo con nadie vinculado a Telegram todavía."""
     import yaml
 
-    from prisma.importador import importar
+    from leda.importador import importar
     from tests.conftest import RAIZ
 
     import os
 
-    os.environ["PRISMA_BOT_TOKEN_COREWORK"] = "prueba:token"
+    os.environ["LEDA_BOT_TOKEN_COREWORK"] = "prueba:token"
 
     pack = yaml.safe_load((RAIZ / "espacios" / "corework.yaml").read_text("utf-8"))
     pack["telegram"]["grupo_gestion_id"] = -1001
@@ -55,9 +55,9 @@ def test_el_espacio_activa_sin_que_nadie_haya_activado(sin_activar):
 def test_genera_un_enlace_por_persona(sin_activar, conn):
     ws = sin_activar.workspace_id
     with admin(conn) as cur:
-        enlaces = generar_enlaces(cur, ws, "prisma_corework_bot", ahora=AHORA)
+        enlaces = generar_enlaces(cur, ws, "leda_corework_bot", ahora=AHORA)
     assert len(enlaces) == 7
-    assert all(e.url.startswith("https://t.me/prisma_corework_bot?start=") for e in enlaces)
+    assert all(e.url.startswith("https://t.me/leda_corework_bot?start=") for e in enlaces)
     # Tokens distintos y largos: no se adivinan.
     tokens = {e.token for e in enlaces}
     assert len(tokens) == 7 and all(len(t) >= 24 for t in tokens)
@@ -138,7 +138,7 @@ def test_presentacion_va_al_grupo(sin_activar, conn):
         fila = cur.fetchone()
         assert fila["chat_id"] == -1001
         assert fila["tipo"] == "informativo"
-        assert "Prisma" in fila["cuerpo"]
+        assert "Leda" in fila["cuerpo"]
         # La presentación no lleva enlaces: esos van uno a uno.
         assert "t.me" not in fila["cuerpo"] and "start=" not in fila["cuerpo"]
         assert not encolar_presentacion(cur, ws, ahora=AHORA)   # no duplica
@@ -157,7 +157,7 @@ def cliente(sin_activar, conn, monkeypatch):
         gateway, "config",
         dataclasses.replace(gateway.config, webhook_secret="s3cr3t"))
     monkeypatch.setattr(
-        "prisma.llm.desde_base",
+        "leda.llm.desde_base",
         lambda cur, ws, key: ProveedorGuionado([Respuesta(texto="Anotado.")]))
     return TestClient(gateway.app)
 
@@ -241,8 +241,8 @@ def test_start_pelado_no_hace_nada(cliente, conn):
 
 def test_activado_recibe_cadencia(cliente, conn, sin_activar):
     """Después de activar, la persona entra en el seguimiento privado."""
-    from prisma import reloj
-    from prisma.calendario import Calendario
+    from leda import reloj
+    from leda.calendario import Calendario
 
     ws = sin_activar.workspace_id
     with admin(conn) as cur:
@@ -269,7 +269,7 @@ def test_activado_recibe_cadencia(cliente, conn, sin_activar):
             (ws, obj, ws, ws))
         t = cur.fetchone()["id"]
         cur.execute("insert into task_state_event (task_id, estado_nuevo, actor_kind) "
-                    "values (%s, 'asignada', 'prisma')", (t,))
+                    "values (%s, 'asignada', 'leda')", (t,))
 
     with espacio(conn, ws) as cur:
         cal = Calendario.desde_base(cur, ws)

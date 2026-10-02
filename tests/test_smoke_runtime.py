@@ -26,7 +26,7 @@ class _Updates:
 
 
 def test_listener_procesa_con_stdout_ascii_redirigido(monkeypatch):
-    from prisma import local
+    from leda import local
 
     procesados = []
     monkeypatch.setattr(
@@ -48,7 +48,7 @@ def test_listener_procesa_con_stdout_ascii_redirigido(monkeypatch):
 
 def test_listener_preserva_update_unicode_aunque_la_consola_no_lo_represente(
         monkeypatch):
-    from prisma import local
+    from leda import local
 
     update = _Updates().json()["result"][0]
     update["message"]["text"] = "señal Δ y válvula"
@@ -103,7 +103,7 @@ class _ChatActionBloqueado:
 
 
 def test_typing_se_refresca_sin_enviar_mensaje_y_se_detiene():
-    from prisma.despachador import mantener_chat_activo
+    from leda.despachador import mantener_chat_activo
 
     http = _ChatActionHttp()
     # `umbral=0` (ADR 0011): esta prueba es sobre el refresco y la limpieza
@@ -123,10 +123,10 @@ def test_typing_se_refresca_sin_enviar_mensaje_y_se_detiene():
 
 
 def test_typing_limpia_el_hilo_si_telegram_falla():
-    from prisma.despachador import mantener_chat_activo
+    from leda.despachador import mantener_chat_activo
 
     http = _ChatActionHttp(falla=True)
-    nombre = "prisma-typing-prueba"
+    nombre = "leda-typing-prueba"
     try:
         with mantener_chat_activo(
                 "token-prueba", 123, cliente=http, intervalo=0.01,
@@ -141,7 +141,7 @@ def test_typing_limpia_el_hilo_si_telegram_falla():
 
 
 def test_typing_cleanup_no_espera_indefinidamente_un_cliente_bloqueado():
-    from prisma.despachador import mantener_chat_activo
+    from leda.despachador import mantener_chat_activo
 
     http = _ChatActionBloqueado()
     inicio = time.monotonic()
@@ -156,7 +156,7 @@ def test_typing_cleanup_no_espera_indefinidamente_un_cliente_bloqueado():
 
 
 def test_typing_owned_client_cierra_al_terminar_el_heartbeat(monkeypatch):
-    from prisma import despachador
+    from leda import despachador
 
     http = _ChatActionBloqueado()
     monkeypatch.setattr("httpx.Client", lambda **kwargs: http)
@@ -166,11 +166,11 @@ def test_typing_owned_client_cierra_al_terminar_el_heartbeat(monkeypatch):
     http.soltar.set()
 
     assert http.cerrado.wait(0.2)
-    assert not any(h.name == "prisma-typing" for h in threading.enumerate())
+    assert not any(h.name == "leda-typing" for h in threading.enumerate())
 
 
 def test_typing_client_creation_failure_degrades_to_noop(monkeypatch):
-    from prisma import despachador
+    from leda import despachador
 
     monkeypatch.setattr(
         "httpx.Client",
@@ -185,13 +185,13 @@ def test_typing_client_creation_failure_degrades_to_noop(monkeypatch):
 
 
 def test_typing_thread_start_failure_degrades_and_closes_owned_client(monkeypatch):
-    from prisma import despachador
+    from leda import despachador
 
     http = _ChatActionBloqueado()
     original_start = threading.Thread.start
 
     def start(thread):
-        if thread.name == "prisma-typing":
+        if thread.name == "leda-typing":
             raise RuntimeError("thread failed")
         return original_start(thread)
 
@@ -265,7 +265,7 @@ class _RespuestaIndicador:
 
 
 def test_indicador_no_aparece_si_la_respuesta_esta_lista_antes_del_umbral():
-    from prisma.despachador import mantener_chat_activo
+    from leda.despachador import mantener_chat_activo
 
     http = _ClienteIndicador()
     with mantener_chat_activo(
@@ -277,7 +277,7 @@ def test_indicador_no_aparece_si_la_respuesta_esta_lista_antes_del_umbral():
 
 
 def test_indicador_aparece_recien_despues_del_umbral():
-    from prisma.despachador import SEMILLA_INDICADOR, mantener_chat_activo
+    from leda.despachador import SEMILLA_INDICADOR, mantener_chat_activo
 
     http = _ClienteIndicador()
     with mantener_chat_activo(
@@ -292,7 +292,7 @@ def test_indicador_aparece_recien_despues_del_umbral():
 
 
 def test_borrador_se_retira_con_mensaje_transitorio_silencioso_y_borrado():
-    from prisma.despachador import SEMILLA_INDICADOR, mantener_chat_activo
+    from leda.despachador import SEMILLA_INDICADOR, mantener_chat_activo
 
     http = _ClienteIndicador()
     with mantener_chat_activo(
@@ -312,7 +312,7 @@ def test_borrador_se_retira_con_mensaje_transitorio_silencioso_y_borrado():
 
 
 def test_grupo_nunca_intenta_el_borrador_sólo_escribiendo():
-    from prisma.despachador import mantener_chat_activo
+    from leda.despachador import mantener_chat_activo
 
     http = _ClienteIndicador()
     with mantener_chat_activo(
@@ -332,7 +332,7 @@ def test_fallo_al_mandar_y_retirar_el_borrador_se_intenta_una_vez_cada_uno_y_no_
     Y retirar) tienen que haberse INTENTADO de verdad -- no sólo "no
     reventó" -- y cada una imprime exactamente una vez (mismo criterio que
     `_reportar_falla_indicador`: a lo sumo una vez por tipo y por turno)."""
-    from prisma.despachador import mantener_chat_activo
+    from leda.despachador import mantener_chat_activo
 
     http = _ClienteIndicador(falla_en=frozenset(
         {"/sendMessageDraft", "/sendMessage", "/deleteMessage"}))
@@ -357,7 +357,7 @@ def test_fallo_al_mandar_y_retirar_el_borrador_se_intenta_una_vez_cada_uno_y_no_
 
 
 def test_draft_id_es_distinto_en_cada_activacion():
-    from prisma.despachador import mantener_chat_activo
+    from leda.despachador import mantener_chat_activo
 
     ids = []
     for _ in range(2):
@@ -377,7 +377,7 @@ def test_retiro_ya_ocurrio_cuando_el_llamador_manda_la_respuesta_real():
     """El retiro pasa adentro del `finally` del `with`: para cuando el
     llamador sigue con lo próximo (acá, un envío marcado aparte), el
     borrador ya no está (ADR 0011, decisión 3 -- "antes de los botones")."""
-    from prisma.despachador import mantener_chat_activo
+    from leda.despachador import mantener_chat_activo
 
     http = _ClienteIndicador()
     with mantener_chat_activo(
@@ -399,7 +399,7 @@ def test_retiro_ya_ocurrio_cuando_el_llamador_manda_la_respuesta_real():
 # ---------------------------------------------------------------------------
 
 def test_fallo_de_typing_se_imprime_una_vez_por_turno_y_no_rompe_el_turno(capsys):
-    from prisma.despachador import mantener_chat_activo
+    from leda.despachador import mantener_chat_activo
 
     http = _ChatActionHttp(falla=True)
     procesado = []
@@ -420,8 +420,8 @@ def test_fallo_de_typing_se_imprime_una_vez_por_turno_y_no_rompe_el_turno(capsys
 
 def test_fallo_al_retirar_se_imprime_por_turno_y_registra_un_solo_incidente(
         conn, corework, capsys):
-    from prisma.db import admin, espacio
-    from prisma.despachador import mantener_chat_activo
+    from leda.db import admin, espacio
+    from leda.despachador import mantener_chat_activo
 
     ws = corework.workspace_id
     # Sólo falla el mensaje transitorio de retiro (`/sendMessage`); el
@@ -503,7 +503,7 @@ def test_el_retiro_nunca_llega_antes_de_que_el_borrador_termine():
     cuando el borrador recién empezaba a mandarse, y esa llamada es lenta,
     retirar de inmediato puede llegar a Telegram ANTES que el propio
     borrador -- el borrador queda visible."""
-    from prisma.despachador import mantener_chat_activo
+    from leda.despachador import mantener_chat_activo
 
     http = _ClienteBorradorLento()
     with mantener_chat_activo(
@@ -530,9 +530,9 @@ def test_el_retiro_nunca_llega_antes_de_que_el_borrador_termine():
 
 def test_fallo_al_registrar_el_incidente_de_retiro_no_aborta_el_turno(
         conn, corework, monkeypatch, capsys):
-    from prisma import despachador
-    from prisma.db import admin, espacio
-    from prisma.despachador import mantener_chat_activo
+    from leda import despachador
+    from leda.db import admin, espacio
+    from leda.despachador import mantener_chat_activo
 
     ws = corework.workspace_id
     http = _ClienteIndicador(falla_en=frozenset({"/sendMessage"}))

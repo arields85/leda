@@ -17,12 +17,12 @@ from datetime import datetime, timezone
 
 import pytest
 
-from prisma import gateway
-from prisma import jev as jev_modulo
-from prisma import pendientes as P
-from prisma.jev import ClienteJevGuionado
-from prisma.db import admin, espacio
-from prisma.llm import (IntentAction, IntentRoute, ProveedorGuionado,
+from leda import gateway
+from leda import jev as jev_modulo
+from leda import pendientes as P
+from leda.jev import ClienteJevGuionado
+from leda.db import admin, espacio
+from leda.llm import (IntentAction, IntentRoute, ProveedorGuionado,
                          RespectoPendiente, Respuesta, RouteEnvelope)
 
 from tests.toques import FUERA_DE_LA_VENTANA, envejecer_toques
@@ -40,7 +40,7 @@ def _ruta(comando: RespectoPendiente | None) -> IntentRoute:
 
 def _con_rutas(monkeypatch, rutas, guion=()) -> ProveedorGuionado:
     proveedor = ProveedorGuionado(guion=list(guion), rutas=list(rutas))
-    monkeypatch.setattr("prisma.llm.desde_base", lambda cur, ws, key: proveedor)
+    monkeypatch.setattr("leda.llm.desde_base", lambda cur, ws, key: proveedor)
     return proveedor
 
 

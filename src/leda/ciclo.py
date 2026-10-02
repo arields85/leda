@@ -478,10 +478,10 @@ class Ciclo:
                 resultados[slug] = {"error": "sin_token_de_bot"}
                 if reportar_fallo(
                         conn, self._fallas, ws_id, "sin_token",
-                        f"'{slug}' está activo sin PRISMA_BOT_TOKEN_"
+                        f"'{slug}' está activo sin LEDA_BOT_TOKEN_"
                         f"{slug.upper()} en el entorno.",
-                        LookupError(f"Falta PRISMA_BOT_TOKEN_{slug.upper()}")):
-                    print(f"  ! '{slug}' está activo sin PRISMA_BOT_TOKEN_"
+                        LookupError(f"Falta LEDA_BOT_TOKEN_{slug.upper()}")):
+                    print(f"  ! '{slug}' está activo sin LEDA_BOT_TOKEN_"
                          f"{slug.upper()}: no se despacha su cola hasta que "
                          "se configure.")
                 continue

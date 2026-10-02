@@ -1,14 +1,14 @@
-# Documentación de Prisma
+# Documentación de Leda
 
 Esta base documental permite retomar el proyecto desde el estado vigente sin
 reconstruir decisiones desde conversaciones anteriores.
 
-Prisma es un producto de gestión de proyectos multi-tenant. CoreWork es su primer
+Leda es un producto de gestión de proyectos multi-tenant. CoreWork es su primer
 cliente, no su definición.
 
 ## Camino rápido
 
-1. Leer [`product/que-es-prisma.md`](product/que-es-prisma.md) para entender qué es
+1. Leer [`product/que-es-leda.md`](product/que-es-leda.md) para entender qué es
    el producto.
 2. Leer [`architecture/frontera.md`](architecture/frontera.md) para entender dónde
    termina el núcleo y qué reglas lo gobiernan.
@@ -21,7 +21,7 @@ cliente, no su definición.
 
 | Necesidad | Documento |
 |---|---|
-| Definición del producto y alcance | [`product/que-es-prisma.md`](product/que-es-prisma.md) |
+| Definición del producto y alcance | [`product/que-es-leda.md`](product/que-es-leda.md) |
 | Traspaso de la jornada del alta conducida (punto de retorno, ritmo, pendientes) | [`traspaso/2026-10-01-alta-conducida.md`](traspaso/2026-10-01-alta-conducida.md) |
 | Qué tiene que permitir configurar la plataforma (inventario) | [`product/plataforma-pendientes.md`](product/plataforma-pendientes.md) |
 | Frontera entre núcleo y adaptadores | [`architecture/frontera.md`](architecture/frontera.md) |
@@ -35,7 +35,7 @@ cliente, no su definición.
 | Decisión sobre las dos superficies web separadas | [`decisions/0004-dos-superficies-separadas.md`](decisions/0004-dos-superficies-separadas.md) |
 | Decisión sobre interpretación, confirmación y aclaración con botones | [`decisions/0005-interpretacion-y-confirmacion.md`](decisions/0005-interpretacion-y-confirmacion.md) |
 | Decisión sobre Jev para resolver referencias y detectar la duda de intención | [`decisions/0006-jev-para-resolver-referencias-e-intencion.md`](decisions/0006-jev-para-resolver-referencias-e-intencion.md) |
-| Decisión sobre Prisma que orienta con opciones concretas, no charla | [`decisions/0007-prisma-orienta-no-charla.md`](decisions/0007-prisma-orienta-no-charla.md) |
+| Decisión sobre Leda que orienta con opciones concretas, no charla | [`decisions/0007-leda-orienta-no-charla.md`](decisions/0007-leda-orienta-no-charla.md) |
 | Decisión sobre que aprobar cierra la tarea, en el mismo acto, si se puede | [`decisions/0008-la-aprobacion-cierra-la-tarea.md`](decisions/0008-la-aprobacion-cierra-la-tarea.md) |
 | Decisión sobre entrega con evidencia y revisión | [`decisions/0009-entrega-con-evidencia-y-revision.md`](decisions/0009-entrega-con-evidencia-y-revision.md) |
 | Decisión sobre correo verificado y Google (propuesta) | [`decisions/0010-correo-verificado-y-google-en-el-producto.md`](decisions/0010-correo-verificado-y-google-en-el-producto.md) |
@@ -45,7 +45,7 @@ cliente, no su definición.
 | Decisión sobre el flujo de un mensaje, con un dueño por etapa, y el experimento A/B | [`decisions/0014-flujo-de-un-mensaje.md`](decisions/0014-flujo-de-un-mensaje.md) |
 | Relevamientos de proyectos externos (Hermes Agent) | [`research/hermes-agent.md`](research/hermes-agent.md) |
 | Relevamiento de NotebookLM y respuestas ancladas en fuentes | [`research/notebooklm-y-grounding.md`](research/notebooklm-y-grounding.md) |
-| Copias literales de documentos condensados el 2026-09-30 (`STATUS`, `AGENTS`, diario de Prisma orienta) | [`historial/`](historial/) |
+| Copias literales de documentos condensados el 2026-09-30 (`STATUS`, `AGENTS`, diario de Leda orienta) | [`historial/`](historial/) |
 | Reglas para futuras sesiones | [`../AGENTS.md`](../AGENTS.md) |
 | Configuración del primer cliente | [`../espacios/corework.yaml`](../espacios/corework.yaml) |
 

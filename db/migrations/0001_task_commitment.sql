@@ -1,7 +1,7 @@
 \set ON_ERROR_STOP on
 
 begin;
-set search_path = prisma, public;
+set search_path = leda, public;
 
 do $$
 declare incompatible bigint;
@@ -67,7 +67,7 @@ create unique index if not exists task_source_draft_unique
 
 -- Existing rows predate this contract and intentionally keep source_draft_id
 -- null. The preflight guarantees they are complete; new application rows must
--- carry a draft link because prisma_app loses direct INSERT below.
+-- carry a draft link because leda_app loses direct INSERT below.
 
 do $$ begin
   if not exists (
@@ -108,36 +108,36 @@ do $$ begin
                   where polname = 'aislamiento_espacio'
                     and polrelid = 'task_draft'::regclass) then
     create policy aislamiento_espacio on task_draft
-      using (workspace_id = nullif(current_setting('prisma.workspace_id', true), '')::uuid);
+      using (workspace_id = nullif(current_setting('leda.workspace_id', true), '')::uuid);
   end if;
   if not exists (select 1 from pg_policy
                   where polname = 'aislamiento_espacio'
                     and polrelid = 'task_evidence_policy'::regclass) then
     create policy aislamiento_espacio on task_evidence_policy
-      using (workspace_id = nullif(current_setting('prisma.workspace_id', true), '')::uuid);
+      using (workspace_id = nullif(current_setting('leda.workspace_id', true), '')::uuid);
   end if;
 end $$;
 
-grant select, insert on task_draft to prisma_app;
-grant select on task_evidence_policy to prisma_app;
-grant all on task_draft, task_evidence_policy to prisma_admin;
-revoke insert on task from prisma_app;
-revoke update, delete on task from prisma_app;
-grant select on task to prisma_app;
+grant select, insert on task_draft to leda_app;
+grant select on task_evidence_policy to leda_app;
+grant all on task_draft, task_evidence_policy to leda_admin;
+revoke insert on task from leda_app;
+revoke update, delete on task from leda_app;
+grant select on task to leda_app;
 
 -- Remove the previous caller-controlled actor/time boundary if this correction
 -- is applied over an earlier 0001 installation.
 drop function if exists confirmar_borrador_tarea(text, uuid, timestamptz);
 
 create or replace function aplicar_evento_tarea() returns trigger
-security definer set search_path = prisma, public as $$
+security definer set search_path = leda, public as $$
 begin
-  perform set_config('prisma.aplicando_evento', '1', true);
+  perform set_config('leda.aplicando_evento', '1', true);
   update task
      set estado = new.estado_nuevo,
          actualizado_en = new.at
    where id = new.task_id;
-  perform set_config('prisma.aplicando_evento', '0', true);
+  perform set_config('leda.aplicando_evento', '0', true);
   return new;
 end $$ language plpgsql;
 
@@ -156,7 +156,7 @@ begin
     raise exception 'Los campos de compromiso de una tarea son inmutables.';
   end if;
   if new.estado is distinct from old.estado
-     and coalesce(current_setting('prisma.aplicando_evento', true), '0') <> '1' then
+     and coalesce(current_setting('leda.aplicando_evento', true), '0') <> '1' then
     raise exception
       'El estado de una tarea no se escribe directamente. Insertá una fila en task_state_event.';
   end if;
@@ -168,7 +168,7 @@ create or replace function confirmar_borrador_tarea(
 )
 returns table (resultado text, task_id uuid)
 language plpgsql security definer
-set search_path = prisma, public, pg_temp as $$
+set search_path = leda, public, pg_temp as $$
 declare
   o pending_action_option%rowtype;
   a pending_action%rowtype;
@@ -183,7 +183,7 @@ declare
   ahora timestamptz := clock_timestamp();
   preview_actual jsonb;
 begin
-  perform set_config('prisma.workspace_id', p_workspace_id::text, true);
+  perform set_config('leda.workspace_id', p_workspace_id::text, true);
   select * into o from pending_action_option
    where token = p_token and workspace_id = p_workspace_id;
   if not found then
@@ -329,16 +329,16 @@ revoke all on function confirmar_borrador_tarea(uuid, text, bigint)
   from public;
 
 do $$ begin
-  if not exists (select 1 from pg_roles where rolname = 'prisma_gateway') then
-    create role prisma_gateway nologin noinherit;
+  if not exists (select 1 from pg_roles where rolname = 'leda_gateway') then
+    create role leda_gateway nologin noinherit;
   end if;
 end $$;
-alter role prisma_gateway noinherit nobypassrls;
+alter role leda_gateway noinherit nobypassrls;
 
 revoke execute on function confirmar_borrador_tarea(uuid, text, bigint)
-  from prisma_app;
-grant usage on schema prisma to prisma_gateway;
+  from leda_app;
+grant usage on schema leda to leda_gateway;
 grant execute on function confirmar_borrador_tarea(uuid, text, bigint)
-  to prisma_gateway;
+  to leda_gateway;
 
 commit;

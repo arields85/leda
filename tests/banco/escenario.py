@@ -3,7 +3,7 @@
 Sigue "Estructura mínima de un escenario" de `docs/validation/README.md`: el
 escenario declara sólo el objetivo, las precondiciones simuladas, el actor y
 el mensaje inicial. No hay IDs internos, herramientas ni estados esperados
-en el texto que Prisma recibe -- eso vive en `herramientas_esperadas` /
+en el texto que Leda recibe -- eso vive en `herramientas_esperadas` /
 `herramientas_prohibidas`, que nunca se le muestran al modelo.
 """
 
@@ -73,7 +73,7 @@ class Escenario:
     # aclaración con botones para este escenario (referencia clara, sin
     # referencia, o el caso "debe preguntar" de siempre, en texto).
     aclaracion_esperada: dict = field(default_factory=dict)
-    # Toques genéricos de escenario (T4, `prisma-orienta`): una secuencia de
+    # Toques genéricos de escenario (T4, `leda-orienta`): una secuencia de
     # botones a tocar, EN ORDEN, después de los mensajes (y de la aclaración
     # con botones de arriba, si la hay) -- antes del toque automático en
     # Confirmar de siempre (`corrida.ejecutar_escenario`). Cada elemento
@@ -85,7 +85,7 @@ class Escenario:
     # vista previa de siempre. Vacío: ningún toque de escenario más allá del
     # de Confirmar, que ya corre siempre.
     toques: tuple[dict, ...] = ()
-    # ADR 0007 ("Prisma orienta, no charla"), T4: opt-out explícito, por
+    # ADR 0007 ("Leda orienta, no charla"), T4: opt-out explícito, por
     # escenario, de `comprobadores.comprobar_pregunta_con_opciones` (activa
     # por defecto para todo escenario) -- para un escenario legado que
     # necesite seguir pasando con una pregunta en texto abierto sin botones.

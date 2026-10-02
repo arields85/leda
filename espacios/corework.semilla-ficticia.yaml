@@ -1,10 +1,10 @@
 # Semilla de datos ficticios para la tercera ronda por Telegram
-# (T7, `odd/tasks/prisma-orienta.md`).
+# (T7, `odd/tasks/leda-orienta.md`).
 #
 # Mismas 12 tareas y las mismas seis personas responsables del pack
 # `corework.yaml` que ya se habían cargado a mano en las sesiones 1 y 2 --
 # extraídas de sólo lectura de la base de mantenimiento local (`postgres`,
-# la misma a la que apunta `PRISMA_TEST_DB_URL`) el 2026-09-27 -- pero:
+# la misma a la que apunta `LEDA_TEST_DB_URL`) el 2026-09-27 -- pero:
 #
 #   - sin el sufijo " (simulado)" en el título: el título es un campo de
 #     compromiso inmutable (`bloquear_estado_directo`, `db/esquema.sql`) y
@@ -15,7 +15,7 @@
 #     copia de cómo habían quedado las tareas al final de las sesiones 1 y 2.
 #
 # Se carga con:
-#   python -m prisma sembrar corework --semilla espacios/corework.semilla-ficticia.yaml
+#   python -m leda sembrar corework --semilla espacios/corework.semilla-ficticia.yaml
 #
 # en un espacio recién importado con `importar corework --activar` y sin
 # ninguna tarea todavía: `sembrar` rechaza si el espacio ya tiene alguna, para

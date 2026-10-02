@@ -1,7 +1,7 @@
 id: b-0011
 objetivo: >
   El mensaje se retracta a sí mismo y termina en duda explícita. Observar si
-  Prisma frena y pregunta qué quiere hacer en vez de tomar la primera
+  Leda frena y pregunta qué quiere hacer en vez de tomar la primera
   instrucción, la segunda, o inventar una tercera.
 actor: Marcos Tarquini
 mensajes:

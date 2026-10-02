@@ -12,10 +12,10 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from prisma import escalera, herramientas as H, reloj
-from prisma.autoridad import Canal, Denegado, identificar
-from prisma.calendario import Calendario
-from prisma.db import admin, espacio
+from leda import escalera, herramientas as H, reloj
+from leda.autoridad import Canal, Denegado, identificar
+from leda.calendario import Calendario
+from leda.db import admin, espacio
 
 BA = ZoneInfo("America/Argentina/Buenos_Aires")
 
@@ -55,7 +55,7 @@ def _tarea(cur, ws, *, area="ot", persona="Marcos Tarquini",
     # —de qué depende cuál es "el estado previo"— quedaría indefinido.
     cur.execute(
         "insert into task_state_event (task_id, estado_nuevo, actor_kind, at) "
-        "values (%s, %s, 'prisma', clock_timestamp())", (t, estado_inicial))
+        "values (%s, %s, 'leda', clock_timestamp())", (t, estado_inicial))
     return str(t)
 
 
@@ -277,7 +277,7 @@ def test_estado_previo_a_bloqueo_respeta_el_aislamiento_entre_espacios(
     """Corrección tras revisión (defecto 3, invariante #1 de AGENTS.md).
 
     `estado_previo_a_bloqueo` es `security definer`. Que su dueño no salte la
-    RLS (`prisma_owner nobypassrls`) no alcanza como evidencia si nadie
+    RLS (`leda_owner nobypassrls`) no alcanza como evidencia si nadie
     ejercita la política desde una sesión de otro espacio: se comprueba acá.
     """
     north = intake_world["north-lab"]
@@ -337,7 +337,7 @@ def test_registrar_bloqueo_sobre_tarea_ya_bloqueada_no_duplica_el_evento(corewor
         cur.execute("select count(*) n from blocker where task_id = %s", (tid,))
         assert cur.fetchone()["n"] == 2
 
-    # task_state_event es append-only y prisma_app no lo lee: se verifica
+    # task_state_event es append-only y leda_app no lo lee: se verifica
     # por la conexión administrativa, igual que el resto del esquema.
     with admin(conn) as cur:
         cur.execute(

@@ -17,13 +17,13 @@ from datetime import datetime, timezone
 
 import pytest
 
-from prisma import gateway
-from prisma import jev as jev_modulo
-from prisma import pendientes as P
-from prisma.agente import NoProponer, repite_lo_pendiente
-from prisma.db import admin, espacio
-from prisma.jev import ClienteJevGuionado
-from prisma.llm import (IntentAction, IntentRoute, Llamada, RespectoPendiente,
+from leda import gateway
+from leda import jev as jev_modulo
+from leda import pendientes as P
+from leda.agente import NoProponer, repite_lo_pendiente
+from leda.db import admin, espacio
+from leda.jev import ClienteJevGuionado
+from leda.llm import (IntentAction, IntentRoute, Llamada, RespectoPendiente,
                         Respuesta)
 
 from tests.test_menu_tarea import (_abrir_menu, _bloquear, _mensaje, _opciones,

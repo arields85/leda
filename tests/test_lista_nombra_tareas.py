@@ -13,11 +13,11 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from prisma import contexto
-from prisma.agente import MAX_TAREAS_NOMBRADAS, _nombrar_tareas_listadas, responder
-from prisma.calendario import Calendario
-from prisma.db import admin, espacio
-from prisma.llm import Llamada, Respuesta
+from leda import contexto
+from leda.agente import MAX_TAREAS_NOMBRADAS, _nombrar_tareas_listadas, responder
+from leda.calendario import Calendario
+from leda.db import admin, espacio
+from leda.llm import Llamada, Respuesta
 from tests.test_lista_botones import (_con_proveedor, _quien, _tarea,
                                       _tareas_en_orden)
 
@@ -236,8 +236,8 @@ def test_un_turno_sin_efecto_no_antepone_filas_a_la_respuesta_reescrita(
         conn, corework, monkeypatch):
     """El turno leyó tareas pero además intentó un cambio que no se aplicó: la
     respuesta es el aviso "sin cambios", no una lista."""
-    from prisma.agente import NoProponer
-    from prisma.salida import NO_EFFECT_STATUS
+    from leda.agente import NoProponer
+    from leda.salida import NO_EFFECT_STATUS
     ws = corework.workspace_id
     tid = _dos_tareas(conn, ws)
     guion = [
@@ -288,7 +288,7 @@ def test_un_turno_que_ofrece_opciones_no_recibe_filas(conn, corework, monkeypatc
 
 
 def test_un_turno_que_no_cierra_no_recibe_filas(conn, corework, monkeypatch):
-    from prisma.agente import INCOMPLETO, MAX_VUELTAS
+    from leda.agente import INCOMPLETO, MAX_VUELTAS
     ws = corework.workspace_id
     _dos_tareas(conn, ws)
     guion = [Respuesta(texto="Sigo.", llamadas=[Llamada(f"c{n}", "consultar_tareas", {})])
@@ -300,7 +300,7 @@ def test_un_turno_que_no_cierra_no_recibe_filas(conn, corework, monkeypatch):
 
 
 def test_un_turno_con_incidente_no_recibe_filas(conn, corework, monkeypatch):
-    from prisma.agente import DISCULPA
+    from leda.agente import DISCULPA
     ws = corework.workspace_id
     _dos_tareas(conn, ws)
     guion = [Respuesta(llamadas=[Llamada("c1", "consultar_tareas", {})])]
@@ -312,7 +312,7 @@ def test_un_turno_con_incidente_no_recibe_filas(conn, corework, monkeypatch):
             return super().responder(sistema, mensajes, herramientas)
 
     proveedor = _Cae(guion=guion)
-    monkeypatch.setattr("prisma.llm.desde_base", lambda cur, ws, key: proveedor)
+    monkeypatch.setattr("leda.llm.desde_base", lambda cur, ws, key: proveedor)
     with espacio(conn, ws) as cur:
         quien = _quien(cur, "Marcos Tarquini", ws)
         r = responder(cur, quien, "qué tengo pendiente", proveedor,
@@ -355,7 +355,7 @@ def test_un_titulo_vacio_no_cuenta_como_nombrado_ni_produce_fila():
 
 
 def test_sobre_la_tarea_resuelta_exige_el_titulo_entero():
-    from prisma.agente import _nombrar_tareas_sin_mencionar
+    from leda.agente import _nombrar_tareas_sin_mencionar
     salida = _nombrar_tareas_sin_mencionar(
         "Sólo va bien Revisar variador 2.",
         {"a": "Revisar variador", "b": "Revisar variador 2"})

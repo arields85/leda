@@ -11,7 +11,7 @@ import dataclasses
 import inspect
 import textwrap
 
-from prisma import herramientas as H
+from leda import herramientas as H
 from tests.test_botones import cliente  # noqa: F401
 from tests.test_vista_previa_en_filas import _confirmar
 

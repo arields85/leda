@@ -8,7 +8,7 @@ receta en `docs/architecture/interpretacion-y-confirmacion.md` §5.6, §5.8 y §
 
 ## Objetivo
 
-Que Prisma sepa a qué tarea se refiere un mensaje antes de actuar, y que ante la
+Que Leda sepa a qué tarea se refiere un mensaje antes de actuar, y que ante la
 duda pregunte con botones en lugar de adivinar. Hoy el modelo de conversación
 extrae y resuelve la referencia a la vez, sin señal de duda.
 
@@ -23,7 +23,7 @@ extrae y resuelve la referencia a la vez, sin señal de duda.
 - `NecesitaElegir` + `pendientes.registrar` + `gateway._toque` ya resuelven una
   elección con botones (hoy sólo personas con nombre repetido). Es el antecedente a
   generalizar. No existe una opción "Ninguna, lo escribo".
-- `config.py` no tiene `PRISMA_OPENROUTER_API_KEY`; no hay cliente de Jev.
+- `config.py` no tiene `LEDA_OPENROUTER_API_KEY`; no hay cliente de Jev.
 
 ## Alcance
 
@@ -43,7 +43,7 @@ sólo como etiqueta de los botones); decir "no encuentro esa tarea" (§5.9 punto
   propuesta completa ("Pasar «X» a revisión"); cuando no lo es, el botón nombra la
   tarea con su responsable. En los dos casos, elegir lleva a la vista previa de
   siempre, con Confirmar, Modificar y Cancelar.
-- **Si Jev no responde,** Prisma no adivina: pide que la persona diga a qué tarea
+- **Si Jev no responde,** Leda no adivina: pide que la persona diga a qué tarea
   se refiere.
 - **Sólo viajan datos del espacio actual** (títulos, áreas, responsables, glosario
   y el texto del mensaje), leídos bajo el cursor con RLS.
@@ -51,7 +51,7 @@ sólo como etiqueta de los botones); decir "no encuentro esa tarea" (§5.9 punto
 ## Tareas
 
 - [x] **T1 — Cliente de Jev y resolución.** `Config.openrouter_api_key`
-  (`PRISMA_OPENROUTER_API_KEY`); cliente de la API de decisiones de OpenRouter;
+  (`LEDA_OPENROUTER_API_KEY`); cliente de la API de decisiones de OpenRouter;
   doble guionado para pruebas; función que aplica la receta (alcance, tarea,
   cortes 0,6 / 0,5 / 0,85 con 0,4 de margen / candidatas ≥ 0,1, verificación < 0,5
   → preguntar) y devuelve clara, ambigua o ninguna.
@@ -138,12 +138,12 @@ Previsión: bastante más de 400 líneas en total, repartidas en seis tareas.
 - 2026-09-24: **T1 cerrada.** Ruta: delegada, un escritor (T1 tiene su fila propia
   en "Ruta"; `config.py`, cliente nuevo, pruebas). TDD estricto: RED observado con
   `.venv/Scripts/python.exe -m pytest -q tests/test_jev.py` (`ModuleNotFoundError:
-  No module named 'prisma.jev'`, 1 error), GREEN con el mismo comando (18 passed).
+  No module named 'leda.jev'`, 1 error), GREEN con el mismo comando (18 passed).
   Suite completa: `.venv/Scripts/python.exe -m pytest -q` → **554 passed, 90
   deselected** (536 + 18 nuevos, 0 regresiones, 173,87 s).
-  - `src/prisma/config.py`: agregado `Config.openrouter_api_key` desde
-    `PRISMA_OPENROUTER_API_KEY`, mismo patrón que `llm_api_key`.
-  - `src/prisma/jev.py` (nuevo): `ClienteJev` (httpx, `POST
+  - `src/leda/config.py`: agregado `Config.openrouter_api_key` desde
+    `LEDA_OPENROUTER_API_KEY`, mismo patrón que `llm_api_key`.
+  - `src/leda/jev.py` (nuevo): `ClienteJev` (httpx, `POST
     https://openrouter.ai/api/alpha/decisions`, bearer, reintentos acotados —
     `intentos` por defecto 4 — para timeouts y 429/5xx con espera creciente
     inyectable vía `dormir`; errores no reintentables como 401 no reintentan;
@@ -173,7 +173,7 @@ Previsión: bastante más de 400 líneas en total, repartidas en seis tareas.
   - **Bloqueado:** `.env.ejemplo` no se pudo leer ni editar — el permiso de la
     sesión deniega cualquier archivo `.env*`, incluida la plantilla pública que
     `AGENTS.md` permite explícitamente. No se tocó ese archivo; falta agregar
-    `PRISMA_OPENROUTER_API_KEY=` a mano o en una sesión con ese permiso
+    `LEDA_OPENROUTER_API_KEY=` a mano o en una sesión con ese permiso
     habilitado.
   - No se conectó a `gateway`/`agente` (es T3). No hubo commit (no pedido
     explícito).
@@ -187,7 +187,7 @@ Previsión: bastante más de 400 líneas en total, repartidas en seis tareas.
   `.venv/Scripts/python.exe -m pytest -q tests/test_jev.py` → **18 failed, 12
   passed** (las pruebas de la receta esperaban ids reales/claves cortas y las de
   malformado esperaban `JevError` que todavía no se lanzaba). GREEN con el mismo
-  comando → **30 passed**. Arreglos en `src/prisma/jev.py`:
+  comando → **30 passed**. Arreglos en `src/leda/jev.py`:
   - `resolver_referencia_tarea` arma claves cortas `"T1".."Tn"` en el orden de
     `tareas` para el `criteria` de la pregunta "tarea", manda esas claves a Jev,
     y traduce la respuesta de vuelta al `id` real de cada `TareaCandidata`
@@ -211,12 +211,12 @@ Previsión: bastante más de 400 líneas en total, repartidas en seis tareas.
     `gateway`/`agente`.
   - **Commit:** `158a410` ("feat: add a Jev client that resolves which task a
     reference means"), pedido explícito del usuario -- cierra T1 (incluye
-    `.env.ejemplo` con `PRISMA_OPENROUTER_API_KEY=`, `src/prisma/jev.py`,
+    `.env.ejemplo` con `LEDA_OPENROUTER_API_KEY=`, `src/leda/jev.py`,
     `tests/test_jev.py` y este documento).
 - 2026-09-24: **T2 cerrada.** Ruta: delegada, un escritor (T2 tiene su fila
   propia en "Ruta"; `llm.py` en los tres proveedores, pruebas). TDD estricto:
   RED observado con `.venv/Scripts/python.exe -m pytest -q
-  tests/test_llm_protocol.py` (`AttributeError: module 'prisma.llm' has no
+  tests/test_llm_protocol.py` (`AttributeError: module 'leda.llm' has no
   attribute 'MAX_LONGITUD_REFERENCIA'`, error de colección) y con
   `.venv/Scripts/python.exe -m pytest -q tests/banco/test_corrida.py -k
   "trabajos_y_personas or grabacion_vieja"` (2 failed:
@@ -226,7 +226,7 @@ Previsión: bastante más de 400 líneas en total, repartidas en seis tareas.
   passed, 90 deselected**. Suite completa: `.venv/Scripts/python.exe -m
   pytest -q` → **605 passed, 90 deselected** (566 + 39 nuevas, 0 regresiones,
   179,10 s).
-  - `src/prisma/llm.py`: `IntentRoute` gana `trabajos` y `personas` (tuplas
+  - `src/leda/llm.py`: `IntentRoute` gana `trabajos` y `personas` (tuplas
     inmutables, default `()`); `ROUTER_TOOL["input_schema"]` gana las
     propiedades `trabajos`/`personas` (`array` de `string`, no requeridas) --
     las tres implementaciones de `route_intent` (`ProveedorAnthropic`,
@@ -308,7 +308,7 @@ Previsión: bastante más de 400 líneas en total, repartidas en seis tareas.
     `MAX_REFERENCIAS_POR_CAMPO` -- degrada **el campo entero** a `()`; no hay
     rescate ítem por ítem (todo o nada, simple y predecible, como pidió la
     revisión). Ausente sigue siendo `()`. La política queda documentada en
-    el docstring de `_referencias_o_vacio` en `src/prisma/llm.py`.
+    el docstring de `_referencias_o_vacio` en `src/leda/llm.py`.
   - `tests/test_llm_protocol.py`: los siete casos de `trabajos`/`personas`
     salieron de `INVALID_ENVELOPES`; entraron a `DEGRADED_REFERENCE_PAYLOADS`
     (ocho casos -- se sumó `personas-blank-entry` para dejar a `personas` con
@@ -331,7 +331,7 @@ Previsión: bastante más de 400 líneas en total, repartidas en seis tareas.
     que la reproduzca.
   - **Commit:** `0dcef8b` ("feat: make the intent router return the
     references it mentions"), pedido explícito del usuario -- cierra T2
-    (incluye `src/prisma/llm.py`, `tests/test_llm_protocol.py`,
+    (incluye `src/leda/llm.py`, `tests/test_llm_protocol.py`,
     `tests/banco/corrida.py`, `tests/banco/test_corrida.py` y este
     documento).
 - 2026-09-24: **T3 cerrada.** Ruta: delegada, un escritor (T3 tiene su fila
@@ -339,7 +339,7 @@ Previsión: bastante más de 400 líneas en total, repartidas en seis tareas.
   también `jev.py` y `tests/banco/corrida.py`, extensión natural de la
   fábrica de Jev y del banco). TDD estricto: RED observado con
   `.venv/Scripts/python.exe -m pytest -q tests/test_resolucion_referencias.py`
-  (`AttributeError: <module 'prisma.jev' ...> has no attribute 'desde_base'`,
+  (`AttributeError: <module 'leda.jev' ...> has no attribute 'desde_base'`,
   7 failed / 1 passed -- la prueba que pasaba de entrada fue la de "sin
   credencial", antes de la corrección del usuario, porque no hacía falta
   código nuevo para no cambiar nada). GREEN con el mismo comando -- **9
@@ -350,7 +350,7 @@ Previsión: bastante más de 400 líneas en total, repartidas en seis tareas.
   - `.venv/Scripts/python.exe -m pytest -q` → **618 passed, 90 deselected**
     (609 + 9 nuevas, 0 regresiones, 249,41 s).
   - **Decisión del usuario, 2026-09-24 (cambio de requisito a mitad de
-    tarea):** sin `PRISMA_OPENROUTER_API_KEY`, Prisma **no** sigue como si
+    tarea):** sin `LEDA_OPENROUTER_API_KEY`, Leda **no** sigue como si
     Jev no existiera. Con referencias en el mensaje, la falta de credencial
     se trata igual que un `JevError` en cada una -- se le pide al modelo que
     pregunte, nunca que elija solo -- y además deja un incidente (sin
@@ -358,26 +358,26 @@ Previsión: bastante más de 400 líneas en total, repartidas en seis tareas.
     pase inadvertida. Un mensaje sin referencias no se toca. Reemplaza el
     criterio original de T3 ("si la clave está vacía, saltear la resolución
     por completo... para que las pruebas y los despliegues sin la clave no
-    cambien"): ese criterio hubiera dejado a Prisma adivinando en cualquier
+    cambien"): ese criterio hubiera dejado a Leda adivinando en cualquier
     despliegue sin la clave configurada, que es justo lo que esta unidad
     existe para evitar.
-  - `src/prisma/jev.py`: `desde_base(api_key) -> Jev | None` -- `None` si
+  - `src/leda/jev.py`: `desde_base(api_key) -> Jev | None` -- `None` si
     `api_key` está vacía, si no un `ClienteJev`. Mismo patrón de reemplazo
     que `llm.desde_base`: un import local en `_turno` lee este nombre del
     módulo en cada turno, así que alcanza con reemplazar
-    `prisma.jev.desde_base` para las pruebas y para que el banco no llame a
+    `leda.jev.desde_base` para las pruebas y para que el banco no llame a
     Jev de verdad por defecto.
-  - `src/prisma/contexto.py`: extraídas `_glosario_filas` y `_lineas_glosario`
+  - `src/leda/contexto.py`: extraídas `_glosario_filas` y `_lineas_glosario`
     de adentro de `construir()`, y agregada `vocabulario(cur, workspace_id)
     -> str` (mismo glosario en texto plano, vacío si no hay) -- para no
     repetir la consulta y para que `gateway.py` pueda pasarle el mismo
     vocabulario del equipo a Jev (ADR 0006, "sólo viajan datos del espacio
     actual"). `construir()` se comporta igual que antes (probado por
     `test_contexto_lleva_nucleo_glosario_y_equipo`, sin tocar).
-  - `src/prisma/agente.py`: `responder()` gana `contexto_referencias: str |
+  - `src/leda/agente.py`: `responder()` gana `contexto_referencias: str |
     None = None`, agregado al sistema igual que `modificacion` -- contexto
     de confianza del servidor, nunca texto de la persona.
-  - `src/prisma/gateway.py`, en `_turno` (después de `route_intent`, antes
+  - `src/leda/gateway.py`, en `_turno` (después de `route_intent`, antes
     de decidir alta guiada vs. `agente.responder`):
     `_resolver_referencias_del_turno` arma las tareas activas del espacio
     (`_tareas_activas`: `estado not in ('terminada', 'cancelada')`, con
@@ -413,7 +413,7 @@ Previsión: bastante más de 400 líneas en total, repartidas en seis tareas.
     opcional y reemplaza `jev.desde_base` con el mismo patrón que ya usa
     para `llm.desde_base` (guardar el original, reemplazar, restaurar en el
     `finally`). Por defecto es un `ClienteJevGuionado(guion=[])` --
-    explícito, nunca `None` (que desde esta unidad hace que Prisma pida en
+    explícito, nunca `None` (que desde esta unidad hace que Leda pida en
     vez de adivinar) -- pero sin ninguna respuesta preparada, así que el
     banco no llama a la red por defecto; ningún escenario actual trae
     `trabajos` que lo ejerciten (T6 va a agregar un grabador real de Jev).
@@ -507,7 +507,7 @@ Previsión: bastante más de 400 líneas en total, repartidas en seis tareas.
   tests/test_gateway.py tests/test_agente.py tests/banco` → **215 passed, 90
   deselected**. Suite completa: `.venv/Scripts/python.exe -m pytest -q` →
   **634 passed, 90 deselected** (618 + 16 nuevas, 0 regresiones, 138,51 s).
-  - `src/prisma/jev.py`: `resolver_referencia_tarea` gana `quien_escribe:
+  - `src/leda/jev.py`: `resolver_referencia_tarea` gana `quien_escribe:
     str | None = None`; si se pasa, entra como `state["quien_escribe"]` en
     las dos llamadas (alcance/tarea y verificación) -- nunca como texto
     agregado a `INSTRUCCION_ALCANCE`/`INSTRUCCION_TAREA`/
@@ -515,7 +515,7 @@ Previsión: bastante más de 400 líneas en total, repartidas en seis tareas.
     campo `TareaCandidata.responsable_membership_id` (opcional, default
     `None`) -- no entra en `criterio()` (lo único que viaja a Jev), sólo
     sirve del lado de `gateway.py` para ordenar los botones.
-  - `src/prisma/gateway.py` (la mayor parte de esta unidad):
+  - `src/leda/gateway.py` (la mayor parte de esta unidad):
     - Constantes nuevas: `_SENTINEL_ACLARACION` (el `herramienta` de una
       `pending_action` de aclaración -- nunca un nombre real de
       `herramientas.REGISTRO`, así que `_toque` la intercepta antes de
@@ -582,7 +582,7 @@ Previsión: bastante más de 400 líneas en total, repartidas en seis tareas.
       sigue sin arrancar el alta guiada nunca, sigue yendo siempre a
       `agente.responder`; lo nuevo es que ese mensaje ya no le llega al
       modelo a resolver solo.
-    - `src/prisma/pendientes.py`: `pending_action_id_de` (el id de la
+    - `src/leda/pendientes.py`: `pending_action_id_de` (el id de la
       acción pendiente dueña de un token) y `marcar_para_corregir` (deja
       `modificar_pedido_en`/invalida cualquier otra Modificación sin leer de
       la misma persona y chat) -- **decisión de reuso, no de SQL nueva:** no
@@ -642,7 +642,7 @@ Previsión: bastante más de 400 líneas en total, repartidas en seis tareas.
   ninguna` → **2 failed, 2 passed** (el mensaje de aclaración nunca llegaba a
   `route_intent`, y una referencia nueva en ese mensaje no se resolvía).
   GREEN con el mismo comando → **4 passed**. Arreglo en
-  `src/prisma/gateway.py`: `_resumir_aclaracion_ninguna` ahora rutea
+  `src/leda/gateway.py`: `_resumir_aclaracion_ninguna` ahora rutea
   (`route_intent`) y resuelve (`_resolver_referencias_del_turno`) el mensaje
   de aclaración como cualquier turno -- mismo camino que ya usa la
   corrección real de Modificar -- y arma su propio bloque de contexto (no
@@ -671,7 +671,7 @@ Previsión: bastante más de 400 líneas en total, repartidas en seis tareas.
 - 2026-09-24: **T5 cerrada.** Ruta: delegada, un escritor (T5 tiene su fila
   propia en "Ruta"; `agente.py`, `contexto.py`, `gateway.py`, pruebas). TDD
   estricto: RED observado guardando (`git stash`) los tres archivos de
-  `src/prisma` tocados por esta unidad y corriendo
+  `src/leda` tocados por esta unidad y corriendo
   `.venv/Scripts/python.exe -m pytest -q tests/test_respuestas_nombran_tarea.py
   tests/test_resolucion_referencias.py` sobre el código de T4 sin tocar --
   **6 failed, 9 passed** (los 4 casos nuevos de `test_respuestas_nombran_
@@ -774,7 +774,7 @@ Previsión: bastante más de 400 líneas en total, repartidas en seis tareas.
   → **1 failed** (la respuesta salía sin la línea "Sobre «…»:", porque sin
   llamar a `consultar_tareas` la condición vieja nunca se cumplía). GREEN
   implementando la corrección con el mismo comando.
-  - `src/prisma/agente.py`: `responder` cambia `tareas_resueltas_claras` de
+  - `src/leda/agente.py`: `responder` cambia `tareas_resueltas_claras` de
     `tuple[str, ...]` (sólo ids) a `dict[str, str]` (id de tarea → título);
     se eliminó por completo `tareas_consultadas` -- el parámetro nuevo de
     `_ejecutar_una`, el bloque que lo llenaba sólo para `consultar_tareas`, y
@@ -783,7 +783,7 @@ Previsión: bastante más de 400 líneas en total, repartidas en seis tareas.
     que devolvió una herramienta. `_nombrar_tareas_sin_mencionar` queda con
     una sola entrada, sin el chequeo `or not tareas_consultadas` que antes
     apagaba la protección sin tool call.
-  - `src/prisma/gateway.py`: `_ReferenciasResueltas` gana
+  - `src/leda/gateway.py`: `_ReferenciasResueltas` gana
     `titulos_resueltas: dict[str, str]` (id de tarea → título, sólo las
     claras), calculado en `_resolver_referencias_del_turno` desde `por_id`
     (las tareas activas del espacio, ya cargadas para armar el bloque de
@@ -885,7 +885,7 @@ Previsión: bastante más de 400 líneas en total, repartidas en seis tareas.
   - **Jev real en el modelo real (punto 2).** `tests/banco/conftest.py`:
     `_cliente_jev_real_o_falla(config, *, desde_base=None)` (función pura,
     testeada con un `Config` fabricado, sin red) -- sin
-    `PRISMA_OPENROUTER_API_KEY` llama a `pytest.fail` con un mensaje que
+    `LEDA_OPENROUTER_API_KEY` llama a `pytest.fail` con un mensaje que
     explica por qué (nunca degrada al guionado vacío, que haría que
     cualquier escenario con referencia termine preguntando siempre -- el
     defecto que esta unidad corrige, visible en vez de silencioso, como
@@ -934,7 +934,7 @@ Previsión: bastante más de 400 líneas en total, repartidas en seis tareas.
       con las dos candidatas y `elegir` la primera; espera
       `actualizar_estado` sobre esa tarea. Deliberadamente NO reusa el
       mensaje de b-0008 (que es idéntico en texto y en tareas de
-      precondición, pero verifica lo contrario: que Prisma frene y
+      precondición, pero verifica lo contrario: que Leda frene y
       pregunte en texto, sin tocar nada) -- son la misma ambigüedad
       probada de dos maneras: b-0008 se queda en la pregunta, b-0013 sigue
       la aclaración con botones hasta el final.
@@ -991,7 +991,7 @@ Previsión: bastante más de 400 líneas en total, repartidas en seis tareas.
     `.venv/Scripts/python.exe -m pytest -m modelo_real tests/banco --banco-n 10 --banco-proveedor nan --banco-modelo deepseek-v4-flash --banco-escenario b-0013`
     (repetir con `b-0014`, `b-0015`, `b-0005`, `b-0005-a`, `b-0005-b`; sin
     `--banco-escenario` corre todo el corpus). Requiere
-    `PRISMA_OPENROUTER_API_KEY` configurada -- sin ella, `cliente_jev_real`
+    `LEDA_OPENROUTER_API_KEY` configurada -- sin ella, `cliente_jev_real`
     hace fallar la corrida con un mensaje claro en vez de dejarla preguntar
     siempre.
   - No se tocó `docs/` (documentación de T6 es tarea aparte del
@@ -1016,8 +1016,8 @@ Previsión: bastante más de 400 líneas en total, repartidas en seis tareas.
   lo frena. (F) b-0015: el modelo registró un bloqueo en vez de una dependencia. T6
   queda abierta hasta corregir y volver a correr.
 - 2026-09-24: **T7 cerrada (A-D).** Ruta: delegada, un escritor (T7 no tiene fila
-  propia en "Ruta" -- se agrega acá: `src/prisma/llm.py`, `src/prisma/jev.py`,
-  `src/prisma/gateway.py`, `src/prisma/contexto.py`, pruebas en
+  propia en "Ruta" -- se agrega acá: `src/leda/llm.py`, `src/leda/jev.py`,
+  `src/leda/gateway.py`, `src/leda/contexto.py`, pruebas en
   `tests/test_llm_protocol.py`, `tests/test_jev.py`,
   `tests/test_resolucion_referencias.py`, `tests/test_aclaracion_botones.py`,
   `tests/test_agente.py`, `tests/banco/test_corrida.py`). No se tocó `docs/`
@@ -1053,7 +1053,7 @@ Previsión: bastante más de 400 líneas en total, repartidas en seis tareas.
     5 netas -- test_llm_protocol.py +1, test_resolucion_referencias.py +4; el resto
     de los archivos tocados sólo reescribió pruebas existentes o ajustó fixtures --
     0 regresiones, 200,52 s).
-  - **A1 -- `llm.ROUTER_SYSTEM` (`src/prisma/llm.py`):** una sola oración nueva,
+  - **A1 -- `llm.ROUTER_SYSTEM` (`src/leda/llm.py`):** una sola oración nueva,
     en el mismo párrafo medido en T2, sin tocar el resto: "no separes un estado
     (\"revisión\", \"terminado\"), una causa o algo que falta (\"el plano que
     prometieron\", \"el switch que faltaba\"), ni una segunda mención de la
@@ -1069,7 +1069,7 @@ Previsión: bastante más de 400 líneas en total, repartidas en seis tareas.
     nada que comparar). La auditoría (`_auditar_resolucion`) sigue corriendo
     sobre `resultados` completo, sin dedupe -- registra lo que Jev respondió de
     verdad, no lo que se terminó preguntando.
-  - **C -- `TipoResolucion.VARIAS` (`src/prisma/jev.py`):** el alcance
+  - **C -- `TipoResolucion.VARIAS` (`src/leda/jev.py`):** el alcance
     "varias_tareas" (un área, lo de una persona, algo genérico) ahora devuelve
     `ResolucionReferencia(TipoResolucion.VARIAS, candidatas=...)` en vez de
     `AMBIGUA` -- son conceptualmente distintos (abarca varias tareas de verdad,
@@ -1127,7 +1127,7 @@ Previsión: bastante más de 400 líneas en total, repartidas en seis tareas.
     nueva que decida "preguntar o no" según lo demás resuelto en el turno; es
     el modelo el que ahora lee una instrucción condicional en vez de una
     orden.
-  - **D -- preámbulo (`src/prisma/contexto.py`, `PREAMBULO`):** la viñeta que
+  - **D -- preámbulo (`src/leda/contexto.py`, `PREAMBULO`):** la viñeta que
     sólo cubría la creación de una tarea ("La creación de una tarea se resuelve
     antes de este turno...") se reemplaza por una general: "Para cambiar algo
     -- crear, actualizar, asignar, cerrar, lo que sea -- llamá a la herramienta
@@ -1151,7 +1151,7 @@ Previsión: bastante más de 400 líneas en total, repartidas en seis tareas.
     Corrección a una propuesta anterior", "apretó Modificar") -- mismo
     chequeo, ya no falso positivo por el preámbulo.
   - **nucleo/ revisado, sin conflicto y sin tocar** (pedido del encargo):
-    `nucleo/constitucion.md` §7 ("Prisma prepara un borrador, pide confirmación
+    `nucleo/constitucion.md` §7 ("Leda prepara un borrador, pide confirmación
     y sólo entonces ejecuta...") y `nucleo/mecanica-pm.md` §12 ("Un mensaje que
     requiere confirmación humana espera en la cola...") describen la
     obligación de confirmar a nivel de negocio, sin fijar el medio (texto vs.
@@ -1169,7 +1169,7 @@ Previsión: bastante más de 400 líneas en total, repartidas en seis tareas.
   separación en algunos casos pero perdía tareas reales: 55 de 60 iguales a la
   extracción separada, contra 57 de 60 con la redacción medida en T2 sin tocar;
   el caso concreto perdido fue "el switch" en "El switch ya se cambio ahora
-  queda el tablero de la 4". `src/prisma/llm.py`: `ROUTER_SYSTEM` vuelve a la
+  queda el tablero de la 4". `src/leda/llm.py`: `ROUTER_SYSTEM` vuelve a la
   redacción exacta de T2 (revierte la oración agregada por A1). `tests/
   test_llm_protocol.py`: `test_router_system_excludes_states_causes_and_
   repeated_mentions` (A1) se reemplaza por `test_router_system_keeps_the_
@@ -1181,7 +1181,7 @@ Previsión: bastante más de 400 líneas en total, repartidas en seis tareas.
 - 2026-09-24: **T7, segunda ronda (E, G, H, I) cerrada.** Motivo: segunda
   corrida del banco real (77 passed, 22 failed) tras la primera tanda de
   arreglos. Ruta: delegada, un escritor (misma fila de T7 en "Ruta", se
-  extiende a `src/prisma/gateway.py`, `src/prisma/jev.py`,
+  extiende a `src/leda/gateway.py`, `src/leda/jev.py`,
   `tests/banco/comprobadores.py`, pruebas en `tests/test_resolucion_
   referencias.py`, `tests/test_aclaracion_botones.py`, `tests/test_jev.py`,
   `tests/banco/test_comprobadores.py`). No se tocó `docs/` ni `nucleo/`
@@ -1292,7 +1292,7 @@ Previsión: bastante más de 400 líneas en total, repartidas en seis tareas.
 - 2026-09-24: **T7, tercera ronda (J, K, L) cerrada.** Motivo: tercera corrida
   del banco real (84 passed, 15 failed) tras la segunda tanda de arreglos.
   Ruta: delegada, un escritor (misma fila de T7 en "Ruta", se extiende a
-  `src/prisma/herramientas.py`, `src/prisma/jev.py`, pruebas en
+  `src/leda/herramientas.py`, `src/leda/jev.py`, pruebas en
   `tests/test_agente.py`, `tests/test_jev.py`). No se tocó `docs/` (el
   orquestador ya había sumado el diseño §5.11) ni `nucleo/` -- se lo leyó
   para K, ver más abajo -- ni ningún `.env*`. `pg_isready` verificado antes de
@@ -1355,7 +1355,7 @@ Previsión: bastante más de 400 líneas en total, repartidas en seis tareas.
     se describe así -- es "causa, impacto y fecha", con pasos de gestión
     (proponer soluciones, preguntar si otro integrante puede ayudar,
     escalar) que sólo tienen sentido para algo fuera del control directo del
-    equipo; `constitucion.md` §6 ya decía que ante un bloqueo Prisma "no
+    equipo; `constitucion.md` §6 ya decía que ante un bloqueo Leda "no
     intenta resolver técnicamente... actuando sobre los sistemas", coherente
     con una causa externa. Ninguna sección usa la frase "causa externa"
     textualmente -- la redacción de las dos herramientas es una síntesis de
@@ -1414,7 +1414,7 @@ Previsión: bastante más de 400 líneas en total, repartidas en seis tareas.
   → **2 failed** (una prueba nueva con 0,91/0,09 esperando ambigua seguía
   dando clara; otra esperando que "rival" viajara igual con una subcampeona
   débil no lo encontraba en la llamada). GREEN sacando el corte en
-  `src/prisma/jev.py` (`if len(ordenadas) > 1:` en vez de `if len(ordenadas) >
+  `src/leda/jev.py` (`if len(ordenadas) > 1:` en vez de `if len(ordenadas) >
   1 and ordenadas[1][1] >= CORTE_CANDIDATA:`) con el mismo comando → **2
   passed**.
   - `tests/test_jev.py`: prueba nueva
@@ -1463,7 +1463,7 @@ Previsión: bastante más de 400 líneas en total, repartidas en seis tareas.
   vez de crear la dependencia. El orquestador midió tres redacciones (diseño
   §5.12, sin commitear -- no se tocó `docs/`) y adoptó la v2, que pregunta
   por la REFERENCIA en vez del mensaje. Ruta: delegada, un escritor (misma
-  fila de T7 en "Ruta", se extiende a `src/prisma/jev.py`,
+  fila de T7 en "Ruta", se extiende a `src/leda/jev.py`,
   `tests/banco/comprobadores.py`, pruebas en `tests/test_jev.py`,
   `tests/banco/test_comprobadores.py`). No se tocó `docs/` ni `nucleo/` ni
   ningún `.env*`. `pg_isready` verificado antes de empezar. TDD estricto,
@@ -1538,6 +1538,6 @@ Previsión: bastante más de 400 líneas en total, repartidas en seis tareas.
   subcadena); `tests/banco/corrida.py:124-128` (sugerencia: grabador de Jev y la
   referencia); `tests/test_resolucion_referencias.py:329-351` (advertencia: la prueba de
   descarte de redundantes usa "revisión", que ahora descarta el filtro de estados, así
-  que no prueba el descarte); `src/prisma/gateway.py:968-982` (advertencia: el
+  que no prueba el descarte); `src/leda/gateway.py:968-982` (advertencia: el
   vocabulario de estados puede descartar una referencia real como "la lista").
 

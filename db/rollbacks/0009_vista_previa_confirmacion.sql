@@ -7,7 +7,7 @@
 -- column in its output) before dropping the column it read from, so no
 -- function is ever left pointing at a column that does not exist.
 begin;
-set search_path = prisma, public;
+set search_path = leda, public;
 
 drop function if exists resolver_pendiente(text, uuid, timestamptz);
 
@@ -18,7 +18,7 @@ language plpgsql security definer as $$
 declare
   o record;
   a record;
-  ws uuid := nullif(current_setting('prisma.workspace_id', true), '')::uuid;
+  ws uuid := nullif(current_setting('leda.workspace_id', true), '')::uuid;
 begin
   select * into o from pending_action_option
    where token = p_token and (ws is null or workspace_id = ws);
@@ -78,7 +78,7 @@ comment on function resolver_pendiente is
   'Resuelve una acción pendiente por el token de una de sus opciones. Atómica: el doble toque de un botón ejecuta una sola vez.';
 
 alter function resolver_pendiente(text, uuid, timestamptz)
-  owner to prisma_owner;
+  owner to leda_owner;
 
 alter table pending_action drop column if exists huella;
 

@@ -1,6 +1,6 @@
 # Estado actual
 
-**Alcance:** Prisma es un producto de gestión de proyectos multi-tenant. CoreWork es
+**Alcance:** Leda es un producto de gestión de proyectos multi-tenant. CoreWork es
 su primer cliente, no su definición.
 
 **Última actualización documental:** 2026-10-01.
@@ -11,7 +11,7 @@ Historia de sesiones y unidades cerradas:
 
 ## Resumen
 
-Prisma se define como producto ofrecible a varios clientes, con superficie
+Leda se define como producto ofrecible a varios clientes, con superficie
 conversacional, superficie de lectura y eventual aplicación móvil. La capa de datos
 funciona (sabe con quién habla, no mezcla tareas de otras personas, los flujos de alta,
 entrega y aprobación avanzan de punta a punta), pero la conversación se siente
@@ -23,7 +23,7 @@ experimento A/B de redacción, criterios, moratoria de parches de conversación 
 posterior de flujo contra modelo) y se congeló la funcionalidad nueva (ver "Próximo
 paso").
 
-Gobiernan: [`product/que-es-prisma.md`](product/que-es-prisma.md), [`architecture/frontera.md`](architecture/frontera.md),
+Gobiernan: [`product/que-es-leda.md`](product/que-es-leda.md), [`architecture/frontera.md`](architecture/frontera.md),
 [`ROADMAP.md`](ROADMAP.md), [`capacidades.md`](capacidades.md); investigación externa en
 [`research/hermes-agent.md`](research/hermes-agent.md). Superados: [`INDEX.md`](INDEX.md#documentos-superados).
 
@@ -43,7 +43,7 @@ Gobiernan: [`product/que-es-prisma.md`](product/que-es-prisma.md), [`architectur
 - El estado de tarea es proyección de eventos, no campo editable
   (`db/esquema.sql:433,1636`).
 - Superficie HTTP: `POST /telegram/{slug}`, `GET /tablero/{token}` (vista HTML por
-  token) y `GET /salud` (`src/prisma/gateway.py:344,4163,4213`). No existe API de
+  token) y `GET /salud` (`src/leda/gateway.py:344,4163,4213`). No existe API de
   lectura.
 - Migraciones hasta `0025` en `db/migrations/` (la `0024` exime los avisos de
   coordinación del tope diario, la `0025` es Rechazar con motivo). Cada una con
@@ -52,9 +52,9 @@ Gobiernan: [`product/que-es-prisma.md`](product/que-es-prisma.md), [`architectur
   cuarta ronda: entrega con evidencia y revisión (ADR 0009), aprobación que cierra la
   tarea (ADR 0008), cambios pedidos con motivo visible, alta guiada, opciones y menú por
   tarea (ADR 0007). Circuitos A y B completos; C hasta "Enviar a aprobación".
-- Feature previa "Prisma orienta" (T1-T4b) cerrada; ver
-  [`../odd/tasks/prisma-orienta.md`](../odd/tasks/prisma-orienta.md) y su diario en
-  [`historial/`](historial/prisma-orienta-diario-hasta-2026-09-30.md).
+- Feature previa "Leda orienta" (T1-T4b) cerrada; ver
+  [`../odd/tasks/leda-orienta.md`](../odd/tasks/leda-orienta.md) y su diario en
+  [`historial/`](historial/leda-orienta-diario-hasta-2026-09-30.md).
 - Git: el 2026-10-01 se subieron `main`, el tag `pre-renombre-leda` y las ramas
   `feat/flujo-de-un-mensaje`, `feat/flujo-variante-a` y `auxiliar/alta-y-google`, como
   respaldo antes del renombre a Leda. El porqué, lo que quedó local y la limpieza
@@ -86,15 +86,15 @@ eran del arnés y se corrigieron en `ffe4e85`). Corridas anteriores y su detalle
 
 - Sin producción, sin trabajo real cargado, sin Docker ni staging. Telegram real sólo
   con datos ficticios (cuentas de prueba Ariel, Ismael y Marcos).
-- Base `prisma` (local): ronda 4, rearmada dos veces el 2026-09-30, esquema completo
+- Base `leda` (local): ronda 4, rearmada dos veces el 2026-09-30, esquema completo
   hasta `0025`, modelo `nan`/`deepseek-v4-flash`, Ariel administrador. **No se toca**
   hasta terminar el circuito C. Respaldo previo al flujo:
   `db/respaldos/prisma-antes-flujo-20260930.dump`.
-- Base `prisma_flujo`: nueva, para la primera prueba real de la variante B; el `.env`
+- Base `leda_flujo`: nueva, para la primera prueba real de la variante B; el `.env`
   del worktree `flujo-de-un-mensaje` apunta a ella.
 - El listener de `main` está detenido (el usuario lo cortó con Ctrl+C) para liberar el
   bot para el listener del worktree. El listener lo corre el usuario en su propia
-  terminal (`python -m prisma escuchar corework`); las tareas en segundo plano del
+  terminal (`python -m leda escuchar corework`); las tareas en segundo plano del
   agente se cortan por tiempo.
 - Banco real de modelos sobre `main` (2026-09-30, n=1, 111 escenarios; reportes en
   `tests/banco/reportes/banco-20260930T235543Z.json` y siguientes): pasan `deepseek-v4-flash`
@@ -110,7 +110,7 @@ eran del arnés y se corrigieron en `ffe4e85`). Corridas anteriores y su detalle
   funcionalidad nueva). La latencia del banco es por escenario (mediana de flash 13 s),
   no por respuesta: el criterio de 5 s del ADR 0014 necesita la medición por respuesta de
   F6a.
-- Quedan bases residuales `prisma_diag_*`/`prisma_test_*` de corridas viejas en el
+- Quedan bases residuales `leda_diag_*`/`leda_test_*` de corridas viejas en el
   servidor local.
 
 ## Riesgos prioritarios
@@ -119,16 +119,16 @@ eran del arnés y se corrigieron en `ffe4e85`). Corridas anteriores y su detalle
    `telegram_message_id` y no tiene columna de canal (`db/esquema.sql:569,572,612`).
    Bloquea toda superficie que no sea la conversacional.
 2. **Un límite de transporte decide validez de negocio.** `telegram_utf16_units`
-   (`src/prisma/salida.py:103`) se usa para aceptar o rechazar datos de negocio en
-   `src/prisma/ingreso_tareas.py` (uso en `:1921`; `PENDIENTE` recontar los demás).
+   (`src/leda/salida.py:103`) se usa para aceptar o rechazar datos de negocio en
+   `src/leda/ingreso_tareas.py` (uso en `:1921`; `PENDIENTE` recontar los demás).
 3. **No existe grafo de transiciones de estado.** `actualizar_estado` acepta cualquier
    destino del tipo enumerado sin validar que la transición sea legítima
-   (`src/prisma/herramientas.py`, `_preparar_actualizar_estado`, `:1050`).
+   (`src/leda/herramientas.py`, `_preparar_actualizar_estado`, `:1050`).
 4. **`pending_reply` no es operativo.** La tabla y la escalera existen, pero el ingreso
    no crea ni satisface el ciclo de respuesta, de modo que el seguimiento no puede
    afirmar silencio sobre evidencia real.
 5. **`confirmar_borrador_tarea` fija el espacio con el valor que recibe.** Está
-   acotada a `prisma_gateway` y fuera del alcance de `prisma_app`, pero confiar el
+   acotada a `leda_gateway` y fuera del alcance de `leda_app`, pero confiar el
    espacio a quien llama es el patrón que la frontera rechaza.
 6. **La conversación se siente robótica.** El modelo interpreta poco: fechas, objetivo
    y título del alta guiada los resuelven expresiones regulares y listas. Es lo que
@@ -173,7 +173,7 @@ desactualizan con cada cambio, así que conviene contrastar contra el símbolo.
 Orden vigente (2026-10-01). **Moratoria:** no se agregan reglas ni parches de
 conversación de caso; los hallazgos se registran y se clasifican por etapa del ADR 0014.
 
-1. **Circuito C (base `prisma`, código de `main`), corrido el 01/10 a las 09:00: no se
+1. **Circuito C (base `leda`, código de `main`), corrido el 01/10 a las 09:00: no se
    pudo hacer, y dejó tres hallazgos del código de `main`.**
    - **C-1 (falla silenciosa, alta).** La vista previa de aprobación del borrador de Marcos
      vence 8 h después de crearse (creada 30/09 18:19, venció 01/10 02:19), pero quedó
@@ -191,7 +191,7 @@ conversación de caso; los hallazgos se registran y se clasifican por etapa del 
      la persona sin un próximo paso".
    El rechazo con motivo queda por probar con un borrador nuevo.
 2. **Alta conducida por el modelo: primera prueba real hecha (01/10), favorable.** Rama
-   `feat/flujo-de-un-mensaje`, base `prisma_flujo` con `alta = conversada` activado.
+   `feat/flujo-de-un-mensaje`, base `leda_flujo` con `alta = conversada` activado.
    Resultado y **criterios de adopción** en la enmienda del
    [`ADR 0014`](decisions/0014-flujo-de-un-mensaje.md) "Resultado de la primera prueba
    del alta conducida": ningún hallazgo de comprensión; 83 % de los turnos del modelo
@@ -215,7 +215,7 @@ conversación de caso; los hallazgos se registran y se clasifican por etapa del 
    rechazo con motivo con un borrador nuevo.
 
 Lectura de las pruebas: `python tools/leer_conversacion.py [minutos] [desde HH:MM]`
-(con `PYTHONPATH=src` desde el worktree para `prisma_flujo`) muestra la conversación con
+(con `PYTHONPATH=src` desde el worktree para `leda_flujo`) muestra la conversación con
 los botones ofrecidos y la etiqueta de cada toque; no sacar conclusiones sin los botones.
 
 **Funcionalidad nueva congelada** hasta que alta, entrega y aprobación cumplan en una
@@ -232,6 +232,6 @@ verificado con pruebas enfocadas); (2) RDD de `39bbf59..HEAD` con
 `tools/rdd_por_tramos.py`; (3) preguntarle al usuario la decisión (e), qué hace el alta
 cuando quien escribe es de Dirección y no tiene objetivos operativos. `main` sin push:
 sólo documentación y herramientas (`tools/leer_conversacion.py --completo`,
-`tools/leer_turnos_alta.py`, `tools/rdd_por_tramos.py`). Base `prisma_flujo`: `alta =
+`tools/leer_turnos_alta.py`, `tools/rdd_por_tramos.py`). Base `leda_flujo`: `alta =
 conversada` y `stream` activados. Consentimiento permanente para commits y revisiones RDD;
 chequeo de rumbo escrito antes de cada unidad (`AGENTS.md`).

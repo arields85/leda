@@ -9,21 +9,21 @@ contradicciones... sin identificadores").
 
 ## Objetivo
 
-Medir cómo interpreta Prisma mensajes escritos como los escribe una persona real
+Medir cómo interpreta Leda mensajes escritos como los escribe una persona real
 —faltas de ortografía, abreviaturas, sin tildes, nombres mal escritos, frases
 ambiguas— y, sobre todo, si ante una ambigüedad real **frena y pregunta** o adivina
 y ejecuta. Es la línea base para diseñar la aclaración con botones.
 
 ## Problema
 
-Los escenarios `b-0001`..`b-0007` están bien escritos. Su 10/10 mide a Prisma con
+Los escenarios `b-0001`..`b-0007` están bien escritos. Su 10/10 mide a Leda con
 mensajes limpios, que no es el uso real. El banco tampoco tiene una comprobación de
 "ante la duda, preguntó en vez de actuar".
 
 ## Decisión del usuario (2026-09-23)
 
-- La ambigüedad es la parte que más cuesta ajustar de Prisma y hay que frenarla.
-- Solución deseada, a diseñar en una unidad posterior: ante la duda, Prisma ofrece
+- La ambigüedad es la parte que más cuesta ajustar de Leda y hay que frenarla.
+- Solución deseada, a diseñar en una unidad posterior: ante la duda, Leda ofrece
   botones con las interpretaciones posibles (texto corregido de lo que la persona
   quiso decir), más un botón "ninguna de las anteriores" que permite escribir.
 - Orden: primero medir con el banco (esta unidad), después diseñar la aclaración
@@ -89,15 +89,15 @@ para detectar ambigüedad y pedir aclaración en asistentes conversacionales.
     `evidencia.ofrecio_opciones` es verdadero. Si (a) falla: `falla` "actuó
     sin preguntar"; si (a) se cumple pero (b) falla: `falla` "no actuó pero
     tampoco preguntó". 8 tests nuevos (58 en total).
-  - **Cómo se detecta que Prisma ofreció una elección con botones**: la fila
+  - **Cómo se detecta que Leda ofreció una elección con botones**: la fila
     de `message_outbox` de la respuesta tiene `pending_action_id` no nulo
-    (confirmación o elección, `src/prisma/agente.py`
+    (confirmación o elección, `src/leda/agente.py`
     `_encolar_confirmacion`:236-257 / `_encolar_eleccion`:260-279, que
     llaman `enqueue_outbox` con ese id) o `intake_choice_set_id` no nulo
-    (alta guiada de tarea, `src/prisma/ingreso_tareas.py`
+    (alta guiada de tarea, `src/leda/ingreso_tareas.py`
     `_open_choices`:785-811). Es la misma condición que arma los botones al
-    despachar (`src/prisma/despachador.py::_botones`:192-214) y la que fija
-    `has_buttons` en `src/prisma/salida.py::enqueue_outbox`:151-176. Nueva
+    despachar (`src/leda/despachador.py::_botones`:192-214) y la que fija
+    `has_buttons` en `src/leda/salida.py::enqueue_outbox`:151-176. Nueva
     consulta pura en `tests/banco/corrida.py`: `filas_respuesta(cur, ws,
     chat, ids_previos)` trae `id, cuerpo, pending_action_id,
     intake_choice_set_id` de las filas nuevas de `message_outbox`;
@@ -176,7 +176,7 @@ para detectar ambigüedad y pedir aclaración en asistentes conversacionales.
     las dos? Tenés abiertas "Cablear tablero de la máquina 3" y "Revisar
     tablero de la máquina 4". Decime cuál paso a revisión.\n\nY si tenés
     algo para respaldar el trabajo — captura, archivo o el detalle de lo
-    que quedó hecho — pasámelo y lo registro junto con la tarea." Prisma
+    que quedó hecho — pasámelo y lo registro junto con la tarea." Leda
     frenó, no ejecutó ninguna herramienta y preguntó cuál de las dos tareas
     -- exactamente el comportamiento que T3 mide. Reporte de sesión
     (`tests/banco/reportes/`, no versionado, borrado tras la verificación).
@@ -208,7 +208,7 @@ para detectar ambigüedad y pedir aclaración en asistentes conversacionales.
      `intake_choice_set_id`; `pending_action_id` en la elección de
      responsable ambiguo de `crear_borrador_tarea` tampoco es alcanzable
      desde una conversación normal, sólo desde el alta guiada). Los
-     escenarios de T3 miden si Prisma pregunta por **texto libre** ("?"),
+     escenarios de T3 miden si Leda pregunta por **texto libre** ("?"),
      que es el único mecanismo hoy disponible en `normal_conversation` --
      coherente con el objetivo del feature doc de medir la línea base antes
      de diseñar la aclaración con botones.
@@ -218,4 +218,4 @@ para detectar ambigüedad y pedir aclaración en asistentes conversacionales.
   `docs/architecture/interpretacion-y-confirmacion.md`; la línea base con
   mensajes desprolijos se corre cuando ese diseño esté listo para comparar.
   T1-T3 quedan implementados y sin commit (499 passed). Quedó una base de
-  prueba huérfana de la corrida cortada (`prisma_test_b872c563a03b`).
+  prueba huérfana de la corrida cortada (`leda_test_b872c563a03b`).

@@ -23,7 +23,7 @@ import re
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 ESQUEMA = ROOT / "db" / "esquema.sql"
-FUENTE = ROOT / "src" / "prisma"
+FUENTE = ROOT / "src" / "leda"
 
 # Qué le promete cada uno a quien lee el esquema.
 PROMESAS_SIN_CUMPLIR = {
@@ -71,7 +71,7 @@ PROMESAS_SIN_CUMPLIR = {
 TABLAS_MUERTAS = ("conversation_access_log", "learning")
 
 # `acceso_tablero` se toca únicamente desde sus dos funciones `security
-# definer`, por diseño: `prisma_app` no tiene ningún privilegio sobre ella.
+# definer`, por diseño: `leda_app` no tiene ningún privilegio sobre ella.
 # Que sus columnas no aparezcan en `src/` es la señal de que eso se respeta.
 TABLAS_POR_FUNCION = ("acceso_tablero",)
 

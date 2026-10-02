@@ -8,7 +8,7 @@ Dos niveles:
   - Advertencias: se importan igual, pero quedan registradas y se le muestran
     al administrador para que las responda a conciencia.
 
-El pack se guarda con su hash. Cada decisión que Prisma registre después va a
+El pack se guarda con su hash. Cada decisión que Leda registre después va a
 poder decir con qué versión exacta de la configuración se tomó.
 """
 
@@ -48,7 +48,7 @@ class Resultado:
 # ---------------------------------------------------------------------------
 
 def _pendientes(nodo: Any, ruta: str = "") -> list[str]:
-    """Todo valor literal PENDIENTE. Prisma no los completa: quedan a la vista."""
+    """Todo valor literal PENDIENTE. Leda no los completa: quedan a la vista."""
     encontrados: list[str] = []
     if isinstance(nodo, dict):
         for k, v in nodo.items():
@@ -190,9 +190,9 @@ def validar(pack: dict[str, Any]) -> tuple[list[str], list[str]]:
     # El token NO se declara acá: es un secreto y vive en el entorno. El pack
     # se versiona en git, así que no puede contener credenciales.
     slug = ((pack.get("espacio") or {}).get("slug") or "").upper()
-    if slug and not os.environ.get(f"PRISMA_BOT_TOKEN_{slug}"):
+    if slug and not os.environ.get(f"LEDA_BOT_TOKEN_{slug}"):
         bloqueantes.append(
-            f"Falta PRISMA_BOT_TOKEN_{slug} en el entorno. El token del bot va "
+            f"Falta LEDA_BOT_TOKEN_{slug} en el entorno. El token del bot va "
             f"en .env, nunca en el pack.")
     if not _definido(tg.get("grupo_gestion_id")):
         bloqueantes.append("Falta el identificador del grupo de gestión.")
@@ -365,7 +365,7 @@ def _importar_taxonomia(cur, ws, pack) -> None:
                      longitud = excluded.longitud,
                      emojis = excluded.emojis,
                      presentacion = excluded.presentacion""",
-            (ws, p.get("nombre_visible", "Prisma"), p.get("registro", "vos"),
+            (ws, p.get("nombre_visible", "Leda"), p.get("registro", "vos"),
              p.get("formalidad", "profesional_cordial"), p.get("longitud", "breve"),
              bool(p.get("emojis")), p.get("presentacion")))
 

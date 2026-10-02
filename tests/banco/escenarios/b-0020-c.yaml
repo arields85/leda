@@ -3,7 +3,7 @@ variante_de: b-0020
 objetivo: >
   Variante de b-0020, otro tema (ADR 0013 regla 1, enmienda "una sola rama de
   conversación abierta", T9-R1d): con Modificar tocado, la persona pide otra
-  cosa (una consulta sobre sus tareas). Prisma no la atiende todavía: hace una
+  cosa (una consulta sobre sus tareas). Leda no la atiende todavía: hace una
   sola pregunta con dos botones sobre lo pendiente ("Estábamos con la
   corrección de la propuesta. ¿Seguimos con eso?"). La consulta no se
   contesta, no se toma como la corrección y no hay ningún efecto sobre la tarea.

@@ -18,7 +18,7 @@ Recuperar la verificación de correo en el alta (sumada al enlace de
 activación existente) y construir el acceso a Google (Calendar, Gmail, Drive,
 Docs) para agenda, reuniones y documentación — reproduciendo el
 comportamiento aceptado que documenta el pack
-`PRISMA-PACK-RECONSTRUCCION-20260925/`, sostenido por la arquitectura
+`LEDA-PACK-RECONSTRUCCION-20260925/`, sostenido por la arquitectura
 multi-tenant vigente de este repositorio.
 
 ## Problema
@@ -33,8 +33,8 @@ ordena y acota el trabajo.
 No volver a preguntarlas.
 
 1. **El pack es trabajo propio del usuario.**
-   `D:\Proyectos\PRISMA-PACK-RECONSTRUCCION-20260925\` documenta la
-   implementación anterior de Prisma que el usuario construyó con otra IA. Lo
+   `D:\Proyectos\LEDA-PACK-RECONSTRUCCION-20260925\` documenta la
+   implementación anterior de Leda que el usuario construyó con otra IA. Lo
    que describe para alta, Google, agenda y reuniones **funcionaba bien y se
    quiere recuperar**. Para esta rama es la especificación de comportamiento
    (ver "Fuentes funcionales obligatorias").
@@ -66,10 +66,10 @@ No volver a preguntarlas.
   falla.
 - **Ninguna protección se degrada en silencio.** Si falta o falla algo que
   protege la interpretación o un efecto (la credencial de Google, la
-  verificación, la vista previa), Prisma actúa como en duda: pregunta o no
+  verificación, la vista previa), Leda actúa como en duda: pregunta o no
   aplica nada, y lo deja visible con un incidente. Nunca un "si no hay clave,
   seguimos sin eso". Las pruebas inyectan dobles explícitos.
-- **Prisma ayuda, no fastidia.** Preferir el flujo con menos pasos, menos
+- **Leda ayuda, no fastidia.** Preferir el flujo con menos pasos, menos
   preguntas y textos más cortos, siempre que se mantengan los invariantes
   (hechos distintos son registros distintos, no acciones distintas de la
   persona). Firme donde importa: seguir lo atrasado y lo que no tiene
@@ -80,7 +80,7 @@ No volver a preguntarlas.
   transmitido completo.
 - **Una pregunta por vez, y sólo cuando es de verdad del usuario.**
 - Lo que manda `AGENTS.md` sigue valiendo entero: no leer `.env*`, no
-  ejecutar `python -m prisma esquema --recrear`, no correr SQL destructivo ni
+  ejecutar `python -m leda esquema --recrear`, no correr SQL destructivo ni
   pruebas contra una base no descartable, no registrar cuerpos de
   conversación en documentación.
 
@@ -121,13 +121,13 @@ diario y el indicador de Telegram (unidades de `main`).
 
 ## Fuentes funcionales obligatorias
 
-El pack `PRISMA-PACK-RECONSTRUCCION-20260925/` es la **especificación del
+El pack `LEDA-PACK-RECONSTRUCCION-20260925/` es la **especificación del
 comportamiento a reproducir**: describe el qué (flujos, estados, mensajes
 exactos, reglas, la experiencia ya aceptada). No es antecedente a ignorar ni
 una sugerencia: es la referencia contra la que esta unidad se mide. Leer en
 este orden, completo, antes de G0:
 
-| Archivo (relativo a `D:\Proyectos\PRISMA-PACK-RECONSTRUCCION-20260925\`) | Gobierna |
+| Archivo (relativo a `D:\Proyectos\LEDA-PACK-RECONSTRUCCION-20260925\`) | Gobierna |
 |---|---|
 | `00-LEER-PRIMERO.md` | Cómo interpretar V/I/D/P; reglas transversales 1-10; instrucción para la IA receptora (matriz de G0) |
 | `01-INCORPORACION-E-IDENTIDAD.md` | Recorrido completo de alta con correo (G1) |
@@ -216,10 +216,10 @@ pertenecen a unidades de `main`; no se usan acá.
   propia, la registra como `docs/decisions/01xx-<slug>.md` (mismo rango que
   sus migraciones) y se renumera al integrar. Al integrar, esta rama renumera
   lo suyo, nunca lo de `main`.
-- **Archivos propios** (los crea; nadie más los toca): `src/prisma/google/`
+- **Archivos propios** (los crea; nadie más los toca): `src/leda/google/`
   (`__init__.py`, `credenciales.py`, `calendario_externo.py` — nombre
-  distinto de `src/prisma/calendario.py`, que es el calendario *laboral* y no
-  se toca —, `correo.py`, `documentos.py`), `src/prisma/alta_correo.py`
+  distinto de `src/leda/calendario.py`, que es el calendario *laboral* y no
+  se toca —, `correo.py`, `documentos.py`), `src/leda/alta_correo.py`
   (paralelo a `onboarding.py`), `tests/test_alta_correo.py`,
   `tests/test_google_credenciales.py`, `tests/test_agenda_google.py` y demás
   pruebas nuevas, escenarios de banco propios con prefijo `g-`,
@@ -227,18 +227,18 @@ pertenecen a unidades de `main`; no se usan acá.
   su espejo en Engram.
 - **Archivos compartidos** que puede tocar mínimamente, listando cada toque
   en el mensaje del commit: `db/esquema.sql` (sólo agregar),
-  `src/prisma/herramientas.py` (registrar herramientas nuevas en
-  `REGISTRO`, nunca cambiar las existentes), `src/prisma/autoridad.py`
-  (acciones nuevas), `src/prisma/gateway.py` (extender `_activacion`/webhook
-  con casos propios), `src/prisma/onboarding.py` (sumar, nunca reemplazar;
+  `src/leda/herramientas.py` (registrar herramientas nuevas en
+  `REGISTRO`, nunca cambiar las existentes), `src/leda/autoridad.py`
+  (acciones nuevas), `src/leda/gateway.py` (extender `_activacion`/webhook
+  con casos propios), `src/leda/onboarding.py` (sumar, nunca reemplazar;
   sin cambiar la firma de `activar()`/`generar_enlaces()`),
-  `src/prisma/cli.py` (comandos nuevos), `docs/architecture/frontera.md`
+  `src/leda/cli.py` (comandos nuevos), `docs/architecture/frontera.md`
   (agregar el puerto de la decisión 7 de ADR 0010), y ADR 0010 (sólo su
   estado al aceptarse en G0).
 - **Archivos que NO debe tocar:** `nucleo/`; `AGENTS.md` y `CLAUDE.md` (los
   actualiza la sesión principal al aceptarse ADR 0010); `docs/STATUS.md`;
-  `docs/ROADMAP.md`; `docs/capacidades.md`; `odd/tasks/prisma-orienta.md`;
-  el área T6 de `src/prisma/herramientas.py` y `src/prisma/menu_tarea.py`
+  `docs/ROADMAP.md`; `docs/capacidades.md`; `odd/tasks/leda-orienta.md`;
+  el área T6 de `src/leda/herramientas.py` y `src/leda/menu_tarea.py`
   (entrega con evidencia, "Pedir cambios", en curso en `main`); los
   escenarios existentes de `tests/banco/` y su corredor.
 
@@ -273,7 +273,7 @@ Un worktree nuevo no trae lo que no se versiona.
 3. **CodeGraph:** este worktree necesita su propio índice
    (`gentle-ai codegraph init --cwd <worktree>`); nunca copiar el de otra
    carpeta.
-4. **Engram:** el proyecto es el mismo (`prisma-pm`). Usar temas con prefijo
+4. **Engram:** el proyecto es el mismo (`leda-pm`). Usar temas con prefijo
    `odd/alta-y-google/` para no pisar los de `main`.
 
 ## Tareas
@@ -295,7 +295,7 @@ Un worktree nuevo no trae lo que no se versiona.
   igual que hoy; encendida, el correo se pide, se verifica y queda registrado
   como hecho auditable aparte.
 - [ ] **G2 — Credencial de Google por espacio.** Tabla dedicada sin
-  privilegios de `prisma_app` (patrón `acceso_tablero`), cifrado en reposo,
+  privilegios de `leda_app` (patrón `acceso_tablero`), cifrado en reposo,
   flujo OAuth mínimo. Depende de las decisiones abiertas 1, 4 y 6.
 - [ ] **G3 — Lectura de Calendar.** Consultar agenda por rango, calendario y
   zona, sin inventar disponibilidad ni ampliar la consulta.

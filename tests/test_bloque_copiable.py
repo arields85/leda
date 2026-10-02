@@ -17,11 +17,11 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from prisma import saludo
-from prisma.calendario import Calendario
-from prisma.db import admin, espacio
-from prisma.despachador import Boton, TransporteDePrueba, TransporteTelegram, despachar
-from prisma.salida import (COPY_TEXT_LIMIT, ETIQUETA_COPIAR, PayloadValidationError,
+from leda import saludo
+from leda.calendario import Calendario
+from leda.db import admin, espacio
+from leda.despachador import Boton, TransporteDePrueba, TransporteTelegram, despachar
+from leda.salida import (COPY_TEXT_LIMIT, ETIQUETA_COPIAR, PayloadValidationError,
                            enqueue_outbox, entidad_de_bloque, prepare_buttons,
                            telegram_utf16_units)
 
@@ -267,8 +267,8 @@ def test_el_token_de_modificar_no_llega_a_convertir_el_borrador(
     demás: un token cuya opción valga "modificar" que llegara hasta ella
     convertiría el borrador. La envoltura `resolver_ingreso_borrador` lo trata
     como inexistente (migración 0020); el botón Confirmar sigue funcionando."""
-    from prisma import pendientes as P
-    from prisma.db import autoridad
+    from leda import pendientes as P
+    from leda.db import autoridad
     from tests.test_task_drafts import (_confirmar, _crear_preview, _telegram,
                                         _token)
 
@@ -300,8 +300,8 @@ def test_el_token_de_enviar_no_llega_a_convertir_el_borrador(
     distingue `false` de todo lo demás) convertiría el borrador. La envoltura
     `resolver_ingreso_borrador` lo trata como inexistente, igual que a Modificar
     (migración 0023): defensa en profundidad."""
-    from prisma import pendientes as P
-    from prisma.db import autoridad
+    from leda import pendientes as P
+    from leda.db import autoridad
     from tests.test_task_drafts import _crear_preview, _telegram
 
     ws = corework.workspace_id

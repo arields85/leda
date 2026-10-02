@@ -8,7 +8,7 @@
 --   \i pruebas.sql
 -- =========================================================================
 
-set search_path = prisma, public;
+set search_path = leda, public;
 
 create or replace function debe_fallar(sql text, esperado text)
 returns void as $$
@@ -97,7 +97,7 @@ $$, 'no se escribe directamente');
 -- =========================================================================
 select debe_fallar($$
   insert into task_state_event (task_id, estado_nuevo, actor_kind)
-  values ('10000000-0000-0000-0000-000000000001','bloqueada','prisma')
+  values ('10000000-0000-0000-0000-000000000001','bloqueada','leda')
 $$, 'sin un bloqueo abierto');
 
 -- =========================================================================
@@ -105,13 +105,13 @@ $$, 'sin un bloqueo abierto');
 -- =========================================================================
 
 insert into task_state_event (task_id, estado_anterior, estado_nuevo, actor_kind) values
-  ('10000000-0000-0000-0000-000000000001', null, 'asignada','prisma'),
+  ('10000000-0000-0000-0000-000000000001', null, 'asignada','leda'),
   ('10000000-0000-0000-0000-000000000001','asignada','en_curso','persona'),
   ('10000000-0000-0000-0000-000000000001','en_curso','en_revision','persona');
 
 select debe_fallar($$
   insert into task_state_event (task_id, estado_anterior, estado_nuevo, actor_kind)
-  values ('10000000-0000-0000-0000-000000000001','en_revision','terminada','prisma')
+  values ('10000000-0000-0000-0000-000000000001','en_revision','terminada','leda')
 $$, 'criterio de aceptación');
 
 update task set criterio_aceptacion = 'Plano en DWG revisado y versionado'
@@ -119,7 +119,7 @@ update task set criterio_aceptacion = 'Plano en DWG revisado y versionado'
 
 select debe_fallar($$
   insert into task_state_event (task_id, estado_anterior, estado_nuevo, actor_kind)
-  values ('10000000-0000-0000-0000-000000000001','en_revision','terminada','prisma')
+  values ('10000000-0000-0000-0000-000000000001','en_revision','terminada','leda')
 $$, 'evidencia requerida');
 
 insert into evidence (workspace_id, task_id, tipo, uri, entregado_por)
@@ -127,7 +127,7 @@ insert into evidence (workspace_id, task_id, tipo, uri, entregado_por)
 
 select debe_fallar($$
   insert into task_state_event (task_id, estado_anterior, estado_nuevo, actor_kind)
-  values ('10000000-0000-0000-0000-000000000001','en_revision','terminada','prisma')
+  values ('10000000-0000-0000-0000-000000000001','en_revision','terminada','leda')
 $$, 'aprobaciones');
 
 -- Marcos aprueba. Recién ahora cierra.
@@ -135,7 +135,7 @@ insert into approval (workspace_id, sujeto_tipo, sujeto_id, aprobador_membership
   values ('c0000000-0000-0000-0000-000000000001','tarea','10000000-0000-0000-0000-000000000001','d0000000-0000-0000-0000-000000000003','aprobado');
 
 insert into task_state_event (task_id, estado_anterior, estado_nuevo, actor_kind)
-  values ('10000000-0000-0000-0000-000000000001','en_revision','terminada','prisma');
+  values ('10000000-0000-0000-0000-000000000001','en_revision','terminada','leda');
 
 do $$ begin
   if (select estado from task where id='10000000-0000-0000-0000-000000000001') <> 'terminada' then
@@ -160,17 +160,17 @@ $$, 'ciclo');
 -- =========================================================================
 select debe_fallar($$
   insert into objective_state_event (objective_id, estado_nuevo, actor_kind)
-  values ('f0000000-0000-0000-0000-000000000002','terminado','prisma')
+  values ('f0000000-0000-0000-0000-000000000002','terminado','leda')
 $$, 'tareas sin terminar');
 
 update task set criterio_aceptacion = 'PLC responde por Modbus'
   where id = '10000000-0000-0000-0000-000000000002';
 insert into task_state_event (task_id, estado_nuevo, actor_kind)
-  values ('10000000-0000-0000-0000-000000000002','terminada','prisma');
+  values ('10000000-0000-0000-0000-000000000002','terminada','leda');
 
 select debe_fallar($$
   insert into objective_state_event (objective_id, estado_nuevo, actor_kind)
-  values ('f0000000-0000-0000-0000-000000000002','terminado','prisma')
+  values ('f0000000-0000-0000-0000-000000000002','terminado','leda')
 $$, 'áreas por aprobar');
 
 insert into approval (workspace_id, sujeto_tipo, sujeto_id, aprobador_membership_id, decision) values
@@ -179,14 +179,14 @@ insert into approval (workspace_id, sujeto_tipo, sujeto_id, aprobador_membership
 
 select debe_fallar($$
   insert into objective_state_event (objective_id, estado_nuevo, actor_kind)
-  values ('f0000000-0000-0000-0000-000000000002','terminado','prisma')
+  values ('f0000000-0000-0000-0000-000000000002','terminado','leda')
 $$, 'aprobación final');
 
 insert into approval (workspace_id, sujeto_tipo, sujeto_id, aprobador_membership_id, decision)
   values ('c0000000-0000-0000-0000-000000000001','objetivo','f0000000-0000-0000-0000-000000000002','d0000000-0000-0000-0000-000000000001','aprobado');
 
 insert into objective_state_event (objective_id, estado_nuevo, actor_kind)
-  values ('f0000000-0000-0000-0000-000000000002','terminado','prisma');
+  values ('f0000000-0000-0000-0000-000000000002','terminado','leda');
 
 do $$ begin raise notice 'OK  el objetivo cerró sólo con todas las partes y aprobaciones'; end $$;
 
@@ -207,8 +207,8 @@ $$, 'dedupe_key');
 insert into area (workspace_id, slug, nombre)
   values ('c0000000-0000-0000-0000-000000000002','preventivo','Preventivo');
 
-set role prisma_app;
-set "prisma.workspace_id" = 'c0000000-0000-0000-0000-000000000001';
+set role leda_app;
+set "leda.workspace_id" = 'c0000000-0000-0000-0000-000000000001';
 
 do $$
 declare n integer;
@@ -220,7 +220,7 @@ begin
   raise notice 'OK  con CoreWork activo se ven sólo sus 4 áreas y 2 tareas';
 end $$;
 
-set "prisma.workspace_id" = 'c0000000-0000-0000-0000-000000000002';
+set "leda.workspace_id" = 'c0000000-0000-0000-0000-000000000002';
 
 do $$
 declare n integer;

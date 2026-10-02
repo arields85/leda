@@ -3,7 +3,7 @@ variante_de: b-0022
 objetivo: >
   Variante de b-0022, otro tema con el borrador esperando confirmación (ADR
   0013 regla 1, enmienda "una sola rama de conversación abierta", T9-R1d): quien
-  tiene el botón Confirmar (Ismael) consulta sus tareas. Prisma no la atiende
+  tiene el botón Confirmar (Ismael) consulta sus tareas. Leda no la atiende
   todavía: hace una sola pregunta con dos botones sobre el borrador ("Estábamos
   con la confirmación del borrador de la tarea nueva. ¿Seguimos con eso?"). El
   borrador sigue esperando y la consulta no se contesta.

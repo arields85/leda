@@ -7,7 +7,7 @@ Las dos cosas son la misma. "¿Confirmás que muevo la fecha?" y "¿Marcos o
 Martín?" se diferencian sólo en qué completa la respuesta: la primera decide
 si la acción va, la segunda le llena un argumento que faltaba.
 
-Por qué importa para que Prisma no invente: una opción elegida devuelve un
+Por qué importa para que Leda no invente: una opción elegida devuelve un
 identificador exacto. Cuando la persona escribe "marcos", hay que adivinar de
 nuevo entre Marcos y Martín. Cuando elige, no hay nada que adivinar.
 
@@ -36,7 +36,7 @@ from .salida import (ETIQUETA_CANCELAR, ETIQUETA_CONFIRMAR, ICONO_SALIR_OPCIONES
 # así que viaja un token corto y la acción queda en la base.
 CALLBACK_PREFIJO = "p:"
 
-# Cuánto espera Prisma la corrección después de un toque en Modificar.
+# Cuánto espera Leda la corrección después de un toque en Modificar.
 VENTANA_MODIFICACION = timedelta(minutes=30)
 
 # `herramienta` de la acción pendiente que es el resumen de quien pidió el borrador
@@ -49,7 +49,7 @@ VENTANA_MODIFICACION = timedelta(minutes=30)
 HERRAMIENTA_REVISION_BORRADOR = "revisar_borrador_tarea"
 
 # `herramienta` reservada para una acción pendiente armada por
-# `ofrecer_opciones` (T1, ADR 0007 "Prisma orienta, no charla"): nunca es un
+# `ofrecer_opciones` (T1, ADR 0007 "Leda orienta, no charla"): nunca es un
 # nombre real del `REGISTRO` de `herramientas.py` -- lo arma `agente.py`
 # (`_encolar_opciones_modelo`) y lo intercepta `gateway._toque` antes de
 # llegar a `H.ejecutar`, igual que `_SENTINEL_ACLARACION` en `gateway.py`.
@@ -58,7 +58,7 @@ HERRAMIENTA_REVISION_BORRADOR = "revisar_borrador_tarea"
 # resuelve está del lado del gateway.
 SENTINEL_OPCIONES_MODELO = "_opciones_modelo"
 
-# T2 (`prisma-orienta`, ADR 0007 §4.6): el menú de acciones de una tarea.
+# T2 (`leda-orienta`, ADR 0007 §4.6): el menú de acciones de una tarea.
 # Dos sentinelas más, viven acá por el mismo motivo que el de arriba -- lo
 # arma y lo intercepta `gateway.py`, en dos puntas distintas (armar la
 # pregunta / resolver el toque o el próximo mensaje).
@@ -101,7 +101,7 @@ AVISO_ENTREGA = "entrega"
 # exactamente la misma etiqueta.
 ETIQUETA_SALIR_OPCIONES = con_icono("Quiero consultar otra cosa", ICONO_SALIR_OPCIONES)
 
-# T3 (`prisma-orienta`, ADR 0007 punto 3): la lista de tareas que arma el
+# T3 (`leda-orienta`, ADR 0007 punto 3): la lista de tareas que arma el
 # servidor cuando el modelo usa `consultar_tareas` pagina con este botón, sin
 # volver a llamar al modelo -- mismo lugar que `ETIQUETA_SALIR_OPCIONES` para
 # que `agente.py` (arma la primera página) y `gateway.py` (arma las
@@ -464,7 +464,7 @@ _OFERTAS_DE_CAMINO = (SENTINEL_OPCIONES_MODELO, SENTINEL_MENU_TAREA,
 
 def ver_eleccion_abierta(cur: psycopg.Cursor, quien: Solicitante, chat_id: int,
                          ahora: datetime) -> Pendiente | None:
-    """Lee, sin consumirla, la elección con botones que Prisma le pidió a esta
+    """Lee, sin consumirla, la elección con botones que Leda le pidió a esta
     persona en este chat y que sigue esperando su respuesta (T9-R1d-1c, ADR 0013
     regla 1, enmienda "una sola rama abierta"): la aclaración "¿A cuál te
     referís?", la de con cuál otra tarea se declara una dependencia o la que
@@ -492,7 +492,7 @@ def ver_eleccion_abierta(cur: psycopg.Cursor, quien: Solicitante, chat_id: int,
 # Los tres tipos de rama que viven en `pending_action` (T9-R1d-2). Las preguntas
 # del alta guiada (`ingreso_tareas.open_intake_question`) son otra clase de fila.
 RAMA_DATO = "dato"                # la Modificación que pide un dato por escrito
-RAMA_ELECCION = "eleccion"        # la elección con botones que Prisma pidió
+RAMA_ELECCION = "eleccion"        # la elección con botones que Leda pidió
 RAMA_VISTA_PREVIA = "vista_previa"  # la vista previa del cambio que ella pidió
 # La pregunta abierta del alta guiada (`ingreso_tareas.open_intake_question`):
 # el campo de texto libre, la elección con botones o su propio borrador esperando
@@ -521,7 +521,7 @@ def ver_rama_abierta(cur: psycopg.Cursor, quien: Solicitante, chat_id: int,
     `alta`, en un chat privado), después el dato o la corrección que se pidió
     por escrito, la elección y por último la vista previa (ver
     `gateway._ver_pregunta_abierta`). Es la única definición de "rama abierta":
-    la comparten el turno de la conversación y la retención de lo que Prisma
+    la comparten el turno de la conversación y la retención de lo que Leda
     inicia (`despachador.despachar`, T9-R1d-2 y T9-R1d-2b), así que no pueden
     discrepar.
 
@@ -675,7 +675,7 @@ def marcar_para_corregir(cur: psycopg.Cursor, quien: Solicitante,
 def retirar_avisos_de_entrega(cur: psycopg.Cursor, workspace_id: str, tarea_id: str,
                               aprobador_membership_id: str,
                               ahora: datetime) -> list[str]:
-    """T6i (`odd/tasks/prisma-orienta.md`; ADR 0009, enmienda 2026-09-27):
+    """T6i (`odd/tasks/leda-orienta.md`; ADR 0009, enmienda 2026-09-27):
     vence cualquier aviso de entrega que el aprobador todavía tenga
     `esperando` sobre esta tarea -- lo llama `herramientas` cuando evidencia
     nueva reemplaza uno vigente. Mismo criterio que
@@ -808,7 +808,7 @@ def texto_terminal_ingreso(*, cancelada: bool) -> str:
 
 def resolver_borrador(cur: psycopg.Cursor, workspace_id: str, token: str,
                        telegram_user_id: int, chat_id: int) -> Resuelta | None:
-    """Commit through prisma_gateway using DB identity and DB time."""
+    """Commit through leda_gateway using DB identity and DB time."""
     cur.execute("select * from resolver_ingreso_borrador(%s, %s, %s, %s)",
                 (workspace_id, token, telegram_user_id, chat_id))
     f = cur.fetchone()

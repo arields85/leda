@@ -1,6 +1,6 @@
 id: b-0016
 objetivo: >
-  Prisma orienta, no charla (ADR 0007, T4): al pedir la lista de tareas
+  Leda orienta, no charla (ADR 0007, T4): al pedir la lista de tareas
   propias, la respuesta las presenta como botones (T3, garantizado por el
   servidor) sin preguntar nada en texto abierto -- no hace falta ninguna
   elección todavía, sólo mostrar la lista.

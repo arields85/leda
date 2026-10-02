@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from prisma import agente, gateway, incidentes
+from leda import agente, gateway, incidentes
 
 SRC = Path(incidentes.__file__).parent
 

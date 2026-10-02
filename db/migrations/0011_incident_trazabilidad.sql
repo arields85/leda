@@ -2,7 +2,7 @@
 \set ON_ERROR_STOP on
 
 -- Applied after 0010_modificar_propuesta.sql. Decisión del usuario,
--- 2026-09-25 (T2b, `prisma-orienta`): un error nunca pasa en silencio, y el
+-- 2026-09-25 (T2b, `leda-orienta`): un error nunca pasa en silencio, y el
 -- incidente que queda tiene que hacer encontrable la causa -- sin copiar
 -- texto de conversación adentro.
 --
@@ -15,7 +15,7 @@
 -- existía sin usar (`docs/capacidades.md`, promesa sin cumplir); esta
 -- unidad es la primera que la llena.
 begin;
-set search_path = prisma, public;
+set search_path = leda, public;
 
 -- Fail closed if an invoking text pipeline decoded the UTF-8 file incorrectly.
 -- chr() builds the expected value independently from non-ASCII source bytes.
@@ -31,12 +31,12 @@ end $$;
 do $$ begin
   if not exists (
       select 1 from information_schema.tables
-       where table_schema = 'prisma' and table_name = 'incident') then
+       where table_schema = 'leda' and table_name = 'incident') then
     raise exception '0011 requires the base schema (incident table missing).';
   end if;
   if exists (
       select 1 from information_schema.columns
-       where table_schema = 'prisma' and table_name = 'incident'
+       where table_schema = 'leda' and table_name = 'incident'
          and column_name = 'etapa') then
     raise exception '0011 ya está aplicada.';
   end if;
@@ -59,7 +59,7 @@ comment on column incident.chat_id is
 comment on column incident.app_user_id is
   'Quién escribió o tocó el botón, si se identificó.';
 
--- `prisma_app` ya tenía `insert` concedido sobre `incident` desde el
+-- `leda_app` ya tenía `insert` concedido sobre `incident` desde el
 -- esquema base (0000): las columnas nuevas no necesitan una concesión
 -- aparte, un `grant insert` cubre la fila entera.
 
