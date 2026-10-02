@@ -1814,3 +1814,13 @@ Diseño B elegido por el usuario. Ruta declarada: un solo escritor (encargo expl
   procesarse 20-40 s después de llegar (21:40: 41 s; 22:07: 23 s), con el modelo tardando
   7-10 s. Se repitió dos veces; sin investigar (candidatos: el arranque del sondeo de
   Telegram, la primera conexión a la base o a Jev).
+
+### Cierre de la jornada (2026-10-01) y punto de retorno
+
+Traspaso completo en `main`: `docs/traspaso/2026-10-01-alta-conducida.md` (diseño que
+funciona, ritmo de trabajo, cómo operar y leer una prueba, decisiones, pendientes en
+orden, lecciones). Punto de retorno: (1) suite completa en HEAD (`96a139b`; última
+completa registrada 3411 passed en `5cd32b6`); (2) RDD de `39bbf59..HEAD` con
+`tools/rdd_por_tramos.py` del checkout principal; (3) decisión (e) del usuario sobre
+Dirección y el objetivo estratégico. `prisma_flujo`: `alta = conversada` y `stream`
+activados.
