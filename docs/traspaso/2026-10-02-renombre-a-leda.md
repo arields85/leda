@@ -94,7 +94,7 @@ esperar: el 2026-10-02 un turno quedó colgado porque el proveedor `nan` estaba 
 | — | Mensaje después de cancelar un borrador; calidad del criterio; (k) primer mensaje lento; (j) stream irregular; frecuencia del rechazo de formato de `acceptance_criterion` | traspaso del 2026-10-01 y rama de flujo |
 | R12 | Integrar `auxiliar/alta-y-google` a `main` y **seguir ese trabajo desde `main`**, no en una rama aparte (decisión del usuario). Primero se renombra la rama con el script, después se trae `main`. Su `.env` apunta a una base que ya no existe. Bajo el congelamiento: la fecha la decide el usuario | `odd/tasks/renombre-a-leda.md`, R12 |
 | C-1…C-3 | Hallazgos del circuito C en `main` | `docs/STATUS.md` |
-| — | Borrar `arields85/prisma` y el remoto `respaldo-prisma` cuando el usuario lo dé por obsoleto; borrar la carpeta de memoria vieja `D--Proyectos-Prisma-PM` cuando la nueva funcione | tabla de limpieza de R11 |
+| — | Borrar `arields85/prisma` y el remoto `respaldo-prisma` cuando el usuario lo dé por obsoleto (la carpeta de memoria vieja `D--Proyectos-Prisma-PM` ya se borró) | tabla de limpieza de R11 |
 
 ## Cómo operar ahora
 
