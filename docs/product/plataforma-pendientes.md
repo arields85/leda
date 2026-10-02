@@ -42,6 +42,7 @@ agrega acá con dónde vive hoy.
 | Proveedor y modelo de lenguaje, con el cambio atribuido | `python -m leda modelo <id> --proveedor <p>` (escribe `model_config`) | ROADMAP, "Panel de plataforma" |
 | Dónde vive la clave de cada proveedor | Una sola `LEDA_LLM_API_KEY` en `.env`, leída al arrancar | `PENDIENTE` |
 | Modelo por espacio (`model_config` ya lo admite) | Sin superficie | `PENDIENTE` |
+| Servicio que transcribe los mensajes de voz y dónde vive su clave | No existe: los audios no se transcriben | ROADMAP, "Mensajes de voz" (pedido del usuario, 2026-10-02) |
 | Plazo total de un turno del modelo: cuánto se espera al proveedor antes de dar el turno por fallido (aviso a la persona e incidente) | Por construir en la rama `feat/flujo-de-un-mensaje`: valor fijo de 2 minutos | Decisión del usuario (2026-10-02), a partir del turno del alta que quedó colgado sin fin. Tiene que poder ajustarse desde la plataforma |
 | Cuánto se espera a que vuelva el proveedor del modelo antes de avisar a la persona que no se pudo y pedirle que lo escriba de nuevo | Por construir en la rama `feat/flujo-de-un-mensaje`: 4 horas hábiles; el sondeo del proveedor empieza a los 30 s y se espacia | Decisión del usuario (2026-10-02), tareas P4 a P6 de esa rama |
 
