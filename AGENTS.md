@@ -41,10 +41,17 @@ nombres con el usuario; "conducida", "guiada" o "método nuevo" confunden.
     como le parece. Hoy: todo lo que no es el alta (consultas, menú, cambios, entrega,
     aprobación). Es donde la IA inventó un cambio (hallazgo H5).
   - **Flujo C, el del [ADR 0014](docs/decisions/0014-flujo-de-un-mensaje.md):** la IA
-    interpreta, el código decide y ejecuta, la IA redacta a partir de los hechos con la
-    voz (`nucleo/voz.md`). Hoy: el alta con `alta = conversada`, en la rama de flujo.
-    **C1:** el de la primera prueba (2026-10-01). **C2:** con las mejoras del 2026-10-02
-    (objetivos del área de la tarea, Modificar, botones vencidos y la voz).
+    interpreta, el código decide y ejecuta, la IA redacta a partir de los hechos. Hoy: el
+    alta con `alta = conversada`, en la rama de flujo. **C1:** el de la primera prueba
+    (2026-10-01). **C2:** con las mejoras del 2026-10-02 (objetivos del área de la tarea,
+    Modificar, botones vencidos y la personalidad como texto aparte). **C3:** la
+    personalidad escrita adentro de la mecánica de cada circuito (decisión del
+    2026-10-02, tarea 0-15).
+- **Personalidad:** cómo es y cómo se comporta Leda (`nucleo/personalidad.md`). Es la
+  referencia para escribir la mecánica de cada circuito y **no se le manda a la IA**: sus
+  reglas van adentro de la mecánica, como reglas concretas del circuito, porque una
+  personalidad aparte contradecía la mecánica y sumaba latencia (medición del 2026-10-02).
+- **Voz:** reservado para cuando Leda responda con audio. No se usa para la personalidad.
 - **Circuito:** cada cosa que Leda sabe hacer (alta, entrega, aprobación…), numerada en
   `odd/tasks/circuitos-al-flujo-nuevo.md` de la rama de flujo: circuito 0, circuito 1…;
   sus tareas, 0-1, 0-2…
