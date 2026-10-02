@@ -1843,3 +1843,33 @@ activados.
   de `leda_flujo` a `leda_flujo` (nueva, armada desde el esquema renombrado, con
   `alta = conversada` y `stream = true`). `leda_flujo` queda como respaldo del historial
   de pruebas.
+
+### Renombre a Leda aplicado en esta rama (2026-10-02)
+
+- Commit mecánico `3b75117` sobre `aeea562`, con `tools/renombrar_a_leda.py` del checkout
+  principal. Verificación: **408 de 408 archivos son pura sustitución**. Los únicos restos
+  son rutas a la carpeta `Prisma-PM`. Arreglo de las pruebas de migración traído con
+  cherry-pick (`1adcfd0`, RDD `review-7ea5dbadc4239272` aprobada).
+- `.env` y `.env.test` renombrados (copias `.env.antes-leda`). Base nueva `leda_flujo`:
+  esquema, CoreWork, semilla, `nan/deepseek-v4-flash`, Ariel administrador,
+  `alta = conversada`, `stream = true`, `redaccion = A` (igual que `prisma_flujo`).
+  Ariel, Ismael y Marcos quedan vinculados desde el pack.
+- Suite completa sobre `1adcfd0`: **3432 passed**, 333 deselected, 21 min. Es el mismo
+  resultado que antes del renombre.
+
+### Hallazgo (2026-10-02 00:11): turno del alta colgado sin fin y sin aviso
+
+- Marcos, primer mensaje de un alta en `leda_flujo`. El mensaje entró a las 00:11:02 y en
+  más de 5 minutos no hubo turno, auditoría ni incidente: los "…" quedaron para siempre.
+- Evidencia: el listener estaba vivo y sin bloqueos en la base. Su conexión quedó
+  `idle in transaction` después de leer `model_config`, esperando al proveedor. Una
+  llamada mínima a `nan` en ese momento tardó 11-15 s (lo normal es 1-4 s). La
+  configuración del modelo es idéntica en `prisma_flujo` y `leda_flujo`: no lo causó el
+  renombre.
+- Causa: `conducir_alta` corre sin plazo total (modelo puro). El único corte es el
+  timeout HTTP de 20 s, que es por fase, y un stream lento o una conexión que el
+  proveedor mantiene abierta nunca lo dispara.
+- Clase: falla silenciosa, contra "nunca fallar en silencio". Choca con la decisión del
+  usuario de no poner plazo por turno, así que se discute antes de tocarla. Propuesta: un
+  plazo total que termine en el aviso neutro y el incidente que ya existen
+  (`alta_conducida_fallida`), sin plantillas que tapen al modelo. `PENDIENTE`.
