@@ -620,7 +620,37 @@ advertencia), R3-002 (`:1043-1059`, advertencia), R3-003 (`:1006-1008`, sugerenc
 R3-004 (`:185-191`, sugerencia).
 
 **Pendiente antes de la prueba real de 0-5 y 0-6:** aplicar la migración `0028` a
-`leda_flujo` con el listener detenido (autorización del usuario pedida, no dada todavía).
+`leda_flujo` con el listener detenido. **Hecho el 2026-10-02** con autorización del
+usuario: respaldo previo `db/respaldos/leda_flujo-antes-de-0028-20261002.dump`, migración
+con `psql -f` (29 mensajes viejos marcados), CoreWork con `emojis = true` y la restricción
+de horario apagada (`tools/restriccion_horario.py`).
+
+### Prueba real del flujo C2 (2026-10-02, 18:20-18:26): pasa
+
+Con `1fc8db0` (voz 1.0, trato y emojis del pack, 0-1 a 0-6) y la restricción de horario
+apagada. Marcos pidió "revisar los sensores de nivel de la línea 3 para el jueves que
+viene, la hago yo", eligió el objetivo, pidió una sugerencia ("¿qué me sugerís?"), la
+cambió por su versión y envió a aprobación; Ismael confirmó.
+
+- **0-6 pasa:** los botones se quitaron en Telegram al resolverse: los de objetivo al
+  elegir (18:22:29), los del resumen de Marcos al enviar (18:24:14) y los de Ismael al
+  confirmar (18:26:31) (`message_outbox.botones_quitados_en`).
+- **0-5 pasa:** Marcos tocó Modificar en el resumen viejo de las 12:50 y Leda contestó "Ese
+  botón ya no está vigente: la tarea ya quedó creada", con el estado real y el menú de la
+  tarea (el menú sigue sin cambios posibles: H6, circuito 9).
+- **Voz:** cada turno registró `voz_hash` `3bbf0765…`, igual a la huella de
+  `nucleo/voz.md` 1.0. Propuso un criterio ante el pedido de ayuda, tomó la versión de la
+  persona ("Queda con tu versión"), una sola pregunta por mensaje.
+- Aviso a Ismael al instante (18:24, fuera del horario original). Cuatro turnos de la IA
+  aceptados al primer intento; sin incidentes.
+- **Observaciones, sin decisión todavía:** (1) el primer mensaje tuvo respuesta a los 73 s:
+  el turno duró 15 s pero arrancó 47 s después de llegar el mensaje; puede ser que se
+  escribió antes de que el listener terminara de arrancar (Telegram lo entrega al
+  arrancar); si se repite con el listener ya andando, es un hallazgo de latencia. (2)
+  "Anoté revisar los sensores…" en el primer mensaje es cierto (se creó el borrador) pero
+  puede leerse como tarea creada: ajuste fino de la voz. (3) El primer turno duró 15 s
+  contra 7-11 s en las pruebas anteriores del día; con un caso no se sabe si es por las
+  instrucciones más largas: juntar más casos antes de concluir.
 
 ## Relación con otros pendientes
 
