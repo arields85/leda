@@ -69,7 +69,10 @@ una ronda, el tablero y el panel. Sigue abierto: mejorar esos tres caminos, corr
 fallas reales y anotar ideas en este roadmap sin construirlas. Motivo: cada ronda
 probaba superficie nueva y los hallazgos no bajaban; una función construida sobre una
 conversación que todavía no funciona hereda sus problemas. Se levanta al cumplir los
-criterios.
+criterios. **Precisión (decisión del usuario, 2026-10-02):** se levanta cuando el alta, la
+entrega y la aprobación (C0, C1 y C2 de `odd/tasks/circuitos-al-flujo-nuevo.md`, en la
+rama de flujo) aprueban las pruebas reales que hacen el usuario y el agente. No espera a
+la prueba final con alguien que no conozca el guion (enmienda del ADR 0014).
 
 **Alta con correo verificado y Google (ADR 0010): se integra a `main` y continúa desde ahí**
 (decisión del usuario, 2026-10-02). El trabajo avanzado de la rama `auxiliar/alta-y-google`

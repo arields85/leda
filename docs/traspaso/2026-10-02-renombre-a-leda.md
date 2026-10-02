@@ -100,9 +100,11 @@ esperar: el 2026-10-02 un turno quedó colgado porque el proveedor `nan` estaba 
 
 ## Congelado hasta cumplir el ADR 0014
 
-No se construye hasta que el alta, la entrega y la aprobación cumplan en una prueba real los
-criterios del [ADR 0014](../decisions/0014-flujo-de-un-mensaje.md) (congelamiento decidido
-por el usuario el 2026-09-30; `docs/ROADMAP.md`, "Orden de entrega"). Figura acá para que
+No se construye hasta que el alta, la entrega y la aprobación (C0, C1 y C2) aprueben las
+pruebas reales que hacen el usuario y el agente, con los criterios del
+[ADR 0014](../decisions/0014-flujo-de-un-mensaje.md) (congelamiento del 2026-09-30,
+precisado el 2026-10-02: no espera a la prueba final con alguien nuevo;
+`docs/ROADMAP.md`, "Orden de entrega"). Figura acá para que
 la lista de pendientes esté completa. Descongelar una unidad lo decide el usuario.
 
 | Unidad | Qué le falta además del descongelamiento | Dónde está el detalle |

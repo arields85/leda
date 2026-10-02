@@ -271,6 +271,9 @@ mismos").
   en todos los circuitos, no hallazgo por hallazgo.
 - El riesgo aceptado: un problema de diseño que sólo vea alguien nuevo aparece tarde y
   su arreglo alcanza a todos los circuitos ya pasados.
+- **El congelamiento de funcionalidad nueva** (`docs/ROADMAP.md`, "Orden de entrega") se
+  levanta cuando el alta, la entrega y la aprobación aprueban estas pruebas propias, sin
+  esperar a la prueba final.
 
 ## Consecuencias
 
