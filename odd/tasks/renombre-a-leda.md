@@ -229,8 +229,8 @@ respaldo del renombre.
 |---|---|---|
 | Bases `prisma` y `prisma_flujo` | Cuando se cumpla "Leda funciona correctamente" | Volcado final a `db/respaldos/` y después `drop database` |
 | Respaldo `db/respaldos/prisma-antes-flujo-20260930.dump` | Junto con las bases de arriba | Borrar el archivo |
-| Worktree `Prisma-PM-worktrees/renombre-a-leda` y su rama `refactor/renombre-a-leda` (ya en `main`; su `.env` tiene secretos) | Ya mismo | `git worktree remove` y `git branch -d` |
-| Bases residuales `prisma_test_*` y `prisma_diag_*` | Ya mismo: son de corridas viejas, no son respaldo de nada | `drop database` |
+| Worktree `Prisma-PM-worktrees/renombre-a-leda` y su rama `refactor/renombre-a-leda` (ya en `main`; su `.env` tiene secretos) | **Hecho** (2026-10-02) | Worktree borrado (sólo tenía cachés y copias del `.env`); rama borrada, ya estaba en `main` |
+| Bases residuales `prisma_test_*` y `prisma_diag_*` | **Hecho** (2026-10-02) | Se borraron 15 (8 `prisma_diag_*` y 7 `prisma_test_*`), todas sin conexiones; `prisma` y `prisma_flujo` siguen como respaldo |
 | Membresía del login de autoridad en `prisma_gateway` | Se va sola al borrar el rol `prisma_gateway` | — |
 | Roles `prisma_*` del servidor | Después de borrar todas las bases `prisma*` (un rol con objetos no se puede borrar) | `drop role` |
 | Variables `PRISMA_*` que queden en algún `.env` | Cuando todos los checkouts en uso estén renombrados | Borrar la línea |

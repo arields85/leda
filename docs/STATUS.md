@@ -123,8 +123,8 @@ eran del arnés y se corrigieron en `ffe4e85`). Corridas anteriores y su detalle
   funcionalidad nueva). La latencia del banco es por escenario (mediana de flash 13 s),
   no por respuesta: el criterio de 5 s del ADR 0014 necesita la medición por respuesta de
   F6a.
-- Quedan bases residuales `prisma_diag_*`/`prisma_test_*` de corridas viejas en el
-  servidor local (se pueden borrar: ver la limpieza del renombre).
+- Bases en el servidor local (2026-10-02): `leda`, `leda_flujo`, y como respaldo `prisma` y
+  `prisma_flujo`. Las residuales de corridas viejas se borraron en la limpieza del renombre.
 
 ## Riesgos prioritarios
 
