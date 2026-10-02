@@ -732,15 +732,21 @@ def test_el_esquema_de_la_salida_es_cerrado_y_describe_el_contrato():
         "objective", "responsible", None]
 
 
+def _guia() -> str:
+    """Lo que recibe el modelo del alta: la voz, la mecánica y el tono (C0-13)."""
+    from leda import instrucciones
+    return instrucciones.instrucciones_alta(None).texto
+
+
 def test_la_guia_de_voz_dice_lo_esencial():
-    guia = T.SISTEMA_ALTA
-    for clave in ("dato", "nunca inventes", "boton_final", "conducir_alta"):
+    guia = " ".join(_guia().split())
+    for clave in ("dato", "no inventa", "boton_final", "conducir_alta"):
         assert clave.lower() in guia.lower()
     assert "Entendí que" in guia      # lo nombra para prohibirlo
 
 
 def test_la_guia_y_el_esquema_dan_un_lugar_a_la_propuesta_de_leda():
-    assert "registralo en `propuesta`" in T.SISTEMA_ALTA
+    assert "se registra en `propuesta`" in T.MECANICA_ALTA
     criterio = T.ESQUEMA_SALIDA["properties"]["valores"]["properties"][
         "acceptance_criterion"]
     assert "propuesta" in criterio["properties"]
@@ -748,8 +754,8 @@ def test_la_guia_y_el_esquema_dan_un_lugar_a_la_propuesta_de_leda():
 
 
 def test_la_guia_ya_no_menciona_la_clave_de_aceptar_la_propuesta():
-    from leda.alta_turno import ESQUEMA_SALIDA, SISTEMA_ALTA
-    assert "acepta_propuesta" not in SISTEMA_ALTA
+    from leda.alta_turno import ESQUEMA_SALIDA
+    assert "acepta_propuesta" not in _guia()
     assert "acepta_propuesta" not in json.dumps(ESQUEMA_SALIDA)
 
 
@@ -776,7 +782,7 @@ def test_con_el_responsable_confirmado_los_hechos_traen_el_boton_final():
 
 
 def test_la_guia_nombra_el_boton_final_de_los_hechos_y_no_uno_fijo():
-    guia = T.SISTEMA_ALTA
+    guia = _guia()
     assert "boton_final" in guia
     assert "confirma con el botón Confirmar" not in guia
 
@@ -794,7 +800,7 @@ def test_los_hechos_dicen_el_margen_de_la_fecha_de_una_tarea():
     descripcion = T.ESQUEMA_SALIDA["properties"]["valores"]["properties"][
         "due_date"]["properties"]["fecha_iso"]["description"].lower()
     assert "hasta" in descripcion and "límite" in descripcion
-    guia = T.SISTEMA_ALTA.lower()
+    guia = T.MECANICA_ALTA.lower()
     assert "límite" in guia and "próxima" in guia
 
 
@@ -925,15 +931,15 @@ def test_la_oferta_nunca_incluye_objetivos_ni_retomar_un_dia(h):
 
 
 def test_la_guia_manda_ofrecer_solo_lo_de_la_lista_y_no_promete_ni_ofrece_objetivos():
-    guia = T.SISTEMA_ALTA
-    assert "podes_ofrecer" in guia and "no prometas" in guia.lower()
+    guia = T.MECANICA_ALTA
+    assert "podes_ofrecer" in guia and "sin prometer" in guia.lower()
     assert "tomarla como un objetivo" not in guia
     assert "objetivo" not in T.regla_de_fechas(hechos(limite_fecha=date(2028, 4, 28)))
 
 
 def test_la_guia_tiene_una_sola_linea_de_un_tema_a_la_vez_y_la_fecha_se_acepta_con_su_valor():
-    guia = T.SISTEMA_ALTA
-    minus = guia.lower()
+    guia = T.MECANICA_ALTA
+    minus = _guia().lower()
     assert not [p for p in _NO_ACCIONABLE if p in minus]
-    assert "ocupate sólo de eso" in guia and "no preguntes además" in guia
+    assert "sólo de eso" in guia and "sin preguntar además" in guia
     assert "esa fecha como `fecha_iso`" in guia

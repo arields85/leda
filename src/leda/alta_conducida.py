@@ -39,6 +39,7 @@ from psycopg.types.json import Jsonb
 from . import alta_turno as T
 from . import despachador
 from . import ingreso_tareas as I
+from . import instrucciones as INS
 from . import redaccion
 from .db import entrante_atado, registrar_auditoria
 from .incidentes import (ETAPA_ALTA_CONDUCIDA_FALLIDA,
@@ -396,6 +397,9 @@ def _conducir(cur, who, request, evento: dict, now: datetime,
               permite_otro_tema: bool) -> ResultadoConducido:
     workspace_id = str(request["workspace_id"])
     historial = I._conversacion_de(cur, request, now)
+    # La voz, la mecánica del alta y el tono del pack, armados por el código (C0-13).
+    # Fuera del `try` del modelo: una voz que falta no es un error del modelo.
+    instr = INS.instrucciones_alta_del_espacio(cur, workspace_id)
     proveedor = None
     rechazos: tuple[str, ...] = ()
     motivos: list[str] = []
@@ -410,13 +414,13 @@ def _conducir(cur, who, request, evento: dict, now: datetime,
         try:
             proveedor = proveedor or redaccion.proveedor_de_redaccion(
                 cur, workspace_id)
-            crudo = proveedor.conducir_alta(T.SISTEMA_ALTA, historial,
+            crudo = proveedor.conducir_alta(instr.texto, historial,
                                             T.hechos_a_json(h), **en_vivo)
         except psycopg.Error:
             raise                    # la transacción no sigue: no es del modelo
         except Exception as exc:     # el modelo dio error: no se reintenta
             razon = redaccion._motivo_de_error(exc)
-            _auditar(cur, workspace_id, intento, "error", razon, inicio)
+            _auditar(cur, workspace_id, intento, "error", razon, inicio, instr)
             motivos.append(razon)
             break
         salida = T.leer_salida(crudo)
@@ -442,11 +446,11 @@ def _conducir(cur, who, request, evento: dict, now: datetime,
                 if motivo:
                     problemas.append(motivo)
         if not problemas:
-            _auditar(cur, workspace_id, intento, "aceptada", None, inicio)
+            _auditar(cur, workspace_id, intento, "aceptada", None, inicio, instr)
             return _responder(cur, who, request, salida, h, aplicacion, evento,
                               now)
         _auditar(cur, workspace_id, intento, "rechazada", "; ".join(problemas),
-                 inicio,
+                 inicio, instr,
                  forma=None if isinstance(salida, str)
                  else _forma_de(salida, h, aplicacion))
         motivos.append("; ".join(problemas))
@@ -471,9 +475,13 @@ def _forma_de(salida: T.SalidaTurno, h: T.HechosTurno,
 
 
 def _auditar(cur, workspace_id: str, intento: int, resultado: str,
-             motivo: str | None, inicio: float, forma: dict | None = None) -> None:
+             motivo: str | None, inicio: float, instr: INS.Instrucciones,
+             forma: dict | None = None) -> None:
+    """Cada intento queda con las huellas de la voz y de las instrucciones que
+    recibió el modelo: así se prueba qué versión se cargó (C0-13)."""
     detalle = {"resultado": resultado, "intento": intento,
-               "duracion_ms": round((time.perf_counter() - inicio) * 1000)}
+               "duracion_ms": round((time.perf_counter() - inicio) * 1000),
+               **instr.auditoria()}
     if motivo:
         detalle["motivo"] = motivo[:300]
     if forma:
