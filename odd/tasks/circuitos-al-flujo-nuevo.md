@@ -355,6 +355,26 @@ vecino):
 - [ ] **C0-12.** Repetir en real una ronda con cambios escritos juntos y un pedido de
       ayuda, después de C0-10 y C0-11.
 
+### Una sola fuente para las reglas de conversación (2026-10-02)
+
+Hallazgo al agregar la fluidez a la constitución (§8, `main` `25b238e`): **el alta
+conducida no lee el núcleo.** Su modelo recibe sólo sus instrucciones propias
+(`SISTEMA_ALTA`, `src/leda/alta_turno.py:687`); la constitución y la mecánica las recibe
+sólo el camino general (`contexto._nucleo`, `src/leda/contexto.py:38`, leído una vez al
+arrancar el proceso y guardado en memoria). Consecuencia: un cambio o un descubrimiento
+escrito en el núcleo no llega al alta. Además, la rama tenía la constitución vieja (sin
+"Leda ayuda y facilita"); se sincronizó con `main` en `677c533`.
+
+**Decisión del usuario (2026-10-02): hay que hacerlo**, para que lo que se decida sobre
+cómo conversa Leda se aplique en todos los circuitos.
+
+- [ ] **C0-13.** Las instrucciones del modelo de cada circuito del flujo nuevo (hoy el
+      alta conducida) toman las reglas de conversación del núcleo, de una sola fuente, en
+      lugar de repetirlas o ignorarlas. `PENDIENTE` de diseño con el usuario: qué parte
+      del núcleo va (la constitución entera, o las secciones de trato y honestidad, §4, §8
+      y §10) frente al costo de un contexto más largo en latencia, y cómo se nota un
+      cambio del núcleo sin reiniciar (hoy hace falta reiniciar el listener).
+
 ## Relación con otros pendientes
 
 - **P1-P7** (falla del proveedor, `odd/tasks/flujo-de-un-mensaje.md`): decidido y listo
