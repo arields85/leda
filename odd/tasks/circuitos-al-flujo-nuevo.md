@@ -659,6 +659,18 @@ cambió por su versión y envió a aprobación; Ismael confirmó.
   y breve". En curso: medición con el banco, instrucciones de C1 contra C2 en seis
   escenarios (feliz, duda, frustración, algo imposible, varios cambios con pedido de ayuda
   y mensaje vago), tres veces cada uno.
+- **Verificado que la IA recibe la voz** (2026-10-02): `alta_conducida.py:402` arma las
+  instrucciones y `:417` le pasa ese mismo texto a `conducir_alta`; empieza con
+  `nucleo/voz.md` e incluye "Personalidad y trato"; su huella (`90398f70…`) es la misma que
+  la registrada en cada turno de la prueba; el proveedor `nan` es `ProveedorCompatible` y
+  manda ese texto como mensaje de sistema. Pero "El borrador ya quedó enviado a Ismael…"
+  (18:24) lo escribió la **redacción A** (`redaccion.py`, auditoría
+  `redaccion_variante_a`), que no lee la voz.
+
+- [ ] **0-14.** La redacción A (y la charla breve) leen la voz desde la misma fuente que el
+      alta (`instrucciones`), para que haya una sola voz en todo lo que escribe la IA en el
+      flujo C. Decidido por el principio de una sola fuente (0-13); pendiente de la
+      medición para saber si hace falta además reforzar la voz.
 
 **RDD de la voz y el trato desde el pack (2026-10-02):** tramo `e8e6499`…`1fc8db0`, riesgo
 medio, revisión debida por presupuesto; linaje `review-1a8be8746c694446`, una lente
