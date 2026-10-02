@@ -71,9 +71,11 @@ push deja una copia remota y un punto de retorno exacto.
 - `feat/flujo-de-un-mensaje`, `feat/flujo-variante-a` y `auxiliar/alta-y-google`, como respaldo.
 
 **Qué quedó sólo local, a propósito:** `auxiliar/alta-y-google-pre-rebase-0929`,
-`auxiliar/alta-y-google-pre-unificacion` y `auxiliar/alta-y-google-unificada-un-commit`. Son
-copias viejas de un rebase y de una unificación de esa rama: no tienen trabajo que no esté en
-`auxiliar/alta-y-google`.
+`auxiliar/alta-y-google-pre-unificacion` y `auxiliar/alta-y-google-unificada-un-commit`, que
+son copias de un rebase y de una unificación de esa rama. La primera versión de este documento
+decía que no tenían trabajo propio, y no estaba verificado. Comparadas el 2026-10-02 con
+`git cherry`, tienen commits sin equivalente exacto en `auxiliar/alta-y-google` (1, 33 y 1).
+Probablemente es el mismo trabajo antes de unificarlo, pero no está probado. Se conservan.
 
 **Control previo:** el repositorio es **público**. Antes de subir se escaneó toda la historia
 pendiente buscando tokens de bot, claves de API, contraseñas y URLs con credenciales. Hubo un
@@ -236,7 +238,7 @@ respaldo del renombre.
 | Variables `PRISMA_*` que queden en algún `.env` | **Hecho** en los checkouts en uso (`main`, flujo). El worktree congelado `alta-y-google` las conserva hasta que se retome; ahí se le aplica el script | — |
 | Copias `.env.antes-leda` (las deja `renombrar_a_leda.py env`, ignoradas por Git) | **Hecho** (2026-10-02) | Borradas en `main` y en flujo (`.env.antes-leda` y `.env.test.antes-leda`) |
 | Tag `pre-renombre-leda` | Nunca hace falta borrarlo: es el registro de dónde estaba todo antes | — |
-| Ramas `auxiliar/alta-y-google-pre-*` y `-unificada-un-commit` (locales) | Ya mismo, si el usuario confirma que no las necesita (no tienen trabajo propio) | `git branch -D` |
+| Ramas `auxiliar/alta-y-google-pre-*` y `-unificada-un-commit` (locales) | **No se borran por la limpieza del renombre.** Son parte del trabajo de alta y Google (rama aparte, `odd/tasks/alta-y-google.md`, ADR 0010), que se retoma para integrarlo. Se decide sobre ellas al retomar esa rama, después de comparar su contenido | — |
 | `feat/flujo-variante-a` (local, remota y su worktree) | Cuando el usuario dé por cerrado el experimento A/B del ADR 0014 | Borrar el worktree, la rama local y la remota |
 | Script `tools/renombrar_a_leda.py` | Cuando ninguna rama viva tenga el nombre viejo (incluida `auxiliar/alta-y-google`, si se retoma) | Borrar el archivo |
 | `tests/historia_previa_a_leda.py` | **Nunca**: las pruebas de migración leen commits anteriores al renombre y lo necesitan siempre. No es un resto de Prisma | — |
