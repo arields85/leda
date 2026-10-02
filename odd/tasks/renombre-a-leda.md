@@ -198,6 +198,14 @@ no un secreto. No hay `.env` ni volcados de base versionados.
         `Prisma-PM` de los tokens protegidos de `tools/renombrar_a_leda.py`, porque desde ahí
         renombrar esas rutas pasa a ser lo correcto; y comprobar el listener desde la ruta
         nueva. Claude Code va a pedir confiar en la carpeta nueva.
+      - RDD del script: `review-a7221ca544b0a4ec`, `review-be7cbb8e4124fef5` y
+        `review-da00320656b0f75e`, aprobadas. Corregidas: restaurar el `.venv` viejo si falla
+        la reconstrucción, que la verificación final falle de verdad, leer los códigos de
+        salida antes de canalizar, y normalizar `/` en las rutas de los worktrees (probado:
+        hoy detecta la ruta vieja). Se descarta "prefijo con falso positivo": después de la
+        mudanza ninguna ruta debe contener `Prisma-PM`, tampoco `Prisma-PM-worktrees`.
+        Sintaxis verificada con el analizador de PowerShell; `-DryRun` frena por los procesos
+        en uso, como corresponde.
 
 ## Procedimiento para integrar `auxiliar/alta-y-google` (R12)
 
