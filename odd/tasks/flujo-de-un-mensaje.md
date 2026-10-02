@@ -1872,7 +1872,7 @@ activados.
 - Clase: falla silenciosa, contra "nunca fallar en silencio". Choca con la decisión del
   usuario de no poner plazo por turno, así que se discute antes de tocarla. Propuesta: un
   plazo total que termine en el aviso neutro y el incidente que ya existen
-  (`alta_conducida_fallida`), sin plantillas que tapen al modelo. `PENDIENTE`.
+  (`alta_conducida_fallida`), sin plantillas que tapen al modelo. **Decidido el 2026-10-02**: ver "Decisión: plazo total, aviso certero y cola cuando falla el proveedor", al final de este documento.
 - Agravante: con la llamada colgada, Ctrl+C deja el listener en "Cortando…" para siempre,
   porque espera al hilo bloqueado en la llamada. Hubo que forzar el cierre del proceso
   (00:20). Misma causa: una llamada al modelo sin plazo total.
@@ -1902,3 +1902,97 @@ activados.
 - Rechazo de contrato (08:55:56, intento 1): `acceptance_criterion` llegó con otra forma
   (`{texto, verificable?, propuesta?}` o `{propuesta}` es lo válido). El intento 2 fue
   aceptado. El turno costó 26 s. Se anota para medir su frecuencia antes de tocar nada.
+
+### Decisión: plazo total, aviso certero y cola cuando falla el proveedor (2026-10-02)
+
+**Estado: decidido por el usuario el 2026-10-02, no empezado.** Responde el hallazgo
+"turno del alta colgado sin fin y sin aviso" (00:11). Se retoma como tarea pendiente,
+P1 a P7 abajo. No es funcionalidad nueva: corrige una falla silenciosa del flujo existente
+("nunca fallar en silencio") y es condición para la prueba de adopción del ADR 0014.
+
+**Decisiones del usuario (no se vuelven a discutir, salvo que la evidencia las contradiga):**
+
+1. **Plazo total de 2 minutos por turno del modelo.** No contradice "modelo puro, sin
+   red" (2026-10-01): aquella decisión rechazó un plazo corto que cortaba respuestas
+   buenas y una plantilla que hablaba en lugar del modelo. Este plazo es largo (las
+   latencias más lentas observadas rondan los 58 s), no reemplaza al modelo y termina en
+   el aviso y el incidente que esa misma decisión exige "ante una falla". El valor tiene
+   que poder ajustarse desde la plataforma (`docs/product/plataforma-pendientes.md`).
+2. **El aviso es certero y sólo promete cuando la falla es del proveedor.** La
+   constitución §10 manda un mensaje humano y genérico, sin errores técnicos ni nombres de
+   modelos o de proveedores, así que la causa no se le muestra a la persona. La certeza
+   decide qué se promete:
+   - falla confirmada del proveedor (pasajera, fuera de Leda): "No pude completar la
+     respuesta y quedó registrado. Apenas pueda, te respondo." La promesa es honesta
+     porque el reintento la va a cumplir;
+   - falla propia de Leda (código, base): sólo el mensaje genérico de §10, sin promesa,
+     porque reintentar no la arregla (§4, honestidad);
+   - el incidente lleva el diagnóstico completo para el administrador.
+   Es la única plantilla del alta conducida: informa el problema, no habla por el modelo.
+3. **Cola con reproceso, no respuesta guardada.** El turno fallido no produjo respuesta.
+   Cuando el proveedor vuelve, Leda procesa los mensajes pendientes en orden **contra el
+   estado de ese momento** (ADR 0013, "estado real y sólo opciones posibles"): la persona
+   pudo haber escrito o tocado algo mientras tanto. Si escribe más durante la caída, esos
+   mensajes también quedan en cola, sin repetir el aviso (ADR 0013, una respuesta visible
+   por mensaje).
+4. **Horario.** Si el proveedor vuelve fuera del horario del espacio, la respuesta sale al
+   inicio del horario (constitución §8), salvo que la persona esté escribiendo en ese
+   momento. La respuesta en cola nunca vence ni se descarta en silencio (lección de C-1).
+5. **Límite de 4 horas hábiles.** Si el proveedor no vuelve, Leda deja de esperar, le avisa
+   a la persona que no se pudo y le pide que lo vuelva a escribir, y registra el incidente
+   (mecánica §12: reintentos con espera creciente y, al agotarse, incidente). Ajustable
+   desde la plataforma.
+6. **Alcance: todo turno del modelo**, no sólo el alta conducida. El cuelgue viene de
+   cualquier llamada al proveedor sin plazo total, así que el mecanismo es general.
+
+**Chequeo de rumbo ("Cómo pensamos juntos", punto 3):**
+
+1. Clase de problema: una falla externa que hoy es silenciosa (los "…" para siempre, sin
+   turno, auditoría ni incidente) y deja al listener sin poder cerrarse. Ya apareció con
+   otra forma: C-1 (un mensaje retenido que venció sin aviso) y el plazo de la redacción A,
+   que valía en el papel y no en el reloj (R12, C1 de esta rama).
+2. Mecanismo general: un plazo total de reloj (no por fase de httpx) para toda llamada al
+   modelo, una clasificación de la falla por tipo y por comprobación, y una cola de
+   entrada que se reprocesa. Ninguna frase ni caso especial.
+3. Qué haría innecesaria la próxima ronda: que ninguna falla del proveedor quede sin
+   aviso, sin incidente o sin respuesta final, y que una prueba real con el proveedor
+   cortado lo muestre de punta a punta.
+4. Hipótesis vigente: las caídas del proveedor son pasajeras (minutos), como el 2026-10-02
+   (11-15 s por llamada mínima, recuperado a la mañana). Si fueran largas y frecuentes, el
+   problema pasa a ser la elección del proveedor, no este mecanismo.
+
+**Tareas (orden de construcción; la prueba real más temprana sale de P1 a P3):**
+
+- [ ] **P1.** Plazo total de reloj de 2 min para toda llamada al modelo (el alta
+      conducida y el camino general), reutilizando `llm.llamar_con_plazo`. Valor en un
+      solo lugar, listo para pasar a la plataforma. Ctrl+C cierra el listener aunque haya
+      una llamada colgada.
+- [ ] **P2.** Clasificación certera de la falla: el proveedor respondió con error
+      (conexión, 5xx, 429), el plazo venció esperando al proveedor, o falló Leda. Para
+      confirmar que es el proveedor y no la conexión de la máquina: una llamada mínima al
+      proveedor y una conexión a otro destino conocido. El diagnóstico va sanitizado al
+      incidente.
+- [ ] **P3.** Aviso por outbox según P2 (con promesa sólo si la falla es del proveedor),
+      un único aviso por caída y por persona, más el incidente.
+- [ ] **P4.** Cola: los mensajes de una persona durante la caída quedan pendientes, no
+      consumidos. Sondeo del proveedor con espera creciente (desde 30 s). Al volver, se
+      reprocesan en orden contra el estado actual, de forma idempotente (el recibo de
+      entrada). Revisar la reentrega de Telegram que ya existe
+      (`mensaje_recuperado_sin_respuesta`) como base. Si hace falta esquema, va con
+      migración y rollback, y se evalúa si la cola merece un ADR.
+- [ ] **P5.** Horario: si el proveedor vuelve fuera de horario, esperar al inicio del
+      horario salvo actividad de la persona. Prueba de que nada vence en silencio.
+- [ ] **P6.** Límite de 4 horas hábiles: aviso de "no se pudo, escribilo de nuevo" e
+      incidente. Ajustable desde la plataforma.
+- [ ] **P7.** Prueba real por Telegram con datos ficticios, en horario: apuntar el
+      proveedor de `leda_flujo` a un destino que no responda, Marcos escribe, llega el
+      aviso con promesa y queda el incidente; se restablece el proveedor y Marcos recibe
+      la respuesta normal. Leer conversación, base, auditoría e incidentes.
+
+**Comprobaciones:** RED antes de cada tarea con `ProveedorGuionado` simulando un proveedor
+colgado, uno que da error y uno que vuelve; suite completa de la rama; replay del caso de
+las 00:11. Antes de empezar, contrastar este diseño con el código y con
+`docs/STATUS.md`.
+
+**Fuera de este trabajo, paso del usuario:** vincular el bot de administración a un
+administrador de plataforma. Hoy ningún incidente le llega a nadie.
