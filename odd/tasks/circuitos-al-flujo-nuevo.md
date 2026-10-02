@@ -308,8 +308,19 @@ revise el cableado del tablero de la línea 2 para el martes que viene":
   escrita un viernes (2026-10-02), quedó 13/10 a las 12:36 y 06/10 a las 14:58. Leda
   muestra la fecha con el día en el mensaje y en el resumen, así que la persona puede
   corregirla, pero la interpretación del modelo no es estable. Etapa 2 del ADR 0014 (el
-  modelo normaliza valores). No se corrige con reglas de frases: `PENDIENTE` de decisión
-  del usuario sobre qué hacer con las fechas relativas ambiguas, y de medir su frecuencia.
+  modelo normaliza valores). No se corrige con reglas de frases.
+
+**Decisión del usuario (2026-10-02): decidido, listo para hacer.**
+
+- [ ] **C0-9.** Cuando una fecha dicha por la persona admite dos lecturas ("el martes que
+      viene" un viernes: 6/10 o 13/10), Leda no elige: pregunta "¿Para qué martes?" con
+      un botón por fecha posible. Cuando la fecha tiene una sola lectura ("el 15/10",
+      "mañana", "el martes 13", "dentro de dos semanas"), sigue como hoy, sin preguntar.
+      Mecanismo: el modelo devuelve todas las fechas posibles en su salida estructurada
+      (etapa 2 del ADR 0014) y el código arma los botones y valida cada una (etapa 4).
+      Ninguna lista de frases. Vale para la fecha en cualquier punto del alta y en
+      Modificar. Constitución §4 (no completa con lo más probable); "botones donde hay
+      opciones".
 
 ## Relación con otros pendientes
 
