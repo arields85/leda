@@ -518,6 +518,43 @@ cómo conversa Leda se aplique en todos los circuitos.
       **C0-13 no se marca** hasta que el usuario apruebe el texto de la voz y pase la
       prueba real.
 
+      **Segunda unidad (revisión del usuario del borrador), 2026-10-02.** Commits
+      `f9a1595` (emojis desde el pack) y `92de5de` (voz 0.2). Ruta: delegado.
+      - `nucleo/voz.md` 0.2, todavía **borrador pendiente de aprobación**: sección
+        "Personalidad y trato" con doce rasgos escritos como rasgo, conducta y límite
+        (cálida y agradable, cordial y profesional, amable sin ser informal, clara y
+        breve, orientada a soluciones, respetuosa de las responsabilidades,
+        persistente sin hostilidad, transparente, pide y no ordena, sin repetirse,
+        acompaña y no vigila, bloqueos a tiempo). Líneas nuevas: nunca nombra un botón
+        que no esté entre sus opciones, y no saluda por su cuenta (el saludo del día
+        lo pone `saludo.py`). "Firme sin hostilidad" pasó entero al rasgo
+        "Persistente"; la brevedad con próximo paso, al rasgo "Clara y breve"; la
+        jerga, también ahí. Los emojis no están en la voz.
+      - Emojis desde el pack, el mismo defecto que el voseo: `redaccion.py` tenía
+        "ni emojis" y "sin emojis" fijos. Ahora `sistema_redaccion` y
+        `sistema_charla` leen `persona_config.emojis` con
+        `instrucciones.emojis_del_espacio`, y la redacción de la regla es una sola
+        (`instrucciones.regla_de_emojis`), la misma del tono del alta. Con emojis:
+        "algún emoji ocasional cuando suma calidez o claridad, no en cada respuesta ni
+        como adorno". `SISTEMA_REDACCION` y `SISTEMA_CHARLA` quedan como la guía sin
+        emojis. Sin cambios: "sin Markdown, sin jerga técnica y sin nombrar botones",
+        y el voseo fijo de esas dos guías (fuera del alcance de esta unidad).
+      - Tope del alta: 2.500 tokens estimados. Medido: voz 5.642 caracteres (~1.410),
+        mecánica 3.419 (~854), total con el tono de CoreWork 9.236 (~2.309) sin emojis
+        y 9.315 (~2.328) con emojis.
+      - Pruebas: RED, cinco fallas en `tests/test_voz_y_instrucciones.py` y error de
+        colección en `tests/test_redaccion_emojis.py` (no existía
+        `sistema_redaccion`); GREEN, 389 pasan en las pruebas de voz, redacción, charla
+        y alta. Suite completa con `persona.emojis: true` en `espacios/corework.yaml`:
+        `2 failed, 3494 passed, 333 deselected, 1 warning in 941.85s` (la falla conocida
+        y `tests/test_charla_breve.py::test_el_modelo_recibe_el_mensaje_y_la_pregunta_pendiente_como_datos`,
+        que compara con la guía sin emojis).
+      - **Pendiente de autorización:** el cambio de `persona.emojis` a `true` en
+        `espacios/corework.yaml` no se commiteó, porque rompe esa prueba (archivo fuera
+        del alcance autorizado, línea 172). Hace falta ajustar esa línea para que
+        compare con la guía de emojis que corresponde al pack. Después, importar el pack
+        a la base (lo hace el coordinador).
+
 ### RDD de C0-3, C0-5 y C0-6 (2026-10-02)
 
 Tramo desde la frontera `cb3befb` hasta `e8e6499` (C0-3, C0-5, C0-6 y documentos): riesgo
