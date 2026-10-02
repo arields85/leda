@@ -170,9 +170,12 @@ no un secreto. No hay `.env` ni volcados de base versionados.
 
 - [ ] R12. **Integrar `auxiliar/alta-y-google` con el renombre** (pedido del usuario,
       2026-10-02). La rama tiene trabajo avanzado sin terminar (alta con correo verificado y
-      credencial de Google, migraciones `0100` y `0101`, ADR 0010) que se retoma y se integra
-      a `main`. Se hace con el procedimiento de abajo, cuando el usuario la retome (la
-      funcionalidad nueva sigue congelada).
+      credencial de Google, migraciones `0100` y `0101`, ADR 0010) que se integra a `main`.
+      **Decisión del usuario (2026-10-02): después de integrarla, ese trabajo continúa desde
+      `main`. No se sigue en una rama aparte.** La rama y su worktree se retiran una vez
+      integrados. Se hace con el procedimiento de abajo cuando el usuario lo indique; la
+      funcionalidad nueva sigue congelada (ROADMAP, "Orden de entrega"), así que la fecha
+      la decide el usuario.
 
 ## Procedimiento para integrar `auxiliar/alta-y-google` (R12)
 
@@ -225,9 +228,12 @@ Orden, aplicado igual que en `feat/flujo-de-un-mensaje`:
 8. **Verificar.** La suite completa tiene que dar el mismo resultado que la línea de base
    del paso 1. RDD por tramos de todo lo escrito a mano (el commit mecánico se prueba con
    el paso 3). Prueba real por Telegram de un alta con correo sobre la base nueva.
-9. **Integrar y limpiar.** Integrar a `main` según lo que decida el usuario. Después,
-   borrar las copias `.env.antes-leda` y, si ninguna rama viva conserva el nombre viejo,
-   el script (tabla de limpieza).
+9. **Integrar a `main` y seguir desde ahí.** Merge de la rama a `main`. Desde ese momento
+   el trabajo de alta y Google (G2c-2, G2d y lo que siga del documento de la rama) se
+   continúa en `main`, con su documento `odd/tasks/alta-y-google.md` traído de la rama,
+   que es la versión completa. Después: borrar el worktree `alta-y-google`, la rama y sus
+   copias locales (si el paso 2 confirmó que no tienen nada propio), las copias
+   `.env.antes-leda` y, si ninguna rama viva conserva el nombre viejo, el script.
 
 ## Leda funciona correctamente: la condición para limpiar
 

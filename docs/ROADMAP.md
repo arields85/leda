@@ -71,6 +71,14 @@ probaba superficie nueva y los hallazgos no bajaban; una función construida sob
 conversación que todavía no funciona hereda sus problemas. Se levanta al cumplir los
 criterios.
 
+**Alta con correo verificado y Google (ADR 0010): se integra a `main` y continúa desde ahí**
+(decisión del usuario, 2026-10-02). El trabajo avanzado de la rama `auxiliar/alta-y-google`
+se integra a `main` con el procedimiento R12 de
+[`../odd/tasks/renombre-a-leda.md`](../odd/tasks/renombre-a-leda.md), que incluye primero el
+renombre a Leda. Desde ahí se continúa en `main`, no en una rama aparte. Es una tarea
+pendiente: su construcción sigue bajo el congelamiento de arriba, y el momento lo decide el
+usuario.
+
 ### Línea base versionada
 
 **Entrega:** el trabajo acumulado queda registrado en un commit con historia
