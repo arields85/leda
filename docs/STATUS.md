@@ -102,7 +102,13 @@ eran del arnés y se corrigieron en `ffe4e85`). Corridas anteriores y su detalle
   la rama de flujo. Falta la limpieza (R11), según la tabla de
   [`../odd/tasks/renombre-a-leda.md`](../odd/tasks/renombre-a-leda.md).
 - PostgreSQL local (scoop) no es un servicio: después de reiniciar la PC hay que
-  levantarlo con `levantar-postgres.bat`.
+  levantarlo con `levantar-postgres.bat`. El 2026-10-02 se cayó dos veces con
+  `0xC0000142` (también el 2026-09-30): un proceso hijo huérfano retiene la memoria
+  compartida; se cierran los procesos `postgres` y se vuelve a levantar (la recuperación
+  desde el WAL terminó limpia). Si se repite, investigar la causa de fondo.
+- `leda_flujo` (2026-10-02): migraciones hasta `0028` (quitar botones resueltos), con
+  respaldo previo en `db/respaldos/leda_flujo-antes-de-0028-20261002.dump`; CoreWork con
+  `emojis = true` (decisión del usuario; el pack se actualiza en la rama de flujo).
 - Base `prisma` (respaldo): ronda 4, rearmada dos veces el 2026-09-30, esquema hasta
   `0025`, Ariel administrador. Tiene el estado del circuito C (hallazgos C-1 a C-3 en
   "Próximo paso"). Respaldo previo al flujo:
