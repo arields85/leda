@@ -20,8 +20,11 @@ sobre las que se apoyan las políticas de aislamiento.
 ## Decisión
 
 1. Una sola sustitución que respeta mayúsculas (`PRISMA` → `LEDA`, `Prisma` → `Leda`,
-   `prisma` → `leda`), aplicada a rutas y contenido de todos los archivos versionados,
-   salvo binarios y el documento de la unidad del renombre.
+   `prisma` → `leda`), aplicada a rutas y contenido de todos los archivos versionados.
+   No toca binarios, archivos de bloqueo, los archivos que describen el renombre (el
+   documento de la unidad, este ADR y el script `tools/renombrar_a_leda.py`) ni los
+   nombres protegidos que quedan fuera de alcance: la carpeta `Prisma-PM`, el repositorio
+   `arields85/prisma` y el archivo de respaldo `prisma-antes-flujo-*`.
 2. Corte limpio: el código no lee nombres viejos de variables, roles ni bases.
 3. **Bases nuevas**, no migración en el lugar. Las bases `leda` y `leda_flujo` se arman desde
    el esquema renombrado y se reimporta el espacio CoreWork. Las bases `prisma*` y sus roles
