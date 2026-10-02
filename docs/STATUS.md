@@ -3,7 +3,7 @@
 **Alcance:** Leda es un producto de gestión de proyectos multi-tenant. CoreWork es
 su primer cliente, no su definición.
 
-**Última actualización documental:** 2026-10-01.
+**Última actualización documental:** 2026-10-02.
 
 Historia de sesiones y unidades cerradas:
 [`historial/STATUS-hasta-2026-09-30.md`](historial/STATUS-hasta-2026-09-30.md)
@@ -59,7 +59,8 @@ Gobiernan: [`product/que-es-leda.md`](product/que-es-leda.md), [`architecture/fr
   `feat/flujo-de-un-mensaje`, `feat/flujo-variante-a` y `auxiliar/alta-y-google`, como
   respaldo antes del renombre a Leda. El porqué, lo que quedó local y la limpieza
   posterior están en [`../odd/tasks/renombre-a-leda.md`](../odd/tasks/renombre-a-leda.md).
-  Frontera de revisión RDD en `ec3109a` (rebanada de documentación aprobada y
+  Lo posterior al tag (el renombre en `main` y en la rama de flujo) todavía no se subió:
+  lo decide el usuario. Frontera de revisión RDD en `ec3109a` (rebanada de documentación aprobada y
   reconocida, linaje `review-147d7327236bfea2`).
 - Rama `feat/flujo-de-un-mensaje`, worktree
   `D:\Proyectos\Prisma-PM-worktrees\flujo-de-un-mensaje`: documento
@@ -90,8 +91,13 @@ eran del arnés y se corrigieron en `ffe4e85`). Corridas anteriores y su detalle
   código renombrado usa bases nuevas, armadas desde el esquema renombrado. `leda` es para
   el código de `main` y `leda_flujo` para la rama de flujo. Las bases anteriores,
   `prisma` y `prisma_flujo`, y sus roles `prisma_*` quedan intactos como respaldo hasta
-  que Leda funcione correctamente. La condición y la limpieza están en
+  la limpieza. **Leda funciona correctamente desde el 2026-10-02**: suites en verde
+  (`main` 2286, flujo 3432), verificación byte a byte, alta real de punta a punta sobre
+  `leda_flujo` y nada lee los nombres viejos. El renombre está en `main` (`2d56952`) y en
+  la rama de flujo. Falta la limpieza (R11), según la tabla de
   [`../odd/tasks/renombre-a-leda.md`](../odd/tasks/renombre-a-leda.md).
+- PostgreSQL local (scoop) no es un servicio: después de reiniciar la PC hay que
+  levantarlo con `levantar-postgres.bat`.
 - Base `prisma` (respaldo): ronda 4, rearmada dos veces el 2026-09-30, esquema hasta
   `0025`, Ariel administrador. Tiene el estado del circuito C (hallazgos C-1 a C-3 en
   "Próximo paso"). Respaldo previo al flujo:

@@ -1,6 +1,6 @@
 # Renombre del producto: Prisma pasa a llamarse Leda
 
-**Estado:** en preparación (2026-10-01). **Decisión del usuario:** renombrar "todo lo que es
+**Estado:** Leda funciona correctamente (2026-10-02); falta la limpieza (R11). **Decisión del usuario:** renombrar "todo lo que es
 Prisma" a Leda. Guía de referencia: `D:\Proyectos\RENAME_PLAYBOOK_prisma_to_leda.md` (renombre
 equivalente hecho en otra aplicación del usuario).
 
@@ -103,12 +103,12 @@ no un secreto. No hay `.env` ni volcados de base versionados.
       - Correcciones a mano, en un commit aparte: en `docs/STATUS.md` y en el traspaso, la
         base de la ronda 4 y los residuales siguen siendo `prisma*`, porque son bases reales
         que no cambian de nombre.
-- [ ] R6. Variables de entorno. Hecho: el `.env` y el `.env.test` del worktree del renombre
+- [x] R6. Variables de entorno. Hecho: el `.env` y el `.env.test` del worktree del renombre
       se copiaron del checkout principal y se les aplicó `renombrar_a_leda.py env`. Quedaron
       con 0 claves `PRISMA` y sin ninguna aparición de "prisma", sin mostrar valores.
       Worktree de flujo: hecho el 2026-10-02, con copias `.env.antes-leda`. Pendiente: el
       `.env` del checkout principal, cuando `main` reciba el renombre.
-- [ ] R7. Bases. Hecho: base `leda` creada el 2026-10-01 con `esquema`,
+- [x] R7. Bases. Hecho: base `leda` creada el 2026-10-01 con `esquema`,
       `importar corework --activar`, `feriados`, `sembrar` (12 tareas, 1 dependencia),
       `modelo deepseek-v4-flash --proveedor nan` y `administrador corework Ariel`.
       `leda_flujo`: creada el 2026-10-02 desde la rama de flujo renombrada (con las migraciones
@@ -116,7 +116,7 @@ no un secreto. No hay `.env` ni volcados de base versionados.
       `redaccion = A`, igual que `prisma_flujo` (el pack de la rama trae B). El modelo es
       idéntico en las dos bases (`nan/deepseek-v4-flash`, sin parámetros). **No hace falta
       reactivar enlaces:** Ariel, Ismael y Marcos quedan vinculados desde el pack.
-- [ ] R8. Suite completa y prueba real por Telegram desde el código renombrado.
+- [x] R8. Suite completa y prueba real por Telegram desde el código renombrado.
       - Primera suite sobre `460b413` (2026-10-01): **9 failed, 2277 passed**. Las 9 son pruebas
         de migración de `tests/test_task_intake.py` que arman una base vieja con
         `git show efa8ee2:db/esquema.sql`. Ese commit es anterior al renombre (roles
@@ -132,7 +132,7 @@ no un secreto. No hay `.env` ni volcados de base versionados.
         `PYTHONPATH=src python -m pytest -q -p no:cacheprovider` → **2286 passed**, 333
         deselected, 15 min. Es toda la suite de `main`, sin fallas. Falta la parte real de
         R8, la prueba por Telegram, que se hace sobre la rama de flujo (R9).
-- [ ] R9. Aplicar el mismo script en `feat/flujo-de-un-mensaje` y repetir R5 y R8 ahí.
+- [x] R9. Aplicar el mismo script en `feat/flujo-de-un-mensaje` y repetir R5 y R8 ahí.
       - Commit mecánico `3b75117` sobre `aeea562`: **408 de 408 archivos son pura
         sustitución**. Los restos son rutas a `Prisma-PM`. Arreglo de las pruebas de
         migración con cherry-pick (`1adcfd0`, RDD `review-7ea5dbadc4239272`).
@@ -160,7 +160,9 @@ no un secreto. No hay `.env` ni volcados de base versionados.
           queda hasta la limpieza.
         - Lección para el inventario de cualquier renombre: además de roles, variables y
           bases, revisar **las membresías de los logins** en `pg_auth_members`.
-- [ ] R10. Actualizar referencias externas: memoria del agente, Engram, `docs/STATUS.md`.
+- [x] R10. Referencias externas (2026-10-02): memoria del agente
+      (`producto-se-llama-leda`, con su línea en el índice), Engram (tema
+      `odd/renombre-a-leda/estado`) y `docs/STATUS.md` (operación y Git).
 - [ ] R11. **Limpiar lo de Prisma cuando quede obsoleto**, según la tabla de abajo. Se hace
       recién cuando se cumpla "Leda funciona correctamente".
 
@@ -195,9 +197,17 @@ Registro:
    `confirmar_borrador_tarea`) coincide con la conversación y la base. El único incidente
    nuevo fue el permiso de `leda_gateway` (R9), un defecto del renombre que se corrigió
    antes de la confirmación final; después de eso no hubo ninguno más.
-4. Parcial. El listener y los comandos corrieron con `.env` sin ninguna `PRISMA_*` y sin
-   conexiones a bases `prisma*` (comprobado el 2026-10-02 en `pg_stat_activity`). Falta
-   el `.env` del checkout principal (R6).
+4. Cumplido (2026-10-02). `refactor/renombre-a-leda` entró a `main` por fast-forward
+   (`2d56952`). El `.env` y el `.env.test` del checkout principal quedaron renombrados con
+   copia, con 0 claves `PRISMA` y sin "prisma". Se borraron `src/prisma` (sólo 33 `.pyc`) y
+   `src/prisma.egg-info`, y el paquete se reinstaló en modo editable como `leda` (`prisma`
+   ya no se puede importar). `python -m leda estado corework` corre contra la base `leda`,
+   y no hay conexiones a bases `prisma*`. El worktree congelado `alta-y-google` conserva su
+   `.env` viejo hasta que se retome (no está en uso).
+
+**Conclusión: Leda funciona correctamente (2026-10-02).** Ya se puede hacer la limpieza
+(R11) siguiendo la tabla. Los borrados destructivos (bases, roles) se confirman con el
+usuario antes de ejecutarse.
 
 ## Limpieza posterior
 
@@ -209,6 +219,7 @@ respaldo del renombre.
 |---|---|---|
 | Bases `prisma` y `prisma_flujo` | Cuando se cumpla "Leda funciona correctamente" | Volcado final a `db/respaldos/` y después `drop database` |
 | Respaldo `db/respaldos/prisma-antes-flujo-20260930.dump` | Junto con las bases de arriba | Borrar el archivo |
+| Worktree `Prisma-PM-worktrees/renombre-a-leda` y su rama `refactor/renombre-a-leda` (ya en `main`; su `.env` tiene secretos) | Ya mismo | `git worktree remove` y `git branch -d` |
 | Bases residuales `prisma_test_*` y `prisma_diag_*` | Ya mismo: son de corridas viejas, no son respaldo de nada | `drop database` |
 | Membresía del login de autoridad en `prisma_gateway` | Se va sola al borrar el rol `prisma_gateway` | — |
 | Roles `prisma_*` del servidor | Después de borrar todas las bases `prisma*` (un rol con objetos no se puede borrar) | `drop role` |
