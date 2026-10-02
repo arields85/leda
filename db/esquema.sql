@@ -619,6 +619,10 @@ create table message_outbox (
   vence_en                timestamptz,
   enviado_en              timestamptz,
   telegram_message_id     bigint,
+  -- C0-6 (migración 0028): cuándo se resolvió quitar los botones de este mensaje
+  -- en Telegram, una vez que su acción o su elección dejó de valer. Ver el
+  -- comentario de la columna, más abajo.
+  botones_quitados_en     timestamptz,
   dedupe_key              text not null unique,
   intentos                integer not null default 0,
   ultimo_error            text,
@@ -899,6 +903,16 @@ alter table message_outbox
 
 create index outbox_por_entrante on message_outbox (entrante_id)
   where entrante_id is not null;
+
+-- C0-6 (migración 0028): los mensajes ya entregados con botones que todavía no se
+-- revisaron; el despachador busca entre ellos los que ya no valen.
+create index outbox_botones_por_quitar on message_outbox (workspace_id, enviado_en)
+  where estado = 'enviado' and botones_quitados_en is null
+    and telegram_message_id is not null
+    and (pending_action_id is not null or intake_choice_set_id is not null);
+
+comment on column message_outbox.botones_quitados_en is
+  'C0-6: cuándo el despachador resolvió quitar los botones de este mensaje en Telegram porque su acción o su elección ya no vale: se quitaron, Telegram dijo que ya no había nada que quitar, o falló y quedó un incidente. Nula mientras no hubo nada que quitar.';
 
 create index inbound_por_boton on inbound_message
   (workspace_id, chat_id, app_user_id, boton_callback, at)

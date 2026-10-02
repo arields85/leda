@@ -114,11 +114,19 @@ class Transporte(Protocol):
         bloque copiable (T9-R1c-3) se entrega con `bloque=...` además: sólo los
         mensajes que lo llevan pasan ese argumento."""
 
+    def quitar_botones(self, chat_id: int, message_id: int) -> None:
+        """Le saca los botones a un mensaje ya entregado (C0-6). Una falla sale
+        como excepción; `_quitar_botones_resueltos` decide qué significa."""
+
 
 @dataclass
 class TransporteDePrueba:
     enviados: list[Entregado] = field(default_factory=list)
     falla_en: set[int] = field(default_factory=set)
+    # C0-6: `(chat_id, message_id)` de cada mensaje al que se le quitaron los
+    # botones, y la excepción con que falla quitarlos, si se quiere probar una.
+    quitados: list[tuple[int, int]] = field(default_factory=list)
+    falla_al_quitar: Exception | None = None
 
     def enviar(self, chat_id: int, texto: str,
                botones: list[Boton] | None = None,
@@ -136,11 +144,18 @@ class TransporteDePrueba:
             bloque))
         return len(self.enviados)
 
+    def quitar_botones(self, chat_id: int, message_id: int) -> None:
+        if self.falla_al_quitar is not None:
+            raise self.falla_al_quitar
+        self.quitados.append((chat_id, message_id))
+
 
 class TransporteTelegram:
     def __init__(self, token: str, cliente=None) -> None:
         import httpx
         self._url = f"https://api.telegram.org/bot{token}/sendMessage"
+        self._url_botones = (
+            f"https://api.telegram.org/bot{token}/editMessageReplyMarkup")
         self._cliente = cliente or httpx.Client(timeout=15)
 
     def enviar(self, chat_id: int, texto: str,
@@ -166,6 +181,14 @@ class TransporteTelegram:
         r = pedido_telegram(self._cliente.post, self._url, json=cuerpo)
         pedido_telegram(r.raise_for_status)
         return r.json()["result"]["message_id"]
+
+    def quitar_botones(self, chat_id: int, message_id: int) -> None:
+        """Un teclado vacío saca los botones; el texto del mensaje no cambia."""
+        r = pedido_telegram(
+            self._cliente.post, self._url_botones,
+            json={"chat_id": chat_id, "message_id": message_id,
+                  "reply_markup": {"inline_keyboard": []}})
+        pedido_telegram(r.raise_for_status)
 
     def cerrar(self) -> None:
         """Cierra el cliente HTTP propio. Lo usa `ciclo.Ciclo` al reemplazar
@@ -976,7 +999,65 @@ def despachar(cur: psycopg.Cursor, workspace_id: str, transporte: Transporte,
             # viene detrás en el mismo chat lo dejaría salir primero (el aviso de una
             # respuesta detrás de su pregunta, F-A1).
             pasada.chats_en_falla.append(m["chat_id"])
+    _quitar_botones_resueltos(cur, workspace_id, transporte, ahora, lote)
     return resumen
+
+
+# C0-6: lo que Telegram contesta cuando ya no hay botones que quitar (alguien ya
+# los quitó, o el mensaje se borró). Es el mismo resultado que haberlos quitado.
+_YA_SIN_BOTONES = ("message is not modified", "message to edit not found")
+ETAPA_QUITAR_BOTONES = "quitar_botones"
+REFERENCIA_MESSAGE_OUTBOX = "message_outbox"
+
+
+def _quitar_botones_resueltos(cur, workspace_id: str, transporte: Transporte,
+                              ahora: datetime, lote: int) -> int:
+    """Le saca los botones a los mensajes ya entregados de este espacio cuya acción
+    pendiente o elección del alta ya no vale: resuelta, cancelada, enviada,
+    rechazada o vencida (C0-6, ADR 0013 regla 3: Leda no ofrece lo que ya no se
+    puede hacer). Corre en la pasada del despachador, bajo su mismo espacio y su
+    mismo candado. `botones_quitados_en` lo hace una sola vez por mensaje: queda
+    puesta si se quitaron, si Telegram dice que ya no había nada que quitar y
+    también si falló de otra manera, porque entonces queda un incidente (nunca un
+    silencio) y reintentar sin fin sólo repetiría el incidente. Un toque que
+    llegue antes o a pesar de esto lo contesta el gateway con el estado real
+    (C0-5). Devuelve cuántos mensajes resolvió."""
+    cur.execute(
+        """select m.id, m.chat_id, m.telegram_message_id
+             from message_outbox m
+             left join pending_action p on p.id = m.pending_action_id
+             left join task_intake_choice_set s on s.id = m.intake_choice_set_id
+            where m.workspace_id = %(ws)s and m.estado = 'enviado'
+              and m.botones_quitados_en is null
+              and m.telegram_message_id is not null
+              and (m.pending_action_id is not null
+                   or m.intake_choice_set_id is not null)
+              and ((p.id is not null
+                    and (p.estado <> 'esperando' or p.vence_en <= %(ahora)s))
+                   or (s.id is not null and s.estado <> 'active'))
+            order by m.enviado_en
+            limit %(lote)s
+            for update of m skip locked""",
+        {"ws": workspace_id, "ahora": ahora, "lote": lote})
+    filas = cur.fetchall()
+    for m in filas:
+        try:
+            transporte.quitar_botones(m["chat_id"], m["telegram_message_id"])
+        except Exception as e:  # noqa: BLE001 -- se registra, no se propaga
+            detalle = texto_error_seguro(e)
+            if not any(s in detalle.lower() for s in _YA_SIN_BOTONES):
+                registrar_incidente(
+                    cur, workspace_id,
+                    "No se pudieron quitar los botones de un mensaje que ya no "
+                    "vale: siguen visibles en Telegram.",
+                    severidad="baja", etapa=ETAPA_QUITAR_BOTONES,
+                    referencia_cruda=redactar_secreto_telegram(detalle)[:500],
+                    referencia_tipo=REFERENCIA_MESSAGE_OUTBOX,
+                    referencia_id=str(m["id"]), chat_id=m["chat_id"])
+        cur.execute(
+            "update message_outbox set botones_quitados_en = %s where id = %s",
+            (ahora, m["id"]))
+    return len(filas)
 
 
 def _retener(cur, workspace_id: str, ahora: datetime, m, rama, resumen: dict,

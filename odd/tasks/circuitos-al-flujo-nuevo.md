@@ -273,9 +273,42 @@ suite completa de la rama.
   texto anterior (alta, toques, ramas, borradores, alta guiada) ahora comprueban el
   estado real.
 - C-3 de `main` queda corregido en esta rama; llega a `main` recién cuando se integre.
-- [ ] **C0-6.** Cuando una vista previa o una elección se resuelve (confirmada, cancelada,
+- [x] **C0-6.** Cuando una vista previa o una elección se resuelve (confirmada, cancelada,
       enviada o vencida), sus botones se quitan del mensaje en Telegram, para que no se
       ofrezca lo que ya no se puede hacer (ADR 0013, regla 3).
+
+**Hecho C0-6** (ruta delegada: un escritor).
+
+- Mecanismo: `despachador._quitar_botones_resueltos`, al final de cada pasada de
+  `despachar`, bajo el mismo espacio y el mismo candado. Busca los mensajes ya entregados
+  (con `telegram_message_id`) cuya acción pendiente ya no espera o venció, o cuya
+  elección del alta ya no está activa, y les quita los botones con
+  `editMessageReplyMarkup` (`Transporte.quitar_botones`; el texto no cambia). La marca
+  `message_outbox.botones_quitados_en` lo hace una sola vez: queda puesta si se
+  quitaron, si Telegram dice "message is not modified" o "message to edit not found"
+  (nada que quitar) y también ante cualquier otra falla, que deja un incidente
+  `quitar_botones` con la referencia al mensaje (nunca un silencio; reintentar sin fin
+  sólo repetiría el incidente). Un toque que llegue antes o a pesar de esto lo contesta
+  C0-5.
+- Migración `0028_quitar_botones.sql` (con su rollback): la columna, un índice parcial
+  y su comentario, igual que en `db/esquema.sql`. No toca privilegios, dueño ni la RLS
+  forzada de `message_outbox`. Lo ya entregado cuya acción ya no valía al aplicarla
+  queda marcado sin tocar Telegram (historia anterior; un toque lo contesta C0-5). El
+  ensayo de migración y rollback de la suite y la paridad entre instalación limpia y
+  base migrada pasan.
+- PENDIENTE (orquestador): aplicar `0028` a `leda_flujo` con el listener detenido, como
+  la `0027`, con el mismo rol: en PowerShell, `$env:PGCLIENTENCODING = "UTF8"` y
+  `psql -v ON_ERROR_STOP=1 -d leda_flujo -f db/migrations/0028_quitar_botones.sql`
+  (ver `db/migrations/README.md`); después reiniciar el listener.
+- RED (2026-10-02): `tests/test_despacho_quita_botones.py`, 7 de 7 en rojo (no existían
+  la columna ni `quitar_botones`). GREEN: 7 de 7: pregunta resuelta y vencida, elección
+  del alta usada, idempotencia, una que sigue esperando no se toca, otro espacio no se
+  toca, "no hay nada que quitar" sin incidente, otra falla con un incidente y sin
+  reintento.
+- Suite completa con C0-5 y C0-6 (2026-10-02, `python -m pytest -q -p no:cacheprovider`):
+  `1 failed, 3457 passed, 333 deselected, 1 warning in 1008.24s`; la única falla es la
+  previa que depende de la fecha
+  (`test_un_texto_con_un_dato_inventado_se_reintenta_con_el_motivo`).
 - [x] **C0-7.** Repetir la ronda C0-C (rechazo con motivo) con Marcos como responsable.
       Hecho el 2026-10-02, 13:06-13:10: ver abajo.
 
@@ -305,7 +338,7 @@ intento; sin incidentes.
 
 **Estado de C0 al 2026-10-02:** las cinco variantes ya se probaron en real (confirma quien
 pide, para otra persona, Modificar, Cancelar por texto y por botón, rechazo con motivo).
-C0-1, C0-2 y C0-3 ya están construidos. Falta construir C0-5, C0-6 y C0-8, retirar el alta guiada (M4-M9) y repetir
+C0-1, C0-2, C0-3, C0-5 y C0-6 ya están construidos. Falta construir C0-8, retirar el alta guiada (M4-M9) y repetir
 la ronda C0-A (C0-4).
 
 ### RDD de C0-1 y C0-2 (2026-10-02)
