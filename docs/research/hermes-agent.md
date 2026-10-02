@@ -70,3 +70,49 @@ roadmap; las otras dos, en el endurecimiento del transporte.
 - El detalle de `run_agent.py:295` (`skip_background_review`) y qué omite exactamente.
 - `gateway/delivery.py`, y los complementos ByteRover, Supermemory y OpenViking.
 - El rendimiento con modelos chicos como el que usa Leda.
+
+## Cómo arma las instrucciones del agente (relevamiento del 2026-10-02)
+
+Pedido del usuario, a partir de C0-13 (`odd/tasks/circuitos-al-flujo-nuevo.md`, rama de
+flujo): Leda le manda al modelo el núcleo entero en cada turno del camino general (~6.400
+tokens) y el alta conducida no lo lee. Clon superficial de `main` en `1a4508e` (2026-10-02);
+documentación en `website/docs/` del repositorio, publicada en
+https://hermes-agent.nousresearch.com/docs/. Verificado en el código por el agente:
+`tools/memory_tool.py:56`, `agent/system_prompt.py:1-8` y `agent/prompt_builder.py:160-168`.
+
+- **`SOUL.md`: identidad y voz, nada más.** Vive en `$HERMES_HOME`, la escribe el usuario,
+  va primera y reemplaza la identidad por omisión (`agent/prompt_builder.py:1626-1669`).
+  No lleva reglas de proyecto ni rutas (`website/docs/.../personality.md:66-90`). La
+  identidad por omisión es una **especificación de conducta** de unas 120 palabras, con
+  prohibiciones con nombre y ejemplos ("una pregunta de una línea tiene una respuesta de
+  una línea"); el código anota que las listas de rasgos "no cambian nada"
+  (`prompt_builder.py:160-168`).
+- **El segundo archivo no son reglas: es memoria.** `MEMORY.md` (notas del agente) y
+  `USER.md` (perfil del usuario), escritos por el agente, con tope duro de 2.200 y 1.375
+  caracteres; una escritura que lo pasa da error y obliga a consolidar
+  (`tools/memory_tool.py:56`). Las reglas de proyecto van en `AGENTS.md` y los
+  procedimientos, en *skills*.
+- **Instrucciones armadas una vez por sesión, en tres capas:** estable (identidad, guías),
+  contexto (archivos del proyecto) y volátil (índice de skills, memoria, fecha). El orden
+  existe para que el proveedor reuse el comienzo idéntico del texto (caché de prefijo); la
+  fecha lleva sólo el día para no romperlo (`agent/system_prompt.py:1-8, 734-797,
+  487-490`). Lo que cambia en cada turno no va en las instrucciones: se agrega al mensaje
+  del usuario (`agent/turn_context.py:781-785`).
+- **Detalle a demanda:** las instrucciones llevan sólo un índice de skills (nombre y
+  descripción); el modelo pide el cuerpo con `skill_view` cuando lo necesita
+  (`prompt_builder.py:1443-1500`). Medido por Hermes: el texto de skills llegó a ser el 34 %
+  de los bytes de resultados de herramientas y se recortó el preámbulo
+  (`agent/oneshot_footprint.py:1-17`).
+- **Guías según el modelo:** bloques que se agregan sólo a familias de modelos con fallas
+  observadas (`prompt_builder.py:340-379`).
+- **Un cambio en esos archivos vale desde la sesión siguiente** (o reiniciando).
+
+**Qué sirve para Leda (a decidir con el usuario, C0-13):** separar una "voz" corta de
+Leda, siempre presente y escrita como especificación de conducta con ejemplos, de las
+reglas que garantiza el código; elegir en el código (no el modelo) qué sección del núcleo
+lleva cada circuito, desde los mismos archivos; poner primero lo estable y al final lo que
+cambia; y un tope de tamaño por circuito que falle a la vista. **Qué no sirve:** que el
+modelo elija sus skills (Leda rutea de forma determinista y usa un modelo chico), la
+memoria escrita por el agente (aprendizaje persistente sin decisión) y los archivos por
+directorio en lugar de PostgreSQL. **Sin verificar:** si el proveedor de Leda tiene caché
+de prefijo, y cuánto pesa el tamaño de las instrucciones en la latencia de un modelo chico.
