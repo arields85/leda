@@ -113,6 +113,18 @@ no un secreto. No hay `.env` ni volcados de base versionados.
       0027), con `alta = conversada` y `stream = true`. Después, el usuario reactiva los
       enlaces de prueba.
 - [ ] R8. Suite completa y prueba real por Telegram desde el código renombrado.
+      - Primera suite sobre `460b413` (2026-10-01): **9 failed, 2277 passed**. Las 9 son pruebas
+        de migración de `tests/test_task_intake.py` que arman una base vieja con
+        `git show efa8ee2:db/esquema.sql`. Ese commit es anterior al renombre (roles
+        `prisma_*`, variables `prisma.*`) y las migraciones que se le aplican ya dicen
+        `leda`. No es un error del código renombrado: la historia de Git no cambia de
+        nombre.
+      - Arreglo general (`de654d3`): un único ayudante `esquema_base()` traduce el esquema
+        histórico con la misma sustitución (`tests/historia_previa_a_leda.py`, permanente
+        y excluido del script en `a3c5ce8`). RED: las 9 observadas. GREEN: 9 passed. RDD
+        `review-ff793423fcb4995a` aprobada. Su WARNING sobre la ruta del import se descarta:
+        es el estilo existente (`from tests.toques …`) y las 9 pasan.
+      - Suite completa repetida sobre `481af9b`: `PENDIENTE` (en curso).
 - [ ] R9. Aplicar el mismo script en `feat/flujo-de-un-mensaje` y repetir R5 y R8 ahí.
 - [ ] R10. Actualizar referencias externas: memoria del agente, Engram, `docs/STATUS.md`.
 - [ ] R11. **Limpiar lo de Prisma cuando quede obsoleto**, según la tabla de abajo. Se hace
@@ -150,8 +162,10 @@ respaldo del renombre.
 | Bases residuales `prisma_test_*` y `prisma_diag_*` | Ya mismo: son de corridas viejas, no son respaldo de nada | `drop database` |
 | Roles `prisma_*` del servidor | Después de borrar todas las bases `prisma*` (un rol con objetos no se puede borrar) | `drop role` |
 | Variables `PRISMA_*` que queden en algún `.env` | Cuando todos los checkouts en uso estén renombrados | Borrar la línea |
+| Copias `.env.antes-leda` (las deja `renombrar_a_leda.py env`, ignoradas por Git) | Cuando se cumpla "Leda funciona correctamente" | Borrar el archivo |
 | Tag `pre-renombre-leda` | Nunca hace falta borrarlo: es el registro de dónde estaba todo antes | — |
 | Ramas `auxiliar/alta-y-google-pre-*` y `-unificada-un-commit` (locales) | Ya mismo, si el usuario confirma que no las necesita (no tienen trabajo propio) | `git branch -D` |
 | `feat/flujo-variante-a` (local, remota y su worktree) | Cuando el usuario dé por cerrado el experimento A/B del ADR 0014 | Borrar el worktree, la rama local y la remota |
 | Script `tools/renombrar_a_leda.py` | Cuando ninguna rama viva tenga el nombre viejo (incluida `auxiliar/alta-y-google`, si se retoma) | Borrar el archivo |
+| `tests/historia_previa_a_leda.py` | **Nunca**: las pruebas de migración leen commits anteriores al renombre y lo necesitan siempre. No es un resto de Prisma | — |
 | Carpeta, worktrees y repositorio de GitHub con el nombre viejo | Cuando el usuario decida renombrarlos (fuera de alcance) | Lo hace el usuario; el agente actualiza después `.venv`, rutas y memoria |
