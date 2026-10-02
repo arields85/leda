@@ -756,8 +756,20 @@ a la IA entera ni aparte).
         `pregunta` (`alta_turno.MAX_PREGUNTAS = 2`): la mecánica pide uno, pero un
         segundo no se rechaza. Bajarlo a 1 convertiría el pedido en un control (con un
         reintento cuando la IA pide dos); queda para decidir con el usuario.
-      - **Pendiente:** medir de nuevo con el banco (`medicion-voz/test_medir_voz.py`),
-        C3 contra C1 y C2, y la prueba real. 0-15 no se marca hasta entonces.
+      - **Medición C3 (2026-10-02),** mismo banco y condiciones, 18 corridas, 32 llamadas
+        (`medicion-voz/lado_a_lado_c1_c2_c3.md`). C1 / C2 / C3 sobre todos los textos
+        aceptados: órdenes secas 12 / 1 / **0**; "anoté" 7 / 1 / **0**; dos datos en una
+        pregunta 9 / 6 / **0**; emojis 0 / 0 / 6 (nunca más de uno); "por favor" 0 / 0 / 0;
+        usa el nombre 0 / 5 / 0; largo mediano 178 / 155 / 148 caracteres; tokens de
+        entrada 2.858 / 4.378 / 3.108; **latencia p50 10,0 / 17,2 / 10,6 s y p90 19,4 /
+        39,9 / 17,9 s**. C3 conserva las mejoras de C2, corrige los dos datos por pregunta
+        y recupera la latencia de C1. **Retroceso:** acepta "lo del tablero" como título
+        (3 de 3; C2 pedía un título claro en 2 de 3). **Sigue igual:** cero "por favor", el
+        primer turno repasa los datos ya dados, "Perfecto" como apertura (10 de 30), "me
+        falta" (2). **Falla del verificador:** rechazó «…ya está puesto 👍 Me falta el
+        objetivo…» como `nombre_inventado: Me`: una mayúscula después de un emoji sin punto
+        se toma como nombre propio inventado; con emojis activados cuesta reintentos.
+      - **Pendiente:** la prueba real por Telegram. 0-15 no se marca hasta entonces.
 
 - [ ] **0-14.** La redacción A (y la charla breve) leen la voz desde la misma fuente que el
       alta (`instrucciones`), para que haya una sola voz en todo lo que escribe la IA en el
