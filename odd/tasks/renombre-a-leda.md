@@ -306,7 +306,7 @@ respaldo del renombre.
 | Copias `.env.antes-leda` (las deja `renombrar_a_leda.py env`, ignoradas por Git) | **Hecho** (2026-10-02) | Borradas en `main` y en flujo (`.env.antes-leda` y `.env.test.antes-leda`) |
 | Tag `pre-renombre-leda` | Nunca hace falta borrarlo: es el registro de dónde estaba todo antes | — |
 | Ramas `auxiliar/alta-y-google-pre-*` y `-unificada-un-commit` (locales) | **No se borran por la limpieza del renombre.** Son parte del trabajo de alta y Google (rama aparte, `odd/tasks/alta-y-google.md`, ADR 0010), que se retoma para integrarlo. Se decide sobre ellas al retomar esa rama, después de comparar su contenido | — |
-| `feat/flujo-variante-a` (local, remota y su worktree) | Cuando el usuario dé por cerrado el experimento A/B del ADR 0014 | Borrar el worktree, la rama local y la remota |
+| `feat/flujo-variante-a` (local, remota y su worktree) | **Hecho en local** (2026-10-02, decisión del usuario) | Worktree y rama local borrados. Sus 20 commits ya estaban todos en `feat/flujo-de-un-mensaje` (0 fuera), y el experimento A/B se cerró el 2026-10-01 (ADR 0014). Queda la rama remota `origin/feat/flujo-variante-a`, que se borra cuando el usuario decida el push |
 | Script `tools/renombrar_a_leda.py` | Cuando `auxiliar/alta-y-google` esté renombrada (R12, pasos 3 y 5) y ninguna otra rama viva conserve el nombre viejo | Borrar el archivo |
 | `tests/historia_previa_a_leda.py` | **Nunca**: las pruebas de migración leen commits anteriores al renombre y lo necesitan siempre. No es un resto de Prisma | — |
 | Carpeta, worktrees y repositorio de GitHub con el nombre viejo | Cuando el usuario decida renombrarlos (fuera de alcance) | Lo hace el usuario; el agente actualiza después `.venv`, rutas y memoria |
