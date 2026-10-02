@@ -61,7 +61,7 @@ de `workspace_setting` (se cambia por SQL).
 | Cadencias: qué pide Leda, qué días y a qué hora (estado, resumen grupal, cierre semanal, informe), y la reunión periódica a preparar (`cadencia`, `reunion_periodica`) | Pack | Pedido del usuario (2026-10-01). Una cadencia fuera del horario declarado advierte al configurarla (alta de equipo, "Advierten, pero no impiden") |
 | Límites de contacto (`limites_de_contacto`) | Pack → `workspace_setting['limites_de_contacto']` | Los avisos de coordinación quedan fuera del tope (mecánica §10) |
 | Tiempos de respuesta, urgencia, escalamiento, bloqueos (`tiempos_de_respuesta`, `urgencia`, `escalamiento`, `bloqueos`) | Pack (`bloqueos` → `workspace_setting`) | |
-| Tono y conversación (`persona`, `conversacion`) | Pack | |
+| Tono y conversación (`persona`, `conversacion`): cómo trata Leda a las personas del cliente (`registro`: vos o usted), si usa emojis, formalidad y largo de las respuestas | Pack → `persona_config`; CoreWork: `registro: vos`, `emojis: true` (cambiado el 2026-10-02) | Decisión del usuario (2026-10-02): se configura desde la plataforma. Desde C0-13 (rama de flujo) el código toma el tono del pack en el alta y en la redacción; nunca va escrito en el código |
 | Bot y grupo de Telegram (`telegram`) | Pack + secreto en `.env` | El grupo de gestión de CoreWork no existe ("chat not found", STATUS) |
 | Objetivos y sus fechas (`objetivo_inicial`, frentes) | Pack | Hoy ningún objetivo tiene fecha: `horizonte_meses: 12` no se convierte al importar |
 | Margen máximo de la fecha de una tarea (`horizonte_tarea`, 2 meses, tope 120) | Pack → `workspace_setting` (rama `feat/flujo-de-un-mensaje`) | Regla de fondo decidida: la fecha de una tarea no pasa la de su objetivo; el margen es la red de seguridad |
