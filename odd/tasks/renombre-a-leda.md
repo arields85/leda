@@ -50,7 +50,9 @@ cambiar comportamiento, y que quede escrito qué se conserva como respaldo y cu�
 | Corte limpio o lecturas de respaldo | Corte limpio | Nada desplegado |
 | Documentos históricos | También se renombran | El usuario dijo "todo"; Git conserva el texto original |
 | Ramas | El mismo script en `main` y en `feat/flujo-de-un-mensaje`; las congeladas, al retomarlas | El merge ve el mismo renombre en los dos lados |
-| Bases de datos | `PENDIENTE` de decisión del usuario. Recomendado: armar bases nuevas desde el esquema renombrado y dejar las `prisma*` intactas como respaldo | No tocar a mano ninguna política de aislamiento |
+| Bases de datos | **Bases nuevas** `leda` (código de `main`) y `leda_flujo` (rama de flujo) armadas desde el esquema renombrado; las `prisma*` quedan intactas como respaldo (usuario, 2026-10-01) | No tocar a mano ninguna política de aislamiento ([ADR 0015](../../docs/decisions/0015-renombre-del-producto-a-leda.md)) |
+| `.env` | Se les aplica la misma sustitución: cambian los nombres `PRISMA_*`, el `dbname` y el `application_name`. El usuario de conexión no lleva el nombre | Comprobado por estructura, sin mostrar valores |
+| Paquete instalado | Reinstalar en modo editable (`pip install -e .`) después de desinstalar `prisma` | El `.venv` tiene una instalación editable que se llama `prisma` |
 | Fuera de alcance (lo hace el usuario) | Bots en BotFather, carpeta del repositorio, nombre del repositorio en GitHub | Cambiar la carpeta rompe el `.venv` y las rutas de memoria; conviene hacerlo aparte |
 | ADR | Sí, uno nuevo para el renombre | `AGENTS.md` lo exige para renombrar módulos |
 
@@ -81,9 +83,9 @@ no un secreto. No hay `.env` ni volcados de base versionados.
 
 - [x] R0. Inventario de sólo lectura y decisiones (este documento).
 - [x] R1. Push de respaldo y tag `pre-renombre-leda` (ver arriba).
-- [ ] R2. Decisión del usuario sobre las bases de datos.
-- [ ] R3. ADR del renombre.
-- [ ] R4. Script determinista (`tools/renombrar_a_leda.py`): primero `git mv` de las rutas,
+- [x] R2. Decisión del usuario sobre las bases de datos: bases nuevas.
+- [x] R3. ADR del renombre: [ADR 0015](../../docs/decisions/0015-renombre-del-producto-a-leda.md).
+- [x] R4. Script determinista (`tools/renombrar_a_leda.py`): primero `git mv` de las rutas,
       después contenido en bytes. Excluye este documento, binarios y archivos de bloqueo.
 - [ ] R5. Aplicarlo en `main`, verificar con la comparación byte a byte contra
       `pre-renombre-leda` y listar cada aparición restante con su motivo.
@@ -93,6 +95,27 @@ no un secreto. No hay `.env` ni volcados de base versionados.
 - [ ] R8. Suite completa y prueba real por Telegram desde el código renombrado.
 - [ ] R9. Aplicar el mismo script en `feat/flujo-de-un-mensaje` y repetir R5 y R8 ahí.
 - [ ] R10. Actualizar referencias externas: memoria del agente, Engram, `docs/STATUS.md`.
+- [ ] R11. **Limpiar lo de Prisma cuando quede obsoleto**, según la tabla de abajo. Se hace
+      recién cuando se cumpla "Leda funciona correctamente".
+
+## Leda funciona correctamente: la condición para limpiar
+
+Pedido del usuario: dejar asentado que Leda funciona antes de borrar nada de Prisma. Se
+considera cumplido sólo con **las cuatro** comprobaciones registradas aquí, con comando, fecha
+y resultado:
+
+1. **Suite completa en verde** sobre el código renombrado, en `main` y en
+   `feat/flujo-de-un-mensaje`, con el mismo resultado que antes del renombre (sin fallas
+   nuevas).
+2. **Verificación determinista** (playbook §6.1): todo archivo que no sea pura sustitución
+   está listado y justificado, y toda aparición restante de `prisma` tiene su motivo.
+3. **Prueba real por Telegram** sobre `leda_flujo` desde la rama renombrada: un alta
+   conversada de punta a punta (Ariel, Ismael o Marcos), sin incidentes nuevos, y la
+   respuesta visible, PostgreSQL y la auditoría coinciden.
+4. **Nada lee los nombres viejos:** el listener y los comandos corren sin ninguna variable
+   `PRISMA_*` en el `.env`, y no hay conexiones a las bases `prisma*`.
+
+Registro: `PENDIENTE`.
 
 ## Limpieza posterior
 
@@ -102,7 +125,7 @@ respaldo del renombre.
 
 | Qué | Cuándo se puede borrar | Cómo |
 |---|---|---|
-| Bases `prisma` y `prisma_flujo` (si en R2 se eligen bases nuevas) | Cuando la suite completa pase sobre Leda y haya una prueba real por Telegram buena sobre las bases nuevas | Volcado final a `db/respaldos/` y después `drop database` |
+| Bases `prisma` y `prisma_flujo` | Cuando se cumpla "Leda funciona correctamente" | Volcado final a `db/respaldos/` y después `drop database` |
 | Respaldo `db/respaldos/prisma-antes-flujo-20260930.dump` | Junto con las bases de arriba | Borrar el archivo |
 | Bases residuales `prisma_test_*` y `prisma_diag_*` | Ya mismo: son de corridas viejas, no son respaldo de nada | `drop database` |
 | Roles `prisma_*` del servidor | Después de borrar todas las bases `prisma*` (un rol con objetos no se puede borrar) | `drop role` |
