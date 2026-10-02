@@ -213,24 +213,50 @@ def _enviar_borrador_semilla(http, token: str, chat_id: int, draft_id: int) -> N
         json={"chat_id": chat_id, "draft_id": draft_id, "text": SEMILLA_INDICADOR})
 
 
+class _RitmoTelegram(Exception):
+    """Telegram pidió ir más despacio (HTTP 429): no es una falla del stream, se
+    espera lo que pide y se sigue."""
+
+    def __init__(self, espera: float) -> None:
+        super().__init__(f"Telegram pidió esperar {espera} s")
+        self.espera = espera
+
+
+# Lo más que se espera ante un 429 antes de volver a intentar el borrador: el
+# mensaje real sale igual, así que no vale la pena esperar más.
+ESPERA_MAXIMA_RITMO = 2.0
+
+
 def _enviar_borrador_texto(http, token: str, chat_id: int, draft_id: int,
                            texto: str) -> None:
     """El mismo borrador nativo de la semilla, con texto: Telegram lo reemplaza
-    (mismo `draft_id`) y lo muestra creciendo."""
-    pedido_telegram(
+    (mismo `draft_id`) y lo muestra creciendo. Un 429 se distingue (`_RitmoTelegram`)
+    y cualquier otro error HTTP se levanta: antes se ignoraban en silencio."""
+    r = pedido_telegram(
         http.post, f"https://api.telegram.org/bot{token}/sendMessageDraft",
         json={"chat_id": chat_id, "draft_id": draft_id,
               "text": texto[:LIMITE_DE_BORRADOR]})
+    codigo = getattr(r, "status_code", 200)
+    if codigo == 429:
+        try:
+            espera = float(((r.json() or {}).get("parameters") or {}).get(
+                "retry_after", 1))
+        except Exception:  # noqa: BLE001 - sin cuerpo legible, un segundo
+            espera = 1.0
+        raise _RitmoTelegram(espera)
+    if codigo >= 400:
+        raise ErrorTelegram(f"HTTP {codigo}: {_descripcion_telegram(r) or ''}".strip())
 
 
 # Un mensaje de Telegram admite hasta 4096 caracteres; el borrador, también.
 LIMITE_DE_BORRADOR = 4096
 # Cada cuánto se actualiza el borrador con el texto que llega (respuesta en stream).
-# El primero sale enseguida; después, a lo sumo cada 0,3 s (pedido del usuario,
-# 2026-10-01: "que apenas tenga algo para mostrar lo muestre"). Si Telegram rechaza
-# por ritmo, el stream se corta en ese turno y se reporta; el mensaje final sale
-# igual. Valor a configurar desde la plataforma.
-INTERVALO_DE_BORRADOR = 0.3
+# El primero sale enseguida; después, a lo sumo cada 0,15 s (pedido del usuario,
+# 2026-10-01: "que apenas tenga algo para mostrar lo muestre", y más seguido para
+# ver cómo escribe). Si Telegram pide ir más despacio (429) se espera lo que pide,
+# acotado, y se sigue con lo último; otro error corta el stream del turno y se
+# reporta. El mensaje final sale igual. Valor a configurar desde la plataforma.
+INTERVALO_DE_BORRADOR = 0.15
 
 
 class IndicadorDeActividad:
@@ -315,15 +341,23 @@ class IndicadorDeActividad:
                         self._trabajando = False
                     return
                 self._ultimo_envio = self._reloj()
+                ritmo = None
                 try:
                     _enviar_borrador_texto(self._http, self._token, self._chat_id,
                                            self.draft_id, texto)
                     self._ultimo_texto = texto
+                except _RitmoTelegram as e:
+                    ritmo = e.espera
                 except Exception as e:  # noqa: BLE001 - no fatal, se reporta
                     self._fallo = True
                     _reportar_falla_indicador(self._impresos, "stream", e)
                 finally:
                     self.intentado.set()
+            if ritmo is not None and self.cerrado.wait(
+                    min(max(ritmo, 0.0), ESPERA_MAXIMA_RITMO)):
+                with self._estado:
+                    self._trabajando = False
+                return
 
 
 # El indicador del turno en curso: `mantener_chat_activo` lo deja aca mientras dura

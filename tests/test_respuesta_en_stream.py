@@ -560,5 +560,56 @@ def test_el_ultimo_texto_siempre_llega_al_borrador_aunque_haya_llegado_rapido():
 
 def test_el_borrador_se_actualiza_seguido_para_que_se_vea_mientras_escribe():
     """Pedido del usuario (2026-10-01): "que apenas tenga algo para mostrar lo
-    muestre". El primer texto sale enseguida y después, a lo sumo cada 0,3 s."""
-    assert desp.INTERVALO_DE_BORRADOR <= 0.3
+    muestre", y bajarlo más para ver mejor cómo escribe. El primer texto sale
+    enseguida y después, a lo sumo cada 0,15 s."""
+    assert desp.INTERVALO_DE_BORRADOR <= 0.15
+
+
+
+class _TelegramConRitmo(Telegram):
+    """Responde 429 (más despacio) al primer texto del borrador, como Telegram
+    cuando se le manda muy seguido; después acepta."""
+
+    def __init__(self, codigo=429):
+        super().__init__()
+        self._codigo = codigo
+        self.rechazados = 0
+
+    def post(self, url, json=None):
+        if (url.endswith("/sendMessageDraft") and (json or {}).get("text") != SEMILLA
+                and self.rechazados == 0):
+            self.rechazados += 1
+            with self._candado:
+                self.pedidos.append(("rechazado", dict(json or {})))
+            return httpx.Response(
+                self._codigo, request=httpx.Request("POST", url),
+                json={"ok": False, "error_code": self._codigo,
+                      "description": "Too Many Requests: retry after 0",
+                      "parameters": {"retry_after": 0}})
+        return super().post(url, json)
+
+
+def test_si_telegram_pide_ir_mas_despacio_se_espera_y_se_sigue_con_lo_ultimo():
+    """Un 429 no corta el stream del turno: se espera lo que pide Telegram
+    (acotado) y se manda el texto más nuevo."""
+    tg = _TelegramConRitmo()
+    with _activo(tg) as ind:
+        _esperar(lambda: ind.activado.is_set())
+        ind.actualizar_borrador("Hola")
+        _esperar(lambda: tg.rechazados == 1)
+        ind.actualizar_borrador("Hola, ¿qué")
+        _esperar(lambda: tg.textos()[-1:] == ["Hola, ¿qué"])
+    assert tg.textos()[-1] == "Hola, ¿qué"
+
+
+def test_otro_error_de_telegram_corta_el_stream_del_turno_y_se_reporta(capsys):
+    tg = _TelegramConRitmo(codigo=400)
+    with _activo(tg) as ind:
+        _esperar(lambda: ind.activado.is_set())
+        ind.actualizar_borrador("Hola")
+        _esperar(lambda: tg.rechazados == 1)
+        time.sleep(0.05)
+        ind.actualizar_borrador("Hola, ¿qué")
+        time.sleep(0.2)
+    assert tg.textos() == []
+    assert "stream" in capsys.readouterr().out
