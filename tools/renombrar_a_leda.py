@@ -39,6 +39,8 @@ EXCLUDE_FILES = {
     "odd/tasks/renombre-a-leda.md",
     "docs/decisions/0015-renombre-del-producto-a-leda.md",
     "tools/renombrar_a_leda.py",
+    # Translates pre-rename Git history (`git show <old commit>:...`) in the tests.
+    "tests/historia_previa_a_leda.py",
 }
 LOCKFILES = {"package-lock.json", "pnpm-lock.yaml", "yarn.lock", "poetry.lock", "uv.lock"}
 BINARY_EXT = {".ico", ".png", ".jpg", ".jpeg", ".gif", ".webp", ".woff", ".woff2",
