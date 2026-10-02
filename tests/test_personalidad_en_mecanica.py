@@ -143,6 +143,39 @@ def test_ante_un_dato_faltante_dice_para_que_hace_falta():
     assert "para qué hace falta" in MECANICA
 
 
+# ----------------------- flujo C4: ajustes después de la medición C3 (2026-10-02)
+
+def _alrededor(clave: str, ancho: int = 220) -> str:
+    assert clave in MECANICA, clave
+    i = MECANICA.index(clave)
+    return MECANICA[max(0, i - ancho):i + ancho]
+
+
+def test_al_pedir_un_dato_usa_por_favor_o_el_condicional():
+    # Con la regla blanda, 0 de 90 textos medidos lo decían.
+    regla = _alrededor("«por favor»")
+    assert "condicional" in regla and "pedir un dato" in regla
+
+
+def test_un_titulo_que_no_dice_que_hacer_se_aclara_antes_de_seguir():
+    # C3 aceptó «lo del tablero» como título en 3 de 3 corridas.
+    regla = _alrededor("no dice qué hay que hacer")
+    assert "propone un título" in regla and "aceptar o cambiar" in regla
+    assert "antes de seguir" in regla
+
+
+def test_usa_el_nombre_de_pila_de_vez_en_cuando():
+    regla = _alrededor("nombre_de_pila")
+    assert "de vez en cuando" in regla and "no en cada mensaje" in regla
+
+
+def test_si_el_mensaje_trae_varios_datos_no_los_repasa_todos():
+    # Todas las variantes repasaron cada dato en el primer turno (9 de 9).
+    regla = _alrededor("varios datos")
+    assert "no los repasa" in regla and "lo esencial" in regla
+    assert "sólo lo que falta" in regla
+
+
 def test_la_personalidad_general_en_pocas_lineas():
     for rasgo in ("cálida", "cordial", "breve", "soluciones", "elogios",
                   "fórmula de cortesía"):
