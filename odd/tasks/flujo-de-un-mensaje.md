@@ -1824,3 +1824,22 @@ completa registrada 3411 passed en `5cd32b6`); (2) RDD de `39bbf59..HEAD` con
 `tools/rdd_por_tramos.py` del checkout principal; (3) decisión (e) del usuario sobre
 Dirección y el objetivo estratégico. `prisma_flujo`: `alta = conversada` y `stream`
 activados.
+
+### Retorno (2026-10-01, noche): suite, RDD y renombre a Leda
+
+- Suite completa en `e506ddd` (equivalente a `96a139b` en código):
+  `PYTHONPATH=src python -m pytest -q -p no:cacheprovider` → **3432 passed**, 333
+  deselected, 21 min.
+- RDD `39bbf59..e506ddd`, linaje `review-42dfc58c6182a6e3`: aprobada y reconocida (un lente,
+  reliability). Observaciones, sin corregir todavía:
+  - WARNING `ingreso_tareas.py:1418-1429` (`_inicio_de_jornada`): si falla el calendario
+    **y además** falla `registrar_incidente`, la excepción se escapa y el aviso se pierde.
+    Es real, pero exige una doble falla de la base. Pendiente chico: aislar el registro del
+    incidente para que siempre se devuelva "ahora".
+  - SUGGESTION `tests/test_aviso_de_asignacion.py:494-495`: la aserción del incidente es
+    débil.
+- Renombre del producto a Leda (ADR 0015 en `main`, unidad `odd/tasks/renombre-a-leda.md`).
+  Esta rama recibe el mismo script determinista en el commit siguiente a éste. Su base pasa
+  de `prisma_flujo` a `leda_flujo` (nueva, armada desde el esquema renombrado, con
+  `alta = conversada` y `stream = true`). `prisma_flujo` queda como respaldo del historial
+  de pruebas.
