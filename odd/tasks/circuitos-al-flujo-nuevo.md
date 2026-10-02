@@ -482,6 +482,42 @@ cómo conversa Leda se aplique en todos los circuitos.
       **Aprobación del texto:** `voz.md` es parte del núcleo; su texto lo aprueba el
       usuario, con la diferencia legible, antes de la prueba real.
 
+      **Construido (borrador de voz pendiente de aprobación), 2026-10-02.** Commit
+      `097d7ff`. Ruta: delegado (un escritor; más de dos archivos no triviales).
+      Alcance: sólo el alta conversada; el camino general (`contexto.construir`) no
+      cambió y sigue con el núcleo entero.
+      - `nucleo/voz.md` (borrador 0.1): encabezado de núcleo para quien lo mantiene
+        (la constitución sigue siendo la autoridad; cambios con aprobación del
+        administrador) y, después de la línea divisoria, la voz que lee el modelo,
+        en español neutro y escrita como conducta. Sin trato de ningún cliente.
+      - `src/leda/instrucciones.py` arma las instrucciones del alta en orden fijo:
+        voz, mecánica del alta (`alta_turno.MECANICA_ALTA`, que reemplaza a
+        `SISTEMA_ALTA`) y tono del espacio desde su pack (`persona_config`: nombre,
+        registro, formalidad, longitud, emojis). Los hechos y el historial siguen
+        viajando aparte. Se leen una vez por proceso y se guardan por tono.
+      - "Con voseo" salió del código del alta; la mecánica, la descripción de la
+        herramienta, el esquema y la regla de fechas quedaron en tercera persona, sin
+        voseo. Lo que ahora dice la voz (fluidez, honestidad, una sola pregunta, nada
+        técnico, texto plano) se sacó de la mecánica.
+      - Huellas: cada intento del alta registra en `audit_log` (acción
+        `alta_conducida_turno`, `detalle`) `voz_hash` (SHA-256 de `voz.md`) e
+        `instrucciones_hash` (SHA-256 del texto armado que recibió el modelo). No hay
+        un registro de arranque de la huella del núcleo, así que no se agregó uno.
+      - Tamaño, en tokens estimados (caracteres / 4): antes, `SISTEMA_ALTA` 3.703
+        caracteres (~925); después, voz ~873 + mecánica ~854 + tono, en total 7.087
+        caracteres (~1.771) con el tono de CoreWork. Tope: 2.000, con prueba que
+        falla a la vista.
+      - Pruebas: `tests/test_voz_y_instrucciones.py` (23). RED: error de colección
+        (no existía `leda.instrucciones`); GREEN: 23 pasan. Se actualizaron siete
+        pruebas de `tests/test_alta_turno.py` que afirmaban el texto viejo.
+        Suite completa: `1 failed, 3480 passed, 333 deselected, 1 warning in 1016.53s` (2026-10-02; la única falla es la conocida `test_un_texto_con_un_dato_inventado_se_reintenta_con_el_motivo`).
+      - Sin decidir: la mecánica del alta no toma ninguna sección de
+        `nucleo/mecanica-pm.md` (§2 y §13 nombran datos que el alta no pide, como
+        prioridad o dependencias, y empujarían al modelo a preguntarlos); queda para
+        decidir con el usuario. La medición con el banco (punto 6) queda pendiente.
+      **C0-13 no se marca** hasta que el usuario apruebe el texto de la voz y pase la
+      prueba real.
+
 ### RDD de C0-3, C0-5 y C0-6 (2026-10-02)
 
 Tramo desde la frontera `cb3befb` hasta `e8e6499` (C0-3, C0-5, C0-6 y documentos): riesgo
