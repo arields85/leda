@@ -170,7 +170,29 @@ suite completa de la rama.
 - [ ] **C0-6.** Cuando una vista previa o una elección se resuelve (confirmada, cancelada,
       enviada o vencida), sus botones se quitan del mensaje en Telegram, para que no se
       ofrezca lo que ya no se puede hacer (ADR 0013, regla 3).
-- [ ] **C0-7.** Repetir la ronda C0-C (rechazo con motivo) con Marcos como responsable.
+- [x] **C0-7.** Repetir la ronda C0-C (rechazo con motivo) con Marcos como responsable.
+      Hecho el 2026-10-02, 13:06-13:10: ver abajo.
+
+### Ronda C0-C repetida (2026-10-02, 13:06-13:10): pasa
+
+Marcos pidió "calibrar los sensores de presión de la línea 1", eligió el objetivo y "Para
+mí", escribió el criterio y tocó Enviar a aprobación (13:09:33). A Ismael le llegó el
+borrador con Confirmar y Rechazar; tocó Rechazar, Leda le preguntó el motivo y él escribió
+"primero hay que comprar los patrones de calibración, todavía no los tenemos". A las
+13:10:21 Marcos recibió el rechazo con ese motivo textual, e Ismael la confirmación de que
+se le avisó. En la base, el borrador y la solicitud quedaron `cancelled` y no se creó
+ninguna tarea; la auditoría tiene `enviar_ingreso_tarea_a_aprobacion` y
+`rechazar_ingreso_tarea` con el motivo. Cuatro turnos del modelo, aceptados al primer
+intento; sin incidentes.
+
+- **H7 (menor). El aviso de rechazo no deja un próximo paso a quien pidió.** Marcos
+  recibe el rechazo con el motivo y nada más. Constitución §8: ningún mensaje deja a la
+  persona sin un próximo paso. `PENDIENTE` de decisión del usuario.
+
+**Estado de C0 al 2026-10-02:** las cinco variantes ya se probaron en real (confirma quien
+pide, para otra persona, Modificar, Cancelar por texto y por botón, rechazo con motivo).
+Falta construir C0-1, C0-2, C0-3, C0-5 y C0-6, retirar el alta guiada (M4-M9) y repetir
+la ronda C0-A (C0-4).
 
 ## Relación con otros pendientes
 
