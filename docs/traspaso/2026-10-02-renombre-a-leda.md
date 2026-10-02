@@ -88,10 +88,10 @@ esperar: el 2026-10-02 un turno quedó colgado porque el proveedor `nan` estaba 
 
 | # | Pendiente | Dónde está el detalle |
 |---|---|---|
-| C0-C9 | **PRIORIDAD** (decisión del usuario, 2026-10-02). Pasar cada circuito de Leda al flujo nuevo del ADR 0014 y probarlo en real: variantes del alta, entrega con evidencia, aprobación de la entrega, estados y bloqueos, consultas y menú, dependencias, aclaraciones, cambio de tema, seguimiento automático y cambios sobre una tarea creada. En C0 ya hay tareas decididas, listas para hacer (C0-1 a C0-9; C0-1 a C0-4 ya hechas). Checklist con la regla de cada uno (diseño, construcción, retiro de lo viejo, prueba real). Cada circuito se diseña con el usuario antes de construirlo | rama de flujo, `odd/tasks/circuitos-al-flujo-nuevo.md` |
+| Circuitos 0 a 10 | **PRIORIDAD** (decisión del usuario, 2026-10-02). Pasar cada circuito de Leda al flujo nuevo del ADR 0014 y probarlo en real: variantes del alta, entrega con evidencia, aprobación de la entrega, estados y bloqueos, consultas y menú, dependencias, aclaraciones, cambio de tema, seguimiento automático y cambios sobre una tarea creada. En el circuito 0 ya hay tareas decididas, listas para hacer (tareas 0-1 a 0-13; el estado de cada una está en el checklist). Checklist con la regla de cada uno (diseño, construcción, retiro de lo viejo, prueba real). Cada circuito se diseña con el usuario antes de construirlo | rama de flujo, `odd/tasks/circuitos-al-flujo-nuevo.md` |
 | P1-P7 | **Decidido, listo para hacer** (2026-10-02). Falla del proveedor del modelo: plazo total de 2 min por turno, aviso certero (promete "te respondo" sólo si la falla es del proveedor; constitución §10), cola que se reprocesa contra el estado actual, respuesta dentro del horario, límite de 4 h hábiles, alcance a todo turno del modelo. Todo está decidido: se empieza directamente por P1 | rama de flujo, `odd/tasks/flujo-de-un-mensaje.md`, "Decisión: plazo total, aviso certero y cola cuando falla el proveedor" |
 | (l) | Espacio muerto entre el stream y el mensaje final. Recomendado: mantener el borrador o "escribiendo…" hasta el final (el ADR 0013 permite varias partes; el límite es la verificación) | rama de flujo |
-| (e) | **Resuelto por decisión** (2026-10-02): no era una decisión de producto, era un mecanismo. Los objetivos salían del área de quien pide y no de la tarea. Se corrige con C0-1 y C0-2 (decidido, listo para hacer) | rama de flujo, `odd/tasks/circuitos-al-flujo-nuevo.md`, ronda C0-A |
+| (e) | **Resuelto por decisión** (2026-10-02): no era una decisión de producto, era un mecanismo. Los objetivos salían del área de quien pide y no de la tarea. Se corrige con 0-1 y 0-2 (decidido, listo para hacer) | rama de flujo, `odd/tasks/circuitos-al-flujo-nuevo.md`, ronda 0-A |
 | — | Advertencia de RDD: doble falla calendario + incidente en `_inicio_de_jornada` (`ingreso_tareas.py`) | rama de flujo |
 | — | Mensaje después de cancelar un borrador; calidad del criterio; (k) primer mensaje lento; (j) stream irregular; frecuencia del rechazo de formato de `acceptance_criterion` | traspaso del 2026-10-01 y rama de flujo |
 | R12 | Integrar `auxiliar/alta-y-google` a `main` y **seguir ese trabajo desde `main`**, no en una rama aparte (decisión del usuario). Primero se renombra la rama con el script, después se trae `main`. Su `.env` apunta a una base que ya no existe. Bajo el congelamiento: la fecha la decide el usuario | `odd/tasks/renombre-a-leda.md`, R12 |
@@ -100,7 +100,7 @@ esperar: el 2026-10-02 un turno quedó colgado porque el proveedor `nan` estaba 
 
 ## Congelado hasta cumplir el ADR 0014
 
-No se construye hasta que el alta, la entrega y la aprobación (C0, C1 y C2) aprueben las
+No se construye hasta que el alta, la entrega y la aprobación (circuitos 0, 1 y 2) aprueben las
 pruebas reales que hacen el usuario y el agente, con los criterios del
 [ADR 0014](../decisions/0014-flujo-de-un-mensaje.md) (congelamiento del 2026-09-30,
 precisado el 2026-10-02: no espera a la prueba final con alguien nuevo;

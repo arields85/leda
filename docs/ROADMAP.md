@@ -70,7 +70,7 @@ fallas reales y anotar ideas en este roadmap sin construirlas. Motivo: cada rond
 probaba superficie nueva y los hallazgos no bajaban; una función construida sobre una
 conversación que todavía no funciona hereda sus problemas. Se levanta al cumplir los
 criterios. **Precisión (decisión del usuario, 2026-10-02):** se levanta cuando el alta, la
-entrega y la aprobación (C0, C1 y C2 de `odd/tasks/circuitos-al-flujo-nuevo.md`, en la
+entrega y la aprobación (circuitos 0, 1 y 2 de `odd/tasks/circuitos-al-flujo-nuevo.md`, en la
 rama de flujo) aprueban las pruebas reales que hacen el usuario y el agente. No espera a
 la prueba final con alguien que no conozca el guion (enmienda del ADR 0014).
 

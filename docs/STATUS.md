@@ -226,7 +226,7 @@ conversación de caso; los hallazgos se registran y se clasifican por etapa del 
 3. **Prioridad: pasar todos los circuitos al flujo nuevo** (decisión del usuario,
    2026-10-02; enmienda del ADR 0014). Cada circuito se pasa al flujo, se retira lo viejo
    y lo prueban el usuario y el agente por Telegram real, con los criterios de éxito del
-   ADR 0014. Checklist C0-C8 en `odd/tasks/circuitos-al-flujo-nuevo.md` (rama de flujo).
+   ADR 0014. Checklist de los circuitos 0 a 10 en `odd/tasks/circuitos-al-flujo-nuevo.md` (rama de flujo).
    La prueba con alguien que no conozca el guion va una sola vez, al final, cuando
    aprobaron todos. Pendientes de la rama que pueden aparecer en esas pruebas: (a) y (f) el modelo promete lo que no existe ("la retomamos el
    lunes", "lo tomamos como objetivo"); (b) el borrador pausado no lo ve el camino

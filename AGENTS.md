@@ -25,6 +25,34 @@ por eso se importan, y Claude Code los carga al iniciar la sesión:
 Un agente que no expanda estas importaciones (otra herramienta que lea `AGENTS.md`)
 tiene que leer esos cuatro archivos enteros antes de su primera respuesta.
 
+## Nombres que usamos
+
+Acordado con el usuario el 2026-10-02, para hablar el mismo idioma. Usar siempre estos
+nombres con el usuario; "conducida", "guiada" o "método nuevo" confunden.
+
+- **La IA:** el modelo de lenguaje que Leda usa por dentro. No se le dice "modelo", para
+  no confundirlo con los flujos.
+- **Flujo:** la forma en que Leda procesa un mensaje. Una letra por mecanismo distinto y
+  un número por versión (flujo C1, C2…):
+  - **Flujo A, formulario mecánico:** pasos fijos, un dato por vez, botones y reglas fijas
+    en el código para entender lo que se escribe. Hoy: el alta de tareas con el
+    interruptor `alta = guiada`.
+  - **Flujo B, IA libre:** la IA lee toda la constitución, elige herramientas y redacta
+    como le parece. Hoy: todo lo que no es el alta (consultas, menú, cambios, entrega,
+    aprobación). Es donde la IA inventó un cambio (hallazgo H5).
+  - **Flujo C, el del [ADR 0014](docs/decisions/0014-flujo-de-un-mensaje.md):** la IA
+    interpreta, el código decide y ejecuta, la IA redacta a partir de los hechos con la
+    voz (`nucleo/voz.md`). Hoy: el alta con `alta = conversada`, en la rama de flujo.
+    **C1:** el de la primera prueba (2026-10-01). **C2:** con las mejoras del 2026-10-02
+    (objetivos del área de la tarea, Modificar, botones vencidos y la voz).
+- **Circuito:** cada cosa que Leda sabe hacer (alta, entrega, aprobación…), numerada en
+  `odd/tasks/circuitos-al-flujo-nuevo.md` de la rama de flujo: circuito 0, circuito 1…;
+  sus tareas, 0-1, 0-2…
+- **Pasar un circuito de flujo:** construir el flujo nuevo al lado del actual, con un
+  interruptor por circuito y por espacio (el actual queda de respaldo y nunca se mezclan
+  en un mismo mensaje), probarlo en real y, si aprueba, retirar el viejo dejándolo
+  guardado en Git con una etiqueta.
+
 ## Orden de lectura
 
 1. `docs/product/que-es-leda.md`: qué es el producto y qué es configuración de cada cliente.
