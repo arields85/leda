@@ -57,6 +57,39 @@ Estado actual de cada uno: *por diseñar*, salvo el alta, que ya está construid
       resumen del equipo, y cómo Leda conversa la respuesta de la persona. Para probarlo
       en real hay que forzar fechas y cadencias por consola (`leda escalera`,
       `leda correr`). Mecánica §9 a §11.
+      **Cómo tiene que comportarse** (decisión del usuario, 2026-10-02, tomada de su
+      contexto de Prisma en Hermes): los atrasos y bloqueos se tratan primero en privado;
+      la exposición en el grupo sólo si el problema persiste, afecta al equipo o no hay
+      otra alternativa, y siempre factual y respetuosa. Ante falta de respuesta: primer
+      recordatorio privado, cordial y breve; segundo, privado, con el impacto o la
+      dependencia; tercero, privado, avisando el escalamiento; después, escalamiento según
+      el área y la relevancia (rutas del pack). Leda ya tiene la escalera anclada al
+      vencimiento (mecánica §9, `escalera.py`); faltan: (a) seguir la **falta de
+      respuesta**, que hoy no se sigue (`pending_reply` no es operativo, riesgo 4 de
+      `docs/STATUS.md`); (b) que los textos de los recordatorios salgan con la voz y el tono
+      del cliente, no escritos fijos en `escalera.py` con voseo.
+- [ ] **C10. Presentación visual de las respuestas.** Decidido (usuario, 2026-10-02, tomado
+      de su contexto de Prisma en Hermes). Se aplica en el **código** que arma los
+      resultados estructurados (resumen del borrador, listas, menú de tarea, avisos), no en
+      el modelo, cuyo texto sigue plano (voz):
+      - varios datos, en pocos bloques breves con títulos cortos o etiquetas claras; una
+        idea por línea y espacio entre temas;
+      - listas sólo cuando ayudan a comparar, elegir o seguir una secuencia;
+      - negrita sólo en etiquetas, estados, cantidades o próximos pasos, nunca en oraciones
+        enteras;
+      - no repetir siempre la misma estructura cuando otra es igual de clara;
+      - en resultados de gestión, un único marcador semántico en el título según el foco
+        que la persona pidió (📊 resumen, 🎯 objetivo, 📋 tarea, ⚠️ bloqueo, 📎 evidencia,
+        👤 integrante, 📌 estado) y `►` antes de cada encabezado de sección; nunca en
+        respuestas simples, aclaraciones o mensajes de una o dos frases;
+      - sin resultados: una sola frase clara, sin título, secciones, marcador ni emoji;
+      - fuera de esos casos, sin emojis de decoración (los marcadores son semánticos y no
+        dependen del ajuste `emojis` del cliente);
+      - la presentación no alarga la respuesta, no agrega lo que no se pidió ni pierde
+        precisión.
+      **Requisito técnico:** hoy Leda manda todo a Telegram como texto plano (no usa
+      `parse_mode`), así que la negrita no es posible; hay que activar el formato de
+      Telegram en el despachador escapando lo que escriben las personas.
 - [ ] **C9. Cambios sobre una tarea creada.** Cambiar el responsable, la fecha o el
       criterio de una tarea ya comprometida, con vista previa, confirmación y la
       re-aprobación cuando el cambio cruza el umbral (cambio de responsable, corrimiento
