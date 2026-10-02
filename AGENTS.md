@@ -56,8 +56,8 @@ nombres con el usuario; "conducida", "guiada" o "método nuevo" confunden.
   flujo actual los rompe, no se arreglan (la versión buena está en la etiqueta; sus
   pruebas rotas se retiran junto con su código). No se mantienen dos flujos andando a la
   vez ni interruptores nuevos por circuito; el interruptor `alta` que ya existe queda
-  como está. Única excepción: un error que rompa una garantía del núcleo (aislamiento
-  entre clientes, confirmación, auditoría) se corrige donde esté.
+  como está. Los flujos anteriores no llegan al producto: el producto final se queda
+  con el flujo definitivo y los demás se descartan.
 
 ## Orden de lectura
 
