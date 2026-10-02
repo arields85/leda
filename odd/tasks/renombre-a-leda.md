@@ -228,11 +228,11 @@ respaldo del renombre.
 | Qué | Cuándo se puede borrar | Cómo |
 |---|---|---|
 | Bases `prisma` y `prisma_flujo` | **Hecho** (2026-10-02) | Volcados finales verificados con `pg_restore --list` (unas 530 entradas y 48 tablas con datos cada uno): `db/respaldos/prisma-final-antes-de-borrar-20261002.dump` y `db/respaldos/prisma_flujo-final-antes-de-borrar-20261002.dump`. Después, `drop database` |
-| Respaldo `db/respaldos/prisma-antes-flujo-20260930.dump` | Junto con las bases de arriba | Borrar el archivo |
+| Volcados intermedios viejos en `db/respaldos/` (11: `prisma-antes-*` y `prisma_flujo-antes-*`, del 27/09 al 01/10) | Cuando el usuario lo confirme: los cubren los tres volcados finales del 2026-10-02 | Borrar los archivos y conservar los tres `*-final-antes-de-borrar-20261002.dump` |
 | Worktree `Prisma-PM-worktrees/renombre-a-leda` y su rama `refactor/renombre-a-leda` (ya en `main`; su `.env` tiene secretos) | **Hecho** (2026-10-02) | Worktree borrado (sólo tenía cachés y copias del `.env`); rama borrada, ya estaba en `main` |
 | Bases residuales `prisma_test_*` y `prisma_diag_*` | **Hecho** (2026-10-02) | Se borraron 15 (8 `prisma_diag_*` y 7 `prisma_test_*`), todas sin conexiones; `prisma` y `prisma_flujo` siguen como respaldo |
-| Membresía del login de autoridad en `prisma_gateway` | Se va sola al borrar el rol `prisma_gateway` | — |
-| Roles `prisma_*` del servidor | Parcial (2026-10-02): se borraron los 5 `prisma_gateway_test_*` que dejaron corridas de pruebas cortadas. `prisma_app`, `prisma_admin`, `prisma_gateway` y `prisma_owner` no se pueden borrar: son dueños de un esquema `prisma` que vive en la base de mantenimiento `postgres` (46 tablas, datos ficticios de las sesiones 1 y 2, último mensaje del 2026-09-27), que el inventario no había visto | `PENDIENTE` de decisión del usuario: volcar ese esquema, `drop schema prisma cascade` en `postgres` y recién ahí `drop role` |
+| Membresía del login de autoridad en `prisma_gateway` | **Hecho** (2026-10-02) | Se fue con el rol |
+| Roles `prisma_*` del servidor | **Hecho** (2026-10-02) | Primero los 5 `prisma_gateway_test_*`. Después se volcó el esquema `prisma` viejo de la base `postgres` (sesiones 1 y 2; `db/respaldos/postgres-esquema-prisma-final-antes-de-borrar-20261002.dump`, 508 entradas, 46 tablas con datos, verificado), se hizo `drop schema prisma cascade` en `postgres` y se borraron `prisma_app`, `prisma_admin`, `prisma_gateway` y `prisma_owner`. No queda ningún rol `prisma*`. Verificado después: la autoridad asume `leda_gateway` y `leda estado` corre en las dos bases |
 | Variables `PRISMA_*` que queden en algún `.env` | Cuando todos los checkouts en uso estén renombrados | Borrar la línea |
 | Copias `.env.antes-leda` (las deja `renombrar_a_leda.py env`, ignoradas por Git) | Cuando se cumpla "Leda funciona correctamente" | Borrar el archivo |
 | Tag `pre-renombre-leda` | Nunca hace falta borrarlo: es el registro de dónde estaba todo antes | — |

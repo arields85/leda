@@ -125,8 +125,8 @@ eran del arnés y se corrigieron en `ffe4e85`). Corridas anteriores y su detalle
   F6a.
 - Bases en el servidor local (2026-10-02): `leda` y `leda_flujo`. `prisma` y `prisma_flujo`
   se borraron después de un volcado final (`db/respaldos/*-final-antes-de-borrar-20261002.dump`).
-  Queda un esquema `prisma` viejo dentro de la base `postgres` (sesiones 1 y 2), pendiente de
-  decisión: ver la limpieza del renombre.
+  El esquema `prisma` viejo de la base `postgres` (sesiones 1 y 2) y los roles `prisma_*`
+  también se borraron, con volcado previo. En el servidor sólo quedan los roles `leda_*`.
 
 ## Riesgos prioritarios
 
