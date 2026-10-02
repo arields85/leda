@@ -223,10 +223,12 @@ conversación de caso; los hallazgos se registran y se clasifican por etapa del 
    botón real y la regla de fechas, margen de 2 meses por espacio (`horizonte_tarea`),
    aviso al aprobar un borrador y nombre de quien lo manda. Suite completa en `13c7ae5`:
    3285 passed.
-3. **Próxima prueba: la de adopción** (sin fecha: hoy no hay quien no conozca el guion; mientras tanto se avanza con los pendientes del traspaso). Por Telegram real, con alguien que no conozca el
-   guion y al menos tres altas. Si cumple los criterios del ADR 0014, retirar el alta
-   guiada (M4-M9) y pasar el patrón a entrega y aprobación. Pendientes de la rama antes o
-   durante esa prueba: (a) y (f) el modelo promete lo que no existe ("la retomamos el
+3. **Prioridad: pasar todos los circuitos al flujo nuevo** (decisión del usuario,
+   2026-10-02; enmienda del ADR 0014). Cada circuito se pasa al flujo, se retira lo viejo
+   y lo prueban el usuario y el agente por Telegram real, con los criterios de éxito del
+   ADR 0014. Checklist C0-C8 en `odd/tasks/circuitos-al-flujo-nuevo.md` (rama de flujo).
+   La prueba con alguien que no conozca el guion va una sola vez, al final, cuando
+   aprobaron todos. Pendientes de la rama que pueden aparecer en esas pruebas: (a) y (f) el modelo promete lo que no existe ("la retomamos el
    lunes", "lo tomamos como objetivo"); (b) el borrador pausado no lo ve el camino
    general y deja una aclaración trabada; (e) alguien de Dirección recibe el objetivo
    estratégico completado solo; (g) el indicador "escribiendo…" se corta; evidencia con

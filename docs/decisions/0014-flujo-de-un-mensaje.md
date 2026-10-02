@@ -236,7 +236,8 @@ por el usuario. Detalle de cada hallazgo, su causa, corrección, pruebas y revis
   guion.
 
 **Criterios de adopción del alta conducida** (decisión del usuario, 2026-10-01, fijados
-antes de la próxima prueba):
+antes de la próxima prueba). **La prueba y el orden quedaron reemplazados por la enmienda
+del 2026-10-02, que sigue; los criterios de éxito siguen vigentes:**
 
 - **Prueba:** por Telegram real, con al menos una persona que no conozca el guion y al
   menos tres altas completas.
@@ -249,6 +250,27 @@ antes de la próxima prueba):
   y aprobación, en ese orden.
 - **Si no cumple:** se revisa el diseño del contrato y del verificador antes de expandir,
   no hallazgo por hallazgo.
+
+**Enmienda: primero todos los circuitos, al final la prueba con alguien nuevo** (decisión
+del usuario, 2026-10-02). Reemplaza la prueba y el orden de los criterios de adopción de
+arriba. Motivo: esperar a una persona que no conozca el guion antes de pasar cada camino
+al flujo frenaba todo el trabajo sin fecha ("nos estamos poniendo trabas nosotros
+mismos").
+
+- **Cada circuito** (alta, entrega, aprobación y el resto del checklist en
+  `odd/tasks/circuitos-al-flujo-nuevo.md` de la rama de flujo) pasa al flujo, se retira
+  lo viejo y lo prueban el usuario y el agente por Telegram real, con datos ficticios.
+  Aprueba con los mismos criterios de éxito de arriba: al menos nueve de cada diez turnos
+  del modelo aceptados al primer intento, ningún mensaje sin próximo paso, ninguna clase
+  de falla repetida, ningún incidente nuevo.
+- **Un circuito no espera al anterior** para empezar: el orden lo fija el checklist.
+- **La prueba con alguien que no conozca el guion se hace una sola vez, al final,**
+  cuando todos los circuitos aprobaron, sobre todos ellos y con al menos tres altas
+  completas.
+- **Si esa prueba final no cumple,** se revisa el diseño del contrato y del verificador
+  en todos los circuitos, no hallazgo por hallazgo.
+- El riesgo aceptado: un problema de diseño que sólo vea alguien nuevo aparece tarde y
+  su arreglo alcanza a todos los circuitos ya pasados.
 
 ## Consecuencias
 
