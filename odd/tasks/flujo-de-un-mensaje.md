@@ -1876,3 +1876,26 @@ activados.
 - Agravante: con la llamada colgada, Ctrl+C deja el listener en "Cortando…" para siempre,
   porque espera al hilo bloqueado en la llamada. Hubo que forzar el cierre del proceso
   (00:20). Misma causa: una llamada al modelo sin plazo total.
+
+### Prueba real sobre `leda_flujo` (2026-10-02, Marcos) — observaciones
+
+- El mensaje de anoche (00:11, colgado) lo retomó la reentrega de Telegram al arrancar el
+  listener (incidente `mensaje_recuperado_sin_respuesta`, 08:48:29). Leda respondió a las
+  08:48:54 (modelo 14 s). El incidente no se avisó a la administración porque ningún
+  administrador tiene el bot de administración vinculado (paso del usuario).
+- Pendiente (l), espacio muerto entre el stream y el mensaje final (observación del
+  usuario, 08:56): el primer párrafo aparece casi enseguida por stream, después el borrador
+  desaparece sin "escribiendo…" hasta que llega el bloque completo con el resumen y los
+  botones. Turno: modelo 4,8 s, mensaje final a los 7 s. Causa: el modelo escribe `texto`
+  primero y sigue generando el resto de su salida sin que se vea; después el código
+  verifica y arma el resumen.
+  - Propuesta del usuario: enviar el primer párrafo como mensaje aparte. Se descarta
+    porque contradice el ADR 0013 (una respuesta visible por mensaje) y porque ese texto
+    todavía no está verificado. A las 08:55:56 el verificador rechazó un primer intento, y
+    un párrafo ya enviado no se puede retirar.
+  - Solución recomendada: no dejar espacio muerto, mantener el borrador con el último texto
+    (o volver a "escribiendo…") hasta que el mensaje final lo reemplace. Misma familia que
+    (j). `PENDIENTE`.
+- Rechazo de contrato (08:55:56, intento 1): `acceptance_criterion` llegó con otra forma
+  (`{texto, verificable?, propuesta?}` o `{propuesta}` es lo válido). El intento 2 fue
+  aceptado. El turno costó 26 s. Se anota para medir su frecuencia antes de tocar nada.
