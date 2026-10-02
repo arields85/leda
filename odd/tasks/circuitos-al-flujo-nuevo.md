@@ -55,6 +55,29 @@ Estado actual de cada uno: *por diseñar*, salvo el alta, que ya está construid
       en real hay que forzar fechas y cadencias por consola (`leda escalera`,
       `leda correr`). Mecánica §9 a §11.
 
+## C0: chequeo de rumbo y rondas (2026-10-02)
+
+1. Clase de problema: comprobar que el alta conducida cubre todas sus ramas reales, no
+   sólo el camino que ya pasó. Ya apareció: los peores hallazgos de la primera corrida
+   salieron de ramas poco recorridas (pausa, convivencia con el alta guiada).
+2. Mecanismo general: una ronda por rama, leyendo la conversación, la base, la auditoría y
+   los incidentes. Los hallazgos se clasifican por regla del ADR 0013 o por etapa del
+   ADR 0014, nunca con un parche de caso.
+3. Qué haría innecesaria la próxima ronda: las cinco variantes en verde y sin incidentes,
+   para poder retirar el alta guiada (M4-M9) con evidencia.
+4. Hipótesis vigente: el alta conducida ya es estable en su camino principal (pasó el
+   2026-10-02 a las 11:07). Si una variante falla por diseño del contrato, se revisa el
+   contrato, no la variante.
+
+Quién confirma: el aprobador del **responsable** de la tarea (`_find_confirmer`). Por eso,
+si Ismael pide una tarea para Marcos, la confirma él mismo (es el aprobador de Marcos).
+
+- **Ronda C0-A:** Ismael pide una tarea para Marcos, toca Modificar y cambia un dato, y
+  confirma él mismo. Cubre "quien pide confirma", "para otra persona" y Modificar.
+- **Ronda C0-B:** Marcos pide una tarea y la cancela desde el resumen. Cubre Cancelar.
+- **Ronda C0-C:** Marcos pide una tarea y la envía a aprobación; Ismael la rechaza y
+  escribe el motivo. Cubre el rechazo con motivo.
+
 ## Relación con otros pendientes
 
 - **P1-P7** (falla del proveedor, `odd/tasks/flujo-de-un-mensaje.md`): decidido y listo
