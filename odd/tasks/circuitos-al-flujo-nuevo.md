@@ -842,7 +842,12 @@ a la IA entera ni aparte).
            propuesta formal en la salida (igual que la propuesta de criterio), que el
            verificador reconoce como hecho del turno. Mecanismo, no lista de frases.
         2. Variar la forma del pedido: "por favor", condicional o una buena pregunta, sin
-           repetir la misma fórmula en mensajes seguidos.
+           repetir la misma fórmula en mensajes seguidos. Verificado: no es falta de
+           contexto; la IA recibe la conversación de las últimas 6 horas con los mensajes
+           de Leda (`contexto.historial`, `contexto.py:305-335`) y tenía el "por favor"
+           anterior cuando repitió. Arreglo: la regla de variar más un refuerzo del código,
+           que le pasa en los hechos del turno cómo abrió y cómo pidió en su mensaje
+           anterior.
         3. El nombre de pila, de verdad ocasional (hoy en casi cada turno).
         4. El repaso completo del primer mensaje (la regla no tuvo efecto).
         5. La demora del primer mensaje después de arrancar el listener: medir dónde se va
