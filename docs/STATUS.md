@@ -203,6 +203,13 @@ desactualizan con cada cambio, así que conviene contrastar contra el símbolo.
 Orden vigente (2026-10-01). **Moratoria:** no se agregan reglas ni parches de
 conversación de caso; los hallazgos se registran y se clasifican por etapa del ADR 0014.
 
+**Prioridad (decisión del usuario, 2026-10-03): sacar las plantillas.** Todo texto que
+ve la persona lo escribe la IA a partir de los hechos. Las únicas plantillas permitidas,
+por ahora: la lista de datos del resumen (constitución §7; la IA escribe alrededor) y el
+aviso de falla del proveedor de la IA. Tarea P-1 en `odd/tasks/circuitos-al-flujo-nuevo.md`
+(rama de flujo): primero se comparan en real los flujos C5 y C6 tal como están, y las
+plantillas se sacan una sola vez en el que gane.
+
 1. **Circuito C (base `prisma`, anterior al renombre; código de `main`), corrido el 01/10 a las 09:00: no se
    pudo hacer, y dejó tres hallazgos del código de `main`.**
    - **C-1 (falla silenciosa, alta).** La vista previa de aprobación del borrador de Marcos
