@@ -810,7 +810,43 @@ a la IA entera ni aparte).
         conducida); GREEN: pasan. Suite completa: `1 failed, 3619 passed, 333 deselected, 1 warning
         in 1010.82s` (2026-10-02; sólo la falla conocida). Commit: el mismo que trae
         esta nota.
-      - **Pendiente:** medir C4 con el mismo banco y la prueba real por Telegram.
+      - **Medición C4 (2026-10-02),** mismo banco, 18 corridas, 34 llamadas
+        (`medicion-voz/lado_a_lado_c1_c2_c3_c4.md`). C1 / C2 / C3 / C4: órdenes secas
+        12 / 1 / 0 / 0; "anoté" 7 / 1 / 0 / 0; dos datos 9 / 6 / 0 / 0; "por favor"
+        0 / 0 / 0 / 0; condicional 1 / 2 / 0 / 4; usa el nombre 0 / 5 / 0 / 15; repaso
+        completo en el primer turno 9 / 8 / 9 / 9 (de 9); título vago aceptado 2 / 1 / 3 /
+        0 (de 3); latencia p50 10,0 / 17,2 / 10,6 / 8,8 s, p90 19,4 / 39,9 / 17,9 / 22,7
+        s; rechazos 0 / 1 / 2 / 5. Funcionó: un dato por pregunta (sin reintentos) y no
+        aceptar un título vago. A medias: condicional sí, "por favor" no; el nombre se usa
+        de más (en cada turno en 4 de 12 conversaciones). No funcionó: el repaso del primer
+        turno. **Regresión:** el verificador rechaza todo título que propone la IA
+        («…» que no está en los hechos, `verificador_redaccion.py:246-248`, y un verbo con
+        mayúscula como "Armar", `:252-255`); en 1 de 3 corridas del mensaje vago los dos
+        intentos se rechazaron y la persona recibió el aviso neutro de falla. Además, "el
+        jueves que viene" quedó 15/10 en 2 de 9 primeros turnos (H8, tarea 0-9).
+      - **Prueba real de C4 (2026-10-02, 22:18-22:22): pasa.** Marcos pidió "actualizar el
+        plano del tablero 5 para el miércoles que viene, la hago yo", eligió el objetivo,
+        dijo "no sé, qué pondrías?", aceptó la propuesta y envió a aprobación; Ismael
+        confirmó. Una sola pregunta por mensaje, propuesta concreta ante la duda, "por
+        favor" en las dos preguntas, primer mensaje compacto ("Listo: actualizar el plano
+        del tablero 5 para el miércoles 07/10, a tu nombre."), aviso a Ismael al instante,
+        cuatro turnos aceptados al primer intento, sin incidentes. **Observaciones del
+        usuario y del agente:** "por favor" en dos mensajes seguidos suena a fórmula (el
+        usuario: "lo malo es que lo dice uno después del otro"); el banco dio cero "por
+        favor" y la prueba real dos: el banco sirve para comparar versiones, el estilo real
+        se ve en Telegram. **Latencia del primer mensaje después de arrancar el listener:**
+        65 s (el turno arrancó 26 s tarde y duró 30 s; los siguientes, 7-8 s); es la tercera
+        vez (12:35, 18:20, 22:18): ya es un patrón.
+      - **Pendientes de C4, en orden** (punto de retorno):
+        1. El título que propone la IA tiene que pasar el verificador: tratarlo como una
+           propuesta formal en la salida (igual que la propuesta de criterio), que el
+           verificador reconoce como hecho del turno. Mecanismo, no lista de frases.
+        2. Variar la forma del pedido: "por favor", condicional o una buena pregunta, sin
+           repetir la misma fórmula en mensajes seguidos.
+        3. El nombre de pila, de verdad ocasional (hoy en casi cada turno).
+        4. El repaso completo del primer mensaje (la regla no tuvo efecto).
+        5. La demora del primer mensaje después de arrancar el listener: medir dónde se va
+           el tiempo (llegada → turno, y el turno mismo).
 
 - [ ] **0-14.** La redacción A (y la charla breve) leen la voz desde la misma fuente que el
       alta (`instrucciones`), para que haya una sola voz en todo lo que escribe la IA en el
