@@ -262,7 +262,19 @@ prueba real los criterios del ADR 0014. Alcance en [`ROADMAP.md`](ROADMAP.md), "
 entrega". Después, según el roadmap: aportes sobre tareas, aprendizaje de apodos y
 aclaraciones, conversación de bloqueos.
 
-**Punto exacto para retomar (2026-10-03, madrugada).** Rama de flujo: después del
+**Punto exacto para retomar (2026-10-03, mañana).** Ganó C6 (veredicto del usuario). Ya
+están construidos sobre C6, revisados con RDD y probados con la suite: P-1a y P-1b (todo
+lo que se ve en el circuito 0 lo escribe la IA desde los hechos, salvo la lista de datos
+del resumen y el aviso de falla del proveedor; los avisos a otras personas se guardan
+como hechos y se reintentan, ADR 0016) y 0-21 (título propuesto con verbo). La migración
+`0029` está aplicada a `leda_flujo` con respaldo previo. **Lo siguiente es la prueba
+real con flash y después con GPT-6 luna (0-22)**: guiones y comandos en la sección P-1
+de `odd/tasks/circuitos-al-flujo-nuevo.md` (rama de flujo). El listener del usuario se
+detuvo para aplicar la migración: hay que volver a arrancarlo. Pendiente de decidir con
+el usuario: si un aviso a otra persona queda `fallido` al agotar los reintentos (hoy no
+se sigue reintentando).
+
+**Punto de retorno anterior (2026-10-03, madrugada).** Rama de flujo: después del
 chequeo de rumbo, el alta pasó por C5 (sólo reglas estructurales; prueba real pasada) y
 C6, el esquema del usuario del ADR 0014 (la IA interpreta, el código decide, la IA
 redacta desde los hechos: dos llamadas por mensaje), ya integrado con la etiqueta
