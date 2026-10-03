@@ -255,6 +255,8 @@ de cada prueba real, el agente responde por escrito en el documento de la unidad
   persona escribe como habla, varias cosas juntas, y Leda pregunta sólo lo que falta. La
   fluidez nunca saltea una garantía (punto 6): las confirmaciones de la constitución §7,
   la validación del código y la auditoría se quedan.
+- ¿Esto lo resuelve la cocina o le estamos enseñando frases al mozo? (la regla del mozo,
+  punto 11).
 
 Si una respuesta no convence, se para y se discute con el usuario antes de seguir. No es
 un trámite: se razona antes de gastar una ronda, no después de varias.
@@ -298,6 +300,26 @@ se recuerda el congelamiento.
 
 **10. Proyectos externos: ideas, no bases.** Un PM conversacional multi-cliente con
 garantías es un problema propio ([`docs/research/`](docs/research/)).
+
+**11. La regla del mozo** (decisión del usuario, 2026-10-03; criterio fijo para evaluar
+cualquier cambio de la conversación). La IA es el mozo: escucha o pregunta qué quiere la
+persona, lleva el pedido exacto a la cocina (el código, Jev y la base), y trae lo que la
+cocina dice, contándolo con naturalidad. No inventa, no promete lo que la cocina no dijo y
+sabe conversar. Todo lo que es conocimiento del caso (estados, reglas, motivos, opciones,
+quién hizo qué) viene de la cocina como hechos; nunca como reglas o frases para el mozo.
+Ante cada cambio se pregunta: **¿esto lo resuelve la cocina o le estamos enseñando frases
+al mozo?**
+
+- Las instrucciones de la IA describen su trabajo (escuchar, llevar el pedido, traer y
+  contar lo que dice la cocina, no inventar, una pregunta por vez); no llevan reglas para
+  casos puntuales, ejemplos de lo que tiene que decir ni formas de pregunta. Su largo no
+  importa: la latencia se trabaja aparte y no limita lo que necesita saber el mozo.
+- Si la IA dice algo mal, primero se mira la comanda: ¿la cocina le pasó el hecho
+  correcto, completo y visto desde quien lo recibe? Se corrige la comanda con una regla
+  para todas, no la frase del caso.
+- La cocina no corrige lo que el mozo escuchó con heurísticas propias (comparar palabras,
+  listas de frases): valida datos y aplica reglas; interpretar es del mozo (ADR 0014).
+- Un arreglo que le agrega al mozo una regla para un caso dispara el punto 4.
 
 ### Al terminar una unidad
 
