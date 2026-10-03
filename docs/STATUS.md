@@ -262,7 +262,18 @@ prueba real los criterios del ADR 0014. Alcance en [`ROADMAP.md`](ROADMAP.md), "
 entrega". Después, según el roadmap: aportes sobre tareas, aprendizaje de apodos y
 aclaraciones, conversación de bloqueos.
 
-**Punto exacto para retomar (cierre del 2026-10-02, noche).** Leer primero el traspaso
+**Punto exacto para retomar (2026-10-03, madrugada).** Rama de flujo: después del
+chequeo de rumbo, el alta pasó por C5 (sólo reglas estructurales; prueba real pasada) y
+C6, el esquema del usuario del ADR 0014 (la IA interpreta, el código decide, la IA
+redacta desde los hechos: dos llamadas por mensaje), ya integrado con la etiqueta
+`respaldo-flujos-antes-de-c6`. **Lo siguiente es la prueba real de C6** (guion en la tarea
+0-19 de `odd/tasks/circuitos-al-flujo-nuevo.md`) y, gane o no, **sacar las plantillas
+(P-1)** en el flujo ganador. La revisión RDD de C5+C6 quedó para el flujo que gane, en
+commits que entren en el presupuesto de los revisores. Los commits de la sesión del
+2026-10-02/03 llevan líneas de atribución contra la regla global del usuario: decidir si
+se reescriben antes de subir.
+
+**Punto de retorno anterior (cierre del 2026-10-02, noche).** Leer primero el traspaso
 [`traspaso/2026-10-02-flujo-c4.md`](traspaso/2026-10-02-flujo-c4.md): la forma de trabajar
 con flujos, lo que se hizo en el circuito 0 (alta, hoy en flujo C4), las conclusiones de
 las mediciones y el punto de retorno, que **empieza con un chequeo de rumbo con el usuario**
