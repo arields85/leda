@@ -80,9 +80,11 @@ resuelve la cocina o le estamos enseñando frases al mozo?
   de las opciones lo compara Jev (ADR 0014), no el código ni la IA adivinando.
 - **Las instrucciones describen el trabajo del mozo,** sin reglas de casos, sin ejemplos
   de lo que tiene que decir y sin límite de largo.
-- **Nada fijo del código llega a la persona,** salvo lo aprobado: las líneas de datos del
-  resumen, el aviso de falla (con el saludo del día y "Pendiente:") y el bloque para copiar
-  de Modificar.
+- **Nada fijo del código llega a la persona,** salvo lo aprobado por el usuario: las dos
+  plantillas (las líneas de datos del resumen y el aviso de falla de la IA, que incluye el
+  saludo del día y "Pendiente:") y, aparte, el bloque para copiar de Modificar, que no es
+  una plantilla sino el propio dato de la persona (decisión del 2026-10-03, después de ver
+  un ejemplo). Las etiquetas de los botones las arma el código.
 - **Se controla solo:** pruebas automáticas fallan si vuelve un texto fijo, una decisión
   de la IA o una regla de caso; y después de cada vuelta, una auditoría independiente.
 
