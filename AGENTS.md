@@ -46,7 +46,9 @@ nombres con el usuario; "conducida", "guiada" o "método nuevo" confunden.
     (2026-10-01). **C2:** con las mejoras del 2026-10-02 (objetivos del área de la tarea,
     Modificar, botones vencidos y la personalidad como texto aparte). **C3:** la
     personalidad escrita adentro de la mecánica de cada circuito (decisión del
-    2026-10-02, tarea 0-15).
+    2026-10-02, tarea 0-15). **C4:** C3 con reglas concretas de estilo y el código que
+    rechaza una pregunta con dos datos (2026-10-02; probado en real). Ver el punto de
+    retorno de `docs/traspaso/2026-10-02-flujo-c4.md` antes de sumarle reglas.
 - **Personalidad:** cómo es y cómo se comporta Leda (`nucleo/personalidad.md`). Es la
   referencia para escribir la mecánica de cada circuito y **no se le manda a la IA**: sus
   reglas van adentro de la mecánica, como reglas concretas del circuito, porque una

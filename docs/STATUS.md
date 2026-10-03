@@ -255,12 +255,14 @@ prueba real los criterios del ADR 0014. Alcance en [`ROADMAP.md`](ROADMAP.md), "
 entrega". Después, según el roadmap: aportes sobre tareas, aprendizaje de apodos y
 aclaraciones, conversación de bloqueos.
 
-**Punto exacto para retomar (cierre del 2026-10-02).** Leer primero el traspaso
-[`traspaso/2026-10-02-renombre-a-leda.md`](traspaso/2026-10-02-renombre-a-leda.md): qué se
-hizo en el renombre, los pendientes en orden, cómo operar ahora y las lecciones. La mudanza
-de la carpeta local a `D:\Proyectos\Leda-PM` (R13) quedó hecha el 2026-10-02 y se verificó
-con una prueba real del alta. PostgreSQL no arranca solo: después de reiniciar la PC hay que
-correr `levantar-postgres.bat`. El
+**Punto exacto para retomar (cierre del 2026-10-02, noche).** Leer primero el traspaso
+[`traspaso/2026-10-02-flujo-c4.md`](traspaso/2026-10-02-flujo-c4.md): la forma de trabajar
+con flujos, lo que se hizo en el circuito 0 (alta, hoy en flujo C4), las conclusiones de
+las mediciones y el punto de retorno, que **empieza con un chequeo de rumbo con el usuario**
+(se estaban sumando reglas de estilo a la mecánica del alta). El traspaso anterior,
+[`traspaso/2026-10-02-renombre-a-leda.md`](traspaso/2026-10-02-renombre-a-leda.md), sigue
+valiendo por su tabla de pendientes y lo congelado. PostgreSQL no arranca solo: después de
+reiniciar la PC hay que correr `levantar-postgres.bat`. El
 traspaso del 2026-10-01 sigue valiendo para el diseño del alta conducida y la forma de
 trabajar. Push sólo a `arields85/leda` y cuando lo decida el usuario. Consentimiento
 permanente para commits y revisiones RDD; chequeo de rumbo escrito antes de cada unidad
