@@ -36,6 +36,63 @@ Qué haría revisar esta conclusión: si después de la tarea 0-34 vuelve a apar
 del mismo tipo en el borrador devuelto, no se cambia de flujo, pero se revisa el diseño del
 borrador devuelto antes de seguir.
 
+## La regla del mozo: por qué se decidió y cómo se aplicó en C6
+
+**Qué es** (decisión del usuario, 2026-10-03; `AGENTS.md`, punto 11). La IA es el mozo de
+un restaurante: escucha o pregunta qué quiere la persona, lleva el pedido exacto a la
+cocina y trae lo que la cocina dice, contándolo con naturalidad. La cocina es el código,
+Jev y la base: valida, decide, ejecuta y sabe los hechos. El mozo no cocina ni inventa
+platos: es intérprete y comunicador de la fuente de verdad, usa su fuerte (hablar e
+interpretar a la persona) y **no toma decisiones**. Ante cada cambio se pregunta: ¿esto lo
+resuelve la cocina o le estamos enseñando frases al mozo?
+
+**Por qué se decidió.**
+
+1. De C1 a C5 la IA escribía la respuesta antes de que el código decidiera: tenía que
+   adivinar qué iba a pasar. Cada vez que adivinaba mal se le agregaba una regla, y la
+   mecánica crecía (el retroceso de C4). El usuario lo resumió así: el actual es un mozo que
+   confirma el plato antes de preguntar en la cocina.
+2. C6 corrigió el orden (el mozo pregunta en la cocina antes de contestar), pero se
+   construyó dejándole a la IA decisiones que no le tocan: elegía qué preguntar de una
+   lista, si mostraba botones y cuándo proponer algo, y seguía llevando las reglas de casos
+   heredadas de C5. La cocina, además, empezó a corregir lo que el mozo escuchaba con
+   trucos propios (comparar nombres por coincidencia de letras).
+3. Al revisar los arreglos de la ronda de modelos, el usuario frenó: "estamos en el límite
+   de volver a cometer el error de agregar reglas puntuales para que el circuito responda
+   como queremos". Propuso fijar el criterio con la analogía del mozo y la cocina, y
+   después lo precisó: la IA no toma decisiones ni inventa datos; para eso va a la cocina.
+   Se dejó escrito en `AGENTS.md` para que sirva de control antes de construir, no después
+   de probar.
+
+**Cómo se aplicó en C6** (tareas 0-31 a 0-34 de la rama de flujo).
+
+- **La cocina decide y se lo dice al mozo como hechos:** qué dato se pregunta (con una
+  sola regla fija), qué botones van, cuándo se propone algo (título que no dice qué hacer,
+  criterio que no se puede comprobar, pedido de ayuda) y qué se ofrece en cada momento.
+  También dice quién hizo qué visto desde quien lee, y el motivo real de cada cosa que no
+  se tomó.
+- **El mozo interpreta y cuenta:** la primera llamada entiende el mensaje (intención,
+  datos, correcciones, nombres que no están entre las opciones, si el título no dice qué
+  hacer, si mantiene un dato); la segunda escribe desde los hechos. Su salida sólo trae el
+  texto, la propuesta cuando la cocina la pide y el dato que preguntó, que tiene que ser
+  el que decidió la cocina.
+- **Lo que necesita juicio sobre la base lo resuelve la pieza indicada:** un nombre fuera
+  de las opciones lo compara Jev (ADR 0014), no el código ni la IA adivinando.
+- **Las instrucciones describen el trabajo del mozo,** sin reglas de casos, sin ejemplos
+  de lo que tiene que decir y sin límite de largo.
+- **Nada fijo del código llega a la persona,** salvo lo aprobado: las líneas de datos del
+  resumen, el aviso de falla (con el saludo del día y "Pendiente:") y el bloque para copiar
+  de Modificar.
+- **Se controla solo:** pruebas automáticas fallan si vuelve un texto fijo, una decisión
+  de la IA o una regla de caso; y después de cada vuelta, una auditoría independiente.
+
+**Resultado hasta ahora.** Prueba real con sol (2026-10-03, 19:18): Ariel explicado con la
+regla real, el rechazo volvió como una pregunta concreta, el bloque para copiar funcionó y
+quién hizo qué salió bien en todos los mensajes. Fallaron dos cosas, las dos de la cocina y
+no del mozo: un bucle en el borrador devuelto (la cocina volvía a pedir la fecha) y la
+misma oferta al final de cada mensaje (la cocina le pasaba siempre la lista de lo posible).
+Se arreglan dentro de la regla (0-34).
+
 ## Los flujos, uno por uno
 
 | Flujo | Qué es | Prueba real | Lo bueno | Lo malo | Estado |
@@ -88,7 +145,7 @@ Banco (tarea 0-24, 2026-10-03; 386 llamadas reales sin caché; por mensaje del a
 
 | Modelo | Tiempo típico / peores casos | Costo por mensaje |
 |---|---|---|
-| flash (`deepseek-v4-flash`, nan) | 19,0 / 21,8 s | ~USD 0,0002 (estimado) |
+| flash (`deepseek-v4-flash`, por el proveedor `nan`) | 19,0 / 21,8 s | ~USD 0,0002 (estimado) |
 | luna (`openai/gpt-6-luna`) | 7,9 / 9,5 s | USD 0,0007 |
 | sol (`openai/gpt-6-sol`) | 11,0 / 13,8 s | USD 0,016 |
 | Gemini (`google/gemini-3.8-flash`), tope de siempre | 12 de 15 mensajes con aviso de falla | — |
@@ -96,5 +153,5 @@ Banco (tarea 0-24, 2026-10-03; 386 llamadas reales sin caché; por mensaje del a
 
 Lo que se aprendió de los modelos: luna y sol mandan todos los campos vacíos (el código lee
 vacío como "no lo dijo"); Gemini razona por dentro y necesita un tope de salida propio (el
-tope por modelo es un pendiente importante de la plataforma); nan no limita el razonamiento
+tope por modelo es un pendiente importante de la plataforma); el proveedor `nan` no limita el razonamiento
 de flash, por eso es lento.

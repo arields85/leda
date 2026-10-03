@@ -264,18 +264,15 @@ aclaraciones, conversación de bloqueos.
 
 **Resultados y conclusión vigente de los flujos y modelos:** [`product/bitacora-de-flujos.md`](product/bitacora-de-flujos.md) (elegido: C6 con la regla del mozo, con GPT-6 sol).
 
-**Punto exacto para retomar (2026-10-03, tarde).** Rama de flujo, circuito 0 en C6 sin
-plantillas. Se probaron en real cuatro modelos (flash, GPT-6 luna, GPT-6 sol, Gemini 3.8
-flash) y se midieron con el mismo banco (tarea 0-24): sol fue el más fiel; luna el más
-rápido y barato pero inventó datos; el tope de salida por modelo quedó configurable
-(pendiente importante para la plataforma). Construidos y revisados los arreglos de
-mecanismo 0-25 a 0-30. **Lo siguiente:** aplicar la regla del mozo (`AGENTS.md`,
-punto 11) al alta: sacar el control del código que corrige nombres por coincidencia
-de letras, dejar en las instrucciones de la IA sólo la descripción de su trabajo (sin
-reglas de casos; sin tope de largo), revisar todos los hechos con una sola regla; y
-después la prueba real con sol (activo en `leda_flujo`) y luego con luna. Sigue
-pendiente decidir si un aviso a otra persona queda `fallido` al agotar los
-reintentos.
+**Punto exacto para retomar (2026-10-03, noche).** Rama de flujo, circuito 0 en C6 con la
+regla del mozo aplicada (tareas 0-31 a 0-33, tres auditorías independientes) y probado
+en real con sol (19:18): funcionó lo principal; fallaron un bucle en el borrador devuelto
+y la oferta repetida al final de cada mensaje. **En curso: 0-34** (esos dos arreglos,
+la orden que volvió, "Soy Leda." y lo que dejó la tercera auditoría). **Lo siguiente:**
+cuarta auditoría independiente y repetir la prueba real con sol. Conclusiones y
+resultados en la bitácora de flujos.
+
+**Punto de retorno anterior (2026-10-03, tarde):** se aplicaba la regla del mozo al alta.
 
 **Punto de retorno anterior (2026-10-03, mañana).** Ganó C6 (veredicto del usuario). Ya
 están construidos sobre C6, revisados con RDD y probados con la suite: P-1a y P-1b (todo
