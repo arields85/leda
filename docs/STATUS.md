@@ -262,6 +262,8 @@ prueba real los criterios del ADR 0014. Alcance en [`ROADMAP.md`](ROADMAP.md), "
 entrega". Después, según el roadmap: aportes sobre tareas, aprendizaje de apodos y
 aclaraciones, conversación de bloqueos.
 
+**Resultados y conclusión vigente de los flujos y modelos:** [`product/bitacora-de-flujos.md`](product/bitacora-de-flujos.md) (elegido: C6 con la regla del mozo, con GPT-6 sol).
+
 **Punto exacto para retomar (2026-10-03, tarde).** Rama de flujo, circuito 0 en C6 sin
 plantillas. Se probaron en real cuatro modelos (flash, GPT-6 luna, GPT-6 sol, Gemini 3.8
 flash) y se midieron con el mismo banco (tarea 0-24): sol fue el más fiel; luna el más

@@ -23,6 +23,7 @@ cliente, no su definición.
 |---|---|
 | Definición del producto y alcance | [`product/que-es-leda.md`](product/que-es-leda.md) |
 | Traspaso de la jornada del alta conducida (punto de retorno, ritmo, pendientes) | [`traspaso/2026-10-01-alta-conducida.md`](traspaso/2026-10-01-alta-conducida.md) |
+| Qué se probó de cada flujo y modelo, y la conclusión vigente | [`product/bitacora-de-flujos.md`](product/bitacora-de-flujos.md) |
 | Qué tiene que permitir configurar la plataforma (inventario) | [`product/plataforma-pendientes.md`](product/plataforma-pendientes.md) |
 | Frontera entre núcleo y adaptadores | [`architecture/frontera.md`](architecture/frontera.md) |
 | Qué se aprovecha, corrige y descarta, y en qué orden | [`ROADMAP.md`](ROADMAP.md) |

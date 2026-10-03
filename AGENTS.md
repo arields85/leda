@@ -49,6 +49,11 @@ nombres con el usuario; "conducida", "guiada" o "método nuevo" confunden.
     2026-10-02, tarea 0-15). **C4:** C3 con reglas concretas de estilo y el código que
     rechaza una pregunta con dos datos (2026-10-02; probado en real). Ver el punto de
     retorno de `docs/traspaso/2026-10-02-flujo-c4.md` antes de sumarle reglas.
+- **Bitácora de flujos:** [`docs/product/bitacora-de-flujos.md`](docs/product/bitacora-de-flujos.md)
+  junta lo que se probó de cada flujo y de cada modelo, lo bueno y lo malo, y la
+  conclusión vigente (qué flujo y qué modelo se eligieron y por qué). Se lee antes de
+  proponer un cambio de flujo o de modelo, y se actualiza al cerrar cada prueba real,
+  medición o auditoría.
 - **Personalidad:** cómo es y cómo se comporta Leda (`nucleo/personalidad.md`). Es la
   referencia para escribir la mecánica de cada circuito y **no se le manda a la IA**: sus
   reglas van adentro de la mecánica, como reglas concretas del circuito, porque una
@@ -331,6 +336,8 @@ al mozo?**
 
 - actualizar `docs/STATUS.md` con hechos comprobados, riesgos y próximo paso;
 - marcar una prueba como ejecutada sólo con comando, fecha y resultado;
+- si fue una prueba real, una medición o una auditoría de la conversación, sumar su
+  resultado a la bitácora de flujos y actualizar la conclusión vigente si cambió;
 - después de la verificación técnica, evaluar el gate de sesión progresiva del protocolo canónico: si el circuito
   es elegible, programar su prueba por Telegram real con datos ficticios sin esperar a completar las Fases 1-4; si
   no, usar harness determinista o `TestClient` y registrar la condición pendiente. Comprobar como mínimo workspace
