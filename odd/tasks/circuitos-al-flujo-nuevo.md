@@ -837,6 +837,14 @@ a la IA entera ni aparte).
         se ve en Telegram. **Latencia del primer mensaje después de arrancar el listener:**
         65 s (el turno arrancó 26 s tarde y duró 30 s; los siguientes, 7-8 s); es la tercera
         vez (12:35, 18:20, 22:18): ya es un patrón.
+      - **RDD de C3 y C4:** tramo desde `c381d4d`, linaje `review-5a19c67e8f254b68`, una
+        lente: **aprobada y reconocida**; una observación no bloqueante, R3-001
+        (`verificador_redaccion.py:80-86`).
+      - **Al cierre, chequeo de rumbo pendiente** (punto de retorno de
+        `docs/traspaso/2026-10-02-flujo-c4.md` en `main`): el usuario sintió que se
+        estaban sumando reglas en lugar de sacarlas. Los pendientes 2 a 4 de abajo
+        (estilo fino) quedan **en suspenso** hasta decidir entre sacar las reglas de
+        estilo, usar ejemplos o medir con una IA más grande.
       - **Pendientes de C4, en orden** (punto de retorno):
         1. El título que propone la IA tiene que pasar el verificador: tratarlo como una
            propuesta formal en la salida (igual que la propuesta de criterio), que el
