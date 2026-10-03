@@ -57,7 +57,9 @@ CAMPOS_DE_OPCION = ("objective", "responsible")
 INTENCIONES = ("continuar", "ayuda", "corrige", "cancelar", "dejar", "otro_tema")
 # Las intenciones que no escriben datos: la persona cancela, deja o cambia de tema.
 INTENCIONES_SIN_DATOS = ("cancelar", "dejar", "otro_tema")
-MAX_PREGUNTAS = 2
+# Un solo dato por pregunta (flujo C4): lo garantiza el código, no sólo la
+# mecánica; un segundo dato se rechaza y se reintenta.
+MAX_PREGUNTAS = 1
 # Cuántos días hacia adelante se le da el calendario al modelo (para resolver
 # "el viernes" o "la semana que viene" sin hacer cuentas de fechas).
 DIAS_DE_CALENDARIO = 14
@@ -328,6 +330,10 @@ def _lista_de_campos(nombre: str, valor: Any, maximo: int | None = None):
         return f"formato: `{nombre}` no es una lista de identificadores"
     if any(v not in CAMPOS for v in valor):
         return f"formato: `{nombre}` trae un dato que el contrato no conoce"
+    if maximo == 1 and len(valor) > 1:
+        # Este motivo lo lee la IA en el reintento: tiene que decirle qué hacer.
+        return (f"formato: `{nombre}` trae {len(valor)} datos: se pide un solo dato "
+                "por turno; el resto, en los turnos siguientes")
     if maximo is not None and len(valor) > maximo:
         return f"formato: `{nombre}` tiene más de {maximo} datos"
     return None

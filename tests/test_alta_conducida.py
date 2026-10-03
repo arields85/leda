@@ -383,7 +383,7 @@ def test_una_fecha_pasada_se_le_dice_al_modelo_y_la_respuesta_es_la_del_reintent
         salida("Quedó para ayer.", valores={"due_date": {"fecha_iso": _en(-3)}},
                pregunta=["title"]),
         salida("Esa fecha ya pasó. ¿Para cuándo la necesitás?",
-               pregunta=["title", "due_date"]))
+               pregunta=["due_date"]))
 
     nuevas = c.escribir("necesito crear una tarea para el viernes pasado")
 
@@ -407,6 +407,19 @@ def test_una_opcion_que_no_es_del_conjunto_se_rechaza_y_no_se_guarda(chat):
     assert any("R9" in r for r in c.hechos(1)["rechazos_anteriores"])
     assert _cuerpos(nuevas) == ["¿A quién se la asigno?"]
     assert nuevas[0]["intake_choice_set_id"] is not None
+
+
+def test_una_pregunta_con_dos_datos_se_reintenta_y_la_ia_sabe_por_que(chat):
+    c = chat(
+        salida("¿Qué hay que hacer y para cuándo?", pregunta=["title", "due_date"]),
+        salida("¿Qué hay que hacer?", pregunta=["title"]))
+
+    nuevas = c.escribir("necesito crear una tarea")
+
+    assert len(c.modelo.conducidos) == 2
+    assert any("un solo dato por turno; el resto, en los turnos siguientes" in r
+               for r in c.hechos(1)["rechazos_anteriores"])
+    assert _cuerpos(nuevas) == ["¿Qué hay que hacer?"]
 
 
 def test_un_texto_con_un_dato_inventado_se_reintenta_con_el_motivo(chat):

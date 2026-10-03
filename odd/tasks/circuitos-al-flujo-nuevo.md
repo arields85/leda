@@ -800,9 +800,16 @@ a la IA entera ni aparte).
         completa: `1 failed, 3607 passed, 333 deselected, 1 warning in 932.21s`
         (2026-10-02; sólo la falla conocida
         `test_un_texto_con_un_dato_inventado_se_reintenta_con_el_motivo`).
-      - **Sin hacer:** `MAX_PREGUNTAS = 1` (rechazar y reintentar un segundo dato en
-        `pregunta`). Rompe `tests/test_horizonte_tarea.py:182`, que usa
-        `pregunta=["title", "due_date"]` y quedaba fuera de lo autorizado para editar.
+      - **Un dato por pregunta, garantizado por el código:** `alta_turno.MAX_PREGUNTAS
+        = 1` (autorizado por el usuario junto con `tests/test_horizonte_tarea.py`). Una
+        `pregunta` con dos datos o más se rechaza entera y el reintento le dice a la IA
+        «se pide un solo dato por turno; el resto, en los turnos siguientes». Las
+        pruebas que pedían dos datos (`test_alta_conducida.py`,
+        `test_horizonte_tarea.py`, `test_alta_turno.py`, imperativo sin signos) piden
+        uno. RED: 5 fallas (4 combinaciones rechazadas y el reintento en el alta
+        conducida); GREEN: pasan. Suite completa: `1 failed, 3619 passed, 333 deselected, 1 warning
+        in 1010.82s` (2026-10-02; sólo la falla conocida). Commit: el mismo que trae
+        esta nota.
       - **Pendiente:** medir C4 con el mismo banco y la prueba real por Telegram.
 
 - [ ] **0-14.** La redacción A (y la charla breve) leen la voz desde la misma fuente que el

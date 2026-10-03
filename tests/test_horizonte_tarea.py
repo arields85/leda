@@ -179,7 +179,7 @@ def test_una_fecha_pasado_el_margen_se_rechaza_y_el_reintento_vuelve_a_preguntar
                valores={"due_date": {"fecha_iso": _en(400)}},
                pregunta=["title"]),
         salida(f"Una tarea puede ir hasta el {limite}. ¿Para qué fecha de acá "
-               "a esa la querés?", pregunta=["title", "due_date"]))
+               "a esa la querés?", pregunta=["due_date"]))
 
     nuevas = c.escribir("necesito crear una tarea para el 15 de agosto")
 

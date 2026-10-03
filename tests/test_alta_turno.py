@@ -131,6 +131,25 @@ def test_una_salida_con_algo_fuera_del_contrato_se_rechaza_entera(cambio):
     assert isinstance(resultado, str) and resultado.startswith("formato:")
 
 
+@pytest.mark.parametrize("pregunta", [
+    ["title", "due_date"],
+    ["objective", "responsible"],
+    ["due_date", "acceptance_criterion"],
+    ["title", "objective", "responsible"],
+])
+def test_una_pregunta_con_mas_de_un_dato_se_rechaza_con_el_motivo_claro(pregunta):
+    """Un solo dato por pregunta lo garantiza el código, no sólo la mecánica (flujo
+    C4): un segundo dato se rechaza y el reintento le dice a la IA qué hacer."""
+    resultado = leer_salida(salida(pregunta=pregunta))
+    assert isinstance(resultado, str) and resultado.startswith("formato:")
+    assert "un solo dato por turno; el resto, en los turnos siguientes" in resultado
+
+
+@pytest.mark.parametrize("campo", T.CAMPOS)
+def test_una_pregunta_con_un_solo_dato_se_acepta(campo):
+    assert leer(pregunta=[campo]).pregunta == (campo,)
+
+
 @pytest.mark.parametrize("crudo", [None, "", "no es json", "[1, 2]", 5, "{"])
 def test_una_salida_que_no_es_un_objeto_se_rechaza(crudo):
     assert isinstance(leer_salida(crudo), str)
@@ -537,17 +556,19 @@ def test_con_datos_pendientes_hay_que_preguntar_algo():
     assert verificar(texto="Dale.").startswith("falta_pregunta")
 
 
-@pytest.mark.parametrize("texto", [
-    "Decime para cuándo la necesitás y contame cómo se comprueba que quedó hecha.",
-    "Pasame la fecha objetivo.",
-    "Contame qué hay que hacer.",
-    "Necesito la fecha para seguir.",
+@pytest.mark.parametrize("texto, campo", [
+    ("Decime para cuándo la necesitás.", "due_date"),
+    ("Contame cómo se comprueba que quedó hecha.", "acceptance_criterion"),
+    ("Pasame la fecha objetivo.", "due_date"),
+    ("Contame qué hay que hacer.", "title"),
+    ("Necesito la fecha para seguir.", "due_date"),
 ])
-def test_pedir_en_imperativo_sin_signo_de_pregunta_alcanza(texto):
+def test_pedir_en_imperativo_sin_signo_de_pregunta_alcanza(texto, campo):
     """Pedir un dato es una pregunta aunque no lleve signos (prueba real del
     2026-10-01: "decime otra fecha" se rechazaba por no tener "?"). Lo que el
-    código comprueba es lo que el modelo declara en `pregunta`, no la puntuación."""
-    assert verificar(texto=texto, pregunta=["title", "due_date"]) is None
+    código comprueba es lo que el modelo declara en `pregunta`, no la puntuación.
+    Un dato por pregunta (flujo C4)."""
+    assert verificar(texto=texto, pregunta=[campo]) is None
 
 
 def test_preguntar_por_lo_que_se_acaba_de_completar_no_lo_rechaza_el_verificador():
