@@ -305,7 +305,9 @@ garantías es un problema propio ([`docs/research/`](docs/research/)).
 cualquier cambio de la conversación). La IA es el mozo: escucha o pregunta qué quiere la
 persona, lleva el pedido exacto a la cocina (el código, Jev y la base), y trae lo que la
 cocina dice, contándolo con naturalidad. No inventa, no promete lo que la cocina no dijo y
-sabe conversar. Todo lo que es conocimiento del caso (estados, reglas, motivos, opciones,
+sabe conversar. Es intérprete y comunicadora de la fuente de verdad: usa su fuerte,
+hablar e interpretar a la persona, y **no toma decisiones** ni inventa datos; para eso va
+a la cocina. Todo lo que es conocimiento del caso (estados, reglas, motivos, opciones,
 quién hizo qué) viene de la cocina como hechos; nunca como reglas o frases para el mozo.
 Ante cada cambio se pregunta: **¿esto lo resuelve la cocina o le estamos enseñando frases
 al mozo?**
@@ -317,6 +319,10 @@ al mozo?**
 - Si la IA dice algo mal, primero se mira la comanda: ¿la cocina le pasó el hecho
   correcto, completo y visto desde quien lo recibe? Se corrige la comanda con una regla
   para todas, no la frase del caso.
+- Lo que hoy decida la IA y no sea interpretar o comunicar (qué dato se pide después,
+  qué se ofrece, qué efecto se da por hecho) pasa a la cocina, que se lo informa como
+  hecho. Una propuesta de la IA es una sugerencia que la persona ve y acepta, nunca un
+  dato que se guarda solo.
 - La cocina no corrige lo que el mozo escuchó con heurísticas propias (comparar palabras,
   listas de frases): valida datos y aplica reglas; interpretar es del mozo (ADR 0014).
 - Un arreglo que le agrega al mozo una regla para un caso dispara el punto 4.
