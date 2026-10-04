@@ -57,7 +57,7 @@ se trabaja y qué no se hace".
 | Relevamientos de proyectos externos (Hermes Agent) | [`research/hermes-agent.md`](research/hermes-agent.md) |
 | Relevamiento de NotebookLM y respuestas ancladas en fuentes | [`research/notebooklm-y-grounding.md`](research/notebooklm-y-grounding.md) |
 | Aprendizajes del `SOUL.md` y del contexto operativo de Prisma en Hermes (trabajo anterior del usuario) | [`research/soul-y-contexto-de-prisma-en-hermes.md`](research/soul-y-contexto-de-prisma-en-hermes.md) |
-| Copias de documentos anteriores: `STATUS` y `AGENTS` hasta el 2026-09-30 y hasta el 2026-10-04, y el diario de Leda orienta. Son historia, no instrucciones vigentes | [`historial/`](historial/) |
+| Copias de documentos anteriores: `STATUS` y `AGENTS` hasta el 2026-09-30, hasta el 2026-10-04 y hasta el paso M1; el documento de la unidad del Motor hasta el paso M1; y el diario de Leda orienta. Son historia, no instrucciones vigentes | [`historial/`](historial/) |
 | Reglas para futuras sesiones | [`../AGENTS.md`](../AGENTS.md) |
 | Configuración del primer cliente | [`../espacios/corework.yaml`](../espacios/corework.yaml) |
 
@@ -88,6 +88,7 @@ usarse para decidir.** El motivo de las cuatro primeras filas está en
 | [`product/functional-specification.md`](product/functional-specification.md) | Genérica por intención, pero precede al modelo multi-tenant: no separa configuración de cliente de núcleo del producto ni trata el aislamiento como garantía. |
 | [`traspaso/2026-10-01-alta-conducida.md`](traspaso/2026-10-01-alta-conducida.md), [`traspaso/2026-10-02-renombre-a-leda.md`](traspaso/2026-10-02-renombre-a-leda.md) y [`traspaso/2026-10-02-flujo-c4.md`](traspaso/2026-10-02-flujo-c4.md) | Traspasos de las jornadas del flujo C y del renombre. Dejaron de ser puntos de retorno el 2026-10-04: sus pendientes y su forma de trabajar quedaron congelados o superados (ver [`STATUS.md`](STATUS.md), "Qué quedó congelado o superado"). |
 | [`historial/STATUS-hasta-2026-10-04.md`](historial/STATUS-hasta-2026-10-04.md) y [`historial/AGENTS-hasta-2026-10-04.md`](historial/AGENTS-hasta-2026-10-04.md) | Copias del estado y de las reglas de trabajo antes del cambio de rumbo del 2026-10-04, literales salvo el aviso de archivo de su primera línea. Sus órdenes de trabajo y sus puntos de retorno ya no rigen. |
+| [`historial/STATUS-hasta-M1.md`](historial/STATUS-hasta-M1.md), [`historial/AGENTS-hasta-M1.md`](historial/AGENTS-hasta-M1.md) y [`historial/motor-de-conversacion-hasta-M1.md`](historial/motor-de-conversacion-hasta-M1.md) | Copias del estado, de las reglas de trabajo y del documento de la unidad del Motor hasta el paso M1 (2026-10-04), antes de condensarlos; literales salvo el aviso de archivo de su primera línea. Lo que figura ahí como pendiente o próximo paso ya no rige: lo vigente está en `STATUS.md`, en el documento de la unidad y en los ADR 0017 y 0018. |
 
 Superados en parte, con una nota del 2026-10-04 al comienzo que dice qué sigue vigente: los ADR
 [`0013`](decisions/0013-reglas-generales-de-la-conversacion.md) y
