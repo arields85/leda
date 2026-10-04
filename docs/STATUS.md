@@ -3,7 +3,7 @@
 **Alcance:** Leda es un producto de gestión de proyectos multi-tenant. CoreWork es
 su primer cliente, no su definición.
 
-**Última actualización documental:** 2026-10-02.
+**Última actualización documental:** 2026-10-04.
 
 Historia de sesiones y unidades cerradas:
 [`historial/STATUS-hasta-2026-09-30.md`](historial/STATUS-hasta-2026-09-30.md)
@@ -264,13 +264,36 @@ aclaraciones, conversación de bloqueos.
 
 **Resultados y conclusión vigente de los flujos y modelos:** [`product/bitacora-de-flujos.md`](product/bitacora-de-flujos.md) (elegido: C6 con la regla del mozo, con GPT-6 sol).
 
-**Punto exacto para retomar (2026-10-03, noche).** Rama de flujo, circuito 0 en C6 con la
-regla del mozo aplicada (tareas 0-31 a 0-33, tres auditorías independientes) y probado
-en real con sol (19:18): funcionó lo principal; fallaron un bucle en el borrador devuelto
-y la oferta repetida al final de cada mensaje. **En curso: 0-34** (esos dos arreglos,
-la orden que volvió, "Soy Leda." y lo que dejó la tercera auditoría). **Lo siguiente:**
-cuarta auditoría independiente y repetir la prueba real con sol. Conclusiones y
-resultados en la bitácora de flujos.
+**Punto exacto para retomar (2026-10-04).** Rama `feat/flujo-de-un-mensaje`, worktree
+`D:\Proyectos\Leda-PM-worktreeslujo-de-un-mensaje`, HEAD con 0-34 construido (suite
+completa 3959 passed, RDD aprobado) y la cuarta auditoría registrada. **Lo primero: la tarea
+0-35, rediseño del borrador devuelto**, aprobada por el usuario el 2026-10-04 (diseño, motivo y
+alcance en `odd/tasks/circuitos-al-flujo-nuevo.md`, tarea 0-35): escribir el chequeo de rumbo,
+delegar el escritor, quinta auditoría independiente, RDD y prueba real con sol.
+
+- **Antes de probar:** PostgreSQL estaba caído al cerrar (`levantar-postgres.bat`); la IA activa
+  en `leda_flujo` es `openai/gpt-6-sol` (`python -m leda modelo` para verla); la restricción de
+  horario sigue apagada; migraciones hasta `0029` aplicadas; el listener lo corre el usuario.
+- **Cómo se trabajó y conviene seguir:** cada cambio de la conversación se evalúa con la regla
+  del mozo (`AGENTS.md`, punto 11); escritor delegado y, después de que dice "cumple", auditoría
+  independiente de otro revisor (sólo lectura); RDD con `tools/rdd_ciclo.py <worktree> <base>`
+  (sigue los comandos que emite la herramienta; el usuario dio consentimiento para cualquier
+  revisión), partiendo en worktrees fijos los tramos de más de ~2.500 líneas; resultados de
+  cada prueba, medición o auditoría a la bitácora de flujos.
+- **Decisiones pendientes con el usuario:** si un aviso a otra persona queda `fallido` al agotar
+  los reintentos (hoy no se sigue reintentando); reescribir la historia de la rama antes de
+  subir (líneas de atribución en commits del 2026-10-02/03 y partir el commit grande de C6 para
+  revisarlo).
+- **Pendientes anotados, sin apuro:** P-1c (plantillas del flujo B); P1-P7 (falla del proveedor;
+  el aviso de falla pasa a "Apenas vuelva a funcionar, te respondo" cuando estén construidos);
+  0-29 (recordatorio del borrador rechazado; depende de `pending_reply`); retirar el flujo A del
+  alta; 0-17 (estilo con ejemplos); tope por modelo y elección de modelo en la plataforma
+  (importante); `llm._limpiar_esquema` no limpia dentro de `items` (Gemini); la prueba
+  intermitente del indicador de escritura; limpiar los worktrees `c4-medicion` y `flujo-c6`
+  cuando no hagan falta (el banco `tools/medir_modelos.py` se escribió para `flujo-c6` y hay que
+  adaptarlo al contrato actual).
+
+**Punto de retorno anterior (2026-10-03, noche):** se construía 0-34.
 
 **Punto de retorno anterior (2026-10-03, tarde):** se aplicaba la regla del mozo al alta.
 

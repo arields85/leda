@@ -36,6 +36,11 @@ Qué haría revisar esta conclusión: si después de la tarea 0-34 vuelve a apar
 del mismo tipo en el borrador devuelto, no se cambia de flujo, pero se revisa el diseño del
 borrador devuelto antes de seguir.
 
+**Actualización (2026-10-04):** pasó. La cuarta auditoría encontró que el borrador devuelto
+todavía puede entrar en bucle (otra causa, la misma clase de falla). Se mantiene C6 y se
+rediseña el borrador devuelto (tarea 0-35): sin lista de datos a corregir; vuelve como un
+borrador normal con el motivo, una pregunta abierta y el resumen para reenviar.
+
 ## La regla del mozo: por qué se decidió y cómo se aplicó en C6
 
 **Qué es** (decisión del usuario, 2026-10-03; `AGENTS.md`, punto 11). La IA es el mozo de
@@ -129,7 +134,8 @@ Se arreglan dentro de la regla (0-34).
   todo lo que se pospone se anota como tarea en el momento.
 - **Auditorías independientes:** después de que un escritor dice "cumple", siempre va una
   auditoría de otro revisor. Primera (6f85bf9): 10 textos fijos y 4 casos del mozo;
-  segunda (a8f4aba): 4 y 3 de severidad baja; tercera (3e5bcb3): 4 y 3, de borde. Los
+  segunda (a8f4aba): 4 y 3 de severidad baja; tercera (3e5bcb3): 4 y 3, de borde. Cuarta
+  (f7dce94): 3 y 3, con el bucle del borrador devuelto de nuevo → rediseño (0-35). Los
   controles automáticos que escribe el mismo escritor tienen sus mismos puntos ciegos.
 
 ## Modelos
