@@ -90,7 +90,7 @@ falla y el usuario frenó el parcheo. El análisis y sus fuentes están en
 | Etapa | Qué | Criterio de paso |
 |---|---|---|
 | 0 | Arranque limpio: etiquetas, cierre en `main`, rama y carpeta nuevas | Hecho (ver "Evidencia") |
-| 1 | Diseño sin código: ADR 0017, ADR 0018, conversaciones de prueba | **M1:** el usuario acepta los dos ADR (el 0018 queda como "propuesta" hasta que pase la prueba); `main` avanza sólo con documentos |
+| 1 | Diseño sin código: ADR 0017, ADR 0018, conversaciones de prueba | **M1:** el usuario acepta los dos ADR (el 0018 queda como "propuesta" hasta que pase la prueba); `main` avanza sólo con documentos. **Cumplido el 2026-10-04:** el usuario aceptó el ADR 0017 y el diseño del ADR 0018 para la prueba. |
 | 2 | Prueba chica y descartable, por Telegram real, con tareas ficticias cargadas con `sembrar` (ADR 0017, decisión 5) y base `leda_motor` | **M2:** resultado registrado en la bitácora, pase o no, contra criterios escritos antes |
 | 3 | Cortar los enredos, mudar las pruebas de garantías, borrar los flujos A y B, construir el motor de conversación y la plataforma web de tareas, con su propio ADR (ADR 0017, decisión 5) | **M3:** motor de conversación construido, flujos viejos borrados, garantías en verde, prueba real aprobada |
 
@@ -354,6 +354,16 @@ Pendientes heredados de la rama congelada que `docs/STATUS.md` deriva a esta lis
   seguía escrita en este documento, en `docs/STATUS.md` y en `AGENTS.md`, contra la decisión 5
   (corregido con una nota en cada lugar); faltaba la pregunta 7 en la lista (agregada); y la
   reserva de números de migración no tiene una prueba que la haga cumplir (ya registrada en E0-4).
+- **E1-1 y E1-2, cierre (2026-10-04).** ADR 0017 completo en `abadf04` y ADR 0018 redactado en
+  `21eaee4`. Revisión RDD de la rama hasta `abadf04` (8 archivos, 797 líneas): linaje
+  `review-2b17d83ab052cefa`, aprobada y reconocida; una observación (la decisión 2 del ADR 0017
+  hablaba de "según el archivo"), corregida. Revisión de la rama hasta `21eaee4` (9 archivos, 1108
+  líneas): linaje `review-6cd67d4cee8cb62d`, aprobada y reconocida; cuatro observaciones no
+  bloqueantes, corregidas: la decisión 1 del ADR 0018 daba la 4 por pendiente; la 5b no decía si
+  "4 de 5" vale por conversación y no incluía cancelar ni escribir en lugar de tocar un botón; el
+  ADR 0017 seguía dando el mecanismo de avisos por pendiente; y una línea repetida en "Próximo
+  paso". Las revisiones de cada cambio sin commit, todas de riesgo bajo y sin lentes, se
+  aprobaron y reconocieron sobre la marcha.
 - **Línea base de las garantías (2026-10-04).** `.venv\Scripts\python.exe -m pytest -q -p
   no:cacheprovider` sobre el código del punto de partida (`respaldo-main-antes-de-d`), corrido
   desde la carpeta de `main`: `2286 passed, 333 deselected, 1 warning in 631.96s (0:10:31)`. Mide
@@ -362,7 +372,7 @@ Pendientes heredados de la rama congelada que `docs/STATUS.md` deriva a esta lis
 
 ## Próximo paso
 
-Los dos ADR están redactados (0017, decisiones 1 a 7; 0018, decisiones 1 a 8). Siguen el paso M1
-(el usuario los lee y los acepta) y la tarea E1-3 (formato de las conversaciones de prueba y las
-primeras, para el circuito de la prueba chica). El ADR 0017 está redactado (decisiones 1 a 7) y
-espera su aceptación en el paso M1.
+Paso M1 cumplido el 2026-10-04: el usuario aceptó el ADR 0017 y el diseño del ADR 0018 para la
+prueba. Siguen la tarea E1-4 (actualizar los documentos que los ADR cambian) y la E1-3 (formato de
+las conversaciones de prueba y las primeras, para el circuito de la prueba chica); después, el plan
+de la Etapa 2.

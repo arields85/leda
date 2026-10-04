@@ -1,7 +1,6 @@
 # ADR 0017: Por chat, los hechos del trabajo; por la web, su estructura
 
-- **Estado:** redactada con el usuario (decisiones 1 a 7, 2026-10-04); `PENDIENTE` de aceptación
-  (paso M1).
+- **Estado:** aceptada por el usuario el 2026-10-04 (paso M1), con las decisiones 1 a 7.
 - **Fecha:** abierta el 2026-10-04.
 - **Alcance:** qué atiende Leda por chat y qué queda por fuera del chat; la carga de tareas; el
   congelamiento de funcionalidad nueva y el orden del roadmap; el ajuste de `nucleo/` al recorte.
@@ -41,7 +40,7 @@ carga las tareas y lo manda con la confirmación de quien pide. No se adopta por
 
 - es un mensaje privado no rutinario, que exige borrador, confirmación y pregunta de atribución
   (constitución §7);
-- necesita el mecanismo de avisos a otras personas, `PENDIENTE` en el ADR 0018;
+- necesita el mecanismo de avisos a otras personas (el del ADR 0018, decisión 8);
 - el pedido es casi un borrador de tarea: reabre por chat la estructura que el recorte saca.
 
 Se reevalúa si una prueba real muestra que los pedidos derivados se pierden.
@@ -64,8 +63,8 @@ Condiciones de la carga (usuario, 2026-10-04):
   un formulario, decisión 5). Leda nunca lo presenta como una aprobación hecha en Leda
   (constitución §4).
 - **No hay circuito de aceptación por chat.** A lo sumo, Leda avisa a los responsables y referentes
-  que se cargaron tareas. Si ese aviso entra, y con qué mecanismo, está `PENDIENTE` en el ADR 0018
-  (avisos a otras personas).
+  que se cargaron tareas. Si ese aviso entra está `PENDIENTE`; si entra, usa el mecanismo de
+  avisos a otras personas del ADR 0018 (decisión 8).
 
 **Anotado para más adelante: la aceptación dentro de Leda.** Quien decide las tareas las acepta en
 Leda. Se retoma cuando exista el formulario web, que es donde se haría; nunca por chat.
@@ -124,8 +123,8 @@ Ejemplo: el 18, Ismael escribe "No llego al 20, necesito hasta el 27, el proveed
 - **Leda anota la nueva previsión y su motivo** (el 27, el proveedor) como un hecho.
 - **El referente se entera por los dos lados** (usuario, 2026-10-04): Leda le avisa por chat en el
   momento, y el pedido aparece además en la plataforma, que es donde se cambia la fecha. Así nada
-  se atrasa en silencio aunque nadie entre a la plataforma. El mecanismo de avisos a otras
-  personas está `PENDIENTE` en el ADR 0018.
+  se atrasa en silencio aunque nadie entre a la plataforma. El aviso usa el mecanismo de avisos a
+  otras personas del ADR 0018 (decisión 8).
 - **La fecha comprometida no cambia:** sigue siendo el 20.
 - **Los recordatorios siguen contra la fecha comprometida**, y la IA recibe como hechos la previsión
   y que el referente está avisado: no le habla a Ismael como si no hubiera dicho nada.

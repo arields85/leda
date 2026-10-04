@@ -1,8 +1,7 @@
 # ADR 0018: El motor de conversación
 
-- **Estado:** redactada con el usuario (decisiones 1 a 8, 2026-10-04). En el paso M1 el usuario
-  acepta el diseño para la prueba, y el ADR queda como "propuesta" hasta que pase la prueba chica
-  de la Etapa 2.
+- **Estado:** propuesta. El usuario aceptó su diseño para la prueba el 2026-10-04 (paso M1), con
+  las decisiones 1 a 8. Queda como propuesta hasta que pase la prueba chica de la Etapa 2.
 - **Fecha:** abierta el 2026-10-04.
 - **Alcance:** cómo procesa Leda cada mensaje y cada toque en el seguimiento por chat (ADR 0017,
   decisión 3): quién decide qué, el estado de la conversación, los circuitos, las situaciones
@@ -73,7 +72,7 @@ de lo que el código informa que pasó.
   heurísticas. Lo que cambia es la extensión que estaba en revisión ("la IA no toma decisiones"):
   la IA elige qué jugada corresponde y cómo decirlo; el código decide si la jugada vale, cómo se
   maneja cada jugada y cada situación general, y ejecuta.
-- Qué declara un circuito y cuáles son las situaciones generales: decisión 4, `PENDIENTE`.
+- Qué declara un circuito y cuáles son las situaciones generales: decisión 4.
 
 **Alternativas descartadas:**
 
@@ -190,10 +189,13 @@ aprueba si se cumplen los tres:
 
 1. **Conversaciones de prueba, cinco corridas cada una contra la IA real.** Unas diez: las cuatro
    respuestas de 5a más las situaciones generales que aplican (varias cosas en un mensaje,
-   corrección, cambio de tema, duda, algo vencido, algo que no está en la lista).
-   - **Las garantías, 5 de 5:** Leda no inventa un dato, no hace sin confirmación algo que la
-     requiere, no deja a la persona sin salida y no confunde a qué tarea responde la persona.
-   - **La comprensión, 4 de 5:** y la vez que no entiende, pregunta; nunca hace otra cosa.
+   corrección, cancelar, cambio de tema, duda, escribir en lugar de tocar un botón, algo vencido
+   y algo que no está en la lista).
+   - **Las garantías, 5 de 5 en cada conversación:** Leda no inventa un dato, no hace sin
+     confirmación algo que la requiere, no deja a la persona sin salida y no confunde a qué tarea
+     responde la persona.
+   - **La comprensión, al menos 4 de 5 en cada conversación:** y la vez que no entiende,
+     pregunta; nunca hace otra cosa.
 2. **Una prueba por Telegram real** con el usuario operando las cuentas de prueba: en toda la
    prueba Leda no se pierde ni se traba ninguna vez.
 3. **El usuario dice que se siente natural.** Es subjetivo a propósito: quien usa a Leda es una
