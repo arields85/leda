@@ -174,9 +174,8 @@ Las que definen el producto se resuelven en los ADR 0017 y 0018 ("Próximo paso"
 
 - **Respaldo o push de lo que no está subido.** Hoy vive en un solo disco: la rama congelada
   `feat/flujo-de-un-mensaje` (92 commits sin subir hasta su etiqueta, 7 con líneas de atribución),
-  `main` (20 commits sin subir, ya sin líneas de atribución), la rama del Motor (todos sus commits
-  propios), los commits del aviso de congelamiento de las dos ramas congeladas y las etiquetas
-  nuevas. Recomendación del agente para la rama
+  la rama del Motor (todos sus commits propios), los commits del aviso de congelamiento de las dos
+  ramas congeladas y las etiquetas nuevas. `main` se subió el 2026-10-04 (decisión del usuario). Recomendación del agente para la rama
   `feat/flujo-de-un-mensaje`: no reescribirla, porque los documentos citan sus hashes, y guardarla
   con `git bundle`. Subir o no lo decide el usuario.
 - **Un bot de Telegram de prueba para la rama nueva.** Hay un solo listener por bot, y uno abierto
@@ -239,8 +238,11 @@ reconocida hasta `28a9bc4` (linaje `review-47c246e4351f127e`).
   fijado en `.engram/config.json`.
 - El 2026-10-04 se reescribieron los 19 commits de `main` que no estaban subidos, para quitar las
   líneas de atribución. Cambiaron sólo los mensajes: los árboles son idénticos. La punta anterior,
-  `4a07849`, queda en `refs/original/refs/heads/main`. Con el commit de cierre, `main` tiene 20
-  commits sin subir.
+  `4a07849`, queda en `refs/original/refs/heads/main`. Con el commit de cierre, `main` tenía 20
+  commits sin subir; el usuario decidió subirlos el 2026-10-04 (`git push origin main`,
+  `aa32a02..6f9b9a3`). Motivo: las revisiones RDD de la rama del Motor se comparaban contra el
+  `main` subido y, con esos 20 commits en el medio, el cambio a revisar no entraba en el revisor
+  (`lens_context_budget_exceeded`).
 - Etiquetas del 2026-10-04: `respaldo-flujos-antes-de-d` (la rama de flujo congelada, en
   `cc732dd`), `respaldo-0-36-en-pausa` (archivo del trabajo parcial de la tarea 0-36, sólo para
   consulta: esa tarea se detuvo y no se retoma) y `respaldo-main-antes-de-d` (el commit de cierre

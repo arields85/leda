@@ -144,7 +144,8 @@ Una por vez. Para el ADR 0017:
    plataforma web donde se maneja la estructura del trabajo (cargar tareas con un formulario, ver
    su estado, cambiar fechas por retrasos, gestionar integrantes); lo demás espera a que Leda
    haga bien el seguimiento en pruebas reales (ADR 0017, decisión 5). Quién entra a la
-   plataforma se decide en su propio ADR. Falta si la prueba chica la espera.
+   plataforma se decide en su propio ADR. La prueba chica no espera a la plataforma: usa tareas
+   ficticias cargadas con `sembrar`.
 6. Qué le falta al seguimiento antes de usarlo: enlazar la respuesta con el recordatorio que la
    originó, seguir la falta de respuesta (`pending_reply`), la conversación de bloqueos
    (mecánica §8) y los textos de recordatorios y cadencias, hoy fijos en el código.
@@ -318,5 +319,6 @@ Pendientes heredados de la rama congelada que `docs/STATUS.md` deriva a esta lis
 
 ## Próximo paso
 
-Seguir el ADR 0017 con el usuario: si la prueba chica de la Etapa 2 espera a la plataforma
-(decisión 5). Las decisiones 1 a 5 ya están escritas en el borrador del ADR.
+Cerrar el ADR 0017 con el usuario: la pregunta 6 (qué le falta al seguimiento) y la 7 (cómo se
+ajusta `nucleo/`, que edita el usuario). Después, el ADR 0018. Las decisiones 1 a 5 ya están
+escritas en el borrador del ADR.

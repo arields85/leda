@@ -155,8 +155,12 @@ esta etapa: es cambiar la estructura por chat y la operación no existe.
 - **Su diseño va en un ADR propio, antes del código:** quién entra, cómo se identifica, qué ve y qué
   puede hacer cada uno, y cómo se cumplen el aislamiento entre espacios y la auditoría en una
   superficie web que escribe en la base.
-- `PENDIENTE`: si la prueba chica de la Etapa 2 espera a la plataforma o usa tareas ficticias
-  cargadas de otra forma.
+- **La prueba chica de la Etapa 2 no espera a la plataforma** (usuario, 2026-10-04): usa unas pocas
+  tareas ficticias cargadas con la herramienta que ya existe (`sembrar`). Esa herramienta no cumple
+  las condiciones de la decisión 2, pero la prueba es descartable y con datos ficticios; la carga
+  de verdad es siempre la plataforma. Razón: el seguimiento es lo que falló en cada prueba real, y
+  conviene probarlo cuanto antes. La prueba sigue viniendo después del paso M1, con el diseño del
+  motor de conversación aceptado (ADR 0018).
 
 Qué existe hoy: un tablero web de sólo lectura, al que cada persona entra con un enlace propio,
 que muestra el avance de los objetivos, cuántas tareas hay en cada estado, la carga por persona,
