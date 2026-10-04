@@ -262,6 +262,9 @@ Precisiones del 2026-10-04, que los ADR 0017 y 0018 tienen que dejar escritas:
   declarado en el código, nunca configuración de un cliente (ADR 0018).
 - La importación de tareas del administrador es un comando de consola, no la interfaz administrativa (ADR 0017).
   El formulario en el tablero del cliente viene después; cómo se hace está `PENDIENTE` en el ADR 0017.
+  *El borrador del ADR 0017 (decisión 5) lo cambia:* las tareas se cargan con un formulario en una plataforma web,
+  que se diseña en su propio ADR antes del código; la prueba chica usa tareas ficticias cargadas con `sembrar`.
+  Este punto se reescribe al aceptar el ADR (tarea E1-4).
 - La memoria por integrante es aprendizaje persistente: queda prevista como tercera parte del diseño del motor
   de conversación y no se construye sin su propio ADR. Engram es sólo una referencia de diseño.
 

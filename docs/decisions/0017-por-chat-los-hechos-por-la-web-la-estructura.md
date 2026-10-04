@@ -1,6 +1,7 @@
 # ADR 0017: Por chat, los hechos del trabajo; por la web, su estructura
 
-- **Estado:** en preparación con el usuario; `PENDIENTE` de aceptación (paso M1).
+- **Estado:** redactada con el usuario (decisiones 1 a 7, 2026-10-04); `PENDIENTE` de aceptación
+  (paso M1).
 - **Fecha:** abierta el 2026-10-04.
 - **Alcance:** qué atiende Leda por chat y qué queda por fuera del chat; la carga de tareas; el
   congelamiento de funcionalidad nueva y el orden del roadmap; el ajuste de `nucleo/` al recorte.
@@ -168,12 +169,43 @@ las tareas vencidas, los bloqueos abiertos y lo que espera aprobación (`GET /ta
 muestra la lista de tareas con su estado. Para cargar tareas sólo existe `sembrar`, que es un
 cargador de datos ficticios (decisión 2, consecuencias).
 
-### 6 y 7. `PENDIENTE`
+### 6. Lo que le falta al seguimiento se construye con él (usuario, 2026-10-04)
 
-6. Qué le falta al seguimiento antes de usarlo: enlazar la respuesta con el recordatorio que la
-   originó, seguir la falta de respuesta (`pending_reply`), la conversación de bloqueos
-   (mecánica §8) y los textos de recordatorios y cadencias, hoy fijos en el código.
-7. Cómo se ajusta `nucleo/` al recorte. Esa edición la hace el usuario.
+Para hacer las ocho cosas de la decisión 3 hoy faltan cuatro piezas. Las cuatro son parte de
+construir el seguimiento, no decisiones aparte:
+
+1. **Saber a qué responde la persona.** Si Leda le recuerda a Ismael la tarea del tablero y él
+   contesta "ya casi", ese "ya casi" tiene que quedar enlazado con esa tarea y ese recordatorio.
+2. **Llevar la cuenta de quién no contestó.** La tabla `pending_reply` existe, pero nada la
+   escribe; sin eso Leda no puede afirmar que alguien no responde.
+3. **La conversación de bloqueos** (decisión 3a).
+4. **Los textos de recordatorios y cadencias**, hoy fijos en el código (`escalera.py`, `reloj.py`).
+
+Cómo se construye cada una se define en el ADR 0018.
+
+### 7. El núcleo no se edita; lo que no aplica en esta etapa vuelve con las capacidades (usuario, 2026-10-04)
+
+En palabras del usuario: la constitución es el ideal a alcanzar; hoy se hace algo más acotado,
+que después va a seguir creciendo. Lo que dicen la constitución, la mecánica y el alta de equipo
+sigue siendo correcto: es el comportamiento que Leda tiene que alcanzar, y no se edita. En esta etapa, los pasajes que
+necesitan capacidades que quedaron fuera del alcance todavía no se aplican. Vuelven a aplicarse a
+medida que se suman capacidades (lista "Anotado para más adelante" de
+`odd/tasks/motor-de-conversacion.md` y roadmap). Son estos:
+
+1. **Constitución §3**, los referentes aceptan las tareas de su área: en esta etapa la aceptación
+   ocurre fuera de Leda y se declara al cargar la tarea (decisión 2).
+2. **Constitución §7**, borrador y confirmación para cambiar fechas o responsables: en esta etapa
+   esos cambios se hacen en la plataforma (decisiones 4 y 5).
+3. **Mecánica §13**, "Antes de crear o asignar": Leda no crea tareas por chat (decisiones 1 y 2).
+4. **Mecánica §9**, el pedido de más tiempo: Leda registra la nueva previsión y avisa; la
+   re-aprobación se resuelve en la plataforma (decisión 4).
+5. **Mecánica §10**, los avisos de un borrador para confirmar o rechazado: eran del alta por chat.
+6. **Alta de equipo**, la entrevista por chat desde el bot de administración: en esta etapa los
+   integrantes se gestionan desde la plataforma (decisión 5).
+
+**Las garantías rigen siempre, también en esta etapa:** la confirmación humana antes de un efecto,
+la honestidad, el trato con las personas, la opacidad técnica, la auditoría y el aislamiento entre
+espacios (`AGENTS.md`, "Sobre `nucleo/`").
 
 ## Consecuencias
 
@@ -186,8 +218,8 @@ cargador de datos ficticios (decisión 2, consecuencias).
   conversión de borrador a tarea tiene que decir que una tarea cargada por el administrador entra
   comprometida por declaración, no por una confirmación en Leda.
 - **Decisión 2:** la constitución §3 dice que los referentes aceptan las tareas de su área. En esta
-  etapa, esa aceptación ocurre fuera de Leda y se declara. Cómo lo refleja `nucleo/` es la
-  decisión 7; esa edición la hace el usuario.
+  etapa, esa aceptación ocurre fuera de Leda y se declara. Es uno de los pasajes del núcleo que
+  no se aplican en esta etapa (decisión 7).
 - **Decisión 4:** cumple la primera mitad de la mecánica §9 (registrar la nueva previsión). La
-  segunda (evaluar el umbral de re-aprobación) la hace el referente fuera de Leda en esta etapa.
-  Cómo lo refleja `nucleo/` es la decisión 7.
+  segunda (evaluar el umbral de re-aprobación) se resuelve en la plataforma en esta etapa
+  (decisión 7).

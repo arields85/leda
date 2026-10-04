@@ -38,7 +38,9 @@ falla y el usuario frenó el parcheo. El análisis y sus fuentes están en
 3. Recorte de alcance: por ahora Leda no crea tareas ni objetivos por chat; hace seguimiento.
    Principio: por chat, hechos del trabajo; por la web, su estructura.
 4. Carga manual: primero una importación por archivo del administrador; después un formulario
-   en el tablero del cliente.
+   en el tablero del cliente. *Cambiada el mismo día en el borrador del ADR 0017 (decisión 5):
+   las tareas se cargan con un formulario en una plataforma web, con su propio ADR; la prueba
+   chica usa tareas ficticias cargadas con `sembrar`.*
 5. Arranque limpio: esta rama sale de `main`; los flujos A, B y C1-C6 quedan congelados en la
    etiqueta `respaldo-flujos-antes-de-d` y no se arreglan.
 6. Los botones son atajos: lo que hace un botón también vale escrito.
@@ -89,8 +91,8 @@ falla y el usuario frenó el parcheo. El análisis y sus fuentes están en
 |---|---|---|
 | 0 | Arranque limpio: etiquetas, cierre en `main`, rama y carpeta nuevas | Hecho (ver "Evidencia") |
 | 1 | Diseño sin código: ADR 0017, ADR 0018, conversaciones de prueba | **M1:** el usuario acepta los dos ADR (el 0018 queda como "propuesta" hasta que pase la prueba); `main` avanza sólo con documentos |
-| 2 | Prueba chica y descartable, por Telegram real, con tareas importadas y base `leda_motor` | **M2:** resultado registrado en la bitácora, pase o no, contra criterios escritos antes |
-| 3 | Cortar los enredos, mudar las pruebas de garantías, borrar los flujos A y B, construir el motor de conversación y la importación real | **M3:** motor de conversación construido, flujos viejos borrados, garantías en verde, prueba real aprobada |
+| 2 | Prueba chica y descartable, por Telegram real, con tareas ficticias cargadas con `sembrar` (ADR 0017, decisión 5) y base `leda_motor` | **M2:** resultado registrado en la bitácora, pase o no, contra criterios escritos antes |
+| 3 | Cortar los enredos, mudar las pruebas de garantías, borrar los flujos A y B, construir el motor de conversación y la plataforma web de tareas, con su propio ADR (ADR 0017, decisión 5) | **M3:** motor de conversación construido, flujos viejos borrados, garantías en verde, prueba real aprobada |
 
 Las etapas 2 y 3 tienen cada una su plan propio, que se escribe al llegar.
 
@@ -108,7 +110,8 @@ Etapa 0:
 
 Etapa 1 (ruta: en línea, con el usuario; son documentos de decisión):
 
-- [ ] **E1-1.** ADR 0017, alcance: `docs/decisions/0017-por-chat-los-hechos-por-la-web-la-estructura.md`.
+- [x] **E1-1.** ADR 0017, alcance: `docs/decisions/0017-por-chat-los-hechos-por-la-web-la-estructura.md`.
+      Redactado con el usuario el 2026-10-04 (decisiones 1 a 7); su aceptación es el paso M1.
 - [ ] **E1-2.** ADR 0018, motor de conversación: `docs/decisions/0018-motor-de-conversacion.md` (queda
       "propuesta" hasta que pase la prueba).
 - [ ] **E1-3.** `tests/conversaciones/`: formato (README) y primeras conversaciones como datos.
@@ -127,8 +130,8 @@ Una por vez. Para el ADR 0017:
    si se puede repetir, garantías de una tarea comprometida (objetivo, responsable, fecha,
    criterio y política de evidencia) y la aceptación del referente (mecánica §7 y §13).
    **Resuelta (usuario, 2026-10-04):** en esta etapa ninguna persona del equipo crea tareas; las
-   crea a mano el administrador designado, con las condiciones del ADR 0017 (decisión 2). La
-   carga no se diseña ahora: se agregan capacidades cuando Leda responda bien en el seguimiento.
+   crea a mano el administrador designado desde una plataforma web (decisión 5), con las
+   condiciones del ADR 0017 (decisión 2).
 3. Qué circuitos quedan por chat y cuáles pasan a la web (dependencias, cambios sobre una
    tarea ya creada). **Resuelta (usuario, 2026-10-04):** el seguimiento persigue los bloqueos de
    persona en persona y, si lo que falta no es una tarea de nadie, sigue el bloqueo mismo con
@@ -149,6 +152,12 @@ Una por vez. Para el ADR 0017:
 6. Qué le falta al seguimiento antes de usarlo: enlazar la respuesta con el recordatorio que la
    originó, seguir la falta de respuesta (`pending_reply`), la conversación de bloqueos
    (mecánica §8) y los textos de recordatorios y cadencias, hoy fijos en el código.
+   **Resuelta (usuario, 2026-10-04):** las cuatro piezas son parte de construir el seguimiento;
+   cómo se construyen se define en el ADR 0018 (ADR 0017, decisión 6).
+7. Cómo se ajusta `nucleo/` al recorte. Esa edición la hace el usuario. **Resuelta (usuario,
+   2026-10-04):** el núcleo no se edita; los pasajes que necesitan capacidades fuera del alcance
+   no se aplican en esta etapa y vuelven con las capacidades; las garantías rigen siempre
+   (ADR 0017, decisión 7).
 
 Para el ADR 0018:
 
@@ -186,13 +195,15 @@ seguimiento en pruebas reales. Al aceptar el ADR 0017 pasan a `docs/ROADMAP.md` 
    ADR 0002 y la constitución §9; toda tabla nueva lleva `workspace_id` y RLS forzado.
 4. **"Interfaz administrativa completa":** la importación es un comando de consola. El
    formulario posterior amplía el tablero del cliente y enmienda el ADR 0004,
-   `que-es-leda.md` y la tabla de puertos.
+   `que-es-leda.md` y la tabla de puertos. *El ADR 0017 (decisión 5) lo cambia: una plataforma
+   web con formulario en esta etapa, diseñada en su propio ADR, que enmienda esos documentos.*
 5. **Autoridad de la importación:** quién decide y quién aplica; cumple la invariante de la
    tarea comprometida y la mecánica §13; no recibe el espacio de quien llama (regla 6 de la
-   frontera).
+   frontera). *Resuelto en el ADR 0017 (decisión 2); el ADR de la plataforma fija cómo se
+   cumple.*
 6. **Congelamiento:** el seguimiento de la falta de respuesta, "necesito más tiempo", el
    enlace respuesta-recordatorio y la importación son funcionalidad nueva; el ADR 0017 redefine
-   el congelamiento y el orden del roadmap.
+   el congelamiento y el orden del roadmap. *Resuelto en el ADR 0017 (decisiones 5 y 6).*
 7. **Regla del mozo:** el punto 11 dice que la cocina decide qué se pregunta; darle a la IA
    libertad para llevar la charla lo contradice tal como está escrito. Se enmienda de forma
    explícita.
@@ -305,12 +316,20 @@ Pendientes heredados de la rama congelada que `docs/STATUS.md` deriva a esta lis
   nota), las referencias de línea de este documento van a quedar viejas (conviene contrastar
   contra el símbolo) y la reserva de números de migración no tiene una prueba que la haga
   cumplir.
-- **E1-1, en curso (2026-10-04).** Borrador del ADR 0017 con las decisiones 1 a 4, commit `3a96a3a`.
+- **E1-1 (2026-10-04).** ADR 0017 redactado con el usuario, decisiones 1 a 7 (primer borrador en
+  el commit `3a96a3a`).
   Revisión RDD: el usuario aceptó revisar el rango completo que propuso el sistema (desde `aa32a02`,
   45 archivos y 4256 líneas, con el cierre de `main` ya revisado en tramos), y falló por tamaño
   (`lens_context_budget_exceeded`, linaje `review-91bc5e5ee5e6c06c`, sin autoridad creada). Lo
   posterior a la última revisión (`02fe502..3a96a3a`, sólo documentos, 207 líneas): `gentle-ai
   review assess` da riesgo `passive` y `review_due = false`, así que no requiere revisión.
+  Después de subir `main` (`aa32a02..6f9b9a3`, decisión del usuario), la rama entera desde
+  `6f9b9a3` hasta `014d7fc` (8 archivos, 728 líneas) dio riesgo medio por el cambio en
+  `AGENTS.md`; el usuario aceptó revisarla: linaje `review-d0498e6bf332490c`, un revisor
+  (confiabilidad), aprobada y reconocida. Tres observaciones no bloqueantes: la carga por archivo
+  seguía escrita en este documento, en `docs/STATUS.md` y en `AGENTS.md`, contra la decisión 5
+  (corregido con una nota en cada lugar); faltaba la pregunta 7 en la lista (agregada); y la
+  reserva de números de migración no tiene una prueba que la haga cumplir (ya registrada en E0-4).
 - **Línea base de las garantías (2026-10-04).** `.venv\Scripts\python.exe -m pytest -q -p
   no:cacheprovider` sobre el código del punto de partida (`respaldo-main-antes-de-d`), corrido
   desde la carpeta de `main`: `2286 passed, 333 deselected, 1 warning in 631.96s (0:10:31)`. Mide
@@ -319,6 +338,6 @@ Pendientes heredados de la rama congelada que `docs/STATUS.md` deriva a esta lis
 
 ## Próximo paso
 
-Cerrar el ADR 0017 con el usuario: la pregunta 6 (qué le falta al seguimiento) y la 7 (cómo se
-ajusta `nucleo/`, que edita el usuario). Después, el ADR 0018. Las decisiones 1 a 5 ya están
-escritas en el borrador del ADR.
+Escribir con el usuario el ADR 0018, empezando por la primera pregunta de su lista (qué decide
+la IA y qué decide el código). El ADR 0017 está redactado (decisiones 1 a 7) y espera su
+aceptación en el paso M1.
