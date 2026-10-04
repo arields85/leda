@@ -105,6 +105,8 @@ palabras del usuario: unir todas las piezas del rompecabezas. Ejemplo:
 Con una tarea cargada, en esta etapa Leda hace por chat estas ocho cosas:
 
 1. Avisa un día hábil antes del vencimiento.
+   **Enmienda (usuario, 2026-10-04):** un solo aviso, tres días hábiles antes del vencimiento para
+   CoreWork; es un valor de cada espacio (mínimo, un día hábil). Ver ADR 0018, decisión 9b.
 2. Anota el inicio cuando la persona dice que arrancó.
 3. Persigue los bloqueos (3a).
 4. Contesta qué tiene pendiente cada persona.

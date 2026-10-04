@@ -1,7 +1,8 @@
 # ADR 0018: El motor de conversación
 
 - **Estado:** propuesta. El usuario aceptó su diseño para la prueba el 2026-10-04 (paso M1), con
-  las decisiones 1 a 8. Queda como propuesta hasta que pase la prueba chica de la Etapa 2.
+  las decisiones 1 a 8. Queda como propuesta hasta que pase la prueba chica de la Etapa 2. La
+  decisión 9 (usuario, 2026-10-04) precisa lo que dejaron abierto las conversaciones de prueba.
 - **Fecha:** abierta el 2026-10-04.
 - **Alcance:** cómo procesa Leda cada mensaje y cada toque en el seguimiento por chat (ADR 0017,
   decisión 3): quién decide qué, el estado de la conversación, los circuitos, las situaciones
@@ -65,7 +66,8 @@ de lo que el código informa que pasó.
     - una jugada nueva, que hace algo que Leda no hacía (por ejemplo, pasarle una tarea a otra
       persona), Leda la propone con este aviso y una persona decide si se agrega. Se escribe
       primero como conversación de prueba y después se declara.
-  - Por qué canal llega el aviso y cómo se agrupan los repetidos: `PENDIENTE`.
+  - Por qué canal llega el aviso y cómo se agrupan los repetidos: `PENDIENTE`. Para la prueba
+    chica, lo decide la decisión 9g.
 - **Enmienda la regla del mozo** (`AGENTS.md`, "Cómo pensamos juntos", punto 11). Su núcleo sigue
   vigente: la IA no inventa datos ni efectos, una propuesta suya es una sugerencia, sus
   instrucciones describen su trabajo y no casos, y la cocina no corrige lo que el mozo escuchó con
@@ -148,8 +150,9 @@ genérico de workflows).
 ocho, y casi todas salen de fallas de las pruebas reales:
 
 1. **Cambio de tema:** un tema a la vez, con tres salidas (seguir, retomarlo después o
-   cancelarlo).
+   cancelarlo). Precisada en la decisión 9d: las salidas no se ofrecen como menú.
 2. **Varias cosas en un mensaje:** Leda atiende una y deja anotadas las otras para enseguida.
+   Precisada en la decisión 9d: vale sólo cuando una de ellas necesita una pregunta.
 3. **Corrección:** "no, era la otra tarea".
 4. **Cancelar:** "dejá, no importa".
 5. **Duda:** si Leda no sabe de qué tarea se habla, pregunta con opciones para elegir.
@@ -181,6 +184,13 @@ entender cualquier respuesta en contexto), es lo que los flujos anteriores nunca
 sabían a qué recordatorio respondía la persona) y tiene pocos efectos, todos simples. La entrega
 con aprobación y el bloqueo perseguido van en las pruebas siguientes: el bloqueo perseguido es el
 más importante, pero también el más grande.
+
+> **Enmienda (usuario, 2026-10-04; decisión 9).** El bloqueo entra **con el arranque de la
+> persecución**, no "sin la persecución": Leda pide la causa si falta, pregunta quién se encarga
+> de destrabarlo, propone salidas y avisa al referente (9c). Escribirle a quien se encarga y
+> seguirlo queda para la prueba siguiente. Además, el aviso sale tres días hábiles antes del
+> vencimiento, no "mañana" (9b), y el "se lo recuerda al día siguiente" es la escalera que pide
+> el estado desde el día del vencimiento (9b).
 
 #### 5b. Cuándo se da por aprobada (usuario, 2026-10-04)
 
@@ -277,9 +287,120 @@ pedido de más tiempo). Se trae de la rama congelada el mecanismo del ADR 0016:
   redactor se rehace dentro del motor de conversación (`odd/tasks/motor-de-conversacion.md`, "Qué
   se trae de la rama congelada").
 
+### 9. Precisiones de las conversaciones de prueba (usuario, 2026-10-04)
+
+Las conversaciones de `tests/conversaciones/` dejaron 16 preguntas abiertas (P1 a P16). El
+usuario las decidió el mismo día; acá quedan agrupadas. Principio del usuario: menos pasos, menos
+burocracia, y todo lo que evite un menú y sea conversación es mejor, siempre que se llegue al
+mismo resultado.
+
+#### 9a. El recordatorio no confirma nada (P1, P2, P3)
+
+- **El inicio, el bloqueo y la nueva previsión se anotan directo**, sin vista previa ni
+  confirmación, y también el aviso al referente que sale de la previsión. La respuesta de Leda
+  le dice a la persona qué quedó anotado; si algo está mal, la persona lo dice (situación general
+  3, corrección). En palabras del usuario: anota y le contesta que anotó.
+- **Consecuencia:** el circuito del recordatorio no tiene nada que confirmar. La guarda de la
+  decisión 2 (la confirmación escrita) se prueba con el primer circuito que confirma, la entrega,
+  y no en la prueba chica.
+
+#### 9b. Avisos y tiempos (P4, P6, P12, P15 y el aviso previo)
+
+- **Un solo aviso previo, tres días hábiles antes del vencimiento** para CoreWork, no uno por
+  día. Es un valor de cada espacio en el pack (mecánica §9 permite alargar los intervalos, con un
+  mínimo de un día hábil) y después de la plataforma (`docs/product/plataforma-pendientes.md`);
+  hoy el código lo tiene fijo en un día (`escalera.py`). Una tarea creada con menos de tres días
+  hábiles por delante comprime la escalera, como dice el núcleo. Enmienda el ADR 0017, decisión
+  3b, punto 1.
+- **El aviso previo no pide respuesta** (mecánica §9: sin exigir respuesta). **Desde el
+  recordatorio del día del vencimiento, cada recordatorio pide el estado y espera respuesta**; si
+  no llega, la escalera avanza: el día hábil siguiente, el segundo; a los dos, el tercero, que
+  avisa que se va a escalar; a los tres, el escalamiento. Es la cuenta de quién no contestó
+  (`pending_reply`, ADR 0017, decisión 6). Excepción: una pregunta que Leda hace para entender
+  algo que la persona empezó se puede dejar sin efecto ("dejá, no importa") y Leda no insiste.
+- **Sin botones** en el aviso previo ni en los recordatorios (constitución §8): la prueba mide si
+  Leda entiende el texto libre, y un botón queda viejo. Se pueden sumar después como atajos si la
+  prueba real se siente pesada.
+- **El aviso al referente de una nueva previsión** lleva la tarea, la previsión y su motivo, la
+  fecha comprometida, los días hábiles de atraso y las tareas que dependen de ella (mecánica §4,
+  impacto en cadena). El atraso lo calcula el código, nunca la IA: es importantísimo calcularlo e
+  informarlo, en palabras del usuario. Mientras no exista la plataforma, no dice cómo se cambia la
+  fecha.
+- **Un aviso guardado para salir más tarde** (decisión 8): al enviarlo, el código vuelve a leer
+  la tarea. Si todavía corresponde, se redacta con los hechos de ese momento. Si ya no
+  corresponde, no sale, y la omisión y su motivo quedan registrados (mecánica §12: nunca en
+  silencio). Si el hecho nuevo merece su propio aviso, ése sale con su propia regla.
+
+#### 9c. Bloqueos: "estoy trabado" nunca queda suelto (P9)
+
+1. Sin causa, Leda pide la explicación.
+2. Si la causa depende de otra persona (faltan cables pedidos), anota el bloqueo con su causa,
+   pregunta quién se encarga de destrabarlo y lo anota.
+3. Si la persona no lo puede resolver sola, Leda propone salidas: que alguien ayude, o más
+   tiempo, que es la jugada de la nueva previsión.
+4. Avisa al referente con la causa, el atraso, las tareas que dependen y quién se encarga, si se
+   sabe; si la persona no lo sabe, el referente se entera por el aviso.
+
+La escalera se detiene. Escribirle a quien se encarga y seguirlo (la persecución completa del
+ADR 0017, decisión 3a) queda para la prueba siguiente. Enmienda la decisión 5a. Cómo se guarda
+quién destraba (`PENDIENTE` del ADR 0017, decisión 3a) se resuelve al diseñar las tablas de la
+Etapa 2.
+
+#### 9d. Situaciones generales (P5, P13, P14)
+
+- **Varias cosas en un mensaje:** Leda anota en una sola respuesta todo lo que se puede anotar
+  directo. Si alguna necesita algo (un dato que falta, una duda sobre la tarea), primero anota lo
+  que se resuelve solo y después pregunta una cosa por vez, en el orden en que la persona las
+  dijo. La situación general 2 ("atiende una y deja las otras") vale sólo cuando una de ellas
+  necesita una pregunta.
+- **Cambio de tema mientras Leda espera una respuesta:** las tres salidas existen, pero no se
+  ofrecen como menú. Si lo nuevo se puede anotar directo, Leda lo anota y en la misma respuesta
+  vuelve a la pregunta pendiente, y eso es retomarla; la persona contesta o dice que lo deja
+  (cancelar, sin insistir). Botones sólo si hay una duda real sobre de qué tarea habla (situación
+  general 5, con las tareas como opciones). Sigue valiendo un tema a la vez: nunca dos preguntas
+  juntas. Precisa la situación general 1.
+- `PENDIENTE`: si lo nuevo también necesita una pregunta, cuál de las dos va primero.
+
+#### 9e. Horario: Leda contesta las 24 horas (P10)
+
+Leda está disponible las 24 horas para contestar a quien le escribe; el horario laboral rige sólo
+para los mensajes que Leda manda por su cuenta. Los avisos a otras personas que dispara ese
+mensaje esperan al horario (las 09:00 del día hábil siguiente), y Leda se lo dice a la persona.
+En palabras del usuario: Leda respeta el horario para enviar mensajes, no para responder si
+alguien le pregunta. Es la lectura del usuario de la constitución §8 ("escribe fuera del
+horario"), en línea con la mecánica §10, que separa la respuesta del mensaje automático.
+
+#### 9f. Correcciones: se agrega, no se borra (P11)
+
+Un hecho anotado en la tarea equivocada se corrige **agregando un hecho de corrección**: la tarea
+vuelve a su estado anterior y el hecho va a la tarea correcta. No se borra nada; los dos quedan
+en la historia (constitución §12; el estado es una proyección de los eventos). Si el error generó
+un aviso que todavía no salió, sale corregido; si ya salió, el referente recibe una corrección
+breve.
+
+#### 9g. Lo que no está en la lista (P7, P8, P16)
+
+- **El aviso al administrador** llega por el bot de administración. En la prueba chica no se
+  agrupan los repetidos. A la persona no se le dice que se avisó, salvo que lo pregunte (la misma
+  lógica de la constitución §9 sobre el registro de las conversaciones). Leda dice qué puede
+  hacer y, si se sabe, quién se ocupa de eso.
+- **La IA conoce las ocho cosas por chat** del ADR 0017 (decisión 3b), pero en la prueba chica
+  sólo se ejecutan las del recordatorio (inicio, nueva previsión, bloqueo) y "qué tengo
+  pendiente", que sólo lee y ya existe. "Ya la terminé" se reconoce como una entrega: Leda dice
+  con honestidad que todavía no la puede recibir por acá, y no avisa al administrador (es
+  conocida, no una situación nueva).
+- **Un pedido de reasignación** ("pasale lo del PLC a Nahuel"): Leda dice que no lo puede hacer y
+  quién lo decide (en CoreWork, Ismael, que aprueba el trabajo de Marcos y es la autoridad del
+  espacio). No pasa el pedido (pasar pedidos espera; ADR 0017, decisión 1) y no avisa al
+  administrador: es una exclusión deliberada, como la entrega. Si el motivo es que no llega a
+  tiempo, ofrece anotar una nueva previsión.
+
 ## Consecuencias
 
 - **Decisión 1:** cada jugada de la lista y cada situación general se declaran y se prueban una
   vez; sumar un circuito es declarar sus jugadas, no escribir ramas.
 - **Decisión 1:** al aceptar este ADR (tarea E1-4), el punto 11 de `AGENTS.md` se reescribe con la
   enmienda.
+- **Decisión 9:** el plan de la Etapa 2 parte de un recordatorio sin confirmaciones; el aviso
+  previo deja de ser fijo en `escalera.py` y pasa a ser un valor del pack; el bloqueo de la prueba
+  chica suma el arranque de la persecución.
