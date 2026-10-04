@@ -43,9 +43,10 @@ falla y el usuario frenó el parcheo. El análisis y sus fuentes están en
    etiqueta `respaldo-flujos-antes-de-d` y no se arreglan.
 6. Los botones son atajos: lo que hace un botón también vale escrito.
 7. Un tema a la vez: ante un cambio de tema, Leda recuerda lo abierto y ofrece seguir, retomarlo
-   después o cancelarlo. Quien confirma puede "Rechazar" o "Rechazar y cancelar". Estas dos
-   decisiones nacieron en el alta (tarea 0-36, en pausa en la etiqueta
-   `respaldo-0-36-en-pausa`); la primera pasa al motor de conversación como situación general.
+   después o cancelarlo. Nació en el alta por chat (tarea 0-36, detenida; su trabajo parcial
+   quedó archivado en la etiqueta `respaldo-0-36-en-pausa`, sólo para consulta) y pasa al motor
+   de conversación como situación general. La otra decisión de esa tarea, "Rechazar y
+   cancelar", era del alta por chat y queda fuera del alcance por ahora.
 
 ## Reglas de trabajo de la unidad
 
