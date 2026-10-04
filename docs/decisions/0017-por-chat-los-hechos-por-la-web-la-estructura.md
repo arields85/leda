@@ -51,8 +51,8 @@ Se reevalúa si una prueba real muestra que los pedidos derivados se pierden.
 
 En la primera etapa del Motor ninguna persona del equipo crea tareas. Las crea a mano el
 administrador de plataforma designado. Las personas del equipo las cumplen y Leda hace el
-seguimiento: recordatorios, cadencias, bloqueos. La carga de tareas no se diseña en esta etapa:
-cuando Leda responda bien en el seguimiento, se le agregan capacidades.
+seguimiento: recordatorios, cadencias, bloqueos. En esta etapa se construye la plataforma donde el
+administrador carga las tareas y donde se ve qué tareas hay y en qué estado están (decisión 5).
 
 Condiciones de la carga (usuario, 2026-10-04):
 
@@ -133,9 +133,29 @@ le pregunta al referente si acepta la nueva fecha y, si confirma, la cambia ella
 confirmación humana que la constitución §7 exige para un cambio de fecha objetivo. No se hace en
 esta etapa: es cambiar la estructura por chat y la operación no existe.
 
-### 5 a 7. `PENDIENTE`
+### 5. En esta etapa se construyen el seguimiento y la plataforma de tareas; lo demás espera (usuario, 2026-10-04)
 
-5. El criterio del congelamiento de funcionalidad nueva y el orden del roadmap.
+- **Se construyen dos cosas:** el seguimiento por chat (decisión 3) y la plataforma donde el
+  administrador carga las tareas y donde se ve qué tareas hay y en qué estado están.
+- **Todo lo demás espera.** Va a la lista "Anotado para más adelante" de
+  `odd/tasks/motor-de-conversacion.md` y no se construye hasta que Leda haga bien el seguimiento en
+  pruebas reales por Telegram. Qué cuenta como "bien" se fija en el ADR 0018, con los criterios de
+  la prueba. El orden de esa lista se decide al llegar a ese punto.
+- **Reemplaza el congelamiento de funcionalidad nueva del 2026-09-30**, cuyo criterio para
+  levantarse nombraba el alta por chat.
+- **Cambia lo que `AGENTS.md` dejaba para después:** la carga de tareas como formulario y el
+  tablero. Se actualiza al aceptar este ADR (tarea E1-4).
+- `PENDIENTE`: cómo carga las tareas el administrador (un archivo o un formulario web) y quién ve
+  la plataforma.
+
+Qué existe hoy: un tablero web de sólo lectura, al que cada persona entra con un enlace propio,
+que muestra el avance de los objetivos, cuántas tareas hay en cada estado, la carga por persona,
+las tareas vencidas, los bloqueos abiertos y lo que espera aprobación (`GET /tablero/{token}`). No
+muestra la lista de tareas con su estado. Para cargar tareas sólo existe `sembrar`, que es un
+cargador de datos ficticios (decisión 2, consecuencias).
+
+### 6 y 7. `PENDIENTE`
+
 6. Qué le falta al seguimiento antes de usarlo: enlazar la respuesta con el recordatorio que la
    originó, seguir la falta de respuesta (`pending_reply`), la conversación de bloqueos
    (mecánica §8) y los textos de recordatorios y cadencias, hoy fijos en el código.

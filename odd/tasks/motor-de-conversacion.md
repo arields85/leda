@@ -139,6 +139,10 @@ Una por vez. Para el ADR 0017:
    2026-10-04):** Leda anota la nueva previsión y avisa al referente, sin cambiar la fecha; si
    el referente acepta, la cambia a mano el administrador (ADR 0017, decisión 4).
 5. El criterio del congelamiento de funcionalidad nueva, que nombraba el alta por chat.
+   **Resuelta en parte (usuario, 2026-10-04):** en esta etapa se construyen el seguimiento y la
+   plataforma para cargar tareas y ver su estado; lo demás espera a que Leda haga bien el
+   seguimiento en pruebas reales (ADR 0017, decisión 5). Falta cómo carga el administrador y
+   quién ve la plataforma.
 6. Qué le falta al seguimiento antes de usarlo: enlazar la respuesta con el recordatorio que la
    originó, seguir la falta de respuesta (`pending_reply`), la conversación de bloqueos
    (mecánica §8) y los textos de recordatorios y cadencias, hoy fijos en el código.
@@ -298,6 +302,12 @@ Pendientes heredados de la rama congelada que `docs/STATUS.md` deriva a esta lis
   nota), las referencias de línea de este documento van a quedar viejas (conviene contrastar
   contra el símbolo) y la reserva de números de migración no tiene una prueba que la haga
   cumplir.
+- **E1-1, en curso (2026-10-04).** Borrador del ADR 0017 con las decisiones 1 a 4, commit `3a96a3a`.
+  Revisión RDD: el usuario aceptó revisar el rango completo que propuso el sistema (desde `aa32a02`,
+  45 archivos y 4256 líneas, con el cierre de `main` ya revisado en tramos), y falló por tamaño
+  (`lens_context_budget_exceeded`, linaje `review-91bc5e5ee5e6c06c`, sin autoridad creada). Lo
+  posterior a la última revisión (`02fe502..3a96a3a`, sólo documentos, 207 líneas): `gentle-ai
+  review assess` da riesgo `passive` y `review_due = false`, así que no requiere revisión.
 - **Línea base de las garantías (2026-10-04).** `.venv\Scripts\python.exe -m pytest -q -p
   no:cacheprovider` sobre el código del punto de partida (`respaldo-main-antes-de-d`), corrido
   desde la carpeta de `main`: `2286 passed, 333 deselected, 1 warning in 631.96s (0:10:31)`. Mide
@@ -306,5 +316,6 @@ Pendientes heredados de la rama congelada que `docs/STATUS.md` deriva a esta lis
 
 ## Próximo paso
 
-Seguir el ADR 0017 con el usuario por la pregunta 5: el criterio del congelamiento de
-funcionalidad nueva. Las decisiones 1 a 4 ya están escritas en el borrador del ADR.
+Seguir el ADR 0017 con el usuario: cómo carga las tareas el administrador (un archivo o un
+formulario web) y quién ve la plataforma (decisión 5, `PENDIENTE`). Las decisiones 1 a 5 ya están
+escritas en el borrador del ADR.
