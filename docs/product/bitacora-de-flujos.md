@@ -135,8 +135,15 @@ Se arreglan dentro de la regla (0-34).
 - **Auditorías independientes:** después de que un escritor dice "cumple", siempre va una
   auditoría de otro revisor. Primera (6f85bf9): 10 textos fijos y 4 casos del mozo;
   segunda (a8f4aba): 4 y 3 de severidad baja; tercera (3e5bcb3): 4 y 3, de borde. Cuarta
-  (f7dce94): 3 y 3, con el bucle del borrador devuelto de nuevo → rediseño (0-35). Los
-  controles automáticos que escribe el mismo escritor tienen sus mismos puntos ciegos.
+  (f7dce94): 3 y 3, con el bucle del borrador devuelto de nuevo → rediseño (0-35). Quinta
+  (bb1ee18, sobre el rediseño): "sí, con reservas"; el bucle no volvió. 7 hallazgos: una
+  propuesta de la IA pisaba un dato confirmado (medio; contra la regla del mozo: una
+  propuesta se acepta, no se guarda sola), el devuelto que esperaba otro borrador volvía
+  en silencio (medio-bajo), 4 bajos (guardas, instrucción sin describir todos los hechos,
+  líneas del resumen repetidas, "Pendiente:" con una oración) y la redacción de
+  `PIDE_ELEGIR` y `PIDE_QUE_CAMBIAR`, que se mira en la prueba real. Arreglados los otros
+  6 en `df761db`, `ba3269d` y `24e92ce`, con el mecanismo y no el caso. Los controles
+  automáticos que escribe el mismo escritor tienen sus mismos puntos ciegos.
 
 ## Modelos
 
