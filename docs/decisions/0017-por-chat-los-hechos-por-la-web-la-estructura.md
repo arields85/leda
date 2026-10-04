@@ -118,17 +118,17 @@ Lo que define la estructura del trabajo (crear, aceptar, reasignar) queda fuera 
 
 Ejemplo: el 18, Ismael escribe "No llego al 20, necesito hasta el 27, el proveedor se demoró".
 
-- **Leda anota la nueva previsión y su motivo** (el 27, el proveedor) como un hecho, y le avisa al
-  referente. El mecanismo de avisos a otras personas está `PENDIENTE` en el ADR 0018.
+- **Leda anota la nueva previsión y su motivo** (el 27, el proveedor) como un hecho.
+- **El referente se entera por los dos lados** (usuario, 2026-10-04): Leda le avisa por chat en el
+  momento, y el pedido aparece además en la plataforma, que es donde se cambia la fecha. Así nada
+  se atrasa en silencio aunque nadie entre a la plataforma. El mecanismo de avisos a otras
+  personas está `PENDIENTE` en el ADR 0018.
 - **La fecha comprometida no cambia:** sigue siendo el 20.
 - **Los recordatorios siguen contra la fecha comprometida**, y la IA recibe como hechos la previsión
   y que el referente está avisado: no le habla a Ismael como si no hubiera dicho nada.
 - **Si el referente acepta correr la fecha, la cambia el administrador desde la plataforma**
   (decisión 5). Hoy esa operación no existe: la fecha de una tarea comprometida queda fija en el
   esquema.
-- `PENDIENTE`: si el aviso de que alguien pidió más tiempo le llega al referente por chat o
-  aparece en la plataforma (el usuario dijo, el 2026-10-04, que los cambios de fecha por retrasos
-  se hacen desde la plataforma).
 - **Si el motivo es un bloqueo,** Leda además lo persigue (3a).
 
 **Pendiente para el futuro, por pedido del usuario: Leda cambia la fecha con confirmación.** Leda
@@ -152,11 +152,11 @@ esta etapa: es cambiar la estructura por chat y la operación no existe.
 - **Cambia lo que `AGENTS.md` dejaba para después:** la interfaz administrativa, la carga de tareas
   por formulario y el tablero. Esta es la decisión explícita que `AGENTS.md` pedía; se actualiza
   al aceptar este ADR (tarea E1-4).
-- **Su diseño va en un ADR propio, antes del código:** quién entra, cómo se identifica, qué puede
-  hacer cada uno, y cómo se cumplen el aislamiento entre espacios y la auditoría en una superficie
-  web que escribe en la base.
-- `PENDIENTE`: quién entra a la plataforma y qué ve cada uno; si la prueba chica de la Etapa 2
-  espera a la plataforma o usa tareas ficticias cargadas de otra forma.
+- **Su diseño va en un ADR propio, antes del código:** quién entra, cómo se identifica, qué ve y qué
+  puede hacer cada uno, y cómo se cumplen el aislamiento entre espacios y la auditoría en una
+  superficie web que escribe en la base.
+- `PENDIENTE`: si la prueba chica de la Etapa 2 espera a la plataforma o usa tareas ficticias
+  cargadas de otra forma.
 
 Qué existe hoy: un tablero web de sólo lectura, al que cada persona entra con un enlace propio,
 que muestra el avance de los objetivos, cuántas tareas hay en cada estado, la carga por persona,
