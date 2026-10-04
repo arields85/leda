@@ -265,7 +265,7 @@ aclaraciones, conversación de bloqueos.
 **Resultados y conclusión vigente de los flujos y modelos:** [`product/bitacora-de-flujos.md`](product/bitacora-de-flujos.md) (elegido: C6 con la regla del mozo, con GPT-6 sol).
 
 **Punto exacto para retomar (2026-10-04).** Rama `feat/flujo-de-un-mensaje`, worktree
-`D:\Proyectos\Leda-PM-worktreeslujo-de-un-mensaje`, HEAD con 0-34 construido (suite
+`D:\Proyectos\Leda-PM-worktrees\flujo-de-un-mensaje`, HEAD con 0-34 construido (suite
 completa 3959 passed, RDD aprobado) y la cuarta auditoría registrada. **Lo primero: la tarea
 0-35, rediseño del borrador devuelto**, aprobada por el usuario el 2026-10-04 (diseño, motivo y
 alcance en `odd/tasks/circuitos-al-flujo-nuevo.md`, tarea 0-35): escribir el chequeo de rumbo,
