@@ -139,10 +139,11 @@ Una por vez. Para el ADR 0017:
    2026-10-04):** Leda anota la nueva previsión y avisa al referente, sin cambiar la fecha; si
    el referente acepta, la cambia a mano el administrador (ADR 0017, decisión 4).
 5. El criterio del congelamiento de funcionalidad nueva, que nombraba el alta por chat.
-   **Resuelta en parte (usuario, 2026-10-04):** en esta etapa se construyen el seguimiento y la
-   plataforma para cargar tareas y ver su estado; lo demás espera a que Leda haga bien el
-   seguimiento en pruebas reales (ADR 0017, decisión 5). Falta cómo carga el administrador y
-   quién ve la plataforma.
+   **Resuelta en parte (usuario, 2026-10-04):** en esta etapa se construyen el seguimiento y una
+   plataforma web donde se maneja la estructura del trabajo (cargar tareas con un formulario, ver
+   su estado, cambiar fechas por retrasos, gestionar integrantes); lo demás espera a que Leda
+   haga bien el seguimiento en pruebas reales (ADR 0017, decisión 5). Falta quién entra a la
+   plataforma y si la prueba chica la espera.
 6. Qué le falta al seguimiento antes de usarlo: enlazar la respuesta con el recordatorio que la
    originó, seguir la falta de respuesta (`pending_reply`), la conversación de bloqueos
    (mecánica §8) y los textos de recordatorios y cadencias, hoy fijos en el código.
@@ -316,6 +317,6 @@ Pendientes heredados de la rama congelada que `docs/STATUS.md` deriva a esta lis
 
 ## Próximo paso
 
-Seguir el ADR 0017 con el usuario: cómo carga las tareas el administrador (un archivo o un
-formulario web) y quién ve la plataforma (decisión 5, `PENDIENTE`). Las decisiones 1 a 5 ya están
-escritas en el borrador del ADR.
+Seguir el ADR 0017 con el usuario: si el aviso de un pedido de más tiempo llega por chat o
+aparece en la plataforma (decisión 4), quién entra a la plataforma y si la prueba chica la espera
+(decisión 5). Las decisiones 1 a 5 ya están escritas en el borrador del ADR.

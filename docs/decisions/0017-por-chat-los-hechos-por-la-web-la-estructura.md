@@ -50,7 +50,7 @@ Se reevalúa si una prueba real muestra que los pedidos derivados se pierden.
 ### 2. En esta etapa, las tareas las crea a mano el administrador (usuario, 2026-10-04)
 
 En la primera etapa del Motor ninguna persona del equipo crea tareas. Las crea a mano el
-administrador de plataforma designado. Las personas del equipo las cumplen y Leda hace el
+administrador de plataforma designado, desde la plataforma web (decisión 5). Las personas del equipo las cumplen y Leda hace el
 seguimiento: recordatorios, cadencias, bloqueos. En esta etapa se construye la plataforma donde el
 administrador carga las tareas y donde se ve qué tareas hay y en qué estado están (decisión 5).
 
@@ -123,9 +123,12 @@ Ejemplo: el 18, Ismael escribe "No llego al 20, necesito hasta el 27, el proveed
 - **La fecha comprometida no cambia:** sigue siendo el 20.
 - **Los recordatorios siguen contra la fecha comprometida**, y la IA recibe como hechos la previsión
   y que el referente está avisado: no le habla a Ismael como si no hubiera dicho nada.
-- **Si el referente acepta correr la fecha, la cambia a mano el administrador**, como la carga de
-  tareas (decisión 2). Hoy esa operación no existe: la fecha de una tarea comprometida queda fija
-  en el esquema. Cómo la cambia el administrador no se diseña en esta etapa.
+- **Si el referente acepta correr la fecha, la cambia el administrador desde la plataforma**
+  (decisión 5). Hoy esa operación no existe: la fecha de una tarea comprometida queda fija en el
+  esquema.
+- `PENDIENTE`: si el aviso de que alguien pidió más tiempo le llega al referente por chat o
+  aparece en la plataforma (el usuario dijo, el 2026-10-04, que los cambios de fecha por retrasos
+  se hacen desde la plataforma).
 - **Si el motivo es un bloqueo,** Leda además lo persigue (3a).
 
 **Pendiente para el futuro, por pedido del usuario: Leda cambia la fecha con confirmación.** Leda
@@ -135,18 +138,25 @@ esta etapa: es cambiar la estructura por chat y la operación no existe.
 
 ### 5. En esta etapa se construyen el seguimiento y la plataforma de tareas; lo demás espera (usuario, 2026-10-04)
 
-- **Se construyen dos cosas:** el seguimiento por chat (decisión 3) y la plataforma donde el
-  administrador carga las tareas y donde se ve qué tareas hay y en qué estado están.
+- **Se construyen dos cosas:** el seguimiento por chat (decisión 3) y una plataforma web.
+- **La plataforma es donde se maneja la estructura del trabajo:** se cargan las tareas con un
+  formulario, se ve qué tareas hay y en qué estado están, se cambian las fechas por retrasos, se
+  gestionan los integrantes y lo demás que define la estructura. Se descartó, por decisión del
+  usuario, cargar las tareas con una planilla y un comando, que era más rápido de construir.
 - **Todo lo demás espera.** Va a la lista "Anotado para más adelante" de
   `odd/tasks/motor-de-conversacion.md` y no se construye hasta que Leda haga bien el seguimiento en
   pruebas reales por Telegram. Qué cuenta como "bien" se fija en el ADR 0018, con los criterios de
   la prueba. El orden de esa lista se decide al llegar a ese punto.
 - **Reemplaza el congelamiento de funcionalidad nueva del 2026-09-30**, cuyo criterio para
   levantarse nombraba el alta por chat.
-- **Cambia lo que `AGENTS.md` dejaba para después:** la carga de tareas como formulario y el
-  tablero. Se actualiza al aceptar este ADR (tarea E1-4).
-- `PENDIENTE`: cómo carga las tareas el administrador (un archivo o un formulario web) y quién ve
-  la plataforma.
+- **Cambia lo que `AGENTS.md` dejaba para después:** la interfaz administrativa, la carga de tareas
+  por formulario y el tablero. Esta es la decisión explícita que `AGENTS.md` pedía; se actualiza
+  al aceptar este ADR (tarea E1-4).
+- **Su diseño va en un ADR propio, antes del código:** quién entra, cómo se identifica, qué puede
+  hacer cada uno, y cómo se cumplen el aislamiento entre espacios y la auditoría en una superficie
+  web que escribe en la base.
+- `PENDIENTE`: quién entra a la plataforma y qué ve cada uno; si la prueba chica de la Etapa 2
+  espera a la plataforma o usa tareas ficticias cargadas de otra forma.
 
 Qué existe hoy: un tablero web de sólo lectura, al que cada persona entra con un enlace propio,
 que muestra el avance de los objetivos, cuántas tareas hay en cada estado, la carga por persona,
