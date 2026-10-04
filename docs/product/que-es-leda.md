@@ -79,8 +79,9 @@ distancia. El razonamiento completo está en
 El [ADR 0017](../decisions/0017-por-chat-los-hechos-por-la-web-la-estructura.md) recorta lo de
 arriba a una regla: *por chat, los hechos del trabajo; por la web, su estructura.*
 
-**Por chat, las ocho cosas del seguimiento** (decisión 3b): avisar un día hábil antes del
-vencimiento; anotar el inicio; perseguir los bloqueos hasta quien puede destrabarlos
+**Por chat, las ocho cosas del seguimiento** (decisión 3b): avisar antes del
+vencimiento (un solo aviso, tres días hábiles antes en CoreWork, configurable por espacio; ADR 0018,
+decisión 9b); anotar el inicio; perseguir los bloqueos hasta quien puede destrabarlos
 (decisión 3a); contestar qué tiene pendiente cada persona; pedir estado según las cadencias;
 recordar y escalar si pasa la fecha sin respuesta; recibir la entrega con su evidencia; y recibir
 la aprobación o el pedido de cambios.
