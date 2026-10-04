@@ -174,8 +174,9 @@ Las que definen el producto se resuelven en los ADR 0017 y 0018 ("Próximo paso"
 
 - **Respaldo o push de lo que no está subido.** Hoy vive en un solo disco: la rama congelada
   `feat/flujo-de-un-mensaje` (92 commits sin subir hasta su etiqueta, 7 con líneas de atribución),
-  `main` (20 commits sin subir, ya sin líneas de atribución), los commits del aviso de congelamiento
-  de las dos ramas congeladas y las etiquetas nuevas. Recomendación del agente para la rama
+  `main` (20 commits sin subir, ya sin líneas de atribución), la rama del Motor (todos sus commits
+  propios), los commits del aviso de congelamiento de las dos ramas congeladas y las etiquetas
+  nuevas. Recomendación del agente para la rama
   `feat/flujo-de-un-mensaje`: no reescribirla, porque los documentos citan sus hashes, y guardarla
   con `git bundle`. Subir o no lo decide el usuario.
 - **Un bot de Telegram de prueba para la rama nueva.** Hay un solo listener por bot, y uno abierto
