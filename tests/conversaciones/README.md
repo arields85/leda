@@ -18,7 +18,8 @@ El circuito es el recordatorio y lo que la persona contesta (ADR 0018, decisión
 2. [`02-nueva-prevision.md`](02-nueva-prevision.md): "llego el 27, el proveedor se demoró"; la fecha
    comprometida no cambia y el referente se entera, con el atraso y lo que depende.
 3. [`03-bloqueo.md`](03-bloqueo.md): "estoy trabado, falta el repuesto"; Leda pregunta quién se encarga,
-   propone salidas y avisa al referente; la escalera se detiene.
+   repite la pregunta al día hábil siguiente y propone salidas, sin avisar al referente; la escalera se
+   detiene.
 4. [`04-sin-respuesta.md`](04-sin-respuesta.md): no contesta; desde el vencimiento Leda pide el estado y la
    escalera avanza hasta escalar.
 5. [`05-varias-cosas.md`](05-varias-cosas.md): dos hechos de dos tareas en un mensaje, y después uno que
@@ -152,18 +153,19 @@ Las conversaciones dejaban 16 preguntas abiertas (P1 a P16). El usuario las deci
   se le dice salvo que pregunte (9g).
 - **P8.** Se ejecutan el inicio, la previsión, el bloqueo y "qué tengo pendiente"; "ya la terminé" se reconoce
   y Leda dice que todavía no la recibe por acá, sin avisar al administrador (9g).
-- **P9.** "Estoy trabado": Leda pide la causa si falta, pregunta quién se encarga, propone salidas y avisa al
-  referente; la escalera se detiene (9c).
+- **P9.** "Estoy trabado": Leda pide la causa si falta, pregunta quién se encarga (y la repite si no hay
+  respuesta) y propone salidas; el referente se entera sólo por un escalamiento (9c, corregida el mismo día).
 - **P10.** Leda contesta las 24 horas; los avisos a otros esperan al horario y Leda lo dice (9e).
 - **P11.** Un hecho en la tarea equivocada se corrige agregando un hecho de corrección (9f).
 - **P12.** El aviso previo, uno solo y tres días hábiles antes, no pide respuesta; desde el vencimiento, cada
   recordatorio pide el estado y la escalera avanza si no hay respuesta (9b).
 - **P13 y P14.** Ante un cambio de tema, Leda anota lo nuevo si es directo y vuelve en la misma respuesta a la
-  pregunta pendiente, sin menú (9d).
+  pregunta pendiente, sin menú; si lo nuevo también pide una pregunta, sigue a la persona y vuelve después
+  (9d).
 - **P15.** Un aviso guardado se vuelve a leer al salir: si ya no corresponde, no sale y se registra la
-  omisión (9b).
+  omisión; si la previsión volvió a la fecha comprometida, tampoco sale otro (9b).
 - **P16.** Una reasignación: Leda dice que no puede y que la decide Ismael, no pasa el pedido ni avisa al
   administrador, y ofrece anotar una nueva previsión si el motivo es el tiempo (9g).
 
-Lo que estas decisiones no cerraron queda como `PENDIENTE` en la conversación que lo toca (la 03 y la 11) y
-en el ADR 0018, decisión 9d.
+Los tres puntos que estas decisiones dejaron abiertos los decidió el usuario el mismo día (ADR 0018, 9b, 9c
+y 9d). Ninguna conversación prueba todavía dos preguntas encadenadas por un cambio de tema.

@@ -64,8 +64,8 @@ decisión 4, situación general 2, con la precisión de la decisión 9d.
    - Jugadas: la respuesta a la pregunta abierta: la causa del bloqueo, que depende de otra persona, y quién
      se encarga (Martín, que Marcos nombra).
    - Efecto: el bloqueo abierto en la tarea del PLC, con su causa y con Martín como quien se encarga; la
-     tarea pasa a `bloqueada` y su escalera se detiene. Lo que sigue (las salidas que Leda propone y el aviso
-     a Ismael con Martín como quien se encarga) es como en la conversación 03, pasos 3 y 4.
+     tarea pasa a `bloqueada` y su escalera se detiene. Ningún aviso a Ismael por el bloqueo (decisión 9c,
+     paso 4). Lo que sigue (las salidas que Leda propone) es como en la conversación 03, paso 5.
    - La respuesta no dice: que Leda le escribió a Martín (eso es la prueba siguiente).
 
 ## Qué mide

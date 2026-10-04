@@ -61,7 +61,7 @@ general 1, con la precisión de la decisión 9d.
    - Jugadas: la respuesta a la pregunta abierta: la causa del bloqueo de la tarea del PLC.
    - Efecto: el bloqueo abierto, con su causa; la tarea del PLC pasa a `bloqueada` y su escalera se detiene.
    - Lo que sigue es como en la conversación 03 (decisión 9c): Leda pregunta quién se encarga de
-     conseguirlo, propone salidas y avisa a Ismael.
+     conseguirlo y propone salidas; Ismael no recibe un aviso por el bloqueo.
 
 ## Qué mide
 

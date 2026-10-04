@@ -187,7 +187,8 @@ más importante, pero también el más grande.
 
 > **Enmienda (usuario, 2026-10-04; decisión 9).** El bloqueo entra **con el arranque de la
 > persecución**, no "sin la persecución": Leda pide la causa si falta, pregunta quién se encarga
-> de destrabarlo, propone salidas y avisa al referente (9c). Escribirle a quien se encarga y
+> de destrabarlo y propone salidas (9c; el aviso al referente que decía esta enmienda se corrigió
+> el mismo día: el referente se entera sólo por un escalamiento). Escribirle a quien se encarga y
 > seguirlo queda para la prueba siguiente. Además, el aviso sale tres días hábiles antes del
 > vencimiento, no "mañana" (9b), y el "se lo recuerda al día siguiente" es la escalera que pide
 > el estado desde el día del vencimiento (9b).
@@ -330,21 +331,36 @@ mismo resultado.
   la tarea. Si todavía corresponde, se redacta con los hechos de ese momento. Si ya no
   corresponde, no sale, y la omisión y su motivo quedan registrados (mecánica §12: nunca en
   silencio). Si el hecho nuevo merece su propio aviso, ése sale con su propia regla.
+- **Una previsión que vuelve a la fecha comprometida antes de que salga el aviso guardado** no
+  genera aviso al referente (usuario, 2026-10-04): para él no cambió nada y sería ruido. La
+  historia guarda la previsión, su corrección y el aviso que no salió, con su motivo.
 
 #### 9c. Bloqueos: "estoy trabado" nunca queda suelto (P9)
 
 1. Sin causa, Leda pide la explicación.
 2. Si la causa depende de otra persona (faltan cables pedidos), anota el bloqueo con su causa,
-   pregunta quién se encarga de destrabarlo y lo anota.
+   pregunta quién se encarga de destrabarlo y lo anota. Esa pregunta espera respuesta como un
+   pedido de estado (9b), no como las que se pueden dejar sin efecto: si no llega, Leda la repite
+   el día hábil siguiente y sigue la misma escalera de quien no contestó. Si la persona no sabe,
+   queda anotado que no se sabe; averiguarlo con otros es la persecución, de la prueba siguiente.
 3. Si la persona no lo puede resolver sola, Leda propone salidas: que alguien ayude, o más
    tiempo, que es la jugada de la nueva previsión.
-4. Avisa al referente con la causa, el atraso, las tareas que dependen y quién se encarga, si se
-   sabe; si la persona no lo sabe, el referente se entera por el aviso.
+4. **El referente no recibe un aviso por el bloqueo.** Leda lo trabaja con la persona, para
+   destrabarlo sin llevarle el problema al referente (constitución §3: los referentes no
+   persiguen avances). El referente se entera sólo por un escalamiento (mecánica §8): un bloqueo
+   abierto más días que los del pack (ya existe en el código) o la escalera de la pregunta del
+   paso 2 agotada sin respuesta. El aviso de una nueva previsión sigue (9b): la fecha comprometida
+   la decide el referente (ADR 0017, decisión 4).
 
-La escalera se detiene. Escribirle a quien se encarga y seguirlo (la persecución completa del
-ADR 0017, decisión 3a) queda para la prueba siguiente. Enmienda la decisión 5a. Cómo se guarda
-quién destraba (`PENDIENTE` del ADR 0017, decisión 3a) se resuelve al diseñar las tablas de la
-Etapa 2.
+> **Corrección (usuario, 2026-10-04).** Más temprano ese mismo día, el paso 4 decía que Leda
+> avisaba al referente con la causa, el atraso, las tareas que dependen y quién se encarga. El
+> usuario lo corrigió: la idea es que Leda ayude a solucionar el inconveniente y no le lleve
+> problemas al referente, que con ese aviso sólo ganaba tener que actuar.
+
+La escalera de recordatorios de la tarea se detiene. Escribirle a quien se encarga y seguirlo
+(la persecución completa del ADR 0017, decisión 3a) queda para la prueba siguiente. Enmienda la
+decisión 5a. Cómo se guarda quién destraba (`PENDIENTE` del ADR 0017, decisión 3a) se resuelve
+al diseñar las tablas de la Etapa 2.
 
 #### 9d. Situaciones generales (P5, P13, P14)
 
@@ -359,7 +375,10 @@ Etapa 2.
   (cancelar, sin insistir). Botones sólo si hay una duda real sobre de qué tarea habla (situación
   general 5, con las tareas como opciones). Sigue valiendo un tema a la vez: nunca dos preguntas
   juntas. Precisa la situación general 1.
-- `PENDIENTE`: si lo nuevo también necesita una pregunta, cuál de las dos va primero.
+- **Si lo nuevo también necesita una pregunta, Leda sigue a la persona** (usuario, 2026-10-04):
+  pregunta por lo nuevo; la pregunta pendiente queda para después (la guarda el estado por
+  persona, decisión 3) y, cuando lo nuevo se cierra, Leda vuelve a ella. Nunca dos preguntas
+  juntas.
 
 #### 9e. Horario: Leda contesta las 24 horas (P10)
 

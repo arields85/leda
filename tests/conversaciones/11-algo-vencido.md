@@ -72,8 +72,10 @@ confirma, queda abajo, en "Para la prueba de la entrega".
    - Efecto: el código vuelve a leer la tarea (decisión 9b). La previsión del 4 ya no existe, así que el
      aviso ya no corresponde: no sale, y la omisión y su motivo quedan registrados (mecánica §12: nunca en
      silencio). Nunca sale un aviso que diga que Marcos llega el 4.
-   - PENDIENTE: si una previsión que vuelve a la fecha comprometida merece su propio aviso a Ismael (que
-     nunca recibió el del 4). Si lo merece, sale con su propia regla (decisión 9b).
+   - Tampoco sale un aviso de que la previsión volvió al viernes 30: para Ismael, que nunca recibió el del
+     4, no cambió nada (decisión 9b). La historia guarda la previsión del 4, su corrección y el aviso que no
+     salió, con su motivo.
+   - Estado de Ismael después: sin tema abierto; ningún mensaje en el outbox para él.
 
 ## Qué mide
 
