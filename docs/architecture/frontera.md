@@ -1,11 +1,14 @@
 # La frontera
 
-> **Nota del 2026-10-04.** El usuario recortó el alcance de la superficie conversacional (por
-> ahora Leda no crea tareas ni objetivos por chat; ver [`../STATUS.md`](../STATUS.md)) y la capa
-> de conversación pasa a un motor nuevo, cuyo lugar en esta frontera está `PENDIENTE` en el
-> ADR 0018. Además, la tabla de adaptadores quedó atrasada en un punto: el tablero de cliente
-> existe hoy como una vista de sólo lectura por enlace personal (`GET /tablero/{token}`). Las
-> tablas de puertos y de adaptadores se actualizan cuando se acepte el ADR 0017.
+> **Nota del 2026-10-04, actualizada después del paso M1.** El
+> [ADR 0017](../decisions/0017-por-chat-los-hechos-por-la-web-la-estructura.md) (aceptado) recortó
+> la superficie conversacional: por chat, Leda registra hechos del trabajo (el seguimiento); la
+> estructura (crear, aceptar o reasignar tareas, cambiar fechas, gestionar integrantes) va a una
+> plataforma web que lleva su propio ADR antes del código. El
+> [ADR 0018](../decisions/0018-motor-de-conversacion.md) (propuesta; diseño aceptado para la
+> prueba) diseña el motor de conversación que reemplaza a los flujos A y B. Ese motor **no está
+> construido**: su lugar en esta frontera está en "El motor de conversación", más abajo. Las tablas
+> de puertos y de adaptadores ya reflejan los dos ADR.
 
 Este documento define dónde termina el núcleo de Leda y dónde empiezan sus
 adaptadores. Gobierna a los demás documentos de arquitectura: ante una discrepancia,
@@ -83,8 +86,8 @@ Un puerto es un contrato que el núcleo define y un adaptador implementa.
 | Notificación | Entrega un mensaje dirigido a una persona, sin conocer su transporte. |
 | Lectura | Expone consultas agregadas del estado para cualquier superficie de lectura. Implementado en `src/leda/lectura.py`; ninguna de sus funciones recibe el espacio, lo toman de la sesión. |
 | Configuración | Materializa y modifica la configuración de un cliente. Tiene dos productores: el paquete versionado, que la siembra una vez, y la edición desde el tablero del cliente. El paquete es formato de transporte, no fuente de verdad: después de sembrar, manda la base. Toda edición queda atribuida en la auditoría. |
-| Razonamiento | Interpreta lenguaje natural y devuelve salida tipada y validada: el comando y los valores normalizados de lo que la persona dijo. Redacta la respuesta a partir del resultado del turno ([`ADR 0014`](../decisions/0014-flujo-de-un-mensaje.md)). |
-| Decisión con duda | Elige entre candidatos de la base (una tarea, una persona, un objetivo) con probabilidades; el núcleo aplica los cortes. No interpreta lenguaje libre ni decide efectos ([`ADR 0014`](../decisions/0014-flujo-de-un-mensaje.md)). |
+| Razonamiento | Interpreta lenguaje natural y devuelve salida tipada y validada: el comando y los valores normalizados de lo que la persona dijo. Redacta la respuesta a partir del resultado del turno ([`ADR 0014`](../decisions/0014-flujo-de-un-mensaje.md)). En el motor de conversación, la IA elige una o más jugadas de una lista cerrada declarada en el código y redacta desde lo que el código informa ([`ADR 0018`](../decisions/0018-motor-de-conversacion.md), decisión 1; diseñado, sin construir). |
+| Decisión con duda | Elige entre candidatos de la base (una tarea, una persona, un objetivo) con probabilidades; el núcleo aplica los cortes. No interpreta lenguaje libre ni decide efectos ([`ADR 0014`](../decisions/0014-flujo-de-un-mensaje.md)). En la prueba chica corre en paralelo sin decidir y se queda sólo si evita errores ([`ADR 0018`](../decisions/0018-motor-de-conversacion.md), decisión 7). |
 
 ## Adaptadores
 
@@ -94,8 +97,9 @@ Un puerto es un contrato que el núcleo define y un adaptador implementa.
 | Proveedores LLM | Existen | `src/leda/llm.py` |
 | Jev (decisión con duda) | Existe | `src/leda/jev.py`; hoy sólo resuelve referencias a tareas. |
 | Importador de paquetes | Existe | `src/leda/importador.py:211` |
-| Tablero de cliente | No existe | Sólo hay webhook y salud en `src/leda/gateway.py:47,434`. Alcanza un solo espacio. **No es de sólo lectura:** consume el puerto de Lectura y también el de Configuración. |
-| Panel de plataforma | No existe | Alcanza todos los espacios: da de alta clientes y conduce la entrevista de alta. Su autenticación es una decisión abierta. |
+| Tablero de cliente | Existe en parte | La lectura: `GET /tablero/{token}` (`src/leda/gateway.py`, `_servir_tablero`), con enlace personal, consume el puerto de Lectura. La parte que consume el de Configuración no existe. Alcanza un solo espacio. |
+| Panel de plataforma | No existe | Alcanza todos los espacios: da de alta clientes y conduce la entrevista de alta (que no aplica en esta etapa: ADR 0017, decisión 7). Su autenticación es una decisión abierta. |
+| Plataforma web de tareas | No existe | [`ADR 0017`](../decisions/0017-por-chat-los-hechos-por-la-web-la-estructura.md), decisión 5: carga de tareas con un formulario, su estado, cambio de fechas por retrasos e integrantes. Lleva su propio ADR antes del código; si es parte del tablero, del panel o una superficie aparte, y cómo cumple el [`ADR 0004`](../decisions/0004-dos-superficies-separadas.md), está `PENDIENTE` en ese ADR. |
 | Aplicación móvil | No existe | — |
 
 Las dos superficies web son adaptadores distintos y aplicaciones separadas, por
@@ -106,6 +110,20 @@ atiende a uno solo.
 El adaptador de Telegram está bien construido: `TransporteTelegram` queda aislado
 detrás de una interfaz de envío y tiene un doble de prueba equivalente. El problema
 no es el adaptador, es que el núcleo lo conoce.
+
+## El motor de conversación
+
+Diseñado en el [`ADR 0018`](../decisions/0018-motor-de-conversacion.md) y **sin construir**. Hoy
+la conversación de `main` son los flujos A y B, congelados, que se borran en la Etapa 3 del Motor.
+
+| Qué | Dónde queda respecto de la frontera |
+|---|---|
+| La IA | Del lado del puerto de Razonamiento: elige jugadas de una lista cerrada y redacta desde los hechos. No decide efectos (decisión 1). |
+| Las jugadas y las situaciones generales | Fichas declaradas en el código, un conjunto cerrado, nunca configuración de un cliente (decisión 4). El código comprueba cada jugada y ejecuta con las operaciones del dominio y su confirmación. |
+| El estado por persona y el registro de turnos | Tablas nuevas, con `workspace_id` y `row level security` forzado, sin `chat_id` ni `callback_data`: cumplen las reglas 1, 2 y 3 (decisión 3). Sus columnas, `PENDIENTE` hasta el plan de la Etapa 2. |
+| El paquete del motor | Propuesta del documento de la unidad, no fijada por el ADR: un paquete que sólo alcanza una lista permitida de módulos sólidos, con su prueba de frontera. Se construye en la Etapa 3. |
+
+La prueba chica de la Etapa 2 vive fuera de `src/leda` y no cambia esta frontera.
 
 ## Reglas invariantes
 

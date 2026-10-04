@@ -1,9 +1,11 @@
 # Qué está construido y qué no
 
-> **Nota del 2026-10-04.** Las tablas de este documento describen el código de `main`. Su
-> conversación (el alta por chat y los flujos A y B) quedó congelada: no se corrige ni se extiende.
-> La línea de trabajo vigente es el Motor. Qué queda por chat y cómo se cargan las tareas se está
-> redefiniendo en el ADR 0017 (`PENDIENTE`); ver [`STATUS.md`](STATUS.md), "Próximo paso".
+> **Nota del 2026-10-04, actualizada después del paso M1.** Las tablas de este documento
+> describen el código de `main`. Su conversación (el alta por chat y los flujos A y B) quedó
+> congelada: no se corrige ni se extiende. Qué queda por chat y cómo se cargan las tareas lo fija
+> el [ADR 0017](decisions/0017-por-chat-los-hechos-por-la-web-la-estructura.md) (aceptado); el
+> motor de conversación del [ADR 0018](decisions/0018-motor-de-conversacion.md) está diseñado y
+> **sin construir** ("Diseñado y sin construir", abajo).
 
 Para entender en cinco minutos dónde está parado el proyecto, sin volver a
 auditarlo. El detalle vive en los documentos que se citan; acá está el mapa.
@@ -27,8 +29,11 @@ No se rehace, con una salvedad del 2026-10-04. Las filas que describen la conver
 tarea por chat, el ruteo de intención, la aclaración con botones, "Leda orienta con opciones", la
 pregunta pendiente, la respuesta única, el estado real, los toques y Modificar) corresponden a los
 flujos A y B, congelados: no se corrigen ni se extienden, y su código se borra en la Etapa 3 del
-Motor. Qué piezas de esas filas se conservan está `PENDIENTE` en el ADR 0018. Las demás filas son
-la capa de garantías y de dominio, que sí se conserva.
+Motor. Las demás filas son la capa de garantías y de dominio, que sí se conserva. El motor de
+conversación reutiliza la vista previa con huella (ADR 0018, decisión 2), mide a Jev en paralelo
+antes de decidir si se queda (decisión 7) y toma las reglas del ADR 0013 como comportamiento, no
+como código. La lista de piezas que se reutilizan está en el documento de la unidad, "Lo sólido
+que se reutiliza".
 
 | Capacidad | Evidencia |
 |---|---|
@@ -42,7 +47,7 @@ la capa de garantías y de dominio, que sí se conserva.
 | Ciclo de vida de un bloqueo | `resolver_bloqueo` cierra y devuelve la tarea al estado previo a `bloqueada`; un bloqueo abierto hace más de `bloqueos.escala_solo_a_los_dias` días hábiles escala solo por la ruta transversal del pack |
 | Despacho idempotente | `dedupe_key`, reintento con incidente, respeta jornada |
 | Puerto de lectura | `lectura.py`: seis consultas agregadas, el espacio sale de la sesión |
-| Tablero de cliente | Credencial por enlace con vencimiento + pantalla |
+| Tablero de cliente | Credencial por enlace con vencimiento + pantalla de sólo lectura (`GET /tablero/{token}`); no lista las tareas con su estado |
 | Importador de paquetes | Genérico, con validaciones cruzadas y hash versionado |
 | Banco conversacional con modelo real | `tests/banco/`: escenarios ficticios en YAML corridos N veces por `gateway.procesar_update` con el proveedor real; comprueba herramientas, acciones afirmadas sin herramienta, personas fuera del equipo, efectos en PostgreSQL y contenido de la respuesta. Fuera de la suite por defecto (`-m modelo_real`); las fallas se guardan para replay |
 | Vista previa y confirmación de todo cambio | Las 8 herramientas que escriben (`herramientas.py`, `Herramienta.preparar`) validan autoridad y reglas, muestran estado vigente y cambio propuesto, y esperan Confirmar, Modificar o Cancelar (`pending_action`, migraciones `0009` y `0010`); al confirmar se recalcula una huella del estado y, si cambió, no se aplica. Modificar acepta la corrección durante 30 minutos. El banco toca Confirmar y comprueba que antes no hubo efectos ([`ADR 0005`](decisions/0005-interpretacion-y-confirmacion.md)) |
@@ -59,18 +64,22 @@ la capa de garantías y de dominio, que sí se conserva.
 
 ## Diseñado y sin construir
 
-Cada uno tiene diseño escrito y cero código.
+Cada uno tiene diseño escrito y cero código, salvo la plataforma web de tareas, que todavía
+no tiene su diseño.
 
 | Área | Lo manda | Estado |
 |---|---|---|
-| **Entrevista de alta de espacios** | [`nucleo/alta-de-equipo.md`](../nucleo/alta-de-equipo.md), 195 líneas | Sin una sola línea. Sólo existe el importador, que consume un paquete ya escrito. Sin esto, cada cliente nuevo exige que alguien lo escriba a mano |
+| **Motor de conversación (flujo D)** | [`ADR 0018`](decisions/0018-motor-de-conversacion.md), propuesta; diseño aceptado para la prueba en M1 | Sin código. La IA elige jugadas de una lista cerrada y el código las comprueba y ejecuta; estado por persona y registro de turnos; circuitos declarados con fichas y ocho situaciones generales. La prueba chica de la Etapa 2 vive fuera de `src/leda`; el motor definitivo, en la Etapa 3 |
+| **Lo que le falta al seguimiento** | [`ADR 0017`](decisions/0017-por-chat-los-hechos-por-la-web-la-estructura.md), decisiones 4 y 6 | No hay enlace entre una respuesta y su recordatorio; `pending_reply` existe y nada la escribe; los textos de recordatorios y cadencias están fijos en `escalera.py` y `reloj.py`; no existe la operación de pedir más tiempo. Relevamiento del 2026-10-04 ([`STATUS.md`](STATUS.md), "Estado comprobado") |
+| **Plataforma web de tareas** | [`ADR 0017`](decisions/0017-por-chat-los-hechos-por-la-web-la-estructura.md), decisión 5 | Sin diseño propio todavía: lleva su ADR antes del código. Para cargar tareas sólo existe `sembrar`, un cargador de datos ficticios que no cumple las condiciones de la carga (decisión 2) |
+| **Entrevista de alta de espacios** | [`nucleo/alta-de-equipo.md`](../nucleo/alta-de-equipo.md), 195 líneas | Sin una sola línea. Sólo existe el importador, que consume un paquete ya escrito. Sin esto, cada cliente nuevo exige que alguien lo escriba a mano. No aplica en esta etapa (ADR 0017, decisión 7) |
 | **Panel de plataforma** | [`ADR 0004`](decisions/0004-dos-superficies-separadas.md) | Decidido: contraseña + TOTP. Sin construir |
 | **Integración de calendario** | Especificación §17.3, constitución §7 | Consultar disponibilidad, proponer, crear, modificar, asistentes. `calendario.py` es el calendario **laboral**, no externo |
 | **Correo** | Especificación §18 | Sólo existe el nombre del permiso |
 | **Almacenamiento documental** | Especificación §11 | `evidence.drive_file_id` sin uso |
 | **Reuniones e informes** | Especificación §17.2 y §23 | Anunciar, pedir temas, consolidar, agenda, minutas. `corework.yaml` declara `reunion_periodica` y el importador no la consume |
-| **Conversación de bloqueos** | Mecánica §8, pasos 2 a 7 | Abrir y cerrar un bloqueo ya funciona. Pedir la información mínima, proponer soluciones, preguntar por ayuda y proponer reasignaciones siguen sin construir. Su precondición —dependencias entre tareas— ya está resuelta. Desde el 2026-10-04 dejó de ser la unidad que seguía: su lugar en el orden está `PENDIENTE` en el ADR 0017 |
-| **Umbral de re-aprobación** | Mecánica §7 | El importador lo guarda en la base y ningún código lo lee |
+| **Conversación de bloqueos** | Mecánica §8, pasos 2 a 7 | Abrir y cerrar un bloqueo ya funciona. Pedir la información mínima, proponer soluciones, preguntar por ayuda y proponer reasignaciones siguen sin construir. Su precondición —dependencias entre tareas— ya está resuelta. El ADR 0017 (decisión 3a) la pone en el seguimiento de esta etapa, ampliada: perseguir el bloqueo de persona en persona hasta quien puede destrabarlo. La prueba chica cubre sólo el primer paso, anotarlo (ADR 0018, decisión 5a) |
+| **Umbral de re-aprobación** | Mecánica §7 | El importador lo guarda en la base y ningún código lo lee. En esta etapa se resuelve en la plataforma (ADR 0017, decisión 7) |
 | **Privacidad configurable** | Especificación §19 | Sin código **ni** esquema. No existe matriz de visibilidad |
 | **Aprendizaje** | Mecánica §14 | Tabla `learning` vacía de uso |
 | **Bot de administración** | Constitución §2 | Cascarón para lo que la administración escribe: identifica, audita y devuelve `ok`. Ya manda algo de vuelta -- el aviso de cada incidente ("Fallas con aviso y trazabilidad", arriba) -- pero eso es todo: sin comandos, sin consultar nada desde el chat |
@@ -131,5 +140,5 @@ nuevo que nadie usa, falla y obliga a decidir si es deuda aceptada o un olvido.
 ## Vigencia
 
 Levantado el 2026-09-22 auditando `nucleo/`, la especificación funcional y el
-código completo. Todo lo de arriba es una foto y envejece; la única parte que
-se mantiene sola es la prueba.
+código completo; notas del 2026-10-04 con los ADR 0017 y 0018. Todo lo de arriba es
+una foto y envejece; la única parte que se mantiene sola es la prueba.

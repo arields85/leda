@@ -1,12 +1,9 @@
 # Qué es Leda
 
-> **Nota del 2026-10-04.** El usuario recortó el alcance de la superficie conversacional: por
-> ahora Leda no crea tareas ni objetivos por chat y hace seguimiento; las tareas se cargan por
-> fuera del chat. El detalle y el orden de trabajo están en [`../STATUS.md`](../STATUS.md), y la
-> decisión se escribe en el ADR 0017 (`PENDIENTE`). Además, la tabla de superficies de abajo quedó
-> atrasada: el tablero de cliente existe hoy como una vista de sólo lectura por enlace personal
-> (`GET /tablero/{token}`). La tabla y la lista de rutas se actualizan cuando se acepte el
-> ADR 0017.
+> **Nota del 2026-10-04, actualizada después del paso M1.** Este documento define el producto
+> completo. Lo que se construye en esta etapa lo fija el
+> [ADR 0017](../decisions/0017-por-chat-los-hechos-por-la-web-la-estructura.md) (aceptado):
+> ver "En esta etapa", más abajo. El orden de trabajo está en [`../STATUS.md`](../STATUS.md).
 
 Leda es un project manager digital ofrecido como producto. Cada organización que lo
 usa es un cliente independiente, con sus propios integrantes, áreas, políticas y
@@ -30,22 +27,25 @@ fuente de verdad: lo produce la entrevista de alta, una exportación o el desarr
 y el importador lo consume una sola vez para sembrar el espacio. Desde ese momento la
 base es la verdad operativa y el tablero del cliente la edita.
 
-## Las cuatro superficies
+## Las superficies
 
-Leda se atiende desde cuatro superficies distintas sobre el mismo núcleo.
+Leda se atiende desde cuatro superficies distintas sobre el mismo núcleo, más la plataforma web
+de tareas que agregó el ADR 0017.
 
 | Superficie | Propósito | Estado |
 |---|---|---|
-| Conversacional | Interacción cotidiana: informar avances, pedir estado, resolver confirmaciones. Hoy sobre Telegram. | Existe |
-| Tablero de cliente | Visión consolidada de objetivos, avance, cumplimiento, bloqueos y carga por persona, **y ajuste de la configuración propia**. | No existe; su credencial está en curso |
+| Conversacional | Interacción cotidiana: los hechos del trabajo (inicio, bloqueos, entrega, aprobación, pedido de más tiempo) y las consultas. Hoy sobre Telegram. | Existe, con los flujos A y B, congelados; el motor de conversación que los reemplaza está diseñado y sin construir (ADR 0018) |
+| Tablero de cliente | Visión consolidada de objetivos, avance, cumplimiento, bloqueos y carga por persona, **y ajuste de la configuración propia**. | Existe la lectura, por enlace personal; el ajuste de la configuración no existe |
 | Panel de plataforma | Alta de clientes y entrevista de alta de un espacio nuevo. | No existe |
+| Plataforma web de tareas | La estructura del trabajo: cargar tareas con un formulario, ver su estado, cambiar fechas por retrasos, gestionar integrantes (ADR 0017, decisión 5). | No existe; su diseño va en su propio ADR, que decide también su relación con el tablero y el panel (`PENDIENTE`) |
 | Aplicación móvil | Acceso rápido a lo propio y a las confirmaciones pendientes. | No existe |
 
-Hoy sólo existe la primera. La superficie HTTP del sistema se limita a dos rutas:
-`POST /telegram/{slug}` y `GET /salud` (`src/leda/gateway.py:47,434`).
+La superficie HTTP del sistema son tres rutas: `POST /telegram/{slug}`,
+`GET /tablero/{token}` (sólo lectura) y `GET /salud` (`src/leda/gateway.py`). No hay API de
+lectura para otras superficies.
 
-El puerto de lectura sí existe (`src/leda/lectura.py`): las consultas agregadas
-están, lo que falta es la superficie que las muestre.
+El puerto de lectura existe (`src/leda/lectura.py`): el tablero muestra sus consultas
+agregadas.
 
 **Las dos superficies web son aplicaciones separadas, no una con niveles de
 permiso.** El tablero de cliente alcanza un solo espacio; el panel de plataforma los
@@ -73,6 +73,38 @@ distancia. El razonamiento completo está en
 - No inventa fechas, aprobaciones, evidencias ni avances. Cuando falta un dato, lo
   pide.
 - No amplía su propia autoridad. Toda ampliación es explícita y queda registrada.
+
+## En esta etapa
+
+El [ADR 0017](../decisions/0017-por-chat-los-hechos-por-la-web-la-estructura.md) recorta lo de
+arriba a una regla: *por chat, los hechos del trabajo; por la web, su estructura.*
+
+**Por chat, las ocho cosas del seguimiento** (decisión 3b): avisar un día hábil antes del
+vencimiento; anotar el inicio; perseguir los bloqueos hasta quien puede destrabarlos
+(decisión 3a); contestar qué tiene pendiente cada persona; pedir estado según las cadencias;
+recordar y escalar si pasa la fecha sin respuesta; recibir la entrega con su evidencia; y recibir
+la aprobación o el pedido de cambios.
+
+**Fuera del chat, en la plataforma web:**
+
+| Qué | Cómo, en esta etapa |
+|---|---|
+| Crear tareas y objetivos | Los carga a mano el administrador de plataforma designado (decisiones 1 y 2) |
+| Aceptar las tareas | Ocurre fuera de Leda y se declara al cargarlas; Leda nunca lo presenta como una aprobación hecha en ella (decisión 2) |
+| Reasignar y cambiar fechas | En la plataforma (decisiones 4 y 5) |
+| Gestionar integrantes | En la plataforma (decisiones 5 y 7) |
+
+- **Un pedido de tarea nueva por chat se deriva**, sin efectos: Leda dice quién las carga
+  (decisión 1).
+- **Un pedido de más tiempo se anota y se avisa al referente**; la fecha comprometida no cambia
+  (decisión 4).
+- **Lo demás espera** hasta que Leda haga bien el seguimiento en pruebas reales
+  ([`ROADMAP.md`](../ROADMAP.md), "Anotado para más adelante").
+- Los pasajes del núcleo que necesitan capacidades fuera de esta etapa todavía no se aplican; las
+  garantías rigen siempre (decisión 7).
+
+Hoy el seguimiento por chat no está construido como lo describe la tabla: lo que existe está en
+[`capacidades.md`](../capacidades.md).
 
 ## Configuración del cliente y núcleo del producto
 
@@ -106,7 +138,8 @@ esquema.
 Dónde se edita cada columna: lo de la izquierda entra por la entrevista de alta y
 después se ajusta desde el tablero del cliente, con cada cambio atribuido en la
 auditoría. Lo de la derecha no se edita desde ninguna superficie: cambia con el
-producto.
+producto. En esta etapa los integrantes se gestionan desde la plataforma web de tareas
+(ADR 0017, decisiones 5 y 7).
 
 ## Principios invariantes
 
@@ -135,7 +168,8 @@ Con una diferencia que conviene no olvidar: ese paquete se escribió a mano, por
 quien lo escribió conocía al equipo. Un cliente nuevo no tiene a nadie que pueda
 hacer eso, y por eso la entrevista de alta —hoy diseñada en
 [`nucleo/alta-de-equipo.md`](../../nucleo/alta-de-equipo.md) y sin implementar— es lo
-que separa a Leda de ser una instalación a medida.
+que separa a Leda de ser una instalación a medida. En esta etapa no aplica (ADR 0017,
+decisión 7): vuelve cuando se sume esa capacidad.
 
 El documento maestro de CoreWork pasa a ser **insumo de configuración de ese
 cliente**: describe sus integrantes, su autoridad, sus cadencias y su objetivo anual.
