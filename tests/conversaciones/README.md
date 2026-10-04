@@ -128,7 +128,7 @@ Ninguna conversación los resuelve. Cada paso que depende de uno lo cita con su 
 
 - **P1. ¿Anotar el inicio lleva vista previa y confirmación?** (a) No: la persona informa un hecho
   (constitución §3) y §7 no lo lista. (b) Sí, como la entrega del ADR 0018, decisión 4. Conversaciones 01,
-  05, 06, 09, 10, 13 y 14.
+  05, 06, 09, 10, 11, 13 y 14.
 - **P2. ¿Anotar un bloqueo lleva vista previa y confirmación?** Las mismas dos opciones. Conversación 03.
 - **P3. ¿Anotar la nueva previsión y avisar al referente lleva confirmación de quien la pide?** (a) No: es
   un aviso de coordinación de un comportamiento decidido (ADR 0017, decisión 4; mecánica §10). (b) Sí, una
