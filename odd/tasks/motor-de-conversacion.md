@@ -152,7 +152,8 @@ que admitir `leda_motor`; `python -m leda modelo` ya existe (`docs/product/plata
 - **E1-3 (2026-10-04).** `5fa7705` (formato y respuestas), `442d34b` (situaciones generales), `f8cb9bb` (Jev) y
   `045e11c`. Son documentos: las corre la Etapa 2.
 - **P1 a P16 (2026-10-04).** Decididas por el usuario: `7ab15f2` (ADR 0018, decisión 9; ADR 0017; plataforma),
-  `396e461` (conversaciones) y el commit que registra esto.
+  `396e461` (conversaciones) y `58f86f8`. Bloqueo, orden de preguntas y previsión que vuelve: `c4be752` y
+  el commit que registra esto.
 - **Línea base de las garantías.** `.venv\Scripts\python.exe -m pytest -q -p no:cacheprovider` sobre
   `respaldo-main-antes-de-d`: `2286 passed, 333 deselected, 1 warning in 631.96s`. Mide el código, no la
   conversación.

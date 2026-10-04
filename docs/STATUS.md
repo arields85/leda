@@ -102,8 +102,7 @@ pasa a una conversación de prueba. Destino de cada uno:
 `PENDIENTE` dentro de los ADR, para resolver al llegar: si se avisa que se cargaron tareas (ADR 0017,
 decisión 2); cómo se guarda quién destraba un bloqueo y qué pasa si dice que no le corresponde (decisión 3a); las
 tablas del motor de conversación (ADR 0018, decisión 3, al diseñar la Etapa 2); y cómo llega el tono de cada
-cliente a la IA. Los de la E1-4 están en las notas de `docs/ROADMAP.md`; los que dejó la decisión 9, en el ADR
-0018 (9d) y en las conversaciones 03 y 11.
+cliente a la IA. Los de la E1-4 están en las notas de `docs/ROADMAP.md`.
 
 ## Estado comprobado
 
