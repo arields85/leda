@@ -3,7 +3,7 @@
 **Alcance:** Leda es un producto de gestión de proyectos multi-tenant. CoreWork es
 su primer cliente, no su definición.
 
-**Última actualización documental:** 2026-10-04, después del paso M1.
+**Última actualización documental:** 2026-10-04, después de la tarea E1-4.
 
 Versiones anteriores (historia, no estado vigente ni instrucción):
 [`STATUS-hasta-2026-09-30.md`](historial/STATUS-hasta-2026-09-30.md),
@@ -30,17 +30,14 @@ una lista cerrada y el código las ejecuta; estado por persona y registro de tur
 fichas y ocho situaciones generales; la prueba chica y sus criterios). El 0018 queda como "propuesta" hasta que
 pase la prueba chica. M1 quedó registrado en el documento de la unidad y en la línea "Estado" de cada ADR.
 
-## Punto exacto para retomar (2026-10-04, después de M1)
+## Punto exacto para retomar (2026-10-04, después de la E1-4)
 
 - **Qué:** el Motor, al cierre de la Etapa 1.
 - **Dónde:** rama `feat/motor-de-conversacion`, carpeta `D:\Proyectos\Leda-PM-worktrees\motor-de-conversacion`
   (reglas en [`../AGENTS.md`](../AGENTS.md), "Dónde se trabaja y qué no se hace").
-- **Primer paso, lo que queda de la tarea E1-4:** actualizar `docs/architecture/frontera.md`,
-  `docs/product/que-es-leda.md`, `docs/capacidades.md`, `docs/ROADMAP.md` (con la lista "Anotado para más
-  adelante" del documento de la unidad), `docs/INDEX.md`, la nota "superada en parte" de los ADR 0013 y 0014 y
-  la nota del ADR 0016 (el ADR 0018, decisión 8, trae su mecanismo). La parte de `AGENTS.md` quedó hecha el
-  2026-10-04.
-- **Después, la tarea E1-3:** `tests/conversaciones/`, con un README del formato (hilos numerados: quién dice
+- **Hecho, la tarea E1-4:** los documentos que cambian los ADR 0017 y 0018 están al día; la lista "Anotado
+  para más adelante" vive en `docs/ROADMAP.md`.
+- **Primer paso, la tarea E1-3:** `tests/conversaciones/`, con un README del formato (hilos numerados: quién dice
   qué y qué tiene que pasar) y las primeras conversaciones: doce para el circuito del recordatorio (las cuatro
   respuestas del ADR 0018, decisión 5a, y las ocho situaciones generales de la decisión 4) y dos con dos tareas
   parecidas para medir a Jev (decisión 7).
@@ -55,7 +52,7 @@ pase la prueba chica. M1 quedó registrado en el documento de la unidad y en la 
 
 El avance se registra en `odd/tasks/motor-de-conversacion.md`.
 
-**Etapa 1. Diseño, sin código.** ADR 0017 y 0018 hechos (M1). Faltan E1-4 y E1-3.
+**Etapa 1. Diseño, sin código.** ADR 0017 y 0018 hechos (M1) y E1-4 hecha. Falta la E1-3.
 
 **Etapa 2. Prueba chica y descartable.** Su plan se escribe antes del código. Ya fijado:
 
@@ -96,9 +93,9 @@ pasa a una conversación de prueba. Destino de cada uno:
   global. El margen es chico (unos 6.000): `docs/STATUS.md` y el documento de la unidad no deberían crecer. El
   global lo maneja entero gentle-ai (`gentle-ai sync` pisaría una edición a mano): achicarlo lo decide el
   usuario, con esa herramienta.
-- **Respaldo de lo no subido.** `main` está subido hasta `dc813e6`. Viven en un solo disco la rama congelada
+- **Respaldo de lo no subido.** `main` está subido hasta `e466eb5`. Viven en un solo disco la rama congelada
   `feat/flujo-de-un-mensaje` (92 commits sin subir, 7 con líneas de atribución), los commits de aviso de las
-  ramas congeladas, las etiquetas del 2026-10-04 y lo posterior a `dc813e6` en la rama del Motor. Recomendación
+  ramas congeladas, las etiquetas del 2026-10-04 y lo posterior a `e466eb5` en la rama del Motor. Recomendación
   del agente para la rama congelada: no reescribirla (los documentos citan sus hashes) y guardarla con
   `git bundle`.
 - **Un bot de Telegram de prueba para la rama del Motor:** hay un solo listener por bot, y uno abierto en la
@@ -109,7 +106,8 @@ pasa a una conversación de prueba. Destino de cada uno:
 `PENDIENTE` dentro de los ADR, para resolver al llegar: si se avisa que se cargaron tareas (ADR 0017,
 decisión 2); cómo se guarda quién destraba un bloqueo y qué pasa si dice que no le corresponde (decisión 3a); el
 canal del aviso al administrador de lo que no está en la lista (ADR 0018, decisión 1); las tablas del motor de
-conversación (decisión 3, al diseñar la Etapa 2); y cómo llega el tono de cada cliente a la IA.
+conversación (decisión 3, al diseñar la Etapa 2); y cómo llega el tono de cada cliente a la IA. Los que dejó
+la E1-4 en las unidades del roadmap están en sus notas (`docs/ROADMAP.md`).
 
 ## Estado comprobado
 
@@ -136,7 +134,7 @@ de aviso; tiene los flujos C1 a C6, las migraciones `0026` a `0029` y los docume
 - Repositorio `arields85/leda` (público). `arields85/prisma` queda como respaldo congelado (remoto
   `respaldo-prisma`). Engram usa el proyecto `prisma-pm` (`.engram/config.json`).
 - `main` se subió el 2026-10-04 (`aa32a02..6f9b9a3`) y, después de M1, recibió por avance rápido los documentos
-  del Motor y se volvió a subir (`6f9b9a3..dc813e6`), por decisión del usuario. La rama sigue encima (`9b91393`).
+  del Motor, por decisión del usuario: `origin/main` está en `e466eb5`. La rama sigue encima con la E1-4.
 - Etiquetas: `respaldo-flujos-antes-de-d`, `respaldo-main-antes-de-d` (punto de partida de la rama),
   `respaldo-0-36-en-pausa` (sólo consulta), `pre-renombre-leda` y `respaldo-flujos-antes-de-c2`, `-c5` y `-c6`.
 - Ramas: `feat/motor-de-conversacion` (vigente) y `main`; congeladas, `feat/flujo-de-un-mensaje` y
