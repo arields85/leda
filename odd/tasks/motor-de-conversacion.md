@@ -79,7 +79,7 @@ Las etapas 2 y 3 tienen cada una su plan propio, que se escribe al llegar.
 - [x] **E1-3.** `tests/conversaciones/`: README del formato y catorce conversaciones: doce del recordatorio
       (las cuatro respuestas del ADR 0018, decisión 5a, y las ocho situaciones generales) y dos para Jev.
 
-Las preguntas al usuario están todas resueltas en los ADR 0017 (1 a 7) y 0018 (1 a 8); lo que sigue
+Las preguntas al usuario están todas resueltas en los ADR 0017 (1 a 7) y 0018 (1 a 9); lo que sigue
 `PENDIENTE` dentro de ellos está en `docs/STATUS.md`, "Decisiones pendientes del usuario". La lista de
 decisiones que los ADR tenían que dejar escritas está resuelta y quedó en la copia de archivo.
 
@@ -150,11 +150,13 @@ que admitir `leda_motor`; `python -m leda modelo` ya existe (`docs/product/plata
 - **E1-4, el resto (2026-10-04).** `74f6f35` (frontera, producto, capacidades), `38ba14b` (roadmap, índice,
   notas de los ADR 0013, 0014 y 0016) y `5795df5` (`docs/STATUS.md` y acá): `review-8127a3bf7edea0bd`, aprobada.
 - **E1-3 (2026-10-04).** `5fa7705` (formato y respuestas), `442d34b` (situaciones generales), `f8cb9bb` (Jev) y
-  el commit que registra esto. Son documentos: las corre la Etapa 2.
+  `045e11c`. Son documentos: las corre la Etapa 2.
+- **P1 a P16 (2026-10-04).** Decididas por el usuario: `7ab15f2` (ADR 0018, decisión 9; ADR 0017; plataforma),
+  `396e461` (conversaciones) y el commit que registra esto.
 - **Línea base de las garantías.** `.venv\Scripts\python.exe -m pytest -q -p no:cacheprovider` sobre
   `respaldo-main-antes-de-d`: `2286 passed, 333 deselected, 1 warning in 631.96s`. Mide el código, no la
   conversación.
 
 ## Próximo paso
 
-Escribir el plan de la Etapa 2, con las decisiones `PENDIENTE` P1 a P16 de `tests/conversaciones/README.md`.
+Escribir el plan de la Etapa 2, con la decisión 9 del ADR 0018 (P1 a P16).

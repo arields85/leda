@@ -230,7 +230,7 @@ hallazgo por hallazgo y parecía progreso. Por eso la señal de parar está escr
 8. **Separar la IA del flujo.** Antes de culpar al flujo de una falla de comprensión, medir cuánto aporta la IA.
    La prueba chica arranca con GPT-6 sol y mide GPT-6 luna y Jev en paralelo (ADR 0018, decisiones 6 y 7).
 9. **Funcionalidad nueva congelada** (ADR 0017, decisión 5): en esta etapa se construyen el seguimiento por chat
-   y la plataforma web de tareas; lo demás va a la lista "Anotado para más adelante" del documento de la unidad
+   y la plataforma web de tareas; lo demás va a la lista "Anotado para más adelante" de `docs/ROADMAP.md`
    hasta que Leda haga bien el seguimiento en pruebas reales. Lo que se pida de pasada se anota ahí.
 10. **Proyectos externos: ideas, no bases** (`docs/research/`). Rasa quedó descartado como componente; Engram es
     sólo referencia de diseño para la memoria.

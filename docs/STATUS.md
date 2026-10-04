@@ -3,7 +3,7 @@
 **Alcance:** Leda es un producto de gestión de proyectos multi-tenant. CoreWork es
 su primer cliente, no su definición.
 
-**Última actualización documental:** 2026-10-04, después de la tarea E1-3.
+**Última actualización documental:** 2026-10-04, después de las decisiones P1 a P16.
 
 Versiones anteriores (historia, no estado vigente ni instrucción):
 [`STATUS-hasta-2026-09-30.md`](historial/STATUS-hasta-2026-09-30.md),
@@ -30,14 +30,14 @@ una lista cerrada y el código las ejecuta; estado por persona y registro de tur
 fichas y ocho situaciones generales; la prueba chica y sus criterios). El 0018 queda como "propuesta" hasta que
 pase la prueba chica. M1 quedó registrado en el documento de la unidad y en la línea "Estado" de cada ADR.
 
-## Punto exacto para retomar (2026-10-04, después de la E1-3)
+## Punto exacto para retomar (2026-10-04, después de P1 a P16)
 
 - **Qué:** el Motor, con la Etapa 1 terminada.
 - **Dónde:** rama `feat/motor-de-conversacion`, carpeta `D:\Proyectos\Leda-PM-worktrees\motor-de-conversacion`
   (reglas en [`../AGENTS.md`](../AGENTS.md), "Dónde se trabaja y qué no se hace").
-- **Hecho, la tarea E1-3:** `tests/conversaciones/`, con el formato y catorce conversaciones (doce del
-  recordatorio y dos para Jev). Dejan 16 decisiones de producto `PENDIENTE` (P1 a P16, en su README).
-- **Primer paso, el plan de la Etapa 2** ("Próximo paso"), con las decisiones P1 a P16 del usuario.
+- **Hecho:** la E1-3 (`tests/conversaciones/`, catorce conversaciones) y las decisiones P1 a P16 del usuario,
+  aplicadas a ellas y escritas en el ADR 0018, decisión 9.
+- **Primer paso, el plan de la Etapa 2** ("Próximo paso").
 - **Acuerdos de trabajo:** chequeo de rumbo escrito antes de cada unidad; consentimiento permanente del usuario
   para los commits de cada unidad y para las revisiones RDD (`tools/rdd_ciclo.py <carpeta> <base>`), que
   comparan la rama con `origin/main`; un cambio en `AGENTS.md` sale de riesgo medio y pide consentimiento, que el
@@ -100,10 +100,10 @@ pasa a una conversación de prueba. Destino de cada uno:
   estar corriendo en `prueba-0-35`).
 
 `PENDIENTE` dentro de los ADR, para resolver al llegar: si se avisa que se cargaron tareas (ADR 0017,
-decisión 2); cómo se guarda quién destraba un bloqueo y qué pasa si dice que no le corresponde (decisión 3a); el
-canal del aviso al administrador de lo que no está en la lista (ADR 0018, decisión 1); las tablas del motor de
-conversación (decisión 3, al diseñar la Etapa 2); y cómo llega el tono de cada cliente a la IA. Los de la E1-4
-están en las notas de `docs/ROADMAP.md`; los de la E1-3, en `tests/conversaciones/README.md`.
+decisión 2); cómo se guarda quién destraba un bloqueo y qué pasa si dice que no le corresponde (decisión 3a); las
+tablas del motor de conversación (ADR 0018, decisión 3, al diseñar la Etapa 2); y cómo llega el tono de cada
+cliente a la IA. Los de la E1-4 están en las notas de `docs/ROADMAP.md`; los que dejó la decisión 9, en el ADR
+0018 (9d) y en las conversaciones 03 y 11.
 
 ## Estado comprobado
 
