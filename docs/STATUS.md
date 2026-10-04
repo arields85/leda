@@ -3,7 +3,7 @@
 **Alcance:** Leda es un producto de gestión de proyectos multi-tenant. CoreWork es
 su primer cliente, no su definición.
 
-**Última actualización documental:** 2026-10-04, después de la tarea E1-4.
+**Última actualización documental:** 2026-10-04, después de la tarea E1-3.
 
 Versiones anteriores (historia, no estado vigente ni instrucción):
 [`STATUS-hasta-2026-09-30.md`](historial/STATUS-hasta-2026-09-30.md),
@@ -30,18 +30,14 @@ una lista cerrada y el código las ejecuta; estado por persona y registro de tur
 fichas y ocho situaciones generales; la prueba chica y sus criterios). El 0018 queda como "propuesta" hasta que
 pase la prueba chica. M1 quedó registrado en el documento de la unidad y en la línea "Estado" de cada ADR.
 
-## Punto exacto para retomar (2026-10-04, después de la E1-4)
+## Punto exacto para retomar (2026-10-04, después de la E1-3)
 
-- **Qué:** el Motor, al cierre de la Etapa 1.
+- **Qué:** el Motor, con la Etapa 1 terminada.
 - **Dónde:** rama `feat/motor-de-conversacion`, carpeta `D:\Proyectos\Leda-PM-worktrees\motor-de-conversacion`
   (reglas en [`../AGENTS.md`](../AGENTS.md), "Dónde se trabaja y qué no se hace").
-- **Hecho, la tarea E1-4:** los documentos que cambian los ADR 0017 y 0018 están al día; la lista "Anotado
-  para más adelante" vive en `docs/ROADMAP.md`.
-- **Primer paso, la tarea E1-3:** `tests/conversaciones/`, con un README del formato (hilos numerados: quién dice
-  qué y qué tiene que pasar) y las primeras conversaciones: doce para el circuito del recordatorio (las cuatro
-  respuestas del ADR 0018, decisión 5a, y las ocho situaciones generales de la decisión 4) y dos con dos tareas
-  parecidas para medir a Jev (decisión 7).
-- **Después, el plan de la Etapa 2** ("Próximo paso").
+- **Hecho, la tarea E1-3:** `tests/conversaciones/`, con el formato y catorce conversaciones (doce del
+  recordatorio y dos para Jev). Dejan 16 decisiones de producto `PENDIENTE` (P1 a P16, en su README).
+- **Primer paso, el plan de la Etapa 2** ("Próximo paso"), con las decisiones P1 a P16 del usuario.
 - **Acuerdos de trabajo:** chequeo de rumbo escrito antes de cada unidad; consentimiento permanente del usuario
   para los commits de cada unidad y para las revisiones RDD (`tools/rdd_ciclo.py <carpeta> <base>`), que
   comparan la rama con `origin/main`; un cambio en `AGENTS.md` sale de riesgo medio y pide consentimiento, que el
@@ -52,7 +48,7 @@ pase la prueba chica. M1 quedó registrado en el documento de la unidad y en la 
 
 El avance se registra en `odd/tasks/motor-de-conversacion.md`.
 
-**Etapa 1. Diseño, sin código.** ADR 0017 y 0018 hechos (M1) y E1-4 hecha. Falta la E1-3.
+**Etapa 1. Diseño, sin código.** Terminada: ADR 0017 y 0018 (M1), E1-4 y E1-3.
 
 **Etapa 2. Prueba chica y descartable.** Su plan se escribe antes del código. Ya fijado:
 
@@ -106,8 +102,8 @@ pasa a una conversación de prueba. Destino de cada uno:
 `PENDIENTE` dentro de los ADR, para resolver al llegar: si se avisa que se cargaron tareas (ADR 0017,
 decisión 2); cómo se guarda quién destraba un bloqueo y qué pasa si dice que no le corresponde (decisión 3a); el
 canal del aviso al administrador de lo que no está en la lista (ADR 0018, decisión 1); las tablas del motor de
-conversación (decisión 3, al diseñar la Etapa 2); y cómo llega el tono de cada cliente a la IA. Los que dejó
-la E1-4 en las unidades del roadmap están en sus notas (`docs/ROADMAP.md`).
+conversación (decisión 3, al diseñar la Etapa 2); y cómo llega el tono de cada cliente a la IA. Los de la E1-4
+están en las notas de `docs/ROADMAP.md`; los de la E1-3, en `tests/conversaciones/README.md`.
 
 ## Estado comprobado
 
