@@ -18,8 +18,8 @@ se trabaja y qué no se hace".
    el producto.
 2. Leer [`architecture/frontera.md`](architecture/frontera.md) para entender dónde
    termina el núcleo y qué reglas lo gobiernan.
-3. Consultar [`ROADMAP.md`](ROADMAP.md) para saber qué se aprovecha y qué se corrige. Su
-   orden se está redefiniendo en el ADR 0017 (`PENDIENTE`).
+3. Consultar [`ROADMAP.md`](ROADMAP.md) para saber qué se aprovecha, qué se corrige y en qué
+   orden (criterio del ADR 0017, decisión 5).
 4. Abrir [`STATUS.md`](STATUS.md) para el estado operativo, los riesgos y el orden de trabajo
    vigente.
 5. Abrir arquitectura detallada o decisiones sólo si la tarea lo requiere.
@@ -34,7 +34,7 @@ se trabaja y qué no se hace".
 | Análisis adversarial del 2026-10-04: mercado, arquitecturas de agentes, confiabilidad, revisión interna y Engram | [`research/gestion-del-dialogo-y-arquitecturas-de-agentes.md`](research/gestion-del-dialogo-y-arquitecturas-de-agentes.md) |
 | Qué tiene que permitir configurar la plataforma (inventario) | [`product/plataforma-pendientes.md`](product/plataforma-pendientes.md) |
 | Frontera entre núcleo y adaptadores | [`architecture/frontera.md`](architecture/frontera.md) |
-| Qué se aprovecha, corrige y descarta; el orden está en redefinición (ADR 0017) | [`ROADMAP.md`](ROADMAP.md) |
+| Qué se aprovecha, corrige y descarta; criterio y orden del ADR 0017 (decisión 5) y la lista "Anotado para más adelante" | [`ROADMAP.md`](ROADMAP.md) |
 | Estado, riesgos, orden de trabajo vigente y próximo paso | [`STATUS.md`](STATUS.md) |
 | Arquitectura implementada | [`architecture/current-state.md`](architecture/current-state.md) |
 | Interpretación, aclaración y confirmación (diseño de los flujos anteriores al Motor, vivo hasta el 2026-09-29; gobiernan los ADR que cita) | [`architecture/interpretacion-y-confirmacion.md`](architecture/interpretacion-y-confirmacion.md) |
@@ -53,7 +53,9 @@ se trabaja y qué no se hace".
 | Decisión sobre las reglas generales de la conversación (superada en parte el 2026-10-04; ver su nota) | [`decisions/0013-reglas-generales-de-la-conversacion.md`](decisions/0013-reglas-generales-de-la-conversacion.md) |
 | Decisión sobre el flujo de un mensaje, con un dueño por etapa, y el experimento A/B (superada en parte el 2026-10-04; ver su nota. Sus flujos C1 a C6 quedaron congelados) | [`decisions/0014-flujo-de-un-mensaje.md`](decisions/0014-flujo-de-un-mensaje.md) |
 | Decisión sobre el renombre del producto a Leda | [`decisions/0015-renombre-del-producto-a-leda.md`](decisions/0015-renombre-del-producto-a-leda.md) |
-| Decisión sobre los avisos a otras personas guardados como hechos (implementada sólo en la rama congelada; ver su nota) | [`decisions/0016-avisos-a-otras-personas-desde-hechos.md`](decisions/0016-avisos-a-otras-personas-desde-hechos.md) |
+| Decisión sobre los avisos a otras personas guardados como hechos (implementada sólo en la rama congelada; el ADR 0018, decisión 8, trae su mecanismo; ver su nota) | [`decisions/0016-avisos-a-otras-personas-desde-hechos.md`](decisions/0016-avisos-a-otras-personas-desde-hechos.md) |
+| Decisión sobre el alcance del Motor: por chat, los hechos del trabajo; por la web, su estructura (aceptada en el paso M1, 2026-10-04) | [`decisions/0017-por-chat-los-hechos-por-la-web-la-estructura.md`](decisions/0017-por-chat-los-hechos-por-la-web-la-estructura.md) |
+| Decisión sobre el motor de conversación (propuesta; su diseño se aceptó para la prueba en el paso M1, y queda como propuesta hasta que pase la prueba chica) | [`decisions/0018-motor-de-conversacion.md`](decisions/0018-motor-de-conversacion.md) |
 | Relevamientos de proyectos externos (Hermes Agent) | [`research/hermes-agent.md`](research/hermes-agent.md) |
 | Relevamiento de NotebookLM y respuestas ancladas en fuentes | [`research/notebooklm-y-grounding.md`](research/notebooklm-y-grounding.md) |
 | Aprendizajes del `SOUL.md` y del contexto operativo de Prisma en Hermes (trabajo anterior del usuario) | [`research/soul-y-contexto-de-prisma-en-hermes.md`](research/soul-y-contexto-de-prisma-en-hermes.md) |
@@ -61,10 +63,8 @@ se trabaja y qué no se hace".
 | Reglas para futuras sesiones | [`../AGENTS.md`](../AGENTS.md) |
 | Configuración del primer cliente | [`../espacios/corework.yaml`](../espacios/corework.yaml) |
 
-Los ADR del Motor, el 0017 (alcance: por chat, hechos del trabajo; por la web, su estructura) y el
-0018 (motor de conversación), están en preparación en la rama `feat/motor-de-conversacion`. El ADR 0016 (avisos a
-otras personas desde hechos) no está en `main`: es de la rama de flujo congelada y se trae a la
-rama nueva.
+Los ADR 0016, 0017 y 0018 están también en `main`, que recibió los documentos del Motor por
+avance rápido. El ADR 0016 nació en la rama de flujo congelada, donde está implementado.
 
 ## Validación
 
@@ -90,8 +90,8 @@ usarse para decidir.** El motivo de las cuatro primeras filas está en
 | [`historial/STATUS-hasta-2026-10-04.md`](historial/STATUS-hasta-2026-10-04.md) y [`historial/AGENTS-hasta-2026-10-04.md`](historial/AGENTS-hasta-2026-10-04.md) | Copias del estado y de las reglas de trabajo antes del cambio de rumbo del 2026-10-04, literales salvo el aviso de archivo de su primera línea. Sus órdenes de trabajo y sus puntos de retorno ya no rigen. |
 | [`historial/STATUS-hasta-M1.md`](historial/STATUS-hasta-M1.md), [`historial/AGENTS-hasta-M1.md`](historial/AGENTS-hasta-M1.md) y [`historial/motor-de-conversacion-hasta-M1.md`](historial/motor-de-conversacion-hasta-M1.md); y [`historial/AGENTS-antes-de-reducir.md`](historial/AGENTS-antes-de-reducir.md), la versión larga de `AGENTS.md` antes de reducirlo a lo que sirve | Copias del estado, de las reglas de trabajo y del documento de la unidad del Motor hasta el paso M1 (2026-10-04), antes de condensarlos; literales salvo el aviso de archivo de su primera línea. Lo que figura ahí como pendiente o próximo paso ya no rige: lo vigente está en `STATUS.md`, en el documento de la unidad y en los ADR 0017 y 0018. |
 
-Superados en parte, con una nota del 2026-10-04 al comienzo que dice qué sigue vigente: los ADR
-[`0013`](decisions/0013-reglas-generales-de-la-conversacion.md) y
+Superados en parte por los ADR 0017 y 0018, con una nota del 2026-10-04 al comienzo que dice qué
+sigue vigente: los ADR [`0013`](decisions/0013-reglas-generales-de-la-conversacion.md) y
 [`0014`](decisions/0014-flujo-de-un-mensaje.md).
 
 Los documentos de `../odd/tasks/` que están en `main` son los diarios de las unidades anteriores

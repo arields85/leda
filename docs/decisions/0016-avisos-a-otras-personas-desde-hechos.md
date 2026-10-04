@@ -11,8 +11,16 @@
 > **Nota del 2026-10-04.** Este ADR se trajo sin cambios desde la rama congelada
 > `feat/flujo-de-un-mensaje` (etiqueta `respaldo-flujos-antes-de-d`). Su decisión sólo está
 > implementada en esa rama: la migración `0029`, la prueba y el documento de tareas que cita no
-> existen en esta. Si el motor de conversación trae este mecanismo, y con qué regla para los
-> reintentos, está `PENDIENTE` en el ADR 0018 (el Motor).
+> existen en esta.
+>
+> **El [ADR 0018](0018-motor-de-conversacion.md), decisión 8, trae este mecanismo** (diseño
+> aceptado para la prueba en el paso M1): los mensajes que Leda manda por su cuenta se guardan
+> como hechos y la IA los redacta justo antes de enviarlos; si falla, se reintenta a los 1, 2, 4
+> y 8 minutos y, al quinto fallo, quedan guardados con sus hechos, con un incidente y el aviso
+> de falla a quien causó el aviso. Nunca sale un texto armado a mano. Las columnas de la `0029`
+> vuelven con una migración nueva, desde la `0030`, y el redactor se rehace dentro del motor de
+> conversación. La decisión 4 de este ADR (`confirmar_borrador_tarea`) era del alta por chat,
+> que salió del alcance (ADR 0017, decisiones 1 y 2).
 
 ## Contexto
 

@@ -1,7 +1,7 @@
 # ADR 0014: El flujo de un mensaje, con un dueño por etapa
 
-- **Estado:** aceptada (decisión del usuario, 2026-09-30); superada en parte el 2026-10-04
-  (ver la nota de abajo)
+- **Estado:** aceptada (decisión del usuario, 2026-09-30); superada en parte el 2026-10-04 por
+  los ADR 0017 y 0018 (ver la nota de abajo)
 - **Fecha:** 2026-09-30
 - **Alcance:** el camino de cada mensaje y de cada toque (`gateway`, `llm`, `jev`,
   `agente`, `contexto`, `ingreso_tareas`, `pendientes`, `herramientas`). Amplía el
@@ -30,7 +30,10 @@
 >   todos los circuitos"), junto con los criterios de adopción del alta conducida: no se pasa
 >   ningún circuito al flujo C;
 > - el criterio para levantar el congelamiento de funcionalidad nueva, que nombra el alta, la
->   entrega y la aprobación: su redefinición está `PENDIENTE` en el ADR 0017;
+>   entrega y la aprobación: lo reemplaza el del
+>   [ADR 0017](0017-por-chat-los-hechos-por-la-web-la-estructura.md), decisión 5 (se construyen
+>   el seguimiento por chat y la plataforma web de tareas; lo demás espera a que Leda haga bien
+>   el seguimiento en pruebas reales);
 > - el comportamiento ante un cambio de tema de la enmienda del 2026-10-01 (pausar el borrador
 >   y atender lo otro directamente): lo reemplaza "un tema a la vez", con tres salidas (seguir,
 >   retomarlo después o cancelarlo; decisión del usuario, 2026-10-04);
@@ -39,8 +42,14 @@
 >   conversación" (los flujos congelados no se corrigen; un hallazgo es primero una
 >   conversación de prueba).
 >
-> **`PENDIENTE` en el ADR 0018:** si las seis etapas de este ADR obligan al motor de
-> conversación, y qué decide la IA y qué decide el código.
+> **Resuelto en el [ADR 0018](0018-motor-de-conversacion.md)** (diseño aceptado para la prueba
+> en el paso M1): qué decide la IA y qué decide el código. La IA elige una o más jugadas de una
+> lista cerrada y redacta desde los hechos; el código comprueba cada jugada, aplica las
+> situaciones generales y ejecuta (decisión 1). El ADR 0018 no adopta las seis etapas de este
+> ADR: la forma del motor de conversación la fijan sus decisiones 1 a 4.
+>
+> Lo que este ADR dice sobre cómo conversa Leda no rige si contradice la constitución §8 o los
+> ADR 0017 y 0018 (`AGENTS.md`, "Orden de lectura y fuentes de verdad").
 
 ## Contexto
 

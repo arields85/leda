@@ -1,6 +1,7 @@
 # ADR 0013: Reglas generales de la conversación
 
-- **Estado:** aceptada; superada en parte el 2026-10-04 (ver la nota de abajo)
+- **Estado:** aceptada; superada en parte el 2026-10-04 por los ADR 0017 y 0018 (ver la nota de
+  abajo)
 - **Fecha:** 2026-09-29
 - **Alcance:** el camino de cada mensaje y de cada toque: `gateway` (`procesar_update`,
   `_turno`, `_toque`, los retomes de preguntas pendientes), `pendientes`,
@@ -31,13 +32,24 @@
 >   lo otro): pasan a ser tres (seguir, retomarlo después o cancelarlo; decisión del usuario,
 >   2026-10-04).
 >
-> **`PENDIENTE` en el ADR 0018:**
+> **Resuelto en el [ADR 0018](0018-motor-de-conversacion.md)** (diseño aceptado para la prueba
+> en el paso M1):
 >
-> - si una confirmación que crea o cambia algo puede hacerse por escrito. La enmienda del
->   2026-10-02 pone botones en las confirmaciones de la constitución §7; la regla del usuario
->   del 2026-10-04 dice que los botones son atajos y que lo que hace un botón también vale
->   escrito. No darlo por decidido;
-> - cómo cumple cada regla el motor de conversación.
+> - una confirmación que crea o cambia algo vale por escrito igual que el botón, con una guarda:
+>   lo que confirma es lo último que la persona vio y no cambió desde entonces; ante la duda,
+>   Leda pregunta (decisión 2). Reemplaza, en ese punto, a la enmienda del 2026-10-02;
+> - la pregunta pendiente como contexto pasa a ser el estado de cada conversación, que Leda lee
+>   en lugar de deducirlo (decisión 3), y "un tema a la vez" es una de las ocho situaciones
+>   generales (decisión 4);
+> - el estado real y sólo opciones posibles: la IA redacta desde lo que el código informa que
+>   pasó y qué se puede hacer (decisión 1).
+>
+> **`PENDIENTE`:** cómo cumple el motor de conversación las reglas 2 (una respuesta visible por
+> mensaje y por toque) y 4 (toques con señal e idempotentes); se fija al diseñar la Etapa 2.
+>
+> Lo que este ADR dice sobre cómo conversa Leda no rige si contradice la constitución §8 o los
+> ADR [0017](0017-por-chat-los-hechos-por-la-web-la-estructura.md) y 0018 (`AGENTS.md`, "Orden de
+> lectura y fuentes de verdad").
 
 ## Contexto
 
