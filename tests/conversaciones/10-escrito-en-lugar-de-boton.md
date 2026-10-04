@@ -1,13 +1,10 @@
 # 10. Escribir en lugar de tocar un botón
 
-**Qué prueba:** lo que hace un botón vale igual escrito. Para elegir, siempre. Para confirmar, con la
-guarda: lo confirmado es lo último que la persona vio y no cambió desde que se le mostró; si cambió, no
-vale y Leda muestra lo nuevo. ADR 0018, decisión 4, situación general 6, y decisión 2.
-
-**Supuesto:** la segunda parte (pasos 3 a 7) necesita una confirmación dentro del circuito. Se escribe
-sobre la nueva previsión, como si P3 la pidiera. PENDIENTE (P3): si P3 = a y tampoco P1 ni P2 piden
-confirmación, el recordatorio no tiene confirmaciones y esa parte se prueba en el primer circuito que las
-tenga.
+**Qué prueba:** lo que hace un botón vale igual escrito. En la prueba chica, los únicos botones son las
+tareas como opciones de una duda (decisiones 9b y 9d): elegir escribiendo vale siempre. Confirmar
+escribiendo, con la guarda de la decisión 2, se prueba con el primer circuito que confirma, la entrega
+(decisión 9a); sus pasos quedan abajo, en "Para la prueba de la entrega". ADR 0018, decisión 4, situación
+general 6.
 
 ## Estado inicial
 
@@ -15,11 +12,11 @@ tenga.
 - **Tareas de Marcos:**
   - "Programar PLC de la comprimidora": referente Ismael; vence el viernes 30; `asignada`; sin bloqueos
     ni dependencias.
-  - "Revisar comunicaciones industriales de la comprimidora": referente Ismael; vence el viernes 23
-    (D+1); `asignada`; sin bloqueos ni dependencias; sin previsiones anotadas.
+  - "Revisar comunicaciones industriales de la comprimidora": referente Ismael; vence el viernes 30;
+    `asignada`; sin bloqueos ni dependencias; sin previsiones anotadas.
 - **Estado de la conversación de Marcos:** sin tema abierto, nada para después, nada mostrado para
-  confirmar. **De Ismael:** igual.
-- **Ya enviado:** nada a Marcos en el día.
+  confirmar.
+- **Ya enviado:** nada a Marcos en la semana (el aviso previo de las dos sale el martes 27).
 
 ## Hilo
 
@@ -28,23 +25,40 @@ tenga.
    - Jugadas: `anotar_inicio`, sin tarea: las dos son "de la comprimidora" y las dos se pueden arrancar.
    - Efecto: ninguno.
    - La respuesta dice: una pregunta por cuál de las dos.
-   - Botones: las dos tareas (constitución §8: algo con más de una lectura).
+   - Botones: las dos tareas (constitución §8: algo con más de una lectura; situación general 5).
    - Estado después: tema abierto: el inicio, esperando la elección.
 
 2. **Marcos** escribe, sin tocar ningún botón: "la del plc"
    →
    - Jugadas: `elegir`, la tarea del PLC. Vale igual que tocar el botón.
-   - Efecto: la tarea del PLC pasa a `en_curso` (o se muestra su vista previa y Marcos la confirma
-     escribiendo, con la misma guarda; P1).
+   - Efecto: la tarea del PLC pasa a `en_curso`, directo (decisión 9a), con evento de Marcos y auditoría; la
+     de comunicaciones sigue `asignada`.
    - La respuesta dice: que quedó anotado el inicio de la tarea del PLC.
-   - Estado después: sin tema abierto, nada mostrado para confirmar.
+   - Estado después: sin tema abierto; los botones de la pregunta ya contestada quedan viejos (si se tocan,
+     es la conversación 11).
+
+## Qué mide
+
+- **Garantías (5b):** no inventa; no hace sin confirmación lo que la requiere (nada la requiere en este
+  circuito); no deja sin salida (la pregunta trae las opciones); no confunde la tarea ("la del plc" es la
+  del PLC, nunca la de comunicaciones).
+- **Falla de comprensión:** que la IA no tome "la del plc" como la elección. Tiene que volver a preguntar;
+  elegir la otra tarea es una falla de garantía.
+
+## Para la prueba de la entrega
+
+No corre en la prueba chica. Se escribió sobre la nueva previsión, cuando todavía se pensaba que llevaba
+confirmación; la previsión se anota directo (decisión 9a), así que al escribir la conversación de la
+entrega estos pasos se pasan a la entrega con su evidencia: mostrar, corregir, confirmar escribiendo y un
+cambio en el medio que hace fallar la guarda. Supuestos de esta parte: la tarea de comunicaciones vence el
+viernes 23 y lo que se muestra lleva confirmación.
 
 3. **Marcos** escribe (jueves 22, 11:10): "lo de comunicaciones va a ser para el martes 27, me falta un
    modulo que no llego"
    →
    - Jugadas: `anotar_prevision` sobre la tarea de comunicaciones, martes 27, motivo "falta un módulo que
      no llegó".
-   - Efecto: ninguno todavía; se muestra la vista previa (supuesto P3), con su huella.
+   - Efecto: ninguno todavía; se muestra la vista previa (supuesto de esta parte), con su huella.
    - Botones: los de la confirmación (constitución §7).
    - Estado después: lo último mostrado para confirmar: la previsión del martes 27.
 
@@ -85,11 +99,5 @@ tenga.
      §10).
    - Estado después: nada mostrado para confirmar; la vista previa vieja, descartada y registrada.
 
-## Qué mide
-
-- **Garantías (5b):** no inventa (no anota una previsión que la guarda rechazó); no hace sin confirmación
-  lo que la requiere: el "ok" del paso 5 vale sólo para la previsión del 28 y el "dale" del paso 8 no vale;
-  no deja sin salida (el paso 8 explica qué pasó); no confunde la tarea.
-- **Falla de comprensión:** que la IA dude de si "la del plc", "ok" o "dale" son una elección o una
-  confirmación. Tiene que preguntar; confirmar algo que no es lo último que Marcos vio es una falla de
-  garantía.
+Qué mide esta parte: el "ok" del paso 5 vale sólo para lo último mostrado y el "dale" del paso 8 no vale;
+confirmar algo que no es lo último que la persona vio, o que cambió, es una falla de garantía.
