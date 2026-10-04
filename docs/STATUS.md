@@ -265,11 +265,14 @@ aclaraciones, conversación de bloqueos.
 **Resultados y conclusión vigente de los flujos y modelos:** [`product/bitacora-de-flujos.md`](product/bitacora-de-flujos.md) (elegido: C6 con la regla del mozo, con GPT-6 sol).
 
 **Punto exacto para retomar (2026-10-04).** Rama `feat/flujo-de-un-mensaje`, worktree
-`D:\Proyectos\Leda-PM-worktrees\flujo-de-un-mensaje`, HEAD con 0-34 construido (suite
-completa 3959 passed, RDD aprobado) y la cuarta auditoría registrada. **Lo primero: la tarea
-0-35, rediseño del borrador devuelto**, aprobada por el usuario el 2026-10-04 (diseño, motivo y
-alcance en `odd/tasks/circuitos-al-flujo-nuevo.md`, tarea 0-35): escribir el chequeo de rumbo,
-delegar el escritor, quinta auditoría independiente, RDD y prueba real con sol.
+`D:\Proyectos\Leda-PM-worktrees\flujo-de-un-mensaje`, HEAD `28a9bc4`: **0-35 construida**
+(el borrador devuelto es un borrador normal; sin la lista de datos devueltos ni el lector del
+motivo), con la quinta auditoría independiente y sus correcciones (suite completa 3997 passed,
+RDD aprobado y reconocido, linaje `review-47c246e4351f127e`). **Lo primero: la prueba real de
+0-35 con sol** (guion: alta con rechazo, corrección o "dejalo así", pedir ayuda sobre un dato
+confirmado, devuelto que espera a otro borrador, reenvío y confirmación); resultado a la
+bitácora de flujos. Detalle y decisiones abiertas en `odd/tasks/circuitos-al-flujo-nuevo.md`,
+tarea 0-35.
 
 - **Antes de probar:** PostgreSQL estaba caído al cerrar (`levantar-postgres.bat`); la IA activa
   en `leda_flujo` es `openai/gpt-6-sol` (`python -m leda modelo` para verla); la restricción de
