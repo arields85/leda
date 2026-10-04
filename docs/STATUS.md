@@ -75,8 +75,9 @@ Documentos superados: [`INDEX.md`](INDEX.md#documentos-superados).
 - **Siempre una sesión nueva:** una sesión iniciada antes del cambio del 2026-10-04 conserva en su
   contexto las instrucciones anteriores y no se continúa.
 - **Lo primero:** escribir con el usuario el ADR 0017 y el ADR 0018 (Etapa 1 de "Próximo paso"),
-  punto por punto y sin código. El ADR 0017 quedó redactado el 2026-10-04 (decisiones 1 a 7) y
-  espera su aceptación en el paso M1; sigue el ADR 0018.
+  punto por punto y sin código. Los dos quedaron redactados el 2026-10-04 (ADR 0017, decisiones 1
+  a 7; ADR 0018, decisiones 1 a 8) y esperan la aceptación del usuario en el paso M1. Sigue la
+  tarea E1-3 (conversaciones de prueba).
 - **Qué no se hace:** lo que lista [`../AGENTS.md`](../AGENTS.md), "Dónde se trabaja y qué no se
   hace", y lo de "Qué quedó congelado o superado", más abajo.
 - **Acuerdos de trabajo vigentes:** chequeo de rumbo escrito antes de cada unidad; consentimiento

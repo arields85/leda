@@ -59,8 +59,10 @@ Condiciones de la carga (usuario, 2026-10-04):
 
 - **Valida los mismos datos que una tarea comprometida:** objetivo, responsable, fecha objetivo,
   criterio de aceptación y política de evidencia.
-- **La auditoría guarda quién cargó y quién decidió según el archivo**, esto último como
-  declaración. Leda nunca lo presenta como una aprobación hecha en Leda (constitución §4).
+- **La auditoría guarda quién cargó y quién decidió**, esto último como declaración de quien
+  carga la tarea en la plataforma (el usuario lo dijo primero de un archivo; la carga pasó a ser
+  un formulario, decisión 5). Leda nunca lo presenta como una aprobación hecha en Leda
+  (constitución §4).
 - **No hay circuito de aceptación por chat.** A lo sumo, Leda avisa a los responsables y referentes
   que se cargaron tareas. Si ese aviso entra, y con qué mecanismo, está `PENDIENTE` en el ADR 0018
   (avisos a otras personas).

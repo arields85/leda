@@ -1,0 +1,283 @@
+# ADR 0018: El motor de conversación
+
+- **Estado:** redactada con el usuario (decisiones 1 a 8, 2026-10-04). En el paso M1 el usuario
+  acepta el diseño para la prueba, y el ADR queda como "propuesta" hasta que pase la prueba chica
+  de la Etapa 2.
+- **Fecha:** abierta el 2026-10-04.
+- **Alcance:** cómo procesa Leda cada mensaje y cada toque en el seguimiento por chat (ADR 0017,
+  decisión 3): quién decide qué, el estado de la conversación, los circuitos, las situaciones
+  generales, la IA que se usa y los criterios de la prueba chica. Es el mecanismo que, comparado
+  con los flujos A, B y C, se llama flujo D.
+- **Evidencia:** `docs/research/gestion-del-dialogo-y-arquitecturas-de-agentes.md` (secciones 2,
+  "Arquitecturas", y 3, "Confiabilidad"); ADR 0013 (reglas generales de la conversación) y
+  ADR 0014 (flujo de un mensaje), superados en parte; `docs/product/bitacora-de-flujos.md`;
+  `odd/tasks/motor-de-conversacion.md`, "Preguntas a resolver con el usuario".
+
+> **Cómo se lee este borrador.** El ADR se escribe con el usuario, una decisión por vez. Cada
+> decisión lleva la fecha en que el usuario la tomó. Lo que figura como `PENDIENTE` no está
+> decidido y no se actúa sobre ello. Ningún código de conversación se escribe antes del paso M1.
+
+## Contexto
+
+La conversación de Leda se escribió a mano, situación por situación, y falló en cada prueba real
+(flujos A, B y C1 a C6). El relevamiento del 2026-10-04 encontró tres formas de organizar un
+asistente de tareas: la IA conduce con herramientas vigiladas; la IA traduce cada mensaje en
+comandos de una lista cerrada y un gestor determinista los ejecuta con flujos declarados; o el
+código escribe un camino por situación. Leda tenía la segunda en la intención (ADR 0013 y 0014) y
+la tercera en la implementación.
+
+## Decisiones
+
+### 1. La IA elige jugadas de una lista cerrada; el código las ejecuta (usuario, 2026-10-04)
+
+Ejemplo. Ismael escribe: "Terminé lo del tablero. Lo de los planos sigo trabado, falta el
+repuesto". La IA lo traduce en dos jugadas: entrega de la tarea del tablero, y bloqueo en la tarea
+de los planos porque falta el repuesto. El código ejecuta cada jugada siempre de la misma manera:
+atiende primero la entrega (si falta la foto que pide la tarea, eso es lo que falta) y deja el
+bloqueo anotado para retomarlo enseguida. La IA escribe la respuesta, con naturalidad, a partir
+de lo que el código informa que pasó.
+
+- **La IA interpreta y elige.** Traduce cada mensaje (y cada texto escrito en lugar de tocar un
+  botón) en una o más jugadas de una lista cerrada declarada en el código, con sus datos: qué
+  tarea, qué evidencia, qué bloqueo.
+- **El código decide y ejecuta.** Comprueba que cada jugada sea posible en el estado actual, que
+  la persona tenga autoridad y que los datos existan; aplica las situaciones generales una sola
+  vez para todos los circuitos; y ejecuta los efectos con las operaciones del dominio, con la
+  confirmación cuando corresponde.
+- **La IA redacta desde los hechos.** La respuesta sale de lo que el código informa: qué pasó, qué
+  falta, qué se puede hacer. Nunca inventa datos ni efectos.
+- **Lo que no está en la lista no se hace.** Leda dice con honestidad qué puede hacer, como en el
+  ADR 0017, decisión 1.
+- **Y se le informa al administrador** (usuario, 2026-10-04). Cuando un mensaje no entra en
+  ninguna jugada de la lista, Leda le avisa al administrador qué situación fue y qué mensaje de
+  la conversación la provocó, para que se analice y se agregue, y la próxima vez Leda sepa
+  responder. Precisiones:
+  - Se informa sólo lo que no entra en ninguna jugada. Una jugada que existe pero no se puede
+    hacer en ese momento (por ejemplo, aprobar una tarea que todavía no se entregó) no es una
+    situación nueva: Leda explica por qué no se puede.
+  - El aviso puede llevar el mensaje: el administrador de plataforma puede ver las conversaciones
+    y ese acceso queda registrado (constitución §2 y §12).
+  - Este aviso es la primera forma del autoaprendizaje de Leda, que el usuario quiere. La
+    constitución lo permite con un límite (§5 y mecánica §14): el aprendizaje puede ajustar cómo
+    Leda entiende, comunica y estima, pero no lo que tiene permitido hacer. Por eso:
+    - entender una forma nueva de decir algo que ya es una jugada (por ejemplo, que "ya lo
+      liquidé" quiere decir "terminé") lo puede aprender Leda sola. Cómo, es la memoria, la
+      tercera parte del motor de conversación, con su propio ADR;
+    - una jugada nueva, que hace algo que Leda no hacía (por ejemplo, pasarle una tarea a otra
+      persona), Leda la propone con este aviso y una persona decide si se agrega. Se escribe
+      primero como conversación de prueba y después se declara.
+  - Por qué canal llega el aviso y cómo se agrupan los repetidos: `PENDIENTE`.
+- **Enmienda la regla del mozo** (`AGENTS.md`, "Cómo pensamos juntos", punto 11). Su núcleo sigue
+  vigente: la IA no inventa datos ni efectos, una propuesta suya es una sugerencia, sus
+  instrucciones describen su trabajo y no casos, y la cocina no corrige lo que el mozo escuchó con
+  heurísticas. Lo que cambia es la extensión que estaba en revisión ("la IA no toma decisiones"):
+  la IA elige qué jugada corresponde y cómo decirlo; el código decide si la jugada vale, cómo se
+  maneja cada jugada y cada situación general, y ejecuta.
+- Qué declara un circuito y cuáles son las situaciones generales: decisión 4, `PENDIENTE`.
+
+**Alternativas descartadas:**
+
+- **La IA conduce con herramientas.** Se adapta sola a lo imprevisto con poco código, pero cumple
+  las reglas de forma probabilística: en la tabla de τ-bench, los modelos que resuelven bien una
+  tarea una vez fallan al repetirla cuatro veces. Además cuesta más y tarda más (la prueba de Rasa
+  informa 0,04 dólares y 2,1 s por mensaje con comandos, contra 0,10 dólares y 7,4 s con un
+  agente que llama funciones).
+- **Un camino escrito a mano por situación.** Es lo que falló en cada prueba real.
+
+### 2. Una confirmación escrita vale como el botón, con una guarda (usuario, 2026-10-04)
+
+Ejemplo. Leda le muestra a Marcos "Ismael entregó 'Revisar el tablero eléctrico' con esta foto",
+con los botones Aprobar y Pedir cambios. Marcos no toca el botón: escribe "aprobado".
+
+- **Vale igual que tocar el botón** si se cumplen las dos condiciones: lo que confirma es lo último
+  que la persona vio, y no cambió desde que se le mostró. La vista previa con huella que ya existe
+  en la base (`Preparacion`, `pendientes.registrar` y `pendientes.resolver`) comprueba lo segundo.
+- **Si cambió, no vale.** Por ejemplo, si Ismael mandó otra foto en el medio, Leda le muestra a
+  Marcos lo nuevo.
+- **Ante cualquier duda, Leda pregunta y no confirma.** "Aprobado, pero que revise el cable" no es
+  una confirmación.
+- En términos de la decisión 1: "confirmar" es una jugada que la IA elige sólo cuando el texto es
+  claramente una confirmación, y el código comprueba la guarda antes de ejecutar.
+- Resuelve lo que estaba `PENDIENTE` sobre "los botones son atajos" (`AGENTS.md`; nota del
+  ADR 0013): la regla alcanza también a las confirmaciones que crean o cambian algo.
+
+**Alternativa descartada:** que una confirmación valga sólo con el botón. No deja dudas sobre qué
+se confirmó, pero va contra "los botones son atajos" y suma un paso cada vez.
+
+### 3. Qué guarda el motor de conversación (usuario, 2026-10-04)
+
+Las tres partes que el usuario definió el 2026-10-04:
+
+1. **El estado de cada conversación.** Para cada persona, en todo momento: el tema abierto (por
+   ejemplo, "esperando la foto de la entrega del tablero"), los temas que quedaron para después y
+   lo último que Leda mostró para confirmar, con su huella. Leda deja de deducir el estado en cada
+   mensaje: lo lee. Ejemplo: Ismael manda una foto con "acá está", y Leda sabe que es la del
+   tablero porque el estado dice que la estaba esperando.
+2. **El registro de cada turno.** Cada mensaje que entra y sale, cada toque (registrado como la
+   opción elegida), las jugadas que eligió la IA y lo que hizo el código. Sirve para leer una
+   prueba real, para el aviso al administrador de lo que no está en la lista (decisión 1) y, más
+   adelante, para el autoaprendizaje. Se conserva como las conversaciones (ADR 0002): sin
+   vencimiento hasta que un administrador autorizado lo borre, con el acceso y el borrado
+   registrados; y Leda lo informa si se lo preguntan (constitución §9).
+3. **La memoria (el autoaprendizaje).** Se le reserva el lugar, pero no se construye en esta
+   etapa: va con su propio ADR.
+
+- **Las tres quedan en la base, separadas por espacio:** toda tabla nueva lleva `workspace_id` y
+  `row level security` forzado, y ninguna lleva `chat_id` ni `callback_data` (reglas 2 y 3 de
+  `docs/architecture/frontera.md`).
+- `PENDIENTE`: las tablas y columnas concretas se escriben al diseñar la Etapa 2, con migraciones
+  desde la `0030`.
+
+### 4. Qué declara un circuito y cuáles son las situaciones generales (usuario, 2026-10-04)
+
+**Un circuito se declara con una ficha en el código**, no con caminos. Cada una de las ocho cosas
+del ADR 0017 (decisión 3) es un circuito. Su ficha dice, por cada jugada: qué datos necesita, qué
+comprueba el código, qué efecto hace y si lleva confirmación, y qué pasa después. Ejemplo, la
+entrega:
+
+- jugada: entregar una tarea;
+- necesita: cuál es la tarea y la evidencia, si la tarea la pide;
+- comprueba: que quien entrega sea el responsable y que la tarea esté en curso;
+- hace: pasa la tarea a revisión, con confirmación;
+- después: le avisa a quien la tiene que aprobar.
+
+Sumar una capacidad es escribir una ficha nueva. Las fichas son un conjunto cerrado declarado en
+el código, nunca configuración de un cliente (`AGENTS.md`, "Límites de alcance": no es un motor
+genérico de workflows).
+
+**Las situaciones generales se resuelven una sola vez y valen para todos los circuitos.** Son
+ocho, y casi todas salen de fallas de las pruebas reales:
+
+1. **Cambio de tema:** un tema a la vez, con tres salidas (seguir, retomarlo después o
+   cancelarlo).
+2. **Varias cosas en un mensaje:** Leda atiende una y deja anotadas las otras para enseguida.
+3. **Corrección:** "no, era la otra tarea".
+4. **Cancelar:** "dejá, no importa".
+5. **Duda:** si Leda no sabe de qué tarea se habla, pregunta con opciones para elegir.
+6. **Escribir en lugar de tocar un botón:** vale igual, con la guarda de la decisión 2.
+7. **Algo vencido:** un botón viejo, una vista previa que ya no corresponde o un aviso que quedó
+   atrás. Leda lo dice; nunca lo descarta en silencio ni deja a la persona sin salida (hallazgos
+   C-1 a C-3).
+8. **Algo que no está en la lista:** Leda dice qué puede hacer y le avisa al administrador
+   (decisión 1).
+
+La lista puede crecer: una situación general nueva se agrega con el mismo procedimiento que una
+jugada nueva (decisión 1).
+
+### 5. La prueba chica
+
+#### 5a. Qué se prueba: el recordatorio y lo que la persona contesta (usuario, 2026-10-04)
+
+Leda le escribe a Ismael que mañana vence una tarea, e Ismael contesta lo que le sale:
+
+- "arranqué": Leda anota el inicio;
+- "llego el 27, el proveedor se demoró": Leda anota la nueva previsión y avisa al referente
+  (ADR 0017, decisión 4);
+- "estoy trabado, falta el repuesto": Leda anota el bloqueo (el primer paso de la decisión 3a del
+  ADR 0017, sin la persecución);
+- no contesta: Leda se lo recuerda al día siguiente.
+
+Por qué este circuito: es el corazón del seguimiento (Leda arranca la conversación y tiene que
+entender cualquier respuesta en contexto), es lo que los flujos anteriores nunca resolvieron (no
+sabían a qué recordatorio respondía la persona) y tiene pocos efectos, todos simples. La entrega
+con aprobación y el bloqueo perseguido van en las pruebas siguientes: el bloqueo perseguido es el
+más importante, pero también el más grande.
+
+#### 5b. Cuándo se da por aprobada (usuario, 2026-10-04)
+
+Los criterios se escriben antes de la prueba, para que no se acomoden a lo que salga. La prueba se
+aprueba si se cumplen los tres:
+
+1. **Conversaciones de prueba, cinco corridas cada una contra la IA real.** Unas diez: las cuatro
+   respuestas de 5a más las situaciones generales que aplican (varias cosas en un mensaje,
+   corrección, cambio de tema, duda, algo vencido, algo que no está en la lista).
+   - **Las garantías, 5 de 5:** Leda no inventa un dato, no hace sin confirmación algo que la
+     requiere, no deja a la persona sin salida y no confunde a qué tarea responde la persona.
+   - **La comprensión, 4 de 5:** y la vez que no entiende, pregunta; nunca hace otra cosa.
+2. **Una prueba por Telegram real** con el usuario operando las cuentas de prueba: en toda la
+   prueba Leda no se pierde ni se traba ninguna vez.
+3. **El usuario dice que se siente natural.** Es subjetivo a propósito: quien usa a Leda es una
+   persona, no una prueba automática.
+
+El tiempo de respuesta se mide y se registra, pero no es criterio de aprobación en esta primera
+prueba. Una suite en verde no cuenta como evidencia (`AGENTS.md`, "Cómo pensamos juntos",
+punto 12).
+
+#### 5c. Cuándo se frena (usuario, 2026-10-04)
+
+Estos criterios no dicen si la prueba pasó: dicen cuándo se deja de arreglar y se revisa el
+diseño, para no repetir lo de los flujos anteriores (arreglar falla tras falla mientras parecía
+que se avanzaba). Se frena si pasa cualquiera de estas tres cosas:
+
+1. **Aparece un caso especial.** Si para que una situación general funcione hay que escribir algo
+   puntual para un circuito (una frase, una condición o un camino para el caso observado), el
+   diseño no está resolviendo las situaciones una sola vez. Ejemplo: para que "dejá, no importa"
+   funcione en el recordatorio hay que agregar una regla sólo para el recordatorio.
+2. **La misma clase de falla vuelve después de un arreglo.** Si después de arreglar el mecanismo la
+   prueba real vuelve a perderse o a trabarse, no se propone otro arreglo: se revisa el diseño con
+   el usuario (`AGENTS.md`, "Cómo pensamos juntos", punto 4).
+3. **Dos vueltas sin llegar.** Si después de dos vueltas de ajustes las conversaciones de prueba no
+   alcanzan los criterios de 5b, se revisa con el usuario si el problema es el diseño o la IA
+   (decisión 6).
+
+Al frenar, el resultado se registra igual en `docs/product/bitacora-de-flujos.md`: el paso M2 se
+cumple con el resultado registrado, pase o no.
+
+### 6. La IA: arranca GPT-6 sol y se mide luna en paralelo (usuario, 2026-10-04)
+
+- **La prueba chica arranca con GPT-6 sol**, la más fiel a los hechos en la prueba real del
+  2026-10-03 (`docs/product/bitacora-de-flujos.md`, "Modelos").
+- **GPT-6 luna corre las mismas conversaciones de prueba en paralelo.** En el flujo C6 confundió
+  quién hizo qué e inventó un dato, pero es unas 23 veces más barata y más rápida (USD 0,0007
+  contra 0,016 por mensaje; unos 8 s contra 11). Esas mediciones son de una sola corrida y del
+  flujo C6; con el motor de conversación la IA hace otro trabajo (elige jugadas de una lista
+  cerrada y redacta desde hechos que le da el código), así que hay que volver a medir.
+- **Si luna alcanza los criterios de 5b**, el agente le presenta al usuario los números y el
+  usuario decide si se cambia.
+
+### 7. Jev se mide en paralelo y se queda sólo si aporta (usuario, 2026-10-04)
+
+Jev (ADR 0006) es una IA chica que sólo elige: de qué tarea habla un mensaje, con una probabilidad
+por opción; si no está segura, Leda pregunta. Con el motor de conversación, la IA principal ya
+elige la tarea al elegir la jugada, y en la prueba chica el estado casi siempre la sabe (Leda le
+acaba de escribir a la persona sobre esa tarea).
+
+- **La prueba arranca sin Jev:** elige la tarea la IA principal.
+- **Jev corre en paralelo sobre las mismas conversaciones, sin decidir nada.** Se suman un par de
+  conversaciones difíciles a propósito, con dos tareas parecidas.
+- **Si Jev evita errores que la IA principal comete sola, se queda; si no, se retira.** Es una
+  pieza y un proveedor menos. La deuda `b-0005-b` (Jev duda con "el plc") se resuelve con esta
+  medición.
+
+### 8. Cuando la IA falla (usuario, 2026-10-04)
+
+La IA es un servicio externo y a veces no responde. Nunca se falla en silencio.
+
+**Caso 1: la persona escribe y la IA no responde.** Ejemplo: Ismael escribe "arranqué" y la IA no
+contesta.
+
+- Leda reintenta una vez, enseguida.
+- Si vuelve a fallar, no se ejecuta nada: sin IA no hay jugada, y nada se hace adivinando.
+- La persona recibe un mensaje neutro: no fue posible completarlo y el caso quedó registrado
+  (constitución §10). Ese texto es fijo en el código, porque no hay IA para escribirlo.
+- El administrador recibe el aviso de la falla, como incidente.
+- El mensaje queda en el registro de turnos (decisión 3): nada se pierde.
+
+**Caso 2: los mensajes que Leda manda por su cuenta** (recordatorios, el aviso al referente de un
+pedido de más tiempo). Se trae de la rama congelada el mecanismo del ADR 0016:
+
+- el mensaje se guarda como hechos y la IA lo redacta justo antes de enviarlo;
+- si la IA falla, el mensaje espera y se reintenta a los 1, 2, 4 y 8 minutos;
+- al quinto fallo queda guardado con sus hechos (no se pierde), se registra un incidente para el
+  administrador, y quien causó el aviso, si lo hay, recibe el aviso de falla con lo pendiente;
+  nunca sale un texto armado a mano.
+- Las columnas de la migración `0029` se traen con una migración nueva, desde la `0030`, y el
+  redactor se rehace dentro del motor de conversación (`odd/tasks/motor-de-conversacion.md`, "Qué
+  se trae de la rama congelada").
+
+## Consecuencias
+
+- **Decisión 1:** cada jugada de la lista y cada situación general se declaran y se prueban una
+  vez; sumar un circuito es declarar sus jugadas, no escribir ramas.
+- **Decisión 1:** al aceptar este ADR (tarea E1-4), el punto 11 de `AGENTS.md` se reescribe con la
+  enmienda.

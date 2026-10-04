@@ -112,12 +112,14 @@ Etapa 1 (ruta: en línea, con el usuario; son documentos de decisión):
 
 - [x] **E1-1.** ADR 0017, alcance: `docs/decisions/0017-por-chat-los-hechos-por-la-web-la-estructura.md`.
       Redactado con el usuario el 2026-10-04 (decisiones 1 a 7); su aceptación es el paso M1.
-- [ ] **E1-2.** ADR 0018, motor de conversación: `docs/decisions/0018-motor-de-conversacion.md` (queda
-      "propuesta" hasta que pase la prueba).
+- [x] **E1-2.** ADR 0018, motor de conversación: `docs/decisions/0018-motor-de-conversacion.md` (queda
+      "propuesta" hasta que pase la prueba). Redactado con el usuario el 2026-10-04 (decisiones 1
+      a 8); el usuario acepta su diseño en el paso M1.
 - [ ] **E1-3.** `tests/conversaciones/`: formato (README) y primeras conversaciones como datos.
 - [ ] **E1-4.** Al aceptar los ADR: actualizar `AGENTS.md` (nombres, puntos 9 y 11),
       `docs/architecture/frontera.md`, `docs/product/que-es-leda.md`, `docs/capacidades.md`,
-      `docs/ROADMAP.md`, `docs/INDEX.md` y la línea "superada en parte" de los ADR 0013 y 0014.
+      `docs/ROADMAP.md`, `docs/INDEX.md`, la línea "superada en parte" de los ADR 0013 y 0014 y
+      la nota del ADR 0016 (el ADR 0018, decisión 8, trae su mecanismo).
 
 ## Preguntas a resolver con el usuario
 
@@ -161,18 +163,40 @@ Una por vez. Para el ADR 0017:
 
 Para el ADR 0018:
 
-1. Qué decide la IA y qué decide el código (enmienda de la regla del mozo).
+1. Qué decide la IA y qué decide el código (enmienda de la regla del mozo). **Resuelta
+   (usuario, 2026-10-04):** la IA elige jugadas de una lista cerrada y redacta desde los hechos;
+   el código decide si cada jugada vale, maneja las situaciones generales una sola vez y ejecuta;
+   lo que no entra en ninguna jugada se le informa al administrador, con el mensaje que lo
+   provocó, para agregarlo (ADR 0018, decisión 1).
 2. Si una confirmación que crea o cambia algo vale escrita, con la guarda de que el resumen sea
-   lo último que la persona vio y no haya cambiado.
+   lo último que la persona vio y no haya cambiado. **Resuelta (usuario, 2026-10-04):** vale como
+   el botón, con esa guarda; ante cualquier duda Leda pregunta (ADR 0018, decisión 2).
 3. La forma del estado explícito, del registro de turnos y el lugar reservado a la memoria.
-4. Qué declara un circuito y cuáles son las situaciones generales.
-5. Los criterios de éxito y de corte de la prueba chica, y su primera prueba real.
+   **Resuelta (usuario, 2026-10-04):** estado por persona (tema abierto, temas para después, lo
+   último mostrado para confirmar), registro de cada turno con la retención del ADR 0002, y la
+   memoria con su lugar reservado y su propio ADR (ADR 0018, decisión 3).
+4. Qué declara un circuito y cuáles son las situaciones generales. **Resuelta (usuario,
+   2026-10-04):** cada circuito es una ficha en el código; ocho situaciones generales resueltas
+   una sola vez, con la lista abierta a crecer (ADR 0018, decisión 4).
+5. Los criterios de éxito y de corte de la prueba chica, y su primera prueba real. **En curso:**
+   resuelta la parte 5a (usuario, 2026-10-04): se prueba el recordatorio y lo que la persona
+   contesta (ADR 0018, decisión 5a); y la 5b: se aprueba con las garantías 5 de 5, la comprensión
+   4 de 5 (y si no entiende, pregunta), una prueba por Telegram sin perderse ni trabarse y el
+   usuario diciendo que se siente natural; y la 5c: se frena ante un caso especial, ante la misma
+   clase de falla después de un arreglo, o tras dos vueltas sin llegar (ADR 0018, decisión 5).
 6. La IA: se sigue con GPT-6 sol; medir de nuevo luna con el motor de conversación (más barata
-   y rápida).
-7. Jev: medir cuánto aporta frente a la IA principal y retirarlo si no aporta.
+   y rápida). **Resuelta (usuario, 2026-10-04):** la prueba arranca con sol y luna corre las
+   mismas conversaciones en paralelo; si alcanza los criterios, el usuario decide si se cambia
+   (ADR 0018, decisión 6).
+7. Jev: medir cuánto aporta frente a la IA principal y retirarlo si no aporta. **Resuelta
+   (usuario, 2026-10-04):** la prueba arranca sin Jev; Jev corre en paralelo sin decidir y se
+   queda sólo si evita errores de la IA principal (ADR 0018, decisión 7).
 8. Qué pasa cuando la IA no responde o falla (en la rama congelada eran las tareas P1-P7), y si
    se trae el mecanismo de avisos guardados como hechos con sus reintentos (ADR 0016), incluido
-   qué pasa cuando un aviso a otra persona agota los reintentos.
+   qué pasa cuando un aviso a otra persona agota los reintentos. **Resuelta (usuario,
+   2026-10-04):** si falla al responder, un reintento y después un mensaje neutro fijo, sin
+   ejecutar nada, con incidente; los mensajes que Leda manda por su cuenta usan el mecanismo del
+   ADR 0016, con reintentos y sin perderse (ADR 0018, decisión 8).
 
 ## Anotado para más adelante
 
@@ -338,6 +362,7 @@ Pendientes heredados de la rama congelada que `docs/STATUS.md` deriva a esta lis
 
 ## Próximo paso
 
-Escribir con el usuario el ADR 0018, empezando por la primera pregunta de su lista (qué decide
-la IA y qué decide el código). El ADR 0017 está redactado (decisiones 1 a 7) y espera su
-aceptación en el paso M1.
+Los dos ADR están redactados (0017, decisiones 1 a 7; 0018, decisiones 1 a 8). Siguen el paso M1
+(el usuario los lee y los acepta) y la tarea E1-3 (formato de las conversaciones de prueba y las
+primeras, para el circuito de la prueba chica). El ADR 0017 está redactado (decisiones 1 a 7) y
+espera su aceptación en el paso M1.
