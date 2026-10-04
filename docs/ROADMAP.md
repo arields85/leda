@@ -82,6 +82,14 @@ renombre a Leda. Desde ahí se continúa en `main`, no en una rama aparte. Es un
 pendiente: su construcción sigue bajo el congelamiento de arriba, y el momento lo decide el
 usuario.
 
+**Idea anotada, congelada (decisión del usuario, 2026-10-04): reemplazar una tarea por otra
+más urgente.** Cuando quien confirma toca "Rechazar y cancelar" sobre el borrador de otra
+persona, Leda le ofrece en la misma respuesta armarle otra tarea a esa persona (alta normal
+con ese responsable, sus datos completos y su confirmación). No se edita la tarea cancelada:
+son dos actos separados, para que la auditoría muestre qué se canceló, por qué y qué se creó
+en su lugar. "Rechazar y cancelar" se construye ahora (tarea 0-36 de la rama de flujo); el
+ofrecimiento espera al levantamiento del congelamiento.
+
 ### Línea base versionada
 
 **Entrega:** el trabajo acumulado queda registrado en un commit con historia
