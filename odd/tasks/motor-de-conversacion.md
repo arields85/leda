@@ -121,14 +121,23 @@ Etapa 1 (ruta: en línea, con el usuario; son documentos de decisión):
 Una por vez. Para el ADR 0017:
 
 1. Qué contesta Leda si alguien le pide una tarea nueva por chat (no puede dejar a la persona
-   sin salida, constitución §8).
+   sin salida, constitución §8). **Resuelta (usuario, 2026-10-04):** Leda deriva, sin efectos;
+   pasar el pedido queda anotado como alternativa (ADR 0017, decisión 1).
 2. La importación del administrador: quién decide y quién aplica (constitución §2), formato,
    si se puede repetir, garantías de una tarea comprometida (objetivo, responsable, fecha,
    criterio y política de evidencia) y la aceptación del referente (mecánica §7 y §13).
+   **Resuelta (usuario, 2026-10-04):** en esta etapa ninguna persona del equipo crea tareas; las
+   crea a mano el administrador designado, con las condiciones del ADR 0017 (decisión 2). La
+   carga no se diseña ahora: se agregan capacidades cuando Leda responda bien en el seguimiento.
 3. Qué circuitos quedan por chat y cuáles pasan a la web (dependencias, cambios sobre una
-   tarea ya creada).
+   tarea ya creada). **Resuelta (usuario, 2026-10-04):** el seguimiento persigue los bloqueos de
+   persona en persona y, si lo que falta no es una tarea de nadie, sigue el bloqueo mismo con
+   quien se encarga de destrabarlo (3a); por chat entran ocho cosas, del aviso antes del
+   vencimiento a la aprobación que cierra la tarea (3b). ADR 0017, decisión 3.
 4. "Necesito más tiempo": hoy no existe la operación; la previsión se informa por chat y el
-   cambio de fecha exige confirmación (constitución §7, mecánica §9).
+   cambio de fecha exige confirmación (constitución §7, mecánica §9). **Resuelta (usuario,
+   2026-10-04):** Leda anota la nueva previsión y avisa al referente, sin cambiar la fecha; si
+   el referente acepta, la cambia a mano el administrador (ADR 0017, decisión 4).
 5. El criterio del congelamiento de funcionalidad nueva, que nombraba el alta por chat.
 6. Qué le falta al seguimiento antes de usarlo: enlazar la respuesta con el recordatorio que la
    originó, seguir la falta de respuesta (`pending_reply`), la conversación de bloqueos
@@ -148,6 +157,17 @@ Para el ADR 0018:
 8. Qué pasa cuando la IA no responde o falla (en la rama congelada eran las tareas P1-P7), y si
    se trae el mecanismo de avisos guardados como hechos con sus reintentos (ADR 0016), incluido
    qué pasa cuando un aviso a otra persona agota los reintentos.
+
+## Anotado para más adelante
+
+Capacidades que el usuario dejó para después de esta etapa: se retoman cuando Leda haga bien el
+seguimiento en pruebas reales. Al aceptar el ADR 0017 pasan a `docs/ROADMAP.md` (tarea E1-4).
+
+| Capacidad | Origen |
+|---|---|
+| Leda le pasa el pedido de una tarea nueva a quien la carga, con confirmación de quien pide | ADR 0017, decisión 1 (se reevalúa si una prueba real muestra que los pedidos se pierden) |
+| Quien decide las tareas las acepta dentro de Leda, en el formulario web; nunca por chat | ADR 0017, decisión 2 |
+| Leda le pregunta al referente si acepta una fecha nueva y, si confirma, la cambia ella misma | ADR 0017, decisión 4 (pedido explícito del usuario) |
 
 ## Decisiones que los ADR tienen que dejar escritas
 
@@ -286,4 +306,5 @@ Pendientes heredados de la rama congelada que `docs/STATUS.md` deriva a esta lis
 
 ## Próximo paso
 
-Escribir con el usuario el ADR 0017, empezando por la primera pregunta de la lista.
+Seguir el ADR 0017 con el usuario por la pregunta 5: el criterio del congelamiento de
+funcionalidad nueva. Las decisiones 1 a 4 ya están escritas en el borrador del ADR.
