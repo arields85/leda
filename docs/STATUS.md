@@ -41,13 +41,13 @@ decisiones:
 4. Se recorta el alcance: por ahora Leda no crea tareas ni objetivos por chat; hace seguimiento.
    Principio: *por chat, hechos del trabajo; por la web, su estructura.*
 5. Las tareas se cargan primero con una importación por archivo que hace el administrador y,
-   después, con un formulario en el tablero del cliente. *El borrador del ADR 0017 (decisión 5)
-   lo cambia: un formulario en una plataforma web, con su propio ADR; la prueba chica usa tareas
-   ficticias cargadas con `sembrar`.*
+   después, con un formulario en el tablero del cliente. *El ADR 0017 (decisión 5), aceptado
+   el 2026-10-04, lo cambia: un formulario en una plataforma web, con su propio ADR; la prueba
+   chica usa tareas ficticias cargadas con `sembrar`.*
 6. Reglas de conversación para el motor de conversación: los botones son atajos (lo que hace un
    botón también vale escrito) y un tema a la vez, con tres salidas ante un cambio de tema (seguir,
-   retomarlo después o cancelarlo). Si lo escrito alcanza a una confirmación que crea o cambia algo
-   está `PENDIENTE` en el ADR 0018.
+   retomarlo después o cancelarlo). Lo escrito vale también para una confirmación que crea o
+   cambia algo, con una guarda (ADR 0018, decisión 2).
 7. Reglas de trabajo: diseño escrito antes del código; cada hallazgo de conversación es primero
    una conversación de prueba; la evidencia son conversaciones reales contra la IA real, corridas
    varias veces; una sola casa para los documentos.
@@ -129,13 +129,13 @@ decidido ni se actúa sobre ello.
   cada situación general con cada circuito.
 
 **Etapa 2. Prueba chica y descartable.** El circuito más simple, de punta a punta, por Telegram
-real, con tareas ficticias cargadas con `sembrar` (borrador del ADR 0017, decisión 5) y una base
+real, con tareas ficticias cargadas con `sembrar` (ADR 0017, decisión 5) y una base
 nueva (`leda_motor`), con los criterios escritos antes. Vive fuera de `src/leda`.
 
 **Etapa 3. Limpieza y motor de conversación definitivo.** Cortar los enredos entre la capa sólida y
 el código de conversación viejo, mudar las pruebas de garantías a archivos limpios, borrar los
 flujos A y B y, recién entonces, construir el motor de conversación definitivo y la plataforma web
-de tareas, con su propio ADR (borrador del ADR 0017, decisión 5).
+de tareas, con su propio ADR (ADR 0017, decisión 5).
 
 **Criterios de paso a `main`.** M1: el usuario acepta los dos ADR (sólo documentos). M2: el
 resultado de la prueba registrado, pase o no. M3: motor de conversación construido, flujos viejos

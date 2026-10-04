@@ -38,7 +38,7 @@ falla y el usuario frenó el parcheo. El análisis y sus fuentes están en
 3. Recorte de alcance: por ahora Leda no crea tareas ni objetivos por chat; hace seguimiento.
    Principio: por chat, hechos del trabajo; por la web, su estructura.
 4. Carga manual: primero una importación por archivo del administrador; después un formulario
-   en el tablero del cliente. *Cambiada el mismo día en el borrador del ADR 0017 (decisión 5):
+   en el tablero del cliente. *Cambiada el mismo día en el ADR 0017 (decisión 5, aceptada):
    las tareas se cargan con un formulario en una plataforma web, con su propio ADR; la prueba
    chica usa tareas ficticias cargadas con `sembrar`.*
 5. Arranque limpio: esta rama sale de `main`; los flujos A, B y C1-C6 quedan congelados en la
@@ -119,7 +119,8 @@ Etapa 1 (ruta: en línea, con el usuario; son documentos de decisión):
 - [ ] **E1-4.** Al aceptar los ADR: actualizar `AGENTS.md` (nombres, puntos 9 y 11),
       `docs/architecture/frontera.md`, `docs/product/que-es-leda.md`, `docs/capacidades.md`,
       `docs/ROADMAP.md`, `docs/INDEX.md`, la línea "superada en parte" de los ADR 0013 y 0014 y
-      la nota del ADR 0016 (el ADR 0018, decisión 8, trae su mecanismo).
+      la nota del ADR 0016 (el ADR 0018, decisión 8, trae su mecanismo). En `AGENTS.md`, además,
+      la nota sobre la carga de tareas, que todavía dice "el borrador del ADR 0017".
 
 ## Preguntas a resolver con el usuario
 

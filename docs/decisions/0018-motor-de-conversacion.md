@@ -187,7 +187,7 @@ más importante, pero también el más grande.
 Los criterios se escriben antes de la prueba, para que no se acomoden a lo que salga. La prueba se
 aprueba si se cumplen los tres:
 
-1. **Conversaciones de prueba, cinco corridas cada una contra la IA real.** Unas diez: las cuatro
+1. **Conversaciones de prueba, cinco corridas cada una contra la IA real.** Son doce: las cuatro
    respuestas de 5a más las situaciones generales que aplican (varias cosas en un mensaje,
    corrección, cancelar, cambio de tema, duda, escribir en lugar de tocar un botón, algo vencido
    y algo que no está en la lista).
@@ -230,7 +230,7 @@ cumple con el resultado registrado, pase o no.
 - **La prueba chica arranca con GPT-6 sol**, la más fiel a los hechos en la prueba real del
   2026-10-03 (`docs/product/bitacora-de-flujos.md`, "Modelos").
 - **GPT-6 luna corre las mismas conversaciones de prueba en paralelo.** En el flujo C6 confundió
-  quién hizo qué e inventó un dato, pero es unas 23 veces más barata y más rápida (USD 0,0007
+  quién hizo qué e inventó un dato, pero es unas 23 veces más barata y algo más rápida (USD 0,0007
   contra 0,016 por mensaje; unos 8 s contra 11). Esas mediciones son de una sola corrida y del
   flujo C6; con el motor de conversación la IA hace otro trabajo (elige jugadas de una lista
   cerrada y redacta desde hechos que le da el código), así que hay que volver a medir.
