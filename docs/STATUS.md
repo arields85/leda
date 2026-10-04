@@ -88,9 +88,13 @@ pasa a una conversación de prueba. Destino de cada uno:
 
 ## Decisiones pendientes del usuario
 
-- **El archivo global `~/.claude/CLAUDE.md` (unos 71.000 caracteres).** Claude Code avisa que las instrucciones
-  que carga al iniciar superan su límite de 150.000. Ese archivo lo maneja entero gentle-ai (bloques entre
-  marcadores `<!-- gentle-ai:... -->`) y `gentle-ai sync` pisaría una edición a mano: achicarlo lo decide el
+- **El archivo global `~/.claude/CLAUDE.md` (unos 71.000 caracteres).** Claude Code avisa cuando las
+  instrucciones que carga al iniciar superan 150.000 caracteres. Desde el 2026-10-04 el proyecto carga
+  `AGENTS.md` reducido a lo que sirve, `docs/STATUS.md`, el documento de la unidad, la constitución y la
+  mecánica (`nucleo/alta-de-equipo.md` ya no se carga, por el ADR 0017, decisión 7). Medido con
+  `LC_ALL=C.UTF-8 wc -m` el 2026-10-04: unos 73.000 caracteres del proyecto y unos 144.000 en total con el
+  global. El margen es chico (unos 6.000): `docs/STATUS.md` y el documento de la unidad no deberían crecer. El
+  global lo maneja entero gentle-ai (`gentle-ai sync` pisaría una edición a mano): achicarlo lo decide el
   usuario, con esa herramienta.
 - **Respaldo de lo no subido.** `main` está subido hasta `dc813e6`. Viven en un solo disco la rama congelada
   `feat/flujo-de-un-mensaje` (92 commits sin subir, 7 con líneas de atribución), los commits de aviso de las
