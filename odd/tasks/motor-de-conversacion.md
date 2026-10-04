@@ -271,7 +271,12 @@ Pendientes heredados de la rama congelada que `docs/STATUS.md` deriva a esta lis
   la rama nace sin diferencias con la etiqueta. Primer commit, sólo documentos: el ADR 0016 y
   `nucleo/personalidad.md` traídos sin cambios de `respaldo-flujos-antes-de-d` (más una nota en
   el ADR), los números `0026` a `0029` reservados en `db/migrations/README.md`, este documento
-  y su importación en `AGENTS.md`.
+  y su importación en `AGENTS.md`. Revisión RDD de ese commit (`02fe502`, base
+  `respaldo-main-antes-de-d`): linaje `review-cec1109be28beca9`, aprobada y reconocida. Tres
+  sugerencias no bloqueantes: el ADR 0016 cita piezas que no existen en esta rama (lo dice su
+  nota), las referencias de línea de este documento van a quedar viejas (conviene contrastar
+  contra el símbolo) y la reserva de números de migración no tiene una prueba que la haga
+  cumplir.
 - **Línea base de las garantías (2026-10-04).** `.venv\Scripts\python.exe -m pytest -q -p
   no:cacheprovider` sobre el código del punto de partida (`respaldo-main-antes-de-d`), corrido
   desde la carpeta de `main`: `2286 passed, 333 deselected, 1 warning in 631.96s (0:10:31)`. Mide
