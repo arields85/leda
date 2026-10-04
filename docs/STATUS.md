@@ -179,8 +179,10 @@ Las que definen el producto se resuelven en los ADR 0017 y 0018 ("Próximo paso"
 
 - **Respaldo o push de lo que no está subido.** Hoy vive en un solo disco: la rama congelada
   `feat/flujo-de-un-mensaje` (92 commits sin subir hasta su etiqueta, 7 con líneas de atribución),
-  la rama del Motor (todos sus commits propios), los commits del aviso de congelamiento de las dos
-  ramas congeladas y las etiquetas nuevas. `main` se subió el 2026-10-04 (decisión del usuario). Recomendación del agente para la rama
+  los commits del aviso de congelamiento de las dos ramas congeladas y las etiquetas nuevas.
+  `main` se subió el 2026-10-04 y, después del paso M1, recibió por avance rápido los documentos
+  de la rama del Motor y se volvió a subir (`6f9b9a3..dc813e6`, decisión del usuario): lo de la
+  rama del Motor hasta `dc813e6` ya está respaldado. Recomendación del agente para la rama
   `feat/flujo-de-un-mensaje`: no reescribirla, porque los documentos citan sus hashes, y guardarla
   con `git bundle`. Subir o no lo decide el usuario.
 - **Un bot de Telegram de prueba para la rama nueva.** Hay un solo listener por bot, y uno abierto
@@ -255,7 +257,9 @@ reconocida hasta `28a9bc4` (linaje `review-47c246e4351f127e`).
   `respaldo-flujos-antes-de-c2`, `-c5` y `-c6`.
 - Ramas:
   - `feat/motor-de-conversacion`: trabajo vigente, el Motor.
-  - `main`: sin commits nuevos hasta M1.
+  - `main`: después del paso M1 recibió por avance rápido los documentos de la rama del Motor
+    hasta `dc813e6` y está subido. Recibe sólo documentos hasta el paso M2 o M3, según
+    corresponda.
   - `feat/flujo-de-un-mensaje`: congelada en su etiqueta; el único commit posterior es el aviso de
     congelamiento de su `AGENTS.md`.
   - `auxiliar/alta-y-google` (alta con correo verificado y Google,
