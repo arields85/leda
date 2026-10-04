@@ -24,12 +24,16 @@ núcleo, sin que haya que pedírselo. Que figuraran en el orden de lectura no al
 por eso se importan, y Claude Code los carga al iniciar la sesión:
 
 @docs/STATUS.md
+@odd/tasks/motor-de-conversacion.md
 @nucleo/constitucion.md
 @nucleo/mecanica-pm.md
 @nucleo/alta-de-equipo.md
 
+El segundo es el documento de la unidad del Motor (etapas, tareas y preguntas a resolver con el
+usuario); se importa desde el 2026-10-04, en la rama `feat/motor-de-conversacion`.
+
 Un agente que no expanda estas importaciones (otra herramienta que lea `AGENTS.md`)
-tiene que leer esos cuatro archivos enteros antes de su primera respuesta.
+tiene que leer esos cinco archivos enteros antes de su primera respuesta.
 
 ## Dónde se trabaja y qué no se hace (desde el 2026-10-04)
 

@@ -259,8 +259,16 @@ reconocida hasta `28a9bc4` (linaje `review-47c246e4351f127e`).
     `auxiliar/alta-y-google-unificada-un-commit`.
 - Revisiones RDD de `main` del 2026-10-04: aprobadas y reconocidas hasta el árbol anterior al commit
   de cierre (último linaje, `review-2cd79d43a965879b`), con advertencias no bloqueantes sobre
-  `tools/rdd_ciclo.py` y `tools/medir_modelos.py`. La revisión del commit de cierre se corre después
-  de crearlo.
+  `tools/rdd_ciclo.py` y `tools/medir_modelos.py`. El commit de cierre entero excedía el presupuesto
+  del revisor (`lens_context_budget_exceeded`), así que se revisó en cuatro tramos sobre una carpeta
+  temporal, con el mismo árbol final que el commit: linajes `review-d620b2bb22b7427d`,
+  `review-8a63e809807fd809` (riesgo bajo, sin lentes), `review-ee3d1ae8de587d93` y
+  `review-02333b9633db361d`, todos aprobados y reconocidos. Observaciones no bloqueantes: los
+  enlaces relativos dentro de las copias de `docs/historial/` no resuelven desde esa carpeta, y
+  faltaba una corrida de la suite en el punto de partida de la rama (ver "Baseline de pruebas").
+- Control de coherencia del 2026-10-04: un auditor independiente simuló el arranque de una sesión
+  nueva sobre el commit de cierre, la memoria y Engram. Primera pasada: tres hallazgos altos y seis
+  medios, corregidos. Segunda pasada: ningún hallazgo alto.
 
 ## Baseline de pruebas
 
@@ -269,9 +277,11 @@ reconocida hasta `28a9bc4` (linaje `review-47c246e4351f127e`).
 | `main` | `.venv\Scripts\python.exe -m pytest -q` | 2026-09-30 | 2279 passed, 333 deselected |
 | `main`, después del renombre | suite completa | 2026-10-02 | 2286 passed |
 | Rama congelada, en `24e92ce` | `python -m pytest -q -p no:cacheprovider` | 2026-10-04 | 3997 passed, 333 deselected, 1 warning |
+| Punto de partida del Motor (`respaldo-main-antes-de-d`, mismo código que `main`) | `.venv\Scripts\python.exe -m pytest -q -p no:cacheprovider` | 2026-10-04 | 2286 passed, 333 deselected, 1 warning in 631.96s |
 
 Los deselected son los escenarios del banco real (`modelo_real`). Banco real completo (n=1) del
-2026-09-30: 108 de 111. El 2026-10-04 no se corrió la suite en `main`.
+2026-09-30: 108 de 111. La última fila es la línea base de la capa de garantías con la que
+arranca la rama del Motor; se corrió desde la carpeta de `main`, que tiene el mismo código.
 
 Estas cifras miden el código, incluida la conversación congelada. **Una suite en verde no es
 evidencia de que la conversación funcione** (`AGENTS.md`, "Cómo pensamos juntos", punto 12): la de la

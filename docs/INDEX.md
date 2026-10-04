@@ -29,7 +29,7 @@ se trabaja y qué no se hace".
 | Necesidad | Documento |
 |---|---|
 | Definición del producto y alcance | [`product/que-es-leda.md`](product/que-es-leda.md) |
-| Documento de la unidad en curso, el Motor (sólo en la rama `feat/motor-de-conversacion`) | `odd/tasks/motor-de-conversacion.md` |
+| Documento de la unidad en curso, el Motor (sólo en la rama `feat/motor-de-conversacion`) | [`../odd/tasks/motor-de-conversacion.md`](../odd/tasks/motor-de-conversacion.md) |
 | Qué se probó de cada flujo y modelo, y la conclusión vigente | [`product/bitacora-de-flujos.md`](product/bitacora-de-flujos.md) |
 | Análisis adversarial del 2026-10-04: mercado, arquitecturas de agentes, confiabilidad, revisión interna y Engram | [`research/gestion-del-dialogo-y-arquitecturas-de-agentes.md`](research/gestion-del-dialogo-y-arquitecturas-de-agentes.md) |
 | Qué tiene que permitir configurar la plataforma (inventario) | [`product/plataforma-pendientes.md`](product/plataforma-pendientes.md) |
@@ -53,6 +53,7 @@ se trabaja y qué no se hace".
 | Decisión sobre las reglas generales de la conversación (superada en parte el 2026-10-04; ver su nota) | [`decisions/0013-reglas-generales-de-la-conversacion.md`](decisions/0013-reglas-generales-de-la-conversacion.md) |
 | Decisión sobre el flujo de un mensaje, con un dueño por etapa, y el experimento A/B (superada en parte el 2026-10-04; ver su nota. Sus flujos C1 a C6 quedaron congelados) | [`decisions/0014-flujo-de-un-mensaje.md`](decisions/0014-flujo-de-un-mensaje.md) |
 | Decisión sobre el renombre del producto a Leda | [`decisions/0015-renombre-del-producto-a-leda.md`](decisions/0015-renombre-del-producto-a-leda.md) |
+| Decisión sobre los avisos a otras personas guardados como hechos (implementada sólo en la rama congelada; ver su nota) | [`decisions/0016-avisos-a-otras-personas-desde-hechos.md`](decisions/0016-avisos-a-otras-personas-desde-hechos.md) |
 | Relevamientos de proyectos externos (Hermes Agent) | [`research/hermes-agent.md`](research/hermes-agent.md) |
 | Relevamiento de NotebookLM y respuestas ancladas en fuentes | [`research/notebooklm-y-grounding.md`](research/notebooklm-y-grounding.md) |
 | Aprendizajes del `SOUL.md` y del contexto operativo de Prisma en Hermes (trabajo anterior del usuario) | [`research/soul-y-contexto-de-prisma-en-hermes.md`](research/soul-y-contexto-de-prisma-en-hermes.md) |

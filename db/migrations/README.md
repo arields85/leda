@@ -19,3 +19,9 @@ Migration `0002_general_task_intake.sql` also pins the `psql` encoding and
 aborts transactionally before DDL if its UTF-8 sentinel was decoded incorrectly.
 
 Never use `python -m leda esquema --recrear` on an operational database.
+
+## Reserved numbers
+
+Numbers `0026` to `0029` belong to the frozen branch `feat/flujo-de-un-mensaje` (tag
+`respaldo-flujos-antes-de-d`) and are not present here. New migrations on this branch start at
+`0030`, so a number never means two different things.
