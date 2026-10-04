@@ -154,7 +154,7 @@ que admitir `leda_motor`; `python -m leda modelo` ya existe (`docs/product/plata
 - **E1-4, parte de `AGENTS.md` (2026-10-04).** Cambiado sólo lo que estaba mal o era estado de sesión;
   `docs/STATUS.md` y este documento, condensados; sus versiones hasta M1, literales en `docs/historial/`.
 - **E1-4, el resto (2026-10-04).** `74f6f35` (frontera, producto, capacidades), `38ba14b` (roadmap, índice,
-  notas de los ADR 0013, 0014 y 0016) y el commit que registra esto en `docs/STATUS.md` y acá.
+  notas de los ADR 0013, 0014 y 0016) y `5795df5` (`docs/STATUS.md` y acá): `review-8127a3bf7edea0bd`, aprobada.
 - **Línea base de las garantías.** `.venv\Scripts\python.exe -m pytest -q -p no:cacheprovider` sobre
   `respaldo-main-antes-de-d`: `2286 passed, 333 deselected, 1 warning in 631.96s`. Mide el código, no la
   conversación.
