@@ -1,5 +1,10 @@
 # Qué está construido y qué no
 
+> **Nota del 2026-10-04.** Las tablas de este documento describen el código de `main`. Su
+> conversación (el alta por chat y los flujos A y B) quedó congelada: no se corrige ni se extiende.
+> La línea de trabajo vigente es el Motor. Qué queda por chat y cómo se cargan las tareas se está
+> redefiniendo en el ADR 0017 (`PENDIENTE`); ver [`STATUS.md`](STATUS.md), "Próximo paso".
+
 Para entender en cinco minutos dónde está parado el proyecto, sin volver a
 auditarlo. El detalle vive en los documentos que se citan; acá está el mapa.
 
@@ -18,7 +23,12 @@ Leda hoy es un registro de tareas bien construido con interfaz de Telegram.
 
 ## Construido y sólido
 
-No se rehace.
+No se rehace, con una salvedad del 2026-10-04. Las filas que describen la conversación (el alta de
+tarea por chat, el ruteo de intención, la aclaración con botones, "Leda orienta con opciones", la
+pregunta pendiente, la respuesta única, el estado real, los toques y Modificar) corresponden a los
+flujos A y B, congelados: no se corrigen ni se extienden, y su código se borra en la Etapa 3 del
+Motor. Qué piezas de esas filas se conservan está `PENDIENTE` en el ADR 0018. Las demás filas son
+la capa de garantías y de dominio, que sí se conserva.
 
 | Capacidad | Evidencia |
 |---|---|
@@ -59,7 +69,7 @@ Cada uno tiene diseño escrito y cero código.
 | **Correo** | Especificación §18 | Sólo existe el nombre del permiso |
 | **Almacenamiento documental** | Especificación §11 | `evidence.drive_file_id` sin uso |
 | **Reuniones e informes** | Especificación §17.2 y §23 | Anunciar, pedir temas, consolidar, agenda, minutas. `corework.yaml` declara `reunion_periodica` y el importador no la consume |
-| **Conversación de bloqueos** | Mecánica §8, pasos 2 a 7 | Abrir y cerrar un bloqueo ya funciona. Pedir la información mínima, proponer soluciones, preguntar por ayuda y proponer reasignaciones siguen sin construir. Su precondición —dependencias entre tareas— ya está resuelta; es la unidad siguiente en `docs/ROADMAP.md` |
+| **Conversación de bloqueos** | Mecánica §8, pasos 2 a 7 | Abrir y cerrar un bloqueo ya funciona. Pedir la información mínima, proponer soluciones, preguntar por ayuda y proponer reasignaciones siguen sin construir. Su precondición —dependencias entre tareas— ya está resuelta. Desde el 2026-10-04 dejó de ser la unidad que seguía: su lugar en el orden está `PENDIENTE` en el ADR 0017 |
 | **Umbral de re-aprobación** | Mecánica §7 | El importador lo guarda en la base y ningún código lo lee |
 | **Privacidad configurable** | Especificación §19 | Sin código **ni** esquema. No existe matriz de visibilidad |
 | **Aprendizaje** | Mecánica §14 | Tabla `learning` vacía de uso |

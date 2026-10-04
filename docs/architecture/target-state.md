@@ -1,5 +1,10 @@
 # Estado arquitectónico objetivo
 
+> **Nota del 2026-10-04.** Documento anterior al Motor. La arquitectura objetivo de la capa de
+> conversación se define en el ADR 0018 (`PENDIENTE`); lo que este documento dice sobre el
+> camino de un mensaje no se toma como plan vigente. Estado y orden de trabajo:
+> [`../STATUS.md`](../STATUS.md).
+
 La evolución conserva un monolito modular. El objetivo es cerrar invariantes y
 límites operativos antes de aumentar infraestructura, no distribuir el sistema.
 

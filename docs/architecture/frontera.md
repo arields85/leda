@@ -1,5 +1,12 @@
 # La frontera
 
+> **Nota del 2026-10-04.** El usuario recortó el alcance de la superficie conversacional (por
+> ahora Leda no crea tareas ni objetivos por chat; ver [`../STATUS.md`](../STATUS.md)) y la capa
+> de conversación pasa a un motor nuevo, cuyo lugar en esta frontera está `PENDIENTE` en el
+> ADR 0018. Además, la tabla de adaptadores quedó atrasada en un punto: el tablero de cliente
+> existe hoy como una vista de sólo lectura por enlace personal (`GET /tablero/{token}`). Las
+> tablas de puertos y de adaptadores se actualizan cuando se acepte el ADR 0017.
+
 Este documento define dónde termina el núcleo de Leda y dónde empiezan sus
 adaptadores. Gobierna a los demás documentos de arquitectura: ante una discrepancia,
 prevalece esta frontera.

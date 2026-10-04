@@ -1,5 +1,9 @@
 # Traspaso: el producto se llama Leda y la carpeta local se mudó
 
+> **Superado el 2026-10-04.** Este traspaso ya no es un punto de retorno: sus pendientes y su forma
+> de trabajar quedaron congelados o superados. El estado y el próximo paso vigentes están en
+> [`../STATUS.md`](../STATUS.md).
+
 Cierre del 2026-10-02. El producto pasó a llamarse **Leda** en todo el repositorio
 ([ADR 0015](../decisions/0015-renombre-del-producto-a-leda.md)), funciona (alta real de
 punta a punta) y lo viejo ya se limpió. La carpeta local también se mudó (R13).

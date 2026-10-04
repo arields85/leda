@@ -1,5 +1,10 @@
 # Prueba local con Ismael, Ariel y Marcos
 
+> **Nota del 2026-10-04.** Guía operativa para levantar el código de `main` en una máquina local.
+> La conversación de ese código son los flujos A y B, congelados: los guiones y las rondas de
+> este documento son historia y no son el próximo paso. El estado y el orden de trabajo vigentes
+> están en [`docs/STATUS.md`](docs/STATUS.md).
+
 Todo corre en tu máquina. Telegram no necesita que seas alcanzable desde
 internet: en vez de webhook, Leda pregunta cada tanto si hay algo nuevo. Al
 pasar a la VPS se cambia por webhook y no se toca nada más — los dos caminos

@@ -8,13 +8,20 @@ cliente, no su definición.
 
 ## Camino rápido
 
+Desde el 2026-10-04 el trabajo vigente es **el Motor** (definición en [`../AGENTS.md`](../AGENTS.md),
+"Nombres que usamos") y está en la rama `feat/motor-de-conversacion` (carpeta
+`D:\Proyectos\Leda-PM-worktrees\motor-de-conversacion`). Una sesión nueva empieza por
+[`STATUS.md`](STATUS.md), "Punto exacto para retomar", y por [`../AGENTS.md`](../AGENTS.md), "Dónde
+se trabaja y qué no se hace".
+
 1. Leer [`product/que-es-leda.md`](product/que-es-leda.md) para entender qué es
    el producto.
 2. Leer [`architecture/frontera.md`](architecture/frontera.md) para entender dónde
    termina el núcleo y qué reglas lo gobiernan.
-3. Consultar [`ROADMAP.md`](ROADMAP.md) para saber qué se aprovecha, qué se corrige y
-   en qué orden.
-4. Abrir [`STATUS.md`](STATUS.md) para el estado operativo y los riesgos vigentes.
+3. Consultar [`ROADMAP.md`](ROADMAP.md) para saber qué se aprovecha y qué se corrige. Su
+   orden se está redefiniendo en el ADR 0017 (`PENDIENTE`).
+4. Abrir [`STATUS.md`](STATUS.md) para el estado operativo, los riesgos y el orden de trabajo
+   vigente.
 5. Abrir arquitectura detallada o decisiones sólo si la tarea lo requiere.
 
 ## Navegación
@@ -22,14 +29,15 @@ cliente, no su definición.
 | Necesidad | Documento |
 |---|---|
 | Definición del producto y alcance | [`product/que-es-leda.md`](product/que-es-leda.md) |
-| Traspaso de la jornada del alta conducida (punto de retorno, ritmo, pendientes) | [`traspaso/2026-10-01-alta-conducida.md`](traspaso/2026-10-01-alta-conducida.md) |
+| Documento de la unidad en curso, el Motor (sólo en la rama `feat/motor-de-conversacion`) | `odd/tasks/motor-de-conversacion.md` |
 | Qué se probó de cada flujo y modelo, y la conclusión vigente | [`product/bitacora-de-flujos.md`](product/bitacora-de-flujos.md) |
+| Análisis adversarial del 2026-10-04: mercado, arquitecturas de agentes, confiabilidad, revisión interna y Engram | [`research/gestion-del-dialogo-y-arquitecturas-de-agentes.md`](research/gestion-del-dialogo-y-arquitecturas-de-agentes.md) |
 | Qué tiene que permitir configurar la plataforma (inventario) | [`product/plataforma-pendientes.md`](product/plataforma-pendientes.md) |
 | Frontera entre núcleo y adaptadores | [`architecture/frontera.md`](architecture/frontera.md) |
-| Qué se aprovecha, corrige y descarta, y en qué orden | [`ROADMAP.md`](ROADMAP.md) |
-| Estado, riesgos y próximo paso | [`STATUS.md`](STATUS.md) |
+| Qué se aprovecha, corrige y descarta; el orden está en redefinición (ADR 0017) | [`ROADMAP.md`](ROADMAP.md) |
+| Estado, riesgos, orden de trabajo vigente y próximo paso | [`STATUS.md`](STATUS.md) |
 | Arquitectura implementada | [`architecture/current-state.md`](architecture/current-state.md) |
-| Interpretación, aclaración y confirmación (diseño vivo, en validación) | [`architecture/interpretacion-y-confirmacion.md`](architecture/interpretacion-y-confirmacion.md) |
+| Interpretación, aclaración y confirmación (diseño de los flujos anteriores al Motor, vivo hasta el 2026-09-29; gobiernan los ADR que cita) | [`architecture/interpretacion-y-confirmacion.md`](architecture/interpretacion-y-confirmacion.md) |
 | Arquitectura objetivo previa | [`architecture/target-state.md`](architecture/target-state.md) |
 | Decisión sobre borradores | [`decisions/0001-drafts-and-committed-tasks.md`](decisions/0001-drafts-and-committed-tasks.md) |
 | Decisión sobre contexto LLM y retención | [`decisions/0002-pilot-llm-context-and-retention.md`](decisions/0002-pilot-llm-context-and-retention.md) |
@@ -42,13 +50,20 @@ cliente, no su definición.
 | Decisión sobre correo verificado y Google (propuesta) | [`decisions/0010-correo-verificado-y-google-en-el-producto.md`](decisions/0010-correo-verificado-y-google-en-el-producto.md) |
 | Decisión sobre respuesta inmediata e indicador de actividad | [`decisions/0011-respuesta-inmediata-e-indicador-de-actividad.md`](decisions/0011-respuesta-inmediata-e-indicador-de-actividad.md) |
 | Decisión sobre ruteo en paralelo con la primera respuesta | [`decisions/0012-ruteo-en-paralelo-con-la-primera-respuesta.md`](decisions/0012-ruteo-en-paralelo-con-la-primera-respuesta.md) |
-| Decisión sobre las reglas generales de la conversación | [`decisions/0013-reglas-generales-de-la-conversacion.md`](decisions/0013-reglas-generales-de-la-conversacion.md) |
-| Decisión sobre el flujo de un mensaje, con un dueño por etapa, y el experimento A/B | [`decisions/0014-flujo-de-un-mensaje.md`](decisions/0014-flujo-de-un-mensaje.md) |
+| Decisión sobre las reglas generales de la conversación (superada en parte el 2026-10-04; ver su nota) | [`decisions/0013-reglas-generales-de-la-conversacion.md`](decisions/0013-reglas-generales-de-la-conversacion.md) |
+| Decisión sobre el flujo de un mensaje, con un dueño por etapa, y el experimento A/B (superada en parte el 2026-10-04; ver su nota. Sus flujos C1 a C6 quedaron congelados) | [`decisions/0014-flujo-de-un-mensaje.md`](decisions/0014-flujo-de-un-mensaje.md) |
+| Decisión sobre el renombre del producto a Leda | [`decisions/0015-renombre-del-producto-a-leda.md`](decisions/0015-renombre-del-producto-a-leda.md) |
 | Relevamientos de proyectos externos (Hermes Agent) | [`research/hermes-agent.md`](research/hermes-agent.md) |
 | Relevamiento de NotebookLM y respuestas ancladas en fuentes | [`research/notebooklm-y-grounding.md`](research/notebooklm-y-grounding.md) |
-| Copias literales de documentos condensados el 2026-09-30 (`STATUS`, `AGENTS`, diario de Leda orienta) | [`historial/`](historial/) |
+| Aprendizajes del `SOUL.md` y del contexto operativo de Prisma en Hermes (trabajo anterior del usuario) | [`research/soul-y-contexto-de-prisma-en-hermes.md`](research/soul-y-contexto-de-prisma-en-hermes.md) |
+| Copias de documentos anteriores: `STATUS` y `AGENTS` hasta el 2026-09-30 y hasta el 2026-10-04, y el diario de Leda orienta. Son historia, no instrucciones vigentes | [`historial/`](historial/) |
 | Reglas para futuras sesiones | [`../AGENTS.md`](../AGENTS.md) |
 | Configuración del primer cliente | [`../espacios/corework.yaml`](../espacios/corework.yaml) |
+
+Los ADR del Motor, el 0017 (alcance: por chat, hechos del trabajo; por la web, su estructura) y el
+0018 (motor de conversación), están en preparación en la rama `feat/motor-de-conversacion`. El ADR 0016 (avisos a
+otras personas desde hechos) no está en `main`: es de la rama de flujo congelada y se trae a la
+rama nueva.
 
 ## Validación
 
@@ -61,8 +76,8 @@ cliente, no su definición.
 ## Documentos superados
 
 Se conservan como registro histórico. **No describen el alcance vigente y no deben
-usarse para decidir.** El motivo de cada uno está en
-[`ROADMAP.md`](ROADMAP.md#qué-queda-superado).
+usarse para decidir.** El motivo de las cuatro primeras filas está en
+[`ROADMAP.md`](ROADMAP.md#qué-queda-superado); el de las demás, en su propia fila.
 
 | Documento | Motivo resumido |
 |---|---|
@@ -70,6 +85,16 @@ usarse para decidir.** El motivo de cada uno está en
 | [`phases/00-pilot-scope.md`](phases/00-pilot-scope.md) | Alcance de piloto local para un único equipo. |
 | [`phases/01-local-pilot-foundations.md`](phases/01-local-pilot-foundations.md) | Organizado por unidades de piloto local, superadas por el orden de entrega vigente. |
 | [`product/functional-specification.md`](product/functional-specification.md) | Genérica por intención, pero precede al modelo multi-tenant: no separa configuración de cliente de núcleo del producto ni trata el aislamiento como garantía. |
+| [`traspaso/2026-10-01-alta-conducida.md`](traspaso/2026-10-01-alta-conducida.md), [`traspaso/2026-10-02-renombre-a-leda.md`](traspaso/2026-10-02-renombre-a-leda.md) y [`traspaso/2026-10-02-flujo-c4.md`](traspaso/2026-10-02-flujo-c4.md) | Traspasos de las jornadas del flujo C y del renombre. Dejaron de ser puntos de retorno el 2026-10-04: sus pendientes y su forma de trabajar quedaron congelados o superados (ver [`STATUS.md`](STATUS.md), "Qué quedó congelado o superado"). |
+| [`historial/STATUS-hasta-2026-10-04.md`](historial/STATUS-hasta-2026-10-04.md) y [`historial/AGENTS-hasta-2026-10-04.md`](historial/AGENTS-hasta-2026-10-04.md) | Copias del estado y de las reglas de trabajo antes del cambio de rumbo del 2026-10-04, literales salvo el aviso de archivo de su primera línea. Sus órdenes de trabajo y sus puntos de retorno ya no rigen. |
+
+Superados en parte, con una nota del 2026-10-04 al comienzo que dice qué sigue vigente: los ADR
+[`0013`](decisions/0013-reglas-generales-de-la-conversacion.md) y
+[`0014`](decisions/0014-flujo-de-un-mensaje.md).
+
+Los documentos de `../odd/tasks/` que están en `main` son los diarios de las unidades anteriores
+al Motor. Cada uno lleva una nota del 2026-10-04 al comienzo: lo que figure ahí como en curso,
+pendiente o próximo paso no se retoma sin una decisión del usuario.
 
 Parte del contenido de la decisión 0003 se reutiliza: su inventario de autoridad y
 privilegios alimenta el cierre del aislamiento entre clientes.

@@ -1,5 +1,13 @@
 # Roadmap
 
+> **Nota del 2026-10-04.** El usuario cambió el rumbo de la conversación de Leda con una línea de
+> trabajo que llama **el Motor** (definición en [`../AGENTS.md`](../AGENTS.md), "Nombres que
+> usamos"): los flujos A, B y C quedaron congelados, se construye un motor chico de conversación y
+> el alcance se recorta al seguimiento (por ahora Leda no crea tareas ni objetivos por chat). Este
+> roadmap conserva sus unidades, pero **su orden y el criterio del congelamiento se redefinen en el
+> ADR 0017 (`PENDIENTE`)**. Hasta entonces, el orden de trabajo vigente es el de
+> [`STATUS.md`](STATUS.md), "Próximo paso", y ninguna unidad de abajo se empieza por su cuenta.
+
 Leda es un producto multi-tenant (ver [`product/que-es-leda.md`](product/que-es-leda.md))
 y este roadmap ordena el trabajo que falta para que el código lo sostenga.
 
@@ -60,19 +68,38 @@ reutiliza al cerrar el aislamiento entre clientes.
 
 ## Orden de entrega
 
-**Congelamiento de funcionalidad nueva (decisión del usuario, 2026-09-30).** No se
-construye funcionalidad nueva hasta que el alta de tareas, la entrega con evidencia y la
-aprobación cumplan en una prueba real los criterios del
-[`ADR 0014`](decisions/0014-flujo-de-un-mensaje.md). Queda congelado: flujos nuevos (la
-rama de correo verificado, Google y agenda del ADR 0010), capacidades nuevas en medio de
-una ronda, el tablero y el panel. Sigue abierto: mejorar esos tres caminos, corregir
-fallas reales y anotar ideas en este roadmap sin construirlas. Motivo: cada ronda
-probaba superficie nueva y los hallazgos no bajaban; una función construida sobre una
-conversación que todavía no funciona hereda sus problemas. Se levanta al cumplir los
-criterios. **Precisión (decisión del usuario, 2026-10-02):** se levanta cuando el alta, la
-entrega y la aprobación (circuitos 0, 1 y 2 de `odd/tasks/circuitos-al-flujo-nuevo.md`, en la
-rama de flujo) aprueban las pruebas reales que hacen el usuario y el agente. No espera a
-la prueba final con alguien que no conozca el guion (enmienda del ADR 0014).
+**Congelamiento de funcionalidad nueva (decisión del usuario, 2026-09-30; criterio en
+redefinición desde el 2026-10-04).** No se construye funcionalidad nueva ni código de
+conversación. Cómo y cuándo se levanta el congelamiento está `PENDIENTE` en el ADR 0017. Queda
+congelado: flujos nuevos (la rama de correo verificado, Google y agenda del ADR 0010),
+capacidades nuevas en medio de una ronda, el tablero y el panel. Lo único que se puede hacer con
+una idea nueva es anotarla en este roadmap, sin construirla. Motivo original: cada ronda probaba
+superficie nueva y los hallazgos no bajaban; una función construida sobre una conversación que
+todavía no funciona hereda sus problemas.
+
+*Historia del criterio, que ya no rige.* Del 2026-09-30 al 2026-10-04, el congelamiento se
+levantaba cuando el alta de tareas, la entrega con evidencia y la aprobación cumplieran en una
+prueba real los criterios del [`ADR 0014`](decisions/0014-flujo-de-un-mensaje.md), y mientras
+tanto se permitía mejorar esos tres caminos y corregir sus fallas. Una precisión del usuario del
+2026-10-02 lo ataba a los circuitos 0, 1 y 2 de `odd/tasks/circuitos-al-flujo-nuevo.md`, en la
+rama de flujo, sin esperar a la prueba final con alguien que no conociera el guion. El 2026-10-04
+el alta por chat salió del alcance y esos caminos quedaron congelados: ya no se mejoran ni se
+corrigen, y ese criterio dejó de describir cómo se levanta el congelamiento.
+
+**El Motor: recorte de alcance y motor de conversación (decisión del usuario, 2026-10-04).** Por
+ahora Leda no crea tareas ni objetivos por chat: hace seguimiento. Qué circuitos quedan por chat
+se fija en el ADR 0017 (`PENDIENTE`); las cadencias, los recordatorios, los bloqueos, la entrega
+con evidencia, la aprobación y las consultas son ejemplos de seguimiento, no la lista decidida.
+Principio: *por chat, hechos del trabajo; por la web, su estructura.* Las tareas se cargan primero
+con una importación por archivo que hace el administrador y, después, con un formulario en el
+tablero del cliente. El cimiento de la
+conversación pasa a ser un motor chico dentro de Leda, sin marcos de terceros. El usuario llama
+**el Motor** a toda esta línea de trabajo. Las dos decisiones se escriben en el ADR 0017 (alcance)
+y el ADR 0018 (motor de conversación), en preparación en la rama `feat/motor-de-conversacion`. Si
+alguna unidad de este roadmap se adelanta para el seguimiento, y cuáles esperan, está `PENDIENTE`
+en el ADR 0017. Evidencia y razones:
+[`research/gestion-del-dialogo-y-arquitecturas-de-agentes.md`](research/gestion-del-dialogo-y-arquitecturas-de-agentes.md).
+Etapas y criterios de paso: [`STATUS.md`](STATUS.md), "Próximo paso".
 
 **Alta con correo verificado y Google (ADR 0010): se integra a `main` y continúa desde ahí**
 (decisión del usuario, 2026-10-02). El trabajo avanzado de la rama `auxiliar/alta-y-google`
@@ -80,6 +107,7 @@ se integra a `main` con el procedimiento R12 de
 [`../odd/tasks/renombre-a-leda.md`](../odd/tasks/renombre-a-leda.md), que incluye primero el
 renombre a Leda. Desde ahí se continúa en `main`, no en una rama aparte. Es una tarea
 pendiente: su construcción sigue bajo el congelamiento de arriba, y el momento lo decide el
+usuario. **Desde el 2026-10-04 no se retoma** antes del paso M3 del Motor, salvo decisión del
 usuario.
 
 **Idea anotada, congelada (decisión del usuario, 2026-10-04): reemplazar una tarea por otra
@@ -87,8 +115,11 @@ más urgente.** Cuando quien confirma toca "Rechazar y cancelar" sobre el borrad
 persona, Leda le ofrece en la misma respuesta armarle otra tarea a esa persona (alta normal
 con ese responsable, sus datos completos y su confirmación). No se edita la tarea cancelada:
 son dos actos separados, para que la auditoría muestre qué se canceló, por qué y qué se creó
-en su lugar. "Rechazar y cancelar" se construye ahora (tarea 0-36 de la rama de flujo); el
-ofrecimiento espera al levantamiento del congelamiento.
+en su lugar. Pertenece al alta por chat, que ese mismo día quedó fuera del alcance: "Rechazar y
+cancelar" se empezó a construir (tarea 0-36 de la rama de flujo), se detuvo y no se retoma; su
+trabajo parcial quedó archivado, sólo para consulta, en la etiqueta `respaldo-0-36-en-pausa`. La
+idea queda anotada; si el alta por chat vuelve al alcance, y qué lo reabre, está `PENDIENTE` en el
+ADR 0017.
 
 ### Línea base versionada
 
@@ -119,7 +150,11 @@ lateral que ese identificador existe.
 **Depende de:** nada.
 
 **Cierre:** un lector nuevo entiende qué es Leda y dónde termina el núcleo sin
-recurrir a documentación superada. *Unidad en curso.*
+recurrir a documentación superada.
+
+**Nota (2026-10-04):** esta unidad figuraba como la que estaba en marcha. Ya no lo está: el
+trabajo vigente es el Motor, y la definición de producto y la frontera se actualizan cuando se
+acepten los ADR 0017 y 0018.
 
 ### Desacople del transporte
 
@@ -142,6 +177,11 @@ sesión, y el aislamiento queda a cargo de la política.
 
 **Su adaptador HTTP no existe**, así que todavía ninguna superficie ajena al canal
 conversacional lee nada. Eso pertenece al tablero de cliente.
+
+**Nota (2026-10-04):** el párrafo de arriba quedó atrasado. Desde el commit `48da6fb` existe
+`GET /tablero/{token}` (`src/leda/gateway.py`, `_servir_tablero`), una vista de sólo lectura que
+arma su página con las seis consultas de este puerto. No existe una API de lectura para otras
+superficies.
 
 Nota sobre la dependencia que este roadmap declaraba: decía depender del desacople
 del transporte, y no era cierto. `message_outbox` es la cola de notificaciones
@@ -212,11 +252,20 @@ las cadencias del bloque 5 de la entrevista de alta (`nucleo/alta-de-equipo.md`)
 qué días y a qué hora Leda pide estado, el resumen grupal y el tope de mensajes
 automáticos por persona. Un cambio de cadencia toma efecto sin reiniciar el proceso.
 
-**Depende de:** puerto de lectura (hecho) y su credencial de acceso, cuya
-implementación quedó en pausa sin comitear.
+**Depende de:** puerto de lectura (hecho) y su credencial de acceso (hecha: tabla
+`acceso_tablero` y migración `0006`, commit `5b1be50`).
+
+**Estado comprobado el 2026-10-04:** la parte de lectura existe. La persona pide su enlace por
+chat privado (`pedir_tablero`), lo abre en `GET /tablero/{token}` (commit `48da6fb`) y ve el
+estado de su espacio; lo cubre `tests/test_tablero.py`. La parte de configuración (que el cliente
+ajuste sus datos, con cada cambio atribuido) no tiene código.
 
 **Cierre:** un integrante abre su enlace, ve el estado de su espacio y sólo el suyo,
 y un cambio de configuración queda registrado con su autor.
+
+**Nota (2026-10-04):** por decisión del usuario, después de la importación por archivo las tareas
+se cargarán con un formulario en este tablero. Cómo se hace, y si hay que revisar el
+[`ADR 0004`](decisions/0004-dos-superficies-separadas.md), está `PENDIENTE` en el ADR 0017.
 
 ### Grafo de transiciones de estado
 
@@ -238,6 +287,11 @@ que la escalera afirme silencio sobre evidencia real.
 **Cierre:** un escenario con tiempo simulado demuestra envío, silencio, respuesta,
 ausencia y escalamiento sobre solicitudes reales.
 
+**Nota (2026-10-04):** el alcance se recortó al seguimiento, y esta unidad es seguimiento. Hoy
+`pending_reply` nunca se escribe y no hay enlace entre la respuesta de una persona y el
+recordatorio que la originó. Si se adelanta, y respecto de cuáles de sus dependencias, está
+`PENDIENTE` en el ADR 0017.
+
 ### Leda orienta
 
 **Entrega:** [`ADR 0007`](decisions/0007-leda-orienta-no-charla.md): cada respuesta que
@@ -254,6 +308,10 @@ respuestas (T10 de `odd/tasks/leda-orienta.md`).
 cuarta ronda (T11), que muestre menos preguntas innecesarias, ninguna respuesta vaga que
 haya que interpretar y ninguna conversación con dos temas abiertos a la vez.
 
+**Nota (2026-10-04):** esta unidad es del flujo B, congelado: no se sigue trabajando sobre su
+código. Las reglas del ADR 0013 siguen vigentes como reglas de comportamiento y pasan al diseño
+del motor de conversación (ADR 0018).
+
 ### Aportes sobre tareas
 
 **Entrega:** texto, foto, video o archivo que una persona suma a una tarea con un motivo:
@@ -265,6 +323,8 @@ pedido de estado de Leda al responsable, respetando el volumen de contacto (mec�
 §10).
 
 **Depende de:** Leda orienta.
+
+**Nota (2026-10-04):** esta unidad y sus dependencias se reevalúan en el ADR 0017 (`PENDIENTE`).
 
 ### Aprendizaje de apodos y de aclaraciones
 
@@ -297,10 +357,17 @@ separa por proyecto y no por cliente, y su modo multiusuario es una capa en la n
 aparte. Lectura inicial: usarlo como componente sumaría un segundo almacén y otro
 modelo de aislamiento, frente a PostgreSQL como única fuente de verdad y RLS por
 espacio; sus ideas (clave de tema con actualización, observaciones con tipo y
-vencimiento, búsqueda de texto) se pueden llevar a PostgreSQL. `PENDIENTE`, a
-profundizar antes del ADR de esta unidad: el modo en la nube y su control de acceso
-por proyecto, cómo decide `mem_judge` los conflictos, y si conviene como
-componente, como servicio aparte o sólo como referencia de diseño.
+vencimiento, búsqueda de texto) se pueden llevar a PostgreSQL. **Verificado el 2026-10-04**
+(repositorio, `DOCS.md` y la versión 3.0.0 instalada; detalle en la sección 7 de
+[`research/gestion-del-dialogo-y-arquitecturas-de-agentes.md`](research/gestion-del-dialogo-y-arquitecturas-de-agentes.md)):
+licencia MIT; SQLite con FTS5; el token opcional de su API HTTP local sólo protege los
+borrados, la exportación y la importación; los datos se separan por nombre de proyecto y nada
+impide leer otro proyecto en la misma base; Engram Cloud se puede alojar por cuenta propia
+sobre PostgreSQL, con permisos por proyecto denegados por omisión, pero es una capa de
+sincronización y la base SQLite local sigue siendo la autoritativa; las relaciones entre
+observaciones las juzga el agente con el modelo (`mem_judge`); la búsqueda documentada es FTS5.
+**Decisión del usuario (2026-10-04):** Engram se toma sólo como referencia de diseño, no como
+componente.
 
 **Insumo: Hermes Agent** (Nous Research, MIT; relevamiento del 2026-09-30 en
 [`research/hermes-agent.md`](research/hermes-agent.md)). No sirve como base: agente
@@ -330,6 +397,12 @@ construirla. Condiciones que la investigación tiene que respetar:
 `PENDIENTE`: medir si mejora las respuestas frente al historial actual de 6 horas
 (`contexto.historial`), y definirlo en el mismo ADR que amplíe la excepción de
 ADR 0005.
+
+**Precisión (2026-10-04).** La memoria por integrante queda prevista como la tercera parte del
+diseño del motor de conversación (estado exacto, registro completo de la conversación y
+memoria). Se construye más adelante y con su propio ADR: el aprendizaje persistente sigue
+fuera del alcance hasta esa decisión. No reemplaza al estado de la conversación, que tiene que
+ser exacto y es lo que falla hoy.
 
 **Insumo a profundizar: Obsidian** ([obsidian.md](https://obsidian.md)). Relevamiento
 inicial, 2026-09-24: aplicación de escritorio sobre una carpeta de archivos Markdown
@@ -391,6 +464,11 @@ plataforma cuando exista: no se ajusta el comportamiento de Leda a sus valores a
 elegida por la persona; ninguna se ofrece sin un mecanismo detrás, y ningún objetivo ni
 excepción queda vigente sin la aprobación que corresponde.
 
+**Nota (2026-10-04):** esta unidad nació del alta por chat, que quedó fuera del alcance por
+ahora, y dependía de la rama de flujo, que quedó congelada. La unidad, y cómo se aplica a las
+tareas importadas la regla de fondo sobre la fecha de una tarea y la de su objetivo, se reevalúan
+en el ADR 0017 (`PENDIENTE`).
+
 ### Respuesta que se va escribiendo
 
 **Entrega:** en chat privado, la respuesta de Leda aparece de a poco, como si la fuera
@@ -412,6 +490,9 @@ verificar) cuando se trabaje la latencia, y elegir entre las dos viéndolas en r
 Probado en real el 2026-10-01 (se ve el texto crecer y hasta el reintento del verificador);
 queda **encendido** en `leda_flujo` porque ayuda a ver cómo se comporta Leda (decisión
 del usuario); en la rama sigue apagado por omisión.
+
+**Nota (2026-10-04):** el experimento vivía en el alta conversada del flujo C, congelado. Si el
+motor de conversación muestra la respuesta de a poco, y cómo, está `PENDIENTE` en el ADR 0018.
 
 ### Mensajes de voz
 
@@ -435,6 +516,9 @@ efecto se confirma con su vista previa, venga el pedido escrito o hablado.
 
 **Depende de:** el congelamiento levantado y los circuitos del alta, la entrega y la
 aprobación en el flujo nuevo (`odd/tasks/circuitos-al-flujo-nuevo.md`, rama de flujo).
+
+**Nota (2026-10-04):** esa dependencia nombraba los circuitos del flujo C, congelado. De qué
+depende ahora esta unidad está `PENDIENTE` en el ADR 0017.
 
 ## Horizonte posterior
 

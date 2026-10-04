@@ -1,5 +1,10 @@
 # Leda
 
+> **Nota del 2026-10-04.** Esta es la guía operativa del código de `main`. El estado, el orden de
+> trabajo y el próximo paso están en [`docs/STATUS.md`](docs/STATUS.md): la línea de trabajo
+> vigente es el Motor, en la rama `feat/motor-de-conversacion`. La sección "Qué falta", al final,
+> es historia y no un orden de trabajo.
+
 Project manager digital que se asigna a un equipo de personas y se encarga de que
 el trabajo tenga objetivos, responsables, fechas, dependencias y criterios claros.
 

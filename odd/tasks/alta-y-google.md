@@ -1,5 +1,9 @@
 # Alta con correo verificado y acceso a Google (rama auxiliar)
 
+> **Nota del 2026-10-04.** Este documento es anterior al Motor, la línea de trabajo vigente. Lo que
+> figure acá como en curso, pendiente o próximo paso no se retoma sin una decisión del usuario. El
+> orden de trabajo vigente está en [`docs/STATUS.md`](../../docs/STATUS.md).
+
 **Estado:** propuesto (no iniciado — pendiente de G0: matriz aprobada y ADR 0010 aceptado)
 **Creado:** 2026-09-27
 **Origen:** decisión del usuario, 2026-09-27; [`ADR 0010`](../../docs/decisions/0010-correo-verificado-y-google-en-el-producto.md).

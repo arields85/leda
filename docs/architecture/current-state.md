@@ -1,5 +1,11 @@
 # Estado arquitectónico actual
 
+> **Nota del 2026-10-04.** Este documento describe el código de `main`. Su capa de
+> conversación (los flujos A y B) está congelada: no se corrige ni se extiende, y se borra en
+> la Etapa 3 del Motor. La capa de garantías que describe sigue vigente. No es la base para
+> diseñar la conversación nueva: eso se decide en el ADR 0018 (`PENDIENTE`). Estado y orden
+> de trabajo: [`../STATUS.md`](../STATUS.md).
+
 Leda es hoy un monolito modular en Python, con PostgreSQL como fuente operativa y
 Telegram como interfaz principal. Esta descripción contrasta inspección estática con
 la evidencia operativa y la baseline registradas en `docs/STATUS.md`.

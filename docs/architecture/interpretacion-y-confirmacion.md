@@ -1,5 +1,11 @@
 # Interpretación, aclaración y confirmación
 
+> **Nota del 2026-10-04.** Es el diseño de la conversación de los flujos A y B, que quedaron
+> congelados. Ya no es un diseño vivo: no se ajusta ni se usa como base de trabajo nuevo. Los
+> ADR 0013 y 0014 están superados en parte (ver la nota al comienzo de cada uno) y la
+> conversación se rediseña en el ADR 0018 (el Motor, `PENDIENTE`). Estado y orden de trabajo:
+> [`../STATUS.md`](../STATUS.md).
+
 > **Diseño vivo hasta 2026-09-29.** Las decisiones que gobiernan hoy son el
 > [`ADR 0005`](../decisions/0005-interpretacion-y-confirmacion.md),
 > [`ADR 0006`](../decisions/0006-jev-para-resolver-referencias-e-intencion.md),

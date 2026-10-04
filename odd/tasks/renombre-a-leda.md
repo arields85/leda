@@ -1,5 +1,9 @@
 # Renombre del producto: Prisma pasa a llamarse Leda
 
+> **Nota del 2026-10-04.** Este documento es anterior al Motor, la línea de trabajo vigente. Lo que
+> figure acá como en curso, pendiente o próximo paso no se retoma sin una decisión del usuario. El
+> orden de trabajo vigente está en [`docs/STATUS.md`](../../docs/STATUS.md).
+
 **Estado:** Leda funciona correctamente (2026-10-02). Limpieza (R11) hecha salvo lo que depende de alta y Google; integración de `auxiliar/alta-y-google` pendiente (R12). **Decisión del usuario:** renombrar "todo lo que es
 Prisma" a Leda. Guía de referencia: `D:\Proyectos\RENAME_PLAYBOOK_prisma_to_leda.md` (renombre
 equivalente hecho en otra aplicación del usuario).

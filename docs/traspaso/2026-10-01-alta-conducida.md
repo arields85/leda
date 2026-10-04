@@ -1,5 +1,9 @@
 # Traspaso: el alta conducida por el modelo funciona y se sigue puliendo
 
+> **Superado el 2026-10-04.** Este traspaso ya no es un punto de retorno: sus pendientes y su forma
+> de trabajar quedaron congelados o superados. El estado y el próximo paso vigentes están en
+> [`../STATUS.md`](../STATUS.md).
+
 Al cierre del 2026-10-01, el alta de tareas conducida por el modelo (enmienda del
 [ADR 0014](../decisions/0014-flujo-de-un-mensaje.md)) se probó todo el día por Telegram
 real y **funciona**. El modelo entiende el lenguaje desprolijo, propone lo que falta, y el

@@ -2,15 +2,65 @@
 
 Documento vivo (pedido del usuario, 2026-10-03). Junta en un solo lugar los resultados,
 progresos, retrocesos y conclusiones de cada flujo y de cada modelo, para que una sesión
-nueva no tenga que reconstruirlos. El detalle de cada prueba está en
-`odd/tasks/circuitos-al-flujo-nuevo.md` de la rama `feat/flujo-de-un-mensaje`; los nombres
-(flujo A, B, C1…, circuito 0…) están definidos en `AGENTS.md`, "Nombres que usamos".
+nueva no tenga que reconstruirlos. El detalle de cada prueba de los flujos C está en
+`odd/tasks/circuitos-al-flujo-nuevo.md` de la rama `feat/flujo-de-un-mensaje`, congelada el
+2026-10-04 (etiqueta `respaldo-flujos-antes-de-d`; se lee con `git show`). Los nombres
+(el Motor; flujo A, B, C1…, D) están definidos en `AGENTS.md`, "Nombres que usamos".
 
 Regla de uso: **al cerrar cada prueba real, medición o auditoría se agrega acá su
 resultado y, si cambia, la conclusión vigente.** No se borran conclusiones anteriores: se
 marcan como reemplazadas.
 
-## Conclusión vigente (2026-10-03)
+## Conclusión vigente (2026-10-04)
+
+**Los flujos A, B y C1 a C6 quedan congelados. La línea de trabajo vigente es el Motor, y su
+mecanismo para procesar un mensaje es el flujo D: un motor chico de conversación dentro de Leda,
+con el alcance recortado al seguimiento.** "El Motor" nombra la línea de trabajo entera; "flujo D",
+sólo el mecanismo, para compararlo con los flujos A, B y C. Es una decisión del usuario, tomada
+después de la prueba real de la tarea 0-35 y de un análisis adversarial del proyecto
+([`../research/gestion-del-dialogo-y-arquitecturas-de-agentes.md`](../research/gestion-del-dialogo-y-arquitecturas-de-agentes.md)).
+
+Qué se decidió:
+
+- **Un motor de conversación chico dentro de Leda (el flujo D),** sin marcos de terceros (Rasa
+  quedó descartado): estado de la conversación explícito, circuitos declarados y situaciones
+  generales resueltas una sola vez. Se diseña en tres partes: estado exacto, registro completo de
+  la conversación (con los toques de botones) y memoria por integrante, que va después y con su
+  propio ADR.
+- **Alcance recortado:** por ahora Leda no crea tareas ni objetivos por chat; hace seguimiento.
+  Qué circuitos quedan por chat se fija en el ADR 0017 (`PENDIENTE`); las cadencias, los
+  recordatorios, los bloqueos, la entrega con evidencia, la aprobación y las consultas son
+  ejemplos de seguimiento, no la lista decidida. Principio: *por chat, hechos del trabajo; por la
+  web, su estructura.*
+- **Carga de tareas:** primero una importación por archivo que hace el administrador; después,
+  un formulario en el tablero del cliente.
+- **Engram:** sólo como referencia de diseño para esa memoria, no como componente.
+- **Dónde sigue el trabajo:** en la rama `feat/motor-de-conversacion`. El diseño se escribe antes
+  del código, en el ADR 0017 (alcance) y el ADR 0018 (motor de conversación), en preparación. Los
+  flujos anteriores quedan intactos en la etiqueta `respaldo-flujos-antes-de-d` y no se corrigen.
+
+Por qué:
+
+- La conclusión anterior decía que los problemas de C6 se arreglaban dentro de su diseño. La
+  prueba real del 2026-10-04 lo desmintió: el bucle del borrador devuelto no volvió, pero
+  aparecieron cuatro fallas nuevas de la misma clase (fila "C6 + 0-35" de la tabla), después de
+  cinco auditorías que encontraron 14, 7, 7, 6 y 7 hallazgos, sin bajar.
+- El análisis mostró que la causa no está en un flujo en particular: la conversación está escrita
+  a mano, situación por situación, sin un modelo de la conversación ("Progresos y retrocesos").
+- El usuario, al cortar la prueba: "me preocupa que no se pueda seguir un hilo de conversación tan
+  simple", "se siente muy estructurado todo", "siento que estamos volviendo a parchear".
+
+La IA: las mediciones de "Modelos" son del flujo C6. Para el flujo D se mantiene GPT-6 sol y falta
+volver a medir GPT-6 luna; la elección está `PENDIENTE` en el ADR 0018.
+
+Qué haría revisar esta conclusión: el resultado de la prueba chica del motor de conversación, con
+los criterios de éxito y de corte escritos antes en el ADR 0018.
+
+El detalle de la prueba del 2026-10-04 y de la tarea 0-36, que se detuvo y no se retoma, está en
+`respaldo-flujos-antes-de-d:odd/tasks/circuitos-al-flujo-nuevo.md`. El trabajo parcial de la
+tarea 0-36 quedó archivado, sólo para consulta, en la etiqueta `respaldo-0-36-en-pausa`.
+
+## Conclusión anterior (2026-10-03), reemplazada el 2026-10-04
 
 **Flujo elegido: C6, con las plantillas fuera y la regla del mozo** (`AGENTS.md`, punto
 11), aunque todavía no está terminado. **Modelo: GPT-6 sol.**
@@ -41,7 +91,18 @@ todavía puede entrar en bucle (otra causa, la misma clase de falla). Se mantien
 rediseña el borrador devuelto (tarea 0-35): sin lista de datos a corregir; vuelve como un
 borrador normal con el motivo, una pregunta abierta y el resumen para reenviar.
 
+**Reemplazo (2026-10-04, después de la prueba real de 0-35):** toda esta conclusión dejó de
+regir, incluida la actualización de arriba. No se mantiene C6 ni se sigue trabajando sobre el
+borrador devuelto; rige la conclusión vigente del comienzo.
+
 ## La regla del mozo: por qué se decidió y cómo se aplicó en C6
+
+> **Nota del 2026-10-04.** Esta sección cuenta cómo se aplicó la regla en el flujo C6, que quedó
+> congelado. El núcleo de la regla sigue vigente (la IA no inventa datos ni efectos; los hechos
+> salen de la cocina). Su extensión a cada movimiento de la conversación está en revisión en el
+> ADR 0018; ver `AGENTS.md`, "Cómo pensamos juntos", punto 11. La forma de trabajar que describe
+> (controlar con pruebas automáticas y con la auditoría de otro agente) tampoco es la vigente:
+> ver el punto 12.
 
 **Qué es** (decisión del usuario, 2026-10-03; `AGENTS.md`, punto 11). La IA es el mozo de
 un restaurante: escucha o pregunta qué quiere la persona, lleva el pedido exacto a la
@@ -93,27 +154,30 @@ resuelve la cocina o le estamos enseñando frases al mozo?
 - **Se controla solo:** pruebas automáticas fallan si vuelve un texto fijo, una decisión
   de la IA o una regla de caso; y después de cada vuelta, una auditoría independiente.
 
-**Resultado hasta ahora.** Prueba real con sol (2026-10-03, 19:18): Ariel explicado con la
-regla real, el rechazo volvió como una pregunta concreta, el bloque para copiar funcionó y
-quién hizo qué salió bien en todos los mensajes. Fallaron dos cosas, las dos de la cocina y
-no del mozo: un bucle en el borrador devuelto (la cocina volvía a pedir la fecha) y la
-misma oferta al final de cada mensaje (la cocina le pasaba siempre la lista de lo posible).
-Se arreglan dentro de la regla (0-34).
+**Resultado en el flujo C6 (al 2026-10-03).** Prueba real con sol (2026-10-03, 19:18): Ariel
+explicado con la regla real, el rechazo volvió como una pregunta concreta, el bloque para copiar
+funcionó y quién hizo qué salió bien en todos los mensajes. Fallaron dos cosas, las dos de la
+cocina y no del mozo: un bucle en el borrador devuelto (la cocina volvía a pedir la fecha) y la
+misma oferta al final de cada mensaje (la cocina le pasaba siempre la lista de lo posible). Las
+dos se trabajaron dentro de la regla en la tarea 0-34. La prueba real del 2026-10-04 mostró que
+la misma clase de falla seguía apareciendo (fila "C6 + 0-35" de la tabla).
 
 ## Los flujos, uno por uno
 
 | Flujo | Qué es | Prueba real | Lo bueno | Lo malo | Estado |
 |---|---|---|---|---|---|
-| A | Formulario mecánico: pasos fijos, un dato por vez, botones | Rondas 1-4 (hasta 2026-09-30) | Predecible; nunca inventa | Robótico; no entiende lo que se escribe libre | Se retira del alta (pendiente) |
-| B | IA libre: lee la constitución, elige herramientas y redacta | Rondas 1-4 | Flexible | Inventó un cambio (H5); textos fijos con muletillas del agente ("Listo…", "Dale…") | Sigue para todo lo que no es el alta; se retira circuito por circuito |
+| A | Formulario mecánico: pasos fijos, un dato por vez, botones | Rondas 1-4 (hasta 2026-09-30) | Predecible; nunca inventa | Robótico; no entiende lo que se escribe libre | Congelado el 2026-10-04; su código en `main` se borra antes de construir el motor de conversación definitivo |
+| B | IA libre: lee la constitución, elige herramientas y redacta | Rondas 1-4 | Flexible | Inventó un cambio (H5); textos fijos con muletillas del agente ("Listo…", "Dale…") | Congelado el 2026-10-04; es lo que atiende en `main` todo lo que no es el alta, y se borra antes de construir el motor de conversación definitivo |
 | C1 | ADR 0014, una llamada: la IA interpreta y escribe antes de que el código decida | 2026-10-01: favorable ("fluidez increíble") | Gran salto contra A | Órdenes secas (12), "anoté" sin efecto (7), dos datos por pregunta (9) | Congelado |
 | C2 | C1 + la personalidad como texto aparte | 2026-10-02 18:20: pasa | Menos órdenes secas | El usuario: "habla exactamente igual"; el más lento (17 s típico, 40 s peores casos) porque la personalidad contradecía la mecánica | Congelado |
 | C3 | Personalidad adentro de la mecánica | No se probó en real (se saltó a C4 por la medición del banco, contra "probar en real enseguida") | Volvió a 10,6 s; cero órdenes secas, "anoté" y dos datos | Aceptaba un título vago | Congelado |
 | C4 | C3 + reglas de estilo concretas | 2026-10-02 22:18: pasa | Un dato por pregunta garantizado por el código | **Retroceso:** reglas de casos ("por favor", nombre de pila, no repasar) que no daban el resultado; el verificador rechazaba el título propuesto | Congelado |
-| C5 | Mecánica sólo con reglas estructurales | 2026-10-03 00:44: pasa en lo estructural | Sin reglas de estilo, lo estructural se sostuvo; textos más cortos | "Perfecto" y «¿te sirve?»; textos fijos del código | Etiqueta `respaldo-flujos-antes-de-c6` |
-| C6 | Esquema del usuario: la IA interpreta, el código decide, la IA escribe desde los hechos (dos llamadas) | 2026-10-03 01:39: pasa; el usuario: "es más conversacional" | La fecha fuera de plazo con el límite real; la propuesta de título pasa el verificador; textos que coinciden con lo que pasó | Muletillas de la IA; textos fijos al final | Elegido |
-| C6 + P-1 | Sin plantillas (sólo dos permitidas) | 2026-10-03 09:13 (flash): "habla sin plantillas ni muletillas" | Sin textos fijos en el camino principal; elección del botón escrita en el mensaje | Responsable fuera de opciones ignorado; el rechazo dejaba el tema abierto; causa inventada; promesa falsa | Base de lo que sigue |
-| C6 + regla del mozo | La IA no decide: la cocina decide qué se pregunta, botones y propuestas | 2026-10-03 19:18 (sol) | Ariel explicado con la regla real; el rechazo vuelve como pregunta concreta; bloque para copiar | Bucle en el borrador devuelto (pedía la fecha); la misma oferta al final de cada mensaje; volvió una orden; "Soy Leda." | En arreglo (0-34) |
+| C5 | Mecánica sólo con reglas estructurales | 2026-10-03 00:44: pasa en lo estructural | Sin reglas de estilo, lo estructural se sostuvo; textos más cortos | "Perfecto" y «¿te sirve?»; textos fijos del código | Congelado; etiqueta `respaldo-flujos-antes-de-c6` |
+| C6 | Esquema del usuario: la IA interpreta, el código decide, la IA escribe desde los hechos (dos llamadas) | 2026-10-03 01:39: pasa; el usuario: "es más conversacional" | La fecha fuera de plazo con el límite real; la propuesta de título pasa el verificador; textos que coinciden con lo que pasó | Muletillas de la IA; textos fijos al final | Elegido el 2026-10-03; congelado el 2026-10-04 |
+| C6 + P-1 | Sin plantillas (sólo dos permitidas) | 2026-10-03 09:13 (flash): "habla sin plantillas ni muletillas" | Sin textos fijos en el camino principal; elección del botón escrita en el mensaje | Responsable fuera de opciones ignorado; el rechazo dejaba el tema abierto; causa inventada; promesa falsa | Fue la base de las versiones siguientes del flujo C; congelado el 2026-10-04 |
+| C6 + regla del mozo | La IA no decide: la cocina decide qué se pregunta, botones y propuestas | 2026-10-03 19:18 (sol) | Ariel explicado con la regla real; el rechazo vuelve como pregunta concreta; bloque para copiar | Bucle en el borrador devuelto (pedía la fecha); la misma oferta al final de cada mensaje; volvió una orden; "Soy Leda." | Arreglado en 0-34; congelado el 2026-10-04 |
+| C6 + 0-35 | El borrador devuelto vuelve como un borrador normal (sin lista de datos a corregir), con las correcciones de la quinta auditoría | 2026-10-04 11:21-11:38 (sol), cortada antes de terminar el guion | El bucle no volvió; una corrección sobre el devuelto volvió al resumen sin pedir otros datos; el selector de Modificar pregunta en lugar de ordenar; la propuesta de la IA no pisó el criterio confirmado | Después de un turno sin cambios, la respuesta salió sin resumen ni botones; pedir por escrito el envío a aprobación no se tomó; la lista de ofertas recitada en casi todos los mensajes; un Cancelar de un resumen anterior canceló el devuelto, y el flujo B no supo del borrador cancelado y ofreció tareas ajenas | Congelado el 2026-10-04 (etiqueta `respaldo-flujos-antes-de-d`) |
+| D | El mecanismo del Motor: un motor de conversación con estado explícito, circuitos declarados y situaciones generales resueltas una sola vez (ADR 0018, en preparación) | Todavía ninguna | — | — | En diseño, en la rama `feat/motor-de-conversacion` |
 
 ## Progresos y retrocesos
 
@@ -144,6 +208,45 @@ Se arreglan dentro de la regla (0-34).
   `PIDE_ELEGIR` y `PIDE_QUE_CAMBIAR`, que se mira en la prueba real. Arreglados los otros
   6 en `df761db`, `ba3269d` y `24e92ce`, con el mecanismo y no el caso. Los controles
   automáticos que escribe el mismo escritor tienen sus mismos puntos ciegos.
+- **Prueba real de 0-35 y freno (2026-10-04).** Con la suite en verde (3.997 pruebas) y la
+  quinta auditoría aprobada con reservas, la prueba real volvió a fallar en formas nuevas de la
+  misma clase: el estado de la conversación y lo que la persona puede hacer se decidían en cada
+  camino por su cuenta. El usuario cortó la prueba y frenó los arreglos. Es el disparador
+  "pruebas en verde y el usuario dice que se siente mal" del punto 4 de `AGENTS.md`, y la misma
+  clase de falla en dos rondas.
+- **Análisis adversarial (2026-10-04),** pedido por el usuario: una revisión interna de sólo
+  lectura y una investigación externa con fuentes. Resumen (detalle y cifras en
+  [`../research/gestion-del-dialogo-y-arquitecturas-de-agentes.md`](../research/gestion-del-dialogo-y-arquitecturas-de-agentes.md)):
+  - La base no está en cuestión: PostgreSQL con las garantías en el código, y la IA que
+    interpreta y redacta, coinciden con el patrón dominante. En ninguna ronda quedó registrado
+    un efecto mal hecho.
+  - La falla está en el medio: unas 16.000 líneas de manejo de conversación escritas a mano, sin
+    un modelo de la conversación (el estado se deduce en cada mensaje; un borrador tiene al
+    menos 14 estados implícitos) y con tres flujos conviviendo. Un mapa sobre el alta contó unos
+    30 lugares que deciden, cada uno por su cuenta, si va el resumen, qué botones salen y qué se
+    ofrece.
+  - Los hallazgos no bajan: 14, 7, 7, 6 y 7 en las cinco auditorías.
+  - Las pruebas miran el código, no las conversaciones: unas 70.000 líneas de pruebas, en su
+    mayoría atadas a la implementación y escritas por el mismo escritor, y ninguna prueba con la
+    IA real del flujo elegido.
+  - El método corrió más rápido que el diseño: 254 commits en la rama entre el 2026-09-30 y el
+    2026-10-04, y seis versiones del alta en tres días.
+  - Ninguno de los productos y marcos relevados escribe a mano una rama por situación, y ningún
+    producto verificado cubre el circuito completo de Leda dentro del chat del equipo.
+- **La parte del agente (2026-10-04).** Ese día el agente delegó tres vueltas de arreglos (la
+  tarea 0-35, las correcciones de la quinta auditoría y la tarea 0-36) y propuso una cuarta. Cada
+  una era un "arreglo del mecanismo" razonable y ninguna cuestionaba la estructura; la suite en
+  verde y la auditoría de otro agente se informaban como avance. El usuario lo señaló: "si no lo
+  menciono vos volvés a caer en ese vicio y siempre estamos parcheando fallas". Desde entonces,
+  un arreglo del mecanismo dentro de una estructura equivocada cuenta como parche, y lo que
+  cuenta como evidencia son conversaciones reales contra la IA real (`AGENTS.md`, "Cómo pensamos
+  juntos", punto 12).
+- **La regla del mozo, en revisión (2026-10-04).** El análisis la encontró correcta para datos
+  y efectos, y señaló como causa del código disperso su extensión a cada movimiento de la
+  conversación (qué se pregunta después, cuándo va el resumen, qué se ofrece): sólo el alta
+  llegó a tener 25 sucesos con hechos redactados por el código. El extremo opuesto también falló
+  (el flujo B inventó). No está decidido cómo queda: qué decide la IA y qué decide el código se
+  fija en el ADR 0018.
 
 ## Modelos
 
@@ -170,3 +273,6 @@ Lo que se aprendió de los modelos: luna y sol mandan todos los campos vacíos (
 vacío como "no lo dijo"); Gemini razona por dentro y necesita un tope de salida propio (el
 tope por modelo es un pendiente importante de la plataforma); el proveedor `nan` no limita el razonamiento
 de flash, por eso es lento.
+
+Estas mediciones son del flujo C6, congelado el 2026-10-04. Para el flujo D se mantiene GPT-6 sol
+y falta volver a medir GPT-6 luna (ADR 0018).

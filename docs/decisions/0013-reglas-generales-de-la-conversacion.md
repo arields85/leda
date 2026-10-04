@@ -1,6 +1,6 @@
 # ADR 0013: Reglas generales de la conversación
 
-- **Estado:** aceptada
+- **Estado:** aceptada; superada en parte el 2026-10-04 (ver la nota de abajo)
 - **Fecha:** 2026-09-29
 - **Alcance:** el camino de cada mensaje y de cada toque: `gateway` (`procesar_update`,
   `_turno`, `_toque`, los retomes de preguntas pendientes), `pendientes`,
@@ -9,6 +9,35 @@
   H19 y H20 en `odd/tasks/leda-orienta.md`); mapeo de causas del 2026-09-29 por
   lectura de código; manual de personalidad, voz y comportamiento del usuario (§13-§16,
   §20, §27), contrastado con el corpus del repo.
+
+> **Nota del 2026-10-04: superada en parte** (decisión del usuario). Los flujos A, B y C
+> quedaron congelados y la línea de trabajo vigente es el Motor
+> ([`AGENTS.md`](../../AGENTS.md), "Nombres que usamos"; estado y orden en
+> [`STATUS.md`](../STATUS.md)). Este documento se conserva entero: lo que sigue dice qué partes
+> rigen todavía.
+>
+> **Sigue vigente:** las cuatro reglas, como reglas de comportamiento: lo que Leda tiene que
+> cumplir en cualquier flujo. También el rechazo de un framework de asistentes como
+> dependencia ("Alternativas consideradas").
+>
+> **Reemplazado, ya no rige:**
+>
+> - el alcance de la enmienda del 2026-10-02 ("cada circuito adopta esta regla al pasar al
+>   flujo nuevo"): no se pasa ningún circuito al flujo C;
+> - el procedimiento de clasificar cada hallazgo por regla y corregir el mecanismo de esa regla
+>   ("Consecuencias"): los flujos congelados no se corrigen, y un hallazgo es primero una
+>   conversación de prueba (`AGENTS.md`, "Hallazgos de conversación");
+> - las dos salidas ante un cambio de tema de la enmienda del 2026-09-29 (Seguir, y Dejar y ver
+>   lo otro): pasan a ser tres (seguir, retomarlo después o cancelarlo; decisión del usuario,
+>   2026-10-04).
+>
+> **`PENDIENTE` en el ADR 0018:**
+>
+> - si una confirmación que crea o cambia algo puede hacerse por escrito. La enmienda del
+>   2026-10-02 pone botones en las confirmaciones de la constitución §7; la regla del usuario
+>   del 2026-10-04 dice que los botones son atajos y que lo que hace un botón también vale
+>   escrito. No darlo por decidido;
+> - cómo cumple cada regla el motor de conversación.
 
 ## Contexto
 

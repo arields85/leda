@@ -1,5 +1,13 @@
 # Qué es Leda
 
+> **Nota del 2026-10-04.** El usuario recortó el alcance de la superficie conversacional: por
+> ahora Leda no crea tareas ni objetivos por chat y hace seguimiento; las tareas se cargan por
+> fuera del chat. El detalle y el orden de trabajo están en [`../STATUS.md`](../STATUS.md), y la
+> decisión se escribe en el ADR 0017 (`PENDIENTE`). Además, la tabla de superficies de abajo quedó
+> atrasada: el tablero de cliente existe hoy como una vista de sólo lectura por enlace personal
+> (`GET /tablero/{token}`). La tabla y la lista de rutas se actualizan cuando se acepte el
+> ADR 0017.
+
 Leda es un project manager digital ofrecido como producto. Cada organización que lo
 usa es un cliente independiente, con sus propios integrantes, áreas, políticas y
 cadencias, y sin visibilidad alguna sobre los datos de otro cliente.

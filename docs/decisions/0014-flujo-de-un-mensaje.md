@@ -1,6 +1,7 @@
 # ADR 0014: El flujo de un mensaje, con un dueño por etapa
 
-- **Estado:** aceptada (decisión del usuario, 2026-09-30)
+- **Estado:** aceptada (decisión del usuario, 2026-09-30); superada en parte el 2026-10-04
+  (ver la nota de abajo)
 - **Fecha:** 2026-09-30
 - **Alcance:** el camino de cada mensaje y de cada toque (`gateway`, `llm`, `jev`,
   `agente`, `contexto`, `ingreso_tareas`, `pendientes`, `herramientas`). Amplía el
@@ -8,6 +9,38 @@
 - **Evidencia:** cuarta ronda por Telegram (R4b-H1 a H7, R4c-H1 a H10 en
   `odd/tasks/leda-orienta.md`); observación del usuario del 2026-09-30 ("todo es muy
   robótico"); mapa del flujo por lectura de código del 2026-09-30.
+
+> **Nota del 2026-10-04: superada en parte** (decisión del usuario). Los flujos que salieron de
+> este ADR (C1 a C6) quedaron congelados y la línea de trabajo vigente es el Motor
+> ([`AGENTS.md`](../../AGENTS.md), "Nombres que usamos"; estado y orden en
+> [`STATUS.md`](../STATUS.md)). Este documento se conserva entero: lo que sigue dice qué partes
+> rigen todavía.
+>
+> **Sigue vigente:**
+>
+> - el principio: la IA interpreta; el código decide y ejecuta los efectos; la IA redacta a
+>   partir de los hechos;
+> - las garantías en el código y en la base;
+> - las alternativas rechazadas ("Alternativas consideradas").
+>
+> **Reemplazado, ya no rige:**
+>
+> - el plan de aplicar el flujo camino por camino (último párrafo de "Decisión") y de que cada
+>   circuito pase al flujo, se retire lo viejo y se pruebe (enmienda del 2026-10-02, "primero
+>   todos los circuitos"), junto con los criterios de adopción del alta conducida: no se pasa
+>   ningún circuito al flujo C;
+> - el criterio para levantar el congelamiento de funcionalidad nueva, que nombra el alta, la
+>   entrega y la aprobación: su redefinición está `PENDIENTE` en el ADR 0017;
+> - el comportamiento ante un cambio de tema de la enmienda del 2026-10-01 (pausar el borrador
+>   y atender lo otro directamente): lo reemplaza "un tema a la vez", con tres salidas (seguir,
+>   retomarlo después o cancelarlo; decisión del usuario, 2026-10-04);
+> - el procedimiento ante un hallazgo nuevo de la sección "Moratoria" (registrarlo y
+>   clasificarlo por etapa del flujo): lo reemplaza el de `AGENTS.md`, "Hallazgos de
+>   conversación" (los flujos congelados no se corrigen; un hallazgo es primero una
+>   conversación de prueba).
+>
+> **`PENDIENTE` en el ADR 0018:** si las seis etapas de este ADR obligan al motor de
+> conversación, y qué decide la IA y qué decide el código.
 
 ## Contexto
 

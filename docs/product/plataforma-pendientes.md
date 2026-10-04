@@ -1,5 +1,12 @@
 # Pendientes para la plataforma
 
+> **Nota del 2026-10-04.** La rama `feat/flujo-de-un-mensaje` quedó congelada. Las filas que dicen
+> "por construir" o "construido" en esa rama, y las que nombran ajustes del alta por chat (`alta`,
+> `redaccion`, `stream`, `horizonte_tarea`, los topes por modelo), describen el flujo C: nada de eso
+> se construye ni se retoma ahí. Lo que siga haciendo falta se vuelve a plantear en el Motor, con el
+> diseño del motor de conversación (ADR 0018) y con el alcance (ADR 0017); ver [`../STATUS.md`](../STATUS.md).
+> El inventario se conserva porque las necesidades de configuración siguen valiendo.
+
 Lista viva de lo que la plataforma de administración tiene que permitir configurar o
 hacer cuando se construya. Existe para que, el día que se empiece, no haya que
 reconstruir de memoria qué se fijó por consola, por SQL o en el pack mientras tanto

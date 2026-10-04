@@ -1,5 +1,9 @@
 # Banco con mensajes humanos reales y ambigüedad
 
+> **Nota del 2026-10-04.** Este documento es anterior al Motor, la línea de trabajo vigente. Lo que
+> figure acá como en curso, pendiente o próximo paso no se retoma sin una decisión del usuario. El
+> orden de trabajo vigente está en [`docs/STATUS.md`](../../docs/STATUS.md).
+
 **Estado:** en pausa (2026-09-23, por decisión del usuario)
 **Creado:** 2026-09-23
 **Origen:** pedido del usuario tras la primera corrida del banco

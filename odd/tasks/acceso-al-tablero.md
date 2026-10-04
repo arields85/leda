@@ -1,5 +1,9 @@
 # Acceso al tablero por enlace personal
 
+> **Nota del 2026-10-04.** Este documento es anterior al Motor, la línea de trabajo vigente. Lo que
+> figure acá como en curso, pendiente o próximo paso no se retoma sin una decisión del usuario. El
+> orden de trabajo vigente está en [`docs/STATUS.md`](../../docs/STATUS.md).
+
 **Estado:** en curso
 **Creado:** 2026-09-22
 **Precondición cumplida:** puerto de lectura (`70685f3`) y aislamiento entre

@@ -1,5 +1,9 @@
 # Banco de pruebas conversacional con el modelo real
 
+> **Nota del 2026-10-04.** Este documento es anterior al Motor, la línea de trabajo vigente. Lo que
+> figure acá como en curso, pendiente o próximo paso no se retoma sin una decisión del usuario. El
+> orden de trabajo vigente está en [`docs/STATUS.md`](../../docs/STATUS.md).
+
 **Estado:** terminado
 **Creado:** 2026-09-23
 **Origen:** `docs/STATUS.md`, "Próximo paso"; protocolo en

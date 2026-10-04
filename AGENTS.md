@@ -1,8 +1,14 @@
 # Continuidad de trabajo en Leda
 
 Este archivo es el punto de entrada para futuras sesiones. Leda se endurece y extiende sobre la arquitectura
-actual; no se reestructura ni reescribe sin una decisión explícita y documentada. Versión previa, sin condensar:
-[`docs/historial/AGENTS-hasta-2026-09-30.md`](docs/historial/AGENTS-hasta-2026-09-30.md).
+actual; no se reestructura ni reescribe sin una decisión explícita y documentada. La del 2026-10-04 es una de
+esas decisiones y se llama **el Motor**: cambia el cimiento de la capa de conversación y deja intacta la capa
+de garantías (ver "Dónde se trabaja y qué no se hace" y "Nombres que usamos"). Versiones previas de este
+archivo:
+[`docs/historial/AGENTS-hasta-2026-09-30.md`](docs/historial/AGENTS-hasta-2026-09-30.md) (sin condensar) y
+[`docs/historial/AGENTS-hasta-2026-10-04.md`](docs/historial/AGENTS-hasta-2026-10-04.md) (antes del Motor;
+literal salvo el aviso de archivo de su primera línea). Lo que dicen esas copias es historia, no una
+instrucción vigente.
 
 > **Este archivo es la fuente única de estas instrucciones.** `CLAUDE.md`
 > contiene sólo `@AGENTS.md`, que las importa. Claude Code lee `AGENTS.md` de
@@ -25,60 +31,146 @@ por eso se importan, y Claude Code los carga al iniciar la sesión:
 Un agente que no expanda estas importaciones (otra herramienta que lea `AGENTS.md`)
 tiene que leer esos cuatro archivos enteros antes de su primera respuesta.
 
+## Dónde se trabaja y qué no se hace (desde el 2026-10-04)
+
+El trabajo vigente es **el Motor**: la línea de trabajo que el usuario decidió el 2026-10-04. Qué abarca está
+definido en "Nombres que usamos". La prueba real de ese día volvió a fallar con fallas nuevas de la misma
+clase, después de varias vueltas de arreglos y de cinco auditorías, y un análisis adversarial del proyecto
+([`docs/research/gestion-del-dialogo-y-arquitecturas-de-agentes.md`](docs/research/gestion-del-dialogo-y-arquitecturas-de-agentes.md))
+mostró que la base es correcta y que la falla está en la capa de conversación, escrita a mano y sin un modelo de
+la conversación. Por eso se deja de corregir la conversación de los flujos anteriores y se construye un motor
+chico de conversación dentro de Leda, sin marcos de terceros, con el alcance recortado al seguimiento: por
+ahora Leda no crea tareas ni objetivos por chat. Principio: *por chat, hechos del trabajo; por la web, su
+estructura.*
+
+**Dónde.**
+
+- Rama `feat/motor-de-conversacion`, carpeta `D:\Proyectos\Leda-PM-worktrees\motor-de-conversacion`, abierta
+  desde la etiqueta `respaldo-main-antes-de-d`. **Las sesiones de trabajo se abren en esa carpeta.**
+- Si la sesión se abrió en otra carpeta (por ejemplo `D:\Proyectos\Leda-PM`, que es `main`), los documentos
+  que se cargaron solos pueden estar atrasados: los vigentes son los de la carpeta nueva. Antes de responder,
+  leer de esa carpeta `AGENTS.md`, `docs/STATUS.md`, `odd/tasks/motor-de-conversacion.md` y los tres documentos
+  de `nucleo/`. En `main` no se hace ningún commit hasta el paso M1: el usuario acepta el ADR 0017 y el diseño
+  del ADR 0018 (`docs/STATUS.md`, "Criterios de paso a `main`").
+- Nunca se abre una sesión de trabajo en las carpetas congeladas de `D:\Proyectos\Leda-PM-worktrees\`:
+  `flujo-de-un-mensaje`, `alta-y-google`, `c4-medicion`, `flujo-c6` y `prueba-0-35`. Cada una lleva un aviso de
+  congelamiento al comienzo de su `AGENTS.md`; el resto de sus documentos es anterior al Motor.
+- Siempre se empieza una sesión nueva. Una sesión iniciada antes del cambio del 2026-10-04 conserva en su
+  contexto las instrucciones anteriores y no se continúa.
+- Una sola casa para los documentos: `AGENTS.md`, `docs/STATUS.md`, `docs/ROADMAP.md`, la bitácora de flujos,
+  los ADR y el documento de la unidad se editan sólo en la rama nueva.
+
+**Lo primero.** Escribir con el usuario, punto por punto y sin código, el ADR 0017 (alcance) y el ADR 0018
+(motor de conversación). Qué tiene que resolver cada uno está en `docs/STATUS.md`, "Próximo paso".
+
+**Qué no se hace.**
+
+- Retomar tareas del alta por chat ni de `odd/tasks/circuitos-al-flujo-nuevo.md` (rama congelada): 0-35, 0-36,
+  P-1c, P1-P7, 0-29, 0-17, 0-14 y las demás. El destino de cada una está en `docs/STATUS.md`, "Qué quedó
+  congelado o superado".
+- Corregir, mejorar o extender los flujos A, B o C, ni pasar circuitos al flujo C6.
+- Escribir código de conversación, crear el paquete del motor de conversación o su prueba de frontera antes de
+  que el usuario acepte el ADR 0018 (paso M1). La prueba chica de la Etapa 2 viene después de M1, es descartable
+  y vive fuera de `src/leda`.
+- Tratar una suite en verde o la auditoría de otro agente como prueba de que la conversación funciona.
+- Adoptar Rasa, Engram u otro marco de terceros como componente.
+- Construir la creación de tareas o de objetivos por chat.
+
+**Sobre `nucleo/`.** Los tres documentos de `nucleo/` se cargan al iniciar cada sesión y siguen siendo el
+comportamiento obligatorio del producto. Pero se escribieron antes de la decisión del usuario del 2026-10-04,
+que es posterior y recorta el alcance. Hasta que el usuario edite `nucleo/`, los pasajes que siguen no se leen
+como una orden de construir el alta por chat:
+
+- `nucleo/mecanica-pm.md` §13, "Antes de crear o asignar": por ahora Leda no crea tareas ni objetivos por chat;
+  se cargan por fuera del chat. Si un cambio de responsable se atiende por chat está `PENDIENTE` en el
+  ADR 0017.
+- `nucleo/mecanica-pm.md` §10, "le llegó un borrador para confirmar" y "le rechazaron uno": son avisos del
+  alta por chat, que quedó fuera del alcance.
+- `nucleo/mecanica-pm.md` §9, "Si la persona responde pidiendo más tiempo, Leda registra la nueva previsión":
+  hoy esa operación no existe (la fecha objetivo de una tarea comprometida no cambia). Cómo se atiende ese
+  pedido está `PENDIENTE` en el ADR 0017.
+- `nucleo/constitucion.md` §7 ("Leda prepara un borrador, pide confirmación y sólo entonces ejecuta") y §8
+  (Leda propone lo que falta "en lugar de sólo pedirlo"): la confirmación humana antes de un efecto sigue
+  vigente entera y se exige siempre. Lo que esos pasajes no ordenan es construir por chat el borrador de una
+  tarea nueva ni la propuesta de sus datos. Qué se prepara y se confirma por chat en el Motor está `PENDIENTE`
+  en el ADR 0017.
+- `nucleo/alta-de-equipo.md`, entero: la entrevista de alta de un espacio, que Leda conduce por chat desde el
+  bot de administración, está diseñada y sin construir, y no es trabajo vigente.
+
+Las garantías de `nucleo/` no cambian: la confirmación humana antes de un efecto, la honestidad, el trato con
+las personas, la opacidad técnica, la auditoría y el aislamiento entre espacios. Cómo se ajusta `nucleo/` al
+recorte está `PENDIENTE` en el ADR 0017, y esa edición la hace el usuario.
+
 ## Nombres que usamos
 
-Acordado con el usuario el 2026-10-02, para hablar el mismo idioma. Usar siempre estos
-nombres con el usuario; "conducida", "guiada" o "método nuevo" confunden.
+Acordado con el usuario el 2026-10-02 y actualizado el 2026-10-04, para hablar el mismo idioma. Usar siempre
+estos nombres con el usuario; "conducida", "guiada" o "método nuevo" confunden.
 
+- **El Motor:** el nombre de toda la línea de trabajo que el usuario decidió el 2026-10-04. Cuando el usuario
+  dice "el Motor", "seguimos con el Motor" o "esto es del Motor", se refiere a toda esa línea de trabajo, no
+  sólo a su pieza de software. Abarca cinco cosas:
+  1. la decisión de dejar de parchear la conversación;
+  2. la rama nueva `feat/motor-de-conversacion` y su carpeta
+     `D:\Proyectos\Leda-PM-worktrees\motor-de-conversacion`, con los flujos A, B y C congelados;
+  3. el recorte de alcance: Leda hace seguimiento y, por ahora, no crea tareas ni objetivos por chat;
+  4. el motor de conversación propio, en tres partes: estado exacto, registro completo de la conversación y,
+     más adelante, memoria;
+  5. el método: diseño antes del código y conversaciones reales como pruebas.
+
+  Sus documentos son `odd/tasks/motor-de-conversacion.md` (el documento de la unidad, en la rama nueva), el
+  ADR 0017 (alcance) y el ADR 0018 (motor de conversación), los dos en preparación. En los documentos,
+  "el Motor" a secas nombra siempre la línea de trabajo entera; su pieza de software se escribe completa,
+  "el motor de conversación", para no confundirlas.
 - **La IA:** el modelo de lenguaje que Leda usa por dentro. No se le dice "modelo", para
   no confundirlo con los flujos.
 - **Flujo:** la forma en que Leda procesa un mensaje. Una letra por mecanismo distinto y
   un número por versión (flujo C1, C2…):
-  - **Flujo A, formulario mecánico:** pasos fijos, un dato por vez, botones y reglas fijas
-    en el código para entender lo que se escribe. Hoy: el alta de tareas con el
-    interruptor `alta = guiada`.
-  - **Flujo B, IA libre:** la IA lee toda la constitución, elige herramientas y redacta
-    como le parece. Hoy: todo lo que no es el alta (consultas, menú, cambios, entrega,
-    aprobación). Es donde la IA inventó un cambio (hallazgo H5).
-  - **Flujo C, el del [ADR 0014](docs/decisions/0014-flujo-de-un-mensaje.md):** la IA
-    interpreta, el código decide y ejecuta, la IA redacta a partir de los hechos. Hoy: el
-    alta con `alta = conversada`, en la rama de flujo. **C1:** el de la primera prueba
-    (2026-10-01). **C2:** con las mejoras del 2026-10-02 (objetivos del área de la tarea,
-    Modificar, botones vencidos y la personalidad como texto aparte). **C3:** la
-    personalidad escrita adentro de la mecánica de cada circuito (decisión del
-    2026-10-02, tarea 0-15). **C4:** C3 con reglas concretas de estilo y el código que
-    rechaza una pregunta con dos datos (2026-10-02; probado en real). Ver el punto de
-    retorno de `docs/traspaso/2026-10-02-flujo-c4.md` antes de sumarle reglas.
-- **Bitácora de flujos:** [`docs/product/bitacora-de-flujos.md`](docs/product/bitacora-de-flujos.md)
-  junta lo que se probó de cada flujo y de cada modelo, lo bueno y lo malo, y la
-  conclusión vigente (qué flujo y qué modelo se eligieron y por qué). Se lee antes de
-  proponer un cambio de flujo o de modelo, y se actualiza al cerrar cada prueba real,
-  medición o auditoría.
-- **Personalidad:** cómo es y cómo se comporta Leda (`nucleo/personalidad.md`). Es la
-  referencia para escribir la mecánica de cada circuito y **no se le manda a la IA**: sus
-  reglas van adentro de la mecánica, como reglas concretas del circuito, porque una
-  personalidad aparte contradecía la mecánica y sumaba latencia (medición del 2026-10-02).
-- **Voz:** reservado para cuando Leda responda con audio. No se usa para la personalidad.
-- **Circuito:** cada cosa que Leda sabe hacer (alta, entrega, aprobación…), numerada en
-  `odd/tasks/circuitos-al-flujo-nuevo.md` de la rama de flujo: circuito 0, circuito 1…;
-  sus tareas, 0-1, 0-2…
+  - **Flujo A, formulario mecánico** (congelado): pasos fijos, un dato por vez, botones y reglas fijas en el
+    código para entender lo que se escribe. Es el alta guiada de `main`.
+  - **Flujo B, IA libre** (congelado): la IA lee toda la constitución, elige herramientas y redacta como le
+    parece. Es lo que atiende en `main` todo lo que no es el alta (consultas, menú, cambios, entrega,
+    aprobación). Ahí la IA inventó un cambio (hallazgo H5).
+  - **Flujo C, el del [ADR 0014](docs/decisions/0014-flujo-de-un-mensaje.md)** (congelado): la IA interpreta,
+    el código decide y ejecuta, la IA redacta a partir de los hechos. Sus seis versiones (C1 a C6) sólo
+    alcanzaron el alta y viven en la rama `feat/flujo-de-un-mensaje`; no están en `main` ni en la rama nueva.
+  - **Flujo D** (en diseño): sólo el nombre técnico del mecanismo, es decir, cómo procesa un mensaje el Motor:
+    estado de la conversación explícito, circuitos declarados y situaciones generales resueltas una sola vez.
+    Se usa al compararlo con los flujos A, B y C, por ejemplo en la bitácora de flujos. No es el nombre del
+    plan: el plan es el Motor. Su diseño se escribe en el ADR 0018 (en preparación).
 - **Flujos congelados** (decisión del usuario, 2026-10-02, "como copiar un archivo de
   Paint y trabajar sólo en la copia"): al empezar un flujo nuevo se pone una **etiqueta
-  de Git** a todo el código tal como está (por ejemplo `respaldo-flujos-antes-de-c2`).
-  Esa etiqueta es la copia intacta de los flujos anteriores. Desde ahí se trabaja **sólo
-  en el flujo actual**: los anteriores no se mejoran ni se corrigen, y si un cambio del
+  de Git** a todo el código tal como está. Esa etiqueta es la copia intacta de los flujos anteriores. Desde ahí
+  se trabaja **sólo en el flujo actual**: los anteriores no se mejoran ni se corrigen, y si un cambio del
   flujo actual los rompe, no se arreglan (la versión buena está en la etiqueta; sus
   pruebas rotas se retiran junto con su código). No se mantienen dos flujos andando a la
-  vez ni interruptores nuevos por circuito; el interruptor `alta` que ya existe queda
-  como está. Los flujos anteriores no llegan al producto: el producto final se queda
-  con el flujo definitivo y los demás se descartan.
+  vez ni interruptores nuevos por circuito. Los flujos anteriores no llegan al producto: el producto final se
+  queda con el flujo definitivo y los demás se descartan. Desde el 2026-10-04 están congelados los flujos A, B
+  y C: la etiqueta `respaldo-flujos-antes-de-d` guarda la rama de flujo, `respaldo-main-antes-de-d` guarda
+  `main`, y `respaldo-0-36-en-pausa` guarda, sólo para consulta, el trabajo parcial de la última tarea del alta,
+  que se detuvo y no se retoma.
+- **Etapas y pasos M1 a M3:** el orden de trabajo del Motor. Etapa 1, diseño sin código; Etapa 2, prueba
+  chica y descartable; Etapa 3, limpieza y motor de conversación definitivo. M1, M2 y M3 son los criterios
+  para pasar la rama nueva a `main`. Detalle en `docs/STATUS.md`, "Próximo paso".
+- **Bitácora de flujos:** [`docs/product/bitacora-de-flujos.md`](docs/product/bitacora-de-flujos.md)
+  junta lo que se probó de cada flujo y de cada modelo, lo bueno y lo malo, y la
+  conclusión vigente. Se lee antes de proponer un cambio de flujo o de modelo, y se actualiza al cerrar cada
+  prueba real, medición o auditoría.
+- **Personalidad:** cómo es y cómo se comporta Leda (`nucleo/personalidad.md`; el archivo está en la rama nueva
+  y en la rama congelada, no en `main`). Es una referencia de diseño y no se le manda a la IA como texto aparte:
+  así contradecía la mecánica y sumaba latencia (medición del 2026-10-02). Cómo llega el tono de cada cliente a
+  la IA en el Motor está `PENDIENTE` en el ADR 0018.
+- **Voz:** reservado para cuando Leda responda con audio. No se usa para la personalidad.
+- **Circuito:** cada cosa que Leda sabe hacer (entrega, aprobación, bloqueos, seguimiento…). La lista numerada
+  del 0 al 10 y sus tareas (0-1, 0-2…) eran de la rama congelada. Qué circuitos quedan por chat en el Motor
+  está `PENDIENTE` en el ADR 0017.
 - **"Apagá / prendé la restricción de horario":** para probar por Telegram a cualquier
   hora. Leda no escribe fuera del horario del espacio (constitución §8), y ese horario
   es un dato de cada cliente (`work_calendar`, cargado del `calendario` del pack), no una
   regla del código. Apagarla pone el horario del espacio en todos los días, 00:00-23:59;
   prenderla lo restaura desde el pack. Se hace con
   `tools/restriccion_horario.py apagar|prender|estado <espacio>`, desde el worktree de la
-  base que se quiere tocar y con `PYTHONPATH=src`; sólo funciona en `leda` y `leda_flujo`.
+  base que se quiere tocar y con `PYTHONPATH=src`; hoy sólo admite las bases `leda` y `leda_flujo`, así que
+  para la base de la rama nueva hay que ajustarla cuando llegue la Etapa 2.
   Mientras está apagada, todos los días cuentan como hábiles y los plazos de los
   recordatorios se acortan.
 
@@ -87,14 +179,19 @@ nombres con el usuario; "conducida", "guiada" o "método nuevo" confunden.
 1. `docs/product/que-es-leda.md`: qué es el producto y qué es configuración de cada cliente.
 2. `docs/architecture/frontera.md`: dónde termina el núcleo y qué reglas lo gobiernan.
 3. `nucleo/` (`constitucion.md`, `mecanica-pm.md`, `alta-de-equipo.md`): comportamiento **obligatorio** de Leda,
-   no material de consulta. Una auditoría que no lo haya leído entero no está terminada.
+   no material de consulta. Una auditoría que no lo haya leído entero no está terminada. Ver "Sobre `nucleo/`"
+   más arriba para lo que el recorte de alcance deja pendiente.
 4. `docs/capacidades.md`: qué está construido, qué está diseñado sin construir y qué es esquema sin implementación.
-5. `docs/STATUS.md`: estado, riesgos y próximo paso.
-6. `docs/ROADMAP.md`: orden de trabajo vigente.
-7. `docs/INDEX.md`: elegir sólo el detalle necesario (`docs/historial/` guarda copias literales de documentos
-   condensados; no es lectura de arranque).
-8. Los ADR aplicables antes de cambiar dominio o arquitectura.
-9. Contrastar cualquier afirmación con código, esquema y pruebas actuales.
+5. `docs/STATUS.md`: estado, riesgos, próximo paso y punto exacto para retomar.
+6. `odd/tasks/motor-de-conversacion.md` (rama nueva): el documento de la unidad del Motor, con el chequeo de
+   rumbo, las etapas y la lista de lo que se trae de la rama congelada.
+7. `docs/ROADMAP.md`: unidades de trabajo; su orden se está redefiniendo en el ADR 0017.
+8. `docs/product/bitacora-de-flujos.md` y `docs/research/gestion-del-dialogo-y-arquitecturas-de-agentes.md`:
+   por qué se congelaron los flujos anteriores y qué evidencia sostiene el Motor.
+9. `docs/INDEX.md`: elegir sólo el detalle necesario (`docs/historial/` y `docs/traspaso/` guardan documentos
+   anteriores; no son lectura de arranque ni puntos de retorno).
+10. Los ADR aplicables antes de cambiar dominio o arquitectura.
+11. Contrastar cualquier afirmación con código, esquema y pruebas actuales.
 
 **Al auditar, auditar contra este repositorio.** El corpus propio del proyecto
 —`nucleo/`, la especificación funcional, el esquema, los paquetes de espacio—
@@ -115,14 +212,21 @@ Orden de autoridad para describir lo que existe hoy:
    arquitectura, prevalece.
 4. `docs/product/que-es-leda.md`: define el producto y qué es configuración de cada cliente frente a núcleo.
 5. `docs/decisions/`: decisiones aceptadas que gobiernan cambios futuros, salvo las marcadas como superadas.
-6. `docs/STATUS.md` y `docs/ROADMAP.md`: estado y orden de trabajo vigentes.
+   Los ADR 0013 y 0014 están superados en parte desde el 2026-10-04: la nota al comienzo de cada uno dice qué
+   sigue vigente, qué quedó reemplazado y qué está `PENDIENTE`. Los demás ADR aceptados son anteriores al
+   Motor: sus garantías siguen vigentes, y lo que digan sobre cómo conversa Leda no se toma como regla cuando
+   contradice la constitución §8 o las decisiones del 2026-10-04 (por ejemplo, cuándo van botones en el
+   ADR 0005, decisión 4, y en el ADR 0007).
+6. `docs/STATUS.md` y `docs/ROADMAP.md`: estado y orden de trabajo. El orden vigente es el de `docs/STATUS.md`,
+   "Próximo paso"; el del roadmap se está redefiniendo en el ADR 0017 (`PENDIENTE`).
 7. `README.md` y `PRUEBA-LOCAL.md`: guía operativa; contrastar con la implementación si hay discrepancias.
 
 La autoridad de `nucleo/` está por encima de cualquier documento de `docs/`. Buena parte de lo que manda todavía
 no tiene código; `docs/capacidades.md` lleva la cuenta. `docs/product/functional-specification.md` quedó superada
 por el cambio de alcance a producto multi-tenant: es insumo histórico, contrastarla contra la frontera antes de
 usar cualquier parte. Una especificación expresa intención, no prueba implementación; un test existente no prueba
-que la suite pase hasta ejecutarlo.
+que la suite pase hasta ejecutarlo, y una suite que pasa no prueba que la conversación funcione ("Cómo pensamos
+juntos", punto 12).
 
 ## Invariantes vigentes
 
@@ -137,7 +241,8 @@ que la suite pase hasta ejecutarlo.
 - Los mensajes visibles salen por outbox; el ACK técnico de Telegram es la excepción acotada existente.
 - Una solicitud incompleta es un borrador sin efectos. Una tarea comprometida exige objetivo, responsable, fecha
   objetivo, criterio de aceptación y política de evidencia. La conversión de borrador a tarea es explícita,
-  confirmada y auditable.
+  confirmada y auditable. Qué garantías cumple la importación del administrador está `PENDIENTE` en el
+  ADR 0017; hasta que ese ADR se acepte, esta invariante no cambia.
 - Actualización, evidencia, aprobación y cierre son hechos distintos.
 - No poder consultar datos no equivale a que no existan.
 
@@ -147,9 +252,19 @@ El producto conserva un monolito modular en Python y PostgreSQL. Fuera del produ
 decisión explícita y documentada: agenda o calendarios externos, aprendizaje persistente, motor genérico de
 workflows, microservicios e interfaz administrativa completa.
 
+Precisiones del 2026-10-04, que los ADR 0017 y 0018 tienen que dejar escritas:
+
+- El motor de conversación no es un motor genérico de workflows: sus circuitos son un conjunto cerrado,
+  declarado en el código, nunca configuración de un cliente (ADR 0018).
+- La importación de tareas del administrador es un comando de consola, no la interfaz administrativa (ADR 0017).
+  El formulario en el tablero del cliente viene después; cómo se hace está `PENDIENTE` en el ADR 0017.
+- La memoria por integrante es aprendizaje persistente: queda prevista como tercera parte del diseño del motor
+  de conversación y no se construye sin su propio ADR. Engram es sólo una referencia de diseño.
+
 Dentro del producto pero todavía no: la API de lectura y el dashboard, por sus precondiciones (cierre del
-aislamiento entre clientes y desacople del transporte). Aplicar el orden del roadmap, no tratarlos como
-prohibidos. La funcionalidad nueva está congelada ("Cómo pensamos juntos", punto 9).
+aislamiento entre clientes y desacople del transporte). No se tratan como prohibidos, pero tampoco se empiezan
+ahora: la funcionalidad nueva está congelada, y su criterio y el orden del roadmap están `PENDIENTE` de
+redefinición en el ADR 0017 ("Cómo pensamos juntos", punto 9).
 
 No cambiar lógica, esquema, dependencias o arquitectura durante trabajo puramente documental. No reestructurar
 carpetas o módulos sin un ADR aceptado.
@@ -157,7 +272,8 @@ carpetas o módulos sin un ADR aceptado.
 ## Comandos verificados por inspección
 
 Existen en `README.md`, `PRUEBA-LOCAL.md`, `pyproject.toml` o `src/leda/cli.py`. Su disponibilidad fue
-inspeccionada; su resultado actual no se presume.
+inspeccionada; su resultado actual no se presume. Corren el código de la carpeta donde se ejecutan: hoy, en
+`main` y en la rama nueva, la conversación que levantan es la de los flujos A y B, congelada.
 
 ```bash
 docker compose up -d postgres
@@ -187,7 +303,10 @@ descartable confirmado.
   autorización.
 - No registrar cuerpos de conversaciones ni errores crudos en documentación.
 - No afirmar que una prueba, restore, backup o rollback funciona sin evidencia de una ejecución registrada.
-- No hacer commits, cambiar configuración Git o agregar archivos al índice salvo pedido explícito.
+- No hacer commits, cambiar configuración Git o agregar archivos al índice salvo pedido explícito. El usuario
+  dio consentimiento permanente para los commits de cada unidad de trabajo y para las revisiones RDD; los
+  commits no llevan líneas de atribución; el push lo decide siempre el usuario; y en `main` no se hace ningún
+  commit hasta el paso M1.
 
 ## Cómo trabajar y registrar continuidad
 
@@ -195,41 +314,68 @@ Antes de implementar una fase:
 
 1. Confirmar que `docs/STATUS.md` sigue vigente contra el repositorio y escribir el chequeo de rumbo ("Cómo
    pensamos juntos", punto 3, más abajo).
-2. Elegir el menor circuito útil de extremo a extremo que pruebe comprensión, respuesta, coordinación o reducción
+2. Tener el diseño escrito y aceptado antes de escribir código de conversación ("Cómo pensamos juntos",
+   punto 12).
+3. Elegir el menor circuito útil de extremo a extremo que pruebe comprensión, respuesta, coordinación o reducción
    de carga humana.
-3. Resolver sólo las decisiones y guardas que bloquean ese circuito; no adelantar hardening de producción sin
+4. Resolver sólo las decisiones y guardas que bloquean ese circuito; no adelantar hardening de producción sin
    evidencia.
-4. Mantener comportamiento, verificación focalizada, replay/regresión y documentación de esa unidad juntos.
-5. Registrar comando, resultado exacto, escenario operativo y límite de rollback.
+5. Mantener comportamiento, verificación focalizada, replay/regresión y documentación de esa unidad juntos.
+6. Registrar comando, resultado exacto, escenario operativo y límite de rollback.
 
 **Hallazgos de conversación: reglas generales, no parches**
 ([`ADR 0013`](docs/decisions/0013-reglas-generales-de-la-conversacion.md), decisión del
-usuario del 2026-09-29). Las variantes de una conversación son infinitas; arreglar cada
-caso con listas de frases o palabras clave no termina nunca. Ante un hallazgo sobre cómo
-conversa Leda:
+usuario del 2026-09-29; procedimiento cambiado por el usuario el 2026-10-04). Las variantes de una conversación
+son infinitas; arreglar cada caso con listas de frases o palabras clave no termina nunca.
 
-- Clasificarlo primero en una de las reglas del ADR 0013: pregunta pendiente como
-  contexto (comandos cerrados; una sola rama de conversación abierta a la vez, enmienda
-  del 2026-09-29), una respuesta visible por mensaje, estado real y sólo
-  opciones posibles, toque con señal e idempotente.
-- Corregir el mecanismo de esa regla y probarlo con el caso y con familias de variantes,
-  no sólo con la frase observada.
-- Si no entra en ninguna regla, discutir con el usuario una regla nueva antes de
-  parchear.
-- Si el hallazgo vuelve después de corregir el mecanismo de su regla, el mecanismo no
-  alcanza: es un disparador para parar y revisar el flujo ("Cómo pensamos juntos",
-  punto 4).
-- Reparto de trabajo: el modelo interpreta el lenguaje y devuelve un comando de una lista
-  cerrada; el código ejecuta un manejo determinista por comando y garantiza las
-  invariantes. Es el patrón probado de los asistentes de tareas ("conversation repair
-  patterns", por ejemplo en Rasa), adoptado dentro del monolito, no como dependencia.
+Las reglas del ADR 0013 siguen vigentes como reglas de comportamiento, es decir, lo que Leda tiene que cumplir
+en cualquier flujo:
+
+- pregunta pendiente como contexto, con una sola rama de conversación abierta a la vez (enmienda del
+  2026-09-29);
+- una respuesta visible por mensaje y por toque;
+- estado real y sólo opciones posibles;
+- toque con señal e idempotente.
+
+A esas reglas se suman tres decisiones del usuario sobre cómo conversa Leda:
+
+- **Botones para elegir, texto para decir** (enmienda del ADR 0013 del 2026-10-02).
+- **Los botones son atajos:** lo que hace un botón también tiene que poder decirse por escrito (2026-10-04).
+  `PENDIENTE` en el ADR 0018: si eso alcanza a una confirmación que crea o cambia algo (constitución §7). No
+  darlo por decidido.
+- **Un tema a la vez:** si la persona cambia de tema con algo abierto, Leda se lo recuerda y le ofrece seguir,
+  retomarlo después o cancelarlo, y recién entonces atiende lo nuevo (2026-10-04). Cómo lo resuelve el motor
+  de conversación, junto con las demás situaciones generales, está `PENDIENTE` en el ADR 0018.
+
+El procedimiento ante un hallazgo sobre cómo conversa Leda es éste:
+
+- Un hallazgo en un flujo congelado (A, B o C) no se arregla.
+- El hallazgo se convierte primero en una conversación de prueba (punto 12). Después se resuelve en el motor
+  de conversación, como una situación general que vale para todos los circuitos, nunca como una rama para un
+  camino.
+- Un "arreglo del mecanismo" hecho dentro de una estructura equivocada también es un parche (usuario,
+  2026-10-04: "siempre estamos parcheando fallas"). No se agregan listas de frases, palabras clave ni casos
+  especiales, y tampoco reglas nuevas dentro de los caminos viejos.
+- Si una prueba real vuelve a fallar después de un arreglo, nadie propone el arreglo siguiente: se para y se
+  cuestiona el nivel del diseño (el modelo de la conversación, el motor de conversación, el método), con
+  evidencia ("Cómo pensamos juntos", punto 4).
+- Si un hallazgo no entra en ninguna regla, se discute con el usuario una regla nueva antes de tocar nada.
+
+Reparto de trabajo (ADR 0013): el modelo interpreta el lenguaje y devuelve un comando de una lista cerrada; el
+código ejecuta un manejo determinista por comando y garantiza las invariantes. Es el patrón probado de los
+asistentes de tareas ("conversation repair patterns", por ejemplo en Rasa). Hasta el 2026-10-04 se tomó la
+idea, pero cada situación se resolvió a mano en cada camino; el motor de conversación existe para resolverlas
+una sola vez. No se adopta Rasa ni ningún otro marco como dependencia. Cómo queda ese reparto en el Motor (qué
+decide la IA y qué decide el código) está `PENDIENTE` en el ADR 0018.
 
 ### Cómo pensamos juntos (usuario y agente)
 
-Acordado con el usuario el 2026-09-30, al cerrar la ronda 4. Vigente para toda sesión.
+Acordado con el usuario el 2026-09-30, al cerrar la ronda 4, y actualizado el 2026-10-04. Vigente para toda
+sesión.
 
-**Por qué existe.** Dos veces el proyecto subió de nivel porque el usuario frenó y
-propuso mirar desde arriba (reglas generales en el ADR 0013, el flujo en el ADR 0014).
+**Por qué existe.** Cada vez que el proyecto subió de nivel fue porque el usuario frenó y
+propuso mirar desde arriba: las reglas generales (ADR 0013), el flujo de un mensaje (ADR 0014), la regla del
+mozo (2026-10-03) y el Motor (2026-10-04).
 El agente seguía el orden documentado y corregía hallazgo por hallazgo: cada arreglo era
 razonable, las pruebas pasaban y parecía progreso, y nada dentro de la tarea decía
 "pará". El agente empieza cada sesión de cero y ve el pasado sólo por los documentos;
@@ -260,8 +406,8 @@ de cada prueba real, el agente responde por escrito en el documento de la unidad
   persona escribe como habla, varias cosas juntas, y Leda pregunta sólo lo que falta. La
   fluidez nunca saltea una garantía (punto 6): las confirmaciones de la constitución §7,
   la validación del código y la auditoría se quedan.
-- ¿Esto lo resuelve la cocina o le estamos enseñando frases al mozo? (la regla del mozo,
-  punto 11).
+- ¿Los datos y los efectos salen de la cocina, o le estamos enseñando frases al mozo? (punto 11).
+- ¿Qué conversación de prueba, corrida contra la IA real, lo demuestra? (punto 12).
 
 Si una respuesta no convence, se para y se discute con el usuario antes de seguir. No es
 un trámite: se razona antes de gastar una ronda, no después de varias.
@@ -273,15 +419,18 @@ un trámite: se razona antes de gastar una ronda, no después de varias.
 - la misma función o el mismo camino tocado por dos arreglos seguidos;
 - la misma clase de hallazgo en dos rondas;
 - pruebas en verde y el usuario dice que se siente mal;
-- un hallazgo que contradice un ADR vigente.
+- un hallazgo que contradice un ADR vigente;
+- una prueba real que vuelve a fallar después de un arreglo del mecanismo.
 
-Al dispararse uno, se revisa el mecanismo o el flujo, no el caso.
+Al dispararse uno, se revisa el mecanismo, el flujo o el diseño, no el caso. Con el último, además, no se
+propone otro arreglo: se cuestiona el nivel del diseño.
 
 **5. Probar en real enseguida** (decisión del usuario). Construir la porción más chica
 que se pueda probar y llevarla a Telegram real con datos ficticios cuanto antes. Todo
 plan nombra primero su prueba real más temprana y recorta el alcance para llegar a ella.
 Las mediciones baratas (banco, repeticiones) corren en paralelo con la construcción. La
-documentación registra decisiones y su porqué, no ensayos.
+documentación registra decisiones y su porqué, no ensayos. Desde el 2026-10-04, el diseño corto y escrito va
+antes de esa porción (punto 12).
 
 **6. Lo sólido no se simplifica.** La base, el aislamiento entre clientes, las
 confirmaciones y la auditoría funcionan. Ninguna propuesta de "simplificar" (un
@@ -290,47 +439,65 @@ las reemplaza: las instrucciones gobiernan el comportamiento; el código y la ba
 que no puede pasar nunca
 ([`ADR 0014`](docs/decisions/0014-flujo-de-un-mensaje.md), alternativas).
 
-**7. Un camino pasa al flujo nuevo sólo cuando se retiró lo viejo.** El problema de la
-conversación es dónde participa el modelo, no la falta de reglas. Si los mecanismos
-viejos conviven con los nuevos, el camino no está terminado y el sistema queda peor.
+**7. Un camino pasa al flujo nuevo sólo cuando se retiró lo viejo.** Si los mecanismos
+viejos conviven con los nuevos, el camino no está terminado y el sistema queda peor. En el Motor, el código
+de los flujos A y B se borra antes de construir el motor de conversación definitivo (Etapa 3), después de
+mudar las pruebas de garantías que hoy viven en archivos del código viejo.
 
 **8. Separar modelo de flujo.** Antes de atribuir una falla de comprensión al flujo,
-medir cuánto aporta el modelo: Leda usa un modelo "flash" chico, elegido por
-velocidad, y medirlo con el banco es barato.
+medir cuánto aporta la IA. En las pruebas reales del flujo C6 la más fiel a los hechos fue GPT-6 sol
+(bitácora de flujos). Qué IA usa el flujo D está `PENDIENTE` en el ADR 0018; por ahora se mantiene GPT-6 sol y
+falta volver a medir GPT-6 luna.
 
-**9. Funcionalidad nueva congelada** (decisión del usuario) hasta que alta, entrega y
-aprobación cumplan en una prueba real los criterios del ADR 0014. Alcance en
-`docs/ROADMAP.md`, "Orden de entrega". Lo que se pida de pasada se anota en el roadmap y
-se recuerda el congelamiento.
+**9. Funcionalidad nueva congelada** (decisión del usuario, 2026-09-30). Su criterio para levantarse nombraba
+el alta por chat, que salió del alcance el 2026-10-04: el criterio y el orden del roadmap están `PENDIENTE` de
+redefinición en el ADR 0017. Hasta que se acepte, no se construye funcionalidad nueva ni código de
+conversación. Lo que se pida de pasada se anota en el roadmap y se recuerda el congelamiento.
 
 **10. Proyectos externos: ideas, no bases.** Un PM conversacional multi-cliente con
-garantías es un problema propio ([`docs/research/`](docs/research/)).
+garantías es un problema propio ([`docs/research/`](docs/research/)). Rasa quedó descartado como componente (el
+usuario no quiere depender de licencias de terceros) y Engram se toma sólo como referencia de diseño para la
+memoria por integrante.
 
-**11. La regla del mozo** (decisión del usuario, 2026-10-03; criterio fijo para evaluar
-cualquier cambio de la conversación). La IA es el mozo: escucha o pregunta qué quiere la
-persona, lleva el pedido exacto a la cocina (el código, Jev y la base), y trae lo que la
-cocina dice, contándolo con naturalidad. No inventa, no promete lo que la cocina no dijo y
-sabe conversar. Es intérprete y comunicadora de la fuente de verdad: usa su fuerte,
-hablar e interpretar a la persona, y **no toma decisiones** ni inventa datos; para eso va
-a la cocina. Todo lo que es conocimiento del caso (estados, reglas, motivos, opciones,
-quién hizo qué) viene de la cocina como hechos; nunca como reglas o frases para el mozo.
-Ante cada cambio se pregunta: **¿esto lo resuelve la cocina o le estamos enseñando frases
-al mozo?**
+**11. La regla del mozo** (decisión del usuario, 2026-10-03). La IA es el mozo: escucha o pregunta qué quiere
+la persona, lleva el pedido exacto a la cocina (el código y la base) y trae lo que la cocina dice, contándolo
+con naturalidad. Sigue vigente su núcleo:
 
-- Las instrucciones de la IA describen su trabajo (escuchar, llevar el pedido, traer y
-  contar lo que dice la cocina, no inventar, una pregunta por vez); no llevan reglas para
-  casos puntuales, ejemplos de lo que tiene que decir ni formas de pregunta. Su largo no
-  importa: la latencia se trabaja aparte y no limita lo que necesita saber el mozo.
-- Si la IA dice algo mal, primero se mira la comanda: ¿la cocina le pasó el hecho
-  correcto, completo y visto desde quien lo recibe? Se corrige la comanda con una regla
-  para todas, no la frase del caso.
-- Lo que hoy decida la IA y no sea interpretar o comunicar (qué dato se pide después,
-  qué se ofrece, qué efecto se da por hecho) pasa a la cocina, que se lo informa como
-  hecho. Una propuesta de la IA es una sugerencia que la persona ve y acepta, nunca un
-  dato que se guarda solo.
-- La cocina no corrige lo que el mozo escuchó con heurísticas propias (comparar palabras,
-  listas de frases): valida datos y aplica reglas; interpretar es del mozo (ADR 0014).
-- Un arreglo que le agrega al mozo una regla para un caso dispara el punto 4.
+- La IA no inventa datos ni efectos, y no promete lo que la cocina no dijo. Todo lo que es conocimiento del
+  caso (estados, reglas, motivos, opciones, quién hizo qué) llega desde la cocina como hechos.
+- Una propuesta de la IA es una sugerencia que la persona ve y acepta, nunca un dato que se guarda solo.
+- Las instrucciones de la IA describen su trabajo (escuchar, llevar el pedido, traer y contar lo que dice la
+  cocina, no inventar); no llevan reglas para casos puntuales, ejemplos de lo que tiene que decir ni formas de
+  pregunta. Su largo no importa: la latencia se trabaja aparte. Un arreglo que le agrega una regla para un caso
+  dispara el punto 4.
+- Si la IA dice algo mal, primero se mira si la cocina le pasó el hecho correcto, completo y visto desde
+  quien lo recibe.
+- La cocina no corrige lo que el mozo escuchó con heurísticas propias (comparar palabras, listas de frases):
+  valida datos y aplica reglas.
+
+**En revisión, `PENDIENTE` en el ADR 0018:** la extensión de la regla a cada movimiento de la conversación
+("la IA no toma decisiones": qué dato se pide después, si pregunta una cosa por vez, cuándo se muestra un
+resumen, qué se ofrece). El análisis del 2026-10-04 la señaló como una de las causas de que el código tuviera
+que prever cada situación. Qué decide la IA y qué decide el código en el flujo D se fija en ese ADR, con el
+usuario. Hasta entonces, esa extensión no se aplica a diseño nuevo ni se usa para sumarles decisiones a los
+flujos congelados.
+
+**12. Diseño antes del código y evidencia real** (decisiones del usuario, 2026-10-04; es el método del Motor).
+
+- **Diseño en papel primero.** Ningún código de conversación se escribe antes de que su diseño esté escrito en
+  un ADR y aceptado por el usuario. Para el motor de conversación, es el ADR 0018.
+- **Un hallazgo es primero una conversación de prueba.** Antes de tocar nada, el hallazgo se escribe como una
+  conversación (qué dice cada persona y qué tiene que quedar después), y esa conversación pasa a ser su
+  regresión.
+- **Qué cuenta como evidencia.** Que la conversación funciona lo muestran conversaciones reales contra la IA
+  real, corridas varias veces. Una suite en verde no lo muestra: hasta el 2026-10-04 la suite pasó entera cada
+  vez y cada prueba real encontró fallas, porque esas pruebas comprueban el código y las escribe el mismo
+  escritor. La auditoría de otro agente tampoco lo muestra. El agente no informa "la suite pasa" como avance de
+  la conversación.
+- **Prueba chica antes de comprometerse.** El motor de conversación se prueba primero con una porción chica y
+  descartable, con los criterios de éxito y de corte escritos antes (ADR 0018).
+- **Una sola casa para los documentos.** Los documentos vivos se editan sólo en la rama del Motor ("Dónde se
+  trabaja y qué no se hace").
 
 ### Al terminar una unidad
 
@@ -344,13 +511,19 @@ al mozo?**
   local o de prueba controlado, ausencia de datos y trabajo real, secreto de Telegram protegido, efectos
   inspeccionables y reversibles, backup, pausa o rollback proporcionado, ninguna operación destructiva y cero
   `CRITICAL` o `HIGH` abiertos en el circuito;
-- inspeccionar respuesta visible, PostgreSQL, herramientas/efectos y auditoría/historia; corregir la causa raíz
-  observada y agregar replay/regresión antes de reanudar;
+- inspeccionar respuesta visible, PostgreSQL, herramientas/efectos y auditoría/historia. Un hallazgo en la
+  capa de garantías (estado en PostgreSQL, efectos de herramientas, auditoría, aislamiento) se corrige en su
+  causa raíz y se le agrega una regresión antes de seguir. Un hallazgo de conversación se convierte primero en
+  una conversación de prueba y se resuelve en el motor de conversación, nunca en un flujo congelado ("Cómo
+  pensamos juntos", punto 12);
 - si el comportamiento es aceptable, elegir el siguiente circuito pequeño y endurecer proporcionalmente según
   evidencia;
 - actualizar `docs/ROADMAP.md` sólo si cambió la secuencia o el criterio de salida;
 - crear un ADR numerado para decisiones de dominio o arquitectura duraderas;
-- no borrar decisiones anteriores: registrar si una nueva las reemplaza.
+- no borrar decisiones anteriores: registrar si una nueva las reemplaza. Cuando `AGENTS.md` o `docs/STATUS.md`
+  cambian de rumbo, la versión anterior se guarda en `docs/historial/` como copia literal, con un aviso de
+  archivo en su primera línea, y el archivo vivo queda sólo con lo vigente, para que una sesión nueva no retome
+  instrucciones viejas.
 
 La sesión progresiva aporta evidencia de desarrollo y regresión, pero no aprueba el piloto ni usa el holdout;
 registrar su resultado sólo cuando cambie un hecho relevante.
