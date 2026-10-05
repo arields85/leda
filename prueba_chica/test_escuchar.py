@@ -416,6 +416,29 @@ def test_un_toque_recibe_su_senal_corre_su_turno_y_no_se_repite(conn, mundo):
     assert m.salida.enviados[1].botones == []       # la pregunta ya se cerró
 
 
+def test_un_toque_que_falla_siempre_queda_como_incidente_y_la_persona_lo_sabe(conn, mundo,
+                                                                             monkeypatch):
+    """Revisión de la E2-4: un toque que no se puede recibir tras los intentos no se deja en
+    silencio, igual que un mensaje: un incidente y el texto fijo a quien tocó."""
+    import psycopg
+
+    def falla(self, toque):
+        raise psycopg.OperationalError("la base no contesta")
+
+    monkeypatch.setattr(Escucha, "_toque", falla)
+    m = _montar(conn, mundo, IAGuionada())
+    m.telegram.lotes = [[_toque(1800, "m:token")] for _ in range(3)]
+
+    for _ in range(3):
+        m.escucha.una_vuelta(espera=0)
+
+    incidente = _uno(conn, "select * from incident")
+    assert incidente["etapa"] == "turno_conversacion" and incidente["severidad"] == "alta"
+    assert incidente["chat_id"] == MARCOS and incidente["app_user_id"] is not None
+    assert [e.texto for e in m.salida.enviados] == [TEXTO_SI_LA_IA_FALLA]
+    assert m.escucha.offset == 1801
+
+
 def test_un_toque_de_alguien_de_afuera_solo_recibe_la_senal(conn, mundo):
     _con_dos_tareas(conn, mundo)
     ia = IAGuionada(jugadas=[[Jugada("anotar_inicio", {})]], redacciones=["¿Cuál?"])

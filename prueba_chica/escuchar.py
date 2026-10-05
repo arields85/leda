@@ -22,10 +22,11 @@ usar (importa `gateway`): acá está lo mínimo, reescrito.
 Lo que no es un mensaje escrito de alguien del equipo (un grupo, un mensaje editado, una foto
 sin texto, un desconocido) no se atiende. Si un turno se cae por algo que no es la IA, queda un
 incidente y la persona recibe el texto fijo de la falla (nunca en silencio). Si falla recibir un
-update (guardarlo, activar), se deshace lo suyo, la escucha sigue y el offset no pasa de él:
-Telegram lo vuelve a entregar; a los `INTENTOS_POR_UPDATE` se deja, con un incidente y el texto
-fijo a la persona (revisión de la E2-3b). El token de los
-bots nunca se imprime: los errores de Telegram pasan por `despachador.pedido_telegram`.
+update (guardarlo, activar, atender un toque), se deshace lo suyo, la escucha sigue y el offset
+no pasa de él: Telegram lo vuelve a entregar; a los `INTENTOS_POR_UPDATE` se deja, con un
+incidente y el texto fijo a quien escribió o tocó (revisión de la E2-3b; los toques, desde la
+revisión de la E2-4). El token de los bots nunca se imprime: los errores de Telegram pasan por
+`despachador.pedido_telegram`.
 Ctrl+C corta al terminar la vuelta en curso.
 """
 
@@ -150,13 +151,12 @@ class Escucha:
                       f"intento {self.fallas[uid]} de {INTENTOS_POR_UPDATE}")
         if self.fallas[uid] < INTENTOS_POR_UPDATE:
             return False
-        mensaje = u.get("message") or {}
-        chat_id = (mensaje.get("chat") or {}).get("id")
-        tg_user = (mensaje.get("from") or {}).get("id")
+        chat, tg_user = _origen(u)
+        chat_id = chat.get("id")
         try:
             with espacio(self.conn, self.ws) as cur:
                 quien = None
-                if tg_user is not None and (mensaje.get("chat") or {}).get("type") == "private":
+                if tg_user is not None and chat.get("type") == "private":
                     try:
                         quien = identificar_en_espacio(cur, tg_user, self.ws)
                     except Denegado:
@@ -402,6 +402,15 @@ class Escucha:
             self.conn.rollback()
             self.imprimir(f"  ! no se pudo avisar a la administración: "
                           f"{texto_error_seguro(e)}")
+
+
+def _origen(u: dict[str, Any]) -> tuple[dict[str, Any], int | None]:
+    """El chat y quién escribió o tocó, de un mensaje o de un toque: los dos se tratan igual
+    cuando no se pueden recibir (revisión de la E2-4)."""
+    toque = u.get("callback_query") or {}
+    mensaje = u.get("message") or toque.get("message") or {}
+    de = (u.get("message") or toque).get("from") or {}
+    return mensaje.get("chat") or {}, de.get("id")
 
 
 _seguir = True

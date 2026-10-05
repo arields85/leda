@@ -389,6 +389,42 @@ def test_una_opcion_que_no_es_de_la_pregunta_abierta_es_un_dato_que_falta(conn, 
     assert r.pregunta["tipo"] == "cual_tarea" and r.pregunta["desde_antes"] is True
 
 
+def test_una_opcion_que_ya_no_se_puede_usar_deja_la_duda_abierta(conn, tareas, marcos):
+    """Revisión de la E2-4: elegir no cierra la duda antes de que la ficha diga si se pudo. Si
+    la opción elegida ya no sirve (la tarea cambió de estado entre la pregunta y la
+    respuesta), la duda sigue abierta con sus opciones y la opción no queda elegida."""
+    marcos.dice(Jugada("anotar_inicio", {}))
+    _poner_estado(conn, tareas["T1"], "en_curso")
+
+    r = marcos.dice(Jugada("elegir", {"opcion": "O1"}))
+
+    assert r.hechos == [{"jugada": "anotar_inicio", "resultado": "no_se_puede",
+                         "motivo": "estado", "tarea": T1, "estado": "en_curso",
+                         "eligio": {"opcion": "O1", "etiqueta": T1["titulo"], "tarea": T1},
+                         "pregunta_sigue_abierta": True}]
+    assert _abierta(conn) == ("cual_tarea", None)
+    assert _cuantas(conn, "conversation_option", "elegida_en is not null") == 0
+    assert r.pregunta["tipo"] == "cual_tarea" and r.pregunta["desde_antes"] is True
+
+    r = marcos.dice(Jugada("elegir", {"opcion": "O2"}))         # la otra sí sirve
+    assert r.hechos[0]["resultado"] == "anotado" and _abierta(conn) is None
+
+
+def test_una_opcion_elegida_a_la_que_le_falta_un_dato_cierra_la_duda_y_lo_dice(conn, tareas,
+                                                                              marcos):
+    """La tarea quedó elegida: la duda se contesta, y lo que falta es la pregunta siguiente
+    (la causa de un bloqueo), dicha en los hechos."""
+    marcos.dice(Jugada("anotar_bloqueo", {}))
+
+    r = marcos.dice(Jugada("elegir", {"opcion": "O2"}))
+
+    assert r.hechos[0]["resultado"] == "falta_dato" and r.hechos[0]["falta"] == ["causa"]
+    assert r.hechos[0]["eligio"]["tarea"] == T2
+    assert _abierta(conn) == ("causa_del_bloqueo", tareas["T2"])
+    assert _uno(conn, "select cierre from conversation_question where tipo = 'cual_tarea'")[
+        "cierre"] == "respondida"
+
+
 # --- Situación 7: algo vencido, escrito (conversación 11) -----------------------------------
 
 def test_elegir_de_una_pregunta_cerrada_no_hace_nada_y_dice_con_que_se_cerro(conn, tareas,

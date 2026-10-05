@@ -9,7 +9,8 @@ contesta, cómo se deshace lo que anotó, `fichas.Ficha`); acá sólo se usa.
 - **elegir** (situaciones 5, 6 y 7): una opción de una duda, escrita (por su alias) o tocada
   (por su token), por el mismo camino (`elegir_opcion`): cierra la pregunta con esa opción y
   hace la jugada que esperaba, con la opción como dato; si la pregunta ya se cerró, no hace
-  nada y los hechos dicen con qué se cerró.
+  nada y los hechos dicen con qué se cerró. Si la opción ya no se puede usar, la pregunta
+  sigue abierta y los hechos lo dicen (`pregunta_sigue_abierta`).
 - **corregir** (situación 3; 9f): agrega un hecho de corrección, nunca borra: la tarea vuelve a
   como estaba (lo hace el `deshacer` de la ficha) y, si la persona dice cuál era, el hecho va a
   la tarea correcta, con los mismos datos y las mismas comprobaciones de su ficha.
@@ -77,6 +78,31 @@ def elegir_opcion(ctx, opcion: dict[str, Any]) -> dict[str, Any]:
         return {"jugada": "elegir", "resultado": "sin_efecto", "motivo": "pregunta_cerrada",
                 "eligio": eligio, "cerrada_con": preguntas.con_que_se_cerro(ctx, pregunta_id)}
 
+    try:
+        # La opción queda elegida y la duda cerrada sólo si la jugada que esperaba se pudo
+        # correr con ella; si no se puede, el punto de guardado deshace las dos cosas y la
+        # duda sigue abierta, con sus opciones (revisión de la E2-4).
+        with ctx.cur.connection.transaction():
+            hecho = _elegir_y_correr(ctx, opcion, pregunta_id, task_id, eligio)
+            if hecho.get("resultado") == "no_se_puede":
+                raise _NoSirve(hecho)
+    except _NoSirve as no_sirve:
+        return {**no_sirve.hecho, "pregunta_sigue_abierta": True}
+    return hecho
+
+
+class _NoSirve(Exception):
+    """La opción elegida no se puede usar: lleva los hechos de por qué."""
+
+    def __init__(self, hecho: dict[str, Any]) -> None:
+        super().__init__(hecho.get("motivo"))
+        self.hecho = hecho
+
+
+def _elegir_y_correr(ctx, opcion, pregunta_id: str, task_id, eligio: dict) -> dict[str, Any]:
+    """Marca la opción, cierra la duda y corre la jugada que esperaba, con la tarea elegida.
+    Un dato que todavía falta (la causa de un bloqueo) no la deja abierta: la tarea quedó
+    elegida, y lo que falta es la pregunta siguiente, que la ficha abre y los hechos dicen."""
     ctx.cur.execute("update conversation_option set elegida_en = %s where id = %s",
                     (ctx.ahora, opcion["id"]))
     ctx.cur.execute("select jugada from conversation_question where id = %s", (pregunta_id,))
