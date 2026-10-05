@@ -2,7 +2,7 @@
 
 **Rama:** `feat/motor-de-conversacion` · **Carpeta:** `D:\Proyectos\Leda-PM-worktrees\motor-de-conversacion`
 **Abierta:** 2026-10-04 · **Copia en Engram:** tema `odd/prueba-chica-del-motor/tasks` (proyecto `prisma-pm`)
-**Estado:** decidido (sección 10, 2026-10-05); E2-1 a E2-4 y E2-3b hechas; sigue la E2-5.
+**Estado:** decidido (sección 10, 2026-10-05); E2-1 a E2-5 y E2-3b hechas; sigue la E2-6.
 
 ## 1. Objetivo
 
@@ -107,8 +107,10 @@ anota (`deshacer`): el resto es común. La duda pregunta con las tareas en que l
 toque y la elección escrita corren el mismo camino (`elegir_opcion`). Una corrección sólo vale
 sobre algo anotado en los últimos turnos de la persona. Los botones los agrega al entregar un
 transporte del motor, porque el despachador sólo arma los de los flujos congelados.
-`PENDIENTE`: una corrección que vuelve a una previsión anterior no rearma el aviso de aquélla si
-se había retirado.
+Resuelto en la E2-5: una corrección que vuelve a una previsión anterior cuyo aviso se había
+retirado sin salir lo vuelve a guardar. Desde la E2-5, una opción que ya no se puede usar deja
+la duda abierta (`pregunta_sigue_abierta`); una a la que le falta un dato la cierra, y lo que
+falta es la pregunta siguiente.
 
 **Escalera.** Propia; `escalera.py` no se toca. El aviso previo sale N días hábiles antes (N en
 `workspace_setting`: 3 en CoreWork, mínimo 1, comprimido si la tarea tiene menos días). Desde V, cada
@@ -117,9 +119,22 @@ recordatorio pide el estado y abre una espera en `pending_reply` (hoy nada la es
 una ausencia. Hallazgo: `escalera.evaluar` escala sin mirar si hubo respuesta; la de la prueba avanza sólo con la
 espera abierta.
 
+Hecho en la E2-5 (`escalera.py`): un paso por vez, nunca dos el mismo día hábil, con clave por
+tarea, vencimiento y paso; el primer pedido abre la espera y, al salir, la pregunta del estado
+(`estado_de_la_tarea`, que no se puede dejar sin efecto y contestan inicio, previsión, bloqueo y
+quién destraba); el tercero dice a quién se va a escalar; el escalamiento va a todos los de la
+ruta (la del área antes que la general), nunca al responsable. Una ausencia la pausa y lo
+guardado no le llega; a la vuelta de una que tocó el período de la escalera, un reencuadre
+reemplaza lo guardado (desde V pide el estado) y la escalera retoma desde donde quedó. Sin
+`aviso_previo_dias_habiles`, el mínimo del núcleo (un día hábil) y un incidente de severidad baja
+por cada aviso previo que sale con él; sin ruta, un incidente una vez y la espera queda escalada.
+
 **Avisos guardados.** Todo lo que Leda manda por su cuenta se guarda como hechos. Al llegar su hora, dentro del
 horario, el código vuelve a leer la tarea; si corresponde, la IA lo redacta y va al outbox; si no, se omite con su
 motivo (9b). El de una nueva previsión va como `es_coordinacion` (lo causa el acto de otra persona, mecánica §10).
+Hecho en la E2-5 (`avisos.py`): cada tipo se declara una vez con su regla de vigencia; los de la
+escalera se redactan con los hechos de ese momento, y un efecto que pasa después dice su estado.
+El aviso a un ausente espera a que vuelva. El comando `avisar` va por el mismo camino.
 
 **Horario (9e).** `despachador._despachar_fila` ya manda las respuestas a cualquier hora y pospone lo demás;
 cuándo sale un aviso a otro es un hecho de la respuesta.
@@ -270,8 +285,27 @@ su evidencia son las corridas. Unas 400 líneas por tarea es una guía, no un to
       Ningún caso especial por circuito (5c.1). Commits `f8bc71b`, `09ede28`, `ee7bf25` y `071092e`; lo
       registra el commit que sigue. Unas 2.070 líneas, 890 de pruebas: más que la guía, porque cada
       situación lleva su prueba de base.
-- [ ] **E2-5. Escalera y avisos guardados** (delegada): aviso previo, esperas, escalamiento, relectura, omisión y
-      reintentos. Unas 450.
+- [x] **E2-5. Escalera y avisos guardados** (delegada: writer, varios archivos no triviales): aviso
+      previo, esperas, escalamiento, relectura, omisión y reintentos; el envío del aviso de
+      corrección; el pendiente de la E2-4 (rearmar el aviso de una previsión anterior); y los
+      dos arreglos de la revisión de la E2-4 (`elegir` no cierra la duda antes de que la ficha
+      diga si se pudo; un toque que falla tres veces deja incidente y texto fijo). Evidencia
+      (2026-10-05): `pytest prueba_chica` en rojo en cada paso (arreglos de la revisión, `2
+      failed, 1 passed`; avisos, error de colección sin `avisos.py` y el rearmado contra la
+      `fichas.py` anterior, `1 failed, 11 passed`; escalera, error de colección sin
+      `escalera.py` y, con la primera versión, `1 failed, 16 passed`: un paso que reemplazó un
+      reencuadre no se volvía a guardar) y en verde, `191 passed in 61.99s`. Reloj fijo que
+      cruza un fin de semana y el feriado del lunes 12; IA guionada. **Decisión sobre el
+      `PENDIENTE` del aviso previo:** sin `aviso_previo_dias_habiles`, el mínimo del núcleo (1) y
+      un incidente por cada aviso previo que sale así; nunca se escribe la configuración.
+      `PENDIENTE`: una respuesta que no es una jugada que informa (por ejemplo "voy bien", sin
+      fecha) no cierra la espera; qué sigue después de que una respuesta detiene la escalera
+      (por ejemplo, cuando vence la previsión); una corrección no reabre la espera que cerró el
+      hecho anotado en la tarea equivocada; las etapas `motor_aviso_guardado` y `motor_escalera`
+      no tienen entrada propia en `incidentes.EXPLICACION_POR_ETAPA` (está en `src/`): su aviso
+      usa la explicación genérica. Commits `a4d4327`, `af28776` y `c1ca293`; lo registra el
+      commit que sigue. Unas 1.790 líneas, 734 de pruebas: más que la guía, porque cada regla de
+      la escalera lleva su prueba con el reloj.
 - [ ] **E2-6. Ciclo y herramientas de prueba** (delegada): ciclo, bot de administración, comando para adelantar
       el reloj, lector de turnos, `restriccion_horario` (el escuchador y la redacción van en la E2-3b). Unas 300.
 - [ ] **E2-7. Corredor** (delegada): los 14 YAML, base por corrida, reloj, comprobaciones, reporte, luna y Jev.
@@ -312,5 +346,6 @@ previo en `workspace_setting`, no en el importador; el referente es quien aprueb
   `PENDIENTE` confirmar al escribir los YAML que ninguna conversación depende de ellas.
 - **La etapa no es tan chica:** si una tarea pide un caso especial, se frena (5c.1).
 
-**Próximo paso:** la E2-5 (escalera y avisos guardados; también el envío del aviso de corrección de
-una previsión, `correccion_de_prevision`, que la E2-4 deja guardado).
+**Próximo paso:** la E2-6 (el ciclo que corre cada minuto `escalera.correr_escalera`,
+`avisos.enviar_avisos` y `despachar`; el bot de administración, el comando que adelanta el reloj,
+el lector de turnos y `restriccion_horario` con `leda_motor`).
