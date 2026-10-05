@@ -7,7 +7,8 @@
 -- Los hechos del seguimiento que el motor anota y la entrada de sus mensajes:
 --
 -- - `task_forecast`: las previsiones de una tarea (9b, 9f). Sólo se agregan; una
---   corrección es una fila nueva que reemplaza a otra. Su espacio no lo declara quien
+--   corrección es una fila nueva que reemplaza a otra, siempre de la misma tarea
+--   (clave foránea con espacio, tarea e id). Su espacio no lo declara quien
 --   escribe: lo deriva de la tarea `derivar_espacio_prevision()`, con los privilegios
 --   de quien llama (como `derivar_espacio_evento_tarea()`): una tarea de otro espacio
 --   falla igual que una inventada.
@@ -76,9 +77,12 @@ create table task_forecast (
   dicho_por_membership_id  uuid not null,
   at                       timestamptz not null,
   constraint task_forecast_workspace_id_unique unique (workspace_id, id),
-  constraint task_forecast_replaces_workspace
-    foreign key (workspace_id, reemplaza_id)
-    references task_forecast(workspace_id, id),
+  constraint task_forecast_task_id_unique unique (workspace_id, task_id, id),
+  -- Una previsión sólo reemplaza a otra de la misma tarea, del mismo espacio
+  -- (revisión de la E2-1). Sin `reemplaza_id` no se comprueba (match simple).
+  constraint task_forecast_replaces_same_task
+    foreign key (workspace_id, task_id, reemplaza_id)
+    references task_forecast(workspace_id, task_id, id),
   constraint task_forecast_member
     foreign key (dicho_por_membership_id)
     references membership(id) on delete cascade

@@ -320,6 +320,33 @@ def test_una_correccion_reemplaza_a_una_prevision_del_mismo_espacio(conn, espaci
                  AHORA))
 
 
+def test_una_prevision_solo_reemplaza_a_otra_de_la_misma_tarea(conn, espacios, intake_world):
+    """Revisión de la E2-1 (`review-03f111a243648455`): reemplazar una previsión de otra
+    tarea del mismo espacio mezclaría las historias de dos tareas."""
+    norte = espacios["north-lab"]
+    w = intake_world["north-lab"]
+    with admin(conn) as cur:
+        cur.execute(
+            """insert into task (workspace_id, objective_id, titulo, area_id,
+                                 responsable_membership_id, estado, fecha_objetivo)
+               values (%s, %s, 'Revisar los planos', %s, %s, 'asignada', %s)
+               returning id""",
+            (norte.id, w["objectives"][0], w["areas"]["field"], norte.persona,
+             AHORA + timedelta(days=5)))
+        otra_tarea = str(cur.fetchone()["id"])
+    conn.commit()
+    with espacio(conn, norte.id) as cur:
+        de_la_otra = _prevision(cur, norte, tarea=otra_tarea)
+        with pytest.raises(psycopg.errors.ForeignKeyViolation), conn.transaction():
+            cur.execute(
+                """insert into task_forecast
+                     (task_id, fecha_prevista, fecha_comprometida, atraso_dias_habiles,
+                      reemplaza_id, es_correccion, dicho_por_membership_id, at)
+                   values (%s, %s, %s, 0, %s, true, %s, %s)""",
+                (norte.tarea, date(2026, 10, 8), AHORA + timedelta(days=3), de_la_otra,
+                 norte.persona, AHORA))
+
+
 # --- Lo que sólo se agrega ------------------------------------------------------------------
 
 def test_turnos_previsiones_y_quien_destraba_solo_se_agregan(conn, espacios):
