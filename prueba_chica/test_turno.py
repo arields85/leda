@@ -1,13 +1,14 @@
 """Un turno del motor de conversación y su registro (E2-2).
 
 `odd/tasks/prueba-chica-del-motor.md`, sección 4 ("Un turno" y "Fallas de la IA"); ADR 0018,
-decisiones 1, 3 y 8 (caso 1). La lista cerrada de jugadas la llena la E2-3: acá se prueba el
-esqueleto con una lista vacía o con un manejador de prueba, y la IA es guionada.
+decisiones 1, 3 y 8 (caso 1). Acá se prueba el esqueleto con
+manejadores de prueba; las fichas de la E2-3, en `test_fichas.py`. La IA es guionada.
 """
 
 from __future__ import annotations
 
 from prueba_chica.conftest import AHORA
+from prueba_chica.fichas import JUGADAS
 from prueba_chica.ia import IAGuionada, Jugada
 from prueba_chica.tiempo import RelojFijo
 from prueba_chica.turno import TEXTO_SI_LA_IA_FALLA, procesar_turno
@@ -54,7 +55,7 @@ def test_un_turno_lee_pide_jugadas_redacta_encola_y_registra(conn, mundo, escrib
     assert situacion["hoy"] == "2026-10-05"
     assert [(t["alias"], t["titulo"]) for t in situacion["tareas"]] == [
         ("T1", "Revisar el tablero")]
-    assert situacion["jugadas_posibles"] == []
+    assert situacion["jugadas_posibles"] == sorted(JUGADAS)
     # (5) la IA redacta desde los hechos.
     assert ia.pedidos_de_redaccion[0]["hechos"] == []
 
@@ -87,24 +88,6 @@ def test_los_turnos_anteriores_llegan_a_la_ia(conn, mundo, escribe):
 
     assert [(t["sentido"], t["texto"]) for t in ia.pedidos_de_jugadas[0]["ultimos_turnos"]] == [
         ("entrada", "hola"), ("salida", "Buen día.")]
-
-
-def test_una_jugada_fuera_de_la_lista_no_hace_nada_y_queda_como_hecho(conn, mundo, escribe):
-    quien, entrante = escribe("Marcos", "arranqué")
-    ia = IAGuionada(jugadas=[[Jugada("anotar_inicio", {"tarea": "T1"})]],
-                    redacciones=["No puedo hacer eso todavía."])
-
-    resultado = procesar_turno(conn, quien, entrante, ia, RelojFijo(AHORA))
-    conn.commit()
-
-    hechos = [{"jugada": "anotar_inicio", "resultado": "fuera_de_la_lista"}]
-    assert resultado.hechos == hechos
-    assert ia.pedidos_de_redaccion[0]["hechos"] == hechos
-    with admin(conn) as cur:
-        cur.execute("select estado from task where id = %s", (mundo["tarea"],))
-        assert cur.fetchone()["estado"] == "asignada"
-    entrada, _ = _turnos(conn, quien.membership_id)
-    assert entrada["jugadas"] == [{"nombre": "anotar_inicio", "datos": {"tarea": "T1"}}]
 
 
 def test_una_jugada_de_la_lista_la_maneja_su_manejador(conn, mundo, escribe):

@@ -5,8 +5,10 @@ la lista cerrada y nombra las tareas por un alias; (3) el código maneja cada ju
 manejador de su ficha; (4) el resultado son hechos; (5) la IA redacta desde los hechos, una
 respuesta por mensaje, que sale por el outbox; (6) todo queda en el registro de turnos.
 
-La lista cerrada (`JUGADAS`) la llena la E2-3 con las fichas; lo que la IA elija fuera de ella
-no se hace y queda como hecho. Las situaciones generales llegan en la E2-4.
+La lista cerrada (`JUGADAS`) y sus fichas están en `fichas.py` (E2-3). Lo que la IA elija fuera
+de ella no se hace: queda como hecho, con lo que Leda puede hacer, y se le avisa al
+administrador con un incidente que apunta al mensaje (decisión 1 y situación general 8; uno
+por turno). Las situaciones generales llegan en la E2-4.
 
 Si la IA no responde (ADR 0018, decisión 8, caso 1): un reintento, enseguida; si vuelve a
 fallar, nada se ejecuta, la persona recibe el único texto fijo, se registra un incidente para
@@ -29,7 +31,6 @@ import json
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import datetime
-from types import MappingProxyType
 from typing import Any
 
 import psycopg
@@ -40,6 +41,7 @@ from leda.incidentes import (ETAPA_TURNO_CONVERSACION, NOTICIA_NEUTRA_INCIDENTE,
                              REFERENCIA_INBOUND_MESSAGE, registrar_incidente)
 from leda.salida import enqueue_outbox
 
+from .fichas import JUGADAS, Contexto, Manejador, lo_que_puede_hacer
 from .ia import IA, Jugada
 from .tiempo import Reloj
 
@@ -50,30 +52,9 @@ TEXTO_SI_LA_IA_FALLA = NOTICIA_NEUTRA_INCIDENTE
 INTENTOS_DE_LA_IA = 2          # un reintento
 ULTIMOS_TURNOS = 10
 
-
-@dataclass(frozen=True)
-class Contexto:
-    """Lo que un manejador de jugada necesita: la transacción del espacio, quién escribió,
-    el momento del motor y lo leído al empezar el turno."""
-
-    cur: psycopg.Cursor
-    quien: Solicitante
-    entrante_id: str
-    chat_id: int
-    texto: str
-    ahora: datetime
-    estado: dict[str, Any] | None
-    tareas: tuple[dict[str, Any], ...]
-    ultimos_turnos: tuple[dict[str, Any], ...]
-
-    def tarea(self, alias: str) -> dict[str, Any] | None:
-        return next((t for t in self.tareas if t["alias"] == alias), None)
-
-
-Manejador = Callable[[Contexto, Jugada], dict[str, Any]]
-
-# La lista cerrada: nombre de la jugada → su manejador. La llena la E2-3.
-JUGADAS: Mapping[str, Manejador] = MappingProxyType({})
+# El aviso al administrador de lo que no está en la lista (plan, sección 4): un incidente de
+# severidad baja con etapa propia, que `registrar_incidente` lleva al bot de administración.
+ETAPA_FUERA_DE_LA_LISTA = "motor_fuera_de_la_lista"
 
 
 @dataclass
@@ -104,14 +85,18 @@ def procesar_turno(conn: psycopg.Connection, quien: Solicitante, entrante_id: st
             elegidas = _pedir(lambda: ia.elegir_jugadas(_situacion(ctx, jugadas)))
             with conn.transaction():
                 hechos = [_manejar(ctx, jugada, jugadas) for jugada in elegidas]
+                _avisar_fuera_de_la_lista(ctx, elegidas, jugadas)
                 texto = _pedir(lambda: _no_vacio(ia.redactar(
                     {"hoy": ctx.ahora.date().isoformat(), "mensaje": ctx.texto,
                      "hechos": hechos})))
         except IANoRespondio as falla:
             return _si_la_ia_falla(cur, ctx, ia, reloj, inicio, elegidas, falla)
         latencia = _ms(reloj.medir() - inicio)
-        _registrar_entrada(cur, ctx, reloj.ahora(), elegidas, {"hechos": hechos}, ia.nombre,
-                           latencia, None)
+        turno = _registrar_entrada(cur, ctx, reloj.ahora(), elegidas, {"hechos": hechos},
+                                   ia.nombre, latencia, None)
+        if ctx.avisos_guardados:
+            cur.execute("update scheduled_notice set turno_id = %s where id = any(%s)",
+                        (turno, ctx.avisos_guardados))
         _responder(cur, ctx, texto, reloj.ahora(), ia.nombre)
         return ResultadoTurno(texto, elegidas, hechos)
 
@@ -151,7 +136,8 @@ def _leer(cur, quien: Solicitante, entrante_id: str, ahora: datetime) -> Context
          "fecha_objetivo": t["fecha_objetivo"].isoformat() if t["fecha_objetivo"] else None}
         for i, t in enumerate(cur.fetchall(), 1))
 
-    cur.execute("""select t.sentido, coalesce(i.texto, o.cuerpo) texto, t.jugadas, t.at
+    cur.execute("""select t.sentido, coalesce(i.texto, o.cuerpo) texto, t.jugadas,
+                          t.resultado -> 'hechos' as hechos, t.at
                      from conversation_turn t
                      left join inbound_message i on i.id = t.inbound_message_id
                      left join message_outbox o on o.id = t.outbox_id
@@ -160,7 +146,7 @@ def _leer(cur, quien: Solicitante, entrante_id: str, ahora: datetime) -> Context
                     limit %s""", (quien.membership_id, ULTIMOS_TURNOS))
     ultimos = tuple(
         {"sentido": t["sentido"], "texto": t["texto"], "jugadas": t["jugadas"],
-         "at": t["at"].isoformat()}
+         "hechos": t["hechos"], "at": t["at"].isoformat()}
         for t in reversed(cur.fetchall()))
 
     return Contexto(cur=cur, quien=quien, entrante_id=entrante_id,
@@ -210,8 +196,27 @@ def _no_vacio(texto: str) -> str:
 def _manejar(ctx: Contexto, jugada: Jugada, jugadas: Mapping[str, Manejador]) -> dict:
     manejador = jugadas.get(jugada.nombre)
     if manejador is None:
-        return {"jugada": jugada.nombre, "resultado": "fuera_de_la_lista"}
+        return {"jugada": jugada.nombre, "resultado": "fuera_de_la_lista",
+                "lo_que_puede_hacer": lo_que_puede_hacer(jugadas),
+                "aviso_al_administrador": True}
     return manejador(ctx, jugada)
+
+
+def _avisar_fuera_de_la_lista(ctx: Contexto, elegidas: list[Jugada],
+                              jugadas: Mapping[str, Manejador]) -> None:
+    """Uno por mensaje, con la referencia al mensaje que lo provocó (decisiones 1 y 9g). A la
+    persona no se le dice, salvo que lo pregunte: el hecho queda en el registro de turnos."""
+    fuera = [dataclasses.asdict(j) for j in elegidas if j.nombre not in jugadas]
+    if not fuera:
+        return
+    registrar_incidente(
+        ctx.cur, ctx.quien.workspace_id,
+        "Un mensaje pidió algo que no está en la lista cerrada de jugadas del motor de "
+        "conversación: no se hizo nada y la IA le dijo a la persona qué puede hacer. Para "
+        "analizar si hace falta una jugada nueva (ADR 0018, decisión 1).",
+        severidad="baja", referencia_cruda=_json(fuera), etapa=ETAPA_FUERA_DE_LA_LISTA,
+        referencia_tipo=REFERENCIA_INBOUND_MESSAGE, referencia_id=ctx.entrante_id,
+        chat_id=ctx.chat_id, app_user_id=ctx.quien.app_user_id)
 
 
 # --- (6) El registro de turnos y la respuesta ---------------------------------------------
