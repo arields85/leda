@@ -90,3 +90,52 @@ def test_un_aviso_de_coordinacion_sale_aparte(conn, mundo, dias, dos_que_vencen_
     assert sorted(len(p["hechos"]) for p in a_ismael) == [1, 1]
     assert sorted(p["hechos"][0].get("aviso", "nueva_prevision") for p in a_ismael) == [
         "falta_de_respuesta", "nueva_prevision"]
+
+
+# --- Si la IA no redacta un envío que junta avisos (revisión de la corrida en seco) ----------
+
+def _guardar_los_avisos_previos(conn, mundo) -> None:
+    from prueba_chica.escalera import correr_escalera
+    from prueba_chica.tiempo import RelojFijo
+    correr_escalera(conn, mundo["id"], RelojFijo(_hora(6, 10)))
+    conn.commit()
+
+
+def test_un_envio_que_la_ia_no_redacto_se_reintenta_entero(conn, mundo, dias,
+                                                           dos_que_vencen_juntas):
+    """Los avisos de un envío comparten la cuenta de intentos: si cada uno llevara la suya,
+    al reintentar saldrían en mensajes separados."""
+    from leda.db import admin
+
+    from prueba_chica.ia import IAGuionada
+    from prueba_chica.test_avisos import _enviar
+    _guardar_los_avisos_previos(conn, mundo)
+    with admin(conn) as cur:        # uno ya había fallado dos veces en otra vuelta
+        cur.execute("""update scheduled_notice set intentos = 2
+                        where id = (select id from scheduled_notice order by dedupe_key
+                                     limit 1)""")
+    conn.commit()
+    caida = IAGuionada(redacciones=[RuntimeError("caída")])
+
+    assert _enviar(conn, mundo, caida, _hora(6, 10)) == {"reintento": 2}
+
+    previos = _avisos(conn, "aviso_previo")
+    assert {a["intentos"] for a in previos} == {3}
+    assert len({a["proximo_intento_en"] for a in previos}) == 1
+    bien = IAGuionada(redacciones=["Las dos vencen el viernes."])
+    assert _enviar(conn, mundo, bien, previos[0]["proximo_intento_en"]) == {"enviado": 2}
+    assert len(bien.pedidos_de_redaccion) == 1          # un solo mensaje con las dos
+    assert _cuantas(conn, "message_outbox", "not es_respuesta") == 1
+
+
+def test_un_texto_que_el_canal_no_lleva_se_reintenta_y_no_corta_la_vuelta(conn, mundo, dias,
+                                                                          dos_que_vencen_juntas):
+    from prueba_chica.ia import IAGuionada
+    from prueba_chica.test_avisos import _enviar
+    _guardar_los_avisos_previos(conn, mundo)
+    larguisimo = IAGuionada(redacciones=["Recordatorio. " * 500])
+
+    assert _enviar(conn, mundo, larguisimo, _hora(6, 10)) == {"reintento": 2}
+
+    assert [a["estado"] for a in _avisos(conn, "aviso_previo")] == ["guardado", "guardado"]
+    assert _cuantas(conn, "message_outbox", "not es_respuesta") == 0

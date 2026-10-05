@@ -24,7 +24,8 @@ otra persona, salen aparte y siempre, como las respuestas. El tope diario del pa
 lo aplica el despachador (`despachador._tope_diario`): pospone, nunca descarta; con un envío
 por día y por espacio, en la prueba chica no se alcanza.
 
-Si la IA no lo redacta, el aviso espera y se reintenta a los 1, 2, 4 y 8 minutos; al quinto
+Si la IA no lo redacta (o redacta un texto que el canal no lleva), el envío entero espera y se
+reintenta a los 1, 2, 4 y 8 minutos, con sus avisos juntos; al quinto
 fallo queda `fallido` con sus hechos, se registra un incidente y, si una persona lo causó (el
 turno que lo guardó), se le guarda un aviso de la falla con lo pendiente, que también redacta
 la IA: nunca sale un texto armado a mano. Un destinatario ausente no recibe nada: su aviso
@@ -50,7 +51,7 @@ import psycopg
 from leda.calendario import Calendario
 from leda.db import espacio
 from leda.incidentes import registrar_incidente
-from leda.salida import enqueue_outbox
+from leda.salida import PayloadValidationError, enqueue_outbox
 
 from . import preguntas
 from .ancla import (REPREGUNTA_DE_ESTADO, VENCIMIENTO_CON_PREVISION, ancla, anclaje,
@@ -254,15 +255,23 @@ def _enviar(m: Momento, envio: list[_Listo], ia: IA) -> list[str]:
     try:
         texto = no_vacio(ia.redactar(pedido))
     except Exception as falla:     # la IA es un servicio externo: cualquier falla es no redactar
-        return [_si_la_ia_no_redacta(m, x.aviso, destinatario, falla) for x in envio]
+        return _si_la_ia_no_redacta(m, envio, falla)
 
     primero = str(envio[0].aviso["id"])
     clave = f"motor:aviso:{primero}"
-    enqueue_outbox(cur, workspace_id=m.workspace_id, chat_id=destinatario["telegram_user_id"],
-                   text=texto, dedupe_key=clave, recipient_membership_id=persona,
-                   message_type=max((x.tipo.tipo_de_mensaje for x in envio),
-                                    key=URGENCIA.index),
-                   es_coordinacion=envio[0].tipo.es_coordinacion, scheduled_for=m.ahora)
+    try:
+        enqueue_outbox(cur, workspace_id=m.workspace_id,
+                       chat_id=destinatario["telegram_user_id"], text=texto, dedupe_key=clave,
+                       recipient_membership_id=persona,
+                       message_type=max((x.tipo.tipo_de_mensaje for x in envio),
+                                        key=URGENCIA.index),
+                       es_coordinacion=envio[0].tipo.es_coordinacion, scheduled_for=m.ahora)
+    except PayloadValidationError as falla:
+        # Un texto que el canal no lleva (más largo que su límite: un envío que junta varios
+        # avisos lo hace más probable) no es una redacción: se reintenta como si la IA no lo
+        # hubiera redactado, y nunca corta la vuelta de los demás avisos. Lo valida antes de
+        # escribir nada, así que no queda nada a medias.
+        return _si_la_ia_no_redacta(m, envio, falla)
     cur.execute("select id from message_outbox where dedupe_key = %s", (clave,))
     outbox_id = str(cur.fetchone()["id"])
     for x in envio:
@@ -354,9 +363,17 @@ def pregunta_del_aviso(cur, aviso: dict[str, Any]) -> dict[str, Any] | None:
     return cur.fetchone()
 
 
-def _si_la_ia_no_redacta(m: Momento, aviso, destinatario, falla: Exception) -> str:
+def _si_la_ia_no_redacta(m: Momento, envio: list[_Listo], falla: Exception) -> list[str]:
+    """Un envío que la IA no redactó se reintenta entero: sus avisos comparten la cuenta de
+    intentos (la del que más lleva) y el momento del próximo, así vuelven a salir juntos en un
+    solo mensaje (mecánica §10) y ninguno espera más de lo que le toca."""
+    intentos = max(x.aviso["intentos"] for x in envio) + 1
+    return [_un_aviso_que_no_salio(m, x.aviso, x.destinatario, falla, intentos) for x in envio]
+
+
+def _un_aviso_que_no_salio(m: Momento, aviso, destinatario, falla: Exception,
+                           intentos: int) -> str:
     cur, aviso_id = m.cur, str(aviso["id"])
-    intentos = aviso["intentos"] + 1
     if intentos < INTENTOS:
         cur.execute("""update scheduled_notice set intentos = %s, proximo_intento_en = %s
                         where id = %s""",

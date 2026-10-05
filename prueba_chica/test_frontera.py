@@ -33,7 +33,9 @@ PERMITIDOS: dict[str, set[str] | None] = {
     "herramientas": {"ejecutar", "NecesitaConfirmacion", "EstadoCambio", "NecesitaElegir",
                      "NecesitaOpciones"},
     "calendario": None,
-    "salida": {"enqueue_outbox"},
+    # `enqueue_outbox` y lo que levanta si el texto no se puede llevar (revisión de la corrida en
+    # seco con las 16).
+    "salida": {"enqueue_outbox", "PayloadValidationError"},
     "despachador": None,
     "incidentes": {"registrar_incidente", "NOTICIA_NEUTRA_INCIDENTE",
                    "ETAPA_TURNO_CONVERSACION", "REFERENCIA_INBOUND_MESSAGE"},
