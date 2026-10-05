@@ -297,7 +297,16 @@ create table workspace_setting (
   workspace_id  uuid not null references workspace(id) on delete cascade,
   clave         text not null,
   valor         jsonb not null,
-  primary key (workspace_id, clave)
+  primary key (workspace_id, clave),
+  -- El Motor (migración 0031; ADR 0018, 9b): cuántos días hábiles antes del
+  -- vencimiento sale el aviso previo. Un entero de al menos 1 (mecánica §9); el
+  -- valor de cada espacio se carga aparte (en CoreWork, 3).
+  constraint workspace_setting_aviso_previo check (
+    case
+      when clave <> 'aviso_previo_dias_habiles' then true
+      when jsonb_typeof(valor) <> 'number' then false
+      else (valor #>> '{}')::numeric >= 1 and (valor #>> '{}')::numeric % 1 = 0
+    end)
 );
 
 -- Policy imported from evidencia.por_area. An empty array is an explicit
@@ -418,7 +427,9 @@ create table task (
   evidencia_policy_version  integer,
   source_draft_id           uuid unique references task_draft(id),
   creado_en                 timestamptz not null default now(),
-  actualizado_en            timestamptz not null default now()
+  actualizado_en            timestamptz not null default now(),
+  -- Migración 0030: para las claves foráneas con el espacio del motor.
+  constraint task_workspace_id_unique unique (workspace_id, id)
 );
 
 alter table task_draft
@@ -488,7 +499,9 @@ create table blocker (
   resuelto_en   timestamptz,
   resolucion    text,
   escalado_a    uuid references membership(id),
-  escalado_en   timestamptz
+  escalado_en   timestamptz,
+  -- Migración 0031: para la clave foránea con el espacio de `blocker_unblocker`.
+  constraint blocker_workspace_id_unique unique (workspace_id, id)
 );
 
 create index blocker_abiertos on blocker (workspace_id, abierto_en)
@@ -559,6 +572,10 @@ create table inbound_message (
   -- fila de toque). Nula en un mensaje escrito y en un toque absorbido por
   -- repetido dentro de la ventana.
   boton_callback      text,
+  -- El Motor (migración 0031): el bot que recibió el mensaje. Con él, el índice
+  -- `inbound_message_unico_por_mensaje` hace que un mensaje de Telegram repetido
+  -- se reciba una sola vez. Nulo en los flujos congelados.
+  telegram_bot_id     bigint,
   constraint inbound_message_workspace_id_unique unique (workspace_id, id),
   constraint inbound_message_workspace_chat_unique
     unique (workspace_id, id, chat_id)
@@ -615,7 +632,9 @@ create table message_outbox (
   ultimo_error            text,
   -- Si el mensaje pregunta algo con opciones, acá está la acción congelada.
   -- La referencia se agrega más abajo: pending_action se declara después.
-  pending_action_id       uuid
+  pending_action_id       uuid,
+  -- Migración 0030: para las claves foráneas con el espacio del motor.
+  constraint message_outbox_workspace_id_unique unique (workspace_id, id)
 );
 
 create index outbox_despacho on message_outbox (estado, programado_para)
@@ -890,6 +909,14 @@ create index outbox_por_entrante on message_outbox (entrante_id)
 create index inbound_por_boton on inbound_message
   (workspace_id, chat_id, app_user_id, boton_callback, at)
   where boton_callback is not null;
+
+-- El Motor (migración 0031): ejecución única de un mensaje repetido. El número de
+-- mensaje es único dentro de una conversación con un bot, así que la identidad del
+-- mensaje lleva el bot. Los flujos congelados no lo informan: su recibo repetido
+-- pasada la cota de reentrega (`gateway._estado_de_entrega`) sigue entrando.
+create unique index inbound_message_unico_por_mensaje
+  on inbound_message (workspace_id, telegram_bot_id, chat_id, telegram_message_id)
+  where telegram_bot_id is not null and telegram_message_id is not null;
 
 -- Resolver es una sola llamada a propósito: dos toques al mismo botón compiten
 -- por la misma fila y sólo uno la mueve de 'esperando'. Si esto se hiciera con
@@ -1278,6 +1305,221 @@ revoke all on function resolver_ingreso_borrador(uuid, text, bigint, bigint)
   from public;
 
 -- =========================================================================
+-- El motor de conversación (El Motor, prueba chica; migraciones 0030 y 0031)
+--
+-- ADR 0018, decisiones 3, 8 y 9; `odd/tasks/prueba-chica-del-motor.md`,
+-- sección 5. Toda tabla lleva `workspace_id` y entra en el bucle de RLS forzado
+-- de abajo; ninguna lleva `chat_id` ni `callback_data`. Toda referencia es al
+-- mismo espacio (la comprobación de una clave foránea no pasa por la RLS): por la
+-- clave foránea con el espacio o, hacia `membership` e `inbound_message`, por
+-- `exigir_referencias_del_espacio()` (más abajo, en "Reglas"). Los momentos no tienen valor por omisión: los pone el motor con su
+-- reloj. El registro de turnos, las previsiones y quién destraba sólo se
+-- agregan; preguntas, opciones y avisos se cierran, pero no se borran.
+-- =========================================================================
+
+create table conversation_question (
+  id                 uuid primary key default gen_random_uuid(),
+  workspace_id       uuid not null references workspace(id) on delete cascade,
+  membership_id      uuid not null,
+  tipo               text not null,
+  task_id            uuid,
+  jugada             jsonb,
+  se_puede_dejar     boolean not null,
+  abierta_en         timestamptz not null,
+  para_despues_en    timestamptz,
+  cerrada_en         timestamptz,
+  cierre             text check (cierre in ('respondida', 'cancelada', 'sin_efecto')),
+  cierre_detalle     jsonb,
+  constraint conversation_question_workspace_id_unique unique (workspace_id, id),
+  constraint conversation_question_membership
+    foreign key (membership_id)
+    references membership(id) on delete cascade,
+  constraint conversation_question_task_workspace
+    foreign key (workspace_id, task_id)
+    references task(workspace_id, id) on delete cascade,
+  constraint conversation_question_cierre check ((cerrada_en is null) = (cierre is null))
+);
+
+create index conversation_question_abiertas
+  on conversation_question (workspace_id, membership_id) where cerrada_en is null;
+
+create table conversation_option (
+  id            uuid primary key default gen_random_uuid(),
+  workspace_id  uuid not null references workspace(id) on delete cascade,
+  question_id   uuid not null,
+  token         text not null unique,
+  etiqueta      text not null,
+  valor         jsonb not null,
+  orden         integer not null,
+  elegida_en    timestamptz,
+  constraint conversation_option_workspace_id_unique unique (workspace_id, id),
+  constraint conversation_option_question_workspace
+    foreign key (workspace_id, question_id)
+    references conversation_question(workspace_id, id) on delete cascade
+);
+
+create index conversation_option_de on conversation_option (question_id, orden);
+
+create table conversation_turn (
+  id                  uuid primary key default gen_random_uuid(),
+  workspace_id        uuid not null references workspace(id) on delete cascade,
+  membership_id       uuid not null,
+  sentido             text not null check (sentido in ('entrada', 'salida')),
+  inbound_message_id  uuid,
+  outbox_id           uuid,
+  option_id           uuid,
+  jugadas             jsonb,
+  resultado           jsonb,
+  ia                  text,
+  latencia_ms         integer check (latencia_ms >= 0),
+  error               text,
+  at                  timestamptz not null,
+  constraint conversation_turn_workspace_id_unique unique (workspace_id, id),
+  constraint conversation_turn_membership
+    foreign key (membership_id)
+    references membership(id) on delete cascade,
+  constraint conversation_turn_inbound
+    foreign key (inbound_message_id)
+    references inbound_message(id) on delete set null,
+  constraint conversation_turn_outbox_workspace
+    foreign key (workspace_id, outbox_id)
+    references message_outbox(workspace_id, id) on delete set null (outbox_id),
+  constraint conversation_turn_option_workspace
+    foreign key (workspace_id, option_id)
+    references conversation_option(workspace_id, id) on delete set null (option_id),
+  constraint conversation_turn_sentido check (
+    (sentido = 'entrada' and outbox_id is null) or
+    (sentido = 'salida' and inbound_message_id is null and option_id is null))
+);
+
+create index conversation_turn_por_persona
+  on conversation_turn (workspace_id, membership_id, at desc);
+
+create table scheduled_notice (
+  id                          uuid primary key default gen_random_uuid(),
+  workspace_id                uuid not null references workspace(id) on delete cascade,
+  tipo                        text not null,
+  task_id                     uuid,
+  destinatario_membership_id  uuid not null,
+  turno_id                    uuid,
+  hechos                      jsonb not null,
+  programado_para             timestamptz not null,
+  estado                      text not null default 'guardado'
+                              check (estado in ('guardado', 'enviado', 'omitido', 'fallido')),
+  intentos                    integer not null default 0 check (intentos >= 0),
+  proximo_intento_en          timestamptz,
+  motivo_omision              text,
+  outbox_id                   uuid,
+  dedupe_key                  text not null,
+  creado_en                   timestamptz not null,
+  resuelto_en                 timestamptz,
+  constraint scheduled_notice_workspace_id_unique unique (workspace_id, id),
+  constraint scheduled_notice_dedupe unique (workspace_id, dedupe_key),
+  constraint scheduled_notice_task_workspace
+    foreign key (workspace_id, task_id)
+    references task(workspace_id, id) on delete cascade,
+  constraint scheduled_notice_recipient
+    foreign key (destinatario_membership_id)
+    references membership(id) on delete cascade,
+  constraint scheduled_notice_turn_workspace
+    foreign key (workspace_id, turno_id)
+    references conversation_turn(workspace_id, id) on delete set null (turno_id),
+  constraint scheduled_notice_outbox_workspace
+    foreign key (workspace_id, outbox_id)
+    references message_outbox(workspace_id, id) on delete set null (outbox_id),
+  constraint scheduled_notice_resuelto check ((estado = 'guardado') = (resuelto_en is null)),
+  constraint scheduled_notice_omision check (estado <> 'omitido' or motivo_omision is not null)
+);
+
+create index scheduled_notice_por_salir
+  on scheduled_notice (workspace_id, programado_para) where estado = 'guardado';
+
+create table conversation_state (
+  membership_id            uuid primary key,
+  workspace_id             uuid not null references workspace(id) on delete cascade,
+  pregunta_abierta_id      uuid,
+  ultimo_aviso_id          uuid,
+  mostrado_para_confirmar  jsonb,
+  huella                   text,
+  actualizado_en           timestamptz not null,
+  constraint conversation_state_membership
+    foreign key (membership_id)
+    references membership(id) on delete cascade,
+  constraint conversation_state_question_workspace
+    foreign key (workspace_id, pregunta_abierta_id)
+    references conversation_question(workspace_id, id)
+    on delete set null (pregunta_abierta_id),
+  constraint conversation_state_notice_workspace
+    foreign key (workspace_id, ultimo_aviso_id)
+    references scheduled_notice(workspace_id, id) on delete set null (ultimo_aviso_id)
+);
+
+comment on table conversation_state is
+  'El Motor (ADR 0018, decisión 3.1): una fila por persona. La pregunta abierta, el último aviso que Leda le mandó (su tarea sale del aviso) y, reservadas, lo mostrado para confirmar y su huella. Los temas para después son las preguntas sin cerrar con para_despues_en.';
+comment on table conversation_turn is
+  'El Motor (ADR 0018, decisión 3.2): el registro de turnos. Sólo se agrega; se conserva como las conversaciones (ADR 0002).';
+comment on table conversation_question is
+  'El Motor: las preguntas de Leda. Se cierran con cerrada_en y cierre; una pregunta dejada para después lleva para_despues_en.';
+comment on table conversation_option is
+  'El Motor: las opciones de una duda (situación general 5). El token es único y es lo que vuelve con un toque.';
+comment on table scheduled_notice is
+  'El Motor (ADR 0018, decisión 8, precisión del 2026-10-05): lo que Leda manda por su cuenta, guardado como hechos. Entra al outbox recién cuando la IA lo redactó.';
+
+create table task_forecast (
+  id                       uuid primary key default gen_random_uuid(),
+  workspace_id             uuid not null references workspace(id) on delete cascade,
+  task_id                  uuid not null references task(id) on delete cascade,
+  fecha_prevista           date not null,
+  motivo                   text,
+  fecha_comprometida       timestamptz not null,
+  atraso_dias_habiles      integer not null,
+  reemplaza_id             uuid,
+  es_correccion            boolean not null default false,
+  dicho_por_membership_id  uuid not null,
+  at                       timestamptz not null,
+  constraint task_forecast_workspace_id_unique unique (workspace_id, id),
+  constraint task_forecast_replaces_workspace
+    foreign key (workspace_id, reemplaza_id)
+    references task_forecast(workspace_id, id),
+  constraint task_forecast_member
+    foreign key (dicho_por_membership_id)
+    references membership(id) on delete cascade
+);
+
+create index task_forecast_de on task_forecast (task_id, at desc);
+
+create table blocker_unblocker (
+  id                       uuid primary key default gen_random_uuid(),
+  workspace_id             uuid not null references workspace(id) on delete cascade,
+  blocker_id               uuid not null,
+  destraba_membership_id   uuid,
+  destraba_externo         text check (btrim(destraba_externo) <> ''),
+  no_sabe                  boolean not null default false,
+  dicho_por_membership_id  uuid not null,
+  at                       timestamptz not null,
+  constraint blocker_unblocker_blocker_workspace
+    foreign key (workspace_id, blocker_id)
+    references blocker(workspace_id, id) on delete cascade,
+  constraint blocker_unblocker_member
+    foreign key (destraba_membership_id)
+    references membership(id) on delete cascade,
+  constraint blocker_unblocker_said_by
+    foreign key (dicho_por_membership_id)
+    references membership(id) on delete cascade,
+  constraint blocker_unblocker_exactamente_uno check (
+    (destraba_membership_id is not null)::int
+    + (destraba_externo is not null)::int
+    + no_sabe::int = 1)
+);
+
+create index blocker_unblocker_de on blocker_unblocker (blocker_id, at desc);
+
+comment on table task_forecast is
+  'El Motor (ADR 0018, 9b y 9f): las previsiones de una tarea. Sólo se agregan; una corrección reemplaza a otra con una fila nueva. El atraso lo calcula el código en días hábiles del espacio.';
+comment on table blocker_unblocker is
+  'El Motor (ADR 0018, 9c): quién destraba un bloqueo -- un integrante, alguien de afuera o que no se sabe, exactamente uno --, quién lo dijo y cuándo. Sólo se agrega.';
+
+-- =========================================================================
 -- Sistema
 -- =========================================================================
 
@@ -1610,6 +1852,80 @@ end $$ language plpgsql;
 create trigger trg_derivar_espacio_ausencia
   before insert on absence
   for each row execute function derivar_espacio_ausencia();
+
+-- Misma regla para las previsiones del motor (migración 0031): el espacio sale de
+-- la tarea, con los privilegios de quien llama.
+create or replace function derivar_espacio_prevision() returns trigger as $$
+begin
+  select t.workspace_id into new.workspace_id
+    from task t where t.id = new.task_id;
+  if new.workspace_id is null then
+    raise exception 'task_forecast: la tarea referida no existe';
+  end if;
+  return new;
+end $$ language plpgsql;
+
+create trigger trg_derivar_espacio_prevision
+  before insert on task_forecast
+  for each row execute function derivar_espacio_prevision();
+
+-- Las referencias a `membership` y a `inbound_message` son al mismo espacio. No se
+-- declaran como clave foránea con el espacio porque la restricción única
+-- `(workspace_id, id)` de esas dos tablas es de la 0002, y volver atrás la 0002
+-- dejaría de ser posible (mismo motivo que `message_outbox.entrante_id`). Esta
+-- función lo comprueba con los privilegios de quien llama: con la RLS, una fila de
+-- otro espacio no se encuentra y falla igual que una inventada; la conexión
+-- administrativa, que no tiene RLS, compara el espacio. Recibe pares (columna,
+-- tabla) y falla como una clave foránea.
+create or replace function exigir_referencias_del_espacio() returns trigger as $$
+declare
+  fila jsonb := to_jsonb(new);
+  valor uuid;
+  suyo uuid;
+  i integer := 0;
+begin
+  while i < tg_nargs loop
+    valor := (fila ->> tg_argv[i])::uuid;
+    if valor is not null then
+      execute format('select workspace_id from %I where id = $1', tg_argv[i + 1])
+        into suyo using valor;
+      if suyo is distinct from new.workspace_id then
+        raise exception '%: la referencia de % no existe en este espacio',
+          tg_table_name, tg_argv[i] using errcode = 'foreign_key_violation';
+      end if;
+    end if;
+    i := i + 2;
+  end loop;
+  return new;
+end $$ language plpgsql;
+
+create trigger trg_exigir_referencias_del_espacio
+  before insert or update on conversation_question
+  for each row execute function exigir_referencias_del_espacio(
+    'membership_id', 'membership');
+create trigger trg_exigir_referencias_del_espacio
+  before insert or update on conversation_turn
+  for each row execute function exigir_referencias_del_espacio(
+    'membership_id', 'membership', 'inbound_message_id', 'inbound_message');
+create trigger trg_exigir_referencias_del_espacio
+  before insert or update on scheduled_notice
+  for each row execute function exigir_referencias_del_espacio(
+    'destinatario_membership_id', 'membership');
+create trigger trg_exigir_referencias_del_espacio
+  before insert or update on conversation_state
+  for each row execute function exigir_referencias_del_espacio(
+    'membership_id', 'membership');
+
+-- Después de `trg_derivar_espacio_prevision`: los disparadores corren por orden de
+-- nombre, así que el espacio ya está derivado de la tarea cuando se comprueba.
+create trigger trg_exigir_referencias_del_espacio
+  before insert or update on task_forecast
+  for each row execute function exigir_referencias_del_espacio(
+    'dicho_por_membership_id', 'membership');
+create trigger trg_exigir_referencias_del_espacio
+  before insert or update on blocker_unblocker
+  for each row execute function exigir_referencias_del_espacio(
+    'destraba_membership_id', 'membership', 'dicho_por_membership_id', 'membership');
 
 -- La auditoría autoritativa es la evidencia que se le muestra a un cliente. Su
 -- espacio lo fija la sesión, nunca quien escribe: si otro cliente pudiera
@@ -2110,7 +2426,9 @@ begin
     'task_intake_field','task_intake_choice_set','task_intake_choice',
     'task_intake_free_text_slot',
     'cadence_job','escalation_route','glossary_term','approval_policy',
-    'workspace_setting','message_template','permission','greeting_state']
+    'workspace_setting','message_template','permission','greeting_state',
+    'conversation_question','conversation_option','conversation_turn',
+    'scheduled_notice','conversation_state','task_forecast','blocker_unblocker']
   loop
     execute format('alter table %I enable row level security', t);
     execute format('alter table %I force row level security', t);
@@ -2140,6 +2458,12 @@ revoke insert, update, delete on task_evidence_policy from leda_app;
 -- juego completo, así que acá se recorta al insert que es lo único legítimo.
 revoke select, update, delete on task_state_event from leda_app;
 revoke select, update, delete on objective_state_event from leda_app;
+-- El motor (migraciones 0030 y 0031): el registro de turnos, las previsiones y
+-- quién destraba sólo se agregan; preguntas, opciones y avisos no se borran.
+revoke update, delete on conversation_turn, task_forecast, blocker_unblocker
+  from leda_app;
+revoke delete on conversation_question, conversation_option, scheduled_notice
+  from leda_app;
 
 -- Registros auxiliares. Quedan fuera del bucle de arriba porque `audit_log` e
 -- `incident` admiten espacio nulo para los hechos de alcance global, que sólo

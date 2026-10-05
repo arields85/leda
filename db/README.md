@@ -95,6 +95,18 @@ terminal.
 
 **Mensajería** — `inbound_message`, `message_outbox`.
 
+**Motor de conversación** (El Motor, prueba chica; migraciones `0030` y `0031`) —
+`conversation_state`, `conversation_turn`, `conversation_question`,
+`conversation_option`, `scheduled_notice`, `task_forecast`, `blocker_unblocker`.
+Qué guarda cada una: `odd/tasks/prueba-chica-del-motor.md`, sección 5. Sin `chat_id`
+ni `callback_data`; toda referencia es al mismo espacio; los momentos los pone el
+motor, sin valor por omisión. `leda_app` no cambia ni borra turnos, previsiones ni
+quién destraba, y no borra preguntas, opciones ni avisos guardados. El aviso previo
+es el ajuste `aviso_previo_dias_habiles` de `workspace_setting` (entero, mínimo 1). Un
+mensaje de Telegram que el motor recibe lleva `inbound_message.telegram_bot_id`, y el
+índice único `inbound_message_unico_por_mensaje` hace que una reentrega entre una sola
+vez.
+
 **Sistema** — `model_config`, `learning`, `incident`, `audit_log`,
 `conversation_access_log`.
 

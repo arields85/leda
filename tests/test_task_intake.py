@@ -1667,6 +1667,14 @@ def test_workspace_correlation_constraints_and_rls_reject_cross_tenant_children(
             )
 
 
+# El Motor (migraciones 0030 y 0031): las tablas nuevas y las existentes que esas
+# migraciones tocan (restricciones únicas, el mínimo del aviso previo).
+TABLAS_DEL_MOTOR = ("conversation_state", "conversation_turn",
+                    "conversation_question", "conversation_option",
+                    "scheduled_notice", "task_forecast", "blocker_unblocker",
+                    "task", "blocker", "workspace_setting")
+
+
 def _retrato_de_aislamiento(url, tablas):
     """Cómo quedó el aislamiento de unas tablas, leído del catálogo real.
 
@@ -1713,10 +1721,23 @@ def _retrato_de_aislamiento(url, tablas):
                     where grantee = 'leda_app' and table_schema = 'leda'
                       and table_name = %s
                     order by privilege_type""", (tabla,)).fetchall()
+            # Restricciones e índices (El Motor, migraciones 0030 y 0031): una
+            # migración puede agregar sólo una restricción o un índice único -- el
+            # mínimo del aviso previo, la ejecución única de un mensaje -- y sin
+            # esto ni la paridad ni el rollback lo verían.
+            restricciones = db.execute(
+                """select conname, pg_get_constraintdef(oid) as definicion
+                     from pg_constraint where conrelid = to_regclass(%s)
+                    order by conname""", (f"leda.{tabla}",)).fetchall()
+            indices = db.execute(
+                """select indexname, indexdef from pg_indexes
+                    where schemaname = 'leda' and tablename = %s
+                    order by indexname""", (tabla,)).fetchall()
             retrato[tabla] = {
                 "columnas": columnas, "seguridad": seguridad,
                 "politicas": politicas, "disparadores": disparadores,
-                "permisos": permisos,
+                "permisos": permisos, "restricciones": restricciones,
+                "indices": indices,
             }
     return retrato
 
@@ -1767,7 +1788,7 @@ def test_los_rollbacks_devuelven_la_base_al_estado_anterior():
 
     tablas = ("task_state_event", "objective_state_event",
               "absence", "audit_log", "incident", "greeting_state",
-              "message_outbox", "inbound_message")
+              "message_outbox", "inbound_message") + TABLAS_DEL_MOTOR
     nombre = f"leda_rollback_{uuid.uuid4().hex[:10]}"
     with psycopg.connect(maintenance, autocommit=True) as control:
         control.execute(SQL("create database {}").format(Identifier(nombre)))
@@ -1832,7 +1853,8 @@ def test_instalacion_limpia_y_base_migrada_convergen_en_el_aislamiento():
     # porque las bases de prueba se construyen desde el esquema limpio.
     tablas = ("task_state_event", "objective_state_event",
               "absence", "audit_log", "incident", "acceso_tablero",
-              "greeting_state", "message_outbox", "inbound_message")
+              "greeting_state", "message_outbox", "inbound_message"
+              ) + TABLAS_DEL_MOTOR
     con_politica = set(tablas) - {"acceso_tablero"}
     sufijo = uuid.uuid4().hex[:10]
     nombres = {"limpia": f"leda_limpia_{sufijo}",

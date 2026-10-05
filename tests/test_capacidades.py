@@ -64,6 +64,11 @@ PROMESAS_SIN_CUMPLIR = {
         "incidente (`admin_notice`). El despacho manda por chat_id, sin "
         "necesitarla; queda para auditoría o soporte (\"¿le llegó a Ariel?\"), "
         "igual que otorgado_por en platform_role.",
+    "telegram_bot_id":
+        "El bot que recibió el mensaje entrante, para que una reentrega de "
+        "Telegram entre una sola vez (migración 0031). La usa el escuchador de "
+        "`prueba_chica/` durante la Etapa 2 del Motor; la Etapa 3 la lleva a "
+        "`src/leda` o la borra.",
 }
 
 # Tablas enteras sin implementación: sus columnas tampoco se referencian, y
@@ -74,6 +79,15 @@ TABLAS_MUERTAS = ("conversation_access_log", "learning")
 # definer`, por diseño: `leda_app` no tiene ningún privilegio sobre ella.
 # Que sus columnas no aparezcan en `src/` es la señal de que eso se respeta.
 TABLAS_POR_FUNCION = ("acceso_tablero",)
+
+# El motor de conversación de la prueba chica (migraciones 0030 y 0031): durante
+# la Etapa 2 del Motor lo usa `prueba_chica/`, que vive fuera de `src/leda` a
+# propósito (`odd/tasks/prueba-chica-del-motor.md`, sección 4). La Etapa 3 las
+# lleva a `src/leda` o las borra.
+TABLAS_DE_LA_PRUEBA_CHICA = (
+    "conversation_state", "conversation_turn", "conversation_question",
+    "conversation_option", "scheduled_notice", "task_forecast",
+    "blocker_unblocker")
 
 
 def _fuente() -> str:
@@ -120,7 +134,8 @@ def test_no_hay_esquema_nuevo_sin_uso_ni_declarado():
     fuente = _fuente()
     tablas = _columnas_por_tabla()
 
-    exentas = set(TABLAS_MUERTAS) | set(TABLAS_POR_FUNCION)
+    exentas = (set(TABLAS_MUERTAS) | set(TABLAS_POR_FUNCION)
+               | set(TABLAS_DE_LA_PRUEBA_CHICA))
     sin_uso = {
         columna
         for tabla, columnas in tablas.items() if tabla not in exentas
