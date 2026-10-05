@@ -10,14 +10,24 @@ ancla; una que vuelve a la fecha comprometida (o anterior) la devuelve a V. La f
 no cambia por chat: el atraso se sigue contando contra ella y su cambio es del referente, en la
 plataforma.
 
-Cada paso de la escalera lleva el ancla en su clave (cuarta parte): un ancla nueva es una
-escalera nueva, con su propia cuenta, y un paso guardado de otra ancla ya no corresponde al
-salir. Lo comparten la escalera (`escalera.py`), los avisos (`avisos.py`) y la ficha del avance
+Cada paso de la escalera lleva su anclaje en la clave (cuarta parte): un anclaje nuevo es una
+escalera nueva, con su propia cuenta, y un paso guardado de otro anclaje ya no corresponde al
+salir. **Un anclaje es una racha de la misma fecha** (revisión del ancla, 2026-10-05): empieza
+con la previsión que llevó el ancla a esa fecha y sigue mientras las previsiones siguientes la
+dejen igual. Volver a una fecha ya usada (la comprometida, después de que su escalera empezó, o
+una previsión anterior) es un anclaje nuevo: la escalera vieja, contestada o escalada, no la
+apaga. Repetir la misma fecha no lo es. La clave del anclaje es la fecha sola mientras no hubo
+ninguna previsión que la moviera (la escalera de V de siempre), o la fecha y la previsión con que
+empezó la racha (`fecha+id`). El aviso previo es de la fecha comprometida, no de un anclaje: es
+uno solo.
+
+Lo comparten la escalera (`escalera.py`), los avisos (`avisos.py`) y la ficha del avance
 (`fichas.py`), por eso vive acá y no importa a ninguno de ellos.
 """
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import date, datetime, time
 from typing import Any
 
@@ -46,18 +56,54 @@ def prevision_vigente(cur, task_id) -> dict[str, Any] | None:
     return cur.fetchone()
 
 
+@dataclass(frozen=True)
+class Anclaje:
+    """La fecha del seguimiento y la clave de su escalera (la cuarta parte de cada paso)."""
+
+    fecha: date
+    clave: str
+
+
+SEPARADOR = "+"      # entre la fecha y la previsión que empezó el anclaje, en la clave
+
+
+def anclaje(cur, task_id, comprometida: date) -> Anclaje:
+    """El anclaje vigente: la fecha (la previsión vigente si es posterior a la comprometida; si
+    no, la comprometida) y la clave de la racha de esa fecha en la cadena de previsiones."""
+    vigente = prevision_vigente(cur, task_id)
+
+    def fecha_de(f) -> date:
+        return max(f["fecha_prevista"], comprometida) if f is not None else comprometida
+
+    fecha = fecha_de(vigente)
+    if vigente is None:
+        return Anclaje(fecha, fecha.isoformat())
+    cur.execute("select id, fecha_prevista, reemplaza_id from task_forecast where task_id = %s",
+                (str(task_id),))
+    cadena = {str(f["id"]): f for f in cur.fetchall()}
+    inicio, f = vigente, vigente
+    while f is not None and fecha_de(f) == fecha:
+        inicio = f
+        f = cadena.get(str(f["reemplaza_id"])) if f["reemplaza_id"] is not None else None
+    if f is None and fecha == comprometida:
+        return Anclaje(fecha, fecha.isoformat())    # ninguna previsión movió el ancla
+    return Anclaje(fecha, f"{fecha.isoformat()}{SEPARADOR}{inicio['id']}")
+
+
 def ancla(cur, task_id, comprometida: date) -> date:
     """La fecha del seguimiento: la previsión vigente si es posterior a la comprometida; si no,
     la comprometida."""
-    f = prevision_vigente(cur, task_id)
-    if f is not None and f["fecha_prevista"] > comprometida:
-        return f["fecha_prevista"]
-    return comprometida
+    return anclaje(cur, task_id, comprometida).fecha
+
+
+def clave_del_anclaje(aviso: dict[str, Any]) -> str:
+    """El anclaje de un paso de la escalera, que está en su clave."""
+    return aviso["dedupe_key"].split(":")[3]
 
 
 def fecha_de_la_clave(aviso: dict[str, Any]) -> date:
-    """El ancla de un paso de la escalera, que está en su clave."""
-    return date.fromisoformat(aviso["dedupe_key"].split(":")[3])
+    """La fecha del anclaje de un paso de la escalera."""
+    return date.fromisoformat(clave_del_anclaje(aviso).split(SEPARADOR)[0])
 
 
 def al_mediodia(dia: date, zona) -> datetime:
@@ -65,13 +111,17 @@ def al_mediodia(dia: date, zona) -> datetime:
     return datetime.combine(dia, time(12), zona)
 
 
-def pasos(cur, task_id, fecha: date) -> list[dict[str, Any]]:
-    """Los avisos de la escalera de la tarea para un ancla (está en su clave)."""
-    cur.execute("""select * from scheduled_notice
-                    where task_id = %s and tipo = any(%s)
-                      and split_part(dedupe_key, ':', 4) = %s
-                    order by creado_en, dedupe_key""",
-                (str(task_id), list(TIPOS_DE_LA_ESCALERA), fecha.isoformat()))
+def pasos(cur, task_id, de: Anclaje | date) -> list[dict[str, Any]]:
+    """Los avisos de la escalera de la tarea de un anclaje (está en su clave). Con una fecha,
+    los de todos los anclajes de esa fecha."""
+    if isinstance(de, Anclaje):
+        condicion, valor = "split_part(dedupe_key, ':', 4) = %s", de.clave
+    else:
+        condicion, valor = f"split_part(split_part(dedupe_key, ':', 4), '{SEPARADOR}', 1) = %s",             de.isoformat()
+    cur.execute(f"""select * from scheduled_notice
+                     where task_id = %s and tipo = any(%s) and {condicion}
+                     order by creado_en, dedupe_key""",
+                (str(task_id), list(TIPOS_DE_LA_ESCALERA), valor))
     return cur.fetchall()
 
 

@@ -45,8 +45,8 @@ from leda.incidentes import registrar_incidente
 from leda.salida import enqueue_outbox
 
 from . import preguntas
-from .ancla import (REPREGUNTA_DE_ESTADO, VENCIMIENTO_CON_PREVISION, ancla,
-                    fecha_de_la_clave)
+from .ancla import (REPREGUNTA_DE_ESTADO, VENCIMIENTO_CON_PREVISION, ancla, anclaje,
+                    clave_del_anclaje, fecha_de_la_clave)
 from .ancla import prevision_vigente as _prevision_vigente
 from .fichas import GUARDADO_SIN_ENVIAR
 from .ia import IA
@@ -171,6 +171,10 @@ def _enviar_uno(m: Momento, aviso: dict[str, Any], ia: IA) -> str:
         return "omitido"
     if ausente(cur, str(aviso["destinatario_membership_id"]), m.hoy):
         return "en_espera"          # vuelve a mirarse cuando vuelva (mecánica §9, ausencias)
+    if aviso["tipo"] == "escalamiento" and _responsable_ausente(m, aviso):
+        # La escalera no avanza durante la ausencia del responsable (mecánica §9): tampoco su
+        # escalamiento, aunque vaya a otra persona. A la vuelta lo reemplaza el reencuadre.
+        return "en_espera"
     tipo = TIPOS.get(aviso["tipo"])
     if tipo is None:
         omitir(cur, aviso_id, "tipo_sin_declarar", m.ahora)
@@ -219,6 +223,12 @@ def _enviar_uno(m: Momento, aviso: dict[str, Any], ia: IA) -> str:
                         where task_id = %s and satisfecho_en is null and escalado_en is null""",
                     (m.ahora, aviso["task_id"]))
     return "enviado"
+
+
+def _responsable_ausente(m: Momento, aviso) -> bool:
+    tarea = leer_tarea(m.cur, aviso["task_id"]) if aviso["task_id"] is not None else None
+    return tarea is not None and tarea["responsable_membership_id"] is not None and ausente(
+        m.cur, str(tarea["responsable_membership_id"]), m.hoy)
 
 
 def _pregunta_del_aviso(m: Momento, aviso, hechos: dict[str, Any]) -> dict[str, Any] | None:
@@ -460,14 +470,17 @@ def _vigencia_de_la_escalera(m: Momento, aviso) -> tuple[str | None, dict[str, A
     if base.get("necesita_respuesta") is True or aviso["tipo"] == "escalamiento":
         if espera_abierta(m.cur, tarea["id"]) is None:
             return "ya_respondio", {}
-    # El ancla (9i): un paso de la escalera de otra ancla ya no corresponde (si la persona
+    # El ancla (9i): un paso de la escalera de otro anclaje ya no corresponde (si la persona
     # contestó, el motivo es ése); el recordatorio del vencimiento, sólo mientras el ancla
-    # siga en una previsión posterior.
-    hasta = ancla(m.cur, tarea["id"], m.fecha(tarea["fecha_objetivo"]))
+    # siga en una previsión posterior; el aviso previo, mientras siga en la fecha comprometida.
+    de = anclaje(m.cur, tarea["id"], m.fecha(tarea["fecha_objetivo"]))
     if aviso["tipo"] == VENCIMIENTO_CON_PREVISION:
-        if hasta <= fecha_de_la_clave(aviso):
+        if de.fecha <= fecha_de_la_clave(aviso):
             return "volvio_a_la_fecha_comprometida", {}
-    elif hasta != fecha_de_la_clave(aviso):
+    elif aviso["tipo"] == "aviso_previo":
+        if de.fecha != fecha_de_la_clave(aviso):
+            return "hay_una_prevision_mas_nueva", {}
+    elif de.clave != clave_del_anclaje(aviso):
         return "hay_una_prevision_mas_nueva", {}
     return None, hechos_de_la_escalera(m, aviso["tipo"], tarea, base)
 

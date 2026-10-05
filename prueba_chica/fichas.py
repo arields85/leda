@@ -41,7 +41,7 @@ from leda.herramientas import (EstadoCambio, NecesitaConfirmacion, NecesitaElegi
                                NecesitaOpciones, ejecutar)
 
 from . import preguntas, situaciones
-from .ancla import (REEMPLAZADO_POR_UN_AVANCE, REPREGUNTA_DE_ESTADO, ancla, candado, escalo,
+from .ancla import (REEMPLAZADO_POR_UN_AVANCE, REPREGUNTA_DE_ESTADO, anclaje, candado, escalo,
                     pasos)
 from .ia import Jugada
 
@@ -502,8 +502,8 @@ def _informar_avance(ctx: Contexto, datos: dict, tarea: dict) -> dict:
     if fila["fecha_objetivo"] is None:      # sin vencimiento no hay escalera que vuelva a pedir
         return {**hecho, "no_vuelve_a_pedir_el_estado": {"motivo": "sin_fecha_comprometida"}}
     vence = fila["fecha_objetivo"].astimezone(cal.zona).date()
-    hasta = ancla(cur, tarea["id"], vence)      # la escalera de la previsión, si es posterior
-    escalon = pasos(cur, tarea["id"], hasta)
+    de = anclaje(cur, tarea["id"], vence)      # la escalera de la previsión, si es posterior
+    escalon = pasos(cur, tarea["id"], de)
     if escalo(escalon, espera):
         return {**hecho, "no_vuelve_a_pedir_el_estado": {
             "motivo": "ya_se_escalo", "escalado_a": _escalado_a(cur, escalon)}}
@@ -536,9 +536,9 @@ def _informar_avance(ctx: Contexto, datos: dict, tarea: dict) -> dict:
                      "avance_anterior": {"dijo": dijo, "el": hoy.isoformat()},
                      "espera_algo_cierto": list(ESPERA_ALGO_CIERTO),
                      "tarea": tarea["titulo"], "vence": vence.isoformat(),
-                     **({"seguimiento_por": "prevision"} if hasta > vence else {})},
+                     **({"seguimiento_por": "prevision"} if de.fecha > vence else {})},
                     ensure_ascii=False),
-         sale, f"motor:{REPREGUNTA_DE_ESTADO}:{tarea['id']}:{hasta.isoformat()}:0:"
+         sale, f"motor:{REPREGUNTA_DE_ESTADO}:{tarea['id']}:{de.clave}:0:"
                f"{de_la_espera}:a{veces}",
          ctx.ahora))
     hecho.update(vuelve_a_pedir_el_estado={"estado": GUARDADO_SIN_ENVIAR,

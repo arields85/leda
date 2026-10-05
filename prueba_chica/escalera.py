@@ -77,7 +77,8 @@ from leda.db import espacio
 from leda.incidentes import registrar_incidente
 
 from .ancla import (NO_DADOS, REEMPLAZADO, REPREGUNTA_DE_ESTADO, TIPOS_DE_LA_ESCALERA,
-                    VENCIMIENTO_CON_PREVISION, al_mediodia, ancla, candado, escalo, pasos)
+                    VENCIMIENTO_CON_PREVISION, Anclaje, al_mediodia, anclaje, candado, escalo,
+                    pasos)
 from .avisos import (ABIERTOS, ESPERA_DE_ESTADO, Momento, ausente, espera_abierta, guardar,
                      hechos_de_la_escalera, leer_tarea, omitir, quienes_escalan)
 from .tiempo import Reloj
@@ -103,11 +104,13 @@ HECHOS_DEL_VENCIMIENTO_CON_PREVISION = {"aviso": VENCIMIENTO_CON_PREVISION,
 POR_LA_PREVISION = {"seguimiento_por": "prevision"}
 
 
-def clave(tipo: str, task_id: str, fecha: date, *resto: Any) -> str:
-    """motor:<tipo>:<tarea>:<ancla>[:<paso, destinatario o ausencia>][:<ronda>]. El ancla es la
-    fecha del seguimiento (`ancla.py`). La ronda cuenta los reencuadres y los avances: un paso
+def clave(tipo: str, task_id: str, de: Anclaje | date, *resto: Any) -> str:
+    """motor:<tipo>:<tarea>:<anclaje>[:<paso, destinatario o ausencia>][:<ronda>]. El anclaje es
+    el del seguimiento (`ancla.py`); el aviso previo y el recordatorio del vencimiento van con
+    la fecha comprometida sola. La ronda cuenta los reencuadres y los avances: un paso
     reemplazado por uno se vuelve a guardar."""
-    return ":".join(["motor", tipo, str(task_id), fecha.isoformat(), *map(str, resto)])
+    parte = de.clave if isinstance(de, Anclaje) else de.isoformat()
+    return ":".join(["motor", tipo, str(task_id), parte, *map(str, resto)])
 
 
 def correr_escalera(conn: psycopg.Connection, workspace_id: str,
@@ -148,10 +151,11 @@ def _un_paso(m: Momento, tarea: dict[str, Any], n: int | None) -> str | None:
     if ausente(cur, persona, m.hoy):
         return None                     # pausada: no avanza mientras no está
     vence = m.fecha(tarea["fecha_objetivo"])
-    hasta = ancla(cur, tarea["id"], vence)          # V, o la previsión si es posterior
+    de = anclaje(cur, tarea["id"], vence)           # V, o la previsión si es posterior
+    hasta = de.fecha
     por = POR_LA_PREVISION if hasta > vence else {}
     k = m.cal.habiles_entre(al_mediodia(hasta, m.cal.zona), m.ahora)
-    avisos = pasos(cur, tarea["id"], hasta)
+    avisos = pasos(cur, tarea["id"], de)
     escalon = [a for a in avisos if a["tipo"] != "aviso_previo"]
     espera = espera_abierta(cur, tarea["id"])
 
@@ -171,14 +175,15 @@ def _un_paso(m: Momento, tarea: dict[str, Any], n: int | None) -> str | None:
     dias = n if n is not None else MINIMO_DEL_NUCLEO
     vuelta = _vuelta_de_una_ausencia(m, persona, _restar_habiles(m.cal, hasta, dias))
     if vuelta is not None and not any(a["dedupe_key"] == clave("reencuadre", tarea["id"],
-                                                               hasta, vuelta["id"])
+                                                               de, vuelta["id"])
                                       for a in avisos):
-        return _reencuadrar(m, tarea, hasta, k, vuelta, por)
+        return _reencuadrar(m, tarea, de, vence, k, vuelta, por)
     if any(a["estado"] == "guardado" for a in escalon):
         return None                     # el paso anterior todavía no salió
 
     if k < 0:
-        if hasta == vence and -k <= dias and not avisos:
+        if hasta == vence and -k <= dias and not avisos and not _hubo_aviso_previo(m, tarea,
+                                                                                    vence):
             return _guardar_aviso_previo(m, tarea, vence, configurado=n is not None)
         if hasta > vence and m.hoy >= vence:
             return _recordar_el_vencimiento(m, tarea, vence)
@@ -196,8 +201,8 @@ def _un_paso(m: Momento, tarea: dict[str, Any], n: int | None) -> str | None:
     ronda = [f"a{v}" for v in [sum(a["tipo"] == REPREGUNTA_DE_ESTADO for a in avisos)] if v]
     ronda += [f"r{r}" for r in [sum(a["tipo"] == "reencuadre" for a in avisos)] if r]
     if siguiente < PEDIDOS:
-        return _pedir_el_estado(m, tarea, hasta, siguiente, ronda, pedidos, por)
-    return _escalar(m, tarea, hasta, pedidos, ronda, avance, por)
+        return _pedir_el_estado(m, tarea, de, siguiente, ronda, pedidos, por)
+    return _escalar(m, tarea, de, pedidos, ronda, avance, por)
 
 
 def _ultimo_avance(escalon: list[dict[str, Any]]) -> dict[str, Any] | None:
@@ -214,7 +219,7 @@ def _paso(aviso) -> int:
     return int(aviso["dedupe_key"].split(":")[4])
 
 
-def _guardar(m: Momento, tipo: str, tarea, fecha: date, base: dict[str, Any], *resto,
+def _guardar(m: Momento, tipo: str, tarea, fecha: Anclaje | date, base: dict[str, Any], *resto,
              destinatario: str | None = None) -> str:
     hechos = hechos_de_la_escalera(m, tipo, tarea, base)
     aviso_id, _ = guardar(
@@ -237,6 +242,13 @@ def _guardar_aviso_previo(m: Momento, tarea, vence: date, *, configurado: bool) 
     return "aviso_previo"
 
 
+def _hubo_aviso_previo(m: Momento, tarea, vence: date) -> bool:
+    """El aviso previo es de la fecha comprometida, no de un anclaje: uno solo (9b)."""
+    m.cur.execute("select 1 from scheduled_notice where workspace_id = %s and dedupe_key = %s",
+                  (m.workspace_id, clave("aviso_previo", tarea["id"], vence)))
+    return m.cur.fetchone() is not None
+
+
 def _recordar_el_vencimiento(m: Momento, tarea, vence: date) -> str | None:
     """Con el ancla en una previsión, el único aviso del vencimiento (9i): uno solo, desde el día
     de V, y sólo si la escalera de V no empezó (si ya pidió el estado, la previsión llegó
@@ -252,7 +264,7 @@ def _recordar_el_vencimiento(m: Momento, tarea, vence: date) -> str | None:
     return VENCIMIENTO_CON_PREVISION
 
 
-def _pedir_el_estado(m: Momento, tarea, hasta: date, paso: int, ronda: list[str],
+def _pedir_el_estado(m: Momento, tarea, hasta: Anclaje, paso: int, ronda: list[str],
                      anteriores: list[dict[str, Any]], por: dict[str, str]) -> str:
     base = {"aviso": "pedido_de_estado", "numero": paso + 1, "necesita_respuesta": True, **por}
     if _no_llegaron(anteriores):        # que no le hable como si ya le hubiera preguntado
@@ -264,7 +276,7 @@ def _pedir_el_estado(m: Momento, tarea, hasta: date, paso: int, ronda: list[str]
     return "pedido_de_estado"
 
 
-def _escalar(m: Momento, tarea, hasta: date, pedidos: list[dict[str, Any]],
+def _escalar(m: Momento, tarea, hasta: Anclaje, pedidos: list[dict[str, Any]],
              ronda: list[str], avance: dict[str, Any] | None, por: dict[str, str]) -> str | None:
     destinos = quienes_escalan(m.cur, tarea)
     if not destinos:
@@ -293,12 +305,15 @@ def _escalar(m: Momento, tarea, hasta: date, pedidos: list[dict[str, Any]],
     return "escalamiento"
 
 
-def _reencuadrar(m: Momento, tarea, hasta: date, k: int, vuelta, por: dict[str, str]) -> str:
-    """Lo guardado que no salió durante la ausencia queda reemplazado por el reencuadre."""
+def _reencuadrar(m: Momento, tarea, hasta: Anclaje, vence: date, k: int, vuelta,
+                 por: dict[str, str]) -> str:
+    """Lo guardado que no salió durante la ausencia (de este anclaje, y el aviso previo)
+    queda reemplazado por el reencuadre."""
     m.cur.execute("""select id from scheduled_notice
                       where task_id = %s and estado = 'guardado' and tipo = any(%s)
-                        and split_part(dedupe_key, ':', 4) = %s""",
-                  (str(tarea["id"]), list(TIPOS_DE_LA_ESCALERA), hasta.isoformat()))
+                        and (split_part(dedupe_key, ':', 4) = %s or dedupe_key = %s)""",
+                  (str(tarea["id"]), list(TIPOS_DE_LA_ESCALERA), hasta.clave,
+                   clave("aviso_previo", tarea["id"], vence)))
     for fila in m.cur.fetchall():
         omitir(m.cur, str(fila["id"]), REEMPLAZADO, m.ahora)
     base = {"aviso": "vuelta_de_ausencia", "necesita_respuesta": k >= 0,

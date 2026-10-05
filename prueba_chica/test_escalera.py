@@ -360,6 +360,31 @@ def test_una_ausencia_antes_del_vencimiento_cambia_el_aviso_previo_por_el_reencu
     assert _avisos(conn, "aviso_previo") == []
 
 
+def test_un_escalamiento_guardado_espera_si_el_responsable_se_ausenta(conn, mundo, dias):
+    """Mecánica §9, ausencias: la escalera no avanza mientras la persona está ausente, tampoco
+    su escalamiento, aunque vaya a otra persona. Uno ya guardado espera; a la vuelta lo
+    reemplaza el reencuadre."""
+    for dia in (9, 13, 14):                         # los tres pedidos, sin respuesta
+        dias.ciclo(_hora(dia, 10))
+    correr_escalera(conn, mundo["id"], RelojFijo(_hora(15, 9, 5)))   # el escalamiento, guardado
+    conn.commit()
+    [guardado] = _avisos(conn, "escalamiento")
+    assert guardado["estado"] == "guardado"
+    _ausente(conn, mundo, "2026-10-15", "2026-10-15")
+
+    assert dias.ciclo(_hora(15, 10)) == []
+    assert _para(conn, mundo, "Ismael") == []
+
+    [vuelta] = dias.ciclo(_hora(16, 10))
+
+    assert vuelta["persona"] == "Marcos"
+    assert vuelta["hechos"][0]["aviso"] == "vuelta_de_ausencia"
+    [escalamiento] = _avisos(conn, "escalamiento")
+    assert (escalamiento["estado"], escalamiento["motivo_omision"]) == (
+        "omitido", "reemplazado_por_el_reencuadre")
+    assert _para(conn, mundo, "Ismael") == []
+
+
 # --- Lo que falta configurar no queda en silencio -------------------------------------------
 
 def test_sin_el_aviso_previo_configurado_usa_el_minimo_y_lo_registra(conn, mundo, dias):

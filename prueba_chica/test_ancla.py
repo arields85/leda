@@ -161,3 +161,57 @@ def test_una_prevision_que_no_pasa_la_fecha_comprometida_deja_el_ancla_en_el_ven
     assert previo["hechos"][0]["aviso"] == "vencimiento_proximo"
     [v] = _de_marcos(dias.ciclo(_hora(9, 10)))
     assert v["hechos"][0]["aviso"] == "pedido_de_estado"
+
+
+# --- Cada anclaje es una escalera nueva (revisión del ancla, 2026-10-05) ----------------------
+#
+# El ancla iba en la clave sólo por su fecha: volver a una fecha ya usada reusaba los pasos de
+# aquella escalera (contestada o escalada) y el seguimiento quedaba muerto. Ahora cada anclaje
+# (la previsión con que empieza una racha de la misma fecha) es una escalera nueva; repetir la
+# misma fecha no lo es.
+
+
+def test_volver_a_la_fecha_comprometida_despues_de_empezar_su_escalera_es_una_escalera_nueva(
+        conn, mundo, dias, escribe):
+    [v] = dias.ciclo(_hora(9, 10))                           # el pedido de V, sin respuesta
+    assert v["hechos"][0]["numero"] == 1
+    _prevision(conn, escribe, "2026-10-16", at=_hora(9, 11))  # contesta: el ancla va al 16
+    assert _de_marcos(dias.ciclo(_hora(13, 9, 30))) == []
+
+    _prevision(conn, escribe, "2026-10-09", at=_hora(13, 9, 40))   # vuelve a V, ya vencida
+
+    [otra_vez] = _de_marcos(dias.ciclo(_hora(13, 10)))
+    hechos = otra_vez["hechos"][0]
+    assert (hechos["aviso"], hechos["numero"]) == ("pedido_de_estado", 1)
+    assert "seguimiento_por" not in hechos
+    assert _cuantas(conn, "pending_reply", "satisfecho_en is null") == 1   # su propia espera
+    # Sin respuesta, sigue hasta escalar, como cualquier escalera.
+    assert dias.ciclo(_hora(14, 10))[0]["hechos"][0]["numero"] == 2
+
+
+def test_volver_a_una_prevision_ya_usada_es_una_escalera_nueva(conn, mundo, dias, escribe):
+    _prevision(conn, escribe, "2026-10-15", at=_hora(5, 11))
+    for dia in (5, 9, 13):
+        dias.ciclo(_hora(dia, 11))
+    [f] = _de_marcos(dias.ciclo(_hora(15, 10)))              # el pedido del día de la previsión
+    assert f["hechos"][0]["numero"] == 1
+    _prevision(conn, escribe, "2026-10-20", at=_hora(15, 11))  # contesta y mueve el ancla
+
+    _prevision(conn, escribe, "2026-10-15", at=_hora(16, 9, 30))  # vuelve al 15, ya pasado
+
+    [otra_vez] = _de_marcos(dias.ciclo(_hora(16, 10)))
+    hechos = otra_vez["hechos"][0]
+    assert (hechos["aviso"], hechos["numero"]) == ("pedido_de_estado", 1)
+    assert hechos["prevision_vigente"]["fecha"] == "2026-10-15"
+
+
+def test_repetir_la_misma_fecha_no_empieza_otra_escalera(conn, mundo, dias, escribe):
+    _prevision(conn, escribe, "2026-10-15", at=_hora(5, 11))
+    for dia in (5, 9, 13):
+        dias.ciclo(_hora(dia, 11))
+    dias.ciclo(_hora(15, 10))                                # el pedido del 15
+
+    _prevision(conn, escribe, "2026-10-15", at=_hora(15, 11))  # "sigo para hoy": contesta
+
+    for momento in (_hora(15, 12), _hora(16, 10), _hora(19, 10)):
+        assert _de_marcos(dias.ciclo(momento)) == []

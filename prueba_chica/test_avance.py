@@ -13,8 +13,9 @@ vence el viernes 9 de octubre de 2026 y el lunes 12 es feriado. La IA es guionad
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 
+from prueba_chica.ancla import fecha_de_la_clave
 from prueba_chica.escalera import correr_escalera
 from prueba_chica.fichas import GUARDADO_SIN_ENVIAR
 from prueba_chica.ia import IAGuionada, Jugada
@@ -302,7 +303,8 @@ def test_con_el_ancla_en_una_prevision_el_avance_vuelve_a_pedir_en_su_escalera(c
 
     assert resultado.hechos[0]["vuelve_a_pedir_el_estado"]["estado"] == GUARDADO_SIN_ENVIAR
     [repregunta] = _repreguntas(conn)
-    assert repregunta["dedupe_key"].split(":")[3] == "2026-10-15"
+    # El anclaje de la previsión del 15 (la fecha y la previsión que lo empezó, `ancla.py`).
+    assert fecha_de_la_clave(repregunta) == date(2026, 10, 15)
     [otra_vez] = dias.ciclo(_hora(16, 10))
     hechos = otra_vez["hechos"][0]
     assert hechos["aviso"] == "repregunta_de_estado"
