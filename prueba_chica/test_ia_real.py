@@ -1,0 +1,278 @@
+"""La IA real del motor: la llamada estructurada y la redacción (E2-3b).
+
+`odd/tasks/prueba-chica-del-motor.md`, sección 4 ("Un turno"); ADR 0018, decisiones 1 y 8.
+Nunca se llama a un proveedor de verdad: el HTTP es un transporte falso que guarda cada
+pedido y contesta lo preparado, como lo haría un proveedor compatible con OpenAI.
+"""
+
+from __future__ import annotations
+
+import json
+import time
+from dataclasses import dataclass
+
+import httpx
+import pytest
+
+from prueba_chica.conftest import AHORA
+from prueba_chica.fichas import FICHAS, JUGADAS
+from prueba_chica.ia import Jugada
+from prueba_chica.ia_real import (FUERA_DE_LA_LISTA, NOMBRE_HERRAMIENTA, ClienteCompatible,
+                                  IAReal, PlazoAgotado, RespuestaInvalida, desde_base)
+from prueba_chica.instrucciones import (INSTRUCCIONES_JUGADAS, INSTRUCCIONES_REDACCION,
+                                        Tono)
+from prueba_chica.tiempo import RelojFijo
+from prueba_chica.turno import SOLO_SI_PREGUNTA, procesar_turno
+
+from leda.db import admin, espacio
+
+SITUACION = {"hoy": "2026-10-20", "mensaje": "llego el 27, el proveedor se demoró",
+             "estado": None, "ultimo_aviso": {"tipo": "aviso_previo", "tarea": "T1"},
+             "tareas": [{"alias": "T1", "titulo": "Programar PLC", "estado": "en_curso",
+                         "fecha_objetivo": "2026-10-23T20:00:00+00:00"}],
+             "ultimos_turnos": [], "jugadas_posibles": sorted(JUGADAS)}
+
+
+@dataclass
+class ProveedorFalso:
+    """Un proveedor compatible con OpenAI, de mentira: contesta en orden lo preparado (un
+    dict de respuesta, una excepción de httpx o un código de error) y guarda los pedidos."""
+
+    respuestas: list
+    pedidos: list = None
+    demora: float = 0.0
+
+    def __post_init__(self) -> None:
+        self.pedidos = []
+
+    def __call__(self, pedido: httpx.Request) -> httpx.Response:
+        self.pedidos.append({"url": str(pedido.url), "cuerpo": json.loads(pedido.content),
+                             "autorizacion": pedido.headers.get("authorization")})
+        if self.demora:
+            time.sleep(self.demora)
+        respuesta = self.respuestas.pop(0)
+        if isinstance(respuesta, Exception):
+            raise respuesta
+        if isinstance(respuesta, int):
+            return httpx.Response(respuesta, json={"error": {"message": "x"}})
+        return httpx.Response(200, json=respuesta)
+
+
+def _llamada(argumentos) -> dict:
+    texto = argumentos if isinstance(argumentos, str) else json.dumps(argumentos)
+    return {"choices": [{"message": {"content": None, "tool_calls": [{
+        "id": "c1", "type": "function",
+        "function": {"name": NOMBRE_HERRAMIENTA, "arguments": texto}}]}}]}
+
+
+def _texto(texto: str | None) -> dict:
+    return {"choices": [{"message": {"content": texto}}]}
+
+
+def _ia(proveedor: ProveedorFalso, *, tono: Tono | None = None, plazo: float = 5.0) -> IAReal:
+    cliente = ClienteCompatible.crear(
+        "openai/gpt-6-sol", "clave-de-prueba", "https://proveedor.invalid/v1",
+        {"plazo_s": plazo}, transporte=httpx.MockTransport(proveedor))
+    return IAReal(cliente, tono, nombre="openrouter/openai/gpt-6-sol")
+
+
+# --- La llamada estructurada ----------------------------------------------------------------
+
+def test_la_eleccion_fuerza_la_herramienta_con_la_lista_cerrada_y_la_lee():
+    proveedor = ProveedorFalso([_llamada({"jugadas": [
+        {"nombre": "anotar_prevision", "tarea": "T1", "fecha": "2026-10-27",
+         "motivo": "el proveedor se demoró", "causa": "", "quien": None}]})])
+
+    jugadas = _ia(proveedor).elegir_jugadas(SITUACION)
+
+    # Los datos vacíos no viajan: la ficha los lee como "no lo dijo".
+    assert jugadas == [Jugada("anotar_prevision", {
+        "tarea": "T1", "fecha": "2026-10-27", "motivo": "el proveedor se demoró"})]
+    [pedido] = proveedor.pedidos
+    assert pedido["url"] == "https://proveedor.invalid/v1/chat/completions"
+    assert pedido["autorizacion"] == "Bearer clave-de-prueba"
+    cuerpo = pedido["cuerpo"]
+    assert cuerpo["model"] == "openai/gpt-6-sol"
+    assert cuerpo["tool_choice"] == {"type": "function",
+                                     "function": {"name": NOMBRE_HERRAMIENTA}}
+    [herramienta] = cuerpo["tools"]
+    esquema = herramienta["function"]["parameters"]
+    jugada = esquema["properties"]["jugadas"]["items"]
+    assert jugada["properties"]["nombre"]["enum"] == sorted(JUGADAS) + [FUERA_DE_LA_LISTA]
+    # Cada dato que alguna ficha usa está en el esquema, con su tipo.
+    for ficha in FICHAS.values():
+        for dato in ficha.necesita + ficha.opcional:
+            assert dato in jugada["properties"], dato
+    assert jugada["properties"]["depende_de_otro"]["type"] == "boolean"
+    assert jugada["properties"]["no_sabe"]["type"] == "boolean"
+    # La IA recibe sus instrucciones y la situación tal cual, como datos.
+    sistema, usuario = cuerpo["messages"]
+    assert sistema == {"role": "system", "content": INSTRUCCIONES_JUGADAS}
+    assert json.loads(usuario["content"]) == SITUACION
+
+
+def test_lo_que_no_esta_en_la_lista_llega_como_fuera_de_la_lista():
+    proveedor = ProveedorFalso([_llamada({"jugadas": [
+        {"nombre": FUERA_DE_LA_LISTA, "que_pide": "un recordatorio personal",
+         "tarea": "T1"},
+        {"nombre": "inventada", "tarea": "T1"}]})])
+
+    jugadas = _ia(proveedor).elegir_jugadas(SITUACION)
+
+    # Las dos quedan fuera de la lista: el turno no las ejecuta y avisa al administrador.
+    assert jugadas == [Jugada(FUERA_DE_LA_LISTA, {"que_pide": "un recordatorio personal"}),
+                       Jugada("inventada", {})]
+    assert not {j.nombre for j in jugadas} & set(JUGADAS)
+
+
+def test_una_lista_vacia_es_ninguna_jugada():
+    assert _ia(ProveedorFalso([_llamada({"jugadas": []})])).elegir_jugadas(SITUACION) == []
+
+
+@pytest.mark.parametrize("respuesta", [
+    _texto("Anoté la previsión."),                       # contestó en vez de elegir
+    _llamada("{no es json"),
+    _llamada({"otra_cosa": []}),
+    _llamada({"jugadas": [{"tarea": "T1"}]}),             # una jugada sin nombre
+    _llamada({"jugadas": "anotar_inicio"}),
+    {"choices": []},
+])
+def test_una_respuesta_que_no_es_la_herramienta_es_no_responder(respuesta):
+    with pytest.raises(RespuestaInvalida):
+        _ia(ProveedorFalso([respuesta])).elegir_jugadas(SITUACION)
+
+
+@pytest.mark.parametrize("falla", [httpx.ReadTimeout("tarde"), httpx.ConnectError("sin red"),
+                                   500, 429])
+def test_una_falla_del_proveedor_se_levanta_sin_reintentar_adentro(falla):
+    """El reintento es uno solo y lo hace el turno (decisión 8): el cliente no reintenta."""
+    proveedor = ProveedorFalso([falla, _llamada({"jugadas": []})])
+
+    with pytest.raises(Exception):
+        _ia(proveedor).elegir_jugadas(SITUACION)
+    assert len(proveedor.pedidos) == 1
+
+
+def test_el_plazo_acota_el_tiempo_total_de_la_llamada():
+    proveedor = ProveedorFalso([_llamada({"jugadas": []})], demora=1.0)
+    inicio = time.perf_counter()
+
+    with pytest.raises(PlazoAgotado):
+        _ia(proveedor, plazo=0.2).elegir_jugadas(SITUACION)
+    assert time.perf_counter() - inicio < 0.9
+
+
+# --- La redacción ---------------------------------------------------------------------------
+
+def test_la_redaccion_recibe_sus_instrucciones_el_tono_y_el_pedido():
+    proveedor = ProveedorFalso([_texto("  Listo, quedó anotado.  ")])
+    tono = Tono(nombre_visible="Leda", registro="vos", formalidad="profesional_cordial",
+                longitud="breve", emojis=True)
+    pedido = {"hoy": "2026-10-20", "persona": "Marcos", "mensaje": "arranqué",
+              "hechos": [{"jugada": "anotar_inicio", "resultado": "anotado"}],
+              "ultimos_turnos": []}
+
+    texto = _ia(proveedor, tono=tono).redactar(pedido)
+
+    assert texto == "Listo, quedó anotado."
+    cuerpo = proveedor.pedidos[0]["cuerpo"]
+    assert "tools" not in cuerpo and "tool_choice" not in cuerpo
+    sistema, usuario = cuerpo["messages"]
+    assert sistema["content"].startswith(INSTRUCCIONES_REDACCION)
+    for linea in ("- Trato: de vos.", "- Formalidad: profesional cordial.",
+                  "- Longitud: breve.", "- Emojis: permitidos."):
+        assert linea in sistema["content"]
+    assert json.loads(usuario["content"]) == pedido
+
+
+def test_las_instrucciones_describen_el_trabajo_y_el_marcador():
+    """Las instrucciones nombran el marcador de lo que se dice sólo si se pregunta (9g) y
+    la opción de lo que no está en la lista; nunca un nombre de modelo ni de proveedor."""
+    assert SOLO_SI_PREGUNTA in INSTRUCCIONES_REDACCION
+    assert FUERA_DE_LA_LISTA in INSTRUCCIONES_JUGADAS
+    for texto in (INSTRUCCIONES_JUGADAS, INSTRUCCIONES_REDACCION):
+        assert "gpt" not in texto.lower() and "openrouter" not in texto.lower()
+        assert "¿te sirve" not in texto.lower()
+
+
+def test_una_redaccion_vacia_se_devuelve_vacia_y_el_turno_la_toma_como_falla():
+    assert _ia(ProveedorFalso([_texto(None)])).redactar({"hechos": []}) == ""
+
+
+# --- El modelo del espacio ------------------------------------------------------------------
+
+@dataclass
+class Claves:
+    clave: str = "clave-de-prueba"
+
+    def clave_llm(self, proveedor: str) -> str:
+        return self.clave
+
+    def variable_clave_llm(self, proveedor: str) -> str:
+        return "LEDA_OPENROUTER_API_KEY"
+
+
+def _modelo(conn, proveedor: str, modelo: str, workspace_id: str | None = None,
+            parametros: dict | None = None) -> None:
+    with admin(conn) as cur:
+        cur.execute("update model_config set activo = false")
+        cur.execute(
+            """insert into model_config (ambito, workspace_id, proveedor, modelo, parametros,
+                                         activo)
+               values (%s, %s, %s, %s, %s, true)""",
+            ("espacio" if workspace_id else "global", workspace_id, proveedor, modelo,
+             json.dumps(parametros or {})))
+    conn.commit()
+
+
+def test_el_modelo_sale_de_la_configuracion_del_espacio(conn, mundo):
+    _modelo(conn, "openrouter", "openai/gpt-6-sol", parametros={"timeout_s": 30})
+    with admin(conn) as cur:
+        cur.execute("update persona_config set emojis = true where workspace_id = %s",
+                    (mundo["id"],))
+    conn.commit()
+
+    with espacio(conn, mundo["id"]) as cur:
+        ia = desde_base(cur, mundo["id"], Claves())
+
+    assert ia.nombre == "openrouter/openai/gpt-6-sol"
+    assert ia.cliente.base_url == "https://openrouter.ai/api/v1"
+    assert ia.tono.emojis is True and ia.tono.registro == "vos"
+
+
+def test_sin_clave_falla_nombrando_la_variable(conn, mundo):
+    _modelo(conn, "openrouter", "openai/gpt-6-sol")
+    with espacio(conn, mundo["id"]) as cur, pytest.raises(LookupError,
+                                                         match="LEDA_OPENROUTER_API_KEY"):
+        desde_base(cur, mundo["id"], Claves(clave=""))
+
+
+def test_un_proveedor_que_no_habla_el_protocolo_compatible_no_se_usa(conn, mundo):
+    _modelo(conn, "anthropic", "un-modelo")
+    with espacio(conn, mundo["id"]) as cur, pytest.raises(LookupError, match="compatible"):
+        desde_base(cur, mundo["id"], Claves())
+
+
+# --- De punta a punta, con el turno ---------------------------------------------------------
+
+def test_un_turno_con_la_ia_real_anota_y_redacta_desde_los_hechos(conn, mundo, escribe):
+    quien, entrante = escribe("Marcos", "llego el 13, el proveedor se demoró")
+    proveedor = ProveedorFalso([
+        _llamada({"jugadas": [{"nombre": "anotar_prevision", "tarea": "T1",
+                               "fecha": "2026-10-13", "motivo": "el proveedor se demoró"}]}),
+        _texto("Anoté que llegás el 13."),
+    ])
+
+    resultado = procesar_turno(conn, quien, entrante, _ia(proveedor), RelojFijo(AHORA))
+    conn.commit()
+
+    assert resultado.error is None and resultado.texto == "Anoté que llegás el 13."
+    assert resultado.hechos[0]["resultado"] == "anotado"
+    redaccion = json.loads(proveedor.pedidos[1]["cuerpo"]["messages"][1]["content"])
+    assert redaccion["persona"] == "Marcos" and redaccion["hoy"] == "2026-10-05"
+    assert redaccion["hechos"] == resultado.hechos
+    with admin(conn) as cur:
+        cur.execute("select fecha_prevista::text f, ia from task_forecast, conversation_turn "
+                    "where conversation_turn.sentido = 'entrada'")
+        fila = cur.fetchone()
+    assert fila == {"f": "2026-10-13", "ia": "openrouter/openai/gpt-6-sol"}

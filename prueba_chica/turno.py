@@ -90,9 +90,7 @@ def procesar_turno(conn: psycopg.Connection, quien: Solicitante, entrante_id: st
             with conn.transaction():
                 hechos = [_manejar(ctx, jugada, jugadas) for jugada in elegidas]
                 _avisar_fuera_de_la_lista(ctx, elegidas, jugadas)
-                texto = _pedir(lambda: _no_vacio(ia.redactar(
-                    {"hoy": ctx.ahora.date().isoformat(), "mensaje": ctx.texto,
-                     "hechos": hechos})))
+                texto = _pedir(lambda: _no_vacio(ia.redactar(_pedido_de_redaccion(ctx, hechos))))
         except IANoRespondio as falla:
             return _si_la_ia_falla(cur, ctx, ia, reloj, inicio, elegidas, falla)
         latencia = _ms(reloj.medir() - inicio)
@@ -124,9 +122,10 @@ def _leer(cur, quien: Solicitante, entrante_id: str, ahora: datetime) -> Context
     if entrante is None or str(entrante["app_user_id"]) != quien.app_user_id:
         raise LookupError("El mensaje no es de esta persona en este espacio.")
 
-    cur.execute("""select q.tipo, q.task_id
+    cur.execute("""select q.tipo, q.task_id, a.tipo as aviso_tipo, a.task_id as aviso_tarea
                      from conversation_state s
                      left join conversation_question q on q.id = s.pregunta_abierta_id
+                     left join scheduled_notice a on a.id = s.ultimo_aviso_id
                     where s.membership_id = %s""", (quien.membership_id,))
     estado = cur.fetchone()
 
@@ -155,14 +154,26 @@ def _leer(cur, quien: Solicitante, entrante_id: str, ahora: datetime) -> Context
 
     return Contexto(cur=cur, quien=quien, entrante_id=entrante_id,
                     chat_id=entrante["chat_id"], texto=entrante["texto"] or "", ahora=ahora,
-                    estado=_estado(estado, tareas), tareas=tareas, ultimos_turnos=ultimos)
+                    estado=_estado(estado, tareas), tareas=tareas, ultimos_turnos=ultimos,
+                    ultimo_aviso=_ultimo_aviso(estado, tareas))
+
+
+def _alias(tareas, task_id) -> str | None:
+    return next((t["alias"] for t in tareas if t["id"] == str(task_id)), None)
 
 
 def _estado(fila, tareas) -> dict[str, Any] | None:
     if fila is None or fila["tipo"] is None:
         return None
-    alias = next((t["alias"] for t in tareas if t["id"] == str(fila["task_id"])), None)
-    return {"pregunta_abierta": {"tipo": fila["tipo"], "tarea": alias}}
+    return {"pregunta_abierta": {"tipo": fila["tipo"], "tarea": _alias(tareas, fila["task_id"])}}
+
+
+def _ultimo_aviso(fila, tareas) -> dict[str, Any] | None:
+    """El último aviso que Leda le mandó y su tarea (la tarea sale del aviso, plan, sección
+    5): dice de qué tarea habla una respuesta que no la nombra."""
+    if fila is None or fila["aviso_tipo"] is None:
+        return None
+    return {"tipo": fila["aviso_tipo"], "tarea": _alias(tareas, fila["aviso_tarea"])}
 
 
 def _situacion(ctx: Contexto, jugadas: Mapping[str, Manejador]) -> dict[str, Any]:
@@ -171,10 +182,19 @@ def _situacion(ctx: Contexto, jugadas: Mapping[str, Manejador]) -> dict[str, Any
         "hoy": ctx.ahora.date().isoformat(),
         "mensaje": ctx.texto,
         "estado": ctx.estado,
+        "ultimo_aviso": ctx.ultimo_aviso,
         "tareas": [{k: v for k, v in t.items() if k != "id"} for t in ctx.tareas],
         "ultimos_turnos": list(ctx.ultimos_turnos),
         "jugadas_posibles": sorted(jugadas),
     }
+
+
+def _pedido_de_redaccion(ctx: Contexto, hechos: list[dict[str, Any]]) -> dict[str, Any]:
+    """Lo que la IA recibe para redactar: hoy, a quién le escribe, su mensaje, los hechos
+    (con lo que se dice sólo si se pregunta, `SOLO_SI_PREGUNTA`) y los últimos turnos."""
+    return {"hoy": ctx.ahora.date().isoformat(), "persona": ctx.quien.nombre,
+            "mensaje": ctx.texto, "hechos": hechos,
+            "ultimos_turnos": list(ctx.ultimos_turnos)}
 
 
 # --- (2) y (5) Los pedidos a la IA ---------------------------------------------------------

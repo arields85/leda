@@ -226,3 +226,49 @@ def test_los_turnos_llegan_a_la_ia_en_orden_aunque_tengan_la_misma_hora(conn, mu
     assert [(t["sentido"], t["texto"]) for t in ia.pedidos_de_jugadas[0]["ultimos_turnos"]] == [
         ("entrada", "hola"), ("salida", "Buen día."),
         ("entrada", "arranqué"), ("salida", "Anotado.")]
+
+
+def test_la_redaccion_recibe_hoy_la_persona_los_hechos_y_los_ultimos_turnos(conn, mundo,
+                                                                            escribe):
+    """E2-3b: la redacción recibe lo mismo que necesita para escribir sin inventar."""
+    quien, primero = escribe("Marcos", "hola")
+    procesar_turno(conn, quien, primero, IAGuionada(jugadas=[[]], redacciones=["Buen día."]),
+                   RelojFijo(AHORA))
+    conn.commit()
+    _, segundo = escribe("Marcos", "arranqué")
+    ia = IAGuionada(jugadas=[[]], redacciones=["Bien."])
+
+    procesar_turno(conn, quien, segundo, ia, RelojFijo(AHORA))
+
+    [pedido] = ia.pedidos_de_redaccion
+    assert pedido["hoy"] == "2026-10-05" and pedido["persona"] == "Marcos"
+    assert pedido["mensaje"] == "arranqué" and pedido["hechos"] == []
+    assert [(t["sentido"], t["texto"]) for t in pedido["ultimos_turnos"]] == [
+        ("entrada", "hola"), ("salida", "Buen día.")]
+
+
+def test_la_ia_sabe_de_que_tarea_fue_el_ultimo_aviso(conn, mundo, escribe):
+    """El último aviso que Leda le mandó a la persona dice de qué tarea habla una respuesta
+    que no la nombra (conversación 01, paso 2): la IA lo recibe con el alias de la tarea."""
+    quien, entrante = escribe("Marcos", "arranqué")
+    with admin(conn) as cur:
+        cur.execute(
+            """insert into scheduled_notice (workspace_id, tipo, task_id,
+                                             destinatario_membership_id, hechos,
+                                             programado_para, estado, dedupe_key, creado_en,
+                                             resuelto_en)
+               values (%s, 'aviso_previo', %s, %s, '{}', %s, 'enviado', 'k', %s, %s)
+               returning id""",
+            (mundo["id"], mundo["tarea"], quien.membership_id, AHORA, AHORA, AHORA))
+        aviso = cur.fetchone()["id"]
+        cur.execute("""insert into conversation_state (membership_id, workspace_id,
+                                                       ultimo_aviso_id, actualizado_en)
+                       values (%s, %s, %s, %s)""",
+                    (quien.membership_id, mundo["id"], aviso, AHORA))
+    conn.commit()
+    ia = IAGuionada(jugadas=[[]], redacciones=["Bien."])
+
+    procesar_turno(conn, quien, entrante, ia, RelojFijo(AHORA))
+
+    assert ia.pedidos_de_jugadas[0]["ultimo_aviso"] == {"tipo": "aviso_previo", "tarea": "T1"}
+    assert ia.pedidos_de_jugadas[0]["estado"] is None

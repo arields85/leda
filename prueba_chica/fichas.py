@@ -54,6 +54,7 @@ class Contexto:
     tareas: tuple[dict[str, Any], ...]
     ultimos_turnos: tuple[dict[str, Any], ...]
     avisos_guardados: list[str] = field(default_factory=list)
+    ultimo_aviso: dict[str, Any] | None = None     # el último que Leda le mandó, y su tarea
 
     def tarea(self, alias: str) -> dict[str, Any] | None:
         return next((t for t in self.tareas if t["alias"] == alias), None)

@@ -1,12 +1,8 @@
 """Lo que el motor de conversación le pide a la IA (ADR 0018, decisión 1).
 
-Dos pedidos por turno: elegir jugadas de la lista cerrada y redactar desde los hechos. El
-adaptador sobre un proveedor real (`leda.llm`) llega con la redacción, en la E2-3b; acá están
-el contrato y una IA guionada para las pruebas deterministas.
-
-`PENDIENTE` (sección 4 del plan): `leda.llm.Proveedor.responder` no fuerza la herramienta en
-ningún proveedor (sólo `route_intent` pasa `tool_choice`, y con la herramienta fija del
-ruteo); el adaptador tiene que forzarla, trayendo la llamada estructurada de la rama congelada.
+Dos pedidos por turno: elegir jugadas de la lista cerrada y redactar desde los hechos. Acá
+están el contrato y una IA guionada para las pruebas deterministas; la IA sobre un proveedor
+real, con la llamada estructurada que fuerza la herramienta, está en `ia_real.py` (E2-3b).
 """
 
 from __future__ import annotations
