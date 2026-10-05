@@ -382,7 +382,7 @@ def _anotar_quien_destraba(ctx: Contexto, datos: dict, tarea: dict | None) -> di
 
     integrante = None
     if quien_texto is not None:
-        coinciden = _integrantes_que_coinciden(cur, quien_texto)
+        coinciden = integrantes_que_coinciden(cur, quien_texto)
         if len(coinciden) > 1:
             return {"resultado": "falta_dato", "falta": ["integrante"],
                     "coinciden": [c["nombre"] for c in coinciden]}
@@ -406,22 +406,22 @@ def _anotar_quien_destraba(ctx: Contexto, datos: dict, tarea: dict | None) -> di
     return {**hecho, "salidas": list(SALIDAS_DE_UN_BLOQUEO)} if no_sabe else hecho
 
 
-def _palabras(texto: str) -> list[str]:
+def palabras(texto: str) -> list[str]:
     """Las palabras de un nombre, sin mayúsculas ni acentos."""
     sin_acentos = unicodedata.normalize("NFKD", texto.casefold())
     sin_acentos = "".join(c for c in sin_acentos if not unicodedata.combining(c))
     return "".join(c if c.isalnum() else " " for c in sin_acentos).split()
 
 
-def _integrantes_que_coinciden(cur, dicho: str) -> list[dict[str, Any]]:
+def integrantes_que_coinciden(cur, dicho: str) -> list[dict[str, Any]]:
     """Los integrantes del espacio cuyo nombre tiene, como palabras enteras, todas las
     palabras de lo dicho: "ismael" es Ismael Soschinski; "Mar" no es Marcos. Se compara
     acá y no con un patrón de la base, así nada de lo dicho actúa como comodín."""
-    buscadas = _palabras(dicho)
+    buscadas = palabras(dicho)
     if not buscadas:
         return []
     cur.execute("select membership_id, nombre from integrante where activo order by nombre")
-    return [f for f in cur.fetchall() if set(buscadas) <= set(_palabras(f["nombre"]))]
+    return [f for f in cur.fetchall() if set(buscadas) <= set(palabras(f["nombre"]))]
 
 
 def _consultar_pendientes(ctx: Contexto, datos: dict, tarea: dict | None) -> dict:

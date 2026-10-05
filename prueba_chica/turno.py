@@ -86,11 +86,11 @@ def procesar_turno(conn: psycopg.Connection, quien: Solicitante, entrante_id: st
         inicio = reloj.medir()
         elegidas: list[Jugada] | None = None    # None: la IA no llegó a elegir
         try:
-            elegidas = _pedir(lambda: ia.elegir_jugadas(_situacion(ctx, jugadas)))
+            elegidas = pedir_a_la_ia(lambda: ia.elegir_jugadas(_situacion(ctx, jugadas)))
             with conn.transaction():
                 hechos = [_manejar(ctx, jugada, jugadas) for jugada in elegidas]
                 _avisar_fuera_de_la_lista(ctx, elegidas, jugadas)
-                texto = _pedir(lambda: _no_vacio(ia.redactar(_pedido_de_redaccion(ctx, hechos))))
+                texto = pedir_a_la_ia(lambda: no_vacio(ia.redactar(_pedido_de_redaccion(ctx, hechos))))
         except IANoRespondio as falla:
             return _si_la_ia_falla(cur, ctx, ia, reloj, inicio, elegidas, falla)
         latencia = _ms(reloj.medir() - inicio)
@@ -139,19 +139,7 @@ def _leer(cur, quien: Solicitante, entrante_id: str, ahora: datetime) -> Context
          "fecha_objetivo": t["fecha_objetivo"].isoformat() if t["fecha_objetivo"] else None}
         for i, t in enumerate(cur.fetchall(), 1))
 
-    cur.execute("""select t.sentido, coalesce(i.texto, o.cuerpo) texto, t.jugadas,
-                          t.resultado -> 'hechos' as hechos, t.at
-                     from conversation_turn t
-                     left join inbound_message i on i.id = t.inbound_message_id
-                     left join message_outbox o on o.id = t.outbox_id
-                    where t.membership_id = %s
-                    order by t.numero desc
-                    limit %s""", (quien.membership_id, ULTIMOS_TURNOS))
-    ultimos = tuple(
-        {"sentido": t["sentido"], "texto": t["texto"], "jugadas": t["jugadas"],
-         "hechos": t["hechos"], "at": t["at"].isoformat()}
-        for t in reversed(cur.fetchall()))
-
+    ultimos = leer_ultimos_turnos(cur, quien.membership_id)
     return Contexto(cur=cur, quien=quien, entrante_id=entrante_id,
                     chat_id=entrante["chat_id"], texto=entrante["texto"] or "", ahora=ahora,
                     estado=_estado(estado, tareas), tareas=tareas, ultimos_turnos=ultimos,
@@ -160,6 +148,22 @@ def _leer(cur, quien: Solicitante, entrante_id: str, ahora: datetime) -> Context
 
 def _alias(tareas, task_id) -> str | None:
     return next((t["alias"] for t in tareas if t["id"] == str(task_id)), None)
+
+
+def leer_ultimos_turnos(cur, membership_id: str) -> tuple[dict[str, Any], ...]:
+    """Los últimos turnos de la persona, del más viejo al más nuevo, con su texto."""
+    cur.execute("""select t.sentido, coalesce(i.texto, o.cuerpo) texto, t.jugadas,
+                          t.resultado -> 'hechos' as hechos, t.at
+                     from conversation_turn t
+                     left join inbound_message i on i.id = t.inbound_message_id
+                     left join message_outbox o on o.id = t.outbox_id
+                    where t.membership_id = %s
+                    order by t.numero desc
+                    limit %s""", (membership_id, ULTIMOS_TURNOS))
+    return tuple(
+        {"sentido": t["sentido"], "texto": t["texto"], "jugadas": t["jugadas"],
+         "hechos": t["hechos"], "at": t["at"].isoformat()}
+        for t in reversed(cur.fetchall()))
 
 
 def _estado(fila, tareas) -> dict[str, Any] | None:
@@ -199,7 +203,9 @@ def _pedido_de_redaccion(ctx: Contexto, hechos: list[dict[str, Any]]) -> dict[st
 
 # --- (2) y (5) Los pedidos a la IA ---------------------------------------------------------
 
-def _pedir(pedido: Callable[[], Any]) -> Any:
+def pedir_a_la_ia(pedido: Callable[[], Any]) -> Any:
+    """El pedido, con un reintento enseguida (decisión 8); si falla dos veces,
+    `IANoRespondio`."""
     ultima: BaseException | None = None
     for _ in range(INTENTOS_DE_LA_IA):
         try:
@@ -209,7 +215,7 @@ def _pedir(pedido: Callable[[], Any]) -> Any:
     raise IANoRespondio(ultima)
 
 
-def _no_vacio(texto: str) -> str:
+def no_vacio(texto: str) -> str:
     if not isinstance(texto, str) or not texto.strip():
         raise ValueError("La IA devolvió una respuesta vacía.")
     return texto.strip()
@@ -271,13 +277,19 @@ def _responder(cur, ctx: Contexto, texto: str, ahora: datetime, ia_nombre: str |
                    dedupe_key=clave, recipient_membership_id=ctx.quien.membership_id,
                    is_response=True, scheduled_for=ahora)
     cur.execute("select id from message_outbox where dedupe_key = %s", (clave,))
-    outbox_id = cur.fetchone()["id"]
+    registrar_salida(cur, ctx.quien.workspace_id, ctx.quien.membership_id,
+                     str(cur.fetchone()["id"]), ia_nombre, ahora)
+
+
+def registrar_salida(cur, workspace_id: str, membership_id: str, outbox_id: str,
+                     ia_nombre: str | None, ahora: datetime) -> None:
+    """Un mensaje de Leda a la persona, en su registro de turnos."""
     cur.execute(
         """insert into conversation_turn (workspace_id, membership_id, sentido, outbox_id,
                                           ia, at, numero)
            values (%s, %s, 'salida', %s, %s, %s, %s)""",
-        (ctx.quien.workspace_id, ctx.quien.membership_id, outbox_id, ia_nombre, ahora,
-         _siguiente_numero(cur, ctx.quien.membership_id)))
+        (workspace_id, membership_id, outbox_id, ia_nombre, ahora,
+         _siguiente_numero(cur, membership_id)))
 
 
 def _registrar_entrada(cur, ctx: Contexto, ahora: datetime, jugadas: list[Jugada] | None,
