@@ -185,7 +185,8 @@ def test_dos_cosas_que_preguntan_van_de_a_una_en_el_orden_dicho(conn, tareas, ma
     assert r.pregunta == {"tipo": "quien_destraba", "tarea": T1, "desde_antes": False}
     assert _para_despues(conn) == [("causa_del_bloqueo", tareas["T2"])]
 
-    r = marcos.dice(Jugada("anotar_quien_destraba", {"no_sabe": True}))
+    # Con alguien que lo destraba no hay salidas que propone (que serían el tema nuevo).
+    r = marcos.dice(Jugada("anotar_quien_destraba", {"quien": "el de compras"}))
     # Cerrada la de T1, vuelve la que quedó para después: retomarla (9d).
     assert r.pregunta == {"tipo": "causa_del_bloqueo", "tarea": T2, "desde_antes": True}
     assert _abierta(conn) == ("causa_del_bloqueo", tareas["T2"]) and _para_despues(conn) == []
@@ -216,7 +217,7 @@ def test_si_lo_nuevo_tambien_pregunta_leda_sigue_a_la_persona(conn, tareas, marc
     assert _para_despues(conn) == [("causa_del_bloqueo", tareas["T1"])]
 
     r = marcos.dice(_bloqueo("T2", "falta el cable"),
-                    Jugada("anotar_quien_destraba", {"tarea": "T2", "nadie_mas": True}))
+                    Jugada("anotar_quien_destraba", {"tarea": "T2", "quien": "el de compras"}))
     # Cerrado lo nuevo, Leda vuelve a la pendiente.
     assert r.pregunta == {"tipo": "causa_del_bloqueo", "tarea": T1, "desde_antes": True}
     assert _abierta(conn) == ("causa_del_bloqueo", tareas["T1"]) and _para_despues(conn) == []

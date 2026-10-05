@@ -74,11 +74,14 @@ pasos:
     quien: Leda
     relojes: ["2026-10-21 10:00"]
     # La pregunta de quién lo destraba otra vez, el día hábil siguiente (9c, paso 2: la misma
-    # escalera de quien no contestó). El .md no le da un tipo de aviso: se espera un mensaje a
-    # Marcos sobre la tarea del PLC.
+    # escalera de quien no contestó). El .md no le da un tipo de aviso: es la repregunta de una
+    # pregunta que espera respuesta (escalera.py), con el bloqueo y su causa.
     salen:
       - a: Marcos
+        tipo: repregunta
         tarea: PLC
+        hechos: {pregunta: quien_destraba, necesita_respuesta: true,
+                 sobre: {jugada: anotar_bloqueo, causa: presente}}
     estado_despues:
       pregunta_abierta: {tipo: quien_destraba, tarea: PLC}
       esperas_abiertas: [PLC]
@@ -100,11 +103,14 @@ pasos:
       destraban: [{tarea: PLC, no_sabe: true}]
     hechos:
       - {jugada: anotar_quien_destraba, resultado: anotado,
-         quien_destraba: {no_sabe: true}, salidas: [que_alguien_ayude, anotar_prevision]}
-    pregunta: null
+         quien_destraba: {no_sabe: true}, salidas: [que_alguien_ayude, anotar_prevision],
+         pregunta: propuesta}
+    # Lo que Leda propone es la única pregunta de la respuesta, y queda como tema abierto
+    # (decisión del usuario, 2026-10-05).
+    pregunta: {tipo: propuesta, tarea: PLC, propone: [que_alguien_ayude, anotar_prevision]}
     estado_despues:
       # Tema abierto: las salidas propuestas, a la espera de lo que Marcos elija.
-      pregunta_abierta: {tarea: PLC}
+      pregunta_abierta: {tipo: propuesta, tarea: PLC}
       esperas_abiertas: []
     dice:
       - que quedó anotado que no se sabe quién lo compra

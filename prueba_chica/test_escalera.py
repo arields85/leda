@@ -243,7 +243,13 @@ def test_una_respuesta_cierra_la_espera_y_la_pregunta_y_detiene_la_escalera(conn
         dias.ciclo(_hora(dia, 10))
     assert _cuantas(conn, "scheduled_notice", "tipo in ('pedido_de_estado', 'escalamiento')") \
         == 1
-    assert _para(conn, mundo, "Ismael") in ([], ["Aviso 2."])    # sólo el de la previsión
+    # A Ismael, sólo el aviso de la previsión o, con el bloqueo, el escalamiento de la pregunta
+    # de quién lo destraba, que Marcos nunca contestó (9c, paso 4; 2026-10-05).
+    al_referente = [a["tipo"] for a in _avisos(conn) if a["estado"] == "enviado"
+                    and str(a["destinatario_membership_id"])
+                    == mundo["personas"]["Ismael"]["membership_id"]]
+    assert al_referente == {"anotar_inicio": [], "anotar_prevision": ["nueva_prevision"],
+                            "anotar_bloqueo": ["escalamiento_de_una_pregunta"]}[jugada.nombre]
 
 
 def test_un_pedido_guardado_que_ya_se_contesto_no_sale(conn, mundo, dias, escribe):
@@ -268,9 +274,14 @@ def test_un_bloqueo_abierto_detiene_la_escalera(conn, mundo, dias, escribe):
     _dice(conn, escribe, Jugada("anotar_bloqueo", {"tarea": "T1", "causa": "falta el PLC"}),
           at=_hora(5, 11))
 
+    # Ningún paso de la escalera de la tarea. Lo que sigue es la escalera de la pregunta de
+    # quién lo destraba, que espera respuesta (`test_preguntas_que_esperan.py`).
     for dia in (6, 9, 13, 14, 15):
-        assert dias.ciclo(_hora(dia, 10)) == []
-    assert _cuantas(conn, "scheduled_notice") == 0 and _espera(conn) is None
+        assert [p for p in dias.ciclo(_hora(dia, 10))
+                if p["hechos"][0]["aviso"] not in ("repregunta", "falta_de_respuesta")] == []
+    assert _cuantas(conn, "scheduled_notice",
+                    "tipo not in ('repregunta', 'escalamiento_de_una_pregunta')") == 0
+    assert _espera(conn) is None
 
 
 def test_un_aviso_guardado_de_una_tarea_que_se_bloqueo_se_omite(conn, mundo, dias, escribe):

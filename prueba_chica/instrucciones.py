@@ -35,7 +35,8 @@ cuál es; si no queda claro, no ponés ninguna y el sistema pregunta.
 - Un mensaje puede traer varias jugadas, en el orden en que la persona las dijo, o ninguna.
 - La pregunta abierta es lo que Leda espera de la persona; las que quedaron para después, \
 lo que espera más tarde. El mensaje puede contestar la abierta, hablar de otra cosa, o las \
-dos. Contestarla es la jugada que completa lo que falta. Si trae opciones y la persona elige \
+dos. Contestarla es la jugada que completa lo que falta; si trae lo que Leda le propuso \
+(propone), es la jugada propuesta que la persona elige. Si trae opciones y la persona elige \
 una, usás elegir con el alias de la opción (opcion). Si la deja sin efecto, cancelar; si la \
 deja para más tarde, dejar_para_despues.
 - Si la persona dice que algo que ya quedó anotado era de otra tarea, o que no pasó, usás \

@@ -18,7 +18,9 @@ Las jugadas de las situaciones generales (`elegir`, `corregir`, `cancelar`,
 se declaran con las demás. Cada ficha declara lo suyo para ellas: qué preguntas contesta
 (`contesta`) y cómo se deshace lo que anota (`deshacer`, para una corrección, 9f). La duda
 también es común: si a una jugada le falta la tarea, se pregunta con las tareas en que vale
-como opciones (situación general 5).
+como opciones (situación general 5). Y lo que una jugada le propone a la persona (`propone`)
+queda como tema abierto, una pregunta como cualquier otra (`preguntas.PROPUESTA`; decisión del
+usuario, 2026-10-05).
 """
 
 from __future__ import annotations
@@ -104,6 +106,9 @@ class Ficha:
     # Cómo se deshace lo que anotó, agregando hechos (9f): `None` si no hay nada que deshacer;
     # si no, los hechos de la corrección y los datos para anotarlo en la tarea correcta.
     deshacer: Callable[[Contexto, dict[str, Any]], dict[str, Any] | None] | None = None
+    # Lo que Leda le propone a la persona en sus hechos (las jugadas o salidas que puede elegir):
+    # queda como tema abierto (`preguntas.PROPUESTA`). `None`: no propone nada.
+    propone: Callable[[dict[str, Any]], list[str] | None] | None = None
 
 
 # Lo que Leda propone cuando no hay otra persona que destrabe el bloqueo (la persona no sabe
@@ -153,10 +158,12 @@ def correr(ficha: Ficha, ctx: Contexto, jugada: Jugada) -> dict[str, Any]:
                     return _hecho(ficha, "no_se_puede", motivo="estado",
                                   tarea=_tarea(tarea), estado=tarea["estado"])
             hecho = {"jugada": ficha.nombre, **ficha.manejar(ctx, datos, tarea)}
+            de_la_tarea = tarea or ctx.tarea((hecho.get("tarea") or {}).get("alias", ""))
             if hecho.get("resultado") == "anotado" and hecho["jugada"] == ficha.nombre:
-                anotada = tarea or ctx.tarea((hecho.get("tarea") or {}).get("alias", ""))
-                if anotada is not None:
-                    preguntas.contestar(ctx, ficha.nombre, ficha.contesta, anotada["id"])
+                if de_la_tarea is not None:
+                    preguntas.contestar(ctx, ficha.nombre, ficha.contesta, de_la_tarea["id"])
+            if hecho["jugada"] == ficha.nombre:
+                _proponer(ficha, ctx, hecho, de_la_tarea)
             return hecho
     except Exception as e:      # el punto de guardado ya deshizo lo de esta jugada
         rechazo = _rechazo_del_dominio(e)
@@ -166,6 +173,19 @@ def correr(ficha: Ficha, ctx: Contexto, jugada: Jugada) -> dict[str, Any]:
         return _hecho(ficha, resultado, tarea=_tarea(tarea) if tarea else None, **mas)
 
 
+def _proponer(ficha: Ficha, ctx: Contexto, hecho: dict[str, Any],
+              tarea: dict[str, Any] | None) -> None:
+    """Lo que la jugada le propone a la persona queda como tema abierto: una pregunta con lo
+    propuesto, ordenada con las demás (un tema a la vez). Los hechos la nombran como a
+    cualquier pregunta (`pregunta` o `pregunta_para_despues`)."""
+    propuesto = ficha.propone(hecho) if ficha.propone is not None else None
+    if not propuesto:
+        return
+    ahora = preguntas.abrir(ctx, preguntas.PROPUESTA, tarea["id"] if tarea else None,
+                            jugada={"nombre": ficha.nombre, "propone": list(propuesto)})
+    hecho[_clave_de_pregunta(ahora)] = preguntas.PROPUESTA
+
+
 def _duda(ficha: Ficha, ctx: Contexto, datos: dict[str, Any]) -> dict[str, Any]:
     """Situación general 5: la jugada no dice de qué tarea habla. Leda no adivina: pregunta
     con las tareas de la persona en que la jugada vale como opciones, y la jugada espera la
@@ -173,7 +193,7 @@ def _duda(ficha: Ficha, ctx: Contexto, datos: dict[str, Any]) -> dict[str, Any]:
     candidatas = [t for t in ctx.tareas if t["estado"] in ficha.estados]
     if not candidatas:
         return _hecho(ficha, "no_se_puede", motivo="ninguna_tarea_posible")
-    ahora = preguntas.abrir(ctx, preguntas.CUAL_TAREA, None, se_puede_dejar=True,
+    ahora = preguntas.abrir(ctx, preguntas.CUAL_TAREA, None,
                             jugada={"nombre": ficha.nombre, "datos": datos},
                             opciones_de_tareas=candidatas)
     return _hecho(ficha, "falta_dato", falta=["tarea"],
@@ -236,12 +256,11 @@ def _cerrar_esperas(ctx: Contexto, task_id: str) -> None:
         (ctx.ahora, ctx.quien.membership_id, task_id))
 
 
-def _abrir_pregunta(ctx: Contexto, tipo: str, task_id: str, *, se_puede_dejar: bool,
-                    jugada: dict[str, Any]) -> str:
-    """Una pregunta de Leda, ordenada con las demás (`preguntas.abrir`: nunca dos juntas, 9d).
-    Devuelve la clave con que el hecho la nombra (`_clave_de_pregunta`)."""
-    return _clave_de_pregunta(preguntas.abrir(ctx, tipo, task_id,
-                                              se_puede_dejar=se_puede_dejar, jugada=jugada))
+def _abrir_pregunta(ctx: Contexto, tipo: str, task_id: str, *, jugada: dict[str, Any]) -> str:
+    """Una pregunta de Leda, ordenada con las demás (`preguntas.abrir`: nunca dos juntas, 9d);
+    si su tipo espera respuesta, con su espera. Devuelve la clave con que el hecho la nombra
+    (`_clave_de_pregunta`)."""
+    return _clave_de_pregunta(preguntas.abrir(ctx, tipo, task_id, jugada=jugada))
 
 
 def referente(cur, responsable_membership_id: str) -> dict[str, str] | None:
@@ -355,10 +374,9 @@ def _anotar_bloqueo(ctx: Contexto, datos: dict, tarea: dict) -> dict:
     jugada = {"nombre": "anotar_bloqueo", "datos": datos}
     if _vacio(datos.get("causa")):
         # Sin causa no hay bloqueo (mecánica §3): se pregunta y no se anota nada (9c, 1).
-        clave = _abrir_pregunta(ctx, "causa_del_bloqueo", tarea["id"], se_puede_dejar=True,
-                                jugada=jugada)
+        clave = _abrir_pregunta(ctx, preguntas.CAUSA_DEL_BLOQUEO, tarea["id"], jugada=jugada)
         return {"resultado": "falta_dato", "falta": ["causa"], "tarea": _tarea(tarea),
-                clave: "causa_del_bloqueo"}
+                clave: preguntas.CAUSA_DEL_BLOQUEO}
     causa = str(datos["causa"]).strip()
     r = ejecutar(ctx.cur, ctx.quien, "registrar_bloqueo",
                  {"tarea_id": tarea["id"], "causa": causa}, ya_confirmada=True)
@@ -366,14 +384,14 @@ def _anotar_bloqueo(ctx: Contexto, datos: dict, tarea: dict) -> dict:
         return _no_hecho(r, tarea)
     _cerrar_esperas(ctx, tarea["id"])
     # La causa contesta su pregunta antes de que se abra la siguiente.
-    preguntas.contestar(ctx, "anotar_bloqueo", ("causa_del_bloqueo",), tarea["id"])
-    # Todo bloqueo con causa: quién lo puede destrabar, una pregunta que espera como un pedido
-    # de estado. Lo decide la respuesta de la persona, no un juicio de la IA sobre la causa
-    # (9c, corregida el 2026-10-05).
-    clave = _abrir_pregunta(ctx, "quien_destraba", tarea["id"], se_puede_dejar=False,
+    preguntas.contestar(ctx, "anotar_bloqueo", (preguntas.CAUSA_DEL_BLOQUEO,), tarea["id"])
+    # Todo bloqueo con causa: quién lo puede destrabar, una pregunta que espera respuesta (su
+    # ficha de pregunta lo dice: abre su espera y la escalera la repite). Lo decide la respuesta
+    # de la persona, no un juicio de la IA sobre la causa (9c, corregida el 2026-10-05).
+    clave = _abrir_pregunta(ctx, preguntas.QUIEN_DESTRABA, tarea["id"],
                             jugada={**jugada, "bloqueo_id": r["bloqueo_id"]})
     return {"resultado": "anotado", "tarea": _tarea(tarea), "causa": causa,
-            clave: "quien_destraba"}
+            clave: preguntas.QUIEN_DESTRABA}
 
 
 def _anotar_quien_destraba(ctx: Contexto, datos: dict, tarea: dict | None) -> dict:
@@ -546,7 +564,6 @@ def _informar_avance(ctx: Contexto, datos: dict, tarea: dict) -> dict:
                  veces_sin_algo_cierto=veces)
     if veces > 1:
         clave = _abrir_pregunta(ctx, preguntas.FECHA_DE_LA_TAREA, tarea["id"],
-                                se_puede_dejar=False,
                                 jugada={"nombre": "informar_avance", "datos": datos})
         hecho[clave] = preguntas.FECHA_DE_LA_TAREA
     return hecho
@@ -781,9 +798,10 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
           hace="anota quién destraba: un integrante, alguien de afuera, que no se sabe o "
                "que le toca a la persona misma",
           despues="cierra la pregunta y la espera; si no se sabe o le toca a ella, propone "
-                  "salidas",
+                  "salidas, que quedan como tema abierto",
           manejar=_anotar_quien_destraba,
-          contesta=("quien_destraba", preguntas.ESTADO_DE_LA_TAREA)),
+          contesta=(preguntas.QUIEN_DESTRABA, preguntas.ESTADO_DE_LA_TAREA),
+          propone=lambda hecho: hecho.get("salidas")),
     Ficha("informar_avance", "anotar cómo viene una tarea cuando la persona cuenta un avance "
                              "sin un hecho cierto",
           necesita=("tarea",), opcional=("palabras",),
@@ -808,9 +826,10 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
     Ficha("pedir_reasignacion", "pasarle una tarea a otra persona",
           necesita=(), opcional=("tarea", "a"),
           comprueba="nada", hace="nada: cambiar el responsable no es por chat (9g)",
-          despues="dice quién lo decide y ofrece una nueva previsión; sin aviso al "
-                  "administrador",
-          manejar=_pedir_reasignacion, se_ofrece=False),
+          despues="dice quién lo decide y ofrece una nueva previsión, que queda como tema "
+                  "abierto; sin aviso al administrador",
+          manejar=_pedir_reasignacion, se_ofrece=False,
+          propone=lambda hecho: [hecho["alternativa"]] if hecho.get("alternativa") else None),
     # Las situaciones generales (`situaciones.py`): valen igual para todas las fichas.
     Ficha("elegir", "elegir una de las opciones de la pregunta abierta",
           necesita=("opcion",), opcional=(),

@@ -57,6 +57,17 @@ lugar del paso que le tocaba recibe un reencuadre (mecánica §9), que reemplaza
 desde V pide el estado, como un pedido; antes de V, no pide nada. Después, la escalera retoma
 desde donde quedó.
 
+**Una pregunta que espera respuesta** (su ficha de pregunta lo dice, `preguntas.TIPOS`; la de
+quién destraba un bloqueo, 9c; decisión del usuario, 2026-10-05) tiene la misma escalera de quien
+no contestó, contada desde el día en que se hizo, que es su primer pedido: sin respuesta, el día
+hábil siguiente Leda la repite (`repregunta`, con lo que se había anotado), al otro la repite
+avisando a quién se va a escalar, y al siguiente escala por la ruta de falta de respuesta
+(`escalamiento_de_una_pregunta`). Un paso por día hábil; termina al escalar o cuando llega la
+respuesta (la pregunta se cierra o su espera se contesta). La del estado de la tarea y la de su
+fecha esperan con el pedido de estado: las repite la escalera de la tarea, no ésta. Una espera
+cuya pregunta se cerró sin contestarse (una corrección la dejó sin efecto) ya no espera nada y
+se cierra. Una ausencia la pausa, como a la de la tarea.
+
 **Sin `aviso_previo_dias_habiles`** (el plan lo dejó `PENDIENTE`): se usa el mínimo del núcleo,
 un día hábil (mecánica §9), y cada aviso previo que sale con él deja un incidente de severidad
 baja para el administrador: nunca en silencio, y sin escribir la configuración por su cuenta.
@@ -79,8 +90,9 @@ from leda.incidentes import registrar_incidente
 from .ancla import (NO_DADOS, REEMPLAZADO, REPREGUNTA_DE_ESTADO, TIPOS_DE_LA_ESCALERA,
                     VENCIMIENTO_CON_PREVISION, Anclaje, al_mediodia, anclaje, candado, escalo,
                     pasos)
-from .avisos import (ABIERTOS, ESPERA_DE_ESTADO, Momento, ausente, espera_abierta, guardar,
-                     hechos_de_la_escalera, leer_tarea, omitir, quienes_escalan)
+from .avisos import (ABIERTOS, ESCALAMIENTO_DE_UNA_PREGUNTA, ESPERA_DE_ESTADO, REPREGUNTA,
+                     Momento, ausente, espera_abierta, guardar, hechos_de_la_escalera,
+                     hechos_de_una_pregunta, leer_tarea, omitir, quienes_escalan)
 from .tiempo import Reloj
 
 ETAPA_ESCALERA = "motor_escalera"
@@ -128,6 +140,16 @@ def correr_escalera(conn: psycopg.Connection, workspace_id: str,
                         order by t.fecha_objetivo, t.titulo""", (list(ABIERTOS),))
         for fila in cur.fetchall():
             guardado = _un_paso(m, leer_tarea(cur, fila["id"]), n)
+            if guardado:
+                resumen[guardado] += 1
+        # Las preguntas que esperan respuesta con su propia espera (la del estado es de la
+        # escalera de la tarea, arriba).
+        cur.execute("""select * from pending_reply
+                        where tipo <> %s and task_id is not null
+                          and satisfecho_en is null and escalado_en is null
+                        order by preguntado_en""", (ESPERA_DE_ESTADO,))
+        for espera in cur.fetchall():
+            guardado = _un_paso_de_una_pregunta(m, espera)
             if guardado:
                 resumen[guardado] += 1
     return dict(resumen)
@@ -340,6 +362,102 @@ def _abrir_la_espera(m: Momento, tarea) -> None:
            values (%s, %s, %s, %s, %s, %s)""",
         (m.workspace_id, str(tarea["responsable_membership_id"]), str(tarea["id"]),
          ESPERA_DE_ESTADO, sale, m.cal.dentro_de_jornada(m.cal.sumar_habiles(sale, 1))))
+
+
+# --- La escalera de una pregunta que espera respuesta -------------------------------------------
+
+def _un_paso_de_una_pregunta(m: Momento, espera: dict[str, Any]) -> str | None:
+    """El paso que toca de la escalera de una pregunta: desde el día en que se hizo (el pedido
+    0, en la respuesta), una repregunta por día hábil hasta la que avisa que va a escalar, y
+    después el escalamiento. Sólo con la espera abierta y la pregunta sin cerrar."""
+    cur = m.cur
+    task_id, persona = str(espera["task_id"]), str(espera["membership_id"])
+    if not candado(cur, task_id, esperar=False):
+        return None                     # un turno la tiene tomada: la vuelta siguiente
+    if ausente(cur, persona, m.hoy):
+        return None                     # pausada: no avanza mientras no está
+    cur.execute("""select * from conversation_question
+                    where membership_id = %s and task_id = %s and tipo = %s
+                      and cerrada_en is null
+                    order by abierta_en desc limit 1""", (persona, task_id, espera["tipo"]))
+    pregunta = cur.fetchone()
+    if pregunta is None:
+        # Se cerró sin contestarse (una corrección la dejó sin efecto): ya no espera nada.
+        cur.execute("update pending_reply set satisfecho_en = %s where id = %s",
+                    (m.ahora, espera["id"]))
+        return None
+    tarea = leer_tarea(cur, task_id)
+    if tarea is None or tarea["estado"] in ("terminada", "cancelada"):
+        return None
+    de = f"q{pregunta['id']}"
+    cur.execute("""select * from scheduled_notice
+                    where task_id = %s and tipo = any(%s)
+                      and split_part(dedupe_key, ':', 4) = %s
+                    order by creado_en, dedupe_key""",
+                (task_id, [REPREGUNTA, ESCALAMIENTO_DE_UNA_PREGUNTA], de))
+    escalon = cur.fetchall()
+    if any(a["estado"] == "guardado" for a in escalon):
+        return None                     # el paso anterior todavía no salió
+    if any(a["tipo"] == ESCALAMIENTO_DE_UNA_PREGUNTA for a in escalon):
+        return None                     # terminó al escalar
+    if any(a["estado"] == "omitido" and a["motivo_omision"] in DETIENEN for a in escalon):
+        return None                     # contestó antes de que saliera
+    dados = sorted(escalon, key=lambda a: a["resuelto_en"])
+    siguiente = 1 + len(dados)          # el pedido 0 es la pregunta misma
+    if siguiente > PEDIDOS or m.cal.habiles_entre(espera["preguntado_en"], m.ahora) < siguiente:
+        return None
+    if dados and m.cal.habiles_entre(dados[-1]["resuelto_en"], m.ahora) < 1:
+        return None                     # nunca dos pasos el mismo día hábil
+    sobre = _lo_anotado(pregunta)
+    if siguiente < PEDIDOS:
+        base = {"aviso": REPREGUNTA, "pregunta": pregunta["tipo"], "numero": siguiente + 1,
+                "necesita_respuesta": True, **({"sobre": sobre} if sobre else {})}
+        if _no_llegaron(dados):
+            base["pedidos_anteriores_que_no_le_llegaron"] = _no_llegaron(dados)
+        if siguiente == PEDIDOS - 1:
+            base["avisa_que_va_a_escalar"] = True
+        _guardar_de_una_pregunta(m, REPREGUNTA, tarea, base, de, siguiente)
+        return REPREGUNTA
+    destinos = quienes_escalan(cur, tarea)
+    if not destinos:
+        registrar_incidente(
+            cur, m.workspace_id,
+            "La escalera de una pregunta del motor tenía que escalar por falta de respuesta y "
+            "el espacio no tiene una ruta `falta_persistente_de_respuesta` con alguien que no "
+            "sea el responsable: no se escaló a nadie.", severidad="media", etapa=ETAPA_ESCALERA)
+        cur.execute("update pending_reply set escalado_en = %s where id = %s",
+                    (m.ahora, espera["id"]))
+        return None
+    base = {"aviso": "falta_de_respuesta", "pregunta": pregunta["tipo"],
+            "necesita_respuesta": False, "preguntas_sin_respuesta": siguiente,
+            "preguntado_el": m.fecha(espera["preguntado_en"]).isoformat(),
+            **({"sobre": sobre} if sobre else {})}
+    for destino in destinos:
+        _guardar_de_una_pregunta(m, ESCALAMIENTO_DE_UNA_PREGUNTA, tarea, base, de,
+                                 destino["membership_id"],
+                                 destinatario=str(destino["membership_id"]))
+    return ESCALAMIENTO_DE_UNA_PREGUNTA
+
+
+def _lo_anotado(pregunta: dict[str, Any]) -> dict[str, Any]:
+    """Lo que se había anotado cuando Leda hizo la pregunta (la jugada y sus datos, sin la
+    tarea ni ids): lo que la repregunta recuerda."""
+    jugada = pregunta["jugada"] or {}
+    if not jugada.get("nombre"):
+        return {}
+    datos = {k: v for k, v in (jugada.get("datos") or {}).items() if k != "tarea"}
+    return {"jugada": jugada["nombre"], **datos}
+
+
+def _guardar_de_una_pregunta(m: Momento, tipo: str, tarea, base: dict[str, Any], de: str,
+                             *resto, destinatario: str | None = None) -> str:
+    aviso_id, _ = guardar(
+        m.cur, m.workspace_id, tipo, task_id=str(tarea["id"]),
+        destinatario=destinatario or str(tarea["responsable_membership_id"]),
+        hechos={**base, **hechos_de_una_pregunta(m, tarea, base)},
+        programado_para=m.cal.dentro_de_jornada(m.ahora),
+        clave=":".join(["motor", tipo, str(tarea["id"]), de, *map(str, resto)]), ahora=m.ahora)
+    return aviso_id
 
 
 def _vuelta_de_una_ausencia(m: Momento, persona: str, inicio: date) -> dict[str, Any] | None:

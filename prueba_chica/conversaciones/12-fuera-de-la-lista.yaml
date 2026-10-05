@@ -46,11 +46,13 @@ pasos:
     efectos: {}
     hechos:
       - {jugada: pedir_reasignacion, resultado: no_por_chat, quien_decide: Ismael Soschinski,
-         alternativa: anotar_prevision, tarea: PLC}
-    pregunta: null
+         alternativa: anotar_prevision, tarea: PLC, pregunta: propuesta}
+    # Lo ofrecido es la única pregunta de la respuesta, y queda como tema abierto (decisión
+    # del usuario, 2026-10-05).
+    pregunta: {tipo: propuesta, tarea: PLC, propone: [anotar_prevision]}
     estado_despues:
       # Tema abierto: la nueva previsión ofrecida, a la espera de lo que Marcos diga.
-      pregunta_abierta: {tarea: PLC}
+      pregunta_abierta: {tipo: propuesta, tarea: PLC}
     dice:
       - que eso no lo puede hacer
       - que lo decide Ismael
@@ -71,7 +73,7 @@ pasos:
       - {nombre: anotar_inicio, tarea: PLC}
     efectos: {}
     hechos:
-      - {jugada: cancelar}
+      - {jugada: cancelar, resultado: cancelado}
       - {jugada: anotar_inicio, resultado: no_se_puede, motivo: estado, estado: en_curso}
     pregunta: null
     estado_despues:

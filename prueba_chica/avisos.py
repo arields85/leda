@@ -65,6 +65,11 @@ ETAPA_AVISO_GUARDADO = "motor_aviso_guardado"
 # y la pregunta que la acompaña.
 ESPERA_DE_ESTADO = preguntas.ESTADO_DE_LA_TAREA
 
+# La escalera de una pregunta que espera respuesta (`escalera.py`): la pregunta otra vez y,
+# agotada sin respuesta, el escalamiento. La clave nombra la pregunta (`q<id>`).
+REPREGUNTA = "repregunta"
+ESCALAMIENTO_DE_UNA_PREGUNTA = "escalamiento_de_una_pregunta"
+
 ABIERTOS = ("asignada", "en_curso")     # en la escalera: comprometida, sin entregar
 ENVIADO = "enviado"                     # el estado de un aviso que ya salió, en un hecho
 NO_SALIO = "no_salio"                   # un aviso que quedó fallido
@@ -171,14 +176,14 @@ def _enviar_uno(m: Momento, aviso: dict[str, Any], ia: IA) -> str:
         return "omitido"
     if ausente(cur, str(aviso["destinatario_membership_id"]), m.hoy):
         return "en_espera"          # vuelve a mirarse cuando vuelva (mecánica §9, ausencias)
-    if aviso["tipo"] == "escalamiento" and _responsable_ausente(m, aviso):
-        # La escalera no avanza durante la ausencia del responsable (mecánica §9): tampoco su
-        # escalamiento, aunque vaya a otra persona. A la vuelta lo reemplaza el reencuadre.
-        return "en_espera"
     tipo = TIPOS.get(aviso["tipo"])
     if tipo is None:
         omitir(cur, aviso_id, "tipo_sin_declarar", m.ahora)
         return "omitido"
+    if tipo.escala and _responsable_ausente(m, aviso):
+        # La escalera no avanza durante la ausencia del responsable (mecánica §9): tampoco su
+        # escalamiento, aunque vaya a otra persona. A la vuelta lo reemplaza el reencuadre.
+        return "en_espera"
     motivo, hechos = tipo.vigente(m, aviso)
     if motivo is not None:
         omitir(cur, aviso_id, motivo, m.ahora)
@@ -217,12 +222,20 @@ def _enviar_uno(m: Momento, aviso: dict[str, Any], ia: IA) -> str:
                   actualizado_en = excluded.actualizado_en""",
         (persona, m.workspace_id, aviso_id, m.ahora))
     if pregunta is not None:
-        _abrir_la_pregunta(m, persona, str(aviso["task_id"]), aviso["tipo"])
+        _abrir_la_pregunta(m, persona, aviso)
     if tipo.escala:
+        # La espera que escala: la de su pregunta, o la del estado de la tarea.
         cur.execute("""update pending_reply set escalado_en = %s
-                        where task_id = %s and satisfecho_en is null and escalado_en is null""",
-                    (m.ahora, aviso["task_id"]))
+                        where task_id = %s and tipo = %s
+                          and satisfecho_en is null and escalado_en is null""",
+                    (m.ahora, aviso["task_id"], _espera_del_aviso(hechos)))
     return "enviado"
+
+
+def _espera_del_aviso(hechos: dict[str, Any]) -> str:
+    """El tipo de la espera de un aviso: la de la pregunta que lleva, o la del estado."""
+    tipo = preguntas.TIPOS.get(hechos.get("pregunta") or "")
+    return tipo.espera if tipo is not None and tipo.espera else ESPERA_DE_ESTADO
 
 
 def _responsable_ausente(m: Momento, aviso) -> bool:
@@ -236,31 +249,46 @@ def _pregunta_del_aviso(m: Momento, aviso, hechos: dict[str, Any]) -> dict[str, 
     se hace en él (la misma regla que en una respuesta)."""
     if hechos.get("necesita_respuesta") is not True or aviso["task_id"] is None:
         return None
-    return {"tipo": ESPERA_DE_ESTADO, "tarea": {"titulo": hechos.get("tarea")},
-            "desde_antes": False}
+    return {"tipo": hechos.get("pregunta") or ESPERA_DE_ESTADO,
+            "tarea": {"titulo": hechos.get("tarea")}, "desde_antes": False}
 
 
-def _abrir_la_pregunta(m: Momento, persona: str, task_id: str, tipo_de_aviso: str) -> None:
-    """La pregunta del estado, ordenada con las demás de la persona (`preguntas.abrir`; la
-    misma si sigue abierta de un recordatorio anterior), y el recordatorio contado en la
-    espera. No se puede dejar sin efecto: espera respuesta (9b). Reemplaza a la pregunta de la
-    fecha de la misma tarea, si quedó sin contestar: es el mismo pedido, hecho de nuevo, y un
-    tema a la vez."""
+def _abrir_la_pregunta(m: Momento, persona: str, aviso: dict[str, Any]) -> None:
+    """La pregunta del aviso, ordenada con las demás de la persona, y el recordatorio contado
+    en su espera. Un pedido de estado abre la pregunta del estado (`preguntas.abrir`; la misma
+    si sigue abierta de un recordatorio anterior), que no se puede dejar sin efecto (9b), y
+    reemplaza a la pregunta de la fecha de la misma tarea, si quedó sin contestar: es el mismo
+    pedido, hecho de nuevo, y un tema a la vez. La repregunta de una pregunta que espera
+    respuesta la vuelve a hacer: es la abierta (`preguntas.retomar`)."""
+    task_id, tipo_de_aviso = str(aviso["task_id"]), aviso["tipo"]
     turno = SimpleNamespace(cur=m.cur, ahora=m.ahora, preguntas_del_turno=[], dejadas=[],
                             quien=SimpleNamespace(workspace_id=m.workspace_id,
                                                   membership_id=persona))
-    preguntas.cerrar_de_tipo(turno, preguntas.FECHA_DE_LA_TAREA, task_id, "sin_efecto",
-                             {"reemplazada_por": tipo_de_aviso})
-    preguntas.abrir(turno, ESPERA_DE_ESTADO, task_id, se_puede_dejar=False,
-                    jugada={"aviso": tipo_de_aviso})
+    if tipo_de_aviso == REPREGUNTA:
+        pregunta = pregunta_del_aviso(m.cur, aviso)
+        preguntas.retomar(turno, str(pregunta["id"]))
+        espera = preguntas.TIPOS[pregunta["tipo"]].espera
+    else:
+        preguntas.cerrar_de_tipo(turno, preguntas.FECHA_DE_LA_TAREA, task_id, "sin_efecto",
+                                 {"reemplazada_por": tipo_de_aviso})
+        preguntas.abrir(turno, ESPERA_DE_ESTADO, task_id, jugada={"aviso": tipo_de_aviso})
+        espera = ESPERA_DE_ESTADO
     # Sólo en la espera de esta escalera, la más nueva: una escalada de un vencimiento anterior
     # ya terminó (`escalera._abrir_la_espera`).
     m.cur.execute("""update pending_reply set recordatorios = recordatorios + 1
                       where id = (select id from pending_reply
-                                   where task_id = %s and membership_id = %s
+                                   where task_id = %s and membership_id = %s and tipo = %s
                                      and satisfecho_en is null
                                    order by preguntado_en desc limit 1)""",
-                  (task_id, persona))
+                  (task_id, persona, espera))
+
+
+def pregunta_del_aviso(cur, aviso: dict[str, Any]) -> dict[str, Any] | None:
+    """La pregunta que repite o escala un aviso de la escalera de una pregunta: su clave la
+    nombra (`motor:<tipo>:<tarea>:q<pregunta>:...`)."""
+    cur.execute("select * from conversation_question where id = %s",
+                (aviso["dedupe_key"].split(":")[3][1:],))
+    return cur.fetchone()
 
 
 def _si_la_ia_no_redacta(m: Momento, aviso, destinatario, falla: Exception) -> str:
@@ -330,6 +358,19 @@ def leer_tarea(cur, task_id) -> dict[str, Any] | None:
                           exists (select 1 from blocker b
                                    where b.task_id = t.id and b.resuelto_en is null) bloqueada
                      from task t where t.id = %s""", (str(task_id),))
+    return cur.fetchone()
+
+
+def espera_de_la_pregunta(cur, pregunta: dict[str, Any]) -> dict[str, Any] | None:
+    """La espera abierta de una pregunta que espera respuesta, si sigue sin contestar."""
+    espera = preguntas.TIPOS[pregunta["tipo"]].espera
+    if espera is None or pregunta["task_id"] is None:
+        return None
+    cur.execute("""select * from pending_reply
+                    where membership_id = %s and task_id = %s and tipo = %s
+                      and satisfecho_en is null
+                    order by preguntado_en desc limit 1""",
+                (str(pregunta["membership_id"]), str(pregunta["task_id"]), espera))
     return cur.fetchone()
 
 
@@ -485,6 +526,47 @@ def _vigencia_de_la_escalera(m: Momento, aviso) -> tuple[str | None, dict[str, A
     return None, hechos_de_la_escalera(m, aviso["tipo"], tarea, base)
 
 
+# --- Los avisos de la escalera de una pregunta ---------------------------------------------------
+#
+# Una pregunta que espera respuesta y no la tuvo (`escalera.py`): Leda la repite, con lo que se
+# había anotado y la pregunta, y al final escala. Ya no corresponden si la pregunta se cerró o
+# su espera se contestó, o si la tarea se cerró o cambió de responsable.
+
+def hechos_de_una_pregunta(m: Momento, tarea: dict[str, Any],
+                           base: dict[str, Any]) -> dict[str, Any]:
+    """Lo fijo de `base` (qué aviso es, la pregunta, el número, lo que se había anotado) y lo
+    de este momento: la tarea y, en la última repregunta, a quién se escala."""
+    hechos = {k: v for k, v in base.items()
+              if k not in _DE_ESTE_MOMENTO and k != AVISA_QUE_VA_A_ESCALAR}
+    hechos["tarea"] = tarea["titulo"]
+    if tarea.get("bloqueada"):
+        hechos["estado"] = "bloqueada"
+    if base.get(AVISA_QUE_VA_A_ESCALAR):
+        a_quienes = [d["nombre"] for d in quienes_escalan(m.cur, tarea)]
+        if a_quienes:       # un efecto que pasa después: todavía no, y a quién
+            hechos["si_no_hay_respuesta"] = {"se_avisa_a": a_quienes, "estado": "todavia_no"}
+    if base.get("aviso") == "falta_de_respuesta":
+        responsable = integrante(m.cur, tarea["responsable_membership_id"])
+        hechos["responsable"] = responsable["nombre"] if responsable else None
+    return hechos
+
+
+def _vigencia_de_una_pregunta(m: Momento, aviso) -> tuple[str | None, dict[str, Any]]:
+    tarea = leer_tarea(m.cur, aviso["task_id"])
+    if tarea is None:
+        return "tarea_inexistente", {}
+    if tarea["estado"] in ("terminada", "cancelada"):
+        return "tarea_cerrada", {}
+    pregunta = pregunta_del_aviso(m.cur, aviso)
+    if pregunta is None or pregunta["cerrada_en"] is not None:
+        return "ya_respondio", {}
+    if str(tarea["responsable_membership_id"]) != str(pregunta["membership_id"]):
+        return "cambio_el_responsable", {}
+    if espera_de_la_pregunta(m.cur, pregunta) is None:
+        return "ya_respondio", {}
+    return None, hechos_de_una_pregunta(m, tarea, dict(aviso["hechos"]))
+
+
 # --- Los avisos de una previsión ---------------------------------------------------------------
 
 def _vigencia_de_la_prevision(m: Momento, aviso) -> tuple[str | None, dict[str, Any]]:
@@ -523,6 +605,10 @@ TIPOS: Mapping[str, TipoDeAviso] = MappingProxyType({t.nombre: t for t in (
     TipoDeAviso("escalamiento", "prioritario", _vigencia_de_la_escalera, escala=True),
     # Después de un avance sin un hecho cierto, el pedido del día hábil siguiente.
     TipoDeAviso(REPREGUNTA_DE_ESTADO, "seguimiento", _vigencia_de_la_escalera),
+    # La escalera de una pregunta que espera respuesta: la pregunta otra vez y su escalamiento.
+    TipoDeAviso(REPREGUNTA, "seguimiento", _vigencia_de_una_pregunta),
+    TipoDeAviso(ESCALAMIENTO_DE_UNA_PREGUNTA, "prioritario", _vigencia_de_una_pregunta,
+                escala=True),
     # Lo que causa el acto de una persona: llega aunque se haya alcanzado el tope (§10).
     TipoDeAviso("nueva_prevision", "normal", _vigencia_de_la_prevision, es_coordinacion=True),
     TipoDeAviso("correccion_de_prevision", "normal", _vigencia_de_la_prevision,

@@ -25,6 +25,21 @@ Un tema a la vez, para todas las fichas igual:
 Nada se borra: una pregunta se cierra con su momento, cómo (`respondida`, `cancelada` o
 `sin_efecto`) y con qué (`cierre_detalle`), que es lo que se dice si después llega un toque
 viejo (situación general 7).
+
+**Cada tipo de pregunta se declara una vez** (`TIPOS`, como las fichas de las jugadas): si
+espera respuesta y cuál es su espera. Una pregunta que **espera respuesta** no se puede dejar
+sin efecto y, al abrirse, abre su espera (`pending_reply`, ADR 0017, decisión 6) si no hay una
+abierta: sin respuesta, la escalera la repite y sigue hasta escalar (`escalera.py`; ADR 0018,
+9b y 9c; decisión del usuario, 2026-10-05). La del estado de la tarea y la de su fecha esperan
+con el pedido de estado, que repite la escalera de la tarea; las demás, con su propia espera,
+que repite la escalera de las preguntas. Una que no espera respuesta se puede dejar ("dejá, no
+importa") y Leda no insiste.
+
+**Lo que Leda propone es un tema abierto** (`PROPUESTA`; ADR 0013, la pregunta pendiente es el
+contexto): cuando una jugada le propone algo a la persona (las salidas de un bloqueo, una
+previsión en lugar de una reasignación), queda como pregunta, con lo propuesto. Se contesta
+haciendo una de las cosas propuestas, se puede cancelar o dejar para después, y vale un tema a
+la vez como para cualquier otra.
 """
 
 from __future__ import annotations
@@ -32,8 +47,12 @@ from __future__ import annotations
 import json
 import re
 import secrets
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
+from types import MappingProxyType
 from typing import Any
+
+from leda.calendario import Calendario
 
 CUAL_TAREA = "cual_tarea"      # la duda: de qué tarea habla (situación general 5)
 # El estado de una tarea, que Leda pide por su cuenta desde el vencimiento (escalera, 9b): no se
@@ -44,6 +63,35 @@ ESTADO_DE_LA_TAREA = "estado_de_la_tarea"
 # estado: no se deja sin efecto, la contestan las jugadas que informan un hecho cierto, y el
 # pedido del estado del día hábil siguiente la reemplaza (`avisos._abrir_la_pregunta`).
 FECHA_DE_LA_TAREA = "fecha_de_la_tarea"
+CAUSA_DEL_BLOQUEO = "causa_del_bloqueo"
+# Quién puede destrabar un bloqueo (9c): espera respuesta como un pedido de estado.
+QUIEN_DESTRABA = "quien_destraba"
+# Lo que Leda le propone a la persona: lo propuesto va en la jugada de la pregunta (`propone`).
+PROPUESTA = "propuesta"
+
+
+@dataclass(frozen=True)
+class TipoDePregunta:
+    """Un tipo de pregunta de Leda. `espera`: el tipo de la espera (`pending_reply.tipo`) con
+    que espera respuesta; `None` si se puede dejar sin efecto."""
+
+    nombre: str
+    espera: str | None = None
+
+    @property
+    def se_puede_dejar(self) -> bool:
+        return self.espera is None
+
+
+TIPOS: Mapping[str, TipoDePregunta] = MappingProxyType({t.nombre: t for t in (
+    TipoDePregunta(CUAL_TAREA),
+    TipoDePregunta(CAUSA_DEL_BLOQUEO),
+    TipoDePregunta(PROPUESTA),
+    TipoDePregunta(ESTADO_DE_LA_TAREA, espera=ESTADO_DE_LA_TAREA),
+    # Parte del pedido de estado: espera con él y la repite la escalera de la tarea.
+    TipoDePregunta(FECHA_DE_LA_TAREA, espera=ESTADO_DE_LA_TAREA),
+    TipoDePregunta(QUIEN_DESTRABA, espera=QUIEN_DESTRABA),
+)})
 
 PREFIJO_TOQUE = "m:"           # el `callback_data` de un botón es el prefijo y el token
 _LARGO_ETIQUETA = 80           # `salida.BUTTON_LABEL_LIMIT`
@@ -117,13 +165,18 @@ def estado_para_la_ia(cur, membership_id: str, tareas) -> dict[str, Any] | None:
 
 
 def _para_la_ia(cur, q, tareas) -> dict[str, Any]:
-    dicha = {"tipo": q["tipo"], "tarea": _alias(tareas, q["task_id"])}
+    dicha = {"tipo": q["tipo"], "tarea": _alias(tareas, q["task_id"]), **_lo_propuesto(q)}
     ops = opciones(cur, q["id"])
     if ops:
         dicha["opciones"] = [{"opcion": alias_de_opcion(o["orden"]), "etiqueta": o["etiqueta"],
                               "tarea": _alias(tareas, (o["valor"] or {}).get("tarea"))}
                              for o in ops]
     return dicha
+
+
+def _lo_propuesto(q) -> dict[str, Any]:
+    propone = (q["jugada"] or {}).get("propone")
+    return {"propone": list(propone)} if propone else {}
 
 
 def _alias(tareas, task_id) -> str | None:
@@ -134,12 +187,15 @@ def _alias(tareas, task_id) -> str | None:
 
 # --- Abrir, cerrar y retomar ------------------------------------------------------------------
 
-def abrir(ctx, tipo: str, task_id: str | None, *, se_puede_dejar: bool,
-          jugada: dict[str, Any], opciones_de_tareas: Sequence[dict[str, Any]] = ()) -> bool:
+def abrir(ctx, tipo: str, task_id: str | None, *, jugada: dict[str, Any],
+          opciones_de_tareas: Sequence[dict[str, Any]] = ()) -> bool:
     """Abre una pregunta (o reconoce la misma sin cerrar) y la ordena con las demás (ver el
-    módulo). `opciones_de_tareas`: las tareas de una duda, que se ofrecen como opciones.
-    Devuelve si es la que se pregunta ahora (`False`: quedó para después)."""
+    módulo); si su tipo espera respuesta, abre también su espera. `opciones_de_tareas`: las
+    tareas de una duda, que se ofrecen como opciones. Devuelve si es la que se pregunta ahora
+    (`False`: quedó para después)."""
     cur, persona = ctx.cur, ctx.quien.membership_id
+    de_tipo = TIPOS[tipo]           # la lista es cerrada: un tipo sin declarar es un error
+    se_puede_dejar = de_tipo.se_puede_dejar
     cur.execute("""select id from conversation_question
                     where membership_id = %s and cerrada_en is null and tipo = %s
                       and task_id is not distinct from %s
@@ -167,6 +223,9 @@ def abrir(ctx, tipo: str, task_id: str | None, *, se_puede_dejar: bool,
                 (ctx.quien.workspace_id, pregunta, secrets.token_urlsafe(9),
                  _etiqueta(tarea["titulo"]), _json({"tarea": tarea["id"]}), orden))
 
+    if de_tipo.espera is not None and task_id is not None:
+        _abrir_la_espera(ctx, de_tipo.espera, task_id)
+
     vigente = actual(cur, persona)
     if vigente is None or str(vigente["id"]) == pregunta:
         _que_sea_la_abierta(ctx, pregunta)
@@ -181,6 +240,34 @@ def abrir(ctx, tipo: str, task_id: str | None, *, se_puede_dejar: bool,
     if pregunta not in ctx.preguntas_del_turno:
         ctx.preguntas_del_turno.append(pregunta)
     return ahora_si
+
+
+def _abrir_la_espera(ctx, tipo: str, task_id: str) -> None:
+    """La espera de la respuesta, si no hay una abierta de ese tipo para esa tarea: una
+    pregunta que espera respuesta nunca queda sin su espera (la repite la escalera)."""
+    cur, persona = ctx.cur, ctx.quien.membership_id
+    cur.execute("""select 1 from pending_reply
+                    where membership_id = %s and task_id = %s and tipo = %s
+                      and satisfecho_en is null and escalado_en is null""",
+                (persona, task_id, tipo))
+    if cur.fetchone() is not None:
+        return
+    cal = Calendario.desde_base(cur, ctx.quien.workspace_id)
+    cur.execute(
+        """insert into pending_reply (workspace_id, membership_id, task_id, tipo,
+                                      preguntado_en, vence_en)
+           values (%s, %s, %s, %s, %s, %s)""",
+        (ctx.quien.workspace_id, persona, task_id, tipo, ctx.ahora,
+         cal.dentro_de_jornada(cal.sumar_habiles(ctx.ahora, 1))))
+
+
+def retomar(ctx, pregunta_id: str) -> None:
+    """Leda vuelve a hacer una pregunta que sigue sin contestar (la repite la escalera): es la
+    abierta, y la que estaba abierta, si era otra, queda para después (un tema a la vez)."""
+    vigente = actual(ctx.cur, ctx.quien.membership_id)
+    if vigente is not None and str(vigente["id"]) != pregunta_id:
+        _dejar_para_despues(ctx, str(vigente["id"]))
+    _que_sea_la_abierta(ctx, pregunta_id)
 
 
 def cerrar(ctx, pregunta_id: str, cierre: str, detalle: dict[str, Any]) -> None:
@@ -217,8 +304,8 @@ def cerrar_las_de_una_jugada(ctx, nombre: str, task_id: str, cierre: str,
 
 def contestar(ctx, nombre: str, tipos: Sequence[str], task_id: str) -> None:
     """Una jugada que se anotó sobre una tarea contesta las preguntas de los tipos que su
-    ficha declara sobre esa tarea y la duda que esperaba esa jugada, si la tarea era una de
-    sus opciones."""
+    ficha declara sobre esa tarea, la duda que esperaba esa jugada, si la tarea era una de
+    sus opciones, y lo que Leda propuso, si era hacer eso sobre esa tarea (o sin tarea)."""
     ctx.cur.execute(
         """select q.id from conversation_question q
             where q.membership_id = %s and q.cerrada_en is null
@@ -226,8 +313,11 @@ def contestar(ctx, nombre: str, tipos: Sequence[str], task_id: str) -> None:
                    or (q.tipo = %s and q.jugada ->> 'nombre' = %s
                        and exists (select 1 from conversation_option o
                                     where o.question_id = q.id
-                                      and o.valor ->> 'tarea' = %s)))""",
-        (ctx.quien.membership_id, list(tipos), task_id, CUAL_TAREA, nombre, task_id))
+                                      and o.valor ->> 'tarea' = %s))
+                   or (q.tipo = %s and q.jugada -> 'propone' ? %s
+                       and (q.task_id is null or q.task_id = %s)))""",
+        (ctx.quien.membership_id, list(tipos), task_id, CUAL_TAREA, nombre, task_id,
+         PROPUESTA, nombre, task_id))
     for fila in ctx.cur.fetchall():
         cerrar(ctx, str(fila["id"]), "respondida", {"jugada": nombre, "tarea": task_id})
 
@@ -263,6 +353,7 @@ def describir(ctx, q) -> dict[str, Any]:
     dicha: dict[str, Any] = {"tipo": q["tipo"]}
     if q["task_id"] is not None:
         dicha["tarea"] = tarea_dicha(ctx, q["task_id"])
+    dicha.update(_lo_propuesto(q))
     ops = opciones(ctx.cur, q["id"])
     if ops:
         dicha["opciones"] = [{"opcion": alias_de_opcion(o["orden"]), "etiqueta": o["etiqueta"],

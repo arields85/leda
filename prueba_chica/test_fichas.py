@@ -375,11 +375,15 @@ def test_quien_destraba_se_anota_y_cierra_la_pregunta(conn, mundo, escribe, dich
         assert str(fila[columna]) == mundo["personas"][
             "Marcos" if "nadie_mas" in esperado else "Ismael"]["membership_id"]
     assert fila["at"] == AHORA
-    pregunta = _uno(conn, "select cerrada_en, cierre, cierre_detalle from conversation_question")
+    pregunta = _uno(conn, """select cerrada_en, cierre, cierre_detalle from conversation_question
+                              where tipo = 'quien_destraba'""")
     assert pregunta["cerrada_en"] == AHORA and pregunta["cierre"] == "respondida"
     assert pregunta["cierre_detalle"] == {"blocker_unblocker_id": str(fila["id"])}
-    assert _uno(conn, "select pregunta_abierta_id from conversation_state")[
-        "pregunta_abierta_id"] is None
+    # Las salidas quedan como tema abierto (decisión del usuario, 2026-10-05); con otra persona
+    # que lo destraba no queda ninguno.
+    abierta = _uno(conn, """select q.tipo from conversation_state s
+                              join conversation_question q on q.id = s.pregunta_abierta_id""")
+    assert (abierta or {}).get("tipo") == ("propuesta" if sin_otra_persona else None)
 
 
 @pytest.mark.parametrize("dicho, esperado", [
@@ -489,10 +493,12 @@ def test_una_reasignacion_dice_quien_decide_y_no_avisa_a_nadie(conn, mundo, escr
         "pedir_reasignacion", {"tarea": "T1", "a": "Nahuel"}),
         texto="me la podés pasar a Nahuel?")
 
+    # La previsión ofrecida queda como tema abierto (decisión del usuario, 2026-10-05).
     assert hecho == {"jugada": "pedir_reasignacion", "resultado": "no_por_chat",
                      "motivo": "cambiar_el_responsable_no_es_por_chat",
                      "quien_decide": "Ismael", "alternativa": "anotar_prevision",
-                     "tarea": {"alias": "T1", "titulo": "Revisar el tablero"}}
+                     "tarea": {"alias": "T1", "titulo": "Revisar el tablero"},
+                     "pregunta": "propuesta"}
     assert _uno(conn, "select responsable_membership_id r from task where id = %s",
                 mundo["tarea"])["r"] is not None
     assert _cuantas(conn, "incident") == 0 and _cuantas(conn, "scheduled_notice") == 0
