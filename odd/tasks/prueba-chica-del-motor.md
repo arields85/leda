@@ -2,8 +2,8 @@
 
 **Rama:** `feat/motor-de-conversacion` · **Carpeta:** `D:\Proyectos\Leda-PM-worktrees\motor-de-conversacion`
 **Abierta:** 2026-10-04 · **Copia en Engram:** tema `odd/prueba-chica-del-motor/tasks` (proyecto `prisma-pm`)
-**Estado:** decidido (sección 10, 2026-10-05); E2-1 a E2-7, E2-3b, `informar_avance` y el ancla en la
-previsión hechas; sigue la E2-8 (antes, tres hallazgos del motor para el usuario, E2-7).
+**Estado:** decidido (sección 10, 2026-10-05); E2-1 a E2-7, E2-3b, `informar_avance`, el ancla en la
+previsión, los tres hallazgos de la corrida en seco y la tarea vencida (9j) hechos; sigue la E2-8.
 
 ## 1. Objetivo
 
@@ -390,14 +390,46 @@ su evidencia son las corridas. Unas 400 líneas por tarea es una guía, no un to
       **Comandos de la E2-8** (los lanza el agente que coordina; nunca los corre una prueba):
       `python -m prueba_chica.correr --ia sol --veces 5 --jev --paralelo 5 --grabar prueba_chica/grabaciones`
       y `python -m prueba_chica.correr --ia luna --veces 5 --paralelo 5 --grabar prueba_chica/grabaciones`.
-      **Costo estimado** (lo que el techo reserva antes de empezar): unas 105 llamadas por vuelta a
-      las 15, con un margen de 1,25 por lo que se manda de más; sol, a USD 0,016 la llamada (la cifra
+      **Costo estimado** (lo que el techo reserva antes de empezar; con las 16, abajo): unas 105
+      llamadas por vuelta a las 15, con un margen de 1,25 por lo que se manda de más; sol, a USD 0,016 la llamada (la cifra
       por mensaje del banco del 2026-10-03, del lado alto), unos USD 10,5 la ronda de 5; Jev, unos
       USD 0,4 (estimado: no informa su costo); luna, unos USD 1. Las dos rondas, unos USD 12 de 30,
       debajo del aviso del 80 %. Desde la primera ronda el techo usa el costo medido por llamada.
       `PENDIENTE`: medir lo que cuesta Jev; la lectura de los textos y la comprensión que vale son
       del usuario (10.3); la sugerencia de la revisión sobre `ancla.escalo` no se aplicó (el
       writer no tenía el texto de la revisión).
+- [x] **Agregado antes de la E2-8: los hallazgos de la corrida en seco, la tarea vencida y la
+      revisión de la E2-7** (decisiones del usuario, 2026-10-05; ADR 0018, 9j y sus precisiones;
+      delegada: writer, varios archivos no triviales). Reglas generales, sin caso por conversación
+      (5c.1): (1) toda pregunta cuya ficha dice que espera respuesta abre su espera y la repite la
+      escalera de quien no contestó, hasta escalar (`preguntas.TIPOS`, la escalera de una pregunta
+      en `escalera.py`; la de quién destraba, conversación 03); (2) lo que Leda propone queda como
+      tema abierto (`preguntas.PROPUESTA`, `Ficha.propone`; conversaciones 03 y 12); (3) los avisos
+      automáticos de una persona que salen juntos van en un solo envío (mecánica §10; los de
+      coordinación, aparte; conversación 13); (4) con la tarea vencida, una respuesta sin fecha se
+      anota y lleva la pregunta de para cuándo (9j; conversación 16, escrita primero). Revisión de
+      la E2-7: una corrida que se cae deja su gasto en la libreta y el informe dice "Ronda cortada";
+      el techo a mitad de la ronda sale con 2 y otra caída con 1; la plantilla se borra aunque falle
+      y al salir, y las bases viejas del corredor se borran al empezar; la prueba del techo no
+      necesita el servidor; un bloqueo resuelto que falta es de comprensión; el emparejamiento es
+      máximo; los avisos al administrador se cuentan por espacio; un mensaje que junta tareas se
+      compara con todas; el recorrido de la cadena de previsiones no se cuelga con un ciclo; un paso
+      guardado con la clave de antes sigue siendo de su ancla (lectura del agente de "compatibilidad
+      del formato de la clave"); el aviso previo una sola vez tiene su prueba. Evidencia
+      (2026-10-05): `pytest prueba_chica` en rojo en cada paso (corredor, `5 failed, 1 passed, 1
+      error`; comparación y ancla, `4 failed, 34 passed`; preguntas que esperan y propuestas,
+      `9 failed`; un envío por día, `3 failed, 1 passed` y el corredor, `1 failed, 2 passed`; la
+      tarea vencida, `4 failed, 2 passed`) y en verde, `305 passed in 110.31s`. Siete pruebas
+      cambiaron por las decisiones (una pregunta sin contestar ahora escala; las salidas quedan
+      abiertas). **Corrida en seco** `python -m prueba_chica.correr --ia guionada --veces 1 --ronda
+      seco-2` (informe `resultados/seco-2.md`): 16 de 16 bien, garantías 16 de 16, ninguna falla.
+      **Con las 16** (E2-8): unas 114 llamadas por vuelta; sol, unos USD 11,4 la ronda de 5; luna,
+      unos USD 1,1; Jev, unos USD 0,4: unos USD 13 de 30, debajo del aviso del 80 %. Los comandos de
+      la E2-8 no cambian. `PENDIENTE`: el paso 2 de `tests/conversaciones/15-avance-vago.md` (el
+      primer avance, con la tarea vencida) todavía dice que no pregunta nada (fuera de lo autorizado
+      a este writer; su YAML ya sigue 9j); un aviso automático que se guarda más tarde el mismo día,
+      después del envío de la persona (por ejemplo, con el comando `avisar`), sale en otro envío.
+      Commits `3d6f07d`, `d2a855f`, `03a20be`, `df2d8ee`, `5aa1a67` y el commit que registra esto.
 - [ ] **E2-8. Primera ronda real:** sol, luna y Jev; lectura de textos; bitácora; chequeo de rumbo contra 5c.
 - [ ] **E2-9. Telegram real** con el usuario; su juicio; M2 en la bitácora.
 
@@ -434,5 +466,5 @@ previo en `workspace_setting`, no en el importador; el referente es quien aprueb
   `PENDIENTE` confirmar al escribir los YAML que ninguna conversación depende de ellas.
 - **La etapa no es tan chica:** si una tarea pide un caso especial, se frena (5c.1).
 
-**Próximo paso:** llevarle al usuario los tres hallazgos del motor de la corrida en seco (E2-7) y,
-con su decisión, la E2-8 (sol con Jev y luna, cinco veces cada una).
+**Próximo paso:** la E2-8 (sol con Jev y luna, cinco veces cada una, sobre las 16), después de llevar
+al `.md` de la conversación 15 el paso 2 que cambió con 9j.
