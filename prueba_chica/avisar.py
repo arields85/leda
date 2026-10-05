@@ -138,7 +138,7 @@ def main(argv: list[str] | None = None) -> int:
     from leda.despachador import TransporteTelegram, despachar, texto_error_seguro
 
     from .ia_real import desde_base
-    from .tiempo import RelojDelSistema
+    from .reloj import RelojDeLeda
 
     p = argparse.ArgumentParser(prog="python -m prueba_chica.avisar")
     p.add_argument("slug")
@@ -157,7 +157,9 @@ def main(argv: list[str] | None = None) -> int:
         print(f"No hay un espacio activo '{a.slug}'.")
         return 1
     ws = str(fila["id"])
-    reloj = RelojDelSistema()
+    reloj = RelojDeLeda()           # el de Leda: adelantado en `leda_motor` si se adelantó
+    reloj.refrescar(conn, ws)
+    conn.commit()
     try:
         with espacio(conn, ws) as cur:
             membership_id, nombre, task_id = resolver(cur, a.persona, a.tarea)

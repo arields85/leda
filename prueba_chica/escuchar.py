@@ -18,6 +18,8 @@ usar (importa `gateway`): acá está lo mínimo, reescrito.
   administrador de plataforma que le escribe (como `local.recibir_admin`), y por él salen los
   avisos de incidentes (`despachador.despachar_avisos_admin`). Un bot de administración con
   webhook puesto no se toca ni se sondea.
+- **El reloj de Leda** (E2-6, `reloj.py`): el comando lo prende con el adelanto que se guarda
+  en `leda_motor` con `python -m prueba_chica.reloj`; se vuelve a leer en cada vuelta.
 - **El ciclo** (E2-6, `ciclo.py`): en cada vuelta, el despacho y los avisos a la
   administración; con `seguimiento` (el comando lo prende), la escalera y los avisos guardados
   una vez por minuto. Cada paso aislado: si uno se cae, un incidente y los demás siguen.
@@ -122,10 +124,29 @@ class Escucha:
     # -- una vuelta ----------------------------------------------------------------------
 
     def una_vuelta(self, espera: int = ESPERA_S) -> int:
+        self.refrescar_reloj()
         recibidos = self.recibir(espera)
         self.recibir_admin()
         self.despachar()
         return recibidos
+
+    def refrescar_reloj(self) -> None:
+        """El reloj de Leda (`reloj.RelojDeLeda`) vuelve a leer su adelanto al empezar cada
+        vuelta: el comando que lo adelanta se nota en la vuelta siguiente. Un reloj sin
+        adelanto (el del sistema, el fijo de las pruebas) no tiene qué leer."""
+        refrescar = getattr(self.reloj, "refrescar", None)
+        if refrescar is None:
+            return
+        try:
+            cambio = refrescar(self.conn, self.ws)
+            self.conn.commit()
+        except Exception as e:  # noqa: BLE001 -- sigue con el adelanto que tenía
+            self.conn.rollback()
+            self.imprimir(f"  ! no se pudo leer el reloj de Leda ({texto_error_seguro(e)}); "
+                          "sigue con el de antes")
+            return
+        if cambio:
+            self.imprimir(f"  ⏰ reloj de Leda: {self.reloj.ahora():%Y-%m-%d %H:%M} UTC")
 
     def recibir(self, espera: int) -> int:
         try:
@@ -415,7 +436,7 @@ def main(argv: list[str] | None = None) -> int:
     from leda.despachador import TransporteTelegram
 
     from .ia_real import desde_base
-    from .tiempo import RelojDelSistema
+    from .reloj import RelojDeLeda
 
     p = argparse.ArgumentParser(prog="python -m prueba_chica.escuchar")
     p.add_argument("slug")
@@ -444,7 +465,7 @@ def main(argv: list[str] | None = None) -> int:
         print("(sin LEDA_BOT_TOKEN_ADMIN: los avisos de incidentes quedan encolados)")
 
     escucha = Escucha(
-        conn, ws, ia, RelojDelSistema(),
+        conn, ws, ia, RelojDeLeda(),
         bot=BotTelegram(token, httpx.Client(timeout=ESPERA_S + 15)),
         transporte=TransporteTelegram(token),
         bot_admin=BotTelegram(token_admin, httpx.Client(timeout=15)) if token_admin else None,

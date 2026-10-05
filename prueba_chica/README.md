@@ -41,6 +41,7 @@ de nuevo en `src/leda`, con su propia prueba de frontera.
 - `avisar.py`: el comando que dispara a mano el aviso previo de una tarea, por el mismo
   camino que los demás avisos guardados.
 - `tiempo.py`: el reloj del motor. Los momentos los pone el motor, nunca la base.
+- `reloj.py`: el reloj de Leda en `leda_motor` y el comando que lo adelanta (decisión 10.2).
 - `test_frontera.py`: qué puede importar esta carpeta de `src/leda` y qué nunca debe alcanzar.
 
 ## Cómo se corren sus pruebas
@@ -56,6 +57,22 @@ efímera en el servidor de `LEDA_TEST_DB_URL` (`.env.test`), que se crea y se bo
 corrida, y nunca leen el `.env` de la carpeta ni tocan `leda`, `leda_flujo` o `leda_motor`.
 Sin esa variable, las pruebas que piden la base se saltean. Telegram y la IA son transportes
 falsos: ninguna prueba llama a un servicio de verdad.
+
+## El paso de los días (E2-6)
+
+Sólo en `leda_motor`, con la restricción de horario prendida (decisión 10.2 del usuario):
+
+```
+python -m prueba_chica.reloj corework adelantar   # al día hábil siguiente, 10:00
+python -m prueba_chica.reloj corework estado      # hora real, reloj de Leda y horario
+python -m prueba_chica.reloj corework volver      # vuelve al tiempo real
+```
+
+El adelanto se guarda en el espacio y el escuchador lo toma en su próxima vuelta: el turno, la
+escalera, los avisos guardados y el horario del despacho ven el mismo momento. `adelantar`
+saltea fines de semana y feriados; correrlo otra vez adelanta otro día. Lo que la base fecha
+sola (los eventos de estado, la apertura de un bloqueo) queda en hora real. `volver` no
+deshace lo escrito con el reloj adelantado: va al terminar la prueba.
 
 ## Primer contacto real (E2-3b)
 
