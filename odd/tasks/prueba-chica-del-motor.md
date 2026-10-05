@@ -2,7 +2,7 @@
 
 **Rama:** `feat/motor-de-conversacion` · **Carpeta:** `D:\Proyectos\Leda-PM-worktrees\motor-de-conversacion`
 **Abierta:** 2026-10-04 · **Copia en Engram:** tema `odd/prueba-chica-del-motor/tasks` (proyecto `prisma-pm`)
-**Estado:** decidido (sección 10, 2026-10-05); E2-1 y E2-2 hechas; sigue la E2-3.
+**Estado:** decidido (sección 10, 2026-10-05); E2-1, E2-2 y E2-3 hechas; sigue la E2-3b.
 
 ## 1. Objetivo
 
@@ -75,6 +75,18 @@ herramienta en ningún proveedor, así que se trae la llamada estructurada de la
 | `entregar`, `pedir_reasignacion` | nada | sin efecto; hechos de qué no se puede y quién lo decide | sin aviso al administrador (9g) |
 | `elegir`, `corregir`, `cancelar`, `dejar_para_despues` | las de su situación general | | |
 
+Hecho en la E2-3 (`prueba_chica/fichas.py`): la comprobación común (datos que faltan, la tarea
+por su alias, que sea del responsable y su estado vigente) es una sola para todas las fichas.
+Quién destraba llega como `quien` (texto) o `no_sabe`, y el código decide si es un integrante
+(un solo nombre que coincide en el equipo) o alguien de afuera; si coinciden varios, falta el
+dato. Si la causa de un bloqueo depende de otro lo dice la IA (`depende_de_otro`); sin decirlo,
+se pregunta quién destraba. Una pregunta nueva con otra abierta queda para después, en el orden
+en que salieron; cómo se retoma, la E2-4. Inicio, previsión, bloqueo y quién destraba contestan
+la espera de su tarea (`pending_reply`). Fuera de la lista es cualquier nombre que no esté en
+ella: `PENDIENTE` para la E2-3b, que el esquema de la IA le deje decir "otra cosa". `PENDIENTE`:
+"en curso desde el lunes" (conversación 12, paso 3) no sale de la base, porque `leda_app` no lee
+`task_state_event`; el hecho dice sólo el estado.
+
 **Las ocho situaciones, una vez:** (1) cambio de tema: lo directo se anota y los hechos traen la pregunta
 pendiente; si lo nuevo pregunta, la pendiente pasa a "para después" (9d); (2) varias cosas: lo directo en una
 respuesta, las preguntas de a una y en orden; (3) corrección: un hecho de corrección, nunca un borrado (9f); (4)
@@ -102,8 +114,11 @@ recibe el único texto fijo, se registra un incidente y el turno queda registrad
 4 y 8 minutos; al quinto fallo, incidente y aviso de falla a quien lo causó.
 
 **Aviso al administrador:** un incidente de severidad baja con etapa propia y referencia al `inbound_message`, que
-`registrar_incidente` lleva al bot de administración con el mensaje (`incidentes._texto_disparador`). `PENDIENTE`:
-verificar el texto con una etapa que `incidentes.py` no conoce, sin editarlo.
+`registrar_incidente` lleva al bot de administración con el mensaje (`incidentes._texto_disparador`); uno por
+mensaje. Verificado en la E2-3: con una etapa que `incidentes.py` no conoce, el aviso usa la explicación genérica y
+su título dice "Leda no pudo responderle a" la persona, que acá no es cierto; el mensaje y el resumen sí dicen qué
+pasó. `PENDIENTE` (decisión del usuario): corregirlo pide una entrada en `incidentes.EXPLICACION_POR_ETAPA`, en
+`src/leda`.
 
 ## 5. Datos
 
@@ -193,8 +208,18 @@ su evidencia son las corridas. Unas 400 líneas por tarea es una guía, no un to
       manejado se deshace (punto de guardado). Resuelto el `PENDIENTE` de la sección 4: `responder` no fuerza la
       herramienta en ningún proveedor; el adaptador de la E2-3b trae la llamada estructurada. Commit `1673e97`;
       lo registra el commit que sigue. Unas 980 líneas, la mitad pruebas.
-- [ ] **E2-3. Jugadas y fichas** (delegada): lista cerrada, fichas, atraso, aviso al administrador; que una
-      previsión sólo reemplace a otra de la misma tarea. Unas 450.
+- [x] **E2-3. Jugadas y fichas** (delegada: writer, varios archivos no triviales): lista cerrada, fichas,
+      atraso, aviso al administrador; que una previsión sólo reemplace a otra de la misma tarea. Evidencia
+      (2026-10-05): `pytest prueba_chica` en rojo con la lista vacía (`23 failed, 16 passed`) y en verde
+      (`39 passed`); `tests/test_motor_tablas.py` en rojo con la previsión de otra tarea (`1 failed, 14 passed`);
+      `tests/test_motor_tablas.py tests/test_capacidades.py tests/test_task_intake.py tests/test_task_drafts.py`
+      `151 passed`; suite completa `2302 passed, 333 deselected, 1 warning in 782.58s`. Correcciones de las revisiones: la previsión reemplaza sólo a
+      otra de su tarea (`0031`, E2-1); un mensaje corre una sola vez (candado por persona e índice único de un
+      turno de entrada por mensaje), los turnos se ordenan por `conversation_turn.numero` (una columna de
+      identidad no sirve: el `truncate ... restart identity` de las pruebas exige ser dueño de la secuencia) y el
+      recorrido de imports entra en los paquetes y falla con un módulo que no encuentra (E2-2). El equipo de
+      prueba sigue a las conversaciones (Marcos responsable, Ismael referente). Commits `249e593`, `47ede6a`,
+      `43db5e1` y `4e2e182`; lo registra el commit que sigue. Unas 1.350 líneas, la mitad pruebas.
 - [ ] **E2-3b. Primer contacto real** (decisión del usuario, 2026-10-05; `AGENTS.md`, punto 5): se adelantan de la
       E2-6, completos y con sus pruebas, el escuchador y la redacción de la IA; el aviso se dispara con un comando,
       sin el ciclo; se crea `leda_motor` (autorizado) y el agente apunta a ella el `.env` de la carpeta
@@ -231,7 +256,8 @@ su evidencia son las corridas. Unas 400 líneas por tarea es una guía, no un to
 
 **Decidido en el plan:** la carpeta; las tablas como migraciones del producto (ADR 0018, decisión 3); el aviso
 previo en `workspace_setting`, no en el importador; el referente es quien aprueba según la política del espacio
-(`PENDIENTE` la consulta); el aviso al administrador como incidente; el de previsión como coordinación.
+(resuelto en la E2-3: el `aprobador_membership_id` del responsable, la regla de `autoridad.puede_aprobar_tarea`;
+`fichas.referente`); el aviso al administrador como incidente; el de previsión como coordinación.
 
 ## 11. Riesgos y próximo paso
 
@@ -243,4 +269,4 @@ previo en `workspace_setting`, no en el importador; el referente es quien aprueb
   `PENDIENTE` confirmar al escribir los YAML que ninguna conversación depende de ellas.
 - **La etapa no es tan chica:** si una tarea pide un caso especial, se frena (5c.1).
 
-**Próximo paso:** la E2-3 (jugadas y fichas).
+**Próximo paso:** la E2-3b (primer contacto real).
