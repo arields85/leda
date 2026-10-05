@@ -157,5 +157,6 @@ Después, leer la conversación con `python -m prueba_chica.leer corework` y la 
   y los avisos guardados salen con sus reintentos. El comando `avisar` lo adelanta a mano.
 - **Pedidos fuera de la lista:** Leda dice qué puede hacer y el administrador recibe un aviso
   por el bot de administración; a la persona no se le dice que se avisó, salvo que lo pregunte.
-- **`tools/restriccion_horario.py` todavía no admite `leda_motor`** (E2-6).
+- **`tools/restriccion_horario.py` admite `leda_motor`** (E2-6), pero en esta prueba la
+  restricción va prendida y los días pasan con el reloj de Leda (decisión 10.2).
 - **La bienvenida de `/start`** es el texto fijo de siempre (`leda.onboarding.bienvenida`).
