@@ -2,8 +2,8 @@
 
 **Rama:** `feat/motor-de-conversacion` · **Carpeta:** `D:\Proyectos\Leda-PM-worktrees\motor-de-conversacion`
 **Abierta:** 2026-10-04 · **Copia en Engram:** tema `odd/prueba-chica-del-motor/tasks` (proyecto `prisma-pm`)
-**Estado:** decidido (sección 10, 2026-10-05); E2-1 a E2-6, E2-3b, `informar_avance` y el ancla en la
-previsión hechas; sigue la E2-7.
+**Estado:** decidido (sección 10, 2026-10-05); E2-1 a E2-7, E2-3b, `informar_avance` y el ancla en la
+previsión hechas; sigue la E2-8 (antes, tres hallazgos del motor para el usuario, E2-7).
 
 ## 1. Objetivo
 
@@ -361,10 +361,43 @@ su evidencia son las corridas. Unas 400 líneas por tarea es una guía, no un to
       passed`. Tres pruebas cambiaron por la decisión (una previsión ya no detiene la escalera para
       siempre). Commits `cf11eaa`, `afb17a3`, `431deef`, `5e01734` y el commit que registra esto.
       `PENDIENTE`: qué sigue después de una respuesta que no es una previsión (un inicio) cuando la
-      tarea sigue sin entregar; si el escalamiento debe esperar cuando el responsable está ausente
-      el día que sale.
-- [ ] **E2-7. Corredor** (delegada): los 14 YAML, base por corrida, reloj, comprobaciones, reporte, luna y Jev.
-      Unas 650.
+      tarea sigue sin entregar. Resuelto en la E2-7: el escalamiento espera si el responsable está
+      ausente el día que sale (mecánica §9, ausencias).
+- [x] **E2-7. Corredor** (delegada: writer, varios archivos no triviales). `python -m prueba_chica.correr`
+      (uso en `prueba_chica/README.md`): las 15 conversaciones en YAML (`prueba_chica/conversaciones/`,
+      cada una con su `fuente`), cargador del estado inicial (lo anterior corre por el motor como
+      preludio), una base por corrida desde una plantilla, el reloj en los momentos del `.md`, el
+      transporte falso, las comprobaciones (garantía, comprensión provisional y motor), grabar y
+      repetir, Jev en paralelo, la libreta del gasto con el techo (10.4) y el informe en
+      `prueba_chica/resultados/`. Arreglos de la revisión del ancla: cada anclaje (la racha de una
+      fecha en la cadena de previsiones) es una escalera nueva, y repetir la misma fecha no; el
+      escalamiento guardado espera la ausencia del responsable. Evidencia (2026-10-05):
+      `test_ancla.py` en rojo (`2 failed, 8 passed`) y `test_escalera.py` en rojo (`1 failed`); las
+      pruebas del corredor se escribieron con su código (sin rojo previo); `pytest prueba_chica` en
+      verde, `275 passed in 98.61s`. **Corrida en seco** con la IA guionada que elige las jugadas
+      esperadas (`--ia guionada --veces 1`, informe `resultados/2026-10-05-en-seco-guionada.md`):
+      12 de 15 bien y garantías 15 de 15; las 3 fallas son del motor, no del YAML, y no se torcieron:
+      (1) **03**: la pregunta de quién destraba no abre una espera ni se repite el día hábil
+      siguiente (pasos 2 a 4), y las salidas propuestas no quedan como tema abierto (paso 5); (2)
+      **12**: el ofrecimiento de una previsión ante una reasignación no queda como tema abierto
+      (paso 2); (3) **13**: los avisos automáticos del día a una persona no se juntan en un envío
+      (mecánica §10): salen dos avisos previos. Ninguna se arregla en el corredor; cómo se
+      resuelven lo decide el usuario (si es una regla general del motor, sin caso especial: 5c.1).
+      Confirmado al escribir los YAML: ninguna comprobación depende de `blocker.abierto_en` ni de
+      `task_state_event.at` en hora real. Commits `5206bb8`, `94d5378`, `93647f3`; lo registra el
+      commit que sigue. Unas 4.250 líneas, 1.400 de YAML: más que la guía, porque cada conversación
+      lleva sus comprobaciones paso por paso.
+      **Comandos de la E2-8** (los lanza el agente que coordina; nunca los corre una prueba):
+      `python -m prueba_chica.correr --ia sol --veces 5 --jev --paralelo 5 --grabar prueba_chica/grabaciones`
+      y `python -m prueba_chica.correr --ia luna --veces 5 --paralelo 5 --grabar prueba_chica/grabaciones`.
+      **Costo estimado** (lo que el techo reserva antes de empezar): unas 105 llamadas por vuelta a
+      las 15, con un margen de 1,25 por lo que se manda de más; sol, a USD 0,016 la llamada (la cifra
+      por mensaje del banco del 2026-10-03, del lado alto), unos USD 10,5 la ronda de 5; Jev, unos
+      USD 0,4 (estimado: no informa su costo); luna, unos USD 1. Las dos rondas, unos USD 12 de 30,
+      debajo del aviso del 80 %. Desde la primera ronda el techo usa el costo medido por llamada.
+      `PENDIENTE`: medir lo que cuesta Jev; la lectura de los textos y la comprensión que vale son
+      del usuario (10.3); la sugerencia de la revisión sobre `ancla.escalo` no se aplicó (el
+      writer no tenía el texto de la revisión).
 - [ ] **E2-8. Primera ronda real:** sol, luna y Jev; lectura de textos; bitácora; chequeo de rumbo contra 5c.
 - [ ] **E2-9. Telegram real** con el usuario; su juicio; M2 en la bitácora.
 
@@ -401,4 +434,5 @@ previo en `workspace_setting`, no en el importador; el referente es quien aprueb
   `PENDIENTE` confirmar al escribir los YAML que ninguna conversación depende de ellas.
 - **La etapa no es tan chica:** si una tarea pide un caso especial, se frena (5c.1).
 
-**Próximo paso:** la E2-7 (el corredor de las 14 conversaciones).
+**Próximo paso:** llevarle al usuario los tres hallazgos del motor de la corrida en seco (E2-7) y,
+con su decisión, la E2-8 (sol con Jev y luna, cinco veces cada una).
