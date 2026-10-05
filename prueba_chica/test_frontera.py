@@ -29,7 +29,9 @@ LEDA = RAIZ / "src" / "leda"
 PERMITIDOS: dict[str, set[str] | None] = {
     "db": None,
     "autoridad": None,
-    "herramientas": {"ejecutar"},
+    # `ejecutar` y lo que levanta como respuesta del dominio (revisión de la E2-3).
+    "herramientas": {"ejecutar", "NecesitaConfirmacion", "EstadoCambio", "NecesitaElegir",
+                     "NecesitaOpciones"},
     "calendario": None,
     "salida": {"enqueue_outbox"},
     "despachador": None,

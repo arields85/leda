@@ -342,6 +342,53 @@ def test_quien_destraba_se_anota_y_cierra_la_pregunta(conn, mundo, escribe, dich
         "pregunta_abierta_id"] is None
 
 
+@pytest.mark.parametrize("dicho, esperado", [
+    # Mayúsculas y acentos no cuentan; un nombre de pila o un apellido entero, sí.
+    ("ismaél", {"integrante": "Ismael"}),
+    ("ISMAEL", {"integrante": "Ismael"}),
+    # Un pedazo de un nombre no es ese nombre, y `%` o `_` no son comodines.
+    ("Mar", {"externo": "Mar"}),
+    ("%", {"externo": "%"}),
+    ("_", {"externo": "_"}),
+    ("el de compras", {"externo": "el de compras"}),
+])
+def test_quien_destraba_reconoce_un_integrante_por_nombre_entero(conn, mundo, escribe, dicho,
+                                                                 esperado):
+    """Revisión de la E2-3: el nombre se compara por palabras enteras, sin mayúsculas ni
+    acentos, nunca como un patrón de la base."""
+    _jugar(conn, escribe, "Marcos", Jugada(
+        "anotar_bloqueo", {"tarea": "T1", "causa": "falta el repuesto"}))
+
+    [hecho] = _jugar(conn, escribe, "Marcos", Jugada("anotar_quien_destraba",
+                                                     {"quien": dicho}))
+
+    assert hecho["resultado"] == "anotado" and hecho["quien_destraba"] == esperado
+
+
+def test_quien_destraba_con_dos_integrantes_que_coinciden_es_un_dato_que_falta(conn, mundo,
+                                                                               escribe):
+    with admin(conn) as cur:
+        cur.execute("""select area_id, rol_id from membership where id = %s""",
+                    (mundo["personas"]["Ismael"]["membership_id"],))
+        base = cur.fetchone()
+        cur.execute("""insert into app_user (telegram_user_id, nombre)
+                       values (81500, 'Ismael Otero') returning id""")
+        usuario = cur.fetchone()["id"]
+        cur.execute("""insert into membership (workspace_id, app_user_id, area_id, rol_id)
+                       values (%s, %s, %s, %s)""",
+                    (mundo["id"], usuario, base["area_id"], base["rol_id"]))
+    conn.commit()
+    _jugar(conn, escribe, "Marcos", Jugada(
+        "anotar_bloqueo", {"tarea": "T1", "causa": "falta el repuesto"}))
+
+    [hecho] = _jugar(conn, escribe, "Marcos", Jugada("anotar_quien_destraba",
+                                                     {"quien": "Ismael"}))
+
+    assert hecho == {"jugada": "anotar_quien_destraba", "resultado": "falta_dato",
+                     "falta": ["integrante"], "coinciden": ["Ismael", "Ismael Otero"]}
+    assert _cuantas(conn, "blocker_unblocker") == 0
+
+
 def test_quien_destraba_sin_bloqueo_abierto_no_anota_nada(conn, mundo, escribe):
     [hecho] = _jugar(conn, escribe, "Marcos", Jugada("anotar_quien_destraba",
                                                      {"no_sabe": True}))
@@ -470,3 +517,97 @@ def test_una_jugada_nunca_toca_una_tarea_de_otro_espacio(conn, mundo, escribe, o
     for tabla in ("task_state_event", "task_forecast", "blocker", "scheduled_notice",
                   "conversation_question"):
         assert _cuantas(conn, tabla) == 0, tabla
+
+
+# --- Lo que la operación del dominio contesta (revisión de la E2-3) -------------------------
+
+def _tarea_cerrada_con_alias(conn, mundo, estado: str) -> str:
+    """Una tarea de Marcos ya cerrada que, como si se hubiera cerrado durante el turno,
+    todavía le llega a la ficha con alias."""
+    return _tarea_nueva(conn, mundo, "Tarea cerrada", estado=estado)
+
+
+@pytest.mark.parametrize("estado", ["terminada", "cancelada"])
+@pytest.mark.parametrize("jugada", [
+    Jugada("anotar_prevision", {"tarea": "T1", "fecha": "2026-10-13"}),
+    Jugada("anotar_bloqueo", {"tarea": "T1", "causa": "faltan cables"}),
+])
+def test_una_tarea_cerrada_no_acepta_prevision_ni_bloqueo(conn, mundo, escribe, estado,
+                                                          jugada):
+    tarea = _tarea_cerrada_con_alias(conn, mundo, estado)
+    quien, entrante = escribe("Marcos", "-")
+    with espacio(conn, mundo["id"]) as cur:
+        hecho = JUGADAS[jugada.nombre](_contexto(cur, quien, entrante, tarea), jugada)
+    conn.commit()
+
+    assert hecho["resultado"] == "no_se_puede" and hecho["motivo"] == "estado"
+    assert hecho["estado"] == estado
+    for tabla in ("task_forecast", "scheduled_notice", "blocker", "conversation_question"):
+        assert _cuantas(conn, tabla) == 0, tabla
+
+
+def _falla_de_la_base(mensaje: str):
+    import psycopg
+
+    return psycopg.errors.RaiseException(mensaje)
+
+
+@pytest.mark.parametrize("jugada", [
+    Jugada("anotar_inicio", {"tarea": "T1"}),
+    Jugada("anotar_bloqueo", {"tarea": "T1", "causa": "faltan cables"}),
+    Jugada("consultar_pendientes"),
+])
+@pytest.mark.parametrize("levanta, resultado, motivo", [
+    (lambda: _falla_de_la_base("No se puede pasar la tarea a en curso: depende de otra"),
+     "no_se_puede", "regla_del_trabajo"),
+    (lambda: _de_herramientas("NecesitaConfirmacion")("resumen", "x", {}),
+     "no_se_puede", "pide_otro_paso"),
+    (lambda: _de_herramientas("EstadoCambio")("resumen", "x", {}, "huella"),
+     "no_se_puede", "pide_otro_paso"),
+    (lambda: _de_herramientas("NecesitaOpciones")("¿cuál?", []),
+     "no_se_puede", "pide_otro_paso"),
+    (lambda: _de_herramientas("NecesitaElegir")("¿cuál?", "responsable", [("Ana", "1")]),
+     "falta_dato", None),
+])
+def test_lo_que_levanta_la_operacion_del_dominio_es_un_hecho_nunca_un_turno_caido(
+        conn, mundo, escribe, monkeypatch, jugada, levanta, resultado, motivo):
+    import prueba_chica.fichas as fichas
+
+    def ejecutar(*_, **__):
+        raise levanta()
+
+    monkeypatch.setattr(fichas, "ejecutar", ejecutar)
+    [hecho] = _jugar(conn, escribe, "Marcos", jugada)
+
+    assert hecho["jugada"] == jugada.nombre and hecho["resultado"] == resultado
+    if motivo is not None:
+        assert hecho["motivo"] == motivo
+    else:
+        assert hecho["falta"] == ["responsable"] and hecho["coinciden"] == ["Ana"]
+    # Ningún texto de la base ni de la operación llega a la IA (constitución §10).
+    assert "depende de otra" not in json.dumps(hecho, ensure_ascii=False)
+    assert _estado_de(conn, mundo["tarea"]) == "asignada"
+    assert _cuantas(conn, "blocker") == 0 and _cuantas(conn, "incident") == 0
+
+
+def _de_herramientas(nombre: str):
+    import prueba_chica.fichas as fichas
+
+    return getattr(fichas, nombre)
+
+
+@pytest.mark.parametrize("devuelve, motivo", [
+    ({"error": "esa tarea no existe en este equipo"}, "tarea_desconocida"),
+    ({"error": "esa tarea ya está cerrada, no se le puede agregar un bloqueo"},
+     "tarea_cerrada"),
+])
+def test_un_rechazo_de_la_operacion_del_bloqueo_dice_su_motivo(conn, mundo, escribe,
+                                                              monkeypatch, devuelve, motivo):
+    import prueba_chica.fichas as fichas
+
+    monkeypatch.setattr(fichas, "ejecutar", lambda *_, **__: devuelve)
+    [hecho] = _jugar(conn, escribe, "Marcos", Jugada(
+        "anotar_bloqueo", {"tarea": "T1", "causa": "faltan cables"}))
+
+    assert hecho["resultado"] == "no_se_puede" and hecho["motivo"] == motivo
+    assert _cuantas(conn, "conversation_question") == 0

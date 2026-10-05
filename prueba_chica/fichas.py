@@ -20,6 +20,7 @@ Las jugadas de las situaciones generales (`elegir`, `corregir`, `cancelar`,
 from __future__ import annotations
 
 import json
+import unicodedata
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import date, datetime, time
@@ -31,7 +32,8 @@ import psycopg
 
 from leda.autoridad import Denegado, Solicitante
 from leda.calendario import Calendario
-from leda.herramientas import ejecutar
+from leda.herramientas import (EstadoCambio, NecesitaConfirmacion, NecesitaElegir,
+                               NecesitaOpciones, ejecutar)
 
 from .ia import Jugada
 
@@ -64,6 +66,10 @@ class Contexto:
 Manejador = Callable[[Contexto, Jugada], dict[str, Any]]
 
 
+# Una tarea abierta: comprometida y sin cerrar (mecánica §3).
+ESTADOS_ABIERTOS = frozenset({"asignada", "en_curso", "bloqueada", "en_revision"})
+
+
 @dataclass(frozen=True)
 class Ficha:
     """Una jugada de la lista cerrada (ADR 0018, decisión 4)."""
@@ -77,7 +83,8 @@ class Ficha:
     despues: str
     manejar: Callable[[Contexto, dict[str, Any], dict[str, Any] | None], dict[str, Any]]
     del_responsable: bool = False   # la tarea tiene que ser de quien escribe
-    estados: frozenset[str] | None = None   # en qué estados de la tarea vale; None: abierta
+    # En qué estados de la tarea vale, si es del responsable: por omisión, abierta.
+    estados: frozenset[str] = ESTADOS_ABIERTOS
     se_ofrece: bool = True          # False: se reconoce, pero no se hace por chat (9g)
 
 
@@ -105,13 +112,43 @@ def _correr(ficha: Ficha, ctx: Contexto, jugada: Jugada) -> dict[str, Any]:
                 # principio del turno (otra jugada del mismo mensaje pudo cambiarlo).
                 fila = _exigir_responsable(ctx.cur, ctx.quien, tarea["id"])
                 tarea = {**tarea, "estado": str(fila["estado"])}
-                if ficha.estados is not None and tarea["estado"] not in ficha.estados:
+                if tarea["estado"] not in ficha.estados:
                     return _hecho(ficha, "no_se_puede", motivo="estado",
                                   tarea=_tarea(tarea), estado=tarea["estado"])
             return {"jugada": ficha.nombre, **ficha.manejar(ctx, datos, tarea)}
-    except Denegado:
-        return _hecho(ficha, "no_se_puede", motivo="no_autorizado",
-                      tarea=_tarea(tarea) if tarea else None)
+    except Exception as e:      # el punto de guardado ya deshizo lo de esta jugada
+        rechazo = _rechazo_del_dominio(e)
+        if rechazo is None:
+            raise
+        resultado, mas = rechazo
+        return _hecho(ficha, resultado, tarea=_tarea(tarea) if tarea else None, **mas)
+
+
+def _rechazo_del_dominio(e: Exception) -> tuple[str, dict[str, Any]] | None:
+    """Lo que `herramientas.ejecutar` levanta como respuesta del dominio, en hechos; `None`
+    si es una falla de verdad. Nunca su texto: puede traer detalles técnicos (§10)."""
+    if isinstance(e, Denegado):
+        return "no_se_puede", {"motivo": "no_autorizado"}
+    if isinstance(e, NecesitaElegir):
+        return "falta_dato", {"falta": [e.campo],
+                              "coinciden": [nombre for nombre, _ in e.opciones]}
+    if isinstance(e, (NecesitaConfirmacion, EstadoCambio, NecesitaOpciones)):
+        # Con `ya_confirmada` no deberían llegar: piden un paso que esta jugada no tiene.
+        return "no_se_puede", {"motivo": "pide_otro_paso"}
+    if isinstance(e, psycopg.errors.RaiseException):
+        # Una regla del trabajo que la base hace cumplir (un disparador), no una falla.
+        return "no_se_puede", {"motivo": "regla_del_trabajo"}
+    return None
+
+
+def _no_hecho(r: dict[str, Any], tarea: dict[str, Any]) -> dict[str, Any]:
+    """Un rechazo de negocio que la operación devuelve como dict, en hechos."""
+    if r.get("falta"):
+        return {"resultado": "no_se_puede", "motivo": "falta", "falta": r["falta"],
+                "tarea": _tarea(tarea)}
+    motivo = ("tarea_cerrada" if "cerrada" in str(r.get("error", ""))
+              else "tarea_desconocida")
+    return {"resultado": "no_se_puede", "motivo": motivo, "tarea": _tarea(tarea)}
 
 
 def _vacio(valor: Any) -> bool:
@@ -213,9 +250,7 @@ def _anotar_inicio(ctx: Contexto, datos: dict, tarea: dict) -> dict:
     r = ejecutar(ctx.cur, ctx.quien, "actualizar_estado",
                  {"tarea_id": tarea["id"], "estado": "en_curso"}, ya_confirmada=True)
     if r.get("estado") != "en_curso":
-        return {"resultado": "no_se_puede", "tarea": _tarea(tarea),
-                **({"motivo": "falta", "falta": r["falta"]} if r.get("falta")
-                   else {"motivo": "tarea_desconocida"})}
+        return _no_hecho(r, tarea)
     _cerrar_esperas(ctx, tarea["id"])
     return {"resultado": "anotado", "tarea": _tarea(tarea), "estado": "en_curso"}
 
@@ -303,7 +338,7 @@ def _anotar_bloqueo(ctx: Contexto, datos: dict, tarea: dict) -> dict:
     r = ejecutar(ctx.cur, ctx.quien, "registrar_bloqueo",
                  {"tarea_id": tarea["id"], "causa": causa}, ya_confirmada=True)
     if "bloqueo_id" not in r:
-        return {"resultado": "no_se_puede", "motivo": "tarea_cerrada", "tarea": _tarea(tarea)}
+        return _no_hecho(r, tarea)
     _cerrar_esperas(ctx, tarea["id"])
     hecho = {"resultado": "anotado", "tarea": _tarea(tarea), "causa": causa}
     # Si la causa depende de otra persona (lo dice la IA; sin decirlo, se pregunta), quién
@@ -346,10 +381,7 @@ def _anotar_quien_destraba(ctx: Contexto, datos: dict, tarea: dict | None) -> di
 
     integrante = None
     if quien_texto is not None:
-        cur.execute("""select membership_id, nombre from integrante
-                        where activo and nombre ilike %s order by nombre""",
-                    (f"%{quien_texto}%",))
-        coinciden = cur.fetchall()
+        coinciden = _integrantes_que_coinciden(cur, quien_texto)
         if len(coinciden) > 1:
             return {"resultado": "falta_dato", "falta": ["integrante"],
                     "coinciden": [c["nombre"] for c in coinciden]}
@@ -371,6 +403,24 @@ def _anotar_quien_destraba(ctx: Contexto, datos: dict, tarea: dict | None) -> di
                                 else {"integrante": integrante["nombre"]} if integrante
                                 else {"externo": quien_texto})}
     return {**hecho, "salidas": list(SALIDAS_DE_UN_BLOQUEO)} if no_sabe else hecho
+
+
+def _palabras(texto: str) -> list[str]:
+    """Las palabras de un nombre, sin mayúsculas ni acentos."""
+    sin_acentos = unicodedata.normalize("NFKD", texto.casefold())
+    sin_acentos = "".join(c for c in sin_acentos if not unicodedata.combining(c))
+    return "".join(c if c.isalnum() else " " for c in sin_acentos).split()
+
+
+def _integrantes_que_coinciden(cur, dicho: str) -> list[dict[str, Any]]:
+    """Los integrantes del espacio cuyo nombre tiene, como palabras enteras, todas las
+    palabras de lo dicho: "ismael" es Ismael Soschinski; "Mar" no es Marcos. Se compara
+    acá y no con un patrón de la base, así nada de lo dicho actúa como comodín."""
+    buscadas = _palabras(dicho)
+    if not buscadas:
+        return []
+    cur.execute("select membership_id, nombre from integrante where activo order by nombre")
+    return [f for f in cur.fetchall() if set(buscadas) <= set(_palabras(f["nombre"]))]
 
 
 def _consultar_pendientes(ctx: Contexto, datos: dict, tarea: dict | None) -> dict:
