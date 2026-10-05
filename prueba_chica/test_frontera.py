@@ -40,6 +40,8 @@ PERMITIDOS: dict[str, set[str] | None] = {
     "llm": None,
     "jev": None,
     "config": None,
+    # La activación de siempre, para el escuchador (E2-3b); `onboarding` sólo importa `salida`.
+    "onboarding": {"activar", "bienvenida", "ActivacionInvalida"},
 }
 
 PROHIBIDOS = {"gateway", "agente", "ingreso_tareas", "contexto", "respuesta_unica",
