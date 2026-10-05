@@ -49,6 +49,9 @@ def elegir(ctx, datos: dict, tarea: dict | None) -> dict:
         opcion = ctx.cur.fetchone()
     if opcion is not None:
         return elegir_opcion(ctx, opcion)
+    if abierta is not None and preguntas.opciones(ctx.cur, abierta["id"]):
+        # Hay una duda abierta, pero lo elegido no es una de sus opciones.
+        return {"resultado": "falta_dato", "falta": ["opcion"]}
     ctx.cur.execute("""select q.id from conversation_question q
                         where q.membership_id = %s and q.cerrada_en is not null
                           and exists (select 1 from conversation_option o

@@ -379,6 +379,16 @@ def test_la_jugada_que_espera_una_eleccion_conserva_sus_datos(conn, tareas, marc
         "2026-10-21", "espera el switch")
 
 
+def test_una_opcion_que_no_es_de_la_pregunta_abierta_es_un_dato_que_falta(conn, tareas, marcos):
+    marcos.dice(Jugada("anotar_inicio", {}))
+
+    r = marcos.dice(Jugada("elegir", {"opcion": "O9"}))
+
+    assert r.hechos == [{"jugada": "elegir", "resultado": "falta_dato", "falta": ["opcion"]}]
+    assert _abierta(conn) == ("cual_tarea", None)
+    assert r.pregunta["tipo"] == "cual_tarea" and r.pregunta["desde_antes"] is True
+
+
 # --- Situación 7: algo vencido, escrito (conversación 11) -----------------------------------
 
 def test_elegir_de_una_pregunta_cerrada_no_hace_nada_y_dice_con_que_se_cerro(conn, tareas,
