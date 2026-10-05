@@ -283,13 +283,18 @@ def _duda(ficha: Ficha, ctx: Contexto, datos: dict[str, Any]) -> dict[str, Any]:
 
 
 def _nombrar_pregunta(hecho: dict[str, Any], clave: str, tipo: str) -> None:
-    """Pone en los hechos la pregunta que abrió la jugada. Si ya nombraban otra con la misma
-    clave (dos que quedaron para después), quedan las dos, en orden: nunca se pierde una."""
+    """Pone en los hechos la pregunta que abrió la jugada, siempre como un nombre (`pregunta` o
+    `pregunta_para_despues`). Si la clave ya nombra otra (dos que quedaron para después), la
+    nueva va a `otras_preguntas_para_despues`, una lista: nunca se pierde una y cada clave
+    tiene siempre la misma forma."""
     antes = hecho.get(clave)
     if antes is None or antes == tipo:
         hecho[clave] = tipo
-    else:
-        hecho[clave] = [*(antes if isinstance(antes, list) else [antes]), tipo]
+    elif tipo not in hecho.setdefault(OTRAS_PARA_DESPUES, []):
+        hecho[OTRAS_PARA_DESPUES].append(tipo)
+
+
+OTRAS_PARA_DESPUES = "otras_preguntas_para_despues"
 
 
 def _clave_de_pregunta(ahora: bool) -> str:

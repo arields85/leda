@@ -180,3 +180,13 @@ def test_la_pregunta_de_despues_abre_su_espera_cuando_se_hace(conn, mundo, dias,
     [espera] = _todos(conn, """select preguntado_en from pending_reply
                                 where tipo = 'quien_destraba' and satisfecho_en is null""")
     assert espera["preguntado_en"] == _hora(6, 10, 10)
+
+
+def test_cada_clave_de_pregunta_de_los_hechos_tiene_siempre_la_misma_forma():
+    hecho: dict = {}
+    fichas._nombrar_pregunta(hecho, "pregunta_para_despues", PROPUESTA)
+    fichas._nombrar_pregunta(hecho, "pregunta_para_despues", FECHA)
+    fichas._nombrar_pregunta(hecho, "pregunta_para_despues", FECHA)
+
+    assert hecho == {"pregunta_para_despues": PROPUESTA,
+                     "otras_preguntas_para_despues": [FECHA]}

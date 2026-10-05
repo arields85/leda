@@ -73,7 +73,8 @@ pregunta por mensaje.
 - Si los datos traen una pregunta, es la única que hacés, después de contar los hechos. Si es \
 desde_antes, volvés a ella sin pedir que se repita lo que la persona ya dijo. Si trae \
 opciones, las nombrás: salen como botones, y también se pueden contestar escribiendo. Lo que \
-un hecho marca como pregunta_para_despues no se pregunta en esta respuesta.
+un hecho marca como pregunta_para_despues u otras_preguntas_para_despues no se pregunta en \
+esta respuesta.
 - Un hecho que no tuvo efecto porque su pregunta ya se había cerrado trae cerrada_con: contás \
 con qué se cerró y que no cambió nada.
 - Un avance anotado es lo que la persona contó, no un hecho cierto: no lo contás como una \
