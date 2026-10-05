@@ -30,14 +30,15 @@ una lista cerrada y el código las ejecuta; estado por persona y registro de tur
 fichas y ocho situaciones generales; la prueba chica y sus criterios). El 0018 queda como "propuesta" hasta que
 pase la prueba chica. M1 quedó registrado en el documento de la unidad y en la línea "Estado" de cada ADR.
 
-## Punto exacto para retomar (2026-10-04, después de P1 a P16)
+## Punto exacto para retomar (2026-10-04, plan de la Etapa 2 en borrador)
 
 - **Qué:** el Motor, con la Etapa 1 terminada.
 - **Dónde:** rama `feat/motor-de-conversacion`, carpeta `D:\Proyectos\Leda-PM-worktrees\motor-de-conversacion`
   (reglas en [`../AGENTS.md`](../AGENTS.md), "Dónde se trabaja y qué no se hace").
 - **Hecho:** la E1-3 (`tests/conversaciones/`, catorce conversaciones) y las decisiones P1 a P16 del usuario,
   aplicadas a ellas y escritas en el ADR 0018, decisión 9.
-- **Primer paso, el plan de la Etapa 2** ("Próximo paso").
+- **Primer paso:** el borrador del plan de la Etapa 2 (`odd/tasks/prueba-chica-del-motor.md`) espera las cinco
+  decisiones del usuario de su sección 10; con ellas, la tarea E2-1.
 - **Acuerdos de trabajo:** chequeo de rumbo escrito antes de cada unidad; consentimiento permanente del usuario
   para los commits de cada unidad y para las revisiones RDD (`tools/rdd_ciclo.py <carpeta> <base>`), que
   comparan la rama con `origin/main`; un cambio en `AGENTS.md` sale de riesgo medio y pide consentimiento, que el
@@ -50,16 +51,9 @@ El avance se registra en `odd/tasks/motor-de-conversacion.md`.
 
 **Etapa 1. Diseño, sin código.** Terminada: ADR 0017 y 0018 (M1), E1-4 y E1-3.
 
-**Etapa 2. Prueba chica y descartable.** Su plan se escribe antes del código. Ya fijado:
-
-- vive fuera de `src/leda` y prueba el recordatorio y lo que la persona contesta (ADR 0018, decisión 5a);
-- se aprueba o se frena con los criterios 5b y 5c del ADR 0018 (conversaciones de la E1-3 corridas cinco veces
-  contra la IA real, una prueba por Telegram real y el juicio del usuario);
-- base nueva `leda_motor` (no existe), migraciones desde la `0030` (`0026` a `0029` son de la rama congelada) y
-  tareas ficticias cargadas con `sembrar` (ADR 0017, decisión 5);
-- `tools/restriccion_horario.py` tiene que admitir `leda_motor`; el `.env` de la carpeta lo copia el usuario;
-  PostgreSQL se levanta a mano (`levantar-postgres.bat`); un solo listener por bot;
-- arranca con GPT-6 sol; luna y Jev corren en paralelo (ADR 0018, decisiones 6 y 7).
+**Etapa 2. Prueba chica y descartable.** Plan en borrador: `odd/tasks/prueba-chica-del-motor.md` (fuera de
+`src/leda`, criterios 5b y 5c, base `leda_motor`, migraciones desde la `0030`, GPT-6 sol con luna y Jev en
+paralelo). PostgreSQL se levanta a mano (`levantar-postgres.bat`).
 
 **Etapa 3. Limpieza y motor de conversación definitivo.** Cortar los enredos con el código viejo, mudar las
 pruebas de garantías a archivos limpios, borrar los flujos A y B y, recién entonces, construir el motor de

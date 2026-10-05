@@ -160,4 +160,5 @@ que admitir `leda_motor`; `python -m leda modelo` ya existe (`docs/product/plata
 
 ## Próximo paso
 
-Escribir el plan de la Etapa 2, con la decisión 9 del ADR 0018 (P1 a P16).
+El plan de la Etapa 2, en borrador en [`prueba-chica-del-motor.md`](prueba-chica-del-motor.md), espera las
+decisiones del usuario (su sección 10).
