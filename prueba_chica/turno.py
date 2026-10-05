@@ -191,7 +191,13 @@ def _leer(cur, quien: Solicitante, ahora: datetime, *, entrante_id: str | None =
             raise LookupError("El mensaje no es de esta persona en este espacio.")
         texto, chat_id = entrante["texto"] or "", entrante["chat_id"]
 
-    cur.execute("""select a.tipo as aviso_tipo, a.task_id as aviso_tarea
+    # El último aviso es un envío: con sus tareas, que pueden ser varias si juntó avisos del
+    # día (mecánica §10).
+    cur.execute("""select a.tipo as aviso_tipo,
+                          array(select b.task_id from scheduled_notice b
+                                 where b.outbox_id = a.outbox_id and b.task_id is not null
+                                 order by b.creado_en, b.dedupe_key) as aviso_tareas,
+                          a.task_id as aviso_tarea
                      from conversation_state s
                      left join scheduled_notice a on a.id = s.ultimo_aviso_id
                     where s.membership_id = %s""", (quien.membership_id,))
@@ -240,9 +246,15 @@ def leer_ultimos_turnos(cur, membership_id: str) -> tuple[dict[str, Any], ...]:
 
 def _ultimo_aviso(fila, tareas) -> dict[str, Any] | None:
     """El último aviso que Leda le mandó y su tarea (la tarea sale del aviso, plan, sección
-    5): dice de qué tarea habla una respuesta que no la nombra."""
+    5): dice de qué tarea habla una respuesta que no la nombra. Si el envío juntó avisos de
+    varias tareas, las dice todas (`tareas`): ninguna es la del último aviso."""
     if fila is None or fila["aviso_tipo"] is None:
         return None
+    de_las = list(dict.fromkeys(str(t) for t in fila["aviso_tareas"] or []))
+    if len(de_las) > 1:
+        # En el orden de la lista de tareas de la persona, el mismo con que se las presenta.
+        return {"tipo": fila["aviso_tipo"],
+                "tareas": [t["alias"] for t in tareas if t["id"] in de_las]}
     return {"tipo": fila["aviso_tipo"], "tarea": _alias(tareas, fila["aviso_tarea"])}
 
 

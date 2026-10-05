@@ -150,10 +150,19 @@ def foto(conn, mundo: Mundo) -> dict[str, Any]:
                 de["abierta"] = dicha
             elif f["para_despues_en"] is not None:
                 de["para_despues"].append(dicha)
-        cur.execute("""select s.membership_id, a.task_id from conversation_state s
+        # El último aviso es un envío: su tarea, o sus tareas si juntó varias (mecánica §10).
+        cur.execute("""select s.membership_id,
+                              array(select b.task_id from scheduled_notice b
+                                     where b.outbox_id = a.outbox_id
+                                       and b.task_id is not null) as tareas
+                         from conversation_state s
                          join scheduled_notice a on a.id = s.ultimo_aviso_id
                         where s.workspace_id = %s""", (ws,))
-        ultimo_aviso = {persona(f["membership_id"]): tarea(f["task_id"]) for f in cur.fetchall()}
+        ultimo_aviso = {}
+        for f in cur.fetchall():
+            de_las = sorted({tarea(t) for t in f["tareas"] or []} - {None})
+            ultimo_aviso[persona(f["membership_id"])] = (
+                de_las[0] if len(de_las) == 1 else de_las or None)
     conn.commit()
     return {"estados": estados, "previsiones": previsiones, "bloqueos": bloqueos,
             "destraban": destraban, "avisos": avisos, "salidas": salidas,

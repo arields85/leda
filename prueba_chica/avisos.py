@@ -16,6 +16,14 @@ del espacio (9e), `enviar_avisos`:
    recibe, como su último aviso. Si pide el estado de la tarea, abre la pregunta y cuenta el
    recordatorio en la espera (`pending_reply`).
 
+**Un envío por persona** (mecánica §10; hallazgo de la E2-7): los avisos automáticos de una
+persona que salen juntos (los de la escalera de un día se guardan todos en la primera vuelta de
+ese día) se redactan en un solo mensaje, desde los hechos de todos, con la pregunta de uno solo
+(un tema a la vez: las demás quedan para después). Los de coordinación, que causa el acto de
+otra persona, salen aparte y siempre, como las respuestas. El tope diario del pack, si lo hay,
+lo aplica el despachador (`despachador._tope_diario`): pospone, nunca descarta; con un envío
+por día y por espacio, en la prueba chica no se alcanza.
+
 Si la IA no lo redacta, el aviso espera y se reintenta a los 1, 2, 4 y 8 minutos; al quinto
 fallo queda `fallido` con sus hechos, se registra un incidente y, si una persona lo causó (el
 turno que lo guardó), se le guarda un aviso de la falla con lo pendiente, que también redacta
@@ -72,6 +80,9 @@ ESCALAMIENTO_DE_UNA_PREGUNTA = "escalamiento_de_una_pregunta"
 
 ABIERTOS = ("asignada", "en_curso")     # en la escalera: comprometida, sin entregar
 ENVIADO = "enviado"                     # el estado de un aviso que ya salió, en un hecho
+# De menos a más urgente (mecánica §11): el tipo de un envío que junta varios avisos es el del
+# más urgente.
+URGENCIA = ("informativo", "normal", "seguimiento", "prioritario", "urgente")
 NO_SALIO = "no_salio"                   # un aviso que quedó fallido
 
 
@@ -159,12 +170,49 @@ def enviar_avisos(conn: psycopg.Connection, workspace_id: str, ia: IA, reloj: Re
                 order by programado_para, creado_en
                 for update skip locked""",
             (ahora, forzar, ahora, solo, solo))
+        listos: list[_Listo] = []
         for aviso in cur.fetchall():
-            resumen[_enviar_uno(m, aviso, ia)] += 1
+            listo = _preparar(m, aviso)
+            if isinstance(listo, str):
+                resumen[listo] += 1
+            else:
+                listos.append(listo)
+        for envio in _envios(listos):
+            for resultado in _enviar(m, envio, ia):
+                resumen[resultado] += 1
     return dict(resumen)
 
 
-def _enviar_uno(m: Momento, aviso: dict[str, Any], ia: IA) -> str:
+@dataclass(frozen=True)
+class _Listo:
+    """Un aviso que corresponde y sale ahora, con los hechos de este momento."""
+
+    aviso: dict[str, Any]
+    tipo: TipoDeAviso
+    destinatario: dict[str, Any]
+    hechos: dict[str, Any]
+
+
+def _envios(listos: list[_Listo]) -> list[list[_Listo]]:
+    """Los envíos: uno por persona con sus avisos automáticos, en el orden en que se guardaron,
+    y uno por cada aviso de coordinación (mecánica §10)."""
+    envios: list[list[_Listo]] = []
+    de_la_persona: dict[str, list[_Listo]] = {}
+    for listo in listos:
+        if listo.tipo.es_coordinacion:
+            envios.append([listo])
+            continue
+        persona = str(listo.destinatario["membership_id"])
+        if persona not in de_la_persona:
+            de_la_persona[persona] = []
+            envios.append(de_la_persona[persona])
+        de_la_persona[persona].append(listo)
+    return envios
+
+
+def _preparar(m: Momento, aviso: dict[str, Any]) -> _Listo | str:
+    """Si el aviso sale ahora: sus hechos de este momento; si no, cómo terminó (`omitido`,
+    `en_espera`)."""
     cur = m.cur
     aviso_id = str(aviso["id"])
     destinatario = integrante(cur, aviso["destinatario_membership_id"])
@@ -188,31 +236,42 @@ def _enviar_uno(m: Momento, aviso: dict[str, Any], ia: IA) -> str:
     if motivo is not None:
         omitir(cur, aviso_id, motivo, m.ahora)
         return "omitido"
+    return _Listo(aviso, tipo, destinatario, hechos)
 
-    pregunta = _pregunta_del_aviso(m, aviso, hechos)
+
+def _enviar(m: Momento, envio: list[_Listo], ia: IA) -> list[str]:
+    """Un envío: la IA redacta un mensaje desde los hechos de todos sus avisos, con una sola
+    pregunta (la del primero que pide respuesta); sale por el outbox una vez y cada aviso queda
+    `enviado` con esa fila. Cómo terminó cada aviso."""
+    cur = m.cur
+    destinatario = envio[0].destinatario
+    persona = str(destinatario["membership_id"])
+    preguntas_de = [_pregunta_del_aviso(m, x.aviso, x.hechos) for x in envio]
+    pregunta = next((q for q in preguntas_de if q is not None), None)
     pedido = {"hoy": m.hoy.isoformat(), "persona": destinatario["nombre"], "mensaje": None,
-              "hechos": [hechos], "pregunta": pregunta,
-              "ultimos_turnos": list(leer_ultimos_turnos(cur, str(destinatario[
-                  "membership_id"])))}
+              "hechos": [x.hechos for x in envio], "pregunta": pregunta,
+              "ultimos_turnos": list(leer_ultimos_turnos(cur, persona))}
     try:
         texto = no_vacio(ia.redactar(pedido))
     except Exception as falla:     # la IA es un servicio externo: cualquier falla es no redactar
-        return _si_la_ia_no_redacta(m, aviso, destinatario, falla)
+        return [_si_la_ia_no_redacta(m, x.aviso, destinatario, falla) for x in envio]
 
-    clave = f"motor:aviso:{aviso_id}"
+    primero = str(envio[0].aviso["id"])
+    clave = f"motor:aviso:{primero}"
     enqueue_outbox(cur, workspace_id=m.workspace_id, chat_id=destinatario["telegram_user_id"],
-                   text=texto, dedupe_key=clave,
-                   recipient_membership_id=str(destinatario["membership_id"]),
-                   message_type=tipo.tipo_de_mensaje, es_coordinacion=tipo.es_coordinacion,
-                   scheduled_for=m.ahora)
+                   text=texto, dedupe_key=clave, recipient_membership_id=persona,
+                   message_type=max((x.tipo.tipo_de_mensaje for x in envio),
+                                    key=URGENCIA.index),
+                   es_coordinacion=envio[0].tipo.es_coordinacion, scheduled_for=m.ahora)
     cur.execute("select id from message_outbox where dedupe_key = %s", (clave,))
     outbox_id = str(cur.fetchone()["id"])
-    cur.execute("""update scheduled_notice
-                      set estado = 'enviado', outbox_id = %s, resuelto_en = %s, hechos = %s,
-                          intentos = intentos + 1, proximo_intento_en = null
-                    where id = %s""", (outbox_id, m.ahora, _json(hechos), aviso_id))
-    persona = str(destinatario["membership_id"])
+    for x in envio:
+        cur.execute("""update scheduled_notice
+                          set estado = 'enviado', outbox_id = %s, resuelto_en = %s, hechos = %s,
+                              intentos = intentos + 1, proximo_intento_en = null
+                        where id = %s""", (outbox_id, m.ahora, _json(x.hechos), x.aviso["id"]))
     registrar_salida(cur, m.workspace_id, persona, outbox_id, ia.nombre, m.ahora)
+    # El último aviso es el envío: el primero de sus avisos; los demás comparten su fila.
     cur.execute(
         """insert into conversation_state (membership_id, workspace_id, ultimo_aviso_id,
                                            actualizado_en)
@@ -220,16 +279,22 @@ def _enviar_uno(m: Momento, aviso: dict[str, Any], ia: IA) -> str:
            on conflict (membership_id) do update
               set ultimo_aviso_id = excluded.ultimo_aviso_id,
                   actualizado_en = excluded.actualizado_en""",
-        (persona, m.workspace_id, aviso_id, m.ahora))
-    if pregunta is not None:
-        _abrir_la_pregunta(m, persona, aviso)
-    if tipo.escala:
-        # La espera que escala: la de su pregunta, o la del estado de la tarea.
-        cur.execute("""update pending_reply set escalado_en = %s
-                        where task_id = %s and tipo = %s
-                          and satisfecho_en is null and escalado_en is null""",
-                    (m.ahora, aviso["task_id"], _espera_del_aviso(hechos)))
-    return "enviado"
+        (persona, m.workspace_id, primero, m.ahora))
+    # Las preguntas de un mismo envío, ordenadas como las de un turno: la primera queda
+    # abierta y las demás para después (un tema a la vez).
+    turno = SimpleNamespace(cur=cur, ahora=m.ahora, preguntas_del_turno=[], dejadas=[],
+                            quien=SimpleNamespace(workspace_id=m.workspace_id,
+                                                  membership_id=persona))
+    for x, q in zip(envio, preguntas_de):
+        if q is not None:
+            _abrir_la_pregunta(m, turno, x.aviso)
+        if x.tipo.escala:
+            # La espera que escala: la de su pregunta, o la del estado de la tarea.
+            cur.execute("""update pending_reply set escalado_en = %s
+                            where task_id = %s and tipo = %s
+                              and satisfecho_en is null and escalado_en is null""",
+                        (m.ahora, x.aviso["task_id"], _espera_del_aviso(x.hechos)))
+    return ["enviado"] * len(envio)
 
 
 def _espera_del_aviso(hechos: dict[str, Any]) -> str:
@@ -253,7 +318,7 @@ def _pregunta_del_aviso(m: Momento, aviso, hechos: dict[str, Any]) -> dict[str, 
             "tarea": {"titulo": hechos.get("tarea")}, "desde_antes": False}
 
 
-def _abrir_la_pregunta(m: Momento, persona: str, aviso: dict[str, Any]) -> None:
+def _abrir_la_pregunta(m: Momento, turno, aviso: dict[str, Any]) -> None:
     """La pregunta del aviso, ordenada con las demás de la persona, y el recordatorio contado
     en su espera. Un pedido de estado abre la pregunta del estado (`preguntas.abrir`; la misma
     si sigue abierta de un recordatorio anterior), que no se puede dejar sin efecto (9b), y
@@ -261,9 +326,7 @@ def _abrir_la_pregunta(m: Momento, persona: str, aviso: dict[str, Any]) -> None:
     pedido, hecho de nuevo, y un tema a la vez. La repregunta de una pregunta que espera
     respuesta la vuelve a hacer: es la abierta (`preguntas.retomar`)."""
     task_id, tipo_de_aviso = str(aviso["task_id"]), aviso["tipo"]
-    turno = SimpleNamespace(cur=m.cur, ahora=m.ahora, preguntas_del_turno=[], dejadas=[],
-                            quien=SimpleNamespace(workspace_id=m.workspace_id,
-                                                  membership_id=persona))
+    persona = turno.quien.membership_id
     if tipo_de_aviso == REPREGUNTA:
         pregunta = pregunta_del_aviso(m.cur, aviso)
         preguntas.retomar(turno, str(pregunta["id"]))

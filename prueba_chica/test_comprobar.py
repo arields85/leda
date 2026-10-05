@@ -36,3 +36,21 @@ def test_el_emparejamiento_no_se_deja_ganar_por_el_primero_que_coincide():
     reales = [{"tarea": "PLC", "fecha": "2026-10-27"}, {"tarea": "PLC", "fecha": "2026-10-30"}]
 
     assert cp._emparejar(esperados, reales) == ([], [])
+
+
+def test_un_envio_que_junto_avisos_de_dos_tareas_cumple_lo_esperado_de_las_dos():
+    """Un mensaje de Leda por su cuenta puede juntar avisos de varias tareas (mecánica §10):
+    el corredor lo compara con todas, no con una sola (revisión de la E2-7)."""
+    from prueba_chica.corredor import Salida, _sale_coincide
+
+    junto = Salida("Marcos", "texto", [], False, tipo="aviso_previo", tareas=["PLC", "COM"],
+                   hechos=[{"tarea": "PLC", "vence": "2026-10-23"},
+                           {"tarea": "COM", "vence": "2026-10-23"}], tipos=["aviso_previo"])
+
+    assert _sale_coincide({"a": "Marcos", "tipo": "aviso_previo", "tareas": ["PLC", "COM"]},
+                          junto)
+    assert _sale_coincide({"tipo": "aviso_previo", "tareas": ["COM", "PLC"],
+                           "hechos": {"tarea": "COM"}}, junto)
+    # Con una sola tarea de la conversación en el foco, el envío cumple lo de esa tarea.
+    assert _sale_coincide({"tarea": "PLC", "hechos": {"vence": "2026-10-23"}}, junto, {"PLC"})
+    assert not _sale_coincide({"tarea": "PLC"}, junto)

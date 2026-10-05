@@ -36,6 +36,9 @@ pasos:
       - a: Marcos
         tipo: aviso_previo
         tareas: [PLC, COM]
+    estado_despues:
+      # El último aviso es el de las dos tareas (en orden de su clave).
+      ultimo_aviso: {Marcos: [COM, PLC]}
     dice:
       - las dos tareas de Marcos
       - que vencen el viernes 23

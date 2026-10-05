@@ -113,14 +113,18 @@ def consultas_a_jev(conv: dict[str, Any]) -> int:
 
 @dataclass
 class Salida:
+    """Un mensaje entregado. Si lo mandó Leda por su cuenta, con sus avisos: un envío puede
+    juntar varios (mecánica §10), y entonces trae los tipos, las tareas y los hechos de todos."""
+
     a: str | None
     texto: str
     botones: list[str]
     es_respuesta: bool
-    tipo: str | None = None             # el tipo de aviso, si lo mandó Leda por su cuenta
+    tipo: str | None = None             # el tipo de aviso, si todos sus avisos son de uno
     tareas: list[str] = field(default_factory=list)
-    hechos: Any = None
+    hechos: Any = None                  # los de su aviso; una lista, si juntó varios
     el: str | None = None
+    tipos: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -353,7 +357,10 @@ class _Corredor:
         enlazó antes en la corrida) y, si lo mandó Leda por su cuenta, con su aviso."""
         salidas = []
         usados = self.enlazadas
-        aviso_de = {a["outbox_id"]: a for a in despues["avisos"].values() if a["outbox_id"]}
+        avisos_de: dict[str, list[dict[str, Any]]] = {}
+        for a in despues["avisos"].values():
+            if a["outbox_id"]:
+                avisos_de.setdefault(a["outbox_id"], []).append(a)
         for e in self.transporte.enviados[desde:]:
             quien = self.mundo.persona_de_chat(e.chat_id)
             fila_id = next((k for k, s in despues["salidas"].items()
@@ -362,14 +369,18 @@ class _Corredor:
             if fila_id is not None:
                 usados.add(fila_id)
             fila = despues["salidas"].get(fila_id, {})
-            aviso = aviso_de.get(fila_id)
+            # Los avisos del envío, en el orden de las tareas: uno solo, o los que juntó.
+            avisos = sorted(avisos_de.get(fila_id, []),
+                            key=lambda a: (a["tarea"] or "", a["tipo"]))
+            tipos = sorted({a["tipo"] for a in avisos})
+            hechos = [cp.normalizar(a["hechos"], self.mundo.titulos) for a in avisos]
             botones = [self.mundo.clave_de_titulo(b.etiqueta) or b.etiqueta for b in e.botones]
             salidas.append(Salida(
                 quien, e.texto, botones, bool(fila.get("es_respuesta")),
-                tipo=aviso["tipo"] if aviso else None,
-                tareas=[aviso["tarea"]] if aviso and aviso["tarea"] else [],
-                hechos=cp.normalizar(aviso["hechos"], self.mundo.titulos) if aviso else None,
-                el=cp.dia(self.reloj.ahora())))
+                tipo=tipos[0] if len(tipos) == 1 else None,
+                tareas=list(dict.fromkeys(a["tarea"] for a in avisos if a["tarea"])),
+                hechos=(hechos[0] if len(hechos) == 1 else hechos) if hechos else None,
+                el=cp.dia(self.reloj.ahora()), tipos=tipos))
         return salidas
 
     # -- lo que se comprueba ------------------------------------------------------------------
@@ -425,7 +436,8 @@ class _Corredor:
                         key=lambda s: (s.el or "", s.a or "", s.tareas, s.tipo or ""))
         sobran = list(reales)
         for e in esperadas:
-            i = next((i for i, s in enumerate(sobran) if _sale_coincide(e, s)), None)
+            i = next((i for i, s in enumerate(sobran) if _sale_coincide(e, s, self.foco)),
+                     None)
             if i is None:
                 c.falla(cp.MOTOR, "no salió lo esperado", e,
                         [_resumen(s) for s in reales if s.a == e.get("a")])
@@ -453,22 +465,30 @@ class _QueMira:
         return self.ia.redactar(pedido)
 
 
-def _sale_coincide(e: dict[str, Any], s: Salida) -> bool:
+def _sale_coincide(e: dict[str, Any], s: Salida, foco: set[str] | None = None) -> bool:
+    """Un mensaje de Leda por su cuenta contra lo esperado. Un envío que juntó avisos de varias
+    tareas (mecánica §10) cumple lo esperado de las tareas de la conversación (`foco`): la
+    tarea o las tareas, y un aviso de ese tipo con esos hechos entre los suyos."""
+    tareas = [t for t in s.tareas if foco is None or t in foco]
     if e.get("a") and e["a"] != s.a:
         return False
-    if e.get("tipo") and e["tipo"] != s.tipo:
+    if e.get("tipo") and e["tipo"] not in (s.tipos or [s.tipo]):
         return False
-    if "tarea" in e and s.tareas != [e["tarea"]]:
+    if "tarea" in e and tareas != [e["tarea"]]:
         return False
-    if "tareas" in e and sorted(s.tareas) != sorted(e["tareas"]):
+    if "tareas" in e and sorted(tareas) != sorted(e["tareas"]):
         return False
     if e.get("el") and e["el"] != s.el:
         return False
-    return cp.coincide(e.get("hechos") or {}, s.hechos or {})
+    if "hechos" not in e:
+        return True
+    de_cada_aviso = s.hechos if isinstance(s.hechos, list) else [s.hechos or {}]
+    return any(cp.coincide(e["hechos"], h) for h in de_cada_aviso)
 
 
 def _resumen(s: Salida) -> dict[str, Any]:
-    return {"a": s.a, "tipo": s.tipo, "tareas": s.tareas, "el": s.el, "hechos": s.hechos}
+    return {"a": s.a, "tipo": s.tipo or s.tipos, "tareas": s.tareas, "el": s.el,
+            "hechos": s.hechos}
 
 
 def correr_conversacion(conn, conv: dict[str, Any], ia: IA, *, vez: int = 1,

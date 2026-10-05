@@ -161,7 +161,8 @@ def transcripciones(corridas: list[Corrida], *, ronda: str) -> str:
             else:
                 lineas.append(f"**{etiqueta}.** {p.quien} ({p.cuando})")
             for s in p.salidas:
-                quien = "Leda" + (f", por su cuenta ({s.tipo} {', '.join(s.tareas)}, {s.el})"
+                tipo = s.tipo or "+".join(s.tipos)
+                quien = "Leda" + (f", por su cuenta ({tipo} {', '.join(s.tareas)}, {s.el})"
                                   if not s.es_respuesta else "")
                 botones = f" [botones: {', '.join(s.botones)}]" if s.botones else ""
                 lineas.append(f"- {quien} → {s.a}: «{s.texto}»{botones}")

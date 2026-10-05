@@ -263,11 +263,19 @@ def _abrir_la_espera(ctx, tipo: str, task_id: str) -> None:
 
 def retomar(ctx, pregunta_id: str) -> None:
     """Leda vuelve a hacer una pregunta que sigue sin contestar (la repite la escalera): es la
-    abierta, y la que estaba abierta, si era otra, queda para después (un tema a la vez)."""
+    abierta, y la que estaba abierta, si era otra, queda para después (un tema a la vez). Si la
+    abierta salió en este mismo mensaje (un envío que junta varios avisos), ésa va primero y
+    ésta queda para después, como al abrir."""
     vigente = actual(ctx.cur, ctx.quien.membership_id)
-    if vigente is not None and str(vigente["id"]) != pregunta_id:
-        _dejar_para_despues(ctx, str(vigente["id"]))
-    _que_sea_la_abierta(ctx, pregunta_id)
+    otra = vigente is not None and str(vigente["id"]) != pregunta_id
+    if otra and str(vigente["id"]) in ctx.preguntas_del_turno:
+        _dejar_para_despues(ctx, pregunta_id)
+    else:
+        if otra:
+            _dejar_para_despues(ctx, str(vigente["id"]))
+        _que_sea_la_abierta(ctx, pregunta_id)
+    if pregunta_id not in ctx.preguntas_del_turno:
+        ctx.preguntas_del_turno.append(pregunta_id)
 
 
 def cerrar(ctx, pregunta_id: str, cierre: str, detalle: dict[str, Any]) -> None:
