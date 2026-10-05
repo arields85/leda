@@ -5,8 +5,9 @@ Se trae lo mínimo de la llamada estructurada de la rama congelada (`llm.py` en
 `respaldo-flujos-antes-de-d`: herramienta forzada con `tool_choice` y `llamar_con_plazo`):
 
 - `elegir_jugadas` fuerza a la IA a contestar con una sola herramienta cuyo esquema es la lista
-  cerrada de jugadas, cada una con sus datos, más `fuera_de_la_lista` para decir que lo pedido
-  no está en ella. El código decide después si cada jugada vale (`fichas.py`).
+  cerrada de jugadas, cada una una variante con su definición y sólo sus datos, más
+  `fuera_de_la_lista` para decir que lo pedido no está en ella. El código decide después si
+  cada jugada vale (`fichas.py`).
 - `redactar` pide el texto de la respuesta desde los hechos, con el tono del espacio.
 
 Habla el protocolo de chat de OpenAI, que es el de GPT-6 sol por OpenRouter (el modelo del
@@ -42,25 +43,43 @@ PLAZO_S = 40.0
 TOPE_JUGADAS = 1500
 TOPE_REDACCION = 700
 
-# Cada dato que alguna ficha usa, con su tipo y qué es. Describen el dato, no un caso.
+# Cada dato que alguna ficha usa, con su tipo y qué es: qué dato es y que va sólo si la persona
+# lo dijo (revisión del contrato, 2026-10-05). Describen el dato, no un caso.
 DATOS = {
-    "tarea": ("string", "El alias de la tarea (T1, T2...), de la lista de tareas."),
-    "fecha": ("string", "La fecha que dijo la persona, como AAAA-MM-DD."),
-    "motivo": ("string", "Por qué, con las palabras de la persona."),
-    "causa": ("string", "Qué la traba, con las palabras de la persona."),
-    "quien": ("string", "Quién puede destrabarla, como lo nombró la persona."),
-    "no_sabe": ("boolean", "La persona dice que no sabe quién puede destrabarla."),
-    "nadie_mas": ("boolean", "La persona dice que nadie más puede destrabarla: le toca a "
-                             "ella."),
+    "tarea": ("string", "El alias de la tarea (T1, T2...), de la lista de tareas. Sólo si el "
+                        "mensaje, la pregunta abierta, el último aviso o la conversación dejan "
+                        "claro de cuál se habla; si no, va vacío y Leda pregunta cuál."),
+    "fecha": ("string", "La fecha para la que la persona espera terminar la tarea, como "
+                        "AAAA-MM-DD, calculada desde hoy. Sólo si la dijo."),
+    "motivo": ("string", "Por qué cambia la fecha: lo que la atrasa o la adelanta, con las "
+                         "palabras de la persona. Sólo si lo dijo; la fecha o el atraso "
+                         "mismos no son un porqué."),
+    "causa": ("string", "Lo que le falta a la persona o lo que frena el trabajo, con sus "
+                        "palabras. Sólo si lo dijo; nombrar la tarea o decir que está trabada "
+                        "no es una causa."),
+    "quien": ("string", "Quién puede destrabar el bloqueo, como lo nombró la persona. Sólo si "
+                        "lo nombró."),
+    "no_sabe": ("boolean", "Verdadero sólo si la persona dice que no sabe quién puede "
+                           "destrabarlo."),
+    "nadie_mas": ("boolean", "Verdadero sólo si la persona dice que nadie más puede "
+                             "destrabarlo: le toca a ella."),
     "palabras": ("string", "Lo que la persona contó de cómo viene la tarea, con sus palabras."),
     "a": ("string", "A quién quiere pasarle la tarea, como lo nombró la persona."),
     "opcion": ("string", "El alias de la opción que eligió (O1, O2...), de la pregunta "
                          "abierta."),
-    "corrige": ("string", "Qué jugada ya anotada se corrige, por su nombre."),
+    "corrige": ("string", "El nombre de la jugada ya anotada que la persona dice que estuvo "
+                          "mal."),
     "tarea_correcta": ("string", "El alias de la tarea en la que sí va, si la persona la "
                                  "dice."),
-    "que_pide": ("string", "Sólo con fuera_de_la_lista: qué pidió la persona, resumido."),
+    "que_pide": ("string", "Qué le pidió la persona a Leda, resumido."),
 }
+
+# Qué es lo que no está en la lista: sólo un pedido de hacer algo (revisión del contrato,
+# 2026-10-05; ronda 1, conversación 12).
+FUERA_DE_LA_LISTA_ES = (
+    "La persona le pide a Leda que haga algo que ninguna jugada hace. Es sólo un pedido de "
+    "hacer algo: una pregunta sobre la conversación o sobre lo que Leda hizo o dijo no es un "
+    "pedido y no lleva jugada.")
 
 
 class RespuestaInvalida(ValueError):
@@ -117,27 +136,32 @@ class ClienteCompatible:
 
 
 def esquema_de_jugadas(posibles: list[str]) -> dict[str, Any]:
-    """La herramienta cuyo esquema es la lista cerrada: el nombre de cada jugada (más
-    `fuera_de_la_lista`) y los datos que usan sus fichas."""
-    usados = {d for n in posibles if n in FICHAS
-              for d in FICHAS[n].necesita + FICHAS[n].opcional} | {"que_pide"}
-    para_que = "; ".join(f"{n}: {FICHAS[n].para_que}" for n in posibles if n in FICHAS)
+    """La herramienta cuyo esquema es la lista cerrada: cada jugada (más `fuera_de_la_lista`)
+    es una variante con su nombre, su definición (`Ficha.es`) y sólo sus datos (revisión del
+    contrato, 2026-10-05: un esquema plano le ofrecía todos los datos a todas). Sólo el nombre
+    es obligatorio: la tarea puede faltar (la duda la pregunta el código) y ningún dato se
+    fuerza."""
+    variantes = [_variante(n, FICHAS[n].es if n in FICHAS else n,
+                           FICHAS[n].necesita + FICHAS[n].opcional if n in FICHAS else ())
+                 for n in posibles]
+    variantes.append(_variante(FUERA_DE_LA_LISTA, FUERA_DE_LA_LISTA_ES, ("que_pide",)))
     return {"type": "function", "function": {
         "name": NOMBRE_HERRAMIENTA,
         "description": ("Las jugadas que corresponden al mensaje, en el orden en que la "
-                        f"persona las dijo. {para_que}; {FUERA_DE_LA_LISTA}: algo que "
-                        "ninguna jugada hace."),
+                        "persona las dijo; ninguna si el mensaje no dice ni pide nada que una "
+                        "jugada haga. Cada jugada lleva sólo sus datos."),
         "parameters": {
             "type": "object",
-            "properties": {"jugadas": {"type": "array", "items": {
-                "type": "object",
-                "properties": {
-                    "nombre": {"type": "string", "enum": [*posibles, FUERA_DE_LA_LISTA]},
-                    **{d: {"type": DATOS[d][0], "description": DATOS[d][1]}
-                       for d in DATOS if d in usados},
-                },
-                "required": ["nombre"]}}},
+            "properties": {"jugadas": {"type": "array", "items": {"anyOf": variantes}}},
             "required": ["jugadas"]}}}
+
+
+def _variante(nombre: str, es: str, datos: tuple[str, ...]) -> dict[str, Any]:
+    return {"type": "object", "description": es,
+            "properties": {"nombre": {"type": "string", "enum": [nombre]},
+                           **{d: {"type": DATOS[d][0], "description": DATOS[d][1]}
+                              for d in datos}},
+            "required": ["nombre"], "additionalProperties": False}
 
 
 def _datos_de(nombre: str, crudos: dict[str, Any]) -> dict[str, Any]:

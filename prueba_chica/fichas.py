@@ -126,6 +126,11 @@ class Ficha:
     # Si su manejador ya sigue el pedido de estado (un avance, 9h): la regla de la tarea vencida
     # no guarda otro pedido.
     sigue_el_pedido: bool = False
+    # Qué es la jugada para la IA que elige: lo que la persona dice para que sea ésta y en qué se
+    # distingue de las parecidas, desde el núcleo (mecánica §3 y §8). Va en el esquema de la
+    # herramienta, junto a sus datos (revisión del contrato, 2026-10-05). Describe la jugada,
+    # nunca un caso ni una frase.
+    es: str = ""
 
 
 # Lo que Leda propone cuando no hay otra persona que destrabe el bloqueo (la persona no sabe
@@ -881,7 +886,9 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
           manejar=_anotar_inicio, del_responsable=True,
           estados=frozenset({"asignada"}),
           contesta=(preguntas.ESTADO_DE_LA_TAREA, preguntas.FECHA_DE_LA_TAREA),
-          deshacer=_deshacer_inicio),
+          deshacer=_deshacer_inicio,
+          es="La persona dice que empezó a trabajar en una tarea. Es sólo el comienzo: no "
+             "trae la fecha para la que la termina ni dice que no puede avanzar."),
     Ficha("anotar_prevision", "anotar para cuándo prevé terminar una tarea, y por qué",
           necesita=("tarea", "fecha"), opcional=("motivo",),
           comprueba="que sea el responsable, que la tarea esté abierta y tenga fecha "
@@ -892,7 +899,12 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
                   "cierra la espera de esa tarea",
           manejar=_anotar_prevision, del_responsable=True,
           contesta=(preguntas.ESTADO_DE_LA_TAREA, preguntas.FECHA_DE_LA_TAREA),
-          deshacer=_deshacer_prevision, algo_cierto=True),
+          deshacer=_deshacer_prevision, algo_cierto=True,
+          es="La persona da la fecha para la que espera terminar una tarea, con su porqué o "
+             "sin él. Es un atraso (o un adelanto) previsto, no un bloqueo: quien da una fecha "
+             "dice cuándo va a terminar, aunque el porqué sea algo que espera, y no dice que "
+             "no puede avanzar. Una fecha nueva que reemplaza otra que dio antes es otra "
+             "previsión, no una corrección."),
     Ficha("anotar_bloqueo", "anotar que una tarea está trabada y por qué",
           necesita=("tarea",), opcional=("causa",),
           comprueba="que sea el responsable y que la tarea esté abierta",
@@ -902,7 +914,10 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
           manejar=_anotar_bloqueo, del_responsable=True,
           contesta=("causa_del_bloqueo", preguntas.ESTADO_DE_LA_TAREA,
                     preguntas.FECHA_DE_LA_TAREA),
-          deshacer=_deshacer_bloqueo, algo_cierto=True),
+          deshacer=_deshacer_bloqueo, algo_cierto=True,
+          es="La persona dice que no puede avanzar con una tarea: está trabada o parada. Su "
+             "causa es lo que le falta o lo que frena el trabajo, si la dice. Explicar por qué "
+             "se corre una fecha no es un bloqueo: es el porqué de una previsión."),
     Ficha("anotar_quien_destraba", "anotar quién puede destrabar un bloqueo",
           necesita=(), opcional=("tarea", "quien", "no_sabe", "nadie_mas"),
           comprueba="que haya un bloqueo abierto en una tarea suya",
@@ -912,7 +927,10 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
                   "salidas, que quedan como tema abierto",
           manejar=_anotar_quien_destraba,
           contesta=(preguntas.QUIEN_DESTRABA, preguntas.ESTADO_DE_LA_TAREA),
-          propone=lambda hecho: hecho.get("salidas")),
+          propone=lambda hecho: hecho.get("salidas"),
+          es="La persona dice quién puede destrabar un bloqueo abierto (alguien del equipo o "
+             "de afuera), que no sabe quién, o que nadie más: le toca a ella. Es la respuesta "
+             "a quién lo destraba, no la causa del bloqueo."),
     Ficha("informar_avance", "anotar cómo viene una tarea cuando la persona cuenta un avance "
                              "sin un hecho cierto",
           necesita=("tarea",), opcional=("palabras",),
@@ -925,22 +943,30 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
                   "cierto, pregunta para cuándo. Sin un pedido siguiente (sin vencimiento, o "
                   "ya escaló), lo dice",
           manejar=_informar_avance, del_responsable=True,
-          contesta=(preguntas.ESTADO_DE_LA_TAREA,), sigue_el_pedido=True),
+          contesta=(preguntas.ESTADO_DE_LA_TAREA,), sigue_el_pedido=True,
+          es="La persona cuenta cómo viene una tarea sin un hecho cierto: no dice que la "
+             "terminó, ni para cuándo, ni que arrancó, ni que no puede avanzar. Si dice uno de "
+             "esos hechos, es la jugada de ese hecho, no ésta."),
     Ficha("consultar_pendientes", "contar qué tareas tiene pendientes",
           necesita=(), opcional=(),
           comprueba="nada", hace="lee sus tareas abiertas (consultar_tareas)",
-          despues="nada", manejar=_consultar_pendientes),
+          despues="nada", manejar=_consultar_pendientes,
+          es="La persona pregunta qué tareas tiene pendientes, o cómo están sus tareas. Leda "
+             "las lee de la base."),
     Ficha("entregar", "recibir la entrega de una tarea",
           necesita=(), opcional=("tarea",),
           comprueba="nada", hace="nada: todavía no se recibe por chat (9g)",
-          despues="sin aviso al administrador", manejar=_entregar, se_ofrece=False),
+          despues="sin aviso al administrador", manejar=_entregar, se_ofrece=False,
+          es="La persona dice que terminó una tarea. Terminarla no es contar que le falta "
+             "poco: eso es un avance."),
     Ficha("pedir_reasignacion", "pasarle una tarea a otra persona",
           necesita=(), opcional=("tarea", "a"),
           comprueba="nada", hace="nada: cambiar el responsable no es por chat (9g)",
           despues="dice quién lo decide y ofrece una nueva previsión, que queda como tema "
                   "abierto; sin aviso al administrador",
           manejar=_pedir_reasignacion, se_ofrece=False,
-          propone=lambda hecho: [hecho["alternativa"]] if hecho.get("alternativa") else None),
+          propone=lambda hecho: [hecho["alternativa"]] if hecho.get("alternativa") else None,
+          es="La persona pide que una tarea suya pase a otra persona."),
     # Las situaciones generales (`situaciones.py`): valen igual para todas las fichas.
     Ficha("elegir", "elegir una de las opciones de la pregunta abierta",
           necesita=("opcion",), opcional=(),
@@ -949,7 +975,10 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
           hace="cierra la pregunta con esa opción y hace la jugada que esperaba, con la "
                "opción como dato y las comprobaciones de su ficha",
           despues="vuelve la pregunta que quedó para después, si hay",
-          manejar=situaciones.elegir, se_ofrece=False),
+          manejar=situaciones.elegir, se_ofrece=False,
+          es="La persona elige una de las opciones de la pregunta abierta de Leda (o una de "
+             "las jugadas que Leda le propuso), tocando o escribiendo. Sin una pregunta abierta "
+             "con opciones, no es esta jugada."),
     Ficha("corregir", "corregir algo ya anotado que era de otra tarea o que no pasó",
           necesita=("corrige", "tarea"), opcional=("tarea_correcta",),
           comprueba="que sea el responsable y que eso haya quedado anotado en esa tarea en "
@@ -958,20 +987,28 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
                "el hecho va a la tarea correcta; nada se borra (9f)",
           despues="un aviso que no salió se retira; uno que ya salió lleva una corrección "
                   "al referente",
-          manejar=situaciones.corregir, del_responsable=True, se_ofrece=False),
+          manejar=situaciones.corregir, del_responsable=True, se_ofrece=False,
+          es="La persona dice que algo que ya quedó anotado estaba mal: era de otra tarea o no "
+             "pasó. Dar un hecho nuevo que reemplaza al de antes no es corregir: es la jugada "
+             "de ese hecho."),
     Ficha("cancelar", "dejar sin efecto la pregunta abierta",
           necesita=(), opcional=(),
           comprueba="que haya una pregunta abierta y que se pueda dejar (la de quién destraba "
                     "espera respuesta, 9c)",
           hace="la cierra sin anotar nada",
           despues="no se vuelve a preguntar; vuelve la que quedó para después, si hay",
-          manejar=situaciones.cancelar, se_ofrece=False),
+          manejar=situaciones.cancelar, se_ofrece=False,
+          es="La persona deja sin efecto la pregunta abierta de Leda: no la va a contestar. "
+             "Dejar sin efecto algo que ella misma dijo antes no es cancelar: es corregirlo o "
+             "dar el hecho nuevo."),
     Ficha("dejar_para_despues", "dejar la pregunta abierta para más tarde",
           necesita=(), opcional=(),
           comprueba="que haya una pregunta abierta",
           hace="la deja para después, sin cerrarla",
           despues="vuelve en un mensaje siguiente, cuando no haya otra abierta",
-          manejar=situaciones.dejar_para_despues, se_ofrece=False),
+          manejar=situaciones.dejar_para_despues, se_ofrece=False,
+          es="La persona deja la pregunta abierta de Leda para más tarde, sin contestarla ni "
+             "dejarla sin efecto."),
 )})
 
 

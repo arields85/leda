@@ -18,7 +18,8 @@ from prueba_chica.conftest import AHORA
 from prueba_chica.fichas import FICHAS, JUGADAS
 from prueba_chica.ia import Jugada
 from prueba_chica.ia_real import (FUERA_DE_LA_LISTA, NOMBRE_HERRAMIENTA, ClienteCompatible,
-                                  IAReal, PlazoAgotado, RespuestaInvalida, desde_base)
+                                  IAReal, PlazoAgotado, RespuestaInvalida, desde_base,
+                                  esquema_de_jugadas)
 from prueba_chica.instrucciones import (INSTRUCCIONES_JUGADAS, INSTRUCCIONES_REDACCION,
                                         Tono)
 from prueba_chica.tiempo import RelojFijo
@@ -96,21 +97,63 @@ def test_la_eleccion_fuerza_la_herramienta_con_la_lista_cerrada_y_la_lee():
     assert cuerpo["tool_choice"] == {"type": "function",
                                      "function": {"name": NOMBRE_HERRAMIENTA}}
     [herramienta] = cuerpo["tools"]
-    esquema = herramienta["function"]["parameters"]
-    jugada = esquema["properties"]["jugadas"]["items"]
-    assert jugada["properties"]["nombre"]["enum"] == sorted(JUGADAS) + [FUERA_DE_LA_LISTA]
-    # Cada dato que alguna ficha usa está en el esquema, con su tipo.
-    for ficha in FICHAS.values():
-        for dato in ficha.necesita + ficha.opcional:
-            assert dato in jugada["properties"], dato
+    variantes = _variantes(herramienta)
+    assert list(variantes) == sorted(JUGADAS) + [FUERA_DE_LA_LISTA]
     # Quién destraba lo dice la persona; la IA no juzga si la causa depende de otro (9c).
-    assert "depende_de_otro" not in jugada["properties"]
-    assert jugada["properties"]["no_sabe"]["type"] == "boolean"
-    assert jugada["properties"]["nadie_mas"]["type"] == "boolean"
+    destraba = variantes["anotar_quien_destraba"]["properties"]
+    assert "depende_de_otro" not in destraba
+    assert destraba["no_sabe"]["type"] == "boolean"
+    assert destraba["nadie_mas"]["type"] == "boolean"
     # La IA recibe sus instrucciones y la situación tal cual, como datos.
     sistema, usuario = cuerpo["messages"]
-    assert sistema == {"role": "system", "content": INSTRUCCIONES_JUGADAS}
+    assert sistema["role"] == "system"
+    assert sistema["content"].startswith(INSTRUCCIONES_JUGADAS)
     assert json.loads(usuario["content"]) == SITUACION
+
+
+def _variantes(herramienta) -> dict:
+    """Cada jugada del esquema, por su nombre."""
+    items = herramienta["function"]["parameters"]["properties"]["jugadas"]["items"]
+    return {v["properties"]["nombre"]["enum"][0]: v for v in items["anyOf"]}
+
+
+def test_cada_jugada_ofrece_solo_sus_datos_y_dice_que_la_distingue():
+    """Revisión del contrato (2026-10-05, ronda 1): un esquema plano le ofrecía todos los datos
+    a todas las jugadas, y la IA llenaba una causa con palabras que no eran una causa. Cada
+    jugada es una variante con sólo sus datos y su definición; nada más se acepta."""
+    variantes = _variantes(esquema_de_jugadas(sorted(JUGADAS)))
+    for nombre, variante in variantes.items():
+        ficha = FICHAS.get(nombre)
+        datos = set(ficha.necesita + ficha.opcional) if ficha else {"que_pide"}
+        assert set(variante["properties"]) == {"nombre"} | datos, nombre
+        assert variante["properties"]["nombre"]["enum"] == [nombre]
+        assert variante["additionalProperties"] is False
+        assert variante["description"].strip(), nombre
+        for dato in datos:
+            assert variante["properties"][dato]["description"].strip(), (nombre, dato)
+    # Cada definición es propia: ninguna jugada se describe como otra.
+    descripciones = [v["description"] for v in variantes.values()]
+    assert len(set(descripciones)) == len(descripciones)
+
+
+def test_la_tarea_nunca_es_obligatoria_en_el_esquema():
+    """La duda (situación general 5): si la jugada es clara y la tarea no, la IA elige la
+    jugada sin la tarea y el código pregunta cuál con opciones. Sólo el nombre es obligatorio:
+    ningún dato se fuerza, para que nunca se complete uno que la persona no dijo."""
+    for variante in _variantes(esquema_de_jugadas(sorted(JUGADAS))).values():
+        assert variante["required"] == ["nombre"]
+
+
+def test_las_instrucciones_de_las_jugadas_dicen_que_hacer_con_la_duda_y_las_preguntas():
+    """Ronda 1: "si no queda claro, no ponés ninguna" perdía la pregunta con botones (13), y
+    una pregunta sobre lo que Leda hizo se elegía como fuera de la lista (12). Reglas
+    generales, sin frases de las conversaciones."""
+    texto = INSTRUCCIONES_JUGADAS.lower()
+    assert "no ponés ninguna" not in texto
+    assert "sin la tarea" in texto
+    assert "no lleva jugada" in texto
+    for frase in ("le avisaste", "comprimidora", "switch", "turno con el medico"):
+        assert frase not in texto, frase
 
 
 def test_lo_que_no_esta_en_la_lista_llega_como_fuera_de_la_lista():
