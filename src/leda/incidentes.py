@@ -332,6 +332,44 @@ EXPLICACION_POR_ETAPA: dict[str, ExplicacionDeEtapa] = {
         que_hacer=("Leé el mensaje y decidí si hace falta una jugada nueva (ADR "
                    "0018, decisión 1); si hace falta, se escribe primero como "
                    "conversación de prueba. No hace falta avisarle a {nombre}.")),
+    # El Motor (`prueba_chica/escalera.py`, mecánica §9): falta configuración del espacio
+    # para la escalera. Leda siguió con el mínimo del núcleo o sin escalar.
+    "motor_escalera": ExplicacionDeEtapa(
+        titulo="La escalera de recordatorios necesita atención",
+        que_paso=("La escalera de recordatorios del motor de conversación no pudo seguir "
+                  "como lo configura el espacio: le falta cuántos días hábiles antes sale el "
+                  "aviso previo, o una ruta de escalamiento por falta de respuesta con "
+                  "alguien que no sea el responsable. El resumen dice cuál."),
+        que_vio=("Sin el aviso previo configurado, {nombre} lo recibió un día hábil antes, "
+                 "el mínimo; sin la ruta, la tarea no se escaló a nadie."),
+        que_hacer=(f"{_BUSCAR_DETALLE} y completá en el pack del espacio lo que falta "
+                   "(`aviso_previo_dias_habiles` o la ruta "
+                   "`falta_persistente_de_respuesta`).")),
+    # El Motor (`prueba_chica/avisos.py`, ADR 0018, decisión 8): la IA no redactó un aviso
+    # guardado tras sus reintentos. Nunca sale un texto armado a mano.
+    "motor_aviso_guardado": ExplicacionDeEtapa(
+        titulo="Un aviso de Leda no salió",
+        que_paso=("La IA no redactó un aviso guardado del motor de conversación (un "
+                  "recordatorio, un escalamiento o un aviso al referente) después de cinco "
+                  "intentos, a los 1, 2, 4 y 8 minutos. Quedó guardado con sus hechos, sin "
+                  "enviar: nunca sale un texto armado a mano."),
+        que_vio=("Nada: el aviso no le llegó a {nombre}. Si lo causó lo que escribió otra "
+                 "persona, a ella le llega un aviso de la falla."),
+        que_hacer=(_BUSCAR_DETALLE + " y corregí la causa (proveedor de la IA caído, clave "
+                   "vencida o un defecto). Una escalera sigue con su paso siguiente; decidí "
+                   "si hay que decirle a {nombre} lo que no le llegó.")),
+    # El Motor (`prueba_chica/ciclo.py`): se cayó un paso del ciclo que corre en el
+    # escuchador. Los demás pasos siguieron.
+    "motor_ciclo": ExplicacionDeEtapa(
+        titulo="Se cayó una parte del ciclo del motor",
+        que_paso=("Una parte del ciclo que corre cada minuto en el escuchador del motor (la "
+                  "escalera, los avisos guardados, el despacho de mensajes o el de los avisos "
+                  "a la administración) se cayó. Las demás siguieron, y ésta se reintenta en "
+                  "cada vuelta; mientras siga cayéndose no llega otro aviso."),
+        que_vio=("Todavía nada: lo que tenía que salir para {nombre} sale cuando esa parte "
+                 "vuelva a andar."),
+        que_hacer=(_BUSCAR_DETALLE + " y corregí la causa; la consola del escuchador "
+                   "dice en cada vuelta si sigue cayéndose.")),
 }
 
 _EXPLICACION_GENERICA = ExplicacionDeEtapa(

@@ -18,6 +18,9 @@ usar (importa `gateway`): acá está lo mínimo, reescrito.
   administrador de plataforma que le escribe (como `local.recibir_admin`), y por él salen los
   avisos de incidentes (`despachador.despachar_avisos_admin`). Un bot de administración con
   webhook puesto no se toca ni se sondea.
+- **El ciclo** (E2-6, `ciclo.py`): en cada vuelta, el despacho y los avisos a la
+  administración; con `seguimiento` (el comando lo prende), la escalera y los avisos guardados
+  una vez por minuto. Cada paso aislado: si uno se cae, un incidente y los demás siguen.
 
 Lo que no es un mensaje escrito de alguien del equipo (un grupo, un mensaje editado, una foto
 sin texto, un desconocido) no se atiende. Si un turno se cae por algo que no es la IA, queda un
@@ -43,14 +46,13 @@ import httpx
 from leda.autoridad import Canal, Denegado, identificar, identificar_en_espacio
 from leda.calendario import Calendario
 from leda.db import admin, espacio, registrar_auditoria
-from leda.despachador import (Transporte, despachar, despachar_avisos_admin, pedido_telegram,
-                              texto_error_seguro)
+from leda.despachador import Transporte, pedido_telegram, texto_error_seguro
 from leda.incidentes import (ETAPA_TURNO_CONVERSACION, REFERENCIA_INBOUND_MESSAGE,
                              registrar_incidente)
 from leda.onboarding import ActivacionInvalida, activar, bienvenida
 from leda.salida import enqueue_outbox
 
-from .botones import ConOpciones
+from .ciclo import Ciclo
 from .ia import IA
 from .preguntas import token_de
 from .tiempo import Reloj
@@ -79,7 +81,7 @@ class BotTelegram:
 class Escucha:
     def __init__(self, conn, workspace_id: str, ia: IA, reloj: Reloj, *, bot: BotTelegram,
                  transporte: Transporte, bot_admin: BotTelegram | None = None,
-                 transporte_admin: Transporte | None = None,
+                 transporte_admin: Transporte | None = None, seguimiento: bool = False,
                  imprimir: Callable[[str], None] = print) -> None:
         self.conn = conn
         self.ws = workspace_id
@@ -95,6 +97,11 @@ class Escucha:
         self.fallas: dict[int, int] = {}       # update → veces que falló al recibirlo
         self.offset_admin = 0
         self.admin_listo = False
+        # Lo que sale: el despacho en cada vuelta y, con `seguimiento`, la escalera y los
+        # avisos guardados cada minuto (`ciclo.py`).
+        self.ciclo = Ciclo(conn, workspace_id, ia, reloj, transporte,
+                           transporte_admin=transporte_admin, seguimiento=seguimiento,
+                           imprimir=imprimir)
 
     # -- arranque ------------------------------------------------------------------------
 
@@ -379,29 +386,9 @@ class Escucha:
     # -- lo que sale ---------------------------------------------------------------------
 
     def despachar(self) -> None:
-        ahora = self.reloj.ahora()
-        try:
-            with espacio(self.conn, self.ws) as cur:
-                # Las respuestas que preguntan una duda salen con sus opciones (`botones`).
-                r = despachar(cur, self.ws, ConOpciones(self.transporte, cur),
-                              Calendario.desde_base(cur, self.ws), ahora)
-            self.conn.commit()
-            if r["pospuestos"]:
-                self.imprimir(f"  … {r['pospuestos']} pospuesto(s) hasta la próxima jornada")
-        except Exception as e:  # noqa: BLE001 -- lo que no salió, sale en otra vuelta
-            self.conn.rollback()
-            self.imprimir(f"  ! no se pudo despachar: {texto_error_seguro(e)}")
-        if self.transporte_admin is None or not self.admin_listo:
-            return
-        try:
-            # Con el reloj real: `admin_notice` lo fecha la base, no el motor.
-            with admin(self.conn) as cur:
-                despachar_avisos_admin(cur, self.transporte_admin)
-            self.conn.commit()
-        except Exception as e:  # noqa: BLE001
-            self.conn.rollback()
-            self.imprimir(f"  ! no se pudo avisar a la administración: "
-                          f"{texto_error_seguro(e)}")
+        """El ciclo (`ciclo.py`): cada paso aislado, con un incidente si se cae. Los avisos a
+        la administración, sólo si su bot está listo."""
+        self.ciclo.vuelta(admin=self.admin_listo)
 
 
 def _origen(u: dict[str, Any]) -> tuple[dict[str, Any], int | None]:
@@ -461,7 +448,8 @@ def main(argv: list[str] | None = None) -> int:
         bot=BotTelegram(token, httpx.Client(timeout=ESPERA_S + 15)),
         transporte=TransporteTelegram(token),
         bot_admin=BotTelegram(token_admin, httpx.Client(timeout=15)) if token_admin else None,
-        transporte_admin=TransporteTelegram(token_admin) if token_admin else None)
+        transporte_admin=TransporteTelegram(token_admin) if token_admin else None,
+        seguimiento=True)
     try:
         usuario = escucha.preparar()
     except Exception as e:  # noqa: BLE001
@@ -469,7 +457,8 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     signal.signal(signal.SIGINT, _parar)
-    print(f"Escuchando como @{usuario}, espacio '{a.slug}', con {ia.nombre}. Ctrl+C corta.")
+    print(f"Escuchando como @{usuario}, espacio '{a.slug}', con {ia.nombre}; la escalera y "
+          f"los avisos guardados corren cada minuto. Ctrl+C corta.")
     while _seguir:
         escucha.una_vuelta()
     return 0

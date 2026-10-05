@@ -23,7 +23,8 @@ de nuevo en `src/leda`, con su propia prueba de frontera.
 - `ia_real.py` e `instrucciones.py`: la IA real. Una llamada que fuerza a la IA a contestar con
   la lista cerrada (o con `fuera_de_la_lista`) y una que redacta desde los hechos, con el tono
   del espacio. El modelo sale de `model_config`; la clave, del entorno.
-- `escuchar.py`: el escuchador por long polling (bot del equipo y bot de administración).
+- `escuchar.py`: el escuchador por long polling (bot del equipo y bot de administración),
+  con el ciclo.
 - `avisos.py`: los avisos guardados, todo lo que Leda manda por su cuenta. Al llegar su hora,
   sólo dentro del horario, se vuelve a leer la tarea; si todavía corresponde, la IA lo redacta
   desde los hechos de ese momento y va al outbox; si no, queda omitido con su motivo. Si la IA
@@ -32,8 +33,11 @@ de nuevo en `src/leda`, con su propia prueba de frontera.
 - `escalera.py`: la escalera propia (mecánica §9; ADR 0018, 9b), en días hábiles desde el
   vencimiento: un aviso previo, pedidos de estado desde V que abren una espera y avanzan sólo
   sin respuesta, y el escalamiento por la ruta del pack. Un bloqueo la detiene; una ausencia
-  la pausa y la vuelta lleva un reencuadre. Sólo guarda avisos: los manda `avisos.py`. La
-  correrá cada minuto el ciclo de la E2-6.
+  la pausa y la vuelta lleva un reencuadre. Sólo guarda avisos: los manda `avisos.py`. Termina
+  al escalar o con una respuesta; un paso que no llegó (la IA no lo redactó) no la apaga.
+- `ciclo.py`: el ciclo, dentro del escuchador. Cada minuto, la escalera y los avisos guardados;
+  en cada vuelta, el despacho (con el reloj de Leda) y los avisos a la administración. Cada
+  paso aislado: si uno se cae, un incidente para el administrador y los demás siguen.
 - `avisar.py`: el comando que dispara a mano el aviso previo de una tarea, por el mismo
   camino que los demás avisos guardados.
 - `tiempo.py`: el reloj del motor. Los momentos los pone el motor, nunca la base.
@@ -119,9 +123,8 @@ Después, leer la conversación con `tools/leer_conversacion.py` y la base (`con
   queda en `scheduled_notice`, estado `guardado`. El hecho de la respuesta lo dice
   (`guardado_sin_enviar`, con la hora en que sale): Leda le dice a Marcos que Ismael se va a
   enterar, nunca que ya está avisado (primer contacto real, 2026-10-05).
-- **El aviso previo se dispara a mano:** no hay ciclo, escalera ni reintentos a los 1, 2, 4 y
-  8 minutos (E2-5 y E2-6). Si la IA no lo redacta, queda guardado y se vuelve a correr el
-  comando.
+- **El escuchador corre el ciclo** (E2-6): la escalera guarda el aviso previo sola, a su hora,
+  y los avisos guardados salen con sus reintentos. El comando `avisar` lo adelanta a mano.
 - **Pedidos fuera de la lista:** Leda dice qué puede hacer y el administrador recibe un aviso
   por el bot de administración; a la persona no se le dice que se avisó, salvo que lo pregunte.
 - **`tools/restriccion_horario.py` todavía no admite `leda_motor`** (E2-6).
