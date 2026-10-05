@@ -200,6 +200,82 @@ def test_si_el_turno_se_cae_queda_un_incidente_y_la_persona_recibe_el_texto_fijo
     assert [e.texto for e in m.salida.enviados] == [TEXTO_SI_LA_IA_FALLA]
 
 
+# --- Una falla al recibir no pierde el mensaje ni corta la escucha (revisión de la E2-3b) -----
+
+def _falla_con(monkeypatch, metodo: str, message_ids: set[int], veces: int | None = None):
+    """Hace fallar `Escucha.<metodo>` para esos mensajes, `veces` veces (o siempre), como una
+    base que se cae en el medio."""
+    import psycopg
+
+    original = getattr(Escucha, metodo)
+    fallas = {"n": 0}
+
+    def falla(self, mensaje, *args, **kwargs):
+        mid = mensaje["message_id"] if isinstance(mensaje, dict) else args[-1]
+        if mid in message_ids and (veces is None or fallas["n"] < veces):
+            fallas["n"] += 1
+            raise psycopg.OperationalError("la base no contesta")
+        return original(self, mensaje, *args, **kwargs)
+
+    monkeypatch.setattr(Escucha, metodo, falla)
+    return fallas
+
+
+def test_una_falla_al_guardar_no_corta_la_escucha_y_el_mensaje_vuelve(conn, mundo, monkeypatch):
+    """La falla deshace lo suyo, la escucha sigue y el mensaje no se pierde: el offset no pasa
+    de él, así que Telegram lo vuelve a entregar y se atiende."""
+    _falla_con(monkeypatch, "_guardar", {1100}, veces=1)
+    ia = IAGuionada(jugadas=[[Jugada("anotar_inicio", {"tarea": "T1"})]],
+                    redacciones=["Anotado."])
+    m = _montar(conn, mundo, ia)
+    m.telegram.lotes = [[_mensaje(1100, "arranqué")], [_mensaje(1100, "arranqué")]]
+
+    m.escucha.una_vuelta(espera=0)          # no levanta: la escucha sigue
+    m.escucha.una_vuelta(espera=0)
+
+    pedidos = [p for metodo, p in m.telegram.llamadas if metodo == "getUpdates"]
+    assert [p["offset"] for p in pedidos[:2]] == [0, 0]      # no pasó del que falló
+    assert _cuantas(conn, "inbound_message") == 1
+    assert _cuantas(conn, "conversation_turn", "sentido = 'entrada'") == 1
+    assert [e.texto for e in m.salida.enviados] == ["Anotado."]
+    assert m.escucha.offset == 1101
+
+
+def test_un_mensaje_que_falla_siempre_queda_como_incidente_y_la_escucha_sigue(conn, mundo,
+                                                                             monkeypatch):
+    """Tras los intentos, nunca en silencio: un incidente, el texto fijo a la persona y el
+    mensaje siguiente se atiende."""
+    _falla_con(monkeypatch, "_guardar", {1200})
+    ia = IAGuionada(jugadas=[[]], redacciones=["Bien."])
+    m = _montar(conn, mundo, ia)
+    atascado = _mensaje(1200, "arranqué")
+    m.telegram.lotes = [[atascado, _mensaje(1201, "hola")] for _ in range(3)]
+
+    for _ in range(3):
+        m.escucha.una_vuelta(espera=0)
+
+    incidente = _uno(conn, "select * from incident")
+    assert incidente["etapa"] == "turno_conversacion" and incidente["severidad"] == "alta"
+    assert incidente["chat_id"] == MARCOS
+    assert _cuantas(conn, "incident") == 1
+    # El atascado no se guardó; el siguiente sí, con su turno, en la tercera vuelta.
+    assert _cuantas(conn, "inbound_message") == 1
+    assert sorted(e.texto for e in m.salida.enviados) == sorted([TEXTO_SI_LA_IA_FALLA, "Bien."])
+    assert m.escucha.offset == 1202
+
+
+def test_una_falla_al_activar_no_corta_la_escucha(conn, mundo, monkeypatch):
+    _falla_con(monkeypatch, "_activar", {1300})
+    m = _montar(conn, mundo, IAGuionada())
+    m.telegram.lotes = [[_mensaje(1300, "/start")] for _ in range(3)]
+
+    for _ in range(3):
+        m.escucha.una_vuelta(espera=0)
+
+    assert _cuantas(conn, "incident") == 1
+    assert m.escucha.offset == 1301
+
+
 # --- Activación -------------------------------------------------------------------------------
 
 def test_un_enlace_de_activacion_vincula_a_la_persona_y_le_da_la_bienvenida(conn, mundo):

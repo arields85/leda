@@ -21,7 +21,10 @@ usar (importa `gateway`): acá está lo mínimo, reescrito.
 
 Lo que no es un mensaje escrito de alguien del equipo (un grupo, un mensaje editado, una foto
 sin texto, un desconocido) no se atiende. Si un turno se cae por algo que no es la IA, queda un
-incidente y la persona recibe el texto fijo de la falla (nunca en silencio). El token de los
+incidente y la persona recibe el texto fijo de la falla (nunca en silencio). Si falla recibir un
+update (guardarlo, activar), se deshace lo suyo, la escucha sigue y el offset no pasa de él:
+Telegram lo vuelve a entregar; a los `INTENTOS_POR_UPDATE` se deja, con un incidente y el texto
+fijo a la persona (revisión de la E2-3b). El token de los
 bots nunca se imprime: los errores de Telegram pasan por `despachador.pedido_telegram`.
 Ctrl+C corta al terminar la vuelta en curso.
 """
@@ -51,6 +54,7 @@ from .tiempo import Reloj
 from .turno import TEXTO_SI_LA_IA_FALLA, procesar_turno
 
 ESPERA_S = 25
+INTENTOS_POR_UPDATE = 3     # un update que falla al recibirse se reintenta; después, se deja
 
 
 class BotTelegram:
@@ -85,6 +89,7 @@ class Escucha:
         self.imprimir = imprimir
         self.bot_id: int | None = None
         self.offset = 0
+        self.fallas: dict[int, int] = {}       # update → veces que falló al recibirlo
         self.offset_admin = 0
         self.admin_listo = False
 
@@ -121,9 +126,60 @@ class Escucha:
             time.sleep(min(espera, 5))
             return 0
         for u in updates:
+            try:
+                self.procesar(u)
+            except Exception as e:  # noqa: BLE001 -- la escucha sigue; el update no se pierde
+                self.conn.rollback()
+                if not self._fallo_al_recibir(u, e):
+                    break       # se vuelve a pedir desde éste en la vuelta siguiente
+            self.fallas.pop(u["update_id"], None)
             self.offset = u["update_id"] + 1
-            self.procesar(u)
         return len(updates)
+
+    def _fallo_al_recibir(self, u: dict[str, Any], error: Exception) -> bool:
+        """Una falla al recibir un update (la base que se cae al guardarlo, por ejemplo). Las
+        primeras veces no se avanza: Telegram lo vuelve a entregar y se reintenta, y un
+        mensaje que quedó guardado sin turno se atiende al volver. A los
+        `INTENTOS_POR_UPDATE`, se deja: nunca en silencio, con un incidente y, si es de
+        alguien del equipo, el texto fijo de la falla. `True` si se deja."""
+        uid = u["update_id"]
+        self.fallas[uid] = self.fallas.get(uid, 0) + 1
+        self.imprimir(f"  ! no se pudo recibir el update {uid} ({type(error).__name__}), "
+                      f"intento {self.fallas[uid]} de {INTENTOS_POR_UPDATE}")
+        if self.fallas[uid] < INTENTOS_POR_UPDATE:
+            return False
+        mensaje = u.get("message") or {}
+        chat_id = (mensaje.get("chat") or {}).get("id")
+        tg_user = (mensaje.get("from") or {}).get("id")
+        try:
+            with espacio(self.conn, self.ws) as cur:
+                quien = None
+                if tg_user is not None and (mensaje.get("chat") or {}).get("type") == "private":
+                    try:
+                        quien = identificar_en_espacio(cur, tg_user, self.ws)
+                    except Denegado:
+                        quien = None
+                registrar_incidente(
+                    cur, self.ws,
+                    f"El escuchador del motor no pudo recibir un update de Telegram tras "
+                    f"{INTENTOS_POR_UPDATE} intentos y lo dejó"
+                    + (": la persona recibió el texto fijo de la falla." if quien else "."),
+                    severidad="alta",
+                    referencia_cruda=f"update {uid}: {texto_error_seguro(error)}",
+                    etapa=ETAPA_TURNO_CONVERSACION, chat_id=chat_id,
+                    app_user_id=quien.app_user_id if quien else None,
+                    notificado_en=self.reloj.ahora() if quien else None)
+                if quien is not None:
+                    enqueue_outbox(cur, workspace_id=self.ws, chat_id=chat_id,
+                                   text=TEXTO_SI_LA_IA_FALLA,
+                                   dedupe_key=f"motor:sin_recibir:{self.bot_id}:{uid}",
+                                   recipient_membership_id=quien.membership_id,
+                                   is_response=True, scheduled_for=self.reloj.ahora())
+            self.conn.commit()
+        except Exception as e:  # noqa: BLE001 -- queda en la consola; la escucha sigue
+            self.conn.rollback()
+            self.imprimir(f"  ! tampoco se pudo registrar la falla: {texto_error_seguro(e)}")
+        return True
 
     def procesar(self, u: dict[str, Any]) -> None:
         mensaje = u.get("message")
