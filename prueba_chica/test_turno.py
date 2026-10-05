@@ -41,13 +41,13 @@ def _incidentes(conn) -> list[dict]:
 
 
 def test_un_turno_lee_pide_jugadas_redacta_encola_y_registra(conn, mundo, escribe):
-    quien, entrante = escribe("Ismael", "arranqué")
-    ia = IAGuionada(jugadas=[[]], redacciones=["Hola, Ismael."])
+    quien, entrante = escribe("Marcos", "arranqué")
+    ia = IAGuionada(jugadas=[[]], redacciones=["Hola, Marcos."])
 
     resultado = procesar_turno(conn, quien, entrante, ia, RelojFijo(AHORA))
     conn.commit()
 
-    assert resultado.texto == "Hola, Ismael." and resultado.error is None
+    assert resultado.texto == "Hola, Marcos." and resultado.error is None
     # (1) la IA recibe lo leído: el mensaje, hoy y las tareas de la persona con su alias.
     situacion = ia.pedidos_de_jugadas[0]
     assert situacion["mensaje"] == "arranqué"
@@ -59,7 +59,7 @@ def test_un_turno_lee_pide_jugadas_redacta_encola_y_registra(conn, mundo, escrib
     assert ia.pedidos_de_redaccion[0]["hechos"] == []
 
     [salida] = _salidas(conn)
-    assert salida["cuerpo"] == "Hola, Ismael."
+    assert salida["cuerpo"] == "Hola, Marcos."
     assert salida["es_respuesta"] is True
     assert str(salida["destinatario_membership_id"]) == quien.membership_id
     assert str(salida["entrante_id"]) == entrante
@@ -76,11 +76,11 @@ def test_un_turno_lee_pide_jugadas_redacta_encola_y_registra(conn, mundo, escrib
 
 
 def test_los_turnos_anteriores_llegan_a_la_ia(conn, mundo, escribe):
-    quien, primero = escribe("Ismael", "hola")
+    quien, primero = escribe("Marcos", "hola")
     procesar_turno(conn, quien, primero, IAGuionada(jugadas=[[]], redacciones=["Buen día."]),
                    RelojFijo(AHORA))
     conn.commit()
-    _, segundo = escribe("Ismael", "arranqué")
+    _, segundo = escribe("Marcos", "arranqué")
     ia = IAGuionada(jugadas=[[]], redacciones=["Bien."])
 
     procesar_turno(conn, quien, segundo, ia, RelojFijo(AHORA))
@@ -90,7 +90,7 @@ def test_los_turnos_anteriores_llegan_a_la_ia(conn, mundo, escribe):
 
 
 def test_una_jugada_fuera_de_la_lista_no_hace_nada_y_queda_como_hecho(conn, mundo, escribe):
-    quien, entrante = escribe("Ismael", "arranqué")
+    quien, entrante = escribe("Marcos", "arranqué")
     ia = IAGuionada(jugadas=[[Jugada("anotar_inicio", {"tarea": "T1"})]],
                     redacciones=["No puedo hacer eso todavía."])
 
@@ -108,7 +108,7 @@ def test_una_jugada_fuera_de_la_lista_no_hace_nada_y_queda_como_hecho(conn, mund
 
 
 def test_una_jugada_de_la_lista_la_maneja_su_manejador(conn, mundo, escribe):
-    quien, entrante = escribe("Ismael", "arranqué")
+    quien, entrante = escribe("Marcos", "arranqué")
     vistos = []
 
     def probar(contexto, jugada):
@@ -125,7 +125,7 @@ def test_una_jugada_de_la_lista_la_maneja_su_manejador(conn, mundo, escribe):
 
 
 def test_si_la_ia_falla_una_vez_el_turno_sigue(conn, mundo, escribe):
-    quien, entrante = escribe("Ismael", "arranqué")
+    quien, entrante = escribe("Marcos", "arranqué")
     ia = IAGuionada(jugadas=[ConnectionError("sin red"), []],
                     redacciones=["", "Anotado."])     # una redacción vacía es no responder
 
@@ -139,7 +139,7 @@ def test_si_la_ia_falla_una_vez_el_turno_sigue(conn, mundo, escribe):
 
 
 def test_si_la_ia_falla_dos_veces_nada_se_ejecuta_y_sale_el_texto_fijo(conn, mundo, escribe):
-    quien, entrante = escribe("Ismael", "arranqué")
+    quien, entrante = escribe("Marcos", "arranqué")
     llamado = []
     ia = IAGuionada(jugadas=[ConnectionError("sin red"), TimeoutError("tarde")])
 
@@ -171,7 +171,7 @@ def test_si_la_ia_falla_dos_veces_nada_se_ejecuta_y_sale_el_texto_fijo(conn, mun
 
 
 def test_si_la_redaccion_falla_dos_veces_se_deshace_lo_ejecutado(conn, mundo, escribe):
-    quien, entrante = escribe("Ismael", "arranqué")
+    quien, entrante = escribe("Marcos", "arranqué")
 
     def anota(contexto, jugada):
         contexto.cur.execute(

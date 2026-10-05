@@ -79,7 +79,8 @@ def conn(uri):
 
 @pytest.fixture
 def mundo(conn) -> dict:
-    """Un espacio con dos personas: Ismael tiene una tarea asignada y Marcos la aprueba."""
+    """Un espacio con dos personas, como en `tests/conversaciones/`: Marcos tiene una tarea
+    asignada e Ismael, referente y autoridad del espacio, aprueba su trabajo."""
     from leda.db import admin
 
     with admin(conn) as cur:
@@ -102,12 +103,12 @@ def mundo(conn) -> dict:
                            values (%s, %s, %s, %s) returning id""", (ws, slug, slug, final))
             roles[slug] = str(cur.fetchone()["id"])
         personas = {}
-        for i, (nombre, rol) in enumerate((("Marcos", "lider"), ("Ismael", "integrante"))):
+        for i, (nombre, rol) in enumerate((("Ismael", "lider"), ("Marcos", "integrante"))):
             telegram = 81_000 + i
             cur.execute("""insert into app_user (telegram_user_id, nombre)
                            values (%s, %s) returning id""", (telegram, nombre))
             app_user = str(cur.fetchone()["id"])
-            aprobador = personas.get("Marcos", {}).get("membership_id")
+            aprobador = personas.get("Ismael", {}).get("membership_id")
             cur.execute("""insert into membership (workspace_id, app_user_id, area_id, rol_id,
                                                    aprobador_membership_id)
                            values (%s, %s, %s, %s, %s) returning id""",
@@ -122,7 +123,7 @@ def mundo(conn) -> dict:
                                          responsable_membership_id, estado, fecha_objetivo)
                        values (%s, %s, 'Revisar el tablero', %s, %s, 'asignada', %s)
                        returning id""",
-                    (ws, objetivo, area, personas["Ismael"]["membership_id"],
+                    (ws, objetivo, area, personas["Marcos"]["membership_id"],
                      datetime(2026, 10, 9, 20, 0, tzinfo=timezone.utc)))
         tarea = str(cur.fetchone()["id"])
         # Sin esto el despachador antepone el saludo del día (pack 06) y cada texto cambia.
