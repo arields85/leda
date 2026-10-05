@@ -47,7 +47,9 @@ que la cuenta de pedidos sin respuesta empieza de nuevo desde él. La espera sig
 pedido del día hábil siguiente (`repregunta_de_estado`, que guarda la ficha) es el primero de la
 cuenta nueva: si queda sin respuesta, la escalera sigue desde ahí, un paso por día hábil, y el
 escalamiento dice el último avance. Un paso que no había salido cuando llegó el avance queda
-reemplazado (`REEMPLAZADO_POR_UN_AVANCE`): no cuenta como dado ni como escalamiento.
+reemplazado (`REEMPLAZADO_POR_UN_AVANCE`): no cuenta como dado ni como escalamiento. Un avance
+después de escalar no guarda otro pedido (la escalera de esa ancla terminó) y sus hechos lo
+dicen. La escalera y el avance toman la tarea de a uno (`ancla.candado`).
 
 **Ausencias.** Mientras la persona está ausente (`absence`), su escalera no avanza y lo que
 tenía guardado no le llega. Cuando vuelve de una ausencia que tocó el período de la escalera, en
@@ -75,7 +77,7 @@ from leda.db import espacio
 from leda.incidentes import registrar_incidente
 
 from .ancla import (NO_DADOS, REEMPLAZADO, REPREGUNTA_DE_ESTADO, TIPOS_DE_LA_ESCALERA,
-                    VENCIMIENTO_CON_PREVISION, al_mediodia, ancla, escalo, pasos)
+                    VENCIMIENTO_CON_PREVISION, al_mediodia, ancla, candado, escalo, pasos)
 from .avisos import (ABIERTOS, ESPERA_DE_ESTADO, Momento, ausente, espera_abierta, guardar,
                      hechos_de_la_escalera, leer_tarea, omitir, quienes_escalan)
 from .tiempo import Reloj
@@ -141,6 +143,8 @@ def dias_de_aviso_previo(cur, workspace_id: str) -> int | None:
 
 def _un_paso(m: Momento, tarea: dict[str, Any], n: int | None) -> str | None:
     cur, persona = m.cur, str(tarea["responsable_membership_id"])
+    if not candado(cur, tarea["id"], esperar=False):
+        return None                     # un turno la tiene tomada: la vuelta siguiente
     if ausente(cur, persona, m.hoy):
         return None                     # pausada: no avanza mientras no está
     vence = m.fecha(tarea["fecha_objetivo"])

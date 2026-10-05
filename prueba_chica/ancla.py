@@ -88,3 +88,16 @@ def escalo(escalon: list[dict[str, Any]], espera: dict[str, Any] | None) -> bool
     if espera is None or espera["escalado_en"] is None or not pedidos:
         return False
     return espera["preguntado_en"] >= min(a["creado_en"] for a in pedidos)
+
+
+def candado(cur, task_id, *, esperar: bool = True) -> bool:
+    """La tarea, tomada hasta el final de la transacción: la escalera y el avance que reemplaza
+    sus pasos guardados la tocan de a uno, así ninguno guarda un paso que el otro no ve. El turno
+    espera (`esperar`); la escalera no: si la tarea está tomada, la deja para la vuelta siguiente
+    del ciclo (devuelve `False`), y nunca espera con otras tareas tomadas."""
+    clave = f"motor:escalera:{task_id}"
+    if esperar:
+        cur.execute("select pg_advisory_xact_lock(hashtextextended(%s, 0))", (clave,))
+        return True
+    cur.execute("select pg_try_advisory_xact_lock(hashtextextended(%s, 0)) as tomada", (clave,))
+    return bool(cur.fetchone()["tomada"])

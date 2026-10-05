@@ -239,3 +239,110 @@ def test_dos_avances_el_mismo_dia_dejan_un_solo_pedido_para_manana(conn, mundo, 
     # Sin respuesta, el silencio cuenta desde el pedido que sí salió.
     [segundo] = dias.ciclo(_hora(14, 10))
     assert segundo["hechos"][0]["numero"] == 2
+
+
+# --- Cuando no hay un pedido siguiente: lo dicen los hechos (revisión de `informar_avance`) ------
+
+def test_sin_fecha_comprometida_el_avance_se_anota_y_dice_que_no_vuelve_a_pedir(conn, mundo,
+                                                                                escribe):
+    """Una tarea sin vencimiento no tiene escalera: el avance se anota igual, y los hechos dicen
+    que no hay un pedido siguiente, nunca en silencio."""
+    from leda.db import admin
+    from prueba_chica.test_escalera import _cambiar_el_vencimiento
+
+    _cambiar_el_vencimiento(conn, mundo, None)
+    with admin(conn) as cur:
+        cur.execute("""insert into pending_reply (workspace_id, membership_id, task_id, tipo,
+                                                  preguntado_en, vence_en)
+                       values (%s, %s, %s, 'estado_de_la_tarea', %s, %s)""",
+                    (mundo["id"], mundo["personas"]["Marcos"]["membership_id"], mundo["tarea"],
+                     _hora(9, 10), _hora(13, 10)))
+    conn.commit()
+
+    resultado = _escribe(conn, escribe, VAGO, _avance(VAGO), at=_hora(9, 11))
+
+    [hecho] = resultado.hechos
+    assert hecho["resultado"] == "anotado" and hecho["avance"] == {"dijo": VAGO}
+    assert hecho["no_vuelve_a_pedir_el_estado"] == {"motivo": "sin_fecha_comprometida"}
+    assert "vuelve_a_pedir_el_estado" not in hecho
+    assert _repreguntas(conn) == []
+    assert _cuantas(conn, "audit_log", "accion = 'informar_avance'") == 1
+
+
+def test_un_avance_despues_de_escalar_no_vuelve_a_pedir_y_lo_dice(conn, mundo, dias, escribe):
+    """La escalera de ese vencimiento terminó al escalar: no se guarda otro pedido. Los hechos
+    dicen que no vuelve a pedir el estado y a quién ya se le avisó."""
+    for dia in (9, 13, 14, 15):
+        dias.ciclo(_hora(dia, 10))
+    assert _para(conn, mundo, "Ismael")                         # escaló
+
+    resultado = _escribe(conn, escribe, VAGO, _avance(VAGO), at=_hora(15, 11))
+
+    [hecho] = resultado.hechos
+    assert hecho["resultado"] == "anotado" and "vuelve_a_pedir_el_estado" not in hecho
+    assert hecho["no_vuelve_a_pedir_el_estado"] == {
+        "motivo": "ya_se_escalo", "escalado_a": [{"a": "Ismael", "estado": "enviado"}]}
+    assert _repreguntas(conn) == []
+    for dia in (16, 19, 20):
+        assert dias.ciclo(_hora(dia, 10)) == []
+
+
+def test_con_el_ancla_en_una_prevision_el_avance_vuelve_a_pedir_en_su_escalera(conn, mundo, dias,
+                                                                              escribe):
+    """9i: el día de la previsión se pide el estado; un avance vago vuelve a pedirlo al día
+    hábil siguiente, dentro de la escalera de la previsión."""
+    from prueba_chica.test_avisos import _dice
+
+    _dice(conn, escribe, Jugada("anotar_prevision", {"tarea": "T1", "fecha": "2026-10-15"}),
+          at=_hora(5, 11))
+    for dia in (5, 9, 15):
+        dias.ciclo(_hora(dia, 12))
+
+    resultado = _escribe(conn, escribe, VAGO, _avance(VAGO), at=_hora(15, 12, 30))
+
+    assert resultado.hechos[0]["vuelve_a_pedir_el_estado"]["estado"] == GUARDADO_SIN_ENVIAR
+    [repregunta] = _repreguntas(conn)
+    assert repregunta["dedupe_key"].split(":")[3] == "2026-10-15"
+    [otra_vez] = dias.ciclo(_hora(16, 10))
+    hechos = otra_vez["hechos"][0]
+    assert hechos["aviso"] == "repregunta_de_estado"
+    assert hechos["seguimiento_por"] == "prevision" and hechos["vence"] == "2026-10-09"
+
+
+# --- Un solo pedido por avance, sin carreras (revisión de `informar_avance`) -------------------
+
+def test_la_escalera_no_toca_una_tarea_mientras_otro_la_tiene_tomada(conn, mundo, dias, uri):
+    """El avance y la escalera toman la misma tarea de a uno: si un turno la tiene tomada (por
+    ejemplo, anotando un avance que reemplaza los pasos guardados), la escalera la deja para la
+    vuelta siguiente en lugar de guardar un paso que el turno no ve."""
+    from leda.db import conectar
+    from prueba_chica.ancla import candado
+
+    otra = conectar(uri)
+    try:
+        with otra.cursor() as cur:
+            candado(cur, mundo["tarea"])
+            correr_escalera(conn, mundo["id"], RelojFijo(_hora(9, 10)))
+            conn.commit()
+            assert _cuantas(conn, "scheduled_notice") == 0
+        otra.rollback()
+    finally:
+        otra.close()
+
+    correr_escalera(conn, mundo["id"], RelojFijo(_hora(9, 10)))
+    conn.commit()
+    assert [a["tipo"] for a in _avisos(conn)] == ["pedido_de_estado"]
+
+
+def test_la_cuenta_de_avances_es_de_la_espera(conn, mundo, dias, escribe):
+    """La segunda respuesta sin nada cierto se cuenta sobre la misma espera; la clave del
+    pedido la nombra, así que contarlo dos veces no guarda dos pedidos."""
+    dias.ciclo(_hora(9, 10))
+    _escribe(conn, escribe, VAGO, _avance(VAGO), at=_hora(9, 10, 30))
+    espera = _espera(conn)
+
+    [repregunta] = _repreguntas(conn)
+
+    assert f":e{espera['id']}:" in repregunta["dedupe_key"]
+    _escribe(conn, escribe, OTRA_VEZ_VAGO, _avance(OTRA_VEZ_VAGO), at=_hora(9, 11))
+    assert [r["dedupe_key"].rsplit(":", 1)[-1] for r in _repreguntas(conn)] == ["a1", "a2"]
