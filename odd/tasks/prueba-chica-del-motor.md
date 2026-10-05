@@ -461,6 +461,39 @@ su evidencia son las corridas. Unas 400 líneas por tarea es una guía, no un to
       `1 failed` (hechos), `1 failed` (clave); verde `320 passed in 116.89s` (una vez, antes,
       `1 failed, 319 passed`, intermitente, no se repitió en dos corridas); `--ronda seco-4`: 16 de
       16, garantías 16 de 16. Commits `aea7cdc`, `12e2f88`, `1fb58dd` y el que registra esto.
+- [x] **Durante la E2-8: la revisión del contrato entre la IA y el código** (usuario, 2026-10-05; ADR
+      0018, 9k; delegada: writer, varios archivos no triviales). **Resultado de la primera ronda**
+      (`resultados/ronda1-sol.md` y `ronda1-luna.md`, commit `3bc32b5`; USD 2,61 y 0,14): con sol,
+      garantías 5 de 5 en 01 a 04, 06, 07, 10 y 13 a 16; fallan 05 (3 de 5: "con el plc" como causa),
+      08 (0 de 5: un motivo que no era un porqué), 09 (4 de 5; la vez 5 sin jugada hizo caer el
+      corredor), 11 (0 de 5: una previsión con su porqué anotada también como bloqueo), 12 (0 de 5:
+      "¿le avisaste a alguien?" como fuera de la lista, con aviso al administrador) y la comprensión
+      de 13 (0 de 5: sin jugada ante la duda, sin botones). En la lectura: el atraso de una previsión
+      contado como el de hoy (15 y 16), respuestas sin próximo paso (03, 07, 11, 12) y, en 11, el
+      sistema narrado por dentro. Luna, peor (05, 07, 08, 09, 12 en 0 de 5). **La revisión**, como
+      reglas generales, sin caso por conversación: (A) el vocabulario de los hechos
+      (`hechos.py`): claves distintas para cosas distintas (`atraso_dias_habiles`, el de hoy;
+      `atraso_si_se_cumple_la_prevision_dias_habiles`, el previsto), los avisos al referente dicen
+      qué aviso son y que no piden respuesta, y los dos pedidos a la IA llevan el significado de cada
+      clave y código que traen; un hecho sin significado es una falla del motor en la corrida; (B)
+      cada jugada es una variante del esquema con su definición (`Ficha.es`) y sólo sus datos, que
+      dicen qué son y que van sólo si la persona los dijo; (C) con la jugada clara y la tarea no, la
+      jugada va sin la tarea y el código pregunta con botones; (D) una pregunta sobre la conversación
+      no lleva jugada y se contesta desde el registro; fuera de la lista es sólo un pedido de hacer
+      algo; (E) la redacción deja siempre un próximo paso y nunca narra el sistema. **Medición:** Jev
+      guarda los valores de su verificación (`misma`, `rival`) y el informe los muestra; la IA que no
+      elige tarea cuenta como que preguntó; un botón que no está es una falla del paso, no una caída;
+      con `puede_traer`, un dato libre vale sólo si son palabras de la persona. Ningún YAML necesitó
+      `puede_traer` nuevo: 05 y 11 ya lo tenían donde el `.md` no dice nada, y 08, 15 y 16 dicen "sin
+      motivo". Evidencia (2026-10-05): `pytest prueba_chica` en rojo en cada paso (esquema, `4
+      failed, 20 passed`; vocabulario, `5 failed, 10 passed`; medición, `4 failed, 3 passed`) y en
+      verde, `334 passed in 119.69s`. **Corrida en seco** `python -m prueba_chica.correr --ia guionada
+      --veces 1 --ronda seco-5` (informe `resultados/seco-5.md`): 16 de 16 bien, garantías 16 de 16,
+      ninguna falla, ningún hecho sin significado. Commits `aac2261`, `78c3016`, `5bf7b3e` y el que
+      registra esto. `PENDIENTE`: cerrar un bloqueo cuando su causa desaparece (11, "llegó el
+      switch") no es ninguna jugada: agregarla lo decide el usuario (9k); que el proveedor real
+      acepte el esquema con `anyOf` no se probó (sólo con la IA guionada); la próxima ronda real lo
+      muestra.
 - [ ] **E2-8. Primera ronda real:** sol, luna y Jev; lectura de textos; bitácora; chequeo de rumbo contra 5c.
 - [ ] **E2-9. Telegram real** con el usuario; su juicio; M2 en la bitácora.
 
@@ -497,4 +530,7 @@ previo en `workspace_setting`, no en el importador; el referente es quien aprueb
   `PENDIENTE` confirmar al escribir los YAML que ninguna conversación depende de ellas.
 - **La etapa no es tan chica:** si una tarea pide un caso especial, se frena (5c.1).
 
-**Próximo paso:** la E2-8 (sol con Jev y luna, cinco veces cada una, sobre las 16).
+**Próximo paso:** la segunda vuelta de la E2-8 con el contrato revisado (9k): sol con Jev y luna,
+cinco veces cada una, sobre las 16; lectura de textos y chequeo de rumbo contra 5c (la revisión
+9k es la primera vuelta de ajustes: si después de la segunda no se alcanza 5b, se revisa con el
+usuario, 5c.3).

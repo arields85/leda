@@ -3,7 +3,8 @@
 - **Estado:** propuesta. El usuario aceptó su diseño para la prueba el 2026-10-04 (paso M1), con
   las decisiones 1 a 8. Queda como propuesta hasta que pase la prueba chica de la Etapa 2. La
   decisión 9 (usuario, 2026-10-04) precisa lo que dejaron abierto las conversaciones de prueba;
-  el 2026-10-05 el usuario le sumó 9h y 9i.
+  el 2026-10-05 el usuario le sumó 9h, 9i y 9j y, después de la primera ronda real, la revisión
+  del contrato entre la IA y el código (9k).
 - **Fecha:** abierta el 2026-10-04.
 - **Alcance:** cómo procesa Leda cada mensaje y cada toque en el seguimiento por chat (ADR 0017,
   decisión 3): quién decide qué, el estado de la conversación, los circuitos, las situaciones
@@ -513,6 +514,42 @@ eso"), **Leda le pregunta en esa misma respuesta para qué día la va a tener**:
 > automáticos del día a una persona salen en un solo envío** (mecánica §10), redactado desde los
 > hechos de todos y con una sola pregunta; los de coordinación y las respuestas, aparte
 > (conversación 13).
+
+#### 9k. Revisión del contrato entre la IA y el código (usuario, 2026-10-05)
+
+La primera ronda real (GPT-6 sol y luna, cinco veces cada una de las 16 conversaciones;
+`prueba_chica/resultados/ronda1-sol.md` y `ronda1-luna.md`) mostró fallas de comprensión que no
+eran de una conversación sino del contrato entre la IA y el código: lo que el código le pasa y lo
+que le pide. Se revisó entero, con reglas generales y sin ningún caso (5c.1):
+
+1. **Los hechos dicen qué significan.** Dos cosas distintas nunca comparten un nombre: el atraso
+   de hoy y el que tendrá la tarea si se cumple una previsión tienen claves distintas (la ronda
+   le contó al referente el segundo como si fuera el primero, conversaciones 15 y 16). Cada clave
+   y cada código tiene su significado una sola vez, en el vocabulario de los hechos
+   (`prueba_chica/hechos.py`), y la IA recibe, en los dos pedidos, el significado de todo lo que
+   le llega. Un hecho sin significado es una falla del motor en la corrida.
+2. **Cada jugada se define por lo que la distingue de las parecidas**, desde el núcleo (mecánica
+   §3 y §8), y ofrece sólo sus datos. Una previsión es una fecha para terminar, con su porqué o
+   sin él: un atraso, no un bloqueo. Un bloqueo es que la persona dice que no puede avanzar. Un
+   avance no trae fecha, ni bloqueo, ni inicio. Corregir es decir que lo anotado estaba mal; dar
+   un hecho nuevo es la jugada de ese hecho. Cada dato dice qué es y va sólo si la persona lo dijo
+   (una causa es lo que falta o frena el trabajo). Lo que la persona dijo una vez va en una sola
+   jugada.
+3. **La duda llega al código.** Si la jugada es clara y la tarea no, la IA elige la jugada sin la
+   tarea y el código pregunta cuál, con botones (situación general 5). Ninguna jugada, sólo cuando
+   el mensaje no dice ni pide nada que una jugada haga.
+4. **Una pregunta sobre la conversación o sobre lo que Leda hizo no es una jugada:** se contesta
+   desde el registro de turnos y sus hechos, también lo que se dice sólo si se pregunta (9g). Lo
+   que no está en la lista es sólo un pedido de hacer algo, y sólo eso avisa al administrador.
+5. **Todo mensaje deja un próximo paso** (constitución §8): la pregunta que se hace, lo que va a
+   pasar y cuándo, o lo que la persona puede hacer; o dice que no hace falta nada. **Y nunca se
+   narra cómo funciona el sistema** (§10): ni lo que intentó o no pudo hacer por dentro; se cuenta
+   lo que cambia para la persona, lo que falta y lo que sigue. Todo lo que quedó anotado o cambió
+   se cuenta.
+
+`PENDIENTE` (decisión del usuario): ninguna jugada cierra un bloqueo cuando su causa desaparece
+(la persona cuenta que llegó lo que faltaba). Agregarla es una jugada nueva (decisión 1); hasta
+entonces, lo que se puede anotar es la previsión.
 
 ## Consecuencias
 
