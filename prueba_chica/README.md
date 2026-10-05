@@ -42,6 +42,7 @@ de nuevo en `src/leda`, con su propia prueba de frontera.
   camino que los demás avisos guardados.
 - `tiempo.py`: el reloj del motor. Los momentos los pone el motor, nunca la base.
 - `reloj.py`: el reloj de Leda en `leda_motor` y el comando que lo adelanta (decisión 10.2).
+- `leer.py`: el lector del registro de turnos, de sólo lectura.
 - `test_frontera.py`: qué puede importar esta carpeta de `src/leda` y qué nunca debe alcanzar.
 
 ## Cómo se corren sus pruebas
@@ -73,6 +74,18 @@ escalera, los avisos guardados y el horario del despacho ven el mismo momento. `
 saltea fines de semana y feriados; correrlo otra vez adelanta otro día. Lo que la base fecha
 sola (los eventos de estado, la apertura de un bloqueo) queda en hora real. `volver` no
 deshace lo escrito con el reloj adelantado: va al terminar la prueba.
+
+## Leer una prueba (E2-6)
+
+```
+python -m prueba_chica.leer corework [--persona Marcos] [--desde 10:30] [--completo]
+```
+
+Muestra los turnos en orden (lo que escribió o tocó cada persona, con las jugadas, los hechos,
+la IA, la latencia y el error; lo que salió de Leda, con el estado del mensaje), las preguntas
+abiertas y para después, las esperas sin contestar y los avisos guardados con su estado. Un
+toque se ve como la opción tocada. `--desde` es la hora de hoy en el reloj de Leda (o
+`"AAAA-MM-DD HH:MM"`). Sólo lee.
 
 ## Primer contacto real (E2-3b)
 
@@ -126,8 +139,8 @@ avisos de incidentes.
    → Queda anotado que no se sabe quién lo destraba. Leda lo dice y propone salidas: que
    alguien ayude o anotar una fecha nueva.
 
-Después, leer la conversación con `tools/leer_conversacion.py` y la base (`conversation_turn`,
-`task_forecast`, `blocker_unblocker`, `scheduled_notice`, `incident`).
+Después, leer la conversación con `python -m prueba_chica.leer corework` y la base
+(`task_forecast`, `blocker_unblocker`, `incident`).
 
 ### Límites conocidos
 
