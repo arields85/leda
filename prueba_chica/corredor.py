@@ -125,6 +125,9 @@ class Salida:
     hechos: Any = None                  # los de su aviso; una lista, si juntó varios
     el: str | None = None
     tipos: list[str] = field(default_factory=list)
+    # Cada aviso del envío con su tipo, su tarea y sus hechos: lo esperado de un tipo y una
+    # tarea se compara con ese aviso, no con cualquiera del envío.
+    avisos: list[dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass
@@ -380,7 +383,9 @@ class _Corredor:
                 tipo=tipos[0] if len(tipos) == 1 else None,
                 tareas=list(dict.fromkeys(a["tarea"] for a in avisos if a["tarea"])),
                 hechos=(hechos[0] if len(hechos) == 1 else hechos) if hechos else None,
-                el=cp.dia(self.reloj.ahora()), tipos=tipos))
+                el=cp.dia(self.reloj.ahora()), tipos=tipos,
+                avisos=[{"tipo": a["tipo"], "tarea": a["tarea"], "hechos": h}
+                        for a, h in zip(avisos, hechos)]))
         return salidas
 
     # -- lo que se comprueba ------------------------------------------------------------------
@@ -468,7 +473,8 @@ class _QueMira:
 def _sale_coincide(e: dict[str, Any], s: Salida, foco: set[str] | None = None) -> bool:
     """Un mensaje de Leda por su cuenta contra lo esperado. Un envío que juntó avisos de varias
     tareas (mecánica §10) cumple lo esperado de las tareas de la conversación (`foco`): la
-    tarea o las tareas, y un aviso de ese tipo con esos hechos entre los suyos."""
+    tarea o las tareas, y un aviso de ese tipo (y de esa tarea, si la dice) con esos hechos
+    entre los suyos: los hechos de otro aviso del mismo envío no cuentan."""
     tareas = [t for t in s.tareas if foco is None or t in foco]
     if e.get("a") and e["a"] != s.a:
         return False
@@ -482,8 +488,14 @@ def _sale_coincide(e: dict[str, Any], s: Salida, foco: set[str] | None = None) -
         return False
     if "hechos" not in e:
         return True
-    de_cada_aviso = s.hechos if isinstance(s.hechos, list) else [s.hechos or {}]
-    return any(cp.coincide(e["hechos"], h) for h in de_cada_aviso)
+    if not s.avisos:        # un envío sin avisos guardados detrás: sus hechos, como vinieron
+        de_cada_aviso = s.hechos if isinstance(s.hechos, list) else [s.hechos or {}]
+        return any(cp.coincide(e["hechos"], h) for h in de_cada_aviso)
+    candidatos = [a for a in s.avisos
+                  if (not e.get("tipo") or a["tipo"] == e["tipo"])
+                  and ("tarea" not in e or a["tarea"] == e["tarea"])
+                  and (foco is None or a["tarea"] is None or a["tarea"] in foco)]
+    return any(cp.coincide(e["hechos"], a["hechos"]) for a in candidatos)
 
 
 def _resumen(s: Salida) -> dict[str, Any]:

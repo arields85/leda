@@ -185,8 +185,11 @@ def _bases_del_corredor(conn) -> list[str]:
 
 def test_las_bases_viejas_de_corridas_muertas_se_borran_al_empezar(conn):
     """Una ejecución que se murió sin borrar su plantilla (revisión de la E2-7): la siguiente
-    borra las bases del corredor que son viejas, y nunca una que puede ser de otra que corre."""
+    borra las bases del corredor que son viejas, y nunca una que puede ser de otra que corre ni
+    una que el corredor no creó (sin la fecha de su nombre). El momento es fijo y anterior a
+    toda base real del servidor: la prueba no depende de lo que haya quedado de otras."""
     import os
+    from datetime import datetime, timezone
 
     import psycopg
     from psycopg.sql import SQL, Identifier
@@ -194,22 +197,26 @@ def test_las_bases_viejas_de_corridas_muertas_se_borran_al_empezar(conn):
     from prueba_chica import correr
 
     url = os.environ["LEDA_TEST_DB_URL"]
-    vieja = f"{correr.PREFIJO}plantilla_20200101000000_abcdef"
-    sin_fecha = f"{correr.PREFIJO}plantilla_0123456789"         # el nombre de antes
+    ahora = datetime(2020, 1, 1, 12, 30, tzinfo=timezone.utc)
+    vieja = f"{correr.PREFIJO}plantilla_20200101000000_abcdef01"      # 12 h 30 antes
+    reciente = f"{correr.PREFIJO}20200101060000_abcdef02"              # de otra que corre
+    sin_fecha = f"{correr.PREFIJO}plantilla_0123456789"                # no es un nombre suyo
+    ajena = f"{correr.PREFIJO}de_otro_20200101000000"                  # tampoco
     bases = correr.Bases(url)
+    creadas = (vieja, reciente, sin_fecha, ajena, bases.plantilla)
     with psycopg.connect(url, autocommit=True) as c:
-        for nombre in (vieja, sin_fecha):
+        for nombre in creadas:
             c.execute(SQL("create database {}").format(Identifier(nombre)))
-        c.execute(SQL("create database {}").format(Identifier(bases.plantilla)))
     try:
-        borradas = bases.limpiar_viejas()
+        borradas = bases.limpiar_viejas(ahora)
 
-        assert sorted(borradas) == sorted([vieja, sin_fecha])
-        assert set(_bases_del_corredor(conn)) & {vieja, sin_fecha} == set()
-        assert bases.plantilla in _bases_del_corredor(conn)     # la nueva queda
+        assert borradas == [vieja]
+        assert set(_bases_del_corredor(conn)) & set(creadas) == set(creadas) - {vieja}
     finally:
-        for nombre in (vieja, sin_fecha, bases.plantilla):
-            bases.borrar(nombre)
+        with psycopg.connect(url, autocommit=True) as c:
+            for nombre in creadas:
+                c.execute(SQL("drop database if exists {} with (force)").format(
+                    Identifier(nombre)))
 
 
 def test_la_corrida_en_seco_por_linea_de_comandos_graba_y_repite(conn, tmp_path, capsys):

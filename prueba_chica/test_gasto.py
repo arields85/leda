@@ -181,7 +181,7 @@ def test_una_corrida_que_se_cae_deja_su_gasto_y_el_informe_dice_que_se_corto(
     codigo = correr.main(["--ia", "sol", "--conversacion", "01", "--veces", "1",
                           "--ronda", "cortada"])
 
-    assert codigo != 0
+    assert codigo == 1           # 1 por una caída; el 2 es sólo del techo
     [anotada] = Gasto(tmp_path / "gasto.json").leer()["corridas"]
     assert anotada["usd"] == pytest.approx(0.5)
     assert "RuntimeError" in anotada["cortada"]

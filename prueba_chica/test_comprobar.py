@@ -54,3 +54,27 @@ def test_un_envio_que_junto_avisos_de_dos_tareas_cumple_lo_esperado_de_las_dos()
     # Con una sola tarea de la conversación en el foco, el envío cumple lo de esa tarea.
     assert _sale_coincide({"tarea": "PLC", "hechos": {"vence": "2026-10-23"}}, junto, {"PLC"})
     assert not _sale_coincide({"tarea": "PLC"}, junto)
+
+
+def test_los_hechos_esperados_se_comparan_con_el_aviso_de_ese_tipo_y_esa_tarea():
+    """En un envío que junta avisos, los hechos esperados de un tipo y una tarea son los de ese
+    aviso, no los de cualquiera del envío (revisión de la corrida en seco con las 16)."""
+    from prueba_chica.corredor import Salida, _sale_coincide
+
+    previo_com = {"aviso": "vencimiento_proximo", "necesita_respuesta": False,
+                  "vence": "2026-11-06"}
+    pedido_plc = {"aviso": "pedido_de_estado", "necesita_respuesta": True, "numero": 1}
+    junto = Salida("Marcos", "texto", [], False, tareas=["PLC", "COM"],
+                   hechos=[pedido_plc, previo_com], tipos=["aviso_previo", "pedido_de_estado"],
+                   avisos=[{"tipo": "pedido_de_estado", "tarea": "PLC", "hechos": pedido_plc},
+                           {"tipo": "aviso_previo", "tarea": "COM", "hechos": previo_com}])
+
+    assert _sale_coincide({"tipo": "pedido_de_estado", "tareas": ["PLC", "COM"],
+                           "hechos": {"numero": 1}}, junto)
+    # Los hechos del aviso previo de COM no cumplen lo esperado del pedido de estado.
+    assert not _sale_coincide({"tipo": "pedido_de_estado", "tareas": ["PLC", "COM"],
+                               "hechos": {"necesita_respuesta": False}}, junto)
+    # Con una sola tarea en el foco, sólo cuentan los avisos de esa tarea.
+    assert not _sale_coincide({"tarea": "PLC", "hechos": {"vence": "2026-11-06"}}, junto,
+                              {"PLC"})
+    assert _sale_coincide({"tarea": "PLC", "hechos": {"numero": 1}}, junto, {"PLC"})

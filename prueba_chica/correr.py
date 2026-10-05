@@ -17,8 +17,9 @@
 - Cada corrida usa una base nueva, copia de una plantilla con el esquema que se crea una vez por
   ejecución, en el servidor de `LEDA_TEST_DB_URL` (`.env.test`), y se borra al terminar. Nunca
   toca `leda`, `leda_flujo` ni `leda_motor`. La plantilla se borra aunque la ejecución se caiga
-  (y al salir del proceso); las bases del corredor que quedaron de una ejecución muerta (más
-  viejas que `VIEJA`, por la fecha de su nombre) se borran al empezar la siguiente.
+  (y al salir del proceso); las bases del corredor que quedaron de una ejecución muerta (con el
+  nombre que él les pone y más viejas que `VIEJA`, por la fecha de ese nombre) se borran al
+  empezar la siguiente; ninguna otra.
 - **El techo de gasto** (USD 30 para la etapa, 10.4): antes de empezar se estima la ronda; si se
   pasa, no corre (sale con 2), salvo con `--pasar-el-techo`, que se usa sólo con el OK del
   usuario. Avisa al llegar al 80 %. La cuenta queda en `prueba_chica/resultados/gasto.json`.
@@ -52,7 +53,10 @@ PREFIJO = "leda_corrida_"
 # Una base del corredor más vieja que esto es de una ejecución que murió sin borrarla: ninguna
 # ronda dura tanto. La fecha va en el nombre (`_nombre`), en UTC.
 VIEJA = timedelta(hours=12)
-_FECHA_DEL_NOMBRE = re.compile(r"_(\d{14})_[0-9a-f]+$")
+# El nombre entero de una base que crea el corredor (`_nombre`): el prefijo, la plantilla o no,
+# la fecha y ocho cifras al azar. Sólo una base con este nombre es suya; cualquier otra que
+# empiece con el prefijo (sin fecha, o con otra forma) no se toca nunca.
+_NOMBRE_DEL_CORREDOR = re.compile(rf"^{PREFIJO}(?:plantilla_)?(\d{{14}})_[0-9a-f]{{8}}$")
 
 
 def _url_de_mantenimiento() -> str:
@@ -112,9 +116,10 @@ class Bases:
         self._ejecutar(SQL("drop database if exists {} with (force)").format(Identifier(nombre)))
 
     def limpiar_viejas(self, ahora: datetime | None = None) -> list[str]:
-        """Borra las bases del corredor que dejó una ejecución muerta: las más viejas que
-        `VIEJA` y las de nombre sin fecha (las de antes de la revisión de la E2-7). Una de otra
-        ejecución que corre ahora es más nueva y queda. Devuelve las que borró."""
+        """Borra las bases del corredor que dejó una ejecución muerta: las que tienen el nombre
+        que les pone el corredor (`_NOMBRE_DEL_CORREDOR`) y son más viejas que `VIEJA`. Una de
+        otra ejecución que corre ahora es más nueva y queda; una con otro nombre, aunque empiece
+        con el prefijo, no es suya y queda siempre. Devuelve las que borró."""
         import psycopg
         ahora = ahora or datetime.now(timezone.utc)
         with psycopg.connect(self.mantenimiento, autocommit=True) as c:
@@ -126,7 +131,7 @@ class Bases:
             if nombre in PROHIBIDAS or nombre == self.plantilla:
                 continue
             fecha = _fecha_del_nombre(nombre)
-            if fecha is None or ahora - fecha > VIEJA:
+            if fecha is not None and ahora - fecha > VIEJA:
                 self.borrar(nombre)
                 borradas.append(nombre)
         return borradas
@@ -138,7 +143,8 @@ def _nombre(tipo: str = "") -> str:
 
 
 def _fecha_del_nombre(nombre: str) -> datetime | None:
-    m = _FECHA_DEL_NOMBRE.search(nombre)
+    """La fecha de una base del corredor; `None` si el nombre no es uno que él pone."""
+    m = _NOMBRE_DEL_CORREDOR.fullmatch(nombre)
     if m is None:
         return None
     return datetime.strptime(m.group(1), "%Y%m%d%H%M%S").replace(tzinfo=timezone.utc)
