@@ -40,9 +40,10 @@ El circuito es el recordatorio y lo que la persona contesta (ADR 0018, decisión
     lo correcto es preguntar (ADR 0018, decisión 7).
 14. [`14-jev-el-estado-decide.md`](14-jev-el-estado-decide.md): dos tareas parecidas, pero el estado de la
     conversación dice cuál es.
-15. [`15-avance-vago.md`](15-avance-vago.md): "voy bien, la tengo casi lista" ante un pedido de estado;
-    Leda anota el avance, la espera sigue abierta, vuelve a preguntar al día hábil siguiente sin contarlo
-    como silencio y, a la segunda respuesta sin nada cierto, pregunta para cuándo.
+15. [`15-avance-vago.md`](15-avance-vago.md): "voy bien, la tengo casi lista" ante el pedido de estado del
+    día del vencimiento; Leda anota el avance, la espera sigue abierta y vuelve a preguntar al día hábil
+    siguiente sin contarlo como silencio; con la tarea ya vencida, la segunda respuesta sin nada cierto
+    lleva la pregunta de para qué día, y la fecha que da Marcos mueve el seguimiento a ella.
 16. [`16-vencida-sin-fecha.md`](16-vencida-sin-fecha.md): "arranqué hoy" con la tarea vencida; Leda anota el
     inicio y, en la misma respuesta, pregunta para qué día la va a tener; la fecha que da Marcos es una
     nueva previsión y el seguimiento se mueve a ella.
@@ -200,6 +201,6 @@ y 9d). Ninguna conversación prueba todavía dos preguntas encadenadas por un ca
   para qué día la va a tener, una sola pregunta. La respuesta no es algo cierto sobre cuándo: la espera
   sigue abierta y, si no contesta, Leda vuelve a pedir el estado el día hábil siguiente, como después de
   un avance. La fecha que da es una nueva previsión, con su aviso al referente, y el seguimiento se mueve
-  a ella. Vale para toda jugada sobre una tarea vencida, no para una (9j; conversación 16).
-  `PENDIENTE`: el paso 2 de la 15 (su primer avance, con la tarea ya vencida) todavía dice que Leda no
-  pregunta nada; su copia comprobable ya sigue esta regla.
+  a ella. Vale para toda jugada sobre una tarea vencida, no para una (9j; conversaciones 15 y 16). La 15
+  la prueba donde 9h y 9j se tocan: el primer avance, el día del vencimiento, no lleva pregunta; el
+  segundo, con la tarea ya vencida, sí.

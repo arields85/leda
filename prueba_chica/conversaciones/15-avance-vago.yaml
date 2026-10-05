@@ -20,44 +20,36 @@ tareas:
     estado: asignada
     depende_de: PLC
 
-# Lo que ya se envió (estado inicial del .md): el aviso previo del jueves 22 y dos pedidos de
-# estado sin respuesta, el martes 27 y el miércoles 28, como en la conversación 04. Corre por el
-# motor; los textos los redacta la IA de la corrida.
+# Lo que ya se envió (estado inicial del .md): el aviso previo del jueves 22, que no pide
+# respuesta. Corre por el motor; los textos los redacta la IA de la corrida.
 preludio:
   - quien: Leda
     relojes: ["2026-10-22 10:00"]
     salen: [{a: Marcos, tipo: aviso_previo, tarea: PLC}]
-  - quien: Leda
-    relojes: ["2026-10-27 10:00"]
-    salen: [{a: Marcos, tipo: pedido_de_estado, tarea: PLC}]
-  - quien: Leda
-    relojes: ["2026-10-28 10:00"]
-    salen: [{a: Marcos, tipo: pedido_de_estado, tarea: PLC}]
 
 pasos:
   - paso: 1
     quien: Leda
-    relojes: ["2026-10-29 10:00"]
+    relojes: ["2026-10-27 10:00"]
     salen:
       - a: Marcos
         tipo: pedido_de_estado
         tarea: PLC
-        hechos: {numero: 3, necesita_respuesta: true,
-                 si_no_hay_respuesta: {se_avisa_a: [Ismael Soschinski], estado: todavia_no}}
+        hechos: {numero: 1, necesita_respuesta: true, vence: "2026-10-27",
+                 atraso_dias_habiles: 0, si_no_hay_respuesta: ausente}
     estado_despues:
       pregunta_abierta: {tipo: estado_de_la_tarea, tarea: PLC}
       esperas_abiertas: [PLC]
     dice:
-      - que la tarea del PLC venció el martes
-      - que si no hay novedades se le va a avisar a Ismael
+      - que la tarea del PLC vence hoy
       - pide el estado
     no_dice:
-      - una amenaza ni un reproche
-      - que ya se avisó a Ismael
+      - que va a avisar a Ismael
+      - un reproche
 
   - paso: 2
     quien: Marcos
-    a_las: "2026-10-29 10:30"
+    a_las: "2026-10-27 10:30"
     escribe: "voy bien, la tengo casi lista"
     jugadas:
       - {nombre: informar_avance, tarea: PLC, palabras: "voy bien, la tengo casi lista"}
@@ -71,42 +63,38 @@ pasos:
         tarea: PLC
         avance: {dijo: presente}
         el_pedido_de_estado: sigue_abierto
-        vuelve_a_pedir_el_estado: {estado: guardado_sin_enviar, sale: "~2026-10-30"}
+        vuelve_a_pedir_el_estado: {estado: guardado_sin_enviar, sale: "~2026-10-28"}
         veces_sin_algo_cierto: 1
-        vencida: {fecha_comprometida: "2026-10-27", atraso_dias_habiles: 2}
-        pregunta: fecha_de_la_tarea
-    # Decisión del usuario del 2026-10-05 (ADR 0018, 9j; conversación 16): con la tarea vencida,
-    # una respuesta sin fecha lleva en la misma respuesta la pregunta de para cuándo, ya desde el
-    # primer avance. PENDIENTE: el paso 2 del .md todavía dice que no pregunta nada.
-    pregunta: {tipo: fecha_de_la_tarea, tarea: PLC}
+        vencida: ausente
+        pregunta: ausente
+    pregunta: null
     estado_despues:
-      pregunta_abierta: {tipo: fecha_de_la_tarea, tarea: PLC}
+      pregunta_abierta: null
       para_despues: []
       esperas_abiertas: [PLC]
     dice:
       - que anotó lo que Marcos contó
-      - "una sola pregunta, directa: para cuándo prevé terminarla (9j)"
+      - que mañana le vuelve a preguntar, como algo que todavía no pasó
     no_dice:
       - que la tarea está terminada, entregada o "casi terminada" como un hecho de Leda
       - una fecha que nadie dio
       - que se va a avisar a Ismael o que se escala
-      - un reproche por los dos pedidos anteriores
-      - otra pregunta además de ésa
+      - ninguna pregunta
 
   - paso: 3
     quien: nadie
-    relojes: ["2026-10-29 16:00"]
+    relojes: ["2026-10-27 16:00"]
     salen: []
 
   - paso: 4
     quien: Leda
-    relojes: ["2026-10-30 10:00"]
+    relojes: ["2026-10-28 10:00"]
     salen:
       - a: Marcos
         tipo: repregunta_de_estado
         tarea: PLC
-        hechos: {necesita_respuesta: true, avance_anterior: {dijo: presente, el: "2026-10-29"},
-                 espera_algo_cierto: presente}
+        hechos: {necesita_respuesta: true, avance_anterior: {dijo: presente, el: "2026-10-27"},
+                 espera_algo_cierto: presente, si_no_hay_respuesta: ausente}
     estado_despues:
       pregunta_abierta: {tipo: estado_de_la_tarea, tarea: PLC}
       esperas_abiertas: [PLC]
@@ -120,7 +108,7 @@ pasos:
 
   - paso: 5
     quien: Marcos
-    a_las: "2026-10-30 10:40"
+    a_las: "2026-10-28 10:40"
     escribe: "todo en orden, sigo con eso"
     jugadas:
       - {nombre: informar_avance, tarea: PLC, palabras: "todo en orden, sigo con eso"}
@@ -129,23 +117,31 @@ pasos:
       avisos_guardados:
         - {tipo: repregunta_de_estado, tarea: PLC, a: Marcos, estado: guardado}
     hechos:
-      - {jugada: informar_avance, resultado: anotado, tarea: PLC, veces_sin_algo_cierto: 2,
-         pregunta: fecha_de_la_tarea}
+      - jugada: informar_avance
+        resultado: anotado
+        tarea: PLC
+        veces_sin_algo_cierto: 2
+        vuelve_a_pedir_el_estado: {estado: guardado_sin_enviar, sale: "~2026-10-29"}
+        vencida: {fecha_comprometida: "2026-10-27", atraso_dias_habiles: 1}
+        pregunta: fecha_de_la_tarea
     pregunta: {tipo: fecha_de_la_tarea, tarea: PLC}
     estado_despues:
       pregunta_abierta: {tipo: fecha_de_la_tarea, tarea: PLC}
+      para_despues: []
       esperas_abiertas: [PLC]
     dice:
       - que lo anotó
-      - "una sola pregunta, directa: para cuándo prevé terminarla"
+      - que la tarea venció el martes 27
+      - "una sola pregunta, directa: para qué día la va a tener"
     no_dice:
       - una fecha propuesta por Leda
       - que va a escalar
+      - un reproche por el atraso
       - dos preguntas juntas
 
   - paso: 6
     quien: Marcos
-    a_las: "2026-10-30 10:45"
+    a_las: "2026-10-28 10:45"
     escribe: "para el martes 3 la tengo"
     jugadas:
       - {nombre: anotar_prevision, tarea: PLC, fecha: "2026-11-03"}
@@ -159,7 +155,8 @@ pasos:
                    atraso_dias_habiles: 5, dependientes: [COM]}
     hechos:
       - {jugada: anotar_prevision, resultado: anotado, tarea: PLC, prevision: "2026-11-03",
-         fecha_comprometida: "2026-10-27", atraso_dias_habiles: 5}
+         fecha_comprometida: "2026-10-27", atraso_dias_habiles: 5,
+         aviso_al_referente: {a: Ismael Soschinski, estado: guardado_sin_enviar}}
     pregunta: null
     estado_despues:
       pregunta_abierta: null
@@ -172,14 +169,17 @@ pasos:
     no_dice:
       - que la fecha comprometida cambió
       - que Ismael ya lo sabe si el aviso no salió
+      - otra pregunta
 
   - paso: 7
     quien: nadie
-    # Enseguida sale el aviso de la previsión a Ismael (dentro del horario), y el lunes 2 nada.
-    relojes: ["2026-10-30 10:46", "2026-10-30 16:00", "2026-11-02 10:00", "2026-11-02 16:00"]
+    # Enseguida sale el aviso de la previsión a Ismael (dentro del horario); a Marcos, nada hasta
+    # el martes 3 (9i).
+    relojes: ["2026-10-28 10:46", "2026-10-28 16:00", "2026-10-29 10:00", "2026-10-29 16:00",
+              "2026-10-30 10:00", "2026-11-02 10:00", "2026-11-02 16:00"]
     salen:
       - a: Ismael
-        el: "2026-10-30"
+        el: "2026-10-28"
         tipo: nueva_prevision
         tarea: PLC
         hechos: {prevision: "2026-11-03", atraso_dias_habiles: 5}
@@ -188,4 +188,27 @@ pasos:
          motivo: ya_respondio}
     dice:
       - "a Ismael, sólo el aviso de la previsión; ningún escalamiento"
-      - "a Marcos, nada el lunes: el pedido guardado se omite con su motivo"
+      - "a Marcos, nada hasta el martes 3: el pedido guardado para el jueves se omite con su motivo"
+
+  - paso: 8
+    quien: Leda
+    relojes: ["2026-11-03 10:00"]
+    # Un solo envío con los avisos automáticos del día (mecánica §10): el pedido de estado del
+    # día que dio Marcos y el aviso previo de la tarea de comunicaciones.
+    salen:
+      - a: Marcos
+        tipo: pedido_de_estado
+        tareas: [PLC, COM]
+        hechos: {numero: 1, necesita_respuesta: true, seguimiento_por: prevision,
+                 prevision_vigente: {fecha: "2026-11-03"}}
+    estado_despues:
+      pregunta_abierta: {tipo: estado_de_la_tarea, tarea: PLC}
+      esperas_abiertas: [PLC]
+    dice:
+      - que hoy es el día que Marcos dio para la tarea del PLC
+      - pide el estado
+      - que la de comunicaciones vence el viernes 6, sin pedir respuesta por ella
+    no_dice:
+      - que va a avisar a Ismael
+      - un reproche
+      - dos preguntas
