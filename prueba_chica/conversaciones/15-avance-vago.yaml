@@ -73,20 +73,25 @@ pasos:
         el_pedido_de_estado: sigue_abierto
         vuelve_a_pedir_el_estado: {estado: guardado_sin_enviar, sale: "~2026-10-30"}
         veces_sin_algo_cierto: 1
-    pregunta: null
+        vencida: {fecha_comprometida: "2026-10-27", atraso_dias_habiles: 2}
+        pregunta: fecha_de_la_tarea
+    # Decisión del usuario del 2026-10-05 (ADR 0018, 9j; conversación 16): con la tarea vencida,
+    # una respuesta sin fecha lleva en la misma respuesta la pregunta de para cuándo, ya desde el
+    # primer avance. PENDIENTE: el paso 2 del .md todavía dice que no pregunta nada.
+    pregunta: {tipo: fecha_de_la_tarea, tarea: PLC}
     estado_despues:
-      pregunta_abierta: null
+      pregunta_abierta: {tipo: fecha_de_la_tarea, tarea: PLC}
       para_despues: []
       esperas_abiertas: [PLC]
     dice:
       - que anotó lo que Marcos contó
-      - que mañana le vuelve a preguntar, como algo que todavía no pasó
+      - "una sola pregunta, directa: para cuándo prevé terminarla (9j)"
     no_dice:
       - que la tarea está terminada, entregada o "casi terminada" como un hecho de Leda
       - una fecha que nadie dio
       - que se va a avisar a Ismael o que se escala
       - un reproche por los dos pedidos anteriores
-      - ninguna pregunta
+      - otra pregunta además de ésa
 
   - paso: 3
     quien: nadie

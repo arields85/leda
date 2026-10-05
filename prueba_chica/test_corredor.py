@@ -46,9 +46,9 @@ def _sin_corridas_variables(corrida) -> list:
 
 # --- Las conversaciones -------------------------------------------------------------------
 
-def test_hay_quince_conversaciones_y_cada_una_nombra_su_fuente():
+def test_hay_dieciseis_conversaciones_y_cada_una_nombra_su_fuente():
     convs = todas()
-    assert [c["numero"] for c in convs] == [f"{n:02d}" for n in range(1, 16)]
+    assert [c["numero"] for c in convs] == [f"{n:02d}" for n in range(1, 17)]
     raiz = CARPETA.parents[1]
     for c in convs:
         assert (raiz / c["fuente"]).exists(), c["fuente"]

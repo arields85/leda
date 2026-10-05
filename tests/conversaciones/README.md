@@ -43,10 +43,14 @@ El circuito es el recordatorio y lo que la persona contesta (ADR 0018, decisión
 15. [`15-avance-vago.md`](15-avance-vago.md): "voy bien, la tengo casi lista" ante un pedido de estado;
     Leda anota el avance, la espera sigue abierta, vuelve a preguntar al día hábil siguiente sin contarlo
     como silencio y, a la segunda respuesta sin nada cierto, pregunta para cuándo.
+16. [`16-vencida-sin-fecha.md`](16-vencida-sin-fecha.md): "arranqué hoy" con la tarea vencida; Leda anota el
+    inicio y, en la misma respuesta, pregunta para qué día la va a tener; la fecha que da Marcos es una
+    nueva previsión y el seguimiento se mueve a ella.
 
 Las cuatro primeras son las cuatro respuestas de 5a; de la 5 a la 12, cada una aplica al recordatorio una
 de las ocho situaciones generales de la decisión 4. La 15 suma la jugada `informar_avance` (decisión del
-usuario, 2026-10-05; ADR 0018, decisión 9b).
+usuario, 2026-10-05; ADR 0018, decisión 9b). La 16, la regla de la tarea vencida (decisión del usuario,
+2026-10-05; ADR 0018, decisión 9j).
 
 ## Formato de cada conversación
 
@@ -191,3 +195,11 @@ y 9d). Ninguna conversación prueba todavía dos preguntas encadenadas por un ca
   ahí. Una previsión más nueva mueve el ancla; una que vuelve a la fecha comprometida la devuelve al
   vencimiento (9i; conversación 02). El referente recibe información y las decisiones que son suyas, nunca
   trabajo de gestión.
+- **Con la tarea vencida, una respuesta sin fecha lleva la pregunta de para cuándo** ("arranqué hoy",
+  "voy bien", "sigo con eso"): Leda anota lo que la persona dijo y, en esa misma respuesta, le pregunta
+  para qué día la va a tener, una sola pregunta. La respuesta no es algo cierto sobre cuándo: la espera
+  sigue abierta y, si no contesta, Leda vuelve a pedir el estado el día hábil siguiente, como después de
+  un avance. La fecha que da es una nueva previsión, con su aviso al referente, y el seguimiento se mueve
+  a ella. Vale para toda jugada sobre una tarea vencida, no para una (9j; conversación 16).
+  `PENDIENTE`: el paso 2 de la 15 (su primer avance, con la tarea ya vencida) todavía dice que Leda no
+  pregunta nada; su copia comprobable ya sigue esta regla.

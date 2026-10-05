@@ -481,6 +481,38 @@ el aviso de que se va a escalar y el escalamiento).
   decisión) y el escalamiento por falta de respuesta (información, mecánica §9). Ninguno le pide
   perseguir a nadie ni resolver nada.
 
+#### 9j. Con la tarea vencida, una respuesta sin fecha lleva la pregunta de para cuándo (usuario, 2026-10-05)
+
+Decidida por el usuario y escrita primero como la conversación de prueba 16
+(`tests/conversaciones/16-vencida-sin-fecha.md`). Con la tarea vencida (pasada su fecha de
+seguimiento: la comprometida o, si es posterior, la previsión, que es el ancla de 9i), **lo que la
+persona contesta se anota igual y, si no trae una fecha** ("arranqué hoy", "voy bien", "sigo con
+eso"), **Leda le pregunta en esa misma respuesta para qué día la va a tener**: una sola pregunta.
+
+- **La respuesta es una previsión**: con su aviso al referente y el atraso, que calcula el código
+  contra la fecha comprometida (9b), y el seguimiento se mueve a esa fecha (9i).
+- **Es una regla general para toda jugada sobre una tarea vencida, no para una.** Una fecha y un
+  bloqueo son algo cierto y no la llevan; el bloqueo sigue con su pregunta de quién lo destraba
+  (9c). Un inicio o un avance no lo son.
+- **Mientras no llega la fecha, no es silencio, pero tampoco algo cierto sobre cuándo**: la
+  espera del estado sigue abierta y, si no contesta, Leda vuelve a pedir el estado el día hábil
+  siguiente con la cuenta de pedidos de nuevo, como después de un avance (9h).
+- **Precisa 9h**: con la tarea vencida, el avance lleva la pregunta de para cuándo ya desde la
+  primera vez; "a la segunda" queda para la tarea que todavía no venció. La conversación 15 lo
+  aplica en su primer avance (`PENDIENTE`: llevarlo a su `.md`, paso 2).
+
+> **Precisiones de la corrida en seco de la E2-7 (usuario, 2026-10-05).** Tres hallazgos del motor,
+> resueltos como reglas generales. (1) **Toda pregunta cuya ficha dice que espera respuesta abre
+> una espera y la repite la escalera** de quien no contestó: el día hábil siguiente, otra vez al
+> otro avisando a quién se va a escalar, y al siguiente escala; la de quién destraba es una de
+> ellas (9c, paso 2; conversación 03). (2) **Todo lo que Leda le propone a la persona queda como
+> tema abierto** (ADR 0013: la pregunta pendiente es el contexto): las salidas de un bloqueo y la
+> previsión ofrecida en lugar de una reasignación se contestan haciendo una de ellas, se pueden
+> cancelar y siguen la regla de un tema a la vez (conversaciones 03 y 12). (3) **Los mensajes
+> automáticos del día a una persona salen en un solo envío** (mecánica §10), redactado desde los
+> hechos de todos y con una sola pregunta; los de coordinación y las respuestas, aparte
+> (conversación 13).
+
 ## Consecuencias
 
 - **Decisión 1:** cada jugada de la lista y cada situación general se declaran y se prueban una

@@ -21,6 +21,14 @@ también es común: si a una jugada le falta la tarea, se pregunta con las tarea
 como opciones (situación general 5). Y lo que una jugada le propone a la persona (`propone`)
 queda como tema abierto, una pregunta como cualquier otra (`preguntas.PROPUESTA`; decisión del
 usuario, 2026-10-05).
+
+**Con la tarea vencida, una respuesta sin fecha lleva la pregunta de para cuándo** (decisión del
+usuario, 2026-10-05; ADR 0018, 9j; conversación 16), también común: si la tarea pasó su fecha de
+seguimiento (la comprometida o, si es posterior, la previsión: el ancla, 9i), lo que la jugada
+anotó queda anotado y, si no es algo cierto sobre cuándo (`Ficha.algo_cierto`: una fecha o un
+bloqueo lo son; un inicio o un avance, no), la espera del estado sigue abierta, Leda vuelve a
+pedirlo el día hábil siguiente con la cuenta de nuevo (como después de un avance, 9h) y, en esa
+misma respuesta, pregunta para qué día la va a tener. Los hechos dicen que venció y el atraso.
 """
 
 from __future__ import annotations
@@ -109,6 +117,12 @@ class Ficha:
     # Lo que Leda le propone a la persona en sus hechos (las jugadas o salidas que puede elegir):
     # queda como tema abierto (`preguntas.PROPUESTA`). `None`: no propone nada.
     propone: Callable[[dict[str, Any]], list[str] | None] | None = None
+    # Si lo que anota es algo cierto sobre la tarea (una fecha, un bloqueo): con la tarea
+    # vencida, lo que no lo es lleva la pregunta de para cuándo (9j).
+    algo_cierto: bool = False
+    # Si su manejador ya sigue el pedido de estado (un avance, 9h): la regla de la tarea vencida
+    # no guarda otro pedido.
+    sigue_el_pedido: bool = False
 
 
 # Lo que Leda propone cuando no hay otra persona que destrabe el bloqueo (la persona no sabe
@@ -164,6 +178,7 @@ def correr(ficha: Ficha, ctx: Contexto, jugada: Jugada) -> dict[str, Any]:
                     preguntas.contestar(ctx, ficha.nombre, ficha.contesta, de_la_tarea["id"])
             if hecho["jugada"] == ficha.nombre:
                 _proponer(ficha, ctx, hecho, de_la_tarea)
+                _si_esta_vencida(ficha, ctx, hecho, de_la_tarea)
             return hecho
     except Exception as e:      # el punto de guardado ya deshizo lo de esta jugada
         rechazo = _rechazo_del_dominio(e)
@@ -184,6 +199,67 @@ def _proponer(ficha: Ficha, ctx: Contexto, hecho: dict[str, Any],
     ahora = preguntas.abrir(ctx, preguntas.PROPUESTA, tarea["id"] if tarea else None,
                             jugada={"nombre": ficha.nombre, "propone": list(propuesto)})
     hecho[_clave_de_pregunta(ahora)] = preguntas.PROPUESTA
+
+
+def _si_esta_vencida(ficha: Ficha, ctx: Contexto, hecho: dict[str, Any],
+                     tarea: dict[str, Any] | None) -> None:
+    """La regla de la tarea vencida (9j, ver el módulo), igual para toda jugada que anota algo
+    sobre una tarea del responsable sin que sea algo cierto sobre cuándo."""
+    if (hecho.get("resultado") != "anotado" or tarea is None or ficha.algo_cierto
+            or not ficha.del_responsable):
+        return
+    vencida = _vencida(ctx, tarea)
+    if vencida is None:
+        return
+    hecho["vencida"] = vencida
+    if not ficha.sigue_el_pedido:
+        candado(ctx.cur, tarea["id"])
+        hecho.update(_seguir_pidiendo(ctx, tarea, _espera_del_estado(ctx, tarea),
+                                      {"jugada": ficha.nombre,
+                                       "dijo": (ctx.texto or ctx.toque or "").strip()}))
+    fecha = preguntas.FECHA_DE_LA_TAREA
+    if fecha not in (hecho.get("pregunta"), hecho.get("pregunta_para_despues")):
+        clave = _abrir_pregunta(ctx, fecha, tarea["id"], jugada={"nombre": ficha.nombre})
+        hecho[clave] = fecha
+
+
+def _vencida(ctx: Contexto, tarea: dict[str, Any]) -> dict[str, Any] | None:
+    """Si la tarea pasó su fecha de seguimiento (el ancla, 9i): la fecha comprometida, el atraso
+    contra ella (lo calcula el código) y, si el ancla era una previsión, cuál. `None` si no."""
+    cal = ctx.calendario
+    ctx.cur.execute("select fecha_objetivo from task where id = %s", (tarea["id"],))
+    fila = ctx.cur.fetchone()
+    if fila is None or fila["fecha_objetivo"] is None:
+        return None
+    vence = fila["fecha_objetivo"].astimezone(cal.zona).date()
+    de = anclaje(ctx.cur, tarea["id"], vence)
+    if ctx.ahora.astimezone(cal.zona).date() <= de.fecha:
+        return None
+    return {"fecha_comprometida": vence.isoformat(),
+            "atraso_dias_habiles": cal.habiles_entre(fila["fecha_objetivo"], ctx.ahora),
+            **({"prevision_vencida": de.fecha.isoformat()} if de.fecha > vence else {})}
+
+
+def _espera_del_estado(ctx: Contexto, tarea: dict[str, Any]) -> dict[str, Any]:
+    """La espera del estado de la tarea: la abierta o, si la jugada la contestó (un inicio),
+    una nueva: la respuesta no fue algo cierto sobre cuándo, así que se sigue esperando."""
+    cur, persona = ctx.cur, ctx.quien.membership_id
+    cur.execute("""select * from pending_reply
+                    where membership_id = %s and task_id = %s and tipo = %s
+                      and satisfecho_en is null
+                    order by preguntado_en desc limit 1""",
+                (persona, tarea["id"], preguntas.ESTADO_DE_LA_TAREA))
+    espera = cur.fetchone()
+    if espera is not None:
+        return espera
+    cal = ctx.calendario
+    cur.execute(
+        """insert into pending_reply (workspace_id, membership_id, task_id, tipo,
+                                      preguntado_en, vence_en)
+           values (%s, %s, %s, %s, %s, %s) returning *""",
+        (ctx.quien.workspace_id, persona, tarea["id"], preguntas.ESTADO_DE_LA_TAREA, ctx.ahora,
+         cal.dentro_de_jornada(cal.sumar_habiles(ctx.ahora, 1))))
+    return cur.fetchone()
 
 
 def _duda(ficha: Ficha, ctx: Contexto, datos: dict[str, Any]) -> dict[str, Any]:
@@ -487,11 +563,12 @@ def _informar_avance(ctx: Contexto, datos: dict, tarea: dict) -> dict:
     respuesta no es cierta, y Leda vuelve a pedir el estado el día hábil siguiente, dentro de la
     escalera de su ancla (la previsión, si es posterior al vencimiento; 9i). No es silencio: la
     escalera cuenta sólo los pedidos sin respuesta (`escalera.py`). A la segunda respuesta así
-    para la misma espera, Leda pregunta directo para cuándo (decisión del usuario, 2026-10-05).
+    para la misma espera, Leda pregunta directo para cuándo (decisión del usuario, 2026-10-05);
+    con la tarea vencida, ya a la primera (9j, `_si_esta_vencida`).
 
     Si no hay un pedido siguiente, los hechos lo dicen (nunca en silencio): la tarea no tiene
     vencimiento, o la escalera de su ancla ya terminó al escalar (y a quién se le avisó)."""
-    cur, cal, persona = ctx.cur, ctx.calendario, ctx.quien.membership_id
+    cur, persona = ctx.cur, ctx.quien.membership_id
     dijo = str(datos["palabras"]).strip() if not _vacio(datos.get("palabras")) \
         else ctx.texto.strip()
     if not dijo:
@@ -516,14 +593,33 @@ def _informar_avance(ctx: Contexto, datos: dict, tarea: dict) -> dict:
                                  "inbound_message_id": ctx.entrante_id})
     hecho: dict[str, Any] = {"resultado": "anotado", "tarea": _tarea(tarea),
                              "avance": {"dijo": dijo}, "el_pedido_de_estado": "sigue_abierto"}
+    hecho.update(_seguir_pidiendo(ctx, tarea, espera, {"dijo": dijo}))
+    if hecho.get("veces_sin_algo_cierto", 0) > 1:
+        clave = _abrir_pregunta(ctx, preguntas.FECHA_DE_LA_TAREA, tarea["id"],
+                                jugada={"nombre": "informar_avance", "datos": datos})
+        hecho[clave] = preguntas.FECHA_DE_LA_TAREA
+    return hecho
+
+
+def _seguir_pidiendo(ctx: Contexto, tarea: dict[str, Any], espera: dict[str, Any],
+                     contesto: dict[str, Any]) -> dict[str, Any]:
+    """Una respuesta que no es algo cierto deja la espera abierta y Leda vuelve a pedir el
+    estado el día hábil siguiente, dentro de la escalera de su ancla (la previsión, si es
+    posterior al vencimiento; 9i): ese pedido es el primero de una cuenta nueva y reemplaza los
+    pasos guardados que no salieron (9h). Los hechos que agrega: cuándo vuelve a pedirlo y
+    cuántas respuestas así lleva la espera, o por qué no vuelve a pedirlo (nunca en silencio:
+    sin vencimiento, o con la escalera de su ancla ya escalada). `contesto`: lo que contestó,
+    que el pedido siguiente recuerda (`avance_anterior`). Quien llama tiene la tarea tomada
+    (`ancla.candado`)."""
+    cur, cal, persona = ctx.cur, ctx.calendario, ctx.quien.membership_id
     fila = _exigir_responsable(cur, ctx.quien, tarea["id"])
     if fila["fecha_objetivo"] is None:      # sin vencimiento no hay escalera que vuelva a pedir
-        return {**hecho, "no_vuelve_a_pedir_el_estado": {"motivo": "sin_fecha_comprometida"}}
+        return {"no_vuelve_a_pedir_el_estado": {"motivo": "sin_fecha_comprometida"}}
     vence = fila["fecha_objetivo"].astimezone(cal.zona).date()
     de = anclaje(cur, tarea["id"], vence)      # la escalera de la previsión, si es posterior
     escalon = pasos(cur, tarea["id"], de)
     if escalo(escalon, espera):
-        return {**hecho, "no_vuelve_a_pedir_el_estado": {
+        return {"no_vuelve_a_pedir_el_estado": {
             "motivo": "ya_se_escalo", "escalado_a": _escalado_a(cur, escalon)}}
 
     # Los pasos de la escalera de esta ancla que todavía no salieron ya no corresponden: la
@@ -551,7 +647,7 @@ def _informar_avance(ctx: Contexto, datos: dict, tarea: dict) -> dict:
            on conflict (workspace_id, dedupe_key) do nothing""",
         (ctx.quien.workspace_id, REPREGUNTA_DE_ESTADO, tarea["id"], persona,
          json.dumps({"aviso": REPREGUNTA_DE_ESTADO, "necesita_respuesta": True,
-                     "avance_anterior": {"dijo": dijo, "el": hoy.isoformat()},
+                     "avance_anterior": {**contesto, "el": hoy.isoformat()},
                      "espera_algo_cierto": list(ESPERA_ALGO_CIERTO),
                      "tarea": tarea["titulo"], "vence": vence.isoformat(),
                      **({"seguimiento_por": "prevision"} if de.fecha > vence else {})},
@@ -559,14 +655,8 @@ def _informar_avance(ctx: Contexto, datos: dict, tarea: dict) -> dict:
          sale, f"motor:{REPREGUNTA_DE_ESTADO}:{tarea['id']}:{de.clave}:0:"
                f"{de_la_espera}:a{veces}",
          ctx.ahora))
-    hecho.update(vuelve_a_pedir_el_estado={"estado": GUARDADO_SIN_ENVIAR,
-                                           "sale": sale.isoformat()},
-                 veces_sin_algo_cierto=veces)
-    if veces > 1:
-        clave = _abrir_pregunta(ctx, preguntas.FECHA_DE_LA_TAREA, tarea["id"],
-                                jugada={"nombre": "informar_avance", "datos": datos})
-        hecho[clave] = preguntas.FECHA_DE_LA_TAREA
-    return hecho
+    return {"vuelve_a_pedir_el_estado": {"estado": GUARDADO_SIN_ENVIAR, "sale": sale.isoformat()},
+            "veces_sin_algo_cierto": veces}
 
 
 def _escalado_a(cur, escalon: list[dict[str, Any]]) -> list[dict[str, str]]:
@@ -781,7 +871,7 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
                   "cierra la espera de esa tarea",
           manejar=_anotar_prevision, del_responsable=True,
           contesta=(preguntas.ESTADO_DE_LA_TAREA, preguntas.FECHA_DE_LA_TAREA),
-          deshacer=_deshacer_prevision),
+          deshacer=_deshacer_prevision, algo_cierto=True),
     Ficha("anotar_bloqueo", "anotar que una tarea está trabada y por qué",
           necesita=("tarea",), opcional=("causa",),
           comprueba="que sea el responsable y que la tarea esté abierta",
@@ -791,7 +881,7 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
           manejar=_anotar_bloqueo, del_responsable=True,
           contesta=("causa_del_bloqueo", preguntas.ESTADO_DE_LA_TAREA,
                     preguntas.FECHA_DE_LA_TAREA),
-          deshacer=_deshacer_bloqueo),
+          deshacer=_deshacer_bloqueo, algo_cierto=True),
     Ficha("anotar_quien_destraba", "anotar quién puede destrabar un bloqueo",
           necesita=(), opcional=("tarea", "quien", "no_sabe", "nadie_mas"),
           comprueba="que haya un bloqueo abierto en una tarea suya",
@@ -814,7 +904,7 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
                   "cierto, pregunta para cuándo. Sin un pedido siguiente (sin vencimiento, o "
                   "ya escaló), lo dice",
           manejar=_informar_avance, del_responsable=True,
-          contesta=(preguntas.ESTADO_DE_LA_TAREA,)),
+          contesta=(preguntas.ESTADO_DE_LA_TAREA,), sigue_el_pedido=True),
     Ficha("consultar_pendientes", "contar qué tareas tiene pendientes",
           necesita=(), opcional=(),
           comprueba="nada", hace="lee sus tareas abiertas (consultar_tareas)",
