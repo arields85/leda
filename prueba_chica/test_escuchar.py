@@ -38,12 +38,15 @@ class TelegramFalso:
         metodo = pedido.url.path.rsplit("/", 1)[-1]
         parametros = json.loads(pedido.content) if pedido.content else {}
         self.llamadas.append((metodo, parametros))
-        resultado = {
-            "getMe": {"id": ID_DEL_BOT, "username": "leda_motor_bot"},
-            "deleteWebhook": True,
-            "getWebhookInfo": {"url": self.webhook},
-            "getUpdates": self.lotes.pop(0) if self.lotes else [],
-        }[metodo]
+        if metodo == "getUpdates":      # sólo este pedido consume un lote
+            resultado = self.lotes.pop(0) if self.lotes else []
+        else:
+            resultado = {
+                "getMe": {"id": ID_DEL_BOT, "username": "leda_motor_bot"},
+                "deleteWebhook": True,
+                "getWebhookInfo": {"url": self.webhook},
+                "answerCallbackQuery": True,
+            }[metodo]
         return httpx.Response(200, json={"ok": True, "result": resultado})
 
     def metodos(self) -> list[str]:
@@ -66,7 +69,8 @@ class Montaje:
     salida_admin: TransporteDePrueba
 
 
-def _montar(conn, mundo, ia, *, webhook_admin: str = "") -> Montaje:
+def _montar(conn, mundo, ia, *, webhook_admin: str = "",
+            imprimir=lambda *_: None) -> Montaje:
     telegram, telegram_admin = TelegramFalso(), TelegramFalso(webhook=webhook_admin)
     salida, salida_admin = TransporteDePrueba(), TransporteDePrueba()
     escucha = Escucha(
@@ -75,7 +79,7 @@ def _montar(conn, mundo, ia, *, webhook_admin: str = "") -> Montaje:
         transporte=salida,
         bot_admin=BotTelegram("token-admin-falso",
                               httpx.Client(transport=httpx.MockTransport(telegram_admin))),
-        transporte_admin=salida_admin, imprimir=lambda *_: None)
+        transporte_admin=salida_admin, imprimir=imprimir)
     escucha.preparar()
     return Montaje(escucha, telegram, telegram_admin, salida, salida_admin)
 
@@ -353,3 +357,105 @@ def test_alguien_que_no_es_administrador_no_se_registra(conn, mundo):
     m.escucha.una_vuelta(espera=0)
 
     assert _cuantas(conn, "audit_log", "accion = 'mensaje_admin'") == 0
+
+
+# --- Botones y toques (E2-4) ----------------------------------------------------------------
+#
+# Situaciones generales 5, 6 y 7: una duda sale con las tareas como botones, por el outbox (el
+# `callback_data` es el token de la opción, nada más); un toque recibe su señal, corre el mismo
+# turno que la elección escrita y no hace nada dos veces (ADR 0013, regla 4).
+
+def _toque(update_id: int, data: str, de: int = MARCOS, callback_id: str | None = None) -> dict:
+    return {"update_id": update_id, "callback_query": {
+        "id": callback_id or f"cb{update_id}", "from": {"id": de, "first_name": "X"},
+        "data": data,
+        "message": {"message_id": 1, "chat": {"id": de, "type": "private"}}}}
+
+
+def _con_dos_tareas(conn, mundo) -> str:
+    from prueba_chica.test_situaciones import _tarea
+    return _tarea(conn, mundo, "Probar las comunicaciones")
+
+
+def test_una_duda_sale_con_las_tareas_como_botones(conn, mundo):
+    _con_dos_tareas(conn, mundo)
+    ia = IAGuionada(jugadas=[[Jugada("anotar_inicio", {})]], redacciones=["¿Cuál arrancaste?"])
+    m = _montar(conn, mundo, ia)
+    m.telegram.lotes = [[_mensaje(1400, "hoy arranque")]]
+
+    m.escucha.una_vuelta(espera=0)
+
+    [salida] = m.salida.enviados
+    tokens = {o["orden"]: o["token"] for o in _todos(
+        conn, "select orden, token from conversation_option")}
+    assert [(b.etiqueta, b.callback_data) for b in salida.botones] == [
+        ("Revisar el tablero", f"m:{tokens[1]}"),
+        ("Probar las comunicaciones", f"m:{tokens[2]}")]
+    pedidos = [p for metodo, p in m.telegram.llamadas if metodo == "getUpdates"]
+    assert "callback_query" in pedidos[0]["allowed_updates"]
+
+
+def test_un_toque_recibe_su_senal_corre_su_turno_y_no_se_repite(conn, mundo):
+    t2 = _con_dos_tareas(conn, mundo)
+    ia = IAGuionada(jugadas=[[Jugada("anotar_inicio", {})]],
+                    redacciones=["¿Cuál arrancaste?", "Anotado."])
+    m = _montar(conn, mundo, ia)
+    m.telegram.lotes = [[_mensaje(1500, "hoy arranque")]]
+    m.escucha.una_vuelta(espera=0)
+    token = _uno(conn, "select token from conversation_option where orden = 2")["token"]
+
+    m.telegram.lotes = [[_toque(1501, f"m:{token}")], [_toque(1502, f"m:{token}")]]
+    m.escucha.una_vuelta(espera=0)
+    m.escucha.una_vuelta(espera=0)          # el mismo botón, tocado otra vez
+
+    senales = [p for metodo, p in m.telegram.llamadas if metodo == "answerCallbackQuery"]
+    assert [s["callback_query_id"] for s in senales] == ["cb1501", "cb1502"]
+    assert _uno(conn, "select estado::text e from task where id = %s", t2)["e"] == "en_curso"
+    assert _cuantas(conn, "conversation_turn", "option_id is not null") == 1
+    assert [e.texto for e in m.salida.enviados] == ["¿Cuál arrancaste?", "Anotado."]
+    assert m.salida.enviados[1].botones == []       # la pregunta ya se cerró
+
+
+def test_un_toque_de_alguien_de_afuera_solo_recibe_la_senal(conn, mundo):
+    _con_dos_tareas(conn, mundo)
+    ia = IAGuionada(jugadas=[[Jugada("anotar_inicio", {})]], redacciones=["¿Cuál?"])
+    m = _montar(conn, mundo, ia)
+    m.telegram.lotes = [[_mensaje(1600, "hoy arranque")]]
+    m.escucha.una_vuelta(espera=0)
+    token = _uno(conn, "select token from conversation_option where orden = 1")["token"]
+
+    m.telegram.lotes = [[_toque(1601, f"m:{token}", de=99999),
+                         _toque(1602, "otra-cosa")]]
+    m.escucha.una_vuelta(espera=0)
+
+    assert m.telegram.metodos().count("answerCallbackQuery") == 2
+    assert _cuantas(conn, "conversation_turn", "option_id is not null") == 0
+    assert len(m.salida.enviados) == 1 and _cuantas(conn, "incident") == 0
+
+
+def test_lo_que_leda_manda_por_su_cuenta_nunca_lleva_botones(conn, mundo):
+    """Sin botones en los avisos (9b), aunque haya una duda abierta."""
+    from leda.db import espacio
+    from leda.salida import enqueue_outbox
+
+    _con_dos_tareas(conn, mundo)
+    ia = IAGuionada(jugadas=[[Jugada("anotar_inicio", {})]], redacciones=["¿Cuál?"])
+    m = _montar(conn, mundo, ia)
+    m.telegram.lotes = [[_mensaje(1700, "hoy arranque")]]
+    m.escucha.una_vuelta(espera=0)
+    with espacio(conn, mundo["id"]) as cur:
+        enqueue_outbox(cur, workspace_id=mundo["id"], chat_id=MARCOS, text="Un aviso.",
+                       dedupe_key="aviso-de-prueba", message_type="informativo",
+                       recipient_membership_id=mundo["personas"]["Marcos"]["membership_id"],
+                       scheduled_for=AHORA)
+    conn.commit()
+
+    m.escucha.una_vuelta(espera=0)
+
+    assert [(e.texto, e.botones) for e in m.salida.enviados][1] == ("Un aviso.", [])
+
+
+def _todos(conn, sql: str, *params) -> list[dict]:
+    with admin(conn) as cur:
+        cur.execute(sql, params)
+        return cur.fetchall()

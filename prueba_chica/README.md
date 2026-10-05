@@ -13,6 +13,12 @@ de nuevo en `src/leda`, con su propia prueba de frontera.
   hechos; la encola y deja todo en el registro de turnos. Si la IA no responde, un reintento y
   después el único texto fijo, con un incidente para el administrador.
 - `fichas.py`: la lista cerrada de jugadas y sus fichas.
+- `preguntas.py` y `situaciones.py`: las situaciones generales, una vez para todas las fichas
+  (E2-4). Las preguntas de Leda, de a una y en orden, con lo que queda para después; la duda
+  con las tareas como opciones; y las jugadas `elegir`, `corregir`, `cancelar` y
+  `dejar_para_despues`.
+- `botones.py`: las opciones de una duda salen como botones con la respuesta, por el outbox.
+  Un toque corre el mismo turno que la elección escrita (`turno.procesar_toque`).
 - `ia.py`: lo que el motor le pide a la IA y una IA guionada para las pruebas.
 - `ia_real.py` e `instrucciones.py`: la IA real. Una llamada que fuerza a la IA a contestar con
   la lista cerrada (o con `fuera_de_la_lista`) y una que redacta desde los hechos, con el tono
@@ -92,8 +98,11 @@ Después, leer la conversación con `tools/leer_conversacion.py` y la base (`con
 
 ### Límites conocidos
 
-- **Todavía no hay cambio de tema, corrección ni cancelar** (E2-4). Si Marcos se corrige,
-  cambia de tema o dice que lo deja, una mala respuesta ahí no es una falla del diseño.
+- **Las situaciones generales están desde la E2-4** (cambio de tema, varias cosas, corrección,
+  cancelar, duda con botones, escrito en lugar de botón y toque viejo). Los botones viejos no
+  se quitan del chat: un toque de una pregunta ya cerrada no hace nada y Leda dice con qué se
+  cerró. Una corrección que vuelve a una previsión anterior no rearma el aviso de aquélla si se
+  había retirado (`PENDIENTE`, plan, E2-4).
 - **El aviso de la nueva previsión a Ismael se guarda pero no se envía** hasta la E2-5:
   queda en `scheduled_notice`, estado `guardado`. El hecho de la respuesta lo dice
   (`guardado_sin_enviar`, con la hora en que sale): Leda le dice a Marcos que Ismael se va a

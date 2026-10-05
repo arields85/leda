@@ -49,9 +49,11 @@ from leda.incidentes import (ETAPA_TURNO_CONVERSACION, REFERENCIA_INBOUND_MESSAG
 from leda.onboarding import ActivacionInvalida, activar, bienvenida
 from leda.salida import enqueue_outbox
 
+from .botones import ConOpciones
 from .ia import IA
+from .preguntas import token_de
 from .tiempo import Reloj
-from .turno import TEXTO_SI_LA_IA_FALLA, procesar_turno
+from .turno import TEXTO_SI_LA_IA_FALLA, procesar_toque, procesar_turno
 
 ESPERA_S = 25
 INTENTOS_POR_UPDATE = 3     # un update que falla al recibirse se reintenta; después, se deja
@@ -120,7 +122,7 @@ class Escucha:
     def recibir(self, espera: int) -> int:
         try:
             updates = self.bot.llamar("getUpdates", offset=self.offset, timeout=espera,
-                                      allowed_updates=["message"])
+                                      allowed_updates=["message", "callback_query"])
         except Exception as e:  # noqa: BLE001 -- sin conexión, se reintenta en la vuelta
             self.imprimir(f"  (sin conexión con Telegram: {texto_error_seguro(e)})")
             time.sleep(min(espera, 5))
@@ -182,6 +184,9 @@ class Escucha:
         return True
 
     def procesar(self, u: dict[str, Any]) -> None:
+        if u.get("callback_query"):
+            self._toque(u["callback_query"])
+            return
         mensaje = u.get("message")
         if not mensaje or (mensaje.get("chat") or {}).get("type") != "private":
             return
@@ -205,9 +210,44 @@ class Escucha:
             self.conn.commit()
         except Exception as e:  # noqa: BLE001 -- nunca en silencio: incidente y texto fijo
             self.conn.rollback()
-            self._turno_caido(quien, entrante, chat_id, e)
+            self._turno_caido(quien, chat_id, e, entrante=entrante,
+                              clave=f"motor:respuesta:{entrante}")
             return
         if not resultado.repetido:
+            self.imprimir(f"  → {resultado.texto[:70]}")
+
+    def _toque(self, toque: dict[str, Any]) -> None:
+        """Un botón tocado: primero la señal (el acuse que Telegram espera; si falla, no se
+        pierde nada) y después, si es de una opción del motor y de alguien del equipo, el mismo
+        turno que la elección escrita (`procesar_toque`). Un toque repetido de la misma opción
+        sólo recibe la señal (ADR 0013, regla 4)."""
+        try:
+            self.bot.llamar("answerCallbackQuery", callback_query_id=toque["id"])
+        except Exception as e:  # noqa: BLE001 -- un acuse: si falla, el toque se atiende igual
+            self.imprimir(f"  (no se pudo dar la señal del toque: {texto_error_seguro(e)})")
+        token = token_de(str(toque.get("data") or ""))
+        chat = (toque.get("message") or {}).get("chat") or {}
+        tg_user = (toque.get("from") or {}).get("id")
+        if token is None or chat.get("type") != "private" or tg_user is None:
+            return
+        with espacio(self.conn, self.ws) as cur:
+            try:
+                quien = identificar_en_espacio(cur, tg_user, self.ws)
+            except Denegado:
+                quien = None
+        self.conn.commit()
+        if quien is None:
+            self.imprimir("  (un toque de alguien que no es del equipo: no se atiende)")
+            return
+        self.imprimir(f"  ← {quien.nombre} tocó una opción")
+        try:
+            resultado = procesar_toque(self.conn, quien, token, chat["id"], self.ia, self.reloj)
+            self.conn.commit()
+        except Exception as e:  # noqa: BLE001 -- nunca en silencio: incidente y texto fijo
+            self.conn.rollback()
+            self._turno_caido(quien, chat["id"], e, clave=f"motor:toque_caido:{toque['id']}")
+            return
+        if resultado is not None and not resultado.repetido:
             self.imprimir(f"  → {resultado.texto[:70]}")
 
     def _guardar(self, mensaje, tg_user: int, chat_id: int, texto: str):
@@ -240,7 +280,9 @@ class Escucha:
         self.conn.commit()
         return quien, str(fila["id"])
 
-    def _turno_caido(self, quien, entrante: str, chat_id: int, error: Exception) -> None:
+    def _turno_caido(self, quien, chat_id: int, error: Exception, *, clave: str,
+                     entrante: str | None = None) -> None:
+        """Un turno (de un mensaje o de un toque) que se cayó por algo que no es la IA."""
         ahora = self.reloj.ahora()
         try:
             with espacio(self.conn, self.ws) as cur:
@@ -249,11 +291,12 @@ class Escucha:
                     "Un turno del motor de conversación se cayó por algo que no es la IA: "
                     "la persona recibió el texto fijo de la falla.",
                     severidad="alta", referencia_cruda=texto_error_seguro(error),
-                    etapa=ETAPA_TURNO_CONVERSACION, referencia_tipo=REFERENCIA_INBOUND_MESSAGE,
+                    etapa=ETAPA_TURNO_CONVERSACION,
+                    referencia_tipo=REFERENCIA_INBOUND_MESSAGE if entrante else None,
                     referencia_id=entrante, chat_id=chat_id, app_user_id=quien.app_user_id,
                     notificado_en=ahora)
                 enqueue_outbox(cur, workspace_id=self.ws, chat_id=chat_id,
-                               text=TEXTO_SI_LA_IA_FALLA, dedupe_key=f"motor:respuesta:{entrante}",
+                               text=TEXTO_SI_LA_IA_FALLA, dedupe_key=clave,
                                recipient_membership_id=quien.membership_id, is_response=True,
                                scheduled_for=ahora)
             self.conn.commit()
@@ -339,7 +382,8 @@ class Escucha:
         ahora = self.reloj.ahora()
         try:
             with espacio(self.conn, self.ws) as cur:
-                r = despachar(cur, self.ws, self.transporte,
+                # Las respuestas que preguntan una duda salen con sus opciones (`botones`).
+                r = despachar(cur, self.ws, ConOpciones(self.transporte, cur),
                               Calendario.desde_base(cur, self.ws), ahora)
             self.conn.commit()
             if r["pospuestos"]:
