@@ -2,7 +2,8 @@
 
 - **Estado:** propuesta. El usuario aceptó su diseño para la prueba el 2026-10-04 (paso M1), con
   las decisiones 1 a 8. Queda como propuesta hasta que pase la prueba chica de la Etapa 2. La
-  decisión 9 (usuario, 2026-10-04) precisa lo que dejaron abierto las conversaciones de prueba.
+  decisión 9 (usuario, 2026-10-04) precisa lo que dejaron abierto las conversaciones de prueba;
+  el 2026-10-05 el usuario le sumó 9h y 9i.
 - **Fecha:** abierta el 2026-10-04.
 - **Alcance:** cómo procesa Leda cada mensaje y cada toque en el seguimiento por chat (ADR 0017,
   decisión 3): quién decide qué, el estado de la conversación, los circuitos, las situaciones
@@ -322,7 +323,9 @@ mismo resultado.
   recordatorio del día del vencimiento, cada recordatorio pide el estado y espera respuesta**; si
   no llega, la escalera avanza: el día hábil siguiente, el segundo; a los dos, el tercero, que
   avisa que se va a escalar; a los tres, el escalamiento. Es la cuenta de quién no contestó
-  (`pending_reply`, ADR 0017, decisión 6). Excepción: una pregunta que Leda hace para entender
+  (`pending_reply`, ADR 0017, decisión 6). Con una previsión posterior al vencimiento, esta
+  escalera corre desde la fecha prevista y el día del vencimiento lleva un solo recordatorio que
+  no pide nada (9i, 2026-10-05). Excepción: una pregunta que Leda hace para entender
   algo que la persona empezó se puede dejar sin efecto ("dejá, no importa") y Leda no insiste.
 - **Sin botones** en el aviso previo ni en los recordatorios (constitución §8): la prueba mide si
   Leda entiende el texto libre, y un botón queda viejo. Se pueden sumar después como atajos si la
@@ -450,6 +453,33 @@ casi lista no es lo mismo que terminé; es una respuesta ambigua y no puede qued
   misma respuesta (una sola pregunta).
 - Lo demás no cambia: una fecha es la nueva previsión; "ya la terminé", la entrega, que la prueba
   chica reconoce y todavía no recibe (9g); "estoy trabado", el bloqueo (9c).
+- **Si no hay un pedido siguiente, se dice** (2026-10-05, revisión de la jugada): con la tarea sin
+  vencimiento, o con la escalera de su ancla ya escalada (9i), el avance se anota igual, no se
+  guarda otro pedido y los hechos dicen por qué y a quién ya se le avisó. Nunca en silencio.
+
+#### 9i. Con una previsión, el seguimiento se mueve a la previsión (usuario, 2026-10-05)
+
+Hasta ese día, una previsión detenía la escalera y nada decía qué seguía cuando llegaba la fecha
+prevista. El usuario lo decidió con un ejemplo: la tarea vence el jueves 15 y el 5 Marcos dijo
+"llego el 27". El 15 Leda le manda **un solo recordatorio** (vencía hoy, ya dio el 27 y el
+referente está al tanto) y no le pregunta nada cada día hasta el 27. **El 27 le pide el estado como
+si fuera el vencimiento**; sin respuesta, corre la escalera normal desde esa fecha (los pedidos,
+el aviso de que se va a escalar y el escalamiento).
+
+- **La fecha comprometida no cambia** y el atraso se sigue contando contra ella: cambiarla es
+  decisión del referente, en la plataforma (ADR 0017, decisión 4).
+- **El ancla de la escalera** es la fecha comprometida o, si la previsión vigente es posterior, la
+  fecha prevista. Una previsión más nueva mueve el ancla y empieza una escalera nueva; una que
+  vuelve a la fecha comprometida (o anterior) la devuelve al vencimiento. Un aviso guardado de otra
+  ancla no sale, con su motivo (9b).
+- **El recordatorio del vencimiento** sale sólo si la escalera del vencimiento no había empezado (si
+  la previsión llegó después del primer pedido, ya está contestado). Con el ancla en la previsión
+  no hay aviso previo: la fecha la dio la persona.
+- **Leda es la PM** (principio del usuario, 2026-10-05): el referente recibe información y las
+  decisiones que son suyas, nunca trabajo de gestión. Revisados los avisos al referente de la
+  escalera: el aviso de una nueva previsión y su corrección (información; la fecha es su
+  decisión) y el escalamiento por falta de respuesta (información, mecánica §9). Ninguno le pide
+  perseguir a nadie ni resolver nada.
 
 ## Consecuencias
 

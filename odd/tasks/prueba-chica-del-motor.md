@@ -2,7 +2,8 @@
 
 **Rama:** `feat/motor-de-conversacion` · **Carpeta:** `D:\Proyectos\Leda-PM-worktrees\motor-de-conversacion`
 **Abierta:** 2026-10-04 · **Copia en Engram:** tema `odd/prueba-chica-del-motor/tasks` (proyecto `prisma-pm`)
-**Estado:** decidido (sección 10, 2026-10-05); E2-1 a E2-6 y E2-3b hechas; sigue la E2-7.
+**Estado:** decidido (sección 10, 2026-10-05); E2-1 a E2-6, E2-3b, `informar_avance` y el ancla en la
+previsión hechas; sigue la E2-7.
 
 ## 1. Objetivo
 
@@ -133,6 +134,11 @@ Desde la E2-6 (revisión de la E2-5): la escalera es de un vencimiento y termina
 con una respuesta (o un bloqueo); un paso que no llegó por otra cosa (la IA no lo redactó, con
 su incidente) cuenta como dado y sigue el próximo, con los hechos de cuántos no le llegaron; un
 vencimiento nuevo empieza de cero, con su propia espera.
+Desde el 2026-10-05 (ADR 0018, 9i; `ancla.py`): la escalera corre sobre su ancla, la fecha
+comprometida o la previsión vigente si es posterior. Con el ancla en la previsión, el día del
+vencimiento sale un solo recordatorio que no pide nada; el día de la previsión se pide el estado y,
+sin respuesta, sigue la escalera hasta escalar. El ancla va en la clave de cada paso: un ancla
+nueva es una escalera nueva. La fecha comprometida y el atraso contra ella no cambian.
 
 **Avisos guardados.** Todo lo que Leda manda por su cuenta se guarda como hechos. Al llegar su hora, dentro del
 horario, el código vuelve a leer la tarea; si corresponde, la IA lo redacta y va al outbox; si no, se omite con su
@@ -331,16 +337,32 @@ su evidencia son las corridas. Unas 400 líneas por tarea es una guía, no un to
       tests/test_capacidades.py tests/test_restriccion_horario.py` `54 passed`; suite completa
       `2306 passed, 333 deselected, 1 warning in 780.79s` (las 4 nuevas son de `restriccion_horario`). Commits `02acd53`, `52e00a6`, `877589d`, `84f1c7a` y `6a4ad8b`; lo registra el
       commit que sigue. Unas 1.590 líneas, 692 de pruebas: más que la guía, porque cada pieza lleva su
-      prueba con base, reloj y transportes falsos. `PENDIENTE`: qué sigue cuando vence una previsión
-      (la fecha comprometida no cambia por chat, así que una previsión no empieza otra escalera);
-      `AGENTS.md` todavía dice que `restriccion_horario` no admite `leda_motor`.
+      prueba con base, reloj y transportes falsos. Qué sigue cuando vence una previsión: resuelto el
+      2026-10-05 (ADR 0018, 9i; abajo). La nota de `AGENTS.md` sobre `restriccion_horario` se
+      corrigió en `5679242`.
 - [x] **Agregado antes de la E2-7: `informar_avance`** (decisión del usuario, 2026-10-05; ADR 0018, 9h;
       conversación 15). El avance queda en el registro de turnos, en `audit_log` (`accion =
       'informar_avance'`) y en los hechos del pedido siguiente (`repregunta_de_estado`); sin tablas
       nuevas. Evidencia: `pytest prueba_chica` en rojo (`10 failed, 216 passed`) y en verde (`226
       passed in 79.24s`). Commits `27f517d` y `bafdf64`; lo registra el commit que sigue. La E2-7 corre
-      15 conversaciones. `PENDIENTE`: un avance después de escalar recibe el pedido siguiente, pero
-      la escalera de ese vencimiento ya terminó.
+      15 conversaciones. El `PENDIENTE` de un avance después de escalar se resolvió con el ancla
+      (abajo).
+- [x] **Agregado antes de la E2-7: el seguimiento sigue a la previsión y arreglos de las revisiones**
+      (decisiones del usuario, 2026-10-05; ADR 0018, 9i; conversación 02, pasos 4 a 7). El ancla de
+      la escalera (`ancla.py`) y el recordatorio del vencimiento (`vencimiento_con_prevision`); un
+      escalamiento reemplazado (por un reencuadre o un avance) no cuenta como escalado; una segunda
+      escalera llega a su propio escalamiento; `informar_avance` cuenta por espera (la espera en la
+      clave del pedido, sin duplicados), toma la tarea con un candado que la escalera prueba antes de
+      cada paso, y sin vencimiento o con la escalera ya escalada no guarda otro pedido y lo dice en
+      sus hechos. Revisados los avisos al referente contra "Leda es la PM": sólo información.
+      Evidencia (2026-10-05): `pytest prueba_chica/test_escalera.py` en rojo (`1 failed, 21
+      passed`, el escalamiento reemplazado); `test_ancla.py` en rojo (`5 failed, 2 passed`);
+      `test_avance.py` en rojo (`5 failed, 7 passed`); `pytest prueba_chica` en verde, `240
+      passed`. Tres pruebas cambiaron por la decisión (una previsión ya no detiene la escalera para
+      siempre). Commits `cf11eaa`, `afb17a3`, `431deef`, `5e01734` y el commit que registra esto.
+      `PENDIENTE`: qué sigue después de una respuesta que no es una previsión (un inicio) cuando la
+      tarea sigue sin entregar; si el escalamiento debe esperar cuando el responsable está ausente
+      el día que sale.
 - [ ] **E2-7. Corredor** (delegada): los 14 YAML, base por corrida, reloj, comprobaciones, reporte, luna y Jev.
       Unas 650.
 - [ ] **E2-8. Primera ronda real:** sol, luna y Jev; lectura de textos; bitácora; chequeo de rumbo contra 5c.
