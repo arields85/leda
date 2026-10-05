@@ -2,7 +2,7 @@
 
 **Rama:** `feat/motor-de-conversacion` · **Carpeta:** `D:\Proyectos\Leda-PM-worktrees\motor-de-conversacion`
 **Abierta:** 2026-10-04 · **Copia en Engram:** tema `odd/prueba-chica-del-motor/tasks` (proyecto `prisma-pm`)
-**Estado:** decidido (sección 10, 2026-10-05); E2-1 a E2-5 y E2-3b hechas; sigue la E2-6.
+**Estado:** decidido (sección 10, 2026-10-05); E2-1 a E2-6 y E2-3b hechas; sigue la E2-7.
 
 ## 1. Objetivo
 
@@ -128,6 +128,10 @@ guardado no le llega; a la vuelta de una que tocó el período de la escalera, u
 reemplaza lo guardado (desde V pide el estado) y la escalera retoma desde donde quedó. Sin
 `aviso_previo_dias_habiles`, el mínimo del núcleo (un día hábil) y un incidente de severidad baja
 por cada aviso previo que sale con él; sin ruta, un incidente una vez y la espera queda escalada.
+Desde la E2-6 (revisión de la E2-5): la escalera es de un vencimiento y termina al escalar o
+con una respuesta (o un bloqueo); un paso que no llegó por otra cosa (la IA no lo redactó, con
+su incidente) cuenta como dado y sigue el próximo, con los hechos de cuántos no le llegaron; un
+vencimiento nuevo empieza de cero, con su propia espera.
 
 **Avisos guardados.** Todo lo que Leda manda por su cuenta se guarda como hechos. Al llegar su hora, dentro del
 horario, el código vuelve a leer la tarea; si corresponde, la IA lo redacta y va al outbox; si no, se omite con su
@@ -303,11 +307,32 @@ su evidencia son las corridas. Unas 400 líneas por tarea es una guía, no un to
       (por ejemplo, cuando vence la previsión); una corrección no reabre la espera que cerró el
       hecho anotado en la tarea equivocada; las etapas `motor_aviso_guardado` y `motor_escalera`
       no tienen entrada propia en `incidentes.EXPLICACION_POR_ETAPA` (está en `src/`): su aviso
-      usa la explicación genérica. Commits `a4d4327`, `af28776` y `c1ca293`; lo registra el
-      commit que sigue. Unas 1.790 líneas, 734 de pruebas: más que la guía, porque cada regla de
-      la escalera lleva su prueba con el reloj.
-- [ ] **E2-6. Ciclo y herramientas de prueba** (delegada): ciclo, bot de administración, comando para adelantar
-      el reloj, lector de turnos, `restriccion_horario` (el escuchador y la redacción van en la E2-3b). Unas 300.
+      usa la explicación genérica (resuelto en la E2-6). Commits `a4d4327`, `af28776` y
+      `c1ca293`; lo registra el commit que sigue. Unas 1.790 líneas, 734 de pruebas: más que la
+      guía, porque cada regla de la escalera lleva su prueba con el reloj.
+- [x] **E2-6. Ciclo y herramientas de prueba** (delegada: writer, varios archivos no triviales): ciclo,
+      bot de administración, comando para adelantar el reloj, lector de turnos, `restriccion_horario`
+      y los tres arreglos de la revisión de la E2-5. **Ciclo** (`ciclo.py`), dentro del escuchador
+      (ya tiene los dos bots, el reloj y la conexión; un proceso aparte sería otro despachador): cada
+      minuto la escalera y los avisos guardados; cada vuelta, el despacho con el reloj de Leda y los
+      avisos a la administración con el real; cada paso en su transacción, y si se cae, un incidente
+      `motor_ciclo` por racha y los demás siguen. **Reloj** (`reloj.py`): un adelanto sobre el tiempo
+      real en `workspace_setting` (`motor_reloj_adelanto_segundos`), que el escuchador relee en cada
+      vuelta; `despachar` recibe ese momento y decide el horario con él, sin tocar `despachador.py`;
+      los tres comandos se niegan fuera de `leda_motor`. Uso: `python -m prueba_chica.reloj corework
+      adelantar|estado|volver` (al día hábil siguiente, 10:00) y `python -m prueba_chica.leer corework
+      [--persona X] [--desde HH:MM]`. `incidentes.EXPLICACION_POR_ETAPA` tiene `motor_escalera`,
+      `motor_aviso_guardado` y `motor_ciclo`. Evidencia (2026-10-05): `pytest prueba_chica` en rojo en
+      cada paso (arreglos de la revisión, `4 failed, 26 passed`; ciclo, incidentes, reloj y lector,
+      errores de colección sin sus módulos, y los títulos sin su entrada, `7 failed, 35 passed`) y en
+      verde, `218 passed in 69.79s`; `tests/test_restriccion_horario.py` en rojo (`1 failed, 3 passed`)
+      y en verde; `tests/test_avisos_admin.py tests/test_aviso_incidente_legible.py
+      tests/test_capacidades.py tests/test_restriccion_horario.py` `54 passed`; suite completa
+      `2306 passed, 333 deselected, 1 warning in 780.79s` (las 4 nuevas son de `restriccion_horario`). Commits `02acd53`, `52e00a6`, `877589d`, `84f1c7a` y `6a4ad8b`; lo registra el
+      commit que sigue. Unas 1.590 líneas, 692 de pruebas: más que la guía, porque cada pieza lleva su
+      prueba con base, reloj y transportes falsos. `PENDIENTE`: qué sigue cuando vence una previsión
+      (la fecha comprometida no cambia por chat, así que una previsión no empieza otra escalera);
+      `AGENTS.md` todavía dice que `restriccion_horario` no admite `leda_motor`.
 - [ ] **E2-7. Corredor** (delegada): los 14 YAML, base por corrida, reloj, comprobaciones, reporte, luna y Jev.
       Unas 650.
 - [ ] **E2-8. Primera ronda real:** sol, luna y Jev; lectura de textos; bitácora; chequeo de rumbo contra 5c.
@@ -346,6 +371,4 @@ previo en `workspace_setting`, no en el importador; el referente es quien aprueb
   `PENDIENTE` confirmar al escribir los YAML que ninguna conversación depende de ellas.
 - **La etapa no es tan chica:** si una tarea pide un caso especial, se frena (5c.1).
 
-**Próximo paso:** la E2-6 (el ciclo que corre cada minuto `escalera.correr_escalera`,
-`avisos.enviar_avisos` y `despachar`; el bot de administración, el comando que adelanta el reloj,
-el lector de turnos y `restriccion_horario` con `leda_motor`).
+**Próximo paso:** la E2-7 (el corredor de las 14 conversaciones).
