@@ -56,14 +56,15 @@ pasos:
           a: Ismael
           estado: guardado
           hechos: {prevision: "2026-10-27", fecha_comprometida: "2026-10-23",
-                   atraso_dias_habiles: 2, dependientes: [COM], motivo: presente}
+                   atraso_si_se_cumple_la_prevision_dias_habiles: 2,
+                   dependientes: [COM], motivo: presente}
     hechos:
       - jugada: anotar_prevision
         resultado: anotado
         tarea: PLC
         prevision: "2026-10-27"
         fecha_comprometida: "2026-10-23"
-        atraso_dias_habiles: 2
+        atraso_si_se_cumple_la_prevision_dias_habiles: 2
         aviso_al_referente: {a: Ismael Soschinski, estado: guardado_sin_enviar}
     pregunta: null
     estado_despues:
@@ -86,7 +87,8 @@ pasos:
         tipo: nueva_prevision
         tarea: PLC
         hechos: {prevision: "2026-10-27", fecha_comprometida: "2026-10-23",
-                 atraso_dias_habiles: 2, dependientes: [COM], motivo: presente}
+                 atraso_si_se_cumple_la_prevision_dias_habiles: 2,
+                 dependientes: [COM], motivo: presente}
     estado_despues:
       de: Ismael
       pregunta_abierta: null
@@ -114,7 +116,7 @@ pasos:
           vence: "2026-10-23"
           prevision_vigente:
             fecha: "2026-10-27"
-            atraso_dias_habiles: 2
+            atraso_si_se_cumple_la_prevision_dias_habiles: 2
             aviso_al_referente: {a: Ismael Soschinski, estado: enviado}
           pide_el_estado_el: {fecha: "2026-10-27", estado: todavia_no}
     estado_despues:

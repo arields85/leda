@@ -207,7 +207,9 @@ def test_la_prevision_anota_el_atraso_en_dias_habiles_y_guarda_el_aviso(conn, mu
         "jugada": "anotar_prevision", "resultado": "anotado",
         "tarea": {"alias": "T1", "titulo": "Revisar el tablero"},
         "prevision": "2026-10-13", "motivo": "el proveedor se demoró",
-        "fecha_comprometida": "2026-10-09", "atraso_dias_habiles": 1,
+        "fecha_comprometida": "2026-10-09",
+        # El atraso que tendrá la tarea si se cumple la previsión, nunca el de hoy (ronda 1).
+        "atraso_si_se_cumple_la_prevision_dias_habiles": 1,
         "dependientes": ["Probar el tablero"],
         # Guardado y todavía sin enviar, y cuándo sale, en la hora del espacio (9e).
         "aviso_al_referente": {"a": "Ismael", "estado": "guardado_sin_enviar",
@@ -227,10 +229,13 @@ def test_la_prevision_anota_el_atraso_en_dias_habiles_y_guarda_el_aviso(conn, mu
     assert aviso["tipo"] == "nueva_prevision" and str(aviso["task_id"]) == mundo["tarea"]
     assert str(aviso["destinatario_membership_id"]) == mundo["personas"]["Ismael"][
         "membership_id"]
+    # Los hechos del aviso dicen qué aviso son y que no piden respuesta (revisión del contrato).
     assert aviso["hechos"] == {
+        "aviso": "nueva_prevision", "necesita_respuesta": False,
         "tarea": "Revisar el tablero", "responsable": "Marcos", "prevision": "2026-10-13",
         "motivo": "el proveedor se demoró", "fecha_comprometida": "2026-10-09",
-        "atraso_dias_habiles": 1, "dependientes": ["Probar el tablero"]}
+        "atraso_si_se_cumple_la_prevision_dias_habiles": 1,
+        "dependientes": ["Probar el tablero"]}
     assert aviso["estado"] == "guardado" and aviso["programado_para"] == AHORA
     assert aviso["creado_en"] == AHORA
     # Guardado, no enviado: el envío es de la E2-5. Atado al turno que lo causó.
@@ -260,7 +265,8 @@ def test_una_prevision_en_la_fecha_comprometida_no_avisa(conn, mundo, escribe):
     [hecho] = _jugar(conn, escribe, "Marcos", Jugada(
         "anotar_prevision", {"tarea": "T1", "fecha": "2026-10-09"}))
 
-    assert hecho["resultado"] == "anotado" and hecho["atraso_dias_habiles"] == 0
+    assert hecho["resultado"] == "anotado"
+    assert hecho["atraso_si_se_cumple_la_prevision_dias_habiles"] == 0
     assert hecho["aviso_al_referente"] is None
     assert hecho["sin_aviso"] == "misma_fecha_comprometida"
     assert _cuantas(conn, "task_forecast") == 1

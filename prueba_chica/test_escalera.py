@@ -214,7 +214,8 @@ def test_los_recordatorios_dicen_la_prevision_y_lo_que_depende(conn, mundo, dias
 
     hechos = v["hechos"][0]
     assert hechos["prevision_vigente"] == {
-        "fecha": "2026-10-14", "motivo": "el proveedor", "atraso_dias_habiles": 2,
+        "fecha": "2026-10-14", "motivo": "el proveedor",
+        "atraso_si_se_cumple_la_prevision_dias_habiles": 2,
         "aviso_al_referente": {"a": "Ismael", "estado": "enviado"}}
     assert hechos["dependientes"] == [{"tarea": "Probar las comunicaciones",
                                        "no_puede_arrancar_hasta_que_termine": True}]

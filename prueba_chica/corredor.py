@@ -42,6 +42,7 @@ from leda.despachador import TransporteDePrueba
 from leda.jev import Jev, TareaCandidata
 
 from . import comprobar as cp
+from . import hechos
 from .carga import AREAS, PERSONAS, Mundo, cargar, momento
 from .ciclo import Ciclo
 from .grabar import IAMixta, IAPerfecta
@@ -196,6 +197,10 @@ class _Corredor:
         self.transporte = TransporteDePrueba()
         self.transporte_admin = TransporteDePrueba()
         callar = lambda _texto: None    # noqa: E731 -- el ciclo cuenta lo que hace en la consola
+        # Las claves y los códigos sin significado de lo que la IA recibe (`hechos.py`): una
+        # falla del motor en el paso en que aparecen (revisión del contrato, 2026-10-05).
+        self.sin_significado: set[str] = set()
+        ia = _QueMira(ia, [], self.sin_significado)
         self.ciclo = Ciclo(conn, self.mundo.workspace_id, ia, self.reloj, self.transporte,
                            transporte_admin=self.transporte_admin, cada_s=0.0,
                            monotono=lambda: 0.0, imprimir=callar)
@@ -242,6 +247,10 @@ class _Corredor:
             r.eleccion_de_la_ia = eleccion_de_la_ia(r.jugadas)
         if not preludio:
             r.fallas = self._comprobar(paso, r, resultado, antes, despues).fallas
+            if self.sin_significado:        # lo del preludio, en el primer paso
+                r.fallas.append(cp.Falla(cp.MOTOR, "hechos sin significado", [],
+                                         sorted(self.sin_significado)))
+                self.sin_significado.clear()
         return r
 
     def _turno(self, paso, ia, preludio: bool):
@@ -251,7 +260,7 @@ class _Corredor:
             quien = identificar_en_espacio(cur, persona["telegram"], self.mundo.workspace_id)
         self.conn.commit()
         situaciones: list[dict[str, Any]] = []
-        ia_que_mira = _QueMira(ia, situaciones)
+        ia_que_mira = _QueMira(ia, situaciones, self.sin_significado)
         jev = None
         if "escribe" in paso:
             texto = paso["escribe"]
@@ -462,20 +471,28 @@ def _avisos_del_envio(avisos: list[dict[str, Any]], titulos: dict[str, str]
 
 
 class _QueMira:
-    """Deja ver la situación que recibió la IA para elegir (los alias de ese turno)."""
+    """Deja ver la situación que recibió la IA para elegir (los alias de ese turno) y junta en
+    `sin_significado` las claves y los códigos de cada pedido que no tienen significado."""
 
-    def __init__(self, ia: IA, situaciones: list[dict[str, Any]]) -> None:
-        self.ia, self.situaciones = ia, situaciones
+    def __init__(self, ia: IA, situaciones: list[dict[str, Any]],
+                 sin_significado: set[str]) -> None:
+        self.ia, self.situaciones, self.faltan = ia, situaciones, sin_significado
 
     @property
     def nombre(self) -> str:
         return self.ia.nombre
 
+    def preparar(self, paso: dict[str, Any]) -> None:
+        if hasattr(self.ia, "preparar"):
+            self.ia.preparar(paso)
+
     def elegir_jugadas(self, situacion):
         self.situaciones.append(situacion)
+        self.faltan |= hechos.sin_significado(situacion)
         return self.ia.elegir_jugadas(situacion)
 
     def redactar(self, pedido):
+        self.faltan |= hechos.sin_significado(pedido)
         return self.ia.redactar(pedido)
 
 

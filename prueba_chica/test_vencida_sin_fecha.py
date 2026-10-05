@@ -84,7 +84,7 @@ def test_la_fecha_contesta_y_el_seguimiento_va_a_ella(conn, mundo, dias, escribe
     r = _dice(conn, escribe, Jugada("anotar_prevision", {"tarea": "T1", "fecha": "2026-10-16"}),
               at=_hora(13, 10, 25))
 
-    assert r.hechos[0]["atraso_dias_habiles"] == 4 and "vencida" not in r.hechos[0]
+    assert r.hechos[0]["atraso_si_se_cumple_la_prevision_dias_habiles"] == 4 and "vencida" not in r.hechos[0]
     assert r.pregunta is None and _abierta(conn) is None and _esperas_abiertas(conn) == 0
     dias.ciclo(_hora(13, 10, 30))                       # el aviso a Ismael
     assert [p for p in dias.ciclo(_hora(14, 10)) if p["persona"] == "Marcos"] == []

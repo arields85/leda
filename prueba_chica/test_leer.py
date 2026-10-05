@@ -66,7 +66,7 @@ def test_el_lector_muestra_turnos_preguntas_esperas_y_avisos(conn, charla):
     assert "tocó «Probar las comunicaciones»" in turnos
     assert '← "llego el 14, el proveedor"' in turnos
     assert "jugadas: anotar_prevision {" in turnos and '"fecha": "2026-10-14"' in turnos
-    assert '"atraso_dias_habiles": 2' in turnos                     # los hechos
+    assert '"atraso_si_se_cumple_la_prevision_dias_habiles": 2' in turnos                     # los hechos
     assert "error: ia_no_respondio: TimeoutError" in turnos
     assert "Leda → Marcos" in turnos and '"Aviso 2."' in turnos     # el pedido del 14
     assert " ms" in turnos

@@ -48,7 +48,8 @@ def test_con_una_prevision_el_vencimiento_lleva_un_recordatorio_y_la_escalera_va
     assert hechos["necesita_respuesta"] is False
     assert hechos["vence"] == "2026-10-09" and hechos["atraso_dias_habiles"] == 0
     assert hechos["prevision_vigente"] == {
-        "fecha": "2026-10-15", "motivo": "el proveedor", "atraso_dias_habiles": 3,
+        "fecha": "2026-10-15", "motivo": "el proveedor",
+        "atraso_si_se_cumple_la_prevision_dias_habiles": 3,
         "aviso_al_referente": {"a": "Ismael", "estado": "enviado"}}
     assert hechos["pide_el_estado_el"] == {"fecha": "2026-10-15", "estado": "todavia_no"}
     assert _espera(conn) is None

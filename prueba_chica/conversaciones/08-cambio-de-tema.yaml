@@ -64,7 +64,7 @@ pasos:
           tarea: COM
           a: Ismael
           hechos: {prevision: "2026-11-04", fecha_comprometida: "2026-10-30",
-                   atraso_dias_habiles: 3, motivo: ausente}
+                   atraso_si_se_cumple_la_prevision_dias_habiles: 3, motivo: ausente}
     hechos:
       - {jugada: anotar_prevision, resultado: anotado, tarea: COM, prevision: "2026-11-04"}
     # La vuelta a la pregunta pendiente, en la misma respuesta (retomarla, 9d).
@@ -88,7 +88,7 @@ pasos:
         tipo: nueva_prevision
         tarea: COM
         hechos: {prevision: "2026-11-04", fecha_comprometida: "2026-10-30",
-                 atraso_dias_habiles: 3, motivo: ausente}
+                 atraso_si_se_cumple_la_prevision_dias_habiles: 3, motivo: ausente}
     dice:
       - la tarea de comunicaciones
       - la previsión del miércoles 4, sin motivo porque Marcos no lo dio

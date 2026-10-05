@@ -96,10 +96,10 @@ pasos:
           tarea: PLC
           a: Ismael
           hechos: {prevision: "2026-10-28", fecha_comprometida: "2026-10-23",
-                   atraso_dias_habiles: 3, dependientes: [COM]}
+                   atraso_si_se_cumple_la_prevision_dias_habiles: 3, dependientes: [COM]}
     hechos:
       - {jugada: anotar_prevision, resultado: anotado, tarea: PLC, prevision: "2026-10-28",
-         fecha_comprometida: "2026-10-23", atraso_dias_habiles: 3,
+         fecha_comprometida: "2026-10-23", atraso_si_se_cumple_la_prevision_dias_habiles: 3,
          aviso_al_referente: {a: Ismael Soschinski, estado: guardado_sin_enviar}}
     pregunta: null
     estado_despues:
@@ -123,7 +123,7 @@ pasos:
         tipo: nueva_prevision
         tarea: PLC
         hechos: {prevision: "2026-10-28", fecha_comprometida: "2026-10-23",
-                 atraso_dias_habiles: 3, dependientes: [COM]}
+                 atraso_si_se_cumple_la_prevision_dias_habiles: 3, dependientes: [COM]}
     dice:
       - que Marcos prevé terminar la tarea del PLC el miércoles 28
       - que la fecha comprometida era el viernes 23

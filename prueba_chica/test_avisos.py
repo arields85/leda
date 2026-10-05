@@ -67,9 +67,10 @@ def test_el_aviso_al_referente_sale_redactado_desde_los_hechos_a_su_hora(conn, m
     assert pedido["persona"] == "Ismael" and pedido["mensaje"] is None
     assert pedido["pregunta"] is None       # el aviso no espera respuesta por chat
     assert pedido["hechos"] == [{
+        "aviso": "nueva_prevision", "necesita_respuesta": False,
         "tarea": "Revisar el tablero", "responsable": "Marcos", "prevision": "2026-10-14",
         "motivo": "el proveedor se demoró", "fecha_comprometida": "2026-10-09",
-        "atraso_dias_habiles": 3, "dependientes": []}]
+        "atraso_si_se_cumple_la_prevision_dias_habiles": 3, "dependientes": []}]
     [aviso] = _avisos(conn)
     assert aviso["estado"] == "enviado" and aviso["intentos"] == 1
     assert aviso["resuelto_en"] == AHORA and aviso["turno_id"] is not None
@@ -180,9 +181,11 @@ def test_corregir_y_volver_a_una_prevision_anterior_rearma_su_aviso(conn, mundo,
     assert _enviar(conn, mundo, ia, _hora(6, 9)) == {"enviado": 2}
     de_t1 = [p["hechos"][0] for p in ia.pedidos_de_redaccion
              if p["hechos"][0]["tarea"] == T1["titulo"]]
-    assert de_t1 == [{"tarea": "Revisar el tablero", "responsable": "Marcos",
+    assert de_t1 == [{"aviso": "nueva_prevision", "necesita_respuesta": False,
+                      "tarea": "Revisar el tablero", "responsable": "Marcos",
                       "prevision": "2026-10-14", "motivo": "el proveedor",
-                      "fecha_comprometida": "2026-10-09", "atraso_dias_habiles": 3,
+                      "fecha_comprometida": "2026-10-09",
+                      "atraso_si_se_cumple_la_prevision_dias_habiles": 3,
                       "dependientes": []}]
 
 

@@ -51,11 +51,12 @@ pasos:
           tarea: COM
           a: Ismael
           hechos: {prevision: "2026-11-04", fecha_comprometida: "2026-10-30",
-                   atraso_dias_habiles: 3, dependientes: [], motivo: presente}
+                   atraso_si_se_cumple_la_prevision_dias_habiles: 3,
+                   dependientes: [], motivo: presente}
     hechos:
       - {jugada: anotar_inicio, resultado: anotado, tarea: PLC}
       - {jugada: anotar_prevision, resultado: anotado, tarea: COM, prevision: "2026-11-04",
-         fecha_comprometida: "2026-10-30", atraso_dias_habiles: 3}
+         fecha_comprometida: "2026-10-30", atraso_si_se_cumple_la_prevision_dias_habiles: 3}
     pregunta: null
     estado_despues:
       pregunta_abierta: null
@@ -75,7 +76,8 @@ pasos:
         tipo: nueva_prevision
         tarea: COM
         hechos: {prevision: "2026-11-04", fecha_comprometida: "2026-10-30",
-                 atraso_dias_habiles: 3, dependientes: [], motivo: presente}
+                 atraso_si_se_cumple_la_prevision_dias_habiles: 3,
+                 dependientes: [], motivo: presente}
     dice:
       - la tarea de comunicaciones
       - la previsión del miércoles 4 y su motivo
@@ -99,12 +101,12 @@ pasos:
           tarea: COM
           a: Ismael
           hechos: {prevision: "2026-11-05", fecha_comprometida: "2026-10-30",
-                   atraso_dias_habiles: 4}
+                   atraso_si_se_cumple_la_prevision_dias_habiles: 4}
     hechos:
       - {jugada: anotar_bloqueo, resultado: falta_dato, falta: [causa], tarea: PLC,
          pregunta: causa_del_bloqueo}
       - {jugada: anotar_prevision, resultado: anotado, tarea: COM, prevision: "2026-11-05",
-         atraso_dias_habiles: 4}
+         atraso_si_se_cumple_la_prevision_dias_habiles: 4}
     pregunta: {tipo: causa_del_bloqueo, tarea: PLC}
     estado_despues:
       pregunta_abierta: {tipo: causa_del_bloqueo, tarea: PLC}

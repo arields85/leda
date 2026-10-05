@@ -84,7 +84,7 @@ pasos:
           a: Ismael
           estado: guardado
           hechos: {prevision: "2026-11-04", fecha_comprometida: "2026-10-30",
-                   atraso_dias_habiles: 3}
+                   atraso_si_se_cumple_la_prevision_dias_habiles: 3}
     hechos:
       - jugada: anotar_prevision
         resultado: anotado

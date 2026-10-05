@@ -57,7 +57,7 @@ from . import preguntas
 from .ancla import (REPREGUNTA_DE_ESTADO, VENCIMIENTO_CON_PREVISION, ancla, anclaje,
                     clave_del_anclaje, fecha_de_la_clave)
 from .ancla import prevision_vigente as _prevision_vigente
-from .fichas import GUARDADO_SIN_ENVIAR
+from .fichas import ATRASO_SI_SE_CUMPLE, GUARDADO_SIN_ENVIAR
 from .ia import IA
 from .tiempo import Reloj
 from .turno import leer_ultimos_turnos, no_vacio, registrar_salida
@@ -503,8 +503,9 @@ def prevision_vigente(m: Momento, tarea: dict[str, Any]) -> dict[str, Any] | Non
     f = _prevision_vigente(m.cur, tarea["id"])
     if f is None or f["fecha_prevista"] == m.fecha(tarea["fecha_objetivo"]):
         return None
+    # El atraso que tendrá si se cumple, no el de hoy: cada uno con su clave (`hechos.py`).
     dicha: dict[str, Any] = {"fecha": f["fecha_prevista"].isoformat(),
-                             "atraso_dias_habiles": f["atraso_dias_habiles"]}
+                             ATRASO_SI_SE_CUMPLE: f["atraso_dias_habiles"]}
     if f["motivo"]:
         dicha["motivo"] = f["motivo"]
     m.cur.execute("""select a.estado, i.nombre from scheduled_notice a

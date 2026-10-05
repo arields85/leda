@@ -150,6 +150,17 @@ EN_COLA_SIN_ENVIAR = "en_cola_sin_enviar"       # en la cola de su canal; sale e
 # escalera que todavía no salieron quedan reemplazados por él (`REEMPLAZADO_POR_UN_AVANCE`): ya
 # no es silencio.
 ESPERA_ALGO_CIERTO = ("si_la_termino", "para_cuando_la_termina", "si_esta_trabada")
+
+# El atraso que tendrá la tarea si se cumple una previsión: distinto del atraso de hoy
+# (`atraso_dias_habiles`), con su propia clave (revisión del contrato, 2026-10-05; ronda 1: el
+# del aviso al referente se contó como el atraso de hoy). Su significado, en `hechos.py`.
+ATRASO_SI_SE_CUMPLE = "atraso_si_se_cumple_la_prevision_dias_habiles"
+
+
+def _es_un_aviso_al_referente(tipo: str) -> dict[str, Any]:
+    """Los hechos de un aviso al referente dicen qué aviso son y que no piden respuesta: es
+    información para él (9i)."""
+    return {"aviso": tipo, "necesita_respuesta": False}
 _PASOS_QUE_REEMPLAZA = ("pedido_de_estado", REPREGUNTA_DE_ESTADO, "escalamiento")
 
 
@@ -446,7 +457,7 @@ def _anotar_prevision(ctx: Contexto, datos: dict, tarea: dict) -> dict:
     hecho = {"resultado": "anotado", "tarea": _tarea(tarea), "prevision": prevista.isoformat(),
              "motivo": motivo,
              "fecha_comprometida": comprometida.astimezone(cal.zona).date().isoformat(),
-             "atraso_dias_habiles": atraso, "dependientes": dependientes,
+             ATRASO_SI_SE_CUMPLE: atraso, "dependientes": dependientes,
              "aviso_al_referente": None}
 
     quien_aprueba = referente(cur, str(fila["responsable_membership_id"]))
@@ -456,15 +467,15 @@ def _anotar_prevision(ctx: Contexto, datos: dict, tarea: dict) -> dict:
         return {**hecho, "sin_aviso": "sin_referente"}
     sale = cal.dentro_de_jornada(ctx.ahora)
     hechos_del_aviso = {k: hecho[k] for k in ("prevision", "motivo", "fecha_comprometida",
-                                              "atraso_dias_habiles", "dependientes")}
+                                              ATRASO_SI_SE_CUMPLE, "dependientes")}
     cur.execute(
         """insert into scheduled_notice (workspace_id, tipo, task_id,
                                          destinatario_membership_id, hechos, programado_para,
                                          dedupe_key, creado_en)
            values (%s, 'nueva_prevision', %s, %s, %s, %s, %s, %s) returning id""",
         (ctx.quien.workspace_id, tarea["id"], quien_aprueba["membership_id"],
-         json.dumps({"tarea": tarea["titulo"], "responsable": ctx.quien.nombre,
-                     **hechos_del_aviso}, ensure_ascii=False),
+         json.dumps({**_es_un_aviso_al_referente("nueva_prevision"), "tarea": tarea["titulo"],
+                     "responsable": ctx.quien.nombre, **hechos_del_aviso}, ensure_ascii=False),
          sale, f"motor:nueva_prevision:{prevision_id}", ctx.ahora))
     ctx.avisos_guardados.append(str(cur.fetchone()["id"]))
     return {**hecho, "aviso_al_referente": {"a": quien_aprueba["nombre"],
@@ -799,7 +810,8 @@ def _deshacer_prevision(ctx: Contexto, tarea: dict) -> dict | None:
                                              programado_para, dedupe_key, creado_en)
                values (%s, 'correccion_de_prevision', %s, %s, %s, %s, %s, %s) returning id""",
             (ctx.quien.workspace_id, tarea["id"], quien_aprueba["membership_id"],
-             json.dumps({"tarea": tarea["titulo"], "responsable": ctx.quien.nombre,
+             json.dumps({**_es_un_aviso_al_referente("correccion_de_prevision"),
+                         "tarea": tarea["titulo"], "responsable": ctx.quien.nombre,
                          "prevision_que_no_vale": equivocada["fecha_prevista"].isoformat(),
                          "motivo": "se_anoto_en_la_tarea_equivocada",
                          **hechos["vuelve_a"]}, ensure_ascii=False),
@@ -844,11 +856,12 @@ def _rearmar_aviso_de_la_anterior(ctx: Contexto, tarea: dict, anterior: dict,
                                          dedupe_key, creado_en)
            values (%s, 'nueva_prevision', %s, %s, %s, %s, %s, %s) returning id""",
         (ctx.quien.workspace_id, tarea["id"], quien_aprueba["membership_id"],
-         json.dumps({"tarea": tarea["titulo"], "responsable": ctx.quien.nombre,
+         json.dumps({**_es_un_aviso_al_referente("nueva_prevision"), "tarea": tarea["titulo"],
+                     "responsable": ctx.quien.nombre,
                      "prevision": anterior["fecha_prevista"].isoformat(),
                      "motivo": anterior["motivo"],
                      "fecha_comprometida": comprometida.isoformat(),
-                     "atraso_dias_habiles": anterior["atraso_dias_habiles"],
+                     ATRASO_SI_SE_CUMPLE: anterior["atraso_dias_habiles"],
                      "dependientes": [r["titulo"] for r in cur.fetchall()]},
                     ensure_ascii=False),
          sale, f"motor:nueva_prevision:{correccion_id}", ctx.ahora))

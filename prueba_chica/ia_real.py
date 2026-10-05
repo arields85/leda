@@ -9,6 +9,8 @@ Se trae lo mínimo de la llamada estructurada de la rama congelada (`llm.py` en
   `fuera_de_la_lista` para decir que lo pedido no está en ella. El código decide después si
   cada jugada vale (`fichas.py`).
 - `redactar` pide el texto de la respuesta desde los hechos, con el tono del espacio.
+- Los dos pedidos llevan, después de las instrucciones, el significado de cada dato y cada código
+  que traen (`hechos.bloque`; revisión del contrato, 2026-10-05).
 
 Habla el protocolo de chat de OpenAI, que es el de GPT-6 sol por OpenRouter (el modelo del
 espacio sale de `model_config`, como en `leda.llm.desde_base`; la clave, del entorno, nunca del
@@ -27,6 +29,7 @@ import httpx
 
 from leda.llm import BASE_URLS, _tiempos
 
+from . import hechos
 from .fichas import FICHAS
 from .ia import Jugada
 from .instrucciones import (INSTRUCCIONES_JUGADAS, INSTRUCCIONES_REDACCION, Tono,
@@ -213,7 +216,8 @@ class IAReal:
         respuesta = self.cliente.completar({
             "temperature": 0,
             "max_tokens": int(self.cliente.parametros.get("tope_jugadas", TOPE_JUGADAS)),
-            "messages": [{"role": "system", "content": INSTRUCCIONES_JUGADAS},
+            "messages": [{"role": "system",
+                          "content": f"{INSTRUCCIONES_JUGADAS}\n\n{hechos.bloque(situacion)}"},
                          {"role": "user", "content": _json(situacion)}],
             "tools": [herramienta],
             "tool_choice": {"type": "function", "function": {"name": NOMBRE_HERRAMIENTA}},
@@ -225,7 +229,8 @@ class IAReal:
             "temperature": self.cliente.parametros.get("temperature", 0.3),
             "max_tokens": int(self.cliente.parametros.get("tope_redaccion", TOPE_REDACCION)),
             "messages": [{"role": "system",
-                          "content": f"{INSTRUCCIONES_REDACCION}\n\n{bloque_de_tono(self.tono)}"},
+                          "content": f"{INSTRUCCIONES_REDACCION}\n\n{hechos.bloque(pedido)}"
+                                     f"\n\n{bloque_de_tono(self.tono)}"},
                          {"role": "user", "content": _json(pedido)}],
         })
         try:
