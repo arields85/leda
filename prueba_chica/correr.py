@@ -2,13 +2,14 @@
 
 `odd/tasks/prueba-chica-del-motor.md`, sección 6 y decisiones 10.3 y 10.4. Uso:
 
-    python -m prueba_chica.correr [--conversacion NN ...] [--veces 5] [--ia sol|luna|guionada]
+    python -m prueba_chica.correr [--conversacion NN ...] [--veces 5] [--ia sol|sol61|sonnet|luna|guionada]
                                   [--jev] [--grabar CARPETA] [--repetir ARCHIVO] [--paralelo N]
                                   [--ronda NOMBRE] [--sin-informe] [--pasar-el-techo]
 
 - `--ia guionada` (por omisión) elige las jugadas que cada paso espera: la corrida en seco, sin
-  gasto. `sol` y `luna` son GPT-6 sol y luna por OpenRouter (decisión 6), con la clave del
-  entorno, que nunca se imprime.
+  gasto. `sol` y `luna` son GPT-6 sol y luna por OpenRouter (decisión 6); `sol61` y `sonnet`,
+  GPT-6.1 sol y Claude Sonnet 5.5, para la segunda ronda (usuario, 2026-10-05). Todos con la
+  clave del entorno, que nunca se imprime.
 - `--jev` consulta a Jev en paralelo en los pasos que lo piden (conversaciones 13 y 14), sin que
   decida nada (decisión 7).
 - `--grabar CARPETA` guarda lo que respondió la IA en cada corrida; `--repetir ARCHIVO` corre esa
@@ -47,7 +48,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parents[1]
-MODELOS = {"sol": "openai/gpt-6-sol", "luna": "openai/gpt-6-luna"}
+MODELOS = {"sol": "openai/gpt-6-sol", "luna": "openai/gpt-6-luna",
+           "sol61": "openai/gpt-6.1-sol", "sonnet": "anthropic/claude-sonnet-5.5"}
 PROHIBIDAS = frozenset({"leda", "leda_flujo", "leda_motor"})
 PREFIJO = "leda_corrida_"
 # Una base del corredor más vieja que esto es de una ejecución que murió sin borrarla: ninguna
