@@ -16,30 +16,43 @@
 - `--paralelo N` corre N corridas a la vez, cada una en su base.
 - Cada corrida usa una base nueva, copia de una plantilla con el esquema que se crea una vez por
   ejecución, en el servidor de `LEDA_TEST_DB_URL` (`.env.test`), y se borra al terminar. Nunca
-  toca `leda`, `leda_flujo` ni `leda_motor`.
+  toca `leda`, `leda_flujo` ni `leda_motor`. La plantilla se borra aunque la ejecución se caiga
+  (y al salir del proceso); las bases del corredor que quedaron de una ejecución muerta (más
+  viejas que `VIEJA`, por la fecha de su nombre) se borran al empezar la siguiente.
 - **El techo de gasto** (USD 30 para la etapa, 10.4): antes de empezar se estima la ronda; si se
-  pasa, no corre, salvo con `--pasar-el-techo`, que se usa sólo con el OK del usuario. Avisa al
-  llegar al 80 %. La cuenta queda en `prueba_chica/resultados/gasto.json`.
+  pasa, no corre (sale con 2), salvo con `--pasar-el-techo`, que se usa sólo con el OK del
+  usuario. Avisa al llegar al 80 %. La cuenta queda en `prueba_chica/resultados/gasto.json`.
+- **Una ronda cortada** (revisión de la E2-7): si una corrida llega al techo a mitad de la ronda,
+  o se cae por otra cosa, lo que la IA ya gastó queda igual en la libreta (marcado `cortada`, con
+  el motivo), el informe lo dice en "Ronda cortada" y la ejecución sale con error: 2 por el
+  techo, 1 por otra cosa. Nunca termina en 0 con corridas que no corrieron.
 - El informe de la ronda queda en `prueba_chica/resultados/` (`informe.py`).
 """
 
 from __future__ import annotations
 
 import argparse
+import atexit
 import concurrent.futures
 import json
 import os
+import re
 import subprocess
 import sys
 import threading
+import traceback
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parents[1]
 MODELOS = {"sol": "openai/gpt-6-sol", "luna": "openai/gpt-6-luna"}
 PROHIBIDAS = frozenset({"leda", "leda_flujo", "leda_motor"})
 PREFIJO = "leda_corrida_"
+# Una base del corredor más vieja que esto es de una ejecución que murió sin borrarla: ninguna
+# ronda dura tanto. La fecha va en el nombre (`_nombre`), en UTC.
+VIEJA = timedelta(hours=12)
+_FECHA_DEL_NOMBRE = re.compile(r"_(\d{14})_[0-9a-f]+$")
 
 
 def _url_de_mantenimiento() -> str:
@@ -65,7 +78,7 @@ class Bases:
         self.partes = conninfo_to_dict(mantenimiento)
         if self.partes.get("dbname") in PROHIBIDAS:
             raise SystemExit("LEDA_TEST_DB_URL apunta a una base de trabajo: no se usa.")
-        self.plantilla = f"{PREFIJO}plantilla_{uuid.uuid4().hex[:10]}"
+        self.plantilla = _nombre("plantilla_")
         self._candado = threading.Lock()
 
     def _url(self, nombre: str) -> str:
@@ -87,7 +100,7 @@ class Bases:
 
     def nueva(self) -> tuple[str, str]:
         from psycopg.sql import SQL, Identifier
-        nombre = f"{PREFIJO}{uuid.uuid4().hex[:12]}"
+        nombre = _nombre()
         with self._candado:      # copiar de la plantilla pide que nadie más la esté copiando
             self._ejecutar(SQL("create database {} template {}").format(
                 Identifier(nombre), Identifier(self.plantilla)))
@@ -97,6 +110,38 @@ class Bases:
         from psycopg.sql import SQL, Identifier
         assert nombre.startswith(PREFIJO)
         self._ejecutar(SQL("drop database if exists {} with (force)").format(Identifier(nombre)))
+
+    def limpiar_viejas(self, ahora: datetime | None = None) -> list[str]:
+        """Borra las bases del corredor que dejó una ejecución muerta: las más viejas que
+        `VIEJA` y las de nombre sin fecha (las de antes de la revisión de la E2-7). Una de otra
+        ejecución que corre ahora es más nueva y queda. Devuelve las que borró."""
+        import psycopg
+        ahora = ahora or datetime.now(timezone.utc)
+        with psycopg.connect(self.mantenimiento, autocommit=True) as c:
+            nombres = [f[0] for f in c.execute(
+                "select datname from pg_database where starts_with(datname, %s)",
+                (PREFIJO,)).fetchall()]
+        borradas = []
+        for nombre in nombres:
+            if nombre in PROHIBIDAS or nombre == self.plantilla:
+                continue
+            fecha = _fecha_del_nombre(nombre)
+            if fecha is None or ahora - fecha > VIEJA:
+                self.borrar(nombre)
+                borradas.append(nombre)
+        return borradas
+
+
+def _nombre(tipo: str = "") -> str:
+    """El nombre de una base del corredor, con la fecha en que se creó (UTC)."""
+    return f"{PREFIJO}{tipo}{datetime.now(timezone.utc):%Y%m%d%H%M%S}_{uuid.uuid4().hex[:8]}"
+
+
+def _fecha_del_nombre(nombre: str) -> datetime | None:
+    m = _FECHA_DEL_NOMBRE.search(nombre)
+    if m is None:
+        return None
+    return datetime.strptime(m.group(1), "%Y%m%d%H%M%S").replace(tzinfo=timezone.utc)
 
 
 def _commit() -> str:
@@ -152,9 +197,6 @@ def main(argv: list[str] | None = None) -> int:
     if not real:
         # Sin IA real no hace falta ninguna clave: el `.env` de la carpeta no se carga.
         os.environ["LEDA_LOAD_DOTENV"] = "0"
-    os.environ["LEDA_TEST_DB_URL"] = _url_de_mantenimiento()
-
-    from leda.db import conectar
 
     from . import informe
     from .corredor import consultas_a_jev, correr_conversacion, elegir, llamadas_previstas
@@ -200,44 +242,74 @@ def main(argv: list[str] | None = None) -> int:
             print(e)
             return 2
 
+    # El servidor de las bases, recién ahora: decidir el techo no lo necesita.
+    os.environ["LEDA_TEST_DB_URL"] = _url_de_mantenimiento()
+    import leda.db
+
     jev = _jev() if a.jev else None
-    bases = Bases(os.environ["LEDA_TEST_DB_URL"])
-    bases.crear_plantilla()
     corridas = []
+    cortes: list[dict] = []         # las corridas que no corrieron o no terminaron, y por qué
     imprimir = threading.Lock()
+
+    def anotar_el_gasto(conv, vez, ia, corrida, reservado: float, cortada: str | None) -> None:
+        """Lo que la IA gastó en la corrida, aunque se haya cortado: nunca se pierde."""
+        llamadas = (corrida.llamadas if corrida is not None
+                    else list(getattr(ia, "llamadas", None) or []))
+        costo = (costo_de_las_llamadas(llamadas, modelo_de(ia.nombre))
+                 if a.ia in MODELOS and ia is not None
+                 else {"llamadas": 0, "tokens_entrada": 0, "tokens_salida": 0, "usd": 0.0,
+                       "llamadas_estimadas": 0})
+        pasos = corrida.pasos if corrida is not None else []
+        jev_llamadas = sum(p.jev.get("llamadas", 0) for p in pasos if p.jev)
+        costo.update(jev_llamadas=jev_llamadas,
+                     jev_usd=round(jev_llamadas * JEV_USD_POR_LLAMADA, 6))
+        if corrida is not None:
+            corrida.costo = costo
+        gasto.anotar({"cuando": datetime.now().isoformat(timespec="seconds"),
+                      "ronda": ronda, "modelo": modelo if a.ia in MODELOS else "-",
+                      "conversacion": str(conv["numero"]).zfill(2), "vez": vez, **costo,
+                      **({"cortada": cortada} if cortada else {})},
+                     reservado=reservado)
+
+    def cortar(numero: str, vez: int, motivo: str, *, techo: bool) -> None:
+        cortes.append({"conversacion": numero, "vez": vez, "techo": techo, "motivo": motivo})
+        with imprimir:
+            print(f"  {numero} vez {vez}: "
+                  f"{'no corrió, llegó al techo' if techo else 'se cortó'} ({motivo})",
+                  flush=True)
 
     def correr(trabajo):
         conv, vez = trabajo
+        numero = str(conv["numero"]).zfill(2)
         reservado = estimado(conv) if real and not a.repetir else 0.0
         if reservado:
-            gasto.reservar(reservado, pasar_el_techo=a.pasar_el_techo)
-        nombre, url = bases.nueva()
-        try:
-            conn = conectar(url)
             try:
-                ia = nueva_ia(conv)
-                corrida = correr_conversacion(conn, conv, ia, vez=vez, jev=jev)
+                gasto.reservar(reservado, pasar_el_techo=a.pasar_el_techo)
+            except TechoAlcanzado as e:
+                cortar(numero, vez, str(e), techo=True)
+                return None
+        ia = corrida = None
+        cortada: str | None = None
+        try:
+            nombre, url = bases.nueva()
+            try:
+                conn = leda.db.conectar(url)
+                try:
+                    ia = nueva_ia(conv)
+                    corrida = correr_conversacion(conn, conv, ia, vez=vez, jev=jev)
+                finally:
+                    conn.close()
             finally:
-                conn.close()
-        except BaseException:
-            if reservado:
-                gasto.liberar(reservado)
-            raise
+                bases.borrar(nombre)
+        except BaseException as e:
+            cortada = "".join(traceback.format_exception_only(type(e), e)).strip()
+            if not isinstance(e, Exception):
+                raise                   # un corte desde la consola: el gasto se anota igual
+            cortar(numero, vez, cortada, techo=False)
+            return None
         finally:
-            bases.borrar(nombre)
-        if real and not a.repetir:
-            costo = (costo_de_las_llamadas(corrida.llamadas, modelo_de(ia.nombre))
-                     if a.ia in MODELOS else {"llamadas": 0, "tokens_entrada": 0,
-                                              "tokens_salida": 0, "usd": 0.0,
-                                              "llamadas_estimadas": 0})
-            jev_llamadas = sum(p.jev.get("llamadas", 0) for p in corrida.pasos if p.jev)
-            costo.update(jev_llamadas=jev_llamadas,
-                         jev_usd=round(jev_llamadas * JEV_USD_POR_LLAMADA, 6))
-            corrida.costo = costo
-            gasto.anotar({"cuando": datetime.now().isoformat(timespec="seconds"),
-                          "ronda": ronda, "modelo": modelo if a.ia in MODELOS else "-",
-                          "conversacion": corrida.numero, "vez": vez, **costo},
-                         reservado=reservado)
+            if real and not a.repetir:
+                anotar_el_gasto(conv, vez, ia, corrida, reservado, cortada)
         if a.grabar:
             a.grabar.mkdir(parents=True, exist_ok=True)
             (a.grabar / f"{corrida.numero}-{a.ia}-{vez}.json").write_text(json.dumps(
@@ -253,29 +325,49 @@ def main(argv: list[str] | None = None) -> int:
 
     ronda = a.ronda or (f"{datetime.now():%Y-%m-%d-%H%M}-{a.ia}"
                         + ("-repeticion" if a.repetir else "") + ("-jev" if a.jev else ""))
+    bases = Bases(os.environ["LEDA_TEST_DB_URL"])
+    for vieja in bases.limpiar_viejas():
+        print(f"  (se borró una base que dejó una ejecución anterior: {vieja})")
+    # La plantilla se borra pase lo que pase: al terminar, si algo se cae y, si el proceso
+    # termina sin pasar por acá, al salir.
+    borrar_la_plantilla = lambda: bases.borrar(bases.plantilla)     # noqa: E731
+    atexit.register(borrar_la_plantilla)
     try:
+        bases.crear_plantilla()
         with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, a.paralelo)) as ej:
             futuros = [ej.submit(correr, t) for t in trabajos]
             for f in concurrent.futures.as_completed(futuros):
-                try:
-                    corridas.append(f.result())
-                except TechoAlcanzado as e:
-                    print(f"  {e}")
+                corrida = f.result()
+                if corrida is not None:
+                    corridas.append(corrida)
     finally:
-        bases.borrar(bases.plantilla)
+        atexit.unregister(borrar_la_plantilla)
+        borrar_la_plantilla()
 
     bien = sum(c.bien for c in corridas)
     print(f"Corridas: {len(corridas)}; todo lo automático bien: {bien}; con fallas: "
           f"{len(corridas) - bien}; garantías bien: {sum(c.garantias for c in corridas)}.")
-    if not a.sin_informe and corridas:
+    if cortes:
+        print(f"Ronda cortada: {len(cortes)} corrida(s) no corrieron o no terminaron.")
+    if not a.sin_informe and (corridas or cortes):
         cabecera = {"Fecha": f"{datetime.now():%Y-%m-%d %H:%M}", "Commit": _commit(),
-                    "IA": corridas[0].ia, "Veces": a.veces if not a.repetir else 1,
+                    "IA": corridas[0].ia if corridas else a.ia,
+                    "Veces": a.veces if not a.repetir else 1,
                     "Jev": "sí" if a.jev else "no",
                     "Gasto de la etapa": f"USD {gasto.total():.2f} de {gasto.techo:.0f}"
                     if real else "sin gasto"}
-        resumen, _ = informe.escribir(corridas, ronda=ronda, cabecera=cabecera)
-        print(f"Informe: {resumen.relative_to(RAIZ)}")
-    return 0 if corridas and all(c.error is None for c in corridas) else 1
+        resumen, _ = informe.escribir(corridas, ronda=ronda, cabecera=cabecera, cortes=cortes)
+        print(f"Informe: {_relativa(resumen)}")
+    if any(c["techo"] for c in cortes):
+        return 2
+    return 0 if corridas and not cortes and all(c.error is None for c in corridas) else 1
+
+
+def _relativa(ruta: Path) -> Path:
+    try:
+        return ruta.relative_to(RAIZ)
+    except ValueError:
+        return ruta
 
 
 if __name__ == "__main__":

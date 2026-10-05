@@ -183,6 +183,35 @@ def _bases_del_corredor(conn) -> list[str]:
     return nombres
 
 
+def test_las_bases_viejas_de_corridas_muertas_se_borran_al_empezar(conn):
+    """Una ejecución que se murió sin borrar su plantilla (revisión de la E2-7): la siguiente
+    borra las bases del corredor que son viejas, y nunca una que puede ser de otra que corre."""
+    import os
+
+    import psycopg
+    from psycopg.sql import SQL, Identifier
+
+    from prueba_chica import correr
+
+    url = os.environ["LEDA_TEST_DB_URL"]
+    vieja = f"{correr.PREFIJO}plantilla_20200101000000_abcdef"
+    sin_fecha = f"{correr.PREFIJO}plantilla_0123456789"         # el nombre de antes
+    bases = correr.Bases(url)
+    with psycopg.connect(url, autocommit=True) as c:
+        for nombre in (vieja, sin_fecha):
+            c.execute(SQL("create database {}").format(Identifier(nombre)))
+        c.execute(SQL("create database {}").format(Identifier(bases.plantilla)))
+    try:
+        borradas = bases.limpiar_viejas()
+
+        assert sorted(borradas) == sorted([vieja, sin_fecha])
+        assert set(_bases_del_corredor(conn)) & {vieja, sin_fecha} == set()
+        assert bases.plantilla in _bases_del_corredor(conn)     # la nueva queda
+    finally:
+        for nombre in (vieja, sin_fecha, bases.plantilla):
+            bases.borrar(nombre)
+
+
 def test_la_corrida_en_seco_por_linea_de_comandos_graba_y_repite(conn, tmp_path, capsys):
     from prueba_chica import correr
 

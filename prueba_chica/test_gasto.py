@@ -107,9 +107,133 @@ def test_el_corredor_no_empieza_si_la_ronda_pasaria_el_techo(tmp_path, monkeypat
     monkeypatch.setattr(correr, "_ia_real", lambda modelo: pytest.fail("no debía crear la IA"))
     monkeypatch.setattr(correr.Bases, "crear_plantilla",
                         lambda self: pytest.fail("no debía crear bases"))
+    # Sin servidor de bases: decidir el techo no depende de él (revisión de la E2-7).
+    monkeypatch.delenv("LEDA_TEST_DB_URL", raising=False)
+    monkeypatch.setattr(correr, "_url_de_mantenimiento",
+                        lambda: pytest.fail("no debía buscar el servidor de bases"))
 
     assert correr.main(["--ia", "sol", "--conversacion", "01", "--veces", "1"]) == 2
     assert Gasto(ruta).total() == pytest.approx(29.99)
+
+
+# --- Una ronda que se corta (revisión de la E2-7) --------------------------------------------
+#
+# Sin servidor de bases ni IA real: las bases, la conexión y la corrida son falsas, y la IA
+# "real" es una que sólo deja grabado lo que habría costado cada llamada.
+
+class _BasesFalsas:
+    def __init__(self, mantenimiento: str) -> None:
+        self.plantilla = "leda_corrida_plantilla_falsa"
+        self.borradas: list[str] = []
+        self.limpiadas = 0
+        _BasesFalsas.ultima = self
+
+    def limpiar_viejas(self) -> list[str]:
+        self.limpiadas += 1
+        return []
+
+    def crear_plantilla(self) -> None:
+        pass
+
+    def nueva(self) -> tuple[str, str]:
+        return "leda_corrida_falsa", "url-falsa"
+
+    def borrar(self, nombre: str) -> None:
+        self.borradas.append(nombre)
+
+
+class _ConexionFalsa:
+    def close(self) -> None:
+        pass
+
+
+class _IAQueCuesta:
+    nombre = "openrouter/openai/gpt-6-sol"
+
+
+def _ronda_sin_servidor(monkeypatch, tmp_path, correr_conversacion):
+    from prueba_chica import corredor, informe
+    import leda.db
+
+    monkeypatch.setattr(gasto, "RUTA", tmp_path / "gasto.json")
+    monkeypatch.setattr(informe, "RESULTADOS", tmp_path / "resultados")
+    monkeypatch.setenv("LEDA_TEST_DB_URL", "dbname=leda_corrida_no_se_usa")
+    monkeypatch.setenv("LEDA_LOAD_DOTENV", "0")
+    monkeypatch.setattr(correr, "Bases", _BasesFalsas)
+    monkeypatch.setattr(correr, "_ia_real", lambda modelo: _IAQueCuesta())
+    monkeypatch.setattr(leda.db, "conectar", lambda url: _ConexionFalsa())
+    monkeypatch.setattr(corredor, "correr_conversacion", correr_conversacion)
+
+
+def _llamada_que_costo(ia, usd: float) -> None:
+    ia.llamadas.append({"tipo": "jugadas", "usos": [{"prompt_tokens": 10,
+                                                      "completion_tokens": 2, "cost": usd}]})
+
+
+def test_una_corrida_que_se_cae_deja_su_gasto_y_el_informe_dice_que_se_corto(
+        tmp_path, monkeypatch, capsys):
+    def se_cae(conn, conv, ia, *, vez=1, jev=None):
+        _llamada_que_costo(ia, 0.5)       # la IA ya cobró antes de que se cayera
+        raise RuntimeError("se cayó la conexión")
+
+    _ronda_sin_servidor(monkeypatch, tmp_path, se_cae)
+
+    codigo = correr.main(["--ia", "sol", "--conversacion", "01", "--veces", "1",
+                          "--ronda", "cortada"])
+
+    assert codigo != 0
+    [anotada] = Gasto(tmp_path / "gasto.json").leer()["corridas"]
+    assert anotada["usd"] == pytest.approx(0.5)
+    assert "RuntimeError" in anotada["cortada"]
+    informe = (tmp_path / "resultados" / "cortada.md").read_text("utf-8")
+    assert "cortada" in informe.lower() and "RuntimeError" in informe
+    assert _BasesFalsas.ultima.plantilla in _BasesFalsas.ultima.borradas
+    assert _BasesFalsas.ultima.limpiadas == 1        # las viejas, antes de empezar
+
+
+def test_llegar_al_techo_a_mitad_de_la_ronda_sale_con_error_y_lo_dice(tmp_path, monkeypatch):
+    from prueba_chica.corredor import Corrida
+
+    def bien(conn, conv, ia, *, vez=1, jev=None):
+        _llamada_que_costo(ia, 0.1)
+        return Corrida(str(conv["numero"]), conv["titulo"], conv["fuente"], vez, ia.nombre,
+                       "garantias")
+
+    _ronda_sin_servidor(monkeypatch, tmp_path, bien)
+    reservas = []
+    original = Gasto.reservar
+
+    def reservar(self, estimado, *, pasar_el_techo=False):
+        reservas.append(estimado)
+        if len(reservas) == 3:          # la ronda entera y la primera corrida pasan
+            raise TechoAlcanzado("El gasto de la etapa llegaría al techo.")
+        return original(self, estimado, pasar_el_techo=pasar_el_techo)
+
+    monkeypatch.setattr(Gasto, "reservar", reservar)
+
+    codigo = correr.main(["--ia", "sol", "--conversacion", "01", "--veces", "2",
+                          "--ronda", "techo"])
+
+    assert codigo == 2
+    informe = (tmp_path / "resultados" / "techo.md").read_text("utf-8")
+    assert "techo" in informe.lower() and "vez 2" in informe
+    assert len(Gasto(tmp_path / "gasto.json").leer()["corridas"]) == 1
+
+
+def test_si_la_plantilla_no_se_puede_crear_igual_se_borra(tmp_path, monkeypatch):
+    def nunca(*a, **k):
+        pytest.fail("no debía correr")
+
+    _ronda_sin_servidor(monkeypatch, tmp_path, nunca)
+
+    def a_medias(self):
+        raise RuntimeError("se cortó el esquema a mitad")
+
+    monkeypatch.setattr(_BasesFalsas, "crear_plantilla", a_medias)
+
+    with pytest.raises(RuntimeError):
+        correr.main(["--conversacion", "01", "--veces", "1"])
+    assert _BasesFalsas.ultima.plantilla in _BasesFalsas.ultima.borradas
 
 
 def test_la_grabacion_guarda_lo_que_uso_cada_llamada_de_la_ia_real():

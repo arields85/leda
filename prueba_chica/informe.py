@@ -43,7 +43,7 @@ def _json(valor: Any) -> str:
 
 
 def resumen(corridas: list[Corrida], *, ronda: str, cabecera: dict[str, Any],
-            transcripciones: str) -> str:
+            transcripciones: str, cortes: list[dict[str, Any]] | None = None) -> str:
     por_conv: dict[str, list[Corrida]] = defaultdict(list)
     for c in sorted(corridas, key=lambda c: (c.numero, c.vez)):
         por_conv[c.numero].append(c)
@@ -51,6 +51,16 @@ def resumen(corridas: list[Corrida], *, ronda: str, cabecera: dict[str, Any],
     lineas = [f"# Ronda {ronda}", ""]
     lineas += [f"- **{k}:** {v}" for k, v in cabecera.items()]
     lineas += [f"- **Transcripciones:** [{transcripciones}]({transcripciones})", ""]
+    if cortes:
+        # Una ronda cortada lo dice antes que nada (revisión de la E2-7): lo que no corrió no
+        # está en la tabla, y la ronda no vale como completa.
+        lineas += ["## Ronda cortada", "",
+                   f"{len(cortes)} corrida(s) no corrieron o no terminaron; lo que la IA ya "
+                   "había gastado quedó en la libreta del gasto.", ""]
+        lineas += [f"- **{c['conversacion']}, vez {c['vez']}:** "
+                   + ("llegó al techo de gasto. " if c["techo"] else "se cortó. ")
+                   + f"`{c['motivo']}`" for c in cortes]
+        lineas.append("")
     lineas += ["## Resultado por conversación", "",
                "G: garantías (5b, se comprueban solas). C: comprensión automática, "
                "**provisional** (jugadas y efectos; la lectura del usuario es la que vale, 10.3). "
@@ -170,11 +180,14 @@ def transcripciones(corridas: list[Corrida], *, ronda: str) -> str:
 
 
 def escribir(corridas: list[Corrida], *, ronda: str, cabecera: dict[str, Any],
-             carpeta: Path = RESULTADOS) -> tuple[Path, Path]:
+             carpeta: Path | None = None,
+             cortes: list[dict[str, Any]] | None = None) -> tuple[Path, Path]:
+    carpeta = carpeta or RESULTADOS
     carpeta.mkdir(parents=True, exist_ok=True)
     nombre_t = f"{ronda}-transcripciones.md"
     ruta_r, ruta_t = carpeta / f"{ronda}.md", carpeta / nombre_t
     ruta_t.write_text(transcripciones(corridas, ronda=ronda), "utf-8", newline="\n")
     ruta_r.write_text(resumen(corridas, ronda=ronda, cabecera=cabecera,
-                              transcripciones=nombre_t), "utf-8", newline="\n")
+                              transcripciones=nombre_t, cortes=cortes), "utf-8",
+                      newline="\n")
     return ruta_r, ruta_t
