@@ -24,6 +24,15 @@ desde el paso que sigue. Cada paso es un aviso guardado con una clave de dedupli
 tarea, su vencimiento y el paso): correrla de nuevo no hace nada nuevo. Una tarea bloqueada no
 está en la escalera, y un aviso suyo guardado se omite al salir.
 
+**Cuándo termina** (revisión de la E2-5). La escalera es de un vencimiento: termina al escalar
+(nada más se le pide a nadie por ese vencimiento) o cuando la persona contesta o se bloquea la
+tarea. Un paso que no llegó por otra cosa (la IA no lo redactó tras sus reintentos, con su
+incidente; el destinatario no se podía alcanzar) no la apaga: cuenta como dado, la escalera
+sigue con el próximo y sus hechos dicen cuántos no le llegaron. Un vencimiento nuevo empieza su
+propia escalera de cero, aunque la anterior haya escalado sin respuesta. La fecha comprometida
+no cambia por chat (ADR 0017, decisión 4): una previsión no empieza otra escalera. Qué sigue
+cuando vence una previsión queda `PENDIENTE` de decisión del usuario.
+
 **Ausencias.** Mientras la persona está ausente (`absence`), su escalera no avanza y lo que
 tenía guardado no le llega. Cuando vuelve de una ausencia que tocó el período de la escalera, en
 lugar del paso que le tocaba recibe un reencuadre (mecánica §9), que reemplaza lo guardado:
@@ -60,6 +69,11 @@ MINIMO_DEL_NUCLEO = 1          # mecánica §9: nunca menos de un día hábil en
 TIPOS_DE_LA_ESCALERA = ("aviso_previo", "pedido_de_estado", "reencuadre", "escalamiento")
 PEDIDOS = 3                     # V, V+1 y V+2; el paso siguiente es el escalamiento
 REEMPLAZADO = "reemplazado_por_el_reencuadre"
+# Los motivos de omisión que detienen la escalera de un vencimiento: la persona contestó o se
+# bloqueó la tarea antes de que el paso saliera (9b; mecánica §9). Cualquier otro paso que no
+# llegó (la IA no lo redactó, el destinatario no se podía alcanzar) cuenta como dado y la
+# escalera sigue con el próximo: nunca se apaga en silencio.
+DETIENEN = frozenset({"ya_respondio", "bloqueo_abierto"})
 
 # Lo que cada aviso trae fijo; lo demás lo lee `avisos.hechos_de_la_escalera` al guardarlo y
 # de nuevo al salir.
@@ -116,17 +130,17 @@ def _un_paso(m: Momento, tarea: dict[str, Any], n: int | None) -> str | None:
     escalon = [a for a in avisos if a["tipo"] != "aviso_previo"]
     espera = espera_abierta(cur, tarea["id"])
 
-    if any(a["tipo"] == "escalamiento" for a in escalon) or (espera and espera["escalado_en"]):
-        return None                     # ya escaló: la escalera terminó
-    ultimo = escalon[-1] if escalon else None
-    if ultimo and ultimo["estado"] in ("omitido", "fallido") and \
-            ultimo["motivo_omision"] != REEMPLAZADO:
-        return None                     # detenida: ya no correspondía o la IA no lo redactó
-    enviados = sorted((a for a in escalon if a["estado"] == "enviado"),
-                      key=lambda a: a["resuelto_en"])
-    ultimo_enviado = enviados[-1] if enviados else None
-    if ultimo_enviado and ultimo_enviado["hechos"].get("necesita_respuesta") and espera is None:
-        return None                     # contestó: la espera se cerró
+    if _ya_escalo(escalon, espera):
+        return None                     # la escalera de este vencimiento terminó
+    if any(a["estado"] == "omitido" and a["motivo_omision"] in DETIENEN for a in escalon):
+        return None                     # contestó o se bloqueó antes de que saliera un paso
+    # Los pasos dados: salieron, fallaron o se omitieron por otra cosa. Uno que la IA no
+    # redactó ya dejó su incidente y no apaga el seguimiento: la escalera sigue con el próximo.
+    dados = sorted((a for a in escalon if a["estado"] != "guardado"
+                    and a["motivo_omision"] != REEMPLAZADO), key=lambda a: a["resuelto_en"])
+    ultimo_dado = dados[-1] if dados else None
+    if espera is None and any(a["hechos"].get("necesita_respuesta") for a in dados):
+        return None                     # contestó: la espera que abrió se cerró
 
     dias = n if n is not None else MINIMO_DEL_NUCLEO
     vuelta = _vuelta_de_una_ausencia(m, persona, _restar_habiles(m.cal, vence, dias))
@@ -141,18 +155,34 @@ def _un_paso(m: Momento, tarea: dict[str, Any], n: int | None) -> str | None:
         if -k <= dias and not avisos:
             return _guardar_aviso_previo(m, tarea, vence, configurado=n is not None)
         return None
-    siguiente = 1 + max((_paso(a) for a in enviados if a["tipo"] == "pedido_de_estado"),
-                        default=-1)
+    pedidos = [a for a in dados if a["tipo"] == "pedido_de_estado"]
+    siguiente = 1 + max((_paso(a) for a in pedidos), default=-1)
     if siguiente > PEDIDOS or k < siguiente:
         return None
-    if ultimo_enviado and m.cal.habiles_entre(ultimo_enviado["resuelto_en"], m.ahora) < 1:
+    if ultimo_dado and m.cal.habiles_entre(ultimo_dado["resuelto_en"], m.ahora) < 1:
         return None                     # nunca dos pasos el mismo día hábil
     # Un paso que un reencuadre reemplazó vuelve a guardarse con otra clave: la de su ronda.
     ronda = [f"r{r}" for r in [sum(a["tipo"] == "reencuadre" for a in avisos)] if r]
     if siguiente < PEDIDOS:
-        return _pedir_el_estado(m, tarea, vence, siguiente, ronda)
-    return _escalar(m, tarea, vence, [a for a in enviados if a["tipo"] == "pedido_de_estado"],
-                    ronda)
+        return _pedir_el_estado(m, tarea, vence, siguiente, ronda, pedidos)
+    return _escalar(m, tarea, vence, pedidos, ronda)
+
+
+def _ya_escalo(escalon: list[dict[str, Any]], espera: dict[str, Any] | None) -> bool:
+    """La escalera de un vencimiento termina al escalar (mecánica §9): con su aviso de
+    escalamiento o, sin ruta, con la espera escalada. La espera cuenta sólo si la abrió esta
+    escalera: la de un vencimiento anterior, escalada y sin contestar, no frena a la nueva,
+    que empieza de cero (la fecha comprometida la cambiará la plataforma, ADR 0017,
+    decisión 4)."""
+    if any(a["tipo"] == "escalamiento" for a in escalon):
+        return True
+    if espera is None or espera["escalado_en"] is None or not escalon:
+        return False
+    return espera["preguntado_en"] >= min(a["creado_en"] for a in escalon)
+
+
+def _no_llegaron(pedidos: list[dict[str, Any]]) -> int:
+    return sum(a["estado"] != "enviado" for a in pedidos)
 
 
 def _avisos_de(cur, task_id, vence: date) -> list[dict[str, Any]]:
@@ -192,8 +222,11 @@ def _guardar_aviso_previo(m: Momento, tarea, vence: date, *, configurado: bool) 
     return "aviso_previo"
 
 
-def _pedir_el_estado(m: Momento, tarea, vence: date, paso: int, ronda: list[str]) -> str:
+def _pedir_el_estado(m: Momento, tarea, vence: date, paso: int, ronda: list[str],
+                     anteriores: list[dict[str, Any]]) -> str:
     base = {"aviso": "pedido_de_estado", "numero": paso + 1, "necesita_respuesta": True}
+    if _no_llegaron(anteriores):        # que no le hable como si ya le hubiera preguntado
+        base["pedidos_anteriores_que_no_le_llegaron"] = _no_llegaron(anteriores)
     if paso == PEDIDOS - 1:
         base["avisa_que_va_a_escalar"] = True
     _guardar(m, "pedido_de_estado", tarea, vence, base, paso, *ronda)
@@ -215,9 +248,13 @@ def _escalar(m: Momento, tarea, vence: date, pedidos: list[dict[str, Any]],
                           where task_id = %s and satisfecho_en is null""",
                       (m.ahora, str(tarea["id"])))
         return None
+    llegaron = [a for a in pedidos if a["estado"] == "enviado"]
     base = {"aviso": "falta_de_respuesta", "necesita_respuesta": False,
-            "pedidos_de_estado_sin_respuesta": len(pedidos),
-            "pedido_desde": m.fecha(pedidos[0]["resuelto_en"]).isoformat()}
+            "pedidos_de_estado_sin_respuesta": len(llegaron)}
+    if llegaron:
+        base["pedido_desde"] = m.fecha(llegaron[0]["resuelto_en"]).isoformat()
+    if _no_llegaron(pedidos):
+        base["pedidos_de_estado_que_no_le_llegaron"] = _no_llegaron(pedidos)
     for destino in destinos:
         _guardar(m, "escalamiento", tarea, vence, base, destino["membership_id"], *ronda,
                  destinatario=str(destino["membership_id"]))
@@ -243,8 +280,10 @@ def _reencuadrar(m: Momento, tarea, vence: date, k: int, vuelta) -> str:
 
 def _abrir_la_espera(m: Momento, tarea) -> None:
     """La espera del estado de la tarea (ADR 0017, decisión 6): una por tarea mientras no se
-    conteste; el recordatorio siguiente la mantiene."""
-    if espera_abierta(m.cur, tarea["id"]) is not None:
+    conteste; el recordatorio siguiente la mantiene. Una escalada es de una escalera que ya
+    terminó: la nueva abre la suya (una respuesta las contesta a las dos)."""
+    abierta = espera_abierta(m.cur, tarea["id"])
+    if abierta is not None and abierta["escalado_en"] is None:
         return
     sale = m.cal.dentro_de_jornada(m.ahora)
     m.cur.execute(

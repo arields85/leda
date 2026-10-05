@@ -378,6 +378,98 @@ def test_sin_el_aviso_previo_configurado_usa_el_minimo_y_lo_registra(conn, mundo
     assert _cuantas(conn, "incident") == 1
 
 
+# --- Un escalamiento termina la escalera de ese vencimiento (revisión de la E2-5) -------------
+
+def _cambiar_el_vencimiento(conn, mundo, vence: datetime) -> None:
+    """La fecha comprometida es inmutable en la base; la cambiará la plataforma (ADR 0017,
+    decisión 4). La prueba la cambia como lo haría ella, con la guarda apagada un momento."""
+    with conn.transaction(), conn.cursor() as cur:
+        cur.execute("alter table task disable trigger trg_bloquear_estado_directo")
+        cur.execute("update task set fecha_objetivo = %s where id = %s", (vence, mundo["tarea"]))
+        cur.execute("alter table task enable trigger trg_bloquear_estado_directo")
+    conn.commit()
+
+
+def test_un_vencimiento_nuevo_empieza_su_propia_escalera_despues_de_escalar(conn, mundo, dias):
+    """Mecánica §9: la escalera se ancla a su vencimiento y termina al escalar. Si la persona
+    nunca contestó, la espera queda abierta y escalada; con un vencimiento nuevo la escalera
+    empieza de cero, con su aviso previo, y no la frena el escalamiento del anterior."""
+    for dia in (6, 9, 13, 14, 15):
+        dias.ciclo(_hora(dia, 10))
+    assert _espera(conn)["escalado_en"] == _hora(15, 10)
+    assert dias.ciclo(_hora(16, 10)) == []                 # la del 9 terminó
+
+    _cambiar_el_vencimiento(conn, mundo, datetime(2026, 10, 23, 20, 0, tzinfo=timezone.utc))
+
+    [previo] = dias.ciclo(_hora(20, 10))                   # faltan 3 días hábiles
+    assert previo["hechos"][0]["aviso"] == "vencimiento_proximo"
+    assert previo["hechos"][0]["vence"] == "2026-10-23"
+    [v] = dias.ciclo(_hora(23, 10))
+    assert v["hechos"][0]["aviso"] == "pedido_de_estado" and v["hechos"][0]["numero"] == 1
+    # La espera de esta escalera es nueva: la del vencimiento anterior quedó escalada.
+    esperas = _todos(conn, """select escalado_en, recordatorios from pending_reply
+                               where satisfecho_en is null order by preguntado_en""")
+    assert esperas == [{"escalado_en": _hora(15, 10), "recordatorios": 3},
+                       {"escalado_en": None, "recordatorios": 1}]
+
+
+# --- Un paso que no salió no apaga el seguimiento (revisión de la E2-5) -----------------------
+
+class IAQueFallaPrimero(IAQueRedacta):
+    """Falla las primeras `fallas` redacciones; después redacta."""
+
+    def __init__(self, fallas: int) -> None:
+        super().__init__()
+        self.fallas = fallas
+
+    def redactar(self, pedido: dict[str, Any]) -> str:
+        if self.fallas:
+            self.fallas -= 1
+            raise RuntimeError("caída")
+        return super().redactar(pedido)
+
+
+def test_un_pedido_que_la_ia_no_redacto_no_detiene_la_escalera(conn, mundo, dias):
+    """El primer pedido queda `fallido` tras los cinco intentos (con su incidente); la
+    escalera sigue con el paso siguiente al día hábil siguiente, y los hechos dicen que el
+    anterior no le llegó."""
+    dias.ia = IAQueFallaPrimero(fallas=5)
+    correr_escalera(conn, mundo["id"], RelojFijo(_hora(9, 10)))
+    conn.commit()
+    for minuto in (0, 1, 3, 7, 15):
+        enviar_avisos(conn, mundo["id"], dias.ia, RelojFijo(_hora(9, 10, minuto)))
+        conn.commit()
+    [pedido] = _avisos(conn, "pedido_de_estado")
+    assert pedido["estado"] == "fallido"
+    assert _uno(conn, "select etapa from incident")["etapa"] == "motor_aviso_guardado"
+
+    [v1] = dias.ciclo(_hora(13, 10))
+
+    assert v1["hechos"][0]["numero"] == 2
+    assert v1["hechos"][0]["pedidos_anteriores_que_no_le_llegaron"] == 1
+    assert v1["pregunta"]["tipo"] == "estado_de_la_tarea"
+    dias.ciclo(_hora(14, 10))
+    [v3] = dias.ciclo(_hora(15, 10))
+    assert v3["persona"] == "Ismael"
+    assert v3["hechos"][0]["pedidos_de_estado_sin_respuesta"] == 2
+    assert v3["hechos"][0]["pedidos_de_estado_que_no_le_llegaron"] == 1
+    assert v3["hechos"][0]["pedido_desde"] == "2026-10-13"
+
+
+def test_un_pedido_omitido_porque_la_persona_contesto_si_detiene_la_escalera(conn, mundo, dias,
+                                                                           escribe):
+    """El primer pedido se omite porque Marcos contestó antes de que saliera: la escalera no
+    vuelve a guardarlo ni abre otra espera."""
+    correr_escalera(conn, mundo["id"], RelojFijo(_hora(9, 7)))
+    conn.commit()
+    _dice(conn, escribe, Jugada("anotar_inicio", {"tarea": "T1"}), at=_hora(9, 8))
+    dias.ciclo(_hora(9, 9))
+
+    for dia in (13, 14, 15):
+        assert dias.ciclo(_hora(dia, 10)) == []
+    assert _cuantas(conn, "pending_reply", "satisfecho_en is null") == 0
+
+
 def test_sin_ruta_de_escalamiento_se_registra_y_no_se_repite(conn, mundo, dias):
     with admin(conn) as cur:
         cur.execute("delete from escalation_route")

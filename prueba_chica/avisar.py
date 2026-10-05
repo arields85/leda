@@ -37,7 +37,8 @@ TIPO = "aviso_previo"
 
 @dataclass
 class ResultadoAviso:
-    estado: str         # encolado | ya_enviado | sin_redactar | fuera_de_horario | omitido
+    # encolado | ya_enviado | sin_redactar | fuera_de_horario | en_espera | omitido | fallido
+    estado: str
     aviso_id: str
     texto: str | None
     hechos: dict[str, Any]
@@ -99,21 +100,36 @@ def avisar_vencimiento(conn: psycopg.Connection, workspace_id: str, membership_i
         cur.execute("select estado, hechos from scheduled_notice where id = %s", (aviso_id,))
         antes = cur.fetchone()
     if antes["estado"] != "guardado":
-        return ResultadoAviso("ya_enviado", aviso_id, None, antes["hechos"])
+        return _resultado(conn, workspace_id, aviso_id, ya_existia=True)
 
     resumen = enviar_avisos(conn, workspace_id, ia, reloj, solo=aviso_id, forzar=True)
+    return _resultado(conn, workspace_id, aviso_id, ya_existia=False, resumen=resumen)
+
+
+# Cómo terminó el aviso, dicho como es (revisión de la E2-5): uno que ya existía fallido u
+# omitido no se informa como enviado, ni el quinto fallo de la IA como un intento más.
+_RESUELTOS = {"enviado": ("ya_enviado", "encolado"), "omitido": ("omitido", "omitido"),
+              "fallido": ("fallido", "fallido")}
+
+
+def _resultado(conn, workspace_id: str, aviso_id: str, *, ya_existia: bool,
+               resumen: dict[str, int] | None = None) -> ResultadoAviso:
     with espacio(conn, workspace_id) as cur:
         cur.execute("""select a.estado, a.hechos, a.motivo_omision, o.cuerpo
                          from scheduled_notice a
                          left join message_outbox o on o.id = a.outbox_id
                         where a.id = %s""", (aviso_id,))
-        despues = cur.fetchone()
-    if "fuera_de_horario" in resumen:
-        return ResultadoAviso("fuera_de_horario", aviso_id, None, despues["hechos"])
-    estado = {"enviado": "encolado", "omitido": "omitido"}.get(despues["estado"],
-                                                               "sin_redactar")
-    return ResultadoAviso(estado, aviso_id, despues["cuerpo"], despues["hechos"],
-                          despues["motivo_omision"])
+        aviso = cur.fetchone()
+    if aviso["estado"] in _RESUELTOS:
+        estado = _RESUELTOS[aviso["estado"]][0 if ya_existia else 1]
+    elif "fuera_de_horario" in (resumen or {}):
+        estado = "fuera_de_horario"
+    elif "en_espera" in (resumen or {}):
+        estado = "en_espera"            # el destinatario está ausente: sale cuando vuelva
+    else:
+        estado = "sin_redactar"         # la IA no respondió; espera su próximo intento
+    texto = aviso["cuerpo"] if estado == "encolado" else None
+    return ResultadoAviso(estado, aviso_id, texto, aviso["hechos"], aviso["motivo_omision"])
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -167,6 +183,13 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if resultado.estado == "omitido":
         print(f"El aviso ya no corresponde y quedó omitido ({resultado.motivo}).")
+        return 0
+    if resultado.estado == "fallido":
+        print("La IA no redactó el aviso tras todos sus intentos: quedó fallido, con un "
+              "incidente para el administrador. Con --de-nuevo se guarda otro.")
+        return 1
+    if resultado.estado == "en_espera":
+        print(f"{nombre} está ausente: el aviso quedó guardado y sale cuando vuelva.")
         return 0
     print(f"Aviso para {nombre} encolado:\n  {resultado.texto}")
     try:

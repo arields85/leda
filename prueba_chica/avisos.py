@@ -236,8 +236,13 @@ def _abrir_la_pregunta(m: Momento, persona: str, task_id: str, tipo_de_aviso: st
                                                   membership_id=persona))
     preguntas.abrir(turno, ESPERA_DE_ESTADO, task_id, se_puede_dejar=False,
                     jugada={"aviso": tipo_de_aviso})
+    # Sólo en la espera de esta escalera, la más nueva: una escalada de un vencimiento anterior
+    # ya terminó (`escalera._abrir_la_espera`).
     m.cur.execute("""update pending_reply set recordatorios = recordatorios + 1
-                      where task_id = %s and membership_id = %s and satisfecho_en is null""",
+                      where id = (select id from pending_reply
+                                   where task_id = %s and membership_id = %s
+                                     and satisfecho_en is null
+                                   order by preguntado_en desc limit 1)""",
                   (task_id, persona))
 
 

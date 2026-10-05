@@ -117,6 +117,42 @@ def test_si_la_ia_no_redacta_el_aviso_queda_guardado_sin_enviar(conn, mundo):
     assert _uno(conn, "select intentos from scheduled_notice")["intentos"] == 2
 
 
+def test_cada_estado_del_aviso_se_informa_como_es(conn, mundo):
+    """Revisión de la E2-5: un aviso que ya existía fallido u omitido no se informa como
+    enviado, y el quinto fallo de la IA no se informa como un intento más."""
+    caida = IAGuionada(redacciones=[RuntimeError("caída") for _ in range(5)])
+    for _ in range(4):
+        assert _avisar(conn, mundo, caida).estado == "sin_redactar"
+
+    quinto = _avisar(conn, mundo, caida)
+    assert quinto.estado == "fallido"
+    assert _avisar(conn, mundo, IAGuionada(redacciones=[TEXTO])).estado == "fallido"
+
+    # Otro aviso (con --de-nuevo) que se omite al salir porque la tarea se bloqueó.
+    with admin(conn) as cur:
+        cur.execute("""insert into blocker (workspace_id, task_id, causa)
+                       values (%s, %s, 'falta el repuesto')""", (mundo["id"], mundo["tarea"]))
+    conn.commit()
+    omitido = _avisar(conn, mundo, IAGuionada(redacciones=[TEXTO]), de_nuevo=True)
+    assert (omitido.estado, omitido.motivo) == ("omitido", "bloqueo_abierto")
+    otra_vez = _avisar(conn, mundo, IAGuionada(redacciones=[TEXTO]), de_nuevo=True)
+    assert (otra_vez.estado, otra_vez.motivo) == ("omitido", "bloqueo_abierto")
+
+
+def test_a_alguien_ausente_el_aviso_le_espera(conn, mundo):
+    with admin(conn) as cur:
+        cur.execute("""insert into absence (workspace_id, membership_id, desde, hasta)
+                       values (%s, %s, '2026-10-05', '2026-10-06')""",
+                    (mundo["id"], mundo["personas"]["Marcos"]["membership_id"]))
+    conn.commit()
+
+    resultado = _avisar(conn, mundo, IAGuionada(redacciones=[TEXTO]))
+
+    assert resultado.estado == "en_espera"
+    assert _uno(conn, "select estado, intentos from scheduled_notice") == {
+        "estado": "guardado", "intentos": 0}
+
+
 @pytest.mark.parametrize("estado", ["terminada", "cancelada"])
 def test_una_tarea_cerrada_no_se_avisa(conn, mundo, estado):
     with admin(conn) as cur:
