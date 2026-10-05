@@ -454,7 +454,13 @@ su evidencia son las corridas. Unas 400 líneas por tarea es una guía, no un to
       `python -m prueba_chica.correr --ia guionada --veces 1 --ronda seco-3` (informe
       `resultados/seco-3.md`): 16 de 16 bien, garantías 16 de 16, ninguna falla. Con la 15 nueva, 113
       llamadas por vuelta; el gasto previsto de la E2-8 no cambia. Commits `4b3681f`, `6a15381`,
-      `8b8e7e1`, `705f99c`, `bfd7cf2` y el commit que registra esto.
+      `8b8e7e1`, `705f99c`, `bfd7cf2` y el commit que registra esto. **Segunda revisión**
+      (`review-47083832b5965548`): cada aviso cuenta sus intentos y falla solo al quinto, y los que
+      siguen se reintentan juntos al próximo más cercano; cada aviso de un envío va con sus propios
+      hechos; cada clave de pregunta de los hechos tiene una sola forma. Rojo `2 failed` (reintentos),
+      `1 failed` (hechos), `1 failed` (clave); verde `320 passed in 116.89s` (una vez, antes,
+      `1 failed, 319 passed`, intermitente, no se repitió en dos corridas); `--ronda seco-4`: 16 de
+      16, garantías 16 de 16. Commits `aea7cdc`, `12e2f88`, `1fb58dd` y el que registra esto.
 - [ ] **E2-8. Primera ronda real:** sol, luna y Jev; lectura de textos; bitácora; chequeo de rumbo contra 5c.
 - [ ] **E2-9. Telegram real** con el usuario; su juicio; M2 en la bitácora.
 
