@@ -3,7 +3,8 @@
 **Rama:** `feat/motor-de-conversacion` · **Carpeta:** `D:\Proyectos\Leda-PM-worktrees\motor-de-conversacion`
 **Abierta:** 2026-10-04 · **Copia en Engram:** tema `odd/prueba-chica-del-motor/tasks` (proyecto `prisma-pm`)
 **Estado:** decidido (sección 10, 2026-10-05); E2-1 a E2-7, E2-3b, `informar_avance`, el ancla en la
-previsión, los tres hallazgos de la corrida en seco y la tarea vencida (9j) hechos; sigue la E2-8.
+previsión, los tres hallazgos de la corrida en seco, la tarea vencida (9j), la conversación 15 alineada
+con 9j y la revisión de la corrida con las 16 hechos; sigue la E2-8.
 
 ## 1. Objetivo
 
@@ -430,6 +431,30 @@ su evidencia son las corridas. Unas 400 líneas por tarea es una guía, no un to
       a este writer; su YAML ya sigue 9j); un aviso automático que se guarda más tarde el mismo día,
       después del envío de la persona (por ejemplo, con el comando `avisar`), sale en otro envío.
       Commits `3d6f07d`, `d2a855f`, `03a20be`, `df2d8ee`, `5aa1a67` y el commit que registra esto.
+- [x] **Agregado antes de la E2-8: la conversación 15 con 9j y la revisión de la corrida con las 16**
+      (2026-10-05; delegada: writer, varios archivos no triviales). Sin decisión nueva ni caso por
+      conversación. **La 15** empezaba con la tarea vencida y su paso 2 contradecía 9j: ahora D es el
+      martes 27 (el vencimiento); el primer avance se anota sin pregunta y Leda vuelve a pedir el estado
+      el miércoles; el segundo, con la tarea ya vencida, lleva la pregunta de para qué día (9j, que acá
+      coincide con 9h); la fecha es una previsión con su aviso a Ismael y el pedido del martes 3 sale con
+      el aviso previo de la otra tarea en un solo envío (9i, mecánica §10). `.md`, YAML y `README.md`
+      iguales; resuelto el `PENDIENTE` de esa conversación (el del ADR 0018, 9j, queda para quien edite el
+      ADR). **La revisión**, reglas generales: lo que una jugada propone espera si se pregunta la fecha de
+      la tarea vencida, y ninguna pregunta se pierde en los hechos; la jugada que esperaba una opción corre
+      por el manejador de la lista cerrada del turno, como una escrita (la regla 9j ya valía para una
+      opción escrita o tocada: dos pruebas la fijan); una pregunta que queda para después abre su espera
+      cuando se hace, no antes; los avisos de un envío que la IA no redactó se reintentan juntos, y un
+      texto más largo que el canal se reintenta en lugar de cortar la vuelta; el corredor compara los
+      hechos esperados con el aviso de ese tipo y esa tarea; la limpieza borra sólo bases con el nombre que
+      pone el corredor, y su prueba usa un momento fijo; un ciclo en la cadena de previsiones es su final;
+      la regla 9j con el ancla en una previsión tiene su prueba; la ronda cortada sale con 1. Evidencia
+      (2026-10-05): `pytest prueba_chica` en rojo en cada paso (un tema a la vez, `4 failed, 2 passed`;
+      un envío por día, `2 failed, 4 passed`; el emparejamiento, `1 failed, 3 passed`; la limpieza, `1
+      failed`; el ciclo, `1 failed, 1 passed`) y en verde, `316 passed in 116.42s`. **Corrida en seco**
+      `python -m prueba_chica.correr --ia guionada --veces 1 --ronda seco-3` (informe
+      `resultados/seco-3.md`): 16 de 16 bien, garantías 16 de 16, ninguna falla. Con la 15 nueva, 113
+      llamadas por vuelta; el gasto previsto de la E2-8 no cambia. Commits `4b3681f`, `6a15381`,
+      `8b8e7e1`, `705f99c`, `bfd7cf2` y el commit que registra esto.
 - [ ] **E2-8. Primera ronda real:** sol, luna y Jev; lectura de textos; bitácora; chequeo de rumbo contra 5c.
 - [ ] **E2-9. Telegram real** con el usuario; su juicio; M2 en la bitácora.
 
@@ -466,5 +491,4 @@ previo en `workspace_setting`, no en el importador; el referente es quien aprueb
   `PENDIENTE` confirmar al escribir los YAML que ninguna conversación depende de ellas.
 - **La etapa no es tan chica:** si una tarea pide un caso especial, se frena (5c.1).
 
-**Próximo paso:** la E2-8 (sol con Jev y luna, cinco veces cada una, sobre las 16), después de llevar
-al `.md` de la conversación 15 el paso 2 que cambió con 9j.
+**Próximo paso:** la E2-8 (sol con Jev y luna, cinco veces cada una, sobre las 16).
