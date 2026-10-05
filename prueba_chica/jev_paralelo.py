@@ -6,8 +6,10 @@ el turno corre con la IA principal; lo que devuelve va sólo al registro de la c
 base ni al turno. Si Jev falla, se anota la falla y la corrida sigue igual.
 
 Por cada consulta queda: qué tipo de resolución dio (`clara`, `ambigua`, `varias`, `ninguna`),
-qué tarea eligió si fue clara, la probabilidad de cada candidata (de la pregunta "tarea") y si
-acertó contra la respuesta correcta del paso (`preguntar`, o la clave de una tarea).
+qué tarea eligió si fue clara, la probabilidad de cada candidata (de la pregunta "tarea"), los
+valores de la llamada de verificación si la hubo (`misma` y `rival`: con ellos se entiende una
+`ambigua` con una candidata muy probable; ronda 1) y si acertó contra la respuesta correcta del
+paso (`preguntar`, o la clave de una tarea).
 """
 
 from __future__ import annotations
@@ -17,8 +19,6 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from leda.jev import Jev, TareaCandidata, TipoResolucion, resolver_referencia_tarea
-
-from .fichas import FICHAS
 
 PREGUNTAR = "preguntar"
 
@@ -66,6 +66,12 @@ def preguntar(cliente: Jev, *, mensaje: str, referencia: str,
         probabilidades = {claves[int(k[1:]) - 1]: round(float(p), 3)
                           for k, p in crudas.items()
                           if k[1:].isdigit() and 0 < int(k[1:]) <= len(claves)}
+    verificacion = next((ll["respuesta"] for ll in graba.llamadas
+                         if "misma" in ll["preguntas"] and "respuesta" in ll), None)
+    if isinstance(verificacion, dict):
+        salida["verificacion"] = {
+            k: round(float(verificacion[k]["noul"]), 3) for k in ("misma", "rival")
+            if isinstance(verificacion.get(k), dict) and "noul" in verificacion[k]}
     eligio = por_id.get(r.tarea_id) if r.tipo is TipoResolucion.CLARA else None
     salida.update(tipo=r.tipo.value, eligio=eligio, probabilidades=probabilidades,
                   llamadas=len(graba.llamadas),
@@ -76,15 +82,13 @@ def preguntar(cliente: Jev, *, mensaje: str, referencia: str,
     return salida
 
 
-def eleccion_de_la_ia(jugadas: list[dict[str, Any]]) -> str | None:
-    """Qué tarea eligió la IA principal en un paso (por su clave), o `preguntar` si eligió una
-    jugada que necesita la tarea y no la dio; `None` si no eligió ninguna sobre una tarea."""
+def eleccion_de_la_ia(jugadas: list[dict[str, Any]]) -> str:
+    """Qué tarea eligió la IA principal en un paso (por su clave), o `preguntar` si no eligió
+    ninguna: no adivinó (ronda 1: con ninguna jugada, la tabla la marcaba como si se hubiera
+    equivocado de tarea). Si además preguntó con botones lo mide la comprensión del paso."""
     for j in jugadas:
         if j.get("tarea"):
             return j["tarea"]
         if j.get("nombre") == "elegir" and j.get("opcion"):
             return j["opcion"]
-        ficha = FICHAS.get(j.get("nombre"))
-        if ficha is not None and "tarea" in ficha.necesita:
-            return PREGUNTAR        # sin la tarea, la ficha pregunta cuál (situación 5)
-    return None
+    return PREGUNTAR

@@ -123,7 +123,8 @@ def resumen(corridas: list[Corrida], *, ronda: str, cabecera: dict[str, Any],
                    "Jev corre en paralelo y no decide nada. Correcta: lo que el paso espera "
                    "(`preguntar` o la tarea).", "",
                    "| Conv. | Vez | Paso | Referencia | Correcta | IA | Jev | Probabilidades "
-                   "| IA acierta | Jev acierta |", "|---|---|---|---|---|---|---|---|---|---|"]
+                   "| Verificación | IA acierta | Jev acierta |",
+                   "|---|---|---|---|---|---|---|---|---|---|---|"]
         for c, p in sorted(jev, key=lambda x: (x[0].numero, x[1].paso, x[0].vez)):
             j = p.jev
             correcta = j.get("correcta")
@@ -132,6 +133,7 @@ def resumen(corridas: list[Corrida], *, ronda: str, cabecera: dict[str, Any],
             lineas.append(
                 f"| {c.numero} | {c.vez} | {p.paso} | {j['referencia']} | {correcta} | "
                 f"{p.eleccion_de_la_ia} | {jev_dijo} | {_json(j.get('probabilidades'))} | "
+                f"{_json(j.get('verificacion'))} | "
                 f"{_ok(ia_acierta)} | {_ok(bool(j.get('acierta')))} |")
     return "\n".join(lineas) + "\n"
 

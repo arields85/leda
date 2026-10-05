@@ -35,7 +35,9 @@ from .carga import ZONA, Mundo
 
 GARANTIA, COMPRENSION, MOTOR = "garantia", "comprension", "motor"
 
-# Los datos de una jugada que son palabras de la persona: se compara sólo si están.
+# Los datos de una jugada que son palabras de la persona: se compara sólo si están. Con
+# `puede_traer`, pueden venir, pero sólo con las palabras de la persona (revisión del contrato,
+# 2026-10-05): uno inventado sigue siendo una falla.
 DATOS_LIBRES = frozenset({"motivo", "causa", "palabras", "quien", "a", "que_pide"})
 FUERA_DE_LA_LISTA = "fuera_de_la_lista"
 ETAPA_FUERA_DE_LA_LISTA = "motor_fuera_de_la_lista"
@@ -235,11 +237,13 @@ def coincide(esperado: Any, real: Any) -> bool:
                                 and not isinstance(esperado, bool))
 
 
-def jugada_coincide(esperada: dict[str, Any], real: dict[str, Any]) -> bool:
+def jugada_coincide(esperada: dict[str, Any], real: dict[str, Any],
+                    mensaje: str | None = None) -> bool:
     """Una jugada elegida contra la esperada: el nombre (`fuera_de_la_lista` es cualquiera que
     no esté en la lista), los datos estructurados iguales, y los libres presentes si y sólo si
-    se esperan (salvo los de `puede_traer`)."""
-    from .fichas import FICHAS
+    se esperan (salvo los de `puede_traer`, que pueden venir si son palabras de la persona:
+    todas las del dato están en su `mensaje`, sin importar mayúsculas ni acentos)."""
+    from .fichas import FICHAS, palabras
 
     nombre = esperada["nombre"]
     if nombre == FUERA_DE_LA_LISTA:
@@ -251,6 +255,10 @@ def jugada_coincide(esperada: dict[str, Any], real: dict[str, Any]) -> bool:
     datos_r = {k: v for k, v in real.items() if k != "nombre"}
     for k in set(datos_e) | set(datos_r):
         if k in libres:
+            r = datos_r.get(k)
+            if (mensaje is not None and k in DATOS_LIBRES and isinstance(r, str)
+                    and not set(palabras(r)) <= set(palabras(mensaje))):
+                return False
             continue
         e, r = datos_e.get(k), datos_r.get(k)
         if k in DATOS_LIBRES:
@@ -264,9 +272,10 @@ def jugada_coincide(esperada: dict[str, Any], real: dict[str, Any]) -> bool:
     return True
 
 
-def comprobar_jugadas(c: Comprobacion, esperadas: list[dict], reales: list[dict]) -> bool:
+def comprobar_jugadas(c: Comprobacion, esperadas: list[dict], reales: list[dict],
+                      mensaje: str | None = None) -> bool:
     ok = len(esperadas) == len(reales) and all(
-        jugada_coincide(e, r) for e, r in zip(esperadas, reales))
+        jugada_coincide(e, r, mensaje) for e, r in zip(esperadas, reales))
     if not ok:
         c.falla(COMPRENSION, "jugadas", esperadas, reales)
     return ok

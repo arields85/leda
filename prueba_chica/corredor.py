@@ -54,6 +54,10 @@ CARPETA = Path(__file__).resolve().parent / "conversaciones"
 RAIZ = Path(__file__).resolve().parents[1]
 
 
+class SinBoton(LookupError):
+    """El paso toca una opción que ninguna pregunta de la persona ofreció."""
+
+
 class RelojDeCorrida:
     """El reloj del motor en una corrida: el momento del paso, y un contador real para la
     latencia de la IA."""
@@ -229,7 +233,19 @@ class _Corredor:
                 ia = IAMixta(guion, self.ia)
             elif hasattr(self.ia, "preparar"):
                 self.ia.preparar(paso)
-            resultado, r.texto, r.jugadas, r.latencia_ms, r.jev = self._turno(paso, ia, preludio)
+            try:
+                resultado, r.texto, r.jugadas, r.latencia_ms, r.jev = self._turno(paso, ia,
+                                                                                  preludio)
+            except SinBoton:
+                if preludio:
+                    raise
+                # Sin la pregunta con botones (un paso anterior no la hizo), no hay qué tocar:
+                # es una falla del paso, consecuencia de no haber entendido, y la corrida sigue
+                # (ronda 1, conversación 09).
+                r.texto = f"[toca] {paso['toca']}"
+                r.fallas = [cp.Falla(cp.COMPRENSION, "no hay un botón para tocar",
+                                     paso["toca"], None)]
+                return r
             self.despacho.vuelta()
         else:
             for cuando in paso["relojes"]:
@@ -314,7 +330,7 @@ class _Corredor:
             fila = cur.fetchone()
         self.conn.commit()
         if fila is None:
-            raise LookupError(f"No hay un botón de {clave} para tocar.")
+            raise SinBoton(f"No hay un botón de {clave} para tocar.")
         return fila["token"], fila["etiqueta"]
 
     def _latencia(self, membership_id: str) -> int | None:
@@ -401,7 +417,8 @@ class _Corredor:
         titulos = self.mundo.titulos
         quien = paso.get("quien", self.persona)
         if "escribe" in paso or "toca" in paso:
-            jugadas_bien = cp.comprobar_jugadas(c, paso.get("jugadas") or [], r.jugadas) \
+            jugadas_bien = cp.comprobar_jugadas(c, paso.get("jugadas") or [], r.jugadas,
+                                                paso["escribe"]) \
                 if "escribe" in paso else True
             _, falta = cp.comprobar_efectos(c, paso.get("efectos") or {}, hubo, titulos)
             # Lo que depende de haber entendido: con las jugadas esperadas, una diferencia es

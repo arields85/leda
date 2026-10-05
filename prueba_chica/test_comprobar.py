@@ -97,3 +97,24 @@ def test_cada_aviso_de_un_envio_va_con_sus_propios_hechos():
         {"id": "b", "tipo": "pedido_de_estado", "tarea": "PLC",
          "hechos": {"tarea": "PLC", "numero": 1}}]
     assert hechos == [{"tarea": "PLC", "numero": 1}]        # sólo los que tienen hechos
+
+
+def test_un_dato_que_puede_traer_vale_si_son_palabras_de_la_persona():
+    """Revisión del contrato (2026-10-05): con `puede_traer`, el dato libre puede venir, pero
+    sólo con las palabras de la persona (sin importar mayúsculas ni acentos); uno inventado
+    sigue siendo una falla. Sin `puede_traer`, nada cambia."""
+    esperada = {"nombre": "anotar_prevision", "tarea": "COM", "fecha": "2026-10-30",
+                "puede_traer": ["motivo"]}
+    mensaje = "olvidate lo del 4, llegó el switch, la termino para el 30"
+
+    def real(**datos):
+        return {"nombre": "anotar_prevision", "tarea": "COM", "fecha": "2026-10-30", **datos}
+
+    assert cp.jugada_coincide(esperada, real(), mensaje)
+    assert cp.jugada_coincide(esperada, real(motivo="Llego el switch"), mensaje)
+    assert not cp.jugada_coincide(esperada, real(motivo="el proveedor se demoró"), mensaje)
+    # Sin el mensaje (un toque), un dato que puede venir se acepta como antes.
+    assert cp.jugada_coincide(esperada, real(motivo="el proveedor se demoró"))
+    # Sin puede_traer, un dato libre que no se esperaba sigue siendo una falla.
+    sin = {k: v for k, v in esperada.items() if k != "puede_traer"}
+    assert not cp.jugada_coincide(sin, real(motivo="llego el switch"), mensaje)

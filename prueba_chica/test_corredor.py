@@ -20,6 +20,7 @@ from prueba_chica import comprobar as cp
 from prueba_chica.carga import cargar
 from prueba_chica.corredor import CARPETA, correr_conversacion, elegir, leer, todas
 from prueba_chica.grabar import IAPerfecta, IAQueGraba, IARepetida
+from prueba_chica.jev_paralelo import PREGUNTAR, eleccion_de_la_ia
 
 
 def _limpiar(conn) -> None:
@@ -171,7 +172,37 @@ def test_jev_en_paralelo_no_cambia_ninguna_decision(conn):
     assert consultas[0]["tipo"] == "clara" and consultas[0]["eligio"] == "PLC"
     assert consultas[0]["acierta"] is False          # lo correcto era preguntar
     assert consultas[0]["probabilidades"]["PLC"] == 0.97
+    # Los valores de la llamada de verificación, para entender una "ambigua" (ronda 1).
+    assert consultas[0]["verificacion"] == {"misma": 0.9, "rival": 0.1}
     assert [p.eleccion_de_la_ia for p in con_jev.pasos if p.jev] == ["preguntar", "PLC"]
+
+
+def test_la_ia_que_no_elige_tarea_no_adivino():
+    """Ronda 1: con ninguna jugada, la tabla de Jev marcaba a la IA como si se equivocara de
+    tarea. Sin una tarea elegida, la IA no adivinó: se cuenta como `preguntar`. Si preguntó con
+    botones lo mide la comprensión, no esta tabla."""
+    assert eleccion_de_la_ia([]) == PREGUNTAR
+    assert eleccion_de_la_ia([{"nombre": "anotar_inicio"}]) == PREGUNTAR
+    assert eleccion_de_la_ia([{"nombre": "anotar_inicio", "tarea": "PLC"}]) == "PLC"
+    assert eleccion_de_la_ia([{"nombre": "elegir", "opcion": "COM"}]) == "COM"
+
+
+def test_un_boton_que_no_esta_es_una_falla_de_la_corrida_no_una_caida(conn):
+    """Ronda 1, conversación 09, vez 5: sin la pregunta con botones, el toque siguiente hacía
+    caer la corrida. Ahora es una falla del paso y la corrida sigue."""
+    [conv] = elegir(["09"])
+    ia = _perfecta(conv)
+    guion = copy.deepcopy(conv)
+    guion["pasos"][0]["jugadas"] = []           # no eligió nada: no hay botones
+    ia.ia.preparar = lambda paso: setattr(ia.ia, "paso", next(
+        (p for p in guion["pasos"] if p.get("paso") == paso.get("paso")), paso))
+
+    corrida = correr_conversacion(conn, conv, ia)
+
+    assert corrida.error is None
+    assert len(corrida.pasos) == len(conv["pasos"])
+    [falla] = [f for p, f in corrida.fallas() if p == 2 and f.que == "no hay un botón para tocar"]
+    assert falla.clase == cp.COMPRENSION and falla.esperado == "COM"
 
 # --- La línea de comandos --------------------------------------------------------------------
 
