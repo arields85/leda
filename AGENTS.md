@@ -92,8 +92,7 @@ Acordados con el usuario; usarlos siempre ("conducida", "guiada" o "método nuev
 - **"Apagá / prendé la restricción de horario":** para probar por Telegram a cualquier hora, con
   `tools/restriccion_horario.py apagar|prender|estado <espacio>` (`PYTHONPATH=src`, desde el worktree de la
   base). Apagada, el horario del espacio es 00:00-23:59 todos los días y los plazos de los recordatorios se
-  acortan; prendida, vuelve el del pack. Hoy sólo admite las bases `leda` y `leda_flujo`: para la Etapa 2 hay que
-  sumarle `leda_motor` antes de usarla.
+  acortan; prendida, vuelve el del pack. Admite las bases `leda`, `leda_flujo` y `leda_motor`.
 
 ## Orden de lectura y fuentes de verdad
 
