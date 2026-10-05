@@ -2,12 +2,13 @@
 
 `odd/tasks/prueba-chica-del-motor.md`, sección 4 ("Un turno"); ADR 0018, decisiones 1, 6 y 8.
 Se trae lo mínimo de la llamada estructurada de la rama congelada (`llm.py` en
-`respaldo-flujos-antes-de-d`: herramienta forzada con `tool_choice` y `llamar_con_plazo`):
+`respaldo-flujos-antes-de-d`: la llamada con herramienta y `llamar_con_plazo`):
 
-- `elegir_jugadas` fuerza a la IA a contestar con una sola herramienta cuyo esquema es la lista
-  cerrada de jugadas, cada una una variante con su definición y sólo sus datos, más
-  `fuera_de_la_lista` para decir que lo pedido no está en ella. El código decide después si
-  cada jugada vale (`fichas.py`).
+- `elegir_jugadas` le ofrece a la IA una sola herramienta cuyo esquema es la lista cerrada de
+  jugadas, cada una una variante con su definición y sólo sus datos, más `fuera_de_la_lista`
+  para decir que lo pedido no está en ella. El código decide después si cada jugada vale
+  (`fichas.py`). La herramienta no se fuerza con `tool_choice` (Claude Sonnet 5.5 no lo
+  acepta): la piden las instrucciones, y no llamarla es no responder.
 - `redactar` pide el texto de la respuesta desde los hechos, con el tono del espacio.
 - Los dos pedidos llevan, después de las instrucciones, el significado de cada dato y cada código
   que traen (`hechos.bloque`; revisión del contrato, 2026-10-05).
@@ -220,7 +221,10 @@ class IAReal:
                           "content": f"{INSTRUCCIONES_JUGADAS}\n\n{hechos.bloque(situacion)}"},
                          {"role": "user", "content": _json(situacion)}],
             "tools": [herramienta],
-            "tool_choice": {"type": "function", "function": {"name": NOMBRE_HERRAMIENTA}},
+            # Sin forzar: Claude Sonnet 5.5 rechaza `tool_choice` forzado (400, 2026-10-05).
+            # La herramienta es la única ofrecida y las instrucciones piden llamarla siempre;
+            # si no la llama, `leer_jugadas` lo trata como no responder.
+            "tool_choice": "auto",
         })
         return leer_jugadas(respuesta)
 

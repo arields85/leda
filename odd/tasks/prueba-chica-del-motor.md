@@ -493,7 +493,11 @@ su evidencia son las corridas. Unas 400 líneas por tarea es una guía, no un to
       registra esto. `PENDIENTE`: cerrar un bloqueo cuando su causa desaparece (11, "llegó el
       switch") no es ninguna jugada: agregarla lo decide el usuario (9k); que el proveedor real
       acepte el esquema con `anyOf` no se probó (sólo con la IA guionada); la próxima ronda real lo
-      muestra.
+      muestra. **Claude Sonnet 5.5** (2026-10-05): el esquema lo aceptan sol y Sonnet; Sonnet rechazaba
+      (400) la herramienta forzada con `tool_choice`, que pasó a `auto` para todos, con las
+      instrucciones pidiendo llamarla siempre (no llamarla sigue siendo no responder). Humo real 01 y
+      02, una vez, con Sonnet y con sol: 2 de 2 bien, sin incidentes (USD 0,37); `pytest prueba_chica`
+      `336 passed`; en seco, 16 de 16.
 - [ ] **E2-8. Primera ronda real:** sol, luna y Jev; lectura de textos; bitácora; chequeo de rumbo contra 5c.
 - [ ] **E2-9. Telegram real** con el usuario; su juicio; M2 en la bitácora.
 

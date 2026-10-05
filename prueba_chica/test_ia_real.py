@@ -79,7 +79,7 @@ def _ia(proveedor: ProveedorFalso, *, tono: Tono | None = None, plazo: float = 5
 
 # --- La llamada estructurada ----------------------------------------------------------------
 
-def test_la_eleccion_fuerza_la_herramienta_con_la_lista_cerrada_y_la_lee():
+def test_la_eleccion_ofrece_la_herramienta_con_la_lista_cerrada_y_la_lee():
     proveedor = ProveedorFalso([_llamada({"jugadas": [
         {"nombre": "anotar_prevision", "tarea": "T1", "fecha": "2026-10-27",
          "motivo": "el proveedor se demoró", "causa": "", "quien": None}]})])
@@ -94,9 +94,13 @@ def test_la_eleccion_fuerza_la_herramienta_con_la_lista_cerrada_y_la_lee():
     assert pedido["autorizacion"] == "Bearer clave-de-prueba"
     cuerpo = pedido["cuerpo"]
     assert cuerpo["model"] == "openai/gpt-6-sol"
-    assert cuerpo["tool_choice"] == {"type": "function",
-                                     "function": {"name": NOMBRE_HERRAMIENTA}}
+    # Sin forzar la herramienta: Claude Sonnet 5.5 rechaza `tool_choice` forzado (`tool` o
+    # `any`, error 400 por OpenRouter, 2026-10-05). Una sola herramienta ofrecida, con
+    # "auto" y las instrucciones que piden llamarla siempre; si no la llama, el turno lo trata
+    # como no responder (`RespuestaInvalida`).
+    assert cuerpo["tool_choice"] == "auto"
     [herramienta] = cuerpo["tools"]
+    assert herramienta["function"]["name"] == NOMBRE_HERRAMIENTA
     variantes = _variantes(herramienta)
     assert list(variantes) == sorted(JUGADAS) + [FUERA_DE_LA_LISTA]
     # Quién destraba lo dice la persona; la IA no juzga si la causa depende de otro (9c).
@@ -134,6 +138,27 @@ def test_cada_jugada_ofrece_solo_sus_datos_y_dice_que_la_distingue():
     # Cada definición es propia: ninguna jugada se describe como otra.
     descripciones = [v["description"] for v in variantes.values()]
     assert len(set(descripciones)) == len(descripciones)
+
+
+def test_el_esquema_es_un_objeto_arriba_y_la_union_va_en_cada_jugada():
+    """Una sola forma para todos los proveedores: Anthropic exige un objeto en la raíz de los
+    parámetros de una herramienta. La raíz es un objeto plano, sin uniones, y la unión por
+    jugada va dentro de los elementos de la lista (así la aceptan GPT-6 sol y Claude Sonnet
+    5.5 por OpenRouter, 2026-10-05)."""
+    parametros = esquema_de_jugadas(sorted(JUGADAS))["function"]["parameters"]
+    assert parametros["type"] == "object"
+    assert not {"anyOf", "oneOf", "allOf"} & set(parametros)
+    assert set(parametros["properties"]) == {"jugadas"}
+    lista = parametros["properties"]["jugadas"]
+    assert lista["type"] == "array"
+    assert all(v["type"] == "object" for v in lista["items"]["anyOf"])
+
+
+def test_las_instrucciones_piden_llamar_siempre_a_la_herramienta():
+    """Sin `tool_choice` forzado, la instrucción es la que pide la herramienta, también
+    cuando no hay ninguna jugada (la lista vacía)."""
+    texto = INSTRUCCIONES_JUGADAS.lower()
+    assert "siempre" in texto and "lista vacía" in texto
 
 
 def test_la_tarea_nunca_es_obligatoria_en_el_esquema():
