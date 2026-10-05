@@ -2,7 +2,7 @@
 
 **Rama:** `feat/motor-de-conversacion` · **Carpeta:** `D:\Proyectos\Leda-PM-worktrees\motor-de-conversacion`
 **Abierta:** 2026-10-04 · **Copia en Engram:** tema `odd/prueba-chica-del-motor/tasks` (proyecto `prisma-pm`)
-**Estado:** decidido (sección 10, 2026-10-05); sigue la E2-1.
+**Estado:** decidido (sección 10, 2026-10-05); E2-1 hecha; sigue la E2-2.
 
 ## 1. Objetivo
 
@@ -107,8 +107,8 @@ verificar el texto con una etapa que `incidentes.py` no conoce, sin editarlo.
 ## 5. Datos
 
 **`leda_motor`** (no existe; se crea con autorización), con los pasos de `PRUEBA-LOCAL.md` para una base nueva
-(`esquema`, `importar --activar`, `feriados`, `modelo` con GPT-6 sol, `sembrar`), más las migraciones nuevas con
-`psql -f` y el valor del aviso previo. `pg_dump` antes de cada prueba real.
+(`esquema`, que ya trae la `0030` y la `0031`; `importar --activar`, `feriados`, `modelo` con GPT-6 sol, `sembrar`),
+más el aviso previo (`aviso_previo_dias_habiles` = 3 en `workspace_setting`). `pg_dump` antes de cada prueba real.
 
 **Migraciones `0030` y `0031`**, como las demás: rollback en `db/rollbacks/`, `db/esquema.sql` al día y el ensayo
 de paridad, que descubre las nuevas solo (`tests/test_task_intake.py:_migraciones_posteriores_a`). Toda tabla
@@ -125,8 +125,12 @@ nueva lleva `workspace_id` y entra en el bucle de `row level security` forzado; 
 | `scheduled_notice` | los avisos guardados: tipo, tarea, destinatario, turno que lo causó, hechos, hora, estado (guardado, enviado, omitido, fallido), intentos, motivo de omisión, clave de deduplicación |
 
 Los momentos de las tablas nuevas los pone el motor con su reloj, nunca un valor por omisión. Queda resuelto
-cómo se guarda quién destraba (ADR 0017, 3a); qué pasa si dice que no le corresponde sigue `PENDIENTE`. `PENDIENTE`
-de la E2-1: la ejecución única de un mensaje repetido (`inbound_message` no tiene índice único por mensaje).
+cómo se guarda quién destraba (ADR 0017, 3a); qué pasa si dice que no le corresponde sigue `PENDIENTE`. Hechas en
+la E2-1: los temas para después son preguntas sin cerrar con `para_despues_en`, y la tarea del último aviso sale
+del aviso; las referencias a `membership` e `inbound_message` las comprueba un disparador (su restricción con el
+espacio es de la `0002`). **Ejecución única:** `inbound_message.telegram_bot_id` y un índice único por espacio,
+bot, chat y mensaje; el escuchador inserta con `on conflict do nothing` y una reentrega no crea turno. Los flujos
+congelados no informan el bot y siguen igual.
 
 **Estado inicial.** `sembrar` carga todo a diez días y rechaza un espacio con tareas, así que las corridas usan un
 cargador propio que escribe como `admin` el estado de cada conversación (tareas, eventos, bloqueos,
@@ -171,8 +175,13 @@ Primero en rojo donde hay una prueba determinista: aislamiento de las tablas nue
 ejecución única, outbox, días hábiles, escalera y fichas con `ProveedorGuionado`. Lo que hace la IA no tiene rojo:
 su evidencia son las corridas. Unas 400 líneas por tarea es una guía, no un tope.
 
-- [ ] **E2-1. Tablas** (delegada): `0030`, `0031`, rollbacks, `esquema.sql`, paridad, aislamiento, ejecución
-      única. Unas 450 líneas.
+- [x] **E2-1. Tablas** (delegada: writer, varios archivos no triviales): `0030`, `0031`, rollbacks, `esquema.sql`,
+      paridad, aislamiento, ejecución única. Evidencia (2026-10-05): `tests/test_motor_tablas.py` en rojo (14
+      fallas, tablas inexistentes) y en verde (`14 passed`); `tests/test_task_intake.py tests/test_task_drafts.py`
+      `132 passed` (paridad y rollbacks, ahora también con restricciones e índices); suite completa `2300 passed,
+      333 deselected, 1 warning in 763.56s`. Commit `7265716`; lo registra el commit que sigue. Unas 1.400 líneas:
+      cada tabla va en su migración y en `esquema.sql`. `tests/test_capacidades.py` declara las tablas, usadas desde
+      `prueba_chica/`.
 - [ ] **E2-2. Esqueleto y frontera** (delegada): `prueba_chica/`, prueba de imports, turno y registro, falla de la
       IA en un turno, el despachador sin retener en `leda_motor`. Unas 400.
 - [ ] **E2-3. Jugadas y fichas** (delegada): lista cerrada, fichas, atraso, aviso al administrador. Unas 450.
@@ -218,4 +227,4 @@ previo en `workspace_setting`, no en el importador; el referente es quien aprueb
   `PENDIENTE` confirmar al escribir los YAML que ninguna conversación depende de ellas.
 - **La etapa no es tan chica:** si una tarea pide un caso especial, se frena (5c.1).
 
-**Próximo paso:** la E2-1 (tablas).
+**Próximo paso:** la E2-2 (esqueleto y frontera).
