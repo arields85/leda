@@ -45,7 +45,10 @@ from leda.incidentes import registrar_incidente
 from leda.salida import enqueue_outbox
 
 from . import preguntas
-from .fichas import GUARDADO_SIN_ENVIAR, REPREGUNTA_DE_ESTADO
+from .ancla import (REPREGUNTA_DE_ESTADO, VENCIMIENTO_CON_PREVISION, ancla,
+                    fecha_de_la_clave)
+from .ancla import prevision_vigente as _prevision_vigente
+from .fichas import GUARDADO_SIN_ENVIAR
 from .ia import IA
 from .tiempo import Reloj
 from .turno import leer_ultimos_turnos, no_vacio, registrar_salida
@@ -354,11 +357,7 @@ def quienes_escalan(cur, tarea: dict[str, Any]) -> list[dict[str, Any]]:
 def prevision_vigente(m: Momento, tarea: dict[str, Any]) -> dict[str, Any] | None:
     """La última previsión de la tarea, si no es la fecha comprometida, con el estado de su
     aviso al referente (un efecto que pasa después dice su estado)."""
-    m.cur.execute("""select f.* from task_forecast f
-                      where f.task_id = %s
-                        and not exists (select 1 from task_forecast g where g.reemplaza_id = f.id)
-                      order by f.at desc limit 1""", (str(tarea["id"]),))
-    f = m.cur.fetchone()
+    f = _prevision_vigente(m.cur, tarea["id"])
     if f is None or f["fecha_prevista"] == m.fecha(tarea["fecha_objetivo"]):
         return None
     dicha: dict[str, Any] = {"fecha": f["fecha_prevista"].isoformat(),
@@ -399,7 +398,8 @@ def dependientes(cur, task_id) -> list[dict[str, Any]]:
 # que nunca llega a la IA: en su lugar van los hechos de a quién se escala.
 _DE_ESTE_MOMENTO = frozenset({"tarea", "vence", "dias_habiles_hasta_el_vencimiento",
                               "atraso_dias_habiles", "estado", "responsable",
-                              "prevision_vigente", "dependientes", "si_no_hay_respuesta"})
+                              "prevision_vigente", "dependientes", "si_no_hay_respuesta",
+                              "pide_el_estado_el"})
 AVISA_QUE_VA_A_ESCALAR = "avisa_que_va_a_escalar"
 
 
@@ -428,6 +428,9 @@ def hechos_de_la_escalera(m: Momento, tipo: str, tarea: dict[str, Any],
         siguen = dependientes(m.cur, tarea["id"])
         if siguen:
             hechos["dependientes"] = siguen
+    if tipo == VENCIMIENTO_CON_PREVISION:   # un efecto que pasa después: cuándo pide el estado
+        hasta = ancla(m.cur, tarea["id"], m.fecha(vence))
+        hechos["pide_el_estado_el"] = {"fecha": hasta.isoformat(), "estado": "todavia_no"}
     if base.get(AVISA_QUE_VA_A_ESCALAR):
         a_quienes = [d["nombre"] for d in quienes_escalan(m.cur, tarea)]
         if a_quienes:       # un efecto que pasa después: todavía no, y a quién
@@ -457,6 +460,15 @@ def _vigencia_de_la_escalera(m: Momento, aviso) -> tuple[str | None, dict[str, A
     if base.get("necesita_respuesta") is True or aviso["tipo"] == "escalamiento":
         if espera_abierta(m.cur, tarea["id"]) is None:
             return "ya_respondio", {}
+    # El ancla (9i): un paso de la escalera de otra ancla ya no corresponde (si la persona
+    # contestó, el motivo es ése); el recordatorio del vencimiento, sólo mientras el ancla
+    # siga en una previsión posterior.
+    hasta = ancla(m.cur, tarea["id"], m.fecha(tarea["fecha_objetivo"]))
+    if aviso["tipo"] == VENCIMIENTO_CON_PREVISION:
+        if hasta <= fecha_de_la_clave(aviso):
+            return "volvio_a_la_fecha_comprometida", {}
+    elif hasta != fecha_de_la_clave(aviso):
+        return "hay_una_prevision_mas_nueva", {}
     return None, hechos_de_la_escalera(m, aviso["tipo"], tarea, base)
 
 
@@ -491,6 +503,8 @@ def _siempre(m: Momento, aviso) -> tuple[str | None, dict[str, Any]]:
 TIPOS: Mapping[str, TipoDeAviso] = MappingProxyType({t.nombre: t for t in (
     # La escalera (mecánica §9; 9b): sin botones, siempre privados.
     TipoDeAviso("aviso_previo", "informativo", _vigencia_de_la_escalera),
+    # Con el ancla en una previsión, el único aviso del vencimiento: no pide nada (9i).
+    TipoDeAviso(VENCIMIENTO_CON_PREVISION, "informativo", _vigencia_de_la_escalera),
     TipoDeAviso("pedido_de_estado", "seguimiento", _vigencia_de_la_escalera),
     TipoDeAviso("reencuadre", "seguimiento", _vigencia_de_la_escalera),
     TipoDeAviso("escalamiento", "prioritario", _vigencia_de_la_escalera, escala=True),

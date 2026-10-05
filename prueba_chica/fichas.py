@@ -41,6 +41,7 @@ from leda.herramientas import (EstadoCambio, NecesitaConfirmacion, NecesitaElegi
                                NecesitaOpciones, ejecutar)
 
 from . import preguntas, situaciones
+from .ancla import REEMPLAZADO_POR_UN_AVANCE, REPREGUNTA_DE_ESTADO, ancla
 from .ia import Jugada
 
 
@@ -116,11 +117,10 @@ GUARDADO_SIN_ENVIAR = "guardado_sin_enviar"     # guardado; sale a la hora de `s
 EN_COLA_SIN_ENVIAR = "en_cola_sin_enviar"       # en la cola de su canal; sale enseguida
 
 # Un avance sin un hecho cierto (`informar_avance`, decisión del usuario, 2026-10-05): la espera
-# sigue abierta y Leda vuelve a pedir el estado el día hábil siguiente con este aviso de la
-# escalera (`escalera.py`), que espera algo cierto. Los pasos de la escalera que todavía no
-# salieron quedan reemplazados por él: ya no es silencio.
-REPREGUNTA_DE_ESTADO = "repregunta_de_estado"
-REEMPLAZADO_POR_UN_AVANCE = "reemplazado_por_un_avance"
+# sigue abierta y Leda vuelve a pedir el estado el día hábil siguiente con un aviso de la
+# escalera (`REPREGUNTA_DE_ESTADO`, `escalera.py`), que espera algo cierto. Los pasos de la
+# escalera que todavía no salieron quedan reemplazados por él (`REEMPLAZADO_POR_UN_AVANCE`): ya
+# no es silencio.
 ESPERA_ALGO_CIERTO = ("si_la_termino", "para_cuando_la_termina", "si_esta_trabada")
 _PASOS_QUE_REEMPLAZA = ("pedido_de_estado", REPREGUNTA_DE_ESTADO, "escalamiento")
 
@@ -500,13 +500,14 @@ def _informar_avance(ctx: Contexto, datos: dict, tarea: dict) -> dict:
     if fila["fecha_objetivo"] is None:
         return hecho                    # sin vencimiento no hay escalera que vuelva a pedir
     vence = fila["fecha_objetivo"].astimezone(cal.zona).date()
+    hasta = ancla(cur, tarea["id"], vence)      # la escalera de la previsión, si es posterior
 
-    # Los pasos de la escalera de este vencimiento que todavía no salieron ya no corresponden:
-    # la persona contestó. Los reemplaza el pedido del día hábil siguiente.
+    # Los pasos de la escalera de esta ancla que todavía no salieron ya no corresponden: la
+    # persona contestó. Los reemplaza el pedido del día hábil siguiente.
     cur.execute("""select id, tipo, estado from scheduled_notice
                     where task_id = %s and tipo = any(%s)
                       and split_part(dedupe_key, ':', 4) = %s""",
-                (tarea["id"], list(_PASOS_QUE_REEMPLAZA), vence.isoformat()))
+                (tarea["id"], list(_PASOS_QUE_REEMPLAZA), hasta.isoformat()))
     pasos = cur.fetchall()
     cur.execute("""update scheduled_notice
                       set estado = 'omitido', motivo_omision = %s, resuelto_en = %s,
@@ -530,7 +531,7 @@ def _informar_avance(ctx: Contexto, datos: dict, tarea: dict) -> dict:
                      "espera_algo_cierto": list(ESPERA_ALGO_CIERTO),
                      "tarea": tarea["titulo"], "vence": vence.isoformat()},
                     ensure_ascii=False),
-         sale, f"motor:{REPREGUNTA_DE_ESTADO}:{tarea['id']}:{vence.isoformat()}:0:a{veces}",
+         sale, f"motor:{REPREGUNTA_DE_ESTADO}:{tarea['id']}:{hasta.isoformat()}:0:a{veces}",
          ctx.ahora))
     hecho.update(vuelve_a_pedir_el_estado={"estado": GUARDADO_SIN_ENVIAR,
                                            "sale": sale.isoformat()},

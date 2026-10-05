@@ -30,7 +30,8 @@ TABLAS = ("conversation_turn", "conversation_question", "pending_reply", "schedu
 @pytest.fixture
 def charla(conn, mundo, escribe, espacio_con_escalera, duda) -> dict:
     """Marcos arrancó sin decir cuál (duda con botones), tocó una opción, dio una previsión, y
-    un mensaje suyo quedó sin respuesta de la IA; el viernes, la escalera le pidió el estado."""
+    un mensaje suyo quedó sin respuesta de la IA; el día de la previsión (9i), la escalera le
+    pidió el estado."""
     _toca(conn, mundo, duda["O2"])
     quien, entrante = escribe("Marcos", "llego el 14, el proveedor")
     procesar_turno(conn, quien, entrante,
@@ -44,9 +45,9 @@ def charla(conn, mundo, escribe, espacio_con_escalera, duda) -> dict:
                    IAGuionada(jugadas=[ConnectionError("sin red"), TimeoutError("tarde")]),
                    RelojFijo(AHORA))
     conn.commit()
-    correr_escalera(conn, mundo["id"], RelojFijo(_hora(9, 10)))
+    correr_escalera(conn, mundo["id"], RelojFijo(_hora(14, 10)))
     conn.commit()
-    enviar_avisos(conn, mundo["id"], IAQueRedacta(), RelojFijo(_hora(9, 10)))
+    enviar_avisos(conn, mundo["id"], IAQueRedacta(), RelojFijo(_hora(14, 10)))
     conn.commit()
     return mundo
 
@@ -67,7 +68,7 @@ def test_el_lector_muestra_turnos_preguntas_esperas_y_avisos(conn, charla):
     assert "jugadas: anotar_prevision {" in turnos and '"fecha": "2026-10-14"' in turnos
     assert '"atraso_dias_habiles": 2' in turnos                     # los hechos
     assert "error: ia_no_respondio: TimeoutError" in turnos
-    assert "Leda → Marcos" in turnos and '"Aviso 2."' in turnos     # el pedido del viernes
+    assert "Leda → Marcos" in turnos and '"Aviso 2."' in turnos     # el pedido del 14
     assert " ms" in turnos
     # Los turnos van en orden: la entrada antes de su respuesta.
     assert turnos.index("hoy arranque") < turnos.index("tocó") < turnos.index("llego el 14")

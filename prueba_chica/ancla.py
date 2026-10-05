@@ -1,0 +1,90 @@
+"""El ancla de la escalera: la fecha desde la que se hace el seguimiento de una tarea.
+
+ADR 0018, decisión 9i (usuario, 2026-10-05); mecánica §9; ADR 0017, decisión 4.
+
+**Con una previsión válida, el seguimiento se mueve a la previsión, sin tocar la fecha
+comprometida.** El ancla es la fecha comprometida (V) o, si la previsión vigente es posterior, la
+fecha prevista (F). La escalera corre sobre el ancla: el día del ancla pide el estado como si
+fuera V y, sin respuesta, sigue el paso a paso hasta escalar. Una previsión más nueva mueve el
+ancla; una que vuelve a la fecha comprometida (o anterior) la devuelve a V. La fecha comprometida
+no cambia por chat: el atraso se sigue contando contra ella y su cambio es del referente, en la
+plataforma.
+
+Cada paso de la escalera lleva el ancla en su clave (cuarta parte): un ancla nueva es una
+escalera nueva, con su propia cuenta, y un paso guardado de otra ancla ya no corresponde al
+salir. Lo comparten la escalera (`escalera.py`), los avisos (`avisos.py`) y la ficha del avance
+(`fichas.py`), por eso vive acá y no importa a ninguno de ellos.
+"""
+
+from __future__ import annotations
+
+from datetime import date, datetime, time
+from typing import Any
+
+# Un avance sin un hecho cierto (`informar_avance`, 9h): el pedido del día hábil siguiente, y el
+# motivo con que quedan atrás los pasos guardados que reemplaza.
+REPREGUNTA_DE_ESTADO = "repregunta_de_estado"
+REEMPLAZADO_POR_UN_AVANCE = "reemplazado_por_un_avance"
+REEMPLAZADO = "reemplazado_por_el_reencuadre"
+# Los pasos que no salieron porque otro los reemplazó: no cuentan como dados.
+NO_DADOS = frozenset({REEMPLAZADO, REEMPLAZADO_POR_UN_AVANCE})
+
+# Los pasos de la escalera de un ancla.
+TIPOS_DE_LA_ESCALERA = ("aviso_previo", "pedido_de_estado", "reencuadre", "escalamiento",
+                        REPREGUNTA_DE_ESTADO)
+# Con el ancla en una previsión, el único aviso del día del vencimiento: un recordatorio que no
+# pide nada (9i). Es de la fecha comprometida, no de la escalera del ancla.
+VENCIMIENTO_CON_PREVISION = "vencimiento_con_prevision"
+
+
+def prevision_vigente(cur, task_id) -> dict[str, Any] | None:
+    """La última previsión de la tarea: la que ninguna otra reemplaza."""
+    cur.execute("""select f.* from task_forecast f
+                    where f.task_id = %s
+                      and not exists (select 1 from task_forecast g where g.reemplaza_id = f.id)
+                    order by f.at desc limit 1""", (str(task_id),))
+    return cur.fetchone()
+
+
+def ancla(cur, task_id, comprometida: date) -> date:
+    """La fecha del seguimiento: la previsión vigente si es posterior a la comprometida; si no,
+    la comprometida."""
+    f = prevision_vigente(cur, task_id)
+    if f is not None and f["fecha_prevista"] > comprometida:
+        return f["fecha_prevista"]
+    return comprometida
+
+
+def fecha_de_la_clave(aviso: dict[str, Any]) -> date:
+    """El ancla de un paso de la escalera, que está en su clave."""
+    return date.fromisoformat(aviso["dedupe_key"].split(":")[3])
+
+
+def al_mediodia(dia: date, zona) -> datetime:
+    """Un momento del día, para contar días hábiles hasta o desde una fecha sin hora."""
+    return datetime.combine(dia, time(12), zona)
+
+
+def pasos(cur, task_id, fecha: date) -> list[dict[str, Any]]:
+    """Los avisos de la escalera de la tarea para un ancla (está en su clave)."""
+    cur.execute("""select * from scheduled_notice
+                    where task_id = %s and tipo = any(%s)
+                      and split_part(dedupe_key, ':', 4) = %s
+                    order by creado_en, dedupe_key""",
+                (str(task_id), list(TIPOS_DE_LA_ESCALERA), fecha.isoformat()))
+    return cur.fetchall()
+
+
+def escalo(escalon: list[dict[str, Any]], espera: dict[str, Any] | None) -> bool:
+    """La escalera de un ancla termina al escalar (mecánica §9): con su aviso de escalamiento o,
+    sin ruta, con la espera escalada. Un escalamiento cuenta sólo si se dio: uno guardado todavía
+    puede quedar reemplazado (por un reencuadre o un avance), y uno reemplazado no salió. La
+    espera cuenta sólo si la abrió esta escalera: la de un ancla anterior, escalada y sin
+    contestar, no frena a la nueva, que empieza de cero."""
+    if any(a["tipo"] == "escalamiento" and a["estado"] != "guardado"
+           and a["motivo_omision"] not in NO_DADOS for a in escalon):
+        return True
+    pedidos = [a for a in escalon if a["tipo"] != "aviso_previo"]
+    if espera is None or espera["escalado_en"] is None or not pedidos:
+        return False
+    return espera["preguntado_en"] >= min(a["creado_en"] for a in pedidos)

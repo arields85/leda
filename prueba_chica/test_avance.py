@@ -194,20 +194,23 @@ def test_a_la_segunda_pregunta_la_fecha_y_con_la_fecha_es_una_prevision(conn, mu
     assert _espera(conn)["satisfecho_en"] is None
     assert [r["estado"] for r in _repreguntas(conn)] == ["enviado", "guardado"]
 
-    con_fecha = _escribe(conn, escribe, "para el miercoles 14 la tengo",
-                         Jugada("anotar_prevision", {"tarea": "T1", "fecha": "2026-10-14"}),
+    con_fecha = _escribe(conn, escribe, "para el martes 20 la tengo",
+                         Jugada("anotar_prevision", {"tarea": "T1", "fecha": "2026-10-20"}),
                          at=_hora(13, 10, 45))
 
     assert con_fecha.hechos[0]["resultado"] == "anotado"
     assert con_fecha.pregunta is None
     assert _espera(conn)["satisfecho_en"] == _hora(13, 10, 45)
     assert _cuantas(conn, "conversation_question", "cerrada_en is null") == 0
-    # El pedido guardado no sale, con su motivo, y la escalera queda detenida.
+    # El pedido guardado no sale, con su motivo, y nada más hasta la previsión (9i).
     for dia in (14, 15, 16, 19):
         assert [p for p in dias.ciclo(_hora(dia, 10)) if p["persona"] == "Marcos"] == []
     assert (_repreguntas(conn)[-1]["estado"], _repreguntas(conn)[-1]["motivo_omision"]) == (
         "omitido", "ya_respondio")
     assert _avisos(conn, "escalamiento") == []
+    # El día de la previsión, el pedido de estado de su escalera.
+    [f] = [p for p in dias.ciclo(_hora(20, 10)) if p["persona"] == "Marcos"]
+    assert (f["hechos"][0]["numero"], f["hechos"][0]["seguimiento_por"]) == (1, "prevision")
 
 
 def test_dos_avances_el_mismo_dia_dejan_un_solo_pedido_para_manana(conn, mundo, dias, escribe):
