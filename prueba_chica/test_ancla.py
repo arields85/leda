@@ -287,3 +287,18 @@ def test_un_paso_guardado_con_la_clave_de_antes_sigue_siendo_de_su_ancla(conn, m
     [pedido] = _avisos(conn, "pedido_de_estado")
     assert pedido["estado"] == "enviado"
     assert _de_marcos(dias.ciclo(_hora(16, 10)))[0]["hechos"][0]["numero"] == 2
+
+
+def test_un_ciclo_que_no_pasa_la_fecha_comprometida_deja_la_escalera_de_siempre():
+    """Un ciclo es el final de la cadena: si sus previsiones no pasan la fecha comprometida,
+    ninguna movió el ancla y la clave es la del vencimiento, no una escalera nueva."""
+    from datetime import date
+
+    from prueba_chica.ancla import anclaje
+
+    cursor = _CursorDeUnaCadena()
+    cursor.a["fecha_prevista"] = cursor.b["fecha_prevista"] = date(2026, 10, 5)
+    _Fila.lecturas = 0
+    de = anclaje(cursor, "tarea", date(2026, 10, 9))
+
+    assert (de.fecha, de.clave, de.legado) == (date(2026, 10, 9), "2026-10-09", None)

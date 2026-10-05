@@ -113,3 +113,23 @@ def test_un_bloqueo_con_la_tarea_vencida_no_lleva_la_pregunta_de_la_fecha(conn, 
 
     assert r.pregunta["tipo"] == "quien_destraba"
     assert _cuantas(conn, "conversation_question", "tipo = %s", FECHA) == 0
+
+
+def test_con_una_prevision_la_tarea_vence_al_pasar_la_prevision(conn, mundo, dias, escribe):
+    """El ancla (9i): pasada la fecha comprometida pero no la prevista, la tarea no está vencida
+    para esta regla; pasada la prevista, sí, y los hechos dicen cuál era la previsión. El atraso
+    se sigue contando contra la fecha comprometida."""
+    _dice(conn, escribe, Jugada("anotar_prevision", {"tarea": "T1", "fecha": "2026-10-14"}),
+          at=_hora(5, 10))
+
+    r = _dice(conn, escribe, Jugada("anotar_inicio", {"tarea": "T1"}), at=_hora(13, 10, 20))
+    assert "vencida" not in r.hechos[0] and r.pregunta is None
+
+    dias.ciclo(_hora(14, 10))                           # el pedido del día de la previsión
+    r = _dice(conn, escribe, Jugada("informar_avance", {"tarea": "T1", "palabras": "voy bien"}),
+              at=_hora(15, 10, 20))
+
+    assert r.hechos[0]["vencida"] == {"fecha_comprometida": "2026-10-09",
+                                      "atraso_dias_habiles": 3,
+                                      "prevision_vencida": "2026-10-14"}
+    assert r.pregunta["tipo"] == FECHA

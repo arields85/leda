@@ -99,6 +99,8 @@ def anclaje(cur, task_id, comprometida: date) -> Anclaje:
         recorridas.add(str(f["id"]))
         inicio = f
         f = cadena.get(str(f["reemplaza_id"])) if f["reemplaza_id"] is not None else None
+    if f is not None and str(f["id"]) in recorridas:
+        f = None            # el ciclo es el final de la cadena: nada antes movió el ancla
     if f is None and fecha == comprometida:
         return Anclaje(fecha, fecha.isoformat())    # ninguna previsión movió el ancla
     return Anclaje(fecha, f"{fecha.isoformat()}{SEPARADOR}{inicio['id']}",
