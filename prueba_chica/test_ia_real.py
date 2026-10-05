@@ -209,6 +209,18 @@ def test_las_instrucciones_describen_las_situaciones_generales():
         assert marcador in INSTRUCCIONES_REDACCION, marcador
 
 
+def test_las_instrucciones_describen_el_avance_sin_algo_cierto():
+    """Decisión del usuario, 2026-10-05: un avance sin un hecho cierto es `informar_avance`,
+    con las palabras de la persona; la redacción no lo cuenta como un hecho cierto. Una
+    descripción de la jugada, sin frases de las conversaciones."""
+    assert "informar_avance" in INSTRUCCIONES_JUGADAS
+    assert "palabras" in INSTRUCCIONES_JUGADAS
+    assert "espera_algo_cierto" in INSTRUCCIONES_REDACCION
+    for texto in (INSTRUCCIONES_JUGADAS, INSTRUCCIONES_REDACCION):
+        for frase in ("casi lista", "voy bien", "todo en orden"):
+            assert frase not in texto.lower(), frase
+
+
 def test_la_redaccion_lee_el_estado_de_lo_que_pasa_despues():
     """Primer contacto real (2026-10-05): un aviso guardado se contó como hecho. La regla es
     de lectura de los hechos, para todo efecto que pasa después, sin frases de ejemplo."""

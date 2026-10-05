@@ -45,7 +45,7 @@ from leda.incidentes import registrar_incidente
 from leda.salida import enqueue_outbox
 
 from . import preguntas
-from .fichas import GUARDADO_SIN_ENVIAR
+from .fichas import GUARDADO_SIN_ENVIAR, REPREGUNTA_DE_ESTADO
 from .ia import IA
 from .tiempo import Reloj
 from .turno import leer_ultimos_turnos, no_vacio, registrar_salida
@@ -230,10 +230,14 @@ def _pregunta_del_aviso(m: Momento, aviso, hechos: dict[str, Any]) -> dict[str, 
 def _abrir_la_pregunta(m: Momento, persona: str, task_id: str, tipo_de_aviso: str) -> None:
     """La pregunta del estado, ordenada con las demás de la persona (`preguntas.abrir`; la
     misma si sigue abierta de un recordatorio anterior), y el recordatorio contado en la
-    espera. No se puede dejar sin efecto: espera respuesta (9b)."""
+    espera. No se puede dejar sin efecto: espera respuesta (9b). Reemplaza a la pregunta de la
+    fecha de la misma tarea, si quedó sin contestar: es el mismo pedido, hecho de nuevo, y un
+    tema a la vez."""
     turno = SimpleNamespace(cur=m.cur, ahora=m.ahora, preguntas_del_turno=[], dejadas=[],
                             quien=SimpleNamespace(workspace_id=m.workspace_id,
                                                   membership_id=persona))
+    preguntas.cerrar_de_tipo(turno, preguntas.FECHA_DE_LA_TAREA, task_id, "sin_efecto",
+                             {"reemplazada_por": tipo_de_aviso})
     preguntas.abrir(turno, ESPERA_DE_ESTADO, task_id, se_puede_dejar=False,
                     jugada={"aviso": tipo_de_aviso})
     # Sólo en la espera de esta escalera, la más nueva: una escalada de un vencimiento anterior
@@ -490,6 +494,8 @@ TIPOS: Mapping[str, TipoDeAviso] = MappingProxyType({t.nombre: t for t in (
     TipoDeAviso("pedido_de_estado", "seguimiento", _vigencia_de_la_escalera),
     TipoDeAviso("reencuadre", "seguimiento", _vigencia_de_la_escalera),
     TipoDeAviso("escalamiento", "prioritario", _vigencia_de_la_escalera, escala=True),
+    # Después de un avance sin un hecho cierto, el pedido del día hábil siguiente.
+    TipoDeAviso(REPREGUNTA_DE_ESTADO, "seguimiento", _vigencia_de_la_escalera),
     # Lo que causa el acto de una persona: llega aunque se haya alcanzado el tope (§10).
     TipoDeAviso("nueva_prevision", "normal", _vigencia_de_la_prevision, es_coordinacion=True),
     TipoDeAviso("correccion_de_prevision", "normal", _vigencia_de_la_prevision,

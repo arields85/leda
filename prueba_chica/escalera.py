@@ -33,6 +33,14 @@ propia escalera de cero, aunque la anterior haya escalado sin respuesta. La fech
 no cambia por chat (ADR 0017, decisión 4): una previsión no empieza otra escalera. Qué sigue
 cuando vence una previsión queda `PENDIENTE` de decisión del usuario.
 
+**Un avance sin un hecho cierto** (`informar_avance`, decisión del usuario, 2026-10-05). La
+escalera escala sólo el silencio: un avance contesta el pedido, aunque no traiga nada cierto, así
+que la cuenta de pedidos sin respuesta empieza de nuevo desde él. La espera sigue abierta, y el
+pedido del día hábil siguiente (`repregunta_de_estado`, que guarda la ficha) es el primero de la
+cuenta nueva: si queda sin respuesta, la escalera sigue desde ahí, un paso por día hábil, y el
+escalamiento dice el último avance. Un paso que no había salido cuando llegó el avance queda
+reemplazado (`REEMPLAZADO_POR_UN_AVANCE`): no cuenta como dado ni como escalamiento.
+
 **Ausencias.** Mientras la persona está ausente (`absence`), su escalera no avanza y lo que
 tenía guardado no le llega. Cuando vuelve de una ausencia que tocó el período de la escalera, en
 lugar del paso que le tocaba recibe un reencuadre (mecánica §9), que reemplaza lo guardado:
@@ -60,15 +68,19 @@ from leda.incidentes import registrar_incidente
 
 from .avisos import (ABIERTOS, ESPERA_DE_ESTADO, Momento, ausente, espera_abierta, guardar,
                      hechos_de_la_escalera, leer_tarea, omitir, quienes_escalan)
+from .fichas import REEMPLAZADO_POR_UN_AVANCE, REPREGUNTA_DE_ESTADO
 from .tiempo import Reloj
 
 ETAPA_ESCALERA = "motor_escalera"
 CLAVE_AVISO_PREVIO = "aviso_previo_dias_habiles"
 MINIMO_DEL_NUCLEO = 1          # mecánica §9: nunca menos de un día hábil entre pasos
 
-TIPOS_DE_LA_ESCALERA = ("aviso_previo", "pedido_de_estado", "reencuadre", "escalamiento")
+TIPOS_DE_LA_ESCALERA = ("aviso_previo", "pedido_de_estado", "reencuadre", "escalamiento",
+                        REPREGUNTA_DE_ESTADO)
 PEDIDOS = 3                     # V, V+1 y V+2; el paso siguiente es el escalamiento
 REEMPLAZADO = "reemplazado_por_el_reencuadre"
+# Los pasos que no salieron porque otro los reemplazó: no cuentan como dados.
+NO_DADOS = frozenset({REEMPLAZADO, REEMPLAZADO_POR_UN_AVANCE})
 # Los motivos de omisión que detienen la escalera de un vencimiento: la persona contestó o se
 # bloqueó la tarea antes de que el paso saliera (9b; mecánica §9). Cualquier otro paso que no
 # llegó (la IA no lo redactó, el destinatario no se podía alcanzar) cuenta como dado y la
@@ -130,6 +142,7 @@ def _un_paso(m: Momento, tarea: dict[str, Any], n: int | None) -> str | None:
     escalon = [a for a in avisos if a["tipo"] != "aviso_previo"]
     espera = espera_abierta(cur, tarea["id"])
 
+    avance = _ultimo_avance(escalon)
     if _ya_escalo(escalon, espera):
         return None                     # la escalera de este vencimiento terminó
     if any(a["estado"] == "omitido" and a["motivo_omision"] in DETIENEN for a in escalon):
@@ -137,7 +150,7 @@ def _un_paso(m: Momento, tarea: dict[str, Any], n: int | None) -> str | None:
     # Los pasos dados: salieron, fallaron o se omitieron por otra cosa. Uno que la IA no
     # redactó ya dejó su incidente y no apaga el seguimiento: la escalera sigue con el próximo.
     dados = sorted((a for a in escalon if a["estado"] != "guardado"
-                    and a["motivo_omision"] != REEMPLAZADO), key=lambda a: a["resuelto_en"])
+                    and a["motivo_omision"] not in NO_DADOS), key=lambda a: a["resuelto_en"])
     ultimo_dado = dados[-1] if dados else None
     if espera is None and any(a["hechos"].get("necesita_respuesta") for a in dados):
         return None                     # contestó: la espera que abrió se cerró
@@ -155,17 +168,21 @@ def _un_paso(m: Momento, tarea: dict[str, Any], n: int | None) -> str | None:
         if -k <= dias and not avisos:
             return _guardar_aviso_previo(m, tarea, vence, configurado=n is not None)
         return None
-    pedidos = [a for a in dados if a["tipo"] == "pedido_de_estado"]
+    # Los pedidos sin respuesta: desde el último avance, si hubo uno (su repregunta es el paso 0).
+    pedidos = [a for a in dados if a["tipo"] in ("pedido_de_estado", REPREGUNTA_DE_ESTADO)
+               and (avance is None or a["creado_en"] >= avance["creado_en"])]
     siguiente = 1 + max((_paso(a) for a in pedidos), default=-1)
     if siguiente > PEDIDOS or k < siguiente:
         return None
     if ultimo_dado and m.cal.habiles_entre(ultimo_dado["resuelto_en"], m.ahora) < 1:
         return None                     # nunca dos pasos el mismo día hábil
     # Un paso que un reencuadre reemplazó vuelve a guardarse con otra clave: la de su ronda.
-    ronda = [f"r{r}" for r in [sum(a["tipo"] == "reencuadre" for a in avisos)] if r]
+    # Los pasos de la cuenta que empieza después de un avance, también: la de sus avances.
+    ronda = [f"a{v}" for v in [sum(a["tipo"] == REPREGUNTA_DE_ESTADO for a in avisos)] if v]
+    ronda += [f"r{r}" for r in [sum(a["tipo"] == "reencuadre" for a in avisos)] if r]
     if siguiente < PEDIDOS:
         return _pedir_el_estado(m, tarea, vence, siguiente, ronda, pedidos)
-    return _escalar(m, tarea, vence, pedidos, ronda)
+    return _escalar(m, tarea, vence, pedidos, ronda, avance)
 
 
 def _ya_escalo(escalon: list[dict[str, Any]], espera: dict[str, Any] | None) -> bool:
@@ -174,11 +191,18 @@ def _ya_escalo(escalon: list[dict[str, Any]], espera: dict[str, Any] | None) -> 
     escalera: la de un vencimiento anterior, escalada y sin contestar, no frena a la nueva,
     que empieza de cero (la fecha comprometida la cambiará la plataforma, ADR 0017,
     decisión 4)."""
-    if any(a["tipo"] == "escalamiento" for a in escalon):
+    if any(a["tipo"] == "escalamiento" and a["motivo_omision"] != REEMPLAZADO_POR_UN_AVANCE
+           for a in escalon):
         return True
     if espera is None or espera["escalado_en"] is None or not escalon:
         return False
     return espera["preguntado_en"] >= min(a["creado_en"] for a in escalon)
+
+
+def _ultimo_avance(escalon: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """El pedido que guardó el último avance sin un hecho cierto, si hubo uno."""
+    avances = [a for a in escalon if a["tipo"] == REPREGUNTA_DE_ESTADO]
+    return max(avances, key=lambda a: a["creado_en"]) if avances else None
 
 
 def _no_llegaron(pedidos: list[dict[str, Any]]) -> int:
@@ -235,7 +259,7 @@ def _pedir_el_estado(m: Momento, tarea, vence: date, paso: int, ronda: list[str]
 
 
 def _escalar(m: Momento, tarea, vence: date, pedidos: list[dict[str, Any]],
-             ronda: list[str]) -> str | None:
+             ronda: list[str], avance: dict[str, Any] | None = None) -> str | None:
     destinos = quienes_escalan(m.cur, tarea)
     if not destinos:
         registrar_incidente(
@@ -255,6 +279,8 @@ def _escalar(m: Momento, tarea, vence: date, pedidos: list[dict[str, Any]],
         base["pedido_desde"] = m.fecha(llegaron[0]["resuelto_en"]).isoformat()
     if _no_llegaron(pedidos):
         base["pedidos_de_estado_que_no_le_llegaron"] = _no_llegaron(pedidos)
+    if avance is not None:      # contestó antes, sin nada cierto: también es un hecho
+        base["avance_sin_algo_cierto"] = avance["hechos"]["avance_anterior"]
     for destino in destinos:
         _guardar(m, "escalamiento", tarea, vence, base, destino["membership_id"], *ronda,
                  destinatario=str(destino["membership_id"]))

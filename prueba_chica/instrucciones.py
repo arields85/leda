@@ -41,6 +41,9 @@ deja para más tarde, dejar_para_despues.
 - Si la persona dice que algo que ya quedó anotado era de otra tarea, o que no pasó, usás \
 corregir: qué jugada se corrige (corrige), en qué tarea quedó (tarea) y, si la dice, en cuál \
 va (tarea_correcta).
+- Si la persona cuenta cómo viene una tarea sin un hecho cierto (no dice que la terminó, ni \
+para cuándo, ni que arrancó, ni que está trabada), usás informar_avance con lo que contó \
+(palabras); nunca lo convertís en uno de esos hechos.
 - Si la persona pide algo que ninguna jugada hace, usás fuera_de_la_lista y resumís en \
 que_pide lo que pidió.
 - Ponés sólo los datos que el mensaje o la conversación dan, con las palabras de la persona; \
@@ -72,6 +75,10 @@ opciones, las nombrás: salen como botones, y también se pueden contestar escri
 un hecho marca como pregunta_para_despues no se pregunta en esta respuesta.
 - Un hecho que no tuvo efecto porque su pregunta ya se había cerrado trae cerrada_con: contás \
 con qué se cerró y que no cambió nada.
+- Un avance anotado es lo que la persona contó, no un hecho cierto: no lo contás como una \
+entrega, una fecha ni un cambio de estado. Un aviso que vuelve a pedir el estado después de \
+un avance trae lo que la persona contó y lo que falta saber (espera_algo_cierto): lo pedís \
+sin reproche.
 - Lo que está dentro de solo_si_pregunta es cierto y lo sabés, pero lo decís sólo si la \
 persona lo pregunta.
 - Si los hechos dicen que el mensaje no necesita respuesta, lo decís.

@@ -52,6 +52,7 @@ DATOS = {
     "no_sabe": ("boolean", "La persona dice que no sabe quién puede destrabarla."),
     "nadie_mas": ("boolean", "La persona dice que nadie más puede destrabarla: le toca a "
                              "ella."),
+    "palabras": ("string", "Lo que la persona contó de cómo viene la tarea, con sus palabras."),
     "a": ("string", "A quién quiere pasarle la tarea, como lo nombró la persona."),
     "opcion": ("string", "El alias de la opción que eligió (O1, O2...), de la pregunta "
                          "abierta."),

@@ -39,6 +39,11 @@ CUAL_TAREA = "cual_tarea"      # la duda: de qué tarea habla (situación genera
 # El estado de una tarea, que Leda pide por su cuenta desde el vencimiento (escalera, 9b): no se
 # puede dejar sin efecto, y la contestan las jugadas que informan un hecho de la tarea.
 ESTADO_DE_LA_TAREA = "estado_de_la_tarea"
+# Para cuándo prevé terminar la tarea: Leda la pregunta directo a la segunda respuesta sin un
+# hecho cierto (`informar_avance`, decisión del usuario, 2026-10-05). Es parte del pedido de
+# estado: no se deja sin efecto, la contestan las jugadas que informan un hecho cierto, y el
+# pedido del estado del día hábil siguiente la reemplaza (`avisos._abrir_la_pregunta`).
+FECHA_DE_LA_TAREA = "fecha_de_la_tarea"
 
 PREFIJO_TOQUE = "m:"           # el `callback_data` de un botón es el prefijo y el token
 _LARGO_ETIQUETA = 80           # `salida.BUTTON_LABEL_LIMIT`

@@ -27,7 +27,7 @@ import json
 import unicodedata
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
 from functools import cached_property
 from types import MappingProxyType
 from typing import Any
@@ -36,6 +36,7 @@ import psycopg
 
 from leda.autoridad import Denegado, Solicitante
 from leda.calendario import Calendario
+from leda.db import registrar_auditoria
 from leda.herramientas import (EstadoCambio, NecesitaConfirmacion, NecesitaElegir,
                                NecesitaOpciones, ejecutar)
 
@@ -113,6 +114,15 @@ SALIDAS_DE_UN_BLOQUEO = ("que_alguien_ayude", "anotar_prevision")
 # real, 2026-10-05: un aviso con sólo `a` y `sale` se contó como enviado.
 GUARDADO_SIN_ENVIAR = "guardado_sin_enviar"     # guardado; sale a la hora de `sale`
 EN_COLA_SIN_ENVIAR = "en_cola_sin_enviar"       # en la cola de su canal; sale enseguida
+
+# Un avance sin un hecho cierto (`informar_avance`, decisión del usuario, 2026-10-05): la espera
+# sigue abierta y Leda vuelve a pedir el estado el día hábil siguiente con este aviso de la
+# escalera (`escalera.py`), que espera algo cierto. Los pasos de la escalera que todavía no
+# salieron quedan reemplazados por él: ya no es silencio.
+REPREGUNTA_DE_ESTADO = "repregunta_de_estado"
+REEMPLAZADO_POR_UN_AVANCE = "reemplazado_por_un_avance"
+ESPERA_ALGO_CIERTO = ("si_la_termino", "para_cuando_la_termina", "si_esta_trabada")
+_PASOS_QUE_REEMPLAZA = ("pedido_de_estado", REPREGUNTA_DE_ESTADO, "escalamiento")
 
 
 # --- Comprobación común --------------------------------------------------------------------
@@ -451,6 +461,88 @@ def integrantes_que_coinciden(cur, dicho: str) -> list[dict[str, Any]]:
     return [f for f in cur.fetchall() if set(buscadas) <= set(palabras(f["nombre"]))]
 
 
+def _informar_avance(ctx: Contexto, datos: dict, tarea: dict) -> dict:
+    """La respuesta a un pedido de estado que cuenta un avance sin un hecho cierto (no dice que
+    la terminó, ni para cuándo, ni que está trabada). Se anota con las palabras de la persona,
+    atribuido y auditado, sin cambiar estado ni fecha; la espera sigue abierta, porque la
+    respuesta no es cierta, y Leda vuelve a pedir el estado el día hábil siguiente. No es
+    silencio: la escalera cuenta sólo los pedidos sin respuesta (`escalera.py`). A la segunda
+    respuesta así para la misma espera, Leda pregunta directo para cuándo (decisión del
+    usuario, 2026-10-05)."""
+    cur, cal, persona = ctx.cur, ctx.calendario, ctx.quien.membership_id
+    dijo = str(datos["palabras"]).strip() if not _vacio(datos.get("palabras")) \
+        else ctx.texto.strip()
+    if not dijo:
+        return {"resultado": "falta_dato", "falta": ["palabras"], "tarea": _tarea(tarea)}
+    cur.execute("""select 1 from pending_reply
+                    where membership_id = %s and task_id = %s and tipo = %s
+                      and satisfecho_en is null
+                   union all
+                   select 1 from conversation_question
+                    where membership_id = %s and task_id = %s and tipo = any(%s)
+                      and cerrada_en is null
+                   limit 1""",
+                (persona, tarea["id"], preguntas.ESTADO_DE_LA_TAREA, persona, tarea["id"],
+                 [preguntas.ESTADO_DE_LA_TAREA, preguntas.FECHA_DE_LA_TAREA]))
+    if cur.fetchone() is None:
+        return {"resultado": "no_se_puede", "motivo": "nadie_pidio_el_estado",
+                "tarea": _tarea(tarea)}
+
+    registrar_auditoria(cur, accion="informar_avance", workspace_id=ctx.quien.workspace_id,
+                        actor_app_user_id=ctx.quien.app_user_id, actor_kind="persona",
+                        sujeto_tipo="task", sujeto_id=tarea["id"],
+                        detalle={"dijo": dijo, "dicho_por_membership_id": persona,
+                                 "at": ctx.ahora.isoformat(),
+                                 "inbound_message_id": ctx.entrante_id})
+    hecho: dict[str, Any] = {"resultado": "anotado", "tarea": _tarea(tarea),
+                             "avance": {"dijo": dijo}, "el_pedido_de_estado": "sigue_abierto"}
+    fila = _exigir_responsable(cur, ctx.quien, tarea["id"])
+    if fila["fecha_objetivo"] is None:
+        return hecho                    # sin vencimiento no hay escalera que vuelva a pedir
+    vence = fila["fecha_objetivo"].astimezone(cal.zona).date()
+
+    # Los pasos de la escalera de este vencimiento que todavía no salieron ya no corresponden:
+    # la persona contestó. Los reemplaza el pedido del día hábil siguiente.
+    cur.execute("""select id, tipo, estado from scheduled_notice
+                    where task_id = %s and tipo = any(%s)
+                      and split_part(dedupe_key, ':', 4) = %s""",
+                (tarea["id"], list(_PASOS_QUE_REEMPLAZA), vence.isoformat()))
+    pasos = cur.fetchall()
+    cur.execute("""update scheduled_notice
+                      set estado = 'omitido', motivo_omision = %s, resuelto_en = %s,
+                          proximo_intento_en = null
+                    where id = any(%s) and estado = 'guardado'""",
+                (REEMPLAZADO_POR_UN_AVANCE, ctx.ahora,
+                 [p["id"] for p in pasos if p["estado"] == "guardado"]))
+    veces = 1 + sum(p["tipo"] == REPREGUNTA_DE_ESTADO for p in pasos)
+    hoy = ctx.ahora.astimezone(cal.zona).date()
+    sale = cal.dentro_de_jornada(datetime.combine(
+        cal.proximo_habil(hoy + timedelta(days=1)), cal.hora_inicio, tzinfo=cal.zona))
+    # Lo manda Leda por su cuenta, como los demás pasos de la escalera: sin turno que lo cause.
+    cur.execute(
+        """insert into scheduled_notice (workspace_id, tipo, task_id,
+                                         destinatario_membership_id, hechos, programado_para,
+                                         dedupe_key, creado_en)
+           values (%s, %s, %s, %s, %s, %s, %s, %s)""",
+        (ctx.quien.workspace_id, REPREGUNTA_DE_ESTADO, tarea["id"], persona,
+         json.dumps({"aviso": REPREGUNTA_DE_ESTADO, "necesita_respuesta": True,
+                     "avance_anterior": {"dijo": dijo, "el": hoy.isoformat()},
+                     "espera_algo_cierto": list(ESPERA_ALGO_CIERTO),
+                     "tarea": tarea["titulo"], "vence": vence.isoformat()},
+                    ensure_ascii=False),
+         sale, f"motor:{REPREGUNTA_DE_ESTADO}:{tarea['id']}:{vence.isoformat()}:0:a{veces}",
+         ctx.ahora))
+    hecho.update(vuelve_a_pedir_el_estado={"estado": GUARDADO_SIN_ENVIAR,
+                                           "sale": sale.isoformat()},
+                 veces_sin_algo_cierto=veces)
+    if veces > 1:
+        clave = _abrir_pregunta(ctx, preguntas.FECHA_DE_LA_TAREA, tarea["id"],
+                                se_puede_dejar=False,
+                                jugada={"nombre": "informar_avance", "datos": datos})
+        hecho[clave] = preguntas.FECHA_DE_LA_TAREA
+    return hecho
+
+
 def _consultar_pendientes(ctx: Contexto, datos: dict, tarea: dict | None) -> dict:
     filas = ejecutar(ctx.cur, ctx.quien, "consultar_tareas", {})
     alias = {t["id"]: t["alias"] for t in ctx.tareas}
@@ -637,7 +729,8 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
           hace="la pasa a en curso (actualizar_estado)",
           despues="cierra la espera de esa tarea",
           manejar=_anotar_inicio, del_responsable=True,
-          estados=frozenset({"asignada"}), contesta=(preguntas.ESTADO_DE_LA_TAREA,),
+          estados=frozenset({"asignada"}),
+          contesta=(preguntas.ESTADO_DE_LA_TAREA, preguntas.FECHA_DE_LA_TAREA),
           deshacer=_deshacer_inicio),
     Ficha("anotar_prevision", "anotar para cuándo prevé terminar una tarea, y por qué",
           necesita=("tarea", "fecha"), opcional=("motivo",),
@@ -648,7 +741,8 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
           despues="guarda el aviso al referente, salvo que vuelva a la fecha comprometida; "
                   "cierra la espera de esa tarea",
           manejar=_anotar_prevision, del_responsable=True,
-          contesta=(preguntas.ESTADO_DE_LA_TAREA,), deshacer=_deshacer_prevision),
+          contesta=(preguntas.ESTADO_DE_LA_TAREA, preguntas.FECHA_DE_LA_TAREA),
+          deshacer=_deshacer_prevision),
     Ficha("anotar_bloqueo", "anotar que una tarea está trabada y por qué",
           necesita=("tarea",), opcional=("causa",),
           comprueba="que sea el responsable y que la tarea esté abierta",
@@ -656,7 +750,8 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
           despues="sin causa, pregunta la causa; con causa, pregunta quién lo puede "
                   "destrabar. Ningún aviso al referente (9c)",
           manejar=_anotar_bloqueo, del_responsable=True,
-          contesta=("causa_del_bloqueo", preguntas.ESTADO_DE_LA_TAREA),
+          contesta=("causa_del_bloqueo", preguntas.ESTADO_DE_LA_TAREA,
+                    preguntas.FECHA_DE_LA_TAREA),
           deshacer=_deshacer_bloqueo),
     Ficha("anotar_quien_destraba", "anotar quién puede destrabar un bloqueo",
           necesita=(), opcional=("tarea", "quien", "no_sabe", "nadie_mas"),
@@ -667,6 +762,18 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
                   "salidas",
           manejar=_anotar_quien_destraba,
           contesta=("quien_destraba", preguntas.ESTADO_DE_LA_TAREA)),
+    Ficha("informar_avance", "anotar cómo viene una tarea cuando la persona cuenta un avance "
+                             "sin un hecho cierto",
+          necesita=("tarea",), opcional=("palabras",),
+          comprueba="que sea el responsable, que la tarea esté abierta y que Leda le haya "
+                    "pedido el estado (una espera o una pregunta abierta)",
+          hace="anota el avance con las palabras de la persona, atribuido y auditado; no "
+               "cambia el estado ni la fecha",
+          despues="la espera sigue abierta y Leda vuelve a pedir el estado el día hábil "
+                  "siguiente, sin contarlo como silencio; a la segunda respuesta sin nada "
+                  "cierto, pregunta para cuándo",
+          manejar=_informar_avance, del_responsable=True,
+          contesta=(preguntas.ESTADO_DE_LA_TAREA,)),
     Ficha("consultar_pendientes", "contar qué tareas tiene pendientes",
           necesita=(), opcional=(),
           comprueba="nada", hace="lee sus tareas abiertas (consultar_tareas)",
