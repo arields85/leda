@@ -431,6 +431,26 @@ breve.
   administrador: es una exclusión deliberada, como la entrega. Si el motivo es que no llega a
   tiempo, ofrece anotar una nueva previsión.
 
+#### 9h. Un avance sin un hecho cierto (usuario, 2026-10-05)
+
+Una jugada nueva, decidida por el usuario y escrita primero como la conversación de prueba 15
+(`tests/conversaciones/15-avance-vago.md`): `informar_avance`, la respuesta a un pedido de estado
+que cuenta un avance sin nada cierto ("voy bien, la tengo casi lista"). En palabras del usuario:
+casi lista no es lo mismo que terminé; es una respuesta ambigua y no puede quedar así.
+
+- **Leda la anota con las palabras de la persona**, atribuida y auditada, sin cambiar el estado
+  ni la fecha.
+- **La espera sigue abierta**, porque la respuesta no es cierta, y **el día hábil siguiente Leda
+  vuelve a pedir el estado**, esperando algo cierto: que la terminó, para cuándo o que está
+  trabada. La respuesta lo dice como algo que todavía no pasó.
+- **No es silencio.** La escalera escala sólo a quien no contesta: un avance contesta el pedido,
+  así que la cuenta de pedidos sin respuesta empieza de nuevo y el pedido siguiente no avisa que
+  se va a escalar. Si ese pedido queda sin respuesta, sí cuenta, y la escalera sigue desde ahí.
+- **Si vuelve a contestar sin nada cierto**, Leda le pregunta directamente para cuándo, en esa
+  misma respuesta (una sola pregunta).
+- Lo demás no cambia: una fecha es la nueva previsión; "ya la terminé", la entrega, que la prueba
+  chica reconoce y todavía no recibe (9g); "estoy trabado", el bloqueo (9c).
+
 ## Consecuencias
 
 - **Decisión 1:** cada jugada de la lista y cada situación general se declaran y se prueban una

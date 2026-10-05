@@ -73,6 +73,7 @@ herramienta en ningún proveedor, así que se trae la llamada estructurada de la
 | `anotar_bloqueo` (tarea, causa) | responsable; tarea abierta | sin causa, pregunta; con causa, `registrar_bloqueo` | con causa, siempre pregunta quién lo puede destrabar (9c, corregida el 2026-10-05) |
 | `anotar_quien_destraba` (integrante, alguien de afuera, "no sabe" o "nadie más") | bloqueo abierto | hecho de quién destraba | cierra la espera; sin otra persona que destrabe, propone salidas |
 | `consultar_pendientes` | nada | lee con `consultar_tareas` | nada |
+| `informar_avance` (tarea, palabras), desde el 2026-10-05 | responsable; tarea abierta; un pedido de estado abierto | hecho de avance con sus palabras, auditado; ni estado ni fecha | la espera sigue abierta; vuelve a pedir el estado el día hábil siguiente sin contarlo como silencio; a la segunda, pregunta para cuándo |
 | `entregar`, `pedir_reasignacion` | nada | sin efecto; hechos de qué no se puede y quién lo decide | sin aviso al administrador (9g) |
 | `elegir`, `corregir`, `cancelar`, `dejar_para_despues` | las de su situación general | | |
 
@@ -333,6 +334,13 @@ su evidencia son las corridas. Unas 400 líneas por tarea es una guía, no un to
       prueba con base, reloj y transportes falsos. `PENDIENTE`: qué sigue cuando vence una previsión
       (la fecha comprometida no cambia por chat, así que una previsión no empieza otra escalera);
       `AGENTS.md` todavía dice que `restriccion_horario` no admite `leda_motor`.
+- [x] **Agregado antes de la E2-7: `informar_avance`** (decisión del usuario, 2026-10-05; ADR 0018, 9h;
+      conversación 15). El avance queda en el registro de turnos, en `audit_log` (`accion =
+      'informar_avance'`) y en los hechos del pedido siguiente (`repregunta_de_estado`); sin tablas
+      nuevas. Evidencia: `pytest prueba_chica` en rojo (`10 failed, 216 passed`) y en verde (`226
+      passed in 79.24s`). Commits `27f517d` y `bafdf64`; lo registra el commit que sigue. La E2-7 corre
+      15 conversaciones. `PENDIENTE`: un avance después de escalar recibe el pedido siguiente, pero
+      la escalera de ese vencimiento ya terminó.
 - [ ] **E2-7. Corredor** (delegada): los 14 YAML, base por corrida, reloj, comprobaciones, reporte, luna y Jev.
       Unas 650.
 - [ ] **E2-8. Primera ronda real:** sol, luna y Jev; lectura de textos; bitácora; chequeo de rumbo contra 5c.
