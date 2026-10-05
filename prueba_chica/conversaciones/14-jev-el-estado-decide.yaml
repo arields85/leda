@@ -1,0 +1,73 @@
+# Copia comprobable de la conversación: la fuente es el .md. Formato: prueba_chica/corredor.py.
+fuente: tests/conversaciones/14-jev-el-estado-decide.md
+numero: "14"
+titulo: "Jev: dos tareas parecidas, y el estado dice cuál"
+mide: jev
+persona: Marcos
+inicio: "2026-10-20 09:00"
+
+tareas:
+  PLC:
+    titulo: Programar PLC de la comprimidora
+    responsable: Marcos
+    vence: "2026-10-23"
+    estado: asignada
+  COM:
+    titulo: Revisar comunicaciones industriales de la comprimidora
+    responsable: Marcos
+    vence: "2026-10-30"
+    estado: asignada
+
+pasos:
+  - paso: 1
+    quien: Leda
+    relojes: ["2026-10-20 10:00"]
+    salen:
+      - a: Marcos
+        tipo: aviso_previo
+        tarea: PLC
+        hechos: {vence: "2026-10-23", necesita_respuesta: false}
+    estado_despues:
+      ultimo_aviso: {Marcos: PLC}
+    dice:
+      - la tarea del PLC
+      - que vence el viernes 23
+      - que no hace falta contestar
+    no_dice:
+      - la tarea de comunicaciones
+
+  - paso: 2
+    quien: Marcos
+    a_las: "2026-10-20 10:45"
+    escribe: "dale, ya arranque con la de la comprimidora"
+    jugadas:
+      - {nombre: anotar_inicio, tarea: PLC}
+    efectos:
+      estados: {PLC: en_curso}
+    hechos:
+      - {jugada: anotar_inicio, resultado: anotado, tarea: PLC}
+    pregunta: null
+    estado_despues:
+      pregunta_abierta: null
+    jev: {referencia: "la de la comprimidora", correcta: PLC}
+    dice:
+      - que quedó anotado el inicio de la tarea del PLC, nombrándola
+
+  - paso: 3
+    quien: Marcos
+    a_las: "2026-10-20 15:00"
+    escribe: "y la otra de la comprimidora tambien la empece"
+    jugadas:
+      - {nombre: anotar_inicio, tarea: COM}
+    efectos:
+      estados: {COM: en_curso}
+    hechos:
+      - {jugada: anotar_inicio, resultado: anotado, tarea: COM}
+    pregunta: null
+    estado_despues:
+      pregunta_abierta: null
+    jev: {referencia: "la otra de la comprimidora", correcta: COM}
+    dice:
+      - que quedó anotado el inicio de la tarea de comunicaciones
+    no_dice:
+      - que la del PLC se volvió a arrancar

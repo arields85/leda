@@ -1,0 +1,80 @@
+# Copia comprobable de la conversación: la fuente es el .md. Formato: prueba_chica/corredor.py.
+fuente: tests/conversaciones/13-jev-dos-tareas-iguales.md
+numero: "13"
+titulo: "Jev: dos tareas parecidas avisadas juntas"
+mide: jev
+persona: Marcos
+inicio: "2026-10-20 09:00"
+# La tarea de Ariel vence el mismo día y Ariel recibe su propio aviso previo: el .md sólo sigue
+# lo que le llega a Marcos.
+foco: [PLC, COM]
+
+tareas:
+  PLC:
+    titulo: Programar PLC de la comprimidora
+    responsable: Marcos
+    vence: "2026-10-23"
+    estado: asignada
+  COM:
+    titulo: Revisar comunicaciones industriales de la comprimidora
+    responsable: Marcos
+    vence: "2026-10-23"
+    estado: asignada
+  ARI:
+    titulo: Integrar datos de la comprimidora en CoreLabs
+    responsable: Ariel
+    vence: "2026-10-23"
+    estado: asignada
+
+pasos:
+  - paso: 1
+    quien: Leda
+    relojes: ["2026-10-20 10:00"]
+    # Un solo aviso previo con las dos tareas (mecánica §10: los mensajes automáticos del día a
+    # una persona se juntan en un envío).
+    salen:
+      - a: Marcos
+        tipo: aviso_previo
+        tareas: [PLC, COM]
+    dice:
+      - las dos tareas de Marcos
+      - que vencen el viernes 23
+      - que no hace falta contestar
+    no_dice:
+      - la tarea de Ariel
+
+  - paso: 2
+    quien: Marcos
+    a_las: "2026-10-20 10:30"
+    escribe: "arranque con la de la comprimidora"
+    jugadas:
+      - {nombre: anotar_inicio}
+    efectos: {}
+    hechos:
+      - {jugada: anotar_inicio, resultado: falta_dato, falta: [tarea], pregunta: cual_tarea}
+    pregunta: {tipo: cual_tarea}
+    botones: [PLC, COM]
+    estado_despues:
+      pregunta_abierta: {tipo: cual_tarea}
+    jev: {referencia: "la de la comprimidora", correcta: preguntar}
+    dice:
+      - una pregunta por cuál de las dos
+    no_dice:
+      - un inicio anotado en cualquiera de ellas
+
+  - paso: 3
+    quien: Marcos
+    a_las: "2026-10-20 10:32"
+    escribe: "la del plc"
+    jugadas:
+      - {nombre: elegir, opcion: PLC}
+    efectos:
+      estados: {PLC: en_curso}
+    hechos:
+      - {jugada: anotar_inicio, resultado: anotado, tarea: PLC}
+    pregunta: null
+    estado_despues:
+      pregunta_abierta: null
+    jev: {referencia: "la del plc", correcta: PLC}
+    dice:
+      - que quedó anotado el inicio de la tarea del PLC

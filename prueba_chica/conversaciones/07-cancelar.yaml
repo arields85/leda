@@ -1,0 +1,91 @@
+# Copia comprobable de la conversación: la fuente es el .md. Formato: prueba_chica/corredor.py.
+fuente: tests/conversaciones/07-cancelar.md
+numero: "07"
+titulo: "Dejá, no importa"
+mide: garantias
+persona: Marcos
+inicio: "2026-10-20 09:00"
+
+tareas:
+  PLC:
+    titulo: Programar PLC de la comprimidora
+    responsable: Marcos
+    vence: "2026-10-23"
+    estado: en_curso
+    desde: "2026-10-19"
+  COM:
+    titulo: Revisar comunicaciones industriales de la comprimidora
+    responsable: Marcos
+    vence: "2026-10-30"
+    estado: asignada
+
+pasos:
+  - paso: 1
+    quien: Leda
+    relojes: ["2026-10-20 10:00"]
+    salen:
+      - a: Marcos
+        tipo: aviso_previo
+        tarea: PLC
+        hechos: {vence: "2026-10-23", necesita_respuesta: false}
+    estado_despues:
+      ultimo_aviso: {Marcos: PLC}
+    dice:
+      - la tarea del PLC
+      - que vence el viernes 23
+      - que no hace falta contestar
+
+  - paso: 2
+    quien: Marcos
+    a_las: "2026-10-20 11:30"
+    escribe: "estoy medio trabado con esto"
+    jugadas:
+      - {nombre: anotar_bloqueo, tarea: PLC}
+    efectos: {}
+    hechos:
+      - {jugada: anotar_bloqueo, resultado: falta_dato, falta: [causa], tarea: PLC,
+         pregunta: causa_del_bloqueo}
+    pregunta: {tipo: causa_del_bloqueo, tarea: PLC}
+    estado_despues:
+      pregunta_abierta: {tipo: causa_del_bloqueo, tarea: PLC}
+    dice:
+      - una pregunta por lo único que falta, la causa
+    no_dice:
+      - que el bloqueo quedó anotado
+      - nada que suene a reproche
+
+  - paso: 3
+    quien: Marcos
+    a_las: "2026-10-20 11:34"
+    escribe: "dejá, no importa"
+    jugadas:
+      - {nombre: cancelar}
+    efectos: {}
+    hechos:
+      - {jugada: cancelar, resultado: cancelado, no_se_anoto_nada: true}
+    pregunta: null
+    estado_despues:
+      pregunta_abierta: null
+      para_despues: []
+    dice:
+      - que no quedó nada anotado
+      - un próximo paso (que puede avisar si se traba)
+    no_dice:
+      - otra vez la pregunta por la causa
+      - un juicio sobre la decisión
+
+  - paso: 4
+    quien: Leda
+    relojes: ["2026-10-20 16:00", "2026-10-21 10:00", "2026-10-22 10:00", "2026-10-23 10:00"]
+    salen:
+      - a: Marcos
+        el: "2026-10-23"
+        tipo: pedido_de_estado
+        tarea: PLC
+        hechos: {numero: 1, necesita_respuesta: true, estado: en_curso}
+    dice:
+      - que la tarea del PLC vence hoy
+      - pide el estado
+    no_dice:
+      - que Marcos está trabado
+      - nada que retome el tema cancelado

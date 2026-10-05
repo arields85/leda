@@ -1,0 +1,131 @@
+# Copia comprobable de la conversación: la fuente es el .md. Formato: prueba_chica/corredor.py.
+# Sólo los pasos 1 a 5: la parte "Para la prueba de la entrega" no corre en la prueba chica.
+fuente: tests/conversaciones/11-algo-vencido.md
+numero: "11"
+titulo: "Algo vencido"
+mide: garantias
+persona: Marcos
+inicio: "2026-10-21 09:00"
+
+tareas:
+  PLC:
+    titulo: Programar PLC de la comprimidora
+    responsable: Marcos
+    vence: "2026-10-30"
+    estado: asignada
+  COM:
+    titulo: Revisar comunicaciones industriales de la comprimidora
+    responsable: Marcos
+    vence: "2026-10-30"
+    estado: asignada
+
+# Lo que ya pasó ayer (estado inicial del .md): Marcos escribió que arrancó una de las dos, Leda
+# le preguntó cuál con las dos como botones, y Marcos contestó escribiendo "la del plc". Corre
+# por el motor; los textos de Leda los redacta la IA de la corrida.
+preludio:
+  - quien: Marcos
+    a_las: "2026-10-21 11:00"
+    escribe: "arranque una de las dos"
+    jugadas:
+      - {nombre: anotar_inicio}
+  - quien: Marcos
+    a_las: "2026-10-21 11:02"
+    escribe: "la del plc"
+    jugadas:
+      - {nombre: elegir, opcion: PLC}
+
+pasos:
+  - paso: 1
+    quien: Marcos
+    a_las: "2026-10-22 09:15"
+    toca: COM
+    efectos: {}
+    hechos:
+      - {jugada: elegir, resultado: sin_efecto, motivo: pregunta_cerrada,
+         cerrada_con: {tarea: PLC}}
+    pregunta: null
+    estado_despues:
+      pregunta_abierta: null
+    dice:
+      - que esa pregunta ya se contestó ayer con la tarea del PLC
+      - que no se cambió nada
+      - un próximo paso (puede decir qué quería sobre la de comunicaciones)
+    no_dice:
+      - que arrancó la de comunicaciones
+      - nada técnico sobre botones
+
+  - paso: 2
+    quien: Marcos
+    a_las: "2026-10-22 09:17"
+    escribe: "ah no, era para decirte q esa tambien la arranque hoy"
+    jugadas:
+      - {nombre: anotar_inicio, tarea: COM}
+    efectos:
+      estados: {COM: en_curso}
+    hechos:
+      - {jugada: anotar_inicio, resultado: anotado, tarea: COM}
+    pregunta: null
+    estado_despues:
+      pregunta_abierta: null
+    dice:
+      - que quedó anotado el inicio de la tarea de comunicaciones
+
+  - paso: 3
+    quien: Marcos
+    a_las: "2026-10-22 17:20"
+    escribe: "y lo de comunicaciones se me va al 4, espero el switch"
+    jugadas:
+      - {nombre: anotar_prevision, tarea: COM, fecha: "2026-11-04", motivo: "espero el switch"}
+    efectos:
+      previsiones: [{tarea: COM, fecha: "2026-11-04", motivo: presente}]
+      avisos_guardados:
+        - tipo: nueva_prevision
+          tarea: COM
+          a: Ismael
+          estado: guardado
+          hechos: {prevision: "2026-11-04", fecha_comprometida: "2026-10-30",
+                   atraso_dias_habiles: 3}
+    hechos:
+      - jugada: anotar_prevision
+        resultado: anotado
+        tarea: COM
+        prevision: "2026-11-04"
+        aviso_al_referente: {a: Ismael Soschinski, estado: guardado_sin_enviar,
+                             sale: "~2026-10-23T09:00"}
+    pregunta: null
+    dice:
+      - que quedó anotada la previsión del 4
+      - que Ismael se va a enterar a las 09:00 del viernes, el horario del equipo
+    no_dice:
+      - que Ismael ya se enteró
+
+  - paso: 4
+    quien: Marcos
+    a_las: "2026-10-23 08:30"
+    escribe: "olvidate lo del 4, llego el switch, la termino para el 30"
+    jugadas:
+      - {nombre: anotar_prevision, tarea: COM, fecha: "2026-10-30", puede_traer: [motivo]}
+    efectos:
+      previsiones: [{tarea: COM, fecha: "2026-10-30"}]
+    hechos:
+      - {jugada: anotar_prevision, resultado: anotado, tarea: COM, prevision: "2026-10-30",
+         sin_aviso: misma_fecha_comprometida}
+    pregunta: null
+    estado_avisos:
+      - {tipo: nueva_prevision, tarea: COM, a: Ismael, estado: omitido}
+    dice:
+      - que la previsión del 4 quedó sin efecto y que la vigente es el viernes 30
+    no_dice:
+      - que Ismael se enteró de lo del 4
+
+  - paso: 5
+    quien: Leda
+    relojes: ["2026-10-23 09:00", "2026-10-23 10:00"]
+    salen: []
+    estado_avisos:
+      - {tipo: nueva_prevision, tarea: COM, a: Ismael, estado: omitido, motivo: presente}
+    estado_despues:
+      de: Ismael
+      pregunta_abierta: null
+    dice:
+      - "nada a Ismael: ni el aviso del 4 ni uno de que volvió al 30"

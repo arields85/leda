@@ -1,0 +1,153 @@
+# Copia comprobable de la conversación: la fuente es el .md. Formato: prueba_chica/corredor.py.
+fuente: tests/conversaciones/12-fuera-de-la-lista.md
+numero: "12"
+titulo: "Algo que no está en la lista"
+mide: garantias
+persona: Marcos
+inicio: "2026-10-20 09:00"
+
+tareas:
+  PLC:
+    titulo: Programar PLC de la comprimidora
+    responsable: Marcos
+    vence: "2026-10-23"
+    estado: en_curso
+    desde: "2026-10-19"
+  COM:
+    titulo: Revisar comunicaciones industriales de la comprimidora
+    responsable: Marcos
+    vence: "2026-10-30"
+    estado: asignada
+
+pasos:
+  - paso: 1
+    quien: Leda
+    relojes: ["2026-10-20 10:00"]
+    salen:
+      - a: Marcos
+        tipo: aviso_previo
+        tarea: PLC
+        hechos: {vence: "2026-10-23", necesita_respuesta: false}
+    estado_despues:
+      ultimo_aviso: {Marcos: PLC}
+    dice:
+      - la tarea del PLC
+      - que vence el viernes 23
+      - que no hace falta contestar
+
+  - paso: 2
+    quien: Marcos
+    a_las: "2026-10-20 10:10"
+    escribe: "uh justo, me la podes pasar a nahuel? estoy tapado con lo de la paila"
+    # "Ninguna de la lista" de las ocho cosas por chat: en la lista cerrada es la jugada que se
+    # reconoce y no se hace (plan, sección 4).
+    jugadas:
+      - {nombre: pedir_reasignacion, tarea: PLC, a: nahuel}
+    efectos: {}
+    hechos:
+      - {jugada: pedir_reasignacion, resultado: no_por_chat, quien_decide: Ismael Soschinski,
+         alternativa: anotar_prevision, tarea: PLC}
+    pregunta: null
+    estado_despues:
+      # Tema abierto: la nueva previsión ofrecida, a la espera de lo que Marcos diga.
+      pregunta_abierta: {tarea: PLC}
+    dice:
+      - que eso no lo puede hacer
+      - que lo decide Ismael
+      - como el motivo es que no llega con el tiempo, ofrece anotar una nueva previsión
+    no_dice:
+      - que la tarea pasó a Nahuel
+      - que le avisó a Nahuel o a Ismael
+      - que le va a pasar el pedido a Ismael
+      - '"consultá con la administración" sin una persona'
+      - nombres de jugadas o herramientas
+
+  - paso: 3
+    quien: Marcos
+    a_las: "2026-10-20 10:12"
+    escribe: "no, la saco igual. ya la arranque eh"
+    jugadas:
+      - {nombre: cancelar}
+      - {nombre: anotar_inicio, tarea: PLC}
+    efectos: {}
+    hechos:
+      - {jugada: cancelar}
+      - {jugada: anotar_inicio, resultado: no_se_puede, motivo: estado, estado: en_curso}
+    pregunta: null
+    estado_despues:
+      pregunta_abierta: null
+    dice:
+      - que no anota ninguna previsión
+      - que la tarea del PLC ya figura en curso desde el lunes 19
+    no_dice:
+      - que anotó un inicio nuevo
+      - otra vez el ofrecimiento
+
+  - paso: 4
+    quien: Marcos
+    a_las: "2026-10-20 10:15"
+    escribe: "otra cosa, me recordas el viernes q tengo turno con el medico?"
+    jugadas:
+      - {nombre: fuera_de_la_lista, que_pide: "que le recuerde el viernes un turno con el médico"}
+    efectos:
+      avisos_al_administrador: 1
+    hechos:
+      - {resultado: fuera_de_la_lista, lo_que_puede_hacer: presente}
+    pregunta: null
+    dice:
+      - que eso no lo puede hacer
+      - "qué puede hacer por chat con sus tareas: anotar que arrancó, una fecha nueva o un bloqueo, y contarle qué tiene pendiente"
+    no_dice:
+      - que le avisó al administrador
+      - que se lo va a recordar
+      - nombres de jugadas o herramientas
+      - el nombre de alguien (nadie se ocupa de esto en los datos)
+
+  - paso: 5
+    quien: Marcos
+    a_las: "2026-10-20 10:16"
+    escribe: "y eso le avisaste a alguien?"
+    jugadas: []
+    efectos: {}
+    pregunta: null
+    dice:
+      - "con honestidad: que se le informó al administrador para que lo analice"
+    no_dice:
+      - que alguien se lo va a recordar
+      - nada más allá de eso
+
+  - paso: 6
+    quien: Marcos
+    a_las: "2026-10-20 16:00"
+    escribe: "listo, ya la termine a la del plc"
+    jugadas:
+      - {nombre: entregar, tarea: PLC}
+    efectos: {}
+    hechos:
+      - {jugada: entregar, resultado: no_por_chat, tarea: PLC}
+    pregunta: null
+    dice:
+      - "con honestidad: que todavía no puede recibir la entrega por acá"
+    no_dice:
+      - que la tarea quedó entregada, en revisión o terminada
+      - que le avisó a Ismael
+
+  - paso: 7
+    quien: Marcos
+    a_las: "2026-10-20 16:02"
+    escribe: "y que mas tengo pendiente?"
+    jugadas:
+      - {nombre: consultar_pendientes}
+    efectos: {}
+    hechos:
+      - jugada: consultar_pendientes
+        resultado: leido
+        tareas:
+          - {titulo: PLC, estado: en_curso, vence: "2026-10-23"}
+          - {titulo: COM, estado: asignada, vence: "2026-10-30"}
+    pregunta: null
+    dice:
+      - "sus dos tareas, con su estado y su fecha: la del PLC en curso, que vence el viernes 23; la de comunicaciones asignada, que vence el viernes 30"
+    no_dice:
+      - tareas de otras personas
+      - la del PLC como entregada

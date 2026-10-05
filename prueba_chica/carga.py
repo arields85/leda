@@ -1,0 +1,185 @@
+"""El estado inicial de cada conversación de prueba, escrito en una base efímera (E2-7).
+
+`odd/tasks/prueba-chica-del-motor.md`, secciones 5 ("Estado inicial") y 6. `sembrar` no sirve:
+carga todo a diez días y rechaza un espacio con tareas. Esto escribe, como `admin`, exactamente
+lo que cada conversación da por hecho (`tests/conversaciones/README.md`, "Formato"):
+
+- **el espacio**, CoreWork en chico y con sus datos de verdad para el seguimiento: el horario
+  (lunes a viernes, 09:00 a 17:00, sin feriados en el período de referencia), el aviso previo a
+  tres días hábiles, la falta de respuesta escalada a Dirección y el tono del pack;
+- **las personas** de `espacios/corework.yaml` que nombran las conversaciones, con quién aprueba
+  el trabajo de cada una (Ismael aprueba el de Marcos), y un administrador de plataforma con el
+  bot de administración alcanzable;
+- **las tareas** de la conversación: título, responsable, vencimiento (17:00 del día, el fin de
+  la jornada), estado (un inicio, como el evento del día que dice) y dependencias.
+
+Lo que pasó antes en la conversación (avisos ya enviados, una pregunta ya contestada) no se
+escribe a mano: lo corre el motor mismo como **preludio** (`corredor.py`), así queda igual que
+si hubiera pasado. El saludo del día se apaga, como en las pruebas: si no, el despachador lo
+antepone y cada texto cambia.
+"""
+
+from __future__ import annotations
+
+import json
+from dataclasses import dataclass, field
+from datetime import date, datetime, time
+from typing import Any
+from zoneinfo import ZoneInfo
+
+from leda.db import admin
+
+ZONA = ZoneInfo("America/Argentina/Buenos_Aires")
+FIN_DE_JORNADA = time(17, 0)
+
+# Las personas de `espacios/corework.yaml` que nombran las conversaciones: nombre, rol, área y
+# quién aprueba su trabajo (`aprobado_por`). Los Telegram son ficticios: el transporte es falso.
+PERSONAS = {
+    "Ismael": ("Ismael Soschinski", "direccion", "direccion", None),
+    "Ariel": ("Ariel De Simone", "referente", "corelabs", "Ismael"),
+    "Martin": ("Martín Forte", "referente", "it", "Ismael"),
+    "Marcos": ("Marcos Tarquini", "referente", "ot", "Ismael"),
+    "Nahuel": ("Nahuel Gimenez", "integrante", "ot", "Marcos"),
+}
+AREAS = {"direccion": "Dirección", "ot": "OT y automatización", "it": "Infraestructura IT",
+         "corelabs": "Software e interfaz HMI"}
+ROLES = {"direccion": ("Dirección", True), "referente": ("Referente técnico de área", False),
+         "integrante": ("Integrante", False)}
+OBJETIVO = "Conectar y automatizar equipos para que produzcan y entreguen datos"
+TELEGRAM_BASE = 70_001
+TELEGRAM_ADMIN = 79_999
+# El tono del pack (`persona` en `espacios/corework.yaml`).
+TONO = {"nombre_visible": "Leda", "registro": "vos", "formalidad": "profesional_cordial",
+        "longitud": "breve", "emojis": False}
+
+
+@dataclass
+class Mundo:
+    """Lo cargado: el espacio, las personas (por su nombre corto) y las tareas (por su clave
+    en la conversación)."""
+
+    workspace_id: str
+    personas: dict[str, dict[str, Any]] = field(default_factory=dict)
+    tareas: dict[str, str] = field(default_factory=dict)          # clave -> task_id
+    titulos: dict[str, str] = field(default_factory=dict)         # clave -> título
+
+    def clave_de_titulo(self, titulo: str) -> str | None:
+        return next((k for k, t in self.titulos.items() if t == titulo), None)
+
+    def persona_de_membresia(self, membership_id) -> str | None:
+        return next((k for k, p in self.personas.items()
+                     if p["membership_id"] == str(membership_id)), None)
+
+    def persona_de_chat(self, chat_id: int) -> str | None:
+        return next((k for k, p in self.personas.items() if p["telegram"] == chat_id), None)
+
+
+def momento(texto: str) -> datetime:
+    """"AAAA-MM-DD HH:MM", hora de Buenos Aires."""
+    return datetime.strptime(texto, "%Y-%m-%d %H:%M").replace(tzinfo=ZONA)
+
+
+def fin_del_dia(dia: str) -> datetime:
+    return datetime.combine(date.fromisoformat(dia), FIN_DE_JORNADA, ZONA)
+
+
+def cargar(conn, conversacion: dict[str, Any]) -> Mundo:
+    """Escribe el estado inicial de la conversación y lo confirma."""
+    with admin(conn) as cur:
+        mundo, objetivo = _espacio(cur)
+        _tareas(cur, mundo, objetivo, conversacion.get("tareas") or {})
+    conn.commit()
+    return mundo
+
+
+def _espacio(cur) -> tuple[Mundo, str]:
+    cur.execute("""insert into workspace (slug, nombre, zona_horaria, activo)
+                   values ('corework', 'CoreWork', %s, true) returning id""", (ZONA.key,))
+    ws = str(cur.fetchone()["id"])
+    cur.execute("""insert into work_calendar (workspace_id, dias, hora_inicio, hora_fin)
+                   values (%s, array['lunes','martes','miercoles','jueves','viernes'],
+                           '09:00', '17:00')""", (ws,))
+    cur.execute("""insert into persona_config (workspace_id, nombre_visible, registro, formalidad,
+                                               longitud, emojis)
+                   values (%s, %s, %s, %s, %s, %s)""",
+                (ws, TONO["nombre_visible"], TONO["registro"], TONO["formalidad"],
+                 TONO["longitud"], TONO["emojis"]))
+    cur.execute("""insert into workspace_version (workspace_id, version, pack_hash)
+                   values (%s, 1, 'corredor-prueba-chica')""", (ws,))
+    cur.execute("""insert into workspace_setting (workspace_id, clave, valor)
+                   values (%s, 'aviso_previo_dias_habiles', '3')""", (ws,))
+    areas = {}
+    for slug, nombre in AREAS.items():
+        cur.execute("""insert into area (workspace_id, slug, nombre) values (%s, %s, %s)
+                       returning id""", (ws, slug, nombre))
+        areas[slug] = str(cur.fetchone()["id"])
+    roles = {}
+    for slug, (nombre, final) in ROLES.items():
+        cur.execute("""insert into rol (workspace_id, slug, nombre, autoridad_final)
+                       values (%s, %s, %s, %s) returning id""", (ws, slug, nombre, final))
+        roles[slug] = str(cur.fetchone()["id"])
+    cur.execute("""insert into escalation_route (workspace_id, disparador, destino_rol_id)
+                   values (%s, 'falta_persistente_de_respuesta', %s)""", (ws, roles["direccion"]))
+
+    mundo = Mundo(ws)
+    for i, (corto, (nombre, rol, area, aprobado_por)) in enumerate(PERSONAS.items()):
+        telegram = TELEGRAM_BASE + i
+        cur.execute("insert into app_user (telegram_user_id, nombre) values (%s, %s) returning id",
+                    (telegram, nombre))
+        app_user = str(cur.fetchone()["id"])
+        aprobador = mundo.personas[aprobado_por]["membership_id"] if aprobado_por else None
+        cur.execute("""insert into membership (workspace_id, app_user_id, area_id, rol_id,
+                                               aprobador_membership_id)
+                       values (%s, %s, %s, %s, %s) returning id""",
+                    (ws, app_user, areas[area], roles[rol], aprobador))
+        mundo.personas[corto] = {"nombre": nombre, "app_user_id": app_user,
+                                 "membership_id": str(cur.fetchone()["id"]),
+                                 "telegram": telegram, "area_id": areas[area]}
+    # Sin esto el despachador antepone el saludo del día y cada texto cambia.
+    cur.execute("""insert into greeting_state (membership_id, workspace_id, ultima_fecha_local)
+                   select id, workspace_id, date '9999-12-31' from membership
+                    where workspace_id = %s""", (ws,))
+    # El administrador de plataforma, con el bot de administración alcanzable (le escribió una
+    # vez): recibe los avisos de lo que no está en la lista (9g).
+    cur.execute("""insert into app_user (telegram_user_id, nombre)
+                   values (%s, 'Administración de la plataforma') returning id""",
+                (TELEGRAM_ADMIN,))
+    administrador = str(cur.fetchone()["id"])
+    cur.execute("insert into platform_role (app_user_id, rol) values (%s, 'administrador')",
+                (administrador,))
+    cur.execute("""insert into audit_log (actor_app_user_id, actor_kind, accion, detalle)
+                   values (%s, 'persona', 'mensaje_admin', %s)""",
+                (administrador, json.dumps({"chat_id": TELEGRAM_ADMIN})))
+    cur.execute("""insert into objective (workspace_id, tipo, titulo, estado)
+                   values (%s, 'operativo', %s, 'activo') returning id""", (ws, OBJETIVO))
+    return mundo, str(cur.fetchone()["id"])
+
+
+def _tareas(cur, mundo: Mundo, objetivo: str, tareas: dict[str, dict[str, Any]]) -> None:
+    for clave, t in tareas.items():
+        persona = mundo.personas[t["responsable"]]
+        cur.execute(
+            """insert into task (workspace_id, objective_id, titulo, area_id,
+                                 responsable_membership_id, estado, fecha_objetivo)
+               values (%s, %s, %s, %s, %s, 'asignada', %s) returning id""",
+            (mundo.workspace_id, objetivo, t["titulo"], persona["area_id"],
+             persona["membership_id"], fin_del_dia(str(t["vence"]))))
+        task_id = str(cur.fetchone()["id"])
+        mundo.tareas[clave], mundo.titulos[clave] = task_id, t["titulo"]
+        estado = t.get("estado", "asignada")
+        if estado != "asignada":
+            # El estado es la proyección de sus eventos: el inicio, con el día que dice.
+            desde = t.get("desde")
+            cur.execute(
+                """insert into task_state_event (task_id, estado_anterior, estado_nuevo,
+                                                 actor_kind, actor_app_user_id, motivo, at)
+                   values (%s, 'asignada', %s, 'persona', %s, 'estado inicial de la prueba',
+                           %s)""",
+                (task_id, estado, persona["app_user_id"],
+                 momento(f"{desde} 10:00") if desde else datetime.now(ZONA)))
+    for clave, t in tareas.items():
+        if t.get("depende_de"):
+            cur.execute("""insert into dependency (workspace_id, origen_task_id, destino_task_id,
+                                                   tipo)
+                           values (%s, %s, %s, 'bloqueante')""",
+                        (mundo.workspace_id, mundo.tareas[t["depende_de"]], mundo.tareas[clave]))

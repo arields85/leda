@@ -1,0 +1,143 @@
+# Copia comprobable de la conversación: la fuente es el .md. Formato: prueba_chica/corredor.py.
+fuente: tests/conversaciones/04-sin-respuesta.md
+numero: "04"
+titulo: "No contesta"
+mide: garantias
+persona: Marcos
+inicio: "2026-10-22 09:00"
+
+tareas:
+  PLC:
+    titulo: Programar PLC de la comprimidora
+    responsable: Marcos
+    vence: "2026-10-27"
+    estado: en_curso
+    desde: "2026-10-20"
+  COM:
+    titulo: Revisar comunicaciones industriales de la comprimidora
+    responsable: Marcos
+    vence: "2026-11-06"
+    estado: asignada
+    depende_de: PLC
+
+pasos:
+  - paso: 1
+    quien: Leda
+    relojes: ["2026-10-22 10:00"]
+    salen:
+      - a: Marcos
+        tipo: aviso_previo
+        tarea: PLC
+        hechos: {vence: "2026-10-27", necesita_respuesta: false,
+                 dias_habiles_hasta_el_vencimiento: 3}
+    estado_despues:
+      ultimo_aviso: {Marcos: PLC}
+      esperas_abiertas: []
+    dice:
+      - la tarea del PLC
+      - que vence el martes 27
+      - que no hace falta contestar
+
+  - paso: 2
+    quien: nadie
+    relojes: ["2026-10-22 16:00", "2026-10-23 10:00", "2026-10-23 16:00", "2026-10-24 10:00",
+              "2026-10-25 10:00", "2026-10-26 10:00", "2026-10-26 16:00"]
+    salen: []
+    estado_despues:
+      esperas_abiertas: []
+
+  - paso: 3
+    quien: Leda
+    relojes: ["2026-10-27 10:00"]
+    salen:
+      - a: Marcos
+        tipo: pedido_de_estado
+        tarea: PLC
+        hechos: {numero: 1, necesita_respuesta: true, vence: "2026-10-27",
+                 atraso_dias_habiles: 0}
+    estado_despues:
+      esperas_abiertas: [PLC]
+      pregunta_abierta: {tipo: estado_de_la_tarea, tarea: PLC}
+    dice:
+      - que la tarea del PLC vence hoy
+      - pide el estado
+    no_dice:
+      - que Marcos no contestó el aviso del jueves
+      - que es urgente
+      - nada de la tarea de comunicaciones como si fuera otro recordatorio
+
+  - paso: 4
+    quien: nadie
+    relojes: ["2026-10-27 16:00"]
+    salen: []
+    estado_despues:
+      esperas_abiertas: [PLC]
+
+  - paso: 5
+    quien: Leda
+    relojes: ["2026-10-28 10:00"]
+    salen:
+      - a: Marcos
+        tipo: pedido_de_estado
+        tarea: PLC
+        hechos: {numero: 2, atraso_dias_habiles: 1,
+                 dependientes: [{tarea: COM, no_puede_arrancar_hasta_que_termine: true}]}
+    dice:
+      - que la tarea del PLC venció ayer
+      - que la de comunicaciones no puede arrancar hasta que la del PLC esté terminada
+      - pide el estado
+    no_dice:
+      - que va a escalar
+      - que Marcos no contestó, salvo como hecho
+      - ningún reproche ni intención atribuida
+
+  - paso: 6
+    quien: nadie
+    relojes: ["2026-10-28 16:00"]
+    salen: []
+
+  - paso: 7
+    quien: Leda
+    relojes: ["2026-10-29 10:00"]
+    salen:
+      - a: Marcos
+        tipo: pedido_de_estado
+        tarea: PLC
+        hechos: {numero: 3, atraso_dias_habiles: 2,
+                 si_no_hay_respuesta: {se_avisa_a: [Ismael Soschinski], estado: todavia_no}}
+    dice:
+      - que la tarea del PLC venció el martes
+      - que si no hay novedades se le va a avisar a Ismael
+      - pide el estado
+    no_dice:
+      - una amenaza ni un reproche
+      - que ya se avisó a Ismael
+
+  - paso: 8
+    quien: nadie
+    relojes: ["2026-10-29 16:00"]
+    salen: []
+
+  - paso: 9
+    quien: Leda
+    relojes: ["2026-10-30 10:00"]
+    salen:
+      - a: Ismael
+        tipo: escalamiento
+        tarea: PLC
+        hechos: {aviso: falta_de_respuesta, vence: "2026-10-27", atraso_dias_habiles: 3,
+                 pedido_desde: "2026-10-27", pedidos_de_estado_sin_respuesta: 3,
+                 responsable: Marcos Tarquini,
+                 dependientes: [{tarea: COM, no_puede_arrancar_hasta_que_termine: true}]}
+    estado_despues:
+      de: Ismael
+      pregunta_abierta: null
+    dice:
+      - la tarea del PLC, que vencía el martes 27
+      - el atraso, tres días hábiles
+      - que a Marcos se le pidió el estado desde el martes y no hubo respuesta
+      - que la tarea de comunicaciones depende de ella
+    no_dice:
+      - que la tarea está bloqueada o que Marcos no trabaja
+      - ninguna intención atribuida
+      - un atraso que no salga del código

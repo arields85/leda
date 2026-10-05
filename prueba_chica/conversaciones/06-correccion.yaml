@@ -1,0 +1,90 @@
+# Copia comprobable de la conversación: la fuente es el .md. Formato: prueba_chica/corredor.py.
+fuente: tests/conversaciones/06-correccion.md
+numero: "06"
+titulo: "No, era la otra tarea"
+mide: garantias
+persona: Marcos
+inicio: "2026-10-20 09:00"
+
+tareas:
+  PLC:
+    titulo: Programar PLC de la comprimidora
+    responsable: Marcos
+    vence: "2026-10-23"
+    estado: asignada
+  COM:
+    titulo: Revisar comunicaciones industriales de la comprimidora
+    responsable: Marcos
+    vence: "2026-10-30"
+    estado: asignada
+
+pasos:
+  - paso: 1
+    quien: Leda
+    relojes: ["2026-10-20 10:00"]
+    salen:
+      - a: Marcos
+        tipo: aviso_previo
+        tarea: PLC
+        hechos: {vence: "2026-10-23", necesita_respuesta: false}
+    estado_despues:
+      ultimo_aviso: {Marcos: PLC}
+    dice:
+      - la tarea del PLC
+      - que vence el viernes 23
+      - que no hace falta contestar
+
+  - paso: 2
+    quien: Marcos
+    a_las: "2026-10-20 10:50"
+    escribe: "ya arranque esta mañana 👍"
+    jugadas:
+      - {nombre: anotar_inicio, tarea: PLC}
+    efectos:
+      estados: {PLC: en_curso}
+    hechos:
+      - {jugada: anotar_inicio, resultado: anotado, tarea: PLC}
+    pregunta: null
+    estado_despues:
+      pregunta_abierta: null
+    dice:
+      - que se anotó el inicio de la tarea del PLC, nombrándola
+
+  - paso: 3
+    quien: Marcos
+    a_las: "2026-10-20 10:52"
+    escribe: "nono era la otra, la de las comunicaciones. la del plc todavia no la empece"
+    jugadas:
+      - {nombre: corregir, corrige: anotar_inicio, tarea: PLC, tarea_correcta: COM}
+    efectos:
+      estados: {PLC: asignada, COM: en_curso}
+    hechos:
+      - jugada: corregir
+        resultado: corregido
+        tarea: PLC
+        vuelve_a: {estado: asignada}
+        aplicado: {jugada: anotar_inicio, resultado: anotado, tarea: COM}
+    pregunta: null
+    estado_despues:
+      pregunta_abierta: null
+    dice:
+      - que la arrancada es la de comunicaciones y que la del PLC sigue sin arrancar
+    no_dice:
+      - que las dos están en curso
+      - nada que reproche el error
+
+  - paso: 4
+    quien: Leda
+    relojes: ["2026-10-23 10:00"]
+    salen:
+      - a: Marcos
+        tipo: pedido_de_estado
+        tarea: PLC
+        hechos: {numero: 1, necesita_respuesta: true, estado: asignada,
+                 atraso_dias_habiles: 0}
+    dice:
+      - que la tarea del PLC vence hoy y que todavía no arrancó
+      - pide el estado
+    no_dice:
+      - que está en curso
+      - nada del inicio corregido como si hubiera valido

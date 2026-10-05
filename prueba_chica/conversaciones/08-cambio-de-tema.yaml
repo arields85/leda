@@ -1,0 +1,120 @@
+# Copia comprobable de la conversación: la fuente es el .md. Formato: prueba_chica/corredor.py.
+fuente: tests/conversaciones/08-cambio-de-tema.md
+numero: "08"
+titulo: "Cambio de tema"
+mide: garantias
+persona: Marcos
+inicio: "2026-10-20 09:00"
+
+tareas:
+  PLC:
+    titulo: Programar PLC de la comprimidora
+    responsable: Marcos
+    vence: "2026-10-23"
+    estado: en_curso
+    desde: "2026-10-19"
+  COM:
+    titulo: Revisar comunicaciones industriales de la comprimidora
+    responsable: Marcos
+    vence: "2026-10-30"
+    estado: en_curso
+    desde: "2026-10-19"
+
+pasos:
+  - paso: 1
+    quien: Leda
+    relojes: ["2026-10-20 10:00"]
+    salen:
+      - a: Marcos
+        tipo: aviso_previo
+        tarea: PLC
+        hechos: {vence: "2026-10-23", necesita_respuesta: false}
+    estado_despues:
+      ultimo_aviso: {Marcos: PLC}
+    dice:
+      - la tarea del PLC
+      - que vence el viernes 23
+      - que no hace falta contestar
+
+  - paso: 2
+    quien: Marcos
+    a_las: "2026-10-20 10:40"
+    escribe: "uff con esto estoy trabado"
+    jugadas:
+      - {nombre: anotar_bloqueo, tarea: PLC}
+    efectos: {}
+    hechos:
+      - {jugada: anotar_bloqueo, resultado: falta_dato, falta: [causa], tarea: PLC}
+    pregunta: {tipo: causa_del_bloqueo, tarea: PLC}
+    estado_despues:
+      pregunta_abierta: {tipo: causa_del_bloqueo, tarea: PLC}
+    dice:
+      - una pregunta por la causa
+
+  - paso: 3
+    quien: Marcos
+    a_las: "2026-10-20 10:43"
+    escribe: "che y lo de comunicaciones no llego al 30, necesito hasta el miercoles 4"
+    jugadas:
+      - {nombre: anotar_prevision, tarea: COM, fecha: "2026-11-04"}
+    efectos:
+      previsiones: [{tarea: COM, fecha: "2026-11-04", motivo: ausente}]
+      avisos_guardados:
+        - tipo: nueva_prevision
+          tarea: COM
+          a: Ismael
+          hechos: {prevision: "2026-11-04", fecha_comprometida: "2026-10-30",
+                   atraso_dias_habiles: 3, motivo: ausente}
+    hechos:
+      - {jugada: anotar_prevision, resultado: anotado, tarea: COM, prevision: "2026-11-04"}
+    # La vuelta a la pregunta pendiente, en la misma respuesta (retomarla, 9d).
+    pregunta: {tipo: causa_del_bloqueo, tarea: PLC, desde_antes: true}
+    estado_despues:
+      pregunta_abierta: {tipo: causa_del_bloqueo, tarea: PLC}
+    dice:
+      - que quedó anotada la previsión del miércoles 4 en la tarea de comunicaciones
+      - la vuelta a la pregunta pendiente, la causa del bloqueo de la tarea del PLC, sin pedirle que repita que está trabado
+    no_dice:
+      - un menú con las salidas (seguir, dejar para después, cancelar)
+      - otra pregunta además de la pendiente
+      - nada que trate la fecha como la causa del bloqueo
+      - que la tarea del PLC está bloqueada
+
+  - paso: 4
+    quien: Leda
+    relojes: ["2026-10-20 10:44"]
+    salen:
+      - a: Ismael
+        tipo: nueva_prevision
+        tarea: COM
+        hechos: {prevision: "2026-11-04", fecha_comprometida: "2026-10-30",
+                 atraso_dias_habiles: 3, motivo: ausente}
+    dice:
+      - la tarea de comunicaciones
+      - la previsión del miércoles 4, sin motivo porque Marcos no lo dio
+      - la fecha comprometida, el viernes 30
+      - el atraso, tres días hábiles
+    no_dice:
+      - un motivo inventado
+      - nada del bloqueo de la tarea del PLC, que todavía no se anotó
+
+  - paso: 5
+    quien: Marcos
+    a_las: "2026-10-20 10:46"
+    escribe: "es que no me mandaron el programa del fabricante"
+    jugadas:
+      - {nombre: anotar_bloqueo, tarea: PLC, causa: "no me mandaron el programa del fabricante"}
+    efectos:
+      estados: {PLC: bloqueada}
+      bloqueos: [{tarea: PLC, causa: presente}]
+    hechos:
+      - {jugada: anotar_bloqueo, resultado: anotado, tarea: PLC, pregunta: quien_destraba}
+    pregunta: {tipo: quien_destraba, tarea: PLC}
+    estado_despues:
+      pregunta_abierta: {tipo: quien_destraba, tarea: PLC}
+    dice:
+      - que quedó anotado el bloqueo con su causa
+      - la pregunta de quién lo puede destrabar
+    no_dice:
+      - salidas (Marcos todavía no dijo que nadie o que no sabe)
+      - que Ismael se va a enterar

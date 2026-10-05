@@ -1,0 +1,143 @@
+# Copia comprobable de la conversación: la fuente es el .md. Formato: prueba_chica/corredor.py.
+fuente: tests/conversaciones/03-bloqueo.md
+numero: "03"
+titulo: "Estoy trabado, falta el repuesto"
+mide: garantias
+persona: Marcos
+inicio: "2026-10-20 09:00"
+foco: [PLC]
+
+tareas:
+  PLC:
+    titulo: Programar PLC de la comprimidora
+    responsable: Marcos
+    vence: "2026-10-23"
+    estado: en_curso
+    desde: "2026-10-19"
+  COM:
+    titulo: Revisar comunicaciones industriales de la comprimidora
+    responsable: Marcos
+    vence: "2026-10-30"
+    estado: asignada
+    depende_de: PLC
+
+pasos:
+  - paso: 1
+    quien: Leda
+    relojes: ["2026-10-20 10:00"]
+    salen:
+      - a: Marcos
+        tipo: aviso_previo
+        tarea: PLC
+        hechos: {vence: "2026-10-23", necesita_respuesta: false}
+    estado_despues:
+      ultimo_aviso: {Marcos: PLC}
+    dice:
+      - la tarea del PLC
+      - que vence el viernes 23
+      - que no hace falta contestar
+
+  - paso: 2
+    quien: Marcos
+    a_las: "2026-10-20 10:20"
+    escribe: "estoy trabado, falta el repuesto"
+    jugadas:
+      - {nombre: anotar_bloqueo, tarea: PLC, causa: "falta el repuesto"}
+    efectos:
+      estados: {PLC: bloqueada}
+      bloqueos: [{tarea: PLC, causa: presente}]
+    hechos:
+      - {jugada: anotar_bloqueo, resultado: anotado, tarea: PLC, causa: presente,
+         pregunta: quien_destraba}
+    pregunta: {tipo: quien_destraba, tarea: PLC}
+    estado_despues:
+      pregunta_abierta: {tipo: quien_destraba, tarea: PLC}
+      # La pregunta espera respuesta como un pedido de estado (9c, paso 2): la espera queda
+      # abierta.
+      esperas_abiertas: [PLC]
+    dice:
+      - que quedó anotado el bloqueo y su causa
+      - "una sola pregunta: quién lo puede destrabar"
+    no_dice:
+      - cuándo llega el repuesto
+      - que Leda le va a escribir a alguien o lo va a seguir
+      - que Ismael se enteró o se va a enterar
+
+  - paso: 3
+    quien: nadie
+    relojes: ["2026-10-20 16:00"]
+    salen: []
+    estado_despues:
+      esperas_abiertas: [PLC]
+
+  - paso: 4
+    quien: Leda
+    relojes: ["2026-10-21 10:00"]
+    # La pregunta de quién lo destraba otra vez, el día hábil siguiente (9c, paso 2: la misma
+    # escalera de quien no contestó). El .md no le da un tipo de aviso: se espera un mensaje a
+    # Marcos sobre la tarea del PLC.
+    salen:
+      - a: Marcos
+        tarea: PLC
+    estado_despues:
+      pregunta_abierta: {tipo: quien_destraba, tarea: PLC}
+      esperas_abiertas: [PLC]
+    dice:
+      - el bloqueo de la tarea del PLC por el repuesto
+      - la pregunta de quién lo puede destrabar
+    no_dice:
+      - que va a avisar a Ismael
+      - un reproche porque no contestó
+      - otra pregunta además de ésa
+
+  - paso: 5
+    quien: Marcos
+    a_las: "2026-10-21 10:25"
+    escribe: "ni idea quien lo esta comprando, lo pidieron hace dos semanas"
+    jugadas:
+      - {nombre: anotar_quien_destraba, no_sabe: true, puede_traer: [tarea]}
+    efectos:
+      destraban: [{tarea: PLC, no_sabe: true}]
+    hechos:
+      - {jugada: anotar_quien_destraba, resultado: anotado,
+         quien_destraba: {no_sabe: true}, salidas: [que_alguien_ayude, anotar_prevision]}
+    pregunta: null
+    estado_despues:
+      # Tema abierto: las salidas propuestas, a la espera de lo que Marcos elija.
+      pregunta_abierta: {tarea: PLC}
+      esperas_abiertas: []
+    dice:
+      - que quedó anotado que no se sabe quién lo compra
+      - "salidas: que alguien lo ayude o anotar una fecha nueva"
+    no_dice:
+      - un nombre de quién compra que nadie dio
+      - una fecha de llegada inventada
+      - que Ismael se va a enterar
+      - dos preguntas juntas
+
+  - paso: 6
+    quien: Marcos
+    a_las: "2026-10-21 10:30"
+    escribe: "no, hay que esperar que llegue nomas"
+    jugadas:
+      - {nombre: cancelar}
+    efectos: {}
+    estado_despues:
+      pregunta_abierta: null
+      para_despues: []
+    dice:
+      - que el bloqueo queda anotado como está
+      - un próximo paso (puede avisar cuando llegue el repuesto)
+    no_dice:
+      - otra vez las salidas
+      - un juicio sobre la decisión
+
+  - paso: 7
+    quien: nadie
+    relojes: ["2026-10-23 10:00", "2026-10-26 10:00", "2026-10-27 10:00"]
+    salen: []
+    estado_despues:
+      esperas_abiertas: []
+    dice:
+      - ningún recordatorio de la tarea del PLC mientras el bloqueo siga abierto
+      - ningún mensaje a Ismael por el bloqueo

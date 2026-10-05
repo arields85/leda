@@ -1,0 +1,53 @@
+# Copia comprobable de la conversación: la fuente es el .md. Formato: prueba_chica/corredor.py.
+# Sólo los pasos 1 y 2: la parte "Para la prueba de la entrega" no corre en la prueba chica.
+fuente: tests/conversaciones/10-escrito-en-lugar-de-boton.md
+numero: "10"
+titulo: "Escribir en lugar de tocar un botón"
+mide: garantias
+persona: Marcos
+inicio: "2026-10-22 09:00"
+
+tareas:
+  PLC:
+    titulo: Programar PLC de la comprimidora
+    responsable: Marcos
+    vence: "2026-10-30"
+    estado: asignada
+  COM:
+    titulo: Revisar comunicaciones industriales de la comprimidora
+    responsable: Marcos
+    vence: "2026-10-30"
+    estado: asignada
+
+pasos:
+  - paso: 1
+    quien: Marcos
+    a_las: "2026-10-22 09:30"
+    escribe: "arranque una de las de la comprimidora"
+    jugadas:
+      - {nombre: anotar_inicio}
+    efectos: {}
+    hechos:
+      - {jugada: anotar_inicio, resultado: falta_dato, falta: [tarea], pregunta: cual_tarea}
+    pregunta: {tipo: cual_tarea}
+    botones: [PLC, COM]
+    estado_despues:
+      pregunta_abierta: {tipo: cual_tarea}
+    dice:
+      - una pregunta por cuál de las dos
+
+  - paso: 2
+    quien: Marcos
+    a_las: "2026-10-22 09:32"
+    escribe: "la del plc"
+    jugadas:
+      - {nombre: elegir, opcion: PLC}
+    efectos:
+      estados: {PLC: en_curso}
+    hechos:
+      - {jugada: anotar_inicio, resultado: anotado, tarea: PLC}
+    pregunta: null
+    estado_despues:
+      pregunta_abierta: null
+    dice:
+      - que quedó anotado el inicio de la tarea del PLC

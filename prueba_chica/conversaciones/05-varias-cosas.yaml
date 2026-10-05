@@ -1,0 +1,141 @@
+# Copia comprobable de la conversación: la fuente es el .md. Formato: prueba_chica/corredor.py.
+fuente: tests/conversaciones/05-varias-cosas.md
+numero: "05"
+titulo: "Varias cosas en un mensaje"
+mide: garantias
+persona: Marcos
+inicio: "2026-10-20 09:00"
+
+tareas:
+  PLC:
+    titulo: Programar PLC de la comprimidora
+    responsable: Marcos
+    vence: "2026-10-23"
+    estado: asignada
+  COM:
+    titulo: Revisar comunicaciones industriales de la comprimidora
+    responsable: Marcos
+    vence: "2026-10-30"
+    estado: en_curso
+    desde: "2026-10-19"
+
+pasos:
+  - paso: 1
+    quien: Leda
+    relojes: ["2026-10-20 10:00"]
+    salen:
+      - a: Marcos
+        tipo: aviso_previo
+        tarea: PLC
+        hechos: {vence: "2026-10-23", necesita_respuesta: false}
+    estado_despues:
+      ultimo_aviso: {Marcos: PLC}
+    dice:
+      - la tarea del PLC
+      - que vence el viernes 23
+      - que no hace falta contestar
+
+  - paso: 2
+    quien: Marcos
+    a_las: "2026-10-20 10:05"
+    escribe: "arranque con el plc recien. y lo de las comunicaciones no llego al 30, va a ser el miercoles 4 xq espero el switch nuevo"
+    jugadas:
+      - {nombre: anotar_inicio, tarea: PLC}
+      - {nombre: anotar_prevision, tarea: COM, fecha: "2026-11-04",
+         motivo: "espera el switch nuevo"}
+    efectos:
+      estados: {PLC: en_curso}
+      previsiones: [{tarea: COM, fecha: "2026-11-04", motivo: presente}]
+      avisos_guardados:
+        - tipo: nueva_prevision
+          tarea: COM
+          a: Ismael
+          hechos: {prevision: "2026-11-04", fecha_comprometida: "2026-10-30",
+                   atraso_dias_habiles: 3, dependientes: [], motivo: presente}
+    hechos:
+      - {jugada: anotar_inicio, resultado: anotado, tarea: PLC}
+      - {jugada: anotar_prevision, resultado: anotado, tarea: COM, prevision: "2026-11-04",
+         fecha_comprometida: "2026-10-30", atraso_dias_habiles: 3}
+    pregunta: null
+    estado_despues:
+      pregunta_abierta: null
+      para_despues: []
+    dice:
+      - "en una sola respuesta: los dos hechos anotados, cada uno con su tarea"
+    no_dice:
+      - que la fecha de la tarea de comunicaciones cambió
+      - un inicio en la de comunicaciones o una previsión en la del PLC
+      - que falta algo
+
+  - paso: 3
+    quien: Leda
+    relojes: ["2026-10-20 10:06"]
+    salen:
+      - a: Ismael
+        tipo: nueva_prevision
+        tarea: COM
+        hechos: {prevision: "2026-11-04", fecha_comprometida: "2026-10-30",
+                 atraso_dias_habiles: 3, dependientes: [], motivo: presente}
+    dice:
+      - la tarea de comunicaciones
+      - la previsión del miércoles 4 y su motivo
+      - la fecha comprometida, el viernes 30
+      - el atraso, tres días hábiles
+    no_dice:
+      - nada de la tarea del PLC
+      - que la fecha cambió
+
+  - paso: 4
+    quien: Marcos
+    a_las: "2026-10-20 16:30"
+    escribe: "me trabe con el plc. y lo de comunicaciones al final es el jueves 5, no el 4"
+    jugadas:
+      - {nombre: anotar_bloqueo, tarea: PLC}
+      - {nombre: anotar_prevision, tarea: COM, fecha: "2026-11-05", puede_traer: [motivo]}
+    efectos:
+      previsiones: [{tarea: COM, fecha: "2026-11-05"}]
+      avisos_guardados:
+        - tipo: nueva_prevision
+          tarea: COM
+          a: Ismael
+          hechos: {prevision: "2026-11-05", fecha_comprometida: "2026-10-30",
+                   atraso_dias_habiles: 4}
+    hechos:
+      - {jugada: anotar_bloqueo, resultado: falta_dato, falta: [causa], tarea: PLC,
+         pregunta: causa_del_bloqueo}
+      - {jugada: anotar_prevision, resultado: anotado, tarea: COM, prevision: "2026-11-05",
+         atraso_dias_habiles: 4}
+    pregunta: {tipo: causa_del_bloqueo, tarea: PLC}
+    estado_despues:
+      pregunta_abierta: {tipo: causa_del_bloqueo, tarea: PLC}
+    dice:
+      - "primero: que quedó anotada la previsión del jueves 5"
+      - "después, una sola pregunta: la causa del bloqueo de la tarea del PLC"
+    no_dice:
+      - que el bloqueo quedó anotado
+      - dos preguntas juntas
+
+  - paso: 5
+    quien: Marcos
+    a_las: "2026-10-20 16:35"
+    escribe: "falta que martin de IT me habilite el acceso a la red de planta"
+    jugadas:
+      - {nombre: anotar_bloqueo, tarea: PLC,
+         causa: "falta que martin de IT me habilite el acceso a la red de planta"}
+      - {nombre: anotar_quien_destraba, quien: "martin", puede_traer: [tarea]}
+    efectos:
+      estados: {PLC: bloqueada}
+      bloqueos: [{tarea: PLC, causa: presente}]
+      destraban: [{tarea: PLC, alguien: true, no_sabe: false}]
+    hechos:
+      - {jugada: anotar_bloqueo, resultado: anotado, tarea: PLC}
+      - {jugada: anotar_quien_destraba, resultado: anotado, salidas: ausente}
+    pregunta: null
+    estado_despues:
+      pregunta_abierta: null
+      para_despues: []
+    dice:
+      - que quedó anotado el bloqueo, con su causa y con Martín como quien lo destraba
+    no_dice:
+      - que Leda le escribió a Martín o lo va a seguir
+      - la pregunta de quién lo destraba, que Marcos ya contestó
