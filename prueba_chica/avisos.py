@@ -364,21 +364,33 @@ def pregunta_del_aviso(cur, aviso: dict[str, Any]) -> dict[str, Any] | None:
 
 
 def _si_la_ia_no_redacta(m: Momento, envio: list[_Listo], falla: Exception) -> list[str]:
-    """Un envío que la IA no redactó se reintenta entero: sus avisos comparten la cuenta de
-    intentos (la del que más lleva) y el momento del próximo, así vuelven a salir juntos en un
-    solo mensaje (mecánica §10) y ninguno espera más de lo que le toca."""
-    intentos = max(x.aviso["intentos"] for x in envio) + 1
-    return [_un_aviso_que_no_salio(m, x.aviso, x.destinatario, falla, intentos) for x in envio]
+    """Un envío que la IA no redactó. Cada aviso cuenta sus propios intentos (decisión 8, caso
+    2): al quinto fallo queda `fallido` él solo, y un aviso que ya venía fallando no le quita
+    intentos a los demás. Los que siguen vuelven a intentarse juntos, al próximo intento más
+    cercano de entre ellos, así salen en un solo mensaje (mecánica §10) y ninguno espera más
+    que lo que le toca a él."""
+    cur = m.cur
+    resultados, siguen = [], []
+    for x in envio:
+        intentos = x.aviso["intentos"] + 1
+        if intentos < INTENTOS:
+            siguen.append((x, intentos))
+            resultados.append("reintento")
+        else:
+            resultados.append(_un_aviso_que_fallo(m, x.aviso, x.destinatario, falla, intentos))
+    if siguen:
+        proximo = min(m.ahora + ESPERAS_TRAS_UN_FALLO[n - 1] for _, n in siguen)
+        for x, intentos in siguen:
+            cur.execute("""update scheduled_notice set intentos = %s, proximo_intento_en = %s
+                            where id = %s""", (intentos, proximo, str(x.aviso["id"])))
+    return resultados
 
 
-def _un_aviso_que_no_salio(m: Momento, aviso, destinatario, falla: Exception,
-                           intentos: int) -> str:
+def _un_aviso_que_fallo(m: Momento, aviso, destinatario, falla: Exception,
+                        intentos: int) -> str:
+    """El quinto fallo de un aviso: queda `fallido` con sus hechos, con su incidente y, si lo
+    causó una persona, el aviso de la falla para ella."""
     cur, aviso_id = m.cur, str(aviso["id"])
-    if intentos < INTENTOS:
-        cur.execute("""update scheduled_notice set intentos = %s, proximo_intento_en = %s
-                        where id = %s""",
-                    (intentos, m.ahora + ESPERAS_TRAS_UN_FALLO[intentos - 1], aviso_id))
-        return "reintento"
     cur.execute("""update scheduled_notice
                       set estado = 'fallido', intentos = %s, resuelto_en = %s,
                           proximo_intento_en = null
