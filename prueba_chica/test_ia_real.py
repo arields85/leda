@@ -23,9 +23,10 @@ from prueba_chica.ia_real import (FUERA_DE_LA_LISTA, NOMBRE_HERRAMIENTA, Cliente
 from prueba_chica.instrucciones import (INSTRUCCIONES_JUGADAS, INSTRUCCIONES_REDACCION,
                                         Tono)
 from prueba_chica.tiempo import RelojFijo
-from prueba_chica.turno import SOLO_SI_PREGUNTA, procesar_turno
+from prueba_chica.turno import SOLO_SI_PREGUNTA, TEXTO_SI_LA_IA_FALLA, procesar_turno
 
 from leda.db import admin, espacio
+from leda.incidentes import ETAPA_TURNO_CONVERSACION
 
 SITUACION = {"hoy": "2026-10-20", "mensaje": "llego el 27, el proveedor se demoró",
              "estado": None, "ultimo_aviso": {"tipo": "aviso_previo", "tarea": "T1"},
@@ -96,8 +97,9 @@ def test_la_eleccion_ofrece_la_herramienta_con_la_lista_cerrada_y_la_lee():
     assert cuerpo["model"] == "openai/gpt-6-sol"
     # Sin forzar la herramienta: Claude Sonnet 5.5 rechaza `tool_choice` forzado (`tool` o
     # `any`, error 400 por OpenRouter, 2026-10-05). Una sola herramienta ofrecida, con
-    # "auto" y las instrucciones que piden llamarla siempre; si no la llama, el turno lo trata
-    # como no responder (`RespuestaInvalida`).
+    # "auto" y las instrucciones que piden llamarla siempre. Con "auto" la IA puede contestar
+    # con texto: eso es no responder, nunca "ninguna jugada" (las pruebas de abajo: la lectura y
+    # el turno con su reintento y su camino de falla).
     assert cuerpo["tool_choice"] == "auto"
     [herramienta] = cuerpo["tools"]
     assert herramienta["function"]["name"] == NOMBRE_HERRAMIENTA
@@ -155,10 +157,12 @@ def test_el_esquema_es_un_objeto_arriba_y_la_union_va_en_cada_jugada():
 
 
 def test_las_instrucciones_piden_llamar_siempre_a_la_herramienta():
-    """Sin `tool_choice` forzado, la instrucción es la que pide la herramienta, también
-    cuando no hay ninguna jugada (la lista vacía)."""
-    texto = INSTRUCCIONES_JUGADAS.lower()
-    assert "siempre" in texto and "lista vacía" in texto
+    """Sin `tool_choice` forzado, la instrucción es la que pide la herramienta: nunca contestarle
+    a la persona con texto, una sola llamada, y también cuando no hay ninguna jugada (la lista
+    vacía). La oración entera, no palabras sueltas que podrían estar en otra regla."""
+    texto = " ".join(INSTRUCCIONES_JUGADAS.split())
+    assert ("No le respondés a la persona: contestás siempre llamando a la herramienta, una "
+            "sola vez, también cuando no hay ninguna jugada (con la lista vacía).") in texto
 
 
 def test_la_tarea_nunca_es_obligatoria_en_el_esquema():
@@ -201,6 +205,13 @@ def test_una_lista_vacia_es_ninguna_jugada():
 
 @pytest.mark.parametrize("respuesta", [
     _texto("Anoté la previsión."),                       # contestó en vez de elegir
+    _texto(None),                                        # ni texto ni herramienta
+    {"choices": [{"message": {"content": "Listo.", "tool_calls": []}}]},
+    {"choices": [{"message": {"content": None, "tool_calls": [{   # otra herramienta
+        "id": "c1", "type": "function",
+        "function": {"name": "otra", "arguments": "{\"jugadas\": []}"}}]}}]},
+    {"choices": [{"message": None}]},
+    {"choices": [{}]},
     _llamada("{no es json"),
     _llamada({"otra_cosa": []}),
     _llamada({"jugadas": [{"tarea": "T1"}]}),             # una jugada sin nombre
@@ -208,6 +219,8 @@ def test_una_lista_vacia_es_ninguna_jugada():
     {"choices": []},
 ])
 def test_una_respuesta_que_no_es_la_herramienta_es_no_responder(respuesta):
+    """Nunca una lista vacía: sin la herramienta, la IA no eligió nada, ni siquiera "ninguna
+    jugada" (`RespuestaInvalida`, que el turno trata como no responder)."""
     with pytest.raises(RespuestaInvalida):
         _ia(ProveedorFalso([respuesta])).elegir_jugadas(SITUACION)
 
@@ -378,3 +391,41 @@ def test_un_turno_con_la_ia_real_anota_y_redacta_desde_los_hechos(conn, mundo, e
                     "where conversation_turn.sentido = 'entrada'")
         fila = cur.fetchone()
     assert fila == {"f": "2026-10-13", "ia": "openrouter/openai/gpt-6-sol"}
+
+
+def test_un_texto_en_lugar_de_la_herramienta_es_no_responder_tambien_en_el_turno(conn, mundo,
+                                                                                escribe):
+    """Con `tool_choice: auto` (revisión, 2026-10-05): si la IA contesta con texto dos veces, el
+    turno no lo toma como "ninguna jugada": un reintento y después el camino de falla (decisión
+    8): nada se ejecuta ni se redacta, la persona recibe el texto fijo y queda el incidente."""
+    quien, entrante = escribe("Marcos", "llego el 13, el proveedor se demoró")
+    proveedor = ProveedorFalso([_texto("Anoté que llegás el 13."), _texto("Listo.")])
+
+    resultado = procesar_turno(conn, quien, entrante, _ia(proveedor), RelojFijo(AHORA))
+    conn.commit()
+
+    assert len(proveedor.pedidos) == 2                  # el pedido y su único reintento
+    assert all(p["cuerpo"]["tools"] for p in proveedor.pedidos)     # ninguna redacción
+    assert resultado.texto == TEXTO_SI_LA_IA_FALLA and resultado.error
+    assert resultado.jugadas == [] and resultado.hechos == []
+    with admin(conn) as cur:
+        cur.execute("select count(*) n from task_forecast")
+        assert cur.fetchone()["n"] == 0
+        cur.execute("select etapa from incident")
+        assert [f["etapa"] for f in cur.fetchall()] == [ETAPA_TURNO_CONVERSACION]
+
+
+def test_un_texto_y_despues_la_herramienta_es_el_reintento_que_responde(conn, mundo, escribe):
+    quien, entrante = escribe("Marcos", "llego el 13, el proveedor se demoró")
+    proveedor = ProveedorFalso([
+        _texto("Anoté que llegás el 13."),
+        _llamada({"jugadas": [{"nombre": "anotar_prevision", "tarea": "T1",
+                               "fecha": "2026-10-13", "motivo": "el proveedor se demoró"}]}),
+        _texto("Anoté que llegás el 13."),
+    ])
+
+    resultado = procesar_turno(conn, quien, entrante, _ia(proveedor), RelojFijo(AHORA))
+    conn.commit()
+
+    assert len(proveedor.pedidos) == 3
+    assert resultado.error is None and resultado.hechos[0]["resultado"] == "anotado"

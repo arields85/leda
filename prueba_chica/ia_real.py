@@ -187,7 +187,9 @@ def leer_jugadas(respuesta: dict[str, Any]) -> list[Jugada]:
         mensaje = respuesta["choices"][0]["message"]
         llamadas = [c["function"] for c in mensaje.get("tool_calls") or []
                     if c["function"]["name"] == NOMBRE_HERRAMIENTA]
-    except (KeyError, IndexError, TypeError) as e:
+    except (KeyError, IndexError, TypeError, AttributeError) as e:
+        # Sin la forma de una respuesta (un mensaje vacío o que no es un objeto): la IA no
+        # respondió, nunca "ninguna jugada".
         raise RespuestaInvalida(f"Respuesta ilegible ({type(e).__name__}).") from e
     if not llamadas:
         raise RespuestaInvalida("La IA no llamó a la herramienta de las jugadas.")
@@ -223,7 +225,9 @@ class IAReal:
             "tools": [herramienta],
             # Sin forzar: Claude Sonnet 5.5 rechaza `tool_choice` forzado (400, 2026-10-05).
             # La herramienta es la única ofrecida y las instrucciones piden llamarla siempre;
-            # si no la llama, `leer_jugadas` lo trata como no responder.
+            # si no la llama (contesta con texto, o nada), `leer_jugadas` levanta
+            # `RespuestaInvalida`: para el turno, la IA no respondió (un reintento y después su
+            # camino de falla), nunca una lista vacía de jugadas.
             "tool_choice": "auto",
         })
         return leer_jugadas(respuesta)
