@@ -498,8 +498,9 @@ eso"), **Leda le pregunta en esa misma respuesta para qué día la va a tener**:
   espera del estado sigue abierta y, si no contesta, Leda vuelve a pedir el estado el día hábil
   siguiente con la cuenta de pedidos de nuevo, como después de un avance (9h).
 - **Precisa 9h**: con la tarea vencida, el avance lleva la pregunta de para cuándo ya desde la
-  primera vez; "a la segunda" queda para la tarea que todavía no venció. La conversación 15 lo
-  aplica en su primer avance (`PENDIENTE`: llevarlo a su `.md`, paso 2).
+  primera vez; "a la segunda" queda para la tarea que todavía no venció. La conversación 15 prueba
+  las dos: el primer avance, el día del vencimiento, sin pregunta; el segundo, ya vencida, con la
+  pregunta de para cuándo.
 
 > **Precisiones de la corrida en seco de la E2-7 (usuario, 2026-10-05).** Tres hallazgos del motor,
 > resueltos como reglas generales. (1) **Toda pregunta cuya ficha dice que espera respuesta abre
