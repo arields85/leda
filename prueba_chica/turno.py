@@ -96,7 +96,7 @@ def procesar_turno(conn: psycopg.Connection, quien: Solicitante, entrante_id: st
         atar_al_entrante(cur, entrante_id)
         if _ya_tiene_turno(cur, quien, entrante_id):
             return ResultadoTurno("", [], [], repetido=True)
-        ctx = _leer(cur, quien, reloj.ahora(), entrante_id=entrante_id)
+        ctx = _leer(cur, quien, reloj.ahora(), entrante_id=entrante_id, jugadas=jugadas)
 
         def elegir() -> list[Jugada]:
             return pedir_a_la_ia(lambda: ia.elegir_jugadas(_situacion(ctx, jugadas)))
@@ -179,7 +179,8 @@ def _ya_tiene_turno(cur, quien: Solicitante, entrante_id: str) -> bool:
 
 
 def _leer(cur, quien: Solicitante, ahora: datetime, *, entrante_id: str | None = None,
-          chat_id: int | None = None, toque: str | None = None) -> Contexto:
+          chat_id: int | None = None, toque: str | None = None,
+          jugadas: Mapping[str, Manejador] = JUGADAS) -> Contexto:
     """Lo leído al empezar el turno: el mensaje (o el toque y su chat), las tareas abiertas de
     la persona con su alias, el estado de su conversación y sus últimos turnos."""
     texto = ""
@@ -218,7 +219,8 @@ def _leer(cur, quien: Solicitante, ahora: datetime, *, entrante_id: str | None =
                     texto=texto, ahora=ahora,
                     estado=preguntas.estado_para_la_ia(cur, quien.membership_id, tareas),
                     tareas=tareas, ultimos_turnos=ultimos,
-                    ultimo_aviso=_ultimo_aviso(estado, tareas), toque=toque)
+                    ultimo_aviso=_ultimo_aviso(estado, tareas), toque=toque,
+                    jugadas=jugadas)
 
 
 def _alias(tareas, task_id) -> str | None:

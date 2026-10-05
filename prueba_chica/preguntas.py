@@ -28,9 +28,10 @@ viejo (situación general 7).
 
 **Cada tipo de pregunta se declara una vez** (`TIPOS`, como las fichas de las jugadas): si
 espera respuesta y cuál es su espera. Una pregunta que **espera respuesta** no se puede dejar
-sin efecto y, al abrirse, abre su espera (`pending_reply`, ADR 0017, decisión 6) si no hay una
-abierta: sin respuesta, la escalera la repite y sigue hasta escalar (`escalera.py`; ADR 0018,
-9b y 9c; decisión del usuario, 2026-10-05). La del estado de la tarea y la de su fecha esperan
+sin efecto y, cuando Leda la hace, abre su espera (`pending_reply`, ADR 0017, decisión 6) si no
+hay una abierta; una que queda para después la abre cuando vuelve. Sin respuesta, la escalera la
+repite y sigue hasta escalar (`escalera.py`; ADR 0018, 9b y 9c; decisión del usuario,
+2026-10-05). La del estado de la tarea y la de su fecha esperan
 con el pedido de estado, que repite la escalera de la tarea; las demás, con su propia espera,
 que repite la escalera de las preguntas. Una que no espera respuesta se puede dejar ("dejá, no
 importa") y Leda no insiste.
@@ -223,9 +224,6 @@ def abrir(ctx, tipo: str, task_id: str | None, *, jugada: dict[str, Any],
                 (ctx.quien.workspace_id, pregunta, secrets.token_urlsafe(9),
                  _etiqueta(tarea["titulo"]), _json({"tarea": tarea["id"]}), orden))
 
-    if de_tipo.espera is not None and task_id is not None:
-        _abrir_la_espera(ctx, de_tipo.espera, task_id)
-
     vigente = actual(cur, persona)
     if vigente is None or str(vigente["id"]) == pregunta:
         _que_sea_la_abierta(ctx, pregunta)
@@ -237,9 +235,20 @@ def abrir(ctx, tipo: str, task_id: str | None, *, jugada: dict[str, Any],
         _dejar_para_despues(ctx, str(vigente["id"]))
         _que_sea_la_abierta(ctx, pregunta)
         ahora_si = True
+    if ahora_si:
+        _esperar_respuesta(ctx, tipo, task_id)
     if pregunta not in ctx.preguntas_del_turno:
         ctx.preguntas_del_turno.append(pregunta)
     return ahora_si
+
+
+def _esperar_respuesta(ctx, tipo: str, task_id) -> None:
+    """Cuando Leda hace una pregunta que espera respuesta, su espera: desde ese momento cuenta el
+    silencio. Una que queda para después no la abre: nadie puede no contestar lo que todavía no
+    se le preguntó (revisión de la corrida en seco con las 16 conversaciones)."""
+    de_tipo = TIPOS[tipo]
+    if de_tipo.espera is not None and task_id is not None:
+        _abrir_la_espera(ctx, de_tipo.espera, str(task_id))
 
 
 def _abrir_la_espera(ctx, tipo: str, task_id: str) -> None:
@@ -351,6 +360,7 @@ def al_terminar_el_turno(ctx) -> dict[str, Any] | None:
         if abierta is None:
             return None
         _que_sea_la_abierta(ctx, str(abierta["id"]))
+        _esperar_respuesta(ctx, abierta["tipo"], abierta["task_id"])
     return {**describir(ctx, abierta),
             "desde_antes": str(abierta["id"]) not in ctx.preguntas_del_turno}
 

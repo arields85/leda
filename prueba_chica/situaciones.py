@@ -110,16 +110,22 @@ def _elegir_y_correr(ctx, opcion, pregunta_id: str, task_id, eligio: dict) -> di
     preguntas.cerrar(ctx, pregunta_id, "respondida",
                      {"opcion": str(opcion["id"]), "tarea": task_id})
     fichas = _fichas()
-    ficha = fichas.FICHAS.get(esperaba.get("nombre"))
-    if ficha is None:
+    nombre = esperaba.get("nombre")
+    if nombre is None:
         return {"jugada": "elegir", "resultado": "elegida", "eligio": eligio}
+    # La jugada que esperaba corre por el manejador de la lista cerrada del turno, el mismo que
+    # una jugada escrita, con las comprobaciones de su ficha: la opción no es otra puerta.
+    jugadas = ctx.jugadas if ctx.jugadas is not None else fichas.JUGADAS
+    manejador = jugadas.get(nombre)
+    if manejador is None:
+        return {"jugada": nombre, "resultado": "no_se_puede", "motivo": "fuera_de_la_lista",
+                "eligio": eligio}
     alias = eligio.get("tarea", {}).get("alias")
     if alias is None:
         # La tarea ya no está abierta entre las de la persona.
-        return {"jugada": ficha.nombre, "resultado": "no_se_puede", "motivo": "tarea_cerrada",
+        return {"jugada": nombre, "resultado": "no_se_puede", "motivo": "tarea_cerrada",
                 "eligio": eligio}
-    hecho = fichas.correr(ficha, ctx, Jugada(ficha.nombre,
-                                             {**(esperaba.get("datos") or {}), "tarea": alias}))
+    hecho = manejador(ctx, Jugada(nombre, {**(esperaba.get("datos") or {}), "tarea": alias}))
     return {**hecho, "eligio": eligio}
 
 

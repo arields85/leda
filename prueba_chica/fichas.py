@@ -76,6 +76,9 @@ class Contexto:
     preguntas_del_turno: list[str] = field(default_factory=list)   # abiertas en este turno
     dejadas: list[str] = field(default_factory=list)   # dejadas para después en este turno
     toque: str | None = None        # si el turno es un toque, la etiqueta de la opción tocada
+    # La lista cerrada de este turno (nombre → manejador): una opción elegida corre la jugada que
+    # esperaba por ella, como una jugada escrita. `None`: la de siempre (`JUGADAS`).
+    jugadas: Mapping[str, Callable[..., dict[str, Any]]] | None = None
 
     def tarea(self, alias: str) -> dict[str, Any] | None:
         return next((t for t in self.tareas if t["alias"] == alias), None)
@@ -177,8 +180,11 @@ def correr(ficha: Ficha, ctx: Contexto, jugada: Jugada) -> dict[str, Any]:
                 if de_la_tarea is not None:
                     preguntas.contestar(ctx, ficha.nombre, ficha.contesta, de_la_tarea["id"])
             if hecho["jugada"] == ficha.nombre:
-                _proponer(ficha, ctx, hecho, de_la_tarea)
+                # Primero la pregunta de la tarea vencida (9j) y después lo propuesto: si ya se
+                # pregunta algo en esta respuesta, lo propuesto queda para después (un tema a
+                # la vez; nunca dos preguntas juntas).
                 _si_esta_vencida(ficha, ctx, hecho, de_la_tarea)
+                _proponer(ficha, ctx, hecho, de_la_tarea)
             return hecho
     except Exception as e:      # el punto de guardado ya deshizo lo de esta jugada
         rechazo = _rechazo_del_dominio(e)
@@ -198,7 +204,7 @@ def _proponer(ficha: Ficha, ctx: Contexto, hecho: dict[str, Any],
         return
     ahora = preguntas.abrir(ctx, preguntas.PROPUESTA, tarea["id"] if tarea else None,
                             jugada={"nombre": ficha.nombre, "propone": list(propuesto)})
-    hecho[_clave_de_pregunta(ahora)] = preguntas.PROPUESTA
+    _nombrar_pregunta(hecho, _clave_de_pregunta(ahora), preguntas.PROPUESTA)
 
 
 def _si_esta_vencida(ficha: Ficha, ctx: Contexto, hecho: dict[str, Any],
@@ -220,7 +226,7 @@ def _si_esta_vencida(ficha: Ficha, ctx: Contexto, hecho: dict[str, Any],
     fecha = preguntas.FECHA_DE_LA_TAREA
     if fecha not in (hecho.get("pregunta"), hecho.get("pregunta_para_despues")):
         clave = _abrir_pregunta(ctx, fecha, tarea["id"], jugada={"nombre": ficha.nombre})
-        hecho[clave] = fecha
+        _nombrar_pregunta(hecho, clave, fecha)
 
 
 def _vencida(ctx: Contexto, tarea: dict[str, Any]) -> dict[str, Any] | None:
@@ -274,6 +280,16 @@ def _duda(ficha: Ficha, ctx: Contexto, datos: dict[str, Any]) -> dict[str, Any]:
                             opciones_de_tareas=candidatas)
     return _hecho(ficha, "falta_dato", falta=["tarea"],
                   **{_clave_de_pregunta(ahora): preguntas.CUAL_TAREA})
+
+
+def _nombrar_pregunta(hecho: dict[str, Any], clave: str, tipo: str) -> None:
+    """Pone en los hechos la pregunta que abrió la jugada. Si ya nombraban otra con la misma
+    clave (dos que quedaron para después), quedan las dos, en orden: nunca se pierde una."""
+    antes = hecho.get(clave)
+    if antes is None or antes == tipo:
+        hecho[clave] = tipo
+    else:
+        hecho[clave] = [*(antes if isinstance(antes, list) else [antes]), tipo]
 
 
 def _clave_de_pregunta(ahora: bool) -> str:
