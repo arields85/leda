@@ -16,7 +16,8 @@ El circuito es el recordatorio y lo que la persona contesta (ADR 0018, decisión
 
 1. [`01-arranque.md`](01-arranque.md): "arranqué" después del aviso previo al vencimiento.
 2. [`02-nueva-prevision.md`](02-nueva-prevision.md): "llego el 27, el proveedor se demoró"; la fecha
-   comprometida no cambia y el referente se entera, con el atraso y lo que depende.
+   comprometida no cambia y el referente se entera, con el atraso y lo que depende; el seguimiento pasa a
+   la previsión (un recordatorio el día del vencimiento y el pedido de estado el día de la previsión).
 3. [`03-bloqueo.md`](03-bloqueo.md): "estoy trabado, falta el repuesto"; Leda pregunta quién lo puede
    destrabar, repite la pregunta al día hábil siguiente y, como Marcos no sabe, propone salidas, sin avisar
    al referente; la escalera se detiene.
@@ -178,3 +179,15 @@ Las conversaciones dejaban 16 preguntas abiertas (P1 a P16). El usuario las deci
 
 Los tres puntos que estas decisiones dejaron abiertos los decidió el usuario el mismo día (ADR 0018, 9b, 9c
 y 9d). Ninguna conversación prueba todavía dos preguntas encadenadas por un cambio de tema.
+
+## Decisiones del usuario (2026-10-05)
+
+- **Un avance sin un hecho cierto** ("voy bien, la tengo casi lista"): se anota con las palabras de la
+  persona, la espera sigue abierta y Leda vuelve a pedir el estado el día hábil siguiente, sin contarlo como
+  silencio; a la segunda, pregunta para cuándo (9h; conversación 15).
+- **Con una previsión posterior al vencimiento, el seguimiento se mueve a la previsión**, sin tocar la fecha
+  comprometida: el día del vencimiento, un solo recordatorio que no pide nada; nada cada día hasta la
+  previsión; ese día, el pedido de estado como si fuera el vencimiento y, sin respuesta, la escalera desde
+  ahí. Una previsión más nueva mueve el ancla; una que vuelve a la fecha comprometida la devuelve al
+  vencimiento (9i; conversación 02). El referente recibe información y las decisiones que son suyas, nunca
+  trabajo de gestión.
