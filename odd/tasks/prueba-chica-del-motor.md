@@ -44,7 +44,8 @@ defecto (`testpaths = ["tests"]`) no la corre ni le aplica `tests/conftest.py`, 
 **Imports** (prueba de frontera propia, que recorre los imports en cadena, como `tests/test_capacidades.py`).
 Permitidos: `leda.db`, `leda.autoridad`, `leda.herramientas.ejecutar`, `leda.calendario`,
 `leda.salida.enqueue_outbox`, `leda.despachador`, `leda.incidentes.registrar_incidente`, `leda.llm`, `leda.jev`,
-`leda.config`. Prohibidos: `gateway`, `agente`, `ingreso_tareas`, `contexto`, `respuesta_unica`, `huerfanos`,
+`leda.config`; desde la E2-3b, lo que `ejecutar` levanta como respuesta del dominio y la activación de
+`leda.onboarding` (sólo importa `salida`). Prohibidos: `gateway`, `agente`, `ingreso_tareas`, `contexto`, `respuesta_unica`, `huerfanos`,
 `ciclo` y `local` (los dos importan `gateway`), `escalera` y `reloj` (textos fijos). Bordes conocidos:
 `despachador._rama_activa_de` llega a `ingreso_tareas` por `pendientes.ver_rama_abierta`, dentro de la función;
 `herramientas.crear_borrador_tarea` y `despachador._botones` (sólo con `intake_choice_set_id`) también, y la
@@ -83,7 +84,7 @@ dato. Si la causa de un bloqueo depende de otro lo dice la IA (`depende_de_otro`
 se pregunta quién destraba. Una pregunta nueva con otra abierta queda para después, en el orden
 en que salieron; cómo se retoma, la E2-4. Inicio, previsión, bloqueo y quién destraba contestan
 la espera de su tarea (`pending_reply`). Fuera de la lista es cualquier nombre que no esté en
-ella: `PENDIENTE` para la E2-3b, que el esquema de la IA le deje decir "otra cosa". `PENDIENTE`:
+ella; el esquema de la IA trae `fuera_de_la_lista` para decirlo (E2-3b). `PENDIENTE`:
 "en curso desde el lunes" (conversación 12, paso 3) no sale de la base, porque `leda_app` no lee
 `task_state_event`; el hecho dice sólo el estado.
 
@@ -116,9 +117,9 @@ recibe el único texto fijo, se registra un incidente y el turno queda registrad
 **Aviso al administrador:** un incidente de severidad baja con etapa propia y referencia al `inbound_message`, que
 `registrar_incidente` lleva al bot de administración con el mensaje (`incidentes._texto_disparador`); uno por
 mensaje. Verificado en la E2-3: con una etapa que `incidentes.py` no conoce, el aviso usa la explicación genérica y
-su título dice "Leda no pudo responderle a" la persona, que acá no es cierto; el mensaje y el resumen sí dicen qué
-pasó. `PENDIENTE` (decisión del usuario): corregirlo pide una entrada en `incidentes.EXPLICACION_POR_ETAPA`, en
-`src/leda`.
+su título dice "Leda no pudo responderle a" la persona, que acá no es cierto. Resuelto en la E2-3b: la etapa
+`motor_fuera_de_la_lista` tiene su entrada en `incidentes.EXPLICACION_POR_ETAPA`, con un título propio. A la
+persona no se le dice que se avisó salvo que lo pregunte: el hecho lo lleva en `solo_si_pregunta`.
 
 ## 5. Datos
 
@@ -226,6 +227,15 @@ su evidencia son las corridas. Unas 400 líneas por tarea es una guía, no un to
       (autorizado). Guion corto por Telegram con el usuario: "arranqué", "llego el 27" y "estoy trabado". Leda
       todavía no maneja cambio de tema, corrección ni cancelar (E2-4): una mala respuesta ahí no es falla del
       diseño. Va a la bitácora como prueba parcial, no como M2.
+      **Construido (2026-10-05; falta el contacto real con el usuario):** correcciones de la revisión de la E2-3
+      (lo que levanta la operación del dominio es un hecho, previsión y bloqueo exigen tarea abierta, quién
+      destraba por palabras enteras sin comodines; `1dfab4a`); el aviso al administrador va en `solo_si_pregunta`
+      y su etapa tiene título propio en `incidentes.py` (`031613e`); la llamada que fuerza la lista cerrada y la
+      redacción, con sus instrucciones (`972dc35`); el escuchador (`1f0cd12`); el comando del aviso previo y la
+      guía en `prueba_chica/README.md` (`0f2aa6b`). `pytest prueba_chica` en rojo en cada paso (24 fallas de las
+      correcciones; 1 del aviso; módulos inexistentes) y en verde, `111 passed`; `tests/test_avisos_admin.py
+      tests/test_capacidades.py` y `test_aviso_incidente_legible.py` `50 passed`; suite completa `2302 passed,
+      333 deselected, 1 warning in 780.59s`.
 - [ ] **E2-4. Situaciones generales** (delegada): las ocho, con preguntas, opciones y correcciones. Unas 400.
 - [ ] **E2-5. Escalera y avisos guardados** (delegada): aviso previo, esperas, escalamiento, relectura, omisión y
       reintentos. Unas 450.
