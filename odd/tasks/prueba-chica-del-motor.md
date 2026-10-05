@@ -2,7 +2,7 @@
 
 **Rama:** `feat/motor-de-conversacion` · **Carpeta:** `D:\Proyectos\Leda-PM-worktrees\motor-de-conversacion`
 **Abierta:** 2026-10-04 · **Copia en Engram:** tema `odd/prueba-chica-del-motor/tasks` (proyecto `prisma-pm`)
-**Estado:** decidido (sección 10, 2026-10-05); E2-1 hecha; sigue la E2-2.
+**Estado:** decidido (sección 10, 2026-10-05); E2-1 y E2-2 hechas; sigue la E2-3.
 
 ## 1. Objetivo
 
@@ -47,7 +47,8 @@ Permitidos: `leda.db`, `leda.autoridad`, `leda.herramientas.ejecutar`, `leda.cal
 `leda.config`. Prohibidos: `gateway`, `agente`, `ingreso_tareas`, `contexto`, `respuesta_unica`, `huerfanos`,
 `ciclo` y `local` (los dos importan `gateway`), `escalera` y `reloj` (textos fijos). Bordes conocidos:
 `despachador._rama_activa_de` llega a `ingreso_tareas` por `pendientes.ver_rama_abierta`, dentro de la función;
-`herramientas.crear_borrador_tarea` también, y la prueba no la usa.
+`herramientas.crear_borrador_tarea` y `despachador._botones` (sólo con `intake_choice_set_id`) también, y la
+prueba no los usa.
 
 **Entrada propia:** un escuchador por long polling (`local.escuchar` importa `gateway`) que guarda el mensaje en
 `inbound_message`, identifica a la persona (`identificar_en_espacio`) y llama al turno. Un ciclo propio corre cada
@@ -59,8 +60,8 @@ lista cerrada con una sola herramienta cuyo esquema es la lista (`Proveedor.resp
 las tareas por un alias de la lista que recibe; (3) el código comprueba cada jugada contra su ficha, aplica las
 situaciones generales y ejecuta con `herramientas.ejecutar(..., ya_confirmada=True)`, que verifica la autoridad
 igual; (4) el resultado son hechos; (5) la IA redacta desde los hechos con el tono de `persona_config`, una
-respuesta por mensaje; (6) todo va al registro de turnos. `PENDIENTE`: si `responder` no fuerza la herramienta,
-se trae la llamada estructurada de la rama congelada.
+respuesta por mensaje; (6) todo va al registro de turnos. Comprobado en la E2-2: `responder` no fuerza la
+herramienta en ningún proveedor, así que se trae la llamada estructurada de la rama congelada (E2-3b).
 
 **Jugadas** (ninguna confirma, por 9a):
 
@@ -183,8 +184,15 @@ su evidencia son las corridas. Unas 400 líneas por tarea es una guía, no un to
       cada tabla va en su migración y en `esquema.sql`. `tests/test_capacidades.py` declara las tablas, usadas desde
       `prueba_chica/`. Revisión RDD `review-03f111a243648455`, aprobada; su observación de que una previsión puede
       reemplazar a otra de otra tarea se corrige en la E2-3.
-- [ ] **E2-2. Esqueleto y frontera** (delegada): `prueba_chica/`, prueba de imports, turno y registro, falla de la
-      IA en un turno, el despachador sin retener en `leda_motor`. Unas 400.
+- [x] **E2-2. Esqueleto y frontera** (delegada: writer, varios archivos no triviales): `prueba_chica/`, prueba de
+      imports, turno y registro, falla de la IA en un turno, el despachador sin retener en `leda_motor`. Evidencia
+      (2026-10-05): `pytest prueba_chica` en rojo (no existía `prueba_chica.ia`) y en verde (`13 passed`); la
+      frontera falla con un import prohibido de prueba; `tests/test_capacidades.py tests/test_motor_tablas.py`
+      `17 passed`. Bordes conocidos: `pendientes.ver_rama_abierta`, `despachador._botones` (no estaba en el plan)
+      y `herramientas.crear_borrador_tarea`, los tres hacia `ingreso_tareas`. Si la redacción falla, lo ya
+      manejado se deshace (punto de guardado). Resuelto el `PENDIENTE` de la sección 4: `responder` no fuerza la
+      herramienta en ningún proveedor; el adaptador de la E2-3b trae la llamada estructurada. Commit `1673e97`;
+      lo registra el commit que sigue. Unas 980 líneas, la mitad pruebas.
 - [ ] **E2-3. Jugadas y fichas** (delegada): lista cerrada, fichas, atraso, aviso al administrador; que una
       previsión sólo reemplace a otra de la misma tarea. Unas 450.
 - [ ] **E2-3b. Primer contacto real** (decisión del usuario, 2026-10-05; `AGENTS.md`, punto 5): se adelantan de la
@@ -235,4 +243,4 @@ previo en `workspace_setting`, no en el importador; el referente es quien aprueb
   `PENDIENTE` confirmar al escribir los YAML que ninguna conversación depende de ellas.
 - **La etapa no es tan chica:** si una tarea pide un caso especial, se frena (5c.1).
 
-**Próximo paso:** la E2-2 (esqueleto y frontera).
+**Próximo paso:** la E2-3 (jugadas y fichas).
