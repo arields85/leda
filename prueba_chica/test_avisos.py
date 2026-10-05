@@ -145,7 +145,7 @@ def test_un_aviso_cuya_tarea_se_cerro_antes_de_salir_se_omite(conn, mundo, escri
     assert aviso["resuelto_en"] == _hora(6, 9)
 
 
-# --- La corrección de una previsión (9f) ---------------------------------------------------------
+# --- La corrección de una previsión (9f) -------------------------------------------------
 
 def test_la_correccion_al_referente_sale_por_el_mismo_camino(conn, mundo, escribe):
     _tarea(conn, mundo, "Probar las comunicaciones")

@@ -1,4 +1,4 @@
-"""El aviso previo, disparado a mano (E2-3b; desde la E2-5, por el camino de los avisos guardados).
+"""El aviso previo, disparado a mano (E2-3b; desde la E2-5, como todo aviso guardado).
 
     python -m prueba_chica.avisar corework <persona> <palabras del título> [--de-nuevo]
 
@@ -27,12 +27,12 @@ from leda.calendario import Calendario
 from leda.db import espacio
 
 from .avisos import Momento, enviar_avisos, guardar, hechos_de_la_escalera, leer_tarea
+from .escalera import HECHOS_DEL_AVISO_PREVIO, clave
 from .fichas import ESTADOS_ABIERTOS, integrantes_que_coinciden, palabras
 from .ia import IA
 from .tiempo import Reloj
 
 TIPO = "aviso_previo"
-HECHOS_DEL_AVISO_PREVIO = {"aviso": "vencimiento_proximo", "necesita_respuesta": False}
 
 
 @dataclass
@@ -42,11 +42,6 @@ class ResultadoAviso:
     texto: str | None
     hechos: dict[str, Any]
     motivo: str | None = None   # el de la omisión
-
-
-def clave_del_aviso_previo(task_id: str, vence: str) -> str:
-    """La misma para la escalera y el comando: un aviso previo por tarea y vencimiento."""
-    return f"motor:{TIPO}:{task_id}:{vence}"
 
 
 def resolver(cur, persona: str, tarea: str) -> tuple[str, str, str]:
@@ -82,7 +77,8 @@ def avisar_vencimiento(conn: psycopg.Connection, workspace_id: str, membership_i
                         where membership_id = %s""", (membership_id,))
         persona = cur.fetchone()
         tarea = leer_tarea(cur, task_id)
-        if persona is None or tarea is None or                 str(tarea["responsable_membership_id"]) != membership_id:
+        if (persona is None or tarea is None
+                or str(tarea["responsable_membership_id"]) != membership_id):
             raise ValueError("La tarea no es de esa persona.")
         if tarea["estado"] not in ESTADOS_ABIERTOS:
             raise ValueError(f"La tarea no está abierta (está {tarea['estado']}).")
@@ -93,12 +89,13 @@ def avisar_vencimiento(conn: psycopg.Connection, workspace_id: str, membership_i
 
         m = Momento(cur, workspace_id, Calendario.desde_base(cur, workspace_id), ahora)
         hechos = hechos_de_la_escalera(m, TIPO, tarea, HECHOS_DEL_AVISO_PREVIO)
-        clave = clave_del_aviso_previo(task_id, hechos["vence"])
+        # La misma clave que la escalera: un aviso previo por tarea y vencimiento.
+        la_clave = clave(TIPO, task_id, m.fecha(tarea["fecha_objetivo"]))
         if de_nuevo:
-            clave += f":{ahora.isoformat()}"
+            la_clave += f":{ahora.isoformat()}"
         aviso_id, _ = guardar(cur, workspace_id, TIPO, task_id=task_id,
                               destinatario=membership_id, hechos=hechos,
-                              programado_para=ahora, clave=clave, ahora=ahora)
+                              programado_para=ahora, clave=la_clave, ahora=ahora)
         cur.execute("select estado, hechos from scheduled_notice where id = %s", (aviso_id,))
         antes = cur.fetchone()
     if antes["estado"] != "guardado":

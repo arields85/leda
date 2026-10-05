@@ -385,12 +385,24 @@ def dependientes(cur, task_id) -> list[dict[str, Any]]:
 # dejan de corresponder: la tarea ya no está abierta, está bloqueada, cambió su vencimiento o
 # su responsable, o la persona ya contestó (la espera se cerró).
 
+# Lo que se lee de nuevo en cada momento; lo demás de un aviso de la escalera es fijo (qué
+# aviso es, el número de pedido, la ausencia). `avisa_que_va_a_escalar` es una marca del código
+# que nunca llega a la IA: en su lugar van los hechos de a quién se escala.
+_DE_ESTE_MOMENTO = frozenset({"tarea", "vence", "dias_habiles_hasta_el_vencimiento",
+                              "atraso_dias_habiles", "estado", "responsable",
+                              "prevision_vigente", "dependientes", "si_no_hay_respuesta"})
+AVISA_QUE_VA_A_ESCALAR = "avisa_que_va_a_escalar"
+
+
 def hechos_de_la_escalera(m: Momento, tipo: str, tarea: dict[str, Any],
                           base: dict[str, Any]) -> dict[str, Any]:
-    """Los hechos de un aviso de la escalera, leídos en este momento: `base` trae lo que no
-    cambia (qué aviso es, cuántos pedidos, la ausencia)."""
+    """Los hechos de un aviso de la escalera, leídos en este momento sobre lo fijo de `base`:
+    cuánto falta o cuánto atraso hay, el estado, la previsión vigente con el estado de su
+    aviso, lo que depende de la tarea y, en el último pedido, a quién se escala."""
     vence = tarea["fecha_objetivo"]
-    hechos = {**base, "tarea": tarea["titulo"], "vence": m.fecha(vence).isoformat()}
+    hechos = {k: v for k, v in base.items()
+              if k not in _DE_ESTE_MOMENTO and k != AVISA_QUE_VA_A_ESCALAR}
+    hechos.update(tarea=tarea["titulo"], vence=m.fecha(vence).isoformat())
     if m.hoy < m.fecha(vence):
         hechos["dias_habiles_hasta_el_vencimiento"] = m.cal.habiles_entre(m.ahora, vence)
     else:
@@ -407,11 +419,11 @@ def hechos_de_la_escalera(m: Momento, tipo: str, tarea: dict[str, Any],
         siguen = dependientes(m.cur, tarea["id"])
         if siguen:
             hechos["dependientes"] = siguen
-    if base.get("avisa_que_va_a_escalar"):
-        hechos["si_no_hay_respuesta"] = {
-            "se_avisa_a": [d["nombre"] for d in quienes_escalan(m.cur, tarea)],
-            "estado": "todavia_no"}
-    return {k: v for k, v in hechos.items() if k != "avisa_que_va_a_escalar"}
+    if base.get(AVISA_QUE_VA_A_ESCALAR):
+        a_quienes = [d["nombre"] for d in quienes_escalan(m.cur, tarea)]
+        if a_quienes:       # un efecto que pasa después: todavía no, y a quién
+            hechos["si_no_hay_respuesta"] = {"se_avisa_a": a_quienes, "estado": "todavia_no"}
+    return hechos
 
 
 def _vigencia_de_la_escalera(m: Momento, aviso) -> tuple[str | None, dict[str, Any]]:
@@ -433,7 +445,7 @@ def _vigencia_de_la_escalera(m: Momento, aviso) -> tuple[str | None, dict[str, A
     if aviso["tipo"] == "aviso_previo" and m.hoy >= m.fecha(tarea["fecha_objetivo"]):
         return "ya_vencio", {}      # un aviso previo que llega al vencimiento ya no es previo
     base = dict(aviso["hechos"])
-    if base.get("necesita_respuesta") or aviso["tipo"] == "escalamiento":
+    if base.get("necesita_respuesta") is True or aviso["tipo"] == "escalamiento":
         if espera_abierta(m.cur, tarea["id"]) is None:
             return "ya_respondio", {}
     return None, hechos_de_la_escalera(m, aviso["tipo"], tarea, base)

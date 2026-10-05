@@ -29,6 +29,11 @@ de nuevo en `src/leda`, con su propia prueba de frontera.
   desde los hechos de ese momento y va al outbox; si no, queda omitido con su motivo. Si la IA
   no lo redacta, se reintenta a los 1, 2, 4 y 8 minutos; al quinto fallo, un incidente y el
   aviso de la falla a quien lo causó, que también redacta la IA.
+- `escalera.py`: la escalera propia (mecánica §9; ADR 0018, 9b), en días hábiles desde el
+  vencimiento: un aviso previo, pedidos de estado desde V que abren una espera y avanzan sólo
+  sin respuesta, y el escalamiento por la ruta del pack. Un bloqueo la detiene; una ausencia
+  la pausa y la vuelta lleva un reencuadre. Sólo guarda avisos: los manda `avisos.py`. La
+  correrá cada minuto el ciclo de la E2-6.
 - `avisar.py`: el comando que dispara a mano el aviso previo de una tarea, por el mismo
   camino que los demás avisos guardados.
 - `tiempo.py`: el reloj del motor. Los momentos los pone el motor, nunca la base.
