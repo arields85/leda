@@ -110,9 +110,15 @@ def otro_espacio(conn) -> dict:
 
 # --- La lista cerrada -----------------------------------------------------------------------
 
+SITUACIONES = ("elegir", "corregir", "cancelar", "dejar_para_despues")
+
+
 def test_la_lista_cerrada_tiene_una_ficha_por_jugada_del_recordatorio():
+    """Las del recordatorio y las de las situaciones generales (E2-4), que no se ofrecen como
+    algo que Leda puede hacer."""
     assert sorted(JUGADAS) == sorted(FICHAS) == sorted(
-        OFRECIDAS + ("entregar", "pedir_reasignacion"))
+        OFRECIDAS + ("entregar", "pedir_reasignacion") + SITUACIONES)
+    assert not any(FICHAS[n].se_ofrece for n in SITUACIONES)
     for ficha in FICHAS.values():
         assert ficha.para_que and ficha.comprueba and ficha.hace and ficha.despues
 
@@ -171,9 +177,10 @@ def test_el_inicio_de_una_tarea_ya_en_curso_lo_dice_sin_efecto(conn, mundo, escr
 
 
 def test_una_tarea_sin_nombrar_es_un_dato_que_falta(conn, mundo, escribe):
+    """Y se pregunta con las tareas como opciones (situación general 5, `test_situaciones`)."""
     hechos = _jugar(conn, escribe, "Marcos", Jugada("anotar_inicio", {}))
     assert hechos == [{"jugada": "anotar_inicio", "resultado": "falta_dato",
-                       "falta": ["tarea"]}]
+                       "falta": ["tarea"], "pregunta": "cual_tarea"}]
     assert _estado_de(conn, mundo["tarea"]) == "asignada"
 
 
@@ -430,8 +437,10 @@ def test_quien_destraba_es_exactamente_una_respuesta(conn, mundo, escribe, dicho
     _jugar(conn, escribe, "Marcos", Jugada(
         "anotar_bloqueo", {"tarea": "T1", "causa": "falta el repuesto"}))
     [hecho] = _jugar(conn, escribe, "Marcos", Jugada("anotar_quien_destraba", dicho))
+    # Las tres respuestas que puede ser, también "nadie más" (revisión de la E2-3b).
     assert hecho == {"jugada": "anotar_quien_destraba", "resultado": "falta_dato",
-                     "falta": ["quien_o_no_sabe"]}
+                     "falta": ["quien_destraba"],
+                     "puede_ser": ["alguien", "no_sabe", "nadie_mas"]}
     assert _cuantas(conn, "blocker_unblocker") == 0
 
 

@@ -4,7 +4,7 @@
 
 Cada jugada se declara con una ficha: qué datos necesita, qué comprueba el código, qué efecto
 hace y qué pasa después. La comprobación común (los datos que faltan, la tarea por su alias y
-los estados en que la jugada vale) la hace `_correr` igual para todas; el manejador de cada
+los estados en que la jugada vale) la hace `correr` igual para todas; el manejador de cada
 ficha hace sólo lo suyo. Ninguna jugada confirma (9a): el efecto va directo, con
 `herramientas.ejecutar(..., ya_confirmada=True)`, que verifica la autoridad igual.
 
@@ -14,7 +14,11 @@ administrador (decisión 1). Las tareas viajan por su alias; un id de la base nu
 IA. Cada jugada corre en su propio punto de guardado: si falla, lo suyo se deshace.
 
 Las jugadas de las situaciones generales (`elegir`, `corregir`, `cancelar`,
-`dejar_para_despues`) son de la E2-4.
+`dejar_para_despues`) están en `situaciones.py`, y las preguntas, en `preguntas.py` (E2-4); acá
+se declaran con las demás. Cada ficha declara lo suyo para ellas: qué preguntas contesta
+(`contesta`) y cómo se deshace lo que anota (`deshacer`, para una corrección, 9f). La duda
+también es común: si a una jugada le falta la tarea, se pregunta con las tareas en que vale
+como opciones (situación general 5).
 """
 
 from __future__ import annotations
@@ -35,6 +39,7 @@ from leda.calendario import Calendario
 from leda.herramientas import (EstadoCambio, NecesitaConfirmacion, NecesitaElegir,
                                NecesitaOpciones, ejecutar)
 
+from . import preguntas, situaciones
 from .ia import Jugada
 
 
@@ -46,7 +51,7 @@ class Contexto:
 
     cur: psycopg.Cursor
     quien: Solicitante
-    entrante_id: str
+    entrante_id: str | None         # None: el turno es un toque
     chat_id: int
     texto: str
     ahora: datetime
@@ -55,6 +60,9 @@ class Contexto:
     ultimos_turnos: tuple[dict[str, Any], ...]
     avisos_guardados: list[str] = field(default_factory=list)
     ultimo_aviso: dict[str, Any] | None = None     # el último que Leda le mandó, y su tarea
+    preguntas_del_turno: list[str] = field(default_factory=list)   # abiertas en este turno
+    dejadas: list[str] = field(default_factory=list)   # dejadas para después en este turno
+    toque: str | None = None        # si el turno es un toque, la etiqueta de la opción tocada
 
     def tarea(self, alias: str) -> dict[str, Any] | None:
         return next((t for t in self.tareas if t["alias"] == alias), None)
@@ -86,7 +94,13 @@ class Ficha:
     del_responsable: bool = False   # la tarea tiene que ser de quien escribe
     # En qué estados de la tarea vale, si es del responsable: por omisión, abierta.
     estados: frozenset[str] = ESTADOS_ABIERTOS
-    se_ofrece: bool = True          # False: se reconoce, pero no se hace por chat (9g)
+    # False: no está entre lo que Leda dice que puede hacer: se reconoce pero no se hace por
+    # chat (9g), o es de una situación general.
+    se_ofrece: bool = True
+    contesta: tuple[str, ...] = ()  # las preguntas sobre su tarea que contesta al anotarse
+    # Cómo se deshace lo que anotó, agregando hechos (9f): `None` si no hay nada que deshacer;
+    # si no, los hechos de la corrección y los datos para anotarlo en la tarea correcta.
+    deshacer: Callable[[Contexto, dict[str, Any]], dict[str, Any] | None] | None = None
 
 
 # Lo que Leda propone cuando no hay otra persona que destrabe el bloqueo (la persona no sabe
@@ -103,9 +117,13 @@ EN_COLA_SIN_ENVIAR = "en_cola_sin_enviar"       # en la cola de su canal; sale e
 
 # --- Comprobación común --------------------------------------------------------------------
 
-def _correr(ficha: Ficha, ctx: Contexto, jugada: Jugada) -> dict[str, Any]:
+def correr(ficha: Ficha, ctx: Contexto, jugada: Jugada) -> dict[str, Any]:
+    """La comprobación común y el manejador de la ficha; si la jugada se anotó, contesta las
+    preguntas que esperaban eso (`preguntas.contestar`)."""
     datos = dict(jugada.datos or {})
     faltan = [k for k in ficha.necesita if _vacio(datos.get(k))]
+    if "tarea" in faltan:
+        return _duda(ficha, ctx, datos)
     if faltan:
         return _hecho(ficha, "falta_dato", falta=faltan)
     tarea = None
@@ -123,13 +141,38 @@ def _correr(ficha: Ficha, ctx: Contexto, jugada: Jugada) -> dict[str, Any]:
                 if tarea["estado"] not in ficha.estados:
                     return _hecho(ficha, "no_se_puede", motivo="estado",
                                   tarea=_tarea(tarea), estado=tarea["estado"])
-            return {"jugada": ficha.nombre, **ficha.manejar(ctx, datos, tarea)}
+            hecho = {"jugada": ficha.nombre, **ficha.manejar(ctx, datos, tarea)}
+            if hecho.get("resultado") == "anotado" and hecho["jugada"] == ficha.nombre:
+                anotada = tarea or ctx.tarea((hecho.get("tarea") or {}).get("alias", ""))
+                if anotada is not None:
+                    preguntas.contestar(ctx, ficha.nombre, ficha.contesta, anotada["id"])
+            return hecho
     except Exception as e:      # el punto de guardado ya deshizo lo de esta jugada
         rechazo = _rechazo_del_dominio(e)
         if rechazo is None:
             raise
         resultado, mas = rechazo
         return _hecho(ficha, resultado, tarea=_tarea(tarea) if tarea else None, **mas)
+
+
+def _duda(ficha: Ficha, ctx: Contexto, datos: dict[str, Any]) -> dict[str, Any]:
+    """Situación general 5: la jugada no dice de qué tarea habla. Leda no adivina: pregunta
+    con las tareas de la persona en que la jugada vale como opciones, y la jugada espera la
+    elección. Sin ninguna en que valga, lo dice."""
+    candidatas = [t for t in ctx.tareas if t["estado"] in ficha.estados]
+    if not candidatas:
+        return _hecho(ficha, "no_se_puede", motivo="ninguna_tarea_posible")
+    ahora = preguntas.abrir(ctx, preguntas.CUAL_TAREA, None, se_puede_dejar=True,
+                            jugada={"nombre": ficha.nombre, "datos": datos},
+                            opciones_de_tareas=candidatas)
+    return _hecho(ficha, "falta_dato", falta=["tarea"],
+                  **{_clave_de_pregunta(ahora): preguntas.CUAL_TAREA})
+
+
+def _clave_de_pregunta(ahora: bool) -> str:
+    """En el hecho de una jugada, la pregunta que abrió: la que se hace ahora (`pregunta`) o
+    una que quedó para después (`pregunta_para_despues`), que no se hace en esta respuesta."""
+    return "pregunta" if ahora else "pregunta_para_despues"
 
 
 def _rechazo_del_dominio(e: Exception) -> tuple[str, dict[str, Any]] | None:
@@ -183,49 +226,11 @@ def _cerrar_esperas(ctx: Contexto, task_id: str) -> None:
 
 
 def _abrir_pregunta(ctx: Contexto, tipo: str, task_id: str, *, se_puede_dejar: bool,
-                    jugada: dict[str, Any]) -> None:
-    """Una pregunta de Leda. Si ya hay una abierta, la nueva queda para después: nunca dos
-    preguntas juntas, en el orden en que salieron (9d). Cómo se retoma, la E2-4."""
-    cur = ctx.cur
-    cur.execute("""select q.id from conversation_state s
-                     join conversation_question q on q.id = s.pregunta_abierta_id
-                    where s.membership_id = %s and q.cerrada_en is null""",
-                (ctx.quien.membership_id,))
-    hay_otra = cur.fetchone() is not None
-    cur.execute(
-        """insert into conversation_question (workspace_id, membership_id, tipo, task_id,
-                                              jugada, se_puede_dejar, abierta_en,
-                                              para_despues_en)
-           values (%s, %s, %s, %s, %s, %s, %s, %s) returning id""",
-        (ctx.quien.workspace_id, ctx.quien.membership_id, tipo, task_id,
-         json.dumps(jugada, ensure_ascii=False), se_puede_dejar, ctx.ahora,
-         ctx.ahora if hay_otra else None))
-    pregunta = str(cur.fetchone()["id"])
-    if not hay_otra:
-        cur.execute(
-            """insert into conversation_state (membership_id, workspace_id,
-                                               pregunta_abierta_id, actualizado_en)
-               values (%s, %s, %s, %s)
-               on conflict (membership_id) do update
-                  set pregunta_abierta_id = excluded.pregunta_abierta_id,
-                      actualizado_en = excluded.actualizado_en""",
-            (ctx.quien.membership_id, ctx.quien.workspace_id, pregunta, ctx.ahora))
-
-
-def _cerrar_preguntas(ctx: Contexto, tipo: str, task_id: str, detalle: dict) -> None:
-    cur = ctx.cur
-    cur.execute(
-        """update conversation_question
-              set cerrada_en = %s, cierre = 'respondida', cierre_detalle = %s
-            where membership_id = %s and tipo = %s and task_id = %s and cerrada_en is null
-        returning id""",
-        (ctx.ahora, json.dumps(detalle), ctx.quien.membership_id, tipo, task_id))
-    cerradas = [r["id"] for r in cur.fetchall()]
-    if cerradas:
-        cur.execute(
-            """update conversation_state set pregunta_abierta_id = null, actualizado_en = %s
-                where membership_id = %s and pregunta_abierta_id = any(%s)""",
-            (ctx.ahora, ctx.quien.membership_id, cerradas))
+                    jugada: dict[str, Any]) -> str:
+    """Una pregunta de Leda, ordenada con las demás (`preguntas.abrir`: nunca dos juntas, 9d).
+    Devuelve la clave con que el hecho la nombra (`_clave_de_pregunta`)."""
+    return _clave_de_pregunta(preguntas.abrir(ctx, tipo, task_id,
+                                              se_puede_dejar=se_puede_dejar, jugada=jugada))
 
 
 def referente(cur, responsable_membership_id: str) -> dict[str, str] | None:
@@ -339,23 +344,25 @@ def _anotar_bloqueo(ctx: Contexto, datos: dict, tarea: dict) -> dict:
     jugada = {"nombre": "anotar_bloqueo", "datos": datos}
     if _vacio(datos.get("causa")):
         # Sin causa no hay bloqueo (mecánica §3): se pregunta y no se anota nada (9c, 1).
-        _abrir_pregunta(ctx, "causa_del_bloqueo", tarea["id"], se_puede_dejar=True,
-                        jugada=jugada)
+        clave = _abrir_pregunta(ctx, "causa_del_bloqueo", tarea["id"], se_puede_dejar=True,
+                                jugada=jugada)
         return {"resultado": "falta_dato", "falta": ["causa"], "tarea": _tarea(tarea),
-                "pregunta": "causa_del_bloqueo"}
+                clave: "causa_del_bloqueo"}
     causa = str(datos["causa"]).strip()
     r = ejecutar(ctx.cur, ctx.quien, "registrar_bloqueo",
                  {"tarea_id": tarea["id"], "causa": causa}, ya_confirmada=True)
     if "bloqueo_id" not in r:
         return _no_hecho(r, tarea)
     _cerrar_esperas(ctx, tarea["id"])
+    # La causa contesta su pregunta antes de que se abra la siguiente.
+    preguntas.contestar(ctx, "anotar_bloqueo", ("causa_del_bloqueo",), tarea["id"])
     # Todo bloqueo con causa: quién lo puede destrabar, una pregunta que espera como un pedido
     # de estado. Lo decide la respuesta de la persona, no un juicio de la IA sobre la causa
     # (9c, corregida el 2026-10-05).
-    _abrir_pregunta(ctx, "quien_destraba", tarea["id"], se_puede_dejar=False,
-                    jugada={**jugada, "bloqueo_id": r["bloqueo_id"]})
+    clave = _abrir_pregunta(ctx, "quien_destraba", tarea["id"], se_puede_dejar=False,
+                            jugada={**jugada, "bloqueo_id": r["bloqueo_id"]})
     return {"resultado": "anotado", "tarea": _tarea(tarea), "causa": causa,
-            "pregunta": "quien_destraba"}
+            clave: "quien_destraba"}
 
 
 def _anotar_quien_destraba(ctx: Contexto, datos: dict, tarea: dict | None) -> dict:
@@ -364,7 +371,9 @@ def _anotar_quien_destraba(ctx: Contexto, datos: dict, tarea: dict | None) -> di
     nadie_mas = datos.get("nadie_mas") is True      # le toca a la persona misma
     quien_texto = None if _vacio(datos.get("quien")) else str(datos["quien"]).strip()
     if no_sabe + nadie_mas + (quien_texto is not None) != 1:
-        return {"resultado": "falta_dato", "falta": ["quien_o_no_sabe"]}
+        # Una sola respuesta, de las tres que puede ser (revisión de la E2-3b).
+        return {"resultado": "falta_dato", "falta": ["quien_destraba"],
+                "puede_ser": ["alguien", "no_sabe", "nadie_mas"]}
 
     # El bloqueo: el de la tarea nombrada o, si no la nombra, el de la pregunta abierta.
     if tarea is not None:
@@ -410,7 +419,8 @@ def _anotar_quien_destraba(ctx: Contexto, datos: dict, tarea: dict | None) -> di
          quien_texto if quien_texto is not None and integrante is None else None,
          no_sabe, ctx.quien.membership_id, ctx.ahora))
     anotado = str(cur.fetchone()["id"])
-    _cerrar_preguntas(ctx, "quien_destraba", task_id, {"blocker_unblocker_id": anotado})
+    preguntas.cerrar_de_tipo(ctx, "quien_destraba", task_id, "respondida",
+                             {"blocker_unblocker_id": anotado})
     _cerrar_esperas(ctx, task_id)
     hecho = {"resultado": "anotado", **({"tarea": _tarea(alias)} if alias else {}),
              "quien_destraba": ({"no_sabe": True} if no_sabe
@@ -467,6 +477,114 @@ def _pedir_reasignacion(ctx: Contexto, datos: dict, tarea: dict | None) -> dict:
             **({"tarea": _tarea(tarea)} if tarea else {})}
 
 
+# --- Cómo se deshace lo anotado (9f) -------------------------------------------------------
+#
+# Una corrección agrega hechos, nunca borra (constitución §12): la tarea vuelve a como estaba
+# por la misma operación del dominio con que cambia siempre, y la historia guarda los dos.
+
+MOTIVO_DE_LA_CORRECCION = "corrección: se había anotado en la tarea equivocada"
+
+
+def _deshacer_inicio(ctx: Contexto, tarea: dict) -> dict | None:
+    """Un inicio sólo se anota desde `asignada` (su ficha), así que vuelve a `asignada`."""
+    fila = _exigir_responsable(ctx.cur, ctx.quien, tarea["id"])
+    if str(fila["estado"]) != "en_curso":
+        return None
+    r = ejecutar(ctx.cur, ctx.quien, "actualizar_estado",
+                 {"tarea_id": tarea["id"], "estado": "asignada",
+                  "motivo": MOTIVO_DE_LA_CORRECCION}, ya_confirmada=True)
+    if r.get("estado") != "asignada":
+        return None
+    return {"hechos": {"vuelve_a": {"estado": "asignada"}}, "datos": {}}
+
+
+def _deshacer_prevision(ctx: Contexto, tarea: dict) -> dict | None:
+    """Una previsión de corrección que reemplaza a la equivocada con la de antes (o con la
+    fecha comprometida, si no había). Su aviso al referente: si no salió, se retira; si salió,
+    se guarda una corrección breve para él (9f)."""
+    cur, cal = ctx.cur, ctx.calendario
+    cur.execute("""select * from task_forecast f
+                    where f.task_id = %s
+                      and not exists (select 1 from task_forecast g where g.reemplaza_id = f.id)
+                    order by f.at desc limit 1""", (tarea["id"],))
+    equivocada = cur.fetchone()
+    if (equivocada is None or equivocada["es_correccion"]
+            or str(equivocada["dicho_por_membership_id"]) != ctx.quien.membership_id):
+        return None
+    anterior = None
+    if equivocada["reemplaza_id"] is not None:
+        cur.execute("select * from task_forecast where id = %s", (equivocada["reemplaza_id"],))
+        anterior = cur.fetchone()
+    comprometida = equivocada["fecha_comprometida"].astimezone(cal.zona).date()
+    vuelve = anterior["fecha_prevista"] if anterior else comprometida
+    cur.execute(
+        """insert into task_forecast (task_id, fecha_prevista, motivo, fecha_comprometida,
+                                      atraso_dias_habiles, reemplaza_id, es_correccion,
+                                      dicho_por_membership_id, at)
+           values (%s, %s, %s, %s, %s, %s, true, %s, %s) returning id""",
+        (tarea["id"], vuelve, anterior["motivo"] if anterior else None,
+         equivocada["fecha_comprometida"],
+         anterior["atraso_dias_habiles"] if anterior else 0, equivocada["id"],
+         ctx.quien.membership_id, ctx.ahora))
+    correccion_id = str(cur.fetchone()["id"])
+    hechos: dict[str, Any] = {
+        "vuelve_a": ({"prevision": vuelve.isoformat()} if anterior
+                     else {"fecha_comprometida": comprometida.isoformat()}),
+        "prevision_corregida": equivocada["fecha_prevista"].isoformat()}
+
+    cur.execute("""select id, estado from scheduled_notice
+                    where workspace_id = %s and dedupe_key = %s""",
+                (ctx.quien.workspace_id, f"motor:nueva_prevision:{equivocada['id']}"))
+    aviso = cur.fetchone()
+    quien_aprueba = referente(cur, ctx.quien.membership_id)
+    if aviso is not None and aviso["estado"] == "guardado":
+        cur.execute("""update scheduled_notice
+                          set estado = 'omitido', motivo_omision = 'prevision_corregida',
+                              resuelto_en = %s
+                        where id = %s""", (ctx.ahora, aviso["id"]))
+        hechos["aviso_de_la_prevision_corregida"] = {"estado": "retirado_sin_enviar"}
+    elif aviso is not None and aviso["estado"] == "enviado" and quien_aprueba is not None:
+        sale = cal.dentro_de_jornada(ctx.ahora)
+        cur.execute(
+            """insert into scheduled_notice (workspace_id, tipo, task_id,
+                                             destinatario_membership_id, hechos,
+                                             programado_para, dedupe_key, creado_en)
+               values (%s, 'correccion_de_prevision', %s, %s, %s, %s, %s, %s) returning id""",
+            (ctx.quien.workspace_id, tarea["id"], quien_aprueba["membership_id"],
+             json.dumps({"tarea": tarea["titulo"], "responsable": ctx.quien.nombre,
+                         "prevision_que_no_vale": equivocada["fecha_prevista"].isoformat(),
+                         "motivo": "se_anoto_en_la_tarea_equivocada",
+                         **hechos["vuelve_a"]}, ensure_ascii=False),
+             sale, f"motor:correccion_de_prevision:{correccion_id}", ctx.ahora))
+        ctx.avisos_guardados.append(str(cur.fetchone()["id"]))
+        hechos["correccion_al_referente"] = {"a": quien_aprueba["nombre"],
+                                             "estado": GUARDADO_SIN_ENVIAR,
+                                             "sale": sale.isoformat()}
+    return {"hechos": hechos,
+            "datos": {"fecha": equivocada["fecha_prevista"].isoformat(),
+                      **({"motivo": equivocada["motivo"]} if equivocada["motivo"] else {})}}
+
+
+def _deshacer_bloqueo(ctx: Contexto, tarea: dict) -> dict | None:
+    """El bloqueo se resuelve como corrección (`resolver_bloqueo`): la tarea vuelve al estado
+    que tenía antes de bloquearse."""
+    cur = ctx.cur
+    cur.execute("""select id, causa from blocker
+                    where task_id = %s and resuelto_en is null and abierto_por = %s
+                    order by abierto_en desc limit 1""", (tarea["id"], ctx.quien.membership_id))
+    bloqueo = cur.fetchone()
+    if bloqueo is None:
+        return None
+    r = ejecutar(cur, ctx.quien, "resolver_bloqueo",
+                 {"bloqueo_id": str(bloqueo["id"]), "resolucion": MOTIVO_DE_LA_CORRECCION},
+                 ya_confirmada=True)
+    if not r.get("resuelto"):
+        return None
+    cur.execute("select estado::text estado from task where id = %s", (tarea["id"],))
+    return {"hechos": {"vuelve_a": {"estado": cur.fetchone()["estado"]}},
+            "datos": {"causa": bloqueo["causa"]}}
+
+
 FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
     Ficha("anotar_inicio", "anotar que arrancó una tarea",
           necesita=("tarea",), opcional=(),
@@ -474,7 +592,7 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
           hace="la pasa a en curso (actualizar_estado)",
           despues="cierra la espera de esa tarea",
           manejar=_anotar_inicio, del_responsable=True,
-          estados=frozenset({"asignada"})),
+          estados=frozenset({"asignada"}), deshacer=_deshacer_inicio),
     Ficha("anotar_prevision", "anotar para cuándo prevé terminar una tarea, y por qué",
           necesita=("tarea", "fecha"), opcional=("motivo",),
           comprueba="que sea el responsable, que la tarea esté abierta y tenga fecha "
@@ -483,14 +601,15 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
                "comprometida no cambia",
           despues="guarda el aviso al referente, salvo que vuelva a la fecha comprometida; "
                   "cierra la espera de esa tarea",
-          manejar=_anotar_prevision, del_responsable=True),
+          manejar=_anotar_prevision, del_responsable=True, deshacer=_deshacer_prevision),
     Ficha("anotar_bloqueo", "anotar que una tarea está trabada y por qué",
           necesita=("tarea",), opcional=("causa",),
           comprueba="que sea el responsable y que la tarea esté abierta",
           hace="sin causa, nada; con causa, registra el bloqueo (registrar_bloqueo)",
           despues="sin causa, pregunta la causa; con causa, pregunta quién lo puede "
                   "destrabar. Ningún aviso al referente (9c)",
-          manejar=_anotar_bloqueo, del_responsable=True),
+          manejar=_anotar_bloqueo, del_responsable=True, contesta=("causa_del_bloqueo",),
+          deshacer=_deshacer_bloqueo),
     Ficha("anotar_quien_destraba", "anotar quién puede destrabar un bloqueo",
           necesita=(), opcional=("tarea", "quien", "no_sabe", "nadie_mas"),
           comprueba="que haya un bloqueo abierto en una tarea suya",
@@ -498,7 +617,7 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
                "que le toca a la persona misma",
           despues="cierra la pregunta y la espera; si no se sabe o le toca a ella, propone "
                   "salidas",
-          manejar=_anotar_quien_destraba),
+          manejar=_anotar_quien_destraba, contesta=("quien_destraba",)),
     Ficha("consultar_pendientes", "contar qué tareas tiene pendientes",
           necesita=(), opcional=(),
           comprueba="nada", hace="lee sus tareas abiertas (consultar_tareas)",
@@ -513,11 +632,42 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
           despues="dice quién lo decide y ofrece una nueva previsión; sin aviso al "
                   "administrador",
           manejar=_pedir_reasignacion, se_ofrece=False),
+    # Las situaciones generales (`situaciones.py`): valen igual para todas las fichas.
+    Ficha("elegir", "elegir una de las opciones de la pregunta abierta",
+          necesita=("opcion",), opcional=(),
+          comprueba="que la opción sea de una pregunta suya; si la pregunta ya se cerró, no "
+                    "hace nada y dice con qué se cerró",
+          hace="cierra la pregunta con esa opción y hace la jugada que esperaba, con la "
+               "opción como dato y las comprobaciones de su ficha",
+          despues="vuelve la pregunta que quedó para después, si hay",
+          manejar=situaciones.elegir, se_ofrece=False),
+    Ficha("corregir", "corregir algo ya anotado que era de otra tarea o que no pasó",
+          necesita=("corrige", "tarea"), opcional=("tarea_correcta",),
+          comprueba="que sea el responsable y que eso haya quedado anotado en esa tarea en "
+                    "sus últimos turnos",
+          hace="agrega un hecho de corrección: la tarea vuelve a como estaba y, si la dice, "
+               "el hecho va a la tarea correcta; nada se borra (9f)",
+          despues="un aviso que no salió se retira; uno que ya salió lleva una corrección "
+                  "al referente",
+          manejar=situaciones.corregir, del_responsable=True, se_ofrece=False),
+    Ficha("cancelar", "dejar sin efecto la pregunta abierta",
+          necesita=(), opcional=(),
+          comprueba="que haya una pregunta abierta y que se pueda dejar (la de quién destraba "
+                    "espera respuesta, 9c)",
+          hace="la cierra sin anotar nada",
+          despues="no se vuelve a preguntar; vuelve la que quedó para después, si hay",
+          manejar=situaciones.cancelar, se_ofrece=False),
+    Ficha("dejar_para_despues", "dejar la pregunta abierta para más tarde",
+          necesita=(), opcional=(),
+          comprueba="que haya una pregunta abierta",
+          hace="la deja para después, sin cerrarla",
+          despues="vuelve en un mensaje siguiente, cuando no haya otra abierta",
+          manejar=situaciones.dejar_para_despues, se_ofrece=False),
 )})
 
 
 def _manejador(ficha: Ficha) -> Manejador:
-    return lambda ctx, jugada: _correr(ficha, ctx, jugada)
+    return lambda ctx, jugada: correr(ficha, ctx, jugada)
 
 
 # La lista cerrada: nombre de la jugada → su manejador.
@@ -528,3 +678,8 @@ JUGADAS: Mapping[str, Manejador] = MappingProxyType(
 def lo_que_puede_hacer(jugadas: Mapping[str, Manejador]) -> list[str]:
     """Lo que Leda puede hacer por chat, para el hecho de algo fuera de la lista."""
     return [FICHAS[n].para_que for n in sorted(jugadas) if n in FICHAS and FICHAS[n].se_ofrece]
+
+
+# Para las situaciones generales (`situaciones.py`).
+vacio = _vacio
+tarea_hecho = _tarea

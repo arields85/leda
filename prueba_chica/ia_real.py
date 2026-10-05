@@ -53,6 +53,11 @@ DATOS = {
     "nadie_mas": ("boolean", "La persona dice que nadie más puede destrabarla: le toca a "
                              "ella."),
     "a": ("string", "A quién quiere pasarle la tarea, como lo nombró la persona."),
+    "opcion": ("string", "El alias de la opción que eligió (O1, O2...), de la pregunta "
+                         "abierta."),
+    "corrige": ("string", "Qué jugada ya anotada se corrige, por su nombre."),
+    "tarea_correcta": ("string", "El alias de la tarea en la que sí va, si la persona la "
+                                 "dice."),
     "que_pide": ("string", "Sólo con fuera_de_la_lista: qué pidió la persona, resumido."),
 }
 

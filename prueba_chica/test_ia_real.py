@@ -197,6 +197,18 @@ def test_las_instrucciones_describen_el_trabajo_y_el_marcador():
         assert "¿te sirve" not in texto.lower()
 
 
+def test_las_instrucciones_describen_las_situaciones_generales():
+    """E2-4: la IA sabe que hay una pregunta abierta y las jugadas que la completan, dejan o
+    corrigen; la redacción hace una sola pregunta, la que trae el pedido, y sabe qué es lo que
+    quedó para después, un toque y una pregunta de antes. Nombres de datos, no frases."""
+    for jugada in ("elegir", "corregir", "cancelar", "dejar_para_despues", "corrige",
+                   "tarea_correcta", "opcion"):
+        assert jugada in INSTRUCCIONES_JUGADAS, jugada
+    for marcador in ("pregunta", "desde_antes", "pregunta_para_despues", "toco", "opciones",
+                     "cerrada_con"):
+        assert marcador in INSTRUCCIONES_REDACCION, marcador
+
+
 def test_la_redaccion_lee_el_estado_de_lo_que_pasa_despues():
     """Primer contacto real (2026-10-05): un aviso guardado se contó como hecho. La regla es
     de lectura de los hechos, para todo efecto que pasa después, sin frases de ejemplo."""
