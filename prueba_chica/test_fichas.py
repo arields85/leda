@@ -466,7 +466,8 @@ def test_lo_que_no_esta_en_la_lista_no_hace_nada_y_avisa_al_administrador(conn, 
     assert hechos == [
         {"jugada": nombre, "resultado": "fuera_de_la_lista",
          "lo_que_puede_hacer": [FICHAS[n].para_que for n in sorted(OFRECIDAS)],
-         "aviso_al_administrador": True}
+         # Leda lo sabe, pero lo dice sólo si la persona lo pregunta (9g).
+         "solo_si_pregunta": {"aviso_al_administrador": True}}
         for nombre in ("recordar_algo_personal", "otra_cosa_nueva")]
     assert _estado_de(conn, mundo["tarea"]) == "asignada"
     # Un solo aviso por mensaje, que apunta al mensaje que lo provocó.
@@ -479,13 +480,17 @@ def test_lo_que_no_esta_en_la_lista_no_hace_nada_y_avisa_al_administrador(conn, 
     [aviso] = _todos(conn, "select cuerpo, chat_id from admin_notice")
     assert aviso["chat_id"] == 90000
     assert pedido in aviso["cuerpo"] and "lista cerrada de jugadas" in aviso["cuerpo"]
+    # Su título no dice que Leda no pudo responder: respondió, con lo que puede hacer.
+    assert aviso["cuerpo"].splitlines()[0] == (
+        "Leda recibió de Marcos un pedido que todavía no sabe hacer")
+    assert "no pudo responder" not in aviso["cuerpo"]
     # Si después pregunta, la IA ve en los últimos turnos que se avisó (conversación 12).
     quien, siguiente = escribe("Marcos", "y eso le avisaste a alguien?")
     ia = IAGuionada(jugadas=[[]], redacciones=["Sí."])
     procesar_turno(conn, quien, siguiente, ia, RelojFijo(AHORA))
     [entrada] = [t for t in ia.pedidos_de_jugadas[0]["ultimos_turnos"]
                  if t["sentido"] == "entrada"]
-    assert entrada["hechos"][0]["aviso_al_administrador"] is True
+    assert entrada["hechos"][0]["solo_si_pregunta"] == {"aviso_al_administrador": True}
 
 
 # --- Aislamiento ----------------------------------------------------------------------------

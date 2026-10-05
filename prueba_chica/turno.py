@@ -56,6 +56,10 @@ ULTIMOS_TURNOS = 10
 # severidad baja con etapa propia, que `registrar_incidente` lleva al bot de administración.
 ETAPA_FUERA_DE_LA_LISTA = "motor_fuera_de_la_lista"
 
+# Dentro de un hecho, lo que Leda sabe y dice sólo si la persona lo pregunta (decisión 9g;
+# la misma lógica que la constitución §9). Un mecanismo para cualquier hecho, no una frase.
+SOLO_SI_PREGUNTA = "solo_si_pregunta"
+
 
 @dataclass
 class ResultadoTurno:
@@ -196,9 +200,11 @@ def _no_vacio(texto: str) -> str:
 def _manejar(ctx: Contexto, jugada: Jugada, jugadas: Mapping[str, Manejador]) -> dict:
     manejador = jugadas.get(jugada.nombre)
     if manejador is None:
+        # Que se avisó al administrador es cierto, pero se dice sólo si la persona lo
+        # pregunta (9g): va en `solo_si_pregunta`, que la redacción trata siempre igual.
         return {"jugada": jugada.nombre, "resultado": "fuera_de_la_lista",
                 "lo_que_puede_hacer": lo_que_puede_hacer(jugadas),
-                "aviso_al_administrador": True}
+                SOLO_SI_PREGUNTA: {"aviso_al_administrador": True}}
     return manejador(ctx, jugada)
 
 

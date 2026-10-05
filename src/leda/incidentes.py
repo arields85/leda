@@ -151,6 +151,9 @@ class ExplicacionDeEtapa:
     que_paso: str
     que_vio: str
     que_hacer: str
+    # El título del aviso, cuando no es "Leda no pudo responderle a {nombre}": una
+    # etapa en la que Leda sí respondió (el Motor, `motor_fuera_de_la_lista`).
+    titulo: str | None = None
 
 
 _BUSCAR_DETALLE = "Buscá el detalle con `python -m leda incidentes <espacio>`"
@@ -318,6 +321,17 @@ EXPLICACION_POR_ETAPA: dict[str, ExplicacionDeEtapa] = {
                  "no desapareció."),
         que_hacer=(f"{_BUSCAR_DETALLE} y verificá que el chat de {{nombre}} "
                    "no tenga un borrador suelto.")),
+    # El Motor (`prueba_chica/turno.py`, ADR 0018, decisiones 1 y 9g): un pedido que no
+    # está en la lista cerrada de jugadas. No es una falla: Leda respondió.
+    "motor_fuera_de_la_lista": ExplicacionDeEtapa(
+        titulo="Leda recibió de {nombre} un pedido que todavía no sabe hacer",
+        que_paso=("Le pidieron a Leda algo que no está en la lista de lo que hace "
+                  "por chat. No hizo nada y respondió con lo que sí puede hacer."),
+        que_vio=("La respuesta de Leda con lo que puede hacer por chat. Que se "
+                 "avisó a la administración se le dice sólo si lo pregunta."),
+        que_hacer=("Leé el mensaje y decidí si hace falta una jugada nueva (ADR "
+                   "0018, decisión 1); si hace falta, se escribe primero como "
+                   "conversación de prueba. No hace falta avisarle a {nombre}.")),
 }
 
 _EXPLICACION_GENERICA = ExplicacionDeEtapa(
@@ -353,8 +367,11 @@ def armar_aviso_admin(*, incident_id: str, slug: str | None,
     `mensaje` es el disparador que el aviso ya mostraba, sin nada nuevo."""
     explicacion = EXPLICACION_POR_ETAPA.get(etapa or "", _EXPLICACION_GENERICA)
     quien = nombre or "la persona"
-    titulo = (f"⚠️ Leda no pudo responderle a {nombre}" if nombre
-              else "⚠️ Leda tuvo un problema")
+    if explicacion.titulo:
+        titulo = explicacion.titulo.format(nombre=quien)
+    else:
+        titulo = (f"⚠️ Leda no pudo responderle a {nombre}" if nombre
+                  else "⚠️ Leda tuvo un problema")
     return "\n".join((
         titulo,
         "",
