@@ -78,3 +78,22 @@ def test_los_hechos_esperados_se_comparan_con_el_aviso_de_ese_tipo_y_esa_tarea()
     assert not _sale_coincide({"tarea": "PLC", "hechos": {"vence": "2026-11-06"}}, junto,
                               {"PLC"})
     assert _sale_coincide({"tarea": "PLC", "hechos": {"numero": 1}}, junto, {"PLC"})
+
+
+def test_cada_aviso_de_un_envio_va_con_sus_propios_hechos():
+    """Los avisos de un envío se emparejan con sus hechos por el aviso mismo, no por posición:
+    uno sin hechos no corre a los demás (revisión de la corrida en seco con las 16)."""
+    from prueba_chica.corredor import _avisos_del_envio
+
+    titulos = {"PLC": "Programar PLC", "COM": "Revisar comunicaciones"}
+    avisos = [{"id": "b", "tipo": "pedido_de_estado", "tarea": "PLC",
+               "hechos": {"tarea": "Programar PLC", "numero": 1}},
+              {"id": "a", "tipo": "aviso_previo", "tarea": "COM", "hechos": None}]
+
+    de_cada_uno, hechos = _avisos_del_envio(avisos, titulos)
+
+    assert de_cada_uno == [
+        {"id": "a", "tipo": "aviso_previo", "tarea": "COM", "hechos": None},
+        {"id": "b", "tipo": "pedido_de_estado", "tarea": "PLC",
+         "hechos": {"tarea": "PLC", "numero": 1}}]
+    assert hechos == [{"tarea": "PLC", "numero": 1}]        # sólo los que tienen hechos

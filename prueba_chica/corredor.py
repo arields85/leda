@@ -361,9 +361,9 @@ class _Corredor:
         salidas = []
         usados = self.enlazadas
         avisos_de: dict[str, list[dict[str, Any]]] = {}
-        for a in despues["avisos"].values():
+        for aviso_id, a in despues["avisos"].items():
             if a["outbox_id"]:
-                avisos_de.setdefault(a["outbox_id"], []).append(a)
+                avisos_de.setdefault(a["outbox_id"], []).append({**a, "id": aviso_id})
         for e in self.transporte.enviados[desde:]:
             quien = self.mundo.persona_de_chat(e.chat_id)
             fila_id = next((k for k, s in despues["salidas"].items()
@@ -372,11 +372,8 @@ class _Corredor:
             if fila_id is not None:
                 usados.add(fila_id)
             fila = despues["salidas"].get(fila_id, {})
-            # Los avisos del envío, en el orden de las tareas: uno solo, o los que juntó.
-            avisos = sorted(avisos_de.get(fila_id, []),
-                            key=lambda a: (a["tarea"] or "", a["tipo"]))
+            avisos, hechos = _avisos_del_envio(avisos_de.get(fila_id, []), self.mundo.titulos)
             tipos = sorted({a["tipo"] for a in avisos})
-            hechos = [cp.normalizar(a["hechos"], self.mundo.titulos) for a in avisos]
             botones = [self.mundo.clave_de_titulo(b.etiqueta) or b.etiqueta for b in e.botones]
             salidas.append(Salida(
                 quien, e.texto, botones, bool(fila.get("es_respuesta")),
@@ -384,8 +381,7 @@ class _Corredor:
                 tareas=list(dict.fromkeys(a["tarea"] for a in avisos if a["tarea"])),
                 hechos=(hechos[0] if len(hechos) == 1 else hechos) if hechos else None,
                 el=cp.dia(self.reloj.ahora()), tipos=tipos,
-                avisos=[{"tipo": a["tipo"], "tarea": a["tarea"], "hechos": h}
-                        for a, h in zip(avisos, hechos)]))
+                avisos=avisos))
         return salidas
 
     # -- lo que se comprueba ------------------------------------------------------------------
@@ -450,6 +446,19 @@ class _Corredor:
                 sobran.pop(i)
         for s in sobran:
             c.falla(cp.MOTOR, "salió algo de más", None, _resumen(s))
+
+
+def _avisos_del_envio(avisos: list[dict[str, Any]], titulos: dict[str, str]
+                      ) -> tuple[list[dict[str, Any]], list[Any]]:
+    """Los avisos de un envío, en el orden de las tareas (uno solo, o los que juntó), cada uno
+    con su tipo, su tarea y sus propios hechos, tomados del aviso mismo y nunca por posición; y
+    los hechos de los que tienen, en ese orden."""
+    de_cada_uno = [{"id": a.get("id"), "tipo": a["tipo"], "tarea": a["tarea"],
+                    "hechos": (cp.normalizar(a["hechos"], titulos)
+                               if a.get("hechos") is not None else None)}
+                   for a in sorted(avisos, key=lambda a: (a["tarea"] or "", a["tipo"],
+                                                          str(a.get("id") or "")))]
+    return de_cada_uno, [a["hechos"] for a in de_cada_uno if a["hechos"] is not None]
 
 
 class _QueMira:
