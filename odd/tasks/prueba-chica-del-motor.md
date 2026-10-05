@@ -2,7 +2,7 @@
 
 **Rama:** `feat/motor-de-conversacion` · **Carpeta:** `D:\Proyectos\Leda-PM-worktrees\motor-de-conversacion`
 **Abierta:** 2026-10-04 · **Copia en Engram:** tema `odd/prueba-chica-del-motor/tasks` (proyecto `prisma-pm`)
-**Estado:** decidido (sección 10, 2026-10-05); E2-1, E2-2, E2-3 y E2-3b hechas; sigue la E2-4.
+**Estado:** decidido (sección 10, 2026-10-05); E2-1 a E2-4 y E2-3b hechas; sigue la E2-5.
 
 ## 1. Objetivo
 
@@ -82,8 +82,8 @@ Quién destraba llega como `quien` (texto), `no_sabe` o `nadie_mas` (le toca a l
 anotada como quien destraba; nombrarse a sí misma es lo mismo), y el código decide si es un
 integrante (un solo nombre que coincide en el equipo) o alguien de afuera; si coinciden varios,
 falta el dato. Todo bloqueo con causa pregunta quién lo puede destrabar: la IA ya no juzga si
-depende de otro (`depende_de_otro` se quitó tras el primer contacto real, 2026-10-05). Una pregunta nueva con otra abierta queda para después, en el orden
-en que salieron; cómo se retoma, la E2-4. Inicio, previsión, bloqueo y quién destraba contestan
+depende de otro (`depende_de_otro` se quitó tras el primer contacto real, 2026-10-05). El orden de
+las preguntas es de la E2-4 (abajo). Inicio, previsión, bloqueo y quién destraba contestan
 la espera de su tarea (`pending_reply`). Fuera de la lista es cualquier nombre que no esté en
 ella; el esquema de la IA trae `fuera_de_la_lista` para decirlo (E2-3b). `PENDIENTE`:
 "en curso desde el lunes" (conversación 12, paso 3) no sale de la base, porque `leda_app` no lee
@@ -96,6 +96,19 @@ cancelar: cierra la pregunta si su ficha la deja dejar (la de quién destraba es
 9c); (5) duda: las tareas como opciones con botones; (6) escrito en lugar de botón: `elegir`, el mismo camino que
 el toque; (7) algo vencido: el toque de una pregunta cerrada no hace nada y se dice con qué se cerró; (8) fuera
 de la lista: ninguna jugada, hechos de qué puede hacer Leda y aviso al administrador.
+
+Hecho en la E2-4 (`preguntas.py`, `situaciones.py`, `botones.py`): una sola pregunta abierta por
+persona y las demás para después. De varias cosas en un mensaje, la primera que pregunta queda
+abierta y las otras para después; si la abierta es de un mensaje anterior, Leda sigue a la persona
+y la de antes queda para después. Al terminar el turno, si no quedó una abierta, vuelve la más
+vieja de las de después, y la redacción recibe la única pregunta que se hace (`pregunta`, con
+`desde_antes`). Cada ficha declara qué preguntas contesta (`contesta`) y cómo se deshace lo que
+anota (`deshacer`): el resto es común. La duda pregunta con las tareas en que la jugada vale; un
+toque y la elección escrita corren el mismo camino (`elegir_opcion`). Una corrección sólo vale
+sobre algo anotado en los últimos turnos de la persona. Los botones los agrega al entregar un
+transporte del motor, porque el despachador sólo arma los de los flujos congelados.
+`PENDIENTE`: una corrección que vuelve a una previsión anterior no rearma el aviso de aquélla si
+se había retirado.
 
 **Escalera.** Propia; `escalera.py` no se toca. El aviso previo sale N días hábiles antes (N en
 `workspace_setting`: 3 en CoreWork, mínimo 1, comprimido si la tarea tiene menos días). Desde V, cada
@@ -247,7 +260,16 @@ su evidencia son las corridas. Unas 400 líneas por tarea es una guía, no un to
       `13e574b`). `pytest prueba_chica` en rojo (4 y 6 fallas) y en verde, `120 passed`. La persecución
       completa (ADR 0017, decisión 3a) va a la prueba siguiente, no a la Etapa 2 (usuario, 2026-10-05). Lo
       registra el commit que sigue.
-- [ ] **E2-4. Situaciones generales** (delegada): las ocho, con preguntas, opciones y correcciones. Unas 400.
+- [x] **E2-4. Situaciones generales** (delegada: writer, varios archivos no triviales): las ocho, con
+      preguntas, opciones y correcciones; los toques en el escuchador; el arreglo del escuchador de la
+      revisión de la E2-3b (una falla al recibir un update deshace lo suyo, no avanza el offset y se
+      reintenta; a los tres intentos, incidente y texto fijo). Evidencia (2026-10-05): `pytest
+      prueba_chica` en rojo en cada paso (escuchador, `3 failed`; situaciones contra el código anterior,
+      `24 failed`; toques, error de colección sin `procesar_toque`; instrucciones, `1 failed`; botones y
+      toques en el escuchador, `3 failed`; opción ajena a la duda, `1 failed`) y en verde, `159 passed`.
+      Ningún caso especial por circuito (5c.1). Commits `f8bc71b`, `09ede28`, `ee7bf25` y `071092e`; lo
+      registra el commit que sigue. Unas 2.070 líneas, 890 de pruebas: más que la guía, porque cada
+      situación lleva su prueba de base.
 - [ ] **E2-5. Escalera y avisos guardados** (delegada): aviso previo, esperas, escalamiento, relectura, omisión y
       reintentos. Unas 450.
 - [ ] **E2-6. Ciclo y herramientas de prueba** (delegada): ciclo, bot de administración, comando para adelantar
@@ -290,4 +312,5 @@ previo en `workspace_setting`, no en el importador; el referente es quien aprueb
   `PENDIENTE` confirmar al escribir los YAML que ninguna conversación depende de ellas.
 - **La etapa no es tan chica:** si una tarea pide un caso especial, se frena (5c.1).
 
-**Próximo paso:** la E2-4 (situaciones generales).
+**Próximo paso:** la E2-5 (escalera y avisos guardados; también el envío del aviso de corrección de
+una previsión, `correccion_de_prevision`, que la E2-4 deja guardado).
