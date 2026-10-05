@@ -81,7 +81,8 @@ avisos de incidentes.
    y que Ismael se va a enterar. No anota un bloqueo.
 4. **Marcos** escribe: "estoy trabado, falta el repuesto"
    → Un bloqueo en la tarea del PLC con esa causa; la tarea queda bloqueada. Leda lo dice y
-   hace una sola pregunta: quién se encarga de conseguir el repuesto. Ningún aviso a Ismael.
+   hace una sola pregunta: quién lo puede destrabar (todo bloqueo con causa la lleva, 9c).
+   Ningún aviso a Ismael.
 5. **Marcos** escribe: "ni idea quién lo está comprando"
    → Queda anotado que no se sabe quién lo destraba. Leda lo dice y propone salidas: que
    alguien ayude o anotar una fecha nueva.

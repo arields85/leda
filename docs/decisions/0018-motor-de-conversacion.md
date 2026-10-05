@@ -343,13 +343,16 @@ mismo resultado.
 #### 9c. Bloqueos: "estoy trabado" nunca queda suelto (P9)
 
 1. Sin causa, Leda pide la explicación.
-2. Si la causa depende de otra persona (faltan cables pedidos), anota el bloqueo con su causa,
-   pregunta quién se encarga de destrabarlo y lo anota. Esa pregunta espera respuesta como un
-   pedido de estado (9b), no como las que se pueden dejar sin efecto: si no llega, Leda la repite
-   el día hábil siguiente y sigue la misma escalera de quien no contestó. Si la persona no sabe,
-   queda anotado que no se sabe; averiguarlo con otros es la persecución, de la prueba siguiente.
-3. Si la persona no lo puede resolver sola, Leda propone salidas: que alguien ayude, o más
-   tiempo, que es la jugada de la nueva previsión.
+2. Con la causa, anota el bloqueo y **pregunta quién lo puede destrabar, en todo bloqueo**. Esa
+   pregunta espera respuesta como un pedido de estado (9b), no como las que se pueden dejar sin
+   efecto: si no llega, Leda la repite el día hábil siguiente y sigue la misma escalera de quien
+   no contestó. **La respuesta de la persona decide lo que sigue.** Si nombra a alguien, queda
+   anotado como quien destraba: es el primer eslabón de la cadena, y escribirle y seguirlo es la
+   persecución, de la prueba siguiente.
+3. Si dice que nadie, que no sabe o que lo tiene que resolver ella, queda anotado y Leda propone
+   salidas: que alguien ayude, o más tiempo, que es la jugada de la nueva previsión. Por ejemplo,
+   "estoy trabado, no sé configurar el protocolo": Leda anota el bloqueo y pregunta quién lo puede
+   destrabar; "nadie, me falta saber cómo": Leda lo anota y ofrece que alguien lo ayude.
 4. **El referente no recibe un aviso por el bloqueo.** Leda lo trabaja con la persona, para
    destrabarlo sin llevarle el problema al referente (constitución §3: los referentes no
    persiguen avances). El referente se entera sólo por un escalamiento (mecánica §8): un bloqueo
@@ -361,6 +364,15 @@ mismo resultado.
 > avisaba al referente con la causa, el atraso, las tareas que dependen y quién se encarga. El
 > usuario lo corrigió: la idea es que Leda ayude a solucionar el inconveniente y no le lleve
 > problemas al referente, que con ese aviso sólo ganaba tener que actuar.
+
+> **Corrección (usuario, 2026-10-05; primer contacto real).** Hasta ese día, el paso 2 preguntaba
+> quién destraba sólo si la causa dependía de otra persona, y eso lo juzgaba la IA. En el primer
+> contacto real, con "estoy trabado, falta el repuesto", la IA juzgó que no dependía de otro y
+> Leda propuso salidas en lugar de preguntar quién consigue el repuesto. El usuario sacó ese
+> juicio: Leda pregunta quién lo puede destrabar en todo bloqueo con causa, y lo que sigue lo
+> decide la respuesta de la persona, que sabe quién es, y no una lectura de la causa. La
+> persecución completa (ADR 0017, decisión 3a) sigue siendo de la prueba siguiente, no de la
+> Etapa 2.
 
 La escalera de recordatorios de la tarea se detiene. Escribirle a quien se encarga y seguirlo
 (la persecución completa del ADR 0017, decisión 3a) queda para la prueba siguiente. Enmienda la

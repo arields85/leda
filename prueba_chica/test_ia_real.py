@@ -103,8 +103,10 @@ def test_la_eleccion_fuerza_la_herramienta_con_la_lista_cerrada_y_la_lee():
     for ficha in FICHAS.values():
         for dato in ficha.necesita + ficha.opcional:
             assert dato in jugada["properties"], dato
-    assert jugada["properties"]["depende_de_otro"]["type"] == "boolean"
+    # Quién destraba lo dice la persona; la IA no juzga si la causa depende de otro (9c).
+    assert "depende_de_otro" not in jugada["properties"]
     assert jugada["properties"]["no_sabe"]["type"] == "boolean"
+    assert jugada["properties"]["nadie_mas"]["type"] == "boolean"
     # La IA recibe sus instrucciones y la situación tal cual, como datos.
     sistema, usuario = cuerpo["messages"]
     assert sistema == {"role": "system", "content": INSTRUCCIONES_JUGADAS}

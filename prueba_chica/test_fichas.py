@@ -322,19 +322,29 @@ def test_un_bloqueo_con_causa_se_anota_y_pregunta_quien_destraba(conn, mundo, es
     assert _cuantas(conn, "message_outbox") == 1          # sólo la respuesta a Marcos
 
 
-def test_un_bloqueo_que_no_depende_de_otro_propone_salidas(conn, mundo, escribe):
-    [hecho] = _jugar(conn, escribe, "Marcos", Jugada(
-        "anotar_bloqueo", {"tarea": "T1", "causa": "no entiendo el plano",
-                           "depende_de_otro": False}))
-    assert hecho["resultado"] == "anotado"
-    assert hecho["salidas"] == ["que_alguien_ayude", "anotar_prevision"]
-    assert "pregunta" not in hecho and _cuantas(conn, "conversation_question") == 0
+@pytest.mark.parametrize("datos", [
+    {"causa": "no sé configurar el protocolo"},
+    # La IA ya no juzga si depende de otro (9c, corregida el 2026-10-05): si lo manda, no
+    # cuenta. En el primer contacto real lo puso en falso y Leda no preguntó.
+    {"causa": "falta el repuesto", "depende_de_otro": False},
+])
+def test_todo_bloqueo_con_causa_pregunta_quien_lo_puede_destrabar(conn, mundo, escribe, datos):
+    """Lo que decide es la respuesta de la persona, no un juicio de la IA sobre la causa."""
+    [hecho] = _jugar(conn, escribe, "Marcos", Jugada("anotar_bloqueo", {"tarea": "T1", **datos}))
+    assert hecho["resultado"] == "anotado" and hecho["pregunta"] == "quien_destraba"
+    assert "salidas" not in hecho
+    [pregunta] = _todos(conn, "select tipo, se_puede_dejar from conversation_question")
+    assert pregunta == {"tipo": "quien_destraba", "se_puede_dejar": False}
 
 
 @pytest.mark.parametrize("dicho, esperado, columna", [
     ({"quien": "Ismael"}, {"integrante": "Ismael"}, "destraba_membership_id"),
     ({"quien": "el de compras"}, {"externo": "el de compras"}, "destraba_externo"),
     ({"no_sabe": True}, {"no_sabe": True}, "no_sabe"),
+    # "Nadie, me falta saber cómo": le toca a la persona, que queda como quien destraba.
+    ({"nadie_mas": True}, {"nadie_mas": True}, "destraba_membership_id"),
+    # Nombrarse a sí misma es lo mismo.
+    ({"quien": "Marcos"}, {"nadie_mas": True}, "destraba_membership_id"),
 ])
 def test_quien_destraba_se_anota_y_cierra_la_pregunta(conn, mundo, escribe, dicho, esperado,
                                                       columna):
@@ -345,13 +355,18 @@ def test_quien_destraba_se_anota_y_cierra_la_pregunta(conn, mundo, escribe, dich
 
     assert hecho["resultado"] == "anotado" and hecho["quien_destraba"] == esperado
     assert hecho["tarea"] == {"alias": "T1", "titulo": "Revisar el tablero"}
-    assert ("salidas" in hecho) is ("no_sabe" in dicho)
+    # Las salidas, sólo si no hay otra persona que lo destrabe (9c, corregida el 2026-10-05):
+    # con un nombre, seguir a esa persona es la persecución, de la prueba siguiente.
+    sin_otra_persona = "no_sabe" in esperado or "nadie_mas" in esperado
+    assert hecho.get("salidas") == (["que_alguien_ayude", "anotar_prevision"]
+                                    if sin_otra_persona else None)
     fila = _uno(conn, "select * from blocker_unblocker")
     assert fila[columna] not in (None, False)
     assert [c for c in ("destraba_membership_id", "destraba_externo")
             if fila[c] is not None and c != columna] == []
     if columna == "destraba_membership_id":
-        assert str(fila[columna]) == mundo["personas"]["Ismael"]["membership_id"]
+        assert str(fila[columna]) == mundo["personas"][
+            "Marcos" if "nadie_mas" in esperado else "Ismael"]["membership_id"]
     assert fila["at"] == AHORA
     pregunta = _uno(conn, "select cerrada_en, cierre, cierre_detalle from conversation_question")
     assert pregunta["cerrada_en"] == AHORA and pregunta["cierre"] == "respondida"
@@ -404,6 +419,19 @@ def test_quien_destraba_con_dos_integrantes_que_coinciden_es_un_dato_que_falta(c
 
     assert hecho == {"jugada": "anotar_quien_destraba", "resultado": "falta_dato",
                      "falta": ["integrante"], "coinciden": ["Ismael", "Ismael Otero"]}
+    assert _cuantas(conn, "blocker_unblocker") == 0
+
+
+@pytest.mark.parametrize("dicho", [
+    {}, {"quien": "Ismael", "no_sabe": True}, {"quien": "Ismael", "nadie_mas": True},
+    {"no_sabe": True, "nadie_mas": True},
+])
+def test_quien_destraba_es_exactamente_una_respuesta(conn, mundo, escribe, dicho):
+    _jugar(conn, escribe, "Marcos", Jugada(
+        "anotar_bloqueo", {"tarea": "T1", "causa": "falta el repuesto"}))
+    [hecho] = _jugar(conn, escribe, "Marcos", Jugada("anotar_quien_destraba", dicho))
+    assert hecho == {"jugada": "anotar_quien_destraba", "resultado": "falta_dato",
+                     "falta": ["quien_o_no_sabe"]}
     assert _cuantas(conn, "blocker_unblocker") == 0
 
 

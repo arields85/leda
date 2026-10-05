@@ -17,9 +17,9 @@ El circuito es el recordatorio y lo que la persona contesta (ADR 0018, decisión
 1. [`01-arranque.md`](01-arranque.md): "arranqué" después del aviso previo al vencimiento.
 2. [`02-nueva-prevision.md`](02-nueva-prevision.md): "llego el 27, el proveedor se demoró"; la fecha
    comprometida no cambia y el referente se entera, con el atraso y lo que depende.
-3. [`03-bloqueo.md`](03-bloqueo.md): "estoy trabado, falta el repuesto"; Leda pregunta quién se encarga,
-   repite la pregunta al día hábil siguiente y propone salidas, sin avisar al referente; la escalera se
-   detiene.
+3. [`03-bloqueo.md`](03-bloqueo.md): "estoy trabado, falta el repuesto"; Leda pregunta quién lo puede
+   destrabar, repite la pregunta al día hábil siguiente y, como Marcos no sabe, propone salidas, sin avisar
+   al referente; la escalera se detiene.
 4. [`04-sin-respuesta.md`](04-sin-respuesta.md): no contesta; desde el vencimiento Leda pide el estado y la
    escalera avanza hasta escalar.
 5. [`05-varias-cosas.md`](05-varias-cosas.md): dos hechos de dos tareas en un mensaje, y después uno que
@@ -153,8 +153,10 @@ Las conversaciones dejaban 16 preguntas abiertas (P1 a P16). El usuario las deci
   se le dice salvo que pregunte (9g).
 - **P8.** Se ejecutan el inicio, la previsión, el bloqueo y "qué tengo pendiente"; "ya la terminé" se reconoce
   y Leda dice que todavía no la recibe por acá, sin avisar al administrador (9g).
-- **P9.** "Estoy trabado": Leda pide la causa si falta, pregunta quién se encarga (y la repite si no hay
-  respuesta) y propone salidas; el referente se entera sólo por un escalamiento (9c, corregida el mismo día).
+- **P9.** "Estoy trabado": Leda pide la causa si falta; con la causa, pregunta siempre quién lo puede
+  destrabar (y la repite si no hay respuesta); si la persona nombra a alguien, queda anotado, y si dice que
+  nadie, que no sabe o que le toca a ella, Leda propone salidas; el referente se entera sólo por un
+  escalamiento (9c, corregida el mismo día y, sin el juicio de la IA sobre la causa, el 2026-10-05).
 - **P10.** Leda contesta las 24 horas; los avisos a otros esperan al horario y Leda lo dice (9e).
 - **P11.** Un hecho en la tarea equivocada se corrige agregando un hecho de corrección (9f).
 - **P12.** El aviso previo, uno solo y tres días hábiles antes, no pide respuesta; desde el vencimiento, cada

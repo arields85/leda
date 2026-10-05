@@ -70,18 +70,19 @@ herramienta en ningún proveedor, así que se trae la llamada estructurada de la
 |---|---|---|---|
 | `anotar_inicio` (tarea) | responsable; `asignada` (si ya está `en_curso`, lo dice) | `actualizar_estado` a `en_curso` | cierra la espera de esa tarea |
 | `anotar_prevision` (tarea, fecha, motivo) | responsable; tarea abierta | hecho de previsión con el atraso (`Calendario.habiles_entre`) | aviso guardado al referente, salvo que vuelva a la fecha comprometida |
-| `anotar_bloqueo` (tarea, causa) | responsable; tarea abierta | sin causa, pregunta; con causa, `registrar_bloqueo` | si depende de otro, pregunta quién destraba; propone salidas |
-| `anotar_quien_destraba` (integrante, alguien de afuera o "no sabe") | bloqueo abierto | hecho de quién destraba | cierra la espera |
+| `anotar_bloqueo` (tarea, causa) | responsable; tarea abierta | sin causa, pregunta; con causa, `registrar_bloqueo` | con causa, siempre pregunta quién lo puede destrabar (9c, corregida el 2026-10-05) |
+| `anotar_quien_destraba` (integrante, alguien de afuera, "no sabe" o "nadie más") | bloqueo abierto | hecho de quién destraba | cierra la espera; sin otra persona que destrabe, propone salidas |
 | `consultar_pendientes` | nada | lee con `consultar_tareas` | nada |
 | `entregar`, `pedir_reasignacion` | nada | sin efecto; hechos de qué no se puede y quién lo decide | sin aviso al administrador (9g) |
 | `elegir`, `corregir`, `cancelar`, `dejar_para_despues` | las de su situación general | | |
 
 Hecho en la E2-3 (`prueba_chica/fichas.py`): la comprobación común (datos que faltan, la tarea
 por su alias, que sea del responsable y su estado vigente) es una sola para todas las fichas.
-Quién destraba llega como `quien` (texto) o `no_sabe`, y el código decide si es un integrante
-(un solo nombre que coincide en el equipo) o alguien de afuera; si coinciden varios, falta el
-dato. Si la causa de un bloqueo depende de otro lo dice la IA (`depende_de_otro`); sin decirlo,
-se pregunta quién destraba. Una pregunta nueva con otra abierta queda para después, en el orden
+Quién destraba llega como `quien` (texto), `no_sabe` o `nadie_mas` (le toca a la persona,
+anotada como quien destraba; nombrarse a sí misma es lo mismo), y el código decide si es un
+integrante (un solo nombre que coincide en el equipo) o alguien de afuera; si coinciden varios,
+falta el dato. Todo bloqueo con causa pregunta quién lo puede destrabar: la IA ya no juzga si
+depende de otro (`depende_de_otro` se quitó tras el primer contacto real, 2026-10-05). Una pregunta nueva con otra abierta queda para después, en el orden
 en que salieron; cómo se retoma, la E2-4. Inicio, previsión, bloqueo y quién destraba contestan
 la espera de su tarea (`pending_reply`). Fuera de la lista es cualquier nombre que no esté en
 ella; el esquema de la IA trae `fuera_de_la_lista` para decirlo (E2-3b). `PENDIENTE`:

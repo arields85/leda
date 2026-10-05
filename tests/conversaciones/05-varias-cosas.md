@@ -61,12 +61,14 @@ decisión 4, situación general 2, con la precisión de la decisión 9d.
 
 5. **Marcos** escribe (martes 20, 16:35): "falta que martin de IT me habilite el acceso a la red de planta"
    →
-   - Jugadas: la respuesta a la pregunta abierta: la causa del bloqueo, que depende de otra persona, y quién
-     se encarga (Martín, que Marcos nombra).
-   - Efecto: el bloqueo abierto en la tarea del PLC, con su causa y con Martín como quien se encarga; la
+   - Jugadas: la respuesta a la pregunta abierta: la causa del bloqueo y, en el mismo mensaje, quién lo
+     destraba (Martín, que Marcos nombra). La pregunta de quién lo destraba (9c, paso 2) queda contestada
+     en el mismo turno.
+   - Efecto: el bloqueo abierto en la tarea del PLC, con su causa y con Martín como quien lo destraba; la
      tarea pasa a `bloqueada` y su escalera se detiene. Ningún aviso a Ismael por el bloqueo (decisión 9c,
-     paso 4). Lo que sigue (las salidas que Leda propone) es como en la conversación 03, paso 5.
-   - La respuesta no dice: que Leda le escribió a Martín (eso es la prueba siguiente).
+     paso 4). Como hay otra persona que lo destraba, Leda no propone salidas (9c, corregida el 2026-10-05).
+   - La respuesta no dice: que Leda le escribió a Martín o lo va a seguir (eso es la prueba siguiente); la
+     pregunta de quién lo destraba, que Marcos ya contestó.
 
 ## Qué mide
 

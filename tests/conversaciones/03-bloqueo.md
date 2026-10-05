@@ -1,11 +1,11 @@
 # 03. "Estoy trabado, falta el repuesto"
 
 **Qué prueba:** Marcos contesta el aviso con un bloqueo y su causa. Leda lo anota, directo, y pregunta
-quién se encarga de destrabarlo; esa pregunta espera respuesta: Marcos no contesta ese día y Leda la repite
-el día hábil siguiente. Como Marcos no sabe y no puede resolverlo solo, Leda propone salidas. Ismael no
-recibe ningún aviso por el bloqueo, y la escalera de recordatorios de la tarea se detiene. ADR 0018,
-decisión 5a, tercera respuesta, con la enmienda de la decisión 9c: el arranque de la persecución (pasos 1 a
-4), sin escribirle todavía a quien se encarga.
+quién lo puede destrabar; esa pregunta espera respuesta: Marcos no contesta ese día y Leda la repite el día
+hábil siguiente. Como Marcos no sabe quién, Leda propone salidas. Ismael no recibe ningún aviso por el
+bloqueo, y la escalera de recordatorios de la tarea se detiene. ADR 0018, decisión 5a, tercera respuesta,
+con la enmienda de la decisión 9c (corregida el 2026-10-05): el arranque de la persecución (pasos 1 a 4),
+sin escribirle todavía a quien destraba.
 
 ## Estado inicial
 
@@ -36,12 +36,13 @@ decisión 5a, tercera respuesta, con la enmienda de la decisión 9c: el arranque
      `en_curso`); la escalera de recordatorios de esa tarea se detiene (mecánica §9). Auditoría. Ningún
      aviso a Ismael (9c, paso 4).
    - Confirmación: ninguna; el bloqueo se anota directo (decisión 9a).
-   - La respuesta dice: que quedó anotado el bloqueo y su causa; una sola pregunta: quién se encarga de
-     conseguir el repuesto (la causa depende de otra persona, 9c, paso 2).
+   - La respuesta dice: que quedó anotado el bloqueo y su causa; una sola pregunta: quién lo puede
+     destrabar (todo bloqueo con causa la lleva; 9c, paso 2, corregido el 2026-10-05). La pregunta no
+     sale de un juicio sobre si la causa depende de otro: lo que sigue lo decide la respuesta de Marcos.
    - La respuesta no dice: cuándo llega el repuesto; que Leda le va a escribir a alguien o lo va a seguir
      (eso es la prueba siguiente); que Ismael se enteró o se va a enterar.
-   - Botones: ninguno; quién se encarga es un dato libre.
-   - Estado después: tema abierto: el bloqueo de la tarea del PLC, esperando quién se encarga. La pregunta
+   - Botones: ninguno; quién lo destraba es un dato libre.
+   - Estado después: tema abierto: el bloqueo de la tarea del PLC, esperando quién lo destraba. La pregunta
      espera respuesta como un pedido de estado (9c, paso 2): queda abierta la espera de la respuesta de
      Marcos.
 
@@ -54,8 +55,8 @@ decisión 5a, tercera respuesta, con la enmienda de la decisión 9c: el arranque
    →
    - Efecto: un mensaje privado en el outbox, nunca antes de las 09:00; la espera de respuesta sigue
      abierta.
-   - El mensaje dice: el bloqueo de la tarea del PLC por el repuesto; la pregunta de quién se encarga de
-     conseguirlo.
+   - El mensaje dice: el bloqueo de la tarea del PLC por el repuesto; la pregunta de quién lo puede
+     destrabar.
    - El mensaje no dice: que va a avisar a Ismael (eso lo dice recién el último paso antes de escalar); un
      reproche porque no contestó (constitución §8); otra pregunta además de ésa.
    - Botones: ninguno.
@@ -63,14 +64,15 @@ decisión 5a, tercera respuesta, con la enmienda de la decisión 9c: el arranque
 
 5. **Marcos** escribe (miércoles 21, 10:25): "ni idea quien lo esta comprando, lo pidieron hace dos semanas"
    →
-   - Jugadas: la respuesta a la pregunta abierta: quién se encarga de destrabarlo, que Marcos no sabe.
-   - Efecto: el bloqueo queda con quién se encarga "no se sabe", atribuido a Marcos, con auditoría; la
+   - Jugadas: la respuesta a la pregunta abierta: quién lo destraba, que Marcos no sabe.
+   - Efecto: el bloqueo queda con quién lo destraba "no se sabe", atribuido a Marcos, con auditoría; la
      espera de respuesta se cierra y la escalera de la pregunta no sigue. Cómo se guarda ese dato se decide
      con las tablas de la Etapa 2 (ADR 0017, decisión 3a). Averiguarlo con otros es la persecución, de la
      prueba siguiente.
    - La respuesta dice: que quedó anotado que no se sabe quién lo compra; salidas que Leda propone porque
-     Marcos no puede resolverlo solo (9c, paso 3): que alguien lo ayude o anotar una fecha nueva (la
-     jugada de la nueva previsión).
+     no hay otra persona que lo destrabe (9c, paso 3): que alguien lo ayude o anotar una fecha nueva (la
+     jugada de la nueva previsión). Si Marcos hubiera nombrado a alguien, quedaba anotado como quien
+     destraba, sin salidas: seguir a esa persona es la persecución, de la prueba siguiente.
    - La respuesta no dice: un nombre de quién compra que nadie dio; una fecha de llegada inventada; que
      Ismael se va a enterar; dos preguntas juntas.
    - Botones: ninguno.
@@ -98,8 +100,10 @@ decisión 5a, tercera respuesta, con la enmienda de la decisión 9c: el arranque
   que el código no calculó); no hace sin confirmación lo que la requiere (nada la requiere en este
   circuito); no deja sin salida (las salidas del paso 5 y el próximo paso del 6); no confunde la tarea (el
   bloqueo va a la del PLC, y la de comunicaciones aparece sólo como lo que depende).
-- **Regla del bloqueo (9c):** ningún aviso a Ismael por el bloqueo; la pregunta de quién se encarga se
-  repite el día hábil siguiente y deja de repetirse cuando llega la respuesta, aunque sea "no sé".
+- **Regla del bloqueo (9c):** ningún aviso a Ismael por el bloqueo; todo bloqueo con causa lleva la
+  pregunta de quién lo puede destrabar, que se repite el día hábil siguiente y deja de repetirse cuando
+  llega la respuesta, aunque sea "no sé". Que Leda proponga salidas sin preguntar es una falla (pasó en el
+  primer contacto real, 2026-10-05).
 - **Falla de comprensión:** que la IA no tome "estoy trabado" como un bloqueo, o "ni idea quien lo esta
-  comprando", al día siguiente, como la respuesta a quién se encarga. Tiene que preguntar; anotar una
+  comprando", al día siguiente, como la respuesta a quién lo destraba. Tiene que preguntar; anotar una
   previsión o un inicio es una falla de garantía.

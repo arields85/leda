@@ -48,9 +48,10 @@ DATOS = {
     "fecha": ("string", "La fecha que dijo la persona, como AAAA-MM-DD."),
     "motivo": ("string", "Por qué, con las palabras de la persona."),
     "causa": ("string", "Qué la traba, con las palabras de la persona."),
-    "depende_de_otro": ("boolean", "Si destrabarla depende de otra persona."),
-    "quien": ("string", "Quién se encarga de destrabarla, como lo nombró la persona."),
-    "no_sabe": ("boolean", "La persona dice que no sabe quién se encarga."),
+    "quien": ("string", "Quién puede destrabarla, como lo nombró la persona."),
+    "no_sabe": ("boolean", "La persona dice que no sabe quién puede destrabarla."),
+    "nadie_mas": ("boolean", "La persona dice que nadie más puede destrabarla: le toca a "
+                             "ella."),
     "a": ("string", "A quién quiere pasarle la tarea, como lo nombró la persona."),
     "que_pide": ("string", "Sólo con fuera_de_la_lista: qué pidió la persona, resumido."),
 }

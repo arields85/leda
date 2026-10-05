@@ -89,8 +89,9 @@ class Ficha:
     se_ofrece: bool = True          # False: se reconoce, pero no se hace por chat (9g)
 
 
-# Lo que Leda propone cuando la persona no puede destrabar sola (9c, paso 3): que alguien la
-# ayude, o más tiempo, que es la jugada de la nueva previsión.
+# Lo que Leda propone cuando no hay otra persona que destrabe el bloqueo (la persona no sabe
+# quién, o le toca a ella; 9c, corregida el 2026-10-05): que alguien la ayude, o más tiempo,
+# que es la jugada de la nueva previsión.
 SALIDAS_DE_UN_BLOQUEO = ("que_alguien_ayude", "anotar_prevision")
 
 # El estado de un efecto que pasa después (un aviso a otra persona), que su hecho dice siempre,
@@ -348,21 +349,21 @@ def _anotar_bloqueo(ctx: Contexto, datos: dict, tarea: dict) -> dict:
     if "bloqueo_id" not in r:
         return _no_hecho(r, tarea)
     _cerrar_esperas(ctx, tarea["id"])
-    hecho = {"resultado": "anotado", "tarea": _tarea(tarea), "causa": causa}
-    # Si la causa depende de otra persona (lo dice la IA; sin decirlo, se pregunta), quién
-    # se encarga de destrabarlo: una pregunta que espera como un pedido de estado (9c, 2).
-    if datos.get("depende_de_otro", True) is not False:
-        _abrir_pregunta(ctx, "quien_destraba", tarea["id"], se_puede_dejar=False,
-                        jugada={**jugada, "bloqueo_id": r["bloqueo_id"]})
-        return {**hecho, "pregunta": "quien_destraba"}
-    return {**hecho, "salidas": list(SALIDAS_DE_UN_BLOQUEO)}
+    # Todo bloqueo con causa: quién lo puede destrabar, una pregunta que espera como un pedido
+    # de estado. Lo decide la respuesta de la persona, no un juicio de la IA sobre la causa
+    # (9c, corregida el 2026-10-05).
+    _abrir_pregunta(ctx, "quien_destraba", tarea["id"], se_puede_dejar=False,
+                    jugada={**jugada, "bloqueo_id": r["bloqueo_id"]})
+    return {"resultado": "anotado", "tarea": _tarea(tarea), "causa": causa,
+            "pregunta": "quien_destraba"}
 
 
 def _anotar_quien_destraba(ctx: Contexto, datos: dict, tarea: dict | None) -> dict:
     cur = ctx.cur
     no_sabe = datos.get("no_sabe") is True
+    nadie_mas = datos.get("nadie_mas") is True      # le toca a la persona misma
     quien_texto = None if _vacio(datos.get("quien")) else str(datos["quien"]).strip()
-    if no_sabe == (quien_texto is not None):
+    if no_sabe + nadie_mas + (quien_texto is not None) != 1:
         return {"resultado": "falta_dato", "falta": ["quien_o_no_sabe"]}
 
     # El bloqueo: el de la tarea nombrada o, si no la nombra, el de la pregunta abierta.
@@ -394,6 +395,11 @@ def _anotar_quien_destraba(ctx: Contexto, datos: dict, tarea: dict | None) -> di
             return {"resultado": "falta_dato", "falta": ["integrante"],
                     "coinciden": [c["nombre"] for c in coinciden]}
         integrante = coinciden[0] if coinciden else None
+        # Nombrarse a sí misma es decir que le toca a ella.
+        nadie_mas = (integrante is not None
+                     and str(integrante["membership_id"]) == ctx.quien.membership_id)
+    if nadie_mas:
+        integrante = {"membership_id": ctx.quien.membership_id, "nombre": ctx.quien.nombre}
     cur.execute(
         """insert into blocker_unblocker (workspace_id, blocker_id, destraba_membership_id,
                                           destraba_externo, no_sabe,
@@ -408,9 +414,13 @@ def _anotar_quien_destraba(ctx: Contexto, datos: dict, tarea: dict | None) -> di
     _cerrar_esperas(ctx, task_id)
     hecho = {"resultado": "anotado", **({"tarea": _tarea(alias)} if alias else {}),
              "quien_destraba": ({"no_sabe": True} if no_sabe
+                                else {"nadie_mas": True} if nadie_mas
                                 else {"integrante": integrante["nombre"]} if integrante
                                 else {"externo": quien_texto})}
-    return {**hecho, "salidas": list(SALIDAS_DE_UN_BLOQUEO)} if no_sabe else hecho
+    # Con otra persona que lo destraba, seguirla es la persecución (ADR 0017, decisión 3a),
+    # de la prueba siguiente; sin otra persona, las salidas (9c, corregida el 2026-10-05).
+    sin_otra_persona = no_sabe or nadie_mas
+    return {**hecho, "salidas": list(SALIDAS_DE_UN_BLOQUEO)} if sin_otra_persona else hecho
 
 
 def palabras(texto: str) -> list[str]:
@@ -475,17 +485,19 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
                   "cierra la espera de esa tarea",
           manejar=_anotar_prevision, del_responsable=True),
     Ficha("anotar_bloqueo", "anotar que una tarea está trabada y por qué",
-          necesita=("tarea",), opcional=("causa", "depende_de_otro"),
+          necesita=("tarea",), opcional=("causa",),
           comprueba="que sea el responsable y que la tarea esté abierta",
           hace="sin causa, nada; con causa, registra el bloqueo (registrar_bloqueo)",
-          despues="sin causa, pregunta la causa; si depende de otro, pregunta quién lo "
-                  "destraba; si no, propone salidas. Ningún aviso al referente (9c)",
+          despues="sin causa, pregunta la causa; con causa, pregunta quién lo puede "
+                  "destrabar. Ningún aviso al referente (9c)",
           manejar=_anotar_bloqueo, del_responsable=True),
-    Ficha("anotar_quien_destraba", "anotar quién se encarga de destrabar un bloqueo",
-          necesita=(), opcional=("tarea", "quien", "no_sabe"),
+    Ficha("anotar_quien_destraba", "anotar quién puede destrabar un bloqueo",
+          necesita=(), opcional=("tarea", "quien", "no_sabe", "nadie_mas"),
           comprueba="que haya un bloqueo abierto en una tarea suya",
-          hace="anota quién destraba: un integrante, alguien de afuera o que no se sabe",
-          despues="cierra la pregunta y la espera; si no se sabe, propone salidas",
+          hace="anota quién destraba: un integrante, alguien de afuera, que no se sabe o "
+               "que le toca a la persona misma",
+          despues="cierra la pregunta y la espera; si no se sabe o le toca a ella, propone "
+                  "salidas",
           manejar=_anotar_quien_destraba),
     Ficha("consultar_pendientes", "contar qué tareas tiene pendientes",
           necesita=(), opcional=(),
