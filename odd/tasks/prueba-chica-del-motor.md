@@ -181,22 +181,30 @@ su evidencia son las corridas. Unas 400 líneas por tarea es una guía, no un to
       `132 passed` (paridad y rollbacks, ahora también con restricciones e índices); suite completa `2300 passed,
       333 deselected, 1 warning in 763.56s`. Commit `7265716`; lo registra el commit que sigue. Unas 1.400 líneas:
       cada tabla va en su migración y en `esquema.sql`. `tests/test_capacidades.py` declara las tablas, usadas desde
-      `prueba_chica/`.
+      `prueba_chica/`. Revisión RDD `review-03f111a243648455`, aprobada; su observación de que una previsión puede
+      reemplazar a otra de otra tarea se corrige en la E2-3.
 - [ ] **E2-2. Esqueleto y frontera** (delegada): `prueba_chica/`, prueba de imports, turno y registro, falla de la
       IA en un turno, el despachador sin retener en `leda_motor`. Unas 400.
-- [ ] **E2-3. Jugadas y fichas** (delegada): lista cerrada, fichas, atraso, aviso al administrador. Unas 450.
+- [ ] **E2-3. Jugadas y fichas** (delegada): lista cerrada, fichas, atraso, aviso al administrador; que una
+      previsión sólo reemplace a otra de la misma tarea. Unas 450.
+- [ ] **E2-3b. Primer contacto real** (decisión del usuario, 2026-10-05; `AGENTS.md`, punto 5): se adelantan de la
+      E2-6, completos y con sus pruebas, el escuchador y la redacción de la IA; el aviso se dispara con un comando,
+      sin el ciclo; se crea `leda_motor` (autorizado) y el agente apunta a ella el `.env` de la carpeta
+      (autorizado). Guion corto por Telegram con el usuario: "arranqué", "llego el 27" y "estoy trabado". Leda
+      todavía no maneja cambio de tema, corrección ni cancelar (E2-4): una mala respuesta ahí no es falla del
+      diseño. Va a la bitácora como prueba parcial, no como M2.
 - [ ] **E2-4. Situaciones generales** (delegada): las ocho, con preguntas, opciones y correcciones. Unas 400.
 - [ ] **E2-5. Escalera y avisos guardados** (delegada): aviso previo, esperas, escalamiento, relectura, omisión y
       reintentos. Unas 450.
-- [ ] **E2-6. Redacción, escuchador y ciclo** (delegada): instrucciones de la IA, tono, polling, ciclo, bot de
-      administración, lector de turnos, `restriccion_horario`. Unas 400.
+- [ ] **E2-6. Ciclo y herramientas de prueba** (delegada): ciclo, bot de administración, comando para adelantar
+      el reloj, lector de turnos, `restriccion_horario` (el escuchador y la redacción van en la E2-3b). Unas 300.
 - [ ] **E2-7. Corredor** (delegada): los 14 YAML, base por corrida, reloj, comprobaciones, reporte, luna y Jev.
       Unas 650.
 - [ ] **E2-8. Primera ronda real:** sol, luna y Jev; lectura de textos; bitácora; chequeo de rumbo contra 5c.
 - [ ] **E2-9. Telegram real** con el usuario; su juicio; M2 en la bitácora.
 
-**Previsión:** unas 3.600 líneas (código, pruebas y YAML). **Entrega:** `ask-on-risk`: al pasar las 400 se le
-pregunta una vez al usuario la estrategia de cadena. Push y PR, del usuario.
+**Previsión:** unas 3.600 líneas (código, pruebas y YAML). **Entrega:** `main` no recibe código hasta M2 o M3
+(`AGENTS.md`), así que no hay cadena de PR que decidir ahora; cada tarea anota sus commits. Push y PR, del usuario.
 
 ## 10. Decisiones del usuario (2026-10-05)
 
