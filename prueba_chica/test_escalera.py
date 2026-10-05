@@ -557,3 +557,20 @@ def test_un_escalamiento_que_reemplazo_un_reencuadre_no_cuenta_como_escalado(con
     assert escalamiento["persona"] == "Ismael"
     assert escalamiento["hechos"][0]["aviso"] == "falta_de_respuesta"
     assert dias.ciclo(_hora(20, 10)) == []
+
+
+def test_el_aviso_previo_no_se_repite_cuando_el_ancla_vuelve_al_vencimiento(conn, mundo, dias,
+                                                                           escribe):
+    """El aviso previo es de la fecha comprometida, no de un anclaje (revisión de la E2-7): si
+    una previsión lleva el ancla a otra fecha y otra la devuelve al vencimiento, la escalera
+    nueva del vencimiento no manda otro aviso previo."""
+    from prueba_chica.test_ancla import _prevision
+
+    [previo] = dias.ciclo(_hora(6, 10))
+    assert previo["hechos"][0]["aviso"] == "vencimiento_proximo"
+    _prevision(conn, escribe, "2026-10-15", at=_hora(6, 11))
+    _prevision(conn, escribe, "2026-10-09", at=_hora(6, 12))
+
+    for momento in (_hora(6, 13), _hora(7, 10), _hora(8, 10)):
+        assert [p for p in dias.ciclo(momento) if p["persona"] == "Marcos"] == []
+    assert len(_avisos(conn, "aviso_previo")) == 1

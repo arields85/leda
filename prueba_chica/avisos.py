@@ -480,7 +480,7 @@ def _vigencia_de_la_escalera(m: Momento, aviso) -> tuple[str | None, dict[str, A
     elif aviso["tipo"] == "aviso_previo":
         if de.fecha != fecha_de_la_clave(aviso):
             return "hay_una_prevision_mas_nueva", {}
-    elif de.clave != clave_del_anclaje(aviso):
+    elif clave_del_anclaje(aviso) not in de.claves:
         return "hay_una_prevision_mas_nueva", {}
     return None, hechos_de_la_escalera(m, aviso["tipo"], tarea, base)
 

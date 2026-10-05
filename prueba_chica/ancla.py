@@ -58,10 +58,20 @@ def prevision_vigente(cur, task_id) -> dict[str, Any] | None:
 
 @dataclass(frozen=True)
 class Anclaje:
-    """La fecha del seguimiento y la clave de su escalera (la cuarta parte de cada paso)."""
+    """La fecha del seguimiento y la clave de su escalera (la cuarta parte de cada paso).
+    `legado`: la clave que tenían los pasos de esta escalera antes de la revisión del ancla
+    (la fecha sola, también con el ancla en una previsión); un paso guardado así en una base de
+    antes sigue siendo de esta escalera (revisión de la E2-7). Sólo con el ancla en una
+    previsión: con la fecha comprometida, la fecha sola es la escalera de siempre."""
 
     fecha: date
     clave: str
+    legado: str | None = None
+
+    @property
+    def claves(self) -> tuple[str, ...]:
+        """Las claves de los pasos de esta escalera: la de ahora y, si hay, la de antes."""
+        return (self.clave,) if self.legado is None else (self.clave, self.legado)
 
 
 SEPARADOR = "+"      # entre la fecha y la previsión que empezó el anclaje, en la clave
@@ -82,12 +92,17 @@ def anclaje(cur, task_id, comprometida: date) -> Anclaje:
                 (str(task_id),))
     cadena = {str(f["id"]): f for f in cur.fetchall()}
     inicio, f = vigente, vigente
-    while f is not None and fecha_de(f) == fecha:
+    recorridas: set[str] = set()
+    # Una cadena rota que vuelve sobre sí misma (dos previsiones que se reemplazan una a la otra)
+    # no cuelga la escalera: el recorrido para en la primera que repite (revisión de la E2-7).
+    while f is not None and fecha_de(f) == fecha and str(f["id"]) not in recorridas:
+        recorridas.add(str(f["id"]))
         inicio = f
         f = cadena.get(str(f["reemplaza_id"])) if f["reemplaza_id"] is not None else None
     if f is None and fecha == comprometida:
         return Anclaje(fecha, fecha.isoformat())    # ninguna previsión movió el ancla
-    return Anclaje(fecha, f"{fecha.isoformat()}{SEPARADOR}{inicio['id']}")
+    return Anclaje(fecha, f"{fecha.isoformat()}{SEPARADOR}{inicio['id']}",
+                   legado=fecha.isoformat() if fecha != comprometida else None)
 
 
 def ancla(cur, task_id, comprometida: date) -> date:
@@ -115,7 +130,7 @@ def pasos(cur, task_id, de: Anclaje | date) -> list[dict[str, Any]]:
     """Los avisos de la escalera de la tarea de un anclaje (está en su clave). Con una fecha,
     los de todos los anclajes de esa fecha."""
     if isinstance(de, Anclaje):
-        condicion, valor = "split_part(dedupe_key, ':', 4) = %s", de.clave
+        condicion, valor = "split_part(dedupe_key, ':', 4) = any(%s)", list(de.claves)
     else:
         condicion, valor = f"split_part(split_part(dedupe_key, ':', 4), '{SEPARADOR}', 1) = %s",             de.isoformat()
     cur.execute(f"""select * from scheduled_notice

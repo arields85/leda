@@ -215,3 +215,75 @@ def test_repetir_la_misma_fecha_no_empieza_otra_escalera(conn, mundo, dias, escr
 
     for momento in (_hora(15, 12), _hora(16, 10), _hora(19, 10)):
         assert _de_marcos(dias.ciclo(momento)) == []
+
+
+# --- Revisión de la E2-7 ---------------------------------------------------------------------
+
+
+class _Fila(dict):
+    """Una fila que cuenta cuántas veces se la recorre: un ciclo en la cadena no termina."""
+
+    lecturas = 0
+
+    def __getitem__(self, clave):
+        type(self).lecturas += 1
+        if type(self).lecturas > 1000:
+            raise AssertionError("la cadena de previsiones no termina")
+        return super().__getitem__(clave)
+
+
+class _CursorDeUnaCadena:
+    """Dos previsiones que se reemplazan una a la otra con la misma fecha: una cadena rota."""
+
+    def __init__(self) -> None:
+        from datetime import date
+        self.a = _Fila(id="a", fecha_prevista=date(2026, 10, 15), reemplaza_id="b")
+        self.b = _Fila(id="b", fecha_prevista=date(2026, 10, 15), reemplaza_id="a")
+        self._ultimo = None
+
+    def execute(self, sql, params=None):
+        self._ultimo = sql
+
+    def fetchone(self):
+        return self.a
+
+    def fetchall(self):
+        return [self.a, self.b]
+
+
+def test_una_cadena_de_previsiones_con_un_ciclo_no_cuelga_el_ancla():
+    from datetime import date
+
+    from prueba_chica.ancla import anclaje
+
+    _Fila.lecturas = 0
+    de = anclaje(_CursorDeUnaCadena(), "tarea", date(2026, 10, 9))
+
+    assert de.fecha == date(2026, 10, 15)
+    assert de.clave.startswith("2026-10-15+")
+
+
+def test_un_paso_guardado_con_la_clave_de_antes_sigue_siendo_de_su_ancla(conn, mundo, dias,
+                                                                         escribe):
+    """Antes de la revisión del ancla, la clave de un paso anclado en una previsión era la
+    fecha sola. Un paso así, guardado en una base de antes, sigue siendo de la escalera de esa
+    previsión: sale, y la escalera sigue contándolo."""
+    from leda.db import admin
+
+    _prevision(conn, escribe, "2026-10-15", at=_hora(5, 11))
+    for dia in (5, 9, 13):
+        dias.ciclo(_hora(dia, 11))
+    correr_escalera(conn, mundo["id"], RelojFijo(_hora(15, 7)))     # el pedido del 15, guardado
+    conn.commit()
+    with admin(conn) as cur:
+        cur.execute("""update scheduled_notice
+                          set dedupe_key = regexp_replace(dedupe_key, '[+][^:]+', '')
+                        where tipo = 'pedido_de_estado'""")
+    conn.commit()
+
+    [f] = _de_marcos(dias.ciclo(_hora(15, 10)))
+
+    assert f["hechos"][0]["numero"] == 1
+    [pedido] = _avisos(conn, "pedido_de_estado")
+    assert pedido["estado"] == "enviado"
+    assert _de_marcos(dias.ciclo(_hora(16, 10)))[0]["hechos"][0]["numero"] == 2

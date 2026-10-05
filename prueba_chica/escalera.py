@@ -311,8 +311,8 @@ def _reencuadrar(m: Momento, tarea, hasta: Anclaje, vence: date, k: int, vuelta,
     queda reemplazado por el reencuadre."""
     m.cur.execute("""select id from scheduled_notice
                       where task_id = %s and estado = 'guardado' and tipo = any(%s)
-                        and (split_part(dedupe_key, ':', 4) = %s or dedupe_key = %s)""",
-                  (str(tarea["id"]), list(TIPOS_DE_LA_ESCALERA), hasta.clave,
+                        and (split_part(dedupe_key, ':', 4) = any(%s) or dedupe_key = %s)""",
+                  (str(tarea["id"]), list(TIPOS_DE_LA_ESCALERA), list(hasta.claves),
                    clave("aviso_previo", tarea["id"], vence)))
     for fila in m.cur.fetchall():
         omitir(m.cur, str(fila["id"]), REEMPLAZADO, m.ahora)

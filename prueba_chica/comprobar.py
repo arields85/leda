@@ -124,7 +124,8 @@ def foto(conn, mundo: Mundo) -> dict[str, Any]:
         cur.execute("select id, etapa, severidad from incident where workspace_id = %s", (ws,))
         incidentes = {str(f["id"]): {"etapa": f["etapa"], "severidad": f["severidad"]}
                       for f in cur.fetchall()}
-        cur.execute("select count(*) n from admin_notice")
+        # Los del espacio de la corrida, no los de toda la base (revisión de la E2-7).
+        cur.execute("select count(*) n from admin_notice where workspace_id = %s", (ws,))
         avisos_admin = cur.fetchone()["n"]
         cur.execute("""select id, sujeto_id from audit_log
                         where workspace_id = %s and accion = 'informar_avance'""", (ws,))
@@ -270,16 +271,27 @@ def _cuenta(lista: list) -> dict[str, int]:
 
 
 def _emparejar(esperados: list[dict], reales: list[dict]) -> tuple[list[dict], list[dict]]:
-    """(los esperados sin uno real que los cumpla, los reales que sobran)."""
-    sobran = list(reales)
-    faltan = []
-    for e in esperados:
-        i = next((i for i, r in enumerate(sobran) if coincide(e, r)), None)
-        if i is None:
-            faltan.append(e)
-        else:
-            sobran.pop(i)
-    return faltan, sobran
+    """(los esperados sin uno real que los cumpla, los reales que sobran), con el mayor número
+    de pares posible: un esperado general no se queda con el real que otro más preciso necesita
+    (revisión de la E2-7; caminos de aumento, las listas de un paso son cortas)."""
+    puede = [[j for j, r in enumerate(reales) if coincide(e, r)] for e in esperados]
+    de_real: dict[int, int] = {}            # real → el esperado con que quedó emparejado
+
+    def emparejar(i: int, vistos: set[int]) -> bool:
+        for j in puede[i]:
+            if j in vistos:
+                continue
+            vistos.add(j)
+            if j not in de_real or emparejar(de_real[j], vistos):
+                de_real[j] = i
+                return True
+        return False
+
+    for i in range(len(esperados)):
+        emparejar(i, set())
+    con_par = set(de_real.values())
+    return ([e for i, e in enumerate(esperados) if i not in con_par],
+            [r for j, r in enumerate(reales) if j not in de_real])
 
 
 def comprobar_efectos(c: Comprobacion, esperados: dict[str, Any], hubo: dict[str, Any],
@@ -318,10 +330,9 @@ def comprobar_efectos(c: Comprobacion, esperados: dict[str, Any], hubo: dict[str
     filas("destraban", hubo["destraban"], "quién destraba")
     filas("avances", hubo["avances"], "avance")
     filas("avisos_guardados", [a for a in hubo["avisos_guardados"]], "aviso guardado")
-    resueltos_e = esperados.get("bloqueos_resueltos") or []
-    if sorted(resueltos_e) != sorted(hubo["bloqueos_resueltos"]):
-        de_mas = de_mas or bool(set(hubo["bloqueos_resueltos"]) - set(resueltos_e))
-        c.falla(GARANTIA, "bloqueo resuelto", resueltos_e, hubo["bloqueos_resueltos"])
+    # Como las demás filas: uno de más es de garantía; uno que falta, de comprensión (revisión
+    # de la E2-7: antes, los dos eran de garantía).
+    filas("bloqueos_resueltos", hubo["bloqueos_resueltos"], "bloqueo resuelto")
     al_admin_e = esperados.get("avisos_al_administrador", 0)
     fuera = [i for i in hubo["incidentes"] if i["etapa"] == ETAPA_FUERA_DE_LA_LISTA]
     if len(fuera) != al_admin_e:
