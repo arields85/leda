@@ -202,8 +202,9 @@ def test_la_prevision_anota_el_atraso_en_dias_habiles_y_guarda_el_aviso(conn, mu
         "prevision": "2026-10-13", "motivo": "el proveedor se demoró",
         "fecha_comprometida": "2026-10-09", "atraso_dias_habiles": 1,
         "dependientes": ["Probar el tablero"],
-        # Cuándo sale, en la hora del espacio: un hecho de la respuesta (9e).
-        "aviso_al_referente": {"a": "Ismael", "sale": "2026-10-05T10:00:00-03:00"}}
+        # Guardado y todavía sin enviar, y cuándo sale, en la hora del espacio (9e).
+        "aviso_al_referente": {"a": "Ismael", "estado": "guardado_sin_enviar",
+                               "sale": "2026-10-05T10:00:00-03:00"}}
     prevision = _uno(conn, "select * from task_forecast")
     assert prevision["fecha_prevista"] == date(2026, 10, 13)
     assert prevision["fecha_comprometida"] == VIERNES_9
@@ -229,6 +230,23 @@ def test_la_prevision_anota_el_atraso_en_dias_habiles_y_guarda_el_aviso(conn, mu
     assert _cuantas(conn, "message_outbox") == 1          # sólo la respuesta a Marcos
     turno = _uno(conn, "select id from conversation_turn where sentido = 'entrada'")
     assert aviso["turno_id"] == turno["id"]
+
+
+def test_la_redaccion_recibe_que_el_aviso_al_referente_todavia_no_salio(conn, mundo, escribe):
+    """Primer contacto real (2026-10-05): con sólo `a` y `sale`, la IA dijo que Ismael ya
+    estaba avisado. Todo hecho de un efecto que pasa después dice su estado, explícito."""
+    quien, entrante = escribe("Marcos", "llego el 13, el proveedor se demoró")
+    ia = IAGuionada(jugadas=[[Jugada("anotar_prevision", {"tarea": "T1",
+                                                          "fecha": "2026-10-13"})]],
+                    redacciones=["Listo."])
+    procesar_turno(conn, quien, entrante, ia, RelojFijo(AHORA))
+    conn.commit()
+
+    [hecho] = ia.pedidos_de_redaccion[0]["hechos"]
+    assert hecho["aviso_al_referente"]["estado"] == "guardado_sin_enviar"
+    # Y es cierto: el aviso está guardado y nada salió para Ismael.
+    assert _uno(conn, "select estado from scheduled_notice")["estado"] == "guardado"
+    assert _cuantas(conn, "message_outbox") == 1          # sólo la respuesta a Marcos
 
 
 def test_una_prevision_en_la_fecha_comprometida_no_avisa(conn, mundo, escribe):
@@ -467,7 +485,8 @@ def test_lo_que_no_esta_en_la_lista_no_hace_nada_y_avisa_al_administrador(conn, 
         {"jugada": nombre, "resultado": "fuera_de_la_lista",
          "lo_que_puede_hacer": [FICHAS[n].para_que for n in sorted(OFRECIDAS)],
          # Leda lo sabe, pero lo dice sólo si la persona lo pregunta (9g).
-         "solo_si_pregunta": {"aviso_al_administrador": True}}
+         # El aviso queda en la cola del bot de administración: todavía no salió.
+         "solo_si_pregunta": {"aviso_al_administrador": {"estado": "en_cola_sin_enviar"}}}
         for nombre in ("recordar_algo_personal", "otra_cosa_nueva")]
     assert _estado_de(conn, mundo["tarea"]) == "asignada"
     # Un solo aviso por mensaje, que apunta al mensaje que lo provocó.
@@ -490,7 +509,8 @@ def test_lo_que_no_esta_en_la_lista_no_hace_nada_y_avisa_al_administrador(conn, 
     procesar_turno(conn, quien, siguiente, ia, RelojFijo(AHORA))
     [entrada] = [t for t in ia.pedidos_de_jugadas[0]["ultimos_turnos"]
                  if t["sentido"] == "entrada"]
-    assert entrada["hechos"][0]["solo_si_pregunta"] == {"aviso_al_administrador": True}
+    assert entrada["hechos"][0]["solo_si_pregunta"] == {
+        "aviso_al_administrador": {"estado": "en_cola_sin_enviar"}}
 
 
 # --- Aislamiento ----------------------------------------------------------------------------

@@ -195,6 +195,14 @@ def test_las_instrucciones_describen_el_trabajo_y_el_marcador():
         assert "¿te sirve" not in texto.lower()
 
 
+def test_la_redaccion_lee_el_estado_de_lo_que_pasa_despues():
+    """Primer contacto real (2026-10-05): un aviso guardado se contó como hecho. La regla es
+    de lectura de los hechos, para todo efecto que pasa después, sin frases de ejemplo."""
+    assert "estado" in INSTRUCCIONES_REDACCION
+    assert "guardado_sin_enviar" not in INSTRUCCIONES_REDACCION   # una regla, no un caso
+    assert "todavía no pasó" in INSTRUCCIONES_REDACCION
+
+
 def test_una_redaccion_vacia_se_devuelve_vacia_y_el_turno_la_toma_como_falla():
     assert _ia(ProveedorFalso([_texto(None)])).redactar({"hechos": []}) == ""
 

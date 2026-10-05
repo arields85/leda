@@ -94,8 +94,9 @@ Después, leer la conversación con `tools/leer_conversacion.py` y la base (`con
 - **Todavía no hay cambio de tema, corrección ni cancelar** (E2-4). Si Marcos se corrige,
   cambia de tema o dice que lo deja, una mala respuesta ahí no es una falla del diseño.
 - **El aviso de la nueva previsión a Ismael se guarda pero no se envía** hasta la E2-5:
-  queda en `scheduled_notice`, estado `guardado`. Leda igual le dice a Marcos que Ismael se va
-  a enterar, porque el hecho es ese.
+  queda en `scheduled_notice`, estado `guardado`. El hecho de la respuesta lo dice
+  (`guardado_sin_enviar`, con la hora en que sale): Leda le dice a Marcos que Ismael se va a
+  enterar, nunca que ya está avisado (primer contacto real, 2026-10-05).
 - **El aviso previo se dispara a mano:** no hay ciclo, escalera ni reintentos a los 1, 2, 4 y
   8 minutos (E2-5 y E2-6). Si la IA no lo redacta, queda guardado y se vuelve a correr el
   comando.

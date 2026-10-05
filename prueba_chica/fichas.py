@@ -93,6 +93,12 @@ class Ficha:
 # ayude, o más tiempo, que es la jugada de la nueva previsión.
 SALIDAS_DE_UN_BLOQUEO = ("que_alguien_ayude", "anotar_prevision")
 
+# El estado de un efecto que pasa después (un aviso a otra persona), que su hecho dice siempre,
+# explícito: la redacción nunca puede contarlo como hecho (constitución §4). Primer contacto
+# real, 2026-10-05: un aviso con sólo `a` y `sale` se contó como enviado.
+GUARDADO_SIN_ENVIAR = "guardado_sin_enviar"     # guardado; sale a la hora de `sale`
+EN_COLA_SIN_ENVIAR = "en_cola_sin_enviar"       # en la cola de su canal; sale enseguida
+
 
 # --- Comprobación común --------------------------------------------------------------------
 
@@ -324,6 +330,7 @@ def _anotar_prevision(ctx: Contexto, datos: dict, tarea: dict) -> dict:
          sale, f"motor:nueva_prevision:{prevision_id}", ctx.ahora))
     ctx.avisos_guardados.append(str(cur.fetchone()["id"]))
     return {**hecho, "aviso_al_referente": {"a": quien_aprueba["nombre"],
+                                            "estado": GUARDADO_SIN_ENVIAR,
                                             "sale": sale.isoformat()}}
 
 

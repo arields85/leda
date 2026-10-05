@@ -41,7 +41,7 @@ from leda.incidentes import (ETAPA_TURNO_CONVERSACION, NOTICIA_NEUTRA_INCIDENTE,
                              REFERENCIA_INBOUND_MESSAGE, registrar_incidente)
 from leda.salida import enqueue_outbox
 
-from .fichas import JUGADAS, Contexto, Manejador, lo_que_puede_hacer
+from .fichas import EN_COLA_SIN_ENVIAR, JUGADAS, Contexto, Manejador, lo_que_puede_hacer
 from .ia import IA, Jugada
 from .tiempo import Reloj
 
@@ -227,10 +227,12 @@ def _manejar(ctx: Contexto, jugada: Jugada, jugadas: Mapping[str, Manejador]) ->
     manejador = jugadas.get(jugada.nombre)
     if manejador is None:
         # Que se avisó al administrador es cierto, pero se dice sólo si la persona lo
-        # pregunta (9g): va en `solo_si_pregunta`, que la redacción trata siempre igual.
+        # pregunta (9g): va en `solo_si_pregunta`, que la redacción trata siempre igual. Con
+        # su estado, como todo aviso: queda en la cola del bot de administración.
         return {"jugada": jugada.nombre, "resultado": "fuera_de_la_lista",
                 "lo_que_puede_hacer": lo_que_puede_hacer(jugadas),
-                SOLO_SI_PREGUNTA: {"aviso_al_administrador": True}}
+                SOLO_SI_PREGUNTA: {
+                    "aviso_al_administrador": {"estado": EN_COLA_SIN_ENVIAR}}}
     return manejador(ctx, jugada)
 
 
