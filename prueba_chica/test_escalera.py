@@ -485,3 +485,48 @@ def test_sin_ruta_de_escalamiento_se_registra_y_no_se_repite(conn, mundo, dias):
     incidente = _uno(conn, "select * from incident")
     assert incidente["etapa"] == ETAPA_ESCALERA and incidente["severidad"] == "media"
     assert _cuantas(conn, "incident") == 1 and _espera(conn)["escalado_en"] == _hora(15, 10)
+
+
+def test_la_escalera_de_un_vencimiento_nuevo_tambien_escala(conn, mundo, dias):
+    """Revisión de la E2-6: la escalera nueva llega hasta su propio escalamiento, con su clave,
+    aunque la del vencimiento anterior ya haya escalado a la misma persona."""
+    for dia in (6, 9, 13, 14, 15):
+        dias.ciclo(_hora(dia, 10))
+    _cambiar_el_vencimiento(conn, mundo, datetime(2026, 10, 23, 20, 0, tzinfo=timezone.utc))
+    for dia in (20, 23, 26, 27):
+        dias.ciclo(_hora(dia, 10))
+
+    [escalamiento] = dias.ciclo(_hora(28, 10))
+
+    assert escalamiento["persona"] == "Ismael"
+    assert escalamiento["hechos"][0]["vence"] == "2026-10-23"
+    assert escalamiento["hechos"][0]["pedido_desde"] == "2026-10-23"
+    claves = [a["dedupe_key"].split(":")[3] for a in _avisos(conn, "escalamiento")]
+    assert claves == ["2026-10-09", "2026-10-23"]
+    assert len(_para(conn, mundo, "Ismael")) == 2
+    assert dias.ciclo(_hora(29, 10)) == []
+
+
+def test_un_escalamiento_que_reemplazo_un_reencuadre_no_cuenta_como_escalado(conn, mundo, dias):
+    """Revisión de `informar_avance`: el escalamiento quedó guardado y la persona estuvo ausente
+    ese día (el ciclo no llegó a mandarlo). A la vuelta, el reencuadre lo reemplaza: no salió,
+    así que la escalera no terminó, y si no hay respuesta, escala el día hábil siguiente."""
+    for dia in (9, 13, 14):
+        dias.ciclo(_hora(dia, 10))
+    correr_escalera(conn, mundo["id"], RelojFijo(_hora(15, 7)))    # el escalamiento, guardado
+    conn.commit()
+    _ausente(conn, mundo, "2026-10-15", "2026-10-15")
+
+    [vuelta] = dias.ciclo(_hora(16, 10))
+
+    assert vuelta["persona"] == "Marcos"
+    assert vuelta["hechos"][0]["aviso"] == "vuelta_de_ausencia"
+    [reemplazado] = _avisos(conn, "escalamiento")
+    assert (reemplazado["estado"], reemplazado["motivo_omision"]) == (
+        "omitido", "reemplazado_por_el_reencuadre")
+
+    [escalamiento] = dias.ciclo(_hora(19, 10))
+
+    assert escalamiento["persona"] == "Ismael"
+    assert escalamiento["hechos"][0]["aviso"] == "falta_de_respuesta"
+    assert dias.ciclo(_hora(20, 10)) == []

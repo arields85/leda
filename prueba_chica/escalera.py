@@ -190,9 +190,11 @@ def _ya_escalo(escalon: list[dict[str, Any]], espera: dict[str, Any] | None) -> 
     escalamiento o, sin ruta, con la espera escalada. La espera cuenta sólo si la abrió esta
     escalera: la de un vencimiento anterior, escalada y sin contestar, no frena a la nueva,
     que empieza de cero (la fecha comprometida la cambiará la plataforma, ADR 0017,
-    decisión 4)."""
-    if any(a["tipo"] == "escalamiento" and a["motivo_omision"] != REEMPLAZADO_POR_UN_AVANCE
-           for a in escalon):
+    decisión 4). Un escalamiento cuenta sólo si se dio: uno guardado todavía puede quedar
+    reemplazado (por un reencuadre o un avance), y uno reemplazado no salió (revisión de
+    `informar_avance`)."""
+    if any(a["tipo"] == "escalamiento" and a["estado"] != "guardado"
+           and a["motivo_omision"] not in NO_DADOS for a in escalon):
         return True
     if espera is None or espera["escalado_en"] is None or not escalon:
         return False
