@@ -7,10 +7,15 @@
 -- restricción única `(workspace_id, id)` de `blocker`, el mínimo del aviso previo en
 -- `workspace_setting` (las filas de esa clave quedan) y `inbound_message.telegram_bot_id`
 -- con su índice único: sin él, un mensaje repetido del motor vuelve a poder entrar dos
--- veces. Se pierden las previsiones y quién destraba cada bloqueo: antes de correrlo en
+-- veces. También el turno de entrada único por mensaje y `conversation_turn.numero`.
+-- Se pierden las previsiones y quién destraba cada bloqueo: antes de correrlo en
 -- una base con datos, `pg_dump` de esas tablas.
 begin;
 set search_path = leda, public;
+
+drop index if exists conversation_turn_una_entrada_por_mensaje;
+alter table conversation_turn drop constraint if exists conversation_turn_numero_unique;
+alter table conversation_turn drop column if exists numero;
 
 drop index if exists inbound_message_unico_por_mensaje;
 alter table inbound_message drop column if exists telegram_bot_id;

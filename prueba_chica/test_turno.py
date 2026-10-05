@@ -198,3 +198,48 @@ def test_si_la_redaccion_falla_dos_veces_se_deshace_lo_ejecutado(conn, mundo, es
     # Lo que la IA eligió queda en el registro aunque no se haya ejecutado.
     assert entrada["jugadas"] == [{"nombre": "anota", "datos": {}}]
     assert entrada["resultado"] is None
+
+
+def test_un_mensaje_procesado_dos_veces_corre_sus_jugadas_una_sola_vez(conn, mundo, escribe):
+    """Revisión de la E2-2: si el mismo mensaje entra dos veces al turno (un reintento del
+    escuchador, dos procesos), la segunda no pide jugadas, no ejecuta y no responde."""
+    quien, entrante = escribe("Marcos", "arranqué")
+    llamadas = []
+
+    def anota(contexto, jugada):
+        llamadas.append(jugada.nombre)
+        return {"jugada": jugada.nombre, "resultado": "hecho"}
+
+    primera = IAGuionada(jugadas=[[Jugada("anota", {})]], redacciones=["Anotado."])
+    procesar_turno(conn, quien, entrante, primera, RelojFijo(AHORA), jugadas={"anota": anota})
+    conn.commit()
+    segunda = IAGuionada(jugadas=[[Jugada("anota", {})]], redacciones=["Anotado otra vez."])
+
+    resultado = procesar_turno(conn, quien, entrante, segunda, RelojFijo(AHORA),
+                               jugadas={"anota": anota})
+    conn.commit()
+
+    assert resultado.repetido is True and resultado.jugadas == [] and resultado.hechos == []
+    assert llamadas == ["anota"]
+    assert segunda.pedidos_de_jugadas == [] and segunda.pedidos_de_redaccion == []
+    assert [s["cuerpo"] for s in _salidas(conn)] == ["Anotado."]
+    assert [t["sentido"] for t in _turnos(conn, quien.membership_id)] == ["entrada", "salida"]
+
+
+def test_los_turnos_llegan_a_la_ia_en_orden_aunque_tengan_la_misma_hora(conn, mundo, escribe):
+    """Revisión de la E2-2: con el reloj fijo todos los turnos tienen la misma hora; el
+    orden en que se registraron decide, no el sentido."""
+    quien, _ = escribe("Marcos", "-")
+    for texto, respuesta in (("hola", "Buen día."), ("arranqué", "Anotado.")):
+        _, entrante = escribe("Marcos", texto)
+        procesar_turno(conn, quien, entrante, IAGuionada(jugadas=[[]], redacciones=[respuesta]),
+                       RelojFijo(AHORA))
+        conn.commit()
+    _, tercero = escribe("Marcos", "¿y ahora?")
+    ia = IAGuionada(jugadas=[[]], redacciones=["Bien."])
+
+    procesar_turno(conn, quien, tercero, ia, RelojFijo(AHORA))
+
+    assert [(t["sentido"], t["texto"]) for t in ia.pedidos_de_jugadas[0]["ultimos_turnos"]] == [
+        ("entrada", "hola"), ("salida", "Buen día."),
+        ("entrada", "arranqué"), ("salida", "Anotado.")]

@@ -26,6 +26,8 @@
 --   antes (su recibo repetido pasada la cota de reentrega es deliberado,
 --   `gateway._estado_de_entrega`); las filas existentes quedan con el bot nulo, así
 --   que ninguna choca con el índice.
+-- - Ejecución única de un turno: un índice único deja un solo turno de entrada por
+--   mensaje; `conversation_turn.numero` ordena los turnos de cada persona.
 --
 -- Se deshace con `db/rollbacks/0031_seguimiento_del_motor.sql`.
 begin;
@@ -181,5 +183,20 @@ create unique index inbound_message_unico_por_mensaje
 
 comment on column inbound_message.telegram_bot_id is
   'El Motor (E2-1): el bot que recibió el mensaje. Con él, el índice inbound_message_unico_por_mensaje hace que un mensaje de Telegram repetido se reciba una sola vez. Nulo en los flujos congelados.';
+
+-- Revisión de la E2-2: un mensaje tiene a lo sumo un turno de entrada (el turno corre
+-- una sola vez aunque el mensaje llegue dos veces al motor), y los turnos de una
+-- persona llevan su número, que los ordena aunque tengan la misma hora (el reloj del
+-- motor puede ser fijo). El número lo pone el motor, como los momentos; una tabla con
+-- turnos no tiene número y la columna no se agrega.
+alter table conversation_turn
+  add column numero integer not null check (numero >= 1),
+  add constraint conversation_turn_numero_unique unique (membership_id, numero);
+
+create unique index conversation_turn_una_entrada_por_mensaje
+  on conversation_turn (inbound_message_id) where sentido = 'entrada';
+
+comment on column conversation_turn.numero is
+  'El Motor (E2-3): el número del turno en la conversación de la persona (1, 2, 3...). Lo pone el motor; ordena los turnos de la misma hora.';
 
 commit;

@@ -1374,7 +1374,11 @@ create table conversation_turn (
   latencia_ms         integer check (latencia_ms >= 0),
   error               text,
   at                  timestamptz not null,
+  -- El Motor (migración 0031): el número del turno en la conversación de la
+  -- persona; lo pone el motor y ordena los turnos de la misma hora.
+  numero              integer not null check (numero >= 1),
   constraint conversation_turn_workspace_id_unique unique (workspace_id, id),
+  constraint conversation_turn_numero_unique unique (membership_id, numero),
   constraint conversation_turn_membership
     foreign key (membership_id)
     references membership(id) on delete cascade,
@@ -1394,6 +1398,10 @@ create table conversation_turn (
 
 create index conversation_turn_por_persona
   on conversation_turn (workspace_id, membership_id, at desc);
+
+-- El Motor (migración 0031): un mensaje tiene a lo sumo un turno de entrada.
+create unique index conversation_turn_una_entrada_por_mensaje
+  on conversation_turn (inbound_message_id) where sentido = 'entrada';
 
 create table scheduled_notice (
   id                          uuid primary key default gen_random_uuid(),
@@ -1458,6 +1466,8 @@ comment on table conversation_state is
   'El Motor (ADR 0018, decisión 3.1): una fila por persona. La pregunta abierta, el último aviso que Leda le mandó (su tarea sale del aviso) y, reservadas, lo mostrado para confirmar y su huella. Los temas para después son las preguntas sin cerrar con para_despues_en.';
 comment on table conversation_turn is
   'El Motor (ADR 0018, decisión 3.2): el registro de turnos. Sólo se agrega; se conserva como las conversaciones (ADR 0002).';
+comment on column conversation_turn.numero is
+  'El Motor (E2-3): el número del turno en la conversación de la persona (1, 2, 3...). Lo pone el motor; ordena los turnos de la misma hora.';
 comment on table conversation_question is
   'El Motor: las preguntas de Leda. Se cierran con cerrada_en y cierre; una pregunta dejada para después lleva para_despues_en.';
 comment on table conversation_option is

@@ -14,7 +14,12 @@ el administrador y el turno queda registrado con su error. Vale para los dos ped
 redacción falla después de manejar las jugadas, lo hecho se deshace (un punto de guardado),
 porque sin respuesta de la IA no hay jugada.
 
-El turno corre en una transacción de `db.espacio`; quien llama la confirma.
+El turno corre en una transacción de `db.espacio`; quien llama la confirma. Los turnos de una
+persona corren de a uno (un candado por persona, de la transacción). Un mensaje corre una sola
+vez: si ya tiene su turno de entrada (un reintento del escuchador, dos procesos con el mismo
+mensaje), no se le pide nada a la IA ni se ejecuta nada, y el resultado lo dice (`repetido`);
+la base lo asegura además con un índice único. Cada turno lleva su número en la conversación
+de la persona, que ordena los últimos turnos aunque tengan la misma hora.
 """
 
 from __future__ import annotations
@@ -77,6 +82,7 @@ class ResultadoTurno:
     jugadas: list[Jugada]
     hechos: list[dict[str, Any]]
     error: str | None = None
+    repetido: bool = False      # el mensaje ya tenía su turno: no se hizo nada
 
 
 class IANoRespondio(RuntimeError):
@@ -89,6 +95,8 @@ def procesar_turno(conn: psycopg.Connection, quien: Solicitante, entrante_id: st
                    reloj: Reloj, jugadas: Mapping[str, Manejador] = JUGADAS) -> ResultadoTurno:
     with espacio(conn, quien.workspace_id) as cur:
         atar_al_entrante(cur, entrante_id)
+        if _ya_tiene_turno(cur, quien, entrante_id):
+            return ResultadoTurno("", [], [], repetido=True)
         ctx = _leer(cur, quien, entrante_id, reloj.ahora())
         inicio = reloj.medir()
         elegidas: list[Jugada] | None = None    # None: la IA no llegó a elegir
@@ -109,6 +117,16 @@ def procesar_turno(conn: psycopg.Connection, quien: Solicitante, entrante_id: st
 
 
 # --- (1) Lo que se lee ------------------------------------------------------------------
+
+def _ya_tiene_turno(cur, quien: Solicitante, entrante_id: str) -> bool:
+    """El candado hace esperar a otro turno de la misma persona hasta que éste termine; con
+    el mismo mensaje, al seguir ve el turno ya registrado."""
+    cur.execute("select pg_advisory_xact_lock(hashtextextended(%s, 0))",
+                (f"motor:persona:{quien.membership_id}",))
+    cur.execute("""select 1 from conversation_turn
+                    where inbound_message_id = %s and sentido = 'entrada'""", (entrante_id,))
+    return cur.fetchone() is not None
+
 
 def _leer(cur, quien: Solicitante, entrante_id: str, ahora: datetime) -> Contexto:
     cur.execute("select texto, chat_id, app_user_id from inbound_message where id = %s",
@@ -138,7 +156,7 @@ def _leer(cur, quien: Solicitante, entrante_id: str, ahora: datetime) -> Context
                      left join inbound_message i on i.id = t.inbound_message_id
                      left join message_outbox o on o.id = t.outbox_id
                     where t.membership_id = %s
-                    order by t.at desc, t.sentido = 'salida' desc
+                    order by t.numero desc
                     limit %s""", (quien.membership_id, ULTIMOS_TURNOS))
     ultimos = tuple(
         {"sentido": t["sentido"], "texto": t["texto"], "jugadas": t["jugadas"],
@@ -222,25 +240,36 @@ def _responder(cur, ctx: Contexto, texto: str, ahora: datetime, ia_nombre: str |
                    dedupe_key=clave, recipient_membership_id=ctx.quien.membership_id,
                    is_response=True, scheduled_for=ahora)
     cur.execute("select id from message_outbox where dedupe_key = %s", (clave,))
+    outbox_id = cur.fetchone()["id"]
     cur.execute(
         """insert into conversation_turn (workspace_id, membership_id, sentido, outbox_id,
-                                          ia, at)
-           values (%s, %s, 'salida', %s, %s, %s)""",
-        (ctx.quien.workspace_id, ctx.quien.membership_id, cur.fetchone()["id"], ia_nombre,
-         ahora))
+                                          ia, at, numero)
+           values (%s, %s, 'salida', %s, %s, %s, %s)""",
+        (ctx.quien.workspace_id, ctx.quien.membership_id, outbox_id, ia_nombre, ahora,
+         _siguiente_numero(cur, ctx.quien.membership_id)))
 
 
 def _registrar_entrada(cur, ctx: Contexto, ahora: datetime, jugadas: list[Jugada] | None,
                        resultado: dict | None, ia_nombre: str, latencia_ms: int,
-                       error: str | None) -> None:
+                       error: str | None) -> str:
     cur.execute(
         """insert into conversation_turn (workspace_id, membership_id, sentido,
                                           inbound_message_id, jugadas, resultado, ia,
-                                          latencia_ms, error, at)
-           values (%s, %s, 'entrada', %s, %s, %s, %s, %s, %s, %s)""",
+                                          latencia_ms, error, at, numero)
+           values (%s, %s, 'entrada', %s, %s, %s, %s, %s, %s, %s, %s)
+           returning id""",
         (ctx.quien.workspace_id, ctx.quien.membership_id, ctx.entrante_id,
          _json([dataclasses.asdict(j) for j in jugadas] if jugadas is not None else None),
-         _json(resultado), ia_nombre, latencia_ms, error, ahora))
+         _json(resultado), ia_nombre, latencia_ms, error, ahora,
+         _siguiente_numero(cur, ctx.quien.membership_id)))
+    return str(cur.fetchone()["id"])
+
+
+def _siguiente_numero(cur, membership_id: str) -> int:
+    """El número del próximo turno de la persona; el candado del turno lo hace único."""
+    cur.execute("""select coalesce(max(numero), 0) + 1 as n from conversation_turn
+                    where membership_id = %s""", (membership_id,))
+    return cur.fetchone()["n"]
 
 
 def _json(valor: Any) -> str | None:

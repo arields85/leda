@@ -101,15 +101,17 @@ def _opcion(cur, e: Espacio, pregunta: str, token: str, ws: str | None = None) -
     return str(cur.fetchone()["id"])
 
 
-def _turno(cur, e: Espacio, ws: str | None = None, entrante: str | None = None) -> str:
+def _turno(cur, e: Espacio, ws: str | None = None, entrante: str | None = None,
+           numero: int = 1) -> str:
     cur.execute(
         """insert into conversation_turn
              (workspace_id, membership_id, sentido, inbound_message_id, jugadas,
-              resultado, ia, latencia_ms, at)
-           values (%s, %s, 'entrada', %s, %s, %s, 'gpt-6-sol', 900, %s) returning id""",
+              resultado, ia, latencia_ms, at, numero)
+           values (%s, %s, 'entrada', %s, %s, %s, 'gpt-6-sol', 900, %s, %s)
+           returning id""",
         (ws or e.id, e.persona, entrante or e.entrante,
          json.dumps([{"jugada": "anotar_inicio"}]), json.dumps({"anotado": True}),
-         AHORA))
+         AHORA, numero))
     return str(cur.fetchone()["id"])
 
 
@@ -516,3 +518,16 @@ def test_un_mensaje_de_telegram_repetido_se_recibe_una_sola_vez(conn, espacios):
         assert len(_entrante(cur, norte, 900, bot=None)) == 1
     with espacio(conn, oeste.id) as cur:
         assert len(_entrante(cur, oeste, 500)) == 1
+
+
+def test_un_mensaje_tiene_un_solo_turno_de_entrada_y_cada_turno_su_numero(conn, espacios):
+    """Revisión de la E2-2: la ejecución única de un turno no depende sólo del motor."""
+    norte = espacios["north-lab"]
+    with espacio(conn, norte.id) as cur:
+        _turno(cur, norte, numero=1)
+        with pytest.raises(psycopg.errors.UniqueViolation), conn.transaction():
+            _turno(cur, norte, numero=2)
+        otro = _entrante(cur, norte, 501)[0]["id"]
+        with pytest.raises(psycopg.errors.UniqueViolation), conn.transaction():
+            _turno(cur, norte, entrante=str(otro), numero=1)
+        assert _turno(cur, norte, entrante=str(otro), numero=2)
