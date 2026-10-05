@@ -1,23 +1,22 @@
-"""El aviso previo, disparado a mano para el primer contacto real (E2-3b).
+"""El aviso previo, disparado a mano (E2-3b; desde la E2-5, por el camino de los avisos guardados).
 
     python -m prueba_chica.avisar corework <persona> <palabras del título> [--de-nuevo]
 
 `odd/tasks/prueba-chica-del-motor.md`, sección 4 ("Avisos guardados"); ADR 0018, decisiones 8
-y 9b. El aviso se guarda como hechos en `scheduled_notice` (la tarea, cuándo vence, cuántos días
-hábiles faltan y que no pide respuesta), la IA lo redacta justo antes de encolarlo y recién
-entonces entra al outbox; después se despacha. Lo que Leda inicia sale sólo dentro del horario
-del espacio: fuera de él, el despachador lo pospone a la próxima jornada.
-
-Para la prueba se dispara con este comando; el ciclo que lo dispara solo a su hora, la escalera
-y los reintentos a los 1, 2, 4 y 8 minutos son de la E2-5 y la E2-6. Si la IA no redacta (un
-reintento enseguida), el aviso queda guardado sin enviar, con su intento contado, y se vuelve
-a intentar corriendo el comando otra vez: nunca sale un texto armado a mano.
+y 9b. La escalera (`escalera.py`) guarda el aviso previo sola, a su hora; este comando lo guarda
+en el momento, con la misma clave (no se repite: el de la escalera y el del comando son el
+mismo) y los mismos hechos (la tarea, cuándo vence, cuántos días hábiles faltan y que no pide
+respuesta), y lo manda por el mismo camino que todo aviso guardado (`avisos.enviar_avisos`):
+se vuelve a leer la tarea, la IA lo redacta y recién entonces entra al outbox; después se
+despacha. Lo que Leda inicia sale sólo dentro del horario del espacio: fuera de él, el aviso
+queda guardado. Si la IA no redacta, queda guardado sin enviar, con su intento contado, y se
+vuelve a intentar corriendo el comando otra vez (sin esperar el próximo reintento): nunca sale
+un texto armado a mano.
 """
 
 from __future__ import annotations
 
 import argparse
-import json
 import sys
 from dataclasses import dataclass
 from typing import Any
@@ -26,23 +25,28 @@ import psycopg
 
 from leda.calendario import Calendario
 from leda.db import espacio
-from leda.salida import enqueue_outbox
 
+from .avisos import Momento, enviar_avisos, guardar, hechos_de_la_escalera, leer_tarea
 from .fichas import ESTADOS_ABIERTOS, integrantes_que_coinciden, palabras
 from .ia import IA
 from .tiempo import Reloj
-from .turno import (IANoRespondio, leer_ultimos_turnos, no_vacio, pedir_a_la_ia,
-                    registrar_salida)
 
 TIPO = "aviso_previo"
+HECHOS_DEL_AVISO_PREVIO = {"aviso": "vencimiento_proximo", "necesita_respuesta": False}
 
 
 @dataclass
 class ResultadoAviso:
-    estado: str                 # encolado | ya_enviado | sin_redactar
+    estado: str         # encolado | ya_enviado | sin_redactar | fuera_de_horario | omitido
     aviso_id: str
     texto: str | None
     hechos: dict[str, Any]
+    motivo: str | None = None   # el de la omisión
+
+
+def clave_del_aviso_previo(task_id: str, vence: str) -> str:
+    """La misma para la escalera y el comando: un aviso previo por tarea y vencimiento."""
+    return f"motor:{TIPO}:{task_id}:{vence}"
 
 
 def resolver(cur, persona: str, tarea: str) -> tuple[str, str, str]:
@@ -69,83 +73,50 @@ def resolver(cur, persona: str, tarea: str) -> tuple[str, str, str]:
 def avisar_vencimiento(conn: psycopg.Connection, workspace_id: str, membership_id: str,
                        task_id: str, ia: IA, reloj: Reloj, *,
                        de_nuevo: bool = False) -> ResultadoAviso:
-    """Guarda el aviso previo de la tarea como hechos, lo redacta y lo encola. Sin
-    `de_nuevo`, un aviso ya enviado de la misma tarea y vencimiento no se repite."""
+    """Guarda el aviso previo de la tarea como hechos y lo manda por el camino de los avisos
+    guardados. Sin `de_nuevo`, un aviso ya enviado de la misma tarea y vencimiento no se
+    repite."""
     ahora = reloj.ahora()
     with espacio(conn, workspace_id) as cur:
-        cur.execute("""select t.titulo, t.estado::text estado, t.fecha_objetivo,
-                              t.responsable_membership_id, i.nombre, i.telegram_user_id
-                         from task t
-                         join integrante i on i.membership_id = %s
-                        where t.id = %s""", (membership_id, task_id))
-        fila = cur.fetchone()
-        if fila is None or str(fila["responsable_membership_id"]) != membership_id:
+        cur.execute("""select nombre, telegram_user_id from integrante
+                        where membership_id = %s""", (membership_id,))
+        persona = cur.fetchone()
+        tarea = leer_tarea(cur, task_id)
+        if persona is None or tarea is None or                 str(tarea["responsable_membership_id"]) != membership_id:
             raise ValueError("La tarea no es de esa persona.")
-        if fila["estado"] not in ESTADOS_ABIERTOS:
-            raise ValueError(f"La tarea no está abierta (está {fila['estado']}).")
-        if fila["fecha_objetivo"] is None:
+        if tarea["estado"] not in ESTADOS_ABIERTOS:
+            raise ValueError(f"La tarea no está abierta (está {tarea['estado']}).")
+        if tarea["fecha_objetivo"] is None:
             raise ValueError("La tarea no tiene fecha comprometida.")
-        if fila["telegram_user_id"] is None:
-            raise ValueError(f"{fila['nombre']} todavía no activó su Telegram.")
+        if persona["telegram_user_id"] is None:
+            raise ValueError(f"{persona['nombre']} todavía no activó su Telegram.")
 
-        cal = Calendario.desde_base(cur, workspace_id)
-        vence = fila["fecha_objetivo"].astimezone(cal.zona).date()
-        hechos = {"aviso": "vencimiento_proximo", "tarea": fila["titulo"],
-                  "vence": vence.isoformat(),
-                  "dias_habiles_hasta_el_vencimiento": cal.habiles_entre(
-                      ahora, fila["fecha_objetivo"]),
-                  "necesita_respuesta": False}
-        clave = f"motor:{TIPO}:{task_id}:{vence.isoformat()}"
+        m = Momento(cur, workspace_id, Calendario.desde_base(cur, workspace_id), ahora)
+        hechos = hechos_de_la_escalera(m, TIPO, tarea, HECHOS_DEL_AVISO_PREVIO)
+        clave = clave_del_aviso_previo(task_id, hechos["vence"])
         if de_nuevo:
             clave += f":{ahora.isoformat()}"
-        cur.execute(
-            """insert into scheduled_notice (workspace_id, tipo, task_id,
-                                             destinatario_membership_id, hechos,
-                                             programado_para, dedupe_key, creado_en)
-               values (%s, %s, %s, %s, %s, %s, %s, %s)
-               on conflict (workspace_id, dedupe_key) do nothing""",
-            (workspace_id, TIPO, task_id, membership_id, json.dumps(hechos, ensure_ascii=False),
-             ahora, clave, ahora))
-        cur.execute("""select id, estado, hechos from scheduled_notice
-                        where workspace_id = %s and dedupe_key = %s""", (workspace_id, clave))
-        aviso = cur.fetchone()
-        aviso_id = str(aviso["id"])
-        if aviso["estado"] != "guardado":
-            return ResultadoAviso("ya_enviado", aviso_id, None, aviso["hechos"])
-        cur.execute("update scheduled_notice set intentos = intentos + 1 where id = %s",
-                    (aviso_id,))
+        aviso_id, _ = guardar(cur, workspace_id, TIPO, task_id=task_id,
+                              destinatario=membership_id, hechos=hechos,
+                              programado_para=ahora, clave=clave, ahora=ahora)
+        cur.execute("select estado, hechos from scheduled_notice where id = %s", (aviso_id,))
+        antes = cur.fetchone()
+    if antes["estado"] != "guardado":
+        return ResultadoAviso("ya_enviado", aviso_id, None, antes["hechos"])
 
-        pedido = {"hoy": ahora.astimezone(cal.zona).date().isoformat(),
-                  "persona": fila["nombre"], "mensaje": None, "hechos": [aviso["hechos"]],
-                  "ultimos_turnos": list(leer_ultimos_turnos(cur, membership_id))}
-        try:
-            texto = pedir_a_la_ia(lambda: no_vacio(ia.redactar(pedido)))
-        except IANoRespondio:
-            cur.execute("update scheduled_notice set proximo_intento_en = %s where id = %s",
-                        (ahora, aviso_id))
-            return ResultadoAviso("sin_redactar", aviso_id, None, aviso["hechos"])
-
-        clave_outbox = f"motor:aviso:{aviso_id}"
-        enqueue_outbox(cur, workspace_id=workspace_id, chat_id=fila["telegram_user_id"],
-                       text=texto, dedupe_key=clave_outbox,
-                       recipient_membership_id=membership_id, message_type="informativo",
-                       scheduled_for=ahora)
-        cur.execute("select id from message_outbox where dedupe_key = %s", (clave_outbox,))
-        outbox_id = str(cur.fetchone()["id"])
-        cur.execute("""update scheduled_notice
-                          set estado = 'enviado', outbox_id = %s, resuelto_en = %s,
-                              proximo_intento_en = null
-                        where id = %s""", (outbox_id, ahora, aviso_id))
-        registrar_salida(cur, workspace_id, membership_id, outbox_id, ia.nombre, ahora)
-        cur.execute(
-            """insert into conversation_state (membership_id, workspace_id, ultimo_aviso_id,
-                                               actualizado_en)
-               values (%s, %s, %s, %s)
-               on conflict (membership_id) do update
-                  set ultimo_aviso_id = excluded.ultimo_aviso_id,
-                      actualizado_en = excluded.actualizado_en""",
-            (membership_id, workspace_id, aviso_id, ahora))
-        return ResultadoAviso("encolado", aviso_id, texto, aviso["hechos"])
+    resumen = enviar_avisos(conn, workspace_id, ia, reloj, solo=aviso_id, forzar=True)
+    with espacio(conn, workspace_id) as cur:
+        cur.execute("""select a.estado, a.hechos, a.motivo_omision, o.cuerpo
+                         from scheduled_notice a
+                         left join message_outbox o on o.id = a.outbox_id
+                        where a.id = %s""", (aviso_id,))
+        despues = cur.fetchone()
+    if "fuera_de_horario" in resumen:
+        return ResultadoAviso("fuera_de_horario", aviso_id, None, despues["hechos"])
+    estado = {"enviado": "encolado", "omitido": "omitido"}.get(despues["estado"],
+                                                               "sin_redactar")
+    return ResultadoAviso(estado, aviso_id, despues["cuerpo"], despues["hechos"],
+                          despues["motivo_omision"])
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -190,9 +161,16 @@ def main(argv: list[str] | None = None) -> int:
         print(f"El aviso de esa tarea ya se le mandó a {nombre}. Con --de-nuevo sale otro.")
         return 0
     if resultado.estado == "sin_redactar":
-        print("La IA no respondió (dos intentos): el aviso quedó guardado sin enviar. "
+        print("La IA no respondió: el aviso quedó guardado sin enviar. "
               "Volvé a correr el comando.")
         return 1
+    if resultado.estado == "fuera_de_horario":
+        print("Fuera del horario del espacio: el aviso quedó guardado y sale en horario "
+              "(volvé a correr el comando entonces).")
+        return 0
+    if resultado.estado == "omitido":
+        print(f"El aviso ya no corresponde y quedó omitido ({resultado.motivo}).")
+        return 0
     print(f"Aviso para {nombre} encolado:\n  {resultado.texto}")
     try:
         with espacio(conn, ws) as cur:

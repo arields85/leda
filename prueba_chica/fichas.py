@@ -501,7 +501,8 @@ def _deshacer_inicio(ctx: Contexto, tarea: dict) -> dict | None:
 def _deshacer_prevision(ctx: Contexto, tarea: dict) -> dict | None:
     """Una previsión de corrección que reemplaza a la equivocada con la de antes (o con la
     fecha comprometida, si no había). Su aviso al referente: si no salió, se retira; si salió,
-    se guarda una corrección breve para él (9f)."""
+    se guarda una corrección breve para él (9f). Si no salió y la de antes tenía un aviso que
+    se había retirado por ella, ése se vuelve a guardar (`_rearmar_aviso_de_la_anterior`)."""
     cur, cal = ctx.cur, ctx.calendario
     cur.execute("""select * from task_forecast f
                     where f.task_id = %s
@@ -560,9 +561,53 @@ def _deshacer_prevision(ctx: Contexto, tarea: dict) -> dict | None:
         hechos["correccion_al_referente"] = {"a": quien_aprueba["nombre"],
                                              "estado": GUARDADO_SIN_ENVIAR,
                                              "sale": sale.isoformat()}
+    if (anterior is not None and quien_aprueba is not None
+            and (aviso is None or aviso["estado"] != "enviado")):
+        rearmado = _rearmar_aviso_de_la_anterior(ctx, tarea, anterior, correccion_id,
+                                                 quien_aprueba)
+        if rearmado is not None:
+            hechos["aviso_de_la_prevision_anterior"] = rearmado
     return {"hechos": hechos,
             "datos": {"fecha": equivocada["fecha_prevista"].isoformat(),
                       **({"motivo": equivocada["motivo"]} if equivocada["motivo"] else {})}}
+
+
+def _rearmar_aviso_de_la_anterior(ctx: Contexto, tarea: dict, anterior: dict,
+                                  correccion_id: str, quien_aprueba: dict) -> dict | None:
+    """La corrección vuelve a una previsión anterior cuyo aviso al referente se había retirado
+    sin salir (la reemplazó la equivocada): el referente nunca supo de ella, así que su aviso
+    se vuelve a guardar, con los hechos de esa previsión, atado a la corrección, que es la
+    previsión vigente. Si el aviso de la anterior ya había salido, el referente ya la sabe
+    (pendiente de la E2-4)."""
+    cur, cal = ctx.cur, ctx.calendario
+    cur.execute("""select estado from scheduled_notice
+                    where workspace_id = %s and dedupe_key = %s""",
+                (ctx.quien.workspace_id, f"motor:nueva_prevision:{anterior['id']}"))
+    suyo = cur.fetchone()
+    comprometida = anterior["fecha_comprometida"].astimezone(cal.zona).date()
+    if suyo is None or suyo["estado"] != "omitido" or anterior["fecha_prevista"] == comprometida:
+        return None
+    cur.execute("""select t.titulo from dependency d join task t on t.id = d.destino_task_id
+                    where d.origen_task_id = %s and t.estado not in ('terminada', 'cancelada')
+                    order by t.titulo""", (tarea["id"],))
+    sale = cal.dentro_de_jornada(ctx.ahora)
+    cur.execute(
+        """insert into scheduled_notice (workspace_id, tipo, task_id,
+                                         destinatario_membership_id, hechos, programado_para,
+                                         dedupe_key, creado_en)
+           values (%s, 'nueva_prevision', %s, %s, %s, %s, %s, %s) returning id""",
+        (ctx.quien.workspace_id, tarea["id"], quien_aprueba["membership_id"],
+         json.dumps({"tarea": tarea["titulo"], "responsable": ctx.quien.nombre,
+                     "prevision": anterior["fecha_prevista"].isoformat(),
+                     "motivo": anterior["motivo"],
+                     "fecha_comprometida": comprometida.isoformat(),
+                     "atraso_dias_habiles": anterior["atraso_dias_habiles"],
+                     "dependientes": [r["titulo"] for r in cur.fetchall()]},
+                    ensure_ascii=False),
+         sale, f"motor:nueva_prevision:{correccion_id}", ctx.ahora))
+    ctx.avisos_guardados.append(str(cur.fetchone()["id"]))
+    return {"a": quien_aprueba["nombre"], "estado": GUARDADO_SIN_ENVIAR,
+            "sale": sale.isoformat()}
 
 
 def _deshacer_bloqueo(ctx: Contexto, tarea: dict) -> dict | None:
@@ -592,7 +637,8 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
           hace="la pasa a en curso (actualizar_estado)",
           despues="cierra la espera de esa tarea",
           manejar=_anotar_inicio, del_responsable=True,
-          estados=frozenset({"asignada"}), deshacer=_deshacer_inicio),
+          estados=frozenset({"asignada"}), contesta=(preguntas.ESTADO_DE_LA_TAREA,),
+          deshacer=_deshacer_inicio),
     Ficha("anotar_prevision", "anotar para cuándo prevé terminar una tarea, y por qué",
           necesita=("tarea", "fecha"), opcional=("motivo",),
           comprueba="que sea el responsable, que la tarea esté abierta y tenga fecha "
@@ -601,14 +647,16 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
                "comprometida no cambia",
           despues="guarda el aviso al referente, salvo que vuelva a la fecha comprometida; "
                   "cierra la espera de esa tarea",
-          manejar=_anotar_prevision, del_responsable=True, deshacer=_deshacer_prevision),
+          manejar=_anotar_prevision, del_responsable=True,
+          contesta=(preguntas.ESTADO_DE_LA_TAREA,), deshacer=_deshacer_prevision),
     Ficha("anotar_bloqueo", "anotar que una tarea está trabada y por qué",
           necesita=("tarea",), opcional=("causa",),
           comprueba="que sea el responsable y que la tarea esté abierta",
           hace="sin causa, nada; con causa, registra el bloqueo (registrar_bloqueo)",
           despues="sin causa, pregunta la causa; con causa, pregunta quién lo puede "
                   "destrabar. Ningún aviso al referente (9c)",
-          manejar=_anotar_bloqueo, del_responsable=True, contesta=("causa_del_bloqueo",),
+          manejar=_anotar_bloqueo, del_responsable=True,
+          contesta=("causa_del_bloqueo", preguntas.ESTADO_DE_LA_TAREA),
           deshacer=_deshacer_bloqueo),
     Ficha("anotar_quien_destraba", "anotar quién puede destrabar un bloqueo",
           necesita=(), opcional=("tarea", "quien", "no_sabe", "nadie_mas"),
@@ -617,7 +665,8 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
                "que le toca a la persona misma",
           despues="cierra la pregunta y la espera; si no se sabe o le toca a ella, propone "
                   "salidas",
-          manejar=_anotar_quien_destraba, contesta=("quien_destraba",)),
+          manejar=_anotar_quien_destraba,
+          contesta=("quien_destraba", preguntas.ESTADO_DE_LA_TAREA)),
     Ficha("consultar_pendientes", "contar qué tareas tiene pendientes",
           necesita=(), opcional=(),
           comprueba="nada", hace="lee sus tareas abiertas (consultar_tareas)",

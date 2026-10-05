@@ -36,6 +36,9 @@ from collections.abc import Sequence
 from typing import Any
 
 CUAL_TAREA = "cual_tarea"      # la duda: de qué tarea habla (situación general 5)
+# El estado de una tarea, que Leda pide por su cuenta desde el vencimiento (escalera, 9b): no se
+# puede dejar sin efecto, y la contestan las jugadas que informan un hecho de la tarea.
+ESTADO_DE_LA_TAREA = "estado_de_la_tarea"
 
 PREFIJO_TOQUE = "m:"           # el `callback_data` de un botón es el prefijo y el token
 _LARGO_ETIQUETA = 80           # `salida.BUTTON_LABEL_LIMIT`

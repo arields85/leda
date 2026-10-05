@@ -24,7 +24,13 @@ de nuevo en `src/leda`, con su propia prueba de frontera.
   la lista cerrada (o con `fuera_de_la_lista`) y una que redacta desde los hechos, con el tono
   del espacio. El modelo sale de `model_config`; la clave, del entorno.
 - `escuchar.py`: el escuchador por long polling (bot del equipo y bot de administración).
-- `avisar.py`: el comando que dispara a mano el aviso previo de una tarea.
+- `avisos.py`: los avisos guardados, todo lo que Leda manda por su cuenta. Al llegar su hora,
+  sólo dentro del horario, se vuelve a leer la tarea; si todavía corresponde, la IA lo redacta
+  desde los hechos de ese momento y va al outbox; si no, queda omitido con su motivo. Si la IA
+  no lo redacta, se reintenta a los 1, 2, 4 y 8 minutos; al quinto fallo, un incidente y el
+  aviso de la falla a quien lo causó, que también redacta la IA.
+- `avisar.py`: el comando que dispara a mano el aviso previo de una tarea, por el mismo
+  camino que los demás avisos guardados.
 - `tiempo.py`: el reloj del motor. Los momentos los pone el motor, nunca la base.
 - `test_frontera.py`: qué puede importar esta carpeta de `src/leda` y qué nunca debe alcanzar.
 
@@ -65,7 +71,8 @@ python -m prueba_chica.avisar corework Marcos PLC
 La persona y la tarea se nombran con palabras enteras del nombre y del título. El aviso se
 guarda como hechos, la IA lo redacta y se encola. Correrlo de nuevo no repite el aviso de la
 misma tarea (`--de-nuevo` manda otro). **Fuera del horario de CoreWork (lunes a viernes, 09:00
-a 17:00) el aviso no sale:** el despachador lo pospone a la próxima jornada. Las respuestas a lo
+a 17:00) el aviso no sale:** queda guardado, sin redactar, y sale al volver a correr el comando en
+horario. Las respuestas a lo
 que escribe la persona salen a cualquier hora. Por eso el primer contacto se corre en horario.
 
 Antes de empezar, cada cuenta que participa le escribe `/start` una vez al bot de prueba
