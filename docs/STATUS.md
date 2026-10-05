@@ -30,18 +30,18 @@ una lista cerrada y el código las ejecuta; estado por persona y registro de tur
 fichas y ocho situaciones generales; la prueba chica y sus criterios). El 0018 queda como "propuesta" hasta que
 pase la prueba chica. M1 quedó registrado en el documento de la unidad y en la línea "Estado" de cada ADR.
 
-## Punto exacto para retomar (2026-10-04, plan de la Etapa 2 en borrador)
+## Punto exacto para retomar (2026-10-05, plan de la Etapa 2 decidido)
 
 - **Qué:** el Motor, con la Etapa 1 terminada.
 - **Dónde:** rama `feat/motor-de-conversacion`, carpeta `D:\Proyectos\Leda-PM-worktrees\motor-de-conversacion`
   (reglas en [`../AGENTS.md`](../AGENTS.md), "Dónde se trabaja y qué no se hace").
 - **Hecho:** la E1-3 (`tests/conversaciones/`, catorce conversaciones) y las decisiones P1 a P16 del usuario,
   aplicadas a ellas y escritas en el ADR 0018, decisión 9.
-- **Primer paso:** el borrador del plan de la Etapa 2 (`odd/tasks/prueba-chica-del-motor.md`) espera las cinco
-  decisiones del usuario de su sección 10; con ellas, la tarea E2-1.
+- **Primer paso:** la tarea E2-1 del plan de la Etapa 2 (`odd/tasks/prueba-chica-del-motor.md`), con su sección 10
+  resuelta por el usuario (2026-10-05).
 - **Acuerdos de trabajo:** chequeo de rumbo escrito antes de cada unidad; consentimiento permanente del usuario
   para los commits de cada unidad y para las revisiones RDD (`tools/rdd_ciclo.py <carpeta> <base>`), que
-  comparan la rama con `origin/main`; un cambio en `AGENTS.md` sale de riesgo medio y pide consentimiento, que el
+  revisan desde el último tramo revisado (desde `origin/main` ya no entra); un cambio en `AGENTS.md` sale de riesgo medio y pide consentimiento, que el
   agente concede solo por ese consentimiento permanente, sin preguntar; esos cambios se juntan; commits sin líneas de atribución; push sólo a `arields85/leda` y cuando lo decida
   el usuario.
 
@@ -51,7 +51,7 @@ El avance se registra en `odd/tasks/motor-de-conversacion.md`.
 
 **Etapa 1. Diseño, sin código.** Terminada: ADR 0017 y 0018 (M1), E1-4 y E1-3.
 
-**Etapa 2. Prueba chica y descartable.** Plan en borrador: `odd/tasks/prueba-chica-del-motor.md` (fuera de
+**Etapa 2. Prueba chica y descartable.** Plan: `odd/tasks/prueba-chica-del-motor.md` (fuera de
 `src/leda`, criterios 5b y 5c, base `leda_motor`, migraciones desde la `0030`, GPT-6 sol con luna y Jev en
 paralelo). PostgreSQL se levanta a mano (`levantar-postgres.bat`).
 

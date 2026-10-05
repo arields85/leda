@@ -160,5 +160,5 @@ que admitir `leda_motor`; `python -m leda modelo` ya existe (`docs/product/plata
 
 ## Próximo paso
 
-El plan de la Etapa 2, en borrador en [`prueba-chica-del-motor.md`](prueba-chica-del-motor.md), espera las
-decisiones del usuario (su sección 10).
+El plan de la Etapa 2, [`prueba-chica-del-motor.md`](prueba-chica-del-motor.md), con su sección 10 decidida
+(2026-10-05); sigue su tarea E2-1.

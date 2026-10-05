@@ -2,7 +2,7 @@
 
 **Rama:** `feat/motor-de-conversacion` · **Carpeta:** `D:\Proyectos\Leda-PM-worktrees\motor-de-conversacion`
 **Abierta:** 2026-10-04 · **Copia en Engram:** tema `odd/prueba-chica-del-motor/tasks` (proyecto `prisma-pm`)
-**Estado:** borrador; espera las decisiones del usuario (sección 10). Ningún código antes.
+**Estado:** decidido (sección 10, 2026-10-05); sigue la E2-1.
 
 ## 1. Objetivo
 
@@ -155,7 +155,7 @@ un texto fijo.
 ## 7. Prueba por Telegram real
 
 Con las condiciones de `AGENTS.md` (espacio de prueba, datos ficticios, secreto protegido, efectos reversibles,
-respaldo, nada destructivo, nada `CRITICAL` o `HIGH` abierto). El bot, decisión 10.1; el paso de los días, 10.2;
+respaldo, nada destructivo, nada `CRITICAL` o `HIGH` abierto). El bot y el paso de los días, sección 10;
 `tools/restriccion_horario.py` tiene que admitir `leda_motor`. El escuchador lo corre el usuario, con el `.env`
 que copia él (el agente no lo lee). Se lee con `tools/leer_conversacion.py` (los toques se ven como su código) y
 un lector del registro de turnos de la prueba.
@@ -189,30 +189,20 @@ su evidencia son las corridas. Unas 400 líneas por tarea es una guía, no un to
 **Previsión:** unas 3.600 líneas (código, pruebas y YAML). **Entrega:** `ask-on-risk`: al pasar las 400 se le
 pregunta una vez al usuario la estrategia de cadena. Push y PR, del usuario.
 
-## 10. Decisiones para el usuario
+## 10. Decisiones del usuario (2026-10-05)
 
-1. **¿Un bot de Telegram aparte para la prueba?** Ejemplo: con el mismo bot y el escuchador viejo abierto en
-   `prueba-0-35`, un "arranqué" de Marcos cae en la base congelada. **Recomiendo** un bot nuevo (dos minutos en
-   BotFather): las bases no se mezclan. **Alternativa:** el mismo bot, cerrando el escuchador viejo cada vez; sin
-   trámite, con el riesgo de olvidarlo.
-2. **¿Cómo pasan los días en Telegram?** Ejemplo: del aviso previo al escalamiento hay seis días hábiles.
-   **Recomiendo** un comando que adelanta el reloj de Leda sólo en `leda_motor` (al día hábil siguiente, 10:00),
-   con el horario prendido: días hábiles y atraso salen bien. **Alternativa:** apagar la restricción de horario;
-   todos los días cuentan como hábiles (del 23 al 27 daría cuatro de atraso, no dos) y la escalera tarda días
-   reales.
-3. **¿Quién juzga lo que dice cada respuesta y si Leda entendió?** Ejemplo: en la 02, que no diga que la fecha
-   cambió. **Recomiendo** que el agente lea todas contra la lista de cada flecha y arme la tabla, y que el usuario
-   lea al menos una corrida por conversación y todas las marcadas como falla (`AGENTS.md` no acepta la auditoría
-   de otro agente como prueba). **Alternativa:** una IA juez; más rápida, pero es otra IA a la que habría que
-   medir.
-4. **¿Cuánto se puede gastar en IA?** Ejemplo: una ronda son 70 corridas de unos cuatro mensajes; con las cifras
-   del flujo C6 (una corrida, otro trabajo), unos USD 5 con sol y centavos con luna. **Recomiendo** un techo de USD
-   30 para la etapa y avisar al acercarse. **Alternativa:** sin techo; nunca frena una ronda a la mitad.
-5. **¿Los avisos guardados en una tabla nueva en lugar de las columnas de la `0029`?** El ADR 0018 (decisión 8)
-   dice que se traen esas columnas a `message_outbox`. Ejemplo: un aviso todavía sin texto en el outbox lo
-   mandaría vacío el despachador de `main`, que no las conoce. **Recomiendo** `scheduled_notice`: no toca el
-   despachador ni suma columnas a una tabla con `chat_id`; se anota la precisión en el ADR. **Alternativa:** las
-   columnas; obliga a enseñarle al despachador a saltear esos avisos.
+1. **Bot de Telegram:** uno nuevo, sólo para la prueba, para que las bases nunca se mezclen. Lo crea el usuario
+   en BotFather y pone el token en el `.env` de la carpeta (el agente no lo lee); se le pide antes de la E2-6.
+2. **El paso de los días en Telegram:** un comando que adelanta el reloj de Leda sólo en `leda_motor` (por
+   ejemplo, al día hábil siguiente, 10:00), con la restricción de horario prendida, para que los días hábiles y
+   el atraso salgan bien. Va en la E2-6.
+3. **Quién juzga los textos y la comprensión:** el agente lee todas las corridas contra lo que cada paso "dice" y
+   "no dice" y arma la tabla; el usuario lee al menos una corrida por conversación y todas las marcadas como falla,
+   y su lectura es la que vale. Sin una IA juez.
+4. **Gasto en IA:** un techo de USD 30 para toda la etapa, con aviso al acercarse; al llegar, se le pregunta al
+   usuario antes de seguir. El corredor (E2-7) lleva la cuenta.
+5. **Avisos guardados:** en la tabla nueva `scheduled_notice`, no en columnas de `message_outbox`; el mensaje entra
+   al outbox recién cuando la IA lo redactó. Anotado como precisión en el ADR 0018, decisión 8.
 
 **Decidido en el plan:** la carpeta; las tablas como migraciones del producto (ADR 0018, decisión 3); el aviso
 previo en `workspace_setting`, no en el importador; el referente es quien aprueba según la política del espacio
@@ -228,4 +218,4 @@ previo en `workspace_setting`, no en el importador; el referente es quien aprueb
   `PENDIENTE` confirmar al escribir los YAML que ninguna conversación depende de ellas.
 - **La etapa no es tan chica:** si una tarea pide un caso especial, se frena (5c.1).
 
-**Próximo paso:** que el usuario resuelva la sección 10; después, la E2-1.
+**Próximo paso:** la E2-1 (tablas).

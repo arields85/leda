@@ -287,6 +287,11 @@ pedido de más tiempo). Se trae de la rama congelada el mecanismo del ADR 0016:
 - Las columnas de la migración `0029` se traen con una migración nueva, desde la `0030`, y el
   redactor se rehace dentro del motor de conversación (`odd/tasks/motor-de-conversacion.md`, "Qué
   se trae de la rama congelada").
+  **Precisión (usuario, 2026-10-05):** en lugar de esas columnas en `message_outbox`, los avisos
+  guardados van en una tabla propia (`scheduled_notice`); al llegar su hora el código relee la tarea,
+  la IA redacta y recién entonces el mensaje entra al outbox, ya con su texto. Así el despachador no
+  cambia y no se suman columnas a una tabla atada a Telegram. Lo demás de este caso sigue igual
+  (`odd/tasks/prueba-chica-del-motor.md`).
 
 ### 9. Precisiones de las conversaciones de prueba (usuario, 2026-10-04)
 
