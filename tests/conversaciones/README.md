@@ -39,9 +39,13 @@ El circuito es el recordatorio y lo que la persona contesta (ADR 0018, decisión
     lo correcto es preguntar (ADR 0018, decisión 7).
 14. [`14-jev-el-estado-decide.md`](14-jev-el-estado-decide.md): dos tareas parecidas, pero el estado de la
     conversación dice cuál es.
+15. [`15-avance-vago.md`](15-avance-vago.md): "voy bien, la tengo casi lista" ante un pedido de estado;
+    Leda anota el avance, la espera sigue abierta, vuelve a preguntar al día hábil siguiente sin contarlo
+    como silencio y, a la segunda respuesta sin nada cierto, pregunta para cuándo.
 
 Las cuatro primeras son las cuatro respuestas de 5a; de la 5 a la 12, cada una aplica al recordatorio una
-de las ocho situaciones generales de la decisión 4.
+de las ocho situaciones generales de la decisión 4. La 15 suma la jugada `informar_avance` (decisión del
+usuario, 2026-10-05; ADR 0018, decisión 9b).
 
 ## Formato de cada conversación
 
@@ -136,6 +140,9 @@ importa es el significado:
 - `dejar_para_despues`: la persona deja el tema abierto para más tarde. Con `cancelar` y contestar la
   pregunta, son las tres salidas de un cambio de tema, que no se ofrecen como menú (decisión 9d).
 - `consultar_pendientes`: la persona pregunta qué tiene pendiente; sólo lee (decisión 9g).
+- `informar_avance`: la persona cuenta cómo viene una tarea sin un hecho cierto (no dice que la
+  terminó, ni para cuándo, ni que está trabada); queda anotado con sus palabras y la espera sigue
+  abierta (decisión del usuario, 2026-10-05).
 
 ## Decisiones del usuario (2026-10-04)
 
