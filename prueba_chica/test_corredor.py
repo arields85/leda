@@ -173,3 +173,27 @@ def test_jev_en_paralelo_no_cambia_ninguna_decision(conn):
     assert consultas[0]["probabilidades"]["PLC"] == 0.97
     assert [p.eleccion_de_la_ia for p in con_jev.pasos if p.jev] == ["preguntar", "PLC"]
 
+# --- La línea de comandos --------------------------------------------------------------------
+
+def _bases_del_corredor(conn) -> list[str]:
+    with conn.cursor() as cur:
+        cur.execute("select datname from pg_database where datname like 'leda_corrida_%'")
+        nombres = [f["datname"] for f in cur.fetchall()]
+    conn.commit()
+    return nombres
+
+
+def test_la_corrida_en_seco_por_linea_de_comandos_graba_y_repite(conn, tmp_path, capsys):
+    from prueba_chica import correr
+
+    antes = _bases_del_corredor(conn)
+
+    assert correr.main(["--conversacion", "01", "--veces", "1", "--sin-informe",
+                        "--grabar", str(tmp_path)]) == 0
+    [grabacion] = list(tmp_path.glob("01-guionada-1.json"))
+    assert correr.main(["--repetir", str(grabacion), "--sin-informe"]) == 0
+
+    salida = capsys.readouterr().out
+    assert salida.count("01 vez 1: bien") == 2
+    # Cada corrida en su base, y ninguna queda: ni las de las corridas ni la plantilla.
+    assert _bases_del_corredor(conn) == antes

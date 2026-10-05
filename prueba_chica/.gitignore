@@ -1,0 +1,4 @@
+# Las grabaciones crudas de la IA (`python -m prueba_chica.correr --grabar prueba_chica/grabaciones`)
+# son grandes y se regeneran: no se versionan. Los informes de resultados/ sí.
+grabaciones/
+resultados/*.tmp
