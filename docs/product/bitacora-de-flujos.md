@@ -60,6 +60,46 @@ El detalle de la prueba del 2026-10-04 y de la tarea 0-36, que se detuvo y no se
 `respaldo-flujos-antes-de-d:odd/tasks/circuitos-al-flujo-nuevo.md`. El trabajo parcial de la
 tarea 0-36 quedó archivado, sólo para consulta, en la etiqueta `respaldo-0-36-en-pausa`.
 
+## Primer contacto real del flujo D (2026-10-05): prueba parcial, no M2
+
+Tarea E2-3b de `odd/tasks/prueba-chica-del-motor.md`. **Es una prueba parcial, no el paso M2:**
+un guion corto, una sola corrida y sin cambio de tema, corrección ni cancelar (E2-4).
+
+- **Cuándo y con qué:** 2026-10-05, de 12:13 a 12:35, sobre el código de `bcc421a`; base
+  `leda_motor`; la IA, GPT-6 sol por OpenRouter; Telegram real con los bots de prueba nuevos y
+  tareas ficticias; el usuario operó a Marcos.
+- **Qué se probó:** el aviso previo, disparado con `prueba_chica.avisar`, y las respuestas del
+  recordatorio: el inicio, la nueva previsión, el bloqueo y quién lo destraba.
+
+| Paso | Qué pasó | Tiempo | Resultado |
+|---|---|---|---|
+| Aviso previo de "Programar PLC de la comprimidora" | Siete días hábiles hasta el 15 de octubre (el 12 es feriado); no pidió respuesta | — | Bien |
+| "arranque" | `anotar_inicio` sobre esa tarea; inicio anotado; respuesta correcta | ~3,9 s | Bien |
+| La previsión al 27 con el proveedor como motivo | `anotar_prevision` con fecha y motivo; atraso de 8 días hábiles, bien calculado; la tarea dependiente, nombrada | ~9,4 s | **Hallazgo 1:** la respuesta dijo que Ismael ya estaba avisado, con el aviso sólo guardado |
+| "Estoy trabado" por un repuesto | `anotar_bloqueo` con su causa; la IA marcó que no dependía de otro y Leda propuso salidas | ~6,5 s | **Hallazgo 2:** no preguntó quién lo destraba |
+| No sabe quién lo compra | `anotar_quien_destraba` con "no sabe", anotado; salidas propuestas | ~8,8 s | Bien |
+
+Sin incidentes, sin errores y ninguna jugada sobre la tarea equivocada.
+
+- **Hallazgo 1 (honestidad, constitución §4).** Causa en la cocina, no en la IA: el hecho del
+  aviso al referente traía a quién y a qué hora sale, pero no que todavía no había salido (el envío
+  es de la E2-5), y la IA lo leyó como hecho. Arreglo general, no del caso: todo hecho de un efecto
+  que pasa después dice su estado explícito (guardado o en cola, sin enviar), también el aviso al
+  administrador, y las instrucciones de redacción describen cómo se lee ese estado, sin frases
+  (`a9abb05`). Regresión: la conversación 11 y una prueba determinista del hecho.
+- **Hallazgo 2 (diseño, ADR 0018, 9c).** La ficha dejaba a la IA juzgar si la causa dependía de
+  otra persona (`depende_de_otro`, sin descripción en el esquema), y lo juzgó mal. El usuario cambió
+  la regla: todo bloqueo con causa pregunta quién lo puede destrabar, y lo que sigue lo decide la
+  respuesta de la persona; un nombre queda anotado como el primer eslabón, y "nadie", "no sé" o "me
+  toca a mí" llevan a las salidas (`13e574b`). La persecución completa (ADR 0017, decisión 3a) es
+  de la prueba siguiente, no de la Etapa 2 (usuario, 2026-10-05).
+
+**Conclusión vigente del flujo D (2026-10-05):** el núcleo funcionó en las cuatro respuestas: la
+IA eligió la jugada correcta de la lista cerrada, con sus datos y la tarea correcta, y el código
+la ejecutó y calculó lo que tenía que calcular. Las dos fallas estaban en la cocina (un hecho
+incompleto y un juicio que no le tocaba a la IA), no en el mecanismo. Es una sola corrida: no
+reemplaza los criterios 5b y 5c del ADR 0018 ni las corridas repetidas de la E2-8.
+
 ## Conclusión anterior (2026-10-03), reemplazada el 2026-10-04
 
 **Flujo elegido: C6, con las plantillas fuera y la regla del mozo** (`AGENTS.md`, punto
@@ -177,7 +217,7 @@ la misma clase de falla seguía apareciendo (fila "C6 + 0-35" de la tabla).
 | C6 + P-1 | Sin plantillas (sólo dos permitidas) | 2026-10-03 09:13 (flash): "habla sin plantillas ni muletillas" | Sin textos fijos en el camino principal; elección del botón escrita en el mensaje | Responsable fuera de opciones ignorado; el rechazo dejaba el tema abierto; causa inventada; promesa falsa | Fue la base de las versiones siguientes del flujo C; congelado el 2026-10-04 |
 | C6 + regla del mozo | La IA no decide: la cocina decide qué se pregunta, botones y propuestas | 2026-10-03 19:18 (sol) | Ariel explicado con la regla real; el rechazo vuelve como pregunta concreta; bloque para copiar | Bucle en el borrador devuelto (pedía la fecha); la misma oferta al final de cada mensaje; volvió una orden; "Soy Leda." | Arreglado en 0-34; congelado el 2026-10-04 |
 | C6 + 0-35 | El borrador devuelto vuelve como un borrador normal (sin lista de datos a corregir), con las correcciones de la quinta auditoría | 2026-10-04 11:21-11:38 (sol), cortada antes de terminar el guion | El bucle no volvió; una corrección sobre el devuelto volvió al resumen sin pedir otros datos; el selector de Modificar pregunta en lugar de ordenar; la propuesta de la IA no pisó el criterio confirmado | Después de un turno sin cambios, la respuesta salió sin resumen ni botones; pedir por escrito el envío a aprobación no se tomó; la lista de ofertas recitada en casi todos los mensajes; un Cancelar de un resumen anterior canceló el devuelto, y el flujo B no supo del borrador cancelado y ofreció tareas ajenas | Congelado el 2026-10-04 (etiqueta `respaldo-flujos-antes-de-d`) |
-| D | El mecanismo del Motor: un motor de conversación con estado explícito, circuitos declarados y situaciones generales resueltas una sola vez (ADR 0018, en preparación) | Todavía ninguna | — | — | En diseño, en la rama `feat/motor-de-conversacion` |
+| D | El mecanismo del Motor: un motor de conversación con estado explícito, circuitos declarados y situaciones generales resueltas una sola vez (ADR 0018, propuesta) | 2026-10-05 12:13 (sol): primer contacto, parcial, no M2 | La jugada y la tarea correctas en las cuatro respuestas; el atraso, bien calculado; sin incidentes | Dijo que el referente estaba avisado con el aviso sólo guardado; no preguntó quién destraba el bloqueo (las dos, de la cocina; arregladas el mismo día) | En la prueba chica (Etapa 2), en la rama `feat/motor-de-conversacion` |
 
 ## Progresos y retrocesos
 

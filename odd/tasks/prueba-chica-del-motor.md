@@ -2,7 +2,7 @@
 
 **Rama:** `feat/motor-de-conversacion` · **Carpeta:** `D:\Proyectos\Leda-PM-worktrees\motor-de-conversacion`
 **Abierta:** 2026-10-04 · **Copia en Engram:** tema `odd/prueba-chica-del-motor/tasks` (proyecto `prisma-pm`)
-**Estado:** decidido (sección 10, 2026-10-05); E2-1, E2-2 y E2-3 hechas; sigue la E2-3b.
+**Estado:** decidido (sección 10, 2026-10-05); E2-1, E2-2, E2-3 y E2-3b hechas; sigue la E2-4.
 
 ## 1. Objetivo
 
@@ -222,7 +222,7 @@ su evidencia son las corridas. Unas 400 líneas por tarea es una guía, no un to
       recorrido de imports entra en los paquetes y falla con un módulo que no encuentra (E2-2). El equipo de
       prueba sigue a las conversaciones (Marcos responsable, Ismael referente). Commits `249e593`, `47ede6a`,
       `43db5e1` y `4e2e182`; lo registra el commit que sigue. Unas 1.350 líneas, la mitad pruebas.
-- [ ] **E2-3b. Primer contacto real** (decisión del usuario, 2026-10-05; `AGENTS.md`, punto 5): se adelantan de la
+- [x] **E2-3b. Primer contacto real** (decisión del usuario, 2026-10-05; `AGENTS.md`, punto 5): se adelantan de la
       E2-6, completos y con sus pruebas, el escuchador y la redacción de la IA; el aviso se dispara con un comando,
       sin el ciclo; se crea `leda_motor` (autorizado) y el agente apunta a ella el `.env` de la carpeta
       (autorizado). Guion corto por Telegram con el usuario: "arranqué", "llego el 27" y "estoy trabado". Leda
@@ -237,6 +237,16 @@ su evidencia son las corridas. Unas 400 líneas por tarea es una guía, no un to
       correcciones; 1 del aviso; módulos inexistentes) y en verde, `111 passed`; `tests/test_avisos_admin.py
       tests/test_capacidades.py` y `test_aviso_incidente_legible.py` `50 passed`; suite completa `2302 passed,
       333 deselected, 1 warning in 780.59s`.
+      **Contacto real (2026-10-05, 12:13 a 12:35, `leda_motor`, GPT-6 sol, el usuario como Marcos):** aviso
+      previo, "arranque", la previsión al 27 y el bloqueo con "no sé quién" salieron con la jugada y la tarea
+      correctas, sin incidentes (bitácora de flujos, "Primer contacto real del flujo D"). Dos hallazgos, los dos
+      de la cocina: (1) la respuesta dijo que Ismael estaba avisado con el aviso sólo guardado, porque su hecho
+      no decía el estado; todo hecho de un efecto que pasa después lo dice ahora (`a9abb05`); (2) la IA juzgó
+      que el repuesto no dependía de otro y Leda no preguntó quién lo destraba; por decisión del usuario, todo
+      bloqueo con causa pregunta quién lo puede destrabar y decide la respuesta (ADR 0018, 9c, corregida;
+      `13e574b`). `pytest prueba_chica` en rojo (4 y 6 fallas) y en verde, `120 passed`. La persecución
+      completa (ADR 0017, decisión 3a) va a la prueba siguiente, no a la Etapa 2 (usuario, 2026-10-05). Lo
+      registra el commit que sigue.
 - [ ] **E2-4. Situaciones generales** (delegada): las ocho, con preguntas, opciones y correcciones. Unas 400.
 - [ ] **E2-5. Escalera y avisos guardados** (delegada): aviso previo, esperas, escalamiento, relectura, omisión y
       reintentos. Unas 450.
@@ -280,4 +290,4 @@ previo en `workspace_setting`, no en el importador; el referente es quien aprueb
   `PENDIENTE` confirmar al escribir los YAML que ninguna conversación depende de ellas.
 - **La etapa no es tan chica:** si una tarea pide un caso especial, se frena (5c.1).
 
-**Próximo paso:** la E2-3b (primer contacto real).
+**Próximo paso:** la E2-4 (situaciones generales).
