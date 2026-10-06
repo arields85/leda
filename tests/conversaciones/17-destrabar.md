@@ -34,8 +34,9 @@ jugada nueva `destrabar` (ADR 0018, decisión 9l), que resuelve el `PENDIENTE` d
      destrabar. La tarea vuelve al seguimiento: vence el viernes 23 y todavía no le tocaba ningún pedido
      de estado, así que no se guarda nada. Ningún aviso a Ismael.
    - Confirmación: ninguna; se anota directo, como el bloqueo (decisión 9a).
-   - La respuesta dice: que quedó anotado que la tarea se destrabó y sigue en curso; un próximo paso
-     (puede avisar si se vuelve a trabar, o que la tarea vence el viernes 23).
+   - La respuesta dice: que quedó anotado que la tarea se destrabó y sigue en curso; el próximo
+     paso concreto: que Leda le pide el estado el viernes 23, el día del vencimiento, o que puede avisar si
+     se vuelve a trabar.
    - La respuesta no dice: que arrancó la tarea (ya estaba en curso antes de trabarse); una fecha para
      terminarla que nadie dio; otra vez la pregunta de quién lo destraba; que Ismael se enteró.
    - Botones: ninguno.

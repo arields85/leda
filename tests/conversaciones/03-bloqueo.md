@@ -82,8 +82,8 @@ sin escribirle todavía a quien destraba.
    →
    - Jugadas: `cancelar`, sobre las salidas propuestas.
    - Efecto: ninguno nuevo. El bloqueo sigue abierto, con su causa.
-   - La respuesta dice: que el bloqueo queda anotado como está; un próximo paso (puede avisar cuando llegue
-     el repuesto).
+   - La respuesta dice: que el bloqueo queda anotado como está; el próximo paso concreto: que puede avisar
+     cuando llegue el repuesto; mientras siga trabada, Leda no le pide el estado.
    - La respuesta no dice: otra vez las salidas; un juicio sobre la decisión.
    - Estado después: sin tema abierto, nada para después.
 

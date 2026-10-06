@@ -264,3 +264,24 @@ def test_la_corrida_en_seco_por_linea_de_comandos_graba_y_repite(conn, tmp_path,
     assert salida.count("01 vez 1: bien") == 2
     # Cada corrida en su base, y ninguna queda: ni las de las corridas ni la plantilla.
     assert _bases_del_corredor(conn) == antes
+
+
+def test_cada_paso_en_que_leda_escribe_lleva_la_casilla_del_proximo_paso(conn):
+    """La definición del usuario (2026-10-06): todo mensaje de Leda termina con un próximo paso
+    concreto. La casilla para leerlo se agrega sola en cada paso en que Leda escribe, salvo que
+    el paso ya diga cuál es su próximo paso; un paso en que Leda no manda nada no la lleva."""
+    from prueba_chica.corredor import PROXIMO_PASO
+
+    [conv] = elegir(["17"])
+    corrida = correr_conversacion(conn, conv, _perfecta(conv))
+
+    assert corrida.error is None
+    for paso in corrida.pasos:
+        con_el_suyo = [d for d in paso.dice if "próximo paso" in d]
+        if paso.preludio or not (paso.texto or paso.salidas):
+            assert PROXIMO_PASO not in paso.dice, paso.paso
+        else:
+            assert len(con_el_suyo) == 1, (paso.paso, paso.dice)
+    primero = next(p for p in corrida.pasos if not p.preludio)     # el destrabe del paso 1
+    assert PROXIMO_PASO not in primero.dice and any("próximo paso concreto" in d
+                                                    for d in primero.dice)

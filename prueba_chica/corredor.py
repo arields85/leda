@@ -54,6 +54,15 @@ CARPETA = Path(__file__).resolve().parent / "conversaciones"
 RAIZ = Path(__file__).resolve().parents[1]
 
 
+# La definición del usuario (2026-10-06; ADR 0018, decisión 9, tercera vuelta): todo mensaje de
+# Leda termina con un próximo paso concreto. Vale para cada paso en que Leda escribe, así que la
+# casilla para leerlo se agrega sola donde el paso no dice ya cuál es su próximo paso.
+PROXIMO_PASO = ("el próximo paso concreto, al final y una sola vez: lo que va a hacer Leda y "
+                "cuándo (si un hecho lo dice), lo que puede hacer la persona, o que no queda "
+                "nada pendiente y lo que sigue; en un aviso que no pide respuesta, que no hace "
+                "falta contestar")
+
+
 class SinBoton(LookupError):
     """El paso toca una opción que ninguna pregunta de la persona ofreció."""
 
@@ -261,6 +270,9 @@ class _Corredor:
             r.hechos = cp.normalizar(resultado.hechos, self.mundo.titulos)
             r.pregunta = cp.normalizar(resultado.pregunta, self.mundo.titulos)
             r.eleccion_de_la_ia = eleccion_de_la_ia(r.jugadas)
+        if not preludio and (r.texto or r.salidas) and not any(
+                "próximo paso" in d for d in r.dice):
+            r.dice.append(PROXIMO_PASO)
         if not preludio:
             r.fallas = self._comprobar(paso, r, resultado, antes, despues).fallas
             if self.sin_significado:        # lo del preludio, en el primer paso

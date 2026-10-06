@@ -110,10 +110,13 @@ pasos:
       - que anotó que la tiene el miércoles 28
       - que la fecha comprometida sigue siendo el viernes 23
       - lo del aviso a Ismael según su estado
+      - que el pedido del estado que el paso 2 anunció para el martes ya no sale
+      - "el próximo paso concreto: que Leda le pide el estado el miércoles 28"
     no_dice:
       - que la fecha comprometida cambió
       - que Ismael ya lo sabe si el aviso no salió
       - otra pregunta
+      - que mañana le vuelve a pedir el estado
 
   - paso: 4
     quien: Leda

@@ -55,7 +55,7 @@ pasos:
       esperas_abiertas: []
     dice:
       - que quedó anotado que la tarea se destrabó y sigue en curso
-      - un próximo paso
+      - "el próximo paso concreto: que Leda le pide el estado el viernes 23, el día del vencimiento, o que puede avisar si se vuelve a trabar"
     no_dice:
       - que arrancó la tarea
       - una fecha para terminarla que nadie dio

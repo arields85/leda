@@ -69,7 +69,7 @@ pasos:
       para_despues: []
     dice:
       - que no quedó nada anotado
-      - un próximo paso (que puede avisar si se traba)
+      - "el próximo paso concreto: lo que sigue en el seguimiento de la tarea (cuándo le pide el estado), o que puede avisar si se traba"
     no_dice:
       - otra vez la pregunta por la causa
       - un juicio sobre la decisión

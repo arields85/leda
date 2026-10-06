@@ -49,7 +49,7 @@ pasos:
     dice:
       - que esa pregunta ya se contestó ayer con la tarea del PLC
       - que no se cambió nada
-      - un próximo paso (puede decir qué quería sobre la de comunicaciones)
+      - "el próximo paso concreto: que puede decir qué quería sobre la de comunicaciones"
     no_dice:
       - que arrancó la de comunicaciones
       - nada técnico sobre botones

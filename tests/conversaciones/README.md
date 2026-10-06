@@ -90,6 +90,14 @@ que se pueden comprobar una por una:
 - **Confirmación:** si hace falta antes del efecto. En el recordatorio, nunca (decisión 9a).
 - **La respuesta dice / no dice:** los hechos que tiene que contener y los que no puede contener ("el
   mensaje dice", cuando lo inicia Leda).
+- **El próximo paso** (definición del usuario, 2026-10-06; ADR 0018, decisión 9, tercera vuelta): todo
+  mensaje de Leda termina con algo concreto que va a pasar o que la persona puede hacer, dicho una vez y
+  en pocas palabras: lo que Leda va a hacer (por ejemplo, cuándo le vuelve a preguntar), lo que la persona
+  puede hacer (por ejemplo, avisar cuando se destrabe) o, si no queda nada pendiente, eso junto con lo que
+  sigue. "No hace falta que respondas" solo no cuenta, salvo en los avisos que no piden respuesta (el aviso
+  previo, mecánica §10), donde tiene que estar. Vale en todos los pasos, aunque la flecha no lo repita: el
+  corredor agrega la casilla para leerlo donde el paso no dice ya cuál es su próximo paso. Un mensaje
+  anterior que anunció algo que ya no va a pasar se corrige en el mensaje siguiente.
 - **Botones:** los que se ofrecen, sólo donde la constitución §8 los admite (elegir entre opciones que la
   persona no conoce de memoria, algo con más de una lectura, un pedido de ayuda y las confirmaciones de §7).
   En la prueba chica, sólo las tareas como opciones de una duda (decisiones 9b y 9d).

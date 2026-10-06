@@ -39,7 +39,8 @@ dejar sin efecto.
    →
    - Jugadas: `cancelar`, sobre el tema abierto.
    - Efecto: ninguno. No se anota un bloqueo; la tarea del PLC sigue `en_curso`; la escalera sigue igual.
-   - La respuesta dice: que no quedó nada anotado; un próximo paso (que puede avisar si se traba).
+   - La respuesta dice: que no quedó nada anotado; el próximo paso concreto: lo que sigue en el seguimiento
+     de la tarea (cuándo le pide el estado), o que puede avisar si se traba.
    - La respuesta no dice: otra vez la pregunta por la causa; un juicio sobre la decisión. Leda no vuelve
      a preguntar por la causa más tarde (decisión 9b).
    - Estado después: sin tema abierto; nada para después (cancelar no es dejarlo para después).

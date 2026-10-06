@@ -32,7 +32,7 @@ confirma, queda abajo, en "Para la prueba de la entrega".
    - Efecto: ninguno sobre las tareas; el toque recibe su señal y queda en el registro de turnos como la
      opción elegida (ADR 0018, decisión 3).
    - La respuesta dice: que esa pregunta ya se contestó ayer con la tarea del PLC, que no se cambió nada, y
-     un próximo paso (puede decir qué quería sobre la de comunicaciones).
+     el próximo paso concreto: que puede decir qué quería sobre la de comunicaciones.
    - La respuesta no dice: que arrancó la de comunicaciones; nada técnico sobre botones (constitución §10).
    - Estado después: sin tema abierto.
 

@@ -57,9 +57,12 @@ eso"), no una regla del inicio; con la decisión 9i (el seguimiento sigue a la p
      previsión, la fecha comprometida, el atraso y lo que depende de ella (la de comunicaciones). La espera
      se cierra y la pregunta de la fecha queda contestada.
    - La respuesta dice: que anotó que la tiene el miércoles 28; que la fecha comprometida sigue siendo el
-     viernes 23; lo del aviso a Ismael según su estado.
+     viernes 23; lo del aviso a Ismael según su estado; que el pedido del estado que el paso 2 anunció para
+     el martes ya no sale (la fecha lo contestó); el próximo paso concreto: que Leda le pide el estado el
+     miércoles 28.
    - La respuesta no dice: que la fecha comprometida cambió; que Ismael ya lo sabe si el aviso no salió;
-     otra pregunta.
+     otra pregunta; que mañana le vuelve a pedir el estado (ronda 2, vez 5: un turno anterior lo anunció y
+     esta fecha lo dejó atrás; tercera vuelta de ajuste, 2026-10-06).
    - Estado después: sin tema abierto, nada para después; ninguna espera abierta.
 
 4. **Leda**, por su cuenta, a Ismael (lunes 26, 10:30): el aviso de la nueva previsión (es de
