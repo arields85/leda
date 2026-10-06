@@ -105,9 +105,17 @@ y 8 (entrega y aprobación), el 5 (cadencias) y la persecución completa (3a). C
 conversaciones de prueba y después una pasada corta por Telegram. M3 es el motor definitivo haciendo bien
 lo ya probado.
 
-**La plataforma web** lleva su ADR antes del código (ADR 0017, decisión 5). Ese ADR se escribe con el
-usuario ahora, en paralelo con la Fase A (usuario, 2026-10-06). Es sólo diseño: el código de la
-plataforma espera a que el ADR esté aceptado.
+**La plataforma web va después de M3** (usuario, 2026-10-06). Reemplaza la decisión del mismo día de
+escribir su ADR en paralelo con la Fase A. El porqué: mantener el foco en el motor y construir la
+plataforma cuando Leda tenga una base más completa.
+
+- **Para no rehacer:** cambiar una fecha, asignar o crear una tarea son una sola operación de la cocina,
+  con su confirmación y su auditoría, y los dos canales la llaman.
+- **El costo de esperar:** hasta que la plataforma exista, un equipo real sólo puede usar Leda si el
+  administrador le carga las tareas con el importador.
+- **Lo que dice el ADR 0017:** cambiar la fecha por chat está anotado para el futuro, con confirmación
+  (decisión 4). Crear y asignar por chat quedan fuera del chat (decisión 2); si se quieren, llevan su
+  propio ADR.
 
 ## 5. Criterios de corte
 
