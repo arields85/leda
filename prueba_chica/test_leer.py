@@ -104,3 +104,19 @@ def test_desde_acepta_una_hora_de_hoy_o_una_fecha_con_hora(conn, charla):
     assert desde_texto("2026-10-05 10:00", _hora(9, 15), zona) == AHORA
     with pytest.raises(ValueError):
         desde_texto("ayer", _hora(9, 15), zona)
+
+
+def test_el_comando_lee_con_una_conexion_recien_abierta(conn, mundo, uri, monkeypatch, capsys):
+    """`conectar` fija la ruta de búsqueda sin confirmarla; el comando no puede perderla al
+    cerrar su primera transacción (E2-9: con la base recreada, el lector no encontraba
+    `workspace`)."""
+    import leda.db
+
+    from prueba_chica.leer import main
+
+    conn.commit()
+    original = leda.db.conectar
+    monkeypatch.setattr(leda.db, "conectar", lambda url=None: original(uri))
+
+    assert main(["prueba"]) == 0
+    assert "Turnos" in capsys.readouterr().out

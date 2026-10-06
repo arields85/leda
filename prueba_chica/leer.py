@@ -225,6 +225,7 @@ def main(argv: list[str] | None = None) -> int:
     a = p.parse_args(argv)
 
     conn = conectar()
+    conn.commit()    # `conectar` fija la ruta de búsqueda sin confirmarla; un rollback la perdería
     with admin(conn) as cur:
         cur.execute("select id, zona_horaria from workspace where slug = %s", (a.slug,))
         fila = cur.fetchone()
