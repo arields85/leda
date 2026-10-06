@@ -81,10 +81,32 @@ revisión por tramos.
 
 **Fase A. Limpieza, sin cambiar el comportamiento de las garantías.**
 
-- [ ] **E3-1. Las pruebas de garantías en archivos limpios.** Aislamiento y RLS, paridad de migraciones,
+- [x] **E3-1. Las pruebas de garantías en archivos limpios.** Aislamiento y RLS, paridad de migraciones,
       vista previa con huella y ejecución única, outbox, auditoría e idempotencia de toques y mensajes.
       `tests/conftest.py` deja de importar `gateway`. Criterio: esas pruebas pasan sin importar `gateway`,
       `ingreso_tareas` ni `agente`, y su número no baja frente a la línea base (`2286 passed`).
+      **Hecho (2026-10-06), delegada a un escritor.**
+      - 80 pruebas pasaron a `tests/garantias/`. Son movidas, no copiadas. `test_vista_previa_confirmacion`
+        sólo cambió la preparación: ahora usa `herramientas.ejecutar` y `pendientes.registrar`, en lugar de
+        `agente`. Sus comprobaciones son las mismas.
+      - Los dos fixtures automáticos de `conftest` no importan `gateway` ni `huerfanos` cuando la prueba es
+        de garantías.
+      - Hay cuatro pruebas de frontera nuevas: una revisa los imports, incluso los de adentro de funciones;
+        otra corre `tests/garantias` en un subproceso y exige que no se carguen los módulos viejos.
+      - Evidencia:
+        - Prueba de frontera en rojo antes del cambio de `conftest`: `1 failed, 3 passed`.
+        - Suite completa antes: `2306 passed, 333 deselected, 1 warning in 853.80s`.
+        - Suite completa después: `2310 passed, 333 deselected, 1 warning in 837.96s`, las mismas más las
+          cuatro nuevas.
+        - `pytest tests/garantias`: `84 passed`, repetido por el agente principal (95 s).
+      - Quedan afuera, con su motivo:
+        - Unas 22 pruebas de borrador y compromiso de `test_task_drafts.py`. Pasan por
+          `crear_borrador_tarea`, que importa `ingreso_tareas` adentro de la función; se mudan cuando
+          E3-4 saque esas constantes.
+        - Las de las tablas `task_intake_*`, que se van con el flujo A.
+        - Toque idempotente, mensaje repetido y una respuesta, que viven en `gateway` y se rehacen en
+          E3-7.
+        - `test_tablero.py`, que usa `gateway.app` y se resuelve en E3-2.
 - [ ] **E3-2. Enredos 3 y 4.** La entrada HTTP (`/telegram/{slug}`, `/tablero/{token}`, `/salud`,
       webhooks) sale de `gateway.py` a un módulo propio. `huerfanos.py`: la garantía se queda, porque un
       mensaje que quedó sin respuesta por una caída se vuelve a procesar y nunca se pierde en silencio. Su

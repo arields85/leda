@@ -10,7 +10,7 @@ capa sólida de `src/leda`; nunca la conversación de los flujos congelados ni s
   `leda/<nombre>/`; uno que no se encuentra hace fallar la prueba, nunca se saltea.
 - `BORDES_CONOCIDOS` son las funciones de la capa sólida que llegan a un prohibido desde
   adentro y que la prueba chica no usa, o usa sabiendo a dónde llegan. Sólo puede achicarse
-  (patrón de `tests/test_capacidades.py`): si un borde desaparece, la prueba pide sacarlo;
+  (patrón de `tests/garantias/test_capacidades.py`): si un borde desaparece, la prueba pide sacarlo;
   si aparece uno nuevo, falla.
 """
 

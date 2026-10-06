@@ -130,7 +130,7 @@ git.
 
 ## Esquema sin implementación
 
-El inventario **no está acá a propósito**: vive en `tests/test_capacidades.py`,
+El inventario **no está acá a propósito**: vive en `tests/garantias/test_capacidades.py`,
 ejecutable. Dos listas de lo mismo divergen; una prueba no puede pudrirse.
 
 Esa prueba funciona en los dos sentidos. Si alguien implementa una de esas

@@ -108,7 +108,7 @@ Propuesta de la unidad; el ADR 0018 no las fija.
 - El motor vive en un paquete nuevo que sólo alcanza una lista permitida de módulos sólidos; su prueba recorre
   los imports en cadena, incluidos los de dentro de funciones (`herramientas.py`, `pendientes.py` y
   `despachador.py` importan `ingreso_tareas`), con bordes conocidos que sólo pueden achicarse (patrón de
-  `tests/test_capacidades.py`).
+  `tests/garantias/test_capacidades.py`).
 - Lista permitida de tablas, con el SQL del motor en un solo módulo. Entrada propia: no llama a
   `gateway.procesar_update` ni agrega interruptores. La prueba chica vive fuera de `src/leda`.
 

@@ -144,6 +144,8 @@ de aviso; flujos C1 a C6 y migraciones `0026` a `0029`.
 | Punto de partida del Motor (`respaldo-main-antes-de-d`) | `.venv\Scripts\python.exe -m pytest -q -p no:cacheprovider` | 2026-10-04 | 2286 passed, 333 deselected, 1 warning in 631.96s |
 | Rama del Motor, en la E2-6 | suite completa | 2026-10-05 | 2306 passed, 333 deselected, 1 warning in 780.79s |
 | Rama del Motor, `prueba_chica` | `pytest prueba_chica` | 2026-10-06 | 411 passed in 133.45s |
+| Rama del Motor, después de la E3-1 | suite completa | 2026-10-06 | 2310 passed, 333 deselected, 1 warning in 837.96s |
+| Rama del Motor, garantías limpias | `pytest tests/garantias` | 2026-10-06 | 84 passed in 95.36s |
 
 Los deselected son el banco real (`modelo_real`). La tercera fila es la línea base de garantías del Motor. Estas
 cifras miden el código: **una suite en verde no es evidencia de que la conversación funcione** (`AGENTS.md`,
