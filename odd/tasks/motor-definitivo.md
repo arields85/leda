@@ -1,0 +1,132 @@
+# El motor de conversación definitivo (Etapa 3 del Motor)
+
+**Rama:** `feat/motor-de-conversacion` · **Carpeta:** `D:\Proyectos\Leda-PM-worktrees\motor-de-conversacion`
+**Abierta:** 2026-10-06 · **Copia en Engram:** tema `odd/motor-definitivo/tasks` (proyecto `prisma-pm`)
+**Estado:** borrador. Las decisiones marcadas `PENDIENTE` las toma el usuario, una por vez.
+
+Plan propio de la Etapa 3 (`odd/tasks/motor-de-conversacion.md`, "Etapas y criterios de paso"). Las
+decisiones duraderas están en los ADR [0017](../../docs/decisions/0017-por-chat-los-hechos-por-la-web-la-estructura.md)
+y [0018](../../docs/decisions/0018-motor-de-conversacion.md), aceptado el 2026-10-06; la prueba chica, en
+[`prueba-chica-del-motor.md`](prueba-chica-del-motor.md).
+
+## 1. Objetivo y criterio de paso
+
+Que la conversación de Leda en `src/leda` sea el motor del ADR 0018 y nada más. Para eso:
+
+- se cortan los enredos entre la capa sólida y el código viejo;
+- las pruebas de garantías se mudan a archivos limpios;
+- los flujos A y B se borran;
+- recién entonces se construye el motor, con lo aprendido en la prueba chica.
+
+**M3** (`docs/STATUS.md`): motor construido, flujos viejos borrados, garantías en verde y prueba real
+aprobada. Con M3, `main` recibe la rama.
+
+## 2. Chequeo de rumbo (2026-10-06)
+
+- **Clase de problema:** no es un hallazgo de conversación. Es mudar un diseño ya probado a su lugar
+  definitivo y retirar lo viejo. El riesgo conocido es reescribir y perder en el camino lo que funcionó.
+- **Mecanismo o caso:** mecanismo. Las 17 conversaciones de prueba y su corredor pasan a ser la regresión
+  del motor definitivo. Corren antes de borrar `prueba_chica/` y otra vez sobre el motor nuevo.
+- **Qué haría innecesaria la próxima ronda:** que sumar un circuito sea declarar su ficha y escribir su
+  conversación de prueba, sin tocar el motor.
+- **Hipótesis:** la de la prueba chica se sostuvo (bitácora, "Prueba por Telegram real del flujo D"). La
+  nueva: el motor definitivo, con los mismos contratos, da el mismo resultado sin el andamiaje de la prueba.
+- **Fluidez:** se mantiene lo que funcionó: sin botones salvo para elegir y escritura libre. Entra la regla
+  de hablar del mundo y no de la cocina.
+- **Cocina o frases al mozo:** cocina. Ningún arreglo agrega frases.
+- **Qué conversación real lo demuestra:** la misma guía de la E2-9, repetida por Telegram sobre el motor
+  definitivo.
+
+## 3. Lo que se sabe hoy (relevamiento del 2026-10-06)
+
+- **Los cinco enredos siguen** (`motor-de-conversacion.md`, "Enredos a cortar"):
+  - (1) entregar crea estado que sólo `gateway` resuelve: `herramientas._notificar_entrega_al_aprobador`;
+  - (2) el despachador arma botones y retiene mensajes según las ramas de los flujos A y B
+    (`despachador._botones`, `_retener`);
+  - (3) `huerfanos.py` importa tres símbolos de `gateway`. Por eso `ciclo` y `reloj`, que figuraban como
+    sólidos, alcanzan `gateway`;
+  - (4) la entrada HTTP vive en `gateway.py`;
+  - (5) `tests/conftest.py` parchea `gateway`. 54 archivos de prueba dependen de él, y las garantías de
+    aislamiento, RLS y paridad de migraciones están en `tests/test_task_intake.py`.
+- **Lo que se borra:** unas 8.700 líneas.
+  - `gateway.py` (salvo la entrada HTTP), `ingreso_tareas.py`, `agente.py`, `contexto.py`,
+    `respuesta_unica.py`, `deteccion_pregunta.py` y `jev.py`;
+  - `huerfanos.py`, según la decisión de E3-2;
+  - `local.py`, que se reemplaza por la entrada del motor;
+  - las cinco tablas `task_intake_*`.
+- **Lo que trae la prueba chica:** el diseño, no el código. `prueba_chica/` se borra entero
+  (`prueba_chica/README.md`). Se traen:
+  - las fichas y jugadas, el estado por persona y el registro de turnos;
+  - los avisos guardados con sus reintentos, la escalera propia y el reloj de Leda;
+  - el corredor con las conversaciones YAML, el lector y la prueba de frontera.
+  - Las migraciones `0030` y `0031` ya son del producto y se quedan.
+- **Circuitos del ADR 0017 (3b) que la prueba chica no cubrió:**
+  - 5, el pedido de estado de las cadencias;
+  - 7, la entrega con evidencia;
+  - 8, la aprobación o el pedido de cambios;
+  - la persecución completa de un bloqueo (3a).
+
+## 4. Tareas
+
+Ruta y disparadores de delegación por tarea, como pide el método; cada una cierra con su commit y su
+revisión por tramos.
+
+**Fase A. Limpieza, sin cambiar el comportamiento de las garantías.**
+
+- [ ] **E3-1. Las pruebas de garantías en archivos limpios.** Aislamiento y RLS, paridad de migraciones,
+      vista previa con huella y ejecución única, outbox, auditoría e idempotencia de toques y mensajes.
+      `tests/conftest.py` deja de importar `gateway`. Criterio: esas pruebas pasan sin importar `gateway`,
+      `ingreso_tareas` ni `agente`, y su número no baja frente a la línea base (`2286 passed`).
+- [ ] **E3-2. Enredos 3 y 4.** La entrada HTTP (`/telegram/{slug}`, `/tablero/{token}`, `/salud`,
+      webhooks) sale de `gateway.py` a un módulo propio. `huerfanos.py`: `PENDIENTE` si la reentrega de
+      mensajes huérfanos sobrevive en el motor o se retira con el flujo viejo.
+- [ ] **E3-3. Enredos 1 y 2.** El despachador queda como transporte: sin botones ni retenciones de los
+      flujos viejos. La entrega deja de crear estado de conversación; se rediseña con los circuitos 7 y 8.
+- [ ] **E3-4. Borrar los flujos A y B**, con sus pruebas (se retiran con su código) y una migración que
+      borra las tablas `task_intake_*`, con rollback. El banco `tests/banco/` prueba los flujos viejos y se
+      retira con ellos. Criterio: suite en verde y ningún import de lo borrado.
+
+**Fase B. El motor definitivo.**
+
+- [ ] **E3-5. El paquete del motor** en `src/leda`, con su prueba de frontera (lista permitida de módulos
+      y de tablas; bordes conocidos que sólo achican).
+- [ ] **E3-6. Mudar el diseño probado:** estado, registro de turnos, fichas de los circuitos probados,
+      avisos guardados, escalera y reloj. Entran las dos entradas de la prueba real: hablar del mundo y no
+      de la cocina, con su conversación de prueba escrita primero; y los efectos en `audit_log` con la
+      versión de las reglas.
+- [ ] **E3-7. La entrada del motor:** escuchador y webhook propios, sin `gateway`.
+- [ ] **E3-8. Regresión y prueba real:** las 17 conversaciones, cinco veces con GPT-6 sol, y la guía de
+      la E2-9 por Telegram. Después se borra `prueba_chica/`.
+
+**Fase C. Lo que la prueba chica no cubrió.** `PENDIENTE`: si entra antes de M3 o después. Son los
+circuitos 7 y 8 (entrega y aprobación), el 5 (cadencias) y la persecución completa (3a), cada uno con sus
+conversaciones de prueba primero.
+
+**La plataforma web** lleva su ADR antes del código (ADR 0017, decisión 5). `PENDIENTE`: cuándo se
+escribe.
+
+## 5. Criterios de corte
+
+Los del ADR 0018 (5c) siguen valiendo para el motor definitivo:
+
+- un caso especial frena;
+- una falla repetida después de un arreglo del mecanismo lleva a revisar el diseño, no a otro arreglo.
+
+Además, si la regresión de las 17 conversaciones da peor que la ronda 3 de la prueba chica (85 de 85), no
+se borra `prueba_chica/` hasta entender por qué.
+
+## 6. Pendientes que este plan hereda
+
+- Si se avisa que se cargaron tareas (ADR 0017, decisión 2).
+- Qué pasa si quien destraba dice que no le corresponde (3a).
+- La tensión entre preguntarle al referente y "Leda es la PM".
+- Qué hace la persona con una tarea terminada antes del circuito de entrega.
+- Cómo llega el tono de cada cliente a la IA.
+- `avisos.espera_saber` con una tarea en revisión.
+- `PENDIENTE` del roadmap: si el grafo de transiciones y el desacople del transporte van antes del
+  seguimiento.
+
+## 7. Próximo paso
+
+Decidir con el usuario los `PENDIENTE` de las secciones 4 y 6 que bloquean el orden, empezando por el
+alcance antes de M3.
