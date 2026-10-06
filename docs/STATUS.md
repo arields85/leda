@@ -37,8 +37,8 @@ aceptó el ADR 0018 el mismo día.
 
 - **Qué:** el Motor. La Etapa 2 (`odd/tasks/prueba-chica-del-motor.md`) está terminada: E2-1 a E2-9 y M2.
   Sigue la Etapa 3, limpieza y motor de conversación definitivo, que lleva su plan propio, todavía sin
-  escribir. El ADR 0018 quedó aceptado (2026-10-06). Antes de escribirlo hay que decidir si `main` recibe los
-  documentos hasta M2.
+  escribir. El ADR 0018 quedó aceptado (2026-10-06). `main` no recibe nada hasta M3, porque la rama ya mezcla
+  documentos con código descartable; la rama está subida como respaldo (usuario, 2026-10-06).
 - **Dónde:** rama `feat/motor-de-conversacion`, carpeta `D:\Proyectos\Leda-PM-worktrees\motor-de-conversacion`
   (reglas en [`../AGENTS.md`](../AGENTS.md), "Dónde se trabaja y qué no se hace").
 - **Para la Etapa 3:** las observaciones de la prueba real (Leda cuenta de más lo de la cocina; los efectos
@@ -91,7 +91,7 @@ pasa a una conversación de prueba. Destino de cada uno:
   edición a mano): achicarlo lo decide el usuario.
 - **Respaldo de lo no subido.** `main` está subido hasta `e466eb5`. Viven en un solo disco la rama congelada
   `feat/flujo-de-un-mensaje` (92 commits sin subir, 7 con líneas de atribución), los commits de aviso de las
-  ramas congeladas, las etiquetas del 2026-10-04 y lo posterior a `e466eb5` en la rama del Motor. Recomendación
+  ramas congeladas y las etiquetas del 2026-10-04 (la rama del Motor está subida desde el 2026-10-06). Recomendación
   del agente: guardar la rama congelada con `git bundle`, sin reescribirla (los documentos citan sus hashes).
 - **Limpieza de las carpetas viejas** `c4-medicion`, `flujo-c6` y `prueba-0-35` (el listener del usuario puede
   estar corriendo en `prueba-0-35`).
@@ -127,8 +127,8 @@ de aviso; flujos C1 a C6 y migraciones `0026` a `0029`.
 
 - Repositorio `arields85/leda` (público). `arields85/prisma` queda como respaldo congelado (remoto
   `respaldo-prisma`). Engram usa el proyecto `prisma-pm`.
-- `origin/main` está en `e466eb5` (documentos del Motor hasta M1, por avance rápido); la rama sigue encima, sin
-  subir.
+- `origin/main` está en `e466eb5` (documentos del Motor hasta M1, por avance rápido) y no recibe nada hasta M3.
+  La rama del Motor está subida a `origin/feat/motor-de-conversacion` como respaldo (2026-10-06).
 - Etiquetas: `respaldo-flujos-antes-de-d`, `respaldo-main-antes-de-d` (punto de partida de la rama),
   `respaldo-0-36-en-pausa` (sólo consulta), `pre-renombre-leda` y `respaldo-flujos-antes-de-c2`, `-c5` y `-c6`.
 - Ramas: `feat/motor-de-conversacion` (vigente) y `main`; congeladas, `feat/flujo-de-un-mensaje` y
@@ -181,7 +181,8 @@ cifras miden el código: **una suite en verde no es evidencia de que la conversa
    patrón que la frontera rechaza.
 6. **La conversación no tiene un modelo en `main`:** el diseño del ADR 0018 pasó la prueba chica (rondas y
    Telegram real), pero vive en `prueba_chica/`, que es descartable; el motor definitivo es la Etapa 3.
-7. **Lo no subido vive en un solo disco** ("Decisiones pendientes del usuario").
+7. **Lo no subido vive en un solo disco:** la rama congelada y las etiquetas ("Decisiones pendientes del
+   usuario"); la rama del Motor ya está subida.
 8. **Ningún equipo real usó Leda:** todas las pruebas fueron con datos ficticios y un evaluador que conoce el
    guion.
 
