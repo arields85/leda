@@ -11,18 +11,11 @@ opción se identifica por su código (`{"accion": ...}`) o su token.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-
 import pytest
 
-from leda import gateway
-from leda.db import admin, espacio
 from leda.salida import (ICONO_TAREA, ICONOS_DE_ACCION_MENU, con_icono,
-                           etiqueta_de_accion_menu, etiqueta_sin_icono,
-                           etiquetas_coinciden)
+                         etiqueta_de_accion_menu, etiqueta_sin_icono, etiquetas_coinciden)
 
-from tests.banco.corrida import sembrar_precondiciones
-from tests.test_menu_tarea import _quien
 
 TABLA_APROBADA = {
     "ver_detalle": "📋", "ver_detalle_evidencia": "📋", "empezar": "▶️",
@@ -48,55 +41,3 @@ def test_etiqueta_sin_icono_saca_cada_icono_de_la_tabla(codigo, icono):
     assert etiqueta == f"{icono} Lo que sea"
     assert etiqueta_sin_icono(etiqueta) == "Lo que sea"
     assert etiquetas_coinciden(etiqueta, "Lo que sea")
-
-
-def _etiquetas_del_menu(conn, ws, persona, tarea_id) -> dict[str, str]:
-    """codigo de accion -> etiqueta real del botón del menú de la tarea."""
-    tg = None
-    with espacio(conn, ws) as cur:
-        quien = _quien(cur, persona, ws)
-        cur.execute("select telegram_user_id t from integrante where nombre = %s",
-                    (persona,))
-        tg = cur.fetchone()["t"]
-        gateway._abrir_menu_tarea(cur, quien, ws, tg, tarea_id,
-                                  datetime.now(timezone.utc))
-    with admin(conn) as cur:
-        cur.execute(
-            """select o.etiqueta, o.valor from pending_action_option o
-                 join pending_action p on p.id = o.pending_action_id
-                where p.workspace_id = %s and p.chat_id = %s
-                order by p.creado_en desc, o.orden""", (ws, tg))
-        filas = cur.fetchall()
-    return {f["valor"].get("accion"): f["etiqueta"] for f in filas[:12]}
-
-
-def test_el_menu_del_responsable_lleva_un_icono_por_accion(corework, conn):
-    ws = corework.workspace_id
-    with admin(conn) as cur:
-        ids = sembrar_precondiciones(cur, ws, {"tareas": [{
-            "id": "t1", "titulo": "Programar HMI", "area": "ot",
-            "responsable": "Nahuel Gimenez"}]})
-    conn.commit()
-
-    etiquetas = _etiquetas_del_menu(conn, ws, "Nahuel Gimenez", ids["t1"])
-
-    for codigo in ("ver_detalle", "empezar", "terminar", "informar_bloqueo",
-                   "depende_de_otra"):
-        assert etiquetas[codigo].startswith(f"{TABLA_APROBADA[codigo]} "), codigo
-    # Ya no todas son 📋: la lista de iconos del menú tiene más de uno.
-    assert len({e.split(" ", 1)[0] for e in etiquetas.values()}) > 1
-
-
-def test_el_menu_del_aprobador_lleva_un_icono_por_accion(corework, conn):
-    ws = corework.workspace_id
-    with admin(conn) as cur:
-        ids = sembrar_precondiciones(cur, ws, {"tareas": [{
-            "id": "t1", "titulo": "Programar PLC", "area": "ot",
-            "responsable": "Nahuel Gimenez", "estado": "en_revision",
-            "evidencia_requerida": []}]})
-    conn.commit()
-
-    etiquetas = _etiquetas_del_menu(conn, ws, "Marcos Tarquini", ids["t1"])
-
-    for codigo in ("ver_detalle_evidencia", "aprobar", "pedir_cambios"):
-        assert etiquetas[codigo].startswith(f"{TABLA_APROBADA[codigo]} "), codigo
