@@ -440,3 +440,55 @@ def test_un_texto_y_despues_la_herramienta_es_el_reintento_que_responde(conn, mu
 
     assert len(proveedor.pedidos) == 3
     assert resultado.error is None and resultado.hechos[0]["resultado"] == "anotado"
+
+
+# --- Una respuesta cortada (tercera vuelta de ajuste, 2026-10-06) ----------------------------
+#
+# Ronda 2 (Sonnet): mensajes que llegaron cortados a la persona. El proveedor dice que cortó por
+# el tope (`finish_reason`); una respuesta cortada es que la IA no respondió (decisión 8): un
+# reintento y después el camino de falla, nunca un texto a medias.
+
+def _cortada(respuesta: dict) -> dict:
+    respuesta["choices"][0]["finish_reason"] = "length"
+    return respuesta
+
+
+def test_una_redaccion_cortada_por_el_tope_es_no_responder():
+    with pytest.raises(RespuestaInvalida):
+        _ia(ProveedorFalso([_cortada(_texto("Quedó anotado que llegás el"))])).redactar(
+            {"hechos": []})
+
+
+def test_una_eleccion_cortada_por_el_tope_es_no_responder():
+    cortada = _cortada(_llamada({"jugadas": []}))
+    with pytest.raises(RespuestaInvalida):
+        _ia(ProveedorFalso([cortada])).elegir_jugadas(SITUACION)
+
+
+def test_una_respuesta_que_termino_normal_se_lee():
+    terminada = _texto("Listo.")
+    terminada["choices"][0]["finish_reason"] = "stop"
+    assert _ia(ProveedorFalso([terminada])).redactar({"hechos": []}) == "Listo."
+
+
+def test_el_tope_de_la_redaccion_alcanza_para_un_mensaje_entero():
+    proveedor = ProveedorFalso([_texto("Listo.")])
+    _ia(proveedor).redactar({"hechos": []})
+    assert proveedor.pedidos[0]["cuerpo"]["max_tokens"] >= 2000
+
+
+def test_una_redaccion_cortada_se_reintenta_en_el_turno(conn, mundo, escribe):
+    quien, entrante = escribe("Marcos", "llego el 13, el proveedor se demoró")
+    proveedor = ProveedorFalso([
+        _llamada({"jugadas": [{"nombre": "anotar_prevision", "tarea": "T1",
+                               "fecha": "2026-10-13"}]}),
+        _cortada(_texto("Quedó anotado que")),
+        _texto("Quedó anotado que la tenés el martes 13."),
+    ])
+
+    resultado = procesar_turno(conn, quien, entrante, _ia(proveedor), RelojFijo(AHORA))
+    conn.commit()
+
+    assert len(proveedor.pedidos) == 3
+    assert resultado.error is None
+    assert resultado.texto == "Quedó anotado que la tenés el martes 13."

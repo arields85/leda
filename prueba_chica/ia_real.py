@@ -46,7 +46,11 @@ PLAZO_S = 40.0
 # Topes de salida (`tope_jugadas`, `tope_redaccion`): un modelo que razona por dentro gasta
 # parte del tope antes de contestar.
 TOPE_JUGADAS = 1500
-TOPE_REDACCION = 700
+# Ronda 2: mensajes cortados con 700. Un tope que alcanza para un mensaje entero; si igual se
+# corta, el proveedor lo dice (`finish_reason`) y es que la IA no respondió (`sin_cortar`).
+TOPE_REDACCION = 2000
+# Lo que el proveedor dice cuando cortó la respuesta por el tope.
+CORTADA_POR_EL_TOPE = frozenset({"length", "max_tokens"})
 # Para elegir jugadas, los días que vienen con su día de la semana: una fecha que la persona
 # nombra por su día sale de ahí (`hechos.dias`).
 DIAS_PROXIMOS = 14
@@ -185,9 +189,24 @@ def _datos_de(nombre: str, crudos: dict[str, Any]) -> dict[str, Any]:
             if k in validos and v is not None and not (isinstance(v, str) and not v.strip())}
 
 
+def sin_cortar(respuesta: dict[str, Any]) -> dict[str, Any]:
+    """La respuesta, si el proveedor no la cortó por el tope; si la cortó, `RespuestaInvalida`:
+    una respuesta a medias es que la IA no respondió (un reintento y después su camino de
+    falla), nunca un texto o unas jugadas incompletas (tercera vuelta, 2026-10-06)."""
+    try:
+        motivo = respuesta["choices"][0].get("finish_reason")
+    except (KeyError, IndexError, TypeError, AttributeError):
+        return respuesta            # sin la forma de una respuesta: lo dice quien la lee
+    if motivo in CORTADA_POR_EL_TOPE:
+        raise RespuestaInvalida("La respuesta se cortó por el tope de salida.")
+    return respuesta
+
+
 def leer_jugadas(respuesta: dict[str, Any]) -> list[Jugada]:
-    """Las jugadas de la llamada a la herramienta; sin ella, o ilegible, `RespuestaInvalida`
-    (para el turno, la IA no respondió: un reintento y después su camino de falla)."""
+    """Las jugadas de la llamada a la herramienta; sin ella, ilegible o cortada,
+    `RespuestaInvalida` (para el turno, la IA no respondió: un reintento y después su camino de
+    falla)."""
+    sin_cortar(respuesta)
     try:
         mensaje = respuesta["choices"][0]["message"]
         llamadas = [c["function"] for c in mensaje.get("tool_calls") or []
@@ -249,6 +268,7 @@ class IAReal:
                                      f"\n\n{bloque_de_tono(self.tono)}"},
                          {"role": "user", "content": _json(pedido)}],
         })
+        sin_cortar(respuesta)
         try:
             texto = respuesta["choices"][0]["message"].get("content")
         except (KeyError, IndexError, TypeError) as e:
