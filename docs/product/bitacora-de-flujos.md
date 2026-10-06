@@ -51,7 +51,9 @@ Por qué:
   simple", "se siente muy estructurado todo", "siento que estamos volviendo a parchear".
 
 La IA: las mediciones de "Modelos" son del flujo C6. Para el flujo D se mantiene GPT-6 sol y falta
-volver a medir GPT-6 luna; la elección está `PENDIENTE` en el ADR 0018.
+volver a medir GPT-6 luna; la elección está `PENDIENTE` en el ADR 0018. **Actualización
+(2026-10-06):** medido en las rondas del flujo D ("Rondas automáticas del flujo D"): se queda sol;
+luna, descartada.
 
 Qué haría revisar esta conclusión: el resultado de la prueba chica del motor de conversación, con
 los criterios de éxito y de corte escritos antes en el ADR 0018.
@@ -94,11 +96,69 @@ Sin incidentes, sin errores y ninguna jugada sobre la tarea equivocada.
   toca a mí" llevan a las salidas (`13e574b`). La persecución completa (ADR 0017, decisión 3a) es
   de la prueba siguiente, no de la Etapa 2 (usuario, 2026-10-05).
 
-**Conclusión vigente del flujo D (2026-10-05):** el núcleo funcionó en las cuatro respuestas: la
-IA eligió la jugada correcta de la lista cerrada, con sus datos y la tarea correcta, y el código
-la ejecutó y calculó lo que tenía que calcular. Las dos fallas estaban en la cocina (un hecho
-incompleto y un juicio que no le tocaba a la IA), no en el mecanismo. Es una sola corrida: no
-reemplaza los criterios 5b y 5c del ADR 0018 ni las corridas repetidas de la E2-8.
+**Conclusión del flujo D (2026-10-05), reemplazada el 2026-10-06 por la de las rondas:** el núcleo
+funcionó en las cuatro respuestas: la IA eligió la jugada correcta de la lista cerrada, con sus
+datos y la tarea correcta, y el código la ejecutó y calculó lo que tenía que calcular. Las dos
+fallas estaban en la cocina (un hecho incompleto y un juicio que no le tocaba a la IA), no en el
+mecanismo. Es una sola corrida: no reemplaza los criterios 5b y 5c del ADR 0018 ni las corridas
+repetidas de la E2-8.
+
+## Rondas automáticas del flujo D (E2-8, 2026-10-05 y 06)
+
+Tarea E2-8 de `odd/tasks/prueba-chica-del-motor.md`. Las conversaciones de prueba (17 desde el
+2026-10-05: se sumaron la 15, avance vago; la 16, vencida sin fecha; y la 17, destrabar), cinco
+veces cada una contra la IA real, con `python -m prueba_chica.correr`, una base por corrida y el
+reloj simulado. Informes, transcripciones y libreta del gasto en `prueba_chica/resultados/`. Las
+cifras son las del corredor: garantías (5b) y comprensión provisional (jugadas y efectos).
+
+| Ronda | IA | Corridas bien | Garantías | Costo | Nota |
+|---|---|---|---|---|---|
+| 1 (2026-10-05, `3bc32b5`, 16 conversaciones) | GPT-6 sol | 57 de 80 | 62 de 80 | USD 2,61 | |
+| 1 | GPT-6 luna | 38 de 80 | 50 de 80 | USD 0,14 | Descartada (ADR 0018, decisión 6) |
+| 2, primer intento (2026-10-05, noche) | sol, 6.1 sol y Sonnet | — | — | — | Inválido: OpenRouter sin crédito (HTTP 402); informes `ronda2-invalida-*` |
+| 2 (2026-10-06) | GPT-6 sol | 81 de 85 | 85 de 85 | USD 2,67 | Sólo falla la 05 |
+| 2 | GPT-6.1 sol | 80 de 85 | 85 de 85 | USD 1,96 | Referencia |
+| 2 | Claude Sonnet 5.5 | incompleta | — | — | Otra vez sin crédito (28 corridas con 402) |
+| 3 (2026-10-06, `ronda3b-sol`) | GPT-6 sol | **85 de 85** | **85 de 85** | USD 2,44 | Comprensión 5 de 5 en las 17; mediana 6,2 s por turno, peor 15,8 s |
+
+- **Ronda 1: el contrato entre la IA y el código.** Las fallas no eran del mecanismo sino de lo
+  que la cocina le daba a la IA: hechos sin su significado (el atraso de una previsión leído como
+  el de hoy), jugadas sin una definición que las separara (un motivo que no era un porqué; una
+  previsión anotada además como bloqueo), ninguna jugada ante la duda, preguntas sobre la propia
+  conversación tratadas como algo fuera de la lista y respuestas sin próximo paso. El usuario
+  decidió revisar el contrato entero, como reglas generales (ADR 0018, 9k), y sumó la jugada
+  `destrabar` (9l) para un bloqueo cuya causa desaparece.
+- **Leda sin crédito en la IA** (primer intento de la ronda 2). Se comportó como dice la decisión
+  8: ningún efecto sin IA, el texto neutro fijo y un incidente por turno; las garantías se
+  sostuvieron también ahí. La libreta contaba como cobradas las llamadas rechazadas; se corrigió,
+  y desde la ronda 3 el corredor consulta el crédito antes de empezar y corta la ronda con un 402.
+- **Ronda 2: una regla tocada dos veces.** Sólo la 05 falló, con las tres IA, por la regla "una
+  sola jugada" que había agregado la ronda 1: el mismo renglón tocado por dos arreglos seguidos,
+  un disparador de parar (`AGENTS.md`, punto 4). Se cambió el enfoque en lugar de parchear: las
+  jugadas de un mensaje se aplican en orden. Con eso, la tercera y última vuelta de ajuste (9m):
+  el próximo paso según la definición del usuario (algo concreto que va a pasar o que la persona
+  puede hacer; "no hace falta que respondas" solo vale sólo en los avisos que no piden respuesta),
+  lo anunciado que ya no va a pasar se dice, los días de la semana los da el código y una
+  respuesta cortada es que la IA no respondió. Sonnet, en sus corridas válidas, entendió bien y
+  escribió peor (días de la semana, "ayer", mensajes cortados, dos preguntas en un mensaje).
+- **Jev (ADR 0018, decisión 7).** En la ronda 2 con sol, sobre los pasos de las conversaciones 13
+  y 14 que eligen tarea: la IA acertó 20 de 20 y Jev 5 de 20 (sólo donde lo correcto era
+  preguntar). Jev dijo siempre "ambigua": su verificación da al rival 0,5 o más, o la probabilidad
+  no llega al corte, y no ve la conversación. **Jev se retira de la prueba chica** (usuario, 2026-10-06); su código
+  sigue en `src/leda`. La deuda `b-0005-b` queda cerrada por esta medición.
+- **Ronda 3.** Todo bien en lo automático; la lectura provisional del agente no encontró fallas,
+  sólo menores. Antes de Telegram se corrigió lo que la cocina le pasaba (una sola hora, las 10:00,
+  para lo que Leda manda por su cuenta; desde cuándo la tarea está en su estado; el pedido de
+  estado según el estado real; una entrega que no se recibe, sin inventar otro canal).
+- **Gasto de la etapa:** unos USD 19,8 del techo de 30.
+- **La lectura de los textos:** el usuario no leyó las corridas (unas 1.000 líneas, "es
+  muchísimo"); su juicio sale de la prueba por Telegram real, que reemplaza esa lectura.
+
+**Conclusión vigente del flujo D (2026-10-06):** con GPT-6 sol, la ronda 3 cumple del lado
+automático el criterio 5b.1 (garantías 5 de 5 y comprensión 5 de 5 en todas las conversaciones),
+sin ningún caso especial (5c.1); las fallas de las rondas 1 y 2 estaban en el contrato entre la IA
+y el código y se resolvieron con reglas generales. Se queda sol; luna y Jev salen. No es el paso
+M2: faltan la prueba por Telegram real (5b.2) y el juicio del usuario (5b.3).
 
 ## Conclusión anterior (2026-10-03), reemplazada el 2026-10-04
 
@@ -217,7 +277,7 @@ la misma clase de falla seguía apareciendo (fila "C6 + 0-35" de la tabla).
 | C6 + P-1 | Sin plantillas (sólo dos permitidas) | 2026-10-03 09:13 (flash): "habla sin plantillas ni muletillas" | Sin textos fijos en el camino principal; elección del botón escrita en el mensaje | Responsable fuera de opciones ignorado; el rechazo dejaba el tema abierto; causa inventada; promesa falsa | Fue la base de las versiones siguientes del flujo C; congelado el 2026-10-04 |
 | C6 + regla del mozo | La IA no decide: la cocina decide qué se pregunta, botones y propuestas | 2026-10-03 19:18 (sol) | Ariel explicado con la regla real; el rechazo vuelve como pregunta concreta; bloque para copiar | Bucle en el borrador devuelto (pedía la fecha); la misma oferta al final de cada mensaje; volvió una orden; "Soy Leda." | Arreglado en 0-34; congelado el 2026-10-04 |
 | C6 + 0-35 | El borrador devuelto vuelve como un borrador normal (sin lista de datos a corregir), con las correcciones de la quinta auditoría | 2026-10-04 11:21-11:38 (sol), cortada antes de terminar el guion | El bucle no volvió; una corrección sobre el devuelto volvió al resumen sin pedir otros datos; el selector de Modificar pregunta en lugar de ordenar; la propuesta de la IA no pisó el criterio confirmado | Después de un turno sin cambios, la respuesta salió sin resumen ni botones; pedir por escrito el envío a aprobación no se tomó; la lista de ofertas recitada en casi todos los mensajes; un Cancelar de un resumen anterior canceló el devuelto, y el flujo B no supo del borrador cancelado y ofreció tareas ajenas | Congelado el 2026-10-04 (etiqueta `respaldo-flujos-antes-de-d`) |
-| D | El mecanismo del Motor: un motor de conversación con estado explícito, circuitos declarados y situaciones generales resueltas una sola vez (ADR 0018, propuesta) | 2026-10-05 12:13 (sol): primer contacto, parcial, no M2 | La jugada y la tarea correctas en las cuatro respuestas; el atraso, bien calculado; sin incidentes | Dijo que el referente estaba avisado con el aviso sólo guardado; no preguntó quién destraba el bloqueo (las dos, de la cocina; arregladas el mismo día) | En la prueba chica (Etapa 2), en la rama `feat/motor-de-conversacion` |
+| D | El mecanismo del Motor: un motor de conversación con estado explícito, circuitos declarados y situaciones generales resueltas una sola vez (ADR 0018, propuesta) | 2026-10-05 12:13 (sol): primer contacto, parcial, no M2. Rondas automáticas del 2026-10-05 y 06: la ronda 3, 85 de 85 | La jugada y la tarea correctas en las cuatro respuestas; el atraso, bien calculado; sin incidentes; en la ronda 3, garantías y comprensión 5 de 5 en las 17 conversaciones | Dijo que el referente estaba avisado con el aviso sólo guardado; no preguntó quién destraba el bloqueo (las dos, de la cocina; arregladas el mismo día); en las rondas 1 y 2, fallas del contrato entre la IA y el código | En la prueba chica (Etapa 2), en la rama `feat/motor-de-conversacion`; falta Telegram real (E2-9) |
 
 ## Progresos y retrocesos
 
@@ -315,4 +375,5 @@ tope por modelo es un pendiente importante de la plataforma); el proveedor `nan`
 de flash, por eso es lento.
 
 Estas mediciones son del flujo C6, congelado el 2026-10-04. Para el flujo D se mantiene GPT-6 sol
-y falta volver a medir GPT-6 luna (ADR 0018).
+y falta volver a medir GPT-6 luna (ADR 0018). Medido el 2026-10-05 y 06 (sol, luna, GPT-6.1 sol y
+Claude Sonnet 5.5) en "Rondas automáticas del flujo D".

@@ -2,10 +2,8 @@
 
 **Rama:** `feat/motor-de-conversacion` · **Carpeta:** `D:\Proyectos\Leda-PM-worktrees\motor-de-conversacion`
 **Abierta:** 2026-10-04 · **Copia en Engram:** tema `odd/prueba-chica-del-motor/tasks` (proyecto `prisma-pm`)
-**Estado:** decidido (sección 10, 2026-10-05); E2-1 a E2-7, E2-3b, `informar_avance`, el ancla en la
-previsión, los tres hallazgos de la corrida en seco, la tarea vencida (9j), la conversación 15 alineada
-con 9j, la revisión de la corrida con las 16 y la jugada `destrabar` (9l, conversación 17) hechos; sigue
-la E2-8.
+**Estado:** decidido (sección 10, 2026-10-05); E2-1 a E2-8 hechas (la ronda 3, 85 de 85 con GPT-6 sol,
+2026-10-06); sigue la E2-9, la prueba por Telegram real, con `leda_motor` recreada (autorizado).
 
 ## 1. Objetivo
 
@@ -166,7 +164,7 @@ persona no se le dice que se avisó salvo que lo pregunte: el hecho lo lleva en 
 
 ## 5. Datos
 
-**`leda_motor`** (no existe; se crea con autorización), con los pasos de `PRUEBA-LOCAL.md` para una base nueva
+**`leda_motor`** (existe desde el 2026-10-05; para la E2-9 se recrea desde cero, autorizado), con los pasos de `PRUEBA-LOCAL.md` para una base nueva
 (`esquema`, que ya trae la `0030` y la `0031`; `importar --activar`, `feriados`, `modelo` con GPT-6 sol, `sembrar`),
 más el aviso previo (`aviso_previo_dias_habiles` = 3 en `workspace_setting`). `pg_dump` antes de cada prueba real.
 
@@ -219,8 +217,9 @@ un texto fijo.
 ## 7. Prueba por Telegram real
 
 Con las condiciones de `AGENTS.md` (espacio de prueba, datos ficticios, secreto protegido, efectos reversibles,
-respaldo, nada destructivo, nada `CRITICAL` o `HIGH` abierto). El bot y el paso de los días, sección 10;
-`tools/restriccion_horario.py` tiene que admitir `leda_motor`. El escuchador lo corre el usuario, con el `.env`
+respaldo, nada destructivo, nada `CRITICAL` o `HIGH` abierto). El bot y el paso de los días, sección 10
+(dos bots nuevos, del equipo y de administración, creados por el usuario); `tools/restriccion_horario.py`
+admite `leda_motor` (E2-6). El escuchador lo corre el usuario, con el `.env`
 que copia él (el agente no lo lee). Se lee con `tools/leer_conversacion.py` (los toques se ven como su código) y
 un lector del registro de turnos de la prueba.
 
@@ -571,8 +570,43 @@ su evidencia son las corridas. Unas 400 líneas por tarea es una guía, no un to
       `PENDIENTE`, por decisión del usuario (2026-10-06), para cuando Leda pueda recibir entregas: qué
       hace la persona con una tarea terminada mientras la entrega no se recibe por chat (9g); y el inicio que la carga trae
       de antes del motor (conversación 12, paso 3, "desde el lunes 19": el motor no lo sabe).
-- [ ] **E2-8. Primera ronda real:** sol, luna y Jev; lectura de textos; bitácora; chequeo de rumbo contra 5c.
-- [ ] **E2-9. Telegram real** con el usuario; su juicio; M2 en la bitácora.
+- [x] **E2-8. Rondas reales** (2026-10-05 y 06; informes y libreta en `prueba_chica/resultados/`; bitácora
+      de flujos, "Rondas automáticas del flujo D"). **Ronda 1** (`3bc32b5`): sol, 57 de 80 corridas bien y
+      garantías 62 de 80, USD 2,61; luna, 38 de 80 y garantías 50 de 80, USD 0,14: luna queda descartada
+      (ADR 0018, decisión 6). Las fallas eran del contrato entre la IA y el código: el usuario decidió
+      revisarlo entero (9k, arriba). **Ronda 2**, después del intento sin crédito (arriba): sol, 81 de 85 y
+      garantías 85 de 85, USD 2,67; GPT-6.1 sol, 80 de 85 y garantías 85 de 85, USD 1,96; Claude Sonnet 5.5,
+      incompleta (otra vez sin crédito, 28 corridas con 402; en las válidas entiende bien y escribe peor:
+      días de la semana, "ayer", mensajes cortados, dos preguntas). Sólo la 05 falló con todas, por la regla
+      "una sola jugada" de la ronda 1 (un renglón tocado por dos arreglos seguidos, disparador de parar):
+      tercera y última vuelta de ajuste (9m, arriba). **Jev** (decisión 7; ronda 2 con sol, 13 y 14): la
+      IA, 20 de 20; Jev, 5 de 20 (siempre "ambigua": su verificación `rival` da 0,5 o más, o no llega al
+      corte, y no ve la conversación). **Jev se retira de
+      la prueba chica** (usuario, 2026-10-06); su código sigue en `src/leda`; la deuda `b-0005-b` queda
+      cerrada por esta medición. **Ronda 3** (`ronda3b-sol`, sólo sol, decisión del usuario; corrida sobre
+      `a58d7b4`): **85 de 85, garantías 85 de 85 y comprensión 5 de 5 en las 17**, USD 2,44, mediana 6,2 s
+      por turno y peor 15,8 s; la lectura provisional del agente, ninguna falla y sólo menores; después, lo
+      que la cocina le pasa (arriba). 5b.1 se cumple del lado automático. **La lectura del usuario** (10.3)
+      no se hizo: las 17 corridas son unas 1.000 líneas ("es muchísimo"); su juicio sale de la prueba por
+      Telegram (usuario, 2026-10-06). Gasto de la etapa, unos USD 19,8 de 30 (`resultados/gasto.json`);
+      crédito en OpenRouter después de la ronda 3, unos USD 10. Chequeo de rumbo contra 5c: ningún caso
+      especial (5c.1); la falla repetida de la 05 se resolvió cambiando el enfoque, no con otro arreglo
+      (5c.2); la tercera vuelta fue la última (5c.3). `PENDIENTE`: lo de la sección de arriba (la tarea
+      terminada sin entrega por chat; "desde el lunes 19" en la 12); la persecución completa (ADR 0017,
+      3a) es de la prueba siguiente, y al diseñarla se resuelve la tensión entre preguntarle al referente
+      (3a, paso 4) y "Leda es la PM".
+- [ ] **E2-9. Telegram real** con el usuario; su juicio (5b.2 y 5b.3); M2 en la bitácora. **Autorizado**
+      (usuario, 2026-10-06): recrear `leda_motor` desde cero antes de la prueba. Preparación: `pg_dump`
+      primero; borrar y crear la base; `python -m leda esquema`, `importar corework --activar`, `feriados
+      corework`, `modelo openai/gpt-6-sol --proveedor openrouter`, `sembrar corework --semilla
+      espacios/corework.semilla-ficticia.yaml` y `administrador corework Ariel`; `aviso_previo_dias_habiles`
+      = 3 en `workspace_setting`, con la conexión de `LEDA_DB_URL` (la de autoridad no tiene privilegios
+      sobre el esquema). Después, una guía corta (un hilo numerado, unos 20 pasos) que adelanta el reloj de
+      Leda entre días para recorrer la escalera entera en una sesión; el usuario opera a Ariel, Ismael y
+      Marcos y corre el escuchador (`python -m prueba_chica.escuchar corework`) en su PowerShell con el
+      `.venv` de la carpeta; antes, `/start` de las tres cuentas al bot nuevo del equipo y un mensaje de
+      Ariel al bot de administración nuevo. En horario de CoreWork o con el reloj. Después: el juicio del
+      usuario, la entrada en la bitácora y M2.
 
 **Previsión:** unas 3.600 líneas (código, pruebas y YAML). **Entrega:** `main` no recibe código hasta M2 o M3
 (`AGENTS.md`), así que no hay cadena de PR que decidir ahora; cada tarea anota sus commits. Push y PR, del usuario.
@@ -586,7 +620,8 @@ su evidencia son las corridas. Unas 400 líneas por tarea es una guía, no un to
    el atraso salgan bien. Va en la E2-6.
 3. **Quién juzga los textos y la comprensión:** el agente lee todas las corridas contra lo que cada paso "dice" y
    "no dice" y arma la tabla; el usuario lee al menos una corrida por conversación y todas las marcadas como falla,
-   y su lectura es la que vale. Sin una IA juez.
+   y su lectura es la que vale. Sin una IA juez. **Reemplazada (usuario, 2026-10-06):** el usuario no lee las
+   corridas; su juicio sale de la prueba por Telegram real (E2-8).
 4. **Gasto en IA:** un techo de USD 30 para toda la etapa, con aviso al acercarse; al llegar, se le pregunta al
    usuario antes de seguir. El corredor (E2-7) lleva la cuenta.
 5. **Avisos guardados:** en la tabla nueva `scheduled_notice`, no en columnas de `message_outbox`; el mensaje entra
@@ -607,7 +642,6 @@ previo en `workspace_setting`, no en el importador; el referente es quien aprueb
   `PENDIENTE` confirmar al escribir los YAML que ninguna conversación depende de ellas.
 - **La etapa no es tan chica:** si una tarea pide un caso especial, se frena (5c.1).
 
-**Próximo paso:** la ronda 3 de la E2-8, sólo con GPT-6 sol (decisión del usuario, 2026-10-06),
-cinco veces cada una de las 17, después de la tercera y última vuelta de ajuste (ADR 0018, 9m);
-lectura de textos, con la casilla del próximo paso en cada mensaje, y chequeo de rumbo contra 5c:
-si no se alcanza 5b, no hay otra vuelta de ajuste: se revisa el diseño con el usuario (5c.3).
+**Próximo paso:** la E2-9 (sección 9): `pg_dump`, recrear `leda_motor` con los pasos de la tarea, escribir
+la guía corta y hacer la prueba por Telegram con el usuario. Si la prueba vuelve a perderse o a trabarse,
+no hay otro arreglo: se revisa el diseño con el usuario (5c.2). Pase o no, el resultado va a la bitácora (M2).

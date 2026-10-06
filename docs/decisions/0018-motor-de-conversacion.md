@@ -4,7 +4,8 @@
   las decisiones 1 a 8. Queda como propuesta hasta que pase la prueba chica de la Etapa 2. La
   decisión 9 (usuario, 2026-10-04) precisa lo que dejaron abierto las conversaciones de prueba;
   el 2026-10-05 el usuario le sumó 9h, 9i y 9j, después de la primera ronda real, la revisión
-  del contrato entre la IA y el código (9k), y la jugada `destrabar` (9l).
+  del contrato entre la IA y el código (9k), y la jugada `destrabar` (9l); el 2026-10-06, la
+  tercera vuelta de ajuste (9m) y las notas de las decisiones 6 y 7 con lo medido.
 - **Fecha:** abierta el 2026-10-04.
 - **Alcance:** cómo procesa Leda cada mensaje y cada toque en el seguimiento por chat (ADR 0017,
   decisión 3): quién decide qué, el estado de la conversación, los circuitos, las situaciones
@@ -250,6 +251,12 @@ cumple con el resultado registrado, pase o no.
 - **Si luna alcanza los criterios de 5b**, el agente le presenta al usuario los números y el
   usuario decide si se cambia.
 
+**Nota (2026-10-06): se queda GPT-6 sol.** En la primera ronda, luna dio 38 de 80 corridas bien y
+garantías 50 de 80, contra 57 y 62 de sol: no alcanza 5b y queda descartada. En la segunda se
+midieron como referencia GPT-6.1 sol (80 de 85, garantías 85 de 85) y Claude Sonnet 5.5 (incompleta
+por falta de crédito; entiende bien y escribe peor); sol dio 81 de 85. La tercera ronda corrió sólo
+con sol: 85 de 85 (`docs/product/bitacora-de-flujos.md`, "Rondas automáticas del flujo D").
+
 ### 7. Jev se mide en paralelo y se queda sólo si aporta (usuario, 2026-10-04)
 
 Jev (ADR 0006) es una IA chica que sólo elige: de qué tarea habla un mensaje, con una probabilidad
@@ -263,6 +270,12 @@ acaba de escribir a la persona sobre esa tarea).
 - **Si Jev evita errores que la IA principal comete sola, se queda; si no, se retira.** Es una
   pieza y un proveedor menos. La deuda `b-0005-b` (Jev duda con "el plc") se resuelve con esta
   medición.
+
+**Nota (usuario, 2026-10-06): Jev se retira de la prueba chica.** En la segunda ronda con sol,
+sobre los pasos de las conversaciones 13 y 14 que eligen tarea, la IA acertó 20 de 20 y Jev 5 de
+20: dijo siempre "ambigua" (su verificación da al rival 0,5 o más, o no llega al corte) y no ve la
+conversación. No evita ningún error de la IA. Su código sigue en `src/leda`; la deuda `b-0005-b`
+queda cerrada por esta medición.
 
 ### 8. Cuando la IA falla (usuario, 2026-10-04)
 

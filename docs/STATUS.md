@@ -3,7 +3,7 @@
 **Alcance:** Leda es un producto de gestión de proyectos multi-tenant. CoreWork es
 su primer cliente, no su definición.
 
-**Última actualización documental:** 2026-10-04, después de las decisiones P1 a P16.
+**Última actualización documental:** 2026-10-06, al cerrar la sesión de las rondas de la Etapa 2 (E2-8).
 
 Versiones anteriores (historia, no estado vigente ni instrucción):
 [`STATUS-hasta-2026-09-30.md`](historial/STATUS-hasta-2026-09-30.md),
@@ -23,27 +23,30 @@ está en la capa de conversación, escrita a mano y sin un modelo de la conversa
 Desde entonces el trabajo es **el Motor** ([`../AGENTS.md`](../AGENTS.md), "Nombres que usamos").
 
 **Paso M1 cumplido (2026-10-04).** El usuario aceptó el
-[ADR 0017](decisions/0017-por-chat-los-hechos-por-la-web-la-estructura.md) (decisiones 1 a 7: por chat, los
-hechos del trabajo; la estructura, en una plataforma web con su propio ADR; el núcleo no se edita) y el diseño
-del [ADR 0018](decisions/0018-motor-de-conversacion.md) para la prueba (decisiones 1 a 8: la IA elige jugadas de
-una lista cerrada y el código las ejecuta; estado por persona y registro de turnos; circuitos declarados con
-fichas y ocho situaciones generales; la prueba chica y sus criterios). El 0018 queda como "propuesta" hasta que
-pase la prueba chica. M1 quedó registrado en el documento de la unidad y en la línea "Estado" de cada ADR.
+[ADR 0017](decisions/0017-por-chat-los-hechos-por-la-web-la-estructura.md) (por chat, los hechos del trabajo; la
+estructura, en una plataforma web con su propio ADR) y el diseño del
+[ADR 0018](decisions/0018-motor-de-conversacion.md) para la prueba (la IA elige jugadas de una lista cerrada y el
+código las ejecuta). El 0018 queda como "propuesta" hasta que pase la prueba chica.
 
-## Punto exacto para retomar (2026-10-05, plan de la Etapa 2 decidido)
+## Punto exacto para retomar (2026-10-06, rondas hechas; sigue Telegram real)
 
-- **Qué:** el Motor, con la Etapa 1 terminada.
+- **Qué:** el Motor, Etapa 2 (`odd/tasks/prueba-chica-del-motor.md`). Construida entera (E2-1 a E2-7, en
+  `prueba_chica/`), con 17 conversaciones de prueba y las jugadas nuevas `informar_avance` y `destrabar`.
 - **Dónde:** rama `feat/motor-de-conversacion`, carpeta `D:\Proyectos\Leda-PM-worktrees\motor-de-conversacion`
   (reglas en [`../AGENTS.md`](../AGENTS.md), "Dónde se trabaja y qué no se hace").
-- **Hecho:** la E1-3 (`tests/conversaciones/`, catorce conversaciones) y las decisiones P1 a P16 del usuario,
-  aplicadas a ellas y escritas en el ADR 0018, decisión 9.
-- **Primer paso:** la tarea E2-1 del plan de la Etapa 2 (`odd/tasks/prueba-chica-del-motor.md`), con su sección 10
-  resuelta por el usuario (2026-10-05).
+- **Hecho (E2-8):** tres rondas reales. La 3 (2026-10-06, sólo GPT-6 sol): **85 de 85, garantías y comprensión
+  5 de 5 en las 17**; 5b.1 cumplido del lado automático. Luna descartada; Jev retirado de la prueba (ADR 0018,
+  notas de las decisiones 6 y 7). El usuario no lee las corridas: su juicio sale de Telegram. Detalle en la
+  bitácora de flujos.
+- **Primer paso: la E2-9, prueba por Telegram real.** El usuario autorizó (2026-10-06) recrear `leda_motor`
+  desde cero, con `pg_dump` antes; los pasos, en la tarea E2-9. Después, una guía corta (un hilo numerado,
+  unos 20 pasos, con el reloj de Leda adelantado entre días), el juicio del usuario (5b.2 y 5b.3), la
+  bitácora y M2.
 - **Acuerdos de trabajo:** chequeo de rumbo escrito antes de cada unidad; consentimiento permanente del usuario
-  para los commits de cada unidad y para las revisiones RDD (`tools/rdd_ciclo.py <carpeta> <base>`), que
-  revisan desde el último tramo revisado (desde `origin/main` ya no entra); un cambio en `AGENTS.md` sale de riesgo medio y pide consentimiento, que el
-  agente concede solo por ese consentimiento permanente, sin preguntar; esos cambios se juntan; commits sin líneas de atribución; push sólo a `arields85/leda` y cuando lo decida
-  el usuario.
+  para los commits de cada unidad y para las revisiones RDD (`tools/rdd_ciclo.py <carpeta> <base>`), por tramos
+  desde el último revisado (la rama entera excede al revisor; los informes generados no se revisan); un cambio
+  en `AGENTS.md` sale de riesgo medio y el agente concede el consentimiento solo; esos cambios se juntan;
+  commits sin líneas de atribución; push sólo a `arields85/leda` y cuando lo decida el usuario.
 
 ## Próximo paso
 
@@ -51,9 +54,8 @@ El avance se registra en `odd/tasks/motor-de-conversacion.md`.
 
 **Etapa 1. Diseño, sin código.** Terminada: ADR 0017 y 0018 (M1), E1-4 y E1-3.
 
-**Etapa 2. Prueba chica y descartable.** Plan: `odd/tasks/prueba-chica-del-motor.md` (fuera de
-`src/leda`, criterios 5b y 5c, base `leda_motor`, migraciones desde la `0030`, GPT-6 sol con luna y Jev en
-paralelo). PostgreSQL se levanta a mano (`levantar-postgres.bat`).
+**Etapa 2. Prueba chica y descartable.** Plan: `odd/tasks/prueba-chica-del-motor.md`. Construida y medida
+(E2-1 a E2-8); falta la E2-9, Telegram real, y M2. PostgreSQL se levanta a mano (`levantar-postgres.bat`).
 
 **Etapa 3. Limpieza y motor de conversación definitivo.** Cortar los enredos con el código viejo, mudar las
 pruebas de garantías a archivos limpios, borrar los flujos A y B y, recién entonces, construir el motor de
@@ -75,55 +77,50 @@ pasa a una conversación de prueba. Destino de cada uno:
 
 ## Decisiones pendientes del usuario
 
-- **El archivo global `~/.claude/CLAUDE.md` (unos 71.000 caracteres).** Claude Code avisa cuando las
-  instrucciones que carga al iniciar superan 150.000 caracteres. Desde el 2026-10-04 el proyecto carga
-  `AGENTS.md` reducido a lo que sirve, `docs/STATUS.md`, el documento de la unidad, la constitución y la
-  mecánica (`nucleo/alta-de-equipo.md` ya no se carga, por el ADR 0017, decisión 7). Medido con
-  `LC_ALL=C.UTF-8 wc -m` el 2026-10-04: unos 73.000 caracteres del proyecto y unos 144.000 en total con el
-  global. El margen es chico (unos 6.000): `docs/STATUS.md` y el documento de la unidad no deberían crecer. El
-  global lo maneja entero gentle-ai (`gentle-ai sync` pisaría una edición a mano): achicarlo lo decide el
-  usuario, con esa herramienta.
+- **El archivo global `~/.claude/CLAUDE.md` (unos 71.000 caracteres).** Claude Code avisa por encima de 150.000
+  caracteres al iniciar; el proyecto carga unos 72.000 (`LC_ALL=C.UTF-8 wc -m`, 2026-10-06): `docs/STATUS.md` y
+  el documento de la unidad no deberían crecer. El global lo maneja gentle-ai (`gentle-ai sync` pisaría una
+  edición a mano): achicarlo lo decide el usuario.
 - **Respaldo de lo no subido.** `main` está subido hasta `e466eb5`. Viven en un solo disco la rama congelada
   `feat/flujo-de-un-mensaje` (92 commits sin subir, 7 con líneas de atribución), los commits de aviso de las
   ramas congeladas, las etiquetas del 2026-10-04 y lo posterior a `e466eb5` en la rama del Motor. Recomendación
-  del agente para la rama congelada: no reescribirla (los documentos citan sus hashes) y guardarla con
-  `git bundle`.
-- **Un bot de Telegram de prueba para la rama del Motor:** hay un solo listener por bot, y uno abierto en la
-  carpeta equivocada escribe en la base equivocada.
+  del agente: guardar la rama congelada con `git bundle`, sin reescribirla (los documentos citan sus hashes).
 - **Limpieza de las carpetas viejas** `c4-medicion`, `flujo-c6` y `prueba-0-35` (el listener del usuario puede
   estar corriendo en `prueba-0-35`).
 
-`PENDIENTE` dentro de los ADR, para resolver al llegar: si se avisa que se cargaron tareas (ADR 0017,
-decisión 2); cómo se guarda quién destraba un bloqueo y qué pasa si dice que no le corresponde (decisión 3a); las
-tablas del motor de conversación (ADR 0018, decisión 3, al diseñar la Etapa 2); y cómo llega el tono de cada
-cliente a la IA. Los de la E1-4 están en las notas de `docs/ROADMAP.md`.
+`PENDIENTE` dentro de los ADR y del plan, para resolver al llegar: si se avisa que se cargaron tareas (ADR 0017,
+decisión 2); qué pasa si quien destraba dice que no le corresponde (decisión 3a); la tensión entre preguntarle al
+referente (3a, paso 4) y "Leda es la PM", al diseñar la persecución completa, que es de la prueba siguiente; qué
+hace la persona con una tarea terminada mientras la entrega no se recibe por chat (con el circuito de entrega);
+y cómo llega el tono de cada cliente a la IA. Los de la E1-4 están en las notas de `docs/ROADMAP.md`.
 
 ## Estado comprobado
 
-**Código y esquema.** La rama del Motor sólo agregó documentos: su código es el de `main`.
+**Código y esquema.** La rama del Motor agregó la prueba chica, descartable, en `prueba_chica/` (fuera de
+`src/leda`), las migraciones `0030` y `0031` (tablas del motor), las etapas del motor en `src/leda/incidentes.py`
+y `leda_motor` en `tools/restriccion_horario.py`; lo demás es el código de `main`.
 
-- `row level security` forzado en 34 tablas (recuento del 2026-09-30); aislamiento entre clientes cerrado por
-  las migraciones `0003` a `0005` ([`architecture/frontera.md`](architecture/frontera.md#cómo-se-cerró-la-regla-1)).
-  `PENDIENTE`: un ensayo de propiedad sobre un clúster enteramente limpio.
-- Sin vocabulario de cliente en el esquema: un segundo cliente no exige modificarlo. El estado de tarea es
-  proyección de eventos. Migraciones hasta `0025`, cada una con rollback y ensayo de paridad.
+- `row level security` forzado en 34 tablas (recuento del 2026-09-30) más las de la `0030` y la `0031`;
+  aislamiento entre clientes cerrado por las migraciones `0003` a `0005`
+  ([`architecture/frontera.md`](architecture/frontera.md#cómo-se-cerró-la-regla-1)). `PENDIENTE`: un ensayo de
+  propiedad sobre un clúster enteramente limpio.
+- Sin vocabulario de cliente en el esquema. El estado de tarea es proyección de eventos. Migraciones hasta
+  `0025` en `main`, más `0030` y `0031` en la rama, cada una con rollback y ensayo de paridad.
 - HTTP: `POST /telegram/{slug}`, `GET /tablero/{token}` (sólo lectura) y `GET /salud`; no hay API de lectura.
 - La conversación de `main` son los flujos A y B, congelados.
-- Para el seguimiento (relevamiento del 2026-10-04): `herramientas.ejecutar` y la vista previa con huella se usan
-  sin el código de conversación; hay cinco enredos entre módulos (documento de la unidad); no hay enlace entre
-  una respuesta y su recordatorio; `pending_reply` nunca se escribe; no existe la operación de pedir más tiempo;
-  los textos de recordatorios y cadencias están fijos en `escalera.py` y `reloj.py`; `sembrar` carga tareas una
-  sola vez por espacio y con menos exigencias que el compromiso normal.
+- Para el seguimiento en `main` (relevamiento del 2026-10-04): cinco enredos entre módulos (documento de la
+  unidad); no existe la operación de pedir más tiempo; los textos de recordatorios están fijos en `escalera.py`
+  y `reloj.py`. La prueba chica lo resuelve por su cuenta.
 
 **Rama congelada `feat/flujo-de-un-mensaje`:** en `cc732dd` (etiqueta `respaldo-flujos-antes-de-d`) más su commit
-de aviso; tiene los flujos C1 a C6, las migraciones `0026` a `0029` y los documentos de sus tareas.
+de aviso; flujos C1 a C6 y migraciones `0026` a `0029`.
 
 **Git.**
 
 - Repositorio `arields85/leda` (público). `arields85/prisma` queda como respaldo congelado (remoto
-  `respaldo-prisma`). Engram usa el proyecto `prisma-pm` (`.engram/config.json`).
-- `main` se subió el 2026-10-04 (`aa32a02..6f9b9a3`) y, después de M1, recibió por avance rápido los documentos
-  del Motor, por decisión del usuario: `origin/main` está en `e466eb5`. La rama sigue encima con la E1-4.
+  `respaldo-prisma`). Engram usa el proyecto `prisma-pm`.
+- `origin/main` está en `e466eb5` (documentos del Motor hasta M1, por avance rápido); la rama sigue encima, sin
+  subir.
 - Etiquetas: `respaldo-flujos-antes-de-d`, `respaldo-main-antes-de-d` (punto de partida de la rama),
   `respaldo-0-36-en-pausa` (sólo consulta), `pre-renombre-leda` y `respaldo-flujos-antes-de-c2`, `-c5` y `-c6`.
 - Ramas: `feat/motor-de-conversacion` (vigente) y `main`; congeladas, `feat/flujo-de-un-mensaje` y
@@ -135,11 +132,12 @@ de aviso; tiene los flujos C1 a C6, las migraciones `0026` a `0029` y los docume
 | Dónde | Comando | Fecha | Resultado |
 |---|---|---|---|
 | `main` | `.venv\Scripts\python.exe -m pytest -q` | 2026-09-30 | 2279 passed, 333 deselected |
-| `main`, después del renombre | suite completa | 2026-10-02 | 2286 passed |
 | Rama congelada, en `24e92ce` | `python -m pytest -q -p no:cacheprovider` | 2026-10-04 | 3997 passed, 333 deselected, 1 warning |
-| Punto de partida del Motor (`respaldo-main-antes-de-d`, mismo código que `main`) | `.venv\Scripts\python.exe -m pytest -q -p no:cacheprovider` | 2026-10-04 | 2286 passed, 333 deselected, 1 warning in 631.96s |
+| Punto de partida del Motor (`respaldo-main-antes-de-d`) | `.venv\Scripts\python.exe -m pytest -q -p no:cacheprovider` | 2026-10-04 | 2286 passed, 333 deselected, 1 warning in 631.96s |
+| Rama del Motor, en la E2-6 | suite completa | 2026-10-05 | 2306 passed, 333 deselected, 1 warning in 780.79s |
+| Rama del Motor, `prueba_chica` | `pytest prueba_chica` | 2026-10-06 | 411 passed in 133.45s |
 
-Los deselected son el banco real (`modelo_real`). La última fila es la línea base de garantías del Motor. Estas
+Los deselected son el banco real (`modelo_real`). La tercera fila es la línea base de garantías del Motor. Estas
 cifras miden el código: **una suite en verde no es evidencia de que la conversación funcione** (`AGENTS.md`,
 "Cómo pensamos juntos", punto 12).
 
@@ -147,18 +145,20 @@ cifras miden el código: **una suite en verde no es evidencia de que la conversa
 
 - Sin producción, trabajo real, Docker ni staging. Telegram real sólo con datos ficticios (cuentas de prueba
   Ariel, Ismael y Marcos, que opera el usuario).
-- Bases locales: `leda` (`main`) y `leda_flujo` (rama congelada: migraciones hasta `0029`, IA
-  `openai/gpt-6-sol`, CoreWork con `emojis = true`); `leda_motor` no existe. Los roles `leda_*` los comparten
-  todas las bases. Respaldos en `db/respaldos/`.
-- **Restricción de horario apagada en `leda_flujo`** desde el 2026-10-02; el horario de CoreWork (lunes a
-  viernes, 09:00-17:00) vuelve con `tools/restriccion_horario.py prender corework`.
-- PostgreSQL local (scoop) no es un servicio: se levanta con `levantar-postgres.bat`. Si se cae con
-  `0xC0000142`, un proceso hijo huérfano retiene la memoria compartida: cerrar los procesos `postgres` y volver a
-  levantarlo (pasó tres veces; si se repite, buscar la causa).
-- El listener lo corre el usuario en su terminal (`python -m leda escuchar corework`); las tareas en segundo
-  plano del agente se cortan por tiempo. El 2026-10-04 corría en `prueba-0-35` contra `leda_flujo`.
-- Para leer una prueba real: `python tools/leer_conversacion.py [minutos] [desde HH:MM]`, con `PYTHONPATH=src`,
-  desde la carpeta de la base. Muestra los botones ofrecidos y cada toque: no sacar conclusiones sin ellos.
+- Bases locales: `leda` (`main`), `leda_flujo` (rama congelada, hasta `0029`) y `leda_motor` (creada el
+  2026-10-05; el `.env` de la carpeta del Motor apunta a ella; respaldo
+  `db/respaldos/leda_motor-antes-primer-contacto-20261005.dump`). Los roles `leda_*` los comparten todas las
+  bases.
+- **Bots del Motor:** dos nuevos, del equipo y de administración, creados por el usuario; sus tokens, en el `.env`
+  de la carpeta del Motor (el agente no lo lee). La carpeta tiene su propio `.venv`, con las versiones de `main`.
+- **Restricción de horario apagada en `leda_flujo`** desde el 2026-10-02; el horario de CoreWork vuelve con
+  `tools/restriccion_horario.py prender corework`.
+- PostgreSQL local (scoop) se levanta con `levantar-postgres.bat`. Si se cae con `0xC0000142`, un proceso
+  huérfano retiene la memoria compartida: cerrar los `postgres` y volver a levantarlo (pasó tres veces).
+- El listener lo corre el usuario en su terminal; las tareas en segundo plano del agente se cortan por tiempo. El
+  del Motor es `python -m prueba_chica.escuchar corework`, con el `.venv` de la carpeta; el reloj de Leda, `python
+  -m prueba_chica.reloj corework adelantar|estado|volver`; el registro de turnos, `python -m prueba_chica.leer
+  corework`. Para los flujos viejos, `tools/leer_conversacion.py` (`PYTHONPATH=src`).
 
 ## Riesgos prioritarios
 
@@ -167,11 +167,12 @@ cifras miden el código: **una suite en verde no es evidencia de que la conversa
 2. **Un límite de transporte decide validez de negocio:** `telegram_utf16_units` (`salida.py`) acepta o rechaza
    datos en `ingreso_tareas.py`.
 3. **No hay grafo de transiciones de estado:** `actualizar_estado` acepta cualquier destino del enumerado.
-4. **`pending_reply` no es operativo:** el seguimiento no puede afirmar silencio. Se construye con el
-   seguimiento (ADR 0017, decisión 6).
+4. **`pending_reply` no es operativo en `main`:** el seguimiento no puede afirmar silencio. La prueba chica lo
+   escribe; en `src/leda` se construye con el seguimiento (ADR 0017, decisión 6).
 5. **`confirmar_borrador_tarea` fija el espacio con el valor que recibe:** acotada a `leda_gateway`, pero es el
    patrón que la frontera rechaza.
-6. **La conversación no tiene un modelo:** lo resuelve el diseño del ADR 0018, a probar en la Etapa 2.
+6. **La conversación no tiene un modelo en `main`:** el diseño del ADR 0018 pasó las rondas automáticas; falta
+   Telegram real.
 7. **Lo no subido vive en un solo disco** ("Decisiones pendientes del usuario").
 8. **Ningún equipo real usó Leda:** todas las pruebas fueron con datos ficticios y un evaluador que conoce el
    guion.
@@ -191,8 +192,8 @@ Del código de `main`; las de conversación se evalúan en el motor de conversac
 - **Aviso por cambio de fecha** de dependencias sin disparador (la fecha comprometida es inmutable; su cambio va
   a la plataforma, ADR 0017, decisión 4).
 - **Reintento del despachador:** puede reordenar partes de una respuesta partida.
-- **`b-0005-b`:** Jev da 0,76/0,53 a "el plc", bajo `jev.CORTE_CLARA = 0,85`; se resuelve con la medición de Jev
-  (ADR 0018, decisión 7).
 - **ADR 0007:** dos puntos abiertos (respuesta sin opciones; opciones en el grupo de gestión).
 - **Configuración:** el resumen "Estado del equipo" va a un grupo de Telegram que no existe (R4b-H7).
 - **Tope de contacto por espacio y no por persona** (`docs/capacidades.md`, "Trampas conocidas").
+
+`b-0005-b` (Jev con "el plc") quedó cerrada el 2026-10-06 por la medición de Jev (ADR 0018, decisión 7).

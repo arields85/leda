@@ -130,8 +130,8 @@ es propuesta.
 
 Pendientes heredados: verificar si `llamar_con_plazo` cubre todas las llamadas antes de traerlo (dos
 exploraciones no coinciden); `llm._limpiar_esquema` no limpia dentro de `items` (Gemini); la prueba
-intermitente del indicador de escritura; adaptar `tools/medir_modelos.py`; `tools/restriccion_horario.py` tiene
-que admitir `leda_motor`; `python -m leda modelo` ya existe (`docs/product/plataforma-pendientes.md`).
+intermitente del indicador de escritura; adaptar `tools/medir_modelos.py`; `python -m leda modelo` ya existe
+(`docs/product/plataforma-pendientes.md`).
 
 ## Evidencia
 
@@ -160,5 +160,5 @@ que admitir `leda_motor`; `python -m leda modelo` ya existe (`docs/product/plata
 
 ## Próximo paso
 
-El plan de la Etapa 2, [`prueba-chica-del-motor.md`](prueba-chica-del-motor.md), con su sección 10 decidida
-(2026-10-05); sigue su tarea E2-1.
+La Etapa 2, [`prueba-chica-del-motor.md`](prueba-chica-del-motor.md): construida y medida (E2-1 a E2-8; la
+ronda 3, 85 de 85 con GPT-6 sol); sigue su tarea E2-9, la prueba por Telegram real.
