@@ -154,10 +154,10 @@ def test_la_aplicacion_no_puede_leer_la_tabla_ni_emitir_para_otro_espacio(
 def cliente_web(conn, monkeypatch):
     from fastapi.testclient import TestClient
 
-    from leda import gateway
+    from leda import entrada
 
-    monkeypatch.setattr(gateway, "_conn", lambda: conn)
-    return TestClient(gateway.app)
+    monkeypatch.setattr(entrada, "_conn", lambda: conn)
+    return TestClient(entrada.app)
 
 
 def _cargar_trabajo(conn, mundo, slug, titulo):
