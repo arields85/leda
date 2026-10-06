@@ -189,3 +189,84 @@ Después, leer la conversación con `python -m prueba_chica.leer corework` y la 
 - **`tools/restriccion_horario.py` admite `leda_motor`** (E2-6), pero en esta prueba la
   restricción va prendida y los días pasan con el reloj de Leda (decisión 10.2).
 - **La bienvenida de `/start`** es el texto fijo de siempre (`leda.onboarding.bienvenida`).
+
+## Prueba por Telegram real (E2-9)
+
+`leda_motor` recreada el 2026-10-06 (respaldo previo en
+`db/respaldos/leda_motor-antes-e2-9-20261006.dump`), con la semilla ficticia: las 12 tareas
+vencen el **viernes 16/10**. Marcos tiene "Programar PLC de la comprimidora" (asignada) y
+"Revisar comunicaciones industriales de la comprimidora" (en curso, depende del PLC); Ariel,
+"Dashboard de lotes en CoreLabs" (en curso) e "Integrar datos de la comprimidora en CoreLabs"
+(asignada). Ismael no tiene tareas: es el referente de los dos y a quien se escala.
+
+**Antes de empezar:**
+
+- Terminal 1: `.venv\Scripts\python.exe -m prueba_chica.escuchar corework` (queda corriendo).
+- Ariel, Ismael y Marcos: `/start` al bot nuevo del equipo; Ariel, un "hola" al bot nuevo de
+  administración.
+- Terminal 2, para el reloj: `.venv\Scripts\python.exe -m prueba_chica.reloj corework
+  adelantar` lleva a Leda al día hábil siguiente, 10:00 (saltea fines de semana y el feriado
+  del lunes 12). Después de cada salto, esperar un minuto: el ciclo corre por minuto real.
+
+**Qué mirar:** que Leda no se pierda ni se trabe (5b.2) y que se sienta natural (5b.3). Cuando
+Leda le escribe a alguien por su cuenta, junta sus dos tareas en un mensaje pero pregunta por
+una sola; la otra queda para después. Las respuestas de abajo sirven pregunte por cuál
+pregunte.
+
+### Guía (un solo hilo)
+
+1. **Reloj:** adelantar → miércoles 07/10, 10:00.
+2. **Marcos** escribe: "qué tengo pendiente?"
+   → Leda le lista sus dos tareas, con su estado y que vencen el viernes 16. No inventa nada.
+3. **Ariel** escribe: "arranqué con la integración de la comprimidora"
+   → "Integrar datos de la comprimidora en CoreLabs" pasa a en curso. Leda lo dice nombrando la
+   tarea, sin pedir confirmación ni preguntar de más.
+4. **Reloj:** adelantar tres veces → jueves 08, viernes 09 y martes 13 (el lunes es feriado).
+   → El martes 13, Marcos y Ariel reciben el aviso previo: un mensaje cada uno, con el saludo
+   del día, que dice que sus tareas vencen el viernes y que no hace falta contestar. Nadie
+   contesta.
+5. **Reloj:** adelantar tres veces → miércoles 14, jueves 15 y viernes 16 (el vencimiento).
+   → El viernes, Marcos y Ariel reciben el primer pedido de estado, con una pregunta.
+6. **Marcos** escribe: "con el PLC estoy trabado, me falta el cable de programación. comunicaciones la termino el 23"
+   → Leda toma las dos cosas: un bloqueo en la del PLC, con esa causa, y una previsión para
+   el viernes 23 en la de comunicaciones (la fecha comprometida no cambia). Dice qué anotó,
+   que Ismael se va a enterar de la fecha nueva, y hace una sola pregunta: quién lo puede
+   destrabar.
+7. **Marcos**, sin contestar eso, escribe: "qué más tengo?"
+   → Leda le contesta o le ofrece dejarlo para después, pero no pierde la pregunta abierta ni
+   la da por contestada.
+8. **Marcos** escribe: "el cable lo trae Juan de compras"
+   → Queda anotado quién lo destraba (alguien de afuera del equipo). Leda lo dice. Ariel no
+   contesta nada en todo este día.
+9. **Reloj:** adelantar → lunes 19.
+   → Ismael recibe el aviso de la previsión de Marcos: comunicaciones para el 23, con el
+   motivo. Ariel recibe el segundo pedido de estado. Marcos no recibe nada del PLC (está
+   trabado).
+10. **Marcos** escribe: "llegó el cable"
+    → El bloqueo se cierra y el PLC vuelve a como estaba (asignada). Leda lo dice; no lo da
+    por empezado.
+11. **Reloj:** adelantar → martes 20.
+    → Marcos recibe un pedido de estado del PLC. Ariel recibe el tercero, que dice que si no
+    contesta se le avisa a Ismael.
+12. **Marcos** escribe: "arranqué recién"
+    → El PLC pasa a en curso. Leda lo dice y no lo vuelve a perseguir por eso.
+13. **Marcos** escribe: "la de comunicaciones me la podés pasar a Nahuel?"
+    → Leda no la reasigna: dice que eso lo decide Ismael y ofrece anotar una fecha nueva.
+14. **Reloj:** adelantar → miércoles 21.
+    → Ismael recibe, en privado, el escalamiento por Ariel: no contestó sobre sus tareas.
+    Factual y respetuoso, sin culpar a nadie.
+15. **Ariel** escribe: "perdón, estuve a full. la integración la termino el viernes 23"
+    → Una previsión para el 23 en "Integrar datos…". Leda lo dice sin retarlo y avisa que
+    Ismael se va a enterar.
+16. **Reloj:** adelantar → jueves 22.
+    → Ismael recibe el aviso de la previsión de Ariel.
+17. **Al terminar:** `.venv\Scripts\python.exe -m prueba_chica.reloj corework volver` y cortar
+    el escuchador con Ctrl+C.
+
+**Ruido esperado:** Martín, Lucas, Nahuel y Mariano tienen tareas pero no Telegram; sus avisos
+no les llegan, y el miércoles 21 Ismael puede recibir escalamientos por ellos y Ariel avisos
+de incidente por el bot de administración. No es parte del juicio, salvo que Leda diga algo
+falso (por ejemplo, que no contestaron a un mensaje que nunca les llegó): eso sí se anota.
+
+Después, el agente lee la conversación con `python -m prueba_chica.leer corework` y la base;
+el usuario cuenta cómo se sintió.
