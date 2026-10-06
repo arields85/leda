@@ -2,7 +2,8 @@
 
 **Rama:** `feat/motor-de-conversacion` · **Carpeta:** `D:\Proyectos\Leda-PM-worktrees\motor-de-conversacion`
 **Abierta:** 2026-10-06 · **Copia en Engram:** tema `odd/motor-definitivo/tasks` (proyecto `prisma-pm`)
-**Estado:** borrador. Las decisiones marcadas `PENDIENTE` las toma el usuario, una por vez.
+**Estado:** aceptado por el usuario (2026-10-06). Las decisiones que siguen marcadas `PENDIENTE` las
+toma el usuario, una por vez, al llegar a ellas.
 
 Plan propio de la Etapa 3 (`odd/tasks/motor-de-conversacion.md`, "Etapas y criterios de paso"). Las
 decisiones duraderas están en los ADR [0017](../../docs/decisions/0017-por-chat-los-hechos-por-la-web-la-estructura.md)
@@ -70,6 +71,13 @@ aprobada. Con M3, `main` recibe la rama.
 
 Ruta y disparadores de delegación por tarea, como pide el método; cada una cierra con su commit y su
 revisión por tramos.
+
+- **Rutas:** E3-1 a E3-4 y E3-6, delegadas a un escritor, porque tocan muchos archivos no triviales. E3-5,
+  E3-7 y E3-8, según su tamaño al llegar.
+- **Entrega:** `main` no recibe nada hasta M3 (usuario, 2026-10-06). Las porciones son los commits de
+  cada tarea, revisados por tramos desde el último revisado.
+- **Previsión:** la Fase A borra mucho más de lo que escribe. La Fase B ronda las 4.000 líneas, por
+  referencia a la prueba chica sin su andamiaje.
 
 **Fase A. Limpieza, sin cambiar el comportamiento de las garantías.**
 
