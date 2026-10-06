@@ -1,31 +1,37 @@
 """Propiedad central de ADR 0005 (decisión 1): ninguna de las 8 herramientas
 que escriben cambia la base sin un Confirmar.
 
-Para cada una: invocarla sin confirmar, a través del agente, dice deja la
-base intacta y una sola acción pendiente con vista previa humana (con la
-huella del estado leído); confirmarla la aplica una sola vez; y si el estado
-cambió entre la vista previa y la confirmación -- acá, simulado con una
-huella que no coincide, el mismo control que usa `gateway._toque` -- no se
-aplica nada.
+Para cada una: invocarla sin confirmar, por `herramientas.ejecutar`, deja la
+base intacta y pide confirmación con una vista previa humana (con la huella
+del estado leído), que queda como una sola acción pendiente; confirmarla la
+aplica una sola vez; y si el estado cambió entre la vista previa y la
+confirmación -- acá, simulado con una huella que no coincide, el mismo
+control que corre `ejecutar` al confirmar de verdad -- no se aplica nada.
+
+Movida desde `tests/test_vista_previa_confirmacion.py` (E3-1): antes la
+invocación pasaba por el agente de los flujos A y B (`agente.responder`), que
+sólo hacía de puente entre la llamada del modelo y `ejecutar`. La garantía
+vive en `ejecutar` y en `pendientes`; la acción pendiente se registra con
+`pendientes.registrar`, con la vigencia y las opciones de siempre.
 """
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 import pytest
 
 from leda import herramientas as H
 from leda import pendientes as P
-from leda.agente import responder
 from leda.autoridad import Canal, identificar
-from leda.calendario import Calendario
 from leda.db import admin, espacio
-from leda.llm import Llamada, ProveedorGuionado, Respuesta
+from leda.salida import ETIQUETA_CANCELAR, ETIQUETA_CONFIRMAR, ETIQUETA_MODIFICAR
 
 BA = ZoneInfo("America/Argentina/Buenos_Aires")
 AHORA = datetime(2026, 7, 27, 10, 0, tzinfo=BA)
+# La vigencia de una acción pendiente (`agente.VIGENCIA_PENDIENTE`).
+VIGENCIA_PENDIENTE = timedelta(hours=8)
 
 
 def _quien(cur, nombre, ws):
@@ -84,17 +90,24 @@ def _dependencia_previa(cur, ws, origen, destino):
 
 def _propiedad(cur, ws, quien, herramienta, args, aplicado, *, chat_id=9100):
     """Ejercita la propiedad central para una herramienta que escribe."""
-    cal = Calendario.desde_base(cur, ws)
     assert aplicado(cur) is False
 
-    guion = [Respuesta(llamadas=[Llamada("c1", herramienta, dict(args))]),
-             Respuesta(texto="listo")]
-    r = responder(cur, quien, "hacé esto", ProveedorGuionado(guion), cal,
-                  chat_id=chat_id, ahora=AHORA)
+    with pytest.raises(H.NecesitaConfirmacion) as pedido:
+        H.ejecutar(cur, quien, herramienta, dict(args), chat_id=chat_id)
+    confirmacion = pedido.value
 
-    assert r.confirmaciones == [herramienta]
-    assert r.acciones == []
+    assert confirmacion.herramienta == herramienta
     assert aplicado(cur) is False, "no se aplicó nada sin confirmar"
+
+    # Las herramientas que escriben (las que llegan con huella) suman Modificar a
+    # Confirmar y Cancelar, como al pedir la confirmación en una conversación.
+    opciones = ([(ETIQUETA_CONFIRMAR, True), (ETIQUETA_MODIFICAR, "modificar"),
+                 (ETIQUETA_CANCELAR, False)]
+                if confirmacion.huella is not None else None)
+    P.registrar(cur, quien, herramienta=confirmacion.herramienta,
+                args=confirmacion.argumentos, resumen=confirmacion.resumen,
+                vence_en=AHORA + VIGENCIA_PENDIENTE, chat_id=chat_id,
+                huella=confirmacion.huella, opciones=opciones)
 
     cur.execute(
         """select count(*) n from pending_action
@@ -128,7 +141,7 @@ def _propiedad(cur, ws, quien, herramienta, args, aplicado, *, chat_id=9100):
     assert aplicado(cur) is True, "confirmar aplica el cambio"
 
     # El mismo botón, apretado de nuevo, no vuelve a ejecutar (el token ya se
-    # usó: lo prueba a fondo tests/test_pendientes.py y tests/test_botones.py;
+    # usó: lo prueba a fondo tests/garantias/test_pendientes.py y tests/test_botones.py;
     # acá sólo se confirma que el efecto de negocio sigue aplicado una sola
     # vez).
     otra = P.resolver(cur, confirmar.token, app_user_id=quien.app_user_id,
