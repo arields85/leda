@@ -1,0 +1,1181 @@
+> **INVÁLIDA como medición (2026-10-06):** OpenRouter se quedó sin crédito y rechazó llamadas con HTTP 402 Payment Required desde el arranque de la ronda (21:22 del 2026-10-05): 75 de las 85 corridas tienen llamadas rechazadas (31 enteras), 505 llamadas en total. Se guarda como evidencia del corte; el gasto que figura acá estaba inflado (la libreta, corregida).
+
+# Ronda ronda2-sol61
+
+- **Fecha:** 2026-10-05 21:25
+- **Commit:** a60cc7c
+- **IA:** openrouter/openai/gpt-6.1-sol
+- **Veces:** 5
+- **Jev:** no
+- **Gasto de la etapa:** USD 19.99 de 30
+- **Transcripciones:** [ronda2-invalida-sol61-transcripciones.md](ronda2-invalida-sol61-transcripciones.md)
+
+## Resultado por conversación
+
+G: garantías (5b, se comprueban solas). C: comprensión automática, **provisional** (jugadas y efectos; la lectura del usuario es la que vale, 10.3). M: lo que hace el código con las jugadas esperadas.
+
+| Conversación | Vez 1 | Vez 2 | Vez 3 | Vez 4 | Vez 5 | Garantías | Comprensión (provisional) | Lectura del usuario |
+|---|---|---|---|---|---|---|---|---|
+| 01 Arranqué (garantias) | G ok · C FALLA · M FALLA | G ok · C FALLA · M FALLA | G ok · C FALLA · M FALLA | G ok · C FALLA · M FALLA | G ok · C FALLA · M FALLA | 5/5 | 0/5 |  |
+| 02 Llego el 27, el proveedor se demoró (garantias) | G ok · C FALLA · M FALLA | G ok · C FALLA · M FALLA | G ok · C FALLA · M FALLA | G ok · C FALLA · M FALLA | G ok · C FALLA · M FALLA | 5/5 | 0/5 |  |
+| 03 Estoy trabado, falta el repuesto (garantias) | G ok · C FALLA · M FALLA | G ok · C FALLA · M FALLA | G ok · C FALLA · M FALLA | G FALLA · C FALLA · M FALLA | G ok · C ok · M ok | 4/5 | 1/5 |  |
+| 04 No contesta (garantias) | G ok · C ok · M ok | G ok · C ok · M ok | G ok · C ok · M ok | G ok · C ok · M ok | G ok · C ok · M ok | 5/5 | 5/5 |  |
+| 05 Varias cosas en un mensaje (garantias) | G ok · C FALLA · M FALLA | G ok · C FALLA · M FALLA | G ok · C FALLA · M FALLA | G ok · C FALLA · M FALLA | G ok · C FALLA · M FALLA | 5/5 | 0/5 |  |
+| 06 No, era la otra tarea (garantias) | G ok · C FALLA · M FALLA | G ok · C FALLA · M FALLA | G ok · C FALLA · M FALLA | G ok · C FALLA · M FALLA | G ok · C FALLA · M FALLA | 5/5 | 0/5 |  |
+| 07 Dejá, no importa (garantias) | G ok · C ok · M ok | G ok · C ok · M ok | G ok · C ok · M ok | G ok · C ok · M FALLA | G ok · C FALLA · M FALLA | 5/5 | 4/5 |  |
+| 08 Cambio de tema (garantias) | G ok · C FALLA · M FALLA | G ok · C FALLA · M FALLA | G ok · C FALLA · M FALLA | G ok · C FALLA · M FALLA | G ok · C FALLA · M FALLA | 5/5 | 0/5 |  |
+| 09 Duda: ¿de qué tarea habla? (garantias) | G ok · C FALLA · M FALLA | G ok · C FALLA · M FALLA | G ok · C FALLA · M FALLA | G ok · C FALLA · M FALLA | G ok · C FALLA · M FALLA | 5/5 | 0/5 |  |
+| 10 Escribir en lugar de tocar un botón (garantias) | G ok · C FALLA · M FALLA | G ok · C FALLA · M FALLA | G ok · C FALLA · M FALLA | G ok · C FALLA · M FALLA | G ok · C FALLA · M FALLA | 5/5 | 0/5 |  |
+| 11 Algo vencido (garantias) | G ok · C FALLA · M FALLA | G ok · C FALLA · M FALLA | G FALLA · C FALLA · M FALLA | G ok · C FALLA · M FALLA | G FALLA · C FALLA · M FALLA | 3/5 | 0/5 |  |
+| 12 Algo que no está en la lista (garantias) | G ok · C FALLA · M FALLA | G ok · C FALLA · M FALLA | G ok · C FALLA · M FALLA | G ok · C FALLA · M FALLA | G ok · C FALLA · M FALLA | 5/5 | 0/5 |  |
+| 13 Jev: dos tareas parecidas avisadas juntas (jev) | G ok · C FALLA · M FALLA | G ok · C FALLA · M FALLA | G ok · C FALLA · M FALLA | G ok · C ok · M ok | G ok · C FALLA · M FALLA | 5/5 | 1/5 |  |
+| 14 Jev: dos tareas parecidas, y el estado dice cuál (jev) | G ok · C FALLA · M FALLA | G ok · C FALLA · M FALLA | G ok · C FALLA · M FALLA | G ok · C FALLA · M FALLA | G ok · C FALLA · M FALLA | 5/5 | 0/5 |  |
+| 15 Voy bien, la tengo casi lista (garantias) | G ok · C FALLA · M FALLA | G ok · C FALLA · M FALLA | G ok · C FALLA · M FALLA | G ok · C FALLA · M FALLA | G ok · C FALLA · M FALLA | 5/5 | 0/5 |  |
+| 16 Arranqué hoy, con la tarea vencida (garantias) | G ok · C ok · M FALLA | G ok · C FALLA · M FALLA | G ok · C FALLA · M FALLA | G ok · C FALLA · M FALLA | G ok · C FALLA · M FALLA | 5/5 | 1/5 |  |
+| 17 Llegó el switch, sigo (garantias) | G ok · C FALLA · M FALLA | G ok · C FALLA · M FALLA | G ok · C FALLA · M FALLA | G ok · C FALLA · M FALLA | G ok · C FALLA · M FALLA | 5/5 | 0/5 |  |
+
+## Fallas
+
+- **01, vez 1, paso 2** [comprension] jugadas: esperado `[{"nombre": "anotar_inicio", "tarea": "PLC"}]`; real `[]`
+- **01, vez 1, paso 2** [comprension] falta un efecto: estado: esperado `{"PLC": "en_curso"}`; real `{}`
+- **01, vez 1, paso 2** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **01, vez 1, paso 2** [comprension] hechos: esperado `[{"jugada": "anotar_inicio", "resultado": "anotado", "tarea": "PLC", "estado": "en_curso"}]`; real `[]`
+- **01, vez 1, paso 4** [motor] no salió lo esperado: esperado `{"a": "Marcos", "tipo": "pedido_de_estado", "tarea": "PLC", "hechos": {"numero": 1, "necesita_respuesta": true, "vence": "2026-10-23", "atraso_dias_habiles": 0, "estado": "en_curso"}}`; real `[]`
+- **01, vez 1, paso 4** [motor] pregunta abierta después: esperado `{"tipo": "estado_de_la_tarea", "tarea": "PLC"}`; real `null`
+- **01, vez 2, paso 1** [motor] no salió lo esperado: esperado `{"a": "Marcos", "tipo": "aviso_previo", "tarea": "PLC", "hechos": {"vence": "2026-10-23", "necesita_respuesta": false, "dias_habiles_hasta_el_vencimiento": 3}}`; real `[]`
+- **01, vez 2, paso 1** [motor] último aviso de Marcos: esperado `"PLC"`; real `null`
+- **01, vez 2, paso 2** [comprension] jugadas: esperado `[{"nombre": "anotar_inicio", "tarea": "PLC"}]`; real `[]`
+- **01, vez 2, paso 2** [comprension] falta un efecto: estado: esperado `{"PLC": "en_curso"}`; real `{}`
+- **01, vez 2, paso 2** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **01, vez 2, paso 2** [comprension] hechos: esperado `[{"jugada": "anotar_inicio", "resultado": "anotado", "tarea": "PLC", "estado": "en_curso"}]`; real `[]`
+- **01, vez 2, paso 3** [motor] salió algo de más: esperado `null`; real `{"a": "Marcos", "tipo": "aviso_previo", "tareas": ["PLC"], "el": "2026-10-22", "hechos": {"aviso": "vencimiento_proximo", "tarea": "PLC", "vence": "2026-10-23", "necesita_respuesta": false, "dias_habiles_hasta_el_vencimiento": 1}}`
+- **01, vez 2, paso 4** [motor] no salió lo esperado: esperado `{"a": "Marcos", "tipo": "pedido_de_estado", "tarea": "PLC", "hechos": {"numero": 1, "necesita_respuesta": true, "vence": "2026-10-23", "atraso_dias_habiles": 0, "estado": "en_curso"}}`; real `[{"a": "Marcos", "tipo": "pedido_de_estado", "tareas": ["PLC"], "el": "2026-10-23", "hechos": {"aviso": "pedido_de_estado", "tarea": "PLC", "vence": "2026-10-23", "estado": "asignada", "numero": 1, "necesita_respuesta": true, "atraso_dias_habiles": 0}}]`
+- **01, vez 2, paso 4** [motor] salió algo de más: esperado `null`; real `{"a": "Marcos", "tipo": "pedido_de_estado", "tareas": ["PLC"], "el": "2026-10-23", "hechos": {"aviso": "pedido_de_estado", "tarea": "PLC", "vence": "2026-10-23", "estado": "asignada", "numero": 1, "necesita_respuesta": true, "atraso_dias_habiles": 0}}`
+- **01, vez 3, paso 1** [motor] no salió lo esperado: esperado `{"a": "Marcos", "tipo": "aviso_previo", "tarea": "PLC", "hechos": {"vence": "2026-10-23", "necesita_respuesta": false, "dias_habiles_hasta_el_vencimiento": 3}}`; real `[]`
+- **01, vez 3, paso 1** [motor] último aviso de Marcos: esperado `"PLC"`; real `null`
+- **01, vez 3, paso 2** [comprension] jugadas: esperado `[{"nombre": "anotar_inicio", "tarea": "PLC"}]`; real `[]`
+- **01, vez 3, paso 2** [comprension] falta un efecto: estado: esperado `{"PLC": "en_curso"}`; real `{}`
+- **01, vez 3, paso 2** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **01, vez 3, paso 2** [comprension] hechos: esperado `[{"jugada": "anotar_inicio", "resultado": "anotado", "tarea": "PLC", "estado": "en_curso"}]`; real `[]`
+- **01, vez 3, paso 3** [motor] salió algo de más: esperado `null`; real `{"a": "Marcos", "tipo": "aviso_previo", "tareas": ["PLC"], "el": "2026-10-21", "hechos": {"aviso": "vencimiento_proximo", "tarea": "PLC", "vence": "2026-10-23", "necesita_respuesta": false, "dias_habiles_hasta_el_vencimiento": 2}}`
+- **01, vez 3, paso 4** [motor] no salió lo esperado: esperado `{"a": "Marcos", "tipo": "pedido_de_estado", "tarea": "PLC", "hechos": {"numero": 1, "necesita_respuesta": true, "vence": "2026-10-23", "atraso_dias_habiles": 0, "estado": "en_curso"}}`; real `[{"a": "Marcos", "tipo": "pedido_de_estado", "tareas": ["PLC"], "el": "2026-10-23", "hechos": {"aviso": "pedido_de_estado", "tarea": "PLC", "vence": "2026-10-23", "estado": "asignada", "numero": 1, "necesita_respuesta": true, "atraso_dias_habiles": 0}}]`
+- **01, vez 3, paso 4** [motor] salió algo de más: esperado `null`; real `{"a": "Marcos", "tipo": "pedido_de_estado", "tareas": ["PLC"], "el": "2026-10-23", "hechos": {"aviso": "pedido_de_estado", "tarea": "PLC", "vence": "2026-10-23", "estado": "asignada", "numero": 1, "necesita_respuesta": true, "atraso_dias_habiles": 0}}`
+- **01, vez 4, paso 1** [motor] no salió lo esperado: esperado `{"a": "Marcos", "tipo": "aviso_previo", "tarea": "PLC", "hechos": {"vence": "2026-10-23", "necesita_respuesta": false, "dias_habiles_hasta_el_vencimiento": 3}}`; real `[]`
+- **01, vez 4, paso 1** [motor] último aviso de Marcos: esperado `"PLC"`; real `null`
+- **01, vez 4, paso 2** [comprension] jugadas: esperado `[{"nombre": "anotar_inicio", "tarea": "PLC"}]`; real `[]`
+- **01, vez 4, paso 2** [comprension] falta un efecto: estado: esperado `{"PLC": "en_curso"}`; real `{}`
+- **01, vez 4, paso 2** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **01, vez 4, paso 2** [comprension] hechos: esperado `[{"jugada": "anotar_inicio", "resultado": "anotado", "tarea": "PLC", "estado": "en_curso"}]`; real `[]`
+- **01, vez 4, paso 3** [motor] incidente: esperado `[]`; real `[{"etapa": "motor_aviso_guardado", "severidad": "media"}]`
+- **01, vez 4, paso 4** [motor] no salió lo esperado: esperado `{"a": "Marcos", "tipo": "pedido_de_estado", "tarea": "PLC", "hechos": {"numero": 1, "necesita_respuesta": true, "vence": "2026-10-23", "atraso_dias_habiles": 0, "estado": "en_curso"}}`; real `[{"a": "Marcos", "tipo": "pedido_de_estado", "tareas": ["PLC"], "el": "2026-10-23", "hechos": {"aviso": "pedido_de_estado", "tarea": "PLC", "vence": "2026-10-23", "estado": "asignada", "numero": 1, "necesita_respuesta": true, "atraso_dias_habiles": 0}}]`
+- **01, vez 4, paso 4** [motor] salió algo de más: esperado `null`; real `{"a": "Marcos", "tipo": "pedido_de_estado", "tareas": ["PLC"], "el": "2026-10-23", "hechos": {"aviso": "pedido_de_estado", "tarea": "PLC", "vence": "2026-10-23", "estado": "asignada", "numero": 1, "necesita_respuesta": true, "atraso_dias_habiles": 0}}`
+- **01, vez 5, paso 1** [motor] no salió lo esperado: esperado `{"a": "Marcos", "tipo": "aviso_previo", "tarea": "PLC", "hechos": {"vence": "2026-10-23", "necesita_respuesta": false, "dias_habiles_hasta_el_vencimiento": 3}}`; real `[]`
+- **01, vez 5, paso 1** [motor] último aviso de Marcos: esperado `"PLC"`; real `null`
+- **01, vez 5, paso 2** [comprension] jugadas: esperado `[{"nombre": "anotar_inicio", "tarea": "PLC"}]`; real `[]`
+- **01, vez 5, paso 2** [comprension] falta un efecto: estado: esperado `{"PLC": "en_curso"}`; real `{}`
+- **01, vez 5, paso 2** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **01, vez 5, paso 2** [comprension] hechos: esperado `[{"jugada": "anotar_inicio", "resultado": "anotado", "tarea": "PLC", "estado": "en_curso"}]`; real `[]`
+- **01, vez 5, paso 3** [motor] incidente: esperado `[]`; real `[{"etapa": "motor_aviso_guardado", "severidad": "media"}]`
+- **01, vez 5, paso 4** [motor] no salió lo esperado: esperado `{"a": "Marcos", "tipo": "pedido_de_estado", "tarea": "PLC", "hechos": {"numero": 1, "necesita_respuesta": true, "vence": "2026-10-23", "atraso_dias_habiles": 0, "estado": "en_curso"}}`; real `[]`
+- **01, vez 5, paso 4** [motor] pregunta abierta después: esperado `{"tipo": "estado_de_la_tarea", "tarea": "PLC"}`; real `null`
+- **02, vez 1, paso 2** [comprension] jugadas: esperado `[{"nombre": "anotar_prevision", "tarea": "PLC", "fecha": "2026-10-27", "motivo": "el proveedor se demoró"}]`; real `[]`
+- **02, vez 1, paso 2** [comprension] falta un efecto: previsión: esperado `[{"tarea": "PLC", "fecha": "2026-10-27", "motivo": "presente"}]`; real `[]`
+- **02, vez 1, paso 2** [comprension] falta un efecto: aviso guardado: esperado `[{"tipo": "nueva_prevision", "tarea": "PLC", "a": "Ismael", "estado": "guardado", "hechos": {"prevision": "2026-10-27", "fecha_comprometida": "2026-10-23", "atraso_si_se_cumple_la_prevision_dias_habiles": 2, "dependientes": ["COM"], "motivo": "presente"}}]`; real `[]`
+- **02, vez 1, paso 2** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **02, vez 1, paso 2** [comprension] hechos: esperado `[{"jugada": "anotar_prevision", "resultado": "anotado", "tarea": "PLC", "prevision": "2026-10-27", "fecha_comprometida": "2026-10-23", "atraso_si_se_cumple_la_prevision_dias_habiles": 2, "aviso_al_referente": {"a": "Ismael Soschinski", "estado": "guardado_sin_enviar"}}]`; real `[]`
+- **02, vez 1, paso 3** [motor] no salió lo esperado: esperado `{"a": "Ismael", "tipo": "nueva_prevision", "tarea": "PLC", "hechos": {"prevision": "2026-10-27", "fecha_comprometida": "2026-10-23", "atraso_si_se_cumple_la_prevision_dias_habiles": 2, "dependientes": ["COM"], "motivo": "presente"}}`; real `[]`
+- **02, vez 1, paso 4** [motor] no salió lo esperado: esperado `{"a": "Marcos", "tipo": "vencimiento_con_prevision", "tarea": "PLC", "hechos": {"necesita_respuesta": false, "vence": "2026-10-23", "prevision_vigente": {"fecha": "2026-10-27", "atraso_si_se_cumple_la_prevision_dias_habiles": 2, "aviso_al_referente": {"a": "Ismael Soschinski", "estado": "enviado"}}, "pide_el_estado_el": {"fecha": "2026-10-27", "estado": "todavia_no"}}}`; real `[{"a": "Marcos", "tipo": "pedido_de_estado", "tareas": ["PLC"], "el": "2026-10-23", "hechos": {"aviso": "pedido_de_estado", "tarea": "PLC", "vence": "2026-10-23", "estado": "en_curso", "numero": 1, "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "necesita_respuesta": true, "atraso_dias_habiles": 0}}]`
+- **02, vez 1, paso 4** [motor] salió algo de más: esperado `null`; real `{"a": "Marcos", "tipo": "pedido_de_estado", "tareas": ["PLC"], "el": "2026-10-23", "hechos": {"aviso": "pedido_de_estado", "tarea": "PLC", "vence": "2026-10-23", "estado": "en_curso", "numero": 1, "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "necesita_respuesta": true, "atraso_dias_habiles": 0}}`
+- **02, vez 1, paso 4** [motor] pregunta abierta después: esperado `null`; real `{"tipo": "estado_de_la_tarea", "tarea": "PLC"}`
+- **02, vez 1, paso 4** [motor] esperas abiertas después: esperado `[]`; real `["PLC"]`
+- **02, vez 1, paso 5** [motor] salió algo de más: esperado `null`; real `{"a": "Marcos", "tipo": "pedido_de_estado", "tareas": ["PLC"], "el": "2026-10-26", "hechos": {"aviso": "pedido_de_estado", "tarea": "PLC", "vence": "2026-10-23", "estado": "en_curso", "numero": 2, "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "necesita_respuesta": true, "atraso_dias_habiles": 1}}`
+- **02, vez 1, paso 6** [motor] no salió lo esperado: esperado `{"a": "Marcos", "tipo": "pedido_de_estado", "tarea": "PLC", "hechos": {"numero": 1, "necesita_respuesta": true, "seguimiento_por": "prevision", "vence": "2026-10-23", "atraso_dias_habiles": 2, "prevision_vigente": {"fecha": "2026-10-27"}}}`; real `[{"a": "Marcos", "tipo": ["aviso_previo", "pedido_de_estado"], "tareas": ["COM", "PLC"], "el": "2026-10-27", "hechos": [{"aviso": "vencimiento_proximo", "tarea": "COM", "vence": "2026-10-30", "necesita_respuesta": false, "dias_habiles_hasta_el_vencimiento": 3}, {"aviso": "pedido_de_estado", "tarea": "PLC", "vence": "2026-10-23", "estado": "en_curso", "numero": 3, "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "necesita_respuesta": true, "atraso_dias_habiles": 2, "si_no_hay_respuesta": {"estado": "todavia_no", "se_avisa_a": ["Ismael Soschinski"]}}]}]`
+- **02, vez 1, paso 6** [motor] salió algo de más: esperado `null`; real `{"a": "Marcos", "tipo": ["aviso_previo", "pedido_de_estado"], "tareas": ["COM", "PLC"], "el": "2026-10-27", "hechos": [{"aviso": "vencimiento_proximo", "tarea": "COM", "vence": "2026-10-30", "necesita_respuesta": false, "dias_habiles_hasta_el_vencimiento": 3}, {"aviso": "pedido_de_estado", "tarea": "PLC", "vence": "2026-10-23", "estado": "en_curso", "numero": 3, "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "necesita_respuesta": true, "atraso_dias_habiles": 2, "si_no_hay_respuesta": {"estado": "todavia_no", "se_avisa_a": ["Ismael Soschinski"]}}]}`
+- **02, vez 1, paso 7** [motor] no salió lo esperado: esperado `{"a": "Marcos", "el": "2026-10-28", "tipo": "pedido_de_estado", "tarea": "PLC", "hechos": {"numero": 2, "seguimiento_por": "prevision"}}`; real `[]`
+- **02, vez 1, paso 7** [motor] no salió lo esperado: esperado `{"a": "Marcos", "el": "2026-10-29", "tipo": "pedido_de_estado", "tarea": "PLC", "hechos": {"numero": 3, "seguimiento_por": "prevision", "si_no_hay_respuesta": {"se_avisa_a": ["Ismael Soschinski"], "estado": "todavia_no"}}}`; real `[]`
+- **02, vez 1, paso 7** [motor] no salió lo esperado: esperado `{"a": "Ismael", "el": "2026-10-30", "tipo": "escalamiento", "tarea": "PLC", "hechos": {"aviso": "falta_de_respuesta", "seguimiento_por": "prevision", "vence": "2026-10-23", "atraso_dias_habiles": 5, "pedido_desde": "2026-10-27", "prevision_vigente": {"fecha": "2026-10-27"}}}`; real `[{"a": "Ismael", "tipo": "escalamiento", "tareas": ["PLC"], "el": "2026-10-28", "hechos": {"aviso": "falta_de_respuesta", "tarea": "PLC", "vence": "2026-10-23", "estado": "en_curso", "responsable": "Marcos Tarquini", "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "pedido_desde": "2026-10-23", "necesita_respuesta": false, "atraso_dias_habiles": 3, "pedidos_de_estado_sin_respuesta": 3}}]`
+- **02, vez 1, paso 7** [motor] salió algo de más: esperado `null`; real `{"a": "Ismael", "tipo": "escalamiento", "tareas": ["PLC"], "el": "2026-10-28", "hechos": {"aviso": "falta_de_respuesta", "tarea": "PLC", "vence": "2026-10-23", "estado": "en_curso", "responsable": "Marcos Tarquini", "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "pedido_desde": "2026-10-23", "necesita_respuesta": false, "atraso_dias_habiles": 3, "pedidos_de_estado_sin_respuesta": 3}}`
+- **02, vez 2, paso 1** [motor] no salió lo esperado: esperado `{"a": "Marcos", "tipo": "aviso_previo", "tarea": "PLC", "hechos": {"vence": "2026-10-23", "necesita_respuesta": false}}`; real `[]`
+- **02, vez 2, paso 1** [motor] último aviso de Marcos: esperado `"PLC"`; real `null`
+- **02, vez 2, paso 2** [comprension] jugadas: esperado `[{"nombre": "anotar_prevision", "tarea": "PLC", "fecha": "2026-10-27", "motivo": "el proveedor se demoró"}]`; real `[]`
+- **02, vez 2, paso 2** [comprension] falta un efecto: previsión: esperado `[{"tarea": "PLC", "fecha": "2026-10-27", "motivo": "presente"}]`; real `[]`
+- **02, vez 2, paso 2** [comprension] falta un efecto: aviso guardado: esperado `[{"tipo": "nueva_prevision", "tarea": "PLC", "a": "Ismael", "estado": "guardado", "hechos": {"prevision": "2026-10-27", "fecha_comprometida": "2026-10-23", "atraso_si_se_cumple_la_prevision_dias_habiles": 2, "dependientes": ["COM"], "motivo": "presente"}}]`; real `[]`
+- **02, vez 2, paso 2** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **02, vez 2, paso 2** [comprension] hechos: esperado `[{"jugada": "anotar_prevision", "resultado": "anotado", "tarea": "PLC", "prevision": "2026-10-27", "fecha_comprometida": "2026-10-23", "atraso_si_se_cumple_la_prevision_dias_habiles": 2, "aviso_al_referente": {"a": "Ismael Soschinski", "estado": "guardado_sin_enviar"}}]`; real `[]`
+- **02, vez 2, paso 3** [motor] no salió lo esperado: esperado `{"a": "Ismael", "tipo": "nueva_prevision", "tarea": "PLC", "hechos": {"prevision": "2026-10-27", "fecha_comprometida": "2026-10-23", "atraso_si_se_cumple_la_prevision_dias_habiles": 2, "dependientes": ["COM"], "motivo": "presente"}}`; real `[]`
+- **02, vez 2, paso 4** [motor] no salió lo esperado: esperado `{"a": "Marcos", "tipo": "vencimiento_con_prevision", "tarea": "PLC", "hechos": {"necesita_respuesta": false, "vence": "2026-10-23", "prevision_vigente": {"fecha": "2026-10-27", "atraso_si_se_cumple_la_prevision_dias_habiles": 2, "aviso_al_referente": {"a": "Ismael Soschinski", "estado": "enviado"}}, "pide_el_estado_el": {"fecha": "2026-10-27", "estado": "todavia_no"}}}`; real `[]`
+- **02, vez 2, paso 4** [motor] esperas abiertas después: esperado `[]`; real `["PLC"]`
+- **02, vez 2, paso 6** [motor] no salió lo esperado: esperado `{"a": "Marcos", "tipo": "pedido_de_estado", "tarea": "PLC", "hechos": {"numero": 1, "necesita_respuesta": true, "seguimiento_por": "prevision", "vence": "2026-10-23", "atraso_dias_habiles": 2, "prevision_vigente": {"fecha": "2026-10-27"}}}`; real `[{"a": "Marcos", "tipo": ["aviso_previo", "pedido_de_estado"], "tareas": ["COM", "PLC"], "el": "2026-10-27", "hechos": [{"aviso": "vencimiento_proximo", "tarea": "COM", "vence": "2026-10-30", "necesita_respuesta": false, "dias_habiles_hasta_el_vencimiento": 3}, {"aviso": "pedido_de_estado", "tarea": "PLC", "vence": "2026-10-23", "estado": "en_curso", "numero": 1, "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "necesita_respuesta": true, "atraso_dias_habiles": 2}]}]`
+- **02, vez 2, paso 6** [motor] salió algo de más: esperado `null`; real `{"a": "Marcos", "tipo": ["aviso_previo", "pedido_de_estado"], "tareas": ["COM", "PLC"], "el": "2026-10-27", "hechos": [{"aviso": "vencimiento_proximo", "tarea": "COM", "vence": "2026-10-30", "necesita_respuesta": false, "dias_habiles_hasta_el_vencimiento": 3}, {"aviso": "pedido_de_estado", "tarea": "PLC", "vence": "2026-10-23", "estado": "en_curso", "numero": 1, "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "necesita_respuesta": true, "atraso_dias_habiles": 2}]}`
+- **02, vez 2, paso 7** [motor] no salió lo esperado: esperado `{"a": "Marcos", "el": "2026-10-28", "tipo": "pedido_de_estado", "tarea": "PLC", "hechos": {"numero": 2, "seguimiento_por": "prevision"}}`; real `[{"a": "Marcos", "tipo": "pedido_de_estado", "tareas": ["PLC"], "el": "2026-10-28", "hechos": {"aviso": "pedido_de_estado", "tarea": "PLC", "vence": "2026-10-23", "estado": "en_curso", "numero": 2, "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "necesita_respuesta": true, "atraso_dias_habiles": 3}}, {"a": "Marcos", "tipo": "pedido_de_estado", "tareas": ["PLC"], "el": "2026-10-29", "hechos": {"aviso": "pedido_de_estado", "tarea": "PLC", "vence": "2026-10-23", "estado": "en_curso", "numero": 3, "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "necesita_respuesta": true, "atraso_dias_habiles": 4, "si_no_hay_respuesta": {"estado": "todavia_no", "se_avisa_a": ["Ismael Soschinski"]}}}]`
+- **02, vez 2, paso 7** [motor] no salió lo esperado: esperado `{"a": "Marcos", "el": "2026-10-29", "tipo": "pedido_de_estado", "tarea": "PLC", "hechos": {"numero": 3, "seguimiento_por": "prevision", "si_no_hay_respuesta": {"se_avisa_a": ["Ismael Soschinski"], "estado": "todavia_no"}}}`; real `[{"a": "Marcos", "tipo": "pedido_de_estado", "tareas": ["PLC"], "el": "2026-10-28", "hechos": {"aviso": "pedido_de_estado", "tarea": "PLC", "vence": "2026-10-23", "estado": "en_curso", "numero": 2, "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "necesita_respuesta": true, "atraso_dias_habiles": 3}}, {"a": "Marcos", "tipo": "pedido_de_estado", "tareas": ["PLC"], "el": "2026-10-29", "hechos": {"aviso": "pedido_de_estado", "tarea": "PLC", "vence": "2026-10-23", "estado": "en_curso", "numero": 3, "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "necesita_respuesta": true, "atraso_dias_habiles": 4, "si_no_hay_respuesta": {"estado": "todavia_no", "se_avisa_a": ["Ismael Soschinski"]}}}]`
+- **02, vez 2, paso 7** [motor] no salió lo esperado: esperado `{"a": "Ismael", "el": "2026-10-30", "tipo": "escalamiento", "tarea": "PLC", "hechos": {"aviso": "falta_de_respuesta", "seguimiento_por": "prevision", "vence": "2026-10-23", "atraso_dias_habiles": 5, "pedido_desde": "2026-10-27", "prevision_vigente": {"fecha": "2026-10-27"}}}`; real `[]`
+- **02, vez 2, paso 7** [motor] salió algo de más: esperado `null`; real `{"a": "Marcos", "tipo": "pedido_de_estado", "tareas": ["PLC"], "el": "2026-10-28", "hechos": {"aviso": "pedido_de_estado", "tarea": "PLC", "vence": "2026-10-23", "estado": "en_curso", "numero": 2, "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "necesita_respuesta": true, "atraso_dias_habiles": 3}}`
+- **02, vez 2, paso 7** [motor] salió algo de más: esperado `null`; real `{"a": "Marcos", "tipo": "pedido_de_estado", "tareas": ["PLC"], "el": "2026-10-29", "hechos": {"aviso": "pedido_de_estado", "tarea": "PLC", "vence": "2026-10-23", "estado": "en_curso", "numero": 3, "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "necesita_respuesta": true, "atraso_dias_habiles": 4, "si_no_hay_respuesta": {"estado": "todavia_no", "se_avisa_a": ["Ismael Soschinski"]}}}`
+- **02, vez 3, paso 2** [comprension] jugadas: esperado `[{"nombre": "anotar_prevision", "tarea": "PLC", "fecha": "2026-10-27", "motivo": "el proveedor se demoró"}]`; real `[]`
+- **02, vez 3, paso 2** [comprension] falta un efecto: previsión: esperado `[{"tarea": "PLC", "fecha": "2026-10-27", "motivo": "presente"}]`; real `[]`
+- **02, vez 3, paso 2** [comprension] falta un efecto: aviso guardado: esperado `[{"tipo": "nueva_prevision", "tarea": "PLC", "a": "Ismael", "estado": "guardado", "hechos": {"prevision": "2026-10-27", "fecha_comprometida": "2026-10-23", "atraso_si_se_cumple_la_prevision_dias_habiles": 2, "dependientes": ["COM"], "motivo": "presente"}}]`; real `[]`
+- **02, vez 3, paso 2** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **02, vez 3, paso 2** [comprension] hechos: esperado `[{"jugada": "anotar_prevision", "resultado": "anotado", "tarea": "PLC", "prevision": "2026-10-27", "fecha_comprometida": "2026-10-23", "atraso_si_se_cumple_la_prevision_dias_habiles": 2, "aviso_al_referente": {"a": "Ismael Soschinski", "estado": "guardado_sin_enviar"}}]`; real `[]`
+- **02, vez 3, paso 3** [motor] no salió lo esperado: esperado `{"a": "Ismael", "tipo": "nueva_prevision", "tarea": "PLC", "hechos": {"prevision": "2026-10-27", "fecha_comprometida": "2026-10-23", "atraso_si_se_cumple_la_prevision_dias_habiles": 2, "dependientes": ["COM"], "motivo": "presente"}}`; real `[]`
+- **02, vez 3, paso 4** [motor] no salió lo esperado: esperado `{"a": "Marcos", "tipo": "vencimiento_con_prevision", "tarea": "PLC", "hechos": {"necesita_respuesta": false, "vence": "2026-10-23", "prevision_vigente": {"fecha": "2026-10-27", "atraso_si_se_cumple_la_prevision_dias_habiles": 2, "aviso_al_referente": {"a": "Ismael Soschinski", "estado": "enviado"}}, "pide_el_estado_el": {"fecha": "2026-10-27", "estado": "todavia_no"}}}`; real `[{"a": "Marcos", "tipo": "pedido_de_estado", "tareas": ["PLC"], "el": "2026-10-23", "hechos": {"aviso": "pedido_de_estado", "tarea": "PLC", "vence": "2026-10-23", "estado": "en_curso", "numero": 1, "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "necesita_respuesta": true, "atraso_dias_habiles": 0}}]`
+- **02, vez 3, paso 4** [motor] salió algo de más: esperado `null`; real `{"a": "Marcos", "tipo": "pedido_de_estado", "tareas": ["PLC"], "el": "2026-10-23", "hechos": {"aviso": "pedido_de_estado", "tarea": "PLC", "vence": "2026-10-23", "estado": "en_curso", "numero": 1, "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "necesita_respuesta": true, "atraso_dias_habiles": 0}}`
+- **02, vez 3, paso 4** [motor] pregunta abierta después: esperado `null`; real `{"tipo": "estado_de_la_tarea", "tarea": "PLC"}`
+- **02, vez 3, paso 4** [motor] esperas abiertas después: esperado `[]`; real `["PLC"]`
+- **02, vez 3, paso 5** [motor] salió algo de más: esperado `null`; real `{"a": "Marcos", "tipo": "pedido_de_estado", "tareas": ["PLC"], "el": "2026-10-26", "hechos": {"aviso": "pedido_de_estado", "tarea": "PLC", "vence": "2026-10-23", "estado": "en_curso", "numero": 2, "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "necesita_respuesta": true, "atraso_dias_habiles": 1}}`
+- **02, vez 3, paso 6** [motor] no salió lo esperado: esperado `{"a": "Marcos", "tipo": "pedido_de_estado", "tarea": "PLC", "hechos": {"numero": 1, "necesita_respuesta": true, "seguimiento_por": "prevision", "vence": "2026-10-23", "atraso_dias_habiles": 2, "prevision_vigente": {"fecha": "2026-10-27"}}}`; real `[{"a": "Marcos", "tipo": ["aviso_previo", "pedido_de_estado"], "tareas": ["COM", "PLC"], "el": "2026-10-27", "hechos": [{"aviso": "vencimiento_proximo", "tarea": "COM", "vence": "2026-10-30", "necesita_respuesta": false, "dias_habiles_hasta_el_vencimiento": 3}, {"aviso": "pedido_de_estado", "tarea": "PLC", "vence": "2026-10-23", "estado": "en_curso", "numero": 3, "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "necesita_respuesta": true, "atraso_dias_habiles": 2, "si_no_hay_respuesta": {"estado": "todavia_no", "se_avisa_a": ["Ismael Soschinski"]}}]}]`
+- **02, vez 3, paso 6** [motor] salió algo de más: esperado `null`; real `{"a": "Marcos", "tipo": ["aviso_previo", "pedido_de_estado"], "tareas": ["COM", "PLC"], "el": "2026-10-27", "hechos": [{"aviso": "vencimiento_proximo", "tarea": "COM", "vence": "2026-10-30", "necesita_respuesta": false, "dias_habiles_hasta_el_vencimiento": 3}, {"aviso": "pedido_de_estado", "tarea": "PLC", "vence": "2026-10-23", "estado": "en_curso", "numero": 3, "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "necesita_respuesta": true, "atraso_dias_habiles": 2, "si_no_hay_respuesta": {"estado": "todavia_no", "se_avisa_a": ["Ismael Soschinski"]}}]}`
+- **02, vez 3, paso 7** [motor] no salió lo esperado: esperado `{"a": "Marcos", "el": "2026-10-28", "tipo": "pedido_de_estado", "tarea": "PLC", "hechos": {"numero": 2, "seguimiento_por": "prevision"}}`; real `[]`
+- **02, vez 3, paso 7** [motor] no salió lo esperado: esperado `{"a": "Marcos", "el": "2026-10-29", "tipo": "pedido_de_estado", "tarea": "PLC", "hechos": {"numero": 3, "seguimiento_por": "prevision", "si_no_hay_respuesta": {"se_avisa_a": ["Ismael Soschinski"], "estado": "todavia_no"}}}`; real `[]`
+- **02, vez 3, paso 7** [motor] no salió lo esperado: esperado `{"a": "Ismael", "el": "2026-10-30", "tipo": "escalamiento", "tarea": "PLC", "hechos": {"aviso": "falta_de_respuesta", "seguimiento_por": "prevision", "vence": "2026-10-23", "atraso_dias_habiles": 5, "pedido_desde": "2026-10-27", "prevision_vigente": {"fecha": "2026-10-27"}}}`; real `[{"a": "Ismael", "tipo": "escalamiento", "tareas": ["PLC"], "el": "2026-10-28", "hechos": {"aviso": "falta_de_respuesta", "tarea": "PLC", "vence": "2026-10-23", "estado": "en_curso", "responsable": "Marcos Tarquini", "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "pedido_desde": "2026-10-23", "necesita_respuesta": false, "atraso_dias_habiles": 3, "pedidos_de_estado_sin_respuesta": 3}}]`
+- **02, vez 3, paso 7** [motor] salió algo de más: esperado `null`; real `{"a": "Ismael", "tipo": "escalamiento", "tareas": ["PLC"], "el": "2026-10-28", "hechos": {"aviso": "falta_de_respuesta", "tarea": "PLC", "vence": "2026-10-23", "estado": "en_curso", "responsable": "Marcos Tarquini", "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "pedido_desde": "2026-10-23", "necesita_respuesta": false, "atraso_dias_habiles": 3, "pedidos_de_estado_sin_respuesta": 3}}`
+- **02, vez 4, paso 2** [comprension] jugadas: esperado `[{"nombre": "anotar_prevision", "tarea": "PLC", "fecha": "2026-10-27", "motivo": "el proveedor se demoró"}]`; real `[]`
+- **02, vez 4, paso 2** [comprension] falta un efecto: previsión: esperado `[{"tarea": "PLC", "fecha": "2026-10-27", "motivo": "presente"}]`; real `[]`
+- **02, vez 4, paso 2** [comprension] falta un efecto: aviso guardado: esperado `[{"tipo": "nueva_prevision", "tarea": "PLC", "a": "Ismael", "estado": "guardado", "hechos": {"prevision": "2026-10-27", "fecha_comprometida": "2026-10-23", "atraso_si_se_cumple_la_prevision_dias_habiles": 2, "dependientes": ["COM"], "motivo": "presente"}}]`; real `[]`
+- **02, vez 4, paso 2** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **02, vez 4, paso 2** [comprension] hechos: esperado `[{"jugada": "anotar_prevision", "resultado": "anotado", "tarea": "PLC", "prevision": "2026-10-27", "fecha_comprometida": "2026-10-23", "atraso_si_se_cumple_la_prevision_dias_habiles": 2, "aviso_al_referente": {"a": "Ismael Soschinski", "estado": "guardado_sin_enviar"}}]`; real `[]`
+- **02, vez 4, paso 3** [motor] no salió lo esperado: esperado `{"a": "Ismael", "tipo": "nueva_prevision", "tarea": "PLC", "hechos": {"prevision": "2026-10-27", "fecha_comprometida": "2026-10-23", "atraso_si_se_cumple_la_prevision_dias_habiles": 2, "dependientes": ["COM"], "motivo": "presente"}}`; real `[]`
+- **02, vez 4, paso 4** [motor] no salió lo esperado: esperado `{"a": "Marcos", "tipo": "vencimiento_con_prevision", "tarea": "PLC", "hechos": {"necesita_respuesta": false, "vence": "2026-10-23", "prevision_vigente": {"fecha": "2026-10-27", "atraso_si_se_cumple_la_prevision_dias_habiles": 2, "aviso_al_referente": {"a": "Ismael Soschinski", "estado": "enviado"}}, "pide_el_estado_el": {"fecha": "2026-10-27", "estado": "todavia_no"}}}`; real `[]`
+- **02, vez 4, paso 4** [motor] esperas abiertas después: esperado `[]`; real `["PLC"]`
+- **02, vez 4, paso 6** [motor] no salió lo esperado: esperado `{"a": "Marcos", "tipo": "pedido_de_estado", "tarea": "PLC", "hechos": {"numero": 1, "necesita_respuesta": true, "seguimiento_por": "prevision", "vence": "2026-10-23", "atraso_dias_habiles": 2, "prevision_vigente": {"fecha": "2026-10-27"}}}`; real `[]`
+- **02, vez 4, paso 6** [motor] incidente: esperado `[]`; real `[{"etapa": "motor_aviso_guardado", "severidad": "media"}]`
+- **02, vez 4, paso 6** [motor] pregunta abierta después: esperado `{"tipo": "estado_de_la_tarea", "tarea": "PLC"}`; real `null`
+- **02, vez 4, paso 7** [motor] no salió lo esperado: esperado `{"a": "Marcos", "el": "2026-10-28", "tipo": "pedido_de_estado", "tarea": "PLC", "hechos": {"numero": 2, "seguimiento_por": "prevision"}}`; real `[{"a": "Marcos", "tipo": "pedido_de_estado", "tareas": ["PLC"], "el": "2026-10-29", "hechos": {"aviso": "pedido_de_estado", "tarea": "PLC", "vence": "2026-10-23", "estado": "en_curso", "numero": 2, "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "necesita_respuesta": true, "atraso_dias_habiles": 4, "pedidos_anteriores_que_no_le_llegaron": 1}}, {"a": "Marcos", "tipo": "pedido_de_estado", "tareas": ["COM", "PLC"], "el": "2026-10-30", "hechos": [{"aviso": "pedido_de_estado", "tarea": "COM", "vence": "2026-10-30", "estado": "asignada", "numero": 1, "necesita_respuesta": true, "atraso_dias_habiles": 0}, {"aviso": "pedido_de_estado", "tarea": "PLC", "vence": "2026-10-23", "estado": "en_curso", "numero": 3, "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "necesita_respuesta": true, "atraso_dias_habiles": 5, "si_no_hay_respuesta": {"estado": "todavia_no", "se_avisa_a": ["Ismael Soschinski"]}, "pedidos_anteriores_que_no_le_llegaron": 1}]}]`
+- **02, vez 4, paso 7** [motor] no salió lo esperado: esperado `{"a": "Marcos", "el": "2026-10-29", "tipo": "pedido_de_estado", "tarea": "PLC", "hechos": {"numero": 3, "seguimiento_por": "prevision", "si_no_hay_respuesta": {"se_avisa_a": ["Ismael Soschinski"], "estado": "todavia_no"}}}`; real `[{"a": "Marcos", "tipo": "pedido_de_estado", "tareas": ["PLC"], "el": "2026-10-29", "hechos": {"aviso": "pedido_de_estado", "tarea": "PLC", "vence": "2026-10-23", "estado": "en_curso", "numero": 2, "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "necesita_respuesta": true, "atraso_dias_habiles": 4, "pedidos_anteriores_que_no_le_llegaron": 1}}, {"a": "Marcos", "tipo": "pedido_de_estado", "tareas": ["COM", "PLC"], "el": "2026-10-30", "hechos": [{"aviso": "pedido_de_estado", "tarea": "COM", "vence": "2026-10-30", "estado": "asignada", "numero": 1, "necesita_respuesta": true, "atraso_dias_habiles": 0}, {"aviso": "pedido_de_estado", "tarea": "PLC", "vence": "2026-10-23", "estado": "en_curso", "numero": 3, "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "necesita_respuesta": true, "atraso_dias_habiles": 5, "si_no_hay_respuesta": {"estado": "todavia_no", "se_avisa_a": ["Ismael Soschinski"]}, "pedidos_anteriores_que_no_le_llegaron": 1}]}]`
+- **02, vez 4, paso 7** [motor] no salió lo esperado: esperado `{"a": "Ismael", "el": "2026-10-30", "tipo": "escalamiento", "tarea": "PLC", "hechos": {"aviso": "falta_de_respuesta", "seguimiento_por": "prevision", "vence": "2026-10-23", "atraso_dias_habiles": 5, "pedido_desde": "2026-10-27", "prevision_vigente": {"fecha": "2026-10-27"}}}`; real `[]`
+- **02, vez 4, paso 7** [motor] salió algo de más: esperado `null`; real `{"a": "Marcos", "tipo": "pedido_de_estado", "tareas": ["PLC"], "el": "2026-10-29", "hechos": {"aviso": "pedido_de_estado", "tarea": "PLC", "vence": "2026-10-23", "estado": "en_curso", "numero": 2, "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "necesita_respuesta": true, "atraso_dias_habiles": 4, "pedidos_anteriores_que_no_le_llegaron": 1}}`
+- **02, vez 4, paso 7** [motor] salió algo de más: esperado `null`; real `{"a": "Marcos", "tipo": "pedido_de_estado", "tareas": ["COM", "PLC"], "el": "2026-10-30", "hechos": [{"aviso": "pedido_de_estado", "tarea": "COM", "vence": "2026-10-30", "estado": "asignada", "numero": 1, "necesita_respuesta": true, "atraso_dias_habiles": 0}, {"aviso": "pedido_de_estado", "tarea": "PLC", "vence": "2026-10-23", "estado": "en_curso", "numero": 3, "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "necesita_respuesta": true, "atraso_dias_habiles": 5, "si_no_hay_respuesta": {"estado": "todavia_no", "se_avisa_a": ["Ismael Soschinski"]}, "pedidos_anteriores_que_no_le_llegaron": 1}]}`
+- **02, vez 4, paso 7** [motor] incidente: esperado `[]`; real `[{"etapa": "motor_aviso_guardado", "severidad": "media"}]`
+- **02, vez 5, paso 1** [motor] no salió lo esperado: esperado `{"a": "Marcos", "tipo": "aviso_previo", "tarea": "PLC", "hechos": {"vence": "2026-10-23", "necesita_respuesta": false}}`; real `[]`
+- **02, vez 5, paso 1** [motor] último aviso de Marcos: esperado `"PLC"`; real `null`
+- **02, vez 5, paso 2** [comprension] jugadas: esperado `[{"nombre": "anotar_prevision", "tarea": "PLC", "fecha": "2026-10-27", "motivo": "el proveedor se demoró"}]`; real `[]`
+- **02, vez 5, paso 2** [comprension] falta un efecto: previsión: esperado `[{"tarea": "PLC", "fecha": "2026-10-27", "motivo": "presente"}]`; real `[]`
+- **02, vez 5, paso 2** [comprension] falta un efecto: aviso guardado: esperado `[{"tipo": "nueva_prevision", "tarea": "PLC", "a": "Ismael", "estado": "guardado", "hechos": {"prevision": "2026-10-27", "fecha_comprometida": "2026-10-23", "atraso_si_se_cumple_la_prevision_dias_habiles": 2, "dependientes": ["COM"], "motivo": "presente"}}]`; real `[]`
+- **02, vez 5, paso 2** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **02, vez 5, paso 2** [comprension] hechos: esperado `[{"jugada": "anotar_prevision", "resultado": "anotado", "tarea": "PLC", "prevision": "2026-10-27", "fecha_comprometida": "2026-10-23", "atraso_si_se_cumple_la_prevision_dias_habiles": 2, "aviso_al_referente": {"a": "Ismael Soschinski", "estado": "guardado_sin_enviar"}}]`; real `[]`
+- **02, vez 5, paso 3** [motor] no salió lo esperado: esperado `{"a": "Ismael", "tipo": "nueva_prevision", "tarea": "PLC", "hechos": {"prevision": "2026-10-27", "fecha_comprometida": "2026-10-23", "atraso_si_se_cumple_la_prevision_dias_habiles": 2, "dependientes": ["COM"], "motivo": "presente"}}`; real `[]`
+- **02, vez 5, paso 4** [motor] no salió lo esperado: esperado `{"a": "Marcos", "tipo": "vencimiento_con_prevision", "tarea": "PLC", "hechos": {"necesita_respuesta": false, "vence": "2026-10-23", "prevision_vigente": {"fecha": "2026-10-27", "atraso_si_se_cumple_la_prevision_dias_habiles": 2, "aviso_al_referente": {"a": "Ismael Soschinski", "estado": "enviado"}}, "pide_el_estado_el": {"fecha": "2026-10-27", "estado": "todavia_no"}}}`; real `[{"a": "Marcos", "tipo": "pedido_de_estado", "tareas": ["PLC"], "el": "2026-10-23", "hechos": {"aviso": "pedido_de_estado", "tarea": "PLC", "vence": "2026-10-23", "estado": "en_curso", "numero": 1, "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "necesita_respuesta": true, "atraso_dias_habiles": 0}}]`
+- **02, vez 5, paso 4** [motor] salió algo de más: esperado `null`; real `{"a": "Marcos", "tipo": "pedido_de_estado", "tareas": ["PLC"], "el": "2026-10-23", "hechos": {"aviso": "pedido_de_estado", "tarea": "PLC", "vence": "2026-10-23", "estado": "en_curso", "numero": 1, "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "necesita_respuesta": true, "atraso_dias_habiles": 0}}`
+- **02, vez 5, paso 4** [motor] pregunta abierta después: esperado `null`; real `{"tipo": "estado_de_la_tarea", "tarea": "PLC"}`
+- **02, vez 5, paso 4** [motor] esperas abiertas después: esperado `[]`; real `["PLC"]`
+- **02, vez 5, paso 5** [motor] salió algo de más: esperado `null`; real `{"a": "Marcos", "tipo": "pedido_de_estado", "tareas": ["PLC"], "el": "2026-10-26", "hechos": {"aviso": "pedido_de_estado", "tarea": "PLC", "vence": "2026-10-23", "estado": "en_curso", "numero": 2, "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "necesita_respuesta": true, "atraso_dias_habiles": 1}}`
+- **02, vez 5, paso 6** [motor] no salió lo esperado: esperado `{"a": "Marcos", "tipo": "pedido_de_estado", "tarea": "PLC", "hechos": {"numero": 1, "necesita_respuesta": true, "seguimiento_por": "prevision", "vence": "2026-10-23", "atraso_dias_habiles": 2, "prevision_vigente": {"fecha": "2026-10-27"}}}`; real `[{"a": "Marcos", "tipo": ["aviso_previo", "pedido_de_estado"], "tareas": ["COM", "PLC"], "el": "2026-10-27", "hechos": [{"aviso": "vencimiento_proximo", "tarea": "COM", "vence": "2026-10-30", "necesita_respuesta": false, "dias_habiles_hasta_el_vencimiento": 3}, {"aviso": "pedido_de_estado", "tarea": "PLC", "vence": "2026-10-23", "estado": "en_curso", "numero": 3, "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "necesita_respuesta": true, "atraso_dias_habiles": 2, "si_no_hay_respuesta": {"estado": "todavia_no", "se_avisa_a": ["Ismael Soschinski"]}}]}]`
+- **02, vez 5, paso 6** [motor] salió algo de más: esperado `null`; real `{"a": "Marcos", "tipo": ["aviso_previo", "pedido_de_estado"], "tareas": ["COM", "PLC"], "el": "2026-10-27", "hechos": [{"aviso": "vencimiento_proximo", "tarea": "COM", "vence": "2026-10-30", "necesita_respuesta": false, "dias_habiles_hasta_el_vencimiento": 3}, {"aviso": "pedido_de_estado", "tarea": "PLC", "vence": "2026-10-23", "estado": "en_curso", "numero": 3, "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "necesita_respuesta": true, "atraso_dias_habiles": 2, "si_no_hay_respuesta": {"estado": "todavia_no", "se_avisa_a": ["Ismael Soschinski"]}}]}`
+- **02, vez 5, paso 7** [motor] no salió lo esperado: esperado `{"a": "Marcos", "el": "2026-10-28", "tipo": "pedido_de_estado", "tarea": "PLC", "hechos": {"numero": 2, "seguimiento_por": "prevision"}}`; real `[]`
+- **02, vez 5, paso 7** [motor] no salió lo esperado: esperado `{"a": "Marcos", "el": "2026-10-29", "tipo": "pedido_de_estado", "tarea": "PLC", "hechos": {"numero": 3, "seguimiento_por": "prevision", "si_no_hay_respuesta": {"se_avisa_a": ["Ismael Soschinski"], "estado": "todavia_no"}}}`; real `[]`
+- **02, vez 5, paso 7** [motor] no salió lo esperado: esperado `{"a": "Ismael", "el": "2026-10-30", "tipo": "escalamiento", "tarea": "PLC", "hechos": {"aviso": "falta_de_respuesta", "seguimiento_por": "prevision", "vence": "2026-10-23", "atraso_dias_habiles": 5, "pedido_desde": "2026-10-27", "prevision_vigente": {"fecha": "2026-10-27"}}}`; real `[{"a": "Ismael", "tipo": "escalamiento", "tareas": ["PLC"], "el": "2026-10-28", "hechos": {"aviso": "falta_de_respuesta", "tarea": "PLC", "vence": "2026-10-23", "estado": "en_curso", "responsable": "Marcos Tarquini", "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "pedido_desde": "2026-10-23", "necesita_respuesta": false, "atraso_dias_habiles": 3, "pedidos_de_estado_sin_respuesta": 3}}]`
+- **02, vez 5, paso 7** [motor] salió algo de más: esperado `null`; real `{"a": "Ismael", "tipo": "escalamiento", "tareas": ["PLC"], "el": "2026-10-28", "hechos": {"aviso": "falta_de_respuesta", "tarea": "PLC", "vence": "2026-10-23", "estado": "en_curso", "responsable": "Marcos Tarquini", "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "pedido_desde": "2026-10-23", "necesita_respuesta": false, "atraso_dias_habiles": 3, "pedidos_de_estado_sin_respuesta": 3}}`
+- **03, vez 1, paso 1** [motor] no salió lo esperado: esperado `{"a": "Marcos", "tipo": "aviso_previo", "tarea": "PLC", "hechos": {"vence": "2026-10-23", "necesita_respuesta": false}}`; real `[]`
+- **03, vez 1, paso 1** [motor] último aviso de Marcos: esperado `"PLC"`; real `null`
+- **03, vez 1, paso 2** [comprension] jugadas: esperado `[{"nombre": "anotar_bloqueo", "tarea": "PLC", "causa": "falta el repuesto"}]`; real `[]`
+- **03, vez 1, paso 2** [comprension] falta un efecto: estado: esperado `{"PLC": "bloqueada"}`; real `{}`
+- **03, vez 1, paso 2** [comprension] falta un efecto: bloqueo: esperado `[{"tarea": "PLC", "causa": "presente"}]`; real `[]`
+- **03, vez 1, paso 2** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **03, vez 1, paso 2** [comprension] la pregunta de la respuesta: esperado `{"tipo": "quien_destraba", "tarea": "PLC"}`; real `null`
+- **03, vez 1, paso 2** [comprension] hechos: esperado `[{"jugada": "anotar_bloqueo", "resultado": "anotado", "tarea": "PLC", "causa": "presente", "pregunta": "quien_destraba"}]`; real `[]`
+- **03, vez 1, paso 2** [comprension] pregunta abierta después: esperado `{"tipo": "quien_destraba", "tarea": "PLC"}`; real `null`
+- **03, vez 1, paso 2** [comprension] esperas abiertas después: esperado `["PLC"]`; real `[]`
+- **03, vez 1, paso 3** [motor] salió algo de más: esperado `null`; real `{"a": "Marcos", "tipo": "aviso_previo", "tareas": ["PLC"], "el": "2026-10-20", "hechos": {"aviso": "vencimiento_proximo", "tarea": "PLC", "vence": "2026-10-23", "necesita_respuesta": false, "dias_habiles_hasta_el_vencimiento": 3}}`
+- **03, vez 1, paso 3** [motor] esperas abiertas después: esperado `["PLC"]`; real `[]`
+- **03, vez 1, paso 4** [motor] no salió lo esperado: esperado `{"a": "Marcos", "tipo": "repregunta", "tarea": "PLC", "hechos": {"pregunta": "quien_destraba", "necesita_respuesta": true, "sobre": {"jugada": "anotar_bloqueo", "causa": "presente"}}}`; real `[]`
+- **03, vez 1, paso 4** [motor] pregunta abierta después: esperado `{"tipo": "quien_destraba", "tarea": "PLC"}`; real `null`
+- **03, vez 1, paso 4** [motor] esperas abiertas después: esperado `["PLC"]`; real `[]`
+- **03, vez 1, paso 5** [comprension] jugadas: esperado `[{"nombre": "anotar_quien_destraba", "no_sabe": true, "puede_traer": ["tarea"]}]`; real `[]`
+- **03, vez 1, paso 5** [comprension] falta un efecto: quién destraba: esperado `[{"tarea": "PLC", "no_sabe": true}]`; real `[]`
+- **03, vez 1, paso 5** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **03, vez 1, paso 5** [comprension] la pregunta de la respuesta: esperado `{"tipo": "propuesta", "tarea": "PLC", "propone": ["que_alguien_ayude", "anotar_prevision"]}`; real `null`
+- **03, vez 1, paso 5** [comprension] hechos: esperado `[{"jugada": "anotar_quien_destraba", "resultado": "anotado", "quien_destraba": {"no_sabe": true}, "salidas": ["que_alguien_ayude", "anotar_prevision"], "pregunta": "propuesta"}]`; real `[]`
+- **03, vez 1, paso 5** [comprension] pregunta abierta después: esperado `{"tipo": "propuesta", "tarea": "PLC"}`; real `null`
+- **03, vez 1, paso 6** [comprension] jugadas: esperado `[{"nombre": "cancelar"}]`; real `[]`
+- **03, vez 1, paso 6** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **03, vez 1, paso 7** [motor] esperas abiertas después: esperado `[]`; real `["PLC"]`
+- **03, vez 2, paso 5** [comprension] jugadas: esperado `[{"nombre": "anotar_quien_destraba", "no_sabe": true, "puede_traer": ["tarea"]}]`; real `[]`
+- **03, vez 2, paso 5** [comprension] falta un efecto: quién destraba: esperado `[{"tarea": "PLC", "no_sabe": true}]`; real `[]`
+- **03, vez 2, paso 5** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **03, vez 2, paso 5** [comprension] la pregunta de la respuesta: esperado `{"tipo": "propuesta", "tarea": "PLC", "propone": ["que_alguien_ayude", "anotar_prevision"]}`; real `null`
+- **03, vez 2, paso 5** [comprension] hechos: esperado `[{"jugada": "anotar_quien_destraba", "resultado": "anotado", "quien_destraba": {"no_sabe": true}, "salidas": ["que_alguien_ayude", "anotar_prevision"], "pregunta": "propuesta"}]`; real `[]`
+- **03, vez 2, paso 5** [comprension] pregunta abierta después: esperado `{"tipo": "propuesta", "tarea": "PLC"}`; real `{"tipo": "quien_destraba", "tarea": "PLC"}`
+- **03, vez 2, paso 5** [comprension] esperas abiertas después: esperado `[]`; real `["PLC"]`
+- **03, vez 2, paso 6** [comprension] jugadas: esperado `[{"nombre": "cancelar"}]`; real `[]`
+- **03, vez 2, paso 6** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **03, vez 2, paso 6** [comprension] pregunta abierta después: esperado `null`; real `{"tipo": "quien_destraba", "tarea": "PLC"}`
+- **03, vez 2, paso 7** [motor] salió algo de más: esperado `null`; real `{"a": "Marcos", "tipo": "repregunta", "tareas": ["PLC"], "el": "2026-10-23", "hechos": {"aviso": "repregunta", "sobre": {"causa": "falta el repuesto", "jugada": "anotar_bloqueo"}, "tarea": "PLC", "estado": "bloqueada", "numero": 3, "pregunta": "quien_destraba", "necesita_respuesta": true, "si_no_hay_respuesta": {"estado": "todavia_no", "se_avisa_a": ["Ismael Soschinski"]}}}`
+- **03, vez 2, paso 7** [motor] salió algo de más: esperado `null`; real `{"a": "Ismael", "tipo": "escalamiento_de_una_pregunta", "tareas": ["PLC"], "el": "2026-10-26", "hechos": {"aviso": "falta_de_respuesta", "sobre": {"causa": "falta el repuesto", "jugada": "anotar_bloqueo"}, "tarea": "PLC", "estado": "bloqueada", "pregunta": "quien_destraba", "responsable": "Marcos Tarquini", "preguntado_el": "2026-10-20", "necesita_respuesta": false, "preguntas_sin_respuesta": 3}}`
+- **03, vez 2, paso 7** [motor] esperas abiertas después: esperado `[]`; real `["PLC"]`
+- **03, vez 3, paso 1** [motor] no salió lo esperado: esperado `{"a": "Marcos", "tipo": "aviso_previo", "tarea": "PLC", "hechos": {"vence": "2026-10-23", "necesita_respuesta": false}}`; real `[]`
+- **03, vez 3, paso 1** [motor] último aviso de Marcos: esperado `"PLC"`; real `null`
+- **03, vez 3, paso 2** [comprension] jugadas: esperado `[{"nombre": "anotar_bloqueo", "tarea": "PLC", "causa": "falta el repuesto"}]`; real `[]`
+- **03, vez 3, paso 2** [comprension] falta un efecto: estado: esperado `{"PLC": "bloqueada"}`; real `{}`
+- **03, vez 3, paso 2** [comprension] falta un efecto: bloqueo: esperado `[{"tarea": "PLC", "causa": "presente"}]`; real `[]`
+- **03, vez 3, paso 2** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **03, vez 3, paso 2** [comprension] la pregunta de la respuesta: esperado `{"tipo": "quien_destraba", "tarea": "PLC"}`; real `null`
+- **03, vez 3, paso 2** [comprension] hechos: esperado `[{"jugada": "anotar_bloqueo", "resultado": "anotado", "tarea": "PLC", "causa": "presente", "pregunta": "quien_destraba"}]`; real `[]`
+- **03, vez 3, paso 2** [comprension] pregunta abierta después: esperado `{"tipo": "quien_destraba", "tarea": "PLC"}`; real `null`
+- **03, vez 3, paso 2** [comprension] esperas abiertas después: esperado `["PLC"]`; real `[]`
+- **03, vez 3, paso 3** [motor] esperas abiertas después: esperado `["PLC"]`; real `[]`
+- **03, vez 3, paso 4** [motor] no salió lo esperado: esperado `{"a": "Marcos", "tipo": "repregunta", "tarea": "PLC", "hechos": {"pregunta": "quien_destraba", "necesita_respuesta": true, "sobre": {"jugada": "anotar_bloqueo", "causa": "presente"}}}`; real `[]`
+- **03, vez 3, paso 4** [motor] pregunta abierta después: esperado `{"tipo": "quien_destraba", "tarea": "PLC"}`; real `null`
+- **03, vez 3, paso 4** [motor] esperas abiertas después: esperado `["PLC"]`; real `[]`
+- **03, vez 3, paso 5** [comprension] jugadas: esperado `[{"nombre": "anotar_quien_destraba", "no_sabe": true, "puede_traer": ["tarea"]}]`; real `[]`
+- **03, vez 3, paso 5** [comprension] falta un efecto: quién destraba: esperado `[{"tarea": "PLC", "no_sabe": true}]`; real `[]`
+- **03, vez 3, paso 5** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **03, vez 3, paso 5** [comprension] la pregunta de la respuesta: esperado `{"tipo": "propuesta", "tarea": "PLC", "propone": ["que_alguien_ayude", "anotar_prevision"]}`; real `null`
+- **03, vez 3, paso 5** [comprension] hechos: esperado `[{"jugada": "anotar_quien_destraba", "resultado": "anotado", "quien_destraba": {"no_sabe": true}, "salidas": ["que_alguien_ayude", "anotar_prevision"], "pregunta": "propuesta"}]`; real `[]`
+- **03, vez 3, paso 5** [comprension] pregunta abierta después: esperado `{"tipo": "propuesta", "tarea": "PLC"}`; real `null`
+- **03, vez 3, paso 6** [comprension] jugadas: esperado `[{"nombre": "cancelar"}]`; real `[]`
+- **03, vez 3, paso 6** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **03, vez 3, paso 7** [motor] esperas abiertas después: esperado `[]`; real `["PLC"]`
+- **03, vez 4, paso 1** [motor] no salió lo esperado: esperado `{"a": "Marcos", "tipo": "aviso_previo", "tarea": "PLC", "hechos": {"vence": "2026-10-23", "necesita_respuesta": false}}`; real `[]`
+- **03, vez 4, paso 1** [motor] último aviso de Marcos: esperado `"PLC"`; real `null`
+- **03, vez 4, paso 2** [comprension] jugadas: esperado `[{"nombre": "anotar_bloqueo", "tarea": "PLC", "causa": "falta el repuesto"}]`; real `[]`
+- **03, vez 4, paso 2** [comprension] falta un efecto: estado: esperado `{"PLC": "bloqueada"}`; real `{}`
+- **03, vez 4, paso 2** [comprension] falta un efecto: bloqueo: esperado `[{"tarea": "PLC", "causa": "presente"}]`; real `[]`
+- **03, vez 4, paso 2** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **03, vez 4, paso 2** [comprension] la pregunta de la respuesta: esperado `{"tipo": "quien_destraba", "tarea": "PLC"}`; real `null`
+- **03, vez 4, paso 2** [comprension] hechos: esperado `[{"jugada": "anotar_bloqueo", "resultado": "anotado", "tarea": "PLC", "causa": "presente", "pregunta": "quien_destraba"}]`; real `[]`
+- **03, vez 4, paso 2** [comprension] pregunta abierta después: esperado `{"tipo": "quien_destraba", "tarea": "PLC"}`; real `null`
+- **03, vez 4, paso 2** [comprension] esperas abiertas después: esperado `["PLC"]`; real `[]`
+- **03, vez 4, paso 3** [motor] salió algo de más: esperado `null`; real `{"a": "Marcos", "tipo": "aviso_previo", "tareas": ["PLC"], "el": "2026-10-20", "hechos": {"aviso": "vencimiento_proximo", "tarea": "PLC", "vence": "2026-10-23", "necesita_respuesta": false, "dias_habiles_hasta_el_vencimiento": 3}}`
+- **03, vez 4, paso 3** [motor] esperas abiertas después: esperado `["PLC"]`; real `[]`
+- **03, vez 4, paso 4** [motor] no salió lo esperado: esperado `{"a": "Marcos", "tipo": "repregunta", "tarea": "PLC", "hechos": {"pregunta": "quien_destraba", "necesita_respuesta": true, "sobre": {"jugada": "anotar_bloqueo", "causa": "presente"}}}`; real `[]`
+- **03, vez 4, paso 4** [motor] pregunta abierta después: esperado `{"tipo": "quien_destraba", "tarea": "PLC"}`; real `null`
+- **03, vez 4, paso 4** [motor] esperas abiertas después: esperado `["PLC"]`; real `[]`
+- **03, vez 4, paso 5** [comprension] falta un efecto: quién destraba: esperado `[{"tarea": "PLC", "no_sabe": true}]`; real `[]`
+- **03, vez 4, paso 5** [comprension] la pregunta de la respuesta: esperado `{"tipo": "propuesta", "tarea": "PLC", "propone": ["que_alguien_ayude", "anotar_prevision"]}`; real `null`
+- **03, vez 4, paso 5** [comprension] hechos: esperado `[{"jugada": "anotar_quien_destraba", "resultado": "anotado", "quien_destraba": {"no_sabe": true}, "salidas": ["que_alguien_ayude", "anotar_prevision"], "pregunta": "propuesta"}]`; real `[{"jugada": "anotar_quien_destraba", "resultado": "no_se_puede", "motivo": "sin_bloqueo_abierto", "tarea": "PLC"}]`
+- **03, vez 4, paso 5** [comprension] pregunta abierta después: esperado `{"tipo": "propuesta", "tarea": "PLC"}`; real `null`
+- **03, vez 4, paso 6** [comprension] jugadas: esperado `[{"nombre": "cancelar"}]`; real `[{"nombre": "anotar_bloqueo", "tarea": "PLC", "causa": "hay que esperar que llegue nomas"}]`
+- **03, vez 4, paso 6** [garantia] efecto de más: estado: esperado `{}`; real `{"PLC": "bloqueada"}`
+- **03, vez 4, paso 6** [garantia] efecto de más: bloqueo: esperado `[]`; real `[{"tarea": "PLC", "causa": "hay que esperar que llegue nomas", "resuelto": false}]`
+- **03, vez 4, paso 6** [comprension] pregunta abierta después: esperado `null`; real `{"tipo": "quien_destraba", "tarea": "PLC"}`
+- **03, vez 4, paso 7** [motor] salió algo de más: esperado `null`; real `{"a": "Marcos", "tipo": "repregunta", "tareas": ["PLC"], "el": "2026-10-23", "hechos": {"aviso": "repregunta", "sobre": {"causa": "hay que esperar que llegue nomas", "jugada": "anotar_bloqueo"}, "tarea": "PLC", "estado": "bloqueada", "numero": 2, "pregunta": "quien_destraba", "necesita_respuesta": true}}`
+- **03, vez 4, paso 7** [motor] salió algo de más: esperado `null`; real `{"a": "Marcos", "tipo": "repregunta", "tareas": ["PLC"], "el": "2026-10-26", "hechos": {"aviso": "repregunta", "sobre": {"causa": "hay que esperar que llegue nomas", "jugada": "anotar_bloqueo"}, "tarea": "PLC", "estado": "bloqueada", "numero": 3, "pregunta": "quien_destraba", "necesita_respuesta": true, "si_no_hay_respuesta": {"estado": "todavia_no", "se_avisa_a": ["Ismael Soschinski"]}}}`
+- **03, vez 4, paso 7** [motor] esperas abiertas después: esperado `[]`; real `["PLC"]`
+- **05, vez 1, paso 2** [comprension] jugadas: esperado `[{"nombre": "anotar_inicio", "tarea": "PLC"}, {"nombre": "anotar_prevision", "tarea": "COM", "fecha": "2026-11-04", "motivo": "espera el switch nuevo"}]`; real `[]`
+- **05, vez 1, paso 2** [comprension] falta un efecto: estado: esperado `{"PLC": "en_curso"}`; real `{}`
+- **05, vez 1, paso 2** [comprension] falta un efecto: previsión: esperado `[{"tarea": "COM", "fecha": "2026-11-04", "motivo": "presente"}]`; real `[]`
+- **05, vez 1, paso 2** [comprension] falta un efecto: aviso guardado: esperado `[{"tipo": "nueva_prevision", "tarea": "COM", "a": "Ismael", "hechos": {"prevision": "2026-11-04", "fecha_comprometida": "2026-10-30", "atraso_si_se_cumple_la_prevision_dias_habiles": 3, "dependientes": [], "motivo": "presente"}}]`; real `[]`
+- **05, vez 1, paso 2** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **05, vez 1, paso 2** [comprension] hechos: esperado `[{"jugada": "anotar_inicio", "resultado": "anotado", "tarea": "PLC"}, {"jugada": "anotar_prevision", "resultado": "anotado", "tarea": "COM", "prevision": "2026-11-04", "fecha_comprometida": "2026-10-30", "atraso_si_se_cumple_la_prevision_dias_habiles": 3}]`; real `[]`
+- **05, vez 1, paso 3** [motor] no salió lo esperado: esperado `{"a": "Ismael", "tipo": "nueva_prevision", "tarea": "COM", "hechos": {"prevision": "2026-11-04", "fecha_comprometida": "2026-10-30", "atraso_si_se_cumple_la_prevision_dias_habiles": 3, "dependientes": [], "motivo": "presente"}}`; real `[]`
+- **05, vez 1, paso 4** [comprension] jugadas: esperado `[{"nombre": "anotar_bloqueo", "tarea": "PLC"}, {"nombre": "anotar_prevision", "tarea": "COM", "fecha": "2026-11-05", "puede_traer": ["motivo"]}]`; real `[]`
+- **05, vez 1, paso 4** [comprension] falta un efecto: previsión: esperado `[{"tarea": "COM", "fecha": "2026-11-05"}]`; real `[]`
+- **05, vez 1, paso 4** [comprension] falta un efecto: aviso guardado: esperado `[{"tipo": "nueva_prevision", "tarea": "COM", "a": "Ismael", "hechos": {"prevision": "2026-11-05", "fecha_comprometida": "2026-10-30", "atraso_si_se_cumple_la_prevision_dias_habiles": 4}}]`; real `[]`
+- **05, vez 1, paso 4** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **05, vez 1, paso 4** [comprension] la pregunta de la respuesta: esperado `{"tipo": "causa_del_bloqueo", "tarea": "PLC"}`; real `null`
+- **05, vez 1, paso 4** [comprension] hechos: esperado `[{"jugada": "anotar_bloqueo", "resultado": "falta_dato", "falta": ["causa"], "tarea": "PLC", "pregunta": "causa_del_bloqueo"}, {"jugada": "anotar_prevision", "resultado": "anotado", "tarea": "COM", "prevision": "2026-11-05", "atraso_si_se_cumple_la_prevision_dias_habiles": 4}]`; real `[]`
+- **05, vez 1, paso 4** [comprension] pregunta abierta después: esperado `{"tipo": "causa_del_bloqueo", "tarea": "PLC"}`; real `null`
+- **05, vez 1, paso 5** [comprension] jugadas: esperado `[{"nombre": "anotar_bloqueo", "tarea": "PLC", "causa": "falta que martin de IT me habilite el acceso a la red de planta"}, {"nombre": "anotar_quien_destraba", "quien": "martin", "puede_traer": ["tarea"]}]`; real `[{"nombre": "anotar_bloqueo", "tarea": "PLC", "causa": "falta que martin de IT me habilite el acceso a la red de planta"}]`
+- **05, vez 1, paso 5** [comprension] falta un efecto: quién destraba: esperado `[{"tarea": "PLC", "alguien": true, "no_sabe": false}]`; real `[]`
+- **05, vez 1, paso 5** [comprension] la pregunta de la respuesta: esperado `null`; real `{"tipo": "quien_destraba", "tarea": "PLC", "desde_antes": false}`
+- **05, vez 1, paso 5** [comprension] hechos: esperado `[{"jugada": "anotar_bloqueo", "resultado": "anotado", "tarea": "PLC"}, {"jugada": "anotar_quien_destraba", "resultado": "anotado", "salidas": "ausente"}]`; real `[{"jugada": "anotar_bloqueo", "resultado": "anotado", "tarea": "PLC", "causa": "falta que martin de IT me habilite el acceso a la red de planta", "pregunta": "quien_destraba"}]`
+- **05, vez 1, paso 5** [comprension] pregunta abierta después: esperado `null`; real `{"tipo": "quien_destraba", "tarea": "PLC"}`
+- **05, vez 2, paso 1** [motor] no salió lo esperado: esperado `{"a": "Marcos", "tipo": "aviso_previo", "tarea": "PLC", "hechos": {"vence": "2026-10-23", "necesita_respuesta": false}}`; real `[]`
+- **05, vez 2, paso 1** [motor] último aviso de Marcos: esperado `"PLC"`; real `null`
+- **05, vez 2, paso 2** [comprension] jugadas: esperado `[{"nombre": "anotar_inicio", "tarea": "PLC"}, {"nombre": "anotar_prevision", "tarea": "COM", "fecha": "2026-11-04", "motivo": "espera el switch nuevo"}]`; real `[]`
+- **05, vez 2, paso 2** [comprension] falta un efecto: estado: esperado `{"PLC": "en_curso"}`; real `{}`
+- **05, vez 2, paso 2** [comprension] falta un efecto: previsión: esperado `[{"tarea": "COM", "fecha": "2026-11-04", "motivo": "presente"}]`; real `[]`
+- **05, vez 2, paso 2** [comprension] falta un efecto: aviso guardado: esperado `[{"tipo": "nueva_prevision", "tarea": "COM", "a": "Ismael", "hechos": {"prevision": "2026-11-04", "fecha_comprometida": "2026-10-30", "atraso_si_se_cumple_la_prevision_dias_habiles": 3, "dependientes": [], "motivo": "presente"}}]`; real `[]`
+- **05, vez 2, paso 2** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **05, vez 2, paso 2** [comprension] hechos: esperado `[{"jugada": "anotar_inicio", "resultado": "anotado", "tarea": "PLC"}, {"jugada": "anotar_prevision", "resultado": "anotado", "tarea": "COM", "prevision": "2026-11-04", "fecha_comprometida": "2026-10-30", "atraso_si_se_cumple_la_prevision_dias_habiles": 3}]`; real `[]`
+- **05, vez 2, paso 3** [motor] no salió lo esperado: esperado `{"a": "Ismael", "tipo": "nueva_prevision", "tarea": "COM", "hechos": {"prevision": "2026-11-04", "fecha_comprometida": "2026-10-30", "atraso_si_se_cumple_la_prevision_dias_habiles": 3, "dependientes": [], "motivo": "presente"}}`; real `[]`
+- **05, vez 2, paso 4** [comprension] jugadas: esperado `[{"nombre": "anotar_bloqueo", "tarea": "PLC"}, {"nombre": "anotar_prevision", "tarea": "COM", "fecha": "2026-11-05", "puede_traer": ["motivo"]}]`; real `[]`
+- **05, vez 2, paso 4** [comprension] falta un efecto: previsión: esperado `[{"tarea": "COM", "fecha": "2026-11-05"}]`; real `[]`
+- **05, vez 2, paso 4** [comprension] falta un efecto: aviso guardado: esperado `[{"tipo": "nueva_prevision", "tarea": "COM", "a": "Ismael", "hechos": {"prevision": "2026-11-05", "fecha_comprometida": "2026-10-30", "atraso_si_se_cumple_la_prevision_dias_habiles": 4}}]`; real `[]`
+- **05, vez 2, paso 4** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **05, vez 2, paso 4** [comprension] la pregunta de la respuesta: esperado `{"tipo": "causa_del_bloqueo", "tarea": "PLC"}`; real `null`
+- **05, vez 2, paso 4** [comprension] hechos: esperado `[{"jugada": "anotar_bloqueo", "resultado": "falta_dato", "falta": ["causa"], "tarea": "PLC", "pregunta": "causa_del_bloqueo"}, {"jugada": "anotar_prevision", "resultado": "anotado", "tarea": "COM", "prevision": "2026-11-05", "atraso_si_se_cumple_la_prevision_dias_habiles": 4}]`; real `[]`
+- **05, vez 2, paso 4** [comprension] pregunta abierta después: esperado `{"tipo": "causa_del_bloqueo", "tarea": "PLC"}`; real `null`
+- **05, vez 2, paso 5** [comprension] jugadas: esperado `[{"nombre": "anotar_bloqueo", "tarea": "PLC", "causa": "falta que martin de IT me habilite el acceso a la red de planta"}, {"nombre": "anotar_quien_destraba", "quien": "martin", "puede_traer": ["tarea"]}]`; real `[]`
+- **05, vez 2, paso 5** [comprension] falta un efecto: estado: esperado `{"PLC": "bloqueada"}`; real `{}`
+- **05, vez 2, paso 5** [comprension] falta un efecto: bloqueo: esperado `[{"tarea": "PLC", "causa": "presente"}]`; real `[]`
+- **05, vez 2, paso 5** [comprension] falta un efecto: quién destraba: esperado `[{"tarea": "PLC", "alguien": true, "no_sabe": false}]`; real `[]`
+- **05, vez 2, paso 5** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **05, vez 2, paso 5** [comprension] hechos: esperado `[{"jugada": "anotar_bloqueo", "resultado": "anotado", "tarea": "PLC"}, {"jugada": "anotar_quien_destraba", "resultado": "anotado", "salidas": "ausente"}]`; real `[]`
+- **05, vez 3, paso 1** [motor] no salió lo esperado: esperado `{"a": "Marcos", "tipo": "aviso_previo", "tarea": "PLC", "hechos": {"vence": "2026-10-23", "necesita_respuesta": false}}`; real `[]`
+- **05, vez 3, paso 1** [motor] último aviso de Marcos: esperado `"PLC"`; real `null`
+- **05, vez 3, paso 2** [comprension] jugadas: esperado `[{"nombre": "anotar_inicio", "tarea": "PLC"}, {"nombre": "anotar_prevision", "tarea": "COM", "fecha": "2026-11-04", "motivo": "espera el switch nuevo"}]`; real `[]`
+- **05, vez 3, paso 2** [comprension] falta un efecto: estado: esperado `{"PLC": "en_curso"}`; real `{}`
+- **05, vez 3, paso 2** [comprension] falta un efecto: previsión: esperado `[{"tarea": "COM", "fecha": "2026-11-04", "motivo": "presente"}]`; real `[]`
+- **05, vez 3, paso 2** [comprension] falta un efecto: aviso guardado: esperado `[{"tipo": "nueva_prevision", "tarea": "COM", "a": "Ismael", "hechos": {"prevision": "2026-11-04", "fecha_comprometida": "2026-10-30", "atraso_si_se_cumple_la_prevision_dias_habiles": 3, "dependientes": [], "motivo": "presente"}}]`; real `[]`
+- **05, vez 3, paso 2** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **05, vez 3, paso 2** [comprension] hechos: esperado `[{"jugada": "anotar_inicio", "resultado": "anotado", "tarea": "PLC"}, {"jugada": "anotar_prevision", "resultado": "anotado", "tarea": "COM", "prevision": "2026-11-04", "fecha_comprometida": "2026-10-30", "atraso_si_se_cumple_la_prevision_dias_habiles": 3}]`; real `[]`
+- **05, vez 3, paso 3** [motor] no salió lo esperado: esperado `{"a": "Ismael", "tipo": "nueva_prevision", "tarea": "COM", "hechos": {"prevision": "2026-11-04", "fecha_comprometida": "2026-10-30", "atraso_si_se_cumple_la_prevision_dias_habiles": 3, "dependientes": [], "motivo": "presente"}}`; real `[]`
+- **05, vez 3, paso 4** [comprension] jugadas: esperado `[{"nombre": "anotar_bloqueo", "tarea": "PLC"}, {"nombre": "anotar_prevision", "tarea": "COM", "fecha": "2026-11-05", "puede_traer": ["motivo"]}]`; real `[]`
+- **05, vez 3, paso 4** [comprension] falta un efecto: previsión: esperado `[{"tarea": "COM", "fecha": "2026-11-05"}]`; real `[]`
+- **05, vez 3, paso 4** [comprension] falta un efecto: aviso guardado: esperado `[{"tipo": "nueva_prevision", "tarea": "COM", "a": "Ismael", "hechos": {"prevision": "2026-11-05", "fecha_comprometida": "2026-10-30", "atraso_si_se_cumple_la_prevision_dias_habiles": 4}}]`; real `[]`
+- **05, vez 3, paso 4** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **05, vez 3, paso 4** [comprension] la pregunta de la respuesta: esperado `{"tipo": "causa_del_bloqueo", "tarea": "PLC"}`; real `null`
+- **05, vez 3, paso 4** [comprension] hechos: esperado `[{"jugada": "anotar_bloqueo", "resultado": "falta_dato", "falta": ["causa"], "tarea": "PLC", "pregunta": "causa_del_bloqueo"}, {"jugada": "anotar_prevision", "resultado": "anotado", "tarea": "COM", "prevision": "2026-11-05", "atraso_si_se_cumple_la_prevision_dias_habiles": 4}]`; real `[]`
+- **05, vez 3, paso 4** [comprension] pregunta abierta después: esperado `{"tipo": "causa_del_bloqueo", "tarea": "PLC"}`; real `null`
+- **05, vez 3, paso 5** [comprension] jugadas: esperado `[{"nombre": "anotar_bloqueo", "tarea": "PLC", "causa": "falta que martin de IT me habilite el acceso a la red de planta"}, {"nombre": "anotar_quien_destraba", "quien": "martin", "puede_traer": ["tarea"]}]`; real `[]`
+- **05, vez 3, paso 5** [comprension] falta un efecto: estado: esperado `{"PLC": "bloqueada"}`; real `{}`
+- **05, vez 3, paso 5** [comprension] falta un efecto: bloqueo: esperado `[{"tarea": "PLC", "causa": "presente"}]`; real `[]`
+- **05, vez 3, paso 5** [comprension] falta un efecto: quién destraba: esperado `[{"tarea": "PLC", "alguien": true, "no_sabe": false}]`; real `[]`
+- **05, vez 3, paso 5** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **05, vez 3, paso 5** [comprension] hechos: esperado `[{"jugada": "anotar_bloqueo", "resultado": "anotado", "tarea": "PLC"}, {"jugada": "anotar_quien_destraba", "resultado": "anotado", "salidas": "ausente"}]`; real `[]`
+- **05, vez 4, paso 1** [motor] no salió lo esperado: esperado `{"a": "Marcos", "tipo": "aviso_previo", "tarea": "PLC", "hechos": {"vence": "2026-10-23", "necesita_respuesta": false}}`; real `[]`
+- **05, vez 4, paso 1** [motor] último aviso de Marcos: esperado `"PLC"`; real `null`
+- **05, vez 4, paso 2** [comprension] jugadas: esperado `[{"nombre": "anotar_inicio", "tarea": "PLC"}, {"nombre": "anotar_prevision", "tarea": "COM", "fecha": "2026-11-04", "motivo": "espera el switch nuevo"}]`; real `[]`
+- **05, vez 4, paso 2** [comprension] falta un efecto: estado: esperado `{"PLC": "en_curso"}`; real `{}`
+- **05, vez 4, paso 2** [comprension] falta un efecto: previsión: esperado `[{"tarea": "COM", "fecha": "2026-11-04", "motivo": "presente"}]`; real `[]`
+- **05, vez 4, paso 2** [comprension] falta un efecto: aviso guardado: esperado `[{"tipo": "nueva_prevision", "tarea": "COM", "a": "Ismael", "hechos": {"prevision": "2026-11-04", "fecha_comprometida": "2026-10-30", "atraso_si_se_cumple_la_prevision_dias_habiles": 3, "dependientes": [], "motivo": "presente"}}]`; real `[]`
+- **05, vez 4, paso 2** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **05, vez 4, paso 2** [comprension] hechos: esperado `[{"jugada": "anotar_inicio", "resultado": "anotado", "tarea": "PLC"}, {"jugada": "anotar_prevision", "resultado": "anotado", "tarea": "COM", "prevision": "2026-11-04", "fecha_comprometida": "2026-10-30", "atraso_si_se_cumple_la_prevision_dias_habiles": 3}]`; real `[]`
+- **05, vez 4, paso 3** [motor] no salió lo esperado: esperado `{"a": "Ismael", "tipo": "nueva_prevision", "tarea": "COM", "hechos": {"prevision": "2026-11-04", "fecha_comprometida": "2026-10-30", "atraso_si_se_cumple_la_prevision_dias_habiles": 3, "dependientes": [], "motivo": "presente"}}`; real `[]`
+- **05, vez 4, paso 4** [comprension] jugadas: esperado `[{"nombre": "anotar_bloqueo", "tarea": "PLC"}, {"nombre": "anotar_prevision", "tarea": "COM", "fecha": "2026-11-05", "puede_traer": ["motivo"]}]`; real `[]`
+- **05, vez 4, paso 4** [comprension] falta un efecto: previsión: esperado `[{"tarea": "COM", "fecha": "2026-11-05"}]`; real `[]`
+- **05, vez 4, paso 4** [comprension] falta un efecto: aviso guardado: esperado `[{"tipo": "nueva_prevision", "tarea": "COM", "a": "Ismael", "hechos": {"prevision": "2026-11-05", "fecha_comprometida": "2026-10-30", "atraso_si_se_cumple_la_prevision_dias_habiles": 4}}]`; real `[]`
+- **05, vez 4, paso 4** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **05, vez 4, paso 4** [comprension] la pregunta de la respuesta: esperado `{"tipo": "causa_del_bloqueo", "tarea": "PLC"}`; real `null`
+- **05, vez 4, paso 4** [comprension] hechos: esperado `[{"jugada": "anotar_bloqueo", "resultado": "falta_dato", "falta": ["causa"], "tarea": "PLC", "pregunta": "causa_del_bloqueo"}, {"jugada": "anotar_prevision", "resultado": "anotado", "tarea": "COM", "prevision": "2026-11-05", "atraso_si_se_cumple_la_prevision_dias_habiles": 4}]`; real `[]`
+- **05, vez 4, paso 4** [comprension] pregunta abierta después: esperado `{"tipo": "causa_del_bloqueo", "tarea": "PLC"}`; real `null`
+- **05, vez 4, paso 5** [comprension] jugadas: esperado `[{"nombre": "anotar_bloqueo", "tarea": "PLC", "causa": "falta que martin de IT me habilite el acceso a la red de planta"}, {"nombre": "anotar_quien_destraba", "quien": "martin", "puede_traer": ["tarea"]}]`; real `[]`
+- **05, vez 4, paso 5** [comprension] falta un efecto: estado: esperado `{"PLC": "bloqueada"}`; real `{}`
+- **05, vez 4, paso 5** [comprension] falta un efecto: bloqueo: esperado `[{"tarea": "PLC", "causa": "presente"}]`; real `[]`
+- **05, vez 4, paso 5** [comprension] falta un efecto: quién destraba: esperado `[{"tarea": "PLC", "alguien": true, "no_sabe": false}]`; real `[]`
+- **05, vez 4, paso 5** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **05, vez 4, paso 5** [comprension] hechos: esperado `[{"jugada": "anotar_bloqueo", "resultado": "anotado", "tarea": "PLC"}, {"jugada": "anotar_quien_destraba", "resultado": "anotado", "salidas": "ausente"}]`; real `[]`
+- **05, vez 5, paso 1** [motor] no salió lo esperado: esperado `{"a": "Marcos", "tipo": "aviso_previo", "tarea": "PLC", "hechos": {"vence": "2026-10-23", "necesita_respuesta": false}}`; real `[]`
+- **05, vez 5, paso 1** [motor] último aviso de Marcos: esperado `"PLC"`; real `null`
+- **05, vez 5, paso 2** [comprension] jugadas: esperado `[{"nombre": "anotar_inicio", "tarea": "PLC"}, {"nombre": "anotar_prevision", "tarea": "COM", "fecha": "2026-11-04", "motivo": "espera el switch nuevo"}]`; real `[]`
+- **05, vez 5, paso 2** [comprension] falta un efecto: estado: esperado `{"PLC": "en_curso"}`; real `{}`
+- **05, vez 5, paso 2** [comprension] falta un efecto: previsión: esperado `[{"tarea": "COM", "fecha": "2026-11-04", "motivo": "presente"}]`; real `[]`
+- **05, vez 5, paso 2** [comprension] falta un efecto: aviso guardado: esperado `[{"tipo": "nueva_prevision", "tarea": "COM", "a": "Ismael", "hechos": {"prevision": "2026-11-04", "fecha_comprometida": "2026-10-30", "atraso_si_se_cumple_la_prevision_dias_habiles": 3, "dependientes": [], "motivo": "presente"}}]`; real `[]`
+- **05, vez 5, paso 2** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **05, vez 5, paso 2** [comprension] hechos: esperado `[{"jugada": "anotar_inicio", "resultado": "anotado", "tarea": "PLC"}, {"jugada": "anotar_prevision", "resultado": "anotado", "tarea": "COM", "prevision": "2026-11-04", "fecha_comprometida": "2026-10-30", "atraso_si_se_cumple_la_prevision_dias_habiles": 3}]`; real `[]`
+- **05, vez 5, paso 3** [motor] no salió lo esperado: esperado `{"a": "Ismael", "tipo": "nueva_prevision", "tarea": "COM", "hechos": {"prevision": "2026-11-04", "fecha_comprometida": "2026-10-30", "atraso_si_se_cumple_la_prevision_dias_habiles": 3, "dependientes": [], "motivo": "presente"}}`; real `[]`
+- **05, vez 5, paso 4** [comprension] jugadas: esperado `[{"nombre": "anotar_bloqueo", "tarea": "PLC"}, {"nombre": "anotar_prevision", "tarea": "COM", "fecha": "2026-11-05", "puede_traer": ["motivo"]}]`; real `[]`
+- **05, vez 5, paso 4** [comprension] falta un efecto: previsión: esperado `[{"tarea": "COM", "fecha": "2026-11-05"}]`; real `[]`
+- **05, vez 5, paso 4** [comprension] falta un efecto: aviso guardado: esperado `[{"tipo": "nueva_prevision", "tarea": "COM", "a": "Ismael", "hechos": {"prevision": "2026-11-05", "fecha_comprometida": "2026-10-30", "atraso_si_se_cumple_la_prevision_dias_habiles": 4}}]`; real `[]`
+- **05, vez 5, paso 4** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **05, vez 5, paso 4** [comprension] la pregunta de la respuesta: esperado `{"tipo": "causa_del_bloqueo", "tarea": "PLC"}`; real `null`
+- **05, vez 5, paso 4** [comprension] hechos: esperado `[{"jugada": "anotar_bloqueo", "resultado": "falta_dato", "falta": ["causa"], "tarea": "PLC", "pregunta": "causa_del_bloqueo"}, {"jugada": "anotar_prevision", "resultado": "anotado", "tarea": "COM", "prevision": "2026-11-05", "atraso_si_se_cumple_la_prevision_dias_habiles": 4}]`; real `[]`
+- **05, vez 5, paso 4** [comprension] pregunta abierta después: esperado `{"tipo": "causa_del_bloqueo", "tarea": "PLC"}`; real `null`
+- **05, vez 5, paso 5** [comprension] jugadas: esperado `[{"nombre": "anotar_bloqueo", "tarea": "PLC", "causa": "falta que martin de IT me habilite el acceso a la red de planta"}, {"nombre": "anotar_quien_destraba", "quien": "martin", "puede_traer": ["tarea"]}]`; real `[]`
+- **05, vez 5, paso 5** [comprension] falta un efecto: estado: esperado `{"PLC": "bloqueada"}`; real `{}`
+- **05, vez 5, paso 5** [comprension] falta un efecto: bloqueo: esperado `[{"tarea": "PLC", "causa": "presente"}]`; real `[]`
+- **05, vez 5, paso 5** [comprension] falta un efecto: quién destraba: esperado `[{"tarea": "PLC", "alguien": true, "no_sabe": false}]`; real `[]`
+- **05, vez 5, paso 5** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **05, vez 5, paso 5** [comprension] hechos: esperado `[{"jugada": "anotar_bloqueo", "resultado": "anotado", "tarea": "PLC"}, {"jugada": "anotar_quien_destraba", "resultado": "anotado", "salidas": "ausente"}]`; real `[]`
+- **06, vez 1, paso 2** [comprension] jugadas: esperado `[{"nombre": "anotar_inicio", "tarea": "PLC"}]`; real `[]`
+- **06, vez 1, paso 2** [comprension] falta un efecto: estado: esperado `{"PLC": "en_curso"}`; real `{}`
+- **06, vez 1, paso 2** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **06, vez 1, paso 2** [comprension] hechos: esperado `[{"jugada": "anotar_inicio", "resultado": "anotado", "tarea": "PLC"}]`; real `[]`
+- **06, vez 1, paso 3** [comprension] jugadas: esperado `[{"nombre": "corregir", "corrige": "anotar_inicio", "tarea": "PLC", "tarea_correcta": "COM"}]`; real `[{"nombre": "anotar_inicio", "tarea": "COM"}, {"nombre": "informar_avance", "tarea": "PLC", "palabras": "la del plc todavia no la empece"}]`
+- **06, vez 1, paso 3** [comprension] falta un efecto: estado: esperado `{"PLC": "asignada", "COM": "en_curso"}`; real `{"COM": "en_curso"}`
+- **06, vez 1, paso 3** [comprension] hechos: esperado `[{"jugada": "corregir", "resultado": "corregido", "tarea": "PLC", "vuelve_a": {"estado": "asignada"}, "aplicado": {"jugada": "anotar_inicio", "resultado": "anotado", "tarea": "COM"}}]`; real `[{"jugada": "anotar_inicio", "resultado": "anotado", "tarea": "COM", "estado": "en_curso"}, {"jugada": "informar_avance", "resultado": "no_se_puede", "motivo": "nadie_pidio_el_estado", "tarea": "PLC"}]`
+- **06, vez 2, paso 2** [comprension] jugadas: esperado `[{"nombre": "anotar_inicio", "tarea": "PLC"}]`; real `[]`
+- **06, vez 2, paso 2** [comprension] falta un efecto: estado: esperado `{"PLC": "en_curso"}`; real `{}`
+- **06, vez 2, paso 2** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **06, vez 2, paso 2** [comprension] hechos: esperado `[{"jugada": "anotar_inicio", "resultado": "anotado", "tarea": "PLC"}]`; real `[]`
+- **06, vez 2, paso 3** [comprension] jugadas: esperado `[{"nombre": "corregir", "corrige": "anotar_inicio", "tarea": "PLC", "tarea_correcta": "COM"}]`; real `[]`
+- **06, vez 2, paso 3** [comprension] falta un efecto: estado: esperado `{"PLC": "asignada", "COM": "en_curso"}`; real `{}`
+- **06, vez 2, paso 3** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **06, vez 2, paso 3** [comprension] hechos: esperado `[{"jugada": "corregir", "resultado": "corregido", "tarea": "PLC", "vuelve_a": {"estado": "asignada"}, "aplicado": {"jugada": "anotar_inicio", "resultado": "anotado", "tarea": "COM"}}]`; real `[]`
+- **06, vez 2, paso 4** [motor] no salió lo esperado: esperado `{"a": "Marcos", "tipo": "pedido_de_estado", "tarea": "PLC", "hechos": {"numero": 1, "necesita_respuesta": true, "estado": "asignada", "atraso_dias_habiles": 0}}`; real `[]`
+- **06, vez 3, paso 2** [comprension] jugadas: esperado `[{"nombre": "anotar_inicio", "tarea": "PLC"}]`; real `[]`
+- **06, vez 3, paso 2** [comprension] falta un efecto: estado: esperado `{"PLC": "en_curso"}`; real `{}`
+- **06, vez 3, paso 2** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **06, vez 3, paso 2** [comprension] hechos: esperado `[{"jugada": "anotar_inicio", "resultado": "anotado", "tarea": "PLC"}]`; real `[]`
+- **06, vez 3, paso 3** [comprension] jugadas: esperado `[{"nombre": "corregir", "corrige": "anotar_inicio", "tarea": "PLC", "tarea_correcta": "COM"}]`; real `[]`
+- **06, vez 3, paso 3** [comprension] falta un efecto: estado: esperado `{"PLC": "asignada", "COM": "en_curso"}`; real `{}`
+- **06, vez 3, paso 3** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **06, vez 3, paso 3** [comprension] hechos: esperado `[{"jugada": "corregir", "resultado": "corregido", "tarea": "PLC", "vuelve_a": {"estado": "asignada"}, "aplicado": {"jugada": "anotar_inicio", "resultado": "anotado", "tarea": "COM"}}]`; real `[]`
+- **06, vez 4, paso 1** [motor] no salió lo esperado: esperado `{"a": "Marcos", "tipo": "aviso_previo", "tarea": "PLC", "hechos": {"vence": "2026-10-23", "necesita_respuesta": false}}`; real `[]`
+- **06, vez 4, paso 1** [motor] último aviso de Marcos: esperado `"PLC"`; real `null`
+- **06, vez 4, paso 2** [comprension] jugadas: esperado `[{"nombre": "anotar_inicio", "tarea": "PLC"}]`; real `[]`
+- **06, vez 4, paso 2** [comprension] falta un efecto: estado: esperado `{"PLC": "en_curso"}`; real `{}`
+- **06, vez 4, paso 2** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **06, vez 4, paso 2** [comprension] hechos: esperado `[{"jugada": "anotar_inicio", "resultado": "anotado", "tarea": "PLC"}]`; real `[]`
+- **06, vez 4, paso 3** [comprension] jugadas: esperado `[{"nombre": "corregir", "corrige": "anotar_inicio", "tarea": "PLC", "tarea_correcta": "COM"}]`; real `[{"nombre": "anotar_inicio", "tarea": "COM"}]`
+- **06, vez 4, paso 3** [comprension] falta un efecto: estado: esperado `{"PLC": "asignada", "COM": "en_curso"}`; real `{"COM": "en_curso"}`
+- **06, vez 4, paso 3** [comprension] hechos: esperado `[{"jugada": "corregir", "resultado": "corregido", "tarea": "PLC", "vuelve_a": {"estado": "asignada"}, "aplicado": {"jugada": "anotar_inicio", "resultado": "anotado", "tarea": "COM"}}]`; real `[{"jugada": "anotar_inicio", "resultado": "anotado", "tarea": "COM", "estado": "en_curso"}]`
+- **06, vez 5, paso 2** [comprension] jugadas: esperado `[{"nombre": "anotar_inicio", "tarea": "PLC"}]`; real `[]`
+- **06, vez 5, paso 2** [comprension] falta un efecto: estado: esperado `{"PLC": "en_curso"}`; real `{}`
+- **06, vez 5, paso 2** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **06, vez 5, paso 2** [comprension] hechos: esperado `[{"jugada": "anotar_inicio", "resultado": "anotado", "tarea": "PLC"}]`; real `[]`
+- **06, vez 5, paso 3** [comprension] jugadas: esperado `[{"nombre": "corregir", "corrige": "anotar_inicio", "tarea": "PLC", "tarea_correcta": "COM"}]`; real `[]`
+- **06, vez 5, paso 3** [comprension] falta un efecto: estado: esperado `{"PLC": "asignada", "COM": "en_curso"}`; real `{}`
+- **06, vez 5, paso 3** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **06, vez 5, paso 3** [comprension] hechos: esperado `[{"jugada": "corregir", "resultado": "corregido", "tarea": "PLC", "vuelve_a": {"estado": "asignada"}, "aplicado": {"jugada": "anotar_inicio", "resultado": "anotado", "tarea": "COM"}}]`; real `[]`
+- **07, vez 4, paso 4** [motor] no salió lo esperado: esperado `{"a": "Marcos", "el": "2026-10-23", "tipo": "pedido_de_estado", "tarea": "PLC", "hechos": {"numero": 1, "necesita_respuesta": true, "estado": "en_curso"}}`; real `[]`
+- **07, vez 5, paso 3** [comprension] jugadas: esperado `[{"nombre": "cancelar"}]`; real `[]`
+- **07, vez 5, paso 3** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **07, vez 5, paso 3** [comprension] hechos: esperado `[{"jugada": "cancelar", "resultado": "cancelado", "no_se_anoto_nada": true}]`; real `[]`
+- **07, vez 5, paso 3** [comprension] pregunta abierta después: esperado `null`; real `{"tipo": "causa_del_bloqueo", "tarea": "PLC"}`
+- **07, vez 5, paso 4** [motor] no salió lo esperado: esperado `{"a": "Marcos", "el": "2026-10-23", "tipo": "pedido_de_estado", "tarea": "PLC", "hechos": {"numero": 1, "necesita_respuesta": true, "estado": "en_curso"}}`; real `[]`
+- **08, vez 1, paso 3** [comprension] jugadas: esperado `[{"nombre": "anotar_prevision", "tarea": "COM", "fecha": "2026-11-04"}]`; real `[]`
+- **08, vez 1, paso 3** [comprension] falta un efecto: previsión: esperado `[{"tarea": "COM", "fecha": "2026-11-04", "motivo": "ausente"}]`; real `[]`
+- **08, vez 1, paso 3** [comprension] falta un efecto: aviso guardado: esperado `[{"tipo": "nueva_prevision", "tarea": "COM", "a": "Ismael", "hechos": {"prevision": "2026-11-04", "fecha_comprometida": "2026-10-30", "atraso_si_se_cumple_la_prevision_dias_habiles": 3, "motivo": "ausente"}}]`; real `[]`
+- **08, vez 1, paso 3** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **08, vez 1, paso 3** [comprension] la pregunta de la respuesta: esperado `{"tipo": "causa_del_bloqueo", "tarea": "PLC", "desde_antes": true}`; real `null`
+- **08, vez 1, paso 3** [comprension] hechos: esperado `[{"jugada": "anotar_prevision", "resultado": "anotado", "tarea": "COM", "prevision": "2026-11-04"}]`; real `[]`
+- **08, vez 1, paso 4** [motor] no salió lo esperado: esperado `{"a": "Ismael", "tipo": "nueva_prevision", "tarea": "COM", "hechos": {"prevision": "2026-11-04", "fecha_comprometida": "2026-10-30", "atraso_si_se_cumple_la_prevision_dias_habiles": 3, "motivo": "ausente"}}`; real `[]`
+- **08, vez 1, paso 5** [comprension] jugadas: esperado `[{"nombre": "anotar_bloqueo", "tarea": "PLC", "causa": "no me mandaron el programa del fabricante"}]`; real `[]`
+- **08, vez 1, paso 5** [comprension] falta un efecto: estado: esperado `{"PLC": "bloqueada"}`; real `{}`
+- **08, vez 1, paso 5** [comprension] falta un efecto: bloqueo: esperado `[{"tarea": "PLC", "causa": "presente"}]`; real `[]`
+- **08, vez 1, paso 5** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **08, vez 1, paso 5** [comprension] la pregunta de la respuesta: esperado `{"tipo": "quien_destraba", "tarea": "PLC"}`; real `null`
+- **08, vez 1, paso 5** [comprension] hechos: esperado `[{"jugada": "anotar_bloqueo", "resultado": "anotado", "tarea": "PLC", "pregunta": "quien_destraba"}]`; real `[]`
+- **08, vez 1, paso 5** [comprension] pregunta abierta después: esperado `{"tipo": "quien_destraba", "tarea": "PLC"}`; real `{"tipo": "causa_del_bloqueo", "tarea": "PLC"}`
+- **08, vez 2, paso 2** [comprension] jugadas: esperado `[{"nombre": "anotar_bloqueo", "tarea": "PLC"}]`; real `[]`
+- **08, vez 2, paso 2** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **08, vez 2, paso 2** [comprension] la pregunta de la respuesta: esperado `{"tipo": "causa_del_bloqueo", "tarea": "PLC"}`; real `null`
+- **08, vez 2, paso 2** [comprension] hechos: esperado `[{"jugada": "anotar_bloqueo", "resultado": "falta_dato", "falta": ["causa"], "tarea": "PLC"}]`; real `[]`
+- **08, vez 2, paso 2** [comprension] pregunta abierta después: esperado `{"tipo": "causa_del_bloqueo", "tarea": "PLC"}`; real `null`
+- **08, vez 2, paso 3** [comprension] jugadas: esperado `[{"nombre": "anotar_prevision", "tarea": "COM", "fecha": "2026-11-04"}]`; real `[]`
+- **08, vez 2, paso 3** [comprension] falta un efecto: previsión: esperado `[{"tarea": "COM", "fecha": "2026-11-04", "motivo": "ausente"}]`; real `[]`
+- **08, vez 2, paso 3** [comprension] falta un efecto: aviso guardado: esperado `[{"tipo": "nueva_prevision", "tarea": "COM", "a": "Ismael", "hechos": {"prevision": "2026-11-04", "fecha_comprometida": "2026-10-30", "atraso_si_se_cumple_la_prevision_dias_habiles": 3, "motivo": "ausente"}}]`; real `[]`
+- **08, vez 2, paso 3** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **08, vez 2, paso 3** [comprension] la pregunta de la respuesta: esperado `{"tipo": "causa_del_bloqueo", "tarea": "PLC", "desde_antes": true}`; real `null`
+- **08, vez 2, paso 3** [comprension] hechos: esperado `[{"jugada": "anotar_prevision", "resultado": "anotado", "tarea": "COM", "prevision": "2026-11-04"}]`; real `[]`
+- **08, vez 2, paso 3** [comprension] pregunta abierta después: esperado `{"tipo": "causa_del_bloqueo", "tarea": "PLC"}`; real `null`
+- **08, vez 2, paso 4** [motor] no salió lo esperado: esperado `{"a": "Ismael", "tipo": "nueva_prevision", "tarea": "COM", "hechos": {"prevision": "2026-11-04", "fecha_comprometida": "2026-10-30", "atraso_si_se_cumple_la_prevision_dias_habiles": 3, "motivo": "ausente"}}`; real `[]`
+- **08, vez 2, paso 5** [comprension] jugadas: esperado `[{"nombre": "anotar_bloqueo", "tarea": "PLC", "causa": "no me mandaron el programa del fabricante"}]`; real `[]`
+- **08, vez 2, paso 5** [comprension] falta un efecto: estado: esperado `{"PLC": "bloqueada"}`; real `{}`
+- **08, vez 2, paso 5** [comprension] falta un efecto: bloqueo: esperado `[{"tarea": "PLC", "causa": "presente"}]`; real `[]`
+- **08, vez 2, paso 5** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **08, vez 2, paso 5** [comprension] la pregunta de la respuesta: esperado `{"tipo": "quien_destraba", "tarea": "PLC"}`; real `null`
+- **08, vez 2, paso 5** [comprension] hechos: esperado `[{"jugada": "anotar_bloqueo", "resultado": "anotado", "tarea": "PLC", "pregunta": "quien_destraba"}]`; real `[]`
+- **08, vez 2, paso 5** [comprension] pregunta abierta después: esperado `{"tipo": "quien_destraba", "tarea": "PLC"}`; real `null`
+- **08, vez 3, paso 2** [comprension] jugadas: esperado `[{"nombre": "anotar_bloqueo", "tarea": "PLC"}]`; real `[]`
+- **08, vez 3, paso 2** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **08, vez 3, paso 2** [comprension] la pregunta de la respuesta: esperado `{"tipo": "causa_del_bloqueo", "tarea": "PLC"}`; real `null`
+- **08, vez 3, paso 2** [comprension] hechos: esperado `[{"jugada": "anotar_bloqueo", "resultado": "falta_dato", "falta": ["causa"], "tarea": "PLC"}]`; real `[]`
+- **08, vez 3, paso 2** [comprension] pregunta abierta después: esperado `{"tipo": "causa_del_bloqueo", "tarea": "PLC"}`; real `null`
+- **08, vez 3, paso 3** [comprension] jugadas: esperado `[{"nombre": "anotar_prevision", "tarea": "COM", "fecha": "2026-11-04"}]`; real `[]`
+- **08, vez 3, paso 3** [comprension] falta un efecto: previsión: esperado `[{"tarea": "COM", "fecha": "2026-11-04", "motivo": "ausente"}]`; real `[]`
+- **08, vez 3, paso 3** [comprension] falta un efecto: aviso guardado: esperado `[{"tipo": "nueva_prevision", "tarea": "COM", "a": "Ismael", "hechos": {"prevision": "2026-11-04", "fecha_comprometida": "2026-10-30", "atraso_si_se_cumple_la_prevision_dias_habiles": 3, "motivo": "ausente"}}]`; real `[]`
+- **08, vez 3, paso 3** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **08, vez 3, paso 3** [comprension] la pregunta de la respuesta: esperado `{"tipo": "causa_del_bloqueo", "tarea": "PLC", "desde_antes": true}`; real `null`
+- **08, vez 3, paso 3** [comprension] hechos: esperado `[{"jugada": "anotar_prevision", "resultado": "anotado", "tarea": "COM", "prevision": "2026-11-04"}]`; real `[]`
+- **08, vez 3, paso 3** [comprension] pregunta abierta después: esperado `{"tipo": "causa_del_bloqueo", "tarea": "PLC"}`; real `null`
+- **08, vez 3, paso 4** [motor] no salió lo esperado: esperado `{"a": "Ismael", "tipo": "nueva_prevision", "tarea": "COM", "hechos": {"prevision": "2026-11-04", "fecha_comprometida": "2026-10-30", "atraso_si_se_cumple_la_prevision_dias_habiles": 3, "motivo": "ausente"}}`; real `[]`
+- **08, vez 3, paso 5** [comprension] jugadas: esperado `[{"nombre": "anotar_bloqueo", "tarea": "PLC", "causa": "no me mandaron el programa del fabricante"}]`; real `[]`
+- **08, vez 3, paso 5** [comprension] falta un efecto: estado: esperado `{"PLC": "bloqueada"}`; real `{}`
+- **08, vez 3, paso 5** [comprension] falta un efecto: bloqueo: esperado `[{"tarea": "PLC", "causa": "presente"}]`; real `[]`
+- **08, vez 3, paso 5** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **08, vez 3, paso 5** [comprension] la pregunta de la respuesta: esperado `{"tipo": "quien_destraba", "tarea": "PLC"}`; real `null`
+- **08, vez 3, paso 5** [comprension] hechos: esperado `[{"jugada": "anotar_bloqueo", "resultado": "anotado", "tarea": "PLC", "pregunta": "quien_destraba"}]`; real `[]`
+- **08, vez 3, paso 5** [comprension] pregunta abierta después: esperado `{"tipo": "quien_destraba", "tarea": "PLC"}`; real `null`
+- **08, vez 4, paso 1** [motor] no salió lo esperado: esperado `{"a": "Marcos", "tipo": "aviso_previo", "tarea": "PLC", "hechos": {"vence": "2026-10-23", "necesita_respuesta": false}}`; real `[]`
+- **08, vez 4, paso 1** [motor] último aviso de Marcos: esperado `"PLC"`; real `null`
+- **08, vez 4, paso 2** [comprension] jugadas: esperado `[{"nombre": "anotar_bloqueo", "tarea": "PLC"}]`; real `[]`
+- **08, vez 4, paso 2** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **08, vez 4, paso 2** [comprension] la pregunta de la respuesta: esperado `{"tipo": "causa_del_bloqueo", "tarea": "PLC"}`; real `null`
+- **08, vez 4, paso 2** [comprension] hechos: esperado `[{"jugada": "anotar_bloqueo", "resultado": "falta_dato", "falta": ["causa"], "tarea": "PLC"}]`; real `[]`
+- **08, vez 4, paso 2** [comprension] pregunta abierta después: esperado `{"tipo": "causa_del_bloqueo", "tarea": "PLC"}`; real `null`
+- **08, vez 4, paso 3** [comprension] jugadas: esperado `[{"nombre": "anotar_prevision", "tarea": "COM", "fecha": "2026-11-04"}]`; real `[]`
+- **08, vez 4, paso 3** [comprension] falta un efecto: previsión: esperado `[{"tarea": "COM", "fecha": "2026-11-04", "motivo": "ausente"}]`; real `[]`
+- **08, vez 4, paso 3** [comprension] falta un efecto: aviso guardado: esperado `[{"tipo": "nueva_prevision", "tarea": "COM", "a": "Ismael", "hechos": {"prevision": "2026-11-04", "fecha_comprometida": "2026-10-30", "atraso_si_se_cumple_la_prevision_dias_habiles": 3, "motivo": "ausente"}}]`; real `[]`
+- **08, vez 4, paso 3** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **08, vez 4, paso 3** [comprension] la pregunta de la respuesta: esperado `{"tipo": "causa_del_bloqueo", "tarea": "PLC", "desde_antes": true}`; real `null`
+- **08, vez 4, paso 3** [comprension] hechos: esperado `[{"jugada": "anotar_prevision", "resultado": "anotado", "tarea": "COM", "prevision": "2026-11-04"}]`; real `[]`
+- **08, vez 4, paso 3** [comprension] pregunta abierta después: esperado `{"tipo": "causa_del_bloqueo", "tarea": "PLC"}`; real `null`
+- **08, vez 4, paso 4** [motor] no salió lo esperado: esperado `{"a": "Ismael", "tipo": "nueva_prevision", "tarea": "COM", "hechos": {"prevision": "2026-11-04", "fecha_comprometida": "2026-10-30", "atraso_si_se_cumple_la_prevision_dias_habiles": 3, "motivo": "ausente"}}`; real `[]`
+- **08, vez 4, paso 5** [comprension] jugadas: esperado `[{"nombre": "anotar_bloqueo", "tarea": "PLC", "causa": "no me mandaron el programa del fabricante"}]`; real `[]`
+- **08, vez 4, paso 5** [comprension] falta un efecto: estado: esperado `{"PLC": "bloqueada"}`; real `{}`
+- **08, vez 4, paso 5** [comprension] falta un efecto: bloqueo: esperado `[{"tarea": "PLC", "causa": "presente"}]`; real `[]`
+- **08, vez 4, paso 5** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **08, vez 4, paso 5** [comprension] la pregunta de la respuesta: esperado `{"tipo": "quien_destraba", "tarea": "PLC"}`; real `null`
+- **08, vez 4, paso 5** [comprension] hechos: esperado `[{"jugada": "anotar_bloqueo", "resultado": "anotado", "tarea": "PLC", "pregunta": "quien_destraba"}]`; real `[]`
+- **08, vez 4, paso 5** [comprension] pregunta abierta después: esperado `{"tipo": "quien_destraba", "tarea": "PLC"}`; real `null`
+- **08, vez 5, paso 1** [motor] no salió lo esperado: esperado `{"a": "Marcos", "tipo": "aviso_previo", "tarea": "PLC", "hechos": {"vence": "2026-10-23", "necesita_respuesta": false}}`; real `[]`
+- **08, vez 5, paso 1** [motor] último aviso de Marcos: esperado `"PLC"`; real `null`
+- **08, vez 5, paso 2** [comprension] jugadas: esperado `[{"nombre": "anotar_bloqueo", "tarea": "PLC"}]`; real `[]`
+- **08, vez 5, paso 2** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **08, vez 5, paso 2** [comprension] la pregunta de la respuesta: esperado `{"tipo": "causa_del_bloqueo", "tarea": "PLC"}`; real `null`
+- **08, vez 5, paso 2** [comprension] hechos: esperado `[{"jugada": "anotar_bloqueo", "resultado": "falta_dato", "falta": ["causa"], "tarea": "PLC"}]`; real `[]`
+- **08, vez 5, paso 2** [comprension] pregunta abierta después: esperado `{"tipo": "causa_del_bloqueo", "tarea": "PLC"}`; real `null`
+- **08, vez 5, paso 3** [comprension] jugadas: esperado `[{"nombre": "anotar_prevision", "tarea": "COM", "fecha": "2026-11-04"}]`; real `[]`
+- **08, vez 5, paso 3** [comprension] falta un efecto: previsión: esperado `[{"tarea": "COM", "fecha": "2026-11-04", "motivo": "ausente"}]`; real `[]`
+- **08, vez 5, paso 3** [comprension] falta un efecto: aviso guardado: esperado `[{"tipo": "nueva_prevision", "tarea": "COM", "a": "Ismael", "hechos": {"prevision": "2026-11-04", "fecha_comprometida": "2026-10-30", "atraso_si_se_cumple_la_prevision_dias_habiles": 3, "motivo": "ausente"}}]`; real `[]`
+- **08, vez 5, paso 3** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **08, vez 5, paso 3** [comprension] la pregunta de la respuesta: esperado `{"tipo": "causa_del_bloqueo", "tarea": "PLC", "desde_antes": true}`; real `null`
+- **08, vez 5, paso 3** [comprension] hechos: esperado `[{"jugada": "anotar_prevision", "resultado": "anotado", "tarea": "COM", "prevision": "2026-11-04"}]`; real `[]`
+- **08, vez 5, paso 3** [comprension] pregunta abierta después: esperado `{"tipo": "causa_del_bloqueo", "tarea": "PLC"}`; real `null`
+- **08, vez 5, paso 4** [motor] no salió lo esperado: esperado `{"a": "Ismael", "tipo": "nueva_prevision", "tarea": "COM", "hechos": {"prevision": "2026-11-04", "fecha_comprometida": "2026-10-30", "atraso_si_se_cumple_la_prevision_dias_habiles": 3, "motivo": "ausente"}}`; real `[]`
+- **08, vez 5, paso 5** [comprension] jugadas: esperado `[{"nombre": "anotar_bloqueo", "tarea": "PLC", "causa": "no me mandaron el programa del fabricante"}]`; real `[]`
+- **08, vez 5, paso 5** [comprension] falta un efecto: estado: esperado `{"PLC": "bloqueada"}`; real `{}`
+- **08, vez 5, paso 5** [comprension] falta un efecto: bloqueo: esperado `[{"tarea": "PLC", "causa": "presente"}]`; real `[]`
+- **08, vez 5, paso 5** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **08, vez 5, paso 5** [comprension] la pregunta de la respuesta: esperado `{"tipo": "quien_destraba", "tarea": "PLC"}`; real `null`
+- **08, vez 5, paso 5** [comprension] hechos: esperado `[{"jugada": "anotar_bloqueo", "resultado": "anotado", "tarea": "PLC", "pregunta": "quien_destraba"}]`; real `[]`
+- **08, vez 5, paso 5** [comprension] pregunta abierta después: esperado `{"tipo": "quien_destraba", "tarea": "PLC"}`; real `null`
+- **09, vez 1, paso 1** [comprension] jugadas: esperado `[{"nombre": "anotar_inicio"}]`; real `[]`
+- **09, vez 1, paso 1** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **09, vez 1, paso 1** [comprension] botones: esperado `["PLC", "COM"]`; real `[]`
+- **09, vez 1, paso 1** [comprension] la pregunta de la respuesta: esperado `{"tipo": "cual_tarea"}`; real `null`
+- **09, vez 1, paso 1** [comprension] hechos: esperado `[{"jugada": "anotar_inicio", "resultado": "falta_dato", "falta": ["tarea"], "pregunta": "cual_tarea"}]`; real `[]`
+- **09, vez 1, paso 1** [comprension] pregunta abierta después: esperado `{"tipo": "cual_tarea"}`; real `null`
+- **09, vez 1, paso 2** [comprension] no hay un botón para tocar: esperado `"COM"`; real `null`
+- **09, vez 2, paso 1** [comprension] jugadas: esperado `[{"nombre": "anotar_inicio"}]`; real `[]`
+- **09, vez 2, paso 1** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **09, vez 2, paso 1** [comprension] botones: esperado `["PLC", "COM"]`; real `[]`
+- **09, vez 2, paso 1** [comprension] la pregunta de la respuesta: esperado `{"tipo": "cual_tarea"}`; real `null`
+- **09, vez 2, paso 1** [comprension] hechos: esperado `[{"jugada": "anotar_inicio", "resultado": "falta_dato", "falta": ["tarea"], "pregunta": "cual_tarea"}]`; real `[]`
+- **09, vez 2, paso 1** [comprension] pregunta abierta después: esperado `{"tipo": "cual_tarea"}`; real `null`
+- **09, vez 2, paso 2** [comprension] no hay un botón para tocar: esperado `"COM"`; real `null`
+- **09, vez 3, paso 1** [comprension] jugadas: esperado `[{"nombre": "anotar_inicio"}]`; real `[]`
+- **09, vez 3, paso 1** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **09, vez 3, paso 1** [comprension] botones: esperado `["PLC", "COM"]`; real `[]`
+- **09, vez 3, paso 1** [comprension] la pregunta de la respuesta: esperado `{"tipo": "cual_tarea"}`; real `null`
+- **09, vez 3, paso 1** [comprension] hechos: esperado `[{"jugada": "anotar_inicio", "resultado": "falta_dato", "falta": ["tarea"], "pregunta": "cual_tarea"}]`; real `[]`
+- **09, vez 3, paso 1** [comprension] pregunta abierta después: esperado `{"tipo": "cual_tarea"}`; real `null`
+- **09, vez 3, paso 2** [comprension] no hay un botón para tocar: esperado `"COM"`; real `null`
+- **09, vez 4, paso 1** [comprension] jugadas: esperado `[{"nombre": "anotar_inicio"}]`; real `[]`
+- **09, vez 4, paso 1** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **09, vez 4, paso 1** [comprension] botones: esperado `["PLC", "COM"]`; real `[]`
+- **09, vez 4, paso 1** [comprension] la pregunta de la respuesta: esperado `{"tipo": "cual_tarea"}`; real `null`
+- **09, vez 4, paso 1** [comprension] hechos: esperado `[{"jugada": "anotar_inicio", "resultado": "falta_dato", "falta": ["tarea"], "pregunta": "cual_tarea"}]`; real `[]`
+- **09, vez 4, paso 1** [comprension] pregunta abierta después: esperado `{"tipo": "cual_tarea"}`; real `null`
+- **09, vez 4, paso 2** [comprension] no hay un botón para tocar: esperado `"COM"`; real `null`
+- **09, vez 5, paso 1** [comprension] jugadas: esperado `[{"nombre": "anotar_inicio"}]`; real `[]`
+- **09, vez 5, paso 1** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **09, vez 5, paso 1** [comprension] botones: esperado `["PLC", "COM"]`; real `[]`
+- **09, vez 5, paso 1** [comprension] la pregunta de la respuesta: esperado `{"tipo": "cual_tarea"}`; real `null`
+- **09, vez 5, paso 1** [comprension] hechos: esperado `[{"jugada": "anotar_inicio", "resultado": "falta_dato", "falta": ["tarea"], "pregunta": "cual_tarea"}]`; real `[]`
+- **09, vez 5, paso 1** [comprension] pregunta abierta después: esperado `{"tipo": "cual_tarea"}`; real `null`
+- **09, vez 5, paso 2** [comprension] no hay un botón para tocar: esperado `"COM"`; real `null`
+- **10, vez 1, paso 1** [comprension] jugadas: esperado `[{"nombre": "anotar_inicio"}]`; real `[]`
+- **10, vez 1, paso 1** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **10, vez 1, paso 1** [comprension] botones: esperado `["PLC", "COM"]`; real `[]`
+- **10, vez 1, paso 1** [comprension] la pregunta de la respuesta: esperado `{"tipo": "cual_tarea"}`; real `null`
+- **10, vez 1, paso 1** [comprension] hechos: esperado `[{"jugada": "anotar_inicio", "resultado": "falta_dato", "falta": ["tarea"], "pregunta": "cual_tarea"}]`; real `[]`
+- **10, vez 1, paso 1** [comprension] pregunta abierta después: esperado `{"tipo": "cual_tarea"}`; real `null`
+- **10, vez 1, paso 2** [comprension] jugadas: esperado `[{"nombre": "elegir", "opcion": "PLC"}]`; real `[]`
+- **10, vez 1, paso 2** [comprension] falta un efecto: estado: esperado `{"PLC": "en_curso"}`; real `{}`
+- **10, vez 1, paso 2** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **10, vez 1, paso 2** [comprension] hechos: esperado `[{"jugada": "anotar_inicio", "resultado": "anotado", "tarea": "PLC"}]`; real `[]`
+- **10, vez 2, paso 1** [comprension] jugadas: esperado `[{"nombre": "anotar_inicio"}]`; real `[]`
+- **10, vez 2, paso 1** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **10, vez 2, paso 1** [comprension] botones: esperado `["PLC", "COM"]`; real `[]`
+- **10, vez 2, paso 1** [comprension] la pregunta de la respuesta: esperado `{"tipo": "cual_tarea"}`; real `null`
+- **10, vez 2, paso 1** [comprension] hechos: esperado `[{"jugada": "anotar_inicio", "resultado": "falta_dato", "falta": ["tarea"], "pregunta": "cual_tarea"}]`; real `[]`
+- **10, vez 2, paso 1** [comprension] pregunta abierta después: esperado `{"tipo": "cual_tarea"}`; real `null`
+- **10, vez 2, paso 2** [comprension] jugadas: esperado `[{"nombre": "elegir", "opcion": "PLC"}]`; real `[]`
+- **10, vez 2, paso 2** [comprension] falta un efecto: estado: esperado `{"PLC": "en_curso"}`; real `{}`
+- **10, vez 2, paso 2** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **10, vez 2, paso 2** [comprension] hechos: esperado `[{"jugada": "anotar_inicio", "resultado": "anotado", "tarea": "PLC"}]`; real `[]`
+- **10, vez 3, paso 1** [comprension] jugadas: esperado `[{"nombre": "anotar_inicio"}]`; real `[]`
+- **10, vez 3, paso 1** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **10, vez 3, paso 1** [comprension] botones: esperado `["PLC", "COM"]`; real `[]`
+- **10, vez 3, paso 1** [comprension] la pregunta de la respuesta: esperado `{"tipo": "cual_tarea"}`; real `null`
+- **10, vez 3, paso 1** [comprension] hechos: esperado `[{"jugada": "anotar_inicio", "resultado": "falta_dato", "falta": ["tarea"], "pregunta": "cual_tarea"}]`; real `[]`
+- **10, vez 3, paso 1** [comprension] pregunta abierta después: esperado `{"tipo": "cual_tarea"}`; real `null`
+- **10, vez 3, paso 2** [comprension] jugadas: esperado `[{"nombre": "elegir", "opcion": "PLC"}]`; real `[]`
+- **10, vez 3, paso 2** [comprension] falta un efecto: estado: esperado `{"PLC": "en_curso"}`; real `{}`
+- **10, vez 3, paso 2** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **10, vez 3, paso 2** [comprension] hechos: esperado `[{"jugada": "anotar_inicio", "resultado": "anotado", "tarea": "PLC"}]`; real `[]`
+- **10, vez 4, paso 1** [comprension] jugadas: esperado `[{"nombre": "anotar_inicio"}]`; real `[]`
+- **10, vez 4, paso 1** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **10, vez 4, paso 1** [comprension] botones: esperado `["PLC", "COM"]`; real `[]`
+- **10, vez 4, paso 1** [comprension] la pregunta de la respuesta: esperado `{"tipo": "cual_tarea"}`; real `null`
+- **10, vez 4, paso 1** [comprension] hechos: esperado `[{"jugada": "anotar_inicio", "resultado": "falta_dato", "falta": ["tarea"], "pregunta": "cual_tarea"}]`; real `[]`
+- **10, vez 4, paso 1** [comprension] pregunta abierta después: esperado `{"tipo": "cual_tarea"}`; real `null`
+- **10, vez 4, paso 2** [comprension] jugadas: esperado `[{"nombre": "elegir", "opcion": "PLC"}]`; real `[]`
+- **10, vez 4, paso 2** [comprension] falta un efecto: estado: esperado `{"PLC": "en_curso"}`; real `{}`
+- **10, vez 4, paso 2** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **10, vez 4, paso 2** [comprension] hechos: esperado `[{"jugada": "anotar_inicio", "resultado": "anotado", "tarea": "PLC"}]`; real `[]`
+- **10, vez 5, paso 1** [comprension] jugadas: esperado `[{"nombre": "anotar_inicio"}]`; real `[]`
+- **10, vez 5, paso 1** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **10, vez 5, paso 1** [comprension] botones: esperado `["PLC", "COM"]`; real `[]`
+- **10, vez 5, paso 1** [comprension] la pregunta de la respuesta: esperado `{"tipo": "cual_tarea"}`; real `null`
+- **10, vez 5, paso 1** [comprension] hechos: esperado `[{"jugada": "anotar_inicio", "resultado": "falta_dato", "falta": ["tarea"], "pregunta": "cual_tarea"}]`; real `[]`
+- **10, vez 5, paso 1** [comprension] pregunta abierta después: esperado `{"tipo": "cual_tarea"}`; real `null`
+- **10, vez 5, paso 2** [comprension] jugadas: esperado `[{"nombre": "elegir", "opcion": "PLC"}]`; real `[]`
+- **10, vez 5, paso 2** [comprension] falta un efecto: estado: esperado `{"PLC": "en_curso"}`; real `{}`
+- **10, vez 5, paso 2** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **10, vez 5, paso 2** [comprension] hechos: esperado `[{"jugada": "anotar_inicio", "resultado": "anotado", "tarea": "PLC"}]`; real `[]`
+- **11, vez 1, paso 1** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **11, vez 1, paso 1** [motor] hechos: esperado `[{"jugada": "elegir", "resultado": "sin_efecto", "motivo": "pregunta_cerrada", "cerrada_con": {"tarea": "PLC"}}]`; real `[]`
+- **11, vez 1, paso 2** [comprension] jugadas: esperado `[{"nombre": "anotar_inicio", "tarea": "COM"}]`; real `[]`
+- **11, vez 1, paso 2** [comprension] falta un efecto: estado: esperado `{"COM": "en_curso"}`; real `{}`
+- **11, vez 1, paso 2** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **11, vez 1, paso 2** [comprension] hechos: esperado `[{"jugada": "anotar_inicio", "resultado": "anotado", "tarea": "COM"}]`; real `[]`
+- **11, vez 1, paso 3** [comprension] jugadas: esperado `[{"nombre": "anotar_prevision", "tarea": "COM", "fecha": "2026-11-04", "motivo": "espero el switch"}]`; real `[]`
+- **11, vez 1, paso 3** [comprension] falta un efecto: previsión: esperado `[{"tarea": "COM", "fecha": "2026-11-04", "motivo": "presente"}]`; real `[]`
+- **11, vez 1, paso 3** [comprension] falta un efecto: aviso guardado: esperado `[{"tipo": "nueva_prevision", "tarea": "COM", "a": "Ismael", "estado": "guardado", "hechos": {"prevision": "2026-11-04", "fecha_comprometida": "2026-10-30", "atraso_si_se_cumple_la_prevision_dias_habiles": 3}}]`; real `[]`
+- **11, vez 1, paso 3** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **11, vez 1, paso 3** [comprension] hechos: esperado `[{"jugada": "anotar_prevision", "resultado": "anotado", "tarea": "COM", "prevision": "2026-11-04", "aviso_al_referente": {"a": "Ismael Soschinski", "estado": "guardado_sin_enviar", "sale": "~2026-10-23T09:00"}}]`; real `[]`
+- **11, vez 1, paso 4** [comprension] jugadas: esperado `[{"nombre": "anotar_prevision", "tarea": "COM", "fecha": "2026-10-30", "puede_traer": ["motivo"]}]`; real `[]`
+- **11, vez 1, paso 4** [comprension] falta un efecto: previsión: esperado `[{"tarea": "COM", "fecha": "2026-10-30"}]`; real `[]`
+- **11, vez 1, paso 4** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **11, vez 1, paso 4** [comprension] hechos: esperado `[{"jugada": "anotar_prevision", "resultado": "anotado", "tarea": "COM", "prevision": "2026-10-30", "sin_aviso": "misma_fecha_comprometida"}]`; real `[]`
+- **11, vez 1, paso 4** [motor] aviso en el estado: esperado `{"tipo": "nueva_prevision", "tarea": "COM", "a": "Ismael", "estado": "omitido"}`; real `[]`
+- **11, vez 1, paso 5** [motor] aviso en el estado: esperado `{"tipo": "nueva_prevision", "tarea": "COM", "a": "Ismael", "estado": "omitido", "motivo": "presente"}`; real `[]`
+- **11, vez 2, paso 1** [comprension] no hay un botón para tocar: esperado `"COM"`; real `null`
+- **11, vez 2, paso 2** [comprension] jugadas: esperado `[{"nombre": "anotar_inicio", "tarea": "COM"}]`; real `[]`
+- **11, vez 2, paso 2** [comprension] falta un efecto: estado: esperado `{"COM": "en_curso"}`; real `{}`
+- **11, vez 2, paso 2** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **11, vez 2, paso 2** [comprension] hechos: esperado `[{"jugada": "anotar_inicio", "resultado": "anotado", "tarea": "COM"}]`; real `[]`
+- **11, vez 2, paso 3** [comprension] jugadas: esperado `[{"nombre": "anotar_prevision", "tarea": "COM", "fecha": "2026-11-04", "motivo": "espero el switch"}]`; real `[]`
+- **11, vez 2, paso 3** [comprension] falta un efecto: previsión: esperado `[{"tarea": "COM", "fecha": "2026-11-04", "motivo": "presente"}]`; real `[]`
+- **11, vez 2, paso 3** [comprension] falta un efecto: aviso guardado: esperado `[{"tipo": "nueva_prevision", "tarea": "COM", "a": "Ismael", "estado": "guardado", "hechos": {"prevision": "2026-11-04", "fecha_comprometida": "2026-10-30", "atraso_si_se_cumple_la_prevision_dias_habiles": 3}}]`; real `[]`
+- **11, vez 2, paso 3** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **11, vez 2, paso 3** [comprension] hechos: esperado `[{"jugada": "anotar_prevision", "resultado": "anotado", "tarea": "COM", "prevision": "2026-11-04", "aviso_al_referente": {"a": "Ismael Soschinski", "estado": "guardado_sin_enviar", "sale": "~2026-10-23T09:00"}}]`; real `[]`
+- **11, vez 2, paso 4** [comprension] jugadas: esperado `[{"nombre": "anotar_prevision", "tarea": "COM", "fecha": "2026-10-30", "puede_traer": ["motivo"]}]`; real `[]`
+- **11, vez 2, paso 4** [comprension] falta un efecto: previsión: esperado `[{"tarea": "COM", "fecha": "2026-10-30"}]`; real `[]`
+- **11, vez 2, paso 4** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **11, vez 2, paso 4** [comprension] hechos: esperado `[{"jugada": "anotar_prevision", "resultado": "anotado", "tarea": "COM", "prevision": "2026-10-30", "sin_aviso": "misma_fecha_comprometida"}]`; real `[]`
+- **11, vez 2, paso 4** [motor] aviso en el estado: esperado `{"tipo": "nueva_prevision", "tarea": "COM", "a": "Ismael", "estado": "omitido"}`; real `[]`
+- **11, vez 2, paso 5** [motor] aviso en el estado: esperado `{"tipo": "nueva_prevision", "tarea": "COM", "a": "Ismael", "estado": "omitido", "motivo": "presente"}`; real `[]`
+- **11, vez 3, paso 1** [garantia] efecto de más: estado: esperado `{}`; real `{"COM": "en_curso"}`
+- **11, vez 3, paso 1** [motor] hechos: esperado `[{"jugada": "elegir", "resultado": "sin_efecto", "motivo": "pregunta_cerrada", "cerrada_con": {"tarea": "PLC"}}]`; real `[{"jugada": "anotar_inicio", "resultado": "anotado", "tarea": "COM", "estado": "en_curso", "eligio": {"opcion": "O2", "etiqueta": "COM", "tarea": "COM"}}]`
+- **11, vez 3, paso 2** [comprension] jugadas: esperado `[{"nombre": "anotar_inicio", "tarea": "COM"}]`; real `[]`
+- **11, vez 3, paso 2** [comprension] falta un efecto: estado: esperado `{"COM": "en_curso"}`; real `{}`
+- **11, vez 3, paso 2** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **11, vez 3, paso 2** [comprension] hechos: esperado `[{"jugada": "anotar_inicio", "resultado": "anotado", "tarea": "COM"}]`; real `[]`
+- **11, vez 3, paso 3** [comprension] jugadas: esperado `[{"nombre": "anotar_prevision", "tarea": "COM", "fecha": "2026-11-04", "motivo": "espero el switch"}]`; real `[]`
+- **11, vez 3, paso 3** [comprension] falta un efecto: previsión: esperado `[{"tarea": "COM", "fecha": "2026-11-04", "motivo": "presente"}]`; real `[]`
+- **11, vez 3, paso 3** [comprension] falta un efecto: aviso guardado: esperado `[{"tipo": "nueva_prevision", "tarea": "COM", "a": "Ismael", "estado": "guardado", "hechos": {"prevision": "2026-11-04", "fecha_comprometida": "2026-10-30", "atraso_si_se_cumple_la_prevision_dias_habiles": 3}}]`; real `[]`
+- **11, vez 3, paso 3** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **11, vez 3, paso 3** [comprension] hechos: esperado `[{"jugada": "anotar_prevision", "resultado": "anotado", "tarea": "COM", "prevision": "2026-11-04", "aviso_al_referente": {"a": "Ismael Soschinski", "estado": "guardado_sin_enviar", "sale": "~2026-10-23T09:00"}}]`; real `[]`
+- **11, vez 3, paso 4** [comprension] jugadas: esperado `[{"nombre": "anotar_prevision", "tarea": "COM", "fecha": "2026-10-30", "puede_traer": ["motivo"]}]`; real `[]`
+- **11, vez 3, paso 4** [comprension] falta un efecto: previsión: esperado `[{"tarea": "COM", "fecha": "2026-10-30"}]`; real `[]`
+- **11, vez 3, paso 4** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **11, vez 3, paso 4** [comprension] hechos: esperado `[{"jugada": "anotar_prevision", "resultado": "anotado", "tarea": "COM", "prevision": "2026-10-30", "sin_aviso": "misma_fecha_comprometida"}]`; real `[]`
+- **11, vez 3, paso 4** [motor] aviso en el estado: esperado `{"tipo": "nueva_prevision", "tarea": "COM", "a": "Ismael", "estado": "omitido"}`; real `[]`
+- **11, vez 3, paso 5** [motor] aviso en el estado: esperado `{"tipo": "nueva_prevision", "tarea": "COM", "a": "Ismael", "estado": "omitido", "motivo": "presente"}`; real `[]`
+- **11, vez 4, paso 2** [comprension] jugadas: esperado `[{"nombre": "anotar_inicio", "tarea": "COM"}]`; real `[]`
+- **11, vez 4, paso 2** [comprension] falta un efecto: estado: esperado `{"COM": "en_curso"}`; real `{}`
+- **11, vez 4, paso 2** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **11, vez 4, paso 2** [comprension] hechos: esperado `[{"jugada": "anotar_inicio", "resultado": "anotado", "tarea": "COM"}]`; real `[]`
+- **11, vez 4, paso 3** [comprension] jugadas: esperado `[{"nombre": "anotar_prevision", "tarea": "COM", "fecha": "2026-11-04", "motivo": "espero el switch"}]`; real `[]`
+- **11, vez 4, paso 3** [comprension] falta un efecto: previsión: esperado `[{"tarea": "COM", "fecha": "2026-11-04", "motivo": "presente"}]`; real `[]`
+- **11, vez 4, paso 3** [comprension] falta un efecto: aviso guardado: esperado `[{"tipo": "nueva_prevision", "tarea": "COM", "a": "Ismael", "estado": "guardado", "hechos": {"prevision": "2026-11-04", "fecha_comprometida": "2026-10-30", "atraso_si_se_cumple_la_prevision_dias_habiles": 3}}]`; real `[]`
+- **11, vez 4, paso 3** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **11, vez 4, paso 3** [comprension] hechos: esperado `[{"jugada": "anotar_prevision", "resultado": "anotado", "tarea": "COM", "prevision": "2026-11-04", "aviso_al_referente": {"a": "Ismael Soschinski", "estado": "guardado_sin_enviar", "sale": "~2026-10-23T09:00"}}]`; real `[]`
+- **11, vez 4, paso 4** [comprension] jugadas: esperado `[{"nombre": "anotar_prevision", "tarea": "COM", "fecha": "2026-10-30", "puede_traer": ["motivo"]}]`; real `[]`
+- **11, vez 4, paso 4** [comprension] falta un efecto: previsión: esperado `[{"tarea": "COM", "fecha": "2026-10-30"}]`; real `[]`
+- **11, vez 4, paso 4** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **11, vez 4, paso 4** [comprension] hechos: esperado `[{"jugada": "anotar_prevision", "resultado": "anotado", "tarea": "COM", "prevision": "2026-10-30", "sin_aviso": "misma_fecha_comprometida"}]`; real `[]`
+- **11, vez 4, paso 4** [motor] aviso en el estado: esperado `{"tipo": "nueva_prevision", "tarea": "COM", "a": "Ismael", "estado": "omitido"}`; real `[]`
+- **11, vez 4, paso 5** [motor] aviso en el estado: esperado `{"tipo": "nueva_prevision", "tarea": "COM", "a": "Ismael", "estado": "omitido", "motivo": "presente"}`; real `[]`
+- **11, vez 5, paso 1** [comprension] no hay un botón para tocar: esperado `"COM"`; real `null`
+- **11, vez 5, paso 2** [comprension] jugadas: esperado `[{"nombre": "anotar_inicio", "tarea": "COM"}]`; real `[{"nombre": "anotar_inicio", "tarea": "PLC"}]`
+- **11, vez 5, paso 2** [garantia] efecto de más: estado: esperado `{"COM": "en_curso"}`; real `{"PLC": "en_curso"}`
+- **11, vez 5, paso 2** [comprension] hechos: esperado `[{"jugada": "anotar_inicio", "resultado": "anotado", "tarea": "COM"}]`; real `[{"jugada": "anotar_inicio", "resultado": "anotado", "tarea": "PLC", "estado": "en_curso"}]`
+- **11, vez 5, paso 3** [comprension] jugadas: esperado `[{"nombre": "anotar_prevision", "tarea": "COM", "fecha": "2026-11-04", "motivo": "espero el switch"}]`; real `[]`
+- **11, vez 5, paso 3** [comprension] falta un efecto: previsión: esperado `[{"tarea": "COM", "fecha": "2026-11-04", "motivo": "presente"}]`; real `[]`
+- **11, vez 5, paso 3** [comprension] falta un efecto: aviso guardado: esperado `[{"tipo": "nueva_prevision", "tarea": "COM", "a": "Ismael", "estado": "guardado", "hechos": {"prevision": "2026-11-04", "fecha_comprometida": "2026-10-30", "atraso_si_se_cumple_la_prevision_dias_habiles": 3}}]`; real `[]`
+- **11, vez 5, paso 3** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **11, vez 5, paso 3** [comprension] hechos: esperado `[{"jugada": "anotar_prevision", "resultado": "anotado", "tarea": "COM", "prevision": "2026-11-04", "aviso_al_referente": {"a": "Ismael Soschinski", "estado": "guardado_sin_enviar", "sale": "~2026-10-23T09:00"}}]`; real `[]`
+- **11, vez 5, paso 4** [comprension] jugadas: esperado `[{"nombre": "anotar_prevision", "tarea": "COM", "fecha": "2026-10-30", "puede_traer": ["motivo"]}]`; real `[]`
+- **11, vez 5, paso 4** [comprension] falta un efecto: previsión: esperado `[{"tarea": "COM", "fecha": "2026-10-30"}]`; real `[]`
+- **11, vez 5, paso 4** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **11, vez 5, paso 4** [comprension] hechos: esperado `[{"jugada": "anotar_prevision", "resultado": "anotado", "tarea": "COM", "prevision": "2026-10-30", "sin_aviso": "misma_fecha_comprometida"}]`; real `[]`
+- **11, vez 5, paso 4** [motor] aviso en el estado: esperado `{"tipo": "nueva_prevision", "tarea": "COM", "a": "Ismael", "estado": "omitido"}`; real `[]`
+- **11, vez 5, paso 5** [motor] aviso en el estado: esperado `{"tipo": "nueva_prevision", "tarea": "COM", "a": "Ismael", "estado": "omitido", "motivo": "presente"}`; real `[]`
+- **12, vez 1, paso 2** [comprension] jugadas: esperado `[{"nombre": "pedir_reasignacion", "tarea": "PLC", "a": "nahuel"}]`; real `[]`
+- **12, vez 1, paso 2** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **12, vez 1, paso 2** [comprension] la pregunta de la respuesta: esperado `{"tipo": "propuesta", "tarea": "PLC", "propone": ["anotar_prevision"]}`; real `null`
+- **12, vez 1, paso 2** [comprension] hechos: esperado `[{"jugada": "pedir_reasignacion", "resultado": "no_por_chat", "quien_decide": "Ismael Soschinski", "alternativa": "anotar_prevision", "tarea": "PLC", "pregunta": "propuesta"}]`; real `[]`
+- **12, vez 1, paso 2** [comprension] pregunta abierta después: esperado `{"tipo": "propuesta", "tarea": "PLC"}`; real `null`
+- **12, vez 1, paso 3** [comprension] jugadas: esperado `[{"nombre": "cancelar"}, {"nombre": "anotar_inicio", "tarea": "PLC"}]`; real `[]`
+- **12, vez 1, paso 3** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **12, vez 1, paso 3** [comprension] hechos: esperado `[{"jugada": "cancelar", "resultado": "cancelado"}, {"jugada": "anotar_inicio", "resultado": "no_se_puede", "motivo": "estado", "estado": "en_curso"}]`; real `[]`
+- **12, vez 1, paso 4** [comprension] jugadas: esperado `[{"nombre": "fuera_de_la_lista", "que_pide": "que le recuerde el viernes un turno con el médico"}]`; real `[]`
+- **12, vez 1, paso 4** [comprension] falta el aviso al administrador: esperado `1`; real `0`
+- **12, vez 1, paso 4** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **12, vez 1, paso 4** [comprension] hechos: esperado `[{"resultado": "fuera_de_la_lista", "lo_que_puede_hacer": "presente"}]`; real `[]`
+- **12, vez 1, paso 5** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **12, vez 1, paso 6** [comprension] jugadas: esperado `[{"nombre": "entregar", "tarea": "PLC"}]`; real `[]`
+- **12, vez 1, paso 6** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **12, vez 1, paso 6** [comprension] hechos: esperado `[{"jugada": "entregar", "resultado": "no_por_chat", "tarea": "PLC"}]`; real `[]`
+- **12, vez 1, paso 7** [comprension] jugadas: esperado `[{"nombre": "consultar_pendientes"}]`; real `[]`
+- **12, vez 1, paso 7** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **12, vez 1, paso 7** [comprension] hechos: esperado `[{"jugada": "consultar_pendientes", "resultado": "leido", "tareas": [{"titulo": "PLC", "estado": "en_curso", "vence": "2026-10-23"}, {"titulo": "COM", "estado": "asignada", "vence": "2026-10-30"}]}]`; real `[]`
+- **12, vez 2, paso 1** [motor] no salió lo esperado: esperado `{"a": "Marcos", "tipo": "aviso_previo", "tarea": "PLC", "hechos": {"vence": "2026-10-23", "necesita_respuesta": false}}`; real `[]`
+- **12, vez 2, paso 1** [motor] último aviso de Marcos: esperado `"PLC"`; real `null`
+- **12, vez 2, paso 2** [comprension] jugadas: esperado `[{"nombre": "pedir_reasignacion", "tarea": "PLC", "a": "nahuel"}]`; real `[]`
+- **12, vez 2, paso 2** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **12, vez 2, paso 2** [comprension] la pregunta de la respuesta: esperado `{"tipo": "propuesta", "tarea": "PLC", "propone": ["anotar_prevision"]}`; real `null`
+- **12, vez 2, paso 2** [comprension] hechos: esperado `[{"jugada": "pedir_reasignacion", "resultado": "no_por_chat", "quien_decide": "Ismael Soschinski", "alternativa": "anotar_prevision", "tarea": "PLC", "pregunta": "propuesta"}]`; real `[]`
+- **12, vez 2, paso 2** [comprension] pregunta abierta después: esperado `{"tipo": "propuesta", "tarea": "PLC"}`; real `null`
+- **12, vez 2, paso 3** [comprension] jugadas: esperado `[{"nombre": "cancelar"}, {"nombre": "anotar_inicio", "tarea": "PLC"}]`; real `[]`
+- **12, vez 2, paso 3** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **12, vez 2, paso 3** [comprension] hechos: esperado `[{"jugada": "cancelar", "resultado": "cancelado"}, {"jugada": "anotar_inicio", "resultado": "no_se_puede", "motivo": "estado", "estado": "en_curso"}]`; real `[]`
+- **12, vez 2, paso 4** [comprension] jugadas: esperado `[{"nombre": "fuera_de_la_lista", "que_pide": "que le recuerde el viernes un turno con el médico"}]`; real `[]`
+- **12, vez 2, paso 4** [comprension] falta el aviso al administrador: esperado `1`; real `0`
+- **12, vez 2, paso 4** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **12, vez 2, paso 4** [comprension] hechos: esperado `[{"resultado": "fuera_de_la_lista", "lo_que_puede_hacer": "presente"}]`; real `[]`
+- **12, vez 2, paso 5** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **12, vez 2, paso 6** [comprension] jugadas: esperado `[{"nombre": "entregar", "tarea": "PLC"}]`; real `[]`
+- **12, vez 2, paso 6** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **12, vez 2, paso 6** [comprension] hechos: esperado `[{"jugada": "entregar", "resultado": "no_por_chat", "tarea": "PLC"}]`; real `[]`
+- **12, vez 2, paso 7** [comprension] jugadas: esperado `[{"nombre": "consultar_pendientes"}]`; real `[]`
+- **12, vez 2, paso 7** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **12, vez 2, paso 7** [comprension] hechos: esperado `[{"jugada": "consultar_pendientes", "resultado": "leido", "tareas": [{"titulo": "PLC", "estado": "en_curso", "vence": "2026-10-23"}, {"titulo": "COM", "estado": "asignada", "vence": "2026-10-30"}]}]`; real `[]`
+- **12, vez 3, paso 2** [comprension] jugadas: esperado `[{"nombre": "pedir_reasignacion", "tarea": "PLC", "a": "nahuel"}]`; real `[]`
+- **12, vez 3, paso 2** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **12, vez 3, paso 2** [comprension] la pregunta de la respuesta: esperado `{"tipo": "propuesta", "tarea": "PLC", "propone": ["anotar_prevision"]}`; real `null`
+- **12, vez 3, paso 2** [comprension] hechos: esperado `[{"jugada": "pedir_reasignacion", "resultado": "no_por_chat", "quien_decide": "Ismael Soschinski", "alternativa": "anotar_prevision", "tarea": "PLC", "pregunta": "propuesta"}]`; real `[]`
+- **12, vez 3, paso 2** [comprension] pregunta abierta después: esperado `{"tipo": "propuesta", "tarea": "PLC"}`; real `null`
+- **12, vez 3, paso 3** [comprension] jugadas: esperado `[{"nombre": "cancelar"}, {"nombre": "anotar_inicio", "tarea": "PLC"}]`; real `[]`
+- **12, vez 3, paso 3** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **12, vez 3, paso 3** [comprension] hechos: esperado `[{"jugada": "cancelar", "resultado": "cancelado"}, {"jugada": "anotar_inicio", "resultado": "no_se_puede", "motivo": "estado", "estado": "en_curso"}]`; real `[]`
+- **12, vez 3, paso 4** [comprension] jugadas: esperado `[{"nombre": "fuera_de_la_lista", "que_pide": "que le recuerde el viernes un turno con el médico"}]`; real `[]`
+- **12, vez 3, paso 4** [comprension] falta el aviso al administrador: esperado `1`; real `0`
+- **12, vez 3, paso 4** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **12, vez 3, paso 4** [comprension] hechos: esperado `[{"resultado": "fuera_de_la_lista", "lo_que_puede_hacer": "presente"}]`; real `[]`
+- **12, vez 3, paso 5** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **12, vez 3, paso 6** [comprension] jugadas: esperado `[{"nombre": "entregar", "tarea": "PLC"}]`; real `[]`
+- **12, vez 3, paso 6** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **12, vez 3, paso 6** [comprension] hechos: esperado `[{"jugada": "entregar", "resultado": "no_por_chat", "tarea": "PLC"}]`; real `[]`
+- **12, vez 3, paso 7** [comprension] jugadas: esperado `[{"nombre": "consultar_pendientes"}]`; real `[]`
+- **12, vez 3, paso 7** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **12, vez 3, paso 7** [comprension] hechos: esperado `[{"jugada": "consultar_pendientes", "resultado": "leido", "tareas": [{"titulo": "PLC", "estado": "en_curso", "vence": "2026-10-23"}, {"titulo": "COM", "estado": "asignada", "vence": "2026-10-30"}]}]`; real `[]`
+- **12, vez 4, paso 2** [comprension] jugadas: esperado `[{"nombre": "pedir_reasignacion", "tarea": "PLC", "a": "nahuel"}]`; real `[]`
+- **12, vez 4, paso 2** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **12, vez 4, paso 2** [comprension] la pregunta de la respuesta: esperado `{"tipo": "propuesta", "tarea": "PLC", "propone": ["anotar_prevision"]}`; real `null`
+- **12, vez 4, paso 2** [comprension] hechos: esperado `[{"jugada": "pedir_reasignacion", "resultado": "no_por_chat", "quien_decide": "Ismael Soschinski", "alternativa": "anotar_prevision", "tarea": "PLC", "pregunta": "propuesta"}]`; real `[]`
+- **12, vez 4, paso 2** [comprension] pregunta abierta después: esperado `{"tipo": "propuesta", "tarea": "PLC"}`; real `null`
+- **12, vez 4, paso 3** [comprension] jugadas: esperado `[{"nombre": "cancelar"}, {"nombre": "anotar_inicio", "tarea": "PLC"}]`; real `[]`
+- **12, vez 4, paso 3** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **12, vez 4, paso 3** [comprension] hechos: esperado `[{"jugada": "cancelar", "resultado": "cancelado"}, {"jugada": "anotar_inicio", "resultado": "no_se_puede", "motivo": "estado", "estado": "en_curso"}]`; real `[]`
+- **12, vez 4, paso 4** [comprension] jugadas: esperado `[{"nombre": "fuera_de_la_lista", "que_pide": "que le recuerde el viernes un turno con el médico"}]`; real `[]`
+- **12, vez 4, paso 4** [comprension] falta el aviso al administrador: esperado `1`; real `0`
+- **12, vez 4, paso 4** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **12, vez 4, paso 4** [comprension] hechos: esperado `[{"resultado": "fuera_de_la_lista", "lo_que_puede_hacer": "presente"}]`; real `[]`
+- **12, vez 4, paso 5** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **12, vez 4, paso 6** [comprension] jugadas: esperado `[{"nombre": "entregar", "tarea": "PLC"}]`; real `[]`
+- **12, vez 4, paso 6** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **12, vez 4, paso 6** [comprension] hechos: esperado `[{"jugada": "entregar", "resultado": "no_por_chat", "tarea": "PLC"}]`; real `[]`
+- **12, vez 4, paso 7** [comprension] jugadas: esperado `[{"nombre": "consultar_pendientes"}]`; real `[]`
+- **12, vez 4, paso 7** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **12, vez 4, paso 7** [comprension] hechos: esperado `[{"jugada": "consultar_pendientes", "resultado": "leido", "tareas": [{"titulo": "PLC", "estado": "en_curso", "vence": "2026-10-23"}, {"titulo": "COM", "estado": "asignada", "vence": "2026-10-30"}]}]`; real `[]`
+- **12, vez 5, paso 1** [motor] no salió lo esperado: esperado `{"a": "Marcos", "tipo": "aviso_previo", "tarea": "PLC", "hechos": {"vence": "2026-10-23", "necesita_respuesta": false}}`; real `[]`
+- **12, vez 5, paso 1** [motor] último aviso de Marcos: esperado `"PLC"`; real `null`
+- **12, vez 5, paso 2** [comprension] jugadas: esperado `[{"nombre": "pedir_reasignacion", "tarea": "PLC", "a": "nahuel"}]`; real `[]`
+- **12, vez 5, paso 2** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **12, vez 5, paso 2** [comprension] la pregunta de la respuesta: esperado `{"tipo": "propuesta", "tarea": "PLC", "propone": ["anotar_prevision"]}`; real `null`
+- **12, vez 5, paso 2** [comprension] hechos: esperado `[{"jugada": "pedir_reasignacion", "resultado": "no_por_chat", "quien_decide": "Ismael Soschinski", "alternativa": "anotar_prevision", "tarea": "PLC", "pregunta": "propuesta"}]`; real `[]`
+- **12, vez 5, paso 2** [comprension] pregunta abierta después: esperado `{"tipo": "propuesta", "tarea": "PLC"}`; real `null`
+- **12, vez 5, paso 3** [comprension] jugadas: esperado `[{"nombre": "cancelar"}, {"nombre": "anotar_inicio", "tarea": "PLC"}]`; real `[]`
+- **12, vez 5, paso 3** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **12, vez 5, paso 3** [comprension] hechos: esperado `[{"jugada": "cancelar", "resultado": "cancelado"}, {"jugada": "anotar_inicio", "resultado": "no_se_puede", "motivo": "estado", "estado": "en_curso"}]`; real `[]`
+- **12, vez 5, paso 4** [comprension] jugadas: esperado `[{"nombre": "fuera_de_la_lista", "que_pide": "que le recuerde el viernes un turno con el médico"}]`; real `[]`
+- **12, vez 5, paso 4** [comprension] falta el aviso al administrador: esperado `1`; real `0`
+- **12, vez 5, paso 4** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **12, vez 5, paso 4** [comprension] hechos: esperado `[{"resultado": "fuera_de_la_lista", "lo_que_puede_hacer": "presente"}]`; real `[]`
+- **12, vez 5, paso 5** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **12, vez 5, paso 6** [comprension] jugadas: esperado `[{"nombre": "entregar", "tarea": "PLC"}]`; real `[]`
+- **12, vez 5, paso 6** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **12, vez 5, paso 6** [comprension] hechos: esperado `[{"jugada": "entregar", "resultado": "no_por_chat", "tarea": "PLC"}]`; real `[]`
+- **12, vez 5, paso 7** [comprension] jugadas: esperado `[{"nombre": "consultar_pendientes"}]`; real `[]`
+- **12, vez 5, paso 7** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **12, vez 5, paso 7** [comprension] hechos: esperado `[{"jugada": "consultar_pendientes", "resultado": "leido", "tareas": [{"titulo": "PLC", "estado": "en_curso", "vence": "2026-10-23"}, {"titulo": "COM", "estado": "asignada", "vence": "2026-10-30"}]}]`; real `[]`
+- **13, vez 1, paso 2** [comprension] jugadas: esperado `[{"nombre": "anotar_inicio"}]`; real `[]`
+- **13, vez 1, paso 2** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **13, vez 1, paso 2** [comprension] botones: esperado `["PLC", "COM"]`; real `[]`
+- **13, vez 1, paso 2** [comprension] la pregunta de la respuesta: esperado `{"tipo": "cual_tarea"}`; real `null`
+- **13, vez 1, paso 2** [comprension] hechos: esperado `[{"jugada": "anotar_inicio", "resultado": "falta_dato", "falta": ["tarea"], "pregunta": "cual_tarea"}]`; real `[]`
+- **13, vez 1, paso 2** [comprension] pregunta abierta después: esperado `{"tipo": "cual_tarea"}`; real `null`
+- **13, vez 1, paso 3** [comprension] jugadas: esperado `[{"nombre": "elegir", "opcion": "PLC"}]`; real `[]`
+- **13, vez 1, paso 3** [comprension] falta un efecto: estado: esperado `{"PLC": "en_curso"}`; real `{}`
+- **13, vez 1, paso 3** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **13, vez 1, paso 3** [comprension] hechos: esperado `[{"jugada": "anotar_inicio", "resultado": "anotado", "tarea": "PLC"}]`; real `[]`
+- **13, vez 2, paso 3** [comprension] jugadas: esperado `[{"nombre": "elegir", "opcion": "PLC"}]`; real `[]`
+- **13, vez 2, paso 3** [comprension] falta un efecto: estado: esperado `{"PLC": "en_curso"}`; real `{}`
+- **13, vez 2, paso 3** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **13, vez 2, paso 3** [comprension] botones: esperado `[]`; real `["PLC", "COM"]`
+- **13, vez 2, paso 3** [comprension] hechos: esperado `[{"jugada": "anotar_inicio", "resultado": "anotado", "tarea": "PLC"}]`; real `[]`
+- **13, vez 2, paso 3** [comprension] pregunta abierta después: esperado `null`; real `{"tipo": "cual_tarea", "tarea": null}`
+- **13, vez 3, paso 1** [motor] no salió lo esperado: esperado `{"a": "Marcos", "tipo": "aviso_previo", "tareas": ["PLC", "COM"]}`; real `[]`
+- **13, vez 3, paso 1** [motor] último aviso de Marcos: esperado `["COM", "PLC"]`; real `null`
+- **13, vez 3, paso 2** [comprension] jugadas: esperado `[{"nombre": "anotar_inicio"}]`; real `[]`
+- **13, vez 3, paso 2** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **13, vez 3, paso 2** [comprension] botones: esperado `["PLC", "COM"]`; real `[]`
+- **13, vez 3, paso 2** [comprension] la pregunta de la respuesta: esperado `{"tipo": "cual_tarea"}`; real `null`
+- **13, vez 3, paso 2** [comprension] hechos: esperado `[{"jugada": "anotar_inicio", "resultado": "falta_dato", "falta": ["tarea"], "pregunta": "cual_tarea"}]`; real `[]`
+- **13, vez 3, paso 2** [comprension] pregunta abierta después: esperado `{"tipo": "cual_tarea"}`; real `null`
+- **13, vez 3, paso 3** [comprension] jugadas: esperado `[{"nombre": "elegir", "opcion": "PLC"}]`; real `[]`
+- **13, vez 3, paso 3** [comprension] falta un efecto: estado: esperado `{"PLC": "en_curso"}`; real `{}`
+- **13, vez 3, paso 3** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **13, vez 3, paso 3** [comprension] hechos: esperado `[{"jugada": "anotar_inicio", "resultado": "anotado", "tarea": "PLC"}]`; real `[]`
+- **13, vez 5, paso 2** [comprension] jugadas: esperado `[{"nombre": "anotar_inicio"}]`; real `[]`
+- **13, vez 5, paso 2** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **13, vez 5, paso 2** [comprension] botones: esperado `["PLC", "COM"]`; real `[]`
+- **13, vez 5, paso 2** [comprension] la pregunta de la respuesta: esperado `{"tipo": "cual_tarea"}`; real `null`
+- **13, vez 5, paso 2** [comprension] hechos: esperado `[{"jugada": "anotar_inicio", "resultado": "falta_dato", "falta": ["tarea"], "pregunta": "cual_tarea"}]`; real `[]`
+- **13, vez 5, paso 2** [comprension] pregunta abierta después: esperado `{"tipo": "cual_tarea"}`; real `null`
+- **13, vez 5, paso 3** [comprension] jugadas: esperado `[{"nombre": "elegir", "opcion": "PLC"}]`; real `[]`
+- **13, vez 5, paso 3** [comprension] falta un efecto: estado: esperado `{"PLC": "en_curso"}`; real `{}`
+- **13, vez 5, paso 3** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **13, vez 5, paso 3** [comprension] hechos: esperado `[{"jugada": "anotar_inicio", "resultado": "anotado", "tarea": "PLC"}]`; real `[]`
+- **14, vez 1, paso 1** [motor] no salió lo esperado: esperado `{"a": "Marcos", "tipo": "aviso_previo", "tarea": "PLC", "hechos": {"vence": "2026-10-23", "necesita_respuesta": false}}`; real `[]`
+- **14, vez 1, paso 1** [motor] último aviso de Marcos: esperado `"PLC"`; real `null`
+- **14, vez 1, paso 2** [comprension] jugadas: esperado `[{"nombre": "anotar_inicio", "tarea": "PLC"}]`; real `[]`
+- **14, vez 1, paso 2** [comprension] falta un efecto: estado: esperado `{"PLC": "en_curso"}`; real `{}`
+- **14, vez 1, paso 2** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **14, vez 1, paso 2** [comprension] hechos: esperado `[{"jugada": "anotar_inicio", "resultado": "anotado", "tarea": "PLC"}]`; real `[]`
+- **14, vez 1, paso 3** [comprension] jugadas: esperado `[{"nombre": "anotar_inicio", "tarea": "COM"}]`; real `[]`
+- **14, vez 1, paso 3** [comprension] falta un efecto: estado: esperado `{"COM": "en_curso"}`; real `{}`
+- **14, vez 1, paso 3** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **14, vez 1, paso 3** [comprension] hechos: esperado `[{"jugada": "anotar_inicio", "resultado": "anotado", "tarea": "COM"}]`; real `[]`
+- **14, vez 2, paso 1** [motor] no salió lo esperado: esperado `{"a": "Marcos", "tipo": "aviso_previo", "tarea": "PLC", "hechos": {"vence": "2026-10-23", "necesita_respuesta": false}}`; real `[]`
+- **14, vez 2, paso 1** [motor] último aviso de Marcos: esperado `"PLC"`; real `null`
+- **14, vez 2, paso 2** [comprension] jugadas: esperado `[{"nombre": "anotar_inicio", "tarea": "PLC"}]`; real `[]`
+- **14, vez 2, paso 2** [comprension] falta un efecto: estado: esperado `{"PLC": "en_curso"}`; real `{}`
+- **14, vez 2, paso 2** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **14, vez 2, paso 2** [comprension] hechos: esperado `[{"jugada": "anotar_inicio", "resultado": "anotado", "tarea": "PLC"}]`; real `[]`
+- **14, vez 2, paso 3** [comprension] jugadas: esperado `[{"nombre": "anotar_inicio", "tarea": "COM"}]`; real `[]`
+- **14, vez 2, paso 3** [comprension] falta un efecto: estado: esperado `{"COM": "en_curso"}`; real `{}`
+- **14, vez 2, paso 3** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **14, vez 2, paso 3** [comprension] hechos: esperado `[{"jugada": "anotar_inicio", "resultado": "anotado", "tarea": "COM"}]`; real `[]`
+- **14, vez 3, paso 1** [motor] no salió lo esperado: esperado `{"a": "Marcos", "tipo": "aviso_previo", "tarea": "PLC", "hechos": {"vence": "2026-10-23", "necesita_respuesta": false}}`; real `[]`
+- **14, vez 3, paso 1** [motor] último aviso de Marcos: esperado `"PLC"`; real `null`
+- **14, vez 3, paso 2** [comprension] jugadas: esperado `[{"nombre": "anotar_inicio", "tarea": "PLC"}]`; real `[]`
+- **14, vez 3, paso 2** [comprension] falta un efecto: estado: esperado `{"PLC": "en_curso"}`; real `{}`
+- **14, vez 3, paso 2** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **14, vez 3, paso 2** [comprension] hechos: esperado `[{"jugada": "anotar_inicio", "resultado": "anotado", "tarea": "PLC"}]`; real `[]`
+- **14, vez 3, paso 3** [comprension] jugadas: esperado `[{"nombre": "anotar_inicio", "tarea": "COM"}]`; real `[]`
+- **14, vez 3, paso 3** [comprension] falta un efecto: estado: esperado `{"COM": "en_curso"}`; real `{}`
+- **14, vez 3, paso 3** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **14, vez 3, paso 3** [comprension] hechos: esperado `[{"jugada": "anotar_inicio", "resultado": "anotado", "tarea": "COM"}]`; real `[]`
+- **14, vez 4, paso 2** [comprension] jugadas: esperado `[{"nombre": "anotar_inicio", "tarea": "PLC"}]`; real `[]`
+- **14, vez 4, paso 2** [comprension] falta un efecto: estado: esperado `{"PLC": "en_curso"}`; real `{}`
+- **14, vez 4, paso 2** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **14, vez 4, paso 2** [comprension] hechos: esperado `[{"jugada": "anotar_inicio", "resultado": "anotado", "tarea": "PLC"}]`; real `[]`
+- **14, vez 5, paso 2** [comprension] jugadas: esperado `[{"nombre": "anotar_inicio", "tarea": "PLC"}]`; real `[]`
+- **14, vez 5, paso 2** [comprension] falta un efecto: estado: esperado `{"PLC": "en_curso"}`; real `{}`
+- **14, vez 5, paso 2** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **14, vez 5, paso 2** [comprension] hechos: esperado `[{"jugada": "anotar_inicio", "resultado": "anotado", "tarea": "PLC"}]`; real `[]`
+- **14, vez 5, paso 3** [comprension] jugadas: esperado `[{"nombre": "anotar_inicio", "tarea": "COM"}]`; real `[]`
+- **14, vez 5, paso 3** [comprension] falta un efecto: estado: esperado `{"COM": "en_curso"}`; real `{}`
+- **14, vez 5, paso 3** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **14, vez 5, paso 3** [comprension] hechos: esperado `[{"jugada": "anotar_inicio", "resultado": "anotado", "tarea": "COM"}]`; real `[]`
+- **15, vez 1, paso 2** [comprension] jugadas: esperado `[{"nombre": "informar_avance", "tarea": "PLC", "palabras": "voy bien, la tengo casi lista"}]`; real `[]`
+- **15, vez 1, paso 2** [comprension] falta un efecto: avance: esperado `[{"tarea": "PLC"}]`; real `[]`
+- **15, vez 1, paso 2** [comprension] falta un efecto: aviso guardado: esperado `[{"tipo": "repregunta_de_estado", "tarea": "PLC", "a": "Marcos", "estado": "guardado"}]`; real `[]`
+- **15, vez 1, paso 2** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **15, vez 1, paso 2** [comprension] hechos: esperado `[{"jugada": "informar_avance", "resultado": "anotado", "tarea": "PLC", "avance": {"dijo": "presente"}, "el_pedido_de_estado": "sigue_abierto", "vuelve_a_pedir_el_estado": {"estado": "guardado_sin_enviar", "sale": "~2026-10-28"}, "veces_sin_algo_cierto": 1, "vencida": "ausente", "pregunta": "ausente"}]`; real `[]`
+- **15, vez 1, paso 2** [comprension] pregunta abierta después: esperado `null`; real `{"tipo": "estado_de_la_tarea", "tarea": "PLC"}`
+- **15, vez 1, paso 4** [motor] no salió lo esperado: esperado `{"a": "Marcos", "tipo": "repregunta_de_estado", "tarea": "PLC", "hechos": {"necesita_respuesta": true, "avance_anterior": {"dijo": "presente", "el": "2026-10-27"}, "espera_algo_cierto": "presente", "si_no_hay_respuesta": "ausente"}}`; real `[{"a": "Marcos", "tipo": "pedido_de_estado", "tareas": ["PLC"], "el": "2026-10-28", "hechos": {"aviso": "pedido_de_estado", "tarea": "PLC", "vence": "2026-10-27", "estado": "en_curso", "numero": 2, "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "necesita_respuesta": true, "atraso_dias_habiles": 1}}]`
+- **15, vez 1, paso 4** [motor] salió algo de más: esperado `null`; real `{"a": "Marcos", "tipo": "pedido_de_estado", "tareas": ["PLC"], "el": "2026-10-28", "hechos": {"aviso": "pedido_de_estado", "tarea": "PLC", "vence": "2026-10-27", "estado": "en_curso", "numero": 2, "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "necesita_respuesta": true, "atraso_dias_habiles": 1}}`
+- **15, vez 1, paso 5** [comprension] jugadas: esperado `[{"nombre": "informar_avance", "tarea": "PLC", "palabras": "todo en orden, sigo con eso"}]`; real `[]`
+- **15, vez 1, paso 5** [comprension] falta un efecto: avance: esperado `[{"tarea": "PLC"}]`; real `[]`
+- **15, vez 1, paso 5** [comprension] falta un efecto: aviso guardado: esperado `[{"tipo": "repregunta_de_estado", "tarea": "PLC", "a": "Marcos", "estado": "guardado"}]`; real `[]`
+- **15, vez 1, paso 5** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **15, vez 1, paso 5** [comprension] la pregunta de la respuesta: esperado `{"tipo": "fecha_de_la_tarea", "tarea": "PLC"}`; real `null`
+- **15, vez 1, paso 5** [comprension] hechos: esperado `[{"jugada": "informar_avance", "resultado": "anotado", "tarea": "PLC", "veces_sin_algo_cierto": 2, "vuelve_a_pedir_el_estado": {"estado": "guardado_sin_enviar", "sale": "~2026-10-29"}, "vencida": {"fecha_comprometida": "2026-10-27", "atraso_dias_habiles": 1}, "pregunta": "fecha_de_la_tarea"}]`; real `[]`
+- **15, vez 1, paso 5** [comprension] pregunta abierta después: esperado `{"tipo": "fecha_de_la_tarea", "tarea": "PLC"}`; real `{"tipo": "estado_de_la_tarea", "tarea": "PLC"}`
+- **15, vez 1, paso 6** [comprension] jugadas: esperado `[{"nombre": "anotar_prevision", "tarea": "PLC", "fecha": "2026-11-03"}]`; real `[]`
+- **15, vez 1, paso 6** [comprension] falta un efecto: previsión: esperado `[{"tarea": "PLC", "fecha": "2026-11-03", "motivo": "ausente"}]`; real `[]`
+- **15, vez 1, paso 6** [comprension] falta un efecto: aviso guardado: esperado `[{"tipo": "nueva_prevision", "tarea": "PLC", "a": "Ismael", "hechos": {"prevision": "2026-11-03", "fecha_comprometida": "2026-10-27", "atraso_si_se_cumple_la_prevision_dias_habiles": 5, "dependientes": ["COM"]}}]`; real `[]`
+- **15, vez 1, paso 6** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **15, vez 1, paso 6** [comprension] hechos: esperado `[{"jugada": "anotar_prevision", "resultado": "anotado", "tarea": "PLC", "prevision": "2026-11-03", "fecha_comprometida": "2026-10-27", "atraso_si_se_cumple_la_prevision_dias_habiles": 5, "aviso_al_referente": {"a": "Ismael Soschinski", "estado": "guardado_sin_enviar"}}]`; real `[]`
+- **15, vez 1, paso 6** [comprension] pregunta abierta después: esperado `null`; real `{"tipo": "estado_de_la_tarea", "tarea": "PLC"}`
+- **15, vez 1, paso 6** [comprension] esperas abiertas después: esperado `[]`; real `["PLC"]`
+- **15, vez 1, paso 7** [motor] no salió lo esperado: esperado `{"a": "Ismael", "el": "2026-10-28", "tipo": "nueva_prevision", "tarea": "PLC", "hechos": {"prevision": "2026-11-03", "atraso_si_se_cumple_la_prevision_dias_habiles": 5}}`; real `[]`
+- **15, vez 1, paso 7** [motor] incidente: esperado `[]`; real `[{"etapa": "motor_aviso_guardado", "severidad": "media"}]`
+- **15, vez 1, paso 7** [motor] aviso en el estado: esperado `{"tipo": "repregunta_de_estado", "tarea": "PLC", "a": "Marcos", "estado": "omitido", "motivo": "ya_respondio"}`; real `[{"tipo": "aviso_previo", "tarea": "PLC", "a": "Marcos", "estado": "enviado", "motivo": null, "hechos": {"aviso": "vencimiento_proximo", "tarea": "PLC", "vence": "2026-10-27", "necesita_respuesta": false, "dias_habiles_hasta_el_vencimiento": 3}, "outbox_id": "bdd021cd-10db-4703-a3e5-276dfbc04d2c"}, {"tipo": "pedido_de_estado", "tarea": "PLC", "a": "Marcos", "estado": "enviado", "motivo": null, "hechos": {"aviso": "pedido_de_estado", "tarea": "PLC", "vence": "2026-10-27", "estado": "en_curso", "numero": 1, "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "necesita_respuesta": true, "atraso_dias_habiles": 0}, "outbox_id": "5ebca0da-2e4c-424b-b332-484e15165cb5"}, {"tipo": "pedido_de_estado", "tarea": "PLC", "a": "Marcos", "estado": "enviado", "motivo": null, "hechos": {"aviso": "pedido_de_estado", "tarea": "PLC", "vence": "2026-10-27", "estado": "en_curso", "numero": 2, "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "necesita_respuesta": true, "atraso_dias_habiles": 1}, "outbox_id": "b53ad76d-f4e1-4b3d-885c-a2fbda34cf61"}, {"tipo": "pedido_de_estado", "tarea": "PLC", "a": "Marcos", "estado": "fallido", "motivo": null, "hechos": {"aviso": "pedido_de_estado", "tarea": "PLC", "vence": "2026-10-27", "estado": "en_curso", "numero": 3, "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "necesita_respuesta": true, "atraso_dias_habiles": 2, "si_no_hay_respuesta": {"estado": "todavia_no", "se_avisa_a": ["Ismael Soschinski"]}, "avisa_que_va_a_escalar": true}, "outbox_id": null}]`
+- **15, vez 1, paso 8** [motor] no salió lo esperado: esperado `{"a": "Marcos", "tipo": "pedido_de_estado", "tareas": ["PLC", "COM"], "hechos": {"numero": 1, "necesita_respuesta": true, "seguimiento_por": "prevision", "prevision_vigente": {"fecha": "2026-11-03"}}}`; real `[]`
+- **15, vez 1, paso 8** [motor] salió algo de más: esperado `null`; real `{"a": "Ismael", "tipo": "escalamiento", "tareas": ["PLC"], "el": "2026-11-03", "hechos": {"aviso": "falta_de_respuesta", "tarea": "PLC", "vence": "2026-10-27", "estado": "en_curso", "responsable": "Marcos Tarquini", "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "pedido_desde": "2026-10-27", "necesita_respuesta": false, "atraso_dias_habiles": 5, "pedidos_de_estado_sin_respuesta": 2, "pedidos_de_estado_que_no_le_llegaron": 1}}`
+- **15, vez 2, paso 5** [comprension] jugadas: esperado `[{"nombre": "informar_avance", "tarea": "PLC", "palabras": "todo en orden, sigo con eso"}]`; real `[]`
+- **15, vez 2, paso 5** [comprension] falta un efecto: avance: esperado `[{"tarea": "PLC"}]`; real `[]`
+- **15, vez 2, paso 5** [comprension] falta un efecto: aviso guardado: esperado `[{"tipo": "repregunta_de_estado", "tarea": "PLC", "a": "Marcos", "estado": "guardado"}]`; real `[]`
+- **15, vez 2, paso 5** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **15, vez 2, paso 5** [comprension] la pregunta de la respuesta: esperado `{"tipo": "fecha_de_la_tarea", "tarea": "PLC"}`; real `null`
+- **15, vez 2, paso 5** [comprension] hechos: esperado `[{"jugada": "informar_avance", "resultado": "anotado", "tarea": "PLC", "veces_sin_algo_cierto": 2, "vuelve_a_pedir_el_estado": {"estado": "guardado_sin_enviar", "sale": "~2026-10-29"}, "vencida": {"fecha_comprometida": "2026-10-27", "atraso_dias_habiles": 1}, "pregunta": "fecha_de_la_tarea"}]`; real `[]`
+- **15, vez 2, paso 5** [comprension] pregunta abierta después: esperado `{"tipo": "fecha_de_la_tarea", "tarea": "PLC"}`; real `{"tipo": "estado_de_la_tarea", "tarea": "PLC"}`
+- **15, vez 2, paso 6** [comprension] jugadas: esperado `[{"nombre": "anotar_prevision", "tarea": "PLC", "fecha": "2026-11-03"}]`; real `[]`
+- **15, vez 2, paso 6** [comprension] falta un efecto: previsión: esperado `[{"tarea": "PLC", "fecha": "2026-11-03", "motivo": "ausente"}]`; real `[]`
+- **15, vez 2, paso 6** [comprension] falta un efecto: aviso guardado: esperado `[{"tipo": "nueva_prevision", "tarea": "PLC", "a": "Ismael", "hechos": {"prevision": "2026-11-03", "fecha_comprometida": "2026-10-27", "atraso_si_se_cumple_la_prevision_dias_habiles": 5, "dependientes": ["COM"]}}]`; real `[]`
+- **15, vez 2, paso 6** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **15, vez 2, paso 6** [comprension] hechos: esperado `[{"jugada": "anotar_prevision", "resultado": "anotado", "tarea": "PLC", "prevision": "2026-11-03", "fecha_comprometida": "2026-10-27", "atraso_si_se_cumple_la_prevision_dias_habiles": 5, "aviso_al_referente": {"a": "Ismael Soschinski", "estado": "guardado_sin_enviar"}}]`; real `[]`
+- **15, vez 2, paso 6** [comprension] pregunta abierta después: esperado `null`; real `{"tipo": "estado_de_la_tarea", "tarea": "PLC"}`
+- **15, vez 2, paso 6** [comprension] esperas abiertas después: esperado `[]`; real `["PLC"]`
+- **15, vez 2, paso 7** [motor] no salió lo esperado: esperado `{"a": "Ismael", "el": "2026-10-28", "tipo": "nueva_prevision", "tarea": "PLC", "hechos": {"prevision": "2026-11-03", "atraso_si_se_cumple_la_prevision_dias_habiles": 5}}`; real `[]`
+- **15, vez 2, paso 7** [motor] incidente: esperado `[]`; real `[{"etapa": "motor_aviso_guardado", "severidad": "media"}]`
+- **15, vez 2, paso 7** [motor] aviso en el estado: esperado `{"tipo": "repregunta_de_estado", "tarea": "PLC", "a": "Marcos", "estado": "omitido", "motivo": "ya_respondio"}`; real `[{"tipo": "aviso_previo", "tarea": "PLC", "a": "Marcos", "estado": "enviado", "motivo": null, "hechos": {"aviso": "vencimiento_proximo", "tarea": "PLC", "vence": "2026-10-27", "necesita_respuesta": false, "dias_habiles_hasta_el_vencimiento": 3}, "outbox_id": "94a6f6d4-9e46-4e6e-8645-e52a5a07e116"}, {"tipo": "pedido_de_estado", "tarea": "PLC", "a": "Marcos", "estado": "enviado", "motivo": null, "hechos": {"aviso": "pedido_de_estado", "tarea": "PLC", "vence": "2026-10-27", "estado": "en_curso", "numero": 1, "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "necesita_respuesta": true, "atraso_dias_habiles": 0}, "outbox_id": "110cae19-3085-4861-879a-6ae5b0fdb9f8"}, {"tipo": "pedido_de_estado", "tarea": "PLC", "a": "Marcos", "estado": "fallido", "motivo": null, "hechos": {"aviso": "pedido_de_estado", "tarea": "PLC", "vence": "2026-10-27", "estado": "en_curso", "numero": 2, "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "necesita_respuesta": true, "atraso_dias_habiles": 2}, "outbox_id": null}, {"tipo": "repregunta_de_estado", "tarea": "PLC", "a": "Marcos", "estado": "enviado", "motivo": null, "hechos": {"aviso": "repregunta_de_estado", "tarea": "PLC", "vence": "2026-10-27", "estado": "en_curso", "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "avance_anterior": {"el": "2026-10-27", "dijo": "voy bien, la tengo casi lista"}, "espera_algo_cierto": ["si_la_termino", "para_cuando_la_termina", "si_esta_trabada"], "necesita_respuesta": true, "atraso_dias_habiles": 1}, "outbox_id": "a671673f-b97f-4634-942c-6ee3d20fe328"}]`
+- **15, vez 2, paso 8** [motor] no salió lo esperado: esperado `{"a": "Marcos", "tipo": "pedido_de_estado", "tareas": ["PLC", "COM"], "hechos": {"numero": 1, "necesita_respuesta": true, "seguimiento_por": "prevision", "prevision_vigente": {"fecha": "2026-11-03"}}}`; real `[{"a": "Marcos", "tipo": ["aviso_previo", "pedido_de_estado"], "tareas": ["COM", "PLC"], "el": "2026-11-03", "hechos": [{"aviso": "vencimiento_proximo", "tarea": "COM", "vence": "2026-11-06", "necesita_respuesta": false, "dias_habiles_hasta_el_vencimiento": 3}, {"aviso": "pedido_de_estado", "tarea": "PLC", "vence": "2026-10-27", "estado": "en_curso", "numero": 3, "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "necesita_respuesta": true, "atraso_dias_habiles": 5, "si_no_hay_respuesta": {"estado": "todavia_no", "se_avisa_a": ["Ismael Soschinski"]}, "pedidos_anteriores_que_no_le_llegaron": 1}]}]`
+- **15, vez 2, paso 8** [motor] salió algo de más: esperado `null`; real `{"a": "Marcos", "tipo": ["aviso_previo", "pedido_de_estado"], "tareas": ["COM", "PLC"], "el": "2026-11-03", "hechos": [{"aviso": "vencimiento_proximo", "tarea": "COM", "vence": "2026-11-06", "necesita_respuesta": false, "dias_habiles_hasta_el_vencimiento": 3}, {"aviso": "pedido_de_estado", "tarea": "PLC", "vence": "2026-10-27", "estado": "en_curso", "numero": 3, "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "necesita_respuesta": true, "atraso_dias_habiles": 5, "si_no_hay_respuesta": {"estado": "todavia_no", "se_avisa_a": ["Ismael Soschinski"]}, "pedidos_anteriores_que_no_le_llegaron": 1}]}`
+- **15, vez 3, paso 5** [comprension] jugadas: esperado `[{"nombre": "informar_avance", "tarea": "PLC", "palabras": "todo en orden, sigo con eso"}]`; real `[]`
+- **15, vez 3, paso 5** [comprension] falta un efecto: avance: esperado `[{"tarea": "PLC"}]`; real `[]`
+- **15, vez 3, paso 5** [comprension] falta un efecto: aviso guardado: esperado `[{"tipo": "repregunta_de_estado", "tarea": "PLC", "a": "Marcos", "estado": "guardado"}]`; real `[]`
+- **15, vez 3, paso 5** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **15, vez 3, paso 5** [comprension] la pregunta de la respuesta: esperado `{"tipo": "fecha_de_la_tarea", "tarea": "PLC"}`; real `null`
+- **15, vez 3, paso 5** [comprension] hechos: esperado `[{"jugada": "informar_avance", "resultado": "anotado", "tarea": "PLC", "veces_sin_algo_cierto": 2, "vuelve_a_pedir_el_estado": {"estado": "guardado_sin_enviar", "sale": "~2026-10-29"}, "vencida": {"fecha_comprometida": "2026-10-27", "atraso_dias_habiles": 1}, "pregunta": "fecha_de_la_tarea"}]`; real `[]`
+- **15, vez 3, paso 5** [comprension] pregunta abierta después: esperado `{"tipo": "fecha_de_la_tarea", "tarea": "PLC"}`; real `{"tipo": "estado_de_la_tarea", "tarea": "PLC"}`
+- **15, vez 3, paso 6** [comprension] jugadas: esperado `[{"nombre": "anotar_prevision", "tarea": "PLC", "fecha": "2026-11-03"}]`; real `[]`
+- **15, vez 3, paso 6** [comprension] falta un efecto: previsión: esperado `[{"tarea": "PLC", "fecha": "2026-11-03", "motivo": "ausente"}]`; real `[]`
+- **15, vez 3, paso 6** [comprension] falta un efecto: aviso guardado: esperado `[{"tipo": "nueva_prevision", "tarea": "PLC", "a": "Ismael", "hechos": {"prevision": "2026-11-03", "fecha_comprometida": "2026-10-27", "atraso_si_se_cumple_la_prevision_dias_habiles": 5, "dependientes": ["COM"]}}]`; real `[]`
+- **15, vez 3, paso 6** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **15, vez 3, paso 6** [comprension] hechos: esperado `[{"jugada": "anotar_prevision", "resultado": "anotado", "tarea": "PLC", "prevision": "2026-11-03", "fecha_comprometida": "2026-10-27", "atraso_si_se_cumple_la_prevision_dias_habiles": 5, "aviso_al_referente": {"a": "Ismael Soschinski", "estado": "guardado_sin_enviar"}}]`; real `[]`
+- **15, vez 3, paso 6** [comprension] pregunta abierta después: esperado `null`; real `{"tipo": "estado_de_la_tarea", "tarea": "PLC"}`
+- **15, vez 3, paso 6** [comprension] esperas abiertas después: esperado `[]`; real `["PLC"]`
+- **15, vez 3, paso 7** [motor] no salió lo esperado: esperado `{"a": "Ismael", "el": "2026-10-28", "tipo": "nueva_prevision", "tarea": "PLC", "hechos": {"prevision": "2026-11-03", "atraso_si_se_cumple_la_prevision_dias_habiles": 5}}`; real `[{"a": "Ismael", "tipo": "escalamiento", "tareas": ["PLC"], "el": "2026-11-02", "hechos": {"aviso": "falta_de_respuesta", "tarea": "PLC", "vence": "2026-10-27", "estado": "en_curso", "responsable": "Marcos Tarquini", "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "pedido_desde": "2026-10-28", "necesita_respuesta": false, "atraso_dias_habiles": 4, "avance_sin_algo_cierto": {"el": "2026-10-27", "dijo": "voy bien, la tengo casi lista"}, "pedidos_de_estado_sin_respuesta": 3}}]`
+- **15, vez 3, paso 7** [motor] salió algo de más: esperado `null`; real `{"a": "Marcos", "tipo": "pedido_de_estado", "tareas": ["PLC"], "el": "2026-10-29", "hechos": {"aviso": "pedido_de_estado", "tarea": "PLC", "vence": "2026-10-27", "estado": "en_curso", "numero": 2, "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "necesita_respuesta": true, "atraso_dias_habiles": 2}}`
+- **15, vez 3, paso 7** [motor] salió algo de más: esperado `null`; real `{"a": "Marcos", "tipo": "pedido_de_estado", "tareas": ["PLC"], "el": "2026-10-30", "hechos": {"aviso": "pedido_de_estado", "tarea": "PLC", "vence": "2026-10-27", "estado": "en_curso", "numero": 3, "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "necesita_respuesta": true, "atraso_dias_habiles": 3, "si_no_hay_respuesta": {"estado": "todavia_no", "se_avisa_a": ["Ismael Soschinski"]}}}`
+- **15, vez 3, paso 7** [motor] salió algo de más: esperado `null`; real `{"a": "Ismael", "tipo": "escalamiento", "tareas": ["PLC"], "el": "2026-11-02", "hechos": {"aviso": "falta_de_respuesta", "tarea": "PLC", "vence": "2026-10-27", "estado": "en_curso", "responsable": "Marcos Tarquini", "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "pedido_desde": "2026-10-28", "necesita_respuesta": false, "atraso_dias_habiles": 4, "avance_sin_algo_cierto": {"el": "2026-10-27", "dijo": "voy bien, la tengo casi lista"}, "pedidos_de_estado_sin_respuesta": 3}}`
+- **15, vez 3, paso 7** [motor] aviso en el estado: esperado `{"tipo": "repregunta_de_estado", "tarea": "PLC", "a": "Marcos", "estado": "omitido", "motivo": "ya_respondio"}`; real `[{"tipo": "aviso_previo", "tarea": "PLC", "a": "Marcos", "estado": "enviado", "motivo": null, "hechos": {"aviso": "vencimiento_proximo", "tarea": "PLC", "vence": "2026-10-27", "necesita_respuesta": false, "dias_habiles_hasta_el_vencimiento": 3}, "outbox_id": "adea71c2-6235-490c-b955-d58a7acfa5cb"}, {"tipo": "escalamiento", "tarea": "PLC", "a": "Ismael", "estado": "enviado", "motivo": null, "hechos": {"aviso": "falta_de_respuesta", "tarea": "PLC", "vence": "2026-10-27", "estado": "en_curso", "responsable": "Marcos Tarquini", "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "pedido_desde": "2026-10-28", "necesita_respuesta": false, "atraso_dias_habiles": 4, "avance_sin_algo_cierto": {"el": "2026-10-27", "dijo": "voy bien, la tengo casi lista"}, "pedidos_de_estado_sin_respuesta": 3}, "outbox_id": "40b51cb2-ac93-42bf-a49e-ba1830e81c48"}, {"tipo": "pedido_de_estado", "tarea": "PLC", "a": "Marcos", "estado": "enviado", "motivo": null, "hechos": {"aviso": "pedido_de_estado", "tarea": "PLC", "vence": "2026-10-27", "estado": "en_curso", "numero": 1, "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "necesita_respuesta": true, "atraso_dias_habiles": 0}, "outbox_id": "6d145da1-0d1e-4bc0-94bc-2cc74032176a"}, {"tipo": "pedido_de_estado", "tarea": "PLC", "a": "Marcos", "estado": "enviado", "motivo": null, "hechos": {"aviso": "pedido_de_estado", "tarea": "PLC", "vence": "2026-10-27", "estado": "en_curso", "numero": 2, "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "necesita_respuesta": true, "atraso_dias_habiles": 2}, "outbox_id": "cbbcdccf-5b4f-4ea1-a989-f50102b9eda2"}, {"tipo": "pedido_de_estado", "tarea": "PLC", "a": "Marcos", "estado": "enviado", "motivo": null, "hechos": {"aviso": "pedido_de_estado", "tarea": "PLC", "vence": "2026-10-27", "estado": "en_curso", "numero": 3, "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "necesita_respuesta": true, "atraso_dias_habiles": 3, "si_no_hay_respuesta": {"estado": "todavia_no", "se_avisa_a": ["Ismael Soschinski"]}}, "outbox_id": "245ca830-bea9-4013-9d06-589ebb4edac7"}, {"tipo": "repregunta_de_estado", "tarea": "PLC", "a": "Marcos", "estado": "enviado", "motivo": null, "hechos": {"aviso": "repregunta_de_estado", "tarea": "PLC", "vence": "2026-10-27", "estado": "en_curso", "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "avance_anterior": {"el": "2026-10-27", "dijo": "voy bien, la tengo casi lista"}, "espera_algo_cierto": ["si_la_termino", "para_cuando_la_termina", "si_esta_trabada"], "necesita_respuesta": true, "atraso_dias_habiles": 1}, "outbox_id": "a0690bee-1684-4c60-bbeb-038933fe166e"}]`
+- **15, vez 3, paso 8** [motor] no salió lo esperado: esperado `{"a": "Marcos", "tipo": "pedido_de_estado", "tareas": ["PLC", "COM"], "hechos": {"numero": 1, "necesita_respuesta": true, "seguimiento_por": "prevision", "prevision_vigente": {"fecha": "2026-11-03"}}}`; real `[{"a": "Marcos", "tipo": "aviso_previo", "tareas": ["COM"], "el": "2026-11-03", "hechos": {"aviso": "vencimiento_proximo", "tarea": "COM", "vence": "2026-11-06", "necesita_respuesta": false, "dias_habiles_hasta_el_vencimiento": 3}}]`
+- **15, vez 3, paso 8** [motor] salió algo de más: esperado `null`; real `{"a": "Marcos", "tipo": "aviso_previo", "tareas": ["COM"], "el": "2026-11-03", "hechos": {"aviso": "vencimiento_proximo", "tarea": "COM", "vence": "2026-11-06", "necesita_respuesta": false, "dias_habiles_hasta_el_vencimiento": 3}}`
+- **15, vez 4, paso 1** [motor] no salió lo esperado: esperado `{"a": "Marcos", "tipo": "pedido_de_estado", "tarea": "PLC", "hechos": {"numero": 1, "necesita_respuesta": true, "vence": "2026-10-27", "atraso_dias_habiles": 0, "si_no_hay_respuesta": "ausente"}}`; real `[]`
+- **15, vez 4, paso 1** [motor] pregunta abierta después: esperado `{"tipo": "estado_de_la_tarea", "tarea": "PLC"}`; real `null`
+- **15, vez 4, paso 2** [comprension] jugadas: esperado `[{"nombre": "informar_avance", "tarea": "PLC", "palabras": "voy bien, la tengo casi lista"}]`; real `[]`
+- **15, vez 4, paso 2** [comprension] falta un efecto: avance: esperado `[{"tarea": "PLC"}]`; real `[]`
+- **15, vez 4, paso 2** [comprension] falta un efecto: aviso guardado: esperado `[{"tipo": "repregunta_de_estado", "tarea": "PLC", "a": "Marcos", "estado": "guardado"}]`; real `[]`
+- **15, vez 4, paso 2** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **15, vez 4, paso 2** [comprension] hechos: esperado `[{"jugada": "informar_avance", "resultado": "anotado", "tarea": "PLC", "avance": {"dijo": "presente"}, "el_pedido_de_estado": "sigue_abierto", "vuelve_a_pedir_el_estado": {"estado": "guardado_sin_enviar", "sale": "~2026-10-28"}, "veces_sin_algo_cierto": 1, "vencida": "ausente", "pregunta": "ausente"}]`; real `[]`
+- **15, vez 4, paso 4** [motor] no salió lo esperado: esperado `{"a": "Marcos", "tipo": "repregunta_de_estado", "tarea": "PLC", "hechos": {"necesita_respuesta": true, "avance_anterior": {"dijo": "presente", "el": "2026-10-27"}, "espera_algo_cierto": "presente", "si_no_hay_respuesta": "ausente"}}`; real `[{"a": "Marcos", "tipo": "pedido_de_estado", "tareas": ["PLC"], "el": "2026-10-28", "hechos": {"aviso": "pedido_de_estado", "tarea": "PLC", "vence": "2026-10-27", "estado": "en_curso", "numero": 1, "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "necesita_respuesta": true, "atraso_dias_habiles": 1}}]`
+- **15, vez 4, paso 4** [motor] salió algo de más: esperado `null`; real `{"a": "Marcos", "tipo": "pedido_de_estado", "tareas": ["PLC"], "el": "2026-10-28", "hechos": {"aviso": "pedido_de_estado", "tarea": "PLC", "vence": "2026-10-27", "estado": "en_curso", "numero": 1, "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "necesita_respuesta": true, "atraso_dias_habiles": 1}}`
+- **15, vez 4, paso 5** [comprension] jugadas: esperado `[{"nombre": "informar_avance", "tarea": "PLC", "palabras": "todo en orden, sigo con eso"}]`; real `[]`
+- **15, vez 4, paso 5** [comprension] falta un efecto: avance: esperado `[{"tarea": "PLC"}]`; real `[]`
+- **15, vez 4, paso 5** [comprension] falta un efecto: aviso guardado: esperado `[{"tipo": "repregunta_de_estado", "tarea": "PLC", "a": "Marcos", "estado": "guardado"}]`; real `[]`
+- **15, vez 4, paso 5** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **15, vez 4, paso 5** [comprension] la pregunta de la respuesta: esperado `{"tipo": "fecha_de_la_tarea", "tarea": "PLC"}`; real `null`
+- **15, vez 4, paso 5** [comprension] hechos: esperado `[{"jugada": "informar_avance", "resultado": "anotado", "tarea": "PLC", "veces_sin_algo_cierto": 2, "vuelve_a_pedir_el_estado": {"estado": "guardado_sin_enviar", "sale": "~2026-10-29"}, "vencida": {"fecha_comprometida": "2026-10-27", "atraso_dias_habiles": 1}, "pregunta": "fecha_de_la_tarea"}]`; real `[]`
+- **15, vez 4, paso 5** [comprension] pregunta abierta después: esperado `{"tipo": "fecha_de_la_tarea", "tarea": "PLC"}`; real `{"tipo": "estado_de_la_tarea", "tarea": "PLC"}`
+- **15, vez 4, paso 6** [comprension] jugadas: esperado `[{"nombre": "anotar_prevision", "tarea": "PLC", "fecha": "2026-11-03"}]`; real `[]`
+- **15, vez 4, paso 6** [comprension] falta un efecto: previsión: esperado `[{"tarea": "PLC", "fecha": "2026-11-03", "motivo": "ausente"}]`; real `[]`
+- **15, vez 4, paso 6** [comprension] falta un efecto: aviso guardado: esperado `[{"tipo": "nueva_prevision", "tarea": "PLC", "a": "Ismael", "hechos": {"prevision": "2026-11-03", "fecha_comprometida": "2026-10-27", "atraso_si_se_cumple_la_prevision_dias_habiles": 5, "dependientes": ["COM"]}}]`; real `[]`
+- **15, vez 4, paso 6** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **15, vez 4, paso 6** [comprension] hechos: esperado `[{"jugada": "anotar_prevision", "resultado": "anotado", "tarea": "PLC", "prevision": "2026-11-03", "fecha_comprometida": "2026-10-27", "atraso_si_se_cumple_la_prevision_dias_habiles": 5, "aviso_al_referente": {"a": "Ismael Soschinski", "estado": "guardado_sin_enviar"}}]`; real `[]`
+- **15, vez 4, paso 6** [comprension] pregunta abierta después: esperado `null`; real `{"tipo": "estado_de_la_tarea", "tarea": "PLC"}`
+- **15, vez 4, paso 6** [comprension] esperas abiertas después: esperado `[]`; real `["PLC"]`
+- **15, vez 4, paso 7** [motor] no salió lo esperado: esperado `{"a": "Ismael", "el": "2026-10-28", "tipo": "nueva_prevision", "tarea": "PLC", "hechos": {"prevision": "2026-11-03", "atraso_si_se_cumple_la_prevision_dias_habiles": 5}}`; real `[]`
+- **15, vez 4, paso 7** [motor] incidente: esperado `[]`; real `[{"etapa": "motor_aviso_guardado", "severidad": "media"}]`
+- **15, vez 4, paso 7** [motor] aviso en el estado: esperado `{"tipo": "repregunta_de_estado", "tarea": "PLC", "a": "Marcos", "estado": "omitido", "motivo": "ya_respondio"}`; real `[{"tipo": "aviso_previo", "tarea": "PLC", "a": "Marcos", "estado": "enviado", "motivo": null, "hechos": {"aviso": "vencimiento_proximo", "tarea": "PLC", "vence": "2026-10-27", "necesita_respuesta": false, "dias_habiles_hasta_el_vencimiento": 3}, "outbox_id": "74411554-e171-498f-86fc-bbf81b4129b3"}, {"tipo": "pedido_de_estado", "tarea": "PLC", "a": "Marcos", "estado": "enviado", "motivo": null, "hechos": {"aviso": "pedido_de_estado", "tarea": "PLC", "vence": "2026-10-27", "estado": "en_curso", "numero": 1, "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "necesita_respuesta": true, "atraso_dias_habiles": 1}, "outbox_id": "bd379e59-e199-4773-b19d-893aa5d62797"}, {"tipo": "pedido_de_estado", "tarea": "PLC", "a": "Marcos", "estado": "fallido", "motivo": null, "hechos": {"aviso": "pedido_de_estado", "tarea": "PLC", "vence": "2026-10-27", "estado": "en_curso", "numero": 2, "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "necesita_respuesta": true, "atraso_dias_habiles": 2}, "outbox_id": null}]`
+- **15, vez 4, paso 8** [motor] no salió lo esperado: esperado `{"a": "Marcos", "tipo": "pedido_de_estado", "tareas": ["PLC", "COM"], "hechos": {"numero": 1, "necesita_respuesta": true, "seguimiento_por": "prevision", "prevision_vigente": {"fecha": "2026-11-03"}}}`; real `[]`
+- **15, vez 5, paso 1** [motor] no salió lo esperado: esperado `{"a": "Marcos", "tipo": "pedido_de_estado", "tarea": "PLC", "hechos": {"numero": 1, "necesita_respuesta": true, "vence": "2026-10-27", "atraso_dias_habiles": 0, "si_no_hay_respuesta": "ausente"}}`; real `[]`
+- **15, vez 5, paso 1** [motor] pregunta abierta después: esperado `{"tipo": "estado_de_la_tarea", "tarea": "PLC"}`; real `null`
+- **15, vez 5, paso 2** [comprension] jugadas: esperado `[{"nombre": "informar_avance", "tarea": "PLC", "palabras": "voy bien, la tengo casi lista"}]`; real `[]`
+- **15, vez 5, paso 2** [comprension] falta un efecto: avance: esperado `[{"tarea": "PLC"}]`; real `[]`
+- **15, vez 5, paso 2** [comprension] falta un efecto: aviso guardado: esperado `[{"tipo": "repregunta_de_estado", "tarea": "PLC", "a": "Marcos", "estado": "guardado"}]`; real `[]`
+- **15, vez 5, paso 2** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **15, vez 5, paso 2** [comprension] hechos: esperado `[{"jugada": "informar_avance", "resultado": "anotado", "tarea": "PLC", "avance": {"dijo": "presente"}, "el_pedido_de_estado": "sigue_abierto", "vuelve_a_pedir_el_estado": {"estado": "guardado_sin_enviar", "sale": "~2026-10-28"}, "veces_sin_algo_cierto": 1, "vencida": "ausente", "pregunta": "ausente"}]`; real `[]`
+- **15, vez 5, paso 4** [motor] no salió lo esperado: esperado `{"a": "Marcos", "tipo": "repregunta_de_estado", "tarea": "PLC", "hechos": {"necesita_respuesta": true, "avance_anterior": {"dijo": "presente", "el": "2026-10-27"}, "espera_algo_cierto": "presente", "si_no_hay_respuesta": "ausente"}}`; real `[]`
+- **15, vez 5, paso 4** [motor] pregunta abierta después: esperado `{"tipo": "estado_de_la_tarea", "tarea": "PLC"}`; real `null`
+- **15, vez 5, paso 5** [comprension] jugadas: esperado `[{"nombre": "informar_avance", "tarea": "PLC", "palabras": "todo en orden, sigo con eso"}]`; real `[]`
+- **15, vez 5, paso 5** [comprension] falta un efecto: avance: esperado `[{"tarea": "PLC"}]`; real `[]`
+- **15, vez 5, paso 5** [comprension] falta un efecto: aviso guardado: esperado `[{"tipo": "repregunta_de_estado", "tarea": "PLC", "a": "Marcos", "estado": "guardado"}]`; real `[]`
+- **15, vez 5, paso 5** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **15, vez 5, paso 5** [comprension] la pregunta de la respuesta: esperado `{"tipo": "fecha_de_la_tarea", "tarea": "PLC"}`; real `null`
+- **15, vez 5, paso 5** [comprension] hechos: esperado `[{"jugada": "informar_avance", "resultado": "anotado", "tarea": "PLC", "veces_sin_algo_cierto": 2, "vuelve_a_pedir_el_estado": {"estado": "guardado_sin_enviar", "sale": "~2026-10-29"}, "vencida": {"fecha_comprometida": "2026-10-27", "atraso_dias_habiles": 1}, "pregunta": "fecha_de_la_tarea"}]`; real `[]`
+- **15, vez 5, paso 5** [comprension] pregunta abierta después: esperado `{"tipo": "fecha_de_la_tarea", "tarea": "PLC"}`; real `null`
+- **15, vez 5, paso 6** [comprension] jugadas: esperado `[{"nombre": "anotar_prevision", "tarea": "PLC", "fecha": "2026-11-03"}]`; real `[]`
+- **15, vez 5, paso 6** [comprension] falta un efecto: previsión: esperado `[{"tarea": "PLC", "fecha": "2026-11-03", "motivo": "ausente"}]`; real `[]`
+- **15, vez 5, paso 6** [comprension] falta un efecto: aviso guardado: esperado `[{"tipo": "nueva_prevision", "tarea": "PLC", "a": "Ismael", "hechos": {"prevision": "2026-11-03", "fecha_comprometida": "2026-10-27", "atraso_si_se_cumple_la_prevision_dias_habiles": 5, "dependientes": ["COM"]}}]`; real `[]`
+- **15, vez 5, paso 6** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **15, vez 5, paso 6** [comprension] hechos: esperado `[{"jugada": "anotar_prevision", "resultado": "anotado", "tarea": "PLC", "prevision": "2026-11-03", "fecha_comprometida": "2026-10-27", "atraso_si_se_cumple_la_prevision_dias_habiles": 5, "aviso_al_referente": {"a": "Ismael Soschinski", "estado": "guardado_sin_enviar"}}]`; real `[]`
+- **15, vez 5, paso 6** [comprension] esperas abiertas después: esperado `[]`; real `["PLC"]`
+- **15, vez 5, paso 7** [motor] no salió lo esperado: esperado `{"a": "Ismael", "el": "2026-10-28", "tipo": "nueva_prevision", "tarea": "PLC", "hechos": {"prevision": "2026-11-03", "atraso_si_se_cumple_la_prevision_dias_habiles": 5}}`; real `[]`
+- **15, vez 5, paso 7** [motor] salió algo de más: esperado `null`; real `{"a": "Marcos", "tipo": "pedido_de_estado", "tareas": ["PLC"], "el": "2026-10-28", "hechos": {"aviso": "pedido_de_estado", "tarea": "PLC", "vence": "2026-10-27", "estado": "en_curso", "numero": 1, "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "necesita_respuesta": true, "atraso_dias_habiles": 1}}`
+- **15, vez 5, paso 7** [motor] salió algo de más: esperado `null`; real `{"a": "Marcos", "tipo": "pedido_de_estado", "tareas": ["PLC"], "el": "2026-10-29", "hechos": {"aviso": "pedido_de_estado", "tarea": "PLC", "vence": "2026-10-27", "estado": "en_curso", "numero": 2, "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "necesita_respuesta": true, "atraso_dias_habiles": 2}}`
+- **15, vez 5, paso 7** [motor] salió algo de más: esperado `null`; real `{"a": "Marcos", "tipo": "pedido_de_estado", "tareas": ["PLC"], "el": "2026-10-30", "hechos": {"aviso": "pedido_de_estado", "tarea": "PLC", "vence": "2026-10-27", "estado": "en_curso", "numero": 3, "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "necesita_respuesta": true, "atraso_dias_habiles": 3, "si_no_hay_respuesta": {"estado": "todavia_no", "se_avisa_a": ["Ismael Soschinski"]}}}`
+- **15, vez 5, paso 7** [motor] aviso en el estado: esperado `{"tipo": "repregunta_de_estado", "tarea": "PLC", "a": "Marcos", "estado": "omitido", "motivo": "ya_respondio"}`; real `[{"tipo": "aviso_previo", "tarea": "PLC", "a": "Marcos", "estado": "omitido", "motivo": "ya_vencio", "hechos": {"aviso": "vencimiento_proximo", "tarea": "PLC", "vence": "2026-10-27", "necesita_respuesta": false, "dias_habiles_hasta_el_vencimiento": 3}, "outbox_id": null}, {"tipo": "escalamiento", "tarea": "PLC", "a": "Ismael", "estado": "guardado", "motivo": null, "hechos": {"aviso": "falta_de_respuesta", "tarea": "PLC", "vence": "2026-10-27", "estado": "en_curso", "responsable": "Marcos Tarquini", "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "pedido_desde": "2026-10-28", "necesita_respuesta": false, "atraso_dias_habiles": 4, "pedidos_de_estado_sin_respuesta": 3}, "outbox_id": null}, {"tipo": "pedido_de_estado", "tarea": "PLC", "a": "Marcos", "estado": "enviado", "motivo": null, "hechos": {"aviso": "pedido_de_estado", "tarea": "PLC", "vence": "2026-10-27", "estado": "en_curso", "numero": 1, "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "necesita_respuesta": true, "atraso_dias_habiles": 1}, "outbox_id": "48850892-737e-4999-bbbd-70211a485533"}, {"tipo": "pedido_de_estado", "tarea": "PLC", "a": "Marcos", "estado": "enviado", "motivo": null, "hechos": {"aviso": "pedido_de_estado", "tarea": "PLC", "vence": "2026-10-27", "estado": "en_curso", "numero": 2, "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "necesita_respuesta": true, "atraso_dias_habiles": 2}, "outbox_id": "3122a7eb-c9e9-44f9-95b3-17def14658be"}, {"tipo": "pedido_de_estado", "tarea": "PLC", "a": "Marcos", "estado": "enviado", "motivo": null, "hechos": {"aviso": "pedido_de_estado", "tarea": "PLC", "vence": "2026-10-27", "estado": "en_curso", "numero": 3, "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "necesita_respuesta": true, "atraso_dias_habiles": 3, "si_no_hay_respuesta": {"estado": "todavia_no", "se_avisa_a": ["Ismael Soschinski"]}}, "outbox_id": "1f204dd3-129b-4328-b195-084747ec69d1"}]`
+- **15, vez 5, paso 8** [motor] no salió lo esperado: esperado `{"a": "Marcos", "tipo": "pedido_de_estado", "tareas": ["PLC", "COM"], "hechos": {"numero": 1, "necesita_respuesta": true, "seguimiento_por": "prevision", "prevision_vigente": {"fecha": "2026-11-03"}}}`; real `[]`
+- **16, vez 1, paso 4** [motor] no salió lo esperado: esperado `{"a": "Ismael", "tipo": "nueva_prevision", "tarea": "PLC", "hechos": {"prevision": "2026-10-28", "fecha_comprometida": "2026-10-23", "atraso_si_se_cumple_la_prevision_dias_habiles": 3, "dependientes": ["COM"]}}`; real `[]`
+- **16, vez 1, paso 6** [motor] no salió lo esperado: esperado `{"a": "Marcos", "tipo": "pedido_de_estado", "tarea": "PLC", "hechos": {"numero": 1, "necesita_respuesta": true, "seguimiento_por": "prevision", "prevision_vigente": {"fecha": "2026-10-28"}}}`; real `[]`
+- **16, vez 1, paso 6** [motor] pregunta abierta después: esperado `{"tipo": "estado_de_la_tarea", "tarea": "PLC"}`; real `null`
+- **16, vez 2, paso 3** [comprension] jugadas: esperado `[{"nombre": "anotar_prevision", "tarea": "PLC", "fecha": "2026-10-28"}]`; real `[]`
+- **16, vez 2, paso 3** [comprension] falta un efecto: previsión: esperado `[{"tarea": "PLC", "fecha": "2026-10-28", "motivo": "ausente"}]`; real `[]`
+- **16, vez 2, paso 3** [comprension] falta un efecto: aviso guardado: esperado `[{"tipo": "nueva_prevision", "tarea": "PLC", "a": "Ismael", "hechos": {"prevision": "2026-10-28", "fecha_comprometida": "2026-10-23", "atraso_si_se_cumple_la_prevision_dias_habiles": 3, "dependientes": ["COM"]}}]`; real `[]`
+- **16, vez 2, paso 3** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **16, vez 2, paso 3** [comprension] hechos: esperado `[{"jugada": "anotar_prevision", "resultado": "anotado", "tarea": "PLC", "prevision": "2026-10-28", "fecha_comprometida": "2026-10-23", "atraso_si_se_cumple_la_prevision_dias_habiles": 3, "aviso_al_referente": {"a": "Ismael Soschinski", "estado": "guardado_sin_enviar"}}]`; real `[]`
+- **16, vez 2, paso 3** [comprension] pregunta abierta después: esperado `null`; real `{"tipo": "fecha_de_la_tarea", "tarea": "PLC"}`
+- **16, vez 2, paso 3** [comprension] esperas abiertas después: esperado `[]`; real `["PLC"]`
+- **16, vez 2, paso 4** [motor] no salió lo esperado: esperado `{"a": "Ismael", "tipo": "nueva_prevision", "tarea": "PLC", "hechos": {"prevision": "2026-10-28", "fecha_comprometida": "2026-10-23", "atraso_si_se_cumple_la_prevision_dias_habiles": 3, "dependientes": ["COM"]}}`; real `[]`
+- **16, vez 2, paso 5** [motor] aviso en el estado: esperado `{"tipo": "repregunta_de_estado", "tarea": "PLC", "a": "Marcos", "estado": "omitido", "motivo": "ya_respondio"}`; real `[{"tipo": "aviso_previo", "tarea": "PLC", "a": "Marcos", "estado": "enviado", "motivo": null, "hechos": {"aviso": "vencimiento_proximo", "tarea": "PLC", "vence": "2026-10-23", "necesita_respuesta": false, "dias_habiles_hasta_el_vencimiento": 3}, "outbox_id": "7a824896-f18f-4aaa-8531-effdf0ead272"}, {"tipo": "pedido_de_estado", "tarea": "PLC", "a": "Marcos", "estado": "enviado", "motivo": null, "hechos": {"aviso": "pedido_de_estado", "tarea": "PLC", "vence": "2026-10-23", "estado": "asignada", "numero": 1, "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "necesita_respuesta": true, "atraso_dias_habiles": 0}, "outbox_id": "d1175a7f-247c-47a5-b424-7e7646b8a57d"}, {"tipo": "pedido_de_estado", "tarea": "PLC", "a": "Marcos", "estado": "enviado", "motivo": null, "hechos": {"aviso": "pedido_de_estado", "tarea": "PLC", "vence": "2026-10-23", "estado": "asignada", "numero": 2, "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "necesita_respuesta": true, "atraso_dias_habiles": 1}, "outbox_id": "54c24ee2-e43c-4ad1-911c-21b0ac0a12e5"}, {"tipo": "repregunta_de_estado", "tarea": "PLC", "a": "Marcos", "estado": "guardado", "motivo": null, "hechos": {"aviso": "repregunta_de_estado", "tarea": "PLC", "vence": "2026-10-23", "avance_anterior": {"el": "2026-10-26", "dijo": "arranque hoy, no pude antes", "jugada": "anotar_inicio"}, "espera_algo_cierto": ["si_la_termino", "para_cuando_la_termina", "si_esta_trabada"], "necesita_respuesta": true}, "outbox_id": null}]`
+- **16, vez 2, paso 6** [motor] no salió lo esperado: esperado `{"a": "Marcos", "tipo": "pedido_de_estado", "tarea": "PLC", "hechos": {"numero": 1, "necesita_respuesta": true, "seguimiento_por": "prevision", "prevision_vigente": {"fecha": "2026-10-28"}}}`; real `[{"a": "Marcos", "tipo": "repregunta_de_estado", "tareas": ["PLC"], "el": "2026-10-28", "hechos": {"aviso": "repregunta_de_estado", "tarea": "PLC", "vence": "2026-10-23", "estado": "en_curso", "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "avance_anterior": {"el": "2026-10-26", "dijo": "arranque hoy, no pude antes", "jugada": "anotar_inicio"}, "espera_algo_cierto": ["si_la_termino", "para_cuando_la_termina", "si_esta_trabada"], "necesita_respuesta": true, "atraso_dias_habiles": 3}}]`
+- **16, vez 2, paso 6** [motor] salió algo de más: esperado `null`; real `{"a": "Marcos", "tipo": "repregunta_de_estado", "tareas": ["PLC"], "el": "2026-10-28", "hechos": {"aviso": "repregunta_de_estado", "tarea": "PLC", "vence": "2026-10-23", "estado": "en_curso", "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "avance_anterior": {"el": "2026-10-26", "dijo": "arranque hoy, no pude antes", "jugada": "anotar_inicio"}, "espera_algo_cierto": ["si_la_termino", "para_cuando_la_termina", "si_esta_trabada"], "necesita_respuesta": true, "atraso_dias_habiles": 3}}`
+- **16, vez 3, paso 2** [comprension] jugadas: esperado `[{"nombre": "anotar_inicio", "tarea": "PLC"}]`; real `[]`
+- **16, vez 3, paso 2** [comprension] falta un efecto: estado: esperado `{"PLC": "en_curso"}`; real `{}`
+- **16, vez 3, paso 2** [comprension] falta un efecto: aviso guardado: esperado `[{"tipo": "repregunta_de_estado", "tarea": "PLC", "a": "Marcos", "estado": "guardado"}]`; real `[]`
+- **16, vez 3, paso 2** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **16, vez 3, paso 2** [comprension] la pregunta de la respuesta: esperado `{"tipo": "fecha_de_la_tarea", "tarea": "PLC"}`; real `null`
+- **16, vez 3, paso 2** [comprension] hechos: esperado `[{"jugada": "anotar_inicio", "resultado": "anotado", "tarea": "PLC", "estado": "en_curso", "vencida": {"fecha_comprometida": "2026-10-23", "atraso_dias_habiles": 1}, "vuelve_a_pedir_el_estado": {"estado": "guardado_sin_enviar", "sale": "~2026-10-27"}, "pregunta": "fecha_de_la_tarea"}]`; real `[]`
+- **16, vez 3, paso 2** [comprension] pregunta abierta después: esperado `{"tipo": "fecha_de_la_tarea", "tarea": "PLC"}`; real `{"tipo": "estado_de_la_tarea", "tarea": "PLC"}`
+- **16, vez 3, paso 3** [comprension] jugadas: esperado `[{"nombre": "anotar_prevision", "tarea": "PLC", "fecha": "2026-10-28"}]`; real `[]`
+- **16, vez 3, paso 3** [comprension] falta un efecto: previsión: esperado `[{"tarea": "PLC", "fecha": "2026-10-28", "motivo": "ausente"}]`; real `[]`
+- **16, vez 3, paso 3** [comprension] falta un efecto: aviso guardado: esperado `[{"tipo": "nueva_prevision", "tarea": "PLC", "a": "Ismael", "hechos": {"prevision": "2026-10-28", "fecha_comprometida": "2026-10-23", "atraso_si_se_cumple_la_prevision_dias_habiles": 3, "dependientes": ["COM"]}}]`; real `[]`
+- **16, vez 3, paso 3** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **16, vez 3, paso 3** [comprension] hechos: esperado `[{"jugada": "anotar_prevision", "resultado": "anotado", "tarea": "PLC", "prevision": "2026-10-28", "fecha_comprometida": "2026-10-23", "atraso_si_se_cumple_la_prevision_dias_habiles": 3, "aviso_al_referente": {"a": "Ismael Soschinski", "estado": "guardado_sin_enviar"}}]`; real `[]`
+- **16, vez 3, paso 3** [comprension] pregunta abierta después: esperado `null`; real `{"tipo": "estado_de_la_tarea", "tarea": "PLC"}`
+- **16, vez 3, paso 3** [comprension] esperas abiertas después: esperado `[]`; real `["PLC"]`
+- **16, vez 3, paso 4** [motor] no salió lo esperado: esperado `{"a": "Ismael", "tipo": "nueva_prevision", "tarea": "PLC", "hechos": {"prevision": "2026-10-28", "fecha_comprometida": "2026-10-23", "atraso_si_se_cumple_la_prevision_dias_habiles": 3, "dependientes": ["COM"]}}`; real `[]`
+- **16, vez 3, paso 5** [motor] aviso en el estado: esperado `{"tipo": "repregunta_de_estado", "tarea": "PLC", "a": "Marcos", "estado": "omitido", "motivo": "ya_respondio"}`; real `[{"tipo": "aviso_previo", "tarea": "PLC", "a": "Marcos", "estado": "enviado", "motivo": null, "hechos": {"aviso": "vencimiento_proximo", "tarea": "PLC", "vence": "2026-10-23", "necesita_respuesta": false, "dias_habiles_hasta_el_vencimiento": 3}, "outbox_id": "82e6e731-510f-4b0b-a578-712656dcb900"}, {"tipo": "pedido_de_estado", "tarea": "PLC", "a": "Marcos", "estado": "enviado", "motivo": null, "hechos": {"aviso": "pedido_de_estado", "tarea": "PLC", "vence": "2026-10-23", "estado": "asignada", "numero": 1, "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "necesita_respuesta": true, "atraso_dias_habiles": 0}, "outbox_id": "fede33cf-a876-4268-aaaf-5371b5db56c5"}, {"tipo": "pedido_de_estado", "tarea": "PLC", "a": "Marcos", "estado": "enviado", "motivo": null, "hechos": {"aviso": "pedido_de_estado", "tarea": "PLC", "vence": "2026-10-23", "estado": "asignada", "numero": 2, "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "necesita_respuesta": true, "atraso_dias_habiles": 1}, "outbox_id": "3b9a7c00-3375-491b-a55a-b64ef8c7018b"}, {"tipo": "pedido_de_estado", "tarea": "PLC", "a": "Marcos", "estado": "guardado", "motivo": null, "hechos": {"aviso": "pedido_de_estado", "tarea": "PLC", "vence": "2026-10-23", "estado": "asignada", "numero": 3, "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "necesita_respuesta": true, "atraso_dias_habiles": 2, "si_no_hay_respuesta": {"estado": "todavia_no", "se_avisa_a": ["Ismael Soschinski"]}, "avisa_que_va_a_escalar": true}, "outbox_id": null}]`
+- **16, vez 3, paso 6** [motor] no salió lo esperado: esperado `{"a": "Marcos", "tipo": "pedido_de_estado", "tarea": "PLC", "hechos": {"numero": 1, "necesita_respuesta": true, "seguimiento_por": "prevision", "prevision_vigente": {"fecha": "2026-10-28"}}}`; real `[{"a": "Marcos", "tipo": "pedido_de_estado", "tareas": ["PLC"], "el": "2026-10-28", "hechos": {"aviso": "pedido_de_estado", "tarea": "PLC", "vence": "2026-10-23", "estado": "asignada", "numero": 3, "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "necesita_respuesta": true, "atraso_dias_habiles": 3, "si_no_hay_respuesta": {"estado": "todavia_no", "se_avisa_a": ["Ismael Soschinski"]}}}]`
+- **16, vez 3, paso 6** [motor] salió algo de más: esperado `null`; real `{"a": "Marcos", "tipo": "pedido_de_estado", "tareas": ["PLC"], "el": "2026-10-28", "hechos": {"aviso": "pedido_de_estado", "tarea": "PLC", "vence": "2026-10-23", "estado": "asignada", "numero": 3, "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "necesita_respuesta": true, "atraso_dias_habiles": 3, "si_no_hay_respuesta": {"estado": "todavia_no", "se_avisa_a": ["Ismael Soschinski"]}}}`
+- **16, vez 4, paso 1** [motor] no salió lo esperado: esperado `{"a": "Marcos", "tipo": "pedido_de_estado", "tarea": "PLC", "hechos": {"numero": 2, "necesita_respuesta": true, "vence": "2026-10-23", "atraso_dias_habiles": 1, "si_no_hay_respuesta": "ausente"}}`; real `[]`
+- **16, vez 4, paso 2** [comprension] jugadas: esperado `[{"nombre": "anotar_inicio", "tarea": "PLC"}]`; real `[]`
+- **16, vez 4, paso 2** [comprension] falta un efecto: estado: esperado `{"PLC": "en_curso"}`; real `{}`
+- **16, vez 4, paso 2** [comprension] falta un efecto: aviso guardado: esperado `[{"tipo": "repregunta_de_estado", "tarea": "PLC", "a": "Marcos", "estado": "guardado"}]`; real `[]`
+- **16, vez 4, paso 2** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **16, vez 4, paso 2** [comprension] la pregunta de la respuesta: esperado `{"tipo": "fecha_de_la_tarea", "tarea": "PLC"}`; real `null`
+- **16, vez 4, paso 2** [comprension] hechos: esperado `[{"jugada": "anotar_inicio", "resultado": "anotado", "tarea": "PLC", "estado": "en_curso", "vencida": {"fecha_comprometida": "2026-10-23", "atraso_dias_habiles": 1}, "vuelve_a_pedir_el_estado": {"estado": "guardado_sin_enviar", "sale": "~2026-10-27"}, "pregunta": "fecha_de_la_tarea"}]`; real `[]`
+- **16, vez 4, paso 2** [comprension] pregunta abierta después: esperado `{"tipo": "fecha_de_la_tarea", "tarea": "PLC"}`; real `{"tipo": "estado_de_la_tarea", "tarea": "PLC"}`
+- **16, vez 4, paso 3** [comprension] jugadas: esperado `[{"nombre": "anotar_prevision", "tarea": "PLC", "fecha": "2026-10-28"}]`; real `[]`
+- **16, vez 4, paso 3** [comprension] falta un efecto: previsión: esperado `[{"tarea": "PLC", "fecha": "2026-10-28", "motivo": "ausente"}]`; real `[]`
+- **16, vez 4, paso 3** [comprension] falta un efecto: aviso guardado: esperado `[{"tipo": "nueva_prevision", "tarea": "PLC", "a": "Ismael", "hechos": {"prevision": "2026-10-28", "fecha_comprometida": "2026-10-23", "atraso_si_se_cumple_la_prevision_dias_habiles": 3, "dependientes": ["COM"]}}]`; real `[]`
+- **16, vez 4, paso 3** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **16, vez 4, paso 3** [comprension] hechos: esperado `[{"jugada": "anotar_prevision", "resultado": "anotado", "tarea": "PLC", "prevision": "2026-10-28", "fecha_comprometida": "2026-10-23", "atraso_si_se_cumple_la_prevision_dias_habiles": 3, "aviso_al_referente": {"a": "Ismael Soschinski", "estado": "guardado_sin_enviar"}}]`; real `[]`
+- **16, vez 4, paso 3** [comprension] pregunta abierta después: esperado `null`; real `{"tipo": "estado_de_la_tarea", "tarea": "PLC"}`
+- **16, vez 4, paso 3** [comprension] esperas abiertas después: esperado `[]`; real `["PLC"]`
+- **16, vez 4, paso 4** [motor] no salió lo esperado: esperado `{"a": "Ismael", "tipo": "nueva_prevision", "tarea": "PLC", "hechos": {"prevision": "2026-10-28", "fecha_comprometida": "2026-10-23", "atraso_si_se_cumple_la_prevision_dias_habiles": 3, "dependientes": ["COM"]}}`; real `[]`
+- **16, vez 4, paso 5** [motor] aviso en el estado: esperado `{"tipo": "repregunta_de_estado", "tarea": "PLC", "a": "Marcos", "estado": "omitido", "motivo": "ya_respondio"}`; real `[{"tipo": "aviso_previo", "tarea": "PLC", "a": "Marcos", "estado": "omitido", "motivo": "ya_vencio", "hechos": {"aviso": "vencimiento_proximo", "tarea": "PLC", "vence": "2026-10-23", "necesita_respuesta": false, "dias_habiles_hasta_el_vencimiento": 3}, "outbox_id": null}, {"tipo": "pedido_de_estado", "tarea": "PLC", "a": "Marcos", "estado": "enviado", "motivo": null, "hechos": {"aviso": "pedido_de_estado", "tarea": "PLC", "vence": "2026-10-23", "estado": "asignada", "numero": 1, "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "necesita_respuesta": true, "atraso_dias_habiles": 0}, "outbox_id": "066cea3a-8fd7-4581-9ca2-77349c46544a"}, {"tipo": "pedido_de_estado", "tarea": "PLC", "a": "Marcos", "estado": "guardado", "motivo": null, "hechos": {"aviso": "pedido_de_estado", "tarea": "PLC", "vence": "2026-10-23", "estado": "asignada", "numero": 2, "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "necesita_respuesta": true, "atraso_dias_habiles": 1}, "outbox_id": null}]`
+- **16, vez 4, paso 6** [motor] no salió lo esperado: esperado `{"a": "Marcos", "tipo": "pedido_de_estado", "tarea": "PLC", "hechos": {"numero": 1, "necesita_respuesta": true, "seguimiento_por": "prevision", "prevision_vigente": {"fecha": "2026-10-28"}}}`; real `[]`
+- **16, vez 5, paso 1** [motor] no salió lo esperado: esperado `{"a": "Marcos", "tipo": "pedido_de_estado", "tarea": "PLC", "hechos": {"numero": 2, "necesita_respuesta": true, "vence": "2026-10-23", "atraso_dias_habiles": 1, "si_no_hay_respuesta": "ausente"}}`; real `[]`
+- **16, vez 5, paso 1** [motor] pregunta abierta después: esperado `{"tipo": "estado_de_la_tarea", "tarea": "PLC"}`; real `null`
+- **16, vez 5, paso 2** [comprension] jugadas: esperado `[{"nombre": "anotar_inicio", "tarea": "PLC"}]`; real `[]`
+- **16, vez 5, paso 2** [comprension] falta un efecto: estado: esperado `{"PLC": "en_curso"}`; real `{}`
+- **16, vez 5, paso 2** [comprension] falta un efecto: aviso guardado: esperado `[{"tipo": "repregunta_de_estado", "tarea": "PLC", "a": "Marcos", "estado": "guardado"}]`; real `[]`
+- **16, vez 5, paso 2** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **16, vez 5, paso 2** [comprension] la pregunta de la respuesta: esperado `{"tipo": "fecha_de_la_tarea", "tarea": "PLC"}`; real `null`
+- **16, vez 5, paso 2** [comprension] hechos: esperado `[{"jugada": "anotar_inicio", "resultado": "anotado", "tarea": "PLC", "estado": "en_curso", "vencida": {"fecha_comprometida": "2026-10-23", "atraso_dias_habiles": 1}, "vuelve_a_pedir_el_estado": {"estado": "guardado_sin_enviar", "sale": "~2026-10-27"}, "pregunta": "fecha_de_la_tarea"}]`; real `[]`
+- **16, vez 5, paso 2** [comprension] pregunta abierta después: esperado `{"tipo": "fecha_de_la_tarea", "tarea": "PLC"}`; real `null`
+- **16, vez 5, paso 3** [comprension] jugadas: esperado `[{"nombre": "anotar_prevision", "tarea": "PLC", "fecha": "2026-10-28"}]`; real `[]`
+- **16, vez 5, paso 3** [comprension] falta un efecto: previsión: esperado `[{"tarea": "PLC", "fecha": "2026-10-28", "motivo": "ausente"}]`; real `[]`
+- **16, vez 5, paso 3** [comprension] falta un efecto: aviso guardado: esperado `[{"tipo": "nueva_prevision", "tarea": "PLC", "a": "Ismael", "hechos": {"prevision": "2026-10-28", "fecha_comprometida": "2026-10-23", "atraso_si_se_cumple_la_prevision_dias_habiles": 3, "dependientes": ["COM"]}}]`; real `[]`
+- **16, vez 5, paso 3** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **16, vez 5, paso 3** [comprension] hechos: esperado `[{"jugada": "anotar_prevision", "resultado": "anotado", "tarea": "PLC", "prevision": "2026-10-28", "fecha_comprometida": "2026-10-23", "atraso_si_se_cumple_la_prevision_dias_habiles": 3, "aviso_al_referente": {"a": "Ismael Soschinski", "estado": "guardado_sin_enviar"}}]`; real `[]`
+- **16, vez 5, paso 3** [comprension] esperas abiertas después: esperado `[]`; real `["PLC"]`
+- **16, vez 5, paso 4** [motor] no salió lo esperado: esperado `{"a": "Ismael", "tipo": "nueva_prevision", "tarea": "PLC", "hechos": {"prevision": "2026-10-28", "fecha_comprometida": "2026-10-23", "atraso_si_se_cumple_la_prevision_dias_habiles": 3, "dependientes": ["COM"]}}`; real `[]`
+- **16, vez 5, paso 5** [motor] aviso en el estado: esperado `{"tipo": "repregunta_de_estado", "tarea": "PLC", "a": "Marcos", "estado": "omitido", "motivo": "ya_respondio"}`; real `[{"tipo": "aviso_previo", "tarea": "PLC", "a": "Marcos", "estado": "omitido", "motivo": "ya_vencio", "hechos": {"aviso": "vencimiento_proximo", "tarea": "PLC", "vence": "2026-10-23", "necesita_respuesta": false, "dias_habiles_hasta_el_vencimiento": 3}, "outbox_id": null}, {"tipo": "pedido_de_estado", "tarea": "PLC", "a": "Marcos", "estado": "guardado", "motivo": null, "hechos": {"aviso": "pedido_de_estado", "tarea": "PLC", "vence": "2026-10-23", "estado": "asignada", "numero": 1, "dependientes": [{"tarea": "COM", "no_puede_arrancar_hasta_que_termine": true}], "necesita_respuesta": true, "atraso_dias_habiles": 0}, "outbox_id": null}]`
+- **16, vez 5, paso 6** [motor] no salió lo esperado: esperado `{"a": "Marcos", "tipo": "pedido_de_estado", "tarea": "PLC", "hechos": {"numero": 1, "necesita_respuesta": true, "seguimiento_por": "prevision", "prevision_vigente": {"fecha": "2026-10-28"}}}`; real `[]`
+- **16, vez 5, paso 6** [motor] incidente: esperado `[]`; real `[{"etapa": "motor_aviso_guardado", "severidad": "media"}]`
+- **16, vez 5, paso 6** [motor] pregunta abierta después: esperado `{"tipo": "estado_de_la_tarea", "tarea": "PLC"}`; real `null`
+- **17, vez 1, paso 1** [comprension] jugadas: esperado `[{"nombre": "destrabar", "tarea": "PLC"}]`; real `[]`
+- **17, vez 1, paso 1** [comprension] falta un efecto: estado: esperado `{"PLC": "en_curso"}`; real `{}`
+- **17, vez 1, paso 1** [comprension] falta un efecto: bloqueo resuelto: esperado `["PLC"]`; real `[]`
+- **17, vez 1, paso 1** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **17, vez 1, paso 1** [comprension] hechos: esperado `[{"jugada": "destrabar", "resultado": "anotado", "tarea": "PLC", "bloqueo_resuelto": {"causa": "espero el switch"}, "estado": "en_curso", "vuelve_a_pedir_el_estado": "ausente", "pregunta": "ausente"}]`; real `[]`
+- **17, vez 1, paso 3** [motor] no salió lo esperado: esperado `{"a": "Marcos", "tipo": "pedido_de_estado", "tarea": "PLC", "hechos": {"numero": 1, "necesita_respuesta": true, "vence": "2026-10-23", "atraso_dias_habiles": 0, "estado": "en_curso"}}`; real `[]`
+- **17, vez 1, paso 3** [motor] pregunta abierta después: esperado `{"tipo": "estado_de_la_tarea", "tarea": "PLC"}`; real `null`
+- **17, vez 1, paso 4** [comprension] jugadas: esperado `[{"nombre": "anotar_bloqueo", "tarea": "PLC", "causa": "se quemo la fuente"}]`; real `[]`
+- **17, vez 1, paso 4** [comprension] falta un efecto: estado: esperado `{"PLC": "bloqueada"}`; real `{}`
+- **17, vez 1, paso 4** [comprension] falta un efecto: bloqueo: esperado `[{"tarea": "PLC", "causa": "presente"}]`; real `[]`
+- **17, vez 1, paso 4** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **17, vez 1, paso 4** [comprension] la pregunta de la respuesta: esperado `{"tipo": "quien_destraba", "tarea": "PLC"}`; real `null`
+- **17, vez 1, paso 4** [comprension] hechos: esperado `[{"jugada": "anotar_bloqueo", "resultado": "anotado", "tarea": "PLC", "causa": "presente", "pregunta": "quien_destraba"}]`; real `[]`
+- **17, vez 1, paso 4** [comprension] pregunta abierta después: esperado `{"tipo": "quien_destraba", "tarea": "PLC"}`; real `null`
+- **17, vez 1, paso 5** [comprension] jugadas: esperado `[{"nombre": "destrabar", "tarea": "PLC"}]`; real `[]`
+- **17, vez 1, paso 5** [comprension] falta un efecto: estado: esperado `{"PLC": "en_curso"}`; real `{}`
+- **17, vez 1, paso 5** [comprension] falta un efecto: aviso guardado: esperado `[{"tipo": "repregunta_de_estado", "tarea": "PLC", "a": "Marcos", "estado": "guardado"}]`; real `[]`
+- **17, vez 1, paso 5** [comprension] falta un efecto: bloqueo resuelto: esperado `["PLC"]`; real `[]`
+- **17, vez 1, paso 5** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **17, vez 1, paso 5** [comprension] hechos: esperado `[{"jugada": "destrabar", "resultado": "anotado", "tarea": "PLC", "bloqueo_resuelto": {"causa": "se quemo la fuente"}, "estado": "en_curso", "vuelve_a_pedir_el_estado": {"estado": "guardado_sin_enviar", "sale": "~2026-10-26"}, "veces_sin_algo_cierto": 1, "vencida": "ausente", "pregunta": "ausente"}]`; real `[]`
+- **17, vez 1, paso 6** [motor] no salió lo esperado: esperado `{"a": "Marcos", "tipo": "repregunta_de_estado", "tarea": "PLC", "hechos": {"necesita_respuesta": true, "avance_anterior": {"jugada": "destrabar", "dijo": "presente"}, "espera_algo_cierto": "presente", "si_no_hay_respuesta": "ausente"}}`; real `[]`
+- **17, vez 1, paso 6** [motor] pregunta abierta después: esperado `{"tipo": "estado_de_la_tarea", "tarea": "PLC"}`; real `null`
+- **17, vez 2, paso 1** [comprension] jugadas: esperado `[{"nombre": "destrabar", "tarea": "PLC"}]`; real `[]`
+- **17, vez 2, paso 1** [comprension] falta un efecto: estado: esperado `{"PLC": "en_curso"}`; real `{}`
+- **17, vez 2, paso 1** [comprension] falta un efecto: bloqueo resuelto: esperado `["PLC"]`; real `[]`
+- **17, vez 2, paso 1** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **17, vez 2, paso 1** [comprension] hechos: esperado `[{"jugada": "destrabar", "resultado": "anotado", "tarea": "PLC", "bloqueo_resuelto": {"causa": "espero el switch"}, "estado": "en_curso", "vuelve_a_pedir_el_estado": "ausente", "pregunta": "ausente"}]`; real `[]`
+- **17, vez 2, paso 3** [motor] no salió lo esperado: esperado `{"a": "Marcos", "tipo": "pedido_de_estado", "tarea": "PLC", "hechos": {"numero": 1, "necesita_respuesta": true, "vence": "2026-10-23", "atraso_dias_habiles": 0, "estado": "en_curso"}}`; real `[]`
+- **17, vez 2, paso 3** [motor] pregunta abierta después: esperado `{"tipo": "estado_de_la_tarea", "tarea": "PLC"}`; real `null`
+- **17, vez 2, paso 4** [comprension] jugadas: esperado `[{"nombre": "anotar_bloqueo", "tarea": "PLC", "causa": "se quemo la fuente"}]`; real `[]`
+- **17, vez 2, paso 4** [comprension] falta un efecto: estado: esperado `{"PLC": "bloqueada"}`; real `{}`
+- **17, vez 2, paso 4** [comprension] falta un efecto: bloqueo: esperado `[{"tarea": "PLC", "causa": "presente"}]`; real `[]`
+- **17, vez 2, paso 4** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **17, vez 2, paso 4** [comprension] la pregunta de la respuesta: esperado `{"tipo": "quien_destraba", "tarea": "PLC"}`; real `null`
+- **17, vez 2, paso 4** [comprension] hechos: esperado `[{"jugada": "anotar_bloqueo", "resultado": "anotado", "tarea": "PLC", "causa": "presente", "pregunta": "quien_destraba"}]`; real `[]`
+- **17, vez 2, paso 4** [comprension] pregunta abierta después: esperado `{"tipo": "quien_destraba", "tarea": "PLC"}`; real `null`
+- **17, vez 2, paso 5** [comprension] jugadas: esperado `[{"nombre": "destrabar", "tarea": "PLC"}]`; real `[]`
+- **17, vez 2, paso 5** [comprension] falta un efecto: estado: esperado `{"PLC": "en_curso"}`; real `{}`
+- **17, vez 2, paso 5** [comprension] falta un efecto: aviso guardado: esperado `[{"tipo": "repregunta_de_estado", "tarea": "PLC", "a": "Marcos", "estado": "guardado"}]`; real `[]`
+- **17, vez 2, paso 5** [comprension] falta un efecto: bloqueo resuelto: esperado `["PLC"]`; real `[]`
+- **17, vez 2, paso 5** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **17, vez 2, paso 5** [comprension] hechos: esperado `[{"jugada": "destrabar", "resultado": "anotado", "tarea": "PLC", "bloqueo_resuelto": {"causa": "se quemo la fuente"}, "estado": "en_curso", "vuelve_a_pedir_el_estado": {"estado": "guardado_sin_enviar", "sale": "~2026-10-26"}, "veces_sin_algo_cierto": 1, "vencida": "ausente", "pregunta": "ausente"}]`; real `[]`
+- **17, vez 2, paso 6** [motor] no salió lo esperado: esperado `{"a": "Marcos", "tipo": "repregunta_de_estado", "tarea": "PLC", "hechos": {"necesita_respuesta": true, "avance_anterior": {"jugada": "destrabar", "dijo": "presente"}, "espera_algo_cierto": "presente", "si_no_hay_respuesta": "ausente"}}`; real `[]`
+- **17, vez 2, paso 6** [motor] pregunta abierta después: esperado `{"tipo": "estado_de_la_tarea", "tarea": "PLC"}`; real `null`
+- **17, vez 3, paso 1** [comprension] jugadas: esperado `[{"nombre": "destrabar", "tarea": "PLC"}]`; real `[]`
+- **17, vez 3, paso 1** [comprension] falta un efecto: estado: esperado `{"PLC": "en_curso"}`; real `{}`
+- **17, vez 3, paso 1** [comprension] falta un efecto: bloqueo resuelto: esperado `["PLC"]`; real `[]`
+- **17, vez 3, paso 1** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **17, vez 3, paso 1** [comprension] hechos: esperado `[{"jugada": "destrabar", "resultado": "anotado", "tarea": "PLC", "bloqueo_resuelto": {"causa": "espero el switch"}, "estado": "en_curso", "vuelve_a_pedir_el_estado": "ausente", "pregunta": "ausente"}]`; real `[]`
+- **17, vez 3, paso 3** [motor] no salió lo esperado: esperado `{"a": "Marcos", "tipo": "pedido_de_estado", "tarea": "PLC", "hechos": {"numero": 1, "necesita_respuesta": true, "vence": "2026-10-23", "atraso_dias_habiles": 0, "estado": "en_curso"}}`; real `[]`
+- **17, vez 3, paso 3** [motor] pregunta abierta después: esperado `{"tipo": "estado_de_la_tarea", "tarea": "PLC"}`; real `null`
+- **17, vez 3, paso 4** [comprension] jugadas: esperado `[{"nombre": "anotar_bloqueo", "tarea": "PLC", "causa": "se quemo la fuente"}]`; real `[]`
+- **17, vez 3, paso 4** [comprension] falta un efecto: estado: esperado `{"PLC": "bloqueada"}`; real `{}`
+- **17, vez 3, paso 4** [comprension] falta un efecto: bloqueo: esperado `[{"tarea": "PLC", "causa": "presente"}]`; real `[]`
+- **17, vez 3, paso 4** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **17, vez 3, paso 4** [comprension] la pregunta de la respuesta: esperado `{"tipo": "quien_destraba", "tarea": "PLC"}`; real `null`
+- **17, vez 3, paso 4** [comprension] hechos: esperado `[{"jugada": "anotar_bloqueo", "resultado": "anotado", "tarea": "PLC", "causa": "presente", "pregunta": "quien_destraba"}]`; real `[]`
+- **17, vez 3, paso 4** [comprension] pregunta abierta después: esperado `{"tipo": "quien_destraba", "tarea": "PLC"}`; real `null`
+- **17, vez 3, paso 5** [comprension] jugadas: esperado `[{"nombre": "destrabar", "tarea": "PLC"}]`; real `[]`
+- **17, vez 3, paso 5** [comprension] falta un efecto: estado: esperado `{"PLC": "en_curso"}`; real `{}`
+- **17, vez 3, paso 5** [comprension] falta un efecto: aviso guardado: esperado `[{"tipo": "repregunta_de_estado", "tarea": "PLC", "a": "Marcos", "estado": "guardado"}]`; real `[]`
+- **17, vez 3, paso 5** [comprension] falta un efecto: bloqueo resuelto: esperado `["PLC"]`; real `[]`
+- **17, vez 3, paso 5** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **17, vez 3, paso 5** [comprension] hechos: esperado `[{"jugada": "destrabar", "resultado": "anotado", "tarea": "PLC", "bloqueo_resuelto": {"causa": "se quemo la fuente"}, "estado": "en_curso", "vuelve_a_pedir_el_estado": {"estado": "guardado_sin_enviar", "sale": "~2026-10-26"}, "veces_sin_algo_cierto": 1, "vencida": "ausente", "pregunta": "ausente"}]`; real `[]`
+- **17, vez 3, paso 6** [motor] no salió lo esperado: esperado `{"a": "Marcos", "tipo": "repregunta_de_estado", "tarea": "PLC", "hechos": {"necesita_respuesta": true, "avance_anterior": {"jugada": "destrabar", "dijo": "presente"}, "espera_algo_cierto": "presente", "si_no_hay_respuesta": "ausente"}}`; real `[]`
+- **17, vez 3, paso 6** [motor] pregunta abierta después: esperado `{"tipo": "estado_de_la_tarea", "tarea": "PLC"}`; real `null`
+- **17, vez 4, paso 1** [comprension] jugadas: esperado `[{"nombre": "destrabar", "tarea": "PLC"}]`; real `[]`
+- **17, vez 4, paso 1** [comprension] falta un efecto: estado: esperado `{"PLC": "en_curso"}`; real `{}`
+- **17, vez 4, paso 1** [comprension] falta un efecto: bloqueo resuelto: esperado `["PLC"]`; real `[]`
+- **17, vez 4, paso 1** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **17, vez 4, paso 1** [comprension] hechos: esperado `[{"jugada": "destrabar", "resultado": "anotado", "tarea": "PLC", "bloqueo_resuelto": {"causa": "espero el switch"}, "estado": "en_curso", "vuelve_a_pedir_el_estado": "ausente", "pregunta": "ausente"}]`; real `[]`
+- **17, vez 4, paso 3** [motor] no salió lo esperado: esperado `{"a": "Marcos", "tipo": "pedido_de_estado", "tarea": "PLC", "hechos": {"numero": 1, "necesita_respuesta": true, "vence": "2026-10-23", "atraso_dias_habiles": 0, "estado": "en_curso"}}`; real `[]`
+- **17, vez 4, paso 3** [motor] pregunta abierta después: esperado `{"tipo": "estado_de_la_tarea", "tarea": "PLC"}`; real `null`
+- **17, vez 4, paso 4** [comprension] jugadas: esperado `[{"nombre": "anotar_bloqueo", "tarea": "PLC", "causa": "se quemo la fuente"}]`; real `[]`
+- **17, vez 4, paso 4** [comprension] falta un efecto: estado: esperado `{"PLC": "bloqueada"}`; real `{}`
+- **17, vez 4, paso 4** [comprension] falta un efecto: bloqueo: esperado `[{"tarea": "PLC", "causa": "presente"}]`; real `[]`
+- **17, vez 4, paso 4** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **17, vez 4, paso 4** [comprension] la pregunta de la respuesta: esperado `{"tipo": "quien_destraba", "tarea": "PLC"}`; real `null`
+- **17, vez 4, paso 4** [comprension] hechos: esperado `[{"jugada": "anotar_bloqueo", "resultado": "anotado", "tarea": "PLC", "causa": "presente", "pregunta": "quien_destraba"}]`; real `[]`
+- **17, vez 4, paso 4** [comprension] pregunta abierta después: esperado `{"tipo": "quien_destraba", "tarea": "PLC"}`; real `null`
+- **17, vez 4, paso 5** [comprension] jugadas: esperado `[{"nombre": "destrabar", "tarea": "PLC"}]`; real `[]`
+- **17, vez 4, paso 5** [comprension] falta un efecto: estado: esperado `{"PLC": "en_curso"}`; real `{}`
+- **17, vez 4, paso 5** [comprension] falta un efecto: aviso guardado: esperado `[{"tipo": "repregunta_de_estado", "tarea": "PLC", "a": "Marcos", "estado": "guardado"}]`; real `[]`
+- **17, vez 4, paso 5** [comprension] falta un efecto: bloqueo resuelto: esperado `["PLC"]`; real `[]`
+- **17, vez 4, paso 5** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **17, vez 4, paso 5** [comprension] hechos: esperado `[{"jugada": "destrabar", "resultado": "anotado", "tarea": "PLC", "bloqueo_resuelto": {"causa": "se quemo la fuente"}, "estado": "en_curso", "vuelve_a_pedir_el_estado": {"estado": "guardado_sin_enviar", "sale": "~2026-10-26"}, "veces_sin_algo_cierto": 1, "vencida": "ausente", "pregunta": "ausente"}]`; real `[]`
+- **17, vez 4, paso 6** [motor] no salió lo esperado: esperado `{"a": "Marcos", "tipo": "repregunta_de_estado", "tarea": "PLC", "hechos": {"necesita_respuesta": true, "avance_anterior": {"jugada": "destrabar", "dijo": "presente"}, "espera_algo_cierto": "presente", "si_no_hay_respuesta": "ausente"}}`; real `[]`
+- **17, vez 4, paso 6** [motor] pregunta abierta después: esperado `{"tipo": "estado_de_la_tarea", "tarea": "PLC"}`; real `null`
+- **17, vez 5, paso 1** [comprension] jugadas: esperado `[{"nombre": "destrabar", "tarea": "PLC"}]`; real `[]`
+- **17, vez 5, paso 1** [comprension] falta un efecto: estado: esperado `{"PLC": "en_curso"}`; real `{}`
+- **17, vez 5, paso 1** [comprension] falta un efecto: bloqueo resuelto: esperado `["PLC"]`; real `[]`
+- **17, vez 5, paso 1** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **17, vez 5, paso 1** [comprension] hechos: esperado `[{"jugada": "destrabar", "resultado": "anotado", "tarea": "PLC", "bloqueo_resuelto": {"causa": "espero el switch"}, "estado": "en_curso", "vuelve_a_pedir_el_estado": "ausente", "pregunta": "ausente"}]`; real `[]`
+- **17, vez 5, paso 3** [motor] no salió lo esperado: esperado `{"a": "Marcos", "tipo": "pedido_de_estado", "tarea": "PLC", "hechos": {"numero": 1, "necesita_respuesta": true, "vence": "2026-10-23", "atraso_dias_habiles": 0, "estado": "en_curso"}}`; real `[]`
+- **17, vez 5, paso 3** [motor] pregunta abierta después: esperado `{"tipo": "estado_de_la_tarea", "tarea": "PLC"}`; real `null`
+- **17, vez 5, paso 4** [comprension] jugadas: esperado `[{"nombre": "anotar_bloqueo", "tarea": "PLC", "causa": "se quemo la fuente"}]`; real `[]`
+- **17, vez 5, paso 4** [comprension] falta un efecto: estado: esperado `{"PLC": "bloqueada"}`; real `{}`
+- **17, vez 5, paso 4** [comprension] falta un efecto: bloqueo: esperado `[{"tarea": "PLC", "causa": "presente"}]`; real `[]`
+- **17, vez 5, paso 4** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **17, vez 5, paso 4** [comprension] la pregunta de la respuesta: esperado `{"tipo": "quien_destraba", "tarea": "PLC"}`; real `null`
+- **17, vez 5, paso 4** [comprension] hechos: esperado `[{"jugada": "anotar_bloqueo", "resultado": "anotado", "tarea": "PLC", "causa": "presente", "pregunta": "quien_destraba"}]`; real `[]`
+- **17, vez 5, paso 4** [comprension] pregunta abierta después: esperado `{"tipo": "quien_destraba", "tarea": "PLC"}`; real `null`
+- **17, vez 5, paso 5** [comprension] jugadas: esperado `[{"nombre": "destrabar", "tarea": "PLC"}]`; real `[]`
+- **17, vez 5, paso 5** [comprension] falta un efecto: estado: esperado `{"PLC": "en_curso"}`; real `{}`
+- **17, vez 5, paso 5** [comprension] falta un efecto: aviso guardado: esperado `[{"tipo": "repregunta_de_estado", "tarea": "PLC", "a": "Marcos", "estado": "guardado"}]`; real `[]`
+- **17, vez 5, paso 5** [comprension] falta un efecto: bloqueo resuelto: esperado `["PLC"]`; real `[]`
+- **17, vez 5, paso 5** [motor] incidente: esperado `[]`; real `[{"etapa": "turno_conversacion", "severidad": "media"}]`
+- **17, vez 5, paso 5** [comprension] hechos: esperado `[{"jugada": "destrabar", "resultado": "anotado", "tarea": "PLC", "bloqueo_resuelto": {"causa": "se quemo la fuente"}, "estado": "en_curso", "vuelve_a_pedir_el_estado": {"estado": "guardado_sin_enviar", "sale": "~2026-10-26"}, "veces_sin_algo_cierto": 1, "vencida": "ausente", "pregunta": "ausente"}]`; real `[]`
+- **17, vez 5, paso 6** [motor] no salió lo esperado: esperado `{"a": "Marcos", "tipo": "repregunta_de_estado", "tarea": "PLC", "hechos": {"necesita_respuesta": true, "avance_anterior": {"jugada": "destrabar", "dijo": "presente"}, "espera_algo_cierto": "presente", "si_no_hay_respuesta": "ausente"}}`; real `[]`
+- **17, vez 5, paso 6** [motor] pregunta abierta después: esperado `{"tipo": "estado_de_la_tarea", "tarea": "PLC"}`; real `null`
+
+## Latencia por turno
+
+Lo que tarda un turno de una persona, de que llega el mensaje a la respuesta encolada (las dos llamadas a la IA). Sin umbral (sección 6).
+
+| Conversación | Turnos | Mediana (ms) | Peor (ms) |
+|---|---|---|---|
+| 01 | 5 | 403 | 495 |
+| 02 | 5 | 392 | 413 |
+| 03 | 15 | 436 | 9995 |
+| 05 | 15 | 781 | 7055 |
+| 06 | 10 | 788 | 13304 |
+| 07 | 10 | 5130 | 6008 |
+| 08 | 15 | 791 | 5191 |
+| 09 | 5 | 892 | 1101 |
+| 10 | 10 | 832 | 1069 |
+| 11 | 18 | 778 | 5835 |
+| 12 | 30 | 773 | 839 |
+| 13 | 10 | 798 | 5115 |
+| 14 | 10 | 798 | 4787 |
+| 15 | 15 | 826 | 6983 |
+| 16 | 10 | 798 | 5771 |
+| 17 | 15 | 780 | 853 |
+| **Todas** | 198 | 788 | 13304 |
+
+## Costo
+
+- Llamadas a la IA: 706 (505 con el costo estimado); tokens de entrada 422186, de salida 14048.
+- Jev: 0 llamadas, USD 0.0000 (estimado).
+- **Total de la ronda: USD 10.7788.**

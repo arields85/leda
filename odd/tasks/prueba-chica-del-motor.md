@@ -517,6 +517,19 @@ su evidencia son las corridas. Unas 400 líneas por tarea es una guía, no un to
       prueba_chica/test_hechos_al_final_del_turno.py` en rojo, `4 failed, 2 passed`; `pytest
       prueba_chica` en verde, `360 passed in 131.15s`; en seco, `--ronda seco-8`, 17 de 17,
       garantías 17 de 17 (informe borrado).
+- [x] **Ronda 2 inválida, sin crédito** (2026-10-05, 21:21 en adelante): OpenRouter rechazó 1.226
+      llamadas con HTTP 402 (sol, 235; sol61, 505; Sonnet, 486) y la libreta las estimaba como
+      cobradas: mostró USD 29,84 y cortó Sonnet (26 corridas) por un techo falso. Corregido: una
+      llamada que falló (error HTTP, plazo, sin respuesta) cuesta 0 y no se estima; sólo se estima
+      la que respondió sin informar su uso. Libreta corregida desde las grabaciones: ronda2-sol USD
+      1,63, sol61 0,68, Sonnet 0,13; **la etapa, USD 6,26 de 30** (0,70 de Jev, estimado). Informes
+      como evidencia del corte en `resultados/ronda2-invalida-*.md`. **Leda durante el corte,
+      observado** (decisión 8): ningún efecto sin IA (Sonnet, las 59 corridas afectadas, sin fallas de
+      garantía), el texto neutro "Tuve un problema y no pude responder tu mensaje..." (134 veces en
+      Sonnet) y un incidente por turno (`turno_conversacion`, `motor_aviso_guardado`). Las tres fallas
+      de garantía de sol61 (03 v4, 11 v3 y 11 v5, efectos de más) son de corridas mezcladas con 402 y
+      no se analizaron: la ronda se repite. Evidencia: `pytest prueba_chica/test_gasto.py` en rojo,
+      `1 failed, 12 passed`; `pytest prueba_chica` en verde, `361 passed in 121.34s`.
 - [ ] **E2-8. Primera ronda real:** sol, luna y Jev; lectura de textos; bitácora; chequeo de rumbo contra 5c.
 - [ ] **E2-9. Telegram real** con el usuario; su juicio; M2 en la bitácora.
 
