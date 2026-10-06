@@ -148,15 +148,20 @@ def _turno(conn, cur, ctx: Contexto, ia: IA, reloj: Reloj,
             pregunta = preguntas.al_terminar_el_turno(ctx)
             # Lo que los hechos dejaron para después, como quedó después de todas las jugadas
             # (9k). `efectos` usa los avisos, que importan este módulo: se importa acá.
-            from .efectos import al_final_del_turno
-            al_final_del_turno(ctx, hechos)
+            # También lo que un turno anterior dejó anunciado y ya no va a pasar, y lo que sigue.
+            from .efectos import ANUNCIADOS, YA_NO_SALE, al_final_del_turno
+            final = al_final_del_turno(ctx, hechos)
             texto = pedir_a_la_ia(lambda: no_vacio(
-                ia.redactar(_pedido_de_redaccion(ctx, hechos, pregunta))))
+                ia.redactar(_pedido_de_redaccion(ctx, hechos, pregunta, final.ya_no_sale))))
     except IANoRespondio as falla:
         return _si_la_ia_falla(cur, ctx, ia, reloj, inicio, elegidas, falla, clave_respuesta,
                                option_id)
     latencia = _ms(reloj.medir() - inicio)
-    resultado = {"hechos": hechos, **({"pregunta": pregunta} if pregunta else {})}
+    # Lo anunciado y pendiente va en el resultado, fuera de los hechos: la IA no lo recibe en
+    # los últimos turnos (sólo los hechos), y el turno siguiente lo vuelve a mirar.
+    resultado = {"hechos": hechos, **({"pregunta": pregunta} if pregunta else {}),
+                 **({YA_NO_SALE: final.ya_no_sale} if final.ya_no_sale else {}),
+                 **({ANUNCIADOS: final.anunciados} if final.anunciados else {})}
     turno = _registrar_entrada(cur, ctx, reloj.ahora(), elegidas, resultado, ia.nombre,
                                latencia, None, option_id)
     if ctx.avisos_guardados:
@@ -279,15 +284,17 @@ def _situacion(ctx: Contexto, jugadas: Mapping[str, Manejador]) -> dict[str, Any
 
 
 def _pedido_de_redaccion(ctx: Contexto, hechos: list[dict[str, Any]],
-                         pregunta: dict[str, Any] | None = None) -> dict[str, Any]:
+                         pregunta: dict[str, Any] | None = None,
+                         ya_no_sale: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     """Lo que la IA recibe para redactar: hoy, a quién le escribe, su mensaje (o la opción que
-    tocó), los hechos (con lo que se dice sólo si se pregunta, `SOLO_SI_PREGUNTA`), la única
-    pregunta que se hace, si hay, y los últimos turnos."""
+    tocó), los hechos (con lo que se dice sólo si se pregunta, `SOLO_SI_PREGUNTA`), lo que un
+    mensaje anterior anunció y ya no va a pasar (`ya_no_sale`, si hay), la única pregunta que
+    se hace, si hay, y los últimos turnos."""
     return {"hoy": ctx.ahora.date().isoformat(), "persona": ctx.quien.nombre,
             "mensaje": ctx.texto if ctx.toque is None else None,
             **({"toco": ctx.toque} if ctx.toque is not None else {}),
-            "hechos": hechos, "pregunta": pregunta,
-            "ultimos_turnos": list(ctx.ultimos_turnos)}
+            "hechos": hechos, **({"ya_no_sale": ya_no_sale} if ya_no_sale else {}),
+            "pregunta": pregunta, "ultimos_turnos": list(ctx.ultimos_turnos)}
 
 
 # --- (2) y (5) Los pedidos a la IA ---------------------------------------------------------

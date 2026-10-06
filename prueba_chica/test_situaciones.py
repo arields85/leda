@@ -342,7 +342,9 @@ def test_elegir_escribiendo_completa_la_jugada_que_esperaba(conn, tareas, marcos
 
     assert r.hechos == [{"jugada": "anotar_inicio", "resultado": "anotado",
                          "estado": "en_curso", "tarea": T1,
-                         "eligio": {"opcion": "O1", "etiqueta": T1["titulo"], "tarea": T1}}]
+                         "eligio": {"opcion": "O1", "etiqueta": T1["titulo"], "tarea": T1},
+                         "lo_que_sigue": {"pide_el_estado_el": {"fecha": "2026-10-09",
+                                                                "estado": "todavia_no"}}}]
     assert _estado_de(conn, tareas["T1"]) == "en_curso"
     assert _estado_de(conn, tareas["T2"]) == "asignada"
     pregunta = _uno(conn, "select cierre, cierre_detalle from conversation_question")

@@ -167,6 +167,18 @@ SIGNIFICADOS: Mapping[str, str] = {
     "aplicado": "Lo corregido, anotado en la tarea correcta: su resultado.",
     "preguntas_ya_cerradas": "Las preguntas que el hecho abrió y que el mismo mensaje ya cerró "
                              "(otra jugada las contestó o las dejó sin efecto): no se hacen.",
+    "lo_que_sigue": "Lo próximo que Leda hace en el seguimiento de esa tarea, como quedó al "
+                    "terminar este mensaje. Todavía no pasó.",
+    "proximo_aviso": "El próximo aviso que Leda tiene guardado para la persona sobre esa "
+                     "tarea, con qué aviso es, su estado y cuándo sale.",
+    "seguimiento": "Cómo sigue el seguimiento de la tarea, con su código.",
+    "detenido_mientras_siga_trabada": "Mientras la tarea siga trabada, Leda no le pide el "
+                                      "estado: el seguimiento vuelve cuando la persona cuenta "
+                                      "que se destrabó.",
+    "ya_no_sale": "Lo que Leda le contó a la persona en un mensaje anterior que iba a pasar y "
+                  "ya no va a pasar: se retiró sin salir, con su motivo. La persona lo sigue "
+                  "esperando.",
+    "anuncio": "Lo que se había anunciado, con el nombre del dato con que se contó.",
     # --- Los datos de una jugada, como se entendieron del mensaje -----------------------------
     "palabras": "Lo que la persona contó de cómo viene la tarea, con sus palabras.",
     "quien": "Quién puede destrabar el bloqueo, como lo nombró la persona.",

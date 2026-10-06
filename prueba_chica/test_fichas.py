@@ -138,7 +138,9 @@ def test_el_inicio_pasa_la_tarea_a_en_curso_y_contesta_su_espera(conn, mundo, es
                      texto="arranqué")
 
     assert hecho == {"jugada": "anotar_inicio", "resultado": "anotado", "estado": "en_curso",
-                     "tarea": {"alias": "T1", "titulo": "Revisar el tablero"}}
+                     "tarea": {"alias": "T1", "titulo": "Revisar el tablero"},
+                     "lo_que_sigue": {"pide_el_estado_el": {"fecha": "2026-10-09",
+                                                            "estado": "todavia_no"}}}
     assert _estado_de(conn, mundo["tarea"]) == "en_curso"
     evento = _uno(conn, """select estado_anterior, estado_nuevo, actor_app_user_id
                              from task_state_event where task_id = %s""", mundo["tarea"])
@@ -213,7 +215,9 @@ def test_la_prevision_anota_el_atraso_en_dias_habiles_y_guarda_el_aviso(conn, mu
         "dependientes": ["Probar el tablero"],
         # Guardado y todavía sin enviar, y cuándo sale, en la hora del espacio (9e).
         "aviso_al_referente": {"a": "Ismael", "estado": "guardado_sin_enviar",
-                               "sale": "2026-10-05T10:00:00-03:00"}}
+                               "sale": "2026-10-05T10:00:00-03:00"},
+        # El seguimiento pasa a la previsión (9i): Leda pide el estado el día previsto.
+        "lo_que_sigue": {"pide_el_estado_el": {"fecha": "2026-10-13", "estado": "todavia_no"}}}
     prevision = _uno(conn, "select * from task_forecast")
     assert prevision["fecha_prevista"] == date(2026, 10, 13)
     assert prevision["fecha_comprometida"] == VIERNES_9
@@ -323,7 +327,8 @@ def test_un_bloqueo_con_causa_se_anota_y_pregunta_quien_destraba(conn, mundo, es
 
     assert hecho == {"jugada": "anotar_bloqueo", "resultado": "anotado",
                      "causa": "falta el repuesto", "pregunta": "quien_destraba",
-                     "tarea": {"alias": "T1", "titulo": "Revisar el tablero"}}
+                     "tarea": {"alias": "T1", "titulo": "Revisar el tablero"},
+                     "lo_que_sigue": {"seguimiento": "detenido_mientras_siga_trabada"}}
     bloqueo = _uno(conn, "select id, causa, resuelto_en from blocker")
     assert bloqueo["causa"] == "falta el repuesto" and bloqueo["resuelto_en"] is None
     assert _estado_de(conn, mundo["tarea"]) == "bloqueada"
@@ -482,7 +487,9 @@ def test_destrabar_cierra_el_bloqueo_y_la_tarea_vuelve_a_su_estado_de_antes(conn
 
     # Antes de su fecha, la escalera sigue sola: no se guarda ningún pedido.
     assert hecho == {"jugada": "destrabar", "resultado": "anotado", "tarea": T1,
-                     "bloqueo_resuelto": {"causa": "espero el switch"}, "estado": antes}
+                     "bloqueo_resuelto": {"causa": "espero el switch"}, "estado": antes,
+                     "lo_que_sigue": {"pide_el_estado_el": {"fecha": "2026-10-09",
+                                                            "estado": "todavia_no"}}}
     assert _estado_de(conn, mundo["tarea"]) == antes
     bloqueo = _uno(conn, "select resuelto_en, resolucion from blocker")
     assert bloqueo["resuelto_en"] is not None
