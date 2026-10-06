@@ -17,9 +17,10 @@ import pytest
 from prueba_chica.conftest import AHORA
 from prueba_chica.fichas import FICHAS, JUGADAS
 from prueba_chica.ia import Jugada
-from prueba_chica.ia_real import (FUERA_DE_LA_LISTA, NOMBRE_HERRAMIENTA, ClienteCompatible,
-                                  IAReal, PlazoAgotado, RespuestaInvalida, desde_base,
-                                  esquema_de_jugadas)
+from prueba_chica import hechos
+from prueba_chica.ia_real import (DIAS_PROXIMOS, FUERA_DE_LA_LISTA, NOMBRE_HERRAMIENTA,
+                                  ClienteCompatible, IAReal, PlazoAgotado, RespuestaInvalida,
+                                  desde_base, esquema_de_jugadas)
 from prueba_chica.instrucciones import (INSTRUCCIONES_JUGADAS, INSTRUCCIONES_REDACCION,
                                         Tono)
 from prueba_chica.tiempo import RelojFijo
@@ -114,7 +115,8 @@ def test_la_eleccion_ofrece_la_herramienta_con_la_lista_cerrada_y_la_lee():
     sistema, usuario = cuerpo["messages"]
     assert sistema["role"] == "system"
     assert sistema["content"].startswith(INSTRUCCIONES_JUGADAS)
-    assert json.loads(usuario["content"]) == SITUACION
+    assert json.loads(usuario["content"]) == {
+        **SITUACION, "dias": hechos.dias(SITUACION, proximos=DIAS_PROXIMOS)}
 
 
 def _variantes(herramienta) -> dict:
@@ -265,7 +267,7 @@ def test_la_redaccion_recibe_sus_instrucciones_el_tono_y_el_pedido():
     for linea in ("- Trato: de vos.", "- Formalidad: profesional cordial.",
                   "- Longitud: breve.", "- Emojis: permitidos."):
         assert linea in sistema["content"]
-    assert json.loads(usuario["content"]) == pedido
+    assert json.loads(usuario["content"]) == {**pedido, "dias": hechos.dias(pedido)}
 
 
 def test_las_instrucciones_describen_el_trabajo_y_el_marcador():

@@ -18,7 +18,7 @@ from prueba_chica.fichas import (EN_COLA_SIN_ENVIAR, ESPERA_ALGO_CIERTO, FICHAS,
                                   GUARDADO_SIN_ENVIAR, SALIDAS_DE_UN_BLOQUEO)
 from prueba_chica.grabar import IAPerfecta
 from prueba_chica.ia import IAGuionada, Jugada
-from prueba_chica.ia_real import DATOS
+from prueba_chica.ia_real import DATOS, DIAS_PROXIMOS
 from prueba_chica.instrucciones import INSTRUCCIONES_JUGADAS, INSTRUCCIONES_REDACCION
 from prueba_chica.test_ia_real import SITUACION, ProveedorFalso, _ia, _llamada, _texto
 from prueba_chica.tiempo import RelojFijo
@@ -84,8 +84,11 @@ def test_los_dos_pedidos_a_la_ia_llevan_el_significado_de_sus_datos():
     ia.redactar(pedido)
 
     eleccion, redaccion = (p["cuerpo"]["messages"][0]["content"] for p in proveedor.pedidos)
-    assert eleccion == f"{INSTRUCCIONES_JUGADAS}\n\n{hechos.bloque(SITUACION)}"
-    assert redaccion.startswith(f"{INSTRUCCIONES_REDACCION}\n\n{hechos.bloque(pedido)}")
+    # Los pedidos llevan además el día de cada fecha (`dias`), con su significado.
+    con_dias = {**SITUACION, "dias": hechos.dias(SITUACION, proximos=DIAS_PROXIMOS)}
+    assert eleccion == f"{INSTRUCCIONES_JUGADAS}\n\n{hechos.bloque(con_dias)}"
+    assert redaccion.startswith(f"{INSTRUCCIONES_REDACCION}\n\n"
+                                f"{hechos.bloque({**pedido, 'dias': hechos.dias(pedido)})}")
     assert hechos.significado("atraso_si_se_cumple_la_prevision_dias_habiles") in redaccion
     assert hechos.significado("nueva_prevision") in redaccion
 

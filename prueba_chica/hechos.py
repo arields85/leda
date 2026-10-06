@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Iterator, Mapping
+from datetime import date, timedelta
 from typing import Any
 
 from .fichas import FICHAS
@@ -38,6 +39,9 @@ _CODIGO = re.compile(r"^[a-z][a-z0-9]*(_[a-z0-9]+)+$")
 SIGNIFICADOS: Mapping[str, str] = {
     # --- Lo que recibe la IA en cada pedido ----------------------------------------------------
     "hoy": "La fecha de hoy, en la hora del equipo.",
+    "dias": "El día de la semana de cada fecha de este pedido (para elegir jugadas, también "
+            "de los próximos días) y, si corresponde, si es hoy, ayer, mañana o pasado "
+            "mañana. Lo da el código: se usa tal cual, nunca se calcula.",
     "persona": "A quién le escribe Leda.",
     "mensaje": "Lo que la persona escribió ahora; vacío si tocó una opción o si Leda escribe "
                "por su cuenta.",
@@ -332,6 +336,55 @@ SIGNIFICADOS: Mapping[str, str] = {
     "falla_de_aviso": "Un aviso que la persona causó no pudo salir.",
     "no_salio_un_aviso": "Un aviso que la persona causó no pudo salir.",
 }
+
+
+# --- Los días de las fechas (tercera vuelta de ajuste, usuario, 2026-10-06) ------------------
+#
+# Ronda 2: la IA calculó mal el día de la semana o el "mañana" desde una fecha AAAA-MM-DD. El
+# código los sabe: cada pedido a la IA lleva, para cada fecha que trae, su día de la semana y,
+# si corresponde, si es hoy, ayer, mañana o pasado mañana (`dias`); para elegir jugadas,
+# también los de los próximos días, para que una fecha que la persona nombra por su día salga
+# de ahí y no de una cuenta. Una fecha con hora se toma por su día tal como está escrita.
+
+_FECHA = re.compile(r"^(\d{4}-\d{2}-\d{2})(?:$|T)")
+_DIAS_DE_LA_SEMANA = ("lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo")
+_MESES = ("enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto",
+          "septiembre", "octubre", "noviembre", "diciembre")
+_RELATIVOS = {-1: "ayer", 0: "hoy", 1: "mañana", 2: "pasado mañana"}
+
+
+def _fechas(valor: Any) -> Iterator[date]:
+    if isinstance(valor, Mapping):
+        for v in valor.values():
+            yield from _fechas(v)
+    elif isinstance(valor, (list, tuple)):
+        for v in valor:
+            yield from _fechas(v)
+    elif isinstance(valor, str):
+        encontrada = _FECHA.match(valor)
+        if encontrada:
+            try:
+                yield date.fromisoformat(encontrada.group(1))
+            except ValueError:
+                return
+
+
+def dia(fecha: date, hoy: date | None = None) -> str:
+    """"2026-10-23: viernes 23 de octubre", con ", mañana" (o hoy, ayer, pasado mañana) si
+    corresponde."""
+    texto = (f"{fecha.isoformat()}: {_DIAS_DE_LA_SEMANA[fecha.weekday()]} {fecha.day} de "
+             f"{_MESES[fecha.month - 1]}")
+    relativo = _RELATIVOS.get((fecha - hoy).days) if hoy is not None else None
+    return f"{texto}, {relativo}" if relativo else texto
+
+
+def dias(pedido: Mapping[str, Any], *, proximos: int = 0) -> list[str]:
+    """El día de cada fecha del pedido (y de los `proximos` días desde hoy), en orden."""
+    hoy = next(_fechas(pedido.get("hoy")), None)
+    fechas = set(_fechas(pedido))
+    if hoy is not None:
+        fechas.update(hoy + timedelta(days=n) for n in range(proximos + 1))
+    return [dia(f, hoy) for f in sorted(fechas)]
 
 
 def significado(nombre: str) -> str | None:

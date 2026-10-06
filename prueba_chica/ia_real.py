@@ -11,7 +11,8 @@ Se trae lo mínimo de la llamada estructurada de la rama congelada (`llm.py` en
   acepta): la piden las instrucciones, y no llamarla es no responder.
 - `redactar` pide el texto de la respuesta desde los hechos, con el tono del espacio.
 - Los dos pedidos llevan, después de las instrucciones, el significado de cada dato y cada código
-  que traen (`hechos.bloque`; revisión del contrato, 2026-10-05).
+  que traen (`hechos.bloque`; revisión del contrato, 2026-10-05), y el día de la semana de cada
+  fecha, con hoy, ayer, mañana o pasado mañana (`hechos.dias`; tercera vuelta, 2026-10-06).
 
 Habla el protocolo de chat de OpenAI, que es el de GPT-6 sol por OpenRouter (el modelo del
 espacio sale de `model_config`, como en `leda.llm.desde_base`; la clave, del entorno, nunca del
@@ -46,6 +47,9 @@ PLAZO_S = 40.0
 # parte del tope antes de contestar.
 TOPE_JUGADAS = 1500
 TOPE_REDACCION = 700
+# Para elegir jugadas, los días que vienen con su día de la semana: una fecha que la persona
+# nombra por su día sale de ahí (`hechos.dias`).
+DIAS_PROXIMOS = 14
 
 # Cada dato que alguna ficha usa, con su tipo y qué es: qué dato es y que va sólo si la persona
 # lo dijo (revisión del contrato, 2026-10-05). Describen el dato, no un caso.
@@ -216,6 +220,8 @@ class IAReal:
 
     def elegir_jugadas(self, situacion: dict[str, Any]) -> list[Jugada]:
         herramienta = esquema_de_jugadas(list(situacion["jugadas_posibles"]))
+        # El día de cada fecha y de las dos semanas que vienen: la IA no los calcula.
+        situacion = {**situacion, "dias": hechos.dias(situacion, proximos=DIAS_PROXIMOS)}
         respuesta = self.cliente.completar({
             "temperature": 0,
             "max_tokens": int(self.cliente.parametros.get("tope_jugadas", TOPE_JUGADAS)),
@@ -233,6 +239,7 @@ class IAReal:
         return leer_jugadas(respuesta)
 
     def redactar(self, pedido: dict[str, Any]) -> str:
+        pedido = {**pedido, "dias": hechos.dias(pedido)}     # el día de cada fecha, del código
         respuesta = self.cliente.completar({
             "temperature": self.cliente.parametros.get("temperature", 0.3),
             "max_tokens": int(self.cliente.parametros.get("tope_redaccion", TOPE_REDACCION)),
