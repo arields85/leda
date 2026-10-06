@@ -607,6 +607,13 @@ su evidencia son las corridas. Unas 400 líneas por tarea es una guía, no un to
       `.venv` de la carpeta; antes, `/start` de las tres cuentas al bot nuevo del equipo y un mensaje de
       Ariel al bot de administración nuevo. En horario de CoreWork o con el reloj. Después: el juicio del
       usuario, la entrada en la bitácora y M2.
+      **Preparación hecha (2026-10-06):** respaldo `db/respaldos/leda_motor-antes-e2-9-20261006.dump`
+      (`pg_restore --list` sin error), base recreada y cargada con los pasos de arriba, todos sin error
+      (12 tareas: 6 asignadas, 6 en curso). Guía en `prueba_chica/README.md`, "Prueba por Telegram real
+      (E2-9)" (`2a72894`). Revisión RDD de `3531c5f` (base, su padre): `review-ac054fdfe693b5a6`,
+      aprobada y reconocida; dos observaciones `WARNING`, sin arreglar: la de la conversación 12 es el
+      `PENDIENTE` ya anotado allí; `avisos.espera_saber` trata todo estado distinto de en curso como
+      sin empezar (una tarea en revisión recibiría "¿la empezaste?"), a ver con el circuito de entrega.
 
 **Previsión:** unas 3.600 líneas (código, pruebas y YAML). **Entrega:** `main` no recibe código hasta M2 o M3
 (`AGENTS.md`), así que no hay cadena de PR que decidir ahora; cada tarea anota sus commits. Push y PR, del usuario.
