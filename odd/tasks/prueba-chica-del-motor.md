@@ -551,6 +551,13 @@ su evidencia son las corridas. Unas 400 líneas por tarea es una guía, no un to
       `PENDIENTE`: la ronda 3, sólo con GPT-6 sol (decisión del usuario), y su lectura; la fecha de
       `hoy` y de las horas de los últimos turnos se toma como viene escrita (un `at` en UTC cerca de
       la medianoche daría el día de UTC).
+- [x] **Sin crédito, la ronda se corta** (2026-10-06; la ronda 3 siguió con la cuenta en 402 y 62
+      de 85 corridas fueron inválidas): un 402 corta la ronda (sale con 3), sus corridas quedan
+      inválidas y aparte en el informe, y antes de empezar se consulta el crédito de OpenRouter
+      (`/credits` y `/key`; imprime sólo lo que queda y lo que hace falta). `ronda3-sol.md`, con
+      la línea de las inválidas (no se rehace desde las grabaciones). Evidencia: `pytest
+      prueba_chica/test_gasto.py` en rojo, error de importación; en verde, `pytest prueba_chica`
+      `401 passed in 125.70s`.
 - [ ] **E2-8. Primera ronda real:** sol, luna y Jev; lectura de textos; bitácora; chequeo de rumbo contra 5c.
 - [ ] **E2-9. Telegram real** con el usuario; su juicio; M2 en la bitácora.
 

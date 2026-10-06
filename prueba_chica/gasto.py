@@ -15,6 +15,10 @@ cuenta:
   no corre (`TechoAlcanzado`) salvo con `pasar_el_techo`, que el agente pasa sólo con el OK del
   usuario. Al llegar al 80 % avisa.
 - `ClienteQueCuenta` es el cliente de la IA real que pide y guarda lo que cada llamada usó.
+- **Sin crédito** (rondas 2 y 3, cortes de OpenRouter a mitad de ronda): un HTTP 402, o un error
+  402 dentro de la respuesta, es `SinCredito`; el corredor corta la ronda y marca inválidas las
+  corridas que lo tuvieron (`llamadas_sin_credito`). Antes de una ronda real, `credito_restante`
+  pregunta cuánto le queda a la cuenta, sin imprimir la clave.
 """
 
 from __future__ import annotations
@@ -25,6 +29,8 @@ import threading
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
+
+import httpx
 
 from .ia_real import ClienteCompatible
 
@@ -44,8 +50,61 @@ MARGEN_DE_LA_ESTIMACION = 1.25
 MINIMO_PARA_PROMEDIAR = 10      # llamadas con costo informado antes de usar su promedio
 
 
+SIN_CREDITO = "sin crédito en el proveedor"
+
+
 class TechoAlcanzado(RuntimeError):
     pass
+
+
+class SinCredito(RuntimeError):
+    """El proveedor dice que la cuenta no tiene crédito (HTTP 402)."""
+
+
+def _sin_credito_en_la_respuesta(respuesta: Any) -> bool:
+    error = respuesta.get("error") if isinstance(respuesta, dict) else None
+    return isinstance(error, dict) and str(error.get("code")) == "402"
+
+
+def es_sin_credito(error: str | None) -> bool:
+    """Si el error grabado de una llamada es un 402: el de `SinCredito` o, en las grabaciones de
+    antes de él, el de httpx."""
+    return bool(error) and (error.startswith(f"{SinCredito.__name__}:")
+                            or "402 Payment Required" in error)
+
+
+def llamadas_sin_credito(llamadas: list[dict[str, Any]]) -> int:
+    """Cuántas llamadas grabadas (`grabar.IAQueGraba`) chocaron con la cuenta sin crédito."""
+    return sum(es_sin_credito(ll.get("error")) for ll in llamadas)
+
+
+def credito_restante(clave: str, base_url: str, *,
+                     transporte: httpx.BaseTransport | None = None,
+                     plazo: float = 10.0) -> float | None:
+    """Los USD que le quedan a la cuenta de OpenRouter: lo comprado menos lo usado
+    (`/credits`) y, si la clave tiene un límite propio, lo que le queda (`/key`); el menor.
+    `None` si el proveedor no lo dice (caído, sin red, otra forma). La clave sólo va en el
+    encabezado; nada de esto la imprime."""
+    base = base_url.rstrip("/")
+    restos: list[float] = []
+    with httpx.Client(timeout=plazo, transport=transporte,
+                      headers={"Authorization": f"Bearer {clave}"}) as http:
+        try:
+            r = http.get(f"{base}/credits")
+            r.raise_for_status()
+            datos = r.json()["data"]
+            restos.append(float(datos["total_credits"]) - float(datos["total_usage"]))
+        except (httpx.HTTPError, KeyError, TypeError, ValueError):
+            pass
+        try:
+            r = http.get(f"{base}/key")
+            r.raise_for_status()
+            limite = r.json()["data"].get("limit_remaining")
+            if limite is not None:
+                restos.append(float(limite))
+        except (httpx.HTTPError, KeyError, TypeError, ValueError, AttributeError):
+            pass
+    return min(restos) if restos else None
 
 
 @dataclass
@@ -57,7 +116,14 @@ class ClienteQueCuenta(ClienteCompatible):
     def completar(self, cuerpo: dict[str, Any]) -> dict[str, Any]:
         if "openrouter" in self.base_url:
             cuerpo = {**cuerpo, "usage": {"include": True}}
-        respuesta = super().completar(cuerpo)
+        try:
+            respuesta = super().completar(cuerpo)
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 402:
+                raise SinCredito("el proveedor no tiene crédito (HTTP 402)") from None
+            raise
+        if _sin_credito_en_la_respuesta(respuesta):
+            raise SinCredito("el proveedor no tiene crédito (error 402 en la respuesta)")
         uso = respuesta.get("usage") if isinstance(respuesta, dict) else None
         self.usos.append({k: (uso or {}).get(k) for k in
                           ("prompt_tokens", "completion_tokens", "cost")})

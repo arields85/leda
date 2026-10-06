@@ -80,7 +80,10 @@ se borra al terminar; nunca toca `leda`, `leda_flujo` ni `leda_motor`. El reloj 
 momentos que dice cada `.md`; el transporte es falso. Con `sol` o `luna` la clave sale del
 entorno (`LEDA_OPENROUTER_API_KEY`) y nunca se imprime. **El techo:** antes de empezar se
 estima la ronda; si con eso el gasto de la etapa pasa de USD 30, no corre (`--pasar-el-techo`,
-sólo con el OK del usuario); avisa desde el 80 %. La cuenta queda en `resultados/gasto.json` y
+sólo con el OK del usuario); avisa desde el 80 %. **El crédito:** también antes de empezar se
+pregunta a OpenRouter cuánto le queda a la cuenta y, si no alcanza para lo estimado, no corre
+(sale con 3; si no se puede preguntar, avisa y sigue); un HTTP 402 a mitad de ronda la corta
+(sale con 3) y las corridas que lo tuvieron quedan inválidas, aparte en el informe. La cuenta queda en `resultados/gasto.json` y
 el informe de la ronda, con sus transcripciones, en `resultados/` (las grabaciones crudas, en
 `grabaciones/`, no se versionan). La comprensión automática del informe es provisional: la que
 vale es la lectura del usuario (decisión 10.3).

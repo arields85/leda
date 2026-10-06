@@ -43,7 +43,9 @@ def _json(valor: Any) -> str:
 
 
 def resumen(corridas: list[Corrida], *, ronda: str, cabecera: dict[str, Any],
-            transcripciones: str, cortes: list[dict[str, Any]] | None = None) -> str:
+            transcripciones: str, cortes: list[dict[str, Any]] | None = None,
+            invalidas: list[tuple[Corrida, int]] | None = None,
+            motivo_del_corte: str | None = None) -> str:
     por_conv: dict[str, list[Corrida]] = defaultdict(list)
     for c in sorted(corridas, key=lambda c: (c.numero, c.vez)):
         por_conv[c.numero].append(c)
@@ -51,15 +53,27 @@ def resumen(corridas: list[Corrida], *, ronda: str, cabecera: dict[str, Any],
     lineas = [f"# Ronda {ronda}", ""]
     lineas += [f"- **{k}:** {v}" for k, v in cabecera.items()]
     lineas += [f"- **Transcripciones:** [{transcripciones}]({transcripciones})", ""]
-    if cortes:
+    if cortes or motivo_del_corte:
         # Una ronda cortada lo dice antes que nada (revisión de la E2-7): lo que no corrió no
         # está en la tabla, y la ronda no vale como completa.
-        lineas += ["## Ronda cortada", "",
-                   f"{len(cortes)} corrida(s) no corrieron o no terminaron; lo que la IA ya "
-                   "había gastado quedó en la libreta del gasto.", ""]
-        lineas += [f"- **{c['conversacion']}, vez {c['vez']}:** "
-                   + ("llegó al techo de gasto. " if c["techo"] else "se cortó. ")
-                   + f"`{c['motivo']}`" for c in cortes]
+        lineas += ["## Ronda cortada", ""]
+        if motivo_del_corte:
+            lineas += [f"**Motivo: {motivo_del_corte}.** No empezó ninguna corrida más.", ""]
+        if cortes:
+            lineas += [f"{len(cortes)} corrida(s) no corrieron o no terminaron; lo que la IA "
+                       "ya había gastado quedó en la libreta del gasto.", ""]
+            lineas += [f"- **{c['conversacion']}, vez {c['vez']}:** "
+                       + ("llegó al techo de gasto. " if c["techo"] else
+                          "no corrió. " if c.get("sin_credito") else "se cortó. ")
+                       + f"`{c['motivo']}`" for c in cortes]
+            lineas.append("")
+    if invalidas:
+        # Chocaron con la cuenta sin crédito: no se puntúan ni entran en la tabla.
+        lineas += ["## Corridas inválidas", "",
+                   "Alguna llamada a la IA chocó con la cuenta sin crédito (HTTP 402): la "
+                   "corrida no mide nada y queda fuera de la tabla y de las fallas.", ""]
+        lineas += [f"- **{c.numero}, vez {c.vez}:** {n} llamada(s) sin crédito (HTTP 402)."
+                   for c, n in sorted(invalidas, key=lambda x: (x[0].numero, x[0].vez))]
         lineas.append("")
     lineas += ["## Resultado por conversación", "",
                "G: garantías (5b, se comprueban solas). C: comprensión automática, "
@@ -104,7 +118,8 @@ def resumen(corridas: list[Corrida], *, ronda: str, cabecera: dict[str, Any],
         lineas.append(f"| **Todas** | {len(todas)} | {statistics.median(todas):.0f} | "
                       f"{max(todas)} |")
     lineas += ["", "## Costo", ""]
-    costos = [c.costo for c in corridas if c.costo]
+    # Lo que gastaron también las inválidas antes del 402: el gasto de la ronda es todo.
+    costos = [c.costo for c in [*corridas, *(c for c, _ in invalidas or [])] if c.costo]
     if costos:
         usd = sum(x["usd"] + x.get("jev_usd", 0.0) for x in costos)
         estimadas = sum(x["llamadas_estimadas"] for x in costos)
@@ -186,13 +201,16 @@ def transcripciones(corridas: list[Corrida], *, ronda: str) -> str:
 
 def escribir(corridas: list[Corrida], *, ronda: str, cabecera: dict[str, Any],
              carpeta: Path | None = None,
-             cortes: list[dict[str, Any]] | None = None) -> tuple[Path, Path]:
+             cortes: list[dict[str, Any]] | None = None,
+             invalidas: list[tuple[Corrida, int]] | None = None,
+             motivo_del_corte: str | None = None) -> tuple[Path, Path]:
     carpeta = carpeta or RESULTADOS
     carpeta.mkdir(parents=True, exist_ok=True)
     nombre_t = f"{ronda}-transcripciones.md"
     ruta_r, ruta_t = carpeta / f"{ronda}.md", carpeta / nombre_t
     ruta_t.write_text(transcripciones(corridas, ronda=ronda), "utf-8", newline="\n")
     ruta_r.write_text(resumen(corridas, ronda=ronda, cabecera=cabecera,
-                              transcripciones=nombre_t, cortes=cortes), "utf-8",
+                              transcripciones=nombre_t, cortes=cortes, invalidas=invalidas,
+                              motivo_del_corte=motivo_del_corte), "utf-8",
                       newline="\n")
     return ruta_r, ruta_t

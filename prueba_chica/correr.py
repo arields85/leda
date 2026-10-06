@@ -28,6 +28,13 @@
   o se cae por otra cosa, lo que la IA ya gastó queda igual en la libreta (marcado `cortada`, con
   el motivo), el informe lo dice en "Ronda cortada" y la ejecución sale con error: 2 por el
   techo, 1 por otra cosa. Nunca termina en 0 con corridas que no corrieron.
+- **Sin crédito en el proveedor** (rondas 2 y 3: la cuenta se quedó sin crédito a mitad de ronda y
+  el corredor siguió): antes de una ronda real se pregunta cuánto crédito le queda a la cuenta y,
+  si no alcanza para lo estimado, no corre (imprime sólo las dos cifras). Si no se puede
+  preguntar, avisa y sigue. Si una llamada a la IA choca con un 402 a mitad de ronda, no empieza
+  ninguna corrida más, las que lo tuvieron son **inválidas** (fuera de la tabla, aparte en el
+  informe) y la ronda queda cortada por "sin crédito en el proveedor"; sale con 3
+  (`SALIDA_SIN_CREDITO`). Las que terminaron antes valen.
 - El informe de la ronda queda en `prueba_chica/resultados/` (`informe.py`).
 """
 
@@ -52,6 +59,8 @@ MODELOS = {"sol": "openai/gpt-6-sol", "luna": "openai/gpt-6-luna",
            "sol61": "openai/gpt-6.1-sol", "sonnet": "anthropic/claude-sonnet-5.5"}
 PROHIBIDAS = frozenset({"leda", "leda_flujo", "leda_motor"})
 PREFIJO = "leda_corrida_"
+# Lo que devuelve una ronda sin crédito en el proveedor: distinto del techo (2) y de una caída (1).
+SALIDA_SIN_CREDITO = 3
 # Una base del corredor más vieja que esto es de una ejecución que murió sin borrarla: ninguna
 # ronda dura tanto. La fecha va en el nombre (`_nombre`), en UTC.
 VIEJA = timedelta(hours=12)
@@ -176,6 +185,20 @@ def _ia_real(modelo: str):
     return IAReal(cliente, Tono(**TONO), nombre=f"openrouter/{modelo}")
 
 
+def _credito_restante() -> float | None:
+    """Los USD que le quedan a la cuenta de OpenRouter, o `None` si no se pudo saber. La clave
+    es la del entorno, como para la IA, y nunca se imprime."""
+    from leda.config import config
+    from leda.llm import BASE_URLS
+
+    from .gasto import credito_restante
+
+    clave = config.clave_llm("openrouter")
+    if not clave:
+        return None
+    return credito_restante(clave, BASE_URLS["openrouter"])
+
+
 def _jev():
     from leda.config import config
     from leda.jev import ClienteJev
@@ -208,8 +231,9 @@ def main(argv: list[str] | None = None) -> int:
 
     from . import informe
     from .corredor import consultas_a_jev, correr_conversacion, elegir, llamadas_previstas
-    from .gasto import (JEV_USD_POR_LLAMADA, MARGEN_DE_LA_ESTIMACION, Gasto, TechoAlcanzado,
-                        costo_de_las_llamadas, modelo_de)
+    from .gasto import (JEV_USD_POR_LLAMADA, MARGEN_DE_LA_ESTIMACION, SIN_CREDITO, Gasto,
+                        TechoAlcanzado, costo_de_las_llamadas, es_sin_credito,
+                        llamadas_sin_credito, modelo_de)
     from .grabar import IAPerfecta, IAQueGraba, IARepetida
 
     if a.repetir:
@@ -249,6 +273,16 @@ def main(argv: list[str] | None = None) -> int:
         except TechoAlcanzado as e:
             print(e)
             return 2
+        restante = _credito_restante()
+        if restante is None:
+            print("Aviso: no se pudo consultar el crédito en el proveedor; la ronda sigue sin "
+                  "esa comprobación.")
+        else:
+            print(f"Crédito en el proveedor: USD {restante:.2f}; la ronda necesita: USD "
+                  f"{total:.2f}.")
+            if restante < total:
+                print("No alcanza: la ronda no empieza.")
+                return SALIDA_SIN_CREDITO
 
     # El servidor de las bases, recién ahora: decidir el techo no lo necesita.
     os.environ["LEDA_TEST_DB_URL"] = _url_de_mantenimiento()
@@ -257,9 +291,12 @@ def main(argv: list[str] | None = None) -> int:
     jev = _jev() if a.jev else None
     corridas = []
     cortes: list[dict] = []         # las corridas que no corrieron o no terminaron, y por qué
+    invalidas: list = []            # (corrida, llamadas con 402): chocaron con la cuenta sin crédito
+    sin_credito = threading.Event()     # algún 402: no empieza ninguna corrida más
     imprimir = threading.Lock()
 
-    def anotar_el_gasto(conv, vez, ia, corrida, reservado: float, cortada: str | None) -> None:
+    def anotar_el_gasto(conv, vez, ia, corrida, reservado: float, cortada: str | None,
+                        invalida: str | None = None) -> None:
         """Lo que la IA gastó en la corrida, aunque se haya cortado: nunca se pierde."""
         llamadas = (corrida.llamadas if corrida is not None
                     else list(getattr(ia, "llamadas", None) or []))
@@ -276,19 +313,33 @@ def main(argv: list[str] | None = None) -> int:
         gasto.anotar({"cuando": datetime.now().isoformat(timespec="seconds"),
                       "ronda": ronda, "modelo": modelo if a.ia in MODELOS else "-",
                       "conversacion": str(conv["numero"]).zfill(2), "vez": vez, **costo,
-                      **({"cortada": cortada} if cortada else {})},
+                      **({"cortada": cortada} if cortada else {}),
+                      **({"invalida": invalida} if invalida else {})},
                      reservado=reservado)
 
-    def cortar(numero: str, vez: int, motivo: str, *, techo: bool) -> None:
-        cortes.append({"conversacion": numero, "vez": vez, "techo": techo, "motivo": motivo})
+    def cortar(numero: str, vez: int, motivo: str, *, techo: bool,
+               credito: bool = False) -> None:
+        cortes.append({"conversacion": numero, "vez": vez, "techo": techo,
+                       "sin_credito": credito, "motivo": motivo})
         with imprimir:
-            print(f"  {numero} vez {vez}: "
-                  f"{'no corrió, llegó al techo' if techo else 'se cortó'} ({motivo})",
-                  flush=True)
+            que = ("no corrió, llegó al techo" if techo else
+                   "no corrió" if credito else "se cortó")
+            print(f"  {numero} vez {vez}: {que} ({motivo})", flush=True)
+
+    def con_402(ia, corrida) -> int:
+        """Cuántas llamadas de la corrida (a la IA o a Jev) chocaron con un 402."""
+        llamadas = list(getattr(ia, "llamadas", None) or
+                        (corrida.llamadas if corrida is not None else []))
+        pasos = corrida.pasos if corrida is not None else []
+        return (llamadas_sin_credito(llamadas)
+                + sum(es_sin_credito(str(p.jev.get("error") or "")) for p in pasos if p.jev))
 
     def correr(trabajo):
         conv, vez = trabajo
         numero = str(conv["numero"]).zfill(2)
+        if sin_credito.is_set():
+            cortar(numero, vez, SIN_CREDITO, techo=False, credito=True)
+            return None
         reservado = estimado(conv) if real and not a.repetir else 0.0
         if reservado:
             try:
@@ -298,6 +349,7 @@ def main(argv: list[str] | None = None) -> int:
                 return None
         ia = corrida = None
         cortada: str | None = None
+        n_402 = 0
         try:
             nombre, url = bases.nueva()
             try:
@@ -316,8 +368,18 @@ def main(argv: list[str] | None = None) -> int:
             cortar(numero, vez, cortada, techo=False)
             return None
         finally:
+            n_402 = con_402(ia, corrida)
+            if n_402:
+                sin_credito.set()
             if real and not a.repetir:
-                anotar_el_gasto(conv, vez, ia, corrida, reservado, cortada)
+                anotar_el_gasto(conv, vez, ia, corrida, reservado, cortada,
+                                SIN_CREDITO if n_402 else None)
+        if n_402:
+            invalidas.append((corrida, n_402))
+            with imprimir:
+                print(f"  {corrida.numero} vez {vez}: INVÁLIDA, {SIN_CREDITO} ({n_402} "
+                      f"llamada(s) con 402)", flush=True)
+            return None
         if a.grabar:
             a.grabar.mkdir(parents=True, exist_ok=True)
             (a.grabar / f"{corrida.numero}-{a.ia}-{vez}.json").write_text(json.dumps(
@@ -355,17 +417,26 @@ def main(argv: list[str] | None = None) -> int:
     bien = sum(c.bien for c in corridas)
     print(f"Corridas: {len(corridas)}; todo lo automático bien: {bien}; con fallas: "
           f"{len(corridas) - bien}; garantías bien: {sum(c.garantias for c in corridas)}.")
+    if invalidas:
+        print(f"Inválidas ({SIN_CREDITO}): {len(invalidas)}.")
+    if sin_credito.is_set():
+        print(f"Ronda cortada: {SIN_CREDITO}.")
     if cortes:
         print(f"Ronda cortada: {len(cortes)} corrida(s) no corrieron o no terminaron.")
-    if not a.sin_informe and (corridas or cortes):
+    if not a.sin_informe and (corridas or cortes or invalidas):
         cabecera = {"Fecha": f"{datetime.now():%Y-%m-%d %H:%M}", "Commit": _commit(),
-                    "IA": corridas[0].ia if corridas else a.ia,
+                    "IA": ([*corridas, *(c for c, _ in invalidas)][0].ia
+                           if corridas or invalidas else a.ia),
                     "Veces": a.veces if not a.repetir else 1,
                     "Jev": "sí" if a.jev else "no",
                     "Gasto de la etapa": f"USD {gasto.total():.2f} de {gasto.techo:.0f}"
                     if real else "sin gasto"}
-        resumen, _ = informe.escribir(corridas, ronda=ronda, cabecera=cabecera, cortes=cortes)
+        resumen, _ = informe.escribir(
+            corridas, ronda=ronda, cabecera=cabecera, cortes=cortes, invalidas=invalidas,
+            motivo_del_corte=SIN_CREDITO if sin_credito.is_set() else None)
         print(f"Informe: {_relativa(resumen)}")
+    if sin_credito.is_set():
+        return SALIDA_SIN_CREDITO
     if any(c["techo"] for c in cortes):
         return 2
     return 0 if corridas and not cortes and all(c.error is None for c in corridas) else 1
