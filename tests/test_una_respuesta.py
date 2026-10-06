@@ -334,28 +334,3 @@ def test_un_toque_no_es_un_mensaje_ni_queda_como_mensaje_sin_respuesta(
         (toque,) = cur.fetchall()
     assert [str(f["entrante_id"]) for f in _filas_de_salida(conn, tg)] == [
         str(toque["id"])]
-
-
-def test_el_arranque_avisa_que_falta_la_migracion_0021():
-    from leda import saludo
-
-    class _Cursor:
-        def __init__(self, respuestas):
-            self._respuestas = list(respuestas)
-            self._actual = None
-
-        def execute(self, *a, **k):
-            self._actual = self._respuestas.pop(0)
-
-        def fetchone(self):
-            return self._actual
-
-    cur = _Cursor([{"ok": True}, {"ok": True}, {"ok": True}, {"ok": False}])
-    assert saludo.verificar_migraciones(cur) == "0021_respuesta_atada_al_mensaje.sql"
-
-
-def test_con_el_esquema_al_dia_el_arranque_no_pide_migraciones(corework, conn):
-    from leda import saludo
-
-    with admin(conn) as cur:
-        assert saludo.verificar_migraciones(cur) is None

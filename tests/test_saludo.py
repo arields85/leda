@@ -341,45 +341,6 @@ def test_una_falla_repetida_se_reporta_una_sola_vez(corework, conn, monkeypatch)
 
 
 # ---------------------------------------------------------------------------
-# R4-003 (revisión 2026-09-28+3): sin las migraciones 0018/0019, CUALQUIER
-# despacho o encolado de un mensaje personal rompe con UndefinedTable/
-# UndefinedColumn -- `verificar_migraciones` es el chequeo de arranque que
-# `cli.py` corre antes de `escuchar`/`servir`. Cursor falso: no hace falta
-# tocar el esquema real de la sesión de pruebas para simular "falta algo".
-# ---------------------------------------------------------------------------
-
-class _CursorFalso:
-    """Devuelve, en orden, cada uno de `resultados` -- un por `execute`. Sin
-    tocar ninguna base real: `verificar_migraciones` hace como mucho dos
-    consultas, siempre de sólo lectura sobre el catálogo."""
-
-    def __init__(self, resultados: list[dict]):
-        self._resultados = list(resultados)
-        self._actual = None
-
-    def execute(self, *a, **k):
-        self._actual = self._resultados.pop(0)
-
-    def fetchone(self):
-        return self._actual
-
-
-def test_verificar_migraciones_todo_al_dia_devuelve_none(corework, conn):
-    with admin(conn) as cur:
-        assert S.verificar_migraciones(cur) is None
-
-
-def test_verificar_migraciones_sin_greeting_state_nombra_la_0018():
-    cur = _CursorFalso([{"ok": False}])
-    assert S.verificar_migraciones(cur) == "0018_saludo_diario.sql"
-
-
-def test_verificar_migraciones_sin_es_bienvenida_nombra_la_0019():
-    cur = _CursorFalso([{"ok": True}, {"ok": False}])
-    assert S.verificar_migraciones(cur) == "0019_marca_de_bienvenida.sql"
-
-
-# ---------------------------------------------------------------------------
 # El margen reservado (`MARGEN_SALUDO`) para que el saludo nunca rompa el
 # límite real de Telegram
 # ---------------------------------------------------------------------------

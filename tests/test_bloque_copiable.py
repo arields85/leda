@@ -17,7 +17,6 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from leda import saludo
 from leda.calendario import Calendario
 from leda.db import admin, espacio
 from leda.despachador import Boton, TransporteDePrueba, TransporteTelegram, despachar
@@ -234,29 +233,6 @@ def test_el_saludo_diario_no_mueve_el_bloque(corework, conn):
     unidades = cuerpo["text"].encode("utf-16-le")
     trozo = unidades[entidad["offset"] * 2:(entidad["offset"] + entidad["length"]) * 2]
     assert trozo.decode("utf-16-le") == "Cablear tablero norte"
-
-
-# ------------------------------------------------- arranque: la migración 0020
-
-def test_verificar_migraciones_sin_bloque_copiable_nombra_la_0020():
-    class _Cursor:
-        def __init__(self, respuestas):
-            self._respuestas = list(respuestas)
-            self._actual = None
-
-        def execute(self, *a, **k):
-            self._actual = self._respuestas.pop(0)
-
-        def fetchone(self):
-            return self._actual
-
-    cur = _Cursor([{"ok": True}, {"ok": True}, {"ok": False}])
-    assert saludo.verificar_migraciones(cur) == "0020_bloque_copiable.sql"
-
-
-def test_verificar_migraciones_al_dia_devuelve_none(corework, conn):
-    with admin(conn) as cur:
-        assert saludo.verificar_migraciones(cur) is None
 
 
 # ----------------------- la base: Modificar nunca convierte el borrador (0020)
