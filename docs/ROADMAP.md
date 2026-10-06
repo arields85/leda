@@ -125,7 +125,7 @@ dentro de Leda, sin marcos de terceros. El usuario llama **el Motor** a toda est
 trabajo. Las decisiones quedaron escritas en el paso M1: el ADR 0017 (alcance, aceptado) fija las
 ocho cosas por chat (decisión 3b) y que las tareas las carga el administrador con un formulario en
 la plataforma web (decisiones 2 y 5; se descartó la importación por archivo que se había pensado
-primero); el ADR 0018 (motor de conversación, propuesta, con su diseño aceptado para la prueba)
+primero); el ADR 0018 (motor de conversación, aceptado el 2026-10-06 después de la prueba chica)
 fija cómo se procesa cada mensaje. Evidencia y razones:
 [`research/gestion-del-dialogo-y-arquitecturas-de-agentes.md`](research/gestion-del-dialogo-y-arquitecturas-de-agentes.md).
 

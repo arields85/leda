@@ -1,7 +1,8 @@
 # ADR 0018: El motor de conversación
 
-- **Estado:** propuesta. El usuario aceptó su diseño para la prueba el 2026-10-04 (paso M1), con
-  las decisiones 1 a 8. Queda como propuesta hasta que pase la prueba chica de la Etapa 2. La
+- **Estado:** aceptado (usuario, 2026-10-06), después de que la prueba chica de la Etapa 2 pasó
+  (bitácora de flujos, "Prueba por Telegram real del flujo D"; paso M2). Antes, el usuario había
+  aceptado su diseño para la prueba el 2026-10-04 (paso M1), con las decisiones 1 a 8. La
   decisión 9 (usuario, 2026-10-04) precisa lo que dejaron abierto las conversaciones de prueba;
   el 2026-10-05 el usuario le sumó 9h, 9i y 9j, después de la primera ronda real, la revisión
   del contrato entre la IA y el código (9k), y la jugada `destrabar` (9l); el 2026-10-06, la
@@ -642,7 +643,7 @@ generales y ningún caso (5c.1); la tercera ronda corre sólo con GPT-6 sol.
    texto para decirle a la persona; lo dicen el encabezado de la lista y las instrucciones, y
    ningún significado se escribe como una frase para repetir.
 
-El diseño sigue como "propuesta" hasta que pase la prueba chica.
+La prueba chica pasó el 2026-10-06 y el usuario aceptó el ADR ese día.
 
 ## Consecuencias
 

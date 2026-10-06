@@ -5,8 +5,8 @@
 > la superficie conversacional: por chat, Leda registra hechos del trabajo (el seguimiento); la
 > estructura (crear, aceptar o reasignar tareas, cambiar fechas, gestionar integrantes) va a una
 > plataforma web que lleva su propio ADR antes del código. El
-> [ADR 0018](../decisions/0018-motor-de-conversacion.md) (propuesta; diseño aceptado para la
-> prueba) diseña el motor de conversación que reemplaza a los flujos A y B. Ese motor **no está
+> [ADR 0018](../decisions/0018-motor-de-conversacion.md) (aceptado el 2026-10-06, después de
+> la prueba chica) diseña el motor de conversación que reemplaza a los flujos A y B. Ese motor **no está
 > construido**: su lugar en esta frontera está en "El motor de conversación", más abajo. Las tablas
 > de puertos y de adaptadores ya reflejan los dos ADR.
 

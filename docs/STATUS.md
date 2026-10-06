@@ -26,18 +26,19 @@ Desde entonces el trabajo es **el Motor** ([`../AGENTS.md`](../AGENTS.md), "Nomb
 [ADR 0017](decisions/0017-por-chat-los-hechos-por-la-web-la-estructura.md) (por chat, los hechos del trabajo; la
 estructura, en una plataforma web con su propio ADR) y el diseño del
 [ADR 0018](decisions/0018-motor-de-conversacion.md) para la prueba (la IA elige jugadas de una lista cerrada y el
-código las ejecuta). El 0018 queda como "propuesta" hasta que pase la prueba chica.
+código las ejecuta). El 0018 quedó como "propuesta" hasta que pasara la prueba chica.
 
 **Paso M2 cumplido (2026-10-06).** La prueba chica pasó: rondas automáticas 85 de 85 con GPT-6 sol y la
 prueba por Telegram real, en la que, según el usuario, Leda no se perdió aun fuera del guion y se siente
-conversacional, sin un botón (bitácora de flujos, "Prueba por Telegram real del flujo D").
+conversacional, sin un botón (bitácora de flujos, "Prueba por Telegram real del flujo D"). El usuario
+aceptó el ADR 0018 el mismo día.
 
 ## Punto exacto para retomar (2026-10-06, M2 cumplido; sigue la Etapa 3)
 
 - **Qué:** el Motor. La Etapa 2 (`odd/tasks/prueba-chica-del-motor.md`) está terminada: E2-1 a E2-9 y M2.
   Sigue la Etapa 3, limpieza y motor de conversación definitivo, que lleva su plan propio, todavía sin
-  escribir. Antes de escribirlo hay que decidir el estado del ADR 0018 (seguía como "propuesta" hasta que pasara
-  la prueba chica) y si `main` recibe los documentos hasta M2.
+  escribir. El ADR 0018 quedó aceptado (2026-10-06). Antes de escribirlo hay que decidir si `main` recibe los
+  documentos hasta M2.
 - **Dónde:** rama `feat/motor-de-conversacion`, carpeta `D:\Proyectos\Leda-PM-worktrees\motor-de-conversacion`
   (reglas en [`../AGENTS.md`](../AGENTS.md), "Dónde se trabaja y qué no se hace").
 - **Para la Etapa 3:** las observaciones de la prueba real (Leda cuenta de más lo de la cocina; los efectos
