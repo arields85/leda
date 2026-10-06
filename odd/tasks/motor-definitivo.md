@@ -119,8 +119,8 @@ plataforma cuando Leda tenga una base más completa.
 
 - **Para no rehacer:** cambiar una fecha, asignar o crear una tarea son una sola operación de la cocina,
   con su confirmación y su auditoría, y los dos canales la llaman.
-- **El costo de esperar:** hasta que la plataforma exista, un equipo real sólo puede usar Leda si el
-  administrador le carga las tareas con el importador.
+- **El costo de esperar:** hoy no hay ninguno. Leda no se va a usar con un equipo real hasta que el
+  usuario lo indique (2026-10-06); las pruebas usan datos ficticios.
 - **Lo que dice el ADR 0017:** cambiar la fecha por chat está anotado para el futuro, con confirmación
   (decisión 4). Crear y asignar por chat quedan fuera del chat (decisión 2); si se quieren, llevan su
   propio ADR.
