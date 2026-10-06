@@ -56,7 +56,8 @@ volver a medir GPT-6 luna; la elección está `PENDIENTE` en el ADR 0018. **Actu
 luna, descartada.
 
 Qué haría revisar esta conclusión: el resultado de la prueba chica del motor de conversación, con
-los criterios de éxito y de corte escritos antes en el ADR 0018.
+los criterios de éxito y de corte escritos antes en el ADR 0018. **Actualización (2026-10-06):** la
+prueba chica pasó; la conclusión se sostiene ("Prueba por Telegram real del flujo D").
 
 El detalle de la prueba del 2026-10-04 y de la tarea 0-36, que se detuvo y no se retoma, está en
 `respaldo-flujos-antes-de-d:odd/tasks/circuitos-al-flujo-nuevo.md`. El trabajo parcial de la
@@ -159,6 +160,62 @@ automático el criterio 5b.1 (garantías 5 de 5 y comprensión 5 de 5 en todas l
 sin ningún caso especial (5c.1); las fallas de las rondas 1 y 2 estaban en el contrato entre la IA
 y el código y se resolvieron con reglas generales. Se queda sol; luna y Jev salen. No es el paso
 M2: faltan la prueba por Telegram real (5b.2) y el juicio del usuario (5b.3).
+
+## Prueba por Telegram real del flujo D (E2-9, 2026-10-06): pasa; paso M2
+
+Tarea E2-9 de `odd/tasks/prueba-chica-del-motor.md`, con la guía de `prueba_chica/README.md`
+("Prueba por Telegram real (E2-9)").
+
+- **Cuándo y con qué:** 2026-10-06, de 16:44 a unos 17:10 en hora real; el reloj de Leda recorrió
+  del martes 6 al jueves 22 de octubre. El código, el de `a702b39`. La base `leda_motor`, recreada
+  desde cero con la semilla ficticia (respaldo previo en `db/respaldos/`). La IA, GPT-6 sol por
+  OpenRouter. Los bots de prueba del Motor, con la restricción de horario prendida. El usuario operó
+  a Ariel, Ismael y Marcos.
+- **Qué se recorrió:** la escalera entera, del aviso previo al escalamiento. Además: el inicio, un
+  bloqueo con su causa y quién lo destraba, destrabar, tres previsiones con su aviso al referente,
+  la consulta de pendientes y un cambio de tema con una pregunta abierta. También un pedido de
+  reasignación, que no se hace por chat, y cancelar una propuesta. El usuario se salió del guion
+  varias veces: preguntó qué es una previsión, preguntó por una fecha máxima, rechazó la propuesta y
+  contestó días antes de lo previsto.
+- **Números:** 16 mensajes de las personas y 27 de Leda, todos enviados. Ningún incidente, ningún
+  envío fallido y ninguna jugada sobre la tarea equivocada. Respuesta en una mediana de 6,1 s y
+  10,7 s la más lenta. **Ningún botón.**
+- **La cocina** (registro de turnos y base, revisados por el agente):
+  - Cuatro cambios de estado, todos dichos por la persona: dos inicios, un bloqueo y su
+    destrabe, que devolvió la tarea a asignada.
+  - Un bloqueo con su causa, quién lo destraba y su resolución.
+  - Tres previsiones con el atraso bien calculado; la fecha comprometida no cambió.
+  - Los avisos a quien no tiene Telegram quedaron omitidos con su motivo. El escalamiento a Ismael
+    dijo que esos pedidos no les llegaron; no dijo que no contestaron.
+- **Juicio del usuario:** "la mejor de todas las que hicimos, leda no se perdió incluso me fui del
+  guion un poco en algunos casos y respondió de maravilla, esto sí se siente mucho mejor y más
+  conversacional que los anteriores.. ni un botón".
+
+Observaciones, ninguna falla de conversación:
+
+- **Leda cuenta de más lo de la cocina.** Por ejemplo, "el aviso a Ismael está guardado, todavía no
+  salió", o que un pedido de estado ya no va a salir. Es honesto, y es lo que pidió el primer
+  contacto, pero se repite. Una vez anunció "sale hoy a las 10:00" cuando ya eran las 10:00:41.
+  Queda para el motor definitivo.
+- **El viernes 16 no salió ningún pedido de estado.** El reloj saltó más rápido que el ciclo, que
+  corre por minuto real, y la escalera empezó el lunes 19 sin recuperar el día perdido. Es un
+  efecto del reloj de la prueba, no del producto. Que no recupere días evita una tanda de mensajes
+  juntos.
+- **Los efectos del motor no van a `audit_log`.** Quedan como hechos con su autor
+  (`task_state_event`, `task_forecast`, `blocker`), pero sin la versión de las reglas que pide la
+  constitución §12. Queda para el motor definitivo (Etapa 3).
+- **El lector de turnos falló con la base recreada:** perdía la ruta de búsqueda. Corregido en
+  `e5227df`, con su regresión.
+
+**Conclusión vigente del flujo D (2026-10-06): la prueba chica pasa.** Cumple los tres criterios
+del ADR 0018 (5b):
+
+- 5b.1, del lado automático (ronda 3);
+- 5b.2: Leda no se perdió ni se trabó en Telegram real, aun fuera del guion;
+- 5b.3: el usuario dice que se siente natural.
+
+Ningún criterio de corte (5c) se disparó. Con este registro se cumple el paso **M2**. Queda la
+Etapa 3: limpieza y motor de conversación definitivo.
 
 ## Conclusión anterior (2026-10-03), reemplazada el 2026-10-04
 

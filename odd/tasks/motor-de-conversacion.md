@@ -63,7 +63,7 @@ misma clase de falla y el usuario frenó el parcheo (análisis en `docs/research
 |---|---|---|
 | 0 | Arranque limpio: etiquetas, cierre en `main`, rama y carpeta nuevas | Hecho |
 | 1 | Diseño sin código: ADR 0017, ADR 0018, conversaciones de prueba | **M1**, el usuario acepta los dos ADR: **cumplido el 2026-10-04** (el 0018 queda "propuesta" hasta que pase la prueba) |
-| 2 | Prueba chica y descartable, por Telegram real, con tareas de `sembrar` y base `leda_motor` | **M2:** resultado registrado en la bitácora, pase o no, contra los criterios del ADR 0018 (decisión 5) |
+| 2 | Prueba chica y descartable, por Telegram real, con tareas de `sembrar` y base `leda_motor` | **M2:** resultado registrado en la bitácora, pase o no, contra los criterios del ADR 0018 (decisión 5): **cumplido el 2026-10-06, pasó** |
 | 3 | Cortar los enredos, mudar las pruebas de garantías, borrar los flujos A y B, construir el motor; la plataforma web, con su ADR | **M3:** motor construido, flujos viejos borrados, garantías en verde, prueba real aprobada |
 
 Las etapas 2 y 3 tienen cada una su plan propio, que se escribe al llegar.
@@ -160,5 +160,6 @@ intermitente del indicador de escritura; adaptar `tools/medir_modelos.py`; `pyth
 
 ## Próximo paso
 
-La Etapa 2, [`prueba-chica-del-motor.md`](prueba-chica-del-motor.md): construida y medida (E2-1 a E2-8; la
-ronda 3, 85 de 85 con GPT-6 sol); sigue su tarea E2-9, la prueba por Telegram real.
+La Etapa 2, [`prueba-chica-del-motor.md`](prueba-chica-del-motor.md), terminó: la ronda 3 dio 85 de 85
+con GPT-6 sol y la prueba por Telegram real pasó (2026-10-06). Con eso se cumple **M2**. Sigue la Etapa 3,
+con su plan propio, que se escribe al llegar.

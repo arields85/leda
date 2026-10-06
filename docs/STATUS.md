@@ -3,7 +3,7 @@
 **Alcance:** Leda es un producto de gestión de proyectos multi-tenant. CoreWork es
 su primer cliente, no su definición.
 
-**Última actualización documental:** 2026-10-06, al cerrar la sesión de las rondas de la Etapa 2 (E2-8).
+**Última actualización documental:** 2026-10-06, al registrar la prueba por Telegram real (E2-9) y M2.
 
 Versiones anteriores (historia, no estado vigente ni instrucción):
 [`STATUS-hasta-2026-09-30.md`](historial/STATUS-hasta-2026-09-30.md),
@@ -28,23 +28,27 @@ estructura, en una plataforma web con su propio ADR) y el diseño del
 [ADR 0018](decisions/0018-motor-de-conversacion.md) para la prueba (la IA elige jugadas de una lista cerrada y el
 código las ejecuta). El 0018 queda como "propuesta" hasta que pase la prueba chica.
 
-## Punto exacto para retomar (2026-10-06, rondas hechas; sigue Telegram real)
+**Paso M2 cumplido (2026-10-06).** La prueba chica pasó: rondas automáticas 85 de 85 con GPT-6 sol y la
+prueba por Telegram real, en la que, según el usuario, Leda no se perdió aun fuera del guion y se siente
+conversacional, sin un botón (bitácora de flujos, "Prueba por Telegram real del flujo D").
 
-- **Qué:** el Motor, Etapa 2 (`odd/tasks/prueba-chica-del-motor.md`). Construida entera (E2-1 a E2-7, en
-  `prueba_chica/`), con 17 conversaciones de prueba y las jugadas nuevas `informar_avance` y `destrabar`.
+## Punto exacto para retomar (2026-10-06, M2 cumplido; sigue la Etapa 3)
+
+- **Qué:** el Motor. La Etapa 2 (`odd/tasks/prueba-chica-del-motor.md`) está terminada: E2-1 a E2-9 y M2.
+  Sigue la Etapa 3, limpieza y motor de conversación definitivo, que lleva su plan propio, todavía sin
+  escribir. Antes de escribirlo hay que decidir el estado del ADR 0018 (seguía como "propuesta" hasta que pasara
+  la prueba chica) y si `main` recibe los documentos hasta M2.
 - **Dónde:** rama `feat/motor-de-conversacion`, carpeta `D:\Proyectos\Leda-PM-worktrees\motor-de-conversacion`
   (reglas en [`../AGENTS.md`](../AGENTS.md), "Dónde se trabaja y qué no se hace").
-- **Hecho (E2-8):** tres rondas reales. La 3 (2026-10-06, sólo GPT-6 sol): **85 de 85, garantías y comprensión
-  5 de 5 en las 17**; 5b.1 cumplido del lado automático. Luna descartada; Jev retirado de la prueba (ADR 0018,
-  notas de las decisiones 6 y 7). El usuario no lee las corridas: su juicio sale de Telegram. Detalle en la
-  bitácora de flujos.
+- **Para la Etapa 3:** las observaciones de la prueba real (Leda cuenta de más lo de la cocina; los efectos
+  del motor sin `audit_log` ni versión de las reglas) y los `PENDIENTE` de abajo.
 - **Antes de nada:** comprobar PostgreSQL (`pg_isready -h localhost -p 5432`); al cerrar la sesión se apaga. Si
   está caído, levantarlo (`levantar-postgres.bat`, o `pg_ctl ... start` como hace ese archivo); con `0xC0000142`,
-  cerrar los procesos `postgres` colgados y reintentar.
-- **Primer paso: la E2-9, prueba por Telegram real.** El usuario autorizó (2026-10-06) recrear `leda_motor`
-  desde cero, con `pg_dump` antes; los pasos, en la tarea E2-9. Después, una guía corta (un hilo numerado,
-  unos 20 pasos, con el reloj de Leda adelantado entre días), el juicio del usuario (5b.2 y 5b.3), la
-  bitácora y M2.
+  cerrar los procesos `postgres` colgados y reintentar. Desde el agente, `pg_ctl start` corre fuera del sandbox:
+  dentro, no puede escribir su registro.
+- **`leda_motor`** quedó con los datos de la prueba real y el reloj de Leda adelantado al 22/10
+  (`python -m prueba_chica.reloj corework volver` lo devuelve). El respaldo de antes de recrearla es
+  `db/respaldos/leda_motor-antes-e2-9-20261006.dump`.
 - **Acuerdos de trabajo:** chequeo de rumbo escrito antes de cada unidad; consentimiento permanente del usuario
   para los commits de cada unidad y para las revisiones RDD (`tools/rdd_ciclo.py <carpeta> <base>`), por tramos
   desde el último revisado (la rama entera excede al revisor; los informes generados no se revisan); un cambio
@@ -57,15 +61,15 @@ El avance se registra en `odd/tasks/motor-de-conversacion.md`.
 
 **Etapa 1. Diseño, sin código.** Terminada: ADR 0017 y 0018 (M1), E1-4 y E1-3.
 
-**Etapa 2. Prueba chica y descartable.** Plan: `odd/tasks/prueba-chica-del-motor.md`. Construida y medida
-(E2-1 a E2-8); falta la E2-9, Telegram real, y M2. PostgreSQL se levanta a mano (`levantar-postgres.bat`).
+**Etapa 2. Prueba chica y descartable.** Plan: `odd/tasks/prueba-chica-del-motor.md`. Terminada: pasó la
+prueba por Telegram real (E2-9) y M2 está cumplido (2026-10-06).
 
 **Etapa 3. Limpieza y motor de conversación definitivo.** Cortar los enredos con el código viejo, mudar las
 pruebas de garantías a archivos limpios, borrar los flujos A y B y, recién entonces, construir el motor de
 conversación definitivo. La plataforma web de tareas lleva su propio ADR antes del código (ADR 0017, decisión 5).
 
 **Criterios de paso a `main`.** M1, el usuario acepta los dos ADR: cumplido. M2: el resultado de la prueba chica
-registrado en la bitácora, pase o no. M3: motor de conversación construido, flujos viejos borrados, garantías en
+registrado en la bitácora, pase o no: cumplido (2026-10-06, pasó). M3: motor de conversación construido, flujos viejos borrados, garantías en
 verde y prueba real aprobada. Hasta M2 o M3, `main` recibe sólo documentos, por avance rápido y cuando lo decide
 el usuario.
 
@@ -174,8 +178,8 @@ cifras miden el código: **una suite en verde no es evidencia de que la conversa
    escribe; en `src/leda` se construye con el seguimiento (ADR 0017, decisión 6).
 5. **`confirmar_borrador_tarea` fija el espacio con el valor que recibe:** acotada a `leda_gateway`, pero es el
    patrón que la frontera rechaza.
-6. **La conversación no tiene un modelo en `main`:** el diseño del ADR 0018 pasó las rondas automáticas; falta
-   Telegram real.
+6. **La conversación no tiene un modelo en `main`:** el diseño del ADR 0018 pasó la prueba chica (rondas y
+   Telegram real), pero vive en `prueba_chica/`, que es descartable; el motor definitivo es la Etapa 3.
 7. **Lo no subido vive en un solo disco** ("Decisiones pendientes del usuario").
 8. **Ningún equipo real usó Leda:** todas las pruebas fueron con datos ficticios y un evaluador que conoce el
    guion.

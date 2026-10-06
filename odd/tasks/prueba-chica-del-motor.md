@@ -2,8 +2,8 @@
 
 **Rama:** `feat/motor-de-conversacion` · **Carpeta:** `D:\Proyectos\Leda-PM-worktrees\motor-de-conversacion`
 **Abierta:** 2026-10-04 · **Copia en Engram:** tema `odd/prueba-chica-del-motor/tasks` (proyecto `prisma-pm`)
-**Estado:** decidido (sección 10, 2026-10-05); E2-1 a E2-8 hechas (la ronda 3, 85 de 85 con GPT-6 sol,
-2026-10-06); sigue la E2-9, la prueba por Telegram real, con `leda_motor` recreada (autorizado).
+**Estado:** terminada. E2-1 a E2-9 hechas; la prueba por Telegram real pasó el 2026-10-06 y con
+ella se cumple M2.
 
 ## 1. Objetivo
 
@@ -595,7 +595,7 @@ su evidencia son las corridas. Unas 400 líneas por tarea es una guía, no un to
       terminada sin entrega por chat; "desde el lunes 19" en la 12); la persecución completa (ADR 0017,
       3a) es de la prueba siguiente, y al diseñarla se resuelve la tensión entre preguntarle al referente
       (3a, paso 4) y "Leda es la PM".
-- [ ] **E2-9. Telegram real** con el usuario; su juicio (5b.2 y 5b.3); M2 en la bitácora. **Autorizado**
+- [x] **E2-9. Telegram real** con el usuario; su juicio (5b.2 y 5b.3); M2 en la bitácora. **Autorizado**
       (usuario, 2026-10-06): recrear `leda_motor` desde cero antes de la prueba. Preparación: `pg_dump`
       primero; borrar y crear la base; `python -m leda esquema`, `importar corework --activar`, `feriados
       corework`, `modelo openai/gpt-6-sol --proveedor openrouter`, `sembrar corework --semilla
@@ -614,6 +614,17 @@ su evidencia son las corridas. Unas 400 líneas por tarea es una guía, no un to
       aprobada y reconocida; dos observaciones `WARNING`, sin arreglar: la de la conversación 12 es el
       `PENDIENTE` ya anotado allí; `avisos.espera_saber` trata todo estado distinto de en curso como
       sin empezar (una tarea en revisión recibiría "¿la empezaste?"), a ver con el circuito de entrega.
+      **Resultado (2026-10-06): pasa.**
+      - La prueba: de 16:44 a unos 17:10, con el reloj de Leda del 6 al 22 de octubre. Hubo 16
+        mensajes de las personas y 27 de Leda, ningún incidente ni envío fallido, y ningún botón.
+      - El juicio del usuario: "la mejor de todas", no se perdió aun fuera del guion y se siente
+        conversacional (5b.2 y 5b.3).
+      - La cocina, revisada: estados, bloqueo, previsiones y avisos, correctos.
+      - El lector de turnos perdía la ruta de búsqueda con la base recreada; corregido en `e5227df`.
+        Prueba en rojo: `pytest prueba_chica/test_leer.py -k recien`, `1 failed`. Después:
+        `pytest prueba_chica/test_leer.py`, `4 passed`.
+      - Detalle y observaciones en la bitácora de flujos, "Prueba por Telegram real del flujo D".
+        Con ese registro se cumple **M2**.
 
 **Previsión:** unas 3.600 líneas (código, pruebas y YAML). **Entrega:** `main` no recibe código hasta M2 o M3
 (`AGENTS.md`), así que no hay cadena de PR que decidir ahora; cada tarea anota sus commits. Push y PR, del usuario.
@@ -649,6 +660,5 @@ previo en `workspace_setting`, no en el importador; el referente es quien aprueb
   `PENDIENTE` confirmar al escribir los YAML que ninguna conversación depende de ellas.
 - **La etapa no es tan chica:** si una tarea pide un caso especial, se frena (5c.1).
 
-**Próximo paso:** la E2-9 (sección 9): `pg_dump`, recrear `leda_motor` con los pasos de la tarea, escribir
-la guía corta y hacer la prueba por Telegram con el usuario. Si la prueba vuelve a perderse o a trabarse,
-no hay otro arreglo: se revisa el diseño con el usuario (5c.2). Pase o no, el resultado va a la bitácora (M2).
+**Próximo paso:** la prueba chica pasó y M2 está cumplido (2026-10-06). Sigue la Etapa 3, con su plan
+propio (`odd/tasks/motor-de-conversacion.md`).
