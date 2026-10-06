@@ -98,9 +98,10 @@ revisión por tramos.
 - [ ] **E3-8. Regresión y prueba real:** las 17 conversaciones, cinco veces con GPT-6 sol, y la guía de
       la E2-9 por Telegram. Después se borra `prueba_chica/`.
 
-**Fase C. Lo que la prueba chica no cubrió.** `PENDIENTE`: si entra antes de M3 o después. Son los
-circuitos 7 y 8 (entrega y aprobación), el 5 (cadencias) y la persecución completa (3a), cada uno con sus
-conversaciones de prueba primero.
+**Fase C. Lo que la prueba chica no cubrió, después de M3** (usuario, 2026-10-06). Son los circuitos 7
+y 8 (entrega y aprobación), el 5 (cadencias) y la persecución completa (3a). Cada uno lleva primero sus
+conversaciones de prueba y después una pasada corta por Telegram. M3 es el motor definitivo haciendo bien
+lo ya probado.
 
 **La plataforma web** lleva su ADR antes del código (ADR 0017, decisión 5). `PENDIENTE`: cuándo se
 escribe.
@@ -128,5 +129,5 @@ se borra `prueba_chica/` hasta entender por qué.
 
 ## 7. Próximo paso
 
-Decidir con el usuario los `PENDIENTE` de las secciones 4 y 6 que bloquean el orden, empezando por el
-alcance antes de M3.
+Decidir con el usuario los `PENDIENTE` de las secciones 4 y 6 que bloquean el orden. El alcance antes de
+M3 ya está decidido: la Fase C va después.
