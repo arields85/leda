@@ -4,7 +4,8 @@
 **Abierta:** 2026-10-04 · **Copia en Engram:** tema `odd/prueba-chica-del-motor/tasks` (proyecto `prisma-pm`)
 **Estado:** decidido (sección 10, 2026-10-05); E2-1 a E2-7, E2-3b, `informar_avance`, el ancla en la
 previsión, los tres hallazgos de la corrida en seco, la tarea vencida (9j), la conversación 15 alineada
-con 9j y la revisión de la corrida con las 16 hechos; sigue la E2-8.
+con 9j, la revisión de la corrida con las 16 y la jugada `destrabar` (9l, conversación 17) hechos; sigue
+la E2-8.
 
 ## 1. Objetivo
 
@@ -74,6 +75,7 @@ herramienta en ningún proveedor, así que se trae la llamada estructurada de la
 | `anotar_prevision` (tarea, fecha, motivo) | responsable; tarea abierta | hecho de previsión con el atraso (`Calendario.habiles_entre`) | aviso guardado al referente, salvo que vuelva a la fecha comprometida |
 | `anotar_bloqueo` (tarea, causa) | responsable; tarea abierta | sin causa, pregunta; con causa, `registrar_bloqueo` | con causa, siempre pregunta quién lo puede destrabar (9c, corregida el 2026-10-05) |
 | `anotar_quien_destraba` (integrante, alguien de afuera, "no sabe" o "nadie más") | bloqueo abierto | hecho de quién destraba | cierra la espera; sin otra persona que destrabe, propone salidas |
+| `destrabar` (tarea), desde el 2026-10-05 | responsable; tarea `bloqueada`, con un solo bloqueo abierto | `resolver_bloqueo`: la tarea vuelve al estado de antes | cierra la pregunta de quién destraba, lo propuesto y sus esperas; con el seguimiento ya empezado, vuelve a pedir el estado el día hábil siguiente (9l) |
 | `consultar_pendientes` | nada | lee con `consultar_tareas` | nada |
 | `informar_avance` (tarea, palabras), desde el 2026-10-05 | responsable; tarea abierta; un pedido de estado abierto | hecho de avance con sus palabras, auditado; ni estado ni fecha | la espera sigue abierta; vuelve a pedir el estado el día hábil siguiente sin contarlo como silencio; a la segunda, pregunta para cuándo |
 | `entregar`, `pedir_reasignacion` | nada | sin efecto; hechos de qué no se puede y quién lo decide | sin aviso al administrador (9g) |
@@ -498,6 +500,16 @@ su evidencia son las corridas. Unas 400 líneas por tarea es una guía, no un to
       instrucciones pidiendo llamarla siempre (no llamarla sigue siendo no responder). Humo real 01 y
       02, una vez, con Sonnet y con sol: 2 de 2 bien, sin incidentes (USD 0,37); `pytest prueba_chica`
       `336 passed`; en seco, 16 de 16.
+- [x] **La jugada `destrabar`** (decisión del usuario, 2026-10-05; ADR 0018, 9l; conversación 17,
+      escrita primero; resuelve el `PENDIENTE` de 9k). Con ella, la revisión de `ia_real`: un mensaje
+      sin la forma de una respuesta también es no responder, y un texto en lugar de la herramienta,
+      en el turno, es un reintento y después el camino de falla. Evidencia (2026-10-05): `pytest
+      prueba_chica` en rojo, `11 failed, 341 passed`; en verde, `353 passed in 126.38s`; en seco,
+      `--ronda seco-7`, 17 de 17, garantías 17 de 17 (informe borrado). Commits `3ca7fa7`, `6c90cd1` y
+      el que registra esto. `PENDIENTE`: deshacer un `destrabar` con `corregir` (hoy, "no se
+      corrige"); elegir cuál con varios bloqueos abiertos; y, en un mismo mensaje, una jugada
+      posterior que deja sin efecto el pedido que guardó una anterior (destrabar o un avance
+      seguidos de una fecha): los hechos de la primera lo siguen contando.
 - [ ] **E2-8. Primera ronda real:** sol, luna y Jev; lectura de textos; bitácora; chequeo de rumbo contra 5c.
 - [ ] **E2-9. Telegram real** con el usuario; su juicio; M2 en la bitácora.
 
