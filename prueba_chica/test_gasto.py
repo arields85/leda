@@ -72,13 +72,31 @@ def test_el_costo_de_las_llamadas_usa_lo_informado_y_estima_lo_que_falta():
                                                "cost": 0.004}]},
                 {"tipo": "redaccion", "usos": [{"prompt_tokens": 50, "completion_tokens": 10,
                                                  "cost": None}]},
-                {"tipo": "redaccion", "usos": [], "error": "PlazoAgotado: 40 s"}]
+                {"tipo": "redaccion", "usos": []}]
 
     costo = costo_de_las_llamadas(llamadas, "openai/gpt-6-sol")
 
     assert costo["tokens_entrada"] == 150 and costo["tokens_salida"] == 30
-    assert costo["llamadas_estimadas"] == 2       # la sin costo y la que falló por plazo
+    assert costo["llamadas_estimadas"] == 2       # la sin costo y la que respondió sin uso
     assert costo["usd"] == pytest.approx(0.004 + 2 * 0.016)
+
+
+def test_una_llamada_que_fallo_no_cuesta_ni_se_estima():
+    """Ronda 2 (2026-10-05): sin crédito, OpenRouter rechazó cientos de llamadas con 402 y la
+    libreta las estimó como cobradas; mostró USD 29,84 cuando se habían gastado unos 8 y cortó
+    la ronda. Una llamada que falló (error HTTP, plazo, sin respuesta) no se cobra."""
+    llamadas = [{"tipo": "jugadas", "usos": [], "error": "HTTPStatusError: Client error "
+                 "'402 Payment Required' for url 'https://openrouter.ai/api/v1/chat/completions'"},
+                {"tipo": "redaccion", "usos": [], "error": "PlazoAgotado: 40 s"},
+                {"tipo": "redaccion", "error": "ConnectError: sin respuesta"},
+                {"tipo": "jugadas", "usos": [{"prompt_tokens": 80, "completion_tokens": 9,
+                                               "cost": 0.003}]}]
+
+    costo = costo_de_las_llamadas(llamadas, "openai/gpt-6-sol")
+
+    assert costo["usd"] == pytest.approx(0.003)
+    assert costo["llamadas_estimadas"] == 0
+    assert costo["llamadas"] == 4
 
 
 def test_el_cliente_pide_el_uso_a_openrouter_y_lo_guarda():

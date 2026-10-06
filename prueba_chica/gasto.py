@@ -8,7 +8,8 @@ cuenta:
   cada corrida real: cuándo, qué IA, qué conversación, cuántas llamadas, los tokens y lo que
   costó. Se escribe después de cada corrida, así un corte no pierde la cuenta.
 - **El costo** es el que informa el proveedor (OpenRouter, con `usage.include`); si no lo
-  informa, una estimación por llamada (`USD_POR_LLAMADA`), marcada como estimada. Jev no informa
+  informa, una estimación por llamada (`USD_POR_LLAMADA`), marcada como estimada; una llamada
+  que falló (error HTTP, plazo, sin respuesta) no se cobra ni se estima. Jev no informa
   su costo: se estima por llamada (`JEV_USD_POR_LLAMADA`, `PENDIENTE` medirlo).
 - **El techo:** antes de cada corrida se estima lo que va a costar; si con eso se pasa del techo,
   no corre (`TechoAlcanzado`) salvo con `pasar_el_techo`, que el agente pasa sólo con el OK del
@@ -70,13 +71,15 @@ def modelo_de(ia_nombre: str) -> str:
 
 def costo_de_las_llamadas(llamadas: list[dict[str, Any]], modelo: str) -> dict[str, Any]:
     """Lo que costaron las llamadas grabadas (`grabar.IAQueGraba`): lo informado, y lo estimado
-    para las que no lo traen."""
+    para las que respondieron sin traerlo. Una llamada que falló (error HTTP, como el 402 de la
+    ronda 2 sin crédito; plazo agotado; sin respuesta) no se cobra: cuesta 0 y no se estima. Sólo
+    cuenta lo que haya respondido antes del error (sus `usos`)."""
     usd, estimadas, entrada, salida = 0.0, 0, 0, 0
     por_llamada = USD_POR_LLAMADA.get(modelo, USD_POR_LLAMADA_DESCONOCIDA)
     for ll in llamadas:
         usos = ll.get("usos")
         if not usos:
-            if usos is not None or "error" not in ll:
+            if "error" not in ll:       # respondió, pero el proveedor no informó el uso
                 usd += por_llamada
                 estimadas += 1
             continue
