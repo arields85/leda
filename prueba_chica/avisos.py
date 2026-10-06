@@ -53,11 +53,11 @@ from leda.db import espacio
 from leda.incidentes import registrar_incidente
 from leda.salida import PayloadValidationError, enqueue_outbox
 
-from . import preguntas
+from . import cambios_de_estado, preguntas
 from .ancla import (REPREGUNTA_DE_ESTADO, VENCIMIENTO_CON_PREVISION, ancla, anclaje,
                     clave_del_anclaje, fecha_de_la_clave)
 from .ancla import prevision_vigente as _prevision_vigente
-from .fichas import ATRASO_SI_SE_CUMPLE, GUARDADO_SIN_ENVIAR
+from .fichas import ATRASO_SI_SE_CUMPLE, ESPERA_ALGO_CIERTO, GUARDADO_SIN_ENVIAR
 from .ia import IA
 from .tiempo import Reloj
 from .turno import leer_ultimos_turnos, no_vacio, registrar_salida
@@ -531,6 +531,33 @@ def dependientes(cur, task_id) -> list[dict[str, Any]]:
              "bloqueante"} for f in cur.fetchall()]
 
 
+def espera_a(cur, task_id) -> list[dict[str, Any]]:
+    """Las tareas que tienen que terminar antes de que ésta pueda arrancar, con su estado: sus
+    dependencias bloqueantes sin cerrar (mecánica §4; la misma regla que
+    `motivo_no_arranca_tarea`, en `db/esquema.sql`)."""
+    cur.execute("""select t.titulo, t.estado::text estado from dependency d
+                     join task t on t.id = d.origen_task_id
+                    where d.destino_task_id = %s and d.tipo = 'bloqueante'
+                      and t.estado not in ('terminada', 'cancelada')
+                    order by t.titulo""", (str(task_id),))
+    return [{"tarea": f["titulo"], "estado": f["estado"]} for f in cur.fetchall()]
+
+
+# Lo que un pedido de estado espera saber depende del estado de la tarea (cuarta vuelta de
+# ajuste, 2026-10-06; ronda 3: a una tarea sin empezar se le preguntó si estaba terminada): en
+# curso, si la terminó; sin empezar, si la empezó; esperando a otra, no puede arrancar, así que
+# ni una cosa ni la otra. Para cuándo la termina y si está trabada valen siempre.
+SIN_EMPEZAR = ("si_la_empezo", "para_cuando_la_termina", "si_esta_trabada")
+ESPERANDO_A_OTRA = ("para_cuando_la_termina", "si_esta_trabada")
+
+
+def espera_saber(estado: str, esperando: list[dict[str, Any]]) -> list[str]:
+    """Lo que Leda necesita saber de una tarea en ese estado: un hecho cierto."""
+    if estado == "en_curso":
+        return list(ESPERA_ALGO_CIERTO)
+    return list(ESPERANDO_A_OTRA if esperando else SIN_EMPEZAR)
+
+
 # --- Los avisos de la escalera ---------------------------------------------------------------
 #
 # La escalera (`escalera.py`) decide cuándo se guarda cada uno; acá están sus hechos y cuándo
@@ -541,8 +568,9 @@ def dependientes(cur, task_id) -> list[dict[str, Any]]:
 # aviso es, el número de pedido, la ausencia). `avisa_que_va_a_escalar` es una marca del código
 # que nunca llega a la IA: en su lugar van los hechos de a quién se escala.
 _DE_ESTE_MOMENTO = frozenset({"tarea", "vence", "dias_habiles_hasta_el_vencimiento",
-                              "atraso_dias_habiles", "estado", "responsable",
-                              "prevision_vigente", "dependientes", "si_no_hay_respuesta",
+                              "atraso_dias_habiles", "estado", "estado_desde", "responsable",
+                              "prevision_vigente", "dependientes", "espera_a",
+                              "espera_algo_cierto", "si_no_hay_respuesta",
                               "pide_el_estado_el"})
 AVISA_QUE_VA_A_ESCALAR = "avisa_que_va_a_escalar"
 
@@ -562,6 +590,7 @@ def hechos_de_la_escalera(m: Momento, tipo: str, tarea: dict[str, Any],
         hechos["atraso_dias_habiles"] = m.cal.habiles_entre(vence, m.ahora)
     if tipo != "aviso_previo":
         hechos["estado"] = tarea["estado"]
+        _desde_y_espera(m, tarea, hechos)
     if tipo == "escalamiento":
         responsable = integrante(m.cur, tarea["responsable_membership_id"])
         hechos["responsable"] = responsable["nombre"] if responsable else None
@@ -572,6 +601,8 @@ def hechos_de_la_escalera(m: Momento, tipo: str, tarea: dict[str, Any],
         siguen = dependientes(m.cur, tarea["id"])
         if siguen:
             hechos["dependientes"] = siguen
+    if base.get("necesita_respuesta") is True:
+        hechos["espera_algo_cierto"] = espera_saber(tarea["estado"], hechos.get("espera_a", []))
     if tipo == VENCIMIENTO_CON_PREVISION:   # un efecto que pasa después: cuándo pide el estado
         hasta = ancla(m.cur, tarea["id"], m.fecha(vence))
         hechos["pide_el_estado_el"] = {"fecha": hasta.isoformat(), "estado": "todavia_no"}
@@ -580,6 +611,18 @@ def hechos_de_la_escalera(m: Momento, tipo: str, tarea: dict[str, Any],
         if a_quienes:       # un efecto que pasa después: todavía no, y a quién
             hechos["si_no_hay_respuesta"] = {"se_avisa_a": a_quienes, "estado": "todavia_no"}
     return hechos
+
+
+def _desde_y_espera(m: Momento, tarea: dict[str, Any], hechos: dict[str, Any]) -> None:
+    """El estado real de la tarea, además de su nombre: desde cuándo lo tiene, si el motor lo
+    sabe (`cambios_de_estado.desde`), y las tareas a las que espera para poder arrancar."""
+    desde = cambios_de_estado.desde(m.cur, tarea["id"], tarea["responsable_membership_id"],
+                                    tarea["estado"], m.cal.zona)
+    if desde is not None:
+        hechos["estado_desde"] = desde
+    esperando = espera_a(m.cur, tarea["id"])
+    if esperando:
+        hechos["espera_a"] = esperando
 
 
 def _vigencia_de_la_escalera(m: Momento, aviso) -> tuple[str | None, dict[str, Any]]:
@@ -628,10 +671,12 @@ def _vigencia_de_la_escalera(m: Momento, aviso) -> tuple[str | None, dict[str, A
 def hechos_de_una_pregunta(m: Momento, tarea: dict[str, Any],
                            base: dict[str, Any]) -> dict[str, Any]:
     """Lo fijo de `base` (qué aviso es, la pregunta, el número, lo que se había anotado) y lo
-    de este momento: la tarea y, en la última repregunta, a quién se escala."""
+    de este momento: la tarea, su vencimiento y, en la última repregunta, a quién se escala."""
     hechos = {k: v for k, v in base.items()
               if k not in _DE_ESTE_MOMENTO and k != AVISA_QUE_VA_A_ESCALAR}
     hechos["tarea"] = tarea["titulo"]
+    if tarea["fecha_objetivo"] is not None:
+        hechos["vence"] = m.fecha(tarea["fecha_objetivo"]).isoformat()
     if tarea.get("bloqueada"):
         hechos["estado"] = "bloqueada"
     if base.get(AVISA_QUE_VA_A_ESCALAR):

@@ -156,7 +156,9 @@ def test_sin_respuesta_la_escalera_avanza_un_dia_habil_por_paso_y_escala(conn, m
     assert v["hechos"] == [{"aviso": "pedido_de_estado", "numero": 1,
                             "necesita_respuesta": True, "tarea": "Revisar el tablero",
                             "vence": "2026-10-09", "atraso_dias_habiles": 0,
-                            "estado": "asignada"}]
+                            "estado": "asignada",
+                            "espera_algo_cierto": ["si_la_empezo", "para_cuando_la_termina",
+                                                   "si_esta_trabada"]}]
     assert v["pregunta"] == {"tipo": "estado_de_la_tarea",
                              "tarea": {"titulo": "Revisar el tablero"}, "desde_antes": False}
     espera = _espera(conn)
@@ -254,15 +256,15 @@ def test_una_respuesta_cierra_la_espera_y_la_pregunta_y_detiene_la_escalera(conn
 
 
 def test_un_pedido_guardado_que_ya_se_contesto_no_sale(conn, mundo, dias, escribe):
-    """Guardado antes del horario; la persona escribe antes de que salga: se omite con su
+    """Guardado antes de su hora; la persona escribe antes de que salga: se omite con su
     motivo, nunca en silencio, y la escalera queda detenida."""
     correr_escalera(conn, mundo["id"], RelojFijo(_hora(9, 7)))
     conn.commit()
     [pedido] = _avisos(conn, "pedido_de_estado")
-    assert pedido["programado_para"] == _hora(9, 9)
+    assert pedido["programado_para"] == _hora(9, 10)
     _dice(conn, escribe, Jugada("anotar_inicio", {"tarea": "T1"}), at=_hora(9, 8, 30))
 
-    assert dias.ciclo(_hora(9, 9)) == []
+    assert dias.ciclo(_hora(9, 10)) == []
 
     [pedido] = _avisos(conn, "pedido_de_estado")
     assert (pedido["estado"], pedido["motivo_omision"]) == ("omitido", "ya_respondio")
@@ -295,7 +297,7 @@ def test_un_aviso_guardado_de_una_tarea_que_se_bloqueo_se_omite(conn, mundo, dia
         cur.execute("update pending_reply set satisfecho_en = null")
     conn.commit()
 
-    assert dias.ciclo(_hora(9, 9)) == []
+    assert dias.ciclo(_hora(9, 10)) == []
     [pedido] = _avisos(conn, "pedido_de_estado")
     assert pedido["motivo_omision"] == "bloqueo_abierto"
 
@@ -309,11 +311,11 @@ def test_destrabar_un_bloqueo_que_detuvo_la_escalera_la_retoma(conn, mundo, dias
     conn.commit()
     _dice(conn, escribe, Jugada("anotar_bloqueo", {"tarea": "T1", "causa": "falta el PLC"}),
           at=_hora(9, 8))
-    assert dias.ciclo(_hora(9, 9)) == []
+    assert dias.ciclo(_hora(9, 10)) == []
     [omitido] = _avisos(conn, "pedido_de_estado")
     assert omitido["motivo_omision"] == "bloqueo_abierto"
 
-    _dice(conn, escribe, Jugada("destrabar", {"tarea": "T1"}), at=_hora(9, 9, 30))
+    _dice(conn, escribe, Jugada("destrabar", {"tarea": "T1"}), at=_hora(9, 10, 30))
 
     [otra_vez] = dias.ciclo(_hora(13, 10))         # el lunes 12 es feriado
     assert otra_vez["hechos"][0]["aviso"] == "repregunta_de_estado"
@@ -323,11 +325,14 @@ def test_destrabar_un_bloqueo_que_detuvo_la_escalera_la_retoma(conn, mundo, dias
 
 # --- Horario (9e) ---------------------------------------------------------------------------------
 
-def test_lo_que_la_escalera_guarda_fuera_del_horario_sale_al_empezar_la_jornada(conn, mundo, dias):
+def test_lo_que_la_escalera_guarda_fuera_del_horario_sale_a_la_hora_de_salida(conn, mundo, dias):
+    """Ni fuera del horario ni al empezar la jornada: a la hora de salida (10:00,
+    `tiempo.HORA_DE_SALIDA`), la misma que dicen los hechos y el reloj adelantado."""
     assert dias.ciclo(_hora(9, 7)) == []
+    assert dias.ciclo(_hora(9, 9)) == []
     assert _cuantas(conn, "message_outbox") == 0
 
-    [v] = dias.ciclo(_hora(9, 9))
+    [v] = dias.ciclo(_hora(9, 10))
     assert v["hechos"][0]["aviso"] == "pedido_de_estado"
 
 

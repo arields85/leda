@@ -48,10 +48,11 @@ confirma, queda abajo, en "Para la prueba de la entrega".
    →
    - Jugadas: `anotar_prevision` sobre la tarea de comunicaciones, miércoles 4 de noviembre, con su motivo.
    - Efecto: la previsión, directo, con la fecha comprometida en el viernes 30. El aviso a Ismael queda
-     guardado como hechos y no sale hasta el viernes 23 a las 09:00: es un mensaje a otra persona y Leda no
-     lo manda fuera del horario (decisión 9e).
+     guardado como hechos y no sale hasta el viernes 23 a las 10:00, la hora en que salen los mensajes que
+     Leda manda por su cuenta (README, "Datos ficticios"): es un mensaje a otra persona y Leda no lo manda
+     fuera del horario (decisión 9e).
    - La respuesta, enseguida, aunque sea fuera del horario (decisión 9e): dice que quedó anotada la
-     previsión del 4 y que Ismael se va a enterar a las 09:00 del viernes, el horario del equipo.
+     previsión del 4 y que Ismael se va a enterar el viernes a las 10:00.
    - La respuesta no dice: que Ismael ya se enteró.
    - Estado después: sin tema abierto.
 
@@ -67,7 +68,7 @@ confirma, queda abajo, en "Para la prueba de la entrega".
    - La respuesta no dice: que Ismael se enteró de lo del 4.
    - Estado después: sin tema abierto.
 
-5. **Leda**, al llegar las 09:00 del viernes 23, va a mandar el aviso guardado a Ismael.
+5. **Leda**, al llegar las 10:00 del viernes 23, va a mandar el aviso guardado a Ismael.
    →
    - Efecto: el código vuelve a leer la tarea (decisión 9b). La previsión del 4 ya no existe, así que el
      aviso ya no corresponde: no sale, y la omisión y su motivo quedan registrados (mecánica §12: nunca en

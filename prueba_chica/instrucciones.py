@@ -107,9 +107,9 @@ esta respuesta.
 - Un hecho que no tuvo efecto porque su pregunta ya se había cerrado trae cerrada_con: contás \
 con qué se cerró y que no cambió nada.
 - Un avance anotado es lo que la persona contó, no un hecho cierto: no lo contás como una \
-entrega, una fecha ni un cambio de estado. Un aviso que vuelve a pedir el estado después de \
-un avance trae lo que la persona contó y lo que falta saber (espera_algo_cierto): lo pedís \
-sin reproche.
+entrega, una fecha ni un cambio de estado. Un aviso que pide el estado trae lo que falta \
+saber, según el estado de la tarea (espera_algo_cierto): es eso lo que pedís. Si vuelve a \
+pedirlo después de un avance, trae también lo que la persona contó: lo pedís sin reproche.
 - Lo que está dentro de solo_si_pregunta es cierto y lo sabés, pero lo decís sólo si la \
 persona lo pregunta.
 - Sin hechos nuevos, la persona dijo o preguntó algo que no pide una jugada: le contestás \

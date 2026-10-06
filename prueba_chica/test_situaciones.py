@@ -403,6 +403,7 @@ def test_una_opcion_que_ya_no_se_puede_usar_deja_la_duda_abierta(conn, tareas, m
 
     assert r.hechos == [{"jugada": "anotar_inicio", "resultado": "no_se_puede",
                          "motivo": "estado", "tarea": T1, "estado": "en_curso",
+                         "estado_desde": "desconocido",
                          "eligio": {"opcion": "O1", "etiqueta": T1["titulo"], "tarea": T1},
                          "pregunta_sigue_abierta": True}]
     assert _abierta(conn) == ("cual_tarea", None)

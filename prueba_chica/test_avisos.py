@@ -90,19 +90,20 @@ def test_el_aviso_al_referente_sale_redactado_desde_los_hechos_a_su_hora(conn, m
 # --- Horario (9e; conversación 11, paso 3) -----------------------------------------------------
 
 def test_fuera_del_horario_no_sale_nada_que_leda_inicie(conn, mundo, escribe):
-    """La respuesta sale enseguida; el aviso a Ismael espera a las 09:00 del día hábil
-    siguiente y, antes, ni se redacta."""
+    """La respuesta sale enseguida; el aviso a Ismael espera a la hora de salida del día hábil
+    siguiente (10:00, `tiempo.HORA_DE_SALIDA`) y, antes, ni se redacta."""
     _dice(conn, escribe, _prevision("T1", "2026-10-14"), at=_hora(5, 17, 20))
     [aviso] = _avisos(conn)
-    assert aviso["programado_para"] == _hora(6, 9)
+    assert aviso["programado_para"] == _hora(6, 10)
     ia = IAGuionada(redacciones=["Aviso."])
 
     assert _enviar(conn, mundo, ia, _hora(5, 18)) == {"fuera_de_horario": 1}
     assert _enviar(conn, mundo, ia, _hora(6, 8, 30)) == {"fuera_de_horario": 1}
+    assert _enviar(conn, mundo, ia, _hora(6, 9, 30)) == {}     # en horario, antes de su hora
     assert ia.pedidos_de_redaccion == []
     assert _cuantas(conn, "message_outbox", "not es_respuesta") == 0
 
-    assert _enviar(conn, mundo, ia, _hora(6, 9)) == {"enviado": 1}
+    assert _enviar(conn, mundo, ia, _hora(6, 10)) == {"enviado": 1}
 
 
 def test_un_fin_de_semana_tampoco_sale(conn, mundo, escribe):
@@ -140,10 +141,10 @@ def test_un_aviso_cuya_tarea_se_cerro_antes_de_salir_se_omite(conn, mundo, escri
                     (mundo["tarea"],))
     conn.commit()
 
-    assert _enviar(conn, mundo, IAGuionada(), _hora(6, 9)) == {"omitido": 1}
+    assert _enviar(conn, mundo, IAGuionada(), _hora(6, 10)) == {"omitido": 1}
     aviso = _avisos(conn)[0]
     assert (aviso["estado"], aviso["motivo_omision"]) == ("omitido", "tarea_cerrada")
-    assert aviso["resuelto_en"] == _hora(6, 9)
+    assert aviso["resuelto_en"] == _hora(6, 10)
 
 
 # --- La corrección de una previsión (9f) -------------------------------------------------
@@ -178,7 +179,7 @@ def test_corregir_y_volver_a_una_prevision_anterior_rearma_su_aviso(conn, mundo,
     assert hecho["aviso_de_la_prevision_corregida"] == {"estado": "retirado_sin_enviar"}
     assert hecho["aviso_de_la_prevision_anterior"]["estado"] == "guardado_sin_enviar"
     ia = IAGuionada(redacciones=["Aviso del 14.", "Aviso de T2."])
-    assert _enviar(conn, mundo, ia, _hora(6, 9)) == {"enviado": 2}
+    assert _enviar(conn, mundo, ia, _hora(6, 10)) == {"enviado": 2}
     de_t1 = [p["hechos"][0] for p in ia.pedidos_de_redaccion
              if p["hechos"][0]["tarea"] == T1["titulo"]]
     assert de_t1 == [{"aviso": "nueva_prevision", "necesita_respuesta": False,

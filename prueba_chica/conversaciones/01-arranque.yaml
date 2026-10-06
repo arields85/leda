@@ -75,7 +75,7 @@ pasos:
         tipo: pedido_de_estado
         tarea: PLC
         hechos: {numero: 1, necesita_respuesta: true, vence: "2026-10-23",
-                 atraso_dias_habiles: 0, estado: en_curso}
+                 atraso_dias_habiles: 0, estado: en_curso, estado_desde: "2026-10-20"}
     estado_despues:
       esperas_abiertas: [PLC]
       pregunta_abierta: {tipo: estado_de_la_tarea, tarea: PLC}

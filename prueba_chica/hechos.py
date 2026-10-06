@@ -113,6 +113,11 @@ SIGNIFICADOS: Mapping[str, str] = {
     "dias_habiles_hasta_el_vencimiento": "Los días hábiles que faltan hasta la fecha "
                                          "comprometida.",
     "dependientes": "Las tareas abiertas que dependen de ésta.",
+    "espera_a": "Las tareas que tienen que terminar antes de que ésta pueda arrancar, con su "
+                "estado: ésta no puede arrancar todavía.",
+    "estado_desde": "Desde qué día la tarea está en su estado, según lo que anotó Leda; "
+                    "desconocido si Leda no lo anotó.",
+    "desconocido": "El sistema no lo sabe.",
     "no_puede_arrancar_hasta_que_termine": "Esa tarea dependiente no puede arrancar hasta que "
                                            "termine ésta.",
     "aviso_al_referente": "El aviso a quien aprueba el trabajo de la persona, con a quién, su "
@@ -152,6 +157,8 @@ SIGNIFICADOS: Mapping[str, str] = {
     "quien_decide": "Quién decide lo que la persona pidió.",
     "alternativa": "La jugada que Leda le ofrece a la persona en lugar de lo pedido.",
     "lo_que_puede_hacer": "Lo que Leda puede hacer por chat.",
+    "otra_forma_de_hacerlo": "Otra forma de hacer lo que la persona pidió fuera de este chat o "
+                             "con otra persona, con su código.",
     "solo_si_pregunta": "Algo cierto que Leda sabe y dice sólo si la persona lo pregunta.",
     "aviso_al_administrador": "El aviso al administrador de que se pidió algo que no está en "
                               "la lista, con su estado.",
@@ -270,6 +277,7 @@ SIGNIFICADOS: Mapping[str, str] = {
     "sin_referente": "La persona no tiene a alguien que apruebe su trabajo.",
     "se_anoto_en_la_tarea_equivocada": "Se había anotado en la tarea equivocada.",
     # --- Códigos: el estado de un efecto que pasa después --------------------------------------
+    "ninguna_definida": "No hay ninguna definida todavía.",
     "guardado_sin_enviar": "Guardado, todavía sin enviar: sale cuando dice sale.",
     "en_cola_sin_enviar": "En la cola de su canal, todavía sin enviar: sale enseguida.",
     "retirado_sin_enviar": "Se retiró sin enviarse: nunca salió.",
@@ -306,13 +314,14 @@ SIGNIFICADOS: Mapping[str, str] = {
     # --- Códigos: lo que Leda propone y lo que espera saber ------------------------------------
     "que_alguien_ayude": "Propuesta: que alguien del equipo ayude con el bloqueo.",
     "si_la_termino": "Si la persona terminó la tarea.",
+    "si_la_empezo": "Si la persona empezó la tarea.",
     "para_cuando_la_termina": "Para qué fecha prevé terminarla.",
     "si_esta_trabada": "Si no puede avanzar con la tarea.",
     # --- Códigos: los tipos de pregunta (lo que la pregunta espera) ----------------------------
     "cual_tarea": "Pregunta de qué tarea habla la persona: espera que elija una.",
     "causa_del_bloqueo": "Pregunta qué traba la tarea: espera la causa.",
-    "estado_de_la_tarea": "Pregunta cómo viene la tarea: espera algo cierto (si la terminó, "
-                          "para cuándo o si está trabada).",
+    "estado_de_la_tarea": "Pregunta cómo viene la tarea: espera algo cierto, según su estado "
+                          "(espera_algo_cierto dice qué, cuando viene).",
     "fecha_de_la_tarea": "Pregunta para qué día va a tener la tarea: espera una fecha.",
     "propuesta": "Leda le propuso algo a la persona: espera que elija una de las propuestas o "
                  "la deje.",

@@ -50,10 +50,11 @@ from leda.db import registrar_auditoria
 from leda.herramientas import (EstadoCambio, NecesitaConfirmacion, NecesitaElegir,
                                NecesitaOpciones, ejecutar)
 
-from . import preguntas, situaciones
+from . import cambios_de_estado, preguntas, situaciones
 from .ancla import (REEMPLAZADO_POR_UN_AVANCE, REPREGUNTA_DE_ESTADO, anclaje, candado, escalo,
                     pasos)
 from .ia import Jugada
+from .tiempo import sale as sale_a_la_hora, sale_el
 
 
 @dataclass(frozen=True)
@@ -148,7 +149,8 @@ EN_COLA_SIN_ENVIAR = "en_cola_sin_enviar"       # en la cola de su canal; sale e
 # sigue abierta y Leda vuelve a pedir el estado el día hábil siguiente con un aviso de la
 # escalera (`REPREGUNTA_DE_ESTADO`, `escalera.py`), que espera algo cierto. Los pasos de la
 # escalera que todavía no salieron quedan reemplazados por él (`REEMPLAZADO_POR_UN_AVANCE`): ya
-# no es silencio.
+# no es silencio. Lo que espera saber depende del estado de la tarea (`avisos.espera_saber`):
+# esto es lo de una tarea en curso.
 ESPERA_ALGO_CIERTO = ("si_la_termino", "para_cuando_la_termina", "si_esta_trabada")
 
 # El atraso que tendrá la tarea si se cumple una previsión: distinto del atraso de hoy
@@ -213,8 +215,12 @@ def correr(ficha: Ficha, ctx: Contexto, jugada: Jugada) -> dict[str, Any]:
                 fila = _exigir_responsable(ctx.cur, ctx.quien, tarea["id"])
                 tarea = {**tarea, "estado": str(fila["estado"])}
                 if tarea["estado"] not in ficha.estados:
+                    # Desde cuándo, si el motor lo sabe (`cambios_de_estado.py`).
                     return _hecho(ficha, "no_se_puede", motivo="estado",
-                                  tarea=_tarea(tarea), estado=tarea["estado"])
+                                  tarea=_tarea(tarea), estado=tarea["estado"],
+                                  estado_desde=cambios_de_estado.desde(
+                                      ctx.cur, tarea["id"], ctx.quien.membership_id,
+                                      tarea["estado"], ctx.calendario.zona))
             hecho = {"jugada": ficha.nombre, **ficha.manejar(ctx, datos, tarea)}
             de_la_tarea = tarea or ctx.tarea((hecho.get("tarea") or {}).get("alias", ""))
             if hecho.get("resultado") == "anotado" and hecho["jugada"] == ficha.nombre:
@@ -501,7 +507,7 @@ def _anotar_prevision(ctx: Contexto, datos: dict, tarea: dict) -> dict:
         return {**hecho, "sin_aviso": "misma_fecha_comprometida"}
     if quien_aprueba is None:
         return {**hecho, "sin_aviso": "sin_referente"}
-    sale = cal.dentro_de_jornada(ctx.ahora)
+    sale = sale_a_la_hora(cal, ctx.ahora)
     hechos_del_aviso = {k: hecho[k] for k in ("prevision", "motivo", "fecha_comprometida",
                                               ATRASO_SI_SE_CUMPLE, "dependientes")}
     cur.execute(
@@ -759,8 +765,7 @@ def _seguir_pidiendo(ctx: Contexto, tarea: dict[str, Any], espera: dict[str, Any
     veces = 1 + sum(p["tipo"] == REPREGUNTA_DE_ESTADO
                     and p["dedupe_key"].split(":")[5:6] == [de_la_espera] for p in escalon)
     hoy = ctx.ahora.astimezone(cal.zona).date()
-    sale = cal.dentro_de_jornada(datetime.combine(
-        cal.proximo_habil(hoy + timedelta(days=1)), cal.hora_inicio, tzinfo=cal.zona))
+    sale = sale_el(cal, cal.proximo_habil(hoy + timedelta(days=1)))
     # Lo manda Leda por su cuenta, como los demás pasos de la escalera: sin turno que lo cause.
     clave = f"motor:{REPREGUNTA_DE_ESTADO}:{tarea['id']}:{de.clave}:0:{de_la_espera}:a{veces}"
     cur.execute(
@@ -772,7 +777,6 @@ def _seguir_pidiendo(ctx: Contexto, tarea: dict[str, Any], espera: dict[str, Any
         (ctx.quien.workspace_id, REPREGUNTA_DE_ESTADO, tarea["id"], persona,
          json.dumps({"aviso": REPREGUNTA_DE_ESTADO, "necesita_respuesta": True,
                      "avance_anterior": {**contesto, "el": hoy.isoformat()},
-                     "espera_algo_cierto": list(ESPERA_ALGO_CIERTO),
                      "tarea": tarea["titulo"], "vence": vence.isoformat(),
                      **({"seguimiento_por": "prevision"} if de.fecha > vence else {})},
                     ensure_ascii=False),
@@ -812,9 +816,17 @@ def _consultar_pendientes(ctx: Contexto, datos: dict, tarea: dict | None) -> dic
     return {"resultado": "leido", "tareas": tareas}
 
 
+# Lo que no se hace por chat y no tiene otra forma definida de hacerse en esta etapa: el hecho lo
+# dice, para que la redacción no invente un canal (ronda 3, conversación 12, paso 6: "presentala
+# por fuera de este chat"). Qué hace la persona con una tarea terminada mientras la entrega no
+# se recibe por chat no está decidido (ADR 0018, 9g): `PENDIENTE` del usuario.
+NINGUNA_DEFINIDA = "ninguna_definida"
+
+
 def _entregar(ctx: Contexto, datos: dict, tarea: dict | None) -> dict:
     return {"resultado": "no_por_chat", "motivo": "la_entrega_todavia_no_se_recibe_por_chat",
-            **({"tarea": _tarea(tarea)} if tarea else {})}
+            **({"tarea": _tarea(tarea)} if tarea else {}),
+            "otra_forma_de_hacerlo": NINGUNA_DEFINIDA}
 
 
 def _pedir_reasignacion(ctx: Contexto, datos: dict, tarea: dict | None) -> dict:
@@ -893,7 +905,7 @@ def _deshacer_prevision(ctx: Contexto, tarea: dict) -> dict | None:
                         where id = %s""", (ctx.ahora, aviso["id"]))
         hechos["aviso_de_la_prevision_corregida"] = {"estado": "retirado_sin_enviar"}
     elif aviso is not None and aviso["estado"] == "enviado" and quien_aprueba is not None:
-        sale = cal.dentro_de_jornada(ctx.ahora)
+        sale = sale_a_la_hora(cal, ctx.ahora)
         cur.execute(
             """insert into scheduled_notice (workspace_id, tipo, task_id,
                                              destinatario_membership_id, hechos,
@@ -943,7 +955,7 @@ def _rearmar_aviso_de_la_anterior(ctx: Contexto, tarea: dict, anterior: dict,
     cur.execute("""select t.titulo from dependency d join task t on t.id = d.destino_task_id
                     where d.origen_task_id = %s and t.estado not in ('terminada', 'cancelada')
                     order by t.titulo""", (tarea["id"],))
-    sale = cal.dentro_de_jornada(ctx.ahora)
+    sale = sale_a_la_hora(cal, ctx.ahora)
     cur.execute(
         """insert into scheduled_notice (workspace_id, tipo, task_id,
                                          destinatario_membership_id, hechos, programado_para,

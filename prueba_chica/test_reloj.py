@@ -82,7 +82,7 @@ def test_el_reloj_adelantado_mueve_la_escalera_y_el_horario_del_despacho_juntos(
     escucha.una_vuelta(espera=0)
     assert salida.enviados == [] and ia.pedidos_de_redaccion == []
     assert _uno(conn, "select programado_para from scheduled_notice")["programado_para"] \
-        == _hora(13, 9)
+        == _hora(13, 10)
 
     adelantar(conn, mundo["id"], real, base=base)
     minuto.s = 60

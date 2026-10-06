@@ -83,7 +83,8 @@ y 9g.
    - Efecto: ninguno. La tarea sigue `en_curso`. Ningún aviso al administrador: la entrega es conocida, no
      una situación nueva.
    - La respuesta dice, con honestidad: que todavía no puede recibir la entrega por acá.
-   - La respuesta no dice: que la tarea quedó entregada, en revisión o terminada; que le avisó a Ismael.
+   - La respuesta no dice: que la tarea quedó entregada, en revisión o terminada; que le avisó a Ismael; que
+     la presente por fuera de este chat o a otra persona (no hay otra forma definida; constitución §4).
    - Estado después: sin tema abierto.
 
 7. **Marcos** escribe (martes 20, 16:02): "y que mas tengo pendiente?"

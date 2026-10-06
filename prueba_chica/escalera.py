@@ -96,7 +96,7 @@ from .ancla import (NO_DADOS, REEMPLAZADO, REPREGUNTA_DE_ESTADO, TIPOS_DE_LA_ESC
 from .avisos import (ABIERTOS, ESCALAMIENTO_DE_UNA_PREGUNTA, ESPERA_DE_ESTADO, REPREGUNTA,
                      Momento, ausente, espera_abierta, guardar, hechos_de_la_escalera,
                      hechos_de_una_pregunta, leer_tarea, omitir, quienes_escalan)
-from .tiempo import Reloj
+from .tiempo import Reloj, sale
 
 ETAPA_ESCALERA = "motor_escalera"
 CLAVE_AVISO_PREVIO = "aviso_previo_dias_habiles"
@@ -257,7 +257,7 @@ def _guardar(m: Momento, tipo: str, tarea, fecha: Anclaje | date, base: dict[str
     aviso_id, _ = guardar(
         m.cur, m.workspace_id, tipo, task_id=str(tarea["id"]),
         destinatario=destinatario or str(tarea["responsable_membership_id"]),
-        hechos={**base, **hechos}, programado_para=m.cal.dentro_de_jornada(m.ahora),
+        hechos={**base, **hechos}, programado_para=sale(m.cal, m.ahora),
         clave=clave(tipo, tarea["id"], fecha, *resto), ahora=m.ahora)
     return aviso_id
 
@@ -378,13 +378,14 @@ def _abrir_la_espera(m: Momento, tarea) -> None:
     abierta = espera_abierta(m.cur, tarea["id"])
     if abierta is not None and abierta["escalado_en"] is None:
         return
-    sale = m.cal.dentro_de_jornada(m.ahora)
+    sale_en = sale(m.cal, m.ahora)
     m.cur.execute(
         """insert into pending_reply (workspace_id, membership_id, task_id, tipo,
                                       preguntado_en, vence_en)
            values (%s, %s, %s, %s, %s, %s)""",
         (m.workspace_id, str(tarea["responsable_membership_id"]), str(tarea["id"]),
-         ESPERA_DE_ESTADO, sale, m.cal.dentro_de_jornada(m.cal.sumar_habiles(sale, 1))))
+         ESPERA_DE_ESTADO, sale_en,
+         m.cal.dentro_de_jornada(m.cal.sumar_habiles(sale_en, 1))))
 
 
 # --- La escalera de una pregunta que espera respuesta -------------------------------------------
@@ -478,7 +479,7 @@ def _guardar_de_una_pregunta(m: Momento, tipo: str, tarea, base: dict[str, Any],
         m.cur, m.workspace_id, tipo, task_id=str(tarea["id"]),
         destinatario=destinatario or str(tarea["responsable_membership_id"]),
         hechos={**base, **hechos_de_una_pregunta(m, tarea, base)},
-        programado_para=m.cal.dentro_de_jornada(m.ahora),
+        programado_para=sale(m.cal, m.ahora),
         clave=":".join(["motor", tipo, str(tarea["id"]), de, *map(str, resto)]), ahora=m.ahora)
     return aviso_id
 

@@ -173,6 +173,8 @@ def test_el_inicio_de_una_tarea_ya_en_curso_lo_dice_sin_efecto(conn, mundo, escr
 
     assert hechos == [{"jugada": "anotar_inicio", "resultado": "no_se_puede",
                        "motivo": "estado", "estado": "en_curso",
+                       # La cargó otro en curso: el motor no sabe desde cuándo.
+                       "estado_desde": "desconocido",
                        "tarea": {"alias": "T1", "titulo": "Armar el tablero"}}]
     assert _cuantas(conn, "task_state_event") == 0
     assert _cuantas(conn, "incident") == 0
@@ -616,7 +618,8 @@ def test_entregar_no_se_recibe_por_chat_y_no_avisa_a_nadie(conn, mundo, escribe)
 
     assert hecho == {"jugada": "entregar", "resultado": "no_por_chat",
                      "motivo": "la_entrega_todavia_no_se_recibe_por_chat",
-                     "tarea": {"alias": "T1", "titulo": "Armar el tablero"}}
+                     "tarea": {"alias": "T1", "titulo": "Armar el tablero"},
+                     "otra_forma_de_hacerlo": "ninguna_definida"}
     assert _cuantas(conn, "task_state_event") == 0 and _cuantas(conn, "incident") == 0
 
 

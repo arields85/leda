@@ -120,7 +120,7 @@ def test_una_sola_jugada_deja_su_efecto_como_estaba(conn, mundo, dias, escribe):
     [hecho] = resultado.hechos
     vuelve = hecho["vuelve_a_pedir_el_estado"]
     assert vuelve["estado"] == GUARDADO_SIN_ENVIAR
-    assert datetime.fromisoformat(vuelve["sale"]) == _hora(13, 9)
+    assert datetime.fromisoformat(vuelve["sale"]) == _hora(13, 10)
     assert hecho["el_pedido_de_estado"] == "sigue_abierto"
     [repregunta] = _avisos(conn, "repregunta_de_estado")
     assert repregunta["estado"] == "guardado"
@@ -154,7 +154,7 @@ def test_destrabar_antes_del_vencimiento_la_escalera_sigue_sola(conn, mundo, dia
     conn.commit()
     _dice(conn, escribe, Jugada("anotar_bloqueo", {"tarea": "T1", "causa": "falta el PLC"}),
           at=_hora(6, 8))
-    assert _de_la_tarea(dias, _hora(6, 9)) == []
+    assert _de_la_tarea(dias, _hora(6, 10)) == []
     [omitido] = _avisos(conn, "aviso_previo")
     assert omitido["motivo_omision"] == "bloqueo_abierto"
 

@@ -132,7 +132,10 @@ Personas, roles y tareas salen de `espacios/corework.yaml` y `espacios/corework.
   rige para lo que Leda manda por su cuenta; a quien le escribe le contesta a cualquier hora (decisión 9e).
 - Las cadencias del espacio (lunes 09:15; miércoles 11:30 y 15:30; viernes 11:00 y 16:15) se suponen
   apagadas, y los mensajes que Leda manda por su cuenta salen a las 10:00: cómo convive el recordatorio con
-  ellas (mecánica §10 junta en un envío los mensajes automáticos del día) es otra conversación.
+  ellas (mecánica §10 junta en un envío los mensajes automáticos del día) es otra conversación. Es una sola
+  hora para todo lo que Leda manda por su cuenta (la escalera, los avisos guardados, también a otra persona,
+  y el pedido que sigue a un avance), la que dicen los hechos y a la que llega el reloj adelantado de la
+  prueba por Telegram (`prueba_chica/tiempo.py`, `HORA_DE_SALIDA`).
 
 ### Calendario de referencia
 

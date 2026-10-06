@@ -63,7 +63,7 @@ def test_un_avance_se_anota_con_sus_palabras_y_la_espera_sigue_abierta(conn, mun
                      "veces_sin_algo_cierto": 1}
     # Un efecto que pasa después, con su estado: el día hábil siguiente (el lunes es feriado).
     assert sale["estado"] == GUARDADO_SIN_ENVIAR
-    assert datetime.fromisoformat(sale["sale"]) == _hora(13, 9)
+    assert datetime.fromisoformat(sale["sale"]) == _hora(13, 10)   # a la hora de salida
     assert resultado.pregunta is None                           # la primera vez, no pregunta
     # Ni estado, ni fecha, ni previsión, ni aviso a Ismael.
     assert str(_uno(conn, "select estado from task")["estado"]) == "asignada"
@@ -84,7 +84,7 @@ def test_un_avance_se_anota_con_sus_palabras_y_la_espera_sigue_abierta(conn, mun
     # El pedido del día hábil siguiente, guardado y sin turno: lo manda Leda por su cuenta.
     [repregunta] = _repreguntas(conn)
     assert repregunta["estado"] == "guardado" and repregunta["turno_id"] is None
-    assert repregunta["programado_para"] == _hora(13, 9)
+    assert repregunta["programado_para"] == _hora(13, 10)
 
 
 def test_sin_un_pedido_de_estado_no_hay_avance_que_anotar(conn, mundo, dias, escribe):
@@ -127,7 +127,8 @@ def test_un_avance_no_es_silencio_la_escalera_vuelve_a_preguntar_sin_escalar(con
     hechos = otra_vez["hechos"][0]
     assert hechos["aviso"] == "repregunta_de_estado" and hechos["necesita_respuesta"] is True
     assert hechos["avance_anterior"] == {"dijo": VAGO, "el": "2026-10-14"}
-    assert hechos["espera_algo_cierto"] == ["si_la_termino", "para_cuando_la_termina",
+    # La tarea sigue sin empezar: lo que se espera saber es de una tarea sin empezar.
+    assert hechos["espera_algo_cierto"] == ["si_la_empezo", "para_cuando_la_termina",
                                             "si_esta_trabada"]
     assert "si_no_hay_respuesta" not in hechos
     assert otra_vez["pregunta"]["tipo"] == "estado_de_la_tarea"

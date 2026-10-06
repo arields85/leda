@@ -53,7 +53,7 @@ from leda.incidentes import (ETAPA_TURNO_CONVERSACION, NOTICIA_NEUTRA_INCIDENTE,
                              REFERENCIA_INBOUND_MESSAGE, registrar_incidente)
 from leda.salida import enqueue_outbox
 
-from . import preguntas
+from . import cambios_de_estado, preguntas
 from .fichas import EN_COLA_SIN_ENVIAR, JUGADAS, Contexto, Manejador, lo_que_puede_hacer
 from .ia import IA, Jugada
 from .situaciones import elegir_opcion
@@ -147,6 +147,9 @@ def _turno(conn, cur, ctx: Contexto, ia: IA, reloj: Reloj,
         elegidas = elegir()
         with conn.transaction():
             hechos = manejar(elegidas)
+            # Desde cuándo cada tarea está en su estado lo sabe el motor por lo que anota
+            # (`cambios_de_estado.py`): los cambios de este turno, fuera de los hechos.
+            cambios = cambios_de_estado.del_turno(cur, ctx.tareas)
             pregunta = preguntas.al_terminar_el_turno(ctx)
             # Lo que los hechos dejaron para después, como quedó después de todas las jugadas
             # (9k). `efectos` usa los avisos, que importan este módulo: se importa acá.
@@ -163,7 +166,8 @@ def _turno(conn, cur, ctx: Contexto, ia: IA, reloj: Reloj,
     # los últimos turnos (sólo los hechos), y el turno siguiente lo vuelve a mirar.
     resultado = {"hechos": hechos, **({"pregunta": pregunta} if pregunta else {}),
                  **({YA_NO_SALE: final.ya_no_sale} if final.ya_no_sale else {}),
-                 **({ANUNCIADOS: final.anunciados} if final.anunciados else {})}
+                 **({ANUNCIADOS: final.anunciados} if final.anunciados else {}),
+                 **({cambios_de_estado.CLAVE: cambios} if cambios else {})}
     turno = _registrar_entrada(cur, ctx, reloj.ahora(), elegidas, resultado, ia.nombre,
                                latencia, None, option_id)
     if ctx.avisos_guardados:

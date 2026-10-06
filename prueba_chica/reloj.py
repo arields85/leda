@@ -17,9 +17,10 @@ salgan como en un equipo real.
   y decide el horario con él (`despachador.despachar` no se toca). Los avisos a la
   administración van con el reloj real (`ciclo.py`). Lo que la base fecha sola
   (`task_state_event.at`, `blocker.abierto_en`) sigue en hora real (plan, sección 11).
-- **`adelantar`:** al día hábil siguiente del de Leda, a las 10:00 (o al empezar la jornada,
-  si a esa hora no se trabaja), con el calendario y los feriados del espacio. Correrlo otra vez
-  adelanta otro día.
+- **`adelantar`:** al día hábil siguiente del de Leda, a la hora de salida de lo que Leda manda
+  por su cuenta (`tiempo.HORA_DE_SALIDA`, 10:00; o al empezar la jornada, si a esa hora no se
+  trabaja), con el calendario y los feriados del espacio: lo que se le dijo a la persona que
+  sale a esa hora, sale. Correrlo otra vez adelanta otro día.
 - **`volver`:** borra el adelanto. Lo escrito con el reloj adelantado queda con su hora: lo
   guardado para "mañana" de Leda sale cuando llegue esa hora real.
 - **Sólo en `leda_motor`:** los tres comandos se niegan en otra base, y el reloj del
@@ -38,11 +39,10 @@ import psycopg
 from leda.calendario import Calendario
 from leda.db import admin, espacio
 
-from .tiempo import Reloj, RelojDelSistema
+from .tiempo import Reloj, RelojDelSistema, sale_el
 
 BASE_DEL_MOTOR = "leda_motor"
 CLAVE_ADELANTO = "motor_reloj_adelanto_segundos"
-HORA_DEL_DIA_NUEVO = time(10, 0)
 
 
 class BaseEquivocada(ValueError):
@@ -91,7 +91,7 @@ def leer_adelanto(conn: psycopg.Connection, workspace_id: str, *,
 
 def adelantar(conn: psycopg.Connection, workspace_id: str, real: Reloj, *,
               base: str = BASE_DEL_MOTOR) -> EstadoDelReloj:
-    """Lleva el reloj de Leda al día hábil siguiente, a las 10:00 (en horario)."""
+    """Lleva el reloj de Leda al día hábil siguiente, a la hora de salida (en horario)."""
     _comprobar(conn, base)
     adelanto = leer_adelanto(conn, workspace_id, base=base)
     ahora = real.ahora()
@@ -100,9 +100,7 @@ def adelantar(conn: psycopg.Connection, workspace_id: str, real: Reloj, *,
         dia = (ahora + adelanto).astimezone(cal.zona).date() + timedelta(days=1)
         while not cal.es_habil(dia):
             dia += timedelta(days=1)
-        objetivo = datetime.combine(dia, HORA_DEL_DIA_NUEVO, tzinfo=cal.zona)
-        if not cal.en_horario(objetivo):
-            objetivo = cal.dentro_de_jornada(objetivo)
+        objetivo = sale_el(cal, dia)
         cur.execute(
             """insert into workspace_setting (workspace_id, clave, valor)
                values (%s, %s, %s)

@@ -146,7 +146,7 @@ def test_un_aviso_guardado_para_la_persona_es_lo_que_sigue(conn, mundo, espacio_
 
     sigue = hecho["lo_que_sigue"]["proximo_aviso"]
     assert (sigue["aviso"], sigue["estado"]) == ("aviso_previo", "guardado_sin_enviar")
-    assert sigue["sale"].startswith("2026-10-06T09:00")
+    assert sigue["sale"].startswith("2026-10-06T10:00")
     assert sin_significado(hecho) == set()
 
 
