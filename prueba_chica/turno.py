@@ -83,6 +83,8 @@ class ResultadoTurno:
     error: str | None = None
     repetido: bool = False      # el mensaje (o el toque) ya tenía su turno: no se hizo nada
     pregunta: dict[str, Any] | None = None      # la única que se hace en la respuesta
+    # Lo que un turno anterior anunció y ya no va a pasar, que la redacción recibió (9m.3).
+    ya_no_sale: list[dict[str, Any]] = dataclasses.field(default_factory=list)
 
 
 class IANoRespondio(RuntimeError):
@@ -168,7 +170,8 @@ def _turno(conn, cur, ctx: Contexto, ia: IA, reloj: Reloj,
         cur.execute("update scheduled_notice set turno_id = %s where id = any(%s)",
                     (turno, ctx.avisos_guardados))
     _responder(cur, ctx, texto, reloj.ahora(), ia.nombre, clave_respuesta)
-    return ResultadoTurno(texto, elegidas, hechos, pregunta=pregunta)
+    return ResultadoTurno(texto, elegidas, hechos, pregunta=pregunta,
+                          ya_no_sale=final.ya_no_sale)
 
 
 # --- (1) Lo que se lee ------------------------------------------------------------------

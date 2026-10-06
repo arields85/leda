@@ -153,6 +153,7 @@ class ResultadoPaso:
     jugadas: list[dict[str, Any]] = field(default_factory=list)
     hechos: list[Any] = field(default_factory=list)
     pregunta: Any = None
+    ya_no_sale: list[Any] = field(default_factory=list)   # lo anunciado antes que ya no sale
     salidas: list[Salida] = field(default_factory=list)
     latencia_ms: int | None = None
     jev: dict[str, Any] | None = None
@@ -269,6 +270,7 @@ class _Corredor:
         if resultado is not None:
             r.hechos = cp.normalizar(resultado.hechos, self.mundo.titulos)
             r.pregunta = cp.normalizar(resultado.pregunta, self.mundo.titulos)
+            r.ya_no_sale = list(resultado.ya_no_sale)
             r.eleccion_de_la_ia = eleccion_de_la_ia(r.jugadas)
         if not preludio and (r.texto or r.salidas) and not any(
                 "próximo paso" in d for d in r.dice):

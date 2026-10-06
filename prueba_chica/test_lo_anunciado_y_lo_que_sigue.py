@@ -59,9 +59,10 @@ def test_una_fecha_dice_que_ya_no_sale_el_pedido_que_anuncio_el_turno_anterior(c
     assert antes.hechos[0]["vuelve_a_pedir_el_estado"]["estado"] == "guardado_sin_enviar"
     assert [a["clave"] for a in _registrado(conn)[ANUNCIADOS]] == ["vuelve_a_pedir_el_estado"]
 
-    _dice(conn, escribe, _fecha("2026-10-16"), at=_hora(9, 11))
+    resultado = _dice(conn, escribe, _fecha("2026-10-16"), at=_hora(9, 11))
 
     registrado = _registrado(conn)
+    assert resultado.ya_no_sale == registrado[YA_NO_SALE]
     assert registrado[YA_NO_SALE] == [{"anuncio": "vuelve_a_pedir_el_estado",
                                        "tarea": "Revisar el tablero", "estado": RETIRADO,
                                        "motivo": "ya_respondio"}]
