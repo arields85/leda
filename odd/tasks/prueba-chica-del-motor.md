@@ -568,8 +568,8 @@ su evidencia son las corridas. Unas 400 líneas por tarea es una guía, no un to
       definida. Evidencia: `pytest prueba_chica/test_lo_que_sabe_la_cocina.py` en rojo, `10 failed`;
       en verde, `pytest prueba_chica` `411 passed in 133.45s`; en seco, `--ronda seco-10`, 17 de 17,
       garantías 17 de 17 (informe borrado). Commits `3531c5f` y el que registra esto.
-      `PENDIENTE` del usuario: qué hace la persona con una
-      tarea terminada mientras la entrega no se recibe por chat (9g); y el inicio que la carga trae
+      `PENDIENTE`, por decisión del usuario (2026-10-06), para cuando Leda pueda recibir entregas: qué
+      hace la persona con una tarea terminada mientras la entrega no se recibe por chat (9g); y el inicio que la carga trae
       de antes del motor (conversación 12, paso 3, "desde el lunes 19": el motor no lo sabe).
 - [ ] **E2-8. Primera ronda real:** sol, luna y Jev; lectura de textos; bitácora; chequeo de rumbo contra 5c.
 - [ ] **E2-9. Telegram real** con el usuario; su juicio; M2 en la bitácora.
