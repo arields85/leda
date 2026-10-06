@@ -9,8 +9,9 @@ cuenta:
   costó. Se escribe después de cada corrida, así un corte no pierde la cuenta.
 - **El costo** es el que informa el proveedor (OpenRouter, con `usage.include`); si no lo
   informa, una estimación por llamada (`USD_POR_LLAMADA`), marcada como estimada; una llamada
-  que falló (error HTTP, plazo, sin respuesta) no se cobra ni se estima. Jev no informa
-  su costo: se estima por llamada (`JEV_USD_POR_LLAMADA`, `PENDIENTE` medirlo).
+  que falló (error HTTP, plazo, sin respuesta) no se cobra ni se estima. Las corridas viejas
+  con Jev (retirado de la prueba, ADR 0018, decisión 7) guardan su costo estimado en `jev_usd`,
+  y el total lo sigue sumando.
 - **El techo:** antes de cada corrida se estima lo que va a costar; si con eso se pasa del techo,
   no corre (`TechoAlcanzado`) salvo con `pasar_el_techo`, que el agente pasa sólo con el OK del
   usuario. Al llegar al 80 % avisa.
@@ -43,7 +44,6 @@ RUTA = Path(__file__).resolve().parent / "resultados" / "gasto.json"
 # la cifra por mensaje como cifra por llamada: queda del lado alto.
 USD_POR_LLAMADA = {"openai/gpt-6-sol": 0.016, "openai/gpt-6-luna": 0.0015}
 USD_POR_LLAMADA_DESCONOCIDA = 0.02
-JEV_USD_POR_LLAMADA = 0.01      # PENDIENTE: Jev no informa su costo
 # Lo que se le pide a la IA en una corrida se cuenta con lo esperado (`corredor.
 # llamadas_previstas`); lo que Leda manda sobre otras tareas o de más no está ahí: un margen.
 MARGEN_DE_LA_ESTIMACION = 1.25

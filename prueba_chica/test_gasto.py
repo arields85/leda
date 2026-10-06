@@ -24,7 +24,7 @@ def _corrida(usd: float, llamadas: int = 10, estimadas: int = 0, **mas) -> dict:
 
 def test_la_libreta_suma_cada_corrida_y_sobrevive(tmp_path):
     ruta = tmp_path / "gasto.json"
-    Gasto(ruta).anotar(_corrida(1.25, jev_usd=0.02))
+    Gasto(ruta).anotar(_corrida(1.25, jev_usd=0.02))   # una vieja, con Jev: también cuenta
     Gasto(ruta).anotar(_corrida(0.5))
 
     assert Gasto(ruta).total() == pytest.approx(1.77)
@@ -192,7 +192,7 @@ def _llamada_que_costo(ia, usd: float) -> None:
 
 def test_una_corrida_que_se_cae_deja_su_gasto_y_el_informe_dice_que_se_corto(
         tmp_path, monkeypatch, capsys):
-    def se_cae(conn, conv, ia, *, vez=1, jev=None):
+    def se_cae(conn, conv, ia, *, vez=1):
         _llamada_que_costo(ia, 0.5)       # la IA ya cobró antes de que se cayera
         raise RuntimeError("se cayó la conexión")
 
@@ -214,7 +214,7 @@ def test_una_corrida_que_se_cae_deja_su_gasto_y_el_informe_dice_que_se_corto(
 def test_llegar_al_techo_a_mitad_de_la_ronda_sale_con_error_y_lo_dice(tmp_path, monkeypatch):
     from prueba_chica.corredor import Corrida
 
-    def bien(conn, conv, ia, *, vez=1, jev=None):
+    def bien(conn, conv, ia, *, vez=1):
         _llamada_que_costo(ia, 0.1)
         return Corrida(str(conv["numero"]), conv["titulo"], conv["fuente"], vez, ia.nombre,
                        "garantias")
@@ -370,7 +370,7 @@ def test_la_ronda_no_empieza_si_el_credito_no_alcanza(tmp_path, monkeypatch, cap
 def test_si_no_se_puede_consultar_el_credito_avisa_y_sigue(tmp_path, monkeypatch, capsys):
     from prueba_chica.corredor import Corrida
 
-    def bien(conn, conv, ia, *, vez=1, jev=None):
+    def bien(conn, conv, ia, *, vez=1):
         return Corrida(str(conv["numero"]), conv["titulo"], conv["fuente"], vez, ia.nombre,
                        "garantias")
 
@@ -387,7 +387,7 @@ def test_un_402_a_mitad_de_la_ronda_la_corta_e_invalida_las_corridas_que_choco(
         tmp_path, monkeypatch):
     from prueba_chica.corredor import Corrida
 
-    def primera_bien_despues_sin_credito(conn, conv, ia, *, vez=1, jev=None):
+    def primera_bien_despues_sin_credito(conn, conv, ia, *, vez=1):
         if vez == 1:
             _llamada_que_costo(ia, 0.1)
         else:

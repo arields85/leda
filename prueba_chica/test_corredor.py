@@ -3,7 +3,7 @@
 `odd/tasks/prueba-chica-del-motor.md`, sección 6 y tarea E2-7. Con la IA guionada: el estado
 inicial de cada conversación se carga como dice su YAML; una conversación pasa entera cuando la
 IA elige las jugadas esperadas y falla con una diferencia clara cuando no; la grabación de una
-corrida la repite igual; Jev, consultado en paralelo, no cambia ninguna decisión.
+corrida la repite igual.
 """
 
 from __future__ import annotations
@@ -14,13 +14,11 @@ from pathlib import Path
 import pytest
 
 from leda.db import admin
-from leda.jev import ClienteJevGuionado
 
 from prueba_chica import comprobar as cp
 from prueba_chica.carga import cargar
 from prueba_chica.corredor import CARPETA, correr_conversacion, elegir, leer, todas
 from prueba_chica.grabar import IAPerfecta, IAQueGraba, IARepetida
-from prueba_chica.jev_paralelo import PREGUNTAR, eleccion_de_la_ia
 
 
 def _limpiar(conn) -> None:
@@ -152,39 +150,6 @@ def test_una_grabacion_repite_la_corrida(conn):
 
     assert repetida.error is None
     assert _sin_corridas_variables(repetida) == _sin_corridas_variables(grabada)
-
-
-def test_jev_en_paralelo_no_cambia_ninguna_decision(conn):
-    [conv] = elegir(["13"])
-    sin_jev = correr_conversacion(conn, conv, _perfecta(conv))
-    _limpiar(conn)
-    respuesta = {"alcance": {"probabilities": {"una_tarea": 0.9, "varias_tareas": 0.05,
-                                                "ninguna": 0.05}},
-                 "tarea": {"probabilities": {"T1": 0.97, "T2": 0.02, "T3": 0.01}}}
-    verificacion = {"misma": {"noul": 0.9}, "rival": {"noul": 0.1}}
-    jev = ClienteJevGuionado([respuesta, verificacion] * 4)
-
-    con_jev = correr_conversacion(conn, conv, _perfecta(conv), jev=jev)
-
-    assert _sin_corridas_variables(con_jev) == _sin_corridas_variables(sin_jev)
-    consultas = [p.jev for p in con_jev.pasos if p.jev]
-    assert len(consultas) == 2
-    assert consultas[0]["tipo"] == "clara" and consultas[0]["eligio"] == "PLC"
-    assert consultas[0]["acierta"] is False          # lo correcto era preguntar
-    assert consultas[0]["probabilidades"]["PLC"] == 0.97
-    # Los valores de la llamada de verificación, para entender una "ambigua" (ronda 1).
-    assert consultas[0]["verificacion"] == {"misma": 0.9, "rival": 0.1}
-    assert [p.eleccion_de_la_ia for p in con_jev.pasos if p.jev] == ["preguntar", "PLC"]
-
-
-def test_la_ia_que_no_elige_tarea_no_adivino():
-    """Ronda 1: con ninguna jugada, la tabla de Jev marcaba a la IA como si se equivocara de
-    tarea. Sin una tarea elegida, la IA no adivinó: se cuenta como `preguntar`. Si preguntó con
-    botones lo mide la comprensión, no esta tabla."""
-    assert eleccion_de_la_ia([]) == PREGUNTAR
-    assert eleccion_de_la_ia([{"nombre": "anotar_inicio"}]) == PREGUNTAR
-    assert eleccion_de_la_ia([{"nombre": "anotar_inicio", "tarea": "PLC"}]) == "PLC"
-    assert eleccion_de_la_ia([{"nombre": "elegir", "opcion": "COM"}]) == "COM"
 
 
 def test_un_boton_que_no_esta_es_una_falla_de_la_corrida_no_una_caida(conn):

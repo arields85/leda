@@ -3,15 +3,13 @@
 `odd/tasks/prueba-chica-del-motor.md`, sección 6 y decisiones 10.3 y 10.4. Uso:
 
     python -m prueba_chica.correr [--conversacion NN ...] [--veces 5] [--ia sol|sol61|sonnet|luna|guionada]
-                                  [--jev] [--grabar CARPETA] [--repetir ARCHIVO] [--paralelo N]
+                                  [--grabar CARPETA] [--repetir ARCHIVO] [--paralelo N]
                                   [--ronda NOMBRE] [--sin-informe] [--pasar-el-techo]
 
 - `--ia guionada` (por omisión) elige las jugadas que cada paso espera: la corrida en seco, sin
   gasto. `sol` y `luna` son GPT-6 sol y luna por OpenRouter (decisión 6); `sol61` y `sonnet`,
   GPT-6.1 sol y Claude Sonnet 5.5, para la segunda ronda (usuario, 2026-10-05). Todos con la
   clave del entorno, que nunca se imprime.
-- `--jev` consulta a Jev en paralelo en los pasos que lo piden (conversaciones 13 y 14), sin que
-  decida nada (decisión 7).
 - `--grabar CARPETA` guarda lo que respondió la IA en cada corrida; `--repetir ARCHIVO` corre esa
   grabación otra vez con la IA guionada que la repite, para mirar una falla.
 - `--paralelo N` corre N corridas a la vez, cada una en su base.
@@ -199,21 +197,12 @@ def _credito_restante() -> float | None:
     return credito_restante(clave, BASE_URLS["openrouter"])
 
 
-def _jev():
-    from leda.config import config
-    from leda.jev import ClienteJev
-    if not config.openrouter_api_key:
-        raise SystemExit("Falta LEDA_OPENROUTER_API_KEY para Jev.")
-    return ClienteJev(api_key=config.openrouter_api_key)
-
-
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="python -m prueba_chica.correr",
                                 description="Corre las conversaciones de prueba del Motor.")
     p.add_argument("--conversacion", nargs="*", metavar="NN")
     p.add_argument("--veces", type=int, default=5)
     p.add_argument("--ia", choices=["guionada", *MODELOS], default="guionada")
-    p.add_argument("--jev", action="store_true")
     p.add_argument("--grabar", type=Path, metavar="CARPETA")
     p.add_argument("--repetir", type=Path, metavar="ARCHIVO")
     p.add_argument("--paralelo", type=int, default=1)
@@ -224,16 +213,15 @@ def main(argv: list[str] | None = None) -> int:
     if not sys.stdout.isatty() and hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")     # una consola de Windows queda como está
 
-    real = a.ia in MODELOS or a.jev
+    real = a.ia in MODELOS
     if not real:
         # Sin IA real no hace falta ninguna clave: el `.env` de la carpeta no se carga.
         os.environ["LEDA_LOAD_DOTENV"] = "0"
 
     from . import informe
-    from .corredor import consultas_a_jev, correr_conversacion, elegir, llamadas_previstas
-    from .gasto import (JEV_USD_POR_LLAMADA, MARGEN_DE_LA_ESTIMACION, SIN_CREDITO, Gasto,
-                        TechoAlcanzado, costo_de_las_llamadas, es_sin_credito,
-                        llamadas_sin_credito, modelo_de)
+    from .corredor import correr_conversacion, elegir, llamadas_previstas
+    from .gasto import (MARGEN_DE_LA_ESTIMACION, SIN_CREDITO, Gasto, TechoAlcanzado,
+                        costo_de_las_llamadas, llamadas_sin_credito, modelo_de)
     from .grabar import IAPerfecta, IAQueGraba, IARepetida
 
     if a.repetir:
@@ -259,8 +247,6 @@ def main(argv: list[str] | None = None) -> int:
         if a.ia in MODELOS and not a.repetir:
             usd += (llamadas_previstas(conv) * MARGEN_DE_LA_ESTIMACION
                     * gasto.por_llamada(modelo))
-        if a.jev:
-            usd += consultas_a_jev(conv) * 2 * JEV_USD_POR_LLAMADA
         return usd
 
     if real and not a.repetir:
@@ -288,7 +274,6 @@ def main(argv: list[str] | None = None) -> int:
     os.environ["LEDA_TEST_DB_URL"] = _url_de_mantenimiento()
     import leda.db
 
-    jev = _jev() if a.jev else None
     corridas = []
     cortes: list[dict] = []         # las corridas que no corrieron o no terminaron, y por qué
     invalidas: list = []            # (corrida, llamadas con 402): chocaron con la cuenta sin crédito
@@ -304,10 +289,6 @@ def main(argv: list[str] | None = None) -> int:
                  if a.ia in MODELOS and ia is not None
                  else {"llamadas": 0, "tokens_entrada": 0, "tokens_salida": 0, "usd": 0.0,
                        "llamadas_estimadas": 0})
-        pasos = corrida.pasos if corrida is not None else []
-        jev_llamadas = sum(p.jev.get("llamadas", 0) for p in pasos if p.jev)
-        costo.update(jev_llamadas=jev_llamadas,
-                     jev_usd=round(jev_llamadas * JEV_USD_POR_LLAMADA, 6))
         if corrida is not None:
             corrida.costo = costo
         gasto.anotar({"cuando": datetime.now().isoformat(timespec="seconds"),
@@ -327,12 +308,10 @@ def main(argv: list[str] | None = None) -> int:
             print(f"  {numero} vez {vez}: {que} ({motivo})", flush=True)
 
     def con_402(ia, corrida) -> int:
-        """Cuántas llamadas de la corrida (a la IA o a Jev) chocaron con un 402."""
+        """Cuántas llamadas de la corrida a la IA chocaron con un 402."""
         llamadas = list(getattr(ia, "llamadas", None) or
                         (corrida.llamadas if corrida is not None else []))
-        pasos = corrida.pasos if corrida is not None else []
-        return (llamadas_sin_credito(llamadas)
-                + sum(es_sin_credito(str(p.jev.get("error") or "")) for p in pasos if p.jev))
+        return llamadas_sin_credito(llamadas)
 
     def correr(trabajo):
         conv, vez = trabajo
@@ -356,7 +335,7 @@ def main(argv: list[str] | None = None) -> int:
                 conn = leda.db.conectar(url)
                 try:
                     ia = nueva_ia(conv)
-                    corrida = correr_conversacion(conn, conv, ia, vez=vez, jev=jev)
+                    corrida = correr_conversacion(conn, conv, ia, vez=vez)
                 finally:
                     conn.close()
             finally:
@@ -384,8 +363,7 @@ def main(argv: list[str] | None = None) -> int:
             a.grabar.mkdir(parents=True, exist_ok=True)
             (a.grabar / f"{corrida.numero}-{a.ia}-{vez}.json").write_text(json.dumps(
                 {"conversacion": corrida.numero, "vez": vez, "ia": corrida.ia,
-                 "llamadas": corrida.llamadas,
-                 "jev": [p.jev for p in corrida.pasos if p.jev]},
+                 "llamadas": corrida.llamadas},
                 ensure_ascii=False, indent=1, default=str), "utf-8")
         with imprimir:
             estado = "ERROR" if corrida.error else ("bien" if corrida.bien else
@@ -394,7 +372,7 @@ def main(argv: list[str] | None = None) -> int:
         return corrida
 
     ronda = a.ronda or (f"{datetime.now():%Y-%m-%d-%H%M}-{a.ia}"
-                        + ("-repeticion" if a.repetir else "") + ("-jev" if a.jev else ""))
+                        + ("-repeticion" if a.repetir else ""))
     bases = Bases(os.environ["LEDA_TEST_DB_URL"])
     for vieja in bases.limpiar_viejas():
         print(f"  (se borró una base que dejó una ejecución anterior: {vieja})")
@@ -428,7 +406,6 @@ def main(argv: list[str] | None = None) -> int:
                     "IA": ([*corridas, *(c for c, _ in invalidas)][0].ia
                            if corridas or invalidas else a.ia),
                     "Veces": a.veces if not a.repetir else 1,
-                    "Jev": "sí" if a.jev else "no",
                     "Gasto de la etapa": f"USD {gasto.total():.2f} de {gasto.techo:.0f}"
                     if real else "sin gasto"}
         resumen, _ = informe.escribir(

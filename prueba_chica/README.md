@@ -47,7 +47,7 @@ de nuevo en `src/leda`, con su propia prueba de frontera.
   `tests/conversaciones/` en YAML, con lo que se comprueba solo; el `.md` es la fuente),
   `carga.py` (el estado inicial de cada una), `corredor.py` (una corrida, paso por paso, por el
   código de verdad), `comprobar.py` (qué se compara y cómo se clasifica una falla), `grabar.py`
-  (la IA guionada con las jugadas esperadas, la que graba y la que repite), `jev_paralelo.py`,
+  (la IA guionada con las jugadas esperadas, la que graba y la que repite),
   `gasto.py` (el techo de USD 30, decisión 10.4), `informe.py` y `correr.py` (el comando).
 - `test_frontera.py`: qué puede importar esta carpeta de `src/leda` y qué nunca debe alcanzar.
 
@@ -71,7 +71,6 @@ falsos: ninguna prueba llama a un servicio de verdad.
 python -m prueba_chica.correr --ia guionada --veces 1          # en seco, sin gasto
 python -m prueba_chica.correr --ia sol --veces 5 --paralelo 5 --grabar prueba_chica/grabaciones
 python -m prueba_chica.correr --ia luna --veces 5 --paralelo 5 --grabar prueba_chica/grabaciones
-python -m prueba_chica.correr --ia sol --veces 5 --conversacion 13 14 --jev
 python -m prueba_chica.correr --repetir prueba_chica/grabaciones/03-sol-2.json
 ```
 

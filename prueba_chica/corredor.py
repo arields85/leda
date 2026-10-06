@@ -15,8 +15,7 @@ creada para ella:
      (`ciclo.Ciclo`): la escalera, los avisos guardados, el despacho y los avisos a la
      administración;
 3. compara lo que pasó con lo esperado (`comprobar.py`) y guarda lo que la persona que lee la
-   corrida necesita: lo que dijo cada uno, las jugadas, los hechos, la latencia y, con `--jev`,
-   lo que Jev habría elegido.
+   corrida necesita: lo que dijo cada uno, las jugadas, los hechos y la latencia.
 
 El transporte es falso (`despachador.TransporteDePrueba`): nada sale a Telegram. La IA es la que
 se le pasa: la guionada con las jugadas esperadas (`grabar.IAPerfecta`), una real o una
@@ -25,7 +24,6 @@ grabación (`grabar.IARepetida`).
 
 from __future__ import annotations
 
-import concurrent.futures
 import time
 import traceback
 import uuid
@@ -39,15 +37,13 @@ import yaml
 from leda.autoridad import identificar_en_espacio
 from leda.db import espacio
 from leda.despachador import TransporteDePrueba
-from leda.jev import Jev, TareaCandidata
 
 from . import comprobar as cp
 from . import hechos
-from .carga import AREAS, PERSONAS, Mundo, cargar, momento
+from .carga import Mundo, cargar, momento
 from .ciclo import Ciclo
 from .grabar import IAMixta, IAPerfecta
 from .ia import IA
-from .jev_paralelo import eleccion_de_la_ia, preguntar
 from .turno import procesar_toque, procesar_turno
 
 CARPETA = Path(__file__).resolve().parent / "conversaciones"
@@ -119,10 +115,6 @@ def llamadas_previstas(conv: dict[str, Any]) -> int:
     return n
 
 
-def consultas_a_jev(conv: dict[str, Any]) -> int:
-    return sum(1 for p in conv.get("pasos") or [] if p.get("jev"))
-
-
 # --- Una corrida ---------------------------------------------------------------------------
 
 @dataclass
@@ -156,8 +148,6 @@ class ResultadoPaso:
     ya_no_sale: list[Any] = field(default_factory=list)   # lo anunciado antes que ya no sale
     salidas: list[Salida] = field(default_factory=list)
     latencia_ms: int | None = None
-    jev: dict[str, Any] | None = None
-    eleccion_de_la_ia: str | None = None
     fallas: list[cp.Falla] = field(default_factory=list)
     dice: list[str] = field(default_factory=list)
     no_dice: list[str] = field(default_factory=list)
@@ -203,8 +193,8 @@ class Corrida:
 
 
 class _Corredor:
-    def __init__(self, conn, conv: dict[str, Any], ia: IA, *, jev: Jev | None) -> None:
-        self.conn, self.conv, self.ia, self.jev = conn, conv, ia, jev
+    def __init__(self, conn, conv: dict[str, Any], ia: IA) -> None:
+        self.conn, self.conv, self.ia = conn, conv, ia
         self.persona = conv.get("persona", "Marcos")
         self.mundo: Mundo = cargar(conn, conv)
         self.reloj = RelojDeCorrida(momento(conv["inicio"]))
@@ -244,8 +234,7 @@ class _Corredor:
             elif hasattr(self.ia, "preparar"):
                 self.ia.preparar(paso)
             try:
-                resultado, r.texto, r.jugadas, r.latencia_ms, r.jev = self._turno(paso, ia,
-                                                                                  preludio)
+                resultado, r.texto, r.jugadas, r.latencia_ms = self._turno(paso, ia)
             except SinBoton:
                 if preludio:
                     raise
@@ -271,7 +260,6 @@ class _Corredor:
             r.hechos = cp.normalizar(resultado.hechos, self.mundo.titulos)
             r.pregunta = cp.normalizar(resultado.pregunta, self.mundo.titulos)
             r.ya_no_sale = list(resultado.ya_no_sale)
-            r.eleccion_de_la_ia = eleccion_de_la_ia(r.jugadas)
         if not preludio and (r.texto or r.salidas) and not any(
                 "próximo paso" in d for d in r.dice):
             r.dice.append(PROXIMO_PASO)
@@ -283,7 +271,7 @@ class _Corredor:
                 self.sin_significado.clear()
         return r
 
-    def _turno(self, paso, ia, preludio: bool):
+    def _turno(self, paso, ia):
         quien_corto = paso.get("quien", self.persona)
         persona = self.mundo.personas[quien_corto]
         with espacio(self.conn, self.mundo.workspace_id) as cur:
@@ -291,15 +279,11 @@ class _Corredor:
         self.conn.commit()
         situaciones: list[dict[str, Any]] = []
         ia_que_mira = _QueMira(ia, situaciones, self.sin_significado)
-        jev = None
         if "escribe" in paso:
             texto = paso["escribe"]
             entrante = self._guardar_mensaje(quien, persona, texto)
-            futuro = self._jev(paso, texto, persona) if not preludio else None
             resultado = procesar_turno(self.conn, quien, entrante, ia_que_mira, self.reloj)
             self.conn.commit()
-            if futuro is not None:
-                jev = futuro.result()
             jugadas = [self._jugada(j.nombre, j.datos, situaciones[-1] if situaciones else {})
                        for j in resultado.jugadas]
             latencia = self._latencia(persona["membership_id"])
@@ -318,7 +302,7 @@ class _Corredor:
                                       self.reloj)
                 self.conn.commit()
                 self._repetido = otra is not None and otra.repetido
-        return resultado, texto, jugadas, latencia, jev
+        return resultado, texto, jugadas, latencia
 
     def _guardar_mensaje(self, quien, persona, texto: str) -> str:
         with espacio(self.conn, self.mundo.workspace_id) as cur:
@@ -372,27 +356,6 @@ class _Corredor:
                 v = de_opcion.get(v, v)
             salida[k] = v
         return salida
-
-    def _jev(self, paso, texto: str, persona: dict[str, Any]):
-        if self.jev is None or not paso.get("jev"):
-            return None
-        consulta = paso["jev"]
-        estados = cp.foto(self.conn, self.mundo)["estados"]
-        candidatas = []
-        for clave, t in (self.conv.get("tareas") or {}).items():
-            if estados.get(clave) in ("terminada", "cancelada"):
-                continue
-            nombre, _, area, _ = PERSONAS[t["responsable"]]
-            candidatas.append((clave, TareaCandidata(
-                id=self.mundo.tareas[clave], titulo=t["titulo"], area=AREAS[area],
-                responsable=nombre)))
-        ejecutor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-        futuro = ejecutor.submit(preguntar, self.jev, mensaje=texto,
-                                 referencia=consulta.get("referencia", texto),
-                                 candidatas=candidatas, quien=persona["nombre"],
-                                 correcta=consulta.get("correcta"))
-        ejecutor.shutdown(wait=False)
-        return futuro
 
     def _salidas(self, desde: int, despues: dict[str, Any]) -> list[Salida]:
         """Lo entregado desde `desde`, cada uno con su fila del outbox (la primera que no se
@@ -560,13 +523,12 @@ def _resumen(s: Salida) -> dict[str, Any]:
             "hechos": s.hechos}
 
 
-def correr_conversacion(conn, conv: dict[str, Any], ia: IA, *, vez: int = 1,
-                        jev: Jev | None = None) -> Corrida:
+def correr_conversacion(conn, conv: dict[str, Any], ia: IA, *, vez: int = 1) -> Corrida:
     """Una corrida de la conversación sobre la base de `conn`, que tiene que estar vacía."""
     corrida = Corrida(str(conv["numero"]).zfill(2), conv["titulo"], conv["fuente"], vez,
                       ia.nombre, conv.get("mide", "garantias"))
     try:
-        corredor = _Corredor(conn, conv, ia, jev=jev)
+        corredor = _Corredor(conn, conv, ia)
         for paso in conv.get("preludio") or []:
             corrida.pasos.append(corredor.correr(paso, preludio=True))
         for paso in conv["pasos"]:

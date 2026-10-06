@@ -6,7 +6,7 @@
 - **el resumen** (`<ronda>.md`): la tabla de conversaciones por corridas con lo que se comprobó
   solo (garantías, comprensión provisional y lo del código), las fallas con su diferencia, la
   columna de la lectura del usuario (vacía: su lectura es la que vale, 10.3), las latencias por
-  turno (mediana y peor caso, sin umbral), el costo y, en la 13 y la 14, Jev contra la IA;
+  turno (mediana y peor caso, sin umbral) y el costo;
 - **las transcripciones** (`<ronda>-transcripciones.md`): cada corrida como se lee, quién dijo
   qué, lo que Leda contestó o mandó, con sus botones, las jugadas y los hechos, y lo que cada
   paso "dice" y "no dice" para marcar al leer.
@@ -121,35 +121,15 @@ def resumen(corridas: list[Corrida], *, ronda: str, cabecera: dict[str, Any],
     # Lo que gastaron también las inválidas antes del 402: el gasto de la ronda es todo.
     costos = [c.costo for c in [*corridas, *(c for c, _ in invalidas or [])] if c.costo]
     if costos:
-        usd = sum(x["usd"] + x.get("jev_usd", 0.0) for x in costos)
+        usd = sum(x["usd"] for x in costos)
         estimadas = sum(x["llamadas_estimadas"] for x in costos)
         lineas += [f"- Llamadas a la IA: {sum(x['llamadas'] for x in costos)} "
                    f"({estimadas} con el costo estimado); tokens de entrada "
                    f"{sum(x['tokens_entrada'] for x in costos)}, de salida "
                    f"{sum(x['tokens_salida'] for x in costos)}.",
-                   f"- Jev: {sum(x.get('jev_llamadas', 0) for x in costos)} llamadas, USD "
-                   f"{sum(x.get('jev_usd', 0.0) for x in costos):.4f} (estimado).",
                    f"- **Total de la ronda: USD {usd:.4f}.**"]
     else:
         lineas.append("Sin gasto: la IA no es un proveedor real.")
-    jev = [(c, p) for c in corridas for p in c.pasos if p.jev]
-    if jev:
-        lineas += ["", "## Jev contra la IA (decisión 7)", "",
-                   "Jev corre en paralelo y no decide nada. Correcta: lo que el paso espera "
-                   "(`preguntar` o la tarea).", "",
-                   "| Conv. | Vez | Paso | Referencia | Correcta | IA | Jev | Probabilidades "
-                   "| Verificación | IA acierta | Jev acierta |",
-                   "|---|---|---|---|---|---|---|---|---|---|---|"]
-        for c, p in sorted(jev, key=lambda x: (x[0].numero, x[1].paso, x[0].vez)):
-            j = p.jev
-            correcta = j.get("correcta")
-            ia_acierta = p.eleccion_de_la_ia == correcta
-            jev_dijo = j.get("error") or f"{j.get('tipo')} {j.get('eligio') or ''}".strip()
-            lineas.append(
-                f"| {c.numero} | {c.vez} | {p.paso} | {j['referencia']} | {correcta} | "
-                f"{p.eleccion_de_la_ia} | {jev_dijo} | {_json(j.get('probabilidades'))} | "
-                f"{_json(j.get('verificacion'))} | "
-                f"{_ok(ia_acierta)} | {_ok(bool(j.get('acierta')))} |")
     return "\n".join(lineas) + "\n"
 
 
@@ -175,8 +155,6 @@ def transcripciones(corridas: list[Corrida], *, ronda: str) -> str:
                         lineas.append(f"- pregunta: `{_json(p.pregunta)}`")
                     if p.latencia_ms is not None:
                         lineas.append(f"- latencia: {p.latencia_ms} ms")
-                    if p.jev:
-                        lineas.append(f"- Jev: `{_json(p.jev)}`")
             else:
                 lineas.append(f"**{etiqueta}.** {p.quien} ({p.cuando})")
             for s in p.salidas:
