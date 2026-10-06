@@ -914,3 +914,20 @@ def test_si_cambia_la_clave_del_productor_la_persona_ve_el_estado_real(
     assert visibles == [P.texto_terminal_ingreso(cancelada=cancelada)]
     assert gateway.NOTICIA_NEUTRA_INCIDENTE not in _cuerpos(conn, telegram, antes)
     assert _incidentes_de(conn, "sin_respuesta") == []
+
+
+# Antes en `tests/test_task_intake.py`, que se retiró con el alta guiada (E3-4): la
+# herramienta vieja de crear tareas sigue oculta para la IA y cerrada en el servidor.
+def _actor(cur, world, workspace_slug="north-lab", person="Taylor Quinn"):
+    item = world[workspace_slug]
+    tg = item["people"][person]["telegram"]
+    return identificar(cur, tg, Canal.ESPACIO, item["id"])
+
+
+def test_legacy_create_task_is_hidden_and_fails_closed(intake_world, conn):
+    assert "crear_tarea" not in {tool["name"] for tool in H.esquemas()}
+    ws = intake_world["north-lab"]["id"]
+    with espacio(conn, ws) as cur:
+        actor = _actor(cur, intake_world)
+        with pytest.raises(Denegado):
+            H.ejecutar(cur, actor, "crear_tarea", {"titulo": "hidden"})
