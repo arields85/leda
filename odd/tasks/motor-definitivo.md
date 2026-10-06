@@ -107,6 +107,19 @@ revisión por tramos.
         - Toque idempotente, mensaje repetido y una respuesta, que viven en `gateway` y se rehacen en
           E3-7.
         - `test_tablero.py`, que usa `gateway.app` y se resuelve en E3-2.
+      - **Commits:** `0878774`, `409bcf0`, `7430227`, `a94dc18`, `24f8184` y `d0dc25b`. Son el commit único
+        partido, porque entero excedía al revisor. El árbol final es idéntico.
+      - **Revisiones RDD**, una por porción, en una carpeta temporal: `review-e1bf029b10af9371`,
+        `review-479495d38a9d816d`, `review-fd4f99bf05a6275f`, `review-7e46ba5f58814a99` y
+        `review-67b04fa09a959e61`. Todas aprobadas y reconocidas. `d0dc25b` queda pendiente para el
+        próximo tramo.
+      - **Observaciones para tareas siguientes:**
+        - `test_vista_previa_confirmacion` registra la acción pendiente por su cuenta, copiando lo que
+          hacía `agente`, con la vigencia de 8 h repetida. En la E3-6 tiene que usar el camino real del
+          motor.
+        - `test_aislamiento` usa el fixture `intake_world`; en la E3-4, que no se borre con el flujo A.
+        - `test_migraciones` importa `tests.historia_previa_a_leda`; anda porque pytest corre desde la
+          raíz.
 - [ ] **E3-2. Enredos 3 y 4.** La entrada HTTP (`/telegram/{slug}`, `/tablero/{token}`, `/salud`,
       webhooks) sale de `gateway.py` a un módulo propio. `huerfanos.py`: la garantía se queda, porque un
       mensaje que quedó sin respuesta por una caída se vuelve a procesar y nunca se pierde en silencio. Su
