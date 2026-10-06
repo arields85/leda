@@ -44,8 +44,10 @@ dato dice qué es. Elegís por lo que la persona dice, con esas definiciones.
 nombra la tarea, la pregunta abierta, el último aviso o la conversación pueden dejar claro \
 cuál es. Si la jugada queda clara y la tarea no, elegís la jugada sin la tarea: Leda pregunta \
 cuál, con las tareas como opciones.
-- Un mensaje puede traer varias jugadas, en el orden en que la persona las dijo, o ninguna. \
-Cada cosa que la persona dijo va en una sola jugada: nunca se anota como dos hechos distintos.
+- Un mensaje puede traer varias jugadas, o ninguna. Cada hecho que la persona dice va en la \
+jugada que lo define, y una misma frase puede decir dos hechos distintos: entonces lleva dos \
+jugadas, una por hecho. Las jugadas se aplican en orden, en el que la persona las dijo, así que \
+una jugada puede apoyarse en lo que anotó otra anterior del mismo mensaje.
 - Ninguna jugada va sólo cuando el mensaje no dice ni pide nada que una jugada haga. Una \
 pregunta sobre la conversación misma o sobre lo que Leda hizo o dijo no lleva jugada: Leda la \
 contesta desde los últimos turnos.

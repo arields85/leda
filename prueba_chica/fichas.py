@@ -1037,9 +1037,11 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
           manejar=_anotar_quien_destraba,
           contesta=(preguntas.QUIEN_DESTRABA, preguntas.ESTADO_DE_LA_TAREA),
           propone=lambda hecho: hecho.get("salidas"),
-          es="La persona dice quién puede destrabar un bloqueo abierto (alguien del equipo o "
-             "de afuera), que no sabe quién, o que nadie más: le toca a ella. Es la respuesta "
-             "a quién lo destraba, no la causa del bloqueo."),
+          es="La persona dice quién puede destrabar un bloqueo (alguien del equipo o de "
+             "afuera), que no sabe quién, o que nadie más: le toca a la persona que escribe. "
+             "El bloqueo es uno abierto antes o el que anota una jugada anterior del mismo "
+             "mensaje. Quién lo destraba es un hecho distinto de la causa, aunque los dos "
+             "vengan en la misma frase: cada uno va en su jugada."),
     Ficha("destrabar", "anotar que una tarea trabada ya puede seguir",
           necesita=("tarea",), opcional=(),
           comprueba="que sea el responsable y que la tarea esté bloqueada, con un solo bloqueo "
@@ -1051,11 +1053,11 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
                   "había empezado, Leda vuelve a pedir el estado el día hábil siguiente",
           manejar=_destrabar, del_responsable=True, estados=frozenset({"bloqueada"}),
           contesta=(preguntas.QUIEN_DESTRABA,), sigue_el_pedido=True,
-          es="La persona dice que la causa de un bloqueo abierto ya no está: llegó lo que le "
-             "faltaba o se resolvió lo que frenaba el trabajo, y la tarea puede seguir. Es "
-             "salir de un bloqueo: no es empezar la tarea, ni dar la fecha para la que la "
-             "termina, ni contar cómo viene; si además dice uno de esos hechos, ése es otra "
-             "jugada."),
+          es="La persona dice que la causa de un bloqueo ya no está: llegó lo que le faltaba "
+             "o se resolvió lo que frenaba el trabajo, y la tarea puede seguir. El bloqueo es "
+             "uno abierto antes o el que anota una jugada anterior del mismo mensaje. Es salir "
+             "de un bloqueo: no es empezar la tarea, ni dar la fecha para la que la termina, "
+             "ni contar cómo viene; si además dice uno de esos hechos, ése es otra jugada."),
     Ficha("informar_avance", "anotar cómo viene una tarea cuando la persona cuenta un avance "
                              "sin un hecho cierto",
           necesita=("tarea",), opcional=("palabras",),
