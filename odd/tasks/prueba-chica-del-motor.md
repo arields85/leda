@@ -558,6 +558,19 @@ su evidencia son las corridas. Unas 400 líneas por tarea es una guía, no un to
       la línea de las inválidas (no se rehace desde las grabaciones). Evidencia: `pytest
       prueba_chica/test_gasto.py` en rojo, error de importación; en verde, `pytest prueba_chica`
       `401 passed in 125.70s`.
+- [x] **Lo que la cocina le pasa, antes de Telegram** (2026-10-06; lectura de la ronda 3, regla del
+      mozo): una sola hora para lo que Leda manda por su cuenta (`tiempo.HORA_DE_SALIDA`, 10:00: la
+      escalera, los avisos guardados, el pedido que sigue a un avance y el reloj adelantado; antes se
+      prometía "mañana a las 9"); desde cuándo la tarea está en su estado, por lo que anotó el motor
+      (`cambios_de_estado.py`, `estado_desde`, o `desconocido`); el vencimiento en la escalera de una
+      pregunta; lo que espera saber un pedido de estado según el estado (`espera_algo_cierto`) y la
+      tarea a la que espera (`espera_a`); y una entrega que no se recibe dice que no hay otra forma
+      definida. Evidencia: `pytest prueba_chica/test_lo_que_sabe_la_cocina.py` en rojo, `10 failed`;
+      en verde, `pytest prueba_chica` `411 passed in 133.45s`; en seco, `--ronda seco-10`, 17 de 17,
+      garantías 17 de 17 (informe borrado). Commits `3531c5f` y el que registra esto.
+      `PENDIENTE` del usuario: qué hace la persona con una
+      tarea terminada mientras la entrega no se recibe por chat (9g); y el inicio que la carga trae
+      de antes del motor (conversación 12, paso 3, "desde el lunes 19": el motor no lo sabe).
 - [ ] **E2-8. Primera ronda real:** sol, luna y Jev; lectura de textos; bitácora; chequeo de rumbo contra 5c.
 - [ ] **E2-9. Telegram real** con el usuario; su juicio; M2 en la bitácora.
 
