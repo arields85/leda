@@ -38,6 +38,9 @@ código las ejecuta). El 0018 queda como "propuesta" hasta que pase la prueba ch
   5 de 5 en las 17**; 5b.1 cumplido del lado automático. Luna descartada; Jev retirado de la prueba (ADR 0018,
   notas de las decisiones 6 y 7). El usuario no lee las corridas: su juicio sale de Telegram. Detalle en la
   bitácora de flujos.
+- **Antes de nada:** comprobar PostgreSQL (`pg_isready -h localhost -p 5432`); al cerrar la sesión se apaga. Si
+  está caído, levantarlo (`levantar-postgres.bat`, o `pg_ctl ... start` como hace ese archivo); con `0xC0000142`,
+  cerrar los procesos `postgres` colgados y reintentar.
 - **Primer paso: la E2-9, prueba por Telegram real.** El usuario autorizó (2026-10-06) recrear `leda_motor`
   desde cero, con `pg_dump` antes; los pasos, en la tarea E2-9. Después, una guía corta (un hilo numerado,
   unos 20 pasos, con el reloj de Leda adelantado entre días), el juicio del usuario (5b.2 y 5b.3), la
