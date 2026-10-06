@@ -78,8 +78,10 @@ revisión por tramos.
       `tests/conftest.py` deja de importar `gateway`. Criterio: esas pruebas pasan sin importar `gateway`,
       `ingreso_tareas` ni `agente`, y su número no baja frente a la línea base (`2286 passed`).
 - [ ] **E3-2. Enredos 3 y 4.** La entrada HTTP (`/telegram/{slug}`, `/tablero/{token}`, `/salud`,
-      webhooks) sale de `gateway.py` a un módulo propio. `huerfanos.py`: `PENDIENTE` si la reentrega de
-      mensajes huérfanos sobrevive en el motor o se retira con el flujo viejo.
+      webhooks) sale de `gateway.py` a un módulo propio. `huerfanos.py`: la garantía se queda, porque un
+      mensaje que quedó sin respuesta por una caída se vuelve a procesar y nunca se pierde en silencio. Su
+      versión atada a `gateway` se retira, y el motor la rehace en su entrada (E3-7). Es decisión del
+      agente, por la regla de no fallar en silencio.
 - [ ] **E3-3. Enredos 1 y 2.** El despachador queda como transporte: sin botones ni retenciones de los
       flujos viejos. La entrega deja de crear estado de conversación; se rediseña con los circuitos 7 y 8.
 - [ ] **E3-4. Borrar los flujos A y B**, con sus pruebas (se retiran con su código) y una migración que
@@ -103,8 +105,9 @@ y 8 (entrega y aprobación), el 5 (cadencias) y la persecución completa (3a). C
 conversaciones de prueba y después una pasada corta por Telegram. M3 es el motor definitivo haciendo bien
 lo ya probado.
 
-**La plataforma web** lleva su ADR antes del código (ADR 0017, decisión 5). `PENDIENTE`: cuándo se
-escribe.
+**La plataforma web** lleva su ADR antes del código (ADR 0017, decisión 5). Ese ADR se escribe con el
+usuario ahora, en paralelo con la Fase A (usuario, 2026-10-06). Es sólo diseño: el código de la
+plataforma espera a que el ADR esté aceptado.
 
 ## 5. Criterios de corte
 
