@@ -510,6 +510,13 @@ su evidencia son las corridas. Unas 400 líneas por tarea es una guía, no un to
       corrige"); elegir cuál con varios bloqueos abiertos; y, en un mismo mensaje, una jugada
       posterior que deja sin efecto el pedido que guardó una anterior (destrabar o un avance
       seguidos de una fecha): los hechos de la primera lo siguen contando.
+- [x] **Los hechos de lo que pasa después, al final del turno** (ADR 0018, 9k, precisión del
+      2026-10-05; resuelve el último `PENDIENTE` de arriba) y, de la revisión
+      `review-e8b69f0cca8677ef`, destrabarse antes del vencimiento: el aviso previo que el bloqueo
+      omitió vuelve a salir. Evidencia (2026-10-05): `pytest
+      prueba_chica/test_hechos_al_final_del_turno.py` en rojo, `4 failed, 2 passed`; `pytest
+      prueba_chica` en verde, `360 passed in 131.15s`; en seco, `--ronda seco-8`, 17 de 17,
+      garantías 17 de 17 (informe borrado).
 - [ ] **E2-8. Primera ronda real:** sol, luna y Jev; lectura de textos; bitácora; chequeo de rumbo contra 5c.
 - [ ] **E2-9. Telegram real** con el usuario; su juicio; M2 en la bitácora.
 
