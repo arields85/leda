@@ -30,19 +30,14 @@ PRUEBAS = RAIZ / "tests"
 GARANTIAS = PRUEBAS / "garantias"
 ESTE_ARCHIVO = pathlib.Path(__file__).resolve()
 
-# La conversación de los flujos A y B, que se borra en la E3-4.
+# La conversación de los flujos A y B, que se borró en la E3-4: no puede volver.
+# `huerfanos` ya no está: no importa la conversación vieja y su garantía se queda (E3-2).
 PROHIBIDOS = {"gateway", "ingreso_tareas", "agente", "contexto", "respuesta_unica",
-              "deteccion_pregunta", "jev", "huerfanos", "local"}
+              "deteccion_pregunta", "jev", "local"}
 
 # (archivo, fixture que importa adentro, prohibido al que llega): por qué no molesta.
-BORDES_CONOCIDOS = {
-    ("tests/conftest.py", "_sin_despacho_inmediato_por_defecto", "gateway"):
-        "Deja inerte el despacho inmediato del webhook en las pruebas de los flujos viejos; "
-        "en las de `tests/garantias/` vuelve sin importar nada (E3-4 la retira).",
-    ("tests/conftest.py", "_sin_fallidos_de_huerfanos_de_otra_prueba", "huerfanos"):
-        "Limpia la deduplicación en memoria de `huerfanos`; en las pruebas de "
-        "`tests/garantias/` vuelve sin importar nada (la entrada del motor lo rehace, E3-7).",
-}
+# Vacía desde la E3-4: `tests/conftest.py` ya no importa la conversación vieja.
+BORDES_CONOCIDOS: dict[tuple[str, str | None, str], str] = {}
 
 # Lo que corre el proceso aparte: las pruebas de garantías y, al final, qué quedó cargado.
 _SONDA = r"""

@@ -9,7 +9,7 @@ frenaba `en_curso` y nadie avisaba de un atraso en cadena.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 from zoneinfo import ZoneInfo
 
 import psycopg
@@ -26,14 +26,6 @@ BA = ZoneInfo("America/Argentina/Buenos_Aires")
 def _quien(cur, nombre, ws):
     cur.execute("select telegram_user_id t from integrante where nombre = %s", (nombre,))
     return identificar(cur, cur.fetchone()["t"], Canal.ESPACIO, ws)
-
-
-def _membership(cur, ws, nombre):
-    """Sólo bajo `admin(conn)`: `app_user` no está en la vista `integrante`."""
-    cur.execute(
-        """select m.id from membership m join app_user u on u.id = m.app_user_id
-            where m.workspace_id = %s and u.nombre = %s""", (ws, nombre))
-    return str(cur.fetchone()["id"])
 
 
 def _mid(cur, nombre):
@@ -353,66 +345,6 @@ def test_quitar_dependencia_inexistente_dice_que_no_existe(corework, conn):
         r = H.ejecutar(cur, quien, "quitar_dependencia",
                        {"dependencia_id": "00000000-0000-0000-0000-000000000000"}, ya_confirmada=True)
         assert "no existe" in r["error"]
-
-
-def test_quitar_dependencia_queda_auditada(corework, conn):
-    """No hay baja blanda en `dependency` (a diferencia de `blocker.resuelto_en`):
-    el rastro de quién quitó qué y cuándo lo da el mismo mecanismo genérico
-    que audita cualquier herramienta.
-
-    Desde ADR 0005 (decisión 1), `quitar_dependencia` pide confirmación: el
-    turno completo sólo deja la propuesta pendiente, y la auditoría con
-    accion `herramienta:<nombre>` se escribe recién al confirmar por botón
-    (`gateway._toque`), no dentro del turno del agente.
-    """
-    from leda import pendientes as P
-    from leda.agente import responder
-    from leda.db import registrar_auditoria
-    from leda.llm import Llamada, ProveedorGuionado, Respuesta
-
-    ws = corework.workspace_id
-    with admin(conn) as cur:
-        origen = _tarea(cur, ws, titulo="Programar PLC", area="ot",
-                        persona="Nahuel Gimenez")
-        destino = _tarea(cur, ws, titulo="Cablear tablero", area="ot",
-                         persona="Marcos Tarquini")
-        dep_id = _dependencia(cur, ws, origen, destino)
-
-    guion = [
-        Respuesta(llamadas=[Llamada("c1", "quitar_dependencia",
-                                    {"dependencia_id": dep_id})]),
-        Respuesta(texto="Listo, la quité."),
-    ]
-    ahora = datetime(2026, 7, 27, 10, 0, tzinfo=BA)
-    with espacio(conn, ws) as cur:
-        quien = _quien(cur, "Marcos Tarquini", ws)
-        cal = Calendario.desde_base(cur, ws)
-        r = responder(cur, quien, "sacá esa dependencia",
-                     ProveedorGuionado(guion), cal, chat_id=9002, ahora=ahora)
-        assert r.confirmaciones == ["quitar_dependencia"]
-        assert r.acciones == []
-
-        cur.execute(
-            """select id from pending_action
-                where herramienta = 'quitar_dependencia' and estado = 'esperando'""")
-        pid = str(cur.fetchone()["id"])
-        confirmar = P.opcion_por_etiqueta(cur, pid, "Confirmar")
-        resuelta = P.resolver(cur, confirmar.token,
-                              app_user_id=quien.app_user_id, ahora=ahora)
-        H.ejecutar(cur, quien, resuelta.herramienta, resuelta.args,
-                  ya_confirmada=True, chat_id=9002, huella_previa=resuelta.huella)
-        registrar_auditoria(
-            cur, accion=f"herramienta:{resuelta.herramienta}", workspace_id=ws,
-            actor_app_user_id=quien.app_user_id, actor_kind="persona",
-            detalle={"args": resuelta.args, "via": "boton"})
-
-    with admin(conn) as cur:
-        cur.execute(
-            """select detalle from audit_log
-                where accion = 'herramienta:quitar_dependencia'""")
-        f = cur.fetchone()
-        assert f is not None
-        assert f["detalle"]["args"]["dependencia_id"] == dep_id
 
 
 # ---------------------------------------------------------------------------

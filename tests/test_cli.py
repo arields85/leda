@@ -8,38 +8,6 @@ from __future__ import annotations
 from leda import cli
 
 
-def test_escuchar_sin_cadencias_llega_a_local_escuchar(conn, corework, monkeypatch):
-    from leda import local
-
-    monkeypatch.setattr(cli, "conectar", lambda *a, **k: conn)
-    llamadas = []
-    monkeypatch.setattr(
-        local, "escuchar",
-        lambda conn_, slug, ws, **kw: llamadas.append((slug, ws, kw)))
-
-    assert cli.main(["escuchar", "corework", "--sin-cadencias"]) == 0
-
-    assert len(llamadas) == 1
-    slug, ws, kw = llamadas[0]
-    assert slug == "corework"
-    assert ws == corework.workspace_id
-    assert kw == {"con_cadencias": False}
-
-
-def test_escuchar_sin_el_flag_deja_las_cadencias_activas(conn, corework, monkeypatch):
-    from leda import local
-
-    monkeypatch.setattr(cli, "conectar", lambda *a, **k: conn)
-    llamadas = []
-    monkeypatch.setattr(
-        local, "escuchar",
-        lambda conn_, slug, ws, **kw: llamadas.append(kw))
-
-    assert cli.main(["escuchar", "corework"]) == 0
-
-    assert llamadas == [{"con_cadencias": True}]
-
-
 class _SchedulerFalso:
     def start(self) -> None:
         pass
@@ -111,16 +79,3 @@ def test_servir_rechaza_arrancar_si_falta_una_migracion(monkeypatch):
     assert cli.main(["servir"]) == 1
     assert llamadas_montar == []
     assert llamadas_uvicorn == []
-
-
-def test_escuchar_rechaza_arrancar_si_falta_una_migracion(
-        conn, corework, monkeypatch):
-    from leda import local
-
-    monkeypatch.setattr(cli, "conectar", lambda *a, **k: conn)
-    monkeypatch.setattr(cli, "_verificar_esquema_o_salir", lambda conn: 1)
-    llamadas = []
-    monkeypatch.setattr(local, "escuchar", lambda *a, **k: llamadas.append(1))
-
-    assert cli.main(["escuchar", "corework"]) == 1
-    assert llamadas == []

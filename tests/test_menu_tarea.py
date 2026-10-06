@@ -17,6 +17,11 @@ from leda.autoridad import Canal, identificar
 from leda.db import admin, espacio
 
 
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
 def _quien(cur, nombre, ws):
     cur.execute("select telegram_user_id t from integrante where nombre = %s", (nombre,))
     return identificar(cur, cur.fetchone()["t"], Canal.ESPACIO, ws)

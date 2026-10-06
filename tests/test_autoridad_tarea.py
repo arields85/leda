@@ -33,17 +33,13 @@ Decisiones (citas de `nucleo/`):
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
 
 import pytest
 
 from leda import herramientas as H
 from leda import menu_tarea as M
-from leda.agente import responder
 from leda.autoridad import Canal, Denegado, identificar
-from leda.calendario import Calendario
 from leda.db import admin, espacio
-from leda.llm import Llamada, ProveedorGuionado, Respuesta
 
 
 def _quien(cur, nombre, ws):
@@ -119,35 +115,6 @@ def test_actualizar_estado_lo_puede_el_responsable(corework, conn):
         r = H.ejecutar(cur, quien, "actualizar_estado",
                        {"tarea_id": tid, "estado": "en_curso"}, ya_confirmada=True)
         assert r == {"estado": "en_curso"}
-
-
-def test_llamada_del_modelo_a_tarea_ajena_no_arma_vista_previa(corework, conn):
-    """El rechazo tiene que frenar antes de mostrar cualquier vista previa
-    -- no sólo antes de aplicar el cambio -- igual que cualquier otro
-    `Denegado` (`agente._ejecutar_una`, `except Denegado` antes de
-    `NecesitaConfirmacion`). Sin este chequeo, el modelo podía llegar a
-    ofrecerle a Ariel una vista previa para mover la tarea de Nahuel."""
-    ws = corework.workspace_id
-    with admin(conn) as cur:
-        tid = _tarea(cur, ws)
-    conn.commit()
-
-    guion = [
-        Respuesta(llamadas=[Llamada("c1", "actualizar_estado",
-                                    {"tarea_id": tid, "estado": "en_curso"})]),
-        Respuesta(texto="No pude hacer eso."),
-    ]
-    with espacio(conn, ws) as cur:
-        ajeno = _quien(cur, "Ariel De Simone", ws)
-        cal = Calendario.desde_base(cur, ws)
-        responder(cur, ajeno, "poné en curso la de Nahuel", ProveedorGuionado(guion),
-                 cal, chat_id=1, ahora=datetime.now(timezone.utc))
-
-        cur.execute(
-            "select count(*) n from pending_action where workspace_id = %s", (ws,))
-        assert cur.fetchone()["n"] == 0
-        cur.execute("select estado from task where id = %s", (tid,))
-        assert cur.fetchone()["estado"] == "asignada"
 
 
 # ---------------------------------------------------------------------------

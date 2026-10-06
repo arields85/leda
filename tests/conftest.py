@@ -35,7 +35,6 @@ from leda.config import _cargar_dotenv
 
 RAIZ = pathlib.Path(__file__).resolve().parents[1]
 ESQUEMA = RAIZ / "db" / "esquema.sql"
-GARANTIAS = RAIZ / "tests" / "garantias"
 
 if os.environ.get("LEDA_TEST_LOAD_DOTENV", "1") != "0":
     _cargar_dotenv(RAIZ / ".env.test")
@@ -126,70 +125,10 @@ def uri(tmp_path_factory) -> Iterator[str]:
     yield _servidor_efimero(tmp_path_factory.mktemp("pgdata"))
 
 
-def _es_prueba_de_garantias(request) -> bool:
-    """Si la prueba vive en `tests/garantias/`, que no carga la conversación de los
-    flujos A y B (E3-1, `tests/garantias/test_frontera.py`)."""
-    return pathlib.Path(str(request.node.path)).resolve().is_relative_to(GARANTIAS)
-
-
 @pytest.fixture(autouse=True)
-def _sin_despacho_inmediato_por_defecto(request, monkeypatch):
-    """El despacho inmediato del webhook (ADR 0011,
-    `gateway._despachar_ahora`) queda inerte por defecto en cualquier
-    prueba.
-
-    Sin esto, cualquier prueba que ya reemplaza `config.token_bot` (para
-    poder procesar un turno por `TestClient(gateway.app)` sin que falte el
-    token -- no para pedir un envío real a Telegram) dispararía un intento
-    de despacho real apenas vuelve el webhook: en el mejor caso, una llamada
-    de red de sobra contra un token inventado; en el peor, Telegram la
-    rechaza y `despachador._fallo` reprograma `message_outbox.programado_para`
-    hacia adelante -- corrompiendo el escenario que la prueba armó, sin que
-    la prueba haya pedido nada de esto.
-
-    También deshabilita `gateway.conectar` (R3-003, revisión 2026-09-28
-    sobre el commit e2a094e): desde que el despacho corre como tarea de
-    FastAPI de fondo, con su propia conexión, esa conexión se abre con
-    `conectar()` sin argumentos -- que usa `config.db_url`, no la base
-    efímera de estas pruebas. Sin este resguardo, cualquier prueba con
-    `TestClient(gateway.app)` (`BackgroundTasks` corre en línea con
-    `TestClient`, verificado empíricamente) intentaría una conexión real a
-    lo que sea que `config.db_url` resuelva en este entorno -- en el mejor
-    caso, una excepción rápida; en el peor, una conexión lenta contra un
-    host inalcanzable.
-
-    Las pruebas que sí quieren verificar el despacho inmediato
-    (`test_gateway.py`, `test_local.py`) reemplazan `gateway._transporte_de`
-    y/o `gateway.conectar` de nuevo, con su propio doble o con una conexión
-    real a la base efímera (`uri`) -- corren después de esta fixture
-    (autouse), así que ganan.
-
-    En las pruebas de `tests/garantias/` no hace nada: no usan `gateway`, y
-    importarlo acá las ataría a la conversación de los flujos A y B (E3-1)."""
-    if _es_prueba_de_garantias(request):
-        return
-    from leda import gateway
-
-    def _sin_transporte(slug, token):
-        raise LookupError("despacho inmediato deshabilitado en esta prueba")
-
-    def _sin_conexion_de_fondo():
-        raise LookupError("conexión de fondo deshabilitada en esta prueba")
-
-    monkeypatch.setattr(gateway, "_transporte_de", _sin_transporte)
-    monkeypatch.setattr(gateway, "conectar", _sin_conexion_de_fondo)
-
-
-@pytest.fixture(autouse=True)
-def _sin_fallidos_de_huerfanos_de_otra_prueba(request):
+def _sin_fallidos_de_huerfanos_de_otra_prueba():
     """`huerfanos._FALLIDOS` (la deduplicación en memoria del reporte de un aviso
-    fallido) vive por proceso: una prueba no hereda las marcas de otra (T9-H19h).
-
-    En las pruebas de `tests/garantias/` no hace nada: `huerfanos` importa `gateway`
-    (E3-1)."""
-    if _es_prueba_de_garantias(request):
-        yield
-        return
+    fallido) vive por proceso: una prueba no hereda las marcas de otra (T9-H19h)."""
     from leda import huerfanos
 
     huerfanos._FALLIDOS.clear()

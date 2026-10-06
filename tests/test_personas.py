@@ -34,6 +34,10 @@ def _objetivo(cur, ws):
     return str(cur.fetchone()["id"])
 
 
+# ---------------------------------------------------------------------------
+# Resolver sin adivinar
+# ---------------------------------------------------------------------------
+
 def test_un_nombre_que_identifica_a_una_sola_persona_se_guarda_en_borrador(
         corework, conn):
     ws = corework.workspace_id

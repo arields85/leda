@@ -336,6 +336,8 @@ def test_la_etapa_del_huerfano_tiene_su_explicacion():
     assert huerfanos.COTA is entrada.COTA_REENTREGA
 
 
+# --- T9-H19g: lo que dejó la revisión de T9-H19e/f ----------------------------------
+
 def _incidentes_de_etapa(conn, ws, etapa):
     with admin(conn) as cur:
         cur.execute("select referencia_id from incident where workspace_id = %s "
@@ -433,6 +435,8 @@ def test_si_ni_el_incidente_del_fallo_se_puede_escribir_no_se_pierde_el_resto(
     assert "RuntimeError" in capsys.readouterr().out      # nunca en silencio
 
 
+# El barrido y la reentrega comparten el candado del mensaje.
+
 class _CursorConGancho:
     """Un cursor que dispara `gancho` justo antes de tomar el candado por mensaje:
     el hueco entre elegir el candidato y escribir, donde puede colarse la reentrega."""
@@ -519,6 +523,8 @@ def test_si_la_reentrega_tiene_el_candado_del_mensaje_el_barrido_lo_deja_para_de
     assert _barrer(conn, ws) == 1                   # liberado: ahora sí
 
 
+# --- La membresía se busca en ESTE espacio ------------------------------------------
+
 def test_una_persona_en_dos_espacios_se_decide_por_su_membresia_de_cada_uno(
         intake_world, conn):
     norte, oeste = intake_world["north-lab"], intake_world["west-studio"]
@@ -551,6 +557,8 @@ def test_una_persona_en_dos_espacios_se_decide_por_su_membresia_de_cada_uno(
     assert _barrer(conn, norte["id"]) == 0 and _barrer(conn, oeste["id"]) == 0
 
 
+# --- El reloj de la base manda, no el de la aplicación ------------------------------
+
 def test_el_barrido_usa_el_reloj_de_la_base_y_no_avisa_un_turno_vivo(
         corework, conn):
     ws = corework.workspace_id
@@ -578,6 +586,8 @@ def test_el_barrido_usa_el_reloj_de_la_base_para_la_cota_de_24_horas(
 
     assert _barrer(conn, ws, _ahora() - timedelta(hours=12)) == 0   # app atrasada
 
+
+# --- El reporte de la falla del barrido y el despacho que sigue ---------------------
 
 def test_el_reporte_de_una_falla_del_barrido_es_deduplicado_y_no_deja_la_excepcion(
         corework, conn):
@@ -668,6 +678,9 @@ def test_una_falla_del_barrido_no_frena_el_despacho_y_se_reporta(
 
 def test_la_etapa_del_fallo_de_un_huerfano_tiene_su_explicacion():
     assert huerfanos.ETAPA_MENSAJE_HUERFANO_FALLO in EXPLICACION_POR_ETAPA
+
+
+# --- T9-H19h: lo que dejó la revisión de T9-H19g -------------------------------------
 
 
 def test_la_marca_de_fallo_no_se_pone_si_el_incidente_no_se_confirmo(

@@ -754,62 +754,6 @@ def test_falla_del_saludo_con_envio_fallido_se_reporta_una_sola_vez(
     assert despues_del_segundo == antes + 1      # sigue siendo uno solo
 
 
-def test_bienvenida_por_activacion_reclama_y_la_respuesta_del_dia_no_repite(
-        conn, intake_world, monkeypatch):
-    """R3-004 (revisión 2026-09-28+3): la versión original despachaba con
-    `datetime.now(timezone.utc)` real y volvía a despachar una hora
-    después -- en la última hora local antes de medianoche, ese salto de
-    una hora cruzaba a la fecha local siguiente y la segunda respuesta
-    volvía a ganar el saludo del día, rompiendo la aserción de abajo.
-    `_activacion` no recibe un reloj inyectado -- programa la bienvenida
-    con el `now()` real de la base -- así que acá se lee ESE mismo
-    `programado_para` ya confirmado y el segundo despacho avanza sólo un
-    segundo desde él, nunca una hora entera: no puede cruzar una
-    medianoche local."""
-    from leda import gateway
-
-    ws = intake_world["north-lab"]["id"]
-    persona = intake_world["north-lab"]["people"]["Taylor Quinn"]
-    tg_user = persona["telegram"]
-    mid = persona["membership_id"]
-
-    monkeypatch.setattr(gateway, "acusar_toque", lambda *a, **k: None)
-
-    with admin(conn) as cur:
-        _limpiar_saludo(cur, mid)
-    conn.commit()
-
-    resultado = gateway._activacion(conn, ws, "/start", tg_user, tg_user)
-    assert resultado == {"ok": True}
-    conn.commit()
-
-    with admin(conn) as cur:
-        cur.execute(
-            "select programado_para from message_outbox where dedupe_key = %s",
-            (f"{ws}:alta:{tg_user}",))
-        ahora = cur.fetchone()["programado_para"]
-
-    with espacio(conn, ws) as cur:
-        cal = _cal(cur, ws)
-        transporte = TransporteDePrueba()
-        # `es_respuesta=True`: salta el chequeo de horario, así que no
-        # importa qué hora local sea de verdad.
-        despachar(cur, ws, transporte, cal, ahora)
-        assert len(transporte.enviados) == 1
-        assert not transporte.enviados[0].texto.startswith("👋")  # bienvenida sola
-
-        siguiente = ahora + timedelta(seconds=1)
-        enqueue_outbox(
-            cur, workspace_id=ws, chat_id=tg_user, text="Tenés tareas abiertas.",
-            recipient_membership_id=mid, is_response=True,
-            scheduled_for=siguiente, dedupe_key="test:bienvenida-activacion:1")
-        despachar(cur, ws, transporte, cal, siguiente)
-    conn.commit()
-
-    assert len(transporte.enviados) == 2
-    assert transporte.enviados[1].texto == "Tenés tareas abiertas."  # sin saludo
-
-
 def test_falla_al_reportar_la_falla_del_saludo_no_deshace_un_envio_exitoso(
         intake_world, conn, monkeypatch):
     """Si el saludo falla y después también falla su reporte, un mensaje ya

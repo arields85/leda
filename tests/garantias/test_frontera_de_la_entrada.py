@@ -26,27 +26,16 @@ from tests.garantias.test_frontera import _imports_de
 
 RAIZ = pathlib.Path(__file__).resolve().parents[2]
 
-# La conversación de los flujos A y B, que se borra en la E3-4.
+# La conversación de los flujos A y B, que se borró en la E3-4: no puede volver.
 PROHIBIDOS = {"gateway", "ingreso_tareas", "agente", "contexto", "respuesta_unica",
               "deteccion_pregunta", "jev", "local"}
 
 # Los módulos de la capa sólida desde los que se recorre.
 INICIOS = ("entrada", "ciclo", "reloj", "huerfanos")
 
-# (archivo, función que importa adentro, prohibido al que llega): por qué sigue.
-BORDES_CONOCIDOS = {
-    ("src/leda/entrada.py", "webhook", "gateway"):
-        "La ruta `/telegram/{slug}` le pasa el update a la conversación de los flujos A y B "
-        "(`gateway.webhook`) hasta que la entrada del motor la reemplace (E3-7).",
-    ("src/leda/despachador.py", "_botones", "ingreso_tareas"):
-        "El despachador arma los botones del alta guiada (enredo 2); lo corta la E3-3.",
-    ("src/leda/herramientas.py", "crear_borrador_tarea", "ingreso_tareas"):
-        "El borrador de tarea usa las constantes del alta guiada; el ciclo lo alcanza por "
-        "el despachador (enredo 2). Lo corta la E3-4.",
-    ("src/leda/pendientes.py", "ver_rama_abierta", "ingreso_tareas"):
-        "La retención del despachador lee la pregunta abierta del alta guiada (enredo 2); "
-        "lo cortan la E3-3 y la E3-4.",
-}
+# (archivo, función que importa adentro, prohibido al que llega): por qué sigue. Vacía
+# desde la E3-4, que borró los flujos A y B y cortó los cuatro bordes que quedaban.
+BORDES_CONOCIDOS: dict[tuple[str, str | None, str], str] = {}
 
 # Lo que corre el proceso aparte: importa los inicios y dice qué quedó cargado.
 _SONDA = r"""

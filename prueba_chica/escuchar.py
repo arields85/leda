@@ -2,8 +2,9 @@
 
     python -m prueba_chica.escuchar corework
 
-`odd/tasks/prueba-chica-del-motor.md`, sección 4 ("Entrada propia"). `leda.local` no se puede
-usar (importa `gateway`): acá está lo mínimo, reescrito.
+`odd/tasks/prueba-chica-del-motor.md`, sección 4 ("Entrada propia"). El escuchador de los flujos
+viejos (`local.py`, que importaba `gateway`; retirado en la E3-4) no se podía usar: acá está lo
+mínimo, reescrito.
 
 - **Bot del equipo:** saca un webhook si lo hay (bloquea `getUpdates`) y pide los mensajes.
   Cada mensaje escrito en un chat privado, de alguien del equipo (`identificar_en_espacio`),

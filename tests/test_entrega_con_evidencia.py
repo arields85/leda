@@ -211,78 +211,6 @@ def test_actualizar_estado_a_en_revision_notifica_al_aprobador_con_botones(
     assert etiquetas == ["Aprobar", "Pedir cambios"]
 
 
-def test_tocar_aprobar_de_la_notificacion_de_entrega_llega_a_la_vista_previa(
-        corework, conn):
-    """Tocar "Aprobar" desde la notificación de entrega reusa el mismo
-    camino que el menú de tarea (T2): `SENTINEL_MENU_TAREA` ->
-    `_resolver_toque_menu_tarea` -> vista previa de `aprobar_tarea` (ADR
-    0008), nunca aplica nada por sí solo."""
-    import dataclasses
-    from contextlib import nullcontext
-
-    from fastapi.testclient import TestClient
-
-    from leda import gateway
-
-    ws = corework.workspace_id
-    with admin(conn) as cur:
-        tid = _tarea(cur, ws)
-    with espacio(conn, ws) as cur:
-        nahuel = _quien(cur, "Nahuel Gimenez", ws)
-        H.ejecutar(
-            cur, nahuel, "actualizar_estado",
-            {"tarea_id": tid, "estado": "en_revision", "evidencia_texto": "Listo."},
-            ya_confirmada=True)
-    conn.commit()
-
-    monkeypatch_targets = []
-
-    class _MP:
-        def setattr(self, obj, name, value):
-            monkeypatch_targets.append((obj, name, getattr(obj, name)))
-            setattr(obj, name, value)
-
-        def undo(self):
-            for obj, name, old in monkeypatch_targets:
-                setattr(obj, name, old)
-
-    mp = _MP()
-    mp.setattr(gateway, "acusar_toque", lambda *a, **k: None)
-    mp.setattr(gateway, "mantener_chat_activo", lambda *a, **k: nullcontext())
-    mp.setattr(gateway, "_conn", lambda: conn)
-    mp.setattr(gateway, "config",
-              dataclasses.replace(gateway.config, webhook_secret="s3cr3t"))
-    try:
-        cliente = TestClient(gateway.app)
-        with admin(conn) as cur:
-            tg_marcos = _tg(cur, "Marcos Tarquini")
-            cur.execute(
-                """select po.token from pending_action pa
-                     join pending_action_option po on po.pending_action_id = pa.id
-                    where pa.workspace_id = %s and pa.chat_id = %s
-                      and pa.estado = 'esperando' and po.etiqueta = 'Aprobar'""",
-                (ws, tg_marcos))
-            token = cur.fetchone()["token"]
-
-        resp = cliente.post(
-            "/telegram/corework",
-            json={"callback_query": {
-                "id": "cb1", "from": {"id": tg_marcos}, "data": f"p:{token}",
-                "message": {"message_id": 9, "chat": {"id": tg_marcos}}}},
-            headers={"X-Telegram-Bot-Api-Secret-Token": "s3cr3t"})
-        assert resp.status_code == 200
-
-        with admin(conn) as cur:
-            cur.execute("select estado from task where id = %s", (tid,))
-            assert cur.fetchone()["estado"] == "en_revision"   # todavía vista previa
-            cur.execute(
-                """select count(*) n from pending_action
-                    where herramienta = 'aprobar_tarea' and estado = 'esperando'""")
-            assert cur.fetchone()["n"] == 1
-    finally:
-        mp.undo()
-
-
 # ---------------------------------------------------------------------------
 # 2. El gate de "Aprobar" (decisión 2)
 # ---------------------------------------------------------------------------
@@ -684,57 +612,6 @@ def test_redelivery_con_evidencia_texto_registra_fila_nueva_y_notifica(
         tg_marcos = _tg(cur, "Marcos Tarquini")
         cuerpo = _outbox_ultimo(cur, ws, tg_marcos)
     assert "Ahora sí, con el detalle corregido." in cuerpo
-
-
-def test_ya_la_termine_pide_evidencia_de_nuevo_tras_pedir_cambios(corework, conn):
-    """Mismo patrón que
-    `test_ya_la_termine_pide_evidencia_si_falta_y_termina_en_vista_previa`
-    (`tests/test_menu_tarea.py`), pero con "Pedir cambios" de por medio: la
-    entrega anterior dejó una fila de `evidence`, y como después el
-    aprobador pidió cambios esa evidencia ya no cuenta -- el menú vuelve a
-    pedirla. Llama a `gateway._resolver_toque_menu_tarea` directo, sin
-    pasar por HTTP ni por el token del menú (que T2 ya prueba de punta a
-    punta): lo que importa acá es que la acción "terminar" recalcule
-    `evidencia_pendiente` y no la vieja lectura descartada."""
-    from leda import gateway
-    from leda import pendientes as P
-
-    ws = corework.workspace_id
-    with admin(conn) as cur:
-        tid = _tarea(cur, ws, estado="en_revision")
-        _evidencia(cur, ws, tid)
-    conn.commit()
-
-    with espacio(conn, ws) as cur:
-        marcos = _quien(cur, "Marcos Tarquini", ws)
-        H.ejecutar(cur, marcos, "pedir_cambios_tarea",
-                   {"tarea_id": tid, "comentario": "Falta un detalle."},
-                   ya_confirmada=True)
-
-    with admin(conn) as cur:
-        tg_nahuel = _tg(cur, "Nahuel Gimenez")
-
-    with espacio(conn, ws) as cur:
-        nahuel = _quien(cur, "Nahuel Gimenez", ws)
-        gateway._resolver_toque_menu_tarea(
-            cur, nahuel, ws, tg_nahuel,
-            {"eleccion": {"accion": "terminar"}, "tarea_id": tid,
-             "titulo": "Programar HMI línea 2"},
-            datetime.now(timezone.utc))
-
-    with admin(conn) as cur:
-        cur.execute("select estado from task where id = %s", (tid,))
-        assert cur.fetchone()["estado"] == "en_curso"      # todavía no se pidió nada
-
-        cuerpo = _outbox_ultimo(cur, ws, tg_nahuel)
-        assert "qué hiciste" in cuerpo.lower()
-
-        cur.execute(
-            """select count(*) n from pending_action
-                where herramienta = %s and modificar_pedido_en is not null
-                  and modificacion_consumida_en is null""",
-            (P.SENTINEL_DATO_MENU_TAREA,))
-        assert cur.fetchone()["n"] == 1
 
 
 def test_aprobar_tarea_rechaza_tras_pedir_cambios_sin_evidencia_nueva(
@@ -1910,70 +1787,6 @@ def test_notificar_entrega_repetido_en_la_misma_transaccion_no_deja_pending_acti
     # lado de un mensaje que apunta a otro lado.
     assert avisos_pendientes[0]["estado"] == "esperando"
     assert str(avisos_pendientes[0]["id"]) == str(mensajes[0]["pending_action_id"])
-
-
-def test_evidencia_nueva_en_revision_no_retira_el_menu_general_del_aprobador(
-        corework, conn):
-    """T6h (4): `retirar_avisos_de_entrega` filtra por `args.aviso =
-    AVISO_ENTREGA`, no por las etiquetas de los botones -- el menú general
-    de la tarea (`gateway._abrir_menu_tarea`, tocado por el aprobador desde
-    el menú, no desde el aviso de entrega) ofrece los mismos
-    "Aprobar"/"Pedir cambios" cuando la tarea está en_revision
-    (`menu_tarea.calcular_menu`), pero su `pending_action` no lleva esa
-    marca (`SENTINEL_MENU_TAREA` sin `aviso` en `args`) y tiene que
-    sobrevivir cuando llega evidencia nueva."""
-    from leda import gateway as G
-    from leda import pendientes as P
-
-    ws = corework.workspace_id
-    with admin(conn) as cur:
-        tid = _tarea(cur, ws, estado="en_curso")
-    conn.commit()
-
-    with espacio(conn, ws) as cur:
-        nahuel = _quien(cur, "Nahuel Gimenez", ws)
-        H.ejecutar(
-            cur, nahuel, "actualizar_estado",
-            {"tarea_id": tid, "estado": "en_revision",
-             "evidencia_texto": "Primera evidencia."},
-            ya_confirmada=True)
-    conn.commit()
-
-    with admin(conn) as cur:
-        tg_marcos = _tg(cur, "Marcos Tarquini")
-        pid_aviso = _id_aviso_entrega_esperando(cur, ws, tg_marcos)
-
-    with espacio(conn, ws) as cur:
-        marcos = _quien(cur, "Marcos Tarquini", ws)
-        G._abrir_menu_tarea(cur, marcos, ws, tg_marcos, tid,
-                            datetime.now(timezone.utc))
-    conn.commit()
-
-    with admin(conn) as cur:
-        cur.execute(
-            """select id from pending_action
-                where workspace_id = %s and chat_id = %s and estado = 'esperando'
-                  and herramienta = %s and args ->> 'tarea_id' = %s
-                  and args ->> 'aviso' is null""",
-            (ws, tg_marcos, P.SENTINEL_MENU_TAREA, str(tid)))
-        fila_menu = cur.fetchone()
-        assert fila_menu is not None, "no se armó el menú general del aprobador"
-        pid_menu = str(fila_menu["id"])
-        assert pid_menu != pid_aviso
-
-    with espacio(conn, ws) as cur:
-        nahuel = _quien(cur, "Nahuel Gimenez", ws)
-        H.ejecutar(
-            cur, nahuel, "adjuntar_evidencia",
-            {"tarea_id": tid, "tipo": "texto", "uri": "Segunda evidencia."},
-            ya_confirmada=True)
-
-    with admin(conn) as cur:
-        cur.execute("select estado from pending_action where id = %s", (pid_aviso,))
-        assert cur.fetchone()["estado"] != "esperando"    # el aviso de entrega sí se retira
-
-        cur.execute("select estado from pending_action where id = %s", (pid_menu,))
-        assert cur.fetchone()["estado"] == "esperando"    # el menú general, no
 
 
 def test_evidencia_previa_a_un_rechazado_no_aparece_en_el_aviso_con_texto_distintivo(

@@ -89,6 +89,14 @@ TABLAS_DE_LA_PRUEBA_CHICA = (
     "conversation_option", "scheduled_notice", "task_forecast",
     "blocker_unblocker")
 
+# TEMPORAL: las tablas del alta guiada (flujo A). Su código se borró en la E3-4 y sus
+# columnas quedaron sin uso en `src/leda`; se borran con la migración 0032 (porción 6 de
+# las E3-3 y E3-4), que saca también esta excepción. Por tabla y no por columna, para no
+# eximir un nombre como `request_id` en otras tablas.
+TABLAS_DEL_ALTA_GUIADA = (
+    "task_intake_request", "task_intake_field", "task_intake_choice_set",
+    "task_intake_choice", "task_intake_free_text_slot")
+
 
 def _fuente() -> str:
     return "\n".join(p.read_text("utf-8") for p in sorted(FUENTE.glob("*.py")))
@@ -135,7 +143,7 @@ def test_no_hay_esquema_nuevo_sin_uso_ni_declarado():
     tablas = _columnas_por_tabla()
 
     exentas = (set(TABLAS_MUERTAS) | set(TABLAS_POR_FUNCION)
-               | set(TABLAS_DE_LA_PRUEBA_CHICA))
+               | set(TABLAS_DE_LA_PRUEBA_CHICA) | set(TABLAS_DEL_ALTA_GUIADA))
     sin_uso = {
         columna
         for tabla, columnas in tablas.items() if tabla not in exentas

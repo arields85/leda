@@ -61,6 +61,10 @@ def _tarea(cur, ws, persona="Marcos Tarquini"):
     return str(t)
 
 
+# ---------------------------------------------------------------------------
+# Salida: el mensaje sale con sus botones
+# ---------------------------------------------------------------------------
+
 def test_un_mensaje_con_accion_pendiente_sale_con_sus_opciones(corework, conn):
     ws = corework.workspace_id
     with espacio(conn, ws) as cur:

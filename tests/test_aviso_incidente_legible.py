@@ -14,11 +14,14 @@ import re
 from datetime import datetime, timezone
 from pathlib import Path
 
-from leda import gateway, incidentes, local, respuesta_unica
+from leda import incidentes
 from leda.incidentes import (EXPLICACION_POR_ETAPA, NOTICIA_NEUTRA_INCIDENTE,
                                armar_aviso_admin)
 
 ZONA_AR = "America/Argentina/Buenos_Aires"
+# La etapa del turno de texto de los flujos A y B (`gateway.ETAPA_TURNO_TEXTO`, retirado
+# en la E3-4): la tabla de explicaciones la conserva y el formato del aviso no cambia.
+ETAPA_TURNO_TEXTO = "turno_texto"
 # 02:30 UTC del 30/09 son las 23:30 del 29/09 en Buenos Aires.
 MOMENTO = datetime(2026, 9, 30, 2, 30, tzinfo=timezone.utc)
 
@@ -26,7 +29,7 @@ MOMENTO = datetime(2026, 9, 30, 2, 30, tzinfo=timezone.utc)
 def _aviso(**cambios) -> str:
     datos = dict(
         incident_id="ab12cd34-0000-0000-0000-000000000000", slug="corework",
-        zona_horaria=ZONA_AR, momento=MOMENTO, etapa=gateway.ETAPA_TURNO_TEXTO,
+        zona_horaria=ZONA_AR, momento=MOMENTO, etapa=ETAPA_TURNO_TEXTO,
         severidad="alta", resumen="Excepción no manejada en 'turno_texto' (RuntimeError).",
         nombre="Nahuel Gimenez", mensaje="arranco con esto")
     datos.update(cambios)
@@ -36,8 +39,7 @@ def _aviso(**cambios) -> str:
 def _etapas_conocidas() -> set[str]:
     """Cada etapa con la que el código registra un incidente: las constantes
     `ETAPA_*` de los módulos y los literales `etapa="..."` de `src/`."""
-    etapas = {valor for modulo in (gateway, respuesta_unica, local, incidentes)
-              for nombre, valor in vars(modulo).items()
+    etapas = {valor for nombre, valor in vars(incidentes).items()
               if nombre.startswith("ETAPA_") and isinstance(valor, str)}
     for archivo in Path(incidentes.__file__).parent.glob("*.py"):
         etapas.update(re.findall(r'etapa="([a-z_]+)"', archivo.read_text(encoding="utf-8")))
@@ -48,13 +50,11 @@ def test_el_aviso_neutro_a_la_persona_es_el_texto_aprobado():
     assert NOTICIA_NEUTRA_INCIDENTE == (
         "Tuve un problema y no pude responder tu mensaje. Ya quedó registrado "
         "para que lo revise un administrador.")
-    assert gateway.NOTICIA_NEUTRA_INCIDENTE == NOTICIA_NEUTRA_INCIDENTE
 
 
 def test_cada_etapa_conocida_tiene_su_explicacion():
     etapas = _etapas_conocidas()
-    assert {"turno_texto", "toque_boton", "sin_respuesta", "mensaje_admin",
-            "saludo_diario", "ciclo_de_fondo"} <= etapas
+    assert {"saludo_diario", "ciclo_de_fondo", "mensaje_huerfano_sin_respuesta"} <= etapas
     assert etapas - set(EXPLICACION_POR_ETAPA) == set()
     for etapa, explicacion in EXPLICACION_POR_ETAPA.items():
         assert explicacion.que_paso.strip() and explicacion.que_hacer.strip(), etapa
@@ -115,14 +115,14 @@ def test_el_aviso_sigue_el_formato_aprobado_en_orden():
 
 
 def test_que_pasó_y_que_hacer_salen_de_la_tabla_de_la_etapa():
-    texto = _aviso(etapa=gateway.ETAPA_TURNO_TEXTO)
-    explicacion = EXPLICACION_POR_ETAPA[gateway.ETAPA_TURNO_TEXTO]
+    texto = _aviso(etapa=ETAPA_TURNO_TEXTO)
+    explicacion = EXPLICACION_POR_ETAPA[ETAPA_TURNO_TEXTO]
     assert explicacion.que_paso in texto
     assert explicacion.que_hacer.format(nombre="Nahuel Gimenez") in texto
 
 
 def test_que_vio_la_persona_es_el_aviso_neutro_cuando_la_etapa_lo_manda():
-    texto = _aviso(etapa=gateway.ETAPA_TURNO_TEXTO)
+    texto = _aviso(etapa=ETAPA_TURNO_TEXTO)
     assert f"Qué vio Nahuel Gimenez\n{NOTICIA_NEUTRA_INCIDENTE}" in texto
 
 

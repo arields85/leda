@@ -31,6 +31,12 @@ def _quien(cur, nombre, ws):
     return identificar(cur, cur.fetchone()["t"], Canal.ESPACIO, ws)
 
 
+# ---------------------------------------------------------------------------
+# Los tres botones, en orden -- y sólo en la vista previa de una herramienta
+# que escribe.
+# ---------------------------------------------------------------------------
+
+
 def test_elegir_entre_personas_no_lleva_los_botones_de_confirmacion(
         corework, conn):
     """`NecesitaElegir` (candidatos ambiguos) mantiene sus propios botones:

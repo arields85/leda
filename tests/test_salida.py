@@ -1,76 +1,20 @@
 from __future__ import annotations
 
 import re
-from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
 
-from leda import gateway, onboarding
-from leda.agente import responder
-from leda.autoridad import Canal, identificar
-from leda.calendario import Calendario
-from leda.db import admin, espacio
-from leda.llm import ProveedorGuionado, Respuesta
-from leda.salida import (BUTTON_LABEL_LIMIT,
-                             ETIQUETA_CANCELAR, ETIQUETA_CONFIRMAR,
-                             ICONO_CANCELAR, ICONO_CONFIRMAR,
-                             ICONO_OTRA_OPCION, ICONO_SALIR_OPCIONES,
-                             ICONO_TAREA, ICONO_VER_MAS,
-                             OBJETIVO_ETIQUETA_BOTON,
-                             TELEGRAM_TEXT_LIMIT, TRUNCAR_ETIQUETA_BOTON,
-                             acortar_etiqueta_boton, con_icono, costo_icono,
-                             etiqueta_sin_icono, etiquetas_de_tarea,
-                             etiquetas_boton_distinguibles,
-                             etiquetas_coinciden,
-                             prepare_buttons,
-                             telegram_utf16_units, truncar_etiqueta_boton)
+from leda.salida import (BUTTON_LABEL_LIMIT, ETIQUETA_CANCELAR, ETIQUETA_CONFIRMAR,
+                         ICONO_CONFIRMAR, ICONO_OTRA_OPCION, ICONO_TAREA, ICONO_VER_MAS,
+                         OBJETIVO_ETIQUETA_BOTON, TRUNCAR_ETIQUETA_BOTON,
+                         acortar_etiqueta_boton, con_icono, costo_icono,
+                         etiqueta_sin_icono, etiquetas_de_tarea,
+                         etiquetas_boton_distinguibles, etiquetas_coinciden,
+                         prepare_buttons, telegram_utf16_units, truncar_etiqueta_boton)
 
 
 ROOT = Path(__file__).resolve().parents[1]
-NOW = datetime(2026, 8, 14, 15, 0, tzinfo=timezone.utc)
-
-
-def test_agent_arbitrary_long_model_output_is_split_before_enqueue(corework, conn):
-    ws = corework.workspace_id
-    long_answer = "👩\u200d🔧 status " * 900
-    with espacio(conn, ws) as cur:
-        cur.execute("select telegram_user_id from integrante where nombre = %s",
-                    ("Marcos Tarquini",))
-        who = identificar(cur, cur.fetchone()["telegram_user_id"],
-                          Canal.ESPACIO, ws)
-        result = responder(
-            cur, who, "status", ProveedorGuionado([Respuesta(texto=long_answer)]),
-            Calendario.desde_base(cur, ws), chat_id=9002, ahora=NOW,
-        )
-        cur.execute("select cuerpo, dedupe_key from message_outbox order by dedupe_key")
-        rows = cur.fetchall()
-        assert result.texto == long_answer.strip()
-        assert len(rows) > 1
-        assert len({row["dedupe_key"] for row in rows}) == len(rows)
-        assert all(telegram_utf16_units(row["cuerpo"]) <= TELEGRAM_TEXT_LIMIT
-                   for row in rows)
-
-
-def test_gateway_and_onboarding_split_long_informational_copy(
-        corework, conn, monkeypatch):
-    ws = corework.workspace_id
-    long_copy = "Welcome 👋 " * 900
-    with admin(conn) as cur:
-        cur.execute(
-            """select u.telegram_user_id
-                 from membership m join app_user u on u.id = m.app_user_id
-                where m.workspace_id = %s and u.telegram_user_id is not null
-                order by u.nombre limit 1""", (ws,))
-        telegram_id = cur.fetchone()["telegram_user_id"]
-    monkeypatch.setattr(onboarding, "bienvenida", lambda *args: long_copy)
-    gateway._activacion(conn, ws, "/start", telegram_id, telegram_id)
-    with admin(conn) as cur:
-        cur.execute("select cuerpo from message_outbox order by dedupe_key")
-        rows = cur.fetchall()
-        assert len(rows) > 1
-        assert all(telegram_utf16_units(row["cuerpo"]) <= TELEGRAM_TEXT_LIMIT
-                   for row in rows)
 
 
 # ---------------------------------------------------------------------------

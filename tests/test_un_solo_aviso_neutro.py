@@ -8,14 +8,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from leda import agente, gateway, incidentes
+from leda import incidentes
 
 SRC = Path(incidentes.__file__).parent
-
-
-def test_la_disculpa_del_agente_es_el_aviso_neutro_aprobado():
-    assert agente.DISCULPA == incidentes.NOTICIA_NEUTRA_INCIDENTE
-    assert gateway.NOTICIA_NEUTRA_INCIDENTE == incidentes.NOTICIA_NEUTRA_INCIDENTE
 
 
 def test_ningun_modulo_escribe_su_propia_disculpa_de_falla():

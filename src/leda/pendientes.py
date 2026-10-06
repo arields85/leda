@@ -489,52 +489,35 @@ def ver_eleccion_abierta(cur: psycopg.Cursor, quien: Solicitante, chat_id: int,
     return buscar(cur, str(f["id"])) if f else None
 
 
-# Los tres tipos de rama que viven en `pending_action` (T9-R1d-2). Las preguntas
-# del alta guiada (`ingreso_tareas.open_intake_question`) son otra clase de fila.
+# Los tres tipos de rama que viven en `pending_action` (T9-R1d-2).
 RAMA_DATO = "dato"                # la Modificación que pide un dato por escrito
 RAMA_ELECCION = "eleccion"        # la elección con botones que Leda pidió
 RAMA_VISTA_PREVIA = "vista_previa"  # la vista previa del cambio que ella pidió
-# La pregunta abierta del alta guiada (`ingreso_tareas.open_intake_question`):
-# el campo de texto libre, la elección con botones o su propio borrador esperando
-# confirmación.
-RAMA_ALTA = "alta"
 
 
 @dataclass(frozen=True)
 class RamaAbierta:
     """La rama abierta de una persona en un chat: `tipo` (`RAMA_*`), su `id` (la
-    fila de `pending_action`, o el campo o la elección del alta) y lo que la
-    describe, en `modificacion` (`RAMA_DATO`), `pendiente` (la elección y la vista
-    previa) o `alta` (`RAMA_ALTA`, lo que devuelve `open_intake_question`)."""
+    fila de `pending_action`) y lo que la describe, en `modificacion` (`RAMA_DATO`)
+    o `pendiente` (la elección y la vista previa)."""
     tipo: str
     id: str
     modificacion: ModificacionAbierta | None = None
     pendiente: Pendiente | None = None
-    alta: dict | None = None
 
 
 def ver_rama_abierta(cur: psycopg.Cursor, quien: Solicitante, chat_id: int,
-                     ahora: datetime, herramientas, *,
-                     alta: bool = False) -> RamaAbierta | None:
+                     ahora: datetime, herramientas) -> RamaAbierta | None:
     """La rama abierta de esta persona en este chat, sin consumirla, con la
-    precedencia de la conversación: primero la pregunta del alta guiada (con
-    `alta`, en un chat privado), después el dato o la corrección que se pidió
-    por escrito, la elección y por último la vista previa (ver
-    `gateway._ver_pregunta_abierta`). Es la única definición de "rama abierta":
-    la comparten el turno de la conversación y la retención de lo que Leda
-    inicia (`despachador.despachar`, T9-R1d-2 y T9-R1d-2b), así que no pueden
-    discrepar.
+    precedencia de la conversación: primero el dato o la corrección que se pidió
+    por escrito, después la elección y por último la vista previa. Es la única
+    definición de "rama abierta" que usa la retención de lo que Leda inicia
+    (`despachador.despachar`, T9-R1d-2 y T9-R1d-2b). La pregunta del alta guiada
+    se retiró con los flujos A y B (E3-4).
 
     Cada tipo tiene su vencimiento (el de siempre): la ventana de Modificar
     (`VENTANA_MODIFICACION`) para el dato, y `vence_en` de la fila para la
-    elección y la vista previa. Las preguntas del alta no vencen: la retención
-    las acota con la actividad de la persona."""
-    if alta:
-        from .ingreso_tareas import open_intake_question
-
-        pregunta = open_intake_question(cur, quien, chat_id)
-        if pregunta is not None:
-            return RamaAbierta(RAMA_ALTA, pregunta["id"], alta=pregunta)
+    elección y la vista previa."""
     abierta = ver_modificacion_abierta(cur, quien, chat_id, ahora)
     if abierta is not None:
         return RamaAbierta(RAMA_DATO, abierta.pregunta_id, modificacion=abierta)

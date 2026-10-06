@@ -31,6 +31,22 @@ from .salida import (OBJETIVO_ETIQUETA_BOTON, enqueue_outbox,
                      etiquetas_de_tarea, normalize_visible_text,
                      telegram_utf16_units, truncar_etiqueta_boton)
 
+# Los topes de lo que una persona escribe en un borrador de tarea, en unidades UTF-16
+# de Telegram (`crear_borrador_tarea`). Vivían en `ingreso_tareas.py`, que se retiró
+# con el alta guiada (E3-4); los mismos valores.
+USER_FIELD_LIMITS = {
+    "title": 200,
+    "description": 800,
+    "objective": 120,
+    "responsible": 120,
+    "area": 120,
+    "due_date": 64,
+    "acceptance_criterion": 500,
+}
+EVIDENCE_ITEM_LIMIT = 160
+EVIDENCE_TOTAL_LIMIT = 800
+EVIDENCE_COUNT_LIMIT = 8
+
 
 @dataclass(frozen=True)
 class Herramienta:
@@ -775,9 +791,6 @@ def crear_borrador_tarea(cur, quien: Solicitante, titulo, objetivo_id=None,
                          responsable_membership_id=None):
     """Internal Unit 1A draft boundary; never exposed as a model tool."""
     verificar(cur, quien, "crear_tarea")
-    from .ingreso_tareas import (EVIDENCE_COUNT_LIMIT, EVIDENCE_ITEM_LIMIT,
-                                 EVIDENCE_TOTAL_LIMIT, USER_FIELD_LIMITS)
-
     titulo = normalize_visible_text(titulo)
     descripcion = normalize_visible_text(descripcion) if descripcion else None
     criterio_aceptacion = (normalize_visible_text(criterio_aceptacion)

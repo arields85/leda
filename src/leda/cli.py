@@ -7,8 +7,7 @@
     python -m leda sembrar corework --semilla espacios/corework.semilla-ficticia.yaml
     python -m leda cadencia corework objetivos_semanales
     python -m leda despachar corework       vacía la cola una vez
-    python -m leda escuchar corework         long polling + cadencias + escalera + despacho
-    python -m leda servir                   webhook + cadencias + escalera + despacho
+    python -m leda servir                   tablero + cadencias + escalera + despacho
     python -m leda servir --sin-cadencias    igual, sin disparar cadencias automáticas
 """
 
@@ -52,7 +51,7 @@ def _verificar_esquema_o_salir(conn) -> int | None:
     """R4-003 (revisión 2026-09-28+3): sin `greeting_state` ni
     `message_outbox.es_bienvenida`, cada `despachar`/`enqueue_outbox` rompe
     con `UndefinedTable`/`UndefinedColumn` en el primer mensaje, tirando
-    abajo todo el despacho. `servir` y `escuchar` son los dos puntos donde
+    abajo todo el despacho. `servir` es el punto donde
     arranca el despacho sostenido -- rechazar arrancar acá, con un mensaje
     claro, es más barato que dejar que la falla aparezca recién en el
     primer envío real."""
@@ -196,11 +195,6 @@ def main(argv: list[str] | None = None) -> int:
 
     sub.add_parser("presentar").add_argument("slug")
 
-    esc = sub.add_parser("escuchar")
-    esc.add_argument("slug")
-    esc.add_argument("--sin-cadencias", action="store_true",
-                     help="no dispara cadencias automáticas; escalera y despacho siguen")
-
     sub.add_parser("grupo").add_argument("slug")
 
     mod = sub.add_parser("modelo")
@@ -211,9 +205,6 @@ def main(argv: list[str] | None = None) -> int:
     mds.add_argument("--proveedor", default="gemini")
     sub.add_parser("estado").add_argument("slug")
     sub.add_parser("incidentes").add_argument("slug")
-
-    cor = sub.add_parser("correr")     # dispara una cadencia a mano
-    cor.add_argument("slug"); cor.add_argument("nombre")
 
     srv = sub.add_parser("servir")
     srv.add_argument("--puerto", type=int, default=8080)
@@ -465,14 +456,6 @@ def main(argv: list[str] | None = None) -> int:
                   "escribió, así que sin eso no hay a qué chat avisarle.")
         return 0
 
-    if a.cmd == "escuchar":
-        from .local import escuchar
-        codigo = _verificar_esquema_o_salir(conn)
-        if codigo is not None:
-            return codigo
-        escuchar(conn, a.slug, ws, con_cadencias=not a.sin_cadencias)
-        return 0
-
     if a.cmd == "estado":
         return _estado(conn, ws, a.slug)
 
@@ -504,12 +487,6 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"    {' · '.join(detalle)}")
             if f["referencia_cruda"]:
                 print(f"    {f['referencia_cruda'][:300]}")
-        return 0
-
-    if a.cmd == "correr":
-        from .local import Escucha
-        e = Escucha(conn, a.slug, ws, token="")
-        print("encolados:", e.correr_cadencia(a.nombre))
         return 0
 
     if a.cmd == "presentar":

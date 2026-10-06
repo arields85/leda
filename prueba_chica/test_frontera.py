@@ -49,15 +49,8 @@ PROHIBIDOS = {"gateway", "agente", "ingreso_tareas", "contexto", "respuesta_unic
               "huerfanos", "ciclo", "local", "escalera", "reloj"}
 
 # (módulo, función que importa adentro, prohibido al que llega): por qué no molesta.
-BORDES_CONOCIDOS = {
-    ("pendientes", "ver_rama_abierta", "ingreso_tareas"):
-        "La llama `despachador._rama_activa_de` para retener lo que Leda inicia; con las "
-        "tablas de los flujos congelados vacías no retiene nada (test_despacho.py).",
-    ("despachador", "_botones", "ingreso_tareas"):
-        "Sólo con `intake_choice_set_id`, que el motor nunca pone en el outbox.",
-    ("herramientas", "crear_borrador_tarea", "ingreso_tareas"):
-        "Crear tareas por chat no es del Motor (ADR 0017); la prueba chica no la usa.",
-}
+# Vacía desde la E3-4, que borró los flujos A y B y cortó los tres bordes que quedaban.
+BORDES_CONOCIDOS: dict[tuple[str, str | None, str], str] = {}
 
 
 def _imports_de(ruta: pathlib.Path) -> list[tuple[str, str | None, set[str]]]:

@@ -492,16 +492,6 @@ def _botones(cur, m) -> list[Boton]:
         if cabe_en_boton_de_copiar(m["bloque_copiable"]):
             return [Boton(ETIQUETA_COPIAR, "", m["bloque_copiable"])]
         return []
-    if m.get("intake_choice_set_id"):
-        from .ingreso_tareas import callback_data
-
-        cur.execute(
-            """select etiqueta, token from task_intake_choice
-                where choice_set_id = %s and activa order by orden""",
-            (m["intake_choice_set_id"],),
-        )
-        return [Boton(row["etiqueta"], callback_data(row["token"]))
-                for row in cur.fetchall()]
     if not m["pending_action_id"]:
         return []
 
@@ -625,8 +615,8 @@ def _activa_en_el_chat(cur, workspace_id: str, app_user_id: str, chat_id: int,
 
 def _rama_activa_de(cur, m, ahora: datetime):
     """La rama abierta del destinatario de `m` en el chat de `m`
-    (`pendientes.ver_rama_abierta`, la misma definición que usa la conversación,
-    con las preguntas del alta), pero sólo si él está activo en ese chat
+    (`pendientes.ver_rama_abierta`, la misma definición que usaba la conversación
+    de los flujos A y B), pero sólo si él está activo en ese chat
     (`VENTANA_DE_ACTIVIDAD`); si no, `None`.
 
     Sin la fila de su membresía (no visible en el espacio o ya no existe) no hay a
@@ -649,8 +639,7 @@ def _rama_activa_de(cur, m, ahora: datetime):
     quien = Solicitante(
         app_user_id=app_user_id, canal=Canal.ESPACIO, workspace_id=workspace_id,
         membership_id=str(m["destinatario_membership_id"]))
-    return ver_rama_abierta(cur, quien, m["chat_id"], ahora, H.REGISTRO,
-                            alta=True)
+    return ver_rama_abierta(cur, quien, m["chat_id"], ahora, H.REGISTRO)
 
 
 def _rama_que_retiene(cur, m, ahora: datetime, cache: dict):

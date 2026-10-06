@@ -1,31 +1,23 @@
 """La entrada HTTP de Leda (E3-2, enredos 3 y 4 de `odd/tasks/motor-definitivo.md`).
 
 La contraparte de `salida.py`: lo que llega de afuera. La aplicación (`app`), sus rutas
-(`POST /telegram/{slug}`, `GET /tablero/{token}`, `GET /salud`), el registro de los webhooks
-en Telegram y lo que la recuperación de un mensaje sin respuesta comparte con el barrido de
-huérfanos (`huerfanos.py`): la ventana del turno en curso, la cota de reentrega, el candado
-por mensaje y el criterio de "este mensaje ya tiene respuesta".
+(`GET /tablero/{token}`, `GET /salud`) y lo que la recuperación de un mensaje sin respuesta
+comparte con el barrido de huérfanos (`huerfanos.py`): la ventana del turno en curso, la cota
+de reentrega, el candado por mensaje y el criterio de "este mensaje ya tiene respuesta".
 
-Es de la capa sólida: no importa la conversación de los flujos A y B
-(`tests/garantias/test_frontera_de_la_entrada.py`). Su único borde conocido es la ruta
-`/telegram/{slug}`, que hasta la entrada del motor (E3-7) le pasa el update a
-`gateway.webhook` con un import de dentro de la función.
-
-Un bot por espacio de trabajo. La ruta lleva el slug, así que el espacio queda
-determinado por el canal de entrada y no hay que deducirlo del mensaje: si
-alguien pertenece a dos equipos, no existe ambigüedad.
+Es de la capa sólida (`tests/garantias/test_frontera_de_la_entrada.py`). La ruta
+`/telegram/{slug}` y el registro de los webhooks se retiraron con la conversación de los
+flujos A y B (E3-4): hasta la entrada del motor (E3-7), Leda no recibe mensajes.
 """
 
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, BackgroundTasks, FastAPI, Header, Request
+from fastapi import APIRouter, FastAPI
 from fastapi.responses import HTMLResponse
 
-from .config import config
 from .db import conectar, espacio
-from .despachador import pedido_telegram
 
 app = FastAPI(title="Leda", docs_url=None, redoc_url=None)
 router = APIRouter()
@@ -50,16 +42,17 @@ COTA_REENTREGA = timedelta(hours=24)
 
 def clave_de_candado_del_mensaje(workspace_id: str, chat_id: int,
                                  message_id: int) -> str:
-    """La clave del candado de asesor de un mensaje de Telegram. La comparten la
-    recuperación del gateway (`_estado_de_entrega`) y el barrido de huérfanos
-    (`huerfanos.barrer`): así nunca actúan a la vez sobre el mismo mensaje."""
+    """La clave del candado de asesor de un mensaje de Telegram. La usa el barrido de
+    huérfanos (`huerfanos.barrer`) y la va a compartir la recuperación de la entrada del
+    motor (E3-7; la de `gateway` se retiró en la E3-4): así nunca actúan a la vez sobre
+    el mismo mensaje."""
     return f"mensaje:{workspace_id}:{chat_id}:{message_id}"
 
 
 def sql_respondido(recibo: str) -> str:
     """Fragmento SQL: el recibo `recibo` (alias de una fila de `inbound_message`) ya
-    tiene respuesta. Es el criterio único de "este turno no murió" (T9-H19f) que
-    comparten `gateway._estado_de_entrega` y `huerfanos.barrer`.
+    tiene respuesta. Es el criterio único de "este turno no murió" (T9-H19f) de
+    `huerfanos.barrer`, y el de la recuperación de la entrada del motor (E3-7).
 
     Cuenta una fila de respuesta en CUALQUIER estado. Lo que el código descarta a
     propósito antes de enviar (un juego de opciones reemplazado, una vista previa que
@@ -74,27 +67,10 @@ def sql_respondido(recibo: str) -> str:
 
 
 def _conn():
-    """La conexión de la aplicación, una por proceso y reabierta si se cerró. `gateway`
-    usa esta misma para atender el webhook."""
+    """La conexión de la aplicación, una por proceso y reabierta si se cerró."""
     if not hasattr(_conn, "_c") or _conn._c.closed:
         _conn._c = conectar()
     return _conn._c
-
-
-@router.post("/telegram/{slug}")
-async def webhook(slug: str, request: Request, background_tasks: BackgroundTasks,
-                  x_telegram_bot_api_secret_token: str = Header(default="")):
-    """El update de un bot. Hasta la entrada del motor (E3-7) lo atiende la
-    conversación de los flujos A y B, entera: la verificación del secreto, el turno y
-    el despacho inmediato de fondo viven en `gateway.webhook`.
-
-    Borde conocido (`tests/garantias/test_frontera_de_la_entrada.py`): el import es de
-    dentro de la función, para que importar la entrada no cargue `gateway`."""
-    from . import gateway
-
-    return await gateway.webhook(
-        slug, request, background_tasks,
-        x_telegram_bot_api_secret_token=x_telegram_bot_api_secret_token)
 
 
 @router.get("/tablero/{token}", response_class=HTMLResponse)
@@ -152,19 +128,3 @@ def salud():
 
 
 app.include_router(router)
-
-
-def registrar_webhooks(cliente=None) -> dict[str, bool]:
-    """Le dice a Telegram dónde entregar, un bot por espacio."""
-    import httpx
-
-    cliente = cliente or httpx.Client(timeout=15)
-    resultado: dict[str, bool] = {}
-    for slug, token in config.espacios_con_token().items():
-        r = pedido_telegram(
-            cliente.post, f"https://api.telegram.org/bot{token}/setWebhook",
-            json={"url": f"{config.base_url}/telegram/{slug}",
-                  "secret_token": config.webhook_secret,
-                  "allowed_updates": ["message", "callback_query"]})
-        resultado[slug] = r.status_code == 200 and r.json().get("ok", False)
-    return resultado

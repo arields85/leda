@@ -21,6 +21,10 @@ from leda.llm import (IntentAction, Llamada, RouteEnvelope, RoutingError, ROUTER
                       ROUTER_SYSTEM)
 
 
+# ---------------------------------------------------------------------------
+# El comando cerrado del ruteo
+# ---------------------------------------------------------------------------
+
 def test_el_saludo_suelto_es_un_comando_de_la_lista_cerrada_del_ruteo():
     assert IntentAction.GREETING.value in ROUTER_TOOL["input_schema"][
         "properties"]["action"]["enum"]

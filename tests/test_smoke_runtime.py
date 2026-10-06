@@ -1,71 +1,7 @@
 from __future__ import annotations
 
-import io
 import threading
 import time
-from contextlib import redirect_stdout
-
-
-class _Updates:
-    def get(self, url, params=None):
-        return self
-
-    def raise_for_status(self):
-        return None
-
-    def json(self):
-        return {"result": [{
-            "update_id": 41,
-            "message": {
-                "message_id": 7,
-                "text": "mensaje de prueba",
-                "chat": {"id": 123},
-                "from": {"id": 456, "first_name": "Nora"},
-            },
-        }]}
-
-
-def test_listener_procesa_con_stdout_ascii_redirigido(monkeypatch):
-    from leda import local
-
-    procesados = []
-    monkeypatch.setattr(
-        local, "procesar_update",
-        lambda *args, **kwargs: procesados.append(args[2]))
-    escucha = local.Escucha(
-        object(), "equipo-prueba", "ws-prueba", "token-prueba",
-        cliente=_Updates(), authority_conn=object())
-    bytes_salida = io.BytesIO()
-    salida_ascii = io.TextIOWrapper(bytes_salida, encoding="ascii", errors="strict")
-
-    with redirect_stdout(salida_ascii):
-        assert escucha.recibir(espera=0) == 1
-    salida_ascii.flush()
-
-    assert procesados[0]["update_id"] == 41
-    assert b"Nora" in bytes_salida.getvalue()
-
-
-def test_listener_preserva_update_unicode_aunque_la_consola_no_lo_represente(
-        monkeypatch):
-    from leda import local
-
-    update = _Updates().json()["result"][0]
-    update["message"]["text"] = "señal Δ y válvula"
-    procesados = []
-    monkeypatch.setattr(
-        local, "procesar_update",
-        lambda *args, **kwargs: procesados.append(args[2]))
-    escucha = local.Escucha(
-        object(), "equipo-prueba", "ws-prueba", "token-prueba",
-        cliente=_UpdatesUnicode(update), authority_conn=object())
-    salida = io.TextIOWrapper(io.BytesIO(), encoding="ascii", errors="strict")
-
-    with redirect_stdout(salida):
-        escucha.recibir(espera=0)
-
-    assert procesados == [update]
-    assert procesados[0]["message"]["text"] == "señal Δ y válvula"
 
 
 class _ChatActionHttp:
@@ -78,14 +14,6 @@ class _ChatActionHttp:
         if self.falla:
             raise ConnectionError("fallo simulado")
         return object()
-
-
-class _UpdatesUnicode(_Updates):
-    def __init__(self, update):
-        self.update = update
-
-    def json(self):
-        return {"result": [self.update]}
 
 
 class _ChatActionBloqueado:
