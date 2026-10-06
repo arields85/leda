@@ -120,13 +120,45 @@ revisión por tramos.
         - `test_aislamiento` usa el fixture `intake_world`; en la E3-4, que no se borre con el flujo A.
         - `test_migraciones` importa `tests.historia_previa_a_leda`; anda porque pytest corre desde la
           raíz.
-- [ ] **E3-2. Enredos 3 y 4.** La entrada HTTP (`/telegram/{slug}`, `/tablero/{token}`, `/salud`,
+- [x] **E3-2. Enredos 3 y 4.** La entrada HTTP (`/telegram/{slug}`, `/tablero/{token}`, `/salud`,
       webhooks) sale de `gateway.py` a un módulo propio. `huerfanos.py`: la garantía se queda, porque un
       mensaje que quedó sin respuesta por una caída se vuelve a procesar y nunca se pierde en silencio. Su
       versión atada a `gateway` se retira, y el motor la rehace en su entrada (E3-7). Es decisión del
       agente, por la regla de no fallar en silencio.
+      **Hecho (2026-10-06), delegada a un escritor.**
+      - La entrada HTTP está en `src/leda/entrada.py`: la app, las rutas `/telegram/{slug}`,
+        `/tablero/{token}` y `/salud`, y los webhooks. `gateway.app` es un alias de esa app.
+        `/telegram` le pasa el mensaje a `gateway.webhook` con un import dentro de la función; ese
+        borde se reemplaza en la E3-7.
+      - `huerfanos` importa de `entrada` los cuatro símbolos que usaba. El cuarto, `sql_respondido`,
+        venía de `respuesta_unica`; la copia que quedó ahí se borró.
+      - `ciclo` y `reloj` ya no alcanzan el código viejo al importarse.
+      - `cli` arranca `leda.entrada:app`.
+      - La prueba del tablero pasó a `tests/garantias/test_tablero.py`.
+      - `tests/garantias/test_frontera_de_la_entrada.py` tiene seis pruebas. Los bordes que quedan, todos
+        dentro de funciones, son cuatro: `entrada.webhook` hacia `gateway`, de la E3-7;
+        `despachador._botones` y `pendientes.ver_rama_abierta` hacia `ingreso_tareas`, de las E3-3 y
+        E3-4; y `herramientas.crear_borrador_tarea`, de la E3-4.
+      - Evidencia:
+        - La frontera nueva en rojo antes del cambio: `4 failed, 2 passed`.
+        - `pytest tests/garantias`: `105 passed`.
+        - Suite completa: `2316 passed, 333 deselected, 1 warning in 845.33s`, es decir 2310 más las 6
+          nuevas.
+        - `import leda.ciclo` no carga ningún módulo viejo.
+        - Después de borrar la copia: garantías, una respuesta y huérfanos, `175 passed`.
+      - Commits `3b5eb9f` y `09a1111`. Revisión `review-03c2a8fcefc22a0e`, aprobada y reconocida; base
+        `24f8184`, el tramo incluye `d0dc25b` y `f063874`.
 - [ ] **E3-3. Enredos 1 y 2.** El despachador queda como transporte: sin botones ni retenciones de los
       flujos viejos. La entrega deja de crear estado de conversación; se rediseña con los circuitos 7 y 8.
+      **Se hace junto con la E3-4** (decisión del agente, 2026-10-06). Si se cortaran primero, los flujos
+      viejos quedarían rotos y sus pruebas en rojo hasta borrarlos. Se borran los flujos y, en el mismo
+      movimiento, lo que en la capa sólida sólo les servía a ellos, en commits que dejan la suite en
+      verde.
+      - Hasta la E3-7, Leda no conversa: la ruta `/telegram`, el registro de webhooks y `local.py` salen
+        con los flujos, y la entrada del motor los reemplaza.
+      - No afecta a nadie: no hay equipo real, y `main` no recibe nada hasta M3.
+      - `prueba_chica/` sigue andando: lo que use de lo borrado (por ejemplo, Jev, ya retirado) se le
+        quita.
 - [ ] **E3-4. Borrar los flujos A y B**, con sus pruebas (se retiran con su código) y una migración que
       borra las tablas `task_intake_*`, con rollback. El banco `tests/banco/` prueba los flujos viejos y se
       retira con ellos. Criterio: suite en verde y ningún import de lo borrado.

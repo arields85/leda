@@ -146,6 +146,7 @@ de aviso; flujos C1 a C6 y migraciones `0026` a `0029`.
 | Rama del Motor, `prueba_chica` | `pytest prueba_chica` | 2026-10-06 | 411 passed in 133.45s |
 | Rama del Motor, después de la E3-1 | suite completa | 2026-10-06 | 2310 passed, 333 deselected, 1 warning in 837.96s |
 | Rama del Motor, garantías limpias | `pytest tests/garantias` | 2026-10-06 | 84 passed in 95.36s |
+| Rama del Motor, después de la E3-2 | suite completa | 2026-10-06 | 2316 passed, 333 deselected, 1 warning in 845.33s |
 
 Los deselected son el banco real (`modelo_real`). La tercera fila es la línea base de garantías del Motor. Estas
 cifras miden el código: **una suite en verde no es evidencia de que la conversación funcione** (`AGENTS.md`,
