@@ -13,13 +13,89 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
+import pytest
+
 from leda import herramientas as H
 from leda import pendientes as P
+from leda.autoridad import Canal, identificar
+from leda.calendario import Calendario
 from leda.db import admin, espacio
+from leda.despachador import TransporteDePrueba, despachar
 from leda.salida import enqueue_outbox
 
-from tests.test_ramas_cerradas_al_terminar_el_flujo import (  # noqa: F401
-    _activa, _enviados_a, _pasada, _quien, reloj)
+# Lo que sigue venía de `tests/test_ramas_cerradas_al_terminar_el_flujo.py`, que se
+# retiró con los flujos A y B (E3-4).
+
+# La pasada del despachador corre a una hora FIJA de la jornada -- un martes a las
+# 10:00 de Buenos Aires, en el pasado de cualquier ejecución --, no a la que marque
+# el reloj de quien corre la suite.
+_AHORA_FIJO = datetime(2026, 9, 29, 13, 0, tzinfo=timezone.utc)
+
+_FILAS_A_MOVER = (
+    ("inbound_message", ("at",)),
+    ("message_outbox", ("programado_para", "vence_en")),
+    ("pending_action", ("vence_en",)),
+)
+
+
+class _Reloj:
+    """Lleva lo que la prueba escribió con el reloj real a la hora fija de la pasada,
+    sin cambiar las distancias entre la actividad de la persona, los avisos y sus
+    vencimientos: sólo cambia la hora del día. Cada fila se mueve UNA vez, aunque
+    `en_horario` se llame varias veces en la misma prueba."""
+
+    def __init__(self, conn, ws) -> None:
+        self._conn = conn
+        self._ws = ws
+        self._movidas: dict[str, set] = {tabla: set() for tabla, _ in _FILAS_A_MOVER}
+        with espacio(conn, ws) as cur:
+            self._cal = Calendario.desde_base(cur, ws)
+        # Un `ahora` fuera de la jornada volvería a mover las filas hasta la
+        # próxima: la prueba se rompería por el calendario, no por lo que prueba.
+        assert self._cal.en_horario(self.ahora), "la hora fija dejó de ser laboral"
+
+    @property
+    def ahora(self) -> datetime:
+        return _AHORA_FIJO + timedelta(seconds=5)
+
+    def en_horario(self) -> datetime:
+        desfase = _AHORA_FIJO - datetime.now(timezone.utc)
+        with admin(self._conn) as cur:
+            for tabla, columnas in _FILAS_A_MOVER:
+                cur.execute(f"select id from {tabla} where workspace_id = %s",
+                            (self._ws,))
+                nuevas = ({f["id"] for f in cur.fetchall()} - self._movidas[tabla])
+                if not nuevas:
+                    continue
+                cambios = ", ".join(f"{c} = {c} + %(d)s" for c in columnas)
+                cur.execute(f"update {tabla} set {cambios} where id = any(%(ids)s)",
+                            {"d": desfase, "ids": list(nuevas)})
+                self._movidas[tabla] |= nuevas
+        self._conn.commit()
+        return self.ahora
+
+
+@pytest.fixture
+def reloj(conn, corework) -> _Reloj:
+    return _Reloj(conn, corework.workspace_id)
+
+
+def _quien(cur, nombre, ws):
+    cur.execute("select telegram_user_id t from integrante where nombre = %s", (nombre,))
+    return identificar(cur, cur.fetchone()["t"], Canal.ESPACIO, ws)
+
+
+def _pasada(conn, ws, ahora):
+    transporte = TransporteDePrueba()
+    with espacio(conn, ws) as cur:
+        cal = Calendario.desde_base(cur, ws)
+        resumen = despachar(cur, ws, transporte, cal, ahora)
+    conn.commit()
+    return resumen, transporte
+
+
+def _enviados_a(transporte, chat_id: int) -> list[str]:
+    return [e.texto for e in transporte.enviados if e.chat_id == chat_id]
 
 
 def _seguimientos(cur, ws, tg, membership_id, n, *, prefijo):

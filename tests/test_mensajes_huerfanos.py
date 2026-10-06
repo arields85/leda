@@ -5,29 +5,23 @@ Si la reentrega no llega (Telegram dejó de reintentar, o el proceso murió y na
 reintenta), el recibo de la fase 1 queda sin respuesta para siempre: el barrido de
 `huerfanos.barrer` -- parte de cada pasada de fondo -- le encola el aviso neutro
 aprobado y deja el incidente. No vuelve a correr el turno con contenido viejo.
+
+Las pruebas que llegaban al barrido por la conversación de los flujos A y B (un mensaje
+o un toque atendido por `gateway`) se retiraron con ellos (E3-4); la entrada del motor
+las rehace (E3-7). Las que siembran los recibos por SQL siguen acá.
 """
 
 from __future__ import annotations
 
-import threading
 import time
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 
-from psycopg import Rollback
-
-from leda import ciclo, gateway, huerfanos
+from leda import ciclo, entrada, huerfanos
 from leda.db import admin, conectar, espacio
 from leda.despachador import TransporteDePrueba
-from leda.incidentes import (EXPLICACION_POR_ETAPA, NOTICIA_NEUTRA_INCIDENTE)
+from leda.incidentes import EXPLICACION_POR_ETAPA, NOTICIA_NEUTRA_INCIDENTE
 from leda.salida import enqueue_outbox
-
-from tests.test_una_respuesta import (_ADJUNTOS, _con_adjunto,
-                                      _con_respuesta_del_modelo, _tg)
-from tests.test_mensaje_repetido import _enviar, _update
-from tests.test_menu_tarea import _mensaje, _tocar, cliente  # noqa: F401
-from tests.test_toque_idempotente import _confirmar_en_curso, _tocar_boton
-
 
 
 def _ahora():
@@ -36,8 +30,9 @@ def _ahora():
     coinciden salvo que una prueba desalinee este a propósito."""
     return datetime.now(timezone.utc)
 
-EN_CURSO = gateway.VENTANA_TURNO_EN_CURSO
-COTA = gateway.COTA_REENTREGA
+
+EN_CURSO = huerfanos.VENTANA
+COTA = huerfanos.COTA
 
 
 def _recibo(conn, ws, app_user_id, chat, *, hace, message_id=41, texto="hola",
@@ -337,11 +332,9 @@ def test_el_ciclo_de_fondo_barre_y_despacha_el_aviso_en_la_misma_pasada(
 def test_la_etapa_del_huerfano_tiene_su_explicacion():
     assert huerfanos.ETAPA_MENSAJE_HUERFANO == "mensaje_huerfano_sin_respuesta"
     assert huerfanos.ETAPA_MENSAJE_HUERFANO in EXPLICACION_POR_ETAPA
-    assert huerfanos.VENTANA is gateway.VENTANA_TURNO_EN_CURSO
-    assert huerfanos.COTA is gateway.COTA_REENTREGA
+    assert huerfanos.VENTANA is entrada.VENTANA_TURNO_EN_CURSO
+    assert huerfanos.COTA is entrada.COTA_REENTREGA
 
-
-# --- T9-H19g: lo que dejó la revisión de T9-H19e/f ----------------------------------
 
 def _incidentes_de_etapa(conn, ws, etapa):
     with admin(conn) as cur:
@@ -440,8 +433,6 @@ def test_si_ni_el_incidente_del_fallo_se_puede_escribir_no_se_pierde_el_resto(
     assert "RuntimeError" in capsys.readouterr().out      # nunca en silencio
 
 
-# El barrido y la reentrega comparten el candado del mensaje.
-
 class _CursorConGancho:
     """Un cursor que dispara `gancho` justo antes de tomar el candado por mensaje:
     el hueco entre elegir el candidato y escribir, donde puede colarse la reentrega."""
@@ -528,146 +519,6 @@ def test_si_la_reentrega_tiene_el_candado_del_mensaje_el_barrido_lo_deja_para_de
     assert _barrer(conn, ws) == 1                   # liberado: ahora sí
 
 
-def test_una_reentrega_durante_el_aviso_de_su_recibo_espera_y_se_absorbe(
-        cliente, corework, conn, uri, monkeypatch):
-    """Mientras la transacción del aviso de un recibo sigue abierta (el aviso ya
-    encolado, sin commit), la reentrega del mismo mensaje espera el candado, ve el
-    aviso como la respuesta y se absorbe: nunca el aviso neutro Y la respuesta real."""
-    ws = corework.workspace_id
-    proveedor = _con_respuesta_del_modelo(monkeypatch)
-    uid, tg = _persona(conn)
-    _recibo(conn, ws, uid, tg, hace=EN_CURSO + timedelta(minutes=1), message_id=41)
-    errores, estado = [], {}
-
-    def entregar():
-        c = conectar(uri)
-        try:
-            gateway.procesar_update(c, "corework", _update(tg))
-        except Exception as e:  # noqa: BLE001
-            errores.append(e)
-        finally:
-            c.close()
-
-    hilo = threading.Thread(target=entregar)
-    real = huerfanos.registrar_incidente
-
-    def incidente_con_reentrega(*a, **k):
-        hilo.start()                                # el aviso ya está encolado
-        time.sleep(1.0)
-        estado["espero"] = hilo.is_alive()          # espera el candado del mensaje
-        return real(*a, **k)
-
-    monkeypatch.setattr(huerfanos, "registrar_incidente", incidente_con_reentrega)
-    assert huerfanos.barrer(conn, ws, _ahora()) == 1
-    hilo.join(timeout=60)
-
-    assert estado["espero"] is True
-    assert not hilo.is_alive() and errores == []
-    assert [a["cuerpo"] for a in _avisos(conn, tg)] == [NOTICIA_NEUTRA_INCIDENTE]
-    assert proveedor.ruteados == []                 # y no corrió un turno de más
-
-
-# --- Ningún turno real queda marcado como huérfano ----------------------------------
-
-def _nada_huerfano(conn, ws):
-    """Envejece todo recibo más allá de la ventana y barre: nada se marca."""
-    with admin(conn) as cur:
-        cur.execute("update inbound_message set at = at - make_interval(secs => %s)",
-                    ((EN_CURSO + timedelta(minutes=2)).total_seconds(),))
-    conn.commit()
-    assert _barrer(conn, ws) == 0
-    assert _incidentes(conn, ws) == []
-
-
-def test_un_mensaje_escrito_y_respondido_nunca_se_marca(
-        cliente, corework, conn, monkeypatch):
-    _con_respuesta_del_modelo(monkeypatch)
-    tg = _tg(conn)
-    _mensaje(cliente, tg, "hola")
-    _nada_huerfano(conn, corework.workspace_id)
-
-
-def test_un_toque_de_un_menu_respondido_nunca_se_marca(cliente, corework, conn):
-    tg, token, _tarea = _confirmar_en_curso(conn, corework.workspace_id)
-    _tocar_boton(cliente, token, tg, callback_id="a")
-    _nada_huerfano(conn, corework.workspace_id)
-
-
-def test_un_toque_repetido_absorbido_nunca_se_marca(cliente, corework, conn):
-    tg, token, _tarea = _confirmar_en_curso(conn, corework.workspace_id)
-    _tocar_boton(cliente, token, tg, callback_id="a")
-    _tocar_boton(cliente, token, tg, callback_id="b")
-    _nada_huerfano(conn, corework.workspace_id)
-
-
-def test_un_toque_de_un_boton_desconocido_nunca_se_marca(
-        cliente, corework, conn, monkeypatch):
-    _con_respuesta_del_modelo(monkeypatch)
-    tg = _tg(conn)
-    _tocar(cliente, "token-inexistente", tg)
-    _nada_huerfano(conn, corework.workspace_id)
-
-
-def test_un_mensaje_editado_nunca_se_marca(cliente, corework, conn, monkeypatch):
-    _con_respuesta_del_modelo(monkeypatch)
-    tg = _tg(conn)
-    _enviar(cliente, _update(tg, message_id=41))
-    _enviar(cliente, _update(tg, texto="hola, editado", message_id=41,
-                             clave="edited_message"))
-    _nada_huerfano(conn, corework.workspace_id)
-
-
-def test_un_mensaje_repetido_absorbido_nunca_se_marca(
-        cliente, corework, conn, monkeypatch):
-    _con_respuesta_del_modelo(monkeypatch)
-    tg = _tg(conn)
-    _enviar(cliente, _update(tg))
-    _enviar(cliente, _update(tg))
-    _nada_huerfano(conn, corework.workspace_id)
-
-
-def test_un_mensaje_con_adjunto_nunca_se_marca(
-        cliente, corework, conn, monkeypatch):
-    _con_respuesta_del_modelo(monkeypatch)
-    tg = _tg(conn)
-    for i, tipo in enumerate(sorted(_ADJUNTOS)):
-        _con_adjunto(cliente, tg, tipo, message_id=10 + i)
-    _con_adjunto(cliente, tg, "photo", "¿qué tengo pendiente?", message_id=30)
-    _nada_huerfano(conn, corework.workspace_id)
-
-
-def test_un_mensaje_que_termino_en_el_aviso_neutro_por_incidente_nunca_se_marca(
-        cliente, corework, conn, monkeypatch):
-    def turno_roto(*a, **k):
-        raise RuntimeError("falló algo interno")
-
-    monkeypatch.setattr(gateway, "_turno", turno_roto)
-    tg = _tg(conn)
-    _mensaje(cliente, tg, "hola")
-    _nada_huerfano(conn, corework.workspace_id)
-
-
-def test_un_mensaje_sin_respuesta_que_termino_en_el_aviso_neutro_nunca_se_marca(
-        cliente, corework, conn, monkeypatch):
-    monkeypatch.setattr(gateway, "_turno", lambda *a, **k: None)
-    tg = _tg(conn)
-    _mensaje(cliente, tg, "hola")
-    _nada_huerfano(conn, corework.workspace_id)
-
-
-def test_un_mensaje_recuperado_por_la_reentrega_nunca_se_marca(
-        cliente, corework, conn, monkeypatch):
-    _con_respuesta_del_modelo(monkeypatch)
-    tg = _tg(conn)
-    uid, _ = _persona(conn)
-    _recibo(conn, corework.workspace_id, uid, tg,
-            hace=EN_CURSO + timedelta(minutes=1), message_id=41)
-    _enviar(cliente, _update(tg, message_id=41))
-    _nada_huerfano(conn, corework.workspace_id)
-
-
-# --- La membresía se busca en ESTE espacio ------------------------------------------
-
 def test_una_persona_en_dos_espacios_se_decide_por_su_membresia_de_cada_uno(
         intake_world, conn):
     norte, oeste = intake_world["north-lab"], intake_world["west-studio"]
@@ -700,8 +551,6 @@ def test_una_persona_en_dos_espacios_se_decide_por_su_membresia_de_cada_uno(
     assert _barrer(conn, norte["id"]) == 0 and _barrer(conn, oeste["id"]) == 0
 
 
-# --- El reloj de la base manda, no el de la aplicación ------------------------------
-
 def test_el_barrido_usa_el_reloj_de_la_base_y_no_avisa_un_turno_vivo(
         corework, conn):
     ws = corework.workspace_id
@@ -729,46 +578,6 @@ def test_el_barrido_usa_el_reloj_de_la_base_para_la_cota_de_24_horas(
 
     assert _barrer(conn, ws, _ahora() - timedelta(hours=12)) == 0   # app atrasada
 
-
-def _reloj_de_la_aplicacion_desalineado(monkeypatch, delta):
-    """El `datetime.now` que ve el gateway, corrido `delta`."""
-    real = gateway.datetime
-
-    class _Desalineado(real):
-        @classmethod
-        def now(cls, tz=None):
-            return real.now(tz) + delta
-
-    monkeypatch.setattr(gateway, "datetime", _Desalineado)
-
-
-def test_la_recuperacion_del_gateway_usa_el_reloj_de_la_base_con_la_app_adelantada(
-        cliente, corework, conn, monkeypatch):
-    proveedor = _con_respuesta_del_modelo(monkeypatch)
-    ws = corework.workspace_id
-    uid, tg = _persona(conn)
-    _recibo(conn, ws, uid, tg, hace=EN_CURSO - timedelta(minutes=1), message_id=41)
-    _reloj_de_la_aplicacion_desalineado(monkeypatch, timedelta(days=30))
-
-    _enviar(cliente, _update(tg, message_id=41))
-
-    assert proveedor.ruteados == []                  # su turno puede seguir vivo
-
-
-def test_la_recuperacion_del_gateway_usa_el_reloj_de_la_base_con_la_app_atrasada(
-        cliente, corework, conn, monkeypatch):
-    proveedor = _con_respuesta_del_modelo(monkeypatch)
-    ws = corework.workspace_id
-    uid, tg = _persona(conn)
-    _recibo(conn, ws, uid, tg, hace=EN_CURSO + timedelta(minutes=1), message_id=41)
-    _reloj_de_la_aplicacion_desalineado(monkeypatch, timedelta(days=-30))
-
-    _enviar(cliente, _update(tg, message_id=41))
-
-    assert len(proveedor.ruteados) == 1              # el turno murió: se recupera
-
-
-# --- El reporte de la falla del barrido y el despacho que sigue ---------------------
 
 def test_el_reporte_de_una_falla_del_barrido_es_deduplicado_y_no_deja_la_excepcion(
         corework, conn):
@@ -861,15 +670,6 @@ def test_la_etapa_del_fallo_de_un_huerfano_tiene_su_explicacion():
     assert huerfanos.ETAPA_MENSAJE_HUERFANO_FALLO in EXPLICACION_POR_ETAPA
 
 
-# --- T9-H19h: lo que dejó la revisión de T9-H19g -------------------------------------
-
-def _cerca_de_ahora_de_la_base(conn, consulta_de_at: str) -> bool:
-    with admin(conn) as cur:
-        cur.execute(f"select abs(extract(epoch from now() - ({consulta_de_at}))) < 30 "
-                    "as cerca")
-        return cur.fetchone()["cerca"]
-
-
 def test_la_marca_de_fallo_no_se_pone_si_el_incidente_no_se_confirmo(
         corework, conn, monkeypatch, capsys):
     """La marca en memoria sólo vale si el incidente del fallo quedó confirmado: si
@@ -909,41 +709,6 @@ def test_la_marca_de_fallo_no_se_pone_si_el_incidente_no_se_confirmo(
         conn, ws, huerfanos.ETAPA_MENSAJE_HUERFANO_FALLO) == [veneno]
 
 
-def test_una_reentrega_durante_el_resto_del_ciclo_no_espera_a_que_termine(
-        cliente, corework, conn, uri, monkeypatch):
-    """El candado del mensaje sólo dura lo que dura el aviso de ese recibo: una
-    reentrega que llega mientras el ciclo sigue (despacho) no espera a su commit."""
-    ws = corework.workspace_id
-    proveedor = _con_respuesta_del_modelo(monkeypatch)
-    uid, tg = _persona(conn)
-    _recibo(conn, ws, uid, tg, hace=EN_CURSO + timedelta(minutes=1), message_id=41)
-    espera = {}
-
-    def entregar():
-        c = conectar(uri)
-        try:
-            gateway.procesar_update(c, "corework", _update(tg))
-        finally:
-            c.close()
-
-    real = ciclo.despachar
-
-    def despachar_con_reentrega(*a, **k):
-        hilo = threading.Thread(target=entregar)
-        hilo.start()
-        hilo.join(timeout=10)                # el ciclo sigue: no puede esperarlo
-        espera["viva"] = hilo.is_alive()
-        return real(*a, **k)
-
-    monkeypatch.setattr(ciclo, "despachar", despachar_con_reentrega)
-    ciclo.ejecutar_pasada(conn, ws, TransporteDePrueba(), _ahora(),
-                          _ahora() - timedelta(hours=1), con_cadencias=False)
-    conn.commit()
-
-    assert espera["viva"] is False
-    assert proveedor.ruteados == []                 # se absorbió: ya tenía su aviso
-
-
 def test_olvidar_fallidos_viejos_descarta_lo_reportado_hace_mas_que_la_cota():
     viejo = time.monotonic() - COTA.total_seconds() - 1
     huerfanos._FALLIDOS["viejo"] = viejo
@@ -952,15 +717,3 @@ def test_olvidar_fallidos_viejos_descarta_lo_reportado_hace_mas_que_la_cota():
     huerfanos._olvidar_fallidos_viejos()
 
     assert list(huerfanos._FALLIDOS) == ["reciente"]
-
-
-def test_un_mensaje_escrito_se_fecha_con_el_reloj_de_la_base_aunque_la_app_este_desalineada(
-        cliente, corework, conn, monkeypatch):
-    _con_respuesta_del_modelo(monkeypatch)
-    tg = _tg(conn)
-    _reloj_de_la_aplicacion_desalineado(monkeypatch, timedelta(days=-2))
-
-    _enviar(cliente, _update(tg, message_id=77))
-
-    assert _cerca_de_ahora_de_la_base(
-        conn, "select at from inbound_message where telegram_message_id = 77")

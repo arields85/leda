@@ -1,19 +1,16 @@
 """Nunca un comprobante pelado (T10-2b, U1; ADR 0013 regla 2).
 
-Toda preparación que escribe define su comprobante corto (`Preparacion.hecho`),
-y el gateway, si por un descuido llegara vacío, no manda un "Hecho." solo.
+Toda preparación que escribe define su comprobante corto (`Preparacion.hecho`). La
+guarda de `gateway` para un comprobante vacío se retiró con los flujos A y B (E3-4).
 """
 
 from __future__ import annotations
 
 import ast
-import dataclasses
 import inspect
 import textwrap
 
 from leda import herramientas as H
-from tests.test_botones import cliente  # noqa: F401
-from tests.test_vista_previa_en_filas import _confirmar
 
 
 def _preparaciones_que_escriben() -> dict[str, object]:
@@ -49,21 +46,3 @@ def test_toda_preparacion_que_escribe_define_su_comprobante():
             if vacio:
                 sin_comprobante.append(f"{nombre}: línea {llamada.lineno}")
     assert sin_comprobante == []
-
-
-def test_el_gateway_no_manda_un_hecho_pelado_si_el_comprobante_llega_vacio(
-        cliente, conn, corework, monkeypatch):
-    original = H.REGISTRO["registrar_bloqueo"]
-
-    def preparar_sin_comprobante(*args, **kwargs):
-        prep = original.preparar(*args, **kwargs)
-        return dataclasses.replace(prep, hecho="")
-
-    monkeypatch.setitem(
-        H.REGISTRO, "registrar_bloqueo",
-        dataclasses.replace(original, preparar=preparar_sin_comprobante))
-    cuerpo = _confirmar(
-        cliente, conn, corework.workspace_id, "registrar_bloqueo",
-        lambda t: {"tarea_id": t, "causa": "falta el switch"})
-    assert cuerpo.strip() != "Hecho."
-    assert "Programar PLC" in cuerpo
