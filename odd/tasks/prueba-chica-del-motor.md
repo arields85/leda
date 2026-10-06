@@ -530,6 +530,27 @@ su evidencia son las corridas. Unas 400 líneas por tarea es una guía, no un to
       de garantía de sol61 (03 v4, 11 v3 y 11 v5, efectos de más) son de corridas mezcladas con 402 y
       no se analizaron: la ronda se repite. Evidencia: `pytest prueba_chica/test_gasto.py` en rojo,
       `1 failed, 12 passed`; `pytest prueba_chica` en verde, `361 passed in 121.34s`.
+- [x] **Tercera y última vuelta de ajuste** (usuario, 2026-10-06; ADR 0018, 9m; 5c.3), después de la
+      ronda 2 válida (`resultados/ronda2-sol.md`: garantías 17 de 17 conversaciones 5 de 5;
+      comprensión 05, 1 de 5; las demás 5 de 5; informes y libreta en `c50f81a`). Reglas generales,
+      ningún caso: las jugadas de un mensaje se aplican en orden (reemplaza "una sola jugada", el
+      renglón tocado por dos arreglos seguidos; el motor ya las aplicaba en orden en la misma
+      transacción y las pruebas nuevas lo fijan); el próximo paso según la definición del usuario,
+      con `lo_que_sigue` en los hechos; lo anunciado en un turno anterior que ya no va a pasar se
+      dice una vez (`ya_no_sale`); el día de la semana y hoy/ayer/mañana/pasado mañana de cada
+      fecha, del código (`dias`); "la persona que escribe" en lugar de "ella"; una respuesta cortada
+      por el tope es no responder (tope de redacción 2000); los significados, de fondo. Las
+      conversaciones: la casilla del próximo paso en cada paso en que Leda escribe, los cuatro
+      próximos pasos vagos hechos concretos y la 16, paso 3, como regresión de lo anunciado.
+      Evidencia (2026-10-06): en rojo, `pytest prueba_chica/test_jugadas_en_orden.py` `2 failed,
+      4 passed` (las instrucciones y las fichas; las cuatro del motor ya pasaban), las de lo
+      anunciado y lo que sigue, de los días y del corte, sin el código nuevo (error de importación;
+      el corte, `4 failed, 38 passed`); en verde, `pytest prueba_chica` `392 passed in 127.42s`; en
+      seco, `--ronda seco-9`, 17 de 17, garantías 17 de 17 (informe borrado). Commits `b15290e`,
+      `7d76376`, `0faaaae`, `4ae0b9a`, `fc8df0c`, `9076d28`, `a977ad6` y el que registra esto.
+      `PENDIENTE`: la ronda 3, sólo con GPT-6 sol (decisión del usuario), y su lectura; la fecha de
+      `hoy` y de las horas de los últimos turnos se toma como viene escrita (un `at` en UTC cerca de
+      la medianoche daría el día de UTC).
 - [ ] **E2-8. Primera ronda real:** sol, luna y Jev; lectura de textos; bitácora; chequeo de rumbo contra 5c.
 - [ ] **E2-9. Telegram real** con el usuario; su juicio; M2 en la bitácora.
 
@@ -566,7 +587,7 @@ previo en `workspace_setting`, no en el importador; el referente es quien aprueb
   `PENDIENTE` confirmar al escribir los YAML que ninguna conversación depende de ellas.
 - **La etapa no es tan chica:** si una tarea pide un caso especial, se frena (5c.1).
 
-**Próximo paso:** la segunda vuelta de la E2-8 con el contrato revisado (9k): sol con Jev y luna,
-cinco veces cada una, sobre las 16; lectura de textos y chequeo de rumbo contra 5c (la revisión
-9k es la primera vuelta de ajustes: si después de la segunda no se alcanza 5b, se revisa con el
-usuario, 5c.3).
+**Próximo paso:** la ronda 3 de la E2-8, sólo con GPT-6 sol (decisión del usuario, 2026-10-06),
+cinco veces cada una de las 17, después de la tercera y última vuelta de ajuste (ADR 0018, 9m);
+lectura de textos, con la casilla del próximo paso en cada mensaje, y chequeo de rumbo contra 5c:
+si no se alcanza 5b, no hay otra vuelta de ajuste: se revisa el diseño con el usuario (5c.3).

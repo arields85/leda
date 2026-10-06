@@ -534,7 +534,7 @@ que le pide. Se revisó entero, con reglas generales y sin ningún caso (5c.1):
    avance no trae fecha, ni bloqueo, ni inicio. Corregir es decir que lo anotado estaba mal; dar
    un hecho nuevo es la jugada de ese hecho. Cada dato dice qué es y va sólo si la persona lo dijo
    (una causa es lo que falta o frena el trabajo). Lo que la persona dijo una vez va en una sola
-   jugada.
+   jugada. *(Esta última oración la reemplaza 9m.1, 2026-10-06.)*
 3. **La duda llega al código.** Si la jugada es clara y la tarea no, la IA elige la jugada sin la
    tarea y el código pregunta cuál, con botones (situación general 5). Ninguna jugada, sólo cuando
    el mensaje no dice ni pide nada que una jugada haga.
@@ -542,7 +542,8 @@ que le pide. Se revisó entero, con reglas generales y sin ningún caso (5c.1):
    desde el registro de turnos y sus hechos, también lo que se dice sólo si se pregunta (9g). Lo
    que no está en la lista es sólo un pedido de hacer algo, y sólo eso avisa al administrador.
 5. **Todo mensaje deja un próximo paso** (constitución §8): la pregunta que se hace, lo que va a
-   pasar y cuándo, o lo que la persona puede hacer; o dice que no hace falta nada. **Y nunca se
+   pasar y cuándo, o lo que la persona puede hacer; o dice que no hace falta nada (*qué cuenta como
+   próximo paso lo reemplaza 9m.2, 2026-10-06*). **Y nunca se
    narra cómo funciona el sistema** (§10): ni lo que intentó o no pudo hacer por dentro; se cuenta
    lo que cambia para la persona, lo que falta y lo que sigue. Todo lo que quedó anotado o cambió
    se cuenta.
@@ -582,6 +583,53 @@ switch, sigo").
   fecha, ni contar un avance; si el mensaje trae además uno de esos hechos, es otra jugada.
 - La respuesta dice qué quedó anotado y el próximo paso. Con más de un bloqueo abierto en la tarea,
   Leda no elige cuál se resolvió: lo dice, con sus causas, y no cierra ninguno.
+
+#### 9m. Tercera vuelta de ajuste (usuario, 2026-10-06)
+
+La segunda ronda real (`prueba_chica/resultados/ronda2-sol.md`, con Sonnet y sol 6.1 como
+referencia) dejó cuatro clases de falla. Es la tercera y última vuelta de ajuste (5c.3), con reglas
+generales y ningún caso (5c.1); la tercera ronda corre sólo con GPT-6 sol.
+
+1. **Las jugadas de un mensaje se aplican en orden.** Reemplaza la última oración de 9k.2, que la
+   ronda 1 había agregado para que una previsión con su porqué no fuera además un bloqueo y que en
+   la ronda 2 impidió anotar quién destraba cuando venía en la misma frase que la causa
+   (conversación 05, paso 5): el mismo renglón tocado por dos arreglos seguidos (punto 4), así que
+   se cambió el enfoque en lugar de parchear la oración. Cada hecho va en la jugada que lo define;
+   una frase puede decir dos hechos distintos y lleva dos jugadas; las jugadas se aplican en el
+   orden en que la persona las dijo, en la misma transacción, así que una se apoya en lo que anotó
+   otra anterior del mismo mensaje (quién destraba y destrabar, sobre el bloqueo que anota la
+   jugada anterior). Lo que evita anotar dos veces una misma cosa son las definiciones de las
+   jugadas (9k.2: una fecha es una previsión, no un bloqueo), no una regla de "una sola jugada".
+2. **El próximo paso** (definición del usuario). Reemplaza qué cuenta como próximo paso en 9k.5:
+   todo mensaje de Leda termina con algo concreto que va a pasar o que la persona puede hacer,
+   dicho una vez y en pocas palabras: lo que Leda va a hacer (por ejemplo, cuándo le vuelve a
+   preguntar), lo que la persona puede hacer (por ejemplo, avisarle cuando se destrabe) o, si no
+   queda nada pendiente, eso junto con lo que sigue. "No hace falta que respondas" solo no cuenta,
+   salvo en los avisos que no piden respuesta (el aviso previo, mecánica §10), donde tiene que estar.
+   Lo que Leda va a hacer lo dicen los hechos, cuando el código lo sabe, para que la IA no lo
+   invente: el último hecho anotado de cada tarea dice lo que sigue en su seguimiento (el próximo
+   aviso guardado para la persona, que el seguimiento se detiene mientras siga trabada, o el día en
+   que Leda le va a pedir el estado). Las instrucciones lo describen en general, sin frases.
+3. **Lo anunciado antes que ya no va a pasar se dice.** Amplía la precisión de 9k (los hechos de lo
+   que pasa después se calculan al final del turno) a lo que anunciaron los turnos anteriores
+   (conversación 16, vez 5: Leda volvió a anunciar un pedido que la fecha ya había dejado sin
+   efecto). Cada turno guarda aparte, fuera de sus hechos, lo que dejó anunciado y pendiente; el
+   turno siguiente lo vuelve a mirar con la misma regla con que se mira al salir, retira lo que ya
+   no corresponde y lo dice una sola vez; lo que sigue pendiente pasa al turno siguiente.
+4. **Los días los da el código.** Cada pedido a la IA lleva, para cada fecha que trae, su día de la
+   semana y, si corresponde, si es hoy, ayer, mañana o pasado mañana; para elegir jugadas, también
+   los de las dos semanas que vienen. Las instrucciones dicen que se usan tal cual, nunca se
+   calculan.
+5. **Se nombra a quién.** Ningún significado, dato ni definición de jugada dice "ella" por la
+   persona que escribe: se dice "la persona que escribe", y que nunca es Leda.
+6. **Una respuesta cortada es que la IA no respondió** (decisión 8): si el proveedor dice que la
+   cortó por el tope de salida, un reintento y después el camino de falla, nunca un texto a medias.
+   El tope de la redacción sube a uno que alcanza para un mensaje entero.
+7. **Los significados son de fondo.** La lista de significados es para entender los datos, nunca un
+   texto para decirle a la persona; lo dicen el encabezado de la lista y las instrucciones, y
+   ningún significado se escribe como una frase para repetir.
+
+El diseño sigue como "propuesta" hasta que pase la prueba chica.
 
 ## Consecuencias
 
