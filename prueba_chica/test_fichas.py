@@ -24,7 +24,7 @@ from leda.db import admin, espacio
 
 VIERNES_9 = datetime(2026, 10, 9, 20, 0, tzinfo=timezone.utc)      # 17:00 en Buenos Aires
 OFRECIDAS = ("anotar_inicio", "anotar_prevision", "anotar_bloqueo", "anotar_quien_destraba",
-             "consultar_pendientes", "informar_avance")
+             "destrabar", "consultar_pendientes", "informar_avance")
 
 
 # --- Ayudas ---------------------------------------------------------------------------------
@@ -460,6 +460,125 @@ def test_quien_destraba_sin_bloqueo_abierto_no_anota_nada(conn, mundo, escribe):
     assert hecho == {"jugada": "anotar_quien_destraba", "resultado": "no_se_puede",
                      "motivo": "sin_bloqueo_abierto"}
     assert _cuantas(conn, "blocker_unblocker") == 0
+
+
+# --- destrabar (decisión del usuario, 2026-10-05; ADR 0018, 9l; conversación 17) -----------
+
+T1 = {"alias": "T1", "titulo": "Revisar el tablero"}
+
+
+@pytest.mark.parametrize("antes", ["asignada", "en_curso"])
+def test_destrabar_cierra_el_bloqueo_y_la_tarea_vuelve_a_su_estado_de_antes(conn, mundo,
+                                                                           escribe, antes):
+    """Mecánica §3: salir de `bloqueada` devuelve la tarea al estado que tenía antes. Se anota
+    directo, como el bloqueo, y cierra la pregunta de quién lo destraba y su espera."""
+    if antes == "en_curso":
+        _jugar(conn, escribe, "Marcos", Jugada("anotar_inicio", {"tarea": "T1"}))
+    _jugar(conn, escribe, "Marcos", Jugada("anotar_bloqueo",
+                                           {"tarea": "T1", "causa": "espero el switch"}))
+
+    [hecho] = _jugar(conn, escribe, "Marcos", Jugada("destrabar", {"tarea": "T1"}),
+                     texto="llego el switch, sigo")
+
+    # Antes de su fecha, la escalera sigue sola: no se guarda ningún pedido.
+    assert hecho == {"jugada": "destrabar", "resultado": "anotado", "tarea": T1,
+                     "bloqueo_resuelto": {"causa": "espero el switch"}, "estado": antes}
+    assert _estado_de(conn, mundo["tarea"]) == antes
+    bloqueo = _uno(conn, "select resuelto_en, resolucion from blocker")
+    assert bloqueo["resuelto_en"] is not None
+    assert bloqueo["resolucion"] == "llego el switch, sigo"
+    [salida] = _todos(conn, """select estado_nuevo from task_state_event
+                                where estado_anterior = 'bloqueada'""")
+    assert salida["estado_nuevo"] == antes
+    pregunta = _uno(conn, """select cerrada_en, cierre from conversation_question
+                              where tipo = 'quien_destraba'""")
+    assert pregunta == {"cerrada_en": AHORA, "cierre": "respondida"}
+    assert _cuantas(conn, "pending_reply where satisfecho_en is null") == 0
+    assert _uno(conn, "select pregunta_abierta_id from conversation_state")[
+        "pregunta_abierta_id"] is None
+    assert _cuantas(conn, "scheduled_notice") == 0      # ni pedido ni aviso a nadie
+
+
+def test_destrabar_cierra_lo_propuesto_para_salir_del_bloqueo(conn, mundo, escribe):
+    """Las salidas de un bloqueo sin otra persona que lo destrabe (9c, paso 3) ya no corresponden
+    cuando el bloqueo se cierra."""
+    _jugar(conn, escribe, "Marcos", Jugada("anotar_bloqueo",
+                                           {"tarea": "T1", "causa": "falta el repuesto"}))
+    _jugar(conn, escribe, "Marcos", Jugada("anotar_quien_destraba", {"no_sabe": True}))
+
+    [hecho] = _jugar(conn, escribe, "Marcos", Jugada("destrabar", {"tarea": "T1"}))
+
+    assert hecho["resultado"] == "anotado" and "pregunta" not in hecho
+    assert _cuantas(conn, "conversation_question where cerrada_en is null") == 0
+    propuesta = _uno(conn, """select cierre from conversation_question
+                               where tipo = 'propuesta'""")
+    assert propuesta["cierre"] == "sin_efecto"
+
+
+def test_destrabar_una_tarea_que_no_esta_trabada_no_hace_nada(conn, mundo, escribe):
+    [hecho] = _jugar(conn, escribe, "Marcos", Jugada("destrabar", {"tarea": "T1"}))
+
+    assert hecho == {"jugada": "destrabar", "resultado": "no_se_puede", "motivo": "estado",
+                     "tarea": T1, "estado": "asignada"}
+    assert _cuantas(conn, "task_state_event") == 0
+
+
+def test_destrabar_con_dos_bloqueos_abiertos_no_adivina_cual(conn, mundo, escribe):
+    """Leda no elige por la persona qué causa desapareció: lo dice, con las causas, y no
+    cierra ninguno."""
+    for causa in ("espero el switch", "falta la fuente"):
+        _jugar(conn, escribe, "Marcos", Jugada("anotar_bloqueo", {"tarea": "T1", "causa": causa}))
+
+    [hecho] = _jugar(conn, escribe, "Marcos", Jugada("destrabar", {"tarea": "T1"}))
+
+    assert hecho == {"jugada": "destrabar", "resultado": "no_se_puede",
+                     "motivo": "varios_bloqueos_abiertos", "tarea": T1,
+                     "causas": ["espero el switch", "falta la fuente"]}
+    assert _cuantas(conn, "blocker where resuelto_en is null") == 2
+    assert _estado_de(conn, mundo["tarea"]) == "bloqueada"
+
+
+def test_destrabar_el_dia_del_vencimiento_vuelve_a_pedir_el_estado(conn, mundo, escribe):
+    """Con el seguimiento ya empezado (hoy es su fecha), destrabarse no es algo cierto sobre
+    cuándo la termina: la espera del estado queda abierta y Leda vuelve a pedirlo el día hábil
+    siguiente, con la cuenta de nuevo, como después de un avance (9h). Todavía no está vencida:
+    sin la pregunta de para cuándo (9j)."""
+    # La fecha comprometida no cambia (la base lo impide): una tarea que vence hoy, que es T1.
+    _tarea_nueva(conn, mundo, "Cablear el tablero",
+                 fecha=datetime(2026, 10, 5, 20, 0, tzinfo=timezone.utc))      # hoy, 17:00
+    _jugar(conn, escribe, "Marcos", Jugada("anotar_bloqueo",
+                                           {"tarea": "T1", "causa": "se quemo la fuente"}))
+
+    [hecho] = _jugar(conn, escribe, "Marcos", Jugada("destrabar", {"tarea": "T1"}),
+                     texto="ya cambie la fuente, sigo")
+
+    assert hecho["resultado"] == "anotado" and hecho["estado"] == "asignada"
+    assert hecho["vuelve_a_pedir_el_estado"]["estado"] == "guardado_sin_enviar"
+    assert hecho["vuelve_a_pedir_el_estado"]["sale"].startswith("2026-10-06")
+    assert hecho["veces_sin_algo_cierto"] == 1
+    assert "vencida" not in hecho and "pregunta" not in hecho
+    [pedido] = _todos(conn, "select tipo, estado, hechos from scheduled_notice")
+    assert (pedido["tipo"], pedido["estado"]) == ("repregunta_de_estado", "guardado")
+    assert pedido["hechos"]["avance_anterior"]["jugada"] == "destrabar"
+    assert pedido["hechos"]["avance_anterior"]["dijo"] == "ya cambie la fuente, sigo"
+    espera = _uno(conn, """select tipo from pending_reply where satisfecho_en is null""")
+    assert espera["tipo"] == "estado_de_la_tarea"
+
+
+def test_destrabar_una_tarea_vencida_pregunta_para_cuando(conn, mundo, escribe):
+    """La regla de la tarea vencida (9j) vale también para destrabar: no es una fecha."""
+    _tarea_nueva(conn, mundo, "Cablear el tablero",
+                 fecha=datetime(2026, 10, 2, 20, 0, tzinfo=timezone.utc))      # el viernes
+    _jugar(conn, escribe, "Marcos", Jugada("anotar_bloqueo",
+                                           {"tarea": "T1", "causa": "espero el switch"}))
+
+    [hecho] = _jugar(conn, escribe, "Marcos", Jugada("destrabar", {"tarea": "T1"}))
+
+    assert hecho["vencida"]["atraso_dias_habiles"] == 1
+    assert hecho["pregunta"] == "fecha_de_la_tarea"
+    assert hecho["vuelve_a_pedir_el_estado"]["sale"].startswith("2026-10-06")
+    assert _cuantas(conn, "scheduled_notice where tipo = 'repregunta_de_estado'") == 1
+
 
 
 # --- consultar_pendientes, entregar y pedir_reasignacion ------------------------------------

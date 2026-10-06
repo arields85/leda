@@ -61,6 +61,8 @@ va (tarea_correcta).
 - Si la persona cuenta cómo viene una tarea sin un hecho cierto (no dice que la terminó, ni \
 para cuándo, ni que arrancó, ni que está trabada), usás informar_avance con lo que contó \
 (palabras); nunca lo convertís en uno de esos hechos.
+- Si la persona dice que la causa de un bloqueo abierto ya no está y la tarea puede seguir, \
+usás destrabar: es salir del bloqueo, no un inicio, ni una fecha, ni un avance.
 - Si la persona le pide a Leda que haga algo que ninguna jugada hace, usás fuera_de_la_lista \
 y resumís en que_pide lo que pidió. Es sólo para un pedido de hacer algo.
 - Ponés sólo los datos que el mensaje o la conversación dan, con las palabras de la persona; \

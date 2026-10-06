@@ -124,6 +124,9 @@ SIGNIFICADOS: Mapping[str, str] = {
     "no_sabe": "La persona dijo que no sabe quién puede destrabarlo.",
     "nadie_mas": "La persona dijo que nadie más puede destrabarlo: le toca a ella.",
     "salidas": "Lo que Leda le propone a la persona para salir de un bloqueo, para que elija.",
+    "bloqueo_resuelto": "El bloqueo que quedó cerrado porque la persona dijo que su causa ya no "
+                        "está, con esa causa: la tarea ya no está trabada por eso.",
+    "causas": "Las causas de los bloqueos abiertos de la tarea, como las dijo la persona.",
     "avance": "Lo que la persona contó de cómo viene la tarea, sin un hecho cierto.",
     "dijo": "Lo que dijo la persona, con sus palabras.",
     "el_pedido_de_estado": "Si Leda sigue esperando saber cómo viene la tarea.",
@@ -223,6 +226,8 @@ SIGNIFICADOS: Mapping[str, str] = {
     "regla_del_trabajo": "Una regla del trabajo no lo permite.",
     "sin_fecha_comprometida": "La tarea no tiene fecha comprometida.",
     "sin_bloqueo_abierto": "La tarea no tiene un bloqueo abierto.",
+    "varios_bloqueos_abiertos": "La tarea tiene más de un bloqueo abierto: falta saber cuál se "
+                                "resolvió (causas dice cuáles son).",
     "nadie_pidio_el_estado": "Leda no le había pedido el estado de esa tarea.",
     "la_entrega_todavia_no_se_recibe_por_chat": "La entrega de una tarea todavía no se recibe "
                                                 "por chat.",

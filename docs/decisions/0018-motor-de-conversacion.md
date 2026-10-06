@@ -3,8 +3,8 @@
 - **Estado:** propuesta. El usuario aceptó su diseño para la prueba el 2026-10-04 (paso M1), con
   las decisiones 1 a 8. Queda como propuesta hasta que pase la prueba chica de la Etapa 2. La
   decisión 9 (usuario, 2026-10-04) precisa lo que dejaron abierto las conversaciones de prueba;
-  el 2026-10-05 el usuario le sumó 9h, 9i y 9j y, después de la primera ronda real, la revisión
-  del contrato entre la IA y el código (9k).
+  el 2026-10-05 el usuario le sumó 9h, 9i y 9j, después de la primera ronda real, la revisión
+  del contrato entre la IA y el código (9k), y la jugada `destrabar` (9l).
 - **Fecha:** abierta el 2026-10-04.
 - **Alcance:** cómo procesa Leda cada mensaje y cada toque en el seguimiento por chat (ADR 0017,
   decisión 3): quién decide qué, el estado de la conversación, los circuitos, las situaciones
@@ -547,9 +547,31 @@ que le pide. Se revisó entero, con reglas generales y sin ningún caso (5c.1):
    lo que cambia para la persona, lo que falta y lo que sigue. Todo lo que quedó anotado o cambió
    se cuenta.
 
-`PENDIENTE` (decisión del usuario): ninguna jugada cierra un bloqueo cuando su causa desaparece
-(la persona cuenta que llegó lo que faltaba). Agregarla es una jugada nueva (decisión 1); hasta
-entonces, lo que se puede anotar es la previsión.
+Cerrar un bloqueo cuando su causa desaparece quedó `PENDIENTE` de una decisión del usuario; la
+tomó el mismo día: es la jugada `destrabar` (9l).
+
+#### 9l. Destrabar: la causa del bloqueo ya no está (usuario, 2026-10-05)
+
+Una jugada nueva, decidida por el usuario (decisión 1: una jugada nueva la decide una persona) y
+escrita primero como la conversación de prueba 17 (`tests/conversaciones/17-destrabar.md`):
+`destrabar`, cuando la persona dice que la causa de un bloqueo abierto ya no está ("llego el
+switch, sigo").
+
+- **Leda cierra el bloqueo, directo**, como lo anotó (9a), con la operación del dominio
+  (`resolver_bloqueo`), atribuido y auditado: la tarea vuelve al estado que tenía antes de
+  bloquearse (mecánica §3).
+- **Lo que esperaba algo del bloqueo se cierra con él**: la pregunta de quién lo destraba (9c,
+  paso 2) y su espera, y lo propuesto para salir de él (9c, paso 3).
+- **El seguimiento vuelve.** Antes de su fecha, la escalera sigue sola. Si el seguimiento ya había
+  empezado (hoy es su fecha, o la pasó), destrabarse no es algo cierto sobre cuándo la termina: la
+  espera del estado queda abierta y Leda vuelve a pedirlo el día hábil siguiente, con la cuenta de
+  nuevo, como después de un avance (9h); vencida, además, la pregunta de para cuándo (9j). Lo que
+  había detenido la cuenta anterior (un paso que no salió porque la tarea se bloqueó) no detiene la
+  nueva.
+- **Se distingue de las parecidas** (9k.2): salir de un bloqueo no es empezar la tarea, ni dar una
+  fecha, ni contar un avance; si el mensaje trae además uno de esos hechos, es otra jugada.
+- La respuesta dice qué quedó anotado y el próximo paso. Con más de un bloqueo abierto en la tarea,
+  Leda no elige cuál se resolvió: lo dice, con sus causas, y no cierra ninguno.
 
 ## Consecuencias
 

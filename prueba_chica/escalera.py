@@ -22,7 +22,10 @@ las pruebas mueven los días. Todo se cuenta en días hábiles del espacio desde
 Un paso por vez y nunca dos el mismo día hábil: si el ciclo estuvo parado, la escalera retoma
 desde el paso que sigue. Cada paso es un aviso guardado con una clave de deduplicación (la
 tarea, su vencimiento y el paso): correrla de nuevo no hace nada nuevo. Una tarea bloqueada no
-está en la escalera, y un aviso suyo guardado se omite al salir.
+está en la escalera, y un aviso suyo guardado se omite al salir. Al destrabarse (`destrabar`,
+ADR 0018, 9l) vuelve a estar: antes de su fecha, sigue sola; con el seguimiento ya empezado, la
+jugada guarda el pedido del día hábil siguiente y la cuenta empieza de nuevo, como con un avance
+(abajo), así que lo que la detuvo antes no la detiene.
 
 **Cuándo termina** (revisión de la E2-5). La escalera es de un vencimiento: termina al escalar
 (nada más se le pide a nadie por ese vencimiento) o cuando la persona contesta o se bloquea la
@@ -184,7 +187,10 @@ def _un_paso(m: Momento, tarea: dict[str, Any], n: int | None) -> str | None:
     avance = _ultimo_avance(escalon)
     if escalo(escalon, espera):
         return None                     # la escalera de esta ancla terminó
-    if any(a["estado"] == "omitido" and a["motivo_omision"] in DETIENEN for a in escalon):
+    # Lo que detuvo una cuenta anterior no detiene la que empezó con un avance (o al
+    # destrabarse, 9l): la persona contestó después, y la cuenta nueva corre desde ahí.
+    if any(a["estado"] == "omitido" and a["motivo_omision"] in DETIENEN
+           and (avance is None or a["creado_en"] >= avance["creado_en"]) for a in escalon):
         return None                     # contestó o se bloqueó antes de que saliera un paso
     # Los pasos dados: salieron, fallaron o se omitieron por otra cosa. Uno que la IA no
     # redactó ya dejó su incidente y no apaga el seguimiento: la escalera sigue con el próximo.

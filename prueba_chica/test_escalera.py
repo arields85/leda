@@ -300,6 +300,27 @@ def test_un_aviso_guardado_de_una_tarea_que_se_bloqueo_se_omite(conn, mundo, dia
     assert pedido["motivo_omision"] == "bloqueo_abierto"
 
 
+def test_destrabar_un_bloqueo_que_detuvo_la_escalera_la_retoma(conn, mundo, dias, escribe):
+    """Decisión del usuario, 2026-10-05 (ADR 0018, 9l; conversación 17): si el bloqueo había
+    detenido la escalera (un paso guardado que no salió porque la tarea se bloqueó), al
+    destrabarse el seguimiento vuelve. El día del vencimiento, destrabarse empieza una cuenta
+    nueva, como un avance (9h): lo que detuvo la cuenta anterior no detiene la nueva."""
+    correr_escalera(conn, mundo["id"], RelojFijo(_hora(9, 7)))
+    conn.commit()
+    _dice(conn, escribe, Jugada("anotar_bloqueo", {"tarea": "T1", "causa": "falta el PLC"}),
+          at=_hora(9, 8))
+    assert dias.ciclo(_hora(9, 9)) == []
+    [omitido] = _avisos(conn, "pedido_de_estado")
+    assert omitido["motivo_omision"] == "bloqueo_abierto"
+
+    _dice(conn, escribe, Jugada("destrabar", {"tarea": "T1"}), at=_hora(9, 9, 30))
+
+    [otra_vez] = dias.ciclo(_hora(13, 10))         # el lunes 12 es feriado
+    assert otra_vez["hechos"][0]["aviso"] == "repregunta_de_estado"
+    [sigue] = dias.ciclo(_hora(14, 10))            # sin respuesta, la escalera sigue
+    assert sigue["hechos"][0]["aviso"] == "pedido_de_estado"
+
+
 # --- Horario (9e) ---------------------------------------------------------------------------------
 
 def test_lo_que_la_escalera_guarda_fuera_del_horario_sale_al_empezar_la_jornada(conn, mundo, dias):

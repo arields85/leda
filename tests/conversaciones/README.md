@@ -47,11 +47,16 @@ El circuito es el recordatorio y lo que la persona contesta (ADR 0018, decisión
 16. [`16-vencida-sin-fecha.md`](16-vencida-sin-fecha.md): "arranqué hoy" con la tarea vencida; Leda anota el
     inicio y, en la misma respuesta, pregunta para qué día la va a tener; la fecha que da Marcos es una
     nueva previsión y el seguimiento se mueve a ella.
+17. [`17-destrabar.md`](17-destrabar.md): "llego el switch, sigo" con la tarea trabada; Leda cierra el
+    bloqueo, la tarea vuelve a su estado de antes, la pregunta de quién lo destraba se cierra y el
+    seguimiento vuelve; el día del vencimiento se traba y se destraba otra vez, y Leda vuelve a pedir el
+    estado el día hábil siguiente.
 
 Las cuatro primeras son las cuatro respuestas de 5a; de la 5 a la 12, cada una aplica al recordatorio una
 de las ocho situaciones generales de la decisión 4. La 15 suma la jugada `informar_avance` (decisión del
 usuario, 2026-10-05; ADR 0018, decisión 9b). La 16, la regla de la tarea vencida (decisión del usuario,
-2026-10-05; ADR 0018, decisión 9j).
+2026-10-05; ADR 0018, decisión 9j). La 17, la jugada `destrabar` (decisión del usuario, 2026-10-05;
+ADR 0018, decisión 9l).
 
 ## Formato de cada conversación
 
@@ -149,6 +154,8 @@ importa es el significado:
 - `informar_avance`: la persona cuenta cómo viene una tarea sin un hecho cierto (no dice que la
   terminó, ni para cuándo, ni que está trabada); queda anotado con sus palabras y la espera sigue
   abierta (decisión del usuario, 2026-10-05).
+- `destrabar`: la persona dice que la causa de un bloqueo abierto ya no está y la tarea puede seguir;
+  el bloqueo se cierra y la tarea vuelve al estado que tenía antes (decisión del usuario, 2026-10-05).
 
 ## Decisiones del usuario (2026-10-04)
 
@@ -204,3 +211,8 @@ y 9d). Ninguna conversación prueba todavía dos preguntas encadenadas por un ca
   a ella. Vale para toda jugada sobre una tarea vencida, no para una (9j; conversaciones 15 y 16). La 15
   la prueba donde 9h y 9j se tocan: el primer avance, el día del vencimiento, no lleva pregunta; el
   segundo, con la tarea ya vencida, sí.
+- **Cuando la causa de un bloqueo desaparece** ("llego el switch, sigo"): Leda cierra el bloqueo, directo,
+  como lo anotó; la tarea vuelve al estado que tenía antes (mecánica §3); la pregunta de quién lo
+  destraba y su espera se cierran; si el bloqueo había detenido el seguimiento, vuelve: antes de su
+  fecha, la escalera sigue sola; con el seguimiento ya empezado, Leda vuelve a pedir el estado el día
+  hábil siguiente, como después de un avance (9l; conversación 17).

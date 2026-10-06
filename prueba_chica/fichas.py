@@ -575,6 +575,54 @@ def _anotar_quien_destraba(ctx: Contexto, datos: dict, tarea: dict | None) -> di
     return {**hecho, "salidas": list(SALIDAS_DE_UN_BLOQUEO)} if sin_otra_persona else hecho
 
 
+def _destrabar(ctx: Contexto, datos: dict, tarea: dict) -> dict:
+    """La persona dice que la causa del bloqueo ya no está (decisión del usuario, 2026-10-05; ADR
+    0018, 9l). Se cierra directo, como se anotó (9a), con la operación del dominio
+    (`resolver_bloqueo`): la tarea vuelve al estado que tenía antes de bloquearse (mecánica §3).
+    Lo que esperaba algo del bloqueo se cierra con él: la pregunta de quién lo destraba (la
+    contesta, por su ficha), lo propuesto para salir de él y sus esperas. Con más de un bloqueo
+    abierto no se elige cuál: se dice, con sus causas.
+
+    La tarea vuelve al seguimiento (la escalera sólo sigue las que no tienen un bloqueo
+    abierto). Antes de su fecha, la escalera sigue sola. Si su seguimiento ya había empezado (hoy
+    es su fecha, o la pasó), la respuesta no es algo cierto sobre cuándo la termina: la espera
+    del estado queda abierta y Leda vuelve a pedirlo el día hábil siguiente con la cuenta de
+    nuevo, como después de un avance (9h); vencida, además, la pregunta de para cuándo (9j,
+    `_si_esta_vencida`)."""
+    cur = ctx.cur
+    cur.execute("""select id, causa from blocker where task_id = %s and resuelto_en is null
+                    order by abierto_en, causa""", (tarea["id"],))
+    abiertos = cur.fetchall()
+    if not abiertos:
+        return {"resultado": "no_se_puede", "motivo": "sin_bloqueo_abierto",
+                "tarea": _tarea(tarea)}
+    if len(abiertos) > 1:
+        return {"resultado": "no_se_puede", "motivo": "varios_bloqueos_abiertos",
+                "tarea": _tarea(tarea), "causas": [b["causa"] for b in abiertos]}
+    [bloqueo] = abiertos
+    dijo = (ctx.texto or ctx.toque or "").strip() or "la causa del bloqueo ya no está"
+    r = ejecutar(cur, ctx.quien, "resolver_bloqueo",
+                 {"bloqueo_id": str(bloqueo["id"]), "resolucion": dijo}, ya_confirmada=True)
+    if not r.get("resuelto"):
+        return _no_hecho(r, tarea)
+    _cerrar_esperas(ctx, tarea["id"])
+    preguntas.cerrar_las_de_una_jugada(ctx, "anotar_quien_destraba", tarea["id"], "sin_efecto",
+                                       {"jugada": "destrabar", "tarea": tarea["id"]})
+    cur.execute("select estado::text estado from task where id = %s", (tarea["id"],))
+    hecho: dict[str, Any] = {"resultado": "anotado", "tarea": _tarea(tarea),
+                             "bloqueo_resuelto": {"causa": bloqueo["causa"]},
+                             "estado": cur.fetchone()["estado"]}
+    fila = _exigir_responsable(cur, ctx.quien, tarea["id"])
+    if fila["fecha_objetivo"] is not None:
+        cal = ctx.calendario
+        de = anclaje(cur, tarea["id"], fila["fecha_objetivo"].astimezone(cal.zona).date())
+        if ctx.ahora.astimezone(cal.zona).date() >= de.fecha:
+            candado(cur, tarea["id"])
+            hecho.update(_seguir_pidiendo(ctx, tarea, _espera_del_estado(ctx, tarea),
+                                          {"jugada": "destrabar", "dijo": dijo}))
+    return hecho
+
+
 def palabras(texto: str) -> list[str]:
     """Las palabras de un nombre, sin mayúsculas ni acentos."""
     sin_acentos = unicodedata.normalize("NFKD", texto.casefold())
@@ -901,7 +949,8 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
           contesta=(preguntas.ESTADO_DE_LA_TAREA, preguntas.FECHA_DE_LA_TAREA),
           deshacer=_deshacer_inicio,
           es="La persona dice que empezó a trabajar en una tarea. Es sólo el comienzo: no "
-             "trae la fecha para la que la termina ni dice que no puede avanzar."),
+             "trae la fecha para la que la termina ni dice que no puede avanzar. Seguir con "
+             "una tarea que estaba trabada no es empezarla: es salir del bloqueo."),
     Ficha("anotar_prevision", "anotar para cuándo prevé terminar una tarea, y por qué",
           necesita=("tarea", "fecha"), opcional=("motivo",),
           comprueba="que sea el responsable, que la tarea esté abierta y tenga fecha "
@@ -944,6 +993,22 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
           es="La persona dice quién puede destrabar un bloqueo abierto (alguien del equipo o "
              "de afuera), que no sabe quién, o que nadie más: le toca a ella. Es la respuesta "
              "a quién lo destraba, no la causa del bloqueo."),
+    Ficha("destrabar", "anotar que una tarea trabada ya puede seguir",
+          necesita=("tarea",), opcional=(),
+          comprueba="que sea el responsable y que la tarea esté bloqueada, con un solo bloqueo "
+                    "abierto",
+          hace="cierra el bloqueo (resolver_bloqueo): la tarea vuelve al estado que tenía "
+               "antes de bloquearse",
+          despues="cierra la pregunta de quién lo destraba, lo propuesto para salir del bloqueo "
+                  "y sus esperas; la escalera vuelve a seguir la tarea y, si su seguimiento ya "
+                  "había empezado, Leda vuelve a pedir el estado el día hábil siguiente",
+          manejar=_destrabar, del_responsable=True, estados=frozenset({"bloqueada"}),
+          contesta=(preguntas.QUIEN_DESTRABA,), sigue_el_pedido=True,
+          es="La persona dice que la causa de un bloqueo abierto ya no está: llegó lo que le "
+             "faltaba o se resolvió lo que frenaba el trabajo, y la tarea puede seguir. Es "
+             "salir de un bloqueo: no es empezar la tarea, ni dar la fecha para la que la "
+             "termina, ni contar cómo viene; si además dice uno de esos hechos, ése es otra "
+             "jugada."),
     Ficha("informar_avance", "anotar cómo viene una tarea cuando la persona cuenta un avance "
                              "sin un hecho cierto",
           necesita=("tarea",), opcional=("palabras",),

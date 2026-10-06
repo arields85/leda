@@ -302,6 +302,15 @@ def test_las_instrucciones_describen_el_avance_sin_algo_cierto():
             assert frase not in texto.lower(), frase
 
 
+def test_las_instrucciones_describen_destrabar_sin_frases():
+    """Decisión del usuario, 2026-10-05 (ADR 0018, 9l): que la causa de un bloqueo ya no esté es
+    `destrabar`, distinta de un inicio, una fecha o un avance. Sin frases de la conversación 17."""
+    texto = INSTRUCCIONES_JUGADAS.lower()
+    assert "destrabar" in texto
+    for frase in ("switch", "llego el", "fuente"):
+        assert frase not in texto, frase
+
+
 def test_la_redaccion_lee_el_estado_de_lo_que_pasa_despues():
     """Primer contacto real (2026-10-05): un aviso guardado se contó como hecho. La regla es
     de lectura de los hechos, para todo efecto que pasa después, sin frases de ejemplo."""
