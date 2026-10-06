@@ -23,7 +23,7 @@ Qué es un huérfano. Un recibo de esta pasada que:
   texto, ni id de Telegram, ni botón, y por diseño no responde: se excluye. Un
   desconocido nunca deja recibo (`procesar_update` lo descarta antes de la fase 1);
 - no tiene ninguna fila de respuesta, en cualquier estado
-  (`respuesta_unica.sql_respondido`): un turno muerto no deja ninguna, y lo que el
+  (`entrada.sql_respondido`): un turno muerto no deja ninguna, y lo que el
   código descartó a propósito o falló al entregarse no es un turno muerto;
 - no tiene un recibo más nuevo del mismo mensaje: si la reentrega lo recuperó, el
   recibo muerto queda atrás y sólo cuenta el último (con respuesta o sin ella).
@@ -49,7 +49,7 @@ Cada recibo se atiende aparte (T9-H19g, T9-H19h):
   ocupan el lugar de los sanos, y se reintentan en cada pasada por si la causa
   desapareció;
 - bajo el MISMO candado por mensaje que toma `gateway._estado_de_entrega`
-  (`gateway.clave_de_candado_del_mensaje`), sin esperar: si la reentrega lo tiene, se
+  (`entrada.clave_de_candado_del_mensaje`), sin esperar: si la reentrega lo tiene, se
   deja para la pasada siguiente; y el recibo se vuelve a comprobar huérfano ya con el
   candado, porque entre elegirlo y tomarlo la reentrega pudo recuperarlo. Así el
   aviso neutro y la respuesta real nunca salen los dos.
@@ -61,13 +61,12 @@ import time
 from datetime import datetime
 
 from .db import atar_al_entrante, espacio
-from .gateway import COTA_REENTREGA as COTA
-from .gateway import VENTANA_TURNO_EN_CURSO as VENTANA
-from .gateway import clave_de_candado_del_mensaje
+from .entrada import COTA_REENTREGA as COTA
+from .entrada import VENTANA_TURNO_EN_CURSO as VENTANA
+from .entrada import clave_de_candado_del_mensaje, sql_respondido
 from .incidentes import (ETAPA_MENSAJE_HUERFANO, ETAPA_MENSAJE_HUERFANO_FALLO,
                          NOTICIA_NEUTRA_INCIDENTE, REFERENCIA_INBOUND_MESSAGE,
                          registrar_incidente)
-from .respuesta_unica import sql_respondido
 from .salida import enqueue_outbox
 
 # Cuántos recibos se avisan por pasada: lo que queda sale en la siguiente.

@@ -1,8 +1,9 @@
-"""Webhook de Telegram.
+"""Webhook de Telegram: la conversación de los flujos A y B.
 
-Un bot por espacio de trabajo. La ruta lleva el slug, así que el espacio queda
-determinado por el canal de entrada y no hay que deducirlo del mensaje: si
-alguien pertenece a dos equipos, no existe ambigüedad.
+La aplicación HTTP y sus rutas viven en `entrada.py` (E3-2). La ruta
+`/telegram/{slug}` le pasa cada update a `webhook`, acá, hasta que la entrada del
+motor la reemplace (E3-7). `app` y `registrar_webhooks` se siguen exponiendo con su
+nombre para las pruebas de los flujos viejos, que se retiran en la E3-4.
 
 El secreto de Telegram se verifica en cada llamada. Sin eso, cualquiera que
 conozca la URL podría hacerse pasar por el gateway.
@@ -15,9 +16,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from fastapi import (APIRouter, BackgroundTasks, FastAPI, Header,
-                     HTTPException, Request)
-from fastapi.responses import HTMLResponse
+from fastapi import BackgroundTasks, HTTPException, Request
 
 from .autoridad import (Canal, Denegado, identificar, identificar_en_espacio)
 from .calendario import Calendario
@@ -25,16 +24,19 @@ from .config import config
 from .db import (admin, atar_al_entrante, autoridad, conectar,
                  conectar_autoridad, espacio, registrar_auditoria)
 from .despachador import (TransporteTelegram, acusar_toque, despachar,
-                          mantener_chat_activo, pedido_telegram,
-                          texto_error_seguro)
+                          mantener_chat_activo, texto_error_seguro)
+# `app` y `registrar_webhooks`, con su nombre de antes, para las pruebas de los
+# flujos viejos (E3-4 las retira); `_conn` es la misma conexión de la entrada.
+from .entrada import (COTA_REENTREGA, VENTANA_TURNO_EN_CURSO, _conn, app,
+                      clave_de_candado_del_mensaje, registrar_webhooks,
+                      sql_respondido)
 from .incidentes import (ETAPA_ENRUTAMIENTO, ETAPA_JEV_NO_CONFIGURADO,
                          NOTICIA_NEUTRA_INCIDENTE, REFERENCIA_INBOUND_MESSAGE,
                          REFERENCIA_PENDING_ACTION, registrar_incidente)
 from .ingreso_tareas import (QUESTION_CHOICE, QUESTION_CONFIRMATION,
                              QUESTION_FREE_TEXT)
 from .respuesta_unica import controlar as controlar_una_respuesta
-from .respuesta_unica import (dejar_nota, limpiar_nota, respuestas_del_mensaje,
-                              sql_respondido)
+from .respuesta_unica import dejar_nota, limpiar_nota, respuestas_del_mensaje
 from .salida import TRUNCAR_ETIQUETA_BOTON as TRUNCAR_TITULO_BOTON
 from .salida import (ETIQUETA_CANCELAR, ETIQUETA_CONFIRMAR, ETIQUETA_MODIFICAR,
                      ICONO_CANCELAR,
@@ -44,9 +46,6 @@ from .salida import (ETIQUETA_CANCELAR, ETIQUETA_CONFIRMAR, ETIQUETA_MODIFICAR,
                      etiquetas_de_tarea,
                      normalize_visible_text, truncar_etiqueta_boton,
                      with_no_effect_status)
-
-app = FastAPI(title="Leda", docs_url=None, redoc_url=None)
-router = APIRouter()
 
 # Aclaración con botones (T4, `aclaracion-con-botones`; ADR 0005 decisión 3).
 #
@@ -152,22 +151,6 @@ AVISO_PEDIDO_NO_VIGENTE = (
 # "El mismo botón" es el mismo `callback_data` en el mismo chat: lleva el token de
 # la opción, único por botón, y queda en `inbound_message.boton_callback`.
 VENTANA_TOQUE_REPETIDO = timedelta(seconds=10)
-# T9-H19d: el recibo de la fase 1 significa "recibido", no "respondido". Una
-# reentrega del mismo mensaje se absorbe sólo si (a) ya tiene una respuesta visible,
-# o (b) su recibo es lo bastante reciente como para que el turno siga corriendo.
-# La duración de un turno está acotada: cada llamada al modelo tarda a lo sumo
-# `llm.TIMEOUT_MODELO_S` (20 s) x (1 + `REINTENTOS_MODELO` = 2) = 60 s, y un turno
-# encadena el enrutamiento (2 intentos) y hasta `agente.MAX_VUELTAS` (5) vueltas:
-# ~7 min en el peor caso teórico, 10-30 s en el normal. 10 min queda por encima.
-# Un recibo más viejo y sin respuesta es un turno muerto (reinicio, OOM): la
-# reentrega es la recuperación.
-VENTANA_TURNO_EN_CURSO = timedelta(minutes=10)
-# Cota global: la Bot API guarda las actualizaciones a lo sumo 24 horas ("they will
-# not be kept longer than 24 hours", getUpdates) y del webhook sólo dice que
-# reintenta "una cantidad razonable de veces" (SUPUESTO: no reentrega más allá de
-# esa cota). Un recibo más viejo nunca absorbe: si Telegram reinicia la numeración
-# (cambia el token del bot), un mensaje nuevo puede chocar con un id viejo.
-COTA_REENTREGA = timedelta(hours=24)
 _ELECCION_DATO_SI = "si"
 _ELECCION_DATO_SEGUIR = "seguir"
 _ELECCION_DATO_DEJAR = "dejar"
@@ -217,12 +200,6 @@ _LIMITE_PROPUESTA_PARA_RUTEO = 400
 # (importado arriba): la regla de truncado vive ahí, reusada por
 # `ofrecer_opciones` (T1, ADR 0007); este nombre se conserva porque las
 # pruebas de la aclaración con botones ya lo referencian.
-
-
-def _conn():
-    if not hasattr(_conn, "_c") or _conn._c.closed:
-        _conn._c = conectar()
-    return _conn._c
 
 
 def _authority_conn():
@@ -341,9 +318,11 @@ def _despachar_ahora_en_fondo(slug: str) -> None:
             pass
 
 
-@router.post("/telegram/{slug}")
 async def webhook(slug: str, request: Request, background_tasks: BackgroundTasks,
-                  x_telegram_bot_api_secret_token: str = Header(default="")):
+                  x_telegram_bot_api_secret_token: str = ""):
+    """Atiende el update que le pasa la ruta `/telegram/{slug}` de `entrada.py`
+    (hasta la E3-7): verifica el secreto, procesa el turno y agenda el despacho
+    inmediato de fondo."""
     if config.webhook_secret and x_telegram_bot_api_secret_token != config.webhook_secret:
         raise HTTPException(status_code=403, detail="origen no verificado")
 
@@ -775,19 +754,11 @@ def _registrar_toque(cur, workspace_id: str, chat_id: int, quien,
     return str(cur.fetchone()["id"])
 
 
-def clave_de_candado_del_mensaje(workspace_id: str, chat_id: int,
-                                 message_id: int) -> str:
-    """La clave del candado de asesor de un mensaje de Telegram. La comparten la
-    recuperación del gateway (`_estado_de_entrega`) y el barrido de huérfanos
-    (`huerfanos.barrer`): así nunca actúan a la vez sobre el mismo mensaje."""
-    return f"mensaje:{workspace_id}:{chat_id}:{message_id}"
-
-
 def _estado_de_entrega(cur, workspace_id: str, chat_id: int,
                        message_id: int | None) -> tuple[str, str | None]:
     """Qué hacer con un `message_id` de este chat: `("nuevo", None)` si nunca se
     recibió (o su recibo pasó `COTA_REENTREGA`), `("absorber", id)` si ya tiene
-    respuesta (`respuesta_unica.sql_respondido`) o su recibo es de dentro de
+    respuesta (`entrada.sql_respondido`) o su recibo es de dentro de
     `VENTANA_TURNO_EN_CURSO`, y `("recuperar", id)` si hay recibo pero viejo y sin
     respuesta (el turno murió). El candado serializa dos entregas simultáneas (y
     el barrido de huérfanos): la segunda espera el commit de la fase 1 de la primera
@@ -4158,77 +4129,3 @@ def reportar_incidente_no_manejado(conn, *, workspace_id: str | None,
             conn.rollback()
         except Exception:  # noqa: BLE001
             pass
-
-
-@router.get("/tablero/{token}", response_class=HTMLResponse)
-def tablero_web(token: str):
-    """La pantalla del tablero.
-
-    El espacio sale del token y de ningún otro lado. No hay parámetro de
-    consulta, cabecera ni segmento de URL que lo indique: si lo hubiera,
-    cambiarlo sería todo lo que hace falta para mirar el espacio de otro.
-
-    Un token inválido, vencido, o de alguien que dejó el equipo, devuelven lo
-    mismo. Distinguirlos le diría a quien prueba enlaces cuáles existieron.
-    """
-    return _servir_tablero(_conn(), token)
-
-
-def _servir_tablero(conn, token: str) -> HTMLResponse:
-    from . import lectura
-    from . import tablero
-    from .db import sin_espacio
-    from .tablero_vista import enlace_vencido, pagina
-
-    with sin_espacio(conn) as cur:
-        acceso = tablero.resolver(cur, token)
-
-    if acceso is None:
-        return HTMLResponse(enlace_vencido(), status_code=401)
-
-    from datetime import datetime, timezone
-    ahora = datetime.now(timezone.utc)
-
-    with espacio(conn, acceso["workspace_id"]) as cur:
-        cur.execute("select nombre from workspace")
-        fila = cur.fetchone()
-        nombre_espacio = fila["nombre"] if fila else "Tu equipo"
-        cur.execute("select nombre from integrante where membership_id = %s",
-                    (acceso["membership_id"],))
-        fila = cur.fetchone()
-        persona = fila["nombre"] if fila else ""
-        datos = {
-            "objetivos": lectura.avance_de_objetivos(cur),
-            "estados": lectura.tareas_por_estado(cur),
-            "carga": lectura.carga_por_persona(cur),
-            "vencidas": lectura.tareas_vencidas(cur, ahora),
-            "bloqueos": lectura.bloqueos_abiertos(cur, ahora),
-            "aprobacion": lectura.trabajo_esperando_aprobacion(cur),
-        }
-
-    return HTMLResponse(
-        pagina(datos, espacio=nombre_espacio, persona=persona))
-
-
-@router.get("/salud")
-def salud():
-    return {"ok": True}
-
-
-app.include_router(router)
-
-
-def registrar_webhooks(cliente=None) -> dict[str, bool]:
-    """Le dice a Telegram dónde entregar, un bot por espacio."""
-    import httpx
-
-    cliente = cliente or httpx.Client(timeout=15)
-    resultado: dict[str, bool] = {}
-    for slug, token in config.espacios_con_token().items():
-        r = pedido_telegram(
-            cliente.post, f"https://api.telegram.org/bot{token}/setWebhook",
-            json={"url": f"{config.base_url}/telegram/{slug}",
-                  "secret_token": config.webhook_secret,
-                  "allowed_updates": ["message", "callback_query"]})
-        resultado[slug] = r.status_code == 200 and r.json().get("ok", False)
-    return resultado

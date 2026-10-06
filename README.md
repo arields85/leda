@@ -49,7 +49,8 @@ src/leda/
   contexto.py          Núcleo, espacio y momento, en ese orden
   llm.py               Proveedor de modelo detrás de una interfaz
   agente.py            El turno: mensaje entra, respuesta a la cola
-  gateway.py           Webhook, un bot por espacio
+  entrada.py           Aplicación HTTP: webhook, tablero y salud
+  gateway.py           La conversación del webhook, un bot por espacio
   cli.py               python -m leda …
 ```
 

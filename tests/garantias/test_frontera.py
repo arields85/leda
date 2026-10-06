@@ -41,7 +41,7 @@ BORDES_CONOCIDOS = {
         "en las de `tests/garantias/` vuelve sin importar nada (E3-4 la retira).",
     ("tests/conftest.py", "_sin_fallidos_de_huerfanos_de_otra_prueba", "huerfanos"):
         "Limpia la deduplicación en memoria de `huerfanos`; en las pruebas de "
-        "`tests/garantias/` vuelve sin importar nada (E3-2 retira `huerfanos`).",
+        "`tests/garantias/` vuelve sin importar nada (la entrada del motor lo rehace, E3-7).",
 }
 
 # Lo que corre el proceso aparte: las pruebas de garantías y, al final, qué quedó cargado.

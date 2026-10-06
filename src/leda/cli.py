@@ -257,7 +257,7 @@ def main(argv: list[str] | None = None) -> int:
         if codigo is not None:
             return codigo
         montar(lambda: conectar(), con_cadencias=not a.sin_cadencias).start()
-        uvicorn.run("leda.gateway:app", host="0.0.0.0", port=a.puerto)
+        uvicorn.run("leda.entrada:app", host="0.0.0.0", port=a.puerto)
         return 0
 
     if a.cmd == "grupo":
