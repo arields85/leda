@@ -35,6 +35,7 @@ from leda.config import _cargar_dotenv
 
 RAIZ = pathlib.Path(__file__).resolve().parents[1]
 ESQUEMA = RAIZ / "db" / "esquema.sql"
+GARANTIAS = RAIZ / "tests" / "garantias"
 
 if os.environ.get("LEDA_TEST_LOAD_DOTENV", "1") != "0":
     _cargar_dotenv(RAIZ / ".env.test")
@@ -125,8 +126,14 @@ def uri(tmp_path_factory) -> Iterator[str]:
     yield _servidor_efimero(tmp_path_factory.mktemp("pgdata"))
 
 
+def _es_prueba_de_garantias(request) -> bool:
+    """Si la prueba vive en `tests/garantias/`, que no carga la conversación de los
+    flujos A y B (E3-1, `tests/garantias/test_frontera.py`)."""
+    return pathlib.Path(str(request.node.path)).resolve().is_relative_to(GARANTIAS)
+
+
 @pytest.fixture(autouse=True)
-def _sin_despacho_inmediato_por_defecto(monkeypatch):
+def _sin_despacho_inmediato_por_defecto(request, monkeypatch):
     """El despacho inmediato del webhook (ADR 0011,
     `gateway._despachar_ahora`) queda inerte por defecto en cualquier
     prueba.
@@ -155,7 +162,12 @@ def _sin_despacho_inmediato_por_defecto(monkeypatch):
     (`test_gateway.py`, `test_local.py`) reemplazan `gateway._transporte_de`
     y/o `gateway.conectar` de nuevo, con su propio doble o con una conexión
     real a la base efímera (`uri`) -- corren después de esta fixture
-    (autouse), así que ganan."""
+    (autouse), así que ganan.
+
+    En las pruebas de `tests/garantias/` no hace nada: no usan `gateway`, y
+    importarlo acá las ataría a la conversación de los flujos A y B (E3-1)."""
+    if _es_prueba_de_garantias(request):
+        return
     from leda import gateway
 
     def _sin_transporte(slug, token):
@@ -169,9 +181,15 @@ def _sin_despacho_inmediato_por_defecto(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
-def _sin_fallidos_de_huerfanos_de_otra_prueba():
+def _sin_fallidos_de_huerfanos_de_otra_prueba(request):
     """`huerfanos._FALLIDOS` (la deduplicación en memoria del reporte de un aviso
-    fallido) vive por proceso: una prueba no hereda las marcas de otra (T9-H19h)."""
+    fallido) vive por proceso: una prueba no hereda las marcas de otra (T9-H19h).
+
+    En las pruebas de `tests/garantias/` no hace nada: `huerfanos` importa `gateway`
+    (E3-1)."""
+    if _es_prueba_de_garantias(request):
+        yield
+        return
     from leda import huerfanos
 
     huerfanos._FALLIDOS.clear()
