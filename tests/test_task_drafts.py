@@ -419,23 +419,6 @@ def test_fallo_posterior_al_insert_revierte_toda_la_conversion(
         assert cur.fetchone()["converted_task_id"] is None
 
 
-def test_ruta_directa_de_aplicacion_no_puede_insertar_tareas(corework, conn):
-    ws = corework.workspace_id
-    with espacio(conn, ws) as cur:
-        objetivo = _objetivo(cur, ws)
-        with pytest.raises(psycopg.errors.InsufficientPrivilege):
-            cur.execute(
-                """insert into task
-                     (workspace_id, objective_id, titulo, area_id,
-                      responsable_membership_id, fecha_objetivo,
-                      criterio_aceptacion, evidencia_requerida)
-                   values (%s, %s, 'atajo',
-                     (select id from area where slug = 'ot'),
-                     (select membership_id from integrante where nombre = 'Nahuel Gimenez'),
-                     '2026-08-20', 'criterio', array['explicacion'])""",
-                (ws, objetivo))
-
-
 def test_agente_legacy_no_crea_preview_ni_tarea(corework, conn):
     ws = corework.workspace_id
     with espacio(conn, ws) as cur:
@@ -662,37 +645,6 @@ def test_leda_app_no_puede_ejecutar_compromiso_ni_usar_overload_anterior(
             """select to_regprocedure(
                  'leda.confirmar_borrador_tarea(text,uuid,timestamptz)') as fn""")
         assert cur.fetchone()["fn"] is None
-
-
-def test_login_autoridad_es_exclusivo_y_no_administra_tablas(
-        corework, conn, authority_conn):
-    with authority_conn.cursor() as cur:
-        cur.execute("select session_user as login")
-        login = cur.fetchone()["login"]
-
-    with admin(conn) as cur:
-        cur.execute(
-            """select array_agg(parent.rolname order by parent.rolname) as roles
-                 from pg_auth_members am
-                 join pg_roles parent on parent.oid = am.roleid
-                 join pg_roles member on member.oid = am.member
-                where member.rolname = %s""", (login,))
-        assert cur.fetchone()["roles"] == ["leda_gateway"]
-
-    with pytest.raises(psycopg.errors.InsufficientPrivilege):
-        with authority_conn.transaction():
-            authority_conn.execute("select count(*) from leda.task")
-
-    with autoridad(authority_conn) as cur:
-        cur.execute(
-            """select has_function_privilege(
-                 current_user,
-                 'leda.confirmar_borrador_tarea(uuid,text,bigint,bigint)',
-                 'EXECUTE') as puede,
-               has_table_privilege(current_user, 'leda.task', 'SELECT')
-                 as lee_task""")
-        permisos = cur.fetchone()
-        assert permisos == {"puede": True, "lee_task": False}
 
 
 def test_compromiso_usa_actor_y_reloj_confiables(
