@@ -112,7 +112,8 @@ SIGNIFICADOS: Mapping[str, str] = {
     "no_puede_arrancar_hasta_que_termine": "Esa tarea dependiente no puede arrancar hasta que "
                                            "termine ésta.",
     "aviso_al_referente": "El aviso a quien aprueba el trabajo de la persona, con a quién, su "
-                          "estado y cuándo sale; vacío si no hay aviso.",
+                          "estado y cuándo sale (o, si se retiró, por qué); vacío si no hay "
+                          "aviso.",
     "sin_aviso": "Por qué no hay aviso al referente, con su código.",
     "a": "A quién va un aviso.",
     "sale": "Cuándo sale un aviso guardado: todavía no salió.",
@@ -130,8 +131,10 @@ SIGNIFICADOS: Mapping[str, str] = {
     "avance": "Lo que la persona contó de cómo viene la tarea, sin un hecho cierto.",
     "dijo": "Lo que dijo la persona, con sus palabras.",
     "el_pedido_de_estado": "Si Leda sigue esperando saber cómo viene la tarea.",
-    "vuelve_a_pedir_el_estado": "Cuándo Leda vuelve a pedirle el estado de la tarea: todavía "
-                                "no pasó.",
+    "vuelve_a_pedir_el_estado": "El pedido del estado de la tarea que Leda guardó para volver "
+                                "a pedírselo, con su estado: si sigue guardado, cuándo sale "
+                                "(todavía no pasó); si se retiró, no va a salir y motivo dice "
+                                "por qué.",
     "veces_sin_algo_cierto": "Cuántas respuestas seguidas sin un hecho cierto lleva este "
                              "pedido de estado.",
     "no_vuelve_a_pedir_el_estado": "Por qué Leda no vuelve a pedirle el estado.",
@@ -162,6 +165,8 @@ SIGNIFICADOS: Mapping[str, str] = {
     "cierre": "Cómo se cerró la pregunta, con su código.",
     "cuando": "El día en que pasó.",
     "aplicado": "Lo corregido, anotado en la tarea correcta: su resultado.",
+    "preguntas_ya_cerradas": "Las preguntas que el hecho abrió y que el mismo mensaje ya cerró "
+                             "(otra jugada las contestó o las dejó sin efecto): no se hacen.",
     # --- Los datos de una jugada, como se entendieron del mensaje -----------------------------
     "palabras": "Lo que la persona contó de cómo viene la tarea, con sus palabras.",
     "quien": "Quién puede destrabar el bloqueo, como lo nombró la persona.",
@@ -254,6 +259,23 @@ SIGNIFICADOS: Mapping[str, str] = {
     "no_salio": "No salió.",
     "todavia_no": "Todavía no pasó.",
     "sigue_abierto": "Sigue abierto: Leda sigue esperando.",
+    "ya_contesto": "Ya no sigue abierto: la persona ya contestó con algo cierto y Leda no "
+                   "espera más esa respuesta.",
+    # --- Códigos: por qué se retiró un aviso que no salió --------------------------------------
+    "ya_respondio": "La persona ya contestó lo que el aviso iba a pedir.",
+    "hay_una_prevision_mas_nueva": "Hay una previsión más nueva: el aviso era de una anterior.",
+    "volvio_a_la_fecha_comprometida": "La previsión volvió a la fecha comprometida.",
+    "tarea_entregada": "La tarea ya se entregó.",
+    "bloqueo_abierto": "La tarea tiene un bloqueo abierto.",
+    "cambio_el_vencimiento": "Cambió la fecha comprometida de la tarea.",
+    "cambio_el_responsable": "Cambió quién es responsable de la tarea.",
+    "tarea_inexistente": "La tarea ya no existe.",
+    "ya_vencio": "La tarea ya llegó a su vencimiento: un aviso previo ya no es previo.",
+    "reemplazado_por_un_avance": "Lo reemplazó el pedido que sigue a un avance.",
+    "reemplazado_por_el_reencuadre": "Lo reemplazó el reencuadre después de una ausencia.",
+    "destinatario_inactivo": "Quien lo iba a recibir ya no está activo en el equipo.",
+    "destinatario_sin_telegram": "Quien lo iba a recibir no tiene un chat con Leda.",
+    "tipo_sin_declarar": "El aviso no es de un tipo que Leda manda.",
     # --- Códigos: el estado de una tarea -------------------------------------------------------
     "asignada": "Asignada a la persona, todavía sin empezar.",
     "en_curso": "En curso: la persona la empezó.",

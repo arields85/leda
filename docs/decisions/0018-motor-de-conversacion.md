@@ -547,6 +547,15 @@ que le pide. Se revisó entero, con reglas generales y sin ningún caso (5c.1):
    lo que cambia para la persona, lo que falta y lo que sigue. Todo lo que quedó anotado o cambió
    se cuenta.
 
+**Precisión (2026-10-05, antes de la segunda ronda): los hechos de lo que pasa después se
+calculan al final del turno.** Una jugada puede dejar sin efecto lo que otra del mismo mensaje
+dejó para después (un avance o un destrabe guardan el pedido del estado del día siguiente; una
+fecha en el mismo mensaje contesta la espera y ese pedido ya no sale). Cada hecho nombra por su
+id los avisos, las esperas y las preguntas que deja para después, y después de todas las jugadas
+el turno los vuelve a leer de la base y pone su estado final (un aviso que ya no corresponde se
+retira en ese momento, con su motivo) antes de pedir la redacción. Un solo paso para todas las
+jugadas (`prueba_chica/efectos.py`); las ids no llegan a la IA ni al registro de turnos.
+
 Cerrar un bloqueo cuando su causa desaparece quedó `PENDIENTE` de una decisión del usuario; la
 tomó el mismo día: es la jugada `destrabar` (9l).
 
@@ -567,7 +576,8 @@ switch, sigo").
   espera del estado queda abierta y Leda vuelve a pedirlo el día hábil siguiente, con la cuenta de
   nuevo, como después de un avance (9h); vencida, además, la pregunta de para cuándo (9j). Lo que
   había detenido la cuenta anterior (un paso que no salió porque la tarea se bloqueó) no detiene la
-  nueva.
+  nueva. Antes de su fecha, tampoco (revisión, 2026-10-05): un aviso previo que no salió porque la
+  tarea estaba bloqueada vuelve a salir mientras siga siendo previo.
 - **Se distingue de las parecidas** (9k.2): salir de un bloqueo no es empezar la tarea, ni dar una
   fecha, ni contar un avance; si el mensaje trae además uno de esos hechos, es otra jugada.
 - La respuesta dice qué quedó anotado y el próximo paso. Con más de un bloqueo abierto en la tarea,

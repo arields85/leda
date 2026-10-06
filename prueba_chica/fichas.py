@@ -157,6 +157,31 @@ ESPERA_ALGO_CIERTO = ("si_la_termino", "para_cuando_la_termina", "si_esta_trabad
 ATRASO_SI_SE_CUMPLE = "atraso_si_se_cumple_la_prevision_dias_habiles"
 
 
+# Lo que un hecho nombra y pasa después (un aviso guardado, una espera, una pregunta) puede
+# cambiar por otra jugada del mismo mensaje: una fecha contesta la espera de un avance y su
+# pedido del día siguiente ya no sale. Por eso el hecho lleva, en esta clave interna, el id de
+# cada efecto que nombra, y al terminar todas las jugadas el turno vuelve a leerlos de la base y
+# pone su estado final (`efectos.al_final_del_turno`; ADR 0018, 9k). La clave se saca antes de
+# redactar: ni la IA ni el registro de turnos ven un id.
+EFECTOS = "_efectos"
+AVISO, ESPERA, PREGUNTA = "aviso", "espera", "pregunta"     # de qué tabla es el efecto
+
+
+def nombrar_efecto(hecho: dict[str, Any], clave: str, de: str, efecto_id: Any) -> None:
+    """Anota en el hecho que `clave` nombra el efecto `efecto_id` (un aviso, una espera o una
+    pregunta), para leerlo al terminar el turno."""
+    hecho.setdefault(EFECTOS, []).append({"clave": clave, "de": de, "id": str(efecto_id)})
+
+
+def _juntar(hecho: dict[str, Any], mas: dict[str, Any]) -> None:
+    """`hecho.update(mas)`, sin perder los efectos que ya nombraba el hecho."""
+    for clave, valor in mas.items():
+        if clave == EFECTOS:
+            hecho.setdefault(EFECTOS, []).extend(valor)
+        else:
+            hecho[clave] = valor
+
+
 def _es_un_aviso_al_referente(tipo: str) -> dict[str, Any]:
     """Los hechos de un aviso al referente dicen qué aviso son y que no piden respuesta: es
     información para él (9i)."""
@@ -218,9 +243,10 @@ def _proponer(ficha: Ficha, ctx: Contexto, hecho: dict[str, Any],
     propuesto = ficha.propone(hecho) if ficha.propone is not None else None
     if not propuesto:
         return
-    ahora = preguntas.abrir(ctx, preguntas.PROPUESTA, tarea["id"] if tarea else None,
-                            jugada={"nombre": ficha.nombre, "propone": list(propuesto)})
-    _nombrar_pregunta(hecho, _clave_de_pregunta(ahora), preguntas.PROPUESTA)
+    ahora, pregunta_id = preguntas.abrir_con_id(
+        ctx, preguntas.PROPUESTA, tarea["id"] if tarea else None,
+        jugada={"nombre": ficha.nombre, "propone": list(propuesto)})
+    _nombrar_pregunta(hecho, _clave_de_pregunta(ahora), preguntas.PROPUESTA, pregunta_id)
 
 
 def _si_esta_vencida(ficha: Ficha, ctx: Contexto, hecho: dict[str, Any],
@@ -236,13 +262,12 @@ def _si_esta_vencida(ficha: Ficha, ctx: Contexto, hecho: dict[str, Any],
     hecho["vencida"] = vencida
     if not ficha.sigue_el_pedido:
         candado(ctx.cur, tarea["id"])
-        hecho.update(_seguir_pidiendo(ctx, tarea, _espera_del_estado(ctx, tarea),
-                                      {"jugada": ficha.nombre,
-                                       "dijo": (ctx.texto or ctx.toque or "").strip()}))
+        _juntar(hecho, _seguir_pidiendo(ctx, tarea, _espera_del_estado(ctx, tarea),
+                                        {"jugada": ficha.nombre,
+                                         "dijo": (ctx.texto or ctx.toque or "").strip()}))
     fecha = preguntas.FECHA_DE_LA_TAREA
     if fecha not in (hecho.get("pregunta"), hecho.get("pregunta_para_despues")):
-        clave = _abrir_pregunta(ctx, fecha, tarea["id"], jugada={"nombre": ficha.nombre})
-        _nombrar_pregunta(hecho, clave, fecha)
+        _abrir_pregunta(ctx, hecho, fecha, tarea["id"], jugada={"nombre": ficha.nombre})
 
 
 def _vencida(ctx: Contexto, tarea: dict[str, Any]) -> dict[str, Any] | None:
@@ -291,18 +316,27 @@ def _duda(ficha: Ficha, ctx: Contexto, datos: dict[str, Any]) -> dict[str, Any]:
     candidatas = [t for t in ctx.tareas if t["estado"] in ficha.estados]
     if not candidatas:
         return _hecho(ficha, "no_se_puede", motivo="ninguna_tarea_posible")
-    ahora = preguntas.abrir(ctx, preguntas.CUAL_TAREA, None,
-                            jugada={"nombre": ficha.nombre, "datos": datos},
-                            opciones_de_tareas=candidatas)
-    return _hecho(ficha, "falta_dato", falta=["tarea"],
-                  **{_clave_de_pregunta(ahora): preguntas.CUAL_TAREA})
+    ahora, pregunta_id = preguntas.abrir_con_id(
+        ctx, preguntas.CUAL_TAREA, None, jugada={"nombre": ficha.nombre, "datos": datos},
+        opciones_de_tareas=candidatas)
+    hecho = _hecho(ficha, "falta_dato", falta=["tarea"])
+    _nombrar_pregunta(hecho, _clave_de_pregunta(ahora), preguntas.CUAL_TAREA, pregunta_id)
+    return hecho
 
 
-def _nombrar_pregunta(hecho: dict[str, Any], clave: str, tipo: str) -> None:
+def _nombrar_pregunta(hecho: dict[str, Any], clave: str, tipo: str,
+                     pregunta_id: str | None = None) -> None:
     """Pone en los hechos la pregunta que abrió la jugada, siempre como un nombre (`pregunta` o
     `pregunta_para_despues`). Si la clave ya nombra otra (dos que quedaron para después), la
     nueva va a `otras_preguntas_para_despues`, una lista: nunca se pierde una y cada clave
-    tiene siempre la misma forma."""
+    tiene siempre la misma forma. Con su id, el turno la vuelve a leer al terminar (`EFECTOS`)
+    y la nombra como quedó."""
+    if pregunta_id is not None:
+        nombrar_efecto(hecho, clave, PREGUNTA, pregunta_id)
+    nombrar_tipo_de_pregunta(hecho, clave, tipo)
+
+
+def nombrar_tipo_de_pregunta(hecho: dict[str, Any], clave: str, tipo: str) -> None:
     antes = hecho.get(clave)
     if antes is None or antes == tipo:
         hecho[clave] = tipo
@@ -369,11 +403,13 @@ def _cerrar_esperas(ctx: Contexto, task_id: str) -> None:
         (ctx.ahora, ctx.quien.membership_id, task_id))
 
 
-def _abrir_pregunta(ctx: Contexto, tipo: str, task_id: str, *, jugada: dict[str, Any]) -> str:
+def _abrir_pregunta(ctx: Contexto, hecho: dict[str, Any], tipo: str, task_id: str, *,
+                    jugada: dict[str, Any]) -> None:
     """Una pregunta de Leda, ordenada con las demás (`preguntas.abrir`: nunca dos juntas, 9d);
-    si su tipo espera respuesta, con su espera. Devuelve la clave con que el hecho la nombra
-    (`_clave_de_pregunta`)."""
-    return _clave_de_pregunta(preguntas.abrir(ctx, tipo, task_id, jugada=jugada))
+    si su tipo espera respuesta, con su espera. El hecho la nombra con su clave
+    (`_clave_de_pregunta`) y su id (`_nombrar_pregunta`)."""
+    ahora, pregunta_id = preguntas.abrir_con_id(ctx, tipo, task_id, jugada=jugada)
+    _nombrar_pregunta(hecho, _clave_de_pregunta(ahora), tipo, pregunta_id)
 
 
 def referente(cur, responsable_membership_id: str) -> dict[str, str] | None:
@@ -477,19 +513,21 @@ def _anotar_prevision(ctx: Contexto, datos: dict, tarea: dict) -> dict:
          json.dumps({**_es_un_aviso_al_referente("nueva_prevision"), "tarea": tarea["titulo"],
                      "responsable": ctx.quien.nombre, **hechos_del_aviso}, ensure_ascii=False),
          sale, f"motor:nueva_prevision:{prevision_id}", ctx.ahora))
-    ctx.avisos_guardados.append(str(cur.fetchone()["id"]))
-    return {**hecho, "aviso_al_referente": {"a": quien_aprueba["nombre"],
-                                            "estado": GUARDADO_SIN_ENVIAR,
-                                            "sale": sale.isoformat()}}
+    aviso_id = str(cur.fetchone()["id"])
+    ctx.avisos_guardados.append(aviso_id)
+    hecho["aviso_al_referente"] = {"a": quien_aprueba["nombre"], "estado": GUARDADO_SIN_ENVIAR,
+                                   "sale": sale.isoformat()}
+    nombrar_efecto(hecho, "aviso_al_referente", AVISO, aviso_id)
+    return hecho
 
 
 def _anotar_bloqueo(ctx: Contexto, datos: dict, tarea: dict) -> dict:
     jugada = {"nombre": "anotar_bloqueo", "datos": datos}
     if _vacio(datos.get("causa")):
         # Sin causa no hay bloqueo (mecánica §3): se pregunta y no se anota nada (9c, 1).
-        clave = _abrir_pregunta(ctx, preguntas.CAUSA_DEL_BLOQUEO, tarea["id"], jugada=jugada)
-        return {"resultado": "falta_dato", "falta": ["causa"], "tarea": _tarea(tarea),
-                clave: preguntas.CAUSA_DEL_BLOQUEO}
+        sin_causa = {"resultado": "falta_dato", "falta": ["causa"], "tarea": _tarea(tarea)}
+        _abrir_pregunta(ctx, sin_causa, preguntas.CAUSA_DEL_BLOQUEO, tarea["id"], jugada=jugada)
+        return sin_causa
     causa = str(datos["causa"]).strip()
     r = ejecutar(ctx.cur, ctx.quien, "registrar_bloqueo",
                  {"tarea_id": tarea["id"], "causa": causa}, ya_confirmada=True)
@@ -501,10 +539,10 @@ def _anotar_bloqueo(ctx: Contexto, datos: dict, tarea: dict) -> dict:
     # Todo bloqueo con causa: quién lo puede destrabar, una pregunta que espera respuesta (su
     # ficha de pregunta lo dice: abre su espera y la escalera la repite). Lo decide la respuesta
     # de la persona, no un juicio de la IA sobre la causa (9c, corregida el 2026-10-05).
-    clave = _abrir_pregunta(ctx, preguntas.QUIEN_DESTRABA, tarea["id"],
-                            jugada={**jugada, "bloqueo_id": r["bloqueo_id"]})
-    return {"resultado": "anotado", "tarea": _tarea(tarea), "causa": causa,
-            clave: preguntas.QUIEN_DESTRABA}
+    anotado = {"resultado": "anotado", "tarea": _tarea(tarea), "causa": causa}
+    _abrir_pregunta(ctx, anotado, preguntas.QUIEN_DESTRABA, tarea["id"],
+                    jugada={**jugada, "bloqueo_id": r["bloqueo_id"]})
+    return anotado
 
 
 def _anotar_quien_destraba(ctx: Contexto, datos: dict, tarea: dict | None) -> dict:
@@ -618,8 +656,8 @@ def _destrabar(ctx: Contexto, datos: dict, tarea: dict) -> dict:
         de = anclaje(cur, tarea["id"], fila["fecha_objetivo"].astimezone(cal.zona).date())
         if ctx.ahora.astimezone(cal.zona).date() >= de.fecha:
             candado(cur, tarea["id"])
-            hecho.update(_seguir_pidiendo(ctx, tarea, _espera_del_estado(ctx, tarea),
-                                          {"jugada": "destrabar", "dijo": dijo}))
+            _juntar(hecho, _seguir_pidiendo(ctx, tarea, _espera_del_estado(ctx, tarea),
+                                            {"jugada": "destrabar", "dijo": dijo}))
     return hecho
 
 
@@ -678,11 +716,11 @@ def _informar_avance(ctx: Contexto, datos: dict, tarea: dict) -> dict:
                                  "inbound_message_id": ctx.entrante_id})
     hecho: dict[str, Any] = {"resultado": "anotado", "tarea": _tarea(tarea),
                              "avance": {"dijo": dijo}, "el_pedido_de_estado": "sigue_abierto"}
-    hecho.update(_seguir_pidiendo(ctx, tarea, espera, {"dijo": dijo}))
+    nombrar_efecto(hecho, "el_pedido_de_estado", ESPERA, espera["id"])
+    _juntar(hecho, _seguir_pidiendo(ctx, tarea, espera, {"dijo": dijo}))
     if hecho.get("veces_sin_algo_cierto", 0) > 1:
-        clave = _abrir_pregunta(ctx, preguntas.FECHA_DE_LA_TAREA, tarea["id"],
-                                jugada={"nombre": "informar_avance", "datos": datos})
-        hecho[clave] = preguntas.FECHA_DE_LA_TAREA
+        _abrir_pregunta(ctx, hecho, preguntas.FECHA_DE_LA_TAREA, tarea["id"],
+                        jugada={"nombre": "informar_avance", "datos": datos})
     return hecho
 
 
@@ -724,6 +762,7 @@ def _seguir_pidiendo(ctx: Contexto, tarea: dict[str, Any], espera: dict[str, Any
     sale = cal.dentro_de_jornada(datetime.combine(
         cal.proximo_habil(hoy + timedelta(days=1)), cal.hora_inicio, tzinfo=cal.zona))
     # Lo manda Leda por su cuenta, como los demás pasos de la escalera: sin turno que lo cause.
+    clave = f"motor:{REPREGUNTA_DE_ESTADO}:{tarea['id']}:{de.clave}:0:{de_la_espera}:a{veces}"
     cur.execute(
         """insert into scheduled_notice (workspace_id, tipo, task_id,
                                          destinatario_membership_id, hechos, programado_para,
@@ -737,11 +776,14 @@ def _seguir_pidiendo(ctx: Contexto, tarea: dict[str, Any], espera: dict[str, Any
                      "tarea": tarea["titulo"], "vence": vence.isoformat(),
                      **({"seguimiento_por": "prevision"} if de.fecha > vence else {})},
                     ensure_ascii=False),
-         sale, f"motor:{REPREGUNTA_DE_ESTADO}:{tarea['id']}:{de.clave}:0:"
-               f"{de_la_espera}:a{veces}",
-         ctx.ahora))
-    return {"vuelve_a_pedir_el_estado": {"estado": GUARDADO_SIN_ENVIAR, "sale": sale.isoformat()},
-            "veces_sin_algo_cierto": veces}
+         sale, clave, ctx.ahora))
+    cur.execute("select id from scheduled_notice where workspace_id = %s and dedupe_key = %s",
+                (ctx.quien.workspace_id, clave))
+    pidiendo = {"vuelve_a_pedir_el_estado": {"estado": GUARDADO_SIN_ENVIAR,
+                                             "sale": sale.isoformat()},
+                "veces_sin_algo_cierto": veces}
+    nombrar_efecto(pidiendo, "vuelve_a_pedir_el_estado", AVISO, cur.fetchone()["id"])
+    return pidiendo
 
 
 def _escalado_a(cur, escalon: list[dict[str, Any]]) -> list[dict[str, str]]:
@@ -864,23 +906,27 @@ def _deshacer_prevision(ctx: Contexto, tarea: dict) -> dict | None:
                          "motivo": "se_anoto_en_la_tarea_equivocada",
                          **hechos["vuelve_a"]}, ensure_ascii=False),
              sale, f"motor:correccion_de_prevision:{correccion_id}", ctx.ahora))
-        ctx.avisos_guardados.append(str(cur.fetchone()["id"]))
+        correccion_aviso = str(cur.fetchone()["id"])
+        ctx.avisos_guardados.append(correccion_aviso)
         hechos["correccion_al_referente"] = {"a": quien_aprueba["nombre"],
                                              "estado": GUARDADO_SIN_ENVIAR,
                                              "sale": sale.isoformat()}
+        nombrar_efecto(hechos, "correccion_al_referente", AVISO, correccion_aviso)
     if (anterior is not None and quien_aprueba is not None
             and (aviso is None or aviso["estado"] != "enviado")):
         rearmado = _rearmar_aviso_de_la_anterior(ctx, tarea, anterior, correccion_id,
                                                  quien_aprueba)
         if rearmado is not None:
-            hechos["aviso_de_la_prevision_anterior"] = rearmado
+            rearmado_id, hechos["aviso_de_la_prevision_anterior"] = rearmado
+            nombrar_efecto(hechos, "aviso_de_la_prevision_anterior", AVISO, rearmado_id)
     return {"hechos": hechos,
             "datos": {"fecha": equivocada["fecha_prevista"].isoformat(),
                       **({"motivo": equivocada["motivo"]} if equivocada["motivo"] else {})}}
 
 
 def _rearmar_aviso_de_la_anterior(ctx: Contexto, tarea: dict, anterior: dict,
-                                  correccion_id: str, quien_aprueba: dict) -> dict | None:
+                                  correccion_id: str,
+                                  quien_aprueba: dict) -> tuple[str, dict] | None:
     """La corrección vuelve a una previsión anterior cuyo aviso al referente se había retirado
     sin salir (la reemplazó la equivocada): el referente nunca supo de ella, así que su aviso
     se vuelve a guardar, con los hechos de esa previsión, atado a la corrección, que es la
@@ -913,9 +959,10 @@ def _rearmar_aviso_de_la_anterior(ctx: Contexto, tarea: dict, anterior: dict,
                      "dependientes": [r["titulo"] for r in cur.fetchall()]},
                     ensure_ascii=False),
          sale, f"motor:nueva_prevision:{correccion_id}", ctx.ahora))
-    ctx.avisos_guardados.append(str(cur.fetchone()["id"]))
-    return {"a": quien_aprueba["nombre"], "estado": GUARDADO_SIN_ENVIAR,
-            "sale": sale.isoformat()}
+    aviso_id = str(cur.fetchone()["id"])
+    ctx.avisos_guardados.append(aviso_id)
+    return aviso_id, {"a": quien_aprueba["nombre"], "estado": GUARDADO_SIN_ENVIAR,
+                      "sale": sale.isoformat()}
 
 
 def _deshacer_bloqueo(ctx: Contexto, tarea: dict) -> dict | None:

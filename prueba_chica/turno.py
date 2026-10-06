@@ -2,7 +2,8 @@
 
 (1) Lee el estado de la persona, sus tareas y sus últimos turnos; (2) la IA elige jugadas de
 la lista cerrada y nombra las tareas por un alias; (3) el código maneja cada jugada con el
-manejador de su ficha; (4) el resultado son hechos; (5) la IA redacta desde los hechos, una
+manejador de su ficha; (4) el resultado son hechos, con lo que dejan para después como quedó al terminar todas las
+jugadas (`efectos.py`); (5) la IA redacta desde los hechos, una
 respuesta por mensaje, que sale por el outbox; (6) todo queda en el registro de turnos.
 
 La lista cerrada (`JUGADAS`) y sus fichas están en `fichas.py` (E2-3). Lo que la IA elija fuera
@@ -145,6 +146,10 @@ def _turno(conn, cur, ctx: Contexto, ia: IA, reloj: Reloj,
         with conn.transaction():
             hechos = manejar(elegidas)
             pregunta = preguntas.al_terminar_el_turno(ctx)
+            # Lo que los hechos dejaron para después, como quedó después de todas las jugadas
+            # (9k). `efectos` usa los avisos, que importan este módulo: se importa acá.
+            from .efectos import al_final_del_turno
+            al_final_del_turno(ctx, hechos)
             texto = pedir_a_la_ia(lambda: no_vacio(
                 ia.redactar(_pedido_de_redaccion(ctx, hechos, pregunta))))
     except IANoRespondio as falla:

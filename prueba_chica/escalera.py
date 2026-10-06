@@ -107,7 +107,8 @@ PEDIDOS = 3                     # el ancla, +1 y +2; el paso siguiente es el esc
 # bloqueó la tarea antes de que el paso saliera (9b; mecánica §9). Cualquier otro paso que no
 # llegó (la IA no lo redactó, el destinatario no se podía alcanzar) cuenta como dado y la
 # escalera sigue con el próximo: nunca se apaga en silencio.
-DETIENEN = frozenset({"ya_respondio", "bloqueo_abierto"})
+BLOQUEO_ABIERTO = "bloqueo_abierto"
+DETIENEN = frozenset({"ya_respondio", BLOQUEO_ABIERTO})
 
 # Lo que cada aviso trae fijo; lo demás lo lee `avisos.hechos_de_la_escalera` al guardarlo y
 # de nuevo al salir.
@@ -210,9 +211,12 @@ def _un_paso(m: Momento, tarea: dict[str, Any], n: int | None) -> str | None:
         return None                     # el paso anterior todavía no salió
 
     if k < 0:
-        if hasta == vence and -k <= dias and not avisos and not _hubo_aviso_previo(m, tarea,
-                                                                                    vence):
-            return _guardar_aviso_previo(m, tarea, vence, configurado=n is not None)
+        # Un aviso previo que el bloqueo omitió no se dio: destrabada antes del vencimiento, la
+        # tarea vuelve a tenerlo mientras siga siendo previo (revisión de destrabar, 9l).
+        dados_antes = [a for a in avisos if not _omitido_por_el_bloqueo(a)]
+        if hasta == vence and -k <= dias and not dados_antes                 and not _hubo_aviso_previo(m, tarea, vence):
+            return _guardar_aviso_previo(m, tarea, vence, configurado=n is not None,
+                                         ronda=len(avisos) - len(dados_antes))
         if hasta > vence and m.hoy >= vence:
             return _recordar_el_vencimiento(m, tarea, vence)
         return None
@@ -258,8 +262,12 @@ def _guardar(m: Momento, tipo: str, tarea, fecha: Anclaje | date, base: dict[str
     return aviso_id
 
 
-def _guardar_aviso_previo(m: Momento, tarea, vence: date, *, configurado: bool) -> str:
-    _guardar(m, "aviso_previo", tarea, vence, HECHOS_DEL_AVISO_PREVIO)
+def _guardar_aviso_previo(m: Momento, tarea, vence: date, *, configurado: bool,
+                          ronda: int = 0) -> str:
+    """`ronda`: cuántos avisos previos omitió un bloqueo; el que vuelve lleva su ronda en la
+    clave (`b<n>`), así no choca con el omitido."""
+    _guardar(m, "aviso_previo", tarea, vence, HECHOS_DEL_AVISO_PREVIO,
+             *([f"b{ronda}"] if ronda else []))
     if not configurado:
         registrar_incidente(
             m.cur, m.workspace_id,
@@ -271,10 +279,19 @@ def _guardar_aviso_previo(m: Momento, tarea, vence: date, *, configurado: bool) 
 
 
 def _hubo_aviso_previo(m: Momento, tarea, vence: date) -> bool:
-    """El aviso previo es de la fecha comprometida, no de un anclaje: uno solo (9b)."""
-    m.cur.execute("select 1 from scheduled_notice where workspace_id = %s and dedupe_key = %s",
-                  (m.workspace_id, clave("aviso_previo", tarea["id"], vence)))
+    """El aviso previo es de la fecha comprometida, no de un anclaje: uno solo (9b). Uno que el
+    bloqueo omitió no cuenta: no se dio."""
+    base = clave("aviso_previo", tarea["id"], vence)
+    m.cur.execute("""select 1 from scheduled_notice
+                      where workspace_id = %s
+                        and (dedupe_key = %s or dedupe_key like %s)
+                        and not (estado = 'omitido' and motivo_omision = %s)""",
+                  (m.workspace_id, base, base + ":b%", BLOQUEO_ABIERTO))
     return m.cur.fetchone() is not None
+
+
+def _omitido_por_el_bloqueo(aviso: dict[str, Any]) -> bool:
+    return aviso["estado"] == "omitido" and aviso["motivo_omision"] == BLOQUEO_ABIERTO
 
 
 def _recordar_el_vencimiento(m: Momento, tarea, vence: date) -> str | None:

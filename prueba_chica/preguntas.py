@@ -194,6 +194,14 @@ def abrir(ctx, tipo: str, task_id: str | None, *, jugada: dict[str, Any],
     módulo); si su tipo espera respuesta, abre también su espera. `opciones_de_tareas`: las
     tareas de una duda, que se ofrecen como opciones. Devuelve si es la que se pregunta ahora
     (`False`: quedó para después)."""
+    return abrir_con_id(ctx, tipo, task_id, jugada=jugada,
+                        opciones_de_tareas=opciones_de_tareas)[0]
+
+
+def abrir_con_id(ctx, tipo: str, task_id: str | None, *, jugada: dict[str, Any],
+                 opciones_de_tareas: Sequence[dict[str, Any]] = ()) -> tuple[bool, str]:
+    """`abrir`, y además el id de la pregunta: el hecho que la nombra lo lleva para leerla al
+    terminar el turno (`fichas.EFECTOS`)."""
     cur, persona = ctx.cur, ctx.quien.membership_id
     de_tipo = TIPOS[tipo]           # la lista es cerrada: un tipo sin declarar es un error
     se_puede_dejar = de_tipo.se_puede_dejar
@@ -239,7 +247,7 @@ def abrir(ctx, tipo: str, task_id: str | None, *, jugada: dict[str, Any],
         _esperar_respuesta(ctx, tipo, task_id)
     if pregunta not in ctx.preguntas_del_turno:
         ctx.preguntas_del_turno.append(pregunta)
-    return ahora_si
+    return ahora_si, pregunta
 
 
 def _esperar_respuesta(ctx, tipo: str, task_id) -> None:
