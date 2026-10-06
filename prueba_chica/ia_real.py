@@ -70,7 +70,8 @@ DATOS = {
     "no_sabe": ("boolean", "Verdadero sólo si la persona dice que no sabe quién puede "
                            "destrabarlo."),
     "nadie_mas": ("boolean", "Verdadero sólo si la persona dice que nadie más puede "
-                             "destrabarlo: le toca a ella."),
+                             "destrabarlo: le toca a la persona que escribe (nunca a "
+                             "Leda)."),
     "palabras": ("string", "Lo que la persona contó de cómo viene la tarea, con sus palabras."),
     "a": ("string", "A quién quiere pasarle la tarea, como lo nombró la persona."),
     "opcion": ("string", "El alias de la opción que eligió (O1, O2...), de la pregunta "

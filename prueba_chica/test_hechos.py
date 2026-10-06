@@ -144,3 +144,25 @@ def test_un_hecho_sin_significado_es_una_falla_del_motor(conn, monkeypatch):
 
     fallas = [f for _, f in corrida.fallas("motor") if f.que == "hechos sin significado"]
     assert fallas and "jugada" in fallas[0].real
+
+
+# --- Tercera vuelta de ajuste (usuario, 2026-10-06) ------------------------------------------
+
+def test_los_significados_son_para_entender_y_nunca_para_repetir():
+    """Ronda 2: "cambiarla lo decide el referente" se le repitió a la persona. El bloque y las
+    instrucciones dicen que los significados son de fondo, y ninguno se lee como una frase para
+    decir."""
+    assert hechos.bloque({"fecha_comprometida": "2026-10-23"}).startswith(
+        hechos.ENCABEZADO_DEL_BLOQUE)
+    assert "nunca se le cuenta" in hechos.ENCABEZADO_DEL_BLOQUE
+    assert "nunca se los contás" in INSTRUCCIONES_REDACCION
+    assert "lo decide el referente" not in hechos.significado("fecha_comprometida")
+
+
+def test_ningun_significado_ni_dato_dice_ella_por_quien_escribe():
+    """Ronda 2: "le toca a ella" se leyó como Leda. Se nombra a quién: la persona que escribe."""
+    textos = [*hechos.SIGNIFICADOS.values(), *(d for _, d in DATOS.values()),
+              *(f.es for f in FICHAS.values())]
+    assert not [t for t in textos if "a ella" in t or "ella misma" in t]
+    assert "nunca a Leda" in hechos.significado("nadie_mas")
+    assert "persona que escribe" in DATOS["nadie_mas"][1]

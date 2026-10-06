@@ -134,7 +134,7 @@ class Ficha:
 
 
 # Lo que Leda propone cuando no hay otra persona que destrabe el bloqueo (la persona no sabe
-# quién, o le toca a ella; 9c, corregida el 2026-10-05): que alguien la ayude, o más tiempo,
+# quién, o le toca a la persona misma; 9c, corregida el 2026-10-05): que alguien la ayude, o más tiempo,
 # que es la jugada de la nueva previsión.
 SALIDAS_DE_UN_BLOQUEO = ("que_alguien_ayude", "anotar_prevision")
 
@@ -584,7 +584,7 @@ def _anotar_quien_destraba(ctx: Contexto, datos: dict, tarea: dict | None) -> di
             return {"resultado": "falta_dato", "falta": ["integrante"],
                     "coinciden": [c["nombre"] for c in coinciden]}
         integrante = coinciden[0] if coinciden else None
-        # Nombrarse a sí misma es decir que le toca a ella.
+        # Nombrarse a sí misma es decir que le toca a la persona que escribe.
         nadie_mas = (integrante is not None
                      and str(integrante["membership_id"]) == ctx.quien.membership_id)
     if nadie_mas:
@@ -1032,8 +1032,8 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
           comprueba="que haya un bloqueo abierto en una tarea suya",
           hace="anota quién destraba: un integrante, alguien de afuera, que no se sabe o "
                "que le toca a la persona misma",
-          despues="cierra la pregunta y la espera; si no se sabe o le toca a ella, propone "
-                  "salidas, que quedan como tema abierto",
+          despues="cierra la pregunta y la espera; si no se sabe o le toca a la persona "
+                  "que escribe, propone salidas, que quedan como tema abierto",
           manejar=_anotar_quien_destraba,
           contesta=(preguntas.QUIEN_DESTRABA, preguntas.ESTADO_DE_LA_TAREA),
           propone=lambda hecho: hecho.get("salidas"),
@@ -1126,7 +1126,7 @@ FICHAS: Mapping[str, Ficha] = MappingProxyType({f.nombre: f for f in (
           despues="no se vuelve a preguntar; vuelve la que quedó para después, si hay",
           manejar=situaciones.cancelar, se_ofrece=False,
           es="La persona deja sin efecto la pregunta abierta de Leda: no la va a contestar. "
-             "Dejar sin efecto algo que ella misma dijo antes no es cancelar: es corregirlo o "
+             "Dejar sin efecto algo que la persona dijo antes no es cancelar: es corregirlo o "
              "dar el hecho nuevo."),
     Ficha("dejar_para_despues", "dejar la pregunta abierta para más tarde",
           necesita=(), opcional=(),

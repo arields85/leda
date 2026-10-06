@@ -105,7 +105,7 @@ def foto(conn, mundo: Mundo) -> dict[str, Any]:
                 "tarea": tarea(f["task_id"]), "no_sabe": f["no_sabe"],
                 "integrante": quien, "externo": f["destraba_externo"],
                 # Otra persona que lo destraba: alguien de afuera o un integrante que no es
-                # quien lo dijo (nombrarse a sí misma es "le toca a ella").
+                # quien lo dijo (nombrarse a sí misma es "le toca a la persona que escribe").
                 "alguien": bool(f["destraba_externo"]) or (
                     f["destraba_membership_id"] is not None
                     and f["destraba_membership_id"] != f["dicho_por_membership_id"])}

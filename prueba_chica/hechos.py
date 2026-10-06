@@ -86,7 +86,7 @@ SIGNIFICADOS: Mapping[str, str] = {
     "opcion": "El alias de una opción.",
     "etiqueta": "Lo que dice una opción, como la ve la persona.",
     "propone": "Lo que Leda le propuso a la persona para que elija.",
-    "desde_antes": "La pregunta ya se había hecho en un mensaje anterior: se vuelve a ella sin "
+    "desde_antes": "La pregunta ya se había hecho en un mensaje anterior: se vuelve a esa pregunta sin "
                    "pedir que se repita lo que la persona ya dijo.",
     # --- Lo que dice un hecho ------------------------------------------------------------------
     "jugada": "Qué entendió el sistema que dijo o pidió la persona (una jugada de la lista); "
@@ -102,8 +102,8 @@ SIGNIFICADOS: Mapping[str, str] = {
     "causa": "Lo que traba la tarea, como lo dijo la persona.",
     "prevision": "La fecha para la que la persona prevé terminar la tarea. No cambia la fecha "
                  "comprometida.",
-    "fecha_comprometida": "La fecha comprometida de la tarea (su vencimiento): no cambia con "
-                          "una previsión; cambiarla lo decide el referente.",
+    "fecha_comprometida": "La fecha comprometida de la tarea (su vencimiento). Una previsión "
+                          "no la cambia.",
     "atraso_dias_habiles": "Los días hábiles que la tarea lleva atrasada hoy, contados desde "
                            "la fecha comprometida.",
     "atraso_si_se_cumple_la_prevision_dias_habiles":
@@ -123,11 +123,13 @@ SIGNIFICADOS: Mapping[str, str] = {
     "sale": "Cuándo sale un aviso guardado: todavía no salió.",
     "quien_destraba": "Quién puede destrabar el bloqueo: como dato, lo que dijo la persona; "
                       "como tipo de pregunta, Leda pregunta quién lo puede destrabar y espera "
-                      "un nombre, que no sabe, o que le toca a ella.",
+                      "un nombre, que no sabe, o que le toca a la persona que escribe "
+                      "(nunca a Leda).",
     "integrante": "Una persona del equipo.",
     "externo": "Alguien de afuera del equipo, como lo nombró la persona.",
     "no_sabe": "La persona dijo que no sabe quién puede destrabarlo.",
-    "nadie_mas": "La persona dijo que nadie más puede destrabarlo: le toca a ella.",
+    "nadie_mas": "La persona que escribe dijo que nadie más puede destrabarlo: le toca a "
+                 "quien escribe, nunca a Leda.",
     "salidas": "Lo que Leda le propone a la persona para salir de un bloqueo, para que elija.",
     "bloqueo_resuelto": "El bloqueo que quedó cerrado porque la persona dijo que su causa ya no "
                         "está, con esa causa: la tarea ya no está trabada por eso.",
@@ -305,7 +307,7 @@ SIGNIFICADOS: Mapping[str, str] = {
     "que_alguien_ayude": "Propuesta: que alguien del equipo ayude con el bloqueo.",
     "si_la_termino": "Si la persona terminó la tarea.",
     "para_cuando_la_termina": "Para qué fecha prevé terminarla.",
-    "si_esta_trabada": "Si no puede avanzar con ella.",
+    "si_esta_trabada": "Si no puede avanzar con la tarea.",
     # --- Códigos: los tipos de pregunta (lo que la pregunta espera) ----------------------------
     "cual_tarea": "Pregunta de qué tarea habla la persona: espera que elija una.",
     "causa_del_bloqueo": "Pregunta qué traba la tarea: espera la causa.",
@@ -413,9 +415,16 @@ def sin_significado(valor: Any) -> set[str]:
     return {n for n in _nombres(valor) if significado(n) is None}
 
 
+# Los significados son para que la IA entienda los datos, nunca un texto para decir: en la
+# ronda 2 una línea de significado se le repitió a la persona (tercera vuelta, 2026-10-06).
+ENCABEZADO_DEL_BLOQUE = (
+    "Lista de significados de los datos y códigos de este pedido. Es sólo para entender los "
+    "datos: nunca se le cuenta ni se le repite a la persona.")
+
+
 def bloque(valor: Any) -> str:
     """Lo que significa cada clave y cada código de un pedido a la IA, una línea por nombre,
     sólo de lo que el pedido usa."""
     vistos = list(dict.fromkeys(n for n in _nombres(valor) if significado(n) is not None))
-    return "\n".join(["Lista de significados de los datos y códigos de este pedido:"]
+    return "\n".join([ENCABEZADO_DEL_BLOQUE]
                      + [f"- {n}: {significado(n)}" for n in vistos])
