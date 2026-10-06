@@ -68,6 +68,20 @@ misma clase de falla y el usuario frenó el parcheo (análisis en `docs/research
 
 Las etapas 2 y 3 tienen cada una su plan propio, que se escribe al llegar.
 
+**Entradas del plan de la Etapa 3, de la prueba por Telegram real (2026-10-06):**
+
+- **Leda habla de lo que pasa en el mundo, no del estado de la cocina.** Decisión del usuario,
+  2026-10-06: se resuelve en el motor definitivo, no en la prueba chica.
+  - Hoy, los hechos le pasan a la IA el estado interno de un aviso ("guardado, todavía sin enviar")
+    y ella lo repite, por ejemplo: "el aviso a Ismael está guardado, todavía no salió".
+  - La regla: Leda dice quién se entera de qué y cuándo ("Ismael se va a enterar hoy"). Sigue
+    siendo honesta: habla en futuro y nunca da por hecho lo que no pasó (primer contacto real,
+    hallazgo 1). Lo anunciado que ya no va a pasar se dice sólo si a la persona le sirve
+    (ADR 0018, 9m).
+  - Se escribe primero como conversación de prueba.
+- **Los efectos del motor, en la auditoría con la versión de las reglas** (constitución §12): hoy
+  quedan como hechos con su autor, pero no van a `audit_log`.
+
 ## Tareas
 
 - [x] **E0-1 a E0-4** (2026-10-04): atribuciones fuera de los commits sin subir de `main`; etiquetas; cierre en
