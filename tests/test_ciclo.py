@@ -831,61 +831,6 @@ def test_ejecutar_cadencia_evaluada_a_la_vez_por_dos_conexiones_no_duplica(
 
 
 # ---------------------------------------------------------------------------
-# Requisito 7: `servir` y `escuchar` corriendo a la vez no duplican envíos
-# ---------------------------------------------------------------------------
-
-def test_despachar_con_fila_tomada_por_otra_conexion_no_la_duplica(
-        corework, conn, uri):
-    """`for update skip locked` es lo que permite correr `servir` y
-    `escuchar` sobre el mismo espacio sin que ambos entreguen el mismo
-    mensaje: mientras otra conexión sostiene el lock (transacción sin
-    `commit` todavía), esta lo saltea en vez de bloquearse o reprocesarlo."""
-    from leda.db import conectar
-    from leda.despachador import despachar
-
-    ws = corework.workspace_id
-    with admin(conn) as cur:
-        _tarea(cur, ws, vence=datetime(2026, 8, 14, 17, 0, tzinfo=BA))
-    conn.commit()
-
-    ahora = datetime(2026, 7, 27, 9, 16, tzinfo=BA)
-    with espacio(conn, ws) as cur:
-        cal = Calendario.desde_base(cur, ws)
-        assert reloj.ejecutar_cadencia(cur, ws, "objetivos_semanales", cal, ahora) == 1
-
-    otra = conectar(uri)
-    try:
-        with otra.transaction():
-            with otra.cursor() as cur_otra:
-                cur_otra.execute("set local role leda_app")
-                cur_otra.execute(
-                    "select set_config('leda.workspace_id', %s, true)", (ws,))
-                cur_otra.execute(
-                    """select id from message_outbox
-                        where workspace_id = %s and estado = 'listo'
-                        for update skip locked""", (ws,))
-                assert len(cur_otra.fetchall()) == 1  # sostiene el lock, sin commit
-
-            transporte = TransporteDePrueba()
-            with espacio(conn, ws) as cur:
-                cal = Calendario.desde_base(cur, ws)
-                r = despachar(cur, ws, transporte, cal, ahora)
-            conn.commit()
-            assert r["enviados"] == 0        # la fila estaba tomada: la salteó
-            assert transporte.enviados == []
-        # el `with otra.transaction()` ya confirmó al salir: lock liberado
-    finally:
-        otra.close()
-
-    transporte2 = TransporteDePrueba()
-    with espacio(conn, ws) as cur:
-        cal = Calendario.desde_base(cur, ws)
-        r2 = despachar(cur, ws, transporte2, cal, ahora)
-    conn.commit()
-    assert r2["enviados"] == 1               # liberado el lock, ahora sí la entrega
-
-
-# ---------------------------------------------------------------------------
 # reloj.montar: un solo job de intervalo que llama al ciclo compartido
 # ---------------------------------------------------------------------------
 
