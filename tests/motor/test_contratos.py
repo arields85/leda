@@ -1,0 +1,94 @@
+"""Los contratos puros del motor: el reloj y la hora de salida (`tiempo`), la IA guionada de las
+pruebas (`ia`) y el tono del espacio para la redacción (`instrucciones`).
+"""
+
+from __future__ import annotations
+
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
+
+import pytest
+
+from leda.calendario import Calendario
+from leda.db import admin, espacio
+from leda.motor.ia import GuionAgotado, IAGuionada, Jugada
+from leda.motor.instrucciones import (INSTRUCCIONES_JUGADAS, INSTRUCCIONES_REDACCION, Tono,
+                                      bloque_de_tono, tono_del_espacio)
+from leda.motor.tiempo import HORA_DE_SALIDA, RelojFijo, RelojDelSistema, sale, sale_el
+
+from tests.motor.ayudantes import AHORA
+
+BA = ZoneInfo("America/Argentina/Buenos_Aires")
+
+
+def _cal(conn, mundo) -> Calendario:
+    with espacio(conn, mundo["id"]) as cur:
+        return Calendario.desde_base(cur, mundo["id"])
+
+
+def _local(dia: int, hora: int, minuto: int = 0) -> datetime:
+    return datetime(2026, 10, dia, hora, minuto, tzinfo=BA)
+
+
+def test_lo_que_leda_manda_por_su_cuenta_sale_a_la_hora_de_salida(conn, mundo):
+    cal = _cal(conn, mundo)                       # lunes a viernes, 9 a 17
+    assert HORA_DE_SALIDA.hour == 10
+    assert sale(cal, _local(5, 8)) == _local(5, 10)           # todavía no llegó: a las 10
+    assert sale(cal, _local(5, 11, 30)) == _local(5, 11, 30)  # ya pasó, en jornada: enseguida
+    assert sale(cal, _local(5, 18)) == _local(6, 10)          # terminó la jornada: mañana
+    assert sale(cal, _local(10, 11)) == _local(12, 10)        # sábado: el lunes
+    assert sale_el(cal, _local(9, 0).date()) == _local(9, 10)
+
+
+def test_los_relojes():
+    fijo = RelojFijo(AHORA)
+    assert (fijo.ahora(), fijo.medir()) == (AHORA, 0.0)
+    sistema = RelojDelSistema()
+    assert sistema.ahora().tzinfo is timezone.utc
+    assert sistema.medir() <= sistema.medir()
+
+
+def test_la_ia_guionada_devuelve_lo_preparado_en_orden_y_guarda_los_pedidos():
+    ia = IAGuionada(jugadas=[[Jugada("iniciar_tarea", {"tarea": "T1"})], RuntimeError("caída")],
+                    redacciones=["Anotado."])
+    assert ia.elegir_jugadas({"mensaje": "arranqué"}) == [Jugada("iniciar_tarea",
+                                                                 {"tarea": "T1"})]
+    with pytest.raises(RuntimeError, match="caída"):
+        ia.elegir_jugadas({"mensaje": "otra vez"})
+    assert ia.redactar({"hechos": []}) == "Anotado."
+    with pytest.raises(GuionAgotado):
+        ia.redactar({"hechos": []})
+    assert [p["mensaje"] for p in ia.pedidos_de_jugadas] == ["arranqué", "otra vez"]
+    assert len(ia.pedidos_de_redaccion) == 2
+
+
+def test_el_tono_sale_del_pack_del_espacio(conn, mundo):
+    with admin(conn) as cur:
+        cur.execute("""update persona_config set nombre_visible = 'Leda', emojis = true
+                        where workspace_id = %s""", (mundo["id"],))
+    with espacio(conn, mundo["id"]) as cur:
+        tono = tono_del_espacio(cur, mundo["id"])
+    assert tono == Tono(nombre_visible="Leda", registro="vos",
+                        formalidad="profesional_cordial", longitud="breve", emojis=True)
+    assert bloque_de_tono(tono).splitlines() == [
+        "Tono de este equipo:", "- Nombre: Leda.", "- Trato: de vos.",
+        "- Formalidad: profesional cordial.", "- Longitud: breve.", "- Emojis: permitidos."]
+
+
+def test_sin_tono_propio_no_se_inventa_un_trato():
+    assert bloque_de_tono(None) == ("Tono de este equipo:\n"
+                                    "- Sin tono propio: trato neutro y cordial.")
+
+
+def test_las_instrucciones_son_las_que_pasaron_la_prueba_real():
+    """Se portaron sin tocar una palabra: cambiarlas es cambiar lo que se probó."""
+    import hashlib
+
+    huellas = {nombre: hashlib.sha256(texto.encode("utf-8")).hexdigest()[:16]
+               for nombre, texto in (("jugadas", INSTRUCCIONES_JUGADAS),
+                                     ("redaccion", INSTRUCCIONES_REDACCION))}
+    assert huellas == HUELLAS_DE_LA_PRUEBA_REAL
+
+
+# Las de `prueba_chica/instrucciones.py`, la ronda 3 (85 de 85) y la prueba por Telegram.
+HUELLAS_DE_LA_PRUEBA_REAL = {"jugadas": "8b25f19b4bfe9b8a", "redaccion": "e5c5767b4f7312fd"}
