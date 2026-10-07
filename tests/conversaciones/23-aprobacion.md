@@ -1,12 +1,14 @@
 # 23. Quien aprueba decide
 
-**Qué prueba:** Ismael tiene cuatro entregas esperando su decisión y contesta por escrito. Un "aprobado"
-claro cierra la tarea, si el código comprueba que se cumple todo lo demás; si algo más frena el cierre,
-la aprobación queda anotada y Leda lo dice con honestidad. Un pedido de cambios claro devuelve la tarea
-a su responsable con el comentario. Lo que mezcla aprobar y pedir un cambio lleva una sola pregunta con
-dos botones. Y alguien que no aprueba esa tarea no puede aprobarla. Lo claro va directo, sin vista
-previa: es la decisión de quien aprueba (`odd/tasks/fase-c.md`, decisión 2). Circuito 8 (ADR 0017,
-decisión 3b); ADR 0018, decisión 2; mecánica §5 y §7; constitución §3 y §11.
+**Qué prueba:** Ismael tiene cuatro entregas esperando su decisión y contesta casi todo por escrito; una
+vez toca el botón "Pedir cambios" del aviso, que le pregunta qué falta. Un "aprobado" claro cierra la
+tarea, si el código comprueba que se cumple todo lo demás; si algo más frena el cierre, la aprobación
+queda anotada, Leda lo dice con honestidad y, cuando lo que faltaba se resuelve, el código vuelve a
+comprobar y la cierra sola, con aviso al responsable y a quien aprobó. Un pedido de cambios claro
+devuelve la tarea a su responsable con el comentario. Lo que mezcla aprobar y pedir un cambio lleva una
+sola pregunta con dos botones. Y alguien que no aprueba esa tarea no puede aprobarla. Lo claro va
+directo, sin vista previa: es la decisión de quien aprueba (`odd/tasks/fase-c.md`, decisiones 2 y 3).
+Circuito 8 (ADR 0017, decisión 3b); ADR 0018, decisión 2; mecánica §5 y §7; constitución §3 y §11.
 
 **Todavía no corre:** el circuito no está construido (`odd/tasks/fase-c.md`, tarea C-3). No tiene YAML.
 
@@ -62,19 +64,31 @@ decisión 3b); ADR 0018, decisión 2; mecánica §5 y §7; constitución §3 y �
 4. **Ismael** escribe (10:35): "lo de comunicaciones tambien aprobado"
    →
    - Jugadas: `aprobar`, la tarea de comunicaciones.
-   - Efecto: la aprobación queda anotada; el código comprueba el cierre y no pasa: la dependencia
-     bloqueante sigue abierta (la del switch está en curso). La tarea sigue `en_revision`. El aviso a
-     Marcos sale enseguida.
+   - Efecto: la aprobación queda registrada; el código comprueba el cierre y no pasa: la dependencia
+     bloqueante sigue abierta (la del switch está en curso). La tarea sigue `en_revision`, esperando que
+     se resuelva lo que frena el cierre (`odd/tasks/fase-c.md`, decisión 3). El aviso a Marcos sale
+     enseguida.
    - La respuesta dice, con honestidad: que la aprobación quedó anotada pero la tarea todavía no queda
-     terminada, porque espera que se termine la del switch de Lucas; el próximo paso: `PENDIENTE` (si se
-     cierra sola cuando se termine la del switch, o qué tiene que pasar; hoy la cocina sólo cierra en el
-     acto de aprobar).
-   - La respuesta no dice: que quedó terminada; que la del switch está atrasada (no lo está).
+     terminada, porque espera que se termine la del switch de Lucas; el próximo paso: que queda terminada
+     sola cuando se termine la del switch, y que les avisa a él y a Marcos.
+   - La respuesta no dice: que quedó terminada; que la del switch está atrasada (no lo está); que va a
+     tener que volver a aprobarla.
    - Estado después: quedan dos entregas esperando a Ismael.
 
-5. **Ismael** escribe (10:40): "a lo de mariano le falta el diagrama del tablero, que lo suba y lo vemos"
+5. **Ismael** toca (10:39) "Pedir cambios" en el aviso de la entrega de Mariano, el del viernes.
    →
-   - Jugadas: `pedir_cambios`, la tarea de Mariano, con el comentario "falta el diagrama del tablero".
+   - Jugadas: `pedir_cambios`, la tarea de Mariano, todavía sin comentario. El botón es un atajo y la
+     guarda pasa: el aviso es el vigente, no llegó evidencia nueva desde el viernes (ADR 0018, decisión 2).
+   - Efecto: ninguno todavía; la tarea sigue `en_revision`. El toque recibe su señal.
+   - La respuesta dice: la tarea de Mariano en su renglón con 📋; una pregunta: qué le falta.
+   - La respuesta no dice: que ya le pidió el cambio a Mariano.
+   - Botones: ninguno.
+   - Estado después: tema abierto, el pedido de cambios de la tarea de Mariano, esperando qué falta.
+
+6. **Ismael** escribe (10:40): "le falta el diagrama del tablero, que lo suba y lo vemos"
+   →
+   - Jugadas: `pedir_cambios`, la tarea de Mariano, con el comentario "falta el diagrama del tablero":
+     contesta la pregunta del tema abierto.
    - Confirmación: ninguna; lo claro va directo.
    - Efecto: el pedido de cambios con su comentario; la tarea vuelve al estado que tenía antes de la
      entrega, `en_curso`, con evento de Ismael y auditoría; el seguimiento de la tarea sigue con su
@@ -84,7 +98,7 @@ decisión 3b); ADR 0018, decisión 2; mecánica §5 y §7; constitución §3 y �
    - La respuesta no dice: que la tarea quedó rechazada o cancelada.
    - Estado después: queda una entrega esperando a Ismael.
 
-6. **Leda**, por su cuenta, a Mariano (10:40): el aviso del pedido de cambios.
+7. **Leda**, por su cuenta, a Mariano (10:40): el aviso del pedido de cambios.
    →
    - El mensaje dice: que Ismael pidió un cambio; la tarea en su renglón con 📋; lo que pidió, con sus
      palabras (falta el diagrama del tablero); que la tarea sigue en curso y vence el vie 30/10; el
@@ -92,7 +106,7 @@ decisión 3b); ADR 0018, decisión 2; mecánica §5 y §7; constitución §3 y �
      tarea, que agrega el código.
    - El mensaje no dice: que la tarea fue rechazada; un juicio sobre su trabajo.
 
-7. **Ismael** escribe (10:45): "lo de ariel aprobado, pero que revise los colores del grafico de lotes"
+8. **Ismael** escribe (10:45): "lo de ariel aprobado, pero que revise los colores del grafico de lotes"
    →
    - Jugadas: ninguna que ejecute: mezcla aprobar y pedir un cambio, y admite dos lecturas (ADR 0018,
      decisión 2: "aprobado, pero…" no es una aprobación clara).
@@ -102,7 +116,7 @@ decisión 3b); ADR 0018, decisión 2; mecánica §5 y §7; constitución §3 y �
    - Botones: dos, uno por cada lectura (constitución §8: algo con más de una lectura).
    - Estado después: tema abierto, la decisión sobre la tarea de Ariel.
 
-8. **Ismael** escribe (10:46), sin tocar los botones: "aprobala nomas y pasale lo de los colores"
+9. **Ismael** escribe (10:46), sin tocar los botones: "aprobala nomas y pasale lo de los colores"
    →
    - Jugadas: `elegir`, la primera lectura: `aprobar`, con el comentario "que revise los colores del
      gráfico de lotes". Escrito vale igual que el botón (situación general 6).
@@ -111,16 +125,39 @@ decisión 3b); ADR 0018, decisión 2; mecánica §5 y §7; constitución §3 y �
    - La respuesta dice: que la tarea de Ariel quedó terminada y que Ariel se va a enterar ahora, con el
      comentario.
    - Estado después: sin tema abierto; ninguna entrega esperando a Ismael (la de comunicaciones ya tiene
-     su aprobación).
+     su aprobación y espera la del switch).
+
+10. **La tarea del switch de Lucas** queda `terminada` (miércoles 28, 11:00), con su entrega y su
+    aprobación, que no son parte de esta conversación.
+    →
+    - Efecto: el código vuelve a comprobar el cierre de las tareas que esperaban por ella. La de
+      comunicaciones ya tiene la aprobación de Ismael, la evidencia completa y nada más que la frene: pasa
+      a `terminada` sola, con evento que lleva como origen la aprobación de Ismael del lunes 26, y
+      auditoría. Nadie tiene que volver a aprobarla. Los avisos a Marcos y a Ismael salen enseguida.
+
+11. **Leda**, por su cuenta (miércoles 28, 11:00), a Marcos y a Ismael: el aviso del cierre.
+    →
+    - A Marcos, el mensaje dice: que la tarea de comunicaciones quedó terminada, en su renglón con 📋;
+      que Ismael la había aprobado el lun 26/10 y faltaba que se terminara la del switch de Lucas, que ya
+      está; que no hace falta que responda, solo en el último renglón. Al final, un enlace a la página de
+      la tarea, que agrega el código.
+    - A Ismael, lo mismo, breve: que la tarea de comunicaciones de Marcos quedó terminada con la
+      aprobación que dio el lun 26/10, ahora que se terminó la del switch; que no hace falta que
+      responda, solo en el último renglón.
+    - El mensaje no dice: que Leda la aprobó o la cerró por su cuenta; que hace falta otra aprobación.
+    - Estado de Marcos y de Ismael después: sin tema abierto.
 
 ## Qué mide
 
 - **Garantías:** la aprobación es de quien la política designa, nunca de otro (paso 1) ni de Leda; el
-  cierre lo decide el código (pasos 2 y 4), y "aprobado" no es "terminada" cuando falta otra cosa; no
-  hace sin confirmación lo que la admite con dos lecturas (paso 7); no inventa (el paso 4 dice qué frena
-  el cierre); el responsable se entera de cada decisión, con el comentario.
+  cierre lo decide el código (pasos 2, 4 y 10), y "aprobado" no es "terminada" cuando falta otra cosa;
+  una aprobación que todavía no puede cerrar queda registrada y el código cierra la tarea cuando se
+  resuelve lo que faltaba, con aviso al responsable y a quien aprobó (pasos 10 y 11); el botón "Pedir
+  cambios" es un atajo que pregunta qué falta, y escribir vale igual (pasos 5 y 6); no hace sin
+  confirmación lo que la admite con dos lecturas (paso 8); no inventa (el paso 4 dice qué frena el
+  cierre); el responsable se entera de cada decisión, con el comentario.
 - **El formato:** el de la conversación 20 en cada mensaje.
-- **Falla de comprensión:** que la IA tome "a lo de mariano le falta el diagrama" como otra cosa que un
-  pedido de cambios, o "aprobado, pero que revise" como una aprobación clara. Tiene que preguntar;
+- **Falla de comprensión:** que la IA tome "le falta el diagrama del tablero" del paso 6 como otra cosa
+  que la respuesta al pedido de cambios, o "aprobado, pero que revise" como una aprobación clara. Tiene que preguntar;
   cerrar la tarea de Ariel sin preguntar, o aprobar la de Mariano por lo que dijo Marcos, es una falla
   de garantía.

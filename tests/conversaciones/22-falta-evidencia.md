@@ -18,8 +18,9 @@ decisiones 2, 4 y 5; ADR 0018, decisión 4 (situación general 5); mecánica §6
   - "Revisar comunicaciones industriales de la comprimidora": área OT; la aprueba Ismael; vence el
     viernes 30; `en_curso` desde el miércoles 21; sin bloqueos ni dependencias.
 - **Lo que pide la política de OT:** una explicación (texto), un resultado de prueba (texto, archivo,
-  imagen o enlace), una captura (imagen) y un archivo (archivo, imagen o enlace); una pieza cubre un solo
-  tipo (ADR 0019, decisión 5).
+  imagen o enlace), una captura (imagen) y un archivo (archivo, imagen o enlace). Un mismo texto puede
+  cubrir varios tipos, si lo dice (la explicación y cómo se probó); la vista previa dice qué cubre cada
+  pieza (ADR 0019, decisión 5).
 - **El límite de un archivo:** 60 MB en el producto; mientras no esté el servidor propio de la API de
   bots, el del canal, 20 MB (ADR 0019, decisión 2).
 - **Estado de la conversación de Marcos:** sin tema abierto, nada para después, nada mostrado para
@@ -52,8 +53,9 @@ decisiones 2, 4 y 5; ADR 0018, decisión 4 (situación general 5); mecánica §6
    →
    - Jugadas: `entregar`, la tarea de comunicaciones.
    - Efecto: ninguno sobre la tarea, que sigue `en_curso`. El código cuenta por tipo: el texto cubre la
-     explicación y la foto del lunes cubriría la captura si la deja; faltan el resultado de la prueba y un
-     archivo. Sin la política completa no hay vista previa para confirmar (ADR 0019, decisión 5).
+     explicación, pero no dice cómo la probó, así que no cubre el resultado de la prueba (a diferencia
+     del "20 ciclos sin una falla" de la conversación 21); la foto del lunes cubriría la captura si la
+     deja; faltan el resultado de la prueba y un archivo. Sin la política completa no hay vista previa para confirmar (ADR 0019, decisión 5).
    - La respuesta dice: lo que falta, en palabras de todos los días, calculado por el código (cómo la
      probó y un archivo, por ejemplo la configuración del switch); que la foto del lunes va a estar en la
      entrega; que la tarea pasa a esperar la aprobación de Ismael cuando esté todo; el cierre, aparte: que
@@ -86,8 +88,9 @@ decisiones 2, 4 y 5; ADR 0018, decisión 4 (situación general 5); mecánica §6
    - Jugadas: ninguna nueva: el archivo se suma a la entrega abierta.
    - Efecto: la política está completa (texto, foto del lunes, enlace y archivo). Se guarda la vista
      previa con su huella; la tarea sigue `en_curso`.
-   - La respuesta dice: la tarea de comunicaciones en su renglón con 📋; una pieza por renglón, con la
-     foto del lun 26/10 aparte, como mandada antes; el cierre, aparte: si la entrega así.
+   - La respuesta dice: la tarea de comunicaciones en su renglón con 📋; una pieza por renglón, con lo que
+     cubre cada una en palabras de todos los días y la foto del lun 26/10 aparte, como mandada antes; el
+     cierre, aparte: si la entrega así, o si corrige algo.
    - Botones: los de la confirmación.
    - Estado después: lo último mostrado para confirmar: la entrega con cuatro piezas.
 

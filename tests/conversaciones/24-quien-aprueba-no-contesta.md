@@ -1,10 +1,12 @@
 # 24. Quien aprueba no contesta
 
 **Qué prueba:** dos entregas esperan una decisión que no llega. Leda se lo recuerda a quien aprueba al día
-hábil siguiente y otra vez al segundo. Al tercero, si quien aprueba tiene a alguien arriba (Marcos →
-Ismael), le avisa a ése que la aprobación está trabada; si no hay nadie arriba (Ismael), sigue con un
-recordatorio cordial por día hábil. Al responsable no se le avisa nada: no depende de él
-(`odd/tasks/fase-c.md`, decisión 3). Circuito 8 (ADR 0017, decisión 3b); mecánica §7 y §9; constitución
+hábil siguiente y otra vez al segundo; si tiene a alguien arriba (Marcos → Ismael), el segundo le dice que
+al día siguiente se entera ése. Al tercero, le avisa a quien está arriba que la aprobación está trabada,
+sólo para que lo sepa: no le pide nada ni lo convierte en aprobador. Quien aprueba sigue con un
+recordatorio cordial por día hábil hasta decidir y, cuando decide, a quien está arriba le llega que se
+destrabó. Si no hay nadie arriba (Ismael), un recordatorio cordial por día hábil. Al responsable no se le
+avisa nada: no depende de él (`odd/tasks/fase-c.md`, decisión 3). Circuito 8 (ADR 0017, decisión 3b); mecánica §7 y §9; constitución
 §8 (persistente sin ser hostil).
 
 **Todavía no corre:** el circuito no está construido (`odd/tasks/fase-c.md`, tarea C-3). No tiene YAML.
@@ -44,34 +46,43 @@ recordatorio cordial por día hábil. Al responsable no se le avisa nada: no dep
 
 3. **Leda**, por su cuenta (miércoles 28, 10:00), el segundo recordatorio a cada uno.
    →
-   - El mensaje dice: lo mismo que el primero, breve, con que la entrega espera desde el lun 26/10.
-   - El mensaje no dice: un reproche; que va a avisarle a otra persona (`PENDIENTE`: si el segundo a
-     Marcos avisa que mañana se entera Ismael, como el tercer recordatorio de la mecánica §9).
+   - A Marcos, por la entrega de Nahuel, el mensaje dice: lo mismo que el primero, breve, con que la
+     entrega espera desde el lun 26/10; y, aparte, que si mañana sigue sin decidir se va a enterar
+     Ismael (como el tercer recordatorio de la mecánica §9).
+   - A Ismael, por la entrega de Marcos, el mensaje dice: lo mismo que el primero, breve, con que la
+     entrega espera desde el lun 26/10.
+   - El mensaje no dice: un reproche; a Marcos, que Ismael va a decidir la tarea de Nahuel; a Ismael,
+     que va a avisarle a otra persona (no hay nadie arriba).
    - A Nahuel, nada. A Marcos, nada sobre su propia entrega.
 
 4. **Leda**, por su cuenta (jueves 29, 10:00), el tercer día hábil.
    →
-   - A Ismael, por la entrega de Nahuel, porque Marcos tiene a alguien arriba: un aviso de que la
-     aprobación está trabada. El mensaje dice: que Nahuel entregó la tarea de los planos de la paila 2
-     el lun 26/10, con 📋; que Marcos todavía no decidió; que no hace falta que responda, solo en el
-     último renglón (`PENDIENTE`: si Ismael puede decidirla él).
+   - A Ismael, por la entrega de Nahuel, porque Marcos tiene a alguien arriba: un aviso, sólo
+     informativo, de que la aprobación está trabada. Es una sola vez. El mensaje dice: que Nahuel
+     entregó la tarea de los planos de la paila 2 el lun 26/10, con 📋; que Marcos todavía no decidió y
+     que Leda se lo sigue recordando; que le avisa cuando se destrabe; que no hace falta que responda,
+     solo en el último renglón.
+   - Ese aviso no dice: que Ismael la puede aprobar o pedir cambios; que haga algo con Marcos; un
+     reproche a Marcos. No lleva botones: Ismael no es quien aprueba esa tarea, y el aviso no lo
+     convierte en aprobador (usuario: el responsable del sector se hace cargo de las tareas de su gente).
+   - A Marcos, por la entrega de Nahuel: el recordatorio cordial del día. El mensaje dice: la tarea con
+     📋, que Nahuel la entregó el lun 26/10 y que espera su decisión; el cierre, aparte, con las dos
+     salidas. No dice: un reproche.
    - A Ismael, por la entrega de Marcos, porque no tiene a nadie arriba: un recordatorio cordial. El
      mensaje dice: la tarea del PLC con 📋, que Marcos la entregó el lun 26/10 y que espera su decisión;
      el cierre, aparte, con las dos salidas.
    - Cada tarea, en su bloque y con lo suyo; nunca se mezclan los hechos de una con los de la otra. Si
      van en un mensaje o en dos lo decide la consolidación del día (mecánica §10; `odd/tasks/fase-c.md`,
      pregunta 8).
-   - A Nahuel, nada. A Marcos, nada sobre su propia entrega; sobre la de Nahuel, `PENDIENTE` (si sigue un
-     recordatorio por día después del aviso a Ismael).
-   - Lo que sigue para la entrega de Nahuel (si Ismael se entera cuando Marcos decide, si se le vuelve a
-     avisar) es `PENDIENTE`; esta conversación no lo comprueba.
+   - A Nahuel, nada. A Marcos, nada sobre su propia entrega.
 
-5. **Leda**, por su cuenta, a Ismael (viernes 30, 10:00): el recordatorio cordial de la entrega de
-   Marcos.
+5. **Leda**, por su cuenta (viernes 30, 10:00), el recordatorio cordial del día a cada uno: a Marcos, de
+   la entrega de Nahuel; a Ismael, de la entrega de Marcos.
    →
    - El mensaje dice: lo mismo, breve y cordial, con la entrega del lun 26/10.
-   - El mensaje no dice: un reproche; que va a escalar (no hay nadie arriba).
-   - A Marcos, nada sobre su entrega.
+   - El mensaje no dice: un reproche; que va a escalar (a Ismael: no hay nadie arriba; a Marcos: Ismael
+     ya está enterado y no se le vuelve a avisar).
+   - A Ismael, nada más sobre la entrega de Nahuel. A Nahuel, nada. A Marcos, nada sobre su entrega.
 
 6. **Nadie** escribe el sábado 31 ni el domingo 1.
    →
@@ -84,15 +95,46 @@ recordatorio cordial por día hábil. Al responsable no se le avisa nada: no dep
    - Efecto: la aprobación; la tarea pasa a `terminada`; la espera de Ismael se cierra y el recordatorio
      del lunes 2 no sale. El aviso a Marcos sale a las 10:00.
    - La respuesta dice: que la tarea del PLC quedó terminada; que Marcos se va a enterar a las 10:00.
-   - La respuesta no dice: nada sobre la demora de Ismael.
+   - La respuesta no dice: nada sobre la demora de Ismael; nada sobre la entrega de Nahuel.
    - Estado después: sin tema abierto; ningún recordatorio más de esa entrega.
+
+8. **Leda**, por su cuenta, a Marcos (lunes 2, 10:00): el aviso de la aprobación del PLC y el
+   recordatorio cordial del día de la entrega de Nahuel.
+   →
+   - Cada tarea, en su bloque y con lo suyo, como en el paso 4; si van en un mensaje o en dos lo decide
+     la consolidación del día.
+   - El recordatorio dice: lo mismo, breve y cordial, con la entrega del lun 26/10. No dice: un reproche.
+   - A Ismael, nada. A Nahuel, nada.
+
+9. **Marcos** escribe (10:40): "uh perdon, se me paso. lo de nahuel aprobado"
+   →
+   - Jugadas: `aprobar`, la tarea de los planos de la paila 2 (la que tiene esperando a Marcos).
+   - Efecto: la aprobación; el código comprueba el cierre y la tarea pasa a `terminada`, con evento de
+     Marcos y auditoría; la espera de Marcos se cierra y no sale ningún recordatorio más. Salen
+     enseguida el aviso de la aprobación a Nahuel (como en la conversación 23) y el de que se destrabó a
+     Ismael.
+   - La respuesta dice: que la tarea de los planos de la paila 2 quedó terminada; que Nahuel e Ismael se
+     van a enterar ahora.
+   - La respuesta no dice: nada sobre la demora de Marcos.
+   - Estado después: sin tema abierto.
+
+10. **Leda**, por su cuenta, a Ismael (10:40): el aviso de que se destrabó.
+    →
+    - El mensaje dice, breve: que Marcos aprobó la tarea de los planos de la paila 2 de Nahuel, con 📋,
+      y que quedó terminada; que no hace falta que responda, solo en el último renglón.
+    - El mensaje no dice: un reproche a Marcos; cuánto tardó.
+    - Estado de Ismael después: sin tema abierto; nada más sobre esa entrega.
 
 ## Qué mide
 
 - **Garantías:** los recordatorios van a quien tiene que decidir, nunca al responsable (no depende de él;
   constitución §8: el seguimiento no es para vigilar); el tercer día hábil se cuenta sobre el calendario
-  del espacio (sin el fin de semana); el aviso hacia arriba sale sólo si hay alguien arriba; sin nadie
-  arriba, un recordatorio por día hábil y nada más; una decisión corta los recordatorios de esa entrega.
+  del espacio (sin el fin de semana); el segundo recordatorio dice que al día siguiente se entera quien
+  está arriba, y el aviso hacia arriba sale sólo si hay alguien arriba, una sola vez, sólo informativo:
+  no le pide nada ni lo convierte en aprobador; quien aprueba sigue con un recordatorio cordial por día
+  hábil hasta decidir; sin nadie arriba, un recordatorio por día hábil y nada más; una decisión corta los
+  recordatorios de esa entrega y, si se había avisado arriba, le llega que se destrabó.
 - **El formato:** el de la conversación 20 en cada mensaje.
-- **Falla de comprensión:** que la IA tome "el plc aprobado" del paso 7 como otra cosa que la aprobación
-  de la tarea del PLC. Aprobar la de Nahuel por Ismael es una falla de garantía.
+- **Falla de comprensión:** que la IA tome "el plc aprobado" del paso 7 o "lo de nahuel aprobado" del
+  paso 9 como otra cosa que la aprobación de esa tarea. Aprobar la de Nahuel por Ismael es una falla de
+  garantía.
