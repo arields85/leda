@@ -206,8 +206,11 @@ Del código de `main`; las de conversación se evalúan en el motor de conversac
 
 - **Contexto de la IA:** comparar el contexto amplio con variantes reducidas; requiere ADR antes de operar en
   internet.
-- **Producción:** cola de entrada, pool de conexiones, secreto de webhook, observabilidad, respaldo y
-  restauración.
+- **Producción:** cola de entrada, pool de conexiones, observabilidad, respaldo y restauración.
+  - El webhook del motor (E3-7) ya tiene un secreto propio de cada bot.
+  - Atiende un mensaje a la vez, bajo un candado global, y el candado de cada mensaje sigue tomado
+    mientras responde la IA. Se resuelve con la cola de entrada, antes de usar Leda en un servidor
+    (revisión de la E3-7).
 - **Alta de un segundo cliente:** el proceso no está definido.
 - **Autoridad sobre `cancelada`** (T2b): `PENDIENTE` de decisión.
 - **Aviso por cambio de fecha** de dependencias sin disparador (la fecha comprometida es inmutable; su cambio va
