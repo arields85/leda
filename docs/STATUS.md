@@ -3,7 +3,8 @@
 **Alcance:** Leda es un producto de gestión de proyectos multi-tenant. CoreWork es
 su primer cliente, no su definición.
 
-**Última actualización documental:** 2026-10-07, al cumplir M3 y cerrar la sesión.
+**Última actualización documental:** 2026-10-07, después de M3: palabras de todos los días, formato de los
+mensajes, `prueba_chica/` borrada y `main` con el motor.
 
 Versiones anteriores (historia, no estado vigente ni instrucción):
 [`STATUS-hasta-2026-09-30.md`](historial/STATUS-hasta-2026-09-30.md),
@@ -27,10 +28,10 @@ usamos"): la IA elige jugadas de una lista cerrada y el código las ejecuta (ADR
   la bitácora de flujos.
 
 Hoy Leda conversa con `python -m leda escuchar corework`, con GPT-6 sol por la suscripción de ChatGPT del
-usuario (proveedor `chatgpt`; uso personal, decisión del usuario). La regresión de las 18 conversaciones de
-prueba dio 90 de 90.
+usuario (proveedor `chatgpt`; uso personal, decisión del usuario). La regresión de las 20 conversaciones de
+prueba dio 100 de 100 (2026-10-07, con el formato de los mensajes).
 
-## Punto exacto para retomar (2026-10-07, M3 cumplido; sigue el formato de los mensajes)
+## Punto exacto para retomar (2026-10-07; espera la prueba por Telegram del formato)
 
 **Dónde:** rama `feat/motor-de-conversacion`, carpeta `D:\Proyectos\Leda-PM-worktrees\motor-de-conversacion`
 (reglas en [`../AGENTS.md`](../AGENTS.md)). El plan de la etapa es
@@ -38,51 +39,27 @@ prueba dio 90 de 90.
 
 **Antes de nada:** comprobar PostgreSQL (`pg_isready -h localhost -p 5432`); al cerrar la sesión se apaga. Si
 está caído, levantarlo con `levantar-postgres.bat` (o `pg_ctl ... start`, que el agente corre fuera del
-sandbox, porque dentro no puede escribir su registro). Con `0xC0000142`, cerrar los procesos `postgres`
-colgados y reintentar.
+sandbox, porque dentro no puede escribir su registro). Si `pg_ctl` dice que otro servidor puede estar en
+ejecución, cerrar los procesos `postgres` colgados (también un `io_worker` huérfano) y reintentar.
 
-**1. Lo que quedó en marcha al cerrar: las palabras de todos los días** (decisión del usuario, 2026-10-07).
-- **La regla:** Leda no nombra los conceptos del sistema, como "previsión", "fecha comprometida" o "pedido de
-  estado"; dice el hecho concreto en palabras de todos los días. Viene de la prueba real: Marcos preguntó
-  "¿qué es previsión?".
-- **Ya commiteado:** la conversación de prueba 19 (`098bc80`, `28f29fc`) y el arreglo en la cocina
-  (`230cf7e`). Los informes del rojo y del verde están en `tests/conversaciones/resultados/palabras-*`.
-- **Lo primero de la próxima sesión:**
-  - `git status` y `git log --oneline -10`.
-  - El ayudante se frenó al cerrar la sesión, con la regresión completa a medio correr y anunciando que
-    iba a ajustar "los textos y la huella de las instrucciones". No dejó cambios sin commitear: primero
-    correr `pytest tests/motor tests/conversaciones` para confirmar que `230cf7e` quedó completo.
-  - Si faltan los informes de la regresión completa con `--ia sol-suscripcion` (19 conversaciones por 5),
-    correrla. Si están sin commitear, commitearlos.
-  - Revisar con RDD los commits `098bc80` a `230cf7e` por tramos, que todavía no tienen revisión.
-  - Registrarlo en la bitácora.
+**1. Lo que espera: la prueba por Telegram del formato de los mensajes.**
+- **Hecho el 2026-10-07:**
+  - las palabras de todos los días, con los nombres de los datos que recibe la IA traducidos; "previsión"
+    quedó en 0 de 500 mensajes;
+  - el rastro de cada intento fallido de redactar un aviso;
+  - el formato de los mensajes (negrita, párrafos y viñetas): regresión de 20 conversaciones por 5, 100 de
+    100.
+  - Evidencia en la bitácora y en el plan.
+- **Lo que notó el agente, para la prueba:** hay mucha negrita (casi todas las tareas y fechas), y los
+  mensajes con varias cosas siguen siendo largos aunque estén en párrafos. No se cambió nada antes del juicio
+  del usuario.
+- **Después de la prueba:** registrarla en la bitácora; si el usuario pide ajustes, cada uno es primero una
+  conversación de prueba.
 
-**2. Lo siguiente: el formato de los mensajes** (pedido del usuario al aprobar M3, con capturas de antes y
-después).
-- **El pedido:** los mensajes de Leda son bloques de texto rígidos. Tienen que ser breves y con formato:
-  - las tareas y las palabras importantes en negrita;
-  - un salto de línea entre párrafos;
-  - listas con viñetas cuando hay varias cosas, por ejemplo una persona con sus tareas en el escalamiento.
-- **Diseño propuesto:**
-  - La IA marca un formato simple (negrita, párrafos y viñetas).
-  - La cocina lo convierte al formato de Telegram, escapando todo lo demás y respetando el largo
-    (`salida.py` y el despachador; ver si hoy mandan `parse_mode`).
-  - La instrucción de redacción describe el trabajo, sin frases de ejemplo.
-- **Método:**
-  1. Primero, una conversación de prueba.
-  2. Después, una prueba del contrato de salida en `tests/garantias`.
-  3. Al final, la verificación con `--ia sol-suscripcion` y la próxima prueba por Telegram.
-
-**3. Después:**
-- Borrar `prueba_chica/` (cumplió). Antes hay que sacarla de `MOTORES` en `tests/conversaciones/motores.py` y
-  reemplazar el lector de turnos: `python -m prueba_chica.leer corework --completo` sigue siendo el único y
-  lee `leda_motor`.
-- **Llevar la rama a `main`: autorizado** (usuario, 2026-10-07: "se puede llevar la rama a main, decidilo
-  vos"). El agente lo deja para el comienzo de la próxima sesión, después de cerrar y revisar las palabras de
-  todos los días.
-  - **Cómo:** desde `D:\Proyectos\Leda-PM`, que es la carpeta de `main`, avance rápido a la punta de la rama
-    (`origin/main` en `e466eb5` es antecesor) y push.
-  - Antes, comprobar que no queden líneas de atribución ni archivos sensibles.
+**2. Después:**
+- **Llevar a `main` lo nuevo de la rama:** `main` ya tiene el motor (`origin/main` en `f2a769c`, avance
+  rápido autorizado por el usuario). Lo posterior va por avance rápido desde `D:\Proyectos\Leda-PM`, después
+  de la prueba del formato, comprobando antes que no haya líneas de atribución ni secretos.
 - La Fase C del plan, después de M3:
   - los circuitos 7 y 8 (entrega y aprobación), el 5 (cadencias) y la persecución completa de un bloqueo (3a);
   - **delegar por chat**, ya decidido en parte (`docs/ROADMAP.md`, "Anotado para más adelante");
@@ -92,7 +69,7 @@ después).
 - `leda escuchar corework`: el escuchador.
 - `leda.motor.reloj corework adelantar|estado|volver`, y `hora HH:MM` para ir a una hora del mismo día.
 - `leda chatgpt login|estado|salir` y `leda modelo gpt-6-sol --proveedor chatgpt`.
-- `prueba_chica.leer corework --completo`: el registro de turnos.
+- `leda.motor.leer corework --completo`: el registro de turnos.
 - **Ojo:** nunca correr el escuchador y una ronda del corredor a la vez. Comparten la sesión de ChatGPT, y una
   renovación simultánea puede invalidarla.
 
@@ -117,8 +94,9 @@ vencimiento a 9 días, para que cayera en un día hábil. Respaldo previo:
 **Etapa 1** (diseño) y **Etapa 2** (prueba chica): terminadas, M1 y M2.
 
 **Etapa 3** (limpieza y motor definitivo): terminada, M3 (2026-10-07). Plan y evidencia en
-`odd/tasks/motor-definitivo.md`. Quedan sus cierres: las palabras de todos los días, el formato de los
-mensajes, borrar `prueba_chica/` y llevar la rama a `main`.
+`odd/tasks/motor-definitivo.md`. Sus cierres están hechos (2026-10-07): las palabras de todos los días, el
+formato de los mensajes (falta la prueba por Telegram del usuario), `prueba_chica/` borrada y `main` con el
+motor.
 
 **Después:** la Fase C y la plataforma web (decisiones del usuario: van después de M3). No hay equipo real
 hasta que el usuario lo diga.
@@ -165,14 +143,19 @@ validador de invariantes. Destino de cada uno:
 - **Seguridad de la base:** `row level security` forzado en todas las tablas con alcance de espacio.
   `PENDIENTE`: un ensayo de propiedad sobre un clúster limpio.
 - **Las pruebas de garantías** están en `tests/garantias/`, con fronteras que impiden importar código viejo. Las
-  del motor, en `tests/motor/`. El corredor y las 19 conversaciones de prueba, en `tests/conversaciones/`
-  (`python -m tests.conversaciones.correr --ia … --motor …`).
-- **`prueba_chica/`** sigue en el repositorio como motor de referencia, hasta que se borre.
+  del motor, en `tests/motor/`. El corredor y las 20 conversaciones de prueba, en `tests/conversaciones/`
+  (`python -m tests.conversaciones.correr --ia …`).
+- **La salida con formato:** la IA escribe `**negrita**`, párrafos y "• "; el outbox guarda ese texto y el
+  despachador lo manda como texto plano con entidades de Telegram (`salida.formatear`), sin `parse_mode`.
+- **Lo que lee la IA al redactar:** los nombres de los datos se traducen a palabras de todos los días
+  (`hechos.para_redactar`); adentro no cambian.
+- **`prueba_chica/`** se borró el 2026-10-07 (`c43e3e5`); el lector de turnos es `leda.motor.leer`.
 
 **Git:**
-- Repositorio `arields85/leda` (público). `origin/main` está en `e466eb5`.
-- La rama del Motor está subida hasta el cierre de esta sesión. Si quedaron commits del ayudante de las
-  palabras de todos los días después del último push, subirlos.
+- Repositorio `arields85/leda` (público). `origin/main` está en `f2a769c`: el motor llegó a `main` por avance
+  rápido el 2026-10-07 (221 commits, sin atribuciones ni secretos).
+- La rama del Motor se sube al cerrar cada tramo; lo posterior a `f2a769c` llega a `main` después de la
+  prueba del formato.
 - Etiquetas: `respaldo-flujos-antes-de-d`, `respaldo-main-antes-de-d`, `respaldo-0-36-en-pausa`,
   `archivo-c4-medicion`, `archivo-flujo-c6`, `archivo-prueba-0-35` y `respaldo-antes-de-partir-limpieza`
   (todas locales salvo las del 2026-10-04).
@@ -188,14 +171,15 @@ validador de invariantes. Destino de cada uno:
 | Punto de partida del Motor (`respaldo-main-antes-de-d`) | suite completa | 2026-10-04 | 2286 passed, 333 deselected |
 | Rama del Motor, sin los flujos A y B (E3-4) | suite completa | 2026-10-06 | 626 passed |
 | Rama del Motor, con el proveedor `chatgpt` | suite completa | 2026-10-07 | 1162 passed |
-| Rama del Motor | `pytest tests/motor` | 2026-10-07 | 480 passed |
-| Rama del Motor | `pytest tests/garantias` | 2026-10-07 | 146 passed |
-| Rama del Motor | `pytest prueba_chica` (fuera de la suite) | 2026-10-07 | 356 passed |
+| Rama del Motor, con el formato y sin `prueba_chica/` | suite completa | 2026-10-07 | 1209 passed |
+| Rama del Motor | `pytest tests/motor tests/conversaciones` | 2026-10-07 | 595 passed |
+| Rama del Motor | `pytest tests/garantias` | 2026-10-07 | 187 passed |
 
 **Conversaciones con la IA real** (bitácora de flujos):
 - La ronda 3 de la prueba chica dio 85 de 85.
 - La regresión del motor definitivo con sol por OpenRouter dio 89 de 90.
-- Con sol por la suscripción dio 90 de 90.
+- Con sol por la suscripción dio 90 de 90; con las palabras de todos los días, 94 de 95 y 95 de 95; con el
+  formato de los mensajes, 100 de 100 (20 conversaciones).
 
 Las cifras de pruebas miden el código: **una suite en verde no es evidencia de que la conversación funcione**
 (`AGENTS.md`, punto 12).
@@ -227,8 +211,7 @@ Las cifras de pruebas miden el código: **una suite en verde no es evidencia de 
    patrón que la frontera rechaza.
 5. **La IA por la suscripción del usuario** sirve sólo para uso personal. Depende de un servicio no oficial de
    OpenAI, que puede cambiar sin aviso. En la etapa comercial, cada cliente pone su proveedor.
-6. **`main` no tiene el motor** hasta que reciba la rama.
-7. **Ningún equipo real usó Leda:** todas las pruebas fueron con datos ficticios y un evaluador que conoce el
+6. **Ningún equipo real usó Leda:** todas las pruebas fueron con datos ficticios y un evaluador que conoce el
    guion.
 
 Contrastar los riesgos 1 a 4 contra el símbolo, no contra números de línea.
@@ -253,3 +236,9 @@ Contrastar los riesgos 1 a 4 contra el símbolo, no contra números de línea.
 - **Autoridad sobre `cancelada`** (T2b): `PENDIENTE` de decisión.
 - **Reintento del despachador:** puede reordenar partes de una respuesta partida.
 - **Tope de contacto por espacio y no por persona** (`docs/capacidades.md`, "Trampas conocidas").
+- **Avisos que a veces no salen a su hora** (1 o 2 de cada 95 corridas, dos rondas): causa desconocida; desde
+  `2b4afbf` cada intento fallido deja un incidente y el informe de la ronda lo muestra.
+- **`conversation_state.mostrado_para_confirmar`** no lo lee nadie: por eso `test_capacidades` exime las
+  tablas del motor (`TABLAS_DEL_MOTOR`). Decidir para qué es o borrarla.
+- **Una prueba intermitente** en `tests/motor tests/conversaciones` (una falla sin nombre en una corrida, dos
+  repeticiones en verde, 2026-10-07); quizás la del indicador de escritura.

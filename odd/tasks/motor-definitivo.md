@@ -477,6 +477,15 @@ varias cosas.
     o, si no puede, que salga como texto.
   - *Qué lo demuestra:* la prueba del contrato en `tests/garantias` (rojo primero), la conversación de prueba
     20 leída en las transcripciones con la IA real y la próxima prueba por Telegram.
+- **Hecho:** `a61f36e`, `47f674d`, `25ec91d` y `a704883` (revisiones `review-5f70100e7d4c1f51` y
+  `review-a55346b24f27d539`). Regresión de 20 conversaciones por 5: 100 de 100 (`b24fc64`). Falta la prueba
+  por Telegram del usuario.
+
+### Borrar `prueba_chica/` (2026-10-07)
+
+- `8fbd549` (el lector de turnos, `python -m leda.motor.leer`), `c21064e` (el corredor sólo con el motor
+  definitivo), `167785a` y `459af03` (referencias) y `c43e3e5` (el borrado, que como borrado puro no se
+  revisa). Suite completa: 1209.
 
 ## 4b. Guía de la prueba por Telegram (M3)
 
