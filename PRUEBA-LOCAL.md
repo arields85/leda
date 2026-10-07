@@ -63,13 +63,20 @@ usa `LEDA_OPENROUTER_API_KEY` y los demás
 `LEDA_LLM_API_KEY`; si falta la que corresponde, Leda lo registra como
 incidente en vez de usar la otra.
 
-Cada llamada al modelo tiene un tiempo máximo por intento y reintentos acotados,
-para que un pedido colgado del proveedor no deje esperando a la persona más de lo
-razonable. Se ajustan en `parametros` de `model_config` con `timeout_s` (por
-defecto 20 segundos) y `reintentos` (por defecto 2). Un timeout que agota los
-reintentos se trata como cualquier otro error del proveedor: incidente y disculpa.
-El cliente de la prueba chica (`prueba_chica/ia_real.py`) usa `timeout_s`; no reintenta
-por su cuenta: el reintento, uno solo, lo hace el turno.
+Cada llamada al modelo tiene un tiempo máximo y un tope de salida, para que un pedido
+colgado del proveedor no deje esperando a la persona más de lo razonable. Se ajustan por
+modelo en `parametros` de `model_config`, con
+`python -m leda modelo <id> --proveedor <p> --parametros '<json>'`:
+
+- `timeout_s`: por defecto 20 segundos por llamada;
+- `plazo_s`: por defecto 40 segundos en total;
+- `tope_jugadas` y `tope_redaccion`: el tope de salida;
+- `cuerpo_extra`: campos que se suman al pedido. Por ejemplo, `{"reasoning_effort": "low"}`
+  para GLM en `nan`, o `{"chat_template_kwargs": {"enable_thinking": false}}` para DeepSeek.
+
+Un valor inválido se rechaza al guardarlo, y el modelo activo no cambia. El reintento, uno
+solo, lo hace el turno. Si la IA no responde, la persona recibe el texto fijo y queda un
+incidente.
 
 ## 3. Dar de alta a los tres
 
