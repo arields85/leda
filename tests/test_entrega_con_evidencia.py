@@ -13,8 +13,9 @@ Estas pruebas cubren:
      de estado cuando llega en el mismo pedido.
   2. `aprobar_tarea`/`pedir_cambios_tarea` sólo se permiten sobre una tarea
      `en_revision`; `aprobar_tarea` además exige que la evidencia ya esté.
-  3. Quien aprueba se entera de la entrega con botones ("Aprobar"/"Pedir
-     cambios"), no sólo el responsable con un aviso de texto.
+  3. Quien aprueba se entera de la entrega con un aviso de coordinación, con
+     toda la evidencia vigente. Los botones "Aprobar"/"Pedir cambios" se
+     retiraron con los flujos A y B (E3-3): sólo los resolvía su toque.
   4. `pedir_cambios_tarea` devuelve la tarea a `en_curso` con el comentario
      como motivo, y avisa al responsable.
 """
@@ -23,7 +24,6 @@ from __future__ import annotations
 
 import threading
 from contextlib import ExitStack
-from datetime import datetime, timezone
 
 import psycopg
 import pytest
@@ -175,7 +175,7 @@ def test_actualizar_estado_a_en_revision_sin_evidencia_requerida_no_pide_nada(
         assert cur.fetchone()["n"] == 0
 
 
-def test_actualizar_estado_a_en_revision_notifica_al_aprobador_con_botones(
+def test_actualizar_estado_a_en_revision_notifica_al_aprobador(
         corework, conn):
     ws = corework.workspace_id
     with admin(conn) as cur:
@@ -201,14 +201,11 @@ def test_actualizar_estado_a_en_revision_notifica_al_aprobador_con_botones(
             "where workspace_id = %s and chat_id = %s and cuerpo = %s",
             (ws, tg_marcos, cuerpo))
         assert cur.fetchone()["es_coordinacion"] is True
-
+        # Sin botones: el toque que los resolvía se retiró con los flujos A y B.
         cur.execute(
-            """select po.etiqueta from pending_action pa
-                 join pending_action_option po on po.pending_action_id = pa.id
-                where pa.workspace_id = %s and pa.chat_id = %s and pa.estado = 'esperando'
-               order by po.orden""", (ws, tg_marcos))
-        etiquetas = [f["etiqueta"] for f in cur.fetchall()]
-    assert etiquetas == ["Aprobar", "Pedir cambios"]
+            "select count(*) n from pending_action where workspace_id = %s",
+            (ws,))
+        assert cur.fetchone()["n"] == 0
 
 
 # ---------------------------------------------------------------------------
@@ -1302,38 +1299,29 @@ def test_evidencia_pendiente_empate_de_at_en_la_misma_transaccion_falla_cerrado(
 
 
 # ---------------------------------------------------------------------------
-# 10. Evidencia nueva en revisión reemplaza el aviso del aprobador (T6i,
+# 10. Evidencia nueva en revisión vuelve a avisar al aprobador (T6i,
 #     `odd/tasks/leda-orienta.md`; ADR 0009, enmienda 2026-09-27).
 #     Decisión del usuario: cuando llega evidencia nueva a una tarea que ya
 #     está `en_revision` -- entrega repetida (T6g) o "Adjuntar evidencia" --
-#     de alguien que no es el aprobador, el aviso que el aprobador tiene
-#     esperando queda retirado y sale uno nuevo con toda la evidencia
-#     vigente. Si la manda el propio aprobador, no hay a quién avisar de
-#     nuevo -- el aviso que esperaba sigue como estaba.
+#     de alguien que no es el aprobador, sale un aviso nuevo con toda la
+#     evidencia vigente. Si la manda el propio aprobador, no hay a quién avisar
+#     de nuevo. Los botones "Aprobar"/"Pedir cambios" del aviso, que había que
+#     retirar al reemplazarlo, se fueron con los flujos A y B (E3-3).
 # ---------------------------------------------------------------------------
 
-def _id_aviso_entrega_esperando(cur, ws, tg_aprobador) -> str:
+def _avisos_de_entrega(cur, ws, tg_aprobador) -> list[dict]:
     cur.execute(
-        """select pa.id from pending_action pa
-            where pa.workspace_id = %s and pa.chat_id = %s and pa.estado = 'esperando'
-              and exists (
-                    select 1 from pending_action_option po
-                     where po.pending_action_id = pa.id and po.etiqueta = 'Aprobar')
-           order by pa.creado_en desc limit 1""",
-        (ws, tg_aprobador))
-    fila = cur.fetchone()
-    assert fila is not None, "no hay aviso de entrega esperando"
-    return str(fila["id"])
+        """select dedupe_key, cuerpo from message_outbox
+            where workspace_id = %s and chat_id = %s and dedupe_key like %s
+           order by programado_para""",
+        (ws, tg_aprobador, f"{ws}:entrega:%"))
+    return cur.fetchall()
 
 
-def test_adjuntar_evidencia_en_revision_retira_el_aviso_viejo_y_manda_uno_nuevo(
-        corework, conn):
+def test_adjuntar_evidencia_en_revision_manda_un_aviso_nuevo(corework, conn):
     """Responsable manda evidencia con "Adjuntar evidencia" sobre una tarea
-    ya en_revision: el aviso que Marcos tiene esperando queda retirado --
-    tocar su "Aprobar" ya no está vigente y no aplica nada -- y sale uno
-    nuevo con las dos evidencias y una clave de dedupe distinta."""
-    from leda import pendientes as P
-
+    ya en_revision: sale un aviso nuevo para Marcos con las dos evidencias y
+    una clave de dedupe distinta, y la tarea no se aprueba sola."""
     ws = corework.workspace_id
     with admin(conn) as cur:
         tid = _tarea(cur, ws, estado="en_curso")
@@ -1350,13 +1338,7 @@ def test_adjuntar_evidencia_en_revision_retira_el_aviso_viejo_y_manda_uno_nuevo(
 
     with admin(conn) as cur:
         tg_marcos = _tg(cur, "Marcos Tarquini")
-        pid_viejo = _id_aviso_entrega_esperando(cur, ws, tg_marcos)
-        token_viejo = next(
-            f.token for f in P.opciones(cur, pid_viejo) if f.etiqueta == "Aprobar")
-        cur.execute(
-            "select dedupe_key from message_outbox where pending_action_id = %s",
-            (pid_viejo,))
-        dedupe_viejo = cur.fetchone()["dedupe_key"]
+        assert len(_avisos_de_entrega(cur, ws, tg_marcos)) == 1
 
     with espacio(conn, ws) as cur:
         nahuel = _quien(cur, "Nahuel Gimenez", ws)
@@ -1368,40 +1350,21 @@ def test_adjuntar_evidencia_en_revision_retira_el_aviso_viejo_y_manda_uno_nuevo(
     assert "evidencia_id" in resultado
 
     with admin(conn) as cur:
-        cur.execute("select estado from pending_action where id = %s", (pid_viejo,))
-        assert cur.fetchone()["estado"] != "esperando"
+        viejo, nuevo = _avisos_de_entrega(cur, ws, tg_marcos)
+        assert nuevo["dedupe_key"] != viejo["dedupe_key"]
+        assert "Primera evidencia." in nuevo["cuerpo"]
+        assert "Segunda evidencia, por adjuntar." in nuevo["cuerpo"]
 
-        pid_nuevo = _id_aviso_entrega_esperando(cur, ws, tg_marcos)
-        assert pid_nuevo != pid_viejo
-
-        cuerpo_nuevo = _outbox_ultimo(cur, ws, tg_marcos)
-        assert "Primera evidencia." in cuerpo_nuevo
-        assert "Segunda evidencia, por adjuntar." in cuerpo_nuevo
-
-        cur.execute(
-            "select dedupe_key from message_outbox where pending_action_id = %s",
-            (pid_nuevo,))
-        dedupe_nuevo = cur.fetchone()["dedupe_key"]
-        assert dedupe_nuevo != dedupe_viejo
-
-    with espacio(conn, ws) as cur:
-        marcos = _quien(cur, "Marcos Tarquini", ws)
-        resuelta = P.resolver(cur, token_viejo, app_user_id=marcos.app_user_id,
-                              ahora=datetime.now(timezone.utc))
-    assert resuelta is None       # "ya no está vigente" (gateway._toque)
-
-    with admin(conn) as cur:
         cur.execute("select estado from task where id = %s", (tid,))
         assert cur.fetchone()["estado"] == "en_revision"     # nunca se aprobó
         cur.execute("select count(*) n from approval where sujeto_id = %s", (tid,))
         assert cur.fetchone()["n"] == 0
 
 
-def test_entrega_repetida_en_revision_retira_el_aviso_viejo_y_manda_uno_nuevo(
-        corework, conn):
+def test_entrega_repetida_en_revision_manda_un_aviso_nuevo(corework, conn):
     """Mismo caso, por el camino de "ya la terminé" repetido sobre una tarea
     que ya está en_revision (T6g): sigue sin registrar un segundo evento de
-    estado, pero ahora también retira el aviso viejo y notifica de nuevo."""
+    estado, pero notifica de nuevo con toda la evidencia."""
     ws = corework.workspace_id
     with admin(conn) as cur:
         tid = _tarea(cur, ws, estado="en_curso")
@@ -1418,7 +1381,6 @@ def test_entrega_repetida_en_revision_retira_el_aviso_viejo_y_manda_uno_nuevo(
 
     with admin(conn) as cur:
         tg_marcos = _tg(cur, "Marcos Tarquini")
-        pid_viejo = _id_aviso_entrega_esperando(cur, ws, tg_marcos)
         cur.execute("select count(*) n from task_state_event where task_id = %s", (tid,))
         eventos_antes = cur.fetchone()["n"]
 
@@ -1435,21 +1397,15 @@ def test_entrega_repetida_en_revision_retira_el_aviso_viejo_y_manda_uno_nuevo(
         cur.execute("select count(*) n from task_state_event where task_id = %s", (tid,))
         assert cur.fetchone()["n"] == eventos_antes           # T6g: ningún evento nuevo
 
-        cur.execute("select estado from pending_action where id = %s", (pid_viejo,))
-        assert cur.fetchone()["estado"] != "esperando"
-
-        pid_nuevo = _id_aviso_entrega_esperando(cur, ws, tg_marcos)
-        assert pid_nuevo != pid_viejo
-
-        cuerpo_nuevo = _outbox_ultimo(cur, ws, tg_marcos)
-        assert "Primera entrega." in cuerpo_nuevo
-        assert "Entrega repetida, con más detalle." in cuerpo_nuevo
+        viejo, nuevo = _avisos_de_entrega(cur, ws, tg_marcos)
+        assert nuevo["dedupe_key"] != viejo["dedupe_key"]
+        assert "Primera entrega." in nuevo["cuerpo"]
+        assert "Entrega repetida, con más detalle." in nuevo["cuerpo"]
 
 
-def test_aprobador_adjunta_su_propia_evidencia_no_reemplaza_el_aviso(corework, conn):
+def test_aprobador_adjunta_su_propia_evidencia_no_manda_otro_aviso(corework, conn):
     """Si quien manda la evidencia nueva es el propio aprobador, no hay a
-    quién avisar de nuevo -- ya lo sabe -- y el aviso que esperaba sigue
-    como estaba, sin ningún aviso adicional."""
+    quién avisar de nuevo -- ya lo sabe --: ningún aviso adicional."""
     ws = corework.workspace_id
     with admin(conn) as cur:
         tid = _tarea(cur, ws, estado="en_curso")
@@ -1466,7 +1422,6 @@ def test_aprobador_adjunta_su_propia_evidencia_no_reemplaza_el_aviso(corework, c
 
     with admin(conn) as cur:
         tg_marcos = _tg(cur, "Marcos Tarquini")
-        pid_viejo = _id_aviso_entrega_esperando(cur, ws, tg_marcos)
         cur.execute(
             "select count(*) n from message_outbox where workspace_id = %s and chat_id = %s",
             (ws, tg_marcos))
@@ -1482,9 +1437,6 @@ def test_aprobador_adjunta_su_propia_evidencia_no_reemplaza_el_aviso(corework, c
     assert "evidencia_id" in resultado
 
     with admin(conn) as cur:
-        cur.execute("select estado from pending_action where id = %s", (pid_viejo,))
-        assert cur.fetchone()["estado"] == "esperando"        # sigue como estaba
-
         cur.execute(
             "select count(*) n from message_outbox where workspace_id = %s and chat_id = %s",
             (ws, tg_marcos))
@@ -1631,19 +1583,15 @@ def test_aprobar_y_pedir_cambios_simultaneos_dejan_una_sola_decision_aplicada(
         assert estado_final == "en_curso"
 
 
-def test_dos_evidencias_simultaneas_en_en_revision_dejan_un_solo_aviso_con_las_dos(
+def test_dos_evidencias_simultaneas_en_en_revision_dejan_un_aviso_con_las_dos(
         corework, conn, uri):
     """review-ae0ab510: dos "adjuntar_evidencia" al mismo tiempo sobre una
     tarea ya `en_revision`, en transacciones reales distintas -- sin el
-    lock, cada una retira los avisos que ve en ese instante y crea el suyo
-    con la evidencia que alcanzó a leer: el aprobador podía terminar con dos
-    avisos esperando, ninguno con las dos evidencias. Con el lock, la
-    segunda espera a que la primera termine, retira EL aviso que dejó la
-    primera (nunca los dos a la vez) y manda el suyo con las dos evidencias
-    ya visibles -- `_evidencia_vigente` corre después de tomar el lock, así
-    que ve lo que la primera ya confirmó."""
-    from leda import pendientes as P
-
+    lock, cada una armaba su aviso con la evidencia que alcanzó a leer: el
+    aprobador podía terminar sin ningún aviso con las dos evidencias. Con el
+    lock, la segunda espera a que la primera termine y manda el suyo con las
+    dos evidencias ya visibles -- `_evidencia_vigente` corre después de tomar
+    el lock, así que ve lo que la primera ya confirmó."""
     ws = corework.workspace_id
     with admin(conn) as cur:
         tid = _tarea(cur, ws, estado="en_revision")
@@ -1684,17 +1632,11 @@ def test_dos_evidencias_simultaneas_en_en_revision_dejan_un_solo_aviso_con_las_d
 
     with admin(conn) as cur:
         tg_marcos = _tg(cur, "Marcos Tarquini")
-        cur.execute(
-            """select id, resumen from pending_action
-                where workspace_id = %s and chat_id = %s and estado = 'esperando'
-                  and herramienta = %s and args ->> 'tarea_id' = %s
-                  and args ->> 'aviso' = %s""",
-            (ws, tg_marcos, P.SENTINEL_MENU_TAREA, str(tid), P.AVISO_ENTREGA))
-        esperando = cur.fetchall()
+        avisos = _avisos_de_entrega(cur, ws, tg_marcos)
 
-    assert len(esperando) == 1     # nunca dos avisos esperando a la vez
-    assert "Evidencia concurrente A." in esperando[0]["resumen"]
-    assert "Evidencia concurrente B." in esperando[0]["resumen"]
+    assert len(avisos) == 2        # uno por cada evidencia nueva
+    assert any("Evidencia concurrente A." in a["cuerpo"]
+               and "Evidencia concurrente B." in a["cuerpo"] for a in avisos)
 
 
 # ---------------------------------------------------------------------------
@@ -1730,63 +1672,6 @@ def test_dedupe_key_shape_tarea_id_y_transaccion_no_colisiona_entre_tareas(
         claves = _dedupe_keys_entrega(cur, ws, tg_marcos)
     assert len(claves) == 2
     assert set(claves) == {f"{ws}:entrega:{t1}:{xact}", f"{ws}:entrega:{t2}:{xact}"}
-
-
-def test_notificar_entrega_repetido_en_la_misma_transaccion_no_deja_pending_action_huerfana(
-        corework, conn):
-    """T6h (2): la prueba de la sección 7
-    (`test_notificar_entrega_repetido_en_la_misma_transaccion_no_duplica_el_aviso`)
-    comprobó que un solo mensaje sale a `message_outbox`, pero no que la
-    segunda llamada no dejara una `pending_action` con botones propios
-    esperando un mensaje que nunca salió -- el `on conflict (dedupe_key) do
-    nothing` de `enqueue_outbox` no le avisa a `pendientes.registrar`, que
-    ya insertó su fila antes de intentarlo. Con el corte de T6h (comprobar
-    `message_outbox` antes de armar nada), la segunda llamada no llega a
-    crear esa segunda `pending_action`: tantas acciones esperando como
-    mensajes salieron.
-
-    T6j (revisión sobre T6h): contar no alcanza -- un WARNING de la revisión
-    de T6f/T6h notó que esta prueba nunca comprobó el ESTADO de la acción
-    que queda ni que fuera la misma que espera el único mensaje. Ahora
-    comprueba que la `pending_action` que sobrevive está `esperando` y que
-    su id es el `pending_action_id` de la única fila de `message_outbox`."""
-    from leda import pendientes as P
-
-    ws = corework.workspace_id
-    with admin(conn) as cur:
-        tid = _tarea(cur, ws, estado="en_curso", evidencia_requerida=None)
-    conn.commit()
-
-    handler = H.REGISTRO["actualizar_estado"].handler
-    with espacio(conn, ws) as cur:
-        nahuel = _quien(cur, "Nahuel Gimenez", ws)
-        handler(cur, nahuel, tarea_id=tid, estado="en_revision")
-        cur.execute(
-            """insert into task_state_event (task_id, estado_anterior,
-                                             estado_nuevo, actor_kind)
-               values (%s, 'en_revision', 'en_curso', 'sistema')""", (tid,))
-        handler(cur, nahuel, tarea_id=tid, estado="en_revision")
-
-    with admin(conn) as cur:
-        tg_marcos = _tg(cur, "Marcos Tarquini")
-        cur.execute(
-            """select id, estado from pending_action
-                where workspace_id = %s and chat_id = %s and herramienta = %s
-                  and args ->> 'tarea_id' = %s and args ->> 'aviso' = %s""",
-            (ws, tg_marcos, P.SENTINEL_MENU_TAREA, str(tid), P.AVISO_ENTREGA))
-        avisos_pendientes = cur.fetchall()
-        cur.execute(
-            """select pending_action_id from message_outbox
-                where workspace_id = %s and chat_id = %s and dedupe_key like %s""",
-            (ws, tg_marcos, f"{ws}:entrega:%"))
-        mensajes = cur.fetchall()
-    assert len(avisos_pendientes) == len(mensajes) == 1
-    # Revisión del orquestador tras T6h: un solo aviso y un solo mensaje no
-    # bastan por sí solos -- hacía falta comprobar que es EL MISMO aviso el
-    # que espera el botón del único mensaje que salió, no uno huérfano al
-    # lado de un mensaje que apunta a otro lado.
-    assert avisos_pendientes[0]["estado"] == "esperando"
-    assert str(avisos_pendientes[0]["id"]) == str(mensajes[0]["pending_action_id"])
 
 
 def test_evidencia_previa_a_un_rechazado_no_aparece_en_el_aviso_con_texto_distintivo(

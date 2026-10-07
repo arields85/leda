@@ -310,35 +310,6 @@ def _tareas_activas_por_id(cur: psycopg.Cursor, workspace_id: str,
     return {str(f["id"]): f["titulo"] for f in cur.fetchall()}
 
 
-def _tareas_existentes_por_id(cur: psycopg.Cursor, workspace_id: str,
-                              tarea_ids: list[Any]) -> dict[str, str]:
-    """Título ACTUAL de cada id de tarea que EXISTE en este espacio, sin
-    filtrar por estado -- a diferencia de `_tareas_activas_por_id`, pensada
-    para T1 (una opción recién ofrecida por el modelo siempre tiene que
-    seguir abierta para que "elegirla" tenga sentido).
-
-    Revisión del orquestador sobre T3: "Ver más" (`gateway._mostrar_mas_tareas`)
-    pagina una lista cuya PRIMERA página ya salió tal cual la devolvió
-    `consultar_tareas` -- que acepta `estado="terminada"` y no filtra nada --,
-    así que la página siguiente tiene que ser consistente con la primera. Con
-    `_tareas_activas_por_id` ahí, alguien que pide sus tareas terminadas, ve
-    más de cuatro y toca "Ver más" se encontraba con "Esas tareas ya no están
-    disponibles" -- falso: nunca dejaron de existir, sólo están cerradas, que
-    es exactamente el estado que pidió ver. Acá sólo desaparece un id que no
-    es un UUID válido, que no existe, o que es de otro espacio; una tarea
-    cerrada en el medio se queda en la lista, y su menú, al abrirse, ya
-    recalcula por estado (cerrada -> sólo "Ver detalle")."""
-    validos = [norm for norm in (_uuid_normalizado(tid) for tid in tarea_ids)
-              if norm is not None]
-    if not validos:
-        return {}
-    cur.execute(
-        """select id, titulo from task
-            where workspace_id = %s and id = any(%s::uuid[])""",
-        (workspace_id, validos))
-    return {str(f["id"]): f["titulo"] for f in cur.fetchall()}
-
-
 @herramienta(
     "ofrecer_opciones", "consultar",
     "Ofrece a la persona una elección concreta, con botones, en vez de "
@@ -617,22 +588,6 @@ def ejecutar(cur: psycopg.Cursor, quien: Solicitante, nombre: str,
 def _resumen(h: Herramienta, args: dict) -> str:
     detalle = ", ".join(f"{k}: {v}" for k, v in args.items() if v is not None)
     return f"{h.descripcion} ({detalle})"
-
-
-def esquemas() -> list[dict[str, Any]]:
-    """Definiciones para pasarle al modelo."""
-    return [
-        {"name": h.nombre, "description": h.descripcion,
-         "input_schema": {
-             "type": "object",
-             # 'requerido' es marca nuestra: se traduce a `required` y no se
-             # manda al proveedor. Gemini rechaza claves que no conoce.
-             "properties": {k: {a: b for a, b in v.items() if a != "requerido"}
-                            for k, v in h.parametros.items()},
-             "required": [k for k, v in h.parametros.items()
-                          if v.get("requerido")]}}
-        for h in REGISTRO.values()
-    ]
 
 
 # ---------------------------------------------------------------------------
@@ -2001,42 +1956,25 @@ def _notificar_entrega_al_aprobador(cur, quien: Solicitante, tarea_id, titulo,
                                     aprobador_membership_id, dedupe_id, ahora,
                                     *, es_reemplazo: bool = False) -> None:
     """ADR 0009, decisión 3: cuando una tarea llega a `en_revision`, quien la
-    aprueba se entera con botones -- no sólo el responsable con `_avisar` --
-    para que "Aprobar" y "Pedir cambios" salgan del mismo mensaje, por el
-    mismo camino que el menú de una tarea (T2):
-    `pendientes.SENTINEL_MENU_TAREA`, resuelto por
-    `gateway._resolver_toque_menu_tarea`. Se omite en silencio si el
-    aprobador no tiene chat vinculado, igual que cualquier otro aviso
-    automático -- nunca falla en silencio por otra causa.
+    aprueba se entera -- no sólo el responsable con `_avisar` --, con un aviso
+    de coordinación: llega siempre, fuera del tope diario (mecánica §10). Se
+    omite en silencio si el aprobador no tiene chat vinculado, igual que
+    cualquier otro aviso automático -- nunca falla en silencio por otra causa.
+
+    Los botones "Aprobar" y "Pedir cambios" que llevaba se retiraron con los
+    flujos A y B (E3-3): sólo los resolvía su toque, que vivía en `gateway`.
 
     Enmienda T6i (2026-09-27): el aviso muestra TODA la evidencia vigente del
     ciclo actual (`_evidencia_vigente`), no sólo la de este llamado -- si el
     aprobador recién abre el chat después de dos entregas, tiene que ver las
     dos. `es_reemplazo` distingue el verbo de la primera entrega del que sale
-    cuando evidencia nueva reemplaza un aviso que el aprobador todavía tenía
-    esperando (`_avisar_evidencia_nueva_en_revision`, abajo) -- mismos
-    botones, mismo destino, sólo cambia cómo se cuenta."""
-    from . import pendientes as P
-    from .autoridad import Canal
-
+    cuando llega evidencia nueva a una tarea que ya está en revisión
+    (`_avisar_evidencia_nueva_en_revision`, abajo)."""
     cur.execute(
-        "select app_user_id, telegram_user_id from integrante where membership_id = %s",
+        "select telegram_user_id from integrante where membership_id = %s",
         (aprobador_membership_id,))
     aprobador = cur.fetchone()
     if not aprobador or aprobador["telegram_user_id"] is None:
-        return
-
-    dedupe_key = f"{quien.workspace_id}:entrega:{dedupe_id}"
-    # T6h (seguimiento de review-6b1efba1): dos entregas reales dentro de la
-    # misma transacción (T6d) comparten esta clave -- `message_outbox` la
-    # descarta en silencio con `on conflict (dedupe_key) do nothing`, pero
-    # `P.registrar` de abajo no sabe nada de eso: sin este corte, la segunda
-    # llamada igual arma una `pending_action` nueva con botones propios que
-    # ningún mensaje va a mostrar nunca, esperando una respuesta que no puede
-    # llegar. Comprobar antes de armar nada hace que la segunda registración
-    # sea imposible, no sólo que su aviso se pierda.
-    cur.execute("select 1 from message_outbox where dedupe_key = %s", (dedupe_key,))
-    if cur.fetchone():
         return
 
     verbo = "sumó evidencia nueva a" if es_reemplazo else "entregó"
@@ -2049,24 +1987,13 @@ def _notificar_entrega_al_aprobador(cur, quien: Solicitante, tarea_id, titulo,
     if enlace:
         texto += f"\n{enlace}"
 
-    aprobador_solicitante = Solicitante(
-        app_user_id=str(aprobador["app_user_id"]), canal=Canal.ESPACIO,
-        workspace_id=quien.workspace_id, membership_id=str(aprobador_membership_id))
-    # `vence_en` fijo (8 horas), no `agente.VIGENCIA_PENDIENTE`: mismo
-    # criterio que `crear_borrador_tarea` para un aviso a un tercero que
-    # puede tardar en mirar el chat, no una confirmación del mismo turno.
-    p = P.registrar(
-        cur, aprobador_solicitante, herramienta=P.SENTINEL_MENU_TAREA,
-        args={"tarea_id": str(tarea_id), "titulo": titulo,
-              "aviso": P.AVISO_ENTREGA}, resumen=texto,
-        vence_en=ahora + timedelta(hours=8), campo="eleccion",
-        opciones=[("Aprobar", {"accion": "aprobar"}),
-                 ("Pedir cambios", {"accion": "pedir_cambios"})],
-        chat_id=aprobador["telegram_user_id"])
+    # T6d/T6h: dos entregas dentro de la misma transacción comparten esta clave
+    # y `enqueue_outbox` descarta la segunda (`on conflict (dedupe_key) do
+    # nothing`): un solo aviso por acto.
     enqueue_outbox(
         cur, workspace_id=quien.workspace_id, chat_id=aprobador["telegram_user_id"],
         text=texto, recipient_membership_id=str(aprobador_membership_id),
-        scheduled_for=ahora, dedupe_key=dedupe_key, pending_action_id=p.id,
+        scheduled_for=ahora, dedupe_key=f"{quien.workspace_id}:entrega:{dedupe_id}",
         es_coordinacion=True)
 
 
@@ -2076,13 +2003,10 @@ def _avisar_evidencia_nueva_en_revision(cur, quien: Solicitante, tarea_id, titul
     """T6i (`odd/tasks/leda-orienta.md`; ADR 0009, enmienda 2026-09-27):
     evidencia nueva sobre una tarea que YA está `en_revision` -- entrega
     repetida (T6g) o "Adjuntar evidencia" -- de alguien que no es el
-    aprobador retira el aviso de entrega que el aprobador tiene esperando
-    (`pendientes.retirar_avisos_de_entrega`) y manda uno nuevo con toda la
-    evidencia vigente (`_notificar_entrega_al_aprobador`, `es_reemplazo`) --
-    así nunca aprueba con botones que responden sobre evidencia que ya no es
-    toda la que hay. Si quien la manda es el propio aprobador, no hay a quién
-    avisar de nuevo -- ya lo sabe -- y el aviso que esperaba sigue como
-    estaba."""
+    aprobador le manda al aprobador un aviso nuevo con toda la evidencia
+    vigente (`_notificar_entrega_al_aprobador`, `es_reemplazo`). Si quien la
+    manda es el propio aprobador, no hay a quién avisar de nuevo -- ya lo
+    sabe."""
     cur.execute(
         "select aprobador_membership_id from membership where id = %s",
         (responsable_membership_id,))
@@ -2093,9 +2017,6 @@ def _avisar_evidencia_nueva_en_revision(cur, quien: Solicitante, tarea_id, titul
     if str(quien.membership_id) == str(aprobador_membership_id):
         return
 
-    from . import pendientes as P
-    P.retirar_avisos_de_entrega(cur, quien.workspace_id, tarea_id,
-                                aprobador_membership_id, ahora)
     _notificar_entrega_al_aprobador(
         cur, quien, tarea_id, titulo, aprobador_membership_id,
         str(evidencia_id), ahora, es_reemplazo=True)

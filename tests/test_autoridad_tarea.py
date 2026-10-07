@@ -6,9 +6,9 @@ y `adjuntar_evidencia` estaban permitidas a CUALQUIER integrante autenticado
 del espacio, sobre CUALQUIER tarea -- un integrante podía mover el estado de
 la tarea de otra persona, declararle un bloqueo o adjuntarle evidencia. En la
 sesión real, sólo la reticencia del modelo evitó hacerlo ("Ese no es tuyo");
-no había nada en el servidor que lo impidiera. El menú de tarea (T2,
-`menu_tarea.calcular_menu`) ya sólo ofrece estos botones a quien corresponde,
-pero texto libre seguía llegando a las herramientas sin ese filtro.
+no había nada en el servidor que lo impidiera. El menú de tarea (T2), que sólo
+ofrecía estos botones a quien correspondía, se retiró con los flujos A y B (E3-3):
+el filtro que vale es el de las herramientas.
 
 Decisiones (citas de `nucleo/`):
 
@@ -22,9 +22,7 @@ Decisiones (citas de `nucleo/`):
   `mecánica-pm.md` §3 tampoco describe ninguna transición de vuelta desde
   `en_revision` que no sea `aprobar_tarea` (ya con su propio chequeo de
   autoridad) o el `motivo_no_cierra_tarea`/impedimento de negocio, que no
-  necesita autoridad ampliada. Coincide con el menú de T2
-  (`test_menu_aprobador_en_revision`, `test_menu_aprobador_otro_estado`):
-  el aprobador nunca ve un botón que cambie el estado, sólo "Aprobar".
+  necesita autoridad ampliada.
 - `adjuntar_evidencia`: responsable O aprobador. `nucleo/mecanica-pm.md` §6
   lista "confirmación del referente" entre la evidencia que Leda
   solicita -- el aprobador de la tarea (`puede_aprobar_tarea`, un solo
@@ -37,7 +35,6 @@ from __future__ import annotations
 import pytest
 
 from leda import herramientas as H
-from leda import menu_tarea as M
 from leda.autoridad import Canal, Denegado, identificar
 from leda.db import admin, espacio
 
@@ -228,70 +225,3 @@ def test_adjuntar_evidencia_de_otra_persona_se_rechaza(corework, conn):
                       {"tarea_id": tid, "tipo": "explicacion",
                        "descripcion": "listo"}, ya_confirmada=True)
 
-
-# ---------------------------------------------------------------------------
-# Consistencia con el menú (T2, `menu_tarea.calcular_menu`): lo que el menú
-# ofrece tiene que ser lo que la herramienta permite, y lo que no ofrece
-# tiene que seguir rechazado del lado de la herramienta.
-# ---------------------------------------------------------------------------
-
-def test_lo_que_el_menu_ofrece_al_responsable_la_herramienta_lo_permite(corework, conn):
-    ws = corework.workspace_id
-    with admin(conn) as cur:
-        tid = _tarea(cur, ws, estado="asignada")
-    conn.commit()
-
-    with espacio(conn, ws) as cur:
-        quien = _quien(cur, "Nahuel Gimenez", ws)
-        menu = M.calcular_menu(cur, quien, tid)
-        codigos = {a.codigo for a in menu.acciones}
-        assert "empezar" in codigos and "informar_bloqueo" in codigos
-
-        # Ninguna de las dos debe levantar Denegado: el menú las ofrece.
-        H.ejecutar(cur, quien, "actualizar_estado",
-                  {"tarea_id": tid, "estado": "en_curso"}, ya_confirmada=True)
-
-
-def test_lo_que_el_menu_no_ofrece_al_aprobador_la_herramienta_lo_rechaza(corework, conn):
-    ws = corework.workspace_id
-    with admin(conn) as cur:
-        tid = _tarea(cur, ws, estado="asignada")
-    conn.commit()
-
-    with espacio(conn, ws) as cur:
-        marcos = _quien(cur, "Marcos Tarquini", ws)
-        menu = M.calcular_menu(cur, marcos, tid)
-        codigos = {a.codigo for a in menu.acciones}
-        assert "empezar" not in codigos
-        assert "informar_bloqueo" not in codigos
-
-        with pytest.raises(Denegado):
-            H.ejecutar(cur, marcos, "actualizar_estado",
-                      {"tarea_id": tid, "estado": "en_curso"}, ya_confirmada=True)
-        with pytest.raises(Denegado):
-            H.ejecutar(cur, marcos, "registrar_bloqueo",
-                      {"tarea_id": tid, "causa": "algo"}, ya_confirmada=True)
-
-
-def test_lo_que_el_menu_no_ofrece_a_otra_persona_la_herramienta_lo_rechaza(corework, conn):
-    ws = corework.workspace_id
-    with admin(conn) as cur:
-        tid = _tarea(cur, ws, estado="asignada")
-    conn.commit()
-
-    with espacio(conn, ws) as cur:
-        ajeno = _quien(cur, "Ariel De Simone", ws)
-        menu = M.calcular_menu(cur, ajeno, tid)
-        codigos = {a.codigo for a in menu.acciones}
-        assert codigos == {"ver_detalle", "mi_trabajo_depende"}
-
-        with pytest.raises(Denegado):
-            H.ejecutar(cur, ajeno, "actualizar_estado",
-                      {"tarea_id": tid, "estado": "en_curso"}, ya_confirmada=True)
-        with pytest.raises(Denegado):
-            H.ejecutar(cur, ajeno, "registrar_bloqueo",
-                      {"tarea_id": tid, "causa": "algo"}, ya_confirmada=True)
-        with pytest.raises(Denegado):
-            H.ejecutar(cur, ajeno, "adjuntar_evidencia",
-                      {"tarea_id": tid, "tipo": "explicacion",
-                       "descripcion": "listo"}, ya_confirmada=True)

@@ -55,28 +55,9 @@ ICONO_CONFIRMAR = "✅"
 ICONO_CANCELAR = "✖️"
 ICONO_OTRA_OPCION = "✏️"
 ICONO_COPIAR = "📄"
-# Un ícono por acción del menú de una tarea (R4-H6, decisión del usuario,
-# 2026-09-30): antes todas llevaban `ICONO_TAREA` y no se distinguían a simple
-# vista. Única fuente de la tabla aprobada -- `etiqueta_de_accion_menu` la aplica
-# y nada compara el texto de la etiqueta: cada opción se identifica por su código.
-ICONO_EMPEZAR = "▶️"
-ICONO_TERMINAR = "🏁"
-ICONO_BLOQUEO = "⛔"
-ICONO_DEPENDENCIA = "🔗"
-ICONOS_DE_ACCION_MENU = {
-    "ver_detalle": ICONO_TAREA,
-    "ver_detalle_evidencia": ICONO_TAREA,
-    "empezar": ICONO_EMPEZAR,
-    "terminar": ICONO_TERMINAR,
-    "informar_bloqueo": ICONO_BLOQUEO,
-    "depende_de_otra": ICONO_DEPENDENCIA,
-    "aprobar": ICONO_CONFIRMAR,
-    "pedir_cambios": ICONO_OTRA_OPCION,
-}
 _ICONOS_CONOCIDOS = (ICONO_TAREA, ICONO_VER_MAS, ICONO_SALIR_OPCIONES,
                     ICONO_CONFIRMAR, ICONO_CANCELAR, ICONO_OTRA_OPCION,
-                    ICONO_COPIAR, ICONO_EMPEZAR, ICONO_TERMINAR, ICONO_BLOQUEO,
-                    ICONO_DEPENDENCIA)
+                    ICONO_COPIAR)
 
 NO_EFFECT_STATUS = "Estado: sin cambios."
 _NO_EFFECT_PATTERNS = tuple(re.compile(pattern, re.IGNORECASE) for pattern in (
@@ -113,13 +94,6 @@ def con_icono(etiqueta: str, icono: str) -> str:
     return f"{icono} {etiqueta}"
 
 
-def etiqueta_de_accion_menu(codigo: str, etiqueta: str) -> str:
-    """La etiqueta de un botón del menú de una tarea con el ícono de SU acción
-    (`ICONOS_DE_ACCION_MENU`); una acción sin ícono propio conserva el de categoría
-    (`ICONO_TAREA`)."""
-    return con_icono(etiqueta, ICONOS_DE_ACCION_MENU.get(codigo, ICONO_TAREA))
-
-
 def costo_icono(icono: str) -> int:
     """Cuánto le resta un ícono, más el espacio que lo separa del texto, al
     presupuesto de una etiqueta de botón -- en unidades UTF-16
@@ -153,19 +127,11 @@ def etiquetas_coinciden(a: str, b: str) -> bool:
 
 ETIQUETA_CONFIRMAR = con_icono("Confirmar", ICONO_CONFIRMAR)
 ETIQUETA_CANCELAR = con_icono("Cancelar", ICONO_CANCELAR)
-# El botón de quien confirma el borrador de OTRA persona en lugar de Cancelar
-# (decisión del usuario, 2026-09-30): pide el motivo y se lo pasa a quien lo pidió.
-ETIQUETA_RECHAZAR = con_icono("Rechazar", ICONO_CANCELAR)
 # El tercer botón de la vista previa (ADR 0005 decisión 1). Único lugar donde se
 # escribe la etiqueta: con ✏️ ("alternativa que permite escribir o modificar",
 # manual de voz §9) junto a Confirmar y Cancelar (T10-3, R3-H10). Una opción se
 # identifica por su valor o su token, nunca por este texto.
 ETIQUETA_MODIFICAR = con_icono("Modificar", ICONO_OTRA_OPCION)
-# El primer botón del resumen que ve quien pidió el borrador cuando lo confirma otra
-# persona (T9-R1c-4, ADR 0005 decisión 1, precisión del 2026-09-29); sin ícono: el
-# manual de voz §9 no tiene uno para "enviar" y ✅ está reservado a un resultado
-# confirmado, no a una acción (T10-3).
-ETIQUETA_ENVIAR = "Enviar a aprobación"
 # El botón que copia al portapapeles lo que la persona había escrito (T9-R1c-3).
 ETIQUETA_COPIAR = con_icono("Copiar", ICONO_COPIAR)
 
@@ -537,25 +503,11 @@ def margen_saludo(*, personal: bool) -> int:
     COMPLETO, sin este descuento -- un texto en esa ventana exacta pasaba
     esa decisión y `enqueue_outbox` lo rechazaba después, en todos los
     reintentos. Todo el que decida si un texto entra, antes de encolarlo,
-    tiene que usar `cabe_en_mensaje` (más abajo), que ya aplica este mismo
-    margen."""
+    tiene que descontar este mismo margen."""
     if not personal:
         return 0
     from .saludo import MARGEN_SALUDO
     return MARGEN_SALUDO
-
-
-def cabe_en_mensaje(texto: Any, *, has_buttons: bool, personal: bool = True) -> bool:
-    """Si `texto` entra en un mensaje de Telegram, con el mismo margen del
-    saludo diario que después va a aplicar `enqueue_outbox`/`prepare_payload`
-    -- la única función que cualquier punto de salida tiene que usar para
-    decidir "entra o no entra" ANTES de encolar (por ejemplo, para elegir si
-    manda el texto largo junto con los botones o aparte), en vez de comparar
-    a mano contra `BUTTON_TEXT_LIMIT`/`TELEGRAM_TEXT_LIMIT` -- eso fue
-    exactamente el bug de R4-001."""
-    limite = (BUTTON_TEXT_LIMIT if has_buttons else TELEGRAM_TEXT_LIMIT) - \
-        margen_saludo(personal=personal)
-    return telegram_utf16_units(normalize_visible_text(texto)) <= limite
 
 
 def enqueue_outbox(cur, *, workspace_id: str, chat_id: int,
