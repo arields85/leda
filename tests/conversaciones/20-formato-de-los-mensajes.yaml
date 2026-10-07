@@ -1,0 +1,111 @@
+# Copia comprobable de la conversación: la fuente es el .md. Formato: tests/conversaciones/README.md.
+fuente: tests/conversaciones/20-formato-de-los-mensajes.md
+numero: "20"
+titulo: "El formato de los mensajes"
+mide: garantias
+persona: Marcos
+inicio: "2026-10-20 09:00"
+
+tareas:
+  PLC:
+    titulo: Programar PLC de la comprimidora
+    responsable: Marcos
+    vence: "2026-10-23"
+    estado: asignada
+  COM:
+    titulo: Revisar comunicaciones industriales de la comprimidora
+    responsable: Marcos
+    vence: "2026-10-30"
+    estado: en_curso
+    desde: "2026-10-19"
+
+# Lo que ya se envió (estado inicial del .md): el aviso previo del martes 20, que no pide
+# respuesta. Corre por el motor; los textos los redacta la IA de la corrida.
+preludio:
+  - quien: Leda
+    relojes: ["2026-10-20 10:00"]
+    salen: [{a: Marcos, tipo: aviso_previo, tarea: PLC}]
+
+# El formato (usuario, 2026-10-07): negrita, párrafos y viñetas. El corredor no juzga el
+# texto: comprueba lo que hace el código (jugadas, efectos, hechos, estado), y la forma se lee
+# en las transcripciones, con las marcas tal como las escribió la IA.
+pasos:
+  - paso: 1
+    quien: Marcos
+    a_las: "2026-10-20 10:10"
+    escribe: "que tengo pendiente?"
+    jugadas:
+      - {nombre: consultar_pendientes}
+    efectos: {}
+    hechos:
+      - jugada: consultar_pendientes
+        resultado: leido
+        tareas:
+          - {titulo: PLC, estado: asignada, vence: "2026-10-23"}
+          - {titulo: COM, estado: en_curso, vence: "2026-10-30"}
+    pregunta: null
+    estado_despues:
+      pregunta_abierta: null
+    dice:
+      - "sus dos tareas, una por viñeta, cada una con su nombre en negrita, su estado y su fecha: la del PLC sin empezar, que vence el viernes 23; la de comunicaciones en curso, que vence el viernes 30"
+      - "breve: lo que no es la lista va en un párrafo corto aparte"
+    no_dice:
+      - tareas de otras personas
+      - las dos tareas en un mismo renglón o en un solo párrafo corrido
+      - otra marca que no sea la negrita y las viñetas (títulos, enlaces, cursiva, código)
+
+  - paso: 2
+    quien: Marcos
+    a_las: "2026-10-20 10:15"
+    escribe: "arranque con el plc. y lo de comunicaciones no llego al 30, va a ser el miercoles 4 xq espero el switch nuevo"
+    jugadas:
+      - {nombre: anotar_inicio, tarea: PLC}
+      - {nombre: anotar_prevision, tarea: COM, fecha: "2026-11-04",
+         motivo: "espera el switch nuevo"}
+    efectos:
+      estados: {PLC: en_curso}
+      previsiones: [{tarea: COM, fecha: "2026-11-04", motivo: presente}]
+      avisos_guardados:
+        - tipo: nueva_prevision
+          tarea: COM
+          a: Ismael
+          hechos: {prevision: "2026-11-04", fecha_comprometida: "2026-10-30",
+                   atraso_si_se_cumple_la_prevision_dias_habiles: 3,
+                   dependientes: [], motivo: presente}
+    hechos:
+      - {jugada: anotar_inicio, resultado: anotado, tarea: PLC}
+      - {jugada: anotar_prevision, resultado: anotado, tarea: COM, prevision: "2026-11-04",
+         fecha_comprometida: "2026-10-30", atraso_si_se_cumple_la_prevision_dias_habiles: 3}
+    pregunta: null
+    estado_despues:
+      pregunta_abierta: null
+      para_despues: []
+    dice:
+      - "cada hecho en su párrafo, con un renglón en blanco entre los dos y el nombre de su tarea en negrita"
+      - que Ismael se va a enterar hoy, como algo que todavía no pasó
+      - "el próximo paso, en pocas palabras y en su propio párrafo al final"
+    no_dice:
+      - los dos hechos mezclados en un párrafo corrido
+      - que la fecha de la tarea de comunicaciones cambió
+      - texto en negrita que no sea una tarea o el hecho importante
+
+  - paso: 3
+    quien: Leda
+    relojes: ["2026-10-20 10:16"]
+    salen:
+      - a: Ismael
+        tipo: nueva_prevision
+        tarea: COM
+        hechos: {prevision: "2026-11-04", fecha_comprometida: "2026-10-30",
+                 atraso_si_se_cumple_la_prevision_dias_habiles: 3,
+                 dependientes: [], motivo: presente}
+    dice:
+      - "en párrafos cortos: la tarea de comunicaciones en negrita"
+      - que Marcos la termina el miércoles 4 porque espera el switch nuevo
+      - que vencía el viernes 30
+      - el atraso, tres días hábiles
+      - que no hace falta que conteste, al final
+    no_dice:
+      - nada de la tarea del PLC
+      - que la fecha cambió
+      - un solo párrafo corrido

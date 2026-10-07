@@ -58,6 +58,9 @@ El circuito es el recordatorio y lo que la persona contesta (ADR 0018, decisión
     de anotar para cuándo la termina, la fecha que da Marcos, "que es prevision?" y lo que Leda manda por
     su cuenta hasta ese día; Leda dice el hecho concreto con palabras de todos los días y nunca nombra un
     concepto del sistema.
+20. [`20-formato-de-los-mensajes.md`](20-formato-de-los-mensajes.md): una consulta de pendientes, dos
+    hechos en un mensaje y el aviso a Ismael; Leda escribe breve, con las tareas y lo importante en
+    negrita, un renglón en blanco entre párrafos y viñetas cuando hay varias cosas.
 
 Las cuatro primeras son las cuatro respuestas de 5a; de la 5 a la 12, cada una aplica al recordatorio una
 de las ocho situaciones generales de la decisión 4. La 15 suma la jugada `informar_avance` (decisión del
@@ -66,6 +69,7 @@ usuario, 2026-10-05; ADR 0018, decisión 9b). La 16, la regla de la tarea vencid
 ADR 0018, decisión 9l). La 18, hablar de lo que pasa en el mundo y no de la cocina (decisión del usuario,
 2026-10-06, de la prueba por Telegram real; Etapa 3, E3-6). La 19, decir el hecho con palabras de todos
 los días y no los nombres del sistema (decisión del usuario, 2026-10-07, de la prueba por Telegram real).
+La 20, el formato de los mensajes (pedido del usuario, 2026-10-07, al aprobar M3).
 
 ## El corredor
 
