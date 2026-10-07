@@ -71,8 +71,9 @@ PARAMETROS = frozenset({"timeout_s", "reintentos", "plazo_s", "tope_jugadas", "t
 DEL_PEDIDO = frozenset({"model", "messages", "tools", "tool_choice", "max_tokens",
                         "max_completion_tokens", "temperature", "stream"})
 # Para elegir jugadas, los días que vienen con su día de la semana: una fecha que la persona
-# nombra por su día sale de ahí (`hechos.dias`).
-DIAS_PROXIMOS = 14
+# nombra por su día sale de ahí (`hechos.dias`). Ocho semanas, para que una previsión realista
+# esté en la lista (E3-8: con dos semanas, "el miércoles 4" a 15 días se perdía).
+DIAS_PROXIMOS = 56
 
 # Cada dato que alguna ficha usa, con su tipo y qué es: qué dato es y que va sólo si la persona
 # lo dijo (revisión del contrato, 2026-10-05). Describen el dato, no un caso.
@@ -339,7 +340,7 @@ class IAReal:
 
     def elegir_jugadas(self, situacion: dict[str, Any]) -> list[Jugada]:
         herramienta = esquema_de_jugadas(list(situacion["jugadas_posibles"]))
-        # El día de cada fecha y de las dos semanas que vienen: la IA no los calcula.
+        # El día de cada fecha y de las ocho semanas que vienen: la IA no los calcula.
         situacion = {**situacion, "dias": hechos.dias(situacion, proximos=DIAS_PROXIMOS)}
         respuesta = self.cliente.completar({
             "temperature": 0,

@@ -74,3 +74,17 @@ def test_las_instrucciones_dicen_que_los_dias_se_usan_sin_calcularlos():
         assert "dias" in texto and "sin calcular" in texto
     for dia in ("lunes", "viernes", "miércoles"):
         assert dia not in INSTRUCCIONES_JUGADAS + INSTRUCCIONES_REDACCION, dia
+
+
+def test_una_fecha_a_mas_de_dos_semanas_tambien_sale_de_la_lista():
+    """E3-8: con la lista de dos semanas, "el miércoles 4" a 15 días quedaba afuera y la IA
+    perdía la fecha (misma falla en dos rondas). La lista cubre ocho semanas: una previsión
+    realista se nombra por su día y su día lo da el código."""
+    proveedor = ProveedorFalso([llamada_de_jugadas({"jugadas": []})])
+    ia = ia_real_falsa(proveedor)
+
+    ia.elegir_jugadas(SITUACION)
+
+    eleccion = json.loads(proveedor.pedidos[0]["cuerpo"]["messages"][1]["content"])
+    assert "2026-11-04: miércoles 4 de noviembre" in eleccion["dias"]
+    assert "2026-12-14: lunes 14 de diciembre" in eleccion["dias"]
