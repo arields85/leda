@@ -24,11 +24,14 @@ ARCHIVOS_DEL_NUCLEO = ("constitucion.md", "mecanica-pm.md")
 @lru_cache(maxsize=1)
 def nucleo_hash() -> str:
     """La huella de las reglas del núcleo, una vez por proceso: el núcleo no se
-    cambia en caliente (Constitución, preámbulo)."""
+    cambia en caliente (Constitución, preámbulo). Si falta un archivo, falla: una
+    huella sobre un núcleo ausente registraría una versión que no existe."""
     partes = []
     for nombre in ARCHIVOS_DEL_NUCLEO:
         ruta = config.nucleo / nombre
-        partes.append(ruta.read_text(encoding="utf-8") if ruta.exists() else "")
+        if not ruta.exists():
+            raise FileNotFoundError(f"falta el archivo del núcleo {nombre}")
+        partes.append(ruta.read_text(encoding="utf-8"))
     return hashlib.sha256("\n\n".join(partes).encode("utf-8")).hexdigest()
 
 

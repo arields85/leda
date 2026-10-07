@@ -200,3 +200,20 @@ def test_la_auditoria_de_un_espacio_no_se_ve_desde_otro(intake_world, conn):
                                 where accion like 'herramienta%%'""")
                 vistas[ws] = cur.fetchone()["n"]
     assert vistas == {west["id"]: 0, north["id"]: 1}
+
+
+def test_sin_los_archivos_del_nucleo_la_huella_no_se_inventa(tmp_path, monkeypatch):
+    """Una huella calculada sobre un núcleo que no está registraría una versión de
+    las reglas que no existe: falta un archivo y la huella falla, nunca en silencio."""
+    import types
+
+    from leda import versiones
+
+    (tmp_path / "constitucion.md").write_text("reglas", encoding="utf-8")
+    monkeypatch.setattr(versiones, "config", types.SimpleNamespace(nucleo=tmp_path))
+    versiones.nucleo_hash.cache_clear()
+    try:
+        with pytest.raises(FileNotFoundError):
+            versiones.nucleo_hash()
+    finally:
+        versiones.nucleo_hash.cache_clear()
