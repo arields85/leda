@@ -67,13 +67,14 @@ BORDES_CONOCIDOS: dict[tuple[str, str | None, str], str] = {}
 # quien escribe (`membership.aprobador_membership_id`). Capa 2, los avisos guardados: las
 # ausencias, que los dejan esperando, y la ruta de escalamiento por falta de respuesta. Capa 3:
 # la configuración del espacio (`workspace_setting`: los días del aviso previo de la escalera y
-# el adelanto del reloj de Leda) y el espacio por su nombre corto (el comando del reloj).
+# el adelanto del reloj de Leda), el espacio por su nombre corto (el comando del reloj) y el
+# modelo configurado del espacio o el global (`model_config`, la IA real).
 TABLAS_PERMITIDAS = {
     "absence", "blocker", "blocker_unblocker", "conversation_option", "conversation_question",
     "conversation_state", "conversation_turn", "dependency", "escalation_route",
-    "inbound_message", "integrante", "membership", "message_outbox", "pending_reply",
-    "persona_config", "scheduled_notice", "task", "task_forecast", "workspace",
-    "workspace_setting",
+    "inbound_message", "integrante", "membership", "message_outbox", "model_config",
+    "pending_reply", "persona_config", "scheduled_notice", "task", "task_forecast",
+    "workspace", "workspace_setting",
 }
 
 _SQL = re.compile(r"\b(select|insert|update|delete)\b", re.IGNORECASE)

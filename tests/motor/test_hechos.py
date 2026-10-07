@@ -7,8 +7,8 @@ de una previsión contado como el atraso de hoy, conversaciones 15 y 16). Cada c
 código de los hechos tiene su significado en `hechos.py`, y la IA recibe el de todo lo que le
 llega en cada pedido. Un hecho sin significado es una falla del motor en la corrida.
 
-Portadas de `prueba_chica/test_hechos.py`. Las que piden la IA real (`ia_real`) o el corredor
-esperan a la capa 3.
+Portadas de `prueba_chica/test_hechos.py`. La de un hecho sin significado como falla del motor
+en una corrida pasa por el corredor de las conversaciones: espera a la E3-8.
 """
 
 from __future__ import annotations
@@ -16,17 +16,30 @@ from __future__ import annotations
 import json
 
 from leda.db import admin
-from leda.motor import hechos
-from leda.motor.fichas import GUARDADO_SIN_ENVIAR
+from leda.motor import avisos, hechos, preguntas
+from leda.motor.fichas import (EN_COLA_SIN_ENVIAR, ESPERA_ALGO_CIERTO, FICHAS, GUARDADO_SIN_ENVIAR,
+                               SALIDAS_DE_UN_BLOQUEO)
 from leda.motor.ia import IAGuionada, Jugada
+from leda.motor.ia_real import DATOS, DIAS_PROXIMOS
 from leda.motor.instrucciones import INSTRUCCIONES_JUGADAS, INSTRUCCIONES_REDACCION
 from leda.motor.tiempo import RelojFijo
 from leda.motor.turno import SOLO_SI_PREGUNTA, procesar_turno
 
-from tests.motor.ayudantes import AHORA
+from tests.motor.ayudantes import (AHORA, SITUACION, ProveedorFalso, ia_real_falsa,
+                                   llamada_de_jugadas, respuesta_de_texto)
 
 
 # --- El vocabulario ---------------------------------------------------------------------------
+
+def test_cada_codigo_del_motor_tiene_su_significado():
+    """Las jugadas y sus datos, los tipos de pregunta y de aviso, los estados de un efecto que
+    pasa después, las salidas y lo que Leda espera saber: lo que un hecho nombra con un código,
+    la IA lo lee con su significado."""
+    codigos = (set(FICHAS) | set(preguntas.TIPOS) | set(avisos.TIPOS) | set(DATOS)
+               | {GUARDADO_SIN_ENVIAR, EN_COLA_SIN_ENVIAR} | set(SALIDAS_DE_UN_BLOQUEO)
+               | set(ESPERA_ALGO_CIERTO))
+    assert not {c for c in codigos if not hechos.significado(c)}, codigos
+
 
 def test_dos_atrasos_distintos_tienen_dos_claves_distintas():
     """El de hoy (desde la fecha comprometida) y el que tendrá la tarea si se cumple una
@@ -61,6 +74,27 @@ def test_el_bloque_de_significados_trae_solo_lo_que_el_pedido_usa():
 
 
 # --- La IA real recibe el significado de lo que le llega ------------------------------------
+
+def test_los_dos_pedidos_a_la_ia_llevan_el_significado_de_sus_datos():
+    pedido = {"hoy": "2026-10-20", "persona": "Ismael", "mensaje": None,
+              "hechos": [{"aviso": "nueva_prevision", "necesita_respuesta": False,
+                          "atraso_si_se_cumple_la_prevision_dias_habiles": 3}],
+              "pregunta": None, "ultimos_turnos": []}
+    proveedor = ProveedorFalso([llamada_de_jugadas({"jugadas": []}), respuesta_de_texto("Hola.")])
+    ia = ia_real_falsa(proveedor)
+
+    ia.elegir_jugadas(SITUACION)
+    ia.redactar(pedido)
+
+    eleccion, redaccion = (p["cuerpo"]["messages"][0]["content"] for p in proveedor.pedidos)
+    # Los pedidos llevan además el día de cada fecha (`dias`), con su significado.
+    con_dias = {**SITUACION, "dias": hechos.dias(SITUACION, proximos=DIAS_PROXIMOS)}
+    assert eleccion == f"{INSTRUCCIONES_JUGADAS}\n\n{hechos.bloque(con_dias)}"
+    assert redaccion.startswith(f"{INSTRUCCIONES_REDACCION}\n\n"
+                                f"{hechos.bloque({**pedido, 'dias': hechos.dias(pedido)})}")
+    assert hechos.significado("atraso_si_se_cumple_la_prevision_dias_habiles") in redaccion
+    assert hechos.significado("nueva_prevision") in redaccion
+
 
 def test_las_instrucciones_remiten_a_los_significados_y_piden_un_proximo_paso():
     """Reglas generales de la redacción (constitución §8 y §10): todo mensaje deja un próximo
@@ -101,6 +135,9 @@ def test_una_pregunta_sobre_lo_hecho_no_lleva_jugada_ni_aviso_y_se_contesta_del_
     assert SOLO_SI_PREGUNTA in registro and "aviso_al_administrador" in registro
 
 
+# --- En la corrida, un hecho sin significado es una falla del motor --------------------------
+
+
 # --- Tercera vuelta de ajuste (usuario, 2026-10-06) ------------------------------------------
 
 def test_los_significados_son_para_entender_y_nunca_para_repetir():
@@ -113,3 +150,11 @@ def test_los_significados_son_para_entender_y_nunca_para_repetir():
     assert "nunca se los contás" in INSTRUCCIONES_REDACCION
     assert "lo decide el referente" not in hechos.significado("fecha_comprometida")
 
+
+def test_ningun_significado_ni_dato_dice_ella_por_quien_escribe():
+    """Ronda 2: "le toca a ella" se leyó como Leda. Se nombra a quién: la persona que escribe."""
+    textos = [*hechos.SIGNIFICADOS.values(), *(d for _, d in DATOS.values()),
+              *(f.es for f in FICHAS.values())]
+    assert not [t for t in textos if "a ella" in t or "ella misma" in t]
+    assert "nunca a Leda" in hechos.significado("nadie_mas")
+    assert "persona que escribe" in DATOS["nadie_mas"][1]

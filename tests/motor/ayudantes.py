@@ -10,22 +10,30 @@ allá, sin el guion bajo: `_tarea` es `nueva_tarea`, `_hora` es `octubre`, `_dic
 `lo_que_salio_para`; el `_prevision` de `test_ancla.py` es `dice_una_prevision`; el
 `_administrador` de `test_ciclo.py` es `administrador`. La IA que redacta, los días de la
 escalera (`Dias`) y el reloj monótono a mano (`Monotono`) van con su nombre de allá; las
-fixtures `espacio_con_escalera` y `dias`, en `conftest.py`.
+fixtures `espacio_con_escalera` y `dias`, en `conftest.py`. De `test_ia_real.py`, el proveedor
+falso (`ProveedorFalso`) y la situación de ejemplo (`SITUACION`) van con su nombre; su `_ia` es
+`ia_real_falsa`, su `_llamada`, `llamada_de_jugadas` y su `_texto`, `respuesta_de_texto`.
 """
 
 from __future__ import annotations
 
 import json
+import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
+
+import httpx
 
 from leda.autoridad import identificar_en_espacio
 from leda.calendario import Calendario
 from leda.db import admin, espacio
 from leda.motor.avisos import enviar_avisos
 from leda.motor.escalera import correr_escalera
+from leda.motor.fichas import JUGADAS
 from leda.motor.ia import IAGuionada, Jugada
+from leda.motor.ia_real import NOMBRE_HERRAMIENTA, ClienteCompatible, IAReal
+from leda.motor.instrucciones import Tono
 from leda.motor.tiempo import RelojFijo
 from leda.motor.turno import procesar_toque, procesar_turno
 
@@ -293,3 +301,59 @@ def administrador(conn) -> None:
                        values (%s, 'persona', 'mensaje_admin', %s)""",
                     (quien, json.dumps({"chat_id": 90000})))
     conn.commit()
+
+
+# --- La IA real, con un proveedor de mentira -------------------------------------------------
+
+SITUACION = {"hoy": "2026-10-20", "mensaje": "llego el 27, el proveedor se demoró",
+             "estado": None, "ultimo_aviso": {"tipo": "aviso_previo", "tarea": "T1"},
+             "tareas": [{"alias": "T1", "titulo": "Programar PLC", "estado": "en_curso",
+                         "fecha_objetivo": "2026-10-23T20:00:00+00:00"}],
+             "ultimos_turnos": [], "jugadas_posibles": sorted(JUGADAS)}
+
+
+@dataclass
+class ProveedorFalso:
+    """Un proveedor compatible con OpenAI, de mentira: contesta en orden lo preparado (un
+    dict de respuesta, una excepción de httpx o un código de error) y guarda los pedidos."""
+
+    respuestas: list
+    pedidos: list = None
+    demora: float = 0.0
+
+    def __post_init__(self) -> None:
+        self.pedidos = []
+
+    def __call__(self, pedido: httpx.Request) -> httpx.Response:
+        self.pedidos.append({"url": str(pedido.url), "cuerpo": json.loads(pedido.content),
+                             "autorizacion": pedido.headers.get("authorization")})
+        if self.demora:
+            time.sleep(self.demora)
+        respuesta = self.respuestas.pop(0)
+        if isinstance(respuesta, Exception):
+            raise respuesta
+        if isinstance(respuesta, int):
+            return httpx.Response(respuesta, json={"error": {"message": "x"}})
+        return httpx.Response(200, json=respuesta)
+
+
+def llamada_de_jugadas(argumentos) -> dict:
+    """Una respuesta del proveedor que llama a la herramienta de las jugadas."""
+    texto = argumentos if isinstance(argumentos, str) else json.dumps(argumentos)
+    return {"choices": [{"message": {"content": None, "tool_calls": [{
+        "id": "c1", "type": "function",
+        "function": {"name": NOMBRE_HERRAMIENTA, "arguments": texto}}]}}]}
+
+
+def respuesta_de_texto(texto: str | None) -> dict:
+    """Una respuesta del proveedor con texto, sin herramienta."""
+    return {"choices": [{"message": {"content": texto}}]}
+
+
+def ia_real_falsa(proveedor: ProveedorFalso, *, tono: Tono | None = None,
+                  plazo: float = 5.0) -> IAReal:
+    """La IA real del motor sobre el proveedor de mentira: nunca sale a la red."""
+    cliente = ClienteCompatible.crear(
+        "openai/gpt-6-sol", "clave-de-prueba", "https://proveedor.invalid/v1",
+        {"plazo_s": plazo}, transporte=httpx.MockTransport(proveedor))
+    return IAReal(cliente, tono, nombre="openrouter/openai/gpt-6-sol")

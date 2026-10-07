@@ -5,9 +5,10 @@ La credencial sale del entorno (`config.clave_llm`). Ninguno de los dos está en
 pack ni en el núcleo.
 
 Los proveedores y el ruteo de intención de los flujos A y B se retiraron con ellos
-(E3-3). Quedan las direcciones de los proveedores (`cli modelos` y la prueba chica) y
-la validación del tiempo máximo y los reintentos (`_tiempos`), que usa el cliente de
-la prueba chica (`prueba_chica/ia_real.py`).
+(E3-3). Quedan las direcciones de los proveedores (`cli modelos`, el motor y la prueba
+chica) y la validación del tiempo máximo y los reintentos (`tiempos`), que usa el
+cliente de la IA real del motor (`leda.motor.ia_real`). `_tiempos` es el mismo, con el
+nombre que usan la prueba chica y su prueba (`tests/test_tiempo_maximo_modelo.py`).
 """
 
 from __future__ import annotations
@@ -23,7 +24,7 @@ TIMEOUT_MODELO_S = 20
 REINTENTOS_MODELO = 2
 
 
-def _tiempos(parametros: dict) -> tuple[float, int]:
+def tiempos(parametros: dict) -> tuple[float, int]:
     """Valida los dos parámetros: un `timeout_s` nulo desactivaría el tiempo
     máximo y un texto rompería el reintento. Un valor inválido falla
     nombrando el parámetro (como una clave faltante), nunca se reemplaza en
@@ -43,6 +44,9 @@ def _tiempos(parametros: dict) -> tuple[float, int]:
         raise ValueError(
             f"reintentos debe ser un entero de 0 o más; vino {reintentos!r}.")
     return timeout, reintentos
+
+
+_tiempos = tiempos
 
 
 GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta"
