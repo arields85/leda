@@ -241,6 +241,36 @@ La guía de la E2-9 (`odd/tasks/motor-definitivo.md`, sección 4b), sobre el mot
 **Paso M3 cumplido (2026-10-07):** el motor definitivo está construido, los flujos A y B borrados, las
 garantías en verde y la prueba real aprobada.
 
+## Las palabras de todos los días (2026-10-07)
+
+Viene de la prueba de M3: Marcos preguntó "¿qué es previsión?". La regla (decisión del usuario): Leda dice el
+hecho concreto con palabras de todos los días y nunca nombra los conceptos del sistema. Conversación de prueba
+19. Plan y chequeo de rumbo en `odd/tasks/motor-definitivo.md`.
+
+Mensajes de Leda en la regresión de las 19 conversaciones por 5 (las 18 antes de la 19), con GPT-6 sol por
+la suscripción:
+
+| Ronda | Todo bien | Garantías | "previsión" | "fecha comprometida" |
+|---|---|---|---|---|
+| Antes (`e3-8-sol-suscripcion`, 465 mensajes) | 90 de 90 | 90 de 90 | 85 | 81 |
+| Significados e instrucción (`230cf7e`, 497 mensajes) | 93 de 95 | 95 de 95 | 36 | 1 |
+| Nombres de los datos (`9b7c6f4`, 499 mensajes) | 94 de 95 | 95 de 95 | **0** | **0** |
+
+- **Primer arreglo (`230cf7e`):** los significados dicen qué es cada dato para la persona y la instrucción de
+  redacción pide las palabras de todos los días. Quedó casi siempre una frase: "si se cumple esa previsión".
+- **Por qué quedaba:** la IA leía en cada pedido el nombre del dato, `atraso_si_se_cumple_la_prevision_dias_habiles`,
+  y lo copiaba aunque la instrucción dijera lo contrario. Era el mismo camino tocado por dos arreglos seguidos,
+  un disparador de parar; el usuario eligió cambiar los nombres.
+- **Segundo arreglo (`b886ad8`, `9b7c6f4`):** en la frontera con la IA que redacta, 50 nombres de datos,
+  códigos y jugadas se traducen a nombres que dicen el hecho (`prevision` → `dia_que_dio_para_terminarla`).
+  Adentro no cambia nada. Una prueba falla si un nombre con un concepto de la cocina llega a la IA.
+  Revisiones `review-7f575a84f8d3d6f6` y `review-7151cacd0f975300`, aprobadas.
+- Lo único que queda es "habías previsto terminarla el martes 27", que es castellano de todos los días.
+- **Avisos que no salen a su hora:** 2 de 95 en la primera ronda (08 y 16) y 1 de 95 en la segunda (15). Al
+  repetirlas, 10 de 10. Es la misma clase en dos rondas y no se conoce la causa: un intento fallido de
+  redactar un aviso no dejaba rastro hasta el quinto. Decisión del usuario: primero dejar rastro de cada
+  intento fallido, después decidir.
+
 ## El motor definitivo con cinco IA (E3-8, 2026-10-07)
 
 Tarea E3-8 de `odd/tasks/motor-definitivo.md`. Las 18 conversaciones de prueba (las 17 de la Etapa 2 y la
