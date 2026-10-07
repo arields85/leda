@@ -376,6 +376,59 @@ plataforma cuando Leda tenga una base más completa.
   (decisión 4). Crear y asignar por chat quedan fuera del chat (decisión 2); si se quieren, llevan su
   propio ADR.
 
+## 4b. Guía de la prueba por Telegram (M3)
+
+La misma prueba de la E2-9 (`prueba_chica/README.md`), sobre el motor definitivo.
+
+**Preparación** (la hace el agente; recrear `leda_motor` necesita la autorización del usuario):
+
+1. `pg_dump` de `leda_motor` a `db/respaldos/`. Después, borrar la base, crearla y cargarla con los pasos
+   de la E2-9: `esquema`, `importar corework --activar`, `feriados`, `modelo openai/gpt-6-sol --proveedor
+   openrouter`, `sembrar … corework.semilla-ficticia.yaml` y `administrador corework Ariel`.
+2. Poner `aviso_previo_dias_habiles` en 3.
+3. Las 12 tareas vencen 10 días corridos después de la siembra. **V** es ese día.
+
+**Antes de empezar** (el usuario):
+
+- Terminal 1: `.venv\Scripts\python.exe -m leda escuchar corework` (queda corriendo).
+- Ariel, Ismael y Marcos: `/start` al bot del equipo del Motor. Ariel: un "hola" al bot de
+  administración.
+- Terminal 2, el reloj: `.venv\Scripts\python.exe -m leda.motor.reloj corework adelantar` lleva al
+  día hábil siguiente, a las 10:00. Después de cada salto, esperar **dos minutos**: la escalera corre una
+  vez por minuto real, y en la E2-9 un salto rápido se salteó un día.
+
+**El hilo** (el mismo de la E2-9, con lo que cambió):
+
+1. Reloj: adelantar un día. **Marcos:** "qué tengo pendiente?" → sus dos tareas, con estado y
+   vencimiento.
+2. **Ariel:** "arranqué con la integración de la comprimidora" → en curso, sin confirmación.
+3. Reloj hasta V − 3 días hábiles → el aviso previo a Marcos y a Ariel, sin pedir respuesta.
+4. Reloj hasta V → el primer pedido de estado.
+5. **Marcos:** "con el PLC estoy trabado, me falta el cable de programación. comunicaciones la termino
+   el <V + 5 días hábiles>" → el bloqueo y la previsión. Dice **que Ismael se va a enterar y cuándo**,
+   sin "guardado", "en cola" ni "todavía no salió". Una sola pregunta: quién lo destraba.
+6. **Marcos:** "qué más tengo?" → no pierde la pregunta abierta.
+7. **Marcos:** "el cable lo trae Juan de compras" → anotado quién lo destraba.
+8. Reloj un día → a Ismael le llega el aviso de la previsión, y a Ariel el segundo pedido.
+9. **Marcos:** "llegó el cable" → el bloqueo se cierra; el PLC vuelve a asignada y no lo da por
+   empezado.
+10. Reloj un día → a Marcos, un pedido de estado del PLC; a Ariel, el tercero, que avisa que se va a
+    enterar Ismael.
+11. **Marcos:** "arranqué recién" → en curso.
+12. **Marcos:** "la de comunicaciones me la podés pasar a Nahuel?" → lo decide Ismael; ofrece una fecha
+    nueva.
+13. Reloj un día → a Ismael le llega el escalamiento por Ariel, factual y sin culpar a nadie.
+14. **Ariel:** "perdón, estuve a full. la integración la termino el <V + 5 días hábiles>" → anotado;
+    dice cuándo se entera Ismael.
+15. Reloj un día → a Ismael le llega el aviso.
+16. **Escribir de noche** (lo nuevo desde la E2-9): con el reloj en tiempo real
+    (`… reloj corework volver`) después de las 21, **Marcos:** "lo termino mañana" → la fecha anotada es
+    la de mañana en Argentina, no la de pasado.
+17. Al terminar: `… reloj corework volver` y Ctrl+C en el escuchador.
+
+**Qué mirar:** que Leda no se pierda ni se trabe y que se sienta natural, como en la E2-9; que no hable
+de la cocina; y que nunca diga que algo pasó si todavía no pasó.
+
 ## 5. Criterios de corte
 
 Los del ADR 0018 (5c) siguen valiendo para el motor definitivo:
