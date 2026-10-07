@@ -60,11 +60,14 @@ def _sql_script(path: Path) -> str:
 
 
 # El Motor (migraciones 0030 y 0031): las tablas nuevas y las existentes que esas
-# migraciones tocan (restricciones únicas, el mínimo del aviso previo).
+# migraciones tocan (restricciones únicas, el mínimo del aviso previo). Los archivos
+# recibidos (migración 0033; ADR 0019): sus dos tablas y el rango del tamaño máximo en
+# `workspace_setting`.
 TABLAS_DEL_MOTOR = ("conversation_state", "conversation_turn",
                     "conversation_question", "conversation_option",
                     "scheduled_notice", "task_forecast", "blocker_unblocker",
-                    "task", "blocker", "workspace_setting")
+                    "task", "blocker", "workspace_setting",
+                    "archivo", "archivo_de_mensaje")
 
 
 def _retrato_de_aislamiento(url, tablas):

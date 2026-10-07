@@ -306,6 +306,15 @@ create table workspace_setting (
       when clave <> 'aviso_previo_dias_habiles' then true
       when jsonb_typeof(valor) <> 'number' then false
       else (valor #>> '{}')::numeric >= 1 and (valor #>> '{}')::numeric % 1 = 0
+    end),
+  -- ADR 0019, decisión 2 (migración 0033): el tamaño máximo de un archivo en el
+  -- espacio, en MB. Un espacio puede bajar el del producto (60 MB), nunca subirlo.
+  constraint workspace_setting_archivo_tamano_maximo check (
+    case
+      when clave <> 'archivo_tamano_maximo_mb' then true
+      when jsonb_typeof(valor) <> 'number' then false
+      else (valor #>> '{}')::numeric between 1 and 60
+           and (valor #>> '{}')::numeric % 1 = 0
     end)
 );
 
@@ -1347,6 +1356,75 @@ comment on table task_forecast is
 comment on table blocker_unblocker is
   'El Motor (ADR 0018, 9c): quién destraba un bloqueo -- un integrante, alguien de afuera o que no se sabe, exactamente uno --, quién lo dijo y cuándo. Sólo se agrega.';
 
+-- Los archivos recibidos por chat (ADR 0019, decisiones 2 a 4; migración 0033).
+-- `archivo` es del dominio: el contenido con su huella, sin ningún identificador
+-- del canal (frontera, regla 2), aparte de `evidence` para que ninguna lectura
+-- arrastre el contenido. La base garantiza la huella y el tamaño (60 MB, el
+-- límite del producto), un archivo por huella y espacio, nunca compartido, y que
+-- nada se modifica ni se borra: `leda_app` sólo agrega y lee, y un disparador
+-- rechaza el resto (`rechazar_cambios_de_archivo`).
+create table archivo (
+  id                         uuid primary key default gen_random_uuid(),
+  workspace_id               uuid not null references workspace(id) on delete cascade,
+  contenido                  bytea not null,
+  sha256                     text not null,
+  tamano                     bigint not null,
+  tipo                       text not null,
+  clase                      text not null,
+  nombre_original            text,
+  enviado_por_membership_id  uuid not null references membership(id),
+  recibido_en                timestamptz not null,
+  constraint archivo_workspace_id_unique unique (workspace_id, id),
+  constraint archivo_unico_por_huella unique (workspace_id, sha256),
+  constraint archivo_huella_del_contenido
+    check (sha256 = encode(sha256(contenido), 'hex')),
+  constraint archivo_tamano_del_contenido
+    check (tamano = octet_length(contenido) and tamano between 1 and 62914560),
+  constraint archivo_clase check (
+    clase in ('imagen', 'video', 'pdf', 'documento', 'texto', 'comprimido')),
+  constraint archivo_nombre_original check (
+    btrim(nombre_original) <> '' and char_length(nombre_original) <= 255)
+);
+
+-- Del lado del transporte: qué archivo trajo cada mensaje entrante, con los
+-- identificadores de Telegram (como `inbound_message` guarda el `chat_id`). Un
+-- álbum es un solo mensaje: todas sus fotos apuntan al mismo entrante, cada una
+-- con su número de mensaje de Telegram y el grupo del álbum. Lo que llegó y no se
+-- guardó (demasiado grande o de un tipo fuera de la lista) queda con su motivo:
+-- nunca se descarta en silencio. `at` es la hora de la base, como la del
+-- entrante: con ella se mide la espera corta de un álbum.
+create table archivo_de_mensaje (
+  id                       uuid primary key default gen_random_uuid(),
+  workspace_id             uuid not null references workspace(id) on delete cascade,
+  inbound_message_id       uuid not null references inbound_message(id) on delete cascade,
+  archivo_id               uuid,
+  que_llego                text not null,
+  nombre_original          text,
+  rechazo                  text,
+  telegram_message_id      bigint not null,
+  telegram_file_id         text not null,
+  telegram_file_unique_id  text not null,
+  telegram_media_group_id  text,
+  at                       timestamptz not null default now(),
+  constraint archivo_de_mensaje_archivo
+    foreign key (workspace_id, archivo_id) references archivo(workspace_id, id),
+  constraint archivo_de_mensaje_unico_por_mensaje
+    unique (inbound_message_id, telegram_message_id),
+  constraint archivo_de_mensaje_que_llego check (que_llego in ('foto', 'video', 'archivo')),
+  constraint archivo_de_mensaje_rechazo check (
+    rechazo in ('demasiado_grande', 'tipo_no_admitido')),
+  constraint archivo_de_mensaje_guardado_o_rechazado check (
+    (archivo_id is null) <> (rechazo is null))
+);
+
+create index archivo_de_mensaje_por_album on archivo_de_mensaje (telegram_media_group_id)
+  where telegram_media_group_id is not null;
+
+comment on table archivo is
+  'ADR 0019, decisiones 2 y 3: el contenido de cada archivo recibido, con su huella (la garantiza la base). Un archivo por huella y espacio. Sólo se agrega: no se modifica ni se borra.';
+comment on table archivo_de_mensaje is
+  'ADR 0019, decisión 4: qué archivo trajo cada mensaje entrante, con los identificadores de Telegram, o por qué no se guardó. Un álbum es un solo mensaje.';
+
 -- =========================================================================
 -- Sistema
 -- =========================================================================
@@ -1754,6 +1832,30 @@ create trigger trg_exigir_referencias_del_espacio
   before insert or update on blocker_unblocker
   for each row execute function exigir_referencias_del_espacio(
     'destraba_membership_id', 'membership', 'dicho_por_membership_id', 'membership');
+
+-- Los archivos recibidos (migración 0033): quién lo mandó y el mensaje que lo trajo
+-- son del mismo espacio.
+create trigger trg_exigir_referencias_del_espacio
+  before insert or update on archivo
+  for each row execute function exigir_referencias_del_espacio(
+    'enviado_por_membership_id', 'membership');
+create trigger trg_exigir_referencias_del_espacio
+  before insert or update on archivo_de_mensaje
+  for each row execute function exigir_referencias_del_espacio(
+    'inbound_message_id', 'inbound_message');
+
+-- Un archivo recibido no se modifica ni se borra (ADR 0019, decisión 3). Es una
+-- garantía aparte de los privilegios de `leda_app`: vale también para la conexión
+-- administrativa. Retirar el contenido por la administración es otra decisión,
+-- con su propio camino y su auditoría, cuando se construya.
+create or replace function rechazar_cambios_de_archivo() returns trigger as $$
+begin
+  raise exception 'archivo: un archivo recibido no se modifica ni se borra';
+end $$ language plpgsql;
+
+create trigger trg_rechazar_cambios_de_archivo
+  before update or delete on archivo
+  for each row execute function rechazar_cambios_de_archivo();
 
 -- La auditoría autoritativa es la evidencia que se le muestra a un cliente. Su
 -- espacio lo fija la sesión, nunca quien escribe: si otro cliente pudiera
@@ -2254,7 +2356,8 @@ begin
     'cadence_job','escalation_route','glossary_term','approval_policy',
     'workspace_setting','message_template','permission','greeting_state',
     'conversation_question','conversation_option','conversation_turn',
-    'scheduled_notice','conversation_state','task_forecast','blocker_unblocker']
+    'scheduled_notice','conversation_state','task_forecast','blocker_unblocker',
+    'archivo','archivo_de_mensaje']
   loop
     execute format('alter table %I enable row level security', t);
     execute format('alter table %I force row level security', t);
@@ -2290,6 +2393,8 @@ revoke update, delete on conversation_turn, task_forecast, blocker_unblocker
   from leda_app;
 revoke delete on conversation_question, conversation_option, scheduled_notice
   from leda_app;
+-- Los archivos recibidos (migración 0033) sólo se agregan y se leen.
+revoke update, delete on archivo, archivo_de_mensaje from leda_app;
 
 -- Registros auxiliares. Quedan fuera del bucle de arriba porque `audit_log` e
 -- `incident` admiten espacio nulo para los hechos de alcance global, que sólo

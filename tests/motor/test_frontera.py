@@ -76,9 +76,12 @@ BORDES_CONOCIDOS: dict[tuple[str, str | None, str], str] = {}
 # la configuración del espacio (`workspace_setting`: los días del aviso previo de la escalera y
 # el adelanto del reloj de Leda), el espacio por su nombre corto (el comando del reloj) y el
 # modelo configurado del espacio o el global (`model_config`, la IA real). La entrada (E3-7):
-# el nombre de quien se activa o ya está vinculado (`app_user`, en la activación).
+# el nombre de quien se activa o ya está vinculado (`app_user`, en la activación). Los archivos
+# recibidos (ADR 0019, decisiones 2 a 4): el contenido y lo que trajo cada mensaje
+# (`archivos.py`).
 TABLAS_PERMITIDAS = {
-    "absence", "app_user", "blocker", "blocker_unblocker", "conversation_option", "conversation_question",
+    "absence", "app_user", "archivo", "archivo_de_mensaje",
+    "blocker", "blocker_unblocker", "conversation_option", "conversation_question",
     "conversation_state", "conversation_turn", "dependency", "escalation_route",
     "inbound_message", "integrante", "membership", "message_outbox", "model_config",
     "pending_reply", "persona_config", "scheduled_notice", "task", "task_forecast",

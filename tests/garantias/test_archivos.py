@@ -261,6 +261,21 @@ def test_el_mismo_archivo_se_guarda_una_vez_por_espacio_y_nunca_se_comparte(conn
         assert en_el_oeste != primero and _cuantas(cur, "archivo") == 1
 
 
+def test_un_mensaje_que_vuelve_a_llegar_no_anota_su_archivo_dos_veces(conn, espacios):
+    norte = espacios["north-lab"]
+    llegada = archivos.Llegada(archivos.FOTO, "AgAD-file", "AQAD-unico", None, len(JPEG), 10)
+    with espacio(conn, norte["id"]) as cur:
+        tipo = archivos.revisar(JPEG, None, archivos.TAMANO_MAXIMO)
+        guardado = archivos.guardar(cur, workspace_id=norte["id"], contenido=JPEG, tipo=tipo,
+                                    nombre=None, enviado_por=norte["persona"], ahora=AHORA)
+        for _ in range(2):
+            archivos.anotar(cur, workspace_id=norte["id"], entrante_id=norte["entrante"],
+                            llegada=llegada, archivo_id=guardado)
+        assert archivos.del_mensaje(cur, norte["entrante"]) == [
+            {"que_llego": "foto", "nombre_original": None, "rechazo": None,
+             "clase": "imagen"}]
+
+
 # --- Límites --------------------------------------------------------------------------------
 
 @pytest.mark.parametrize(("contenido", "nombre", "clase"), [
