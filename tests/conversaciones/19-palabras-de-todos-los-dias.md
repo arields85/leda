@@ -24,12 +24,14 @@ Decisión del usuario del 2026-10-07, de la prueba por Telegram real (Marcos pre
 
 ## Hilo
 
-1. **Marcos** escribe (martes 20, 11:00): "me la podes pasar a nahuel? no llego con los tiempos"
+1. **Marcos** escribe (martes 20, 11:00): "me la podes pasar a nahuel?"
    →
    - Jugadas: la reasignación, que Leda reconoce y no hace (como en la conversación 12).
    - Efecto: ninguno sobre la tarea; ningún aviso al administrador.
-   - La respuesta dice: que eso no lo puede hacer y que lo decide Ismael; como el motivo es el tiempo,
-     ofrece anotar para qué día la va a terminar, con palabras de todos los días.
+   - La respuesta dice: que eso no lo puede hacer y que lo decide Ismael; ofrece anotar para qué día la
+     va a terminar, con palabras de todos los días. Marcos no da un porqué: en la ronda roja, con "no llego
+     con los tiempos", la IA lo llevó como motivo de la fecha del paso 2, que es lo que la conversación
+     dice, y no es lo que esta conversación mide.
    - La respuesta no dice: "previsión" ni otro nombre de un dato o de una jugada; que la tarea pasó a
      Nahuel.
    - Estado después: tema abierto, lo que Leda ofreció.
@@ -90,6 +92,6 @@ Decisión del usuario del 2026-10-07, de la prueba por Telegram real (Marcos pre
   "dependiente" como sustantivo), y que ante "qué es" conteste con una definición en lugar del hecho.
 - **Garantías (5b):** no inventa (lo que todavía no pasó va en futuro); no deja sin salida (cada mensaje
   termina con su próximo paso); no confunde la tarea.
-- **Falla de comprensión:** que la IA no tome "me la podes pasar a nahuel" como una reasignación, "dale, para
+- **Falla de comprensión:** que la IA no tome "me la podes pasar a nahuel?" como una reasignación, "dale, para
   el martes 27" como una fecha nueva para terminar, o "que es prevision?" como una pregunta sobre la
   conversación.

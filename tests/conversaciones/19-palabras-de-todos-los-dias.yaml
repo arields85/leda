@@ -34,7 +34,7 @@ pasos:
   - paso: 1
     quien: Marcos
     a_las: "2026-10-20 11:00"
-    escribe: "me la podes pasar a nahuel? no llego con los tiempos"
+    escribe: "me la podes pasar a nahuel?"
     jugadas:
       - {nombre: pedir_reasignacion, tarea: PLC, a: nahuel}
     efectos: {}
@@ -46,7 +46,7 @@ pasos:
       pregunta_abierta: {tipo: propuesta, tarea: PLC}
     dice:
       - que eso no lo puede hacer y que lo decide Ismael
-      - "como el motivo es el tiempo, ofrece anotar para qué día la va a terminar, con palabras de todos los días"
+      - "ofrece anotar para qué día la va a terminar, con palabras de todos los días"
     no_dice:
       - '"previsión" ni otro nombre de un dato o de una jugada'
       - que la tarea pasó a Nahuel
