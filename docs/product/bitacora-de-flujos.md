@@ -217,6 +217,54 @@ del ADR 0018 (5b):
 Ningún criterio de corte (5c) se disparó. Con este registro se cumple el paso **M2**. Queda la
 Etapa 3: limpieza y motor de conversación definitivo.
 
+## El motor definitivo con cinco IA (E3-8, 2026-10-07)
+
+Tarea E3-8 de `odd/tasks/motor-definitivo.md`. Las 18 conversaciones de prueba (las 17 de la Etapa 2 y la
+18, hablar del mundo), cinco veces cada una, sobre el motor definitivo (`leda.motor`, con la regla de hablar
+del mundo y el arreglo de la fecha). Se usó el corredor de `tests/conversaciones/`, con una base por corrida.
+Informes en `tests/conversaciones/resultados/e3-8-*.md`.
+
+| IA | Todo bien | Garantías | Mediana / peor por turno | Costo de la ronda |
+|---|---|---|---|---|
+| GPT-6 sol | **89 de 90** | **90 de 90** | 5,1 s / 12,0 s | USD 3,04 |
+| GPT-6 luna | 75 de 90 | 83 de 90 | 7,2 s / 17,6 s | USD 0,19 |
+| GPT-6 luna pro | 76 de 90 | 87 de 90 | 13,2 s / 37,7 s | USD 0,65 |
+| DeepSeek flash (`nan`), razonando | 41 de 90 | 90 de 90 | 8,9 s / 50,9 s | sin precio informado |
+| GLM 5.3 flash (`nan`), razonando | 12 de 90 | 90 de 90 | 3,6 s / 54,6 s | sin precio informado |
+| DeepSeek flash (`nan`), sin razonar | 49 de 90 | 75 de 90 | 2,3 s / 13,7 s | sin precio informado |
+| GLM 5.3 flash (`nan`), sin razonar | 49 de 90 | 80 de 90 | 2,6 s / 34,3 s | sin precio informado |
+
+- **Los modelos de `nan`, razonando:** fallaron por límites, no por comprensión.
+  - El corredor les daba los límites pensados para sol: 20 s por llamada, 40 s en total y un tope de
+    salida. Los dos razonan largo en cada llamada; GLM, además, gasta el tope en razonar y devuelve una
+    respuesta vacía.
+  - Leda cayó en el texto fijo con su incidente. Por eso las garantías dan bien.
+  - Se agregaron parámetros por modelo (tiempo, tope y campos del pedido; también para producción, con
+    `python -m leda modelo … --parametros`) y se repitió con el razonamiento apagado, de a dos
+    conversaciones a la vez.
+  - No se midió razonando con tiempo de sobra: son 3 a 4 horas por modelo.
+- **Sin razonar** responden rápido, pero entienden menos.
+  - Las fallas de garantía de luna, luna pro y los flash son todas "efecto de más" del mismo tipo, en la
+    08 (cambio de tema) y la 05 (varias cosas). Por ejemplo, "lo de comunicaciones no llegó al 30,
+    necesito hasta el miércoles 4": la IA guarda "no llegó al 30" como motivo de la demora, y ese motivo
+    inventado le llegaría a Ismael.
+  - También pierden fechas y agregan jugadas que nadie pidió.
+- **`nan` guarda en caché los pedidos idénticos,** así que las cinco repeticiones no son del todo
+  independientes.
+- **La única falla de sol** es perder una fecha a más de 14 días ("el miércoles 4 de noviembre"). Es la
+  misma clase que su falla de la regresión de la E3-6 (conversación 08): la IA recibe los nombres de los
+  días sólo de las próximas dos semanas (`DIAS_PROXIMOS`). Es la misma clase de hallazgo en dos rondas,
+  un disparador de parar (`AGENTS.md`, punto 4): no se parchea, y la revisión del mecanismo queda para el
+  usuario.
+- **Gasto en OpenRouter:** unos USD 3,9. El gasto acumulado desde la Etapa 2 es de unos USD 27 (el techo
+  de USD 30 era de esa etapa), y quedan unos USD 2,3 de crédito.
+
+**Conclusión vigente (2026-10-07): se queda GPT-6 sol.** Es el único que no hace efectos de más y el más
+rápido de los que entienden bien; cuesta unos USD 0,034 por conversación de prueba. Luna y luna pro no
+alcanzan con el motor nuevo, igual que en la ronda 1. Los flash de `nan` sin razonar son 15 veces más
+rápidos pero entienden la mitad. Razonando con tiempo de sobra quedan sin medir, y no sirven para
+conversar: tardan hasta un minuto por turno.
+
 ## Conclusión anterior (2026-10-03), reemplazada el 2026-10-04
 
 **Flujo elegido: C6, con las plantillas fuera y la regla del mozo** (`AGENTS.md`, punto

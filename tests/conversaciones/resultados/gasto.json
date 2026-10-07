@@ -19853,6 +19853,4326 @@
    "llamadas_estimadas": 0,
    "precio": "desconocido",
    "llamadas_sin_precio": 5
+  },
+  {
+   "cuando": "2026-10-07T04:45:44",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "01",
+   "vez": 1,
+   "llamadas": 4,
+   "tokens_entrada": 11502,
+   "tokens_salida": 202,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 4,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T04:45:44",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "01",
+   "vez": 2,
+   "llamadas": 4,
+   "tokens_entrada": 11524,
+   "tokens_salida": 193,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 4,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T04:45:49",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "01",
+   "vez": 3,
+   "llamadas": 4,
+   "tokens_entrada": 11524,
+   "tokens_salida": 193,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 4,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T04:45:49",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "01",
+   "vez": 4,
+   "llamadas": 4,
+   "tokens_entrada": 11524,
+   "tokens_salida": 193,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 4,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T04:45:54",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "01",
+   "vez": 5,
+   "llamadas": 4,
+   "tokens_entrada": 11524,
+   "tokens_salida": 193,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 4,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T04:46:46",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "02",
+   "vez": 2,
+   "llamadas": 10,
+   "tokens_entrada": 32435,
+   "tokens_salida": 1130,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 10,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T04:46:49",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "02",
+   "vez": 1,
+   "llamadas": 10,
+   "tokens_entrada": 32252,
+   "tokens_salida": 1171,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 10,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T04:47:53",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "02",
+   "vez": 4,
+   "llamadas": 10,
+   "tokens_entrada": 32347,
+   "tokens_salida": 1065,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 10,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T04:47:53",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "02",
+   "vez": 3,
+   "llamadas": 10,
+   "tokens_entrada": 32318,
+   "tokens_salida": 1082,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 10,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T04:48:03",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "02",
+   "vez": 5,
+   "llamadas": 10,
+   "tokens_entrada": 32318,
+   "tokens_salida": 1081,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 10,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T04:48:45",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "03",
+   "vez": 1,
+   "llamadas": 9,
+   "tokens_entrada": 33144,
+   "tokens_salida": 835,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 9,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T04:48:58",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "03",
+   "vez": 3,
+   "llamadas": 9,
+   "tokens_entrada": 33144,
+   "tokens_salida": 835,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 9,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T04:49:03",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "03",
+   "vez": 2,
+   "llamadas": 9,
+   "tokens_entrada": 36200,
+   "tokens_salida": 897,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 9,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T04:49:08",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "03",
+   "vez": 4,
+   "llamadas": 9,
+   "tokens_entrada": 33144,
+   "tokens_salida": 835,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 9,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T04:49:18",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "03",
+   "vez": 5,
+   "llamadas": 9,
+   "tokens_entrada": 36200,
+   "tokens_salida": 897,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 9,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T04:49:28",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "04",
+   "vez": 1,
+   "llamadas": 5,
+   "tokens_entrada": 11110,
+   "tokens_salida": 433,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 5,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T04:49:31",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "04",
+   "vez": 2,
+   "llamadas": 5,
+   "tokens_entrada": 11110,
+   "tokens_salida": 417,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 5,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T04:49:34",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "04",
+   "vez": 3,
+   "llamadas": 5,
+   "tokens_entrada": 11110,
+   "tokens_salida": 417,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 5,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T04:49:38",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "04",
+   "vez": 4,
+   "llamadas": 5,
+   "tokens_entrada": 11110,
+   "tokens_salida": 417,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 5,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T04:49:39",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "04",
+   "vez": 5,
+   "llamadas": 5,
+   "tokens_entrada": 11110,
+   "tokens_salida": 417,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 5,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T04:50:25",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "05",
+   "vez": 2,
+   "llamadas": 8,
+   "tokens_entrada": 31590,
+   "tokens_salida": 814,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 8,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T04:50:29",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "05",
+   "vez": 1,
+   "llamadas": 8,
+   "tokens_entrada": 31864,
+   "tokens_salida": 805,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 8,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T04:50:34",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "05",
+   "vez": 3,
+   "llamadas": 8,
+   "tokens_entrada": 31864,
+   "tokens_salida": 805,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 8,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T04:50:39",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "05",
+   "vez": 4,
+   "llamadas": 8,
+   "tokens_entrada": 31864,
+   "tokens_salida": 805,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 8,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T04:50:46",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "05",
+   "vez": 5,
+   "llamadas": 8,
+   "tokens_entrada": 31590,
+   "tokens_salida": 814,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 8,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T04:51:10",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "06",
+   "vez": 1,
+   "llamadas": 6,
+   "tokens_entrada": 19862,
+   "tokens_salida": 311,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 6,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T04:51:10",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "06",
+   "vez": 2,
+   "llamadas": 6,
+   "tokens_entrada": 19864,
+   "tokens_salida": 318,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 6,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T04:51:16",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "06",
+   "vez": 3,
+   "llamadas": 6,
+   "tokens_entrada": 19864,
+   "tokens_salida": 318,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 6,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T04:51:16",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "06",
+   "vez": 4,
+   "llamadas": 6,
+   "tokens_entrada": 19864,
+   "tokens_salida": 318,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 6,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T04:51:43",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "06",
+   "vez": 5,
+   "llamadas": 6,
+   "tokens_entrada": 19912,
+   "tokens_salida": 315,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 6,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T04:51:54",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "07",
+   "vez": 1,
+   "llamadas": 6,
+   "tokens_entrada": 19693,
+   "tokens_salida": 270,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 6,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T04:52:10",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "07",
+   "vez": 3,
+   "llamadas": 6,
+   "tokens_entrada": 19692,
+   "tokens_salida": 302,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 6,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T04:52:11",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "07",
+   "vez": 2,
+   "llamadas": 6,
+   "tokens_entrada": 19695,
+   "tokens_salida": 307,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 6,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T04:52:20",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "07",
+   "vez": 4,
+   "llamadas": 6,
+   "tokens_entrada": 19692,
+   "tokens_salida": 302,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 6,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T04:52:43",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "07",
+   "vez": 5,
+   "llamadas": 6,
+   "tokens_entrada": 19672,
+   "tokens_salida": 256,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 6,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T04:53:00",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "08",
+   "vez": 1,
+   "llamadas": 8,
+   "tokens_entrada": 28938,
+   "tokens_salida": 508,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 8,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T04:53:10",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "08",
+   "vez": 3,
+   "llamadas": 8,
+   "tokens_entrada": 28938,
+   "tokens_salida": 508,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 8,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T04:53:18",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "08",
+   "vez": 2,
+   "llamadas": 8,
+   "tokens_entrada": 28966,
+   "tokens_salida": 582,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 8,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T04:53:21",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "08",
+   "vez": 4,
+   "llamadas": 8,
+   "tokens_entrada": 28966,
+   "tokens_salida": 584,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 8,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T04:53:30",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "08",
+   "vez": 5,
+   "llamadas": 8,
+   "tokens_entrada": 28938,
+   "tokens_salida": 508,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 8,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T04:53:37",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "09",
+   "vez": 2,
+   "llamadas": 3,
+   "tokens_entrada": 9129,
+   "tokens_salida": 116,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 3,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T04:53:39",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "09",
+   "vez": 1,
+   "llamadas": 3,
+   "tokens_entrada": 9131,
+   "tokens_salida": 129,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 3,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T04:53:41",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "09",
+   "vez": 3,
+   "llamadas": 3,
+   "tokens_entrada": 9131,
+   "tokens_salida": 129,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 3,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T04:53:43",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "09",
+   "vez": 4,
+   "llamadas": 3,
+   "tokens_entrada": 9129,
+   "tokens_salida": 116,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 3,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T04:53:45",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "09",
+   "vez": 5,
+   "llamadas": 3,
+   "tokens_entrada": 9129,
+   "tokens_salida": 116,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 3,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T04:54:05",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "10",
+   "vez": 1,
+   "llamadas": 4,
+   "tokens_entrada": 14650,
+   "tokens_salida": 153,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 4,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T04:54:08",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "10",
+   "vez": 2,
+   "llamadas": 4,
+   "tokens_entrada": 14680,
+   "tokens_salida": 207,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 4,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T04:54:10",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "10",
+   "vez": 3,
+   "llamadas": 4,
+   "tokens_entrada": 14680,
+   "tokens_salida": 207,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 4,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T04:54:13",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "10",
+   "vez": 4,
+   "llamadas": 4,
+   "tokens_entrada": 14680,
+   "tokens_salida": 207,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 4,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T04:54:15",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "10",
+   "vez": 5,
+   "llamadas": 4,
+   "tokens_entrada": 14680,
+   "tokens_salida": 207,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 4,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T04:55:05",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "11",
+   "vez": 1,
+   "llamadas": 9,
+   "tokens_entrada": 38453,
+   "tokens_salida": 798,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 9,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T04:55:07",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "11",
+   "vez": 2,
+   "llamadas": 10,
+   "tokens_entrada": 42696,
+   "tokens_salida": 1144,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 10,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T04:55:15",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "11",
+   "vez": 3,
+   "llamadas": 10,
+   "tokens_entrada": 42696,
+   "tokens_salida": 1144,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 10,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T04:55:17",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "11",
+   "vez": 4,
+   "llamadas": 10,
+   "tokens_entrada": 42696,
+   "tokens_salida": 1144,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 10,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T04:55:26",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "11",
+   "vez": 5,
+   "llamadas": 10,
+   "tokens_entrada": 42696,
+   "tokens_salida": 1144,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 10,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T04:56:36",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "12",
+   "vez": 1,
+   "llamadas": 14,
+   "tokens_entrada": 57582,
+   "tokens_salida": 1121,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 13,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T04:56:45",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "12",
+   "vez": 2,
+   "llamadas": 13,
+   "tokens_entrada": 59380,
+   "tokens_salida": 1403,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 13,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T04:57:53",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "12",
+   "vez": 3,
+   "llamadas": 13,
+   "tokens_entrada": 59172,
+   "tokens_salida": 906,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 13,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T04:57:57",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "12",
+   "vez": 4,
+   "llamadas": 13,
+   "tokens_entrada": 59460,
+   "tokens_salida": 1264,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 13,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T04:58:27",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "13",
+   "vez": 1,
+   "llamadas": 6,
+   "tokens_entrada": 18947,
+   "tokens_salida": 396,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 6,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T04:58:33",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "13",
+   "vez": 2,
+   "llamadas": 6,
+   "tokens_entrada": 18947,
+   "tokens_salida": 396,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 6,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T04:58:41",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "13",
+   "vez": 3,
+   "llamadas": 6,
+   "tokens_entrada": 18947,
+   "tokens_salida": 396,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 6,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T04:58:49",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "13",
+   "vez": 4,
+   "llamadas": 6,
+   "tokens_entrada": 18947,
+   "tokens_salida": 396,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 6,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T04:58:57",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "13",
+   "vez": 5,
+   "llamadas": 6,
+   "tokens_entrada": 18947,
+   "tokens_salida": 396,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 6,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T04:59:17",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "14",
+   "vez": 1,
+   "llamadas": 5,
+   "tokens_entrada": 16647,
+   "tokens_salida": 228,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 5,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T04:59:43",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "14",
+   "vez": 2,
+   "llamadas": 5,
+   "tokens_entrada": 16659,
+   "tokens_salida": 211,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 5,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T04:59:49",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "12",
+   "vez": 5,
+   "llamadas": 13,
+   "tokens_entrada": 57492,
+   "tokens_salida": 1233,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 13,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T04:59:49",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "14",
+   "vez": 3,
+   "llamadas": 5,
+   "tokens_entrada": 16659,
+   "tokens_salida": 211,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 5,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T04:59:55",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "14",
+   "vez": 5,
+   "llamadas": 5,
+   "tokens_entrada": 16659,
+   "tokens_salida": 211,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 5,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T04:59:56",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "14",
+   "vez": 4,
+   "llamadas": 5,
+   "tokens_entrada": 16647,
+   "tokens_salida": 228,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 5,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:01:20",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "15",
+   "vez": 2,
+   "llamadas": 14,
+   "tokens_entrada": 52195,
+   "tokens_salida": 1429,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 14,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:01:22",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "15",
+   "vez": 1,
+   "llamadas": 14,
+   "tokens_entrada": 52532,
+   "tokens_salida": 1486,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 14,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:02:25",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "15",
+   "vez": 3,
+   "llamadas": 14,
+   "tokens_entrada": 52450,
+   "tokens_salida": 1250,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 14,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:02:48",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "15",
+   "vez": 4,
+   "llamadas": 13,
+   "tokens_entrada": 46939,
+   "tokens_salida": 1284,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 13,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:02:50",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "15",
+   "vez": 5,
+   "llamadas": 13,
+   "tokens_entrada": 46939,
+   "tokens_salida": 1367,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 13,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:03:34",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "16",
+   "vez": 2,
+   "llamadas": 9,
+   "tokens_entrada": 30412,
+   "tokens_salida": 754,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 9,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:03:40",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "16",
+   "vez": 1,
+   "llamadas": 9,
+   "tokens_entrada": 31270,
+   "tokens_salida": 763,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 9,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:03:42",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "16",
+   "vez": 3,
+   "llamadas": 9,
+   "tokens_entrada": 31270,
+   "tokens_salida": 763,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 9,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:04:18",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "16",
+   "vez": 4,
+   "llamadas": 9,
+   "tokens_entrada": 31110,
+   "tokens_salida": 721,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 9,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:04:36",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "16",
+   "vez": 5,
+   "llamadas": 9,
+   "tokens_entrada": 34011,
+   "tokens_salida": 1050,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 9,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:05:11",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "17",
+   "vez": 1,
+   "llamadas": 10,
+   "tokens_entrada": 38607,
+   "tokens_salida": 479,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 10,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:05:12",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "17",
+   "vez": 2,
+   "llamadas": 11,
+   "tokens_entrada": 38655,
+   "tokens_salida": 506,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 10,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:05:21",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "17",
+   "vez": 3,
+   "llamadas": 11,
+   "tokens_entrada": 38655,
+   "tokens_salida": 521,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 10,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:05:24",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "17",
+   "vez": 4,
+   "llamadas": 10,
+   "tokens_entrada": 38655,
+   "tokens_salida": 521,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 10,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:05:31",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "17",
+   "vez": 5,
+   "llamadas": 10,
+   "tokens_entrada": 38655,
+   "tokens_salida": 521,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 10,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:06:08",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "18",
+   "vez": 2,
+   "llamadas": 8,
+   "tokens_entrada": 26686,
+   "tokens_salida": 608,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 8,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:06:11",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "18",
+   "vez": 1,
+   "llamadas": 8,
+   "tokens_entrada": 26751,
+   "tokens_salida": 613,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 8,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:06:42",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "18",
+   "vez": 3,
+   "llamadas": 8,
+   "tokens_entrada": 26717,
+   "tokens_salida": 645,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 8,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:06:54",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "18",
+   "vez": 4,
+   "llamadas": 9,
+   "tokens_entrada": 31169,
+   "tokens_salida": 826,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 9,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:06:54",
+   "ronda": "e3-8-glm-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "glm5.3-flash",
+   "conversacion": "18",
+   "vez": 5,
+   "llamadas": 9,
+   "tokens_entrada": 31169,
+   "tokens_salida": 826,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 9,
+   "parametros": {
+    "cuerpo_extra": {
+     "reasoning_effort": "low"
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:07:12",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "01",
+   "vez": 2,
+   "llamadas": 4,
+   "tokens_entrada": 12351,
+   "tokens_salida": 206,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 4,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:07:14",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "01",
+   "vez": 1,
+   "llamadas": 4,
+   "tokens_entrada": 12363,
+   "tokens_salida": 205,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 4,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:07:17",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "01",
+   "vez": 3,
+   "llamadas": 4,
+   "tokens_entrada": 12363,
+   "tokens_salida": 205,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 4,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:07:18",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "01",
+   "vez": 4,
+   "llamadas": 4,
+   "tokens_entrada": 12363,
+   "tokens_salida": 205,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 4,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:07:21",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "01",
+   "vez": 5,
+   "llamadas": 4,
+   "tokens_entrada": 12363,
+   "tokens_salida": 205,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 4,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:07:52",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "02",
+   "vez": 2,
+   "llamadas": 10,
+   "tokens_entrada": 34802,
+   "tokens_salida": 944,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 10,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:08:04",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "02",
+   "vez": 1,
+   "llamadas": 10,
+   "tokens_entrada": 34834,
+   "tokens_salida": 985,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 10,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:08:05",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "02",
+   "vez": 3,
+   "llamadas": 10,
+   "tokens_entrada": 34834,
+   "tokens_salida": 994,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 10,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:08:14",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "02",
+   "vez": 4,
+   "llamadas": 10,
+   "tokens_entrada": 34834,
+   "tokens_salida": 994,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 10,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:08:37",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "02",
+   "vez": 5,
+   "llamadas": 10,
+   "tokens_entrada": 34727,
+   "tokens_salida": 935,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 10,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:08:42",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "03",
+   "vez": 1,
+   "llamadas": 9,
+   "tokens_entrada": 35359,
+   "tokens_salida": 507,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 9,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:08:46",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "03",
+   "vez": 2,
+   "llamadas": 9,
+   "tokens_entrada": 35359,
+   "tokens_salida": 507,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 9,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:08:50",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "03",
+   "vez": 3,
+   "llamadas": 9,
+   "tokens_entrada": 35359,
+   "tokens_salida": 507,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 9,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:09:01",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "03",
+   "vez": 5,
+   "llamadas": 11,
+   "tokens_entrada": 12463,
+   "tokens_salida": 211,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 4,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:09:02",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "03",
+   "vez": 4,
+   "llamadas": 11,
+   "tokens_entrada": 12469,
+   "tokens_salida": 213,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 4,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:09:12",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "04",
+   "vez": 1,
+   "llamadas": 11,
+   "tokens_entrada": 0,
+   "tokens_salida": 0,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 0,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:09:14",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "04",
+   "vez": 2,
+   "llamadas": 11,
+   "tokens_entrada": 0,
+   "tokens_salida": 0,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 0,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:09:23",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "04",
+   "vez": 3,
+   "llamadas": 11,
+   "tokens_entrada": 0,
+   "tokens_salida": 0,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 0,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:09:26",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "04",
+   "vez": 4,
+   "llamadas": 11,
+   "tokens_entrada": 0,
+   "tokens_salida": 0,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 0,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:09:34",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "04",
+   "vez": 5,
+   "llamadas": 11,
+   "tokens_entrada": 0,
+   "tokens_salida": 0,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 0,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:09:36",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "05",
+   "vez": 1,
+   "llamadas": 8,
+   "tokens_entrada": 0,
+   "tokens_salida": 0,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 0,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:09:42",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "05",
+   "vez": 2,
+   "llamadas": 8,
+   "tokens_entrada": 0,
+   "tokens_salida": 0,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 0,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:09:43",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "05",
+   "vez": 3,
+   "llamadas": 8,
+   "tokens_entrada": 0,
+   "tokens_salida": 0,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 0,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:09:50",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "05",
+   "vez": 4,
+   "llamadas": 8,
+   "tokens_entrada": 0,
+   "tokens_salida": 0,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 0,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:09:58",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "05",
+   "vez": 5,
+   "llamadas": 10,
+   "tokens_entrada": 10947,
+   "tokens_salida": 212,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 2,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:10:05",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "06",
+   "vez": 1,
+   "llamadas": 7,
+   "tokens_entrada": 12486,
+   "tokens_salida": 213,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 4,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:10:17",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "06",
+   "vez": 2,
+   "llamadas": 8,
+   "tokens_entrada": 18304,
+   "tokens_salida": 339,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 5,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:10:18",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "06",
+   "vez": 3,
+   "llamadas": 6,
+   "tokens_entrada": 12489,
+   "tokens_salida": 230,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 4,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:10:25",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "06",
+   "vez": 4,
+   "llamadas": 8,
+   "tokens_entrada": 18304,
+   "tokens_salida": 339,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 5,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:10:36",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "06",
+   "vez": 5,
+   "llamadas": 6,
+   "tokens_entrada": 19422,
+   "tokens_salida": 304,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 5,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:10:45",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "07",
+   "vez": 1,
+   "llamadas": 7,
+   "tokens_entrada": 21688,
+   "tokens_salida": 290,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 6,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:10:56",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "07",
+   "vez": 2,
+   "llamadas": 6,
+   "tokens_entrada": 21075,
+   "tokens_salida": 290,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 6,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:11:02",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "07",
+   "vez": 3,
+   "llamadas": 6,
+   "tokens_entrada": 21069,
+   "tokens_salida": 292,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 6,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:11:03",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "07",
+   "vez": 4,
+   "llamadas": 6,
+   "tokens_entrada": 21075,
+   "tokens_salida": 290,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 6,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:11:15",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "07",
+   "vez": 5,
+   "llamadas": 6,
+   "tokens_entrada": 21059,
+   "tokens_salida": 289,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 6,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:11:29",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "08",
+   "vez": 1,
+   "llamadas": 8,
+   "tokens_entrada": 31160,
+   "tokens_salida": 605,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 8,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:11:34",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "08",
+   "vez": 2,
+   "llamadas": 8,
+   "tokens_entrada": 31138,
+   "tokens_salida": 576,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 8,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:11:37",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "08",
+   "vez": 3,
+   "llamadas": 8,
+   "tokens_entrada": 31160,
+   "tokens_salida": 605,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 8,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:11:45",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "08",
+   "vez": 5,
+   "llamadas": 8,
+   "tokens_entrada": 31138,
+   "tokens_salida": 576,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 8,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:11:53",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "09",
+   "vez": 1,
+   "llamadas": 3,
+   "tokens_entrada": 9809,
+   "tokens_salida": 142,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 3,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:11:56",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "09",
+   "vez": 2,
+   "llamadas": 3,
+   "tokens_entrada": 9809,
+   "tokens_salida": 142,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 3,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:12:00",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "09",
+   "vez": 3,
+   "llamadas": 3,
+   "tokens_entrada": 9809,
+   "tokens_salida": 142,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 3,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:12:04",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "09",
+   "vez": 4,
+   "llamadas": 3,
+   "tokens_entrada": 9809,
+   "tokens_salida": 142,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 3,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:12:05",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "08",
+   "vez": 4,
+   "llamadas": 8,
+   "tokens_entrada": 31160,
+   "tokens_salida": 610,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 8,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:12:07",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "09",
+   "vez": 5,
+   "llamadas": 3,
+   "tokens_entrada": 9809,
+   "tokens_salida": 142,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 3,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:12:17",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "10",
+   "vez": 1,
+   "llamadas": 4,
+   "tokens_entrada": 15765,
+   "tokens_salida": 202,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 4,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:12:18",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "10",
+   "vez": 2,
+   "llamadas": 4,
+   "tokens_entrada": 15761,
+   "tokens_salida": 200,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 4,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:12:22",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "10",
+   "vez": 4,
+   "llamadas": 4,
+   "tokens_entrada": 15765,
+   "tokens_salida": 202,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 4,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:12:22",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "10",
+   "vez": 3,
+   "llamadas": 4,
+   "tokens_entrada": 15765,
+   "tokens_salida": 202,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 4,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:12:27",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "10",
+   "vez": 5,
+   "llamadas": 4,
+   "tokens_entrada": 15765,
+   "tokens_salida": 202,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 4,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:12:54",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "11",
+   "vez": 1,
+   "llamadas": 9,
+   "tokens_entrada": 41113,
+   "tokens_salida": 662,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 9,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:12:59",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "11",
+   "vez": 2,
+   "llamadas": 9,
+   "tokens_entrada": 41540,
+   "tokens_salida": 724,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 9,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:13:03",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "11",
+   "vez": 3,
+   "llamadas": 9,
+   "tokens_entrada": 41540,
+   "tokens_salida": 724,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 9,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:13:10",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "11",
+   "vez": 4,
+   "llamadas": 9,
+   "tokens_entrada": 41540,
+   "tokens_salida": 724,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 9,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:13:14",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "11",
+   "vez": 5,
+   "llamadas": 9,
+   "tokens_entrada": 41540,
+   "tokens_salida": 724,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 9,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:13:53",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "12",
+   "vez": 1,
+   "llamadas": 13,
+   "tokens_entrada": 62847,
+   "tokens_salida": 738,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 13,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:14:02",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "12",
+   "vez": 2,
+   "llamadas": 13,
+   "tokens_entrada": 63267,
+   "tokens_salida": 816,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 13,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:14:15",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "12",
+   "vez": 4,
+   "llamadas": 13,
+   "tokens_entrada": 63267,
+   "tokens_salida": 816,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 13,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:14:30",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "12",
+   "vez": 3,
+   "llamadas": 13,
+   "tokens_entrada": 63277,
+   "tokens_salida": 790,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 13,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:14:49",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "13",
+   "vez": 1,
+   "llamadas": 6,
+   "tokens_entrada": 19657,
+   "tokens_salida": 318,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 6,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:14:56",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "13",
+   "vez": 2,
+   "llamadas": 6,
+   "tokens_entrada": 19657,
+   "tokens_salida": 318,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 6,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:14:59",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "12",
+   "vez": 5,
+   "llamadas": 13,
+   "tokens_entrada": 63095,
+   "tokens_salida": 760,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 13,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:15:02",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "13",
+   "vez": 3,
+   "llamadas": 6,
+   "tokens_entrada": 19657,
+   "tokens_salida": 318,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 6,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:15:07",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "13",
+   "vez": 4,
+   "llamadas": 6,
+   "tokens_entrada": 19657,
+   "tokens_salida": 318,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 6,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:15:09",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "13",
+   "vez": 5,
+   "llamadas": 6,
+   "tokens_entrada": 19657,
+   "tokens_salida": 318,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 6,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:15:20",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "14",
+   "vez": 1,
+   "llamadas": 5,
+   "tokens_entrada": 17921,
+   "tokens_salida": 271,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 5,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:15:22",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "14",
+   "vez": 2,
+   "llamadas": 5,
+   "tokens_entrada": 17909,
+   "tokens_salida": 271,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 5,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:15:27",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "14",
+   "vez": 4,
+   "llamadas": 5,
+   "tokens_entrada": 17909,
+   "tokens_salida": 271,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 5,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:15:32",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "14",
+   "vez": 5,
+   "llamadas": 5,
+   "tokens_entrada": 17921,
+   "tokens_salida": 271,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 5,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:15:36",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "14",
+   "vez": 3,
+   "llamadas": 5,
+   "tokens_entrada": 17895,
+   "tokens_salida": 250,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 5,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:16:07",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "15",
+   "vez": 2,
+   "llamadas": 11,
+   "tokens_entrada": 44206,
+   "tokens_salida": 835,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 11,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:16:09",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "15",
+   "vez": 1,
+   "llamadas": 11,
+   "tokens_entrada": 44171,
+   "tokens_salida": 901,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 11,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:16:18",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "15",
+   "vez": 3,
+   "llamadas": 11,
+   "tokens_entrada": 44171,
+   "tokens_salida": 901,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 11,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:16:20",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "15",
+   "vez": 4,
+   "llamadas": 11,
+   "tokens_entrada": 44171,
+   "tokens_salida": 901,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 11,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:16:33",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "15",
+   "vez": 5,
+   "llamadas": 11,
+   "tokens_entrada": 44171,
+   "tokens_salida": 860,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 11,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:16:55",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "16",
+   "vez": 1,
+   "llamadas": 9,
+   "tokens_entrada": 32485,
+   "tokens_salida": 720,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 9,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:17:05",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "16",
+   "vez": 3,
+   "llamadas": 10,
+   "tokens_entrada": 32485,
+   "tokens_salida": 720,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 9,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:17:07",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "16",
+   "vez": 2,
+   "llamadas": 9,
+   "tokens_entrada": 32641,
+   "tokens_salida": 760,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 9,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:17:16",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "16",
+   "vez": 5,
+   "llamadas": 11,
+   "tokens_entrada": 32485,
+   "tokens_salida": 720,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 9,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:17:17",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "16",
+   "vez": 4,
+   "llamadas": 10,
+   "tokens_entrada": 32485,
+   "tokens_salida": 720,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 9,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:17:48",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "17",
+   "vez": 1,
+   "llamadas": 10,
+   "tokens_entrada": 43436,
+   "tokens_salida": 668,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 10,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:17:54",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "17",
+   "vez": 2,
+   "llamadas": 10,
+   "tokens_entrada": 43580,
+   "tokens_salida": 692,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 10,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:17:59",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "17",
+   "vez": 3,
+   "llamadas": 11,
+   "tokens_entrada": 43580,
+   "tokens_salida": 692,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 10,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:18:05",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "17",
+   "vez": 4,
+   "llamadas": 10,
+   "tokens_entrada": 43580,
+   "tokens_salida": 692,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 10,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:18:11",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "17",
+   "vez": 5,
+   "llamadas": 10,
+   "tokens_entrada": 43580,
+   "tokens_salida": 692,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 10,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:18:27",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "18",
+   "vez": 1,
+   "llamadas": 8,
+   "tokens_entrada": 28750,
+   "tokens_salida": 597,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 8,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:18:28",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "18",
+   "vez": 2,
+   "llamadas": 8,
+   "tokens_entrada": 28750,
+   "tokens_salida": 629,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 8,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:18:47",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "18",
+   "vez": 3,
+   "llamadas": 8,
+   "tokens_entrada": 28721,
+   "tokens_salida": 604,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 8,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:18:52",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "18",
+   "vez": 4,
+   "llamadas": 8,
+   "tokens_entrada": 28801,
+   "tokens_salida": 663,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 8,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
+  },
+  {
+   "cuando": "2026-10-07T05:18:56",
+   "ronda": "e3-8-deepseek-sin-razonar",
+   "motor": "leda.motor",
+   "proveedor": "nan",
+   "modelo": "deepseek-v4-flash",
+   "conversacion": "18",
+   "vez": 5,
+   "llamadas": 8,
+   "tokens_entrada": 28721,
+   "tokens_salida": 608,
+   "usd": 0.0,
+   "llamadas_estimadas": 0,
+   "precio": "desconocido",
+   "llamadas_sin_precio": 8,
+   "parametros": {
+    "cuerpo_extra": {
+     "chat_template_kwargs": {
+      "enable_thinking": false
+     }
+    },
+    "timeout_s": 60,
+    "plazo_s": 90
+   }
   }
  ]
 }
