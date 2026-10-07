@@ -37,7 +37,8 @@ trabajo; por la web, su estructura.* El porqué está en
   `D:\Proyectos\Leda-PM`, que es `main`), lo cargado puede estar atrasado: leer este archivo y los importados
   desde la carpeta del Motor.
 - Nunca se abre una sesión en las carpetas congeladas de `D:\Proyectos\Leda-PM-worktrees\`:
-  `flujo-de-un-mensaje`, `alta-y-google`, `c4-medicion`, `flujo-c6` y `prueba-0-35`.
+  `flujo-de-un-mensaje` y `alta-y-google`. Las de `c4-medicion`, `flujo-c6` y `prueba-0-35` se borraron el
+  2026-10-06; sus commits quedan en las etiquetas `archivo-*`.
 - Una sola casa para los documentos vivos (este archivo, `docs/STATUS.md`, `docs/ROADMAP.md`, la bitácora de
   flujos, los ADR y el documento de la unidad): la rama del Motor. `main` recibe sólo documentos, por avance
   rápido y cuando lo decide el usuario, hasta el paso M2 o M3.

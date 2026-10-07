@@ -97,8 +97,6 @@ pasa a una conversación de prueba. Destino de cada uno:
   `feat/flujo-de-un-mensaje` (92 commits sin subir, 7 con líneas de atribución), los commits de aviso de las
   ramas congeladas y las etiquetas del 2026-10-04 (la rama del Motor está subida desde el 2026-10-06). Recomendación
   del agente: guardar la rama congelada con `git bundle`, sin reescribirla (los documentos citan sus hashes).
-- **Limpieza de las carpetas viejas** `c4-medicion`, `flujo-c6` y `prueba-0-35` (el listener del usuario puede
-  estar corriendo en `prueba-0-35`).
 
 `PENDIENTE` dentro de los ADR y del plan, para resolver al llegar: si se avisa que se cargaron tareas (ADR 0017,
 decisión 2); qué pasa si quien destraba dice que no le corresponde (decisión 3a); la tensión entre preguntarle al
@@ -132,7 +130,11 @@ de aviso; flujos C1 a C6 y migraciones `0026` a `0029`.
 - Repositorio `arields85/leda` (público). `arields85/prisma` queda como respaldo congelado (remoto
   `respaldo-prisma`). Engram usa el proyecto `prisma-pm`.
 - `origin/main` está en `e466eb5` (documentos del Motor hasta M1, por avance rápido) y no recibe nada hasta M3.
-  La rama del Motor está subida a `origin/feat/motor-de-conversacion` como respaldo (2026-10-06).
+  La rama del Motor está subida a `origin/feat/motor-de-conversacion` como respaldo (2026-10-06); el agente la
+  sube con autorización del usuario.
+- Carpetas borradas el 2026-10-06 (usuario): `c4-medicion`, `flujo-c6` y `prueba-0-35`. Sus commits, que no
+  estaban en ninguna rama, quedan en las etiquetas locales `archivo-c4-medicion`, `archivo-flujo-c6` y
+  `archivo-prueba-0-35`. Sus `.env`, sin leer, en `D:\Proyectos\Leda-PM-worktrees\_archivo-env-de-carpetas-borradas`.
 - Etiquetas: `respaldo-flujos-antes-de-d`, `respaldo-main-antes-de-d` (punto de partida de la rama),
   `respaldo-0-36-en-pausa` (sólo consulta), `pre-renombre-leda` y `respaldo-flujos-antes-de-c2`, `-c5` y `-c6`.
 - Ramas: `feat/motor-de-conversacion` (vigente) y `main`; congeladas, `feat/flujo-de-un-mensaje` y
