@@ -8,8 +8,8 @@ El adelanto se guarda en el espacio (`workspace_setting`) y lo leen el escuchado
 escalera, los avisos y el horario del despacho ven el mismo momento. La base de las pruebas no
 es `leda_motor`: cada prueba nombra la suya, y las que no lo hacen comprueban que se niega.
 
-Portadas de `prueba_chica/test_reloj.py`. La del reloj adelantado que mueve la escalera y el
-horario del despacho juntos pasa por el escuchador: espera al del motor (E3-7).
+Portadas de `prueba_chica/test_reloj.py`; la del reloj adelantado que mueve la escalera y el
+horario del despacho juntos pasa por el escuchador del motor (E3-7).
 """
 
 from __future__ import annotations
@@ -19,10 +19,12 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from leda.db import admin
+from leda.despachador import TransporteDePrueba
+from leda.motor.escucha import BotTelegram, Escucha
 from leda.motor.reloj import CLAVE_ADELANTO, BaseEquivocada, RelojDeLeda, adelantar, estado, volver
 from leda.motor.tiempo import RelojFijo
 
-from tests.motor.ayudantes import cuantas, octubre, uno
+from tests.motor.ayudantes import IAQueRedacta, Monotono, TelegramFalso, cuantas, octubre, uno
 
 
 VIERNES_18 = octubre(9, 18)        # fuera del horario; el lunes 12 es feriado
@@ -58,6 +60,36 @@ def test_el_reloj_de_leda_corre_con_el_tiempo_real(conn, mundo):
     assert reloj.ahora() == octubre(6, 10)
     real.momento += timedelta(minutes=5)
     assert reloj.ahora() == octubre(6, 10, 5)
+
+
+def test_el_reloj_adelantado_mueve_la_escalera_y_el_horario_del_despacho_juntos(
+        conn, mundo, espacio_con_escalera):
+    """El viernes a las 18:00 la escalera guarda el primer pedido, pero nada sale: está fuera
+    del horario. Adelantado al martes 13 a las 10:00, el pedido sale con el atraso de ese día y
+    el despacho lo manda, con la restricción de horario prendida."""
+    base = conn.info.dbname
+    real = RelojFijo(VIERNES_18)
+    salida = TransporteDePrueba()
+    ia = IAQueRedacta()
+    escucha = Escucha(conn, mundo["id"], ia, RelojDeLeda(real=real, base=base),
+                      bot=BotTelegram("token-falso", TelegramFalso().cliente()),
+                      transporte=salida, seguimiento=True, imprimir=lambda *_: None)
+    escucha.ciclo.monotono = minuto = Monotono()
+    escucha.preparar()
+
+    escucha.una_vuelta(espera=0)
+    assert salida.enviados == [] and ia.pedidos_de_redaccion == []
+    assert uno(conn, "select programado_para from scheduled_notice")["programado_para"] \
+        == octubre(13, 10)
+
+    adelantar(conn, mundo["id"], real, base=base)
+    minuto.s = 60
+    escucha.una_vuelta(espera=0)
+
+    [pedido] = ia.pedidos_de_redaccion
+    assert pedido["hoy"] == "2026-10-13" and pedido["hechos"][0]["atraso_dias_habiles"] == 1
+    assert [e.texto for e in salida.enviados] == ["Aviso 1."]
+    assert uno(conn, "select enviado_en from message_outbox")["enviado_en"] == octubre(13, 10)
 
 
 # --- Sólo en `leda_motor` ---------------------------------------------------------------------

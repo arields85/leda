@@ -1,8 +1,7 @@
 """El ciclo del motor de conversación (diseño probado en la Etapa 2, E2-6).
 
 `odd/tasks/prueba-chica-del-motor.md`, sección 4 ("Entrada propia"); mecánica §9 y §12. Corre
-dentro del escuchador (el de la prueba chica, `prueba_chica/escuchar.py`; el del motor llega con
-la E3-7), no como un proceso aparte: el escuchador ya tiene los
+dentro del escuchador (`escucha.py`, E3-7), no como un proceso aparte: el escuchador ya tiene los
 transportes de los dos bots, el reloj de Leda y la conexión, y hay uno solo por bot; un segundo
 proceso sería otro despachador sobre la misma cola y otro comando para el usuario.
 

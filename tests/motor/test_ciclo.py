@@ -6,8 +6,8 @@ administración. Cada paso va aislado: si uno se cae, deja un incidente (una vez
 cayéndose) y los demás corren igual. Nunca importa `leda.ciclo`, `leda.reloj` ni
 `leda.escalera` (`test_frontera.py`). Reloj fijo, IA guionada, transportes de prueba.
 
-Portadas de `prueba_chica/test_ciclo.py`. La del escuchador que corre el ciclo en cada vuelta
-espera al escuchador del motor (E3-7).
+Portadas de `prueba_chica/test_ciclo.py`; la del escuchador que corre el ciclo en cada vuelta,
+con el escuchador del motor (E3-7).
 """
 
 from __future__ import annotations
@@ -22,8 +22,8 @@ from leda.motor.ciclo import ETAPA_CICLO, Ciclo
 from leda.motor.ia import Jugada
 from leda.motor.tiempo import RelojFijo
 
-from tests.motor.ayudantes import (IAQueRedacta, Monotono, administrador, cuantas, dice, octubre,
-                                   todos, uno)
+from tests.motor.ayudantes import (IAQueRedacta, Monotono, TelegramFalso, administrador, cuantas,
+                                   dice, octubre, todos, uno)
 
 
 def _ciclo(conn, mundo, at, **opciones) -> tuple[Ciclo, TransporteDePrueba]:
@@ -168,3 +168,18 @@ def test_lo_que_causa_un_turno_sale_con_el_ciclo(conn, mundo, escribe):
 
     ismael = mundo["personas"]["Ismael"]["telegram"]
     assert [e.chat_id for e in salida.enviados if e.chat_id == ismael] == [ismael]
+
+
+def test_el_escuchador_corre_el_ciclo_en_cada_vuelta(conn, mundo, espacio_con_escalera):
+    from leda.motor.escucha import BotTelegram, Escucha
+
+    salida = TransporteDePrueba()
+    escucha = Escucha(conn, mundo["id"], IAQueRedacta(), RelojFijo(octubre(9, 10)),
+                      bot=BotTelegram("token-falso", TelegramFalso().cliente()),
+                      transporte=salida, seguimiento=True, imprimir=lambda *_: None)
+    escucha.preparar()
+
+    escucha.una_vuelta(espera=0)
+
+    assert [e.texto for e in salida.enviados] == ["Aviso 1."]
+    assert uno(conn, "select tipo from scheduled_notice")["tipo"] == "pedido_de_estado"

@@ -7,6 +7,7 @@
     python -m leda sembrar corework --semilla espacios/corework.semilla-ficticia.yaml
     python -m leda cadencia corework objetivos_semanales
     python -m leda despachar corework       vacía la cola una vez
+    python -m leda escuchar corework        el motor de conversación, por long polling
     python -m leda servir                   tablero + cadencias + escalera + despacho
     python -m leda servir --sin-cadencias    igual, sin disparar cadencias automáticas
 """
@@ -205,6 +206,8 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("estado").add_argument("slug")
     sub.add_parser("incidentes").add_argument("slug")
 
+    sub.add_parser("escuchar").add_argument("slug")
+
     srv = sub.add_parser("servir")
     srv.add_argument("--puerto", type=int, default=8080)
     srv.add_argument("--sin-cadencias", action="store_true",
@@ -234,6 +237,12 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         print("Esquema aplicado.")
         return 0
+
+    if a.cmd == "escuchar":
+        # El escuchador del motor, por long polling: abre su propia conexión.
+        from .motor.escucha import main as escuchar
+
+        return escuchar([a.slug])
 
     if a.cmd == "servir":
         import uvicorn

@@ -18,7 +18,7 @@ salgan como en un equipo real.
   y decide el horario con él (`despachador.despachar` no se toca). Los avisos a la
   administración van con el reloj real (`ciclo.py`). Lo que la base fecha sola
   (`task_state_event.at`, `blocker.abierto_en`) sigue en hora real (plan, sección 11). El
-  escuchador del motor llega con la E3-7; hasta entonces, el de la prueba chica usa su reloj.
+  escuchador es el del motor (`escucha.py`, E3-7).
 - **`adelantar`:** al día hábil siguiente del de Leda, a la hora de salida de lo que Leda manda
   por su cuenta (`tiempo.HORA_DE_SALIDA`, 10:00; o al empezar la jornada, si a esa hora no se
   trabaja), con el calendario y los feriados del espacio: lo que se le dijo a la persona que

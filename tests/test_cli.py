@@ -79,3 +79,17 @@ def test_servir_rechaza_arrancar_si_falta_una_migracion(monkeypatch):
     assert cli.main(["servir"]) == 1
     assert llamadas_montar == []
     assert llamadas_uvicorn == []
+
+
+def test_escuchar_corre_el_escuchador_del_motor_con_el_espacio(monkeypatch):
+    """E3-7: `escuchar` es el escuchador del motor (`leda.motor.escucha`), no el de los
+    flujos viejos; abre su propia conexión, así que el comando no abre otra."""
+    from leda.motor import escucha
+
+    llamadas = []
+    monkeypatch.setattr(escucha, "main", lambda argv: llamadas.append(argv) or 0)
+    monkeypatch.setattr(cli, "conectar", lambda *a, **k: (_ for _ in ()).throw(
+        AssertionError("escuchar no abre una conexión propia")))
+
+    assert cli.main(["escuchar", "corework"]) == 0
+    assert llamadas == [["corework"]]

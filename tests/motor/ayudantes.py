@@ -12,7 +12,9 @@ allá, sin el guion bajo: `_tarea` es `nueva_tarea`, `_hora` es `octubre`, `_dic
 escalera (`Dias`) y el reloj monótono a mano (`Monotono`) van con su nombre de allá; las
 fixtures `espacio_con_escalera` y `dias`, en `conftest.py`. De `test_ia_real.py`, el proveedor
 falso (`ProveedorFalso`) y la situación de ejemplo (`SITUACION`) van con su nombre; su `_ia` es
-`ia_real_falsa`, su `_llamada`, `llamada_de_jugadas` y su `_texto`, `respuesta_de_texto`.
+`ia_real_falsa`, su `_llamada`, `llamada_de_jugadas` y su `_texto`, `respuesta_de_texto`. De
+`test_escuchar.py`, el Telegram falso (`TelegramFalso`) y el id de su bot van con su nombre; su
+`_mensaje` es `mensaje_de_telegram` y su `_toque`, `toque_de_telegram`.
 """
 
 from __future__ import annotations
@@ -357,3 +359,56 @@ def ia_real_falsa(proveedor: ProveedorFalso, *, tono: Tono | None = None,
         "openai/gpt-6-sol", "clave-de-prueba", "https://proveedor.invalid/v1",
         {"plazo_s": plazo}, transporte=httpx.MockTransport(proveedor))
     return IAReal(cliente, tono, nombre="openrouter/openai/gpt-6-sol")
+
+
+# --- La entrada: Telegram, de mentira --------------------------------------------------------
+
+ID_DEL_BOT = 7000
+
+
+@dataclass
+class TelegramFalso:
+    """La API de un bot, de mentira: `getUpdates` entrega los lotes preparados, de a uno, y
+    guarda cada llamada. Nunca sale a la red (`httpx.MockTransport`)."""
+
+    lotes: list[list[dict]] = field(default_factory=list)
+    webhook: str = ""
+    llamadas: list[tuple[str, dict]] = field(default_factory=list)
+
+    def __call__(self, pedido: httpx.Request) -> httpx.Response:
+        metodo = pedido.url.path.rsplit("/", 1)[-1]
+        parametros = json.loads(pedido.content) if pedido.content else {}
+        self.llamadas.append((metodo, parametros))
+        if metodo == "getUpdates":      # sólo este pedido consume un lote
+            resultado = self.lotes.pop(0) if self.lotes else []
+        else:
+            resultado = {
+                "getMe": {"id": ID_DEL_BOT, "username": "leda_motor_bot"},
+                "deleteWebhook": True,
+                "getWebhookInfo": {"url": self.webhook},
+                "answerCallbackQuery": True,
+                "setWebhook": True,
+            }[metodo]
+        return httpx.Response(200, json={"ok": True, "result": resultado})
+
+    def metodos(self) -> list[str]:
+        return [m for m, _ in self.llamadas]
+
+    def cliente(self) -> httpx.Client:
+        return httpx.Client(transport=httpx.MockTransport(self))
+
+
+def mensaje_de_telegram(update_id: int, texto: str, de: int, message_id: int | None = None,
+                        tipo: str = "private") -> dict:
+    """Un update de Telegram con un mensaje escrito."""
+    return {"update_id": update_id, "message": {
+        "message_id": message_id or update_id, "text": texto,
+        "from": {"id": de, "first_name": "X"}, "chat": {"id": de, "type": tipo}}}
+
+
+def toque_de_telegram(update_id: int, data: str, de: int, callback_id: str | None = None) -> dict:
+    """Un update de Telegram con un botón tocado."""
+    return {"update_id": update_id, "callback_query": {
+        "id": callback_id or f"cb{update_id}", "from": {"id": de, "first_name": "X"},
+        "data": data,
+        "message": {"message_id": 1, "chat": {"id": de, "type": "private"}}}}
