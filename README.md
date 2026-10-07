@@ -41,9 +41,6 @@ src/leda/
   importador.py        Pack YAML → base, con las validaciones del alta
   siembra.py           Datos ficticios para probar (python -m leda sembrar)
   calendario.py        Días hábiles y feriados
-  escalera.py          Recordatorios anclados al vencimiento
-  reloj.py             Cadencia y planificador
-  ciclo.py             El ciclo de fondo: cadencias, escalera, despacho, huérfanos
   salida.py            Lo que sale: validación del texto y la cola (outbox)
   despachador.py       Cola de salida hacia Telegram
   saludo.py            El saludo del día, una vez por persona
@@ -56,17 +53,21 @@ src/leda/
   huerfanos.py         Aviso neutro a un mensaje que quedó sin respuesta
   incidentes.py        Incidentes sanitizados y aviso a la administración
   llm.py               Direcciones de los proveedores y tiempo máximo de la IA
-  entrada.py           Aplicación HTTP: tablero y salud
+  entrada.py           Aplicación HTTP: webhook de Telegram, tablero y salud
+  motor/               El motor de conversación: turnos, escalera, ciclo, reloj de Leda,
+                       escuchador (escucha.py) y lo que se hace con cada update (recibir.py)
   tablero.py           El tablero de sólo lectura de un espacio
   tablero_vista.py     Su página
   cli.py               python -m leda …
 ```
 
 La conversación de los flujos A y B (`gateway`, `agente`, `contexto`, `ingreso_tareas`
-y sus módulos) se borró en la Etapa 3 del Motor (`docs/STATUS.md`). Hasta que entre el
-motor de conversación definitivo (tarea E3-7), Leda no recibe mensajes: no hay ruta de
-webhook. El motor de la prueba chica, descartable, vive en `prueba_chica/` y se escucha
-con `python -m prueba_chica.escuchar <espacio>` (`PRUEBA-LOCAL.md`).
+y sus módulos) se borró en la Etapa 3 del Motor (`docs/STATUS.md`), y con ella la escalera,
+la cadencia y el ciclo de fondo viejos (`escalera.py`, `reloj.py`, `ciclo.py`, E3-7). Leda
+conversa con el motor de conversación (`src/leda/motor/`): en una máquina, por long polling
+con `python -m leda escuchar <espacio>`; en un servidor, por webhook con `python -m leda
+servir` (`PRUEBA-LOCAL.md`). Las cadencias vuelven después de M3. El motor de la prueba
+chica, descartable, sigue en `prueba_chica/` hasta la E3-8.
 
 ## El turno del agente
 
@@ -104,7 +105,8 @@ python -m leda esquema
 python -m leda importar corework            # revisar advertencias
 python -m leda feriados corework
 python -m leda importar corework --activar
-python -m leda servir     # tablero, salud y ciclo de fondo; sin conversación hasta la E3-7
+python -m leda webhooks   # registra el webhook de cada bot (LEDA_BASE_URL, LEDA_WEBHOOK_SECRET)
+python -m leda servir     # webhook, tablero, salud y el ciclo del motor de cada espacio
 ```
 
 Después, el alta de cada persona:

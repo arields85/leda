@@ -86,19 +86,34 @@ existen, tienen tareas y cuentan para cerrar objetivos, pero no reciben nada.
 
 ## 4. Escuchar
 
-> `python -m leda escuchar` y `python -m leda correr` se borraron con la conversación de
-> los flujos A y B (Etapa 3 del Motor, `docs/STATUS.md`). La entrada de mensajes vuelve
-> con el motor de conversación definitivo (tarea E3-7); hasta entonces, `python -m leda`
-> no recibe mensajes.
-
-El motor de la prueba chica (descartable, `prueba_chica/`) tiene su propio escuchador,
-con el `.venv` de la carpeta: recibe mensajes, contesta, corre su ciclo (despacho, avisos
-a la administración y, con el seguimiento prendido, la escalera) y despacha la cola.
-Ctrl+C para cortar:
+Desde la E3-7, `python -m leda escuchar` es el escuchador del motor de conversación
+(`src/leda/motor/escucha.py`), con el `.venv` de la carpeta: recibe mensajes y toques,
+contesta, corre el ciclo del motor (la escalera y los avisos guardados una vez por minuto;
+en cada vuelta, los mensajes que quedaron sin respuesta, el despacho y los avisos a la
+administración) y despacha la cola. Saca el webhook del bot del equipo si lo hay. Ctrl+C
+para cortar:
 
 ```bash
-python -m prueba_chica.escuchar corework
+python -m leda escuchar corework
 ```
+
+El reloj de Leda, para que pasen los días sin esperar (sólo en la base `leda_motor`; el
+escuchador lo toma en su vuelta siguiente):
+
+```bash
+python -m leda.motor.reloj corework adelantar
+python -m leda.motor.reloj corework estado
+python -m leda.motor.reloj corework volver
+```
+
+En un servidor alcanzable desde internet, el mismo motor atiende por webhook:
+`python -m leda webhooks` registra el webhook de cada bot (pide `LEDA_BASE_URL` y
+`LEDA_WEBHOOK_SECRET`) y `python -m leda servir` recibe los mensajes y corre el ciclo del
+motor de cada espacio. Los dos caminos usan la misma función (`leda.motor.recibir`); uno o
+el otro, nunca los dos con el mismo bot.
+
+El escuchador de la prueba chica (`python -m prueba_chica.escuchar corework`) sigue hasta la
+E3-8, para comparar.
 
 En otra terminal, para ver cómo va:
 
@@ -175,16 +190,10 @@ Ese contraste es lo que muestra que la cadena es por persona y no por área.
 - **Un bloqueo.** Que Marcos diga que está trabado por algo. La tarea sale de
   la escalera de recordatorios y deja de recibir avisos.
 
-### Cadencias sin esperar al lunes
+### Cadencias
 
-Con `servir` corriendo, cada cadencia se dispara sola apenas vence su horario
--- no hace falta reiniciar el proceso ni volver a importar el pack para que un
-horario editado tome efecto. Para no esperar ni eso:
-
-```bash
-python -m leda cadencia corework objetivos_semanales
-python -m leda cadencia corework resumen_grupal
-```
+Las cadencias viejas (`python -m leda cadencia`) se retiraron en la E3-7 con su ciclo; el
+pedido de estado de las cadencias (circuito 5) se rehace en el motor después de M3.
 
 ### Escalera de recordatorios
 
@@ -196,7 +205,8 @@ update leda.task set fecha_objetivo = now() - interval '2 days'
  where titulo like 'Relevar%';
 ```
 
-Y esperá una vuelta del proceso, o corré `python -m leda escalera corework`.
+Y esperá un minuto con el escuchador corriendo: la escalera del motor corre una vez por
+minuto (`python -m leda escalera` se retiró en la E3-7 con la escalera vieja).
 
 ---
 
@@ -322,11 +332,10 @@ arriba; sin `--solo`, genera el enlace de las siete:
 python -m leda enlaces corework --solo <nombres>
 ```
 
-**7. Arrancar el proceso** que escucha Telegram. Desde la Etapa 3 del Motor es el
-de la prueba chica (punto 4):
+**7. Arrancar el proceso** que escucha Telegram: el escuchador del motor (punto 4):
 
 ```bash
-python -m prueba_chica.escuchar corework
+python -m leda escuchar corework
 ```
 
 La semilla deja, para probar entrega con evidencia y "Pedir cambios" (ADR
@@ -363,7 +372,7 @@ ya lo tenía. Si todavía no activó su cuenta de Telegram, igual se lo otorga
 -- pero avisa que los incidentes no le van a llegar hasta que la active y
 escriba una vez al bot de administración.
 
-Con `python -m prueba_chica.escuchar corework` corriendo (punto 7 -- también
+Con `python -m leda escuchar corework` corriendo (punto 7 -- también
 sondea el bot de administración, sin bloquear, si `LEDA_BOT_TOKEN_ADMIN`
 está puesto), esa persona le escribe **una vez** cualquier cosa al bot de
 administración. Sin ese mensaje no hay a qué `chat_id` mandarle nada.
