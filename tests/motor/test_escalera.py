@@ -55,6 +55,24 @@ def test_el_aviso_previo_sale_una_sola_vez_n_dias_habiles_antes(conn, mundo, dia
     assert cuantas(conn, "scheduled_notice") == 1
 
 
+def test_lo_que_leda_manda_por_su_cuenta_no_espera_el_margen_para_corregir(conn, mundo, dias):
+    """El margen para corregir (`margen.py`) es para lo que una persona dijo y le llega a otra:
+    la escalera no sale de lo que nadie dijo, así que sale a su hora aunque el espacio tenga un
+    margen largo (decisión del usuario, 2026-10-07)."""
+    with admin(conn) as cur:
+        cur.execute("""insert into workspace_setting (workspace_id, clave, valor)
+                       values (%s, 'margen_para_corregir_minutos', '30')""", (mundo["id"],))
+    conn.commit()
+
+    [previo] = dias.ciclo(octubre(6, 10))
+    [pedido] = dias.ciclo(octubre(9, 10))
+
+    assert previo["hechos"][0]["aviso"] == "vencimiento_proximo"
+    assert pedido["hechos"][0]["aviso"] == "pedido_de_estado"
+    assert [(a["tipo"], a["programado_para"]) for a in avisos_guardados(conn)] == [
+        ("aviso_previo", octubre(6, 10)), ("pedido_de_estado", octubre(9, 10))]
+
+
 def test_una_tarea_corta_comprime_el_aviso_previo(conn, mundo, dias):
     """Una tarea con menos días hábiles por delante que el aviso previo lo recibe enseguida
     (mecánica §9: la escalera se comprime, nunca saltea un paso)."""

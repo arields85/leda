@@ -10,7 +10,7 @@ fijo: el lunes 5 de octubre de 2026, 10:00 en Buenos Aires.
 from __future__ import annotations
 
 import json
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 import pytest
 
@@ -215,8 +215,9 @@ def test_la_prevision_anota_el_atraso_en_dias_habiles_y_guarda_el_aviso(conn, mu
         "atraso_si_se_cumple_la_prevision_dias_habiles": 1,
         "dependientes": ["Probar el tablero"],
         # A quién le llega y cuándo se entera, en la hora del espacio (9e): lo que pasa en el
-        # mundo, nunca el estado interno del aviso (usuario, 2026-10-06).
-        "aviso_al_referente": {"a": "Ismael", "llega": "2026-10-05T10:00:00-03:00"},
+        # mundo, nunca el estado interno del aviso (usuario, 2026-10-06). Con el margen para
+        # corregir (10 minutos; `margen.py`): la hora real en que sale.
+        "aviso_al_referente": {"a": "Ismael", "llega": "2026-10-05T10:10:00-03:00"},
         # El seguimiento pasa a la previsión (9i): Leda pide el estado el día previsto.
         "lo_que_sigue": {"pide_el_estado_el": {"fecha": "2026-10-13"}}}
     prevision = _uno(conn, "select * from task_forecast")
@@ -241,7 +242,8 @@ def test_la_prevision_anota_el_atraso_en_dias_habiles_y_guarda_el_aviso(conn, mu
         "motivo": "el proveedor se demoró", "fecha_comprometida": "2026-10-09",
         "atraso_si_se_cumple_la_prevision_dias_habiles": 1,
         "dependientes": ["Probar el tablero"]}
-    assert aviso["estado"] == "guardado" and aviso["programado_para"] == AHORA
+    assert aviso["estado"] == "guardado"
+    assert aviso["programado_para"] == AHORA + timedelta(minutes=10)
     assert aviso["creado_en"] == AHORA
     # Guardado, no enviado: el envío es de la E2-5. Atado al turno que lo causó.
     assert _cuantas(conn, "message_outbox") == 1          # sólo la respuesta a Marcos
@@ -261,10 +263,43 @@ def test_la_redaccion_recibe_cuando_se_entera_el_referente(conn, mundo, escribe)
     conn.commit()
 
     [hecho] = ia.pedidos_de_redaccion[0]["hechos"]
-    assert hecho["aviso_al_referente"] == {"a": "Ismael", "llega": "2026-10-05T10:00:00-03:00"}
+    assert hecho["aviso_al_referente"] == {"a": "Ismael", "llega": "2026-10-05T10:10:00-03:00"}
     # Y es cierto: el aviso está guardado y nada salió para Ismael.
     assert _uno(conn, "select estado from scheduled_notice")["estado"] == "guardado"
     assert _cuantas(conn, "message_outbox") == 1          # sólo la respuesta a Marcos
+
+
+def test_el_aviso_al_referente_espera_el_margen_del_espacio(conn, mundo, escribe):
+    """El margen para corregir es del espacio (`workspace_setting`, `margen.CLAVE_MARGEN`): el
+    aviso se guarda para cuando termina, y el hecho dice esa hora, la real."""
+    with admin(conn) as cur:
+        cur.execute("""insert into workspace_setting (workspace_id, clave, valor)
+                       values (%s, 'margen_para_corregir_minutos', '3')""", (mundo["id"],))
+    conn.commit()
+
+    [hecho] = _jugar(conn, escribe, "Marcos", Jugada(
+        "anotar_prevision", {"tarea": "T1", "fecha": "2026-10-13"}))
+
+    assert hecho["aviso_al_referente"] == {"a": "Ismael", "llega": "2026-10-05T10:03:00-03:00"}
+    aviso = _uno(conn, "select programado_para from scheduled_notice")
+    assert aviso["programado_para"] == AHORA + timedelta(minutes=3)
+
+
+def test_el_margen_que_termina_fuera_del_horario_espera_al_dia_habil_siguiente(conn, mundo,
+                                                                              escribe):
+    """El horario sigue valiendo encima del margen (9e): a las 16:55, el margen termina después
+    de las 17:00, así que el aviso sale el martes a la hora de salida, y el hecho lo dice."""
+    quien, entrante = escribe("Marcos", "llego el 13")
+    a_las = datetime(2026, 10, 5, 19, 55, tzinfo=timezone.utc)          # 16:55
+    resultado = procesar_turno(
+        conn, quien, entrante,
+        IAGuionada(jugadas=[[Jugada("anotar_prevision", {"tarea": "T1", "fecha": "2026-10-13"})]],
+                   redacciones=["Listo."]), RelojFijo(a_las))
+    conn.commit()
+
+    [hecho] = resultado.hechos
+    assert hecho["aviso_al_referente"] == {"a": "Ismael", "llega": "2026-10-06T10:00:00-03:00"}
+    assert _uno(conn, "select programado_para from scheduled_notice")["programado_para"] ==         datetime(2026, 10, 6, 13, 0, tzinfo=timezone.utc)
 
 
 def test_una_prevision_en_la_fecha_comprometida_no_avisa(conn, mundo, escribe):

@@ -13,9 +13,12 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from leda.db import admin
+from leda.motor.avisos import enviar_avisos
 from leda.motor.ia import Jugada
+from leda.motor.tiempo import RelojFijo
 
-from tests.motor.ayudantes import (AHORA, T1, T2, cuantas, estado_de, jugada_bloqueo, nueva_tarea,
+from tests.motor.ayudantes import (AHORA, T1, T2, IAQueRedacta, cuantas, dice, estado_de,
+                                   jugada_bloqueo, lo_que_salio_para, nueva_tarea, octubre,
                                    poner_estado, abierta, todos, uno)
 
 # --- Ayudas ---------------------------------------------------------------------------------
@@ -412,6 +415,45 @@ def test_corregir_una_prevision_retira_su_aviso_y_la_anota_en_la_correcta(conn, 
     assert avisos[tareas["T1"]]["estado"] == "omitido"
     assert avisos[tareas["T1"]]["motivo_omision"] == "prevision_corregida"
     assert avisos[tareas["T2"]]["estado"] == "guardado"
+
+
+def test_una_correccion_dentro_del_margen_no_deja_salir_el_aviso_equivocado(conn, mundo,
+                                                                           tareas, escribe):
+    """La prueba por Telegram real del 2026-10-07 (conversación 25): la fecha quedó en la tarea
+    equivocada y el aviso a Ismael salió antes de que Marcos pudiera corregirla. El aviso a otra
+    persona espera el margen para corregir (`margen.py`): Marcos corrige cuatro minutos después,
+    el aviso equivocado se retira sin salir y a Ismael le llega sólo el de la tarea correcta,
+    con su propio margen desde la corrección."""
+    dice(conn, escribe, Jugada("anotar_prevision", {"tarea": "T1", "fecha": "2026-10-21"}),
+         at=octubre(5, 10, 30))
+    r = dice(conn, escribe, Jugada("corregir", {"corrige": "anotar_prevision", "tarea": "T1",
+                                                "tarea_correcta": "T2"}),
+             at=octubre(5, 10, 34))
+
+    [hecho] = r.hechos
+    assert hecho["aviso_de_la_prevision_corregida"] == {"a": "Ismael",
+                                                        "llega": "no_le_va_a_llegar"}
+    assert hecho["aplicado"]["aviso_al_referente"] == {"a": "Ismael",
+                                                       "llega": "2026-10-05T10:44:00-03:00"}
+    ia = IAQueRedacta()
+    for minuto in (40, 43):         # el margen de la equivocada ya pasó; el de la correcta, no
+        enviar_avisos(conn, mundo["id"], ia, RelojFijo(octubre(5, 10, minuto)))
+        conn.commit()
+    assert ia.pedidos_de_redaccion == []
+    assert lo_que_salio_para(conn, mundo, "Ismael") == []
+
+    enviar_avisos(conn, mundo["id"], ia, RelojFijo(octubre(5, 10, 44)))
+    conn.commit()
+
+    [pedido] = ia.pedidos_de_redaccion
+    assert pedido["persona"] == "Ismael"
+    assert [(h["aviso"], h["tarea"], h["prevision"]) for h in pedido["hechos"]] == [
+        ("nueva_prevision", "Probar las comunicaciones", "2026-10-21")]
+    assert len(lo_que_salio_para(conn, mundo, "Ismael")) == 1
+    equivocado = uno(conn, "select estado, motivo_omision from scheduled_notice "
+                           "where task_id = %s", tareas["T1"])
+    assert (equivocado["estado"], equivocado["motivo_omision"]) == (
+        "omitido", "prevision_corregida")
 
 
 def test_corregir_una_prevision_cuyo_aviso_ya_salio_guarda_una_correccion(conn, mundo, tareas,
