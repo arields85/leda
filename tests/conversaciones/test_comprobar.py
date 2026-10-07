@@ -141,3 +141,128 @@ def test_de_la_falla_de_un_aviso_el_informe_sabe_la_clase_y_el_codigo_nunca_el_t
     assert [(f.clase, f.que, f.real) for f in c.fallas] == [
         (cp.MOTOR, cp.AVISO_SIN_REDACTAR, {"falla": "X"}),
         (cp.MOTOR, "incidente", [{"etapa": "motor_ciclo", "severidad": "alta"}])]
+
+
+# --- El formato de los mensajes (segunda vuelta, usuario, 2026-10-07) ---------------------------
+
+PLC = "Programar PLC de la comprimidora"
+COM = "Revisar comunicaciones industriales de la comprimidora"
+TITULOS = (PLC, COM)
+
+
+def _reglas(texto: str) -> set[str]:
+    return {regla for regla, _ in cp.fallas_de_formato(texto, TITULOS)}
+
+
+# Mensajes con el formato que pidió el usuario (fixtures: datos ficticios de las conversaciones).
+BIEN_CON_PREGUNTA = f"""Anoté lo que me contaste.
+
+📋 {PLC}
+✏️ La arrancaste hoy.
+✏️ Te pregunto cómo viene el vie 23/10.
+
+📋 {COM}
+✏️ La terminás el mié 4/11: esperás el switch nuevo.
+⚠️ Vence el vie 30/10: serían 3 días hábiles de atraso.
+✏️ Ismael se entera hoy.
+
+¿Quién te trae el switch?"""
+
+BIEN_SIN_RESPUESTA = f"""Marcos va a terminar más tarde una tarea.
+
+📋 {COM}
+✏️ La termina el mié 4/11: espera el switch nuevo.
+⚠️ Vencía el vie 30/10: son 3 días hábiles de atraso.
+
+No hace falta que respondas."""
+
+BIEN_LISTA = f"""Tenés dos tareas pendientes.
+
+📅 {PLC}: sin empezar, vence vie 23/10
+📅 {COM}: en curso, vence vie 30/10
+
+Conviene empezar por la del PLC, que vence primero."""
+
+
+def test_un_mensaje_con_el_formato_pedido_no_tiene_fallas_de_formato():
+    for texto in (BIEN_CON_PREGUNTA, BIEN_SIN_RESPUESTA, BIEN_LISTA, "¿Cuál de las dos?",
+                  "Listo, quedó anotado.\n\nNo hace falta que respondas."):
+        assert cp.fallas_de_formato(texto, TITULOS) == [], texto
+
+
+def test_cada_regla_del_formato_se_reconoce_con_su_renglon():
+    assert _reglas(BIEN_LISTA.replace("Tenés dos", "Tenés **dos**")) == {cp.SIN_NEGRITA}
+    # El nombre completo, en un renglón que no es de una tarea, y dos veces.
+    assert _reglas(BIEN_LISTA.replace("la del PLC", PLC)) == {cp.TAREA_EN_SU_RENGLON,
+                                                               cp.TAREA_UNA_VEZ}
+    assert _reglas(BIEN_SIN_RESPUESTA.replace(f"📋 {COM}", f"📋 {COM}, en curso")) == {
+        cp.TAREA_SOLA}
+    largo = "✏️ " + "una idea que se estira " * 7
+    assert len(largo) > cp.RENGLON_MAXIMO
+    assert _reglas(BIEN_SIN_RESPUESTA.replace("✏️ La termina", largo + "\n✏️ La termina")) == {
+        cp.RENGLON_CORTO}
+    assert _reglas(BIEN_LISTA.replace("vence vie 23/10", "vence el viernes 23 de octubre")) == {
+        cp.FECHA_CORTA}
+
+
+def test_el_cierre_va_solo_y_al_final():
+    # La pregunta no es el último renglón, o hay dos.
+    assert _reglas(BIEN_CON_PREGUNTA.replace("Anoté lo que me contaste.",
+                                             "¿Te anoto todo?")) == {cp.PREGUNTA_AL_FINAL}
+    assert _reglas(BIEN_CON_PREGUNTA + "\n\nOtra cosa más.") == {cp.PREGUNTA_AL_FINAL}
+    # Que no hace falta responder, pero no al final.
+    assert _reglas(BIEN_SIN_RESPUESTA + "\n\nSigo atenta.") == {cp.NO_HACE_FALTA_AL_FINAL}
+    # El cierre pegado a lo anterior: en el mismo renglón o sin un renglón en blanco antes.
+    assert _reglas(BIEN_SIN_RESPUESTA.replace(
+        "\n\nNo hace falta", " No hace falta")) == {cp.CIERRE_APARTE}
+    assert _reglas(BIEN_CON_PREGUNTA.replace("\n\n¿Quién", "\n¿Quién")) == {cp.CIERRE_APARTE}
+
+
+# Mensajes reales de la primera vuelta del formato (`resultados/formato-regresion-sol-suscripcion-
+# transcripciones.md`, conversación 20, vez 1; GPT-6 sol con la instrucción de negrita, párrafos y
+# viñetas): bloques con negrita que la segunda vuelta deja de aceptar.
+REAL_AVISO_PREVIO = (f"**{PLC}** vence el **viernes 23 de octubre**, dentro de tres días "
+                     "hábiles. No hace falta que respondas.")
+REAL_PENDIENTES = f"""Tenés pendientes:
+
+• **{PLC}**: todavía sin empezar; vence el **viernes 23 de octubre**.
+• **{COM}**: en curso; vence el **viernes 30 de octubre**.
+
+Podés empezar por **{PLC}**, que vence primero."""
+REAL_DOS_HECHOS = f"""Quedó anotado que arrancaste **{PLC}**. Te voy a preguntar cómo viene el \
+**viernes 23 de octubre**.
+
+También quedó anotado que prevés terminar **{COM}** el **miércoles 4 de noviembre** porque \
+esperás el switch nuevo. Sigue venciendo el **viernes 30 de octubre**; si la terminás el 4, \
+serán **3 días hábiles de atraso**. Ismael Soschinski se enterará hoy a las 10:15.
+
+Te voy a preguntar cómo viene esa tarea el **miércoles 4 de noviembre**."""
+REAL_AVISO_A_ISMAEL = f"""Marcos dijo que terminará **{COM}** el miércoles 4 de noviembre \
+porque espera el switch nuevo. La tarea vence el viernes 30 de octubre; si la termina el día \
+que indicó, serán **3 días hábiles de atraso**.
+
+Es solo para que estés al tanto; no hace falta responder."""
+
+
+def test_los_mensajes_de_la_primera_vuelta_no_cumplen_el_formato_nuevo():
+    """La evidencia en rojo: con la instrucción anterior, los mensajes reales de la IA son
+    bloques con negrita, las tareas en medio del texto y las fechas largas."""
+    assert _reglas(REAL_AVISO_PREVIO) >= {cp.SIN_NEGRITA, cp.TAREA_EN_SU_RENGLON,
+                                          cp.FECHA_CORTA, cp.CIERRE_APARTE}
+    assert _reglas(REAL_PENDIENTES) >= {cp.SIN_NEGRITA, cp.TAREA_EN_SU_RENGLON,
+                                        cp.TAREA_UNA_VEZ, cp.FECHA_CORTA}
+    assert _reglas(REAL_DOS_HECHOS) >= {cp.SIN_NEGRITA, cp.TAREA_EN_SU_RENGLON,
+                                        cp.RENGLON_CORTO, cp.FECHA_CORTA}
+    assert _reglas(REAL_AVISO_A_ISMAEL) >= {cp.SIN_NEGRITA, cp.TAREA_EN_SU_RENGLON,
+                                            cp.RENGLON_CORTO, cp.FECHA_CORTA}
+
+
+def test_una_falla_de_formato_es_de_su_propia_clase_con_el_renglon():
+    c = cp.Comprobacion()
+
+    cp.comprobar_formato(c, REAL_AVISO_PREVIO, TITULOS, a="Marcos")
+
+    assert c.fallas and {f.clase for f in c.fallas} == {cp.FORMATO}
+    assert all(f.que == "formato del mensaje a Marcos" for f in c.fallas)
+    assert (cp.SIN_NEGRITA, REAL_AVISO_PREVIO) in {(f.esperado, f.real) for f in c.fallas}
+    assert not c.de(cp.GARANTIA) and not c.de(cp.COMPRENSION) and not c.de(cp.MOTOR)
