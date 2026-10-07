@@ -54,13 +54,18 @@ El circuito es el recordatorio y lo que la persona contesta (ADR 0018, decisión
 18. [`18-habla-del-mundo.md`](18-habla-del-mundo.md): un avance, una previsión antes de la hora en que
     Leda escribe por su cuenta y el pedido de estado del día previsto; Leda cuenta quién se entera de qué
     y cuándo, y qué va a hacer ella, nunca el estado interno de un aviso o de un pedido.
+19. [`19-palabras-de-todos-los-dias.md`](19-palabras-de-todos-los-dias.md): una reasignación con la oferta
+    de anotar para cuándo la termina, la fecha que da Marcos, "que es prevision?" y lo que Leda manda por
+    su cuenta hasta ese día; Leda dice el hecho concreto con palabras de todos los días y nunca nombra un
+    concepto del sistema.
 
 Las cuatro primeras son las cuatro respuestas de 5a; de la 5 a la 12, cada una aplica al recordatorio una
 de las ocho situaciones generales de la decisión 4. La 15 suma la jugada `informar_avance` (decisión del
 usuario, 2026-10-05; ADR 0018, decisión 9b). La 16, la regla de la tarea vencida (decisión del usuario,
 2026-10-05; ADR 0018, decisión 9j). La 17, la jugada `destrabar` (decisión del usuario, 2026-10-05;
 ADR 0018, decisión 9l). La 18, hablar de lo que pasa en el mundo y no de la cocina (decisión del usuario,
-2026-10-06, de la prueba por Telegram real; Etapa 3, E3-6).
+2026-10-06, de la prueba por Telegram real; Etapa 3, E3-6). La 19, decir el hecho con palabras de todos
+los días y no los nombres del sistema (decisión del usuario, 2026-10-07, de la prueba por Telegram real).
 
 ## El corredor
 

@@ -1,0 +1,176 @@
+# Copia comprobable de la conversación: la fuente es el .md. Formato: tests/conversaciones/README.md.
+fuente: tests/conversaciones/19-palabras-de-todos-los-dias.md
+numero: "19"
+titulo: "Palabras de todos los días, no los nombres del sistema"
+mide: garantias
+persona: Marcos
+inicio: "2026-10-20 09:00"
+
+tareas:
+  PLC:
+    titulo: Programar PLC de la comprimidora
+    responsable: Marcos
+    vence: "2026-10-23"
+    estado: en_curso
+    desde: "2026-10-19"
+  COM:
+    titulo: Revisar comunicaciones industriales de la comprimidora
+    responsable: Marcos
+    vence: "2026-11-06"
+    estado: asignada
+    depende_de: PLC
+
+# Lo que ya se envió (estado inicial del .md): el aviso previo del martes 20, que no pide
+# respuesta. Corre por el motor; los textos los redacta la IA de la corrida.
+preludio:
+  - quien: Leda
+    relojes: ["2026-10-20 10:00"]
+    salen: [{a: Marcos, tipo: aviso_previo, tarea: PLC}]
+
+# La regla (usuario, 2026-10-07): Leda dice el hecho concreto con las palabras de todos los días,
+# nunca el nombre de un dato o de una jugada. El corredor no juzga el texto: lo comprueba solo lo
+# que hace el código (jugadas, efectos, hechos, estado) y el texto se lee en las transcripciones.
+pasos:
+  - paso: 1
+    quien: Marcos
+    a_las: "2026-10-20 11:00"
+    escribe: "me la podes pasar a nahuel? no llego con los tiempos"
+    jugadas:
+      - {nombre: pedir_reasignacion, tarea: PLC, a: nahuel}
+    efectos: {}
+    hechos:
+      - {jugada: pedir_reasignacion, resultado: no_por_chat, quien_decide: Ismael Soschinski,
+         alternativa: anotar_prevision, tarea: PLC, pregunta: propuesta}
+    pregunta: {tipo: propuesta, tarea: PLC, propone: [anotar_prevision]}
+    estado_despues:
+      pregunta_abierta: {tipo: propuesta, tarea: PLC}
+    dice:
+      - que eso no lo puede hacer y que lo decide Ismael
+      - "como el motivo es el tiempo, ofrece anotar para qué día la va a terminar, con palabras de todos los días"
+    no_dice:
+      - '"previsión" ni otro nombre de un dato o de una jugada'
+      - que la tarea pasó a Nahuel
+
+  - paso: 2
+    quien: Marcos
+    a_las: "2026-10-20 11:05"
+    escribe: "dale, para el martes 27"
+    jugadas:
+      - {nombre: anotar_prevision, tarea: PLC, fecha: "2026-10-27"}
+    efectos:
+      previsiones: [{tarea: PLC, fecha: "2026-10-27", motivo: ausente}]
+      avisos_guardados:
+        - tipo: nueva_prevision
+          tarea: PLC
+          a: Ismael
+          hechos: {prevision: "2026-10-27", fecha_comprometida: "2026-10-23",
+                   atraso_si_se_cumple_la_prevision_dias_habiles: 2, dependientes: [COM]}
+    hechos:
+      - {jugada: anotar_prevision, resultado: anotado, tarea: PLC, prevision: "2026-10-27",
+         fecha_comprometida: "2026-10-23", atraso_si_se_cumple_la_prevision_dias_habiles: 2,
+         aviso_al_referente: {a: Ismael Soschinski, llega: "~2026-10-20T11:05"}}
+    pregunta: null
+    estado_despues:
+      pregunta_abierta: null
+      para_despues: []
+    dice:
+      - que anotó que la del PLC la termina el martes 27
+      - que el vencimiento sigue siendo el viernes 23, dicho como el día para el que estaba
+      - que Ismael se va a enterar hoy, como algo que todavía no pasó
+      - "el próximo paso concreto: que el martes 27 le pregunta cómo viene"
+    no_dice:
+      - '"previsión", "fecha comprometida", "referente", "dependiente" ni otro nombre de un dato o de una jugada'
+      - que la fecha de la tarea cambió
+
+  - paso: 3
+    quien: Leda
+    relojes: ["2026-10-20 11:06"]
+    salen:
+      - a: Ismael
+        tipo: nueva_prevision
+        tarea: PLC
+        hechos: {prevision: "2026-10-27", fecha_comprometida: "2026-10-23",
+                 atraso_si_se_cumple_la_prevision_dias_habiles: 2, dependientes: [COM]}
+    estado_despues:
+      de: Ismael
+      pregunta_abierta: null
+    dice:
+      - que Marcos la termina el martes 27
+      - que vencía el viernes 23
+      - el atraso, dos días hábiles
+      - que la de comunicaciones depende de ella
+      - que no hace falta que conteste
+    no_dice:
+      - '"previsión", "fecha comprometida", "referente", "dependiente" ni otro nombre de un dato o de una jugada'
+      - que Ismael tiene que hacer algo
+
+  - paso: 4
+    quien: Marcos
+    a_las: "2026-10-20 11:15"
+    escribe: "que es prevision?"
+    jugadas: []
+    efectos: {}
+    pregunta: null
+    estado_despues:
+      pregunta_abierta: null
+    dice:
+      - "el hecho concreto que esa palabra nombra en su caso: el día que él dio para terminar la tarea del PLC, el martes 27, y que el vencimiento del viernes 23 no cambia"
+    no_dice:
+      - una definición general del sistema (un campo, un dato, un registro, cómo lo guarda o lo usa Leda)
+      - otra pregunta
+
+  - paso: 5
+    quien: Leda
+    relojes: ["2026-10-23 10:00"]
+    salen:
+      - a: Marcos
+        tipo: vencimiento_con_prevision
+        tarea: PLC
+        hechos:
+          necesita_respuesta: false
+          vence: "2026-10-23"
+          prevision_vigente:
+            fecha: "2026-10-27"
+            atraso_si_se_cumple_la_prevision_dias_habiles: 2
+            aviso_al_referente: {a: Ismael Soschinski, llega: ya_le_llego}
+          pide_el_estado_el: {fecha: "2026-10-27"}
+    estado_despues:
+      pregunta_abierta: null
+      esperas_abiertas: []
+    dice:
+      - que la tarea del PLC vence hoy
+      - que tiene anotado que la termina el martes 27 y que Ismael ya lo sabe
+      - que el martes 27 le pregunta cómo viene, como algo que todavía no pasó
+      - que no hace falta contestar
+    no_dice:
+      - '"previsión", "fecha comprometida", "pedido de estado", "referente", "dependiente" ni otro nombre de un dato o de una jugada'
+      - un reproche
+      - una pregunta
+
+  - paso: 6
+    quien: nadie
+    relojes: ["2026-10-23 16:00", "2026-10-26 10:00", "2026-10-26 16:00"]
+    salen: []
+
+  - paso: 7
+    quien: Leda
+    relojes: ["2026-10-27 10:00"]
+    salen:
+      - a: Marcos
+        tipo: pedido_de_estado
+        tarea: PLC
+        hechos:
+          numero: 1
+          necesita_respuesta: true
+          seguimiento_por: prevision
+          vence: "2026-10-23"
+          prevision_vigente: {fecha: "2026-10-27"}
+    estado_despues:
+      pregunta_abierta: {tipo: estado_de_la_tarea, tarea: PLC}
+      esperas_abiertas: [PLC]
+    dice:
+      - que hoy es el día que Marcos dio para terminar la tarea del PLC
+      - pregunta cómo viene
+    no_dice:
+      - '"previsión", "fecha comprometida", "pedido de estado", "escalamiento", "referente", "dependiente" ni otro nombre de un dato o de una jugada'
+      - un reproche
