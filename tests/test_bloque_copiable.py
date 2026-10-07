@@ -245,8 +245,8 @@ def test_el_token_de_modificar_no_llega_a_convertir_el_borrador(
     como inexistente (migración 0020); el botón Confirmar sigue funcionando."""
     from leda import pendientes as P
     from leda.db import autoridad
-    from tests.test_task_drafts import (_confirmar, _crear_preview, _telegram,
-                                        _token)
+    from tests.garantias.test_borradores import (_confirmar, _crear_preview,
+                                                  _telegram, _token)
 
     ws = corework.workspace_id
     with espacio(conn, ws) as cur:
@@ -278,7 +278,7 @@ def test_el_token_de_enviar_no_llega_a_convertir_el_borrador(
     (migración 0023): defensa en profundidad."""
     from leda import pendientes as P
     from leda.db import autoridad
-    from tests.test_task_drafts import _crear_preview, _telegram
+    from tests.garantias.test_borradores import _crear_preview, _telegram
 
     ws = corework.workspace_id
     with espacio(conn, ws) as cur:

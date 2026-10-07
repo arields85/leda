@@ -1,3 +1,11 @@
+"""El compromiso de una tarea: borrador, vista previa congelada y conversión confirmada.
+
+Una solicitud incompleta es un borrador sin efectos; la tarea comprometida sale sólo de
+`confirmar_borrador_tarea()`, confirmada por la autoridad vigente, una sola vez y con
+auditoría (`AGENTS.md`, "Invariantes vigentes"). Movidas desde `tests/test_task_drafts.py`
+(E3-4): ya no dependen de la conversación de los flujos A y B.
+"""
+
 from __future__ import annotations
 
 import threading
