@@ -298,12 +298,28 @@ def test_la_redaccion_describe_el_formato_sin_frases_de_ejemplo():
     texto = INSTRUCCIONES_REDACCION
     assert "sin Markdown" not in texto and "**" not in texto and '"• "' not in texto
     assert "breve" in texto and "renglón en blanco" in texto and "Sin negrita" in texto
-    for marca in ("📋", "📅", "✏️", "⚠️"):
+    for marca in ("📋", "🗓️", "✏️", "⚠️"):
         assert marca in texto, marca
     assert "aunque el tono del equipo no lleve emojis" in texto
     assert "una sola vez" in texto and "último renglón" in texto and "forma corta" in texto
     for palabra in ("programar plc", "comunicaciones", "vence el", "anoté", "vie ", "/10"):
         assert palabra not in texto.lower(), palabra
+
+
+def test_la_redaccion_describe_la_tercera_vuelta_del_formato_sin_frases_de_ejemplo():
+    """Tercera vuelta (usuario, 2026-10-07, después de la segunda prueba por Telegram): 🗓️ en vez
+    de 📅, que Telegram dibuja con una fecha fija; en un bloque con una tarea, su renglón es el
+    primero y todo lo de la tarea va debajo; una marca va sólo al principio de su renglón; y
+    quien se entera se dice en voz pasiva, en futuro o en pasado según si ya pasó. La
+    instrucción describe el trabajo: ni la frase del usuario ni las que no quiere."""
+    texto = INSTRUCCIONES_REDACCION
+    assert "📅" not in texto
+    assert "el primero del bloque" in texto and "va debajo" in texto
+    assert "al principio de su renglón" in texto and "nunca en el medio" in texto
+    assert "voz pasiva" in texto and "Nunca lo contás como algo que hacés vos" in texto
+    for frase in ("ismael", "marcos", "será notificad", "fue notificad", "le avis", "avisarle",
+                  "le voy a"):
+        assert frase not in texto.lower(), frase
 
 
 def test_una_redaccion_vacia_se_devuelve_vacia_y_el_turno_la_toma_como_falla():

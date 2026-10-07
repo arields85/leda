@@ -108,4 +108,8 @@ def test_las_instrucciones_son_las_que_pasaron_la_prueba_real():
 # después de verlo en Telegram: sin negrita, un renglón por idea, cuatro marcas fijas (📋 ✏️ 📅
 # ⚠️) que van aunque el tono no lleve emojis, el título completo una sola vez, fechas cortas
 # (`hechos.dia_corto`) y el cierre aparte, al final (conversación 20). Antes: "66f8a2e23d9bbbd9".
-HUELLAS_DE_LA_PRUEBA_REAL = {"jugadas": "8b25f19b4bfe9b8a", "redaccion": "d546932a0f6b9262"}
+# Y otra vez a propósito el 2026-10-07, con la tercera vuelta del formato, decidida por el usuario
+# después de la segunda prueba por Telegram: 🗓️ en vez de 📅, el renglón de la tarea primero en su
+# bloque, las marcas sólo al principio del renglón y quien se entera, en voz pasiva (conversación
+# 20). Antes: "d546932a0f6b9262".
+HUELLAS_DE_LA_PRUEBA_REAL = {"jugadas": "8b25f19b4bfe9b8a", "redaccion": "d8c6b0de58c4c2a3"}
