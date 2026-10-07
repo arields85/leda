@@ -267,10 +267,31 @@ revisión por tramos.
         - Garantías y motor, después de `12e63d9`: 188.
         - `prueba_chica`: 410.
       - **Revisiones:** `review-fb5aae5abbb4e2a8` y `review-6e0da2c028ca5d98`, aprobadas y reconocidas.
-- [ ] **E3-6. Mudar el diseño probado:** estado, registro de turnos, fichas de los circuitos probados,
+- [~] **E3-6. Mudar el diseño probado:** estado, registro de turnos, fichas de los circuitos probados,
       avisos guardados, escalera y reloj. Entran las dos entradas de la prueba real: hablar del mundo y no
       de la cocina, con su conversación de prueba escrita primero; y los efectos en `audit_log` con la
       versión de las reglas.
+      **Portado (2026-10-06 y 07), delegado a dos escritores.** Falta la regla de hablar del mundo.
+      - **Capa 2:** `4e3c16d` (jugadas, situaciones y hechos), `fd8f833` (turno, avisos y efectos) y
+        `8d6d195` (pruebas por el turno). Revisiones `review-9b72635703d52896`,
+        `review-f713d77c04cb3163` y `review-4edb74708eee992b`.
+      - **Auditoría de lo que el motor escribe directo:** `59cf884` (`motor/auditoria.py`). Se auditan
+        las previsiones, sus correcciones, quién destraba, el avance y cada aviso que sale. No se audita
+        la conversación, que ya está en el registro de turnos. Revisión `review-ea83c61eeba28416`.
+      - **Capa 3:** `3025384` (escalera, botones, ciclo y reloj, con `python -m leda.motor.reloj`),
+        `34f3336` (pruebas por la escalera) y `3d51094` (cliente real de la IA; `llm.tiempos` pasa a
+        público). Revisiones `review-f1e7ebdcd9a28451`, `review-2978709cb62e3a74` y
+        `review-d0e2467fbbdb4240`. Todas aprobadas.
+      - **Diferencias con la prueba chica:** ninguna en comportamiento, salvo la auditoría.
+      - **Arreglo de la fecha:** `8edd1fc` le da a la IA la fecha de hoy en la zona del espacio, no en
+        UTC (de noche se contaba un día de más). Viene de una advertencia de revisión. La prueba nueva
+        falló primero: `assert '2026-10-06' == '2026-10-05'`.
+      - **Evidencia:** `tests/motor` 363; suite completa 995, más 1 con el arreglo; `tests/garantias`
+        146; `prueba_chica` 410.
+      - **Pendiente:**
+        - Dos pruebas del escuchador esperan la E3-7, y una del corredor, la mudanza del corredor.
+        - Una prueba de `prueba_chica` falló una vez sin explicación y pasó al repetirla
+          (intermitente, sin identificar).
 - [ ] **E3-7. La entrada del motor:** escuchador y webhook propios, sin `gateway`.
 - [ ] **E3-8. Regresión y prueba real:** las 17 conversaciones, cinco veces con GPT-6 sol, y la guía de
       la E2-9 por Telegram. Después se borra `prueba_chica/`.
