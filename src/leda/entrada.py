@@ -11,8 +11,9 @@ cada update es lo mismo que el escuchador por long polling (`leda.motor.recibir`
 dentro de las funciones. Telegram manda en cada entrega el secreto que se le dio al registrar
 el webhook; cada bot tiene el suyo, derivado de `LEDA_WEBHOOK_SECRET` y del espacio
 (`secreto_del_bot`), así el secreto de un espacio no abre el webhook de otro. Sin secreto
-configurado, el webhook no atiende a nadie. Lo despacha el ciclo de fondo de `servir`
-(`leda.motor.fondo`).
+configurado, el webhook no atiende a nadie. La respuesta de cada update sale al atenderlo, por
+el bot que lo recibió (`recibir.Recepcion.despachar_ahora`); el ciclo de fondo de `servir`
+(`leda.motor.fondo`) despacha lo demás, y lo que no haya salido ahí.
 
 Es de la capa sólida (`tests/garantias/test_frontera_de_la_entrada.py`).
 """
@@ -150,7 +151,8 @@ def atender_update(slug: str, update: dict[str, Any]) -> dict[str, bool]:
         ws = str(fila["id"])
         recepcion = Recepcion(conn, ws, _ia_de(conn, ws), _reloj_de(conn, ws),
                               bot_id=bot_id_del_token(token), senal=_senal(token),
-                              imprimir=_imprimir, indicador=_indicador(token))
+                              imprimir=_imprimir, indicador=_indicador(token),
+                              transporte=_transporte_de(token))
         intentos = _INTENTOS.setdefault(slug, IntentosPorUpdate())
         if not recibir_update(recepcion, intentos, update):
             raise HTTPException(status_code=503, detail="no se pudo recibir; reentregar")
@@ -212,12 +214,21 @@ def _indicador(token: str):
     """El indicador de actividad de un turno (ADR 0011, decisión 2), por el bot que recibió el
     mensaje y con el cliente HTTP de la aplicación: el "escribiendo…", los tres puntos y la
     redacción en vivo. El motor sólo atiende chats privados, así que lleva borrador. La
-    respuesta sale con el despacho del servidor."""
+    respuesta sale al terminar de atender el update (`_transporte_de`) y reemplaza al borrador,
+    sin retiro."""
     from .despachador import mantener_chat_activo
 
     def abrir(chat_id: int):
         return mantener_chat_activo(token, chat_id, cliente=_cliente_http(), chat_type="private")
     return abrir
+
+
+def _transporte_de(token: str):
+    """Por dónde sale enseguida la respuesta de un update: el bot que lo recibió, con el
+    cliente HTTP de la aplicación. El mismo despacho del outbox que el de fondo."""
+    from .despachador import TransporteTelegram
+
+    return TransporteTelegram(token, cliente=_cliente_http())
 
 
 def _imprimir(linea: str) -> None:

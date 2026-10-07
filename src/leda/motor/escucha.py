@@ -18,8 +18,10 @@ escuchar:
   `leda_motor` con `python -m leda.motor.reloj`; se vuelve a leer en cada vuelta.
 - **El indicador de actividad** (`recibir.py`; ADR 0011, decisión 2): mientras corre el turno de
   alguien del equipo, el "escribiendo…", los tres puntos del borrador y el texto que la IA va
-  redactando (`despachador.mantener_chat_activo`). Apenas termina el turno y se retira el
-  borrador, la respuesta se despacha (decisión 1): no espera al resto del lote ni de la vuelta.
+  redactando (`despachador.mantener_chat_activo`). Apenas termina el turno, la respuesta se
+  despacha (decisión 1; `recibir.Recepcion.despachar_ahora`): no espera al resto del lote ni de
+  la vuelta, y el indicador no la demora (el mensaje reemplaza al borrador, sin retiro). La
+  consola dice cuánto tardó en salir desde que su texto estuvo listo.
 - **El ciclo** (`ciclo.py`): en cada vuelta, el despacho y los avisos a la administración; con
   `seguimiento` (el comando lo prende), la escalera y los avisos guardados una vez por minuto.
   Cada paso aislado: si uno se cae, un incidente y los demás siguen.
@@ -41,11 +43,9 @@ from typing import Any, Callable
 
 import httpx
 
-from ..calendario import Calendario
 from ..db import admin, espacio
-from ..despachador import Transporte, despachar, pedido_telegram, texto_error_seguro
+from ..despachador import Transporte, pedido_telegram, texto_error_seguro
 
-from .botones import ConOpciones
 from .ciclo import Ciclo
 from .ia import IA
 from .recibir import (INTENTOS_POR_UPDATE, AbrirIndicador, IntentosPorUpdate, Recepcion,
@@ -80,9 +80,8 @@ class Escucha(Recepcion):
                  imprimir: Callable[[str], None] = print,
                  indicador: AbrirIndicador | None = None) -> None:
         super().__init__(conn, workspace_id, ia, reloj, bot_id=None, senal=self._senal,
-                         imprimir=imprimir, indicador=indicador)
+                         imprimir=imprimir, indicador=indicador, transporte=transporte)
         self.bot = bot
-        self.transporte = transporte
         self.bot_admin = bot_admin
         self.transporte_admin = transporte_admin
         self.offset = 0
@@ -147,27 +146,12 @@ class Escucha(Recepcion):
             time.sleep(min(espera, 5))
             return 0
         for u in updates:
+            # Con el update recibido, su respuesta ya salió (`recibir_update`, que despacha
+            # enseguida): no espera al resto del lote ni a la vuelta.
             if not recibir_update(self, self.intentos, u):
                 break       # se vuelve a pedir desde éste en la vuelta siguiente
             self.offset = u["update_id"] + 1
-            self.despachar_ahora()
         return len(updates)
-
-    def despachar_ahora(self) -> None:
-        """La respuesta del update que se acaba de recibir sale enseguida (ADR 0011, decisión
-        1): el borrador ya se retiró, y esperar al resto del lote o a la vuelta (que puede estar
-        redactando avisos) deja a la persona sin nada en pantalla. Es el mismo despacho del
-        ciclo, idempotente; si falla, se deshace y sale en el despacho de esta misma vuelta,
-        que es el que registra el incidente si la caída sigue."""
-        try:
-            with espacio(self.conn, self.ws) as cur:
-                despachar(cur, self.ws, ConOpciones(self.transporte, cur),
-                          Calendario.desde_base(cur, self.ws), self.reloj.ahora())
-            self.conn.commit()
-        except Exception as e:  # noqa: BLE001 -- lo despacha la vuelta
-            self.conn.rollback()
-            self.imprimir(f"  (no se pudo despachar enseguida: {texto_error_seguro(e)}; sale "
-                          f"en esta vuelta)")
 
     def _senal(self, callback_query_id: str) -> None:
         self.bot.llamar("answerCallbackQuery", callback_query_id=callback_query_id)

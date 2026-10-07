@@ -24,9 +24,17 @@ sin texto, un desconocido) no se atiende.
 corre el turno de alguien del equipo (un mensaje o un toque), `indicador` muestra el
 "escribiendo…", los tres puntos del borrador y, cuando la IA redacta, el texto que va
 escribiendo (`despachador.mantener_chat_activo`). Se apaga al terminar el turno, salga lo que
-salga, y antes de que se despache la respuesta: el borrador se retira primero. Lo que Leda manda
+salga, y nunca demora la respuesta ("La función del escribiendo y el '…' es mostrar que Leda está
+activa, no generar demora en la respuesta"): cuando el turno dejó un mensaje confirmado en el
+outbox, se le avisa (`sigue_la_respuesta`) y el cierre no espera ni retira nada, porque ese
+mensaje reemplaza al borrador. Sólo un turno sin mensaje retira el borrador. Lo que Leda manda
 por su cuenta (avisos, escalera) no pasa por acá y nunca lo muestra. Una falla del indicador no
 cambia el turno.
+
+**La respuesta sale enseguida** (ADR 0011, decisión 1), por el escuchador y por el webhook: con
+`transporte`, apenas se recibió un update se despacha el outbox (`despachar_ahora`), el mismo
+despacho idempotente del ciclo. Lo que no salga ahí sale en el despacho siguiente. En la consola
+queda cuánto tardó la respuesta desde que su texto estuvo listo hasta que Telegram la aceptó.
 
 Si un turno se cae por algo que no es la IA, queda un incidente y la persona recibe el texto fijo
 de la falla (nunca en silencio). Si falla recibir un update (guardarlo, activar, atender un
@@ -44,19 +52,22 @@ respuesta tardía nunca salen los dos.
 
 from __future__ import annotations
 
+import time
 from collections.abc import Callable, Iterator
 from contextlib import AbstractContextManager, contextmanager
 from typing import Any
 
 from ..autoridad import Canal, Denegado, identificar, identificar_en_espacio
+from ..calendario import Calendario
 from ..db import admin, atar_al_entrante, espacio, registrar_auditoria
-from ..despachador import texto_error_seguro
+from ..despachador import Transporte, despachar, texto_error_seguro
 from ..entrada import clave_de_candado_del_mensaje, sql_respondido
 from ..incidentes import (ETAPA_TURNO_CONVERSACION, REFERENCIA_INBOUND_MESSAGE,
                           registrar_incidente)
 from ..onboarding import ActivacionInvalida, activar, bienvenida
 from ..salida import enqueue_outbox
 
+from .botones import ConOpciones
 from .ia import IA
 from .preguntas import token_de
 from .tiempo import Reloj
@@ -116,14 +127,47 @@ class IntentosPorUpdate:
         self.fallas.pop(update_id, None)
 
 
+class IndicadorDelTurno:
+    """Lo que el turno usa del indicador abierto: con qué mostrar la redacción en vivo
+    (`al_avanzar`, o `None` si no hay borrador) y el aviso de que le sigue un mensaje
+    (`sigue_la_respuesta`). Sin indicador, o con uno que no sabe de avisos, no hace nada."""
+
+    def __init__(self, abierto: Any = None) -> None:
+        self._abierto = abierto
+        self.al_avanzar: Callable[[str], None] | None = (
+            getattr(abierto, "actualizar_borrador", None)
+            if getattr(abierto, "admite_borrador", False) else None)
+
+    def sigue_la_respuesta(self) -> None:
+        avisar = getattr(self._abierto, "sigue_la_respuesta", None)
+        if avisar is not None:
+            avisar()
+
+
+class _ConHoraDeEnvio:
+    """El transporte del despacho inmediato, que anota cuándo Telegram aceptó el último
+    mensaje de cada chat (`time.monotonic`): es el final de la línea de la consola."""
+
+    def __init__(self, transporte: Transporte) -> None:
+        self.transporte = transporte
+        self.enviado_en: dict[int, float] = {}
+
+    def enviar(self, chat_id: int, texto: str, botones=None, **mas: Any) -> int:
+        tg_id = self.transporte.enviar(chat_id, texto, botones, **mas)
+        self.enviado_en[chat_id] = time.monotonic()
+        return tg_id
+
+
 class Recepcion:
     """Lo que se hace con un update del bot de un espacio, con la conexión, la IA y el reloj de
-    quien recibe. `bot_id` es el del bot que lo recibió; `senal`, el acuse de un toque."""
+    quien recibe. `bot_id` es el del bot que lo recibió; `senal`, el acuse de un toque;
+    `transporte`, por dónde sale enseguida la respuesta (`despachar_ahora`)."""
 
     def __init__(self, conn, workspace_id: str, ia: IA, reloj: Reloj, *,
                  bot_id: int | None = None, senal: Callable[[str], Any] | None = None,
                  imprimir: Callable[[str], None] = print,
-                 indicador: AbrirIndicador | None = None) -> None:
+                 indicador: AbrirIndicador | None = None,
+                 transporte: Transporte | None = None) -> None:
         self.conn = conn
         self.ws = workspace_id
         self.ia = ia
@@ -132,6 +176,10 @@ class Recepcion:
         self.senal = senal
         self.imprimir = imprimir
         self.indicador = indicador
+        self.transporte = transporte
+        # El chat y la hora (`time.monotonic`) en que estuvo listo el texto de la respuesta del
+        # último turno, hasta que `despachar_ahora` la mide.
+        self._listo: tuple[int, float] | None = None
 
     def procesar(self, u: dict[str, Any]) -> None:
         if u.get("callback_query"):
@@ -155,7 +203,7 @@ class Recepcion:
             return
         quien, entrante = guardado
         self.imprimir(f"  ← {quien.nombre}: {texto[:70]}")
-        with self._indicador_del_turno(chat_id) as al_avanzar:
+        with self._indicador_del_turno(chat_id) as indicador:
             try:
                 # El candado por mensaje se suelta con el commit, al terminar el turno.
                 with self.conn.transaction():
@@ -164,35 +212,47 @@ class Recepcion:
                                       "atender)")
                         return
                     resultado = procesar_turno(self.conn, quien, entrante, self.ia, self.reloj,
-                                               al_avanzar=al_avanzar)
+                                               al_avanzar=indicador.al_avanzar)
             except Exception as e:  # noqa: BLE001 -- nunca en silencio: incidente y texto fijo
                 self.conn.rollback()
                 self._turno_caido(quien, chat_id, e, entrante=entrante,
-                                  clave=f"motor:respuesta:{entrante}")
+                                  clave=f"motor:respuesta:{entrante}", indicador=indicador)
                 return
+            if not resultado.repetido:
+                # La respuesta ya está confirmada en el outbox: el indicador se apaga sin
+                # demorarla.
+                self._sigue_la_respuesta(indicador, chat_id, resultado.listo_en)
         if not resultado.repetido:
             self.imprimir(f"  → {resultado.texto[:70]}")
 
+    def _sigue_la_respuesta(self, indicador: IndicadorDelTurno, chat_id: int,
+                            listo_en: float | None) -> None:
+        """Al turno le sigue un mensaje, ya confirmado en el outbox: el indicador se apaga sin
+        esperar ni retirar nada, y `despachar_ahora` mide desde `listo_en`."""
+        self._listo = (chat_id, listo_en if listo_en is not None else time.monotonic())
+        try:
+            indicador.sigue_la_respuesta()
+        except Exception as e:  # noqa: BLE001 -- cosmético: el turno ya terminó
+            self.imprimir(f"  ! el indicador de actividad no recibió el aviso: "
+                          f"{texto_error_seguro(e)}")
+
     @contextmanager
-    def _indicador_del_turno(self, chat_id: int) -> Iterator[Callable[[str], None] | None]:
-        """El indicador mientras dura el turno; da con qué mostrar la redacción en vivo, o
-        `None` si no hay borrador donde mostrarla. Una falla al abrirlo o al cerrarlo queda en
-        la consola y el turno sigue igual: es cosmético (constitución §10). Lo que falle adentro
-        del turno sale tal cual, después de apagar el indicador."""
+    def _indicador_del_turno(self, chat_id: int) -> Iterator[IndicadorDelTurno]:
+        """El indicador mientras dura el turno (`IndicadorDelTurno`). Una falla al abrirlo o al
+        cerrarlo queda en la consola y el turno sigue igual: es cosmético (constitución §10).
+        Lo que falle adentro del turno sale tal cual, después de apagar el indicador."""
         if self.indicador is None:
-            yield None
+            yield IndicadorDelTurno()
             return
         try:
             contexto = self.indicador(chat_id)
             abierto = contexto.__enter__()
         except Exception as e:  # noqa: BLE001 -- sin indicador, el turno igual
             self.imprimir(f"  ! el indicador de actividad no arrancó: {texto_error_seguro(e)}")
-            yield None
+            yield IndicadorDelTurno()
             return
-        al_avanzar = (getattr(abierto, "actualizar_borrador", None)
-                      if getattr(abierto, "admite_borrador", False) else None)
         try:
-            yield al_avanzar
+            yield IndicadorDelTurno(abierto)
         except BaseException as e:
             self._apagar(contexto, e)
             raise
@@ -244,16 +304,19 @@ class Recepcion:
             self.imprimir("  (un toque de alguien que no es del equipo: no se atiende)")
             return
         self.imprimir(f"  ← {quien.nombre} tocó una opción")
-        with self._indicador_del_turno(chat["id"]) as al_avanzar:
+        with self._indicador_del_turno(chat["id"]) as indicador:
             try:
                 resultado = procesar_toque(self.conn, quien, token, chat["id"], self.ia,
-                                           self.reloj, al_avanzar=al_avanzar)
+                                           self.reloj, al_avanzar=indicador.al_avanzar)
                 self.conn.commit()
             except Exception as e:  # noqa: BLE001 -- nunca en silencio: incidente y texto fijo
                 self.conn.rollback()
                 self._turno_caido(quien, chat["id"], e,
-                                  clave=f"motor:toque_caido:{toque['id']}")
+                                  clave=f"motor:toque_caido:{toque['id']}",
+                                  indicador=indicador)
                 return
+            if resultado is not None and not resultado.repetido:
+                self._sigue_la_respuesta(indicador, chat["id"], resultado.listo_en)
         if resultado is not None and not resultado.repetido:
             self.imprimir(f"  → {resultado.texto[:70]}")
 
@@ -290,8 +353,13 @@ class Recepcion:
         return quien, str(fila["id"])
 
     def _turno_caido(self, quien, chat_id: int, error: Exception, *, clave: str,
-                     entrante: str | None = None) -> None:
-        """Un turno (de un mensaje o de un toque) que se cayó por algo que no es la IA."""
+                     entrante: str | None = None,
+                     indicador: IndicadorDelTurno | None = None) -> None:
+        """Un turno (de un mensaje o de un toque) que se cayó por algo que no es la IA. El
+        texto fijo, ya confirmado en el outbox, reemplaza al borrador como cualquier respuesta:
+        se le avisa al indicador (`_sigue_la_respuesta`). Si ni eso se pudo guardar, no sigue
+        ningún mensaje y el indicador retira el borrador."""
+        listo_en = time.monotonic()
         ahora = self.reloj.ahora()
         try:
             with espacio(self.conn, self.ws) as cur:
@@ -314,7 +382,38 @@ class Recepcion:
         except Exception as e:  # noqa: BLE001 -- la recepción sigue; queda en la consola
             self.conn.rollback()
             self.imprimir(f"  ! no se pudo registrar la falla: {texto_error_seguro(e)}")
+        else:
+            if indicador is not None:
+                self._sigue_la_respuesta(indicador, chat_id, listo_en)
         self.imprimir(f"  ! el turno se cayó: {type(error).__name__}")
+
+    def despachar_ahora(self) -> None:
+        """Lo que quedó en el outbox sale enseguida (ADR 0011, decisión 1): la respuesta del
+        update que se acaba de recibir no espera al resto del lote, a la vuelta del escuchador
+        ni al despacho de fondo del servidor. Es el mismo despacho del ciclo, idempotente (cada
+        fila se toma con `for update skip locked` y se marca antes de enviarse): si falla, se
+        deshace y sale en el despacho siguiente, que es el que registra el incidente si la
+        caída sigue. Sin `transporte`, no hace nada.
+
+        Si el update dejó una respuesta, imprime cuánto tardó en salir desde que su texto
+        estuvo listo; sin datos de la conversación."""
+        listo, self._listo = self._listo, None
+        if self.transporte is None:
+            return
+        salida = _ConHoraDeEnvio(self.transporte)
+        try:
+            with espacio(self.conn, self.ws) as cur:
+                despachar(cur, self.ws, ConOpciones(salida, cur),
+                          Calendario.desde_base(cur, self.ws), self.reloj.ahora())
+            self.conn.commit()
+        except Exception as e:  # noqa: BLE001 -- lo despacha la vuelta siguiente
+            self.conn.rollback()
+            self.imprimir(f"  (no se pudo despachar enseguida: {texto_error_seguro(e)}; sale "
+                          f"en el despacho siguiente)")
+            return
+        if listo is not None and listo[0] in salida.enviado_en:
+            ms = max(0, round((salida.enviado_en[listo[0]] - listo[1]) * 1000))
+            self.imprimir(f"  ⏱ respuesta: texto listo → enviado en {ms} ms")
 
     def _activar(self, texto: str, tg_user: int, chat_id: int, message_id: int) -> None:
         """El mecanismo de activación de siempre (`leda.onboarding`), con permisos de
@@ -410,6 +509,8 @@ def recibir_update(recepcion: Recepcion, intentos: IntentosPorUpdate,
             return False
         recepcion.dejar(u, e)
     intentos.olvidar(uid)
+    # La respuesta (o el texto fijo) sale ya, en el escuchador y en el webhook.
+    recepcion.despachar_ahora()
     return True
 
 

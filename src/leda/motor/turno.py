@@ -41,6 +41,7 @@ from __future__ import annotations
 
 import dataclasses
 import json
+import time
 import uuid
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
@@ -90,6 +91,9 @@ class ResultadoTurno:
     # `ya_no_va_a_pasar`. El atributo conserva su nombre: el corredor de las conversaciones lo
     # lee igual en los dos motores.
     ya_no_sale: list[dict[str, Any]] = dataclasses.field(default_factory=list)
+    # Cuándo estuvo listo el texto (`time.monotonic`): al volver la redacción, o al elegir el
+    # texto fijo. Desde ahí mide el escuchador cuánto tarda en salir la respuesta.
+    listo_en: float | None = None
 
 
 class IANoRespondio(RuntimeError):
@@ -166,6 +170,7 @@ def _turno(conn, cur, ctx: Contexto, ia: IA, reloj: Reloj,
             final = al_final_del_turno(ctx, hechos)
             texto = pedir_a_la_ia(lambda: no_vacio(_redactar(
                 ia, _pedido_de_redaccion(ctx, hechos, pregunta, final.ya_no_sale), al_avanzar)))
+            listo_en = time.monotonic()
     except IANoRespondio as falla:
         return _si_la_ia_falla(cur, ctx, ia, reloj, inicio, elegidas, falla, clave_respuesta,
                                option_id)
@@ -183,7 +188,7 @@ def _turno(conn, cur, ctx: Contexto, ia: IA, reloj: Reloj,
                     (turno, ctx.avisos_guardados))
     _responder(cur, ctx, texto, reloj.ahora(), ia.nombre, clave_respuesta)
     return ResultadoTurno(texto, elegidas, hechos, pregunta=pregunta,
-                          ya_no_sale=final.ya_no_sale)
+                          ya_no_sale=final.ya_no_sale, listo_en=listo_en)
 
 
 # --- (1) Lo que se lee ------------------------------------------------------------------
@@ -365,6 +370,7 @@ def _si_la_ia_falla(cur, ctx: Contexto, ia: IA, reloj: Reloj, inicio: float,
                     elegidas: list[Jugada] | None, falla: IANoRespondio, clave: str,
                     option_id: str | None) -> ResultadoTurno:
     error = str(falla)
+    listo_en = time.monotonic()
     ahora = reloj.ahora()
     registrar_incidente(
         cur, ctx.quien.workspace_id,
@@ -378,7 +384,7 @@ def _si_la_ia_falla(cur, ctx: Contexto, ia: IA, reloj: Reloj, inicio: float,
     _registrar_entrada(cur, ctx, ahora, elegidas, None, ia.nombre,
                        _ms(reloj.medir() - inicio), error, option_id)
     _responder(cur, ctx, TEXTO_SI_LA_IA_FALLA, ahora, None, clave)
-    return ResultadoTurno(TEXTO_SI_LA_IA_FALLA, [], [], error)
+    return ResultadoTurno(TEXTO_SI_LA_IA_FALLA, [], [], error, listo_en=listo_en)
 
 
 def _responder(cur, ctx: Contexto, texto: str, ahora: datetime, ia_nombre: str | None,
