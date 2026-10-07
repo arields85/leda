@@ -49,6 +49,9 @@ colgados y reintentar.
   (`230cf7e`). Los informes del rojo y del verde están en `tests/conversaciones/resultados/palabras-*`.
 - **Lo primero de la próxima sesión:**
   - `git status` y `git log --oneline -10`.
+  - El ayudante se frenó al cerrar la sesión, con la regresión completa a medio correr y anunciando que
+    iba a ajustar "los textos y la huella de las instrucciones". No dejó cambios sin commitear: primero
+    correr `pytest tests/motor tests/conversaciones` para confirmar que `230cf7e` quedó completo.
   - Si faltan los informes de la regresión completa con `--ia sol-suscripcion` (19 conversaciones por 5),
     correrla. Si están sin commitear, commitearlos.
   - Revisar con RDD los commits `098bc80` a `230cf7e` por tramos, que todavía no tienen revisión.
