@@ -259,6 +259,12 @@ Informes en `tests/conversaciones/resultados/e3-8-*.md`.
 - **Gasto en OpenRouter:** unos USD 3,9. El gasto acumulado desde la Etapa 2 es de unos USD 27 (el techo
   de USD 30 era de esa etapa), y quedan unos USD 2,3 de crédito.
 
+**Las fechas a más de dos semanas (decisión del usuario, 2026-10-07).** La lista de días con su nombre
+que recibe la IA pasa de 14 a 56 días (ocho semanas): es la regla 9m, "los días de la semana los da el
+código", aplicada más lejos (`aec4b0e`, revisión `review-2c521db7ea334a0b`). La prueba nueva falló
+primero. Con GPT-6 sol, la 05 y la 08 dieron 5 de 5 cada una. La regresión completa queda pendiente
+hasta cargar crédito en OpenRouter.
+
 **Conclusión vigente (2026-10-07): se queda GPT-6 sol.** Es el único que no hace efectos de más y el más
 rápido de los que entienden bien; cuesta unos USD 0,034 por conversación de prueba. Luna y luna pro no
 alcanzan con el motor nuevo, igual que en la ronda 1. Los flash de `nan` sin razonar son 15 veces más

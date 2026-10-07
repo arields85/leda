@@ -43,8 +43,8 @@ aceptó el ADR 0018 el mismo día.
   - **E3-8, hecho:** la regresión con GPT-6 sol (89 de 90, garantías 90 de 90) y la comparación de cinco IA
     (bitácora de flujos). Se queda sol.
   - **Decisiones del usuario para cerrar M3:**
-    1. El mecanismo de las fechas a más de dos semanas. Es la misma falla en dos rondas, un disparador de
-       parar.
+    1. Las fechas a más de dos semanas: hecho; la lista se amplió a ocho semanas (2026-10-07). La regresión
+       completa espera crédito en OpenRouter.
     2. Autorizar que se recree `leda_motor` para su prueba por Telegram. La guía está en
        `odd/tasks/motor-definitivo.md`, sección 4b.
   - Decisiones del usuario: los circuitos 5, 7, 8 y la persecución 3a, después de M3; la plataforma web,

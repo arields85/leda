@@ -383,9 +383,9 @@ plataforma cuando Leda tenga una base más completa.
 - **Parámetros por modelo** para el corredor y para producción: `444de7c`, `9bf64f2` y `a732017`, con las
   revisiones `review-20540c248f5c00d5`, `review-bae1ec2c67963df8` y `review-b54c532f98b721d7`.
 - **Falta:**
-  1. Decidir el mecanismo de las fechas a más de dos semanas. La IA sólo recibe los nombres de los días de
-     las próximas 14 (`DIAS_PROXIMOS`) y pierde fechas más lejanas: es la misma clase de falla en dos
-     rondas, un disparador de parar.
+  1. ~~El mecanismo de las fechas a más de dos semanas~~. Hecho: el usuario eligió ampliar la lista a ocho
+     semanas (`aec4b0e`). Con sol, la 05 y la 08 dieron 5 de 5. Falta la regresión completa, que
+     espera crédito en OpenRouter.
   2. Recrear `leda_motor` y hacer la prueba por Telegram del usuario (M3); recrear la base necesita su
      autorización.
   3. Borrar `prueba_chica/` después de M3.
