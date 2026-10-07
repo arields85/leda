@@ -10,13 +10,16 @@ Portadas de `prueba_chica/test_escuchar.py` (E3-7). Lo que se hace con cada upda
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from contextlib import contextmanager
+from dataclasses import dataclass, field
+from types import SimpleNamespace
 
 import psycopg
 import pytest
 
 from leda.db import admin, espacio
 from leda.despachador import TransporteDePrueba
+from leda.motor import recibir
 from leda.motor.escucha import BotTelegram, Escucha
 from leda.motor.ia import IAGuionada, Jugada
 from leda.motor.tiempo import RelojFijo
@@ -49,7 +52,7 @@ class Montaje:
 
 
 def _montar(conn, mundo, ia, *, webhook_admin: str = "",
-            imprimir=lambda *_: None) -> Montaje:
+            imprimir=lambda *_: None, indicador=None) -> Montaje:
     telegram, telegram_admin = TelegramFalso(), TelegramFalso(webhook=webhook_admin)
     salida, salida_admin = TransporteDePrueba(), TransporteDePrueba()
     escucha = Escucha(
@@ -57,7 +60,7 @@ def _montar(conn, mundo, ia, *, webhook_admin: str = "",
         bot=BotTelegram("token-falso", telegram.cliente()),
         transporte=salida,
         bot_admin=BotTelegram("token-admin-falso", telegram_admin.cliente()),
-        transporte_admin=salida_admin, imprimir=imprimir)
+        transporte_admin=salida_admin, imprimir=imprimir, indicador=indicador)
     escucha.preparar()
     return Montaje(escucha, telegram, telegram_admin, salida, salida_admin)
 
@@ -426,3 +429,153 @@ def test_lo_que_leda_manda_por_su_cuenta_nunca_lleva_botones(conn, mundo):
     m.escucha.una_vuelta(espera=0)
 
     assert [(e.texto, e.botones) for e in m.salida.enviados][1] == ("Un aviso.", [])
+
+
+# --- El indicador de actividad (pedido del usuario, 2026-10-07; ADR 0011, decisión 2) ---------
+
+@dataclass
+class IndicadorFalso:
+    """El indicador de un turno, de mentira: guarda en qué chat se abrió, el texto que la
+    redacción le fue pasando y cuántos mensajes habían salido cuando se apagó. `falla` hace que
+    falle al abrirse o al cerrarse."""
+
+    salida: TransporteDePrueba
+    falla: str | None = None
+    abiertos: list[int] = field(default_factory=list)
+    textos: list[str] = field(default_factory=list)
+    cerrados: list[tuple[int, int]] = field(default_factory=list)
+
+    def __call__(self, chat_id: int):
+        return self._abrir(chat_id)
+
+    @contextmanager
+    def _abrir(self, chat_id: int):
+        if self.falla == "al_abrir":
+            raise ConnectionError("el indicador no arranca")
+        self.abiertos.append(chat_id)
+        try:
+            yield SimpleNamespace(admite_borrador=True, actualizar_borrador=self.textos.append)
+        finally:
+            self.cerrados.append((chat_id, len(self.salida.enviados)))
+            if self.falla == "al_cerrar":
+                raise ConnectionError("el indicador no se apaga")
+
+
+def _con_indicador(conn, mundo, ia, **opciones) -> tuple[Montaje, IndicadorFalso]:
+    salida_previa = TransporteDePrueba()
+    indicador = IndicadorFalso(salida_previa, **opciones)
+    m = _montar(conn, mundo, ia, indicador=indicador)
+    indicador.salida = m.salida
+    return m, indicador
+
+
+def test_mientras_corre_el_turno_se_ve_el_indicador_y_se_apaga_antes_de_la_respuesta(conn,
+                                                                                    mundo):
+    ia = IAGuionada(jugadas=[[Jugada("anotar_inicio", {"tarea": "T1"})]],
+                    redacciones=["Anoté que arrancaste Revisar el tablero."])
+    m, indicador = _con_indicador(conn, mundo, ia)
+    m.telegram.lotes = [[_mensaje(2000, "arranqué")]]
+
+    m.escucha.una_vuelta(espera=0)
+
+    assert indicador.abiertos == [MARCOS]
+    # Se apagó con el turno, antes de que saliera la respuesta (el borrador se retira primero).
+    assert indicador.cerrados == [(MARCOS, 0)]
+    # La redacción se vio en vivo; lo que sale es el texto del outbox.
+    assert indicador.textos == ["Anoté que arrancaste Revisar el tablero."]
+    assert [e.texto for e in m.salida.enviados] == ["Anoté que arrancaste Revisar el tablero."]
+
+
+def test_la_respuesta_sale_apenas_termina_su_turno_sin_esperar_al_resto_del_lote(conn, mundo):
+    """Despacho inmediato (ADR 0011, decisión 1): con el borrador retirado, la respuesta no
+    espera al siguiente mensaje del lote ni al resto de la vuelta."""
+    ia = IAGuionada(jugadas=[[], []], redacciones=["Primera.", "Segunda."])
+    m, indicador = _con_indicador(conn, mundo, ia)
+    m.telegram.lotes = [[_mensaje(2100, "hola"), _mensaje(2101, "¿seguís?")]]
+
+    m.escucha.una_vuelta(espera=0)
+
+    # Cuando se apagó el indicador del segundo turno, la primera respuesta ya había salido.
+    assert indicador.cerrados == [(MARCOS, 0), (MARCOS, 1)]
+    assert [e.texto for e in m.salida.enviados] == ["Primera.", "Segunda."]
+
+
+def test_si_la_ia_no_responde_el_indicador_se_apaga_y_sale_el_texto_fijo(conn, mundo):
+    ia = IAGuionada(jugadas=[[]], redacciones=[TimeoutError("uno"), TimeoutError("dos")])
+    m, indicador = _con_indicador(conn, mundo, ia)
+    m.telegram.lotes = [[_mensaje(2200, "hola")]]
+
+    m.escucha.una_vuelta(espera=0)
+
+    assert indicador.cerrados == [(MARCOS, 0)]
+    assert [e.texto for e in m.salida.enviados] == [TEXTO_SI_LA_IA_FALLA]
+
+
+def test_si_el_turno_se_cae_el_indicador_se_apaga_y_sale_el_texto_fijo(conn, mundo,
+                                                                       monkeypatch):
+    def se_cae(*_, **__):
+        raise RuntimeError("se cayó el turno")
+
+    monkeypatch.setattr(recibir, "procesar_turno", se_cae)
+    m, indicador = _con_indicador(conn, mundo, IAGuionada())
+    m.telegram.lotes = [[_mensaje(2300, "hola")]]
+
+    m.escucha.una_vuelta(espera=0)
+
+    assert indicador.cerrados == [(MARCOS, 0)]
+    assert [e.texto for e in m.salida.enviados] == [TEXTO_SI_LA_IA_FALLA]
+
+
+@pytest.mark.parametrize("falla", ["al_abrir", "al_cerrar"])
+def test_un_indicador_que_falla_no_cambia_el_turno(conn, mundo, falla):
+    ia = IAGuionada(jugadas=[[]], redacciones=["Hola, Marcos."])
+    m, indicador = _con_indicador(conn, mundo, ia, falla=falla)
+    m.telegram.lotes = [[_mensaje(2400, "hola")]]
+
+    m.escucha.una_vuelta(espera=0)
+
+    assert [e.texto for e in m.salida.enviados] == ["Hola, Marcos."]
+    assert cuantas(conn, "incident") == 0
+    assert m.escucha.offset == 2401
+
+
+def test_un_toque_tambien_muestra_el_indicador(conn, mundo):
+    nueva_tarea(conn, mundo, "Probar las comunicaciones")
+    ia = IAGuionada(jugadas=[[Jugada("anotar_inicio", {})]],
+                    redacciones=["¿Cuál arrancaste?", "Anotado."])
+    m, indicador = _con_indicador(conn, mundo, ia)
+    m.telegram.lotes = [[_mensaje(2500, "hoy arranque")]]
+    m.escucha.una_vuelta(espera=0)
+    token = uno(conn, "select token from conversation_option where orden = 2")["token"]
+
+    m.telegram.lotes = [[_toque(2501, f"m:{token}")]]
+    m.escucha.una_vuelta(espera=0)
+
+    assert indicador.abiertos == [MARCOS, MARCOS]
+    assert indicador.cerrados == [(MARCOS, 0), (MARCOS, 1)]
+    assert indicador.textos == ["¿Cuál arrancaste?", "Anotado."]
+
+
+def test_lo_que_leda_manda_por_su_cuenta_no_muestra_el_indicador(conn, mundo):
+    """Ni los avisos ni la escalera: el indicador es sólo para responder a alguien."""
+    m, indicador = _con_indicador(conn, mundo, IAGuionada())
+    with espacio(conn, mundo["id"]) as cur:
+        enqueue_outbox(cur, workspace_id=mundo["id"], chat_id=MARCOS, text="Un aviso.",
+                       dedupe_key="aviso-sin-indicador", message_type="informativo",
+                       recipient_membership_id=mundo["personas"]["Marcos"]["membership_id"],
+                       scheduled_for=AHORA)
+    conn.commit()
+
+    m.escucha.una_vuelta(espera=0)
+
+    assert [e.texto for e in m.salida.enviados] == ["Un aviso."]
+    assert indicador.abiertos == []
+
+
+def test_a_quien_no_es_del_equipo_no_se_le_muestra_el_indicador(conn, mundo):
+    m, indicador = _con_indicador(conn, mundo, IAGuionada())
+    m.telegram.lotes = [[_mensaje(2600, "hola", de=99999)]]
+
+    m.escucha.una_vuelta(espera=0)
+
+    assert indicador.abiertos == [] and m.salida.enviados == []

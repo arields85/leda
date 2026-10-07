@@ -287,3 +287,62 @@ def test_hoy_es_la_fecha_del_espacio_y_no_la_de_utc(conn, mundo, escribe):
 
     assert ia.pedidos_de_jugadas[0]["hoy"] == "2026-10-05"
     assert ia.pedidos_de_redaccion[0]["hoy"] == "2026-10-05"
+
+
+# --- La respuesta que se ve mientras la IA la escribe (pedido del usuario, 2026-10-07) -------
+
+class IASinAvance:
+    """Una IA de antes, que no sabe del avance: el turno nunca se lo pide si nadie lo mira."""
+
+    nombre = "sin_avance"
+
+    def elegir_jugadas(self, situacion):
+        return []
+
+    def redactar(self, pedido):
+        return "Hola, Marcos."
+
+
+class IAQueAvanza:
+    """Una IA que escribe en vivo: cuenta qué pedido recibió el avance y lo usa al redactar."""
+
+    nombre = "en_vivo"
+
+    def __init__(self) -> None:
+        self.avance_al_elegir: list[bool] = []
+        self.avance_al_redactar: list[bool] = []
+
+    def elegir_jugadas(self, situacion, **opciones):
+        self.avance_al_elegir.append(bool(opciones))
+        return []
+
+    def redactar(self, pedido, al_avanzar=None):
+        self.avance_al_redactar.append(al_avanzar is not None)
+        if al_avanzar is not None:
+            for parcial in ("Hola", "Hola, Mar", "Hola, Marcos."):
+                al_avanzar(parcial)
+        return "Hola, Marcos."
+
+
+def test_solo_la_redaccion_se_ve_en_vivo_y_nunca_la_eleccion(conn, mundo, escribe):
+    quien, entrante = escribe("Marcos", "hola")
+    ia, vistos = IAQueAvanza(), []
+
+    resultado = procesar_turno(conn, quien, entrante, ia, RelojFijo(AHORA),
+                               al_avanzar=vistos.append)
+    conn.commit()
+
+    assert ia.avance_al_elegir == [False] and ia.avance_al_redactar == [True]
+    assert vistos == ["Hola", "Hola, Mar", "Hola, Marcos."]
+    # Lo que sale es el texto del outbox, no lo que se vio en vivo.
+    assert resultado.texto == "Hola, Marcos."
+    assert [s["cuerpo"] for s in _salidas(conn)] == ["Hola, Marcos."]
+
+
+def test_sin_quien_mire_la_ia_redacta_como_siempre(conn, mundo, escribe):
+    """Las IA de las pruebas y del corredor no reciben el avance: el turno no cambia."""
+    quien, entrante = escribe("Marcos", "hola")
+
+    resultado = procesar_turno(conn, quien, entrante, IASinAvance(), RelojFijo(AHORA))
+
+    assert resultado.texto == "Hola, Marcos." and resultado.error is None

@@ -400,6 +400,34 @@ def test_la_redaccion_lee_el_texto_del_mensaje(tmp_path):
     assert instrucciones["content"][0]["text"].startswith(INSTRUCCIONES_REDACCION)
 
 
+def test_la_redaccion_avisa_el_texto_a_medida_que_llega(tmp_path):
+    """La respuesta en vivo (pedido del usuario, 2026-10-07): cada parte que llega se avisa con
+    todo lo escrito hasta ahí; lo que vale al final es el texto entero."""
+    codex = Codex([sse({"type": "response.output_text.delta", "delta": "Anoté "},
+                       {"type": "response.output_text.delta", "delta": "el 27."},
+                       {"type": "response.output_item.done", "item": mensaje("Anoté el 27.")},
+                       completada([]))])
+    vistos: list[str] = []
+
+    texto = ia_por_suscripcion(tmp_path, codex).redactar({"hoy": "2026-10-20"},
+                                                          al_avanzar=vistos.append)
+
+    assert vistos == ["Anoté ", "Anoté el 27."]
+    assert texto == "Anoté el 27."
+
+
+def test_un_aviso_del_avance_que_falla_no_cambia_la_respuesta(tmp_path):
+    codex = Codex([sse({"type": "response.output_text.delta", "delta": "Hola, "},
+                       {"type": "response.output_text.delta", "delta": "Marcos."},
+                       completada([]))])
+
+    def se_rompe(_texto):
+        raise RuntimeError("el borrador no anda")
+
+    assert ia_por_suscripcion(tmp_path, codex).redactar(
+        {"hoy": "2026-10-20"}, al_avanzar=se_rompe) == "Hola, Marcos."
+
+
 def test_sin_el_mensaje_entero_vale_el_texto_que_llego_por_partes(tmp_path):
     codex = Codex([sse({"type": "response.output_text.delta", "delta": "Hola, "},
                        {"type": "response.output_text.delta", "delta": "Marcos."},

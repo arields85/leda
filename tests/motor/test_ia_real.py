@@ -236,6 +236,19 @@ def test_la_redaccion_recibe_sus_instrucciones_el_tono_y_el_pedido():
     assert json.loads(usuario["content"])["hechos"][0]["jugada"] == "anotar_que_arranco"
 
 
+def test_un_proveedor_sin_flujo_no_avisa_ningun_avance_y_redacta_igual():
+    """Por OpenRouter la respuesta llega entera: sin texto en vivo, quedan los tres puntos del
+    borrador hasta que sale el mensaje (pedido del usuario, 2026-10-07)."""
+    proveedor = ProveedorFalso([respuesta_de_texto("Listo, quedó anotado.")])
+    vistos: list[str] = []
+
+    texto = ia_real_falsa(proveedor).redactar({"hoy": "2026-10-20", "hechos": []},
+                                              al_avanzar=vistos.append)
+
+    assert texto == "Listo, quedó anotado." and vistos == []
+    assert "stream" not in proveedor.pedidos[0]["cuerpo"]
+
+
 def test_las_instrucciones_describen_el_trabajo_y_el_marcador():
     """Las instrucciones nombran el marcador de lo que se dice sólo si se pregunta (9g) y
     la opción de lo que no está en la lista; nunca un nombre de modelo ni de proveedor."""
