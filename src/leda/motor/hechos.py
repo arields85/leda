@@ -363,6 +363,17 @@ SIGNIFICADOS: Mapping[str, str] = {
 }
 
 
+# Los conceptos de la cocina: un nombre que lleva uno de éstos, o que es el de una jugada
+# (`FICHAS`), nunca le llega a la IA que redacta.
+CONCEPTOS_DE_LA_COCINA = ("prevision", "comprometid", "referente", "dependiente", "escal",
+                          "aviso_previo", "reencuadre", "repregunta", "de_estado", "el_estado")
+
+
+def es_un_concepto_de_la_cocina(nombre: str) -> bool:
+    """Si un nombre nombra un concepto de la cocina: lleva uno o es el de una jugada."""
+    return nombre in FICHAS or any(c in nombre for c in CONCEPTOS_DE_LA_COCINA)
+
+
 # --- Los días de las fechas (tercera vuelta de ajuste, usuario, 2026-10-06) ------------------
 #
 # Ronda 2: la IA calculó mal el día de la semana o el "mañana" desde una fecha AAAA-MM-DD. El
