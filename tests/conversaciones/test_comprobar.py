@@ -163,8 +163,8 @@ BIEN_CON_PREGUNTA = f"""Anoté lo que me contaste.
 
 📋 {COM}
 ✏️ La terminás el mié 4/11: esperás el switch nuevo.
+✏️ Ismael será notificado hoy.
 ⚠️ Vence el vie 30/10: serían 3 días hábiles de atraso.
-✏️ Ismael se entera hoy.
 
 ¿Quién te trae el switch?"""
 
@@ -178,8 +178,8 @@ No hace falta que respondas."""
 
 BIEN_LISTA = f"""Tenés dos tareas pendientes.
 
-📅 {PLC}: sin empezar, vence vie 23/10
-📅 {COM}: en curso, vence vie 30/10
+🗓️ {PLC}: sin empezar, vence vie 23/10
+🗓️ {COM}: en curso, vence vie 30/10
 
 Conviene empezar por la del PLC, que vence primero."""
 
@@ -203,6 +203,110 @@ def test_cada_regla_del_formato_se_reconoce_con_su_renglon():
         cp.RENGLON_CORTO}
     assert _reglas(BIEN_LISTA.replace("vence vie 23/10", "vence el viernes 23 de octubre")) == {
         cp.FECHA_CORTA}
+
+
+# --- Tercera vuelta (usuario, 2026-10-07, después de la segunda prueba por Telegram) ------------
+
+def test_la_marca_de_una_tarea_con_su_vencimiento_es_el_calendario_de_espiral():
+    """Telegram dibuja 📅 con una fecha fija, que confunde al lado de un vencimiento: la marca de
+    la lista es 🗓️, con o sin el selector de emoji que la sigue."""
+    assert _reglas(BIEN_LISTA.replace("🗓️", "🗓")) == set()
+    con_la_vieja = BIEN_LISTA.replace("🗓️", "📅")
+    assert cp.MARCA_DE_LA_LISTA in _reglas(con_la_vieja)
+    assert dict(cp.fallas_de_formato(con_la_vieja, TITULOS))[cp.MARCA_DE_LA_LISTA] == (
+        f"📅 {PLC}: sin empezar, vence vie 23/10")
+
+
+# Lo que escribió la IA en la prueba por Telegram (datos ficticios): lo anotado antes que la tarea.
+REAL_ANOTADO_ANTES = f"""Quedó anotado.
+
+✏️ Anoté que estás trabado: te falta el cable de programación.
+📋 {PLC}
+⚠️ Vence el vie 23/10.
+
+¿Quién te puede conseguir el cable?"""
+
+
+# El aviso a Ismael que escribió la IA en la prueba por Telegram (datos ficticios): quién dijo qué
+# antes de la tarea, y una marca en el medio del renglón.
+REAL_AVISO_A_ISMAEL_DESORDENADO = f"""Marcos dijo que terminará esta tarea el vie 23/10:
+📋 {COM}
+
+Vence el vie 16/10. ⚠️ Si la termina el día que dijo, tendrá 5 días hábiles de atraso.
+
+No hace falta responder."""
+# Lo que pidió el usuario en su lugar.
+AVISO_A_ISMAEL_ORDENADO = f"""📋 {COM}
+Marcos dijo que terminará esta tarea el vie 23/10.
+
+Vence el vie 16/10.
+
+⚠️ Si la termina el día que dijo, tendrá 5 días hábiles de atraso.
+
+No hace falta responder."""
+
+
+def test_en_un_bloque_con_una_tarea_su_renglon_es_el_primero():
+    """Usuario, 2026-10-07: todo lo de la tarea, también quién dijo qué, va debajo de su renglón
+    con 📋. Un bloque sin 📋 no tiene orden que cumplir."""
+    assert _reglas(AVISO_A_ISMAEL_ORDENADO) == set()
+    reales = dict(cp.fallas_de_formato(REAL_AVISO_A_ISMAEL_DESORDENADO, TITULOS))
+    assert set(reales) == {cp.TAREA_PRIMERO, cp.MARCA_AL_PRINCIPIO}
+    assert reales[cp.TAREA_PRIMERO] == "Marcos dijo que terminará esta tarea el vie 23/10:"
+    assert reales[cp.MARCA_AL_PRINCIPIO] == (
+        "Vence el vie 16/10. ⚠️ Si la termina el día que dijo, tendrá 5 días hábiles de atraso.")
+
+
+def test_una_marca_va_solo_al_principio_de_su_renglon():
+    """Usuario, 2026-10-07: 📋 🗓️ ✏️ ⚠️ abren su renglón; nunca van en el medio, tampoco una
+    segunda marca después de la que lo abre."""
+    for renglon in (f"Arrancaste 📋 {PLC}", "Quedó anotado ✏️ la arrancaste hoy.",
+                    "⚠️ Vence hoy. ⚠️ Son 3 días de atraso.", "Vence vie 23/10 🗓️",
+                    "✏ La arrancaste hoy, ⚠ vence mañana."):
+        assert cp.MARCA_AL_PRINCIPIO in _reglas(renglon), renglon
+    for renglon in ("⚠️ Vence hoy.", "⚠ Vence hoy.", "✏️ La arrancaste hoy.", f"📋 {PLC}"):
+        assert _reglas(renglon) == set(), renglon
+
+
+def test_en_cada_bloque_la_tarea_va_primero_y_despues_lo_anotado():
+    assert _reglas(REAL_ANOTADO_ANTES) == {cp.TAREA_PRIMERO}
+    assert dict(cp.fallas_de_formato(REAL_ANOTADO_ANTES, TITULOS))[cp.TAREA_PRIMERO] == (
+        "✏️ Anoté que estás trabado: te falta el cable de programación.")
+    # Una consecuencia antes de la tarea, también; con o sin el selector de emoji.
+    assert _reglas(BIEN_SIN_RESPUESTA.replace(
+        f"📋 {COM}\n✏️ La termina el mié 4/11: espera el switch nuevo.\n⚠",
+        f"⚠ Vencía el vie 30/10.\n📋 {COM}\n✏️ La termina el mié 4/11: espera el switch nuevo.\n⚠"
+    )) == {cp.TAREA_PRIMERO}
+    # Con la tarea primero, bien; un bloque sin tarea puede llevar lo anotado solo.
+    ordenado = REAL_ANOTADO_ANTES.replace(
+        f"✏️ Anoté que estás trabado: te falta el cable de programación.\n📋 {PLC}",
+        f"📋 {PLC}\n✏️ Anoté que estás trabado: te falta el cable de programación.")
+    assert _reglas(ordenado) == set()
+    assert _reglas("✏️ Quedó anotado.\n\n📋 " + PLC + "\n✏️ La arrancaste hoy.") == set()
+    # Lo que va debajo de una tarea no cuenta contra la siguiente del mismo bloque.
+    assert _reglas(f"📋 {PLC}\n✏️ La arrancaste hoy.\n📋 {COM}\n✏️ La terminás el mié 4/11."
+                   ) == set()
+
+
+# El aviso de escalamiento que escribió la IA en la prueba por Telegram (datos ficticios).
+REAL_AVISARE = "Si no respondés, le avisaré a Ismael sobre las dos."
+
+
+def test_cuando_otra_persona_se_entera_se_dice_en_pasiva_sobre_ella():
+    """Usuario, 2026-10-07: "Ismael será notificado", "Ismael fue notificado"; nunca Leda como
+    quien le avisa a otro. Lo que la persona que lee va a saber (te aviso) no es un tercero."""
+    assert _reglas(REAL_AVISARE) == {cp.NOTIFICADO_EN_PASIVA}
+    for activa in ("Le voy a avisar a Ismael hoy.", "Voy a avisarle a Ismael hoy.",
+                   "Ya le avisé a Ismael.", "Le aviso a Ismael hoy.",
+                   "Les avisaré a los dos.", "Le notifiqué a Ismael el cambio.",
+                   "Avisé a Ismael.", "Voy a notificar a Ismael hoy.",
+                   "Le acabo de avisar a Ismael."):
+        assert _reglas(activa) == {cp.NOTIFICADO_EN_PASIVA}, activa
+    for bien in ("Ismael será notificado sobre las dos.", "Ismael fue notificado hoy.",
+                 "Ismael se va a enterar hoy.", "Te aviso cuando responda.",
+                 "El aviso a Ismael sale hoy.", "Te voy a avisar el vie 23/10.",
+                 "Te voy a avisar a las 10.", "¿Querés que le avise a Ismael?"):
+        assert _reglas(bien) == set(), bien
 
 
 def test_el_cierre_va_solo_y_al_final():

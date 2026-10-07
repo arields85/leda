@@ -451,22 +451,36 @@ def comprobar_avisos_en_estado(c: Comprobacion, esperados: list[dict], f: dict[s
 #
 # Lo que pidió el usuario después de verlo en Telegram (`odd/tasks/motor-definitivo.md`, "El
 # formato, segunda vuelta"): sin negrita; un renglón por idea; cada tarea en su renglón, con 📋
-# (su nombre solo) o con 📅 (con su vencimiento, en una lista); el nombre completo de una tarea,
+# (su nombre solo) o con 🗓️ (con su vencimiento, en una lista); el nombre completo de una tarea,
 # una sola vez por mensaje; fechas cortas; y el cierre (la pregunta, o que no hace falta
-# responder) solo en su renglón, aparte y al final. Se mide solo, en cada mensaje de una corrida,
-# para no depender de leer las transcripciones. Se comprueba sobre el texto que escribió la IA,
-# sin el saludo del día que agrega el sistema. Lo que no se puede medir sin juzgar el texto (que
-# el primer renglón diga lo que pasó, que una idea no se parta) lo sigue leyendo una persona.
+# responder) solo en su renglón, aparte y al final. Tercera vuelta (usuario, 2026-10-07, después
+# de la segunda prueba por Telegram): 🗓️ en vez de 📅, que Telegram dibuja con una fecha fija; en
+# un bloque con una tarea, su renglón con 📋 es el primero y todo lo de la tarea va debajo; una
+# marca va sólo al principio de su renglón; y cuando otra persona se entera, se dice en pasiva
+# sobre ella, nunca con Leda como quien le avisa. Se
+# mide solo, en cada mensaje de una corrida, para no depender de leer las transcripciones. Se
+# comprueba sobre el texto que escribió la IA, sin el saludo del día que agrega el sistema. Lo
+# que no se puede medir sin juzgar el texto (que el primer renglón diga lo que pasó, que una idea
+# no se parta) lo sigue leyendo una persona.
 #
 # El tope del renglón: 140 caracteres son tres o cuatro renglones en la pantalla de un teléfono,
 # lo que ocupa una idea con el nombre completo de una tarea y su fecha; los párrafos de la
 # primera vuelta pasaban de 200.
 RENGLON_MAXIMO = 140
-MARCAS_DE_TAREA = ("📋", "📅")
+# Las marcas se reconocen sin el selector de emoji (U+FE0F) que puede seguirlas: 🗓️ y 🗓 son la
+# misma marca.
 MARCA_DE_LA_TAREA_SOLA = "📋"
+MARCA_DEL_VENCIMIENTO = "\U0001F5D3"             # 🗓, sin el selector
+MARCA_VIEJA_DEL_VENCIMIENTO = "📅"
+MARCAS_DE_TAREA = (MARCA_DE_LA_TAREA_SOLA, MARCA_DEL_VENCIMIENTO)
+MARCA_DE_LO_ANOTADO = "✏"                   # ✏, sin el selector
+MARCA_DE_LA_CONSECUENCIA = "⚠"              # ⚠, sin el selector
+# Todas las marcas, también la vieja: cada una va sólo al principio de su renglón.
+MARCAS = (MARCA_DE_LA_TAREA_SOLA, MARCA_DEL_VENCIMIENTO, MARCA_DE_LO_ANOTADO,
+          MARCA_DE_LA_CONSECUENCIA, MARCA_VIEJA_DEL_VENCIMIENTO)
 
 SIN_NEGRITA = "sin negrita (**)"
-TAREA_EN_SU_RENGLON = "el nombre completo de una tarea, en un renglón que empieza con 📋 o 📅"
+TAREA_EN_SU_RENGLON = "el nombre completo de una tarea, en un renglón que empieza con 📋 o 🗓️"
 TAREA_SOLA = "un renglón con 📋 lleva sólo el nombre de la tarea"
 TAREA_UNA_VEZ = "el nombre completo de una tarea, una sola vez por mensaje"
 RENGLON_CORTO = f"ningún renglón de más de {RENGLON_MAXIMO} caracteres"
@@ -474,6 +488,12 @@ FECHA_CORTA = "las fechas, cortas: nunca el día con el nombre del mes"
 PREGUNTA_AL_FINAL = "la pregunta, una sola y en el último renglón"
 NO_HACE_FALTA_AL_FINAL = "que no hace falta responder, en el último renglón"
 CIERRE_APARTE = "el cierre, solo en su renglón y con un renglón en blanco antes"
+MARCA_DE_LA_LISTA = "una tarea con su vencimiento, con 🗓️: nunca 📅"
+TAREA_PRIMERO = ("en un bloque con una tarea, su renglón con 📋 es el primero: todo lo de la "
+                 "tarea va debajo")
+MARCA_AL_PRINCIPIO = "una marca (📋 🗓️ ✏️ ⚠️) sólo al principio de su renglón, nunca en el medio"
+NOTIFICADO_EN_PASIVA = ("cuando otra persona se entera, dicho en pasiva sobre ella: nunca que "
+                        "Leda le avisa o la notifica")
 
 _MESES = ("enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|"
           "noviembre|diciembre")
@@ -483,6 +503,29 @@ _FECHA_LARGA = re.compile(rf"\b\d{{1,2}} de ({_MESES})\b", re.IGNORECASE)
 _NO_HACE_FALTA = re.compile(r"\b(no hace falta|no hay que|no necesit\w*|sin necesidad de)\b"
                             r"[^.?!\n]*\b(respond|contest)", re.IGNORECASE)
 _ORACION = re.compile(r"(?<=[.!?…])\s+(?=\S)")
+# Leda en primera persona avisándole o notificándole a otra persona (tercera vuelta). Es una
+# medida del corredor sobre el texto, no algo que Leda tenga que decir así. Cuenta:
+# - con "le" o "les" antes: los tiempos de primera persona (aviso, avisé, avisaré, avisaría;
+#   notifico, notifiqué, notificaré, notificaría), "voy a", "acabo de" o "tengo que" con el
+#   infinitivo, y "estoy" con el gerundio;
+# - con "le" o "les" pegado al infinitivo o al gerundio: "voy a", "acabo de" o "tengo que"
+#   con avisarle o notificarle, y "estoy" con avisándole o notificándole;
+# - sin "le": los tiempos que no se confunden con el sustantivo (avisé, avisaré, avisaría,
+#   notifico, notifiqué, notificaré, notificaría) y "voy a", "acabo de" o "tengo que" con el
+#   infinitivo, seguidos de "a" y la persona (no de "a la" o "a las", que es una hora).
+# No cuenta "te", "me" ni "nos": lo que va a saber la persona que lee no es un tercero. Tampoco
+# "aviso a" sin "le", que es casi siempre el sustantivo ("el aviso a"), ni las formas sin tilde,
+# que son otro tiempo ("que le avise"). Las tildes se comparan tal como vienen.
+_YO_AVISO = r"(?:avisé|avisaré|avisaría|notifico|notifiqué|notificaré|notificaría)"
+_VOY_A = r"(?:voy\s+a|acabo\s+de|tengo\s+que)"
+_LE_AVISO = re.compile(
+    rf"\bles?\s+(?:aviso|{_YO_AVISO}|{_VOY_A}\s+(?:avisar|notificar)"
+    r"|estoy\s+(?:avisando|notificando))\b"
+    rf"|\b{_VOY_A}\s+(?:avisarles?|notificarles?)\b"
+    r"|\bestoy\s+(?:avisándoles?|notificándoles?)\b"
+    rf"|(?<!\bte )(?<!\bme )(?<!\bnos )"
+    rf"\b(?:{_YO_AVISO}|{_VOY_A}\s+(?:avisar|notificar))\s+a\s+(?!las?\b)\w",
+    re.IGNORECASE)
 
 
 def _es_pregunta(renglon: str) -> bool:
@@ -495,6 +538,26 @@ def _solo_el_titulo(renglon: str, titulo: str) -> bool:
     return resto.casefold() == titulo.casefold()
 
 
+def _marca_en_el_medio(renglon: str) -> bool:
+    """Si un renglón lleva una marca en otro lugar que su principio (sin contar la que lo abre ni
+    el selector de emoji que la sigue)."""
+    resto = renglon.strip()
+    if resto.startswith(MARCAS):
+        resto = resto[1:]
+    return any(marca in resto for marca in MARCAS)
+
+
+def _bloques(renglones: list[str]) -> list[list[str]]:
+    """Los bloques de un mensaje: los renglones con texto entre dos renglones en blanco."""
+    bloques: list[list[str]] = [[]]
+    for renglon in renglones:
+        if renglon.strip():
+            bloques[-1].append(renglon)
+        elif bloques[-1]:
+            bloques.append([])
+    return [b for b in bloques if b]
+
+
 def fallas_de_formato(texto: str, titulos: Iterable[str]) -> list[tuple[str, str]]:
     """Las reglas del formato que un mensaje de Leda no cumple, cada una una sola vez y con el
     primer renglón que la rompe (o el título, si es una tarea nombrada dos veces). `titulos`
@@ -504,6 +567,12 @@ def fallas_de_formato(texto: str, titulos: Iterable[str]) -> list[tuple[str, str
     for renglon in renglones:
         if "**" in renglon:
             fallas.setdefault(SIN_NEGRITA, renglon)
+        if renglon.strip().startswith(MARCA_VIEJA_DEL_VENCIMIENTO):
+            fallas.setdefault(MARCA_DE_LA_LISTA, renglon)
+        if _LE_AVISO.search(renglon):
+            fallas.setdefault(NOTIFICADO_EN_PASIVA, renglon)
+        if _marca_en_el_medio(renglon):
+            fallas.setdefault(MARCA_AL_PRINCIPIO, renglon)
         if len(renglon.strip()) > RENGLON_MAXIMO:
             fallas.setdefault(RENGLON_CORTO, renglon)
         if _FECHA_LARGA.search(renglon):
@@ -525,6 +594,13 @@ def fallas_de_formato(texto: str, titulos: Iterable[str]) -> list[tuple[str, str
                 fallas.setdefault(TAREA_SOLA, renglones[i])
         if veces > 1:
             fallas.setdefault(TAREA_UNA_VEZ, titulo)
+    # El orden de cada bloque (los renglones entre dos en blanco): en un bloque con una tarea
+    # (📋), su renglón es el primero y todo lo de la tarea, también quién dijo qué, va debajo. Un
+    # bloque sin 📋 no tiene orden que cumplir.
+    for bloque in _bloques(renglones):
+        if (any(r.strip().startswith(MARCA_DE_LA_TAREA_SOLA) for r in bloque)
+                and not bloque[0].strip().startswith(MARCA_DE_LA_TAREA_SOLA)):
+            fallas.setdefault(TAREA_PRIMERO, bloque[0])
     # El cierre: la pregunta o que no hace falta responder, en el último renglón, solo y aparte.
     llenos = [i for i, r in enumerate(renglones) if r.strip()]
     if llenos:

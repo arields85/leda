@@ -26,7 +26,9 @@ preludio:
     relojes: ["2026-10-20 10:00"]
     salen: [{a: Marcos, tipo: aviso_previo, tarea: PLC}]
 
-# El formato (usuario, 2026-10-07, segunda vuelta): renglones y emojis, sin negrita. El corredor
+# El formato (usuario, 2026-10-07, segunda vuelta): renglones y emojis, sin negrita; tercera
+# vuelta: 🗓️ en la lista, la tarea primero en su bloque, las marcas sólo al principio del renglón
+# y quien se entera, en pasiva. El corredor
 # comprueba lo que hace el código (jugadas, efectos, hechos, estado) y mide solo el formato de
 # cada mensaje (`comprobar.fallas_de_formato`); lo demás de la forma se lee en las
 # transcripciones.
@@ -49,7 +51,7 @@ pasos:
       pregunta_abierta: null
     dice:
       - primero, en un renglón, que tiene dos tareas pendientes
-      - "las dos, cada una en su renglón con 📅, su nombre completo, su estado y su fecha corta: la del PLC sin empezar, que vence el vie 23/10; la de comunicaciones en curso, que vence el vie 30/10"
+      - "las dos, cada una en su renglón con 🗓️, su nombre completo, su estado y su fecha corta: la del PLC sin empezar, que vence el vie 23/10; la de comunicaciones en curso, que vence el vie 30/10"
       - el próximo paso, aparte y al final
     no_dice:
       - tareas de otras personas
@@ -85,14 +87,16 @@ pasos:
       para_despues: []
     dice:
       - primero, en un renglón, lo que anotó
-      - "cada tarea en su bloque, separado por un renglón en blanco: un renglón con 📋 y su nombre solo, y debajo, con ✏️, lo anotado: arrancó la del PLC; la de comunicaciones la termina el mié 4/11 porque espera el switch nuevo"
+      - "cada tarea en su bloque, separado por un renglón en blanco: primero un renglón con 📋 y su nombre solo, y debajo, con ✏️, lo anotado: arrancó la del PLC; la de comunicaciones la termina el mié 4/11 porque espera el switch nuevo"
       - "con ⚠️, la consecuencia: vence el vie 30/10, tres días hábiles de atraso"
-      - que Ismael se va a enterar hoy, como algo que todavía no pasó
+      - que Ismael será notificado hoy, dicho en pasiva sobre él y en futuro, como algo que todavía no pasó
       - el próximo paso, en pocas palabras, aparte y al final
     no_dice:
       - los dos hechos mezclados en un renglón o en un párrafo corrido
+      - lo anotado antes que el renglón de su tarea
       - que la fecha de la tarea de comunicaciones cambió
       - el nombre completo de una tarea dos veces
+      - "que Leda le avisa a Ismael (\"le voy a avisar\", \"le avisé\")"
       - negrita
 
   - paso: 3
@@ -106,13 +110,15 @@ pasos:
                  atraso_si_se_cumple_la_prevision_dias_habiles: 3,
                  dependientes: [], motivo: presente}
     dice:
-      - "un renglón por idea: primero, lo que pasó; la tarea de comunicaciones en su renglón con 📋"
-      - que Marcos la termina el mié 4/11 porque espera el switch nuevo
-      - "con ⚠️, que vence el vie 30/10 y el atraso, tres días hábiles"
+      - "un renglón por idea: la tarea de comunicaciones en su renglón con 📋, el primero de su bloque"
+      - debajo, que Marcos dijo que la termina el mié 4/11 porque espera el switch nuevo
+      - "que vence el vie 30/10 y, con ⚠️ al principio de su renglón, el atraso, tres días hábiles"
       - que no hace falta que conteste, solo en el último renglón
     no_dice:
       - nada de la tarea del PLC
       - que la fecha cambió
+      - quién dijo qué antes del renglón de la tarea
+      - una marca en el medio de un renglón
       - un párrafo corrido
       - Marcos con su apellido
       - negrita
