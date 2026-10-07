@@ -15,19 +15,172 @@ para toda ficha y toda pregunta:
 El reloj es el de `test_escalera.py`: "Revisar el tablero" (T1) de Marcos vence el viernes 9 de
 octubre de 2026; el lunes 12 es feriado.
 
-Portada de `prueba_chica/test_un_tema_a_la_vez.py` la que no necesita la escalera; las demás
-(capa 3) se portan con ella.
+Portadas de `prueba_chica/test_un_tema_a_la_vez.py`.
 """
 
 from __future__ import annotations
 
+from datetime import datetime
+
 from leda.motor import fichas
+from leda.motor.ia import IAGuionada, Jugada
+from leda.motor.tiempo import RelojFijo
+from leda.motor.turno import procesar_toque, procesar_turno
+
+from tests.motor.ayudantes import cuantas, dice, nueva_tarea, octubre, solicitante, todos
+
 
 FECHA = "fecha_de_la_tarea"
 PROPUESTA = "propuesta"
 
 
+def _vencida(dias) -> None:
+    """El pedido del vencimiento (viernes 9) y el del martes 13, sin respuesta."""
+    dias.ciclo(octubre(9, 10))
+    dias.ciclo(octubre(13, 10))
+
+
+def _abierta(conn) -> str | None:
+    fila = todos(conn, """select q.tipo from conversation_state s
+                            join conversation_question q on q.id = s.pregunta_abierta_id
+                           where q.cerrada_en is null""")
+    return fila[0]["tipo"] if fila else None
+
+
+def _para_despues(conn) -> list[str]:
+    return [f["tipo"] for f in todos(conn, """select tipo from conversation_question
+                                                where cerrada_en is null
+                                                  and para_despues_en is not null
+                                                order by abierta_en""")]
+
+
+# --- Nunca dos preguntas juntas ------------------------------------------------------------
+
+def _anotar_y_proponer(ctx, datos, tarea):
+    """Una jugada cualquiera que anota algo que no es cierto sobre cuándo y propone salidas."""
+    return {"resultado": "anotado", "tarea": fichas.tarea_hecho(tarea),
+            "salidas": ["anotar_prevision"]}
+
+
+PROPONE = fichas.Ficha(
+    "anotar_y_proponer", "una jugada de prueba", necesita=("tarea",), opcional=(),
+    comprueba="", hace="", despues="", manejar=_anotar_y_proponer, del_responsable=True,
+    propone=lambda hecho: hecho.get("salidas"))
+
+
+def test_con_la_tarea_vencida_lo_propuesto_espera_y_se_pregunta_la_fecha(conn, mundo, dias,
+                                                                        escribe):
+    _vencida(dias)
+    jugadas = {**fichas.JUGADAS, PROPONE.nombre: lambda ctx, j: fichas.correr(PROPONE, ctx, j)}
+    quien, entrante = escribe("Marcos", "-", at=octubre(13, 10, 20))
+    ia = IAGuionada(jugadas=[[Jugada(PROPONE.nombre, {"tarea": "T1"})]], redacciones=["Ok."])
+
+    r = procesar_turno(conn, quien, entrante, ia, RelojFijo(octubre(13, 10, 20)), jugadas)
+    conn.commit()
+
+    [hecho] = r.hechos
+    assert r.pregunta["tipo"] == FECHA and _abierta(conn) == FECHA     # una sola, la fecha
+    assert hecho["pregunta"] == FECHA
+    assert hecho["pregunta_para_despues"] == PROPUESTA                 # lo propuesto, después
+    assert PROPUESTA in _para_despues(conn)
+
+
+# --- Una opción elegida pasa por las comprobaciones de su ficha ----------------------------
+
+def _duda_con_la_tarea_vencida(conn, mundo, dias, escribe) -> dict[str, str]:
+    """T1 vencida, y Marcos dice que arrancó sin decir cuál: Leda pregunta con las dos."""
+    nueva_tarea(conn, mundo, "Probar las comunicaciones")
+    _vencida(dias)
+    r = dice(conn, escribe, Jugada("anotar_inicio", {}), at=octubre(13, 10, 20))
+    assert r.pregunta["tipo"] == "cual_tarea"
+    return {o["etiqueta"]: o["token"] for o in todos(conn, "select etiqueta, token "
+                                                           "from conversation_option")}
+
+
+def _es_la_regla_de_la_tarea_vencida(conn, r) -> None:
+    [hecho] = [h for h in r.hechos if h.get("jugada") == "anotar_inicio"]
+    assert (hecho["resultado"], hecho["estado"]) == ("anotado", "en_curso")
+    assert hecho["vencida"] == {"fecha_comprometida": "2026-10-09", "atraso_dias_habiles": 1}
+    assert hecho["pregunta"] == FECHA and r.pregunta["tipo"] == FECHA
+    assert cuantas(conn, "conversation_question", "tipo = %s and cerrada_en is null",
+                   FECHA) == 1
+
+
+def test_una_opcion_escrita_lleva_la_pregunta_de_la_tarea_vencida(conn, mundo, dias, escribe):
+    _duda_con_la_tarea_vencida(conn, mundo, dias, escribe)
+
+    r = dice(conn, escribe, Jugada("elegir", {"opcion": "O1"}), at=octubre(13, 10, 25))
+
+    _es_la_regla_de_la_tarea_vencida(conn, r)
+
+
+def test_una_opcion_tocada_lleva_la_pregunta_de_la_tarea_vencida(conn, mundo, dias, escribe):
+    tokens = _duda_con_la_tarea_vencida(conn, mundo, dias, escribe)
+
+    r = procesar_toque(conn, solicitante(conn, mundo), tokens["Revisar el tablero"],
+                       mundo["personas"]["Marcos"]["telegram"],
+                       IAGuionada(redacciones=["Ok."]), RelojFijo(octubre(13, 10, 25)))
+    conn.commit()
+
+    _es_la_regla_de_la_tarea_vencida(conn, r)
+
+
+def test_una_opcion_que_la_lista_del_turno_no_tiene_no_corre(conn, mundo, dias, escribe):
+    """La jugada que esperaba la duda se busca en la lista cerrada del turno, como una escrita:
+    si no está, no se corre por la puerta de la opción."""
+    _duda_con_la_tarea_vencida(conn, mundo, dias, escribe)
+    sin_inicio = {k: v for k, v in fichas.JUGADAS.items() if k != "anotar_inicio"}
+    quien, entrante = escribe("Marcos", "la primera", at=octubre(13, 10, 25))
+    ia = IAGuionada(jugadas=[[Jugada("elegir", {"opcion": "O1"})]], redacciones=["Ok."])
+
+    r = procesar_turno(conn, quien, entrante, ia, RelojFijo(octubre(13, 10, 25)), sin_inicio)
+    conn.commit()
+
+    [hecho] = r.hechos
+    assert (hecho["resultado"], hecho["motivo"]) == ("no_se_puede", "fuera_de_la_lista")
+    assert hecho["pregunta_sigue_abierta"] is True and _abierta(conn) == "cual_tarea"
+    assert cuantas(conn, "task_state_event", "estado_nuevo = 'en_curso'") == 0
+
+
 # --- Una pregunta para después no cuenta silencio ------------------------------------------
+
+def _dos_bloqueos(conn, mundo, escribe, at: datetime) -> None:
+    """Dos bloqueos con causa en un mensaje: la pregunta de quién destraba el primero se hace;
+    la del segundo queda para después (situación general 2)."""
+    nueva_tarea(conn, mundo, "Probar las comunicaciones")
+    r = dice(conn, escribe, Jugada("anotar_bloqueo", {"tarea": "T1", "causa": "falta el PLC"}),
+             Jugada("anotar_bloqueo", {"tarea": "T2", "causa": "falta el switch"}), at=at)
+    assert r.pregunta["tipo"] == "quien_destraba"
+    assert _para_despues(conn) == ["quien_destraba"]
+
+
+def _esperas_de_quien_destraba(conn) -> int:
+    return cuantas(conn, "pending_reply", "tipo = 'quien_destraba' and satisfecho_en is null")
+
+
+def test_una_pregunta_que_queda_para_despues_no_abre_su_espera(conn, mundo, dias, escribe):
+    _dos_bloqueos(conn, mundo, escribe, octubre(6, 10))
+
+    assert _esperas_de_quien_destraba(conn) == 1          # sólo la que se hizo
+
+    # Al día siguiente, la escalera repite sólo la que se hizo.
+    [repregunta] = [p for p in dias.ciclo(octubre(7, 10)) if p["persona"] == "Marcos"]
+    assert [h.get("aviso") for h in repregunta["hechos"]] == ["repregunta"]
+
+
+def test_la_pregunta_de_despues_abre_su_espera_cuando_se_hace(conn, mundo, dias, escribe):
+    _dos_bloqueos(conn, mundo, escribe, octubre(6, 10))
+
+    r = dice(conn, escribe, Jugada("anotar_quien_destraba", {"tarea": "T1", "no_sabe": True}),
+             at=octubre(6, 10, 5))
+
+    assert r.pregunta["tipo"] == PROPUESTA       # las salidas del primero, antes que la otra
+    r = dice(conn, escribe, Jugada("cancelar", {}), at=octubre(6, 10, 10))
+    assert r.pregunta["tipo"] == "quien_destraba"           # ahora sí se hace la del segundo
+    [espera] = todos(conn, """select preguntado_en from pending_reply
+                                where tipo = 'quien_destraba' and satisfecho_en is null""")
+    assert espera["preguntado_en"] == octubre(6, 10, 10)
+
 
 def test_cada_clave_de_pregunta_de_los_hechos_tiene_siempre_la_misma_forma():
     hecho: dict = {}
