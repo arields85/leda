@@ -4,7 +4,9 @@ lecturas cortas de la base y los turnos de Marcos con la IA guionada.
 Las pruebas de `prueba_chica/` se importaban unas a otras como bibliotecas de ayudantes; acá
 lo compartido vive en este módulo, y ningún archivo de prueba importa otro. Los nombres de
 allá, sin el guion bajo: `_tarea` es `nueva_tarea`, `_hora` es `octubre`, `_dice` es `dice`,
-`_prevision` es `jugada_prevision`, `_quien` es `solicitante` y `_toca`, `toca`.
+`_prevision` es `jugada_prevision`, `_bloqueo` es `jugada_bloqueo`, `_abierta` es
+`abierta`, `_quien` es `solicitante` y `_toca`, `toca`; el `_avisos` de
+`test_escalera.py` es `avisos_guardados`.
 """
 
 from __future__ import annotations
@@ -98,8 +100,39 @@ def estado_de(conn, tarea: str) -> str:
     return uno(conn, "select estado::text e from task where id = %s", tarea)["e"]
 
 
+def poner_estado(conn, tarea: str, estado: str) -> None:
+    """El estado inicial de una conversación, como un evento (el estado es su proyección)."""
+    with admin(conn) as cur:
+        cur.execute("""insert into task_state_event (task_id, estado_anterior, estado_nuevo,
+                                                     actor_kind, motivo)
+                       select id, estado, %s, 'sistema', 'estado inicial de la prueba'
+                         from task where id = %s""", (estado, tarea))
+    conn.commit()
 
 
+def cambiar_el_vencimiento(conn, mundo, vence: datetime | None) -> None:
+    """La fecha comprometida es inmutable en la base; la cambiará la plataforma (ADR 0017,
+    decisión 4). La prueba la cambia como lo haría ella, con la guarda apagada un momento."""
+    with conn.transaction(), conn.cursor() as cur:
+        cur.execute("alter table task disable trigger trg_bloquear_estado_directo")
+        cur.execute("update task set fecha_objetivo = %s where id = %s", (vence, mundo["tarea"]))
+        cur.execute("alter table task enable trigger trg_bloquear_estado_directo")
+    conn.commit()
+
+
+def abierta(conn) -> tuple[str, str | None] | None:
+    """La pregunta abierta de la conversación: su tipo y su tarea."""
+    fila = uno(conn, """select q.tipo, q.task_id from conversation_state s
+                          join conversation_question q on q.id = s.pregunta_abierta_id
+                         where q.cerrada_en is null""")
+    return (fila["tipo"], str(fila["task_id"]) if fila["task_id"] else None) if fila else None
+
+
+def avisos_guardados(conn, tipo: str | None = None) -> list[dict]:
+    """Los avisos guardados, de un tipo o todos, en el orden en que se guardaron."""
+    return todos(conn, """select * from scheduled_notice
+                           where %s::text is null or tipo = %s
+                           order by creado_en, dedupe_key""", tipo, tipo)
 
 
 # --- Los turnos de Marcos y lo que Leda manda por su cuenta ----------------------------------
@@ -131,6 +164,9 @@ def jugada_prevision(tarea: str, fecha: str, motivo: str | None = None) -> Jugad
     return Jugada("anotar_prevision", {"tarea": tarea, "fecha": fecha,
                                        **({"motivo": motivo} if motivo else {})})
 
+
+def jugada_bloqueo(tarea: str, causa: str | None = None) -> Jugada:
+    return Jugada("anotar_bloqueo", {"tarea": tarea, **({"causa": causa} if causa else {})})
 
 
 class Charla:

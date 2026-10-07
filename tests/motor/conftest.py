@@ -3,8 +3,8 @@
 La base efímera y la conexión son las de `tests/conftest.py` (`uri`, `conn`); acá va el
 mundo de las conversaciones de prueba, el mismo de `prueba_chica/conftest.py`: un espacio con
 dos personas, Ismael, referente y autoridad, y Marcos, con una tarea asignada que vence el
-viernes 9 de octubre de 2026. También la duda de un toque: Marcos arrancó sin decir cuál, y
-Leda le preguntó con sus dos tareas.
+viernes 9 de octubre de 2026. También sus dos tareas (`tareas`), sus turnos (`marcos`) y la
+duda de un toque: Marcos arrancó sin decir cuál, y Leda le preguntó con sus dos tareas.
 """
 
 from __future__ import annotations
@@ -107,3 +107,15 @@ def duda(conn, mundo, escribe) -> dict:
     tokens = {o["orden"]: o["token"] for o in todos(conn, "select orden, token "
                                                           "from conversation_option")}
     return {"T1": mundo["tarea"], "T2": t2, "O1": tokens[1], "O2": tokens[2]}
+
+
+@pytest.fixture
+def tareas(conn, mundo) -> dict[str, str]:
+    """Las dos tareas de Marcos: "Revisar el tablero" (T1) y "Probar las comunicaciones" (T2)."""
+    return {"T1": mundo["tarea"], "T2": nueva_tarea(conn, mundo, "Probar las comunicaciones")}
+
+
+@pytest.fixture
+def marcos(conn, escribe) -> Charla:
+    """Los turnos de Marcos, uno por mensaje (`ayudantes.Charla`)."""
+    return Charla(conn, escribe)

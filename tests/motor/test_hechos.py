@@ -8,14 +8,23 @@ código de los hechos tiene su significado en `hechos.py`, y la IA recibe el de 
 llega en cada pedido. Un hecho sin significado es una falla del motor en la corrida.
 
 Portadas de `prueba_chica/test_hechos.py`. Las que piden la IA real (`ia_real`) o el corredor
-esperan a la capa 3; la que pasa por el turno llega con él.
+esperan a la capa 3.
 """
 
 from __future__ import annotations
 
+import json
+
+from leda.db import admin
 from leda.motor import hechos
 from leda.motor.fichas import GUARDADO_SIN_ENVIAR
+from leda.motor.ia import IAGuionada, Jugada
 from leda.motor.instrucciones import INSTRUCCIONES_JUGADAS, INSTRUCCIONES_REDACCION
+from leda.motor.tiempo import RelojFijo
+from leda.motor.turno import SOLO_SI_PREGUNTA, procesar_turno
+
+from tests.motor.ayudantes import AHORA
+
 
 # --- El vocabulario ---------------------------------------------------------------------------
 
@@ -65,6 +74,31 @@ def test_las_instrucciones_remiten_a_los_significados_y_piden_un_proximo_paso():
     assert "últimos turnos" in redaccion
     for frase in ("le avisaste", "switch", "no pude cancelar", "¿te sirve"):
         assert frase not in redaccion, frase
+
+
+# --- Una pregunta sobre lo que ya está en el registro -----------------------------------------
+
+def test_una_pregunta_sobre_lo_hecho_no_lleva_jugada_ni_aviso_y_se_contesta_del_registro(
+        conn, mundo, escribe):
+    """Ronda 1, conversación 12: "¿le avisaste a alguien?" no es un pedido. Sin jugada no hay
+    aviso al administrador, y la redacción tiene en los últimos turnos el hecho guardado del
+    aviso de antes (`solo_si_pregunta`) para contestar con la verdad."""
+    ia = IAGuionada(jugadas=[[Jugada("fuera_de_la_lista", {"que_pide": "un recordatorio"})],
+                             []],
+                    redacciones=["Eso no lo puedo hacer.", "Sí, quedó avisado."])
+    for texto in ("me recordás el turno?", "y eso le avisaste a alguien?"):
+        quien, entrante = escribe("Marcos", texto)
+        resultado = procesar_turno(conn, quien, entrante, ia, RelojFijo(AHORA))
+        conn.commit()
+        assert resultado.error is None
+
+    assert resultado.jugadas == [] and resultado.hechos == []
+    with admin(conn) as cur:
+        cur.execute("select count(*) n from incident where etapa = 'motor_fuera_de_la_lista'")
+        assert cur.fetchone()["n"] == 1             # sólo el del pedido, no el de la pregunta
+    conn.commit()
+    registro = json.dumps(ia.pedidos_de_redaccion[-1]["ultimos_turnos"], ensure_ascii=False)
+    assert SOLO_SI_PREGUNTA in registro and "aviso_al_administrador" in registro
 
 
 # --- Tercera vuelta de ajuste (usuario, 2026-10-06) ------------------------------------------
