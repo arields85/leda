@@ -7,7 +7,9 @@ Cada jugada se declara con una ficha: qué datos necesita, qué comprueba el có
 hace y qué pasa después. La comprobación común (los datos que faltan, la tarea por su alias y
 los estados en que la jugada vale) la hace `correr` igual para todas; el manejador de cada
 ficha hace sólo lo suyo. Ninguna jugada confirma (9a): el efecto va directo, con
-`herramientas.ejecutar(..., ya_confirmada=True)`, que verifica la autoridad igual.
+`herramientas.ejecutar(..., ya_confirmada=True)`, que verifica la autoridad igual y lo audita.
+Lo que una ficha escribe directo, sin la cocina (una previsión y su corrección, quién destraba,
+un avance), lo audita ella, con la versión de las reglas (`auditoria.py`).
 
 El resultado de una jugada son hechos (un dict), nunca un texto: la IA redacta desde ellos. Una
 jugada que existe pero no se puede hacer ahora devuelve por qué (`no_se_puede`), sin aviso al
@@ -47,13 +49,13 @@ import psycopg
 
 from ..autoridad import Denegado, Solicitante
 from ..calendario import Calendario
-from ..db import registrar_auditoria
 from ..herramientas import (EstadoCambio, NecesitaConfirmacion, NecesitaElegir,
                             NecesitaOpciones, ejecutar)
 
 from . import cambios_de_estado, preguntas, situaciones
 from .ancla import (REEMPLAZADO_POR_UN_AVANCE, REPREGUNTA_DE_ESTADO, anclaje, candado, escalo,
                     pasos)
+from .auditoria import auditar
 from .ia import Jugada
 from .tiempo import sale as sale_a_la_hora, sale_el
 
@@ -402,6 +404,17 @@ def _tarea(tarea: dict[str, Any]) -> dict[str, str]:
 
 # --- Lo que comparten las fichas -----------------------------------------------------------
 
+def _auditar(ctx: Contexto, accion: str, sujeto_tipo: str, sujeto_id: Any,
+             detalle: dict[str, Any]) -> None:
+    """Un hecho del trabajo que la ficha escribe directo, atribuido a quien lo dijo, con la
+    versión de las reglas y en el punto de guardado de la jugada (`auditoria`): el momento del
+    motor y el mensaje que lo dijo van con él."""
+    auditar(ctx.cur, accion=accion, workspace_id=ctx.quien.workspace_id,
+            sujeto_tipo=sujeto_tipo, sujeto_id=sujeto_id, quien=ctx.quien,
+            detalle={**detalle, "at": ctx.ahora.isoformat(),
+                     "inbound_message_id": ctx.entrante_id})
+
+
 def _cerrar_esperas(ctx: Contexto, task_id: str) -> None:
     """Un hecho informado sobre una tarea contesta la espera de esa tarea (9b)."""
     ctx.cur.execute(
@@ -482,6 +495,11 @@ def _anotar_prevision(ctx: Contexto, datos: dict, tarea: dict) -> dict:
         (tarea["id"], prevista, motivo, comprometida, atraso,
          anterior["id"] if anterior else None, ctx.quien.membership_id, ctx.ahora))
     prevision_id = str(cur.fetchone()["id"])
+    _auditar(ctx, "anotar_prevision", "task", tarea["id"], {
+        "prevision_id": prevision_id, "fecha_prevista": prevista,
+        "fecha_comprometida": comprometida.astimezone(cal.zona).date(),
+        "atraso_dias_habiles": atraso, "motivo": motivo,
+        "reemplaza_id": anterior["id"] if anterior else None})
     _cerrar_esperas(ctx, tarea["id"])
 
     # Un aviso de previsión que todavía no salió queda atrás: lo reemplaza el de ésta, o
@@ -606,6 +624,12 @@ def _anotar_quien_destraba(ctx: Contexto, datos: dict, tarea: dict | None) -> di
          quien_texto if quien_texto is not None and integrante is None else None,
          no_sabe, ctx.quien.membership_id, ctx.ahora))
     anotado = str(cur.fetchone()["id"])
+    _auditar(ctx, "anotar_quien_destraba", "blocker", bloqueo["id"], {
+        "blocker_unblocker_id": anotado, "task_id": task_id,
+        "destraba_membership_id": integrante["membership_id"] if integrante else None,
+        "destraba_externo": quien_texto if quien_texto is not None and integrante is None
+        else None,
+        "no_sabe": no_sabe})
     preguntas.cerrar_de_tipo(ctx, "quien_destraba", task_id, "respondida",
                              {"blocker_unblocker_id": anotado})
     _cerrar_esperas(ctx, task_id)
@@ -715,12 +739,8 @@ def _informar_avance(ctx: Contexto, datos: dict, tarea: dict) -> dict:
         return {"resultado": "no_se_puede", "motivo": "nadie_pidio_el_estado",
                 "tarea": _tarea(tarea)}
 
-    registrar_auditoria(cur, accion="informar_avance", workspace_id=ctx.quien.workspace_id,
-                        actor_app_user_id=ctx.quien.app_user_id, actor_kind="persona",
-                        sujeto_tipo="task", sujeto_id=tarea["id"],
-                        detalle={"dijo": dijo, "dicho_por_membership_id": persona,
-                                 "at": ctx.ahora.isoformat(),
-                                 "inbound_message_id": ctx.entrante_id})
+    _auditar(ctx, "informar_avance", "task", tarea["id"],
+             {"dijo": dijo, "dicho_por_membership_id": persona})
     hecho: dict[str, Any] = {"resultado": "anotado", "tarea": _tarea(tarea),
                              "avance": {"dijo": dijo}, "el_pedido_de_estado": "sigue_abierto"}
     nombrar_efecto(hecho, "el_pedido_de_estado", ESPERA, espera["id"])
@@ -889,6 +909,9 @@ def _deshacer_prevision(ctx: Contexto, tarea: dict) -> dict | None:
          anterior["atraso_dias_habiles"] if anterior else 0, equivocada["id"],
          ctx.quien.membership_id, ctx.ahora))
     correccion_id = str(cur.fetchone()["id"])
+    _auditar(ctx, "corregir_prevision", "task", tarea["id"], {
+        "prevision_id": correccion_id, "corrige_prevision_id": equivocada["id"],
+        "fecha_prevista": vuelve})
     hechos: dict[str, Any] = {
         "vuelve_a": ({"prevision": vuelve.isoformat()} if anterior
                      else {"fecha_comprometida": comprometida.isoformat()}),

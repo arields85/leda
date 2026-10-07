@@ -12,9 +12,10 @@ del espacio (9e), `enviar_avisos`:
 2. le pide a la IA que lo redacte desde los hechos de ese momento, que quedan guardados como
    los que se mandaron; un efecto que pasa después dice siempre su estado (primer contacto
    real, 2026-10-05);
-3. lo encola en el outbox, lo marca `enviado` y lo deja en el registro de turnos de quien lo
-   recibe, como su último aviso. Si pide el estado de la tarea, abre la pregunta y cuenta el
-   recordatorio en la espera (`pending_reply`).
+3. lo encola en el outbox, lo marca `enviado`, lo audita como un envío de Leda, con la versión
+   de las reglas (`auditoria.py`), y lo deja en el registro de turnos de quien lo recibe, como
+   su último aviso. Si pide el estado de la tarea, abre la pregunta y cuenta el recordatorio
+   en la espera (`pending_reply`).
 
 **Un envío por persona** (mecánica §10; hallazgo de la E2-7): los avisos automáticos de una
 persona que salen juntos (los de la escalera de un día se guardan todos en la primera vuelta de
@@ -57,6 +58,7 @@ from . import cambios_de_estado, preguntas
 from .ancla import (REPREGUNTA_DE_ESTADO, VENCIMIENTO_CON_PREVISION, ancla, anclaje,
                     clave_del_anclaje, fecha_de_la_clave)
 from .ancla import prevision_vigente as _prevision_vigente
+from .auditoria import auditar
 from .fichas import ATRASO_SI_SE_CUMPLE, ESPERA_ALGO_CIERTO, GUARDADO_SIN_ENVIAR
 from .ia import IA
 from .registro import leer_ultimos_turnos, no_vacio, registrar_salida
@@ -279,6 +281,7 @@ def _enviar(m: Momento, envio: list[_Listo], ia: IA) -> list[str]:
                           set estado = 'enviado', outbox_id = %s, resuelto_en = %s, hechos = %s,
                               intentos = intentos + 1, proximo_intento_en = null
                         where id = %s""", (outbox_id, m.ahora, _json(x.hechos), x.aviso["id"]))
+        _auditar_el_envio(m, x.aviso, persona, outbox_id)
     registrar_salida(cur, m.workspace_id, persona, outbox_id, ia.nombre, m.ahora)
     # El último aviso es el envío: el primero de sus avisos; los demás comparten su fila.
     cur.execute(
@@ -304,6 +307,18 @@ def _enviar(m: Momento, envio: list[_Listo], ia: IA) -> list[str]:
                               and satisfecho_en is null and escalado_en is null""",
                         (m.ahora, x.aviso["task_id"], _espera_del_aviso(x.hechos)))
     return ["enviado"] * len(envio)
+
+
+def _auditar_el_envio(m: Momento, aviso: dict[str, Any], persona: str, outbox_id: str) -> None:
+    """Un aviso que sale es un envío de Leda (constitución §12): una fila por aviso, sobre su
+    tarea, con la versión de las reglas (`auditoria`). El texto queda en el outbox."""
+    sujeto = ("task", aviso["task_id"]) if aviso["task_id"] is not None \
+        else ("scheduled_notice", aviso["id"])
+    auditar(m.cur, accion="enviar_aviso", workspace_id=m.workspace_id,
+            sujeto_tipo=sujeto[0], sujeto_id=sujeto[1],
+            detalle={"aviso_id": aviso["id"], "tipo": aviso["tipo"],
+                     "destinatario_membership_id": persona, "outbox_id": outbox_id,
+                     "at": m.ahora.isoformat()})
 
 
 def _espera_del_aviso(hechos: dict[str, Any]) -> str:
