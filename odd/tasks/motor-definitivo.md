@@ -376,6 +376,20 @@ plataforma cuando Leda tenga una base más completa.
   (decisión 4). Crear y asignar por chat quedan fuera del chat (decisión 2); si se quieren, llevan su
   propio ADR.
 
+**Avance de la E3-8 (2026-10-07):**
+- **Regresión del motor definitivo con GPT-6 sol:** 89 de 90 con todo lo automático bien, 90 de 90 en
+  garantías, 5,1 s de mediana (`ac24f67`).
+- **Comparación de cinco IA,** en la bitácora de flujos ("El motor definitivo con cinco IA"). Se queda sol.
+- **Parámetros por modelo** para el corredor y para producción: `444de7c`, `9bf64f2` y `a732017`, con las
+  revisiones `review-20540c248f5c00d5`, `review-bae1ec2c67963df8` y `review-b54c532f98b721d7`.
+- **Falta:**
+  1. Decidir el mecanismo de las fechas a más de dos semanas. La IA sólo recibe los nombres de los días de
+     las próximas 14 (`DIAS_PROXIMOS`) y pierde fechas más lejanas: es la misma clase de falla en dos
+     rondas, un disparador de parar.
+  2. Recrear `leda_motor` y hacer la prueba por Telegram del usuario (M3); recrear la base necesita su
+     autorización.
+  3. Borrar `prueba_chica/` después de M3.
+
 ## 4b. Guía de la prueba por Telegram (M3)
 
 La misma prueba de la E2-9 (`prueba_chica/README.md`), sobre el motor definitivo.
