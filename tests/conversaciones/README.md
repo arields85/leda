@@ -51,12 +51,16 @@ El circuito es el recordatorio y lo que la persona contesta (ADR 0018, decisión
     bloqueo, la tarea vuelve a su estado de antes, la pregunta de quién lo destraba se cierra y el
     seguimiento vuelve; el día del vencimiento se traba y se destraba otra vez, y Leda vuelve a pedir el
     estado el día hábil siguiente.
+18. [`18-habla-del-mundo.md`](18-habla-del-mundo.md): un avance, una previsión antes de la hora en que
+    Leda escribe por su cuenta y el pedido de estado del día previsto; Leda cuenta quién se entera de qué
+    y cuándo, y qué va a hacer ella, nunca el estado interno de un aviso o de un pedido.
 
 Las cuatro primeras son las cuatro respuestas de 5a; de la 5 a la 12, cada una aplica al recordatorio una
 de las ocho situaciones generales de la decisión 4. La 15 suma la jugada `informar_avance` (decisión del
 usuario, 2026-10-05; ADR 0018, decisión 9b). La 16, la regla de la tarea vencida (decisión del usuario,
 2026-10-05; ADR 0018, decisión 9j). La 17, la jugada `destrabar` (decisión del usuario, 2026-10-05;
-ADR 0018, decisión 9l).
+ADR 0018, decisión 9l). La 18, hablar de lo que pasa en el mundo y no de la cocina (decisión del usuario,
+2026-10-06, de la prueba por Telegram real; Etapa 3, E3-6).
 
 ## El corredor
 
