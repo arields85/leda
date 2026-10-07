@@ -1,8 +1,8 @@
 """La escalera del motor de conversación (diseño probado en la Etapa 2, E2-5).
 
 `odd/tasks/prueba-chica-del-motor.md`, sección 4 ("Escalera"); mecánica §9; ADR 0018, decisión
-9b; ADR 0017, decisión 6. Propia: `leda.escalera` no se toca ni se importa (sus textos son
-fijos y escala sin mirar si hubo respuesta; se retira en la E3-7, `tests/motor/test_frontera.py`).
+9b; ADR 0017, decisión 6. Propia: reemplaza a la escalera vieja de `leda` (`leda.escalera`, de
+textos fijos y que escalaba sin mirar si hubo respuesta), retirada en la E3-7.
 
 `correr_escalera` la corre para cada tarea abierta (asignada o en curso, con fecha comprometida
 y sin un bloqueo abierto) y sólo decide qué aviso guardar; los manda `avisos.enviar_avisos`,

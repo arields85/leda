@@ -1,16 +1,18 @@
-"""La frontera de la entrada HTTP y del ciclo de fondo (E3-2).
+"""La frontera de la entrada HTTP y del barrido de mensajes huérfanos (E3-2; E3-7).
 
-`odd/tasks/motor-definitivo.md`, tarea E3-2: la entrada HTTP (`leda.entrada`), el ciclo de
-fondo (`leda.ciclo`), el reloj (`leda.reloj`) y el barrido de mensajes huérfanos
-(`leda.huerfanos`) son de la capa sólida y no dependen de la conversación de los flujos A y
-B, que se borra en la E3-4. Dos controles, con el patrón de `test_frontera.py`:
+`odd/tasks/motor-definitivo.md`, tarea E3-2: la entrada HTTP (`leda.entrada`) y el barrido de
+mensajes huérfanos (`leda.huerfanos`) son de la capa sólida y no dependen de la conversación de
+los flujos A y B, que se borró en la E3-4. El ciclo de fondo (`leda.ciclo`) y el reloj
+(`leda.reloj`) viejos se retiraron en la E3-7: el ciclo es el del motor, que la entrada alcanza
+por el webhook (`leda.motor.recibir`) y el recorrido mira en cadena. Dos controles, con el
+patrón de `test_frontera.py`:
 
-- Estático. Desde esos cuatro módulos se recorren, en cadena, los módulos de `leda` que
+- Estático. Desde esos módulos se recorren, en cadena, los módulos de `leda` que
   importan, también los imports de dentro de funciones. Ningún import de nivel de módulo
   llega a un módulo de `PROHIBIDOS`; los de dentro de funciones sólo si están en
   `BORDES_CONOCIDOS`, cada uno con su motivo y la tarea que lo retira. Esa lista sólo puede
   achicarse: si un borde desaparece, la prueba pide sacarlo; si aparece uno nuevo, falla.
-- En ejecución. Un proceso aparte importa los cuatro módulos y, al terminar, ningún módulo de
+- En ejecución. Un proceso aparte importa esos módulos y, al terminar, ningún módulo de
   `PROHIBIDOS` quedó cargado.
 """
 
@@ -31,7 +33,7 @@ PROHIBIDOS = {"gateway", "ingreso_tareas", "agente", "contexto", "respuesta_unic
               "deteccion_pregunta", "jev", "local"}
 
 # Los módulos de la capa sólida desde los que se recorre.
-INICIOS = ("entrada", "ciclo", "reloj", "huerfanos")
+INICIOS = ("entrada", "huerfanos")
 
 # (archivo, función que importa adentro, prohibido al que llega): por qué sigue. Vacía
 # desde la E3-4, que borró los flujos A y B y cortó los cuatro bordes que quedaban.
@@ -62,8 +64,9 @@ def _prohibido(modulo: str) -> str | None:
 
 
 def _archivo_de(modulo: str, fuentes: pathlib.Path) -> pathlib.Path | None:
-    """El archivo de un módulo de `leda` (`leda.ciclo` → `src/leda/ciclo.py`), o `None` si
-    el import no es de `leda` o nombra algo que no es un módulo (`leda.ciclo.Ciclo`)."""
+    """El archivo de un módulo de `leda` (`leda.huerfanos` → `src/leda/huerfanos.py`), o
+    `None` si el import no es de `leda` o nombra algo que no es un módulo
+    (`leda.huerfanos.barrer`)."""
     partes = modulo.split(".")
     if partes[0] != "leda":
         return None
@@ -111,7 +114,7 @@ def test_la_entrada_y_el_ciclo_no_importan_la_conversacion_de_los_flujos_viejos(
     bordes, _, _ = _bordes_desde_la_capa_solida()
     nuevos = sorted(map(str, bordes - set(BORDES_CONOCIDOS)))
     assert not nuevos, (
-        "La entrada, el ciclo, el reloj o el barrido de huérfanos llegan a la conversación "
+        "La entrada o el barrido de huérfanos llegan a la conversación "
         "de los flujos viejos:\n  " + "\n  ".join(nuevos))
 
 

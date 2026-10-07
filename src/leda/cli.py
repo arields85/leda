@@ -5,7 +5,6 @@
     python -m leda importar corework --activar
     python -m leda feriados corework        carga los feriados nacionales
     python -m leda sembrar corework --semilla espacios/corework.semilla-ficticia.yaml
-    python -m leda cadencia corework objetivos_semanales
     python -m leda despachar corework       vacía la cola una vez
     python -m leda escuchar corework        el motor de conversación, por long polling
     python -m leda servir                   webhook + tablero + el ciclo del motor
@@ -179,11 +178,9 @@ def main(argv: list[str] | None = None) -> int:
     sem.add_argument("--semilla", required=True,
                      help="ruta al YAML de datos ficticios (T7, odd/tasks/leda-orienta.md)")
 
-    cad = sub.add_parser("cadencia")
-    cad.add_argument("slug"); cad.add_argument("nombre")
-
+    # `cadencia` y `escalera` corrían la cadencia y la escalera viejas, retiradas en la E3-7:
+    # la escalera es la del motor (`escuchar`, `servir`) y las cadencias vuelven después de M3.
     des = sub.add_parser("despachar"); des.add_argument("slug")
-    esc = sub.add_parser("escalera"); esc.add_argument("slug")
 
     enl = sub.add_parser("enlaces")
     enl.add_argument("slug")
@@ -562,15 +559,7 @@ def main(argv: list[str] | None = None) -> int:
     with espacio(conn, ws) as cur:
         cal = Calendario.desde_base(cur, ws)
 
-        if a.cmd == "cadencia":
-            from .reloj import ejecutar_cadencia
-            print("encolados:", ejecutar_cadencia(cur, ws, a.nombre, cal))
-
-        elif a.cmd == "escalera":
-            from .reloj import ejecutar_escalera
-            print("encolados:", ejecutar_escalera(cur, ws, cal))
-
-        elif a.cmd == "despachar":
+        if a.cmd == "despachar":
             from .despachador import TransporteTelegram, despachar
             transporte = TransporteTelegram(config.token_bot(a.slug))
             print(despachar(cur, ws, transporte, cal))

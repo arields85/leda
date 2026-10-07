@@ -5,22 +5,19 @@ Implementa la sección 4 de `nucleo/mecanica-pm.md`. Antes de esto el esquema
 estaba completo (`dependency`, `evitar_ciclo_dependencia`,
 `motivo_no_cierra_tarea`) y ninguna ruta de código escribía una fila: nada
 frenaba `en_curso` y nadie avisaba de un atraso en cadena.
+
+El aviso de las dependencias en riesgo era de la escalera vieja de `leda` (`escalera.py`),
+retirada con sus pruebas en la E3-7; quedan los avisos de las dependencias informativas.
 """
 
 from __future__ import annotations
 
-from datetime import datetime
-from zoneinfo import ZoneInfo
-
 import psycopg
 import pytest
 
-from leda import escalera, herramientas as H, reloj
+from leda import herramientas as H
 from leda.autoridad import Canal, Denegado, identificar
-from leda.calendario import Calendario
 from leda.db import admin, espacio
-
-BA = ZoneInfo("America/Argentina/Buenos_Aires")
 
 
 def _quien(cur, nombre, ws):
@@ -465,95 +462,6 @@ def test_en_curso_directo_por_base_sigue_bloqueado_por_el_disparador(corework, c
 # T3 -- aviso en cadena
 # ---------------------------------------------------------------------------
 
-def test_dependencia_bloqueante_vencida_avisa_a_la_cadena_completa(corework, conn):
-    ws = corework.workspace_id
-    with admin(conn) as cur:
-        origen = _tarea(cur, ws, titulo="Programar PLC", area="ot",
-                        persona="Nahuel Gimenez",
-                        fecha_objetivo=datetime(2026, 7, 20, 17, 0, tzinfo=BA))
-        medio = _tarea(cur, ws, titulo="Cablear tablero", area="ot",
-                       persona="Marcos Tarquini",
-                       fecha_objetivo=datetime(2026, 8, 1, 17, 0, tzinfo=BA))
-        final = _tarea(cur, ws, titulo="Entregar máquina", area="ot",
-                       persona="Nahuel Gimenez",
-                       fecha_objetivo=datetime(2026, 8, 10, 17, 0, tzinfo=BA))
-        _dependencia(cur, ws, origen, medio)
-        _dependencia(cur, ws, medio, final)
-
-    with espacio(conn, ws) as cur:
-        cal = Calendario.desde_base(cur, ws)
-        ahora = datetime(2026, 7, 28, 10, 0, tzinfo=BA)
-        acciones = escalera.evaluar_dependencias_en_riesgo(cur, ws, cal, ahora)
-        destinatarios = {a.destinatario_membership_id for a in acciones}
-        assert destinatarios == {
-            _mid(cur, "Marcos Tarquini"),
-            _mid(cur, "Nahuel Gimenez"),
-        }
-
-        encoladas = escalera.encolar_dependencias(cur, ws, acciones, ahora)
-        assert encoladas == len(acciones)
-
-        # un reinicio que vuelve a evaluar el mismo momento no duplica
-        acciones2 = escalera.evaluar_dependencias_en_riesgo(cur, ws, cal, ahora)
-        assert escalera.encolar_dependencias(cur, ws, acciones2, ahora) == 0
-
-
-def test_dependencia_en_riesgo_por_fecha_posterior_a_la_del_dependiente(corework, conn):
-    """No hace falta estar vencida: alcanza con que la fecha de la bloqueante
-    quede después de la de quien depende de ella."""
-    ws = corework.workspace_id
-    with admin(conn) as cur:
-        origen = _tarea(cur, ws, titulo="Programar PLC", area="ot",
-                        persona="Nahuel Gimenez",
-                        fecha_objetivo=datetime(2026, 8, 20, 17, 0, tzinfo=BA))
-        destino = _tarea(cur, ws, titulo="Cablear tablero", area="ot",
-                         persona="Marcos Tarquini",
-                         fecha_objetivo=datetime(2026, 8, 10, 17, 0, tzinfo=BA))
-        _dependencia(cur, ws, origen, destino)
-
-    with espacio(conn, ws) as cur:
-        cal = Calendario.desde_base(cur, ws)
-        ahora = datetime(2026, 7, 28, 10, 0, tzinfo=BA)   # nada vencido todavía
-        acciones = escalera.evaluar_dependencias_en_riesgo(cur, ws, cal, ahora)
-        assert [a.destinatario_membership_id for a in acciones] == [
-            _mid(cur, "Marcos Tarquini")]
-
-
-def test_dependencia_sin_riesgo_no_avisa(corework, conn):
-    ws = corework.workspace_id
-    with admin(conn) as cur:
-        origen = _tarea(cur, ws, titulo="Programar PLC", area="ot",
-                        persona="Nahuel Gimenez",
-                        fecha_objetivo=datetime(2026, 8, 1, 17, 0, tzinfo=BA))
-        destino = _tarea(cur, ws, titulo="Cablear tablero", area="ot",
-                         persona="Marcos Tarquini",
-                         fecha_objetivo=datetime(2026, 8, 20, 17, 0, tzinfo=BA))
-        _dependencia(cur, ws, origen, destino)
-
-    with espacio(conn, ws) as cur:
-        cal = Calendario.desde_base(cur, ws)
-        ahora = datetime(2026, 7, 28, 10, 0, tzinfo=BA)
-        assert escalera.evaluar_dependencias_en_riesgo(cur, ws, cal, ahora) == []
-
-
-def test_ejecutar_escalera_tambien_avisa_dependencias_en_riesgo(corework, conn):
-    ws = corework.workspace_id
-    with admin(conn) as cur:
-        origen = _tarea(cur, ws, titulo="Programar PLC", area="ot",
-                        persona="Nahuel Gimenez",
-                        fecha_objetivo=datetime(2026, 7, 20, 17, 0, tzinfo=BA))
-        destino = _tarea(cur, ws, titulo="Cablear tablero", area="ot",
-                         persona="Marcos Tarquini",
-                         fecha_objetivo=datetime(2026, 8, 1, 17, 0, tzinfo=BA))
-        _dependencia(cur, ws, origen, destino)
-
-    with espacio(conn, ws) as cur:
-        cal = Calendario.desde_base(cur, ws)
-        ahora = datetime(2026, 7, 28, 10, 0, tzinfo=BA)
-        n = reloj.ejecutar_escalera(cur, ws, cal, ahora)
-        assert n >= 1
-
-
 def test_dependencia_informativa_avisa_a_ambos_al_cambiar_de_estado(corework, conn):
     ws = corework.workspace_id
     with admin(conn) as cur:
@@ -655,86 +563,6 @@ def test_actualizar_estado_de_bloqueada_a_en_curso_no_se_frena_por_dependencia(c
         r = H.ejecutar(cur, quien, "actualizar_estado",
                        {"tarea_id": destino, "estado": "en_curso"}, ya_confirmada=True)
         assert r == {"estado": "en_curso"}
-
-
-def test_dependencia_en_riesgo_reavisa_al_pasar_de_posterior_a_vencida(corework, conn):
-    """Defecto: la clave de deduplicación no distinguía el motivo del riesgo.
-    Si el primer aviso salía por "la fecha queda después de la del
-    dependiente" y más tarde la origen se vencía de verdad, el segundo aviso
-    -- más grave -- reusaba la misma clave y se perdía en silencio."""
-    ws = corework.workspace_id
-    with admin(conn) as cur:
-        origen = _tarea(cur, ws, titulo="Programar PLC", area="ot",
-                        persona="Nahuel Gimenez",
-                        fecha_objetivo=datetime(2026, 8, 20, 17, 0, tzinfo=BA))
-        destino = _tarea(cur, ws, titulo="Cablear tablero", area="ot",
-                         persona="Marcos Tarquini",
-                         fecha_objetivo=datetime(2026, 8, 10, 17, 0, tzinfo=BA))
-        _dependencia(cur, ws, origen, destino)
-
-    with espacio(conn, ws) as cur:
-        cal = Calendario.desde_base(cur, ws)
-
-        # corrida 1: no vencida todavía, pero la fecha queda después de la
-        # del dependiente.
-        ahora1 = datetime(2026, 7, 28, 10, 0, tzinfo=BA)
-        acciones1 = escalera.evaluar_dependencias_en_riesgo(cur, ws, cal, ahora1)
-        assert "vencida" not in acciones1[0].cuerpo
-        assert escalera.encolar_dependencias(cur, ws, acciones1, ahora1) == 1
-
-        # corrida 2, mismo momento: no duplica.
-        acciones2 = escalera.evaluar_dependencias_en_riesgo(cur, ws, cal, ahora1)
-        assert escalera.encolar_dependencias(cur, ws, acciones2, ahora1) == 0
-
-        # corrida 3: la origen ya está vencida -- motivo distinto, reavisa.
-        ahora2 = datetime(2026, 8, 25, 10, 0, tzinfo=BA)
-        acciones3 = escalera.evaluar_dependencias_en_riesgo(cur, ws, cal, ahora2)
-        assert "vencida" in acciones3[0].cuerpo
-        assert escalera.encolar_dependencias(cur, ws, acciones3, ahora2) == 1
-
-        # corrida 4, mismo momento vencido: no duplica de nuevo.
-        acciones4 = escalera.evaluar_dependencias_en_riesgo(cur, ws, cal, ahora2)
-        assert escalera.encolar_dependencias(cur, ws, acciones4, ahora2) == 0
-
-        cur.execute("select count(*) n from message_outbox")
-        assert cur.fetchone()["n"] == 2
-
-
-def test_dependencia_en_riesgo_nombra_las_tareas_afectadas_directas_e_indirectas(
-        corework, conn):
-    """Defecto: el aviso no nombraba ninguna tarea ("de ella depende esta
-    tarea"), así que el destinatario no tenía sobre qué actuar, y para un
-    dependiente indirecto la frase además era inexacta."""
-    ws = corework.workspace_id
-    with admin(conn) as cur:
-        origen = _tarea(cur, ws, titulo="Programar PLC", area="ot",
-                        persona="Nahuel Gimenez",
-                        fecha_objetivo=datetime(2026, 7, 20, 17, 0, tzinfo=BA))
-        medio = _tarea(cur, ws, titulo="Cablear tablero", area="ot",
-                       persona="Marcos Tarquini",
-                       fecha_objetivo=datetime(2026, 8, 1, 17, 0, tzinfo=BA))
-        final = _tarea(cur, ws, titulo="Entregar máquina", area="ot",
-                       persona="Nahuel Gimenez",
-                       fecha_objetivo=datetime(2026, 8, 10, 17, 0, tzinfo=BA))
-        _dependencia(cur, ws, origen, medio)
-        _dependencia(cur, ws, medio, final)
-
-    with espacio(conn, ws) as cur:
-        cal = Calendario.desde_base(cur, ws)
-        ahora = datetime(2026, 7, 28, 10, 0, tzinfo=BA)
-        acciones = escalera.evaluar_dependencias_en_riesgo(cur, ws, cal, ahora)
-
-        por_destinatario = {a.destinatario_membership_id: a for a in acciones}
-        marcos = _mid(cur, "Marcos Tarquini")
-        nahuel = _mid(cur, "Nahuel Gimenez")
-
-        # Marcos: dependiente directo de la origen.
-        assert "Cablear tablero" in por_destinatario[marcos].cuerpo
-        assert "cadena" not in por_destinatario[marcos].cuerpo
-
-        # Nahuel: dependiente indirecto, a través de "Cablear tablero".
-        assert "Entregar máquina" in por_destinatario[nahuel].cuerpo
-        assert "cadena" in por_destinatario[nahuel].cuerpo
 
 
 def test_en_curso_desde_bloqueada_sigue_frenado_si_nunca_arranco(corework, conn):

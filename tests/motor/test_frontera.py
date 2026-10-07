@@ -8,8 +8,8 @@ de juntar el SQL del motor en un solo módulo (decisiones técnicas de la E3-5).
   `PERMITIDOS` (y, si se limita, sólo esos nombres). Nunca importa `prueba_chica`.
 - **Cadena.** Desde ahí se recorren los imports en cadena, incluidos los de dentro de funciones
   (un módulo alcanzado cuenta entero, y un paquete, con todos sus archivos), y ninguno puede
-  llegar a `PROHIBIDOS`: la escalera, el reloj y el ciclo viejos de `src/leda`, y los módulos
-  de los flujos A y B. Un módulo alcanzado que no se encuentra hace fallar la prueba.
+  llegar a `PROHIBIDOS`: los módulos de los flujos A y B. Un módulo alcanzado que no se
+  encuentra hace fallar la prueba.
 - **Bordes conocidos.** Las funciones que llegan a un prohibido desde adentro y que el motor no
   usa: sólo pueden achicarse.
 - **Tablas.** Cada texto SQL de un módulo del motor (un texto con `select`, `insert`, `update`
@@ -55,11 +55,11 @@ PERMITIDOS: dict[str, set[str] | None] = {
     "entrada": {"clave_de_candado_del_mensaje", "sql_respondido"},
 }
 
-# La escalera, el reloj y el ciclo viejos se retiran cuando el motor tenga los suyos (E3-7);
-# el resto son los módulos de los flujos A y B, borrados en la E3-4, por si volvieran.
-# `huerfanos` ya no: dejó de importar los flujos viejos (E3-2) y el ciclo del motor lo corre.
-PROHIBIDOS = {"escalera", "reloj", "ciclo", "gateway", "agente", "ingreso_tareas", "contexto",
-              "respuesta_unica", "local"}
+# Los módulos de los flujos A y B, borrados en la E3-4, por si volvieran. La escalera, el reloj
+# y el ciclo viejos de `leda` se borraron en la E3-7: un import de ellos ya no se encuentra y
+# hace fallar el recorrido. `huerfanos` ya no: dejó de importar los flujos viejos (E3-2) y el
+# ciclo del motor lo corre.
+PROHIBIDOS = {"gateway", "agente", "ingreso_tareas", "contexto", "respuesta_unica", "local"}
 
 # (módulo, función que importa adentro, prohibido al que llega): por qué no molesta.
 BORDES_CONOCIDOS: dict[tuple[str, str | None, str], str] = {}
@@ -305,13 +305,13 @@ def test_el_recorrido_sigue_la_cadena_y_entra_en_las_funciones(tmp_path):
     leda, _ = _arbol_de_juguete(tmp_path, {
         f"{PAQUETE}/x.py": "from ..db import algo\nfrom . import y\n",
         f"{PAQUETE}/y.py": "def f():\n    from ..paquete import otra\n",
-        "db.py": "def algo():\n    from .escalera import correr\n",
+        "db.py": "def algo():\n    from .gateway import correr\n",
         "paquete/__init__.py": "from .interno import otra\n",
-        "paquete/interno.py": "def otra():\n    from ..reloj import montar\n",
-        "escalera.py": "", "reloj.py": "",
+        "paquete/interno.py": "def otra():\n    from ..agente import montar\n",
+        "gateway.py": "", "agente.py": "",
     })
     bordes, alcanzados = _bordes_hacia_prohibidos(leda)
-    assert bordes == {("db", "algo", "escalera"), ("paquete", "otra", "reloj")}
+    assert bordes == {("db", "algo", "gateway"), ("paquete", "otra", "agente")}
     assert {"db", "paquete"} <= alcanzados
     assert "motor" not in alcanzados, "el motor se mira entero, no se recorre como un módulo"
 

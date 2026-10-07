@@ -3,8 +3,8 @@
 `odd/tasks/prueba-chica-del-motor.md`, sección 4 ("Entrada propia"): cada minuto corre la
 escalera y los avisos guardados; cada vuelta del escuchador, el despacho y los avisos a la
 administración. Cada paso va aislado: si uno se cae, deja un incidente (una vez mientras siga
-cayéndose) y los demás corren igual. Nunca importa `leda.ciclo`, `leda.reloj` ni
-`leda.escalera` (`test_frontera.py`). Reloj fijo, IA guionada, transportes de prueba.
+cayéndose) y los demás corren igual. Reemplaza al ciclo viejo de `leda`, retirado en la
+E3-7. Reloj fijo, IA guionada, transportes de prueba.
 
 Portadas de `prueba_chica/test_ciclo.py`; la del escuchador que corre el ciclo en cada vuelta,
 con el escuchador del motor (E3-7).

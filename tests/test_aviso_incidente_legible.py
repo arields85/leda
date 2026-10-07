@@ -54,7 +54,9 @@ def test_el_aviso_neutro_a_la_persona_es_el_texto_aprobado():
 
 def test_cada_etapa_conocida_tiene_su_explicacion():
     etapas = _etapas_conocidas()
-    assert {"saludo_diario", "ciclo_de_fondo", "mensaje_huerfano_sin_respuesta"} <= etapas
+    # `ciclo_de_fondo` era del ciclo viejo (retirado en la E3-7): su explicación se queda en la
+    # tabla por los incidentes ya registrados.
+    assert {"saludo_diario", "mensaje_huerfano_sin_respuesta"} <= etapas
     assert etapas - set(EXPLICACION_POR_ETAPA) == set()
     for etapa, explicacion in EXPLICACION_POR_ETAPA.items():
         assert explicacion.que_paso.strip() and explicacion.que_hacer.strip(), etapa

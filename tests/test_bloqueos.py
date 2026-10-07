@@ -3,21 +3,18 @@
 Implementa la sección 8 de `nucleo/mecanica-pm.md`. Antes de esto un bloqueo
 se abría y quedaba abierto para siempre: ninguna ruta de código escribía
 `resuelto_en`, `resolucion`, `escalado_a` ni `escalado_en`.
+
+El escalamiento por antigüedad era de la escalera vieja de `leda` (`escalera.py`), retirada
+con sus pruebas en la E3-7: la persecución de un bloqueo vuelve con el motor (ADR 0017, 3a).
 """
 
 from __future__ import annotations
 
-from datetime import datetime
-from zoneinfo import ZoneInfo
-
 import pytest
 
-from leda import escalera, herramientas as H, reloj
+from leda import herramientas as H
 from leda.autoridad import Canal, Denegado, identificar
-from leda.calendario import Calendario
 from leda.db import admin, espacio
-
-BA = ZoneInfo("America/Argentina/Buenos_Aires")
 
 
 def _quien(cur, nombre, ws):
@@ -363,105 +360,3 @@ def test_registrar_bloqueo_en_tarea_cancelada_se_rechaza(corework, conn):
         assert "error" in r
         cur.execute("select count(*) n from blocker where task_id = %s", (tid,))
         assert cur.fetchone()["n"] == 0
-
-
-# ---------------------------------------------------------------------------
-# T2 — escalamiento por antigüedad
-# ---------------------------------------------------------------------------
-
-def test_bloqueo_escala_al_superar_el_umbral_de_dias_habiles(corework, conn):
-    ws = corework.workspace_id
-    with admin(conn) as cur:
-        tid = _tarea(cur, ws)
-        bid = _bloquear(cur, ws, tid,
-                        abierto_en=datetime(2026, 7, 20, 10, 0, tzinfo=BA))
-
-    with espacio(conn, ws) as cur:
-        cal = Calendario.desde_base(cur, ws)
-        # 2026-07-20 a 2026-07-28: seis días hábiles, más de los cinco del pack
-        ahora = datetime(2026, 7, 28, 10, 0, tzinfo=BA)
-        acciones = escalera.evaluar_bloqueos(cur, ws, cal, ahora)
-        assert [a.bloqueo_id for a in acciones] == [bid]
-
-        encoladas = escalera.encolar_bloqueos(cur, ws, acciones, ahora)
-        assert encoladas == 1
-
-        cur.execute("select escalado_a, escalado_en from blocker where id = %s", (bid,))
-        f = cur.fetchone()
-        assert f["escalado_a"] is not None
-        assert f["escalado_en"] is not None
-
-        cur.execute("select destinatario_membership_id, tipo from message_outbox")
-        m = cur.fetchone()
-        assert str(m["destinatario_membership_id"]) == str(f["escalado_a"])
-        assert m["tipo"] == "prioritario"
-
-        # el destino es la ruta transversal del pack: rol dirección -> Ismael
-        cur.execute("select nombre from integrante where membership_id = %s",
-                   (f["escalado_a"],))
-        assert cur.fetchone()["nombre"] == "Ismael Soschinski"
-
-
-def test_bloqueo_no_escala_antes_del_umbral(corework, conn):
-    ws = corework.workspace_id
-    with admin(conn) as cur:
-        tid = _tarea(cur, ws)
-        _bloquear(cur, ws, tid, abierto_en=datetime(2026, 7, 20, 10, 0, tzinfo=BA))
-
-    with espacio(conn, ws) as cur:
-        cal = Calendario.desde_base(cur, ws)
-        # exactamente cinco días hábiles: todavía no es "más de cinco"
-        ahora = datetime(2026, 7, 27, 10, 0, tzinfo=BA)
-        assert escalera.evaluar_bloqueos(cur, ws, cal, ahora) == []
-
-
-def test_bloqueo_escalado_no_se_reescala_al_reevaluar(corework, conn):
-    ws = corework.workspace_id
-    with admin(conn) as cur:
-        tid = _tarea(cur, ws)
-        _bloquear(cur, ws, tid, abierto_en=datetime(2026, 7, 20, 10, 0, tzinfo=BA))
-
-    with espacio(conn, ws) as cur:
-        cal = Calendario.desde_base(cur, ws)
-        ahora = datetime(2026, 7, 28, 10, 0, tzinfo=BA)
-        acciones = escalera.evaluar_bloqueos(cur, ws, cal, ahora)
-        assert escalera.encolar_bloqueos(cur, ws, acciones, ahora) == 1
-
-        # el proceso reinicia y vuelve a evaluar el mismo momento
-        acciones = escalera.evaluar_bloqueos(cur, ws, cal, ahora)
-        assert acciones == []
-
-        cur.execute("select count(*) n from message_outbox")
-        assert cur.fetchone()["n"] == 1
-
-
-def test_bloqueo_sin_configuracion_de_umbral_no_escala(corework, conn):
-    ws = corework.workspace_id
-    with admin(conn) as cur:
-        tid = _tarea(cur, ws)
-        _bloquear(cur, ws, tid, abierto_en=datetime(2026, 7, 20, 10, 0, tzinfo=BA))
-        cur.execute(
-            "delete from workspace_setting where workspace_id = %s and clave = 'bloqueos'",
-            (ws,))
-
-    with espacio(conn, ws) as cur:
-        cal = Calendario.desde_base(cur, ws)
-        ahora = datetime(2026, 7, 28, 10, 0, tzinfo=BA)
-        assert escalera.evaluar_bloqueos(cur, ws, cal, ahora) == []
-
-
-def test_ejecutar_escalera_tambien_escala_bloqueos_por_antiguedad(corework, conn):
-    ws = corework.workspace_id
-    with admin(conn) as cur:
-        tid = _tarea(cur, ws)
-        bid = _bloquear(cur, ws, tid,
-                        abierto_en=datetime(2026, 7, 20, 10, 0, tzinfo=BA))
-
-    with espacio(conn, ws) as cur:
-        cal = Calendario.desde_base(cur, ws)
-        ahora = datetime(2026, 7, 28, 10, 0, tzinfo=BA)
-        n = reloj.ejecutar_escalera(cur, ws, cal, ahora)
-        assert n == 1
-
-        cur.execute("select escalado_en from blocker where id = %s", (bid,))
-        assert cur.fetchone()["escalado_en"] is not None

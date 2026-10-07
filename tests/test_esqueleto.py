@@ -1,19 +1,22 @@
-"""Pruebas del esqueleto: importación, calendario, escalera, cadencia,
-despacho y autoridad."""
+"""Pruebas del esqueleto: importación, calendario, despacho y autoridad.
+
+La escalera y la cadencia viejas de `leda` (`escalera.py`, `reloj.py`) se retiraron con sus
+pruebas en la E3-7: la escalera es la del motor (`tests/motor/test_escalera.py`) y las
+cadencias vuelven después de M3."""
 
 from __future__ import annotations
 
-from datetime import date, datetime, time, timedelta, timezone
+from datetime import date, datetime, time, timezone
 from zoneinfo import ZoneInfo
 
 import pytest
 
-from leda import escalera, reloj
 from leda.autoridad import Canal, Denegado, identificar, verificar
-from leda.calendario import Calendario, cargar_feriados_ar
+from leda.calendario import Calendario
 from leda.db import admin, espacio
 from leda.despachador import TransporteDePrueba, despachar
 from leda.importador import PackInvalido, importar
+from leda.salida import enqueue_outbox
 
 BA = ZoneInfo("America/Argentina/Buenos_Aires")
 
@@ -102,158 +105,30 @@ def test_fuera_de_horario_se_corre_al_proximo_habil():
 # Utilidades para armar trabajo
 # ---------------------------------------------------------------------------
 
-def _tarea(cur, ws, *, area="ot", persona="Marcos Tarquini", vence=None):
-    cur.execute("select id from objective where workspace_id = %s limit 1", (ws,))
-    obj = cur.fetchone()
-    if not obj:
-        cur.execute(
-            """insert into objective (workspace_id, tipo, titulo)
-               values (%s, 'operativo', 'Integrar comprimidora 3') returning id""",
-            (ws,))
-        obj = cur.fetchone()
-    cur.execute(
-        """insert into task (workspace_id, objective_id, titulo, area_id,
-                             responsable_membership_id, fecha_objetivo,
-                             criterio_aceptacion, evidencia_requerida)
-           values (%s, %s, 'Programar PLC',
-                   (select id from area where workspace_id = %s and slug = %s),
-                   (select m.id from membership m join app_user u on u.id = m.app_user_id
-                     where m.workspace_id = %s and u.nombre = %s),
-                    %s, 'Resultado verificado', array['resultado_de_prueba'])
-           returning id""",
-        (ws, obj["id"], ws, area, ws, persona, vence))
-    t = cur.fetchone()["id"]
-    cur.execute(
-        "insert into task_state_event (task_id, estado_nuevo, actor_kind) "
-        "values (%s, 'asignada', 'leda')", (t,))
-    return t
+def _seguimiento(cur, ws, ahora) -> None:
+    """Un mensaje que Leda manda por su cuenta a Marcos, en la cola. Antes lo armaba la
+    cadencia vieja (`reloj.ejecutar_cadencia`, retirada en la E3-7); lo que se prueba acá es el
+    despacho, no quién lo encola."""
+    cur.execute("""select membership_id, telegram_user_id from integrante
+                    where workspace_id = %s and nombre = 'Marcos Tarquini'""", (ws,))
+    marcos = cur.fetchone()
+    enqueue_outbox(cur, workspace_id=ws, chat_id=marcos["telegram_user_id"],
+                   text="Tus tareas abiertas: Programar PLC.", message_type="seguimiento",
+                   recipient_membership_id=str(marcos["membership_id"]),
+                   scheduled_for=ahora, dedupe_key=f"{ws}:seguimiento:prueba")
+
 
 
 # ---------------------------------------------------------------------------
-# Escalera
+# Despacho
 # ---------------------------------------------------------------------------
-
-def test_escalera_avanza_por_dias_habiles(corework, conn):
-    ws = corework.workspace_id
-    vence = datetime(2026, 7, 24, 17, 0, tzinfo=BA)          # viernes
-    with admin(conn) as cur:
-        cargar_feriados_ar(cur, ws)
-        _tarea(cur, ws, vence=vence)
-
-    with espacio(conn, ws) as cur:
-        cal = Calendario.desde_base(cur, ws)
-
-        # jueves: todavía falta un día hábil -> aviso
-        a = escalera.evaluar(cur, ws, cal, datetime(2026, 7, 23, 10, 0, tzinfo=BA))
-        assert [x.paso for x in a] == ["aviso"]
-
-        # el mismo viernes -> primer recordatorio
-        a = escalera.evaluar(cur, ws, cal, datetime(2026, 7, 24, 10, 0, tzinfo=BA))
-        assert [x.paso for x in a] == ["recordar1"]
-
-        # sábado y domingo no cuentan: sigue en el primer recordatorio
-        a = escalera.evaluar(cur, ws, cal, datetime(2026, 7, 26, 10, 0, tzinfo=BA))
-        assert [x.paso for x in a] == ["recordar1"]
-
-        # lunes -> segundo
-        a = escalera.evaluar(cur, ws, cal, datetime(2026, 7, 27, 10, 0, tzinfo=BA))
-        assert [x.paso for x in a] == ["recordar2"]
-
-        # miércoles -> escala
-        a = escalera.evaluar(cur, ws, cal, datetime(2026, 7, 29, 10, 0, tzinfo=BA))
-        assert [x.paso for x in a] == ["escalar"]
-        assert a[0].escalamiento
-
-
-def test_ausente_no_recibe_ni_avanza(corework, conn):
-    ws = corework.workspace_id
-    with admin(conn) as cur:
-        _tarea(cur, ws, vence=datetime(2026, 7, 24, 17, 0, tzinfo=BA))
-        cur.execute(
-            """insert into absence (membership_id, desde, hasta)
-               select m.id, '2026-07-20', '2026-07-31'
-                 from membership m join app_user u on u.id = m.app_user_id
-                where u.nombre = 'Marcos Tarquini'""")
-
-    with espacio(conn, ws) as cur:
-        cal = Calendario.desde_base(cur, ws)
-        a = escalera.evaluar(cur, ws, cal, datetime(2026, 7, 27, 10, 0, tzinfo=BA))
-        assert a == []
-
-
-def test_tarea_bloqueada_sale_de_la_escalera(corework, conn):
-    ws = corework.workspace_id
-    with admin(conn) as cur:
-        t = _tarea(cur, ws, vence=datetime(2026, 7, 24, 17, 0, tzinfo=BA))
-        cur.execute(
-            "insert into blocker (workspace_id, task_id, causa) values (%s, %s, %s)",
-            (ws, t, "falta el switch en sala"))
-
-    with espacio(conn, ws) as cur:
-        cal = Calendario.desde_base(cur, ws)
-        a = escalera.evaluar(cur, ws, cal, datetime(2026, 7, 27, 10, 0, tzinfo=BA))
-        assert a == []
-
-
-def test_escalera_no_duplica_al_reintentar(corework, conn):
-    ws = corework.workspace_id
-    with admin(conn) as cur:
-        _tarea(cur, ws, vence=datetime(2026, 7, 24, 17, 0, tzinfo=BA))
-
-    ahora = datetime(2026, 7, 27, 10, 0, tzinfo=BA)
-    with espacio(conn, ws) as cur:
-        cal = Calendario.desde_base(cur, ws)
-        a = escalera.evaluar(cur, ws, cal, ahora)
-        assert escalera.encolar(cur, ws, a, cal, ahora) == 1
-        # el proceso reinicia y vuelve a evaluar el mismo momento
-        a = escalera.evaluar(cur, ws, cal, ahora)
-        assert escalera.encolar(cur, ws, a, cal, ahora) == 0
-
-
-# ---------------------------------------------------------------------------
-# Cadencia y despacho
-# ---------------------------------------------------------------------------
-
-def test_cadencia_encola_y_despacha(corework, conn):
-    ws = corework.workspace_id
-    with admin(conn) as cur:
-        _tarea(cur, ws, vence=datetime(2026, 8, 14, 17, 0, tzinfo=BA))
-
-    lunes = datetime(2026, 7, 27, 9, 15, tzinfo=BA)
-    with espacio(conn, ws) as cur:
-        cal = Calendario.desde_base(cur, ws)
-        n = reloj.ejecutar_cadencia(cur, ws, "objetivos_semanales", cal, lunes)
-        assert n == 1                      # sólo Marcos tiene tarea abierta
-
-        transporte = TransporteDePrueba()
-        r = despachar(cur, ws, transporte, cal, lunes)
-        assert r["enviados"] == 1
-        assert "Programar PLC" in transporte.enviados[0][1]
-
-
-def test_cadencia_no_duplica_en_la_misma_semana(corework, conn):
-    ws = corework.workspace_id
-    with admin(conn) as cur:
-        _tarea(cur, ws, vence=datetime(2026, 8, 14, 17, 0, tzinfo=BA))
-
-    with espacio(conn, ws) as cur:
-        cal = Calendario.desde_base(cur, ws)
-        lunes = datetime(2026, 7, 27, 9, 15, tzinfo=BA)
-        assert reloj.ejecutar_cadencia(cur, ws, "objetivos_semanales", cal, lunes) == 1
-        # reinicio un minuto después
-        assert reloj.ejecutar_cadencia(cur, ws, "objetivos_semanales", cal,
-                                       lunes + timedelta(minutes=1)) == 0
-
 
 def test_no_escribe_fuera_de_horario(corework, conn):
     ws = corework.workspace_id
-    with admin(conn) as cur:
-        _tarea(cur, ws, vence=datetime(2026, 8, 14, 17, 0, tzinfo=BA))
-
     with espacio(conn, ws) as cur:
         cal = Calendario.desde_base(cur, ws)
         lunes = datetime(2026, 7, 27, 9, 15, tzinfo=BA)
-        reloj.ejecutar_cadencia(cur, ws, "objetivos_semanales", cal, lunes)
+        _seguimiento(cur, ws, lunes)
 
         transporte = TransporteDePrueba()
         sabado = datetime(2026, 8, 1, 11, 0, tzinfo=BA)
@@ -264,13 +139,10 @@ def test_no_escribe_fuera_de_horario(corework, conn):
 
 def test_reintenta_y_abre_incidente(corework, conn):
     ws = corework.workspace_id
-    with admin(conn) as cur:
-        _tarea(cur, ws, vence=datetime(2026, 8, 14, 17, 0, tzinfo=BA))
-
     with espacio(conn, ws) as cur:
         cal = Calendario.desde_base(cur, ws)
         lunes = datetime(2026, 7, 27, 9, 15, tzinfo=BA)
-        reloj.ejecutar_cadencia(cur, ws, "objetivos_semanales", cal, lunes)
+        _seguimiento(cur, ws, lunes)
 
         cur.execute("select chat_id from message_outbox limit 1")
         chat = cur.fetchone()["chat_id"]

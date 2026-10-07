@@ -14,7 +14,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from leda import escalera, onboarding, reloj
+from leda import onboarding
 from leda.calendario import Calendario
 from leda.db import admin, espacio
 from leda.despachador import Boton, TransporteDePrueba, TransporteTelegram
@@ -27,34 +27,6 @@ from leda.salida import (BUTTON_TEXT_LIMIT, NO_EFFECT_STATUS, TELEGRAM_TEXT_LIMI
 ROOT = Path(__file__).resolve().parents[2]
 NOW = datetime(2026, 8, 14, 15, 0, tzinfo=timezone.utc)
 BA = ZoneInfo("America/Argentina/Buenos_Aires")
-
-
-def _tarea(cur, ws, *, area="ot", persona="Marcos Tarquini", vence=None,
-          estado="asignada"):
-    cur.execute("select id from objective where workspace_id = %s limit 1", (ws,))
-    obj = cur.fetchone()
-    if not obj:
-        cur.execute(
-            """insert into objective (workspace_id, tipo, titulo)
-               values (%s, 'operativo', 'Integrar comprimidora 3') returning id""",
-            (ws,))
-        obj = cur.fetchone()
-    cur.execute(
-        """insert into task (workspace_id, objective_id, titulo, area_id,
-                             responsable_membership_id, fecha_objetivo,
-                             criterio_aceptacion, evidencia_requerida)
-           values (%s, %s, 'Programar PLC',
-                   (select id from area where workspace_id = %s and slug = %s),
-                   (select m.id from membership m join app_user u on u.id = m.app_user_id
-                     where m.workspace_id = %s and u.nombre = %s),
-                    %s, 'Resultado verificado', array['resultado_de_prueba'])
-           returning id""",
-        (ws, obj["id"], ws, area, ws, persona, vence))
-    t = cur.fetchone()["id"]
-    cur.execute(
-        "insert into task_state_event (task_id, estado_nuevo, actor_kind) "
-        "values (%s, %s, 'leda')", (t, estado))
-    return t
 
 
 def test_payload_contract_normalizes_controls_and_counts_utf16_units():
@@ -203,15 +175,12 @@ def test_onboarding_scheduler_and_escalation_split_only_buttonless_messages(
                     ("Marcos Tarquini",))
         membership_id = str(cur.fetchone()["membership_id"])
         assert onboarding.encolar_presentacion(cur, ws, NOW)
-        cal = Calendario.desde_base(cur, ws)
-        action = escalera.Accion(
-            task_id="00000000-0000-0000-0000-000000000001", paso="aviso",
-            tipo="informativo", destinatario_membership_id=membership_id, chat_id=9002,
-            cuerpo=long_copy, dedupe_key="long-escalation",
-        )
-        escalera.encolar(cur, ws, [action], cal, NOW)
-        reloj._encolar(cur, ws, 9002, membership_id,
-                       long_copy, "long-cadence", cal, NOW)
+        # Lo que Leda manda por su cuenta, sin botones (antes, la escalera y la cadencia
+        # viejas, retiradas en la E3-7; hoy, los avisos guardados del motor): se parte.
+        for tipo, clave in (("informativo", "long-escalation"), ("seguimiento", "long-cadence")):
+            enqueue_outbox(cur, workspace_id=ws, chat_id=9002, text=long_copy,
+                           recipient_membership_id=membership_id, message_type=tipo,
+                           scheduled_for=NOW, dedupe_key=clave, allow_split=True)
         cur.execute("select cuerpo from message_outbox")
         rows = cur.fetchall()
         assert len(rows) >= 6
@@ -245,14 +214,16 @@ def test_despachar_con_fila_tomada_por_otra_conexion_no_la_duplica(
     from leda.despachador import despachar
 
     ws = corework.workspace_id
-    with admin(conn) as cur:
-        _tarea(cur, ws, vence=datetime(2026, 8, 14, 17, 0, tzinfo=BA))
-    conn.commit()
-
     ahora = datetime(2026, 7, 27, 9, 16, tzinfo=BA)
     with espacio(conn, ws) as cur:
-        cal = Calendario.desde_base(cur, ws)
-        assert reloj.ejecutar_cadencia(cur, ws, "objetivos_semanales", cal, ahora) == 1
+        cur.execute("""select membership_id, telegram_user_id from integrante
+                        where nombre = 'Marcos Tarquini'""")
+        marcos = cur.fetchone()
+        enqueue_outbox(cur, workspace_id=ws, chat_id=marcos["telegram_user_id"],
+                       text="Tus tareas abiertas: Programar PLC.", message_type="seguimiento",
+                       recipient_membership_id=str(marcos["membership_id"]),
+                       scheduled_for=ahora, dedupe_key="test:una-fila")
+    conn.commit()
 
     otra = conectar(uri)
     try:

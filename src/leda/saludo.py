@@ -201,9 +201,8 @@ MARGEN_SALUDO = (
 # donde `despachador._fallo` ya escribe sin este problema.
 #
 # `reportar_falla` marca en el `set` recién DESPUÉS de escribir el incidente
-# con éxito (mismo patrón de fondo que `ciclo.SupresorDeRepetidos`/
-# `reportar_fallo`, sin importarlo de `ciclo.py` para no crear un ciclo de
-# imports -- `ciclo -> despachador -> saludo -> ciclo`).
+# con éxito (el mismo patrón que tenía el ciclo de fondo viejo, retirado en la
+# E3-7, y que sigue el del motor: `motor.ciclo.Ciclo._caido`).
 # ---------------------------------------------------------------------------
 
 _FALLAS_SALUDO_REPORTADAS: set[tuple[str | None, str]] = set()

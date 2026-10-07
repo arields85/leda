@@ -40,9 +40,6 @@ PROMESAS_SIN_CUMPLIR = {
         "tiene nula.",
     "drive_file_id":
         "Evidencia almacenada en Drive (§11 de la especificación funcional).",
-    "preguntado_en":
-        "El ciclo de respuesta pendiente, que la escalera necesita para afirmar "
-        "silencio sobre evidencia real.",
     "intencion":
         "Clasificación de intención persistida del mensaje entrante.",
     "bot_token_ref":
@@ -77,11 +74,10 @@ PROMESAS_SIN_CUMPLIR = {
         "(E3-3).",
     "resuelta_en":
         "Cuándo se resolvió una acción pendiente (ver `resuelta_por`).",
-    "telegram_bot_id":
-        "El bot que recibió el mensaje entrante, para que una reentrega de "
-        "Telegram entre una sola vez (migración 0031). La usa el escuchador de "
-        "`prueba_chica/` durante la Etapa 2 del Motor; la Etapa 3 la lleva a "
-        "`src/leda` o la borra.",
+    "ultima_corrida":
+        "Cuándo corrió por última vez una cadencia (`cadence_job`). La escribía el "
+        "ciclo viejo de `leda`, retirado en la E3-7 con las cadencias; vuelve con el "
+        "circuito 5 (el pedido de estado de las cadencias), después de M3.",
 }
 
 # Tablas enteras sin implementación: sus columnas tampoco se referencian, y
@@ -104,7 +100,9 @@ TABLAS_DE_LA_PRUEBA_CHICA = (
 
 
 def _fuente() -> str:
-    return "\n".join(p.read_text("utf-8") for p in sorted(FUENTE.glob("*.py")))
+    """Todo `src/leda`, con sus paquetes: desde la E3-7 el motor de conversación
+    (`src/leda/motor/`) es quien lee y escribe buena parte del esquema."""
+    return "\n".join(p.read_text("utf-8") for p in sorted(FUENTE.rglob("*.py")))
 
 
 def _columnas_por_tabla() -> dict[str, set[str]]:

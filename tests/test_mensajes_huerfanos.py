@@ -3,12 +3,16 @@
 T9-H19d recupera un mensaje muerto cuando Telegram lo reentrega pasada la ventana.
 Si la reentrega no llega (Telegram dejó de reintentar, o el proceso murió y nadie
 reintenta), el recibo de la fase 1 queda sin respuesta para siempre: el barrido de
-`huerfanos.barrer` -- parte de cada pasada de fondo -- le encola el aviso neutro
+`huerfanos.barrer` -- parte de cada vuelta del ciclo del motor (`leda.motor.ciclo`, E3-7)
+-- le encola el aviso neutro
 aprobado y deja el incidente. No vuelve a correr el turno con contenido viejo.
 
 Las pruebas que llegaban al barrido por la conversación de los flujos A y B (un mensaje
-o un toque atendido por `gateway`) se retiraron con ellos (E3-4); la entrada del motor
-las rehace (E3-7). Las que siembran los recibos por SQL siguen acá.
+o un toque atendido por `gateway`) se retiraron con ellos (E3-4); las de la entrada del
+motor están en `tests/motor/test_nunca_en_silencio.py` (E3-7). Las que siembran los recibos
+por SQL siguen acá. Las del reporte deduplicado de una falla del barrido eran del ciclo viejo
+de `leda` (`ciclo.py`, retirado en la E3-7): en el ciclo del motor, el barrido es un paso
+aislado más (`tests/motor/test_ciclo.py`).
 """
 
 from __future__ import annotations
@@ -17,10 +21,13 @@ import time
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 
-from leda import ciclo, entrada, huerfanos
+from leda import entrada, huerfanos
 from leda.db import admin, conectar, espacio
 from leda.despachador import TransporteDePrueba
 from leda.incidentes import EXPLICACION_POR_ETAPA, NOTICIA_NEUTRA_INCIDENTE
+from leda.motor import ciclo as ciclo_del_motor
+from leda.motor.ciclo import Ciclo
+from leda.motor.tiempo import RelojDelSistema
 from leda.salida import enqueue_outbox
 
 
@@ -69,6 +76,12 @@ def _responder(conn, ws, chat, entrante_id, *, estado="listo"):
                values (%s, %s, 'normal', 'ok', %s, true, %s, %s)""",
             (ws, chat, estado, entrante_id, f"test:{entrante_id}"))
     conn.commit()
+
+
+def _ciclo(conn, ws, transporte) -> Ciclo:
+    """El ciclo del motor sin seguimiento: el barrido y el despacho (E3-7)."""
+    return Ciclo(conn, ws, None, RelojDelSistema(), transporte, seguimiento=False,
+                 imprimir=lambda *_: None)
 
 
 def _barrer(conn, ws, ahora=None):
@@ -307,9 +320,7 @@ def test_sin_membresia_activa_no_sale_ningun_mensaje_y_queda_un_incidente(
     (incidente,) = _incidentes(conn, ws)
     assert str(incidente["referencia_id"]) == recibo
     transporte = TransporteDePrueba()
-    ciclo.ejecutar_pasada(conn, ws, transporte, _ahora(),
-                          _ahora() - timedelta(hours=1), con_cadencias=False)
-    conn.commit()
+    _ciclo(conn, ws, transporte).vuelta()
     assert not [e for e in transporte.enviados if NOTICIA_NEUTRA_INCIDENTE in str(e)]
 
 
@@ -320,12 +331,9 @@ def test_el_ciclo_de_fondo_barre_y_despacha_el_aviso_en_la_misma_pasada(
     _recibo(conn, ws, uid, tg, hace=EN_CURSO + timedelta(minutes=1))
     transporte = TransporteDePrueba()
 
-    resumen = ciclo.ejecutar_pasada(
-        conn, ws, transporte, _ahora(), _ahora() - timedelta(hours=1),
-        con_cadencias=False)
-    conn.commit()
+    resultado = _ciclo(conn, ws, transporte).vuelta()
 
-    assert resumen["huerfanos_avisados"] == 1
+    assert resultado["huerfanos"] == 1
     assert [e for e in transporte.enviados if NOTICIA_NEUTRA_INCIDENTE in str(e)]
 
 
@@ -589,62 +597,6 @@ def test_el_barrido_usa_el_reloj_de_la_base_para_la_cota_de_24_horas(
 
 # --- El reporte de la falla del barrido y el despacho que sigue ---------------------
 
-def _resumen_vacio() -> dict:
-    """El resumen de una pasada del ciclo sin ningún efecto."""
-    return {"enviados": 0, "pospuestos": 0, "fallidos": 0, "descartados": 0,
-            "cadencias_encoladas": 0, "escalera_encoladas": 0,
-            "huerfanos_avisados": 0, "huerfanos_fallo": None,
-            "cadencias_fallidas": [], "cadencias_ok": []}
-
-
-def test_el_reporte_de_una_falla_del_barrido_es_deduplicado_y_no_deja_la_excepcion(
-        corework, conn):
-    ws = corework.workspace_id
-    supresor = ciclo.SupresorDeRepetidos()
-    impreso = []
-
-    def resumen():
-        r = _resumen_vacio()
-        r["huerfanos_fallo"] = RuntimeError("falla del barrido")
-        return r
-
-    primero = resumen()
-    ciclo.reportar_cadencias_rotas(conn, supresor, ws, "corework", primero,
-                                   imprimir=impreso.append)
-    ciclo.reportar_cadencias_rotas(conn, supresor, ws, "corework", resumen(),
-                                   imprimir=impreso.append)
-
-    assert "huerfanos_fallo" not in primero
-    assert not any(isinstance(v, BaseException) for v in primero.values())
-    assert len(impreso) == 1 and "RuntimeError" in impreso[0]
-    assert len(_incidentes_de_etapa(conn, ws, "ciclo_de_fondo")) == 1
-    assert supresor.activa((ws, "barrido_huerfanos"))
-
-
-def test_un_barrido_que_se_recupera_limpia_la_marca_y_una_falla_nueva_se_reporta(
-        corework, conn):
-    ws = corework.workspace_id
-    supresor = ciclo.SupresorDeRepetidos()
-    impreso = []
-    con_fallo = _resumen_vacio()
-    con_fallo["huerfanos_fallo"] = RuntimeError("x")
-    ciclo.reportar_cadencias_rotas(conn, supresor, ws, "corework", con_fallo,
-                                   imprimir=impreso.append)
-
-    sano = _resumen_vacio()
-    ciclo.reportar_cadencias_rotas(conn, supresor, ws, "corework", sano,
-                                   imprimir=impreso.append)
-    assert not supresor.activa((ws, "barrido_huerfanos"))
-    assert "huerfanos_fallo" not in sano
-
-    otra = _resumen_vacio()
-    otra["huerfanos_fallo"] = RuntimeError("y")
-    ciclo.reportar_cadencias_rotas(conn, supresor, ws, "corework", otra,
-                                   imprimir=impreso.append)
-    assert len(impreso) == 2
-    assert len(_incidentes_de_etapa(conn, ws, "ciclo_de_fondo")) == 2
-
-
 def test_una_falla_del_barrido_no_frena_el_despacho_y_se_reporta(
         corework, conn, monkeypatch):
     """El barrido falla DESPUÉS de una escritura parcial: esa escritura se revierte
@@ -669,15 +621,11 @@ def test_una_falla_del_barrido_no_frena_el_despacho_y_se_reporta(
                            is_response=True)
             raise RuntimeError("falla del barrido")
 
-    monkeypatch.setattr(huerfanos, "barrer", _revienta)
+    monkeypatch.setattr(ciclo_del_motor, "barrer_huerfanos", _revienta)
     transporte = TransporteDePrueba()
-    resumen = ciclo.ejecutar_pasada(
-        conn, ws, transporte, _ahora(), _ahora() - timedelta(hours=1),
-        con_cadencias=False)
-    conn.commit()
+    resultado = _ciclo(conn, ws, transporte).vuelta()
 
-    assert resumen["huerfanos_avisados"] == 0
-    assert isinstance(resumen["huerfanos_fallo"], RuntimeError)
+    assert resultado["huerfanos"] is None             # se cayó: un paso aislado
     enviados = [str(e) for e in transporte.enviados]
     assert any("Listo para salir" in e for e in enviados)
     assert not any("Parcial que se revierte" in e for e in enviados)

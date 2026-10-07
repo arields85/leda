@@ -19,8 +19,9 @@ En cada vuelta del escuchador (a lo sumo unos 25 segundos):
 4. **los avisos a la administración** (`despachador.despachar_avisos_admin`), con el reloj
    real: `admin_notice` lo fecha la base y no tiene horario.
 
-Nunca importa `leda.ciclo`, `leda.reloj` ni `leda.escalera` (sus textos son fijos y corren
-sobre las ramas de los flujos congelados; se retiran en la E3-7; `tests/motor/test_frontera.py`).
+Reemplaza al ciclo, al reloj y a la escalera viejos de `leda` (`leda.ciclo`, `leda.reloj`,
+`leda.escalera`, de textos fijos y con las cadencias), retirados en la E3-7; las cadencias
+vuelven después de M3. Detrás del webhook lo corre `fondo.py`.
 
 **Cada paso, aislado.** Corre en su transacción y se confirma solo. Si se cae, se deshace lo
 suyo, se dice en la consola y queda un incidente (`ETAPA_CICLO`) la primera vez: mientras siga
