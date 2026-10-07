@@ -62,11 +62,14 @@ BORDES_CONOCIDOS: dict[tuple[str, str | None, str], str] = {}
 # Las tablas que toca el SQL del motor, exactas. Capa 1: las preguntas y sus opciones, el
 # estado y el registro de turnos (con el mensaje y la salida que nombran), la espera de una
 # respuesta, los pasos guardados de la escalera y las previsiones que mueven el ancla, el
-# estado de las tareas y el tono del espacio.
+# estado de las tareas y el tono del espacio. Capa 2, las fichas: los bloqueos y quién los
+# destraba, las tareas que dependen de otra, los integrantes por su nombre y el referente de
+# quien escribe (`membership.aprobador_membership_id`).
 TABLAS_PERMITIDAS = {
-    "conversation_option", "conversation_question", "conversation_state",
-    "conversation_turn", "inbound_message", "message_outbox", "pending_reply",
-    "persona_config", "scheduled_notice", "task", "task_forecast",
+    "blocker", "blocker_unblocker", "conversation_option", "conversation_question",
+    "conversation_state", "conversation_turn", "dependency", "inbound_message", "integrante",
+    "membership", "message_outbox", "pending_reply", "persona_config", "scheduled_notice",
+    "task", "task_forecast",
 }
 
 _SQL = re.compile(r"\b(select|insert|update|delete)\b", re.IGNORECASE)
