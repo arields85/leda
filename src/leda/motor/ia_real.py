@@ -20,12 +20,20 @@ espacio sale de `model_config`, como hacía `leda.llm.desde_base`, retirado en l
 clave, del entorno, nunca del código). Sin reintentos propios: el reintento es uno solo y lo
 hace el turno (decisión 8). Cada llamada tiene un plazo total, además del tiempo por fase del
 cliente HTTP.
+
+Cada modelo lleva sus parámetros (`model_config.parametros`, o un argumento para el corredor de
+las conversaciones; E3-8, la comparación de IA): el tiempo por fase (`timeout_s`), el plazo total
+(`plazo_s`), los topes de salida (`tope_jugadas`, `tope_redaccion`) y campos propios del pedido
+(`cuerpo_extra`, por ejemplo para que un modelo no razone por dentro). `validar_parametros` los
+revisa al crear el cliente: un valor que no vale, o un nombre que no se conoce, se rechaza
+nombrándolo; nunca se reemplaza en silencio por el de omisión.
 """
 
 from __future__ import annotations
 
 import concurrent.futures
 import json
+import math
 from dataclasses import dataclass
 from typing import Any
 
@@ -53,6 +61,15 @@ TOPE_JUGADAS = 1500
 TOPE_REDACCION = 2000
 # Lo que el proveedor dice cuando cortó la respuesta por el tope.
 CORTADA_POR_EL_TOPE = frozenset({"length", "max_tokens"})
+# Los techos de los parámetros: más que esto es un error de escritura, no una espera razonable.
+SEGUNDOS_MAXIMOS = 600.0
+TOPE_MAXIMO = 32_768
+# Los parámetros que el cliente y la IA leen; cualquier otro nombre es un error de escritura.
+PARAMETROS = frozenset({"timeout_s", "reintentos", "plazo_s", "tope_jugadas", "tope_redaccion",
+                        "temperature", "base_url", "cuerpo_extra"})
+# Lo que arma el código en cada pedido: `cuerpo_extra` no lo puede pisar.
+DEL_PEDIDO = frozenset({"model", "messages", "tools", "tool_choice", "max_tokens",
+                        "max_completion_tokens", "temperature", "stream"})
 # Para elegir jugadas, los días que vienen con su día de la semana: una fecha que la persona
 # nombra por su día sale de ahí (`hechos.dias`).
 DIAS_PROXIMOS = 14
@@ -106,6 +123,83 @@ class PlazoAgotado(TimeoutError):
         super().__init__(f"sin respuesta en {plazo:g} s")
 
 
+class ParametrosInvalidos(ValueError):
+    """Un parámetro del modelo que no vale; el mensaje lo nombra."""
+
+
+def validar_parametros(parametros: dict[str, Any]) -> dict[str, Any]:
+    """Los parámetros del modelo, revisados y con los de omisión completados (`timeout_s`,
+    `reintentos`, `plazo_s`, los dos topes y `cuerpo_extra`). Un valor que no vale o un nombre
+    desconocido es `ParametrosInvalidos`, nombrándolo; nunca se ignora."""
+    if not isinstance(parametros, dict):
+        raise ParametrosInvalidos(f"Los parámetros del modelo son un objeto; vino {parametros!r}.")
+    desconocidos = sorted(set(parametros) - PARAMETROS)
+    if desconocidos:
+        raise ParametrosInvalidos(
+            f"Parámetro desconocido: {', '.join(map(repr, desconocidos))}; los que hay son "
+            f"{', '.join(sorted(PARAMETROS))}.")
+    try:
+        timeout, reintentos = tiempos(parametros)
+    except ValueError as e:
+        raise ParametrosInvalidos(str(e)) from None
+    if timeout > SEGUNDOS_MAXIMOS:
+        raise ParametrosInvalidos(
+            f"timeout_s debe ser de {SEGUNDOS_MAXIMOS:g} s o menos; vino {timeout!r}.")
+    validos = {**parametros, "timeout_s": timeout, "reintentos": reintentos,
+               "plazo_s": _segundos(parametros, "plazo_s", PLAZO_S),
+               "tope_jugadas": _tope(parametros, "tope_jugadas", TOPE_JUGADAS),
+               "tope_redaccion": _tope(parametros, "tope_redaccion", TOPE_REDACCION),
+               "cuerpo_extra": _cuerpo_extra(parametros.get("cuerpo_extra", {}))}
+    if "temperature" in parametros:
+        t = parametros["temperature"]
+        if (isinstance(t, bool) or not isinstance(t, (int, float)) or not math.isfinite(t)
+                or not 0 <= t <= 2):
+            raise ParametrosInvalidos(f"temperature debe ser un número de 0 a 2; vino {t!r}.")
+    if "base_url" in parametros:
+        b = parametros["base_url"]
+        if not isinstance(b, str) or not b.strip():
+            raise ParametrosInvalidos(f"base_url debe ser una dirección; vino {b!r}.")
+    return validos
+
+
+def _segundos(parametros: dict[str, Any], nombre: str, omision: float) -> float:
+    valor = parametros.get(nombre, omision)
+    if (isinstance(valor, bool) or not isinstance(valor, (int, float))
+            or not math.isfinite(valor) or not 0 < valor <= SEGUNDOS_MAXIMOS):
+        raise ParametrosInvalidos(
+            f"{nombre} debe ser un número de segundos mayor que 0 y de {SEGUNDOS_MAXIMOS:g} o "
+            f"menos; vino {valor!r}.")
+    return float(valor)
+
+
+def _tope(parametros: dict[str, Any], nombre: str, omision: int) -> int:
+    valor = parametros.get(nombre, omision)
+    # Un JSON escrito `1500.0` es un entero lógico: se acepta y se normaliza.
+    if isinstance(valor, float) and math.isfinite(valor) and valor.is_integer():
+        valor = int(valor)
+    if isinstance(valor, bool) or not isinstance(valor, int) or not 0 < valor <= TOPE_MAXIMO:
+        raise ParametrosInvalidos(
+            f"{nombre} debe ser un entero de tokens mayor que 0 y de {TOPE_MAXIMO} o menos; "
+            f"vino {valor!r}.")
+    return valor
+
+
+def _cuerpo_extra(extra: Any) -> dict[str, Any]:
+    if not isinstance(extra, dict) or not all(isinstance(k, str) for k in extra):
+        raise ParametrosInvalidos(
+            f"cuerpo_extra debe ser un objeto con los campos que se suman al pedido; vino "
+            f"{extra!r}.")
+    pisados = sorted(set(extra) & DEL_PEDIDO)
+    if pisados:
+        raise ParametrosInvalidos(
+            f"cuerpo_extra no puede llevar {', '.join(map(repr, pisados))}: lo arma el código.")
+    try:
+        json.dumps(extra)
+    except (TypeError, ValueError) as e:
+        raise ParametrosInvalidos(f"cuerpo_extra no se puede mandar como JSON ({e}).") from None
+    return dict(extra)
+
+
 def llamar_con_plazo(llamada, plazo: float):
     """El resultado de `llamada()` o `PlazoAgotado`: el plazo acota el tiempo TOTAL (el del
     cliente HTTP es por fase). La respuesta tardía se descarta; el hilo termina solo,
@@ -133,17 +227,20 @@ class ClienteCompatible:
     @classmethod
     def crear(cls, modelo: str, api_key: str, base_url: str, parametros: dict[str, Any],
               transporte: httpx.BaseTransport | None = None) -> ClienteCompatible:
-        timeout, _ = tiempos(parametros)     # los reintentos del proveedor no se usan
-        http = httpx.Client(timeout=timeout, transport=transporte,
+        parametros = validar_parametros(parametros)
+        # Los reintentos del proveedor no se usan: el reintento es uno y lo hace el turno.
+        http = httpx.Client(timeout=parametros["timeout_s"], transport=transporte,
                             headers={"Authorization": f"Bearer {api_key}"})
-        return cls(modelo, base_url.rstrip("/"), http, dict(parametros))
+        return cls(modelo, base_url.rstrip("/"), http, parametros)
 
     def completar(self, cuerpo: dict[str, Any]) -> dict[str, Any]:
         plazo = float(self.parametros.get("plazo_s", PLAZO_S))
+        # Los campos propios del modelo van primero: lo que arma el código nunca se pisa.
+        extra = self.parametros.get("cuerpo_extra") or {}
 
         def pedir() -> dict[str, Any]:
             r = self.http.post(f"{self.base_url}/chat/completions",
-                               json={"model": self.modelo, **cuerpo})
+                               json={**extra, "model": self.modelo, **cuerpo})
             r.raise_for_status()
             return r.json()
 
@@ -292,6 +389,12 @@ def desde_base(cur, workspace_id: str, claves) -> IAReal:
     if proveedor in ("anthropic", "gemini"):
         raise LookupError(f"El motor sólo habla el protocolo compatible con OpenAI; "
                           f"'{proveedor}' no lo usa.")
+    try:
+        parametros = validar_parametros(parametros)
+    except ParametrosInvalidos as e:
+        # Para quien llama, la IA no está configurada (incidente y aviso neutro), con el porqué.
+        raise LookupError(f"Los parámetros del modelo '{proveedor}/{fila['modelo']}' no "
+                          f"valen: {e}") from None
     base = parametros.get("base_url") or BASE_URLS.get(proveedor)
     if not base:
         raise LookupError(f"No hay dirección para el proveedor '{proveedor}'.")

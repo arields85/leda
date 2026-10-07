@@ -22,8 +22,10 @@ from leda.incidentes import ETAPA_TURNO_CONVERSACION
 from leda.motor import hechos
 from leda.motor.fichas import FICHAS, JUGADAS
 from leda.motor.ia import Jugada
-from leda.motor.ia_real import (DIAS_PROXIMOS, FUERA_DE_LA_LISTA, NOMBRE_HERRAMIENTA, PlazoAgotado,
-                                RespuestaInvalida, desde_base, esquema_de_jugadas)
+from leda.motor.ia_real import (DIAS_PROXIMOS, FUERA_DE_LA_LISTA, NOMBRE_HERRAMIENTA, PLAZO_S,
+                                TOPE_JUGADAS, TOPE_REDACCION, ClienteCompatible, IAReal,
+                                ParametrosInvalidos, PlazoAgotado, RespuestaInvalida, desde_base,
+                                esquema_de_jugadas, validar_parametros)
 from leda.motor.instrucciones import INSTRUCCIONES_JUGADAS, INSTRUCCIONES_REDACCION, Tono
 from leda.motor.tiempo import RelojFijo
 from leda.motor.turno import SOLO_SI_PREGUNTA, TEXTO_SI_LA_IA_FALLA, procesar_turno
@@ -459,3 +461,142 @@ def test_una_redaccion_cortada_se_reintenta_en_el_turno(conn, mundo, escribe):
     assert len(proveedor.pedidos) == 3
     assert resultado.error is None
     assert resultado.texto == "Quedó anotado que la tenés el martes 13."
+
+
+# --- Los parámetros por modelo (E3-8, la comparación de IA) ---------------------------------
+#
+# La regresión de la E3-8 con los dos modelos flash de `nan` falló sobre todo por los límites:
+# el corredor creaba el cliente sin parámetros. Cada modelo lleva los suyos (en
+# `model_config.parametros` o, para el corredor, como argumento): el tiempo por fase, el plazo
+# total, los dos topes de salida y campos propios del pedido (`cuerpo_extra`, por ejemplo para
+# que un modelo no razone por dentro). Un valor que no vale se rechaza nombrándolo; nunca se
+# reemplaza en silencio por el de omisión.
+
+def _ia_con(proveedor: ProveedorFalso, parametros: dict) -> IAReal:
+    cliente = ClienteCompatible.crear(
+        "glm5.3-flash", "clave-de-prueba", "https://proveedor.invalid/v1", parametros,
+        transporte=httpx.MockTransport(proveedor))
+    return IAReal(cliente, None, nombre="nan/glm5.3-flash")
+
+
+SIN_RAZONAR = {"cuerpo_extra": {"reasoning_effort": "low"}, "timeout_s": 60, "plazo_s": 90,
+               "tope_jugadas": 3000, "tope_redaccion": 4000}
+
+
+def test_los_campos_extra_viajan_en_los_dos_pedidos_y_los_topes_se_aplican():
+    proveedor = ProveedorFalso([llamada_de_jugadas({"jugadas": []}),
+                                respuesta_de_texto("Listo.")])
+    ia = _ia_con(proveedor, SIN_RAZONAR)
+
+    assert ia.elegir_jugadas(SITUACION) == []
+    assert ia.redactar({"hechos": []}) == "Listo."
+
+    eleccion, redaccion = (p["cuerpo"] for p in proveedor.pedidos)
+    assert eleccion["reasoning_effort"] == "low" and redaccion["reasoning_effort"] == "low"
+    assert eleccion["max_tokens"] == 3000 and redaccion["max_tokens"] == 4000
+    # Lo demás del pedido es el de siempre: el extra no lo pisa.
+    assert eleccion["model"] == "glm5.3-flash" and eleccion["tool_choice"] == "auto"
+    assert ia.cliente.http.timeout.read == 60
+
+
+def test_un_campo_extra_anidado_viaja_tal_cual():
+    proveedor = ProveedorFalso([respuesta_de_texto("Listo.")])
+    extra = {"chat_template_kwargs": {"enable_thinking": False}}
+    _ia_con(proveedor, {"cuerpo_extra": extra}).redactar({"hechos": []})
+    assert proveedor.pedidos[0]["cuerpo"]["chat_template_kwargs"] == {"enable_thinking": False}
+
+
+def test_sin_parametros_quedan_los_de_omision_y_ningun_campo_extra():
+    proveedor = ProveedorFalso([llamada_de_jugadas({"jugadas": []}),
+                                respuesta_de_texto("Listo.")])
+    ia = _ia_con(proveedor, {})
+    ia.elegir_jugadas(SITUACION)
+    ia.redactar({"hechos": []})
+
+    eleccion, redaccion = (p["cuerpo"] for p in proveedor.pedidos)
+    assert set(eleccion) == {"model", "temperature", "max_tokens", "messages", "tools",
+                             "tool_choice"}
+    assert set(redaccion) == {"model", "temperature", "max_tokens", "messages"}
+    assert (eleccion["max_tokens"], redaccion["max_tokens"]) == (TOPE_JUGADAS, TOPE_REDACCION)
+    assert validar_parametros({})["plazo_s"] == PLAZO_S
+
+
+def test_el_plazo_de_los_parametros_acota_la_llamada():
+    proveedor = ProveedorFalso([llamada_de_jugadas({"jugadas": []})], demora=1.0)
+    inicio = time.perf_counter()
+    with pytest.raises(PlazoAgotado):
+        _ia_con(proveedor, {"plazo_s": 0.2}).elegir_jugadas(SITUACION)
+    assert time.perf_counter() - inicio < 0.9
+
+
+@pytest.mark.parametrize(("parametros", "nombrado"), [
+    ({"plazo_s": 0}, "plazo_s"),
+    ({"plazo_s": -5}, "plazo_s"),
+    ({"plazo_s": "90"}, "plazo_s"),
+    ({"plazo_s": True}, "plazo_s"),
+    ({"plazo_s": None}, "plazo_s"),
+    ({"plazo_s": 100_000}, "plazo_s"),
+    ({"timeout_s": 0}, "timeout_s"),
+    ({"timeout_s": 100_000}, "timeout_s"),
+    ({"reintentos": -1}, "reintentos"),
+    ({"tope_jugadas": 0}, "tope_jugadas"),
+    ({"tope_jugadas": 1.5}, "tope_jugadas"),
+    ({"tope_jugadas": "1500"}, "tope_jugadas"),
+    ({"tope_redaccion": 10_000_000}, "tope_redaccion"),
+    ({"tope_redaccion": False}, "tope_redaccion"),
+    ({"temperature": 5}, "temperature"),
+    ({"cuerpo_extra": "reasoning_effort=low"}, "cuerpo_extra"),
+    ({"cuerpo_extra": ["reasoning_effort"]}, "cuerpo_extra"),
+    ({"cuerpo_extra": {"model": "otro"}}, "model"),
+    ({"cuerpo_extra": {"messages": []}}, "messages"),
+    ({"cuerpo_extra": {"tools": []}}, "tools"),
+    ({"cuerpo_extra": {"tool_choice": "required"}}, "tool_choice"),
+    ({"cuerpo_extra": {"max_tokens": 10}}, "max_tokens"),
+    ({"cuerpo_extra": {"max_completion_tokens": 10}}, "max_completion_tokens"),
+    ({"cuerpo_extra": {"temperature": 1}}, "temperature"),
+    ({"cuerpo_extra": {"stream": True}}, "stream"),
+    ({"plazo": 90}, "plazo"),                       # un nombre mal escrito no se ignora
+])
+def test_un_parametro_que_no_vale_se_rechaza_nombrandolo(parametros, nombrado):
+    with pytest.raises(ParametrosInvalidos, match=nombrado):
+        validar_parametros(parametros)
+    with pytest.raises(ParametrosInvalidos, match=nombrado):
+        _ia_con(ProveedorFalso([]), parametros)
+
+
+def test_los_parametros_validos_se_normalizan():
+    validos = validar_parametros({"timeout_s": 60, "plazo_s": 90.0, "tope_jugadas": 3000.0,
+                                  "reintentos": 2.0, "cuerpo_extra": {"reasoning_effort": "low"},
+                                  "base_url": "https://otro.invalid/v1", "temperature": 0.3})
+    assert validos["tope_jugadas"] == 3000 and isinstance(validos["tope_jugadas"], int)
+    assert validos["plazo_s"] == 90.0 and validos["timeout_s"] == 60
+    assert validos["cuerpo_extra"] == {"reasoning_effort": "low"}
+
+
+@pytest.mark.parametrize("respuesta", [
+    # GLM cuenta lo que razona dentro del tope: puede volver sin nada y cortada.
+    {"choices": [{"message": {"content": ""}, "finish_reason": "length"}]},
+    {"choices": [{"message": {"content": None, "tool_calls": []}, "finish_reason": "length"}]},
+])
+def test_una_respuesta_vacia_cortada_por_el_tope_es_no_responder_con_parametros(respuesta):
+    with pytest.raises(RespuestaInvalida):
+        _ia_con(ProveedorFalso([respuesta]), SIN_RAZONAR).elegir_jugadas(SITUACION)
+    with pytest.raises(RespuestaInvalida):
+        _ia_con(ProveedorFalso([respuesta]), SIN_RAZONAR).redactar({"hechos": []})
+
+
+def test_el_modelo_del_espacio_lleva_sus_parametros(conn, mundo):
+    _modelo(conn, "nan", "glm5.3-flash", parametros=SIN_RAZONAR)
+    with espacio(conn, mundo["id"]) as cur:
+        ia = desde_base(cur, mundo["id"], Claves())
+    assert ia.cliente.parametros["cuerpo_extra"] == {"reasoning_effort": "low"}
+    assert ia.cliente.parametros["plazo_s"] == 90
+    assert ia.cliente.http.timeout.read == 60
+
+
+def test_parametros_invalidos_en_la_base_son_un_modelo_no_configurado(conn, mundo):
+    """Quien llama trata `LookupError` como "la IA no está configurada" (incidente y aviso
+    neutro); un parámetro que no vale es eso, nombrándolo, nunca el valor de omisión."""
+    _modelo(conn, "nan", "glm5.3-flash", parametros={"cuerpo_extra": {"model": "otro"}})
+    with espacio(conn, mundo["id"]) as cur, pytest.raises(LookupError, match="model"):
+        desde_base(cur, mundo["id"], Claves())
