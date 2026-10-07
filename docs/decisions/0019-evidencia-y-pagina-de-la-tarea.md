@@ -1,8 +1,7 @@
 # ADR 0019: La evidencia de la entrega y la página de la tarea
 
-- **Estado:** propuesta. La decisión de origen es del usuario (2026-10-07); el resto es la propuesta
-  del agente, que el usuario acepta o corrige. Lo que figura como `PENDIENTE` no está decidido y no
-  se actúa sobre ello.
+- **Estado:** aceptado por el usuario el 2026-10-07, con sus cinco respuestas a las preguntas del
+  borrador. La decisión de origen es del usuario; el resto fue la propuesta del agente.
 - **Fecha:** abierta el 2026-10-07.
 - **Alcance:** cómo recibe y guarda Leda la evidencia de una entrega (texto, fotos y archivos por
   Telegram), cómo la lleva a quien aprueba y la página de sólo lectura de una tarea, que es el primer

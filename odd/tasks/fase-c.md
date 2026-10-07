@@ -90,7 +90,9 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
 ## Tareas
 
 - [x] **C-1.** Las preguntas 1 a 3, decididas por el usuario (2026-10-07).
-- [ ] **C-1b.** El ADR de la evidencia y la página de la tarea, aceptado por el usuario.
+- [x] **C-1b.** El ADR 0019, la evidencia y la página de la tarea: aceptado por el usuario (2026-10-07),
+  con cinco decisiones más (Ismael ve todas las páginas; resultado de prueba por texto; comprimidos y
+  proyectos sin abrirlos; lo mandado antes cuenta si se incluye; videos, 60 MB con 20 MB por ahora).
 - [ ] **C-2.** Conversaciones de prueba de la entrega y la aprobación.
 - [ ] **C-3.** Fichas de la entrega y la aprobación, la confirmación escrita y los avisos por el motor.
 - [ ] **C-4.** Regresión con la IA real y prueba por Telegram.
