@@ -99,7 +99,9 @@ class IANoRespondio(RuntimeError):
 
 
 def procesar_turno(conn: psycopg.Connection, quien: Solicitante, entrante_id: str, ia: IA,
-                   reloj: Reloj, jugadas: Mapping[str, Manejador] = JUGADAS) -> ResultadoTurno:
+                   reloj: Reloj, jugadas: Mapping[str, Manejador] = JUGADAS, *,
+                   al_avanzar: Callable[[str], None] | None = None) -> ResultadoTurno:
+    """Un mensaje escrito. Con `al_avanzar`, la redacción se ve en vivo (`_redactar`)."""
     with espacio(conn, quien.workspace_id) as cur:
         atar_al_entrante(cur, entrante_id)
         if _ya_tiene_turno(cur, quien, entrante_id):
@@ -115,11 +117,12 @@ def procesar_turno(conn: psycopg.Connection, quien: Solicitante, entrante_id: st
             return hechos
 
         return _turno(conn, cur, ctx, ia, reloj, elegir, manejar,
-                      clave_respuesta=f"motor:respuesta:{entrante_id}")
+                      clave_respuesta=f"motor:respuesta:{entrante_id}", al_avanzar=al_avanzar)
 
 
 def procesar_toque(conn: psycopg.Connection, quien: Solicitante, token: str, chat_id: int,
-                   ia: IA, reloj: Reloj) -> ResultadoTurno | None:
+                   ia: IA, reloj: Reloj, *,
+                   al_avanzar: Callable[[str], None] | None = None) -> ResultadoTurno | None:
     """Un toque de una opción: el mismo turno que la elección escrita (situación general 6).
     `None` si el token no es de una pregunta de esta persona (no se atiende); `repetido` si
     esa opción ya se tocó con su turno."""
@@ -138,13 +141,14 @@ def procesar_toque(conn: psycopg.Connection, quien: Solicitante, token: str, cha
         return _turno(conn, cur, ctx, ia, reloj, lambda: [jugada],
                       lambda _: [elegir_opcion(ctx, opcion)],
                       clave_respuesta=f"motor:toque:{opcion['id']}:{uuid.uuid4().hex}",
-                      option_id=str(opcion["id"]))
+                      option_id=str(opcion["id"]), al_avanzar=al_avanzar)
 
 
 def _turno(conn, cur, ctx: Contexto, ia: IA, reloj: Reloj,
            elegir: Callable[[], list[Jugada]],
            manejar: Callable[[list[Jugada]], list[dict[str, Any]]], *,
-           clave_respuesta: str, option_id: str | None = None) -> ResultadoTurno:
+           clave_respuesta: str, option_id: str | None = None,
+           al_avanzar: Callable[[str], None] | None = None) -> ResultadoTurno:
     """(2) a (6), iguales para un mensaje y un toque."""
     inicio = reloj.medir()
     elegidas: list[Jugada] | None = None    # None: la IA no llegó a elegir
@@ -160,8 +164,8 @@ def _turno(conn, cur, ctx: Contexto, ia: IA, reloj: Reloj,
             # (9k). También lo que un turno anterior dejó anunciado y ya no va a pasar, y lo
             # que sigue.
             final = al_final_del_turno(ctx, hechos)
-            texto = pedir_a_la_ia(lambda: no_vacio(
-                ia.redactar(_pedido_de_redaccion(ctx, hechos, pregunta, final.ya_no_sale))))
+            texto = pedir_a_la_ia(lambda: no_vacio(_redactar(
+                ia, _pedido_de_redaccion(ctx, hechos, pregunta, final.ya_no_sale), al_avanzar)))
     except IANoRespondio as falla:
         return _si_la_ia_falla(cur, ctx, ia, reloj, inicio, elegidas, falla, clave_respuesta,
                                option_id)
@@ -307,6 +311,19 @@ def pedir_a_la_ia(pedido: Callable[[], Any]) -> Any:
         except Exception as e:     # la IA es un servicio externo: cualquier falla es no responder
             ultima = e
     raise IANoRespondio(ultima)
+
+
+def _redactar(ia: IA, pedido: dict[str, Any],
+              al_avanzar: Callable[[str], None] | None) -> str:
+    """La redacción, la única parte del turno que se ve mientras la IA la escribe (pedido del
+    usuario, 2026-10-07): con `al_avanzar`, la IA avisa lo escrito hasta ahí y el escuchador lo
+    muestra en el borrador de Telegram. La elección de jugadas nunca se muestra. Lo que sale es
+    siempre el texto que devuelve, por el outbox; lo visto en vivo es efímero. Un reintento
+    vuelve a escribir desde el principio, y el borrador lo muestra igual. Sin nadie que mire,
+    se le pide como siempre: una IA sin ese argumento sigue sirviendo."""
+    if al_avanzar is None:
+        return ia.redactar(pedido)
+    return ia.redactar(pedido, al_avanzar=al_avanzar)
 
 
 # --- (3) y (4) Las jugadas ----------------------------------------------------------------

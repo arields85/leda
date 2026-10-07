@@ -7,6 +7,7 @@ real, con la llamada estructurada que fuerza la herramienta, va en `ia_real.py`.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
@@ -26,8 +27,12 @@ class IA(Protocol):
     def elegir_jugadas(self, situacion: dict[str, Any]) -> list[Jugada]:
         """Las jugadas que corresponden al mensaje, de `situacion["jugadas_posibles"]`."""
 
-    def redactar(self, pedido: dict[str, Any]) -> str:
-        """La respuesta a la persona, escrita desde `pedido["hechos"]`."""
+    def redactar(self, pedido: dict[str, Any],
+                 al_avanzar: Callable[[str], None] | None = None) -> str:
+        """La respuesta a la persona, escrita desde `pedido["hechos"]`. Con `al_avanzar`, quien
+        escribe en vivo avisa todo lo escrito hasta ahí cada vez que crece (lo muestra el
+        borrador de Telegram, pedido del usuario del 2026-10-07); quien no, no avisa nada. El
+        turno lo pasa sólo cuando alguien mira, así una IA sin ese argumento sigue sirviendo."""
 
 
 class GuionAgotado(RuntimeError):
@@ -49,9 +54,15 @@ class IAGuionada:
         self.pedidos_de_jugadas.append(situacion)
         return list(self._siguiente(self.jugadas))
 
-    def redactar(self, pedido: dict[str, Any]) -> str:
+    def redactar(self, pedido: dict[str, Any],
+                 al_avanzar: Callable[[str], None] | None = None) -> str:
+        """Con `al_avanzar`, avisa el texto preparado entero, como una IA en vivo que lo
+        escribió de una vez."""
         self.pedidos_de_redaccion.append(pedido)
-        return self._siguiente(self.redacciones)
+        texto = self._siguiente(self.redacciones)
+        if al_avanzar is not None:
+            al_avanzar(texto)
+        return texto
 
     @staticmethod
     def _siguiente(guion: list):

@@ -150,7 +150,7 @@ def atender_update(slug: str, update: dict[str, Any]) -> dict[str, bool]:
         ws = str(fila["id"])
         recepcion = Recepcion(conn, ws, _ia_de(conn, ws), _reloj_de(conn, ws),
                               bot_id=bot_id_del_token(token), senal=_senal(token),
-                              imprimir=_imprimir)
+                              imprimir=_imprimir, indicador=_indicador(token))
         intentos = _INTENTOS.setdefault(slug, IntentosPorUpdate())
         if not recibir_update(recepcion, intentos, update):
             raise HTTPException(status_code=503, detail="no se pudo recibir; reentregar")
@@ -206,6 +206,18 @@ def _senal(token: str):
         BotTelegram(token, _cliente_http()).llamar("answerCallbackQuery",
                                                    callback_query_id=callback_query_id)
     return senal
+
+
+def _indicador(token: str):
+    """El indicador de actividad de un turno (ADR 0011, decisión 2), por el bot que recibió el
+    mensaje y con el cliente HTTP de la aplicación: el "escribiendo…", los tres puntos y la
+    redacción en vivo. El motor sólo atiende chats privados, así que lleva borrador. La
+    respuesta sale con el despacho del servidor."""
+    from .despachador import mantener_chat_activo
+
+    def abrir(chat_id: int):
+        return mantener_chat_activo(token, chat_id, cliente=_cliente_http(), chat_type="private")
+    return abrir
 
 
 def _imprimir(linea: str) -> None:

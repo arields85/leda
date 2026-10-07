@@ -563,7 +563,11 @@ def _a_chat(salida: list[Any], por_partes: str, final: dict[str, Any]) -> dict[s
                       "completion_tokens": uso.get("output_tokens")}}
 
 
-def respuesta_de_eventos(eventos: Iterable[dict[str, Any]]) -> dict[str, Any]:
+def respuesta_de_eventos(eventos: Iterable[dict[str, Any]],
+                         al_avanzar: Callable[[str], None] | None = None) -> dict[str, Any]:
+    """La respuesta del flujo. Con `al_avanzar`, cada parte de texto que llega se avisa con todo
+    lo escrito hasta ahí (la respuesta en vivo, pedido del usuario del 2026-10-07). Un aviso que
+    falla no cambia la respuesta: es lo que se muestra mientras tanto, no lo que vale."""
     items: list[Any] = []
     partes: list[str] = []
     final: dict[str, Any] | None = None
@@ -573,6 +577,11 @@ def respuesta_de_eventos(eventos: Iterable[dict[str, Any]]) -> dict[str, Any]:
             items.append(evento.get("item"))
         elif tipo == "response.output_text.delta":
             partes.append(str(evento.get("delta") or ""))
+            if al_avanzar is not None:
+                try:
+                    al_avanzar("".join(partes))
+                except Exception:  # noqa: BLE001 -- lo que se muestra nunca rompe la respuesta
+                    pass
         elif tipo in ("response.completed", "response.incomplete"):
             final = evento.get("response") or {}
         elif tipo == "response.failed":
@@ -609,7 +618,12 @@ class ClienteChatGPT(ClienteCompatible):
         return cls(modelo=modelo, base_url=(parametros.get("base_url") or BASE_URL).rstrip("/"),
                    http=http, parametros=parametros, sesion=sesion)
 
-    def completar(self, cuerpo: dict[str, Any]) -> dict[str, Any]:
+    def completar(self, cuerpo: dict[str, Any],
+                  al_avanzar: Callable[[str], None] | None = None) -> dict[str, Any]:
+        """Con `al_avanzar`, el texto que el servicio va escribiendo se avisa a medida que llega
+        (`respuesta_de_eventos`). Corre en el hilo de `llamar_con_plazo`: si el plazo se agota,
+        el aviso puede seguir llegando después; quien lo recibe lo ignora (el borrador ya se
+        cerró, `despachador.IndicadorDeActividad`)."""
         plazo = float(self.parametros.get("plazo_s", PLAZO_S))
         extra = self.parametros.get("cuerpo_extra") or {}
         pedido, lite = pedido_de_respuestas(self.modelo, cuerpo)
@@ -634,7 +648,7 @@ class ClienteChatGPT(ClienteCompatible):
                 # real no declara el tipo; primera llamada real, 2026-10-07).
                 tipo = r.headers.get("content-type", "")
                 if "text/event-stream" in tipo or (not tipo and pedido.get("stream")):
-                    return respuesta_de_eventos(leer_eventos(r.iter_lines()))
+                    return respuesta_de_eventos(leer_eventos(r.iter_lines()), al_avanzar)
                 r.read()
                 try:
                     return respuesta_de_salida(r.json())

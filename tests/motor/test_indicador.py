@@ -46,7 +46,7 @@ class TelegramDeMentira:
         self.falla_en = falla_en
         self.ritmo = ritmo
         self.siguiente_id = 900
-        self._candado = threading.Lock()
+        self._candado = threading.RLock()     # los predicados de `esperar` lo vuelven a tomar
         self._hubo = threading.Condition(self._candado)
 
     def post(self, url, json=None):

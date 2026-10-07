@@ -16,6 +16,10 @@ escuchar:
   toca ni se sondea.
 - **El reloj de Leda** (`reloj.py`): el comando lo prende con el adelanto que se guarda en
   `leda_motor` con `python -m leda.motor.reloj`; se vuelve a leer en cada vuelta.
+- **El indicador de actividad** (`recibir.py`; ADR 0011, decisión 2): mientras corre el turno de
+  alguien del equipo, el "escribiendo…", los tres puntos del borrador y el texto que la IA va
+  redactando (`despachador.mantener_chat_activo`). Apenas termina el turno y se retira el
+  borrador, la respuesta se despacha (decisión 1): no espera al resto del lote ni de la vuelta.
 - **El ciclo** (`ciclo.py`): en cada vuelta, el despacho y los avisos a la administración; con
   `seguimiento` (el comando lo prende), la escalera y los avisos guardados una vez por minuto.
   Cada paso aislado: si uno se cae, un incidente y los demás siguen.
@@ -37,13 +41,15 @@ from typing import Any, Callable
 
 import httpx
 
+from ..calendario import Calendario
 from ..db import admin, espacio
-from ..despachador import Transporte, pedido_telegram, texto_error_seguro
+from ..despachador import Transporte, despachar, pedido_telegram, texto_error_seguro
 
+from .botones import ConOpciones
 from .ciclo import Ciclo
 from .ia import IA
-from .recibir import (INTENTOS_POR_UPDATE, IntentosPorUpdate, Recepcion, recibir_update,
-                      registrar_admin)
+from .recibir import (INTENTOS_POR_UPDATE, AbrirIndicador, IntentosPorUpdate, Recepcion,
+                      recibir_update, registrar_admin)
 from .tiempo import Reloj
 
 ESPERA_S = 25
@@ -71,9 +77,10 @@ class Escucha(Recepcion):
     def __init__(self, conn, workspace_id: str, ia: IA, reloj: Reloj, *, bot: BotTelegram,
                  transporte: Transporte, bot_admin: BotTelegram | None = None,
                  transporte_admin: Transporte | None = None, seguimiento: bool = False,
-                 imprimir: Callable[[str], None] = print) -> None:
+                 imprimir: Callable[[str], None] = print,
+                 indicador: AbrirIndicador | None = None) -> None:
         super().__init__(conn, workspace_id, ia, reloj, bot_id=None, senal=self._senal,
-                         imprimir=imprimir)
+                         imprimir=imprimir, indicador=indicador)
         self.bot = bot
         self.transporte = transporte
         self.bot_admin = bot_admin
@@ -143,7 +150,24 @@ class Escucha(Recepcion):
             if not recibir_update(self, self.intentos, u):
                 break       # se vuelve a pedir desde éste en la vuelta siguiente
             self.offset = u["update_id"] + 1
+            self.despachar_ahora()
         return len(updates)
+
+    def despachar_ahora(self) -> None:
+        """La respuesta del update que se acaba de recibir sale enseguida (ADR 0011, decisión
+        1): el borrador ya se retiró, y esperar al resto del lote o a la vuelta (que puede estar
+        redactando avisos) deja a la persona sin nada en pantalla. Es el mismo despacho del
+        ciclo, idempotente; si falla, se deshace y sale en el despacho de esta misma vuelta,
+        que es el que registra el incidente si la caída sigue."""
+        try:
+            with espacio(self.conn, self.ws) as cur:
+                despachar(cur, self.ws, ConOpciones(self.transporte, cur),
+                          Calendario.desde_base(cur, self.ws), self.reloj.ahora())
+            self.conn.commit()
+        except Exception as e:  # noqa: BLE001 -- lo despacha la vuelta
+            self.conn.rollback()
+            self.imprimir(f"  (no se pudo despachar enseguida: {texto_error_seguro(e)}; sale "
+                          f"en esta vuelta)")
 
     def _senal(self, callback_query_id: str) -> None:
         self.bot.llamar("answerCallbackQuery", callback_query_id=callback_query_id)
@@ -185,7 +209,7 @@ def _parar(*_) -> None:
 def main(argv: list[str] | None = None) -> int:
     from ..config import config
     from ..db import conectar
-    from ..despachador import TransporteTelegram
+    from ..despachador import TransporteTelegram, mantener_chat_activo
 
     from .ia_real import desde_base
     from .reloj import RelojDeLeda
@@ -222,7 +246,9 @@ def main(argv: list[str] | None = None) -> int:
         transporte=TransporteTelegram(token),
         bot_admin=BotTelegram(token_admin, httpx.Client(timeout=15)) if token_admin else None,
         transporte_admin=TransporteTelegram(token_admin) if token_admin else None,
-        seguimiento=True)
+        seguimiento=True,
+        # El motor sólo atiende chats privados (`recibir.py`): con borrador.
+        indicador=lambda chat_id: mantener_chat_activo(token, chat_id, chat_type="private"))
     try:
         usuario = escucha.preparar()
     except Exception as e:  # noqa: BLE001

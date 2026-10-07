@@ -17,6 +17,7 @@ from __future__ import annotations
 import json
 import random
 import threading
+import time
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
@@ -29,7 +30,7 @@ from .calendario import Calendario
 from .incidentes import (ETAPA_ENTREGA_AVISO_ADMIN, ETAPA_ENTREGA_MENSAJE,
                          REFERENCIA_ADMIN_NOTICE, redactar_secreto_telegram,
                          registrar_incidente)
-from .salida import (ETIQUETA_COPIAR, cabe_en_boton_de_copiar, prepare_buttons,
+from .salida import (ETIQUETA_COPIAR, cabe_en_boton_de_copiar, formatear, prepare_buttons,
                      prepare_payload, texto_y_entidades)
 
 
@@ -215,6 +216,162 @@ def _enviar_borrador_semilla(http, token: str, chat_id: int, draft_id: int) -> N
         json={"chat_id": chat_id, "draft_id": draft_id, "text": SEMILLA_INDICADOR})
 
 
+class _RitmoTelegram(Exception):
+    """Telegram pidió ir más despacio (HTTP 429): no es una falla del borrador, se espera lo
+    que pide y se sigue."""
+
+    def __init__(self, espera: float) -> None:
+        super().__init__(f"Telegram pidió esperar {espera} s")
+        self.espera = espera
+
+
+# Lo más que se espera ante un 429 antes de volver a mandar el borrador: el mensaje de verdad
+# sale igual, así que no vale la pena esperar más.
+ESPERA_MAXIMA_RITMO = 2.0
+
+# Un mensaje de Telegram admite hasta 4096 caracteres; el borrador, también.
+LIMITE_DE_BORRADOR = 4096
+
+# Cada cuánto, a lo sumo, se actualiza el borrador con el texto que la IA va escribiendo. El
+# primero sale enseguida; lo que llega antes se junta y sale lo último. Es el valor que pidió
+# el usuario en la prueba real del 2026-10-01 ("que apenas tenga algo para mostrar lo
+# muestre"), en la rama congelada; un 429 de Telegram se respeta igual. Valor a configurar
+# desde la plataforma.
+INTERVALO_DE_BORRADOR = 0.15
+
+
+def texto_del_borrador(texto: str) -> str:
+    """Lo que muestra el borrador de un texto a medio escribir: texto plano, sin las marcas del
+    formato (`salida.formatear`), que llegan como negritas con el mensaje de verdad. Una marca
+    que todavía no se cerró tampoco se ve."""
+    plano = formatear(texto)[0].replace("**", "").rstrip("*")
+    return plano[:LIMITE_DE_BORRADOR]
+
+
+def _enviar_borrador_texto(http, token: str, chat_id: int, draft_id: int,
+                           texto: str) -> None:
+    """El mismo borrador nativo de la semilla, con texto: Telegram lo reemplaza (mismo
+    `draft_id`) y lo muestra creciendo. Un 429 se distingue (`_RitmoTelegram`) y cualquier otro
+    error HTTP se levanta."""
+    r = pedido_telegram(
+        http.post, f"https://api.telegram.org/bot{token}/sendMessageDraft",
+        json={"chat_id": chat_id, "draft_id": draft_id, "text": texto})
+    codigo = getattr(r, "status_code", 200)
+    if codigo == 429:
+        try:
+            espera = float(((r.json() or {}).get("parameters") or {}).get("retry_after", 1))
+        except Exception:  # noqa: BLE001 - sin cuerpo legible, un segundo
+            espera = 1.0
+        raise _RitmoTelegram(espera)
+    if codigo >= 400:
+        raise ErrorTelegram(f"HTTP {codigo}: {_descripcion_telegram(r) or ''}".strip())
+
+
+class IndicadorDeActividad:
+    """Lo que `mantener_chat_activo` le da a quien atiende el turno: el borrador nativo que
+    abrió el indicador, para mostrarle el texto que la IA va redactando (respuesta en vivo,
+    pedido del usuario del 2026-10-07; mecanismo de la rama congelada, probado en Telegram real
+    el 2026-10-01).
+
+    Efímero: es el borrador, nunca un mensaje; no pasa por el outbox, no se audita y no lleva
+    botones. El mensaje de verdad sale por el outbox, con su texto, y el indicador retira el
+    borrador antes, como siempre. Seguro entre hilos: lo llama el hilo que lee lo que escribe
+    la IA mientras el hilo del indicador manda la semilla y el "escribiendo…"; `candado` los
+    ordena, y el cierre lo toma antes de retirar, así nunca se cruzan."""
+
+    def __init__(self, http, token: str, chat_id: int, draft_id: int,
+                 admite_borrador: bool, impresos: set[str], reloj=time.monotonic,
+                 intervalo: float = INTERVALO_DE_BORRADOR) -> None:
+        self._http, self._token, self._chat_id = http, token, chat_id
+        self.draft_id = draft_id
+        self.admite_borrador = admite_borrador
+        self._impresos, self._reloj, self._intervalo = impresos, reloj, intervalo
+        self.candado = threading.Lock()
+        self.cerrado = threading.Event()
+        # Con texto en el borrador, la semilla ya no se manda: lo taparía.
+        self.con_texto = threading.Event()
+        self.intentado = threading.Event()
+        self.activado = threading.Event()
+        self._ultimo_texto: str | None = None
+        self._ultimo_envio: float | None = None
+        self._fallo = False
+        # El último texto que tiene que mostrar el borrador y si hay un trabajador mandándolo
+        # (`_trabajar`): uno solo por indicador.
+        self._estado = threading.Lock()
+        self._pendiente: str | None = None
+        self._trabajando = False
+
+    def actualizar_borrador(self, texto: str) -> None:
+        """Deja `texto` (lo escrito hasta ahora) como lo último que tiene que mostrar el
+        borrador. Nunca espera a Telegram y nunca lanza: un solo trabajador en segundo plano
+        manda siempre el texto más reciente, a lo sumo una vez cada `intervalo`, y sólo si
+        cambió; lo que llega mientras hay un envío en vuelo o antes del intervalo queda
+        pendiente y sale apenas se puede. Una falla se reporta una vez por turno y no se
+        insiste en el resto del turno. Después del cierre no hace nada: la respuesta de una IA
+        que llega tarde nunca reabre un borrador."""
+        if not self.admite_borrador or self._fallo or self.cerrado.is_set():
+            return
+        try:
+            texto = texto_del_borrador(texto)
+        except Exception:  # noqa: BLE001 - cosmético: sin texto, quedan los tres puntos
+            return
+        if not texto.strip():
+            return
+        with self._estado:
+            self._pendiente = texto
+            if self._trabajando:
+                return
+            self._trabajando = True
+        self.con_texto.set()
+        self.activado.set()
+        try:
+            threading.Thread(target=self._trabajar, name="leda-borrador",
+                             daemon=True).start()
+        except Exception:  # noqa: BLE001 - cosmético: sin hilo no hay texto en vivo
+            self._terminar()
+
+    def _terminar(self) -> None:
+        with self._estado:
+            self._trabajando = False
+
+    def _trabajar(self) -> None:
+        while True:
+            with self._estado:
+                texto = self._pendiente
+                if (texto is None or texto == self._ultimo_texto or self._fallo
+                        or self.cerrado.is_set()):
+                    self._trabajando = False
+                    return
+            if self._ultimo_envio is not None:
+                espera = self._intervalo - (self._reloj() - self._ultimo_envio)
+                if espera > 0 and self.cerrado.wait(espera):
+                    self._terminar()
+                    return
+                with self._estado:
+                    texto = self._pendiente      # lo más nuevo después de esperar
+            with self.candado:
+                if self.cerrado.is_set() or self._fallo:
+                    self._terminar()
+                    return
+                self._ultimo_envio = self._reloj()
+                ritmo = None
+                try:
+                    _enviar_borrador_texto(self._http, self._token, self._chat_id,
+                                           self.draft_id, texto)
+                    self._ultimo_texto = texto
+                except _RitmoTelegram as e:
+                    ritmo = e.espera
+                except Exception as e:  # noqa: BLE001 - no fatal, se reporta
+                    self._fallo = True
+                    _reportar_falla_indicador(self._impresos, "stream", e)
+                finally:
+                    self.intentado.set()
+            if ritmo is not None and self.cerrado.wait(
+                    min(max(ritmo, 0.0), ESPERA_MAXIMA_RITMO)):
+                self._terminar()
+                return
+
+
 def _retirar_borrador(http, token: str, chat_id: int) -> None:
     """Retira el borrador nativo materializando la semilla como mensaje
     normal -- silencioso, para no sonar ni vibrar por un mensaje que se
@@ -306,12 +463,20 @@ def mantener_chat_activo(token: str, chat_id: int, *, cliente=None,
                          nombre_hilo: str = "leda-typing",
                          espera_cierre: float = 0.25,
                          timeout_borrador: float = _TIMEOUT_CLIENTE_INDICADOR,
-                         cur=None, workspace_id: str | None = None):
+                         cur=None, workspace_id: str | None = None,
+                         intervalo_borrador: float = INTERVALO_DE_BORRADOR,
+                         reloj=time.monotonic):
     """Indicador de actividad mientras se procesa un turno: "escribiendo…"
     y, en chat privado, un borrador nativo -- ninguno de los dos aparece si
     la respuesta está lista antes de `umbral` segundos (decisión del
     usuario, 2026-09-27: nunca un destello en una respuesta rápida; ADR
     0011, decisión 2).
+
+    Da el `IndicadorDeActividad` del turno: con `actualizar_borrador`, quien
+    atiende el turno muestra en el borrador el texto que la IA va
+    redactando (pedido del usuario, 2026-10-07). Sin texto, el borrador
+    queda con la semilla: los tres puntos. Si no se pudo armar el
+    indicador, da `None`.
 
     El borrador sólo se intenta si `chat_type` es `"private"` -- Bot API
     9.5 sólo lo abrió ahí; en grupo o canal degrada en silencio a sólo
@@ -352,15 +517,19 @@ def mantener_chat_activo(token: str, chat_id: int, *, cliente=None,
     try:
         http = cliente or httpx.Client(timeout=_TIMEOUT_CLIENTE_INDICADOR)
     except Exception:  # noqa: BLE001 - cosmetic
-        yield
+        yield None
         return
     owned_client = cliente is None
     detener = threading.Event()
-    activado = threading.Event()
-    borrador_intentado = threading.Event()
     intenta_borrador = (chat_type or "").lower() == "private"
     draft_id = random.randint(1, 2**31 - 1)
     impresos: set[str] = set()
+    indicador = IndicadorDeActividad(http, token, chat_id, draft_id, intenta_borrador,
+                                     impresos, reloj, intervalo_borrador)
+    # Los mismos eventos de siempre, compartidos con el indicador: el texto en vivo también
+    # "activa" el borrador y resuelve su intento.
+    activado = indicador.activado
+    borrador_intentado = indicador.intentado
 
     def ciclo() -> None:
         try:
@@ -369,7 +538,11 @@ def mantener_chat_activo(token: str, chat_id: int, *, cliente=None,
             activado.set()
             if intenta_borrador:
                 try:
-                    _enviar_borrador_semilla(http, token, chat_id, draft_id)
+                    with indicador.candado:
+                        # Con el texto de la respuesta ya en el borrador, la
+                        # semilla lo taparía: no se manda.
+                        if not indicador.con_texto.is_set():
+                            _enviar_borrador_semilla(http, token, chat_id, draft_id)
                 except Exception as e:  # noqa: BLE001 - no fatal, se reporta
                     _reportar_falla_indicador(impresos, "borrador", e)
                 finally:
@@ -386,7 +559,9 @@ def mantener_chat_activo(token: str, chat_id: int, *, cliente=None,
         finally:
             if owned_client:
                 try:
-                    http.close()
+                    indicador.cerrado.set()
+                    with indicador.candado:     # espera un texto en vuelo
+                        http.close()
                 except Exception:  # noqa: BLE001 - cosmetic cleanup is isolated
                     pass
 
@@ -396,11 +571,16 @@ def mantener_chat_activo(token: str, chat_id: int, *, cliente=None,
     except Exception:  # noqa: BLE001 - cosmetic
         if owned_client:
             _close_client_bounded(http, espera_cierre)
-        yield
+        yield None
         return
     try:
-        yield
+        yield indicador
     finally:
+        # Ningún texto más: el mensaje de verdad ya está en el outbox (o no va a estar), y el
+        # retiro no puede cruzarse con una actualización del borrador en vuelo.
+        indicador.cerrado.set()
+        if indicador.candado.acquire(timeout=timeout_borrador):
+            indicador.candado.release()
         detener.set()
         try:
             hilo.join(timeout=espera_cierre)
@@ -426,11 +606,25 @@ def mantener_chat_activo(token: str, chat_id: int, *, cliente=None,
                     if owned_client:
                         with httpx.Client(timeout=_TIMEOUT_CLIENTE_INDICADOR) as http_retiro:
                             _retirar_borrador(http_retiro, token, chat_id)
+                            _escribiendo_tras_el_retiro(http_retiro, token, chat_id, impresos)
                     else:
                         _retirar_borrador(http, token, chat_id)
+                        _escribiendo_tras_el_retiro(http, token, chat_id, impresos)
                 except Exception as e:  # noqa: BLE001 - no fatal, pero pesa más
                     _reportar_falla_indicador(impresos, "retiro", e)
                     _reportar_falla_retiro(cur, workspace_id, e)
+
+
+def _escribiendo_tras_el_retiro(http, token: str, chat_id: int, impresos: set[str]) -> None:
+    """El retiro manda (y borra) un mensaje, y cualquier mensaje del bot apaga el
+    "escribiendo…" en Telegram; la respuesta de verdad sale después, por el outbox, y ese
+    hueco se veía como "aparece y se va antes de la respuesta" (prueba real del 2026-10-01, en
+    la rama congelada). Un "escribiendo…" más lo cubre hasta que la respuesta llega y lo
+    reemplaza. Falla como cualquier typing: no fatal, se reporta."""
+    try:
+        _enviar_chat_action(http, token, chat_id)
+    except Exception as e:  # noqa: BLE001 - no fatal, se reporta
+        _reportar_falla_indicador(impresos, "typing", e)
 
 
 MAX_INTENTOS = 5

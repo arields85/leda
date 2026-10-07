@@ -18,11 +18,20 @@ servidor no cambie el comportamiento. Portado de `prueba_chica/escuchar.py`, bor
   escribe deja registrado su chat para los avisos de incidentes.
 
 Lo que no es un mensaje escrito de alguien del equipo (un grupo, un mensaje editado, una foto
-sin texto, un desconocido) no se atiende. Si un turno se cae por algo que no es la IA, queda un
-incidente y la persona recibe el texto fijo de la falla (nunca en silencio). Si falla recibir un
-update (guardarlo, activar, atender un toque), quien llama deshace lo suyo y lo reintenta; a los
-`INTENTOS_POR_UPDATE` lo deja, con un incidente y el texto fijo a quien escribió o tocó
-(`recibir_update`).
+sin texto, un desconocido) no se atiende.
+
+**El indicador de actividad** (ADR 0011, decisión 2; pedido del usuario, 2026-10-07): mientras
+corre el turno de alguien del equipo (un mensaje o un toque), `indicador` muestra el
+"escribiendo…", los tres puntos del borrador y, cuando la IA redacta, el texto que va
+escribiendo (`despachador.mantener_chat_activo`). Se apaga al terminar el turno, salga lo que
+salga, y antes de que se despache la respuesta: el borrador se retira primero. Lo que Leda manda
+por su cuenta (avisos, escalera) no pasa por acá y nunca lo muestra. Una falla del indicador no
+cambia el turno.
+
+Si un turno se cae por algo que no es la IA, queda un incidente y la persona recibe el texto fijo
+de la falla (nunca en silencio). Si falla recibir un update (guardarlo, activar, atender un
+toque), quien llama deshace lo suyo y lo reintenta; a los `INTENTOS_POR_UPDATE` lo deja, con un
+incidente y el texto fijo a quien escribió o tocó (`recibir_update`).
 
 **Nunca en silencio** (con el barrido de `leda.huerfanos`, que corre en el ciclo): el mensaje se
 guarda con la hora de la base, que es con la que el barrido mide la ventana del turno en curso
@@ -35,7 +44,8 @@ respuesta tardía nunca salen los dos.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import AbstractContextManager, contextmanager
 from typing import Any
 
 from ..autoridad import Canal, Denegado, identificar, identificar_en_espacio
@@ -53,6 +63,10 @@ from .tiempo import Reloj
 from .turno import TEXTO_SI_LA_IA_FALLA, procesar_toque, procesar_turno
 
 INTENTOS_POR_UPDATE = 3     # un update que falla al recibirse se reintenta; después, se deja
+
+# El indicador de un turno: con el chat, un contexto que lo muestra mientras dura y da algo con
+# `actualizar_borrador` y `admite_borrador` (`despachador.IndicadorDeActividad`), o `None`.
+AbrirIndicador = Callable[[int], AbstractContextManager[Any]]
 
 
 def bot_id_del_token(token: str) -> int:
@@ -78,7 +92,7 @@ class IANoConfigurada:
     def elegir_jugadas(self, situacion: dict[str, Any]) -> list:
         raise LookupError(self.motivo)
 
-    def redactar(self, pedido: dict[str, Any]) -> str:
+    def redactar(self, pedido: dict[str, Any], al_avanzar=None) -> str:
         raise LookupError(self.motivo)
 
 
@@ -108,7 +122,8 @@ class Recepcion:
 
     def __init__(self, conn, workspace_id: str, ia: IA, reloj: Reloj, *,
                  bot_id: int | None = None, senal: Callable[[str], Any] | None = None,
-                 imprimir: Callable[[str], None] = print) -> None:
+                 imprimir: Callable[[str], None] = print,
+                 indicador: AbrirIndicador | None = None) -> None:
         self.conn = conn
         self.ws = workspace_id
         self.ia = ia
@@ -116,6 +131,7 @@ class Recepcion:
         self.bot_id = bot_id
         self.senal = senal
         self.imprimir = imprimir
+        self.indicador = indicador
 
     def procesar(self, u: dict[str, Any]) -> None:
         if u.get("callback_query"):
@@ -139,20 +155,59 @@ class Recepcion:
             return
         quien, entrante = guardado
         self.imprimir(f"  ← {quien.nombre}: {texto[:70]}")
-        try:
-            # El candado por mensaje se suelta con el commit, al terminar el turno.
-            with self.conn.transaction():
-                if self._ya_respondido(entrante, chat_id, mensaje["message_id"]):
-                    self.imprimir("  (ese mensaje ya tiene respuesta: no se vuelve a atender)")
-                    return
-                resultado = procesar_turno(self.conn, quien, entrante, self.ia, self.reloj)
-        except Exception as e:  # noqa: BLE001 -- nunca en silencio: incidente y texto fijo
-            self.conn.rollback()
-            self._turno_caido(quien, chat_id, e, entrante=entrante,
-                              clave=f"motor:respuesta:{entrante}")
-            return
+        with self._indicador_del_turno(chat_id) as al_avanzar:
+            try:
+                # El candado por mensaje se suelta con el commit, al terminar el turno.
+                with self.conn.transaction():
+                    if self._ya_respondido(entrante, chat_id, mensaje["message_id"]):
+                        self.imprimir("  (ese mensaje ya tiene respuesta: no se vuelve a "
+                                      "atender)")
+                        return
+                    resultado = procesar_turno(self.conn, quien, entrante, self.ia, self.reloj,
+                                               al_avanzar=al_avanzar)
+            except Exception as e:  # noqa: BLE001 -- nunca en silencio: incidente y texto fijo
+                self.conn.rollback()
+                self._turno_caido(quien, chat_id, e, entrante=entrante,
+                                  clave=f"motor:respuesta:{entrante}")
+                return
         if not resultado.repetido:
             self.imprimir(f"  → {resultado.texto[:70]}")
+
+    @contextmanager
+    def _indicador_del_turno(self, chat_id: int) -> Iterator[Callable[[str], None] | None]:
+        """El indicador mientras dura el turno; da con qué mostrar la redacción en vivo, o
+        `None` si no hay borrador donde mostrarla. Una falla al abrirlo o al cerrarlo queda en
+        la consola y el turno sigue igual: es cosmético (constitución §10). Lo que falle adentro
+        del turno sale tal cual, después de apagar el indicador."""
+        if self.indicador is None:
+            yield None
+            return
+        try:
+            contexto = self.indicador(chat_id)
+            abierto = contexto.__enter__()
+        except Exception as e:  # noqa: BLE001 -- sin indicador, el turno igual
+            self.imprimir(f"  ! el indicador de actividad no arrancó: {texto_error_seguro(e)}")
+            yield None
+            return
+        al_avanzar = (getattr(abierto, "actualizar_borrador", None)
+                      if getattr(abierto, "admite_borrador", False) else None)
+        try:
+            yield al_avanzar
+        except BaseException as e:
+            self._apagar(contexto, e)
+            raise
+        else:
+            self._apagar(contexto, None)
+
+    def _apagar(self, contexto: AbstractContextManager[Any],
+                error: BaseException | None) -> None:
+        try:
+            if error is None:
+                contexto.__exit__(None, None, None)
+            else:
+                contexto.__exit__(type(error), error, error.__traceback__)
+        except Exception as e:  # noqa: BLE001 -- el turno ya terminó; queda en la consola
+            self.imprimir(f"  ! el indicador de actividad no se apagó: {texto_error_seguro(e)}")
 
     def _ya_respondido(self, entrante: str, chat_id: int, message_id: int) -> bool:
         """Toma el candado del mensaje (el mismo del barrido de huérfanos; espera si el
@@ -189,13 +244,16 @@ class Recepcion:
             self.imprimir("  (un toque de alguien que no es del equipo: no se atiende)")
             return
         self.imprimir(f"  ← {quien.nombre} tocó una opción")
-        try:
-            resultado = procesar_toque(self.conn, quien, token, chat["id"], self.ia, self.reloj)
-            self.conn.commit()
-        except Exception as e:  # noqa: BLE001 -- nunca en silencio: incidente y texto fijo
-            self.conn.rollback()
-            self._turno_caido(quien, chat["id"], e, clave=f"motor:toque_caido:{toque['id']}")
-            return
+        with self._indicador_del_turno(chat["id"]) as al_avanzar:
+            try:
+                resultado = procesar_toque(self.conn, quien, token, chat["id"], self.ia,
+                                           self.reloj, al_avanzar=al_avanzar)
+                self.conn.commit()
+            except Exception as e:  # noqa: BLE001 -- nunca en silencio: incidente y texto fijo
+                self.conn.rollback()
+                self._turno_caido(quien, chat["id"], e,
+                                  clave=f"motor:toque_caido:{toque['id']}")
+                return
         if resultado is not None and not resultado.repetido:
             self.imprimir(f"  → {resultado.texto[:70]}")
 

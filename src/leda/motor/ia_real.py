@@ -38,6 +38,7 @@ from __future__ import annotations
 import concurrent.futures
 import json
 import math
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
@@ -238,7 +239,10 @@ class ClienteCompatible:
                             headers={"Authorization": f"Bearer {api_key}"})
         return cls(modelo, base_url.rstrip("/"), http, parametros)
 
-    def completar(self, cuerpo: dict[str, Any]) -> dict[str, Any]:
+    def completar(self, cuerpo: dict[str, Any],
+                  al_avanzar: Callable[[str], None] | None = None) -> dict[str, Any]:
+        """La respuesta entera, de una vez: este proveedor no escribe en vivo, así que
+        `al_avanzar` no se avisa nunca (el borrador queda con los tres puntos)."""
         plazo = float(self.parametros.get("plazo_s", PLAZO_S))
         # Los campos propios del modelo van primero: lo que arma el código nunca se pisa.
         extra = self.parametros.get("cuerpo_extra") or {}
@@ -362,9 +366,13 @@ class IAReal:
         })
         return leer_jugadas(respuesta)
 
-    def redactar(self, pedido: dict[str, Any]) -> str:
+    def redactar(self, pedido: dict[str, Any],
+                 al_avanzar: Callable[[str], None] | None = None) -> str:
+        """El texto de la respuesta. Con `al_avanzar`, un proveedor que escribe en vivo avisa lo
+        escrito hasta ahí (`chatgpt.ClienteChatGPT`); la elección de jugadas nunca lo recibe."""
         # El día de cada fecha, del código; y los nombres que dicen el hecho, nunca el concepto.
         pedido = hechos.para_redactar({**pedido, "dias": hechos.dias(pedido)})
+        en_vivo = {"al_avanzar": al_avanzar} if al_avanzar is not None else {}
         respuesta = self.cliente.completar({
             "temperature": self.cliente.parametros.get("temperature", 0.3),
             "max_tokens": int(self.cliente.parametros.get("tope_redaccion", TOPE_REDACCION)),
@@ -372,7 +380,7 @@ class IAReal:
                           "content": f"{INSTRUCCIONES_REDACCION}\n\n{hechos.bloque(pedido)}"
                                      f"\n\n{bloque_de_tono(self.tono)}"},
                          {"role": "user", "content": _json(pedido)}],
-        })
+        }, **en_vivo)
         sin_cortar(respuesta)
         try:
             texto = respuesta["choices"][0]["message"].get("content")
