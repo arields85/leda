@@ -184,17 +184,17 @@ def test_el_motor_no_usa_las_funciones_de_los_bordes():
         if ruta.name.startswith("test_") or ruta.name == "conftest.py":
             continue
         texto = ruta.read_text("utf-8")
-        for palabra in ("crear_borrador_tarea", "intake_choice_set_id", "ver_rama_abierta"):
+        for palabra in ("crear_borrador_tarea", "intake_choice_set_id"):
             if palabra in texto:
                 usos.append(f"{ruta.name}: {palabra}")
     assert not usos, "La prueba chica usa una función de un borde:\n  " + "\n  ".join(usos)
 
 
 def test_el_recorrido_ve_los_imports_dentro_de_funciones():
-    """Control del propio recorrido: `despachador._rama_activa_de` importa `pendientes`
+    """Control del propio recorrido: `despachador._botones` importa `pendientes`
     adentro de la función, y por eso `pendientes` aparece alcanzado."""
     importados = {(m, f) for m, f, _ in _imports_de(LEDA / "despachador.py")}
-    assert ("pendientes", "_rama_activa_de") in importados
+    assert ("pendientes", "_botones") in importados
     _, alcanzados = _bordes_hacia_prohibidos()
     assert {"despachador", "pendientes", "herramientas"} <= alcanzados
 

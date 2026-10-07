@@ -15,9 +15,10 @@ Se trae lo mínimo de la llamada estructurada de la rama congelada (`llm.py` en
   fecha, con hoy, ayer, mañana o pasado mañana (`hechos.dias`; tercera vuelta, 2026-10-06).
 
 Habla el protocolo de chat de OpenAI, que es el de GPT-6 sol por OpenRouter (el modelo del
-espacio sale de `model_config`, como en `leda.llm.desde_base`; la clave, del entorno, nunca del
-código). Sin reintentos propios: el reintento es uno solo y lo hace el turno (decisión 8). Cada
-llamada tiene un plazo total, además del tiempo por fase del cliente HTTP.
+espacio sale de `model_config`, como hacía `leda.llm.desde_base`, retirado en la E3-3; la
+clave, del entorno, nunca del código). Sin reintentos propios: el reintento es uno solo y lo
+hace el turno (decisión 8). Cada llamada tiene un plazo total, además del tiempo por fase del
+cliente HTTP.
 """
 
 from __future__ import annotations
@@ -277,7 +278,7 @@ class IAReal:
 
 
 def desde_base(cur, workspace_id: str, claves) -> IAReal:
-    """La IA configurada para el espacio (o la global), como `leda.llm.desde_base`. `claves`
+    """La IA configurada para el espacio (o la global), como hacía `leda.llm.desde_base`. `claves`
     es la fuente de credenciales (`leda.config.config`): la clave nunca pasa por acá."""
     cur.execute(
         """select proveedor, modelo, parametros from model_config
