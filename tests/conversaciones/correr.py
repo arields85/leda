@@ -4,14 +4,14 @@
 `odd/tasks/motor-definitivo.md`, E3-8. Uso:
 
     python -m tests.conversaciones.correr [--conversacion NN ...] [--veces 5]
-                                          [--motor leda.motor|prueba_chica]
+                                          [--motor leda.motor]
                                           [--ia guionada|ALIAS|PROVEEDOR/MODELO]
                                           [--parametros JSON | --parametros-archivo ARCHIVO]
                                           [--grabar CARPETA] [--repetir ARCHIVO] [--paralelo N]
                                           [--ronda NOMBRE] [--sin-informe] [--pasar-el-techo]
 
-- `--motor` elige el motor de conversación (`motores.py`): el definitivo, por omisión, o el de
-  la prueba chica.
+- `--motor` elige el motor de conversación (`motores.py`): hoy hay uno solo, el definitivo, que
+  es el de omisión.
 - `--ia guionada` (por omisión) elige las jugadas que cada paso espera: la corrida en seco, sin
   gasto. Una IA real es `PROVEEDOR/MODELO`, con cualquier proveedor de `leda.llm.BASE_URLS`
   (`openrouter/openai/gpt-6-luna-pro`, `nan/deepseek-v4-flash`), o uno de los nombres cortos de
@@ -316,7 +316,7 @@ def main(argv: list[str] | None = None) -> int:
                                      "model_config.parametros")
     con_parametros.add_argument("--parametros-archivo", type=Path, metavar="ARCHIVO")
     p.add_argument("--motor", choices=MOTORES, default=POR_OMISION,
-                   help="el motor de conversación que corre (por omisión, el definitivo)")
+                   help="el motor de conversación que corre (hoy, sólo el definitivo)")
     p.add_argument("--grabar", type=Path, metavar="CARPETA")
     p.add_argument("--repetir", type=Path, metavar="ARCHIVO")
     p.add_argument("--paralelo", type=int, default=1)

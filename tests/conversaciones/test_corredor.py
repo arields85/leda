@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import copy
 import json
-import re
 from pathlib import Path
 
 import pytest
@@ -44,38 +43,6 @@ def _sin_corridas_variables(corrida) -> list:
              # Dos mensajes del mismo momento pueden salir en cualquier orden.
              sorted((s.a, s.texto, s.botones, s.tipo, s.tareas) for s in p.salidas),
              [str(f) for f in p.fallas]) for p in corrida.pasos]
-
-
-# Lo único en que el motor definitivo se aparta a propósito de la prueba chica: sus hechos
-# cuentan lo que pasa después como pasa en el mundo (`llega`), no con el estado interno de un
-# aviso (usuario, 2026-10-06; conversación 18). Para comparar, la forma vieja se traduce.
-_HUELLA = re.compile(r" · [0-9a-f]{6}\)")
-# Lo que la prueba chica falla, y sólo por eso, en las conversaciones con la forma nueva.
-_SOLO_LA_FORMA_DE_LOS_HECHOS = {(cp.MOTOR, "hechos"), (cp.MOTOR, "no salió lo esperado"),
-                                (cp.MOTOR, "salió algo de más")}
-_DE_LA_COCINA_AL_MUNDO = {"enviado": "ya_le_llego", "no_salio": "no_le_llego",
-                          "retirado_sin_enviar": "no_le_va_a_llegar"}
-
-
-def _como_en_el_mundo(valor):
-    if isinstance(valor, list):
-        return [_como_en_el_mundo(v) for v in valor]
-    if not isinstance(valor, dict):
-        return valor
-    valor = {k: _como_en_el_mundo(v) for k, v in valor.items()}
-    estado = valor.get("estado")
-    if estado == "guardado_sin_enviar" and "sale" in valor:
-        valor = {k: v for k, v in valor.items() if k not in ("estado", "sale")} | {
-            "llega": valor["sale"]}
-    elif estado == "todavia_no":
-        valor = {k: v for k, v in valor.items() if k != "estado"}
-    elif estado in _DE_LA_COCINA_AL_MUNDO and ("a" in valor or "motivo" in valor
-                                                or len(valor) == 1):
-        valor = {k: v for k, v in valor.items() if k != "estado"} | {
-            "llega": _DE_LA_COCINA_AL_MUNDO[estado]}
-    if "ya_no_sale" in valor:
-        valor["ya_no_va_a_pasar"] = valor.pop("ya_no_sale")
-    return valor
 
 
 # --- Las conversaciones -------------------------------------------------------------------
@@ -345,62 +312,31 @@ def test_cada_paso_en_que_leda_escribe_lleva_la_casilla_del_proximo_paso(conn):
     assert PROXIMO_PASO not in primero.dice and any("próximo paso concreto" in d
                                                     for d in primero.dice)
 
-# --- Los dos motores (E3-8) -------------------------------------------------------------------
+# --- El motor que corre (E3-8) ---------------------------------------------------------------
 #
-# Un solo corredor para el motor de la prueba chica y el definitivo (`motores.py`): la misma
-# conversación, con la IA guionada, da lo mismo en los dos, y cada corrida dice cuál corrió.
+# El corredor toma lo que usa del motor en un solo lugar (`motores.py`), y cada corrida dice
+# cuál corrió. Hasta el 2026-10-07 también corría el de la prueba chica, ya borrada.
 
 def test_el_motor_por_omision_es_el_definitivo():
+    assert motores.MOTORES == ("leda.motor",)
     assert motores.POR_OMISION == "leda.motor"
     assert motores.cargar().procesar_turno.__module__ == "leda.motor.turno"
     with pytest.raises(ValueError, match="No hay un motor"):
         motores.cargar("otro")
 
 
-@pytest.mark.parametrize("nombre", motores.MOTORES)
-def test_cada_motor_corre_la_conversacion_con_su_propio_codigo(conn, nombre):
-    motor = motores.cargar(nombre)
+def test_el_motor_corre_la_conversacion_con_su_propio_codigo(conn):
+    motor = motores.cargar()
     [conv] = elegir(["17"])
 
     corrida = correr_conversacion(conn, conv, IAQueGraba(IAPerfecta(
         {k: t["titulo"] for k, t in conv["tareas"].items()}, jugada=motor.Jugada)), motor=motor)
 
     assert corrida.error is None
-    if nombre == motores.POR_OMISION:
-        assert corrida.fallas() == []
-    else:       # la prueba chica se quedó con la forma vieja de los hechos (conversación 18)
-        assert {(f.clase, f.que) for _, f in corrida.fallas()} <= _SOLO_LA_FORMA_DE_LOS_HECHOS
-    assert corrida.motor_usado == nombre
-    assert motor.procesar_turno.__module__ == f"{nombre}.turno"
-    assert motor.Ciclo.__module__ == f"{nombre}.ciclo"
-
-
-def test_los_dos_motores_dan_lo_mismo_con_la_ia_guionada(conn):
-    [conv] = elegir(["02"])
-    por_motor = {}
-    for nombre in motores.MOTORES:
-        motor = motores.cargar(nombre)
-        corrida = correr_conversacion(conn, conv, IAPerfecta(
-            {k: t["titulo"] for k, t in conv["tareas"].items()}, jugada=motor.Jugada),
-            motor=motor)
-        _limpiar(conn)
-        assert corrida.error is None
-        por_motor[nombre] = corrida
-
-    definitivo, chica = (por_motor[n] for n in motores.MOTORES)
-    # El definitivo cumple la conversación entera; la prueba chica, que se quedó con la forma
-    # vieja de los hechos, falla sólo en ellos.
-    assert definitivo.fallas() == []
-    assert {(f.clase, f.que) for _, f in chica.fallas()} <= _SOLO_LA_FORMA_DE_LOS_HECHOS
-    # Traducidos los hechos, todo lo demás es igual. El texto de la IA guionada lleva la huella
-    # de los hechos que recibió, que por eso cambia: se compara sin ella.
-    for corrida in (definitivo, chica):
-        for p in corrida.pasos:
-            p.hechos, p.fallas = _como_en_el_mundo(p.hechos), []
-            p.texto = _HUELLA.sub(")", p.texto) if p.texto else p.texto
-            for s in p.salidas:
-                s.texto = _HUELLA.sub(")", s.texto) if s.texto else s.texto
-    assert _sin_corridas_variables(definitivo) == _sin_corridas_variables(chica)
+    assert corrida.fallas() == []
+    assert corrida.motor_usado == "leda.motor"
+    assert motor.procesar_turno.__module__ == "leda.motor.turno"
+    assert motor.Ciclo.__module__ == "leda.motor.ciclo"
 
 
 @pytest.mark.parametrize("nombre", motores.MOTORES)

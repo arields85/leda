@@ -73,20 +73,19 @@ La 20, el formato de los mensajes (pedido del usuario, 2026-10-07, al aprobar M3
 
 ## El corredor
 
-Vino de `prueba_chica/` en la E3-8, para que la regresión sobreviva al borrado de la prueba chica.
+Vino de la prueba chica en la E3-8, para que la regresión sobreviviera a su borrado (2026-10-07).
 Corre cada conversación por el código de verdad: carga su estado inicial (`carga.py`), corre cada paso
 con el reloj en el momento que dice el `.md` (`corredor.py`), compara lo que pasó con lo esperado y
 clasifica cada diferencia como garantía, comprensión o motor (`comprobar.py`). Las IA del corredor
 están en `grabar.py`: la guionada con las jugadas esperadas, la que graba y la que repite. El techo de
 gasto y la libreta, en `gasto.py`; el informe de cada ronda, en `informe.py`; el comando, en `correr.py`.
 
-**Un solo corredor para los dos motores** (`motores.py`): `--motor leda.motor`, el definitivo, es el de
-siempre; `--motor prueba_chica` corre el de la prueba chica, para la regresión de la E3-8. El informe, la
-libreta del gasto y cada grabación dicen qué motor corrió. Cuando se borre `prueba_chica/`, sale de la lista.
+**El motor** (`motores.py`): `--motor leda.motor`, el definitivo, es el único y el de omisión; hasta el
+2026-10-07 también corría el de la prueba chica, para la regresión de la E3-8. El informe, la libreta del
+gasto y cada grabación dicen qué motor corrió.
 
 ```
 python -m tests.conversaciones.correr --ia guionada --veces 1          # en seco, sin gasto
-python -m tests.conversaciones.correr --ia guionada --veces 1 --motor prueba_chica
 python -m tests.conversaciones.correr --ia sol --veces 5 --paralelo 5 --grabar tests/conversaciones/grabaciones
 python -m tests.conversaciones.correr --ia nan/deepseek-v4-flash --veces 5 --paralelo 5
 python -m tests.conversaciones.correr --repetir tests/conversaciones/grabaciones/03-leda.motor-sol-2.json

@@ -1,14 +1,12 @@
-"""Los motores de conversación que corre el corredor (E3-8).
+"""El motor de conversación que corre el corredor (E3-8).
 
-`odd/tasks/motor-definitivo.md`, E3-5, "Un solo corredor para los dos motores": la regresión de
-la E3-8 corre las mismas conversaciones sobre el motor de la prueba chica (`prueba_chica`) y sobre
-el definitivo (`leda.motor`), con el mismo corredor. Lo que el corredor usa de un motor se toma
-de su paquete una sola vez, acá, y viaja en un `Motor`: ningún otro módulo del corredor importa
-un motor por su nombre.
+`odd/tasks/motor-definitivo.md`, E3-5, "Un solo corredor para los dos motores": lo que el
+corredor usa de un motor se toma de su paquete una sola vez, acá, y viaja en un `Motor`: ningún
+otro módulo del corredor importa un motor por su nombre.
 
-Los dos motores cumplen el mismo contrato (el definitivo se portó fiel de la prueba chica): las
-mismas funciones de turno y de toque, el mismo ciclo, la misma lista cerrada de jugadas y la
-misma IA real. Cuando se borre `prueba_chica/`, sale de `MOTORES`.
+Hoy hay uno solo, el definitivo (`leda.motor`). Hasta el 2026-10-07 también estaba el de la
+prueba chica, con el mismo contrato, para la regresión de la E3-8; salió de `MOTORES` cuando se
+borró.
 """
 
 from __future__ import annotations
@@ -17,7 +15,7 @@ import importlib
 from dataclasses import dataclass
 from typing import Any, Callable, Mapping
 
-MOTORES = ("leda.motor", "prueba_chica")
+MOTORES = ("leda.motor",)
 POR_OMISION = "leda.motor"
 
 
