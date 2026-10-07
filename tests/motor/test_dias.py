@@ -14,6 +14,7 @@ Portadas de `prueba_chica/test_dias.py`.
 from __future__ import annotations
 
 import json
+from datetime import date
 
 from leda.motor import hechos
 from leda.motor.ia_real import DIAS_PROXIMOS
@@ -63,10 +64,33 @@ def test_los_dos_pedidos_a_la_ia_llevan_los_dias():
     assert len(eleccion["dias"]) == DIAS_PROXIMOS + 1          # hoy y los que vienen
     assert "2026-10-23: viernes 23 de octubre" in eleccion["dias"]
     assert "2026-10-21: miércoles 21 de octubre, mañana" in eleccion["dias"]
-    assert redaccion["dias"] == ["2026-10-20: martes 20 de octubre, hoy",
-                                 "2026-10-27: martes 27 de octubre"]
+    # La redacción los recibe en la forma corta con que se escriben (segunda vuelta del
+    # formato, 2026-10-07); para elegir jugadas siguen largos, como los nombra la persona.
+    assert redaccion["dias"] == ["2026-10-20: mar 20/10, hoy", "2026-10-27: mar 27/10"]
     for pedido in proveedor.pedidos:
         assert "- dias:" in pedido["cuerpo"]["messages"][0]["content"]   # con su significado
+
+
+def test_para_redactar_cada_dia_va_en_su_forma_corta_con_su_relacion_con_hoy():
+    """Segunda vuelta del formato (usuario, 2026-10-07): fechas cortas, el día abreviado y el
+    número con el mes, sin ceros. Lo da el código, para que la IA lo copie y no lo calcule; la
+    relación con hoy se conserva."""
+    pedido = {"hoy": "2026-11-03", "hechos": [{"prevision": "2026-11-04"},
+                                              {"vence": "2026-11-09"}, {"vencio": "2026-11-02"},
+                                              {"llega": "2026-11-05T10:00:00-03:00"}]}
+
+    largos = hechos.dias(pedido)
+    cortos = hechos.para_redactar({**pedido, "dias": largos})["dias"]
+
+    assert cortos == ["2026-11-02: lun 2/11, ayer", "2026-11-03: mar 3/11, hoy",
+                      "2026-11-04: mié 4/11, mañana", "2026-11-05: jue 5/11, pasado mañana",
+                      "2026-11-09: lun 9/11"]
+    assert [hechos.dia_corto(date(2026, 10, d)) for d in range(23, 30)] == [
+        "vie 23/10", "sáb 24/10", "dom 25/10", "lun 26/10", "mar 27/10", "mié 28/10",
+        "jue 29/10"]
+    # Lo que la persona escribió no se toca, aunque se llame igual.
+    assert hechos.para_redactar({"mensaje": "dias", "dias": ["no es un día"]})["dias"] == [
+        "no es un día"]
 
 
 def test_las_instrucciones_dicen_que_los_dias_se_usan_sin_calcularlos():

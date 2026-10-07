@@ -53,8 +53,9 @@ SIGNIFICADOS: Mapping[str, str] = {
     # --- Lo que recibe la IA en cada pedido ----------------------------------------------------
     "hoy": "La fecha de hoy, en la hora del equipo.",
     "dias": "El día de la semana de cada fecha de este pedido (para elegir jugadas, también "
-            "de los próximos días) y, si corresponde, si es hoy, ayer, mañana o pasado "
-            "mañana. Lo da el código: se usa tal cual, nunca se calcula.",
+            "de los próximos días; para escribir un mensaje, en la forma corta con que se "
+            "escribe) y, si corresponde, si es hoy, ayer, mañana o pasado mañana. Lo da el "
+            "código: se usa tal cual, nunca se calcula.",
     "persona": "A quién le escribe Leda.",
     "mensaje": "Lo que la persona escribió ahora; vacío si tocó una opción o si Leda escribe "
                "por su cuenta.",
@@ -451,10 +452,15 @@ _LO_QUE_ALGUIEN_ESCRIBIO = frozenset({"mensaje", "texto"})
 
 def para_redactar(valor: Any) -> Any:
     """Una copia del pedido de redacción con cada clave y cada código de la cocina que nombra un
-    concepto cambiado por el suyo para redactar (`PARA_LA_REDACCION`); lo demás, tal cual."""
+    concepto cambiado por el suyo para redactar (`PARA_LA_REDACCION`) y cada día de `dias` en
+    la forma corta con que se escribe (segunda vuelta del formato, 2026-10-07); lo demás, tal
+    cual."""
     if isinstance(valor, Mapping):
         return {PARA_LA_REDACCION.get(k, k):
-                v if k in _LO_QUE_ALGUIEN_ESCRIBIO else para_redactar(v)
+                v if k in _LO_QUE_ALGUIEN_ESCRIBIO
+                else [_dia_para_redactar(d) for d in v]
+                if k == "dias" and isinstance(v, (list, tuple))
+                else para_redactar(v)
                 for k, v in valor.items()}
     if isinstance(valor, (list, tuple)):
         return [para_redactar(v) for v in valor]
@@ -471,8 +477,15 @@ def para_redactar(valor: Any) -> Any:
 # también los de los próximos días, para que una fecha que la persona nombra por su día salga
 # de ahí y no de una cuenta. Una fecha con hora se toma por su día tal como está escrita.
 
+#
+# Segunda vuelta del formato (usuario, 2026-10-07): en los mensajes, fechas cortas, el día
+# abreviado y el número con el mes. La redacción recibe cada día ya en esa forma
+# (`para_redactar`), para copiarlo; la elección de jugadas lo sigue recibiendo largo, porque
+# la persona nombra los días enteros y así los encuentra.
+
 _FECHA = re.compile(r"^(\d{4}-\d{2}-\d{2})(?:$|T)")
 _DIAS_DE_LA_SEMANA = ("lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo")
+_DIAS_CORTOS = ("lun", "mar", "mié", "jue", "vie", "sáb", "dom")
 _MESES = ("enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto",
           "septiembre", "octubre", "noviembre", "diciembre")
 _RELATIVOS = {-1: "ayer", 0: "hoy", 1: "mañana", 2: "pasado mañana"}
@@ -510,6 +523,28 @@ def dias(pedido: Mapping[str, Any], *, proximos: int = 0) -> list[str]:
     if hoy is not None:
         fechas.update(hoy + timedelta(days=n) for n in range(proximos + 1))
     return [dia(f, hoy) for f in sorted(fechas)]
+
+
+def dia_corto(fecha: date) -> str:
+    """"vie 23/10": el día abreviado y el número con el mes, sin ceros."""
+    return f"{_DIAS_CORTOS[fecha.weekday()]} {fecha.day}/{fecha.month}"
+
+
+_DIA_LARGO = re.compile(r"^(\d{4}-\d{2}-\d{2}): [^,]+(, .+)?$")
+
+
+def _dia_para_redactar(linea: Any) -> Any:
+    """Un día de `dias` en la forma corta con que se escribe, con su relación con hoy: de
+    "2026-10-23: viernes 23 de octubre, mañana" a "2026-10-23: vie 23/10, mañana". Lo que no
+    tiene esa forma queda tal cual."""
+    encontrada = _DIA_LARGO.match(linea) if isinstance(linea, str) else None
+    if encontrada is None:
+        return linea
+    try:
+        fecha = date.fromisoformat(encontrada.group(1))
+    except ValueError:
+        return linea
+    return f"{fecha.isoformat()}: {dia_corto(fecha)}{encontrada.group(2) or ''}"
 
 
 def significado(nombre: str) -> str | None:
