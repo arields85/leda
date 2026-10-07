@@ -24,6 +24,7 @@ from fastapi.testclient import TestClient
 from leda import config as config_mod
 from leda import entrada
 from leda.db import admin
+from leda.despachador import TransporteDePrueba
 from leda.motor.ia import IAGuionada, Jugada
 
 from tests.motor.ayudantes import TelegramFalso, mensaje_de_telegram, toque_de_telegram
@@ -39,6 +40,7 @@ def webhook(conn, intake_world, monkeypatch):
     IA guionada y Telegram de mentira."""
     ia = IAGuionada()
     telegram = TelegramFalso()
+    salida = TransporteDePrueba()
     monkeypatch.setattr(entrada, "config",
                         dataclasses.replace(config_mod.config, webhook_secret=SECRETO,
                                             base_url="https://leda.example"))
@@ -47,8 +49,10 @@ def webhook(conn, intake_world, monkeypatch):
     monkeypatch.setattr(entrada, "_ia_de", lambda conn, ws: ia)
     monkeypatch.setattr(entrada, "_cliente_http", telegram.cliente)
     monkeypatch.setattr(entrada, "_INTENTOS", {})
+    # Lo que sale por el bot de cada espacio, de mentira.
+    monkeypatch.setattr(entrada, "_transporte_de", lambda token: salida, raising=False)
     return {"cliente": TestClient(entrada.app), "ia": ia, "telegram": telegram,
-            "mundo": intake_world}
+            "salida": salida, "mundo": intake_world}
 
 
 def _token(slug: str) -> str:
@@ -177,6 +181,25 @@ def test_un_mensaje_valido_corre_un_turno_y_deja_una_respuesta(conn, webhook):
     assert respuesta["chat_id"] == _de(webhook, "north-lab") and respuesta["cuerpo"] == "Hola, Sam."
     assert respuesta["es_respuesta"] and respuesta["entrante_id"] == entrante["id"]
     assert _cuantas(conn, "incident") == 0
+
+
+def test_la_respuesta_sale_al_atender_el_update_sin_esperar_al_despacho_de_fondo(conn,
+                                                                               webhook):
+    """Pedido del usuario (2026-10-07): la respuesta sale apenas termina su turno, también por
+    el webhook. Cuando Telegram recibe el 200, el mensaje ya se entregó: no espera la vuelta
+    siguiente del despacho de fondo (`leda.motor.fondo`). Sale por el outbox, como siempre."""
+    webhook["ia"].jugadas = [[]]
+    webhook["ia"].redacciones = ["Hola, Sam."]
+    update = mensaje_de_telegram(33, "hola", _de(webhook, "north-lab"))
+
+    r = _post(webhook["cliente"], "north-lab", update, entrada.secreto_del_bot("north-lab"))
+
+    assert r.status_code == 200
+    assert [(e.chat_id, e.texto) for e in webhook["salida"].enviados] == [
+        (_de(webhook, "north-lab"), "Hola, Sam.")]
+    with admin(conn) as cur:
+        cur.execute("select estado::text e from message_outbox")
+        assert [f["e"] for f in cur.fetchall()] == ["enviado"]
 
 
 def test_sin_ia_configurada_la_persona_recibe_el_texto_fijo_y_queda_un_incidente(

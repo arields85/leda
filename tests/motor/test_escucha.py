@@ -10,6 +10,8 @@ Portadas de `prueba_chica/test_escuchar.py` (E3-7). Lo que se hace con cada upda
 
 from __future__ import annotations
 
+import re
+import time
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from types import SimpleNamespace
@@ -444,6 +446,7 @@ class IndicadorFalso:
     abiertos: list[int] = field(default_factory=list)
     textos: list[str] = field(default_factory=list)
     cerrados: list[tuple[int, int]] = field(default_factory=list)
+    siguen: list[int] = field(default_factory=list)     # chats a los que les sigue un mensaje
 
     def __call__(self, chat_id: int):
         return self._abrir(chat_id)
@@ -454,7 +457,8 @@ class IndicadorFalso:
             raise ConnectionError("el indicador no arranca")
         self.abiertos.append(chat_id)
         try:
-            yield SimpleNamespace(admite_borrador=True, actualizar_borrador=self.textos.append)
+            yield SimpleNamespace(admite_borrador=True, actualizar_borrador=self.textos.append,
+                                  sigue_la_respuesta=lambda: self.siguen.append(chat_id))
         finally:
             self.cerrados.append((chat_id, len(self.salida.enviados)))
             if self.falla == "al_cerrar":
@@ -479,16 +483,18 @@ def test_mientras_corre_el_turno_se_ve_el_indicador_y_se_apaga_antes_de_la_respu
     m.escucha.una_vuelta(espera=0)
 
     assert indicador.abiertos == [MARCOS]
-    # Se apagó con el turno, antes de que saliera la respuesta (el borrador se retira primero).
+    # Se apagó con el turno, antes de que saliera la respuesta, avisado de que sigue un mensaje:
+    # el mensaje reemplaza al borrador, sin retiro (pedido del usuario, 2026-10-07).
     assert indicador.cerrados == [(MARCOS, 0)]
+    assert indicador.siguen == [MARCOS]
     # La redacción se vio en vivo; lo que sale es el texto del outbox.
     assert indicador.textos == ["Anoté que arrancaste Revisar el tablero."]
     assert [e.texto for e in m.salida.enviados] == ["Anoté que arrancaste Revisar el tablero."]
 
 
 def test_la_respuesta_sale_apenas_termina_su_turno_sin_esperar_al_resto_del_lote(conn, mundo):
-    """Despacho inmediato (ADR 0011, decisión 1): con el borrador retirado, la respuesta no
-    espera al siguiente mensaje del lote ni al resto de la vuelta."""
+    """Despacho inmediato (ADR 0011, decisión 1): la respuesta no espera al siguiente mensaje
+    del lote ni al resto de la vuelta."""
     ia = IAGuionada(jugadas=[[], []], redacciones=["Primera.", "Segunda."])
     m, indicador = _con_indicador(conn, mundo, ia)
     m.telegram.lotes = [[_mensaje(2100, "hola"), _mensaje(2101, "¿seguís?")]]
@@ -508,6 +514,7 @@ def test_si_la_ia_no_responde_el_indicador_se_apaga_y_sale_el_texto_fijo(conn, m
     m.escucha.una_vuelta(espera=0)
 
     assert indicador.cerrados == [(MARCOS, 0)]
+    assert indicador.siguen == [MARCOS]
     assert [e.texto for e in m.salida.enviados] == [TEXTO_SI_LA_IA_FALLA]
 
 
@@ -579,3 +586,157 @@ def test_a_quien_no_es_del_equipo_no_se_le_muestra_el_indicador(conn, mundo):
     m.escucha.una_vuelta(espera=0)
 
     assert indicador.abiertos == [] and m.salida.enviados == []
+
+
+# --- El indicador no demora la respuesta (pedido del usuario, 2026-10-07) ----------------------
+#
+# "La función del escribiendo y el '…' es mostrar que Leda está activa, no generar demora en la
+# respuesta." Con el indicador de verdad (`despachador.mantener_chat_activo`) y la salida de
+# verdad (`despachador.TransporteTelegram`) sobre el mismo Telegram de mentira, que guarda cada
+# llamada en orden: después de la redacción, lo próximo que llega a ese chat es el mensaje.
+
+class IAQueEsperaSuBorrador(IAGuionada):
+    """La IA guionada que, al terminar de redactar, espera (acotado) a que el borrador con su
+    texto esté en vuelo, y anota cuándo terminó: así la prueba sabe que el cierre del turno
+    encuentra un borrador todavía en vuelo."""
+
+    def __init__(self, telegram, **guion) -> None:
+        super().__init__(**guion)
+        self.telegram = telegram
+        self.termino: float | None = None
+
+    def redactar(self, pedido, al_avanzar=None):
+        texto = super().redactar(pedido, al_avanzar)
+        if al_avanzar is not None and self.telegram.borrador_lento:
+            self.telegram.borrador_en_vuelo.wait(1.0)
+        self.termino = time.monotonic()
+        return texto
+
+
+def _con_indicador_de_verdad(conn, mundo, ia_de, *, borrador_lento: float = 0.0):
+    """El escuchador con el indicador y la salida de verdad sobre un Telegram de mentira. El
+    umbral es largo: sólo se ve el borrador con el texto que la IA redacta."""
+    from leda.despachador import TransporteTelegram, mantener_chat_activo
+
+    from tests.motor.test_indicador import TelegramDeMentira
+
+    telegram = TelegramDeMentira(borrador_lento=borrador_lento)
+    ia = ia_de(telegram)
+    lineas: list[str] = []
+    bot = TelegramFalso()
+    escucha = Escucha(
+        conn, mundo["id"], ia, RelojFijo(AHORA),
+        bot=BotTelegram("token-falso", bot.cliente()),
+        transporte=TransporteTelegram("token-falso", cliente=telegram),
+        imprimir=lineas.append,
+        indicador=lambda chat_id: mantener_chat_activo(
+            "token-falso", chat_id, cliente=telegram, chat_type="private", umbral=10.0,
+            intervalo=10.0, intervalo_borrador=0.0))
+    escucha.preparar()
+    return escucha, bot, telegram, ia, lineas
+
+
+def _hilos_del_indicador() -> set:
+    import threading
+    return {h for h in threading.enumerate()
+            if h.name in ("leda-typing", "leda-borrador") and h.is_alive()}
+
+
+def _sin_hilos_nuevos(antes: set, timeout: float = 1.0) -> bool:
+    limite = time.monotonic() + timeout
+    while time.monotonic() < limite:
+        if not (_hilos_del_indicador() - antes):
+            return True
+        time.sleep(0.01)
+    return False
+
+
+def test_despues_de_la_redaccion_lo_proximo_que_sale_es_la_respuesta(conn, mundo):
+    escucha, bot, telegram, _, lineas = _con_indicador_de_verdad(
+        conn, mundo, lambda _: IAGuionada(jugadas=[[Jugada("anotar_inicio", {"tarea": "T1"})]],
+                                          redacciones=["Anoté que arrancaste."]))
+    bot.lotes = [[_mensaje(2700, "arranqué")]]
+    antes = _hilos_del_indicador()
+
+    escucha.una_vuelta(espera=0)
+    time.sleep(0.2)                 # un borrador tardío tendría tiempo de salir
+
+    # A lo sumo el borrador con el texto (si llegó a salir antes del cierre) y la respuesta:
+    # ni retiro (semilla silenciosa y su borrado), ni otro "escribiendo…", ni borradores después.
+    metodos = telegram.metodos()
+    assert metodos in (["sendMessage"], ["sendMessageDraft", "sendMessage"])
+    [final] = [p for metodo, p in telegram.llamadas if metodo == "sendMessage"]
+    assert final["chat_id"] == MARCOS and final["text"] == "Anoté que arrancaste."
+    assert final["disable_notification"] is False
+    # La línea de la consola: cuánto tardó la respuesta desde que el texto estuvo listo.
+    [hora] = [linea for linea in lineas if "⏱" in linea]
+    assert re.fullmatch(r"  ⏱ respuesta: texto listo → enviado en \d+ ms", hora)
+    assert _sin_hilos_nuevos(antes)
+
+
+def test_un_borrador_lento_no_demora_la_respuesta(conn, mundo):
+    """Un borrador en vuelo que tarda 2 s en volver: la respuesta sale igual enseguida."""
+    escucha, bot, telegram, ia, lineas = _con_indicador_de_verdad(
+        conn, mundo, lambda telegram: IAQueEsperaSuBorrador(
+            telegram, jugadas=[[]], redacciones=["Hola, Marcos."]), borrador_lento=2.0)
+    bot.lotes = [[_mensaje(2800, "hola")]]
+    try:
+        escucha.una_vuelta(espera=0)
+        enviado = telegram.horas[telegram.metodos().index("sendMessage")]
+
+        assert ia.termino is not None and enviado - ia.termino < 1.0
+        assert telegram.metodos() == ["sendMessageDraft", "sendMessage"]
+    finally:
+        telegram.soltar.set()
+
+
+def test_el_texto_fijo_de_un_turno_caido_tambien_sale_sin_retiro(conn, mundo, monkeypatch):
+    def se_cae(conn, quien, entrante, ia, reloj, *, al_avanzar=None):
+        al_avanzar("Anoté que")
+        time.sleep(0.1)
+        raise RuntimeError("se cayó el turno")
+
+    monkeypatch.setattr(recibir, "procesar_turno", se_cae)
+    escucha, bot, telegram, _, _ = _con_indicador_de_verdad(conn, mundo,
+                                                            lambda _: IAGuionada())
+    bot.lotes = [[_mensaje(2900, "hola")]]
+    antes = _hilos_del_indicador()
+
+    escucha.una_vuelta(espera=0)
+
+    assert telegram.metodos() == ["sendMessageDraft", "sendMessage"]
+    assert telegram.llamadas[-1][1]["text"] == TEXTO_SI_LA_IA_FALLA
+    assert _sin_hilos_nuevos(antes)
+
+
+def test_un_mensaje_ya_respondido_retira_el_borrador_y_no_deja_hilos(conn, mundo):
+    """Sin mensaje que siga (el mensaje ya tenía respuesta), el borrador se retira: es el único
+    caso con retiro."""
+    escucha, bot, telegram, _, _ = _con_indicador_de_verdad(
+        conn, mundo, lambda _: IAGuionada(jugadas=[[]], redacciones=["Hola."]))
+    bot.lotes = [[_mensaje(3000, "hola")]]
+    escucha.una_vuelta(espera=0)
+    escucha.indicador = lambda chat_id: _indicador_que_muestra_algo(telegram, chat_id)
+    bot.lotes = [[_mensaje(3000, "hola")]]            # Telegram lo reentrega
+    antes = _hilos_del_indicador()
+
+    escucha.una_vuelta(espera=0)
+
+    from leda.despachador import SEMILLA_INDICADOR
+
+    assert telegram.metodos()[-3:] == ["sendMessage", "deleteMessage", "sendChatAction"]
+    enviados = [p["text"] for metodo, p in telegram.llamadas if metodo == "sendMessage"]
+    assert enviados == ["Hola.", SEMILLA_INDICADOR]
+    assert _sin_hilos_nuevos(antes)
+
+
+@contextmanager
+def _indicador_que_muestra_algo(telegram, chat_id):
+    """El indicador de verdad, que ya mostró los tres puntos y el "escribiendo…" cuando el
+    turno empieza: así el turno que no deja mensaje tiene algo que retirar."""
+    from leda.despachador import mantener_chat_activo
+    with mantener_chat_activo("token-falso", chat_id, cliente=telegram, chat_type="private",
+                              umbral=0.0, intervalo=10.0) as abierto:
+        assert telegram.esperar(lambda: telegram.metodos()[-2:] == ["sendMessageDraft",
+                                                                   "sendChatAction"])
+        yield abierto
