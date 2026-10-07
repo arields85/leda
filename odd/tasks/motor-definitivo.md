@@ -430,6 +430,28 @@ Después de M3 quedan:
 - la Fase C;
 - la plataforma web.
 
+### Las palabras de todos los días (2026-10-07)
+
+- **Primer arreglo, `230cf7e`:** los significados de los datos y la instrucción de redacción. Revisiones
+  `review-f499820c0f94d009` (el reloj, `25bb192` y `410e81e`) y `review-7f575a84f8d3d6f6`, aprobadas.
+  La regresión dio 93 de 95, con las garantías 95 de 95 (`6203a12`). Las dos fallas, un aviso que no salió
+  a tiempo en la 08 y en la 16, no se repitieron: 10 de 10.
+- **Medición:** los mensajes de Leda con "previsión", "fecha comprometida" o "pedido de estado" bajaron de
+  107 de 465 (`e3-8-sol-suscripcion`) a 16 de 497. Lo que queda es casi siempre "si se cumple esa
+  previsión".
+- **Chequeo de rumbo.**
+  - *Clase:* la IA repite lo que la cocina le pasa. Es la misma clase que "habla del mundo" (conversación
+    18).
+  - *Mecanismo o caso:* mecanismo. El nombre de un dato que recibe la IA (`atraso_si_se_cumple_la_prevision_dias_habiles`)
+    trae la palabra, y la instrucción no alcanza contra lo que lee en cada pedido. Es el disparador "el
+    mismo camino tocado por dos arreglos seguidos": se consultó al usuario, que eligió cambiar los nombres.
+  - *Cocina o frases al mozo:* cocina. En la frontera con la IA que redacta, los nombres de los datos y los
+    códigos dicen el hecho y no el concepto del sistema; adentro (base, jugadas, pruebas) no cambian.
+  - *Qué lo demuestra:* una prueba determinista de que ningún nombre que recibe la IA al redactar lleva un
+    concepto del sistema, y la regresión con la IA real midiendo esas palabras en el texto de Leda.
+  - *Qué haría innecesaria la próxima ronda:* que un dato nuevo no pueda llegar a la IA con un nombre de
+    la cocina sin que una prueba falle.
+
 ## 4b. Guía de la prueba por Telegram (M3)
 
 La misma prueba de la E2-9 (`prueba_chica/README.md`), sobre el motor definitivo.
