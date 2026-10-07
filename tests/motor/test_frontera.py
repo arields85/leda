@@ -65,12 +65,15 @@ BORDES_CONOCIDOS: dict[tuple[str, str | None, str], str] = {}
 # estado de las tareas y el tono del espacio. Capa 2, las fichas: los bloqueos y quién los
 # destraba, las tareas que dependen de otra, los integrantes por su nombre y el referente de
 # quien escribe (`membership.aprobador_membership_id`). Capa 2, los avisos guardados: las
-# ausencias, que los dejan esperando, y la ruta de escalamiento por falta de respuesta.
+# ausencias, que los dejan esperando, y la ruta de escalamiento por falta de respuesta. Capa 3:
+# la configuración del espacio (`workspace_setting`: los días del aviso previo de la escalera y
+# el adelanto del reloj de Leda) y el espacio por su nombre corto (el comando del reloj).
 TABLAS_PERMITIDAS = {
     "absence", "blocker", "blocker_unblocker", "conversation_option", "conversation_question",
     "conversation_state", "conversation_turn", "dependency", "escalation_route",
     "inbound_message", "integrante", "membership", "message_outbox", "pending_reply",
-    "persona_config", "scheduled_notice", "task", "task_forecast",
+    "persona_config", "scheduled_notice", "task", "task_forecast", "workspace",
+    "workspace_setting",
 }
 
 _SQL = re.compile(r"\b(select|insert|update|delete)\b", re.IGNORECASE)

@@ -4,7 +4,9 @@ La base efímera y la conexión son las de `tests/conftest.py` (`uri`, `conn`); 
 mundo de las conversaciones de prueba, el mismo de `prueba_chica/conftest.py`: un espacio con
 dos personas, Ismael, referente y autoridad, y Marcos, con una tarea asignada que vence el
 viernes 9 de octubre de 2026. También sus dos tareas (`tareas`), sus turnos (`marcos`) y la
-duda de un toque: Marcos arrancó sin decir cuál, y Leda le preguntó con sus dos tareas.
+duda de un toque: Marcos arrancó sin decir cuál, y Leda le preguntó con sus dos tareas. Y la
+escalera: el espacio con su configuración (`espacio_con_escalera`) y sus ciclos día por día
+(`dias`).
 """
 
 from __future__ import annotations
@@ -16,7 +18,7 @@ import pytest
 
 from leda.motor.ia import Jugada
 
-from tests.motor.ayudantes import AHORA, Charla, nueva_tarea, todos
+from tests.motor.ayudantes import AHORA, Charla, Dias, nueva_tarea, todos
 
 
 @pytest.fixture
@@ -119,3 +121,28 @@ def tareas(conn, mundo) -> dict[str, str]:
 def marcos(conn, escribe) -> Charla:
     """Los turnos de Marcos, uno por mensaje (`ayudantes.Charla`)."""
     return Charla(conn, escribe)
+
+
+@pytest.fixture
+def espacio_con_escalera(conn, mundo) -> dict:
+    """CoreWork en chico: aviso previo a 3 días hábiles, el feriado del lunes 12 y la falta de
+    respuesta escalada a quien lidera (Ismael)."""
+    from leda.db import admin
+
+    with admin(conn) as cur:
+        cur.execute("""insert into workspace_setting (workspace_id, clave, valor)
+                       values (%s, 'aviso_previo_dias_habiles', '3')""", (mundo["id"],))
+        cur.execute("insert into holiday (workspace_id, fecha) values (%s, '2026-10-12')",
+                    (mundo["id"],))
+        cur.execute("""insert into escalation_route (workspace_id, disparador, destino_rol_id)
+                       select %s, 'falta_persistente_de_respuesta', id from rol
+                        where workspace_id = %s and slug = 'lider'""",
+                    (mundo["id"], mundo["id"]))
+    conn.commit()
+    return mundo
+
+
+@pytest.fixture
+def dias(conn, espacio_con_escalera) -> Dias:
+    """Los ciclos de la escalera, día por día (`ayudantes.Dias`)."""
+    return Dias(conn, espacio_con_escalera)

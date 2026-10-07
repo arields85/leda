@@ -6,11 +6,16 @@ lo compartido vive en este módulo, y ningún archivo de prueba importa otro. Lo
 allá, sin el guion bajo: `_tarea` es `nueva_tarea`, `_hora` es `octubre`, `_dice` es `dice`,
 `_prevision` es `jugada_prevision`, `_bloqueo` es `jugada_bloqueo`, `_abierta` es
 `abierta`, `_quien` es `solicitante` y `_toca`, `toca`; el `_avisos` de
-`test_escalera.py` es `avisos_guardados`.
+`test_escalera.py` es `avisos_guardados`, su `_espera` es `espera_del_estado` y su `_para`,
+`lo_que_salio_para`; el `_prevision` de `test_ancla.py` es `dice_una_prevision`; el
+`_administrador` de `test_ciclo.py` es `administrador`. La IA que redacta, los días de la
+escalera (`Dias`) y el reloj monótono a mano (`Monotono`) van con su nombre de allá; las
+fixtures `espacio_con_escalera` y `dias`, en `conftest.py`.
 """
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
@@ -19,6 +24,7 @@ from leda.autoridad import identificar_en_espacio
 from leda.calendario import Calendario
 from leda.db import admin, espacio
 from leda.motor.avisos import enviar_avisos
+from leda.motor.escalera import correr_escalera
 from leda.motor.ia import IAGuionada, Jugada
 from leda.motor.tiempo import RelojFijo
 from leda.motor.turno import procesar_toque, procesar_turno
@@ -208,3 +214,82 @@ def toca(conn, mundo, token: str, ia: IAGuionada | None = None, nombre: str = "M
                                mundo["personas"][nombre]["telegram"], ia, RelojFijo(AHORA))
     conn.commit()
     return resultado, ia
+
+
+# --- La escalera, día por día --------------------------------------------------------------
+
+@dataclass
+class IAQueRedacta:
+    """La IA de lo que Leda manda por su cuenta: redacta siempre y guarda lo que recibió."""
+
+    nombre: str = "guionada"
+    pedidos_de_redaccion: list[dict[str, Any]] = field(default_factory=list)
+
+    def redactar(self, pedido: dict[str, Any]) -> str:
+        self.pedidos_de_redaccion.append(pedido)
+        return f"Aviso {len(self.pedidos_de_redaccion)}."
+
+    def elegir_jugadas(self, situacion):     # la escalera nunca elige jugadas
+        raise AssertionError("La escalera no le pide jugadas a la IA.")
+
+
+class Dias:
+    """Los ciclos de la escalera, día por día, con la IA que redacta."""
+
+    def __init__(self, conn, mundo) -> None:
+        self.conn, self.mundo = conn, mundo
+        self.ia = IAQueRedacta()
+
+    def ciclo(self, at: datetime) -> list[dict[str, Any]]:
+        """Corre la escalera y manda lo guardado; devuelve lo que se redactó en este ciclo."""
+        antes = len(self.ia.pedidos_de_redaccion)
+        correr_escalera(self.conn, self.mundo["id"], RelojFijo(at))
+        self.conn.commit()
+        enviar_avisos(self.conn, self.mundo["id"], self.ia, RelojFijo(at))
+        self.conn.commit()
+        return self.ia.pedidos_de_redaccion[antes:]
+
+
+def espera_del_estado(conn) -> dict | None:
+    """La espera del estado de la tarea (`pending_reply`)."""
+    return uno(conn, "select * from pending_reply where tipo = 'estado_de_la_tarea'")
+
+
+def lo_que_salio_para(conn, mundo, nombre: str) -> list[str]:
+    """Lo que salió por cuenta de Leda para esa persona, en orden."""
+    return [f["cuerpo"] for f in todos(
+        conn, """select cuerpo from message_outbox
+                  where not es_respuesta and chat_id = %s order by programado_para, cuerpo""",
+        mundo["personas"][nombre]["telegram"])]
+
+
+def dice_una_prevision(conn, escribe, fecha: str, at) -> None:
+    """Marcos da una fecha prevista para T1, con su motivo."""
+    dice(conn, escribe, Jugada("anotar_prevision", {"tarea": "T1", "fecha": fecha,
+                                                    "motivo": "el proveedor"}), at=at)
+
+
+# --- El ciclo -------------------------------------------------------------------------------
+
+class Monotono:
+    """Los segundos que pasan entre vueltas, a mano."""
+
+    def __init__(self) -> None:
+        self.s = 0.0
+
+    def __call__(self) -> float:
+        return self.s
+
+
+def administrador(conn) -> None:
+    """Un administrador de plataforma con su chat registrado: recibe los avisos."""
+    with admin(conn) as cur:
+        cur.execute("""insert into app_user (telegram_user_id, nombre)
+                       values (90000, 'Admin') returning id""")
+        quien = str(cur.fetchone()["id"])
+        cur.execute("insert into platform_role (app_user_id, rol) values (%s, 'administrador')",
+                    (quien,))
+        cur.execute("""insert into audit_log (actor_app_user_id, actor_kind, accion, detalle)
+                       values (%s, 'persona', 'mensaje_admin', %s)""",
+                    (quien, json.dumps({"chat_id": 90000})))
+    conn.commit()
