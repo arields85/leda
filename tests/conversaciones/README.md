@@ -62,6 +62,28 @@ El circuito es el recordatorio y lo que la persona contesta (ADR 0018, decisión
     hechos en un mensaje y el aviso a Ismael; Leda escribe breve, un renglón por idea, con 📋, ✏️, 📅 y
     ⚠️ al principio del renglón, fechas cortas, sin negrita y el cierre aparte, al final.
 
+La entrega y la aprobación (circuitos 7 y 8; `odd/tasks/fase-c.md`, decisiones 1 a 3, y ADR 0019):
+
+21. [`21-entrega-con-evidencia.md`](21-entrega-con-evidencia.md): "termine el plc" con un álbum de fotos;
+    la vista previa muestra también lo mandado durante la tarea, que entra sólo si queda; sacar una
+    pieza, el botón de una vista previa vieja, una foto nueva con un "dale" que no vale (la guarda
+    escrita) y el "dale" que sí; la tarea pasa a revisión y a Ismael le llega el aviso con las fotos y un
+    enlace a la página de la tarea. Toma los pasos "Para la prueba de la entrega" de la 10 y la 11.
+22. [`22-falta-evidencia.md`](22-falta-evidencia.md): una foto sin ninguna entrega abierta (Leda pregunta
+    para qué es), un "listo" al que le falta lo que pide el área (Leda dice qué falta y no la pasa a
+    revisión) y un video que no entra (Leda lo dice y propone un enlace o uno más corto).
+23. [`23-aprobacion.md`](23-aprobacion.md): "aprobado" que cierra; "aprobado" que no cierra porque falta
+    otra cosa, dicho con honestidad; un pedido de cambios con su comentario; "aprobado, pero que
+    revise…", con una sola pregunta y dos botones; y quien no aprueba esa tarea intenta aprobarla.
+24. [`24-quien-aprueba-no-contesta.md`](24-quien-aprueba-no-contesta.md): recordatorios a quien aprueba
+    el primer y el segundo día hábil; al tercero, el aviso a quien está arriba (Marcos → Ismael) o, sin
+    nadie arriba, un recordatorio cordial por día; al responsable, nada.
+
+**Las conversaciones 21 a 24 todavía no corren:** sus circuitos no están construidos (tarea C-3 de la
+Fase C). Tienen sólo el `.md`; el corredor carga los `*.yaml`, así que cada una recibe su YAML cuando su
+ficha exista. Lo que dejan `PENDIENTE` está marcado en cada paso. Usan más personas que Marcos e Ismael:
+Nahuel (lo aprueba Marcos), Mariano y Ariel (los aprueba Ismael) y Lucas.
+
 Las cuatro primeras son las cuatro respuestas de 5a; de la 5 a la 12, cada una aplica al recordatorio una
 de las ocho situaciones generales de la decisión 4. La 15 suma la jugada `informar_avance` (decisión del
 usuario, 2026-10-05; ADR 0018, decisión 9b). La 16, la regla de la tarea vencida (decisión del usuario,
@@ -223,7 +245,7 @@ importa es el significado:
 - `anotar_bloqueo`: la persona dice que no puede avanzar y, si lo dice, por qué.
 - `elegir`: la persona elige una de las opciones que Leda le ofreció, tocando o escribiendo.
 - `confirmar`: la persona confirma lo último que Leda le mostró (decisión 2). Sólo en las partes "Para la
-  prueba de la entrega": el recordatorio no confirma nada.
+  prueba de la entrega" y en la entrega (conversaciones 21 y 22): el recordatorio no confirma nada.
 - `corregir`: la persona corrige algo que acaba de decir o que Leda tomó mal.
 - `cancelar`: la persona deja sin efecto el tema abierto.
 - `dejar_para_despues`: la persona deja el tema abierto para más tarde. Con `cancelar` y contestar la
@@ -234,6 +256,10 @@ importa es el significado:
   abierta (decisión del usuario, 2026-10-05).
 - `destrabar`: la persona dice que la causa de un bloqueo abierto ya no está y la tarea puede seguir;
   el bloqueo se cierra y la tarea vuelve al estado que tenía antes (decisión del usuario, 2026-10-05).
+- `entregar`: la persona dice que terminó una tarea; con la evidencia completa, Leda muestra la entrega
+  para confirmar (conversaciones 21 y 22).
+- `aprobar` y `pedir_cambios`: quien aprueba decide sobre una entrega, directo cuando es claro
+  (conversaciones 23 y 24).
 
 ## Decisiones del usuario (2026-10-04)
 
