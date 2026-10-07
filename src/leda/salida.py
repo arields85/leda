@@ -420,6 +420,61 @@ def entidad_de_bloque(texto: str, bloque: str) -> dict:
             "length": telegram_utf16_units(bloque)}
 
 
+# El formato de los mensajes (pedido del usuario, 2026-10-07): la IA escribe `**negrita**`,
+# párrafos separados por un renglón en blanco y viñetas con "• ". El outbox lo guarda así, y
+# al enviar se convierte en texto plano más entidades `bold`, nunca con `parse_mode`: no hay
+# nada que escapar, y una marca mal cerrada sale como texto.
+#
+# Una negrita abre y cierra en el mismo renglón, con algo adentro que no empieza ni termina
+# con un espacio o un asterisco; la búsqueda va de izquierda a derecha y toma el cierre más
+# cercano, así que cualquier texto da siempre el mismo resultado y dos negritas nunca se pisan.
+_NEGRITA = re.compile(r"\*\*(?![\s*])([^\n]+?)(?<![\s*])\*\*")
+# Una viñeta escrita con un guion al principio del renglón sale con "• ", como las demás.
+_VINETA = re.compile(r"(?m)^[ \t]*[-•][ \t]+")
+# Telegram toma hasta 100 entidades por mensaje e ignora el formato de las que siguen
+# (`MAX_MESSAGE_ENTITIES` de python-telegram-bot, sacado de la Bot API).
+MAX_ENTIDADES_TELEGRAM = 100
+
+
+def formatear(texto: str) -> tuple[str, list[dict]]:
+    """El texto con las marcas de formato convertido en texto plano y sus entidades `bold`,
+    con posición y largo en unidades UTF-16 (`telegram_utf16_units`), ordenadas y sin
+    pisarse. Lo que no es una marca bien cerrada queda como está."""
+    texto = _VINETA.sub("• ", texto)
+    partes: list[str] = []
+    entidades: list[dict] = []
+    unidades = desde = 0
+    for marca in _NEGRITA.finditer(texto):
+        antes, dentro = texto[desde:marca.start()], marca.group(1)
+        unidades += telegram_utf16_units(antes)
+        largo = telegram_utf16_units(dentro)
+        entidades.append({"type": "bold", "offset": unidades, "length": largo})
+        partes += [antes, dentro]
+        unidades += largo
+        desde = marca.end()
+    partes.append(texto[desde:])
+    return "".join(partes), entidades
+
+
+def texto_y_entidades(texto: str, bloque: str | None = None) -> tuple[str, list[dict]]:
+    """Lo que de verdad sale por Telegram a partir de un texto ya preparado
+    (`prepare_payload`): el texto plano y sus entidades. El bloque copiable, si lo hay, es lo
+    que la persona escribió: queda literal, con su entidad `pre` al final. Si las entidades
+    pasan de `MAX_ENTIDADES_TELEGRAM`, el mensaje sale sin negritas en lugar de fallar o de
+    salir con el formato a medias."""
+    if bloque is None:
+        plano, entidades = formatear(texto)
+    else:
+        entidad_de_bloque(texto, bloque)
+        plano, entidades = formatear(texto[:len(texto) - len(bloque)])
+        plano += bloque
+    if len(entidades) + (bloque is not None) > MAX_ENTIDADES_TELEGRAM:
+        entidades = []
+    if bloque is not None:
+        entidades.append(entidad_de_bloque(plano, bloque))
+    return plano, entidades
+
+
 def prepare_payload(text: Any, *, dedupe_key: str, has_buttons: bool = False,
                     buttons: Iterable[Any] = (), allow_split: bool = False,
                     margen: int = 0) -> list[PreparedPayload]:

@@ -29,8 +29,8 @@ from .calendario import Calendario
 from .incidentes import (ETAPA_ENTREGA_AVISO_ADMIN, ETAPA_ENTREGA_MENSAJE,
                          REFERENCIA_ADMIN_NOTICE, redactar_secreto_telegram,
                          registrar_incidente)
-from .salida import (ETIQUETA_COPIAR, cabe_en_boton_de_copiar, entidad_de_bloque,
-                     prepare_buttons, prepare_payload)
+from .salida import (ETIQUETA_COPIAR, cabe_en_boton_de_copiar, prepare_buttons,
+                     prepare_payload, texto_y_entidades)
 
 
 class ErrorTelegram(RuntimeError):
@@ -97,11 +97,14 @@ class Boton(NamedTuple):
 
 class Entregado(NamedTuple):
     """Lo que se entregó. Es tupla para que `(chat_id, texto)` siga sirviendo.
-    `bloque` es el bloque que se copia con un toque, si el mensaje lo llevaba."""
+    `bloque` es el bloque que se copia con un toque, si el mensaje lo llevaba.
+    `texto` es el que vio la persona, ya sin las marcas de formato, y `entidades`, las de
+    Telegram (`salida.texto_y_entidades`), o `None` si el mensaje no tenía ninguna."""
     chat_id: int
     texto: str
     botones: list[Boton]
     bloque: str | None = None
+    entidades: list[dict] | None = None
 
 
 class Transporte(Protocol):
@@ -124,13 +127,12 @@ class TransporteDePrueba:
         payload = prepare_payload(
             texto, dedupe_key="transport", has_buttons=bool(prepared_buttons),
         )[0]
-        if bloque is not None:
-            entidad_de_bloque(payload.text, bloque)
+        plano, entidades = texto_y_entidades(payload.text, bloque)
         if chat_id in self.falla_en:
             raise ConnectionError(f"no se pudo entregar a {chat_id}")
         self.enviados.append(Entregado(
-            chat_id, payload.text, [Boton(*button) for button in prepared_buttons],
-            bloque))
+            chat_id, plano, [Boton(*button) for button in prepared_buttons],
+            bloque, entidades or None))
         return len(self.enviados)
 
 
@@ -147,12 +149,15 @@ class TransporteTelegram:
         payload = prepare_payload(
             texto, dedupe_key="transport", has_buttons=bool(prepared_buttons),
         )[0]
-        cuerpo: dict = {"chat_id": chat_id, "text": payload.text,
+        # El formato de los mensajes (2026-10-07): texto plano y entidades, nunca
+        # `parse_mode`. El bloque que se copia con un toque (T9-R1c-3) es una entidad
+        # `pre` sobre el final del texto que de verdad se manda. Sin ninguna, el cuerpo
+        # no lleva `entities`.
+        plano, entidades = texto_y_entidades(payload.text, bloque)
+        cuerpo: dict = {"chat_id": chat_id, "text": plano,
                          "disable_notification": False}
-        if bloque is not None:
-            # El bloque que se copia con un toque (T9-R1c-3): una entidad `pre`
-            # sobre el final del texto que de verdad se manda.
-            cuerpo["entities"] = [entidad_de_bloque(payload.text, bloque)]
+        if entidades:
+            cuerpo["entities"] = entidades
         if prepared_buttons:
             # Uno por fila: las etiquetas son nombres de personas o frases
             # cortas, y en el teléfono dos por fila se cortan.
