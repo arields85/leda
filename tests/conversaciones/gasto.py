@@ -17,6 +17,8 @@ cuenta:
   no informa el costo y no tiene precio en esta libreta. Sus llamadas se anotan con sus tokens y
   `precio: desconocido`, cuestan 0 en la cuenta (nunca una cifra inventada), y la ronda no se
   estima ni cuenta para el techo.
+- **Por suscripción** (`chatgpt`, decisión del usuario del 2026-10-07): igual que un precio
+  desconocido, pero la libreta dice `precio: suscripción`.
 - **El techo:** antes de cada corrida se estima lo que va a costar; si con eso se pasa del techo,
   no corre (`TechoAlcanzado`) salvo con `pasar_el_techo`, que el agente pasa sólo con el OK del
   usuario. Al llegar al 80 % avisa.
@@ -38,6 +40,7 @@ from typing import Any, Callable
 
 import httpx
 
+from leda.motor.chatgpt import ClienteChatGPT
 from leda.motor.ia_real import ClienteCompatible
 
 TECHO_USD = 30.0
@@ -56,6 +59,10 @@ USD_POR_LLAMADA_DESCONOCIDA = 0.02
 # desconocido: no se estima (`precio_conocido`).
 INFORMAN_EL_COSTO = frozenset({"openrouter"})
 PRECIO_DESCONOCIDO = "desconocido"
+# La suscripción de ChatGPT del usuario (2026-10-07): no se paga por llamada. Como un precio
+# desconocido, no se estima ni cuenta para el techo, y la libreta dice por qué.
+POR_SUSCRIPCION = frozenset({"chatgpt"})
+PRECIO_SUSCRIPCION = "suscripción"
 # Lo que se le pide a la IA en una corrida se cuenta con lo esperado (`corredor.
 # llamadas_previstas`); lo que Leda manda sobre otras tareas o de más no está ahí: un margen.
 MARGEN_DE_LA_ESTIMACION = 1.25
@@ -142,6 +149,12 @@ class ClienteQueCuenta(ClienteCompatible):
         return respuesta
 
 
+@dataclass
+class ClienteChatGPTQueCuenta(ClienteQueCuenta, ClienteChatGPT):
+    """El cliente de la suscripción de ChatGPT que además guarda los tokens de cada llamada (sin
+    costo: es por suscripción)."""
+
+
 def precio_conocido(proveedor: str) -> bool:
     """Si el gasto con ese proveedor se puede estimar: el proveedor informa lo que costó."""
     return proveedor in INFORMAN_EL_COSTO
@@ -183,7 +196,9 @@ def costo_de_las_llamadas(llamadas: list[dict[str, Any]], modelo: str, *,
     costo = {"llamadas": len(llamadas), "tokens_entrada": entrada, "tokens_salida": salida,
              "usd": round(usd, 6), "llamadas_estimadas": estimadas}
     if not conocido:
-        costo.update(precio=PRECIO_DESCONOCIDO, llamadas_sin_precio=sin_precio)
+        costo.update(precio=(PRECIO_SUSCRIPCION if proveedor in POR_SUSCRIPCION
+                             else PRECIO_DESCONOCIDO),
+                     llamadas_sin_precio=sin_precio)
     return costo
 
 

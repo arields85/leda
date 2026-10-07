@@ -16,7 +16,9 @@
   gasto. Una IA real es `PROVEEDOR/MODELO`, con cualquier proveedor de `leda.llm.BASE_URLS`
   (`openrouter/openai/gpt-6-luna-pro`, `nan/deepseek-v4-flash`), o uno de los nombres cortos de
   `ALIAS` (`sol`, `luna`, `luna-pro`, `deepseek-flash`, `glm-flash`...). La clave es la del
-  proveedor en el entorno (`leda.config.clave_llm`), que nunca se imprime.
+  proveedor en el entorno (`leda.config.clave_llm`), que nunca se imprime. Con `chatgpt`
+  (`chatgpt/gpt-6-sol`, o `sol-suscripcion`) no hay clave: es la sesión de la suscripción del
+  usuario (`python -m leda chatgpt login`), y la libreta anota `precio: suscripción`.
 - `--parametros '<json>'` (o `--parametros-archivo`) son los parámetros del cliente de la IA, los
   mismos de `model_config.parametros` (`leda.motor.ia_real.validar_parametros`: `timeout_s`,
   `plazo_s`, `tope_jugadas`, `tope_redaccion`, `cuerpo_extra`...); uno que no vale no corre.
@@ -68,6 +70,8 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+from leda.llm import PROVEEDORES_CON_SESION     # sin efectos: no carga el `.env`
+
 from .motores import MOTORES, POR_OMISION
 
 RAIZ = Path(__file__).resolve().parents[2]
@@ -79,7 +83,9 @@ ALIAS = {"sol": "openrouter/openai/gpt-6-sol", "luna": "openrouter/openai/gpt-6-
          "luna-pro": "openrouter/openai/gpt-6-luna-pro",
          "sol61": "openrouter/openai/gpt-6.1-sol",
          "sonnet": "openrouter/anthropic/claude-sonnet-5.5",
-         "deepseek-flash": "nan/deepseek-v4-flash", "glm-flash": "nan/glm5.3-flash"}
+         "deepseek-flash": "nan/deepseek-v4-flash", "glm-flash": "nan/glm5.3-flash",
+         # Sol por la suscripción de ChatGPT del usuario (decisión del 2026-10-07).
+         "sol-suscripcion": "chatgpt/gpt-6-sol"}
 # Los dos de `nan` sin razonar por dentro (E3-8): cada uno con el campo del pedido que `nan`
 # acepta para eso, y más tiempo que el de omisión. GLM cuenta lo que razona dentro del tope y
 # podía volver vacío y cortado.
@@ -241,6 +247,13 @@ def parametros_pedidos(ia: str, texto: str | None = None, *,
             raise ValueError(f"--parametros tiene que ser un objeto JSON; vino {texto!r}.")
         parametros.update(explicitos)
     validar_parametros(parametros)          # ParametrosInvalidos es un ValueError
+    try:
+        pedida = ia_pedida(ia)
+    except ValueError:
+        pedida = None
+    if pedida is not None and pedida[0] in PROVEEDORES_CON_SESION:
+        from leda.motor.chatgpt import validar_parametros_chatgpt
+        validar_parametros_chatgpt(parametros)      # lo que la suscripción no recibe
     return parametros
 
 
@@ -258,8 +271,17 @@ def _ia_real(proveedor: str, modelo: str, motor, parametros: dict | None = None)
     from leda.llm import BASE_URLS
 
     from .carga import TONO
-    from .gasto import ClienteQueCuenta
+    from .gasto import ClienteChatGPTQueCuenta, ClienteQueCuenta
 
+    if proveedor in PROVEEDORES_CON_SESION:
+        # La suscripción de ChatGPT: la sesión de `python -m leda chatgpt login`, sin clave.
+        from leda.motor.chatgpt import SesionChatGPT
+        try:
+            sesion = SesionChatGPT.abrir()
+        except (LookupError, ValueError) as e:
+            raise SystemExit(str(e)) from None
+        cliente = ClienteChatGPTQueCuenta.crear(modelo, sesion, parametros or {})
+        return motor.IAReal(cliente, motor.Tono(**TONO), nombre=f"{proveedor}/{modelo}")
     clave = config.clave_llm(proveedor)
     if not clave:
         raise SystemExit(f"Falta {config.variable_clave_llm(proveedor)} en el entorno.")
@@ -328,8 +350,9 @@ def main(argv: list[str] | None = None) -> int:
     from . import informe
     from .motores import cargar as cargar_motor
     from .corredor import correr_conversacion, elegir, llamadas_previstas
-    from .gasto import (MARGEN_DE_LA_ESTIMACION, SIN_CREDITO, Gasto, TechoAlcanzado,
-                        costo_de_las_llamadas, llamadas_sin_credito, precio_conocido)
+    from .gasto import (MARGEN_DE_LA_ESTIMACION, POR_SUSCRIPCION, SIN_CREDITO, Gasto,
+                        TechoAlcanzado, costo_de_las_llamadas, llamadas_sin_credito,
+                        precio_conocido)
     from .grabar import IAPerfecta, IAQueGraba, IARepetida
 
     motor = cargar_motor(a.motor)
@@ -362,6 +385,10 @@ def main(argv: list[str] | None = None) -> int:
         total = sum(estimado(c) for c, _ in trabajos)
         if precio_conocido(proveedor):
             print(f"Estimado de la ronda: USD {total:.2f}; gastado en la etapa: USD "
+                  f"{gasto.total():.2f}; techo: USD {gasto.techo:.2f}.")
+        elif proveedor in POR_SUSCRIPCION:
+            print(f"Por suscripción en {proveedor}: la ronda no se estima en USD ni cuenta para "
+                  f"el techo; la libreta anota los tokens. Gastado en la etapa: USD "
                   f"{gasto.total():.2f}; techo: USD {gasto.techo:.2f}.")
         else:
             print(f"Precio desconocido en {proveedor}: la ronda no se estima ni cuenta para el "

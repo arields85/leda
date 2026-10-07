@@ -446,6 +446,8 @@ def test_la_grabacion_de_un_402_dice_que_fue_sin_credito():
     ("nan/deepseek-v4-flash", ("nan", "deepseek-v4-flash")),
     ("glm-flash", ("nan", "glm5.3-flash")),
     ("nan/glm5.3-flash", ("nan", "glm5.3-flash")),
+    ("sol-suscripcion", ("chatgpt", "gpt-6-sol")),
+    ("chatgpt/gpt-6-sol", ("chatgpt", "gpt-6-sol")),
     ("guionada", None),
 ])
 def test_la_ia_se_pide_por_su_nombre_corto_o_por_proveedor_y_modelo(ia, esperada):
@@ -682,3 +684,84 @@ def test_una_ronda_sin_parametros_lo_dice_y_no_anota_parametros(tmp_path, monkey
     informe = (tmp_path / "resultados" / "sol.md").read_text("utf-8")
     assert "los de omisión" in informe
     assert "caché" not in informe             # la nota es sólo de `nan`
+
+
+# --- La suscripción de ChatGPT (decisión del usuario, 2026-10-07) ---------------------------
+
+def test_la_ia_por_suscripcion_usa_la_sesion_y_nunca_una_clave(tmp_path, monkeypatch):
+    import types
+
+    import leda.config
+    from leda.motor import chatgpt
+
+    from tests.conversaciones import motores
+    from tests.motor.test_chatgpt import sesion_guardada
+
+    def sin_clave(proveedor):
+        raise AssertionError("la suscripción no usa una clave")
+
+    monkeypatch.setattr(leda.config, "config", types.SimpleNamespace(
+        clave_llm=sin_clave, variable_clave_llm=lambda proveedor: "NINGUNA"))
+    monkeypatch.setenv(chatgpt.VARIABLE_RUTA, str(tmp_path / "s.json"))
+    with pytest.raises(SystemExit, match="chatgpt login"):
+        correr._ia_real("chatgpt", "gpt-6-sol", motores.cargar())
+
+    sesion_guardada(tmp_path / "s.json")
+    ia = correr._ia_real("chatgpt", "gpt-6-sol", motores.cargar(), {"plazo_s": 120})
+
+    assert ia.nombre == "chatgpt/gpt-6-sol"
+    assert isinstance(ia.cliente, chatgpt.ClienteChatGPT)
+    assert isinstance(ia.cliente, ClienteQueCuenta)          # cuenta los tokens de cada llamada
+    assert ia.cliente.base_url == chatgpt.BASE_URL
+    assert ia.cliente.parametros["plazo_s"] == 120
+
+
+def test_el_cliente_de_la_suscripcion_guarda_los_tokens_de_cada_llamada(tmp_path):
+    from tests.conversaciones.gasto import ClienteChatGPTQueCuenta
+    from tests.motor.test_chatgpt import Codex, completada, mensaje, sesion_guardada, sse
+
+    codex = Codex([sse({"type": "response.output_item.done", "item": mensaje("Listo.")},
+                       completada([], entrada=200, sale=15))])
+    cliente = ClienteChatGPTQueCuenta.crear("gpt-6-sol", sesion_guardada(tmp_path / "s.json"),
+                                            {}, transporte=httpx.MockTransport(codex))
+
+    cliente.completar({"messages": [{"role": "user", "content": "hola"}]})
+
+    assert cliente.usos == [{"prompt_tokens": 200, "completion_tokens": 15, "cost": None}]
+    assert "usage" not in codex.pedidos[0]["cuerpo"]       # el pedido de uso es de OpenRouter
+
+
+def test_por_suscripcion_el_precio_es_la_suscripcion_y_nunca_una_cifra():
+    llamadas = [{"tipo": "jugadas", "usos": [{"prompt_tokens": 100, "completion_tokens": 20,
+                                               "cost": None}]}]
+
+    costo = costo_de_las_llamadas(llamadas, "gpt-6-sol", proveedor="chatgpt")
+
+    assert costo["precio"] == gasto.PRECIO_SUSCRIPCION == "suscripción"
+    assert costo["usd"] == 0.0 and costo["llamadas_estimadas"] == 0
+    assert costo["tokens_entrada"] == 100
+    assert not gasto.precio_conocido("chatgpt")
+
+
+def test_los_parametros_que_la_suscripcion_no_recibe_no_corren(capsys):
+    with pytest.raises(ValueError, match="temperature"):
+        correr.parametros_pedidos("sol-suscripcion", '{"temperature": 0.2}')
+    with pytest.raises(SystemExit):
+        correr.main(["--ia", "sol-suscripcion", "--parametros", '{"temperature": 0.2}',
+                     "--conversacion", "01", "--veces", "1"])
+    assert "temperature" in capsys.readouterr().err
+
+
+def test_el_informe_dice_que_la_ronda_fue_por_suscripcion():
+    from tests.conversaciones import informe
+    from tests.conversaciones.corredor import Corrida
+
+    corrida = Corrida("01", "Arranque", "fuente", 1, "chatgpt/gpt-6-sol", "mide")
+    corrida.costo = costo_de_las_llamadas(
+        [{"tipo": "jugadas", "usos": [{"prompt_tokens": 10, "completion_tokens": 2,
+                                       "cost": None}]}], "gpt-6-sol", proveedor="chatgpt")
+
+    texto = informe.resumen([corrida], ronda="r", cabecera={}, transcripciones="t.md")
+
+    assert "**Por suscripción:** 1 llamada(s)" in texto
+    assert "Precio desconocido" not in texto

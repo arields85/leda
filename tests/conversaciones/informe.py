@@ -130,7 +130,10 @@ def resumen(corridas: list[Corrida], *, ronda: str, cabecera: dict[str, Any],
                    f"{sum(x['tokens_salida'] for x in costos)}.",
                    f"- **Total de la ronda: USD {usd:.4f}.**"]
         sin_precio = sum(x.get("llamadas_sin_precio", 0) for x in costos)
-        if sin_precio:
+        if sin_precio and all(x.get("precio") == "suscripción" for x in costos):
+            lineas.append(f"- **Por suscripción:** {sin_precio} llamada(s) por la suscripción "
+                          "de ChatGPT, sin costo por llamada; el total en USD no las incluye.")
+        elif sin_precio:
             lineas.append(f"- **Precio desconocido:** {sin_precio} llamada(s) sin el costo "
                           "informado por el proveedor; el total en USD no las incluye.")
     else:
