@@ -506,5 +506,15 @@ se borra `prueba_chica/` hasta entender por qué.
 
 ## 7. Próximo paso
 
-Decidir con el usuario los `PENDIENTE` de las secciones 4 y 6 que bloquean el orden. El alcance antes de
-M3 ya está decidido: la Fase C va después.
+M3 se cumplió el 2026-10-07. El punto exacto para retomar está en `docs/STATUS.md`. En orden:
+
+1. **Cerrar las palabras de todos los días.** Ya están commiteados `098bc80`, `28f29fc` y `230cf7e`. Falta
+   comprobar la regresión completa con `--ia sol-suscripcion` (correrla si falta), revisar esos commits por
+   tramos y registrarlo en la bitácora.
+2. **Llevar la rama a `main`,** autorizado: avance rápido desde la carpeta de `main` y push.
+3. **El formato de los mensajes,** pedido del usuario: breves, con negrita, párrafos y viñetas. La IA marca
+   un formato simple y la cocina lo convierte para Telegram, con su conversación de prueba y su prueba de
+   contrato de salida.
+4. **Borrar `prueba_chica/`.** Antes, sacarla de `tests/conversaciones/motores.py` y reemplazar su lector de
+   turnos.
+5. **La Fase C y la plataforma web.**

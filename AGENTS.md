@@ -157,8 +157,9 @@ carpetas o módulos sin un ADR aceptado.
 ## Comandos y operación
 
 Los comandos están en `README.md`, `PRUEBA-LOCAL.md` y `src/leda/cli.py`; su resultado actual no se presume.
-Corren el código de la carpeta donde se ejecutan (hoy, en `main` y en la rama del Motor, la conversación de los
-flujos A y B, congelada). `python -m leda esquema --recrear` borra los datos: nunca sin autorización explícita y
+Corren el código de la carpeta donde se ejecutan. En `main`, la conversación es la de los flujos A y B,
+congelada. En la rama del Motor es el motor definitivo (`src/leda/motor/`): los flujos A y B ya se borraron.
+`python -m leda esquema --recrear` borra los datos: nunca sin autorización explícita y
 un entorno descartable confirmado. El listener lo corre el usuario en su terminal; hay uno solo por bot.
 
 ## Reglas de seguridad
