@@ -33,14 +33,15 @@ prueba por Telegram real, en la que, según el usuario, Leda no se perdió aun f
 conversacional, sin un botón (bitácora de flujos, "Prueba por Telegram real del flujo D"). El usuario
 aceptó el ADR 0018 el mismo día.
 
-## Punto exacto para retomar (2026-10-06, Fase A de la Etapa 3 hecha; sigue la E3-5)
+## Punto exacto para retomar (2026-10-07, motor definitivo construido; sigue la E3-8)
 
 - **Qué:** el Motor, Etapa 3, con su plan en `odd/tasks/motor-definitivo.md`, aceptado el 2026-10-06.
   - **Hecha la Fase A** (E3-1 a E3-4): las garantías están en `tests/garantias/`, la entrada HTTP en
     `entrada.py`, y los flujos A y B y su banco, borrados. La migración `0032` borró las tablas del alta.
-  - **Leda no conversa hasta la E3-7**, la entrada del motor.
-  - **Sigue la Fase B:** E3-5, el paquete del motor con su prueba de frontera; después la E3-6, mudar el
-    diseño de la prueba chica.
+  - **Fase B:** el motor definitivo está en `src/leda/motor/` (E3-5 a E3-7), con la regla de hablar del
+    mundo, y Leda vuelve a conversar: `python -m leda escuchar corework`.
+  - **Sigue la E3-8:** regresión con la IA real y comparación de cinco IA. Después, la prueba por Telegram
+    del usuario (M3). Recrear `leda_motor` para esa prueba necesita su autorización.
   - Decisiones del usuario: los circuitos 5, 7, 8 y la persecución 3a, después de M3; la plataforma web,
     después de M3; no hay equipo real hasta que el usuario lo diga.
 - **Dónde:** rama `feat/motor-de-conversacion`, carpeta `D:\Proyectos\Leda-PM-worktrees\motor-de-conversacion`

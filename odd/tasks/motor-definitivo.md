@@ -317,7 +317,31 @@ revisión por tramos.
         - Dos pruebas del escuchador esperan la E3-7.
         - Una prueba de `prueba_chica` falló una vez sin explicación y pasó al repetirla
           (intermitente, sin identificar).
-- [ ] **E3-7. La entrada del motor:** escuchador y webhook propios, sin `gateway`.
+- [x] **E3-7. La entrada del motor:** escuchador y webhook propios, sin `gateway`.
+      **Hecha (2026-10-07), delegada a un escritor. Leda vuelve a conversar.**
+      - `075bd9c`: el escuchador del motor (`motor/escucha.py`, `cli escuchar <slug>`). Lo que pasa con
+        cada mensaje vive en `motor/recibir.py`, compartido con el webhook.
+      - `3a1be85`: la ruta `POST /telegram/{slug}`, `python -m leda webhooks`, y `servir` corre el ciclo
+        del motor de cada espacio activo (`motor/fondo.py`).
+        - El secreto del webhook es propio de cada bot: un HMAC del secreto general y el espacio. Sin
+          secreto configurado, el webhook rechaza todo.
+      - `c5d7c88`: el barrido de mensajes sin respuesta corre en cada vuelta del ciclo del motor.
+        - Los mensajes entrantes llevan la hora de la base, que es la que usa el barrido.
+        - El texto fijo de un turno caído cuenta como su respuesta, para que no salga un segundo aviso.
+        - El turno toma el mismo candado que el barrido.
+      - `829ca4b`: las pruebas del despachador, fuera de la prueba vieja del ciclo.
+      - `e4213e5`: se retiran `escalera.py`, `reloj.py`, `ciclo.py` y `cli cadencia` y `escalera`.
+        La cadencia vuelve con el circuito 5, después de M3.
+      - `4529c6e`: README y PRUEBA-LOCAL.
+      - Si no hay IA configurada, la persona recibe el texto fijo y queda un incidente. Un espacio sin
+        token de bot deja un incidente nuevo, `motor_sin_bot`.
+      - **Evidencia:**
+        - Antes del cambio, el webhook dio `1 failed, 13 errors` y el barrido `3 failed, 3 passed`.
+        - Suite completa: 1060.
+        - `prueba_chica`: 356.
+        - Ronda en seco: 18 de 18.
+      - **Pendiente:** `apscheduler` en `pyproject.toml` ya no lo usa nadie. El importador sigue
+        cargando `cadence_job` para el circuito 5.
 - [ ] **E3-8. Regresión y prueba real:** las 17 conversaciones, cinco veces con GPT-6 sol, y la guía de
       la E2-9 por Telegram. Después se borra `prueba_chica/`.
       **Comparación de IA** (pedido del usuario, 2026-10-06; el gasto en IA real está autorizado):
