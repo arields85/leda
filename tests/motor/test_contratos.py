@@ -72,7 +72,11 @@ def test_el_tono_sale_del_pack_del_espacio(conn, mundo):
                         formalidad="profesional_cordial", longitud="breve", emojis=True)
     assert bloque_de_tono(tono).splitlines() == [
         "Tono de este equipo:", "- Nombre: Leda.", "- Trato: de vos.",
-        "- Formalidad: profesional cordial.", "- Longitud: breve.", "- Emojis: permitidos."]
+        "- Formalidad: profesional cordial.", "- Longitud: breve.",
+        "- Emojis, fuera de las marcas del formato: permitidos."]
+    # Sin emojis en el tono, las marcas del formato siguen (segunda vuelta, 2026-10-07).
+    assert bloque_de_tono(Tono(emojis=False)).splitlines()[-1] == (
+        "- Emojis, fuera de las marcas del formato: no.")
 
 
 def test_sin_tono_propio_no_se_inventa_un_trato():
@@ -100,4 +104,8 @@ def test_las_instrucciones_son_las_que_pasaron_la_prueba_real():
 # Y otra vez a propósito el 2026-10-07, con el formato de los mensajes pedido por el usuario al
 # aprobar M3: negrita para las tareas y lo importante, párrafos y viñetas, en lugar de "sin
 # Markdown" (conversación 20). Antes: "11fb65a678d82884".
-HUELLAS_DE_LA_PRUEBA_REAL = {"jugadas": "8b25f19b4bfe9b8a", "redaccion": "66f8a2e23d9bbbd9"}
+# Y otra vez a propósito el 2026-10-07, con la segunda vuelta del formato, decidida por el usuario
+# después de verlo en Telegram: sin negrita, un renglón por idea, cuatro marcas fijas (📋 ✏️ 📅
+# ⚠️) que van aunque el tono no lleve emojis, el título completo una sola vez, fechas cortas
+# (`hechos.dia_corto`) y el cierre aparte, al final (conversación 20). Antes: "66f8a2e23d9bbbd9".
+HUELLAS_DE_LA_PRUEBA_REAL = {"jugadas": "8b25f19b4bfe9b8a", "redaccion": "d546932a0f6b9262"}

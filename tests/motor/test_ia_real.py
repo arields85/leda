@@ -228,7 +228,7 @@ def test_la_redaccion_recibe_sus_instrucciones_el_tono_y_el_pedido():
     sistema, usuario = cuerpo["messages"]
     assert sistema["content"].startswith(INSTRUCCIONES_REDACCION)
     for linea in ("- Trato: de vos.", "- Formalidad: profesional cordial.",
-                  "- Longitud: breve.", "- Emojis: permitidos."):
+                  "- Longitud: breve.", "- Emojis, fuera de las marcas del formato: permitidos."):
         assert linea in sistema["content"]
     # Con los nombres que dicen el hecho (`hechos.para_redactar`, 2026-10-07).
     assert json.loads(usuario["content"]) == hechos.para_redactar(
@@ -291,14 +291,18 @@ def test_la_redaccion_cuenta_lo_que_pasa_en_el_mundo_y_no_da_por_hecho_lo_que_no
 
 
 def test_la_redaccion_describe_el_formato_sin_frases_de_ejemplo():
-    """Pedido del usuario al aprobar M3 (2026-10-07; conversación 20): mensajes breves, con
-    las tareas y lo importante en negrita, párrafos y viñetas. La instrucción describe el
-    trabajo y las marcas que el envío convierte (`salida.formatear`), sin frases de ejemplo."""
+    """Segunda vuelta del formato (usuario, 2026-10-07, después de verlo en Telegram;
+    conversación 20): sin negrita, un renglón por idea, cuatro marcas fijas al principio del
+    renglón que van aunque el tono no lleve emojis, el título completo una vez, fechas cortas y
+    el cierre aparte. La instrucción describe el trabajo, sin frases de ejemplo."""
     texto = INSTRUCCIONES_REDACCION
-    assert "sin Markdown" not in texto
-    assert "breve" in texto and "**" in texto and "renglón en blanco" in texto
-    assert '"• "' in texto
-    for palabra in ("programar plc", "comunicaciones", "vence el"):
+    assert "sin Markdown" not in texto and "**" not in texto and '"• "' not in texto
+    assert "breve" in texto and "renglón en blanco" in texto and "Sin negrita" in texto
+    for marca in ("📋", "📅", "✏️", "⚠️"):
+        assert marca in texto, marca
+    assert "aunque el tono del equipo no lleve emojis" in texto
+    assert "una sola vez" in texto and "último renglón" in texto and "forma corta" in texto
+    for palabra in ("programar plc", "comunicaciones", "vence el", "anoté", "vie ", "/10"):
         assert palabra not in texto.lower(), palabra
 
 
