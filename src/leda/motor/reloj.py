@@ -51,6 +51,10 @@ class BaseEquivocada(ValueError):
     pass
 
 
+class HoraAtrasada(ValueError):
+    """El reloj de Leda nunca va para atrás: lo ya registrado quedaría en el futuro."""
+
+
 @dataclass
 class RelojDeLeda:
     """El tiempo real más el adelanto guardado. `refrescar` lo vuelve a leer."""
@@ -112,6 +116,28 @@ def adelantar(conn: psycopg.Connection, workspace_id: str, real: Reloj, *,
     return estado(conn, workspace_id, real, base=base)
 
 
+def a_la_hora(conn: psycopg.Connection, workspace_id: str, real: Reloj, hora: time, *,
+              base: str = BASE_DEL_MOTOR) -> EstadoDelReloj:
+    """Lleva el reloj de Leda a `hora` del día en que está, para probar de noche sin esperar
+    (usuario, 2026-10-07). Sólo hacia adelante (`HoraAtrasada`)."""
+    _comprobar(conn, base)
+    adelanto = leer_adelanto(conn, workspace_id, base=base)
+    ahora = real.ahora()
+    with admin(conn) as cur:
+        cal = Calendario.desde_base(cur, workspace_id)
+        leda = (ahora + adelanto).astimezone(cal.zona)
+        objetivo = datetime.combine(leda.date(), hora, cal.zona)
+        if objetivo <= leda:
+            raise HoraAtrasada(f"El reloj de Leda ya está en {leda:%H:%M}; sólo va hacia adelante.")
+        cur.execute(
+            """insert into workspace_setting (workspace_id, clave, valor)
+               values (%s, %s, %s)
+               on conflict (workspace_id, clave) do update set valor = excluded.valor""",
+            (workspace_id, CLAVE_ADELANTO, str(round((objetivo - ahora).total_seconds()))))
+    conn.commit()
+    return estado(conn, workspace_id, real, base=base)
+
+
 def volver(conn: psycopg.Connection, workspace_id: str, real: Reloj, *,
            base: str = BASE_DEL_MOTOR) -> EstadoDelReloj:
     """El reloj de Leda vuelve al tiempo real."""
@@ -164,8 +190,15 @@ def main(argv: list[str] | None = None) -> int:
         sys.stdout.reconfigure(encoding="utf-8")    # la consola de Windows no es UTF-8
     p = argparse.ArgumentParser(prog="python -m leda.motor.reloj")
     p.add_argument("slug")
-    p.add_argument("accion", choices=("adelantar", "estado", "volver"))
+    p.add_argument("accion", choices=("adelantar", "estado", "volver", "hora"))
+    p.add_argument("hhmm", nargs="?", help='con "hora": la hora del mismo día, por ejemplo 22:30')
     a = p.parse_args(argv)
+    if a.accion == "hora":
+        try:
+            hora = datetime.strptime(a.hhmm or "", "%H:%M").time()
+        except ValueError:
+            print('Falta la hora, como "22:30".')
+            return 1
 
     conn = conectar()
     try:
@@ -180,8 +213,15 @@ def main(argv: list[str] | None = None) -> int:
     if fila is None:
         print(f"No hay un espacio activo '{a.slug}'.")
         return 1
-    comando = {"adelantar": adelantar, "estado": estado, "volver": volver}[a.accion]
-    resultado = comando(conn, str(fila["id"]), RelojDelSistema())
+    if a.accion == "hora":
+        try:
+            resultado = a_la_hora(conn, str(fila["id"]), RelojDelSistema(), hora)
+        except HoraAtrasada as e:
+            print(f"STOP: {e}")
+            return 1
+    else:
+        comando = {"adelantar": adelantar, "estado": estado, "volver": volver}[a.accion]
+        resultado = comando(conn, str(fila["id"]), RelojDelSistema())
     print(f"base: {conn.info.dbname} · espacio: {a.slug}")
     print(_mostrar(resultado))
     if not resultado.restriccion_prendida:

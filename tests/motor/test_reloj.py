@@ -113,3 +113,23 @@ def test_fuera_de_leda_motor_el_reloj_no_se_adelanta(conn, mundo):
     reloj.refrescar(conn, mundo["id"])
 
     assert reloj.adelanto == timedelta(0) and reloj.ahora() == real.momento
+
+
+def test_a_la_hora_lleva_el_reloj_a_esa_hora_del_mismo_dia_y_nunca_para_atras(
+        conn, mundo, espacio_con_escalera):
+    """Para probar de noche sin esperar (pedido del usuario, 2026-10-07): el reloj de Leda va a
+    una hora del día en que está. Nunca para atrás: lo ya registrado quedaría en el futuro."""
+    from datetime import time
+
+    from leda.motor.reloj import HoraAtrasada, a_la_hora
+
+    base = conn.info.dbname
+    real = RelojFijo(VIERNES_18)
+    adelantar(conn, mundo["id"], real, base=base)                  # martes 13, 10:00
+
+    noche = a_la_hora(conn, mundo["id"], real, time(22, 30), base=base)
+
+    assert noche.leda == octubre(13, 22, 30)
+    assert not noche.en_horario
+    with pytest.raises(HoraAtrasada):
+        a_la_hora(conn, mundo["id"], real, time(9, 0), base=base)
