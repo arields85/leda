@@ -1,7 +1,7 @@
 """El informe de una ronda de conversaciones de prueba (E2-7).
 
 `odd/tasks/prueba-chica-del-motor.md`, secciones 6 y 10.3. Dos archivos Markdown por ronda en
-`prueba_chica/resultados/`, versionados porque son la evidencia (las grabaciones crudas, no):
+`tests/conversaciones/resultados/`, versionados porque son la evidencia (las grabaciones crudas, no):
 
 - **el resumen** (`<ronda>.md`): la tabla de conversaciones por corridas con lo que se comprobó
   solo (garantías, comprensión provisional y lo del código), las fallas con su diferencia, la

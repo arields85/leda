@@ -43,12 +43,8 @@ de nuevo en `src/leda`, con su propia prueba de frontera.
 - `tiempo.py`: el reloj del motor. Los momentos los pone el motor, nunca la base.
 - `reloj.py`: el reloj de Leda en `leda_motor` y el comando que lo adelanta (decisión 10.2).
 - `leer.py`: el lector del registro de turnos, de sólo lectura.
-- El corredor de las conversaciones de prueba (E2-7): `conversaciones/` (las 15 de
-  `tests/conversaciones/` en YAML, con lo que se comprueba solo; el `.md` es la fuente),
-  `carga.py` (el estado inicial de cada una), `corredor.py` (una corrida, paso por paso, por el
-  código de verdad), `comprobar.py` (qué se compara y cómo se clasifica una falla), `grabar.py`
-  (la IA guionada con las jugadas esperadas, la que graba y la que repite),
-  `gasto.py` (el techo de USD 30, decisión 10.4), `informe.py` y `correr.py` (el comando).
+- El corredor de las conversaciones de prueba (E2-7) se mudó a `tests/conversaciones/` en la
+  E3-8, con sus YAML, sus informes y su libreta del gasto.
 - `test_frontera.py`: qué puede importar esta carpeta de `src/leda` y qué nunca debe alcanzar.
 
 ## Cómo se corren sus pruebas
@@ -67,25 +63,8 @@ falsos: ninguna prueba llama a un servicio de verdad.
 
 ## Correr las conversaciones (E2-7)
 
-```
-python -m prueba_chica.correr --ia guionada --veces 1          # en seco, sin gasto
-python -m prueba_chica.correr --ia sol --veces 5 --paralelo 5 --grabar prueba_chica/grabaciones
-python -m prueba_chica.correr --ia luna --veces 5 --paralelo 5 --grabar prueba_chica/grabaciones
-python -m prueba_chica.correr --repetir prueba_chica/grabaciones/03-sol-2.json
-```
-
-Cada corrida va en una base nueva del servidor de `LEDA_TEST_DB_URL`, copia de una plantilla, y
-se borra al terminar; nunca toca `leda`, `leda_flujo` ni `leda_motor`. El reloj se mueve a los
-momentos que dice cada `.md`; el transporte es falso. Con `sol` o `luna` la clave sale del
-entorno (`LEDA_OPENROUTER_API_KEY`) y nunca se imprime. **El techo:** antes de empezar se
-estima la ronda; si con eso el gasto de la etapa pasa de USD 30, no corre (`--pasar-el-techo`,
-sólo con el OK del usuario); avisa desde el 80 %. **El crédito:** también antes de empezar se
-pregunta a OpenRouter cuánto le queda a la cuenta y, si no alcanza para lo estimado, no corre
-(sale con 3; si no se puede preguntar, avisa y sigue); un HTTP 402 a mitad de ronda la corta
-(sale con 3) y las corridas que lo tuvieron quedan inválidas, aparte en el informe. La cuenta queda en `resultados/gasto.json` y
-el informe de la ronda, con sus transcripciones, en `resultados/` (las grabaciones crudas, en
-`grabaciones/`, no se versionan). La comprensión automática del informe es provisional: la que
-vale es la lectura del usuario (decisión 10.3).
+El corredor vive ahora en `tests/conversaciones/` (E3-8); cómo se corre está en su
+`README.md`, "El corredor".
 
 ## El paso de los días (E2-6)
 

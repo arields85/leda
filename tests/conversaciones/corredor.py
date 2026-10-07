@@ -1,9 +1,8 @@
 """El corredor de las conversaciones de prueba: una corrida de una conversación (E2-7).
 
 `odd/tasks/prueba-chica-del-motor.md`, sección 6; ADR 0018, decisiones 5b, 6 y 7. Cada
-conversación de `tests/conversaciones/` (la fuente) está copiada en un YAML de
-`prueba_chica/conversaciones/` con lo que se comprueba solo. Una corrida, sobre una base ya
-creada para ella:
+conversación de `tests/conversaciones/` (la fuente, en Markdown) está copiada en un YAML al lado,
+con lo que se comprueba solo. Una corrida, sobre una base ya creada para ella:
 
 1. carga el estado inicial (`carga.py`) y corre el **preludio**, si lo hay: lo que pasó antes,
    por el motor mismo, con las jugadas del YAML y los textos de la IA de la corrida;
@@ -39,15 +38,15 @@ from leda.db import espacio
 from leda.despachador import TransporteDePrueba
 
 from . import comprobar as cp
-from . import hechos
+from prueba_chica import hechos
 from .carga import Mundo, cargar, momento
-from .ciclo import Ciclo
+from prueba_chica.ciclo import Ciclo
 from .grabar import IAMixta, IAPerfecta
-from .ia import IA
-from .turno import procesar_toque, procesar_turno
+from prueba_chica.ia import IA
+from prueba_chica.turno import procesar_toque, procesar_turno
 
-CARPETA = Path(__file__).resolve().parent / "conversaciones"
-RAIZ = Path(__file__).resolve().parents[1]
+CARPETA = Path(__file__).resolve().parent
+RAIZ = Path(__file__).resolve().parents[2]
 
 
 # La definición del usuario (2026-10-06; ADR 0018, decisión 9, tercera vuelta): todo mensaje de

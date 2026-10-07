@@ -1,12 +1,12 @@
 """Las reglas de comparación del corredor, sin base (revisión de la E2-7).
 
-`prueba_chica/comprobar.py`: lo esperado de un paso contra lo que pasó, y cómo se clasifica cada
+`tests/conversaciones/comprobar.py`: lo esperado de un paso contra lo que pasó, y cómo se clasifica cada
 diferencia (garantía, comprensión o motor).
 """
 
 from __future__ import annotations
 
-from prueba_chica import comprobar as cp
+from tests.conversaciones import comprobar as cp
 
 
 def _hubo(**mas) -> dict:
@@ -41,7 +41,7 @@ def test_el_emparejamiento_no_se_deja_ganar_por_el_primero_que_coincide():
 def test_un_envio_que_junto_avisos_de_dos_tareas_cumple_lo_esperado_de_las_dos():
     """Un mensaje de Leda por su cuenta puede juntar avisos de varias tareas (mecánica §10):
     el corredor lo compara con todas, no con una sola (revisión de la E2-7)."""
-    from prueba_chica.corredor import Salida, _sale_coincide
+    from tests.conversaciones.corredor import Salida, _sale_coincide
 
     junto = Salida("Marcos", "texto", [], False, tipo="aviso_previo", tareas=["PLC", "COM"],
                    hechos=[{"tarea": "PLC", "vence": "2026-10-23"},
@@ -59,7 +59,7 @@ def test_un_envio_que_junto_avisos_de_dos_tareas_cumple_lo_esperado_de_las_dos()
 def test_los_hechos_esperados_se_comparan_con_el_aviso_de_ese_tipo_y_esa_tarea():
     """En un envío que junta avisos, los hechos esperados de un tipo y una tarea son los de ese
     aviso, no los de cualquiera del envío (revisión de la corrida en seco con las 16)."""
-    from prueba_chica.corredor import Salida, _sale_coincide
+    from tests.conversaciones.corredor import Salida, _sale_coincide
 
     previo_com = {"aviso": "vencimiento_proximo", "necesita_respuesta": False,
                   "vence": "2026-11-06"}
@@ -83,7 +83,7 @@ def test_los_hechos_esperados_se_comparan_con_el_aviso_de_ese_tipo_y_esa_tarea()
 def test_cada_aviso_de_un_envio_va_con_sus_propios_hechos():
     """Los avisos de un envío se emparejan con sus hechos por el aviso mismo, no por posición:
     uno sin hechos no corre a los demás (revisión de la corrida en seco con las 16)."""
-    from prueba_chica.corredor import _avisos_del_envio
+    from tests.conversaciones.corredor import _avisos_del_envio
 
     titulos = {"PLC": "Programar PLC", "COM": "Revisar comunicaciones"}
     avisos = [{"id": "b", "tipo": "pedido_de_estado", "tarea": "PLC",

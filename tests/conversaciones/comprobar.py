@@ -243,7 +243,7 @@ def jugada_coincide(esperada: dict[str, Any], real: dict[str, Any],
     no esté en la lista), los datos estructurados iguales, y los libres presentes si y sólo si
     se esperan (salvo los de `puede_traer`, que pueden venir si son palabras de la persona:
     todas las del dato están en su `mensaje`, sin importar mayúsculas ni acentos)."""
-    from .fichas import FICHAS, palabras
+    from prueba_chica.fichas import FICHAS, palabras
 
     nombre = esperada["nombre"]
     if nombre == FUERA_DE_LA_LISTA:

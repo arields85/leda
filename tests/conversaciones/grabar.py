@@ -24,7 +24,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from .ia import IA, Jugada
+from prueba_chica.ia import IA, Jugada
 
 # Las claves de una jugada esperada que no son datos para la IA.
 _SOLO_PARA_COMPROBAR = ("puede_traer",)

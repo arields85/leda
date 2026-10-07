@@ -7,8 +7,8 @@ seguir de arriba abajo y que dice qué tiene que pasar en cada paso, sin dictarl
   conversación se escribe primero acá, y la conversación queda como su prueba.
 - **En la Etapa 2, cada una corre cinco veces contra la IA real** (ADR 0018, decisión 5b): las garantías
   tienen que cumplirse 5 de 5 veces y la comprensión al menos 4 de 5; la vez que Leda no entiende, pregunta.
-- **Cómo se corren de forma automática lo decide el plan de la Etapa 2.** Esta carpeta tiene sólo las
-  conversaciones: ni código, ni arnés, ni datos cargables.
+- **Se corren solas con el corredor** ("El corredor", abajo): cada `.md` tiene al lado su YAML con lo
+  que se comprueba solo, y el `.md` sigue siendo la fuente.
 
 ## Las conversaciones
 
@@ -57,6 +57,34 @@ de las ocho situaciones generales de la decisión 4. La 15 suma la jugada `infor
 usuario, 2026-10-05; ADR 0018, decisión 9b). La 16, la regla de la tarea vencida (decisión del usuario,
 2026-10-05; ADR 0018, decisión 9j). La 17, la jugada `destrabar` (decisión del usuario, 2026-10-05;
 ADR 0018, decisión 9l).
+
+## El corredor
+
+Vino de `prueba_chica/` en la E3-8, para que la regresión sobreviva al borrado de la prueba chica.
+Corre cada conversación por el código de verdad: carga su estado inicial (`carga.py`), corre cada paso
+con el reloj en el momento que dice el `.md` (`corredor.py`), compara lo que pasó con lo esperado y
+clasifica cada diferencia como garantía, comprensión o motor (`comprobar.py`). Las IA del corredor
+están en `grabar.py`: la guionada con las jugadas esperadas, la que graba y la que repite. El techo de
+gasto y la libreta, en `gasto.py`; el informe de cada ronda, en `informe.py`; el comando, en `correr.py`.
+
+```
+python -m tests.conversaciones.correr --ia guionada --veces 1          # en seco, sin gasto
+python -m tests.conversaciones.correr --ia sol --veces 5 --paralelo 5 --grabar tests/conversaciones/grabaciones
+python -m tests.conversaciones.correr --repetir tests/conversaciones/grabaciones/03-sol-2.json
+```
+
+Cada corrida va en una base nueva del servidor de `LEDA_TEST_DB_URL` (`.env.test`), copia de una
+plantilla, y se borra al terminar; nunca toca `leda`, `leda_flujo` ni `leda_motor`. El transporte es
+falso. Con una IA real la clave sale del entorno y nunca se imprime. **El techo:** antes de empezar se
+estima la ronda; si con eso el gasto pasa de USD 30, no corre (`--pasar-el-techo`, sólo con el OK del
+usuario); avisa desde el 80 %. **El crédito:** antes de empezar se pregunta a OpenRouter cuánto le queda
+a la cuenta y, si no alcanza, no corre (sale con 3); un HTTP 402 a mitad de ronda la corta (sale con 3)
+y las corridas que lo tuvieron quedan inválidas, aparte en el informe. La cuenta queda en
+`resultados/gasto.json` y el informe de la ronda, con sus transcripciones, en `resultados/` (las
+grabaciones crudas, en `grabaciones/`, no se versionan). La comprensión automática del informe es
+provisional: la que vale es la lectura del usuario.
+
+Sus pruebas (`test_corredor.py`, `test_comprobar.py` y `test_gasto.py`) están en la suite de siempre.
 
 ## Formato de cada conversación
 

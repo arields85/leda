@@ -13,10 +13,8 @@ import json
 
 from prueba_chica import avisos, hechos, preguntas
 from prueba_chica.conftest import AHORA
-from prueba_chica.corredor import correr_conversacion, elegir
 from prueba_chica.fichas import (EN_COLA_SIN_ENVIAR, ESPERA_ALGO_CIERTO, FICHAS,
                                   GUARDADO_SIN_ENVIAR, SALIDAS_DE_UN_BLOQUEO)
-from prueba_chica.grabar import IAPerfecta
 from prueba_chica.ia import IAGuionada, Jugada
 from prueba_chica.ia_real import DATOS, DIAS_PROXIMOS
 from prueba_chica.instrucciones import INSTRUCCIONES_JUGADAS, INSTRUCCIONES_REDACCION
@@ -25,6 +23,9 @@ from prueba_chica.tiempo import RelojFijo
 from prueba_chica.turno import SOLO_SI_PREGUNTA, procesar_turno
 
 from leda.db import admin
+
+from tests.conversaciones.corredor import correr_conversacion, elegir
+from tests.conversaciones.grabar import IAPerfecta
 
 # --- El vocabulario ---------------------------------------------------------------------------
 

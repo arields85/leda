@@ -4,7 +4,7 @@
 acercarse y, al llegar, se le pregunta al usuario antes de seguir. El corredor (E2-7) lleva la
 cuenta:
 
-- **La libreta** (`prueba_chica/resultados/gasto.json`, versionada: no tiene nada sensible) suma
+- **La libreta** (`tests/conversaciones/resultados/gasto.json`, versionada: no tiene nada sensible) suma
   cada corrida real: cuándo, qué IA, qué conversación, cuántas llamadas, los tokens y lo que
   costó. Se escribe después de cada corrida, así un corte no pierde la cuenta.
 - **El costo** es el que informa el proveedor (OpenRouter, con `usage.include`); si no lo
@@ -33,7 +33,7 @@ from typing import Any, Callable
 
 import httpx
 
-from .ia_real import ClienteCompatible
+from prueba_chica.ia_real import ClienteCompatible
 
 TECHO_USD = 30.0
 AVISO_DESDE = 0.8

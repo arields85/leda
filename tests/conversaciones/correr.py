@@ -1,8 +1,8 @@
-"""Corre las conversaciones de prueba: `python -m prueba_chica.correr` (E2-7).
+"""Corre las conversaciones de prueba: `python -m tests.conversaciones.correr` (E2-7).
 
 `odd/tasks/prueba-chica-del-motor.md`, sección 6 y decisiones 10.3 y 10.4. Uso:
 
-    python -m prueba_chica.correr [--conversacion NN ...] [--veces 5] [--ia sol|sol61|sonnet|luna|guionada]
+    python -m tests.conversaciones.correr [--conversacion NN ...] [--veces 5] [--ia sol|sol61|sonnet|luna|guionada]
                                   [--grabar CARPETA] [--repetir ARCHIVO] [--paralelo N]
                                   [--ronda NOMBRE] [--sin-informe] [--pasar-el-techo]
 
@@ -21,7 +21,7 @@
   empezar la siguiente; ninguna otra.
 - **El techo de gasto** (USD 30 para la etapa, 10.4): antes de empezar se estima la ronda; si se
   pasa, no corre (sale con 2), salvo con `--pasar-el-techo`, que se usa sólo con el OK del
-  usuario. Avisa al llegar al 80 %. La cuenta queda en `prueba_chica/resultados/gasto.json`.
+  usuario. Avisa al llegar al 80 %. La cuenta queda en `tests/conversaciones/resultados/gasto.json`.
 - **Una ronda cortada** (revisión de la E2-7): si una corrida llega al techo a mitad de la ronda,
   o se cae por otra cosa, lo que la IA ya gastó queda igual en la libreta (marcado `cortada`, con
   el motivo), el informe lo dice en "Ronda cortada" y la ejecución sale con error: 2 por el
@@ -33,7 +33,7 @@
   ninguna corrida más, las que lo tuvieron son **inválidas** (fuera de la tabla, aparte en el
   informe) y la ronda queda cortada por "sin crédito en el proveedor"; sale con 3
   (`SALIDA_SIN_CREDITO`). Las que terminaron antes valen.
-- El informe de la ronda queda en `prueba_chica/resultados/` (`informe.py`).
+- El informe de la ronda queda en `tests/conversaciones/resultados/` (`informe.py`).
 """
 
 from __future__ import annotations
@@ -52,7 +52,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-RAIZ = Path(__file__).resolve().parents[1]
+RAIZ = Path(__file__).resolve().parents[2]
 MODELOS = {"sol": "openai/gpt-6-sol", "luna": "openai/gpt-6-luna",
            "sol61": "openai/gpt-6.1-sol", "sonnet": "anthropic/claude-sonnet-5.5"}
 PROHIBIDAS = frozenset({"leda", "leda_flujo", "leda_motor"})
@@ -173,8 +173,8 @@ def _ia_real(modelo: str):
 
     from .carga import TONO
     from .gasto import ClienteQueCuenta
-    from .ia_real import IAReal
-    from .instrucciones import Tono
+    from prueba_chica.ia_real import IAReal
+    from prueba_chica.instrucciones import Tono
 
     clave = config.clave_llm("openrouter")
     if not clave:
@@ -198,7 +198,7 @@ def _credito_restante() -> float | None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    p = argparse.ArgumentParser(prog="python -m prueba_chica.correr",
+    p = argparse.ArgumentParser(prog="python -m tests.conversaciones.correr",
                                 description="Corre las conversaciones de prueba del Motor.")
     p.add_argument("--conversacion", nargs="*", metavar="NN")
     p.add_argument("--veces", type=int, default=5)

@@ -12,8 +12,8 @@ import json
 import httpx
 import pytest
 
-from prueba_chica import correr, gasto
-from prueba_chica.gasto import (ClienteQueCuenta, Gasto, SinCredito, TechoAlcanzado,
+from tests.conversaciones import correr, gasto
+from tests.conversaciones.gasto import (ClienteQueCuenta, Gasto, SinCredito, TechoAlcanzado,
                                 costo_de_las_llamadas, credito_restante)
 
 
@@ -170,7 +170,7 @@ class _IAQueCuesta:
 
 
 def _ronda_sin_servidor(monkeypatch, tmp_path, correr_conversacion):
-    from prueba_chica import corredor, informe
+    from tests.conversaciones import corredor, informe
     import leda.db
 
     monkeypatch.setattr(gasto, "RUTA", tmp_path / "gasto.json")
@@ -212,7 +212,7 @@ def test_una_corrida_que_se_cae_deja_su_gasto_y_el_informe_dice_que_se_corto(
 
 
 def test_llegar_al_techo_a_mitad_de_la_ronda_sale_con_error_y_lo_dice(tmp_path, monkeypatch):
-    from prueba_chica.corredor import Corrida
+    from tests.conversaciones.corredor import Corrida
 
     def bien(conn, conv, ia, *, vez=1):
         _llamada_que_costo(ia, 0.1)
@@ -257,7 +257,7 @@ def test_si_la_plantilla_no_se_puede_crear_igual_se_borra(tmp_path, monkeypatch)
 
 
 def test_la_grabacion_guarda_lo_que_uso_cada_llamada_de_la_ia_real():
-    from prueba_chica.grabar import IAQueGraba
+    from tests.conversaciones.grabar import IAQueGraba
     from prueba_chica.ia_real import IAReal
 
     def responder(pedido: httpx.Request) -> httpx.Response:
@@ -368,7 +368,7 @@ def test_la_ronda_no_empieza_si_el_credito_no_alcanza(tmp_path, monkeypatch, cap
 
 
 def test_si_no_se_puede_consultar_el_credito_avisa_y_sigue(tmp_path, monkeypatch, capsys):
-    from prueba_chica.corredor import Corrida
+    from tests.conversaciones.corredor import Corrida
 
     def bien(conn, conv, ia, *, vez=1):
         return Corrida(str(conv["numero"]), conv["titulo"], conv["fuente"], vez, ia.nombre,
@@ -385,7 +385,7 @@ def test_si_no_se_puede_consultar_el_credito_avisa_y_sigue(tmp_path, monkeypatch
 
 def test_un_402_a_mitad_de_la_ronda_la_corta_e_invalida_las_corridas_que_choco(
         tmp_path, monkeypatch):
-    from prueba_chica.corredor import Corrida
+    from tests.conversaciones.corredor import Corrida
 
     def primera_bien_despues_sin_credito(conn, conv, ia, *, vez=1):
         if vez == 1:
@@ -420,7 +420,7 @@ def test_un_402_a_mitad_de_la_ronda_la_corta_e_invalida_las_corridas_que_choco(
 
 
 def test_la_grabacion_de_un_402_dice_que_fue_sin_credito():
-    from prueba_chica.gasto import llamadas_sin_credito
+    from tests.conversaciones.gasto import llamadas_sin_credito
 
     llamadas = [{"tipo": "jugadas", "respuesta": []},
                 {"tipo": "jugadas", "error": "SinCredito: el proveedor no tiene crédito"},

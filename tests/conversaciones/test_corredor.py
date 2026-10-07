@@ -15,10 +15,10 @@ import pytest
 
 from leda.db import admin
 
-from prueba_chica import comprobar as cp
-from prueba_chica.carga import cargar
-from prueba_chica.corredor import CARPETA, correr_conversacion, elegir, leer, todas
-from prueba_chica.grabar import IAPerfecta, IAQueGraba, IARepetida
+from tests.conversaciones import comprobar as cp
+from tests.conversaciones.carga import cargar
+from tests.conversaciones.corredor import CARPETA, correr_conversacion, elegir, leer, todas
+from tests.conversaciones.grabar import IAPerfecta, IAQueGraba, IARepetida
 
 
 def _limpiar(conn) -> None:
@@ -190,7 +190,7 @@ def test_las_bases_viejas_de_corridas_muertas_se_borran_al_empezar(conn):
     import psycopg
     from psycopg.sql import SQL, Identifier
 
-    from prueba_chica import correr
+    from tests.conversaciones import correr
 
     url = os.environ["LEDA_TEST_DB_URL"]
     ahora = datetime(2020, 1, 1, 12, 30, tzinfo=timezone.utc)
@@ -216,7 +216,7 @@ def test_las_bases_viejas_de_corridas_muertas_se_borran_al_empezar(conn):
 
 
 def test_la_corrida_en_seco_por_linea_de_comandos_graba_y_repite(conn, tmp_path, capsys):
-    from prueba_chica import correr
+    from tests.conversaciones import correr
 
     antes = _bases_del_corredor(conn)
 
@@ -235,7 +235,7 @@ def test_cada_paso_en_que_leda_escribe_lleva_la_casilla_del_proximo_paso(conn):
     """La definición del usuario (2026-10-06): todo mensaje de Leda termina con un próximo paso
     concreto. La casilla para leerlo se agrega sola en cada paso en que Leda escribe, salvo que
     el paso ya diga cuál es su próximo paso; un paso en que Leda no manda nada no la lleva."""
-    from prueba_chica.corredor import PROXIMO_PASO
+    from tests.conversaciones.corredor import PROXIMO_PASO
 
     [conv] = elegir(["17"])
     corrida = correr_conversacion(conn, conv, _perfecta(conv))
