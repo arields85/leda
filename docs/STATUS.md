@@ -33,12 +33,16 @@ prueba por Telegram real, en la que, según el usuario, Leda no se perdió aun f
 conversacional, sin un botón (bitácora de flujos, "Prueba por Telegram real del flujo D"). El usuario
 aceptó el ADR 0018 el mismo día.
 
-## Punto exacto para retomar (2026-10-06, M2 cumplido; sigue la Etapa 3)
+## Punto exacto para retomar (2026-10-06, Fase A de la Etapa 3 hecha; sigue la E3-5)
 
-- **Qué:** el Motor. La Etapa 2 (`odd/tasks/prueba-chica-del-motor.md`) está terminada: E2-1 a E2-9 y M2.
-  Sigue la Etapa 3, limpieza y motor de conversación definitivo, que lleva su plan propio, todavía sin
-  escribir. El ADR 0018 quedó aceptado (2026-10-06). `main` no recibe nada hasta M3, porque la rama ya mezcla
-  documentos con código descartable; la rama está subida como respaldo (usuario, 2026-10-06).
+- **Qué:** el Motor, Etapa 3, con su plan en `odd/tasks/motor-definitivo.md`, aceptado el 2026-10-06.
+  - **Hecha la Fase A** (E3-1 a E3-4): las garantías están en `tests/garantias/`, la entrada HTTP en
+    `entrada.py`, y los flujos A y B y su banco, borrados. La migración `0032` borró las tablas del alta.
+  - **Leda no conversa hasta la E3-7**, la entrada del motor.
+  - **Sigue la Fase B:** E3-5, el paquete del motor con su prueba de frontera; después la E3-6, mudar el
+    diseño de la prueba chica.
+  - Decisiones del usuario: los circuitos 5, 7, 8 y la persecución 3a, después de M3; la plataforma web,
+    después de M3; no hay equipo real hasta que el usuario lo diga.
 - **Dónde:** rama `feat/motor-de-conversacion`, carpeta `D:\Proyectos\Leda-PM-worktrees\motor-de-conversacion`
   (reglas en [`../AGENTS.md`](../AGENTS.md), "Dónde se trabaja y qué no se hace").
 - **Para la Etapa 3:** las observaciones de la prueba real (Leda cuenta de más lo de la cocina; los efectos
