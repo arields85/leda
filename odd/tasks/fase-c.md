@@ -59,9 +59,14 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
    persona puede ver. La página es el primer pedazo de la plataforma: lleva su ADR corto antes del código.
    Propuesta del usuario ("que se guarden en la plataforma y Leda envíe el enlace"), con los ajustes del
    agente que aceptó: fotos adjuntas en el aviso, la base como almacenamiento y el ADR primero.
-2. **La aprobación escrita y ambigua:** "aprobado, pero que revise el cable", ¿es aprobar o pedir cambios?
-   `PENDIENTE`.
-3. **Un aprobador que no contesta:** ¿recordatorio y escalamiento, y a quién? `PENDIENTE`.
+2. **La aprobación escrita:** decidida (usuario, 2026-10-07). Lo claro va directo, sin vista previa: es la
+   decisión de quien aprueba. Si mezcla aprobar y pedir un cambio ("aprobado, pero que revise el cable"),
+   Leda pregunta una sola vez cuál de las dos, con dos botones, porque admite dos lecturas (constitución
+   §8).
+3. **Quien aprueba no contesta:** decidida (usuario, 2026-10-07). Un recordatorio al día hábil siguiente
+   y otro al segundo. Al tercero, si tiene a alguien arriba (Marcos → Ismael), se le avisa a ese que la
+   aprobación está trabada; si no hay nadie arriba, un recordatorio cordial por día. Al responsable no se
+   le avisa: no depende de él.
 4. **Escribirle a quien destraba:** ¿directo, o preguntándole antes a quien lo nombró (constitución §7,
    atribución)? `PENDIENTE`.
 5. **Quien destraba dice que no le corresponde:** ¿a quién va Leda? `PENDIENTE`.
@@ -84,7 +89,7 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
 
 ## Tareas
 
-- [ ] **C-1.** Las preguntas 1 a 3, decididas por el usuario. La 1, decidida.
+- [x] **C-1.** Las preguntas 1 a 3, decididas por el usuario (2026-10-07).
 - [ ] **C-1b.** El ADR de la evidencia y la página de la tarea, aceptado por el usuario.
 - [ ] **C-2.** Conversaciones de prueba de la entrega y la aprobación.
 - [ ] **C-3.** Fichas de la entrega y la aprobación, la confirmación escrita y los avisos por el motor.
@@ -95,4 +100,5 @@ Sin entrega y aprobación, una tarea nunca se cierra por chat ("ya la terminé" 
 
 ## Próximo paso
 
-La pregunta 2.
+El ADR de la evidencia y la página de la tarea (C-1b), y en paralelo las conversaciones de prueba de la
+entrega y la aprobación (C-2).
