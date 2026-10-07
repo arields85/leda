@@ -221,6 +221,30 @@ revisión por tramos.
 
 - [ ] **E3-5. El paquete del motor** en `src/leda`, con su prueba de frontera (lista permitida de módulos
       y de tablas; bordes conocidos que sólo achican).
+      **Decisiones técnicas (agente, 2026-10-06, con el mapa de la prueba chica):**
+      - **Primero, la auditoría en la cocina.** Desde que se borró `agente.py` (`d002c99`),
+        `herramientas.ejecutar` no deja ninguna fila en `audit_log`; antes la dejaba `agente`, con
+        `pack_hash` y `nucleo_hash`. Vuelve a `herramientas.ejecutar`, con su prueba en
+        `tests/garantias`, en rojo antes del arreglo. Lo que el motor escribe directo (previsiones,
+        quién destraba, avisos) audita con el mismo ayudante. Es la segunda entrada de la prueba real.
+      - **Paquete `src/leda/motor/`.** `escalera.py`, `reloj.py` y `ciclo.py` ya existen en `src/leda`:
+        son la cadencia y la escalera viejas. Se retiran cuando el motor tenga su ciclo propio (E3-7),
+        porque un camino nuevo entra sólo cuando se retiró el viejo (`AGENTS.md`, punto 7).
+      - **Se porta el código de la prueba chica, limpiándolo.** Es el camino más fiel a lo que pasó la
+        prueba. `prueba_chica/` queda intacta hasta la E3-8.
+      - **Capas:**
+        1. Contratos y partes puras: `tiempo`, `ia`, `ancla`, `cambios_de_estado`, `preguntas`,
+           `instrucciones` y un `registro` nuevo con el registro de turnos. Ese registro corta el
+           ciclo `turno` → `efectos` → `avisos` → `turno`.
+        2. Turnos: `fichas`, `situaciones`, `hechos`, `avisos`, `efectos` y `turno`.
+        3. Tiempo y afuera: `escalera`, `botones`, `ciclo`, `reloj` e `ia_real`.
+      - **El SQL del motor no se junta en un solo módulo.** Son unas 130 consultas en 12 módulos, y
+        juntarlas arriesga cambiar lo que funcionó. La garantía que buscaba esa regla la da la prueba de
+        frontera, con una lista permitida de tablas que revisa el SQL de cada módulo del paquete.
+      - **Las pruebas del motor van en `tests/motor/`.** Las auxiliares compartidas van en un módulo
+        propio, y no importando un archivo de prueba desde otro.
+      - **Un solo corredor para los dos motores:** el corredor y las conversaciones YAML se mudan con un
+        parámetro para elegir el motor (`prueba_chica` o `leda.motor`), para la regresión de la E3-8.
 - [ ] **E3-6. Mudar el diseño probado:** estado, registro de turnos, fichas de los circuitos probados,
       avisos guardados, escalera y reloj. Entran las dos entradas de la prueba real: hablar del mundo y no
       de la cocina, con su conversación de prueba escrita primero; y los efectos en `audit_log` con la
