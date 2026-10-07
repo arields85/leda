@@ -38,6 +38,7 @@ from leda.autoridad import identificar_en_espacio
 from leda.db import espacio
 from leda.despachador import TransporteDePrueba
 from leda.motor.ia import IA
+from leda.salida import formatear
 
 from . import comprobar as cp
 from .carga import Mundo, cargar, momento
@@ -372,17 +373,25 @@ class _Corredor:
                 avisos_de.setdefault(a["outbox_id"], []).append({**a, "id": aviso_id})
         for e in self.transporte.enviados[desde:]:
             quien = self.mundo.persona_de_chat(e.chat_id)
+            # El outbox guarda el texto con las marcas de formato de la IA y el transporte
+            # entrega el texto plano (`salida.formatear`): se comparan ya convertidos.
             fila_id = next((k for k, s in despues["salidas"].items()
                             if k not in usados and s["a"] == quien
-                            and e.texto.endswith(s["cuerpo"])), None)
+                            and e.texto.endswith(formatear(s["cuerpo"])[0])), None)
             if fila_id is not None:
                 usados.add(fila_id)
             fila = despues["salidas"].get(fila_id, {})
+            texto = e.texto
+            if fila:
+                # La transcripción muestra lo que escribió la IA, con sus marcas, después
+                # del saludo del día si lo hubo.
+                plano = formatear(fila["cuerpo"])[0]
+                texto = e.texto[:len(e.texto) - len(plano)] + fila["cuerpo"]
             avisos, hechos = _avisos_del_envio(avisos_de.get(fila_id, []), self.mundo.titulos)
             tipos = sorted({a["tipo"] for a in avisos})
             botones = [self.mundo.clave_de_titulo(b.etiqueta) or b.etiqueta for b in e.botones]
             salidas.append(Salida(
-                quien, e.texto, botones, bool(fila.get("es_respuesta")),
+                quien, texto, botones, bool(fila.get("es_respuesta")),
                 tipo=tipos[0] if len(tipos) == 1 else None,
                 tareas=list(dict.fromkeys(a["tarea"] for a in avisos if a["tarea"])),
                 hechos=(hechos[0] if len(hechos) == 1 else hechos) if hechos else None,

@@ -223,6 +223,29 @@ def test_un_aviso_que_la_ia_no_redacto_a_su_hora_se_informa_sin_el_texto_de_la_f
     assert "texto crudo" not in texto and "ChatGPT respondió" not in texto
 
 
+def test_un_texto_con_formato_se_enlaza_con_su_fila_y_el_informe_lo_muestra_entero(conn):
+    """El formato de los mensajes (2026-10-07; conversación 20): el outbox guarda las marcas
+    de la IA y el transporte entrega el texto plano. El corredor enlaza cada entregado con su
+    fila igual, y la transcripción muestra el texto como lo escribió la IA, renglón por
+    renglón, sin romper la lista del paso."""
+    [conv] = elegir(["01"])
+    ia = _perfecta(conv)
+    redactar = ia.ia.redactar
+    ia.ia.redactar = lambda pedido: f"**Anotado.**\n\n• {redactar(pedido)}\n• otra cosa"
+
+    corrida = correr_conversacion(conn, conv, ia)
+
+    assert corrida.error is None
+    assert corrida.fallas() == []
+    [aviso] = corrida.pasos[0].salidas
+    assert aviso.texto.startswith("**Anotado.**\n\n• (IA guionada")
+    assert aviso.texto.endswith("\n• otra cosa")
+    transcripcion = informe.transcripciones([corrida], ronda="r")
+    assert "- Leda, por su cuenta (aviso_previo PLC" in transcripcion
+    assert "  > **Anotado.**\n  >\n  > • (IA guionada" in transcripcion
+    assert "\n  > • otra cosa\n" in transcripcion
+
+
 def test_un_boton_que_no_esta_es_una_falla_de_la_corrida_no_una_caida(conn):
     """Ronda 1, conversación 09, vez 5: sin la pregunta con botones, el toque siguiente hacía
     caer la corrida. Ahora es una falla del paso y la corrida sigue."""

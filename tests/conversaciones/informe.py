@@ -141,6 +141,20 @@ def resumen(corridas: list[Corrida], *, ronda: str, cabecera: dict[str, Any],
     return "\n".join(lineas) + "\n"
 
 
+def _cita(texto: str) -> list[str]:
+    """Un mensaje de varios renglones como cita dentro del punto de la lista, renglón por
+    renglón y con las marcas de formato tal como las escribió la IA (2026-10-07): así se lee
+    su forma sin romper la lista del paso. Dos renglones seguidos llevan el corte de renglón
+    de Markdown (dos espacios al final), para que las viñetas no se junten al mostrarlo."""
+    renglones = texto.split("\n")
+    salida = []
+    for i, renglon in enumerate(renglones):
+        sigue = i + 1 < len(renglones) and renglones[i + 1].strip()
+        salida.append(f"  > {renglon}  " if renglon.strip() and sigue
+                      else f"  > {renglon}" if renglon.strip() else "  >")
+    return salida
+
+
 def transcripciones(corridas: list[Corrida], *, ronda: str) -> str:
     lineas = [f"# Transcripciones de la ronda {ronda}", "",
               "Para leer contra lo que cada paso dice y no dice (decisión 10.3). Cada casilla "
@@ -171,7 +185,11 @@ def transcripciones(corridas: list[Corrida], *, ronda: str) -> str:
                 quien = "Leda" + (f", por su cuenta ({tipo} {', '.join(s.tareas)}, {s.el})"
                                   if not s.es_respuesta else "")
                 botones = f" [botones: {', '.join(s.botones)}]" if s.botones else ""
-                lineas.append(f"- {quien} → {s.a}: «{s.texto}»{botones}")
+                if "\n" in s.texto:
+                    lineas.append(f"- {quien} → {s.a}:{botones}")
+                    lineas += _cita(s.texto)
+                else:
+                    lineas.append(f"- {quien} → {s.a}: «{s.texto}»{botones}")
                 if not s.es_respuesta and s.hechos is not None and not p.preludio:
                     lineas.append(f"  - hechos: `{_json(s.hechos)}`")
             if not p.salidas and not p.preludio:
