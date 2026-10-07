@@ -203,14 +203,24 @@ def test_un_texto_con_formato_se_enlaza_con_su_fila_y_el_informe_lo_muestra_ente
     corrida = correr_conversacion(conn, conv, ia)
 
     assert corrida.error is None
-    assert corrida.fallas() == []
     [aviso] = corrida.pasos[0].salidas
     assert aviso.texto.startswith("**Anotado.**\n\n• (IA guionada")
     assert aviso.texto.endswith("\n• otra cosa")
+    assert aviso.redactado == aviso.texto
     transcripcion = informe.transcripciones([corrida], ronda="r")
     assert "- Leda, por su cuenta (aviso_previo PLC" in transcripcion
     assert "  > **Anotado.**\n  >\n  > • (IA guionada" in transcripcion
     assert "\n  > • otra cosa\n" in transcripcion
+    # Desde la segunda vuelta del formato (2026-10-07), la negrita es una falla de formato de
+    # cada mensaje, aparte: el código hizo lo esperado.
+    assert corrida.garantias and corrida.comprension and corrida.motor
+    assert not corrida.formato and not corrida.bien
+    assert {(f.clase, f.esperado, f.real) for _, f in corrida.fallas()} == {
+        (cp.FORMATO, cp.SIN_NEGRITA, "**Anotado.**")}
+    resumen = informe.resumen([corrida], ronda="r", cabecera={}, transcripciones="t.md")
+    assert "G ok · C ok · M ok · F FALLA" in resumen
+    assert "| Garantías | Comprensión (provisional) | Formato | Lectura del usuario |" in resumen
+    assert "| 1/1 | 1/1 | 0/1 |  |" in resumen
 
 
 def test_un_boton_que_no_esta_es_una_falla_de_la_corrida_no_una_caida(conn):

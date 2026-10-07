@@ -21,12 +21,16 @@ Una vez para todas las conversaciones: ninguna regla sabe de qué conversación 
 - `comprension`: las jugadas no son las esperadas o falta un efecto esperado, sin ningún efecto
   de más (no entendió, pero no hizo otra cosa: que haya preguntado lo lee una persona);
 - `motor`: con las jugadas esperadas, algo que el código hace distinto de lo esperado (los
-  hechos, la pregunta, el estado después, lo que Leda manda por su cuenta).
+  hechos, la pregunta, el estado después, lo que Leda manda por su cuenta);
+- `formato`: un mensaje de Leda que no tiene la forma que pidió el usuario (segunda vuelta del
+  formato, 2026-10-07; `fallas_de_formato`). Es aparte de las otras tres: dice cómo se lee un
+  mensaje, no qué hizo el código ni si la IA entendió.
 """
 
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -37,7 +41,7 @@ from .carga import ZONA, Mundo
 from .motores import Motor
 from .motores import cargar as cargar_motor
 
-GARANTIA, COMPRENSION, MOTOR = "garantia", "comprension", "motor"
+GARANTIA, COMPRENSION, MOTOR, FORMATO = "garantia", "comprension", "motor", "formato"
 
 # Los datos de una jugada que son palabras de la persona: se compara sólo si están. Con
 # `puede_traer`, pueden venir, pero sólo con las palabras de la persona (revisión del contrato,
@@ -55,7 +59,7 @@ _HTTP = re.compile(r"\bHTTP (\d{3})\b|'(\d{3}) [A-Z]")
 
 @dataclass
 class Falla:
-    clase: str              # garantia | comprension | motor
+    clase: str              # garantia | comprension | motor | formato
     que: str                # qué se comprobó
     esperado: Any
     real: Any
@@ -441,6 +445,111 @@ def comprobar_avisos_en_estado(c: Comprobacion, esperados: list[dict], f: dict[s
         if not any(coincide(e, r) for r in reales):
             c.falla(MOTOR, "aviso en el estado", e,
                     [r for r in reales if r.get("tarea") == e.get("tarea")])
+
+
+# --- El formato de los mensajes (segunda vuelta, usuario, 2026-10-07) ------------------------
+#
+# Lo que pidió el usuario después de verlo en Telegram (`odd/tasks/motor-definitivo.md`, "El
+# formato, segunda vuelta"): sin negrita; un renglón por idea; cada tarea en su renglón, con 📋
+# (su nombre solo) o con 📅 (con su vencimiento, en una lista); el nombre completo de una tarea,
+# una sola vez por mensaje; fechas cortas; y el cierre (la pregunta, o que no hace falta
+# responder) solo en su renglón, aparte y al final. Se mide solo, en cada mensaje de una corrida,
+# para no depender de leer las transcripciones. Se comprueba sobre el texto que escribió la IA,
+# sin el saludo del día que agrega el sistema. Lo que no se puede medir sin juzgar el texto (que
+# el primer renglón diga lo que pasó, que una idea no se parta) lo sigue leyendo una persona.
+#
+# El tope del renglón: 140 caracteres son tres o cuatro renglones en la pantalla de un teléfono,
+# lo que ocupa una idea con el nombre completo de una tarea y su fecha; los párrafos de la
+# primera vuelta pasaban de 200.
+RENGLON_MAXIMO = 140
+MARCAS_DE_TAREA = ("📋", "📅")
+MARCA_DE_LA_TAREA_SOLA = "📋"
+
+SIN_NEGRITA = "sin negrita (**)"
+TAREA_EN_SU_RENGLON = "el nombre completo de una tarea, en un renglón que empieza con 📋 o 📅"
+TAREA_SOLA = "un renglón con 📋 lleva sólo el nombre de la tarea"
+TAREA_UNA_VEZ = "el nombre completo de una tarea, una sola vez por mensaje"
+RENGLON_CORTO = f"ningún renglón de más de {RENGLON_MAXIMO} caracteres"
+FECHA_CORTA = "las fechas, cortas: nunca el día con el nombre del mes"
+PREGUNTA_AL_FINAL = "la pregunta, una sola y en el último renglón"
+NO_HACE_FALTA_AL_FINAL = "que no hace falta responder, en el último renglón"
+CIERRE_APARTE = "el cierre, solo en su renglón y con un renglón en blanco antes"
+
+_MESES = ("enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|"
+          "noviembre|diciembre")
+_FECHA_LARGA = re.compile(rf"\b\d{{1,2}} de ({_MESES})\b", re.IGNORECASE)
+# Que no hace falta contestar, dicho de las formas en que se dice. Es una medida del corredor
+# sobre el texto, no algo que Leda tenga que decir así.
+_NO_HACE_FALTA = re.compile(r"\b(no hace falta|no hay que|no necesit\w*|sin necesidad de)\b"
+                            r"[^.?!\n]*\b(respond|contest)", re.IGNORECASE)
+_ORACION = re.compile(r"(?<=[.!?…])\s+(?=\S)")
+
+
+def _es_pregunta(renglon: str) -> bool:
+    return "?" in renglon or "¿" in renglon
+
+
+def _solo_el_titulo(renglon: str, titulo: str) -> bool:
+    """Si un renglón con 📋 lleva sólo ese título (sin contar la marca ni la puntuación)."""
+    resto = renglon.strip()[len(MARCA_DE_LA_TAREA_SOLA):].lstrip("️ ").rstrip(" .:")
+    return resto.casefold() == titulo.casefold()
+
+
+def fallas_de_formato(texto: str, titulos: Iterable[str]) -> list[tuple[str, str]]:
+    """Las reglas del formato que un mensaje de Leda no cumple, cada una una sola vez y con el
+    primer renglón que la rompe (o el título, si es una tarea nombrada dos veces). `titulos`
+    son los de las tareas de la conversación."""
+    fallas: dict[str, str] = {}
+    renglones = texto.split("\n")
+    for renglon in renglones:
+        if "**" in renglon:
+            fallas.setdefault(SIN_NEGRITA, renglon)
+        if len(renglon.strip()) > RENGLON_MAXIMO:
+            fallas.setdefault(RENGLON_CORTO, renglon)
+        if _FECHA_LARGA.search(renglon):
+            fallas.setdefault(FECHA_CORTA, renglon)
+    # Las tareas, de la más larga a la más corta: un título que está dentro de otro no se cuenta
+    # en el renglón del otro.
+    tapados = [r.casefold() for r in renglones]
+    for titulo in sorted({t for t in titulos if t}, key=len, reverse=True):
+        buscado, veces = titulo.casefold(), 0
+        for i, renglon in enumerate(tapados):
+            if buscado not in renglon:
+                continue
+            veces += renglon.count(buscado)
+            tapados[i] = renglon.replace(buscado, "\0" * len(buscado))
+            if not renglones[i].strip().startswith(MARCAS_DE_TAREA):
+                fallas.setdefault(TAREA_EN_SU_RENGLON, renglones[i])
+            elif (renglones[i].strip().startswith(MARCA_DE_LA_TAREA_SOLA)
+                  and not _solo_el_titulo(renglones[i], titulo)):
+                fallas.setdefault(TAREA_SOLA, renglones[i])
+        if veces > 1:
+            fallas.setdefault(TAREA_UNA_VEZ, titulo)
+    # El cierre: la pregunta o que no hace falta responder, en el último renglón, solo y aparte.
+    llenos = [i for i, r in enumerate(renglones) if r.strip()]
+    if llenos:
+        ultimo = llenos[-1]
+        antes = [i for i in llenos if _es_pregunta(renglones[i]) and i != ultimo]
+        if antes:
+            fallas.setdefault(PREGUNTA_AL_FINAL, renglones[antes[0]])
+        antes = [i for i in llenos if _NO_HACE_FALTA.search(renglones[i]) and i != ultimo]
+        if antes:
+            fallas.setdefault(NO_HACE_FALTA_AL_FINAL, renglones[antes[0]])
+        cierre = renglones[ultimo]
+        if _es_pregunta(cierre) or _NO_HACE_FALTA.search(cierre):
+            solo = len(_ORACION.split(cierre.strip())) == 1
+            aparte = len(llenos) == 1 or not renglones[ultimo - 1].strip()
+            if not (solo and aparte):
+                fallas.setdefault(CIERRE_APARTE, cierre)
+    return list(fallas.items())
+
+
+def comprobar_formato(c: Comprobacion, texto: str, titulos: Iterable[str], *,
+                      a: str | None) -> None:
+    """El formato de un mensaje de Leda a `a`: una falla de `formato` por regla que no cumple,
+    con la regla como lo esperado y el renglón como lo real."""
+    for regla, renglon in fallas_de_formato(texto, titulos):
+        c.falla(FORMATO, f"formato del mensaje a {a}", regla, renglon)
 
 
 def dia(momento) -> str:

@@ -71,7 +71,9 @@ class IAPerfecta:
     def redactar(self, pedido: dict[str, Any]) -> str:
         """Un texto fijo que dice qué recibió: el mismo pedido da el mismo texto, y dos pedidos
         distintos, textos distintos (la huella de los hechos), para enlazar cada mensaje
-        entregado con su fila."""
+        entregado con su fila. El corredor mide el formato de todos los mensajes, también de
+        éstos (2026-10-07): un solo renglón corto, sin títulos de tareas, sin pregunta y sin
+        negrita, así que la corrida en seco no tiene fallas de formato."""
         hechos = pedido.get("hechos") or []
         pregunta = pedido.get("pregunta")
         resumen = ", ".join(str(h.get("aviso") or h.get("jugada") or "?") for h in hechos)

@@ -59,8 +59,8 @@ El circuito es el recordatorio y lo que la persona contesta (ADR 0018, decisión
     su cuenta hasta ese día; Leda dice el hecho concreto con palabras de todos los días y nunca nombra un
     concepto del sistema.
 20. [`20-formato-de-los-mensajes.md`](20-formato-de-los-mensajes.md): una consulta de pendientes, dos
-    hechos en un mensaje y el aviso a Ismael; Leda escribe breve, con las tareas y lo importante en
-    negrita, un renglón en blanco entre párrafos y viñetas cuando hay varias cosas.
+    hechos en un mensaje y el aviso a Ismael; Leda escribe breve, un renglón por idea, con 📋, ✏️, 📅 y
+    ⚠️ al principio del renglón, fechas cortas, sin negrita y el cierre aparte, al final.
 
 Las cuatro primeras son las cuatro respuestas de 5a; de la 5 a la 12, cada una aplica al recordatorio una
 de las ocho situaciones generales de la decisión 4. La 15 suma la jugada `informar_avance` (decisión del
@@ -69,14 +69,21 @@ usuario, 2026-10-05; ADR 0018, decisión 9b). La 16, la regla de la tarea vencid
 ADR 0018, decisión 9l). La 18, hablar de lo que pasa en el mundo y no de la cocina (decisión del usuario,
 2026-10-06, de la prueba por Telegram real; Etapa 3, E3-6). La 19, decir el hecho con palabras de todos
 los días y no los nombres del sistema (decisión del usuario, 2026-10-07, de la prueba por Telegram real).
-La 20, el formato de los mensajes (pedido del usuario, 2026-10-07, al aprobar M3).
+La 20, el formato de los mensajes (pedido del usuario, 2026-10-07, al aprobar M3; segunda vuelta el
+mismo día, después de verlo en Telegram).
 
 ## El corredor
 
 Vino de la prueba chica en la E3-8, para que la regresión sobreviviera a su borrado (2026-10-07).
 Corre cada conversación por el código de verdad: carga su estado inicial (`carga.py`), corre cada paso
 con el reloj en el momento que dice el `.md` (`corredor.py`), compara lo que pasó con lo esperado y
-clasifica cada diferencia como garantía, comprensión o motor (`comprobar.py`). Las IA del corredor
+clasifica cada diferencia como garantía, comprensión o motor (`comprobar.py`). Aparte, mide el
+formato de cada mensaje de Leda, respuesta o aviso, sobre lo que escribió la IA y sin el saludo del día
+(`comprobar.fallas_de_formato`, segunda vuelta del formato, 2026-10-07): sin negrita; el nombre
+completo de una tarea en un renglón con 📋 (solo) o 📅, una sola vez; ningún renglón de más de 140
+caracteres; fechas cortas; la pregunta, una sola y en el último renglón; que no hace falta responder,
+en el último renglón; el cierre solo y con un renglón en blanco antes. Una falla de formato es de su
+propia clase (`formato`, la columna F del informe) y no cambia la de las otras tres. Las IA del corredor
 están en `grabar.py`: la guionada con las jugadas esperadas, la que graba y la que repite. El techo de
 gasto y la libreta, en `gasto.py`; el informe de cada ronda, en `informe.py`; el comando, en `correr.py`.
 

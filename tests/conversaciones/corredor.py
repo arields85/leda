@@ -13,7 +13,8 @@ con lo que se comprueba solo. Una corrida, sobre una base ya creada para ella:
    - **Leda por su cuenta o nadie escribe** (`relojes`): en cada momento, una vuelta del ciclo
      (`ciclo.Ciclo`): la escalera, los avisos guardados, el despacho y los avisos a la
      administración;
-3. compara lo que pasó con lo esperado (`comprobar.py`) y guarda lo que la persona que lee la
+3. compara lo que pasó con lo esperado (`comprobar.py`), mide el formato de cada mensaje de Leda
+   (`comprobar.fallas_de_formato`) y guarda lo que la persona que lee la
    corrida necesita: lo que dijo cada uno, las jugadas, los hechos y la latencia.
 
 El transporte es falso (`despachador.TransporteDePrueba`): nada sale a Telegram. La IA es la que
@@ -134,6 +135,9 @@ class Salida:
     # Cada aviso del envío con su tipo, su tarea y sus hechos: lo esperado de un tipo y una
     # tarea se compara con ese aviso, no con cualquiera del envío.
     avisos: list[dict[str, Any]] = field(default_factory=list)
+    # Lo que escribió la IA, tal como quedó en el outbox: sin el saludo del día que antepone el
+    # sistema. Es lo que mide el formato (`comprobar.fallas_de_formato`).
+    redactado: str | None = None
 
 
 @dataclass
@@ -185,6 +189,10 @@ class Corrida:
     @property
     def motor(self) -> bool:
         return self.error is None and not self.fallas(cp.MOTOR)
+
+    @property
+    def formato(self) -> bool:
+        return self.error is None and not self.fallas(cp.FORMATO)
 
     @property
     def bien(self) -> bool:
@@ -396,7 +404,7 @@ class _Corredor:
                 tareas=list(dict.fromkeys(a["tarea"] for a in avisos if a["tarea"])),
                 hechos=(hechos[0] if len(hechos) == 1 else hechos) if hechos else None,
                 el=cp.dia(self.reloj.ahora()), tipos=tipos,
-                avisos=avisos))
+                avisos=avisos, redactado=fila.get("cuerpo")))
         return salidas
 
     # -- lo que se comprueba ------------------------------------------------------------------
@@ -438,6 +446,11 @@ class _Corredor:
         de = estado.pop("de", self.persona)
         cp.comprobar_estado(c, estado, despues, de, clase)
         cp.comprobar_avisos_en_estado(c, paso.get("estado_avisos") or [], despues, titulos)
+        # El formato de cada mensaje de Leda del paso, respuesta o aviso, a quien sea (segunda
+        # vuelta del formato, 2026-10-07): sobre lo que escribió la IA, sin el saludo del día.
+        for s in r.salidas:
+            cp.comprobar_formato(c, s.redactado if s.redactado is not None else s.texto,
+                                 titulos.values(), a=s.a)
         return c
 
     def _comprobar_salen(self, c: cp.Comprobacion, esperadas: list[dict],

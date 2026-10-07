@@ -5,7 +5,7 @@
 no):
 
 - **el resumen** (`<ronda>.md`): la tabla de conversaciones por corridas con lo que se comprobó
-  solo (garantías, comprensión provisional y lo del código), las fallas con su diferencia, la
+  solo (garantías, comprensión provisional, lo del código y el formato de los mensajes), las fallas con su diferencia, la
   columna de la lectura del usuario (vacía: su lectura es la que vale, 10.3), las latencias por
   turno (mediana y peor caso, sin umbral) y el costo;
 - **las transcripciones** (`<ronda>-transcripciones.md`): cada corrida como se lee, quién dijo
@@ -36,7 +36,8 @@ def _ok(valor: bool) -> str:
 def _celda(c: Corrida) -> str:
     if c.error:
         return "ERROR"
-    return f"G {_ok(c.garantias)} · C {_ok(c.comprension)} · M {_ok(c.motor)}"
+    return (f"G {_ok(c.garantias)} · C {_ok(c.comprension)} · M {_ok(c.motor)} · "
+            f"F {_ok(c.formato)}")
 
 
 def _json(valor: Any) -> str:
@@ -79,17 +80,20 @@ def resumen(corridas: list[Corrida], *, ronda: str, cabecera: dict[str, Any],
     lineas += ["## Resultado por conversación", "",
                "G: garantías (5b, se comprueban solas). C: comprensión automática, "
                "**provisional** (jugadas y efectos; la lectura del usuario es la que vale, 10.3). "
-               "M: lo que hace el código con las jugadas esperadas.", ""]
+               "M: lo que hace el código con las jugadas esperadas. F: el formato de los "
+               "mensajes de Leda (segunda vuelta, 2026-10-07; se comprueba solo y aparte de "
+               "las otras tres).", ""]
     encabezado = ["Conversación", *[f"Vez {i}" for i in range(1, veces + 1)],
-                  "Garantías", "Comprensión (provisional)", "Lectura del usuario"]
+                  "Garantías", "Comprensión (provisional)", "Formato", "Lectura del usuario"]
     lineas += ["| " + " | ".join(encabezado) + " |",
                "|" + "---|" * len(encabezado)]
     for numero, cs in por_conv.items():
         celdas = [_celda(c) for c in cs] + [""] * (veces - len(cs))
         g = sum(c.garantias for c in cs)
         comp = sum(c.comprension for c in cs)
+        fmt = sum(c.formato for c in cs)
         lineas.append(f"| {numero} {cs[0].titulo} ({cs[0].mide}) | " + " | ".join(celdas)
-                      + f" | {g}/{len(cs)} | {comp}/{len(cs)} |  |")
+                      + f" | {g}/{len(cs)} | {comp}/{len(cs)} | {fmt}/{len(cs)} |  |")
     lineas += ["", "## Fallas", ""]
     alguna = False
     for numero, cs in por_conv.items():
